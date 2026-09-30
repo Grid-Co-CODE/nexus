@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}OS Creator fora do ar{% endblock %}
+{% block conteudo %}
+<p class="gc-eyebrow">OS Creator</p>
+<h1 class="titulo-pagina">O OS Creator não subiu</h1>
+<p class="lead">O resto do Nexus segue funcionando. Só o OS Creator ficou fora, até o motivo abaixo ser resolvido.</p>
+
+<section class="bloco">
+  <div class="linha-bloco">
+    <span class="gc-rotulo">Situação</span>
+    <span class="gc-status gc-status--neutro">Fora do ar</span>
+  </div>
+  <div class="linha-bloco">
+    <span class="gc-rotulo">Motivo</span>
+    <span class="gc-dado">{{ motivo }}</span>
+  </div>
+  <div class="linha-bloco">
+    <span class="gc-rotulo">O que fazer</span>
+    <span>Instalar as dependências do clone (<span class="gc-dado">nexus/torres/oscreator/os_creator/requirements.txt</span>)
+      e reiniciar o Nexus. O README da torre explica o clone.</span>
+  </div>
+</section>
+{% endblock %}

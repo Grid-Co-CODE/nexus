@@ -1,0 +1,177 @@
+/* Nexus — tema escuro do Design System Grid Co. (tokens gc-*, 29/09/2026).
+   Navy, nunca lilás: o navy arroxeado do mockup (#191528) não entra aqui. */
+:root{
+  --fundo:#090d18; --superficie:#161d30; --superficie-2:#1c2640; --superficie-3:#243154;
+  --barra:#0d1526; --tinta:#e9eef6; --tinta-2:#c3cad7; --mudo:#96a0b4; --fraco:#767d92;
+  --linha:rgba(255,255,255,.09); --linha-forte:rgba(255,255,255,.16);
+  --verde:#a3d900; --verde-hover:#8bbf00; --verde-suave:rgba(163,217,0,.12); --verde-texto:#c4e755;
+  --sobre-verde:#191528; --sobre-barra:#fff; --sobre-barra-mudo:#a6adb4; --foco:#a3d900;
+  --critico:#ff5b6e; --critico-suave:rgba(255,91,110,.14); --alerta:#ffd83d;
+  --font-display:"Raleway","Poppins",system-ui,sans-serif;
+  --font-sans:"Poppins",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono","Cascadia Mono",Consolas,monospace;
+  --raio-tag:6px; --raio-controle:8px; --raio-md:10px;
+  --topo:60px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.5 var(--font-sans)}
+a{color:inherit}
+.gc-num{font-variant-numeric:tabular-nums}
+:where(a,button,select,input,summary):focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+
+/* Componentes gc-* usados na casca (recorte do bundle.css do design system) */
+.gc-btn{display:inline-flex;align-items:center;gap:8px;font:600 13px/18px var(--font-sans);padding:8px 14px;
+  border-radius:var(--raio-controle);border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.gc-btn--primario{background:var(--verde);color:var(--sobre-verde)}
+.gc-btn--primario:hover{background:var(--verde-hover)}
+.gc-btn--contorno{background:transparent;border-color:var(--linha-forte);color:var(--tinta)}
+.gc-btn--fantasma{background:transparent;color:var(--mudo)}
+.gc-btn--fantasma:hover{color:var(--tinta)}
+.gc-eyebrow{font:500 12px/16px var(--font-sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+.gc-rotulo{display:block;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.gc-campo{font:400 13px/20px var(--font-sans);color:var(--tinta);background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:var(--raio-controle);padding:8px 12px;min-width:0}
+.gc-campo:focus{border-color:var(--foco);outline:none}
+.gc-campo[aria-invalid="true"]{border-color:var(--critico)}
+.gc-ajuda{font-size:12px;color:var(--mudo);margin:6px 0 0}
+.gc-ajuda--erro{color:var(--critico)}
+.gc-status{display:inline-flex;align-items:center;gap:6px;font:600 11px/16px var(--font-sans);padding:3px 9px;border-radius:var(--raio-tag)}
+.gc-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.gc-status--neutro{color:var(--mudo);background:var(--superficie-2)}
+.gc-dado{font:500 13px/20px var(--font-mono);color:var(--tinta-2)}
+.gc-numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));background:var(--superficie-2);
+  border:1px solid var(--linha);border-radius:var(--raio-md);margin:24px 0}
+.gc-numeros>div{padding:18px 22px;border-left:1px solid var(--linha)}
+.gc-numeros>div:first-child{border-left:0}
+.gc-numeros .r{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.gc-numeros .v{font:600 27px/32px var(--font-sans);letter-spacing:-.02em;color:var(--tinta);margin-top:6px}
+.gc-numeros .d{font-size:13px;color:var(--tinta-2);margin-top:2px}
+
+/* Tipografia da casca */
+.titulo-pagina{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}
+.lead{font-size:15px;line-height:1.6;color:var(--tinta-2);max-width:760px;margin:0}
+.mudo{color:var(--mudo)}
+.ui-kicker{font:700 10px/14px var(--font-sans);letter-spacing:.14em;text-transform:uppercase;color:var(--mudo);margin:28px 0 12px}
+.aviso{background:var(--verde-suave);border:1px solid var(--linha);border-radius:var(--raio-md);padding:12px 16px;color:var(--tinta-2);max-width:760px}
+
+/* Barra de topo */
+.topo{position:sticky;top:0;z-index:10;height:var(--topo);display:flex;align-items:center;gap:20px;
+  padding:0 24px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.marca{display:flex;align-items:center;gap:12px;text-decoration:none}
+.marca img{height:24px;width:auto;display:block}
+.marca-nexus{font:800 17px/1 var(--font-display);color:var(--sobre-barra);padding-left:12px;border-left:1px solid var(--linha-forte)}
+.cadeira{display:flex;align-items:center;gap:10px;margin-left:auto}
+.cadeira .gc-rotulo{color:var(--sobre-barra-mudo)}
+.cadeira select{max-width:320px}
+.botao-menu{display:none}
+
+/* Corpo: menu lateral + conteúdo */
+/* A coluna do menu segue o conteúdo (o maior nome de torre ou tela), entre 176 e 224 px. Com 256 px
+   fixos sobrava faixa vazia à direita dos nomes (Levi, 29/09: "muito grande"). */
+.corpo{display:grid;grid-template-columns:auto minmax(0,1fr);min-height:calc(100vh - var(--topo))}
+.menu{width:max-content;min-width:176px;max-width:224px;border-right:1px solid var(--linha);padding:14px 8px 40px;position:sticky;top:var(--topo);
+  height:calc(100vh - var(--topo));overflow:auto}
+.torre summary{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;padding:8px 10px;
+  border-radius:var(--raio-controle);font:600 13px/18px var(--font-sans);color:var(--tinta-2)}
+.torre summary::-webkit-details-marker{display:none}
+.torre summary:hover{background:var(--superficie-2);color:var(--tinta)}
+.torre summary i{font-size:17px;color:var(--mudo)}
+.torre[data-sua="1"] summary i,.torre[data-sua="1"] summary{color:var(--verde-texto)}
+.sua{margin-left:auto;font:700 10px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--sobre-verde);background:var(--verde);padding:1px 7px;border-radius:var(--raio-tag)}
+.torre ul{list-style:none;margin:2px 0 8px;padding:0 0 0 29px}
+.torre li a{display:block;padding:5px 10px;border-radius:var(--raio-controle);font-size:13px;color:var(--mudo);text-decoration:none}
+.torre li a:hover{color:var(--tinta);background:var(--superficie-2)}
+.torre li a[aria-current="page"]{color:var(--tinta);background:var(--verde-suave)}
+.conteudo{padding:32px;min-width:0}
+/* Tela que embute outro sistema (OS Creator): sem margem, a moldura ocupa todo o espaço ao lado do menu. */
+.conteudo--moldura{padding:0;display:flex}
+.os-moldura{flex:1;width:100%;height:calc(100vh - var(--topo));border:0;display:block;background:var(--fundo)}
+/* Faixa que só a vitrine estática do GitHub Pages recebe (ferramentas/exportar_estatico.py). */
+.faixa-vitrine{padding:8px 24px;background:var(--superficie-2);border-bottom:1px solid var(--linha);
+  font-size:12px;color:var(--tinta-2)}
+
+/* Barra de rolagem fina e escura. A padrão do Windows (cinza claro, com setas) destoava do navy
+   no menu lateral. scrollbar-color vale no Edge/Chrome atuais e no Firefox; o ::-webkit-scrollbar
+   fica de reserva para navegador mais antigo. A do menu só acende quando o mouse está sobre ele. */
+html{scrollbar-width:thin;scrollbar-color:var(--superficie-3) transparent}
+.menu{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.menu:hover,.menu:focus-within{scrollbar-color:var(--superficie-3) transparent}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--superficie-3);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:#34426b}
+::-webkit-scrollbar-button{display:none}
+
+/* Início: botão direto no topo do menu, com a mesma altura de uma torre */
+.item-inicio{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;
+  border-radius:var(--raio-controle);font:600 13px/18px var(--font-sans);color:var(--tinta-2);text-decoration:none}
+.item-inicio i{font-size:17px;color:var(--mudo)}
+.item-inicio:hover{background:var(--superficie-2);color:var(--tinta)}
+.item-inicio[aria-current="page"]{background:var(--verde-suave);color:var(--tinta)}
+.item-inicio[aria-current="page"] i{color:var(--verde-texto)}
+
+/* Recolher: o menu vira um trilho de 64 px só com os ícones; o nome aparece no title */
+.recolhe-menu{padding:8px 9px;margin-left:-8px;color:var(--sobre-barra-mudo)}
+.recolhe-menu i{font-size:18px}
+.recolhe-menu:hover{color:var(--sobre-barra)}
+.menu-recolhido .menu{width:64px;min-width:0;padding:14px 8px 40px}
+.menu-recolhido .menu span,
+.menu-recolhido .torre ul{display:none}
+.menu-recolhido .item-inicio,
+.menu-recolhido .torre summary{justify-content:center;padding:10px 0}
+.menu-recolhido .torre[data-sua="1"] summary{background:var(--verde-suave)}
+
+/* Início: grade de torres */
+.grade-torres{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.card-torre{display:block;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);
+  padding:16px;text-decoration:none}
+.card-torre:hover{background:var(--superficie-3)}
+.card-torre .cab{display:flex;align-items:center;gap:10px}
+.card-torre .cab i{font-size:18px;color:var(--verde-texto)}
+.card-torre .nome{font:600 14px/20px var(--font-sans)}
+.card-torre .qtd{margin-left:auto;font-size:12px;color:var(--mudo)}
+.card-torre p{margin:8px 0 0;font-size:13px;color:var(--tinta-2)}
+
+/* Tela placeholder */
+.bloco{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);margin:24px 0 16px;max-width:760px}
+.linha-bloco{display:grid;grid-template-columns:160px 1fr;align-items:center;gap:12px;padding:14px 16px;border-top:1px solid var(--linha)}
+.linha-bloco:first-child{border-top:0}
+
+/* Entrar */
+.pagina-entrar{display:grid;place-items:center;min-height:100vh}
+.entrar{width:min(380px,calc(100vw - 32px));background:var(--superficie);border:1px solid var(--linha);
+  border-radius:14px;padding:28px}
+.entrar-logo{height:26px;display:block;margin-bottom:18px}
+.entrar form{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.entrar .gc-btn{justify-content:center;margin-top:8px}
+
+/* Celular: o menu sobe para cima do conteúdo */
+/* Tela média (notebook pequeno, janela lado a lado): menu mais estreito, nomes longos quebram. */
+@media (min-width:821px) and (max-width:1180px){.menu{max-width:196px}}
+
+@media (max-width:820px){
+  /* Linha 1: marca + Menu. Linha 2: seletor de cadeira + Sair (só o ícone).
+     O select tem de poder encolher: a opção mais longa da lista forçava 365 px e a página
+     ganhava rolagem lateral no celular de 375 px. */
+  .topo{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;padding:10px 16px;gap:10px}
+  .cadeira{margin-left:0;min-width:0;grid-column:1;grid-row:2}
+  .sair{grid-column:2;grid-row:2;justify-self:end}
+  .cadeira .gc-rotulo{display:none}
+  .cadeira select{width:100%;min-width:0;max-width:none}
+  .botao-menu{display:inline-flex;margin-left:auto}
+  /* No celular o menu já fica atrás do botão Menu; o trilho recolhido não se aplica. */
+  .recolhe-menu{display:none}
+  .menu-recolhido .menu{width:auto}
+  .menu-recolhido .menu span{display:inline}
+  .menu-recolhido .torre ul{display:block}
+  .menu-recolhido .item-inicio,.menu-recolhido .torre summary{justify-content:flex-start;padding:8px 10px}
+  .sair{padding-left:10px;padding-right:10px}
+  .rotulo-sair{display:none}
+  .corpo{grid-template-columns:1fr}
+  .menu{display:none;width:auto;min-width:0;max-width:none;position:static;height:auto;border-right:0;border-bottom:1px solid var(--linha);padding:8px}
+  .abre-menu:checked + .menu{display:block}
+  .conteudo{padding:20px 16px}
+  .linha-bloco{grid-template-columns:1fr;gap:4px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

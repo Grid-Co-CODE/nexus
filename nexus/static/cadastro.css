@@ -1,0 +1,236 @@
+/* Cadastro do Nexus (o BD_Operações fora da planilha, 29/09/2026).
+   Usa os tokens do nexus.css (tema navy do Design System Grid Co.). Severidade só por cor e palavra, sem emoji. */
+
+.cad-topo{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.cad-topo .titulo-pagina{margin-bottom:4px}
+.cad-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.cad-sub{color:var(--mudo);font-size:13px;margin:0}
+.cad-sub .gc-dado{font-size:12px}
+
+/* Avisos (faixa) */
+.cad-aviso{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--linha);border-radius:var(--raio-md);
+  padding:12px 14px;margin:0 0 16px;background:var(--superficie);color:var(--tinta-2);max-width:980px}
+.cad-aviso i{font-size:18px;margin-top:1px}
+.cad-aviso strong{color:var(--tinta)}
+.cad-aviso--ok{border-color:rgba(163,217,0,.35);background:var(--verde-suave)}
+.cad-aviso--ok i{color:var(--verde-texto)}
+.cad-aviso--alerta{border-color:rgba(255,216,61,.35);background:rgba(255,216,61,.08)}
+.cad-aviso--alerta i{color:var(--alerta)}
+.cad-aviso--critico{border-color:rgba(255,91,110,.45);background:var(--critico-suave)}
+.cad-aviso--critico i{color:var(--critico)}
+.cad-aviso ul{margin:6px 0 0;padding-left:18px}
+
+/* Filtros */
+.cad-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 14px}
+.cad-filtros .campo{display:flex;flex-direction:column;gap:5px;min-width:0}
+.cad-filtros .busca{flex:1 1 260px}
+.cad-filtros .busca .gc-campo{width:100%}
+.cad-filtros select.gc-campo{min-width:150px;max-width:220px}
+.cad-conta{font-size:12px;color:var(--mudo);margin:0 0 8px}
+
+/* Tabela */
+.cad-rolagem{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+.cad-tabela{width:100%;border-collapse:collapse;font-size:13px}
+.cad-tabela th{position:sticky;top:0;background:var(--superficie-2);text-align:left;font:700 11px/14px var(--font-sans);
+  letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);padding:10px 12px;white-space:nowrap;
+  border-bottom:1px solid var(--linha)}
+.cad-tabela td{padding:9px 12px;border-top:1px solid var(--linha);color:var(--tinta-2);vertical-align:top}
+.cad-tabela tbody tr:first-child td{border-top:0}
+.cad-tabela tbody tr:hover td{background:var(--superficie-2);color:var(--tinta)}
+.cad-tabela a.linha{color:var(--tinta);text-decoration:none;font-weight:600}
+.cad-tabela a.linha:hover{color:var(--verde-texto)}
+.cad-tabela .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cad-tabela .id{font:500 12px/18px var(--font-mono);color:var(--mudo);white-space:nowrap}
+.cad-tabela .vazio{color:var(--fraco)}
+.cad-tabela .legado{color:var(--alerta)}
+
+/* Tabelas de lista (Registro mestre, Equipes, Colaboradores Operação, Clientes): Levi, 29/09 — fonte 4 px menor,
+   título da coluna quebrando linha, valores e cabeçalhos centralizados; só o nome e a equipe à esquerda. */
+.cad-tabela--lista{font-size:9px;font-variant-numeric:tabular-nums}
+.cad-tabela--lista th{font-size:9px;line-height:12px;white-space:normal;text-align:center;vertical-align:bottom;
+  padding:8px 8px;min-width:44px}
+.cad-tabela--lista td{padding:6px 8px;text-align:center;vertical-align:middle}
+.cad-tabela--lista td.esq{text-align:left}
+/* Código curto não quebra no hífen ("THPN-ALT100" em duas linhas); o título da coluna, sim. */
+.cad-tabela--lista td:is([data-col="codigo"],[data-col="id_bd"],[data-col="uf"],[data-col="latitude"],
+  [data-col="longitude"],[data-col="potencia_contratual"],[data-col="potencia_real"]){white-space:nowrap}
+.cad-tabela--lista .id{font-size:9px;line-height:12px;text-align:center}
+.cad-tabela--lista .cad-chip{font-size:9px;line-height:13px;padding:1px 6px}
+.cad-tabela--lista tfoot td{font-weight:700;color:var(--tinta);background:var(--superficie-2);
+  border-top:1px solid var(--linha-forte)}
+
+/* Aviso que abre na linha (Levi, 30/09: "ao clicar na linha que tivesse avisos expandiria o aviso"). O texto do
+   aviso é frase, não número: vai a 11 px para dar para ler. */
+.cad-tabela--lista tr.cad-com-aviso{cursor:pointer}
+.cad-tabela--lista tr.cad-com-aviso.aberta td{background:var(--superficie-2);color:var(--tinta)}
+.cad-avisos-botao{border:0;cursor:pointer;font-family:var(--font-sans)}
+.cad-avisos-botao i{font-size:9px;transition:transform .15s ease}
+.cad-avisos-botao[aria-expanded="true"] i{transform:rotate(180deg)}
+.cad-avisos-botao:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+.cad-tabela--lista tr.cad-detalhe td,.cad-tabela--lista tbody tr.cad-detalhe:hover td{text-align:left;
+  background:var(--barra);border-top:0;padding:10px 14px 12px 44px}
+.cad-avisos-lista{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:6px}
+.cad-avisos-lista li{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:11px;line-height:16px;
+  color:var(--tinta-2)}
+.cad-avisos-lista strong{color:var(--tinta);font-weight:600}
+.cad-detalhe-ir{display:inline-flex;gap:4px;align-items:center;font:600 11px/16px var(--font-sans);
+  color:var(--verde-texto);text-decoration:none}
+.cad-detalhe-ir:hover{color:var(--tinta)}
+
+/* Barra acima da tabela: a contagem e o botão Colunas */
+.cad-barra-tabela{position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 8px}
+.cad-barra-tabela .cad-conta{margin:0}
+/* O painel se ancora na BARRA (largura do conteúdo), não no botão: no celular o botão fica no meio da linha e o
+   painel ancorado nele passava da borda direita, criando rolagem lateral (conferido em 375 px, 29/09). */
+.cad-colunas{position:static}
+.cad-colunas>summary{list-style:none}
+.cad-colunas>summary::-webkit-details-marker{display:none}
+.cad-colunas-painel{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(560px,100%);
+  max-height:60vh;overflow:auto;background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);padding:14px 16px;box-shadow:0 12px 32px rgba(0,0,0,.35);
+  display:flex;flex-direction:column;gap:12px}
+.cad-colunas-painel .gc-ajuda{margin:0}
+.cad-colunas fieldset{border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:4px 12px}
+.cad-colunas legend{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--mudo);padding:0;margin:0 0 6px}
+.cad-colunas label{font-size:12px;color:var(--tinta-2);display:flex;gap:6px;align-items:center;cursor:pointer}
+.cad-colunas input{accent-color:var(--verde)}
+
+/* Visões (Lista | Por cliente | Por supervisor) */
+.cad-visoes{display:inline-flex;gap:2px;padding:3px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:10px;margin:0 0 14px;flex-wrap:wrap}
+.cad-visoes a{font:600 13px/18px var(--font-sans);color:var(--tinta-2);text-decoration:none;padding:6px 14px;
+  border-radius:8px}
+.cad-visoes a[aria-current="page"]{background:var(--verde);color:var(--sobre-verde)}
+.cad-visoes a:hover:not([aria-current]){background:var(--superficie-2);color:var(--tinta)}
+.cad-alternar{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--tinta-2);cursor:pointer;
+  padding:7px 12px;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);background:var(--superficie)}
+.cad-alternar input{accent-color:var(--verde)}
+
+/* Visões somadas em cartões (Levi, 30/09: "cards suspensos, algo bem mais dinâmico e visual"). A elevação é a
+   sombra, que se vê parada; o levantar no passar do mouse é enfeite e some no movimento reduzido do Windows. */
+.cad-barra-visao{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.cad-barra-visao .cad-filtros{margin:0}
+.cad-ordem{display:inline-flex;align-items:center;gap:2px;margin-left:auto;padding:3px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:10px;flex-wrap:wrap}
+.cad-ordem span{font-size:12px;color:var(--mudo);padding:0 6px}
+.cad-ordem button{font:600 12px/16px var(--font-sans);color:var(--tinta-2);background:none;border:0;padding:6px 10px;
+  border-radius:8px;cursor:pointer}
+.cad-ordem button[aria-pressed="true"]{background:var(--superficie-3);color:var(--tinta)}
+.cad-ordem button:hover:not([aria-pressed="true"]){background:var(--superficie-2);color:var(--tinta)}
+.cad-ordem button:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+/* A faixa da visão tem valor em reais comprido: cada número ocupa o que precisa, sem quebrar "R$" do número (em
+   grade de colunas iguais, o "R$ 67.578.032" vazava da caixa no celular). Seletor composto: a regra .cad-numeros
+   vem depois no arquivo e, com o mesmo peso, ganhava desta. */
+.cad-numeros.cad-numeros--visao{display:flex;flex-wrap:wrap}
+.cad-numeros.cad-numeros--visao>div{flex:1 1 auto}
+.cad-numeros.cad-numeros--visao .v{font-size:20px;line-height:26px;white-space:nowrap}
+.cad-numeros .v.mascarado,.cad-cartao .mascarado{color:var(--fraco);letter-spacing:.08em}
+.cad-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin:0 0 24px}
+.cad-cartao{display:flex;flex-direction:column;gap:12px;padding:16px 18px 14px;min-width:0;
+  background:linear-gradient(180deg,var(--superficie-2) 0%,var(--superficie) 100%);border:1px solid var(--linha);
+  border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 14px 30px -16px rgba(0,0,0,.85);
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.cad-cartao:hover,.cad-cartao:focus-within{transform:translateY(-3px);border-color:rgba(163,217,0,.4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 22px 40px -16px rgba(0,0,0,.95),0 0 0 1px rgba(163,217,0,.12)}
+.cad-cartao-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.cad-cartao-nome{font:700 15px/20px var(--font-sans);margin:0;color:var(--tinta);overflow-wrap:anywhere}
+.cad-cartao-nome a{color:inherit;text-decoration:none}
+.cad-cartao-nome a:hover{color:var(--verde-texto)}
+.cad-cartao-parte{font:600 12px/18px var(--font-sans);color:var(--verde-texto);background:var(--verde-suave);
+  padding:1px 8px;border-radius:var(--raio-tag);white-space:nowrap}
+.cad-cartao-kwp{margin:0;font:600 28px/32px var(--font-sans);color:var(--tinta);letter-spacing:-.01em}
+.cad-cartao-kwp .u{font-size:13px;color:var(--mudo);letter-spacing:0}
+.cad-cartao-trilho{height:6px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.cad-cartao-trilho span{display:block;height:100%;min-width:3px;background:var(--verde);border-radius:inherit}
+.cad-cartao dl{margin:0;display:grid;gap:10px}
+.cad-cartao dl>div{min-width:0}
+.cad-cartao-dados{grid-template-columns:repeat(auto-fit,minmax(72px,1fr))}
+.cad-cartao-dinheiro{grid-template-columns:1fr 1fr;padding-top:12px;border-top:1px solid var(--linha)}
+.cad-cartao dt{font:700 10px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.cad-cartao dd{margin:2px 0 0;font:600 15px/20px var(--font-sans);color:var(--tinta);font-variant-numeric:tabular-nums}
+.cad-cartao-dinheiro dd{font-size:14px}
+.cad-cartao .falta{display:block;font:500 11px/15px var(--font-sans);color:var(--alerta);margin-top:2px}
+.cad-cartao-nota{margin:-4px 0 0;font:500 11px/15px var(--font-sans);color:var(--alerta)}
+.cad-cartao-ir{margin-top:auto;align-self:flex-start;display:inline-flex;gap:6px;align-items:center;
+  font:600 12px/16px var(--font-sans);color:var(--verde-texto);text-decoration:none}
+.cad-cartao-ir:hover{color:var(--tinta)}
+@media (max-width:560px){.cad-ordem{margin-left:0}}
+
+/* Nomes sem sublinhado (Levi, 29/09): ligação se vê pela cor, e o passar do mouse acende o verde. */
+.cad-painel a,.cad-lista-links a,.gc-eyebrow a{color:inherit;text-decoration:none}
+.cad-painel a{color:var(--tinta);font-weight:500}
+.cad-painel a:hover,.gc-eyebrow a:hover{color:var(--verde-texto)}
+
+/* Etiquetas */
+.cad-chip{display:inline-flex;align-items:center;gap:6px;font:600 11px/16px var(--font-sans);padding:2px 8px;
+  border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--tinta-2);white-space:nowrap}
+.cad-chip--operacao{background:var(--verde-suave);color:var(--verde-texto)}
+.cad-chip--alerta{background:rgba(255,216,61,.12);color:var(--alerta)}
+.cad-chip--critico{background:var(--critico-suave);color:var(--critico)}
+.cad-chip--info{background:var(--superficie-3);color:var(--tinta-2)}
+
+/* Ficha */
+.cad-ficha{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.cad-secao{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);margin:0 0 16px}
+.cad-secao>h2{font:700 13px/18px var(--font-sans);margin:0;padding:12px 16px;border-bottom:1px solid var(--linha);
+  color:var(--tinta)}
+.cad-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px 16px;padding:14px 16px 16px}
+.cad-campo{display:flex;flex-direction:column;gap:5px;min-width:0}
+.cad-campo--largo{grid-column:1/-1}
+.cad-campo .gc-rotulo{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cad-campo .gc-campo{width:100%}
+.cad-campo textarea.gc-campo{resize:vertical;min-height:40px;font-family:var(--font-sans)}
+.cad-origem{font:600 10px/14px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;
+  border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--mudo)}
+.cad-origem--sobreposto{background:rgba(255,216,61,.12);color:var(--alerta)}
+.cad-origem--automatico,.cad-origem--calculado{background:var(--superficie-3);color:var(--tinta-2)}
+.cad-valor-fixo{font-size:13px;color:var(--tinta);padding:8px 0;min-height:36px;border-bottom:1px dashed var(--linha-forte)}
+.cad-valor-fixo.mono{font-family:var(--font-mono);letter-spacing:.02em}
+.cad-legado{font-size:12px;color:var(--alerta);margin:0}
+.cad-lateral{position:sticky;top:calc(var(--topo) + 16px);display:flex;flex-direction:column;gap:16px}
+.cad-painel{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px 16px}
+.cad-painel h3{font:700 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);
+  margin:0 0 10px}
+.cad-painel ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.cad-painel li{font-size:13px;color:var(--tinta-2)}
+.cad-painel li .quando{display:block;font:500 11px/16px var(--font-mono);color:var(--mudo)}
+.cad-meta{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px}
+.cad-meta dt{color:var(--mudo)}
+.cad-meta dd{margin:0;color:var(--tinta-2)}
+.cad-barra{position:sticky;bottom:0;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;
+  padding:12px 0;background:linear-gradient(to top,var(--fundo) 70%,transparent);margin-top:4px}
+.cad-barra .dica{margin-right:auto;font-size:12px;color:var(--mudo)}
+
+/* Listas */
+.cad-listas{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.cad-valores{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 16px}
+.cad-valores .cad-chip span{color:var(--mudo);font-weight:500}
+
+/* Prévia da importação e qualidade */
+.cad-numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;background:var(--superficie-2);
+  border:1px solid var(--linha);border-radius:var(--raio-md);margin:0 0 18px}
+.cad-numeros>div{padding:14px 18px;border-left:1px solid var(--linha)}
+.cad-numeros>div:first-child{border-left:0}
+.cad-numeros .r{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cad-numeros .v{font:600 24px/30px var(--font-sans);font-variant-numeric:tabular-nums;margin-top:4px}
+.cad-numeros .d{font-size:12px;color:var(--tinta-2)}
+.cad-bloco{margin:0 0 18px}
+.cad-bloco>h2{font:700 15px/20px var(--font-sans);margin:0 0 10px}
+details.cad-dif{border-top:1px solid var(--linha)}
+details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);font-size:13px}
+.cad-upload{background:var(--superficie);border:1px dashed var(--linha-forte);border-radius:var(--raio-md);
+  padding:20px;max-width:720px;display:flex;flex-direction:column;gap:12px}
+.cad-upload input[type=file]{color:var(--tinta-2)}
+
+@media (max-width:1100px){
+  .cad-ficha{grid-template-columns:1fr}
+  .cad-lateral{position:static}
+}
+@media (max-width:560px){
+  .cad-grade{grid-template-columns:1fr;padding:12px}
+  .cad-filtros select.gc-campo{max-width:none;flex:1 1 140px}
+  .cad-barra{justify-content:stretch}
+  .cad-barra .gc-btn{flex:1;justify-content:center}
+}

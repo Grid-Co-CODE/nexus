@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Importar do Excel{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Cadastro</p>
+<h1 class="titulo-pagina">Importar do Excel</h1>
+<p class="lead">Envie o BD_Operações de hoje. O Nexus mostra o que muda no ensaio e compara, célula por célula, o que o
+  Excel calculava com o que o Nexus calcula. Nada é gravado antes de você aplicar.</p>
+
+{% if erro %}<div class="cad-aviso cad-aviso--critico" style="margin-top:16px"><i class="ph ph-warning"></i><div>{{ erro }}</div></div>{% endif %}
+
+<form class="cad-upload" method="post" enctype="multipart/form-data" style="margin-top:18px">
+  <label class="gc-rotulo" for="arquivo">Arquivo (.xlsx)</label>
+  <input id="arquivo" name="arquivo" type="file" accept=".xlsx,.xlsm" required>
+  <p class="gc-ajuda">O Nexus não lê o OneDrive: o arquivo vem daqui, pela tela. Esta é a única porta de Excel do Nexus e sai depois da virada.</p>
+  <div><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-magnifying-glass"></i> Ver o que muda</button></div>
+</form>
+
+{% if importacoes %}
+<div class="cad-bloco" style="margin-top:24px">
+  <h2>Importações anteriores</h2>
+  <div class="cad-rolagem">
+    <table class="cad-tabela">
+      <thead><tr><th>Quando</th><th>Arquivo</th><th>Impressão digital</th></tr></thead>
+      <tbody>{% for x in importacoes %}<tr><td class="gc-num">{{ x.quando_br }}</td><td>{{ x.arquivo }}</td><td class="id">{{ x.sha256 or '—' }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

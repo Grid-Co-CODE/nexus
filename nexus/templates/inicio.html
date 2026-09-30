@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titulo %}Início{% endblock %}
+{% block conteudo %}
+<p class="gc-eyebrow">{{ cadeira.nome if cadeira else "Sem cadeira escolhida" }}</p>
+<h1 class="titulo-pagina">Início</h1>
+<p class="lead">O Nexus reúne Performance, PCM, App de Campo, Fracttal e COS numa casca só, organizada
+  pelas torres da Estrutura O&amp;M. Esta é a fase 0: as telas existem e dizem o que vão responder;
+  os dados entram torre a torre.</p>
+
+<div class="gc-numeros gc-numeros--ui">
+  <div><div class="r">Torres</div><div class="v gc-num">{{ torres|length }}</div><div class="d">organizadas pelo book R02</div></div>
+  <div><div class="r">Telas previstas</div><div class="v gc-num">{{ total_telas }}</div><div class="d">das specs R00 a R13</div></div>
+  <div><div class="r">Com dado real</div><div class="v gc-num">0</div><div class="d">fonte: API db_performace</div></div>
+</div>
+
+{% if not cadeira %}
+<p class="aviso">Escolha uma cadeira na barra superior para ver o menu como aquela cadeira vê: a torre dela
+  sobe para o topo do menu, aberta.</p>
+{% endif %}
+
+<h2 class="ui-kicker">Torres</h2>
+<div class="grade-torres">
+  {% for t in torres %}
+  <a class="card-torre" href="/t/{{ t.id }}/{{ t.telas[0].id }}">
+    <div class="cab"><i class="ph ph-{{ t.icone }}"></i><span class="nome">{{ t.nome }}</span>
+      <span class="qtd gc-num">{{ t.telas|length }} telas</span></div>
+    <p>{{ t.descricao }}</p>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

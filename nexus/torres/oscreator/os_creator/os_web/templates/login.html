@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{# fora das abas (28/09): o login toma a janela inteira — a sessão que cai dentro de uma aba sai dela aqui #}
+{% set sem_abas = true %}
+{% block titulo %}Entrar — Fracttal{% endblock %}
+{% block conteudo %}
+{# SÓ E-MAIL E SENHA (Levi, 21/09). Saíram daqui duas coisas: o redirecionamento automático para
+   a tela do Fracttal — que era a PRIMEIRA coisa que a pessoa via, antes mesmo deste formulário —
+   e o bloco "Entrar com Microsoft / SSO", com os três caminhos que ele abria: a tela do próprio
+   Fracttal (OAuth), o `gridos://sso` que acordava o OS Creator instalado, e o favorito que
+   copiava a sessão de uma aba já aberta. Três formas de fazer a mesma coisa, e a que todo mundo
+   usava era esta. As rotas do OAuth continuam de pé, sem link nenhum apontando para elas. #}
+<section class="os-login">
+  <img src="/os/assets/grid-logo.png" alt="Grid Co." class="os-logo">
+  <h1>Entrar no Fracttal</h1>
+  <p class="os-ajuda">Seu e-mail e senha do Fracttal. A OS é criada no seu nome; a senha não é armazenada.</p>
+  {% if aviso %}<p class="os-aviso">{{ aviso }}</p>{% endif %}
+  {% if erro %}<p class="os-erro">⚠ {{ erro }}</p>{% endif %}
+  <form method="post" action="/os/login" autocomplete="on">
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="email" name="email" placeholder="e-mail" value="{{ email }}" required autofocus autocomplete="username">
+    <input type="password" name="senha" placeholder="senha" required autocomplete="current-password">
+    <button type="submit" class="os-btn">Entrar</button>
+  </form>
+  <p class="os-nota">Sessão por pessoa: a OS nasce no nome de quem entrou. O Fracttal aceita uma sessão por conta — entrar aqui derruba o Fracttal aberto em outra aba, e vice-versa.</p>
+</section>
+{% endblock %}

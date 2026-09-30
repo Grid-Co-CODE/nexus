@@ -1,0 +1,13 @@
+# Segredos: nunca no git.
+.env
+*.env
+!.env.example
+
+__pycache__/
+*.pyc
+.pytest_cache/
+logs/
+.venv/
+
+# Saída da vitrine estática (gerada no Actions).
+_site/

@@ -1,0 +1,38 @@
+{# Um campo do cadastro, desenhado pelo tipo que o esquema declara (nexus/cadastro/esquema.py). #}
+{% macro campo(c) -%}
+{% set rotulo_origem = {'automatico': 'automático', 'sobreposto': 'sobreposto', 'calculado': 'calculado'} %}
+<div class="cad-campo{% if c.tipo == 'texto_longo' %} cad-campo--largo{% endif %}">
+  <label class="gc-rotulo" for="f-{{ c.id }}">
+    <span>{{ c.rotulo }}{% if c.obrigatorio %} *{% endif %}</span>
+    {% if c.origem in rotulo_origem %}<span class="cad-origem cad-origem--{{ c.origem }}">{{ rotulo_origem[c.origem] }}</span>{% endif %}
+    {% if c.sensivel %}<i class="ph ph-lock-simple" title="Dado sensível: gravado cifrado"></i>{% endif %}
+  </label>
+  {% if c.modo == 'calculado' or c.mascarado %}
+    <div class="cad-valor-fixo{% if c.mascarado %} mono{% endif %}" id="f-{{ c.id }}">{{ c.exibido or '—' }}</div>
+  {% elif c.tipo in ('lista', 'simnao') %}
+    <select id="f-{{ c.id }}" name="{{ c.id }}" class="gc-campo"{% if c.erro %} aria-invalid="true"{% endif %}>
+      {% for v, rot in c.opcoes %}<option value="{{ v }}"{% if v == c.valor %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+    </select>
+  {% elif c.tipo == 'ref' %}
+    <select id="f-{{ c.id }}" name="{{ c.id }}" class="gc-campo"{% if c.erro %} aria-invalid="true"{% endif %}>
+      {% for grupo, itens in c.grupos %}
+        {% if grupo %}<optgroup label="{{ grupo }}">{% endif %}
+        {% for v, rot in itens %}<option value="{{ v }}"{% if v == c.valor %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+        {% if grupo %}</optgroup>{% endif %}
+      {% endfor %}
+    </select>
+  {% elif c.tipo == 'texto_longo' %}
+    <textarea id="f-{{ c.id }}" name="{{ c.id }}" rows="2" class="gc-campo" placeholder="{{ c.placeholder }}"{% if c.erro %} aria-invalid="true"{% endif %}>{{ c.valor }}</textarea>
+  {% else %}
+    <input id="f-{{ c.id }}" name="{{ c.id }}" class="gc-campo" value="{{ c.valor }}" placeholder="{{ c.placeholder }}" autocomplete="off"
+      {%- if c.tipo in ('numero', 'inteiro', 'moeda', 'coordenada') %} inputmode="decimal"{% endif %}
+      {%- if c.tipo == 'sugestao' %} list="dl-{{ c.id }}"{% endif %}
+      {%- if c.tipo == 'data' %} placeholder="dd/mm/aaaa"{% endif %}
+      {%- if c.erro %} aria-invalid="true"{% endif %}>
+    {% if c.tipo == 'sugestao' %}<datalist id="dl-{{ c.id }}">{% for s in c.sugestoes %}<option value="{{ s }}">{% endfor %}</datalist>{% endif %}
+  {% endif %}
+  {% if c.legado %}<p class="cad-legado">Veio do Excel fora do tipo: “{{ c.legado }}”. Fica como está até alguém corrigir.</p>{% endif %}
+  {% if c.erro_calculo %}<p class="cad-legado">Não dá para calcular: o Excel mostrava #N/A aqui.</p>{% endif %}
+  {% if c.erro %}<p class="gc-ajuda gc-ajuda--erro">{{ c.erro }}</p>{% elif c.ajuda %}<p class="gc-ajuda">{{ c.ajuda }}</p>{% endif %}
+</div>
+{%- endmacro %}

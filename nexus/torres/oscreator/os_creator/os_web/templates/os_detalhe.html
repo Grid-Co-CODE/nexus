@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}OS {{ d.folio }}{% endblock %}
+{% block body_class %}os-form{% endblock %}
+{# canonical (28/09): aberta pelo nº (/os/os/folio/N) ou pelo id, é a MESMA OS — a aba já aberta dela é reaproveitada (abas.js) #}
+{% block head %}<link rel="stylesheet" href="/os/static/os_acoes.css"><link rel="canonical" href="/os/os/{{ wid }}">{% endblock %}
+{% block conteudo %}
+{% include "os_detalhe_conteudo.html" %}
+{% endblock %}
+{# as ações do card (e a contagem dos anexos, que chega depois) vivem no os_acoes.js — o mesmo que o card do Histórico usa #}
+{% block scripts %}<script src="/os/static/os_acoes.js"></script>{% endblock %}

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR" data-nexus>
+<head>
+  <meta charset="utf-8">
+  <script>
+    // data-nexus marca a casca para o OS Creator embutido (ponte.py). E o Nexus nunca fica dentro de moldura: se
+    // um link do OS Creator trouxer uma página do Nexus para dentro dela, ela toma a janela.
+    try { if (window.top !== window.self) window.top.location.href = location.href; } catch (e) {}
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Nexus{% endblock %} · Grid Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  <script>
+    // Aplica o menu recolhido antes de pintar, para a página não piscar aberta e depois fechar.
+    // localStorage pode faltar (janela privada, dado bloqueado): aí o menu só abre expandido.
+    try { if (localStorage.getItem("nexus.menu") === "recolhido") document.documentElement.classList.add("menu-recolhido"); } catch (e) {}
+  </script>
+</head>
+<body>
+<header class="topo">
+  <button type="button" id="recolhe-menu" class="gc-btn gc-btn--ui gc-btn--fantasma recolhe-menu"
+          aria-label="Recolher ou expandir o menu" title="Recolher ou expandir o menu ( [ )">
+    <i class="ph ph-sidebar-simple"></i>
+  </button>
+  <a class="marca" href="/">
+    <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co.">
+    <span class="marca-nexus">Nexus</span>
+  </a>
+  <form class="cadeira" method="post" action="/cadeira">
+    <label class="gc-rotulo" for="sel-cadeira">Cadeira</label>
+    <select id="sel-cadeira" name="cadeira" class="gc-campo" onchange="this.form.submit()">
+      <option value="" {% if not cadeira %}selected{% endif %}>Sem cadeira</option>
+      {% for c in cadeiras %}
+      <option value="{{ c.id }}" {% if cadeira and cadeira.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
+      {% endfor %}
+    </select>
+    <input type="hidden" name="voltar" value="{{ caminho }}">
+    <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno">Trocar</button></noscript>
+  </form>
+  <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
+  <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
+</header>
+
+<div class="corpo">
+  {# No celular o menu fica fechado atrás do botão Menu; sem JS, via checkbox. #}
+  <input type="checkbox" id="abre-menu" class="abre-menu" hidden>
+  <nav class="menu" aria-label="Torres">
+    <a class="item-inicio" href="/" {% if caminho == '/' %}aria-current="page"{% endif %} title="Início">
+      <i class="ph ph-house"></i><span>Início</span>
+    </a>
+    {% for t in menu %}
+    <details class="torre" data-torre="{{ t.id }}" data-sua="{{ 1 if t.sua else 0 }}" {% if t.aberta %}open{% endif %}>
+      <summary title="{{ t.nome }}" data-primeira="{{ t.telas[0].url }}">
+        <i class="ph ph-{{ t.icone }}"></i>
+        <span>{{ t.nome }}</span>
+        {% if t.sua %}<span class="sua">sua</span>{% endif %}
+      </summary>
+      <ul>
+        {% for s in t.telas %}
+        <li><a href="{{ s.url }}" {% if caminho == s.url %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endfor %}
+  </nav>
+
+  <main class="conteudo {% block classe_conteudo %}{% endblock %}">
+    {% block conteudo %}{% endblock %}
+  </main>
+</div>
+<script>
+(function () {
+  var raiz = document.documentElement;
+  function alternar() {
+    var recolhido = raiz.classList.toggle("menu-recolhido");
+    try { localStorage.setItem("nexus.menu", recolhido ? "recolhido" : "expandido"); } catch (e) {}
+  }
+  document.getElementById("recolhe-menu").addEventListener("click", alternar);
+  // Tecla [ alterna, fora de campos de texto (mesmo atalho da spec R08b).
+  document.addEventListener("keydown", function (ev) {
+    var alvo = ev.target.tagName;
+    if (ev.key === "[" && alvo !== "INPUT" && alvo !== "TEXTAREA" && alvo !== "SELECT") alternar();
+  });
+  // No trilho recolhido não há espaço para as sub-telas: o ícone leva direto à primeira tela.
+  document.querySelectorAll(".torre summary").forEach(function (s) {
+    s.addEventListener("click", function (ev) {
+      if (raiz.classList.contains("menu-recolhido") && window.innerWidth > 820) {
+        ev.preventDefault();
+        location.href = s.dataset.primeira;
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Listas{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Cadastro</p>
+<div class="cad-topo">
+  <div>
+    <h1 class="titulo-pagina">Listas</h1>
+    <p class="cad-sub">Os valores que cada campo de lista aceita (antes: abas Auxiliar e Parametros e as listas suspensas da Operações). O número é quantos registros usam o valor.</p>
+  </div>
+</div>
+{% if incluido %}<div class="cad-aviso cad-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>Valor incluído.</strong></div></div>{% endif %}
+{% if erro %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div>{{ erro }}</div></div>{% endif %}
+
+<form class="cad-filtros" method="post">
+  <div class="campo">
+    <label class="gc-rotulo" for="lista">Lista</label>
+    <select id="lista" name="lista" class="gc-campo">{% for g in grupos %}<option value="{{ g.id }}">{{ g.nome }}</option>{% endfor %}</select>
+  </div>
+  <div class="campo busca">
+    <label class="gc-rotulo" for="valor">Valor novo</label>
+    <input id="valor" name="valor" class="gc-campo" autocomplete="off">
+  </div>
+  <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-plus"></i> Incluir</button>
+</form>
+
+<div class="cad-listas">
+  {% for g in grupos %}
+  <section class="cad-secao">
+    <h2>{{ g.nome }} <span class="mudo gc-num">· {{ g.valores|length }}</span></h2>
+    <div class="cad-valores">
+      {% for v, n in g.valores %}<span class="cad-chip">{{ v }} <span class="gc-num">{{ n }}</span></span>{% else %}<span class="mudo">Vazia.</span>{% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

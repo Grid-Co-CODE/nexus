@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titulo %}Qualidade do cadastro{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Cadastro</p>
+<h1 class="titulo-pagina">Qualidade do cadastro</h1>
+<p class="lead">O que o Excel deixava passar calado: o PROCV que pega o primeiro sem avisar, a digitação fora do tipo, o nome que não
+  casa. Cada item leva à ficha.</p>
+
+<div class="cad-numeros" style="margin-top:18px">
+  <div><div class="r">Críticos</div><div class="v">{{ contagem.get('critico', 0) }}</div><div class="d">revise antes de usar</div></div>
+  <div><div class="r">Alertas</div><div class="v">{{ contagem.get('alerta', 0) }}</div><div class="d">dado incompleto ou fora da regra</div></div>
+  <div><div class="r">Informativos</div><div class="v">{{ contagem.get('info', 0) }}</div><div class="d">para limpar com calma</div></div>
+</div>
+
+{% for tipo, itens in grupos.items() %}
+<details class="cad-secao" {% if itens[0].gravidade == 'critico' %}open{% endif %}>
+  <summary style="padding:12px 16px;cursor:pointer;font-weight:600">
+    <span class="cad-chip cad-chip--{{ itens[0].gravidade }}">{{ gravidades.get(itens[0].gravidade, itens[0].gravidade) }}</span>
+    {{ nomes.get(tipo, tipo) }} <span class="mudo gc-num">· {{ itens|length }}</span>
+  </summary>
+  <div class="cad-rolagem" style="border:0;border-top:1px solid var(--linha);border-radius:0">
+    <table class="cad-tabela">
+      <tbody>{% for p in itens %}<tr><td class="id">{{ p.id }}</td><td><a class="linha" href="{{ p.url }}">{{ p.titulo }}</a></td><td>{{ p.detalhe }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</details>
+{% else %}
+<div class="cad-aviso cad-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>Nenhuma pendência.</strong></div></div>
+{% endfor %}
+
+<div class="cad-bloco" style="margin-top:24px">
+  <h2>Últimas alterações</h2>
+  <div class="cad-rolagem">
+    <table class="cad-tabela">
+      <thead><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Registro</th><th>Campos</th></tr></thead>
+      <tbody>
+        {% for a in auditoria %}
+        <tr><td class="gc-num">{{ a.quando_br }}</td><td>{{ a.quem }}</td><td>{{ a.acao }}</td><td class="id">{{ a.entidade }}/{{ a.id }}</td><td>{{ (a.campos or [])|join(', ') }}</td></tr>
+        {% else %}
+        <tr><td colspan="5" class="vazio">Nada ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

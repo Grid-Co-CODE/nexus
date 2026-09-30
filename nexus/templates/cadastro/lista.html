@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">{{ 'Pessoas' if ent.id == 'pessoas' else 'Base' }} · Cadastro</p>
+<div class="cad-topo">
+  <div>
+    <h1 class="titulo-pagina">{{ titulo }}</h1>
+    <p class="cad-sub">Ensaio local: o BD_Operações continua sendo a fonte oficial até a virada.</p>
+  </div>
+  <div class="cad-acoes">
+    {% if ent.id == 'usinas' %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/base/importar"><i class="ph ph-upload-simple"></i> Importar do Excel</a>{% endif %}
+    <a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ url_nova }}"><i class="ph ph-plus"></i> {{ texto_novo }}</a>
+  </div>
+</div>
+
+{% if visoes %}
+<nav class="cad-visoes" aria-label="Visões">
+  {% for v in visoes %}<a href="{{ v.url }}"{% if v.atual %} aria-current="page"{% endif %}>{{ v.rotulo }}</a>{% endfor %}
+</nav>
+{% endif %}
+
+{% if importado %}
+<div class="cad-aviso cad-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>Importação aplicada no ensaio.</strong>
+  A cópia do ensaio anterior ficou guardada em backups/, ao lado do arquivo.</div></div>
+{% endif %}
+{% if vazio %}
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>O ensaio está vazio.</strong>
+  <a href="/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
+{% endif %}
+
+<form class="cad-filtros" method="get" id="cad-filtros">
+  <div class="campo busca">
+    <label class="gc-rotulo" for="q">Buscar</label>
+    <input id="q" name="q" class="gc-campo" value="{{ q }}" placeholder="Nome, código, cliente, cidade…" autocomplete="off">
+  </div>
+  {% for f in filtros %}
+  <div class="campo">
+    <label class="gc-rotulo" for="f-{{ f.id }}">{{ f.rotulo }}</label>
+    <select id="f-{{ f.id }}" name="{{ f.id }}" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for v, rot in f.valores %}<option value="{{ v }}"{% if v == f.atual %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endfor %}
+  <input type="hidden" name="cols" id="cad-cols" value="{{ cols_atuais }}">
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
+  {% if q or filtros|selectattr('atual')|list %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ request.path }}">Limpar</a>{% endif %}
+</form>
+
+<div class="cad-barra-tabela">
+  <p class="cad-conta"><span class="gc-num">{{ linhas|length }}</span> de <span class="gc-num">{{ total }}</span> {{ ent.plural }}</p>
+  <details class="cad-colunas" id="cad-colunas">
+    <summary class="gc-btn gc-btn--ui gc-btn--contorno"><i class="ph ph-columns"></i> Colunas</summary>
+    <div class="cad-colunas-painel">
+      <p class="gc-ajuda">Escolha o que ver. Vale até atualizar a página; aí volta ao padrão.</p>
+      {% for secao, cols in grupos_colunas %}
+      <fieldset>
+        <legend>{{ secao or 'Outros' }}</legend>
+        {% for c in cols %}
+        <label><input type="checkbox" id="cc-{{ c.id }}" data-col="{{ c.id }}"{% if c.visivel %} checked{% endif %}> {{ c.rotulo }}</label>
+        {% endfor %}
+      </fieldset>
+      {% endfor %}
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" id="cad-colunas-padrao" data-padrao="{{ cols_padrao }}">Voltar ao padrão</button>
+    </div>
+  </details>
+</div>
+<div class="cad-rolagem">
+  <table class="cad-tabela cad-tabela--lista">
+    <thead>
+      <tr>
+        <th>ID</th>
+        {% for c in colunas %}<th data-col="{{ c.id }}"{% if not c.visivel %} hidden{% endif %}>{{ c.rotulo }}</th>{% endfor %}
+        <th>Avisos</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in linhas %}
+      <tr{% if l.avisos %} class="cad-com-aviso"{% endif %}>
+        <td class="id">{{ l.id }}</td>
+        {% for cel in l.celulas %}
+        <td data-col="{{ cel.col }}" class="{{ 'esq' if cel.esquerda }}{{ ' legado' if cel.legado }}"{% if not cel.visivel %} hidden{% endif %}>
+          {%- if cel.link -%}<a class="linha" href="{{ l.url }}">{{ cel.texto or '(sem nome)' }}</a>
+          {%- elif cel.chip and cel.texto -%}<span class="cad-chip{{ ' cad-chip--operacao' if cel.texto in ('OPERAÇÃO', 'Ativo') }}">{{ cel.texto }}</span>
+          {%- elif cel.texto -%}{{ cel.texto }}
+          {%- else -%}<span class="vazio">—</span>{%- endif -%}
+        </td>
+        {% endfor %}
+        <td>{% if not l.selo_ok %}<span class="cad-chip cad-chip--critico">selo</span> {% endif %}
+          {%- if l.avisos -%}
+          <button type="button" class="cad-chip cad-chip--{{ l.gravidade }} cad-avisos-botao" aria-expanded="false"
+                  aria-controls="av-{{ l.id }}" title="Ver os avisos">{{ l.avisos }} <i class="ph ph-caret-down" aria-hidden="true"></i></button>
+          {%- else -%}<span class="vazio">—</span>{%- endif -%}
+        </td>
+      </tr>
+      {% if l.avisos %}
+      <tr class="cad-detalhe" id="av-{{ l.id }}" hidden>
+        <td colspan="{{ n_colunas }}">
+          <ul class="cad-avisos-lista">
+            {% for p in l.pendencias %}
+            <li><span class="cad-chip cad-chip--{{ p.gravidade }}">{{ gravidades.get(p.gravidade, p.gravidade) }}</span>
+              <strong>{{ nomes.get(p.tipo, p.tipo) }}</strong> <span>{{ p.detalhe }}</span></li>
+            {% endfor %}
+          </ul>
+          <a class="cad-detalhe-ir" href="{{ l.url }}">Abrir a ficha para corrigir <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+        </td>
+      </tr>
+      {% endif %}
+      {% else %}
+      <tr><td colspan="{{ colunas|length + 2 }}" class="vazio">Nada encontrado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function () {
+  // A escolha de colunas mora só nesta página: vai junto no filtro (campo "cols") e sai do endereço logo que a
+  // página abre, para o F5 voltar ao padrão (Levi, 29/09: "quando atualiza volta ao normal").
+  var campo = document.getElementById("cad-cols");
+  function aplicar(col, visivel) {
+    document.querySelectorAll('[data-col="' + col + '"]').forEach(function (el) {
+      if (el.tagName === "INPUT") el.checked = visivel; else el.hidden = !visivel;
+    });
+    ajustarAvisos();
+  }
+  // O aviso aberto ocupa a linha inteira, com quantas colunas estiverem à vista.
+  function ajustarAvisos() {
+    var n = document.querySelectorAll(".cad-tabela--lista thead th:not([hidden])").length;
+    document.querySelectorAll("tr.cad-detalhe > td").forEach(function (td) { td.colSpan = n; });
+  }
+  // Linha com aviso abre o aviso embaixo dela (Levi, 30/09). O nome continua levando à ficha; o resto da linha
+  // abre e fecha; quem está selecionando texto não dispara nada.
+  function alternar(botao) {
+    var abrir = botao.getAttribute("aria-expanded") !== "true";
+    botao.setAttribute("aria-expanded", abrir ? "true" : "false");
+    document.getElementById(botao.getAttribute("aria-controls")).hidden = !abrir;
+    botao.closest("tr").classList.toggle("aberta", abrir);
+  }
+  document.querySelectorAll(".cad-avisos-botao").forEach(function (b) {
+    b.addEventListener("click", function (ev) { ev.stopPropagation(); alternar(b); });
+  });
+  document.querySelectorAll("tr.cad-com-aviso").forEach(function (tr) {
+    tr.addEventListener("click", function (ev) {
+      if (ev.target.closest("a, button, input, select, label")) return;
+      if (window.getSelection && String(window.getSelection())) return;
+      alternar(tr.querySelector(".cad-avisos-botao"));
+    });
+  });
+  function atualizarCampo() {
+    campo.value = Array.prototype.map.call(document.querySelectorAll('.cad-colunas input[type=checkbox]:checked'),
+      function (c) { return c.dataset.col; }).join(",");
+  }
+  document.querySelectorAll('.cad-colunas input[type=checkbox]').forEach(function (c) {
+    c.addEventListener("change", function () { aplicar(c.dataset.col, c.checked); atualizarCampo(); });
+  });
+  var padrao = document.getElementById("cad-colunas-padrao");
+  padrao.addEventListener("click", function () {
+    var quer = padrao.dataset.padrao.split(",");
+    document.querySelectorAll('.cad-colunas input[type=checkbox]').forEach(function (c) {
+      aplicar(c.dataset.col, quer.indexOf(c.dataset.col) >= 0);
+    });
+    atualizarCampo();
+  });
+  try {
+    var u = new URL(location.href);
+    if (u.searchParams.has("cols")) { u.searchParams.delete("cols"); history.replaceState(null, "", u.pathname + (u.search || "")); }
+  } catch (e) {}
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block classe_conteudo %}conteudo--moldura{% endblock %}
+{% block conteudo %}
+{# O OS Creator dentro do Nexus, com o menu lateral à vista (Levi, 30/09). A ponte (ponte.py) faz o clone tratar
+   esta moldura como a janela dele: a casca liga as abas e o login fica aqui dentro. #}
+<iframe class="os-moldura" src="{{ destino }}" title="OS Creator: {{ tela.nome }}"></iframe>
+<noscript><p class="mudo">O OS Creator precisa de JavaScript. <a href="{{ destino }}">Abrir em tela cheia</a>.</p></noscript>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<p class="gc-eyebrow">{{ torre.nome }}</p>
+<h1 class="titulo-pagina">{{ tela.nome }}</h1>
+<p class="lead">{{ tela.pergunta }}</p>
+
+<section class="bloco">
+  <div class="linha-bloco">
+    <span class="gc-rotulo">Situação</span>
+    <span class="gc-status gc-status--neutro">Em construção</span>
+  </div>
+  <div class="linha-bloco">
+    <span class="gc-rotulo">Fonte prevista</span>
+    <span>{{ tela.fonte }}</span>
+  </div>
+  <div class="linha-bloco">
+    <span class="gc-rotulo">Endereço</span>
+    <span class="gc-dado">/t/{{ torre.id }}/{{ tela.id }}</span>
+  </div>
+</section>
+
+<p class="mudo">Para construir esta tela, crie a view em <span class="gc-dado">nexus/torres/{{ torre.pasta }}/</span>
+  com a rota <span class="gc-dado">/{{ tela.id }}</span>. Ela passa a valer no lugar deste aviso.</p>
+{% endblock %}

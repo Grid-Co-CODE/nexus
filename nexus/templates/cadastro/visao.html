@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Cadastro</p>
+<div class="cad-topo">
+  <div>
+    <h1 class="titulo-pagina">{{ titulo }}</h1>
+    <p class="cad-sub">Quanto cada {{ rotulo_grupo|lower }} soma: usinas, kWp (a potência contratual, que o BD guarda em MWp)
+      e valor contratado (a receita contratual, mensal × prazo).</p>
+  </div>
+</div>
+
+<nav class="cad-visoes" aria-label="Visões">
+  {% for v in visoes %}<a href="{{ v.url }}"{% if v.atual %} aria-current="page"{% endif %}>{{ v.rotulo }}</a>{% endfor %}
+</nav>
+
+{% if vazio %}
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>O ensaio está vazio.</strong>
+  <a href="/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
+{% endif %}
+
+<div class="cad-barra-visao">
+  <form class="cad-filtros" method="get">
+    <input type="hidden" name="visao" value="{{ visao }}">
+    {% if revelar %}<input type="hidden" name="sensiveis" value="1">{% endif %}
+    <label class="cad-alternar" for="so-operacao">
+      <input type="checkbox" id="so-operacao" name="operacao" value="1"{% if so_operacao %} checked{% endif %} onchange="this.form.submit()">
+      Só o que está em operação
+    </label>
+    <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Aplicar</button></noscript>
+  </form>
+  {% if revelar %}
+  <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="?visao={{ visao }}{{ '&operacao=1' if so_operacao }}"><i class="ph ph-eye-slash"></i> Esconder valores</a>
+  {% else %}
+  <a class="gc-btn gc-btn--ui gc-btn--contorno" href="?visao={{ visao }}&sensiveis=1{{ '&operacao=1' if so_operacao }}"
+     title="A receita é dado sensível: ver fica na auditoria"><i class="ph ph-eye"></i> Mostrar valores</a>
+  {% endif %}
+  {% if cartoes %}
+  <div class="cad-ordem" role="group" aria-label="Ordenar os cartões">
+    <span>Ordenar por</span>
+    <button type="button" data-ordem="kwp" aria-pressed="true">kWp</button>
+    <button type="button" data-ordem="usinas" aria-pressed="false">Usinas</button>
+    {% if revelar %}<button type="button" data-ordem="valor" aria-pressed="false">Valor</button>{% endif %}
+    <button type="button" data-ordem="nome" aria-pressed="false">A–Z</button>
+  </div>
+  {% endif %}
+</div>
+
+<div class="cad-numeros cad-numeros--visao">
+  {% for f in faixa %}<div><div class="r">{{ f.r }}</div><div class="v{{ ' mascarado' if f.v == mascara }}">{{ f.v }}</div>{% if f.d %}<div class="d">{{ f.d }}</div>{% endif %}</div>{% endfor %}
+</div>
+
+<div class="cad-cartoes" id="cad-cartoes">
+  {% for c in cartoes %}
+  <article class="cad-cartao" data-kwp="{{ c.kwp }}" data-usinas="{{ c.usinas }}" data-nome="{{ c.nome|lower }}"{% if revelar %} data-valor="{{ c.valor.bruto or 0 }}"{% endif %}>
+    <header class="cad-cartao-topo">
+      <h2 class="cad-cartao-nome">{% if c.url %}<a href="{{ c.url }}">{{ c.nome }}</a>{% else %}{{ c.nome }}{% endif %}</h2>
+      <span class="cad-cartao-parte gc-num" title="Parte do kWp {{ 'em operação' if so_operacao else 'da carteira' }}">{{ c.parte_txt }}</span>
+    </header>
+    <p class="cad-cartao-kwp"><span class="gc-num">{{ c.kwp_txt }}</span> <span class="u">kWp</span></p>
+    <div class="cad-cartao-trilho" aria-hidden="true"><span style="width:{{ c.parte }}%"></span></div>
+    <dl class="cad-cartao-dados">
+      {% for r, v in c.dados %}<div><dt>{{ r }}</dt><dd class="gc-num">{{ v }}</dd></div>{% endfor %}
+    </dl>
+    <dl class="cad-cartao-dinheiro">
+      {% for rot, d in (("Valor contratado", c.valor), ("Por mês", c.mensal)) %}
+      <div><dt>{{ rot }}</dt><dd><span class="gc-num{{ ' mascarado' if not revelar }}">{{ d.texto }}</span>
+        {%- if d.falta %}<span class="falta">{{ d.falta }}</span>{% endif %}</dd></div>
+      {% endfor %}
+    </dl>
+    {% if c.nota %}<p class="cad-cartao-nota">{{ c.nota }}</p>{% endif %}
+    {% if c.url_usinas %}<a class="cad-cartao-ir" href="{{ c.url_usinas }}">Ver as usinas <i class="ph ph-arrow-right" aria-hidden="true"></i></a>{% endif %}
+  </article>
+  {% else %}
+  <p class="cad-sub">Nenhuma usina{{ ' em operação' if so_operacao }}.</p>
+  {% endfor %}
+</div>
+
+<script>
+(function () {
+  // Reordena os cartões sem recarregar. O valor só entra na ordem quando está à vista.
+  var grade = document.getElementById("cad-cartoes");
+  var botoes = document.querySelectorAll(".cad-ordem button");
+  botoes.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var campo = b.dataset.ordem;
+      var cartoes = Array.prototype.slice.call(grade.querySelectorAll(".cad-cartao"));
+      cartoes.sort(function (x, y) {
+        var porNome = x.dataset.nome.localeCompare(y.dataset.nome, "pt-BR");
+        if (campo === "nome") return porNome;
+        return (parseFloat(y.dataset[campo]) || 0) - (parseFloat(x.dataset[campo]) || 0) || porNome;
+      });
+      cartoes.forEach(function (c) { grade.appendChild(c); });
+      botoes.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+    });
+  });
+})();
+</script>
+{% endblock %}

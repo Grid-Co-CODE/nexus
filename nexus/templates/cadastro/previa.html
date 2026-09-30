@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block titulo %}Importar do Excel{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow"><a href="/t/base/importar">Importar do Excel</a></p>
+<div class="cad-topo">
+  <div>
+    <h1 class="titulo-pagina">Prévia da importação</h1>
+    <p class="cad-sub">{{ p.origem.arquivo }} · impressão digital <span class="gc-dado">{{ p.origem.sha256 }}</span> ·
+      {% for aba, n in p.origem.abas.items() %}{{ aba }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %} linhas</p>
+  </div>
+  <form class="cad-acoes" method="post" action="/t/base/importar/aplicar">
+    <input type="hidden" name="token" value="{{ token }}">
+    <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="/t/base/importar">Cancelar</a>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-check"></i> Aplicar no ensaio</button>
+  </form>
+</div>
+
+{% set editados = p.resumo.values()|map(attribute='editados_no_nexus')|sum(start=[]) %}
+{% if editados %}
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div><strong>{{ editados|length }} registro(s) editado(s) no Nexus serão sobrescritos pelo Excel:</strong>
+  {{ editados|join(', ') }}. No ensaio a fonte ainda é a planilha.</div></div>
+{% endif %}
+
+<div class="cad-bloco">
+  <h2>O que muda no ensaio</h2>
+  <div class="cad-rolagem">
+    <table class="cad-tabela">
+      <thead><tr><th>Cadastro</th><th class="num">Novos</th><th class="num">Alterados</th><th class="num">Iguais</th><th class="num">Sairiam (marcados excluídos)</th></tr></thead>
+      <tbody>
+        {% for eid, r in p.resumo.items() %}
+        <tr><td>{{ ENTIDADES[eid].plural|capitalize }}</td><td class="num">{{ r.novos }}</td><td class="num">{{ r.alterados }}</td>
+          <td class="num">{{ r.iguais }}</td><td class="num">{{ r.sairiam }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% set tot = p.comparacao|sum(attribute='total') %}
+{% set ig = p.comparacao|sum(attribute='iguais') %}
+<div class="cad-bloco">
+  <h2>Comparação: o que o Excel calculava × o que o Nexus calcula</h2>
+  <div class="cad-numeros">
+    <div><div class="r">Células de fórmula</div><div class="v">{{ tot }}</div><div class="d">conferidas uma a uma</div></div>
+    <div><div class="r">Iguais</div><div class="v">{{ ig }}</div><div class="d">mesmo valor nos dois</div></div>
+    <div><div class="r">Diferentes</div><div class="v">{{ tot - ig }}</div><div class="d">{{ 'nenhuma' if tot == ig else 'veja abaixo, com o motivo' }}</div></div>
+  </div>
+  <div class="cad-rolagem">
+    <table class="cad-tabela">
+      <thead><tr><th>Campo</th><th>Cadastro</th><th class="num">Células</th><th class="num">Iguais</th><th class="num">Diferentes</th></tr></thead>
+      <tbody>
+        {% for c in p.comparacao %}
+        <tr><td>{{ c.rotulo }}</td><td>{{ ENTIDADES[c.entidade].plural }}</td><td class="num">{{ c.total }}</td><td class="num">{{ c.iguais }}</td>
+          <td class="num">{% if c.diferentes %}<span class="cad-chip cad-chip--alerta">{{ c.diferentes|length }}</span>{% else %}0{% endif %}</td></tr>
+        {% if c.diferentes %}
+        <tr><td colspan="5" style="padding:0">
+          <details class="cad-dif"><summary>Ver as {{ c.diferentes|length }} diferenças de {{ c.rotulo }}</summary>
+            <table class="cad-tabela">
+              <thead><tr><th>ID</th><th>Registro</th><th>Excel</th><th>Nexus</th><th>Motivo</th></tr></thead>
+              <tbody>{% for d in c.diferentes %}<tr><td class="id">{{ d.id }}</td><td>{{ d.titulo }}</td><td>{{ d.excel }}</td><td>{{ d.nexus }}</td><td>{{ d.motivo or '—' }}</td></tr>{% endfor %}</tbody>
+            </table>
+          </details>
+        </td></tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if p.avisos %}
+<div class="cad-bloco">
+  <h2>Avisos da importação</h2>
+  <div class="cad-painel"><ul>{% for a in p.avisos %}<li>{{ a }}</li>{% endfor %}</ul></div>
+</div>
+{% endif %}
+{% endblock %}

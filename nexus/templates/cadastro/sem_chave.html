@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Cadastro</p>
+<h1 class="titulo-pagina">{{ titulo }}</h1>
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>O cadastro está desligado nesta máquina.</strong>
+  {{ motivo }} Gere a chave com <span class="gc-dado">python -c "from nexus.cadastro.cifra import gerar_chave; print(gerar_chave())"</span>,
+  ponha em <span class="gc-dado">NEXUS_CHAVE_CADASTRO</span> no .env e reinicie. Guarde uma cópia da chave: sem ela, o dado cifrado não volta.</div></div>
+{% endblock %}

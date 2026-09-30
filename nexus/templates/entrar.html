@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · Nexus · Grid Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+</head>
+<body class="pagina-entrar">
+<main class="entrar">
+  <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co." class="entrar-logo">
+  <h1 class="titulo-pagina">Nexus</h1>
+  <p class="mudo">Operação e manutenção da Grid Co. numa casca só.</p>
+  <form method="post" action="/entrar{% if destino and destino != '/' %}?next={{ destino|urlencode }}{% endif %}">
+    <label class="gc-rotulo" for="senha">Senha</label>
+    <input id="senha" name="senha" type="password" class="gc-campo" autocomplete="current-password"
+           autofocus required {% if erro %}aria-invalid="true" aria-describedby="erro"{% endif %}>
+    {% if erro %}<p id="erro" class="gc-ajuda gc-ajuda--erro">{{ erro }}</p>{% endif %}
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar</button>
+  </form>
+</main>
+</body>
+</html>
