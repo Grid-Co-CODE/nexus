@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de IDs · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--barra:#0d1526;--tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#8f9ab0;
+  --linha:rgba(255,255,255,.10);--verde:#a3d900;--verde-texto:#c4e755;--ambar:#ffd83d;--vermelho:#ff7a7a;--azul:#7fb8ff;
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.55 var(--sans)}
+.topo{display:flex;gap:14px;align-items:center;padding:14px 28px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1480px;margin:0 auto;padding:22px 28px 50px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 28px/34px var(--display);margin:6px 0 6px}
+.sub{color:var(--tinta-2);margin:0;max-width:980px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:16px 0 14px}
+.kpi{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:10px 14px}
+.kpi .v{font:700 22px/28px var(--display)}.kpi .r{font-size:12px;color:var(--tinta-2)}
+.kpi.ok .v{color:var(--verde-texto)}.kpi.al .v{color:var(--ambar)}.kpi.er .v{color:var(--vermelho)}
+.palco{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+figure{margin:0;background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:10px}
+figcaption{font-size:12.5px;color:var(--mudo);padding:6px 6px 2px}
+svg.mapa{display:block;width:100%;height:auto;color:var(--tinta)}
+/* nós */
+.no rect.caixa{fill:#111a2d;stroke:var(--linha);stroke-width:1.2;rx:10}
+.no.cad rect.caixa{fill:#16213a;stroke:rgba(163,217,0,.55)}
+.no.ilha rect.caixa{fill:rgba(255,122,122,.07);stroke:var(--vermelho);stroke-dasharray:5 4}
+.no.consumo rect.caixa{fill:#121a2b}
+.no .titulo{font:600 13px var(--sans);fill:var(--tinta)}
+.no .det{font:400 11px var(--mono);fill:var(--mudo)}
+.no .num{font:600 12px var(--mono)}
+.no{cursor:pointer;transition:opacity .15s}
+.no:hover rect.caixa,.no.sel rect.caixa{stroke:var(--tinta);stroke-width:1.8}
+.quadro{fill:rgba(163,217,0,.035);stroke:rgba(163,217,0,.35);stroke-dasharray:3 4}
+.quadro-t{font:700 11px var(--sans);letter-spacing:1.6px;fill:var(--verde-texto)}
+/* arestas */
+.ar path{fill:none;stroke-width:2.2;transition:opacity .15s,stroke-width .15s}
+.ar.ok path{stroke:var(--verde)}.ar.al path{stroke:var(--ambar)}.ar.er path{stroke:var(--vermelho)}.ar.fk path{stroke:var(--azul);stroke-width:1.6}
+.ar.nome path{stroke-dasharray:6 5}
+.ar text{font:500 11px var(--mono);paint-order:stroke;stroke:#161d30;stroke-width:4px;stroke-linejoin:round}
+.ar.ok text{fill:var(--verde-texto)}.ar.al text{fill:var(--ambar)}.ar.er text{fill:var(--vermelho)}.ar.fk text{fill:var(--azul)}
+svg.mapa.foco .no:not(.aceso){opacity:.28}
+svg.mapa.foco .ar:not(.aceso){opacity:.12}
+svg.mapa.foco .ar.aceso path{stroke-width:3.4}
+/* painel */
+aside{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:16px 18px;position:sticky;top:12px}
+aside h2{font:700 17px/22px var(--display);margin:0 0 2px}
+aside .tipo{font:500 11px/16px var(--sans);letter-spacing:1.4px;text-transform:uppercase;color:var(--mudo)}
+aside .barra{height:8px;border-radius:4px;background:var(--linha);margin:10px 0 4px;overflow:hidden}
+aside .barra i{display:block;height:100%}
+aside .pct{font:600 13px var(--mono)}
+aside dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:12px 0 0;font-size:13px}
+aside dt{color:var(--mudo)}aside dd{margin:0;color:var(--tinta-2)}
+aside h3{font:600 12px/16px var(--sans);letter-spacing:1px;text-transform:uppercase;color:var(--mudo);margin:14px 0 6px}
+aside ul{margin:0;padding-left:18px;color:var(--tinta-2);font-size:13px}
+aside li+li{margin-top:3px}
+aside .proximo{margin-top:12px;border-left:2px solid var(--verde);padding:4px 0 4px 10px;font-size:13px;color:var(--tinta-2)}
+aside .chips{display:flex;flex-wrap:wrap;gap:5px}
+aside .chip{font:400 11.5px/18px var(--mono);background:#0f1729;border:1px solid var(--linha);border-radius:6px;padding:0 6px;color:var(--tinta-2)}
+.legenda{display:flex;flex-wrap:wrap;gap:14px;margin:10px 4px 2px;font-size:12px;color:var(--tinta-2);align-items:center}
+.legenda svg{vertical-align:middle;margin-right:5px}
+.cob{margin-top:16px;background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:14px 18px}
+.cob h2{font:700 16px/22px var(--display);margin:0 0 4px}
+.cob p{margin:0 0 10px;color:var(--tinta-2);font-size:13px}
+.pilha{display:flex;height:34px;border-radius:8px;overflow:hidden;font:600 12px/34px var(--mono);color:#0b1120}
+.pilha span{text-align:center;white-space:nowrap;overflow:hidden}
+.pilha-leg{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:12.5px;color:var(--tinta-2)}
+.pilha-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+@media (max-width:1100px){.palco{grid-template-columns:1fr}aside{position:static}}
+@media (max-width:640px){main{padding:16px}.topo{padding:12px 16px}h1{font-size:22px;line-height:28px}}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Mapa de IDs · medido no banco em 04/10/2026</span></div>
+<main>
+<p class="eyebrow">Governança de dados</p>
+<h1>Como os IDs ligam as bases da Grid Co.</h1>
+<p class="sub">No centro, o cadastro do Nexus: cada tabela com ID numérico e as ligações internas por ID. Em volta, cada base, com a chave que ela usa de verdade e quanto dela liga. Embaixo, quem consome. Passe o mouse para acender o caminho; clique para o detalhe.</p>
+
+<div class="kpis">
+  <div class="kpi ok"><div class="v">876</div><div class="r">linhas no de_para, ligadas ou com o motivo</div></div>
+  <div class="kpi ok"><div class="v">96,5%</div><div class="r">Fracttal ligado (139 de 144)</div></div>
+  <div class="kpi al"><div class="v">87 / 115</div><div class="r">BD_Thopen ligado, sem coluna de código</div></div>
+  <div class="kpi er"><div class="v">51</div><div class="r">usinas em operação que nenhuma outra base enxerga</div></div>
+  <div class="kpi al"><div class="v">3 de 3</div><div class="r">consumidores ainda casam algo por nome</div></div>
+</div>
+
+<div class="palco">
+<figure>
+<svg class="mapa" id="mapa" viewBox="0 0 1180 650" role="img" aria-label="Mapa das ligações: o cadastro do Nexus no centro com ID numérico; BD_Operações liga 100% pelo id do BD, Fracttal 96,5% pelo código do equipamento, BD_Performance e Tickets 87% pelo código, BD_Thopen 76% pelo nome; motor do PCM, App de Campo e plataforma ainda consomem algo por nome; 51 usinas em operação sem ligação externa.">
+  <defs>
+    <marker id="m-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a3d900"/></marker>
+    <marker id="m-al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffd83d"/></marker>
+    <marker id="m-er" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ff7a7a"/></marker>
+    <marker id="m-fk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7fb8ff"/></marker>
+  </defs>
+
+  <!-- quadro do cadastro -->
+  <rect class="quadro" x="400" y="40" width="400" height="370" rx="16"/>
+  <text class="quadro-t" x="416" y="62">CADASTRO DO NEXUS · POSTGRESQL</text>
+  <text class="quadro-t" x="430" y="500">QUEM CONSOME</text>
+
+  <!-- chaves estrangeiras dentro do cadastro -->
+  <g class="ar fk" data-a="usinas" data-b="clientes"><path d="M540,190 L489,150" marker-end="url(#m-fk)"/><text x="490" y="182" text-anchor="end">cliente_id</text></g>
+  <g class="ar fk" data-a="usinas" data-b="pessoas"><path d="M600,190 L600,150" marker-end="url(#m-fk)"/><text x="606" y="174">responsável</text></g>
+  <g class="ar fk" data-a="usinas" data-b="equipes"><path d="M660,190 L711,150" marker-end="url(#m-fk)"/><text x="704" y="182">equipe_id</text></g>
+  <g class="ar fk" data-a="pessoas" data-b="equipes"><path d="M655,118 L666,118" marker-end="url(#m-fk)"/></g>
+  <g class="ar fk" data-a="de_para" data-b="usinas"><path d="M600,330 L600,280" marker-end="url(#m-fk)"/><text x="606" y="310">usina_id</text></g>
+
+  <!-- bases à esquerda -->
+  <g class="ar ok" data-a="bdops" data-b="usinas"><path d="M250,104 C360,104 400,232 506,232" marker-end="url(#m-ok)"/><text x="262" y="94">id do BD · 258/258</text></g>
+  <g class="ar al" data-a="bdperf" data-b="de_para"><path d="M250,256 C330,256 350,346 426,346" marker-end="url(#m-al)"/><text x="262" y="240">código 121 + nome 15</text><text x="262" y="282">136/156</text></g>
+  <g class="ar al" data-a="tickets" data-b="de_para"><path d="M250,386 C330,386 350,364 426,364" marker-end="url(#m-al)"/><text x="262" y="412">código 120 + nome 16</text><text x="262" y="426">136/156</text></g>
+  <g class="ar er nome" data-a="ilha" data-b="usinas"><path d="M250,540 C340,540 380,256 506,256" marker-end="url(#m-er)"/><text x="262" y="574">só no BD_Operações</text></g>
+
+  <!-- bases à direita -->
+  <g class="ar ok" data-a="fracttal" data-b="de_para"><path d="M930,120 C860,120 850,340 774,340" marker-end="url(#m-ok)"/><text x="808" y="160">código 134</text><text x="808" y="174">+ nome 5 · 139/144</text></g>
+  <g class="ar ok" data-a="sup" data-b="fracttal"><path d="M1040,200 L1040,162" marker-end="url(#m-ok)"/><text x="1032" y="186" text-anchor="end">4.313/4.745 trackers</text></g>
+  <g class="ar al nome" data-a="sup" data-b="bdthopen"><path d="M1040,264 L1040,316" marker-end="url(#m-al)"/><text x="1048" y="296">dica · 11 usinas</text></g>
+  <g class="ar al nome" data-a="bdthopen" data-b="de_para"><path d="M930,360 L774,360" marker-end="url(#m-al)"/><text x="808" y="382">nome + cidade</text><text x="808" y="396">+ potência 87/115</text></g>
+
+  <!-- consumidores -->
+  <g class="ar er nome" data-a="usinas" data-b="pcm"><path d="M520,410 L520,508" marker-end="url(#m-er)"/><text x="512" y="456" text-anchor="end">AUXILIAR: usina por nome</text></g>
+  <g class="ar ok" data-a="fracttal" data-b="pcm"><path d="M1150,120 L1168,120 L1168,612 L535,612 L535,576" marker-end="url(#m-ok)"/><text x="850" y="628" text-anchor="middle">tarefa: OS + código do equipamento (ID)</text></g>
+  <g class="ar ok" data-a="pcm" data-b="app"><path d="M640,542 L706,542" marker-end="url(#m-ok)"/><text x="673" y="532" text-anchor="middle">semana</text></g>
+  <g class="ar er nome" data-a="pessoas" data-b="app"><path d="M770,410 L770,508" marker-end="url(#m-er)"/><text x="778" y="456">pessoa por nome · 81×134</text></g>
+  <g class="ar al nome" data-a="bdthopen" data-b="plat"><path d="M1040,398 L1040,508" marker-end="url(#m-al)"/><text x="1048" y="456">por nome da usina</text></g>
+
+  <!-- nós: bases -->
+  <g class="no" data-no="bdops"><rect class="caixa" x="30" y="74" width="220" height="60"/><text class="titulo" x="44" y="98">BD_Operações</text><text class="det" x="44" y="118">IDUsina (UFV-001)</text><text class="num" x="236" y="98" text-anchor="end" fill="#c4e755">100%</text></g>
+  <g class="no" data-no="bdperf"><rect class="caixa" x="30" y="226" width="220" height="60"/><text class="titulo" x="44" y="250">BD_Performance</text><text class="det" x="44" y="270">Base UFV · Código</text><text class="num" x="236" y="250" text-anchor="end" fill="#ffd83d">87%</text></g>
+  <g class="no" data-no="tickets"><rect class="caixa" x="30" y="356" width="220" height="60"/><text class="titulo" x="44" y="380">Tickets</text><text class="det" x="44" y="400">Código da usina</text><text class="num" x="236" y="380" text-anchor="end" fill="#ffd83d">87%</text></g>
+  <g class="no ilha" data-no="ilha"><rect class="caixa" x="30" y="506" width="220" height="72"/><text class="titulo" x="44" y="530">Faro Energy 36 · Elis 13</text><text class="det" x="44" y="550">em operação, sem código,</text><text class="det" x="44" y="566">fora do Fracttal</text></g>
+  <g class="no" data-no="fracttal"><rect class="caixa" x="930" y="74" width="220" height="88"/><text class="titulo" x="944" y="98">Fracttal</text><text class="det" x="944" y="118">Classificação 1</text><text class="det" x="944" y="134">+ código do equipamento</text><text class="det" x="944" y="150">+ localização do ativo</text><text class="num" x="1136" y="98" text-anchor="end" fill="#c4e755">96,5%</text></g>
+  <g class="no" data-no="sup"><rect class="caixa" x="930" y="200" width="220" height="64"/><text class="titulo" x="944" y="224">Supervisórios</text><text class="det" x="944" y="244">API PV · SunOp · Axis</text><text class="num" x="1136" y="224" text-anchor="end" fill="#c4e755">91%</text></g>
+  <g class="no" data-no="bdthopen"><rect class="caixa" x="930" y="316" width="220" height="82"/><text class="titulo" x="944" y="340">BD_Thopen</text><text class="det" x="944" y="360">Dados Gerais Usinas</text><text class="det" x="944" y="376">sem código: pelo nome</text><text class="num" x="1136" y="340" text-anchor="end" fill="#ffd83d">76%</text></g>
+
+  <!-- nós: cadastro -->
+  <g class="no cad" data-no="clientes"><rect class="caixa" x="420" y="90" width="110" height="60"/><text class="titulo" x="434" y="112">clientes</text><text class="det" x="434" y="132">cliente_id · 16</text></g>
+  <g class="no cad" data-no="pessoas"><rect class="caixa" x="545" y="90" width="110" height="60"/><text class="titulo" x="559" y="112">pessoas</text><text class="det" x="559" y="132">pessoa_id · 134</text></g>
+  <g class="no cad" data-no="equipes"><rect class="caixa" x="670" y="90" width="110" height="60"/><text class="titulo" x="684" y="112">equipes</text><text class="det" x="684" y="132">equipe_id · 145</text></g>
+  <g class="no cad" data-no="usinas"><rect class="caixa" x="510" y="190" width="180" height="90"/><text class="titulo" x="526" y="214">usinas</text><text class="det" x="526" y="234">usina_id · 258</text><text class="det" x="526" y="250">177 em operação</text><text class="det" x="526" y="266">código em 126 das 177</text></g>
+  <g class="no cad" data-no="de_para"><rect class="caixa" x="430" y="330" width="340" height="56"/><text class="titulo" x="446" y="352">de_para</text><text class="det" x="446" y="372">usina_id · sistema · chave_externa · casou_por</text><text class="num" x="756" y="352" text-anchor="end" fill="#c4e755">876</text></g>
+
+  <!-- nós: consumidores -->
+  <g class="no consumo" data-no="pcm"><rect class="caixa" x="430" y="508" width="210" height="68"/><text class="titulo" x="446" y="532">Motor do PCM</text><text class="det" x="446" y="552">programação semanal</text></g>
+  <g class="no consumo" data-no="app"><rect class="caixa" x="706" y="508" width="174" height="68"/><text class="titulo" x="722" y="532">App de Campo</text><text class="det" x="722" y="552">OS, rondas, PT/APR</text></g>
+  <g class="no consumo" data-no="plat"><rect class="caixa" x="930" y="508" width="220" height="68"/><text class="titulo" x="944" y="532">Plataforma 5050 / 5080</text><text class="det" x="944" y="552">performance e Thopen</text></g>
+</svg>
+<div class="legenda">
+  <span><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#a3d900" stroke-width="2.4"/></svg>liga por ID ou código, 90%+</span>
+  <span><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#ffd83d" stroke-width="2.4"/></svg>liga por código ou nome, parcial</span>
+  <span><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#ff7a7a" stroke-width="2.4" stroke-dasharray="6 5"/></svg>ainda por nome: a consertar</span>
+  <span><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#7fb8ff" stroke-width="2"/></svg>chave estrangeira dentro do cadastro</span>
+  <span>tracejado = casamento por nome</span>
+</div>
+<figcaption>Cada seta é uma ligação medida no banco em 04/10/2026. Os números são as chaves externas ligadas ao cadastro sobre o total de cada base (teste, tarefa interna e Porteiras fora da conta).</figcaption>
+</figure>
+
+<aside id="painel" aria-live="polite"></aside>
+</div>
+
+<section class="cob">
+  <h2>Quantas bases enxergam cada usina em operação</h2>
+  <p>Das 177 usinas em operação do cadastro: em quantas das outras quatro bases (Fracttal, BD_Performance, Tickets, BD_Thopen) cada uma aparece ligada.</p>
+  <div class="pilha">
+    <span style="flex:76;background:#a3d900">76 · em 4</span>
+    <span style="flex:45;background:#c4e755">45 · em 3</span>
+    <span style="flex:5;background:#ffd83d" title="5 · em 2">5</span>
+    <span style="flex:51;background:#ff7a7a">51 · em nenhuma</span>
+  </div>
+  <div class="pilha-leg">
+    <span><i style="background:#a3d900"></i>Thopen, em geral: Fracttal, BD_Performance, Tickets e BD_Thopen</span>
+    <span><i style="background:#ff7a7a"></i>Faro Energy 36 · Elis Energia 13 · Qair 2</span>
+  </div>
+</section>
+</main>
+
+<script>
+const D = {
+  inicio: {tipo: "visão geral", nome: "Clique numa caixa", pct: null, linhas: [
+    ["Bases ligadas", "5 + o próprio BD_Operações"], ["Chave", "ID numérico de cada cadastro"], ["Tabela de ligação", "de_para, 876 linhas"]],
+    lista: ["Verde: liga por ID ou código", "Âmbar: parcial", "Vermelho tracejado: ainda casa por nome"],
+    proximo: "O que está vermelho é o próximo trabalho: motor do PCM e App de Campo passarem a ler o ID."},
+  bdops: {tipo: "fonte do cadastro", nome: "BD_Operações", pct: 100, linhas: [["Chave", "IDUsina (UFV-001) → usina_id"], ["Usinas", "258 de 258"], ["Estado", "importado no Nexus em 29/09"]],
+    lista: ["É a origem do cadastro; o Nexus guarda o IDUsina em id_bd", "Correções agora são feitas no Nexus (Matões 100 → ATHN-MTS100, 04/10)"],
+    proximo: "Virar só leitura: o cadastro do Nexus passa a ser a fonte."},
+  bdperf: {tipo: "API db_performace", nome: "BD_Performance · Base UFV", pct: 87.2, linhas: [["Chave", "Código (THPN-ALT100)"], ["Ligadas", "136 de 156"], ["Como", "código 121 · nome 15"]],
+    lista: ["20 sem par: as mesmas 20 da Thopen em negociação (Água Boa, Anápolis, Andradina…)", "Nenhuma ligação errada: código ambíguo não casa"],
+    proximo: "Decidir se as 20 em negociação saem da base ou viram \"ignorado\"."},
+  tickets: {tipo: "API db_performace", nome: "Tickets · Base de dados - Usinas", pct: 87.2, linhas: [["Chave", "Código da usina"], ["Ligadas", "136 de 156"], ["Como", "código 120 · nome 16"]],
+    lista: ["Mesmas 20 da Thopen em negociação sem par", "Matões ligou depois da correção do código"],
+    proximo: "Tickets podem gravar usina_id ao abrir chamado."},
+  fracttal: {tipo: "CMMS", nome: "Fracttal", pct: 96.5, linhas: [["Chave", "código do equipamento (MAB100-… e THPN-SDI100-…)"], ["Ligadas", "139 de 144 (código 134, nome 5)"], ["Fora da conta", "44: teste, Grid Co., Porteiras"]],
+    lista: ["Sem Classificação 1: a usina sai do código e da localização (Brodowski, Nobres, Indaiatuba)", "Sem par: Solier Cascavel, Marajoara 2, Porto Real 2 e 3 da Thopen", "Árvore com erro: Nobres \"CE\" (é MT); ativo de Nobres sob \"TESTE - PA\""],
+    proximo: "Corrigir a árvore no Fracttal; a programação ainda tem 14 tarefas da S41 sem usina."},
+  bdthopen: {tipo: "API db_performace", nome: "BD_Thopen · Dados Gerais Usinas", pct: 75.7, linhas: [["Chave", "nenhuma: casa pelo nome"], ["Ligadas", "87 de 115"], ["Como", "nome 73 · + potência 12 · cidade 3 · trackers 1"]],
+    lista: ["Romano, \"1 e 2\", cidade e potência ±15%", "Cidade errada na base só anota (Saturnino \"no PR\")", "28 sem par: Ouro Branco I–V, Delmiro Gouvea 1–4, Lyon, Caroá… não estão no cadastro"],
+    proximo: "Dizer quais dessas 28 a Grid opera; as demais ficam fora da conta."},
+  sup: {tipo: "tempo real", nome: "Supervisórios · de-para de trackers", pct: 90.9, linhas: [["Chave", "Code Fracttal (ALT100-ETKR1.101)"], ["Trackers", "4.313 de 4.745 casados"], ["Usinas", "104 de supervisório"]],
+    lista: ["API PV 81 · SunOp 9 · Axis 1 · Banco de Dados 13", "Pendência: Córrego do Sapucaia (2 sub-usinas × 2 cabines)", "Os 13 do Banco de Dados confirmam o BD_Thopen"],
+    proximo: "COS lê alarmes por usina_id usando esse de-para."},
+  ilha: {tipo: "sem ligação", nome: "Ilha: Faro Energy e Elis Energia", pct: 0, linhas: [["Usinas", "49 em operação + Qair 2"], ["Código", "nenhuma tem"], ["Equipe", "o nome da própria usina"]],
+    lista: ["Não estão no Fracttal, no BD_Performance, no Tickets nem no BD_Thopen", "Só existem no BD_Operações (e agora no Nexus, com ID)"],
+    proximo: "Saber onde essas usinas são operadas (outro CMMS? contrato novo?) e dar código a elas."},
+  clientes: {tipo: "cadastro", nome: "clientes", pct: null, linhas: [["ID", "cliente_id · 16"], ["Apontam para cá", "usinas.cliente_id 258/258"]], lista: ["E1 e Thopen são clientes diferentes: casamento por nome nunca cruza cliente"], proximo: "Relatórios por cliente_id."},
+  pessoas: {tipo: "cadastro", nome: "pessoas", pct: null, linhas: [["ID", "pessoa_id · 134"], ["equipe_id", "100 de 134"], ["supervisor_id", "78 de 134"]], lista: ["Nome, CPF e contato vão cifrados no banco", "App de Campo tem 81 pessoas e liga por nome/e-mail"], proximo: "Completar equipe e supervisor; App passa a usar pessoa_id."},
+  equipes: {tipo: "cadastro", nome: "equipes", pct: null, linhas: [["ID", "equipe_id · 145"], ["Apontam para cá", "usinas 255/258 · pessoas 100/134"]], lista: ["50 equipes \"locais\" (nome da usina): Faro e Elis"], proximo: "Ligar equipe_id ao nome da equipe no Fracttal."},
+  usinas: {tipo: "cadastro", nome: "usinas", pct: null, linhas: [["ID", "usina_id · 258"], ["Em operação", "177"], ["Com código", "126 das 177"], ["Responsável", "211 de 258"]], lista: ["Código sem par na casa: 51 em operação (Faro, Elis, Qair)", "Sensível (receita, CNPJ, UC) cifrado no banco"], proximo: "Código nas 51; responsável nas 47 sem."},
+  de_para: {tipo: "cadastro", nome: "de_para", pct: null, linhas: [["Linhas", "876"], ["Colunas", "usina_id · sistema · chave_externa · casou_por"]], lista: ["Uma linha por chave de cada base, ligada ou com o motivo", "Regras de ignorar fora do git (teste, Grid Co., Porteiras)"], proximo: "Tela no Nexus para confirmar os sem par."},
+  pcm: {tipo: "consumidor", nome: "Motor do PCM", pct: null, linhas: [["Tarefa", "OS + código do equipamento: ID ✓"], ["Usina", "Classificação 1 (texto) × AUXILIAR por nome"]], lista: ["A AUXILIAR já sai do cadastro do Nexus", "Ainda casa a usina pelo nome: 27% sem responsável na S40", "14 tarefas da S41 sem usina (Classificação 1 vazia)"], proximo: "Fase 4: o motor lê usina_id pelo de_para."},
+  app: {tipo: "consumidor", nome: "App de Campo", pct: null, linhas: [["Semana", "vem do robô do PCM"], ["Pessoas", "81 no App × 134 no cadastro"]], lista: ["Supervisor diferente em 32 pessoas", "Dono da usina na PT vazio desde 15/09 (Graph 403)"], proximo: "Ler pessoa_id e responsável da usina do Nexus."},
+  plat: {tipo: "consumidor", nome: "Plataforma 5050 / painel 5080", pct: null, linhas: [["Lê", "abas por usina do BD_Thopen e BD_Performance"], ["Liga", "de-paras de nome próprios"]], lista: ["Ex.: dashboard_thopen.py traduz nomes à mão"], proximo: "Trocar os de-paras de nome pelo usina_id do de_para."}
+};
+const cor = p => p === null ? "#7fb8ff" : p >= 90 ? "#a3d900" : p >= 75 ? "#ffd83d" : "#ff7a7a";
+const painel = document.getElementById("painel"), mapa = document.getElementById("mapa");
+function mostrar(k) {
+  const d = D[k] || D.inicio;
+  painel.innerHTML = `<div class="tipo">${d.tipo}</div><h2>${d.nome}</h2>` +
+    (d.pct !== null ? `<div class="barra"><i style="width:${d.pct}%;background:${cor(d.pct)}"></i></div><span class="pct" style="color:${cor(d.pct)}">${String(d.pct).replace(".", ",")}%</span>` : "") +
+    `<dl>${d.linhas.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("")}</dl>` +
+    `<h3>O que importa</h3><ul>${d.lista.map(x => `<li>${x}</li>`).join("")}</ul>` +
+    `<div class="proximo"><b>Próximo:</b> ${d.proximo}</div>`;
+}
+function acender(k) {
+  mapa.classList.add("foco");
+  mapa.querySelectorAll(".aceso").forEach(e => e.classList.remove("aceso"));
+  mapa.querySelector(`.no[data-no="${k}"]`)?.classList.add("aceso");
+  mapa.querySelectorAll(".ar").forEach(a => {
+    if (a.dataset.a === k || a.dataset.b === k) {
+      a.classList.add("aceso");
+      mapa.querySelector(`.no[data-no="${a.dataset.a === k ? a.dataset.b : a.dataset.a}"]`)?.classList.add("aceso");
+    }
+  });
+}
+let fixo = null;
+mapa.querySelectorAll(".no").forEach(n => {
+  n.addEventListener("mouseenter", () => acender(n.dataset.no));
+  n.addEventListener("mouseleave", () => fixo ? acender(fixo) : mapa.classList.remove("foco"));
+  n.addEventListener("click", () => {
+    mapa.querySelectorAll(".no.sel").forEach(e => e.classList.remove("sel"));
+    fixo = fixo === n.dataset.no ? null : n.dataset.no;
+    if (fixo) { n.classList.add("sel"); acender(fixo); } else { mapa.classList.remove("foco"); }
+    mostrar(fixo || "inicio");
+  });
+});
+mostrar("inicio");
+</script>
+</body>
+</html>

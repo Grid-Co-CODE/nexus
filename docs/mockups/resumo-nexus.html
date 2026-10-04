@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resumo do Nexus · 04/10</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--barra:#0d1526;--tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#8f9ab0;
+  --linha:rgba(255,255,255,.10);--verde:#a3d900;--verde-texto:#c4e755;--verde-suave:rgba(163,217,0,.12);--ambar:#ffd83d;
+  --ambar-suave:rgba(255,216,61,.12);--vermelho:#ff7a7a;--vermelho-suave:rgba(255,122,122,.12);--azul:#7fb8ff;--azul-suave:rgba(127,184,255,.13);
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.5 var(--sans)}
+.topo{display:flex;gap:14px;align-items:center;padding:14px 28px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1280px;margin:0 auto;padding:22px 28px 50px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 28px/34px var(--display);margin:6px 0 4px}
+h2{font:700 19px/26px var(--display);margin:34px 0 12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:16px 0 0}
+.kpi{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:12px 14px}
+.kpi .v{font:700 22px/28px var(--display);color:var(--verde-texto)}.kpi .r{font-size:12.5px;color:var(--tinta-2)}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.col{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:14px 16px}
+.col h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font:700 15px/20px var(--sans)}
+.col h3 i{width:10px;height:10px;border-radius:50%}
+.item{display:grid;grid-template-columns:62px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--linha);font-size:13.5px}
+.item:first-of-type{border-top:0}
+.item .d{font:500 12px/20px var(--mono);color:var(--mudo)}
+.item b{color:var(--tinta);font-weight:600}.item span{color:var(--tinta-2)}
+.item .quem{display:inline-block;font:600 10.5px/16px var(--sans);letter-spacing:.04em;text-transform:uppercase;padding:0 7px;border-radius:999px;margin-left:6px;vertical-align:1px}
+.q-levi{background:var(--ambar-suave);color:var(--ambar)}.q-ti{background:var(--azul-suave);color:var(--azul)}.q-nexus{background:var(--verde-suave);color:var(--verde-texto)}
+.linha-tempo{display:grid;grid-template-columns:repeat(5,1fr);gap:0;position:relative;margin-top:6px}
+.linha-tempo::before{content:"";position:absolute;left:0;right:0;top:15px;height:2px;background:var(--linha)}
+.marco{position:relative;padding:0 10px 0 0}
+.marco .pt{width:12px;height:12px;border-radius:50%;background:var(--superficie-2);border:2px solid var(--verde);margin:9px 0 10px}
+.marco.feito .pt{background:var(--verde)}
+.marco .q{font:600 12px/16px var(--mono);color:var(--verde-texto)}
+.marco b{display:block;font-size:13.5px;margin:2px 0}
+.marco span{display:block;font-size:12.5px;color:var(--tinta-2)}
+.setores{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.setor{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.setor header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.setor header b{font:600 14.5px/20px var(--sans)}
+.selo{font:600 10.5px/18px var(--sans);letter-spacing:.04em;text-transform:uppercase;padding:0 8px;border-radius:999px;white-space:nowrap}
+.s-ok{background:var(--verde-suave);color:var(--verde-texto)}.s-meio{background:var(--ambar-suave);color:var(--ambar)}.s-zero{background:var(--vermelho-suave);color:var(--vermelho)}
+.setor p{margin:0;font-size:13px;color:var(--tinta-2)}
+.setor p em{font-style:normal;color:var(--mudo);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;margin-right:6px}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.links a{color:var(--verde-texto);font-size:13px;text-decoration:none;border:1px solid var(--linha);border-radius:8px;padding:5px 10px;background:var(--superficie)}
+.links a:hover{border-color:var(--verde)}
+.nota{font-size:12px;color:var(--mudo);margin:10px 0 0}
+@media (max-width:900px){.duas{grid-template-columns:1fr}.linha-tempo{grid-template-columns:1fr 1fr}main{padding:16px}.topo{padding:12px 16px}}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Resumo · 04/10/2026</span></div>
+<main>
+<p class="eyebrow">O que está feito, o que falta e o que vem</p>
+<h1>Nexus: a base com ID que os setores vão usar</h1>
+<div class="kpis">
+  <div class="kpi"><div class="v">5 bases</div><div class="r">ligadas ao cadastro por ID num só de_para (876 linhas), mais os supervisórios pelos trackers</div></div>
+  <div class="kpi"><div class="v">1.128 → 563</div><div class="r">S41 corrigida e já no campo</div></div>
+  <div class="kpi"><div class="v">S41 = oficial</div><div class="r">o Nexus gera a semana igual à do PCM</div></div>
+  <div class="kpi"><div class="v">303 testes</div><div class="r">e as regras provadas quebrando de propósito</div></div>
+</div>
+<div class="links">
+  <a href="mapa-ids.html">Mapa de IDs →</a><a href="governanca-ids.html">Plano de governança →</a><a href="correcoes-e-banco.html">Correções e banco →</a>
+</div>
+
+<h2>Feito e falta</h2>
+<div class="duas">
+  <section class="col"><h3><i style="background:var(--verde)"></i>Feito</h3>
+    <div class="item"><span class="d">29/09</span><div><b>Casca do Nexus</b> <span>login, menu por cadeira, OS Creator dentro, servidor local com 2 cliques</span></div></div>
+    <div class="item"><span class="d">29/09</span><div><b>Cadastro do BD_Operações</b> <span>258 usinas, 134 pessoas, 145 equipes, 16 clientes; sensível cifrado</span></div></div>
+    <div class="item"><span class="d">02/10</span><div><b>PCM no Nexus</b> <span>insumos sem Excel; S41 idêntica à oficial com a mesma foto do Fracttal</span></div></div>
+    <div class="item"><span class="d">04/10</span><div><b>Cadastro no PostgreSQL</b> <span>ID numérico em toda tabela, ligação por ID, reenvio só regrava o que mudou</span></div></div>
+    <div class="item"><span class="d">04/10</span><div><b>de_para das 5 bases</b> <span>Fracttal 96,5% · BD_Performance e Tickets 87% · BD_Thopen 76%</span></div></div>
+    <div class="item"><span class="d">04/10</span><div><b>S41 corrigida no campo</b> <span>rótulos de reprogramada certos; agenda das equipes intacta</span></div></div>
+    <div class="item"><span class="d">04/10</span><div><b>Pacote do servidor</b> <span>código no GitHub, acessos em zip, passo a passo para a T.I.</span></div></div>
+  </section>
+  <section class="col"><h3><i style="background:var(--ambar)"></i>Falta</h3>
+    <div class="item"><span class="d">seg/ter</span><div><b>Subir o Nexus no servidor</b><span class="quem q-ti">T.I.</span> <span>pacote nexus-acessos-2026-10-04.zip</span></div></div>
+    <div class="item"><span class="d">S42</span><div><b>Publicar a semana pelo Nexus</b><span class="quem q-nexus">Nexus</span> <span>e gravar o próprio histórico</span></div></div>
+    <div class="item"><span class="d">S42</span><div><b>Motor do PCM: 2ª geração</b><span class="quem q-nexus">Nexus</span> <span>vira nova versão, não conta a semana 2×</span></div></div>
+    <div class="item"><span class="d">aberto</span><div><b>Árvore do Fracttal</b><span class="quem q-levi">Levi</span> <span>Classificação 1 vazia em Brodowski e Nobres; Nobres "CE"; ativo sob "TESTE"</span></div></div>
+    <div class="item"><span class="d">aberto</span><div><b>51 usinas em operação sem código</b><span class="quem q-levi">Levi</span> <span>Faro Energy 36, Elis 13, Qair 2: onde são operadas?</span></div></div>
+    <div class="item"><span class="d">aberto</span><div><b>Decisões de cadastro</b><span class="quem q-levi">Levi</span> <span>Solier = Qair? Marajoara 2 e Porto Real 2/3 da Thopen entram? 20 em negociação e 28 do BD_Thopen</span></div></div>
+    <div class="item"><span class="d">sem. 2</span><div><b>Publicar no banco a cada salvar</b><span class="quem q-nexus">Nexus</span> <span>hoje é por comando</span></div></div>
+  </section>
+</div>
+
+<h2>Próximas semanas</h2>
+<div class="linha-tempo">
+  <div class="marco feito"><div class="pt"></div><span class="q">até 04/10</span><b>Base com ID</b><span>cadastro e de_para no PostgreSQL</span></div>
+  <div class="marco"><div class="pt"></div><span class="q">06–07/10</span><b>Servidor</b><span>Nexus no ar para todos, com HTTPS</span></div>
+  <div class="marco"><div class="pt"></div><span class="q">semana 1</span><b>Códigos e de-para</b><span>tela para confirmar os sem par</span></div>
+  <div class="marco"><div class="pt"></div><span class="q">semana 2–3</span><b>PCM e App por ID</b><span>responsável em 100% das tarefas</span></div>
+  <div class="marco"><div class="pt"></div><span class="q">semana 3–4</span><b>API por setor</b><span>leitura com token + guardião do % ligado</span></div>
+</div>
+
+<h2>Projeções para os demais setores</h2>
+<div class="setores">
+  <article class="setor"><header><b>PCM</b><span class="selo s-ok">em uso</span></header>
+    <p><em>Ganha</em>semana gerada no Nexus, sem Excel; responsável pela usina_id</p>
+    <p><em>Próximo</em>publicar a S42 pelo Nexus</p></article>
+  <article class="setor"><header><b>COS (tempo real)</b><span class="selo s-meio">ponte pronta</span></header>
+    <p><em>Ganha</em>alarme do supervisório já na usina_id: 4.313 trackers casados com o Fracttal</p>
+    <p><em>Próximo</em>o dev do COS monta a visão na torre COS</p></article>
+  <article class="setor"><header><b>Performance (5050 / 5080)</b><span class="selo s-meio">por nome</span></header>
+    <p><em>Ganha</em>fim dos de-paras de nome à mão; BD_Thopen já 87/115 ligado</p>
+    <p><em>Próximo</em>trocar o casamento por nome pelo usina_id</p></article>
+  <article class="setor"><header><b>Campo (App)</b><span class="selo s-meio">por nome</span></header>
+    <p><em>Ganha</em>pessoa_id e responsável da usina vindos do Nexus (hoje 81 × 134 pessoas)</p>
+    <p><em>Próximo</em>App ler pessoas e usinas do Nexus</p></article>
+  <article class="setor"><header><b>HSEQ (PT/APR)</b><span class="selo s-meio">desbloqueia</span></header>
+    <p><em>Ganha</em>dono da usina na PT pelo responsavel_om_id (211 de 258), vazio desde 15/09</p>
+    <p><em>Próximo</em>PT ler o responsável do Nexus</p></article>
+  <article class="setor"><header><b>Chamados (Tickets)</b><span class="selo s-meio">87% ligado</span></header>
+    <p><em>Ganha</em>chamado nasce com usina_id; relatório por cliente sem casar nome</p>
+    <p><em>Próximo</em>resolver as 20 da Thopen em negociação</p></article>
+  <article class="setor"><header><b>Contratos</b><span class="selo s-zero">não começou</span></header>
+    <p><em>Ganha</em>receita e prazo por usina_id e cliente_id, já cifrados no banco</p>
+    <p><em>Próximo</em>tela de contratos sobre o cadastro</p></article>
+  <article class="setor"><header><b>Engenharia</b><span class="selo s-zero">não começou</span></header>
+    <p><em>Ganha</em>dados técnicos (inversor, módulo, tracker) por usina_id</p>
+    <p><em>Próximo</em>torre Engenharia lendo o cadastro</p></article>
+  <article class="setor"><header><b>Relatórios</b><span class="selo s-zero">não começou</span></header>
+    <p><em>Ganha</em>um relatório por cliente_id juntando PCM, Tickets e Performance</p>
+    <p><em>Próximo</em>depois da API por setor</p></article>
+  <article class="setor"><header><b>Pessoas</b><span class="selo s-meio">parcial</span></header>
+    <p><em>Ganha</em>uma lista só de colaboradores; hoje equipe em 100 de 134 e supervisor em 78</p>
+    <p><em>Próximo</em>completar equipe e supervisor no Nexus</p></article>
+  <article class="setor"><header><b>Comando (diretoria)</b><span class="selo s-zero">não começou</span></header>
+    <p><em>Ganha</em>painel do % ligado por base e por cliente, todo dia</p>
+    <p><em>Próximo</em>guardião diário (semana 3–4)</p></article>
+</div>
+<p class="nota">Projeções: o que cada setor passa a ter quando ler o ID do Nexus. Os números são de 04/10/2026, medidos no banco.</p>
+</main>
+</body>
+</html>
