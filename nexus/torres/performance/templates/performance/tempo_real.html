@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block classe_conteudo %}conteudo--moldura{% endblock %}
+{% block conteudo %}
+{# A Entrada e o Monitoramento da Plataforma de Performance, só leitura, pela ponte (04/10/2026). As ações que gravam
+   (cadeado, ticket, OS) seguem na plataforma: "Abrir na plataforma" leva até lá. #}
+<div class="ponte-recorte">
+  <div class="ponte-faixa">
+    <span class="ponte-origem">Plataforma de Performance · somente leitura</span>
+    {% if plataforma %}<a class="ponte-fora" href="{{ plataforma }}/tempo-real" target="_blank" rel="noopener">Abrir na plataforma</a>{% endif %}
+  </div>
+  {% if falta %}
+  <p class="ponte-falta">A aba ainda não está ligada à plataforma: falta {{ falta|join(" e ") }} no .env do Nexus.</p>
+  {% else %}
+  <iframe class="ponte-moldura" src="{{ prefixo }}/tempo-real" title="Tempo real da Plataforma de Performance"></iframe>
+  {% endif %}
+</div>
+{% endblock %}
