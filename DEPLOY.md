@@ -8,7 +8,7 @@ no GitHub** vem num pacote à parte que o Levi envia, o `nexus-acessos-AAAA-MM-D
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro e o token de escrita na API db_performace (publicar o cadastro no banco) |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, o token de escrita na API db_performace (publicar o cadastro no banco), `NEXUS_PLATAFORMA_URL` (no servidor, `https://app.gridco.com.br`) e `NEXUS_PLATAFORMA_TOKEN` (a mesma `NEXUS_LEITURA_TOKEN` do `.env` da plataforma no servidor) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator e motor do PCM) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/pcm/insumos.json` | os insumos da programação semanal do PCM |

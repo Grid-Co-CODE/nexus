@@ -20,6 +20,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Torres (como criar tela) | `nexus/torres/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | OS Creator embutido | `nexus/torres/oscreator/README.md` |
+| Performance (Tempo real pela ponte) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
 | PCM (programação semanal) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | Servidor da T.I. | `DEPLOY.md` |

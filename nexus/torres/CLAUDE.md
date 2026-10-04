@@ -7,6 +7,7 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 |---|---|---|
 | `cos/` | em construção pelo dev do COS | `cos/CLAUDE.md` |
 | `oscreator/` | clone do OS Creator Web servido em `/os/*` | `oscreator/README.md` |
+| `performance/` | Tempo real = plataforma pela ponte, só leitura; as outras telas placeholder | `nexus/performance/CLAUDE.md` |
 | `pcm/` | telas da programação semanal | `nexus/pcm/CLAUDE.md` (o código mora em `nexus/pcm/`) |
 | `base/`, `pessoas/` | telas do cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | as demais | só placeholder | — |
