@@ -1,12 +1,10 @@
 """Torre PCM: Programação semanal, aderência ao plano e capacidade das equipes.
 
-Telas ainda em construção: todas caem no placeholder da casca. Para dar vida a uma tela, crie uma
-view com a mesma rota (ela vence a genérica), por exemplo:
-
-    @bp.route("/semana")
-    def semana():
-        return render_template("pcm/semana.html")
+Desde 30/09/2026 a programação semanal está vindo para o Nexus (nexus/pcm/). Semana e Tarefas e OS já têm
+tela própria (leem a programação que está valendo); as outras ainda caem no placeholder da casca. Para dar vida a
+uma tela, crie a view com a mesma rota (ela vence a genérica) em nexus/pcm/telas.py.
 """
+from ...pcm.telas import registrar_pcm
 from ..modelo import Tela, Torre
 
 TORRE = Torre(
@@ -25,6 +23,9 @@ TORRE = Torre(
         Tela("tarefas", "Tarefas e OS",
              "Qual é a lista consolidada de OS e tarefas da semana?",
              "banco_dados.json do painel PCM"),
+        Tela("gerar", "Gerar a semana",
+             "A semana que o Nexus gera bate com a do Fabrício?",
+             "Motor do PCM rodando no Nexus, em sombra: nada é publicado"),
         Tela("etiquetas", "Chamados por etiqueta",
              "Quanto está aberto e atrasado em religamento, preventiva e garantia?",
              "banco_dados.json do painel PCM"),
@@ -47,3 +48,4 @@ TORRE = Torre(
 )
 
 bp = TORRE.criar_blueprint(__name__)
+registrar_pcm(bp)

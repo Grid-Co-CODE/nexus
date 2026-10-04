@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelo de dados · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+:root{
+  --fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--superficie-3:#243154;--barra:#0d1526;
+  --tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#96a0b4;--fraco:#767d92;
+  --linha:rgba(255,255,255,.09);--linha-forte:rgba(255,255,255,.16);
+  --verde:#a3d900;--verde-suave:rgba(163,217,0,.12);--verde-texto:#c4e755;--sobre-verde:#191528;
+  --info:#7fb8ff;--info-suave:rgba(91,157,255,.14);--alerta:#ffd83d;--alerta-suave:rgba(255,216,61,.14);
+  --critico:#ff5b6e;--critico-suave:rgba(255,91,110,.14);
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.5 var(--sans)}
+:where(button,a):focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.topo{display:flex;align-items:center;gap:14px;padding:14px 32px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}
+.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1440px;margin:0 auto;padding:28px 32px 60px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 30px/36px var(--display);margin:6px 0 8px}
+h2{font:700 20px/28px var(--display);margin:34px 0 12px}
+.lead{color:var(--tinta-2);max-width:900px;margin:0}
+.mudo{color:var(--mudo)}
+.dado{font:500 12.5px/18px var(--mono)}
+
+/* faixa de números */
+.numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));background:var(--superficie-2);border:1px solid var(--linha);border-radius:10px;margin:22px 0}
+.numeros>div{padding:16px 20px;border-left:1px solid var(--linha)}
+.numeros>div:first-child{border-left:0}
+.numeros .r{font:700 11px/14px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.numeros .v{font:600 27px/32px var(--sans);margin-top:4px;font-variant-numeric:tabular-nums}
+.numeros .d{font-size:12.5px;color:var(--tinta-2)}
+
+/* princípios */
+.principios{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.principio{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.principio b{display:flex;align-items:center;gap:8px;font-weight:600}
+.principio b i{color:var(--verde-texto);font-size:18px}
+.principio p{margin:6px 0 0;color:var(--tinta-2);font-size:13px}
+
+/* antes x depois */
+.antes-depois{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:stretch}
+.lado{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:16px}
+.lado h3{margin:0 0 8px;font:600 14px/20px var(--sans)}
+.seta{display:flex;align-items:center;color:var(--verde-texto);font-size:26px}
+.coluna-larga{display:flex;flex-wrap:wrap;gap:4px}
+.coluna-larga span{font:500 10.5px/16px var(--mono);padding:1px 6px;border-radius:4px;background:var(--superficie-2);color:var(--tinta-2)}
+.coluna-larga span.c-contrato{background:var(--alerta-suave);color:var(--alerta)}
+.coluna-larga span.c-ativo{background:var(--info-suave);color:var(--info)}
+.coluna-larga span.c-contato{background:var(--critico-suave);color:var(--critico)}
+.coluna-larga span.c-equipe{background:var(--verde-suave);color:var(--verde-texto)}
+.separadas{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.separadas div{border:1px solid var(--linha);border-radius:8px;padding:8px 10px;font-size:12.5px;color:var(--tinta-2)}
+.separadas b{display:block;font:600 12.5px/18px var(--mono);color:var(--tinta)}
+
+/* filtros */
+.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 16px}
+.chip{font:600 12px/16px var(--sans);padding:6px 12px;border-radius:999px;border:1px solid var(--linha-forte);background:transparent;color:var(--tinta-2);cursor:pointer}
+.chip:hover{background:var(--superficie-3)}
+.chip[aria-pressed="true"]{background:var(--verde-suave);border-color:var(--verde);color:var(--tinta)}
+.legenda{display:flex;flex-wrap:wrap;gap:14px;margin-left:auto;font-size:12px;color:var(--mudo)}
+.legenda span{display:inline-flex;align-items:center;gap:6px}
+
+/* selos */
+.selo{display:inline-flex;align-items:center;gap:5px;font:600 10.5px/15px var(--sans);padding:1px 7px;border-radius:6px;white-space:nowrap}
+.selo::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-existe{color:var(--verde-texto);background:var(--verde-suave)}
+.s-novo{color:var(--alerta);background:var(--alerta-suave)}
+.s-espelho{color:var(--info);background:var(--info-suave)}
+
+/* mapa: núcleo em cima, domínios em grade */
+.mapa{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.dominio{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:14px;min-width:0}
+.dominio.nucleo{grid-column:1/-1;border-color:rgba(163,217,0,.35)}
+.dominio header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.dominio header i{font-size:18px;color:var(--verde-texto)}
+.dominio header b{font:600 14px/20px var(--sans)}
+.dominio header small{margin-left:auto;color:var(--mudo);font-size:12px}
+.dominio .desc{margin:-4px 0 10px;color:var(--mudo);font-size:12.5px}
+.tabelas{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.tabela{text-align:left;font:inherit;color:inherit;background:var(--superficie-2);border:1px solid var(--linha);border-radius:8px;padding:9px 10px;cursor:pointer;display:flex;flex-direction:column;gap:5px;min-width:0}
+.tabela:hover{background:var(--superficie-3)}
+.tabela .nome{font:500 13px/18px var(--mono);color:var(--tinta);overflow-wrap:anywhere}
+.tabela .mata{font-size:11.5px;color:var(--mudo);overflow-wrap:anywhere}
+.tabela.ativa{border-color:var(--verde);background:var(--verde-suave)}
+.tabela.vizinha{border-color:var(--info)}
+.tabela.apagada{opacity:.32}
+.dominio.escondido{display:none}
+
+/* gaveta */
+.veu{position:fixed;inset:0;background:rgba(5,9,18,.55);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.veu.aberto{opacity:1;pointer-events:auto}
+.gaveta{position:fixed;top:0;right:0;width:min(560px,96vw);height:100vh;overflow:auto;background:var(--superficie);border-left:1px solid var(--linha-forte);
+  box-shadow:-8px 0 30px rgba(0,0,0,.35);transform:translateX(100%);transition:transform .2s;z-index:30;padding:22px 24px 40px}
+.gaveta.aberta{transform:none}
+@media (prefers-reduced-motion:reduce){.veu,.gaveta{transition:none}}
+.gaveta .cab{display:flex;align-items:flex-start;gap:10px}
+.gaveta h3{font:700 22px/28px var(--mono);margin:0;overflow-wrap:anywhere}
+.fechar{margin-left:auto;background:transparent;border:1px solid var(--linha-forte);color:var(--tinta-2);border-radius:8px;padding:6px 10px;cursor:pointer;font:600 12px var(--sans)}
+.rotulo{font:700 11px/14px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:18px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font:700 10.5px/14px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:left;padding:8px 10px;background:var(--superficie-2);border-bottom:1px solid var(--linha)}
+td{padding:8px 10px;border-bottom:1px solid var(--linha);vertical-align:top}
+td.col{font:500 12.5px/18px var(--mono);white-space:nowrap}
+.chave{font:700 9.5px/14px var(--sans);padding:1px 5px;border-radius:4px;margin-left:6px}
+.pk{background:var(--verde-suave);color:var(--verde-texto)}
+.fk{background:var(--info-suave);color:var(--info)}
+.cif{background:var(--critico-suave);color:var(--critico)}
+.ligacoes{display:flex;flex-wrap:wrap;gap:6px}
+.ligacoes button{font:500 12px/16px var(--mono);padding:4px 9px;border-radius:6px;border:1px solid var(--linha-forte);background:transparent;color:var(--tinta);cursor:pointer}
+.ligacoes button:hover{border-color:var(--verde)}
+
+/* Excel que morre */
+.lista-mortos{width:100%;border-collapse:collapse;background:var(--superficie);border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+.lista-mortos td,.lista-mortos th{padding:10px 14px}
+.lista-mortos td:first-child{font:500 12.5px/18px var(--mono);color:var(--tinta-2)}
+.lista-mortos button{font:500 12px/16px var(--mono);padding:2px 8px;margin:2px 4px 2px 0;border-radius:6px;border:1px solid var(--linha-forte);background:transparent;color:var(--tinta);cursor:pointer}
+.lista-mortos button:hover{border-color:var(--verde)}
+.envolve{overflow-x:auto}
+
+/* etapas */
+.etapas{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;counter-reset:etapa}
+.etapa{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px;counter-increment:etapa}
+.etapa b::before{content:counter(etapa) ". ";color:var(--verde-texto)}
+.etapa p{margin:6px 0 0;color:var(--tinta-2);font-size:13px}
+
+@media (max-width:1100px){.mapa{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){
+  main{padding:20px 16px 40px}.topo{padding:12px 16px}
+  .mapa{grid-template-columns:1fr}.antes-depois{grid-template-columns:1fr}.seta{justify-content:center;transform:rotate(90deg)}
+  .separadas{grid-template-columns:1fr}.legenda{margin-left:0}
+}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Mockup · Modelo de dados ideal · 30/09/2026</span></div>
+<main>
+  <p class="eyebrow">Base estruturada · sem Excel</p>
+  <h1>Um banco onde todos os dados se conversam</h1>
+  <p class="lead">Cada coisa do mundo real (cliente, usina, ativo, pessoa, semana) tem uma tabela e um id. Tudo o
+    resto aponta para esses ids, em vez de repetir nomes. O ponto de partida é o registro mestre que já veio do
+    BD_Operações. Clique numa tabela para ver as colunas e com quem ela conversa.</p>
+
+  <div class="numeros" id="numeros"></div>
+
+  <h2>Os cinco princípios</h2>
+  <div class="principios">
+    <div class="principio"><b><i class="ph ph-key"></i> Um id por coisa</b>
+      <p>Usina, ativo, pessoa e cliente têm id próprio. O nome que cada sistema usa (TIM100, "Thopen - Ibaté 1 - SP",
+        "Ibaté 1") vira uma linha de <span class="dado">apelido</span>, e não código nem planilha de de-para.</p></div>
+    <div class="principio"><b><i class="ph ph-tree-structure"></i> Ativo é linha, não contagem</b>
+      <p>"Nº de inversores = 12" vira 12 linhas em <span class="dado">ativo</span>, com hierarquia: cabine, inversor,
+        string. A contagem passa a ser calculada, e cada OS, falha ou chamado aponta para o ativo certo.</p></div>
+    <div class="principio"><b><i class="ph ph-arrows-clockwise"></i> Espelho, não digitação</b>
+      <p>O que nasce no Fracttal, no App de Campo ou na telemetria entra por sincronização. Ninguém digita a mesma
+        informação em dois lugares.</p></div>
+    <div class="principio"><b><i class="ph ph-clock-counter-clockwise"></i> Tudo vira evento</b>
+      <p>OS, ocorrência, falha, ronda e chamado gravam uma linha em <span class="dado">evento</span>. É isso que
+        monta o prontuário da usina e alimenta as regras de correlação R01 a R13.</p></div>
+    <div class="principio"><b><i class="ph ph-shield-check"></i> Histórico em vez de sobrescrever</b>
+      <p>Toda mudança fica em <span class="dado">auditoria</span> (quem, quando, antes, depois). A programação é
+        guardada por semana e versão: gerar duas vezes a mesma semana não distorce mais nada.</p></div>
+  </div>
+
+  <h2>A usina hoje e no modelo</h2>
+  <div class="antes-depois">
+    <div class="lado">
+      <h3>Hoje: uma linha com 80 colunas</h3>
+      <p class="mudo" style="margin:0 0 10px;font-size:12.5px">A aba Operações mistura assuntos diferentes na mesma linha. As cores mostram para onde cada grupo vai.</p>
+      <div class="coluna-larga" id="colunas-hoje"></div>
+    </div>
+    <div class="seta"><i class="ph ph-arrow-right"></i></div>
+    <div class="lado">
+      <h3>No modelo: cada assunto na sua tabela</h3>
+      <div class="separadas">
+        <div><b>usina</b>identidade, cliente, localização, potência</div>
+        <div><b>contrato</b>prazo, preço, receita, SLA, gestor</div>
+        <div><b>ativo</b>inversores, módulos, trackers, cabines, transformadores</div>
+        <div><b>contato</b>segurança local e remota, internet, cliente</div>
+        <div><b>equipe_usina</b>equipe, técnico, eletricista, mantenedor</div>
+        <div><b>apelido</b>código do Fracttal, nome na API PV, no PCM, no BD_Thopen</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>O mapa das tabelas</h2>
+  <div class="filtros" id="filtros">
+    <div class="legenda">
+      <span><span class="selo s-existe">Já existe</span> no Nexus hoje</span>
+      <span><span class="selo s-novo">Nova</span> substitui planilha ou arquivo</span>
+      <span><span class="selo s-espelho">Espelho</span> sincronizada de outro sistema</span>
+    </div>
+  </div>
+  <div class="mapa" id="mapa"></div>
+
+  <h2>O Excel que morre</h2>
+  <p class="mudo" style="margin:-4px 0 12px">Cada arquivo de hoje e a tabela que fica no lugar dele.</p>
+  <div class="envolve"><table class="lista-mortos" id="mortos">
+    <thead><tr><th>Arquivo de hoje</th><th>Quem usa</th><th>Tabela no Nexus</th></tr></thead><tbody></tbody>
+  </table></div>
+
+  <h2>Ordem sugerida</h2>
+  <div class="etapas">
+    <div class="etapa"><b>Núcleo</b><p>Separar a usina em usina, contrato, contato e equipe_usina; criar apelido, cluster e município. O cadastro do BD_Operações já é a base.</p></div>
+    <div class="etapa"><b>Ativos</b><p>Ativo com hierarquia, a partir da aba Equipamentos do BD_Performance e do catálogo do Fracttal, ligado por código.</p></div>
+    <div class="etapa"><b>PCM sem arquivos</b><p>Histórico da programação, observações, feriados, prioridades e tempos de referência. O motor recebe os arquivos gerados na hora.</p></div>
+    <div class="etapa"><b>Espelhos</b><p>OS e tarefas do Fracttal, execuções e rondas do App de Campo, numa cópia local sincronizada.</p></div>
+    <div class="etapa"><b>Evento e correlação</b><p>Toda tabela grava na linha do tempo; prontuário da usina e as regras R01 a R13 leem dali.</p></div>
+  </div>
+</main>
+
+<div class="veu" id="veu"></div>
+<aside class="gaveta" id="gaveta" aria-hidden="true" aria-labelledby="g-nome">
+  <div class="cab">
+    <div><p class="eyebrow" id="g-dominio"></p><h3 id="g-nome"></h3></div>
+    <button class="fechar" id="fechar">Fechar</button>
+  </div>
+  <p id="g-desc" style="color:var(--tinta-2);margin:10px 0 0"></p>
+  <div id="g-selos" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"></div>
+  <p class="rotulo">Colunas</p>
+  <div class="envolve"><table><thead><tr><th>Coluna</th><th>O que guarda</th></tr></thead><tbody id="g-colunas"></tbody></table></div>
+  <p class="rotulo">Conversa com</p>
+  <div class="ligacoes" id="g-ligacoes"></div>
+  <p class="rotulo" id="g-mata-r">Substitui</p>
+  <p id="g-mata" style="margin:0;color:var(--tinta-2)"></p>
+</aside>
+
+<script>
+// Domínios e tabelas. "fk" diz para qual tabela a coluna aponta: é daí que saem as ligações do mapa.
+const DOMINIOS = [
+  {id:"nucleo", nome:"Registro mestre", icone:"database", desc:"O núcleo. Veio do BD_Operações e é para onde todo o resto aponta."},
+  {id:"contratos", nome:"Contratos e clientes", icone:"handshake", desc:"O que foi vendido e o que o cliente quer receber."},
+  {id:"ativos", nome:"Ativos", icone:"tree-structure", desc:"O equipamento de verdade, em hierarquia."},
+  {id:"calendario", nome:"Calendário", icone:"calendar-blank", desc:"Datas que mudam a operação."},
+  {id:"pcm", nome:"PCM", icone:"calendar-check", desc:"Plano, prioridade e programação da semana."},
+  {id:"manutencao", nome:"Manutenção e campo", icone:"wrench", desc:"O que acontece no Fracttal e no App de Campo."},
+  {id:"performance", nome:"Performance", icone:"chart-line-up", desc:"Quanto gerou e o que se perdeu."},
+  {id:"cos", nome:"COS", icone:"broadcast", desc:"Ocorrências, avisos ao cliente e escala."},
+  {id:"transversal", nome:"Transversal", icone:"graph", desc:"O que faz tudo conversar e deixa rastro."},
+];
+
+const T = [
+  // ── núcleo ──
+  {id:"cliente", d:"nucleo", s:"existe", desc:"Quem contrata a Grid. Separa usinas de mesmo nome e clientes diferentes.",
+   c:[["id","pk",""],["nome","","Nome do cliente"],["cnpj","cif","CNPJ"],["observacao","","Texto livre"]], mata:"Coluna CLIENTE da aba Operações"},
+  {id:"usina", d:"nucleo", s:"existe", desc:"A usina: identidade, dono, onde fica e de que tamanho é. Só isso.",
+   c:[["id","pk",""],["codigo","","Código Grid (ATHN-MAB100)"],["id_bd","","IDUsina do BD (UFV-001), chave da reimportação"],["nome","","Nome canônico"],["cliente_id","fk:cliente",""],["status","","Em operação, mobilização, encerrada"],["tipologia","","Fixa, tracker"],["municipio_id","fk:municipio",""],["cluster_id","fk:cluster",""],["latitude, longitude","cif","Coordenadas"],["potencia_contratual_mwp","","Potência contratual"],["potencia_real_mwp","","Potência real"]],
+   mata:"Aba Operações do BD_Operações (a parte de identidade)"},
+  {id:"apelido", d:"nucleo", s:"novo", desc:"O nome da usina em cada sistema. Resolve o mesmo lugar com três nomes.",
+   c:[["usina_id","fk:usina",""],["sistema","","fracttal, apipv, sunop, solaredge, pcm, bd_thopen"],["valor","","O nome ou código naquele sistema"],["desde","","Quando passou a valer"]],
+   mata:"de_para_trackers, os de-para dentro do código e a CONSULTA do Power Query"},
+  {id:"pessoa", d:"nucleo", s:"existe", desc:"Colaborador da operação. Registro inteiro cifrado.",
+   c:[["id","pk",""],["nome","cif","Nome"],["vinculo","","CLT, terceiro, parceiro"],["cargo","","Cargo"],["equipe_id","fk:equipe",""],["supervisor_id","fk:pessoa","Quem é o supervisor"],["email, telefones, cpf","cif","Contatos e documento"],["status","","Contratado, desligado"]],
+   mata:"Aba Relação Geral Colaboradores do BD_Operações"},
+  {id:"equipe", d:"nucleo", s:"existe", desc:"Equipe de campo.",
+   c:[["id","pk",""],["nome","","Nome da equipe"],["cluster_id","fk:cluster",""],["base_municipio_id","fk:municipio","Cidade-base"]], mata:"Coluna Equipe Cluster"},
+  {id:"equipe_usina", d:"nucleo", s:"novo", desc:"Quem cuida de cada usina, com data. Tira técnico, eletricista e mantenedor da linha da usina.",
+   c:[["usina_id","fk:usina",""],["equipe_id","fk:equipe",""],["papel","","Responsável O&M, técnico, eletricista, mantenedor"],["pessoa_id","fk:pessoa",""],["inicio, fim","","Vigência"]],
+   mata:"Colunas Responsável, Técnico, Eletricista e Mantenedor O&M"},
+  {id:"cluster", d:"nucleo", s:"novo", desc:"Agrupamento regional das usinas. Hoje é uma lista solta, com grafias duplas.",
+   c:[["id","pk",""],["nome","","PA Leste 01"],["regiao","","Norte, Nordeste, Sudeste, Sul, Centro-Oeste"],["supervisor_id","fk:pessoa",""]], mata:"Coluna Cluster e a lista do AUXILIAR - FABRICIO"},
+  {id:"municipio", d:"nucleo", s:"novo", desc:"Cidade com UF e código do IBGE. Liga usina, equipe e feriado municipal.",
+   c:[["id","pk","Código IBGE"],["nome","",""],["uf","",""]], mata:"Colunas Cidade e UF digitadas à mão"},
+
+  // ── contratos ──
+  {id:"contrato", d:"contratos", s:"novo", desc:"O que foi vendido: prazo, preço, SLA e garantias de desempenho.",
+   c:[["id","pk",""],["cliente_id","fk:cliente",""],["usina_id","fk:usina",""],["inicio","","Data de mobilização"],["prazo_meses","",""],["preco_mwp, receita_mensal","cif","Valores"],["sla_resposta_h, sla_reparo_h","","Relógios do SLA"],["pr_garantido, disp_garantida","","Metas contratuais"],["gestor_id","fk:pessoa","Gestor do contrato"]],
+   mata:"Gestao_Contratos_GridCo.xlsx e as colunas de contrato da aba Operações"},
+  {id:"contato", d:"contratos", s:"novo", desc:"Telefones e empresas por usina e papel.",
+   c:[["usina_id","fk:usina",""],["papel","","Segurança local, remota, internet, cliente"],["empresa","",""],["telefone, email","cif",""]],
+   mata:"Colunas contato_* da aba Operações"},
+  {id:"perfil_comunicacao", d:"contratos", s:"novo", desc:"O que cada cliente quer receber, quando e por onde (spec R13).",
+   c:[["cliente_id","fk:cliente",""],["preset","","Tudo, essencial, silencioso"],["janela","","Horário permitido"],["canais","","WhatsApp, e-mail, portal"],["regras","","Religamento suspenso, contato único"]],
+   mata:"O que hoje vive na cabeça do operador e no grupo do WhatsApp"},
+
+  // ── ativos ──
+  {id:"ativo", d:"ativos", s:"novo", desc:"Cada equipamento, com o pai dele: cabine, inversor, string; tracker; ETM.",
+   c:[["id","pk",""],["usina_id","fk:usina",""],["pai_id","fk:ativo","Equipamento de cima"],["tipo","","cabine, skid, transformador, inversor, string, tracker, ETM, módulo"],["fabricante, modelo, serie","",""],["codigo_fracttal","","Código do ativo no CMMS"],["id_supervisorio","","Como a telemetria o chama"],["garantia_ate","",""]],
+   mata:"Contagens Nº de inversores, módulos, cabines (aba Operações), aba Equipamentos do BD_Performance e assets_cache.json"},
+  {id:"garantia", d:"ativos", s:"novo", desc:"Garantia por ativo ou família, com prazo e contato do fabricante.",
+   c:[["id","pk",""],["ativo_id","fk:ativo","Ou só a família"],["fabricante","",""],["vence_em","",""],["condicao","",""],["contato","","Canal de garantia"]], mata:"Matriz de Garantias do Plano de Documentação"},
+
+  // ── calendário ──
+  {id:"feriado", d:"calendario", s:"novo", desc:"Feriados nacionais, estaduais e municipais.",
+   c:[["data","",""],["escopo","","nacional, uf, municipio"],["uf","","Quando estadual"],["municipio_id","fk:municipio","Quando municipal"],["nome","",""]], mata:"Feriados/FERIADOS ESTADUAIS, MUNICIPAIS E NACIONAIS 2026.xlsx"},
+  {id:"semana", d:"calendario", s:"novo", desc:"A semana de programação, com estado.",
+   c:[["id","pk","2026-W41"],["inicio, fim","",""],["estado","","aberta, gerada, publicada"]], mata:"A semana implícita no nome do arquivo"},
+
+  // ── pcm ──
+  {id:"prioridade", d:"pcm", s:"novo", desc:"O RPN por tipo de tarefa, que o motor usa para ordenar.",
+   c:[["padrao_tarefa","","Texto que casa com a tarefa"],["severidade, ocorrencia, deteccao","",""],["rpn","","Calculado"],["vigente_desde","",""]], mata:"Lista_Prioridades_GridCo.xlsx"},
+  {id:"tempo_referencia", d:"pcm", s:"novo", desc:"Duração típica por categoria, por usina ou cluster. Da planilha ou aprendida das execuções.",
+   c:[["categoria","",""],["usina_id","fk:usina","Opcional"],["cluster_id","fk:cluster","Opcional"],["horas","",""],["origem","","planilha, aprendido"],["amostras","","Quantas execuções"]],
+   mata:"Planilha Confiabilidade R00.xlsx e duracoes_aprendidas.json"},
+  {id:"plano_preventiva", d:"pcm", s:"novo", desc:"O plano anual de preventivas por usina e sigla.",
+   c:[["usina_id","fk:usina",""],["sigla","","MPM, MPS, MPA, MPQ"],["periodicidade","",""],["semana_id","fk:semana","Semana prevista"]], mata:"PCM 52 Semanas - R04.xlsx"},
+  {id:"programacao", d:"pcm", s:"novo", desc:"O que foi programado em cada semana, por versão. Uma versão publicada por semana, travada.",
+   c:[["semana_id","fk:semana",""],["versao","","1, 2, 3 (só uma publicada)"],["os_id","fk:os",""],["tarefa_id","fk:tarefa",""],["equipe_id","fk:equipe",""],["dia, hora, duracao_h","",""],["reprogramada, motivo","",""],["n_vezes","","Quantas semanas já rolou"]],
+   mata:"Historico_Programacoes.xlsx e BD_Relatório Semanal.xlsx"},
+  {id:"observacao_semana", d:"pcm", s:"novo", desc:"Recados da semana para o motor, um por linha, com autor.",
+   c:[["semana_id","fk:semana",""],["texto","",""],["autor_id","fk:pessoa",""]], mata:"Observacoes_Semana.txt"},
+  {id:"controle_pcm", d:"pcm", s:"novo", desc:"Os controles da Torre de controle do PCM.",
+   c:[["id","pk",""],["nome","",""],["usina_id","fk:usina",""],["estado, marca","",""]], mata:"Controles PCM.xlsx e estado.json"},
+
+  // ── manutenção ──
+  {id:"os", d:"manutencao", s:"espelho", desc:"Ordem de serviço, copiada do Fracttal a cada 15 minutos.",
+   c:[["id","pk","Folio do Fracttal"],["usina_id","fk:usina","Pelo apelido"],["ativo_id","fk:ativo",""],["tipo, status, causa","",""],["criada_em, fechada_em","",""]], mata:"Leituras soltas do Fracttal em cada sistema"},
+  {id:"tarefa", d:"manutencao", s:"espelho", desc:"Tarefa da OS no Fracttal.",
+   c:[["id","pk",""],["os_id","fk:os",""],["descricao","",""],["estado","",""],["previsto_h, real_h","",""]], mata:"banco_dados.json do PCM"},
+  {id:"execucao", d:"manutencao", s:"espelho", desc:"O que o técnico fez no App de Campo, com evidência.",
+   c:[["tarefa_id","fk:tarefa",""],["pessoa_id","fk:pessoa",""],["inicio, fim","",""],["gps, fotos","",""],["nota","","Qualidade do fechamento"]], mata:"Tabelas do Storage do App de Campo, lidas por cada painel"},
+  {id:"apr_pt", d:"manutencao", s:"espelho", desc:"Análise de risco e permissão de trabalho da tarefa.",
+   c:[["tarefa_id","fk:tarefa",""],["tipo","","APR, PT"],["assinada_por","fk:pessoa",""],["validade","",""]], mata:"BD de APR/PT do App"},
+  {id:"ronda", d:"manutencao", s:"espelho", desc:"Ronda de campo do App, com desvios.",
+   c:[["usina_id","fk:usina",""],["pessoa_id","fk:pessoa",""],["inicio, fim","",""],["nota, desvios","",""]], mata:"Workbook de rondas"},
+  {id:"chamado", d:"manutencao", s:"novo", desc:"Chamado ao fabricante, com de quem é a vez.",
+   c:[["id","pk",""],["ativo_id","fk:ativo",""],["garantia_id","fk:garantia",""],["os_id","fk:os","OS de teste"],["ticket_fornecedor","",""],["status, pendencia","",""]], mata:"Planilha de Gestão de Chamados e o painel no Supabase"},
+
+  // ── performance ──
+  {id:"geracao_diaria", d:"performance", s:"espelho", desc:"Energia, irradiação e PR por usina e dia.",
+   c:[["usina_id","fk:usina",""],["dia","",""],["energia_kwh","",""],["irradiacao","",""],["pr","",""],["fonte","","API PV, SunOp, SolarEdge, 2C"]], mata:"BD_Thopen.xlsx e BD_Performance.xlsx (abas diárias)"},
+  {id:"meta_mensal", d:"performance", s:"novo", desc:"Meta de energia e PR por usina e mês.",
+   c:[["usina_id","fk:usina",""],["mes","",""],["energia_meta","",""],["pr_meta","",""]], mata:"Aba Info Mensal e as metas do cadastro"},
+  {id:"falha", d:"performance", s:"espelho", desc:"Perda detectada por string, tracker ou inversor.",
+   c:[["ativo_id","fk:ativo",""],["inicio, fim","",""],["perda_kwh","",""],["causa_provavel","",""],["os_id","fk:os","Se virou OS"]], mata:"falhas_performance"},
+  {id:"ticket", d:"performance", s:"novo", desc:"Ticket de performance: detectado, notificado, análise, ação, verificado.",
+   c:[["id","pk",""],["usina_id","fk:usina",""],["ativo_id","fk:ativo",""],["etapa","",""],["os_id","fk:os",""]], mata:"tickets_performance.xlsx"},
+
+  // ── cos ──
+  {id:"ocorrencia", d:"cos", s:"novo", desc:"O ciclo da ocorrência: detectada, informada, acionada, normalizada, encerrada.",
+   c:[["id","pk",""],["usina_id","fk:usina",""],["ativo_id","fk:ativo",""],["tipo, severidade","",""],["detectada ... encerrada","","Os cinco carimbos"],["os_id","fk:os",""]], mata:"O registro que hoje fica no WhatsApp"},
+  {id:"comunicacao", d:"cos", s:"novo", desc:"Cada aviso enviado ao cliente, ao técnico ou à distribuidora.",
+   c:[["ocorrencia_id","fk:ocorrencia",""],["canal","",""],["para","",""],["texto_publico","",""],["enviada_em","",""]], mata:"whats_enviados.json e os avisos manuais"},
+  {id:"passagem_turno", d:"cos", s:"novo", desc:"O que o próximo turno precisa saber e quem assumiu.",
+   c:[["mesa, turno","",""],["registrado_por","fk:pessoa",""],["assumido_por","fk:pessoa",""],["pendencias","",""]], mata:"Plantao_COS"},
+  {id:"escala_sobreaviso", d:"cos", s:"novo", desc:"Quem está de sobreaviso, por bloco e cluster.",
+   c:[["bloco","",""],["pessoa_id","fk:pessoa",""],["cluster_id","fk:cluster",""]], mata:"SOBREAVISOS EQUIPES GRID.xlsx"},
+
+  // ── transversal ──
+  {id:"evento", d:"transversal", s:"novo", desc:"A linha do tempo única. Toda tabela grava aqui o que aconteceu.",
+   c:[["id","pk",""],["usina_id","fk:usina",""],["ativo_id","fk:ativo","Opcional"],["fonte","","fracttal, campo, performance, cos, pcm, contrato"],["tipo","",""],["ref_tabela, ref_id","","A linha de origem"],["inicio, fim","",""]], mata:"Nada: é o que não existe hoje"},
+  {id:"item_trabalho", d:"transversal", s:"novo", desc:"Tudo que pede ação, com dono, prazo e valor.",
+   c:[["id","pk",""],["tipo","","OS, insight, chamado, ticket, decisão"],["ref_tabela, ref_id","",""],["dono_cadeira","",""],["prazo, status, prioridade","",""]], mata:"Listas e cobranças espalhadas"},
+  {id:"auditoria", d:"transversal", s:"novo", desc:"Quem mudou o quê, quando, com antes e depois.",
+   c:[["tabela, registro_id","",""],["campo","",""],["antes, depois","",""],["quem","",""],["quando","",""]], mata:"O histórico que o Excel não tem"},
+  {id:"acesso", d:"transversal", s:"novo", desc:"Quem entra no Nexus e em que cadeira.",
+   c:[["chave","","HMAC do e-mail"],["cadeira","",""],["atualizado_em, por","",""]], mata:"identidades.json mantido à mão"},
+];
+
+const POR_ID = Object.fromEntries(T.map(t => [t.id, t]));
+// Ligações nos dois sentidos: quem eu aponto e quem me aponta.
+const LIGA = {};
+T.forEach(t => { LIGA[t.id] = LIGA[t.id] || new Set(); });
+T.forEach(t => t.c.forEach(([, k]) => {
+  if (k.startsWith("fk:")) { const alvo = k.slice(3); if (alvo !== t.id && POR_ID[alvo]) { LIGA[t.id].add(alvo); LIGA[alvo].add(t.id); } }
+}));
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+const SELO = {existe:["s-existe","Já existe"], novo:["s-novo","Nova"], espelho:["s-espelho","Espelho"]};
+
+// números
+const n = s => T.filter(t => t.s === s).length;
+const mortos = new Set(T.map(t => t.mata));
+$("#numeros").innerHTML = [
+  ["Tabelas", T.length, "em " + DOMINIOS.length + " domínios"],
+  ["Já existem", n("existe"), "registro mestre do BD_Operações"],
+  ["Novas", n("novo"), "no lugar de planilhas e arquivos"],
+  ["Espelhos", n("espelho"), "Fracttal, App de Campo, telemetria"],
+].map(([r, v, d]) => `<div><div class="r">${r}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
+
+// colunas de hoje, coloridas pelo destino
+const HOJE = [
+  ["OPERAÇÃO",""],["CÓDIGO",""],["IDUsina",""],["STATUS",""],["CLIENTE",""],["TIPOLOGIA",""],["NOME SPE","c-contrato"],["CNPJ","c-contrato"],
+  ["CONTRATO ASSINADO","c-contrato"],["PRAZO","c-contrato"],["PREÇO MWp","c-contrato"],["RECEITA MENSAL","c-contrato"],["RECEITA CONTRATUAL","c-contrato"],
+  ["GESTOR CONTRATO","c-contrato"],["DATA MOBILIZAÇÃO","c-contrato"],["UCs","c-contrato"],["CONCESSIONÁRIA","c-contrato"],
+  ["EQUIPE","c-equipe"],["CLUSTER","c-equipe"],["REGIÃO","c-equipe"],["RESPONSÁVEL O&M","c-equipe"],["TÉCNICO O&M","c-equipe"],["ELETRICISTA O&M","c-equipe"],["MANTENEDOR O&M","c-equipe"],
+  ["POTÊNCIA CONTRATUAL",""],["POTÊNCIA REAL",""],["Nº INVERSORES","c-ativo"],["FABRICANTE INV.","c-ativo"],["MODELO INV.","c-ativo"],["Nº MÓDULOS","c-ativo"],
+  ["FABRICANTE MÓD.","c-ativo"],["FABRICANTE TRACKER","c-ativo"],["Qtd TCU","c-ativo"],["Nº CABINE","c-ativo"],["Nº SKID","c-ativo"],["Nº TRANSFORMADOR","c-ativo"],["TENSÃO","c-ativo"],
+  ["CIDADE",""],["UF",""],["ENDEREÇO",""],["LATITUDE",""],["LONGITUDE",""],["CÓD. CMMS",""],
+  ["SEGURANÇA LOCAL","c-contato"],["CONTATO SEG. LOCAL","c-contato"],["SEGURANÇA REMOTA","c-contato"],["CONTATO SEG. REMOTA","c-contato"],["INTERNET","c-contato"],["CONTATO INTERNET","c-contato"],
+  ["… mais 30",""],
+];
+$("#colunas-hoje").innerHTML = HOJE.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).join("");
+
+// filtros por domínio
+let filtro = "todos";
+const filtros = $("#filtros");
+filtros.insertAdjacentHTML("afterbegin",
+  [["todos","Todos"]].concat(DOMINIOS.map(d => [d.id, d.nome]))
+    .map(([id, nome]) => `<button class="chip" data-f="${id}" aria-pressed="${id === "todos"}">${esc(nome)}</button>`).join(""));
+filtros.addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  filtro = b.dataset.f;
+  filtros.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", x === b));
+  document.querySelectorAll(".dominio").forEach(el => el.classList.toggle("escondido", filtro !== "todos" && el.dataset.d !== filtro && el.dataset.d !== "nucleo"));
+});
+
+// mapa
+$("#mapa").innerHTML = DOMINIOS.map(d => {
+  const ts = T.filter(t => t.d === d.id);
+  return `<section class="dominio ${d.id === "nucleo" ? "nucleo" : ""}" data-d="${d.id}">
+    <header><i class="ph ph-${d.icone}"></i><b>${esc(d.nome)}</b><small>${ts.length} tabelas</small></header>
+    <p class="desc">${esc(d.desc)}</p>
+    <div class="tabelas">${ts.map(t => `<button class="tabela" data-t="${t.id}">
+      <span class="nome">${t.id}</span><span class="selo ${SELO[t.s][0]}">${SELO[t.s][1]}</span>
+      <span class="mata">${esc(t.mata)}</span></button>`).join("")}</div></section>`;
+}).join("");
+
+// Excel que morre (só o que é arquivo/planilha de verdade)
+const ARQUIVOS = [
+  ["BD_Operações.xlsx (aba Operações)","Todos os sistemas",["usina","contrato","contato","equipe_usina","apelido"]],
+  ["BD_Operações.xlsx (Relação Geral Colaboradores)","Cadastro, App de Campo",["pessoa"]],
+  ["AUXILIAR - FABRICIO.xlsx","Motor do PCM",["usina","cluster","equipe_usina"]],
+  ["Gestao_Contratos_GridCo.xlsx","Contratos",["contrato"]],
+  ["Lista_Prioridades_GridCo.xlsx","Motor do PCM",["prioridade"]],
+  ["Planilha Confiabilidade R00.xlsx","Motor do PCM, Engenharia",["tempo_referencia"]],
+  ["duracoes_aprendidas.json","Motor do PCM",["tempo_referencia"]],
+  ["Historico_Programacoes.xlsx","Motor do PCM",["programacao"]],
+  ["Observacoes_Semana.txt","Motor do PCM",["observacao_semana"]],
+  ["Feriados 2026.xlsx","Motor do PCM",["feriado"]],
+  ["PCM 52 Semanas - R04.xlsx","PCM",["plano_preventiva"]],
+  ["Controles PCM.xlsx","Torre de controle",["controle_pcm"]],
+  ["BD_Performance.xlsx (Equipamentos)","Plataforma de Performance",["ativo"]],
+  ["BD_Thopen.xlsx / BD_Performance.xlsx (diárias)","Plataforma, dashboard do cliente",["geracao_diaria","meta_mensal"]],
+  ["tickets_performance.xlsx","Performance, OS Creator",["ticket"]],
+  ["SOBREAVISOS EQUIPES GRID.xlsx","COS",["escala_sobreaviso"]],
+  ["Matriz de Garantias","Controller, Chamados",["garantia","chamado"]],
+];
+$("#mortos tbody").innerHTML = ARQUIVOS.map(([a, quem, ts]) =>
+  `<tr><td>${esc(a)}</td><td class="mudo">${esc(quem)}</td><td>${ts.map(t => `<button data-t="${t}">${t}</button>`).join("")}</td></tr>`).join("");
+
+// seleção: acende a tabela e as vizinhas, abre a gaveta
+function selecionar(id) {
+  const t = POR_ID[id]; if (!t) return;
+  const viz = LIGA[id];
+  document.querySelectorAll(".tabela").forEach(el => {
+    const tid = el.dataset.t;
+    el.classList.toggle("ativa", tid === id);
+    el.classList.toggle("vizinha", viz.has(tid));
+    el.classList.toggle("apagada", tid !== id && !viz.has(tid));
+  });
+  const dom = DOMINIOS.find(d => d.id === t.d);
+  $("#g-dominio").textContent = dom.nome;
+  $("#g-nome").textContent = t.id;
+  $("#g-desc").textContent = t.desc;
+  $("#g-selos").innerHTML = `<span class="selo ${SELO[t.s][0]}">${SELO[t.s][1]}</span>`;
+  $("#g-colunas").innerHTML = t.c.map(([col, k, o]) => {
+    let marca = "";
+    if (k === "pk") marca = '<span class="chave pk">id</span>';
+    else if (k === "cif") marca = '<span class="chave cif">cifrada</span>';
+    else if (k.startsWith("fk:")) marca = `<span class="chave fk">liga a ${esc(k.slice(3))}</span>`;
+    return `<tr><td class="col">${esc(col)}${marca}</td><td>${esc(o)}</td></tr>`;
+  }).join("");
+  $("#g-ligacoes").innerHTML = [...viz].sort().map(v => `<button data-t="${v}">${v}</button>`).join("") || '<span class="mudo">Nenhuma ligação direta.</span>';
+  $("#g-mata").textContent = t.mata;
+  $("#gaveta").classList.add("aberta"); $("#gaveta").setAttribute("aria-hidden", "false");
+  $("#veu").classList.add("aberto");
+}
+function fechar() {
+  $("#gaveta").classList.remove("aberta"); $("#gaveta").setAttribute("aria-hidden", "true");
+  $("#veu").classList.remove("aberto");
+  document.querySelectorAll(".tabela").forEach(el => el.classList.remove("ativa", "vizinha", "apagada"));
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-t]");
+  if (b) { selecionar(b.dataset.t); return; }
+});
+$("#fechar").addEventListener("click", fechar);
+$("#veu").addEventListener("click", fechar);
+document.addEventListener("keydown", e => { if (e.key === "Escape") fechar(); });
+</script>
+</body>
+</html>

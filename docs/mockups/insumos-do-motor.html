@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Insumos do motor · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+:root{--fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--superficie-3:#243154;--barra:#0d1526;--tinta:#e9eef6;--tinta-2:#c3cad7;
+  --mudo:#96a0b4;--linha:rgba(255,255,255,.09);--linha-forte:rgba(255,255,255,.16);--verde:#a3d900;--verde-suave:rgba(163,217,0,.12);
+  --verde-texto:#c4e755;--alerta:#ffd83d;--alerta-suave:rgba(255,216,61,.14);--info:#7fb8ff;--info-suave:rgba(91,157,255,.14);
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.55 var(--sans)}
+.topo{display:flex;gap:14px;align-items:center;padding:14px 32px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1240px;margin:0 auto;padding:28px 32px 60px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 30px/36px var(--display);margin:6px 0 8px}
+h2{font:700 20px/28px var(--display);margin:34px 0 12px}
+.lead{color:var(--tinta-2);max-width:900px;margin:0}
+.dado{font:500 12.5px/18px var(--mono)}
+.mudo{color:var(--mudo)}
+/* o caminho: arquivos -> motor -> semana */
+.fluxo{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;margin:22px 0 6px}
+.fluxo .caixa{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.fluxo .caixa b{display:block;font-weight:600}
+.fluxo .caixa span{font-size:12.5px;color:var(--tinta-2)}
+.fluxo .seta{color:var(--verde-texto);font-size:22px}
+/* porquê */
+.porque{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.porque div{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.porque b{display:flex;gap:8px;align-items:center;font-weight:600}.porque b i{color:var(--verde-texto);font-size:18px}
+.porque p{margin:6px 0 0;color:var(--tinta-2);font-size:13px}
+/* cartões dos arquivos */
+.arquivos{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
+.arq{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.arq header{display:flex;gap:10px;align-items:flex-start}
+.arq header i{font-size:22px;color:var(--verde-texto);margin-top:2px}
+.arq h3{margin:0;font:600 15px/20px var(--sans)}
+.arq h3 small{display:block;font:500 12px/16px var(--mono);color:var(--mudo);margin-top:2px;overflow-wrap:anywhere}
+.selo{margin-left:auto;flex:none;font:600 10.5px/15px var(--sans);padding:2px 8px;border-radius:6px;white-space:nowrap;display:inline-flex;gap:5px;align-items:center}
+.selo::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-nexus{color:var(--verde-texto);background:var(--verde-suave)}
+.s-arquivo{color:var(--alerta);background:var(--alerta-suave)}
+.linha{display:grid;grid-template-columns:118px minmax(0,1fr);gap:10px;font-size:13px}
+.linha>span:first-child{font:700 10.5px/18px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.linha>span:last-child{color:var(--tinta-2)}
+.linha b{color:var(--tinta);font-weight:600}
+.proximo{border-top:1px solid var(--linha);padding-top:10px;font-size:13px;color:var(--tinta-2)}
+.proximo b{color:var(--info);font-weight:600}
+@media (max-width:760px){main{padding:20px 16px 40px}.topo{padding:12px 16px}.fluxo{grid-template-columns:1fr}.fluxo .seta{transform:rotate(90deg);justify-self:center}
+  .arquivos{grid-template-columns:1fr}.linha{grid-template-columns:1fr;gap:2px}}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Mockup · Insumos do motor do PCM · 01/10/2026</span></div>
+<main>
+  <p class="eyebrow">PCM · Programação semanal</p>
+  <h1>O que o motor lê para montar a semana</h1>
+  <p class="lead">O motor da programação semanal (<span class="dado">programacao_v7.py</span>) junta as OS do Fracttal com
+    sete insumos que não estão no Fracttal: quem é responsável por cada usina, quanto tempo cada serviço leva, o que é
+    mais urgente, o que já foi programado, os feriados e os recados da semana. Cinco já moram no Nexus; dois ainda são
+    arquivo.</p>
+
+  <div class="fluxo">
+    <div class="caixa"><b>Fracttal</b><span>as OS e tarefas abertas, lidas pela API a 1 pedido por segundo</span></div>
+    <i class="ph ph-plus seta"></i>
+    <div class="caixa"><b>Os 7 insumos</b><span>o que o Fracttal não sabe: dono, duração, urgência, histórico, calendário, recados</span></div>
+    <i class="ph ph-arrow-right seta"></i>
+    <div class="caixa"><b>A semana</b><span>cada tarefa com equipe, dia, hora e duração, mais as pendentes que não couberam</span></div>
+  </div>
+
+  <h2>Por que eles eram arquivos externos</h2>
+  <div class="porque">
+    <div><b><i class="ph ph-desktop"></i> O motor nasceu como script de PC</b>
+      <p>Ele roda na máquina do Fabrício e lê o que estiver na pasta do PCM no OneDrive. Não havia banco para guardar
+        estas informações, então cada uma virou um arquivo ao lado do script.</p></div>
+    <div><b><i class="ph ph-users-three"></i> Cada insumo tem um dono diferente</b>
+      <p>O cadastro vem do BD_Operações, a prioridade de uma análise das OS, a confiabilidade de outra, os feriados de
+        uma planilha de RH. Arquivo foi o jeito de cada um entregar a sua parte sem depender de sistema.</p></div>
+    <div><b><i class="ph ph-warning"></i> O que isso custa hoje</b>
+      <p>A geração só sai daquele PC; o histórico gravado duas vezes distorceu a semana 40 (415 tarefas viraram
+        reprogramadas); e o cadastro puxado por Power Query está desatualizado (166 de 258 usinas).</p></div>
+  </div>
+
+  <h2>Os sete insumos, um a um</h2>
+  <div class="arquivos">
+
+    <article class="arq">
+      <header><i class="ph ph-buildings"></i><h3>Cadastro das usinas<small>AUXILIAR - FABRICIO.xlsx</small></h3><span class="selo s-nexus">No Nexus</span></header>
+      <div class="linha"><span>O que é</span><span>Uma linha por usina: o <b>responsável O&amp;M</b>, a <b>cidade</b> e o <b>porte em MWp</b>.</span></div>
+      <div class="linha"><span>O motor usa para</span><span>Pôr o responsável em cada tarefa, achar o feriado municipal pela cidade e pesar a prioridade pelo tamanho da usina.</span></div>
+      <div class="linha"><span>De onde vem</span><span>Um Power Query no Excel do Fabrício, que puxa a aba Operações do BD_Operações.</span></div>
+      <div class="linha"><span>Por que é arquivo</span><span>O motor não lê o BD_Operações direto: lê esta cópia filtrada, e a cópia parou de acompanhar a base (166 linhas contra 258; 52 usinas em operação faltam).</span></div>
+      <div class="proximo"><b>Feito em 02/10:</b> a cada geração o Nexus escreve esta planilha a partir do cadastro (258 usinas). Na semana 41, com a mesma foto do Fracttal, a agenda saiu idêntica à oficial e 48 tarefas ganharam responsável. <b>Falta:</b> casar a usina pelo CÓDIGO, e não pelo nome (medido na semana 40: sem responsável cairia de 297 para 79).</div>
+    </article>
+
+    <article class="arq">
+      <header><i class="ph ph-timer"></i><h3>Durações aprendidas<small>duracoes_aprendidas.json</small></h3><span class="selo s-arquivo">Ainda arquivo</span></header>
+      <div class="linha"><span>O que é</span><span>A <b>duração típica</b> de cada tipo de serviço, por usina, por cluster e geral, aprendida das execuções reais.</span></div>
+      <div class="linha"><span>O motor usa para</span><span>Hoje, <b>só mostrar</b> numa coluna da planilha ("Duração aprendida (h)"), em sombra. A capacidade da equipe ainda é calculada pela estimativa antiga.</span></div>
+      <div class="linha"><span>De onde vem</span><span>O script <span class="dado">aprender_duracoes.py</span>, rodado toda sexta pelo robô do GitHub do PCM. A pasta do PCM ainda tem a cópia de 18/09: a passagem do repositório para a pasta é manual. Explicado em <a href="duracoes-aprendidas.html">duracoes-aprendidas.html</a>.</span></div>
+      <div class="linha"><span>Por que é arquivo</span><span>É resultado de outro script: um programa escreve, o motor lê. É dado derivado, ninguém edita à mão.</span></div>
+      <div class="proximo"><b>Próximo passo:</b> o Nexus calcula sozinho a partir das execuções do App de Campo, como tarefa de fundo, sem arquivo no meio.</div>
+    </article>
+
+    <article class="arq">
+      <header><i class="ph ph-list-numbers"></i><h3>Lista de Prioridades<small>Lista_Prioridades_GridCo.xlsx</small></h3><span class="selo s-nexus">No Nexus</span></header>
+      <div class="linha"><span>O que é</span><span>38 tipos de atividade (religamento, falha de inversor, preventiva mensal...) com a <b>prioridade</b> de 1 a 40 e o <b>MTTR mediano</b>.</span></div>
+      <div class="linha"><span>O motor usa para</span><span>Ordenar o que entra primeiro na semana e, quando não há outra estimativa, usar o MTTR como duração da tarefa.</span></div>
+      <div class="linha"><span>De onde vem</span><span>Uma análise de 9.753 OS (Relatório Mensal R00, maio de 2026).</span></div>
+      <div class="linha"><span>Por que era arquivo</span><span>Foi feita uma vez, por uma análise, e entregue em planilha. Muda pouco.</span></div>
+      <div class="proximo"><b>Próximo passo:</b> tela de edição no Nexus (hoje se atualiza importando de novo).</div>
+    </article>
+
+    <article class="arq">
+      <header><i class="ph ph-gauge"></i><h3>Confiabilidade<small>Planilha Confiabilidade R00.xlsx</small></h3><span class="selo s-nexus">No Nexus</span></header>
+      <div class="linha"><span>O que é</span><span>O <b>tempo médio de cada categoria de corretiva</b> (inspeção de inversor, troca de fusível...), sem os casos fora da curva.</span></div>
+      <div class="linha"><span>O motor usa para</span><span>Dar a duração das corretivas: é o que decide quantas cabem no dia de cada equipe.</span></div>
+      <div class="linha"><span>De onde vem</span><span>Análise das corretivas da Programação Semanal R00, com os outliers tirados pelo método IQR.</span></div>
+      <div class="linha"><span>Por que era arquivo</span><span>Mesmo caso da prioridade: análise pontual entregue em planilha.</span></div>
+      <div class="proximo"><b>Próximo passo:</b> tela de edição; depois, recalcular sozinho com as execuções reais (e aí ela e as durações aprendidas viram uma coisa só).</div>
+    </article>
+
+    <article class="arq">
+      <header><i class="ph ph-clock-counter-clockwise"></i><h3>Histórico das programações<small>Historico_Programacoes.xlsx</small></h3><span class="selo s-nexus">No Nexus</span></header>
+      <div class="linha"><span>O que é</span><span>Para cada tarefa (7.301), <b>em quais semanas ela já foi programada</b>.</span></div>
+      <div class="linha"><span>O motor usa para</span><span>Marcar a tarefa como <b>reprogramada</b> e contar o <b>"Nº vezes programada"</b>: é o que mostra o que está rolando de semana em semana sem ser feito.</span></div>
+      <div class="linha"><span>De onde vem</span><span>O próprio motor: ele lê, acrescenta a semana nova e grava de volta a cada geração.</span></div>
+      <div class="linha"><span>Por que era arquivo</span><span>Era a memória do script entre uma semana e outra. Por estar só naquele PC, é a peça que prendia a geração à máquina do Fabrício, e gerar duas vezes distorcia tudo.</span></div>
+      <div class="proximo"><b>No Nexus:</b> a rodada parte do histórico de <b>antes</b> da semana, então gerar de novo não marca mais tudo como reprogramado.</div>
+    </article>
+
+    <article class="arq">
+      <header><i class="ph ph-calendar-x"></i><h3>Feriados<small>Feriados/FERIADOS ESTADUAIS, MUNICIPAIS E NACIONAIS 2026.xlsx</small></h3><span class="selo s-nexus">No Nexus</span></header>
+      <div class="linha"><span>O que é</span><span>28 feriados nacionais e estaduais e 72 municipais de 2026.</span></div>
+      <div class="linha"><span>O motor usa para</span><span>Nacional: o dia sai da semana. Estadual: tira as equipes daquela UF. Municipal: tira só as usinas daquela cidade.</span></div>
+      <div class="linha"><span>De onde vem</span><span>Uma planilha de controle de feriados, com os estaduais e nacionais de um lado e os municipais do outro.</span></div>
+      <div class="linha"><span>Por que era arquivo</span><span>Calendário mantido à mão, uma vez por ano.</span></div>
+      <div class="proximo"><b>Próximo passo:</b> lista editável em Base; os nacionais podem vir de calendário automático.</div>
+    </article>
+
+    <article class="arq">
+      <header><i class="ph ph-note-pencil"></i><h3>Observações da semana<small>Observacoes_Semana.txt</small></h3><span class="selo s-nexus">No Nexus</span></header>
+      <div class="linha"><span>O que é</span><span>Os recados do PCM para a semana: <b>dias de atendimento de cada usina</b>, <b>OS fora da semana</b> e <b>OS com dia fixo</b>.</span></div>
+      <div class="linha"><span>O motor usa para</span><span>Obedecer ao que o PCM decidiu: só programar a usina nos dias dela, não programar a OS tirada, pôr a OS fixada no dia pedido.</span></div>
+      <div class="linha"><span>De onde vem</span><span>O Fabrício escreve no bloco de notas, numa gramática própria (<span class="dado">@usina Nome = seg, qua</span>).</span></div>
+      <div class="linha"><span>Por que era arquivo</span><span>Era o jeito mais rápido de passar instrução para um script. Um erro de digitação só aparecia no log, depois de gerar.</span></div>
+      <div class="proximo"><b>No Nexus:</b> as 143 usinas do Fracttal com os dias clicáveis e filtro por cliente; problema aparece antes de gerar.</div>
+    </article>
+
+  </div>
+</main>
+</body>
+</html>

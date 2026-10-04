@@ -8,3 +8,5 @@ cryptography==48.0.1
 # Engenharia importa o steps/ui.py do desktop, que é PyQt6. Sem os dois, só o /os/* fica fora; o Nexus sobe.
 requests==2.34.2
 PyQt6==6.11.0
+# motor do PCM (nexus/pcm/motor, a programação semanal): roda num subprocesso com este mesmo Python
+pandas==3.0.3

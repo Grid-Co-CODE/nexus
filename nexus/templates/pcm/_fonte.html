@@ -1,0 +1,11 @@
+{# De onde a tela leu. Etapa 1: o Nexus só lê a programação que está valendo; nada aqui a altera. #}
+{% if fonte_erro and not sem %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler a programação.</strong>
+  Motivo: {{ fonte_erro }}. A programação atual segue no ar para o campo; esta tela volta quando a leitura voltar.</div></div>
+{% elif fonte_velha %}
+<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-clock-counter-clockwise"></i><div><strong>Mostrando a última leitura boa.</strong>
+  A tentativa de agora falhou ({{ fonte_erro }}).</div></div>
+{% else %}
+<p class="pcm-fonte"><i class="ph ph-plug"></i><span>Lê a programação que está valendo, a mesma do App de Campo e do painel do
+  PCM{% if fonte_gerada %}, atualizada em {{ fonte_gerada }}{% endif %}. Nada nesta tela altera a programação.</span></p>
+{% endif %}

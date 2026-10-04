@@ -1,0 +1,38 @@
+# Motor da programação semanal (cópia)
+
+Estes três arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório `fillipefigueiro-source/gridco-pcm-data`
+no commit `8ee58d9` (30/09/2026):
+
+| Arquivo | O que faz |
+|---|---|
+| `programacao_v7.py` | o gerador (motor v9): escolhe, ordena e distribui as tarefas da semana |
+| `fonte_bd_api.py` | lê as ordens e tarefas do Fracttal |
+| `gerar_bd_via_api.py` | lê as ordens e tarefas do Fracttal |
+
+Conferido pelo hash (SHA-256):
+
+| Arquivo | Hash |
+|---|---|
+| `programacao_v7.py` | `17bd4926102b…` |
+| `fonte_bd_api.py` | `d8fb8806b1e8…` |
+| `gerar_bd_via_api.py` | `6c580738ab5e…` |
+
+## Por que uma cópia, e não um motor novo
+
+O Nexus precisa gerar a **mesma** semana que o Fabrício gera, para a comparação linha a linha provar que pode
+substituir. Reescrever o motor tornaria a comparação inútil.
+
+**Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
+sistemas rodarem juntos, as duas cópias precisam ser iguais.
+
+## Como o Nexus roda (`nexus/pcm/geracao.py`)
+
+- **Processo:** um subprocesso com o mesmo Python do Nexus.
+- **Pasta de trabalho:** uma por rodada, em `C:\GridcoAuto\nexus\pcm\geracoes\`, fora do OneDrive. Leva a cópia dos
+  insumos da pasta do PCM e o histórico de antes da semana.
+- **Ambiente próprio:**
+  - a credencial do Fracttal, a mesma do OS Creator, sem login;
+  - `FRACTTAL_BASE_URL` com `/api/`;
+  - 1 pedido por segundo;
+  - nenhuma variável `NEXUS_*`.
+- **Saída:** a planilha fica em `saida/sombra.xlsx` e é comparada com a `Programação Semana NN.xlsx` oficial.

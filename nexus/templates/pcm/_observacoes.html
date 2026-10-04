@@ -1,0 +1,359 @@
+{# Observações da semana como regras (01/10/2026). O motor lê o mesmo texto de sempre: esta tela só desenha as linhas
+   como cartões e etiquetas e, ao salvar, monta o texto de volta. Linha que ninguém mexeu sai idêntica (data-bruta).
+   A ordem original das linhas é mantida pelo data-ordem. #}
+{% set r = obs_resumo %}
+{% macro dias_botoes(sel) %}{% for d in dias %}<button type="button" class="obs-dia" data-dia="{{ d }}" aria-pressed="{{ 'true' if d in sel else 'false' }}" title="{{ nomes_dia[d] }}">{{ nomes_dia[d][0] }}</button>{% endfor %}{% endmacro %}
+<section class="obs" id="obs">
+  <div class="obs-topo">
+    <h2 class="pcm-h2">Observações da semana {{ semana_sugerida }}</h2>
+    <p class="obs-resumo">
+      <span><b class="gc-num">{{ r.usinas }}</b> usinas com dia</span>
+      <span><b class="gc-num">{{ r.fora }}</b> OS fora</span>
+      <span><b class="gc-num">{{ r.fixar }}</b> OS com dia fixo</span>
+      {% if r.notas %}<span><b class="gc-num">{{ r.notas }}</b> notas</span>{% endif %}
+      {% if r.problemas %}<span class="obs-resumo-ruim"><i class="ph ph-warning"></i> {{ r.problemas }} {{ 'linha' if r.problemas == 1 else 'linhas' }} com problema</span>{% endif %}
+    </p>
+    <div class="obs-topo-acoes">
+      {% if tem_anterior and not observacoes.strip() %}
+      <form method="post" action="/t/pcm/gerar/observacoes/copiar">
+        <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+        <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-copy"></i> Copiar da {{ semana_anterior }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <form id="obs-form" method="post" action="/t/pcm/gerar/observacoes">
+    <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+    <textarea name="texto" id="obs-saida" hidden>{{ observacoes }}</textarea>
+
+    {# ── usinas ── #}
+    {% if usinas %}
+    {# Todas as usinas do Fracttal (01/10/2026, Levi: "quero que apareça todas as usinas do fracttal aqui e que dê para
+       filtrar por cliente"). Segunda a sexta ligados = sem regra: o motor atende em qualquer dia. Mexer nos dias grava
+       a regra "@usina"; voltar aos cinco dias tira a regra. As regras em si ficam escondidas logo abaixo. #}
+    {# Os clientes como cards no topo, sempre à vista (01/10, Levi: "filtrar por cliente clicando nos cards de cima"):
+       o clique abre a lista já filtrada; clicar de novo, ou em Todos, tira o filtro. #}
+    <div class="obs-bloco-cab obs-cab-usinas"><span class="gc-rotulo">Dias de atendimento por usina</span>
+      <span class="gc-ajuda">{{ usinas|length }} usinas do Fracttal · <span id="obs-restritas">{{ usinas_restritas }}</span> com dia restrito</span></div>
+    <div class="obs-cli-cards" role="group" aria-label="Filtrar por cliente">
+      <button type="button" class="obs-cli" data-cliente="" aria-pressed="true">
+        <span class="obs-cli-nome">Todos</span><span class="obs-cli-num gc-num">{{ usinas|length }}</span>
+        <span class="obs-cli-sub"><span data-restritas-de="">{{ usinas_restritas }}</span> com dia restrito</span></button>
+      {% for c in clientes %}
+      <button type="button" class="obs-cli" data-cliente="{{ c.nome }}" aria-pressed="false">
+        <span class="obs-cli-nome">{{ c.nome }}</span><span class="obs-cli-num gc-num">{{ c.usinas }}</span>
+        <span class="obs-cli-sub"><span data-restritas-de="{{ c.nome }}">{{ c.restritas }}</span> com dia restrito</span></button>
+      {% endfor %}
+    </div>
+    <details class="obs-bloco obs-bloco--usinas"{% if r.problemas %} open{% endif %}>
+      <summary class="obs-bloco-cab">
+        <span class="obs-por-dia" id="obs-por-dia">{% for d in dias %}<span>{{ nomes_dia[d][:3] }} <b class="gc-num" data-dia="{{ d }}">{{ usinas_por_dia[d] }}</b></span>{% endfor %}</span>
+        <span class="gc-ajuda" id="obs-filtro-ativo"></span>
+        <span class="gc-ajuda obs-abrir">abrir para editar</span>
+      </summary>
+      <div class="obs-filtro">
+        <input class="obs-campo obs-busca" id="obs-busca" type="search" placeholder="Buscar usina" autocomplete="off">
+        <label class="obs-so"><input type="checkbox" id="obs-so-restritas"> Só com dia restrito</label>
+      </div>
+      <div class="obs-usinas obs-usinas--fracttal" id="obs-usinas">
+        {% for u in usinas %}
+        <div class="obs-usina obs-ufr{{ ' obs-restrita' if u.dias|length < dias|length }}" data-cliente="{{ u.cliente }}" data-busca="{{ (u.nome ~ ' ' ~ u.fracttal)|lower }}"
+             data-regra="{{ u.regra if u.regra is not none else '' }}" data-nome-regra="{{ u.nome_regra }}" title="{{ u.fracttal }}">
+          <span class="obs-nome">{{ u.nome }}<small class="obs-uf">{{ u.uf }}</small>{% if u.divide %}<small class="obs-divide" title="A mesma regra vale para: {{ u.divide|join(', ') }}">+{{ u.divide|length }}</small>{% endif %}</span>
+          <span class="obs-dias">{{ dias_botoes(u.dias) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="gc-ajuda">Lista do Fracttal de {{ fracttal_em }}. Segunda a sexta ligados quer dizer sem regra: o motor atende em qualquer dia.</p>
+      {% if sem_usina %}
+      <div class="obs-bloco-cab"><span class="gc-rotulo">Regras que não casam com nenhuma usina do Fracttal</span>
+        <span class="gc-ajuda">o motor não aplica a nenhuma usina</span></div>
+      <div class="obs-usinas">
+        {% for i, x in regras if i in sem_usina %}
+        <div class="obs-usina obs-ruim" data-ordem="{{ i }}" data-tipo="usina" data-bruta="{{ x.bruta }}" data-usina="{{ x.usina }}">
+          <span class="obs-nome">{{ x.usina }}</span>
+          <span class="obs-dias">{{ dias_botoes(x.dias) }}</span>
+          <button type="button" class="obs-tirar" aria-label="Tirar a regra de {{ x.usina }}" title="Tirar">&times;</button>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </details>
+    {% for i, x in regras if x.tipo == 'usina' and i not in sem_usina %}<span hidden data-ordem="{{ i }}" data-tipo="usina" data-bruta="{{ x.bruta }}" data-usina="{{ x.usina }}" data-dias="{{ x.dias|join(',') }}"></span>{% endfor %}
+    {% else %}
+    {# Sem a lista do Fracttal nesta máquina (o cache que o motor grava): só as regras escritas. #}
+    <details class="obs-bloco obs-bloco--usinas"{% if not r.usinas or r.problemas %} open{% endif %}>
+      <summary class="obs-bloco-cab">
+        <span class="gc-rotulo">Dias de atendimento por usina</span>
+        <span class="obs-por-dia">{% for d in dias %}<span>{{ nomes_dia[d][:3] }} <b class="gc-num">{{ r.por_dia[d] }}</b></span>{% endfor %}</span>
+        <span class="gc-ajuda obs-abrir">abrir para editar</span>
+      </summary>
+      <div class="obs-usinas" id="obs-usinas">
+        {% for i, x in regras if x.tipo == 'usina' %}
+        <div class="obs-usina{{ ' obs-ruim' if x.problema }}" data-ordem="{{ i }}" data-tipo="usina" data-bruta="{{ x.bruta }}" data-usina="{{ x.usina }}"{% if x.problema %} title="{{ x.problema }}"{% endif %}>
+          <span class="obs-nome">{{ x.usina }}</span>
+          <span class="obs-dias">{{ dias_botoes(x.dias) }}</span>
+          <button type="button" class="obs-tirar" aria-label="Tirar a regra de {{ x.usina }}" title="Tirar">&times;</button>
+          {% if x.problema %}<span class="obs-problema">{{ x.problema }}</span>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="obs-usina obs-nova">
+          <input class="obs-campo" id="obs-nova-usina" placeholder="Nova usina e Enter" list="obs-usinas-lista" autocomplete="off">
+          <datalist id="obs-usinas-lista">{% for i, x in regras if x.tipo == 'usina' %}<option value="{{ x.usina }}">{% endfor %}</datalist>
+        </div>
+      </div>
+    </details>
+    {% endif %}
+
+    {# ── OS fora ── #}
+    <div class="obs-bloco">
+      <div class="obs-bloco-cab"><span class="gc-rotulo">OS fora da semana</span>
+        <span class="gc-ajuda">não entram nem como pendente</span></div>
+      <div class="obs-chips" id="obs-chips">
+        {% for i, x in regras if x.tipo == 'fora' %}
+        <span class="obs-chip" data-os="{{ x.os }}" data-ordem="{{ i }}" data-tipo="fora" data-bruta="{{ x.bruta }}"><span class="gc-dado">{{ x.os }}</span><button type="button" class="obs-tirar" aria-label="Devolver a OS {{ x.os }} à semana" title="Devolver à semana">&times;</button></span>
+        {% endfor %}
+        <input class="obs-campo obs-campo--os" id="obs-nova-fora" placeholder="nº da OS e Enter" inputmode="numeric" autocomplete="off">
+      </div>
+    </div>
+
+    {# ── OS com dia fixo ── #}
+    <div class="obs-bloco">
+      <div class="obs-bloco-cab"><span class="gc-rotulo">OS com dia fixo</span>
+        <span class="gc-ajuda">tudo opcional menos a OS. Nas OS de plano (Handover, MPx), "só as tarefas com" divide o plano por dia e "tirar as tarefas com" deixa parte de fora</span></div>
+      <div class="pcm-rolagem">
+        <table class="obs-tabela" id="obs-fixar">
+          <thead><tr><th>OS</th><th>Dias</th><th title="OS comum: fixa no dia só as tarefas citadas (vazio = todas)">Tarefas</th><th>Turno</th><th title="OS de plano (Handover, MPM, MPS...): nesta linha, só as tarefas cujo nome tem estas palavras">Só as tarefas com</th><th title="Tira da semana as tarefas da OS cujo nome tem estas palavras">Tirar as tarefas com</th><th></th></tr></thead>
+          <tbody>
+          {% for i, x in regras if x.tipo == 'fixar' %}
+            <tr class="obs-fixa{{ ' obs-ruim' if x.problema }}" data-ordem="{{ i }}" data-tipo="fixar" data-bruta="{{ x.bruta }}">
+              <td><input class="obs-campo obs-campo--os" data-campo="os" value="{{ x.os }}" inputmode="numeric"></td>
+              <td><span class="obs-dias">{{ dias_botoes(x.dias) }}</span></td>
+              <td><input class="obs-campo" data-campo="tarefas" value="{{ x.tarefas|join(', ') }}" placeholder="todas"></td>
+              <td><select class="obs-campo" data-campo="turno"><option value="">padrão</option>{% for t in turnos %}<option{% if x.turno|lower == t %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></td>
+              <td><input class="obs-campo" data-campo="so" value="{{ x.so|join(', ') }}" placeholder="ex.: Inversor"></td>
+              <td><input class="obs-campo" data-campo="sem" value="{{ x.sem|join(', ') }}" placeholder="ex.: QGBT, Trafo"></td>
+              <td><button type="button" class="obs-tirar" aria-label="Tirar a regra da OS {{ x.os }}" title="Tirar">&times;</button></td>
+            </tr>
+            {% if x.problema %}<tr class="obs-problema-linha"><td colspan="7"><span class="obs-problema">{{ x.problema }}</span> <span class="gc-dado">{{ x.bruta }}</span></td></tr>{% endif %}
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" id="obs-add-fixar"><i class="ph ph-plus"></i> OS com dia fixo</button>
+    </div>
+
+    {# ── o resto: comentário, texto livre e linha vazia (mantidos como estão) ── #}
+    {% set outras = regras|selectattr('1.tipo', 'in', ['nota', 'comentario'])|list %}
+    {% if outras %}
+    <div class="obs-bloco">
+      <div class="obs-bloco-cab"><span class="gc-rotulo">Notas e linhas que o motor não usa como regra</span></div>
+      <ul class="obs-notas">
+        {% for i, x in outras %}
+        <li class="{{ 'obs-ruim' if x.problema }}" data-ordem="{{ i }}" data-tipo="{{ x.tipo }}" data-bruta="{{ x.bruta }}">
+          <span class="gc-dado">{{ x.bruta }}</span>{% if x.problema %} <span class="obs-problema">{{ x.problema }}</span>{% endif %}
+          <button type="button" class="obs-tirar" aria-label="Tirar a linha" title="Tirar">&times;</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% for i, x in regras if x.tipo == 'vazia' %}<span hidden data-ordem="{{ i }}" data-tipo="vazia" data-bruta=""></span>{% endfor %}
+
+    <div class="obs-salvar">
+      <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-floppy-disk"></i> Salvar observações</button>
+      <span class="gc-ajuda" id="obs-estado">A geração da semana {{ semana_sugerida }} usa o que estiver salvo.</span>
+    </div>
+  </form>
+
+  <details class="obs-texto">
+    <summary>Editar como texto</summary>
+    <form method="post" action="/t/pcm/gerar/observacoes">
+      <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+      <p class="gc-ajuda">Uma regra por linha, na gramática do motor: <span class="gc-dado">@usina Nome = seg, qua</span> ·
+        <span class="gc-dado">13480; não</span> · <span class="gc-dado">10369; qua; tarefas; manhã; só: X; sem: Y</span> · linha com # é comentário.</p>
+      <textarea name="texto" class="gc-campo pcm-obs-texto" rows="10" spellcheck="false">{{ observacoes }}</textarea>
+      <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Salvar o texto</button>
+    </form>
+  </details>
+</section>
+
+<template id="obs-tpl-usina">
+  <div class="obs-usina" data-tipo="usina" data-bruta="" data-novo="1">
+    <span class="obs-nome"></span><span class="obs-dias">{{ dias_botoes([]) }}</span>
+    <button type="button" class="obs-tirar" aria-label="Tirar a regra" title="Tirar">&times;</button>
+  </div>
+</template>
+<template id="obs-tpl-fixar">
+  <tr class="obs-fixa" data-tipo="fixar" data-bruta="" data-novo="1">
+    <td><input class="obs-campo obs-campo--os" data-campo="os" inputmode="numeric" placeholder="nº"></td>
+    <td><span class="obs-dias">{{ dias_botoes([]) }}</span></td>
+    <td><input class="obs-campo" data-campo="tarefas" placeholder="todas"></td>
+    <td><select class="obs-campo" data-campo="turno"><option value="">padrão</option>{% for t in turnos %}<option>{{ t }}</option>{% endfor %}</select></td>
+    <td><input class="obs-campo" data-campo="so" placeholder="ex.: Inversor"></td>
+    <td><input class="obs-campo" data-campo="sem" placeholder="ex.: QGBT, Trafo"></td>
+    <td><button type="button" class="obs-tirar" aria-label="Tirar a regra" title="Tirar">&times;</button></td>
+  </tr>
+</template>
+
+<script>
+(function () {
+  var raiz = document.getElementById("obs"); if (!raiz) return;
+  var form = document.getElementById("obs-form"), saida = document.getElementById("obs-saida");
+  var estado = document.getElementById("obs-estado");
+  var DIAS = ["seg", "ter", "qua", "qui", "sex"];
+  var proxima = 0;
+  raiz.querySelectorAll("[data-ordem]").forEach(function (el) { proxima = Math.max(proxima, +el.dataset.ordem + 1); });
+
+  function lista(s) { return String(s || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean); }
+  function diasDe(el) {
+    // regra escondida (a que as usinas do Fracttal editam) guarda os dias no data-dias; cartão de regra, nos botões
+    if (!el.querySelector(".obs-dia")) return String(el.dataset.dias || "").split(",").filter(Boolean);
+    return DIAS.filter(function (d) { var b = el.querySelector('.obs-dia[data-dia="' + d + '"]'); return b && b.getAttribute("aria-pressed") === "true"; });
+  }
+  // A mesma escrita do observacoes.escrever_regra (Python); o teste do Python lê de volta o que sai daqui.
+  function escrever(el) {
+    var t = el.dataset.tipo;
+    if (t === "usina") return "@usina " + el.dataset.usina + " = " + diasDe(el).join(", ");
+    if (t === "fora") return el.dataset.os + "; não";
+    if (t === "fixar") {
+      var v = function (c) { var i = el.querySelector('[data-campo="' + c + '"]'); return i ? i.value.trim() : ""; };
+      var campos = [v("os"), diasDe(el).join(", "), lista(v("tarefas")).join(", "), v("turno")];
+      while (campos.length > 1 && !campos[campos.length - 1]) campos.pop();
+      if (lista(v("so")).length) campos.push("só: " + lista(v("so")).join(", "));
+      if (lista(v("sem")).length) campos.push("sem: " + lista(v("sem")).join(", "));
+      return campos.join("; ");
+    }
+    return el.dataset.bruta;
+  }
+  function montar() {
+    var itens = Array.prototype.slice.call(form.querySelectorAll("[data-ordem]")).filter(function (el) { return !el.dataset.removido; });
+    itens.sort(function (a, b) { return a.dataset.ordem - b.dataset.ordem; });
+    var linhas = itens.map(function (el) { return el.dataset.mexido ? escrever(el) : el.dataset.bruta; })
+      .filter(function (l, i) { return !(itens[i].dataset.tipo === "fixar" && itens[i].dataset.mexido && !/^\d+/.test(l)); });
+    saida.value = linhas.join("\n") + (linhas.length ? "\n" : "");
+  }
+  function mexeu(el) {
+    if (el) el.dataset.mexido = "1";
+    estado.textContent = "Alterações ainda não salvas.";
+    estado.classList.add("obs-estado--pendente");
+  }
+  function novo(el) { el.dataset.ordem = proxima++; el.dataset.mexido = "1"; return el; }
+
+  // ── usinas do Fracttal: o cartão edita a regra escondida que vale para ela (ou cria uma) ──
+  function regraDe(ordem) { return ordem === "" ? null : form.querySelector('[data-ordem="' + ordem + '"][data-tipo="usina"]'); }
+  function pintar(card, dias) {
+    card.querySelectorAll(".obs-dia").forEach(function (b) { b.setAttribute("aria-pressed", dias.indexOf(b.dataset.dia) >= 0 ? "true" : "false"); });
+    card.classList.toggle("obs-restrita", dias.length < DIAS.length);
+  }
+  function contar() {
+    var cards = form.querySelectorAll(".obs-ufr");
+    DIAS.forEach(function (d) {
+      var n = 0; cards.forEach(function (c) { if (c.querySelector('.obs-dia[data-dia="' + d + '"][aria-pressed="true"]')) n++; });
+      var alvo = document.querySelector('#obs-por-dia [data-dia="' + d + '"]'); if (alvo) alvo.textContent = n;
+    });
+    var r = document.getElementById("obs-restritas"); if (r) r.textContent = form.querySelectorAll(".obs-ufr.obs-restrita").length;
+    form.querySelectorAll("[data-restritas-de]").forEach(function (s) {
+      var c = s.dataset.restritasDe, n = 0;
+      form.querySelectorAll(".obs-ufr.obs-restrita").forEach(function (u) { if (!c || u.dataset.cliente === c) n++; });
+      s.textContent = n;
+    });
+  }
+  function clicarUsina(card, botao) {
+    var atuais = DIAS.filter(function (d) { return card.querySelector('.obs-dia[data-dia="' + d + '"][aria-pressed="true"]'); });
+    var dia = botao.dataset.dia;
+    var novos = atuais.indexOf(dia) >= 0 ? atuais.filter(function (d) { return d !== dia; }) : DIAS.filter(function (d) { return d === dia || atuais.indexOf(d) >= 0; });
+    if (!novos.length) {
+      // regra sem dia o motor descarta, e a usina voltaria a ser atendida em qualquer dia: o contrário do pedido
+      estado.textContent = "A usina precisa de pelo menos um dia."; estado.classList.add("obs-estado--pendente"); return;
+    }
+    var regra = regraDe(card.dataset.regra);
+    if (!regra) {
+      regra = document.createElement("span"); regra.hidden = true;
+      regra.dataset.tipo = "usina"; regra.dataset.bruta = ""; regra.dataset.usina = card.dataset.nomeRegra;
+      form.appendChild(novo(regra));
+      card.dataset.regra = regra.dataset.ordem;
+    }
+    regra.dataset.dias = novos.join(",");
+    if (novos.length === DIAS.length) regra.dataset.removido = "1"; else delete regra.dataset.removido;   // 5 dias = sem regra
+    form.querySelectorAll('.obs-ufr[data-regra="' + regra.dataset.ordem + '"]').forEach(function (c) { pintar(c, novos); });
+    mexeu(regra); contar();
+  }
+
+  form.addEventListener("click", function (e) {
+    var b = e.target.closest(".obs-dia");
+    if (b && b.closest(".obs-ufr")) { clicarUsina(b.closest(".obs-ufr"), b); return; }
+    if (b) { b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true"); mexeu(b.closest("[data-ordem]")); return; }
+    var x = e.target.closest(".obs-tirar");
+    if (x) {
+      var item = x.closest("[data-ordem]");
+      item.dataset.removido = "1"; item.hidden = true;
+      var prob = item.nextElementSibling;
+      if (prob && prob.classList.contains("obs-problema-linha")) prob.hidden = true;
+      mexeu(null);
+    }
+  });
+  form.addEventListener("input", function (e) { var item = e.target.closest("[data-ordem]"); if (item) mexeu(item); });
+  form.addEventListener("change", function (e) { var item = e.target.closest("[data-ordem]"); if (item) mexeu(item); });
+
+  function aoEnter(input, fn) {
+    input.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      var v = input.value.trim(); if (!v) return;
+      if (fn(v) !== false) input.value = "";
+    });
+  }
+  // filtro por cliente, busca e "só com dia restrito"
+  var cliente = "";
+  function filtrar() {
+    var q = (document.getElementById("obs-busca") || {}).value || "", so = (document.getElementById("obs-so-restritas") || {}).checked;
+    q = q.trim().toLowerCase();
+    form.querySelectorAll(".obs-ufr").forEach(function (c) {
+      c.hidden = !((!cliente || c.dataset.cliente === cliente) && (!q || c.dataset.busca.indexOf(q) >= 0) && (!so || c.classList.contains("obs-restrita")));
+    });
+  }
+  form.querySelectorAll(".obs-cli").forEach(function (b) {
+    b.addEventListener("click", function () {
+      // clicar de novo no cliente que já está filtrado volta para Todos
+      cliente = (b.dataset.cliente && b.dataset.cliente === cliente) ? "" : b.dataset.cliente;
+      form.querySelectorAll(".obs-cli").forEach(function (x) { x.setAttribute("aria-pressed", x.dataset.cliente === cliente ? "true" : "false"); });
+      var lista = form.querySelector(".obs-bloco--usinas"); if (lista && cliente) lista.open = true;
+      var aviso = document.getElementById("obs-filtro-ativo"); if (aviso) aviso.textContent = cliente ? "mostrando " + cliente : "";
+      filtrar();
+    });
+  });
+  var busca = document.getElementById("obs-busca");
+  if (busca) { busca.addEventListener("input", filtrar); busca.addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); }); }
+  var so = document.getElementById("obs-so-restritas"); if (so) so.addEventListener("change", filtrar);
+
+  if (document.getElementById("obs-nova-usina")) aoEnter(document.getElementById("obs-nova-usina"), function (nome) {
+    var el = document.getElementById("obs-tpl-usina").content.firstElementChild.cloneNode(true);
+    el.dataset.usina = nome; el.querySelector(".obs-nome").textContent = nome;
+    var novaCaixa = document.querySelector("#obs-usinas .obs-nova");
+    novaCaixa.parentNode.insertBefore(novo(el), novaCaixa);
+    mexeu(el); el.querySelector(".obs-dia").focus();
+  });
+  aoEnter(document.getElementById("obs-nova-fora"), function (v) {
+    if (!/^\d+$/.test(v)) { estado.textContent = "Digite só o número da OS."; return false; }
+    var el = document.createElement("span");
+    el.className = "obs-chip"; el.dataset.tipo = "fora"; el.dataset.os = v; el.dataset.bruta = "";
+    el.innerHTML = '<span class="gc-dado"></span><button type="button" class="obs-tirar" title="Devolver à semana">&times;</button>';
+    el.querySelector(".gc-dado").textContent = v;
+    var campo = document.getElementById("obs-nova-fora");
+    campo.parentNode.insertBefore(novo(el), campo);
+    mexeu(el);
+  });
+  document.getElementById("obs-add-fixar").addEventListener("click", function () {
+    var tr = document.getElementById("obs-tpl-fixar").content.firstElementChild.cloneNode(true);
+    document.querySelector("#obs-fixar tbody").appendChild(novo(tr));
+    mexeu(tr); tr.querySelector("input").focus();
+  });
+  form.addEventListener("submit", montar);
+  window.addEventListener("beforeunload", function (e) {
+    if (estado.classList.contains("obs-estado--pendente") && !form.dataset.enviando) { e.preventDefault(); e.returnValue = ""; }
+  });
+  form.addEventListener("submit", function () { form.dataset.enviando = "1"; });
+})();
+</script>

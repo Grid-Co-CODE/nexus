@@ -1,0 +1,187 @@
+/* PCM no Nexus: as mesmas medidas do cadastro (tabela, filtros, avisos), com prefixo pcm-, e os tokens do nexus.css.
+   Semáforo: finalizada = verde, em andamento = amarelo, dia acima da capacidade = vermelho. */
+.pcm-topo{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.pcm-topo .titulo-pagina{margin-bottom:2px}
+.pcm-sub{margin:0;color:var(--tinta-2);font-size:14px}
+.pcm-semanas{display:flex;gap:6px;flex-wrap:wrap}
+.pcm-semanas a{font:600 12px/16px var(--font-sans);padding:6px 10px;border:1px solid var(--linha);border-radius:var(--raio-tag);
+  color:var(--tinta-2);text-decoration:none;white-space:nowrap}
+.pcm-semanas a:hover{border-color:var(--linha-forte);color:var(--tinta)}
+.pcm-semanas a[aria-current]{background:var(--verde-suave);border-color:rgba(163,217,0,.35);color:var(--tinta)}
+
+.pcm-fonte{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--mudo);margin:0 0 16px;max-width:760px}
+.pcm-fonte i{font-size:16px;margin-top:1px}
+.pcm-aviso{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--linha);border-radius:var(--raio-md);
+  padding:12px 14px;margin:0 0 16px;color:var(--tinta-2);font-size:14px;max-width:760px}
+.pcm-aviso i{font-size:18px;margin-top:1px}
+.pcm-aviso strong{color:var(--tinta)}
+.pcm-aviso--alerta{border-color:rgba(255,216,61,.35);background:rgba(255,216,61,.08)}
+.pcm-aviso--alerta i{color:var(--alerta)}
+.pcm-aviso--critico{border-color:rgba(255,91,110,.45);background:var(--critico-suave)}
+.pcm-aviso--critico i{color:var(--critico)}
+
+.pcm-numeros{margin:0 0 22px}
+.pcm-h2{font:700 18px/24px var(--font-display);color:var(--tinta);margin:24px 0 4px}
+
+.pcm-rolagem{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md);margin-top:10px}
+.pcm-tabela{width:100%;border-collapse:collapse;font-size:13px}
+.pcm-tabela th{position:sticky;top:0;background:var(--superficie-2);text-align:left;font:700 11px/14px var(--font-sans);
+  letter-spacing:.04em;text-transform:uppercase;color:var(--mudo);padding:9px 12px;white-space:nowrap}
+.pcm-tabela td{padding:9px 12px;border-top:1px solid var(--linha);color:var(--tinta-2);vertical-align:top}
+.pcm-tabela tbody tr:first-child td{border-top:0}
+.pcm-tabela tbody tr:hover td{background:var(--superficie-2);color:var(--tinta)}
+.pcm-tabela a.linha{color:var(--tinta);text-decoration:none;font-weight:600}
+.pcm-tabela a.linha:hover{color:var(--verde-texto)}
+.pcm-tabela .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pcm-data{display:block;font-weight:500;letter-spacing:0;text-transform:none;color:var(--fraco)}
+.pcm-mudo{display:block;font-size:12px;color:var(--mudo)}
+.pcm-noite{display:block;font-size:11px;font-weight:500;color:var(--mudo)}
+.pcm-link{color:var(--verde-texto);text-decoration:none}
+.pcm-link:hover{text-decoration:underline}
+.pcm-tabela td.pcm-estourou{color:var(--critico);font-weight:700;background:var(--critico-suave)}
+.pcm-barra{display:inline-block;width:38px;height:6px;border-radius:3px;background:var(--linha);margin-right:8px;
+  vertical-align:middle;position:relative;overflow:hidden}
+.pcm-barra::after{content:"";position:absolute;top:0;bottom:0;left:0;width:var(--p);background:var(--verde)}
+
+.pcm-tipos{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.pcm-tipo{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--linha);
+  border-radius:var(--raio-tag);color:var(--tinta-2);text-decoration:none;font-size:13px}
+.pcm-tipo:hover{border-color:var(--linha-forte);color:var(--tinta)}
+.pcm-tipo b{color:var(--tinta);font-weight:600}
+
+.pcm-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px}
+.pcm-filtros .campo{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pcm-filtros .busca{flex:1 1 240px}
+.pcm-filtros .busca .gc-campo{width:100%}
+.pcm-filtros select.gc-campo{min-width:140px;max-width:220px}
+.pcm-conta{margin:0;color:var(--mudo);font-size:13px}
+.pcm-hora{white-space:nowrap}
+.pcm-sit{display:inline-flex;align-items:center;gap:6px;font:600 11px/16px var(--font-sans);padding:3px 9px;
+  border-radius:var(--raio-tag);white-space:nowrap;color:var(--mudo);background:var(--superficie-2)}
+.pcm-sit::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pcm-sit--feita{color:var(--verde-texto);background:var(--verde-suave)}
+.pcm-sit--andamento{color:var(--alerta);background:rgba(255,216,61,.10)}
+.pcm-paginas{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+
+/* Gerar a semana (etapa 2) */
+.pcm-aviso--ok{border-color:rgba(163,217,0,.35);background:var(--verde-suave)}
+.pcm-aviso--ok i{color:var(--verde-texto)}
+.pcm-sit--ok{color:var(--verde-texto);background:var(--verde-suave)}
+.pcm-sit--rodando{color:var(--alerta);background:rgba(255,216,61,.10)}
+.pcm-sit--falhou,.pcm-sit--interrompida{color:var(--critico);background:var(--critico-suave)}
+.pcm-rodada{border:1px solid var(--linha);border-radius:var(--raio-md);padding:16px 18px;margin:0 0 22px;display:grid;gap:10px}
+.pcm-rodada-topo{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pcm-rodada-topo .pcm-h2{margin:0}
+.pcm-rodada .pcm-numeros{margin:0}
+.pcm-rodada .pcm-aviso{margin:0}
+.pcm-conf{max-width:760px}
+.pcm-conf-item{display:inline-flex;gap:6px;align-items:flex-start;color:var(--tinta-2)}
+.pcm-conf-item i{font-size:16px;margin-top:2px}
+.pcm-conf-item--ok i{color:var(--verde-texto)}
+.pcm-conf-item--falta{color:var(--tinta)}
+.pcm-conf-item--falta i{color:var(--critico)}
+.pcm-conf-item--aviso{color:var(--tinta)}
+.pcm-conf-item--aviso i{color:var(--alerta)}
+.pcm-conf-ajuda{max-width:760px;margin:-4px 0 10px}
+.pcm-obs{display:flex;flex-direction:column;gap:8px;max-width:760px}
+.pcm-obs-texto{width:100%;font:500 13px/20px var(--font-mono);resize:vertical}
+.pcm-obs-acoes{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.pcm-gerar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:10px 0 8px}
+.pcm-gerar .campo{display:flex;flex-direction:column;gap:5px}
+.pcm-gerar .gc-campo{width:130px}
+.pcm-gerar button[disabled]{opacity:.45;cursor:not-allowed}
+.pcm-confirma{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--tinta-2);max-width:420px}
+/* Observações da semana como regras (01/10/2026): cartões de usina, etiquetas de OS e uma tabela curta, no lugar
+   do bloco de texto de 57 linhas que ocupava a tela inteira. */
+.obs{margin-top:8px}
+.obs-topo{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+.obs-topo .pcm-h2{margin-bottom:0}
+.obs-resumo{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font-size:13px;color:var(--mudo)}
+.obs-resumo b{color:var(--tinta);font-weight:600}
+.obs-resumo-ruim{color:var(--alerta)}
+.obs-topo-acoes{margin-left:auto}
+.obs-bloco{margin-top:14px}
+.obs-bloco-cab{display:flex;gap:10px;align-items:baseline;margin-bottom:6px}
+.obs-bloco--usinas>summary{list-style:none;cursor:pointer;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--linha);
+  border-radius:var(--raio-controle);background:var(--superficie)}
+.obs-bloco--usinas>summary::-webkit-details-marker{display:none}
+.obs-bloco--usinas>summary:hover{background:var(--superficie-2)}
+.obs-bloco--usinas[open]>summary{margin-bottom:6px}
+.obs-bloco--usinas[open] .obs-abrir{display:none}
+.obs-por-dia{display:inline-flex;gap:12px;font-size:12.5px;color:var(--mudo)}
+.obs-por-dia b{color:var(--tinta)}
+.obs-abrir{margin-left:auto}
+/* Colunas largas o bastante para o nome inteiro ao lado dos dias: com cartão de 205 px, 42 dos 49 nomes
+   saíam cortados ("Bonfim Limoeiro do Norte"). */
+.obs-usinas{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:4px 8px}
+.obs-usina{display:flex;align-items:center;gap:6px;padding:3px 4px 3px 9px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-controle);min-width:0;flex-wrap:wrap}
+/* as 143 usinas abertas davam 2.100 px de página: a lista rola por dentro e o filtro fica sempre à vista */
+.obs-usinas--fracttal{max-height:60vh;overflow-y:auto;padding-right:4px;align-content:start}
+.obs-filtro{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:2px 0 8px}
+/* cards de cliente no topo: clicar filtra a lista de usinas (o mesmo grid simétrico, largura igual para todos) */
+.obs-cab-usinas{margin-top:14px}
+.obs-cli-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:8px}
+.obs-cli{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:0 8px;text-align:left;cursor:pointer;
+  padding:8px 10px;border:1px solid var(--linha);border-radius:var(--raio-controle);background:var(--superficie);color:var(--tinta);
+  font:inherit;min-width:0}
+.obs-cli:hover{background:var(--superficie-2)}
+.obs-cli[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-suave)}
+.obs-cli-nome{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obs-cli-num{font-size:15px;font-weight:600}
+.obs-cli-sub{grid-column:1/-1;font-size:11px;color:var(--mudo)}
+.obs-clientes{display:flex;flex-wrap:wrap;gap:5px}
+.obs-clientes .gc-chip{padding:4px 10px;font-size:11.5px}
+.obs-clientes .gc-chip span{color:var(--mudo);margin-left:2px}
+.obs-busca{width:200px}
+.obs-so{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--tinta-2)}
+/* usina com dia restrito (tem regra) fica marcada em verde; a que atende em qualquer dia fica discreta */
+.obs-ufr .obs-dia[aria-pressed="true"]{background:var(--superficie-3);border-color:var(--linha-forte);color:var(--tinta-2)}
+.obs-ufr.obs-restrita{border-color:rgba(163,217,0,.35)}
+.obs-ufr.obs-restrita .obs-dia[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.obs-uf{margin-left:6px;font-size:10.5px;color:var(--mudo)}
+.obs-divide{margin-left:6px;font-size:10.5px;color:var(--info);cursor:help}
+.obs-nome{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obs-dias{display:inline-flex;gap:2px;flex:none}
+.obs-dia{width:21px;height:21px;border-radius:6px;border:1px solid var(--linha-forte);background:transparent;
+  color:var(--mudo);font:600 11px/1 var(--font-sans);cursor:pointer;padding:0}
+.obs-dia:hover{border-color:var(--verde)}
+.obs-dia[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.obs-tirar{flex:none;width:22px;height:22px;border:0;background:transparent;color:var(--fraco);font-size:16px;line-height:1;
+  cursor:pointer;border-radius:6px;padding:0}
+.obs-tirar:hover{color:var(--critico);background:var(--critico-suave)}
+.obs-nova{background:transparent;border-style:dashed;padding:3px 6px}
+.obs-campo{font:400 13px/18px var(--font-sans);color:var(--tinta);background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:6px;padding:4px 8px;min-width:0;width:100%}
+.obs-nova .obs-campo{border:0;background:transparent;padding:4px 2px}
+.obs-campo:focus{outline:none;border-color:var(--foco)}
+.obs-campo--os{width:96px;font-family:var(--font-mono)}
+.obs-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.obs-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 2px 2px 10px;border:1px solid var(--linha-forte);
+  border-radius:999px;background:var(--superficie)}
+.obs-chips .obs-campo--os{width:150px;border-style:dashed;border-radius:999px}
+.obs-tabela{width:100%;border-collapse:collapse;font-size:13px}
+.obs-tabela th{font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:left;padding:6px 6px}
+.obs-tabela td{padding:4px 6px;border-top:1px solid var(--linha);vertical-align:middle}
+.obs-tabela tbody:empty::after{content:"Nenhuma OS com dia fixo nesta semana.";display:block;padding:6px;color:var(--mudo);font-size:12.5px}
+.obs-notas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.obs-notas li{display:flex;gap:8px;align-items:center;padding:4px 6px 4px 10px;border:1px solid var(--linha);border-radius:6px}
+.obs-notas li .gc-dado{flex:1;min-width:0;overflow-wrap:anywhere}
+.obs-ruim{border-color:rgba(255,216,61,.5)!important}
+.obs-problema{flex-basis:100%;font-size:11.5px;color:var(--alerta)}
+.obs-notas .obs-problema{flex-basis:auto}
+.obs-salvar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.obs-estado--pendente{color:var(--alerta)}
+.obs-texto{margin-top:12px;max-width:760px}
+.obs-texto summary{cursor:pointer;font-size:13px;color:var(--mudo)}
+.obs-texto form{display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-start}
+.pcm-pre{font:12px/1.5 var(--font-mono);white-space:pre-wrap;word-break:break-word;margin:6px 0 0;color:var(--tinta-2)}
+.pcm-log summary{cursor:pointer;font-size:13px;color:var(--mudo)}
+.pcm-log .pcm-pre{background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md);padding:10px 12px;max-height:360px;overflow:auto}
+
+@media (max-width:640px){
+  .pcm-tabela{font-size:12px}
+  .pcm-tabela td,.pcm-tabela th{padding:8px 9px}
+  .pcm-filtros .campo{flex:1 1 45%}
+  .pcm-filtros select.gc-campo{min-width:0;max-width:none;width:100%}
+}

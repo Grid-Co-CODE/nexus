@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block titulo %}Semana{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+<p class="gc-eyebrow">PCM · Programação semanal</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Semana</h1>
+    {% if sem %}<p class="pcm-sub">{{ sem.label }}</p>{% endif %}
+  </div>
+  {% if sem %}
+  <nav class="pcm-semanas" aria-label="Semanas">
+    {% for s in semanas %}<a href="?semana={{ s.week }}"{% if s.week == sem.week %} aria-current="page"{% endif %}>Semana {{ s.num }}{% if s.ativa %} · valendo{% endif %}</a>{% endfor %}
+  </nav>
+  {% endif %}
+</div>
+
+{% include "pcm/_fonte.html" %}
+
+{% if sem %}
+<div class="gc-numeros pcm-numeros">
+  <div><div class="r">Tarefas</div><div class="v gc-num">{{ resumo.linhas }}</div>
+    <div class="d">{{ resumo.os }} OS · {{ resumo.usinas }} usinas · {{ resumo.equipes }} equipes</div></div>
+  <div><div class="r">Aderência</div><div class="v gc-num">{{ resumo.aderencia }}%</div>
+    <div class="d">{{ resumo.feitas }} finalizadas · {{ resumo.em_andamento }} em andamento</div></div>
+  <div><div class="r">Horas programadas</div><div class="v gc-num">{{ resumo.horas_txt }}</div>
+    <div class="d">capacidade de {{ capacidade }} por equipe e dia</div></div>
+  <div><div class="r">Pendentes</div><div class="v gc-num">{{ resumo.pendentes }}</div>
+    <div class="d">{{ resumo.reprogramadas }} reprogramadas · {{ resumo.novas }} OS novas na semana</div></div>
+  <div><div class="r">Fora do horário</div><div class="v gc-num">{{ resumo.fora_horario }}</div>
+    <div class="d"><a class="pcm-link" href="/t/pcm/tarefas?semana={{ sem.week }}&amp;horario=fora">começam antes das 07:00 ou depois das 17:00</a></div></div>
+</div>
+
+<h2 class="pcm-h2">Por equipe</h2>
+<p class="gc-ajuda">Horas programadas por dia. Em vermelho, o dia que passou de {{ capacidade }}. A MPA roda à noite
+  (15:30 à 01:30) e aparece à parte; a zeladoria é terceirizada e não entra na conta. Clique na equipe para ver as tarefas.</p>
+<div class="pcm-rolagem">
+  <table class="pcm-tabela">
+    <thead><tr>
+      <th>Equipe</th><th class="num">Tarefas</th><th class="num">Aderência</th>
+      {% for d in dias %}<th class="num">{{ d.nome }}<span class="pcm-data">{{ d.data }}</span></th>{% endfor %}
+      <th class="num">Pendentes</th>
+    </tr></thead>
+    <tbody>
+    {% for e in equipes %}
+      <tr>
+        <td><a class="linha" href="/t/pcm/tarefas?semana={{ sem.week }}&amp;equipe={{ e.equipe|urlencode }}">{{ e.equipe }}</a>
+          <span class="pcm-mudo">{{ e.usinas }} usina{{ 's' if e.usinas != 1 }}</span></td>
+        <td class="num">{{ e.linhas }}</td>
+        <td class="num"><span class="pcm-barra" style="--p:{{ e.aderencia }}%"></span>{{ e.aderencia }}%</td>
+        {% for d in dias %}<td class="num{% if d.id in e.estourou %} pcm-estourou{% endif %}">{{ e.horas_txt[d.id] or '—' }}
+          {%- if e.noite_txt[d.id] %}<span class="pcm-noite">+{{ e.noite_txt[d.id] }} de MPA</span>{% endif %}</td>{% endfor %}
+        <td class="num">{{ e.pendentes or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="pcm-h2">Por tipo</h2>
+<div class="pcm-tipos">
+  {% for t, n in resumo.por_tipo %}<a class="pcm-tipo" href="/t/pcm/tarefas?semana={{ sem.week }}&amp;tipo={{ t|urlencode }}"><span>{{ t }}</span><b class="gc-num">{{ n }}</b></a>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block titulo %}Gerar a semana{% endblock %}
+{% set rotulo = {'rodando': 'Rodando', 'ok': 'Terminou', 'falhou': 'Falhou', 'interrompida': 'Interrompida'} %}
+{% macro hora(iso) %}{{ iso[8:10] ~ '/' ~ iso[5:7] ~ ' ' ~ iso[11:16] if iso else '' }}{% endmacro %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+<p class="gc-eyebrow">PCM · Programação semanal · sombra</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Gerar a semana</h1>
+    <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana do Fabrício. Nada é publicado: o campo continua
+      com a semana dele.</p>
+  </div>
+</div>
+
+{% if erro %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>
+{% endif %}
+{% if ok %}
+<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>{{ ok }}</strong></div></div>
+{% endif %}
+
+{% if sel %}
+<section class="pcm-rodada">
+  <div class="pcm-rodada-topo">
+    <h2 class="pcm-h2">Semana {{ sel.semana }}</h2>
+    <span class="pcm-sit pcm-sit--{{ sel.estado }}">{{ rotulo.get(sel.estado, sel.estado) }}</span>
+  </div>
+  <p class="gc-ajuda">Começou em {{ hora(sel.inicio) }}{% if sel.fim %}, terminou em {{ hora(sel.fim) }}
+    ({{ sel.duracao_s // 60 }} min {{ sel.duracao_s % 60 }} s){% endif %}. Credencial do Fracttal: {{ sel.credencial }}.</p>
+
+  {% if sel.estado == 'rodando' %}
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-hourglass-medium"></i><div><strong>O motor está lendo o Fracttal.</strong>
+    Esta página se atualiza sozinha quando ele terminar; pode sair e voltar depois.</div></div>
+  <script>
+  (function () {
+    var id = {{ sel.id|tojson }};
+    function ver() {
+      fetch("/t/pcm/gerar/estado?rodada=" + encodeURIComponent(id), {credentials: "same-origin"})
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (j.estado !== "rodando") location.reload(); else setTimeout(ver, 5000); })
+        .catch(function () { setTimeout(ver, 10000); });
+    }
+    setTimeout(ver, 5000);
+  })();
+  </script>
+  {% elif sel.estado == 'interrompida' %}
+  <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-plugs"></i><div><strong>A rodada foi interrompida.</strong>
+    O Nexus reiniciou enquanto o motor rodava. Gere de novo.</div></div>
+  {% endif %}
+
+  {% if sel.erro %}
+  <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>O motor não terminou.</strong>
+    <pre class="pcm-pre">{{ sel.erro }}</pre></div></div>
+  {% endif %}
+
+  {% if sel.resumo %}
+  <div class="gc-numeros pcm-numeros">
+    <div><div class="r">Linhas geradas</div><div class="v gc-num">{{ sel.resumo.linhas }}</div><div class="d">{{ sel.resumo.equipes }} equipes</div></div>
+    <div><div class="r">Pendentes</div><div class="v gc-num">{{ sel.resumo.pendentes }}</div><div class="d">o que não coube na semana</div></div>
+    {% if sel.comparacao %}
+    <div><div class="r">Contra a do Fabrício</div><div class="v">{{ 'Idênticas' if sel.comparacao.identicas else 'Diferentes' }}</div>
+      <div class="d">{{ sel.comparacao.iguais }} de {{ sel.comparacao.comuns }} linhas iguais em tudo</div></div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if sel.comparacao %}
+  {% set c = sel.comparacao %}
+  {% if c.identicas %}
+  <div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>Idênticas.</strong> A geração do Nexus bateu
+    linha a linha com a {{ sel.oficial.arquivo }} ({{ sel.oficial.atualizado }}): mesma equipe, dia, hora, duração e pendentes.</div></div>
+  {% else %}
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-git-diff"></i><div><strong>Diferentes da {{ sel.oficial.arquivo }}.</strong>
+    Cada diferença precisa de explicação antes da troca (por exemplo, uma OS que mudou no Fracttal entre as duas gerações).</div></div>
+  <div class="pcm-rolagem">
+    <table class="pcm-tabela">
+      <thead><tr><th></th><th class="num">Oficial</th><th class="num">Nexus</th></tr></thead>
+      <tbody>
+        <tr><td>Linhas programadas</td><td class="num">{{ c.linhas_a }}</td><td class="num">{{ c.linhas_b }}</td></tr>
+        <tr><td>Só de um lado</td><td class="num">{{ c.so_a }}</td><td class="num">{{ c.so_b }}</td></tr>
+        <tr><td>Pendentes</td><td class="num">{{ c.pendentes_a }}</td><td class="num">{{ c.pendentes_b }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% if c.diferencas %}
+  <div class="pcm-rolagem">
+    <table class="pcm-tabela">
+      <thead><tr><th>Campo</th><th class="num">Linhas diferentes</th><th>Exemplo (OS: oficial → Nexus)</th></tr></thead>
+      <tbody>
+      {% for campo, n in c.diferencas.items() %}
+        {% set ex = c.exemplos[campo] %}
+        <tr><td>{{ campo }}</td><td class="num">{{ n }}</td><td><span class="gc-dado">{{ ex.os }}</span>: {{ ex.oficial or 'vazio' }} → {{ ex.nexus or 'vazio' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if c.os_so_a or c.os_so_b %}
+  <p class="gc-ajuda">{% if c.os_so_a %}Só na oficial: OS {{ c.os_so_a|join(', ') }}. {% endif %}{% if c.os_so_b %}Só no Nexus: OS {{ c.os_so_b|join(', ') }}.{% endif %}</p>
+  {% endif %}
+  {% endif %}
+  {% elif sel.estado == 'ok' %}
+  <p class="gc-ajuda">A semana oficial ainda não está na pasta do PCM. A comparação sai quando o Fabrício publicar: gere de novo depois.</p>
+  {% endif %}
+
+  {% if log %}
+  <details class="pcm-log"><summary>Log do motor (últimas 40 linhas)</summary><pre class="pcm-pre">{{ log }}</pre></details>
+  {% endif %}
+</section>
+{% endif %}
+
+<h2 class="pcm-h2">O que o motor precisa</h2>
+<p class="gc-ajuda pcm-conf-ajuda">Prioridades, Confiabilidade, Histórico, Feriados e Observações moram no Nexus: a cada geração o
+  Nexus escreve os arquivos que o motor lê. Enquanto o Fabrício gera pelo PC dele, importe os arquivos dele antes de gerar,
+  para as duas semanas partirem do mesmo dado.</p>
+<section class="bloco pcm-conf">
+  {% for i in conf.itens %}
+  {% set classe = 'aviso' if i.aviso else ('ok' if i.ok else 'falta') %}
+  <div class="linha-bloco">
+    <span class="gc-rotulo">{{ i.nome }}</span>
+    <span class="pcm-conf-item pcm-conf-item--{{ classe }}"><i class="ph {{ {'ok': 'ph-check-circle', 'aviso': 'ph-warning', 'falta': 'ph-x-circle'}[classe] }}"></i> {{ i.detalhe }}</span>
+  </div>
+  {% endfor %}
+</section>
+{% if tem_origem %}
+<form class="pcm-gerar" method="post" action="/t/pcm/gerar/importar">
+  <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-download-simple"></i> Importar da pasta do PCM</button>
+  <span class="gc-ajuda">Traz os cinco arquivos de hoje; as observações entram na semana {{ semana_sugerida }}.</span>
+</form>
+{% endif %}
+
+{% include "pcm/_observacoes.html" %}
+<form class="pcm-gerar" method="get" action="/t/pcm/gerar">
+  <div class="campo">
+    <label class="gc-rotulo" for="ver-semana">Ver outra semana</label>
+    <input id="ver-semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>
+  </div>
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Abrir</button>
+</form>
+
+<h2 class="pcm-h2">Nova geração</h2>
+<form class="pcm-gerar" method="post" action="/t/pcm/gerar">
+  <div class="campo">
+    <label class="gc-rotulo" for="semana">Semana</label>
+    <input id="semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>
+  </div>
+  {% if campo %}
+  <label class="pcm-confirma"><input type="checkbox" name="confirmo" value="1"> Estou ciente: é horário de campo, e o motor divide a
+    cota do Fracttal com o App de Campo.</label>
+  {% else %}<input type="hidden" name="confirmo" value="1">{% endif %}
+  <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not conf.pronto %} disabled{% endif %}><i class="ph ph-play"></i> Gerar em sombra</button>
+</form>
+<p class="gc-ajuda">Leva alguns minutos: o motor lê o Fracttal inteiro, a 1 pedido por segundo. Pode sair desta página.</p>
+
+{% if ultimas %}
+<h2 class="pcm-h2">Últimas gerações</h2>
+<div class="pcm-rolagem">
+  <table class="pcm-tabela">
+    <thead><tr><th>Começou</th><th>Semana</th><th>Situação</th><th class="num">Linhas</th><th>Contra a do Fabrício</th></tr></thead>
+    <tbody>
+    {% for u in ultimas %}
+      <tr>
+        <td><a class="linha" href="?rodada={{ u.id }}">{{ hora(u.inicio) }}</a></td>
+        <td>{{ u.semana }}</td>
+        <td><span class="pcm-sit pcm-sit--{{ u.estado }}">{{ rotulo.get(u.estado, u.estado) }}</span></td>
+        <td class="num">{{ u.resumo.linhas if u.resumo else '—' }}</td>
+        <td>{% if u.comparacao %}{{ 'Idênticas' if u.comparacao.identicas else 'Diferentes' }}{% elif u.estado == 'ok' %}sem a oficial ainda{% else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

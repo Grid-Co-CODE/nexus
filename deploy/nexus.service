@@ -1,0 +1,20 @@
+# Serviço do Nexus para o systemd. Copie para /etc/systemd/system/nexus.service e ajuste o caminho e o usuário.
+#   sudo systemctl daemon-reload && sudo systemctl enable --now nexus
+#   journalctl -u nexus -f          (log)
+[Unit]
+Description=Nexus (Grid Co. O&M)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=nexus
+WorkingDirectory=/opt/nexus
+# o .env fica ao lado do servir.py (o Nexus o lê de lá); variável de ambiente por cima vale mais
+Environment=NEXUS_PORTA=5070
+Environment=TZ=America/Sao_Paulo
+ExecStart=/opt/nexus/.venv/bin/python servir.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

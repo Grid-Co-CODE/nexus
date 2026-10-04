@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block titulo %}Tarefas e OS{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+<p class="gc-eyebrow">PCM · Programação semanal</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Tarefas e OS</h1>
+    {% if sem %}<p class="pcm-sub">{{ sem.label }}</p>{% endif %}
+  </div>
+  {% if sem %}
+  <nav class="pcm-semanas" aria-label="Semanas">
+    {% for s in semanas %}<a href="?semana={{ s.week }}"{% if s.week == sem.week %} aria-current="page"{% endif %}>Semana {{ s.num }}{% if s.ativa %} · valendo{% endif %}</a>{% endfor %}
+  </nav>
+  {% endif %}
+</div>
+
+{% include "pcm/_fonte.html" %}
+
+{% if sem %}
+<form class="pcm-filtros" method="get">
+  <input type="hidden" name="semana" value="{{ sem.week }}">
+  {% if filtros.horario %}<input type="hidden" name="horario" value="{{ filtros.horario }}">{% endif %}
+  <div class="campo busca">
+    <label class="gc-rotulo" for="q">Buscar</label>
+    <input id="q" name="q" class="gc-campo" value="{{ q }}" placeholder="Usina, OS, tarefa…" autocomplete="off">
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="f-equipe">Equipe</label>
+    <select id="f-equipe" name="equipe" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for e in opcoes.equipes %}<option value="{{ e }}"{% if e == filtros.equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="f-dia">Dia</label>
+    <select id="f-dia" name="dia" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for v, rot in opcoes.dias %}<option value="{{ v }}"{% if v == filtros.dia %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="f-status">Situação</label>
+    <select id="f-status" name="status" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for v, rot in opcoes.situacoes %}<option value="{{ v }}"{% if v == filtros.status %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="f-tipo">Tipo</label>
+    <select id="f-tipo" name="tipo" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for t in opcoes.tipos %}<option value="{{ t }}"{% if t == filtros.tipo %} selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
+  {% if filtros.values()|select|list %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="?semana={{ sem.week }}">Limpar</a>{% endif %}
+</form>
+
+{% if filtros.horario %}
+<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-moon"></i><div><strong>Só as que começam fora da jornada (antes das 07:00
+  ou depois das 17:00).</strong> A MPA fica de fora (tem janela própria à noite), e a zeladoria também (é terceirizada). Pode haver
+  turno noturno pedido pelo PCM no meio. <a href="?semana={{ sem.week }}">Ver todas</a></div></div>
+{% endif %}
+<p class="pcm-conta"><span class="gc-num">{{ total }}</span> de <span class="gc-num">{{ total_semana }}</span> tarefas
+  {%- if paginas > 1 %} · página {{ pagina }} de {{ paginas }}{% endif %}</p>
+<div class="pcm-rolagem">
+  <table class="pcm-tabela">
+    <thead><tr>
+      <th>Dia · hora</th><th>Equipe</th><th>Usina</th><th>OS</th><th>Tarefa</th><th>Tipo</th>
+      <th class="num">Duração</th><th>Situação</th><th>Responsável</th>
+    </tr></thead>
+    <tbody>
+    {% for r in linhas %}
+      <tr>
+        <td class="pcm-hora">{{ r._dia }} <span class="gc-dado">{{ r.h_ini }}–{{ r.h_fim }}</span></td>
+        <td>{{ r.cluster }}</td>
+        <td>{{ r.usina }}</td>
+        <td class="gc-dado">{{ r.os_id }}</td>
+        <td>{{ r.tarefa }}</td>
+        <td>{{ r.tipo }}</td>
+        <td class="num">{{ r._duracao }}</td>
+        <td><span class="pcm-sit pcm-sit--{{ r._situacao }}">{{ {'feita': 'Finalizada', 'andamento': 'Em andamento', 'nao_iniciada': 'Não iniciada'}.get(r._situacao, r.status) }}</span></td>
+        <td>{{ r.responsavel }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9" class="pcm-mudo">Nenhuma tarefa com esses filtros.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if paginas > 1 %}
+<nav class="pcm-paginas" aria-label="Páginas">
+  {% set base = request.args.to_dict() %}
+  {% if pagina > 1 %}{% set _ = base.update({'pagina': pagina - 1}) %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="?{{ base|urlencode }}">Anterior</a>{% endif %}
+  <span class="pcm-conta">Página {{ pagina }} de {{ paginas }}</span>
+  {% if pagina < paginas %}{% set _ = base.update({'pagina': pagina + 1}) %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="?{{ base|urlencode }}">Próxima</a>{% endif %}
+</nav>
+{% endif %}
+{% endif %}
+{% endblock %}

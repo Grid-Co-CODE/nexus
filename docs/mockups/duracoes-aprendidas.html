@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Durações aprendidas · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+:root{--fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--superficie-3:#243154;--barra:#0d1526;--tinta:#e9eef6;--tinta-2:#c3cad7;
+  --mudo:#96a0b4;--linha:rgba(255,255,255,.09);--linha-forte:rgba(255,255,255,.16);--verde:#a3d900;--verde-suave:rgba(163,217,0,.12);
+  --verde-texto:#c4e755;--alerta:#ffd83d;--alerta-suave:rgba(255,216,61,.14);--info:#7fb8ff;--info-suave:rgba(91,157,255,.14);
+  --erro:#ff7a7a;--erro-suave:rgba(255,107,107,.13);
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.55 var(--sans)}
+.topo{display:flex;gap:14px;align-items:center;padding:14px 32px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1240px;margin:0 auto;padding:28px 32px 60px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 30px/36px var(--display);margin:6px 0 8px}
+h2{font:700 20px/28px var(--display);margin:38px 0 12px}
+.lead{color:var(--tinta-2);max-width:920px;margin:0}
+.lead b{color:var(--tinta)}
+.dado{font:500 12.5px/18px var(--mono)}
+.mudo{color:var(--mudo)}
+p.texto{color:var(--tinta-2);max-width:920px;margin:0 0 12px}
+p.texto b{color:var(--tinta);font-weight:600}
+/* resposta curta */
+.resposta{margin:20px 0 0;background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:10px;padding:16px 18px;max-width:980px}
+.resposta b{color:var(--tinta)}
+.resposta p{margin:0;color:var(--tinta-2)}
+.resposta p+p{margin-top:8px}
+/* números */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:18px 0 0}
+.kpi{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.kpi .v{font:700 24px/30px var(--display)}
+.kpi .r{font-size:12.5px;color:var(--tinta-2)}
+.kpi.al .v{color:var(--alerta)}.kpi.ok .v{color:var(--verde-texto)}.kpi.in .v{color:var(--info)}
+/* fluxo */
+.fluxo{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:10px;align-items:stretch;margin:14px 0 6px}
+.fluxo .caixa{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.fluxo .caixa b{display:block;font-weight:600}
+.fluxo .caixa span{font-size:12.5px;color:var(--tinta-2)}
+.fluxo .caixa.quebra{border-color:rgba(255,216,61,.45);background:linear-gradient(0deg,var(--alerta-suave),var(--alerta-suave)),var(--superficie)}
+.fluxo .caixa.quebra b{color:var(--alerta)}
+.fluxo .seta{color:var(--verde-texto);font-size:22px;align-self:center}
+/* passos */
+.passos{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.passos div{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.passos b{display:flex;gap:8px;align-items:center;font-weight:600}
+.passos b em{font:700 11px/20px var(--mono);font-style:normal;color:var(--fundo);background:var(--verde);border-radius:50%;width:20px;height:20px;display:inline-grid;place-items:center;flex:none}
+.passos p{margin:6px 0 0;color:var(--tinta-2);font-size:13px}
+/* tabelas */
+.tab{width:100%;border-collapse:collapse;background:var(--superficie);border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:13px}
+.tab th{font:700 10.5px/16px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:left;padding:10px 12px;background:var(--superficie-2);border-bottom:1px solid var(--linha)}
+.tab td{padding:9px 12px;border-bottom:1px solid var(--linha);color:var(--tinta-2);vertical-align:top}
+.tab tr:last-child td{border-bottom:0}
+.tab td.n{font:500 12.5px/18px var(--mono);text-align:right;white-space:nowrap;color:var(--tinta)}
+.tab th.n{text-align:right}
+.tab td b{color:var(--tinta);font-weight:600}
+.cima{color:var(--info)!important}.baixo{color:var(--alerta)!important}.fora{color:var(--erro)!important}
+.rolar{overflow-x:auto}
+.nota{font-size:12.5px;color:var(--mudo);margin:8px 0 0;max-width:980px}
+/* código */
+pre{margin:0;background:#0b1120;border:1px solid var(--linha);border-radius:10px;padding:14px 16px;overflow-x:auto;font:400 12.5px/19px var(--mono);color:var(--tinta-2)}
+pre .c{color:var(--mudo)}pre .k{color:var(--verde-texto)}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.painel{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:16px 18px}
+.painel h3{margin:0 0 8px;font:600 15px/20px var(--sans);display:flex;gap:8px;align-items:center}
+.painel h3 i{font-size:20px}
+.painel p,.painel li{color:var(--tinta-2);font-size:13px}
+.painel p{margin:6px 0 0}
+.painel ul{margin:6px 0 0;padding-left:18px}
+.painel li+li{margin-top:4px}
+.painel b{color:var(--tinta);font-weight:600}
+.painel.sombra h3 i{color:var(--info)}
+.painel.ativo h3 i{color:var(--alerta)}
+/* opções */
+.opcoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+.op{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.op header{display:flex;gap:10px;align-items:flex-start}
+.op h3{margin:0;font:600 15px/20px var(--sans)}
+.op p{margin:0;color:var(--tinta-2);font-size:13px}
+.op p b{color:var(--tinta);font-weight:600}
+.op.rec{border-color:rgba(163,217,0,.5);box-shadow:inset 0 0 0 1px rgba(163,217,0,.18)}
+.selo{margin-left:auto;flex:none;font:600 10.5px/15px var(--sans);padding:2px 8px;border-radius:6px;white-space:nowrap;display:inline-flex;gap:5px;align-items:center}
+.selo::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-ok{color:var(--verde-texto);background:var(--verde-suave)}
+.s-al{color:var(--alerta);background:var(--alerta-suave)}
+.s-erro{color:var(--erro);background:var(--erro-suave)}
+.s-in{color:var(--info);background:var(--info-suave)}
+.lista-nao{margin:0;padding-left:18px;color:var(--tinta-2);max-width:980px}
+.lista-nao li+li{margin-top:6px}
+.lista-nao b{color:var(--tinta);font-weight:600}
+@media (max-width:860px){.fluxo{grid-template-columns:1fr}.fluxo .seta{transform:rotate(90deg);justify-self:center}.duas{grid-template-columns:1fr}}
+@media (max-width:760px){main{padding:20px 16px 40px}.topo{padding:12px 16px}h1{font-size:25px;line-height:31px}}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Mockup · Durações aprendidas · 02/10/2026</span></div>
+<main>
+  <p class="eyebrow">PCM · Programação semanal · Insumo do motor</p>
+  <h1>O que é o duracoes_aprendidas.json, e para que ele serve</h1>
+  <p class="lead">É uma <b>tabela de "quanto tempo cada tipo de serviço leva de verdade"</b>, medida nas tarefas
+    finalizadas do Fracttal: MPA, MPM, MPS, Handover e o resto, por usina, por cluster e no geral. O motor da programação
+    lê esse arquivo toda sexta, escreve o número numa coluna da planilha e <b>não usa para nada</b>. A agenda continua
+    saindo das durações fixas.</p>
+
+  <div class="resposta">
+    <p><b>Em uma frase:</b> é um experimento em modo sombra para trocar as durações fixas do motor pela medição real.
+      Ele foi medido, deu um número que reflete <b>o jeito de cada equipe apontar a hora no Fracttal</b> e não o trabalho,
+      e por isso continua desligado desde 18/09.</p>
+    <p><b>Para a decisão do Nexus:</b> se o arquivo sumir amanhã, a semana sai idêntica. Só desaparece a coluna
+      "Duração aprendida (h)". Não há urgência; há uma escolha.</p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi in"><div class="v">31,6 KB</div><div class="r">o arquivo inteiro. 198 chaves por usina, 104 por cluster, 6 gerais e 205 rejeitadas</div></div>
+    <div class="kpi al"><div class="v">18/09</div><div class="r">data da cópia que o motor lê, na pasta do PCM. A nuvem já recalculou em 25/09 e 02/10</div></div>
+    <div class="kpi ok"><div class="v">0 h</div><div class="r">o que ele muda na agenda hoje. Modo sombra: só preenche uma coluna</div></div>
+    <div class="kpi al"><div class="v">−11,5%</div><div class="r">o que mudaria na carga da semana 41 se fosse ligado (−365 h em 2.126 tarefas)</div></div>
+  </div>
+
+  <h2>Quem gera, quando, e de onde vem o dado</h2>
+  <div class="fluxo">
+    <div class="caixa"><b>Fracttal</b><span>tarefas com estado "Finalizados" dos últimos 180 dias e o campo <span class="dado">real_duration</span> (o "Tempo de execução" que o técnico aponta)</span></div>
+    <i class="ph ph-arrow-right seta"></i>
+    <div class="caixa"><b>aprender_duracoes.py</b><span>roda no GitHub do PCM (<span class="dado">duracoes.yml</span>) toda sexta, agendado para 05:00 de Brasília. Na prática começou às 10:20 em 25/09 e às 11:31 em 02/10; leva 20 a 30 min</span></div>
+    <i class="ph ph-arrow-right seta"></i>
+    <div class="caixa quebra"><b>Cópia para a pasta do PCM</b><span>o JSON é publicado no repositório, mas o motor lê a pasta do OneDrive. Alguém precisa copiar. Isso parou: a pasta ainda tem a versão de 18/09</span></div>
+    <i class="ph ph-arrow-right seta"></i>
+    <div class="caixa"><b>Motor (programacao_v7.py)</b><span>lê o arquivo na geração e preenche "Duração aprendida (h)" e "Duração (base)" em cada tarefa</span></div>
+  </div>
+  <p class="nota">O conteúdo da cópia da pasta e o do repositório (clone local de 25/09) são idênticos, chave por chave; só a data do arquivo difere.
+    A versão de 02/10, que está só no GitHub, tem 207 chaves por usina, 106 por cluster e 209 rejeitadas, medidas em 15.106 tarefas finalizadas.</p>
+
+  <h2>Como o número é calculado</h2>
+  <div class="passos">
+    <div><b><em>1</em> Filtra o que é execução</b>
+      <p>Só tarefas finalizadas, com data nos últimos 180 dias. Descarta apontamento abaixo de 3 minutos ou acima de 24 h
+        (em 02/10: 2.806 descartadas, 15.106 ficaram).</p></div>
+    <div><b><em>2</em> Classifica pelo nome</b>
+      <p>MPA, MPS, MPT, MPM, MPQ, MPW pela sigla ou por "anual/semestral/mensal" no nome; Handover pelo nome; o resto vira
+        OUTRA (corretivas e demais).</p></div>
+    <div><b><em>3</em> Tira os fora da curva</b>
+      <p>Remove outliers pelo IQR (o mesmo método da análise de 31/07) e tira a média. Precisa de <b>pelo menos 5 amostras</b>
+        no grupo, senão o grupo não entra.</p></div>
+    <div><b><em>4</em> Teto de 2 vezes</b>
+      <p>Se a média ficar acima do dobro ou abaixo da metade da duração fixa do motor, o grupo é <b>rejeitado</b> e o motor
+        fica com a fixa. Pega quem fecha a tarefa em segundos.</p></div>
+    <div><b><em>5</em> Do mais específico ao mais geral</b>
+      <p>Para cada tarefa o motor procura: categoria na <b>usina</b>; se não houver, na <b>equipe/cluster</b>; se não houver, o
+        <b>geral</b> da categoria.</p></div>
+    <div><b><em>6</em> Duas travas no motor</b>
+      <p><b>Zeladoria fica de fora</b> (o apontamento é a conferência do técnico, cerca de 1 h, não as 20 h da roçagem
+        terceirizada) e a tarefa cuja medição diverge mais de 2 vezes da própria estimativa mantém a estimativa.</p></div>
+  </div>
+
+  <h2>Duração fixa de hoje contra a medida</h2>
+  <p class="texto">A duração que manda na agenda <b>não vem da Planilha Confiabilidade para as preventivas</b>: elas têm
+    um número fixo no código do motor, calibrado à mão em 31/07 com 26.267 tarefas. A Planilha Confiabilidade R00
+    (15 categorias de corretiva, por exemplo Inspeção de Inversor 1,45 h e Religamento de Inversor 1,24 h) só entra
+    para corretiva <b>sem</b> estimativa no Fracttal; depois dela vem o MTTR da Lista de Prioridades e, no fim, 1,5 h.</p>
+  <div class="rolar">
+  <table class="tab">
+    <thead><tr><th>Categoria</th><th class="n">Fixa no motor</th><th class="n">Medida 18/09 (a da pasta)</th><th class="n">Amostras</th><th class="n">Medida 02/10 (nuvem)</th><th>Leitura</th></tr></thead>
+    <tbody>
+      <tr><td><b>MPA</b> anual</td><td class="n">4,00 h</td><td class="n baixo">2,27 h</td><td class="n">538</td><td class="n baixo">2,72 h</td><td>A maior diferença. Na análise de 31/07 deu 3,95 h; em 18/09, 2,27 h</td></tr>
+      <tr><td><b>MPM</b> mensal</td><td class="n">1,10 h</td><td class="n">1,02 h</td><td class="n">4.033</td><td class="n">0,98 h</td><td>Praticamente bate</td></tr>
+      <tr><td><b>MPS</b> semestral</td><td class="n">1,30 h</td><td class="n">1,32 h</td><td class="n">1.062</td><td class="n">1,31 h</td><td>Bate</td></tr>
+      <tr><td><b>MPT</b> trimestral</td><td class="n">1,30 h</td><td class="n baixo">0,72 h</td><td class="n">56</td><td class="n mudo">sem leitura</td><td>A fixa é provisória (copiada da MPS em 14/09)</td></tr>
+      <tr><td><b>Handover</b></td><td class="n">0,65 h</td><td class="n cima">0,86 h</td><td class="n">851</td><td class="n cima">0,84 h</td><td>Medido maior que a fixa</td></tr>
+      <tr><td><b>OUTRA</b> corretivas e demais</td><td class="n">1,50 h</td><td class="n">1,22 h</td><td class="n">6.077</td><td class="n">1,11 h</td><td>Só serve de último recurso</td></tr>
+      <tr><td><b>MPQ</b> / <b>MPW</b></td><td class="n">0,75 h</td><td class="n fora">0,13 / 0,16 h</td><td class="n">41 / 42</td><td class="n mudo">rejeitadas</td><td>Rejeitadas pelo teto: apontamento de segundos</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="nota">A coluna de 02/10 vem do registro da rodada no GitHub; a MPT de 02/10 não aparece nesse resumo e não foi conferida.</p>
+
+  <h2>O que o motor faz com ele hoje: modo sombra</h2>
+  <div class="duas">
+    <div>
+      <pre><span class="c"># programacao_v7.py, bloco "duração APRENDIDA"</span>
+DURACAO_APRENDIDA_ATIVA = os.environ.get(<span class="k">'PCM_DURACAO_APRENDIDA'</span>, <span class="k">'0'</span>) == <span class="k">'1'</span>
+...
+df_tasks[<span class="k">'dur_aprendida'</span>] = ...   <span class="c"># só a coluna nova</span>
+<span class="k">if</span> DURACAO_APRENDIDA_ATIVA:              <span class="c"># desligado: '0'</span>
+    df_tasks.loc[com, <span class="k">'dur_h'</span>] = df_tasks.loc[com, <span class="k">'dur_aprendida'</span>]</pre>
+      <p class="nota">Conferido no código: com a variável desligada, a duração usada para encher o dia de cada equipe (<span class="dado">dur_h</span>) não é tocada.
+        <span class="dado">dur_aprendida</span> só é levada até a planilha de saída. Sem o arquivo, o motor imprime um aviso e segue igual.</p>
+    </div>
+    <div class="painel sombra">
+      <h3><i class="ph ph-eye"></i> Medido na semana 41 (sombra)</h3>
+      <ul>
+        <li><b>Rodada do Nexus de 02/10:</b> 1.951 de 2.126 tarefas candidatas acharam medição; se valesse, a carga cairia <b>365 h (−11,5%)</b>.</li>
+        <li><b>Planilha do PCM "Programação Semana 41":</b> 953 de 1.113 linhas programadas com a coluna preenchida. Origem: 464 geral, 408 usina, 81 cluster. Vazias: 103 fora do teto, 57 zeladoria.</li>
+        <li><b>Diferença por linha:</b> média −0,16 h, 0,43 h em módulo; 533 linhas ficariam menores, 415 maiores.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="rolar" style="margin-top:14px">
+  <table class="tab">
+    <thead><tr><th>Categoria na semana 41</th><th class="n">Linhas com medição</th><th class="n">Média agendada</th><th class="n">Média aprendida</th><th class="n">Efeito na semana</th><th>Exemplo real</th></tr></thead>
+    <tbody>
+      <tr><td><b>MPA</b></td><td class="n">113</td><td class="n">4,00 h</td><td class="n baixo">2,78 h</td><td class="n baixo">−138 h</td><td>Ipixuna 1 e 2: 4,00 h vira 5,11 h (usina, n=24); Tupi Paulista: 4,00 h vira 2,27 h (geral)</td></tr>
+      <tr><td><b>MPM</b></td><td class="n">516</td><td class="n">1,06 h</td><td class="n">0,94 h</td><td class="n baixo">−59 h</td><td>Altair 1: 1,10 h vira 0,55 h (usina, n=62)</td></tr>
+      <tr><td><b>Handover</b></td><td class="n">141</td><td class="n">0,64 h</td><td class="n cima">0,86 h</td><td class="n cima">+32 h</td><td>quase tudo pelo geral (n=851)</td></tr>
+      <tr><td><b>OUTRA</b></td><td class="n">141</td><td class="n">1,05 h</td><td class="n">1,20 h</td><td class="n cima">+21 h</td><td>de 301 linhas, menos da metade achou medição</td></tr>
+      <tr><td><b>MPT</b></td><td class="n">14</td><td class="n">1,30 h</td><td class="n">0,86 h</td><td class="n">−6 h</td><td></td></tr>
+      <tr><td><b>MPS</b></td><td class="n">28</td><td class="n">1,30 h</td><td class="n">1,25 h</td><td class="n">−1 h</td><td>Piracicaba 1: 1,30 h vira 0,66 h (usina, n=28)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="nota">"Média agendada" é a coluna "Duração (h)" da planilha, que é o bloco de horário reservado: tarefa partida em dois dias aparece em pedaços, então a comparação por linha é aproximada.
+    O número exato do motor é o −365 h da rodada, que inclui também as pendentes que não couberam.</p>
+
+  <h2>O que mudaria se ligasse (PCM_DURACAO_APRENDIDA=1)</h2>
+  <div class="duas">
+    <div class="painel ativo">
+      <h3><i class="ph ph-warning"></i> A agenda passa a usar a medição</h3>
+      <ul>
+        <li>A duração de cada tarefa com medição troca pela aprendida, e é ela que consome as horas do dia da equipe.</li>
+        <li>Com 11,5% a menos de carga, o motor <b>enche os dias com mais tarefas</b>, sobretudo MPA: cada uma passa a ocupar cerca de 2,3 h a 2,8 h em vez de 4 h.</li>
+        <li>Handover cresce e ocupa mais espaço.</li>
+      </ul>
+    </div>
+    <div class="painel ativo">
+      <h3><i class="ph ph-x-circle" style="color:var(--erro)"></i> Por que o PCM não ligou</h3>
+      <ul>
+        <li><b>O tempo apontado mede hábito, não trabalho.</b> Há equipe que fecha a tarefa em segundos (MPA de Marabá 1 e 2: 0,09 h com mais de 40 amostras cada, rejeitadas pelo teto) e equipe que deixa o relógio correr a visita inteira (MPA de Matões 1: 7,04 h, aceita).</li>
+        <li>Dentro de uma usina as categorias se parecem: em 7 de 24 usinas a anual mede <b>menos</b> que a mensal (análise do PCM de 18/09).</li>
+        <li>O nível "por usina" é o mais contaminado, porque isola o hábito de uma equipe. A mensal de Matões 1 mede 3,94 h, mais de três vezes a fixa; hoje só o teto de 2x impede que ela entre.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Por que é um arquivo externo</h2>
+  <div class="passos">
+    <div><b><i class="ph ph-key" style="color:var(--verde-texto)"></i> A credencial estava em outro lugar</b>
+      <p>O cálculo precisa da API do Fracttal, cuja credencial do PCM só existia nos segredos do GitHub. O motor rodava
+        num PC. Então um lado calcula na nuvem e escreve, o outro lê da pasta.</p></div>
+    <div><b><i class="ph ph-function" style="color:var(--verde-texto)"></i> É dado derivado</b>
+      <p>Ninguém edita à mão. É resultado de outro programa, recalculável a qualquer momento das OS finalizadas.</p></div>
+    <div><b><i class="ph ph-link-break" style="color:var(--alerta)"></i> O elo entre os dois quebrou</b>
+      <p>A cópia do repositório para a pasta não é automática. Desde 18/09 o motor lê uma medição de duas semanas atrás, e
+        ninguém notou porque em sombra não faz diferença.</p></div>
+  </div>
+
+  <h2>O que fazer no Nexus</h2>
+  <div class="opcoes">
+    <article class="op rec">
+      <header><h3>A. O Nexus calcula ele mesmo e guarda como tabela</h3><span class="selo s-ok">Recomendado</span></header>
+      <p>A mesma conta (180 dias, 5 amostras, IQR, teto de 2x, usina, cluster, geral) roda dentro da geração da sexta e grava
+        numa tabela com data e número de amostras (a <span class="dado">tempo_referencia</span> do modelo de dados). O motor
+        segue em <b>sombra</b>.</p>
+      <p><b>Ganha:</b> some o arquivo e o passo de cópia que quebrou; a coluna de comparação volta a ser da semana certa; o
+        histórico das medições fica guardado, dá para ver se o apontamento está melhorando.</p>
+      <p><b>Custo:</b> o cálculo usa a mesma leitura de tarefas que o motor já faz (<span class="dado">df_semanal</span>),
+        então em princípio não gasta pedido a mais da cota do Fracttal. Falta confirmar que a leitura do Nexus traz as finalizadas
+        dos 180 dias.</p>
+    </article>
+    <article class="op">
+      <header><h3>B. Deixar de ler e desligar o robô</h3><span class="selo s-in">Simples</span></header>
+      <p>Tirar o arquivo da lista de insumos e desligar o <span class="dado">duracoes.yml</span>. A agenda não muda nada.</p>
+      <p><b>Perde:</b> a única medição contínua de quanto as tarefas duram de fato, que é o argumento para corrigir o apontamento
+        no campo. Retomar depois é barato: a conta é curta.</p>
+    </article>
+    <article class="op">
+      <header><h3>C. Continuar lendo o arquivo da pasta</h3><span class="selo s-al">Não recomendado</span></header>
+      <p>É o que o Nexus faz hoje (insumo opcional). Mantém uma dependência do OneDrive e de alguém lembrar de copiar, e o arquivo já
+        está duas semanas atrasado.</p>
+    </article>
+    <article class="op">
+      <header><h3>D. Ligar a duração aprendida</h3><span class="selo s-erro">Ainda não</span></header>
+      <p>Só depois que o apontamento no campo for confiável. Se um dia ligar, começar só pelo nível <b>geral</b> e só em
+        MPM, MPS e Handover, que são as que batem ou têm muita amostra; deixar MPA e o nível por usina de fora.</p>
+    </article>
+  </div>
+
+  <h2>O que não foi confirmado</h2>
+  <ul class="lista-nao">
+    <li><b>Quem copiou o arquivo para a pasta em 18/09</b>, e se havia rotina para isso. O registro do PCM diz que "precisa ser copiado"; não achei automação.</li>
+    <li><b>Se a leitura de tarefas do Nexus inclui as finalizadas de 180 dias</b> com o tempo de execução. É a mesma função do script, mas não rodei a conta dentro do Nexus.</li>
+    <li><b>O efeito exato por linha</b> na planilha da semana 41: a coluna "Duração (h)" é o bloco agendado, não a duração da tarefa. O total confiável é o −365 h do registro da rodada.</li>
+    <li><b>A MPT de 02/10</b> e as chaves novas daquela rodada: só li o resumo do registro, não o arquivo.</li>
+  </ul>
+</main>
+</body>
+</html>

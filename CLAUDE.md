@@ -1,8 +1,28 @@
 # CLAUDE.md — Nexus
 
 Casca única da operação O&M da Grid Co. (specs de produto R00 a R13 do Fillipe Figueiró, no SharePoint
-`Gridco/4. O&M/6.Gerencial/10. Nexus`). Responsável: Levi Maia. Repositório **privado**
-(`Grid-Co-CODE/nexus`): tem, e vai ter mais, dado de cliente e de contrato.
+`Gridco/4. O&M/6.Gerencial/10. Nexus`). Responsável: Levi Maia. Repositório **PÚBLICO** desde 30/09
+(`Grid-Co-CODE/nexus`): nenhum dado pessoal (CPF, telefone, e-mail, endereço), dado de cliente ou de contrato,
+print nem segredo em commit. Dado real mora em `dados/` e no armazém local, ambos fora do git.
+
+## REGRA: um `.md` por área, sempre em dia (Levi, 03/10/2026)
+
+Toda alteração em qualquer área atualiza o `CLAUDE.md` da pasta dela **no mesmo trabalho**; área sem `CLAUDE.md`
+ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não precisa varrer o código (economiza token).
+- Escreva o que o código não diz sozinho: para que serve, de onde vem o dado, a regra e o caso real que a criou,
+  como provar que funciona. Nada de repetir o código nem de diário de sessão.
+- Regra que mudou: **corrija** a linha velha, não acrescente outra ao lado. Curto e atual vale mais que completo.
+- Área nova: acrescente na tabela abaixo.
+
+| Área | `.md` |
+|---|---|
+| Casca, login, menu, servidor local | `nexus/casca/CLAUDE.md` |
+| Torres (como criar tela) | `nexus/torres/CLAUDE.md` |
+| COS | `nexus/torres/cos/CLAUDE.md` |
+| OS Creator embutido | `nexus/torres/oscreator/README.md` |
+| PCM (programação semanal) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
+| Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
+| Servidor da T.I. | `DEPLOY.md` |
 
 Desenho da fase atual: `docs/superpowers/specs/2026-09-29-casca-nexus-design.md`.
 
@@ -17,6 +37,8 @@ python -m pytest -q
 Sem o `.env` completo o app não sobe, e diz qual variável falta.
 
 ## Como o código está organizado
+
+**Leia o `.md` da área em que for mexer** (tabela acima).
 
 - `nexus/torres/<torre>/__init__.py` — uma pasta por torre. Declara `TORRE` e `bp`; é descoberta sozinha.
   **Para construir uma tela**, crie uma view no `bp` da torre com a mesma rota da tela
