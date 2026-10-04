@@ -15,7 +15,9 @@ RAIZ = Path(__file__).resolve().parent.parent
 OBRIGATORIAS = ("NEXUS_SECRET_KEY", "NEXUS_SENHA_ADMIN")
 # Opcionais: sem elas o Nexus sobe, e só a tela que depende delas avisa. O cadastro (29/09/2026) é a primeira:
 # sem NEXUS_CHAVE_CADASTRO ele não abre, e o resto da casca segue igual (a torre COS não precisa dela).
-OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL")
+OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
+             # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela
+             "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN")
 
 
 class ConfigErro(RuntimeError):

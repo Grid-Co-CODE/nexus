@@ -1,6 +1,10 @@
 import pytest
 
-from nexus.config import ConfigErro, carregar_config
+from nexus.config import ConfigErro, OPCIONAIS, carregar_config
+
+
+def test_a_ponte_da_plataforma_e_opcional():
+    assert "NEXUS_PLATAFORMA_URL" in OPCIONAIS and "NEXUS_PLATAFORMA_TOKEN" in OPCIONAIS
 
 
 def test_falta_variavel_diz_o_nome():
