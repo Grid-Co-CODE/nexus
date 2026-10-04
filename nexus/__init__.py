@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from flask import Flask
 
-from .config import carregar_config
+from .config import OPCIONAIS, carregar_config
 
 
 def create_app(config: dict | None = None) -> Flask:
@@ -25,6 +25,9 @@ def create_app(config: dict | None = None) -> Flask:
         # O BD_Operações tem 350 KB: 25 MB é folga para a planilha crescer sem abrir a porta a upload gigante.
         MAX_CONTENT_LENGTH=25 * 1024 * 1024,
     )
+    # As outras opcionais (tela Ligações: pasta de dados, regras, token do banco). Sem isto o teste que passava
+    # NEXUS_DADOS gravava no arquivo de regras de verdade (04/10/2026).
+    app.config.update({k: v for k, v in cfg.items() if k in OPCIONAIS and k not in app.config})
 
     from .auth import bp as auth_bp, instalar_portao
     from .casca import bp as casca_bp, instalar_contexto

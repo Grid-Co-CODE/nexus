@@ -30,3 +30,14 @@ def test_completa():
     cfg = carregar_config({"NEXUS_SECRET_KEY": "a", "NEXUS_SENHA_ADMIN": "b"})
     assert cfg["NEXUS_SECRET_KEY"] == "a"
     assert cfg["NEXUS_SENHA_ADMIN"] == "b"
+
+
+def test_a_ponte_chega_ao_app_config():
+    from nexus import create_app
+    cfg = {"NEXUS_SECRET_KEY": "x", "NEXUS_SENHA_ADMIN": "y",
+           "NEXUS_PLATAFORMA_URL": "http://127.0.0.1:5050", "NEXUS_PLATAFORMA_TOKEN": "t"}
+    app = create_app(cfg)
+    assert app.config["NEXUS_PLATAFORMA_URL"] == "http://127.0.0.1:5050"
+    assert app.config["NEXUS_PLATAFORMA_TOKEN"] == "t"
+    sem = create_app({"NEXUS_SECRET_KEY": "x", "NEXUS_SENHA_ADMIN": "y"})
+    assert "NEXUS_PLATAFORMA_URL" not in sem.config
