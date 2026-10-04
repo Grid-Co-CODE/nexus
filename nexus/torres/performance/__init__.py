@@ -79,6 +79,11 @@ def plataforma(caminho: str):
     # A barra inicial é obrigatória: o <path:> chega sem ela, e "@evil.com/x" colado em "http://plat:5050" viraria
     # usuário "plat" no servidor evil.com, levando a chave de leitura para fora (revisão da Tarefa 8).
     c = "/" + caminho
+    # O Flask decodifica %3F e %23 dentro do <path:>: "/api/x%3Fforce=1%26run=1" chegaria aqui como "api/x?force=1&run=1"
+    # e iria à plataforma como query de verdade, por fora do filtro do montar_pedido (que só limpa a query real) e
+    # com o POST de consulta passando no pode_passar mesmo com a query colada. Caminho não leva "?" nem "#".
+    if "?" in c or "#" in c:
+        return jsonify({"ok": False, "error": "caminho inválido"}), 400
     if not ponte.pode_passar(request.method, c):
         return jsonify({"ok": False, "error": "somente leitura (Nexus)"}), 403
     pedido = ponte.montar_pedido(url, token, request.method, c, list(request.args.items(multi=True)),

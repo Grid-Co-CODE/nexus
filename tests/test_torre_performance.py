@@ -69,6 +69,20 @@ def test_caminho_nunca_troca_de_servidor(logado_ponte, monkeypatch):
     assert visto["url"].startswith("http://plat:5050/@evil.com")
 
 
+@pytest.mark.parametrize("metodo,caminho", [
+    ("get", "/api/x%3Fforce=1%26run=1"),
+    ("post", "/api/etm/os%3Fforce=1"),
+    ("get", "/tempo-real%23x"),
+])
+def test_query_escondida_no_caminho_nao_sai(logado_ponte, monkeypatch, metodo, caminho):
+    # O Flask decodifica %3F e %23 dentro do <path:>. Sem esta recusa, "/api/x%3Fforce=1" viraria a URL
+    # ".../api/x?force=1": o force/run chegaria à plataforma por fora do filtro do montar_pedido (que só limpa a
+    # query de verdade) e o POST de consulta passaria no pode_passar mesmo com a query colada.
+    monkeypatch.setattr(ponte, "enviar", lambda **p: pytest.fail("pedido com query escondida saiu do Nexus"))
+    r = getattr(logado_ponte, metodo)(ponte.PREFIXO + caminho)
+    assert r.status_code == 400 and r.get_json()["error"] == "caminho inválido"
+
+
 def test_gravacao_nao_sai_do_nexus(logado_ponte, monkeypatch):
     monkeypatch.setattr(ponte, "enviar", lambda **p: pytest.fail("gravação saiu do Nexus"))
     r = logado_ponte.post(ponte.PREFIXO + "/api/state/tracking", json={"key": "x"})
