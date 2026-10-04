@@ -8,10 +8,11 @@ no GitHub** vem num pacote à parte que o Levi envia, o `nexus-acessos-AAAA-MM-D
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro e o token de escrita na API db_performace (publicar o cadastro no banco) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator e motor do PCM) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/pcm/insumos.json` | os insumos da programação semanal do PCM |
+| `dados/de_para_regras.json` | as decisões que tiram linhas do de-para (teste, tarefa interna, usina que não entra no BD) |
 | `dados/pcm/_ativos_classificacao_cache.json` | a lista de usinas do Fracttal (a tela de observações do PCM usa) |
 
 O pacote é descompactado **na raiz do clone**: cada arquivo cai no lugar certo. Os dois `.env` e a `dados/` nunca vão

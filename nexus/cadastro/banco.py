@@ -1,0 +1,326 @@
+"""O cadastro do Nexus no PostgreSQL (API db_performace), workbook `cadastro_nexus`: uma aba por tabela, ID numérico
+na 1ª coluna e ligação por ID.
+
+Decisão do Levi (04/10/2026): a chave é o ID, não o código da usina — "puxar ID é mais leve e fica mais fácil entender
+os inner joins". O código e os nomes de cada sistema ficam na aba `de_para`, que diz qual usina_id cada base chama de
+quê. Assim qualquer setor faz `usinas.cliente_id = clientes.cliente_id` sem casar nome.
+
+O que vai cifrado (a leitura da API não pede credencial): na usina, os campos marcados `sensivel` no esquema (receita,
+CNPJ, contatos, endereço, CEP, coordenadas); da pessoa, tudo menos vínculo, cargo, equipe, status e supervisor. Vão
+juntos, numa coluna `sensivel_cifrado` por linha, que só o Nexus abre (chave NEXUS_CHAVE_CADASTRO). Referência que não
+casou com ninguém (o nome do Excel que não tem ficha) fica sem ID e com o texto lá dentro.
+
+A cifra usa nonce aleatório: cifrar de novo o mesmo texto daria outro valor, e a API guarda histórico por linha. Por
+isso o texto cifrado que já está no banco é reaproveitado quando o conteúdo não mudou.
+
+Gravação: o caminho provado do `falhas_performance` e do `de_para_trackers` — xlsx com a linha 1 de cabeçalho, célula
+vazia = None, POST /api/workbooks/<chave>/sync-xlsx?replace=true. A API não apaga workbook: ele é criado uma vez só.
+"""
+import io
+import json
+import re
+import unicodedata
+from datetime import datetime, timedelta, timezone
+
+from .calculos import ERRO
+from .esquema import CLIENTES, EQUIPES, PESSOAS, USINAS
+from .tipos import TIPOS_COM_MARCADOR, Legado, marcador, para_api
+
+WORKBOOK = "cadastro_nexus"
+NOME = "Cadastro Nexus (BD_Operações): IDs e ligações"
+MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+COL_CIFRA = "sensivel_cifrado"
+_BRT = timezone(timedelta(hours=-3))
+
+# (entidade, aba, coluna do ID). A ordem é a dos inner joins: quem é apontado vem antes.
+TABELAS = ((CLIENTES, "clientes", "cliente_id"), (EQUIPES, "equipes", "equipe_id"),
+           (PESSOAS, "pessoas", "pessoa_id"), (USINAS, "usinas", "usina_id"))
+# Da pessoa, só isto sai em claro: nada aqui identifica alguém sozinho.
+PESSOA_EM_CLARO = ("vinculo", "cargo", "equipe", "status", "supervisor")
+# Na usina, além dos `sensivel` do esquema: a coluna "Ucs" do BD guarda o NÚMERO da UC (7 a 10 dígitos, igual à
+# "Instalação", que é sensível), não a quantidade. Achado na conferência do 1º envio (04/10/2026): iria em claro em 9 usinas.
+USINA_CIFRADA_NO_BANCO = ("ucs",)
+# Para onde aponta cada referência (campo "ref" -> coluna de ID da tabela apontada).
+ID_DE = {"clientes": "cliente_id", "equipes": "equipe_id", "pessoas": "pessoa_id", "usinas": "usina_id"}
+CAB_DE_PARA = ["usina_id", "sistema", "chave_externa", "casou_por"]
+CAB_ATUALIZACAO = ["publicado_em", "clientes", "equipes", "pessoas", "usinas", "de_para", "sem_id_na_referencia",
+                   "como_ler"]
+
+
+class BancoErro(RuntimeError):
+    pass
+
+
+def _id(v):
+    """ID do cadastro (texto "17") -> 17. Marcador, Legado ou vazio -> None (a ligação não existe)."""
+    if v is None or isinstance(v, Legado) or marcador(v) or v == "":
+        return None
+    s = str(v).strip()
+    if not s.isdigit():
+        raise BancoErro(f"ID não numérico no cadastro: {s!r}")
+    return int(s)
+
+
+def _valor(c, v):
+    if v is None:
+        return None
+    if isinstance(v, str) and marcador(v) and c.tipo in TIPOS_COM_MARCADOR:
+        return None                     # "N/A" numa coluna de número ou data: no banco é vazio
+    v = para_api(c.tipo, v)
+    if isinstance(v, bool):
+        return "sim" if v else "não"
+    return v
+
+
+def _coluna(c) -> str:
+    return f"{c.id}_id" if c.tipo == "ref" and not c.id.endswith("_id") else c.id
+
+
+def _em_claro(ent, c) -> bool:
+    if c.sensivel:
+        return False
+    if ent is PESSOAS:
+        return c.id in PESSOA_EM_CLARO
+    return not (ent is USINAS and c.id in USINA_CIFRADA_NO_BANCO)
+
+
+def _cabecalho(ent, col_id):
+    cab = [col_id]
+    for c in ent.campos:
+        if _em_claro(ent, c):
+            cab.append(_coluna(c))
+    return cab + ["excluido", "versao", "alterado_em", COL_CIFRA]
+
+
+def _cifra(cofre, ent, id_, segredo: dict, anteriores: dict):
+    if not segredo:
+        return None
+    texto = json.dumps(segredo, ensure_ascii=False, sort_keys=True)
+    contexto = f"banco/{ent.id}/{id_}"
+    antigo = anteriores.get(id_)
+    if antigo and cofre.eh_cifrado(antigo):
+        try:
+            if cofre.decifrar(antigo, contexto) == texto:
+                return antigo               # nada mudou: a linha do banco fica intocada
+        except Exception:                   # noqa: BLE001 — cifrado com outra chave ou outro contexto: refaz
+            pass
+    return cofre.cifrar(texto, contexto)
+
+
+def tabelas(srv, cofre, anteriores: dict | None = None) -> dict:
+    """{aba: (cabecalho, linhas)} do cadastro inteiro. `anteriores` = {aba: {id: sensivel_cifrado}} do banco."""
+    anteriores = anteriores or {}
+    out, sem_id = {}, 0
+    for ent, aba, col_id in TABELAS:
+        cab = _cabecalho(ent, col_id)
+        linhas = []
+        regs = sorted(srv.registros(ent.id, incluir_excluidos=True), key=lambda r: _id(r.id))
+        for r in regs:
+            if r.ilegivel:
+                raise BancoErro(f"{ent.plural} {r.id} não abre com a chave atual: não publico um cadastro pela metade")
+            id_ = _id(r.id)
+            linha, segredo = {col_id: id_}, {}
+            for c in ent.campos:
+                v = r.valor(c.id)
+                if v is ERRO:       # fórmula que no Excel dava #ERRO (ex.: base da equipe sem endereço legível)
+                    v = None
+                if not _em_claro(ent, c):
+                    if v is not None:
+                        segredo[c.id] = para_api(c.tipo, v)
+                    continue
+                if c.tipo == "ref":
+                    linha[_coluna(c)] = _id(v)
+                    if isinstance(v, Legado):
+                        segredo[f"{c.id}_texto"] = v.texto      # nome que não casou: guarda, mas não em claro
+                        sem_id += 1
+                    continue
+                linha[_coluna(c)] = _valor(c, v)
+            linha.update({"excluido": "sim" if r.excluido else "não", "versao": r.versao,
+                          "alterado_em": r.alterado_em or None,
+                          COL_CIFRA: _cifra(cofre, ent, id_, segredo, anteriores.get(aba, {}))})
+            linhas.append([linha.get(k) for k in cab])
+        out[aba] = (cab, linhas)
+    out["_sem_id"] = sem_id
+    return out
+
+
+# ── de-para: o que cada base chama de cada usina ───────────────────────────────────────────────────────────────
+
+def norm(s) -> str:
+    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"\s*-\s*[a-z]{2}\s*$", "", s.strip())          # " - SP" do Fracttal
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def sufixo_codigo(c) -> str:
+    """"ATHN-MAB100" e "MAB100" -> "MAB100": as bases da API gravam com e sem o prefixo do cliente."""
+    c = str(c or "").strip().upper()
+    return c.split("-", 1)[1] if "-" in c else c
+
+
+def codigo_do_equipamento(c) -> str | None:
+    """Código da usina dentro do código de equipamento do Fracttal, que vem em dois formatos: "MAB100-INVR2.4" e
+    "THPN-SDI100-INVR11.1" (com o prefixo do cliente). Devolve "MAB100" ou "THPN-SDI100". Ler só o 1º pedaço tomava o
+    prefixo "THPN" por código e derrubou a medição de 04/10 para 47%; lendo os dois formatos, casam 132 de 142."""
+    partes = str(c or "").strip().upper().split("-")
+    if re.fullmatch(r"[A-Z]{3}\d{3}", partes[0]):
+        return partes[0]
+    if len(partes) > 1 and re.fullmatch(r"[A-Z]{3}\d{3}", partes[1]):
+        return f"{partes[0]}-{partes[1]}"
+    return None
+
+
+SEM_PAR = "sem par no cadastro"
+
+
+def ignorado(regras, sistema, chave) -> str | None:
+    """Decisões do Levi que tiram uma linha da conta ("TESTE é teste", "Porteiras não entra no BD"). Cada regra:
+    {"contem": texto, "sistema": opcional, "motivo": texto}."""
+    k = norm(chave)
+    for r in regras or ():
+        if r.get("sistema") and r["sistema"] != sistema:
+            continue
+        if norm(r["contem"]) and norm(r["contem"]) in k:
+            return f"ignorado: {r['motivo']}"
+    return None
+
+
+def de_para(srv, fontes: dict, regras=None) -> list[list]:
+    """Uma linha por chave externa de cada base: a usina_id a que ela liga e COMO ligou, ou por que não ligou.
+    `fontes` = {sistema: [{"chave", "codigo", "nome", "cliente", "nomes", "cidade", "uf", "mwp", "dica"}]}.
+
+    Ordem: regra de ignorar; código (o inteiro, com o prefixo do cliente, depois só o "AAA999": "IPX100" é de duas
+    usinas, "2C-IPX100" de uma); nome do Fracttal ("Cliente - Usina - UF"); e, para base sem código, o casamento por
+    nome de `casamento.py` (só dentro do cliente: E1 e Thopen têm usinas de mesmo nome e são usinas diferentes). A
+    `dica` é a usina que outra fonte já conferida aponta (o de-para de trackers): sem casamento, ela liga; contra o
+    casamento, não liga ninguém. Nome ou código que serve a duas usinas não casa: ligação errada é pior que faltando."""
+    from . import casamento as K
+    por_cod, por_cheio, por_nome, por_cliente = {}, {}, {}, {}
+    for u in srv.registros("usinas"):
+        uid = _id(u.id)
+        cheio = str(u.valor("codigo") or "").strip().upper()
+        cod = sufixo_codigo(cheio)
+        if cod and not marcador(cod) and re.fullmatch(r"[A-Z]{3}\d{3}", cod):
+            por_cod.setdefault(cod, set()).add(uid)
+            por_cheio.setdefault(cheio, set()).add(uid)
+        cliente = srv.titulo_de("clientes", u.valor("cliente"))
+        por_nome.setdefault(norm(f"{cliente} - {u.valor('nome')}"), set()).add(uid)
+        pot = u.valor("potencia_contratual")
+        por_cliente.setdefault(norm(cliente), []).append({
+            "id": uid, "nome": u.valor("nome"), "cidade": u.valor("cidade"), "uf": u.valor("uf"),
+            "mwp": float(pot) if isinstance(pot, (int, float)) and not isinstance(pot, bool) else None})
+    linhas = [[_id(u.id), "BD_Operações", u.valor("id_bd"), "id do BD"]
+              for u in srv.registros("usinas") if u.valor("id_bd")]
+    ligado_por_nome = {}                    # chave externa (ex.: nome no Fracttal) -> usina_id, para as dicas
+    for sistema, itens in fontes.items():
+        vistos = set()
+        for it in itens:
+            ids, como = [], ignorado(regras, sistema, it["chave"])
+            cheio = str(it.get("codigo") or "").strip().upper()
+            cod = sufixo_codigo(cheio)
+            if como:
+                pass
+            elif "-" in cheio and len(por_cheio.get(cheio, ())) == 1:
+                ids, como = list(por_cheio[cheio]), "código"
+            elif cod and len(por_cod.get(cod, ())) == 1:
+                ids, como = list(por_cod[cod]), "código"
+            elif it.get("nomes") and it.get("cliente"):
+                r = K.casar(it, por_cliente.get(norm(it["cliente"]), []))
+                dica = it.get("dica")
+                if dica is not None and isinstance(dica, str):
+                    dica = ligado_por_nome.get(dica) or next(iter(por_nome.get(norm(dica), ())), None)
+                if r and (dica is None or dica in r[0]):
+                    ids, como = r
+                    como += " + de-para de trackers" if dica is not None else ""
+                elif r is None and dica is not None:
+                    ids, como = [dica], "de-para de trackers"
+                else:
+                    como = "conflito com o de-para de trackers" if r else None
+            elif it.get("nome"):
+                nome = norm(f"{it['cliente']} - {it['nome']}") if it.get("cliente") else norm(it["nome"])
+                if len(por_nome.get(nome, ())) == 1:
+                    ids, como = list(por_nome[nome]), "nome"
+            if ids and it.get("origem") and not como.startswith("código"):
+                como = f"{como} ({it['origem']})"       # o nome veio de outro campo (ex.: a localização no Fracttal)
+            if len(ids) == 1:
+                ligado_por_nome[it["chave"]] = ids[0]
+            for uid in ids or [None]:
+                if (uid, it["chave"]) not in vistos:
+                    vistos.add((uid, it["chave"]))
+                    linhas.append([uid, sistema, it["chave"], como or SEM_PAR])
+    return sorted(linhas, key=lambda l: (l[1], l[0] if l[0] is not None else 10 ** 9, str(l[2])))
+
+
+# ── arquivo e envio ────────────────────────────────────────────────────────────────────────────────────────────
+
+def montar(srv, cofre, fontes: dict | None = None, anteriores: dict | None = None, regras=None) -> dict:
+    t = tabelas(srv, cofre, anteriores)
+    sem_id = t.pop("_sem_id")
+    dp = de_para(srv, fontes or {}, regras)
+    t["de_para"] = (CAB_DE_PARA, dp)
+    agora = datetime.now(_BRT).isoformat(timespec="seconds")
+    t["atualizacao"] = (CAB_ATUALIZACAO, [[agora, len(t["clientes"][1]), len(t["equipes"][1]), len(t["pessoas"][1]),
+                                           len(t["usinas"][1]), len(dp), sem_id,
+                                           "liga por ID: usinas.cliente_id = clientes.cliente_id; "
+                                           "sensivel_cifrado só abre no Nexus"]])
+    return t
+
+
+def xlsx_bytes(t: dict) -> bytes:
+    from openpyxl import Workbook
+    wb = Workbook()
+    wb.remove(wb.active)
+    for aba, (cab, linhas) in t.items():
+        ws = wb.create_sheet(aba)
+        ws.append(cab)
+        for l in linhas:
+            ws.append([None if v == "" else v for v in l])    # o sync recusa texto vazio
+        ws.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def ler_anteriores(base: str, sessao=None) -> dict:
+    """{aba: {id: sensivel_cifrado}} do que já está no banco, para não recifrar o que não mudou."""
+    import requests
+    s = sessao or requests
+    base = base.rstrip("/")
+    abas = {x["sheet_name"]: x["id"] for x in s.get(f"{base}/api/sheets", timeout=60).json()
+            if x.get("workbook_key") == WORKBOOK}
+    out = {}
+    for aba, col_id in ((a, c) for _, a, c in TABELAS):
+        if aba not in abas:
+            continue
+        m, offset = {}, 0
+        while True:
+            r = s.get(f"{base}/api/sheets/{abas[aba]}/rows", params={"limit": 1000, "offset": offset}, timeout=60)
+            r.raise_for_status()
+            rows = r.json()
+            rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
+            for x in rows:
+                d = dict(zip(x.get("headers") or [], x.get("values") or []))
+                if d.get(col_id) is not None and d.get(COL_CIFRA):
+                    m[int(d[col_id])] = d[COL_CIFRA]
+            if len(rows) < 1000:
+                break
+            offset += 1000
+        out[aba] = m
+    return out
+
+
+def sincronizar(conteudo: bytes, *, base: str, token: str, sessao=None) -> dict:
+    """Cria o workbook só se faltar (a API não apaga workbook) e sincroniza com replace=true."""
+    import requests
+    s = sessao or requests
+    base = base.rstrip("/")
+    h = {"Authorization": f"Bearer {token}"}
+    r = s.get(f"{base}/api/workbooks", headers=h, timeout=60)
+    r.raise_for_status()
+    if WORKBOOK not in {w.get("key") for w in r.json()}:
+        s.post(f"{base}/api/workbooks", headers=h, json={"key": WORKBOOK, "display_name": NOME},
+               timeout=60).raise_for_status()
+    r = s.post(f"{base}/api/workbooks/{WORKBOOK}/sync-xlsx", headers=h, params={"replace": "true"},
+               files={"file": (f"{WORKBOOK}.xlsx", conteudo, MIME_XLSX)}, timeout=300)
+    r.raise_for_status()
+    return r.json()

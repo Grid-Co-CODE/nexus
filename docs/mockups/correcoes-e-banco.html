@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Correções e cadastro no banco · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+:root{--fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--barra:#0d1526;--tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#96a0b4;
+  --linha:rgba(255,255,255,.09);--verde:#a3d900;--verde-texto:#c4e755;--verde-suave:rgba(163,217,0,.12);--alerta:#ffd83d;
+  --alerta-suave:rgba(255,216,61,.12);--erro:#ff7a7a;--erro-suave:rgba(255,107,107,.12);--info:#7fb8ff;--info-suave:rgba(91,157,255,.14);
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.55 var(--sans)}
+.topo{display:flex;gap:14px;align-items:center;padding:14px 32px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1180px;margin:0 auto;padding:28px 32px 60px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 30px/36px var(--display);margin:6px 0 10px}
+h2{font:700 20px/28px var(--display);margin:40px 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+h2 .tag{font:600 11px/20px var(--sans);letter-spacing:.08em;text-transform:uppercase;padding:0 9px;border-radius:999px}
+.tag.ok{background:var(--verde-suave);color:var(--verde-texto)}.tag.al{background:var(--alerta-suave);color:var(--alerta)}
+.resumo{background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:10px;padding:14px 18px;max-width:920px;color:var(--tinta-2)}
+.resumo b{color:var(--tinta)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:14px 0 0}
+.kpi{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.kpi .v{font:700 24px/30px var(--display)}.kpi .v s{color:var(--erro);font-size:17px;text-decoration-thickness:2px;margin-right:6px}
+.kpi .r{font-size:12.5px;color:var(--tinta-2)}
+.kpi.ok .v{color:var(--verde-texto)}
+.provas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+.prova{display:inline-flex;gap:6px;align-items:center;background:var(--verde-suave);color:var(--verde-texto);border-radius:999px;padding:3px 12px;font-size:12.5px}
+.aviso{margin:14px 0 0;background:linear-gradient(0deg,var(--alerta-suave),var(--alerta-suave)),var(--superficie);border:1px solid rgba(255,216,61,.4);border-radius:10px;padding:12px 16px;max-width:920px;color:var(--tinta-2)}
+.aviso b{color:var(--alerta)}
+pre{margin:8px 0 0;background:#0b1120;border:1px solid var(--linha);border-radius:10px;padding:12px 14px;overflow-x:auto;font:400 12.5px/19px var(--mono);color:var(--tinta-2)}
+pre .k{color:var(--verde-texto)}pre .c{color:var(--mudo)}
+.tab{width:100%;border-collapse:collapse;background:var(--superficie);border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:13px}
+.tab th{font:700 10.5px/16px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:left;padding:10px 12px;background:var(--superficie-2);border-bottom:1px solid var(--linha)}
+.tab td{padding:9px 12px;border-bottom:1px solid var(--linha);color:var(--tinta-2);vertical-align:top}
+.tab tr:last-child td{border-bottom:0}.tab td b{color:var(--tinta);font-weight:600}
+.dado{font:500 12.5px/18px var(--mono)}
+.rolar{overflow-x:auto}
+.selo{font:600 11px/18px var(--sans);padding:0 8px;border-radius:999px;white-space:nowrap}
+.selo.ok{background:var(--verde-suave);color:var(--verde-texto)}.selo.al{background:var(--alerta-suave);color:var(--alerta)}
+/* diagrama */
+.er{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:start}
+.t{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+.t header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--superficie-2);font-weight:600}
+.t header span{font:500 11.5px/1 var(--mono);color:var(--mudo)}
+.t ul{list-style:none;margin:0;padding:6px 0}
+.t li{display:flex;gap:8px;align-items:center;padding:3px 12px;font:400 12.5px/18px var(--mono);color:var(--tinta-2)}
+.t li em{font:700 10px/16px var(--sans);font-style:normal;padding:0 6px;border-radius:4px}
+.pk{background:var(--verde-suave);color:var(--verde-texto)}.fk{background:var(--info-suave);color:var(--info)}.cf{background:var(--alerta-suave);color:var(--alerta)}
+.t.centro{border-color:rgba(163,217,0,.45)}
+.liga{margin:10px 0 0;font:400 12.5px/20px var(--mono);color:var(--mudo)}
+.liga b{color:var(--info);font-weight:500}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.painel{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:14px 16px}
+.painel h3{margin:0 0 6px;font:600 15px/20px var(--sans);display:flex;gap:8px;align-items:center}
+.painel h3 i{font-size:19px;color:var(--verde-texto)}
+.painel p,.painel li{color:var(--tinta-2);font-size:13px;margin:4px 0 0}
+.painel ul{margin:4px 0 0;padding-left:18px}
+.painel b{color:var(--tinta);font-weight:600}
+.barra{display:flex;align-items:center;gap:8px;min-width:150px}
+.barra i{display:block;height:8px;border-radius:4px;background:var(--linha);flex:1;position:relative;overflow:hidden}
+.barra i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--p);background:var(--c)}
+.barra span{font:500 12.5px/1 var(--mono);color:var(--tinta);width:58px;text-align:right}
+.b-ok{--c:var(--verde)}.b-al{--c:var(--alerta)}.b-er{--c:var(--erro)}
+.nota{font-size:12px;color:var(--mudo);margin:8px 0 0}
+@media (max-width:900px){main{padding:20px 16px 40px}.topo{padding:12px 16px}.er{grid-template-columns:1fr 1fr}.duas{grid-template-columns:1fr}h1{font-size:24px;line-height:30px}}
+@media (max-width:520px){.er{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Correções + cadastro no banco · 04/10/2026</span></div>
+<main>
+<p class="eyebrow">PCM · governança de dados</p>
+<h1>O que foi corrigido e o cadastro no banco</h1>
+<div class="resumo"><b>S41:</b> corrigida, só os rótulos de reprogramada; a agenda das equipes não muda. <b>Banco:</b> o cadastro está no PostgreSQL, uma tabela por cadastro, ID numérico e ligação por ID.</div>
+
+<h2><span class="tag ok">Publicada</span> S41 corrigida</h2>
+<div class="kpis">
+  <div class="kpi ok"><div class="v"><s>1.128</s>563</div><div class="r">tarefas "reprogramadas"</div></div>
+  <div class="kpi ok"><div class="v"><s>9</s>574</div><div class="r">tarefas na 1ª vez (Nº vezes = 1)</div></div>
+  <div class="kpi ok"><div class="v">0</div><div class="r">horários, dias ou equipes mudados</div></div>
+  <div class="kpi"><div class="v">1.693</div><div class="r">células trocadas, todas em "Reprogramada" e "Nº vezes"</div></div>
+</div>
+<div class="provas">
+  <span class="prova"><i class="ph ph-check"></i>0 células diferentes fora das duas colunas</span>
+  <span class="prova"><i class="ph ph-check"></i>1.119 de 1.119 iguais à geração certa</span>
+  <span class="prova"><i class="ph ph-check"></i>abre no Excel, 70 abas</span>
+</div>
+<p class="nota">Causa: o PCM gerou a S41 duas vezes em 02/10 (08:00 e 18:42); a 2ª contou a própria semana como anterior. A regra "reprogramada primeiro" é o último desempate da agenda, por isso só os rótulos estavam errados.</p>
+<div class="aviso" style="border-color:rgba(163,217,0,.45);background:var(--superficie)"><b style="color:var(--verde-texto)">Publicada em 04/10 00:41</b> (commit <span class="dado">22ab2ab</span>). O arquivo do repositório é idêntico ao conferido; o robô semanal já levou ao campo (00:55): no banco do App, 563 reprogramadas e 574 na 1ª vez, de 1.137. <b>Recado ao PCM:</b> não republicar a S41 da pasta, senão a versão errada volta.</div>
+
+<h2><span class="tag ok">Feito</span> Tudo o que foi corrigido</h2>
+<div class="rolar"><table class="tab">
+<tr><th>Quando</th><th>Erro</th><th>Correção</th><th>Prova</th></tr>
+<tr><td class="dado">04/10</td><td><b>S41 com 1.128 reprogramadas</b></td><td>Rótulos refeitos pelo histórico de antes da semana</td><td>agenda idêntica · <span class="selo ok">publicada</span></td></tr>
+<tr><td class="dado">04/10</td><td><b>Fracttal "47%" ligado ao cadastro</b></td><td>Erro meu de medição: o código vem em dois formatos ("MAB100-…" e "THPN-SDI100-…")</td><td>93% (132 de 142)</td></tr>
+<tr><td class="dado">04/10</td><td><b>Número da UC iria em claro no banco</b></td><td>A coluna "Ucs" do BD guarda o número, não a quantidade: vai cifrada</td><td>achado na conferência, antes do envio</td></tr>
+<tr><td class="dado">04/10</td><td><b>Cálculo com #ERRO derrubava o envio</b></td><td>Vira vazio</td><td>teste</td></tr>
+<tr><td class="dado">03/10</td><td><b>Servidor não geraria a semana</b></td><td>A pasta do PCM no OneDrive deixou de ser obrigatória</td><td>teste sem a pasta</td></tr>
+<tr><td class="dado">02/10</td><td><b>27% das tarefas sem responsável</b></td><td>AUXILIAR sai do cadastro do Nexus (258 usinas, não 166)</td><td>S41: +48 com responsável, agenda idêntica</td></tr>
+<tr><td class="dado">02/10</td><td><b>63 abas vazias</b></td><td>Equipe "local" (nome da usina) não vira aba</td><td>70 → 74 abas, 5 equipes reais</td></tr>
+<tr><td class="dado">02/10</td><td><b>Relógio do motor 4 h adiantado</b></td><td>O fuso só vai pelo TZ no Linux</td><td>teste</td></tr>
+</table></div>
+
+<h2><span class="tag ok">No ar</span> Cadastro no PostgreSQL</h2>
+<div class="resumo">Workbook <span class="dado">cadastro_nexus</span> na API db_performace. <b>Cada tabela tem ID numérico na 1ª coluna</b>; quem aponta para outro cadastro guarda o ID dele. O ID nunca muda e nunca é reaproveitado. O nome é rótulo.</div>
+<div style="margin-top:14px" class="er">
+  <div class="t"><header>clientes<span>16</span></header><ul><li><em class="pk">PK</em>cliente_id</li><li>nome</li></ul></div>
+  <div class="t"><header>equipes<span>145</span></header><ul><li><em class="pk">PK</em>equipe_id</li><li>nome</li></ul></div>
+  <div class="t"><header>pessoas<span>134</span></header><ul><li><em class="pk">PK</em>pessoa_id</li><li><em class="fk">FK</em>equipe_id</li><li><em class="fk">FK</em>supervisor_id</li><li>cargo · status</li><li><em class="cf">cifrado</em>nome, CPF, contato</li></ul></div>
+  <div class="t centro"><header>usinas<span>258</span></header><ul><li><em class="pk">PK</em>usina_id</li><li><em class="fk">FK</em>cliente_id</li><li><em class="fk">FK</em>equipe_id</li><li><em class="fk">FK</em>responsavel_om_id</li><li>código · status · cidade · MWp</li><li><em class="cf">cifrado</em>receita, CNPJ, UC</li></ul></div>
+</div>
+<div class="er" style="margin-top:12px;grid-template-columns:2fr 1fr">
+  <div class="t"><header>de_para<span>876</span></header><ul><li><em class="fk">FK</em>usina_id</li><li>sistema · chave_externa · casou_por</li><li style="color:var(--mudo)">o que cada base chama de cada usina</li></ul></div>
+  <div class="t"><header>atualizacao<span>1</span></header><ul><li>publicado_em · contagens</li></ul></div>
+</div>
+<p class="liga"><b>usinas.cliente_id</b> → clientes · <b>usinas.equipe_id</b> → equipes · <b>usinas.responsavel_om_id</b> → pessoas · <b>de_para.usina_id</b> → usinas</p>
+
+<div class="duas" style="margin-top:16px">
+  <div class="painel"><h3><i class="ph ph-arrows-merge"></i>Como outro setor usa</h3>
+    <pre><span class="k">SELECT</span> u.nome, c.nome <span class="k">AS</span> cliente, e.nome <span class="k">AS</span> equipe
+<span class="k">FROM</span> usinas u
+<span class="k">JOIN</span> clientes c <span class="k">ON</span> c.cliente_id = u.cliente_id
+<span class="k">JOIN</span> equipes  e <span class="k">ON</span> e.equipe_id  = u.equipe_id</pre>
+    <p>Pela API: <span class="dado">GET /api/sheets/450/rows</span> (usinas).</p></div>
+  <div class="painel"><h3><i class="ph ph-shield-check"></i>Conferido no banco</h3>
+    <ul><li><b>0</b> ligação quebrada (todo ID apontado existe)</li><li><b>0</b> dado pessoal em claro (1.972 valores procurados)</li><li><b>392 de 392</b> cifras abrem com a chave do Nexus</li><li>IDs gravados como número inteiro</li><li>Reenviar sem mudança troca <b>1 linha</b> (a data), não todas</li></ul></div>
+</div>
+
+<h2>Ligação de cada base, hoje (de_para)</h2>
+<div class="rolar"><table class="tab">
+<tr><th>Sistema</th><th>Usinas ligadas</th><th>Liga por</th></tr>
+<tr><td><b>BD_Operações</b></td><td><div class="barra b-ok"><i style="--p:100%"></i><span>258/258</span></div></td><td>id do BD</td></tr>
+<tr><td><b>BD_Performance</b> · Base UFV</td><td><div class="barra b-al"><i style="--p:87%"></i><span>136/156</span></div></td><td>código, depois nome</td></tr>
+<tr><td><b>Tickets</b> · Base de dados - Usinas</td><td><div class="barra b-al"><i style="--p:87%"></i><span>136/156</span></div></td><td>código, depois nome</td></tr>
+<tr><td><b>Fracttal</b> · Classificação 1</td><td><div class="barra b-ok"><i style="--p:96%"></i><span>139/144</span></div></td><td>código do equipamento; sem Classificação 1, a localização do ativo</td></tr>
+<tr><td><b>BD_Thopen</b> · Dados Gerais Usinas</td><td><div class="barra b-al"><i style="--p:76%"></i><span>87/115</span></div></td><td>nome (romano, "1 e 2", cidade, potência) + de-para de trackers</td></tr>
+</table></div>
+<p class="nota">Nome ou código que serve a duas usinas não liga: ligação faltando é melhor que ligação errada. O que sobra não está no cadastro: 20 usinas da Thopen em negociação (BD_Performance e Tickets), 28 do BD_Thopen (Ouro Branco I–V, Delmiro Gouvea 1–4, Lyon…) e, no Fracttal, Solier Cascavel, Marajoara 2 e Porto Real 2/3 da Thopen. Teste, "Grid Co." e Porteiras ficam fora da conta por decisão.</p>
+
+<h2>Próximos passos</h2>
+<div class="rolar"><table class="tab">
+<tr><th>#</th><th>O quê</th><th>Quem</th></tr>
+<tr><td class="dado">1</td><td>Avisar o PCM: não republicar a S41 da pasta</td><td>você</td></tr>
+<tr><td class="dado">2</td><td>Motor do PCM: gerar a mesma semana de novo vira nova versão, não nova contagem</td><td>Nexus já faz; levar ao motor do PCM</td></tr>
+<tr><td class="dado">3</td><td>Código nas 6 usinas do Fracttal sem ele no cadastro e nas outras 46 em operação; tela de-para para o Thopen</td><td>fase 1–2</td></tr>
+<tr><td class="dado">4</td><td>Publicar no banco a cada vez que o cadastro for salvo (hoje é por comando)</td><td>Nexus</td></tr>
+</table></div>
+</main>
+</body>
+</html>

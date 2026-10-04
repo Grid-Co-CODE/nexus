@@ -146,6 +146,18 @@ def test_conferir_lista_o_que_falta(config, origem, tmp_path):
     assert nomes == [I.NOMES[k] for k in ("prioridades", "confiabilidade", "historico", "feriados")]
 
 
+def test_servidor_sem_a_pasta_do_pcm_gera_mesmo_assim(config, tmp_path):
+    """No servidor não existe o OneDrive do PCM. Desde 02/10 a AUXILIAR sai do cadastro e os insumos moram no Nexus:
+    a pasta só serve para comparar com a oficial e trazer as durações (sombra). Ela era obrigatória e travava a
+    geração no servidor."""
+    cfg = dict(config, NEXUS_PCM_ORIGEM=str(tmp_path / "nao-existe"))
+    conf = G.conferir(cfg)
+    assert conf["pronto"], [i for i in conf["itens"] if not i["ok"]]
+    st = G.aguardar(cfg, G.iniciar(cfg, "2026-W41")["id"], 60)
+    assert st["estado"] == "ok", st
+    assert "comparacao" not in st                     # sem a oficial, não há com o que comparar
+
+
 def test_gerar_em_sombra_e_comparar_com_a_do_fabricio(config, origem):
     planilha(origem / "Programação Semana 41.xlsx")               # a semana oficial (a do Fabrício)
     r = G.iniciar(config, "2026-W41")

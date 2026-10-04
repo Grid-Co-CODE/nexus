@@ -14,6 +14,8 @@ Qualidade do cadastro) e Pessoas (Colaboradores Operação).
 | `cifra.py` | AES-256-GCM no dado sensível, amarrado ao contexto (entidade, registro, campo), e selo HMAC da linha |
 | `armazem.py` | onde o dado mora; hoje `ArmazemLocal` |
 | `servico.py` | ler, salvar e versionar registros; quem chama não fala com o armazém direto |
+| `banco.py` | publica o cadastro no PostgreSQL com ID e ligação por ID (`ferramentas/publicar_cadastro.py`) |
+| `casamento.py` | casa o nome de uma base sem código (BD_Thopen) com a usina do cadastro |
 | `importar.py` | importa o `BD_Operacoes.xlsx` e mostra a prévia do que muda antes de gravar |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
@@ -21,8 +23,9 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 
 ## Onde o dado mora
 
-- **Ensaio local:** `C:\GridcoAuto\nexus\cadastro_ensaio.json`, fora do OneDrive e do AppData, com o sensível cifrado.
-  A API de dados entra depois, só com o OK do Levi, porque criar o workbook lá é permanente.
+- **Fonte (onde se edita):** `C:\GridcoAuto\nexus\cadastro_ensaio.json` (servidor: `dados/cadastro_ensaio.json`), fora
+  do OneDrive e do AppData, com o sensível cifrado. **Cópia para os outros setores:** o workbook `cadastro_nexus` no
+  PostgreSQL (seção "No banco" abaixo), publicado por comando desde 04/10.
 - **A chave da cifra** é a `NEXUS_CHAVE_CADASTRO` do `.env`. **Sem ela, CPF, telefone, endereço e receita não
   voltam.** Ela precisa de uma cópia num cofre.
 - **Pessoa vai cifrada inteira**, porque quase todo campo identifica alguém. Na usina vão cifrados receita, CNPJ,
@@ -33,6 +36,46 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 
 - **ID simples por cadastro** (1, 2, 3...). O IDUsina da planilha (UFV-001) fica em `id_bd` e é a chave da
   reimportação. Cliente tem cadastro próprio, com ID, porque há usinas de mesmo nome de clientes diferentes.
+- **A chave de tudo é o ID numérico do cadastro** (decisão do Levi, 04/10: inner join por ID). O código da usina e o
+  nome em cada sistema vivem na tabela `de_para`, nunca como chave. Plano: `docs/superpowers/plans/2026-10-04-governanca-ids.md`.
+  Pelo código, 99% das linhas das outras bases casam; pelo nome, de 44% a 87%. 121 usinas estão sem código (52 em
+  operação) e uma tem "CÓDIGO" escrito como valor.
+
+## No banco (PostgreSQL): `banco.py`
+
+- Workbook `cadastro_nexus` da API db_performace: `clientes`, `equipes`, `pessoas`, `usinas`, `de_para`,
+  `atualizacao`. ID inteiro na 1ª coluna; referência vira `<campo>_id` (inteiro). Publicar:
+  `python ferramentas/publicar_cadastro.py` (`--ensaio` monta e grava só o xlsx local). Precisa de `GRIDCO_SQL_TOKEN`
+  no `.env`.
+- O sensível vai numa coluna `sensivel_cifrado` (contexto `banco/<entidade>/<id>`), que só o Nexus abre. Da pessoa,
+  só vínculo, cargo, equipe, status e supervisor vão em claro. **`ucs` vai cifrada:** no BD é o número da UC, não a
+  quantidade (achado no 1º envio).
+- **Texto cifrado é reaproveitado se o conteúdo não mudou:** o nonce é aleatório e a API guarda histórico por linha;
+  sem isso, cada envio regravaria todas as linhas. Reenvio sem mudança = 1 linha (a data).
+- **`de_para` tem uma linha por chave externa de cada base**, ligada ou não: `usina_id` vazio + `casou_por` diz por
+  quê ("sem par no cadastro", "ignorado: …", "conflito com o de-para de trackers"). O "% ligado" sai daí.
+- Ordem: regra de ignorar → código (com o prefixo do cliente, depois só "AAA999"; "IPX100" é de 2C e de Thopen, não
+  casa) → nome do Fracttal → casamento por nome (`casamento.py`, para base sem código) → dica do de-para de trackers.
+  Nome ou código que serve a duas usinas **não** casa.
+- **Fracttal:** o código da usina sai do código de equipamento, nos dois formatos "MAB100-INVR2.4" e
+  "THPN-SDI100-INVR11.1" (`codigo_do_equipamento`; ler só o 1º pedaço deu 47% em 04/10). Ativo **sem Classificação 1**
+  não é "sem usina": a usina sai do código e, sem código, da "Localização ou parte de" ("// Thopen/ Thopen - Brodowski
+  1 - SP/…"). Assim BWK200 e "Transformador 2" acham Brodowski e Nobres (Levi, 04/10: "você sabe que é Brodowski e
+  Nobres").
+- **`casamento.py` (BD_Thopen, sem código):** romano → número, "1 e 2"/"1 a 4" abertos, usina sem número = a "1".
+  Nome igual casa mesmo com cidade/estado diferente (o BD_Thopen erra: Saturnino "no PR", Sítio dos Nogueiras "no MT")
+  e fica anotado; nome só-base precisa de localização igual e potência (±15%) — é o que separa "Ouro Branco I" (PR) da
+  "Ouro Branco" (AL) e "AP. do Taboado" (0,41 MWp) da "Aparecida do Taboado 1 e 2". **Nunca cruza cliente:** E1 é E1,
+  não Thopen, com usinas diferentes de mesmo nome (Levi, 04/10).
+- **Regras de ignorar** moram em `C:\GridcoAuto\nexus\de_para_regras.json` (servidor: `dados/de_para_regras.json`),
+  fora do git: teste ("TESTE é teste"), "Grid Co." (tarefa interna) e Porteiras ("não entra no BD"). Decisão nova do
+  Levi entra lá, com quem e quando no motivo.
+- Medido em 04/10 (no banco): BD_Operações 258/258, Fracttal 139/144, Tickets 136/156, BD_Performance 136/156,
+  BD_Thopen 87/115. Os que sobram não estão no cadastro (20 usinas da Thopen em negociação nas bases da API; 28 do
+  BD_Thopen como Ouro Branco I–V, Delmiro Gouvea 1–4, Lyon; no Fracttal, Solier Cascavel, Marajoara 2 e Porto Real 2/3
+  da Thopen).
+- Antes de publicar mudança de regra: `--ensaio` e a conferência (nada sensível em claro, todo FK acha o par, toda
+  cifra abre). A API não apaga workbook: o `cadastro_nexus` é para sempre.
 - **Abrir e salvar sem mexer não pode mudar nada.** Já aconteceu de um select sem o valor atual trocar o valor calado.
   Há teste que lê o formulário como o navegador.
 - Nos campos de pessoa da usina (técnico, eletricista...), três valores diferentes: **"N/A"** = a usina não tem

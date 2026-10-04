@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Governança de IDs · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+:root{--fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--barra:#0d1526;--tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#96a0b4;
+  --linha:rgba(255,255,255,.09);--verde:#a3d900;--verde-texto:#c4e755;--verde-suave:rgba(163,217,0,.12);--alerta:#ffd83d;
+  --alerta-suave:rgba(255,216,61,.12);--erro:#ff7a7a;--erro-suave:rgba(255,107,107,.12);--info:#7fb8ff;
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.55 var(--sans)}
+.topo{display:flex;gap:14px;align-items:center;padding:14px 32px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1180px;margin:0 auto;padding:28px 32px 60px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 30px/36px var(--display);margin:6px 0 10px}
+h2{font:700 20px/28px var(--display);margin:40px 0 12px;display:flex;gap:10px;align-items:center}
+h2 .tag{font:600 11px/20px var(--sans);letter-spacing:.08em;text-transform:uppercase;padding:0 9px;border-radius:999px}
+.tag.p{background:var(--erro-suave);color:var(--erro)}.tag.s{background:var(--verde-suave);color:var(--verde-texto)}
+.resumo{background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:10px;padding:14px 18px;max-width:900px;color:var(--tinta-2)}
+.resumo b{color:var(--tinta)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:18px 0 0}
+.kpi{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.kpi .v{font:700 26px/32px var(--display)}.kpi .r{font-size:12.5px;color:var(--tinta-2)}
+.kpi.er .v{color:var(--erro)}.kpi.al .v{color:var(--alerta)}.kpi.ok .v{color:var(--verde-texto)}
+.tab{width:100%;border-collapse:collapse;background:var(--superficie);border:1px solid var(--linha);border-radius:10px;overflow:hidden;font-size:13px}
+.tab th{font:700 10.5px/16px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:left;padding:10px 12px;background:var(--superficie-2);border-bottom:1px solid var(--linha)}
+.tab td{padding:9px 12px;border-bottom:1px solid var(--linha);color:var(--tinta-2);vertical-align:middle}
+.tab tr:last-child td{border-bottom:0}
+.tab td b{color:var(--tinta);font-weight:600}
+.dado{font:500 12.5px/18px var(--mono)}
+.rolar{overflow-x:auto}
+.barra{display:flex;align-items:center;gap:8px;min-width:170px}
+.barra i{display:block;height:8px;border-radius:4px;background:var(--linha);flex:1;position:relative;overflow:hidden}
+.barra i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--p);background:var(--c)}
+.barra span{font:500 12.5px/1 var(--mono);color:var(--tinta);width:42px;text-align:right}
+.ok{--c:var(--verde)}.al{--c:var(--alerta)}.er{--c:var(--erro)}
+.selo{font:600 11px/18px var(--sans);padding:0 8px;border-radius:999px;white-space:nowrap}
+.selo.er{background:var(--erro-suave);color:var(--erro)}.selo.al{background:var(--alerta-suave);color:var(--alerta)}.selo.ok{background:var(--verde-suave);color:var(--verde-texto)}
+.erros{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.erro{background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--erro);border-radius:10px;padding:12px 14px}
+.erro.al{border-left-color:var(--alerta)}.erro.ok{border-left-color:var(--verde)}
+.erro b{display:block;font-weight:600}.erro span{font-size:12.5px;color:var(--tinta-2)}
+/* hub */
+.hub{display:grid;grid-template-columns:1fr 300px 1fr;gap:14px;align-items:center}
+.lado{display:grid;gap:10px}
+.sis{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.sis b{font-weight:600}.sis .dado{color:var(--verde-texto)}
+.centro{background:linear-gradient(0deg,var(--verde-suave),var(--verde-suave)),var(--superficie);border:1px solid rgba(163,217,0,.45);border-radius:14px;padding:20px;text-align:center}
+.centro i{font-size:30px;color:var(--verde-texto)}
+.centro b{display:block;font:800 18px/24px var(--display);margin-top:4px}
+.centro .dado{display:inline-block;margin-top:8px;background:#0b1120;border:1px solid var(--linha);border-radius:6px;padding:3px 8px;color:var(--verde-texto)}
+.centro p{margin:8px 0 0;font-size:12.5px;color:var(--tinta-2)}
+.regras{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.regra{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.regra b{display:flex;gap:8px;align-items:center;font-weight:600}
+.regra b em{font:700 11px/20px var(--mono);font-style:normal;color:var(--fundo);background:var(--verde);border-radius:50%;width:20px;height:20px;display:inline-grid;place-items:center;flex:none}
+.regra p{margin:6px 0 0;font-size:13px;color:var(--tinta-2)}
+/* plano */
+.fases{display:grid;gap:10px}
+.fase{display:grid;grid-template-columns:120px 1fr 260px;gap:16px;background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:14px 16px;align-items:start}
+.fase .q{font:700 12px/18px var(--mono);color:var(--verde-texto)}
+.fase .q small{display:block;font:400 11.5px/16px var(--sans);color:var(--mudo)}
+.fase b{font-weight:600}.fase ul{margin:6px 0 0;padding-left:18px;color:var(--tinta-2);font-size:13px}
+.fase .pronto{font-size:12.5px;color:var(--tinta-2);border-left:2px solid var(--verde);padding-left:10px}
+.fase .pronto b{display:block;color:var(--verde-texto);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.decisoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.dec{background:var(--superficie);border:1px solid rgba(255,216,61,.35);border-radius:10px;padding:12px 14px}
+.dec b{display:block;color:var(--alerta);font-weight:600}.dec span{font-size:12.5px;color:var(--tinta-2)}
+.nota{font-size:12px;color:var(--mudo);margin:8px 0 0}
+@media (max-width:860px){main{padding:20px 16px 40px}.topo{padding:12px 16px}.hub{grid-template-columns:1fr}.regras{grid-template-columns:1fr}
+  .fase{grid-template-columns:1fr;gap:8px}h1{font-size:24px;line-height:30px}}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Governança de dados · problema e plano · 04/10/2026</span></div>
+<main>
+<p class="eyebrow">Backend · bases da Grid Co.</p>
+<h1>Toda planilha com ID e ligação</h1>
+<div class="resumo">Hoje cada base tem a <b>sua</b> lista de usinas e elas se ligam pelo <b>nome</b>. Onde existe coluna Código, a ligação é de <b>99%</b>; pelo nome, de 44% a 87%. <b>Solução (decidida em 04/10):</b> cada cadastro tem <b>ID numérico</b> e a ligação é por ID; o código e os nomes de cada sistema ficam na tabela <b>de_para</b>. O cadastro do Nexus é a fonte, e nenhuma base entra sem o ID.</div>
+
+<div class="kpis">
+  <div class="kpi er"><div class="v">6</div><div class="r">listas de usinas diferentes, sem chave comum</div></div>
+  <div class="kpi ok"><div class="v">99%</div><div class="r">ligam pelo código (241 de 243 linhas)</div></div>
+  <div class="kpi ok"><div class="v">93%</div><div class="r">Fracttal pelo código do equipamento (132 de 142)</div></div>
+  <div class="kpi al"><div class="v">52</div><div class="r">usinas em operação sem código no cadastro</div></div>
+</div>
+
+<h2><span class="tag p">Problema</span> Ligação medida hoje (04/10)</h2>
+<div class="rolar"><table class="tab">
+<tr><th>Base</th><th>Usinas</th><th>Liga por</th><th>Casa com o cadastro</th></tr>
+<tr><td><b>Cadastro Nexus</b> (BD_Operações)</td><td class="dado">258</td><td>ID + código</td><td><span class="selo al">137 com código · 121 sem · 1 = "CÓDIGO"</span></td></tr>
+<tr><td><b>BD_Performance</b> · Base UFV</td><td class="dado">157</td><td>Código</td><td><div class="barra ok"><i style="--p:99%"></i><span>99%</span></div></td></tr>
+<tr><td><b>Tickets</b> · Base de dados - Usinas</td><td class="dado">157</td><td>Código</td><td><div class="barra ok"><i style="--p:99%"></i><span>99%</span></div></td></tr>
+<tr><td><b>AUXILIAR</b> do PCM</td><td class="dado">166</td><td>nome</td><td><div class="barra al"><i style="--p:88%"></i><span>88%</span></div></td></tr>
+<tr><td><b>Fracttal</b> (ativos)</td><td class="dado">155</td><td>nome</td><td><div class="barra er"><i style="--p:51%"></i><span>51%</span></div></td></tr>
+<tr><td><b>Fracttal</b> (código do equipamento)</td><td class="dado">142</td><td>"MAB100-…" e "THPN-SDI100-…"</td><td><div class="barra ok"><i style="--p:93%"></i><span>93%</span></div></td></tr>
+<tr><td><b>BD_Thopen</b> · Dados Gerais Usinas</td><td class="dado">116</td><td>nome (não tem código)</td><td><div class="barra er"><i style="--p:44%"></i><span>44%</span></div></td></tr>
+</table></div>
+<p class="nota">Fracttal: pelo nome liga 51%; pelo código do equipamento, 93%. Faltam 6 usinas sem código no cadastro (Matões 1, Solier Cascavel, Marajoara 2, Porteiras 1, Porto Real 2 e 3) e 2 que não são usina ("Grid Co.", "Teste 1").</p>
+
+<h2><span class="tag p">Problema</span> O que isso já causou</h2>
+<div class="erros">
+  <div class="erro"><b>27% das tarefas sem responsável</b><span>S40: 297 de 1.119 linhas. Casamento por nome.</span></div>
+  <div class="erro"><b>S41 no campo: 1.128 de 1.137 "reprogramadas"</b><span>Gerar a semana 2× conta a semana 2×. A certa: 551.</span></div>
+  <div class="erro al"><b>50 equipes que não existem</b><span>Equipe = nome da usina. Viravam 63 abas vazias.</span></div>
+  <div class="erro al"><b>20 usinas com nome morto</b><span>Na AUXILIAR, sem par no BD.</span></div>
+  <div class="erro al"><b>Pessoas: 81 no App × 134 no BD</b><span>Supervisor diferente em 32. Ligação por nome.</span></div>
+  <div class="erro ok"><b>Relógio do motor 4 h adiantado</b><span>Corrigido em 02/10.</span></div>
+</div>
+
+<h2><span class="tag s">Solução</span> Um cadastro no centro, uma chave para tudo</h2>
+<div class="hub">
+  <div class="lado">
+    <div class="sis"><b>Fracttal</b><span class="dado">código + id_item</span></div>
+    <div class="sis"><b>PCM (programação)</b><span class="dado">código</span></div>
+    <div class="sis"><b>App de Campo</b><span class="dado">código · e-mail</span></div>
+  </div>
+  <div class="centro"><i class="ph ph-database"></i><b>Cadastro do Nexus</b><span class="dado">usina_id 17</span><p>Fonte única de usina, cliente, equipe e pessoa. A chave é o ID; código e nome são rótulos, ligados pela de_para.</p></div>
+  <div class="lado">
+    <div class="sis"><b>BD_Performance</b><span class="dado">código</span></div>
+    <div class="sis"><b>Tickets</b><span class="dado">código</span></div>
+    <div class="sis"><b>BD_Thopen</b><span class="dado">+ coluna código</span></div>
+  </div>
+</div>
+<div class="regras">
+  <div class="regra"><b><em>1</em>Toda tabela tem ID</b><p>Primeira coluna, nunca reaproveitado, nunca editado.</p></div>
+  <div class="regra"><b><em>2</em>Ligação guarda o ID</b><p>Linha que fala de usina, equipe ou pessoa guarda o ID dela, não só o nome.</p></div>
+  <div class="regra"><b><em>3</em>Sem chave, não entra</b><p>Base nova ou coluna nova só entra com a chave. O Nexus recusa e diz o que falta.</p></div>
+</div>
+
+<h2><span class="tag s">Solução</span> Cada entidade: ID e ligação</h2>
+<div class="rolar"><table class="tab">
+<tr><th>Entidade</th><th>ID</th><th>Liga com</th><th>Hoje</th></tr>
+<tr><td><b>Usina</b></td><td class="dado">usina_id (código vai na de_para)</td><td>Fracttal, PCM, App, BD_Performance, Tickets, Thopen</td><td><span class="selo al">parcial</span></td></tr>
+<tr><td><b>Cliente</b></td><td class="dado">cliente_id</td><td>usina, contrato</td><td><span class="selo ok">no cadastro</span></td></tr>
+<tr><td><b>Equipe</b></td><td class="dado">equipe_id + nome no Fracttal</td><td>usina, pessoa, PCM</td><td><span class="selo er">texto</span></td></tr>
+<tr><td><b>Pessoa</b></td><td class="dado">e-mail corporativo</td><td>equipe, App, PT/APR, supervisor</td><td><span class="selo er">nome</span></td></tr>
+<tr><td><b>OS / tarefa</b></td><td class="dado">id do Fracttal</td><td>histórico do PCM, App</td><td><span class="selo ok">já é ID</span></td></tr>
+<tr><td><b>Categoria de serviço</b></td><td class="dado">categoria_id</td><td>prioridades, confiabilidade, durações</td><td><span class="selo er">texto</span></td></tr>
+<tr><td><b>Município</b></td><td class="dado">código IBGE</td><td>usina, feriado municipal</td><td><span class="selo er">nome da cidade</span></td></tr>
+<tr><td><b>Semana programada</b></td><td class="dado">2026-W41 + versão</td><td>histórico, App</td><td><span class="selo er">gerar 2× conta 2×</span></td></tr>
+</table></div>
+
+<h2><span class="tag s">Plano</span> Fases</h2>
+<div class="fases">
+  <div class="fase"><div class="q">FASE 0<small>segunda</small></div>
+    <div><b>Parar o sangramento</b><ul><li>S41: rótulos corrigidos, agenda intacta (pronta; publicação com você)</li><li>Motor: gerar a mesma semana de novo vira nova versão, não nova contagem</li></ul></div>
+    <div class="pronto"><b>Pronto quando</b>2ª geração com Reprogramada igual à 1ª</div></div>
+  <div class="fase"><div class="q">FASE 1<small>semana 1</small></div>
+    <div><b>ID e código da usina</b><ul><li>ID numérico já no banco (04/10); código obrigatório e único, para alimentar a de_para</li><li>Preencher as 52 em operação; depois as 69 a mobilizar; corrigir "CÓDIGO"</li></ul></div>
+    <div class="pronto"><b>Pronto quando</b>177 de 177 em operação com código</div></div>
+  <div class="fase"><div class="q">FASE 2<small>semana 1–2</small></div>
+    <div><b>De-para no Nexus</b><ul><li>Tela que liga cada usina ao Fracttal e às bases da API</li><li>Sugestão automática por código e nome; o que sobrar, uma pessoa confirma</li></ul></div>
+    <div class="pronto"><b>Pronto quando</b>100% das em operação ligadas ao Fracttal e ao Thopen</div></div>
+  <div class="fase"><div class="q">FASE 3<small>semana 2</small></div>
+    <div><b>Equipe, pessoa, categoria, município com ID</b><ul><li>Equipe ligada ao nome do Fracttal; pessoa pelo e-mail</li><li>Categorias e municípios viram tabela</li></ul></div>
+    <div class="pronto"><b>Pronto quando</b>0 ligação por texto no cadastro</div></div>
+  <div class="fase"><div class="q">FASE 4<small>semana 2–3</small></div>
+    <div><b>PCM e App leem por ID</b><ul><li>Motor casa usina pelo ID (via de_para); observações guardam o ID</li><li>Prova: mesma foto do Fracttal, agenda idêntica</li></ul></div>
+    <div class="pronto"><b>Pronto quando</b>Responsável em 100% das tarefas</div></div>
+  <div class="fase"><div class="q">FASE 5<small>semana 3–4</small></div>
+    <div><b>Backend único</b><ul><li>API do Nexus por setor, com token: usinas, equipes, pessoas, de-para</li><li>Cadastro no PostgreSQL <b>(feito em 04/10)</b>; guardião diário mostra o % ligado de cada base</li></ul></div>
+    <div class="pronto"><b>Pronto quando</b>Qualquer setor lê do Nexus; alerta abaixo de 100%</div></div>
+</div>
+
+<h2>Decisões (04/10)</h2>
+<div class="decisoes">
+  <div class="dec"><b>Chave = ID numérico</b><span>Decidido: mais leve e o inner join fica óbvio. Código vira ligação externa.</span></div>
+  <div class="dec"><b>S41: sim</b><span>Corrigida; ver correcoes-e-banco.html.</span></div>
+  <div class="dec"><b>Cadastro no PostgreSQL: feito</b><span>Workbook cadastro_nexus, 6 tabelas.</span></div>
+</div>
+<p class="nota">Medido em 04/10/2026: cadastro do Nexus (BD_Operações de 29/09), API db_performace e foto do Fracttal da geração de 02/10.</p>
+</main>
+</body>
+</html>

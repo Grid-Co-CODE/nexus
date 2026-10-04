@@ -151,8 +151,11 @@ def conferir(config, semana: str | None = None) -> dict:
                   "falta: copie o .env do OS Creator para nexus/torres/oscreator/os_creator/.env"})
     origem = pasta_origem(config)
     tem_origem = bool(origem and origem.is_dir())
-    itens.append({"nome": "Pasta do PCM", "ok": tem_origem, "obrigatorio": True,
-                  "detalhe": "a mesma de onde o Fabrício gera" if tem_origem else "pasta não encontrada"})
+    # Opcional desde 02/10: a AUXILIAR sai do cadastro e os insumos moram no Nexus. A pasta só traz a oficial (para
+    # comparar) e as durações (sombra). Obrigatória, ela travava a geração no servidor, onde o OneDrive não existe.
+    itens.append({"nome": "Pasta do PCM", "ok": True, "obrigatorio": False,
+                  "detalhe": "a mesma de onde o Fabrício gera: serve para comparar com a oficial" if tem_origem else
+                  "não está nesta máquina: gera mesmo assim, sem comparar com a oficial"})
     for nome, obrig in INSUMOS:
         p = origem / nome if origem else None
         existe = bool(p and p.exists())
@@ -242,8 +245,8 @@ def iniciar(config, semana: str) -> dict:
         origem = pasta_origem(config)
         insumos = []
         for nome, _obrig in INSUMOS:
-            p = origem / nome
-            if not p.exists():
+            p = origem / nome if origem else None
+            if not (p and p.exists()):
                 continue
             shutil.copy2(p, pasta / nome)
             insumos.append({"nome": nome, "sha": _sha(p), "atualizado": _quando(p.stat().st_mtime),
