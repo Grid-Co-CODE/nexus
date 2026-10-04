@@ -58,3 +58,25 @@ def test_guarda_chega_ao_navegador_com_o_prefixo_e_a_regex_das_barras_finais():
     assert 'P="/t/performance/plataforma"' in html
     assert r"c.replace(/\/+$/,'')" in html              # no JS: /\/+$/ (barras finais), com UMA barra invertida
     assert "%s" not in html
+
+
+def test_cabecalho_em_minusculo_tambem_e_reconhecido_e_volta_com_o_nome_canonico():
+    # Cloudflare e HTTP/2 baixam a caixa dos nomes; antes, o HTML passava SEM o guarda de leitura (falhava aberto)
+    st, cab, corpo = pt.ajustar_resposta(200, {"content-type": "text/html; charset=utf-8",
+                                               "content-disposition": "inline", "cache-control": "no-store",
+                                               "etag": "x", "last-modified": "hoje"}, b"<head></head>")
+    assert set(cab) == {"Content-Type", "Content-Disposition", "Cache-Control", "ETag", "Last-Modified"}
+    assert cab["Content-Type"] == "text/html; charset=utf-8"
+    assert b'id="nexus-leitura"' in corpo and b'id="nexus-visual"' in corpo
+
+
+def test_tipo_html_em_maiuscula_tambem_recebe_o_guarda():
+    _, cab, corpo = pt.ajustar_resposta(200, {"Content-Type": "TEXT/HTML"}, b"<head></head>")
+    assert cab["Content-Type"] == "TEXT/HTML" and b'id="nexus-leitura"' in corpo
+
+
+def test_cookie_e_tamanho_em_minusculo_continuam_barrados():
+    _, cab, _ = pt.ajustar_resposta(200, {"content-type": "application/json", "set-cookie": "s=1",
+                                          "content-length": "9", "content-encoding": "gzip",
+                                          "transfer-encoding": "chunked", "connection": "keep-alive"}, b"{}")
+    assert cab == {"Content-Type": "application/json"}

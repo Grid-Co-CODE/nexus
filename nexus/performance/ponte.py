@@ -52,8 +52,12 @@ def montar_pedido(base_url, token, metodo, caminho, query, corpo, tipo) -> dict:
 
 
 def ajustar_resposta(status, cabecalhos, corpo):
-    cab = {k: v for k, v in (cabecalhos or {}).items() if k in _CABECALHOS_QUE_PASSAM}
-    if str(cab.get("Content-Type", "")).startswith("text/html"):
+    # Nome de cabeçalho não tem caixa fixa: Cloudflare e HTTP/2 entregam tudo em minúsculo, e o `requests` mantém a
+    # caixa de origem no `.items()`. Comparar com a caixa exata deixaria o HTML passar SEM o guarda de leitura (falha
+    # aberta), então o casamento é por minúsculo e a resposta volta com o nome canônico.
+    recebidos = {str(k).lower(): v for k, v in (cabecalhos or {}).items()}
+    cab = {nome: recebidos[nome.lower()] for nome in _CABECALHOS_QUE_PASSAM if nome.lower() in recebidos}
+    if str(cab.get("Content-Type", "")).lower().startswith("text/html"):
         corpo = injetar(corpo.decode("utf-8", "replace")).encode("utf-8")
     return status, cab, corpo
 
