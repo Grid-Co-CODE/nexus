@@ -8,6 +8,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
         return render_template("performance/tempo-real.html")
 """
 from datetime import datetime
+from urllib.parse import urlsplit
 
 from flask import Response, current_app, jsonify, render_template, request
 
@@ -65,17 +66,37 @@ def tempo_real():
                            prefixo=ponte.PREFIXO, plataforma=url, falta=falta)
 
 
-def _erro(texto: str) -> Response:
+_TITULO_PADRAO = "Plataforma de Performance sem resposta"
+# Fora da máquina local, http levaria a chave de leitura em texto puro pela rede.
+_LOCAL = ("localhost", "127.0.0.1", "::1")
+
+
+def _erro(texto: str, titulo: str = _TITULO_PADRAO, status: int = 502) -> Response:
     hora = datetime.now().strftime("%H:%M")
-    html = render_template("performance/ponte_erro.html", texto=texto, hora=hora)
-    return Response(html, status=502, mimetype="text/html")
+    html = render_template("performance/ponte_erro.html", texto=texto, hora=hora, titulo=titulo)
+    return Response(html, status=status, mimetype="text/html")
+
+
+def _http_fora_da_maquina_local(url: str) -> bool:
+    p = urlsplit(url)
+    return p.scheme.lower() == "http" and (p.hostname or "").lower() not in _LOCAL
+
+
+def _confirmou_a_chave(r) -> bool:
+    # Plataforma sem NEXUS_LEITURA_TOKEN (aberta) ignora a chave e deixa passar até gravação: só a que a cumpre devolve
+    # `X-Nexus-Leitura-Ok: 1`. Sem ele, nada é mostrado (falha fechada). Nome de cabeçalho não tem caixa fixa.
+    return {str(k).lower(): v for k, v in r.headers.items()}.get("x-nexus-leitura-ok") == "1"
 
 
 @bp.route("/plataforma/<path:caminho>", methods=["GET", "HEAD", "POST"])
 def plataforma(caminho: str):
     url, token, falta = _config_ponte()
     if falta:
-        return _erro("A ponte não está configurada: falta " + " e ".join(falta) + " no .env do Nexus.")
+        return _erro("A ponte não está configurada: falta " + " e ".join(falta) + " no .env do Nexus.",
+                     titulo="Ponte não configurada")
+    if _http_fora_da_maquina_local(url):
+        return _erro("NEXUS_PLATAFORMA_URL tem de ser https fora da máquina local: a chave iria sem criptografia.",
+                     titulo="Ponte não configurada")
     # A barra inicial é obrigatória: o <path:> chega sem ela, e "@evil.com/x" colado em "http://plat:5050" viraria
     # usuário "plat" no servidor evil.com, levando a chave de leitura para fora (revisão da Tarefa 8).
     c = "/" + caminho
@@ -90,10 +111,21 @@ def plataforma(caminho: str):
                                  request.get_data() if request.method == "POST" else None, request.content_type)
     try:
         r = ponte.enviar(**pedido)
+    except ponte.Ocupada:
+        return _erro("A ponte está ocupada com outros pedidos à plataforma. Tente de novo em instantes.",
+                     titulo="Ponte ocupada", status=503)
+    except ponte.RedirecionamentoRecusado:
+        return _erro("A plataforma mandou seguir para outro servidor; a ponte não foi, para a chave de leitura não sair "
+                     "do servidor configurado.", titulo="Redirecionamento recusado")
     except ponte.ForaDoAr:
         return _erro(f"Plataforma de Performance sem resposta em {ponte.TEMPO_LIMITE_S} s.")
-    if r.status_code == 401:
+    destino = {str(k).lower(): v for k, v in r.headers.items()}.get("location", "")
+    # 401 é a chave errada; 3xx para /login é a plataforma sem sessão e sem a chave valendo (a ponte não o segue)
+    if r.status_code == 401 or (300 <= r.status_code < 400 and ponte.vai_para_login(destino)):
         return _erro("A plataforma recusou a chave de leitura do Nexus. Confira NEXUS_PLATAFORMA_TOKEN no .env do "
-                     "Nexus e NEXUS_LEITURA_TOKEN na plataforma.")
+                     "Nexus e NEXUS_LEITURA_TOKEN na plataforma.", titulo="A plataforma recusou a chave")
+    if 200 <= r.status_code < 300 and not _confirmou_a_chave(r):
+        return _erro("A plataforma não confirmou a chave de leitura: ela pode estar aberta sem NEXUS_LEITURA_TOKEN. "
+                     "Nada foi mostrado.", titulo="Plataforma não confirmou a chave")
     status, cab, corpo = ponte.ajustar_resposta(r.status_code, dict(r.headers), r.content)
     return Response(corpo, status=status, headers=cab)

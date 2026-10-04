@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Plataforma sem resposta</title>
+<title>{{ titulo|default('Plataforma de Performance sem resposta') }}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}"></head>
 <body class="ponte-erro">
-  <h1>Plataforma de Performance sem resposta</h1>
+  <h1>{{ titulo|default('Plataforma de Performance sem resposta') }}</h1>
   <p>{{ texto }}</p>
   <p class="mudo">Às {{ hora }}.</p>
   <button class="gc-btn gc-btn--primario" type="button" onclick="location.reload()">Tentar de novo</button>

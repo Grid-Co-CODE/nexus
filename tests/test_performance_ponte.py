@@ -1,5 +1,8 @@
 # tests/test_performance_ponte.py
 """Ponte do Nexus para a plataforma de Performance (04/10/2026): só leitura, com o visual do Nexus."""
+import pytest
+import requests
+
 from nexus.performance import ponte as pt
 
 
@@ -22,7 +25,8 @@ def test_pedido_leva_a_chave_o_prefixo_e_tira_o_force():
     assert p["headers"]["X-Nexus-Leitura"] == "k"
     assert p["headers"]["X-Forwarded-Prefix"] == pt.PREFIXO
     assert "Cookie" not in p["headers"]
-    assert p["timeout"] == pt.TEMPO_LIMITE_S and p["allow_redirects"] is True
+    # o salto é seguido por `enviar`, só no mesmo servidor: o `requests` seguiria para qualquer host, com a chave
+    assert p["timeout"] == pt.TEMPO_LIMITE_S and p["allow_redirects"] is False
 
 
 def test_post_de_consulta_leva_o_corpo_e_o_tipo():
@@ -80,3 +84,155 @@ def test_cookie_e_tamanho_em_minusculo_continuam_barrados():
                                           "content-length": "9", "content-encoding": "gzip",
                                           "transfer-encoding": "chunked", "connection": "keep-alive"}, b"{}")
     assert cab == {"Content-Type": "application/json"}
+
+
+# Controles de gravação das páginas (Monitoramento): o atributo é o REAL de cada um, conferido em
+# docs/redesign/"Monitoramento (novo design).html" da plataforma. `tkStrQtdSai` e `tkStrQuem` são `onchange` (não
+# `onblur`/`oninput`); a quantidade digitada é `oninput="tkStrQtdDig"`.
+CONTROLES_DE_GRAVACAO = [
+    '[onclick*="trancarString"]', '[onclick*="excluirComent"]', '[onclick*="gcDesatribuirOS"]',
+    '[onclick*="gcUsinaReligada"]', '[onchange*="setTracking"]', '[oninput*="setTracking"]',
+    '[onclick*="toggleOsMode"]', '[onclick*="osGerar"]', '[onclick*="gcUsinaDesligada"]',
+    '[onclick*="gcDeslConfirmar"]', '[onclick*="tkStrSalvar"]', '[onclick*="tkStrFinalizar"]',
+    '[onclick*="tkStrConfirmar"]', '[onclick*="tkStrQtd"]', '[oninput*="tkStrQtdDig"]', '[onchange*="tkStrQtdSai"]',
+    '[onclick*="tkStrCampo"]', '[onchange*="tkStrCampo"]', '[onchange*="tkStrFim"]', '[onchange*="tkStrQuem"]',
+    '[onclick*="publicarComent"]', '[onclick*="gcAtribuirOS"]', '[onclick*="gcPickOS"]', '[onclick*="gcConfirmarOS"]',
+]
+
+
+@pytest.mark.parametrize("seletor", CONTROLES_DE_GRAVACAO)
+def test_todo_controle_de_gravacao_da_pagina_some_no_nexus(seletor):
+    # O guarda do navegador já barra o POST; isto tira o botão da frente (senão o analista clica e só vê o aviso).
+    html = pt.injetar("<html><head></head><body></body></html>")
+    estilo = html[html.index('id="nexus-visual"'):html.index("</style>")]
+    assert seletor in estilo, seletor
+
+
+def test_montar_pedido_recusa_caminho_sem_barra_inicial_ou_com_query():
+    # "@evil.com/x" colado na base viraria usuário "plat" no servidor evil.com; "?" e "#" escondem query por fora do filtro
+    for ruim in ("@evil.com/x", "api/x", "", "/api/x?force=1", "/api/x#y"):
+        with pytest.raises(ValueError):
+            pt.montar_pedido("https://plat", "k", "GET", ruim, [], None, None)
+
+
+class _R:
+    """Resposta falsa com a mesma interface mínima do `requests.Response`."""
+    def __init__(self, status=200, location=None, corpo=b"{}"):
+        self.status_code, self.content = status, corpo
+        self.headers = {"Content-Type": "application/json", **({"Location": location} if location else {})}
+
+
+class _Sessao:
+    """Sessão falsa: devolve as respostas em ordem (ou levanta, se for exceção) e guarda cada pedido recebido."""
+    def __init__(self, *respostas):
+        self.respostas, self.pedidos = list(respostas), []
+
+    def request(self, **p):
+        self.pedidos.append(p)
+        r = self.respostas.pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+
+def _pedido(base="https://plat:5050"):
+    return pt.montar_pedido(base, "chave-k", "GET", "/api/x", [], None, None)
+
+
+def test_salto_no_mesmo_servidor_e_seguido_com_a_chave(monkeypatch):
+    s = _Sessao(_R(302, "/api/novo"), _R(200, corpo=b'{"ok":1}'))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    r = pt.enviar(**_pedido())
+    assert r.status_code == 200 and r.content == b'{"ok":1}'
+    assert [p["url"] for p in s.pedidos] == ["https://plat:5050/api/x", "https://plat:5050/api/novo"]
+    # os cabeçalhos (a chave e o prefixo) vão de novo no salto, e quem salta é a ponte: o `requests` não segue sozinho
+    assert all(p["headers"]["X-Nexus-Leitura"] == "chave-k" and p["allow_redirects"] is False for p in s.pedidos)
+
+
+def test_salto_nao_repete_a_query_do_pedido_original(monkeypatch):
+    s = _Sessao(_R(302, "/api/novo?x=1"), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    pt.enviar(**pt.montar_pedido("https://plat:5050", "chave-k", "GET", "/api/x", [("data", "d")], None, None))
+    assert s.pedidos[0]["params"] == [("data", "d")]
+    assert s.pedidos[1]["url"] == "https://plat:5050/api/novo?x=1" and s.pedidos[1]["params"] == []
+
+
+def test_salto_303_de_post_vira_get_sem_corpo(monkeypatch):
+    s = _Sessao(_R(303, "/api/lista"), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    pt.enviar(**pt.montar_pedido("https://plat:5050", "chave-k", "POST", "/api/etm/os", [], b"{}", "application/json"))
+    assert s.pedidos[1]["method"] == "GET" and "data" not in s.pedidos[1]
+    assert "Content-Type" not in s.pedidos[1]["headers"] and s.pedidos[1]["headers"]["X-Nexus-Leitura"] == "chave-k"
+
+
+@pytest.mark.parametrize("destino", [
+    "https://evil.com/x", "//evil.com/x", "https://plat:6060/x", "http://plat:5050/x", "https://plat.evil.com/x",
+])
+def test_salto_para_outro_servidor_nao_e_seguido_e_a_chave_nao_vai(monkeypatch, destino):
+    s = _Sessao(_R(302, destino), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.ForaDoAr, match="redirecionamento para outro servidor"):
+        pt.enviar(**_pedido())
+    assert len(s.pedidos) == 1                           # o segundo pedido (com a chave) nunca saiu
+    assert all(p["url"].startswith("https://plat:5050/") for p in s.pedidos)
+
+
+def test_no_maximo_tres_saltos(monkeypatch):
+    s = _Sessao(_R(302, "/a"), _R(302, "/b"), _R(302, "/c"), _R(302, "/d"), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.ForaDoAr, match="redirecionamentos demais"):
+        pt.enviar(**_pedido())
+    assert len(s.pedidos) == 4                           # o original + 3 saltos seguidos
+
+
+def test_porta_padrao_escrita_ou_omitida_e_o_mesmo_servidor(monkeypatch):
+    s = _Sessao(_R(301, "https://plat:443/y"), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    assert pt.enviar(**_pedido("https://plat")).status_code == 200
+
+
+@pytest.mark.parametrize("login", ["/login?next=%2Ftempo-real", "/t/performance/plataforma/login", "/auth/login"])
+def test_salto_para_o_login_volta_como_esta(monkeypatch, login):
+    # a plataforma manda a chave sem sessão para o /login: seguir mostraria a tela de login dela dentro do Nexus
+    s = _Sessao(_R(302, login), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    r = pt.enviar(**_pedido())
+    assert r.status_code == 302 and len(s.pedidos) == 1
+
+
+def test_erro_de_rede_vira_fora_do_ar(monkeypatch):
+    monkeypatch.setattr(pt, "_SESSAO", _Sessao(requests.ConnectionError("x")))
+    with pytest.raises(pt.ForaDoAr, match="ConnectionError"):
+        pt.enviar(**_pedido())
+
+
+def _esgotar_vagas():
+    n = 0
+    while pt._VAGAS.acquire(blocking=False):
+        n += 1
+    return n
+
+
+def test_enviar_devolve_a_vaga_depois_de_erro_de_rede_ou_de_codigo(monkeypatch):
+    # sem o `finally`, 4 pedidos que falham deixariam o Nexus sem vaga para sempre
+    for erro in (requests.ReadTimeout("x"), RuntimeError("bug")):
+        monkeypatch.setattr(pt, "_SESSAO", _Sessao(erro))
+        with pytest.raises((pt.ForaDoAr, RuntimeError)):
+            pt.enviar(**_pedido())
+    n = _esgotar_vagas()
+    for _ in range(n):
+        pt._VAGAS.release()
+    assert n == 4
+
+
+def test_sem_vaga_levanta_ocupada_depois_de_esperar(monkeypatch):
+    monkeypatch.setattr(pt, "ESPERA_VAGA_S", 0.05)
+    monkeypatch.setattr(pt, "_SESSAO", _Sessao())        # se chegasse à rede, esvaziaria a lista e quebraria
+    n = _esgotar_vagas()
+    try:
+        with pytest.raises(pt.Ocupada):
+            pt.enviar(**_pedido())
+    finally:
+        for _ in range(n):
+            pt._VAGAS.release()
+    assert n == 4
