@@ -8,6 +8,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
         return render_template("base/registro-mestre.html")
 """
 from ...cadastro.telas import registrar_base
+from ...cadastro.telas_ligacoes import registrar_ligacoes
 from ..modelo import Tela, Torre
 
 TORRE = Torre(
@@ -33,6 +34,9 @@ TORRE = Torre(
         Tela("importar", "Importar do Excel",
              "O que muda no ensaio se eu importar o BD_Operações de hoje?",
              "BD_Operacoes.xlsx enviado pela tela"),
+        Tela("ligacoes", "Ligações entre bases",
+             "Que usina cada base chama de quê, e onde a ligação falta?",
+             "de_para do Nexus (cadastro_nexus no PostgreSQL)"),
         Tela("qualidade", "Qualidade do cadastro",
              "O que o Excel deixava passar calado?",
              "Cadastro do Nexus"),
@@ -59,3 +63,4 @@ TORRE = Torre(
 
 bp = TORRE.criar_blueprint(__name__)
 registrar_base(bp)
+registrar_ligacoes(bp)

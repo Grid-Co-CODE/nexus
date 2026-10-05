@@ -16,6 +16,7 @@ Qualidade do cadastro) e Pessoas (Colaboradores Operação).
 | `servico.py` | ler, salvar e versionar registros; quem chama não fala com o armazém direto |
 | `banco.py` | publica o cadastro no PostgreSQL com ID e ligação por ID (`ferramentas/publicar_cadastro.py`) |
 | `casamento.py` | casa o nome de uma base sem código (BD_Thopen) com a usina do cadastro |
+| `ligacoes.py` + `telas_ligacoes.py` | tela Base → Ligações entre bases: lê as bases, mostra os buracos, grava as decisões |
 | `importar.py` | importa o `BD_Operacoes.xlsx` e mostra a prévia do que muda antes de gravar |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
@@ -67,9 +68,19 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
   e fica anotado; nome só-base precisa de localização igual e potência (±15%) — é o que separa "Ouro Branco I" (PR) da
   "Ouro Branco" (AL) e "AP. do Taboado" (0,41 MWp) da "Aparecida do Taboado 1 e 2". **Nunca cruza cliente:** E1 é E1,
   não Thopen, com usinas diferentes de mesmo nome (Levi, 04/10).
-- **Regras de ignorar** moram em `C:\GridcoAuto\nexus\de_para_regras.json` (servidor: `dados/de_para_regras.json`),
-  fora do git: teste ("TESTE é teste"), "Grid Co." (tarefa interna) e Porteiras ("não entra no BD"). Decisão nova do
-  Levi entra lá, com quem e quando no motivo.
+- **Decisões** moram em `C:\GridcoAuto\nexus\de_para_regras.json` (servidor: `dados/de_para_regras.json`), fora do
+  git: `ignorar` (regra fixa "contem" ou chave exata da tela), `ligar` e `desligar` (chave → usina_id, vence o
+  automático) e `ausencia` (usina ou cliente inteiro que a base não precisa ter). Fixas: teste, "Grid Co." e Porteiras.
+- **Tela Base → Ligações entre bases** (`/t/base/ligacoes`): "Ler as bases de novo" grava `de_para_atual.json` (as
+  fontes lidas + o de_para; ~6–11 s); decidir reaplica sem rede; "Publicar no banco" manda ao `cadastro_nexus`. Abas:
+  Buracos (com sugestões e ligar/ignorar), Ligado por nome (confirmar/desligar), Usinas fora (ausência esperada por
+  cliente) e Decisões (desfazer).
+- **Sugestão nunca cruza cliente** nem passa pelas travas do casamento (número diferente, cidade diferente, potência
+  40%+ diferente): na 1ª versão real (04/10) ela sugeria "E1 - Andradina 1" para a Andradina da Thopen, "Marajoara 1"
+  a 100% para a Marajoara 2 e "Ouro Branco" (AL) para as de Bandeirantes (PR). Hoje os 73 buracos não têm par no
+  cadastro e a tela diz "nenhuma parecida".
+- **Teste da tela nunca grava na pasta real:** em 04/10 um teste gravou no arquivo de regras de verdade (o `create_app`
+  não repassava `NEXUS_DADOS`). Hoje `pasta_dados` recusa em TESTING sem `NEXUS_DADOS`.
 - Medido em 04/10 (no banco): BD_Operações 258/258, Fracttal 139/144, Tickets 136/156, BD_Performance 136/156,
   BD_Thopen 87/115. Os que sobram não estão no cadastro (20 usinas da Thopen em negociação nas bases da API; 28 do
   BD_Thopen como Ouro Branco I–V, Delmiro Gouvea 1–4, Lyon; no Fracttal, Solier Cascavel, Marajoara 2 e Porto Real 2/3

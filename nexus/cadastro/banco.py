@@ -174,15 +174,33 @@ SEM_PAR = "sem par no cadastro"
 
 
 def ignorado(regras, sistema, chave) -> str | None:
-    """Decisões do Levi que tiram uma linha da conta ("TESTE é teste", "Porteiras não entra no BD"). Cada regra:
-    {"contem": texto, "sistema": opcional, "motivo": texto}."""
+    """Decisões que tiram uma linha da conta ("TESTE é teste", "Porteiras não entra no BD"). Cada regra:
+    {"contem": texto, "sistema": opcional, "motivo": texto} ou, vinda da tela, {"chave": a chave exata, ...}."""
     k = norm(chave)
     for r in regras or ():
         if r.get("sistema") and r["sistema"] != sistema:
             continue
-        if norm(r["contem"]) and norm(r["contem"]) in k:
+        if r.get("chave") is not None:
+            if str(r["chave"]) == str(chave):
+                return f"ignorado: {r['motivo']}"
+            continue
+        if norm(r.get("contem")) and norm(r["contem"]) in k:
             return f"ignorado: {r['motivo']}"
     return None
+
+
+def _decisoes(regras):
+    """Aceita a lista antiga (só "ignorar") ou o dicionário da tela de Ligações (ligar, desligar, ignorar)."""
+    if isinstance(regras, dict):
+        return regras.get("ignorar") or [], regras.get("ligar") or [], regras.get("desligar") or []
+    return regras or [], [], []
+
+
+def _quando_curto(iso) -> str:
+    try:
+        return datetime.fromisoformat(iso).strftime("%d/%m")
+    except (TypeError, ValueError):
+        return ""
 
 
 def de_para(srv, fontes: dict, regras=None) -> list[list]:
@@ -195,6 +213,10 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
     `dica` é a usina que outra fonte já conferida aponta (o de-para de trackers): sem casamento, ela liga; contra o
     casamento, não liga ninguém. Nome ou código que serve a duas usinas não casa: ligação errada é pior que faltando."""
     from . import casamento as K
+    ignorar, ligar, desligar = _decisoes(regras)
+    manual = {(d["sistema"], str(d["chave"])): d for d in ligar}
+    vetado = {(d["sistema"], str(d["chave"]), int(d["usina_id"])) for d in desligar}
+    existe = {_id(u.id) for u in srv.registros("usinas")}
     por_cod, por_cheio, por_nome, por_cliente = {}, {}, {}, {}
     for u in srv.registros("usinas"):
         uid = _id(u.id)
@@ -215,10 +237,16 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
     for sistema, itens in fontes.items():
         vistos = set()
         for it in itens:
-            ids, como = [], ignorado(regras, sistema, it["chave"])
+            m = manual.get((sistema, str(it["chave"])))
+            ids, como = [], None if m else ignorado(ignorar, sistema, it["chave"])
             cheio = str(it.get("codigo") or "").strip().upper()
             cod = sufixo_codigo(cheio)
-            if como:
+            if m:                                   # quem corrigiu na tela vence qualquer regra automática
+                if int(m["usina_id"]) in existe:
+                    ids, como = [int(m["usina_id"])], f"manual ({m.get('quem') or '?'}, {_quando_curto(m.get('quando'))})"
+                else:
+                    como = "manual aponta usina que não existe mais"
+            elif como:
                 pass
             elif "-" in cheio and len(por_cheio.get(cheio, ())) == 1:
                 ids, como = list(por_cheio[cheio]), "código"
@@ -240,7 +268,10 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
                 nome = norm(f"{it['cliente']} - {it['nome']}") if it.get("cliente") else norm(it["nome"])
                 if len(por_nome.get(nome, ())) == 1:
                     ids, como = list(por_nome[nome]), "nome"
-            if ids and it.get("origem") and not como.startswith("código"):
+            if ids and not m and any((sistema, str(it["chave"]), i) in vetado for i in ids):
+                ids = [i for i in ids if (sistema, str(it["chave"]), i) not in vetado]
+                como = como if ids else "desligado à mão"
+            if ids and it.get("origem") and not como.startswith(("código", "manual")):
                 como = f"{como} ({it['origem']})"       # o nome veio de outro campo (ex.: a localização no Fracttal)
             if len(ids) == 1:
                 ligado_por_nome[it["chave"]] = ids[0]

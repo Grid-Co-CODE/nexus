@@ -234,3 +234,41 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
   .cad-barra{justify-content:stretch}
   .cad-barra .gc-btn{flex:1;justify-content:center}
 }
+
+/* Base → Ligações entre bases (04/10/2026): os buracos do de_para à vista, e a correção na própria linha */
+.lig-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+.lig-acoes form{margin:0}
+.lig-meta{color:var(--mudo);font-size:12.5px;margin:4px 0 12px}
+.lig-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:14px 0 6px}
+.lig-card{display:flex;flex-direction:column;gap:4px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);
+  padding:10px 12px;text-decoration:none;color:var(--tinta)}
+.lig-card:hover{border-color:var(--linha-forte)}
+.lig-card.sel{border-color:var(--verde);box-shadow:inset 0 0 0 1px var(--verde)}
+.lig-card .nome{font:600 12.5px/16px var(--font-sans)}
+.lig-card .pct{font:700 22px/26px var(--font-display)}
+.lig-card .pct.ok{color:var(--verde-texto)}.lig-card .pct.al{color:var(--alerta)}.lig-card .pct.er{color:var(--critico)}
+.lig-card .det{font-size:11.5px;color:var(--mudo)}
+.lig-barra{display:block;height:6px;border-radius:3px;background:var(--linha);overflow:hidden}
+.lig-barra i{display:block;height:100%}
+.lig-barra i.ok{background:var(--verde)}.lig-barra i.al{background:var(--alerta)}.lig-barra i.er{background:var(--critico)}
+.lig-abas{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--linha);margin:16px 0 10px}
+.lig-abas a{padding:8px 12px;text-decoration:none;color:var(--mudo);font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.lig-abas a:hover{color:var(--tinta)}
+.lig-abas a.sel{color:var(--tinta);border-bottom-color:var(--verde)}
+.lig-abas a span{font:500 11.5px var(--font-mono);color:var(--mudo);margin-left:4px}
+.lig-ajuda{color:var(--tinta-2);font-size:13px;margin:0 0 10px;max-width:900px}
+.lig-tabela td{vertical-align:middle}
+.lig-base{white-space:nowrap;color:var(--mudo)}
+.lig-chave{color:var(--tinta);font-weight:600}
+.lig-form{margin:0;display:inline}
+.lig-linha{display:flex;gap:6px;align-items:center}
+.lig-linha .gc-campo{min-width:150px;padding:6px 8px;font-size:12.5px}
+.lig-sug{display:flex;align-items:center;gap:6px;width:100%;margin:2px 0;padding:4px 8px;border-radius:var(--raio-controle);
+  border:1px solid var(--linha);background:transparent;color:var(--tinta-2);font:500 12px/16px var(--font-sans);cursor:pointer;text-align:left}
+.lig-sug:hover{border-color:var(--verde);color:var(--tinta)}
+.lig-sug span{margin-left:auto;font:500 11px var(--font-mono);color:var(--verde-texto)}
+.lig-botoes{white-space:nowrap}
+.lig-h2{font:700 16px/22px var(--font-display);margin:18px 0 8px}
+.lig-grupo summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;cursor:pointer}
+.lig-direita{margin-left:auto}
+@media (max-width:760px){.lig-linha{flex-wrap:wrap}.lig-linha .gc-campo{min-width:0;flex:1}}

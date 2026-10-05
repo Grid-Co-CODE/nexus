@@ -1,13 +1,8 @@
 """Casamento por nome para base sem código (nexus/cadastro/casamento.py). Os casos são os reais do BD_Thopen (04/10/2026)."""
-import sys
-from pathlib import Path
-
 import pytest
 
 from nexus.cadastro import casamento as K
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ferramentas"))
-import publicar_cadastro as P  # noqa: E402
+from nexus.cadastro import ligacoes as L
 
 CAD = [
     {"id": 1, "nome": "Ibaté 1", "cidade": "Ibaté", "uf": "SP", "mwp": 3.13},
@@ -72,7 +67,7 @@ def test_sem_numero_no_cadastro_e_a_1_das_outras_bases():
 
 
 def test_usina_do_caminho_de_localizacao_do_fracttal():
-    assert P._usina_do_caminho("// Thopen/ Thopen - Brodowski 1 - SP/ Cabine 1/ SKID 2/ QGBT 2/ ") == ("Thopen", "Brodowski 1")
-    assert P._usina_do_caminho("// RenoGrid/ RenoGrid - Nobres 1 - MT/ Cabine 1/ ") == ("RenoGrid", "Nobres 1")
-    assert P._usina_do_caminho("// TESTE - PA/ ") is None
-    assert P._usina_do_caminho(None) is None
+    assert L.usina_do_caminho("// Thopen/ Thopen - Brodowski 1 - SP/ Cabine 1/ SKID 2/ QGBT 2/ ") == ("Thopen", "Brodowski 1")
+    assert L.usina_do_caminho("// RenoGrid/ RenoGrid - Nobres 1 - MT/ Cabine 1/ ") == ("RenoGrid", "Nobres 1")
+    assert L.usina_do_caminho("// TESTE - PA/ ") is None
+    assert L.usina_do_caminho(None) is None

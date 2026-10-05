@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block titulo %}Ligações entre bases{% endblock %}
+{% macro alvo(sistema) %}<input type="hidden" name="alvo_sistema" value="{{ sistema }}"><input type="hidden" name="aba" value="{{ aba }}">{% if request.args.get('sistema') %}<input type="hidden" name="sistema" value="{{ request.args.get('sistema') }}">{% endif %}{% endmacro %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Governança de dados</p>
+<div class="cad-topo">
+  <div>
+    <h1 class="titulo-pagina">Ligações entre bases</h1>
+    <p class="cad-sub">Que usina cada base chama de quê, e onde a ligação falta. A correção feita aqui entra no de_para na hora e vai ao banco quando você publicar.</p>
+  </div>
+  <div class="lig-acoes">
+    <form method="post" action="/t/base/ligacoes/recalcular">{{ alvo('') }}<button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-arrows-clockwise"></i> Ler as bases de novo</button></form>
+    <form method="post" action="/t/base/ligacoes/publicar">{{ alvo('') }}<button class="gc-btn gc-btn--primario" type="submit" {% if not pode_publicar or not gerado_em %}disabled title="Falta o token de escrita ou a leitura das bases"{% endif %}><i class="ph ph-cloud-arrow-up"></i> Publicar no banco</button></form>
+  </div>
+</div>
+{% if gerado_em %}<p class="lig-meta">Bases lidas em <span class="gc-num">{{ gerado_em }}</span> · {{ p.decisoes|length }} decisões gravadas</p>{% endif %}
+{% if ok %}<div class="cad-aviso cad-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>{{ ok }}</strong></div></div>{% endif %}
+{% if erro %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div>{{ erro }}</div></div>{% endif %}
+
+{% if not gerado_em %}
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>As bases ainda não foram lidas nesta máquina.</strong> Use "Ler as bases de novo": leva alguns segundos (API de dados e a foto do Fracttal do PCM).</div></div>
+{% else %}
+
+<div class="lig-cards">
+  <a class="lig-card{% if not sistema %} sel{% endif %}" href="?{{ {'aba': aba}|urlencode }}">
+    <span class="nome">Todas as bases</span>
+    <span class="pct gc-num">{{ contagem['buracos'] if not sistema else '' }}</span>
+    <span class="det">buracos em aberto</span>
+  </a>
+  {% for s in p.sistemas %}
+  <a class="lig-card{% if sistema == s.nome %} sel{% endif %}" href="?{{ {'aba': aba, 'sistema': s.nome}|urlencode }}">
+    <span class="nome">{{ s.nome }}</span>
+    <span class="pct gc-num {{ 'ok' if s.pct >= 90 else ('al' if s.pct >= 75 else 'er') }}">{{ ('%.1f' % s.pct).replace('.', ',') }}%</span>
+    <span class="lig-barra"><i class="{{ 'ok' if s.pct >= 90 else ('al' if s.pct >= 75 else 'er') }}" style="width:{{ s.pct }}%"></i></span>
+    <span class="det gc-num">{{ s.ligadas }}/{{ s.total }} ligadas · {{ s.buracos }} buracos{% if s.fora %} · {{ s.fora }} usinas fora{% endif %}{% if s.ignoradas %} · {{ s.ignoradas }} ignoradas{% endif %}</span>
+  </a>
+  {% endfor %}
+</div>
+
+<nav class="lig-abas">
+  {% for id, nome in abas %}<a class="{{ 'sel' if aba == id }}" href="?{{ {'aba': id, 'sistema': sistema}|urlencode }}">{{ nome }} <span class="gc-num">{{ contagem[id] }}</span></a>{% endfor %}
+</nav>
+
+{% if aba == 'buracos' %}
+<p class="lig-ajuda">Chave de uma base que não ligou a usina nenhuma. Ligue a uma usina do cadastro do Nexus ou diga por que ignorar. Ligar grava só no Nexus que essa chave é aquela usina: a base de origem e o Fracttal não mudam. Vai ao banco quando você publicar.</p>
+<div class="cad-rolagem">
+<table class="cad-tabela lig-tabela">
+  <thead><tr><th>Base</th><th>Chave na base</th><th>Por quê</th><th>Sugestões do Nexus</th><th>Ligar a uma usina do cadastro</th><th>Ignorar</th></tr></thead>
+  <tbody>
+  {% for b in buracos %}
+  <tr>
+    <td class="lig-base">{{ b.sistema.split(' · ')[0] }}</td>
+    <td><strong class="lig-chave">{{ b.chave }}</strong>{% if b.tarefas %}<span class="mudo gc-num"> · {{ b.tarefas }} tarefas</span>{% endif %}{% if b.cidade %}<div class="mudo">{{ b.cidade }}</div>{% endif %}</td>
+    <td class="mudo">{{ b.motivo }}</td>
+    <td>
+      {% for g in b.sugestoes %}
+      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(b.sistema) }}
+        <input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ b.chave }}"><input type="hidden" name="usina" value="{{ g.id }}">
+        <button class="lig-sug" type="submit" title="Ligar a {{ g.titulo }}"><i class="ph ph-link"></i> {{ g.titulo }}<span class="gc-num">{{ g.nota }}%</span></button>
+      </form>
+      {% else %}<span class="mudo">nenhuma parecida</span>{% endfor %}
+    </td>
+    <td>
+      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form lig-linha">{{ alvo(b.sistema) }}
+        <input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ b.chave }}">
+        <input class="gc-campo" name="usina" list="lig-usinas" placeholder="usina do cadastro (id ou nome)" required aria-label="Usina do cadastro para ligar">
+        <button class="gc-btn gc-btn--contorno" type="submit">Ligar</button>
+      </form>
+    </td>
+    <td>
+      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form lig-linha">{{ alvo(b.sistema) }}
+        <input type="hidden" name="acao" value="ignorar"><input type="hidden" name="chave" value="{{ b.chave }}">
+        <input class="gc-campo" name="motivo" placeholder="por quê" required aria-label="Motivo para ignorar">
+        <button class="gc-btn gc-btn--fantasma" type="submit">Ignorar</button>
+      </form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="vazio">Nenhum buraco aqui.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% elif aba == 'por-nome' %}
+<p class="lig-ajuda">Ligações que o Nexus fez só pelo nome (sem código). Confirme as certas e desligue as erradas; confirmada, ela vira decisão sua e não muda mais sozinha.</p>
+<div class="cad-rolagem">
+<table class="cad-tabela lig-tabela">
+  <thead><tr><th>Base</th><th>Chave na base</th><th>Ligou a</th><th>Como</th><th></th></tr></thead>
+  <tbody>
+  {% for x in por_nome %}
+  <tr>
+    <td class="lig-base">{{ x.sistema.split(' · ')[0] }}</td>
+    <td><strong class="lig-chave">{{ x.chave }}</strong></td>
+    <td><span class="id">{{ x.usina_id }}</span> {{ x.usina }}</td>
+    <td class="mudo">{{ x.como }}</td>
+    <td class="lig-botoes">
+      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(x.sistema) }}<input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ x.chave }}"><input type="hidden" name="usina" value="{{ x.usina_id }}"><button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-check"></i> Confirmar</button></form>
+      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(x.sistema) }}<input type="hidden" name="acao" value="desligar"><input type="hidden" name="chave" value="{{ x.chave }}"><input type="hidden" name="usina" value="{{ x.usina_id }}"><button class="gc-btn gc-btn--fantasma" type="submit"><i class="ph ph-link-break"></i> Desligar</button></form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="vazio">Nada ligado só pelo nome aqui.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% elif aba == 'fora' %}
+<p class="lig-ajuda">Usinas em operação no cadastro que a base não enxerga. Se a ausência é esperada (ex.: cliente operado fora do Fracttal), marque, com o motivo; vale para o cliente inteiro.</p>
+{% for s, total, grupos in fora %}
+<h2 class="lig-h2">{{ s }} <span class="mudo gc-num">· {{ total }} usinas</span></h2>
+{% for (cliente, cliente_id), us in grupos %}
+<details class="cad-secao lig-grupo"{% if loop.first %} open{% endif %}>
+  <summary><strong>{{ cliente or 'sem cliente' }}</strong> <span class="mudo gc-num">· {{ us|length }} usinas</span>
+    {% if cliente_id is not none %}
+    <form method="post" action="/t/base/ligacoes/decidir" class="lig-form lig-linha lig-direita">{{ alvo(s) }}
+      <input type="hidden" name="acao" value="ausencia"><input type="hidden" name="cliente_id" value="{{ cliente_id }}">
+      <input class="gc-campo" name="motivo" placeholder="por que esse cliente não está nesta base" required aria-label="Motivo da ausência">
+      <button class="gc-btn gc-btn--contorno" type="submit">Ausência esperada</button>
+    </form>{% endif %}
+  </summary>
+  <div class="cad-rolagem" style="border:0;border-top:1px solid var(--linha);border-radius:0">
+  <table class="cad-tabela"><thead><tr><th>ID</th><th>Usina</th><th>Código</th><th>Equipe</th><th>Cidade</th></tr></thead><tbody>
+  {% for u in us %}<tr><td class="id">{{ u.id }}</td><td><a class="linha" href="/t/base/usina/{{ u.id }}">{{ u.nome }}</a></td><td class="id">{{ u.codigo or '—' }}</td><td>{{ u.equipe }}</td><td>{{ u.cidade or '' }}{% if u.uf %}/{{ u.uf }}{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  </div>
+</details>
+{% endfor %}
+{% else %}<p class="vazio">Nenhuma usina em operação fora.</p>{% endfor %}
+
+{% else %}
+<p class="lig-ajuda">Tudo o que alguém decidiu à mão, e a regra que vale para todas. Desfazer volta a ligação para o automático.</p>
+<div class="cad-rolagem">
+<table class="cad-tabela lig-tabela">
+  <thead><tr><th>Decisão</th><th>Base</th><th>Chave ou usina</th><th>Usina ligada</th><th>Motivo</th><th>Quem</th><th></th></tr></thead>
+  <tbody>
+  {% for d in p.decisoes %}
+  <tr>
+    <td><span class="cad-chip">{{ {'ligar': 'ligou', 'desligar': 'desligou', 'ignorar': 'ignorou', 'ausencia': 'ausência esperada'}[d.tipo] }}</span></td>
+    <td class="lig-base">{{ d.sistema.split(' · ')[0] }}</td>
+    <td>{{ d.alvo }}</td>
+    <td>{{ d.usina or '' }}</td>
+    <td class="mudo">{{ d.motivo }}</td>
+    <td class="mudo">{{ d.quem }}{% if d.quando %} · <span class="gc-num">{{ hora(d.quando) }}</span>{% endif %}</td>
+    <td>{% if d.quem %}
+      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(d.sistema) }}
+        <input type="hidden" name="acao" value="desfazer"><input type="hidden" name="motivo" value="{{ d.tipo }}">
+        {% if d.tipo in ('ligar', 'desligar', 'ignorar') %}<input type="hidden" name="chave" value="{{ d.chave }}">{% elif d.usina_id is not none %}<input type="hidden" name="usina" value="{{ d.usina_id }}">{% else %}<input type="hidden" name="cliente_id" value="{{ d.cliente_id }}">{% endif %}
+        <button class="gc-btn gc-btn--fantasma" type="submit"><i class="ph ph-arrow-counter-clockwise"></i> Desfazer</button>
+      </form>{% else %}<span class="mudo">regra fixa</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="vazio">Nenhuma decisão ainda.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endif %}
+
+<datalist id="lig-usinas">{% for u in p.usinas %}<option value="{{ u.id }} · {{ u.titulo }}"></option>{% endfor %}</datalist>
+{% endblock %}
