@@ -1,0 +1,47 @@
+/* Base → Governança de dados (05/10/2026): a matriz de barramento e a qualidade da ligação. Tokens do nexus.css. */
+.dd-sub{color:var(--tinta-2);max-width:980px;margin:4px 0 0}
+.dd-sub code,.dd-mudo code,.dd-rodape code{font-family:var(--font-mono,monospace);font-size:12.5px}
+.dd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:18px 0 14px}
+.dd-kpi{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column}
+.dd-kpi .v{font:700 24px/30px var(--font-display,inherit)}.dd-kpi .v.dd-hora{font-size:18px}
+.dd-kpi .r{font-size:12px;color:var(--tinta-2)}
+.dd-kpi.ok .v{color:var(--verde-texto)}.dd-kpi.al .v{color:var(--alerta,#ffd83d)}.dd-kpi.er .v{color:var(--erro,#ff7a7a)}
+.dd-aviso{color:var(--alerta,#ffd83d)}
+.dd-qual{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:12px 16px;margin:12px 0}
+.dd-qual h2{font-size:16px;margin:0 0 4px}
+.dd-mudo{color:var(--mudo);font-size:13px;margin:4px 0}
+.dd-falta{color:var(--tinta-2);font-size:13px;margin:4px 0}
+.dd-barras{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 18px;margin:8px 0}
+.dd-barra{display:grid;grid-template-columns:62px 1fr 44px;gap:8px;align-items:center;font-size:13px}
+.dd-barra .trilho{height:8px;border-radius:99px;background:var(--superficie-2)}
+.dd-barra .enche{display:block;height:100%;border-radius:99px}
+.dd-barra .enche.ok{background:var(--verde)}.dd-barra .enche.al{background:var(--alerta,#ffd83d)}.dd-barra .enche.er{background:var(--erro,#ff7a7a)}
+.dd-barra .pct{text-align:right;font-variant-numeric:tabular-nums}
+.dd-h2{font-size:18px;margin:28px 0 8px}
+.dd-legenda{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--tinta-2);margin-bottom:10px}
+.dd-legenda>span{display:inline-flex;gap:6px;align-items:center}
+.dd-moldura{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;overflow-x:auto}
+.dd-matriz{border-collapse:separate;border-spacing:0;width:100%;min-width:1100px}
+.dd-matriz th,.dd-matriz td{padding:8px 10px;border-bottom:1px solid var(--linha);text-align:left;vertical-align:top}
+.dd-matriz thead th{background:var(--superficie-2);font-size:12px;color:var(--tinta-2);font-weight:600}
+.dd-matriz th.dd-dim{text-align:center}.dd-matriz th small{display:block;font-weight:400;color:var(--mudo);font-size:11px}
+.dd-grupo td{background:var(--verde-suave);color:var(--verde-texto);font:700 11px/14px var(--font-sans,inherit);letter-spacing:1.4px;text-transform:uppercase}
+.dd-proc{min-width:270px}.dd-proc b{display:block;font-size:13.5px}
+.dd-proc code{display:block;font-size:11.5px;color:var(--mudo)}.dd-proc code.dd-conf{color:var(--verde-texto)}
+.dd-proc .grao{display:block;font-size:12px;color:var(--tinta-2)}.dd-proc .obs{display:block;font-size:11.5px;color:var(--mudo)}
+.dd-c{text-align:center;min-width:110px}.dd-c .col{display:block;font-size:11px;color:var(--mudo);margin-top:3px}
+.dd-chip{display:inline-block;min-width:58px;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:600;border:1px solid transparent}
+.dd-chip.id{background:var(--verde-suave);color:var(--verde-texto);border-color:rgba(163,217,0,.45)}
+.dd-chip.cod{color:#ffd83d;border-color:rgba(255,216,61,.4);background:rgba(255,216,61,.08)}
+.dd-chip.hmac{color:#7fb8ff;border-color:rgba(127,184,255,.42);background:rgba(127,184,255,.10)}
+.dd-chip.nome{color:#ff7a7a;border-color:rgba(255,122,122,.42);background:rgba(255,122,122,.08)}
+.dd-chip.largo{color:#ffd83d;border:1px dashed rgba(255,216,61,.5)}
+.dd-chip.prop{color:#ff7a7a;border:1px dashed rgba(255,122,122,.55)}
+.dd-chip.nao{color:var(--mudo);min-width:20px;padding:0}
+.dd-selo{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:600;padding:0 7px;border-radius:99px;border:1px solid var(--linha);color:var(--mudo);vertical-align:1px}
+.dd-selo.ok{color:var(--verde-texto);border-color:rgba(163,217,0,.45)}.dd-selo.al{color:#ffd83d;border-color:rgba(255,216,61,.45)}
+.dd-aposentado td{opacity:.6}
+.dd-dims{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.dd-dim-card{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.dd-dim-card code{font-size:12px;color:var(--verde-texto)}.dd-dim-card span{color:var(--tinta-2)}
+.dd-rodape{margin-top:18px}

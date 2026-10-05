@@ -12,6 +12,7 @@ from waitress import serve
 
 from nexus import create_app
 from nexus.campo import instalar as instalar_campo
+from nexus.dados import instalar as instalar_dados
 from nexus.config import ConfigErro
 
 PORTA = 5070
@@ -23,5 +24,6 @@ if __name__ == "__main__":
         sys.exit(f"Nexus não subiu: {erro}")
     app.config["SESSION_COOKIE_SECURE"] = False
     instalar_campo(app)
+    instalar_dados(app)
     print(f"Nexus em http://localhost:{PORTA}", flush=True)
     serve(app, listen=f"127.0.0.1:{PORTA} [::1]:{PORTA}", threads=8)

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block titulo %}Governança de dados{% endblock %}
+{% set AREAS = {"campo": "Campo · App", "hseq": "Segurança · HSEQ", "performance": "Performance", "chamados": "Chamados",
+                "pcm": "PCM", "engenharia": "Engenharia", "cos": "COS"} %}
+{% set PCT = {"data": "pct_data", "usina": "pct_usina", "equipe": "pct_equipe", "pessoa": "pct_pessoa"} %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='dados.css') }}">
+<p class="gc-eyebrow">Base · Governança de dados</p>
+<h1 class="titulo-pagina">Matriz de barramento</h1>
+<p class="dd-sub">Cada acontecimento (um <b>fato</b>: um fechamento, uma ronda, a geração de um dia) ligado aos cadastros de
+referência (as <b>dimensões</b>: usina, pessoa, data…) por <b>ID</b>. Quando dois setores usam a mesma dimensão pelo mesmo
+ID, os dados deles se cruzam sem conversão. A matriz vem do catálogo do Nexus (<code>nexus/dados/catalogo.py</code>); a
+qualidade, da carga de hora em hora.</p>
+
+<div class="dd-kpis">
+  <div class="dd-kpi"><span class="v">{{ resumo.fatos }}</span><span class="r">fatos no catálogo</span></div>
+  <div class="dd-kpi {{ 'ok' if resumo.conformados else 'er' }}"><span class="v">{{ resumo.conformados }}</span><span class="r">já gravados com os IDs</span></div>
+  <div class="dd-kpi"><span class="v">{{ resumo.dimensoes }}</span><span class="r">dimensões em comum</span></div>
+  <div class="dd-kpi {{ 'al' if resumo.fora else '' }}"><span class="v">{{ resumo.fora }}</span><span class="r">fora do banco</span></div>
+  <div class="dd-kpi"><span class="v dd-hora">{{ hora(atualizacao.get('gerado_em')) or '—' }}</span><span class="r">última carga{% if atualizacao.get('maquina') %} ({{ atualizacao.get('maquina') }}){% endif %}</span></div>
+</div>
+{% if erro %}<p class="dd-aviso">Não consegui ler a qualidade no banco ({{ erro }}): a matriz abaixo é a do catálogo.</p>{% endif %}
+
+{% for fid, l in q.items() %}{% set f = catalogo.POR_ID.get(fid) %}
+<section class="dd-qual">
+  <h2>Qualidade da ligação · {{ f.nome if f else fid }}</h2>
+  <p class="dd-mudo">{{ l.get('linhas') }} linhas de <code>{{ l.get('livro_origem') }}</code> em <code>{{ f.conformado_em if f else '' }}</code>.
+  Vazio é "não ligou": nunca um ID chutado.</p>
+  <div class="dd-barras">
+    {% for d, rot in (("data", "Data"), ("usina", "Usina"), ("equipe", "Equipe"), ("pessoa", "Pessoa")) %}
+    {% set p = (l.get(PCT[d]) or 0) | int %}
+    <div class="dd-barra"><span class="rot">{{ rot }}</span><span class="trilho"><span class="enche {{ 'ok' if p >= 98 else ('al' if p >= 90 else 'er') }}" style="width:{{ p }}%"></span></span><span class="pct">{{ p }}%</span></div>
+    {% endfor %}
+  </div>
+  <p class="dd-mudo">Usina: {{ l.get('usina_por_de_para') }} pelo de-para do Fracttal, {{ l.get('usina_por_codigo') }} pelo código do ativo.</p>
+  {% if l.get('sem_usina_exemplos') %}<p class="dd-falta"><b>Sem usina:</b> {{ l.get('sem_usina_exemplos') }}</p>{% endif %}
+  {% if l.get('sem_equipe_exemplos') %}<p class="dd-falta"><b>Sem equipe:</b> {{ l.get('sem_equipe_exemplos') }}</p>{% endif %}
+</section>
+{% endfor %}
+
+<h2 class="dd-h2">A matriz</h2>
+<div class="dd-legenda">
+  {% for e, rot in (("id", "liga pelo ID do cadastro"), ("cod", "código de um sistema (liga pelo de-para)"), ("hmac", "código da pessoa (liga com a chave)"), ("nome", "texto livre: junção frágil"), ("largo", "um equipamento por coluna"), ("prop", "cadastro próprio"), ("nao", "não tem")) %}
+  <span><span class="dd-chip {{ e }}">{{ catalogo.ESTADOS[e] }}</span> {{ rot }}</span>
+  {% endfor %}
+</div>
+<div class="dd-moldura">
+<table class="dd-matriz">
+<thead><tr><th class="dd-proc">Fato · livro · grão</th>
+  {% for did, nome, onde, chave in catalogo.DIMENSOES %}<th class="dd-dim">{{ nome }}<small>{{ chave }}</small></th>{% endfor %}</tr></thead>
+<tbody>
+{% for area, lista in grupos.items() %}
+  <tr class="dd-grupo"><td colspan="{{ catalogo.DIMENSOES | length + 1 }}">{{ AREAS.get(area, area) }}</td></tr>
+  {% for f in lista %}{% set ql = q.get(f.id) %}
+  <tr class="{{ 'dd-aposentado' if f.estado == 'aposentado' else '' }}">
+    <td class="dd-proc"><b>{{ f.nome }}
+      {% if f.estado == 'conformado' %}<span class="dd-selo ok">com IDs</span>{% elif f.estado == 'fora' %}<span class="dd-selo al">fora do banco</span>{% elif f.estado == 'aposentado' %}<span class="dd-selo">aposentado</span>{% endif %}</b>
+      <code>{{ f.livro }}</code>{% if f.conformado_em %}<code class="dd-conf">→ {{ f.conformado_em }}</code>{% endif %}
+      <span class="grao">{{ f.grao }}</span>{% if f.observacao %}<span class="obs">{{ f.observacao }}</span>{% endif %}</td>
+    {% for did, nome, onde, chave in catalogo.DIMENSOES %}{% set est, col = f.dims[did] %}
+      {% if f.estado == 'conformado' and did in PCT and ql %}
+      <td class="dd-c"><span class="dd-chip id">ID</span><span class="col">{{ (ql.get(PCT[did]) or 0) | int }}% ligado</span></td>
+      {% elif est == 'nao' %}<td class="dd-c"><span class="dd-chip nao">—</span></td>
+      {% else %}<td class="dd-c"><span class="dd-chip {{ est }}">{{ catalogo.ESTADOS[est] }}</span><span class="col">{{ col }}</span></td>{% endif %}
+    {% endfor %}
+  </tr>
+  {% endfor %}
+{% endfor %}
+</tbody></table></div>
+
+<h2 class="dd-h2">As dimensões</h2>
+<div class="dd-dims">
+{% for did, nome, onde, chave in catalogo.DIMENSOES %}
+  <div class="dd-dim-card"><b>{{ nome }}</b><code>{{ chave }}</code><span>{{ onde }}</span></div>
+{% endfor %}
+</div>
+<p class="dd-mudo dd-rodape">Como entra um dado novo (chamados, engenharia, PCM, segurança…): o passo a passo está no
+<code>nexus/dados/CLAUDE.md</code>. Fonte nova entra primeiro no catálogo, com o grão e as dimensões declarados.</p>
+{% endblock %}

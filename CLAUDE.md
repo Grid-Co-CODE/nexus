@@ -17,6 +17,15 @@ confiabilidade e governança dos dados, não podemos fazer nada nas coxas."
 - Governança: dado pessoal e sensível vai cifrado (cofre do cadastro); coluna nova em claro na API é revisada antes
   (o endereço da usina foi em claro na 1ª carga do Campo · App, 04/10, e saiu no mesmo dia).
 
+## PRIORIDADE 0: governança e controle de dados (Levi, 05/10/2026)
+
+"Prioridade 0 para a governança e controle de dados"; "precisamos construir e manter uma base sólida para futuras
+análises correlacionadas". O modelo é o de **Kimball** (fato com IDs, dimensão única, grão escrito), e mora em
+`nexus/dados/` — **leia `nexus/dados/CLAUDE.md` antes de pôr qualquer dado novo no banco** (chamados, engenharia, PCM,
+segurança, mais inversores). Em uma linha: fonte nova entra primeiro no catálogo (`nexus/dados/catalogo.py`) com o grão
+e as dimensões declarados; o fato vai ao banco com `data_id`, `usina_id`, `pessoa_id`…, nunca com nome em claro nem ID
+chutado; a qualidade da ligação é medida e aparece em Base → Governança de dados.
+
 ## REGRA: um `.md` por área, sempre em dia (Levi, 03/10/2026)
 
 Toda alteração em qualquer área atualiza o `CLAUDE.md` da pasta dela **no mesmo trabalho**; área sem `CLAUDE.md`
@@ -36,6 +45,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Performance (Tempo real pela ponte) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
 | PCM (programação semanal) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
+| **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |
 | Servidor da T.I. | `DEPLOY.md` |
 
 Desenho da fase atual: `docs/superpowers/specs/2026-09-29-casca-nexus-design.md`.

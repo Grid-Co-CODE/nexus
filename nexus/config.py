@@ -23,7 +23,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # a pessoa nos workbooks que o App de Campo manda (v226): HMAC do e-mail, a mesma chave do App Setting
              "NEXUS_PESSOA_HMAC",
              # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela
-             "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN")
+             "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN",
+             # camada de dados (05/10/2026): a carga de hora em hora liga onde há o token de escrita; "0" desliga
+             "NEXUS_CARGA_DADOS")
 
 
 class ConfigErro(RuntimeError):

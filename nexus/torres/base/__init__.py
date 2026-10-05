@@ -9,6 +9,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
 """
 from ...cadastro.telas import registrar_base
 from ...cadastro.telas_ligacoes import registrar_ligacoes
+from ...dados.telas import registrar_governanca
 from ..modelo import Tela, Torre
 
 TORRE = Torre(
@@ -37,6 +38,10 @@ TORRE = Torre(
         Tela("ligacoes", "Ligações entre bases",
              "Que usina cada base chama de quê, e onde a ligação falta?",
              "de_para do Nexus (cadastro_nexus no PostgreSQL)"),
+        # Governança de dados (05/10/2026, Levi: "prioridade 0"): a matriz de barramento e a qualidade da ligação por ID.
+        Tela("governanca", "Governança de dados",
+             "Que dado temos, de onde vem, o que é cada linha e quanto dele liga por ID?",
+             "Catálogo do Nexus (nexus/dados) e nexus_fatos · qualidade no banco"),
         Tela("qualidade", "Qualidade do cadastro",
              "O que o Excel deixava passar calado?",
              "Cadastro do Nexus"),
@@ -64,3 +69,4 @@ TORRE = Torre(
 bp = TORRE.criar_blueprint(__name__)
 registrar_base(bp)
 registrar_ligacoes(bp)
+registrar_governanca(bp)
