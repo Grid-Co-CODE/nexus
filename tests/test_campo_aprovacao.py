@@ -7,9 +7,9 @@ import re
 from datetime import datetime, timedelta
 
 import pytest
-from test_campo_atencao import TabelaFalsa
+from test_campo_regras_app import TabelaFalsa
 
-from nexus.campo import aprovacao, atencao, fracttal, tabelas
+from nexus.campo import aprovacao, fracttal, leitura, tabelas
 
 
 def _quando(atras_dias):
@@ -54,11 +54,11 @@ def campo():
     fx = FracttalFalso([_os(15002, 33, "Técnico 7"), _os(15088, 8, "Técnico 4"), _os(15102, 4, "Técnico 5")])
     tabelas.usar_fornecedor(lambda nome: TabelaFalsa(dados.setdefault(nome, [])))
     fracttal.usar_fornecedor(fx)
-    atencao.limpar_cache()
+    leitura.limpar_cache()
     yield fx
     tabelas.usar_fornecedor(None)
     fracttal.usar_fornecedor(None)
-    atencao.limpar_cache()
+    leitura.limpar_cache()
 
 
 def test_fila_tem_os_grupos_e_numeros_do_painel_do_app(campo):
@@ -94,14 +94,9 @@ def test_nexus_so_le_o_fracttal_e_uma_vez_a_cada_10_min(campo):
 
 def test_fracttal_recusou_vira_aviso(campo):
     campo.recusar = True
-    atencao.limpar_cache()
-    leitura = aprovacao.fila({"dias": "60"})
-    assert "fila do Fracttal" in leitura.erro and not leitura.dados
-
-
-def test_sem_chave_a_tela_continua_no_painel_do_app(logado):
-    html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
-    assert '<iframe class="campo-moldura"' in html
+    leitura.limpar_cache()
+    lida = aprovacao.fila({"dias": "60"})
+    assert "fila do Fracttal" in lida.erro and not lida.dados
 
 
 def test_tela_do_nexus(logado, campo):
@@ -115,6 +110,6 @@ def test_tela_do_nexus(logado, campo):
 
 def test_tela_com_fracttal_recusando_avisa(logado, campo):
     campo.recusar = True
-    atencao.limpar_cache()
+    leitura.limpar_cache()
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
-    assert "Não consegui ler" in html and "Abrir no App" in html
+    assert "Não consegui ler" in html and "Abrir no App" not in html and "azurewebsites" not in html

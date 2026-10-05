@@ -9,7 +9,7 @@ from pg_falso import ApiPGFalsa
 from test_campo_aprovacao import FracttalFalso, _os
 from test_campo_fonte_pg import BASE, CHAVE, _linha
 
-from nexus.campo import aprovacao, atencao, banco_campo, fonte_pg, fracttal, ordens, tabelas, triagem
+from nexus.campo import aprovacao, banco_campo, fonte_pg, fracttal, leitura, ordens, tabelas, triagem
 from nexus.torres.campo import _motivo
 
 
@@ -26,15 +26,10 @@ def banco():
               _linha(601, 15002, fim=_iso(4), pelo_app=False, nota=None)]
     banco_campo.gravar(linhas, banco_campo.resumo(linhas, "x", completa=True), base=BASE, token="t", sessao=api)
     tabelas.usar_fornecedor(fonte_pg.Fornecedor({"GRIDCO_DB_API": BASE, "NEXUS_CHAVE_CADASTRO": CHAVE}, sessao=api))
-    atencao.limpar_cache()
+    leitura.limpar_cache()
     yield api
     tabelas.usar_fornecedor(None)
-    atencao.limpar_cache()
-
-
-def test_atencao_e_pt_continuam_no_painel_do_app(logado, banco):
-    for tela in ("atencao", "pt"):
-        assert '<iframe class="campo-moldura"' in logado.get(f"/t/campo/{tela}").get_data(as_text=True), tela
+    leitura.limpar_cache()
 
 
 def test_ordens_de_servico_pelo_banco(logado, banco):
@@ -43,7 +38,7 @@ def test_ordens_de_servico_pelo_banco(logado, banco):
     assert r["pontualidade_pct"] is None              # o Fracttal não tem a hora de início no celular: sem dado, não 0%
     html = logado.get("/t/campo/os?dias=7").get_data(as_text=True)
     assert "#15102" in html and "#15077" in html and "#15002" not in html    # fechada fora do App não entra
-    assert "notas pelo Fracttal" in html and "só no App (hora de início no celular)" in html
+    assert "notas do App" in html and "só no App (hora de início no celular)" in html
     assert "<iframe" not in html
 
 

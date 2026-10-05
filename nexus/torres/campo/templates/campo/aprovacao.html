@@ -3,7 +3,7 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Aprovação de OS do Nexus (Levi aprovou a proposta em 04/10/2026). A fila, os grupos e os números são os do painel do
-   App, pela cópia das regras dele; aprovar, aprovar em lote e devolver continuam no App. #}
+   App, pela cópia das regras dele; a nota vem do livro que o App grava no banco. O Nexus só mostra. #}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div>
@@ -11,13 +11,12 @@
       <h1 class="cn-titulo">{{ tela.nome }}</h1>
       <p class="cn-pergunta">{{ tela.pergunta }}</p>
     </div>
-    <div class="cn-frescor">fila de verificação do Fracttal{% if coleta %} · notas da coleta {{ coleta }}{% endif %}<br><b>lida às {{ lido }}</b>{% if d.janela %} · OS fechadas de {{ dia_curto(d.janela.de) }} a {{ dia_curto(d.janela.ate) }}{% endif %}</div>
+    <div class="cn-frescor">fila de verificação do Fracttal{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>lida às {{ lido }}</b>{% if d.janela %} · OS fechadas de {{ dia_curto(d.janela.de) }} a {{ dia_curto(d.janela.ate) }}{% endif %}</div>
   </div>
 
   {% if leitura.erro %}
   <div class="cn-erro" role="alert">
     <b>{{ leitura.erro }}.</b> A fila abaixo pode estar incompleta ou vazia por isso.
-    <a class="cn-fora" href="{{ painel }}#ir=su" target="_blank" rel="noopener">Abrir no App</a>
   </div>
   {% endif %}
 
@@ -35,7 +34,7 @@
     <a class="cn-grupo cn-g-{{ cor }}" href="{{ url(balde=None if balde == id else id, pag=None) }}"{% if balde == id %} aria-current="page"{% endif %}>
       <span class="q">{{ d.get('baldes', {}).get(id, 0) }}</span><span class="t">{{ nome }}</span>
       <span class="d">{{ desc }}</span>
-      {% if id == 'completa' %}<span class="ac">Aprovar em lote fica no App</span>{% endif %}
+      {% if id == 'completa' %}<span class="ac">Pronta para aprovar</span>{% endif %}
     </a>
     {% endfor %}
   </div>
@@ -59,7 +58,7 @@
   </div>
   <div class="cn-tab">
     <table>
-      <thead><tr><th>Espera</th><th>OS e tarefa</th><th>Técnico</th><th>Supervisor</th><th>Região</th><th>Fechada em</th><th>Nota do registro</th><th>Grupo</th><th>Ação</th></tr></thead>
+      <thead><tr><th>Espera</th><th>OS e tarefa</th><th>Técnico</th><th>Supervisor</th><th>Região</th><th>Fechada em</th><th>Nota do registro</th><th>Grupo</th></tr></thead>
       <tbody>
       {% for x in d.get('linhas') or [] %}
         {% set g = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
@@ -72,10 +71,9 @@
           <td class="m">{{ dia_curto(x.fim) }}</td>
           <td>{% if x.pelo_app %}<span class="cn-pill cn-{{ 'ok' if (x.qualidade or 0) >= 80 else 'alerta' }}">{{ x.qualidade or 0 }}%</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
           <td><span class="cn-pill cn-{{ g[1] }}">{{ g[0] }}</span></td>
-          <td><a class="cn-fora" href="{{ painel }}#ir=su" target="_blank" rel="noopener">Decidir no App</a></td>
         </tr>
       {% else %}
-        <tr><td colspan="9" class="mudo">Nada na fila com esses filtros.</td></tr>
+        <tr><td colspan="8" class="mudo">Nada na fila com esses filtros.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -89,10 +87,8 @@
   {% endif %}
 
   <div class="cn-nota"><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal, lida pelo Nexus só para
-    consulta e no máximo a cada 10 minutos. A nota do registro é a do painel do App, mesma régua, calculada pelo Nexus
-    com o que o Fracttal guarda (respostas, fotos e o GPS das fotos); a observação escrita só na caixa do App não vai
-    ao Fracttal e fica de fora. OS ainda sem nota caem em "Fechadas fora do App" até o coletor chegar a elas. Os grupos
-    seguem a mesma regra do painel do App. Aprovar, aprovar em lote e devolver continuam no App enquanto o Nexus roda
-    em paralelo.{% if d.get('sem_cadastro') %} {{ d.sem_cadastro }} tarefas são de técnicos sem cadastro.{% endif %}</div>
+    consulta e no máximo a cada 10 minutos. A nota do registro é a que o próprio App grava no banco do Nexus, de hora
+    em hora: a mesma do painel dele. Tarefa sem registro do App cai em "Fechadas fora do App". Os grupos seguem a regra
+    do painel do App. O Nexus só mostra: para decidir, abra a OS no Fracttal.{% if d.get('sem_cadastro') %} {{ d.sem_cadastro }} tarefas são de técnicos sem cadastro.{% endif %}</div>
 </div>
 {% endblock %}

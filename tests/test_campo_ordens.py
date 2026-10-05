@@ -2,9 +2,9 @@
 from datetime import datetime, timedelta
 
 import pytest
-from test_campo_atencao import TabelaFalsa
+from test_campo_regras_app import TabelaFalsa
 
-from nexus.campo import atencao, ordens, regras_app, tabelas
+from nexus.campo import leitura, ordens, regras_app, tabelas
 
 
 def _ts(dias_atras):
@@ -28,10 +28,10 @@ def campo():
         _registro("d", 10, "15002", 40),          # janela anterior (7 dias antes)
     ]}
     tabelas.usar_fornecedor(lambda nome: TabelaFalsa(dados.setdefault(nome, [])))
-    atencao.limpar_cache()
+    leitura.limpar_cache()
     yield dados
     tabelas.usar_fornecedor(None)
-    atencao.limpar_cache()
+    leitura.limpar_cache()
 
 
 def test_numeros_do_periodo_e_da_janela_anterior(campo):
@@ -44,10 +44,6 @@ def test_numeros_do_periodo_e_da_janela_anterior(campo):
 
 def test_periodo_estranho_vira_7_dias(campo):
     assert ordens.painel(13).dados["dias"] == 7
-
-
-def test_sem_chave_a_tela_continua_no_painel_do_app(logado):
-    assert '<iframe class="campo-moldura"' in logado.get("/t/campo/os").get_data(as_text=True)
 
 
 def test_tela_do_nexus(logado, campo):

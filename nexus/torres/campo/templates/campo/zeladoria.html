@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Zeladoria, visão do Nexus (05/10/2026): o livro de zeladoria que o App grava no banco (nexus/campo/visao.py). #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">livro de zeladoria do App<br><b>lido às {{ lido }}</b></div>
+  </div>
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+  {% set r = d.get('resumo') or {} %}
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Serviços</span><span class="v">{{ r.get('servicos', 0) }}</span><span class="d">com registro pelo App</span></span>
+    <span><span class="gc-rotulo">Abertos</span><span class="v">{{ r.get('abertos', 0) }}</span><span class="d">OS ainda não fechada</span></span>
+    <span><span class="gc-rotulo">Sem diária hoje</span><span class="v{% if r.get('sem_diaria_hoje') %} ruim{% endif %}">{{ r.get('sem_diaria_hoje', 0) }}</span><span class="d">dos abertos</span></span>
+    <span><span class="gc-rotulo">Sem EPI registrado</span><span class="v">{{ r.get('sem_epi', 0) }}</span><span class="d">dos abertos</span></span>
+  </div>
+  <div class="cn-tab"><table>
+    <thead><tr><th>OS</th><th>Usina</th><th>Serviço</th><th>Prestador</th><th>Etapas registradas</th><th>Última</th><th>Diária hoje</th><th>Situação</th></tr></thead>
+    <tbody>
+    {% for s in d.get('servicos') or [] %}
+      <tr><td>#{{ s.os }}</td><td>{{ s.usina }}</td><td>{{ s.servico }}</td><td>{{ s.prestador or '—' }}</td>
+        <td>{% for e in s.etapas %}<span class="cn-tag" title="{{ e.data }}{% if e.quem %} · {{ e.quem }}{% endif %}">{{ e.etapa }}</span> {% endfor %}</td>
+        <td class="m">{{ dia_curto(s.ultima) if s.ultima else '—' }}</td>
+        <td>{{ 'Sim' if s.diaria_hoje else ('—' if s.fechada else 'Não') }}</td>
+        <td><span class="cn-pill cn-{{ 'ok' if s.fechada else 'alerta' }}">{{ 'Fechada' if s.fechada else 'Aberta' }}</span></td></tr>
+    {% else %}
+      <tr><td colspan="8" class="cn-vazio">Nenhum registro de zeladoria pelo App ainda. A tela de zeladoria do App entrou
+        na v226 (05/10/2026): o primeiro registro aparece aqui na rodada seguinte do App (de hora em hora).</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+  <div class="cn-nota"><b>De onde vem.</b> Cada etapa (APR, vistoria inicial, diária, final, EPI) que o App grava no banco do
+    Nexus. Do prestador vai só a empresa; da pessoa, o código do e-mail (o nome sai do cadastro do App, na hora).</div>
+</div>
+{% endblock %}

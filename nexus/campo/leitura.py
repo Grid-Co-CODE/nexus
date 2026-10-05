@@ -24,6 +24,14 @@ def limpar():
     _CACHE.clear()
 
 
+def limpar_cache():
+    """Esquece o que foi lido, inclusive os caches internos das regras do App (catálogo de usinas, fila do Fracttal)."""
+    import importlib
+    from . import regras_app
+    limpar()
+    importlib.reload(regras_app)
+
+
 def ler(chave, calcular) -> Leitura:
     guardada = _CACHE.get(chave)
     if guardada and time.time() - guardada.lido_em < TTL_S:

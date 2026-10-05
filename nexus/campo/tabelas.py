@@ -1,4 +1,4 @@
-"""De onde as regras copiadas do App leem as tabelas dele (rondas, notas de fechamento, PT, decisões, atenção).
+"""De onde as regras copiadas do App leem as tabelas dele (rondas e notas de fechamento).
 
 Levi, 04/10/2026: "não quero ligação com Azure, quero que seja direto pelo GitHub pois subirei para um servidor que
 Azure não existe". O Nexus NÃO lê o Storage do App no Azure. A fonte destas tabelas ainda não existe no Nexus: o dado
@@ -11,7 +11,8 @@ leitura fica ANOTADO: as regras do App engolem o erro e devolvem fila vazia, e a
 
 Primeira fonte de verdade (04/10/2026): os fechamentos que o Nexus calcula pelo Fracttal e grava na API do PG
 (fonte_pg.py). Ela serve a `qualidadelog` inteira e diz isso por `serve(nome)`; o resto vem vazio. `configurado` liga
-só a tela cujas tabelas EXIGIDAS a fonte serve: Atenção e PT continuam no painel do App.
+só a tela cujas tabelas EXIGIDAS a fonte serve. Desde 05/10/2026 nenhuma tela abre o painel do App: Atenção, PT,
+Rondas, Zeladoria e Ranking são contas do Nexus (visao.py) pelos livros que o App grava no banco.
 """
 import re
 import threading

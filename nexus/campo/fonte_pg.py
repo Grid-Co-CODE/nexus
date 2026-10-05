@@ -8,7 +8,7 @@ entregues às regras copiadas do App no formato das tabelas DELE, para `_fila_su
   tem. A assinatura vem como dada: o App não deixa concluir sem ela.
 - `rondaos` e `rondas`: só o par que liga a OS de ronda à nota da ronda na fila de verificação (o `_rondas_os_pares` do
   App). A ronda NÃO vem como finalizada: a Triagem não conta ronda que o Nexus não viu inteira.
-- o resto: vazio. `serve` diz que só a `qualidadelog` está inteira: Atenção e PT continuam no painel do App.
+- o resto: vazio. `serve` diz que só a `qualidadelog` está inteira (Atenção e PT são do visao.py, pelos livros).
 - e só depois que a coleta cobriu TUDO (aba de atualização, `completa`): a fila de verificação inteira e as aprovadas
   dos últimos 90 dias. Na 1ª carga (04/10) a coleta tinha 40 de ~2.900 OS; mostrar as telas ali punha 2.846 tarefas em
   "fora do App" só porque o coletor ainda não tinha chegado a elas.

@@ -3,7 +3,7 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Triagem de qualidade do Nexus (04/10/2026). A mesa de triagem do painel do App (gestao/prioridades), pela cópia das
-   regras dele: OS e supervisores. Rondas, usinas sem ronda e as marcações para conversa continuam no App. #}
+   regras dele: OS e supervisores, com o livro que o App grava no banco. Rondas e cobertura: tela Rondas. #}
 {% set r = d.get('resumo', {}) %}
 {% set itens = d.get('itens') or [] %}
 {% set criticos = itens|selectattr('nivel', 'equalto', 'critico')|list %}
@@ -14,12 +14,11 @@
       <h1 class="cn-titulo">{{ tela.nome }}</h1>
       <p class="cn-pergunta">{{ tela.pergunta }}</p>
     </div>
-    <div class="cn-frescor">notas pelo Fracttal{% if coleta %} · coleta {{ coleta }}{% endif %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
+    <div class="cn-frescor">notas do App{% if coleta %} até {{ coleta }}{% endif %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
   </div>
 
   {% if leitura.erro %}
-  <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> A lista abaixo pode estar incompleta por isso.
-    <a class="cn-fora" href="{{ painel }}#ir=vg" target="_blank" rel="noopener">Abrir no App</a></div>
+  <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> A lista abaixo pode estar incompleta por isso.</div>
   {% endif %}
 
   <div class="cn-filtros">
@@ -32,7 +31,7 @@
     <span><span class="gc-rotulo">OS no período</span><span class="v">{{ r.get('os_periodo', 0) }}</span><span class="d">fechadas pelo App</span></span>
     <span><span class="gc-rotulo">Supervisores</span><span class="v">{{ r.get('por_tipo', {}).get('supervisor', 0) }}</span><span class="d">fila parada ou avaliação errada</span></span>
     <span><span class="gc-rotulo">Podem servir de exemplo</span><span class="v">{{ r.get('exemplares', 0) }}</span><span class="d">registros exemplares</span></span>
-    <span><span class="gc-rotulo">Rondas</span><span class="v">—</span><span class="d">só no App por enquanto</span></span>
+    <span><span class="gc-rotulo">Rondas</span><span class="v">—</span><span class="d"><a class="cn-fora" href="/t/campo/rondas">ver a tela Rondas</a></span></span>
   </div>
 
   <div class="cn-duas">
@@ -81,9 +80,8 @@
   </div>
 
   <div class="cn-nota"><b>De onde vem.</b> A mesma triagem do painel do App, com os limiares padrão dele. A nota de cada
-    OS é a do painel, calculada pelo Nexus com o que o Fracttal guarda (respostas, fotos e o GPS das fotos); a
-    observação escrita só na caixa do App não vai ao Fracttal e fica de fora. Fila parada e avaliação errada vêm do
-    Fracttal. Rondas, usinas sem ronda e as marcações para conversa nascem no App e continuam lá:
-    <a class="cn-fora" href="{{ painel }}#ir=vg" target="_blank" rel="noopener">abrir a triagem no App</a>.</div>
+    OS é a que o próprio App grava no banco do Nexus, de hora em hora. Demora e divergência de supervisor dependem da
+    situação e da avaliação da OS no Fracttal, que o livro do App ainda não traz. Rondas e usinas sem ronda: tela
+    <a class="cn-fora" href="/t/campo/rondas">Rondas</a> e <a class="cn-fora" href="/t/campo/atencao">Central de atenção</a>.</div>
 </div>
 {% endblock %}

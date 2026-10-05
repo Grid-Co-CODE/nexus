@@ -63,9 +63,9 @@ def ident(cadastro_tab) -> dict:
 
 
 # As partições da tabela dos tokens que o Nexus pode ler. Os tokens moram em "tok" (e o login em "state"): fechadas.
-#   cadastro  o cadastro de pessoas (bd_operacoes) e o dono de cada usina para a PT (bd_responsaveis)
-#   pt        as Permissões de trabalho
-PARTICOES_LIBERADAS = ("cadastro", "pt")
+#   cadastro  o cadastro de pessoas (bd_operacoes) e o dono de cada usina (bd_responsaveis)
+# A partição "pt" saiu em 05/10/2026: a tela de PT do Nexus lê o livro pt_app_campo do banco (nexus/campo/visao.py).
+PARTICOES_LIBERADAS = ("cadastro",)
 
 
 class _TabelaDosTokens:

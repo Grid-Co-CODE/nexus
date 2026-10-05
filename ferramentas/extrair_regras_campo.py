@@ -6,7 +6,7 @@ leitura do Nexus (nexus/campo/tabelas.py) e o Fracttal pelo leitor do Nexus (nex
 
 A cópia leva a LÓGICA, sem comentários nem docstrings (ast.unparse): o repositório do Nexus é público e os comentários
 do App citam colegas pelo nome completo e casos internos. A fidelidade é conferida pela árvore do código (ast.dump),
-não pelo texto: tests/test_campo_atencao.py acusa qualquer diferença de lógica entre a cópia e o App.
+não pelo texto: tests/test_campo_regras_app.py acusa qualquer diferença de lógica entre a cópia e o App.
 
 Uso (Levi, 04/10/2026: "pode passar para o Nexus"):
     python ferramentas/extrair_regras_campo.py "<...>/App_Campo/middleware/function_app.py"
@@ -24,16 +24,12 @@ RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "nexus" / "campo" / "regras_app.py"
 
 # O que as telas chamam no App. O resto vem pelo fecho.
-#   Central de atenção: rotas gestao/atencao e gestao/encaminhamentos
 #   Aprovação de OS:    rota gestao/supervisao/fila
-#   Permissões de trabalho: rota gestao/pt
 #   Ordens de serviço:  rota gestao/os
-RAIZES = ("_central_atencao", "_aplicar_tratamentos", "_tratamentos", "_hist_ler", "_enc_resumo", "ATN_SEG",
-          "ATN_TIPOS", "_fila_supervisao", "_janela", "TRIAGEM_NOTA_OK",
+# Central de atenção e Permissões de trabalho saíram da cópia em 05/10/2026: são contas do próprio Nexus
+# (nexus/campo/visao.py), pelos livros que o App grava no banco (Levi: "quero parar de referenciar o Azure").
+RAIZES = ("_fila_supervisao", "_janela", "TRIAGEM_NOTA_OK",
           "_cadastro_tab",          # o ident() do Nexus (nexus/campo/pessoas.py) usa o cadastro da tabela como o do App
-          # Permissões de trabalho: rota gestao/pt
-          "_pt_lista", "_pt_publico", "_pt_ve", "PT_DESTAQUE_MIN", "PT_VALIDADE_DIAS", "PT_HIST_DIAS_MAX", "PT_HIST_MAX",
-          "PT_CAMPOS_RESUMO",
           # Ordens de serviço: rota gestao/os (e a janela anterior, para a comparação dos números)
           "_gestao_os", "_janela_str",
           # Nota do fechamento recalculada com o que o Fracttal guarda (nexus/campo/nota_fracttal.py): a do PAINEL é a

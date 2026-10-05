@@ -12,12 +12,11 @@
       <h1 class="cn-titulo">{{ tela.nome }}</h1>
       <p class="cn-pergunta">{{ tela.pergunta }}</p>
     </div>
-    <div class="cn-frescor">notas pelo Fracttal{% if coleta %} · coleta {{ coleta }}{% endif %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
+    <div class="cn-frescor">notas do App{% if coleta %} até {{ coleta }}{% endif %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
   </div>
 
   {% if leitura.erro %}
-  <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> Os números abaixo podem estar incompletos por isso.
-    <a class="cn-fora" href="{{ painel }}#ir=os" target="_blank" rel="noopener">Abrir no App</a></div>
+  <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> Os números abaixo podem estar incompletos por isso.</div>
   {% endif %}
 
   <form class="cn-filtros" method="get">
@@ -50,7 +49,7 @@
   </div>
   <div class="cn-tab">
     <table>
-      <thead><tr><th>OS</th><th>Tarefa</th><th>Técnico</th><th>Usina</th><th>Região</th><th>Tipo</th><th>Qualidade</th><th>Situação</th><th>Prev. / real</th><th>Pontual</th><th>Fechada</th><th>Ação</th></tr></thead>
+      <thead><tr><th>OS</th><th>Tarefa</th><th>Técnico</th><th>Usina</th><th>Região</th><th>Tipo</th><th>Qualidade</th><th>Situação</th><th>Prev. / real</th><th>Pontual</th><th>Fechada</th></tr></thead>
       <tbody>
       {% for x in lista %}
         {% set s = situacao(x) %}{% set suspeito = x.dur_prev and x.dur_real and x.dur_real < x.dur_prev * 0.4 %}
@@ -66,10 +65,9 @@
           <td class="m{% if suspeito %} cn-suspeito{% endif %}">{% if x.dur_prev or x.dur_real %}{{ x.dur_prev }} / {{ x.dur_real }} min{% else %}—{% endif %}</td>
           <td>{{ '—' if x.pontual is none else ('Sim' if x.pontual else 'Não') }}</td>
           <td class="m">{{ dia_curto(x.quando) }}</td>
-          <td><a class="cn-fora" href="{{ painel }}#ir=os" target="_blank" rel="noopener">Abrir no App</a></td>
         </tr>
       {% else %}
-        <tr><td colspan="12" class="mudo">Nada com esses filtros.</td></tr>
+        <tr><td colspan="11" class="mudo">Nada com esses filtros.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -77,8 +75,8 @@
 
   <div class="cn-nota"><b>Prev. / real</b> fica em vermelho quando o tempo real é menos de 40% do previsto: o sinal mais
     comum de OS fechada sem execução. Os números acima são do período inteiro; os filtros valem só para a lista.
-    <b>De onde vem.</b> A nota é a do painel do App, mesma régua, calculada pelo Nexus com o que o Fracttal guarda
-    (respostas, fotos e o GPS das fotos); a observação escrita só na caixa do App não vai ao Fracttal e fica de fora.
-    Devolvida = voltou ao técnico depois que o Nexus começou a acompanhar. Devolver e encaminhar continuam no App.</div>
+    <b>De onde vem.</b> A nota e a pontualidade são as que o próprio App grava no banco do Nexus, de hora em hora.
+    "Tempo real" e "Em verificação" dependem da duração e da situação da OS no Fracttal, que esse livro ainda não traz:
+    ficam "—" em vez de um número errado. O Nexus só mostra: para agir, abra a OS no Fracttal.</div>
 </div>
 {% endblock %}
