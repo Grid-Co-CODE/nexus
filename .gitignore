@@ -14,4 +14,4 @@ _site/
 
 # Dado de verdade no servidor (cadastro cifrado, insumos e rodadas do PCM): o repositório é público, e isto nunca
 # pode ir para um commit feito de lá.
-dados/
+/dados/
