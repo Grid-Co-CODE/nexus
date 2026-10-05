@@ -98,7 +98,8 @@ o servidor inteiro como uma só.
 3. **Base → Registro mestre** abre a lista de usinas: a chave da cifra está certa.
 4. **PCM → Gerar a semana**: a lista de conferência diz "pronto" (motor, credencial do Fracttal, cadastro e insumos).
    A "Pasta do PCM" e as durações aprendidas aparecem como opcionais ausentes: é o esperado no servidor.
-5. **OS Creator → Ativos Fracttal** lista os ativos: a credencial do Fracttal está certa.
+5. **OS Creator → Início** abre a entrada do OS Creator: cada pessoa entra com o próprio usuário do Fracttal, e
+   depois disso **Ativos Fracttal** lista os ativos.
 6. Em até 30 minutos o log mostra a 1ª rodada do coletor: `journalctl -u nexus | grep "coletor campo"`.
 
 ## 7. Coletor da torre Campo · App (uma máquina só)
@@ -110,6 +111,10 @@ o Levi desliga o do computador dele** (reiniciar o Nexus de lá pelo `Iniciar Ne
 coletores leriam a mesma fila e gastariam em dobro a cota do Fracttal, que é da empresa inteira. Sem a variável, as
 telas continuam lendo o banco; só deixa de haver coleta nova. Rodada à mão: `.venv/bin/python ferramentas/coletar_campo.py`
 (imprime só contagens).
+
+A tela **Aprovação de OS** lê a fila do Fracttal ao vivo quando alguém a abre: ~55 pedidos de uma vez, no máximo a
+cada 10 minutos por servidor (os filtros reusam a mesma leitura). Em hora de pico da cota ela mostra o aviso de fila
+incompleta; a tela continua de pé.
 
 ## 8. Atualizar
 
