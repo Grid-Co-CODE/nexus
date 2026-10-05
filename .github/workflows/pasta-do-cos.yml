@@ -26,7 +26,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
           AUTOR: ${{ github.event.pull_request.user.login }}
           LIVRES: "Levi-6242 admin-gridco"
           # a torre (rotas e templates), a regra sem Flask, o estilo e os testes do COS
@@ -35,8 +36,15 @@ jobs:
           for livre in $LIVRES; do
             if [ "$AUTOR" = "$livre" ]; then echo "Administrador ($AUTOR): sem trava de pasta."; exit 0; fi
           done
+          # Pelos commits exatos do evento (base...cabeça), e não pela lista de arquivos do pedido: essa lista demora uns
+          # segundos para incluir o push novo, e a conferência aprovava com a lista velha (ensaio de 05/10/2026).
+          comparacao="repos/$REPO/compare/$BASE...$HEAD"
+          # a comparação lista no máximo 300 arquivos: com 300, pode haver mais, e o pedido vai para o Levi
+          if [ "$(gh api "$comparacao" --jq '.files | length')" -ge 300 ]; then
+            echo "::error::Pedido grande demais para conferir (300 arquivos ou mais). Peça ao Levi."; exit 1
+          fi
           # arquivo renomeado conta pelos dois nomes: tirar algo de fora para dentro da área também é mexer fora
-          arquivos=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          arquivos=$(gh api "$comparacao" --jq '.files[] | .filename, (.previous_filename // empty)')
           fora=$(printf '%s\n' "$arquivos" | grep -Ev "$AREA" | grep -v '^$' || true)
           if [ -n "$fora" ]; then
             echo "::error::Este pedido mexe fora da área do COS. Peça ao Levi para revisar estes arquivos:"
