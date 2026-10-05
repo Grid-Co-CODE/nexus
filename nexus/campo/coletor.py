@@ -435,6 +435,15 @@ def espera_s(ultimo: dict | None, minutos: int, agora=None) -> int:
     return 60 if (u.get("pendentes") or 0) > 0 else minutos * 60
 
 
+def deve_rodar(agora=None) -> bool:
+    """No horário de campo (seg a sex, 6h às 18h) o coletor NÃO roda. Segunda, 05/10, das 07:12 em diante, a cota do
+    Fracttal da empresa ficou esgotada a manhã inteira (429 já no 1º pedido de cada rodada), e a lista do técnico no App
+    (`/minhas-os`) depende de ler o Fracttal a cada 10 min: a OS 15423, criada às 09:53, não aparecia para ele. O Nexus
+    é paralelo; o App, não. A carga fica pronta de madrugada e as telas do Nexus leem o banco."""
+    from ..pcm.geracao import horario_de_campo
+    return not horario_de_campo(agora)
+
+
 def ligar(app):
     if _LACO["thread"] is not None:
         return
@@ -442,6 +451,9 @@ def ligar(app):
 
     def laco():
         while not _LACO["parar"].is_set():
+            if not deve_rodar():
+                _LACO["parar"].wait(minutos * 60)
+                continue
             with app.app_context():
                 try:
                     _LACO["ultimo"] = rodar(app.config)

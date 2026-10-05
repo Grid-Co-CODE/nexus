@@ -480,3 +480,12 @@ def test_codigo_do_app_vira_pessoa_id():
     assert coletor.ligacao_cadastro.pessoa_id_do_codigo(m, do_app + ";outro") == 17
     sem = coletor.ligacao_cadastro.mapas({"GRIDCO_DB_API": "http://pg.falso", "NEXUS_CHAVE_CADASTRO": CHAVE}, api)
     assert sem["hmac"] == {} and coletor.ligacao_cadastro.pessoa_id_do_codigo(sem, do_app) is None
+
+
+@pytest.mark.parametrize("quando,roda", [
+    (datetime(2026, 10, 5, 13, 30, tzinfo=coletor.timezone.utc), False),   # segunda, 10h30 em Brasília
+    (datetime(2026, 10, 5, 22, 0, tzinfo=coletor.timezone.utc), True),     # segunda, 19h
+    (datetime(2026, 10, 4, 15, 0, tzinfo=coletor.timezone.utc), True)])    # domingo, 12h
+def test_no_horario_de_campo_o_coletor_nao_roda(quando, roda):
+    # 05/10: a cota do Fracttal esgotada de manhã fez a OS 15423 não aparecer para o técnico no App
+    assert coletor.deve_rodar(quando) is roda

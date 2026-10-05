@@ -50,7 +50,8 @@ lê com a régua copiada:
   vazia e outra repetia o resumo (o supervisor preenche à mão para conseguir aprovar). Fotos da ronda: nenhuma
   nas 3 (ficam no blob do App).
 
-**O que só o App sabe, vindo do próprio App (v226, 05/10, aguarda o deploy do Levi):** o timer `nexus_workbooks_sync`
+**O que só o App sabe, vindo do próprio App (v226, no ar desde 05/10 12:03, mas o envio está DESLIGADO até a chave
+`NEXUS_PESSOA_HMAC` entrar no App Setting; a chave é o interruptor):** o timer `nexus_workbooks_sync`
 do `function_app.py` (aos :25) sobe `fechamentos_app_campo` (nota do painel, caixa de observação, GPS no início e no
 fim, pontualidade), `pt_app_campo`, `zeladoria_app_campo` e `decisoes_app_campo` para a API de planilhas. Pessoa só
 como HMAC do e-mail (`NEXUS_PESSOA_HMAC`, a mesma chave no App Setting e no `.env` daqui): `ligacao_cadastro` troca o
@@ -113,8 +114,10 @@ para a OS de ronda na fila) -> telas.
   confira o que o Fracttal manda nela.
 
 **Cota do Fracttal:** 200 pedidos por minuto para a EMPRESA inteira, a mesma do App (domingo 04/10, perto das 20h, já
-estava esgotada: 429). O coletor: 2 s antes de cada pedido no horário de campo e 1 s fora dele (rodada da madrugada
-que chega às 6h de dia útil para e grava); a fila inteira (~55 páginas) a cada rodada; por OS nova,
+estava esgotada: 429). **O coletor NÃO roda no horário de campo** (seg a sex, 6h às 18h; `deve_rodar`): segunda,
+05/10, a cota ficou esgotada das 07:12 em diante e a OS 15423, criada às 09:53, não aparecia para o técnico no App (a
+lista dele, `/minhas-os`, lê o Fracttal a cada 10 min e, com 429, serve a última lista boa; saída na hora: "Buscar OS
+pelo número" no App). Fora do horário, 1 s antes de cada pedido (rodada que chega às 6h de dia útil para e grava); a fila inteira (~55 páginas) a cada rodada; por OS nova,
 as fotos (1 pedido) e, só se for do App, as subtarefas (mais 1); no máximo 40 OS novas por rodada no horário de campo
 (seg a sex, 6h às 18h) e 1.000 fora dele, gravando a cada 100 OS; fora do horário de campo, com pendência e sem
 429, a próxima rodada emenda em 1 min (`espera_s`); de madrugada, um 429 espera 90 s e repete o MESMO pedido (até 3
