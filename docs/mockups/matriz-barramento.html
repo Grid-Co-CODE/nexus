@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matriz de barramento · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--barra:#0d1526;--tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#8f9ab0;
+  --linha:rgba(255,255,255,.10);--verde:#a3d900;--verde-texto:#c4e755;--ambar:#ffd83d;--vermelho:#ff7a7a;--azul:#7fb8ff;
+  --display:"Raleway","Poppins",system-ui,sans-serif;--sans:"Poppins",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 14px/1.55 var(--sans)}
+.topo{display:flex;gap:14px;align-items:center;padding:14px 28px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.topo b{font:800 17px/1 var(--display)}.topo span{color:var(--mudo);font-size:13px}
+main{max-width:1480px;margin:0 auto;padding:22px 28px 56px}
+.eyebrow{font:500 12px/16px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--verde-texto);margin:0}
+h1{font:800 28px/34px var(--display);margin:6px 0 6px}
+h2{font:700 18px/24px var(--display);margin:34px 0 8px}
+.sub{color:var(--tinta-2);margin:0;max-width:1000px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:18px 0 16px}
+.kpi{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:10px 14px}
+.kpi .v{font:700 24px/30px var(--display)}.kpi .r{font-size:12px;color:var(--tinta-2)}
+.kpi.ok .v{color:var(--verde-texto)}.kpi.al .v{color:var(--ambar)}.kpi.er .v{color:var(--vermelho)}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:4px 0 12px;font-size:12.5px;color:var(--tinta-2)}
+.legenda span{display:inline-flex;align-items:center;gap:7px}
+.moldura{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;overflow-x:auto}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1180px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--linha);vertical-align:top;text-align:left}
+thead th{position:sticky;top:0;background:#121a2d;font:600 12px/16px var(--sans);color:var(--tinta-2);z-index:1}
+thead th.dim{text-align:center;cursor:default}
+thead th.dim small{display:block;font:400 11px var(--mono);color:var(--mudo)}
+tbody tr.grupo td{background:rgba(163,217,0,.05);font:700 11px/14px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--verde-texto);padding:7px 10px}
+tbody tr:hover td:not(.grupo-td){background:rgba(255,255,255,.025)}
+td.proc b{display:block;font:600 13.5px/18px var(--sans)}
+td.proc code,td.proc .grao{display:block;font:400 11.5px/16px var(--mono);color:var(--mudo)}
+td.proc .grao{color:var(--tinta-2);font-family:var(--sans);font-size:12px}
+td.proc .n{font:500 11.5px var(--mono);color:var(--tinta-2)}
+td.c{text-align:center;min-width:118px}
+.chip{display:inline-flex;align-items:center;justify-content:center;min-width:64px;padding:2px 9px;border-radius:999px;font:600 11.5px/18px var(--sans);border:1px solid transparent}
+.chip.id{background:rgba(163,217,0,.14);color:var(--verde-texto);border-color:rgba(163,217,0,.45)}
+.chip.cod{background:rgba(255,216,61,.10);color:var(--ambar);border-color:rgba(255,216,61,.38)}
+.chip.hmac{background:rgba(127,184,255,.12);color:var(--azul);border-color:rgba(127,184,255,.42)}
+.chip.nome{background:rgba(255,122,122,.10);color:var(--vermelho);border-color:rgba(255,122,122,.42)}
+.chip.largo{background:rgba(255,216,61,.06);color:var(--ambar);border:1px dashed rgba(255,216,61,.5)}
+.chip.prop{background:rgba(255,122,122,.06);color:var(--vermelho);border:1px dashed rgba(255,122,122,.55)}
+.chip.nao{color:#5f6a80;min-width:24px;padding:0}
+td.c .col{display:block;font:400 11px/14px var(--mono);color:var(--mudo);margin-top:3px}
+tr.aposentado td{opacity:.62}
+tr.aposentado td.proc b::after{content:"aposentado hoje";margin-left:8px;font:600 10.5px var(--sans);letter-spacing:.5px;color:var(--mudo);border:1px solid var(--linha);border-radius:999px;padding:0 7px}
+.selo{display:inline-block;margin-left:6px;font:600 10.5px/16px var(--sans);padding:0 7px;border-radius:999px;vertical-align:1px}
+.selo.fora{color:var(--ambar);border:1px solid rgba(255,216,61,.45)}
+.selo.vazio{color:var(--mudo);border:1px solid var(--linha)}
+.dims{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.dim-card{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:12px 14px}
+.dim-card h3{margin:0 0 6px;font:700 15px/20px var(--display);display:flex;align-items:center;gap:8px}
+.dim-card .estado{font:600 11px var(--sans);padding:1px 8px;border-radius:999px}
+.estado.ok{color:var(--verde-texto);border:1px solid rgba(163,217,0,.45)}
+.estado.al{color:var(--ambar);border:1px solid rgba(255,216,61,.45)}
+.estado.er{color:var(--vermelho);border:1px solid rgba(255,122,122,.45)}
+.dim-card p{margin:4px 0;color:var(--tinta-2);font-size:13px}
+.dim-card code{font:400 12px var(--mono);color:var(--tinta)}
+.dim-card .faz{color:var(--tinta);margin-top:8px;padding-top:8px;border-top:1px solid var(--linha)}
+.passos{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.passo{background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:12px;padding:12px 14px}
+.passo .num{font:700 12px var(--mono);color:var(--verde-texto)}
+.passo h3{margin:2px 0 6px;font:700 15px/20px var(--display)}
+.passo p{margin:0;color:var(--tinta-2);font-size:13px}
+.nota{color:var(--mudo);font-size:12.5px;margin-top:14px;max-width:1000px}
+.explica{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:14px 0 6px}
+.explica div{background:var(--superficie);border:1px solid var(--linha);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--tinta-2)}
+.explica b{color:var(--tinta);display:block;font-size:13.5px}
+@media (max-width:640px){main{padding:16px 16px 40px}.topo{padding:12px 16px}h1{font-size:23px;line-height:29px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="topo"><b>Nexus</b><span>Governança de dados · matriz de barramento (método Kimball) · 05/10/2026</span></div>
+<main>
+<p class="eyebrow">O que cruza com o quê</p>
+<h1>Matriz de barramento: cada acontecimento contra cada cadastro</h1>
+<p class="sub">No método Kimball, todo dado de análise é um <b>fato</b> (um acontecimento: um fechamento, uma ronda, a geração de um
+dia) ligado a <b>dimensões</b> (os cadastros de referência: usina, pessoa, data…) por um <b>ID</b>. Quando dois setores usam a
+mesma dimensão pelo mesmo ID, os dados deles se cruzam sem conversão. Esta é a foto dos 14 processos que existem hoje, lida
+do cabeçalho de cada livro do banco.</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">14</div><div class="r">processos (fatos) mapeados</div></div>
+  <div class="kpi"><div class="v">7</div><div class="r">dimensões em comum</div></div>
+  <div class="kpi er"><div class="v">0</div><div class="r">fatos ligados por ID hoje (o único, o do coletor, saiu hoje)</div></div>
+  <div class="kpi er"><div class="v">4</div><div class="r">cadastros diferentes de usina</div></div>
+  <div class="kpi al"><div class="v">2</div><div class="r">dimensões que não existem (data e equipamento)</div></div>
+  <div class="kpi al"><div class="v">1</div><div class="r">processo fora do banco (programação do PCM)</div></div>
+</div>
+
+<div class="explica">
+  <div><b>Fato</b>Uma linha = um acontecimento. Tem números (nota, kWh, minutos) e os IDs de quem, onde e quando.</div>
+  <div><b>Dimensão</b>O cadastro de referência, com um ID nosso. É o mesmo para todos os setores: uma usina só.</div>
+  <div><b>Grão</b>O que exatamente é uma linha do fato. Sem ele escrito, dois relatórios contam coisas diferentes.</div>
+</div>
+
+<h2>A matriz</h2>
+<div class="legenda">
+  <span><span class="chip id">ID</span> liga pelo ID do cadastro</span>
+  <span><span class="chip cod">código</span> código de um sistema (liga pelo de-para)</span>
+  <span><span class="chip hmac">código da pessoa</span> e-mail cifrado (liga com a chave)</span>
+  <span><span class="chip nome">nome</span> texto livre: junção frágil</span>
+  <span><span class="chip largo">em colunas</span> um equipamento por coluna</span>
+  <span><span class="chip prop">cadastro próprio</span> dimensão que só aquele livro usa</span>
+  <span><span class="chip nao">—</span> não tem</span>
+</div>
+
+<div class="moldura">
+<table>
+<thead><tr>
+  <th style="min-width:280px">Processo (fato) · livro · grão</th>
+  <th class="dim">Data<small>calendário</small></th>
+  <th class="dim">Usina<small>usina_id</small></th>
+  <th class="dim">Cliente<small>cliente_id</small></th>
+  <th class="dim">Equipe / região<small>equipe_id</small></th>
+  <th class="dim">Pessoa<small>pessoa_id</small></th>
+  <th class="dim">Equipamento<small>não existe</small></th>
+  <th class="dim">OS<small>nº no próprio fato</small></th>
+</tr></thead>
+<tbody id="corpo"></tbody>
+</table>
+</div>
+<p class="nota">Linha esmaecida: o livro do coletor (<code>campo_nexus</code>), o único fato que chegou a levar <code>usina_id</code> e
+<code>pessoa_id</code> (92% e 80% das linhas). Saiu hoje porque a nota dele batia com a do painel do App em só 14% das tarefas; o
+livro do App que o substituiu traz a nota certa, mas sem os IDs. É o passo 2 abaixo.</p>
+
+<h2>As dimensões</h2>
+<div class="dims" id="dims"></div>
+
+<h2>Por onde começar</h2>
+<div class="passos">
+  <div class="passo"><div class="num">PASSO 1 · ESTA PÁGINA</div><h3>Grão de cada livro escrito</h3>
+    <p>A tabela acima diz o que é uma linha de cada fato. Vai para o <code>CLAUDE.md</code> de cada área, e livro novo só entra
+    no banco com o grão e as dimensões dele declarados.</p></div>
+  <div class="passo"><div class="num">PASSO 2</div><h3>Fato gravado com os IDs</h3>
+    <p>O Nexus lê cada livro de origem e grava o fato já com <code>usina_id</code>, <code>pessoa_id</code>, data e equipamento.
+    Começa pelos fechamentos do App: a pessoa já liga em 95% pelo código, e a usina pelo código do ativo e o de-para.</p></div>
+  <div class="passo"><div class="num">PASSO 3</div><h3>Uma dimensão de cada</h3>
+    <p>A usina do cadastro vira a única (as outras três passam a apontar para ela), o equipamento nasce do gêmeo (que já tem a
+    lista e os apelidos por sistema), entra a dimensão de data, e a pessoa ganha histórico de equipe e supervisor.</p></div>
+</div>
+<p class="nota">Vale para a camada de indicadores, previsão e diagnóstico (ranking, triagem, perdas, geração, PCM). As telas
+operacionais (fila da Aprovação, cadastro em edição) continuam lendo o registro vivo. O banco é a API de planilhas: o modelo
+vale igual, e a junção continua sendo feita no Nexus, pelo ID.</p>
+</main>
+
+<script>
+// [estado, texto do chip, coluna/observação]. Estados: id, cod, hmac, nome, largo, prop, nao
+const G = (n) => ({grupo: n});
+const L = [
+  G("Campo · App (o App grava, de hora em hora)"),
+  {p:"Fechamento de OS", l:"fechamentos_app_campo", g:"1 linha = 1 tarefa fechada pelo App", n:"2.499",
+   c:[["cod","data","Registrado em"],["nome","nome","Usina"],["nao"],["nome","nome","Região"],["hmac","código","Técnico (HMAC)"],["cod","código","Código do ativo"],["cod","nº","OS"]]},
+  {p:"Ronda", l:"rondas_app_campo", g:"1 linha = 1 OS de ronda", n:"766",
+   c:[["cod","data","Data"],["cod","código","Ativo da usina no Fracttal"],["nao"],["nome","nome","Região"],["nome","nome","Técnico (em claro)"],["nao"],["cod","nº","OS"]]},
+  {p:"Permissão de trabalho", l:"pt_app_campo", g:"1 linha = 1 PT", n:"122",
+   c:[["cod","data","Criada em"],["nome","nome","Usina"],["nao"],["nome","nome","Região"],["hmac","código","Solicitante, quem decidiu"],["cod","código","Código do ativo"],["cod","nº","OS"]]},
+  {p:"Decisão do painel", l:"decisoes_app_campo", g:"1 linha = 1 decisão, tratamento ou devolução", n:"122",
+   c:[["cod","data","Quando"],["nome","nome","Usina (só Central de atenção)"],["nao"],["nao"],["hmac","código","3 papéis"],["cod","código","Código do ativo (devolução)"],["cod","nº","OS"]]},
+  {p:"Zeladoria", l:"zeladoria_app_campo", g:"1 linha = 1 etapa registrada", n:"0", vazio:true,
+   c:[["cod","data","Data"],["nome","nome","Usina"],["nao"],["nao"],["hmac","código","Registrado por"],["nao"],["cod","nº","OS"]]},
+  {p:"Fechamento pelo coletor", l:"campo_nexus · fechamentos", g:"1 linha = 1 tarefa da fila do Fracttal", n:"11.059", aposentado:true,
+   c:[["cod","data","fim"],["id","ID","usina_id"],["nao"],["nome","nome","regiao"],["id","ID","pessoa_id"],["cod","código","codigo"],["cod","nº","os"]]},
+
+  G("Performance"),
+  {p:"Geração diária (Thopen)", l:"bd_thopen · 1 aba por usina", g:"1 linha = usina × dia", n:"~115 abas",
+   c:[["cod","data","Data"],["nome","nome","Usina (aba)"],["nao"],["nao"],["nao"],["largo","em colunas","SKID 1…, Inversor 1.1…"],["nao"]]},
+  {p:"Geração diária (demais)", l:"bd_performance · 1 aba por usina", g:"1 linha = usina × dia", n:"17 abas",
+   c:[["cod","data","Data"],["cod","código","aba = código (MAB100)"],["nao"],["nao"],["nao"],["largo","em colunas","Inversor 1.1…"],["nao"]]},
+  {p:"Meta e histórico mensal", l:"bd_thopen · Dados Mensais, Historico", g:"1 linha = usina × mês", n:"1.971 + 6.486",
+   c:[["cod","mês","Mês"],["nome","nome","Usina"],["nao"],["nao"],["nao"],["nao"],["nao"]]},
+  {p:"Falha de string", l:"falhas_performance · strings_episodios, strings_inversor_dia", g:"1 linha = 1 episódio · inversor × dia", n:"936 + 891",
+   c:[["cod","data","saiu / dia"],["nome","nome","usina (+ fonte)"],["nome","nome","cliente"],["nao"],["nao"],["nome","nome","inversor, string"],["nao"]]},
+  {p:"Falha de tracker", l:"falhas_performance · trackers_episodios", g:"1 linha = 1 episódio", n:"7.199",
+   c:[["cod","data","parou"],["nome","nome","usina"],["nome","nome","cliente"],["nao"],["nao"],["nome","nome","tracker, inversor"],["nao"]]},
+  {p:"Parada de tracker", l:"plataforma_series · trk_eventos", g:"1 linha = 1 parada", n:"114.851",
+   c:[["cod","data","dia"],["cod","código","plant_id da fonte"],["nao"],["nao"],["nao"],["nome","nome","tracker"],["nao"]]},
+
+  G("Gêmeo digital"),
+  {p:"Perda por equipamento", l:"gemeo_digital · perda_dia, cascata_dia, evento", g:"1 linha = usina × dia × equipamento × parcela", n:"24.671",
+   c:[["cod","data","dia"],["prop","cadastro próprio","usina (25, do gêmeo)"],["nao"],["nao"],["nao"],["prop","cadastro próprio","equipamento (9.918 + apelidos)"],["nao"]]},
+
+  G("Tickets"),
+  {p:"Ticket de performance", l:"tickets_performance · Tickets, Trackers, Strings indisp", g:"1 linha = 1 ticket", n:"774 + 3.191 + 331",
+   c:[["cod","data","Início da ocorrência"],["cod","código","Código da usina"],["nome","nome","Cliente"],["nao"],["nome","nome","Supervisor(a), Responsável"],["nome","nome","Equipamento, Inversor, Tracker"],["cod","nº","N° OS"]]},
+
+  G("PCM"),
+  {p:"Programação semanal", l:"fora do banco: Nexus local + GitHub do PCM", g:"1 linha = tarefa × semana", n:"~1.100 por semana", fora:true,
+   c:[["cod","semana","semana ISO"],["nome","nome","Classificação 1 do Fracttal"],["nome","nome","no nome da usina"],["nome","nome","Equipe Cluster"],["nome","nome","técnico do Fracttal"],["cod","código","código do equipamento"],["cod","nº","OS"]]},
+];
+const corpo = document.getElementById("corpo");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+for (const r of L) {
+  const tr = document.createElement("tr");
+  if (r.grupo) { tr.className = "grupo"; tr.innerHTML = `<td colspan="8">${esc(r.grupo)}</td>`; corpo.appendChild(tr); continue; }
+  if (r.aposentado) tr.className = "aposentado";
+  const selo = r.fora ? '<span class="selo fora">fora do banco</span>' : (r.vazio ? '<span class="selo vazio">sem registro ainda</span>' : "");
+  let h = `<td class="proc"><b>${esc(r.p)}${selo}</b><code>${esc(r.l)}</code><span class="grao">${esc(r.g)}</span><span class="n">${esc(r.n)} linhas</span></td>`;
+  for (const [est, txt, col] of r.c) {
+    h += est === "nao" ? `<td class="c"><span class="chip nao">—</span></td>`
+                       : `<td class="c"><span class="chip ${est}">${esc(txt)}</span><span class="col">${esc(col)}</span></td>`;
+  }
+  tr.innerHTML = h; corpo.appendChild(tr);
+}
+const D = [
+  {n:"Usina", e:"er", et:"4 cadastros", t:"<code>cadastro_nexus.usinas</code> (258, <code>usina_id</code>) com o <code>de_para</code> (876 chaves de outros sistemas). Cópias soltas: <code>bd_thopen</code> Dados Gerais Usinas (116), <code>gemeo_digital.usina</code> (25) e a aba de usinas da planilha de tickets.", f:"As cópias passam a apontar para o <code>usina_id</code>; atributo novo de usina mora só no cadastro."},
+  {n:"Cliente", e:"al", et:"existe", t:"<code>cadastro_nexus.clientes</code> (16). Nos fatos aparece em texto (falhas, tickets) e há uma cópia em <code>bd_thopen.Clientes</code>.", f:"Fato não precisa de cliente: sai da usina. As cópias em texto deixam de ser fonte."},
+  {n:"Equipe / região", e:"al", et:"existe", t:"<code>cadastro_nexus.equipes</code> (145) e o cluster/região da usina. Nos fatos: \"Região\" e \"Equipe Cluster\" em texto.", f:"A região do fato sai da usina (ou da pessoa) pelo ID, não do texto que cada sistema escreve."},
+  {n:"Pessoa", e:"al", et:"sem histórico", t:"<code>cadastro_nexus.pessoas</code> (134, com <code>equipe_id</code> e <code>supervisor_id</code>). Guarda só o ATUAL: quando um técnico muda de equipe, as notas antigas dele mudam de supervisor.", f:"Histórico \"válido de / até\" (no Kimball, SCD tipo 2): a nota de agosto fica com o supervisor de agosto."},
+  {n:"Data", e:"er", et:"não existe", t:"Cada tela calcula a semana ISO, o dia útil e o horário de campo; os feriados moram nos insumos do PCM.", f:"Uma tabela de calendário: dia, semana ISO, mês, feriado (nacional, estadual, municipal), dia útil, horário de campo."},
+  {n:"Equipamento", e:"er", et:"não existe", t:"Não há no cadastro. O gêmeo já tem a melhor base: <code>gemeo_digital.equipamento</code> (9.918) com <code>alias</code> (917 apelidos por sistema), e o <code>de_para_trackers</code> (4.745) liga o tracker do supervisório ao do Fracttal.", f:"Nasce do gêmeo e vira dimensão única, com <code>equipamento_id</code> ligado à usina."},
+  {n:"OS", e:"ok", et:"certo como está", t:"O número da OS vai no próprio fato (no Kimball, dimensão \"degenerada\": não precisa de tabela).", f:"Nada a fazer: é o elo entre App, PCM, tickets e Fracttal."},
+];
+document.getElementById("dims").innerHTML = D.map((d) =>
+  `<div class="dim-card"><h3>${d.n}<span class="estado ${d.e}">${d.et}</span></h3><p>${d.t}</p><p class="faz">${d.f}</p></div>`).join("");
+</script>
+</body>
+</html>

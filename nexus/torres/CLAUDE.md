@@ -9,7 +9,7 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 | `oscreator/` | clone do OS Creator Web servido em `/os/*` | `oscreator/README.md` |
 | `performance/` | Tempo real = plataforma pela ponte, só leitura; as outras telas placeholder | `nexus/performance/CLAUDE.md` |
 | `pcm/` | telas da programação semanal | `nexus/pcm/CLAUDE.md` (o código mora em `nexus/pcm/`) |
-| `base/`, `pessoas/` | telas do cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
+| `base/`, `pessoas/` | telas do cadastro (BD_Operações); Base → Governança de dados é da camada de dados | `nexus/cadastro/CLAUDE.md`, `nexus/dados/CLAUDE.md` |
 | `campo/` | Aprovação de OS, Ordens de serviço e Triagem pelo banco do Nexus (nota calculada pelo Fracttal, coletor -> API do PG); as outras abrem o painel do App na aba (moldura) | `campo/CLAUDE.md` |
 | as demais | só placeholder | — |
 

@@ -117,6 +117,14 @@ A tela **Aprovação de OS** lê a fila do Fracttal ao vivo quando alguém a abr
 cada 10 minutos por servidor (os filtros reusam a mesma leitura). Em hora de pico da cota ela mostra o aviso de fila
 incompleta; a tela continua de pé.
 
+## 7a. Camada de dados: a carga de hora em hora
+
+O Nexus grava, aos :40 de cada hora, os livros `nexus_dimensoes` (calendário, feriados, histórico de pessoas e usinas) e
+`nexus_fatos` (os fatos com os IDs do cadastro e a qualidade da ligação) na API do banco. Liga sozinho onde há o
+`GRIDCO_SQL_TOKEN` no `.env` (o pacote tem); não precisa de nada a mais. Com o PC do Levi e o servidor no ar ao mesmo
+tempo, só um grava por hora (o outro vê a hora da última carga no próprio livro e pula). Desligar numa máquina:
+`NEXUS_CARGA_DADOS=0`. Conferir: Base → **Governança de dados** mostra a hora da última carga e a máquina.
+
 ## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
 
 A aba Performance → Tempo real do Nexus mostra a plataforma de Performance por uma chave só de leitura. O Nexus já leva a
