@@ -14,7 +14,8 @@ from nexus.torres import descobrir_torres
 # o clone importa o steps/ui.py do OS Creator (PyQt6) ao montar a tela de Engenharia
 pytest.importorskip("PyQt6")
 
-DESTINOS = {"inicio": "/os/", "historico": "/os/historico", "setores": "/os/#h_setores",
+DESTINOS = {"inicio": "/os/", "historico": "/os/historico", "ativos": "/os/ativos", "performance": "/os/performance",
+            "cos": "/os/cos", "pcm": "/os/setor/pcm", "chamados": "/os/chamados", "engenharia": "/os/engenharia",
             "solicitacao": "/os/solicitacao", "clonagem": "/os/clonar"}
 
 
@@ -57,16 +58,40 @@ def test_abas_js_ajustado_nao_fica_preso_no_cache_do_original(logado):
     etag = r.headers.get("ETag", "")
     assert "nexus" in etag
     # quem tem o ORIGINAL em cache (ETag e data do arquivo) recebe o ajustado, e não um 304
-    original = etag.replace("-nexus", "")
+    original = etag.split("-nexus")[0] + '"' if etag.endswith('"') else etag.split("-nexus")[0]
     r2 = logado.get("/os/static/abas.js", headers={"If-None-Match": original,
                                                    "If-Modified-Since": r.headers.get("Last-Modified", "")})
     assert r2.status_code == 200 and "__osTopo" in r2.get_data(as_text=True)
 
 
-def test_voltar_do_os_creator_sai_da_moldura(logado):
+def test_topo_do_os_creator_no_nexus_sem_voltar_e_sem_marca(logado):
+    """Levi, 04/10: sem o botão de voltar (o menu lateral já leva a qualquer lugar) e sem o símbolo e o "Grid Co."
+    (o topo do Nexus já tem); só o "Sistema de Ordens de Serviço"."""
     html = logado.get("/os/login").get_data(as_text=True)
-    if "&larr; Nexus" in html:          # o login pode não ter o topo; a casca tem
-        assert 'target="_top"' in html
+    assert "os-topo-voltar" not in html and "Plataforma" not in html and "&larr; Nexus" not in html
+    assert 'class="os-n1"' not in html and 'class="os-simbolo"' not in html
+    assert 'class="os-n2 os-n2--nexus">Sistema de Ordens de Serviço<' in html
+    assert ".os-n2--nexus{" in html
+
+
+def test_menu_lateral_abre_aba_nova_na_casca(logado):
+    """Levi, 04/10: "os botões laterais devem contribuir em adicionar novas abas também na tela acima". A página da
+    torre leva o mapa menu → tela, e o abas.js ganha (pela ponte) uma porta que só ouve o Nexus."""
+    html = logado.get("/t/os/historico").get_data(as_text=True)
+    assert '"/t/os/pcm": {"nome": "PCM", "url": "/os/setor/pcm"}' in html
+    assert "nexusOs: 1" in html
+    abas = logado.get("/os/static/abas.js").get_data(as_text=True)
+    assert abas.count("d.nexusOs !== 1") == 1 and "e.source !== window.parent" in abas
+    assert abas.index("d.nexusOs !== 1") < abas.index("if (d.tipo === 'pagina')")     # dentro da casca, antes da original
+
+
+def test_fila_do_pcm_usa_o_id_que_a_lista_de_pessoas_tem():
+    """04/10: clicar em PCM dava 500. A Fila pedia p.id_account, campo que a lista de responsáveis não tem; o oem já
+    tinha corrigido em 02/10 (id_personnel) e o clone era de 30/09."""
+    from pathlib import Path
+    from nexus.torres.oscreator import ponte
+    fila = Path(ponte.RAIZ_CLONE, "os_web", "templates", "solic_fila.html").read_text(encoding="utf-8")
+    assert "p.id_account" not in fila.split("{#")[0] + fila.split("#}")[-1] and "p.id_personnel" in fila
 
 
 def test_os_sem_login_do_nexus_para_no_portao(cliente):
@@ -102,12 +127,6 @@ def test_arquivos_do_os_creator_passam(logado):
     assert css.status_code == 200 and css.mimetype == "text/css"
     png = logado.get("/os/assets/grid-logo.png")
     assert png.status_code == 200 and png.mimetype == "image/png"
-
-
-def test_voltar_do_os_creator_leva_ao_nexus(logado):
-    html = logado.get("/os/login").get_data(as_text=True)
-    assert "&larr; Nexus" in html
-    assert "Plataforma" not in html
 
 
 def test_sessao_do_fracttal_fica_no_cookie_do_os_creator(app):

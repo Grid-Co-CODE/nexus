@@ -6,4 +6,36 @@
    esta moldura como a janela dele: a casca liga as abas e o login fica aqui dentro. #}
 <iframe class="os-moldura" src="{{ destino }}" title="OS Creator: {{ tela.nome }}"></iframe>
 <noscript><p class="mudo">O OS Creator precisa de JavaScript. <a href="{{ destino }}">Abrir em tela cheia</a>.</p></noscript>
+<script type="application/json" id="os-menu">{{ menu_os|tojson }}</script>
+<script>
+/* O menu lateral do OS Creator abre a tela como ABA NOVA na faixa do OS Creator já aberta, sem recarregar a página
+   e sem perder as abas (Levi, 04/10/2026). A casca escuta essa mensagem pela porta que a ponte põe no abas.js.
+   Sem a casca de pé (login do Fracttal na tela, por exemplo) o clique segue o caminho normal: abre a página. */
+(function () {
+  var moldura = document.querySelector(".os-moldura");
+  var menu = JSON.parse(document.getElementById("os-menu").textContent || "{}");
+  if (!moldura) return;
+  function cascaDePe() {
+    try { var w = moldura.contentWindow; return !!(w && w.OsAbas && w.OsAbas.casca); } catch (e) { return false; }
+  }
+  function marcar(href) {
+    document.querySelectorAll('a[aria-current="page"]').forEach(function (a) { a.removeAttribute("aria-current"); });
+    document.querySelectorAll('a[href="' + href + '"]').forEach(function (a) { a.setAttribute("aria-current", "page"); });
+  }
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest("a[href]");
+    if (!a) return;
+    var href = a.getAttribute("href"), alvo = menu[href];
+    if (!alvo || !cascaDePe()) return;
+    e.preventDefault();
+    moldura.contentWindow.postMessage({nexusOs: 1, url: alvo.url, rotulo: alvo.nome}, location.origin);
+    if (location.pathname !== href) history.pushState({os: href}, "", href);
+    document.title = alvo.nome + " · Grid Co.";
+    marcar(href);
+  });
+  // voltar/avançar do navegador: a página da torre de verdade (a casca guarda as abas na sessão desta janela)
+  window.addEventListener("popstate", function () { location.reload(); });
+})();
+</script>
 {% endblock %}

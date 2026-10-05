@@ -28,19 +28,31 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ_CLONE = os.path.join(AQUI, "os_creator")
 
 # Cada tela da torre abre o OS Creator na seção dela. Tela aberta sozinha vai para a casca do OS Creator com ela
-# numa aba (base.html do clone); o Setores é a seção da tela inicial.
+# numa aba (base.html do clone).
 DESTINOS = {
     "inicio": "/os/",
     "historico": "/os/historico",
-    "setores": "/os/#h_setores",
+    "ativos": "/os/ativos",
+    # um item por setor (Levi, 04/10): o mesmo endereço do card do setor na tela inicial do OS Creator
+    "performance": "/os/performance",
+    "cos": "/os/cos",
+    "pcm": "/os/setor/pcm",
+    "chamados": "/os/chamados",
+    "engenharia": "/os/engenharia",
     "solicitacao": "/os/solicitacao",
     "clonagem": "/os/clonar",
 }
 
-# O topo do OS Creator diz "← Plataforma": no supervisório, "/" é a Plataforma de Performance. Aqui "/" é o Nexus.
-# target=_top: dentro da moldura, o Voltar abriria um Nexus dentro do outro.
-_VOLTAR_DE = 'href="/" title="Voltar para a Plataforma de Performance">&larr; Plataforma</a>'.encode()
-_VOLTAR_PARA = 'href="/" target="_top" title="Voltar para o Nexus">&larr; Nexus</a>'.encode()
+# O topo do OS Creator, dentro do Nexus (Levi, 04/10/2026):
+# - sem o "← Plataforma" (no supervisório, "/" é a Plataforma de Performance): o menu lateral do Nexus já leva a
+#   qualquer lugar, e o botão só abria um Nexus dentro do outro;
+# - sem o símbolo e o "Grid Co." (o topo do Nexus já tem), só o "Sistema de Ordens de Serviço", centralizado.
+_VOLTAR_DE = (b'<a class="os-topo-voltar" href="/" title="Voltar para a Plataforma de Performance">'
+              b'&larr; Plataforma</a>')
+_MARCA_DE = ('<img src="/os/assets/grid-icon.png" alt="" class="os-simbolo">\n'
+             '    <div><div class="os-n1">Grid Co.</div><div class="os-n2">Sistema de Ordens de Serviço</div></div>').encode()
+_MARCA_PARA = '<div class="os-n2 os-n2--nexus">Sistema de Ordens de Serviço</div>'.encode()
+_ESTILO_NEXUS = b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:center}</style>'
 
 # Sobe de moldura em moldura até a de baixo do Nexus (o <html data-nexus>). Sem Nexus em cima, chega ao topo e é o
 # window.top de sempre. Moldura de outro domínio (o supervisório embutido na Engenharia) para a subida no try.
@@ -52,7 +64,19 @@ _TROCAS_HTML = [
     (b"window.top.location.href", b"window.__osTopo().location.href"),
 ]
 # O abas.js liga a casca só quando ela não tem pai; dentro do Nexus ela tem, e o pai é o Nexus.
-_TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTopo() === window) casca();")]
+# E a casca só ouve as molduras das próprias abas: o menu lateral do Nexus ganha uma porta própria, para abrir a tela
+# como ABA NOVA na faixa do OS Creator, sem recarregar a casca e sem perder as abas abertas (Levi, 04/10/2026: "os
+# botões laterais devem contribuir em adicionar novas abas também na tela acima").
+_OUVIR_NEXUS = b"""    window.addEventListener('message', function (e) {
+      if (e.origin !== location.origin || e.source !== window.parent) return;
+      const d = e.data;
+      if (!d || d.nexusOs !== 1 || !d.url) return;
+      if (d.url === '/os/') ativar('inicio', {focar: true}); else abrir(d.url, d.rotulo);
+    });
+"""
+_ANCORA_MENSAGEM = b"    window.addEventListener('message', function (e) {\n"
+_TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTopo() === window) casca();"),
+                (_ANCORA_MENSAGEM, _OUVIR_NEXUS + _ANCORA_MENSAGEM)]
 
 _METODOS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
 _trava = threading.Lock()
@@ -111,10 +135,10 @@ def encaminhar(resto: str):
         environ.pop("HTTP_IF_MODIFIED_SINCE", None)
     resp = app.response_class.from_app(alvo, environ)
     if resp.mimetype == "text/html":
-        corpo = resp.get_data().replace(_VOLTAR_DE, _VOLTAR_PARA)
+        corpo = resp.get_data().replace(_VOLTAR_DE, b"").replace(_MARCA_DE, _MARCA_PARA)
         if b"<head>" in corpo:
             # a função entra antes de qualquer script da página, que já a usa no <head>
-            corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS, 1)
+            corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _ESTILO_NEXUS, 1)
             for de, para in _TROCAS_HTML:
                 corpo = corpo.replace(de, para)
         resp.set_data(corpo)
@@ -123,10 +147,11 @@ def encaminhar(resto: str):
         for de, para in _TROCAS_ABAS:
             corpo = corpo.replace(de, para)
         resp.set_data(corpo)
-        # Marca de versão própria (a do original + "-nexus") e sem data: a data é a do arquivo original, e um
-        # navegador que comparasse só a data acharia que nada mudou.
+        # Marca de versão própria (a do original + "-nexus-" + o hash do que sai) e sem data: a data é a do arquivo
+        # original, e um navegador que comparasse só a data acharia que nada mudou. O hash muda quando o ajuste muda
+        # (04/10: a porta do menu lateral entrou num abas.js que já tinha marca "-nexus").
         etag, _fraca = resp.get_etag()
-        resp.set_etag(f"{etag or 'abas'}-nexus")
+        resp.set_etag(f"{etag or 'abas'}-nexus-{hashlib.sha256(corpo).hexdigest()[:10]}")
         resp.headers.pop("Last-Modified", None)
         resp.make_conditional(request)
     return resp
@@ -135,7 +160,9 @@ def encaminhar(resto: str):
 def abrir(torre, tela_id: str):
     """A view de uma tela da torre: a página do Nexus que leva ao OS Creator na seção da tela."""
     def view():
+        # o mapa "item do menu → tela do OS Creator": com ele, o clique no menu abre uma aba na casca já aberta
+        menu_os = {f"/t/{torre.id}/{t.id}": {"url": DESTINOS[t.id], "nome": t.nome} for t in torre.telas if t.id in DESTINOS}
         return render_template("oscreator/abrir.html", torre=torre, tela=torre.tela(tela_id),
-                               destino=DESTINOS[tela_id])
+                               destino=DESTINOS[tela_id], menu_os=menu_os)
     view.__name__ = f"abrir_{tela_id}"
     return view

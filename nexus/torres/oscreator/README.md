@@ -59,10 +59,24 @@ nesta pasta.
   | Tela da torre | Abre em |
   |---|---|
   | Início | `/os/` |
-  | Histórico | `/os/historico` |
-  | Setores | `/os/#h_setores` |
+  | Histórico de OS | `/os/historico` |
+  | Ativos Fracttal | `/os/ativos` |
+  | Performance | `/os/performance` |
+  | COS | `/os/cos` |
+  | PCM | `/os/setor/pcm` |
+  | Chamados | `/os/chamados` |
+  | Engenharia | `/os/engenharia` |
   | Solicitação | `/os/solicitacao` |
-  | Clonagem | `/os/clonar` |
+  | Clonagem de OS | `/os/clonar` |
+
+  O "Setores" virou um item por setor e entrou "Ativos Fracttal" (Levi, 04/10/2026). Cada setor abre o mesmo
+  endereço do card dele na tela inicial do OS Creator.
+- **Menu lateral → aba nova** (Levi, 04/10: "os botões laterais devem contribuir em adicionar novas abas também na
+  tela acima"). Com a casca do OS Creator de pé, o clique no menu não recarrega a página: manda à casca
+  `{nexusOs: 1, url, rotulo}` e ela abre a tela numa aba nova (ou reativa a que já existe). A porta é posta no
+  `abas.js` pela ponte (`_OUVIR_NEXUS`) e só ouve a janela-mãe; a ETag do abas.js ajustado leva o hash do conteúdo,
+  para o navegador largar a versão anterior. Sem a casca (login do Fracttal na tela), o clique abre a página normal.
+  Provado num ensaio com o abas.js ajustado de verdade: 2 abas novas, repetir não duplica, "/os/" volta ao Início.
 
 - **Dentro da casca do Nexus, com o menu lateral** (Levi, 30/09). Cada tela da torre mostra o OS Creator numa
   moldura. Até então abria em tela cheia, porque o clone usa `window.top` para saber se é a casca. Numa moldura, isso
@@ -70,9 +84,13 @@ nesta pasta.
   `window.top` por `window.__osTopo()`, que é a janela mais alta que ainda é do OS Creator. Fora do Nexus, essa
   janela é o próprio `window.top`, então nada muda no supervisório. Se o oem mudar esses trechos, os testes da
   moldura acusam.
-- **Voltar:** o "← Plataforma" do topo dele vira "← Nexus", com `target="_top"`, para não abrir um Nexus dentro do
-  outro. As páginas do Nexus também saem de qualquer moldura. A troca é feita na resposta, pela ponte, para o clone
-  continuar idêntico ao do oem.
+- **Topo do OS Creator no Nexus** (Levi, 04/10): sem o "← Plataforma" (o menu lateral já leva a qualquer lugar) e sem
+  o símbolo e o "Grid Co." (o topo do Nexus já tem); fica só o "Sistema de Ordens de Serviço", centralizado. As
+  páginas do Nexus também saem de qualquer moldura. A troca é feita na resposta, pela ponte, para o clone continuar
+  idêntico ao do oem.
+- **Sincronizado com o oem em 04/10:** `os_web/templates/solic_fila.html` (a Fila do PCM dava 500: pedia
+  `p.id_account`, campo que a lista de responsáveis não tem; o oem corrigiu em 02/10 para `id_personnel`). Era o
+  único arquivo diferente entre o clone e o oem.
 - **Sessão:** a chave da sessão do clone é derivada da `NEXUS_SECRET_KEY`. Não é a do supervisório e não precisa de
   segredo novo. O cookie continua `os_sessao`, só em `/os`.
 - **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
