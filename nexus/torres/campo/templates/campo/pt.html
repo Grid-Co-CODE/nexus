@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Permissões de trabalho do Nexus (Levi aprovou a proposta em 04/10/2026). As PT, a situação e o destaque são os do
+   painel do App, pela cópia das regras dele; De acordo e Não autorizo continuam no App. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div>
+      <p class="gc-eyebrow">{{ torre.nome }}</p>
+      <h1 class="cn-titulo">{{ tela.nome }}</h1>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p>
+    </div>
+    <div class="cn-frescor">PT abertas pela APR do App<br><b>lido às {{ lido }}</b> · últimos {{ d.get('dias', 30) }} dias</div>
+  </div>
+
+  {% if leitura.erro %}
+  <div class="cn-erro" role="alert">
+    <b>{{ leitura.erro }}.</b> A lista abaixo pode estar incompleta ou vazia por isso.
+    <a class="cn-fora" href="{{ painel }}#ir=pt" target="_blank" rel="noopener">Abrir no App</a>
+  </div>
+  {% endif %}
+
+  {% set c = d.get('contagem', {}) %}{% set esp = d.get('esperando') or [] %}
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Esperando agora</span><span class="v">{{ esp|length }}</span><span class="d">PT sem decisão</span></span>
+    {% set atrasadas = esp|selectattr('atrasada')|list|length %}
+    <span><span class="gc-rotulo">Passaram de {{ d.get('destaque_min', 30) }} min</span><span class="v{% if atrasadas %} ruim{% endif %}">{{ atrasadas }}</span><span class="d">o destaque do App</span></span>
+    <span><span class="gc-rotulo">De acordo</span><span class="v">{{ c.get('de_acordo', 0) }}</span><span class="d">no período</span></span>
+    <span><span class="gc-rotulo">Não autorizadas</span><span class="v">{{ c.get('negada', 0) }}</span><span class="d">voltaram para nova APR</span></span>
+    <span><span class="gc-rotulo">Vencidas</span><span class="v">{{ c.get('vencida', 0) }}</span><span class="d">passaram da validade de {{ d.get('validade_dias', 7) }} dias</span></span>
+  </div>
+
+  <div class="cn-lista-cab"><h2>Esperando decisão</h2><span class="mudo">a mais antiga primeiro</span></div>
+  <div class="cn-pts">
+    {% for p in esp %}
+    <article class="cn-pt{% if p.atrasada %} atrasada{% endif %}">
+      <div class="topo-pt"><b>{{ p.numero or p.id }}</b><span class="cn-pill cn-{{ 'critico' if p.atrasada else 'alerta' }}">há {{ idade_min(p.idade_min) }}</span></div>
+      <div class="onde">{{ p.usina }} · OS {{ p.os }} · {{ p.tarefa }}</div>
+      {% if p.atividades %}<div class="ativ">{% for a in p.atividades %}<span class="cn-tag">{{ a.titulo }}{% if a.nao %} · {{ a.nao }} NÃO{% endif %}</span>{% endfor %}</div>{% endif %}
+      <div class="quem">Pedida por {{ p.nome or '—' }}</div>
+      <div class="quem"><span>Aguarda <b>{{ (p.assina_agora_txt or 'quem aprova').split(' (')[0] }}</b></span>
+        <a class="cn-fora" href="{{ painel }}#ir=pt" target="_blank" rel="noopener">Decidir no App</a></div>
+    </article>
+    {% else %}
+    <div class="cn-vazio">Nenhuma PT esperando decisão.</div>
+    {% endfor %}
+  </div>
+
+  <div class="cn-lista-cab"><h2>Histórico</h2><span class="mudo">{{ historico|length }} de {{ d.get('total', 0) }}</span></div>
+  <div class="cn-chips">
+    <a href="{{ url(sit=None) }}"{% if not sit %} aria-current="page"{% endif %}>Todas<i>{{ d.get('total', 0) }}</i></a>
+    {% for k, (rotulo, cor) in situacoes.items() %}{% if c.get(k) %}
+    <a href="{{ url(sit=k) }}"{% if sit == k %} aria-current="page"{% endif %}>{{ rotulo }}<i>{{ c.get(k) }}</i></a>
+    {% endif %}{% endfor %}
+  </div>
+  <div class="cn-tab">
+    <table>
+      <thead><tr><th>PT</th><th>Situação</th><th>Aberta em</th><th>OS e tarefa</th><th>Usina</th><th>Técnico</th><th>Atividades críticas</th><th>Itens NÃO</th><th>Decidida por</th><th>Motivo</th><th>Válida até</th></tr></thead>
+      <tbody>
+      {% for p in historico %}
+        {% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
+        <tr>
+          <td><b>{{ p.numero or p.id }}</b></td>
+          <td><span class="cn-pill cn-{{ s[1] }}">{{ s[0] }}</span></td>
+          <td class="m">{{ p.criado_br or '—' }}</td>
+          <td><b>{{ p.os or '—' }}</b>{% if p.tarefa %}<span class="det">{{ p.tarefa }}</span>{% endif %}</td>
+          <td>{{ p.usina or '—' }}</td>
+          <td>{{ p.nome or '—' }}</td>
+          <td>{{ (p.atividades or [])|map(attribute='titulo')|join(', ') or '—' }}</td>
+          <td class="m">{{ p.naos or '—' }}</td>
+          <td>{{ p.decidido_nome or '—' }}{% if p.decidido_papel %}<span class="det">{{ p.decidido_papel }}</span>{% endif %}</td>
+          <td>{{ p.motivo or '—' }}</td>
+          <td class="m">{{ p.validade_br or '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="11" class="mudo">Nenhuma PT no período com esse filtro.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cn-nota"><b>Como funciona.</b> A PT nasce da APR do App quando o técnico marca uma atividade crítica.
+    Quem aprova é o supervisor da usina de segunda a sexta e o COS no fim de semana e no feriado; quem pediu a PT não a
+    assina. <b>De acordo</b> pede a assinatura e anexa o PDF da PT, com as duas assinaturas, à tarefa no Fracttal.
+    <b>Não autorizo</b> devolve para nova APR. Decidir continua no App enquanto o Nexus roda em paralelo; esta tela
+    não mostra assinatura nem as respostas da APR.</div>
+</div>
+{% endblock %}

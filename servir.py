@@ -13,6 +13,7 @@ import sys
 from waitress import serve
 
 from nexus import create_app
+from nexus.campo import instalar as instalar_campo
 from nexus.config import ConfigErro
 
 if __name__ == "__main__":
@@ -20,6 +21,7 @@ if __name__ == "__main__":
         app = create_app()
     except ConfigErro as erro:
         sys.exit(f"Nexus não subiu: {erro}")
+    instalar_campo(app)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     print(f"Nexus em produção: {host}:{porta} (cookie seguro, atrás do proxy HTTPS)", flush=True)

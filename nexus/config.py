@@ -16,6 +16,12 @@ OBRIGATORIAS = ("NEXUS_SECRET_KEY", "NEXUS_SENHA_ADMIN")
 # Opcionais: sem elas o Nexus sobe, e só a tela que depende delas avisa. O cadastro (29/09/2026) é a primeira:
 # sem NEXUS_CHAVE_CADASTRO ele não abre, e o resto da casca segue igual (a torre COS não precisa dela).
 OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
+             # tela Base → Ligações (04/10/2026): onde moram as decisões e o token para publicar no banco
+             "NEXUS_DADOS", "NEXUS_DE_PARA_REGRAS", "GRIDCO_SQL_TOKEN", "GRIDCO_DB_API",
+             # torre Campo · App (04/10/2026): o coletor do Fracttal roda só onde NEXUS_CAMPO_COLETOR=1, a cada N minutos
+             "NEXUS_CAMPO_COLETOR", "NEXUS_CAMPO_COLETOR_MIN",
+             # a pessoa nos workbooks que o App de Campo manda (v226): HMAC do e-mail, a mesma chave do App Setting
+             "NEXUS_PESSOA_HMAC",
              # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela
              "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN")
 

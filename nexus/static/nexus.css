@@ -83,7 +83,9 @@ a{color:inherit}
 .torre summary::-webkit-details-marker{display:none}
 .torre summary:hover{background:var(--superficie-2);color:var(--tinta)}
 .torre summary i{font-size:17px;color:var(--mudo)}
-.torre[data-sua="1"] summary i,.torre[data-sua="1"] summary{color:var(--verde-texto)}
+/* Verde = já tem conteúdo (Levi, 04/10/2026: "para eu ir vendo o progresso"). A torre da cadeira deixou de ser verde
+   para não confundir os dois sinais: ela se distingue pela etiqueta "sua". */
+.torre.com-conteudo summary,.torre.com-conteudo summary i,.torre li a.com-conteudo{color:var(--verde-texto)}
 .sua{margin-left:auto;font:700 10px/14px var(--font-sans);letter-spacing:.08em;text-transform:uppercase;
   color:var(--sobre-verde);background:var(--verde);padding:1px 7px;border-radius:var(--raio-tag)}
 .torre ul{list-style:none;margin:2px 0 8px;padding:0 0 0 29px}
@@ -91,9 +93,10 @@ a{color:inherit}
 .torre li a:hover{color:var(--tinta);background:var(--superficie-2)}
 .torre li a[aria-current="page"]{color:var(--tinta);background:var(--verde-suave)}
 .conteudo{padding:32px;min-width:0}
-/* Tela que embute outro sistema (OS Creator): sem margem, a moldura ocupa todo o espaço ao lado do menu. */
+/* Tela que embute outro sistema (OS Creator, painel do App de Campo): sem margem, a moldura ocupa todo o espaço ao
+   lado do menu. */
 .conteudo--moldura{padding:0;display:flex}
-.os-moldura{flex:1;width:100%;height:calc(100vh - var(--topo));border:0;display:block;background:var(--fundo)}
+.os-moldura,.campo-moldura{flex:1;width:100%;height:calc(100vh - var(--topo));border:0;display:block;background:var(--fundo)}
 /* Tempo real pela ponte (04/10/2026): faixa + moldura, sem o menu próprio da plataforma */
 .ponte-recorte{flex:1;min-width:0;height:calc(100vh - var(--topo));display:flex;flex-direction:column}
 .ponte-faixa{display:flex;align-items:center;gap:16px;padding:0 16px;min-height:40px;border-bottom:1px solid var(--linha);
@@ -105,6 +108,24 @@ a{color:inherit}
 .ponte-falta{margin:24px 16px;color:var(--alerta)}
 .ponte-erro{padding:32px 24px;max-width:640px}
 .ponte-erro h1{font:600 20px/1.3 var(--font-display);margin:0 0 12px}
+/* Painel do App de Campo (torre Campo · App): o menu lateral dele duplicava o do Nexus (Levi, 04/10/2026). O painel
+   vem de outro endereço e o Nexus não mexe nele: a moldura fica 224 px mais larga e a faixa do menu do App fica fora
+   da vista. Medidas do gestao.html v225: .sb{width:224px}; com 900 px ou menos o próprio painel esconde o menu (vira
+   gaveta), por isso o recorte só vale com 677 px ou mais de área visível. App mudou as medidas? Mude aqui e no
+   tests/test_torre_campo.py. */
+.campo-recorte{flex:1;min-width:0;height:calc(100vh - var(--topo));overflow:hidden;container-type:inline-size;
+  display:flex;flex-direction:column}
+.campo-recorte .campo-moldura{flex:1;min-height:0;height:auto;width:100%}
+@container (min-width:677px){.campo-recorte .campo-moldura{width:calc(100% + 224px);margin-left:-224px}}
+.campo-faixa{display:flex;align-items:center;gap:16px;padding:0 16px;min-height:40px;border-bottom:1px solid var(--linha);
+  font-size:13px}
+.campo-abas{display:flex;gap:4px}
+.campo-abas a{color:var(--mudo);text-decoration:none;font-weight:600;padding:10px 10px 7px;border-bottom:3px solid transparent}
+.campo-abas a:hover{color:var(--tinta)}
+.campo-abas a[aria-current="page"]{color:var(--tinta);border-bottom-color:var(--verde)}
+.campo-origem{color:var(--mudo)}
+.campo-fora{margin-left:auto;color:var(--verde-texto);font-weight:600;text-decoration:none}
+.campo-fora:hover{text-decoration:underline}
 /* Faixa que só a vitrine estática do GitHub Pages recebe (ferramentas/exportar_estatico.py). */
 .faixa-vitrine{padding:8px 24px;background:var(--superficie-2);border-bottom:1px solid var(--linha);
   font-size:12px;color:var(--tinta-2)}

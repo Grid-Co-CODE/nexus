@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% macro vs(atual, antes, melhor_se_sobe=true, unidade=' pts') %}{% if atual is not none and antes is not none %}{% set dif = atual - antes %}<span class="cn-vs {{ 'igual' if dif == 0 else ('melhor' if (dif > 0) == melhor_se_sobe else 'pior') }}">{{ 'igual' if dif == 0 else ('%+d'|format(dif) ~ unidade) }} vs. período anterior</span>{% endif %}{% endmacro %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Ordens de serviço do Nexus (04/10/2026). Os números e a lista são os do painel do App, pela cópia das regras dele;
+   devolver e encaminhar continuam no App. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div>
+      <p class="gc-eyebrow">{{ torre.nome }}</p>
+      <h1 class="cn-titulo">{{ tela.nome }}</h1>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p>
+    </div>
+    <div class="cn-frescor">notas pelo Fracttal{% if coleta %} · coleta {{ coleta }}{% endif %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
+  </div>
+
+  {% if leitura.erro %}
+  <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> Os números abaixo podem estar incompletos por isso.
+    <a class="cn-fora" href="{{ painel }}#ir=os" target="_blank" rel="noopener">Abrir no App</a></div>
+  {% endif %}
+
+  <form class="cn-filtros" method="get">
+    <span class="gc-rotulo">Período</span>
+    <div class="cn-seg">{% for p in (7, 30, 90) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
+    <label class="gc-rotulo" for="cn-regiao">Região</label>
+    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for g in regioes %}<option value="{{ g }}"{% if g == regiao %} selected{% endif %}>{{ g }}</option>{% endfor %}
+    </select>
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, técnico ou usina" aria-label="Buscar">
+    {% for k in ('dias', 'faixa') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+  </form>
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">OS fechadas</span><span class="v">{{ r.get('os', 0) }}</span><span class="d">pelo App, no período</span></span>
+    <span><span class="gc-rotulo">Qualidade média</span><span class="v{% if (r.get('qualidade_media') or 0) < 70 %} ruim{% endif %}">{{ r.get('qualidade_media', 0) }}%</span>{{ vs(r.get('qualidade_media'), ra.get('qualidade_media')) }}</span>
+    <span><span class="gc-rotulo">Retrabalho</span><span class="v">{{ r.get('retrabalho_pct', 0) }}%</span><span class="d">{{ r.get('devolvidas', 0) }} devolvidas</span>{{ vs(r.get('retrabalho_pct'), ra.get('retrabalho_pct'), false) }}</span>
+    <span><span class="gc-rotulo">Aprovação de 1ª</span><span class="v">{{ '—' if r.get('primeira_aprovacao_pct') is none else r.get('primeira_aprovacao_pct') ~ '%' }}</span><span class="d">das já aprovadas</span>{{ vs(r.get('primeira_aprovacao_pct'), ra.get('primeira_aprovacao_pct')) }}</span>
+    {# Pela fonte do Nexus a pontualidade não vem: a hora de início no celular não vai ao Fracttal (ordens.py). #}
+    <span><span class="gc-rotulo">Pontualidade</span><span class="v">{{ '—' if r.get('pontualidade_pct') is none else r.get('pontualidade_pct') ~ '%' }}</span><span class="d">{{ 'só no App (hora de início no celular)' if r.get('pontualidade_pct') is none else 'começou no horário' }}</span>{{ vs(r.get('pontualidade_pct'), ra.get('pontualidade_pct')) }}</span>
+    {# O App mostra este número como "+66%"; a conta é real ÷ previsto, então 66 quer dizer 66% do previsto. #}
+    <span><span class="gc-rotulo">Tempo real</span><span class="v">{{ '—' if r.get('tempo_vs_previsto_pct') is none else r.get('tempo_vs_previsto_pct') ~ '%' }}</span><span class="d">do previsto, em média</span></span>
+    <span><span class="gc-rotulo">Em verificação</span><span class="v">{{ r.get('em_verificacao', 0) }}</span><span class="d">na fila do supervisor</span></span>
+  </div>
+
+  <div class="cn-lista-cab">
+    <h2>Ordens de serviço</h2><span class="mudo">{{ lista|length }} de {{ total }}</span>
+    <div class="cn-seg cn-vista">{% for f, rot in faixas %}<a href="{{ url(faixa=f or None) }}"{% if f == faixa %} aria-current="page"{% endif %}>{{ rot }}</a>{% endfor %}</div>
+  </div>
+  <div class="cn-tab">
+    <table>
+      <thead><tr><th>OS</th><th>Tarefa</th><th>Técnico</th><th>Usina</th><th>Região</th><th>Tipo</th><th>Qualidade</th><th>Situação</th><th>Prev. / real</th><th>Pontual</th><th>Fechada</th><th>Ação</th></tr></thead>
+      <tbody>
+      {% for x in lista %}
+        {% set s = situacao(x) %}{% set suspeito = x.dur_prev and x.dur_real and x.dur_real < x.dur_prev * 0.4 %}
+        <tr>
+          <td><b>#{{ x.os }}</b></td>
+          <td>{{ (x.tarefa or '')[:60] }}</td>
+          <td>{{ x.tecnico or '—' }}</td>
+          <td>{{ x.usina or '—' }}</td>
+          <td>{{ x.cluster or '—' }}</td>
+          <td><span class="cn-tag">{{ x.tipo or '—' }}</span></td>
+          <td><span class="cn-pill cn-{{ 'ok' if x.qualidade >= 85 else ('alerta' if x.qualidade >= 70 else 'critico') }}">{{ x.qualidade }}%</span></td>
+          <td><span class="cn-pill cn-{{ s[1] }}">{{ s[0] }}</span></td>
+          <td class="m{% if suspeito %} cn-suspeito{% endif %}">{% if x.dur_prev or x.dur_real %}{{ x.dur_prev }} / {{ x.dur_real }} min{% else %}—{% endif %}</td>
+          <td>{{ '—' if x.pontual is none else ('Sim' if x.pontual else 'Não') }}</td>
+          <td class="m">{{ dia_curto(x.quando) }}</td>
+          <td><a class="cn-fora" href="{{ painel }}#ir=os" target="_blank" rel="noopener">Abrir no App</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="12" class="mudo">Nada com esses filtros.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cn-nota"><b>Prev. / real</b> fica em vermelho quando o tempo real é menos de 40% do previsto: o sinal mais
+    comum de OS fechada sem execução. Os números acima são do período inteiro; os filtros valem só para a lista.
+    <b>De onde vem.</b> A nota é a do painel do App, mesma régua, calculada pelo Nexus com o que o Fracttal guarda
+    (respostas, fotos e o GPS das fotos); a observação escrita só na caixa do App não vai ao Fracttal e fica de fora.
+    Devolvida = voltou ao técnico depois que o Nexus começou a acompanhar. Devolver e encaminhar continuam no App.</div>
+</div>
+{% endblock %}

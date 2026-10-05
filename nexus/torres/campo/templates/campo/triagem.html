@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Triagem de qualidade do Nexus (04/10/2026). A mesa de triagem do painel do App (gestao/prioridades), pela cópia das
+   regras dele: OS e supervisores. Rondas, usinas sem ronda e as marcações para conversa continuam no App. #}
+{% set r = d.get('resumo', {}) %}
+{% set itens = d.get('itens') or [] %}
+{% set criticos = itens|selectattr('nivel', 'equalto', 'critico')|list %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div>
+      <p class="gc-eyebrow">{{ torre.nome }}</p>
+      <h1 class="cn-titulo">{{ tela.nome }}</h1>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p>
+    </div>
+    <div class="cn-frescor">notas pelo Fracttal{% if coleta %} · coleta {{ coleta }}{% endif %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
+  </div>
+
+  {% if leitura.erro %}
+  <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> A lista abaixo pode estar incompleta por isso.
+    <a class="cn-fora" href="{{ painel }}#ir=vg" target="_blank" rel="noopener">Abrir no App</a></div>
+  {% endif %}
+
+  <div class="cn-filtros">
+    <span class="gc-rotulo">Período</span>
+    <div class="cn-seg">{% for p in (7, 30, 90) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
+  </div>
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Exigem ação</span><span class="v{% if itens %} ruim{% endif %}">{{ d.get('totais', {}).get('itens', itens|length) }}</span><span class="d">{{ r.get('criticos', 0) }} críticas · {{ r.get('atencao', 0) }} atenção</span></span>
+    <span><span class="gc-rotulo">OS no período</span><span class="v">{{ r.get('os_periodo', 0) }}</span><span class="d">fechadas pelo App</span></span>
+    <span><span class="gc-rotulo">Supervisores</span><span class="v">{{ r.get('por_tipo', {}).get('supervisor', 0) }}</span><span class="d">fila parada ou avaliação errada</span></span>
+    <span><span class="gc-rotulo">Podem servir de exemplo</span><span class="v">{{ r.get('exemplares', 0) }}</span><span class="d">registros exemplares</span></span>
+    <span><span class="gc-rotulo">Rondas</span><span class="v">—</span><span class="d">só no App por enquanto</span></span>
+  </div>
+
+  <div class="cn-duas">
+    <div>
+      <div class="cn-lista-cab"><h2>Exige ação hoje</h2>
+        <span class="mudo">o mais grave primeiro{% if d.get('totais', {}).get('itens', 0) > itens|length %} · mostrando {{ itens|length }} de {{ d.totais.itens }}{% endif %}</span></div>
+      <div class="cn-itens">
+      {% for i in itens %}
+        <div class="cn-item{% if i.nivel != 'critico' %} atencao{% endif %}">
+          <div class="topo-it">
+            <span class="cn-pill cn-{{ 'critico' if i.nivel == 'critico' else 'alerta' }}">{{ i.titulo }}</span>
+            <b>{{ rot_item(i) }}</b>
+            {% if i.qualidade %}<span class="q">{{ i.qualidade }}%</span>{% endif %}
+          </div>
+          <div class="mot">{{ motivo(i.motivo) }}</div>
+          {% if i.os %}<div class="oss">{% for o in i.os %}<span class="cn-tag">OS {{ o }}</span>{% endfor %}</div>{% endif %}
+          {% set meta = [i.quem if i.tipo != 'supervisor' else '', i.onde, i.cluster, dia_curto(i.quando) if i.quando else '']|select|list %}
+          {% if meta %}<div class="meta">{{ meta|join(' · ') }}</div>{% endif %}
+        </div>
+      {% else %}
+        <div class="cn-vazio">Nada exigindo ação no período.</div>
+      {% endfor %}
+      </div>
+    </div>
+    <div>
+      {% for c in d.get('concentracao') or [] %}
+      <div class="cn-painel">
+        <h3>Concentração 80/20</h3>
+        <p class="d">{{ c.n }} {{ c.rotulo }} concentram {{ c.pct }}% {{ c.sufixo }} ({{ c.total }} casos).</p>
+        {% set topo = (c.top or [{'n': 1}])[0].n or 1 %}
+        {% for t in c.top or [] %}
+        <div class="cn-par"><span class="nm">{{ t.nome }}</span><span class="n">{{ t.n }}</span><span class="bb"><i style="width:{{ (100 * t.n / topo)|round|int }}%"></i></span></div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+      <div class="cn-painel">
+        <h3>Pode servir de exemplo</h3>
+        <p class="d">Registros completos, bons para treinamento.</p>
+        {% for i in d.get('exemplares') or [] %}
+        <div class="cn-par"><span class="nm">{{ rot_item(i) }} · {{ i.quem or '' }}</span><span class="n">{{ i.qualidade }}%</span><span></span></div>
+        {% else %}
+        <div class="mudo">Nenhum ainda.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="cn-nota"><b>De onde vem.</b> A mesma triagem do painel do App, com os limiares padrão dele. A nota de cada
+    OS é a do painel, calculada pelo Nexus com o que o Fracttal guarda (respostas, fotos e o GPS das fotos); a
+    observação escrita só na caixa do App não vai ao Fracttal e fica de fora. Fila parada e avaliação errada vêm do
+    Fracttal. Rondas, usinas sem ronda e as marcações para conversa nascem no App e continuam lá:
+    <a class="cn-fora" href="{{ painel }}#ir=vg" target="_blank" rel="noopener">abrir a triagem no App</a>.</div>
+</div>
+{% endblock %}

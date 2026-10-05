@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Central de atenção do Nexus (Levi aprovou a proposta em 04/10/2026). As contas são as do painel do App, pela cópia
+   fiel das regras dele; encaminhar e resolver continuam no App enquanto o Nexus roda em paralelo. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div>
+      <p class="gc-eyebrow">{{ torre.nome }}</p>
+      <h1 class="cn-titulo">{{ tela.nome }}</h1>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p>
+    </div>
+    <div class="cn-frescor">dado do App de Campo{% if lido %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias{% endif %}</div>
+  </div>
+
+  <nav class="cn-abas" aria-label="Abas da Central de atenção">
+    <a href="{{ url(aba=None) }}"{% if aba == 'pontos' %} aria-current="page"{% endif %}>Pontos de atenção</a>
+    <a href="{{ url(aba='enc') }}"{% if aba == 'enc' %} aria-current="page"{% endif %}>Encaminhamentos<i>{{ enc.dados.get('resumo', {}).get('abertos', 0) }}</i></a>
+  </nav>
+
+  {% if leitura.erro %}
+  <div class="cn-erro" role="alert">
+    <b>Não consegui ler as tabelas do App.</b> A lista abaixo pode estar incompleta. ({{ leitura.erro }})
+    <a class="cn-fora" href="{{ painel }}#ir=atn" target="_blank" rel="noopener">Abrir no App</a>
+  </div>
+  {% endif %}
+
+  {% if aba == 'pontos' %}
+  <form class="cn-filtros" method="get">
+    <span class="gc-rotulo">Período</span>
+    <div class="cn-seg">
+      {% for d in (7, 14, 30) %}<a href="{{ url(dias=d) }}"{% if d == dias %} aria-current="page"{% endif %}>{{ d }} dias</a>{% endfor %}
+    </div>
+    <label class="gc-rotulo" for="cn-regiao">Região</label>
+    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="Usina, OS ou técnico" aria-label="Buscar">
+    {% for k in ('dias', 'f', 'tipo', 'vista') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+  </form>
+
+  <div class="cn-numeros">
+    <a href="{{ url(f=None, tipo=None) }}"{% if not f and not tipo %} aria-current="page"{% endif %}>
+      <span class="gc-rotulo">Pontos abertos</span><span class="v">{{ total }}</span><span class="d">tudo o que está pendente</span></a>
+    <a href="{{ url(f='velhos', tipo=None) }}"{% if f == 'velhos' %} aria-current="page"{% endif %}>
+      <span class="gc-rotulo">Parados +7 dias</span><span class="v{% if velhos %} ruim{% endif %}">{{ velhos }}</span><span class="d">o mais antigo primeiro</span></a>
+    <span><span class="gc-rotulo">Usinas</span><span class="v">{{ usinas }}</span><span class="d">com algum ponto aberto</span></span>
+    <a href="{{ url(tipo='sem_ronda', f=None) }}"{% if tipo == 'sem_ronda' %} aria-current="page"{% endif %}>
+      <span class="gc-rotulo">Sem ronda</span><span class="v{% if sem_ronda %} ruim{% endif %}">{{ sem_ronda }}</span><span class="d">cobertura vencida</span></a>
+  </div>
+
+  {% if por_tipo %}
+  <div class="cn-chips">
+    <a href="{{ url(tipo=None, f=None) }}"{% if not tipo and not f %} aria-current="page"{% endif %}>Todos<i>{{ total }}</i></a>
+    {% for k, n in por_tipo|dictsort(by='value', reverse=true) %}
+    <a href="{{ url(tipo=k, f=None) }}"{% if tipo == k %} aria-current="page"{% endif %}>{{ tipos.get(k, k) }}<i>{{ n }}</i></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="cn-lista-cab">
+    <h2>Pontos de atenção</h2><span class="mudo">{{ lista|length }} de {{ total }}</span>
+    <div class="cn-seg cn-vista">
+      <a href="{{ url(vista=None) }}"{% if vista == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
+      <a href="{{ url(vista='usina') }}"{% if vista == 'usina' %} aria-current="page"{% endif %}>Por usina</a>
+    </div>
+  </div>
+
+  {% if vista == 'tabela' %}
+  <div class="cn-tab">
+    <table>
+      <thead><tr><th>Dias</th><th>Quando</th><th>O que precisa de atenção</th><th>Tipo</th><th>Onde</th><th>Usina</th><th>Região</th><th>Quem viu</th><th>Fotos</th><th>Ação</th></tr></thead>
+      <tbody>
+      {% for p in lista %}
+        <tr>
+          <td><span class="cn-pill cn-{{ cor_idade(p.dias) }}">{{ idade(p.dias) }}</span></td>
+          <td class="m">{{ dia_curto(p.data) }}</td>
+          <td><b>{{ p.oque }}</b>{% if p.detalhe %}<span class="det">{{ p.detalhe }}</span>{% endif %}</td>
+          <td><span class="cn-pill cn-{{ cor_tipo.get(p.tipo, 'alerta') }}">{{ p.rotulo or tipos.get(p.tipo, p.tipo) }}</span></td>
+          <td><span class="cn-tag">{{ 'OS' if p.origem == 'os' else 'Ronda' }}</span></td>
+          <td>{{ p.usina }}</td><td>{{ p.cluster }}</td><td>{{ p.nome or '—' }}</td>
+          <td class="m">{{ p.fotos or '—' }}</td>
+          <td>
+            {% if p.estado == 'encaminhada' %}<span class="cn-pill cn-{{ 'critico' if p.escalada else 'info' }}">Encaminhada · {{ 'venceu' if p.escalada else (p.resp_nome or 'no prazo') }}</span>
+            {% elif p.estado == 'aguarda_confirmacao' %}<span class="cn-pill cn-info">Aguarda confirmação</span>
+            {% elif p.estado == 'silencio_vencido' %}<span class="cn-pill cn-alerta">Silêncio venceu</span>
+            {% else %}<a class="cn-fora" href="{{ painel }}#ir=atn" target="_blank" rel="noopener">Abrir no App</a>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" class="mudo">{{ 'Nada com esses filtros.' if total else 'Nenhum ponto aberto no período.' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="cn-usinas">
+    {% for u, itens in por_usina %}
+    <article class="cn-usina">
+      <h3>{{ u }}</h3>
+      <div class="sub">{{ itens[0].cluster }} · {{ itens|length }} {{ 'pontos' if itens|length > 1 else 'ponto' }}</div>
+      <ul>{% for p in itens %}<li><span class="cn-pill cn-{{ cor_idade(p.dias) }}">{{ idade(p.dias) }}</span><span>{{ p.oque }}</span></li>{% endfor %}</ul>
+    </article>
+    {% else %}<p class="mudo">Nada com esses filtros.</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="cn-nota"><b>De onde vem.</b> Da <b>ronda</b>: resposta fora do padrão, ação corretiva não feita, praga ou
+    vegetação generalizada, ocorrência, tracker sem devolutiva ou observação do técnico. Da <b>OS em revisão</b>:
+    verificação com alerta ou falha, item obrigatório em branco ou anexo exigido que não veio. Mais as usinas sem ronda
+    há {{ dias_sem_ronda }} dias ou mais. <b>A ordem é a idade</b>, não a gravidade: o que está parado há mais tempo vem primeiro.
+    São as mesmas contas do painel do App; encaminhar e resolver continuam lá.
+    {% if not leitura.dados.get('os_ts') %}<br><b>Atenção:</b> o job das OS em revisão ainda não rodou; a lista não tem OS.{% endif %}</div>
+
+  {% else %}
+  {% set r = leitura.dados.get('resumo', {}) %}
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Em aberto</span><span class="v">{{ r.get('abertos', 0) }}</span><span class="d">com alguém, esperando ação</span></span>
+    <span><span class="gc-rotulo">Vencidos</span><span class="v{% if r.get('vencidos') %} ruim{% endif %}">{{ r.get('vencidos', 0) }}</span><span class="d">passaram do prazo e seguem abertos</span></span>
+    <span><span class="gc-rotulo">Fechados</span><span class="v">{{ r.get('fechados', 0) }}</span><span class="d">feitos, confirmados ou resolvidos</span></span>
+  </div>
+  <div class="cn-lista-cab"><h2>Encaminhamentos</h2><span class="mudo">vencido conta só o que ainda está aberto</span></div>
+  <div class="cn-tab">
+    <table>
+      <thead><tr><th>Situação</th><th>O que foi encaminhado</th><th>Com quem</th><th>Desde</th><th>Prazo</th><th>O que virou</th><th>Usina</th></tr></thead>
+      <tbody>
+      {% for i in leitura.dados.get('itens', []) %}
+        {% if i.estado == 'encaminhada' %}{% set s = ('Vencido', 'critico') if i.vencida else ('Em aberto', 'alerta') %}{% else %}{% set s = situacao_enc.get(i.estado, (i.estado, 'neutro')) %}{% endif %}
+        <tr>
+          <td><span class="cn-pill cn-{{ s[1] }}">{{ s[0] }}</span></td>
+          <td><b>{{ i.oque or '—' }}</b>{% if i.instrucao %}<span class="det">{{ i.instrucao }}</span>{% endif %}</td>
+          <td>{{ i.resp_nome or '—' }}</td>
+          <td class="m">{{ dia_curto(i.quando) }}</td>
+          <td class="m">{{ dia_curto(i.prazo) }}</td>
+          <td>{{ ('OS ' ~ i.os_gerada) if i.os_gerada else (i.desfecho or '—') }}</td>
+          <td>{{ i.usina or '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="mudo">Nenhum encaminhamento.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

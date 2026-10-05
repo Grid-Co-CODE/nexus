@@ -1,0 +1,150 @@
+/* Telas do Nexus da torre Campo · App (Central de atenção, 04/10/2026). Os tokens vêm do nexus.css; aqui só o desenho
+   aprovado pelo Levi na proposta https://claude.ai/artifact/SBPyaREFJpHAEKimd7xnHv. Classes cn-* para não colidir. */
+.campo-nativa{--ok:#4ade80;--ok-suave:rgba(74,222,128,.14);--alerta-suave:rgba(255,216,61,.14);
+  --info:#7fb8ff;--info-suave:rgba(91,157,255,.14);min-width:0}
+.campo-nativa .mudo{color:var(--mudo)}
+.cn-cab{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px}
+.cn-cab > div{min-width:0}
+.cn-titulo{font:800 28px/1.15 var(--font-display);margin:6px 0 0;letter-spacing:-.01em}
+.cn-pergunta{color:var(--tinta-2);margin:6px 0 0}
+.cn-frescor{margin-left:auto;font:500 12px/1.4 var(--font-mono);color:var(--mudo);text-align:right}
+.cn-frescor b{color:var(--ok);font-weight:500}
+
+/* overflow-y escondido: com overflow-x:auto o navegador também rola na vertical e desenhava setinhas ao lado das abas */
+.cn-abas{display:flex;gap:4px;border-bottom:1px solid var(--linha);margin-top:20px;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none}
+.cn-abas a{font:600 14px/20px var(--font-sans);color:var(--mudo);text-decoration:none;border-bottom:3px solid transparent;
+  padding:9px 14px 8px;white-space:nowrap}
+.cn-abas a:hover{color:var(--tinta)}
+.cn-abas a[aria-current="page"]{color:var(--tinta);border-bottom-color:var(--verde)}
+.cn-abas i{font:600 11px/16px var(--font-sans);font-style:normal;background:var(--superficie-3);color:var(--tinta-2);
+  border-radius:999px;padding:1px 7px;margin-left:6px}
+
+.cn-erro{margin-top:16px;padding:12px 16px;border:1px solid var(--critico);border-radius:var(--raio-md);
+  background:var(--critico-suave);color:var(--tinta);font-size:13px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+
+.cn-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:18px}
+/* flex-wrap: com muitas opções (as 5 faixas de qualidade) o segmento não cabe no celular numa linha só */
+.cn-seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.cn-seg a{font:600 12.5px/18px var(--font-sans);color:var(--mudo);text-decoration:none;padding:6px 12px;border-radius:7px;white-space:nowrap}
+.cn-seg a:hover{color:var(--tinta)}
+.cn-seg a[aria-current="page"]{background:var(--verde);color:var(--sobre-verde)}
+
+/* faixa de números: cada número filtra a lista */
+.cn-numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:18px;background:var(--superficie-2);
+  border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden}
+.cn-numeros > a,.cn-numeros > span{display:block;padding:16px 20px;border-left:1px solid var(--linha);color:inherit;text-decoration:none}
+.cn-numeros > :first-child{border-left:0}
+.cn-numeros > a:hover{background:var(--superficie-3)}
+.cn-numeros > a[aria-current="page"]{box-shadow:inset 0 -3px 0 var(--verde)}
+.cn-numeros .v{display:block;font:600 27px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:4px}
+.cn-numeros .v.ruim{color:var(--critico)}
+.cn-numeros .d{font-size:12px;color:var(--mudo)}
+
+.cn-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.cn-chips a{font:600 12px/16px var(--font-sans);padding:6px 12px;border-radius:999px;border:1px solid var(--linha-forte);
+  color:var(--tinta-2);text-decoration:none}
+.cn-chips a:hover{background:var(--superficie-3)}
+.cn-chips a[aria-current="page"]{background:var(--verde-suave);border-color:var(--verde);color:var(--tinta)}
+.cn-chips i{font-style:normal;color:var(--mudo);margin-left:6px;font-variant-numeric:tabular-nums}
+
+.cn-lista-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:22px}
+.cn-lista-cab h2{font:600 14px/20px var(--font-sans);margin:0}
+.cn-lista-cab .mudo{font-size:12.5px}
+.cn-vista{margin-left:auto}
+
+.cn-tab{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md);margin-top:10px;background:var(--superficie)}
+.cn-tab table{width:100%;border-collapse:collapse;font:400 13px/1.5 var(--font-sans);color:var(--tinta);min-width:980px}
+.cn-tab th{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:left;
+  padding:11px 14px;background:var(--superficie-2);border-bottom:1px solid var(--linha);white-space:nowrap}
+.cn-tab td{padding:12px 14px;border-bottom:1px solid var(--linha);vertical-align:top}
+.cn-tab tr:last-child td{border-bottom:0}
+.cn-tab tbody tr:hover td{background:var(--superficie-2)}
+.cn-tab .det{display:block;color:var(--mudo);font-size:12px;margin-top:2px}
+.cn-tab td.m{font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;color:var(--tinta-2)}
+
+.cn-pill{display:inline-flex;align-items:center;gap:6px;font:600 11px/16px var(--font-sans);padding:3px 9px;border-radius:var(--raio-tag);white-space:nowrap}
+.cn-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.cn-critico{color:var(--critico);background:var(--critico-suave)}
+.cn-alerta{color:var(--alerta);background:var(--alerta-suave)}
+.cn-info{color:var(--info);background:var(--info-suave)}
+.cn-ok{color:var(--ok);background:var(--ok-suave)}
+.cn-neutro{color:var(--mudo);background:var(--superficie-2)}
+.cn-tag{display:inline-block;font:600 11px/16px var(--font-sans);padding:2px 8px;border-radius:5px;background:var(--superficie-3);color:var(--tinta-2)}
+.cn-fora{color:var(--verde-texto);font-weight:600;text-decoration:none;white-space:nowrap}
+.cn-fora:hover{text-decoration:underline}
+
+.cn-usinas{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:10px}
+.cn-usina{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px 16px;min-width:0}
+.cn-usina h3{margin:0;font:600 15px/1.35 var(--font-sans)}
+.cn-usina .sub{color:var(--mudo);font-size:12px}
+.cn-usina ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.cn-usina li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start;font-size:13px}
+
+.cn-nota{margin-top:18px;padding:14px 16px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie);
+  color:var(--tinta-2);font-size:13px;max-width:96ch}
+.cn-nota b{color:var(--tinta)}
+
+/* Aprovação de OS: os três grupos da fila, cada um a decisão que pede (proposta aprovada em 04/10/2026) */
+.cn-grupos{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:16px}
+.cn-grupo{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:start;color:inherit;text-decoration:none;
+  background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--linha-forte);
+  border-radius:var(--raio-md);padding:14px 16px}
+.cn-grupo:hover{background:var(--superficie-2)}
+.cn-grupo[aria-current="page"]{border-color:var(--verde);box-shadow:inset 0 0 0 1px var(--verde)}
+.cn-g-ok{border-left-color:var(--ok)}
+.cn-g-alerta{border-left-color:var(--alerta)}
+.cn-grupo .q{font:600 27px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;grid-row:span 2}
+.cn-grupo .t{font:600 14px/20px var(--font-sans)}
+.cn-grupo .d{font-size:12px;color:var(--mudo);line-height:1.5}
+.cn-grupo .ac{grid-column:2;margin-top:6px;font-size:12px;color:var(--verde-texto);font-weight:600}
+.cn-pag{display:flex;align-items:center;gap:12px;margin-top:10px;font-size:12.5px;color:var(--mudo)}
+.cn-pag a{color:var(--verde-texto);font-weight:600;text-decoration:none}
+
+/* Ordens de serviço: comparação com a janela anterior e o alerta de previsto/real */
+.cn-vs{display:block;font-size:12px;margin-top:2px;font-variant-numeric:tabular-nums;color:var(--mudo)}
+.cn-vs.melhor{color:var(--ok)}
+.cn-vs.pior{color:var(--critico)}
+.cn-tab td.cn-suspeito{color:var(--critico);font-weight:600}
+
+/* Permissões de trabalho: um cartão por PT esperando, com quem tem de assinar e há quanto tempo */
+.cn-pts{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:10px}
+.cn-pt{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--alerta);border-radius:var(--raio-md);
+  padding:14px 16px;display:grid;gap:8px;min-width:0}
+.cn-pt.atrasada{border-left-color:var(--critico)}
+.cn-pt .topo-pt{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cn-pt .topo-pt b{font:600 15px/1.3 var(--font-sans)}
+.cn-pt .onde{color:var(--tinta-2);font-size:13px}
+.cn-pt .ativ{display:flex;flex-wrap:wrap;gap:6px}
+.cn-pt .quem{display:flex;align-items:center;gap:8px;font-size:13px}
+.cn-pt .quem .cn-fora{margin-left:auto}
+.cn-vazio{padding:16px;border:1px dashed var(--linha-forte);border-radius:var(--raio-md);color:var(--mudo)}
+
+/* Triagem de qualidade: o que exige decisão, o mais grave primeiro (rota gestao/prioridades do App) */
+.cn-duas{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;margin-top:10px;align-items:start}
+.cn-itens{display:grid;gap:10px}
+.cn-item{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--critico);border-radius:var(--raio-md);
+  padding:12px 16px;display:grid;gap:6px;min-width:0}
+.cn-item.atencao{border-left-color:var(--alerta)}
+.cn-item .topo-it{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cn-item .topo-it b{font:600 14px/1.3 var(--font-sans)}
+.cn-item .topo-it .q{margin-left:auto;font:600 13px/1 var(--font-mono)}
+.cn-item .mot{font-size:13px;color:var(--tinta-2)}
+.cn-item .mot b{color:var(--tinta)}
+.cn-item .meta{font-size:12px;color:var(--mudo)}
+.cn-item .oss{display:flex;flex-wrap:wrap;gap:6px}
+.cn-painel{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px 16px;min-width:0}
+.cn-painel + .cn-painel{margin-top:12px}
+.cn-painel h3{margin:0 0 4px;font:600 14px/20px var(--font-sans)}
+.cn-painel .d{font-size:12px;color:var(--mudo);margin:0 0 10px}
+.cn-par{display:grid;grid-template-columns:minmax(0,1fr) auto 90px;gap:10px;align-items:center;font-size:13px;padding:4px 0}
+.cn-par .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cn-par .n{font:500 12.5px/1 var(--font-mono);color:var(--tinta-2)}
+.cn-par .bb{height:6px;border-radius:3px;background:var(--superficie-3);overflow:hidden}
+.cn-par .bb i{display:block;height:100%;background:var(--verde)}
+
+@media (max-width:980px){.cn-duas{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){
+  .cn-frescor{margin-left:0;text-align:left}
+  .cn-vista{margin-left:0}
+}
