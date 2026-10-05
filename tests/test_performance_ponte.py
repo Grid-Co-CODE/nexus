@@ -2,6 +2,7 @@
 """Ponte do Nexus para a plataforma de Performance (04/10/2026): só leitura, com o visual do Nexus."""
 import pytest
 import requests
+from urllib3.util import parse_url
 
 from nexus.performance import ponte as pt
 
@@ -122,13 +123,29 @@ class _R:
         self.headers = {"Content-Type": "application/json", **({"Location": location} if location else {})}
 
 
+def _destino_real(p):
+    """(esquema, host, porta) a que o `requests`/urllib3 conectaria de verdade para este pedido.
+
+    A sessão de verdade prepara a URL (`Request.prepare`) e é o host DELA que o urllib3 usa: a barra invertida termina o
+    host, então "https://evil.com", barra invertida, "@plat:5050/x" conecta em evil.com, ainda que o `urlsplit` do
+    Python leia o host como `plat`. A sessão falsa precisa registrar esse destino, e não a URL como texto, senão o teste
+    não enxerga a fuga."""
+    try:
+        u = parse_url(requests.Request(p["method"], p["url"], params=p.get("params")).prepare().url)
+    except Exception:
+        return ("url inválida",)
+    return u.scheme, u.host, u.port or {"http": 80, "https": 443}.get(u.scheme)
+
+
 class _Sessao:
-    """Sessão falsa: devolve as respostas em ordem (ou levanta, se for exceção) e guarda cada pedido recebido."""
+    """Sessão falsa: devolve as respostas em ordem (ou levanta, se for exceção) e guarda cada pedido recebido,
+    com o destino real (`destinos`) a que a conexão iria."""
     def __init__(self, *respostas):
-        self.respostas, self.pedidos = list(respostas), []
+        self.respostas, self.pedidos, self.destinos = list(respostas), [], []
 
     def request(self, **p):
         self.pedidos.append(p)
+        self.destinos.append(_destino_real(p))
         r = self.respostas.pop(0)
         if isinstance(r, Exception):
             raise r
@@ -175,6 +192,78 @@ def test_salto_para_outro_servidor_nao_e_seguido_e_a_chave_nao_vai(monkeypatch, 
         pt.enviar(**_pedido())
     assert len(s.pedidos) == 1                           # o segundo pedido (com a chave) nunca saiu
     assert all(p["url"].startswith("https://plat:5050/") for p in s.pedidos)
+
+
+# Location que o `urlsplit` do Python lê como o MESMO servidor e o `requests`/urllib3 lê como outro (04/10/2026, revisão
+# final): a barra invertida termina o host para o urllib3, então `//evil.com\@plat:5050/x` conectava em evil.com levando
+# a chave de leitura. Tudo aqui é Location que a ponte tem de recusar sem mandar pedido algum.
+LOCATIONS_ENGANOSAS = [
+    r"//evil.com\@plat:5050/x",              # barra invertida: host real = evil.com
+    r"https://evil.com\@plat:5050/x",        # o mesmo, com esquema
+    r"/x\y",                                 # barra invertida em qualquer lugar é recusada (política, não só o host)
+    "https://plat:5050:/x",                  # porta malformada: o urlsplit levantava ValueError (virava 500)
+    "https://plat:5050/x y",                 # espaço
+    "/x\ty",                                 # tabulação (o urljoin a engole: tem de ser olhada na Location crua)
+    "/x\r\nX-Evil: 1",                       # quebra de linha (injeção de cabeçalho)
+    "/x\x00y", "/x\x7fy",                    # controles
+    "/x\u00a0y", "/x\u2028y",                # espaços que não são o ASCII
+]
+
+
+@pytest.mark.parametrize("destino", LOCATIONS_ENGANOSAS)
+def test_location_enganosa_nao_leva_a_chave_a_outro_servidor(monkeypatch, destino):
+    s = _Sessao(_R(302, destino), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.RedirecionamentoRecusado) as e:
+        pt.enviar(**_pedido())
+    assert e.value.motivo == pt.MOTIVO_LOCATION_INVALIDO
+    # nenhum pedido (com a chave) chegou a servidor algum além do original, e o original foi para a plataforma
+    assert len(s.pedidos) == 1 and s.destinos == [("https", "plat", 5050)]
+
+
+def test_origem_e_a_da_url_que_o_requests_vai_usar():
+    # o urlsplit do Python diz "plat"; o requests/urllib3 conecta em evil.com. A comparação tem de usar o segundo.
+    assert pt._origem(r"https://evil.com\@plat:5050/x") == ("https", "evil.com", 443)
+    assert pt._origem("https://PLAT:5050/x") == ("https", "plat", 5050)          # host sem caixa
+    assert pt._origem("https://plat/x") == ("https", "plat", 443)                # porta padrão omitida
+    assert pt._origem("http://plat/x") == ("http", "plat", 80)
+    for malformada in ("https://plat:5050:/x", "https://plat:abc/x", "https:///x", "ftp://plat/x", "/so/caminho"):
+        with pytest.raises(ValueError):
+            pt._origem(malformada)
+
+
+@pytest.mark.parametrize("destino", [r"//evil.com\@plat:5050/x", r"https://evil.com\@plat:5050/x", "https://plat:5050:/x"])
+def test_origem_sozinha_ja_barra_mesmo_sem_a_checagem_de_caracteres(monkeypatch, destino):
+    # defesa em profundidade: se a lista de caracteres proibidos falhasse (ou fosse afrouxada), a comparação de origem
+    # pela URL real do requests ainda barra
+    monkeypatch.setattr(pt, "_location_limpa", lambda local: True)
+    s = _Sessao(_R(302, destino), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.RedirecionamentoRecusado):
+        pt.enviar(**_pedido())
+    assert len(s.pedidos) == 1 and s.destinos == [("https", "plat", 5050)]
+
+
+def test_motivo_de_cada_recusa(monkeypatch):
+    s = _Sessao(_R(302, "https://evil.com/x"))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.RedirecionamentoRecusado) as e:
+        pt.enviar(**_pedido())
+    assert e.value.motivo == pt.MOTIVO_OUTRO_SERVIDOR
+    s = _Sessao(*[_R(302, "/a")] * 5)
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.RedirecionamentoRecusado) as e:
+        pt.enviar(**_pedido())
+    assert e.value.motivo == pt.MOTIVO_DEMAIS
+
+
+def test_salto_no_mesmo_servidor_com_caminho_e_query_normais_continua_seguido(monkeypatch):
+    # a recusa de caracteres não pode pegar Location legítima: acento já vem percent-encoded, e `%5C` (barra invertida
+    # codificada) não é a barra invertida crua
+    s = _Sessao(_R(302, "/api/novo?x=1&y=%C3%A1"), _R(301, "https://plat:5050/api/b%5Cc"), _R(200))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    assert pt.enviar(**_pedido()).status_code == 200
+    assert s.destinos == [("https", "plat", 5050)] * 3
 
 
 def test_no_maximo_tres_saltos(monkeypatch):

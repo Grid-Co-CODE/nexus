@@ -114,9 +114,11 @@ def plataforma(caminho: str):
     except ponte.Ocupada:
         return _erro("A ponte está ocupada com outros pedidos à plataforma. Tente de novo em instantes.",
                      titulo="Ponte ocupada", status=503)
-    except ponte.RedirecionamentoRecusado:
-        return _erro("A plataforma mandou seguir para outro servidor; a ponte não foi, para a chave de leitura não sair "
-                     "do servidor configurado.", titulo="Redirecionamento recusado")
+    except ponte.RedirecionamentoRecusado as e:
+        # O motivo vem da exceção (outro servidor, redirecionamentos demais ou endereço inválido): antes a tela dizia
+        # sempre "outro servidor", e quem lia ia procurar a causa errada. É texto fixo da ponte, nunca a Location.
+        return _erro(f"A ponte não seguiu o redirecionamento da plataforma ({e.motivo}); a chave de leitura não sai do "
+                     "servidor configurado.", titulo="Redirecionamento recusado")
     except ponte.ForaDoAr:
         return _erro(f"Plataforma de Performance sem resposta em {ponte.TEMPO_LIMITE_S} s.")
     destino = {str(k).lower(): v for k, v in r.headers.items()}.get("location", "")

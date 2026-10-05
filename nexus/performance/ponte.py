@@ -14,6 +14,7 @@ import threading
 from urllib.parse import urljoin, urlsplit
 
 import requests
+from urllib3.util import parse_url
 
 PREFIXO = "/t/performance/plataforma"
 # O drill da API PV leva até 120 s na plataforma (24/09/2026, API PV lenta); 150 s cobre sem prender para sempre.
@@ -45,8 +46,19 @@ class ForaDoAr(Exception):
     """A plataforma não respondeu (rede, tempo-limite)."""
 
 
+# Por que a ponte não seguiu um salto. A rota mostra o motivo na tela: antes ela dizia sempre "outro servidor", mesmo
+# quando a causa era a plataforma em círculos ou uma Location inválida.
+MOTIVO_OUTRO_SERVIDOR = "redirecionamento para outro servidor"
+MOTIVO_DEMAIS = "redirecionamentos demais"
+MOTIVO_LOCATION_INVALIDO = "endereço de redirecionamento inválido"
+
+
 class RedirecionamentoRecusado(ForaDoAr):
-    """A plataforma mandou seguir para outro servidor (ou em círculos); a ponte não foi."""
+    """A ponte não seguiu um salto (3xx): outro servidor, círculos, ou uma Location inválida. `motivo` diz qual."""
+
+    def __init__(self, motivo: str):
+        super().__init__(motivo)
+        self.motivo = motivo
 
 
 class Ocupada(Exception):
@@ -134,10 +146,36 @@ def injetar(html: str) -> str:
 
 
 def _origem(url: str):
-    """(esquema, host, porta): o que define "o mesmo servidor". Porta omitida vale a padrão do esquema."""
-    p = urlsplit(url)
-    esq = (p.scheme or "").lower()
-    return esq, (p.hostname or "").lower(), p.port or _PORTA_PADRAO.get(esq)
+    """(esquema, host, porta) da URL como o `requests` vai usá-la: o que define "o mesmo servidor".
+
+    Não pode ser o `urlsplit`: ele e o urllib3 leem a mesma URL de jeitos diferentes. Para o urllib3 a barra invertida
+    termina o host: "https://evil.com", barra invertida, "@plat:5050/x" é o servidor evil.com, e o `urlsplit` lê
+    "plat:5050" (revisão final, 04/10/2026: a chave de leitura chegaria a evil.com). Por isso a URL passa por
+    `Request.prepare()` (o mesmo caminho que o `Session.request` faz antes de conectar) e o resultado é lido pelo
+    `parse_url` do urllib3, que é quem escolhe o host da conexão. Porta omitida vale a padrão do esquema.
+
+    Levanta `ValueError` se a URL não se deixa preparar ou ler (porta malformada, sem host, esquema que não é http/https):
+    quem chama trata como recusa, nunca como "mesmo servidor"."""
+    try:
+        u = parse_url(requests.Request("GET", url).prepare().url)
+    except Exception as e:
+        # Qualquer falha (InvalidURL, LocationParseError, ...) é falha FECHADA: se não dá para saber para onde o
+        # `requests` iria, não se vai. `from e` mantém a causa para quem for investigar.
+        raise ValueError("URL inválida") from e
+    esq = (u.scheme or "").lower()
+    if esq not in _PORTA_PADRAO or not u.host:
+        raise ValueError("URL sem esquema http(s) ou sem host")
+    return esq, u.host.lower(), u.port or _PORTA_PADRAO[esq]
+
+
+def _location_limpa(local) -> bool:
+    """False se a Location traz algo que os leitores de URL interpretam de jeitos diferentes.
+
+    Barra invertida, espaço (qualquer um, inclusive os não ASCII) e caractere de controle não aparecem na Location de uma
+    plataforma Flask sã: caminho e query saem percent-encoded. Para o urllib3 a barra invertida termina o host, e o
+    `urljoin` engole tabulação e quebra de linha, então a Location tem de ser olhada CRUA, antes do `urljoin`. Os
+    controles são os do ASCII (< 32, 127) e os C1 (128 a 159)."""
+    return not any(c == "\\" or c.isspace() or ord(c) < 32 or 127 <= ord(c) <= 159 for c in str(local))
 
 
 def vai_para_login(destino: str) -> bool:
@@ -147,8 +185,11 @@ def vai_para_login(destino: str) -> bool:
 
 
 def _seguir(pedido: dict):
-    url = pedido["url"]
-    origem = _origem(url)
+    try:
+        origem = _origem(pedido["url"])
+    except ValueError as e:
+        # a URL da plataforma (NEXUS_PLATAFORMA_URL + caminho) não é uma URL que o `requests` entenda: nada sai
+        raise ForaDoAr("URL da plataforma inválida") from e
     atual = dict(pedido, allow_redirects=False)
     for salto in range(MAX_SALTOS + 1):
         try:
@@ -158,15 +199,23 @@ def _seguir(pedido: dict):
         local = {str(k).lower(): v for k, v in (r.headers or {}).items()}.get("location")
         if r.status_code not in (301, 302, 303, 307, 308) or not local:
             return r
+        # Duas travas, e nenhum pedido sai antes das duas. 1) Location com barra invertida, espaço ou controle é
+        # recusada crua: é o que faz os leitores de URL discordarem. 2) A origem do destino é a da URL que o `requests`
+        # vai usar (e não a do `urlsplit`), comparada com a da plataforma: seguir um salto para outro host (ou outra
+        # porta, ou http) entregaria a chave de leitura a quem a plataforma, ou alguém no caminho, escolheu.
+        if not _location_limpa(local):
+            raise RedirecionamentoRecusado(MOTIVO_LOCATION_INVALIDO)
         destino = urljoin(atual["url"], local)
-        # A chave de leitura vai em todo pedido: seguir um salto para outro host (ou outra porta, ou http) a entregaria a
-        # quem a plataforma, ou alguém no caminho, escolheu. Só o mesmo servidor.
-        if _origem(destino) != origem:
-            raise RedirecionamentoRecusado("redirecionamento para outro servidor")
+        try:
+            destino_origem = _origem(destino)
+        except ValueError as e:
+            raise RedirecionamentoRecusado(MOTIVO_LOCATION_INVALIDO) from e
+        if destino_origem != origem:
+            raise RedirecionamentoRecusado(MOTIVO_OUTRO_SERVIDOR)
         if vai_para_login(destino):
             return r
         if salto == MAX_SALTOS:
-            raise RedirecionamentoRecusado("redirecionamentos demais")
+            raise RedirecionamentoRecusado(MOTIVO_DEMAIS)
         # a query do pedido original já foi embutida na URL que saltou; o destino traz a sua própria
         atual = dict(atual, url=destino, params=[])
         if r.status_code in (301, 302, 303) and atual["method"] != "HEAD":

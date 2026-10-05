@@ -24,6 +24,11 @@ só leitura", "em paralelo por enquanto"). Fase 1 de cinco para a plataforma mor
   (`ForaDoAr`); salto para `/login` volta como está e a rota diz "a plataforma recusou a chave" (sem sessão e sem a chave
   valendo, a plataforma manda o pedido para o login dela). `NEXUS_PLATAFORMA_URL` com `http://` fora de
   localhost/127.0.0.1/::1 é recusada antes de qualquer rede: a chave iria em texto puro.
+  `Location` com `\`, espaço ou controle é recusada (crua, antes do `urljoin`, que engole tabulação) e a origem é
+  conferida pela URL que o `requests` vai usar (`Request.prepare()` + `urllib3.parse_url`), não pelo `urlsplit`
+  (04/10/2026: `//evil.com\@plat/x` passava pelo `urlsplit` e o urllib3 conectava em evil.com, com a chave). URL
+  malformada (porta inválida) é `RedirecionamentoRecusado`, nunca `ValueError`/500. A exceção traz o `motivo`
+  (outro servidor, redirecionamentos demais, endereço inválido) e a rota o mostra.
 - **Falha fechada se a plataforma não cumpre a chave:** resposta 2xx sem `X-Nexus-Leitura-Ok: 1` (cabeçalho que o
   `_auth_gate` da plataforma só põe quando aceitou a chave) não é mostrada. Plataforma sem `NEXUS_LEITURA_TOKEN` ignora
   a chave e deixa passar até gravação, e a ponte não tinha como saber.
@@ -39,7 +44,8 @@ O HTML da plataforma roda na origem do Nexus, com a sessão do administrador. O 
 `fetch`: um script injetado numa página da plataforma (texto de terceiro ou de usuário que chegue ao HTML sem escape)
 poderia usar a sessão do Nexus por outros caminhos (`XMLHttpRequest`, formulário, `window.open`). A correção de verdade é
 servir a ponte em **outra origem** (subdomínio ou porta, cookie próprio), antes do login por pessoa (fase 3). Até lá,
-todo texto de terceiro ou de usuário nas páginas da plataforma passa por `_he`. **Decisão pendente do Levi.**
+todo texto de terceiro ou de usuário nas páginas da plataforma passa por `_he`. Levi aceitou o risco por agora
+(04/10/2026); a origem separada entra antes do login por pessoa (fase 3).
 
 Como provar: `tests/test_performance_ponte.py`, `tests/test_torre_performance.py` e, na tela, o Nexus local contra a
 plataforma local — mesmo número do card nos dois no mesmo minuto.

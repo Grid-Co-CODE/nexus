@@ -174,6 +174,40 @@ def test_salto_para_outro_servidor_nao_leva_a_chave(logado_ponte, monkeypatch):
     assert len(Sessao.pedidos) == 1 and Sessao.pedidos[0]["url"].startswith("https://plat:5050/")
 
 
+@pytest.mark.parametrize("location,motivo,nao_diz", [
+    ("https://evil.com/x", "redirecionamento para outro servidor", "demais"),
+    ("/a", "redirecionamentos demais", "outro servidor"),
+    ("//evil.com\\@plat:5050/x", "endereço de redirecionamento inválido", "outro servidor"),
+])
+def test_recusa_de_salto_mostra_o_motivo_certo(logado_ponte, monkeypatch, location, motivo, nao_diz):
+    # a rota dizia sempre "mandou seguir para outro servidor", mesmo quando eram redirecionamentos demais (a plataforma
+    # em círculos) ou uma Location inválida: quem lê a tela precisa da causa verdadeira
+    class Sessao:
+        def __init__(self):
+            self.pedidos = []
+
+        def request(self, **p):
+            self.pedidos.append(p)
+            return _Resp(302, b"", extra={"Location": location})
+    s = Sessao()
+    monkeypatch.setattr(ponte, "_SESSAO", s)
+    r = logado_ponte.get(ponte.PREFIXO + "/tempo-real")
+    corpo = r.get_data(as_text=True)
+    assert r.status_code == 502 and "<h1>Redirecionamento recusado</h1>" in corpo
+    assert motivo in corpo and nao_diz not in corpo and "segredo-xyz" not in corpo
+    assert all(p["url"].startswith("https://plat:5050/") for p in s.pedidos)
+
+
+def test_location_malformada_nao_vira_500(logado_ponte, monkeypatch):
+    # porta malformada fazia o `urlsplit` levantar ValueError dentro da ponte (500 na casca)
+    class Sessao:
+        def request(self, **p):
+            return _Resp(302, b"", extra={"Location": "https://plat:5050:/x"})
+    monkeypatch.setattr(ponte, "_SESSAO", Sessao())
+    r = logado_ponte.get(ponte.PREFIXO + "/tempo-real")
+    assert r.status_code == 502 and "endereço de redirecionamento inválido" in r.get_data(as_text=True)
+
+
 def _app_com(url):
     app = create_app({"NEXUS_SECRET_KEY": "k", "NEXUS_SENHA_ADMIN": SENHA_TESTE,
                       "NEXUS_PLATAFORMA_URL": url, "NEXUS_PLATAFORMA_TOKEN": "segredo-xyz"})
