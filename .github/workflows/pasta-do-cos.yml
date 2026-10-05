@@ -1,0 +1,47 @@
+# Trava da área do COS (Levi, 05/10/2026): o programador do COS sobe commits na torre dele, e só nela.
+#
+# O GitHub não dá permissão por pasta. Então: a regra da main exige pull request com esta conferência verde, e a
+# conferência reprova o pedido que mexe fora da área do COS. Os administradores (lista LIVRES) passam direto e
+# continuam commitando na main.
+#
+# pull_request_target, e não pull_request: roda a versão DESTE arquivo que está na main, e não a do pedido. Assim o
+# pedido não consegue trocar a própria conferência. Por isso mesmo, este job nunca baixa nem executa o código do
+# pedido: só lê a lista de arquivos pela API.
+name: Pasta do COS
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pasta-do-cos:
+    name: pasta-do-cos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir se o pedido mexe só na área do COS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTOR: ${{ github.event.pull_request.user.login }}
+          LIVRES: "Levi-6242 admin-gridco"
+          # a torre (rotas e templates), a regra sem Flask, o estilo e os testes do COS
+          AREA: '^(nexus/torres/cos/|nexus/cos/|nexus/static/cos/|nexus/static/cos\.css$|tests/cos/|tests/test_cos[^/]*\.py$)'
+        run: |
+          for livre in $LIVRES; do
+            if [ "$AUTOR" = "$livre" ]; then echo "Administrador ($AUTOR): sem trava de pasta."; exit 0; fi
+          done
+          # arquivo renomeado conta pelos dois nomes: tirar algo de fora para dentro da área também é mexer fora
+          arquivos=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          fora=$(printf '%s\n' "$arquivos" | grep -Ev "$AREA" | grep -v '^$' || true)
+          if [ -n "$fora" ]; then
+            echo "::error::Este pedido mexe fora da área do COS. Peça ao Levi para revisar estes arquivos:"
+            printf '%s\n' "$fora"
+            exit 1
+          fi
+          echo "Só arquivos da área do COS:"
+          printf '%s\n' "$arquivos"
