@@ -9,8 +9,8 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace. Também liga o coletor do Campo · App (`NEXUS_CAMPO_COLETOR=1`) e leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) |
-| `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e coletor do Campo · App usam a mesma) |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace. Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) |
+| `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e a fila da Aprovação de OS usam a mesma) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da tela Base → Ligações (o de-para entre as bases) |
 | `dados/pcm/insumos.json` | os insumos da programação semanal do PCM (prioridades, confiabilidade, feriados e o histórico, já com a S41 publicada) |
@@ -100,17 +100,19 @@ o servidor inteiro como uma só.
    A "Pasta do PCM" e as durações aprendidas aparecem como opcionais ausentes: é o esperado no servidor.
 5. **OS Creator → Início** abre a entrada do OS Creator: cada pessoa entra com o próprio usuário do Fracttal, e
    depois disso **Ativos Fracttal** lista os ativos.
-6. Em até 30 minutos o log mostra a 1ª rodada do coletor: `journalctl -u nexus | grep "coletor campo"`.
+6. **Campo · App → Ordens de serviço** mostra as OS da semana com a nota do painel do App (a fonte é o livro que o
+   App grava no banco; precisa da `NEXUS_PESSOA_HMAC` no `.env`, ver o passo 7).
 
-## 7. Coletor da torre Campo · App (uma máquina só)
+## 7. Campo · App: o Nexus lê o que o App grava
 
-As telas Aprovação de OS, Ordens de serviço e Triagem leem a nota de cada fechamento do banco (API db_performace,
-workbook `campo_nexus`). Quem calcula e grava é o coletor, que lê o Fracttal devagar (2 s por pedido) e roda dentro do
-Nexus a cada 30 minutos **só onde o `.env` tem `NEXUS_CAMPO_COLETOR=1`**. O `.env` do pacote já liga. **No mesmo dia,
-o Levi desliga o do computador dele** (reiniciar o Nexus de lá pelo `Iniciar Nexus.bat`, que não liga o coletor): dois
-coletores leriam a mesma fila e gastariam em dobro a cota do Fracttal, que é da empresa inteira. Sem a variável, as
-telas continuam lendo o banco; só deixa de haver coleta nova. Rodada à mão: `.venv/bin/python ferramentas/coletar_campo.py`
-(imprime só contagens).
+As telas Aprovação de OS, Ordens de serviço e Triagem leem o registro de cada fechamento **que o próprio App de Campo
+grava no banco** (API db_performace, livros `fechamentos_app_campo` e `rondas_app_campo`, de hora em hora). O técnico
+vem como código (HMAC do e-mail): o `.env` do Nexus precisa da `NEXUS_PESSOA_HMAC`, a MESMA chave da configuração do
+App. **Ela não vai no pacote: o Levi passa à parte**; é uma linha `NEXUS_PESSOA_HMAC=...` no `.env`, seguida de um
+`systemctl restart nexus`. Sem ela, as telas seguem com o livro antigo do coletor (dados parados).
+
+**O coletor do Fracttal está aposentado:** não ponha `NEXUS_CAMPO_COLETOR=1` no servidor (o pacote não tem). Ele lia o
+Fracttal com a cota da empresa inteira para recalcular uma nota que o App já grava.
 
 A tela **Aprovação de OS** lê a fila do Fracttal ao vivo quando alguém a abre: ~55 pedidos de uma vez, no máximo a
 cada 10 minutos por servidor (os filtros reusam a mesma leitura). Em hora de pico da cota ela mostra o aviso de fila

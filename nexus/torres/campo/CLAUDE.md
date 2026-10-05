@@ -50,14 +50,25 @@ lê com a régua copiada:
   vazia e outra repetia o resumo (o supervisor preenche à mão para conseguir aprovar). Fotos da ronda: nenhuma
   nas 3 (ficam no blob do App).
 
-**O que só o App sabe, vindo do próprio App (v226, no ar desde 05/10 12:03, mas o envio está DESLIGADO até a chave
-`NEXUS_PESSOA_HMAC` entrar no App Setting; a chave é o interruptor):** o timer `nexus_workbooks_sync`
-do `function_app.py` (aos :25) sobe `fechamentos_app_campo` (nota do painel, caixa de observação, GPS no início e no
-fim, pontualidade), `pt_app_campo`, `zeladoria_app_campo` e `decisoes_app_campo` para a API de planilhas. Pessoa só
-como HMAC do e-mail (`NEXUS_PESSOA_HMAC`, a mesma chave no App Setting e no `.env` daqui): `ligacao_cadastro` troca o
-código pelo `pessoa_id` (e-mail do cadastro decifrado na hora). O livro `rondas_app_campo` (v210) já existia: falhas,
-trackers, início e fim de cada ronda. **Falta:** as telas daqui lerem esses livros (a nota do App no lugar da calculada,
-a pontualidade, a PT e a zeladoria).
+**A FONTE das telas é o que o próprio App grava no banco (Levi, 05/10/2026: "operador faz ronda > após ronda input é
+dado na API do PG > Nexus lê"; `nexus/campo/livros_app.py`).** O timer `nexus_workbooks_sync` do App (v226, aos :25
+de cada hora; ligado em 05/10 às 13:39, quando a chave `NEXUS_PESSOA_HMAC` entrou no App Setting — sem ela o App não
+manda nada) sobe `fechamentos_app_campo` (o registro de 90 dias: nota do painel, caixa de observação, GPS no início e
+no fim, pontualidade), `pt_app_campo`, `zeladoria_app_campo` e `decisoes_app_campo`; o v210 já subia `rondas_app_campo`.
+1ª carga (05/10 13:40): 2.488 fechamentos, 120 PT, 122 decisões, 766 rondas, zeladoria vazia. Pessoa só como HMAC do
+e-mail: o Nexus calcula o mesmo código para cada e-mail do cadastro do App (`identidades.json`) e troca pelo e-mail e
+pelo nome (`livros_app.pessoas_por_codigo`). **A troca vale só com `NEXUS_PESSOA_HMAC` no `.env` daqui** (a mesma do
+App): sem ela, `fonte_pg` segue o livro do coletor, para a tela não perder o técnico.
+- Por que trocar: medido em 05/10, nas 1.807 tarefas dos dois livros, a nota que o coletor recalculava pelo Fracttal
+  batia com a do painel do App em só 14% (11,8 pontos de diferença média); o coletor dava 124 fechamentos do App como
+  "fora do App" e não tinha 223. Ordens, 7 dias: 447 OS pelo App contra 223 pelo coletor; Triagem, 30 dias: 35 críticos
+  pelo App contra 131.
+- O livro ainda não traz a situação da OS no Fracttal, as durações do Fracttal, a aprovação e a avaliação (o App guarda,
+  de madrugada, no `_enriquecer_qlog`, e não manda). Ficam desconhecidas, não aproximadas: "Em verificação" e "Tempo
+  real" saem "—" (`ordens._ajuste_da_fonte`; com a duração do celular dava 5.726%, com a situação pela revisão do
+  painel, 402 de 447 "em verificação"); a Triagem não acusa demora nem divergência de supervisor. Para ter: o App mandar
+  essas colunas no livro (mudança no App).
+- A Aprovação de OS continua lendo a fila do Fracttal ao vivo (a nota é a do livro).
 
 **Não está no Fracttal:**
 - da nota: a caixa "Registre observações" do App (até 15 pontos), o GPS do fechamento (vale o das fotos) e os
@@ -129,6 +140,11 @@ tarefas (fila + aprovadas), ~1,4 tarefa por OS; o relatório de cada rodada vai 
 até 60 por rodada; fila ou aprovadas lidas pela metade = a rodada para ali; para no primeiro 406/429 e grava o que já
 calculou. 1ª rodada real (04/10, 20:55): fila de 5.411 tarefas, 40 OS, 122 pedidos, 5 min 11 s, 45 linhas gravadas e
 conferidas; 3 OS recalculadas por outro caminho bateram com o banco.
+
+**O coletor está APOSENTADO como fonte (05/10/2026):** com a chave no `.env`, as telas leem o livro do App e o coletor
+deve ficar DESLIGADO (sem `NEXUS_CAMPO_COLETOR`): ele gastava a cota do Fracttal da empresa para chegar a uma nota que
+batia em 14% das tarefas. O código fica só como reserva enquanto o Nexus não tiver a chave; sai quando a troca estiver
+conferida com o painel do App.
 
 **Rodar o coletor:** dentro do Nexus, a cada `NEXUS_CAMPO_COLETOR_MIN` minutos (30), só onde `NEXUS_CAMPO_COLETOR=1`
 (UMA máquina: duas leriam a mesma fila e gastariam a cota em dobro). À mão: `python ferramentas/coletar_campo.py

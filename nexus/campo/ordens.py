@@ -27,9 +27,16 @@ def configurado() -> bool:
     return tabelas.configurado(EXIGIDAS)
 
 
-def _sem_pontualidade(r: dict) -> dict:
-    """A fonte do banco do Nexus não tem a hora de início no celular: pontualidade = sem dado, não 0%."""
-    if not hasattr(tabelas.fornecedor(), "coleta"):
+def _ajuste_da_fonte(r: dict) -> dict:
+    """O que a fonte do banco não tem vira "sem dado", não 0. O coletor não tem a hora de início no celular
+    (pontualidade); o livro do App (05/10/2026) tem a pontualidade, mas não a situação da OS no Fracttal (em
+    verificação) nem as durações do Fracttal (ver `livros_app`)."""
+    f = tabelas.fornecedor()
+    if not hasattr(f, "coleta"):
+        return r
+    if getattr(f, "do_app", False):
+        if isinstance(r.get("resumo"), dict):
+            r["resumo"]["em_verificacao"] = None
         return r
     if isinstance(r.get("resumo"), dict):
         r["resumo"]["pontualidade_pct"] = None
@@ -54,8 +61,8 @@ def painel(dias: int = 7) -> Leitura:
     dias = int(dias) if int(dias) in PERIODOS else 7
 
     def calcular():
-        atual = _sem_pontualidade(regras_app._gestao_os(
+        atual = _ajuste_da_fonte(regras_app._gestao_os(
             dias, {}, None, janela=regras_app._janela_str(_Pedido({"dias": str(dias)})), inteira=True))
-        anterior = _sem_pontualidade(regras_app._gestao_os(dias, {}, None, janela=_janela_anterior(dias)))
+        anterior = _ajuste_da_fonte(regras_app._gestao_os(dias, {}, None, janela=_janela_anterior(dias)))
         return {"atual": atual, "anterior": anterior.get("resumo") or {}, "dias": dias}
     return leitura.ler(("ordens", dias), calcular)

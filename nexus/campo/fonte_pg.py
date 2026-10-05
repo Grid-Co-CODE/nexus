@@ -15,12 +15,16 @@ entregues às regras copiadas do App no formato das tabelas DELE, para `_fila_su
 
 Nome do técnico: decifrado na hora (NEXUS_CHAVE_CADASTRO); e-mail e supervisor pelo cadastro do App, como o
 `_pessoa_por_nome` da fila faz. Nada disso volta ao banco. Cópia de 5 min; banco fora do ar = a tela volta ao App.
+
+**Desde 05/10/2026, com `NEXUS_PESSOA_HMAC`, a fonte é o que o PRÓPRIO App grava** (`livros_app.py`: a nota do painel,
+não a recalculada pelo Fracttal, que batia em só 14% das tarefas). Sem a chave, segue o livro do coletor, para a tela
+não perder o técnico (o livro do App traz a pessoa só como código).
 """
 import threading
 import time
 from datetime import datetime, timezone
 
-from . import banco_campo, regras_app, tabelas
+from . import banco_campo, livros_app, regras_app, tabelas
 from .coletor import contexto_do_tecnico
 from .tabelas import TabelaSoLeitura
 
@@ -66,6 +70,25 @@ class Fornecedor:
         self._cache = {"t": 0.0, "v": None, "atualizacao": {}}
         self._trava = threading.Lock()
         self._cofre = None
+        # com a chave do código da pessoa, a fonte é o livro do App; sem ela, o do coletor
+        self.chave_hmac = config.get("NEXUS_PESSOA_HMAC")
+        self.do_app = bool(self.chave_hmac)
+        self._cache_app = {"t": 0.0, "fech": None, "rondas": None, "em": None}
+
+    def livros(self) -> tuple[list, list]:
+        """(fechamentos, rondas) dos livros do App. Erro de leitura sobe: quem chama anota e a tela avisa."""
+        import requests
+        with self._trava:
+            c = self._cache_app
+            if c["fech"] is not None and time.time() - c["t"] < self.ttl_s:
+                return c["fech"], c["rondas"]
+        s = self.sessao or requests
+        fech = livros_app.ler(self.base, s, livros_app.LIVRO_FECHAMENTOS)
+        rondas = livros_app.ler(self.base, s, livros_app.LIVRO_RONDAS)
+        em = max((str(a.get("Registrado em") or "") for a in fech), default="") or None
+        with self._trava:
+            self._cache_app.update(t=time.time(), fech=fech, rondas=rondas, em=em)
+        return fech, rondas
 
     def linhas(self) -> dict:
         """{id_tarefa: linha} do banco. Erro de leitura sobe: quem chama anota e a tela avisa."""
@@ -78,7 +101,14 @@ class Fornecedor:
         return v
 
     def coleta(self) -> str | None:
-        """Quando o coletor gravou o banco pela última vez (o frescor que a tela mostra)."""
+        """Quando o coletor gravou o banco pela última vez (o frescor que a tela mostra). Com o livro do App: o
+        fechamento mais recente que ele trouxe."""
+        if self.do_app:
+            try:
+                self.livros()
+            except Exception:       # noqa: BLE001
+                return None
+            return self._cache_app["em"]
         try:
             self.linhas()
         except Exception:       # noqa: BLE001
@@ -88,9 +118,16 @@ class Fornecedor:
     def limpar(self):
         with self._trava:
             self._cache.update(t=0.0, v=None, atualizacao={})
+            self._cache_app.update(t=0.0, fech=None, rondas=None, em=None)
 
     def completa(self) -> bool:
-        """A última coleta cobriu a fila inteira e as aprovadas da janela? Antes disso, o número sai pela metade."""
+        """A última coleta cobriu a fila inteira e as aprovadas da janela? Antes disso, o número sai pela metade. O livro
+        do App é inteiro por construção (o registro dos 90 dias, trocado de uma vez a cada rodada)."""
+        if self.do_app:
+            try:
+                return bool(self.livros()[0])
+            except Exception:       # noqa: BLE001
+                return False
         try:
             self.linhas()
         except Exception:       # noqa: BLE001
@@ -100,18 +137,41 @@ class Fornecedor:
     def serve(self, nome) -> bool:
         if nome not in SERVE:
             return False
+        if self.do_app:
+            return self.completa()
         try:
             return self.completa() and any(_do_registro(l) for l in self.linhas().values())
         except Exception:       # noqa: BLE001 — banco fora do ar: a tela fica no painel do App
             return False
 
     def __call__(self, nome):
+        if self.do_app:
+            return self._do_app(nome)
         if nome == "qualidadelog":
             return TabelaSoLeitura(nome, self._registros())
         if nome == "rondaos":
             return TabelaSoLeitura(nome, [_ronda_os(l) for l in self._rondas_do_banco()])
         if nome == "rondas":
             return TabelaSoLeitura(nome, [_ronda(l, self._nome(l)) for l in self._rondas_do_banco()])
+        return TabelaSoLeitura(nome, [])
+
+    def _do_app(self, nome):
+        fech, rondas = self.livros()
+        if nome == "qualidadelog":
+            try:
+                quem = livros_app.pessoas_por_codigo(self.chave_hmac)
+            except Exception:       # noqa: BLE001 — sem o cadastro do App, sai sem e-mail (e sem supervisor)
+                quem = {}
+            out = []
+            for a in fech:
+                em, nm = quem.get(str(a.get("Técnico (HMAC)") or "").split(";")[0].strip(), ("", ""))
+                out.append(livros_app.registro(a, em, nm))
+            return TabelaSoLeitura(nome, out)
+        com_os = [r for r in rondas if r.get("OS") and r.get("Data")]
+        if nome == "rondaos":
+            return TabelaSoLeitura(nome, [livros_app.ronda_os(r) for r in com_os])
+        if nome == "rondas":
+            return TabelaSoLeitura(nome, [livros_app.ronda(r) for r in com_os])
         return TabelaSoLeitura(nome, [])
 
     # ── pessoas: na hora, nunca no banco ───────────────────────────────────────────────────────────────────────────

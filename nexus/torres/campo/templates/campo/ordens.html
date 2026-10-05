@@ -41,7 +41,7 @@
     <span><span class="gc-rotulo">Pontualidade</span><span class="v">{{ '—' if r.get('pontualidade_pct') is none else r.get('pontualidade_pct') ~ '%' }}</span><span class="d">{{ 'só no App (hora de início no celular)' if r.get('pontualidade_pct') is none else 'começou no horário' }}</span>{{ vs(r.get('pontualidade_pct'), ra.get('pontualidade_pct')) }}</span>
     {# O App mostra este número como "+66%"; a conta é real ÷ previsto, então 66 quer dizer 66% do previsto. #}
     <span><span class="gc-rotulo">Tempo real</span><span class="v">{{ '—' if r.get('tempo_vs_previsto_pct') is none else r.get('tempo_vs_previsto_pct') ~ '%' }}</span><span class="d">do previsto, em média</span></span>
-    <span><span class="gc-rotulo">Em verificação</span><span class="v">{{ r.get('em_verificacao', 0) }}</span><span class="d">na fila do supervisor</span></span>
+    <span><span class="gc-rotulo">Em verificação</span><span class="v">{{ '—' if r.get('em_verificacao', 0) is none else r.get('em_verificacao', 0) }}</span><span class="d">na fila do supervisor</span></span>
   </div>
 
   <div class="cn-lista-cab">
