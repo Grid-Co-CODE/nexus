@@ -74,7 +74,28 @@
 .pcm-rodada-topo .pcm-h2{margin:0}
 .pcm-rodada .pcm-numeros{margin:0}
 .pcm-rodada .pcm-aviso{margin:0}
-.pcm-conf{max-width:760px}
+/* Blocos numerados da tela Gerar (05/10/2026, Levi: "está confuso, separe por blocos"): cada passo do trabalho num
+   cartão, com número, título, o que faz e o estado; a semana é escolhida uma vez só, no topo. */
+.pcm-semana-sel{display:flex;align-items:center;gap:8px}
+.pcm-semana-sel .gc-campo{width:118px}
+.pcm-passo{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:18px 20px 20px;margin:16px 0}
+.pcm-passo-cab{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
+.pcm-passo-n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--verde);
+  background:var(--verde-suave);color:var(--verde-texto);font:700 14px/1 var(--font-display)}
+.pcm-passo-txt{flex:1;min-width:0}
+.pcm-passo-tit{font:700 18px/24px var(--font-display);color:var(--tinta);margin:2px 0}
+.pcm-passo-sub{margin:0;font-size:12.5px;line-height:18px;color:var(--mudo);max-width:900px}
+.pcm-passo-estado{flex:none;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;
+  border:1px solid var(--linha-forte);font-size:12.5px;font-weight:600;white-space:nowrap}
+.pcm-passo-estado--ok{color:var(--verde-texto);border-color:var(--verde);background:var(--verde-suave)}
+.pcm-passo-estado--falta{color:var(--critico);border-color:var(--critico);background:var(--critico-suave)}
+.pcm-passo-pe{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--linha)}
+.pcm-passo .pcm-gerar{margin:0}
+.pcm-passo .pcm-rolagem{margin-top:0}
+/* insumos em duas colunas: as dez linhas cabem na altura de cinco */
+.pcm-conf{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr));gap:0 28px}
+.pcm-conf-linha{display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px;align-items:center;padding:9px 0;
+  border-top:1px solid var(--linha);font-size:13px}
 .pcm-conf-item{display:inline-flex;gap:6px;align-items:flex-start;color:var(--tinta-2)}
 .pcm-conf-item i{font-size:16px;margin-top:2px}
 .pcm-conf-item--ok i{color:var(--verde-texto)}
@@ -93,10 +114,21 @@
 .pcm-confirma{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--tinta-2);max-width:420px}
 /* Observações da semana como regras (01/10/2026): cartões de usina, etiquetas de OS e uma tabela curta, no lugar
    do bloco de texto de 57 linhas que ocupava a tela inteira. */
-.obs{margin-top:8px}
-.obs-topo{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
-.obs-topo .pcm-h2{margin-bottom:0}
-.obs-resumo{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font-size:13px;color:var(--mudo)}
+.obs-topo{flex-wrap:wrap}
+.obs-resumo{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 0 0;font-size:13px;color:var(--mudo)}
+/* as partes do bloco 2, separadas por uma linha e com título próprio */
+.obs-sec{margin-top:20px;padding-top:16px;border-top:1px solid var(--linha)}
+form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
+.obs-sec-tit{font:700 14px/20px var(--font-display);color:var(--tinta)}
+.obs-legenda{display:inline-flex;flex-wrap:wrap;gap:4px 14px;margin-left:auto;font-size:12px;color:var(--mudo)}
+.obs-legenda>span{display:inline-flex;align-items:center;gap:5px}
+.obs-amostra{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;border:1px solid var(--linha-forte);
+  font:600 10.5px/1 var(--font-sans);font-style:normal;color:var(--fraco)}
+.obs-amostra--sim{background:var(--verde-suave);border-color:var(--verde);color:var(--verde-texto)}
+.obs-amostra--regra{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.obs-filtro .obs-busca{width:260px;flex:none}   /* o .obs-campo (100%) vem depois e jogava a legenda para baixo */
+.obs-fechar{display:none}
+.obs-bloco--usinas[open] .obs-fechar{display:inline;margin-left:auto}
 .obs-resumo b{color:var(--tinta);font-weight:600}
 .obs-resumo-ruim{color:var(--alerta)}
 .obs-topo-acoes{margin-left:auto}
@@ -135,10 +167,14 @@
 .obs-clientes .gc-chip span{color:var(--mudo);margin-left:2px}
 .obs-busca{width:200px}
 .obs-so{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--tinta-2)}
-/* usina com dia restrito (tem regra) fica marcada em verde; a que atende em qualquer dia fica discreta */
-.obs-ufr .obs-dia[aria-pressed="true"]{background:var(--superficie-3);border-color:var(--linha-forte);color:var(--tinta-2)}
-.obs-ufr.obs-restrita{border-color:rgba(163,217,0,.35)}
+/* O dia que a usina atende é VERDE, sempre (05/10/2026, Levi: "não está aparecendo os dias selecionados das usinas,
+   está aparecendo tudo cinza"). O "atende" da usina sem regra era pintado de cinza (superficie-3) e não se distinguia
+   do "não atende" no navy: com as 143 usinas sem regra, a lista inteira parecia desligada. Agora: verde suave = atende,
+   sem regra (os cinco dias); verde cheio = dia escolhido numa usina com dia restrito, que ganha a faixa verde. */
+.obs-ufr .obs-dia[aria-pressed="true"]{background:var(--verde-suave);border-color:var(--verde);color:var(--verde-texto)}
+.obs-ufr.obs-restrita{border-color:var(--verde);box-shadow:inset 3px 0 0 var(--verde)}
 .obs-ufr.obs-restrita .obs-dia[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.obs-dia[aria-pressed="false"]{color:var(--fraco)}
 .obs-uf{margin-left:6px;font-size:10.5px;color:var(--mudo)}
 .obs-divide{margin-left:6px;font-size:10.5px;color:var(--info);cursor:help}
 .obs-nome{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -180,6 +216,11 @@
 .pcm-log .pcm-pre{background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md);padding:10px 12px;max-height:360px;overflow:auto}
 
 @media (max-width:640px){
+  .pcm-passo{padding:14px 14px 16px}
+  .pcm-passo-cab{flex-wrap:wrap}
+  .pcm-passo-estado{margin-left:44px}
+  .pcm-conf-linha{grid-template-columns:1fr;gap:4px}
+  .obs-legenda{margin-left:0}
   .pcm-tabela{font-size:12px}
   .pcm-tabela td,.pcm-tabela th{padding:8px 9px}
   .pcm-filtros .campo{flex:1 1 45%}

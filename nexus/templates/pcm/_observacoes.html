@@ -3,16 +3,19 @@
    A ordem original das linhas é mantida pelo data-ordem. #}
 {% set r = obs_resumo %}
 {% macro dias_botoes(sel) %}{% for d in dias %}<button type="button" class="obs-dia" data-dia="{{ d }}" aria-pressed="{{ 'true' if d in sel else 'false' }}" title="{{ nomes_dia[d] }}">{{ nomes_dia[d][0] }}</button>{% endfor %}{% endmacro %}
-<section class="obs" id="obs">
-  <div class="obs-topo">
-    <h2 class="pcm-h2">Observações da semana {{ semana_sugerida }}</h2>
-    <p class="obs-resumo">
-      <span><b class="gc-num">{{ r.usinas }}</b> usinas com dia</span>
-      <span><b class="gc-num">{{ r.fora }}</b> OS fora</span>
-      <span><b class="gc-num">{{ r.fixar }}</b> OS com dia fixo</span>
-      {% if r.notas %}<span><b class="gc-num">{{ r.notas }}</b> notas</span>{% endif %}
-      {% if r.problemas %}<span class="obs-resumo-ruim"><i class="ph ph-warning"></i> {{ r.problemas }} {{ 'linha' if r.problemas == 1 else 'linhas' }} com problema</span>{% endif %}
-    </p>
+<section class="obs pcm-passo" id="obs">
+  <header class="pcm-passo-cab obs-topo">
+    <span class="pcm-passo-n">2</span>
+    <div class="pcm-passo-txt">
+      <h2 class="pcm-passo-tit">Observações da semana {{ semana_sugerida }}</h2>
+      <p class="obs-resumo">
+        <span><b class="gc-num">{{ r.usinas }}</b> usinas com dia</span>
+        <span><b class="gc-num">{{ r.fora }}</b> OS fora</span>
+        <span><b class="gc-num">{{ r.fixar }}</b> OS com dia fixo</span>
+        {% if r.notas %}<span><b class="gc-num">{{ r.notas }}</b> notas</span>{% endif %}
+        {% if r.problemas %}<span class="obs-resumo-ruim"><i class="ph ph-warning"></i> {{ r.problemas }} {{ 'linha' if r.problemas == 1 else 'linhas' }} com problema</span>{% endif %}
+      </p>
+    </div>
     <div class="obs-topo-acoes">
       {% if tem_anterior and not observacoes.strip() %}
       <form method="post" action="/t/pcm/gerar/observacoes/copiar">
@@ -21,20 +24,21 @@
       </form>
       {% endif %}
     </div>
-  </div>
+  </header>
 
   <form id="obs-form" method="post" action="/t/pcm/gerar/observacoes">
     <input type="hidden" name="semana" value="{{ semana_sugerida }}">
     <textarea name="texto" id="obs-saida" hidden>{{ observacoes }}</textarea>
 
     {# ── usinas ── #}
+    <div class="obs-sec">
     {% if usinas %}
     {# Todas as usinas do Fracttal (01/10/2026, Levi: "quero que apareça todas as usinas do fracttal aqui e que dê para
        filtrar por cliente"). Segunda a sexta ligados = sem regra: o motor atende em qualquer dia. Mexer nos dias grava
        a regra "@usina"; voltar aos cinco dias tira a regra. As regras em si ficam escondidas logo abaixo. #}
     {# Os clientes como cards no topo, sempre à vista (01/10, Levi: "filtrar por cliente clicando nos cards de cima"):
        o clique abre a lista já filtrada; clicar de novo, ou em Todos, tira o filtro. #}
-    <div class="obs-bloco-cab obs-cab-usinas"><span class="gc-rotulo">Dias de atendimento por usina</span>
+    <div class="obs-bloco-cab obs-cab-usinas"><span class="obs-sec-tit">Dias de atendimento por usina</span>
       <span class="gc-ajuda">{{ usinas|length }} usinas do Fracttal · <span id="obs-restritas">{{ usinas_restritas }}</span> com dia restrito</span></div>
     <div class="obs-cli-cards" role="group" aria-label="Filtrar por cliente">
       <button type="button" class="obs-cli" data-cliente="" aria-pressed="true">
@@ -46,15 +50,22 @@
         <span class="obs-cli-sub"><span data-restritas-de="{{ c.nome }}">{{ c.restritas }}</span> com dia restrito</span></button>
       {% endfor %}
     </div>
-    <details class="obs-bloco obs-bloco--usinas"{% if r.problemas %} open{% endif %}>
+    {# Aberta por padrão (05/10/2026, Levi: "não está aparecendo os dias selecionados das usinas, está tudo cinza"):
+       fechada, os dias de cada usina só apareciam depois de um clique, e o "atende" pintado de cinza não se
+       distinguia do "não atende". #}
+    <details class="obs-bloco obs-bloco--usinas" open>
       <summary class="obs-bloco-cab">
         <span class="obs-por-dia" id="obs-por-dia">{% for d in dias %}<span>{{ nomes_dia[d][:3] }} <b class="gc-num" data-dia="{{ d }}">{{ usinas_por_dia[d] }}</b></span>{% endfor %}</span>
         <span class="gc-ajuda" id="obs-filtro-ativo"></span>
-        <span class="gc-ajuda obs-abrir">abrir para editar</span>
+        <span class="gc-ajuda obs-abrir">abrir a lista</span>
+        <span class="gc-ajuda obs-fechar">recolher</span>
       </summary>
       <div class="obs-filtro">
         <input class="obs-campo obs-busca" id="obs-busca" type="search" placeholder="Buscar usina" autocomplete="off">
         <label class="obs-so"><input type="checkbox" id="obs-so-restritas"> Só com dia restrito</label>
+        <span class="obs-legenda" aria-hidden="true"><span><i class="obs-amostra obs-amostra--sim">S</i> atende (sem regra)</span>
+          <span><i class="obs-amostra obs-amostra--regra">S</i> dia escolhido</span>
+          <span><i class="obs-amostra obs-amostra--nao">S</i> não atende</span></span>
       </div>
       <div class="obs-usinas obs-usinas--fracttal" id="obs-usinas">
         {% for u in usinas %}
@@ -105,10 +116,11 @@
       </div>
     </details>
     {% endif %}
+    </div>
 
     {# ── OS fora ── #}
-    <div class="obs-bloco">
-      <div class="obs-bloco-cab"><span class="gc-rotulo">OS fora da semana</span>
+    <div class="obs-bloco obs-sec">
+      <div class="obs-bloco-cab"><span class="obs-sec-tit">OS fora da semana</span>
         <span class="gc-ajuda">não entram nem como pendente</span></div>
       <div class="obs-chips" id="obs-chips">
         {% for i, x in regras if x.tipo == 'fora' %}
@@ -119,8 +131,8 @@
     </div>
 
     {# ── OS com dia fixo ── #}
-    <div class="obs-bloco">
-      <div class="obs-bloco-cab"><span class="gc-rotulo">OS com dia fixo</span>
+    <div class="obs-bloco obs-sec">
+      <div class="obs-bloco-cab"><span class="obs-sec-tit">OS com dia fixo</span>
         <span class="gc-ajuda">tudo opcional menos a OS. Nas OS de plano (Handover, MPx), "só as tarefas com" divide o plano por dia e "tirar as tarefas com" deixa parte de fora</span></div>
       <div class="pcm-rolagem">
         <table class="obs-tabela" id="obs-fixar">
@@ -147,8 +159,8 @@
     {# ── o resto: comentário, texto livre e linha vazia (mantidos como estão) ── #}
     {% set outras = regras|selectattr('1.tipo', 'in', ['nota', 'comentario'])|list %}
     {% if outras %}
-    <div class="obs-bloco">
-      <div class="obs-bloco-cab"><span class="gc-rotulo">Notas e linhas que o motor não usa como regra</span></div>
+    <div class="obs-bloco obs-sec">
+      <div class="obs-bloco-cab"><span class="obs-sec-tit">Notas e linhas que o motor não usa como regra</span></div>
       <ul class="obs-notas">
         {% for i, x in outras %}
         <li class="{{ 'obs-ruim' if x.problema }}" data-ordem="{{ i }}" data-tipo="{{ x.tipo }}" data-bruta="{{ x.bruta }}">
@@ -161,7 +173,7 @@
     {% endif %}
     {% for i, x in regras if x.tipo == 'vazia' %}<span hidden data-ordem="{{ i }}" data-tipo="vazia" data-bruta=""></span>{% endfor %}
 
-    <div class="obs-salvar">
+    <div class="obs-salvar pcm-passo-pe">
       <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-floppy-disk"></i> Salvar observações</button>
       <span class="gc-ajuda" id="obs-estado">A geração da semana {{ semana_sugerida }} usa o que estiver salvo.</span>
     </div>

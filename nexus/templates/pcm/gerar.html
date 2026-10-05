@@ -5,12 +5,19 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
 <p class="gc-eyebrow">PCM · Programação semanal · sombra</p>
+{# Em blocos numerados, na ordem do trabalho (05/10/2026, Levi: "está confuso, separe por blocos"): 1 insumos,
+   2 observações, 3 gerar, 4 histórico. A semana é escolhida UMA vez, no topo, e vale para a página inteira. #}
 <div class="pcm-topo">
   <div>
     <h1 class="titulo-pagina">Gerar a semana</h1>
     <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana do Fabrício. Nada é publicado: o campo continua
       com a semana dele.</p>
   </div>
+  <form class="pcm-semana-sel" method="get" action="/t/pcm/gerar">
+    <label class="gc-rotulo" for="ver-semana">Semana</label>
+    <input id="ver-semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Abrir</button>
+  </form>
 </div>
 
 {% if erro %}
@@ -110,52 +117,72 @@
 </section>
 {% endif %}
 
-<h2 class="pcm-h2">O que o motor precisa</h2>
-<p class="gc-ajuda pcm-conf-ajuda">Prioridades, Confiabilidade, Histórico, Feriados e Observações moram no Nexus: a cada geração o
-  Nexus escreve os arquivos que o motor lê. Enquanto o Fabrício gera pelo PC dele, importe os arquivos dele antes de gerar,
-  para as duas semanas partirem do mesmo dado.</p>
-<section class="bloco pcm-conf">
-  {% for i in conf.itens %}
-  {% set classe = 'aviso' if i.aviso else ('ok' if i.ok else 'falta') %}
-  <div class="linha-bloco">
-    <span class="gc-rotulo">{{ i.nome }}</span>
-    <span class="pcm-conf-item pcm-conf-item--{{ classe }}"><i class="ph {{ {'ok': 'ph-check-circle', 'aviso': 'ph-warning', 'falta': 'ph-x-circle'}[classe] }}"></i> {{ i.detalhe }}</span>
+{# ── 1. insumos ── #}
+{% set n_falta = conf.itens|rejectattr('ok')|list|length %}
+<section class="pcm-passo" id="passo-insumos">
+  <header class="pcm-passo-cab">
+    <span class="pcm-passo-n">1</span>
+    <div class="pcm-passo-txt">
+      <h2 class="pcm-passo-tit">O que o motor precisa</h2>
+      <p class="pcm-passo-sub">Prioridades, Confiabilidade, Histórico, Feriados e Observações moram no Nexus: a cada geração o
+        Nexus escreve os arquivos que o motor lê. Enquanto o Fabrício gera pelo PC dele, importe os arquivos dele antes de
+        gerar, para as duas semanas partirem do mesmo dado.</p>
+    </div>
+    <span class="pcm-passo-estado pcm-passo-estado--{{ 'ok' if not n_falta else 'falta' }}">{% if not n_falta %}<i class="ph ph-check-circle"></i> tudo pronto{% else %}<i class="ph ph-x-circle"></i> {{ n_falta }} {{ 'falta' if n_falta == 1 else 'faltam' }}{% endif %}</span>
+  </header>
+  <div class="pcm-conf">
+    {% for i in conf.itens %}
+    {% set classe = 'aviso' if i.aviso else ('ok' if i.ok else 'falta') %}
+    <div class="pcm-conf-linha">
+      <span class="gc-rotulo">{{ i.nome }}</span>
+      <span class="pcm-conf-item pcm-conf-item--{{ classe }}"><i class="ph {{ {'ok': 'ph-check-circle', 'aviso': 'ph-warning', 'falta': 'ph-x-circle'}[classe] }}"></i> {{ i.detalhe }}</span>
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
+  {% if tem_origem %}
+  <form class="pcm-passo-pe" method="post" action="/t/pcm/gerar/importar">
+    <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-download-simple"></i> Importar da pasta do PCM</button>
+    <span class="gc-ajuda">Traz os cinco arquivos de hoje; as observações entram na semana {{ semana_sugerida }}.</span>
+  </form>
+  {% endif %}
 </section>
-{% if tem_origem %}
-<form class="pcm-gerar" method="post" action="/t/pcm/gerar/importar">
-  <input type="hidden" name="semana" value="{{ semana_sugerida }}">
-  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-download-simple"></i> Importar da pasta do PCM</button>
-  <span class="gc-ajuda">Traz os cinco arquivos de hoje; as observações entram na semana {{ semana_sugerida }}.</span>
-</form>
-{% endif %}
 
+{# ── 2. observações ── #}
 {% include "pcm/_observacoes.html" %}
-<form class="pcm-gerar" method="get" action="/t/pcm/gerar">
-  <div class="campo">
-    <label class="gc-rotulo" for="ver-semana">Ver outra semana</label>
-    <input id="ver-semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>
-  </div>
-  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Abrir</button>
-</form>
 
-<h2 class="pcm-h2">Nova geração</h2>
-<form class="pcm-gerar" method="post" action="/t/pcm/gerar">
-  <div class="campo">
-    <label class="gc-rotulo" for="semana">Semana</label>
-    <input id="semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>
-  </div>
-  {% if campo %}
-  <label class="pcm-confirma"><input type="checkbox" name="confirmo" value="1"> Estou ciente: é horário de campo, e o motor divide a
-    cota do Fracttal com o App de Campo.</label>
-  {% else %}<input type="hidden" name="confirmo" value="1">{% endif %}
-  <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not conf.pronto %} disabled{% endif %}><i class="ph ph-play"></i> Gerar em sombra</button>
-</form>
-<p class="gc-ajuda">Leva alguns minutos: o motor lê o Fracttal inteiro, a 1 pedido por segundo. Pode sair desta página.</p>
+{# ── 3. gerar ── #}
+<section class="pcm-passo" id="passo-gerar">
+  <header class="pcm-passo-cab">
+    <span class="pcm-passo-n">3</span>
+    <div class="pcm-passo-txt">
+      <h2 class="pcm-passo-tit">Gerar em sombra</h2>
+      <p class="pcm-passo-sub">Leva alguns minutos: o motor lê o Fracttal inteiro, a 1 pedido por segundo. Pode sair desta
+        página. Nada é publicado.</p>
+    </div>
+  </header>
+  <form class="pcm-gerar" method="post" action="/t/pcm/gerar">
+    <div class="campo">
+      <label class="gc-rotulo" for="semana">Semana</label>
+      <input id="semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>
+    </div>
+    {% if campo %}
+    <label class="pcm-confirma"><input type="checkbox" name="confirmo" value="1"> Estou ciente: é horário de campo, e o motor divide a
+      cota do Fracttal com o App de Campo.</label>
+    {% else %}<input type="hidden" name="confirmo" value="1">{% endif %}
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not conf.pronto %} disabled{% endif %}><i class="ph ph-play"></i> Gerar em sombra</button>
+  </form>
+  {% if not conf.pronto %}<p class="gc-ajuda">Falta insumo no bloco 1: o botão libera quando estiver tudo pronto.</p>{% endif %}
+</section>
 
+{# ── 4. histórico ── #}
 {% if ultimas %}
-<h2 class="pcm-h2">Últimas gerações</h2>
+<section class="pcm-passo" id="passo-historico">
+  <header class="pcm-passo-cab">
+    <span class="pcm-passo-n">4</span>
+    <div class="pcm-passo-txt"><h2 class="pcm-passo-tit">Últimas gerações</h2>
+      <p class="pcm-passo-sub">Clique no horário para abrir a rodada e a comparação com a semana do Fabrício.</p></div>
+  </header>
 <div class="pcm-rolagem">
   <table class="pcm-tabela">
     <thead><tr><th>Começou</th><th>Semana</th><th>Situação</th><th class="num">Linhas</th><th>Contra a do Fabrício</th></tr></thead>
@@ -172,5 +199,6 @@
     </tbody>
   </table>
 </div>
+</section>
 {% endif %}
 {% endblock %}

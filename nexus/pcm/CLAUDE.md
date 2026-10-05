@@ -42,6 +42,22 @@ do original. A AUXILIAR sai do cadastro do Nexus (`auxiliar.py`, desde 02/10/202
   que ele lia do original, com as mesmas leituras do `programacao_v7.py`. `tests/test_pcm_insumos.py` faz isso com
   dado de mentira; com os arquivos reais, rode a mesma comparação fora do repositório.
 
+## A tela Gerar (`templates/pcm/gerar.html` + `_observacoes.html`, estilo em `static/pcm.css`)
+
+Desde 05/10/2026 (Levi: "está confuso, separe por blocos"), em quatro blocos numerados, na ordem do trabalho: **1** o
+que o motor precisa (insumos, em duas colunas, e "Importar da pasta do PCM"), **2** observações da semana (dias por
+usina, OS fora, OS com dia fixo), **3** gerar em sombra, **4** últimas gerações. A semana se escolhe uma vez, no topo.
+
+- **Dia de atendimento é verde, sempre.** Verde suave = a usina atende sem regra (os cinco dias); verde cheio = dia
+  escolhido numa usina com dia restrito, que ganha a faixa verde à esquerda; contorno = não atende. Até 05/10 o
+  "atende" sem regra era cinza e, com as 143 usinas sem regra da W42, a lista inteira parecia desligada ("está tudo
+  cinza"). A lista abre aberta.
+- O JavaScript do editor depende dos ids e classes (`#obs`, `#obs-form`, `.obs-ufr`, `.obs-dia`, `#obs-por-dia`,
+  `.obs-bloco--usinas`...): a legenda usa `.obs-amostra` de propósito, porque um `.obs-dia` fora de uma regra vira
+  clique de edição.
+- Ver a tela sem login no navegador: renderize no processo (`test_client` + `session_transaction`, logado) e abra o
+  HTML ao lado de uma cópia do `static/`. O Nexus em produção não recarrega template: depois de mudar, reinicie.
+
 ## Armadilhas já vividas
 
 - **Gerar duas vezes a mesma semana distorcia tudo:** na S40, 415 tarefas viraram reprogramadas, e todas ganharam +1
