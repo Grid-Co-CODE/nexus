@@ -8,7 +8,6 @@ view com a mesma rota (ela vence a genérica), por exemplo:
         return render_template("performance/tempo-real.html")
 """
 from datetime import datetime
-from urllib.parse import urlsplit
 
 from flask import Response, current_app, jsonify, render_template, request
 
@@ -77,9 +76,23 @@ def _erro(texto: str, titulo: str = _TITULO_PADRAO, status: int = 502) -> Respon
     return Response(html, status=status, mimetype="text/html")
 
 
+def _url_invalida(url: str) -> bool:
+    # A mesma leitura do salto da ponte: barra invertida, espaço ou controle na URL configurada, ou uma URL que o
+    # `requests` não entende como http(s), é recusada. Com o `urlsplit`, "http://evil.com", barra invertida,
+    # "@localhost:5050" parecia localhost e passava pela regra do http, mas o `requests` conectava em evil.com, em texto
+    # puro e com a chave (revisão, 04/10/2026).
+    try:
+        ponte.origem_configurada(url)
+    except ValueError:
+        return True
+    return False
+
+
 def _http_fora_da_maquina_local(url: str) -> bool:
-    p = urlsplit(url)
-    return p.scheme.lower() == "http" and (p.hostname or "").lower() not in _LOCAL
+    # Esquema e host vêm da URL como o `requests` a vai usar (`origem_configurada`), e não do `urlsplit`; chame depois de
+    # `_url_invalida`. O host de IPv6 já vem sem colchetes ("::1").
+    esquema, host, _porta = ponte.origem_configurada(url)
+    return esquema == "http" and host not in _LOCAL
 
 
 def _confirmou_a_chave(r) -> bool:
@@ -94,6 +107,9 @@ def plataforma(caminho: str):
     if falta:
         return _erro("A ponte não está configurada: falta " + " e ".join(falta) + " no .env do Nexus.",
                      titulo="Ponte não configurada")
+    if _url_invalida(url):
+        return _erro("NEXUS_PLATAFORMA_URL é inválida: use https://servidor[:porta], sem barra invertida, espaço ou "
+                     "caractere de controle.", titulo="Ponte não configurada")
     if _http_fora_da_maquina_local(url):
         return _erro("NEXUS_PLATAFORMA_URL tem de ser https fora da máquina local: a chave iria sem criptografia.",
                      titulo="Ponte não configurada")

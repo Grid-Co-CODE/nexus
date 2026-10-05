@@ -207,6 +207,9 @@ LOCATIONS_ENGANOSAS = [
     "/x\r\nX-Evil: 1",                       # quebra de linha (injeção de cabeçalho)
     "/x\x00y", "/x\x7fy",                    # controles
     "/x\u00a0y", "/x\u2028y",                # espaços que não são o ASCII
+    # ASCII puro que passa pela lista de caracteres, mas o `urljoin` do Python 3.14 recusa com ValueError (colchete solto,
+    # IPv6 inválido): era 500 na rota, tem de ser a recusa de sempre
+    "https://[x@plat:5050/x", "//]", "http://evil.com[/x",
 ]
 
 
@@ -232,11 +235,48 @@ def test_origem_e_a_da_url_que_o_requests_vai_usar():
             pt._origem(malformada)
 
 
+def test_origem_de_ipv6_vem_sem_colchetes_e_os_dois_leitores_do_requests_tem_de_concordar(monkeypatch):
+    assert pt._origem("http://[::1]:5050/x") == ("http", "::1", 5050)
+    # endurecimento: o requests 2.34 escolhe o host do pool pelo `urlparse` e o urllib3 pelo `parse_url`; se um dia
+    # discordarem sobre a mesma URL já preparada, não se sabe para onde a conexão iria, e a ponte não vai
+    real = pt.parse_url
+
+    def outro_host(u):
+        return real(u)._replace(host="evil.com")
+    monkeypatch.setattr(pt, "parse_url", outro_host)
+    with pytest.raises(ValueError, match="discordam"):
+        pt._origem("https://plat:5050/x")
+
+
+def test_url_limpa_recusa_barra_invertida_espaco_e_controle():
+    assert pt.url_limpa("https://plat:5050") and pt.url_limpa("/api/novo?x=1&y=%C3%A1")
+    for ruim in ("a\\b", "a b", "a\tb", "a\nb", "a\x00b", "a\x7fb", "a\x85b", "a\u00a0b"):
+        assert not pt.url_limpa(ruim), repr(ruim)
+
+
+def test_origem_configurada_le_a_url_como_o_requests_e_recusa_a_enganosa():
+    assert pt.origem_configurada("http://localhost:5050") == ("http", "localhost", 5050)
+    assert pt.origem_configurada("http://[::1]:5050") == ("http", "::1", 5050)
+    assert pt.origem_configurada("https://plat") == ("https", "plat", 443)
+    for ruim in ("http://evil.com\\@localhost:5050", "https://plat:5050 ", " https://plat", "http://plat:5050:",
+                 "ftp://plat", "plat:5050", ""):
+        with pytest.raises(ValueError):
+            pt.origem_configurada(ruim)
+
+
+@pytest.mark.parametrize("local", ["http://evil.com[/x", "https://[x@plat:5050/x", "//]"])
+def test_vai_para_login_nao_estoura_com_location_malformada(local):
+    # a rota chama isto na Location crua de respostas 3xx que a ponte não seguiu (300, 305...): colchete solto fazia o
+    # `urlsplit` levantar ValueError (500). Não é o login.
+    assert pt.vai_para_login(local) is False
+    assert pt.vai_para_login("/login?next=%2F") is True
+
+
 @pytest.mark.parametrize("destino", [r"//evil.com\@plat:5050/x", r"https://evil.com\@plat:5050/x", "https://plat:5050:/x"])
 def test_origem_sozinha_ja_barra_mesmo_sem_a_checagem_de_caracteres(monkeypatch, destino):
     # defesa em profundidade: se a lista de caracteres proibidos falhasse (ou fosse afrouxada), a comparação de origem
     # pela URL real do requests ainda barra
-    monkeypatch.setattr(pt, "_location_limpa", lambda local: True)
+    monkeypatch.setattr(pt, "url_limpa", lambda local: True)
     s = _Sessao(_R(302, destino), _R(200))
     monkeypatch.setattr(pt, "_SESSAO", s)
     with pytest.raises(pt.RedirecionamentoRecusado):

@@ -25,10 +25,16 @@ só leitura", "em paralelo por enquanto"). Fase 1 de cinco para a plataforma mor
   valendo, a plataforma manda o pedido para o login dela). `NEXUS_PLATAFORMA_URL` com `http://` fora de
   localhost/127.0.0.1/::1 é recusada antes de qualquer rede: a chave iria em texto puro.
   `Location` com `\`, espaço ou controle é recusada (crua, antes do `urljoin`, que engole tabulação) e a origem é
-  conferida pela URL que o `requests` vai usar (`Request.prepare()` + `urllib3.parse_url`), não pelo `urlsplit`
+  conferida pela URL que o `requests` vai usar (`Request.prepare()`, lida pelo `urllib3.parse_url` E pelo `urlparse` do
+  adaptador do requests 2.34; se os dois discordam, recusa), não pelo `urlsplit`
   (04/10/2026: `//evil.com\@plat/x` passava pelo `urlsplit` e o urllib3 conectava em evil.com, com a chave). URL
-  malformada (porta inválida) é `RedirecionamentoRecusado`, nunca `ValueError`/500. A exceção traz o `motivo`
-  (outro servidor, redirecionamentos demais, endereço inválido) e a rota o mostra.
+  malformada (porta inválida, colchete solto: o `urljoin` do Python 3.14 levanta `ValueError`) é
+  `RedirecionamentoRecusado`, nunca `ValueError`/500. A exceção traz o `motivo` (outro servidor, redirecionamentos
+  demais, endereço inválido) e a rota o mostra.
+- **A `NEXUS_PLATAFORMA_URL` é lida do mesmo jeito** (`ponte.origem_configurada`, usada pela rota): barra invertida,
+  espaço ou controle, ou URL que não é http(s), vira a página "Ponte não configurada" sem nenhuma chamada de rede; a
+  regra "http só em localhost/127.0.0.1/::1" usa esquema e host dessa leitura, não do `urlsplit`
+  (04/10/2026: `http://evil.com\@localhost:5050` parecia localhost e o `requests` ia para evil.com em texto puro).
 - **Falha fechada se a plataforma não cumpre a chave:** resposta 2xx sem `X-Nexus-Leitura-Ok: 1` (cabeçalho que o
   `_auth_gate` da plataforma só põe quando aceitou a chave) não é mostrada. Plataforma sem `NEXUS_LEITURA_TOKEN` ignora
   a chave e deixa passar até gravação, e a ponte não tinha como saber.

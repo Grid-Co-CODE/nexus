@@ -11,7 +11,7 @@ navegador. Sem Flask: a rota está em nexus/torres/performance.
 """
 import json
 import threading
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlparse, urlsplit
 
 import requests
 from urllib3.util import parse_url
@@ -151,37 +151,63 @@ def _origem(url: str):
     Não pode ser o `urlsplit`: ele e o urllib3 leem a mesma URL de jeitos diferentes. Para o urllib3 a barra invertida
     termina o host: "https://evil.com", barra invertida, "@plat:5050/x" é o servidor evil.com, e o `urlsplit` lê
     "plat:5050" (revisão final, 04/10/2026: a chave de leitura chegaria a evil.com). Por isso a URL passa por
-    `Request.prepare()` (o mesmo caminho que o `Session.request` faz antes de conectar) e o resultado é lido pelo
-    `parse_url` do urllib3, que é quem escolhe o host da conexão. Porta omitida vale a padrão do esquema.
+    `Request.prepare()` (o mesmo caminho que o `Session.request` faz antes de conectar) e o resultado é lido pelos DOIS
+    leitores que o requests 2.34 usa na conexão: o `parse_url` do urllib3 e o `urlparse` do adaptador (é dele que sai o
+    host do pool de conexões). Se os dois discordam, não se sabe para onde a conexão iria: recusa. Porta omitida vale a
+    padrão do esquema; o host de IPv6 vem sem colchetes (é como o `urlparse` o entrega).
 
-    Levanta `ValueError` se a URL não se deixa preparar ou ler (porta malformada, sem host, esquema que não é http/https):
-    quem chama trata como recusa, nunca como "mesmo servidor"."""
+    Levanta `ValueError` se a URL não se deixa preparar ou ler (porta malformada, sem host, esquema que não é http/https,
+    leitores discordando): quem chama trata como recusa, nunca como "mesmo servidor"."""
     try:
-        u = parse_url(requests.Request("GET", url).prepare().url)
+        preparada = requests.Request("GET", url).prepare().url
+        u = parse_url(preparada)
+        p = urlparse(preparada)
+        host_p, porta_p = p.hostname, p.port
     except Exception as e:
-        # Qualquer falha (InvalidURL, LocationParseError, ...) é falha FECHADA: se não dá para saber para onde o
-        # `requests` iria, não se vai. `from e` mantém a causa para quem for investigar.
+        # Qualquer falha (InvalidURL, LocationParseError, ValueError do urlparse, ...) é falha FECHADA: se não dá para
+        # saber para onde o `requests` iria, não se vai. `from e` mantém a causa para quem for investigar.
         raise ValueError("URL inválida") from e
     esq = (u.scheme or "").lower()
     if esq not in _PORTA_PADRAO or not u.host:
         raise ValueError("URL sem esquema http(s) ou sem host")
-    return esq, u.host.lower(), u.port or _PORTA_PADRAO[esq]
+    host = u.host.lower().removeprefix("[").removesuffix("]")
+    porta = u.port or _PORTA_PADRAO[esq]
+    if (p.scheme or "").lower() != esq or (host_p or "").lower() != host or (porta_p or _PORTA_PADRAO[esq]) != porta:
+        raise ValueError("os leitores de URL do requests discordam")
+    return esq, host, porta
 
 
-def _location_limpa(local) -> bool:
-    """False se a Location traz algo que os leitores de URL interpretam de jeitos diferentes.
+def url_limpa(texto) -> bool:
+    """False se a URL (a Location de um salto, ou a NEXUS_PLATAFORMA_URL) traz algo que os leitores de URL interpretam de
+    jeitos diferentes.
 
     Barra invertida, espaço (qualquer um, inclusive os não ASCII) e caractere de controle não aparecem na Location de uma
-    plataforma Flask sã: caminho e query saem percent-encoded. Para o urllib3 a barra invertida termina o host, e o
-    `urljoin` engole tabulação e quebra de linha, então a Location tem de ser olhada CRUA, antes do `urljoin`. Os
-    controles são os do ASCII (< 32, 127) e os C1 (128 a 159)."""
-    return not any(c == "\\" or c.isspace() or ord(c) < 32 or 127 <= ord(c) <= 159 for c in str(local))
+    plataforma Flask sã (caminho e query saem percent-encoded) nem numa URL configurada certa. Para o urllib3 a barra
+    invertida termina o host, e o `urljoin` engole tabulação e quebra de linha, então o texto tem de ser olhado CRU, antes
+    do `urljoin`. Os controles são os do ASCII (< 32, 127) e os C1 (128 a 159)."""
+    return not any(c == "\\" or c.isspace() or ord(c) < 32 or 127 <= ord(c) <= 159 for c in str(texto))
+
+
+def origem_configurada(url: str):
+    """(esquema, host, porta) da NEXUS_PLATAFORMA_URL lida como o `requests` a lê (mesma leitura do salto).
+
+    A rota usa isto para a regra "http só na máquina local": com o `urlsplit`, "http://evil.com", barra invertida,
+    "@localhost:5050" parecia localhost e o `requests` conectava em evil.com, em texto puro, com a chave. `ValueError` se
+    a URL tem barra invertida, espaço ou controle, ou não é uma URL http(s) que o `requests` entenda."""
+    if not url_limpa(url):
+        raise ValueError("URL com barra invertida, espaço ou caractere de controle")
+    return _origem(url)
 
 
 def vai_para_login(destino: str) -> bool:
     # A plataforma manda para o /login quem chega sem sessão e sem a chave valendo. Seguir mostraria a tela de login dela
     # dentro do Nexus; a rota traduz isto em "a plataforma recusou a chave".
-    return urlsplit(destino).path.rstrip("/").endswith("/login")
+    try:
+        return urlsplit(destino).path.rstrip("/").endswith("/login")
+    except ValueError:
+        # Location crua de uma resposta que a ponte não validou (300, 305...) com colchete solto: o `urlsplit` levanta
+        # ValueError, que virava 500 na rota. Não dá para ser o login: não é.
+        return False
 
 
 def _seguir(pedido: dict):
@@ -203,10 +229,12 @@ def _seguir(pedido: dict):
         # recusada crua: é o que faz os leitores de URL discordarem. 2) A origem do destino é a da URL que o `requests`
         # vai usar (e não a do `urlsplit`), comparada com a da plataforma: seguir um salto para outro host (ou outra
         # porta, ou http) entregaria a chave de leitura a quem a plataforma, ou alguém no caminho, escolheu.
-        if not _location_limpa(local):
+        if not url_limpa(local):
             raise RedirecionamentoRecusado(MOTIVO_LOCATION_INVALIDO)
-        destino = urljoin(atual["url"], local)
         try:
+            # O `urljoin` também levanta ValueError (o Python 3.14 recusa colchete solto: "https://[x@plat:5050/x",
+            # "//]", "http://evil.com[/x"), então fica DENTRO do try: Location malformada é a página de erro 502, não 500.
+            destino = urljoin(atual["url"], local)
             destino_origem = _origem(destino)
         except ValueError as e:
             raise RedirecionamentoRecusado(MOTIVO_LOCATION_INVALIDO) from e

@@ -198,14 +198,33 @@ def test_recusa_de_salto_mostra_o_motivo_certo(logado_ponte, monkeypatch, locati
     assert all(p["url"].startswith("https://plat:5050/") for p in s.pedidos)
 
 
-def test_location_malformada_nao_vira_500(logado_ponte, monkeypatch):
-    # porta malformada fazia o `urlsplit` levantar ValueError dentro da ponte (500 na casca)
+@pytest.mark.parametrize("location", ["https://plat:5050:/x", "https://[x@plat:5050/x", "//]", "http://evil.com[/x"])
+def test_location_malformada_nao_vira_500(logado_ponte, monkeypatch, location):
+    # porta malformada (`urlsplit.port`) e colchete solto (`urljoin` do Python 3.14) levantavam ValueError dentro da
+    # ponte: 500 na casca em vez da página de erro. Nenhum pedido além do primeiro sai.
     class Sessao:
+        def __init__(self):
+            self.pedidos = []
+
         def request(self, **p):
-            return _Resp(302, b"", extra={"Location": "https://plat:5050:/x"})
-    monkeypatch.setattr(ponte, "_SESSAO", Sessao())
+            self.pedidos.append(p)
+            return _Resp(302, b"", extra={"Location": location})
+    s = Sessao()
+    monkeypatch.setattr(ponte, "_SESSAO", s)
     r = logado_ponte.get(ponte.PREFIXO + "/tempo-real")
-    assert r.status_code == 502 and "endereço de redirecionamento inválido" in r.get_data(as_text=True)
+    corpo = r.get_data(as_text=True)
+    assert r.status_code == 502 and "endereço de redirecionamento inválido" in corpo
+    assert "<h1>Redirecionamento recusado</h1>" in corpo and "segredo-xyz" not in corpo
+    assert len(s.pedidos) == 1 and s.pedidos[0]["url"].startswith("https://plat:5050/")
+
+
+def test_resposta_3xx_nao_seguida_com_location_malformada_nao_vira_500(logado_ponte, monkeypatch):
+    # 300 (e 305...) não é salto que a ponte siga: a resposta passa como está, e a rota olha a Location crua para saber
+    # se é o login. Colchete solto fazia o `urlsplit` levantar ValueError aí (500).
+    monkeypatch.setattr(ponte, "_SESSAO", type("S", (), {
+        "request": lambda *a, **k: _Resp(300, b"", extra={"Location": "http://evil.com[/x"})})())
+    r = logado_ponte.get(ponte.PREFIXO + "/tempo-real")
+    assert r.status_code == 300
 
 
 def _app_com(url):
@@ -232,6 +251,29 @@ def test_http_fora_da_maquina_local_e_recusado_antes_de_qualquer_rede(url, monke
 def test_http_na_maquina_local_e_https_em_qualquer_lugar_passam(url, monkeypatch):
     monkeypatch.setattr(ponte, "enviar", lambda **p: _Resp())
     assert _app_com(url).get(ponte.PREFIXO + "/api/state").status_code == 200
+
+
+@pytest.mark.parametrize("url", [
+    "http://evil.com\\@localhost:5050",       # o urlsplit lê "localhost"; o requests conecta em evil.com, em texto puro
+    "https://evil.com\\@plat:5050",           # mesmo em https: a URL configurada com barra invertida nunca vale
+    "http://localhost:5050 ",                 # espaço
+    "http://localhost:5050\t",                # tabulação
+    "http://localhost:5050:",                 # porta malformada
+    "ftp://plat",                             # não é http(s)
+    "plat:5050",                              # sem esquema
+])
+def test_url_da_plataforma_lida_como_o_requests_le_e_a_enganosa_e_recusada(url, monkeypatch):
+    # A regra "http só na máquina local" lia a URL com o `urlsplit`: `http://evil.com\@localhost:5050` passava, e o
+    # `requests` ia para evil.com em texto puro levando a chave. Agora a URL configurada com barra invertida, espaço ou
+    # controle é recusada com a página de configuração, sem nenhuma chamada de rede.
+    monkeypatch.setattr(ponte, "enviar", lambda **p: pytest.fail("a chave saiu para a URL enganosa"))
+    monkeypatch.setattr(ponte, "_SESSAO", type("S", (), {"request": lambda *a, **k: pytest.fail("rede")})())
+    c = _app_com(url)
+    for caminho in ("/tempo-real", "/api/state"):
+        r = c.get(ponte.PREFIXO + caminho)
+        corpo = r.get_data(as_text=True)
+        assert r.status_code == 502 and "<h1>Ponte não configurada</h1>" in corpo, caminho
+        assert "NEXUS_PLATAFORMA_URL é inválida" in corpo and "segredo-xyz" not in corpo
 
 
 def test_sem_configuracao_a_aba_diz_o_que_falta(logado):
