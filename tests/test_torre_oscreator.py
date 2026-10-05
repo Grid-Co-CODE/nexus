@@ -152,3 +152,14 @@ def test_clone_que_nao_sobe_vira_aviso_e_o_nexus_segue(logado, monkeypatch):
     html = resp.get_data(as_text=True)
     assert "OS Creator" in html and "PyQt6" in html
     assert logado.get("/").status_code == 200
+
+
+def test_troca_vale_com_crlf():
+    """Clone do Windows (core.autocrlf) sai em CRLF: a porta do menu e o topo têm de entrar do mesmo jeito (05/10/2026,
+    ensaio da T.I. num clone limpo: o abas.js saía sem a porta, sem erro)."""
+    from nexus.torres.oscreator import ponte
+    for de, para in ponte._TROCAS_ABAS + [(ponte._MARCA_DE, ponte._MARCA_PARA)]:
+        lf = b"antes\n" + de + b"depois\n"
+        crlf = lf.replace(b"\n", b"\r\n")
+        assert ponte._trocar(lf, de, para) == b"antes\n" + para + b"depois\n"
+        assert ponte._trocar(crlf, de, para) == (b"antes\n" + para + b"depois\n").replace(b"\n", b"\r\n")

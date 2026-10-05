@@ -79,6 +79,18 @@ _TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTop
                 (_ANCORA_MENSAGEM, _OUVIR_NEXUS + _ANCORA_MENSAGEM)]
 
 _METODOS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+
+def _trocar(corpo: bytes, de: bytes, para: bytes) -> bytes:
+    """Troca com a quebra de linha que o arquivo tiver: num clone do Windows (git com core.autocrlf) o clone sai em
+    CRLF, e a troca com LF não achava nada (05/10/2026, ensaio da T.I.: a porta do menu lateral não entrava no
+    abas.js, sem erro nenhum)."""
+    corpo = corpo.replace(de, para)
+    if b"\n" in de:
+        corpo = corpo.replace(de.replace(b"\n", b"\r\n"), para.replace(b"\n", b"\r\n"))
+    return corpo
+
+
 _trava = threading.Lock()
 
 # Sem prefixo de propósito: o OS Creator gera links /os/... absolutos, e o cookie dele vale só em /os.
@@ -135,7 +147,7 @@ def encaminhar(resto: str):
         environ.pop("HTTP_IF_MODIFIED_SINCE", None)
     resp = app.response_class.from_app(alvo, environ)
     if resp.mimetype == "text/html":
-        corpo = resp.get_data().replace(_VOLTAR_DE, b"").replace(_MARCA_DE, _MARCA_PARA)
+        corpo = _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA)
         if b"<head>" in corpo:
             # a função entra antes de qualquer script da página, que já a usa no <head>
             corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _ESTILO_NEXUS, 1)
@@ -145,7 +157,7 @@ def encaminhar(resto: str):
     elif ajusta_js and resp.status_code == 200:
         corpo = resp.get_data()
         for de, para in _TROCAS_ABAS:
-            corpo = corpo.replace(de, para)
+            corpo = _trocar(corpo, de, para)
         resp.set_data(corpo)
         # Marca de versão própria (a do original + "-nexus-" + o hash do que sai) e sem data: a data é a do arquivo
         # original, e um navegador que comparasse só a data acharia que nada mudou. O hash muda quando o ajuste muda
