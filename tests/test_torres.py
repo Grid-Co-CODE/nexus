@@ -1,5 +1,7 @@
 from nexus.cadeiras import CADEIRAS
-from nexus.torres import descobrir_torres, montar_menu
+import re
+
+from nexus.torres import descobrir_torres, montar_menu, telas_com_conteudo
 
 
 def test_treze_torres_descobertas():
@@ -51,6 +53,25 @@ def test_menu_abre_a_torre_atual():
     menu = montar_menu(descobrir_torres(), "cos", "pcm")
     pcm = next(m for m in menu if m["id"] == "pcm")
     assert pcm["aberta"] and not pcm["sua"]
+
+
+def test_tela_com_view_propria_conta_como_conteudo(app):
+    """O verde do menu sai do mapa de rotas: view própria conta, placeholder não (Levi, 04/10/2026)."""
+    prontas = telas_com_conteudo(app)
+    assert "/t/base/ligacoes" in prontas          # view própria
+    assert "/t/pcm/semana" in prontas
+    assert "/t/cos/mesa" not in prontas           # ainda placeholder
+    assert all(not u.startswith("/t/comando/") for u in prontas)
+
+
+def test_menu_pinta_de_verde_so_o_que_tem_conteudo(logado):
+    html = logado.get("/").get_data(as_text=True)
+    classe = {torre: extra for extra, torre in re.findall(r'<details class="torre( com-conteudo)?" data-torre="([^"]+)"', html)}
+    assert len(classe) == 13
+    assert classe["base"] and classe["os"]
+    assert not classe["comando"]
+    assert '<a href="/t/base/ligacoes" class="com-conteudo"' in html
+    assert 'href="/t/cos/mesa" class="com-conteudo"' not in html
 
 
 def test_aviso_aponta_a_pasta_certa(app):

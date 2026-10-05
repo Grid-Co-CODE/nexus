@@ -27,4 +27,8 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira 
 - **`<html data-nexus>`** + script anti-moldura: o OS Creator embutido não pode abrir o Nexus dentro do iframe dele.
 - **Servidor local some com a sessão do Claude que o subiu.** Para ficar no ar: `Iniciar Nexus.bat` (pythonw
   escondido, log em `logs/`) e `Parar Nexus.bat` (só o processo da porta 5070).
+- **Verde no menu = tela com conteúdo** (Levi, 04/10/2026, "para eu ir vendo o progresso"): torre com ao menos uma
+  tela pronta fica verde, e a tela pronta também. "Pronta" = a rota `/t/<torre>/<tela>` cai numa view própria, não no
+  `placeholder` da torre (`telas_com_conteudo`, calculado uma vez no primeiro pedido). Ninguém marca à mão: construiu a
+  tela, ela fica verde sozinha. A torre da cadeira deixou de ser verde (era o mesmo sinal); fica só a etiqueta "sua".
 - Edge "localhost recusou": o waitress tem de escutar em `127.0.0.1` **e** `[::1]`.

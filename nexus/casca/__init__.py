@@ -8,7 +8,7 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
 
 from ..auth import next_seguro
 from ..cadeiras import CADEIRAS
-from ..torres import montar_menu
+from ..torres import montar_menu, telas_com_conteudo
 
 bp = Blueprint("casca", __name__)
 
@@ -54,8 +54,12 @@ def instalar_contexto(app) -> None:
         blueprint = request.blueprint or ""
         torre_atual = blueprint.removeprefix("torre_") if blueprint.startswith("torre_") else None
         cadeira_id = session.get("cadeira")
+        # O mapa de rotas não muda depois do boot: calcula uma vez, na primeira página.
+        if "nexus_telas_prontas" not in app.extensions:
+            app.extensions["nexus_telas_prontas"] = telas_com_conteudo(app)
         return {
-            "menu": montar_menu(app.extensions["nexus_torres"], cadeira_id, torre_atual),
+            "menu": montar_menu(app.extensions["nexus_torres"], cadeira_id, torre_atual,
+                                app.extensions["nexus_telas_prontas"]),
             "cadeira": CADEIRAS.get(cadeira_id) if cadeira_id else None,
             "cadeiras": list(CADEIRAS.values()),
             "caminho": request.path,

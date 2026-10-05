@@ -52,7 +52,8 @@
       <i class="ph ph-house"></i><span>Início</span>
     </a>
     {% for t in menu %}
-    <details class="torre" data-torre="{{ t.id }}" data-sua="{{ 1 if t.sua else 0 }}" {% if t.aberta %}open{% endif %}>
+    {# Verde = a torre já tem tela com conteúdo (progresso, Levi 04/10/2026). #}
+    <details class="torre{% if t.prontas %} com-conteudo{% endif %}" data-torre="{{ t.id }}" data-sua="{{ 1 if t.sua else 0 }}" {% if t.aberta %}open{% endif %}>
       <summary title="{{ t.nome }}" data-primeira="{{ t.telas[0].url }}">
         <i class="ph ph-{{ t.icone }}"></i>
         <span>{{ t.nome }}</span>
@@ -60,7 +61,7 @@
       </summary>
       <ul>
         {% for s in t.telas %}
-        <li><a href="{{ s.url }}" {% if caminho == s.url %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
+        <li><a href="{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
         {% endfor %}
       </ul>
     </details>
