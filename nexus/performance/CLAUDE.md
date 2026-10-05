@@ -31,6 +31,12 @@ só leitura", "em paralelo por enquanto"). Fase 1 de cinco para a plataforma mor
   malformada (porta inválida, colchete solto: o `urljoin` do Python 3.14 levanta `ValueError`) é
   `RedirecionamentoRecusado`, nunca `ValueError`/500. A exceção traz o `motivo` (outro servidor, redirecionamentos
   demais, endereço inválido) e a rota o mostra.
+  **O `requests` lê a Location sozinho no `Session.send`, mesmo com `allow_redirects=False`** (preenche `r._next`): o
+  `urlparse` e o `latin1 -> utf8` dele levantam `ValueError` (`UnicodeDecodeError` incluso) DENTRO de `_SESSAO.request`,
+  antes de a ponte ver a resposta; `_seguir` captura esse `ValueError` em volta do envio e recusa (502, não 500). A
+  ponte relê a Location em UTF-8 como o requests (`encode("latin-1").decode("utf-8")`) antes das travas. **Teste
+  de salto com sessão falsa não vê isso** (04/10/2026: os testes passavam e a rota dava 500): use
+  `tests/sessao_real_sem_rede.py` (`requests.Session` real com adaptador falso montado, sem rede).
 - **A `NEXUS_PLATAFORMA_URL` é lida do mesmo jeito** (`ponte.origem_configurada`, usada pela rota): barra invertida,
   espaço ou controle, ou URL que não é http(s), vira a página "Ponte não configurada" sem nenhuma chamada de rede; a
   regra "http só em localhost/127.0.0.1/::1" usa esquema e host dessa leitura, não do `urlsplit`

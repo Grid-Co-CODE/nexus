@@ -5,6 +5,7 @@ import requests
 from urllib3.util import parse_url
 
 from nexus.performance import ponte as pt
+from sessao_real_sem_rede import sessao_real
 
 
 def test_so_leitura_e_os_tres_posts_de_consulta_passam():
@@ -304,6 +305,62 @@ def test_salto_no_mesmo_servidor_com_caminho_e_query_normais_continua_seguido(mo
     monkeypatch.setattr(pt, "_SESSAO", s)
     assert pt.enviar(**_pedido()).status_code == 200
     assert s.destinos == [("https", "plat", 5050)] * 3
+
+
+# Com a Session REAL do requests (adaptador falso montado, sem rede). `Session.send` lê a Location sozinho mesmo com
+# `allow_redirects=False` (`resolve_redirects(yield_requests=True)`): `urlparse` e `latin1 -> utf8` levantam ValueError
+# DENTRO de `request()`. A sessão falsa acima não passa por aí e deixava o 500 da rota escondido (re-revisão, 04/10/2026).
+LATIN1_CRU = "/caf" + chr(0xE9)       # byte 0xE9 cru no cabeçalho: não é UTF-8 válido (UnicodeDecodeError, subclasse de ValueError)
+
+
+@pytest.mark.parametrize("destino", LOCATIONS_ENGANOSAS + [LATIN1_CRU])
+def test_sessao_real_location_que_o_requests_nao_le_vira_recusa_e_nao_excecao(monkeypatch, destino):
+    s, ad = sessao_real((302, destino), (302, "/api/nunca"))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.RedirecionamentoRecusado) as e:           # e não ValueError/UnicodeDecodeError (500 na rota)
+        pt.enviar(**_pedido())
+    assert e.value.motivo == pt.MOTIVO_LOCATION_INVALIDO
+    # só o pedido original saiu, para a plataforma e com a chave
+    assert [p.url for p in ad.pedidos] == ["https://plat:5050/api/x"]
+    assert ad.pedidos[0].headers["X-Nexus-Leitura"] == "chave-k"
+
+
+def test_sessao_real_salto_no_mesmo_servidor_continua_seguido_com_a_chave(monkeypatch):
+    s, ad = sessao_real((302, "/api/novo?x=1"), (301, "https://plat:5050/api/b%5Cc"), (200, None))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    assert pt.enviar(**_pedido()).status_code == 200
+    assert [p.url for p in ad.pedidos] == ["https://plat:5050/api/x", "https://plat:5050/api/novo?x=1",
+                                           "https://plat:5050/api/b%5Cc"]
+    assert all(p.headers["X-Nexus-Leitura"] == "chave-k" for p in ad.pedidos)
+
+
+def test_sessao_real_location_em_utf8_cru_e_lida_como_o_requests_le(monkeypatch):
+    # O http.client entrega o cabeçalho em latin-1: os bytes UTF-8 de "é" (0xC3 0xA9) chegam como "Ã©". O requests os relê
+    # como UTF-8; a ponte também, senão pediria "/caf%C3%83%C2%A9" em vez de "/caf%C3%A9".
+    utf8_cru = "/caf" + chr(0xC3) + chr(0xA9)
+    s, ad = sessao_real((302, utf8_cru), (200, None))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    assert pt.enviar(**_pedido()).status_code == 200
+    assert [p.url for p in ad.pedidos] == ["https://plat:5050/api/x", "https://plat:5050/caf%C3%A9"]
+
+
+def test_sessao_real_espaco_nao_ascii_em_utf8_cru_continua_recusado(monkeypatch):
+    # 0xC2 0xA0 no fio é o espaço sem quebra: só aparece depois da releitura em UTF-8, e a trava de caracteres tem de olhar
+    # o texto relido (o que de fato iria ao pedido)
+    s, ad = sessao_real((302, "/x" + chr(0xC2) + chr(0xA0) + "y"), (200, None))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.RedirecionamentoRecusado) as e:
+        pt.enviar(**_pedido())
+    assert e.value.motivo == pt.MOTIVO_LOCATION_INVALIDO and len(ad.pedidos) == 1
+
+
+@pytest.mark.parametrize("destino", ["https://evil.com/x", "//evil.com/x", "https://plat:6060/x", "http://plat:5050/x"])
+def test_sessao_real_outro_servidor_continua_recusado(monkeypatch, destino):
+    s, ad = sessao_real((302, destino), (200, None))
+    monkeypatch.setattr(pt, "_SESSAO", s)
+    with pytest.raises(pt.RedirecionamentoRecusado) as e:
+        pt.enviar(**_pedido())
+    assert e.value.motivo == pt.MOTIVO_OUTRO_SERVIDOR and len(ad.pedidos) == 1
 
 
 def test_no_maximo_tres_saltos(monkeypatch):

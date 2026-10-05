@@ -5,6 +5,7 @@ from nexus import create_app
 from nexus.performance import ponte
 
 from conftest import SENHA_TESTE
+from sessao_real_sem_rede import sessao_real
 
 
 class _Resp:
@@ -216,6 +217,29 @@ def test_location_malformada_nao_vira_500(logado_ponte, monkeypatch, location):
     assert r.status_code == 502 and "endereço de redirecionamento inválido" in corpo
     assert "<h1>Redirecionamento recusado</h1>" in corpo and "segredo-xyz" not in corpo
     assert len(s.pedidos) == 1 and s.pedidos[0]["url"].startswith("https://plat:5050/")
+
+
+@pytest.mark.parametrize("location", ["https://[x@plat:5050/x", "//]", "http://evil.com[/x", "/caf" + chr(0xE9)])
+def test_sessao_real_location_que_o_requests_nao_le_e_502_e_nao_500(logado_ponte, monkeypatch, location):
+    # Com a Session REAL do requests (adaptador falso, sem rede): `Session.send` lê a Location sozinho mesmo sem seguir, e
+    # `urlparse` / `latin1 -> utf8` levantam ValueError (UnicodeDecodeError é subclasse) dentro de `request()`. A sessão
+    # falsa dos outros testes pula esse caminho e escondia o 500 (re-revisão do c6810e8, 04/10/2026).
+    s, ad = sessao_real((302, location), (302, "/api/nunca"))
+    monkeypatch.setattr(ponte, "_SESSAO", s)
+    r = logado_ponte.get(ponte.PREFIXO + "/api/state")
+    corpo = r.get_data(as_text=True)
+    assert r.status_code == 502 and "<h1>Redirecionamento recusado</h1>" in corpo
+    assert "endereço de redirecionamento inválido" in corpo and "segredo-xyz" not in corpo
+    assert [p.url for p in ad.pedidos] == ["https://plat:5050/api/state"]
+
+
+def test_sessao_real_salto_legitimo_no_mesmo_servidor_continua_seguido_pela_rota(logado_ponte, monkeypatch):
+    s, ad = sessao_real((302, "/api/novo"), (200, None))
+    monkeypatch.setattr(ponte, "_SESSAO", s)
+    r = logado_ponte.get(ponte.PREFIXO + "/api/state")
+    assert r.status_code == 200
+    assert [p.url for p in ad.pedidos] == ["https://plat:5050/api/state", "https://plat:5050/api/novo"]
+    assert all(p.headers["X-Nexus-Leitura"] == "segredo-xyz" for p in ad.pedidos)
 
 
 def test_resposta_3xx_nao_seguida_com_location_malformada_nao_vira_500(logado_ponte, monkeypatch):

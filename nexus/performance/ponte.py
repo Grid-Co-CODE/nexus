@@ -222,9 +222,23 @@ def _seguir(pedido: dict):
             r = _SESSAO.request(**atual)
         except requests.RequestException as e:
             raise ForaDoAr(type(e).__name__) from e
+        except ValueError as e:
+            # O `requests` LÊ a Location dentro do `Session.send` mesmo com `allow_redirects=False` (preenche `r._next`
+            # com `resolve_redirects(yield_requests=True)`): `urlparse` da Location e `latin1 -> utf8` levantam
+            # ValueError (`UnicodeDecodeError`/`UnicodeEncodeError` são subclasses) AQUI, antes de a ponte ver a
+            # resposta. "https://[x@plat:5050/x", "//]", "http://evil.com[/x" e um byte 0xE9 cru no cabeçalho davam 500
+            # na rota (re-revisão do c6810e8, 04/10/2026). É uma Location que ninguém sabe ler: recusa, nada sai.
+            raise RedirecionamentoRecusado(MOTIVO_LOCATION_INVALIDO) from e
         local = {str(k).lower(): v for k, v in (r.headers or {}).items()}.get("location")
         if r.status_code not in (301, 302, 303, 307, 308) or not local:
             return r
+        # O http.client entrega o cabeçalho decodificado em latin-1 e o `requests` o relê como UTF-8
+        # (`get_redirect_target`). A ponte faz a mesma leitura: sem isso pediria "/caf%C3%83%C2%A9" onde o requests
+        # pediria "/caf%C3%A9", e as travas abaixo olhariam um texto diferente do que vai ser usado.
+        try:
+            local = str(local).encode("latin-1").decode("utf-8")
+        except UnicodeError as e:
+            raise RedirecionamentoRecusado(MOTIVO_LOCATION_INVALIDO) from e
         # Duas travas, e nenhum pedido sai antes das duas. 1) Location com barra invertida, espaço ou controle é
         # recusada crua: é o que faz os leitores de URL discordarem. 2) A origem do destino é a da URL que o `requests`
         # vai usar (e não a do `urlsplit`), comparada com a da plataforma: seguir um salto para outro host (ou outra
