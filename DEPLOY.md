@@ -9,7 +9,7 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace. Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace. Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e a fila da Aprovação de OS usam a mesma) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da tela Base → Ligações (o de-para entre as bases) |
@@ -107,9 +107,8 @@ o servidor inteiro como uma só.
 
 As telas Aprovação de OS, Ordens de serviço e Triagem leem o registro de cada fechamento **que o próprio App de Campo
 grava no banco** (API db_performace, livros `fechamentos_app_campo` e `rondas_app_campo`, de hora em hora). O técnico
-vem como código (HMAC do e-mail): o `.env` do Nexus precisa da `NEXUS_PESSOA_HMAC`, a MESMA chave da configuração do
-App. **Ela não vai no pacote: o Levi passa à parte**; é uma linha `NEXUS_PESSOA_HMAC=...` no `.env`, seguida de um
-`systemctl restart nexus`. Sem ela, as telas seguem com o livro antigo do coletor (dados parados).
+vem como código (HMAC do e-mail): o `.env` do pacote já traz a `NEXUS_PESSOA_HMAC`, a MESMA chave da configuração do
+App. Sem ela, as telas seguiriam com o livro antigo do coletor (dados parados).
 
 **O coletor do Fracttal está aposentado:** não ponha `NEXUS_CAMPO_COLETOR=1` no servidor (o pacote não tem). Ele lia o
 Fracttal com a cota da empresa inteira para recalcular uma nota que o App já grava.
@@ -117,6 +116,15 @@ Fracttal com a cota da empresa inteira para recalcular uma nota que o App já gr
 A tela **Aprovação de OS** lê a fila do Fracttal ao vivo quando alguém a abre: ~55 pedidos de uma vez, no máximo a
 cada 10 minutos por servidor (os filtros reusam a mesma leitura). Em hora de pico da cota ela mostra o aviso de fila
 incompleta; a tela continua de pé.
+
+## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
+
+A aba Performance → Tempo real do Nexus mostra a plataforma de Performance por uma chave só de leitura. O Nexus já leva a
+chave; a plataforma precisa da mesma. No pacote vem à parte o arquivo `plataforma-tokens-nexus.txt`, com UMA linha
+`NEXUS_LEITURA_TOKEN=...`: acrescente no `tokens.txt` da raiz da plataforma, no servidor dela, e reinicie a plataforma.
+Conferir: no Nexus, **Performance → Tempo real** abre a Entrada da plataforma (antes disso, a aba diz "A plataforma
+recusou a chave"; o resto do Nexus não depende dela). Pelo Nexus, a API PV fica de fora por enquanto: só o que a
+plataforma já tem guardado.
 
 ## 8. Atualizar
 
@@ -145,10 +153,7 @@ dado cifrado do cadastro (CPF, telefone, endereço, receita) não volta.**
   (`dados/pcm/insumos.json`) e a AUXILIAR sai do cadastro, então gerar a semana não depende mais da pasta. Só as
   durações aprendidas (opcionais, em sombra) ficam de fora.
 - **Login:** é por senha de admin. O login Microsoft ainda não está ligado.
-- **Performance → Tempo real:** o Nexus já leva a chave; falta o outro lado. A linha `NEXUS_LEITURA_TOKEN=...` vai no
-  `tokens.txt` do **servidor da plataforma** (app.gridco.com.br), seguida de um reinício dela: o Levi manda num arquivo à
-  parte (`plataforma-tokens-nexus.txt`). Até lá, a aba diz "a plataforma não confirmou a chave"; o resto do Nexus não
-  depende dela. Pelo Nexus, a API PV fica de fora por enquanto: só o que a plataforma já tem guardado.
+
 - **Campo · App, ligação técnico ↔ cadastro pelo e-mail:** espera a `NEXUS_PESSOA_HMAC` (a mesma chave do App de Campo),
   que o Levi gera quando o App passar a mandar os dados. Até lá, o mapa dos técnicos vem vazio e as telas funcionam.
 - **Base → Ligações:** o pacote já traz o de-para calculado. O Fracttal entra pela foto da última semana gerada no
