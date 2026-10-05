@@ -5,6 +5,18 @@ Casca única da operação O&M da Grid Co. (specs de produto R00 a R13 do Fillip
 (`Grid-Co-CODE/nexus`): nenhum dado pessoal (CPF, telefone, e-mail, endereço), dado de cliente ou de contrato,
 print nem segredo em commit. Dado real mora em `dados/` e no armazém local, ambos fora do git.
 
+## Visão: os setores ligados pela base de dados (Levi, 05/10/2026)
+
+"Quero que veja o Nexus como um projeto onde todos os setores se interligam pela base de dados da API; a ideia é unir
+informações para conseguirmos fazer previsões e diagnósticos de forma que faça sentido. Sempre vamos focar em
+confiabilidade e governança dos dados, não podemos fazer nada nas coxas."
+- Todo setor grava e lê pela API de dados (PostgreSQL da T.I., `db_performace`), ligado por ID: o `cadastro_nexus` é a
+  chave comum (usina_id, pessoa_id, ...). Nada de JSON como banco, planilha no OneDrive nem Azure.
+- Confiabilidade antes de tela: conferir antes e depois de gravar; número pela metade não vai para a tela (a torre
+  Campo · App só sai da moldura com a coleta completa).
+- Governança: dado pessoal e sensível vai cifrado (cofre do cadastro); coluna nova em claro na API é revisada antes
+  (o endereço da usina foi em claro na 1ª carga do Campo · App, 04/10, e saiu no mesmo dia).
+
 ## REGRA: um `.md` por área, sempre em dia (Levi, 03/10/2026)
 
 Toda alteração em qualquer área atualiza o `CLAUDE.md` da pasta dela **no mesmo trabalho**; área sem `CLAUDE.md`
@@ -19,6 +31,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Casca, login, menu, servidor local | `nexus/casca/CLAUDE.md` |
 | Torres (como criar tela) | `nexus/torres/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
+| Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |
 | OS Creator embutido | `nexus/torres/oscreator/README.md` |
 | Performance (Tempo real pela ponte) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
 | PCM (programação semanal) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
