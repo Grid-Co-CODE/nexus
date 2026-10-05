@@ -10,6 +10,7 @@ Só leitura em três camadas: o portão da plataforma (403 para gravação com a
 navegador. Sem Flask: a rota está em nexus/torres/performance.
 """
 import json
+import re
 import threading
 from urllib.parse import urljoin, urlparse, urlsplit
 
@@ -26,6 +27,17 @@ POSTS_DE_CONSULTA = frozenset({"/api/os-performance/counts", "/api/os-creator/fr
 # `leitura_nexus.py` da plataforma: a chave de leitura RECUSA o pedido que os traz, então a ponte os tira antes de
 # enviar. O "Atualizar" das páginas, pelo Nexus, lê o que o motor já montou. ESPELHADA: muda aqui, muda lá.
 PARAMETROS_QUE_DISPARAM = frozenset({"force", "forcar", "run", "backfill"})
+# A API PV fica de fora (Levi, 05/10/2026: "por hora não puxa nada da API da thopen, estou tentando economizar requests
+# e tenho medo que duplique as chamadas"). Estas rotas abrem a usina na API PV na hora (Thopen, SEMP, Alves Lima e
+# 2C-API): a ponte nem pergunta, e a plataforma também as recusa pela chave e não fala com a API PV em pedido do Nexus.
+# Vale o que a plataforma já tem guardado. ESPELHADA: muda aqui, muda em `plataforma/leitura_nexus.py` (NEGADOS_API_PV).
+_FONTES_API_PV = "pv|2capi|semp|alveslima"
+NEGADOS_API_PV = tuple(re.compile(r) for r in (
+    r"^/api/plant/", r"^/api/pv/grupo/", r"^/api/pv/pr/", rf"^/api/({_FONTES_API_PV})/trackers/\d+",
+    r"^/api/(2capi|semp|alveslima)/trackers$", r"^/api/spv/(usina/|pdf)", r"^/api/etm/(chart|export)",
+    r"^/api/owen/strings/plant/",
+))
+AVISO_API_PV = "No Nexus, por enquanto, a API PV fica de fora: vale o que a plataforma já tem guardado."
 # cabeçalhos que a plataforma devolve e o navegador pode ver; o resto (Set-Cookie, salto, tamanho) fica aqui
 _CABECALHOS_QUE_PASSAM = ("Content-Type", "Content-Disposition", "Cache-Control", "Last-Modified", "ETag")
 
@@ -63,6 +75,11 @@ class RedirecionamentoRecusado(ForaDoAr):
 
 class Ocupada(Exception):
     """Todas as vagas da ponte estão em uso: o Nexus não aceita mais um pedido à plataforma agora."""
+
+
+def fora_por_api_pv(caminho: str) -> bool:
+    c = (caminho or "").split("?", 1)[0].rstrip("/")
+    return any(r.match(c) for r in NEGADOS_API_PV)
 
 
 def pode_passar(metodo: str, caminho: str) -> bool:

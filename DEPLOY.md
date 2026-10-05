@@ -9,7 +9,7 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace. Também liga o coletor do Campo · App (`NEXUS_CAMPO_COLETOR=1`) e diz onde está a plataforma de Performance (`NEXUS_PLATAFORMA_URL`) |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace. Também liga o coletor do Campo · App (`NEXUS_CAMPO_COLETOR=1`) e leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e coletor do Campo · App usam a mesma) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da tela Base → Ligações (o de-para entre as bases) |
@@ -143,9 +143,10 @@ dado cifrado do cadastro (CPF, telefone, endereço, receita) não volta.**
   (`dados/pcm/insumos.json`) e a AUXILIAR sai do cadastro, então gerar a semana não depende mais da pasta. Só as
   durações aprendidas (opcionais, em sombra) ficam de fora.
 - **Login:** é por senha de admin. O login Microsoft ainda não está ligado.
-- **Performance → Tempo real:** falta a chave de leitura da plataforma (`NEXUS_PLATAFORMA_TOKEN`, igual à
-  `NEXUS_LEITURA_TOKEN` do servidor da plataforma). Até ela entrar, a aba diz o que falta; o resto do Nexus não depende
-  dela.
+- **Performance → Tempo real:** o Nexus já leva a chave; falta o outro lado. A linha `NEXUS_LEITURA_TOKEN=...` vai no
+  `tokens.txt` do **servidor da plataforma** (app.gridco.com.br), seguida de um reinício dela: o Levi manda num arquivo à
+  parte (`plataforma-tokens-nexus.txt`). Até lá, a aba diz "a plataforma não confirmou a chave"; o resto do Nexus não
+  depende dela. Pelo Nexus, a API PV fica de fora por enquanto: só o que a plataforma já tem guardado.
 - **Campo · App, ligação técnico ↔ cadastro pelo e-mail:** espera a `NEXUS_PESSOA_HMAC` (a mesma chave do App de Campo),
   que o Levi gera quando o App passar a mandar os dados. Até lá, o mapa dos técnicos vem vazio e as telas funcionam.
 - **Base → Ligações:** o pacote já traz o de-para calculado. O Fracttal entra pela foto da última semana gerada no

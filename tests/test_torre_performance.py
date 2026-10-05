@@ -92,6 +92,24 @@ def test_gravacao_nao_sai_do_nexus(logado_ponte, monkeypatch):
     assert r.status_code == 403 and r.get_json()["error"] == "somente leitura (Nexus)"
 
 
+@pytest.mark.parametrize("caminho", ["/api/plant/297410", "/api/pv/trackers/297410/chart", "/api/semp/trackers",
+                                     "/api/2capi/trackers/1/chart.csv", "/api/spv/usina/12", "/api/etm/chart"])
+def test_api_pv_nao_sai_do_nexus(logado_ponte, monkeypatch, caminho):
+    """Levi, 05/10/2026: "por hora não puxa nada da API da thopen". O detalhe que abriria a usina na API PV nem chega à
+    plataforma; o que ela já tem guardado (tabela, lista de trackers) segue passando."""
+    monkeypatch.setattr(ponte, "enviar", lambda **p: pytest.fail("pedido da API PV saiu do Nexus"))
+    r = logado_ponte.get(ponte.PREFIXO + caminho)
+    assert r.status_code == 403 and r.get_json()["error"] == ponte.AVISO_API_PV
+
+
+def test_o_guardado_da_api_pv_passa(logado_ponte, monkeypatch):
+    enviados = []
+    monkeypatch.setattr(ponte, "enviar", lambda **p: enviados.append(p) or _Resp(corpo=b"{}"))
+    for c in ("/api/data", "/api/pv/trackers", "/api/pv/trackers/parados", "/api/spv/usinas", "/api/etm"):
+        assert logado_ponte.get(ponte.PREFIXO + c).status_code == 200, c
+    assert len(enviados) == 5
+
+
 def test_post_de_consulta_passa(logado_ponte, monkeypatch):
     monkeypatch.setattr(ponte, "enviar", lambda **p: _Resp(corpo=b'{"A":1}'))
     r = logado_ponte.post(ponte.PREFIXO + "/api/os-performance/counts", json={"usinas": ["A"]})

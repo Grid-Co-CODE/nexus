@@ -123,6 +123,8 @@ def plataforma(caminho: str):
         return jsonify({"ok": False, "error": "caminho inválido"}), 400
     if not ponte.pode_passar(request.method, c):
         return jsonify({"ok": False, "error": "somente leitura (Nexus)"}), 403
+    if ponte.fora_por_api_pv(c):
+        return jsonify({"ok": False, "error": ponte.AVISO_API_PV}), 403
     pedido = ponte.montar_pedido(url, token, request.method, c, list(request.args.items(multi=True)),
                                  request.get_data() if request.method == "POST" else None, request.content_type)
     try:
