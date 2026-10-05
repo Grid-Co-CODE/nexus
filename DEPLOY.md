@@ -154,8 +154,6 @@ dado cifrado do cadastro (CPF, telefone, endereço, receita) não volta.**
   durações aprendidas (opcionais, em sombra) ficam de fora.
 - **Login:** é por senha de admin. O login Microsoft ainda não está ligado.
 
-- **Campo · App, ligação técnico ↔ cadastro pelo e-mail:** espera a `NEXUS_PESSOA_HMAC` (a mesma chave do App de Campo),
-  que o Levi gera quando o App passar a mandar os dados. Até lá, o mapa dos técnicos vem vazio e as telas funcionam.
 - **Base → Ligações:** o pacote já traz o de-para calculado. O Fracttal entra pela foto da última semana gerada no
   Nexus (`dados/pcm/geracoes/*/`): só use "Ler as bases de novo" depois da 1ª geração no servidor. Antes dela, o
   Fracttal liga só pelo nome das usinas (sem o código do equipamento, liga menos).
