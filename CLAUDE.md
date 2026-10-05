@@ -77,4 +77,8 @@ Sem o `.env` completo o app não sobe, e diz qual variável falta.
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.
 - Commit só quando pedido. Quando houver deploy automático, push na `main` vai para produção.
+- **Quem sobe o quê:** os administradores (Levi) commitam direto na `main`. O programador do COS entra por pull
+  request, e a conferência `pasta-do-cos` só aprova o que mexe na área dele (`nexus/torres/cos/CLAUDE.md`, "Como
+  entregar"). Quem obriga é a regra da `main` no GitHub (ruleset "main: pull request e pasta do COS"); mudar a área é
+  mexer no `.github/workflows/pasta-do-cos.yml`.
 - Antes de dar algo por pronto: testes passando e a tela conferida no navegador (desktop e 375 px).
