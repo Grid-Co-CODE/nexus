@@ -26,15 +26,66 @@
   {% set pts = lidas|reverse|list %}{% set w = 760 %}{% set h = 150 %}{% set n = pts|length %}
   {% macro x(i) %}{{ 40 + (i * (w - 60) / ((n - 1) or 1))|round(1) }}{% endmacro %}
   {% macro y(v) %}{{ 15 + ((5 - v) * (h - 40) / 4)|round(1) }}{% endmacro %}
+  {% set passo = (w - 60) / ((n - 1) or 1) %}
   <section class="cn-painel cn-evolucao">
-    <div class="cn-lista-cab"><h2>Evolução</h2><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação</span></div>
+    <div class="cn-lista-cab"><h2>Evolução</h2><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação · passe o mouse no ponto</span></div>
     <svg viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Sujidade e vegetação por ronda">
       {% for v in range(1, 6) %}<line x1="34" x2="{{ w - 10 }}" y1="{{ y(v) }}" y2="{{ y(v) }}" class="grade{% if v == 3 %} limite{% endif %}"/><text x="24" y="{{ y(v)|float + 4 }}" class="eixo">{{ v }}</text>{% endfor %}
-      <polyline class="suj" points="{% for p in pts if p.sujidade is not none %}{{ x(loop.index0) }},{{ y(p.sujidade) }} {% endfor %}"/>
-      <polyline class="veg" points="{% for p in pts if p.vegetacao is not none %}{{ x(loop.index0) }},{{ y(p.vegetacao) }} {% endfor %}"/>
-      {% for p in pts %}{% if p.sujidade is not none %}<circle class="suj" cx="{{ x(loop.index0) }}" cy="{{ y(p.sujidade) }}" r="4"><title>{{ dia_curto(p.data) }}: sujidade {{ p.sujidade }}</title></circle>{% endif %}{% if p.vegetacao is not none %}<circle class="veg" cx="{{ x(loop.index0) }}" cy="{{ y(p.vegetacao) }}" r="4"><title>{{ dia_curto(p.data) }}: vegetação {{ p.vegetacao }}</title></circle>{% endif %}<text x="{{ x(loop.index0) }}" y="{{ h - 4 }}" class="eixo" text-anchor="middle">{{ dia_curto(p.data) }}</text>{% endfor %}
+      {# o x é o da ronda na lista inteira: filtrar no for renumeraria o loop e deslocaria o ponto #}
+      <polyline class="suj" points="{% for p in pts %}{% if p.sujidade is not none %}{{ x(loop.index0) }},{{ y(p.sujidade) }} {% endif %}{% endfor %}"/>
+      <polyline class="veg" points="{% for p in pts %}{% if p.vegetacao is not none %}{{ x(loop.index0) }},{{ y(p.vegetacao) }} {% endif %}{% endfor %}"/>
+      <line class="cn-guia" x1="0" x2="0" y1="10" y2="{{ h - 22 }}" visibility="hidden"/>
+      {# um grupo por ronda: passar o mouse (ou o foco do teclado) mostra OS, quem fez e quando (Levi, 06/10) #}
+      {% for p in pts %}
+      <g class="cn-ponto" tabindex="0" data-x="{{ x(loop.index0) }}" data-os="{{ p.os or 'sem OS' }}" data-tec="{{ p.tecnico or '—' }}"
+         data-quando="{{ p.data[8:10] }}/{{ p.data[5:7] }}/{{ p.data[:4] }}{% if p.ini_hm %} às {{ p.ini_hm }}{% if p.fim_hm %} (até {{ p.fim_hm }}){% endif %}{% endif %}"
+         data-suj="{{ '—' if p.sujidade is none else p.sujidade }}" data-veg="{{ '—' if p.vegetacao is none else p.vegetacao }}"
+         aria-label="OS {{ p.os or 'sem OS' }}, {{ p.tecnico or '—' }}, {{ dia_curto(p.data) }}: sujidade {{ '—' if p.sujidade is none else p.sujidade }}, vegetação {{ '—' if p.vegetacao is none else p.vegetacao }}">
+        <rect class="cn-alvo" x="{{ (x(loop.index0)|float - passo / 2)|round(1) }}" y="0" width="{{ passo|round(1) }}" height="{{ h - 18 }}"/>
+        {% if p.sujidade is not none %}<circle class="suj" cx="{{ x(loop.index0) }}" cy="{{ y(p.sujidade) }}" r="4"/>{% endif %}
+        {% if p.vegetacao is not none %}<circle class="veg" cx="{{ x(loop.index0) }}" cy="{{ y(p.vegetacao) }}" r="4"/>{% endif %}
+      </g>
+      <text x="{{ x(loop.index0) }}" y="{{ h - 4 }}" class="eixo" text-anchor="middle">{{ dia_curto(p.data) }}</text>
+      {% endfor %}
     </svg>
+    <div class="cn-dica" role="tooltip" hidden>
+      <b class="cn-dica-os"></b><span class="cn-dica-tec"></span><span class="cn-dica-quando"></span>
+      <span class="cn-dica-niveis"><i class="suj"></i>sujidade <b class="cn-dica-suj"></b><i class="veg"></i>vegetação <b class="cn-dica-veg"></b></span>
+    </div>
   </section>
+  <script>
+    // a dica do ponto: OS, quem fez e o dia com a hora; o texto entra só por textContent (o dado vem do livro do App)
+    (function () {
+      var sec = document.querySelector('.cn-evolucao'); if (!sec) return;
+      var dica = sec.querySelector('.cn-dica'), guia = sec.querySelector('.cn-guia');
+      function campo(c, v) { dica.querySelector(c).textContent = v; }
+      function limpa() { sec.querySelectorAll('.cn-ponto.ativo').forEach(function (o) { o.classList.remove('ativo'); }); }
+      function mostra(g) {
+        campo('.cn-dica-os', g.dataset.os === 'sem OS' ? 'Sem OS' : 'OS ' + g.dataset.os);
+        campo('.cn-dica-tec', g.dataset.tec); campo('.cn-dica-quando', g.dataset.quando);
+        campo('.cn-dica-suj', g.dataset.suj); campo('.cn-dica-veg', g.dataset.veg);
+        guia.setAttribute('x1', g.dataset.x); guia.setAttribute('x2', g.dataset.x); guia.setAttribute('visibility', 'visible');
+        limpa(); g.classList.add('ativo');
+        dica.hidden = false;
+        // a dica fica acima do ponto mais alto da ronda; perto do topo, desce para baixo dele
+        var pts = g.querySelectorAll('circle'), alvo = pts.length ? pts[0] : g;
+        pts.forEach(function (c) { if (c.getBoundingClientRect().top < alvo.getBoundingClientRect().top) alvo = c; });
+        var r = alvo.getBoundingClientRect(), s = sec.getBoundingClientRect();
+        var meio = r.left - s.left + r.width / 2, topo = r.top - s.top;
+        var esq = Math.max(8, Math.min(meio - dica.offsetWidth / 2, sec.clientWidth - dica.offsetWidth - 8));
+        var cima = topo - dica.offsetHeight - 12;
+        dica.style.left = esq + 'px';
+        dica.style.top = (cima < 4 ? topo + r.height + 12 : cima) + 'px';
+      }
+      function esconde() { dica.hidden = true; guia.setAttribute('visibility', 'hidden'); limpa(); }
+      sec.querySelectorAll('.cn-ponto').forEach(function (g) {
+        g.addEventListener('mouseenter', function () { mostra(g); });
+        g.addEventListener('focus', function () { mostra(g); });
+        g.addEventListener('mouseleave', esconde);
+        g.addEventListener('blur', esconde);
+      });
+    })();
+  </script>
   {% endif %}
   <div class="cn-lista-cab"><h2>Histórico de rondas</h2><span class="mudo">a mais recente primeiro</span></div>
   <div class="cn-tab"><table>
@@ -50,7 +101,7 @@
         <td>{{ nivel(r.sujidade) }}</td><td>{{ nivel(r.vegetacao) }}</td>
         <td class="cn-menor">{{ r.vala or '—' }}</td>
         <td>{% if r.sensores_sujos %}<span class="cn-t-alerta">{{ r.sensores_sujos|join(', ') }}</span>{% elif r.lida %}<span class="mudo">limpos</span>{% else %}—{% endif %}</td>
-        <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if not r.falhas and not r.pendencia %}—{% endif %}</td>
+        <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia and r.pend_obs not in (r.falhas or '') %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if not r.falhas and not r.pendencia %}—{% endif %}</td>
         <td class="m">{% if r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td></tr>
     {% else %}<tr><td colspan="12" class="mudo">Nenhuma ronda pelo App nos últimos 90 dias.</td></tr>{% endfor %}
     </tbody></table></div>

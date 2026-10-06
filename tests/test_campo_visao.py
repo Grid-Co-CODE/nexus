@@ -517,3 +517,14 @@ def test_historico_de_rondas_da_usina_com_sujidade_e_vegetacao(banco, logado):
     assert pag.count('class="cn-pessoa"') == 2
     vazia = logado.get("/t/campo/rondas/usina/3").get_data(as_text=True)
     assert "Nenhuma ronda pelo App nos últimos 90 dias" in vazia and "Coração 1" in vazia
+
+
+def test_grafico_do_historico_diz_os_quem_fez_e_quando(banco, logado, monkeypatch):
+    """Levi, 06/10: no gráfico de evolução, passar o mouse no ponto mostra a OS, quem fez e o dia com a hora."""
+    from nexus.campo import ronda_checklist
+    monkeypatch.setattr(ronda_checklist, "respostas", lambda: {"500": {"sujidade": 4, "vegetacao": 2}})
+    pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+    assert pag.count('class="cn-ponto"') == 2 and 'class="cn-dica"' in pag
+    d1 = _dia(1)
+    assert f'data-quando="{d1[8:10]}/{d1[5:7]}/{d1[:4]} às 07:00 (até 08:00)"' in pag
+    assert 'data-os="500"' in pag and 'data-tec="Fulano Souza"' in pag and 'data-suj="4"' in pag

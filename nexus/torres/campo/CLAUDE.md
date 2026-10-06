@@ -100,7 +100,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     nome da usina já aparece o histórico de rondas com data e sujidade e vegetação"): o nome da usina é link nas abas
     Registros, Sujidade e Cobertura. Todas as rondas do livro (90 dias), a mais recente primeiro, com sujidade,
     vegetação, vala e sensores da OS (só das OS lidas: em verificação e aprovadas dos últimos 45 dias; o resto fica
-    "—"), e a evolução em gráfico quando há duas leituras ou mais.
+    "—"), e a evolução em gráfico quando há duas leituras ou mais. Passar o mouse (ou o foco do teclado) num ponto
+    mostra a OS, quem fez, o dia com a hora (início e fim) e os dois níveis (Levi, 06/10); o texto entra por
+    `textContent`, nunca como HTML, porque vem do livro do App.
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
   - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não
