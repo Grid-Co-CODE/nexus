@@ -53,7 +53,9 @@ O Nexus serve o clone em `/os/*`, **dentro do próprio processo**, sem segundo s
 nesta pasta.
 
 - **Login:** a ponte é uma rota do Nexus, então quem não entrou no Nexus para no portão dele. Depois disso, o login
-  do Fracttal é o do próprio OS Creator, por pessoa.
+  do Fracttal é o do próprio OS Creator, por pessoa. Quando o JWT do Fracttal vence e não renova, o clone respondia com o aviso do app de
+  desktop ("cole um novo em fracttal_login.txt"); a ponte troca isso por voltar ao login do OS Creator, limpando o
+  cookie dele, e depois volta à mesma tela (pedido de dados recebe 401 com `login: true`). Levi, 05/10/2026.
 - **Telas da torre:** cada uma (`/t/os/<tela>`) leva ao OS Creator na seção dela.
 
   | Tela da torre | Abre em |

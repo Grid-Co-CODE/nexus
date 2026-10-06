@@ -165,7 +165,18 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
   páginas recusadas com 429, e cada visita recomeçava do zero). `aprovacao.py` relê em segundo plano, uma leitura por
   vez, quando a fila tem mais de 10 min; mostra a última fila boa e quando foi lida; depois de recusa, 5 min sem
   tentar. A cópia do App nunca relê na hora da tela (`FILA_TTL_S` vai para "sempre" a cada visita). Medido em 05/10:
-  a visita responde em 0,01 s; a 1ª leitura levou ~1 min. Não abra essa tela em teste no horário de campo.
+  a visita responde em 0,01 s. Não abra essa tela em teste no horário de campo.
+  - **O gargalo** (Levi, 05/10: "por que demora se o histórico do OS Creator carrega tão rápido?"): o REST do Fracttal
+    entrega no máximo 100 tarefas por pedido (limit=1000 devolve 99) e a fila tem ~5.500, então são 55 páginas de
+    ~1,1 s; até 05/10 saíam uma por vez com 0,5 s de folga (~90 s). O histórico do OS Creator pergunta outra coisa: o RPC
+    com o login da pessoa, com período e "criado por" filtrados no servidor (poucas OS). Agora `fracttal.py` deixa 4
+    pedidos ao mesmo tempo, no máximo 4 por segundo, e em segundo plano tenta de novo depois de um 429 (5 s, 10 s); a
+    fila é lida ao subir o Nexus (`aprovacao.aquecer`, 20 s depois; `NEXUS_CAMPO_AQUECER=0` desliga). Medido: fila
+    inteira em ~20 s.
+  - **Filtro de equipe e de supervisor** pelo cadastro: as usinas da equipe (ou do supervisor) pelo nome no Fracttal
+    (de-para "Fracttal · Classificação 1", `visao.usinas_do_fracttal`) viram o escopo de usinas da conta do App
+    (`_area_ok`, `clusters.usinas`): grupos, números e lista saem já filtrados. Usina sem de-para do Fracttal não entra
+    em filtro nenhum (a lista sai em `sem_de_para`).
 
 ## Peças em `nexus/campo/`
 

@@ -1,0 +1,130 @@
+"""Aprovação de OS (05/10/2026): o gargalo da fila do Fracttal, os filtros de equipe e supervisor pelo cadastro, e a
+sessão vencida do Fracttal no OS Creator voltando ao login (Levi: "por qual motivo demora tanto ... exponha e
+resolva!", "tem que voltar a logar no Fracttal", "Adicione um filtro de supervisores e Equipes")."""
+import pytest
+from pg_falso import ApiPGFalsa
+from test_campo_aprovacao import FracttalFalso, _nota, _os
+from test_campo_regras_app import TabelaFalsa
+from test_campo_visao import _aba
+
+from nexus.campo import fracttal, leitura, tabelas, visao
+
+
+class _Resp:
+    def __init__(self, status, corpo=None):
+        self.status_code, self._corpo = status, corpo or {}
+
+    def json(self):
+        return self._corpo
+
+    def raise_for_status(self):
+        pass
+
+
+def test_recusa_em_segundo_plano_espera_e_tenta_de_novo(monkeypatch):
+    import requests
+    respostas = [_Resp(429), _Resp(200, {"data": [1]})]
+    monkeypatch.setattr(requests, "get", lambda *a, **k: respostas.pop(0))
+    monkeypatch.setattr(fracttal, "_token", lambda: "t")
+    monkeypatch.setattr(fracttal, "ESPERAS_RECUSA_S", (0, 0))
+    assert fracttal.ler("work_orders?x=1") == {"data": [1]} and respostas == []
+
+
+def test_recusa_dentro_da_tela_sobe_na_hora(app, monkeypatch):
+    import requests
+    chamadas = []
+    monkeypatch.setattr(requests, "get", lambda *a, **k: chamadas.append(1) or _Resp(429))
+    monkeypatch.setattr(fracttal, "_token", lambda: "t")
+    with app.test_request_context():
+        with pytest.raises(fracttal.Recusado):
+            fracttal.ler("work_orders?x=1")
+    assert len(chamadas) == 1
+
+
+def test_no_maximo_4_pedidos_ao_mesmo_tempo(monkeypatch):
+    import threading
+    import time
+    import requests
+    agora, pico = [0], [0]
+    trava = threading.Lock()
+
+    def get(*a, **k):
+        with trava:
+            agora[0] += 1
+            pico[0] = max(pico[0], agora[0])
+        time.sleep(0.05)
+        with trava:
+            agora[0] -= 1
+        return _Resp(200, {"data": []})
+    monkeypatch.setattr(requests, "get", get)
+    monkeypatch.setattr(fracttal, "_token", lambda: "t")
+    monkeypatch.setattr(fracttal, "INTERVALO_S", 0)
+    ts = [threading.Thread(target=fracttal.ler, args=(f"p{i}",)) for i in range(12)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert 1 < pico[0] <= fracttal.SIMULTANEOS
+
+
+@pytest.fixture
+def fila_e_cadastro(app):
+    """A fila do Fracttal (usina "SP 01" no Fracttal) e o cadastro ligando "SP 01" à usina 1 da equipe SP Norte 01."""
+    api = ApiPGFalsa()
+    _aba(api, "cadastro_nexus", "usinas", [
+        {"usina_id": 1, "nome": "Usina A", "status": "OPERAÇÃO", "equipe_id": 10, "data_mobilizacao": "2025-01-01",
+         "uf": "SP"},
+        {"usina_id": 2, "nome": "Usina B", "status": "OPERAÇÃO", "equipe_id": 20, "data_mobilizacao": "2025-01-01",
+         "uf": "SC"}])
+    _aba(api, "cadastro_nexus", "equipes", [{"equipe_id": 10, "nome": "SP Norte 01"}, {"equipe_id": 20, "nome": "SC Oeste 01"}])
+    _aba(api, "cadastro_nexus", "de_para", [
+        {"usina_id": 1, "sistema": "Fracttal · Classificação 1", "chave_externa": "SP 01"},
+        {"usina_id": 2, "sistema": "Fracttal · Classificação 1", "chave_externa": "SC 01"}])
+    _aba(api, "cadastro_nexus", "pessoas", [
+        {"pessoa_id": 1, "vinculo": "Colaborador de campo", "equipe_id": 10, "status": "Ativo", "supervisor_id": 90},
+        {"pessoa_id": 2, "vinculo": "Colaborador de campo", "equipe_id": 20, "status": "Ativo", "supervisor_id": 91}])
+    app.config.update(GRIDCO_DB_API="http://pg.falso")
+    app.extensions["nexus_dados_sessao"] = api
+    dados = {"qualidadelog": [_nota(15102, 96), _nota(15088, 71)]}
+    fx = FracttalFalso([_os(15002, 33, "Técnico 7"), _os(15088, 8, "Técnico 4"), _os(15102, 4, "Técnico 5")])
+    tabelas.usar_fornecedor(lambda nome: TabelaFalsa(dados.setdefault(nome, [])))
+    fracttal.usar_fornecedor(fx)
+    leitura.limpar_cache()
+    visao.limpar()
+    yield
+    tabelas.usar_fornecedor(None)
+    fracttal.usar_fornecedor(None)
+    leitura.limpar_cache()
+    visao.limpar()
+    app.extensions.pop("nexus_dados_sessao", None)
+
+
+def test_filtro_de_equipe_e_supervisor_pelo_cadastro(fila_e_cadastro, logado):
+    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    assert 'id="cn-equipe"' in html and 'id="cn-supervisor"' in html and "SP Norte 01" in html
+    assert ">15102<" in html and ">15002<" in html
+    html = logado.get("/t/campo/aprovacao?dias=60&equipe=SP+Norte+01").get_data(as_text=True)
+    assert ">15102<" in html and ">15088<" in html and ">15002<" in html          # as 3 são da usina "SP 01"
+    html = logado.get("/t/campo/aprovacao?dias=60&equipe=SC+Oeste+01").get_data(as_text=True)
+    assert ">15102<" not in html and "Nada na fila com esses filtros" in html
+    html = logado.get("/t/campo/aprovacao?dias=60&supervisor=Supervisor+91").get_data(as_text=True)
+    assert ">15102<" not in html                                                  # o supervisor 91 é da SC Oeste 01
+
+
+# ── OS Creator: sessão do Fracttal vencida volta ao login ──────────────────────────────────────────────────────
+def _clone_que_responde(corpo: bytes, tipo: str):
+    def wsgi(environ, start_response):
+        start_response("200 OK", [("Content-Type", tipo)])
+        return [corpo]
+    wsgi.config = {"SESSION_COOKIE_NAME": "os_sessao"}
+    return wsgi
+
+
+def test_jwt_vencido_no_os_creator_volta_ao_login(logado, monkeypatch):
+    from nexus.torres.oscreator import ponte
+    aviso = "⚠ O JWT do login do Fracttal expirou — cole um novo em fracttal_login.txt.".encode()
+    monkeypatch.setattr(ponte, "clone", lambda app: _clone_que_responde(b"<html><head></head>" + aviso, "text/html"))
+    r = logado.get("/os/historico?modo=criadas")
+    assert r.status_code == 302 and r.headers["Location"] == "/os/login?next=%2Fos%2Fhistorico%3Fmodo%3Dcriadas"
+    assert any("os_sessao=;" in c and "Path=/os" in c for c in r.headers.getlist("Set-Cookie"))
+    monkeypatch.setattr(ponte, "clone", lambda app: _clone_que_responde(b'{"erro": "' + aviso + b'"}', "application/json"))
+    r = logado.get("/os/historico/meta")
+    assert r.status_code == 401 and r.get_json()["login"] is True

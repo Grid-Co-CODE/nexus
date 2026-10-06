@@ -456,6 +456,34 @@ def ranking(dias: int = 30) -> leitura.Leitura:
     return _ler(("visao_ranking", dias), calcular)
 
 
+# ── Equipe e supervisor das usinas do Fracttal ───────────────────────────────────────────────────────────────────
+FRACTTAL_C1 = "Fracttal · Classificação 1"
+
+
+def usinas_do_fracttal() -> leitura.Leitura:
+    """Para filtrar o que vem do Fracttal por equipe ou supervisor (Levi, 05/10: "As usinas do Fracttal são ligadas
+    com as usinas do antigo BD_Operações de forma que dê para fazer essas ligações, certo?" Sim: pelo de-para "Fracttal ·
+    Classificação 1" do cadastro, o mesmo do Ligador). {"equipes": {equipe: [nome no Fracttal]}, "supervisores":
+    {supervisor: [nome no Fracttal]}, "sem_de_para": [usina mobilizada sem nome do Fracttal]}."""
+    def calcular():
+        b = _Base()
+        nomes = {}
+        for d in _livro("cadastro_nexus", "de_para"):
+            uid = D._id(d.get("usina_id"))
+            if uid and str(d.get("sistema") or "").strip() == FRACTTAL_C1 and str(d.get("chave_externa") or "").strip():
+                nomes.setdefault(uid, set()).add(str(d["chave_externa"]).strip())
+        equipes, supervisores = {}, {}
+        for uid in b.por_id:
+            o = b.onde(uid)
+            for n in nomes.get(uid, ()):
+                equipes.setdefault(o["equipe"], set()).add(n)
+                supervisores.setdefault(o["supervisor"], set()).add(n)
+        return {"equipes": {k: sorted(v) for k, v in equipes.items() if k},
+                "supervisores": {k: sorted(v) for k, v in supervisores.items() if k},
+                "sem_de_para": sorted(str(u.get("nome") or "") for uid, u in b.mobilizadas.items() if uid not in nomes)}
+    return _ler(("visao_usinas_fracttal",), calcular)
+
+
 # ── Central de atenção ───────────────────────────────────────────────────────────────────────────────────────────
 # Três visões (Levi, 05/10/2026): "separar Rondas feitas (histórico de rondas) e rondas pendentes, dando bastante
 # atenção nas pendentes" e "separe o que é ronda e o que é Permissão de Trabalho".

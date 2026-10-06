@@ -11,8 +11,11 @@ def instalar(app):
     mesma fila e gastariam a cota do Fracttal em dobro). Quem chama é o app.py e o servir.py, nunca o create_app: os
     testes não podem ligar nada que fale com a rede."""
     import logging
-    from . import coletor, fonte_pg, tabelas
+    import threading
+    from . import aprovacao, coletor, fonte_pg, tabelas
     tabelas.usar_fornecedor(fonte_pg.Fornecedor(app.config))
+    if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
+        threading.Timer(20, lambda: aprovacao.aquecer(app)).start()
     # o relatório de cada rodada (só contagens) vai para o log do processo: sem isto, um 429 ou um erro de gravação
     # ficava só na memória (1ª carga, 04/10: a rodada parou e ninguém via por quê)
     log = logging.getLogger("nexus.campo")

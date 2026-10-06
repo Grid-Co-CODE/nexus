@@ -58,6 +58,15 @@
     <div class="cn-seg">
       {% for dd in ('7', '30', '90') %}<a href="{{ url(dias=dd, de=None, ate=None, pag=None) }}"{% if request.args.get('dias', '30') == dd and not request.args.get('de') %} aria-current="page"{% endif %}>{{ dd }} dias</a>{% endfor %}
     </div>
+    {# equipe e supervisor pelo cadastro do Nexus: as usinas deles, pelo nome no Fracttal (Levi, 05/10) #}
+    {% if equipes %}<label class="gc-rotulo" for="cn-equipe">Equipe</label>
+    <select class="gc-campo" id="cn-equipe" name="equipe" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for e in equipes %}<option value="{{ e }}"{% if e == equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
+    </select>
+    <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
+    <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>{% endif %}
     <input class="gc-campo" type="search" name="os" value="{{ request.args.get('os', '') }}" placeholder="Nº da OS (começa com)" aria-label="Número da OS">
     <input class="gc-campo" type="search" name="nome" value="{{ request.args.get('nome', '') }}" placeholder="Nome da tarefa" aria-label="Nome da tarefa">
     <input class="gc-campo" type="search" name="colab" value="{{ request.args.get('colab', '') }}" placeholder="Técnico (nome ou e-mail)" aria-label="Técnico">

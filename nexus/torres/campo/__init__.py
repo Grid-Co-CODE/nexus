@@ -274,10 +274,23 @@ def _cor_espera(dias) -> str:
 
 @bp.route("/aprovacao")
 def aprovacao():
-    leitura = campo_aprovacao.fila(request.args)
+    """Filtro de equipe e de supervisor (Levi, 05/10) pelo cadastro do Nexus: as usinas da equipe (ou das equipes do
+    supervisor), pelo nome delas no Fracttal, viram o escopo da conta do App. Sem o cadastro, o filtro some e a fila
+    vem inteira."""
+    equipe, supervisor = request.args.get("equipe", ""), request.args.get("supervisor", "")
+    mapa = visao.usinas_do_fracttal()
+    opcoes = mapa.dados or {}
+    usinas = None
+    if equipe and equipe in (opcoes.get("equipes") or {}):
+        usinas = set(opcoes["equipes"][equipe])
+    if supervisor and supervisor in (opcoes.get("supervisores") or {}):
+        usinas = set(opcoes["supervisores"][supervisor]) & (usinas if usinas is not None else set(opcoes["supervisores"][supervisor]))
+    leitura = campo_aprovacao.fila(request.args, usinas)
     return render_template("campo/aprovacao.html", **_comum(
         "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS},
-        balde=request.args.get("balde", ""), cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado()))
+        balde=request.args.get("balde", ""), cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(),
+        equipe=equipe, supervisor=supervisor, equipes=sorted(opcoes.get("equipes") or {}),
+        supervisores=sorted(opcoes.get("supervisores") or {}), mapa_erro=mapa.erro))
 
 
 # ── Ordens de serviço (os números e a lista são os do App, nexus/campo/ordens.py) ────────────────────────────────

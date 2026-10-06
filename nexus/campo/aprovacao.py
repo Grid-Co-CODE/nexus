@@ -37,6 +37,15 @@ _ESTADO = {"lendo": False, "erro": "", "erro_em": 0.0}
 _TRAVA = threading.Lock()
 
 
+class _Usinas(list):
+    """O escopo "estas usinas" que a cópia do App entende (`_area_ok`: `clusters.usinas`, comparado com a usina do
+    Fracttal, `groups_1_description`). É assim que o filtro de equipe e de supervisor entra na conta do App."""
+
+    def __init__(self, nomes):
+        super().__init__(sorted(nomes))
+        self.usinas = {regras_app._norm(n) for n in nomes}
+
+
 class _Pedido:
     """O pedaço do HttpRequest que as regras do App leem: só .params.get."""
 
@@ -93,7 +102,18 @@ def estado() -> dict:
             "lida_em": lida.replace(tzinfo=timezone.utc).astimezone(_BRT).strftime("%d/%m %H:%M") if lida else ""}
 
 
-def fila(params: dict) -> Leitura:
+def aquecer(app):
+    """Lê a fila ao subir o Nexus, em segundo plano: a 1ª visita depois de um reinício não espera (05/10: "fila ainda
+    não lida" logo depois de cada reinício)."""
+    with _TRAVA:
+        if _ESTADO["lendo"]:
+            return
+        _ESTADO["lendo"] = True
+    threading.Thread(target=lambda: _reler(app), daemon=True, name="nexus-fila-fracttal").start()
+
+
+def fila(params: dict, usinas=None) -> Leitura:
+    """`usinas` = os nomes do Fracttal (Classificação 1) das usinas da equipe ou do supervisor escolhido; None = todas."""
     p = {k: str(v) for k, v in params.items() if k in PARAMETROS and v not in (None, "")}
     regras_app.FILA_TTL_S = _SEMPRE        # a cópia é recarregada nos testes: reafirma a cada visita
     _pedir_releitura()
@@ -101,10 +121,13 @@ def fila(params: dict) -> Leitura:
     if regras_app._FILA_CACHE.get("linhas") is None:
         return Leitura({}, time.time(), "")      # 1ª leitura em andamento (ou recusada): a tela diz qual
 
+    escopo = ESCOPO_ADMIN if usinas is None else {**ESCOPO_ADMIN, "clusters": _Usinas(usinas)}
+
     def calcular():
-        return regras_app._fila_supervisao(_Pedido(p), ESCOPO_ADMIN)
+        return regras_app._fila_supervisao(_Pedido(p), escopo)
     # a fila relida entra na conta na hora: a data da fila faz parte da chave da cópia de 5 min
-    return leitura.ler(("fila", str(lida)) + tuple(sorted(p.items())), calcular)
+    filtro = tuple(sorted(usinas)) if usinas is not None else None
+    return leitura.ler(("fila", str(lida), filtro) + tuple(sorted(p.items())), calcular)
 
 
 def limpar():

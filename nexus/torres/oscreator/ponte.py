@@ -79,6 +79,10 @@ _TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTop
                 (_ANCORA_MENSAGEM, _OUVIR_NEXUS + _ANCORA_MENSAGEM)]
 
 _METODOS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+# O aviso do app de DESKTOP quando o JWT do Fracttal venceu e não renovou (api._rpc_headers). Na web ele aparecia na
+# tela (Levi, 05/10/2026: "Em histórico de OS do OS Creator Web do Nexus, tem que voltar a logar no Fracttal"): aqui
+# vira o que a web faz com sessão morta, voltar ao login, sem mexer no clone.
+_JWT_VENCIDO = b"cole um novo em fracttal_login.txt"
 
 
 def _trocar(corpo: bytes, de: bytes, para: bytes) -> bytes:
@@ -146,6 +150,8 @@ def encaminhar(resto: str):
         environ.pop("HTTP_IF_NONE_MATCH", None)
         environ.pop("HTTP_IF_MODIFIED_SINCE", None)
     resp = app.response_class.from_app(alvo, environ)
+    if resp.mimetype in ("text/html", "application/json") and _JWT_VENCIDO in resp.get_data():
+        return _de_volta_ao_login(app, resto, resp.mimetype == "application/json")
     if resp.mimetype == "text/html":
         corpo = _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA)
         if b"<head>" in corpo:
@@ -166,6 +172,22 @@ def encaminhar(resto: str):
         resp.set_etag(f"{etag or 'abas'}-nexus-{hashlib.sha256(corpo).hexdigest()[:10]}")
         resp.headers.pop("Last-Modified", None)
         resp.make_conditional(request)
+    return resp
+
+
+def _de_volta_ao_login(app, resto: str, json: bool):
+    """Sessão do Fracttal vencida: limpa o cookie do OS Creator e manda ao login dele, voltando depois para a mesma
+    tela (o login do OS Creator só devolve para /os/...). Pedido de dados (JSON) recebe o 401 que a tela do OS
+    Creator já entende ({"login": true})."""
+    from urllib.parse import quote
+    from flask import jsonify, redirect
+    destino = "/os/" + resto + (("?" + request.query_string.decode()) if request.query_string else "")
+    if json:
+        resp = jsonify({"erro": "Sua sessão do Fracttal venceu. Entre de novo.", "login": True})
+        resp.status_code = 401
+    else:
+        resp = redirect("/os/login?next=" + quote(destino, safe=""))
+    resp.delete_cookie(clone(app).config["SESSION_COOKIE_NAME"], path="/os")
     return resp
 
 
