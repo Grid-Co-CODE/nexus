@@ -47,9 +47,11 @@ decisões, 766 rondas, zeladoria vazia.
   único). A base da cobertura, do ranking e da Central são as **usinas mobilizadas**: status `OPERAÇÃO` E data de
   mobilização já passada (Levi, 05/10: "tem usina que nem mobilizada está"; medido: das 177 em OPERAÇÃO, 49 sem data
   de mobilização e nenhuma delas com ronda pelo App; as 107 com ronda têm a data). A PT não passa por esse filtro: PT
-  esperando decisão aparece sempre. Onde a tela mostra a usina, mostra **Estado e Cidade** do cadastro (`uf`,
-  `cidade`), nunca a "Região" que o App escreve (Levi: "uma hora é '-' outra é o nome da UFV, outra é o nome do
-  cluster"). Pessoa aparece pelo **nome resumido** (`visao.nome_curto` = o "Nome padrão" do cadastro: primeiro e último
+  esperando decisão aparece sempre. Onde a tela mostra a usina, mostra **Equipe, Estado e Região do Brasil** do
+  cadastro, nunca a "Região" que o App escreve (Levi: "uma hora é '-' outra é o nome da UFV, outra é o nome do
+  cluster"). A **região do Brasil sai da UF** (`visao.REGIAO_DA_UF`), não da coluna `regiao` do cadastro: medido em
+  05/10, ela diz "Sudeste" para Alto Paraná 1 e 2 (PR), "Nordeste" para Ponto Belo 1 (ES), está vazia em Aquiraz e
+  Cascavel (CE) e mistura "Centro Oeste" com "Centro-Oeste". Conserto da coluna é no cadastro. Pessoa aparece pelo **nome resumido** (`visao.nome_curto` = o "Nome padrão" do cadastro: primeiro e último
   nome). A Aprovação de OS e as Ordens seguem com a região do Fracttal/App, porque a fila não traz a usina. Região que o App
   escreve e o cadastro não tem (medido em 05/10: "MT Sul 02", 15 fechamentos; "Grid Co.", 1) vai para "fora do
   cadastro", não some. Conserto é no cadastro.
@@ -73,11 +75,17 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   pendentes, dando bastante atenção nas pendentes"; "separe o que é ronda e o que é Permissão de Trabalho"):
   - **Rondas pendentes** (abre nela, com números grandes que filtram): uma linha por usina mobilizada que pede ronda:
     nunca teve, sem ronda há 7 dias ou mais, ou ronda longa pendente pela última ronda (o App repete o aviso em toda
-    ronda curta). Colunas: Há, Status, Usina, Estado, Cidade, Observação. Medido em 05/10: 86 (21 nunca, 45 há 7 d ou
+    ronda curta). Colunas: Há, Status, Usina, Equipe, Estado, Região, Observação. Medido em 05/10: 86 (21 nunca, 45 há 7 d ou
     mais, 20 longa pendente).
   - **Rondas feitas:** o histórico do período, com "Feito por" (só aqui aparece quem fez), Status (Sem OS no
     Fracttal, Evidência incompleta, Sem pendência), Observação, OS e nota. Medido: 232 em 14 dias (178, 39 e 15).
   - **Permissões de trabalho:** as PT esperando, Técnico e a OS em verde, que abre a aprovação. Medido: 22 (21 paradas).
+  - **Duas visões em cada aba** (Levi, 05/10: "tem que ter a visão por equipe (CARDS grandes agrupados) e a visão
+    da tabela!"): abre nos **cartões por equipe** (`visao.por_equipe`): usinas pendentes de ronda, % feitas (= usinas da
+    equipe que não estão pendentes ÷ usinas da equipe, com a barra feitas × pendentes), o detalhe por status, as rondas
+    do período e as PT esperando. O cartão leva à tabela da equipe (`?equipe=`). Filtro pela **região do Brasil** no
+    lugar do estado. Medido em 05/10: 53 equipes; PR Norte 02 com 6 de 6 usinas pendentes.
+  - Todas as colunas e cabeçalhos das tabelas do campo **centralizados** (Levi, 05/10).
   - Os filtros (status) são só a palavra colorida, sem fundo (`.cn-st`). "Detalhe" virou "Observação"; "O quê" virou
     "Status"; a coluna "Quem" saiu. **Nota baixa de fechamento não entra:** é a fila da Aprovação, e o fechamento
     aprovado direto no Fracttal nunca tem decisão no painel, o que dava ponto falso.

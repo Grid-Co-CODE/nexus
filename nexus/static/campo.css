@@ -55,9 +55,9 @@
 
 .cn-tab{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md);margin-top:10px;background:var(--superficie)}
 .cn-tab table{width:100%;border-collapse:collapse;font:400 13px/1.5 var(--font-sans);color:var(--tinta);min-width:980px}
-.cn-tab th{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:left;
+.cn-tab th{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:center;
   padding:11px 14px;background:var(--superficie-2);border-bottom:1px solid var(--linha);white-space:nowrap}
-.cn-tab td{padding:12px 14px;border-bottom:1px solid var(--linha);vertical-align:top}
+.cn-tab td{padding:12px 14px;border-bottom:1px solid var(--linha);vertical-align:middle;text-align:center}
 .cn-tab tr:last-child td{border-bottom:0}
 .cn-tab tbody tr:hover td{background:var(--superficie-2)}
 .cn-tab .det{display:block;color:var(--mudo);font-size:12px;margin-top:2px}
@@ -185,3 +185,29 @@
 .cn-botoes{display:flex;flex-wrap:wrap;gap:10px}
 .cn-btn-negar{color:var(--critico);border-color:var(--critico)}
 .campo-nativa .m{font-family:var(--font-mono);font-size:12.5px}
+
+/* Central de atenção: cartões por equipe (Levi, 05/10: "agrupamento por cards das equipes, usinas pendentes de ronda
+   e % de rondas feitas da equipe"). A borda da esquerda segue o % feitas: 80% ou mais ok, 50% ou mais alerta. */
+.cn-equipes{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:18px}
+.cn-equipe{display:grid;gap:12px;align-content:start;color:inherit;text-decoration:none;background:var(--superficie);
+  border:1px solid var(--linha);border-left:4px solid var(--linha-forte);border-radius:var(--raio-md);padding:18px 20px;min-width:0}
+.cn-equipe:hover{background:var(--superficie-2);border-color:var(--verde)}
+.cn-equipe--ok{border-left-color:var(--ok)}
+.cn-equipe--alerta{border-left-color:var(--alerta)}
+.cn-equipe--critico{border-left-color:var(--critico)}
+.cn-eq-cab{display:grid;gap:2px}
+.cn-eq-cab b{font:700 18px/1.25 var(--font-display)}
+.cn-eq-cab span{font-size:12px;color:var(--mudo)}
+.cn-eq-num{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.cn-eq-num > span{display:grid}
+.cn-eq-num .dir{text-align:right}
+.cn-eq-num .v{font:600 34px/38px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cn-eq-num .d{font-size:12px;color:var(--mudo)}
+.cn-barra{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--superficie-3)}
+.cn-barra .ok{background:var(--ok)}
+.cn-barra .pend{background:var(--critico)}
+.cn-eq-leg{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--tinta-2);font-variant-numeric:tabular-nums}
+.cn-eq-pe{display:flex;flex-wrap:wrap;gap:6px 14px}
+.cn-filtro-ativo{font:600 12.5px/18px var(--font-sans);color:var(--tinta);text-decoration:none;padding:6px 12px;
+  border:1px solid var(--verde);border-radius:999px;background:var(--verde-suave)}
+.cn-filtro-ativo span{margin-left:4px;color:var(--mudo)}

@@ -31,6 +31,15 @@ DIAS_COBERTURA = 14              # janela da cobertura de ronda (a mesma do rank
 PT_PARADA_MIN = 120              # PT esperando o De acordo há mais de 2 h = parada
 PESO_QUALIDADE, PESO_COBERTURA = 0.6, 0.4     # ranking por região, a mesma régua do painel do App
 _DATA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}")
+# Região do Brasil pela UF do cadastro (Levi, 05/10: "Adicione uma coluna de região do Brasil"). Pela UF, e não pela
+# coluna `regiao` do cadastro: medido em 05/10, ela tem "Centro Oeste" e "Centro-Oeste" e 2 usinas vazias.
+REGIOES = ("Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul")
+REGIAO_DA_UF = {**dict.fromkeys(("AC", "AP", "AM", "PA", "RO", "RR", "TO"), "Norte"),
+                **dict.fromkeys(("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"), "Nordeste"),
+                **dict.fromkeys(("DF", "GO", "MT", "MS"), "Centro-Oeste"),
+                **dict.fromkeys(("ES", "MG", "RJ", "SP"), "Sudeste"),
+                **dict.fromkeys(("PR", "RS", "SC"), "Sul")}
+SEM_EQUIPE = "Sem equipe"
 
 
 class SemBanco(RuntimeError):
@@ -159,10 +168,13 @@ class _Base:
         return self.nome_equipe.get(D._id(u.get("equipe_id")), "")
 
     def onde(self, uid, nome_da_fonte="") -> dict:
-        """Usina (o nome do cadastro), estado e cidade. Sem ligação: o nome que a fonte escreveu, sem estado nem cidade."""
+        """Usina (o nome do cadastro), equipe, estado, região do Brasil e cidade. Sem ligação: o nome que a fonte
+        escreveu, o resto vazio."""
         u = self.por_id.get(uid) or {}
-        return {"usina": str(u.get("nome") or nome_da_fonte or ""), "uf": str(u.get("uf") or "").strip(),
-                "cidade": str(u.get("cidade") or "").strip()}
+        uf = str(u.get("uf") or "").strip().upper()
+        return {"usina": str(u.get("nome") or nome_da_fonte or ""), "uf": uf,
+                "regiao_br": REGIAO_DA_UF.get(uf, ""), "cidade": str(u.get("cidade") or "").strip(),
+                "equipe": (self.equipe_da_usina(uid) or SEM_EQUIPE) if u else ""}
 
 
 # ── Rondas ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -192,8 +204,7 @@ def _cobertura(b: _Base, rondas: list[dict], hoje) -> list[dict]:
     for uid in b.mobilizadas:
         r = ultima.get(uid)
         dias = (hoje - datetime.fromisoformat(r["data"]).date()).days if r else 999
-        out.append({"usina_id": uid, **b.onde(uid), "equipe": b.equipe_da_usina(uid),
-                    "ultima": r["data"] if r else None, "dias": dias, "tecnico": r["tecnico"] if r else "",
+        out.append({"usina_id": uid, **b.onde(uid), "ultima": r["data"] if r else None, "dias": dias, "tecnico": r["tecnico"] if r else "",
                     "tipo": r["tipo"] if r else "", "falhas": r["falhas"] if r else "", "os": r["os"] if r else None})
     out.sort(key=lambda x: (-x["dias"], x["usina"]))
     return out
@@ -406,21 +417,62 @@ def atencao(dias: int = 14) -> leitura.Leitura:
             else:
                 continue
             pendentes.append({"tipo": tipo, "usina": c["usina"], "uf": c["uf"], "cidade": c["cidade"],
+                              "equipe": c["equipe"], "regiao_br": c["regiao_br"],
                               "dias": c["dias"], "ultima": c["ultima"], "obs": obs})
+        usinas = [{k: c[k] for k in ("usina", "equipe", "uf", "regiao_br", "cidade", "dias")}
+                  for c in _cobertura(b, rond, hoje)]
         feitas = []
         for r in sorted((r for r in rond if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
             faltas = [f.strip() for f in r["falhas"].split(";") if f.strip() and f.strip().lower() != LONGA_PENDENTE]
             status = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "ok")
             obs = "; ".join(([r["situacao_os"] or "OS não criada"] if r["sem_os"] else []) + faltas)
             feitas.append({"data": r["data"], "status": status, "usina": r["usina"], "uf": r["uf"], "cidade": r["cidade"],
-                           "obs": obs, "feito_por": r["tecnico"], "os": None if r["sem_os"] else r["os"],
+                           "equipe": r["equipe"], "regiao_br": r["regiao_br"], "obs": obs, "feito_por": r["tecnico"], "os": None if r["sem_os"] else r["os"],
                            "nota": r["nota"], "tipo": r["tipo"]})
         p = pts()
         if p.erro:
             raise SemBanco(p.erro)
-        return {"pendentes": pendentes, "feitas": feitas, "pts": p.dados.get("aguardando") or [],
+        return {"pendentes": pendentes, "feitas": feitas, "pts": p.dados.get("aguardando") or [], "usinas": usinas,
                 "sem_mobilizacao": b.sem_mobilizacao}
     return _ler(("visao_atencao", dias), calcular)
+
+
+def por_equipe(usinas, pendentes, feitas, pts) -> list[dict]:
+    """Um cartão por equipe (Levi, 05/10: "agrupamento por cards das equipes, usinas pendentes de ronda e % de rondas
+    feitas da equipe"). Feitas = usinas mobilizadas da equipe que NÃO estão pendentes (ronda nos últimos 7 dias e sem a
+    longa pendente); % feitas = feitas ÷ usinas. Junto: as rondas do período e as PT esperando. As listas chegam já
+    filtradas pela tela (região, busca), então o cartão conta o mesmo que a tabela."""
+    eq = {}
+
+    def card(nome):
+        return eq.setdefault(nome or SEM_EQUIPE, {"equipe": nome or SEM_EQUIPE, "regioes": set(), "ufs": set(),
+                                                  "usinas": 0, "pendentes": 0, "nunca": 0, "sem_ronda": 0,
+                                                  "longa_pendente": 0, "rondas": 0, "ok": 0, "sem_os": 0,
+                                                  "incompleta": 0, "pts": 0, "parada": 0})
+    for u in usinas:
+        c = card(u["equipe"])
+        c["usinas"] += 1
+        c["ufs"].update([u["uf"]] if u["uf"] else [])
+        c["regioes"].update([u["regiao_br"]] if u["regiao_br"] else [])
+    for x in pendentes:
+        c = card(x["equipe"])
+        c["pendentes"] += 1
+        c[x["tipo"]] += 1
+    for x in feitas:
+        c = card(x["equipe"])
+        c["rondas"] += 1
+        c[x["status"]] += 1
+    for x in pts:
+        c = card(x.get("equipe"))
+        c["pts"] += 1
+        c["parada"] += bool(x.get("parada"))
+        c["ufs"].update([x["uf"]] if x.get("uf") else [])
+        c["regioes"].update([x["regiao_br"]] if x.get("regiao_br") else [])
+    for c in eq.values():
+        c["feitas"] = max(0, c["usinas"] - c["pendentes"])
+        c["pct_feitas"] = round(100 * c["feitas"] / c["usinas"]) if c["usinas"] else None
+        c["regioes"], c["ufs"] = sorted(c["regioes"]), sorted(c["ufs"])
+    return list(eq.values())
 
 
 def limpar():

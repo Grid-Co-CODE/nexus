@@ -114,28 +114,45 @@ def _idade_min(m) -> str:
     return f"{m // 60} h {m % 60} min" if m >= 60 else f"{m} min"
 
 
+ORDEM_DOS_CARTOES = {"pendentes": lambda c: (-c["pendentes"], c["pct_feitas"] or 0, c["equipe"]),
+                     "feitas": lambda c: (-c["rondas"], c["equipe"]),
+                     "pt": lambda c: (-c["parada"], -c["pts"], c["equipe"])}
+
+
 @bp.route("/atencao")
 def atencao():
+    """Duas visões em cada aba (Levi, 05/10: "tem que ter a visão por equipe (CARDS grandes agrupados) e a visão da
+    tabela!"): cartões por equipe ou a tabela. Filtro pela região do Brasil; o cartão leva à tabela da equipe."""
     dias = _dias((7, 14, 30), 14)
     leitura = visao.atencao(dias)
     d = leitura.dados
     ids = [v[0] for v in VISTAS]
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
-    f, uf = request.args.get("f", ""), request.args.get("uf", "")
+    f, regiao, equipe = request.args.get("f", ""), request.args.get("regiao", ""), request.args.get("equipe", "")
+    modo = "tabela" if request.args.get("modo") == "tabela" or equipe else "equipes"
     q = request.args.get("q", "").strip().lower()
-    fontes = {"pendentes": d.get("pendentes") or [], "feitas": d.get("feitas") or [], "pt": d.get("pts") or []}
-    campos = ("usina", "cidade", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
-    base = [x for x in fontes[vista] if (not uf or x.get("uf") == uf)
-            and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
+    campos = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
+
+    def filtra(lista):
+        return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
+                and (not equipe or x.get("equipe") == equipe)
+                and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
+    fontes = {"pendentes": filtra(d.get("pendentes") or []), "feitas": filtra(d.get("feitas") or []),
+              "pt": filtra(d.get("pts") or [])}
+    base = fontes[vista]
     contagem = {}
     for x in base:
         contagem[_status(vista, x)] = contagem.get(_status(vista, x), 0) + 1
     lista = [x for x in base if not f or _status(vista, x) == f]
+    cartoes = visao.por_equipe(filtra(d.get("usinas") or []), fontes["pendentes"], fontes["feitas"], fontes["pt"])
+    if vista == "pt":
+        cartoes = [c for c in cartoes if c["pts"]]
+    cartoes.sort(key=ORDEM_DOS_CARTOES[vista])
     return render_template("campo/atencao.html", **_comum(
         "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
         status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
-        lista=lista, f=f, uf=uf, q=request.args.get("q", ""), idade_min=_idade_min,
-        estados=sorted({x.get("uf") for v in fontes.values() for x in v if x.get("uf")})))
+        lista=lista, f=f, regiao=regiao, equipe=equipe, modo=modo, cartoes=cartoes, regioes=visao.REGIOES,
+        q=request.args.get("q", ""), idade_min=_idade_min))
 
 
 # ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────

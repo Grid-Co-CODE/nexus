@@ -25,26 +25,26 @@
     <div>
       <div class="cn-lista-cab"><h2>Usinas há mais tempo sem ronda</h2><span class="mudo">{{ (d.get('cobertura') or [])|length }} mobilizadas</span></div>
       <div class="cn-tab"><table>
-        <thead><tr><th>Usina</th><th>Estado</th><th>Cidade</th><th>Última ronda</th><th>Há</th><th>Feito por</th></tr></thead>
+        <thead><tr><th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th><th>Última ronda</th><th>Há</th><th>Feito por</th></tr></thead>
         <tbody>
         {% for c in (d.get('cobertura') or [])[:60] %}
-          <tr><td>{{ c.usina }}</td><td>{{ c.uf or '—' }}</td><td>{{ c.cidade or '—' }}</td><td class="m">{{ dia_curto(c.ultima) if c.ultima else '—' }}</td>
+          <tr><td>{{ c.usina }}</td><td>{{ c.equipe or '—' }}</td><td>{{ c.uf or '—' }}</td><td>{{ c.regiao_br or '—' }}</td><td class="m">{{ dia_curto(c.ultima) if c.ultima else '—' }}</td>
             <td><span class="cn-pill cn-{{ 'critico' if c.dias >= 14 else ('alerta' if c.dias >= 7 else 'ok') }}">{{ 'nunca' if c.dias >= 999 else ('hoje' if c.dias == 0 else c.dias ~ ' d') }}</span></td>
             <td>{{ c.tecnico or '—' }}</td></tr>
-        {% else %}<tr><td colspan="6" class="mudo">Sem usina mobilizada no cadastro.</td></tr>{% endfor %}
+        {% else %}<tr><td colspan="7" class="mudo">Sem usina mobilizada no cadastro.</td></tr>{% endfor %}
         </tbody></table></div>
     </div>
     <div>
       <div class="cn-lista-cab"><h2>Rondas do período</h2><span class="mudo">{{ (d.get('periodo') or [])|length }}</span></div>
       <div class="cn-tab"><table>
-        <thead><tr><th>Dia</th><th>Usina</th><th>Estado</th><th>Feito por</th><th>Tipo</th><th>Nota</th><th>Pendências</th><th>OS</th></tr></thead>
+        <thead><tr><th>Dia</th><th>Usina</th><th>Equipe</th><th>Estado</th><th>Feito por</th><th>Tipo</th><th>Nota</th><th>Pendências</th><th>OS</th></tr></thead>
         <tbody>
         {% for x in (d.get('periodo') or [])[:80] %}
-          <tr><td class="m">{{ dia_curto(x.data) }}</td><td>{{ x.usina }}<span class="det">{{ x.cidade }}</span></td><td>{{ x.uf or '—' }}</td><td>{{ x.tecnico or '—' }}</td><td><span class="cn-tag">{{ x.tipo or '—' }}</span></td>
+          <tr><td class="m">{{ dia_curto(x.data) }}</td><td>{{ x.usina }}</td><td>{{ x.equipe or '—' }}</td><td>{{ x.uf or '—' }}</td><td>{{ x.tecnico or '—' }}</td><td><span class="cn-tag">{{ x.tipo or '—' }}</span></td>
             <td>{% if x.nota is not none %}<span class="cn-pill cn-{{ 'ok' if x.nota >= 85 else ('alerta' if x.nota >= 70 else 'critico') }}">{{ x.nota }}%</span>{% else %}—{% endif %}</td>
             <td>{{ x.falhas or '—' }}</td>
             <td>{% if x.sem_os %}<span class="cn-pill cn-alerta">sem OS</span>{% elif x.os %}<span class="m">{{ x.os }}</span>{% else %}—{% endif %}</td></tr>
-        {% else %}<tr><td colspan="8" class="mudo">Nenhuma ronda no período.</td></tr>{% endfor %}
+        {% else %}<tr><td colspan="9" class="mudo">Nenhuma ronda no período.</td></tr>{% endfor %}
         </tbody></table></div>
     </div>
   </div>

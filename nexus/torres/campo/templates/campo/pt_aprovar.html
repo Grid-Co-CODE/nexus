@@ -15,7 +15,7 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Aprovação de PT</p>
       <h1 class="cn-titulo">{{ p.numero }} <span class="cn-st cn-t-{{ s[1] }} cn-st--titulo">{{ s[0] }}</span></h1>
-      <p class="cn-pergunta">{{ p.usina }}{% if p.cidade %} · {{ p.cidade }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}</p></div>
+      <p class="cn-pergunta">{{ p.usina }}{% if p.equipe %} · {{ p.equipe }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}{% if p.regiao_br %} · {{ p.regiao_br }}{% endif %}</p></div>
     <div class="cn-frescor">livro de PT do App<br><b>lido às {{ lido }}</b></div>
   </div>
   {% if aviso %}<div class="cn-erro" role="alert"><b>{{ aviso }}</b></div>{% endif %}
