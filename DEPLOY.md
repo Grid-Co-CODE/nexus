@@ -24,7 +24,10 @@ ou grupo de conversa.
 
 - Linux com **Python 3.14**, `git` e `unzip`. Proxy com HTTPS na frente (exemplo abaixo com o Caddy).
 - Saída para a internet: `github.com` (código), `app.gridco.com.br` (API db_performace e plataforma de Performance),
-  `app.fracttal.com` e `one.fracttal.com` (Fracttal), `raw.githubusercontent.com` (banco do PCM).
+  `app.fracttal.com` e `one.fracttal.com` (Fracttal), `raw.githubusercontent.com` (banco do PCM),
+  `apiprevmet3.inmet.gov.br` (avisos meteorológicos do INMET) e `dataserver-coids.inpe.br` (focos de queimada e risco
+  de fogo do INPE): os dois últimos são da tela Performance → Clima e risco, só HTTPS (443), leitura pública, sem chave.
+  Sem eles a tela abre e mostra as fontes como "fora agora".
 - Disco: cada geração da programação semanal guarda ~65 MB em `dados/pcm/geracoes/` (uma por semana).
 - Fuso `America/Sao_Paulo` (o `deploy/nexus.service` já define).
 
@@ -102,6 +105,9 @@ o servidor inteiro como uma só.
    depois disso **Ativos Fracttal** lista os ativos.
 6. **Campo · App → Ordens de serviço** mostra as OS da semana com a nota do painel do App (a fonte é o livro que o
    App grava no banco; precisa da `NEXUS_PESSOA_HMAC` no `.env`, ver o passo 7).
+7. **Performance → Clima e risco** abre com as três fontes em verde (INMET, focos e risco de fogo do INPE). A primeira
+   visita leva uns 10 s (lê o risco de fogo de todas as usinas); depois a tela é imediata. Fonte "fora agora": confira a
+   saída para os dois endereços da seção 0 (ver a seção 7c).
 
 ## 7. Campo · App: o Nexus lê o que o App grava
 
@@ -133,6 +139,16 @@ chave; a plataforma precisa da mesma. No pacote vem à parte o arquivo `platafor
 Conferir: no Nexus, **Performance → Tempo real** abre a Entrada da plataforma (antes disso, a aba diz "A plataforma
 recusou a chave"; o resto do Nexus não depende dela). Pelo Nexus, a API PV fica de fora por enquanto: só o que a
 plataforma já tem guardado.
+
+## 7c. Performance → Clima e risco: só leitura de fontes públicas
+
+A tela cruza as usinas em operação do cadastro (a latitude e a longitude são campos cifrados, abertos só no processo do
+Nexus com a `NEXUS_CHAVE_CADASTRO`, e nunca aparecem na tela) com os avisos do INMET, os focos de queimada e o risco de
+fogo do INPE. **Não grava nada**: nem em `dados/`, nem no banco; cada fonte fica só na memória do processo (avisos 30 min,
+focos 10 min, risco de fogo 6 h; depois de uma falha, 60 s sem insistir). Reiniciar o Nexus esvazia o cache e a primeira
+visita relê tudo (~10 s). Precisa da saída para `apiprevmet3.inmet.gov.br` e `dataserver-coids.inpe.br` (seção 0) e do
+cadastro no servidor (`dados/cadastro_ensaio.json`). Os endereços têm padrão e só se trocam para apontar a um espelho:
+`NEXUS_CLIMA_INMET_URL`, `NEXUS_CLIMA_FOCOS_URL` e `NEXUS_CLIMA_RISCO_URL` (este leva `{d}`, o dia de 0 a 3), no `.env`.
 
 ## 8. Atualizar
 

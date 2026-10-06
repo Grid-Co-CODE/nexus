@@ -69,3 +69,72 @@ todo texto de terceiro ou de usuário nas páginas da plataforma passa por `_he`
 
 Como provar: `tests/test_performance_ponte.py`, `tests/test_torre_performance.py` e, na tela, o Nexus local contra a
 plataforma local — mesmo número do card nos dois no mesmo minuto.
+
+## Clima e risco (06/10/2026): alertas públicos por usina, só leitura
+
+Aba Performance → Clima e risco (`/t/performance/clima`). O Levi trouxe o pacote `gridco_meteo` (referência, fora do
+repositório) e escolheu (06/10) começar pelos **alertas**: avisos do INMET, focos de queimada do INPE e risco de fogo do
+INPE, todos públicos e de uso livre. A tela cruza isso com as usinas em operação do cadastro e se atualiza sozinha
+(recarrega a cada 60 s; o que vai à rede é decidido pelo cache, não pela recarga). Atribuição no rodapé: "Dados: INMET,
+INPE (Programa Queimadas)."
+
+| Fonte | O que traz | Cache | Endereço (troca por `NEXUS_CLIMA_*_URL`) |
+|---|---|---|---|
+| INMET avisos | JSON `{hoje, futuro}`; cada aviso com evento, severidade, início, fim e polígono (texto de JSON) | 30 min | `apiprevmet3.inmet.gov.br/avisos/ativos` (não documentado oficialmente) |
+| INPE focos | CSV de 10 em 10 min (`lat,lon,satelite,data`, hora em UTC); vale a última hora = os 6 últimos arquivos | 10 min | `dataserver-coids.inpe.br/queimadas/queimadas/focos/csv/10min/` |
+| INPE risco de fogo | GeoTIFF por dia, `RF.PREV.T0..T3.tif` (hoje e D+1 a D+3), 0 a 1, pixel de ~1 km | 6 h (sai ~06:30) | `dataserver-coids.inpe.br/.../riscofogo_meteorologia/previsto/risco_fogo/RF.PREV.T{d}.tif` |
+
+O código (sem Flask) está em `nexus/performance/clima/`: `geometria` (ponto em polígono e haversine), `geotiff` (leitor do
+COG), `fontes` (os três clientes), `alertas` (as regras), `leitura` (cache por fonte), `usinas` (cadastro), `visao` (o que a
+tela escreve). A rota é `nexus/torres/performance/clima_tela.py`; o CSS, `nexus/static/clima.css`.
+
+**Regras que custaram caro**
+- **O Pillow não abre o GeoTIFF do INPE.** É um COG de 64 bits (BitsPerSample 64, LZW, tiles de 256, 8699 x 8899): o plugin
+  TIFF do Pillow só tem modo para float de 32 bits (`UnidentifiedImageError`, "unknown pixel mode", medido com o 12.2), e
+  rasterio e shapely estão vetados (sem dependência nova). `geotiff.py` lê só o cabeçalho e a tile de cada usina, por `Range`,
+  e decodifica o LZW em Python puro (bytes idênticos aos do Pillow nas 1190 tiles do T0). Aceita **só o formato medido**
+  (little-endian, tiles, LZW sem predictor, float64, EPSG:4326, PixelIsArea, escala + tiepoint no canto); o que mudar vira
+  `GeoTiffErro` dizendo o que achou, e a tela diz que o formato do INPE mudou. Custo medido (160 usinas, 4 dias em paralelo):
+  ~7 s e ~4,6 MB na leitura fria, uma vez a cada 6 h (ou quando o conjunto de usinas muda).
+- **Pixel sem dado (-999):** o INPE não calcula onde não há vegetação (cidades, água e, às vezes, a própria usina: 1 de 40
+  coordenadas de referência). Vale o MAIOR valor do quadrado de 5 x 5 pixels (~2 km), com a nota "entorno"; se nem o
+  entorno tem dado, "sem dado (sem vegetação no entorno)" (não é alerta, e a tela lista essas usinas).
+- **Faixas do risco de fogo** (as do `config.ALERTA` do pacote): mínimo < 0,15 ≤ baixo < 0,4 ≤ médio < 0,7 ≤ alto ≤ 0,95 <
+  crítico; o valor é arredondado a 9 casas antes de comparar (o 0,70 em double pode chegar 0,6999999999999). Valor fora de
+  0 a 1 é recusado: uma escala trocada acenderia o "crítico" em toda usina.
+- **A borda do polígono conta como dentro** (o `contains` do shapely a exclui): um aviso que encosta na usina vale.
+- **Gravidade, três degraus (semáforo):** Crítico = "Grande Perigo", foco a até 5 km ou risco crítico; Alto = "Perigo" ou
+  risco alto; Atenção = "Perigo Potencial". O foco é sempre crítico (é evento, não previsão). Desempate: tem foco, mais
+  tipos de alerta, foco mais perto, aviso mais grave, nome. Risco médio não é alerta.
+- **Fonte fora:** a última leitura boa é servida com o erro e a hora ("INMET fora agora; última leitura boa às HH:MM"), nunca
+  como fresca; sem leitura boa, o número é "—" (nunca 0) e a lista diz que não inclui aquela fonte. Depois de uma falha,
+  60 s sem insistir; uma busca por vez (quem chega no meio recebe a última boa, sem esperar a rede).
+- **Usinas e coordenadas** vêm do cadastro (`nexus/cadastro/`): em operação, latitude e longitude cifradas e abertas só no
+  processo do Nexus. A coordenada **nunca** vai à tela, ao log nem ao `repr` da usina. Usina em operação sem coordenada
+  utilizável, ou com coordenada fora do Brasil (0 e 0, sinal ou latitude e longitude trocadas), aparece numa linha própria:
+  nunca some. O risco de fogo é lido para TODAS as usinas com coordenada (o cache vale pelo conjunto de pontos); o filtro
+  por cliente é só da tela.
+- **O texto do aviso é de terceiros:** só entra escapado, e a cor do aviso nem é lida. Aviso sem polígono utilizável é
+  contado e dito na fonte, não some.
+- **Focos:** a hora vem da coluna `data` (UTC), não do nome do arquivo (satélite polar chega atrasado); sem arquivo novo há
+  mais de 30 min, a fonte fica em atenção. Um foco é um pixel com fogo detectado, não um incêndio confirmado.
+- **Nenhum teste vai à rede:** `leitura.usar_sessao` e `leitura.usar_relogio` injetam a sessão falsa e o relógio; com
+  `TESTING` e sem sessão injetada a fonte diz "sem fonte nos testes". O COG dos testes é montado no próprio teste
+  (`tests/clima_cog.py`: contêiner à mão, LZW comprimido pelo Pillow), sem binário no repositório. Teste sem
+  `NEXUS_ARMAZEM_LOCAL` se recusa a abrir o cadastro de verdade.
+
+**Fase 1 só lê, e nada é gravado no banco.** Histórico de aviso, foco ou risco seria fato novo da governança de dados
+(`nexus/dados/CLAUDE.md`: entra primeiro no catálogo, com grão e dimensões): é outra fase.
+
+**Fase 2 (fora desta entrega) e por quê:** previsão de vento, chuva e convecção, os testes T1 a T5 de confiabilidade do POA
+e do GHI e a substituição de ETM do `gridco_meteo` dependem do Open-Meteo, cuja API grátis é só para uso não comercial.
+Antes de ligar isso, decidir a licença: plano pago, ou servidor interno do Open-Meteo (ERA5 e previsão, uso comercial livre)
+mais o CAMS/SoDa para a radiação de satélite. Cada troca de fonte pede recalibrar os parâmetros.
+
+**Servidor da T.I.:** precisa de saída para `apiprevmet3.inmet.gov.br` e `dataserver-coids.inpe.br` (`DEPLOY.md`, seções 0 e
+7c); sem elas a tela abre e mostra as fontes como "fora agora".
+
+Como provar: `python -m pytest -q tests/test_clima_*.py tests/test_torre_performance_clima.py`. Ao vivo (06/10/2026, 40
+coordenadas de referência, só leitura): 25 usinas dentro de algum aviso, 1 com foco a 1,9 km, 18 com risco alto ou crítico;
+1,6 s e 0,7 MB por dia de risco. Mudou o leitor do GeoTIFF? Confira as tiles contra o Pillow (monte um mini-TIFF de uma faixa
+com `int32` no lugar de `double`: os bytes são os mesmos) antes de confiar.
