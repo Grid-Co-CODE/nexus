@@ -163,3 +163,63 @@ def test_troca_vale_com_crlf():
         crlf = lf.replace(b"\n", b"\r\n")
         assert ponte._trocar(lf, de, para) == b"antes\n" + para + b"depois\n"
         assert ponte._trocar(crlf, de, para) == (b"antes\n" + para + b"depois\n").replace(b"\n", b"\r\n")
+
+
+# ── sincronia com o oem: o Nexus é a referência (Levi, 06/10/2026) ──────────────────────────────────────────────────
+def _arvore(raiz, arquivos):
+    for rel, texto in arquivos.items():
+        p = raiz / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(texto, encoding="utf-8")
+
+
+def test_sincronia_leva_o_que_mudou_no_nexus_e_nao_atropela_o_oem(tmp_path):
+    from nexus.torres.oscreator import sincronia as S
+    nexus, oem, backup = tmp_path / "nexus", tmp_path / "oem", tmp_path / "backup"
+    comum = {"os_creator/a.py": "a = 1\n", "os_creator/b.py": "b = 1\n", "os_creator/c.py": "c = 1\n",
+             "os_creator/d.py": "d = 1\n"}
+    _arvore(nexus, comum)
+    _arvore(oem, comum)
+    base = {rel: S._hash(nexus / rel) for rel in comum}
+    _arvore(nexus, {"os_creator/b.py": "b = 2\n", "os_creator/d.py": "d = 2\n", "os_creator/os_web/e.html": "novo"})
+    _arvore(oem, {"os_creator/c.py": "c = 9\n", "os_creator/d.py": "d = 9\n"})
+    lista = sorted(list(comum) + ["os_creator/os_web/e.html"])
+    st = S.estado(nexus, oem, lista, base)
+    assert (st["igual"], st["levar"], st["trazer"], st["conflito"]) == (
+        ["os_creator/a.py"], ["os_creator/b.py", "os_creator/os_web/e.html"], ["os_creator/c.py"], ["os_creator/d.py"])
+    feitos, nova = S.aplicar(nexus, oem, lista, base, backup)
+    assert feitos == ["os_creator/b.py", "os_creator/os_web/e.html"]
+    assert (oem / "os_creator/b.py").read_text(encoding="utf-8") == "b = 2\n"
+    assert (backup / "os_creator/b.py").read_text(encoding="utf-8") == "b = 1\n"                 # o do oem guardado
+    assert (oem / "os_creator/c.py").read_text(encoding="utf-8") == "c = 9\n"                    # não atropela o oem
+    assert (oem / "os_creator/d.py").read_text(encoding="utf-8") == "d = 9\n"                    # conflito fica
+    st = S.estado(nexus, oem, lista, nova)
+    assert (st["levar"], st["trazer"], st["conflito"]) == ([], ["os_creator/c.py"], ["os_creator/d.py"])
+    feitos, nova = S.trazer(nexus, oem, lista, nova, backup)
+    assert feitos == ["os_creator/c.py"] and (nexus / "os_creator/c.py").read_text(encoding="utf-8") == "c = 9\n"
+    assert S.estado(nexus, oem, lista, nova)["conflito"] == ["os_creator/d.py"]
+
+
+def test_sincronia_recusa_copia_que_importa_o_nexus(tmp_path):
+    from nexus.torres.oscreator import sincronia as S
+    _arvore(tmp_path / "n", {"os_creator/x.py": "from nexus.config import algo\n"})
+    with pytest.raises(RuntimeError, match="importa o pacote nexus"):
+        S.aplicar(tmp_path / "n", tmp_path / "o", ["os_creator/x.py"], {}, tmp_path / "b")
+
+
+def test_copia_do_os_creator_vai_sem_o_env_e_sem_importar_o_nexus():
+    """O .env da cópia tem a credencial do Fracttal: nunca entra na lista. E a cópia não importa o nexus."""
+    from nexus.torres.oscreator import sincronia as S
+    lista = S.arquivos()
+    assert len(lista) > 100 and not any(rel.endswith(".env") for rel in lista)
+    assert S.importa_o_nexus(S.AQUI, lista) == []
+
+
+@pytest.mark.skipif(not (__import__("nexus.torres.oscreator.sincronia", fromlist=["x"]).OEM_PADRAO / "os_creator").is_dir(),
+                    reason="o oem não está nesta máquina")
+def test_copia_do_os_creator_igual_ao_oem():
+    """O Nexus é a referência: mudou aqui, rode `python ferramentas/sincronizar_oscreator.py --aplicar` para levar ao
+    oem (o 5090 do supervisório). Mudou só no oem, ou nos dois: a ferramenta lista, e nada é atropelado."""
+    from nexus.torres.oscreator import sincronia as S
+    st = S.estado(S.AQUI, S.OEM_PADRAO, S.arquivos(), S.ler_manifesto())
+    assert not (st["levar"] or st["trazer"] or st["conflito"]), {k: st[k][:10] for k in ("levar", "trazer", "conflito")}

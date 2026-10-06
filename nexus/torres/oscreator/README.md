@@ -117,8 +117,24 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
 
 ## Antes de mexer
 
-- **Agora são duas cópias.** O que mudar no oem não chega aqui sozinho, e o que mudar aqui não volta para lá.
-  Para sincronizar, copie de novo os mesmos arquivos. Por isso a ponte não edita o clone.
+- **O Nexus é a referência; o oem acompanha** (Levi, 06/10/2026: "sincronize a ferramenta usando o do nexus como
+  referência"). Mudança no OS Creator: faça aqui, na cópia, prove aqui, e leve ao oem (o 5090 do supervisório):
+
+  ```
+  python ferramentas/sincronizar_oscreator.py              mostra o que mudou
+  python ferramentas/sincronizar_oscreator.py --aplicar    leva ao oem o que mudou só no Nexus
+  python ferramentas/sincronizar_oscreator.py --trazer     traz ao Nexus o que mudou só no oem
+  ```
+
+  A regra é de três lados (`sincronia.py`, com o hash de cada arquivo na última sincronia em `sincronia.json`): o que
+  mudou só no Nexus vai; o que mudou só no oem não é atropelado (aparece na lista); o que mudou nos dois é conflito e
+  fica para resolver à mão. O que o destino tinha antes vai para `<pasta de dados>/oscreator_backup/`. Só vão os
+  arquivos da cópia que estão no git (o `os_creator/.env`, com a credencial do Fracttal, fica fora sempre). Copiar
+  não reinicia o 5090 nem faz commit no oem (público: commit lá é decisão do Levi). Depois, commit do
+  `sincronia.json` no Nexus. Sincronia inicial (06/10, 15:58): 120 arquivos, todos iguais.
+- **O que é só do Nexus vai na `ponte.py`, nunca na cópia** (a cópia vai para o supervisório, que não tem o Nexus):
+  a cópia não pode importar o pacote `nexus`, e a ferramenta recusa se importar. O
+  `tests/test_torre_oscreator.py` acusa quando a cópia e o oem divergem (só na máquina que tem o oem).
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
   supervisório a chave da sessão e o token do banco.
 - Precisa do PyQt6 instalado, porque a tela de Engenharia importa `steps/engenharia`, que puxa `steps/ui.py`.
