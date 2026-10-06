@@ -23,7 +23,9 @@ def test_respostas_juntam_a_fila_e_as_aprovadas():
     ronda_checklist.limpar()
     regras_app._FILA_CACHE.update(linhas=[{"wo_folio": "500", "description": "Ronda Longa — Altair", "note": NOTA},
                                           {"wo_folio": "501", "description": "Preventiva", "note": NOTA}])
-    ronda_checklist._APROVADAS["notas"] = {"400": NOTA.replace("módulos: 4", "módulos: 2")}
+    ronda_checklist._APROVADAS["resp"] = {"400": {**ronda_checklist.ler_nota(NOTA.replace("módulos: 4", "módulos: 2")),
+                                                  "fim": "2026-10-05"}}
+    ronda_checklist._APROVADAS["carregado"] = True
     try:
         r = ronda_checklist.respostas()
         assert set(r) == {"500", "400"} and r["500"]["sujidade"] == 4 and r["400"]["sujidade"] == 2
@@ -57,3 +59,67 @@ def test_aba_de_sujidade_e_vegetacao(banco, logado, monkeypatch):  # noqa: F811
     assert "Nenhuma usina com leitura" in html                       # vegetação 2: não é alta
     html = logado.get("/t/campo/rondas?aba=sujidade&sv=sujidade").get_data(as_text=True)
     assert "Altair" in html
+
+
+def _pagina(inicio, n=100, fim="2026-10-05"):
+    """Uma página da listagem de aprovadas: a 1ª OS de cada página é ronda (com resposta), o resto é outra coisa."""
+    linhas = [{"wo_folio": str(1000 + inicio + i), "final_date": f"{fim}T12:00:00",
+               "description": "Ronda Curta — Altair" if i == 0 else "Preventiva", "note": NOTA if i == 0 else ""}
+              for i in range(n)]
+    return {"data": linhas}
+
+
+def test_aprovadas_guardam_o_que_veio_quando_o_fracttal_recusa(app, tmp_path, monkeypatch):
+    """06/10: o 429 no meio da leitura jogava fora tudo; agora o que veio fica no arquivo e a próxima continua de onde
+    parou (uma página antes, porque as novas empurram a lista)."""
+    from nexus.campo import fracttal
+    pedidos = []
+
+    def ler(path):
+        inicio = int(path.split("start=")[1].split("&")[0])
+        pedidos.append(inicio)
+        if inicio == 300 and len(pedidos) < 5:
+            raise RuntimeError("o Fracttal recusou por excesso de pedidos (HTTP 429)")
+        return _pagina(inicio, n=100 if inicio < 500 else 10)
+    monkeypatch.setattr(fracttal, "ler", ler)
+    monkeypatch.setattr(ronda_checklist, "PAUSA_S", 0)
+    app.config.update(NEXUS_DADOS=str(tmp_path))
+    ronda_checklist.limpar()
+    try:
+        with app.app_context():
+            ronda_checklist._reler()
+            e = ronda_checklist.estado()
+            assert pedidos == [0, 100, 200, 300] and e["erro"] and not e["lidas"] and e["n"] == 3
+            assert set(ronda_checklist.respostas()) == {"1000", "1100", "1200"}
+            ronda_checklist.limpar()                      # reinício: volta do arquivo, sem pedir nada
+            assert set(ronda_checklist.respostas()) == {"1000", "1100", "1200"}
+            ronda_checklist._reler()                      # continua da página 200, não do começo
+            assert pedidos[4:] == [200, 300, 400, 500]
+            e = ronda_checklist.estado()
+            assert e["lidas"] and not e["erro"] and e["ate"] == "2026-10-05" and e["n"] == 6
+    finally:
+        ronda_checklist.limpar()
+
+
+def test_aprovadas_depois_da_primeira_vez_so_leem_as_novas(app, tmp_path, monkeypatch):
+    """Lida uma vez por inteiro, a releitura para ao passar da última leitura completa (menos a margem): 1 página."""
+    from nexus.campo import fracttal
+    pedidos = []
+
+    def ler(path):
+        inicio = int(path.split("start=")[1].split("&")[0])
+        pedidos.append(inicio)
+        # da 2ª página em diante, OS aprovadas antes da última leitura completa
+        return _pagina(inicio, fim="2026-10-05" if inicio == 0 else "2026-09-01")
+    monkeypatch.setattr(fracttal, "ler", ler)
+    monkeypatch.setattr(ronda_checklist, "PAUSA_S", 0)
+    app.config.update(NEXUS_DADOS=str(tmp_path))
+    ronda_checklist.limpar()
+    try:
+        with app.app_context():
+            ronda_checklist._carregar()
+            ronda_checklist._APROVADAS.update(ate="2026-10-04")
+            ronda_checklist._reler()
+            assert pedidos == [0, 100] and ronda_checklist.estado()["ate"] == "2026-10-05"
+    finally:
+        ronda_checklist.limpar()

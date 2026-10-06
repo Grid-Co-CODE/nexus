@@ -13,7 +13,7 @@
       <p class="cn-pergunta">{% if usina %}{{ usina.cliente or '—' }} · {{ usina.cluster or '—' }} · {{ usina.equipe or '—' }} · {{ usina.cidade }}{% if usina.uf %} - {{ usina.uf }}{% endif %} · supervisor {{ usina.supervisor or '—' }}{% endif %}</p></div>
     <div class="cn-frescor">livro de rondas do App + OS de ronda no Fracttal<br><b>lido às {{ lido }}</b></div>
   </div>
-  {% if suj_estado and (suj_estado.lendo or not suj_estado.fila) %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de ronda no Fracttal.</b> Sujidade e vegetação aparecem em 1 a 2 minutos; recarregue a página.</div>{% endif %}
+  {% include 'campo/_aviso_checklist.html' %}
   {% set ult = lidas[0] if lidas else none %}
   <div class="cn-kpis">
     <div class="cn-kpi"><span class="gc-rotulo">Rondas</span><span class="v">{{ hist|length }}</span><span class="d">nos últimos 90 dias</span></div>
@@ -98,7 +98,8 @@
         <td class="m">{{ duracao(r.dur_min) }}</td>
         <td class="m">{{ '—' if r.nota is none else r.nota ~ '%' }}</td>
         <td><span class="cn-selo cn-selo--{{ v[0] }}" title="{{ r.falhas }}">{{ v[1] }}</span></td>
-        <td>{{ nivel(r.sujidade) }}</td><td>{{ nivel(r.vegetacao) }}</td>
+        {% if r.lida or not r.os %}<td>{{ nivel(r.sujidade) }}</td><td>{{ nivel(r.vegetacao) }}</td>
+        {% else %}<td colspan="2" class="mudo" title="A OS {{ r.os }} ainda não foi lida no Fracttal">não lida</td>{% endif %}
         <td class="cn-menor">{{ r.vala or '—' }}</td>
         <td>{% if r.sensores_sujos %}<span class="cn-t-alerta">{{ r.sensores_sujos|join(', ') }}</span>{% elif r.lida %}<span class="mudo">limpos</span>{% else %}—{% endif %}</td>
         <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia and r.pend_obs not in (r.falhas or '') %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if not r.falhas and not r.pendencia %}—{% endif %}</td>

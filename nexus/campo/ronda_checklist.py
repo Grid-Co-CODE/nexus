@@ -6,25 +6,39 @@ ronda no Fracttal (`note`), cada resposta como "Rótulo: valor" (`_nota_ronda_os
 módulos: 2; Altura da vegetação: 3; Sujidade da vala de drenagem: Parcial; Piranômetro IPOA (...): Limpo; ...". As
 listagens do REST trazem esse texto em lote (medido em 05/10):
 - as rondas em verificação (status 2) já vêm na fila que a Aprovação de OS lê (`regras_app._FILA_CACHE`);
-- as aprovadas (status 3) vêm da mesma listagem, da mais recente para trás, até passar do período: ~6 páginas por mês.
-Nada disso vai para o banco. A releitura das aprovadas é em segundo plano, uma por vez, a cada 30 min no máximo.
+- as aprovadas (status 3) vêm da mesma listagem, da mais recente para trás, até passar do período.
+Nada disso vai para o banco.
+
+As aprovadas não mudam mais, então o que foi lido fica num arquivo da pasta de dados do Nexus (fora do git) e a
+releitura só busca o que foi aprovado depois da última leitura completa (1 a 2 páginas). Antes (até 06/10/2026) cada
+reinício e cada meia hora reliam ~30 páginas, tudo ou nada: no reinício das 10:09 de 06/10 o Fracttal recusou por
+excesso de pedidos (429), a leitura inteira foi descartada e o histórico de Matões 200 mostrou "—" em OS aprovadas que
+tinham a resposta no texto (15055: sujidade 2, vegetação 3, vala obstruída). Agora o que já veio fica, e a leitura que
+cai continua de onde parou.
 
 Escalas (as do App, `CHECKLIST_RONDA`): sujidade e vegetação de 1 a 5, comparadas com as fotos de referência; o App
 alerta acima de 3 (`alerta_acima`).
 """
+import json
+import logging
+import os
 import threading
 import time
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from . import fracttal, regras_app
 
-VALIDADE_S = 1800            # as aprovadas de novo no máximo a cada 30 min
+VALIDADE_S = 600             # as aprovadas novas, no máximo a cada 10 min (1 a 2 páginas)
 ESPERA_APOS_ERRO_S = 300
-DIAS_PARA_TRAS = 45          # o maior período da tela (30 dias) + 15 para a leitura anterior (a seta): ~30 páginas
-PAGINAS_MAX = 60
+DIAS_PARA_TRAS = 90          # o histórico da usina mostra os 90 dias do livro de rondas
+MARGEM_DIAS = 3              # a aprovação em lote pode carimbar o fim antes da última leitura completa
+GUARDA_DIAS = 120            # resposta mais velha que isso sai do arquivo
+PAGINAS_MAX = 120
+PAUSA_S = 0.5                # entre páginas: a cota do Fracttal é de 200 pedidos/min para a empresa toda
 ALERTA_ACIMA = 3             # nível 4 e 5 pedem ação (App)
-_APROVADAS = {"ts": 0.0, "notas": {}, "lendo": False, "erro": "", "erro_em": 0.0}
+_APROVADAS = {"ts": 0.0, "resp": {}, "ate": "", "retomar": 0, "topo": "", "lendo": False, "erro": "", "erro_em": 0.0,
+              "carregado": False}
 _TRAVA = threading.Lock()
 
 
@@ -66,24 +80,99 @@ def _notas_de(linhas) -> dict:
             for w in linhas or [] if str(w.get("description") or "").startswith("Ronda") and w.get("wo_folio")}
 
 
-def _reler():
-    """As OS de ronda aprovadas, da mais recente para trás, até passar de DIAS_PARA_TRAS."""
+def _arquivo():
+    """O arquivo das respostas aprovadas, na pasta de dados do Nexus (fora do git). Teste sem pasta própria: só em
+    memória (a pasta_dados recusa)."""
+    from flask import current_app, has_app_context
+    if not has_app_context():
+        return None
+    from ..cadastro.ligacoes import pasta_dados
     try:
-        piso = (datetime.now(timezone.utc) - timedelta(days=DIAS_PARA_TRAS)).strftime("%Y-%m-%d")
-        notas, inicio = {}, 0
+        return pasta_dados(current_app.config) / "campo" / "rondas_aprovadas.json"
+    except RuntimeError:
+        return None
+
+
+def _carregar():
+    with _TRAVA:
+        if _APROVADAS["carregado"]:
+            return
+        arq = _arquivo()
+        if arq is None:
+            return
+        _APROVADAS["carregado"] = True
+        try:
+            d = json.loads(arq.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        _APROVADAS.update(resp=d.get("resp") or {}, ate=d.get("ate") or "", retomar=int(d.get("retomar") or 0),
+                          topo=d.get("topo") or "", ts=time.time() if d.get("ate") else 0.0)
+
+
+def _gravar():
+    arq = _arquivo()
+    if arq is None:
+        return
+    a = _APROVADAS
+    corpo = {"ate": a["ate"], "retomar": a["retomar"], "topo": a["topo"], "resp": a["resp"]}
+    try:
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        tmp = arq.with_suffix(".tmp")
+        tmp.write_text(json.dumps(corpo, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, arq)
+    except OSError as e:
+        logging.warning("rondas aprovadas: não gravei o arquivo (%s)", e)
+
+
+def _rondas_de(linhas) -> dict:
+    """{OS: (texto, dia do fim)} das OS de ronda de uma página."""
+    return {str(w["wo_folio"]): (w.get("note") or w.get("task_note") or "", str(w.get("final_date") or "")[:10])
+            for w in linhas or [] if str(w.get("description") or "").startswith("Ronda") and w.get("wo_folio")}
+
+
+def _reler():
+    """As OS de ronda aprovadas, da mais recente para trás. A primeira vez, até DIAS_PARA_TRAS (e, se cair no meio,
+    continua da página em que parou); depois, só até a última leitura completa menos MARGEM_DIAS. O que cada página
+    traz entra na hora: um 429 no meio não joga fora o que já veio."""
+    _carregar()
+    a = _APROVADAS
+    hoje = datetime.now(timezone.utc).date()
+    piso = (hoje - timedelta(days=DIAS_PARA_TRAS)).isoformat()
+    if a["ate"]:
+        piso = max(piso, (date.fromisoformat(a["ate"]) - timedelta(days=MARGEM_DIAS)).isoformat())
+        inicio, topo = 0, ""
+    else:
+        inicio = a["retomar"]
+        topo = a["topo"] if inicio else ""
+    paginas = 0
+    try:
         for _ in range(PAGINAS_MAX):
+            if paginas:
+                time.sleep(PAUSA_S)
             r = fracttal.ler(f"work_orders?id_status_work_order=3&limit=100&start={inicio}&sort=final_date:desc")
             pagina = (r.get("data") if isinstance(r, dict) else r) or []
-            notas.update(_notas_de(pagina))
+            paginas += 1
+            for os_, (nota, fim) in _rondas_de(pagina).items():
+                a["resp"][os_] = {**ler_nota(nota), "fim": fim}
             datas = [str(w.get("final_date") or "")[:10] for w in pagina if w.get("final_date")]
+            if datas and not topo:
+                topo = max(datas)
             if len(pagina) < 100 or (datas and max(datas) < piso):
                 break
             inicio += 100
-        _APROVADAS.update(ts=time.time(), notas=notas, erro="", erro_em=0.0)
-    except Exception as e:      # noqa: BLE001 — 429 ou rede: fica a leitura anterior, e tenta de novo depois
-        _APROVADAS.update(erro=str(e)[:160], erro_em=time.time())
+            if not a["ate"]:
+                a.update(retomar=max(0, inicio - 100), topo=topo)    # uma página antes: as novas empurram a lista
+        a.update(ate=topo or a["ate"] or hoje.isoformat(), retomar=0, topo="", ts=time.time(), erro="", erro_em=0.0)
+        logging.info("rondas aprovadas: %d página(s), %d respostas, completas até %s", paginas, len(a["resp"]), a["ate"])
+    except Exception as e:      # noqa: BLE001 — 429 ou rede: fica o que já veio, e tenta de novo depois
+        a.update(erro=str(e)[:160], erro_em=time.time())
+        logging.warning("rondas aprovadas: leitura parou na página %d (%s); %d respostas guardadas", paginas,
+                        str(e)[:120], len(a["resp"]))
     finally:
-        _APROVADAS["lendo"] = False
+        corte = (hoje - timedelta(days=GUARDA_DIAS)).isoformat()
+        a["resp"] = {k: v for k, v in a["resp"].items() if (v.get("fim") or corte) >= corte}
+        _gravar()
+        a["lendo"] = False
 
 
 def em_segundo_plano(fn):
@@ -113,17 +202,20 @@ def pedir_releitura(app=None):
 
 
 def respostas() -> dict:
-    """{número da OS: respostas} de todas as OS de ronda que o Nexus tem: as em verificação (a fila da Aprovação) e as
-    aprovadas (lidas aqui)."""
-    notas = dict(_APROVADAS["notas"])
-    notas.update(_notas_de(regras_app._FILA_CACHE.get("linhas")))
-    return {os_: ler_nota(n) for os_, n in notas.items()}
+    """{número da OS: respostas} de todas as OS de ronda que o Nexus tem: as aprovadas (o arquivo e as releituras) e as
+    em verificação (a fila da Aprovação), que valem por cima."""
+    _carregar()
+    out = {os_: {k: v for k, v in r.items() if k != "fim"} for os_, r in list(_APROVADAS["resp"].items())}
+    out.update({os_: ler_nota(n) for os_, n in _notas_de(regras_app._FILA_CACHE.get("linhas")).items()})
+    return out
 
 
 def estado() -> dict:
-    return {"lendo": _APROVADAS["lendo"], "erro": _APROVADAS["erro"], "lidas": bool(_APROVADAS["ts"]),
+    """lidas = a leitura das aprovadas já foi completa ao menos uma vez (até `ate`)."""
+    return {"lendo": _APROVADAS["lendo"], "erro": _APROVADAS["erro"], "lidas": bool(_APROVADAS["ate"]),
+            "ate": _APROVADAS["ate"], "n": len(_APROVADAS["resp"]),
             "fila": regras_app._FILA_CACHE.get("linhas") is not None}
 
 
 def limpar():
-    _APROVADAS.update(ts=0.0, notas={}, lendo=False, erro="", erro_em=0.0)
+    _APROVADAS.update(ts=0.0, resp={}, ate="", retomar=0, topo="", lendo=False, erro="", erro_em=0.0, carregado=False)

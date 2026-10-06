@@ -1,0 +1,7 @@
+{# O estado da leitura do checklist das rondas no Fracttal (ronda_checklist.estado): a tela diz quando falta
+   leitura, em vez de mostrar "—" calado (06/10/2026: Matões 200 com "—" em OS aprovadas que tinham resposta). #}
+{% if suj_estado %}
+{% if suj_estado.lendo %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de ronda no Fracttal.</b> {{ suj_estado.n }} respostas já lidas; recarregue em 1 a 2 minutos.</div>
+{% elif suj_estado.erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou parte da leitura ({{ suj_estado.erro }}).</b> Mostrando as {{ suj_estado.n }} respostas já lidas{% if suj_estado.lidas %} (completas até {{ suj_estado.ate[8:10] }}/{{ suj_estado.ate[5:7] }}){% endif %}; nova tentativa em 5 minutos.</div>
+{% elif not suj_estado.lidas or not suj_estado.fila %}<div class="cn-erro cn-aviso" role="status"><b>A leitura das OS de ronda no Fracttal ainda não terminou.</b> Rondas marcadas "não lida" aparecem quando ela terminar; recarregue em alguns minutos.</div>{% endif %}
+{% endif %}

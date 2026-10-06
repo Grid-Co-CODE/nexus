@@ -99,8 +99,8 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   - **Histórico da usina** (`/rondas/usina/<usina_id>`, `visao.historico_usina`; Levi, 05/10: "quando clicarmos no
     nome da usina já aparece o histórico de rondas com data e sujidade e vegetação"): o nome da usina é link nas abas
     Registros, Sujidade e Cobertura. Todas as rondas do livro (90 dias), a mais recente primeiro, com sujidade,
-    vegetação, vala e sensores da OS (só das OS lidas: em verificação e aprovadas dos últimos 45 dias; o resto fica
-    "—"), e a evolução em gráfico quando há duas leituras ou mais. Passar o mouse (ou o foco do teclado) num ponto
+    vegetação, vala e sensores da OS (em verificação e aprovadas dos 90 dias; OS ainda não lida aparece "não lida",
+    ronda sem OS fica "—"), e a evolução em gráfico quando há duas leituras ou mais. Passar o mouse (ou o foco do teclado) num ponto
     mostra a OS, quem fez, o dia com a hora (início e fim) e os dois níveis (Levi, 06/10); o texto entra por
     `textContent`, nunca como HTML, porque vem do livro do App.
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
@@ -108,8 +108,14 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não
     traz o checklist, mas o App escreve cada resposta no texto da OS de ronda no Fracttal ("Sujidade dos módulos: 2;
     Altura da vegetação: 3; Sujidade da vala de drenagem: Parcial; Piranômetro IPOA ...: Limpo"). As listagens do REST
-    trazem esse texto em lote: as em verificação já estão na fila da Aprovação; as aprovadas, ~30 páginas (45 dias),
-    relidas em segundo plano no máximo a cada 30 min (e 90 s depois de subir). Nada vai para o banco. Por usina: a
+    trazem esse texto em lote: as em verificação já estão na fila da Aprovação; as aprovadas (que não mudam mais)
+    ficam em `<pasta de dados>/campo/rondas_aprovadas.json` (fora do git; no PC, `C:\GridcoAuto\nexus`). A primeira
+    leitura vai até 90 dias (e, se o Fracttal recusar no meio, continua da página em que parou); depois, a cada 10 min
+    no máximo, só o que foi aprovado depois da última leitura completa menos 3 dias (1 a 2 páginas), com 0,5 s entre
+    páginas. **Por quê (06/10):** antes era tudo ou nada, ~30 páginas a cada reinício e a cada 30 min; no reinício das
+    10:09 o 429 descartou a leitura inteira e Matões 200 mostrou "—" em OS aprovadas que tinham a resposta (15055:
+    sujidade 2, vegetação 3, vala obstruída). A tela agora diz quando a leitura falhou ou não terminou
+    (`_aviso_checklist.html`). Nada vai para o banco. Por usina: a
     última leitura no período e a anterior (a seta); nível 1 a 5, acima de 3 pede ação (o `alerta_acima` do App);
     distribuição por nível; vala, sombreamento e sensores sujos. Medido em 05/10 (30 dias): 96 de 128 usinas com
     leitura, 382 de 417 rondas com OS lidas; sujidade média 2,5 (21 usinas em 4 ou 5), vegetação 2,4 (16), vala suja
@@ -260,7 +266,7 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
     com o login do Fracttal de quem clica (status 3 + recalculate + reconferência da data de fim; IRREVERSÍVEL, pede
     confirmação). Sem login: 401, a tela leva ao login e volta (`/os/_nexus/voltar?para=`, só /t/campo/). Aprovada,
     a OS sai da fila guardada na hora (`POST /t/campo/aprovacao/<id>/tirar`). O id da OS vem da fila crua.
-    **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas) e as rondas aprovadas (~30); em 05/10, com
+    **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas; as rondas aprovadas vêm do arquivo desde 06/10); em 05/10, com
     muitos reinícios seguidos, o Fracttal passou a recusar (429). Em desenvolvimento, `NEXUS_CAMPO_AQUECER=0`.
   - **Filtro de equipe e de supervisor** pelo cadastro: as usinas da equipe (ou do supervisor) pelo nome no Fracttal
     (de-para "Fracttal · Classificação 1", `visao.usinas_do_fracttal`) viram o escopo de usinas da conta do App
