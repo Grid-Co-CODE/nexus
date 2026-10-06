@@ -12,6 +12,7 @@ import io
 import json
 import re
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import NamedTuple
 
@@ -32,6 +33,7 @@ INPE_RISCO_FOGO = ("https://dataserver-coids.inpe.br/queimadas/queimadas/riscofo
 
 FOCOS_ARQUIVOS = 6                       # seis arquivos de 10 min = a última hora
 DIAS_DE_RISCO = (0, 1, 2, 3)             # RF.PREV.T0..T3: hoje e D+1 a D+3
+TRABALHADORES_POR_DIA = 2                # tiles pedidas ao mesmo tempo em cada dia; os 4 dias vão juntos: 8 conexões no máximo
 _NIVEL_INMET = {"perigo potencial": 1, "perigo": 2, "grande perigo": 3}   # amarelo, laranja, vermelho
 
 
@@ -233,24 +235,35 @@ def inpe_risco_fogo(pontos, sessao, modelo_url=INPE_RISCO_FOGO, *, dias=DIAS_DE_
         raise FonteErro("o endereço do risco de fogo precisa de {d} (o dia, de 0 a 3)")
     if not pontos:
         return {"por_ponto": {}, "arquivos": {}, "erros": {}}
-    por_ponto = {chave: [] for chave, _, _ in pontos}
-    arquivos, erros = {}, {}
     extra = {} if janela is None else {"janela": janela}
-    for d in dias:
+    dias = tuple(dias)
+
+    def um_dia(d):
         try:
-            gt = GeoTiff(modelo_url.format(d=d), sessao, timeout=timeout, **extra)
+            gt = GeoTiff(modelo_url.format(d=d), sessao, timeout=timeout, trabalhadores=TRABALHADORES_POR_DIA, **extra)
             resultado = gt.amostrar_varios(pontos)
             for a in resultado.values():
                 if a.valor is not None and not -1e-9 <= a.valor <= 1 + 1e-9:
                     raise FonteErro(f"valor {a.valor:g} fora da faixa de 0 a 1: o INPE mudou a escala do risco?")
         except (GeoTiffErro, FonteErro, requests.RequestException, OSError) as e:
-            erros[d] = resumo_do_erro(e)
+            return d, None, None, resumo_do_erro(e)
+        return d, gt.modificado, resultado, None
+
+    # Os quatro dias são arquivos independentes: em fila, 160 usinas levavam 10 s na primeira visita (medido em 06/10/2026);
+    # juntos, o tempo é o do dia mais lento.
+    with ThreadPoolExecutor(max_workers=len(dias)) as pool:
+        feitos = list(pool.map(um_dia, dias))
+    por_ponto = {chave: [] for chave, _, _ in pontos}
+    arquivos, erros = {}, {}
+    for d, modificado, resultado, erro in feitos:
+        if erro is not None:
+            erros[d] = erro
             for chave in por_ponto:
                 por_ponto[chave].append(Amostra(None, "indisponivel"))
             continue
-        arquivos[d] = gt.modificado
+        arquivos[d] = modificado
         for chave in por_ponto:
             por_ponto[chave].append(resultado[chave])
-    if len(erros) == len(tuple(dias)):
+    if len(erros) == len(dias):
         raise FonteErro("nenhum dia do risco de fogo pôde ser lido: " + "; ".join(f"D{d}: {m}" for d, m in erros.items()))
     return {"por_ponto": por_ponto, "arquivos": arquivos, "erros": erros}

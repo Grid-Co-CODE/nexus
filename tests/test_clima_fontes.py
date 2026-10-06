@@ -288,6 +288,24 @@ def test_risco_sem_pontos_nao_vai_a_rede():
     assert r["por_ponto"] == {} and s.pedidos == []
 
 
+def test_risco_os_quatro_dias_sao_buscados_ao_mesmo_tempo():
+    # Cada dia é um arquivo independente: com 160 usinas, um a um levava 10 s na primeira visita. A barreira só deixa o
+    # primeiro pedido de cada dia passar quando os QUATRO estão no ar; se os dias fossem em fila, ela estouraria o tempo.
+    import threading
+    barreira = threading.Barrier(4, timeout=5)
+
+    class Concorrente(SessaoArquivos):
+        def get(self, url, params=None, headers=None, timeout=None):
+            if len(self.pedidos) < 4 and not hasattr(self, "_barrou_" + url):
+                setattr(self, "_barrou_" + url, True)
+                barreira.wait()
+            return super().get(url, params, headers, timeout)
+
+    s = Concorrente({RISCO.format(d=d): montar_cog(plano(0.2), origem=(X0, Y0), escala=D) for d in range(4)})
+    r = F.inpe_risco_fogo([("a", *centro(3, 3))], s, RISCO)
+    assert [a.valor for a in r["por_ponto"]["a"]] == [0.2] * 4 and r["erros"] == {}
+
+
 def test_risco_so_busca_as_tiles_dos_pontos():
     s = sessao_risco({d: plano(0.2) for d in range(4)})
     F.inpe_risco_fogo([("a", *centro(3, 3))], s, RISCO, janela=512)
