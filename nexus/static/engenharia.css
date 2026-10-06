@@ -1,0 +1,35 @@
+/* Engenharia · Confiabilidade (06/10/2026): o que a tela tem além do campo.css (filtros, nível, sinais, OS do ativo) */
+.eg-filtros{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,1.4fr);gap:10px 14px;align-items:end}
+.eg-filtros label{display:grid;gap:6px;min-width:0}
+.eg-filtros .gc-campo{width:100%}
+@media (max-width:1100px){.eg-filtros{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.eg-filtros{grid-template-columns:minmax(0,1fr)}}
+.eg-conta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:12px 0 0;font-size:13.5px;color:var(--tinta-2)}
+.eg-conta b{color:var(--tinta);font-variant-numeric:tabular-nums}
+.eg-conta .eg-ligado{border-color:var(--verde);color:var(--tinta)}
+.eg-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1100px){.eg-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.eg-meta{font-size:12.5px;margin:8px 0 0}
+.eg-nivel{display:inline-block;font:700 11px/16px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;
+  padding:3px 10px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.eg-nivel--critico{color:var(--critico);background:var(--critico-suave)}
+.eg-nivel--alerta{color:var(--alerta);background:var(--alerta-suave)}
+.eg-nivel--info{color:var(--info);background:var(--info-suave)}
+.eg-lista td{vertical-align:middle}
+.eg-lista .eg-ativo{text-align:left}
+.eg-lista .eg-ativo .det{display:block;margin-top:2px;font-size:12px;color:var(--mudo)}
+.eg-tags{text-align:left}
+.eg-crit{font:600 13px var(--font-sans);color:var(--tinta);margin-right:6px}
+.eg-tag{display:inline-block;margin:2px 4px 2px 0;font:600 11.5px/16px var(--font-sans);padding:2px 8px;border-radius:6px;
+  border:1px solid currentColor;white-space:nowrap}
+.eg-tag--critico{color:var(--critico);background:var(--critico-suave)}
+.eg-tag--alerta{color:var(--alerta);background:var(--alerta-suave)}
+.eg-tag--info{color:var(--info);background:var(--info-suave)}
+.eg-n{font:700 20px/1 var(--font-sans);color:var(--tinta)}
+.eg-lista td .det{display:block;font-size:11.5px;color:var(--mudo)}
+.eg-sub{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:16px 0 8px}
+.eg-os{width:100%;border-collapse:collapse;font-size:13px}
+.eg-os th{font:700 11px/14px var(--font-sans);text-transform:uppercase;letter-spacing:.04em;color:var(--mudo);text-align:left;
+  padding:6px 8px;border-bottom:1px solid var(--linha)}
+.eg-os td{padding:6px 8px;border-bottom:1px solid var(--linha);text-align:left;vertical-align:top}
+.eg-os .det{display:block;color:var(--mudo);font-size:12px;margin-top:2px}

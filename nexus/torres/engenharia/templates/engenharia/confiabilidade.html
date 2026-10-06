@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+{# Confiabilidade, nossa (06/10/2026): as OS de falha do Fracttal lidas pelo Nexus (nexus/engenharia/os_falhas.py) e as
+   contas em nexus/engenharia/confiabilidade.py, com as regras do robô do PCM e o ativo pelo CÓDIGO (com a usina). #}
+{% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
+{% macro nivel_selo(n) %}{% for k, rot, cor in niveis if k == n %}<span class="eg-nivel eg-nivel--{{ cor }}">{{ rot }}</span>{% endfor %}{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Confiabilidade</p>
+      <h1 class="cn-titulo">Confiabilidade dos ativos</h1>
+      <p class="cn-pergunta">Que ativo falha mais e demora mais a voltar: os sinais das corretivas dos últimos {{ janela }} dias
+        ({{ periodo }}) e a disponibilidade de cada ativo pelo método do Power BI.</p></div>
+    <div class="cn-frescor">OS de falha do Fracttal<br><b>contas às {{ lido }}</b></div>
+  </div>
+  <details class="cn-entenda">
+    <summary>Entenda esta tela</summary>
+    <ul>
+      <li><b>Sinal</b> (só corretiva e corretiva emergencial dos últimos {{ janela }} dias; serviço registrado como corretiva,
+        como limpeza, ensaio, vistoria ou reset, não conta como falha): <b>A</b> = falhas em {{ janela }} dias; <b>B</b> = falhas
+        em 7 dias; <b>D</b> = falhas acima do P90 da família (o normal da família no período).</li>
+      <li><b>Nível:</b> crítico com 4 falhas ou mais, ou 3 em 7 dias; atenção com 3 falhas, ou 2 em 7 dias, ou acima do P90;
+        monitorar com 2. Criticidade A sobe monitorar para atenção. Só serviço (nenhuma falha e 2 OS ou mais) fica em
+        monitorar para reclassificar a OS.</li>
+      <li><b>Disponibilidade</b> = MTBF ÷ (MTBF + MTTR), por ativo, desde 20/10/2025 (corretiva, emergencial, religamento e
+        religamento remoto). MTBF = horas desde a mobilização (do cadastro) menos as horas paradas, ÷ nº de falhas. MTTR =
+        média do incidente ao fim (até 1 dia, em horas corridas; acima, 12 h por dia). λ = 1 ÷ MTBF.</li>
+      <li><b>Criticidade</b> por família enquanto a matriz real não existe: inversor, QGBT, cabine e transformador = A;
+        outros = B; tracker = C.</li>
+      <li>O ativo é o <b>código</b> do Fracttal, que já traz a usina; usina, cliente e cluster vêm do cadastro do Nexus.</li>
+    </ul>
+  </details>
+  {% if sem_cadastro %}<div class="cn-erro cn-aviso" role="status"><b>O cadastro do Nexus não respondeu.</b> Usina e cliente estão como o Fracttal escreve, e a mobilização vale 20/10/2025 para todas.</div>{% endif %}
+  {% if est.lendo and not est.completa %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de falha no Fracttal pela primeira vez.</b> {{ est.n }} já lidas; recarregue em 2 a 3 minutos.</div>
+  {% elif est.erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou parte da leitura ({{ est.erro }}).</b> Mostrando as {{ est.n }} OS já lidas; nova tentativa em 5 minutos.</div>
+  {% elif not est.completa %}<div class="cn-erro cn-aviso" role="status"><b>A leitura das OS de falha ainda não terminou.</b> Os números podem mudar; recarregue em alguns minutos.</div>{% endif %}
+
+  <form class="cn-barra-filtros eg-filtros" method="get">
+    <label><span class="gc-rotulo">Cliente</span>
+      <select class="gc-campo" name="cliente" onchange="this.form.usina.value='';this.form.submit()"><option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == f.cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+    <label><span class="gc-rotulo">Usina</span>
+      <select class="gc-campo" name="usina" onchange="this.form.submit()"><option value="">Todas</option>{% for u in usinas %}<option value="{{ u }}"{% if u == f.usina %} selected{% endif %}>{{ u }}</option>{% endfor %}</select></label>
+    <label><span class="gc-rotulo">Família</span>
+      <select class="gc-campo" name="fam" onchange="this.form.submit()"><option value="">Todas</option>{% for x in familias %}<option value="{{ x }}"{% if x == f.fam %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></label>
+    <label><span class="gc-rotulo">Criticidade</span>
+      <select class="gc-campo" name="crit" onchange="this.form.submit()"><option value="">Todas</option>{% for x in ('A', 'B', 'C') %}<option value="{{ x }}"{% if x == f.crit %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></label>
+    <label><span class="gc-rotulo">Nível</span>
+      <select class="gc-campo" name="nivel" onchange="this.form.submit()"><option value="">Todos</option>{% for x, rot, _c in niveis %}<option value="{{ x }}"{% if x == f.nivel %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
+    <label class="eg-busca"><span class="gc-rotulo">Buscar</span>
+      <input class="gc-campo" type="search" name="q" value="{{ f.q }}" placeholder="ativo, código, usina"></label>
+    {% for x in ('aba', 'por', 'servico') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+  </form>
+  <p class="eg-conta"><b>{{ sinais|length }}</b> ativos com sinal, de <b>{{ k.ativosCorretiva }}</b> com corretiva em {{ janela }} dias
+    <a class="cn-filtro-ativo{% if esconder %} eg-ligado{% endif %}" href="{{ url(servico=None if esconder else '0') }}">{{ 'Mostrar' if esconder else 'Esconder' }} serviço registrado como corretiva</a></p>
+
+  <nav class="cn-abas" aria-label="Abas">
+    {% for a, nome in abas %}<a href="{{ url(aba=None if a == 'ativos' else a) }}"{% if a == aba %} aria-current="page"{% endif %}>{{ nome }}{% if a == 'ativos' %}<i>{{ sinais|length }}</i>{% endif %}</a>{% endfor %}
+  </nav>
+
+  <div class="cn-kpis eg-kpis">
+    <div class="cn-kpi"><span class="gc-rotulo">Disponibilidade</span><span class="v cn-t-{{ 'ok' if (k.disp or 0) >= meta else 'critico' }}">{{ pct(k.disp) }}</span><span class="d">mediana de {{ k.ativosConf }} ativos · meta ≥ {{ (meta * 100)|int }}%</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">MTBF mediano</span><span class="v">{{ h(k.mtbf) }}</span><span class="d">{% if k.mtbf %}λ = {{ '%.1e'|format(1 / k.mtbf) }} falhas/h{% endif %}</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">MTTR mediano</span><span class="v">{{ h(k.mttr) }}</span><span class="d">tempo médio de reparo</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">Abaixo da meta</span><span class="v cn-t-{{ 'critico' if k.abaixo else 'ok' }}">{{ k.abaixo }}</span><span class="d">ativos com disponibilidade &lt; {{ (meta * 100)|int }}%</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">Críticos</span><span class="v cn-t-{{ 'critico' if k.criticos else 'ok' }}">{{ k.criticos }}</span><span class="d">{{ k.corretivas }} corretivas em {{ janela }} dias</span></div>
+  </div>
+  <p class="mudo eg-meta">Metas de classe mundial: disponibilidade ≥ 85% · Disp = MTBF ÷ (MTBF + MTTR) · λ = 1 ÷ MTBF.</p>
+
+  {% if aba == 'ativos' %}
+  <div class="cn-lista-cab"><h2>Ativos com sinal</h2><span class="mudo">por gravidade · clique na linha para ver as OS</span></div>
+  <div class="cn-tab"><table class="cn-expande eg-lista">
+    <thead><tr><th>Nível</th><th>Ativo</th><th>Usina</th><th>Sinais</th><th>Disponibilidade</th><th>Falhas</th></tr></thead>
+    <tbody>
+    {% for a in sinais %}
+      <tr class="cn-linha" tabindex="0" aria-expanded="false">
+        <td>{{ nivel_selo(a.nivel) }}</td>
+        <td class="eg-ativo"><b>{{ a.nome }}</b><span class="det m">{{ a.cod }}</span></td>
+        <td class="eg-ativo">{{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %}<span class="det">{{ a.cliente }}</span></td>
+        <td class="eg-tags"><span class="eg-crit">Crit. {{ a.crit }}</span>
+          {% if a.soServico %}{{ tag(a.n30 ~ ' OS de serviço', 'info') }}{% endif %}
+          {% if a.nFalha >= 3 %}{{ tag('A · ' ~ a.nFalha ~ ' falhas em ' ~ janela ~ 'd', 'critico' if a.nFalha >= 4 else 'alerta') }}{% endif %}
+          {% if a.n7 >= 2 %}{{ tag('B · ' ~ a.n7 ~ ' em 7d', 'critico' if a.n7 >= 3 else 'alerta') }}{% endif %}
+          {% if a.nFalha > a.p90 %}{{ tag('D · P90 ' ~ a.fam ~ ' = ' ~ a.p90, 'alerta') }}{% endif %}</td>
+        <td class="m">{% if a.disp is not none %}<span class="cn-t-{{ 'ok' if a.disp >= meta else 'critico' }}">{{ pct(a.disp) }}</span>{% else %}—{% endif %}</td>
+        <td class="m"><b class="eg-n">{{ a.nFalha }}</b><span class="det">{{ a.n30 }} OS</span></td>
+      </tr>
+      <tr class="cn-detalhe" hidden><td colspan="6">
+        <div class="cn-detalhe-grade">
+          <dl class="cn-dados">
+            <dt>Código</dt><dd class="m">{{ a.cod }}</dd>
+            <dt>Família</dt><dd>{{ a.fam }} · criticidade {{ a.crit }} ({{ a.critVal }})</dd>
+            <dt>Usina</dt><dd>{{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %} · {{ a.cliente }}{% if a.cluster %} · {{ a.cluster }}{% endif %}{% if a.circuito %}<span class="det">{{ a.circuito }}</span>{% endif %}</dd>
+            <dt>MTBF</dt><dd>{{ h(a.mtbf) }}{% if a.mtbf %} · λ = {{ '%.1e'|format(1 / a.mtbf) }} falhas/h{% endif %}</dd>
+            <dt>MTTR</dt><dd>{{ h(a.mttr) }}</dd>
+            <dt>Disponibilidade</dt><dd>{{ pct(a.disp) }} <span class="mudo">({{ a.n }} falha{{ 's' if a.n != 1 }} desde 20/10/2025)</span></dd>
+          </dl>
+          <div>
+            <h3>Por que acendeu</h3>
+            <ul class="cn-ativ">{% for p in a.porQue %}<li>{{ p }}</li>{% else %}<li class="mudo">2 falhas em {{ janela }} dias.</li>{% endfor %}</ul>
+          </div>
+        </div>
+        <h3 class="eg-sub">As últimas OS ({{ a.os|length }} de {{ a.n30 }})</h3>
+        <table class="eg-os"><thead><tr><th>Data</th><th>OS</th><th>Tipo</th><th>Tarefa</th><th>Técnico</th><th>Estado</th></tr></thead><tbody>
+        {% for o in a.os %}<tr><td class="m">{{ o.d }}</td>
+          <td class="m">{% if o.url %}<a class="cn-link" href="{{ o.url }}" target="_blank" rel="noopener">{{ o.os }}</a>{% else %}{{ o.os }}{% endif %}</td>
+          <td>{{ o.tipo }}{% if o.servico %} {{ tag('serviço', 'info') }}{% endif %}</td>
+          <td>{{ o.t }}{% if o.nota %}<span class="det">{{ o.nota }}</span>{% endif %}</td>
+          <td class="cn-menor">{{ o.quem or '—' }}</td><td class="cn-menor">{{ o.st }}</td></tr>{% endfor %}
+        </tbody></table>
+      </td></tr>
+    {% else %}<tr><td colspan="6" class="mudo">Nenhum ativo com sinal com esses filtros.</td></tr>{% endfor %}
+    </tbody></table></div>
+  {% else %}
+  <div class="cn-lista-cab"><h2>Indicadores por {{ por }}</h2>
+    <span class="cn-seg"><a href="{{ url(por=None) }}"{% if por == 'cliente' %} aria-current="page"{% endif %}>Por cliente</a><a href="{{ url(por='usina') }}"{% if por == 'usina' %} aria-current="page"{% endif %}>Por usina</a></span></div>
+  <div class="cn-tab"><table>
+    <thead><tr><th>{{ 'Cliente' if por == 'cliente' else 'Usina' }}</th><th>Ativos com histórico</th><th>Disponibilidade</th><th>MTBF</th><th>MTTR</th><th>Abaixo da meta</th><th>Com sinal</th><th>Críticos</th><th>Falhas em {{ janela }} dias</th></tr></thead>
+    <tbody>
+    {% for r in indicadores %}
+      <tr><td><b>{{ r.nome }}</b></td><td class="m">{{ r.ativos }}</td>
+        <td class="m">{% if r.disp is not none %}<span class="cn-t-{{ 'ok' if r.disp >= meta else 'critico' }}">{{ pct(r.disp) }}</span>{% else %}—{% endif %}</td>
+        <td class="m">{{ h(r.mtbf) }}</td><td class="m">{{ h(r.mttr) }}</td>
+        <td class="m">{% if r.abaixo %}<span class="cn-t-critico">{{ r.abaixo }}</span>{% else %}0{% endif %}</td>
+        <td class="m">{{ r.sinais }}</td><td class="m">{% if r.criticos %}<span class="cn-t-critico">{{ r.criticos }}</span>{% else %}0{% endif %}</td>
+        <td class="m">{{ r.falhas30 }}</td></tr>
+    {% else %}<tr><td colspan="9" class="mudo">Nada com esses filtros.</td></tr>{% endfor %}
+    </tbody></table></div>
+  <p class="mudo cn-rodape">Disponibilidade, MTBF e MTTR são as medianas dos ativos do grupo (não a conta do grupo inteiro, que
+    soma as falhas da frota toda e derruba a disponibilidade).</p>
+  {% endif %}
+  <div class="cn-nota"><b>De onde vem.</b> As OS de falha (corretiva, corretiva emergencial, religamento e religamento remoto)
+    lidas pelo Nexus no Fracttal: as abertas a cada leitura, as concluídas desde 20/10/2025 guardadas e atualizadas pelo
+    que fechou depois; as canceladas ficam fora. {{ est.n }} OS na conta de agora.</div>
+</div>
+<script>
+  // clicar na linha abre as OS do ativo logo abaixo
+  document.querySelectorAll('table.cn-expande tr.cn-linha').forEach(function (tr) {
+    function alterna(ev) {
+      if (ev.target.closest('a')) return;
+      var det = tr.nextElementSibling;
+      if (!det || !det.classList.contains('cn-detalhe')) return;
+      det.hidden = !det.hidden;
+      tr.setAttribute('aria-expanded', String(!det.hidden));
+    }
+    tr.addEventListener('click', alterna);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
+  });
+</script>
+{% endblock %}
