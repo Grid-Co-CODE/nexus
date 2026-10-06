@@ -129,6 +129,7 @@ def atencao():
     ids = [v[0] for v in VISTAS]
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
     f, regiao, equipe = request.args.get("f", ""), request.args.get("regiao", ""), request.args.get("equipe", "")
+    supervisor = request.args.get("supervisor", "")
     modo = "tabela" if request.args.get("modo") == "tabela" or equipe else "equipes"
     q = request.args.get("q", "").strip().lower()
     campos = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
@@ -136,6 +137,7 @@ def atencao():
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
                 and (not equipe or x.get("equipe") == equipe)
+                and (not supervisor or x.get("supervisor") == supervisor)
                 and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
     fontes = {"pendentes": filtra(d.get("pendentes") or []), "feitas": filtra(d.get("feitas") or []),
               "pt": filtra(d.get("pts") or [])}
@@ -144,7 +146,8 @@ def atencao():
     for x in base:
         contagem[_status(vista, x)] = contagem.get(_status(vista, x), 0) + 1
     lista = [x for x in base if not f or _status(vista, x) == f]
-    cartoes = visao.por_equipe(filtra(d.get("usinas") or []), fontes["pendentes"], fontes["feitas"], fontes["pt"])
+    cartoes = visao.por_equipe(filtra(d.get("usinas") or []), fontes["pendentes"], fontes["feitas"], fontes["pt"],
+                               d.get("times") or {})
     if vista == "pt":
         cartoes = [c for c in cartoes if c["pts"]]
     cartoes.sort(key=ORDEM_DOS_CARTOES[vista])
@@ -152,6 +155,8 @@ def atencao():
         "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
         status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
         lista=lista, f=f, regiao=regiao, equipe=equipe, modo=modo, cartoes=cartoes, regioes=visao.REGIOES,
+        supervisor=supervisor, supervisores=sorted({x.get("supervisor") for x in (d.get("usinas") or []) + (d.get("pts") or [])
+                                                    if x.get("supervisor")}),
         q=request.args.get("q", ""), idade_min=_idade_min))
 
 

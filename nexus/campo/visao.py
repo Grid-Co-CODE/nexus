@@ -12,6 +12,8 @@ A pessoa vem do App como código do e-mail (HMAC): o nome sai do cadastro do App
 
 As contas são NOSSAS e estão escritas em cada função: quem quiser saber por que um número deu tanto lê aqui.
 """
+import collections
+import json
 import re
 import statistics
 import time
@@ -40,6 +42,8 @@ REGIAO_DA_UF = {**dict.fromkeys(("AC", "AP", "AM", "PA", "RO", "RR", "TO"), "Nor
                 **dict.fromkeys(("ES", "MG", "RJ", "SP"), "Sudeste"),
                 **dict.fromkeys(("PR", "RS", "SC"), "Sul")}
 SEM_EQUIPE = "Sem equipe"
+SEM_SUPERVISOR = "Sem supervisor"
+CAMPO = "Colaborador de campo"       # o vínculo de quem vai a campo no cadastro (técnico, eletricista, mantenedor)
 
 
 class SemBanco(RuntimeError):
@@ -162,10 +166,66 @@ class _Base:
         self.sem_mobilizacao = sorted(str(u.get("nome") or "") for uid, u in self.por_id.items()
                                       if uid not in self.mobilizadas
                                       and str(u.get("status") or "").strip().upper() == STATUS_OPERACAO)
+        self.time = self._time(_livro("cadastro_nexus", "pessoas"))
+
+    def _time(self, pessoas) -> dict:
+        """{equipe_id: técnicos, cargos, supervisor} pelo cadastro de pessoas (Levi, 05/10: "um número ao lado
+        indicando o número de técnicos" e "um filtro para supervisor"). Técnico = colaborador de campo da equipe que
+        não está Desligado: medido em 05/10, os 28 sem status no cadastro estão todos em equipes sem nenhum Ativo, e
+        contar só os Ativos zerava essas equipes. Supervisor = o `supervisor_id` dos técnicos da equipe (em 05/10, uma
+        equipe tem sempre um só); o nome é o "Nome padrão" da ficha dele, decifrado na hora (NEXUS_CHAVE_CADASTRO)."""
+        time = {}
+        for p in pessoas:
+            eid = D._id(p.get("equipe_id"))
+            if (not eid or str(p.get("vinculo") or "").strip() != CAMPO
+                    or str(p.get("status") or "").strip().lower() == "desligado"
+                    or str(p.get("excluido") or "").strip().lower() == "sim"):
+                continue
+            e = time.setdefault(eid, {"tecnicos": 0, "ativos": 0, "cargos": collections.Counter(),
+                                      "supervisores": collections.Counter()})
+            e["tecnicos"] += 1
+            e["ativos"] += str(p.get("status") or "").strip() == "Ativo"
+            e["cargos"][str(p.get("cargo") or "sem cargo").strip()] += 1
+            if D._id(p.get("supervisor_id")):
+                e["supervisores"][D._id(p.get("supervisor_id"))] += 1
+        nomes = self._nomes({s for e in time.values() for s in e["supervisores"]}, pessoas)
+        for e in time.values():
+            sid = e["supervisores"].most_common(1)[0][0] if e["supervisores"] else None
+            e["supervisor"] = nomes.get(sid, f"Supervisor {sid}") if sid else SEM_SUPERVISOR
+            e["cargos"] = dict(e["cargos"])
+            del e["supervisores"]
+        return time
+
+    @staticmethod
+    def _nomes(ids, pessoas) -> dict:
+        """O "Nome padrão" de cada pessoa pedida, decifrado da ficha. Sem a chave do cadastro, vazio (a tela mostra o
+        número da pessoa)."""
+        chave = current_app.config.get("NEXUS_CHAVE_CADASTRO")
+        if not chave or not ids:
+            return {}
+        from ..cadastro.cifra import CifraErro, Cofre
+        cofre, out = Cofre(chave), {}
+        for p in pessoas:
+            pid = D._id(p.get("pessoa_id"))
+            if pid in ids and p.get("sensivel_cifrado"):
+                try:
+                    s = json.loads(cofre.decifrar(p["sensivel_cifrado"], f"banco/pessoas/{pid}"))
+                except (CifraErro, ValueError):
+                    continue
+                out[pid] = nome_curto(s.get("nome_padrao") or s.get("nome"))
+        return out
 
     def equipe_da_usina(self, uid) -> str:
         u = self.por_id.get(uid) or {}
         return self.nome_equipe.get(D._id(u.get("equipe_id")), "")
+
+    def time_da_usina(self, uid) -> dict:
+        u = self.por_id.get(uid) or {}
+        return self.time.get(D._id(u.get("equipe_id"))) or {}
+
+    def times(self) -> dict:
+        """{nome da equipe: técnicos, ativos, cargos, supervisor}, para os cartões."""
+        return {self.nome_equipe.get(eid, ""): e for eid, e in self.time.items() if self.nome_equipe.get(eid)}
 
     def onde(self, uid, nome_da_fonte="") -> dict:
         """Usina (o nome do cadastro), equipe, estado, região do Brasil e cidade. Sem ligação: o nome que a fonte
@@ -174,7 +234,8 @@ class _Base:
         uf = str(u.get("uf") or "").strip().upper()
         return {"usina": str(u.get("nome") or nome_da_fonte or ""), "uf": uf,
                 "regiao_br": REGIAO_DA_UF.get(uf, ""), "cidade": str(u.get("cidade") or "").strip(),
-                "equipe": (self.equipe_da_usina(uid) or SEM_EQUIPE) if u else ""}
+                "equipe": (self.equipe_da_usina(uid) or SEM_EQUIPE) if u else "",
+                "supervisor": (self.time_da_usina(uid).get("supervisor") or SEM_SUPERVISOR) if u else ""}
 
 
 # ── Rondas ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -417,9 +478,9 @@ def atencao(dias: int = 14) -> leitura.Leitura:
             else:
                 continue
             pendentes.append({"tipo": tipo, "usina": c["usina"], "uf": c["uf"], "cidade": c["cidade"],
-                              "equipe": c["equipe"], "regiao_br": c["regiao_br"],
+                              "equipe": c["equipe"], "regiao_br": c["regiao_br"], "supervisor": c["supervisor"],
                               "dias": c["dias"], "ultima": c["ultima"], "obs": obs})
-        usinas = [{k: c[k] for k in ("usina", "equipe", "uf", "regiao_br", "cidade", "dias")}
+        usinas = [{k: c[k] for k in ("usina", "equipe", "supervisor", "uf", "regiao_br", "cidade", "dias")}
                   for c in _cobertura(b, rond, hoje)]
         feitas = []
         for r in sorted((r for r in rond if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
@@ -427,21 +488,23 @@ def atencao(dias: int = 14) -> leitura.Leitura:
             status = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "ok")
             obs = "; ".join(([r["situacao_os"] or "OS não criada"] if r["sem_os"] else []) + faltas)
             feitas.append({"data": r["data"], "status": status, "usina": r["usina"], "uf": r["uf"], "cidade": r["cidade"],
-                           "equipe": r["equipe"], "regiao_br": r["regiao_br"], "obs": obs, "feito_por": r["tecnico"], "os": None if r["sem_os"] else r["os"],
+                           "equipe": r["equipe"], "regiao_br": r["regiao_br"], "supervisor": r["supervisor"],
+                           "obs": obs, "feito_por": r["tecnico"], "os": None if r["sem_os"] else r["os"],
                            "nota": r["nota"], "tipo": r["tipo"]})
         p = pts()
         if p.erro:
             raise SemBanco(p.erro)
         return {"pendentes": pendentes, "feitas": feitas, "pts": p.dados.get("aguardando") or [], "usinas": usinas,
-                "sem_mobilizacao": b.sem_mobilizacao}
+                "times": b.times(), "sem_mobilizacao": b.sem_mobilizacao}
     return _ler(("visao_atencao", dias), calcular)
 
 
-def por_equipe(usinas, pendentes, feitas, pts) -> list[dict]:
+def por_equipe(usinas, pendentes, feitas, pts, times=None) -> list[dict]:
     """Um cartão por equipe (Levi, 05/10: "agrupamento por cards das equipes, usinas pendentes de ronda e % de rondas
     feitas da equipe"). Feitas = usinas mobilizadas da equipe que NÃO estão pendentes (ronda nos últimos 7 dias e sem a
-    longa pendente); % feitas = feitas ÷ usinas. Junto: as rondas do período e as PT esperando. As listas chegam já
-    filtradas pela tela (região, busca), então o cartão conta o mesmo que a tabela."""
+    longa pendente); % feitas = feitas ÷ usinas. Junto: as rondas do período, as PT esperando e, do cadastro, quantos
+    técnicos a equipe tem e quem é o supervisor. As listas chegam já filtradas pela tela (região, supervisor, busca),
+    então o cartão conta o mesmo que a tabela."""
     eq = {}
 
     def card(nome):
@@ -469,6 +532,9 @@ def por_equipe(usinas, pendentes, feitas, pts) -> list[dict]:
         c["ufs"].update([x["uf"]] if x.get("uf") else [])
         c["regioes"].update([x["regiao_br"]] if x.get("regiao_br") else [])
     for c in eq.values():
+        tm = (times or {}).get(c["equipe"]) or {}
+        c["tecnicos"], c["ativos"], c["cargos"] = tm.get("tecnicos", 0), tm.get("ativos", 0), tm.get("cargos", {})
+        c["supervisor"] = tm.get("supervisor") or SEM_SUPERVISOR
         c["feitas"] = max(0, c["usinas"] - c["pendentes"])
         c["pct_feitas"] = round(100 * c["feitas"] / c["usinas"]) if c["usinas"] else None
         c["regioes"], c["ufs"] = sorted(c["regioes"]), sorted(c["ufs"])

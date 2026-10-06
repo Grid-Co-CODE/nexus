@@ -28,6 +28,10 @@
     <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
       <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
+    <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
+    <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, equipe, cidade{{ ', OS ou técnico' if vista != 'pendentes' else '' }}" aria-label="Buscar">
     {% for k in ('f', 'modo', 'equipe') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
@@ -42,7 +46,9 @@
   {% endif %}
 
   {% if modo == 'equipes' %}
-  {# cartões por equipe: o cartão leva à tabela da equipe #}
+  {# cartões por equipe: o cartão leva à tabela da equipe. O "homem de capacete" (Levi, 05/10) é um ícone desenhado,
+     não emoji: a regra da casa é sem emoji na interface #}
+  {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
   {% set no_cartao = {'nunca': ('nunca teve ronda', 'nunca tiveram ronda'), 'sem_ronda': ('sem ronda há 7 d ou mais', 'sem ronda há 7 d ou mais'),
                       'longa_pendente': ('com a longa pendente', 'com a longa pendente'),
                       'sem_os': ('sem OS no Fracttal', 'sem OS no Fracttal'), 'incompleta': ('com evidência incompleta', 'com evidência incompleta')} %}
@@ -52,7 +58,12 @@
       {% if vista == 'pt' %}{% set cor = 'critico' if c.parada else 'alerta' %}
       {% else %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}{% endif %}
       <a class="cn-equipe cn-equipe--{{ cor }}" href="{{ url(modo='tabela', equipe=c.equipe, f=None) }}">
-        <div class="cn-eq-cab"><b>{{ c.equipe }}</b><span>{{ c.regioes|join(', ') or '—' }}{% if c.ufs %} · {{ c.ufs|join(', ') }}{% endif %}</span></div>
+        <div class="cn-eq-cab">
+          <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>
+            <span class="cn-eq-tec" title="{{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }} na equipe (cadastro){% for k, n in c.cargos.items() %}{{ ':' if loop.first else ',' }} {{ n }} {{ k }}{% endfor %}">{{ capacete() }}<b>{{ c.tecnicos }}</b></span></div>
+          <span>{{ c.regioes|join(', ') or '—' }}{% if c.ufs %} · {{ c.ufs|join(', ') }}{% endif %}</span>
+          <span>Supervisor: <b class="cn-eq-sup">{{ c.supervisor }}</b></span>
+        </div>
         {% if vista == 'pt' %}
         <div class="cn-eq-num"><span><span class="v cn-t-{{ cor }}">{{ c.pts }}</span><span class="d">PT esperando o De acordo</span></span></div>
         <div class="cn-eq-pe"><span class="cn-st cn-t-critico">{{ c.parada }} parada{{ 's' if c.parada != 1 }} há mais de 2 h</span><span class="cn-st cn-t-alerta">{{ c.pts - c.parada }} aguardando</span></div>
@@ -64,7 +75,12 @@
         <div class="cn-barra" role="img" aria-label="{{ c.feitas }} feitas e {{ c.pendentes }} pendentes de {{ c.usinas }} usinas">
           {% if c.usinas %}<span class="ok" style="width: {{ (100 * c.feitas / c.usinas)|round(1) }}%"></span><span class="pend" style="width: {{ (100 * c.pendentes / c.usinas)|round(1) }}%"></span>{% endif %}
         </div>
-        <div class="cn-eq-leg"><span>{{ c.feitas }} feita{{ 's' if c.feitas != 1 }}</span><span>{{ c.pendentes }} pendente{{ 's' if c.pendentes != 1 }}</span><span>{{ c.usinas }} usina{{ 's' if c.usinas != 1 }}</span></div>
+        {# um leigo lê o cartão (Levi, 05/10): o número em cima, o que ele é embaixo #}
+        <div class="cn-eq-leg">
+          <span><b>{{ c.feitas }} usina{{ 's' if c.feitas != 1 }}</b>feita{{ 's' if c.feitas != 1 }}</span>
+          <span><b>{{ c.pendentes }} usina{{ 's' if c.pendentes != 1 }}</b>pendente{{ 's' if c.pendentes != 1 }}</span>
+          <span><b>{{ c.usinas }} usina{{ 's' if c.usinas != 1 }}</b>total</span>
+        </div>
         {% if vista == 'pendentes' %}
         <div class="cn-eq-pe">{% for s, (rot, cor2) in status.items() if c[s] %}<span class="cn-st cn-t-{{ cor2 }}">{{ c[s] }} {{ no_cartao[s][0 if c[s] == 1 else 1] }}</span>{% endfor %}</div>
         {% else %}

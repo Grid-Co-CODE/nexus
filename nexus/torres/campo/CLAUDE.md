@@ -86,6 +86,13 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     do período e as PT esperando. O cartão leva à tabela da equipe (`?equipe=`). Filtro pela **região do Brasil** no
     lugar do estado. Medido em 05/10: 53 equipes; PR Norte 02 com 6 de 6 usinas pendentes.
   - Todas as colunas e cabeçalhos das tabelas do campo **centralizados** (Levi, 05/10).
+  - **No cartão, do cadastro de pessoas** (`visao._Base._time`): o ícone de homem de capacete com o número de
+    técnicos (colaborador de campo da equipe que não está Desligado: os 28 sem status estão todos em equipes sem
+    nenhum Ativo) e o supervisor (o `supervisor_id` dos técnicos; o nome é o "Nome padrão" da ficha, decifrado com
+    `NEXUS_CHAVE_CADASTRO`; sem a chave, "Supervisor <id>"). O Levi pediu emoji; é ícone desenhado, pela regra sem
+    emoji na interface. **Filtro de supervisor** ao lado da região. Embaixo da barra, número em cima e o que ele é
+    embaixo ("feitas", "pendentes", "total"), para um leigo ler. Medido em 05/10: 6 supervisores; SP Oeste 03, PI Leste
+    01, MS Leste 01 sem técnico no cadastro (6 usinas sem supervisor).
   - Os filtros (status) são só a palavra colorida, sem fundo (`.cn-st`). "Detalhe" virou "Observação"; "O quê" virou
     "Status"; a coluna "Quem" saiu. **Nota baixa de fechamento não entra:** é a fila da Aprovação, e o fechamento
     aprovado direto no Fracttal nunca tem decisão no painel, o que dava ponto falso.

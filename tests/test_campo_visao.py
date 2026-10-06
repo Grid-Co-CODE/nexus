@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pg_falso import ApiPGFalsa
 
+from nexus.cadastro.cifra import Cofre, gerar_chave
 from nexus.campo import decisao_pt, visao
 from nexus.campo.ligacao_cadastro import codigo_da_pessoa
 
@@ -44,6 +45,25 @@ USINAS = [{"usina_id": 1, "nome": "Altair", "codigo": "THPN-ALT100", "status": "
            "uf": "SC", "cidade": "Sem Data"}]
 EQUIPES = [{"equipe_id": 10, "nome": "SP Norte 01"}, {"equipe_id": 20, "nome": "SC Oeste 01"}]
 DE_PARA = [{"usina_id": 1, "sistema": "Fracttal · Classificação 1", "chave_externa": "Thopen - Altair 1 - SP"}]
+CHAVE_CADASTRO = gerar_chave()
+
+
+def _pessoas():
+    """Dois técnicos na SP Norte 01 (um Ativo, um sem status), um desligado (não conta), um na SC Oeste 01 e os dois
+    supervisores, com o nome só cifrado, como no banco."""
+    cofre = Cofre(CHAVE_CADASTRO)
+
+    def p(pid, vinculo, cargo, equipe, status, sup, nome=None):
+        return {"pessoa_id": pid, "vinculo": vinculo, "cargo": cargo, "equipe_id": equipe, "status": status,
+                "supervisor_id": sup, "excluido": "não",
+                "sensivel_cifrado": cofre.cifrar(json.dumps({"nome": nome, "nome_padrao": nome}),
+                                                 f"banco/pessoas/{pid}") if nome else None}
+    return [p(1, "Colaborador de campo", "Técnico O&M", 10, "Ativo", 90),
+            p(2, "Colaborador de campo", "Eletricista O&M", 10, None, 90),
+            p(3, "Colaborador de campo", "Técnico O&M", 10, "Desligado", 90),
+            p(4, "Colaborador de campo", "Técnico O&M", 20, "Ativo", 91),
+            p(90, "Supervisor", None, None, None, None, "Beltrano Supervisor"),
+            p(91, "Supervisor", None, None, None, None, "Ciclano Chefe")]
 
 
 def _ronda(dia, usina="Thopen - Altair 1 - SP", ativo="THPN-ALT100", **kw):
@@ -81,6 +101,7 @@ def banco(app, tmp_path):
     _aba(api, "cadastro_nexus", "usinas", USINAS)
     _aba(api, "cadastro_nexus", "equipes", EQUIPES)
     _aba(api, "cadastro_nexus", "de_para", DE_PARA)
+    _aba(api, "cadastro_nexus", "pessoas", _pessoas())
     _aba(api, "rondas_app_campo", "OS de ronda", [
         _ronda(_dia(1), Falhas="ronda longa pendente; item sem foto de evidência"),
         _ronda(_dia(3), Falhas="ronda longa pendente"),
@@ -95,7 +116,7 @@ def banco(app, tmp_path):
     ident = tmp_path / "identidades.json"
     ident.write_text(json.dumps({"porEmail": {"tec1@exemplo.test": {"nome": "Técnico Um da Silva"}}}), encoding="utf-8")
     app.config.update(GRIDCO_DB_API="http://pg.falso", NEXUS_PESSOA_HMAC=CHAVE, NEXUS_CAMPO_IDENTIDADES=str(ident),
-                      GRIDCO_SQL_TOKEN="token-de-teste")
+                      GRIDCO_SQL_TOKEN="token-de-teste", NEXUS_CHAVE_CADASTRO=CHAVE_CADASTRO)
     app.extensions["nexus_dados_sessao"] = api
     visao.limpar()
     with app.app_context():
@@ -182,12 +203,22 @@ def test_regiao_do_brasil_pela_uf_e_cartoes_por_equipe(banco):
     d = visao.atencao(14).dados
     assert {p["usina"]: (p["equipe"], p["regiao_br"]) for p in d["pendentes"]} == {
         "Coração 1": ("SC Oeste 01", "Sul"), "Altair": ("SP Norte 01", "Sudeste")}
-    c = {x["equipe"]: x for x in visao.por_equipe(d["usinas"], d["pendentes"], d["feitas"], d["pts"])}
+    c = {x["equipe"]: x for x in visao.por_equipe(d["usinas"], d["pendentes"], d["feitas"], d["pts"], d["times"])}
     sp, sc = c["SP Norte 01"], c["SC Oeste 01"]
     assert (sp["usinas"], sp["pendentes"], sp["feitas"], sp["pct_feitas"]) == (2, 1, 1, 50)   # Altair: longa pendente
     assert (sc["usinas"], sc["pendentes"], sc["feitas"], sc["pct_feitas"]) == (1, 1, 0, 0)
     assert sp["longa_pendente"] == 1 and sc["nunca"] == 1 and sp["regioes"] == ["Sudeste"] and sp["ufs"] == ["SP"]
     assert sp["rondas"] == 3 and sp["sem_os"] == 1 and sp["incompleta"] == 1 and sp["pts"] == 2 and sp["parada"] == 1
+    # técnicos e supervisor pelo cadastro: o desligado não conta; o sem status conta (ver visao._Base._time)
+    assert (sp["tecnicos"], sp["ativos"], sp["supervisor"]) == (2, 1, "Beltrano Supervisor")
+    assert sp["cargos"] == {"Técnico O&M": 1, "Eletricista O&M": 1}
+    assert (sc["tecnicos"], sc["supervisor"]) == (1, "Ciclano Chefe")
+
+
+def test_sem_a_chave_do_cadastro_o_supervisor_sai_pelo_numero(app, banco):
+    app.config["NEXUS_CHAVE_CADASTRO"] = None
+    visao.limpar()
+    assert {x["supervisor"] for x in visao.atencao(14).dados["usinas"]} == {"Supervisor 90", "Supervisor 91"}
 
 
 def test_central_abre_nos_cartoes_e_o_cartao_leva_a_tabela_da_equipe(banco, logado):
@@ -202,6 +233,18 @@ def test_central_abre_nos_cartoes_e_o_cartao_leva_a_tabela_da_equipe(banco, loga
     assert "Coração 1" in html and "Altair" not in html and 'id="cn-regiao"' in html and 'id="cn-uf"' not in html
     html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
     assert "PT esperando o De acordo" in html and "SC Oeste 01" not in html   # equipe sem PT não ganha cartão
+
+
+def test_cartao_tem_tecnicos_supervisor_e_total_e_filtro_de_supervisor(banco, logado):
+    html = logado.get("/t/campo/atencao").get_data(as_text=True)
+    assert 'class="cn-capacete"' in html and "<b>2</b>" in html and "2 técnicos na equipe" in html
+    assert "Supervisor: <b class=\"cn-eq-sup\">Beltrano Supervisor</b>" in html
+    assert "<b>2 usinas</b>total" in html and "<b>1 usina</b>pendente" in html
+    assert 'id="cn-supervisor"' in html and "Ciclano Chefe" in html
+    html = logado.get("/t/campo/atencao?supervisor=Ciclano+Chefe").get_data(as_text=True)
+    assert "SC Oeste 01" in html and "SP Norte 01" not in html
+    html = logado.get("/t/campo/atencao?supervisor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
+    assert "Coração 1" in html and "Altair" not in html
 
 
 # ── aprovação da PT no Nexus ─────────────────────────────────────────────────────────────────────────────────────
