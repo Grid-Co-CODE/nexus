@@ -39,6 +39,16 @@ construindo algo nosso!". Então o Nexus **não lê o site nem o JSON dele**: l�
   paradas) / nº de falhas com início >= 20/10/2025; MTTR = média do incidente ao fim (até 1 dia, horas corridas; acima,
   dias x 12); disponibilidade = MTBF / (MTBF + MTTR). KPIs = medianas sobre os ativos com histórico; meta 85%.
 
+### A tela (o visual, 06/10)
+Levi: "acho essa estética bem mais atrativa, o nosso está pouco criativo" (mostrando o pcm.gridco.com.br). Ficou:
+abas em pílula; faixa de 5 indicadores; **Ativos** = lista em cartões (selo do nível, título com código e usina,
+etiquetas A/B/D/Disp, o número de falhas grande à direita) e, ao clicar, a **gaveta lateral** (`<template>` por
+ativo, copiado para a gaveta; Esc ou o véu fecham) com MTBF/MTTR/Disp, "Por que acendeu" e as OS; ao lado, "Onde
+está o problema" (falhas por família, com P90), "Criticidade" (A/B/C clicáveis) e "Clientes com sinal" (filtra).
+**Indicadores** = painel "Estatísticas" com "Ver por" cliente/usina, filtro de texto, ordenação pelo cabeçalho e
+barras dentro das colunas (disponibilidade com o marco de 85%). Classes `eg-*` em `nexus/static/engenharia.css`;
+cuidado com `.m` (do campo.css, é fonte de código).
+
 ### O que muda em relação ao PCM (de propósito)
 - **O ativo é o código** (IBI200-INVR1.3, com a usina dentro). No PCM o MTBF era casado pelo NOME (26 letras), sem a
   usina: o Inversor 1.3 de Ibirapuã 2 saía com 8.406 h, o do Inversor 1.3 de Cipó Guaçu (o certo é 466 h); 318 dos

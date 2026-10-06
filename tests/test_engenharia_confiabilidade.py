@@ -117,10 +117,11 @@ def test_tela_de_confiabilidade(app, logado, monkeypatch):
     try:
         html = logado.get("/t/engenharia/confiabilidade").get_data(as_text=True)
         assert "Ativos com sinal" in html and "IBI200-INVR1.3" in html and "Crítico" in html
+        assert 'class="eg-gaveta"' in html and "Onde está o problema" in html and "Por que acendeu" in html
         assert "A · 4 falhas em 30d" in html and "B · 3 em 7d" in html
         assert "IBI200-TRK07" in html                                       # monitorar aparece
         assert "IBI200-TRK07" not in logado.get("/t/engenharia/confiabilidade?nivel=critico").get_data(as_text=True)
         ind = logado.get("/t/engenharia/confiabilidade?aba=indicadores").get_data(as_text=True)
-        assert "Indicadores por cliente" in ind and "Thopen" in ind
+        assert "Estatísticas" in ind and "Thopen" in ind and "Eventos (hist.)" in ind and 'class="eg-disp"' in ind
     finally:
         torre._CACHE.clear()

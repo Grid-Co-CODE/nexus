@@ -214,7 +214,16 @@ def calcular(linhas: list[dict], onde, agora: datetime | None = None) -> dict:
            "ativosConf": len(disps), "corretivas": sum(len(a["janela"]) for a in ativos.values()),
            "ativosCorretiva": com_corretiva, "ativosSinal": len(sinais),
            "criticos": sum(1 for a in sinais if a["nivel"] == "critico")}
-    return {"kpi": kpi, "p90": p90, "critDist": dict(crit_dist), "sinais": sinais,
+    # onde está o problema: por família, as falhas dos 30 dias (serviço fora), os ativos com corretiva e com sinal
+    fams = collections.defaultdict(lambda: {"falhas": 0, "ativos": 0, "sinais": 0})
+    for a in ativos.values():
+        if a["janela"]:
+            fams[a["fam"]]["ativos"] += 1
+            fams[a["fam"]]["falhas"] += sum(1 for r in a["janela"] if not r["_servico"])
+    for s in sinais:
+        fams[s["fam"]]["sinais"] += 1
+    familias = sorted(({"fam": f, **v, "p90": p90.get(f, 2)} for f, v in fams.items()), key=lambda x: -x["falhas"])
+    return {"kpi": kpi, "p90": p90, "critDist": dict(crit_dist), "sinais": sinais, "familias": familias,
             "ativos": [{k: v for k, v in a.items() if k != "janela"} for a in confi], "semCodigo": sem_codigo,
             "periodo": {"de": inicio_janela, "ate": agora}}
 
@@ -235,6 +244,8 @@ def indicadores(ativos: list[dict], sinais: list[dict], por: str) -> list[dict]:
     for nome, x in g.items():
         ds = [a["disp"] for a in x["ativos"] if a["disp"] is not None]
         out.append({"nome": nome, "ativos": len(x["ativos"]), "disp": _mediana(ds),
+                    "usinas": len({a.get("usina") for a in x["ativos"] if a.get("usina")}),
+                    "eventos": sum(a.get("n") or 0 for a in x["ativos"]),
                     "mtbf": _mediana([a["mtbf"] for a in x["ativos"]]), "mttr": _mediana([a["mttr"] for a in x["ativos"]]),
                     "abaixo": sum(1 for d in ds if d < META_DISP), "sinais": x["sinais"], "criticos": x["criticos"],
                     "falhas30": x["falhas30"]})

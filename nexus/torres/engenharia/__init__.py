@@ -140,8 +140,16 @@ def confiabilidade():
     clientes = sorted({a.get("cliente") for a in d["ativos"] + d["sinais"] if a.get("cliente")})
     usinas = sorted({a.get("usina") for a in d["ativos"] + d["sinais"] if a.get("usina")
                      and (not f["cliente"] or a.get("cliente") == f["cliente"])})
+    # o painel ao lado: os clientes com mais ativos com sinal (com os filtros de agora)
+    por_cliente = {}
+    for a in sinais:
+        x = por_cliente.setdefault(a.get("cliente") or "—", {"nome": a.get("cliente") or "—", "sinais": 0, "criticos": 0})
+        x["sinais"] += 1
+        x["criticos"] += a["nivel"] == "critico"
+    top_clientes = sorted(por_cliente.values(), key=lambda x: (-x["sinais"], -x["criticos"], x["nome"]))[:6]
     return render_template(
-        "engenharia/confiabilidade.html", torre=TORRE, tela=TORRE.tela("confiabilidade"), d=d, k=d["kpi"],
+        "engenharia/confiabilidade.html", fams=d.get("familias") or [], crit_dist=d.get("critDist") or {},
+        top_clientes=top_clientes, torre=TORRE, tela=TORRE.tela("confiabilidade"), d=d, k=d["kpi"],
         sinais=sinais, total_sinais=len(d["sinais"]), ativos=ativos, f=f, esconder=esconder, aba=aba, abas=ABAS,
         por=por, indicadores=C.indicadores(ativos, sinais, por) if aba == "indicadores" else [],
         clientes=clientes, usinas=usinas, familias=C.FAMILIAS, niveis=C.NIVEIS, meta=C.META_DISP,
