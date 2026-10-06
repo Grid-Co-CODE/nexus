@@ -164,3 +164,50 @@ def test_copiar_nao_apaga_o_que_ja_tem(logado, trab):
     resp = logado.post("/t/pcm/gerar/observacoes/copiar", data={"semana": "2026-W41"})
     assert resp.status_code == 409
     assert I.observacoes(trab, "2026-W41") == "13480; não\n"
+
+
+# ── o padrão é a última programação (05/10/2026, Levi: "quero como padrão marcado o que já estava marcado na última
+#    programação semanal, quero que apareça só o que está marcado, o que não estiver só vai aparecer por um botão
+#    adicionar"). Herança de DADO, não só de tela: o motor recebe os mesmos dias que a tela mostra. ──
+
+def test_semana_sem_observacao_herda_os_dias_por_usina_da_ultima_salva(trab):
+    I.salvar_observacoes(trab, "2026-W39", "@usina Caicó = seg\n")
+    I.salvar_observacoes(trab, "2026-W40", "# comentário\n@usina Marabá 1 = seg, qua\n13480; não\n10369; qua\n")
+    texto, de = I.observacoes_efetivas(trab, "2026-W42")
+    assert de == "2026-W40"                                    # a mais recente antes da semana
+    assert texto == "@usina Marabá 1 = seg, qua\n"            # só os dias por usina: OS fora e dia fixo são da semana
+
+
+def test_semana_salva_vale_o_que_foi_salvo_mesmo_vazio(trab):
+    I.salvar_observacoes(trab, "2026-W40", "@usina Marabá 1 = seg, qua\n")
+    I.salvar_observacoes(trab, "2026-W41", "13480; não\n")
+    assert I.observacoes_efetivas(trab, "2026-W41") == ("13480; não\n", None)
+    I.salvar_observacoes(trab, "2026-W42", "")                  # salvou vazia: é decisão, não herda
+    assert I.observacoes_efetivas(trab, "2026-W42") == ("", None)
+    # a última salva (W41) não tinha dia por usina: a W43 herda isso, nada
+    assert I.observacoes_efetivas(trab, "2026-W43") == ("", None)
+
+
+def test_semana_depois_nao_vale_como_anterior(trab):
+    I.salvar_observacoes(trab, "2026-W43", "@usina Caicó = seg\n")
+    assert I.observacoes_efetivas(trab, "2026-W42") == ("", None)
+    assert I.observacoes_efetivas(trab, "2027-W01") == ("@usina Caicó = seg\n", "2026-W43")   # vira o ano
+
+
+def test_tela_mostra_so_as_usinas_marcadas_e_herda_da_ultima(app, logado, trab, tmp_path):
+    import json
+    origem = tmp_path / "pcm"
+    origem.mkdir()
+    (origem / O.CACHE_ATIVOS).write_text(json.dumps({str(i): [n, "x"] for i, n in enumerate(FRACTTAL)}), encoding="utf-8")
+    app.config.update(NEXUS_PCM_ORIGEM=str(origem))
+    I.salvar_observacoes(trab, "2026-W41", "@usina Marabá 1 = seg, qua\n13480; não\n")
+    html = logado.get("/t/pcm/gerar?semana=2026-W42").get_data(as_text=True)
+    assert "herdados da 2026-W41" in html                       # a tela diz de onde veio o padrão
+    assert 'data-usina="Marabá 1" data-dias="seg,qua"' in html  # a regra herdada está no formulário (salvar fixa)
+    assert 'data-os="13480"' not in html                         # OS fora não passa para a semana seguinte
+    cards = html.split('class="obs-usina obs-ufr')[1:]
+    assert len(cards) == 7                                       # todas continuam na página, para o Adicionar
+    marcadas = [c for c in cards if "obs-restrita" in c.split(">")[0]]
+    escondidas = [c for c in cards if " hidden" in c.split(">")[0]]
+    assert len(marcadas) == 1 and len(escondidas) == 6           # só a marcada aparece
+    assert 'id="obs-add-usina-btn"' in html                      # as outras entram pelo botão

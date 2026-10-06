@@ -47,7 +47,8 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     semana = semana if semana and geracao.SEMANA_RE.match(semana) else (sel or {}).get("semana") or geracao.semana_padrao()
     origem = geracao.pasta_origem(cfg)
     trab = geracao.pasta_trabalho(cfg)
-    texto_obs = I.observacoes(trab, semana)
+    # semana sem nada salvo mostra os dias por usina da última salva (o mesmo texto que o motor recebe)
+    texto_obs, herdada_de = I.observacoes_efetivas(trab, semana)
     regras = O.ler(texto_obs)
     anterior = O.semana_anterior(semana)
     # Todas as usinas do Fracttal, do cache que o motor grava ao ler o Fracttal (pasta do PCM ou rodada do Nexus)
@@ -62,7 +63,8 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
         c["restritas"] += len(u["dias"]) < len(O.DIAS)
     return {"conf": geracao.conferir(cfg, semana), "ultimas": geracao.ultimas(cfg), "sel": sel,
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,
-            "observacoes": texto_obs, "regras": list(enumerate(regras)), "obs_resumo": O.resumo(regras),
+            "observacoes": texto_obs, "herdada_de": herdada_de,
+            "regras": list(enumerate(regras)), "obs_resumo": O.resumo(regras),
             "dias": O.DIAS, "nomes_dia": O.NOMES_DIA, "turnos": O.TURNOS,
             "semana_anterior": anterior, "tem_anterior": bool(I.observacoes(trab, anterior).strip()),
             "usinas": usinas, "clientes": sorted(clientes.values(), key=lambda c: (-c["usinas"], c["nome"])),

@@ -124,9 +124,21 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 .obs-legenda>span{display:inline-flex;align-items:center;gap:5px}
 .obs-amostra{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;border:1px solid var(--linha-forte);
   font:600 10.5px/1 var(--font-sans);font-style:normal;color:var(--fraco)}
-.obs-amostra--sim{background:var(--verde-suave);border-color:var(--verde);color:var(--verde-texto)}
-.obs-amostra--regra{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.obs-amostra--regra{background:rgba(163,217,0,.16);border-color:rgba(163,217,0,.42);color:var(--verde-texto)}
+.obs-amostra--nao{border-color:var(--linha)}
 .obs-filtro .obs-busca{width:260px;flex:none}   /* o .obs-campo (100%) vem depois e jogava a legenda para baixo */
+/* "Adicionar usina": a lista mostra só as marcadas; as outras entram por aqui (05/10/2026) */
+.obs-add{margin:2px 0 10px;padding:10px 12px;border:1px dashed var(--linha-forte);border-radius:var(--raio-controle);
+  background:var(--superficie-2)}
+.obs-add .obs-busca{width:320px;max-width:100%}
+.obs-add-lista{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:220px;overflow-y:auto}
+.obs-add-item{display:inline-flex;align-items:baseline;gap:6px;padding:5px 11px;border:1px solid var(--linha-forte);
+  border-radius:999px;background:var(--superficie);color:var(--tinta);font:600 12.5px/16px var(--font-sans);cursor:pointer}
+.obs-add-item:hover{border-color:var(--verde);background:var(--verde-suave)}
+.obs-add-item small{font-weight:500;color:var(--mudo)}
+.obs-vazio{margin:4px 0 10px}
+.obs-ufr.obs-recem{border-style:dashed;border-color:rgba(163,217,0,.42)}
+.obs-herdada{margin:0 0 14px}
 .obs-fechar{display:none}
 .obs-bloco--usinas[open] .obs-fechar{display:inline;margin-left:auto}
 .obs-resumo b{color:var(--tinta);font-weight:600}
@@ -167,22 +179,20 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 .obs-clientes .gc-chip span{color:var(--mudo);margin-left:2px}
 .obs-busca{width:200px}
 .obs-so{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--tinta-2)}
-/* O dia que a usina atende é VERDE, sempre (05/10/2026, Levi: "não está aparecendo os dias selecionados das usinas,
-   está aparecendo tudo cinza"). O "atende" da usina sem regra era pintado de cinza (superficie-3) e não se distinguia
-   do "não atende" no navy: com as 143 usinas sem regra, a lista inteira parecia desligada. Agora: verde suave = atende,
-   sem regra (os cinco dias); verde cheio = dia escolhido numa usina com dia restrito, que ganha a faixa verde. */
-.obs-ufr .obs-dia[aria-pressed="true"]{background:var(--verde-suave);border-color:var(--verde);color:var(--verde-texto)}
-.obs-ufr.obs-restrita{border-color:var(--verde);box-shadow:inset 3px 0 0 var(--verde)}
-.obs-ufr.obs-restrita .obs-dia[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
-.obs-dia[aria-pressed="false"]{color:var(--fraco)}
+/* O dia que a usina atende é VERDE (05/10/2026, Levi: "não está aparecendo os dias selecionados das usinas, está
+   aparecendo tudo cinza"): o "atende" cinza não se distinguia do "não atende" no navy. E é verde SUAVE (Levi, no mesmo
+   dia: "tá muito estourado esse verde, suavize isso"): o verde cheio em todo dia marcado, mais a borda e a faixa verdes
+   em toda usina, acendiam a lista inteira, já que agora ela mostra só as usinas marcadas. Tinta clara + texto verde =
+   atende; contorno apagado = não atende. */
+.obs-dia[aria-pressed="false"]{color:var(--fraco);border-color:var(--linha)}
 .obs-uf{margin-left:6px;font-size:10.5px;color:var(--mudo)}
 .obs-divide{margin-left:6px;font-size:10.5px;color:var(--info);cursor:help}
 .obs-nome{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .obs-dias{display:inline-flex;gap:2px;flex:none}
 .obs-dia{width:21px;height:21px;border-radius:6px;border:1px solid var(--linha-forte);background:transparent;
   color:var(--mudo);font:600 11px/1 var(--font-sans);cursor:pointer;padding:0}
-.obs-dia:hover{border-color:var(--verde)}
-.obs-dia[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.obs-dia:hover{border-color:rgba(163,217,0,.6)}
+.obs-dia[aria-pressed="true"]{background:rgba(163,217,0,.16);border-color:rgba(163,217,0,.42);color:var(--verde-texto)}
 .obs-tirar{flex:none;width:22px;height:22px;border:0;background:transparent;color:var(--fraco);font-size:16px;line-height:1;
   cursor:pointer;border-radius:6px;padding:0}
 .obs-tirar:hover{color:var(--critico);background:var(--critico-suave)}
