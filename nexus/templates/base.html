@@ -41,6 +41,7 @@
     <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno">Trocar</button></noscript>
   </form>
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
+  {% if session.usuario %}<span class="usuario-topo" title="{{ session.usuario.email }}{% if session.usuario.perfil %} · {{ session.usuario.perfil }}{% endif %}">{{ session.usuario.nome }}</span>{% endif %}
   <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
 </header>
 

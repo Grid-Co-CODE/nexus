@@ -15,7 +15,9 @@ def instalar(app):
     from . import aprovacao, coletor, fonte_pg, tabelas
     tabelas.usar_fornecedor(fonte_pg.Fornecedor(app.config))
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
-        from . import ronda_checklist
+        from . import ronda_checklist, visao
+        # as telas do Campo · App prontas na memória, e renovadas antes de vencer (só o banco do Nexus)
+        threading.Timer(5, lambda: visao.manter_quente(app)).start()
         threading.Timer(20, lambda: aprovacao.aquecer(app)).start()
         # as OS de ronda aprovadas (sujidade e vegetação), depois da fila: as duas leituras não saem juntas
         threading.Timer(90, lambda: ronda_checklist.pedir_releitura(app)).start()

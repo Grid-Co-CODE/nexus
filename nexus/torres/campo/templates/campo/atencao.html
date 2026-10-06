@@ -27,7 +27,7 @@
     </select>
     <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
     <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
-      <option value="">Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
+      <option value="*"{% if not supervisor %} selected{% endif %}>Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, equipe, cidade{{ ', OS ou técnico' if vista != 'pendentes' else '' }}" aria-label="Buscar">
     {% for k in ('f', 'modo', 'equipe') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}

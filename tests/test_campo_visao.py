@@ -54,16 +54,16 @@ def _pessoas():
     supervisores, com o nome só cifrado, como no banco."""
     cofre = Cofre(CHAVE_CADASTRO)
 
-    def p(pid, vinculo, cargo, equipe, status, sup, nome=None):
+    def p(pid, vinculo, cargo, equipe, status, sup, nome=None, email=None):
         return {"pessoa_id": pid, "vinculo": vinculo, "cargo": cargo, "equipe_id": equipe, "status": status,
                 "supervisor_id": sup, "excluido": "não",
-                "sensivel_cifrado": cofre.cifrar(json.dumps({"nome": nome, "nome_padrao": nome}),
+                "sensivel_cifrado": cofre.cifrar(json.dumps({"nome": nome, "nome_padrao": nome, "email": email}),
                                                  f"banco/pessoas/{pid}") if nome else None}
     return [p(1, "Colaborador de campo", "Técnico O&M", 10, "Ativo", 90),
             p(2, "Colaborador de campo", "Eletricista O&M", 10, None, 90),
             p(3, "Colaborador de campo", "Técnico O&M", 10, "Desligado", 90),
             p(4, "Colaborador de campo", "Técnico O&M", 20, "Ativo", 91),
-            p(90, "Supervisor", None, None, None, None, "Beltrano Supervisor"),
+            p(90, "Supervisor", None, None, None, None, "Beltrano Supervisor", "beltrano@exemplo.test"),
             p(91, "Supervisor", None, None, None, None, "Ciclano Chefe")]
 
 
@@ -600,3 +600,49 @@ def test_fotos_da_ronda_separam_sujidade_e_vegetacao(banco, logado, monkeypatch)
         assert 'data-url="/t/campo/rondas/os/500/fotos"' in pag and 'class="cn-caixa-foto"' in pag
     finally:
         ronda_fotos.limpar()
+
+
+def _entra_fracttal(cliente, monkeypatch, email, nome):
+    """O login do Fracttal sem o Fracttal: a conta que ele devolveria e o cookie do OS Creator."""
+    from nexus.auth import fracttal
+    monkeypatch.setattr(fracttal, "entrar", lambda app, e, s: {"email": email, "nome": nome, "perfil": "Supervisor",
+                                                                  "cookie": ("os_sessao", "valor-assinado", 3600)})
+    return cliente.post("/entrar", data={"email": email, "senha": "x"})
+
+
+def test_supervisor_que_entra_pelo_fracttal_ja_vem_filtrado(banco, cliente, monkeypatch):
+    """Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para a pessoa automaticamente, mas ela pode
+    mudar o filtro se quiser". O supervisor é achado no cadastro pelo e-mail do Fracttal."""
+    r = _entra_fracttal(cliente, monkeypatch, "Beltrano@Exemplo.test".lower(), "Beltrano S.")
+    assert r.status_code == 302
+    with cliente.session_transaction() as s:
+        assert s["supervisor_padrao"] == "Beltrano Supervisor" and s["usuario"]["nome"] == "Beltrano S."
+        assert not s.get("admin")
+    html = cliente.get("/t/campo/rondas?aba=cobertura").get_data(as_text=True)
+    assert '<option value="Beltrano Supervisor" selected>' in html and "Coração 1" not in html   # Coração é do Ciclano
+    todos = cliente.get("/t/campo/rondas?aba=cobertura&supervisor=*").get_data(as_text=True)
+    assert '<option value="*" selected>' in todos and "Coração 1" in todos                      # pode trocar
+    assert "Beltrano S." in html                                                                 # quem entrou, no topo
+
+
+def test_quem_nao_e_supervisor_entra_sem_filtro(banco, cliente, monkeypatch):
+    _entra_fracttal(cliente, monkeypatch, "tecnico@exemplo.test", "Fulano de Tal")
+    with cliente.session_transaction() as s:
+        assert s["logado"] and "supervisor_padrao" not in s
+    assert visao.supervisor_da_pessoa("", "Ciclano Chefe") == "Ciclano Chefe"       # sem e-mail, pelo nome (único)
+    assert visao.supervisor_da_pessoa("ciclano.chefe@gridco.test", "C. Chefe") == "Ciclano Chefe"   # pelo e-mail
+    assert visao.supervisor_da_pessoa("outra.pessoa@gridco.test", "Outra Pessoa") == ""
+
+
+def test_tela_do_campo_volta_na_hora_e_se_renova_sozinha(banco, logado, monkeypatch):
+    """Levi, 06/10: "O carregamento das abas está sendo muito lento... O certo seria carregar e ficar carregado no
+    cache!". A cópia vencida volta na hora e a conta se refaz por trás (nos testes, na mesma chamada)."""
+    monkeypatch.setattr(visao, "LIVRO_S", 0)
+    antes = visao.rondas()
+    n = len(antes.dados["todas"])
+    _aba(banco, "rondas_app_campo", "OS de ronda", [_ronda(_dia(1)), _ronda(_dia(2)), _ronda(_dia(3)), _ronda(_dia(4))])
+    assert visao.rondas() is antes                                    # dentro dos 5 min: a mesma cópia
+    antes.lido_em -= visao.TTL_S + 1                                  # venceu
+    assert visao.rondas() is antes                                    # volta na hora a cópia que havia...
+    depois = visao.rondas()
+    assert depois is not antes and len(depois.dados["todas"]) == 4 != n   # ...e a nova já está pronta

@@ -198,3 +198,7 @@ html{scrollbar-width:thin;scrollbar-color:var(--superficie-3) transparent}
   .linha-bloco{grid-template-columns:1fr;gap:4px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.entrar-alt{margin:14px 0 0;font-size:12.5px;line-height:1.5}
+.entrar-alt a{color:var(--verde-texto)}
+.usuario-topo{font-size:13px;color:var(--sobre-barra-mudo,#c7cede);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}

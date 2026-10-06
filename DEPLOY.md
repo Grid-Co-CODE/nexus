@@ -94,7 +94,9 @@ o servidor inteiro como uma só.
 ## 6. Conferir depois de subir
 
 1. `https://nexus.gridco.com.br/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
-2. Entrar com a senha de admin (a `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem).
+2. Entrar com o login do Fracttal (e-mail e senha de quem vai usar; desde 06/10/2026). A senha de admin (a
+   `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem) segue em "Entrar com a senha de administrador" e é ela que abre o
+   Cadastro, além dos e-mails em `NEXUS_ADMINS` (opcional, separados por vírgula).
 3. **Base → Registro mestre** abre a lista de usinas: a chave da cifra está certa.
 4. **PCM → Gerar a semana**: a lista de conferência diz "pronto" (motor, credencial do Fracttal, cadastro e insumos).
    A "Pasta do PCM" e as durações aprendidas aparecem como opcionais ausentes: é o esperado no servidor.
@@ -137,10 +139,12 @@ plataforma já tem guardado.
 ## 8. Atualizar
 
 ```
-cd /opt/nexus && sudo -u nexus git pull && sudo systemctl restart nexus
+cd /opt/nexus && sudo -u nexus git pull && sudo .venv/bin/pip install -r requirements.txt && sudo systemctl restart nexus
 ```
 
-O git não toca nos `.env` nem na `dados/`.
+O git não toca nos `.env` nem na `dados/`. O `pip install` só demora quando o `requirements.txt` mudou (em 06/10 entrou o
+`pillow`, que faz as miniaturas das fotos da ronda; sem ele as fotos aparecem do mesmo jeito, só mais pesadas).
+Se a atualização roda sozinha a cada push, ponha o `pip install` nela também.
 
 **Depois da 1ª subida, a `dados/` do servidor é a original**: o que se edita no Nexus (cadastro, decisões do de-para,
 observações e gerações do PCM) mora lá. Se o Levi mandar um pacote novo, descompacte **só os `.env`**, a menos que ele
@@ -160,7 +164,8 @@ dado cifrado do cadastro (CPF, telefone, endereço, receita) não volta.**
 - **"Importar da pasta do PCM"**: a pasta é o OneDrive do PCM. Os insumos já moram no Nexus
   (`dados/pcm/insumos.json`) e a AUXILIAR sai do cadastro, então gerar a semana não depende mais da pasta. Só as
   durações aprendidas (opcionais, em sombra) ficam de fora.
-- **Login:** é por senha de admin. O login Microsoft ainda não está ligado.
+- **Login:** é pelo Fracttal (o mesmo do OS Creator: entra quem tem conta da Grid Co. no Fracttal; um login abre o
+  Nexus e o OS Creator). A senha de admin ficou como reserva. O login Microsoft não está ligado.
 
 - **Base → Ligações:** o pacote já traz o de-para calculado. O Fracttal entra pela foto da última semana gerada no
   Nexus (`dados/pcm/geracoes/*/`): só use "Ler as bases de novo" depois da 1ª geração no servidor. Antes dela, o
