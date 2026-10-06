@@ -1,0 +1,95 @@
+"""As regras de alerta por usina (06/10/2026), no mesmo corte do `gridco_meteo/alertas.py` e do `config.ALERTA` do pacote
+de referência: aviso do INMET cujo polígono contém a usina, foco de queimada a até 5 km, classe do risco de fogo do INPE.
+
+Funções puras: recebem coordenada e dado já lido, devolvem o que a tela mostra. Quem cruza com o cadastro e ordena por
+gravidade é o `visao.py`.
+"""
+import math
+from collections import defaultdict
+from datetime import datetime, timezone
+
+from . import geometria
+
+FOCO_KM = 5.0              # foco de queimada a até 5 km da usina é alerta
+RISCO_ALTO = 0.7           # escala de 0 a 1 do INPE: alto >= 0,7 ...
+RISCO_CRITICO = 0.95       # ... e crítico > 0,95 (o 0,95 ainda é alto)
+
+_KM_POR_GRAU_MINIMO = 110.0   # um grau de latitude vale de 110,6 a 111,7 km: o menor, para a busca nunca ficar curta
+_SEM_INICIO = datetime.min.replace(tzinfo=timezone.utc)
+
+
+# ── risco de fogo ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def classe_risco_fogo(v) -> str:
+    """As faixas do INPE: mínimo < 0,15 <= baixo < 0,4 <= médio < 0,7 <= alto <= 0,95 < crítico. O valor vem de um double
+    gravado em passos de 0,01, e o 0,70 pode chegar como 0,6999999999999: arredonda (9 casas, bem acima do ruído de 1e-16 e
+    bem abaixo de qualquer passo real) antes de comparar com a divisa."""
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return "sem dado"
+    v = round(v, 9)
+    return ("mínimo" if v < 0.15 else "baixo" if v < 0.4 else "médio" if v < RISCO_ALTO
+            else "alto" if v <= RISCO_CRITICO else "crítico")
+
+
+def nivel_do_risco(classe: str) -> int:
+    """Gravidade para a ordem da tela: 0 não é alerta, 2 alto, 3 crítico."""
+    return {"alto": 2, "crítico": 3}.get(classe, 0)
+
+
+# ── aviso do INMET ───────────────────────────────────────────────────────────────────────────────────────────────────
+
+def em_vigor(aviso, agora) -> bool:
+    """O aviso já começou? (O INMET manda em `futuro` o que ainda vai começar.)"""
+    return aviso.inicio is None or aviso.inicio <= agora
+
+
+def avisos_que_contem(lat, lon, avisos, agora) -> list:
+    """Os avisos não vencidos cujo polígono contém o ponto, do mais grave para o menos (e, no empate, o que começa antes).
+    A caixa do polígono descarta a maioria sem percorrer um vértice. Um aviso que ainda vai começar entra: a tela diz
+    quando começa."""
+    achados = []
+    for a in avisos:
+        if a.fim is not None and a.fim < agora:
+            continue
+        x0, y0, x1, y1 = a.caixa
+        if x0 <= lon <= x1 and y0 <= lat <= y1 and geometria.contem(a.geometria, lon, lat):
+            achados.append(a)
+    achados.sort(key=lambda a: (-a.nivel, a.inicio or _SEM_INICIO))
+    return achados
+
+
+# ── focos de queimada ────────────────────────────────────────────────────────────────────────────────────────────────
+
+class IndiceFocos:
+    """Os focos numa grade de células de `celula` graus (~11 km): cada usina olha só as células em volta. Na hora do pico
+    da estação seca são milhares de focos por hora no continente, e a conta de cada usina contra todos eles seria
+    centenas de milhares de haversines por visita à tela."""
+
+    def __init__(self, focos, celula=0.1):
+        self.celula = celula
+        self._celulas = defaultdict(list)
+        for f in focos:
+            self._celulas[(math.floor(f.lat / celula), math.floor(f.lon / celula))].append(f)
+
+    def perto(self, lat, lon, raio_km=FOCO_KM):
+        """None se não há foco no raio. Senão: quantos (`n`), a distância do mais perto (`km`) com o satélite e a hora (UTC)
+        dele, e a detecção mais recente entre todos os do raio (`ultima`)."""
+        graus_lat = raio_km / _KM_POR_GRAU_MINIMO
+        graus_lon = raio_km / (_KM_POR_GRAU_MINIMO * max(math.cos(math.radians(lat)), 0.05))
+        dl, dc = math.ceil(graus_lat / self.celula), math.ceil(graus_lon / self.celula)
+        c0, c1 = math.floor(lat / self.celula), math.floor(lon / self.celula)
+        n, melhor, ultima = 0, None, None
+        for i in range(c0 - dl, c0 + dl + 1):
+            for j in range(c1 - dc, c1 + dc + 1):
+                for f in self._celulas.get((i, j), ()):
+                    d = geometria.distancia_km(lat, lon, f.lat, f.lon)
+                    if d <= raio_km:
+                        n += 1
+                        if melhor is None or d < melhor[0]:
+                            melhor = (d, f)
+                        if ultima is None or f.data > ultima:
+                            ultima = f.data
+        if not n:
+            return None
+        d, f = melhor
+        return {"n": n, "km": d, "satelite": f.satelite, "hora": f.data, "ultima": ultima}
