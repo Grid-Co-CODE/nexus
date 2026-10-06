@@ -1,0 +1,35 @@
+{# As fotos de uma OS de ronda, separadas em sujidade, vegetação e as demais (Levi, 06/10/2026). Pedaço carregado pelo
+   botão Fotos do histórico da usina; a miniatura abre ampliada (a caixa fica no rondas_usina.html). #}
+{% if erro %}<p class="cn-fotos-msg cn-t-alerta">{{ erro }}</p>
+{% elif not total %}<p class="cn-fotos-msg mudo">A OS {{ os_ }} não tem fotos anexadas no Fracttal.</p>
+{% else %}
+{% macro miniatura(f, legenda=false) %}
+      <a class="cn-foto{% if legenda %} cn-foto--legenda{% endif %}" href="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i) }}" data-legenda="{{ f.desc }}" title="{{ f.desc }}">
+        <img src="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i, mini=1) }}" alt="{{ f.desc }}" loading="lazy" width="96" height="96">
+        {% if f.resposta %}<span class="cn-foto-resp">{{ f.resposta }}</span>{% endif %}
+        {% if legenda %}<span class="cn-foto-rotulo">{{ f.rotulo }}</span>{% endif %}
+      </a>{% endmacro %}
+<div class="cn-fotos" data-os="{{ os_ }}">
+  {% for g in grupos[:2] if g.fotos %}
+  <section class="cn-fotos-grupo cn-fotos-grupo--{{ g.chave }}">
+    <h3>{{ g.titulo }} <span class="mudo">{{ g.fotos|length }}</span></h3>
+    <div class="cn-fotos-grade">{% for f in g.fotos %}{{ miniatura(f) }}{% endfor %}</div>
+  </section>
+  {% endfor %}
+  {% if not grupos[0].fotos and not grupos[1].fotos %}<p class="cn-fotos-msg mudo">Nenhuma foto de sujidade ou de vegetação nesta OS.</p>{% endif %}
+  {% set demais = grupos[2] %}
+  {% if demais.fotos %}
+  {# recolhido; aberto, por tipo (Levi, 06/10). A foto dentro do recolhido só carrega quando abre (loading=lazy) #}
+  <details class="cn-fotos-demais">
+    <summary>Demais fotos da ronda <span class="mudo">{{ demais.fotos|length }}</span>
+      <span class="cn-fotos-tipos">{% for tp in demais.tipos if tp.fotos %}{{ tp.titulo.split(':')[0] }} {{ tp.fotos|length }}{% if not loop.last %} · {% endif %}{% endfor %}</span></summary>
+    {% for tp in demais.tipos if tp.fotos %}
+    <section class="cn-fotos-grupo cn-fotos-grupo--tipo">
+      <h4>{{ tp.titulo }} <span class="mudo">{{ tp.fotos|length }}</span></h4>
+      <div class="cn-fotos-grade">{% for f in tp.fotos %}{{ miniatura(f, true) }}{% endfor %}</div>
+    </section>
+    {% endfor %}
+  </details>
+  {% endif %}
+</div>
+{% endif %}

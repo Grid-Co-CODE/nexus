@@ -387,3 +387,43 @@ tr.cn-aprovada td{opacity:.45}
 .cn-leg i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-left:6px}
 .cn-leg i.suj{background:#7fb8ff}
 .cn-leg i.veg{background:#a3d900}
+
+/* fotos da ronda no histórico da usina: miniaturas por grupo e a caixa que amplia (sem animação) */
+.cn-bt-fotos{font:600 12px var(--font-sans);color:var(--verde-texto);background:transparent;border:1px solid var(--linha);
+  border-radius:7px;padding:4px 10px;cursor:pointer}
+.cn-bt-fotos:hover,.cn-bt-fotos[aria-expanded="true"]{border-color:var(--verde-texto)}
+tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px 16px}
+.cn-fotos{display:grid;gap:14px}
+.cn-fotos-grupo h3{margin:0 0 8px;font:700 13px var(--font-sans);color:var(--tinta)}
+.cn-fotos-grupo--sujidade h3{color:#7fb8ff}
+.cn-fotos-grupo--vegetacao h3{color:#a3d900}
+.cn-fotos-grade{display:flex;flex-wrap:wrap;gap:8px}
+.cn-foto{position:relative;display:block;width:96px;height:96px;border-radius:8px;overflow:hidden;border:1px solid var(--linha);
+  background:var(--superficie-3)}
+.cn-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.cn-foto:hover,.cn-foto:focus{border-color:var(--verde-texto);outline:none}
+.cn-foto-resp{position:absolute;left:4px;bottom:4px;padding:1px 6px;border-radius:5px;font:700 11px var(--font-sans);
+  color:#fff;background:rgba(9,13,24,.78)}
+.cn-fotos-msg{margin:0}
+.cn-caixa-foto{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;gap:12px;
+  background:rgba(9,13,24,.92);padding:24px}
+.cn-caixa-foto[hidden]{display:none}
+.cn-caixa-foto figure{margin:0;display:grid;gap:8px;justify-items:center;max-width:min(1100px,88vw)}
+.cn-caixa-foto img{max-width:100%;max-height:80vh;border-radius:8px;object-fit:contain}
+.cn-caixa-foto figcaption{color:#e6e9f2;font:13px var(--font-sans);text-align:center}
+.cn-caixa-foto button{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;
+  font:600 22px/1 var(--font-sans);width:44px;height:44px;cursor:pointer}
+.cn-caixa-foto button:hover{border-color:#a3d900}
+.cn-caixa-fechar{position:absolute;top:16px;right:16px}
+.cn-fotos-demais{border-top:1px solid var(--linha);padding-top:10px}
+.cn-fotos-demais summary{cursor:pointer;font:700 13px var(--font-sans);color:var(--tinta);list-style-position:inside}
+.cn-fotos-demais summary:hover{color:var(--verde-texto)}
+.cn-fotos-tipos{margin-left:10px;font:500 12px var(--font-sans);color:var(--tinta-2)}
+.cn-fotos-demais[open] .cn-fotos-tipos{display:none}
+.cn-fotos-demais .cn-fotos-grupo{margin-top:12px}
+.cn-fotos-grupo h4{margin:0 0 8px;font:600 12.5px var(--font-sans);color:var(--tinta-2)}
+.cn-foto--legenda{height:116px}
+.cn-foto--legenda img{height:96px}
+.cn-foto-rotulo{display:block;height:20px;padding:2px 4px;font:600 10.5px/16px var(--font-sans);color:var(--tinta-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--superficie-2)}
+.cn-foto--legenda .cn-foto-resp{bottom:24px}

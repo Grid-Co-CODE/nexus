@@ -559,3 +559,44 @@ def test_eixo_de_datas_do_grafico_nao_encavala(banco, logado, monkeypatch):
     datas = pag.count('class="eixo data"')
     assert 20 <= datas <= 32 and pag.count('class="cn-ponto"') == 80      # 80 pontos, ~30 datas
     assert f'class="eixo data" text-anchor="middle">{_dia(0)[8:10]}/{_dia(0)[5:7]}<' in pag     # a mais recente
+
+
+def test_fotos_da_ronda_separam_sujidade_e_vegetacao(banco, logado, monkeypatch):
+    """Levi, 06/10: o botão Fotos do histórico traz os anexos da OS separando sujidade e vegetação; a miniatura abre a
+    foto, que o Nexus baixa e entrega (o link assinado do Fracttal não vai para o navegador)."""
+    from nexus.campo import nota_fracttal, ronda_fotos
+    anexos = [{"description": "Ronda 2026-10-06 — Thopen - Altair 1 - SP · qualidade 100%", "value": "https://s3/a.jpg?x=1"},
+              {"description": "Sujidade dos módulos — 4", "value": "https://s3/b.jpg?x=1"},
+              {"description": "Altura da vegetação — 2", "value": "https://s3/c.jpeg?x=1"},
+              {"description": "Sujidade da vala de drenagem — parcial", "value": "https://s3/d.png?x=1"},
+              {"description": "Relatório", "value": "https://s3/e.pdf?x=1"}]
+    pedidos = []
+    monkeypatch.setattr(nota_fracttal, "anexos_da_os", lambda os_, ler=None: pedidos.append(os_) or anexos)
+    monkeypatch.setattr(ronda_fotos, "_baixar", lambda url: b"IMG:" + url.encode())
+    ronda_fotos.limpar()
+    try:
+        g = {x["chave"]: [f["resposta"] for f in x["fotos"]] for x in ronda_fotos.grupos(500)}
+        assert g == {"sujidade": ["4"], "vegetacao": ["2"], "outras": ["", "parcial"]}     # o PDF fica fora
+        tipos = {tp["chave"]: [f["rotulo"] for f in tp["fotos"]] for tp in ronda_fotos.grupos(500)[2]["tipos"] if tp["fotos"]}
+        assert tipos == {"vala": ["Vala"], "capa": ["Capa"]}                    # as demais, por tipo, com o nome curto
+        html = logado.get("/t/campo/rondas/os/500/fotos").get_data(as_text=True)
+        assert "Sujidade dos módulos" in html and "Vegetação" in html and "s3/" not in html
+        assert '<details class="cn-fotos-demais">' in html and "Vala de drenagem" in html     # recolhido, por tipo
+        r = logado.get("/t/campo/rondas/os/500/foto/1")
+        assert r.mimetype == "image/jpeg" and r.data == b"IMG:https://s3/b.jpg?x=1"
+        assert logado.get("/t/campo/rondas/os/500/foto/9").status_code == 404
+        import io
+
+        from PIL import Image
+        png = io.BytesIO()
+        Image.new("RGB", (1280, 1700), (90, 120, 60)).save(png, "PNG")
+        monkeypatch.setattr(ronda_fotos, "_baixar", lambda url: png.getvalue())
+        ronda_fotos.limpar()
+        mini = logado.get("/t/campo/rondas/os/500/foto/3?mini=1")
+        assert mini.mimetype == "image/jpeg" and max(Image.open(io.BytesIO(mini.data)).size) == 240
+        assert not ronda_fotos._EM_CURSO                            # nada ficou esperando (06/10: 60 s preso)
+        assert pedidos == ["500", "500"]                       # a lista fica guardada (o limpar acima zera)
+        pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+        assert 'data-url="/t/campo/rondas/os/500/fotos"' in pag and 'class="cn-caixa-foto"' in pag
+    finally:
+        ronda_fotos.limpar()

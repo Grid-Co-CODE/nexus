@@ -17,7 +17,7 @@ from ...campo import fonte_pg as campo_fonte
 from ...campo import ordens as campo_ordens
 from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
-from ...campo import decisao_pt, pt_fracttal, ronda_checklist
+from ...campo import decisao_pt, pt_fracttal, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
 from .assinatura import bp_assinatura
 
@@ -363,6 +363,34 @@ def rondas_usina(usina_id):
     return render_template("campo/rondas_usina.html", **_comum(
         "rondas", leitura, usina=usina, usina_id=usina_id, hist=hist, lidas=lidas, duracao=_duracao, iniciais=_iniciais,
         suj_estado=ronda_checklist.estado()))
+
+
+@bp.route("/rondas/os/<int:os_>/fotos")
+def ronda_fotos_os(os_):
+    """As fotos da OS de ronda, separadas em sujidade, vegetação e as demais (Levi, 06/10: "ao clicar no botão aparecer
+    os anexos, separando vegetação e sujidade"). Pedaço de HTML que o botão Fotos do histórico carrega."""
+    try:
+        gs = ronda_fotos.grupos(os_)
+        erro = ""
+        ronda_fotos.preparar(os_, ronda_checklist.em_segundo_plano)     # nos testes, na hora
+    except Exception as e:      # noqa: BLE001 — Fracttal fora ou recusando: o pedaço diz, a página segue
+        gs = []
+        erro = ("O Fracttal recusou agora por excesso de pedidos; tente de novo em 1 minuto."
+                if "429" in str(e) else f"Não consegui ler os anexos da OS no Fracttal ({type(e).__name__}).")
+    return render_template("campo/_ronda_fotos.html", os_=os_, grupos=gs, erro=erro,
+                           total=sum(len(g["fotos"]) for g in gs))
+
+
+@bp.route("/rondas/os/<int:os_>/foto/<int:i>")
+def ronda_foto(os_, i):
+    """Uma foto da OS de ronda: o Nexus baixa do Fracttal e entrega (o link assinado não sai para o navegador)."""
+    try:
+        corpo, mime = (ronda_fotos.miniatura if request.args.get("mini") else ronda_fotos.foto)(os_, i)
+    except ronda_fotos.SemFoto as e:
+        return Response(str(e), status=404, mimetype="text/plain")
+    except Exception as e:      # noqa: BLE001
+        return Response(f"Fracttal: {type(e).__name__}", status=502, mimetype="text/plain")
+    return Response(corpo, mimetype=mime, headers={"Cache-Control": "private, max-age=3600"})
 
 
 @bp.route("/zeladoria")

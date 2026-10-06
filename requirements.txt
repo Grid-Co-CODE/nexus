@@ -10,3 +10,5 @@ requests==2.34.2
 PyQt6==6.11.0
 # motor do PCM (nexus/pcm/motor, a programação semanal): roda num subprocesso com este mesmo Python
 pandas==3.0.3
+# miniatura das fotos da ronda (nexus/campo/ronda_fotos.py); sem ele, a miniatura é a foto inteira
+pillow==12.2.0
