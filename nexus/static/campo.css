@@ -320,3 +320,10 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-nivel-fundo--3{background:var(--info)}
 .cn-nivel-fundo--4{background:var(--alerta)}
 .cn-nivel-fundo--5{background:var(--critico)}
+
+/* indicador que filtra a tabela (Levi, 05/10): cartão inteiro clicável, o ativo com a borda verde */
+.cn-kpi--link{color:inherit;text-decoration:none;cursor:pointer}
+.cn-kpi--link:hover{background:var(--superficie-2);border-color:var(--verde)}
+.cn-kpi--link[aria-current="true"]{border-color:var(--verde);box-shadow:inset 0 -3px 0 var(--verde)}
+.cn-kpi-acao{color:var(--verde-texto) !important;font-weight:600}
+.cn-painel .cn-filtro-ativo{display:inline-block;margin-top:14px}

@@ -75,6 +75,10 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     60/85/95 e 10 min); o GPS só aparece como a falha "sem GPS". "Ronda longa pendente" é pendência para o App
     (vira Atenção). Medido em 05/10, 30 dias: 455 rondas, cobertura 80% (102 de 128; antes 65%), qualidade 96%,
     duração média 45 min, 36 abaixo de 10 min.
+  - **Os seis indicadores filtram a tabela** (Levi, 05/10): Rondas finalizadas = as de hoje (`ind=hoje`); Cobertura =
+    as usinas sem ronda no período (`aba=cobertura&cob=sem`); Qualidade = abaixo do limite (`ind=qualidade`); Duração =
+    da mais longa para a mais curta (`ind=duracao`); Abaixo de 10 min = `dur=curta`; Usina mais atrasada = as há 7 dias
+    ou mais (`cob=atrasadas`). O cartão ativo fica marcado; clicar de novo, ou no × do filtro, tira.
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
   - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não

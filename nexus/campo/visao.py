@@ -374,7 +374,7 @@ def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
         q["dur_mediana"] = round(statistics.median(q["durs"])) if q["durs"] else None
         del q["notas"], q["durs"]
     return {
-        "periodo": periodo, "trackers": [r for r in periodo if r["trk_apontados"]],
+        "periodo": periodo, "trackers": [r for r in periodo if r["trk_apontados"]], "hoje": hoje_iso,
         "quem": sorted(quem.values(), key=lambda q: (-q["rondas"], q["tecnico"])),
         "kpi": {"rondas": len(periodo), "hoje": sum(1 for r in periodo if r["data"] == hoje_iso),
                 "usinas": len(usinas), "cobertas": len(cobertas), "cobertura_pct": pct(len(cobertas)),

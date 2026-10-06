@@ -437,3 +437,20 @@ def test_pt_ja_decidida_no_app_nao_recebe_decisao_e_outro_site_nao_decide(app, b
                     headers={"Origin": "https://outro.site.test"})
     assert r.status_code == 403
     assert "nexus_pt_decisoes" not in banco.workbooks
+
+
+def test_indicadores_da_ronda_filtram_a_tabela(banco, logado):
+    """Levi, 05/10: "quero que esses botões sejam clicáveis e filtre a tabela"."""
+    html = logado.get("/t/campo/rondas").get_data(as_text=True)
+    assert html.count('class="cn-kpi cn-kpi--link"') == 6
+    assert 'href="?ind=qualidade"' in html and 'href="?aba=cobertura&amp;cob=sem"' in html and 'href="?dur=curta"' in html
+    html = logado.get("/t/campo/rondas?ind=hoje").get_data(as_text=True)
+    assert "Só as de hoje" in html and "Nenhuma ronda com esses filtros" in html     # nenhuma ronda hoje no banco falso
+    html = logado.get("/t/campo/rondas?ind=qualidade").get_data(as_text=True)
+    assert "Qualidade abaixo de 85%" in html and "Nenhuma ronda com esses filtros" in html   # todas com 90%
+    html = logado.get("/t/campo/rondas?aba=cobertura&cob=sem").get_data(as_text=True)
+    assert "Coração 1" in html and "Brodowski 1" not in html and 'aria-current="true"' in html
+    html = logado.get("/t/campo/rondas?aba=cobertura&cob=atrasadas").get_data(as_text=True)
+    assert "Coração 1" in html and "<td>Altair</td>" not in html
+    html = logado.get("/t/campo/rondas?ind=duracao").get_data(as_text=True)
+    assert "Da mais longa para a mais curta" in html

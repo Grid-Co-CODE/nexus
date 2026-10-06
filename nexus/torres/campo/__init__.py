@@ -269,6 +269,9 @@ def rondas():
     aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS_RONDAS) else "registros"
     dur, q = request.args.get("dur", ""), request.args.get("q", "").strip().lower()
     pend = request.args.get("pend", "") if request.args.get("pend") in visao.FEITA else ""
+    # os indicadores filtram a tabela (Levi, 05/10: "quero que esses botões sejam clicáveis e filtre a tabela")
+    ind = request.args.get("ind", "") if request.args.get("ind") in ("hoje", "qualidade", "duracao") else ""
+    cob = request.args.get("cob", "") if request.args.get("cob") in ("sem", "atrasadas") else ""
 
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
@@ -280,7 +283,15 @@ def rondas():
                  if (dur != "curta" or (r["dur_min"] is not None and r["dur_min"] < lim))
                  and (dur != "longa" or (r["dur_min"] or 0) > 120)
                  and (not pend or r["pendencia"] == pend)
+                 and (ind != "hoje" or r["data"] == painel["hoje"])
+                 and (ind != "qualidade" or (r["nota"] is not None and r["nota"] < painel["kpi"]["limite"]))
                  and (not q or q in " ".join(str(r.get(c) or "") for c in ("tecnico", "usina", "equipe", "os")).lower())]
+    if ind == "duracao":
+        registros.sort(key=lambda r: -(r["dur_min"] if r["dur_min"] is not None else -1))
+    if cob == "sem":
+        cobertura = [c for c in cobertura if c["dias"] >= dias]
+    elif cob == "atrasadas":
+        cobertura = [c for c in cobertura if c["dias"] >= visao.DIAS_SEM_RONDA_ALERTA]
     if request.args.get("csv") == "1":
         import csv
         import io
@@ -312,7 +323,7 @@ def rondas():
         suj["filtradas"] = [x for x in suj["linhas"] if not filtro or filtro(x)]
     return render_template("campo/rondas.html", **_comum(
         "rondas", leitura, dias=dias, regiao=regiao, supervisor=supervisor, aba=aba, abas=ABAS_RONDAS, dur=dur,
-        pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"},
+        pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"}, ind=ind, cob=cob,
         n_pend={k: sum(1 for r in painel["periodo"] if r["pendencia"] == k) for k in ("sem_os", "incompleta")},
         q=request.args.get("q", ""), k=painel["kpi"], registros=registros, limite=LIMITE_LINHAS, cobertura=cobertura,
         trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES, supervisores=supervisores,

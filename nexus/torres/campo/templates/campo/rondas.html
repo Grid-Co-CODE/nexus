@@ -41,22 +41,27 @@
   </form>
 
   {% set atr = k.atrasada %}
+  {# cada indicador filtra a tabela (Levi, 05/10); o ativo fica marcado e o clique de novo tira o filtro #}
+  {% set limpo = dict(aba=None, dur=None, pend=None, ind=None, cob=None, q=None) %}
+  {% macro card(ativo, destino) %}<a class="cn-kpi cn-kpi--link" href="{{ url(**dict(limpo, **({} if ativo else destino))) }}"{% if ativo %} aria-current="true"{% endif %}>{% endmacro %}
   <div class="cn-kpis">
-    <div class="cn-kpi"><span class="gc-rotulo">Rondas finalizadas</span><span class="v">{{ k.rondas }}</span><span class="d">{{ k.hoje }} hoje</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Cobertura de usinas</span>
+    {{ card(aba == 'registros' and ind == 'hoje', dict(ind='hoje')) }}<span class="gc-rotulo">Rondas finalizadas</span><span class="v">{{ k.rondas }}</span><span class="d">{{ k.hoje }} hoje · ver as de hoje</span></a>
+    {{ card(aba == 'cobertura' and cob == 'sem', dict(aba='cobertura', cob='sem')) }}<span class="gc-rotulo">Cobertura de usinas</span>
       <span class="v">{{ '—' if k.cobertura_pct is none else k.cobertura_pct }}<small>%</small></span>
-      <span class="d">{{ k.cobertas }} de {{ k.usinas }}{% if k.cobertura_ant_pct is not none and k.cobertura_pct is not none %}{% set dl = k.cobertura_pct - k.cobertura_ant_pct %} · <span class="cn-t-{{ 'ok' if dl >= 0 else 'critico' }}">{{ '▲' if dl >= 0 else '▼' }} {{ dl|abs }}%</span> antes {{ k.cobertura_ant_pct }}%{% endif %}</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Qualidade média</span>
-      <span class="v">{{ '—' if k.qualidade is none else k.qualidade }}<small>%</small></span><span class="d">{{ k.abaixo_limite }} abaixo do limite</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Duração média</span>
-      <span class="v">{{ '—' if k.dur_media is none else k.dur_media }}<small>min</small></span><span class="d">mediana {{ '—' if k.dur_mediana is none else k.dur_mediana ~ ' min' }}</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Abaixo de {{ k.dur_min }} min</span>
+      <span class="d">{{ k.cobertas }} de {{ k.usinas }}{% if k.cobertura_ant_pct is not none and k.cobertura_pct is not none %}{% set dl = k.cobertura_pct - k.cobertura_ant_pct %} · <span class="cn-t-{{ 'ok' if dl >= 0 else 'critico' }}">{{ '▲' if dl >= 0 else '▼' }} {{ dl|abs }}%</span> antes {{ k.cobertura_ant_pct }}%{% endif %}</span>
+      <span class="d cn-kpi-acao">ver as {{ k.usinas - k.cobertas }} sem ronda no período</span></a>
+    {{ card(aba == 'registros' and ind == 'qualidade', dict(ind='qualidade')) }}<span class="gc-rotulo">Qualidade média</span>
+      <span class="v">{{ '—' if k.qualidade is none else k.qualidade }}<small>%</small></span><span class="d">{{ k.abaixo_limite }} abaixo do limite · ver</span></a>
+    {{ card(aba == 'registros' and ind == 'duracao', dict(ind='duracao')) }}<span class="gc-rotulo">Duração média</span>
+      <span class="v">{{ '—' if k.dur_media is none else k.dur_media }}<small>min</small></span><span class="d">mediana {{ '—' if k.dur_mediana is none else k.dur_mediana ~ ' min' }} · ordenar pela duração</span></a>
+    {{ card(aba == 'registros' and dur == 'curta', dict(dur='curta')) }}<span class="gc-rotulo">Abaixo de {{ k.dur_min }} min</span>
       <span class="v{% if k.curtas %} cn-t-critico{% endif %}">{{ k.curtas }}</span><span class="d">checklist não percorrido</span>
-      {% if k.curtas %}<a class="cn-selo cn-selo--critico" href="{{ url(aba='registros', dur='curta') }}">exige ação</a>{% endif %}</div>
-    <div class="cn-kpi"><span class="gc-rotulo">Usina mais atrasada</span>
+      {% if k.curtas %}<span class="cn-selo cn-selo--critico">exige ação</span>{% endif %}</a>
+    {{ card(aba == 'cobertura' and cob == 'atrasadas', dict(aba='cobertura', cob='atrasadas')) }}<span class="gc-rotulo">Usina mais atrasada</span>
       {% if atr %}<span class="v cn-t-{{ 'critico' if atr.dias >= 14 else ('alerta' if atr.dias >= 7 else 'ok') }}">{{ 'nunca' if atr.dias >= 999 else atr.dias ~ ' d' }}</span>
       <span class="d">{{ atr.usina }}{% if k.nunca > 1 %} · {{ k.nunca }} sem receber ronda{% elif atr.dias >= 999 %} · sem receber ronda{% endif %}</span>
-      {% else %}<span class="v">—</span>{% endif %}</div>
+      <span class="d cn-kpi-acao">ver as {{ k.sem_ronda_alerta }} há 7 dias ou mais</span>
+      {% else %}<span class="v">—</span>{% endif %}</a>
   </div>
 
   <section class="cn-painel">
@@ -79,6 +84,7 @@
         <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="técnico, usina, equipe ou OS" aria-label="Buscar"></form>
       <span class="mudo">Início, fim e duração são carimbados pelo aparelho: tempo de tela aberta, não cronômetro de campo.</span>
     </div>
+    {% if ind %}<a class="cn-filtro-ativo" href="{{ url(ind=None) }}">{{ {'hoje': 'Só as de hoje', 'qualidade': 'Qualidade abaixo de ' ~ k.limite ~ '%', 'duracao': 'Da mais longa para a mais curta'}[ind] }} <span aria-hidden="true">×</span></a>{% endif %}
     <div class="cn-lista-cab"><h2>Rondas diárias</h2><span class="mudo">{{ [registros|length, limite]|min }} de {{ registros|length }}</span>
       {% if registros|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ registros|length }}</span>{% endif %}
       <a class="cn-link cn-exportar" href="{{ url(csv='1') }}">Exportar CSV</a></div>
@@ -136,6 +142,7 @@
     {% if s.sem_leitura %}<p class="mudo cn-rodape">{{ s.sem_leitura }} usinas mobilizadas sem leitura no período (sem ronda, ou a ronda não tem OS no Fracttal).</p>{% endif %}
 
     {% elif aba == 'cobertura' %}
+    {% if cob %}<a class="cn-filtro-ativo" href="{{ url(cob=None) }}">{{ 'Sem ronda nos últimos ' ~ dias ~ ' dias' if cob == 'sem' else 'Sem ronda há 7 dias ou mais' }} <span aria-hidden="true">×</span></a>{% endif %}
     <div class="cn-lista-cab"><h2>Usinas há mais tempo sem ronda</h2><span class="mudo">{{ cobertura|length }} mobilizadas · {{ k.sem_ronda_alerta }} há 7 dias ou mais</span></div>
     <div class="cn-tab"><table>
       <thead><tr><th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th><th>Última ronda</th><th>Há</th><th>Feito por</th></tr></thead>
