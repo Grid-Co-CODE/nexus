@@ -115,7 +115,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     páginas. **Por quê (06/10):** antes era tudo ou nada, ~30 páginas a cada reinício e a cada 30 min; no reinício das
     10:09 o 429 descartou a leitura inteira e Matões 200 mostrou "—" em OS aprovadas que tinham a resposta (15055:
     sujidade 2, vegetação 3, vala obstruída). A tela agora diz quando a leitura falhou ou não terminou
-    (`_aviso_checklist.html`). Nada vai para o banco. Por usina: a
+    (`_aviso_checklist.html`). Nada disso vai para o banco. **Ronda sem OS** (não há texto da OS para ler): as de
+    11/08 a 06/10 vêm da carga única `nexus_rondas_checklist` (06/10, ver `nexus/dados/CLAUDE.md`), ligadas à ronda
+    por `usina_id` + `inicio` (`visao._checklist_sem_os`, `resposta_da_ronda`). Por usina: a
     última leitura no período e a anterior (a seta); nível 1 a 5, acima de 3 pede ação (o `alerta_acima` do App);
     distribuição por nível; vala, sombreamento e sensores sujos. Medido em 05/10 (30 dias): 96 de 128 usinas com
     leitura, 382 de 417 rondas com OS lidas; sujidade média 2,5 (21 usinas em 4 ou 5), vegetação 2,4 (16), vala suja

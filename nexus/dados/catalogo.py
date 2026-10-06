@@ -63,6 +63,13 @@ FATOS = (
     Fato("ronda", "Ronda", "campo", "rondas_app_campo · OS de ronda", "1 linha = 1 OS de ronda",
          _d(data=("cod", "Data"), usina=("cod", "Ativo da usina no Fracttal"), equipe=("nome", "Região"),
             pessoa=("nome", "Técnico (nome em claro)"), os=("cod", "OS"))),
+    # carga ÚNICA (Levi, 06/10/2026: "Atualize o banco de dados com essas rondas passadas sem OS, mas não será rotina")
+    Fato("ronda_checklist", "Checklist da ronda sem OS", "campo", "nexus_rondas_checklist · fato_checklist_ronda",
+         "1 linha = 1 ronda do App que ficou sem OS no Fracttal, com as respostas do checklist",
+         _d(data=("id", "data_id"), usina=("id", "usina_id"), equipe=("id", "equipe_id"), pessoa=("id", "pessoa_id")),
+         estado="conformado", conformado_em="nexus_rondas_checklist · fato_checklist_ronda",
+         observacao="carga única de 06/10 (rondas de 11/08 a 06/10), do registro da ronda no App; a ronda com OS "
+                    "tem as respostas no texto da OS do Fracttal. Liga ao livro de rondas por usina_id + inicio"),
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", "1 linha = 1 PT",
          _d(data=("cod", "Criada em"), usina=("nome", "Usina"), equipe=("nome", "Região"),
             pessoa=("hmac", "Solicitante, quem decidiu"), equipamento=("cod", "Código do ativo"), os=("cod", "OS"))),

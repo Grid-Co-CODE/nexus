@@ -146,3 +146,53 @@ def qualidade(fato: str, livro: str, linhas: list[list], cab: list, origem: list
     return [fato, livro, n, com["data_id"], com["usina_id"], com["equipe_id"], com["pessoa_id"],
             _pct(com["data_id"], n), _pct(com["usina_id"], n), _pct(com["equipe_id"], n), _pct(com["pessoa_id"], n),
             como.get("de-para do Fracttal", 0), como.get("código do ativo", 0), ex(sem_u), ex(sem_e), origem_em, agora]
+
+
+# ── 2º fato (06/10/2026): o checklist das rondas que ficaram SEM OS ───────────────────────────────────────────────
+# Levi, 06/10: "Atualize o banco de dados com essas rondas passadas sem OS, mas não será rotina". A ronda com OS tem as
+# respostas no texto da OS do Fracttal (`nexus/campo/ronda_checklist.py`); a ronda sem OS só as tinha no registro da
+# ronda no App. Carga ÚNICA (`ferramentas/carregar_checklist_rondas_sem_os.py`), não entra na carga de hora em hora.
+# Grão: 1 linha = 1 ronda do App sem OS. Liga ao livro de rondas (`rondas_app_campo`) por usina_id + inicio.
+CAB_CHECKLIST_RONDA = ["ronda_id", "data_id", "usina_id", "equipe_id", "pessoa_id", "tipo", "inicio", "fim",
+                       "sujidade", "vegetacao", "vala", "ipoa_sujo", "ghi_sujo", "albedo_sujo", "usina_ligada_por"]
+VALAS = ("Limpa", "Parcial", "Obstruída")
+
+
+def _nivel(v):
+    i = _int(v)
+    return i if i is not None and 1 <= i <= 5 else None
+
+
+def _sujo(v):
+    """Sensor: 1 sujo, 0 limpo; "Não se aplica" ou sem resposta = vazio."""
+    t = _txt(v).lower()
+    return 1 if t == "sujo" else (0 if t == "limpo" else None)
+
+
+def fato_checklist_ronda(sem_os: list[dict], registros: dict, lig: Ligador, codigo_do_email) -> tuple[list, list]:
+    """(linhas do fato, linhas de origem que casaram). `sem_os`: as linhas do livro de rondas sem OS; `registros`:
+    {(dia, início): registro da ronda no App, com "email" e "respostas"}; `codigo_do_email`: e-mail -> código HMAC.
+    Ronda que não casa com UM registro fica fora (nunca uma resposta de outra ronda); o e-mail só vira pessoa_id."""
+    import json
+    out, origem = [], []
+    for l in sem_os:
+        ini = _txt(l.get("Início"))
+        reg = registros.get((_txt(l.get("Data"))[:10], ini))
+        if not ini or not reg:
+            continue
+        try:
+            resp = json.loads(reg.get("respostas") or "{}") or {}
+        except ValueError:
+            resp = {}
+        uid, como = lig.usina(l.get("Usina"), l.get("Ativo da usina no Fracttal"))
+        email = _txt(reg.get("email")).lower()
+        vala = _txt(resp.get("vala"))
+        out.append([
+            hashlib.sha1(f"{_txt(l.get('Data'))}|{_txt(l.get('Usina'))}|{ini}".encode("utf-8")).hexdigest()[:16],
+            data_do_registro(ini), uid, lig.equipe(l.get("Região")),
+            lig.pessoa(codigo_do_email(email)) if email else None, _txt(l.get("Tipo")) or None, ini,
+            _txt(l.get("Fim")) or None, _nivel(resp.get("sujidade")), _nivel(resp.get("vegetacao")),
+            vala if vala in VALAS else None, _sujo(resp.get("pir_ipoa")), _sujo(resp.get("pir_ghi")),
+            _sujo(resp.get("pir_albedo")), como])
+        origem.append(l)
+    return out, origem

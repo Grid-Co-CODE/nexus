@@ -20,6 +20,7 @@ inversores. Esta pasta é o lugar onde esses dados viram uma base só, ligada po
 | Calendário | `calendario.py` → `nexus_dimensoes · dim_data` | 1 linha por dia, 2025 a 2027: `data_id` (AAAAMMDD), semana ISO, mês, trimestre, fim de semana, feriado nacional, dia útil |
 | Feriados locais | → `nexus_dimensoes · feriados_locais` | estaduais e municipais (UF, município), cruzam com a usina pela cidade |
 | Histórico (SCD tipo 2) | `historico.py` → `pessoas_historico`, `usinas_historico` | válido de / até de equipe, supervisor, cargo e status da pessoa; de cliente, equipe, responsáveis e região da usina |
+| Checklist da ronda sem OS (carga única) | `fatos.py` → `nexus_rondas_checklist · fato_checklist_ronda` | 1 linha = 1 ronda do App que ficou sem OS, com sujidade, vegetação, vala e sensores; liga ao `rondas_app_campo` por `usina_id` + `inicio`. **Não é rotina** (ver abaixo) |
 | 1º fato com IDs | `fatos.py` → `nexus_fatos · fato_fechamento` | o fechamento de OS do App, com `data_id`, `usina_id`, `equipe_id`, `pessoa_id` |
 | Qualidade da ligação | → `nexus_fatos · qualidade` | por fato: quanto ligou a cada dimensão e exemplos do que faltou |
 | Carga | `carga.py` (+ `ferramentas/carregar_dados.py`) | de hora em hora, aos :40, grava os dois livros e confere aba a aba |
@@ -33,6 +34,15 @@ equipamento no lugar da usina), "Grid Co." e Solier Cascavel (sem de-para); equi
 **O Nexus como fonte (05/10/2026):** a decisão da PT assinada no Nexus (`nexus/campo/decisao_pt.py`) grava
 `nexus_pt_decisoes · decisoes` (grão: 1 linha = 1 decisão). Já nasce com `data_id`, `usina_id` e a pessoa como HMAC;
 o motivo vai mascarado (e-mail e número viram marcador), porque o técnico lê e a API é de leitura aberta.
+
+**Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
+sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal, de onde o Nexus lê sujidade e vegetação;
+as respostas só existiam no registro da ronda no App. Foram exportadas UMA vez da tabela de rondas do App (pela conta do
+Levi, com o `az`; o Nexus não lê o Azure) e gravadas por `ferramentas/carregar_checklist_rondas_sem_os.py`, num livro
+próprio (o `nexus_fatos` é regravado inteiro a cada hora e apagaria a aba). Medido e gravado em 06/10: 125 rondas sem OS
+de 11/08 a 06/10, 125 casaram 1 para 1 por dia + início; data, usina e equipe 100%, pessoa 90% (as 12 do Frank Melo: o
+e-mail dele não está no cadastro); 0 diferença de sujidade/vegetação contra o App, nenhum e-mail no livro. Ronda sem OS
+depois de 06/10 não entra aqui.
 
 ## As regras (valem para todo dado novo)
 

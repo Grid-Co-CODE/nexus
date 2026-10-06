@@ -111,6 +111,26 @@ def test_fato_fechamento_leva_ids_dia_de_brasilia_e_nada_de_texto_livre():
     assert "texto com nome" not in [str(v) for v in f.values()]
 
 
+def test_checklist_da_ronda_sem_os_liga_pela_data_e_inicio_e_nao_chuta():
+    """Carga única de 06/10: a ronda sem OS ganha as respostas do registro dela no App, casando dia + início; ronda sem
+    registro único fica fora; o e-mail só vira pessoa_id; sensor "Não se aplica" e vala fora da lista = vazio."""
+    import json
+    livro = [{"Data": "2026-09-30", "Usina": "Thopen - Ipixuna 1 e 2 - PA", "Ativo da usina no Fracttal": "",
+              "Região": "PR Oeste 01", "Tipo": "longa", "Início": "2026-10-01T01:30:00.000Z", "Fim": "2026-10-01T02:30:00.000Z"},
+             {"Data": "2026-09-29", "Usina": "Thopen - Ipixuna 1 e 2 - PA", "Início": "2026-09-29T12:00:00.000Z"}]
+    resp = {"sujidade": "4", "vegetacao": "9", "vala": "Não se aplica", "pir_ipoa": "Sujo", "pir_ghi": "Limpo",
+            "pir_albedo": "Não se aplica", "observacao": "texto com nome"}
+    regs = {("2026-09-30", "2026-10-01T01:30:00.000Z"): {"email": "Tec@Exemplo.test", "respostas": json.dumps(resp)}}
+    linhas, origem = fatos.fato_checklist_ronda(livro, regs, _lig(), lambda e: "abc" if e == "tec@exemplo.test" else "")
+    assert len(linhas) == 1 and origem == livro[:1]
+    f = dict(zip(fatos.CAB_CHECKLIST_RONDA, linhas[0]))
+    assert (f["data_id"], f["usina_id"], f["equipe_id"], f["pessoa_id"]) == (20260930, 3, 41, 55)   # dia de Brasília
+    assert (f["sujidade"], f["vegetacao"], f["vala"]) == (4, None, None)          # 9 não é nível; N/A não é vala
+    assert (f["ipoa_sujo"], f["ghi_sujo"], f["albedo_sujo"]) == (1, 0, None)
+    assert not any("exemplo" in str(v).lower() or "texto com nome" in str(v) for v in f.values())
+    assert any(x.id == "ronda_checklist" and x.estado == "conformado" for x in catalogo.FATOS)
+
+
 def test_qualidade_conta_e_mostra_o_que_faltou():
     origem = [_fech(), _fech(Usina="Nobreak 1", **{"Código do ativo": "SPDA", "Região": "MT Sul 02"})]
     linhas = fatos.fato_fechamento(origem, _lig())

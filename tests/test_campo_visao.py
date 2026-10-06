@@ -528,3 +528,19 @@ def test_grafico_do_historico_diz_os_quem_fez_e_quando(banco, logado, monkeypatc
     d1 = _dia(1)
     assert f'data-quando="{d1[8:10]}/{d1[5:7]}/{d1[:4]} às 07:00 (até 08:00)"' in pag
     assert 'data-os="500"' in pag and 'data-tec="Fulano Souza"' in pag and 'data-suj="4"' in pag
+
+
+def test_ronda_sem_os_mostra_o_checklist_da_carga_unica(banco, logado):
+    """06/10: a ronda sem OS (Brodowski, há 2 dias) tem as respostas no nexus_rondas_checklist; o histórico mostra."""
+    _aba(banco, "nexus_rondas_checklist", "fato_checklist_ronda", [
+        {"ronda_id": "x", "data_id": 1, "usina_id": 2, "inicio": f"{_dia(2)}T10:00:00.000Z", "sujidade": 3,
+         "vegetacao": 5, "vala": "Obstruída", "ipoa_sujo": 1, "ghi_sujo": None, "albedo_sujo": 0}])
+    visao.limpar()
+    d = visao.rondas().dados
+    h = visao.historico_usina(d["todas"], {}, 2)
+    assert (h[0]["sujidade"], h[0]["vegetacao"], h[0]["vala"], h[0]["sensores_sujos"], h[0]["lida"]) ==         (3, 5, "Obstruída", ["IPOA"], True)
+    assert visao.historico_usina(d["todas"], {}, 1)[0]["lida"] is False     # a com OS segue pelo texto da OS
+    s = visao.sujidade_vegetacao(d["todas"], d["cobertura"], {}, 30, d["hoje"])
+    assert [x["usina"] for x in s["linhas"]] == ["Brodowski 1"] and s["linhas"][0]["vegetacao"] == 5
+    pag = logado.get("/t/campo/rondas/usina/2").get_data(as_text=True)
+    assert 'cn-nivel cn-nivel--5">5<' in pag and "não lida" not in pag

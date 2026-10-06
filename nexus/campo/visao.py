@@ -252,8 +252,29 @@ class _Base:
 
 
 # ── Rondas ───────────────────────────────────────────────────────────────────────────────────────────────────────
+def _checklist_sem_os() -> dict:
+    """{(usina_id, início): respostas} das rondas sem OS (carga única de 06/10/2026, `nexus_rondas_checklist`), no
+    formato do `ronda_checklist.ler_nota`. A ronda com OS tem as respostas no texto da OS do Fracttal."""
+    sensores = (("ipoa_sujo", "IPOA"), ("albedo_sujo", "Albedômetro"), ("ghi_sujo", "GHI"))
+    out = {}
+    for f in _livro("nexus_rondas_checklist", "fato_checklist_ronda"):
+        uid = D._id(f.get("usina_id"))
+        if not uid or not f.get("inicio"):
+            continue
+        out[(uid, str(f["inicio"]))] = {"sujidade": _int(f.get("sujidade")), "vegetacao": _int(f.get("vegetacao")),
+                                        "vala": str(f.get("vala") or ""),
+                                        "sensores_sujos": [n for c, n in sensores if _int(f.get(c)) == 1]}
+    return out
+
+
+def resposta_da_ronda(r, respostas: dict) -> dict:
+    """As respostas do checklist de UMA ronda: pela OS (o texto da OS no Fracttal) ou, sem OS, as da carga única."""
+    return (respostas.get(str(r["os"])) if r.get("os") else None) or r.get("checklist") or {}
+
+
 def _rondas_ligadas(b: _Base) -> list[dict]:
     out = []
+    sem_os = _checklist_sem_os()
     for r in _livro("rondas_app_campo"):
         uid, _como = b.lig.usina(r.get("Usina"), r.get("Ativo da usina no Fracttal"))
         sit = str(r.get("Situação da OS") or "")
@@ -264,7 +285,8 @@ def _rondas_ligadas(b: _Base) -> list[dict]:
                     "trk_apontados": _int(r.get("Trackers apontados")) or 0,
                     "trk_respondidos": _int(r.get("Trackers respondidos")) or 0, "situacao_os": sit,
                     "sem_os": sit.lower().startswith("não criada") or not r.get("OS"),
-                    "mobilizada": uid in b.mobilizadas, "inicio": r.get("Início"), "fim": r.get("Fim")})
+                    "mobilizada": uid in b.mobilizadas, "inicio": r.get("Início"), "fim": r.get("Fim"),
+                    "checklist": None if r.get("OS") else sem_os.get((uid, str(r.get("Início") or "")))})
     return out
 
 
@@ -428,7 +450,7 @@ def historico_usina(todas, respostas: dict, usina_id) -> list[dict]:
     for r in todas:
         if r["usina_id"] != usina_id:
             continue
-        resp = respostas.get(str(r["os"] or "")) or {}
+        resp = resposta_da_ronda(r, respostas)
         out.append({**r, "sujidade": resp.get("sujidade"), "vegetacao": resp.get("vegetacao"), "vala": resp.get("vala") or "",
                     "sombreamento": resp.get("sombreamento") or "", "sensores_sujos": resp.get("sensores_sujos") or [],
                     "lida": bool(resp)})
@@ -498,10 +520,10 @@ def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: s
     leituras = {}
     com_os = lidas = 0
     for r in sorted(todas, key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
-        if r["usina_id"] not in usinas or not r["os"]:
+        if r["usina_id"] not in usinas or not (r["os"] or r.get("checklist")):
             continue
         com_os += r["data"] >= piso
-        resp = respostas.get(str(r["os"]))
+        resp = resposta_da_ronda(r, respostas)
         if not resp or (resp.get("sujidade") is None and resp.get("vegetacao") is None):
             continue
         lidas += r["data"] >= piso
