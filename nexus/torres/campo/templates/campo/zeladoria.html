@@ -20,7 +20,7 @@
     <thead><tr><th>OS</th><th>Usina</th><th>Serviço</th><th>Prestador</th><th>Etapas registradas</th><th>Última</th><th>Diária hoje</th><th>Situação</th></tr></thead>
     <tbody>
     {% for s in d.get('servicos') or [] %}
-      <tr><td>#{{ s.os }}</td><td>{{ s.usina }}</td><td>{{ s.servico }}</td><td>{{ s.prestador or '—' }}</td>
+      <tr><td class="m">{{ s.os }}</td><td>{{ s.usina }}</td><td>{{ s.servico }}</td><td>{{ s.prestador or '—' }}</td>
         <td>{% for e in s.etapas %}<span class="cn-tag" title="{{ e.data }}{% if e.quem %} · {{ e.quem }}{% endif %}">{{ e.etapa }}</span> {% endfor %}</td>
         <td class="m">{{ dia_curto(s.ultima) if s.ultima else '—' }}</td>
         <td>{{ 'Sim' if s.diaria_hoje else ('—' if s.fechada else 'Não') }}</td>

@@ -4,30 +4,33 @@ nosso (Levi, 05/10/2026: "quero parar de referenciar o Azure e ter uma visão no
 Tudo vem do banco (API db_performace), nunca do App nem do Azure:
 - os livros que o próprio App grava de hora em hora (aos :25): `fechamentos_app_campo`, `pt_app_campo`,
   `zeladoria_app_campo`, `decisoes_app_campo` e `rondas_app_campo`;
-- o cadastro do Nexus (`cadastro_nexus`): as usinas em OPERAÇÃO e a equipe de cada uma são a base da cobertura de
-  ronda e do ranking por região. A usina que o App escreve liga ao `usina_id` pelo mesmo `Ligador` da camada de dados
-  (de-para do Fracttal; código do ativo de reserva).
-A pessoa vem do App como código do e-mail (HMAC): o nome sai do cadastro do App (`identidades.json`), na hora. Nada
-volta ao banco. Cópia de 5 min por tela (`leitura.py`); banco fora do ar = a tela avisa, não some.
+- o cadastro do Nexus (`cadastro_nexus`): as usinas MOBILIZADAS (status OPERAÇÃO e data de mobilização já passada) e a
+  equipe, o estado e a cidade de cada uma. A usina que o App escreve liga ao `usina_id` pelo mesmo `Ligador` da camada
+  de dados (de-para do Fracttal; código do ativo de reserva).
+A pessoa vem do App como código do e-mail (HMAC): o nome sai do cadastro do App (`identidades.json`), na hora, no
+"Nome padrão" do cadastro (primeiro e último nome). Cópia de 5 min por tela; banco fora do ar = a tela avisa, não some.
 
 As contas são NOSSAS e estão escritas em cada função: quem quiser saber por que um número deu tanto lê aqui.
 """
+import re
 import statistics
 import time
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 
+from ..cadastro.calculos import nome_padrao
 from ..dados import fatos as D
 from ..dados import livros
 from . import leitura, livros_app
 
 _BRT = timezone(timedelta(hours=-3))
 STATUS_OPERACAO = "OPERAÇÃO"
-DIAS_SEM_RONDA_ALERTA = 7        # usina em operação sem ronda há 7 dias ou mais = ponto de atenção
+DIAS_SEM_RONDA_ALERTA = 7        # usina mobilizada sem ronda há 7 dias ou mais = ronda pendente
 DIAS_COBERTURA = 14              # janela da cobertura de ronda (a mesma do ranking por região)
-PT_PARADA_MIN = 120              # PT esperando o De acordo há mais de 2 h = ponto de atenção
+PT_PARADA_MIN = 120              # PT esperando o De acordo há mais de 2 h = parada
 PESO_QUALIDADE, PESO_COBERTURA = 0.6, 0.4     # ranking por região, a mesma régua do painel do App
+_DATA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 
 class SemBanco(RuntimeError):
@@ -101,6 +104,12 @@ def _int(v):
         return None
 
 
+def nome_curto(nome) -> str:
+    """O "Nome padrão" do cadastro (primeiro e último nome): Levi, 05/10: "tem que ter o nome resumido do técnico"."""
+    s = " ".join(str(nome or "").split())
+    return str(nome_padrao(s)) if " " in s else s
+
+
 def _quem() -> dict:
     """{código do App: (e-mail, nome)}: o cadastro do App, na hora."""
     try:
@@ -109,9 +118,24 @@ def _quem() -> dict:
         return {}
 
 
+def _codigo(codigo) -> str:
+    return str(codigo or "").split(";")[0].strip()
+
+
 def _nome(quem: dict, codigo) -> str:
-    primeiro = str(codigo or "").split(";")[0].strip()
-    return (quem.get(primeiro) or ("", ""))[1] if primeiro else ""
+    """O nome resumido de quem o App mandou como código (vários e-mails: o primeiro)."""
+    c = _codigo(codigo)
+    return nome_curto((quem.get(c) or ("", ""))[1]) if c else ""
+
+
+def _mobilizada(u: dict, hoje: str) -> bool:
+    """Mobilizada = OPERAÇÃO no cadastro e com a data de mobilização já passada. Medido em 05/10: das 177 em OPERAÇÃO,
+    49 não têm data de mobilização e NENHUMA delas teve ronda pelo App; as 107 com ronda têm a data (Levi: "tem usina
+    que nem mobilizada está")."""
+    d = str(u.get("data_mobilizacao") or "").strip()
+    return (str(u.get("status") or "").strip().upper() == STATUS_OPERACAO
+            and str(u.get("excluido") or "").strip().lower() != "sim"
+            and bool(_DATA_ISO.match(d)) and d[:10] <= hoje)
 
 
 class _Base:
@@ -122,13 +146,23 @@ class _Base:
         self.equipes = _livro("cadastro_nexus", "equipes")
         self.lig = D.Ligador(self.usinas, _livro("cadastro_nexus", "de_para"), self.equipes, {})
         self.nome_equipe = {D._id(e.get("equipe_id")): str(e.get("nome") or "") for e in self.equipes}
-        self.em_operacao = {D._id(u.get("usina_id")): u for u in self.usinas
-                            if str(u.get("status") or "").strip().upper() == STATUS_OPERACAO
-                            and str(u.get("excluido") or "").strip().lower() != "sim" and D._id(u.get("usina_id"))}
+        self.por_id = {D._id(u.get("usina_id")): u for u in self.usinas if D._id(u.get("usina_id"))}
+        hoje = _agora().date().isoformat()
+        self.mobilizadas = {uid: u for uid, u in self.por_id.items() if _mobilizada(u, hoje)}
+        # em OPERAÇÃO no cadastro, mas sem data de mobilização (ou com ela no futuro): conserto é no cadastro
+        self.sem_mobilizacao = sorted(str(u.get("nome") or "") for uid, u in self.por_id.items()
+                                      if uid not in self.mobilizadas
+                                      and str(u.get("status") or "").strip().upper() == STATUS_OPERACAO)
 
     def equipe_da_usina(self, uid) -> str:
-        u = self.em_operacao.get(uid) or {}
+        u = self.por_id.get(uid) or {}
         return self.nome_equipe.get(D._id(u.get("equipe_id")), "")
+
+    def onde(self, uid, nome_da_fonte="") -> dict:
+        """Usina (o nome do cadastro), estado e cidade. Sem ligação: o nome que a fonte escreveu, sem estado nem cidade."""
+        u = self.por_id.get(uid) or {}
+        return {"usina": str(u.get("nome") or nome_da_fonte or ""), "uf": str(u.get("uf") or "").strip(),
+                "cidade": str(u.get("cidade") or "").strip()}
 
 
 # ── Rondas ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -137,29 +171,30 @@ def _rondas_ligadas(b: _Base) -> list[dict]:
     for r in _livro("rondas_app_campo"):
         uid, _como = b.lig.usina(r.get("Usina"), r.get("Ativo da usina no Fracttal"))
         sit = str(r.get("Situação da OS") or "")
-        out.append({"data": str(r.get("Data") or "")[:10], "os": r.get("OS"), "usina": r.get("Usina") or "",
-                    "usina_id": uid, "regiao": r.get("Região") or "", "tecnico": r.get("Técnico") or "",
-                    "tipo": r.get("Tipo") or "", "nota": _int(r.get("Nota da ronda")),
-                    "falhas": str(r.get("Falhas") or "").strip(), "trk_apontados": _int(r.get("Trackers apontados")) or 0,
+        out.append({"data": str(r.get("Data") or "")[:10], "os": r.get("OS"), "usina_id": uid,
+                    **b.onde(uid, r.get("Usina")), "regiao": r.get("Região") or "",
+                    "tecnico": nome_curto(r.get("Técnico")), "tipo": r.get("Tipo") or "",
+                    "nota": _int(r.get("Nota da ronda")), "falhas": str(r.get("Falhas") or "").strip(),
+                    "trk_apontados": _int(r.get("Trackers apontados")) or 0,
                     "trk_respondidos": _int(r.get("Trackers respondidos")) or 0, "situacao_os": sit,
                     "sem_os": sit.lower().startswith("não criada") or not r.get("OS"),
-                    "inicio": r.get("Início"), "fim": r.get("Fim")})
+                    "mobilizada": uid in b.mobilizadas, "inicio": r.get("Início"), "fim": r.get("Fim")})
     return out
 
 
 def _cobertura(b: _Base, rondas: list[dict], hoje) -> list[dict]:
-    """Uma linha por usina em OPERAÇÃO: a última ronda e há quantos dias. Nunca teve ronda = 999."""
+    """Uma linha por usina MOBILIZADA: a última ronda e há quantos dias. Nunca teve ronda = 999."""
     ultima = {}
     for r in rondas:
         if r["usina_id"] and (r["usina_id"] not in ultima or r["data"] > ultima[r["usina_id"]]["data"]):
             ultima[r["usina_id"]] = r
     out = []
-    for uid, u in b.em_operacao.items():
+    for uid in b.mobilizadas:
         r = ultima.get(uid)
         dias = (hoje - datetime.fromisoformat(r["data"]).date()).days if r else 999
-        out.append({"usina_id": uid, "usina": u.get("nome") or "", "equipe": b.equipe_da_usina(uid),
+        out.append({"usina_id": uid, **b.onde(uid), "equipe": b.equipe_da_usina(uid),
                     "ultima": r["data"] if r else None, "dias": dias, "tecnico": r["tecnico"] if r else "",
-                    "tipo": r["tipo"] if r else ""})
+                    "tipo": r["tipo"] if r else "", "falhas": r["falhas"] if r else "", "os": r["os"] if r else None})
     out.sort(key=lambda x: (-x["dias"], x["usina"]))
     return out
 
@@ -168,39 +203,47 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
     def calcular():
         b = _Base()
         hoje = _agora().date()
-        todas = _rondas_ligadas(b)
+        todas = [r for r in _rondas_ligadas(b) if r["mobilizada"]]
         piso = (hoje - timedelta(days=dias - 1)).isoformat()
         periodo = sorted((r for r in todas if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
         cob = _cobertura(b, todas, hoje)
         notas = [r["nota"] for r in periodo if r["nota"] is not None]
-        return {"periodo": periodo, "cobertura": cob,
+        return {"periodo": periodo, "cobertura": cob, "sem_mobilizacao": b.sem_mobilizacao,
                 "resumo": {"rondas": len(periodo), "nota_media": round(statistics.mean(notas)) if notas else None,
                            "com_falha": sum(1 for r in periodo if r["falhas"]),
                            "sem_os": sum(1 for r in periodo if r["sem_os"]),
                            "usinas": len(cob), "cobertas": sum(1 for c in cob if c["dias"] < dias),
-                           "sem_ronda_alerta": sum(1 for c in cob if c["dias"] >= DIAS_SEM_RONDA_ALERTA),
-                           "nao_ligadas": sum(1 for r in periodo if not r["usina_id"])}}
+                           "sem_ronda_alerta": sum(1 for c in cob if c["dias"] >= DIAS_SEM_RONDA_ALERTA)}}
     return _ler(("visao_rondas", dias), calcular)
 
 
 # ── Permissões de trabalho ───────────────────────────────────────────────────────────────────────────────────────
 def pts() -> leitura.Leitura:
+    """Todas as PT do livro do App. A PT NÃO passa pelo filtro de usina mobilizada: PT esperando decisão sempre aparece
+    (esconder deixaria o técnico parado no campo)."""
     def calcular():
+        b = _Base()
         quem = _quem()
         agora = _agora()
         out = []
         for r in _livro("pt_app_campo"):
             criada, decidida = _dt(r.get("Criada em")), _dt(r.get("Decidida em"))
             sit = str(r.get("Situação") or "").strip() or "aguardando"
-            out.append({"numero": r.get("Número"), "os": r.get("OS"), "tarefa": r.get("Tarefa") or "",
-                        "usina": r.get("Usina") or "", "regiao": r.get("Região") or "", "ativo": r.get("Ativo") or "",
+            uid, _como = b.lig.usina(r.get("Usina"), r.get("Código do ativo"))
+            out.append({"numero": str(r.get("Número") or ""), "os": r.get("OS"), "tarefa": r.get("Tarefa") or "",
+                        "usina_id": uid, **b.onde(uid, r.get("Usina")), "ativo": r.get("Ativo") or "",
+                        "codigo": r.get("Código do ativo") or "",
                         "solicitante": _nome(quem, r.get("Solicitante (HMAC)")), "situacao": sit,
                         "criada": criada, "decidida": decidida, "decidida_por": _nome(quem, r.get("Decidida por (HMAC)")),
                         "papel": r.get("Papel de quem decidiu") or "", "motivo": r.get("Motivo") or "",
+                        "efeito": r.get("Efeito") or "",
                         "respostas_nao": _int(r.get("Respostas NÃO")) or 0, "faltam": r.get("Faltam") or "",
-                        "atividades": r.get("Atividades") or "", "forcada": _sim(r.get("Forçada")),
+                        "atividades": [a.strip() for a in str(r.get("Atividades") or "").split(";") if a.strip()],
+                        "forcada": _sim(r.get("Forçada")),
                         "espera_min": int((decidida - criada).total_seconds() // 60) if criada and decidida else None,
                         "idade_min": int((agora - criada).total_seconds() // 60) if criada and sit == "aguardando" else None})
+        for p in out:
+            p["parada"] = (p["idade_min"] or 0) > PT_PARADA_MIN
         aguardando = sorted((p for p in out if p["situacao"] == "aguardando"), key=lambda p: p["criada"] or agora)
         historico = sorted((p for p in out if p["situacao"] != "aguardando"), key=lambda p: p["criada"] or agora,
                            reverse=True)
@@ -211,10 +254,17 @@ def pts() -> leitura.Leitura:
         return {"aguardando": aguardando, "historico": historico, "situacoes": situacoes,
                 "resumo": {"aguardando": len(aguardando),
                            "mais_antiga_min": aguardando[0]["idade_min"] if aguardando else None,
-                           "paradas": sum(1 for p in aguardando if (p["idade_min"] or 0) > PT_PARADA_MIN),
+                           "paradas": sum(1 for p in aguardando if p["parada"]),
                            "espera_mediana_min": round(statistics.median(esperas)) if esperas else None,
                            "com_nao": sum(1 for p in out if p["respostas_nao"])}}
     return _ler(("visao_pt",), calcular)
+
+
+def pt(numero) -> dict | None:
+    """Uma PT pelo número, do livro do App (a cópia de 5 min)."""
+    d = pts().dados
+    n = str(numero or "").strip()
+    return next((p for p in (d.get("aguardando") or []) + (d.get("historico") or []) if p["numero"] == n), None)
 
 
 # ── Zeladoria ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -252,23 +302,24 @@ def zeladoria() -> leitura.Leitura:
 
 # ── Ranking ──────────────────────────────────────────────────────────────────────────────────────────────────────
 def ranking(dias: int = 30) -> leitura.Leitura:
-    """Regiões: 60% a nota média dos fechamentos + 40% a cobertura de ronda (usinas da equipe com ronda nos últimos 14
-    dias), a régua do painel do App. Colaboradores: nota média, fechamentos, pontualidade e devolvidas no período."""
+    """Regiões: 60% a nota média dos fechamentos + 40% a cobertura de ronda (usinas mobilizadas da equipe com ronda nos
+    últimos 14 dias), a régua do painel do App. Colaboradores: nota média, fechamentos, pontualidade e devolvidas no
+    período, somados pelo código da pessoa (dois técnicos com o mesmo nome resumido não se misturam)."""
     def calcular():
         b = _Base()
         quem = _quem()
         agora = _agora()
         piso = agora - timedelta(days=dias)
         fech = [r for r in _livro("fechamentos_app_campo") if (_dt(r.get("Registrado em")) or agora) >= piso]
-        cob = _cobertura(b, _rondas_ligadas(b), agora.date())
+        cob = _cobertura(b, [r for r in _rondas_ligadas(b) if r["mobilizada"]], agora.date())
 
-        def agrega(chave):
+        def agrega(chave, nome=lambda k: k):
             g = {}
             for r in fech:
                 k = chave(r)
                 if not k:
                     continue
-                a = g.setdefault(k, {"nome": k, "os": 0, "notas": [], "pontuais": 0, "devolvidas": 0})
+                a = g.setdefault(k, {"nome": nome(k), "os": 0, "notas": [], "pontuais": 0, "devolvidas": 0})
                 a["os"] += 1
                 if _int(r.get("Nota do painel")) is not None:
                     a["notas"].append(_int(r.get("Nota do painel")))
@@ -300,11 +351,12 @@ def ranking(dias: int = 30) -> leitura.Leitura:
             a.setdefault("usinas", 0)
             a.setdefault("cobertas", 0)
             a["cobertura_pct"] = round(100 * a["cobertas"] / a["usinas"]) if a["usinas"] else None
-            # só pontua quem tem as duas partes: região sem fechamento no período (ou sem usina em operação) não
-            # pode ganhar 100 só pela outra metade
+            # só pontua quem tem as duas partes: região sem fechamento no período (ou sem usina mobilizada) não pode
+            # ganhar 100 só pela outra metade
             a["pontos"] = (round(PESO_QUALIDADE * a["nota"] + PESO_COBERTURA * a["cobertura_pct"])
                            if a["nota"] is not None and a["cobertura_pct"] is not None else None)
-        colab = agrega(lambda r: _nome(quem, r.get("Técnico (HMAC)")))
+        colab = {k: a for k, a in agrega(lambda r: _codigo(r.get("Técnico (HMAC)")),
+                                         lambda k: _nome(quem, k)).items() if a["nome"]}
         ordem = lambda a: (-(a["pontos"] if a.get("pontos") is not None else -1), a["nome"])
         return {"regioes": sorted(regioes.values(), key=ordem), "fora_do_cadastro": fora,
                 "colaboradores": sorted(colab.values(), key=lambda a: (-(a["nota"] or 0), -a["os"], a["nome"])),
@@ -313,73 +365,61 @@ def ranking(dias: int = 30) -> leitura.Leitura:
 
 
 # ── Central de atenção ───────────────────────────────────────────────────────────────────────────────────────────
-TIPOS_ATENCAO = {
-    "sem_ronda": ("Usina sem ronda", "critico"),
-    "pt_parada": ("PT esperando o De acordo", "alerta"),
-    "ronda_sem_os": ("Ronda sem OS no Fracttal", "alerta"),
-    "longa_pendente": ("Ronda longa pendente", "alerta"),
-    "ronda_incompleta": ("Ronda com evidência incompleta", "info"),
-}
+# Três visões (Levi, 05/10/2026): "separar Rondas feitas (histórico de rondas) e rondas pendentes, dando bastante
+# atenção nas pendentes" e "separe o que é ronda e o que é Permissão de Trabalho".
+PENDENTE = {"nunca": ("Nunca teve ronda", "critico"), "sem_ronda": ("Sem ronda", "critico"),
+            "longa_pendente": ("Ronda longa pendente", "alerta")}
+FEITA = {"sem_os": ("Sem OS no Fracttal", "alerta"), "incompleta": ("Evidência incompleta", "info"),
+         "ok": ("Sem pendência", "ok")}
+PT_STATUS = {"parada": ("Parada há mais de 2 h", "critico"), "aguardando": ("Aguardando", "alerta")}
 LONGA_PENDENTE = "ronda longa pendente"
 
 
+def _dm(iso) -> str:
+    s = str(iso or "")
+    return f"{s[8:10]}/{s[5:7]}" if len(s) >= 10 else ""
+
+
 def atencao(dias: int = 14) -> leitura.Leitura:
-    """O que pede ação, juntando as fontes: usina em operação sem ronda há 7 dias ou mais; PT esperando o De acordo há
-    mais de 2 h; ronda cuja OS o Fracttal não criou; ronda longa pendente (uma vez por usina, pela última ronda dela: o
-    App repete o aviso em toda ronda curta); ronda com evidência incompleta (foto, registro de ação, checklist). Nota
-    baixa de fechamento NÃO entra: é a fila da Aprovação de OS (e o fechamento aprovado direto no Fracttal nunca tem
-    decisão no painel, o que encheria esta lista de ponto falso). Os tratamentos da Central do App ficam ao lado."""
+    """O que pede ação no campo, em três visões. Só usina MOBILIZADA (a PT é a exceção, ver `pts`).
+    - Rondas pendentes: uma linha por usina que pede ronda: sem ronda há 7 dias ou mais (ou nunca) ou com a ronda longa
+      pendente pela última ronda dela (o App repete o aviso em toda ronda curta: uma linha só por usina).
+    - Rondas feitas: o histórico do período, com o que ficou faltando: OS que o Fracttal não criou, evidência
+      incompleta (foto, registro de ação, checklist).
+    - Permissões de trabalho: as PT esperando o De acordo, da mais antiga para a mais nova.
+    Nota baixa de fechamento NÃO entra: é a fila da Aprovação de OS."""
     def calcular():
         b = _Base()
-        quem = _quem()
-        agora = _agora()
-        hoje = agora.date()
+        hoje = _agora().date()
         piso = (hoje - timedelta(days=dias - 1)).isoformat()
-        pontos = []
-        rond = _rondas_ligadas(b)
+        rond = [r for r in _rondas_ligadas(b) if r["mobilizada"]]
+        pendentes = []
         for c in _cobertura(b, rond, hoje):
-            if c["dias"] >= DIAS_SEM_RONDA_ALERTA:
-                pontos.append({"tipo": "sem_ronda", "usina": c["usina"], "regiao": c["equipe"], "dias": c["dias"],
-                               "oque": "nunca teve ronda pelo App" if c["dias"] >= 999 else f"última ronda {c['ultima']}",
-                               "quem": c["tecnico"], "os": None, "quando": c["ultima"]})
-        for p in pts().dados.get("aguardando") or []:
-            if (p["idade_min"] or 0) > PT_PARADA_MIN:
-                pontos.append({"tipo": "pt_parada", "usina": p["usina"], "regiao": p["regiao"],
-                               "dias": (p["idade_min"] or 0) // 1440, "oque": f"PT {p['numero']} · {p['tarefa'][:60]}",
-                               "quem": p["solicitante"], "os": p["os"],
-                               "quando": p["criada"].date().isoformat() if p["criada"] else None})
-        ultima_da_usina = {}
-        for r in rond:
-            if r["data"] < piso:
+            longa = LONGA_PENDENTE in c["falhas"].lower()
+            if c["dias"] >= 999:
+                tipo, obs = "nunca", "Nenhuma ronda pelo App desde que a usina foi mobilizada"
+            elif c["dias"] >= DIAS_SEM_RONDA_ALERTA:
+                tipo, obs = "sem_ronda", f"Última ronda em {_dm(c['ultima'])}" + (
+                    "; a ronda longa também está pendente" if longa else "")
+            elif longa:
+                tipo, obs = "longa_pendente", f"O App pede a ronda longa (última ronda em {_dm(c['ultima'])})"
+            else:
                 continue
-            idade = (hoje - datetime.fromisoformat(r["data"]).date()).days
-            chave = r["usina_id"] or r["usina"]
-            if chave not in ultima_da_usina or r["data"] > ultima_da_usina[chave]["data"]:
-                ultima_da_usina[chave] = r
-            if r["sem_os"]:
-                pontos.append({"tipo": "ronda_sem_os", "usina": r["usina"], "regiao": r["regiao"], "dias": idade,
-                               "oque": r["situacao_os"] or "OS não criada", "quem": r["tecnico"], "os": r["os"],
-                               "quando": r["data"]})
+            pendentes.append({"tipo": tipo, "usina": c["usina"], "uf": c["uf"], "cidade": c["cidade"],
+                              "dias": c["dias"], "ultima": c["ultima"], "obs": obs})
+        feitas = []
+        for r in sorted((r for r in rond if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
             faltas = [f.strip() for f in r["falhas"].split(";") if f.strip() and f.strip().lower() != LONGA_PENDENTE]
-            if faltas:
-                pontos.append({"tipo": "ronda_incompleta", "usina": r["usina"], "regiao": r["regiao"], "dias": idade,
-                               "oque": "; ".join(faltas), "quem": r["tecnico"], "os": r["os"], "quando": r["data"]})
-        for r in ultima_da_usina.values():
-            if LONGA_PENDENTE in r["falhas"].lower():
-                pontos.append({"tipo": "longa_pendente", "usina": r["usina"], "regiao": r["regiao"],
-                               "dias": (hoje - datetime.fromisoformat(r["data"]).date()).days,
-                               "oque": "o App pede a ronda longa desta usina", "quem": r["tecnico"], "os": r["os"],
-                               "quando": r["data"]})
-        pontos.sort(key=lambda p: (-int(p["dias"] or 0), p["tipo"], p["usina"]))
-        tratados = [{"quando": _dia(d.get("Quando")), "os": d.get("OS"), "acao": d.get("Ação") or "",
-                     "texto": d.get("Texto") or "", "tipo": d.get("Tipo do ponto") or "", "usina": d.get("Usina") or "",
-                     "prazo": d.get("Prazo") or "", "por": _nome(quem, d.get("Decidido por (HMAC)"))}
-                    for d in _livro("decisoes_app_campo") if str(d.get("Origem") or "") == "Central de atenção"]
-        por_tipo = {}
-        for p in pontos:
-            por_tipo[p["tipo"]] = por_tipo.get(p["tipo"], 0) + 1
-        return {"pontos": pontos, "por_tipo": por_tipo, "tratados": sorted(tratados, key=lambda t: t["quando"],
-                                                                           reverse=True)}
+            status = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "ok")
+            obs = "; ".join(([r["situacao_os"] or "OS não criada"] if r["sem_os"] else []) + faltas)
+            feitas.append({"data": r["data"], "status": status, "usina": r["usina"], "uf": r["uf"], "cidade": r["cidade"],
+                           "obs": obs, "feito_por": r["tecnico"], "os": None if r["sem_os"] else r["os"],
+                           "nota": r["nota"], "tipo": r["tipo"]})
+        p = pts()
+        if p.erro:
+            raise SemBanco(p.erro)
+        return {"pendentes": pendentes, "feitas": feitas, "pts": p.dados.get("aguardando") or [],
+                "sem_mobilizacao": b.sem_mobilizacao}
     return _ler(("visao_atencao", dias), calcular)
 
 

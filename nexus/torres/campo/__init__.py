@@ -9,7 +9,7 @@ grava de hora em hora e o cadastro do Nexus. Aprovação, Ordens e Triagem usam 
 from datetime import datetime
 from urllib.parse import urlencode
 
-from flask import render_template, request
+from flask import render_template, request, session
 from markupsafe import Markup, escape
 
 from ...campo import aprovacao as campo_aprovacao
@@ -17,7 +17,9 @@ from ...campo import fonte_pg as campo_fonte
 from ...campo import ordens as campo_ordens
 from ...campo import triagem as campo_triagem
 from ...campo import visao
+from ...campo import decisao_pt
 from ..modelo import Tela, Torre
+from .assinatura import bp_assinatura
 
 FONTE_APP = "Livros que o App de Campo grava no banco do Nexus + cadastro do Nexus"
 
@@ -51,6 +53,8 @@ TORRE = Torre(
 )
 
 bp = TORRE.criar_blueprint(__name__)
+# as rotas de quem assina a PT moram em /os/_nexus (o cookie do login do Fracttal do OS Creator só vale em /os)
+bp.record_once(lambda estado: estado.app.register_blueprint(bp_assinatura))
 
 
 def _url(**mudar) -> str:
@@ -93,28 +97,14 @@ def _comum(tela_id, leitura, **k):
 
 
 # ── Central de atenção (visão nossa) ─────────────────────────────────────────────────────────────────────────────
-@bp.route("/atencao")
-def atencao():
-    dias = _dias((7, 14, 30), 14)
-    leitura = visao.atencao(dias)
-    todos = leitura.dados.get("pontos") or []
-    regiao, tipo = request.args.get("regiao", ""), request.args.get("tipo", "")
-    q = request.args.get("q", "").strip().lower()
-    na_regiao = [p for p in todos if not regiao or p.get("regiao") == regiao]
-    lista = [p for p in na_regiao if (not tipo or p["tipo"] == tipo)
-             and (not q or q in " ".join(str(p.get(c) or "") for c in ("usina", "oque", "quem", "os")).lower())]
-    por_tipo = {}
-    for p in na_regiao:
-        por_tipo[p["tipo"]] = por_tipo.get(p["tipo"], 0) + 1
-    return render_template("campo/atencao.html", **_comum("atencao", leitura, dias=dias, lista=lista,
-                           total=len(na_regiao), por_tipo=por_tipo, tipos=visao.TIPOS_ATENCAO, tipo=tipo,
-                           regiao=regiao, q=request.args.get("q", ""),
-                           regioes=sorted({p.get("regiao") for p in todos if p.get("regiao")})))
+# Três visões (Levi, 05/10/2026): ronda e PT separadas, e as rondas pendentes antes do histórico.
+VISTAS = (("pendentes", "Rondas pendentes"), ("feitas", "Rondas feitas"), ("pt", "Permissões de trabalho"))
+STATUS_DA_VISTA = {"pendentes": visao.PENDENTE, "feitas": visao.FEITA, "pt": visao.PT_STATUS}
 
 
-# ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────
-SITUACAO_PT = {"aguardando": ("Aguardando", "alerta"), "de_acordo": ("De acordo", "ok"),
-               "negada": ("Não autorizada", "critico"), "vencida": ("Vencida", "neutro")}
+def _status(vista, x) -> str:
+    return {"pendentes": x.get("tipo"), "feitas": x.get("status"),
+            "pt": "parada" if x.get("parada") else "aguardando"}[vista]
 
 
 def _idade_min(m) -> str:
@@ -124,6 +114,35 @@ def _idade_min(m) -> str:
     return f"{m // 60} h {m % 60} min" if m >= 60 else f"{m} min"
 
 
+@bp.route("/atencao")
+def atencao():
+    dias = _dias((7, 14, 30), 14)
+    leitura = visao.atencao(dias)
+    d = leitura.dados
+    ids = [v[0] for v in VISTAS]
+    vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
+    f, uf = request.args.get("f", ""), request.args.get("uf", "")
+    q = request.args.get("q", "").strip().lower()
+    fontes = {"pendentes": d.get("pendentes") or [], "feitas": d.get("feitas") or [], "pt": d.get("pts") or []}
+    campos = ("usina", "cidade", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
+    base = [x for x in fontes[vista] if (not uf or x.get("uf") == uf)
+            and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
+    contagem = {}
+    for x in base:
+        contagem[_status(vista, x)] = contagem.get(_status(vista, x), 0) + 1
+    lista = [x for x in base if not f or _status(vista, x) == f]
+    return render_template("campo/atencao.html", **_comum(
+        "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
+        status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
+        lista=lista, f=f, uf=uf, q=request.args.get("q", ""), idade_min=_idade_min,
+        estados=sorted({x.get("uf") for v in fontes.values() for x in v if x.get("uf")})))
+
+
+# ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────
+SITUACAO_PT = {"aguardando": ("Aguardando", "alerta"), "de_acordo": ("De acordo", "ok"),
+               "negada": ("Não autorizada", "critico"), "vencida": ("Vencida", "neutro")}
+
+
 @bp.route("/pt")
 def pt():
     leitura = visao.pts()
@@ -131,6 +150,23 @@ def pt():
     historico = [p for p in leitura.dados.get("historico") or [] if not sit or p.get("situacao") == sit]
     return render_template("campo/pt.html", **_comum("pt", leitura, historico=historico, sit=sit,
                                                      situacoes=SITUACAO_PT, idade_min=_idade_min))
+
+
+@bp.route("/pt/<numero>")
+def pt_aprovar(numero):
+    """A aprovação da PT no Nexus: a PT inteira e a decisão, assinada com o login do Fracttal do OS Creator."""
+    leitura = visao.pts()
+    p = visao.pt(numero) if not leitura.erro else None
+    nexus, erro_nexus = None, ""
+    if p:
+        try:
+            nexus = decisao_pt.da_pt(p["numero"])
+        except Exception as e:      # noqa: BLE001 — sem o livro de decisões, a tela abre e diz
+            erro_nexus = f"Não consegui ler as decisões do Nexus ({type(e).__name__})"
+    return render_template("campo/pt_aprovar.html", **_comum(
+        "pt", leitura, p=p, numero=numero, nexus=nexus, erro_nexus=erro_nexus, situacoes=SITUACAO_PT,
+        idade_min=_idade_min, decisoes=decisao_pt.DECISOES, aviso=session.pop("pt_aviso", ""),
+        gravada=request.args.get("gravada") == "1", quando=visao._dt))
 
 
 # ── Rondas, Zeladoria e Ranking (visão nossa) ────────────────────────────────────────────────────────────────────

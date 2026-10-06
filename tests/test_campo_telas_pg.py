@@ -37,7 +37,7 @@ def test_ordens_de_servico_pelo_banco(logado, banco):
     assert r["os"] == 3 and r["qualidade_media"] == round((96 + 45 + 88) / 3)
     assert r["pontualidade_pct"] is None              # o Fracttal não tem a hora de início no celular: sem dado, não 0%
     html = logado.get("/t/campo/os?dias=7").get_data(as_text=True)
-    assert "#15102" in html and "#15077" in html and "#15002" not in html    # fechada fora do App não entra
+    assert ">15102<" in html and ">15077<" in html and ">15002<" not in html    # fechada fora do App não entra
     assert "notas do App" in html and "só no App (hora de início no celular)" in html
     assert "<iframe" not in html
 

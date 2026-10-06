@@ -2,7 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Rondas, visão do Nexus (05/10/2026): o livro de rondas que o App grava no banco + as usinas em OPERAÇÃO do cadastro.
+{# Rondas, visão do Nexus (05/10/2026): o livro de rondas que o App grava no banco + as usinas mobilizadas do cadastro.
    As contas estão em nexus/campo/visao.py (rondas, _cobertura). #}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -16,40 +16,41 @@
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Rondas</span><span class="v">{{ r.get('rondas', 0) }}</span><span class="d">no período</span></span>
     <span><span class="gc-rotulo">Nota média</span><span class="v">{{ '—' if r.get('nota_media') is none else r.get('nota_media') ~ '%' }}</span><span class="d">da ronda</span></span>
-    <span><span class="gc-rotulo">Cobertura</span><span class="v">{{ r.get('cobertas', 0) }} / {{ r.get('usinas', 0) }}</span><span class="d">usinas em operação com ronda no período</span></span>
-    <span><span class="gc-rotulo">Sem ronda há 7 d ou mais</span><span class="v{% if r.get('sem_ronda_alerta') %} ruim{% endif %}">{{ r.get('sem_ronda_alerta', 0) }}</span><span class="d">usinas em operação</span></span>
+    <span><span class="gc-rotulo">Cobertura</span><span class="v">{{ r.get('cobertas', 0) }} / {{ r.get('usinas', 0) }}</span><span class="d">usinas mobilizadas com ronda no período</span></span>
+    <span><span class="gc-rotulo">Sem ronda há 7 d ou mais</span><span class="v{% if r.get('sem_ronda_alerta') %} ruim{% endif %}">{{ r.get('sem_ronda_alerta', 0) }}</span><span class="d">usinas mobilizadas</span></span>
     <span><span class="gc-rotulo">Ronda sem OS</span><span class="v">{{ r.get('sem_os', 0) }}</span><span class="d">o Fracttal não criou a OS</span></span>
   </div>
 
   <div class="cn-duas">
     <div>
-      <div class="cn-lista-cab"><h2>Usinas há mais tempo sem ronda</h2><span class="mudo">{{ (d.get('cobertura') or [])|length }} em operação</span></div>
+      <div class="cn-lista-cab"><h2>Usinas há mais tempo sem ronda</h2><span class="mudo">{{ (d.get('cobertura') or [])|length }} mobilizadas</span></div>
       <div class="cn-tab"><table>
-        <thead><tr><th>Usina</th><th>Equipe</th><th>Última ronda</th><th>Há</th><th>Quem fez</th></tr></thead>
+        <thead><tr><th>Usina</th><th>Estado</th><th>Cidade</th><th>Última ronda</th><th>Há</th><th>Feito por</th></tr></thead>
         <tbody>
         {% for c in (d.get('cobertura') or [])[:60] %}
-          <tr><td>{{ c.usina }}</td><td>{{ c.equipe or '—' }}</td><td class="m">{{ dia_curto(c.ultima) if c.ultima else '—' }}</td>
+          <tr><td>{{ c.usina }}</td><td>{{ c.uf or '—' }}</td><td>{{ c.cidade or '—' }}</td><td class="m">{{ dia_curto(c.ultima) if c.ultima else '—' }}</td>
             <td><span class="cn-pill cn-{{ 'critico' if c.dias >= 14 else ('alerta' if c.dias >= 7 else 'ok') }}">{{ 'nunca' if c.dias >= 999 else ('hoje' if c.dias == 0 else c.dias ~ ' d') }}</span></td>
             <td>{{ c.tecnico or '—' }}</td></tr>
-        {% else %}<tr><td colspan="5" class="mudo">Sem usina em operação no cadastro.</td></tr>{% endfor %}
+        {% else %}<tr><td colspan="6" class="mudo">Sem usina mobilizada no cadastro.</td></tr>{% endfor %}
         </tbody></table></div>
     </div>
     <div>
       <div class="cn-lista-cab"><h2>Rondas do período</h2><span class="mudo">{{ (d.get('periodo') or [])|length }}</span></div>
       <div class="cn-tab"><table>
-        <thead><tr><th>Dia</th><th>Usina</th><th>Técnico</th><th>Tipo</th><th>Nota</th><th>Pendências</th><th>OS</th></tr></thead>
+        <thead><tr><th>Dia</th><th>Usina</th><th>Estado</th><th>Feito por</th><th>Tipo</th><th>Nota</th><th>Pendências</th><th>OS</th></tr></thead>
         <tbody>
         {% for x in (d.get('periodo') or [])[:80] %}
-          <tr><td class="m">{{ dia_curto(x.data) }}</td><td>{{ x.usina }}</td><td>{{ x.tecnico or '—' }}</td><td><span class="cn-tag">{{ x.tipo or '—' }}</span></td>
+          <tr><td class="m">{{ dia_curto(x.data) }}</td><td>{{ x.usina }}<span class="det">{{ x.cidade }}</span></td><td>{{ x.uf or '—' }}</td><td>{{ x.tecnico or '—' }}</td><td><span class="cn-tag">{{ x.tipo or '—' }}</span></td>
             <td>{% if x.nota is not none %}<span class="cn-pill cn-{{ 'ok' if x.nota >= 85 else ('alerta' if x.nota >= 70 else 'critico') }}">{{ x.nota }}%</span>{% else %}—{% endif %}</td>
             <td>{{ x.falhas or '—' }}</td>
-            <td>{% if x.sem_os %}<span class="cn-pill cn-alerta">sem OS</span>{% elif x.os %}#{{ x.os }}{% else %}—{% endif %}</td></tr>
-        {% else %}<tr><td colspan="7" class="mudo">Nenhuma ronda no período.</td></tr>{% endfor %}
+            <td>{% if x.sem_os %}<span class="cn-pill cn-alerta">sem OS</span>{% elif x.os %}<span class="m">{{ x.os }}</span>{% else %}—{% endif %}</td></tr>
+        {% else %}<tr><td colspan="8" class="mudo">Nenhuma ronda no período.</td></tr>{% endfor %}
         </tbody></table></div>
     </div>
   </div>
   <div class="cn-nota"><b>De onde vem.</b> As rondas são as que o App grava no banco do Nexus. A usina liga ao cadastro pelo
-    de-para do Fracttal (o código do ativo de reserva); a cobertura conta as usinas em OPERAÇÃO do cadastro, com a equipe
-    de cada uma. "Pendências" é o que o App anota na ronda (ronda longa pendente, foto de evidência, ação sem registro).</div>
+    de-para do Fracttal (o código do ativo de reserva); a cobertura conta as usinas mobilizadas do cadastro (OPERAÇÃO e
+    data de mobilização já passada){% if d.get('sem_mobilizacao') %}; {{ d.sem_mobilizacao|length }} em OPERAÇÃO sem data
+    de mobilização ficam de fora{% endif %}. "Pendências" é o que o App anota na ronda (ronda longa pendente, foto de evidência, ação sem registro).</div>
 </div>
 {% endblock %}

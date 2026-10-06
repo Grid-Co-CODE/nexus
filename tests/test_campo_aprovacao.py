@@ -103,9 +103,9 @@ def test_tela_do_nexus(logado, campo):
     html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
     assert "<iframe" not in html and 'class="campo-nativa"' in html
     assert "Evidência completa" in html and "Precisa do seu olho" in html and "Fechadas fora do App" in html
-    assert "#15102" in html and "#15088" in html and "#15002" in html
+    assert ">15102<" in html and ">15088<" in html and ">15002<" in html
     html = logado.get("/t/campo/aprovacao?dias=60&balde=olho").get_data(as_text=True)
-    assert "#15088" in html and "#15102" not in html
+    assert ">15088<" in html and ">15102<" not in html
 
 
 def test_tela_com_fracttal_recusando_avisa(logado, campo):

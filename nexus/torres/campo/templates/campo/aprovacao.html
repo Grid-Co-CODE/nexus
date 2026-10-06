@@ -64,7 +64,7 @@
         {% set g = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
         <tr>
           <td><span class="cn-pill cn-{{ cor_espera(x.espera_d) }}">{{ '—' if x.espera_d is none else ('hoje' if x.espera_d == 0 else x.espera_d ~ ' d') }}</span></td>
-          <td><b>#{{ x.os }}</b>{% if x.tarefa %}<span class="det">{{ x.tarefa }}</span>{% endif %}</td>
+          <td><b class="m">{{ x.os }}</b>{% if x.tarefa %}<span class="det">{{ x.tarefa }}</span>{% endif %}</td>
           <td>{{ x.tecnico }}<span class="det">{{ x.funcao or 'sem cadastro' }}</span></td>
           <td>{{ x.supervisor }}</td>
           <td>{{ x.area }}</td>

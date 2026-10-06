@@ -49,9 +49,9 @@ def test_periodo_estranho_vira_7_dias(campo):
 def test_tela_do_nexus(logado, campo):
     html = logado.get("/t/campo/os").get_data(as_text=True)
     assert "<iframe" not in html and 'class="campo-nativa"' in html
-    assert "#15140" in html and "#15131" in html and "Devolvida" in html
+    assert ">15140<" in html and ">15131<" in html and "Devolvida" in html
     assert "do previsto" in html                       # o número do App, com o rótulo certo
     html = logado.get("/t/campo/os?faixa=dev").get_data(as_text=True)
-    assert "#15131" in html and "#15140" not in html
+    assert ">15131<" in html and ">15140<" not in html
     html = logado.get("/t/campo/os?faixa=ok").get_data(as_text=True)
-    assert "#15140" in html and "#15131" not in html and "#15118" not in html
+    assert ">15140<" in html and ">15131<" not in html and ">15118<" not in html

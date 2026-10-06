@@ -20,13 +20,14 @@
 
   <div class="cn-lista-cab"><h2>Esperando o De acordo</h2><span class="mudo">da mais antiga para a mais nova</span></div>
   <div class="cn-tab"><table>
-    <thead><tr><th>Espera</th><th>PT</th><th>OS e tarefa</th><th>Usina</th><th>Região</th><th>Solicitante</th><th>Respostas NÃO</th></tr></thead>
+    <thead><tr><th>Espera</th><th>PT</th><th>OS e tarefa</th><th>Usina</th><th>Estado</th><th>Cidade</th><th>Técnico</th><th>Respostas NÃO</th></tr></thead>
     <tbody>
     {% for p in d.get('aguardando') or [] %}
       <tr><td><span class="cn-pill cn-{{ 'critico' if (p.idade_min or 0) > 1440 else ('alerta' if (p.idade_min or 0) > 120 else 'ok') }}">{{ idade_min(p.idade_min) }}</span></td>
-        <td class="m">{{ p.numero }}</td><td><b>#{{ p.os }}</b><span class="det">{{ p.tarefa[:70] }}</span></td><td>{{ p.usina }}</td><td>{{ p.regiao or '—' }}</td>
+        <td class="m">{{ p.numero }}</td><td><a class="cn-link m" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT para aprovar">{{ p.os or p.numero }}</a><span class="det">{{ p.tarefa[:70] }}</span></td>
+        <td>{{ p.usina }}</td><td>{{ p.uf or '—' }}</td><td>{{ p.cidade or '—' }}</td>
         <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td></tr>
-    {% else %}<tr><td colspan="7" class="mudo">Nenhuma PT esperando.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="8" class="mudo">Nenhuma PT esperando.</td></tr>{% endfor %}
     </tbody></table></div>
 
   <div class="cn-lista-cab"><h2>Decididas</h2>
@@ -37,12 +38,13 @@
     <tbody>
     {% for p in historico[:120] %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
       <tr><td class="m">{{ p.criada.strftime('%d/%m %H:%M') if p.criada else '—' }}</td><td class="m">{{ p.numero }}</td>
-        <td><b>#{{ p.os }}</b><span class="det">{{ p.tarefa[:70] }}</span></td><td>{{ p.usina }}</td>
+        <td><a class="cn-link m" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">{{ p.os or p.numero }}</a><span class="det">{{ p.tarefa[:70] }}</span></td><td>{{ p.usina }}</td>
         <td><span class="cn-pill cn-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ '—' if p.espera_min is none else idade_min(p.espera_min) }}</td>
-        <td>{{ p.decidida_por or p.papel or '—' }}</td><td class="det">{{ p.atividades[:90] }}</td></tr>
+        <td>{{ p.decidida_por or p.papel or '—' }}</td><td class="det">{{ p.atividades|join('; ')|truncate(90) }}</td></tr>
     {% else %}<tr><td colspan="8" class="mudo">Nada com esse filtro.</td></tr>{% endfor %}
     </tbody></table></div>
   <div class="cn-nota"><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
-    App como código do e-mail; o nome sai do cadastro do App, na hora. "Esperou" é da criação da PT até a decisão.</div>
+    App como código do e-mail; o nome (resumido, como o "Nome padrão" do cadastro) sai do cadastro do App, na hora.
+    "Esperou" é da criação da PT até a decisão. Clique na OS para abrir a PT e decidir.</div>
 </div>
 {% endblock %}

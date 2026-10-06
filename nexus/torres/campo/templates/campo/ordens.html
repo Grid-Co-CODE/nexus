@@ -54,7 +54,7 @@
       {% for x in lista %}
         {% set s = situacao(x) %}{% set suspeito = x.dur_prev and x.dur_real and x.dur_real < x.dur_prev * 0.4 %}
         <tr>
-          <td><b>#{{ x.os }}</b></td>
+          <td class="m"><b>{{ x.os }}</b></td>
           <td>{{ (x.tarefa or '')[:60] }}</td>
           <td>{{ x.tecnico or '—' }}</td>
           <td>{{ x.usina or '—' }}</td>

@@ -148,3 +148,40 @@
   .cn-frescor{margin-left:0;text-align:left}
   .cn-vista{margin-left:0}
 }
+
+/* Central de atenção em três visões (05/10/2026). Status só com a palavra colorida, sem fundo (Levi: "tire o
+   preenchimento de fundo colorido, deixe só as palavras coloridas"); vale para os filtros de todas as telas do campo. */
+.cn-st{display:inline-flex;align-items:center;gap:6px;font:600 12px/16px var(--font-sans);white-space:nowrap}
+.cn-st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.cn-t-critico{color:var(--critico)}
+.cn-t-alerta{color:var(--alerta)}
+.cn-t-info{color:var(--info)}
+.cn-t-ok{color:var(--ok)}
+.cn-t-neutro{color:var(--mudo)}
+.cn-chips b{margin-left:4px;font-variant-numeric:tabular-nums;color:var(--tinta)}
+/* a OS da PT abre a aprovação: verde Grid, clicável */
+.cn-link{color:var(--verde-texto);font-weight:600;text-decoration:none}
+.cn-link:hover{text-decoration:underline}
+
+/* Aprovação de PT no Nexus */
+.cn-voltar{margin:0 0 12px;font-size:13px}
+.cn-st--titulo{font-size:14px;vertical-align:middle;margin-left:10px}
+.cn-certo{margin-top:16px;padding:12px 16px;border:1px solid var(--ok);border-radius:var(--raio-md);background:var(--ok-suave);
+  color:var(--tinta);font-size:13px}
+.cn-pt-grade{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-top:20px}
+@media (max-width:900px){.cn-pt-grade{grid-template-columns:minmax(0,1fr)}}
+.cn-cartao{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:18px 20px;min-width:0}
+.cn-cartao h2{font:600 15px/20px var(--font-sans);margin:0 0 12px}
+.cn-cartao h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:18px 0 8px}
+.cn-dados{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 18px;margin:0;font-size:13.5px}
+.cn-dados dt{color:var(--mudo)}
+.cn-dados dd{margin:0;min-width:0}
+.cn-dados .det,.cn-cartao .det{display:block;color:var(--mudo);font-size:12px;margin-top:2px}
+.cn-ativ{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13.5px}
+.cn-decisao{border-top:3px solid var(--verde)}
+.cn-form-decisao{display:grid;gap:10px}
+.cn-form-decisao textarea{width:100%;resize:vertical;min-height:72px}
+.cn-quem{margin:0;font-size:13px;color:var(--tinta-2)}
+.cn-botoes{display:flex;flex-wrap:wrap;gap:10px}
+.cn-btn-negar{color:var(--critico);border-color:var(--critico)}
+.campo-nativa .m{font-family:var(--font-mono);font-size:12.5px}

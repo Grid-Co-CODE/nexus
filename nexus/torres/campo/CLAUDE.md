@@ -7,18 +7,21 @@ Leia também o `CLAUDE.md` da raiz e, antes de pôr dado novo no banco, o `nexus
 ## Regra: tudo em paralelo (Levi, 04/10/2026)
 
 "Por hora todas as decisões para o Nexus são paralelas, não deve afetar o funcionamento atual." Nada aqui escreve no
-App nem no Fracttal. Aprovar, devolver, encaminhar e decidir PT continuam no App: o Nexus mostra. Sem link para o painel
-do App e sem "Abrir no App"; a OS aparece como `#número` (o Fracttal não tem endereço direto de uma OS).
+App nem no Fracttal. Aprovar e devolver OS e encaminhar ponto continuam no App. Sem link para o painel do App e sem
+"Abrir no App". **A OS aparece só com o número, sem "#"** (Levi, 05/10: "Em OS tira esse #").
+
+**Exceção: a decisão da PT** (Levi, 05/10: "Técnico faz APR e PT -> Chega no PG -> Atualiza para os steakholders ->
+Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!"). Ver "Aprovação de PT no Nexus" abaixo.
 
 ## As telas
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
-| Central de atenção | rondas, PT e decisões do App + cadastro do Nexus | `visao.atencao` (conta nossa) |
+| Central de atenção | rondas e PT do App + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS | fila de verificação do Fracttal ao vivo (só GET) + nota do livro do App | regras copiadas do App |
-| Permissões de trabalho | `pt_app_campo` | `visao.pts` (conta nossa) |
+| Permissões de trabalho | `pt_app_campo`; a OS abre a aprovação (`/t/campo/pt/<número>`) | `visao.pts` (conta nossa) |
 | Ordens de serviço | `fechamentos_app_campo` | regras copiadas do App |
-| Rondas | `rondas_app_campo` + usinas em operação do cadastro | `visao.rondas` (conta nossa) |
+| Rondas | `rondas_app_campo` + usinas mobilizadas do cadastro | `visao.rondas` (conta nossa) |
 | Zeladoria | `zeladoria_app_campo` | `visao.zeladoria` (conta nossa) |
 | Ranking | `fechamentos_app_campo` + cobertura de ronda | `visao.ranking` (conta nossa) |
 | Triagem de qualidade | `fechamentos_app_campo` + rondas | regras copiadas do App |
@@ -41,7 +44,13 @@ decisões, 766 rondas, zeladoria vazia.
   copiadas volta ao livro do coletor.
 - **Usina e equipe ligam ao cadastro pelo `Ligador`** da camada de dados (`nexus/dados/fatos.py`): de-para "Fracttal ·
   Classificação 1" (a parte depois de " · "), de reserva o código da usina dentro do código do ativo (só se for
-  único). A base da cobertura e do ranking são as usinas com status `OPERAÇÃO` e a equipe de cada uma. Região que o App
+  único). A base da cobertura, do ranking e da Central são as **usinas mobilizadas**: status `OPERAÇÃO` E data de
+  mobilização já passada (Levi, 05/10: "tem usina que nem mobilizada está"; medido: das 177 em OPERAÇÃO, 49 sem data
+  de mobilização e nenhuma delas com ronda pelo App; as 107 com ronda têm a data). A PT não passa por esse filtro: PT
+  esperando decisão aparece sempre. Onde a tela mostra a usina, mostra **Estado e Cidade** do cadastro (`uf`,
+  `cidade`), nunca a "Região" que o App escreve (Levi: "uma hora é '-' outra é o nome da UFV, outra é o nome do
+  cluster"). Pessoa aparece pelo **nome resumido** (`visao.nome_curto` = o "Nome padrão" do cadastro: primeiro e último
+  nome). A Aprovação de OS e as Ordens seguem com a região do Fracttal/App, porque a fila não traz a usina. Região que o App
   escreve e o cadastro não tem (medido em 05/10: "MT Sul 02", 15 fechamentos; "Grid Co.", 1) vai para "fora do
   cadastro", não some. Conserto é no cadastro.
 - **O que o livro ainda não traz:** a situação da OS no Fracttal, as durações do Fracttal, a aprovação e a avaliação (o
@@ -53,22 +62,46 @@ decisões, 766 rondas, zeladoria vazia.
 ## As contas nossas (`nexus/campo/visao.py`)
 
 As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
-- **Rondas:** cobertura = dias desde a última ronda de cada usina em operação (nunca = 999, aparece "nunca"), da mais
-  esquecida para a mais recente; janela de 7, 14 ou 30 dias. Conta também ronda sem OS no Fracttal e ronda que não
-  ligou ao cadastro.
-- **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão. Medido em 05/10: 31
-  esperando, 28 há mais de 2 h, mediana de 85 min.
+- **Rondas:** cobertura = dias desde a última ronda de cada usina mobilizada (nunca = 999, aparece "nunca"), da mais
+  esquecida para a mais recente; janela de 7, 14 ou 30 dias. Conta também ronda sem OS no Fracttal.
+- **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão; parada = mais de 2 h.
 - **Ranking por região:** 60% nota média dos fechamentos + 40% cobertura de ronda (usinas da equipe com ronda nos
   últimos 14 dias), a régua do painel do App. **Só pontua quem tem as duas partes:** região sem fechamento no período
   ganhava 100 só pela cobertura (erro meu, corrigido em 05/10). Colaboradores: nota, fechamentos, pontualidade e
   devolvidas.
-- **Central de atenção:** usina em operação sem ronda há 7 dias ou mais (crítico); PT esperando há mais de 2 h; ronda
-  cuja OS o Fracttal não criou; ronda longa pendente, **uma vez por usina** (o App repete o aviso em toda ronda curta:
-  sem isso a lista enchia de repetidos); ronda com evidência incompleta. **Nota baixa de fechamento não entra:** é a
-  fila da Aprovação, e o fechamento aprovado direto no Fracttal nunca tem decisão no painel, o que dava ponto falso.
-  Os tratamentos da Central do App (`decisoes_app_campo`, origem "Central de atenção") aparecem ao lado.
+- **Central de atenção, em três visões** (Levi, 05/10: "separar Rondas feitas (histórico de rondas) e rondas
+  pendentes, dando bastante atenção nas pendentes"; "separe o que é ronda e o que é Permissão de Trabalho"):
+  - **Rondas pendentes** (abre nela, com números grandes que filtram): uma linha por usina mobilizada que pede ronda:
+    nunca teve, sem ronda há 7 dias ou mais, ou ronda longa pendente pela última ronda (o App repete o aviso em toda
+    ronda curta). Colunas: Há, Status, Usina, Estado, Cidade, Observação. Medido em 05/10: 86 (21 nunca, 45 há 7 d ou
+    mais, 20 longa pendente).
+  - **Rondas feitas:** o histórico do período, com "Feito por" (só aqui aparece quem fez), Status (Sem OS no
+    Fracttal, Evidência incompleta, Sem pendência), Observação, OS e nota. Medido: 232 em 14 dias (178, 39 e 15).
+  - **Permissões de trabalho:** as PT esperando, Técnico e a OS em verde, que abre a aprovação. Medido: 22 (21 paradas).
+  - Os filtros (status) são só a palavra colorida, sem fundo (`.cn-st`). "Detalhe" virou "Observação"; "O quê" virou
+    "Status"; a coluna "Quem" saiu. **Nota baixa de fechamento não entra:** é a fila da Aprovação, e o fechamento
+    aprovado direto no Fracttal nunca tem decisão no painel, o que dava ponto falso.
 - Cópia de 5 min por tela; banco fora do ar = a tela avisa "Não consegui ler o banco do Nexus" e não some. Nos testes,
   sem `app.extensions["nexus_dados_sessao"]`, nunca vai à rede.
+
+## Aprovação de PT no Nexus (05/10/2026)
+
+A OS da PT (verde) abre `/t/campo/pt/<número>`: a PT inteira (tarefa, ativo, técnico, atividades da APR com sim/não/NA,
+respostas NÃO, falta, forçada) e a decisão.
+- **Quem assina: o login do Fracttal do OS Creator** (Levi: "utilize o login do fractal do OS Creator Web que já dá
+  certo!"). O OS Creator roda dentro do Nexus com sessão própria (cookie `os_sessao`, só em /os); por isso as rotas de
+  assinatura moram em `/os/_nexus/...` (`assinatura.py`): `quem` (o e-mail de quem entrou), `pt/<n>/decidir` (POST) e
+  `pt/<n>/voltar` (o OS Creator só devolve para /os depois do login). Token do Fracttal vencido (`exp`) não assina;
+  pedido de outra origem leva 403.
+- **Fica salvo:** `nexus_pt_decisoes · decisoes` (`nexus/campo/decisao_pt.py`; registrado no `catalogo.py` como
+  `decisao_pt`). Grão: 1 linha = 1 decisão. Pessoa só como HMAC do e-mail (o mesmo código do App); motivo mascarado. O
+  primeiro que decide vale: PT que já tem decisão do Nexus, ou que o livro do App já mostra decidida, recusa.
+- **Falta o App aplicar** (próxima versão do App, decisão de publicar é do Levi): ler `nexus_pt_decisoes` a cada
+  minuto; para cada decisão nova, conferir pelo HMAC se quem assinou pode assinar aquela PT (`_pt_pode_assinar`), se a
+  PT ainda está aguardando e se a decisão é recente (sugestão: 30 min; decisão velha não libera ninguém), aplicar como
+  o `gestao/pt/decidir` (pausa no Fracttal, anexo) e devolver o resultado no `pt_app_campo`. E mandar a PT ao banco na
+  hora em que nasce, não só no timer de hora em hora (hoje a PT chega ao Nexus com até 1 h de atraso). Até isso, a
+  tela diz: "O App ainda não lê esta decisão".
 
 ## As contas copiadas do App (`nexus/campo/regras_app.py`)
 
@@ -101,7 +134,7 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
 
 ## Peças em `nexus/campo/`
 
-- `visao.py`: as contas nossas (acima).
+- `visao.py`: as contas nossas (acima). `decisao_pt.py`: a decisão da PT no banco (acima).
 - `livros_app.py`, `fonte_pg.py`, `tabelas.py`: os livros do App no formato que as regras copiadas consultam
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
 - `aprovacao.py`, `ordens.py`, `triagem.py`: as telas pelas regras copiadas. `leitura.py`: cópia de 5 min e
@@ -112,6 +145,6 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_visao.py` (as
-contas nossas com banco falso), `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_ordens.py`,
+contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_ordens.py`,
 `test_campo_telas_pg.py`, `test_campo_livros_app.py`, `test_campo_fonte_pg.py`, `test_campo_nota_fracttal.py`,
 `test_campo_coletor.py` (`tests/pg_falso.py`).

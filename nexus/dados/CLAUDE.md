@@ -16,7 +16,7 @@ inversores. Esta pasta é o lugar onde esses dados viram uma base só, ligada po
 
 | Peça | Onde | O que é |
 |---|---|---|
-| Catálogo (a matriz de barramento) | `catalogo.py` | os 14 fatos e as 7 dimensões, o grão e como cada fato liga a cada dimensão. **Fonte única**: a tela, os testes e esta página leem dele |
+| Catálogo (a matriz de barramento) | `catalogo.py` | os 15 fatos e as 7 dimensões, o grão e como cada fato liga a cada dimensão. **Fonte única**: a tela, os testes e esta página leem dele |
 | Calendário | `calendario.py` → `nexus_dimensoes · dim_data` | 1 linha por dia, 2025 a 2027: `data_id` (AAAAMMDD), semana ISO, mês, trimestre, fim de semana, feriado nacional, dia útil |
 | Feriados locais | → `nexus_dimensoes · feriados_locais` | estaduais e municipais (UF, município), cruzam com a usina pela cidade |
 | Histórico (SCD tipo 2) | `historico.py` → `pessoas_historico`, `usinas_historico` | válido de / até de equipe, supervisor, cargo e status da pessoa; de cliente, equipe, responsáveis e região da usina |
@@ -29,6 +29,10 @@ inversores. Esta pasta é o lugar onde esses dados viram uma base só, ligada po
 código do ativo), equipe 98%, pessoa 95%. O que não ligou: "Nobreak 1", "SPDA", "Inversor 1.1 Huawei" (o App gravou o
 equipamento no lugar da usina), "Grid Co." e Solier Cascavel (sem de-para); equipe "MT Sul 02" (não está no cadastro) e
 19 sem região. Feriados: os 12 nacionais de 2026 do PCM batem dia a dia com a lista calculada pela Páscoa.
+
+**O Nexus como fonte (05/10/2026):** a decisão da PT assinada no Nexus (`nexus/campo/decisao_pt.py`) grava
+`nexus_pt_decisoes · decisoes` (grão: 1 linha = 1 decisão). Já nasce com `data_id`, `usina_id` e a pessoa como HMAC;
+o motivo vai mascarado (e-mail e número viram marcador), porque o técnico lê e a API é de leitura aberta.
 
 ## As regras (valem para todo dado novo)
 

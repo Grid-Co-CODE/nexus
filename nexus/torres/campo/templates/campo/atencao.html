@@ -2,49 +2,90 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Central de atenção, visão do Nexus (05/10/2026): o que pede ação, juntando rondas, PT e cadastro (nexus/campo/visao.py,
-   atencao). Os tratamentos da Central do App aparecem ao lado. #}
+{# Central de atenção, visão do Nexus (05/10/2026): três visões, ronda separada de PT e as rondas pendentes primeiro
+   (nexus/campo/visao.py, atencao). Só usina mobilizada; a PT esperando decisão aparece sempre. #}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">rondas, PT e decisões do App + cadastro do Nexus<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
+    <div class="cn-frescor">rondas e PT do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if vista == 'feitas' %} · últimos {{ dias }} dias{% endif %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
-  <form class="cn-filtros" method="get">
-    <span class="gc-rotulo">Período</span>
-    <div class="cn-seg">{% for p in (7, 14, 30) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
-    <label class="gc-rotulo" for="cn-regiao">Região</label>
-    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
-      <option value="">Todas</option>{% for g in regioes %}<option value="{{ g }}"{% if g == regiao %} selected{% endif %}>{{ g }}</option>{% endfor %}
-    </select>
-    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, OS ou pessoa" aria-label="Buscar">
-    {% for k in ('dias', 'tipo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-  </form>
-  <div class="cn-chips">
-    <a href="{{ url(tipo=None) }}"{% if not tipo %} aria-current="page"{% endif %}>Todos <b>{{ total }}</b></a>
-    {% for t, (rot, cor) in tipos.items() %}<a href="{{ url(tipo=t) }}"{% if t == tipo %} aria-current="page"{% endif %}><span class="cn-pill cn-{{ cor }}">{{ rot }}</span> <b>{{ por_tipo.get(t, 0) }}</b></a>{% endfor %}
-  </div>
-  <div class="cn-tab"><table>
-    <thead><tr><th>Há</th><th>O quê</th><th>Usina</th><th>Região</th><th>Detalhe</th><th>Quem</th><th>OS</th></tr></thead>
-    <tbody>
-    {% for p in lista[:200] %}{% set t = tipos.get(p.tipo, (p.tipo, 'neutro')) %}
-      <tr><td><span class="cn-pill cn-{{ 'critico' if (p.dias or 0) >= 14 else ('alerta' if (p.dias or 0) >= 7 else 'neutro') }}">{{ 'nunca' if (p.dias or 0) >= 999 else ('hoje' if not p.dias else p.dias ~ ' d') }}</span></td>
-        <td><span class="cn-pill cn-{{ t[1] }}">{{ t[0] }}</span></td><td>{{ p.usina }}</td><td>{{ p.regiao or '—' }}</td>
-        <td>{{ p.oque }}</td><td>{{ p.quem or '—' }}</td>
-        <td>{% if p.os %}#{{ p.os }}{% else %}—{% endif %}</td></tr>
-    {% else %}<tr><td colspan="7" class="mudo">Nada pedindo ação com esses filtros.</td></tr>{% endfor %}
-    </tbody></table></div>
-  {% if lista|length > 200 %}<p class="mudo">Mostrando 200 de {{ lista|length }}: use a região ou o tipo para afunilar.</p>{% endif %}
 
-  {% if d.get('tratados') %}
-  <div class="cn-lista-cab"><h2>Tratados na Central do App</h2><span class="mudo">{{ d.tratados|length }}</span></div>
-  <div class="cn-tab"><table>
-    <thead><tr><th>Quando</th><th>Ponto</th><th>Usina</th><th>Situação</th><th>Texto</th><th>Prazo</th><th>Por</th></tr></thead>
-    <tbody>{% for t in d.tratados %}<tr><td class="m">{{ dia_curto(t.quando) }}</td><td>{{ t.tipo or '—' }}</td><td>{{ t.usina or '—' }}</td>
-      <td>{{ t.acao }}</td><td>{{ t.texto }}</td><td>{{ t.prazo or '—' }}</td><td>{{ t.por or '—' }}</td></tr>{% endfor %}</tbody></table></div>
+  <nav class="cn-abas" aria-label="Visões">
+    {% for v, nome, n in vistas %}<a href="{{ url(vista=v, f=None) }}"{% if v == vista %} aria-current="page"{% endif %}>{{ nome }}<i>{{ n }}</i></a>{% endfor %}
+  </nav>
+
+  <form class="cn-filtros" method="get">
+    <input type="hidden" name="vista" value="{{ vista }}">
+    {% if vista == 'feitas' %}<span class="gc-rotulo">Período</span>
+    <div class="cn-seg">{% for p in (7, 14, 30) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
+    <input type="hidden" name="dias" value="{{ dias }}">{% endif %}
+    <label class="gc-rotulo" for="cn-uf">Estado</label>
+    <select class="gc-campo" id="cn-uf" name="uf" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for e in estados %}<option value="{{ e }}"{% if e == uf %} selected{% endif %}>{{ e }}</option>{% endfor %}
+    </select>
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="{{ 'usina, cidade, OS ou técnico' if vista != 'pendentes' else 'usina ou cidade' }}" aria-label="Buscar">
+    {% if f %}<input type="hidden" name="f" value="{{ f }}">{% endif %}
+  </form>
+
+  {% if vista == 'pendentes' %}
+  {# as pendentes pedem atenção: cada número é um filtro #}
+  <div class="cn-numeros cn-numeros--filtro">
+    <a href="{{ url(f=None) }}"{% if not f %} aria-current="page"{% endif %}><span class="gc-rotulo">Rondas pendentes</span><span class="v{% if total %} ruim{% endif %}">{{ total }}</span><span class="d">usinas mobilizadas pedindo ronda</span></a>
+    {% for s, (rot, cor) in status.items() %}<a href="{{ url(f=s) }}"{% if s == f %} aria-current="page"{% endif %}><span class="gc-rotulo">{{ rot }}</span><span class="v cn-t-{{ cor }}">{{ contagem.get(s, 0) }}</span><span class="d">{{ {'nunca': 'desde a mobilização', 'sem_ronda': 'há 7 dias ou mais', 'longa_pendente': 'o App pede a longa'}[s] }}</span></a>{% endfor %}
+  </div>
+  {% else %}
+  <div class="cn-chips">
+    <a href="{{ url(f=None) }}"{% if not f %} aria-current="page"{% endif %}>Todas <b>{{ total }}</b></a>
+    {% for s, (rot, cor) in status.items() %}<a href="{{ url(f=s) }}"{% if s == f %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
+  </div>
   {% endif %}
-  <div class="cn-nota"><b>O que entra.</b> Usina em operação sem ronda há 7 dias ou mais; PT esperando o De acordo há mais
-    de 2 h; ronda cuja OS o Fracttal não criou; ronda longa pendente (uma vez por usina); ronda com evidência incompleta.
-    Fechamento com nota baixa fica na Aprovação de OS. As contas estão em <code>nexus/campo/visao.py</code>.</div>
+
+  <div class="cn-tab"><table>
+  {% if vista == 'pendentes' %}
+    <thead><tr><th>Há</th><th>Status</th><th>Usina</th><th>Estado</th><th>Cidade</th><th>Observação</th></tr></thead>
+    <tbody>
+    {% for x in lista[:300] %}{% set s = status.get(x.tipo, (x.tipo, 'neutro')) %}
+      <tr><td class="m"><span class="cn-t-{{ 'critico' if x.dias >= 14 else 'alerta' }}">{{ 'nunca' if x.dias >= 999 else x.dias ~ ' d' }}</span></td>
+        <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ x.usina }}</td><td>{{ x.uf or '—' }}</td><td>{{ x.cidade or '—' }}</td>
+        <td>{{ x.obs }}</td></tr>
+    {% else %}<tr><td colspan="6" class="mudo">Nenhuma ronda pendente com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  {% elif vista == 'feitas' %}
+    <thead><tr><th>Data</th><th>Status</th><th>Usina</th><th>Estado</th><th>Cidade</th><th>Observação</th><th>Feito por</th><th>OS</th><th>Nota</th></tr></thead>
+    <tbody>
+    {% for x in lista[:300] %}{% set s = status.get(x.status, (x.status, 'neutro')) %}
+      <tr><td class="m">{{ dia_curto(x.data) }}</td><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+        <td>{{ x.usina }}</td><td>{{ x.uf or '—' }}</td><td>{{ x.cidade or '—' }}</td><td>{{ x.obs or '—' }}</td>
+        <td>{{ x.feito_por or '—' }}</td><td class="m">{{ x.os or '—' }}</td>
+        <td class="m">{{ '—' if x.nota is none else x.nota ~ '%' }}</td></tr>
+    {% else %}<tr><td colspan="9" class="mudo">Nenhuma ronda com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  {% else %}
+    <thead><tr><th>Há</th><th>Status</th><th>Usina</th><th>Estado</th><th>Cidade</th><th>Observação</th><th>Técnico</th><th>OS</th></tr></thead>
+    <tbody>
+    {% for x in lista %}{% set s = status.get(status_de(x), ('', 'neutro')) %}
+      <tr><td class="m"><span class="cn-t-{{ s[1] }}">{{ idade_min(x.idade_min) }}</span></td><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+        <td>{{ x.usina }}</td><td>{{ x.uf or '—' }}</td><td>{{ x.cidade or '—' }}</td>
+        <td>{{ x.tarefa[:70] }}{% if x.respostas_nao %}<span class="det">{{ x.respostas_nao }} resposta{{ 's' if x.respostas_nao > 1 }} NÃO na APR</span>{% endif %}</td>
+        <td>{{ x.solicitante or '—' }}</td>
+        <td class="m"><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=x.numero) }}" title="Abrir a PT {{ x.numero }} para aprovar">{{ x.os or x.numero }}</a></td></tr>
+    {% else %}<tr><td colspan="8" class="mudo">Nenhuma PT esperando o De acordo com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  {% endif %}
+  </table></div>
+  {% if lista|length > 300 %}<p class="mudo">Mostrando 300 de {{ lista|length }}: use o estado ou a busca para afunilar.</p>{% endif %}
+
+  <div class="cn-nota">
+  {% if vista == 'pendentes' %}<b>O que entra.</b> Usina mobilizada (OPERAÇÃO no cadastro, com a data de mobilização já
+    passada) sem ronda há 7 dias ou mais, ou cuja última ronda deixou a ronda longa pendente. Uma linha por usina.
+    {% if d.get('sem_mobilizacao') %}<br>{{ d.sem_mobilizacao|length }} usinas estão em OPERAÇÃO no cadastro sem data de
+    mobilização e ficam de fora até a data entrar no cadastro.{% endif %}
+  {% elif vista == 'feitas' %}<b>O que entra.</b> Toda ronda do período em usina mobilizada. "Sem OS no Fracttal": a ronda
+    foi feita e o Fracttal não criou a OS. "Evidência incompleta": o que o App anotou como faltando (foto, registro de
+    ação, checklist).
+  {% else %}<b>O que entra.</b> As PT esperando o De acordo, da mais antiga para a mais nova; parada = mais de 2 h. Clique
+    na OS para abrir a PT e decidir. O livro de PT do App chega de hora em hora.{% endif %}
+  </div>
 </div>
 {% endblock %}

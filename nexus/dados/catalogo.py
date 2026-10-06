@@ -66,6 +66,13 @@ FATOS = (
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", "1 linha = 1 PT",
          _d(data=("cod", "Criada em"), usina=("nome", "Usina"), equipe=("nome", "Região"),
             pessoa=("hmac", "Solicitante, quem decidiu"), equipamento=("cod", "Código do ativo"), os=("cod", "OS"))),
+    # o Nexus é a FONTE deste: a decisão da PT assinada no Nexus com o login do Fracttal do OS Creator (05/10/2026);
+    # quem aplica no campo é o App (nexus/campo/decisao_pt.py)
+    Fato("decisao_pt", "Decisão de PT no Nexus", "hseq", "nexus_pt_decisoes · decisoes",
+         "1 linha = 1 decisão (De acordo ou Não autorizo) de uma PT, tomada no Nexus",
+         _d(data=("id", "data_id"), usina=("id", "usina_id"), pessoa=("hmac", "decidida_por_hmac"),
+            os=("cod", "os")),
+         observacao="PT pelo número (a chave do pt_app_campo); o motivo vai mascarado, porque o técnico lê"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
