@@ -2,7 +2,37 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Permissões de trabalho, visão do Nexus (05/10/2026): o livro de PT que o App grava no banco (nexus/campo/visao.py, pts). #}
+{# Permissões de trabalho, visão do Nexus (05/10/2026): o livro de PT que o App grava no banco (nexus/campo/visao.py,
+   pts e pts_por_equipe). Duas abas: esperando o De acordo (por equipe ou tabela) e o histórico das decididas. A OS em
+   verde abre a aprovação; clicar na linha abre o detalhe. #}
+{% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
+{% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
+{% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
+{% macro detalhe(p, colunas) %}
+  <tr class="cn-detalhe" hidden><td colspan="{{ colunas }}">
+    <div class="cn-detalhe-grade">
+      <dl class="cn-dados">
+        <dt>PT</dt><dd class="m">{{ p.numero }}</dd>
+        <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
+        <dt>Equipamento</dt><dd>{{ equipamento(p) }}</dd>
+        <dt>Usina</dt><dd>{{ p.usina }}{% if p.cidade %} · {{ p.cidade }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}</dd>
+        <dt>Equipe</dt><dd>{{ p.equipe or '—' }} · supervisor {{ p.supervisor or '—' }}</dd>
+        <dt>Técnico</dt><dd>{{ p.solicitante or '—' }}</dd>
+        <dt>Criada</dt><dd>{{ p.criada.strftime('%d/%m às %H:%M') if p.criada else '—' }}</dd>
+        {% if p.situacao != 'aguardando' %}<dt>Decisão</dt><dd>{{ situacoes.get(p.situacao, (p.situacao,))[0] }}{% if p.decidida %} em {{ p.decidida.strftime('%d/%m às %H:%M') }}{% endif %}{% if p.decidida_por %} por {{ p.decidida_por }}{% endif %}{% if p.papel %} ({{ p.papel }}){% endif %}</dd>{% endif %}
+        {% if p.motivo %}<dt>Motivo</dt><dd>{{ p.motivo }}</dd>{% endif %}
+        {% if p.aviso_em %}<dt>1º aviso</dt><dd>{{ p.aviso_em.strftime('%d/%m às %H:%M') }}{% if p.aviso_motivo %} · {{ p.aviso_motivo }}{% endif %}</dd>{% endif %}
+        {% if p.forcada %}<dt>Forçada</dt><dd class="cn-t-alerta">sim (aberta pelo Forçar encontro)</dd>{% endif %}
+      </dl>
+      <div>
+        <h3>Atividades críticas da APR</h3>
+        <ul class="cn-ativ">{% for a in p.atividades %}<li>{{ a }}</li>{% else %}<li class="mudo">Sem atividade crítica marcada.</li>{% endfor %}</ul>
+        <p class="cn-detalhe-nao">{% if p.respostas_nao %}<span class="cn-t-alerta">{{ p.respostas_nao }} resposta{{ 's' if p.respostas_nao > 1 }} NÃO na APR</span>{% else %}Nenhuma resposta NÃO na APR{% endif %}{% if p.faltam %} · falta: {{ p.faltam }}{% endif %}</p>
+        <p><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">{{ 'Abrir para aprovar' if p.situacao == 'aguardando' else 'Abrir a PT' }}</a></p>
+      </div>
+    </div>
+  </td></tr>
+{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
@@ -18,33 +48,102 @@
     <span><span class="gc-rotulo">Com resposta NÃO</span><span class="v">{{ r.get('com_nao', 0) }}</span><span class="d">na APR</span></span>
   </div>
 
-  <div class="cn-lista-cab"><h2>Esperando o De acordo</h2><span class="mudo">da mais antiga para a mais nova</span></div>
-  <div class="cn-tab"><table>
-    <thead><tr><th>Espera</th><th>PT</th><th>OS e tarefa</th><th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th></tr></thead>
-    <tbody>
-    {% for p in d.get('aguardando') or [] %}
-      <tr><td><span class="cn-pill cn-{{ 'critico' if (p.idade_min or 0) > 1440 else ('alerta' if (p.idade_min or 0) > 120 else 'ok') }}">{{ idade_min(p.idade_min) }}</span></td>
-        <td class="m">{{ p.numero }}</td><td><a class="cn-link m" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT para aprovar">{{ p.os or p.numero }}</a><span class="det">{{ p.tarefa[:70] }}</span></td>
-        <td>{{ p.usina }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.uf or '—' }}</td><td>{{ p.regiao_br or '—' }}</td>
-        <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td></tr>
-    {% else %}<tr><td colspan="9" class="mudo">Nenhuma PT esperando.</td></tr>{% endfor %}
-    </tbody></table></div>
+  <nav class="cn-abas" aria-label="Abas">
+    <a href="{{ url(aba=None, sit=None, dias=None) }}"{% if aba == 'esperando' %} aria-current="page"{% endif %}>Esperando o De acordo<i>{{ (d.get('aguardando') or [])|length }}</i></a>
+    <a href="{{ url(aba='historico', modo=None, equipe=None) }}"{% if aba == 'historico' %} aria-current="page"{% endif %}>Histórico<i>{{ (d.get('historico') or [])|length }}</i></a>
+  </nav>
 
-  <div class="cn-lista-cab"><h2>Decididas</h2>
-    <div class="cn-seg cn-vista"><a href="{{ url(sit=None) }}"{% if not sit %} aria-current="page"{% endif %}>Todas</a>
-      {% for s, n in (d.get('situacoes') or {}).items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}>{{ situacoes.get(s, (s,))[0] }} ({{ n }})</a>{% endfor %}</div></div>
-  <div class="cn-tab"><table>
-    <thead><tr><th>Criada</th><th>PT</th><th>OS e tarefa</th><th>Usina</th><th>Situação</th><th>Esperou</th><th>Decidida por</th><th>Atividades</th></tr></thead>
+  <form class="cn-filtros" method="get">
+    {% if aba == 'esperando' %}
+    <div class="cn-seg" aria-label="Visão">
+      <a href="{{ url(modo=None, equipe=None) }}"{% if modo == 'equipes' %} aria-current="page"{% endif %}>Por equipe</a>
+      <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
+    </div>
+    {% else %}
+    <input type="hidden" name="aba" value="historico">
+    <span class="gc-rotulo">Período</span>
+    <div class="cn-seg">{% for p in (7, 30, 90) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
+    <input type="hidden" name="dias" value="{{ dias }}">
+    {% endif %}
+    <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
+    <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, usina, equipamento ou técnico" aria-label="Buscar">
+    {% for k in ('modo', 'equipe', 'sit') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+    {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
+  </form>
+
+  {% if aba == 'esperando' and modo == 'equipes' %}
+  {# um cartão por equipe com as PT que ela tem esperando (Levi, 05/10: "a divisão por equipe mostrando o que está pendente") #}
+  <div class="cn-equipes">
+    {% for c in cartoes %}
+      <div class="cn-equipe cn-equipe--{{ 'critico' if c.parada else 'alerta' }}">
+        <div class="cn-eq-cab">
+          <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>
+            <span class="cn-eq-tec" title="{{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }} na equipe (cadastro){% for k, n in c.cargos.items() %}{{ ':' if loop.first else ',' }} {{ n }} {{ k }}{% endfor %}">{{ capacete() }}<b>{{ c.tecnicos }}</b></span></div>
+          <span>{{ c.regioes|join(', ') or '—' }}</span>
+          <span>Supervisor: <b class="cn-eq-sup">{{ c.supervisor }}</b></span>
+        </div>
+        <div class="cn-eq-num"><span><span class="v cn-t-{{ 'critico' if c.parada else 'alerta' }}">{{ c.pts|length }}</span><span class="d">PT esperando o De acordo</span></span>
+          <span class="dir"><span class="v cn-t-critico">{{ c.parada }}</span><span class="d">parada{{ 's' if c.parada != 1 }} há mais de 2 h</span></span></div>
+        <ul class="cn-eq-pts">
+          {% for p in c.pts %}<li>{{ os_link(p) }}<span class="t">{{ p.tarefa[:48] }}<span class="det">{{ p.usina }} · {{ p.solicitante or '—' }}</span></span><span class="m cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></li>{% endfor %}
+        </ul>
+        <a class="cn-link cn-eq-mais" href="{{ url(modo='tabela', equipe=c.equipe) }}">Ver na tabela</a>
+      </div>
+    {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
+  </div>
+  {% elif aba == 'esperando' %}
+  <div class="cn-tab"><table class="cn-expande">
+    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th></tr></thead>
     <tbody>
-    {% for p in historico[:120] %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
-      <tr><td class="m">{{ p.criada.strftime('%d/%m %H:%M') if p.criada else '—' }}</td><td class="m">{{ p.numero }}</td>
-        <td><a class="cn-link m" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">{{ p.os or p.numero }}</a><span class="det">{{ p.tarefa[:70] }}</span></td><td>{{ p.usina }}</td>
-        <td><span class="cn-pill cn-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ '—' if p.espera_min is none else idade_min(p.espera_min) }}</td>
-        <td>{{ p.decidida_por or p.papel or '—' }}</td><td class="det">{{ p.atividades|join('; ')|truncate(90) }}</td></tr>
-    {% else %}<tr><td colspan="8" class="mudo">Nada com esse filtro.</td></tr>{% endfor %}
+    {% for p in aguardando %}
+      <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
+        <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.regiao_br or '—' }}</td>
+        <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td>
+        <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td></tr>
+      {{ detalhe(p, 9) }}
+    {% else %}<tr><td colspan="9" class="mudo">Nenhuma PT esperando com esses filtros.</td></tr>{% endfor %}
     </tbody></table></div>
+  {% else %}
+  <div class="cn-chips">
+    <a href="{{ url(sit=None) }}"{% if not sit %} aria-current="page"{% endif %}>Todas <b>{{ contagem.values()|sum }}</b></a>
+    {% for s, (rot, cor) in situacoes.items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
+  </div>
+  <div class="cn-tab"><table class="cn-expande">
+    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th></tr></thead>
+    <tbody>
+    {% for p in historico[:300] %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
+      <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
+        <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.solicitante or '—' }}</td>
+        <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ p.decidida_por or p.papel or '—' }}</td>
+        <td class="m">{{ p.criada.strftime('%d/%m %H:%M') if p.criada else '—' }}</td>
+        <td class="m">{{ '—' if p.espera_min is none else idade_min(p.espera_min) }}</td></tr>
+      {{ detalhe(p, 10) }}
+    {% else %}<tr><td colspan="10" class="mudo">Nenhuma PT decidida com esses filtros.</td></tr>{% endfor %}
+    </tbody></table></div>
+  {% if historico|length > 300 %}<p class="mudo">Mostrando 300 de {{ historico|length }}: use o período, o supervisor ou a busca.</p>{% endif %}
+  {% endif %}
+
   <div class="cn-nota"><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
-    App como código do e-mail; o nome (resumido, como o "Nome padrão" do cadastro) sai do cadastro do App, na hora.
-    "Esperou" é da criação da PT até a decisão. Clique na OS para abrir a PT e decidir.</div>
+    App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, supervisor e técnicos vêm do
+    cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
+    {% if aba == 'historico' %}<br><b>PDF com as assinaturas:</b> as assinaturas (do técnico e de quem aceitou) ainda só
+    existem no App; o PDF entra aqui quando o App passar a mandá-las ao banco, cifradas.{% endif %}</div>
 </div>
+<script>
+  // clicar na linha abre o detalhe da PT logo abaixo (Levi, 05/10); o link da OS continua indo para a aprovação
+  document.querySelectorAll('table.cn-expande tr.cn-linha').forEach(function (tr) {
+    function alterna(ev) {
+      if (ev.target.closest('a')) return;
+      var det = tr.nextElementSibling;
+      if (!det || !det.classList.contains('cn-detalhe')) return;
+      det.hidden = !det.hidden;
+      tr.setAttribute('aria-expanded', String(!det.hidden));
+    }
+    tr.addEventListener('click', alterna);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
+  });
+</script>
 {% endblock %}

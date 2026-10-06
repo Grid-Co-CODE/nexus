@@ -223,3 +223,19 @@
 
 /* aviso que não é erro (a fila sendo lida, a última fila boa em uso): âmbar, não vermelho */
 .cn-aviso{border-color:var(--alerta);background:var(--alerta-suave)}
+
+/* Permissões de trabalho (05/10/2026): a OS em verde Grid abre a PT; a linha abre o detalhe logo abaixo */
+.cn-os{font-size:13.5px}
+table.cn-expande tr.cn-linha{cursor:pointer}
+table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superficie-2)}
+.cn-tab tr.cn-detalhe td{text-align:left;background:var(--superficie-2);padding:16px 20px}
+.cn-detalhe-grade{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px 32px}
+@media (max-width:900px){.cn-detalhe-grade{grid-template-columns:minmax(0,1fr)}}
+.cn-detalhe-grade h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:0 0 8px}
+.cn-detalhe-nao{margin:10px 0 0;font-size:13px}
+/* cartão da equipe com as PT dela */
+.cn-eq-pts{list-style:none;margin:0;padding:0;display:grid;gap:8px;border-top:1px solid var(--linha);padding-top:10px}
+.cn-eq-pts li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;font-size:13px}
+.cn-eq-pts .t{min-width:0}
+.cn-eq-pts .det{display:block;color:var(--mudo);font-size:11.5px}
+.cn-eq-mais{font-size:12.5px;justify-self:start}

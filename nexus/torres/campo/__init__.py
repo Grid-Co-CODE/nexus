@@ -6,7 +6,7 @@ grava de hora em hora e o cadastro do Nexus. Aprovação, Ordens e Triagem usam 
 (`nexus/campo/regras_app.py`); Central de atenção, PT, Rondas, Zeladoria e Ranking são contas NOSSAS
 (`nexus/campo/visao.py`). Imagens da ronda e Rotas do dia ficam no placeholder: o dado delas ainda não chega ao banco.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 from flask import render_template, request, session
@@ -165,11 +165,34 @@ SITUACAO_PT = {"aguardando": ("Aguardando", "alerta"), "de_acordo": ("De acordo"
 
 @bp.route("/pt")
 def pt():
+    """Duas abas (Levi, 05/10): as PT esperando o De acordo (por equipe ou em tabela, a linha abre o detalhe) e o
+    histórico das decididas. Filtro de supervisor; a equipe vem do cartão."""
     leitura = visao.pts()
-    sit = request.args.get("sit", "")
-    historico = [p for p in leitura.dados.get("historico") or [] if not sit or p.get("situacao") == sit]
-    return render_template("campo/pt.html", **_comum("pt", leitura, historico=historico, sit=sit,
-                                                     situacoes=SITUACAO_PT, idade_min=_idade_min))
+    d = leitura.dados
+    aba = "historico" if request.args.get("aba") == "historico" else "esperando"
+    supervisor, equipe = request.args.get("supervisor", ""), request.args.get("equipe", "")
+    sit, q = request.args.get("sit", ""), request.args.get("q", "").strip().lower()
+    modo = "tabela" if request.args.get("modo") == "tabela" or equipe or aba == "historico" else "equipes"
+    dias = _dias((7, 30, 90), 30)
+    piso = visao._agora() - timedelta(days=dias)
+    campos = ("os", "numero", "tarefa", "usina", "ativo", "codigo", "equipe", "solicitante", "decidida_por")
+
+    def filtra(lista):
+        return [p for p in lista if (not supervisor or p.get("supervisor") == supervisor)
+                and (not equipe or p.get("equipe") == equipe)
+                and (not q or q in " ".join(str(p.get(c) or "") for c in campos).lower())]
+    aguardando = filtra(d.get("aguardando") or [])
+    historico = [p for p in filtra(d.get("historico") or []) if (p.get("criada") or piso) >= piso]
+    contagem = {}
+    for p in historico:
+        contagem[p["situacao"]] = contagem.get(p["situacao"], 0) + 1
+    historico = [p for p in historico if not sit or p.get("situacao") == sit]
+    todas = (d.get("aguardando") or []) + (d.get("historico") or [])
+    return render_template("campo/pt.html", **_comum(
+        "pt", leitura, aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem=contagem, sit=sit,
+        dias=dias, supervisor=supervisor, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
+        idade_min=_idade_min, cartoes=visao.pts_por_equipe(aguardando, d.get("times") or {}),
+        supervisores=sorted({p.get("supervisor") for p in todas if p.get("supervisor")})))
 
 
 @bp.route("/pt/<numero>")

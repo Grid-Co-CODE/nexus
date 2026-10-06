@@ -247,6 +247,25 @@ def test_cartao_tem_tecnicos_supervisor_e_total_e_filtro_de_supervisor(banco, lo
     assert "Coração 1" in html and "Altair" not in html
 
 
+def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
+    """Levi, 05/10: divisão por equipe com o que está pendente, filtro de supervisor, linha que abre o detalhe,
+    equipamento no lugar do estado, espera no fim e só o número da OS, em verde, no lugar do número da PT."""
+    html = logado.get("/t/campo/pt").get_data(as_text=True)
+    assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "Beltrano Supervisor" in html
+    assert html.count('class="cn-link cn-os"') == 2 and ">700<" in html                    # PT-1 e PT-2, pela OS
+    html = logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
+    cab = ("<th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th>"
+           "<th>Técnico</th><th>Respostas NÃO</th><th>Espera</th>")
+    assert cab in html and "<th>Estado</th>" not in html and "<th>PT</th>" not in html
+    assert 'class="cn-detalhe" hidden' in html and "Atividades críticas da APR" in html and "Eletricidade" in html
+    assert "Inversor 1" in html and "THPN-ALT100-INVR1" in html
+    html = logado.get("/t/campo/pt?supervisor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
+    assert "Nenhuma PT esperando com esses filtros" in html
+    html = logado.get("/t/campo/pt?aba=historico").get_data(as_text=True)
+    assert "<th>Situação</th>" in html and "De acordo" in html and "/t/campo/pt/PT-3" in html
+    assert "PDF com as assinaturas" in html
+
+
 # ── aprovação da PT no Nexus ─────────────────────────────────────────────────────────────────────────────────────
 def _jwt(exp_s=3600):
     corpo = base64.urlsafe_b64encode(json.dumps({"email": "sup@exemplo.test", "exp": time.time() + exp_s}).encode())

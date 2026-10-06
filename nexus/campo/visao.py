@@ -311,7 +311,8 @@ def pts() -> leitura.Leitura:
                         "efeito": r.get("Efeito") or "",
                         "respostas_nao": _int(r.get("Respostas NÃO")) or 0, "faltam": r.get("Faltam") or "",
                         "atividades": [a.strip() for a in str(r.get("Atividades") or "").split(";") if a.strip()],
-                        "forcada": _sim(r.get("Forçada")),
+                        "forcada": _sim(r.get("Forçada")), "aviso_em": _dt(r.get("1º aviso em")),
+                        "aviso_motivo": r.get("1º aviso: motivo") or "",
                         "espera_min": int((decidida - criada).total_seconds() // 60) if criada and decidida else None,
                         "idade_min": int((agora - criada).total_seconds() // 60) if criada and sit == "aguardando" else None})
         for p in out:
@@ -323,13 +324,32 @@ def pts() -> leitura.Leitura:
         situacoes = {}
         for p in out:
             situacoes[p["situacao"]] = situacoes.get(p["situacao"], 0) + 1
-        return {"aguardando": aguardando, "historico": historico, "situacoes": situacoes,
+        return {"aguardando": aguardando, "historico": historico, "situacoes": situacoes, "times": b.times(),
                 "resumo": {"aguardando": len(aguardando),
                            "mais_antiga_min": aguardando[0]["idade_min"] if aguardando else None,
                            "paradas": sum(1 for p in aguardando if p["parada"]),
                            "espera_mediana_min": round(statistics.median(esperas)) if esperas else None,
                            "com_nao": sum(1 for p in out if p["respostas_nao"])}}
     return _ler(("visao_pt",), calcular)
+
+
+def pts_por_equipe(pts, times=None) -> list[dict]:
+    """Um cartão por equipe com as PT dela (Levi, 05/10: "a divisão por equipe mostrando o que está pendente"): quem é
+    o supervisor, quantos técnicos, quantas esperam, quantas paradas e a lista, da mais antiga para a mais nova. A
+    equipe com mais PT parada vem primeiro."""
+    eq = {}
+    for p in pts:
+        nome = p.get("equipe") or SEM_EQUIPE
+        tm = (times or {}).get(nome) or {}
+        c = eq.setdefault(nome, {"equipe": nome, "supervisor": p.get("supervisor") or tm.get("supervisor") or SEM_SUPERVISOR,
+                                 "tecnicos": tm.get("tecnicos", 0), "cargos": tm.get("cargos", {}), "regioes": set(),
+                                 "pts": [], "parada": 0})
+        c["pts"].append(p)
+        c["parada"] += bool(p.get("parada"))
+        c["regioes"].update([p["regiao_br"]] if p.get("regiao_br") else [])
+    for c in eq.values():
+        c["regioes"] = sorted(c["regioes"])
+    return sorted(eq.values(), key=lambda c: (-c["parada"], -len(c["pts"]), c["equipe"]))
 
 
 def pt(numero) -> dict | None:
