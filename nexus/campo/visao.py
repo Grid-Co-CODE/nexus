@@ -310,6 +310,23 @@ def _veredito(r, lim) -> tuple[str, str]:
     return "ok", "Bom"
 
 
+def motivo_sem_os(situacao) -> str:
+    """O motivo de a OS da ronda não ter nascido, em português de quem lê a tela (Levi, 05/10: "não entendi essa
+    observação, minha conta fracttal já está conectada"). O App cria a OS de ronda com a conta Fracttal do TÉCNICO
+    (`token_fracttal_valido(email do técnico)`); a mensagem crua dele ("Conecte sua conta Fracttal") é para o técnico.
+    Medido em 05/10: 114 de 771 rondas sem OS por isso, e o App desiste depois de 5 tentativas (uma por minuto), então a
+    ronda antiga não ganha OS quando o técnico conecta depois."""
+    s = str(situacao or "")
+    if "Conecte sua conta Fracttal" in s:
+        return "OS não criada: o técnico não tinha conectado a conta Fracttal dele no App"
+    if "Sessão Fracttal expirada" in s:
+        return "OS não criada: a conta Fracttal do técnico tinha desconectado no App (sessão vencida)"
+    if "responsável não resolvido" in s:
+        quem = s.split("para", 1)[-1].strip(" '\"") if "para" in s else ""
+        return "OS não criada: o Fracttal não achou o técnico como responsável" + (f" ({quem})" if quem else "")
+    return s or "OS não criada"
+
+
 def _hm(iso) -> str:
     d = _dt(iso)
     return d.strftime("%H:%M") if d else ""
@@ -330,7 +347,7 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
             # o que ficou faltando na ronda (as "rondas feitas" que saíram da Central de atenção, 05/10)
             faltas = [f.strip() for f in r["falhas"].split(";") if f.strip() and f.strip().lower() != LONGA_PENDENTE]
             r["pendencia"] = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "")
-            r["pend_obs"] = "; ".join(([r["situacao_os"] or "OS não criada"] if r["sem_os"] else []) + faltas)
+            r["pend_obs"] = "; ".join(([motivo_sem_os(r["situacao_os"])] if r["sem_os"] else []) + faltas)
         todas.sort(key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
         return {"todas": todas, "cobertura": _cobertura(b, todas, hoje), "sem_mobilizacao": b.sem_mobilizacao,
                 "hoje": hoje.isoformat()}
@@ -686,7 +703,7 @@ def atencao(dias: int = 14) -> leitura.Leitura:
         for r in sorted((r for r in rond if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
             faltas = [f.strip() for f in r["falhas"].split(";") if f.strip() and f.strip().lower() != LONGA_PENDENTE]
             status = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "ok")
-            obs = "; ".join(([r["situacao_os"] or "OS não criada"] if r["sem_os"] else []) + faltas)
+            obs = "; ".join(([motivo_sem_os(r["situacao_os"])] if r["sem_os"] else []) + faltas)
             feitas.append({"data": r["data"], "status": status, "usina": r["usina"], "uf": r["uf"], "cidade": r["cidade"],
                            "equipe": r["equipe"], "regiao_br": r["regiao_br"], "supervisor": r["supervisor"],
                            "obs": obs, "feito_por": r["tecnico"], "os": None if r["sem_os"] else r["os"],

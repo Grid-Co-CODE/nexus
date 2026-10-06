@@ -454,3 +454,11 @@ def test_indicadores_da_ronda_filtram_a_tabela(banco, logado):
     assert "Coração 1" in html and "<td>Altair</td>" not in html
     html = logado.get("/t/campo/rondas?ind=duracao").get_data(as_text=True)
     assert "Da mais longa para a mais curta" in html
+
+
+def test_motivo_de_ronda_sem_os_fala_do_tecnico():
+    """Levi, 05/10: "não entendi essa observação, minha conta fracttal já está conectada"."""
+    m = visao.motivo_sem_os("Não criada — Fracttal: Conecte sua conta Fracttal (Conectar conta Fracttal)")
+    assert m == "OS não criada: o técnico não tinha conectado a conta Fracttal dele no App"
+    assert "sessão vencida" in visao.motivo_sem_os("Não criada — Fracttal: Sessão Fracttal expirada — reconecte sua conta")
+    assert "(Isake Costa)" in visao.motivo_sem_os("Não criada — responsável não resolvido no Fracttal para 'Isake Costa'")

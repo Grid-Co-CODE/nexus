@@ -79,6 +79,11 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     as usinas sem ronda no período (`aba=cobertura&cob=sem`); Qualidade = abaixo do limite (`ind=qualidade`); Duração =
     da mais longa para a mais curta (`ind=duracao`); Abaixo de 10 min = `dur=curta`; Usina mais atrasada = as há 7 dias
     ou mais (`cob=atrasadas`). O cartão ativo fica marcado; clicar de novo, ou no × do filtro, tira.
+  - **Ronda sem OS, o motivo em português** (`visao.motivo_sem_os`; Levi, 05/10: "não entendi essa observação, minha
+    conta fracttal já está conectada"): o App cria a OS de ronda com a conta Fracttal do TÉCNICO; "Conecte sua conta
+    Fracttal" é a mensagem do App para o técnico. Medido em 05/10: 114 de 771 rondas (90 dias) sem OS por isso (Daniel
+    Paula 22, Manuel Silva 14 + 8, Frank Melo 10, Isake Costa 12, Valmir Junior 8...). O App tenta 5 vezes, uma por
+    minuto, e desiste (`RONDA_OS_FILA_MAX`, `_MAX_H` 24 h): a ronda antiga não ganha OS quando o técnico conecta depois.
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
   - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não
