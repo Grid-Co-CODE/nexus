@@ -138,13 +138,27 @@ plataforma já tem guardado.
 
 ## 8. Atualizar
 
+Um comando, no servidor (desde 06/10/2026):
+
 ```
-cd /opt/nexus && sudo -u nexus git pull && sudo .venv/bin/pip install -r requirements.txt && sudo systemctl restart nexus
+sudo /opt/nexus/deploy/atualizar.sh
 ```
 
-O git não toca nos `.env` nem na `dados/`. O `pip install` só demora quando o `requirements.txt` mudou (em 06/10 entrou o
-`pillow`, que faz as miniaturas das fotos da ronda; sem ele as fotos aparecem do mesmo jeito, só mais pesadas).
-Se a atualização roda sozinha a cada push, ponha o `pip install` nela também.
+Ele puxa do GitHub (`git pull --ff-only`, como o dono do clone), instala as dependências só quando o `requirements.txt`
+mudou, reinicia o serviço e confere no `/saude` que o commit novo está no ar. Sem commit novo, não reinicia; com
+`--forcar`, reinicia assim mesmo. Qualquer erro (por exemplo, arquivo mexido à mão no servidor) para tudo antes do
+restart, e o Nexus segue no ar com o código de antes. **O restart é obrigatório:** o Nexus não relê as telas com o
+processo rodando. Em 06/10, o servidor ficou com a tela antiga do PCM depois de só um `git pull`.
+
+**Na primeira vez** o clone do servidor ainda não tem o script. Puxe uma vez à mão e rode-o:
+
+```
+sudo -u nexus git -C /opt/nexus pull --ff-only && sudo bash /opt/nexus/deploy/atualizar.sh --forcar
+```
+
+O git não toca nos `.env` nem na `dados/`. Em 06/10 entrou o `pillow` no `requirements.txt` (miniaturas das fotos da
+ronda; sem ele as fotos aparecem do mesmo jeito, só mais pesadas): o script instala sozinho. Para atualizar a cada push
+sem ninguém rodar nada, chame o mesmo script num timer do systemd.
 
 **Depois da 1ª subida, a `dados/` do servidor é a original**: o que se edita no Nexus (cadastro, decisões do de-para,
 observações e gerações do PCM) mora lá. Se o Levi mandar um pacote novo, descompacte **só os `.env`**, a menos que ele
