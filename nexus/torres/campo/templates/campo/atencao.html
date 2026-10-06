@@ -34,6 +34,9 @@
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
   </form>
 
+  {% if vista == 'pt' %}
+  {% include 'campo/_pt_esperando.html' %}
+  {% else %}
   {% if vista == 'pendentes' %}
   {# as pendentes pedem atenção: cada número filtra a tabela #}
   <div class="cn-numeros cn-numeros--filtro">
@@ -120,6 +123,7 @@
   {% if lista|length > 300 %}<p class="mudo">Mostrando 300 de {{ lista|length }}: use a região, a equipe ou a busca para afunilar.</p>{% endif %}
   {% endif %}
 
+  {% endif %}
   <div class="cn-nota">
   {% if vista == 'pendentes' %}<b>O que entra.</b> Usina mobilizada (OPERAÇÃO no cadastro, com a data de mobilização já
     passada) sem ronda há 7 dias ou mais, ou cuja última ronda deixou a ronda longa pendente. Uma linha por usina. As

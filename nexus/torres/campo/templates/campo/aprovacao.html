@@ -2,11 +2,11 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Aprovação de OS, para tirar insight (Levi, 05/10/2026). A fila, os grupos e os números são os do App (a fila inteira
+{# Aprovação de OS, para tirar insight (Levi, 05/10/2026), contada por OS: é a OS que se aprova, não a tarefa. A fila, os grupos e os números são os do App (a fila inteira
    pela _fila_supervisao, nexus/campo/aprovacao.py: fila_toda); equipe e supervisor vêm do cadastro do Nexus pela usina
    do Fracttal. Os indicadores e a idade filtram a fila; o cartão do supervisor leva à fila dele. O Nexus só mostra. #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
-{% macro barra_grupos(a) %}<div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ a.completa }} prontas, {{ a.olho }} pedem olho, {{ a.fora_do_app }} fora do App">{% if a.tarefas %}<span class="ok" style="width: {{ (100 * a.completa / a.tarefas)|round(1) }}%"></span><span class="alerta" style="width: {{ (100 * a.olho / a.tarefas)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * a.fora_do_app / a.tarefas)|round(1) }}%"></span>{% endif %}</div>{% endmacro %}
+{% macro barra_grupos(a) %}<div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ a.completa }} prontas, {{ a.olho }} pedem olho, {{ a.fora_do_app }} fora do App">{% if a.ordens %}<span class="ok" style="width: {{ (100 * a.completa / a.ordens)|round(1) }}%"></span><span class="alerta" style="width: {{ (100 * a.olho / a.ordens)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * a.fora_do_app / a.ordens)|round(1) }}%"></span>{% endif %}</div>{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
@@ -51,26 +51,26 @@
   {% set b = k.baldes %}
   <div class="cn-kpis">
     {{ card(vista == 'fila' and not balde and not idade, dict(vista='fila')) }}<span class="gc-rotulo">Esperando aprovação</span>
-      <span class="v">{{ k.ordens }}<small>OS</small></span><span class="d">{{ k.tarefas }} tarefas na fila</span><span class="d cn-kpi-acao">ver a fila</span></a>
+      <span class="v">{{ k.ordens }}<small>OS</small></span><span class="d">com {{ k.tarefas }} tarefas</span><span class="d cn-kpi-acao">ver a fila</span></a>
     {{ card(balde == 'completa', dict(balde='completa')) }}<span class="gc-rotulo">Prontas para aprovar</span>
-      <span class="v cn-t-ok">{{ b.get('completa', 0) }}</span><span class="d">evidência completa: é decisão, não análise</span><span class="d cn-kpi-acao">aprovar em lote no Fracttal</span></a>
+      <span class="v cn-t-ok">{{ b.get('completa', 0) }}<small>OS</small></span><span class="d">todas as tarefas com evidência completa: é decisão, não análise</span></a>
     {{ card(balde == 'olho', dict(balde='olho')) }}<span class="gc-rotulo">Precisam do seu olho</span>
-      <span class="v cn-t-alerta">{{ b.get('olho', 0) }}</span><span class="d">nota abaixo de 80, tempo fora, foto marcada ou já devolvida</span></a>
+      <span class="v cn-t-alerta">{{ b.get('olho', 0) }}<small>OS</small></span><span class="d">alguma tarefa com nota abaixo de 80, tempo fora, foto marcada ou já devolvida</span></a>
     {{ card(idade and idade[0] in ('31-60', '61-'), dict(idade='31-60')) }}<span class="gc-rotulo">Paradas há 30 dias ou mais</span>
-      <span class="v{% if k.aged30 %} cn-t-critico{% endif %}">{{ k.aged30 }}</span><span class="d">tarefas em {{ k.aged30_os }} OS esquecidas na fila</span></a>
+      <span class="v{% if k.aged30 %} cn-t-critico{% endif %}">{{ k.aged30 }}<small>OS</small></span><span class="d">esquecidas na fila</span></a>
     {{ card(idade and idade[0] == '61-', dict(idade='61-')) }}<span class="gc-rotulo">Espera máxima</span>
       <span class="v{% if k.espera_max >= 30 %} cn-t-critico{% endif %}">{{ k.espera_max }}<small>dias</small></span>
-      <span class="d">{% if k.mais_antiga %}OS {{ k.mais_antiga.os }} · {{ k.mais_antiga.tecnico }}{% endif %}</span></a>
+      <span class="d">{% if k.mais_antiga %}OS {{ k.mais_antiga.os }} · {{ k.mais_antiga.tecnicos|join(', ') }}{% endif %}</span></a>
     {{ card(balde == 'fora_do_app', dict(balde='fora_do_app')) }}<span class="gc-rotulo">Uso do App</span>
       <span class="v{% if k.uso_app is not none and k.uso_app < 50 %} cn-t-alerta{% endif %}">{{ '—' if k.uso_app is none else k.uso_app }}<small>%</small></span>
-      <span class="d">{{ b.get('fora_do_app', 0) }} fechadas fora do App, sem evidência para julgar</span></a>
+      <span class="d">das OS com todas as tarefas pelo App · {{ b.get('fora_do_app', 0) }} com tarefa fechada fora do App</span></a>
   </div>
 
   {# há quanto tempo a fila espera: cada faixa filtra #}
   <div class="cn-idades">
     <span class="gc-rotulo">Idade da fila</span>
-    <div class="cn-idades-barra" role="group" aria-label="Tarefas por tempo de espera">
-      {% for i, n in idades if n %}<a class="cn-idade cn-idade--{{ loop.index0 }}{% if idade and idade[0] == i[0] %} ativa{% endif %}" style="flex: {{ n }}" href="{{ url(idade=None if idade and idade[0] == i[0] else i[0], vista=None) }}" title="{{ n }} tarefas esperando {{ i[1] }}"><b>{{ n }}</b><span>{{ i[1] }}</span></a>{% endfor %}
+    <div class="cn-idades-barra" role="group" aria-label="OS por tempo de espera">
+      {% for i, n in idades if n %}<a class="cn-idade cn-idade--{{ loop.index0 }}{% if idade and idade[0] == i[0] %} ativa{% endif %}" style="flex: {{ n }}" href="{{ url(idade=None if idade and idade[0] == i[0] else i[0], vista=None) }}" title="{{ n }} OS esperando {{ i[1] }}"><b>{{ n }}</b><span>{{ i[1] }}</span></a>{% endfor %}
     </div>
   </div>
 
@@ -87,10 +87,10 @@
         <div class="cn-equipe cn-equipe--{{ cor }} cn-clicavel" role="link" tabindex="0" data-href="{{ url(vista='fila', supervisor=a.nome if a.nome != 'Sem cadastro' else None) }}" title="Ver a fila de {{ a.nome }}">
           <div class="cn-eq-cab">
             <div class="cn-eq-titulo"><b>{{ a.nome }}</b><span class="cn-eq-tec" title="{{ a.n_tecnicos }} técnicos com OS na fila">{{ capacete() }}<b>{{ a.n_tecnicos }}</b></span></div>
-            <span>{{ a.n_equipes }} equipe{{ 's' if a.n_equipes != 1 }} · {{ a.ordens }} OS</span>
+            <span>{{ a.n_equipes }} equipe{{ 's' if a.n_equipes != 1 }} · {{ a.tarefas }} tarefas</span>
           </div>
           <div class="cn-eq-num">
-            <span><span class="v cn-t-{{ cor }}">{{ a.tarefas }}</span><span class="d">tarefas esperando aprovação</span></span>
+            <span><span class="v cn-t-{{ cor }}">{{ a.ordens }}</span><span class="d">OS esperando aprovação</span></span>
             <span class="dir"><span class="v{% if a.espera_max >= 30 %} cn-t-critico{% endif %}">{{ a.espera_max }}<small> d</small></span><span class="d">a mais antiga</span></span>
           </div>
           {{ barra_grupos(a) }}
@@ -109,13 +109,13 @@
     </div>
 
     {% elif vista == 'tecnicos' %}
-    <div class="cn-lista-cab"><h2>Por técnico</h2><span class="mudo">quem tem mais tarefa esperando aprovação, e como fecha</span></div>
+    <div class="cn-lista-cab"><h2>Por técnico</h2><span class="mudo">quem tem mais OS esperando aprovação, e como fecha</span></div>
     <div class="cn-tab"><table>
-      <thead><tr><th>Técnico</th><th>Equipe</th><th>Supervisor</th><th>Tarefas</th><th>Prontas</th><th>Pedem olho</th><th>Fora do App</th><th>Uso do App</th><th>Nota média</th><th>Devolvidas</th><th>Mais antiga</th></tr></thead>
+      <thead><tr><th>Técnico</th><th>Equipe</th><th>Supervisor</th><th>OS</th><th>Prontas</th><th>Pedem olho</th><th>Fora do App</th><th>Uso do App</th><th>Nota média</th><th>Devolvidas</th><th>Mais antiga</th></tr></thead>
       <tbody>
       {% for a in por_tecnico[:limite] %}
         <tr><td class="cn-pessoa"><a class="cn-link" href="{{ url(vista='fila', q=a.nome) }}"><span class="cn-avatar">{{ iniciais(a.nome) }}</span>{{ a.nome }}</a></td>
-          <td class="cn-menor">{{ a.equipe }}</td><td class="cn-menor">{{ a.supervisor }}</td><td class="m"><b>{{ a.tarefas }}</b></td>
+          <td class="cn-menor">{{ a.equipe }}</td><td class="cn-menor">{{ a.supervisor }}</td><td class="m"><b>{{ a.ordens }}</b></td>
           <td class="m cn-t-ok">{{ a.completa }}</td><td class="m cn-t-alerta">{{ a.olho }}</td><td class="m">{{ a.fora_do_app }}</td>
           <td><span class="cn-st cn-t-{{ 'ok' if (a.uso_app or 0) >= 80 else ('alerta' if (a.uso_app or 0) >= 50 else 'critico') }}">{{ a.uso_app }}%</span></td>
           <td class="m">{{ '—' if a.nota is none else a.nota ~ '%' }}</td><td class="m">{{ a.devolvidas or '—' }}</td>
@@ -130,39 +130,44 @@
         <input type="hidden" name="vista" value="fila">
         <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, técnico ou usina" aria-label="Buscar"></form>
     </div>
-    <div class="cn-lista-cab"><h2>Fila de verificação</h2><span class="mudo">{{ [linhas_fila|length, limite]|min }} de {{ linhas_fila|length }}, a mais antiga primeiro</span>
+    <div class="cn-lista-cab"><h2>Fila de verificação</h2><span class="mudo">{{ [linhas_fila|length, limite]|min }} de {{ linhas_fila|length }} OS, a mais antiga primeiro</span>
       {% if linhas_fila|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ linhas_fila|length }}</span>{% endif %}</div>
     <div class="cn-tab"><table class="cn-expande">
-      <thead><tr><th>Espera</th><th>OS</th><th>Tarefa</th><th>Técnico</th><th>Usina</th><th>Equipe</th><th>Supervisor</th><th>Fechada em</th><th>Nota do registro</th><th>Grupo</th></tr></thead>
+      <thead><tr><th>Espera</th><th>OS</th><th>Tarefas</th><th>Técnico</th><th>Usina</th><th>Equipe</th><th>Supervisor</th><th>Fechada em</th><th>Pior nota</th><th>Grupo</th></tr></thead>
       <tbody>
-      {% for x in linhas_fila[:limite] %}{% set g = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
-        <tr class="cn-linha" tabindex="0" aria-expanded="false" data-wo="{{ x.id_wo or '' }}"><td><span class="cn-st cn-t-{{ cor_espera(x.espera_d) }}">{{ '—' if x.espera_d is none else ('hoje' if x.espera_d == 0 else x.espera_d ~ ' d') }}</span></td>
-          <td class="m"><b>{{ x.os }}</b></td><td>{{ (x.tarefa or '')[:60] }}</td>
-          <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico }}</td>
-          <td class="cn-menor">{{ x.usina_cad or '—' }}</td><td class="cn-menor">{{ x.equipe_cad or '—' }}</td><td class="cn-menor">{{ x.supervisor_cad or '—' }}</td>
-          <td class="m">{{ dia_curto(x.fim) }}</td>
-          <td>{% if x.pelo_app %}{% set c = 'ok' if (x.qualidade or 0) >= 80 else 'alerta' %}<span class="cn-nota-barra"><b class="cn-t-{{ c }}">{{ x.qualidade or 0 }}%</b><span class="cn-barrinha"><span class="cn-b-{{ c }}" style="width: {{ x.qualidade or 0 }}%"></span></span></span>{% else %}<span class="mudo">—</span>{% endif %}</td>
-          <td><span class="cn-selo cn-selo--{{ g[1] if g[1] != 'neutro' else 'neutro' }}">{{ g[0] }}</span></td></tr>
-        {# o porquê do grupo e o Aprovar (o Concluir do OS Creator Web, com o login do Fracttal de quem aprova) #}
+      {% for o in linhas_fila[:limite] %}{% set g = nome_grupo.get(o.balde, (o.balde, 'neutro')) %}
+        <tr class="cn-linha" tabindex="0" aria-expanded="false" data-wo="{{ o.id_wo or '' }}"><td><span class="cn-st cn-t-{{ cor_espera(o.espera_d) }}">{{ 'hoje' if o.espera_d == 0 else o.espera_d ~ ' d' }}</span></td>
+          <td class="m"><b>{{ o.os }}</b></td>
+          <td>{{ (o.tarefas[0].tarefa or '')[:56] }}{% if o.tarefas|length > 1 %}<span class="det">e mais {{ o.tarefas|length - 1 }} tarefa{{ 's' if o.tarefas|length > 2 }}</span>{% endif %}</td>
+          <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(o.tecnicos[0]) }}</span>{{ o.tecnicos[0] }}{% if o.tecnicos|length > 1 %}<span class="det">+{{ o.tecnicos|length - 1 }}</span>{% endif %}</td>
+          <td class="cn-menor">{{ o.usina_cad or '—' }}</td><td class="cn-menor">{{ o.equipe_cad or '—' }}</td><td class="cn-menor">{{ o.supervisor_cad or '—' }}</td>
+          <td class="m">{{ dia_curto(o.fim) }}</td>
+          <td>{% if o.nota is not none %}{% set c = 'ok' if o.nota >= 80 else 'alerta' %}<span class="cn-nota-barra"><b class="cn-t-{{ c }}">{{ o.nota }}%</b><span class="cn-barrinha"><span class="cn-b-{{ c }}" style="width: {{ o.nota }}%"></span></span></span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+          <td><span class="cn-selo cn-selo--{{ g[1] }}">{{ g[0] }}</span></td></tr>
+        {# a OS aberta: cada tarefa com o grupo e o porquê (a regra do App), e o Aprovar (o Concluir do OS Creator Web) #}
         <tr class="cn-detalhe" hidden><td colspan="10">
           <div class="cn-detalhe-grade">
             <div>
-              <h3>Por que está em "{{ g[0] }}"</h3>
-              <ul class="cn-motivos">{% for cor, texto in motivos(x) %}<li class="cn-t-{{ cor }}"><span>{{ texto }}</span></li>{% endfor %}</ul>
+              <h3>Por que a OS está em "{{ g[0] }}"{% if o.tarefas|length > 1 %} · {{ o.tarefas|length }} tarefas{% endif %}</h3>
+              <ul class="cn-tarefas-os">
+              {% for x in o.tarefas %}{% set gx = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
+                <li><div class="cn-tarefa-cab"><span class="cn-selo cn-selo--{{ gx[1] }}">{{ gx[0] }}</span><b>{{ x.tarefa or 'Tarefa' }}</b><span class="mudo">{{ x.tecnico }}{% if x.pelo_app %} · nota {{ x.qualidade or 0 }}%{% endif %}</span></div>
+                  <ul class="cn-motivos">{% for cor, texto in motivos(x) %}<li class="cn-t-{{ cor }}"><span>{{ texto }}</span></li>{% endfor %}</ul></li>
+              {% endfor %}
+              </ul>
             </div>
             <div>
               <dl class="cn-dados">
-                <dt>OS</dt><dd class="m">{{ x.os }}{% if x.ronda %} · OS de ronda{% endif %}</dd>
-                <dt>Tarefa</dt><dd>{{ x.tarefa or '—' }}</dd>
-                <dt>Técnico</dt><dd>{{ x.tecnico }}{% if x.funcao %} · {{ x.funcao }}{% endif %}</dd>
-                <dt>Usina</dt><dd>{{ x.usina_cad or '—' }}{% if x.equipe_cad %} · {{ x.equipe_cad }}{% endif %}{% if x.supervisor_cad %} · supervisor {{ x.supervisor_cad }}{% endif %}</dd>
-                <dt>Fechada em</dt><dd>{{ dia_curto(x.fim) }} · esperando há {{ x.espera_d or 0 }} dia{{ 's' if (x.espera_d or 0) != 1 }}</dd>
-                <dt>Pelo App</dt><dd>{{ 'sim, nota ' ~ (x.qualidade or 0) ~ '%' if x.pelo_app else 'não' }}{% if x.foi_devolvida %} · já devolvida{% endif %}</dd>
+                <dt>OS</dt><dd class="m">{{ o.os }}{% if o.ronda %} · OS de ronda{% endif %}</dd>
+                <dt>Técnicos</dt><dd>{{ o.tecnicos|join(', ') }}</dd>
+                <dt>Usina</dt><dd>{{ o.usina_cad or '—' }}{% if o.equipe_cad %} · {{ o.equipe_cad }}{% endif %}{% if o.supervisor_cad %} · supervisor {{ o.supervisor_cad }}{% endif %}</dd>
+                <dt>Fechada em</dt><dd>{{ dia_curto(o.fim) }} · esperando há {{ o.espera_d }} dia{{ 's' if o.espera_d != 1 }}</dd>
+                <dt>Pelo App</dt><dd>{{ o.n_app }} de {{ o.tarefas|length }} tarefa{{ 's' if o.tarefas|length != 1 }}{% if o.devolvida %} · já devolvida{% endif %}</dd>
               </dl>
-              {% if x.id_wo %}
-              <div class="cn-aprovar" data-wo="{{ x.id_wo }}" data-os="{{ x.os }}">
-                <button class="gc-btn gc-btn--primario" type="button">Aprovar a OS {{ x.os }}</button>
-                <span class="cn-aprovar-msg mudo">Conclui a OS no Fracttal com o seu login do Fracttal (o mesmo do OS Creator). Não dá para desfazer.</span>
+              {% if o.id_wo %}
+              <div class="cn-aprovar" data-wo="{{ o.id_wo }}" data-os="{{ o.os }}">
+                <button class="gc-btn gc-btn--primario" type="button">Aprovar a OS {{ o.os }}</button>
+                <span class="cn-aprovar-msg mudo">Conclui a OS inteira no Fracttal{% if o.tarefas|length > 1 %} (as {{ o.tarefas|length }} tarefas){% endif %}, com o seu login do Fracttal (o mesmo do OS Creator). Não dá para desfazer.</span>
               </div>
               {% endif %}
             </div>
@@ -174,7 +179,8 @@
   </section>
 
   <div class="cn-nota"><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e esperando a aprovação do
-    supervisor), relida pelo Nexus a cada 10 minutos, só para consulta. Os grupos são a regra do painel do App: <b>prontas</b> =
+    supervisor), relida pelo Nexus a cada 10 minutos, contada por OS, que é o que se aprova. Cada tarefa ganha o grupo pela
+    regra do painel do App, e a OS fica no pior grupo das tarefas dela: <b>prontas</b> =
     subtarefas respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80,
     tempo muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. O
     supervisor e a equipe saem do cadastro do Nexus pela usina da OS. Aprovar continua no Fracttal.</div>

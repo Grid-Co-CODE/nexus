@@ -352,3 +352,5 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-aprovar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px}
 .cn-aprovar-msg{font-size:12.5px;max-width:52ch}
 tr.cn-aprovada td{opacity:.45}
+.cn-tarefas-os{margin:0;padding:0;list-style:none;display:grid;gap:14px}
+.cn-tarefa-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:6px;font-size:13px}

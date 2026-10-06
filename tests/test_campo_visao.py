@@ -205,7 +205,7 @@ def test_zeladoria_vazia_diz_por_que(banco, logado):
 
 def test_telas_mostram_o_dado_do_banco(banco, logado):
     assert "Coração 1" in logado.get("/t/campo/rondas").get_data(as_text=True)
-    assert "PT-1" in logado.get("/t/campo/pt").get_data(as_text=True)
+    assert "PT-1" in logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
     assert "SP Norte 01" in logado.get("/t/campo/ranking").get_data(as_text=True)
 
 
@@ -280,6 +280,12 @@ def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
     equipamento no lugar do estado, espera no fim e só o número da OS, em verde, no lugar do número da PT."""
     html = logado.get("/t/campo/pt").get_data(as_text=True)
     assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "Beltrano Supervisor" in html
+    assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
+    # a mesma tela da Central de atenção > Permissões de trabalho (Levi, 05/10)
+    import re as _re
+    corpo = lambda h: " ".join(_re.sub(r'href="[^"]*"', "", h[h.index('<div class="cn-equipes">'):h.index('<div class="cn-nota">')]).split())
+    assert corpo(html) == corpo(logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True))
+    html = logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
     assert html.count('class="cn-link cn-os"') == 2 and ">700<" in html                    # PT-1 e PT-2, pela OS
     html = logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
     cab = ("<th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th>"
@@ -288,7 +294,7 @@ def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
     assert 'class="cn-detalhe" hidden' in html and "Atividades críticas da APR" in html and "Eletricidade" in html
     assert "Inversor 1" in html and "THPN-ALT100-INVR1" in html
     html = logado.get("/t/campo/pt?supervisor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
-    assert "Nenhuma PT esperando com esses filtros" in html
+    assert "Nenhuma PT esperando o De acordo com esses filtros" in html
     html = logado.get("/t/campo/pt?aba=historico").get_data(as_text=True)
     assert "<th>Situação</th>" in html and "De acordo" in html and "/t/campo/pt/PT-3" in html
     assert "/t/campo/pt/PT-3/pdf" in html and "<th>PDF</th>" in html
@@ -296,7 +302,7 @@ def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
 
 def test_cartao_leva_a_tabela_da_equipe_com_o_supervisor(banco, logado):
     html = logado.get("/t/campo/pt").get_data(as_text=True)
-    assert 'class="cn-equipe cn-equipe--critico cn-clicavel"' in html and 'data-href="?modo=tabela&amp;equipe=SP+Norte+01"' in html
+    assert '<a class="cn-equipe cn-equipe--critico" href="?modo=tabela&amp;equipe=SP+Norte+01">' in html
     html = logado.get("/t/campo/pt?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
     assert 'class="cn-faixa-equipe"' in html and "Supervisor: <b>Beltrano Supervisor</b>" in html and "2</b> técnicos" in html
 

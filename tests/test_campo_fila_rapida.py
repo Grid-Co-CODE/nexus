@@ -134,7 +134,7 @@ def test_aprovacao_para_insight(fila_e_cadastro, logado):
     """Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights"."""
     html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
     # abre nos cartões por supervisor (do cadastro, pela usina do Fracttal "SP 01")
-    assert 'class="cn-equipes"' in html and "Supervisor 90" in html and "tarefas esperando aprovação" in html
+    assert 'class="cn-equipes"' in html and "Supervisor 90" in html and "OS esperando aprovação" in html
     assert "Prontas para aprovar" in html and "Precisam do seu olho" in html and "Uso do App" in html
     assert "Idade da fila" in html and "31 a 60 dias" in html                       # a OS 15002 espera 33 dias
     # os indicadores e a idade filtram a fila
@@ -158,7 +158,7 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     assert aprovacao.motivos({"pelo_app": True, "qualidade": 96})[0][0] == "ok"
     assert "fora do App" in aprovacao.motivos({"pelo_app": False})[0][1]
     html = logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
-    assert 'class="cn-detalhe" hidden' in html and "Por que está em" in html and "Nota do registro 71%" in html
+    assert 'class="cn-detalhe" hidden' in html and "Por que a OS está em" in html and "Nota do registro 71%" in html
     assert 'data-wo="15088"' in html and "Aprovar a OS 15088" in html and "/os/api/os/" in html
     # o Concluir do OS Creator sem login do Fracttal: 401 pedindo login (a tela leva ao login e volta)
     r = logado.post("/os/api/os/15088/concluir", json={"folio": "15088"})
@@ -170,3 +170,21 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     assert logado.post("/t/campo/aprovacao/15088/tirar").get_json()["tarefas"] == 1
     assert len(regras_app._FILA_CACHE["linhas"]) == antes - 1
     assert ">15088<" not in logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
+
+
+def test_a_fila_e_contada_por_os():
+    """Levi, 05/10: "Está separando por tarefa, não faz sentido, ele não consegue aprovar uma tarefa em si, e sim uma PT
+    ou uma OS". A OS fica no pior grupo das tarefas dela; a espera é a da tarefa mais antiga."""
+    from nexus.torres.campo import _agrupa_os, _por_os
+    t = lambda os_, balde, espera, **kw: {"os": os_, "id_wo": int(os_), "balde": balde, "espera_d": espera,
+                                          "tecnico": kw.get("tec", "Ana Souza"), "fim": "2026-10-01",
+                                          "pelo_app": balde != "fora_do_app", "qualidade": kw.get("q", 90),
+                                          "supervisor_cad": "Sup", "equipe_cad": "Eq"}
+    oss = _por_os([t("100", "completa", 3), t("100", "olho", 9, q=70), t("200", "completa", 2),
+                   t("300", "completa", 1), t("300", "fora_do_app", 40, tec="Bia Lima")])
+    por = {o["os"]: o for o in oss}
+    assert (por["100"]["balde"], por["100"]["espera_d"], por["100"]["nota"]) == ("olho", 9, 70)
+    assert por["200"]["balde"] == "completa" and por["300"]["balde"] == "fora_do_app"
+    assert por["300"]["tecnicos"] == ["Ana Souza", "Bia Lima"] and oss[0]["os"] == "300"     # a mais antiga primeiro
+    sup = _agrupa_os(oss, lambda o: [o["supervisor_cad"]])[0]
+    assert (sup["ordens"], sup["tarefas"], sup["completa"], sup["olho"], sup["fora_do_app"], sup["aged30"]) == (3, 5, 1, 1, 1, 1)

@@ -1,0 +1,83 @@
+{# As PT esperando o De acordo: a MESMA tela na Central de atenção (aba Permissões de trabalho) e em Permissões de trabalho
+   (aba Esperando o De acordo) (Levi, 05/10/2026: "a mesma tela do Central de atenção > Permissões de Trabalho").
+   Cartões compactos por equipe (o da Central) ou a tabela (a da tela de PT: só a OS, em verde, abre a PT; Equipamento;
+   Espera no fim; a linha abre o detalhe). Espera do contexto: modo, cartoes (visao.por_equipe), lista, contagem, total,
+   f, status (visao.PT_STATUS), situacoes (SITUACAO_PT), equipe, idade_min, url. #}
+{% macro capacete_pt() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
+{% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
+{% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
+{% if modo == 'equipes' %}
+<div class="cn-equipes">
+  {% for c in cartoes %}{% set cor = 'critico' if c.parada else 'alerta' %}
+    <a class="cn-equipe cn-equipe--{{ cor }}" href="{{ url(modo='tabela', equipe=c.equipe, f=None) }}">
+      <div class="cn-eq-cab">
+        <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>
+          <span class="cn-eq-tec" title="{{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }} na equipe (cadastro){% for k, n in c.cargos.items() %}{{ ':' if loop.first else ',' }} {{ n }} {{ k }}{% endfor %}">{{ capacete_pt() }}<b>{{ c.tecnicos }}</b></span></div>
+        <span>{{ c.regioes|join(', ') or '—' }}{% if c.ufs %} · {{ c.ufs|join(', ') }}{% endif %}</span>
+        <span>Supervisor: <b class="cn-eq-sup">{{ c.supervisor }}</b></span>
+      </div>
+      <div class="cn-eq-num"><span><span class="v cn-t-{{ cor }}">{{ c.pts }}</span><span class="d">PT esperando o De acordo</span></span></div>
+      <div class="cn-eq-pe"><span class="cn-st cn-t-critico">{{ c.parada }} parada{{ 's' if c.parada != 1 }} há mais de 2 h</span><span class="cn-st cn-t-alerta">{{ c.pts - c.parada }} aguardando</span></div>
+    </a>
+  {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
+</div>
+{% else %}
+{% if equipe %}{% set ce = (cartoes|selectattr('equipe', 'equalto', equipe)|list or [none])[0] %}
+{# a tabela de uma equipe diz de quem ela é (Levi, 05/10: "mostrando também qual é o supervisor") #}
+<div class="cn-faixa-equipe">
+  <b>{{ equipe }}</b>
+  <span>Supervisor: <b>{{ ce.supervisor if ce else '—' }}</b></span>
+  {% if ce %}<span class="cn-eq-tec">{{ capacete_pt() }}<b>{{ ce.tecnicos }}</b> técnico{{ 's' if ce.tecnicos != 1 }}</span>
+  <span><b class="cn-t-alerta">{{ ce.pts }}</b> PT esperando · <b class="cn-t-critico">{{ ce.parada }}</b> parada{{ 's' if ce.parada != 1 }} há +2 h</span>{% endif %}
+</div>
+{% endif %}
+<div class="cn-chips">
+  <a href="{{ url(f=None) }}"{% if not f %} aria-current="page"{% endif %}>Todas <b>{{ total }}</b></a>
+  {% for s, (rot, cor) in status.items() %}<a href="{{ url(f=s) }}"{% if s == f %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
+</div>
+<div class="cn-tab"><table class="cn-expande">
+  <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th></tr></thead>
+  <tbody>
+  {% for p in lista %}
+    <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
+      <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.regiao_br or '—' }}</td>
+      <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td>
+      <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td></tr>
+    <tr class="cn-detalhe" hidden><td colspan="9">
+      <div class="cn-detalhe-grade">
+        <dl class="cn-dados">
+          <dt>PT</dt><dd class="m">{{ p.numero }}</dd>
+          <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
+          <dt>Equipamento</dt><dd>{{ equipamento(p) }}</dd>
+          <dt>Usina</dt><dd>{{ p.usina }}{% if p.cidade %} · {{ p.cidade }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}</dd>
+          <dt>Equipe</dt><dd>{{ p.equipe or '—' }} · supervisor {{ p.supervisor or '—' }}</dd>
+          <dt>Técnico</dt><dd>{{ p.solicitante or '—' }}</dd>
+          <dt>Criada</dt><dd>{{ p.criada.strftime('%d/%m às %H:%M') if p.criada else '—' }}</dd>
+          {% if p.aviso_em %}<dt>1º aviso</dt><dd>{{ p.aviso_em.strftime('%d/%m às %H:%M') }}{% if p.aviso_motivo %} · {{ p.aviso_motivo }}{% endif %}</dd>{% endif %}
+          {% if p.forcada %}<dt>Forçada</dt><dd class="cn-t-alerta">sim (aberta pelo Forçar encontro)</dd>{% endif %}
+        </dl>
+        <div>
+          <h3>Atividades críticas da APR</h3>
+          <ul class="cn-ativ">{% for a in p.atividades %}<li>{{ a }}</li>{% else %}<li class="mudo">Sem atividade crítica marcada.</li>{% endfor %}</ul>
+          <p class="cn-detalhe-nao">{% if p.respostas_nao %}<span class="cn-t-alerta">{{ p.respostas_nao }} resposta{{ 's' if p.respostas_nao > 1 }} NÃO na APR</span>{% else %}Nenhuma resposta NÃO na APR{% endif %}{% if p.faltam %} · falta: {{ p.faltam }}{% endif %}</p>
+          <p><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">Abrir para aprovar</a></p>
+        </div>
+      </div>
+    </td></tr>
+  {% else %}<tr><td colspan="9" class="mudo">Nenhuma PT esperando o De acordo com esses filtros.</td></tr>{% endfor %}
+  </tbody></table></div>
+<script>
+  // clicar na linha abre o detalhe da PT logo abaixo; o link da OS continua indo para a aprovação
+  document.querySelectorAll('table.cn-expande tr.cn-linha').forEach(function (tr) {
+    function alterna(ev) {
+      if (ev.target.closest('a')) return;
+      var det = tr.nextElementSibling;
+      if (!det || !det.classList.contains('cn-detalhe')) return;
+      det.hidden = !det.hidden;
+      tr.setAttribute('aria-expanded', String(!det.hidden));
+    }
+    tr.addEventListener('click', alterna);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
+  });
+</script>
+{% endif %}

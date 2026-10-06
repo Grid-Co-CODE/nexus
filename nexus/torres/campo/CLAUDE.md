@@ -96,6 +96,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     leitura, 382 de 417 rondas com OS lidas; sujidade média 2,5 (21 usinas em 4 ou 5), vegetação 2,4 (16), vala suja
     ou parcial em 47. O caminho limpo é o App mandar essas colunas no livro de rondas (mudança no App).
 - **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão; parada = mais de 2 h.
+- **"Esperando o De acordo" é a MESMA tela da Central > Permissões de trabalho** (Levi, 05/10): as duas incluem
+  `templates/campo/_pt_esperando.html` (cartões compactos por equipe; tabela com a OS em verde, Equipamento, Espera no fim
+  e a linha que abre o detalhe). Mudou uma, mudou a outra.
 - **Tela de PT** (Levi, 05/10): abas "Esperando o De acordo" (cartões por equipe com a lista das PT de cada uma, ou
   tabela) e "Histórico" (decididas, período 7/30/90 dias, por situação). Filtro de supervisor; o cartão leva à tabela
   da equipe. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
@@ -210,6 +213,10 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
     30 dias primeiro; o supervisor e a equipe saem do cadastro pela usina do Fracttal), por técnico e a fila; CSV.
     Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas esperando; 937 prontas; 1.780 tarefas paradas há 30 dias ou
     mais; uso do App 41%; Camila Viana 1.373 tarefas (uso do App 29%), Vitor Valadares 829 (12%).
+  - **Contada por OS, não por tarefa** (Levi, 05/10: "ele não consegue aprovar uma tarefa em si, e sim uma PT ou uma
+    OS"; `_por_os`, `_agrupa_os`): a OS fica no pior grupo das tarefas dela (olho > fora do App > completa), a espera é
+    a da tarefa mais antiga, a nota é a pior; indicadores, idade, cartões e técnicos em OS. A linha aberta mostra cada
+    tarefa com o grupo e os motivos dela.
   - **A linha aberta diz o porquê do grupo e aprova** (Levi, 05/10): `aprovacao.motivos` = a regra `_triagem` do App
     mostrando TODOS os motivos que valem (nota abaixo de 80, ronda com pendência, já devolvida, tempo fora por causa
     do técnico, foto divergente; ou por que está completa). **Aprovar = o Concluir do OS Creator Web** ("usando o

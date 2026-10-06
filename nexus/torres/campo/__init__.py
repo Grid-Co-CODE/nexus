@@ -154,6 +154,7 @@ def atencao():
         "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
         status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
         lista=lista, f=f, regiao=regiao, equipe=equipe, modo=modo, cartoes=cartoes, regioes=visao.REGIOES,
+        situacoes=SITUACAO_PT,
         supervisor=supervisor, supervisores=sorted({x.get("supervisor") for x in (d.get("usinas") or []) + (d.get("pts") or [])
                                                     if x.get("supervisor")}),
         q=request.args.get("q", ""), idade_min=_idade_min))
@@ -183,6 +184,15 @@ def pt():
                 and (not equipe or p.get("equipe") == equipe)
                 and (not q or q in " ".join(str(p.get(c) or "") for c in campos).lower())]
     aguardando = filtra(d.get("aguardando") or [])
+    # a aba Esperando é a MESMA da Central de atenção > Permissões de trabalho (Levi, 05/10)
+    f = request.args.get("f", "") if request.args.get("f") in visao.PT_STATUS else ""
+    regiao = request.args.get("regiao", "")
+    if regiao:
+        aguardando = [p for p in aguardando if p.get("regiao_br") == regiao]
+    contagem_pt = {s: sum(1 for p in aguardando if _status("pt", p) == s) for s in visao.PT_STATUS}
+    cartoes_pt = sorted((c for c in visao.por_equipe([], [], [], aguardando, d.get("times") or {}) if c["pts"]),
+                        key=ORDEM_DOS_CARTOES["pt"])
+    lista_pt = [p for p in aguardando if not f or _status("pt", p) == f]
     historico = [p for p in filtra(d.get("historico") or []) if (p.get("criada") or piso) >= piso]
     contagem = {}
     for p in historico:
@@ -190,9 +200,10 @@ def pt():
     historico = [p for p in historico if not sit or p.get("situacao") == sit]
     todas = (d.get("aguardando") or []) + (d.get("historico") or [])
     return render_template("campo/pt.html", **_comum(
-        "pt", leitura, aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem=contagem, sit=sit,
+        "pt", leitura, aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem_hist=contagem, sit=sit,
         dias=dias, supervisor=supervisor, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
-        idade_min=_idade_min, cartoes=visao.pts_por_equipe(aguardando, d.get("times") or {}),
+        idade_min=_idade_min, cartoes=cartoes_pt, lista=lista_pt, contagem=contagem_pt, total=len(aguardando), f=f,
+        status=visao.PT_STATUS, regiao=regiao, regioes=visao.REGIOES,
         supervisores=sorted({p.get("supervisor") for p in todas if p.get("supervisor")})))
 
 
@@ -365,31 +376,63 @@ VISTAS_APROVACAO = (("supervisores", "Por supervisor"), ("tecnicos", "Por técni
 SEM_CADASTRO = "Sem cadastro"
 
 
-def _agrupa_fila(linhas, chave) -> list[dict]:
-    """Uma linha por supervisor (ou técnico): o tamanho da fila, os três grupos do App, a idade e o uso do App."""
+# O grupo da OS sai das tarefas dela: quem aprova, aprova a OS inteira (Levi, 05/10: "ele não consegue aprovar uma
+# tarefa em si, e sim uma PT ou uma OS"). Basta uma tarefa pedir olho para a OS pedir; sem isso, uma tarefa fechada fora
+# do App já tira a OS de "completa"; completa é só a OS com TODAS as tarefas completas.
+ORDEM_DO_GRUPO = ("olho", "fora_do_app", "completa")
+
+
+def _por_os(linhas) -> list[dict]:
+    """Uma linha por OS, a partir das tarefas da fila (cada tarefa com o grupo e os motivos do App)."""
     g = {}
     for x in linhas:
-        k = chave(x) or SEM_CADASTRO
-        a = g.setdefault(k, {"nome": k, "os": set(), "tarefas": 0, "completa": 0, "olho": 0, "fora_do_app": 0,
-                             "aged7": 0, "aged30": 0, "espera_max": 0, "pelo_app": 0, "notas": [], "devolvidas": 0,
-                             "equipes": {}, "tecnicos": set(), "supervisores": {}})
-        a["os"].add(x["os"])
-        a["tarefas"] += 1
-        a[x["balde"]] = a.get(x["balde"], 0) + 1
-        e = x.get("espera_d") or 0
-        a["aged7"] += e >= 7
-        a["aged30"] += e >= 30
-        a["espera_max"] = max(a["espera_max"], e)
-        a["pelo_app"] += bool(x.get("pelo_app"))
-        if x.get("pelo_app") and x.get("qualidade") is not None:
-            a["notas"].append(int(x["qualidade"]))
-        a["devolvidas"] += bool(x.get("foi_devolvida"))
-        a["equipes"][x.get("equipe_cad") or SEM_CADASTRO] = a["equipes"].get(x.get("equipe_cad") or SEM_CADASTRO, 0) + 1
-        a["supervisores"][x.get("supervisor_cad") or SEM_CADASTRO] = a["supervisores"].get(x.get("supervisor_cad") or SEM_CADASTRO, 0) + 1
-        a["tecnicos"].add(x.get("tecnico") or "—")
+        o = g.setdefault(x["os"], {"os": x["os"], "id_wo": None, "tarefas": []})
+        o["tarefas"].append(x)
+        o["id_wo"] = o["id_wo"] or x.get("id_wo")
+    for o in g.values():
+        ts = o["tarefas"]
+        baldes = {t["balde"] for t in ts}
+        o["balde"] = next(b for b in ORDEM_DO_GRUPO if b in baldes)
+        o["espera_d"] = max(t.get("espera_d") or 0 for t in ts)              # a tarefa mais antiga
+        o["fim"] = max(str(t.get("fim") or "") for t in ts)
+        o["tecnicos"] = sorted({t.get("tecnico") or "—" for t in ts})
+        primeira = next((t for t in ts if t.get("usina_cad")), ts[0])
+        for c in ("usina_cad", "equipe_cad", "supervisor_cad", "regiao_br"):
+            o[c] = primeira.get(c) or ""
+        notas = [int(t["qualidade"]) for t in ts if t.get("pelo_app") and t.get("qualidade") is not None]
+        o["nota"] = min(notas) if notas else None                            # a pior tarefa
+        o["pelo_app"] = all(t.get("pelo_app") for t in ts)
+        o["n_app"] = sum(1 for t in ts if t.get("pelo_app"))
+        o["devolvida"] = any(t.get("foi_devolvida") for t in ts)
+        o["ronda"] = any(t.get("ronda") for t in ts)
+        o["n_por_grupo"] = {b: sum(1 for t in ts if t["balde"] == b) for b in ORDEM_DO_GRUPO}
+    return sorted(g.values(), key=lambda o: -o["espera_d"])
+
+
+def _agrupa_os(oss, chaves) -> list[dict]:
+    """Uma linha por supervisor (ou técnico): as OS esperando, os três grupos, a idade e o uso do App, em OS."""
+    g = {}
+    for o in oss:
+        for k in chaves(o):
+            k = k or SEM_CADASTRO
+            a = g.setdefault(k, {"nome": k, "ordens": 0, "tarefas": 0, "completa": 0, "olho": 0, "fora_do_app": 0,
+                                 "aged7": 0, "aged30": 0, "espera_max": 0, "pelo_app": 0, "notas": [], "devolvidas": 0,
+                                 "equipes": {}, "supervisores": {}, "tecnicos": set()})
+            a["ordens"] += 1
+            a["tarefas"] += len(o["tarefas"])
+            a[o["balde"]] += 1
+            a["aged7"] += o["espera_d"] >= 7
+            a["aged30"] += o["espera_d"] >= 30
+            a["espera_max"] = max(a["espera_max"], o["espera_d"])
+            a["pelo_app"] += o["pelo_app"]
+            a["notas"] += [o["nota"]] if o["nota"] is not None else []
+            a["devolvidas"] += o["devolvida"]
+            e, s = o.get("equipe_cad") or SEM_CADASTRO, o.get("supervisor_cad") or SEM_CADASTRO
+            a["equipes"][e] = a["equipes"].get(e, 0) + 1
+            a["supervisores"][s] = a["supervisores"].get(s, 0) + 1
+            a["tecnicos"].update(o["tecnicos"])
     for a in g.values():
-        a["ordens"] = len(a.pop("os"))
-        a["uso_app"] = round(100 * a["pelo_app"] / a["tarefas"]) if a["tarefas"] else None
+        a["uso_app"] = round(100 * a["pelo_app"] / a["ordens"]) if a["ordens"] else None
         a["nota"] = round(sum(a["notas"]) / len(a["notas"])) if a["notas"] else None
         del a["notas"]
         a["equipe"] = max(a["equipes"], key=a["equipes"].get)
@@ -401,10 +444,10 @@ def _agrupa_fila(linhas, chave) -> list[dict]:
 @bp.route("/aprovacao")
 def aprovacao():
     """A fila de verificação do Fracttal para tirar insight (Levi, 05/10: "refaça essa parte de aprovação de OS para
-    retirada de bons insights"). Os números e os grupos são os do App (a fila inteira pela `_fila_supervisao`); a
-    equipe e o supervisor de cada tarefa vêm do cadastro do Nexus, pela usina do Fracttal (de-para "Fracttal ·
-    Classificação 1"). Três visões: por supervisor (quem acumula), por técnico e a fila. Os indicadores e a barra da
-    idade filtram a fila."""
+    retirada de bons insights"), contada por OS, que é o que se aprova. Os grupos de cada tarefa são os do App (a fila
+    inteira pela `_fila_supervisao`); a equipe e o supervisor vêm do cadastro do Nexus, pela usina do Fracttal (de-para
+    "Fracttal · Classificação 1"). Três visões: por supervisor (quem acumula), por técnico e a fila. Os indicadores e a
+    barra da idade filtram a fila."""
     equipe, supervisor = request.args.get("equipe", ""), request.args.get("supervisor", "")
     dias = _dias((7, 30, 60, 90), 30)
     mapa = visao.usinas_do_fracttal()
@@ -422,40 +465,41 @@ def aprovacao():
         cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
         x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
         x["supervisor_cad"], x["regiao_br"] = cad.get("supervisor") or "", cad.get("regiao_br") or ""
+    oss = _por_os(todas)
     vista = request.args.get("vista") if request.args.get("vista") in dict(VISTAS_APROVACAO) else "supervisores"
-    balde = request.args.get("balde") if request.args.get("balde") in ("completa", "olho", "fora_do_app") else ""
+    balde = request.args.get("balde") if request.args.get("balde") in ORDEM_DO_GRUPO else ""
     idade = next((i for i in IDADES if i[0] == request.args.get("idade")), None)
     q = request.args.get("q", "").strip().lower()
     if balde or idade or q:
         vista = "fila"
-    fila = [x for x in todas if (not balde or x["balde"] == balde)
-            and (not idade or idade[2] <= (x.get("espera_d") or 0) <= idade[3])
-            and (not q or q in " ".join(str(x.get(c) or "") for c in ("os", "tarefa", "tecnico", "usina_cad")).lower())]
+    fila = [o for o in oss if (not balde or o["balde"] == balde)
+            and (not idade or idade[2] <= o["espera_d"] <= idade[3])
+            and (not q or q in " ".join([o["os"], o["usina_cad"]] + o["tecnicos"] + [t.get("tarefa") or "" for t in o["tarefas"]]).lower())]
+    nome_grupo = {g[0]: g[1] for g in GRUPOS}
     if request.args.get("csv") == "1":
         import csv
         import io
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
-        w.writerow(["OS", "Tarefa", "Técnico", "Usina", "Equipe", "Supervisor", "Região", "Fechada em", "Espera (dias)",
-                    "Nota do registro", "Grupo", "Devolvida"])
-        for x in fila:
-            w.writerow([x["os"], x.get("tarefa"), x.get("tecnico"), x.get("usina_cad"), x.get("equipe_cad"),
-                        x.get("supervisor_cad"), x.get("regiao_br"), str(x.get("fim") or "")[:10], x.get("espera_d"),
-                        x.get("qualidade") if x.get("pelo_app") else "", dict((g[0], g[1]) for g in GRUPOS).get(x["balde"]),
-                        "sim" if x.get("foi_devolvida") else ""])
+        w.writerow(["OS", "Tarefas", "Técnicos", "Usina", "Equipe", "Supervisor", "Região", "Fechada em", "Espera (dias)",
+                    "Pior nota do registro", "Grupo", "Tarefas prontas", "Tarefas pedem olho", "Tarefas fora do App",
+                    "Devolvida"])
+        for o in fila:
+            n = o["n_por_grupo"]
+            w.writerow([o["os"], len(o["tarefas"]), ", ".join(o["tecnicos"]), o["usina_cad"], o["equipe_cad"],
+                        o["supervisor_cad"], o["regiao_br"], o["fim"][:10], o["espera_d"],
+                        "" if o["nota"] is None else o["nota"], nome_grupo.get(o["balde"]), n["completa"], n["olho"],
+                        n["fora_do_app"], "sim" if o["devolvida"] else ""])
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="aprovacao-os-{dias}d.csv"'})
-    r = d.get("resumo") or {}
-    mais_antiga = max(todas, key=lambda x: x.get("espera_d") or 0) if todas else None
-    k = {"ordens": r.get("ordens", 0), "tarefas": r.get("tarefas", 0), "baldes": d.get("baldes") or {},
-         "aged30": sum(1 for x in todas if (x.get("espera_d") or 0) >= 30),
-         "aged30_os": len({x["os"] for x in todas if (x.get("espera_d") or 0) >= 30}),
-         "espera_max": r.get("espera_max", 0), "mais_antiga": mais_antiga,
-         "uso_app": round(100 * r.get("pelo_app", 0) / r["tarefas"]) if r.get("tarefas") else None}
-    idades = [(i, sum(1 for x in todas if i[2] <= (x.get("espera_d") or 0) <= i[3])) for i in IDADES]
-    supervisores_g = sorted(_agrupa_fila(todas, lambda x: x.get("supervisor_cad")),
-                            key=lambda a: (-a["aged30"], -a["tarefas"], a["nome"]))
-    tecnicos_g = sorted(_agrupa_fila(todas, lambda x: x.get("tecnico")), key=lambda a: (-a["tarefas"], a["nome"]))
+    mais_antiga = oss[0] if oss else None
+    k = {"ordens": len(oss), "tarefas": len(todas), "baldes": {b: sum(1 for o in oss if o["balde"] == b) for b in ORDEM_DO_GRUPO},
+         "aged30": sum(1 for o in oss if o["espera_d"] >= 30), "espera_max": mais_antiga["espera_d"] if mais_antiga else 0,
+         "mais_antiga": mais_antiga, "uso_app": round(100 * sum(o["pelo_app"] for o in oss) / len(oss)) if oss else None}
+    idades = [(i, sum(1 for o in oss if i[2] <= o["espera_d"] <= i[3])) for i in IDADES]
+    supervisores_g = sorted(_agrupa_os(oss, lambda o: [o.get("supervisor_cad")]),
+                            key=lambda a: (-a["aged30"], -a["ordens"], a["nome"]))
+    tecnicos_g = sorted(_agrupa_os(oss, lambda o: o["tecnicos"]), key=lambda a: (-a["ordens"], a["nome"]))
     return render_template("campo/aprovacao.html", **_comum(
         "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS}, balde=balde,
         cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), equipe=equipe, supervisor=supervisor,

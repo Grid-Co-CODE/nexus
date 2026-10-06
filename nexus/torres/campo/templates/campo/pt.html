@@ -65,61 +65,25 @@
     <div class="cn-seg">{% for p in (7, 30, 90) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
     <input type="hidden" name="dias" value="{{ dias }}">
     {% endif %}
+    <label class="gc-rotulo" for="cn-regiao">Região</label>
+    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
     <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
     <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
       <option value="">Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, usina, equipamento ou técnico" aria-label="Buscar">
-    {% for k in ('modo', 'equipe', 'sit') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+    {% for k in ('modo', 'equipe', 'sit', 'f') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
   </form>
 
-  {% if aba == 'esperando' and modo == 'equipes' %}
-  {# um cartão por equipe com as PT que ela tem esperando (Levi, 05/10: "a divisão por equipe mostrando o que está pendente") #}
-  <div class="cn-equipes">
-    {% for c in cartoes %}
-      <div class="cn-equipe cn-equipe--{{ 'critico' if c.parada else 'alerta' }} cn-clicavel" role="link" tabindex="0"
-           data-href="{{ url(modo='tabela', equipe=c.equipe) }}" title="Abrir a tabela da {{ c.equipe }}">
-        <div class="cn-eq-cab">
-          <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>
-            <span class="cn-eq-tec" title="{{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }} na equipe (cadastro){% for k, n in c.cargos.items() %}{{ ':' if loop.first else ',' }} {{ n }} {{ k }}{% endfor %}">{{ capacete() }}<b>{{ c.tecnicos }}</b></span></div>
-          <span>{{ c.regioes|join(', ') or '—' }}</span>
-          <span>Supervisor: <b class="cn-eq-sup">{{ c.supervisor }}</b></span>
-        </div>
-        <div class="cn-eq-num"><span><span class="v cn-t-{{ 'critico' if c.parada else 'alerta' }}">{{ c.pts|length }}</span><span class="d">PT esperando</span></span>
-          <span class="dir"><span class="v cn-t-critico">{{ c.parada }}</span><span class="d">parada{{ 's' if c.parada != 1 }} há +2 h</span></span></div>
-        <ul class="cn-eq-pts">
-          {% for p in c.pts %}<li>{{ os_link(p) }}<span class="t">{{ p.tarefa[:48] }}<span class="det">{{ p.usina }} · {{ p.solicitante or '—' }}</span></span><span class="m cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></li>{% endfor %}
-        </ul>
-        <a class="cn-link cn-eq-mais" href="{{ url(modo='tabela', equipe=c.equipe) }}">Ver a tabela da equipe</a>
-      </div>
-    {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
-  </div>
-  {% elif aba == 'esperando' %}
-  {% if equipe %}{% set c = (cartoes|selectattr('equipe', 'equalto', equipe)|list or [none])[0] %}
-  {# a tabela de uma equipe diz de quem ela é (Levi, 05/10: "mostrando também qual é o supervisor") #}
-  <div class="cn-faixa-equipe">
-    <b>{{ equipe }}</b>
-    <span>Supervisor: <b>{{ c.supervisor if c else '—' }}</b></span>
-    {% if c %}<span class="cn-eq-tec">{{ capacete() }}<b>{{ c.tecnicos }}</b> técnico{{ 's' if c.tecnicos != 1 }}</span>
-    <span><b class="cn-t-alerta">{{ c.pts|length }}</b> PT esperando · <b class="cn-t-critico">{{ c.parada }}</b> parada{{ 's' if c.parada != 1 }} há +2 h</span>{% endif %}
-  </div>
-  {% endif %}
-  <div class="cn-tab"><table class="cn-expande">
-    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th></tr></thead>
-    <tbody>
-    {% for p in aguardando %}
-      <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
-        <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.regiao_br or '—' }}</td>
-        <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td>
-        <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td></tr>
-      {{ detalhe(p, 9) }}
-    {% else %}<tr><td colspan="9" class="mudo">Nenhuma PT esperando com esses filtros.</td></tr>{% endfor %}
-    </tbody></table></div>
+  {% if aba == 'esperando' %}
+  {% include 'campo/_pt_esperando.html' %}
   {% else %}
   <div class="cn-chips">
-    <a href="{{ url(sit=None) }}"{% if not sit %} aria-current="page"{% endif %}>Todas <b>{{ contagem.values()|sum }}</b></a>
-    {% for s, (rot, cor) in situacoes.items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
+    <a href="{{ url(sit=None) }}"{% if not sit %} aria-current="page"{% endif %}>Todas <b>{{ contagem_hist.values()|sum }}</b></a>
+    {% for s, (rot, cor) in situacoes.items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem_hist.get(s, 0) }}</b></a>{% endfor %}
   </div>
   <div class="cn-tab"><table class="cn-expande">
     <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th><th>PDF</th></tr></thead>
@@ -143,6 +107,7 @@
     {% if aba == 'historico' %}<br><b>PDF:</b> é o que o App anexou na tarefa do Fracttal no De acordo, com a assinatura
     do técnico e a de quem aceitou; o Nexus busca no Fracttal na hora do clique. PT não autorizada não tem PDF.{% endif %}</div>
 </div>
+{% if aba == 'historico' %}
 <script>
   // clicar no cartão abre a tabela da equipe (Levi, 05/10); o link da OS dentro dele continua indo para a PT
   document.querySelectorAll('.cn-clicavel[data-href]').forEach(function (c) {
@@ -163,4 +128,5 @@
     tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
   });
 </script>
+{% endif %}
 {% endblock %}
