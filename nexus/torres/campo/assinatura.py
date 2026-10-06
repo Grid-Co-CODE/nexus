@@ -110,6 +110,14 @@ def assinatura_tecnico(numero):
     return jsonify({"ok": True, "img": img})
 
 
+@bp_assinatura.route("/os/_nexus/voltar")
+def voltar_para():
+    """Depois do login do Fracttal (o OS Creator só devolve para /os/...), de volta à tela do Nexus de onde se veio.
+    Só endereço da torre Campo: nada de mandar para fora."""
+    para = request.args.get("para") or ""
+    return redirect(para if para.startswith("/t/campo/") and not para.startswith("//") else "/t/campo/aprovacao")
+
+
 @bp_assinatura.route("/os/_nexus/pt/<numero>/voltar")
 def voltar(numero):
     return redirect(_tela(numero))

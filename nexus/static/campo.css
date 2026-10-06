@@ -343,3 +343,12 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-idade--3{background:#ff8f3c}
 .cn-idade--4{background:var(--critico)}
 .cn-idade:hover,.cn-idade.ativa{outline:2px solid var(--tinta);outline-offset:1px}
+
+/* o porquê do grupo e o Aprovar, na linha aberta da fila */
+.cn-motivos{margin:0;padding:0;list-style:none;display:grid;gap:8px;font-size:13px}
+.cn-motivos li{display:grid;grid-template-columns:8px minmax(0,1fr);gap:10px;align-items:start}
+.cn-motivos li::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;margin-top:5px}
+.cn-motivos li span{color:var(--tinta)}
+.cn-aprovar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px}
+.cn-aprovar-msg{font-size:12.5px;max-width:52ch}
+tr.cn-aprovada td{opacity:.45}

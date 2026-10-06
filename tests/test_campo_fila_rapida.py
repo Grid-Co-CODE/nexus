@@ -146,3 +146,27 @@ def test_aprovacao_para_insight(fila_e_cadastro, logado):
     assert "Técnico 7" in html and "<th>Uso do App</th>" in html
     r = logado.get("/t/campo/aprovacao?dias=60&csv=1")
     assert r.mimetype == "text/csv" and "15102" in r.get_data(as_text=True)
+
+
+def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cadastro, logado):
+    """Levi, 05/10: "expandir a linha para entender o motivo do grupo, pq precisa do meu olho?" e "ao expandir o
+    supervisor deve conseguir aprovar a OS também, usando o mesmo caminho que o OS Creator Web"."""
+    from nexus.campo import aprovacao, regras_app
+    olho = {"pelo_app": True, "qualidade": 71, "foi_devolvida": True}
+    assert [c for c, _ in aprovacao.motivos(olho)] == ["alerta", "alerta"]
+    assert "abaixo de 80%" in aprovacao.motivos(olho)[0][1] and "devolvida" in aprovacao.motivos(olho)[1][1]
+    assert aprovacao.motivos({"pelo_app": True, "qualidade": 96})[0][0] == "ok"
+    assert "fora do App" in aprovacao.motivos({"pelo_app": False})[0][1]
+    html = logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
+    assert 'class="cn-detalhe" hidden' in html and "Por que está em" in html and "Nota do registro 71%" in html
+    assert 'data-wo="15088"' in html and "Aprovar a OS 15088" in html and "/os/api/os/" in html
+    # o Concluir do OS Creator sem login do Fracttal: 401 pedindo login (a tela leva ao login e volta)
+    r = logado.post("/os/api/os/15088/concluir", json={"folio": "15088"})
+    assert r.status_code == 401 and r.get_json()["login"] is True
+    assert logado.get("/os/_nexus/voltar?para=/t/campo/aprovacao%3Fvista%3Dfila").headers["Location"].endswith("/t/campo/aprovacao?vista=fila")
+    assert logado.get("/os/_nexus/voltar?para=https://fora.test/x").headers["Location"].endswith("/t/campo/aprovacao")
+    # aprovada: sai da fila guardada na hora
+    antes = len(regras_app._FILA_CACHE["linhas"])
+    assert logado.post("/t/campo/aprovacao/15088/tirar").get_json()["tarefas"] == 1
+    assert len(regras_app._FILA_CACHE["linhas"]) == antes - 1
+    assert ">15088<" not in logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)

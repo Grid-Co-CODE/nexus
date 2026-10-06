@@ -210,6 +210,15 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
     30 dias primeiro; o supervisor e a equipe saem do cadastro pela usina do Fracttal), por técnico e a fila; CSV.
     Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas esperando; 937 prontas; 1.780 tarefas paradas há 30 dias ou
     mais; uso do App 41%; Camila Viana 1.373 tarefas (uso do App 29%), Vitor Valadares 829 (12%).
+  - **A linha aberta diz o porquê do grupo e aprova** (Levi, 05/10): `aprovacao.motivos` = a regra `_triagem` do App
+    mostrando TODOS os motivos que valem (nota abaixo de 80, ronda com pendência, já devolvida, tempo fora por causa
+    do técnico, foto divergente; ou por que está completa). **Aprovar = o Concluir do OS Creator Web** ("usando o
+    mesmo caminho que o OS Creator Web"): o botão chama `POST /os/api/os/<id_work_order>/concluir`, a rota do clone,
+    com o login do Fracttal de quem clica (status 3 + recalculate + reconferência da data de fim; IRREVERSÍVEL, pede
+    confirmação). Sem login: 401, a tela leva ao login e volta (`/os/_nexus/voltar?para=`, só /t/campo/). Aprovada,
+    a OS sai da fila guardada na hora (`POST /t/campo/aprovacao/<id>/tirar`). O id da OS vem da fila crua.
+    **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas) e as rondas aprovadas (~30); em 05/10, com
+    muitos reinícios seguidos, o Fracttal passou a recusar (429). Em desenvolvimento, `NEXUS_CAMPO_AQUECER=0`.
   - **Filtro de equipe e de supervisor** pelo cadastro: as usinas da equipe (ou do supervisor) pelo nome no Fracttal
     (de-para "Fracttal · Classificação 1", `visao.usinas_do_fracttal`) viram o escopo de usinas da conta do App
     (`_area_ok`, `clusters.usinas`): grupos, números e lista saem já filtrados. Usina sem de-para do Fracttal não entra

@@ -7,7 +7,7 @@ grava de hora em hora e o cadastro do Nexus. Aprovação, Ordens e Triagem usam 
 (`nexus/campo/visao.py`). Imagens da ronda e Rotas do dia ficam no placeholder: o dado delas ainda não chega ao banco.
 """
 from datetime import datetime, timedelta
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from flask import Response, redirect, render_template, request, session
 from markupsafe import Markup, escape
@@ -462,7 +462,16 @@ def aprovacao():
         equipes=sorted(opcoes.get("equipes") or {}), supervisores=sorted(opcoes.get("supervisores") or {}),
         mapa_erro=mapa.erro, dias=dias, vista=vista, vistas=VISTAS_APROVACAO, k=k, idades=idades, idade=idade,
         q=request.args.get("q", ""), linhas_fila=fila, limite=LIMITE_LINHAS, por_supervisor=supervisores_g,
-        por_tecnico=tecnicos_g, iniciais=_iniciais))
+        por_tecnico=tecnicos_g, iniciais=_iniciais, motivos=campo_aprovacao.motivos))
+
+
+@bp.route("/aprovacao/<int:id_wo>/tirar", methods=["POST"])
+def aprovacao_tirar(id_wo):
+    """Depois de o supervisor aprovar pelo Concluir do OS Creator, a OS sai da fila guardada do Nexus."""
+    origem = request.headers.get("Origin")
+    if origem and urlsplit(origem).netloc != request.host:
+        return "Origem recusada.", 403
+    return {"ok": True, "tarefas": campo_aprovacao.tirar_da_fila(id_wo)}
 
 
 # ── Ordens de serviço (os números e a lista são os do App, nexus/campo/ordens.py) ────────────────────────────────

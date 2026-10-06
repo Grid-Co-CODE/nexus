@@ -132,17 +132,42 @@
     </div>
     <div class="cn-lista-cab"><h2>Fila de verificação</h2><span class="mudo">{{ [linhas_fila|length, limite]|min }} de {{ linhas_fila|length }}, a mais antiga primeiro</span>
       {% if linhas_fila|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ linhas_fila|length }}</span>{% endif %}</div>
-    <div class="cn-tab"><table>
+    <div class="cn-tab"><table class="cn-expande">
       <thead><tr><th>Espera</th><th>OS</th><th>Tarefa</th><th>Técnico</th><th>Usina</th><th>Equipe</th><th>Supervisor</th><th>Fechada em</th><th>Nota do registro</th><th>Grupo</th></tr></thead>
       <tbody>
       {% for x in linhas_fila[:limite] %}{% set g = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
-        <tr><td><span class="cn-st cn-t-{{ cor_espera(x.espera_d) }}">{{ '—' if x.espera_d is none else ('hoje' if x.espera_d == 0 else x.espera_d ~ ' d') }}</span></td>
+        <tr class="cn-linha" tabindex="0" aria-expanded="false" data-wo="{{ x.id_wo or '' }}"><td><span class="cn-st cn-t-{{ cor_espera(x.espera_d) }}">{{ '—' if x.espera_d is none else ('hoje' if x.espera_d == 0 else x.espera_d ~ ' d') }}</span></td>
           <td class="m"><b>{{ x.os }}</b></td><td>{{ (x.tarefa or '')[:60] }}</td>
           <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico }}</td>
           <td class="cn-menor">{{ x.usina_cad or '—' }}</td><td class="cn-menor">{{ x.equipe_cad or '—' }}</td><td class="cn-menor">{{ x.supervisor_cad or '—' }}</td>
           <td class="m">{{ dia_curto(x.fim) }}</td>
           <td>{% if x.pelo_app %}{% set c = 'ok' if (x.qualidade or 0) >= 80 else 'alerta' %}<span class="cn-nota-barra"><b class="cn-t-{{ c }}">{{ x.qualidade or 0 }}%</b><span class="cn-barrinha"><span class="cn-b-{{ c }}" style="width: {{ x.qualidade or 0 }}%"></span></span></span>{% else %}<span class="mudo">—</span>{% endif %}</td>
           <td><span class="cn-selo cn-selo--{{ g[1] if g[1] != 'neutro' else 'neutro' }}">{{ g[0] }}</span></td></tr>
+        {# o porquê do grupo e o Aprovar (o Concluir do OS Creator Web, com o login do Fracttal de quem aprova) #}
+        <tr class="cn-detalhe" hidden><td colspan="10">
+          <div class="cn-detalhe-grade">
+            <div>
+              <h3>Por que está em "{{ g[0] }}"</h3>
+              <ul class="cn-motivos">{% for cor, texto in motivos(x) %}<li class="cn-t-{{ cor }}"><span>{{ texto }}</span></li>{% endfor %}</ul>
+            </div>
+            <div>
+              <dl class="cn-dados">
+                <dt>OS</dt><dd class="m">{{ x.os }}{% if x.ronda %} · OS de ronda{% endif %}</dd>
+                <dt>Tarefa</dt><dd>{{ x.tarefa or '—' }}</dd>
+                <dt>Técnico</dt><dd>{{ x.tecnico }}{% if x.funcao %} · {{ x.funcao }}{% endif %}</dd>
+                <dt>Usina</dt><dd>{{ x.usina_cad or '—' }}{% if x.equipe_cad %} · {{ x.equipe_cad }}{% endif %}{% if x.supervisor_cad %} · supervisor {{ x.supervisor_cad }}{% endif %}</dd>
+                <dt>Fechada em</dt><dd>{{ dia_curto(x.fim) }} · esperando há {{ x.espera_d or 0 }} dia{{ 's' if (x.espera_d or 0) != 1 }}</dd>
+                <dt>Pelo App</dt><dd>{{ 'sim, nota ' ~ (x.qualidade or 0) ~ '%' if x.pelo_app else 'não' }}{% if x.foi_devolvida %} · já devolvida{% endif %}</dd>
+              </dl>
+              {% if x.id_wo %}
+              <div class="cn-aprovar" data-wo="{{ x.id_wo }}" data-os="{{ x.os }}">
+                <button class="gc-btn gc-btn--primario" type="button">Aprovar a OS {{ x.os }}</button>
+                <span class="cn-aprovar-msg mudo">Conclui a OS no Fracttal com o seu login do Fracttal (o mesmo do OS Creator). Não dá para desfazer.</span>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </td></tr>
       {% else %}<tr><td colspan="10" class="mudo">Nada na fila com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>
     {% endif %}
@@ -155,6 +180,47 @@
     supervisor e a equipe saem do cadastro do Nexus pela usina da OS. Aprovar continua no Fracttal.</div>
 </div>
 <script>
+  // clicar na linha abre o porquê do grupo e o Aprovar (Levi, 05/10)
+  document.querySelectorAll('table.cn-expande tr.cn-linha').forEach(function (tr) {
+    function alterna(ev) {
+      if (ev.target.closest('a, button')) return;
+      var det = tr.nextElementSibling;
+      if (!det || !det.classList.contains('cn-detalhe')) return;
+      det.hidden = !det.hidden;
+      tr.setAttribute('aria-expanded', String(!det.hidden));
+    }
+    tr.addEventListener('click', alterna);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
+  });
+  // Aprovar = o Concluir do OS Creator Web (POST /os/api/os/<id>/concluir), com o login do Fracttal de quem clica.
+  // Irreversível: pede confirmação. Sem login, leva ao login do Fracttal e volta para esta tela.
+  document.querySelectorAll('.cn-aprovar').forEach(function (box) {
+    var bt = box.querySelector('button'), msg = box.querySelector('.cn-aprovar-msg');
+    bt.addEventListener('click', function () {
+      if (!confirm('Aprovar a OS ' + box.dataset.os + '?
+
+Ela é concluída no Fracttal com o seu login do Fracttal e isso não dá para desfazer.')) return;
+      bt.disabled = true; msg.textContent = 'Aprovando no Fracttal…';
+      fetch('/os/api/os/' + box.dataset.wo + '/concluir', {method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({folio: box.dataset.os})})
+        .then(function (r) { return r.json().then(function (j) { return {status: r.status, j: j}; }); })
+        .then(function (res) {
+          if (res.status === 401 || (res.j && res.j.login)) {
+            var volta = '/os/_nexus/voltar?para=' + encodeURIComponent(location.pathname + location.search);
+            msg.innerHTML = 'Para aprovar, <a class="cn-link" href="/os/login?next=' + encodeURIComponent(volta) + '">entre com o seu login do Fracttal</a>.';
+            bt.disabled = false; return;
+          }
+          if (!res.j || !res.j.ok) { msg.textContent = 'O Fracttal não aprovou: ' + ((res.j && (res.j.erro || res.j.msg)) || 'erro'); bt.disabled = false; return; }
+          msg.textContent = res.j.mensagem || 'OS aprovada.';
+          msg.className = 'cn-aprovar-msg cn-t-ok';
+          bt.textContent = 'Aprovada';
+          var tr = box.closest('tr.cn-detalhe').previousElementSibling;
+          if (tr) tr.classList.add('cn-aprovada');
+          fetch('/t/campo/aprovacao/' + box.dataset.wo + '/tirar', {method: 'POST', credentials: 'same-origin'});
+        })
+        .catch(function () { msg.textContent = 'Não consegui falar com o Fracttal. Tente de novo.'; bt.disabled = false; });
+    });
+  });
   // o cartão do supervisor leva à fila dele (o link dentro do cartão continua valendo)
   document.querySelectorAll('.cn-clicavel[data-href]').forEach(function (c) {
     function vai(ev) { if (ev.target.closest('a')) return; location.href = c.dataset.href; }

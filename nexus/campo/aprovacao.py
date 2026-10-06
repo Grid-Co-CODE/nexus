@@ -162,14 +162,55 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
             if pag >= int((d.get("pagina") or {}).get("paginas") or 1):
                 break
             pag += 1
-        grupo = {w.get("id_work_orders_tasks") or w.get("id_work_order"): w.get("groups_1_description") or ""
-                 for w in regras_app._FILA_CACHE.get("linhas") or []}
+        crua = {w.get("id_work_orders_tasks") or w.get("id_work_order"): w for w in regras_app._FILA_CACHE.get("linhas") or []}
         for x in todas:
-            x["usina_fx"] = grupo.get(x.get("id_wt"), "")
+            w = crua.get(x.get("id_wt")) or {}
+            # a usina do Fracttal e o id da OS (o que o Concluir do OS Creator pede), que a cópia do App não devolve
+            x["usina_fx"], x["id_wo"] = w.get("groups_1_description") or "", w.get("id_work_order")
         return {"janela": primeira.get("janela"), "resumo": primeira.get("resumo"), "baldes": primeira.get("baldes"),
                 "sem_cadastro": primeira.get("sem_cadastro"), "linhas": todas}
     filtro = tuple(sorted(usinas)) if usinas is not None else None
     return leitura.ler(("fila_toda", str(lida), filtro) + tuple(sorted(p.items())), calcular)
+
+
+def motivos(x) -> list[tuple[str, str]]:
+    """Por que a tarefa caiu no grupo dela (Levi, 05/10: "pq precisa do meu olho?"): a regra do App (`_triagem`), na
+    mesma ordem, mas mostrando TODOS os motivos que valem, não só o primeiro. Mais o que explica o tempo sem pesar
+    contra o técnico (previsto curto, execução longa)."""
+    if not x.get("pelo_app"):
+        return [("neutro", "Fechada fora do App: sem as fotos, o GPS e o checklist do App para julgar por aqui. "
+                           "Olhe a OS no Fracttal antes de aprovar.")]
+    m, q = [], x.get("qualidade")
+    if q is None or int(q) < regras_app.TRIAGEM_NOTA_OK:
+        m.append(("alerta", f"Nota do registro {int(q or 0)}%: abaixo de {regras_app.TRIAGEM_NOTA_OK}% "
+                            "(subtarefas, fotos, descrição, assinatura, observação e GPS)"))
+    if x.get("ronda") and x.get("falhas"):
+        m.append(("alerta", "Ronda com pendências: " + "; ".join(str(f) for f in x["falhas"])))
+    if x.get("foi_devolvida"):
+        m.append(("alerta", "Já foi devolvida ao técnico uma vez"))
+    if x.get("estouro_causa") == "tecnico":
+        m.append(("alerta", f"Tempo real {x.get('estouro')} vezes o previsto, e não é o previsto que está curto"))
+    if x.get("foto_divergente"):
+        m.append(("alerta", "Foto marcada pelo App como divergente (não bate com o item que ela deveria mostrar)"))
+    if not m:
+        m.append(("ok", f"Subtarefas respondidas, nota {int(q or 0)}% ({regras_app.TRIAGEM_NOTA_OK}% ou mais), tempo dentro "
+                        "do previsto e nenhuma foto marcada: é decisão, não análise"))
+    if x.get("estouro_causa") == "previsto":
+        m.append(("neutro", f"O tempo passou {x.get('estouro')} vezes o previsto, mas o previsto é curto demais para a tarefa"))
+    elif x.get("estouro_causa") == "execucao":
+        m.append(("neutro", "Execução longa (mais de 8 h): o tempo não pesa contra o técnico"))
+    return m
+
+
+def tirar_da_fila(id_wo) -> int:
+    """A OS aprovada pelo Nexus sai da fila guardada na hora (sem esperar a releitura de 10 min). Quantas tarefas saíram."""
+    linhas = regras_app._FILA_CACHE.get("linhas")
+    if not linhas or not id_wo:
+        return 0
+    restam = [w for w in linhas if str(w.get("id_work_order")) != str(id_wo)]
+    regras_app._FILA_CACHE["linhas"] = restam
+    leitura.limpar()
+    return len(linhas) - len(restam)
 
 
 def limpar():
