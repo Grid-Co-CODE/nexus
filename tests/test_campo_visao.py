@@ -9,7 +9,7 @@ import pytest
 from pg_falso import ApiPGFalsa
 
 from nexus.cadastro.cifra import Cofre, gerar_chave
-from nexus.campo import decisao_pt, visao
+from nexus.campo import decisao_pt, fracttal, pt_fracttal, visao
 from nexus.campo.ligacao_cadastro import codigo_da_pessoa
 
 BRT = timezone(timedelta(hours=-3))
@@ -263,7 +263,78 @@ def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
     assert "Nenhuma PT esperando com esses filtros" in html
     html = logado.get("/t/campo/pt?aba=historico").get_data(as_text=True)
     assert "<th>Situação</th>" in html and "De acordo" in html and "/t/campo/pt/PT-3" in html
-    assert "PDF com as assinaturas" in html
+    assert "/t/campo/pt/PT-3/pdf" in html and "<th>PDF</th>" in html
+
+
+def test_cartao_leva_a_tabela_da_equipe_com_o_supervisor(banco, logado):
+    html = logado.get("/t/campo/pt").get_data(as_text=True)
+    assert 'class="cn-equipe cn-equipe--critico cn-clicavel"' in html and 'data-href="?modo=tabela&amp;equipe=SP+Norte+01"' in html
+    html = logado.get("/t/campo/pt?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
+    assert 'class="cn-faixa-equipe"' in html and "Supervisor: <b>Beltrano Supervisor</b>" in html and "2</b> técnicos" in html
+
+
+class _FracttalPT:
+    """O REST do Fracttal para uma OS de PT: a tarefa e os anexos (com o PDF que o App anexa no De acordo)."""
+
+    def __init__(self, com_pdf=True):
+        self.com_pdf = com_pdf
+
+    def __call__(self, path):
+        if path.startswith("work_orders_attachments"):
+            dados = [{"description": "foto 1", "value": "https://s3.test/foto.jpg"}]
+            if self.com_pdf:
+                dados.append({"description": "Permissão de Trabalho PT-3", "value": "https://s3.test/PT-3.pdf"})
+            return {"data": dados}
+        if path.startswith("work_orders?wo_folio="):
+            return {"data": [{"id_work_orders_tasks": 777, "tasks_description": "Troca de string"}]}
+        raise AssertionError(path)
+
+
+@pytest.fixture
+def fracttal_pt():
+    fx = _FracttalPT()
+    fracttal.usar_fornecedor(fx)
+    pt_fracttal.limpar()
+    yield fx
+    fracttal.usar_fornecedor(None)
+    pt_fracttal.limpar()
+
+
+def test_pdf_da_pt_vem_do_anexo_do_fracttal(banco, logado, fracttal_pt, monkeypatch):
+    baixados = []
+    monkeypatch.setattr(pt_fracttal, "_baixar", lambda url, lim: baixados.append(url) or b"%PDF-1.4 teste")
+    r = logado.get("/t/campo/pt/PT-3/pdf")
+    assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data.startswith(b"%PDF")
+    assert 'filename="PT-3.pdf"' in r.headers["Content-Disposition"] and baixados == ["https://s3.test/PT-3.pdf"]
+    fracttal_pt.com_pdf = False
+    r = logado.get("/t/campo/pt/PT-3/pdf")
+    assert r.status_code == 302 and "não está nos anexos" in logado.get("/t/campo/pt/PT-3").get_data(as_text=True)
+
+
+def test_assinatura_do_tecnico_vem_da_apr_pelo_login_de_quem_olha(app, banco, logado, fracttal_pt, monkeypatch):
+    from nexus.torres.campo import assinatura
+    assert logado.get("/os/_nexus/pt/PT-1/assinatura-tecnico").get_json()["login"] is True
+    _entrar_no_fracttal(app, logado, _jwt())
+    pedidos = []
+
+    def rpc_falso(jwt, email):
+        def rpc(metodo, params):
+            pedidos.append((metodo, params))
+            if metodo == "tasks.work_order_offline_ptw_download":
+                return {"data": {"pre": [{"values": {"filled_by_signature": "company_1/validations/ass.png"}}]}}
+            if metodo == "companies.s3_object_get":
+                return {"data": {"url": "https://s3.test/ass.png"}}
+            raise AssertionError(metodo)
+        return rpc
+    monkeypatch.setattr(assinatura, "_rpc_de_quem_olha", rpc_falso)
+    monkeypatch.setattr(pt_fracttal, "_baixar", lambda url, lim: b"\x89PNG\r\n\x1a\nimagem")
+    j = logado.get("/os/_nexus/pt/PT-1/assinatura-tecnico").get_json()
+    assert j["ok"] and j["img"].startswith("data:image/png;base64,")
+    assert pedidos[0] == ("tasks.work_order_offline_ptw_download", {"id_work_order_task": 777})
+    logado.get("/os/_nexus/pt/PT-1/assinatura-tecnico")
+    assert len(pedidos) == 2                       # guardada 1 h: a segunda vez não pergunta ao Fracttal
+    html = logado.get("/t/campo/pt/PT-1").get_data(as_text=True)
+    assert 'id="cn-ass-tec"' in html and "/os/_nexus/pt/PT-1/assinatura-tecnico" in html
 
 
 # ── aprovação da PT no Nexus ─────────────────────────────────────────────────────────────────────────────────────

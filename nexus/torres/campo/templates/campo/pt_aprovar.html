@@ -24,6 +24,8 @@
   <div class="cn-pt-grade">
     <section class="cn-cartao">
       <h2>A PT</h2>
+      <div class="cn-pt-corpo">
+      <div>
       <dl class="cn-dados">
         <dt>OS</dt><dd class="m">{{ p.os or '—' }}</dd>
         <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
@@ -36,7 +38,30 @@
       </dl>
       <h3>Atividades da APR</h3>
       <ul class="cn-ativ">{% for a in p.atividades %}<li>{{ a }}</li>{% else %}<li class="mudo">Sem atividade crítica marcada.</li>{% endfor %}</ul>
+      </div>
+      {# a assinatura do técnico na APR, do Fracttal, pelo login de quem olha (nexus/campo/pt_fracttal.py) #}
+      <figure class="cn-ass" id="cn-ass-tec">
+        <figcaption>Assinatura do técnico · APR</figcaption>
+        <div class="cn-ass-quadro"><span class="mudo">Buscando no Fracttal…</span></div>
+        <span class="cn-ass-quem">{{ p.solicitante or '—' }}{% if p.criada %} · {{ p.criada.strftime('%d/%m/%y %H:%M') }}{% endif %}</span>
+      </figure>
+      </div>
+      {% if p.situacao == 'de_acordo' %}<p class="cn-pt-pdf"><a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_pdf', numero=p.numero) }}">Baixar PDF da PT</a>
+        <span class="mudo">o que o App anexou no Fracttal, com a assinatura do técnico e a de quem aceitou</span></p>{% endif %}
     </section>
+    <script>
+      // a assinatura vem do Fracttal pelo login do OS Creator (cookie só em /os); sem login, o quadro diz como entrar
+      fetch('/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico', {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); }).then(function (a) {
+          var q = document.querySelector('#cn-ass-tec .cn-ass-quadro');
+          q.textContent = '';
+          if (a.ok) { var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img); return; }
+          var s = document.createElement('span'); s.className = 'mudo';
+          if (a.login) { s.innerHTML = 'Para ver a assinatura, <a class="cn-link" href="' + a.entrar + '">entre com o seu login do Fracttal</a>.'; }
+          else { s.textContent = 'Sem a assinatura: ' + (a.motivo || 'o Fracttal não respondeu') + '.'; }
+          q.appendChild(s);
+        }).catch(function () {});
+    </script>
 
     <section class="cn-cartao cn-decisao">
       <h2>Decisão</h2>

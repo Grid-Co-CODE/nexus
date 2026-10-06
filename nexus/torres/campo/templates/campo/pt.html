@@ -78,23 +78,33 @@
   {# um cartão por equipe com as PT que ela tem esperando (Levi, 05/10: "a divisão por equipe mostrando o que está pendente") #}
   <div class="cn-equipes">
     {% for c in cartoes %}
-      <div class="cn-equipe cn-equipe--{{ 'critico' if c.parada else 'alerta' }}">
+      <div class="cn-equipe cn-equipe--{{ 'critico' if c.parada else 'alerta' }} cn-clicavel" role="link" tabindex="0"
+           data-href="{{ url(modo='tabela', equipe=c.equipe) }}" title="Abrir a tabela da {{ c.equipe }}">
         <div class="cn-eq-cab">
           <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>
             <span class="cn-eq-tec" title="{{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }} na equipe (cadastro){% for k, n in c.cargos.items() %}{{ ':' if loop.first else ',' }} {{ n }} {{ k }}{% endfor %}">{{ capacete() }}<b>{{ c.tecnicos }}</b></span></div>
           <span>{{ c.regioes|join(', ') or '—' }}</span>
           <span>Supervisor: <b class="cn-eq-sup">{{ c.supervisor }}</b></span>
         </div>
-        <div class="cn-eq-num"><span><span class="v cn-t-{{ 'critico' if c.parada else 'alerta' }}">{{ c.pts|length }}</span><span class="d">PT esperando o De acordo</span></span>
-          <span class="dir"><span class="v cn-t-critico">{{ c.parada }}</span><span class="d">parada{{ 's' if c.parada != 1 }} há mais de 2 h</span></span></div>
+        <div class="cn-eq-num"><span><span class="v cn-t-{{ 'critico' if c.parada else 'alerta' }}">{{ c.pts|length }}</span><span class="d">PT esperando</span></span>
+          <span class="dir"><span class="v cn-t-critico">{{ c.parada }}</span><span class="d">parada{{ 's' if c.parada != 1 }} há +2 h</span></span></div>
         <ul class="cn-eq-pts">
           {% for p in c.pts %}<li>{{ os_link(p) }}<span class="t">{{ p.tarefa[:48] }}<span class="det">{{ p.usina }} · {{ p.solicitante or '—' }}</span></span><span class="m cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></li>{% endfor %}
         </ul>
-        <a class="cn-link cn-eq-mais" href="{{ url(modo='tabela', equipe=c.equipe) }}">Ver na tabela</a>
+        <a class="cn-link cn-eq-mais" href="{{ url(modo='tabela', equipe=c.equipe) }}">Ver a tabela da equipe</a>
       </div>
     {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
   </div>
   {% elif aba == 'esperando' %}
+  {% if equipe %}{% set c = (cartoes|selectattr('equipe', 'equalto', equipe)|list or [none])[0] %}
+  {# a tabela de uma equipe diz de quem ela é (Levi, 05/10: "mostrando também qual é o supervisor") #}
+  <div class="cn-faixa-equipe">
+    <b>{{ equipe }}</b>
+    <span>Supervisor: <b>{{ c.supervisor if c else '—' }}</b></span>
+    {% if c %}<span class="cn-eq-tec">{{ capacete() }}<b>{{ c.tecnicos }}</b> técnico{{ 's' if c.tecnicos != 1 }}</span>
+    <span><b class="cn-t-alerta">{{ c.pts|length }}</b> PT esperando · <b class="cn-t-critico">{{ c.parada }}</b> parada{{ 's' if c.parada != 1 }} há +2 h</span>{% endif %}
+  </div>
+  {% endif %}
   <div class="cn-tab"><table class="cn-expande">
     <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th></tr></thead>
     <tbody>
@@ -112,16 +122,17 @@
     {% for s, (rot, cor) in situacoes.items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
   </div>
   <div class="cn-tab"><table class="cn-expande">
-    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th></tr></thead>
+    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th><th>PDF</th></tr></thead>
     <tbody>
     {% for p in historico[:300] %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
         <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.solicitante or '—' }}</td>
         <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ p.decidida_por or p.papel or '—' }}</td>
         <td class="m">{{ p.criada.strftime('%d/%m %H:%M') if p.criada else '—' }}</td>
-        <td class="m">{{ '—' if p.espera_min is none else idade_min(p.espera_min) }}</td></tr>
-      {{ detalhe(p, 10) }}
-    {% else %}<tr><td colspan="10" class="mudo">Nenhuma PT decidida com esses filtros.</td></tr>{% endfor %}
+        <td class="m">{{ '—' if p.espera_min is none else idade_min(p.espera_min) }}</td>
+        <td>{% if p.situacao in ('de_acordo', 'vencida') %}<a class="cn-link" href="{{ url_for('torre_campo.pt_pdf', numero=p.numero) }}" title="O PDF que o App anexou no Fracttal, com as assinaturas">Baixar</a>{% else %}—{% endif %}</td></tr>
+      {{ detalhe(p, 11) }}
+    {% else %}<tr><td colspan="11" class="mudo">Nenhuma PT decidida com esses filtros.</td></tr>{% endfor %}
     </tbody></table></div>
   {% if historico|length > 300 %}<p class="mudo">Mostrando 300 de {{ historico|length }}: use o período, o supervisor ou a busca.</p>{% endif %}
   {% endif %}
@@ -129,10 +140,16 @@
   <div class="cn-nota"><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
     App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, supervisor e técnicos vêm do
     cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
-    {% if aba == 'historico' %}<br><b>PDF com as assinaturas:</b> as assinaturas (do técnico e de quem aceitou) ainda só
-    existem no App; o PDF entra aqui quando o App passar a mandá-las ao banco, cifradas.{% endif %}</div>
+    {% if aba == 'historico' %}<br><b>PDF:</b> é o que o App anexou na tarefa do Fracttal no De acordo, com a assinatura
+    do técnico e a de quem aceitou; o Nexus busca no Fracttal na hora do clique. PT não autorizada não tem PDF.{% endif %}</div>
 </div>
 <script>
+  // clicar no cartão abre a tabela da equipe (Levi, 05/10); o link da OS dentro dele continua indo para a PT
+  document.querySelectorAll('.cn-clicavel[data-href]').forEach(function (c) {
+    function vai(ev) { if (ev.target.closest('a')) return; location.href = c.dataset.href; }
+    c.addEventListener('click', vai);
+    c.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') vai(ev); });
+  });
   // clicar na linha abre o detalhe da PT logo abaixo (Levi, 05/10); o link da OS continua indo para a aprovação
   document.querySelectorAll('table.cn-expande tr.cn-linha').forEach(function (tr) {
     function alterna(ev) {

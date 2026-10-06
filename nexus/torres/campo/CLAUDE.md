@@ -71,9 +71,18 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   tabela) e "Histórico" (decididas, período 7/30/90 dias, por situação). Filtro de supervisor; o cartão leva à tabela
   da equipe. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
   lugar do Estado; Espera na última coluna; clicar na linha abre o detalhe (PT, equipamento, equipe e supervisor,
-  atividades críticas com sim/não/NA, respostas NÃO, 1º aviso, decisão e motivo). **Falta o PDF com as assinaturas**
-  (do técnico e de quem aceitou, como no painel do App): as assinaturas só existem no App; entra quando o App mandá-las
-  ao banco, cifradas (mesma versão do App que manda o detalhe da APR).
+  atividades críticas com sim/não/NA, respostas NÃO, 1º aviso, decisão e motivo). O cartão inteiro leva à tabela
+  da equipe, com a faixa de quem ela é (supervisor, técnicos, PT esperando e paradas).
+- **PDF e assinatura do técnico pelo Fracttal, sem App e sem Azure** (`nexus/campo/pt_fracttal.py`, 05/10):
+  - **PDF** (Histórico e aprovação): no De acordo o App gera o PDF com as duas assinaturas e anexa na tarefa
+    ("Permissão de Trabalho <número>"). O REST de anexos (credencial do OS Creator) traz o link já assinado (24 h); o
+    Nexus baixa e entrega (`/t/campo/pt/<n>/pdf`), o link não vai ao navegador. Medido: PT-15457-0510-1751, 26,9 KB em
+    1,8 s. PT não autorizada não tem PDF.
+  - **Assinatura do técnico ao lado de "A PT"**: a da APR (`filled_by_signature`), pelo RPC
+    `tasks.work_order_offline_ptw_download` com o login do Fracttal (OS Creator) de quem olha; caminho de arquivo se
+    assina com `companies.s3_object_get`. A tarefa da PT sai do REST da OS (a única, ou a de mesma descrição; duas
+    candidatas = não chuta). Guardada 1 h em memória, nunca no banco. **Sem prova com login real ainda** (os testes
+    usam o RPC falso): o Levi entra com o login dele e abre uma PT.
 - **Ranking por região:** 60% nota média dos fechamentos + 40% cobertura de ronda (usinas da equipe com ronda nos
   últimos 14 dias), a régua do painel do App. **Só pontua quem tem as duas partes:** região sem fechamento no período
   ganhava 100 só pela cobertura (erro meu, corrigido em 05/10). Colaboradores: nota, fechamentos, pontualidade e

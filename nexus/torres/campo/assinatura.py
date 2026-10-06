@@ -13,7 +13,7 @@ from urllib.parse import quote, urlsplit
 
 from flask import Blueprint, current_app, jsonify, redirect, request, session
 
-from ...campo import decisao_pt
+from ...campo import decisao_pt, pt_fracttal, visao
 
 bp_assinatura = Blueprint("campo_assinatura", __name__)
 
@@ -36,17 +36,40 @@ def _jwt_vivo(jwt: str) -> bool:
     return bool(jwt) and (not exp or float(exp) > time.time())
 
 
-def quem_assina() -> dict:
-    """{"email", "nome"} de quem entrou no Fracttal pelo OS Creator, ou {} (sem login, ou o token venceu)."""
+def _sessao_os() -> tuple[str, dict]:
+    """(JWT, conta) do login do Fracttal pelo OS Creator, ou ("", {}) sem login ou com o token vencido."""
     from ..oscreator import ponte
     clone = ponte.clone(current_app._get_current_object())
     s = clone.session_interface.open_session(clone, request) or {}
     jwt = str(s.get("jwt") or "")
     if not jwt or not _jwt_vivo(jwt):
+        return "", {}
+    return jwt, s.get("conta") or {}
+
+
+def quem_assina() -> dict:
+    """{"email", "nome"} de quem entrou no Fracttal pelo OS Creator, ou {} (sem login, ou o token venceu)."""
+    jwt, conta = _sessao_os()
+    if not jwt:
         return {}
-    conta = s.get("conta") or {}
     email = str(conta.get("email") or (_carga(jwt) or {}).get("email") or "").strip().lower()
     return {"email": email, "nome": str(conta.get("nome") or email)} if email else {}
+
+
+def _rpc_de_quem_olha(jwt: str, email: str):
+    """O RPC do Fracttal com o login de quem está olhando: o mesmo `_rpc_call` do OS Creator, dentro da sessão dele
+    (a costura `os_web.sessao` põe o JWT da pessoa no lugar do da máquina)."""
+    import importlib
+    api = importlib.import_module("api")
+    sessao = importlib.import_module("os_web.sessao")
+
+    def rpc(metodo, params):
+        fichas = sessao.abrir(jwt, email)
+        try:
+            return api._rpc_call(metodo, params)
+        finally:
+            sessao.fechar(fichas)
+    return rpc
 
 
 def _tela(numero) -> str:
@@ -62,6 +85,29 @@ def _login(numero) -> str:
 def quem():
     q = quem_assina()
     return jsonify({"email": q.get("email", ""), "nome": q.get("nome", "")})
+
+
+@bp_assinatura.route("/os/_nexus/pt/<numero>/assinatura-tecnico")
+def assinatura_tecnico(numero):
+    """A assinatura que o técnico desenhou na APR, para a tela da PT pôr ao lado de "A PT" (Levi, 05/10). JSON:
+    {"ok", "img"} ou {"ok": false, "login" | "motivo"}. Só com o login do Fracttal de quem olha."""
+    jwt, conta = _sessao_os()
+    if not jwt:
+        return jsonify({"ok": False, "login": True, "entrar": _login(numero)})
+    p = visao.pt(numero)
+    if not p or not p.get("os"):
+        return jsonify({"ok": False, "motivo": "a PT não está no livro do App"})
+    try:
+        id_wt = pt_fracttal.id_tarefa(p["os"], p.get("tarefa"))
+        if not id_wt:
+            return jsonify({"ok": False, "motivo": "não achei a tarefa desta PT na OS do Fracttal"})
+        email = str(conta.get("email") or (_carga(jwt) or {}).get("email") or "")
+        img = pt_fracttal.assinatura_do_tecnico(p["numero"], id_wt, _rpc_de_quem_olha(jwt, email))
+    except pt_fracttal.SemArquivo as e:
+        return jsonify({"ok": False, "motivo": str(e)})
+    except Exception as e:      # noqa: BLE001 — Fracttal recusou ou o login caiu: a tela diz, a PT abre igual
+        return jsonify({"ok": False, "motivo": f"o Fracttal não respondeu ({type(e).__name__})"})
+    return jsonify({"ok": True, "img": img})
 
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/voltar")

@@ -9,7 +9,7 @@ grava de hora em hora e o cadastro do Nexus. Aprovação, Ordens e Triagem usam 
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
-from flask import render_template, request, session
+from flask import Response, redirect, render_template, request, session
 from markupsafe import Markup, escape
 
 from ...campo import aprovacao as campo_aprovacao
@@ -17,7 +17,7 @@ from ...campo import fonte_pg as campo_fonte
 from ...campo import ordens as campo_ordens
 from ...campo import triagem as campo_triagem
 from ...campo import visao
-from ...campo import decisao_pt
+from ...campo import decisao_pt, pt_fracttal
 from ..modelo import Tela, Torre
 from .assinatura import bp_assinatura
 
@@ -193,6 +193,31 @@ def pt():
         dias=dias, supervisor=supervisor, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
         idade_min=_idade_min, cartoes=visao.pts_por_equipe(aguardando, d.get("times") or {}),
         supervisores=sorted({p.get("supervisor") for p in todas if p.get("supervisor")})))
+
+
+@bp.route("/pt/<numero>/pdf")
+def pt_pdf(numero):
+    """O PDF da PT como o App anexou no Fracttal no De acordo, com a assinatura do técnico e a de quem aceitou (Levi,
+    05/10: "exportar o anexo do PDF ... conforme estava no Azure"). O Nexus baixa e entrega: o link do Fracttal não
+    sai para o navegador."""
+    p = visao.pt(numero)
+    try:
+        if not p or not p.get("os"):
+            raise pt_fracttal.SemArquivo(f"{numero} não está no livro do App")
+        corpo = pt_fracttal.pdf(p["os"], p["numero"])
+    except pt_fracttal.SemArquivo as e:
+        session["pt_aviso"] = f"Sem PDF: {e}."
+        return redirect(url_for_pt(numero))
+    except Exception as e:      # noqa: BLE001 — Fracttal fora ou recusando
+        session["pt_aviso"] = f"Não consegui buscar o PDF no Fracttal ({type(e).__name__}). Tente de novo em instantes."
+        return redirect(url_for_pt(numero))
+    return Response(corpo, mimetype="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{p["numero"]}.pdf"'})
+
+
+def url_for_pt(numero) -> str:
+    from urllib.parse import quote
+    return f"/t/campo/pt/{quote(str(numero), safe='')}"
 
 
 @bp.route("/pt/<numero>")
