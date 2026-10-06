@@ -33,16 +33,17 @@ def _aba(api, livro, aba, linhas):
 
 _MOB = "2025-10-01"
 USINAS = [{"usina_id": 1, "nome": "Altair", "codigo": "THPN-ALT100", "status": "OPERAÇÃO", "equipe_id": 10,
-           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Altair"},
+           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Altair", "cliente_id": 1, "cluster": "SP Norte"},
           {"usina_id": 2, "nome": "Brodowski 1", "codigo": "THPN-BWK100", "status": "OPERAÇÃO", "equipe_id": 10,
-           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Brodowski"},
+           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Brodowski", "cliente_id": 1, "cluster": "SP NORTE"},
           {"usina_id": 3, "nome": "Coração 1", "codigo": "THPN-COR100", "status": "OPERAÇÃO", "equipe_id": 20,
-           "data_mobilizacao": _MOB, "uf": "SC", "cidade": "Coração"},
+           "data_mobilizacao": _MOB, "uf": "SC", "cidade": "Coração", "cliente_id": 2, "cluster": "SC oeste"},
           {"usina_id": 4, "nome": "Nova", "codigo": "THPN-NOV100", "status": "A MOBILIZAR", "equipe_id": 20,
            "uf": "SC", "cidade": "Nova"},
           # em OPERAÇÃO no cadastro, mas sem data de mobilização: não é usina mobilizada (Levi, 05/10)
           {"usina_id": 5, "nome": "Sem Data", "codigo": "THPN-SDT100", "status": "OPERAÇÃO", "equipe_id": 20,
            "uf": "SC", "cidade": "Sem Data"}]
+CLIENTES = [{"cliente_id": 1, "nome": "Thopen"}, {"cliente_id": 2, "nome": "Outro Cliente"}]
 EQUIPES = [{"equipe_id": 10, "nome": "SP Norte 01"}, {"equipe_id": 20, "nome": "SC Oeste 01"}]
 DE_PARA = [{"usina_id": 1, "sistema": "Fracttal · Classificação 1", "chave_externa": "Thopen - Altair 1 - SP"}]
 CHAVE_CADASTRO = gerar_chave()
@@ -100,6 +101,7 @@ def banco(app, tmp_path):
     api = ApiPGFalsa()
     _aba(api, "cadastro_nexus", "usinas", USINAS)
     _aba(api, "cadastro_nexus", "equipes", EQUIPES)
+    _aba(api, "cadastro_nexus", "clientes", CLIENTES)
     _aba(api, "cadastro_nexus", "de_para", DE_PARA)
     _aba(api, "cadastro_nexus", "pessoas", _pessoas())
     _aba(api, "rondas_app_campo", "OS de ronda", [
@@ -159,7 +161,9 @@ def test_tela_de_rondas_no_estilo_do_painel(banco, logado):
     r = logado.get("/t/campo/rondas?csv=1")
     assert r.mimetype == "text/csv" and "Fulano Souza" in r.get_data(as_text=True)
     assert "Coração 1" in logado.get("/t/campo/rondas?aba=cobertura").get_data(as_text=True)
-    assert "Fulano Souza" in logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
+    quem = logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
+    assert "Quem ronda, por cluster" in quem and "SP Norte" in quem and "SC Oeste" in quem
+    assert "Fulano Souza" in logado.get("/t/campo/rondas?aba=quem&cluster=SP+Norte").get_data(as_text=True)
     assert "Nenhuma ronda" in logado.get("/t/campo/rondas?dur=curta").get_data(as_text=True)
 
 
@@ -468,3 +472,48 @@ def test_motivo_de_ronda_sem_os_fala_do_tecnico():
     assert m == "OS não criada: o técnico não tinha conectado a conta Fracttal dele no App"
     assert "sessão vencida" in visao.motivo_sem_os("Não criada — Fracttal: Sessão Fracttal expirada — reconecte sua conta")
     assert "(Isake Costa)" in visao.motivo_sem_os("Não criada — responsável não resolvido no Fracttal para 'Isake Costa'")
+
+
+def test_quem_ronda_por_cluster_com_pendentes_por_pessoa(banco):
+    """Levi, 05/10: Quem ronda por cluster; clicando, as mesmas informações por pessoa, com as usinas pendentes de ronda.
+    O cluster vem do cadastro com uma grafia só (SP Norte e SP NORTE são o mesmo)."""
+    d = visao.rondas().dados
+    cl = {c["cluster"]: c for c in visao.painel_rondas(d["todas"], d["cobertura"], 14, d["hoje"])["clusters"]}
+    assert set(cl) == {"SP Norte", "SC Oeste"}
+    sp, sc = cl["SP Norte"], cl["SC Oeste"]
+    # Altair: ronda há 1 dia, mas a longa pendente; Brodowski: há 2 dias, em dia; Coração 1: nunca teve ronda
+    assert (sp["usinas"], sp["pendentes"], sp["rondas"], sp["longas"], sp["usinas_rondadas"]) == (2, 1, 3, 0, 2)
+    assert (sc["usinas"], sc["pendentes"], sc["rondas"], sc["tecnicos"]) == (1, 1, 0, 0)
+    assert sp["equipes"] == ["SP Norte 01"] and sp["tecnicos"] == 1
+    p = sp["pessoas"][0]
+    assert (p["tecnico"], p["equipe"], p["rondas"], p["pendentes"]) == ("Fulano Souza", "SP Norte 01", 3, 1)
+    assert visao.nome_cluster("rn  OESTE") == "RN Oeste" and visao.nome_cluster(None) == visao.SEM_CLUSTER
+
+
+def test_filtro_por_cliente_conta_a_cobertura_pelas_usinas_do_cadastro(banco, logado):
+    """Levi, 05/10: filtro por cliente e a cobertura das rondas das UFVs do cliente, com as mesmas usinas do registro
+    mestre (o cadastro): Thopen tem Altair e Brodowski 1 mobilizadas, as duas com ronda."""
+    cob = {c["usina"]: c["cliente"] for c in visao.rondas().dados["cobertura"]}
+    assert cob == {"Altair": "Thopen", "Brodowski 1": "Thopen", "Coração 1": "Outro Cliente"}
+    html = logado.get("/t/campo/rondas?cliente=Thopen").get_data(as_text=True)
+    assert "cobertura das rondas: <b class=\"cn-t-ok\">100%</b>" in html
+    assert "2 de 2 usinas mobilizadas do cliente" in html
+    outro = logado.get("/t/campo/rondas?cliente=Outro+Cliente").get_data(as_text=True)
+    assert "0 de 1 usinas mobilizadas do cliente" in outro
+
+
+def test_historico_de_rondas_da_usina_com_sujidade_e_vegetacao(banco, logado):
+    """Levi, 05/10: clicar no nome da usina abre o histórico de rondas com data, sujidade e vegetação."""
+    d = visao.rondas().dados
+    resp = {"500": {"sujidade": 4, "vegetacao": 2, "vala": "limpa", "sensores_sujos": ["piranômetro"]}}
+    h = visao.historico_usina(d["todas"], resp, 1)
+    assert [r["data"] for r in h] == [_dia(1), _dia(3)]                 # a mais recente primeiro
+    assert (h[0]["sujidade"], h[0]["vegetacao"], h[0]["lida"]) == (4, 2, True)
+    assert visao.historico_usina(d["todas"], {}, 3) == []               # Coração 1 nunca teve ronda
+    html = logado.get("/t/campo/rondas").get_data(as_text=True)
+    assert '/t/campo/rondas/usina/1"' in html                           # o nome da usina é o link do histórico
+    pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+    assert "Histórico de rondas" in pag and "Altair" in pag and "Thopen" in pag and "SP Norte" in pag
+    assert pag.count('class="cn-pessoa"') == 2
+    vazia = logado.get("/t/campo/rondas/usina/3").get_data(as_text=True)
+    assert "Nenhuma ronda pelo App nos últimos 90 dias" in vazia and "Coração 1" in vazia

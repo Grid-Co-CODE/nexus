@@ -277,6 +277,9 @@ def rondas():
     leitura = visao.rondas()
     d = leitura.dados
     regiao, supervisor = request.args.get("regiao", ""), request.args.get("supervisor", "")
+    # cliente pelo cadastro (Levi, 05/10: "filtro por cliente e a cobertura das rondas das UFVs do cliente. Essas usinas
+    # tem que bater com as mesmas do registro mestre"): filtra as rondas E a base da cobertura
+    cliente, cluster = request.args.get("cliente", ""), request.args.get("cluster", "")
     aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS_RONDAS) else "registros"
     dur, q = request.args.get("dur", ""), request.args.get("q", "").strip().lower()
     pend = request.args.get("pend", "") if request.args.get("pend") in visao.FEITA else ""
@@ -286,7 +289,8 @@ def rondas():
 
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
-                and (not supervisor or x.get("supervisor") == supervisor)]
+                and (not supervisor or x.get("supervisor") == supervisor)
+                and (not cliente or x.get("cliente") == cliente)]
     cobertura = filtra(d.get("cobertura") or [])
     painel = visao.painel_rondas(filtra(d.get("todas") or []), cobertura, dias, d.get("hoje") or visao._agora().date().isoformat())
     lim = painel["kpi"]["dur_min"]
@@ -318,6 +322,8 @@ def rondas():
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="rondas-{dias}d.csv"'})
     supervisores = sorted({c.get("supervisor") for c in d.get("cobertura") or [] if c.get("supervisor")})
+    clientes = sorted({c.get("cliente") for c in d.get("cobertura") or [] if c.get("cliente")})
+    cluster_aberto = next((c for c in painel["clusters"] if c["cluster"] == cluster), None) if cluster else None
     suj, suj_estado, suj_f = None, None, request.args.get("sv", "")
     if aba == "sujidade":
         # as respostas vêm das OS de ronda no Fracttal: as aprovadas, relidas em segundo plano, e as em verificação,
@@ -339,7 +345,24 @@ def rondas():
         q=request.args.get("q", ""), k=painel["kpi"], registros=registros, limite=LIMITE_LINHAS, cobertura=cobertura,
         trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES, supervisores=supervisores,
         duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, suj_f=suj_f,
+        cliente=cliente, clientes=clientes, clusters=painel["clusters"], cluster_aberto=cluster_aberto,
         filtros_sujidade=FILTROS_SUJIDADE))
+
+
+@bp.route("/rondas/usina/<int:usina_id>")
+def rondas_usina(usina_id):
+    """O histórico de rondas de uma usina, com data, sujidade e vegetação (Levi, 05/10: "quando clicarmos no nome da
+    usina já aparece o histórico de rondas ... essas informações são importantes!")."""
+    leitura = visao.rondas()
+    d = leitura.dados or {}
+    ronda_checklist.pedir_releitura()
+    campo_aprovacao._pedir_releitura()
+    hist = visao.historico_usina(d.get("todas") or [], ronda_checklist.respostas(), usina_id)
+    usina = next((c for c in d.get("cobertura") or [] if c["usina_id"] == usina_id), None) or (hist[0] if hist else None)
+    lidas = [r for r in hist if r["sujidade"] is not None or r["vegetacao"] is not None]
+    return render_template("campo/rondas_usina.html", **_comum(
+        "rondas", leitura, usina=usina, usina_id=usina_id, hist=hist, lidas=lidas, duracao=_duracao, iniciais=_iniciais,
+        suj_estado=ronda_checklist.estado()))
 
 
 @bp.route("/zeladoria")

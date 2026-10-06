@@ -33,10 +33,13 @@
     <select class="gc-campo" name="regiao" aria-label="Região" onchange="this.form.submit()">
       <option value="">todas as regiões</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
+    <select class="gc-campo" name="cliente" aria-label="Cliente" onchange="this.form.submit()">
+      <option value="">todos os clientes</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
     <select class="gc-campo" name="supervisor" aria-label="Supervisor" onchange="this.form.submit()">
       <option value="">todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>
-    {% for x in ('aba', 'dur') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+    {% for x in ('aba', 'dur', 'cluster') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     <span class="cn-barra-fonte">livro de rondas do App · lido às {{ lido }}</span>
   </form>
 
@@ -65,7 +68,7 @@
   </div>
 
   <section class="cn-painel">
-    <nav class="cn-abas" aria-label="Abas">
+    <nav class="cn-abas" id="abas" aria-label="Abas">
       {% for a, nome in abas %}<a href="{{ url(aba=None if a == 'registros' else a, dur=None) }}"{% if a == aba %} aria-current="page"{% endif %}>{{ nome }}{% if a == 'cobertura' %}<i>{{ k.sem_ronda_alerta }}</i>{% elif a == 'trackers' %}<i>{{ trackers|length }}</i>{% endif %}</a>{% endfor %}
     </nav>
 
@@ -80,11 +83,14 @@
         <a href="{{ url(pend=None) }}"{% if not pend %} aria-current="page"{% endif %}>Toda ronda</a>
         {% for p_, (rot, cor) in pendencias.items() %}<a href="{{ url(pend=p_) }}"{% if p_ == pend %} aria-current="page"{% endif %}>{{ rot }} <b>{{ n_pend[p_] }}</b></a>{% endfor %}
       </div>
-      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'supervisor', 'dur', 'pend') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'supervisor', 'cliente', 'dur', 'pend') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
         <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="técnico, usina, equipe ou OS" aria-label="Buscar"></form>
       <span class="mudo">Início, fim e duração são carimbados pelo aparelho: tempo de tela aberta, não cronômetro de campo.</span>
     </div>
     {% if ind %}<a class="cn-filtro-ativo" href="{{ url(ind=None) }}">{{ {'hoje': 'Só as de hoje', 'qualidade': 'Qualidade abaixo de ' ~ k.limite ~ '%', 'duracao': 'Da mais longa para a mais curta'}[ind] }} <span aria-hidden="true">×</span></a>{% endif %}
+    {% if cliente %}<div class="cn-faixa-equipe"><b>{{ cliente }}</b><span>cobertura das rondas: <b class="cn-t-{{ 'ok' if (k.cobertura_pct or 0) >= 80 else ('alerta' if (k.cobertura_pct or 0) >= 50 else 'critico') }}">{{ k.cobertura_pct }}%</b></span>
+      <span>{{ k.cobertas }} de {{ k.usinas }} usinas mobilizadas do cliente no cadastro com ronda nos últimos {{ dias }} dias</span>
+      <a class="cn-link" href="{{ url(aba='cobertura', cob='sem') }}">ver as {{ k.usinas - k.cobertas }} sem ronda</a></div>{% endif %}
     <div class="cn-lista-cab"><h2>Rondas diárias</h2><span class="mudo">{{ [registros|length, limite]|min }} de {{ registros|length }}</span>
       {% if registros|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ registros|length }}</span>{% endif %}
       <a class="cn-link cn-exportar" href="{{ url(csv='1') }}">Exportar CSV</a></div>
@@ -94,7 +100,7 @@
       {% for r in registros[:limite] %}{% set v = r.veredito %}
         <tr><td class="m"><b>{{ dia_curto(r.data) }}</b></td>
           <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</td>
-          <td>{{ r.usina }}</td><td class="cn-menor">{{ r.equipe or '—' }}</td><td class="cn-menor">{{ r.regiao_br or '—' }}</td>
+          <td>{% if r.usina_id %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=r.usina_id) }}">{{ r.usina }}</a>{% else %}{{ r.usina }}{% endif %}</td><td class="cn-menor">{{ r.equipe or '—' }}</td><td class="cn-menor">{{ r.regiao_br or '—' }}</td>
           <td><span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span></td>
           <td class="m cn-menor">{{ r.ini_hm or '—' }}</td><td class="m cn-menor">{{ r.fim_hm or '—' }}</td>
           <td><b class="{{ 'cn-t-critico' if r.dur_min is not none and r.dur_min < k.dur_min else '' }}">{{ duracao(r.dur_min) }}</b></td>
@@ -131,7 +137,7 @@
       <thead><tr><th>Usina</th><th>Equipe</th><th>Região</th><th>Última leitura</th><th>Sujidade</th><th>Vegetação</th><th>Sombreamento</th><th>Vala</th><th>Sensores</th><th>Técnico</th><th>OS</th></tr></thead>
       <tbody>
       {% for x in suj.filtradas[:limite] %}
-        <tr><td>{{ x.usina }}</td><td class="cn-menor">{{ x.equipe or '—' }}</td><td class="cn-menor">{{ x.regiao_br or '—' }}</td>
+        <tr><td><a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=x.usina_id) }}">{{ x.usina }}</a></td><td class="cn-menor">{{ x.equipe or '—' }}</td><td class="cn-menor">{{ x.regiao_br or '—' }}</td>
           <td class="m">{{ dia_curto(x.data) }}<span class="det">ronda {{ x.tipo }}</span></td>
           <td>{{ nivel(x.sujidade, x.sujidade_ant) }}</td><td>{{ nivel(x.vegetacao, x.vegetacao_ant) }}</td>
           <td class="cn-menor">{{ x.sombreamento or '—' }}</td><td class="cn-menor">{{ x.vala or '—' }}</td>
@@ -148,7 +154,7 @@
       <thead><tr><th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th><th>Última ronda</th><th>Há</th><th>Feito por</th></tr></thead>
       <tbody>
       {% for c in cobertura[:limite] %}
-        <tr><td>{{ c.usina }}</td><td>{{ c.equipe or '—' }}</td><td>{{ c.uf or '—' }}</td><td>{{ c.regiao_br or '—' }}</td>
+        <tr><td><a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=c.usina_id) }}">{{ c.usina }}</a></td><td>{{ c.equipe or '—' }}</td><td>{{ c.uf or '—' }}</td><td>{{ c.regiao_br or '—' }}</td>
           <td class="m">{{ dia_curto(c.ultima) if c.ultima else '—' }}</td>
           <td><span class="cn-st cn-t-{{ 'critico' if c.dias >= 14 else ('alerta' if c.dias >= 7 else 'ok') }}">{{ 'nunca' if c.dias >= 999 else ('hoje' if c.dias == 0 else c.dias ~ ' d') }}</span></td>
           <td>{{ c.tecnico or '—' }}</td></tr>
@@ -168,18 +174,37 @@
       </tbody></table></div>
 
     {% else %}
-    <div class="cn-lista-cab"><h2>Quem ronda</h2><span class="mudo">por técnico, no período</span></div>
-    <div class="cn-tab"><table>
-      <thead><tr><th>Técnico</th><th>Equipe</th><th>Rondas</th><th>Longas</th><th>Usinas</th><th>Qualidade média</th><th>Duração (mediana)</th><th>Abaixo de {{ k.dur_min }} min</th><th>Última</th></tr></thead>
-      <tbody>
-      {% for x in quem %}
-        <tr><td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico }}</td><td>{{ x.equipe or '—' }}</td>
-          <td class="m"><b>{{ x.rondas }}</b></td><td class="m">{{ x.longas }}</td><td class="m">{{ x.usinas }}</td>
+    {% macro linha_resumo(x) %}
+          <td class="m"><b>{{ x.rondas }}</b></td><td class="m">{{ x.longas }}</td><td class="m">{{ x.usinas_rondadas }}</td>
+          <td class="m"><b class="cn-t-{{ 'critico' if x.pendentes else 'ok' }}">{{ x.pendentes }}</b></td>
           <td>{% if x.nota is not none %}<span class="cn-st cn-t-{{ 'ok' if x.nota >= 95 else ('alerta' if x.nota >= 85 else 'critico') }}">{{ x.nota }}%</span>{% else %}—{% endif %}</td>
           <td class="m">{{ duracao(x.dur_mediana) }}</td><td>{% if x.curtas %}<span class="cn-t-critico">{{ x.curtas }}</span>{% else %}0{% endif %}</td>
-          <td class="m">{{ dia_curto(x.ultima) }}</td></tr>
-      {% else %}<tr><td colspan="9" class="mudo">Nenhuma ronda no período.</td></tr>{% endfor %}
+          <td class="m">{{ dia_curto(x.ultima) if x.ultima else '—' }}</td>{% endmacro %}
+    {% if cluster_aberto %}{% set cl = cluster_aberto %}
+    {# o cluster aberto: as mesmas informações, por pessoa (Levi, 05/10) #}
+    <div class="cn-faixa-equipe"><b>{{ cl.cluster }}</b><span>{{ cl.equipes|join(', ') }}</span>
+      <span>{{ cl.usinas }} usinas mobilizadas · <b class="cn-t-{{ 'critico' if cl.pendentes else 'ok' }}">{{ cl.pendentes }}</b> pendentes de ronda</span>
+      <a class="cn-filtro-ativo" href="{{ url(cluster=None) }}#abas">Todos os clusters <span aria-hidden="true">×</span></a></div>
+    <div class="cn-tab"><table>
+      <thead><tr><th>Técnico</th><th>Equipe</th><th>Rondas</th><th>Longas</th><th>Usinas rondadas</th><th>Pendentes de ronda</th><th>Qualidade média</th><th>Duração (mediana)</th><th>Abaixo de {{ k.dur_min }} min</th><th>Última</th></tr></thead>
+      <tbody>
+      {% for x in cl.pessoas %}
+        <tr><td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico }}</td><td class="cn-menor">{{ x.equipe }}</td>{{ linha_resumo(x) }}</tr>
+      {% else %}<tr><td colspan="10" class="mudo">Nenhuma ronda neste cluster no período.</td></tr>{% endfor %}
       </tbody></table></div>
+    <p class="mudo cn-rodape">Pendentes da pessoa = usinas mobilizadas da equipe em que ela mais ronda que pedem ronda (sem ronda há 7 dias ou mais, nunca, ou com a longa pendente).</p>
+    {% else %}
+    <div class="cn-lista-cab"><h2>Quem ronda, por cluster</h2><span class="mudo">o cluster do cadastro; clique para ver as pessoas dele</span></div>
+    <div class="cn-tab"><table>
+      <thead><tr><th>Cluster</th><th>Equipes</th><th>Técnicos</th><th>Rondas</th><th>Longas</th><th>Usinas rondadas</th><th>Pendentes de ronda</th><th>Qualidade média</th><th>Duração (mediana)</th><th>Abaixo de {{ k.dur_min }} min</th><th>Última</th></tr></thead>
+      <tbody>
+      {% for c in clusters %}
+        <tr class="cn-linha" onclick="location.href='{{ url(cluster=c.cluster) }}#abas'"><td><a class="cn-link" href="{{ url(cluster=c.cluster) }}#abas"><b>{{ c.cluster }}</b></a><span class="det">{{ c.usinas }} usinas mobilizadas</span></td>
+          <td class="cn-menor">{{ c.equipes|length }}</td><td class="m">{{ c.tecnicos }}</td>{{ linha_resumo(c) }}</tr>
+      {% else %}<tr><td colspan="11" class="mudo">Nenhum cluster com esses filtros.</td></tr>{% endfor %}
+      </tbody></table></div>
+    <p class="mudo cn-rodape">Pendentes de ronda = usinas mobilizadas do cluster que pedem ronda: a mesma regra da Central de atenção.</p>
+    {% endif %}
     {% endif %}
   </section>
   {% if d.get('sem_mobilizacao') %}<p class="mudo cn-rodape">{{ d.sem_mobilizacao|length }} usinas em OPERAÇÃO no cadastro sem data de mobilização ficam de fora da cobertura até a data entrar no cadastro.</p>{% endif %}

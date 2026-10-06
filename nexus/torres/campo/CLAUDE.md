@@ -65,10 +65,10 @@ decisões, 766 rondas, zeladoria vazia.
 
 As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
 - **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou): seis indicadores do período (`painel_rondas`,
-  depois dos filtros de região e supervisor) e quatro abas: Registros (a tabela "Rondas diárias": iniciais do
+  depois dos filtros de região, cliente e supervisor) e cinco abas: Registros (a tabela "Rondas diárias": iniciais do
   técnico, tipo, início e fim em Brasília, duração "27 min"/"1h04", qualidade com barra, veredito em selo; filtro
   de duração; até 300 linhas com o aviso; Exportar CSV com BOM para o Excel), Cobertura (usinas mobilizadas, a mais
-  esquecida primeiro), Trackers (rondas com trackers apontados e a devolutiva) e Quem ronda (por técnico).
+  esquecida primeiro), Trackers (rondas com trackers apontados e a devolutiva), Sujidade e vegetação e Quem ronda (por cluster).
   - Cobertura = usinas mobilizadas com ronda no período ÷ mobilizadas; a seta compara com o período anterior de
     mesmo tamanho. Duração = fim − início carimbados pelo aparelho (0 a 8 h; fora disso, sem duração; o livro não
     traz a pausa). **Veredito = o `_veredito_ronda` do App, na mesma ordem, com os limites dele** (`LIMIARES_PADRAO`:
@@ -84,6 +84,23 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     Fracttal" é a mensagem do App para o técnico. Medido em 05/10: 114 de 771 rondas (90 dias) sem OS por isso (Daniel
     Paula 22, Manuel Silva 14 + 8, Frank Melo 10, Isake Costa 12, Valmir Junior 8...). O App tenta 5 vezes, uma por
     minuto, e desiste (`RONDA_OS_FILA_MAX`, `_MAX_H` 24 h): a ronda antiga não ganha OS quando o técnico conecta depois.
+  - **Filtro por cliente** (Levi, 05/10: "a cobertura das rondas das UFVs do cliente. Essas usinas tem que bater com
+    as mesmas do registro mestre!"): o cliente vem de `usinas.cliente_id` → `clientes.nome` do `cadastro_nexus`
+    (`_Base.nome_cliente`), nunca do nome da usina no livro. Filtra as rondas E a base da cobertura; com cliente
+    escolhido aparece a faixa "cobertura das rondas: N%, X de Y usinas mobilizadas do cliente no cadastro". Medido em
+    05/10: as 128 mobilizadas têm cliente; Thopen 61 de 80 (76%) em 30 dias.
+  - **Quem ronda por cluster** (`visao._por_cluster`; Levi, 05/10: "seria melhor por cluster, aí nesse cluster clicando
+    apareceria as mesmas informações porém por pessoa"): o cluster é o do cadastro pela usina, numa grafia só
+    (`nome_cluster`: "SP OESTE" e "SP Oeste" eram dois no banco). **Pendentes de ronda** = usinas mobilizadas do cluster
+    que pedem ronda pela regra da Central (`_pendente`: 7 dias ou mais, nunca, ou a longa pendente). Clicar abre as
+    pessoas (`cluster=`), com as mesmas colunas; o pendente da pessoa é o da equipe em que ela mais ronda. Conferido em
+    05/10 (30 dias): soma dos clusters = 464 rondas, 128 usinas e 87 pendentes, igual ao total e à regra direta;
+    2 usinas sem cluster no cadastro.
+  - **Histórico da usina** (`/rondas/usina/<usina_id>`, `visao.historico_usina`; Levi, 05/10: "quando clicarmos no
+    nome da usina já aparece o histórico de rondas com data e sujidade e vegetação"): o nome da usina é link nas abas
+    Registros, Sujidade e Cobertura. Todas as rondas do livro (90 dias), a mais recente primeiro, com sujidade,
+    vegetação, vala e sensores da OS (só das OS lidas: em verificação e aprovadas dos últimos 45 dias; o resto fica
+    "—"), e a evolução em gráfico quando há duas leituras ou mais.
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
   - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não

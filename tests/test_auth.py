@@ -9,7 +9,9 @@ def test_toda_rota_nao_publica_exige_login(app, cliente):
     for regra in app.url_map.iter_rules():
         if regra.endpoint in ROTAS_PUBLICAS or "GET" not in regra.methods:
             continue
-        valores = {arg: "x" for arg in regra.arguments}
+        # rota com <int:...> (o histórico de rondas da usina) só monta com número
+        valores = {arg: 1 if type(regra._converters.get(arg)).__name__ == "IntegerConverter" else "x"
+                   for arg in regra.arguments}
         url = regra.build(valores, append_unknown=False)[1]
         resp = cliente.get(url)
         assert resp.status_code == 302, url

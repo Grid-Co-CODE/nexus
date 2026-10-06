@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titulo %}{{ usina.usina if usina else 'Usina' }} · Rondas{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# O histórico de rondas de uma usina (Levi, 05/10/2026: "quando clicarmos no nome da usina já aparece o histórico de
+   rondas com data e sujidade e vegetação, essas informações são importantes!"). nexus/campo/visao.py: historico_usina. #}
+{% macro nivel(n) %}{% if n is none %}<span class="mudo">—</span>{% else %}<span class="cn-nivel cn-nivel--{{ n }}">{{ n }}</span>{% endif %}{% endmacro %}
+<div class="campo-nativa">
+  <p class="cn-voltar"><a class="cn-link" href="{{ url_for('torre_campo.rondas') }}">Voltar para Rondas</a></p>
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Rondas · Histórico da usina</p>
+      <h1 class="cn-titulo">{{ usina.usina if usina else 'Usina ' ~ usina_id }}</h1>
+      <p class="cn-pergunta">{% if usina %}{{ usina.cliente or '—' }} · {{ usina.cluster or '—' }} · {{ usina.equipe or '—' }} · {{ usina.cidade }}{% if usina.uf %} - {{ usina.uf }}{% endif %} · supervisor {{ usina.supervisor or '—' }}{% endif %}</p></div>
+    <div class="cn-frescor">livro de rondas do App + OS de ronda no Fracttal<br><b>lido às {{ lido }}</b></div>
+  </div>
+  {% if suj_estado and (suj_estado.lendo or not suj_estado.fila) %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de ronda no Fracttal.</b> Sujidade e vegetação aparecem em 1 a 2 minutos; recarregue a página.</div>{% endif %}
+  {% set ult = lidas[0] if lidas else none %}
+  <div class="cn-kpis">
+    <div class="cn-kpi"><span class="gc-rotulo">Rondas</span><span class="v">{{ hist|length }}</span><span class="d">nos últimos 90 dias</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">Última ronda</span><span class="v">{{ dia_curto(hist[0].data) if hist else '—' }}</span><span class="d">{{ hist[0].tecnico if hist else 'nunca teve ronda pelo App' }}</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">Sujidade dos módulos</span><span class="v">{{ nivel(ult.sujidade if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">Altura da vegetação</span><span class="v">{{ nivel(ult.vegetacao if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></div>
+  </div>
+  {% if lidas|length > 1 %}
+  {# a evolução: sujidade e vegetação de 1 a 5, da leitura mais antiga para a mais recente #}
+  {% set pts = lidas|reverse|list %}{% set w = 760 %}{% set h = 150 %}{% set n = pts|length %}
+  {% macro x(i) %}{{ 40 + (i * (w - 60) / ((n - 1) or 1))|round(1) }}{% endmacro %}
+  {% macro y(v) %}{{ 15 + ((5 - v) * (h - 40) / 4)|round(1) }}{% endmacro %}
+  <section class="cn-painel cn-evolucao">
+    <div class="cn-lista-cab"><h2>Evolução</h2><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação</span></div>
+    <svg viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Sujidade e vegetação por ronda">
+      {% for v in range(1, 6) %}<line x1="34" x2="{{ w - 10 }}" y1="{{ y(v) }}" y2="{{ y(v) }}" class="grade{% if v == 3 %} limite{% endif %}"/><text x="24" y="{{ y(v)|float + 4 }}" class="eixo">{{ v }}</text>{% endfor %}
+      <polyline class="suj" points="{% for p in pts if p.sujidade is not none %}{{ x(loop.index0) }},{{ y(p.sujidade) }} {% endfor %}"/>
+      <polyline class="veg" points="{% for p in pts if p.vegetacao is not none %}{{ x(loop.index0) }},{{ y(p.vegetacao) }} {% endfor %}"/>
+      {% for p in pts %}{% if p.sujidade is not none %}<circle class="suj" cx="{{ x(loop.index0) }}" cy="{{ y(p.sujidade) }}" r="4"><title>{{ dia_curto(p.data) }}: sujidade {{ p.sujidade }}</title></circle>{% endif %}{% if p.vegetacao is not none %}<circle class="veg" cx="{{ x(loop.index0) }}" cy="{{ y(p.vegetacao) }}" r="4"><title>{{ dia_curto(p.data) }}: vegetação {{ p.vegetacao }}</title></circle>{% endif %}<text x="{{ x(loop.index0) }}" y="{{ h - 4 }}" class="eixo" text-anchor="middle">{{ dia_curto(p.data) }}</text>{% endfor %}
+    </svg>
+  </section>
+  {% endif %}
+  <div class="cn-lista-cab"><h2>Histórico de rondas</h2><span class="mudo">a mais recente primeiro</span></div>
+  <div class="cn-tab"><table>
+    <thead><tr><th>Data</th><th>Tipo</th><th>Técnico</th><th>Duração</th><th>Qualidade</th><th>Veredito</th><th>Sujidade</th><th>Vegetação</th><th>Vala</th><th>Sensores</th><th>Pendências</th><th>OS</th></tr></thead>
+    <tbody>
+    {% for r in hist %}{% set v = r.veredito %}
+      <tr><td class="m"><b>{{ dia_curto(r.data) }}</b><span class="det">{{ r.ini_hm }}{% if r.fim_hm %} às {{ r.fim_hm }}{% endif %}</span></td>
+        <td><span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span></td>
+        <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</td>
+        <td class="m">{{ duracao(r.dur_min) }}</td>
+        <td class="m">{{ '—' if r.nota is none else r.nota ~ '%' }}</td>
+        <td><span class="cn-selo cn-selo--{{ v[0] }}" title="{{ r.falhas }}">{{ v[1] }}</span></td>
+        <td>{{ nivel(r.sujidade) }}</td><td>{{ nivel(r.vegetacao) }}</td>
+        <td class="cn-menor">{{ r.vala or '—' }}</td>
+        <td>{% if r.sensores_sujos %}<span class="cn-t-alerta">{{ r.sensores_sujos|join(', ') }}</span>{% elif r.lida %}<span class="mudo">limpos</span>{% else %}—{% endif %}</td>
+        <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if not r.falhas and not r.pendencia %}—{% endif %}</td>
+        <td class="m">{% if r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="12" class="mudo">Nenhuma ronda pelo App nos últimos 90 dias.</td></tr>{% endfor %}
+    </tbody></table></div>
+  <div class="cn-nota"><b>De onde vem.</b> As rondas são as do livro do App (90 dias). Sujidade, vegetação, vala e sensores
+    são as respostas do checklist que o App escreve na OS de ronda no Fracttal; o Nexus lê as OS em verificação e as
+    aprovadas dos últimos 45 dias, então ronda mais antiga ou sem OS aparece com "—".</div>
+</div>
+{% endblock %}

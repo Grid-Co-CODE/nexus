@@ -15,7 +15,7 @@ alerta acima de 3 (`alerta_acima`).
 import threading
 import time
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from . import fracttal, regras_app
 
@@ -69,7 +69,7 @@ def _notas_de(linhas) -> dict:
 def _reler():
     """As OS de ronda aprovadas, da mais recente para trás, até passar de DIAS_PARA_TRAS."""
     try:
-        piso = (datetime.utcnow() - timedelta(days=DIAS_PARA_TRAS)).strftime("%Y-%m-%d")
+        piso = (datetime.now(timezone.utc) - timedelta(days=DIAS_PARA_TRAS)).strftime("%Y-%m-%d")
         notas, inicio = {}, 0
         for _ in range(PAGINAS_MAX):
             r = fracttal.ler(f"work_orders?id_status_work_order=3&limit=100&start={inicio}&sort=final_date:desc")

@@ -354,3 +354,18 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 tr.cn-aprovada td{opacity:.45}
 .cn-tarefas-os{margin:0;padding:0;list-style:none;display:grid;gap:14px}
 .cn-tarefa-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:6px;font-size:13px}
+
+/* histórico da usina: a evolução de sujidade e vegetação (1 a 5) */
+.cn-evolucao svg{width:100%;height:auto;display:block;margin-top:6px}
+.cn-evolucao .grade{stroke:var(--linha);stroke-width:1}
+.cn-evolucao .grade.limite{stroke:var(--alerta);stroke-dasharray:4 4}
+.cn-evolucao .eixo{fill:var(--mudo);font:11px var(--font-mono)}
+.cn-evolucao polyline{fill:none;stroke-width:2}
+.cn-evolucao polyline.suj,.cn-evolucao circle.suj{stroke:#7fb8ff}
+.cn-evolucao circle.suj{fill:#7fb8ff}
+.cn-evolucao polyline.veg,.cn-evolucao circle.veg{stroke:#a3d900}
+.cn-evolucao circle.veg{fill:#a3d900}
+.cn-leg{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tinta-2)}
+.cn-leg i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-left:6px}
+.cn-leg i.suj{background:#7fb8ff}
+.cn-leg i.veg{background:#a3d900}

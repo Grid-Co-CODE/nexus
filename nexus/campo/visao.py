@@ -43,6 +43,7 @@ REGIAO_DA_UF = {**dict.fromkeys(("AC", "AP", "AM", "PA", "RO", "RR", "TO"), "Nor
                 **dict.fromkeys(("PR", "RS", "SC"), "Sul")}
 SEM_EQUIPE = "Sem equipe"
 SEM_SUPERVISOR = "Sem supervisor"
+SEM_CLUSTER = "Sem cluster"
 CAMPO = "Colaborador de campo"       # o vínculo de quem vai a campo no cadastro (técnico, eletricista, mantenedor)
 
 
@@ -151,6 +152,15 @@ def _mobilizada(u: dict, hoje: str) -> bool:
             and bool(_DATA_ISO.match(d)) and d[:10] <= hoje)
 
 
+def nome_cluster(c) -> str:
+    """O cluster do cadastro com uma grafia só: medido em 05/10, "SP Oeste" e "SP OESTE", "PR Norte" e "PR NORTE",
+    "RN OESTE" conviviam (o conserto é no cadastro). A UF fica em maiúsculas; o resto, com a inicial maiúscula."""
+    partes = str(c or "").split()
+    if not partes:
+        return SEM_CLUSTER
+    return " ".join([partes[0].upper()] + [x.capitalize() for x in partes[1:]])
+
+
 class _Base:
     """O cadastro e o ligador, lidos uma vez por cálculo."""
 
@@ -167,6 +177,7 @@ class _Base:
                                       if uid not in self.mobilizadas
                                       and str(u.get("status") or "").strip().upper() == STATUS_OPERACAO)
         self.time = self._time(_livro("cadastro_nexus", "pessoas"))
+        self.nome_cliente = {D._id(c.get("cliente_id")): str(c.get("nome") or "") for c in _livro("cadastro_nexus", "clientes")}
 
     def _time(self, pessoas) -> dict:
         """{equipe_id: técnicos, cargos, supervisor} pelo cadastro de pessoas (Levi, 05/10: "um número ao lado
@@ -235,7 +246,9 @@ class _Base:
         return {"usina": str(u.get("nome") or nome_da_fonte or ""), "uf": uf,
                 "regiao_br": REGIAO_DA_UF.get(uf, ""), "cidade": str(u.get("cidade") or "").strip(),
                 "equipe": (self.equipe_da_usina(uid) or SEM_EQUIPE) if u else "",
-                "supervisor": (self.time_da_usina(uid).get("supervisor") or SEM_SUPERVISOR) if u else ""}
+                "supervisor": (self.time_da_usina(uid).get("supervisor") or SEM_SUPERVISOR) if u else "",
+                "cliente": self.nome_cliente.get(D._id(u.get("cliente_id")), "") if u else "",
+                "cluster": nome_cluster(u.get("cluster")) if u else ""}
 
 
 # ── Rondas ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -354,6 +367,74 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
     return _ler(("visao_rondas",), calcular)
 
 
+def _pendente(c) -> bool:
+    """A usina pede ronda: a mesma regra da Central de atenção (sem ronda há 7 dias ou mais, nunca, ou a ronda longa
+    pendente pela última ronda)."""
+    return c["dias"] >= DIAS_SEM_RONDA_ALERTA or LONGA_PENDENTE in str(c.get("falhas") or "").lower()
+
+
+def _resumo_rondas(rondas, lim) -> dict:
+    notas = [r["nota"] for r in rondas if r["nota"] is not None]
+    durs = [r["dur_min"] for r in rondas if r["dur_min"] is not None]
+    return {"rondas": len(rondas), "longas": sum(1 for r in rondas if r["tipo"] == "longa"),
+            "usinas_rondadas": len({r["usina_id"] or r["usina"] for r in rondas}),
+            "nota": round(statistics.mean(notas)) if notas else None,
+            "dur_mediana": round(statistics.median(durs)) if durs else None,
+            "curtas": sum(1 for d in durs if d < lim["ronda_dur_min"]),
+            "ultima": max((r["data"] for r in rondas), default="")}
+
+
+def _por_cluster(periodo, cobertura, lim) -> list[dict]:
+    """Quem ronda por cluster (Levi, 05/10: "seria melhor por cluster, aí nesse cluster clicando apareceria as mesmas
+    informações porém por pessoa do cluster e também tem que ter um contador de usinas pendentes de ronda"). O cluster é
+    o do cadastro (registro mestre), pela usina. Pendentes do cluster = usinas mobilizadas dele que pedem ronda (a regra
+    da Central). Pendentes da pessoa = as da equipe em que ela mais ronda (a equipe da usina, do cadastro)."""
+    pend_eq, usinas_cl, pend_cl, equipes_cl = {}, {}, {}, {}
+    for c in cobertura:
+        cl = c.get("cluster") or SEM_CLUSTER
+        usinas_cl[cl] = usinas_cl.get(cl, 0) + 1
+        equipes_cl.setdefault(cl, set()).add(c.get("equipe") or SEM_EQUIPE)
+        if _pendente(c):
+            pend_cl[cl] = pend_cl.get(cl, 0) + 1
+            pend_eq[c.get("equipe") or SEM_EQUIPE] = pend_eq.get(c.get("equipe") or SEM_EQUIPE, 0) + 1
+    rondas_cl = {}
+    for r in periodo:
+        rondas_cl.setdefault(r.get("cluster") or SEM_CLUSTER, []).append(r)
+    out = []
+    for cl in sorted(set(usinas_cl) | set(rondas_cl)):
+        rs = rondas_cl.get(cl, [])
+        pessoas = {}
+        for r in rs:
+            pessoas.setdefault(r["tecnico"] or "—", []).append(r)
+        lista = []
+        for nome, prs in pessoas.items():
+            eqs = {}
+            for r in prs:
+                eqs[r["equipe"] or SEM_EQUIPE] = eqs.get(r["equipe"] or SEM_EQUIPE, 0) + 1
+            equipe = max(eqs, key=eqs.get)
+            lista.append({"tecnico": nome, "equipe": equipe, "pendentes": pend_eq.get(equipe, 0), **_resumo_rondas(prs, lim)})
+        out.append({"cluster": cl, "usinas": usinas_cl.get(cl, 0), "pendentes": pend_cl.get(cl, 0),
+                    "equipes": sorted(equipes_cl.get(cl, set())), "tecnicos": len(pessoas),
+                    "pessoas": sorted(lista, key=lambda q: (-q["rondas"], q["tecnico"])), **_resumo_rondas(rs, lim)})
+    return sorted(out, key=lambda c: (-c["pendentes"], -c["rondas"], c["cluster"]))
+
+
+def historico_usina(todas, respostas: dict, usina_id) -> list[dict]:
+    """O histórico de rondas de uma usina (Levi, 05/10: "quando clicarmos no nome da usina já aparece o histórico de
+    rondas com data e sujidade e vegetação"): todas as rondas do livro (90 dias), a mais recente primeiro, com as
+    respostas do checklist lidas da OS no Fracttal (`ronda_checklist`; só das OS que o Nexus leu: as em verificação e
+    as aprovadas dos últimos 45 dias)."""
+    out = []
+    for r in todas:
+        if r["usina_id"] != usina_id:
+            continue
+        resp = respostas.get(str(r["os"] or "")) or {}
+        out.append({**r, "sujidade": resp.get("sujidade"), "vegetacao": resp.get("vegetacao"), "vala": resp.get("vala") or "",
+                    "sombreamento": resp.get("sombreamento") or "", "sensores_sujos": resp.get("sensores_sujos") or [],
+                    "lida": bool(resp)})
+    return sorted(out, key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
+
+
 def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
     """Os indicadores do período, sobre as listas já filtradas pela tela (região, supervisor):
     - cobertura = usinas mobilizadas com ronda no período ÷ usinas mobilizadas, e a mesma conta no período anterior de
@@ -390,7 +471,7 @@ def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
         q["nota"] = round(statistics.mean(q["notas"])) if q["notas"] else None
         q["dur_mediana"] = round(statistics.median(q["durs"])) if q["durs"] else None
         del q["notas"], q["durs"]
-    return {
+    return {"clusters": _por_cluster(periodo, cobertura, lim),
         "periodo": periodo, "trackers": [r for r in periodo if r["trk_apontados"]], "hoje": hoje_iso,
         "quem": sorted(quem.values(), key=lambda q: (-q["rondas"], q["tecnico"])),
         "kpi": {"rondas": len(periodo), "hoje": sum(1 for r in periodo if r["data"] == hoje_iso),
@@ -432,7 +513,7 @@ def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: s
             continue
         ant = lst[1][1] if len(lst) > 1 else {}
         c = usinas[uid]
-        linhas.append({"usina": c["usina"], "equipe": c["equipe"], "uf": c["uf"], "regiao_br": c["regiao_br"],
+        linhas.append({"usina": c["usina"], "usina_id": uid, "equipe": c["equipe"], "uf": c["uf"], "regiao_br": c["regiao_br"],
                        "supervisor": c.get("supervisor"), "data": r["data"], "tecnico": r["tecnico"], "os": r["os"],
                        "tipo": r["tipo"], "sujidade": resp.get("sujidade"), "sujidade_ant": ant.get("sujidade"),
                        "vegetacao": resp.get("vegetacao"), "vegetacao_ant": ant.get("vegetacao"),
