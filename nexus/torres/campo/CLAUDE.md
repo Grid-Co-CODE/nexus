@@ -101,7 +101,8 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     Registros, Sujidade e Cobertura. Todas as rondas do livro (90 dias), a mais recente primeiro, com sujidade,
     vegetação, vala e sensores da OS (em verificação e aprovadas dos 90 dias; OS ainda não lida aparece "não lida",
     ronda sem OS fica "—"), e a evolução em gráfico quando há duas leituras ou mais. Passar o mouse (ou o foco do teclado) num ponto
-    mostra a OS, quem fez, o dia com a hora (início e fim) e os dois níveis (Levi, 06/10); o texto entra por
+    mostra a OS, quem fez, o dia com a hora (início e fim) e os dois níveis (Levi, 06/10). A data do eixo vai em meia
+    fonte e, com muitas rondas, uma a cada tantos pontos (a última sempre; Crateús, 25 rondas, encavalava); o texto entra por
     `textContent`, nunca como HTML, porque vem do livro do App.
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.

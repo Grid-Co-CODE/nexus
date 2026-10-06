@@ -377,6 +377,7 @@ tr.cn-aprovada td{opacity:.45}
 .cn-evolucao .grade{stroke:var(--linha);stroke-width:1}
 .cn-evolucao .grade.limite{stroke:var(--alerta);stroke-dasharray:4 4}
 .cn-evolucao .eixo{fill:var(--mudo);font:11px var(--font-mono)}
+.cn-evolucao .eixo.data{font-size:5.5px}
 .cn-evolucao polyline{fill:none;stroke-width:2}
 .cn-evolucao polyline.suj,.cn-evolucao circle.suj{stroke:#7fb8ff}
 .cn-evolucao circle.suj{fill:#7fb8ff}

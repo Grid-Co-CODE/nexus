@@ -27,6 +27,9 @@
   {% macro x(i) %}{{ 40 + (i * (w - 60) / ((n - 1) or 1))|round(1) }}{% endmacro %}
   {% macro y(v) %}{{ 15 + ((5 - v) * (h - 40) / 4)|round(1) }}{% endmacro %}
   {% set passo = (w - 60) / ((n - 1) or 1) %}
+  {# a data no eixo em meia fonte (Levi, 06/10: Crateús, 25 rondas, as datas encavalavam): cada "dd/mm" pede ~23
+     unidades; com menos espaço, uma data a cada `salto` pontos, e a última sempre (a dica do ponto diz a data inteira) #}
+  {% set salto = [((23 / passo) | round(0, 'ceil')) | int, 1] | max %}
   <section class="cn-painel cn-evolucao">
     <div class="cn-lista-cab"><h2>Evolução</h2><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação · passe o mouse no ponto</span></div>
     <svg viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Sujidade e vegetação por ronda">
@@ -45,7 +48,7 @@
         {% if p.sujidade is not none %}<circle class="suj" cx="{{ x(loop.index0) }}" cy="{{ y(p.sujidade) }}" r="4"/>{% endif %}
         {% if p.vegetacao is not none %}<circle class="veg" cx="{{ x(loop.index0) }}" cy="{{ y(p.vegetacao) }}" r="4"/>{% endif %}
       </g>
-      <text x="{{ x(loop.index0) }}" y="{{ h - 4 }}" class="eixo" text-anchor="middle">{{ dia_curto(p.data) }}</text>
+      {% if loop.last or (loop.index0 % salto == 0 and n - 1 - loop.index0 >= salto) %}<text x="{{ x(loop.index0) }}" y="{{ h - 5 }}" class="eixo data" text-anchor="middle">{{ dia_curto(p.data) }}</text>{% endif %}
       {% endfor %}
     </svg>
     <div class="cn-dica" role="tooltip" hidden>

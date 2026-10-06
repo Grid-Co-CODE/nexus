@@ -544,3 +544,18 @@ def test_ronda_sem_os_mostra_o_checklist_da_carga_unica(banco, logado):
     assert [x["usina"] for x in s["linhas"]] == ["Brodowski 1"] and s["linhas"][0]["vegetacao"] == 5
     pag = logado.get("/t/campo/rondas/usina/2").get_data(as_text=True)
     assert 'cn-nivel cn-nivel--5">5<' in pag and "não lida" not in pag
+
+
+def test_eixo_de_datas_do_grafico_nao_encavala(banco, logado, monkeypatch):
+    """06/10 (Crateús): com muitas rondas a data do eixo vai em meia fonte e, sem espaço, uma a cada tantos pontos;
+    a última sempre aparece."""
+    from nexus.campo import ronda_checklist
+    base = visao.rondas().dados["todas"][0]
+    muitas = [dict(base, data=_dia(i), sujidade=3, vegetacao=2, lida=True, os=str(900 + i), sensores_sujos=[], vala="")
+              for i in range(80)]
+    monkeypatch.setattr(visao, "historico_usina", lambda todas, resp, uid: muitas)
+    monkeypatch.setattr(ronda_checklist, "pedir_releitura", lambda app=None: None)
+    pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+    datas = pag.count('class="eixo data"')
+    assert 20 <= datas <= 32 and pag.count('class="cn-ponto"') == 80      # 80 pontos, ~30 datas
+    assert f'class="eixo data" text-anchor="middle">{_dia(0)[8:10]}/{_dia(0)[5:7]}<' in pag     # a mais recente
