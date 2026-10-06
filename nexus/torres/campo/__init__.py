@@ -238,10 +238,62 @@ def pt_aprovar(numero):
 
 
 # ── Rondas, Zeladoria e Ranking (visão nossa) ────────────────────────────────────────────────────────────────────
+ABAS_RONDAS = (("registros", "Registros"), ("cobertura", "Cobertura"), ("trackers", "Trackers"), ("quem", "Quem ronda"))
+LIMITE_LINHAS = 300
+
+
+def _duracao(m) -> str:
+    """27 min, 1h04: como o painel de rondas mostrava (Levi, 05/10)."""
+    if m is None:
+        return "—"
+    return f"{m // 60}h{m % 60:02d}" if m >= 60 else f"{m} min"
+
+
+def _iniciais(nome) -> str:
+    partes = [p for p in str(nome or "").split() if p]
+    return (partes[0][0] + (partes[-1][0] if len(partes) > 1 else "")).upper() if partes else "?"
+
+
 @bp.route("/rondas")
 def rondas():
-    dias = _dias((7, 14, 30), 14)
-    return render_template("campo/rondas.html", **_comum("rondas", visao.rondas(dias), dias=dias))
+    """Cobertura, duração e qualidade da ronda (Levi, 05/10: o estilo do painel de rondas, no tema do Nexus): seis
+    indicadores do período e quatro abas. Filtros de região do Brasil e de supervisor; Exportar CSV dos registros."""
+    dias = _dias((7, 14, 30), 30)
+    leitura = visao.rondas()
+    d = leitura.dados
+    regiao, supervisor = request.args.get("regiao", ""), request.args.get("supervisor", "")
+    aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS_RONDAS) else "registros"
+    dur, q = request.args.get("dur", ""), request.args.get("q", "").strip().lower()
+
+    def filtra(lista):
+        return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
+                and (not supervisor or x.get("supervisor") == supervisor)]
+    cobertura = filtra(d.get("cobertura") or [])
+    painel = visao.painel_rondas(filtra(d.get("todas") or []), cobertura, dias, d.get("hoje") or visao._agora().date().isoformat())
+    lim = painel["kpi"]["dur_min"]
+    registros = [r for r in painel["periodo"]
+                 if (dur != "curta" or (r["dur_min"] is not None and r["dur_min"] < lim))
+                 and (dur != "longa" or (r["dur_min"] or 0) > 120)
+                 and (not q or q in " ".join(str(r.get(c) or "") for c in ("tecnico", "usina", "equipe", "os")).lower())]
+    if request.args.get("csv") == "1":
+        import csv
+        import io
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter=";")
+        w.writerow(["Data", "Técnico", "Usina", "Equipe", "Estado", "Região", "Tipo", "Início", "Fim", "Duração (min)",
+                    "Qualidade (%)", "Veredito", "Trackers apontados", "Trackers respondidos", "OS", "Pendências"])
+        for r in registros:
+            w.writerow([r["data"], r["tecnico"], r["usina"], r["equipe"], r["uf"], r["regiao_br"], r["tipo"], r["ini_hm"],
+                        r["fim_hm"], r["dur_min"] if r["dur_min"] is not None else "", r["nota"] if r["nota"] is not None else "",
+                        r["veredito"][1], r["trk_apontados"], r["trk_respondidos"], r["os"] or "", r["falhas"]])
+        return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="rondas-{dias}d.csv"'})
+    supervisores = sorted({c.get("supervisor") for c in d.get("cobertura") or [] if c.get("supervisor")})
+    return render_template("campo/rondas.html", **_comum(
+        "rondas", leitura, dias=dias, regiao=regiao, supervisor=supervisor, aba=aba, abas=ABAS_RONDAS, dur=dur,
+        q=request.args.get("q", ""), k=painel["kpi"], registros=registros, limite=LIMITE_LINHAS, cobertura=cobertura,
+        trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES, supervisores=supervisores,
+        duracao=_duracao, iniciais=_iniciais))
 
 
 @bp.route("/zeladoria")

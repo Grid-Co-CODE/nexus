@@ -271,22 +271,118 @@ def _cobertura(b: _Base, rondas: list[dict], hoje) -> list[dict]:
     return out
 
 
+# Os limites da ronda são os do App (LIMIARES_PADRAO do function_app.py, copiado em regras_app.py): a tela do Nexus
+# chama de "Muito bom", "Atenção" e "Não está bom" exatamente o que o painel do App chamava.
+def _limites() -> dict:
+    from . import regras_app
+    return regras_app.LIMIARES_PADRAO
+
+
+def _duracao_min(r) -> int | None:
+    """Do início ao fim, carimbados pelo aparelho (como o `_duracao_ronda` do App, sem a pausa, que o livro não traz).
+    Fora de 0 a 8 h = relógio errado, não ronda: fica sem duração."""
+    a, b = _dt(r.get("inicio")), _dt(r.get("fim"))
+    if not a or not b:
+        return None
+    m = (b - a).total_seconds() / 60
+    return int(round(m)) if 0 <= m <= 480 else None
+
+
+def _veredito(r, lim) -> tuple[str, str]:
+    """O `_veredito_ronda` do App, na mesma ordem, com o que o livro traz: o GPS só aparece como a falha "sem GPS"."""
+    q, dur = r["nota"] or 0, r["dur_min"]
+    falhas = [f for f in (x.strip() for x in r["falhas"].split(";")) if f]
+    sem_gps = any("gps" in f.lower() for f in falhas)
+    tt, tr = r["trk_apontados"], r["trk_respondidos"]
+    curta = dur is not None and dur < lim["ronda_dur_min"]
+    if curta and (sem_gps or (tt and tr == 0)) or sem_gps:
+        return "critico", "Não está bom"
+    if tt and tr == 0:
+        return "critico", "Sem devolutiva"
+    if curta:
+        return "alerta", "Atenção"
+    if q < lim["ronda_critico_q"]:
+        return "critico", "Não está bom"
+    if q >= lim["ronda_exemplar_q"] and not falhas and (not tt or tr == tt):
+        return "ok", "Muito bom"
+    if q < lim["ronda_atencao_q"] or falhas:
+        return "alerta", "Atenção"
+    return "ok", "Bom"
+
+
+def _hm(iso) -> str:
+    d = _dt(iso)
+    return d.strftime("%H:%M") if d else ""
+
+
 def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
+    """As rondas de usina mobilizada, cada uma com duração, horário de Brasília e veredito, e a cobertura das usinas.
+    A conta do período (os indicadores) é `painel_rondas`, depois dos filtros da tela."""
     def calcular():
         b = _Base()
         hoje = _agora().date()
+        lim = _limites()
         todas = [r for r in _rondas_ligadas(b) if r["mobilizada"]]
-        piso = (hoje - timedelta(days=dias - 1)).isoformat()
-        periodo = sorted((r for r in todas if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
-        cob = _cobertura(b, todas, hoje)
-        notas = [r["nota"] for r in periodo if r["nota"] is not None]
-        return {"periodo": periodo, "cobertura": cob, "sem_mobilizacao": b.sem_mobilizacao,
-                "resumo": {"rondas": len(periodo), "nota_media": round(statistics.mean(notas)) if notas else None,
-                           "com_falha": sum(1 for r in periodo if r["falhas"]),
-                           "sem_os": sum(1 for r in periodo if r["sem_os"]),
-                           "usinas": len(cob), "cobertas": sum(1 for c in cob if c["dias"] < dias),
-                           "sem_ronda_alerta": sum(1 for c in cob if c["dias"] >= DIAS_SEM_RONDA_ALERTA)}}
-    return _ler(("visao_rondas", dias), calcular)
+        for r in todas:
+            r["dur_min"] = _duracao_min(r)
+            r["ini_hm"], r["fim_hm"] = _hm(r["inicio"]), _hm(r["fim"])
+            r["veredito"] = _veredito(r, lim)
+        todas.sort(key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
+        return {"todas": todas, "cobertura": _cobertura(b, todas, hoje), "sem_mobilizacao": b.sem_mobilizacao,
+                "hoje": hoje.isoformat()}
+    return _ler(("visao_rondas",), calcular)
+
+
+def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
+    """Os indicadores do período, sobre as listas já filtradas pela tela (região, supervisor):
+    - cobertura = usinas mobilizadas com ronda no período ÷ usinas mobilizadas, e a mesma conta no período anterior de
+      mesmo tamanho (a seta);
+    - qualidade abaixo do limite = nota abaixo de 85 (o "atenção" do App);
+    - abaixo de 10 min = checklist não percorrido (o tempo mínimo do App);
+    - usina mais atrasada = a mobilizada há mais tempo sem ronda."""
+    lim = _limites()
+    hoje = datetime.fromisoformat(hoje_iso).date()
+    piso = (hoje - timedelta(days=dias - 1)).isoformat()
+    piso_ant = (hoje - timedelta(days=2 * dias - 1)).isoformat()
+    periodo = [r for r in todas if r["data"] >= piso]
+    anterior = [r for r in todas if piso_ant <= r["data"] < piso]
+    usinas = {c["usina_id"] for c in cobertura}
+    cobertas = {r["usina_id"] for r in periodo} & usinas
+    cobertas_ant = {r["usina_id"] for r in anterior} & usinas
+    pct = lambda n: round(100 * n / len(usinas)) if usinas else None
+    notas = [r["nota"] for r in periodo if r["nota"] is not None]
+    durs = [r["dur_min"] for r in periodo if r["dur_min"] is not None]
+    atrasada = cobertura[0] if cobertura else None
+    quem = {}
+    for r in periodo:
+        q = quem.setdefault(r["tecnico"] or "—", {"tecnico": r["tecnico"] or "—", "rondas": 0, "usinas": set(), "notas": [],
+                                                  "durs": [], "curtas": 0, "longas": 0, "ultima": "", "equipe": r["equipe"]})
+        q["rondas"] += 1
+        q["usinas"].add(r["usina"])
+        q["notas"] += [r["nota"]] if r["nota"] is not None else []
+        q["durs"] += [r["dur_min"]] if r["dur_min"] is not None else []
+        q["curtas"] += r["dur_min"] is not None and r["dur_min"] < lim["ronda_dur_min"]
+        q["longas"] += r["tipo"] == "longa"
+        q["ultima"] = max(q["ultima"], r["data"])
+    for q in quem.values():
+        q["usinas"] = len(q["usinas"])
+        q["nota"] = round(statistics.mean(q["notas"])) if q["notas"] else None
+        q["dur_mediana"] = round(statistics.median(q["durs"])) if q["durs"] else None
+        del q["notas"], q["durs"]
+    return {
+        "periodo": periodo, "trackers": [r for r in periodo if r["trk_apontados"]],
+        "quem": sorted(quem.values(), key=lambda q: (-q["rondas"], q["tecnico"])),
+        "kpi": {"rondas": len(periodo), "hoje": sum(1 for r in periodo if r["data"] == hoje_iso),
+                "usinas": len(usinas), "cobertas": len(cobertas), "cobertura_pct": pct(len(cobertas)),
+                "cobertura_ant_pct": pct(len(cobertas_ant)),
+                "qualidade": round(statistics.mean(notas)) if notas else None,
+                "abaixo_limite": sum(1 for n in notas if n < lim["ronda_atencao_q"]), "limite": lim["ronda_atencao_q"],
+                "dur_media": round(statistics.mean(durs)) if durs else None,
+                "dur_mediana": round(statistics.median(durs)) if durs else None,
+                "curtas": sum(1 for d in durs if d < lim["ronda_dur_min"]), "dur_min": lim["ronda_dur_min"],
+                "atrasada": atrasada, "nunca": sum(1 for c in cobertura if c["dias"] >= 999),
+                "sem_ronda_alerta": sum(1 for c in cobertura if c["dias"] >= DIAS_SEM_RONDA_ALERTA),
+                "sem_os": sum(1 for r in periodo if r["sem_os"])}}
 
 
 # ── Permissões de trabalho ───────────────────────────────────────────────────────────────────────────────────────

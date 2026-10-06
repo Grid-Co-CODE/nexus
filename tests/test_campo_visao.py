@@ -126,15 +126,41 @@ def banco(app, tmp_path):
 
 
 def test_so_usina_mobilizada_entra_e_com_estado_e_cidade(banco):
-    d = visao.rondas(14).dados
+    d = visao.rondas().dados
     cob = {c["usina"]: c for c in d["cobertura"]}
     assert set(cob) == {"Altair", "Brodowski 1", "Coração 1"}      # a mobilizar e a sem data de mobilização ficam fora
     assert d["sem_mobilizacao"] == ["Sem Data"]
     assert (cob["Altair"]["uf"], cob["Altair"]["cidade"]) == ("SP", "Altair")
     assert cob["Altair"]["dias"] == 1 and cob["Brodowski 1"]["dias"] == 2 and cob["Coração 1"]["dias"] == 999
     assert d["cobertura"][0]["usina"] == "Coração 1"                    # a mais tempo sem ronda primeiro
-    assert d["resumo"]["sem_os"] == 1 and d["resumo"]["cobertas"] == 2
-    assert d["periodo"][0]["tecnico"] == "Fulano Souza"               # nome resumido: o "Nome padrão" do cadastro
+    assert d["todas"][0]["tecnico"] == "Fulano Souza"                 # nome resumido: o "Nome padrão" do cadastro
+    k = visao.painel_rondas(d["todas"], d["cobertura"], 14, d["hoje"])["kpi"]
+    assert (k["rondas"], k["cobertas"], k["usinas"], k["sem_os"]) == (3, 2, 3, 1)
+
+
+def test_painel_de_rondas_duracao_veredito_e_indicadores(banco):
+    d = visao.rondas().dados
+    r = d["todas"][0]
+    assert r["dur_min"] == 60 and r["ini_hm"] == "07:00"              # 10:00Z = 07:00 em Brasília
+    vered = {(x["usina"], x["data"]): x["veredito"] for x in d["todas"]}
+    assert vered[("Altair", _dia(1))] == ("alerta", "Atenção")       # 90% com pendência
+    p = visao.painel_rondas(d["todas"], d["cobertura"], 7, d["hoje"])
+    k = p["kpi"]
+    assert k["cobertura_pct"] == 67 and k["qualidade"] == 90 and k["dur_media"] == 60 and k["curtas"] == 0
+    assert k["atrasada"]["usina"] == "Coração 1" and k["nunca"] == 1
+    assert p["quem"][0]["tecnico"] == "Fulano Souza" and p["quem"][0]["rondas"] == 3
+
+
+def test_tela_de_rondas_no_estilo_do_painel(banco, logado):
+    html = logado.get("/t/campo/rondas").get_data(as_text=True)
+    assert "Cobertura, duração e qualidade da ronda" in html and "Rondas finalizadas" in html
+    assert "Usina mais atrasada" in html and "Rondas diárias" in html and 'class="cn-avatar">FS<' in html
+    assert "1h00" in html and "Atenção" in html and "Exportar CSV" in html
+    r = logado.get("/t/campo/rondas?csv=1")
+    assert r.mimetype == "text/csv" and "Fulano Souza" in r.get_data(as_text=True)
+    assert "Coração 1" in logado.get("/t/campo/rondas?aba=cobertura").get_data(as_text=True)
+    assert "Fulano Souza" in logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
+    assert "Nenhuma ronda" in logado.get("/t/campo/rondas?dur=curta").get_data(as_text=True)
 
 
 def test_pt_fila_da_mais_antiga_nome_resumido_e_local(banco):

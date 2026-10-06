@@ -64,8 +64,17 @@ decisões, 766 rondas, zeladoria vazia.
 ## As contas nossas (`nexus/campo/visao.py`)
 
 As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
-- **Rondas:** cobertura = dias desde a última ronda de cada usina mobilizada (nunca = 999, aparece "nunca"), da mais
-  esquecida para a mais recente; janela de 7, 14 ou 30 dias. Conta também ronda sem OS no Fracttal.
+- **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou): seis indicadores do período (`painel_rondas`,
+  depois dos filtros de região e supervisor) e quatro abas: Registros (a tabela "Rondas diárias": iniciais do
+  técnico, tipo, início e fim em Brasília, duração "27 min"/"1h04", qualidade com barra, veredito em selo; filtro
+  de duração; até 300 linhas com o aviso; Exportar CSV com BOM para o Excel), Cobertura (usinas mobilizadas, a mais
+  esquecida primeiro), Trackers (rondas com trackers apontados e a devolutiva) e Quem ronda (por técnico).
+  - Cobertura = usinas mobilizadas com ronda no período ÷ mobilizadas; a seta compara com o período anterior de
+    mesmo tamanho. Duração = fim − início carimbados pelo aparelho (0 a 8 h; fora disso, sem duração; o livro não
+    traz a pausa). **Veredito = o `_veredito_ronda` do App, na mesma ordem, com os limites dele** (`LIMIARES_PADRAO`:
+    60/85/95 e 10 min); o GPS só aparece como a falha "sem GPS". "Ronda longa pendente" é pendência para o App
+    (vira Atenção). Medido em 05/10, 30 dias: 455 rondas, cobertura 80% (102 de 128; antes 65%), qualidade 96%,
+    duração média 45 min, 36 abaixo de 10 min.
 - **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão; parada = mais de 2 h.
 - **Tela de PT** (Levi, 05/10): abas "Esperando o De acordo" (cartões por equipe com a lista das PT de cada uma, ou
   tabela) e "Histórico" (decididas, período 7/30/90 dias, por situação). Filtro de supervisor; o cartão leva à tabela
