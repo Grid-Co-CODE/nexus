@@ -91,6 +91,13 @@ def test_clientes_para_o_filtro_sem_repetir_e_em_ordem(srv):
     assert U.carregar(srv).clientes() == ["Cliente Alfa", "Cliente Beta", U.SEM_CLIENTE]
 
 
+def test_cliente_so_com_usina_sem_coordenada_tambem_esta_no_filtro():
+    com = U.Usina("1", "U1", "Alfa", lat=-5.0, lon=-40.0)
+    sem = U.Usina("2", "U2", "Beta")
+    fora = U.Usina("3", "U3", "Gama", lat=0.0, lon=0.0)
+    assert U.Cadastro([com], [sem], [fora], 3).clientes() == ["Alfa", "Beta", "Gama"]
+
+
 def test_a_coordenada_nao_aparece_nem_no_repr(srv):
     c = U.carregar(srv)
     texto = repr(c.usinas) + str(c.usinas[0]) + repr(c)

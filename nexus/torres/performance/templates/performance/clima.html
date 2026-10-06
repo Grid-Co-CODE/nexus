@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
+{# Clima e risco (06/10/2026): avisos do INMET, focos de queimada e risco de fogo do INPE por usina, só leitura. A tela se
+   recarrega a cada 60 s, como a Operação em tempo real; o que vai à rede é decidido pelo cache de cada fonte (30 min, 10 min
+   e 6 h), não por esta recarga. O base.html não tem bloco de head, e o navegador aceita o meta dentro do corpo.
+   Texto do INMET é de terceiros: só entra por {{ }} (escapado), nunca por |safe, e a cor do aviso nem é lida. #}
+<meta http-equiv="refresh" content="60">
+<div class="cl">
+  <header class="cl-cab">
+    <div>
+      <p class="gc-eyebrow">{{ torre.nome }}</p>
+      <h1 class="cl-titulo">{{ tela.nome }}</h1>
+      <p class="cl-pergunta">{{ tela.pergunta }}</p>
+    </div>
+    <p class="cl-atualizada">Tela atualizada às {{ v.atualizada }}</p>
+  </header>
+
+  {% if v.erro_cadastro %}
+  <div class="cl-aviso" role="alert">Cadastro indisponível: {{ v.erro_cadastro }}</div>
+  {% else %}
+
+  {% if v.clientes %}
+  <form class="cl-filtro" method="get" action="">
+    <label class="gc-rotulo" for="cl-cliente">Cliente</label>
+    <select id="cl-cliente" name="cliente" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos os clientes</option>
+      {% for c in v.clientes %}<option value="{{ c }}"{% if c == v.cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
+  </form>
+  {% endif %}
+
+  {% if v.sem_usinas %}
+  <p class="cl-aviso">Nenhuma usina em operação com coordenada no cadastro. Sem coordenada não há onde procurar aviso, foco nem risco de fogo.</p>
+  {% else %}
+  <p class="cl-base">Alertas calculados para {{ v.n_usinas }} {{ "usina em operação com coordenada" if v.n_usinas == 1 else "usinas em operação com coordenada" }} no cadastro{% if v.cliente %} (cliente {{ v.cliente }}){% endif %}. A coordenada não aparece nesta tela.</p>
+
+  <section class="cl-resumo" aria-label="Resumo dos alertas">
+    {% for r in v.resumo %}
+    <div class="cl-num {{ r.classe }}" data-id="{{ r.id }}"><span class="cl-rotulo">{{ r.rotulo }}</span><span class="cl-valor">{{ r.valor }}</span><span class="cl-sub">{{ r.sub }}</span></div>
+    {% endfor %}
+  </section>
+
+  <section class="cl-fontes" aria-label="Estado das fontes">
+    {% for f in v.fontes %}
+    <div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>
+    {% endfor %}
+  </section>
+  {% if v.faltando %}<p class="cl-nota cl-nota--atencao">A lista e os números acima não incluem: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
+  {% if v.sem_risco %}<p class="cl-nota">Risco de fogo sem dado (sem vegetação no entorno): {{ v.sem_risco|join(", ") }}.</p>{% endif %}
+
+  <h2 class="cl-h2">{% if v.alertas %}Usinas com alerta ({{ v.alertas|length }}), da mais grave para a menos{% else %}Nenhuma usina com alerta agora{% endif %}</h2>
+  <section class="cl-lista" aria-label="Usinas com alerta">
+    {% for c in v.alertas %}
+    <article class="cl-usina cl-n{{ c.nivel }}">
+      <div class="cl-usina-cab">
+        <div class="cl-usina-id"><h3 class="cl-nome">{{ c.nome }}</h3><span class="cl-cliente">{{ c.cliente }}{% if c.uf %} · {{ c.uf }}{% endif %}</span></div>
+        <span class="cl-nivel cl-n{{ c.nivel }}">{{ c.rotulo }}</span>
+      </div>
+      {% if c.avisos or c.foco %}
+      <ul class="cl-linhas">
+        {% for a in c.avisos %}
+        <li class="cl-linha cl-n{{ a.nivel }}"><span class="cl-tipo">INMET</span> <strong>{{ a.evento }}</strong> · {{ a.severidade }} · {{ a.validade }}</li>
+        {% endfor %}
+        {% if c.foco %}<li class="cl-linha cl-n3"><span class="cl-tipo">Foco</span> {{ c.foco.texto }}</li>{% endif %}
+      </ul>
+      {% endif %}
+      {% if c.dias %}
+      <p class="cl-rotulo-risco">Risco de fogo (INPE)</p>
+      {% if c.risco_sem_dado %}
+      <p class="cl-linha cl-n0">{{ c.dias[0].valor }}</p>
+      {% else %}
+      <div class="cl-dias">
+        {% for d in c.dias %}
+        <div class="cl-dia cl-n{{ d.nivel }}"><span class="cl-dia-rot">{{ d.rotulo }}</span> <span class="cl-dia-val">{{ d.valor }}</span>{% if d.classe %} <span class="cl-dia-classe">{{ d.classe }}</span>{% endif %}{% if d.nota %} <span class="cl-dia-nota">{{ d.nota }}</span>{% endif %}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+  <p class="cl-nota">{{ v.sem_alerta }} {{ "usina sem alerta" if v.sem_alerta == 1 else "usinas sem alerta" }} agora.</p>
+  {% endif %}
+
+  {% if v.sem_coordenada %}
+  <section class="cl-pendencia">
+    <h2 class="cl-h2">Sem coordenada no cadastro ({{ v.sem_coordenada|length }})</h2>
+    <p class="cl-nota">Usinas em operação sem latitude e longitude utilizáveis: ficam sem aviso, foco e risco de fogo até o cadastro ser corrigido. {{ v.sem_coordenada|join(", ") }}.</p>
+  </section>
+  {% endif %}
+  {% if v.fora_do_brasil %}
+  <section class="cl-pendencia">
+    <h2 class="cl-h2">Coordenada fora do Brasil no cadastro ({{ v.fora_do_brasil|length }})</h2>
+    <p class="cl-nota">Provável erro de digitação (zero, sinal ou latitude e longitude trocadas); ficam de fora dos alertas até a correção. {{ v.fora_do_brasil|join(", ") }}.</p>
+  </section>
+  {% endif %}
+  {% if v.ilegiveis %}<p class="cl-nota">{{ v.ilegiveis }} {{ "ficha do cadastro não abriu" if v.ilegiveis == 1 else "fichas do cadastro não abriram" }} (a chave do cadastro não confere): fora dos alertas.</p>{% endif %}
+  {% endif %}
+
+  <footer class="cl-rodape">
+    <p><strong>Dados: INMET, INPE (Programa Queimadas).</strong> Somente leitura: esta tela não grava nada.</p>
+    <ul>
+      <li>Avisos: INMET, avisos meteorológicos ativos, cada um com o seu polígono; o aviso vale para a usina cujo ponto está dentro dele. Fonte pública, de endereço não documentado oficialmente.</li>
+      <li>Focos: INPE, Programa Queimadas, arquivos de 10 em 10 min com a detecção dos satélites. Um foco é um pixel com fogo detectado, não um incêndio confirmado; contam os que estão a até 5 km, nos arquivos da última hora.</li>
+      <li>Risco de fogo: INPE, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1; alto a partir de 0,7, crítico acima de 0,95). Onde o INPE não calcula, por não haver vegetação, vale o maior valor do entorno de 2 km, marcado como entorno.</li>
+    </ul>
+  </footer>
+</div>
+{% endblock %}

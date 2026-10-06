@@ -1,0 +1,103 @@
+/* Clima e risco (06/10/2026). Tokens do nexus.css (navy, nunca lilás); o semáforo é local, como em campo.css: a gravidade
+   vai na cor E na palavra (Crítico, Alto, Atenção), nunca só na cor, e sem emoji. Nada de largura fixa maior que o celular:
+   a tela de 375 px não rola para o lado, e texto de terceiros (INMET) quebra em vez de alargar a página. */
+.cl{--cl-ok:#4ade80;--cl-atencao:#ffd83d;--cl-alto:#ff9f43;--cl-critico:#ff5b6e;--cl-mudo:#767d92;
+  --cl-ok-suave:rgba(74,222,128,.12);--cl-atencao-suave:rgba(255,216,61,.12);--cl-alto-suave:rgba(255,159,67,.14);
+  --cl-critico-suave:rgba(255,91,110,.14);max-width:1280px;margin:0 auto;min-width:0}
+.cl-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 16px}
+.cl-titulo{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}
+.cl-pergunta{font-size:15px;line-height:1.6;color:var(--tinta-2);max-width:760px;margin:0;overflow-wrap:anywhere}
+.cl-atualizada{font:500 12px/16px var(--font-mono);color:var(--mudo);margin:0}
+.cl-aviso{margin:18px 0 0;padding:12px 16px;border:1px solid var(--alerta);border-radius:var(--raio-md);
+  background:var(--cl-atencao-suave);color:var(--tinta);overflow-wrap:anywhere}
+.cl-filtro{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:18px 0 0}
+.cl-filtro .gc-rotulo{display:inline-block}
+.cl-filtro select{min-width:0;max-width:100%}
+.cl-base{margin:14px 0 0;font-size:13px;color:var(--mudo);overflow-wrap:anywhere}
+
+/* faixa de resumo: três números, cada um com a cor do pior alerta do tipo */
+.cl-resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.cl-num{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--cl-mudo);
+  border-radius:var(--raio-md);padding:14px 16px;min-width:0}
+.cl-num.cl-n0{border-left-color:var(--cl-ok)}
+.cl-num.cl-n1{border-left-color:var(--cl-atencao)}
+.cl-num.cl-n2{border-left-color:var(--cl-alto)}
+.cl-num.cl-n3{border-left-color:var(--cl-critico)}
+.cl-rotulo{display:block;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cl-valor{display:block;font:700 30px/1.1 var(--font-display);margin-top:6px;color:var(--tinta)}
+.cl-num.cl-n0 .cl-valor{color:var(--cl-ok)}
+.cl-num.cl-n1 .cl-valor{color:var(--cl-atencao)}
+.cl-num.cl-n2 .cl-valor{color:var(--cl-alto)}
+.cl-num.cl-n3 .cl-valor{color:var(--cl-critico)}
+.cl-num.cl-nx .cl-valor{color:var(--fraco)}
+.cl-sub{display:block;font-size:12.5px;color:var(--tinta-2);margin-top:4px;overflow-wrap:anywhere}
+
+/* uma linha por fonte: de quando é o dado e, se falhou, que falhou */
+.cl-fontes{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:14px 0 0}
+.cl-fonte{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:10px 14px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md);font-size:13px;min-width:0}
+.cl-fonte::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--cl-mudo);align-self:center}
+.cl-fonte.cl-ok::before{background:var(--cl-ok)}
+.cl-fonte.cl-atencao{border-color:var(--alerta)}
+.cl-fonte.cl-atencao::before{background:var(--cl-atencao)}
+.cl-fonte.cl-fora{border-color:var(--critico)}
+.cl-fonte.cl-fora::before{background:var(--cl-critico)}
+.cl-fonte-texto{flex:1 1 220px;min-width:0;overflow-wrap:anywhere}
+.cl-detalhe{flex:1 1 100%;font-size:12px;color:var(--mudo);overflow-wrap:anywhere;padding-left:18px}
+.cl-nota{margin:12px 0 0;font-size:13px;color:var(--tinta-2);overflow-wrap:anywhere}
+.cl-nota--atencao{padding:10px 14px;border:1px solid var(--alerta);border-radius:var(--raio-md);background:var(--cl-atencao-suave);color:var(--tinta)}
+
+.cl-h2{font:700 16px/22px var(--font-sans);margin:26px 0 12px;overflow-wrap:anywhere}
+
+/* a lista: um cartão por usina, o mais grave primeiro */
+.cl-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:14px}
+.cl-usina{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--cl-mudo);
+  border-radius:var(--raio-md);padding:14px 16px;min-width:0}
+.cl-usina.cl-n1{border-left-color:var(--cl-atencao)}
+.cl-usina.cl-n2{border-left-color:var(--cl-alto)}
+.cl-usina.cl-n3{border-left-color:var(--cl-critico)}
+.cl-usina-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.cl-usina-id{min-width:0}
+.cl-nome{font:600 15px/20px var(--font-sans);margin:0;overflow-wrap:anywhere}
+.cl-cliente{display:block;font-size:12px;color:var(--mudo);overflow-wrap:anywhere}
+.cl-nivel{flex:none;font:700 11px/16px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;padding:2px 9px;
+  border-radius:var(--raio-tag);color:var(--cl-mudo);background:var(--superficie-2)}
+.cl-nivel.cl-n1{color:var(--cl-atencao);background:var(--cl-atencao-suave)}
+.cl-nivel.cl-n2{color:var(--cl-alto);background:var(--cl-alto-suave)}
+.cl-nivel.cl-n3{color:var(--cl-critico);background:var(--cl-critico-suave)}
+.cl-linhas{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.cl-linha{margin:0;font-size:13px;line-height:1.45;color:var(--tinta-2);overflow-wrap:anywhere}
+.cl-tipo{font:700 10.5px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;margin-right:6px;color:var(--mudo)}
+.cl-linha.cl-n1 .cl-tipo{color:var(--cl-atencao)}
+.cl-linha.cl-n2 .cl-tipo{color:var(--cl-alto)}
+.cl-linha.cl-n3 .cl-tipo{color:var(--cl-critico)}
+.cl-linha strong{color:var(--tinta);font-weight:600}
+.cl-rotulo-risco{margin:12px 0 6px;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cl-dias{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cl-dia{display:flex;flex-direction:column;gap:1px;padding:8px 9px;background:var(--superficie-2);border-radius:var(--raio-controle);
+  min-width:0;overflow-wrap:anywhere;font-size:12px;color:var(--mudo)}
+.cl-dia-val{font:700 16px/22px var(--font-display);color:var(--tinta)}
+.cl-dia-classe{font-weight:600;color:var(--tinta-2)}
+.cl-dia.cl-n2 .cl-dia-val,.cl-dia.cl-n2 .cl-dia-classe{color:var(--cl-alto)}
+.cl-dia.cl-n3 .cl-dia-val,.cl-dia.cl-n3 .cl-dia-classe{color:var(--cl-critico)}
+.cl-dia-nota{font-size:11px;color:var(--mudo)}
+
+.cl-pendencia{margin-top:6px}
+.cl-rodape{margin-top:30px;padding-top:16px;border-top:1px solid var(--linha);font-size:12px;line-height:1.55;color:var(--mudo)}
+.cl-rodape p{margin:0 0 8px;color:var(--tinta-2)}
+.cl-rodape ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.cl-rodape li{overflow-wrap:anywhere}
+
+@media (max-width:700px){
+  .cl-resumo{grid-template-columns:minmax(0,1fr)}
+  .cl-fontes{grid-template-columns:minmax(0,1fr)}
+  .cl-lista{grid-template-columns:minmax(0,1fr)}
+  .cl-dias{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cl-titulo{font-size:26px;line-height:32px}
+  .cl-filtro select{width:100%}
+  /* no celular os três números ocupam uma linha cada: o valor ao lado do rótulo, em vez de um bloco alto por número */
+  .cl-num{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"v r" "v s";column-gap:14px;align-items:center;padding:10px 14px}
+  .cl-num .cl-valor{grid-area:v;margin:0;min-width:44px;text-align:center}
+  .cl-num .cl-rotulo{grid-area:r;align-self:end}
+  .cl-num .cl-sub{grid-area:s;margin-top:2px;align-self:start}
+}

@@ -48,8 +48,9 @@ class Cadastro:
         return [(u.id, u.lat, u.lon) for u in self.usinas]
 
     def clientes(self) -> list:
-        """Os clientes das usinas do mapa, sem repetir, em ordem; "Sem cliente" por último."""
-        nomes = {u.cliente for u in self.usinas}
+        """Os clientes das usinas em operação, sem repetir, em ordem; "Sem cliente" por último. Inclui o cliente que só tem
+        usina sem coordenada (ou com coordenada fora do Brasil): filtrar por ele mostra as pendências dele."""
+        nomes = {u.cliente for u in self.usinas + self.sem_coordenada + self.fora_do_brasil}
         return sorted(nomes - {SEM_CLIENTE}, key=chave_texto) + ([SEM_CLIENTE] if SEM_CLIENTE in nomes else [])
 
 

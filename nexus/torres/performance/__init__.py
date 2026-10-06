@@ -42,6 +42,9 @@ TORRE = Torre(
         Tela("gemeo", "Gêmeo digital",
              "Quanto a usina deveria ter gerado com o sol que teve?",
              "gemeo_digital, via API"),
+        Tela("clima", "Clima e risco",
+             "Onde há aviso do INMET, foco de queimada ou risco de fogo perto das usinas?",
+             "INMET (avisos) e INPE (focos e risco de fogo), cruzados com as coordenadas do cadastro; só leitura"),
     ],
 )
 
@@ -149,3 +152,8 @@ def plataforma(caminho: str):
                      "Nada foi mostrado.", titulo="Plataforma não confirmou a chave")
     status, cab, corpo = ponte.ajustar_resposta(r.status_code, dict(r.headers), r.content)
     return Response(corpo, status=status, headers=cab)
+
+
+# Clima e risco (06/10/2026): alertas públicos por usina. A rota mora em clima_tela.py, importada aqui no fim porque precisa
+# do `bp` e da `TORRE` definidos acima; a regra mora em nexus/performance/clima/.
+from . import clima_tela  # noqa: E402,F401
