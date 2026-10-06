@@ -17,7 +17,7 @@ from ...campo import fonte_pg as campo_fonte
 from ...campo import ordens as campo_ordens
 from ...campo import triagem as campo_triagem
 from ...campo import visao
-from ...campo import decisao_pt, pt_fracttal
+from ...campo import decisao_pt, pt_fracttal, ronda_checklist
 from ..modelo import Tela, Torre
 from .assinatura import bp_assinatura
 
@@ -96,12 +96,14 @@ def _comum(tela_id, leitura, **k):
 
 # ── Central de atenção (visão nossa) ─────────────────────────────────────────────────────────────────────────────
 # Três visões (Levi, 05/10/2026): ronda e PT separadas, e as rondas pendentes antes do histórico.
-VISTAS = (("pendentes", "Rondas pendentes"), ("feitas", "Rondas feitas"), ("pt", "Permissões de trabalho"))
-STATUS_DA_VISTA = {"pendentes": visao.PENDENTE, "feitas": visao.FEITA, "pt": visao.PT_STATUS}
+# Só o que está PENDENTE (Levi, 05/10: "na parte de atenção quero só o que for pendente"): as rondas feitas, com o que
+# ficou faltando nelas, moram na tela Rondas (aba Registros, filtro de pendência).
+VISTAS = (("pendentes", "Rondas pendentes"), ("pt", "Permissões de trabalho"))
+STATUS_DA_VISTA = {"pendentes": visao.PENDENTE, "pt": visao.PT_STATUS}
 
 
 def _status(vista, x) -> str:
-    return {"pendentes": x.get("tipo"), "feitas": x.get("status"),
+    return {"pendentes": x.get("tipo"),
             "pt": "parada" if x.get("parada") else "aguardando"}[vista]
 
 
@@ -113,7 +115,6 @@ def _idade_min(m) -> str:
 
 
 ORDEM_DOS_CARTOES = {"pendentes": lambda c: (-c["pendentes"], c["pct_feitas"] or 0, c["equipe"]),
-                     "feitas": lambda c: (-c["rondas"], c["equipe"]),
                      "pt": lambda c: (-c["parada"], -c["pts"], c["equipe"])}
 
 
@@ -137,14 +138,14 @@ def atencao():
                 and (not equipe or x.get("equipe") == equipe)
                 and (not supervisor or x.get("supervisor") == supervisor)
                 and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
-    fontes = {"pendentes": filtra(d.get("pendentes") or []), "feitas": filtra(d.get("feitas") or []),
+    fontes = {"pendentes": filtra(d.get("pendentes") or []),
               "pt": filtra(d.get("pts") or [])}
     base = fontes[vista]
     contagem = {}
     for x in base:
         contagem[_status(vista, x)] = contagem.get(_status(vista, x), 0) + 1
     lista = [x for x in base if not f or _status(vista, x) == f]
-    cartoes = visao.por_equipe(filtra(d.get("usinas") or []), fontes["pendentes"], fontes["feitas"], fontes["pt"],
+    cartoes = visao.por_equipe(filtra(d.get("usinas") or []), fontes["pendentes"], [], fontes["pt"],
                                d.get("times") or {})
     if vista == "pt":
         cartoes = [c for c in cartoes if c["pts"]]
@@ -238,7 +239,10 @@ def pt_aprovar(numero):
 
 
 # ── Rondas, Zeladoria e Ranking (visão nossa) ────────────────────────────────────────────────────────────────────
-ABAS_RONDAS = (("registros", "Registros"), ("cobertura", "Cobertura"), ("trackers", "Trackers"), ("quem", "Quem ronda"))
+ABAS_RONDAS = (("registros", "Registros"), ("sujidade", "Sujidade e vegetação"), ("cobertura", "Cobertura"),
+               ("trackers", "Trackers"), ("quem", "Quem ronda"))
+FILTROS_SUJIDADE = (("", "Todas"), ("sujidade", "Sujidade alta"), ("vegetacao", "Vegetação alta"),
+                    ("sensores", "Sensor sujo"), ("vala", "Vala de drenagem"))
 LIMITE_LINHAS = 300
 
 
@@ -264,6 +268,7 @@ def rondas():
     regiao, supervisor = request.args.get("regiao", ""), request.args.get("supervisor", "")
     aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS_RONDAS) else "registros"
     dur, q = request.args.get("dur", ""), request.args.get("q", "").strip().lower()
+    pend = request.args.get("pend", "") if request.args.get("pend") in visao.FEITA else ""
 
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
@@ -274,6 +279,7 @@ def rondas():
     registros = [r for r in painel["periodo"]
                  if (dur != "curta" or (r["dur_min"] is not None and r["dur_min"] < lim))
                  and (dur != "longa" or (r["dur_min"] or 0) > 120)
+                 and (not pend or r["pendencia"] == pend)
                  and (not q or q in " ".join(str(r.get(c) or "") for c in ("tecnico", "usina", "equipe", "os")).lower())]
     if request.args.get("csv") == "1":
         import csv
@@ -282,6 +288,7 @@ def rondas():
         w = csv.writer(buf, delimiter=";")
         w.writerow(["Data", "Técnico", "Usina", "Equipe", "Estado", "Região", "Tipo", "Início", "Fim", "Duração (min)",
                     "Qualidade (%)", "Veredito", "Trackers apontados", "Trackers respondidos", "OS", "Pendências"])
+        # (a coluna Pendências do CSV leva tudo o que o App anotou, inclusive a ronda longa pendente)
         for r in registros:
             w.writerow([r["data"], r["tecnico"], r["usina"], r["equipe"], r["uf"], r["regiao_br"], r["tipo"], r["ini_hm"],
                         r["fim_hm"], r["dur_min"] if r["dur_min"] is not None else "", r["nota"] if r["nota"] is not None else "",
@@ -289,11 +296,28 @@ def rondas():
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="rondas-{dias}d.csv"'})
     supervisores = sorted({c.get("supervisor") for c in d.get("cobertura") or [] if c.get("supervisor")})
+    suj, suj_estado, suj_f = None, None, request.args.get("sv", "")
+    if aba == "sujidade":
+        # as respostas vêm das OS de ronda no Fracttal: as aprovadas, relidas em segundo plano, e as em verificação,
+        # que já estão na fila da Aprovação de OS (nunca espera o Fracttal)
+        campo_aprovacao._pedir_releitura()
+        ronda_checklist.pedir_releitura()
+        suj = visao.sujidade_vegetacao(filtra(d.get("todas") or []), cobertura, ronda_checklist.respostas(), dias,
+                                       d.get("hoje") or visao._agora().date().isoformat())
+        suj_estado = ronda_checklist.estado()
+        alto = lambda n: n is not None and n > 3
+        filtro = {"sujidade": lambda x: alto(x["sujidade"]), "vegetacao": lambda x: alto(x["vegetacao"]),
+                  "sensores": lambda x: x["sensores_sujos"],
+                  "vala": lambda x: x["vala"] and visao._norm_txt(x["vala"]) not in ("limpa", "ok", "nao se aplica")}.get(suj_f)
+        suj["filtradas"] = [x for x in suj["linhas"] if not filtro or filtro(x)]
     return render_template("campo/rondas.html", **_comum(
         "rondas", leitura, dias=dias, regiao=regiao, supervisor=supervisor, aba=aba, abas=ABAS_RONDAS, dur=dur,
+        pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"},
+        n_pend={k: sum(1 for r in painel["periodo"] if r["pendencia"] == k) for k in ("sem_os", "incompleta")},
         q=request.args.get("q", ""), k=painel["kpi"], registros=registros, limite=LIMITE_LINHAS, cobertura=cobertura,
         trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES, supervisores=supervisores,
-        duracao=_duracao, iniciais=_iniciais))
+        duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, suj_f=suj_f,
+        filtros_sujidade=FILTROS_SUJIDADE))
 
 
 @bp.route("/zeladoria")

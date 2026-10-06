@@ -211,13 +211,15 @@ def test_telas_mostram_o_dado_do_banco(banco, logado):
 
 def test_central_separa_ronda_de_pt_e_sem_hashtag_na_os(banco, logado):
     html = logado.get("/t/campo/atencao?modo=tabela").get_data(as_text=True)
-    assert "Rondas pendentes" in html and "Rondas feitas" in html and "Permissões de trabalho" in html
+    # só o que está pendente (Levi, 05/10): as rondas feitas foram para a tela Rondas
+    assert "Rondas pendentes" in html and "Rondas feitas" not in html and "Permissões de trabalho" in html
     assert "Nunca teve ronda" in html and "Coração" in html
     assert "<th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th>" in html and "<th>Cidade</th>" not in html
     assert "<th>O quê</th>" not in html and "<th>Quem</th>" not in html
-    html = logado.get("/t/campo/atencao?vista=feitas&modo=tabela").get_data(as_text=True)
-    assert "<th>Feito por</th>" in html and "Fulano Souza" in html and "#500" not in html and ">500<" in html
-    assert "<th>Observação</th>" in html and "Sem OS no Fracttal" in html
+    html = logado.get("/t/campo/rondas?pend=sem_os").get_data(as_text=True)
+    assert "<th>Pendências</th>" in html and "Não criada" in html and "Brodowski 1" in html and "#500" not in html
+    html = logado.get("/t/campo/rondas?pend=incompleta").get_data(as_text=True)
+    assert "item sem foto de evidência" in html and ">500<" in html
     html = logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True)
     assert 'class="cn-link" href="/t/campo/pt/PT-1"' in html and "Técnico Silva" in html
     assert "Ronda longa pendente" not in html                          # na visão de PT, só status de PT

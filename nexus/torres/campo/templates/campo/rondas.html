@@ -71,7 +71,11 @@
         <a href="{{ url(dur='curta') }}"{% if dur == 'curta' %} aria-current="page"{% endif %}>&lt; {{ k.dur_min }} min</a>
         <a href="{{ url(dur='longa') }}"{% if dur == 'longa' %} aria-current="page"{% endif %}>&gt; 2 h</a>
       </div>
-      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'supervisor', 'dur') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+      <div class="cn-seg" aria-label="Pendência">
+        <a href="{{ url(pend=None) }}"{% if not pend %} aria-current="page"{% endif %}>Toda ronda</a>
+        {% for p_, (rot, cor) in pendencias.items() %}<a href="{{ url(pend=p_) }}"{% if p_ == pend %} aria-current="page"{% endif %}>{{ rot }} <b>{{ n_pend[p_] }}</b></a>{% endfor %}
+      </div>
+      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'supervisor', 'dur', 'pend') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
         <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="técnico, usina, equipe ou OS" aria-label="Buscar"></form>
       <span class="mudo">Início, fim e duração são carimbados pelo aparelho: tempo de tela aberta, não cronômetro de campo.</span>
     </div>
@@ -79,7 +83,7 @@
       {% if registros|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ registros|length }}</span>{% endif %}
       <a class="cn-link cn-exportar" href="{{ url(csv='1') }}">Exportar CSV</a></div>
     <div class="cn-tab cn-tab--rondas"><table>
-      <thead><tr><th>Data</th><th>Técnico</th><th>Usina</th><th>Equipe</th><th>Região</th><th>Tipo</th><th>Início</th><th>Fim</th><th>Duração</th><th>Qualidade</th><th>Veredito</th><th>Trackers</th><th>OS</th></tr></thead>
+      <thead><tr><th>Data</th><th>Técnico</th><th>Usina</th><th>Equipe</th><th>Região</th><th>Tipo</th><th>Início</th><th>Fim</th><th>Duração</th><th>Qualidade</th><th>Veredito</th><th>Pendências</th><th>Trackers</th><th>OS</th></tr></thead>
       <tbody>
       {% for r in registros[:limite] %}{% set v = r.veredito %}
         <tr><td class="m"><b>{{ dia_curto(r.data) }}</b></td>
@@ -90,10 +94,46 @@
           <td><b class="{{ 'cn-t-critico' if r.dur_min is not none and r.dur_min < k.dur_min else '' }}">{{ duracao(r.dur_min) }}</b></td>
           <td>{% if r.nota is not none %}{% set c = 'ok' if r.nota >= 95 else ('alerta' if r.nota >= 85 else 'critico') %}<span class="cn-nota-barra"><b class="cn-t-{{ c }}">{{ r.nota }}%</b><span class="cn-barrinha"><span class="cn-b-{{ c }}" style="width: {{ r.nota }}%"></span></span></span>{% else %}—{% endif %}</td>
           <td><span class="cn-selo cn-selo--{{ v[0] }}" title="{{ r.falhas }}">{{ v[1] }}</span></td>
+          <td class="cn-pend">{% if r.pendencia %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% else %}—{% endif %}</td>
           <td class="m">{{ r.trk_respondidos ~ '/' ~ r.trk_apontados if r.trk_apontados else '—' }}</td>
           <td class="m">{% if r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td></tr>
-      {% else %}<tr><td colspan="13" class="mudo">Nenhuma ronda com esses filtros.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="14" class="mudo">Nenhuma ronda com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>
+
+    {% elif aba == 'sujidade' %}
+    {# Sujidade e vegetação (Levi, 05/10: "é importante!"): a última leitura de cada usina, pelas respostas da ronda que
+       o App escreve na OS do Fracttal (nexus/campo/ronda_checklist.py). Nível 1 a 5; acima de 3 pede ação. #}
+    {% macro nivel(n, ant) %}{% if n is none %}<span class="mudo">—</span>{% else %}<span class="cn-nivel cn-nivel--{{ n }}">{{ n }}</span>{% if ant is not none and ant != n %}<span class="cn-t-{{ 'critico' if n > ant else 'ok' }} cn-seta" title="antes {{ ant }}">{{ '▲' if n > ant else '▼' }} {{ ant }}</span>{% endif %}{% endif %}{% endmacro %}
+    {% macro distribuicao(dist, total) %}<div class="cn-dist" role="img" aria-label="usinas por nível">{% for n in range(1, 6) %}{% if dist[n] %}<span class="cn-nivel-fundo--{{ n }}" style="flex: {{ dist[n] }}" title="nível {{ n }}: {{ dist[n] }} usina{{ 's' if dist[n] != 1 }}">{{ dist[n] }}</span>{% endif %}{% endfor %}</div>{% endmacro %}
+    {% set s = suj.resumo %}
+    {% if suj_estado and (suj_estado.lendo or not suj_estado.fila) %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de ronda no Fracttal.</b> As respostas aparecem em 1 a 2 minutos; recarregue a página.</div>
+    {% elif suj_estado and suj_estado.erro %}<div class="cn-erro cn-aviso" role="status"><b>A última leitura no Fracttal falhou ({{ suj_estado.erro }}).</b> Mostrando o que já foi lido.</div>{% endif %}
+    <div class="cn-suj-topo">
+      <div class="cn-kpi"><span class="gc-rotulo">Sujidade dos módulos</span><span class="v">{{ s.sujidade_media if s.sujidade_media is not none else '—' }}<small>média</small></span>
+        <span class="d"><b class="cn-t-{{ 'critico' if s.sujidade_alta else 'ok' }}">{{ s.sujidade_alta }}</b> usina{{ 's' if s.sujidade_alta != 1 }} no nível 4 ou 5</span>{{ distribuicao(s.dist_sujidade, s.com_leitura) }}</div>
+      <div class="cn-kpi"><span class="gc-rotulo">Altura da vegetação</span><span class="v">{{ s.vegetacao_media if s.vegetacao_media is not none else '—' }}<small>média</small></span>
+        <span class="d"><b class="cn-t-{{ 'critico' if s.vegetacao_alta else 'ok' }}">{{ s.vegetacao_alta }}</b> usina{{ 's' if s.vegetacao_alta != 1 }} no nível 4 ou 5</span>{{ distribuicao(s.dist_vegetacao, s.com_leitura) }}</div>
+      <div class="cn-kpi"><span class="gc-rotulo">Sensores sujos</span><span class="v{% if s.sensores %} cn-t-alerta{% endif %}">{{ s.sensores }}</span><span class="d">usinas com IPOA, albedômetro ou GHI sujo</span></div>
+      <div class="cn-kpi"><span class="gc-rotulo">Vala de drenagem</span><span class="v{% if s.vala %} cn-t-alerta{% endif %}">{{ s.vala }}</span><span class="d">usinas com a vala suja ou parcial</span></div>
+      <div class="cn-kpi"><span class="gc-rotulo">Com leitura</span><span class="v">{{ s.com_leitura }}<small>de {{ s.usinas }}</small></span><span class="d">{{ s.rondas_lidas }} de {{ s.rondas_com_os }} rondas com o checklist lido</span></div>
+    </div>
+    <div class="cn-painel-barra">
+      <div class="cn-seg">{% for f_, rot in filtros_sujidade %}<a href="{{ url(sv=f_ or None) }}"{% if f_ == suj_f %} aria-current="page"{% endif %}>{{ rot }}</a>{% endfor %}</div>
+      <span class="mudo">Nível de 1 (limpo, baixa) a 5, comparado com as fotos de referência do App; acima de 3 pede ação. A seta compara com a leitura anterior da usina.</span>
+    </div>
+    <div class="cn-tab"><table>
+      <thead><tr><th>Usina</th><th>Equipe</th><th>Região</th><th>Última leitura</th><th>Sujidade</th><th>Vegetação</th><th>Sombreamento</th><th>Vala</th><th>Sensores</th><th>Técnico</th><th>OS</th></tr></thead>
+      <tbody>
+      {% for x in suj.filtradas[:limite] %}
+        <tr><td>{{ x.usina }}</td><td class="cn-menor">{{ x.equipe or '—' }}</td><td class="cn-menor">{{ x.regiao_br or '—' }}</td>
+          <td class="m">{{ dia_curto(x.data) }}<span class="det">ronda {{ x.tipo }}</span></td>
+          <td>{{ nivel(x.sujidade, x.sujidade_ant) }}</td><td>{{ nivel(x.vegetacao, x.vegetacao_ant) }}</td>
+          <td class="cn-menor">{{ x.sombreamento or '—' }}</td><td class="cn-menor">{{ x.vala or '—' }}</td>
+          <td>{% if x.sensores_sujos %}<span class="cn-t-alerta">{{ x.sensores_sujos|join(', ') }}</span>{% else %}<span class="mudo">limpos</span>{% endif %}</td>
+          <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico or '—' }}</td><td class="m">{{ x.os }}</td></tr>
+      {% else %}<tr><td colspan="11" class="mudo">Nenhuma usina com leitura de sujidade ou vegetação com esses filtros.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% if s.sem_leitura %}<p class="mudo cn-rodape">{{ s.sem_leitura }} usinas mobilizadas sem leitura no período (sem ronda, ou a ronda não tem OS no Fracttal).</p>{% endif %}
 
     {% elif aba == 'cobertura' %}
     <div class="cn-lista-cab"><h2>Usinas há mais tempo sem ronda</h2><span class="mudo">{{ cobertura|length }} mobilizadas · {{ k.sem_ronda_alerta }} há 7 dias ou mais</span></div>

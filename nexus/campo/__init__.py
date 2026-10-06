@@ -15,7 +15,10 @@ def instalar(app):
     from . import aprovacao, coletor, fonte_pg, tabelas
     tabelas.usar_fornecedor(fonte_pg.Fornecedor(app.config))
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
+        from . import ronda_checklist
         threading.Timer(20, lambda: aprovacao.aquecer(app)).start()
+        # as OS de ronda aprovadas (sujidade e vegetação), depois da fila: as duas leituras não saem juntas
+        threading.Timer(90, lambda: ronda_checklist.pedir_releitura(app)).start()
     # o relatório de cada rodada (só contagens) vai para o log do processo: sem isto, um 429 ou um erro de gravação
     # ficava só na memória (1ª carga, 04/10: a rodada parou e ninguém via por quê)
     log = logging.getLogger("nexus.campo")

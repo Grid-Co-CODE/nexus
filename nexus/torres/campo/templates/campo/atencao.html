@@ -2,12 +2,12 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Central de atenção, visão do Nexus (05/10/2026): três abas (rondas pendentes, rondas feitas, PT), cada uma em cartões
+{# Central de atenção, visão do Nexus (05/10/2026): só o que está pendente, em duas abas (rondas pendentes e PT), cada uma em cartões
    por equipe ou em tabela (nexus/campo/visao.py: atencao, por_equipe). Só usina mobilizada; a PT esperando aparece sempre. #}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">rondas e PT do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if vista == 'feitas' %} · últimos {{ dias }} dias{% endif %}</div>
+    <div class="cn-frescor">rondas e PT do App + cadastro do Nexus<br><b>lido às {{ lido }}</b></div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
 
@@ -21,9 +21,6 @@
       <a href="{{ url(modo=None, equipe=None) }}"{% if modo == 'equipes' %} aria-current="page"{% endif %}>Por equipe</a>
       <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
     </div>
-    {% if vista == 'feitas' %}<span class="gc-rotulo">Período</span>
-    <div class="cn-seg">{% for p in (7, 14, 30) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
-    <input type="hidden" name="dias" value="{{ dias }}">{% endif %}
     <label class="gc-rotulo" for="cn-regiao">Região</label>
     <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
       <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
@@ -83,8 +80,6 @@
         </div>
         {% if vista == 'pendentes' %}
         <div class="cn-eq-pe">{% for s, (rot, cor2) in status.items() if c[s] %}<span class="cn-st cn-t-{{ cor2 }}">{{ c[s] }} {{ no_cartao[s][0 if c[s] == 1 else 1] }}</span>{% endfor %}</div>
-        {% else %}
-        <div class="cn-eq-pe"><span class="cn-st cn-t-neutro">{{ c.rondas }} ronda{{ 's' if c.rondas != 1 }} em {{ dias }} dias</span>{% for s, (rot, cor2) in status.items() if s != 'ok' and c[s] %}<span class="cn-st cn-t-{{ cor2 }}">{{ c[s] }} {{ no_cartao[s][0 if c[s] == 1 else 1] }}</span>{% endfor %}</div>
         {% endif %}
         {% endif %}
       </a>
@@ -109,16 +104,6 @@
         <td>{{ x.uf or '—' }}</td><td>{{ x.regiao_br or '—' }}</td><td>{{ x.obs }}</td></tr>
     {% else %}<tr><td colspan="7" class="mudo">Nenhuma ronda pendente com esses filtros.</td></tr>{% endfor %}
     </tbody>
-  {% elif vista == 'feitas' %}
-    <thead><tr><th>Data</th><th>Status</th><th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th><th>Observação</th><th>Feito por</th><th>OS</th><th>Nota</th></tr></thead>
-    <tbody>
-    {% for x in lista[:300] %}{% set s = status.get(x.status, (x.status, 'neutro')) %}
-      <tr><td class="m">{{ dia_curto(x.data) }}</td><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        <td>{{ x.usina }}</td><td>{{ x.equipe or '—' }}</td><td>{{ x.uf or '—' }}</td><td>{{ x.regiao_br or '—' }}</td>
-        <td>{{ x.obs or '—' }}</td><td>{{ x.feito_por or '—' }}</td><td class="m">{{ x.os or '—' }}</td>
-        <td class="m">{{ '—' if x.nota is none else x.nota ~ '%' }}</td></tr>
-    {% else %}<tr><td colspan="10" class="mudo">Nenhuma ronda com esses filtros.</td></tr>{% endfor %}
-    </tbody>
   {% else %}
     <thead><tr><th>Há</th><th>Status</th><th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th><th>Observação</th><th>Técnico</th><th>OS</th></tr></thead>
     <tbody>
@@ -137,13 +122,11 @@
 
   <div class="cn-nota">
   {% if vista == 'pendentes' %}<b>O que entra.</b> Usina mobilizada (OPERAÇÃO no cadastro, com a data de mobilização já
-    passada) sem ronda há 7 dias ou mais, ou cuja última ronda deixou a ronda longa pendente. Uma linha por usina. No
+    passada) sem ronda há 7 dias ou mais, ou cuja última ronda deixou a ronda longa pendente. Uma linha por usina. As
+    rondas feitas, com o que ficou faltando nelas, estão na tela Rondas. No
     cartão, "feitas" são as usinas da equipe que não estão pendentes, e o % é sobre as usinas da equipe.
     {% if d.get('sem_mobilizacao') %}<br>{{ d.sem_mobilizacao|length }} usinas estão em OPERAÇÃO no cadastro sem data de
     mobilização e ficam de fora até a data entrar no cadastro.{% endif %}
-  {% elif vista == 'feitas' %}<b>O que entra.</b> Toda ronda do período em usina mobilizada. "Sem OS no Fracttal": a ronda
-    foi feita e o Fracttal não criou a OS. "Evidência incompleta": o que o App anotou como faltando (foto, registro de
-    ação, checklist).
   {% else %}<b>O que entra.</b> As PT esperando o De acordo, da mais antiga para a mais nova; parada = mais de 2 h. Clique
     na OS para abrir a PT e decidir. O livro de PT do App chega de hora em hora.{% endif %}
     A região do Brasil sai do estado da usina no cadastro.

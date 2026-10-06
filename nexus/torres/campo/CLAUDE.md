@@ -75,6 +75,17 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     60/85/95 e 10 min); o GPS só aparece como a falha "sem GPS". "Ronda longa pendente" é pendência para o App
     (vira Atenção). Medido em 05/10, 30 dias: 455 rondas, cobertura 80% (102 de 128; antes 65%), qualidade 96%,
     duração média 45 min, 36 abaixo de 10 min.
+  - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
+    na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
+  - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não
+    traz o checklist, mas o App escreve cada resposta no texto da OS de ronda no Fracttal ("Sujidade dos módulos: 2;
+    Altura da vegetação: 3; Sujidade da vala de drenagem: Parcial; Piranômetro IPOA ...: Limpo"). As listagens do REST
+    trazem esse texto em lote: as em verificação já estão na fila da Aprovação; as aprovadas, ~30 páginas (45 dias),
+    relidas em segundo plano no máximo a cada 30 min (e 90 s depois de subir). Nada vai para o banco. Por usina: a
+    última leitura no período e a anterior (a seta); nível 1 a 5, acima de 3 pede ação (o `alerta_acima` do App);
+    distribuição por nível; vala, sombreamento e sensores sujos. Medido em 05/10 (30 dias): 96 de 128 usinas com
+    leitura, 382 de 417 rondas com OS lidas; sujidade média 2,5 (21 usinas em 4 ou 5), vegetação 2,4 (16), vala suja
+    ou parcial em 47. O caminho limpo é o App mandar essas colunas no livro de rondas (mudança no App).
 - **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão; parada = mais de 2 h.
 - **Tela de PT** (Levi, 05/10): abas "Esperando o De acordo" (cartões por equipe com a lista das PT de cada uma, ou
   tabela) e "Histórico" (decididas, período 7/30/90 dias, por situação). Filtro de supervisor; o cartão leva à tabela
@@ -96,7 +107,7 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   últimos 14 dias), a régua do painel do App. **Só pontua quem tem as duas partes:** região sem fechamento no período
   ganhava 100 só pela cobertura (erro meu, corrigido em 05/10). Colaboradores: nota, fechamentos, pontualidade e
   devolvidas.
-- **Central de atenção, em três visões** (Levi, 05/10: "separar Rondas feitas (histórico de rondas) e rondas
+- **Central de atenção, só o que está pendente** (as rondas feitas foram para a tela Rondas em 05/10; o texto abaixo descreve a origem) (Levi, 05/10: "separar Rondas feitas (histórico de rondas) e rondas
   pendentes, dando bastante atenção nas pendentes"; "separe o que é ronda e o que é Permissão de Trabalho"):
   - **Rondas pendentes** (abre nela, com números grandes que filtram): uma linha por usina mobilizada que pede ronda:
     nunca teve, sem ronda há 7 dias ou mais, ou ronda longa pendente pela última ronda (o App repete o aviso em toda

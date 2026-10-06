@@ -327,6 +327,10 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
             r["dur_min"] = _duracao_min(r)
             r["ini_hm"], r["fim_hm"] = _hm(r["inicio"]), _hm(r["fim"])
             r["veredito"] = _veredito(r, lim)
+            # o que ficou faltando na ronda (as "rondas feitas" que saíram da Central de atenção, 05/10)
+            faltas = [f.strip() for f in r["falhas"].split(";") if f.strip() and f.strip().lower() != LONGA_PENDENTE]
+            r["pendencia"] = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "")
+            r["pend_obs"] = "; ".join(([r["situacao_os"] or "OS não criada"] if r["sem_os"] else []) + faltas)
         todas.sort(key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
         return {"todas": todas, "cobertura": _cobertura(b, todas, hoje), "sem_mobilizacao": b.sem_mobilizacao,
                 "hoje": hoje.isoformat()}
@@ -383,6 +387,58 @@ def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
                 "atrasada": atrasada, "nunca": sum(1 for c in cobertura if c["dias"] >= 999),
                 "sem_ronda_alerta": sum(1 for c in cobertura if c["dias"] >= DIAS_SEM_RONDA_ALERTA),
                 "sem_os": sum(1 for r in periodo if r["sem_os"])}}
+
+
+def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: str) -> dict:
+    """Sujidade dos módulos e altura da vegetação por usina (Levi, 05/10: "é importante!"): a última leitura de cada
+    usina mobilizada no período e a anterior a ela (a seta), pelas respostas da ronda que o App escreve na OS do
+    Fracttal (`ronda_checklist`). Nível de 1 a 5; acima de 3 pede ação (o `alerta_acima` do App). Junto: vala de
+    drenagem, sombreamento, dejeto de pássaro e os sensores (IPOA, albedômetro, GHI) que a ronda achou sujos."""
+    hoje = datetime.fromisoformat(hoje_iso).date()
+    piso = (hoje - timedelta(days=dias - 1)).isoformat()
+    usinas = {c["usina_id"]: c for c in cobertura}
+    leituras = {}
+    com_os = lidas = 0
+    for r in sorted(todas, key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
+        if r["usina_id"] not in usinas or not r["os"]:
+            continue
+        com_os += r["data"] >= piso
+        resp = respostas.get(str(r["os"]))
+        if not resp or (resp.get("sujidade") is None and resp.get("vegetacao") is None):
+            continue
+        lidas += r["data"] >= piso
+        leituras.setdefault(r["usina_id"], []).append((r, resp))
+    linhas = []
+    for uid, lst in leituras.items():
+        r, resp = lst[0]
+        if r["data"] < piso:
+            continue
+        ant = lst[1][1] if len(lst) > 1 else {}
+        c = usinas[uid]
+        linhas.append({"usina": c["usina"], "equipe": c["equipe"], "uf": c["uf"], "regiao_br": c["regiao_br"],
+                       "supervisor": c.get("supervisor"), "data": r["data"], "tecnico": r["tecnico"], "os": r["os"],
+                       "tipo": r["tipo"], "sujidade": resp.get("sujidade"), "sujidade_ant": ant.get("sujidade"),
+                       "vegetacao": resp.get("vegetacao"), "vegetacao_ant": ant.get("vegetacao"),
+                       "vala": resp.get("vala") or "", "sombreamento": resp.get("sombreamento") or "",
+                       "dejeto": resp.get("dejeto") or "", "sensores_sujos": resp.get("sensores_sujos") or []})
+    alto = lambda n: n is not None and n > 3
+    linhas.sort(key=lambda x: (-max(x["sujidade"] or 0, x["vegetacao"] or 0), -(x["sujidade"] or 0), x["usina"]))
+    dist = lambda k: {n: sum(1 for x in linhas if x[k] == n) for n in range(1, 6)}
+    media = lambda k: round(statistics.mean([x[k] for x in linhas if x[k] is not None]), 1) if any(x[k] is not None for x in linhas) else None
+    return {"linhas": linhas,
+            "resumo": {"usinas": len(usinas), "com_leitura": len(linhas), "sem_leitura": len(usinas) - len(linhas),
+                       "sujidade_alta": sum(1 for x in linhas if alto(x["sujidade"])),
+                       "vegetacao_alta": sum(1 for x in linhas if alto(x["vegetacao"])),
+                       "sensores": sum(1 for x in linhas if x["sensores_sujos"]),
+                       "vala": sum(1 for x in linhas if x["vala"] and _norm_txt(x["vala"]) not in ("limpa", "ok", "nao se aplica")),
+                       "sujidade_media": media("sujidade"), "vegetacao_media": media("vegetacao"),
+                       "dist_sujidade": dist("sujidade"), "dist_vegetacao": dist("vegetacao"),
+                       "rondas_com_os": com_os, "rondas_lidas": lidas}}
+
+
+def _norm_txt(s) -> str:
+    import unicodedata
+    return " ".join(unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower().split())
 
 
 # ── Permissões de trabalho ───────────────────────────────────────────────────────────────────────────────────────
