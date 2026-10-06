@@ -220,3 +220,6 @@
 .cn-filtro-ativo{font:600 12.5px/18px var(--font-sans);color:var(--tinta);text-decoration:none;padding:6px 12px;
   border:1px solid var(--verde);border-radius:999px;background:var(--verde-suave)}
 .cn-filtro-ativo span{margin-left:4px;color:var(--mudo)}
+
+/* aviso que não é erro (a fila sendo lida, a última fila boa em uso): âmbar, não vermelho */
+.cn-aviso{border-color:var(--alerta);background:var(--alerta-suave)}

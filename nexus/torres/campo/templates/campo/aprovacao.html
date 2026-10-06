@@ -11,8 +11,22 @@
       <h1 class="cn-titulo">{{ tela.nome }}</h1>
       <p class="cn-pergunta">{{ tela.pergunta }}</p>
     </div>
-    <div class="cn-frescor">fila de verificação do Fracttal{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>lida às {{ lido }}</b>{% if d.janela %} · OS fechadas de {{ dia_curto(d.janela.de) }} a {{ dia_curto(d.janela.ate) }}{% endif %}</div>
+    <div class="cn-frescor">fila de verificação do Fracttal{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}{% if d.janela %} · OS fechadas de {{ dia_curto(d.janela.de) }} a {{ dia_curto(d.janela.ate) }}{% endif %}</div>
   </div>
+
+  {# a tela nunca espera o Fracttal: a fila é relida em segundo plano (nexus/campo/aprovacao.py) #}
+  {% if not fila.lida_em %}
+  <div class="cn-erro cn-aviso" role="status">
+    {% if fila.lendo %}<b>Lendo a fila de verificação do Fracttal</b> (cerca de 5 mil tarefas, leva 1 a 2 minutos). A
+      página se atualiza sozinha.
+      <script>setTimeout(function () { location.reload(); }, 20000);</script>
+    {% else %}<b>O Fracttal não entregou a fila{% if fila.erro %} ({{ fila.erro }}){% endif %}.</b> O Nexus tenta de novo
+      em 5 minutos, sem gastar a cota da empresa à toa.{% endif %}
+  </div>
+  {% elif fila.erro %}
+  <div class="cn-erro cn-aviso" role="status"><b>A última releitura falhou ({{ fila.erro }}).</b> Mostrando a fila lida em
+    {{ fila.lida_em }}; o Nexus tenta de novo em 5 minutos.</div>
+  {% endif %}
 
   {% if leitura.erro %}
   <div class="cn-erro" role="alert">

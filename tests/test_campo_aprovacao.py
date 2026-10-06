@@ -96,7 +96,34 @@ def test_fracttal_recusou_vira_aviso(campo):
     campo.recusar = True
     leitura.limpar_cache()
     lida = aprovacao.fila({"dias": "60"})
-    assert "fila do Fracttal" in lida.erro and not lida.dados
+    assert not lida.dados and "recusou" in aprovacao.estado()["erro"]
+
+
+def test_tela_nao_espera_o_fracttal(logado, campo, monkeypatch):
+    """Levi, 05/10: "fica carregando infinito". A visita não lê o Fracttal: pede a releitura em segundo plano e
+    responde na hora, dizendo que está lendo."""
+    pendentes = []
+    monkeypatch.setattr(aprovacao, "em_segundo_plano", pendentes.append)
+    html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
+    assert "Lendo a fila de verificação do Fracttal" in html and campo.pedidos == []
+    logado.get("/t/campo/aprovacao")
+    assert len(pendentes) == 1                         # uma releitura por vez, por mais visitas que cheguem
+    pendentes[0]()                                     # a releitura termina
+    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    assert ">15102<" in html and "fila lida em" in html and len(pendentes) == 1
+
+
+def test_recusa_mantem_a_ultima_fila_boa_e_espera_para_tentar_de_novo(logado, campo):
+    from datetime import datetime, timedelta
+    from nexus.campo import regras_app
+    assert ">15102<" in logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    regras_app._FILA_CACHE["ts"] = datetime.utcnow() - timedelta(minutes=20)    # a fila envelheceu
+    campo.recusar = True
+    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    assert ">15102<" in html and "A última releitura falhou" in html
+    antes = len(campo.pedidos)
+    logado.get("/t/campo/aprovacao?dias=60")
+    assert len(campo.pedidos) == antes                 # 5 min sem pedir de novo ao Fracttal
 
 
 def test_tela_do_nexus(logado, campo):
@@ -112,4 +139,4 @@ def test_tela_com_fracttal_recusando_avisa(logado, campo):
     campo.recusar = True
     leitura.limpar_cache()
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
-    assert "Não consegui ler" in html and "Abrir no App" not in html and "azurewebsites" not in html
+    assert "O Fracttal não entregou a fila" in html and "Abrir no App" not in html and "azurewebsites" not in html

@@ -83,12 +83,10 @@ def _dias(validos, padrao) -> int:
 
 
 def _coleta() -> str:
-    """Até quando vão as notas que a fonte serve (o fechamento mais recente do livro do App), "05/10 14:25"."""
-    iso = campo_fonte.coleta()
-    try:
-        return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).strftime("%d/%m %H:%M") if iso else ""
-    except ValueError:
-        return ""
+    """Até quando vão as notas que a fonte serve (o fechamento mais recente do livro do App), "05/10 14:25", no horário
+    de Brasília: o App grava em UTC e a tela mostrava 01:23 para um fechamento das 22:23."""
+    d = visao._dt(campo_fonte.coleta())
+    return d.strftime("%d/%m %H:%M") if d else ""
 
 
 def _comum(tela_id, leitura, **k):
@@ -231,7 +229,7 @@ def aprovacao():
     leitura = campo_aprovacao.fila(request.args)
     return render_template("campo/aprovacao.html", **_comum(
         "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS},
-        balde=request.args.get("balde", ""), cor_espera=_cor_espera, coleta=_coleta()))
+        balde=request.args.get("balde", ""), cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado()))
 
 
 # ── Ordens de serviço (os números e a lista são os do App, nexus/campo/ordens.py) ────────────────────────────────

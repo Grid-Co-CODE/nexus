@@ -144,8 +144,12 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
   chave HMAC e sai quando a troca estiver conferida com o painel do App. Se um dia religar: nunca no horário de campo
   (seg a sex, 6h às 18h, `deve_rodar`), uma máquina só, e nunca o nome do técnico nem o endereço da usina em claro (o
   `items_log_description` do Fracttal traz o endereço).
-- A Aprovação de OS ainda lê a fila do Fracttal ao vivo: 0,5 s entre pedidos, para no primeiro 406/429, a fila crua
-  fica 10 min em cópia. Não abra essa tela em teste no horário de campo.
+- A Aprovação de OS lê a fila do Fracttal (55 páginas, ~5.500 tarefas, 0,5 s entre pedidos), mas **a tela nunca
+  espera** (Levi, 05/10: "fica carregando infinito"; o log mostrava a leitura de 1 min ou mais e, à noite, 4 a 26
+  páginas recusadas com 429, e cada visita recomeçava do zero). `aprovacao.py` relê em segundo plano, uma leitura por
+  vez, quando a fila tem mais de 10 min; mostra a última fila boa e quando foi lida; depois de recusa, 5 min sem
+  tentar. A cópia do App nunca relê na hora da tela (`FILA_TTL_S` vai para "sempre" a cada visita). Medido em 05/10:
+  a visita responde em 0,01 s; a 1ª leitura levou ~1 min. Não abra essa tela em teste no horário de campo.
 
 ## Peças em `nexus/campo/`
 
