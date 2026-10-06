@@ -43,7 +43,12 @@ RAIZES = ("_fila_supervisao", "_janela", "TRIAGEM_NOTA_OK",
 #   fx       chama o Fracttal com a credencial do App (e escreve, se pedirem); o Nexus só lê, devagar
 #   ident    lê o identidades.json de dentro do pacote do App
 #   tabela_qlog  abre a conexão do App direto (sem passar por _tabela); a tabela é a "qualidadelog"
-FORA = {"_tabela", "tabela", "fx", "ident", "tabela_qlog"}
+#   _varredura_carregar  (v235, 06/10/2026) põe na memória a fila que o relógio do App guarda para todas as cópias dele
+#                no armazenamento do Azure (blob "varredura"); o _fila_bruta a chama antes de ler o Fracttal. Copiada,
+#                arrastava o cliente do blob (abre a conexão do App) e mais 13 nomes. O Nexus não toca o Azure e relê a
+#                própria fila em segundo plano (nexus/campo/aprovacao.py): devolve False, que é o que o App faz numa
+#                cópia sem armazenamento ("cada cópia lê sozinha, como antes")
+FORA = {"_tabela", "tabela", "fx", "ident", "tabela_qlog", "_varredura_carregar"}
 
 
 def _definicoes(arvore):
@@ -132,7 +137,7 @@ def _imports_da_biblioteca_padrao(arvore):
 SUBSTITUTOS = '''
 
 # ── Trocados pelo Nexus ────────────────────────────────────────────────────────────────────────────────────────────
-# O resto deste arquivo é a lógica do App, intocada. Estes quatro é que mudam: de onde o dado vem, nunca a conta.
+# O resto deste arquivo é a lógica do App, intocada. Estes é que mudam: de onde o dado vem, nunca a conta.
 from . import fracttal as _fracttal_do_nexus  # noqa: E402
 from . import pessoas as _pessoas_do_nexus  # noqa: E402
 from .tabelas import tabela as _tabela_do_nexus  # noqa: E402
@@ -156,6 +161,10 @@ def fx(path, method="GET", body=None, _tentativa=0):
 
 def ident():
     return _pessoas_do_nexus.ident(_cadastro_tab)
+
+
+def _varredura_carregar():
+    return False
 '''
 
 

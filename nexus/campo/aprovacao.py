@@ -67,7 +67,10 @@ def configurado() -> bool:
 
 
 def _lida_em():
-    return regras_app._FILA_CACHE.get("ts")         # UTC sem fuso, como a cópia do App grava
+    """Quando a fila guardada foi lida (segundos desde 1970), ou None. É o relógio da cópia do App: desde o v235
+    (06/10/2026) o `_fila_bruta` mede a idade por `_FILA_CACHE["t"]`; com só o "ts" de antes, ele achava a fila velha
+    e relia as 55 páginas do Fracttal na hora da tela."""
+    return regras_app._FILA_CACHE.get("t") or None
 
 
 def _reler(app):
@@ -75,7 +78,8 @@ def _reler(app):
     try:
         with app.app_context() if app else contextlib.nullcontext():
             linhas = regras_app._fx_wo_paralelo(2, "final_date", regras_app.SUP_CAP_BACKLOG)
-        regras_app._FILA_CACHE.update(ts=datetime.utcnow(), linhas=linhas)
+        agora = time.time()
+        regras_app._FILA_CACHE.update(t=agora, ts=agora, linhas=linhas)     # como o _fila_bruta do App grava
         _ESTADO.update(erro="", erro_em=0.0)
         if app:
             # a conta da tela (a fila inteira pela regra do App) fica pronta para o período padrão: a 1ª visita depois
@@ -94,7 +98,7 @@ def _reler(app):
 
 def _pedir_releitura():
     lida = _lida_em()
-    if lida and (datetime.utcnow() - lida).total_seconds() < VALIDADE_S:
+    if lida and time.time() - lida < VALIDADE_S:
         return
     with _TRAVA:
         if _ESTADO["lendo"] or time.time() - _ESTADO["erro_em"] < ESPERA_APOS_RECUSA_S:
@@ -108,7 +112,7 @@ def estado() -> dict:
     """Para a tela: se está lendo, quando a fila foi lida (horário de Brasília) e o erro da última tentativa."""
     lida = _lida_em()
     return {"lendo": _ESTADO["lendo"], "erro": _ESTADO["erro"],
-            "lida_em": lida.replace(tzinfo=timezone.utc).astimezone(_BRT).strftime("%d/%m %H:%M") if lida else ""}
+            "lida_em": datetime.fromtimestamp(lida, _BRT).strftime("%d/%m %H:%M") if lida else ""}
 
 
 def aquecer(app):
@@ -215,4 +219,4 @@ def tirar_da_fila(id_wo) -> int:
 
 def limpar():
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)
-    regras_app._FILA_CACHE.update(ts=None, linhas=None)
+    regras_app._FILA_CACHE.update(t=0.0, ts=None, linhas=None)

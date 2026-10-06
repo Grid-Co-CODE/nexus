@@ -1,13 +1,13 @@
 """CÓPIA da lógica de regras do App de Campo (function_app.py). NÃO EDITE: rode ferramentas/extrair_regras_campo.py.
 
-Origem: function_app.py do App, codigo 68d4d468251f7d6a (o número que o /api/health do App mostra quando é esta a
-versão no ar). Copiado em 05/10/2026 17:53. Sem comentários nem docstrings (o repositório é
+Origem: function_app.py do App, codigo e41fbad895cc8ff4 (o número que o /api/health do App mostra quando é esta a
+versão no ar). Copiado em 06/10/2026 10:19. Sem comentários nem docstrings (o repositório é
 público); o porquê de cada regra está no código do App. Só o acesso a dado foi trocado (fim do arquivo).
 """
 # ruff: noqa
-CODIGO_APP = "68d4d468251f7d6a"
+CODIGO_APP = "e41fbad895cc8ff4"
 COPIADAS = ('ApiError', 'CADASTRO_TTL_S', 'ESTOURO_EXEC_MIN', 'ESTOURO_EXEC_X', 'ESTOURO_PREV_TETO', 'ESTOURO_PREV_X', 'FILA_TTL_S', 'GESTAO_OS_MAX', 'GESTAO_TODAS_MAX', 'LIMIARES_PADRAO', 'STATUS_IN_REVIEW', 'SUP_CAP_BACKLOG', 'TRIAGEM_ESTOURO', 'TRIAGEM_NOTA_OK', 'V2_PESOS', 'V2_PISO', '_CAD', '_CANON', '_CATOV', '_CL_USINA', '_FILA_CACHE', '_SUPCAN', '_agora_iso', '_area_ok', '_cadastro_tab', '_canon_cluster', '_casa_nome', '_catalogo_ov', '_cluster_da_usina', '_clusters_por_email', '_concentracao', '_contar_fotos', '_dias_entre', '_duracao_ronda', '_estouro', '_estouro_causa', '_fila_bruta', '_fila_do_app', '_fila_supervisao', '_filtro_pessoas', '_fora', '_fx_wo_paralelo', '_gestao_os', '_gestao_prioridades', '_hoje', '_int0', '_janela', '_janela_str', '_lim_cache', '_limiares', '_link_fracttal_os', '_no_escopo', '_norm', '_obs_do_fechamento', '_parse_iso', '_pessoa_por_nome', '_preenchido_item', '_qlog_por_os', '_qualidade_os', '_qualidade_v2', '_ronda_resumo', '_rondas_os_pares', '_rondas_os_por_folio', '_sup_canon', '_sup_canon_mapa', '_sup_norm', '_triagem', '_txt_tarefa', '_usinas_do_cluster', '_v2_achou_falha', '_v2_e_na', '_v2_pede_foto', '_veredito_os', '_veredito_ronda', '_veredito_usina', 'tabela_limiares', 'tabela_ronda', 'tabela_ronda_ativos', 'tabela_ronda_os')
-ASSINATURAS_TROCADAS = {'_tabela': '583740a7d68b3a65', 'fx': 'df3a6bba0b68da47', 'ident': 'a47f156debb43b7c', 'tabela': '666a04282aab3cbf', 'tabela_qlog': '95a72f1f98b561d4'}
+ASSINATURAS_TROCADAS = {'_tabela': '583740a7d68b3a65', '_varredura_carregar': '8aed24ae7d04f3b0', 'fx': 'df3a6bba0b68da47', 'ident': 'a47f156debb43b7c', 'tabela': '666a04282aab3cbf', 'tabela_qlog': '95a72f1f98b561d4'}
 
 import base64
 import gzip
@@ -709,7 +709,7 @@ def _sup_canon(nome):
 FILA_TTL_S = 600
 
 
-_FILA_CACHE = {'ts': None, 'linhas': None}
+_FILA_CACHE = {'ts': None, 'linhas': None, 't': 0.0}
 
 
 def _fx_wo_paralelo(status, sort, cap):
@@ -728,12 +728,26 @@ def _fx_wo_paralelo(status, sort, cap):
             res = fx('work_orders?id_status_work_order=%d&limit=100&start=%d&sort=%s' % (status, start, sort))
             return (res.get('data') if isinstance(res, dict) else res) or []
         except Exception as e:
-            falhas.append((start, str(e)[:90]))
+            falhas.append((start, str(e)[:90], int(getattr(e, 'espera', 0) or 0)))
             logging.warning('wo pagina %s@%d: %s', status, start, e)
             return []
     with ThreadPoolExecutor(max_workers=6) as ex:
-        partes = list(ex.map(_pag, offsets))
-    linhas = [x for p in partes for x in p]
+        partes = dict(zip(offsets, ex.map(_pag, offsets)))
+    _esperou = 0
+    for _rodada in range(2):
+        if not falhas:
+            break
+        _pend = list(falhas)
+        del falhas[:]
+        for start, _msg, _esp in _pend:
+            w = min(max(_esp, 5), 30)
+            if _esperou + w > 60:
+                falhas.append((start, _msg, _esp))
+                continue
+            time.sleep(w)
+            _esperou += w
+            partes[start] = _pag(start)
+    linhas = [x for s in offsets for x in partes.get(s) or []]
     if falhas:
         logging.error('fila status %s INCOMPLETA: %d de %d pagina(s) falharam (%s) — vieram %d de %d linhas', status, len(falhas), len(offsets), falhas[0][1], len(linhas), total)
         raise ApiError(502, 'fila do Fracttal veio incompleta (%d pagina(s) falharam)' % len(falhas))
@@ -743,19 +757,19 @@ def _fx_wo_paralelo(status, sort, cap):
 
 
 def _fila_bruta(forcar=False):
-    from datetime import datetime
-    agora = datetime.utcnow()
-    ts = _FILA_CACHE.get('ts')
-    if not forcar and ts and (_FILA_CACHE.get('linhas') is not None) and ((agora - ts).total_seconds() < FILA_TTL_S):
+    agora = time.time()
+    if not forcar and _FILA_CACHE.get('linhas') is not None and (agora - (_FILA_CACHE.get('t') or 0) < FILA_TTL_S):
+        return _FILA_CACHE['linhas']
+    if not forcar and _varredura_carregar():
         return _FILA_CACHE['linhas']
     try:
         linhas = _fx_wo_paralelo(2, 'final_date', SUP_CAP_BACKLOG)
     except Exception as e:
         if _FILA_CACHE.get('linhas') is not None:
-            logging.error('fila incompleta (%s) — servindo o cache de %s', str(e)[:100], _FILA_CACHE.get('ts'))
+            logging.error('fila incompleta (%s) — servindo o cache de %.0f s atrás', str(e)[:100], agora - (_FILA_CACHE.get('t') or agora))
             return _FILA_CACHE['linhas']
         raise
-    _FILA_CACHE['ts'] = agora
+    _FILA_CACHE['t'] = _FILA_CACHE['ts'] = agora
     _FILA_CACHE['linhas'] = linhas
     return linhas
 
@@ -1116,7 +1130,7 @@ def _rondas_os_por_folio(piso):
 
 
 # ── Trocados pelo Nexus ────────────────────────────────────────────────────────────────────────────────────────────
-# O resto deste arquivo é a lógica do App, intocada. Estes quatro é que mudam: de onde o dado vem, nunca a conta.
+# O resto deste arquivo é a lógica do App, intocada. Estes é que mudam: de onde o dado vem, nunca a conta.
 from . import fracttal as _fracttal_do_nexus  # noqa: E402
 from . import pessoas as _pessoas_do_nexus  # noqa: E402
 from .tabelas import tabela as _tabela_do_nexus  # noqa: E402
@@ -1140,3 +1154,7 @@ def fx(path, method="GET", body=None, _tentativa=0):
 
 def ident():
     return _pessoas_do_nexus.ident(_cadastro_tab)
+
+
+def _varredura_carregar():
+    return False

@@ -109,15 +109,19 @@ def test_tela_nao_espera_o_fracttal(logado, campo, monkeypatch):
     logado.get("/t/campo/aprovacao")
     assert len(pendentes) == 1                         # uma releitura por vez, por mais visitas que cheguem
     pendentes[0]()                                     # a releitura termina
+    lidos = len(campo.pedidos)
     html = logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
     assert ">15102<" in html and "fila lida em" in html and len(pendentes) == 1
+    # e a cópia do App serve a fila relida, sem ir ao Fracttal na hora da tela: desde o v235 (06/10) o _fila_bruta
+    # do App mede a idade da fila por _FILA_CACHE["t"]; sem ele, cada visita relia as 55 páginas
+    assert len(campo.pedidos) == lidos
 
 
 def test_recusa_mantem_a_ultima_fila_boa_e_espera_para_tentar_de_novo(logado, campo):
-    from datetime import datetime, timedelta
+    import time
     from nexus.campo import regras_app
     assert ">15102<" in logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
-    regras_app._FILA_CACHE["ts"] = datetime.utcnow() - timedelta(minutes=20)    # a fila envelheceu
+    regras_app._FILA_CACHE["t"] = time.time() - 20 * 60     # a fila envelheceu (o relógio da cópia do App)
     campo.recusar = True
     html = logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
     assert ">15102<" in html and "A última releitura falhou" in html

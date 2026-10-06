@@ -70,6 +70,10 @@ def test_copia_nao_abre_a_conexao_do_app_nem_a_tabela_dos_tokens():
     assert "create_table" not in copia
     assert "AzureWebJobsStorage" not in copia
     assert "fracttaltokens" not in copia     # a tabela dos tokens só é tocada por pessoas.tabela_do_cadastro
+    # v235 (06/10): o _fila_bruta do App pega a fila que o relógio dele guarda no blob do Azure. O Nexus relê a dele
+    # (aprovacao.py) e responde como uma cópia do App sem armazenamento: "não há guardada"
+    assert "azure" not in copia.lower() and "blob" not in copia.lower()
+    assert regras_app._varredura_carregar() is False
 
 
 def test_copia_sem_comentarios_do_app():
