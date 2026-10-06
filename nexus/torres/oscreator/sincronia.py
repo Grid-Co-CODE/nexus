@@ -34,8 +34,18 @@ FORA = (".env",)            # nunca vai, nem que entre no git por engano: é a c
 ESTADOS = ("igual", "levar", "trazer", "conflito")
 
 
+BINARIOS = (".png", ".ico", ".jpg", ".jpeg", ".gif", ".ttf", ".otf", ".woff", ".woff2")
+
+
 def _hash(p: Path) -> str | None:
-    return hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else None
+    """O fim de linha não conta: num clone do Windows com `core.autocrlf` o git entrega CRLF, e o oem tem LF; sem isto,
+    os 120 arquivos pareceriam mudados sem diferença nenhuma (e o --aplicar regravaria o oem inteiro)."""
+    if not p.is_file():
+        return None
+    b = p.read_bytes()
+    if p.suffix.lower() not in BINARIOS:
+        b = b.replace(b"\r\n", b"\n")
+    return hashlib.sha256(b).hexdigest()[:16]
 
 
 def arquivos() -> list[str]:

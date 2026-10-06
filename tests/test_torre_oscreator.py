@@ -223,3 +223,13 @@ def test_copia_do_os_creator_igual_ao_oem():
     from nexus.torres.oscreator import sincronia as S
     st = S.estado(S.AQUI, S.OEM_PADRAO, S.arquivos(), S.ler_manifesto())
     assert not (st["levar"] or st["trazer"] or st["conflito"]), {k: st[k][:10] for k in ("levar", "trazer", "conflito")}
+
+
+def test_sincronia_nao_conta_o_fim_de_linha(tmp_path):
+    """Clone do Windows (CRLF) contra o oem (LF): o mesmo conteúdo é igual, e nada é copiado."""
+    from nexus.torres.oscreator import sincronia as S
+    (tmp_path / "n/os_creator").mkdir(parents=True)
+    (tmp_path / "o/os_creator").mkdir(parents=True)
+    (tmp_path / "n/os_creator/a.py").write_bytes(b"x = 1\r\ny = 2\r\n")
+    (tmp_path / "o/os_creator/a.py").write_bytes(b"x = 1\ny = 2\n")
+    assert S.estado(tmp_path / "n", tmp_path / "o", ["os_creator/a.py"], {})["igual"] == ["os_creator/a.py"]
