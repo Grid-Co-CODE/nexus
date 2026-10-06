@@ -2,24 +2,25 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Aprovação de OS do Nexus (Levi aprovou a proposta em 04/10/2026). A fila, os grupos e os números são os do painel do
-   App, pela cópia das regras dele; a nota vem do livro que o App grava no banco. O Nexus só mostra. #}
+{# Aprovação de OS, para tirar insight (Levi, 05/10/2026). A fila, os grupos e os números são os do App (a fila inteira
+   pela _fila_supervisao, nexus/campo/aprovacao.py: fila_toda); equipe e supervisor vêm do cadastro do Nexus pela usina
+   do Fracttal. Os indicadores e a idade filtram a fila; o cartão do supervisor leva à fila dele. O Nexus só mostra. #}
+{% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
+{% macro barra_grupos(a) %}<div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ a.completa }} prontas, {{ a.olho }} pedem olho, {{ a.fora_do_app }} fora do App">{% if a.tarefas %}<span class="ok" style="width: {{ (100 * a.completa / a.tarefas)|round(1) }}%"></span><span class="alerta" style="width: {{ (100 * a.olho / a.tarefas)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * a.fora_do_app / a.tarefas)|round(1) }}%"></span>{% endif %}</div>{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div>
-      <p class="gc-eyebrow">{{ torre.nome }}</p>
-      <h1 class="cn-titulo">{{ tela.nome }}</h1>
-      <p class="cn-pergunta">{{ tela.pergunta }}</p>
-    </div>
-    <div class="cn-frescor">fila de verificação do Fracttal{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}{% if d.janela %} · OS fechadas de {{ dia_curto(d.janela.de) }} a {{ dia_curto(d.janela.ate) }}{% endif %}</div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      <p class="cn-pergunta">Toda OS fechada no Fracttal espera o supervisor aprovar. Quem está acumulando, o que dá para aprovar
+        já e o que precisa de olho?</p></div>
+    <div class="cn-frescor">fila de verificação do Fracttal{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}</div>
   </div>
 
   {# a tela nunca espera o Fracttal: a fila é relida em segundo plano (nexus/campo/aprovacao.py) #}
   {% if not fila.lida_em %}
   <div class="cn-erro cn-aviso" role="status">
-    {% if fila.lendo %}<b>Lendo a fila de verificação do Fracttal</b> (cerca de 5 mil tarefas, leva 1 a 2 minutos). A
+    {% if fila.lendo %}<b>Lendo a fila de verificação do Fracttal</b> (cerca de 5 mil tarefas, leva uns 20 segundos). A
       página se atualiza sozinha.
-      <script>setTimeout(function () { location.reload(); }, 20000);</script>
+      <script>setTimeout(function () { location.reload(); }, 15000);</script>
     {% else %}<b>O Fracttal não entregou a fila{% if fila.erro %} ({{ fila.erro }}){% endif %}.</b> O Nexus tenta de novo
       em 5 minutos, sem gastar a cota da empresa à toa.{% endif %}
   </div>
@@ -27,91 +28,138 @@
   <div class="cn-erro cn-aviso" role="status"><b>A última releitura falhou ({{ fila.erro }}).</b> Mostrando a fila lida em
     {{ fila.lida_em }}; o Nexus tenta de novo em 5 minutos.</div>
   {% endif %}
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
 
-  {% if leitura.erro %}
-  <div class="cn-erro" role="alert">
-    <b>{{ leitura.erro }}.</b> A fila abaixo pode estar incompleta ou vazia por isso.
-  </div>
-  {% endif %}
-
-  {% set r = d.get('resumo', {}) %}
-  <div class="cn-numeros">
-    <span><span class="gc-rotulo">Em verificação</span><span class="v">{{ r.get('ordens', 0) }}</span><span class="d">{{ r.get('tarefas', 0) }} tarefas em {{ r.get('ordens', 0) }} ordens</span></span>
-    <span><span class="gc-rotulo">Paradas +7 dias</span><span class="v{% if r.get('aged7d') %} ruim{% endif %}">{{ r.get('aged7d', 0) }}</span><span class="d">sem movimentação</span></span>
-    <span><span class="gc-rotulo">Paradas +30 dias</span><span class="v{% if r.get('aged30d') %} ruim{% endif %}">{{ r.get('aged30d', 0) }}</span><span class="d">esquecidas na fila</span></span>
-    <span><span class="gc-rotulo">Espera máxima</span><span class="v">{{ r.get('espera_max', 0) }} d</span><span class="d">a mais antiga da fila</span></span>
-    <span><span class="gc-rotulo">Fechadas pelo App</span><span class="v">{{ r.get('pelo_app', 0) }}</span><span class="d">estas têm nota de registro</span></span>
-  </div>
-
-  <div class="cn-grupos">
-    {% for id, nome, cor, desc in grupos %}
-    <a class="cn-grupo cn-g-{{ cor }}" href="{{ url(balde=None if balde == id else id, pag=None) }}"{% if balde == id %} aria-current="page"{% endif %}>
-      <span class="q">{{ d.get('baldes', {}).get(id, 0) }}</span><span class="t">{{ nome }}</span>
-      <span class="d">{{ desc }}</span>
-      {% if id == 'completa' %}<span class="ac">Pronta para aprovar</span>{% endif %}
-    </a>
-    {% endfor %}
-  </div>
-
-  <form class="cn-filtros" method="get">
-    <span class="gc-rotulo">Período</span>
-    <div class="cn-seg">
-      {% for dd in ('7', '30', '90') %}<a href="{{ url(dias=dd, de=None, ate=None, pag=None) }}"{% if request.args.get('dias', '30') == dd and not request.args.get('de') %} aria-current="page"{% endif %}>{{ dd }} dias</a>{% endfor %}
-    </div>
-    {# equipe e supervisor pelo cadastro do Nexus: as usinas deles, pelo nome no Fracttal (Levi, 05/10) #}
-    {% if equipes %}<label class="gc-rotulo" for="cn-equipe">Equipe</label>
-    <select class="gc-campo" id="cn-equipe" name="equipe" onchange="this.form.submit()">
-      <option value="">Todas</option>{% for e in equipes %}<option value="{{ e }}"{% if e == equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
+  <form class="cn-barra-filtros" method="get">
+    <span class="gc-rotulo">OS fechadas nos</span>
+    <div class="cn-seg">{% for p in (7, 30, 60, 90) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>últimos {{ p }} dias</a>{% endfor %}</div>
+    <input type="hidden" name="dias" value="{{ dias }}">
+    {% if equipes %}
+    <select class="gc-campo" name="equipe" aria-label="Equipe" onchange="this.form.submit()">
+      <option value="">todas as equipes</option>{% for e in equipes %}<option value="{{ e }}"{% if e == equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
     </select>
-    <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
-    <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
-      <option value="">Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
+    <select class="gc-campo" name="supervisor" aria-label="Supervisor" onchange="this.form.submit()">
+      <option value="">todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>{% endif %}
-    <input class="gc-campo" type="search" name="os" value="{{ request.args.get('os', '') }}" placeholder="Nº da OS (começa com)" aria-label="Número da OS">
-    <input class="gc-campo" type="search" name="nome" value="{{ request.args.get('nome', '') }}" placeholder="Nome da tarefa" aria-label="Nome da tarefa">
-    <input class="gc-campo" type="search" name="colab" value="{{ request.args.get('colab', '') }}" placeholder="Técnico (nome ou e-mail)" aria-label="Técnico">
-    {% for k in ('dias', 'balde', 'de', 'ate') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-    <button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button>
+    {% for x in ('vista', 'balde', 'idade', 'q') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+    <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>
   </form>
 
-  <div class="cn-lista-cab">
-    <h2>Fila de verificação</h2>
-    {% set pg = d.get('pagina', {}) %}
-    <span class="mudo">{{ (d.get('linhas') or [])|length }} de {{ pg.get('total', 0) }}{% if balde %} · {{ nome_grupo[balde][0] }}{% endif %}</span>
+  {# os indicadores filtram a fila; o ativo fica marcado e o clique de novo tira #}
+  {% set limpo = dict(vista=None, balde=None, idade=None, q=None) %}
+  {% macro card(ativo, destino) %}<a class="cn-kpi cn-kpi--link" href="{{ url(**dict(limpo, **({} if ativo else destino))) }}"{% if ativo %} aria-current="true"{% endif %}>{% endmacro %}
+  {% set b = k.baldes %}
+  <div class="cn-kpis">
+    {{ card(vista == 'fila' and not balde and not idade, dict(vista='fila')) }}<span class="gc-rotulo">Esperando aprovação</span>
+      <span class="v">{{ k.ordens }}<small>OS</small></span><span class="d">{{ k.tarefas }} tarefas na fila</span><span class="d cn-kpi-acao">ver a fila</span></a>
+    {{ card(balde == 'completa', dict(balde='completa')) }}<span class="gc-rotulo">Prontas para aprovar</span>
+      <span class="v cn-t-ok">{{ b.get('completa', 0) }}</span><span class="d">evidência completa: é decisão, não análise</span><span class="d cn-kpi-acao">aprovar em lote no Fracttal</span></a>
+    {{ card(balde == 'olho', dict(balde='olho')) }}<span class="gc-rotulo">Precisam do seu olho</span>
+      <span class="v cn-t-alerta">{{ b.get('olho', 0) }}</span><span class="d">nota abaixo de 80, tempo fora, foto marcada ou já devolvida</span></a>
+    {{ card(idade and idade[0] in ('31-60', '61-'), dict(idade='31-60')) }}<span class="gc-rotulo">Paradas há 30 dias ou mais</span>
+      <span class="v{% if k.aged30 %} cn-t-critico{% endif %}">{{ k.aged30 }}</span><span class="d">tarefas em {{ k.aged30_os }} OS esquecidas na fila</span></a>
+    {{ card(idade and idade[0] == '61-', dict(idade='61-')) }}<span class="gc-rotulo">Espera máxima</span>
+      <span class="v{% if k.espera_max >= 30 %} cn-t-critico{% endif %}">{{ k.espera_max }}<small>dias</small></span>
+      <span class="d">{% if k.mais_antiga %}OS {{ k.mais_antiga.os }} · {{ k.mais_antiga.tecnico }}{% endif %}</span></a>
+    {{ card(balde == 'fora_do_app', dict(balde='fora_do_app')) }}<span class="gc-rotulo">Uso do App</span>
+      <span class="v{% if k.uso_app is not none and k.uso_app < 50 %} cn-t-alerta{% endif %}">{{ '—' if k.uso_app is none else k.uso_app }}<small>%</small></span>
+      <span class="d">{{ b.get('fora_do_app', 0) }} fechadas fora do App, sem evidência para julgar</span></a>
   </div>
-  <div class="cn-tab">
-    <table>
-      <thead><tr><th>Espera</th><th>OS e tarefa</th><th>Técnico</th><th>Supervisor</th><th>Região</th><th>Fechada em</th><th>Nota do registro</th><th>Grupo</th></tr></thead>
-      <tbody>
-      {% for x in d.get('linhas') or [] %}
-        {% set g = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
-        <tr>
-          <td><span class="cn-pill cn-{{ cor_espera(x.espera_d) }}">{{ '—' if x.espera_d is none else ('hoje' if x.espera_d == 0 else x.espera_d ~ ' d') }}</span></td>
-          <td><b class="m">{{ x.os }}</b>{% if x.tarefa %}<span class="det">{{ x.tarefa }}</span>{% endif %}</td>
-          <td>{{ x.tecnico }}<span class="det">{{ x.funcao or 'sem cadastro' }}</span></td>
-          <td>{{ x.supervisor }}</td>
-          <td>{{ x.area }}</td>
-          <td class="m">{{ dia_curto(x.fim) }}</td>
-          <td>{% if x.pelo_app %}<span class="cn-pill cn-{{ 'ok' if (x.qualidade or 0) >= 80 else 'alerta' }}">{{ x.qualidade or 0 }}%</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
-          <td><span class="cn-pill cn-{{ g[1] }}">{{ g[0] }}</span></td>
-        </tr>
-      {% else %}
-        <tr><td colspan="8" class="mudo">Nada na fila com esses filtros.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if pg.get('paginas', 1) > 1 %}
-  <div class="cn-pag">
-    Página {{ pg.n }} de {{ pg.paginas }}
-    {% if pg.n > 1 %}<a href="{{ url(pag=pg.n - 1) }}">Anterior</a>{% endif %}
-    {% if pg.n < pg.paginas %}<a href="{{ url(pag=pg.n + 1) }}">Próxima</a>{% endif %}
-  </div>
-  {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal, lida pelo Nexus só para
-    consulta e no máximo a cada 10 minutos. A nota do registro é a que o próprio App grava no banco do Nexus, de hora
-    em hora: a mesma do painel dele. Tarefa sem registro do App cai em "Fechadas fora do App". Os grupos seguem a regra
-    do painel do App. O Nexus só mostra: para decidir, abra a OS no Fracttal.{% if d.get('sem_cadastro') %} {{ d.sem_cadastro }} tarefas são de técnicos sem cadastro.{% endif %}</div>
+  {# há quanto tempo a fila espera: cada faixa filtra #}
+  <div class="cn-idades">
+    <span class="gc-rotulo">Idade da fila</span>
+    <div class="cn-idades-barra" role="group" aria-label="Tarefas por tempo de espera">
+      {% for i, n in idades if n %}<a class="cn-idade cn-idade--{{ loop.index0 }}{% if idade and idade[0] == i[0] %} ativa{% endif %}" style="flex: {{ n }}" href="{{ url(idade=None if idade and idade[0] == i[0] else i[0], vista=None) }}" title="{{ n }} tarefas esperando {{ i[1] }}"><b>{{ n }}</b><span>{{ i[1] }}</span></a>{% endfor %}
+    </div>
+  </div>
+
+  <section class="cn-painel">
+    <nav class="cn-abas" aria-label="Visões">
+      {% for v, nome in vistas %}<a href="{{ url(vista=None if v == 'supervisores' else v, balde=None, idade=None) }}"{% if v == vista %} aria-current="page"{% endif %}>{{ nome }}{% if v == 'supervisores' %}<i>{{ por_supervisor|length }}</i>{% elif v == 'tecnicos' %}<i>{{ por_tecnico|length }}</i>{% else %}<i>{{ linhas_fila|length }}</i>{% endif %}</a>{% endfor %}
+    </nav>
+
+    {% if vista == 'supervisores' %}
+    {# quem acumula: um cartão por supervisor (do cadastro, pela usina da OS), o que mais tem parada há 30 dias primeiro #}
+    <div class="cn-equipes">
+      {% for a in por_supervisor %}
+        {% set cor = 'critico' if a.aged30 else ('alerta' if a.aged7 else 'ok') %}
+        <div class="cn-equipe cn-equipe--{{ cor }} cn-clicavel" role="link" tabindex="0" data-href="{{ url(vista='fila', supervisor=a.nome if a.nome != 'Sem cadastro' else None) }}" title="Ver a fila de {{ a.nome }}">
+          <div class="cn-eq-cab">
+            <div class="cn-eq-titulo"><b>{{ a.nome }}</b><span class="cn-eq-tec" title="{{ a.n_tecnicos }} técnicos com OS na fila">{{ capacete() }}<b>{{ a.n_tecnicos }}</b></span></div>
+            <span>{{ a.n_equipes }} equipe{{ 's' if a.n_equipes != 1 }} · {{ a.ordens }} OS</span>
+          </div>
+          <div class="cn-eq-num">
+            <span><span class="v cn-t-{{ cor }}">{{ a.tarefas }}</span><span class="d">tarefas esperando aprovação</span></span>
+            <span class="dir"><span class="v{% if a.espera_max >= 30 %} cn-t-critico{% endif %}">{{ a.espera_max }}<small> d</small></span><span class="d">a mais antiga</span></span>
+          </div>
+          {{ barra_grupos(a) }}
+          <div class="cn-eq-leg">
+            <span><b class="cn-t-ok">{{ a.completa }}</b>prontas</span>
+            <span><b class="cn-t-alerta">{{ a.olho }}</b>pedem olho</span>
+            <span><b>{{ a.fora_do_app }}</b>fora do App</span>
+          </div>
+          <div class="cn-eq-pe">
+            {% if a.aged30 %}<span class="cn-st cn-t-critico">{{ a.aged30 }} há 30 dias ou mais</span>{% endif %}
+            {% if a.aged7 - a.aged30 %}<span class="cn-st cn-t-alerta">{{ a.aged7 - a.aged30 }} de 7 a 29 dias</span>{% endif %}
+            <span class="cn-st cn-t-{{ 'ok' if (a.uso_app or 0) >= 80 else ('alerta' if (a.uso_app or 0) >= 50 else 'critico') }}">uso do App {{ a.uso_app }}%</span>
+          </div>
+        </div>
+      {% else %}<p class="mudo">Nada na fila com esses filtros.</p>{% endfor %}
+    </div>
+
+    {% elif vista == 'tecnicos' %}
+    <div class="cn-lista-cab"><h2>Por técnico</h2><span class="mudo">quem tem mais tarefa esperando aprovação, e como fecha</span></div>
+    <div class="cn-tab"><table>
+      <thead><tr><th>Técnico</th><th>Equipe</th><th>Supervisor</th><th>Tarefas</th><th>Prontas</th><th>Pedem olho</th><th>Fora do App</th><th>Uso do App</th><th>Nota média</th><th>Devolvidas</th><th>Mais antiga</th></tr></thead>
+      <tbody>
+      {% for a in por_tecnico[:limite] %}
+        <tr><td class="cn-pessoa"><a class="cn-link" href="{{ url(vista='fila', q=a.nome) }}"><span class="cn-avatar">{{ iniciais(a.nome) }}</span>{{ a.nome }}</a></td>
+          <td class="cn-menor">{{ a.equipe }}</td><td class="cn-menor">{{ a.supervisor }}</td><td class="m"><b>{{ a.tarefas }}</b></td>
+          <td class="m cn-t-ok">{{ a.completa }}</td><td class="m cn-t-alerta">{{ a.olho }}</td><td class="m">{{ a.fora_do_app }}</td>
+          <td><span class="cn-st cn-t-{{ 'ok' if (a.uso_app or 0) >= 80 else ('alerta' if (a.uso_app or 0) >= 50 else 'critico') }}">{{ a.uso_app }}%</span></td>
+          <td class="m">{{ '—' if a.nota is none else a.nota ~ '%' }}</td><td class="m">{{ a.devolvidas or '—' }}</td>
+          <td class="m{% if a.espera_max >= 30 %} cn-t-critico{% endif %}">{{ a.espera_max }} d</td></tr>
+      {% else %}<tr><td colspan="11" class="mudo">Nada na fila com esses filtros.</td></tr>{% endfor %}
+      </tbody></table></div>
+
+    {% else %}
+    <div class="cn-painel-barra">
+      {% if balde or idade %}<a class="cn-filtro-ativo" href="{{ url(balde=None, idade=None) }}">{% if balde %}{{ nome_grupo[balde][0] }}{% endif %}{% if balde and idade %} · {% endif %}{% if idade %}esperando {{ idade[1] }}{% endif %} <span aria-hidden="true">×</span></a>{% endif %}
+      <form method="get" class="cn-busca">{% for x in ('dias', 'equipe', 'supervisor', 'balde', 'idade') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+        <input type="hidden" name="vista" value="fila">
+        <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, técnico ou usina" aria-label="Buscar"></form>
+    </div>
+    <div class="cn-lista-cab"><h2>Fila de verificação</h2><span class="mudo">{{ [linhas_fila|length, limite]|min }} de {{ linhas_fila|length }}, a mais antiga primeiro</span>
+      {% if linhas_fila|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ linhas_fila|length }}</span>{% endif %}</div>
+    <div class="cn-tab"><table>
+      <thead><tr><th>Espera</th><th>OS</th><th>Tarefa</th><th>Técnico</th><th>Usina</th><th>Equipe</th><th>Supervisor</th><th>Fechada em</th><th>Nota do registro</th><th>Grupo</th></tr></thead>
+      <tbody>
+      {% for x in linhas_fila[:limite] %}{% set g = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
+        <tr><td><span class="cn-st cn-t-{{ cor_espera(x.espera_d) }}">{{ '—' if x.espera_d is none else ('hoje' if x.espera_d == 0 else x.espera_d ~ ' d') }}</span></td>
+          <td class="m"><b>{{ x.os }}</b></td><td>{{ (x.tarefa or '')[:60] }}</td>
+          <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico }}</td>
+          <td class="cn-menor">{{ x.usina_cad or '—' }}</td><td class="cn-menor">{{ x.equipe_cad or '—' }}</td><td class="cn-menor">{{ x.supervisor_cad or '—' }}</td>
+          <td class="m">{{ dia_curto(x.fim) }}</td>
+          <td>{% if x.pelo_app %}{% set c = 'ok' if (x.qualidade or 0) >= 80 else 'alerta' %}<span class="cn-nota-barra"><b class="cn-t-{{ c }}">{{ x.qualidade or 0 }}%</b><span class="cn-barrinha"><span class="cn-b-{{ c }}" style="width: {{ x.qualidade or 0 }}%"></span></span></span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+          <td><span class="cn-selo cn-selo--{{ g[1] if g[1] != 'neutro' else 'neutro' }}">{{ g[0] }}</span></td></tr>
+      {% else %}<tr><td colspan="10" class="mudo">Nada na fila com esses filtros.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% endif %}
+  </section>
+
+  <div class="cn-nota"><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e esperando a aprovação do
+    supervisor), relida pelo Nexus a cada 10 minutos, só para consulta. Os grupos são a regra do painel do App: <b>prontas</b> =
+    subtarefas respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80,
+    tempo muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. O
+    supervisor e a equipe saem do cadastro do Nexus pela usina da OS. Aprovar continua no Fracttal.</div>
 </div>
+<script>
+  // o cartão do supervisor leva à fila dele (o link dentro do cartão continua valendo)
+  document.querySelectorAll('.cn-clicavel[data-href]').forEach(function (c) {
+    function vai(ev) { if (ev.target.closest('a')) return; location.href = c.dataset.href; }
+    c.addEventListener('click', vai);
+    c.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') vai(ev); });
+  });
+</script>
 {% endblock %}

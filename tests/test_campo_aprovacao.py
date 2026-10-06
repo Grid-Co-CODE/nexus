@@ -109,17 +109,17 @@ def test_tela_nao_espera_o_fracttal(logado, campo, monkeypatch):
     logado.get("/t/campo/aprovacao")
     assert len(pendentes) == 1                         # uma releitura por vez, por mais visitas que cheguem
     pendentes[0]()                                     # a releitura termina
-    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
     assert ">15102<" in html and "fila lida em" in html and len(pendentes) == 1
 
 
 def test_recusa_mantem_a_ultima_fila_boa_e_espera_para_tentar_de_novo(logado, campo):
     from datetime import datetime, timedelta
     from nexus.campo import regras_app
-    assert ">15102<" in logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    assert ">15102<" in logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
     regras_app._FILA_CACHE["ts"] = datetime.utcnow() - timedelta(minutes=20)    # a fila envelheceu
     campo.recusar = True
-    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
     assert ">15102<" in html and "A última releitura falhou" in html
     antes = len(campo.pedidos)
     logado.get("/t/campo/aprovacao?dias=60")
@@ -127,11 +127,11 @@ def test_recusa_mantem_a_ultima_fila_boa_e_espera_para_tentar_de_novo(logado, ca
 
 
 def test_tela_do_nexus(logado, campo):
-    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?dias=60&vista=fila").get_data(as_text=True)
     assert "<iframe" not in html and 'class="campo-nativa"' in html
     assert "Evidência completa" in html and "Precisa do seu olho" in html and "Fechadas fora do App" in html
     assert ">15102<" in html and ">15088<" in html and ">15002<" in html
-    html = logado.get("/t/campo/aprovacao?dias=60&balde=olho").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?dias=60&vista=fila&balde=olho").get_data(as_text=True)
     assert ">15088<" in html and ">15102<" not in html
 
 

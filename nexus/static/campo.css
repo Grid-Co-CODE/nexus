@@ -327,3 +327,19 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-kpi--link[aria-current="true"]{border-color:var(--verde);box-shadow:inset 0 -3px 0 var(--verde)}
 .cn-kpi-acao{color:var(--verde-texto) !important;font-weight:600}
 .cn-painel .cn-filtro-ativo{display:inline-block;margin-top:14px}
+
+/* Aprovação de OS (05/10/2026): os três grupos na barra do cartão e a idade da fila */
+.cn-barra--grupos .alerta{background:var(--alerta)}
+.cn-barra--grupos .neutro{background:var(--linha-forte)}
+.cn-selo--neutro{color:var(--tinta-2);background:var(--superficie-3)}
+.cn-idades{display:grid;gap:8px;margin-top:14px;padding:14px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.cn-idades-barra{display:flex;gap:3px;min-height:46px}
+.cn-idade{display:grid;align-content:center;justify-items:center;min-width:70px;padding:6px 8px;border-radius:7px;text-decoration:none;
+  color:#0b1220;font-size:11px;line-height:1.25;text-align:center}
+.cn-idade b{font:700 15px/1.1 var(--font-sans)}
+.cn-idade--0{background:var(--ok)}
+.cn-idade--1{background:#a8e05f}
+.cn-idade--2{background:var(--alerta)}
+.cn-idade--3{background:#ff8f3c}
+.cn-idade--4{background:var(--critico)}
+.cn-idade:hover,.cn-idade.ativa{outline:2px solid var(--tinta);outline-offset:1px}

@@ -98,14 +98,14 @@ def fila_e_cadastro(app):
 
 
 def test_filtro_de_equipe_e_supervisor_pelo_cadastro(fila_e_cadastro, logado):
-    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
-    assert 'id="cn-equipe"' in html and 'id="cn-supervisor"' in html and "SP Norte 01" in html
+    html = logado.get("/t/campo/aprovacao?vista=fila&dias=60").get_data(as_text=True)
+    assert 'name="equipe"' in html and 'name="supervisor"' in html and "SP Norte 01" in html
     assert ">15102<" in html and ">15002<" in html
-    html = logado.get("/t/campo/aprovacao?dias=60&equipe=SP+Norte+01").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?vista=fila&dias=60&equipe=SP+Norte+01").get_data(as_text=True)
     assert ">15102<" in html and ">15088<" in html and ">15002<" in html          # as 3 são da usina "SP 01"
-    html = logado.get("/t/campo/aprovacao?dias=60&equipe=SC+Oeste+01").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?vista=fila&dias=60&equipe=SC+Oeste+01").get_data(as_text=True)
     assert ">15102<" not in html and "Nada na fila com esses filtros" in html
-    html = logado.get("/t/campo/aprovacao?dias=60&supervisor=Supervisor+91").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?vista=fila&dias=60&supervisor=Supervisor+91").get_data(as_text=True)
     assert ">15102<" not in html                                                  # o supervisor 91 é da SC Oeste 01
 
 
@@ -128,3 +128,21 @@ def test_jwt_vencido_no_os_creator_volta_ao_login(logado, monkeypatch):
     monkeypatch.setattr(ponte, "clone", lambda app: _clone_que_responde(b'{"erro": "' + aviso + b'"}', "application/json"))
     r = logado.get("/os/historico/meta")
     assert r.status_code == 401 and r.get_json()["login"] is True
+
+
+def test_aprovacao_para_insight(fila_e_cadastro, logado):
+    """Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights"."""
+    html = logado.get("/t/campo/aprovacao?dias=60").get_data(as_text=True)
+    # abre nos cartões por supervisor (do cadastro, pela usina do Fracttal "SP 01")
+    assert 'class="cn-equipes"' in html and "Supervisor 90" in html and "tarefas esperando aprovação" in html
+    assert "Prontas para aprovar" in html and "Precisam do seu olho" in html and "Uso do App" in html
+    assert "Idade da fila" in html and "31 a 60 dias" in html                       # a OS 15002 espera 33 dias
+    # os indicadores e a idade filtram a fila
+    html = logado.get("/t/campo/aprovacao?dias=60&balde=completa").get_data(as_text=True)
+    assert ">15102<" in html and ">15088<" not in html and "Fila de verificação" in html
+    html = logado.get("/t/campo/aprovacao?dias=60&idade=31-60").get_data(as_text=True)
+    assert ">15002<" in html and ">15102<" not in html and "Usina A" in html and "SP Norte 01" in html
+    html = logado.get("/t/campo/aprovacao?dias=60&vista=tecnicos").get_data(as_text=True)
+    assert "Técnico 7" in html and "<th>Uso do App</th>" in html
+    r = logado.get("/t/campo/aprovacao?dias=60&csv=1")
+    assert r.mimetype == "text/csv" and "15102" in r.get_data(as_text=True)

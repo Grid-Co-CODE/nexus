@@ -641,14 +641,17 @@ def usinas_do_fracttal() -> leitura.Leitura:
             uid = D._id(d.get("usina_id"))
             if uid and str(d.get("sistema") or "").strip() == FRACTTAL_C1 and str(d.get("chave_externa") or "").strip():
                 nomes.setdefault(uid, set()).add(str(d["chave_externa"]).strip())
-        equipes, supervisores = {}, {}
+        from . import regras_app
+        equipes, supervisores, por_nome = {}, {}, {}
         for uid in b.por_id:
             o = b.onde(uid)
             for n in nomes.get(uid, ()):
                 equipes.setdefault(o["equipe"], set()).add(n)
                 supervisores.setdefault(o["supervisor"], set()).add(n)
+                # o nome do Fracttal (normalizado como a cópia do App normaliza) -> a usina do cadastro
+                por_nome[regras_app._norm(n)] = {k: o[k] for k in ("usina", "equipe", "supervisor", "uf", "regiao_br")}
         return {"equipes": {k: sorted(v) for k, v in equipes.items() if k},
-                "supervisores": {k: sorted(v) for k, v in supervisores.items() if k},
+                "supervisores": {k: sorted(v) for k, v in supervisores.items() if k}, "por_nome": por_nome,
                 "sem_de_para": sorted(str(u.get("nome") or "") for uid, u in b.mobilizadas.items() if uid not in nomes)}
     return _ler(("visao_usinas_fracttal",), calcular)
 

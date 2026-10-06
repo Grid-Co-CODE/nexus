@@ -16,7 +16,7 @@ from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
 from ...campo import ordens as campo_ordens
 from ...campo import triagem as campo_triagem
-from ...campo import visao
+from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_checklist
 from ..modelo import Tela, Torre
 from .assinatura import bp_assinatura
@@ -359,12 +359,54 @@ def _cor_espera(dias) -> str:
     return "critico" if n >= 30 else ("alerta" if n >= 7 else "ok")
 
 
+IDADES = (("0-2", "até 2 dias", 0, 2), ("3-7", "3 a 7 dias", 3, 7), ("8-30", "8 a 30 dias", 8, 30),
+          ("31-60", "31 a 60 dias", 31, 60), ("61-", "mais de 60 dias", 61, 10 ** 6))
+VISTAS_APROVACAO = (("supervisores", "Por supervisor"), ("tecnicos", "Por técnico"), ("fila", "Fila"))
+SEM_CADASTRO = "Sem cadastro"
+
+
+def _agrupa_fila(linhas, chave) -> list[dict]:
+    """Uma linha por supervisor (ou técnico): o tamanho da fila, os três grupos do App, a idade e o uso do App."""
+    g = {}
+    for x in linhas:
+        k = chave(x) or SEM_CADASTRO
+        a = g.setdefault(k, {"nome": k, "os": set(), "tarefas": 0, "completa": 0, "olho": 0, "fora_do_app": 0,
+                             "aged7": 0, "aged30": 0, "espera_max": 0, "pelo_app": 0, "notas": [], "devolvidas": 0,
+                             "equipes": {}, "tecnicos": set(), "supervisores": {}})
+        a["os"].add(x["os"])
+        a["tarefas"] += 1
+        a[x["balde"]] = a.get(x["balde"], 0) + 1
+        e = x.get("espera_d") or 0
+        a["aged7"] += e >= 7
+        a["aged30"] += e >= 30
+        a["espera_max"] = max(a["espera_max"], e)
+        a["pelo_app"] += bool(x.get("pelo_app"))
+        if x.get("pelo_app") and x.get("qualidade") is not None:
+            a["notas"].append(int(x["qualidade"]))
+        a["devolvidas"] += bool(x.get("foi_devolvida"))
+        a["equipes"][x.get("equipe_cad") or SEM_CADASTRO] = a["equipes"].get(x.get("equipe_cad") or SEM_CADASTRO, 0) + 1
+        a["supervisores"][x.get("supervisor_cad") or SEM_CADASTRO] = a["supervisores"].get(x.get("supervisor_cad") or SEM_CADASTRO, 0) + 1
+        a["tecnicos"].add(x.get("tecnico") or "—")
+    for a in g.values():
+        a["ordens"] = len(a.pop("os"))
+        a["uso_app"] = round(100 * a["pelo_app"] / a["tarefas"]) if a["tarefas"] else None
+        a["nota"] = round(sum(a["notas"]) / len(a["notas"])) if a["notas"] else None
+        del a["notas"]
+        a["equipe"] = max(a["equipes"], key=a["equipes"].get)
+        a["supervisor"] = max(a["supervisores"], key=a["supervisores"].get)
+        a["n_equipes"], a["n_tecnicos"] = len(a["equipes"]), len(a.pop("tecnicos"))
+    return list(g.values())
+
+
 @bp.route("/aprovacao")
 def aprovacao():
-    """Filtro de equipe e de supervisor (Levi, 05/10) pelo cadastro do Nexus: as usinas da equipe (ou das equipes do
-    supervisor), pelo nome delas no Fracttal, viram o escopo da conta do App. Sem o cadastro, o filtro some e a fila
-    vem inteira."""
+    """A fila de verificação do Fracttal para tirar insight (Levi, 05/10: "refaça essa parte de aprovação de OS para
+    retirada de bons insights"). Os números e os grupos são os do App (a fila inteira pela `_fila_supervisao`); a
+    equipe e o supervisor de cada tarefa vêm do cadastro do Nexus, pela usina do Fracttal (de-para "Fracttal ·
+    Classificação 1"). Três visões: por supervisor (quem acumula), por técnico e a fila. Os indicadores e a barra da
+    idade filtram a fila."""
     equipe, supervisor = request.args.get("equipe", ""), request.args.get("supervisor", "")
+    dias = _dias((7, 30, 60, 90), 30)
     mapa = visao.usinas_do_fracttal()
     opcoes = mapa.dados or {}
     usinas = None
@@ -372,12 +414,55 @@ def aprovacao():
         usinas = set(opcoes["equipes"][equipe])
     if supervisor and supervisor in (opcoes.get("supervisores") or {}):
         usinas = set(opcoes["supervisores"][supervisor]) & (usinas if usinas is not None else set(opcoes["supervisores"][supervisor]))
-    leitura = campo_aprovacao.fila(request.args, usinas)
+    leitura = campo_aprovacao.fila_toda({"dias": dias}, usinas)
+    d = leitura.dados or {}
+    por_nome = opcoes.get("por_nome") or {}
+    todas = d.get("linhas") or []
+    for x in todas:
+        cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
+        x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
+        x["supervisor_cad"], x["regiao_br"] = cad.get("supervisor") or "", cad.get("regiao_br") or ""
+    vista = request.args.get("vista") if request.args.get("vista") in dict(VISTAS_APROVACAO) else "supervisores"
+    balde = request.args.get("balde") if request.args.get("balde") in ("completa", "olho", "fora_do_app") else ""
+    idade = next((i for i in IDADES if i[0] == request.args.get("idade")), None)
+    q = request.args.get("q", "").strip().lower()
+    if balde or idade or q:
+        vista = "fila"
+    fila = [x for x in todas if (not balde or x["balde"] == balde)
+            and (not idade or idade[2] <= (x.get("espera_d") or 0) <= idade[3])
+            and (not q or q in " ".join(str(x.get(c) or "") for c in ("os", "tarefa", "tecnico", "usina_cad")).lower())]
+    if request.args.get("csv") == "1":
+        import csv
+        import io
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter=";")
+        w.writerow(["OS", "Tarefa", "Técnico", "Usina", "Equipe", "Supervisor", "Região", "Fechada em", "Espera (dias)",
+                    "Nota do registro", "Grupo", "Devolvida"])
+        for x in fila:
+            w.writerow([x["os"], x.get("tarefa"), x.get("tecnico"), x.get("usina_cad"), x.get("equipe_cad"),
+                        x.get("supervisor_cad"), x.get("regiao_br"), str(x.get("fim") or "")[:10], x.get("espera_d"),
+                        x.get("qualidade") if x.get("pelo_app") else "", dict((g[0], g[1]) for g in GRUPOS).get(x["balde"]),
+                        "sim" if x.get("foi_devolvida") else ""])
+        return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="aprovacao-os-{dias}d.csv"'})
+    r = d.get("resumo") or {}
+    mais_antiga = max(todas, key=lambda x: x.get("espera_d") or 0) if todas else None
+    k = {"ordens": r.get("ordens", 0), "tarefas": r.get("tarefas", 0), "baldes": d.get("baldes") or {},
+         "aged30": sum(1 for x in todas if (x.get("espera_d") or 0) >= 30),
+         "aged30_os": len({x["os"] for x in todas if (x.get("espera_d") or 0) >= 30}),
+         "espera_max": r.get("espera_max", 0), "mais_antiga": mais_antiga,
+         "uso_app": round(100 * r.get("pelo_app", 0) / r["tarefas"]) if r.get("tarefas") else None}
+    idades = [(i, sum(1 for x in todas if i[2] <= (x.get("espera_d") or 0) <= i[3])) for i in IDADES]
+    supervisores_g = sorted(_agrupa_fila(todas, lambda x: x.get("supervisor_cad")),
+                            key=lambda a: (-a["aged30"], -a["tarefas"], a["nome"]))
+    tecnicos_g = sorted(_agrupa_fila(todas, lambda x: x.get("tecnico")), key=lambda a: (-a["tarefas"], a["nome"]))
     return render_template("campo/aprovacao.html", **_comum(
-        "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS},
-        balde=request.args.get("balde", ""), cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(),
-        equipe=equipe, supervisor=supervisor, equipes=sorted(opcoes.get("equipes") or {}),
-        supervisores=sorted(opcoes.get("supervisores") or {}), mapa_erro=mapa.erro))
+        "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS}, balde=balde,
+        cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), equipe=equipe, supervisor=supervisor,
+        equipes=sorted(opcoes.get("equipes") or {}), supervisores=sorted(opcoes.get("supervisores") or {}),
+        mapa_erro=mapa.erro, dias=dias, vista=vista, vistas=VISTAS_APROVACAO, k=k, idades=idades, idade=idade,
+        q=request.args.get("q", ""), linhas_fila=fila, limite=LIMITE_LINHAS, por_supervisor=supervisores_g,
+        por_tecnico=tecnicos_g, iniciais=_iniciais))
 
 
 # ── Ordens de serviço (os números e a lista são os do App, nexus/campo/ordens.py) ────────────────────────────────

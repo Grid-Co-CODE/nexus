@@ -202,6 +202,14 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
     pedidos ao mesmo tempo, no máximo 4 por segundo, e em segundo plano tenta de novo depois de um 429 (5 s, 10 s); a
     fila é lida ao subir o Nexus (`aprovacao.aquecer`, 20 s depois; `NEXUS_CAMPO_AQUECER=0` desliga). Medido: fila
     inteira em ~20 s.
+  - **Tela para insight** (Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights";
+    `aprovacao.fila_toda` + `_agrupa_fila`): a fila inteira pela conta do App (a cópia devolve 200 linhas por chamada;
+    as páginas são juntadas, ~4 s na 1ª, e a conta do período padrão fica pronta logo depois de cada releitura).
+    Seis indicadores que filtram (esperando, prontas para aprovar, pedem olho, paradas há 30 dias, espera máxima, uso do
+    App), a barra da idade da fila (cada faixa filtra) e três visões: por supervisor (cartões, o que mais tem parada há
+    30 dias primeiro; o supervisor e a equipe saem do cadastro pela usina do Fracttal), por técnico e a fila; CSV.
+    Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas esperando; 937 prontas; 1.780 tarefas paradas há 30 dias ou
+    mais; uso do App 41%; Camila Viana 1.373 tarefas (uso do App 29%), Vitor Valadares 829 (12%).
   - **Filtro de equipe e de supervisor** pelo cadastro: as usinas da equipe (ou do supervisor) pelo nome no Fracttal
     (de-para "Fracttal · Classificação 1", `visao.usinas_do_fracttal`) viram o escopo de usinas da conta do App
     (`_area_ok`, `clusters.usinas`): grupos, números e lista saem já filtrados. Usina sem de-para do Fracttal não entra
