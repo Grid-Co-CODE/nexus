@@ -45,7 +45,7 @@ def test_a_ponte_chega_ao_app_config():
 
 def test_os_enderecos_do_clima_sao_opcionais_e_chegam_ao_app_config():
     from nexus import create_app
-    for nome in ("NEXUS_CLIMA_INMET_URL", "NEXUS_CLIMA_FOCOS_URL", "NEXUS_CLIMA_RISCO_URL"):
+    for nome in ("NEXUS_CLIMA_INMET_URL", "NEXUS_CLIMA_FOCOS_URL", "NEXUS_CLIMA_RISCO_URL", "NEXUS_CLIMA_POWER_URL"):
         assert nome in OPCIONAIS
     app = create_app({"NEXUS_SECRET_KEY": "x", "NEXUS_SENHA_ADMIN": "y",
                       "NEXUS_CLIMA_INMET_URL": "https://espelho.exemplo.test/avisos"})
@@ -54,3 +54,6 @@ def test_os_enderecos_do_clima_sao_opcionais_e_chegam_ao_app_config():
     # e o .env vazio não vira configuração
     assert "NEXUS_CLIMA_RISCO_URL" not in carregar_config({"NEXUS_SECRET_KEY": "a", "NEXUS_SENHA_ADMIN": "b",
                                                            "NEXUS_CLIMA_RISCO_URL": "  "})
+    espelho = "https://espelho.exemplo.test/p?x={lat},{lon}&a={inicio}&b={fim}"
+    assert create_app({"NEXUS_SECRET_KEY": "x", "NEXUS_SENHA_ADMIN": "y", "NEXUS_CLIMA_POWER_URL": espelho}
+                      ).config["NEXUS_CLIMA_POWER_URL"] == espelho

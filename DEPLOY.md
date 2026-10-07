@@ -25,9 +25,10 @@ ou grupo de conversa.
 - Linux com **Python 3.14**, `git` e `unzip`. Proxy com HTTPS na frente (exemplo abaixo com o Caddy).
 - Saída para a internet: `github.com` (código), `app.gridco.com.br` (API db_performace e plataforma de Performance),
   `app.fracttal.com` e `one.fracttal.com` (Fracttal), `raw.githubusercontent.com` (banco do PCM),
-  `apiprevmet3.inmet.gov.br` (avisos meteorológicos do INMET) e `dataserver-coids.inpe.br` (focos de queimada e risco
-  de fogo do INPE): os dois últimos são da tela Performance → Clima e risco, só HTTPS (443), leitura pública, sem chave.
-  Sem eles a tela abre e mostra as fontes como "fora agora".
+  `apiprevmet3.inmet.gov.br` (avisos meteorológicos do INMET), `dataserver-coids.inpe.br` (focos de queimada e risco
+  de fogo do INPE) e `power.larc.nasa.gov` (irradiação diária da NASA POWER): os três últimos são da tela Performance →
+  Clima e risco, só HTTPS (443), leitura pública, sem chave. A NASA só é chamada pela PÁGINA de uma usina (um pedido por
+  usina, guardado por 12 h), nunca pela tela principal. Sem eles a tela abre e mostra as fontes como "fora agora".
 - Disco: cada geração da programação semanal guarda ~65 MB em `dados/pcm/geracoes/` (uma por semana).
 - Fuso `America/Sao_Paulo` (o `deploy/nexus.service` já define).
 
@@ -148,11 +149,15 @@ A tela cruza as usinas em operação do cadastro (a latitude e a longitude são 
 Nexus com a `NEXUS_CHAVE_CADASTRO`, e nunca aparecem na tela) com os avisos do INMET, os focos de queimada e o risco de
 fogo do INPE. **Não grava nada**: nem em `dados/`, nem no banco; cada fonte fica só na memória do processo (avisos 30 min,
 focos 10 min, risco de fogo 6 h, ou 15 min enquanto o arquivo do INPE não é o de hoje: ele sai por volta das 06:30; depois
-de uma falha, 60 s sem insistir). Reiniciar o Nexus esvazia o cache e a primeira visita relê tudo (~10 s). Cada falha de fonte
-vai ao log (`journalctl -u nexus`) como uma linha de aviso, `clima: INMET (avisos) fora: sem conexão com o servidor`, sem dado
-de usina. Precisa da saída para `apiprevmet3.inmet.gov.br` e `dataserver-coids.inpe.br` (seção 0) e do
-cadastro no servidor (`dados/cadastro_ensaio.json`). Os endereços têm padrão e só se trocam para apontar a um espelho:
-`NEXUS_CLIMA_INMET_URL`, `NEXUS_CLIMA_FOCOS_URL` e `NEXUS_CLIMA_RISCO_URL` (este leva `{d}`, o dia de 0 a 3), no `.env`.
+de uma falha, 60 s sem insistir). Reiniciar o Nexus esvazia o cache e a primeira visita relê tudo (~10 s). A PÁGINA de cada
+usina (`/t/performance/clima/usina/<id>`) acrescenta a irradiação diária da **NASA POWER** (`power.larc.nasa.gov`): um pedido
+por usina, só quando alguém abre a página dela, guardado por 12 h na memória (a tela principal nunca chama a NASA); a latitude
+e a longitude vão no pedido com 2 casas. Cada falha de fonte vai ao log (`journalctl -u nexus`) como uma linha de aviso,
+`clima: INMET (avisos) fora: sem conexão com o servidor`, sem dado de usina. Precisa da saída para `apiprevmet3.inmet.gov.br`,
+`dataserver-coids.inpe.br` e `power.larc.nasa.gov` (seção 0) e do cadastro no servidor (`dados/cadastro_ensaio.json`). Os
+endereços têm padrão e só se trocam para apontar a um espelho: `NEXUS_CLIMA_INMET_URL`, `NEXUS_CLIMA_FOCOS_URL`,
+`NEXUS_CLIMA_RISCO_URL` (este leva `{d}`, o dia de 0 a 3) e `NEXUS_CLIMA_POWER_URL` (leva `{lat}`, `{lon}`, `{inicio}` e `{fim}`,
+as datas em AAAAMMDD), no `.env`.
 
 ## 8. Atualizar
 

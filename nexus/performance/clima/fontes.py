@@ -1,11 +1,13 @@
-"""Os três clientes públicos do Clima e risco: avisos do INMET, focos de queimada do INPE e risco de fogo do INPE.
+"""Os quatro clientes públicos do Clima e risco: avisos do INMET, focos de queimada do INPE, risco de fogo do INPE e a irradiação
+diária da NASA POWER.
 
-Todos são só leitura (GET), sem chave e de uso livre; o formato abaixo é o medido em 06/10/2026, e o que fugir dele vira
-`FonteErro` (a tela diz que a fonte falhou) em vez de número lido do jeito errado. Quem recebe a sessão é quem chama: a
-sessão de verdade em produção, uma falsa nos testes (nenhum teste vai à rede).
+Todos são só leitura (GET), sem chave e de uso livre; o formato abaixo é o medido em 06/10/2026 (a NASA POWER, em 07/10), e o
+que fugir dele vira `FonteErro` (a tela diz que a fonte falhou) em vez de número lido do jeito errado. Quem recebe a sessão é
+quem chama: a sessão de verdade em produção, uma falsa nos testes (nenhum teste vai à rede).
 
-Atribuição que a tela mostra no rodapé: "Dados: INMET, INPE (Programa Queimadas)". O endereço do INMET não é documentado
-oficialmente (é o que o próprio site de avisos usa); se ele sumir, a tela mostra o INMET como fora do ar.
+Atribuição que a tela mostra no rodapé: "Dados: INMET, INPE (Programa Queimadas)", e "NASA LaRC POWER" na página da usina. O
+endereço do INMET não é documentado oficialmente (é o que o próprio site de avisos usa); se ele sumir, a tela mostra o INMET
+como fora do ar.
 """
 import csv
 import io
@@ -13,7 +15,7 @@ import json
 import re
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import NamedTuple
 
 import requests
@@ -30,6 +32,17 @@ INMET_AVISOS = "https://apiprevmet3.inmet.gov.br/avisos/ativos"
 INPE_FOCOS = "https://dataserver-coids.inpe.br/queimadas/queimadas/focos/csv/10min/"
 INPE_RISCO_FOGO = ("https://dataserver-coids.inpe.br/queimadas/queimadas/riscofogo_meteorologia/previsto/risco_fogo/"
                    "RF.PREV.T{d}.tif")
+
+# NASA POWER (07/10/2026): irradiação global horizontal (GHI) diária num ponto. Medida contra as ETMs de 40 usinas (mai a set/2026,
+# 2.642 dias válidos): erro mediano 7,4% no dia e 3,9% no mês, 84% dos meses dentro de 10%. Grátis, sem chave, de uso livre.
+NASA_POWER = ("https://power.larc.nasa.gov/api/temporal/daily/point?parameters=ALLSKY_SFC_SW_DWN&community=RE"
+              "&longitude={lon}&latitude={lat}&start={inicio}&end={fim}&format=JSON")
+POWER_PARAMETRO = "ALLSKY_SFC_SW_DWN"
+POWER_UNIDADE = "kW-hr/m^2/day"          # kWh/m² por dia; é o que `parameters.ALLSKY_SFC_SW_DWN.units` diz hoje
+POWER_SEM_DADO = -999                    # dia ainda não publicado (a NASA atrasa uns 5 dias) ou buraco isolado: NUNCA vira zero
+POWER_MAXIMO = 15.0                      # kWh/m²/dia: acima disto não é GHI de superfície (o máximo físico passa pouco de 12)
+POWER_CASAS = 2                          # a coordenada vai com 2 casas (~1 km): a grade da NASA é de dezenas de km, e a posição
+                                         # exata da usina não precisa chegar a um servidor de fora
 
 FOCOS_ARQUIVOS = 6                       # seis arquivos de 10 min = a última hora
 DIAS_DE_RISCO = (0, 1, 2, 3)             # RF.PREV.T0..T3: hoje e D+1 a D+3
@@ -58,11 +71,18 @@ class Aviso:
 
 
 def enderecos(config) -> dict:
+    """Os quatro endereços: o padrão, ou o da configuração (`NEXUS_CLIMA_*_URL`, por exemplo um espelho interno). Valor em branco
+    vale o padrão."""
     cfg = config or {}
-    focos = (cfg.get("NEXUS_CLIMA_FOCOS_URL") or INPE_FOCOS).strip()
-    return {"inmet": (cfg.get("NEXUS_CLIMA_INMET_URL") or INMET_AVISOS).strip(),
+
+    def de(chave, padrao):
+        return str(cfg.get(chave) or "").strip() or padrao
+
+    focos = de("NEXUS_CLIMA_FOCOS_URL", INPE_FOCOS)
+    return {"inmet": de("NEXUS_CLIMA_INMET_URL", INMET_AVISOS),
             "focos": focos if focos.endswith("/") else focos + "/",
-            "risco": (cfg.get("NEXUS_CLIMA_RISCO_URL") or INPE_RISCO_FOGO).strip()}
+            "risco": de("NEXUS_CLIMA_RISCO_URL", INPE_RISCO_FOGO),
+            "power": de("NEXUS_CLIMA_POWER_URL", NASA_POWER)}
 
 
 _sessao = None
@@ -296,3 +316,61 @@ def inpe_risco_fogo(pontos, sessao, modelo_url=INPE_RISCO_FOGO, *, dias=DIAS_DE_
     if len(erros) == len(dias):
         raise FonteErro("nenhum dia do risco de fogo pôde ser lido: " + "; ".join(f"D{d}: {m}" for d, m in erros.items()))
     return {"por_ponto": por_ponto, "arquivos": arquivos, "erros": erros}
+
+
+# ── NASA POWER: irradiação diária ────────────────────────────────────────────────────────────────────────────────────
+
+def nasa_power(lat, lon, inicio: date, fim: date, sessao, modelo_url=NASA_POWER, *, timeout=TEMPO_LIMITE_S) -> dict:
+    """O GHI diário (kWh/m²/dia) da NASA POWER num ponto, de `inicio` a `fim` (datas de Brasília). {"dias": {data: valor ou
+    None}, "publicado_ate": a última data com valor, ou None}. O -999 da NASA (dia ainda não publicado, ou um buraco no meio da
+    série) vira None, nunca zero; os dias que ela devolve cobrem a janela inteira. `modelo_url` leva {lat}, {lon}, {inicio} e
+    {fim} (AAAAMMDD). Formato diferente do medido em 07/10/2026 (não JSON, sem a série, data fora de AAAAMMDD, valor que não é
+    número, fora de 0 a 15, unidade que não é kWh/m²/dia, outro valor de preenchimento) é FonteErro, nunca número lido do jeito
+    errado. A coordenada vai com `POWER_CASAS` casas: a posição exata da usina não precisa chegar à NASA."""
+    if fim < inicio:
+        raise ValueError("a janela da NASA POWER termina antes de começar")
+    if not all(f"{{{nome}}}" in modelo_url for nome in ("lat", "lon", "inicio", "fim")):
+        raise FonteErro("o endereço da NASA POWER precisa de {lat}, {lon}, {inicio} e {fim}")
+    url = modelo_url.format(lat=f"{lat:.{POWER_CASAS}f}", lon=f"{lon:.{POWER_CASAS}f}", inicio=inicio.strftime("%Y%m%d"),
+                            fim=fim.strftime("%Y%m%d"))
+    r = sessao.get(url, headers={"Accept": "application/json"}, timeout=timeout)
+    r.raise_for_status()
+    try:
+        js = json.loads(r.content)
+    except ValueError:
+        raise FonteErro("a resposta da NASA POWER não é JSON") from None
+    if not isinstance(js, dict):
+        raise FonteErro("a resposta da NASA POWER não é um objeto JSON")
+    try:
+        serie = js["properties"]["parameter"][POWER_PARAMETRO]
+    except (KeyError, TypeError):
+        raise FonteErro(f"a resposta da NASA POWER não traz {POWER_PARAMETRO} em properties.parameter") from None
+    if not isinstance(serie, dict) or not serie:
+        raise FonteErro("a série diária da NASA POWER veio vazia ou fora do formato")
+    parametros = js.get("parameters") if isinstance(js.get("parameters"), dict) else {}
+    do_parametro = parametros.get(POWER_PARAMETRO)
+    unidade = do_parametro.get("units") if isinstance(do_parametro, dict) else None
+    if unidade is None:
+        raise FonteErro("a NASA POWER não informou a unidade da irradiação")
+    if unidade != POWER_UNIDADE:
+        raise FonteErro(f"a unidade da NASA POWER mudou (esperava {POWER_UNIDADE}, veio {str(unidade)[:40]})")
+    cabecalho = js.get("header") if isinstance(js.get("header"), dict) else {}
+    preenchimento = cabecalho.get("fill_value", POWER_SEM_DADO)
+    if preenchimento != POWER_SEM_DADO:
+        raise FonteErro(f"o valor de preenchimento da NASA POWER mudou (esperava {POWER_SEM_DADO}, veio {str(preenchimento)[:20]})")
+    dias = {}
+    for chave, valor in serie.items():
+        try:
+            dia = datetime.strptime(chave, "%Y%m%d").date()
+        except (ValueError, TypeError):
+            raise FonteErro(f"data fora do formato AAAAMMDD na NASA POWER: {str(chave)[:20]!r}") from None
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+            raise FonteErro(f"valor que não é número na NASA POWER ({str(chave)[:20]})")
+        if valor == POWER_SEM_DADO:
+            dias[dia] = None
+        elif 0 <= valor <= POWER_MAXIMO:
+            dias[dia] = float(valor)
+        else:
+            raise FonteErro(f"valor {valor:g} fora da faixa de 0 a {POWER_MAXIMO:g} kWh/m²/dia: a NASA mudou a unidade?")
+    publicados = [d for d, v in dias.items() if v is not None]
+    return {"dias": dias, "publicado_ate": max(publicados) if publicados else None}
