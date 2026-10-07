@@ -176,3 +176,77 @@ def test_raio_se_escolhe():
     idx = A.IndiceFocos([foco(-10 + 8.0 / UM_GRAU, -40)])
     assert idx.perto(-10, -40) is None
     assert idx.perto(-10, -40, raio_km=10)["n"] == 1
+
+
+# ── os três níveis da usina (07/10/2026) ─────────────────────────────────────────────────────────────────────────────
+
+SEIS = ["Tempestade", "Chuvas Intensas", "Acumulado de Chuva", "Vendaval", "Ventos Costeiros", "Granizo"]
+
+
+def test_os_eventos_que_estragam_usina_sao_os_seis_combinados_com_o_levi():
+    assert A.EVENTOS_QUE_ESTRAGAM_USINA == frozenset(
+        {"tempestade", "chuvas intensas", "acumulado de chuva", "vendaval", "ventos costeiros", "granizo"})
+
+
+@pytest.mark.parametrize("evento", SEIS + ["TEMPESTADE", "  chuvas   intensas ", "ventos COSTEIROS", "Acúmulado de Chuvá"])
+def test_evento_que_estraga_usina_compara_sem_acento_sem_caixa_e_sem_espaco_sobrando(evento):
+    assert A.evento_estraga_usina(evento) is True
+
+
+@pytest.mark.parametrize("evento", ["Baixa Umidade", "Onda de Calor", "Onda de Frio", "Geada", "Nevoeiro", "Ressaca", "",
+                                    None, "Tempestade Solar", "Chuva", "Vento"])
+def test_evento_desconhecido_ou_que_nao_estraga_usina_nao_conta(evento):
+    assert A.evento_estraga_usina(evento) is False
+
+
+@pytest.mark.parametrize("evento", SEIS + ["Baixa Umidade", "Onda de Calor", "", "Evento Novo"])
+def test_grande_perigo_manda_agir_de_qualquer_evento(evento):
+    assert A.aviso_manda_agir(aviso(nivel=3, severidade="Grande Perigo", evento=evento)) is True
+
+
+@pytest.mark.parametrize("evento", SEIS)
+def test_perigo_dos_eventos_que_estragam_usina_manda_agir(evento):
+    assert A.aviso_manda_agir(aviso(nivel=2, evento=evento)) is True
+
+
+@pytest.mark.parametrize("evento", ["Baixa Umidade", "Onda de Calor", "Geada", "Evento Novo", ""])
+def test_perigo_de_evento_desconhecido_nao_manda_agir_vai_para_atencao(evento):
+    assert A.aviso_manda_agir(aviso(nivel=2, evento=evento)) is False
+
+
+@pytest.mark.parametrize("evento", SEIS + ["Baixa Umidade"])
+def test_perigo_potencial_nunca_manda_agir_nem_de_tempestade(evento):
+    assert A.aviso_manda_agir(aviso(nivel=1, severidade="Perigo Potencial", evento=evento)) is False
+
+
+def test_foco_manda_agir_sozinho():
+    assert A.nivel_da_usina([], True, False) == "agir"
+    assert A.nivel_da_usina([], True, True) == "agir"
+
+
+def test_aviso_que_manda_agir_basta_e_vale_o_futuro():
+    assert A.nivel_da_usina([aviso(nivel=2, evento="Granizo")], False, False) == "agir"
+    futuro = aviso(nivel=3, severidade="Grande Perigo", evento="Onda de Calor", inicio=AGORA + timedelta(days=2))
+    assert A.nivel_da_usina([futuro], False, False) == "agir"
+
+
+def test_outro_aviso_ou_risco_alto_e_atencao():
+    potencial = aviso(nivel=1, severidade="Perigo Potencial", evento="Tempestade")
+    assert A.nivel_da_usina([potencial], False, False) == "atencao"
+    assert A.nivel_da_usina([aviso(nivel=2, evento="Onda de Calor")], False, False) == "atencao"
+    assert A.nivel_da_usina([], False, True) == "atencao"
+    assert A.nivel_da_usina([potencial], False, True) == "atencao"
+
+
+def test_agir_vence_atencao_quando_os_dois_aparecem():
+    leve = aviso(nivel=1, severidade="Perigo Potencial", evento="Baixa Umidade")
+    assert A.nivel_da_usina([leve, aviso(nivel=2, evento="Vendaval")], False, True) == "agir"
+    assert A.nivel_da_usina([leve], True, True) == "agir"
+
+
+def test_sem_nada_e_sem_alerta():
+    assert A.nivel_da_usina([], False, False) == "sem"
+
+
+def test_rotulos_dos_niveis():
+    assert A.ROTULO_NIVEL == {"agir": "Agir agora", "atencao": "Atenção", "sem": "Sem alerta"}
