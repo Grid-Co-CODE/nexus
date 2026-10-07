@@ -18,7 +18,7 @@ from nexus.performance.clima.usinas import Usina
 
 from clima_mapa_mundo import (ALFA, BETA, DELTA, EPSILON, GAMA, LIDO, REF, TETA, UM_GRAU, aviso, cadastro, dias, foco_a,
                               foco_em, instalar_leituras, lei_avisos, lei_focos, lei_risco, montar, mundo_completo, mundo_de_usinas,
-                              por_nome, risco_baixo, tudo_instalado, usina)
+                              por_nome, quebrar_contorno, risco_baixo, tudo_instalado, usina)
 
 UTC = timezone.utc
 
@@ -439,3 +439,34 @@ def test_a_ilha_fora_do_recorte_do_brasil_e_dita_e_nao_some(leituras):
     tudo_instalado(leituras)
     m = montar(cadastro=cadastro(*mundo_de_usinas(), usina("9", "Usina Ilha", (-3.85, -32.4))))
     assert len(m["usinas"]) == 6 and m["fora_do_recorte"] == 1 and m["n_usinas"] == 7
+
+
+# ── o contorno que não abre ──────────────────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("erro", [ValueError("o arquivo do IBGE não traz: RS"), FileNotFoundError("sem o arquivo")],
+                         ids=["conteudo-errado", "arquivo-ausente"])
+def test_contorno_que_nao_abre_vira_aviso_e_o_mapa_sai_sem_as_divisas_em_vez_de_500(leituras, monkeypatch, caplog, erro):
+    quebrar_contorno(monkeypatch, erro)
+    mundo_completo(leituras)
+    m = montar(regiao="sul")
+    assert m["erro_contorno"].startswith("O contorno dos estados não abriu") and m["ufs"] == ()
+    assert m["regiao"] == "brasil" and m["viewbox"] == M.vista_de_caixa(M.BRASIL, "Brasil", *M.LIMITES_BRASIL).viewbox
+    assert len(m["usinas"]) == 6 and m["camada_avisos"]["n_vigor"] == 2 and m["camada_focos"]["n"] == 4      # o resto continua
+    assert "o contorno dos estados do IBGE não abriu" in caplog.text and str(erro) in caplog.text                  # o motivo vai ao log
+    M._vista.cache_clear()
+    M.ufs_da_vista.cache_clear()
+
+
+def test_com_o_contorno_aberto_nao_ha_erro_de_contorno(leituras):
+    mundo_completo(leituras)
+    assert montar()["erro_contorno"] == ""
+
+
+def test_os_limites_do_mapa_sem_contorno_cobrem_o_continente_sem_sobrar_muito():
+    x0 = min(e.caixa[0] for e in M.estados())
+    y0 = min(e.caixa[1] for e in M.estados())
+    x1 = max(e.caixa[2] for e in M.estados())
+    y1 = max(e.caixa[3] for e in M.estados())
+    lon0, lat0, lon1, lat1 = M.LIMITES_BRASIL
+    assert lon0 <= x0 and lat0 <= y0 and lon1 >= x1 and lat1 >= y1
+    assert x0 - lon0 < 1.0 and y0 - lat0 < 1.0 and lon1 - x1 < 1.0 and lat1 - y1 < 1.0

@@ -125,3 +125,16 @@ def mundo_completo(leituras):
         focos=lei_focos(foco_a(1.0, DELTA), foco_a(3.0, DELTA, "NOAA-21", dlon_km=1.0), foco_em(-3.0, -61.0),
                         foco_em(-9.0, -40.0)),
         risco=lei_risco({**risco_baixo(), "5": dias(0.8, 0.1, 0.1, 0.1)}))
+
+
+def quebrar_contorno(monkeypatch, erro=None):
+    """O arquivo do IBGE some ou vem quebrado: `estados()` levanta (ValueError se o conteúdo não é o esperado, FileNotFoundError se
+    o arquivo não está lá). As vistas e os estados são guardados (lru_cache), então limpa antes: sem isso o teste herdaria o
+    resultado de outro. Quem chama limpa de novo no fim (a fixture do teste)."""
+    erro = erro or ValueError("o arquivo do IBGE não traz: RS")
+
+    def quebrado(*args, **kwargs):
+        raise erro
+    M._vista.cache_clear()
+    M.ufs_da_vista.cache_clear()
+    monkeypatch.setattr(M, "estados", quebrado)

@@ -221,6 +221,10 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
   vira "Sem alerta nas fontes lidas" e a legenda traz o qualificador ("parcial", "dado de HH:MM", "N avisos sem polígono utilizável
   não aparecem"). O painel de frescor é o MESMO CÓDIGO da lista (`visao._fonte_inmet/_fonte_focos/_fonte_risco`), e há teste que
   compara os dois. O risco de fogo não é desenhado: entra na cor da usina (Atenção, se alto ou crítico em algum dos 4 dias).
+- **Contorno que não abre** (arquivo ausente ou quebrado: `estados()` levanta `ValueError` ou `OSError`): a tela NÃO dá 500. O
+  mapa sai sem as divisas e sem o recorte por região (a vista do Brasil vem de `LIMITES_BRASIL`, números fixos que um teste
+  confere contra o arquivo), com a nota "O contorno dos estados não abriu...", e o motivo vai ao log (`clima: o contorno dos
+  estados do IBGE não abriu`). As usinas, os avisos e os focos continuam, como em qualquer camada que perde a fonte.
 - **Coordenada:** a POSIÇÃO é permitida (atrás do login, como o cadastro); o NÚMERO de latitude ou longitude nunca vira texto (nem
   no `<title>`, nem em atributo com nome de coordenada). O teste olha número de 3 casas ou mais NO TEXTO, e a fixture usa
   coordenadas com 5 casas para o vazamento do número inteiro ser achado.
@@ -238,5 +242,5 @@ risco de fogo como camada (é um raster de pixels de ~1 km, e o Nexus lê só o 
 oceânicas (o contorno mínimo não as tem: uma usina ali cai em "fora deste recorte").
 
 Como provar: `python -m pytest -q tests/test_clima_mapa.py tests/test_clima_mapa_camadas.py tests/test_torre_performance_mapa.py`
-(63 + 58 + 53 testes, sem rede; 101 mutações no código, no template e no CSS novos, todas mortas). Na tela: `/t/performance/clima/mapa` no desktop e a 375 px
+(63 + 62 + 54 testes, sem rede; 109 mutações no código, no template e no CSS novos, todas mortas). Na tela: `/t/performance/clima/mapa` no desktop e a 375 px
 (sem rolagem lateral; o SVG a 100% da largura).

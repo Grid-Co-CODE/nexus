@@ -34,6 +34,7 @@
   <p class="cl-base">{{ v.n_usinas }} {{ "usina em operação com coordenada" if v.n_usinas == 1 else "usinas em operação com coordenada" }} no cadastro, cada uma na cor do nível de alerta dela. A coordenada não aparece nesta tela.{% if v.fora_do_recorte %} {{ v.fora_do_recorte }} {{ "usina em operação está fora deste recorte" if v.fora_do_recorte == 1 else "usinas em operação estão fora deste recorte" }}: escolha outra região ou o Brasil inteiro.{% endif %}</p>
   {% if v.faltando %}<p class="cl-nota cl-nota--atencao">O mapa não inclui: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
   {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. O mapa ainda não inclui essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
+  {% if v.erro_contorno %}<p class="cl-nota cl-nota--atencao" role="alert">{{ v.erro_contorno }}</p>{% endif %}
 
   {% set av = v.camada_avisos %}
   {% set fo = v.camada_focos %}

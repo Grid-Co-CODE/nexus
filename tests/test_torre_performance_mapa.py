@@ -17,7 +17,7 @@ from nexus.performance.clima import visao as V
 
 from clima_cog import SessaoArquivos, montar_cog
 from clima_mapa_mundo import (ALFA, BETA, DELTA, EPSILON, GAMA, REF, TETA, aviso, instalar_leituras, lei_avisos, lei_focos,
-                              lei_risco, mundo_completo, mundo_de_usinas, risco_baixo, tudo_instalado)
+                              lei_risco, mundo_completo, mundo_de_usinas, quebrar_contorno, risco_baixo, tudo_instalado)
 from conftest import SENHA_TESTE
 
 URL = "/t/performance/clima/mapa"
@@ -401,6 +401,23 @@ def test_usina_com_coordenada_fora_do_brasil_tambem_fica_na_lista(tmp_path, monk
     tudo_instalado(leituras)
     html = pagina(c)
     assert "Coordenada fora do Brasil no cadastro (1)" in texto(html) and "Usina Trocada" not in usinas_do_svg(html)
+
+
+# ── o contorno que não abre ──────────────────────────────────────────────────────────────────────────────────────────
+
+def test_contorno_que_nao_abre_a_tela_diz_e_mostra_o_resto_em_vez_de_500(mundo, monkeypatch):
+    quebrar_contorno(monkeypatch)
+    try:
+        html = pagina(mundo, regiao="sul")
+        t = texto(html)
+        s = svg(html)
+        assert "O contorno dos estados não abriu" in t and "sem as divisas" in t
+        assert 'class="mp-uf"' not in s and len(usinas_do_svg(html)) == 6 and 'class="mp-avisos"' in s       # o resto continua
+        assert f'viewBox="{M.vista_de_caixa(M.BRASIL, "Brasil", *M.LIMITES_BRASIL).viewbox}"' in s
+        assert 'class="cl-fonte cl-ok"' in html                                                              # o painel das fontes também
+    finally:
+        M._vista.cache_clear()
+        M.ufs_da_vista.cache_clear()
 
 
 # ── sem cadastro ─────────────────────────────────────────────────────────────────────────────────────────────────────

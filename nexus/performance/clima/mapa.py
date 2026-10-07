@@ -18,6 +18,7 @@ A primeira metade do módulo é geometria pura (contorno, projeção, vista, cam
 do cadastro e as leituras das três fontes (as MESMAS da tela principal, pelo mesmo cache) e devolve o que o template desenha.
 """
 import json
+import logging
 import math
 from dataclasses import dataclass
 from functools import lru_cache
@@ -29,10 +30,14 @@ from . import alertas as A
 from . import leitura as L
 from . import visao as V
 
+log = logging.getLogger(__name__)
 ARQUIVO_UFS = Path(__file__).resolve().parents[2] / "static" / "clima" / "ibge-ufs-minima.geojson"
 LARGURA = 1000                     # a largura do viewBox de TODA vista; a altura sai da geografia
 MARGEM = 0.03                      # folga em volta do recorte, para o traço da borda e o ponto da usina não serem cortados
 BRASIL = "brasil"
+# Só para o contorno que não abre: o continente (lon mín., lat mín., lon máx., lat máx.) sem depender do arquivo, para o mapa sair
+# sem as divisas em vez de 500. Um teste confere que cobre o contorno do IBGE e não sobra mais de 1 grau.
+LIMITES_BRASIL = (-74.0, -33.8, -34.7, 5.3)
 REGIOES = {"norte": "Norte", "nordeste": "Nordeste", "centro-oeste": "Centro-Oeste", "sudeste": "Sudeste", "sul": "Sul"}
 
 # O IBGE manda só `codarea` (o código da UF), sem sigla nem nome: a tabela é a oficial da divisão política.
@@ -374,11 +379,21 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     dá para dizer que não há aviso.
     """
     ref = ref or V.agora()
-    v = vista(regiao)
-    m = {"erro_cadastro": erro_cadastro, "atualizada": V.hora(ref, ref), "regiao": v.id, "regiao_nome": v.nome,
+    try:
+        v = vista(regiao)
+        ufs = ufs_da_vista(v)
+        erro_contorno = ""
+    except (ValueError, OSError):
+        # O contorno é um arquivo do repositório: se faltar ou vier quebrado, o mapa sai sem as divisas (e sem o recorte por
+        # região, que sai das caixas dos estados), e a tela diz; o motivo vai ao log. Antes disto seria um 500.
+        log.exception("clima: o contorno dos estados do IBGE não abriu")
+        v, ufs = vista_de_caixa(BRASIL, "Brasil", *LIMITES_BRASIL), ()
+        erro_contorno = ("O contorno dos estados não abriu (o motivo está no log do servidor): o mapa sai sem as divisas e sem o "
+                         "recorte por região.")
+    m = {"erro_cadastro": erro_cadastro, "erro_contorno": erro_contorno, "atualizada": V.hora(ref, ref), "regiao": v.id, "regiao_nome": v.nome,
          "regioes": [{"id": BRASIL, "nome": "Brasil", "atual": v.id == BRASIL},
                      *({"id": r, "nome": n, "atual": v.id == r} for r, n in REGIOES.items())],
-         "viewbox": v.viewbox, "ufs": (), "usinas": [], "contagem": {A.AGIR: 0, A.ATENCAO: 0, A.SEM_ALERTA: 0, NX: 0},
+         "viewbox": v.viewbox, "ufs": ufs, "usinas": [], "contagem": {A.AGIR: 0, A.ATENCAO: 0, A.SEM_ALERTA: 0, NX: 0},
          "n_usinas": 0, "n_no_recorte": 0, "fora_do_recorte": 0, "sem_usinas": False, "rotulo_sem": "Sem alerta",
          "sem_leitura_de": "", "camada_avisos": None, "camada_focos": None, "fontes": [], "faltando": [], "lendo": [],
          "completa": True, "recarrega_em": V.RECARGA_S, "sem_coordenada": [], "fora_do_brasil": [], "ilegiveis": 0}
@@ -440,5 +455,4 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     desenhadas.sort(key=lambda d: (ORDEM_DE_DESENHO[d["nivel"]], d["nome"].casefold()))
     m["usinas"] = desenhadas
     m["n_no_recorte"] = len(desenhadas)
-    m["ufs"] = ufs_da_vista(v)
     return m
