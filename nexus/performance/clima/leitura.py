@@ -1,6 +1,8 @@
 """Cache de cada fonte do Clima e risco (06/10/2026), no padrão do `publicacao.py` da operação em tempo real.
 
 - TTL por fonte: avisos do INMET 30 min, focos do INPE 10 min, risco de fogo 6 h (o INPE publica uma vez por dia, ~06:30).
+  O TTL do risco conta da leitura, e a leitura de antes da publicação é do arquivo de ontem: lido às 05:00, ficaria com ele até
+  as 11:01. Por isso, enquanto o T0 não é comprovadamente o de hoje (pela data do arquivo), o TTL é de 15 min.
 - Depois de uma falha, 60 s sem insistir: a fonte caída não leva um pedido por visita à tela.
 - Uma busca por vez: quem chega enquanto outra thread busca recebe a última leitura boa como está (ou "lendo a fonte"),
   sem esperar a rede. Uma busca de risco de fogo leva alguns segundos; sem isto, a fila de visitas esgotaria as threads.
@@ -10,16 +12,22 @@
 
 Nada aqui grava em disco nem no banco: a fase 1 é só leitura, e histórico seria fato novo da governança de dados.
 """
+import logging
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from . import fontes
 
+log = logging.getLogger(__name__)
+BRT = timezone(timedelta(hours=-3))
+
 TTL_AVISOS_S = 30 * 60
 TTL_FOCOS_S = 10 * 60
 TTL_RISCO_S = 6 * 3600
+TTL_RISCO_DESATUALIZADO_S = 15 * 60     # enquanto o arquivo T0 do INPE não é comprovadamente o de hoje
 FALHA_TTL_S = 60
 LENDO = "lendo a fonte"
 SEM_FONTE_NOS_TESTES = "sem fonte nos testes"
@@ -54,9 +62,20 @@ def usar_sessao(sessao) -> None:
     _sessao_teste[0] = sessao
 
 
+def _ttl_do_risco(dados, t) -> float:
+    """O TTL de uma leitura do risco de fogo, lida em `t` (epoch): 6 h se o T0 é de hoje (em Brasília); senão 15 min. Sem a
+    data do T0 (dia 0 sem leitura, ou servidor sem Last-Modified) não dá para confirmar, e na dúvida o TTL é o curto."""
+    arquivo = ((dados or {}).get("arquivos") or {}).get(0)
+    if arquivo is None:
+        return TTL_RISCO_DESATUALIZADO_S
+    hoje = datetime.fromtimestamp(t, BRT).date()
+    return TTL_RISCO_S if arquivo.astimezone(BRT).date() == hoje else TTL_RISCO_DESATUALIZADO_S
+
+
 class Cache:
-    def __init__(self, ttl_s, falha_ttl_s=FALHA_TTL_S, relogio=None):
-        self.ttl_s, self.falha_ttl_s = ttl_s, falha_ttl_s
+    def __init__(self, ttl_s, falha_ttl_s=FALHA_TTL_S, relogio=None, nome="fonte", validade=None):
+        """`validade(dados, t)`, se houver, diz por quantos segundos vale CADA leitura (no lugar do `ttl_s`)."""
+        self.ttl_s, self.falha_ttl_s, self.nome, self.validade = ttl_s, falha_ttl_s, nome, validade
         self._relogio_proprio = relogio
         self._trava = threading.Lock()
         self.limpar()
@@ -66,7 +85,7 @@ class Cache:
 
     def limpar(self) -> None:
         with self._trava:
-            self._bom, self._chave, self._t = None, None, 0.0
+            self._bom, self._chave, self._t, self._ttl_efetivo = None, None, 0.0, self.ttl_s
             self._erro, self._falha_t, self._buscando = None, 0.0, False
 
     def ler(self, buscar, chave=None) -> Leitura:
@@ -75,7 +94,7 @@ class Cache:
         agora = self._agora()
         with self._trava:
             bom = self._bom if self._bom is not None and self._chave == chave else None
-            if bom is not None and agora - self._t < self.ttl_s:
+            if bom is not None and agora - self._t < self._ttl_efetivo:
                 return bom
             if self._erro is not None and agora - self._falha_t < self.falha_ttl_s:
                 if bom is not None:
@@ -87,25 +106,35 @@ class Cache:
         dados, erro = None, None
         try:
             dados = buscar()
-        except Exception as e:                          # noqa: BLE001 — a tela diz o erro; nada vai para o log com dado
+        except Exception as e:                          # noqa: BLE001 — a tela diz o erro, e o log guarda uma linha dele
             erro = fontes.resumo_do_erro(e)
+        except BaseException:
+            # Ctrl+C, SystemExit e afins atravessam, mas antes soltam a trava: sem isto, a fonte ficava em "lendo a fonte" para
+            # sempre (toda visita via a trava presa, e nenhuma refazia a busca).
+            with self._trava:
+                self._buscando = False
+            raise
         with self._trava:
             self._buscando = False
             fim = self._agora()
             if erro is None:
                 self._bom, self._chave, self._t, self._erro, self._falha_t = Leitura(dados, fim), chave, fim, None, 0.0
+                self._ttl_efetivo = self.validade(dados, fim) if self.validade else self.ttl_s
                 return self._bom
             if self._chave != chave:
                 self._bom, self._chave = None, chave    # a leitura velha era de outro conjunto: não vale para este
             self._erro, self._falha_t = erro, fim
-            if self._bom is not None:
-                return Leitura(self._bom.dados, self._bom.lido_em, erro=erro, velha=True)
-            return Leitura(None, None, erro=erro)
+            resposta = (Leitura(self._bom.dados, self._bom.lido_em, erro=erro, velha=True) if self._bom is not None
+                        else Leitura(None, None, erro=erro))
+        # Uma linha por FALHA (a janela de 60 s não busca de novo, então não repete): o resumo curto, sem a mensagem crua da
+        # rede, e nunca dado de usina.
+        log.warning("clima: %s fora: %s", self.nome, erro)
+        return resposta
 
 
-_AVISOS = Cache(TTL_AVISOS_S)
-_FOCOS = Cache(TTL_FOCOS_S)
-_RISCO = Cache(TTL_RISCO_S)
+_AVISOS = Cache(TTL_AVISOS_S, nome="INMET (avisos)")
+_FOCOS = Cache(TTL_FOCOS_S, nome="INPE (focos)")
+_RISCO = Cache(TTL_RISCO_S, nome="INPE (risco de fogo)", validade=_ttl_do_risco)
 
 
 def limpar_cache() -> None:

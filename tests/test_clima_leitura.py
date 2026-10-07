@@ -1,7 +1,9 @@
 """Clima e risco: o cache de cada fonte (padrão de `publicacao.py` da operação em tempo real): TTL, janela de 60 s depois de
 falha, uma busca por vez, última leitura boa servida com o erro e a hora, e nenhuma rede nos testes sem sessão injetada."""
 import json
+import logging
 import threading
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import requests
@@ -10,6 +12,8 @@ from nexus.performance.clima import fontes
 from nexus.performance.clima import leitura as L
 
 from clima_cog import Resposta, SessaoArquivos, montar_cog
+
+BRT = timezone(timedelta(hours=-3))
 
 
 class Relogio:
@@ -246,10 +250,10 @@ def test_endereco_vem_da_configuracao(relogio):
     assert l.erro is None and s.pedidos[0][0] == "https://outro.exemplo.test/avisos"
 
 
-def _cogs():
+def _cogs(**kw):
     quadro = [[0.2] * 40 for _ in range(30)]
     return SessaoArquivos({URLS["NEXUS_CLIMA_RISCO_URL"].format(d=d): montar_cog(quadro, origem=(-50.0, 10.0), escala=0.01)
-                           for d in range(4)})
+                           for d in range(4)}, **kw)
 
 
 def test_risco_guarda_pelo_conjunto_de_pontos_e_refaz_se_o_conjunto_mudar(relogio):
@@ -278,3 +282,170 @@ def test_as_tres_fontes_tem_cache_proprio(relogio):
     relogio.avanca(L.TTL_AVISOS_S + 1)
     L.focos(c, s)                                              # falha (404), mas só a dos focos
     assert L.avisos(c, s).erro is None and L.avisos(c, s).velha is False
+
+
+# ── o TTL do risco de fogo conta da DATA do arquivo, não só da leitura ──────────────────────────────────────────────
+
+def _brt(dia, hh, mm=0):
+    return datetime(2026, 10, dia, hh, mm, tzinfo=BRT).timestamp()
+
+
+def test_ttl_do_risco_de_arquivo_desatualizado():
+    assert L.TTL_RISCO_DESATUALIZADO_S == 15 * 60
+
+
+def test_risco_lido_antes_da_publicacao_com_o_arquivo_de_ontem_so_vale_15_min(relogio):
+    # O INPE publica às ~06:30. Lido às 05:00, o T0 ainda é o de 05/10: com 6 h de TTL a tela ficava com o arquivo de ontem
+    # até as 11:01, mesmo com o de hoje no ar desde as 06:32.
+    relogio.t = _brt(6, 5, 0)
+    s = _cogs(modificado="Mon, 05 Oct 2026 09:32:00 GMT")                       # 06:32 de 05/10 em Brasília
+    c, p = config(TESTING=True), [("a", 9.9, -49.9)]
+    L.risco(c, p, s)
+    n = len(s.pedidos)
+    relogio.avanca(14 * 60)
+    L.risco(c, p, s)
+    assert len(s.pedidos) == n                                                  # 14 min depois ainda vale
+    relogio.avanca(2 * 60)
+    L.risco(c, p, s)
+    assert len(s.pedidos) > n                                                   # 16 min depois lê de novo
+
+
+def test_risco_lido_com_o_arquivo_de_hoje_vale_as_6_h(relogio):
+    relogio.t = _brt(6, 7, 0)
+    s = _cogs(modificado="Tue, 06 Oct 2026 09:32:00 GMT")                       # 06:32 de 06/10: o de hoje
+    c, p = config(TESTING=True), [("a", 9.9, -49.9)]
+    L.risco(c, p, s)
+    n = len(s.pedidos)
+    relogio.avanca(6 * 3600 - 60)
+    L.risco(c, p, s)
+    assert len(s.pedidos) == n                                                  # 5 h 59 min depois ainda vale
+    relogio.avanca(120)
+    L.risco(c, p, s)
+    assert len(s.pedidos) > n
+
+
+def test_risco_sem_a_data_do_arquivo_nao_ganha_6_h_na_duvida(relogio):
+    relogio.t = _brt(6, 7, 0)
+    s = _cogs(modificado=None)
+    c, p = config(TESTING=True), [("a", 9.9, -49.9)]
+    L.risco(c, p, s)
+    n = len(s.pedidos)
+    relogio.avanca(16 * 60)
+    L.risco(c, p, s)
+    assert len(s.pedidos) > n
+
+
+def test_o_ttl_do_risco_vem_do_t0_e_nao_dos_outros_dias(relogio):
+    # o T0 de ontem e os outros dias de hoje (arquivos publicados em horas diferentes): vale o T0
+    relogio.t = _brt(6, 5, 0)
+    dados = {"arquivos": {0: datetime(2026, 10, 5, 9, 32, tzinfo=timezone.utc), 1: datetime(2026, 10, 6, 9, 32, tzinfo=timezone.utc)}}
+    assert L._ttl_do_risco(dados, relogio.t) == L.TTL_RISCO_DESATUALIZADO_S
+    dados = {"arquivos": {1: datetime(2026, 10, 6, 9, 32, tzinfo=timezone.utc)}}                   # sem o T0: não dá para confirmar
+    assert L._ttl_do_risco(dados, relogio.t) == L.TTL_RISCO_DESATUALIZADO_S
+    assert L._ttl_do_risco({"arquivos": {0: datetime(2026, 10, 6, 9, 32, tzinfo=timezone.utc)}}, relogio.t) == L.TTL_RISCO_S
+
+
+def test_o_ttl_das_outras_fontes_nao_muda(relogio):
+    c = L.Cache(100, relogio=relogio)
+    assert c.ler(Busca("a")).dados == "a"
+    relogio.avanca(99)
+    assert c.ler(Busca("b")).dados == "a"                                       # sem hook de validade, é o TTL do cache
+    relogio.avanca(2)
+    assert c.ler(Busca("c")).dados == "c"
+
+
+def test_hook_de_validade_encurta_a_leitura_de_cada_resultado(relogio):
+    c = L.Cache(1000, relogio=relogio, validade=lambda dados, t: 10 if dados == "curta" else 1000)
+    c.ler(Busca("curta"))
+    relogio.avanca(11)
+    assert c.ler(Busca("nova")).dados == "nova"
+    relogio.avanca(11)
+    assert c.ler(Busca("outra")).dados == "nova"                                # "nova" ganhou o TTL longo
+
+
+# ── a busca interrompida não deixa "lendo a fonte" para sempre ───────────────────────────────────────────────────────
+
+class _Interrompida(BaseException):
+    """Como Ctrl+C ou SystemExit: não é Exception, e `except Exception` não pega."""
+
+
+def test_busca_interrompida_por_baseexception_solta_a_trava_e_a_proxima_busca_roda(relogio):
+    c = cache(relogio)
+
+    def morre():
+        raise _Interrompida()
+    with pytest.raises(_Interrompida):
+        c.ler(morre)
+    r = c.ler(Busca("ok"))
+    assert (r.dados, r.erro) == ("ok", None)                                    # antes: "lendo a fonte" para sempre
+
+
+# ── a falha vai ao log, uma vez por falha ────────────────────────────────────────────────────────────────────────────
+
+def test_falha_da_fonte_vai_ao_log_uma_vez_por_falha_sem_a_mensagem_crua_da_rede(relogio, caplog):
+    c = L.Cache(100, relogio=relogio, nome="INMET")
+    c.ler(Busca("boa"))
+    relogio.avanca(150)
+    fora = Busca(falha=requests.ConnectionError("HTTPSConnectionPool(host='apiprevmet3.inmet.gov.br', port=443): Max retries"))
+    with caplog.at_level(logging.WARNING, logger="nexus.performance.clima.leitura"):
+        c.ler(fora)                                                             # a falha de verdade
+        c.ler(fora)
+        c.ler(fora)                                                             # dentro dos 60 s: nem busca, nem loga
+    avisos = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(avisos) == 1 and fora.n == 1
+    msg = avisos[0].getMessage()
+    assert "INMET" in msg and "sem conexão com o servidor" in msg and "HTTPSConnectionPool" not in msg
+    relogio.avanca(61)
+    with caplog.at_level(logging.WARNING, logger="nexus.performance.clima.leitura"):
+        c.ler(fora)                                                             # outra tentativa que falha: outro aviso
+    assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 2
+
+
+def test_leitura_boa_nao_loga_aviso(relogio, caplog):
+    c = L.Cache(100, relogio=relogio, nome="INMET")
+    with caplog.at_level(logging.DEBUG, logger="nexus.performance.clima.leitura"):
+        c.ler(Busca("boa"))
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
+
+
+def test_as_tres_fontes_tem_nome_no_log(relogio, caplog):
+    s = SessaoArquivos({})                                                       # tudo dá 404
+    with caplog.at_level(logging.WARNING, logger="nexus.performance.clima.leitura"):
+        L.avisos(config(TESTING=True), s)
+        L.focos(config(TESTING=True), s)
+        L.risco(config(TESTING=True), [("a", -5.0, -45.0)], s)
+    mensagens = " | ".join(r.getMessage() for r in caplog.records)
+    assert "INMET" in mensagens and "focos" in mensagens and "risco de fogo" in mensagens and "HTTP 404" in mensagens
+
+
+def test_hoje_e_a_data_de_brasilia_e_nao_a_do_utc(relogio):
+    # 22:00 de 06/10 em Brasília já é 01:00 de 07/10 em UTC. O arquivo de 06:32 de 06/10 (BRT) é o de hoje: 6 h de TTL
+    relogio.t = _brt(6, 22, 0)
+    s = _cogs(modificado="Tue, 06 Oct 2026 09:32:00 GMT")
+    c, p = config(TESTING=True), [("a", 9.9, -49.9)]
+    L.risco(c, p, s)
+    n = len(s.pedidos)
+    relogio.avanca(16 * 60)
+    L.risco(c, p, s)
+    assert len(s.pedidos) == n
+
+
+def test_a_data_do_arquivo_tambem_e_a_de_brasilia(relogio):
+    # arquivo de 22:30 de 05/10 em Brasília = 01:30 de 06/10 em UTC: pela data em UTC pareceria "de hoje" às 05:00 de 06/10
+    relogio.t = _brt(6, 5, 0)
+    s = _cogs(modificado="Tue, 06 Oct 2026 01:30:00 GMT")
+    c, p = config(TESTING=True), [("a", 9.9, -49.9)]
+    L.risco(c, p, s)
+    n = len(s.pedidos)
+    relogio.avanca(16 * 60)
+    L.risco(c, p, s)
+    assert len(s.pedidos) > n
+
+
+def test_falha_dentro_da_janela_de_60_s_nao_loga_de_novo(relogio, caplog):
+    c = L.Cache(100, relogio=relogio, nome="focos")
+    fora = Busca(falha=requests.Timeout("lento"))
+    with caplog.at_level(logging.WARNING, logger="nexus.performance.clima.leitura"):
+        for _ in range(5):
+            c.ler(fora)
+    assert fora.n == 1 and len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
