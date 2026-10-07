@@ -218,7 +218,7 @@ com `int32` no lugar de `double`: os bytes são os mesmos) antes de confiar.
 
 ## Mapa de risco (07/10/2026): o Clima e risco num mapa do Brasil, só leitura
 
-Aba Performance → Mapa de risco (`/t/performance/clima/mapa`, filha da lista; o cabeçalho tem "Ver a lista"). Pedido do Levi
+Aba Performance → Mapa de risco (`/t/performance/clima/mapa`, filha da lista; o cabeçalho tem "Ver a lista", e o da lista tem "Ver no mapa"). Pedido do Levi
 (07/10), como tela à parte: a lista segue sendo a leitura detalhada, o mapa mostra ONDE. **Não é outra conta:**
 lê as MESMAS três fontes pelo MESMO cache (visitar a lista e o mapa não faz pedido a mais à rede) e o nível de cada usina vem da
 mesma regra (`alertas.nivel_da_usina`: Agir agora = vermelho, Atenção = amarelo, Sem alerta = verde).

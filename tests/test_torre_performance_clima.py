@@ -60,6 +60,14 @@ def test_a_tela_responde_com_titulo_pergunta_e_atualiza_sozinha(mundo):
     assert "atualizada às 15:00" in texto(html)
 
 
+def test_a_lista_leva_ao_mapa_de_risco(mundo):
+    """A lista e o mapa são duas visões do mesmo dado (Levi, 06/10/2026: "o mapa será complementar"): a lista leva
+    ao mapa como o mapa já leva de volta à lista."""
+    c, _, _ = mundo
+    html = pagina(c)
+    assert re.search(r'<a class="gc-btn[^"]*" href="/t/performance/clima/mapa">Ver no mapa</a>', html)
+
+
 def test_a_tela_aparece_como_pronta_no_menu(mundo):
     c, _, _ = mundo
     assert 'href="/t/performance/clima" class="com-conteudo"' in pagina(c, "/")

@@ -25,6 +25,8 @@
         <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
       </form>
       {% endif %}
+      {# o mapa é a outra visão do mesmo dado (Levi, 06/10/2026: "o mapa será complementar"); ele leva de volta à lista #}
+      <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_performance.mapa_de_risco') }}">Ver no mapa</a>
       <span class="cl-atualizada">atualizada às {{ v.atualizada }}</span>
     </div>
   </header>
