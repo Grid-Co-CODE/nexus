@@ -105,6 +105,75 @@ nesta pasta.
   - o login pelo OAuth do Fracttal tem a volta configurada para o supervisório; e-mail e senha funcionam normal;
   - gravar ticket precisa do `GRIDCO_SQL_TOKEN`, que vem da variável ou do `%APPDATA%` da máquina.
 
+## Nova solicitação: PCM ou Engenharia (06/10/2026)
+
+O pedido do Levi, de 06/10: em "Nova solicitação" aparecem duas opções. **PCM** continua criando a solicitação do
+Fracttal (`/os/solicitacao`). **Engenharia** é uma tela nova (`/os/solicitacao/engenharia`), no estilo de
+Performance > Geração e ETM > ETM, só que liberada para todos os ativos. As duas telas têm no topo o seletor
+PCM | Engenharia. As duas são do mesmo setor das abas (`/os/solicitacao`), então o seletor troca a tela na mesma
+aba, sem abrir outra.
+
+- **O que a Engenharia cria:** uma OS por ativo marcado. **Não** cria uma solicitação. Segue o molde da OS de análise
+  (`api.create_os_analise`):
+  - tipo de tarefa `Administrativa` e **só a Classificação 1, `Programada`** (pelo nome, via `_classif_ids`), sem
+    plano. Levi, 06/10: "o tipo de tarefa seria administrativa e class1 é programada!". A Classificação 2 fica vazia: a
+    tela vale para qualquer ativo, e "Elétrica" não serve a uma cerca;
+  - **as etiquetas `Remoto` e `ENGENHARIA`, sempre, e só elas** (os nomes como estão no catálogo; o Levi confirmou que
+    a "Remoto" existe). Nem `PERFORMANCE` nem `Dar prioridade` no urgente. Levi, 06/10: "Etiqueta de remoto e
+    engenharia fixas sempre! só essas etiquetas viu, sem performance".
+    - Casam pelo nome **exato** (`solic_eng_web.etiquetas`), sem acento e sem caixa. A busca por trecho do
+      `label_id_por_nome` tomaria a "Religamento Remoto" pela "Remoto".
+    - As etiquetas são conferidas **antes** de criar. Faltando uma no Fracttal, nenhuma OS sai, e a tela diz "Não achei
+      no Fracttal a etiqueta Remoto. Nenhuma OS foi criada.";
+  - título `[Ativo] - Descrição`, montado pelo `perf_os_nome` em cada ativo;
+  - a "Descrição" é a atividade que o solicitante escreve, com o subtexto "Atividade a ser realizada (de forma
+    direta)";
+  - o "Descreva o problema" (obrigatório) vai na observação da OS (`note`).
+
+  O plano ficou de fora porque as telas da Performance dependem do plano do Fracttal, que só inversor, ETM e usina
+  têm.
+- **Bloco 1:** Cliente | Usina, e embaixo Filtrar | Tipo de ativo, cada um da largura do de cima.
+  - O tipo de ativo aceita digitação (`data-busca`).
+  - A sigla do cadastro aparece com o nome, por exemplo NBRK → Nobreak. O mapa é `NOME_TIPO`, em `solic_eng_web.py`,
+    e foi tirado dos rótulos dos próprios ativos: 57 tipos numa usina do catálogo.
+  - Ficaram com a sigla NCU e RSU, dos trackers, porque o cadastro não dá nome a eles. Tipo novo com sigla aparece
+    como veio; para dar nome, é uma linha no `NOME_TIPO`.
+- **Data do evento: editável, com o padrão "agora", como na ETM** (Levi, 06/10: "você sumiu com data do evento, tem
+  que ter data do evento"). Ela vai no `event_date`. O servidor recusa data inválida e evento no futuro (com folga de
+  5 min), porque o evento já aconteceu. A programada **não** conta do evento: conta da criação.
+- **Data programada: 7 dias depois da criação, ou 2 com o "Urgente" (em vermelho), e NÃO se edita** (Levi, 06/10:
+  "data programada não deve ser possível editar!").
+  - A tela só mostra a data: não há campo. A base é a hora do servidor quando a página abriu, e o relógio dela anda a
+    cada 30 s, para a data mostrada continuar sendo a que vai valer.
+  - Quem põe a data é o servidor, na hora de criar (`data_padrao`). Uma `programada` que venha no pedido é ignorada.
+  - A resposta diz a data posta: "… — programada(s) para 13/10/2026 17:51.".
+- **Responsável:** só entre os nomes da Engenharia. Os nomes ficam no `.env` (`OS_WEB_ENGENHARIA_RESPONSAVEIS`,
+  separados por `;`), **nunca no código**, porque o repositório é público.
+  - O nome casa pelo primeiro nome igual e por todos os pedaços dele como palavras inteiras, sem acento: "Ana Teste"
+    casa com "Ana Teste da Silva", e "Bruno" não casa com "Brunoso".
+  - O servidor confere o responsável de novo no criar.
+  - Sem a variável, a tela avisa. Nome sem ninguém no Fracttal aparece como "Não achei no Fracttal: …".
+  - Nome que casar com duas pessoas põe as duas no menu. Aí basta escrever o nome completo no `.env`.
+- **No servidor da T.I.:** o `.env` do OS Creator precisa da linha `OS_WEB_ENGENHARIA_RESPONSAVEIS=...`. Sem ela, a
+  tela abre mas não deixa escolher responsável.
+- **Arquivos:**
+  - `os_web/solic_eng_web.py`: as regras, puras, sem Flask;
+  - `os_web/rotas_solic_eng.py`: a tela, a cascata e o criar;
+  - `templates/solic_eng.html`, `static/solic_eng.js` e `static/solic_eng.css`;
+  - o seletor no `templates/solic.html`;
+  - no `static/os.css`, a linha do topo que quebra no celular. Com o seletor, 375 px cortavam o "Engenharia".
+- **Como provar:** `tests/test_oscreator_solic_engenharia.py` (12 testes, catálogo e pessoas sintéticos, sem rede).
+  Na bancada, com o criar de mentira, foram conferidos:
+  - 353 ativos de uma usina do catálogo;
+  - "nob" no tipo → Nobreak;
+  - a data só exibida, com o Urgente trocando 13/10 por 08/10;
+  - o pedido saindo sem data e a resposta com a data do servidor;
+  - as recusas do servidor (sem ativo, sem nome, sem problema, responsável de fora);
+  - o seletor nas duas telas.
+
+  **Falta a prova ao vivo** pedida no `CLAUDE.md` do OS Creator: uma OS de verdade em `TESTE - PA`, conferida campo a
+  campo no Fracttal e cancelada no fim.
+
 ## Rodar sozinho (sem o Nexus e sem mexer no 5090)
 
 ```

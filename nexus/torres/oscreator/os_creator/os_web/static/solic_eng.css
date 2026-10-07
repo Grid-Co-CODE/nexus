@@ -1,0 +1,14 @@
+/* os_creator/os_web/static/solic_eng.css — a Nova solicitação para a Engenharia (06/10/2026). O resto vem do os.css (o
+   molde da Performance); aqui só o que é desta tela: o Urgente em vermelho, a caixa do problema e a linha marcada. */
+.eng-urgente{display:flex;align-items:center;gap:10px;width:max-content;max-width:100%;padding:8px 12px;border-radius:10px;
+  border:1px solid rgba(245,118,107,.45);background:rgba(245,118,107,.07);color:#f5766b;cursor:pointer}
+.eng-urgente input{accent-color:#f5766b;width:18px;height:18px;margin:0}
+.eng-urgente small{color:#e7a39c}
+#eng.eng-e-urgente .eng-urgente{background:rgba(245,118,107,.18);border-color:#f5766b}
+#eng.eng-e-urgente #dt_prog{border-color:#f5766b!important}
+/* a data programada só se lê (Levi, 06/10: "não deve ser possível editar"): a cara do campo, sem ser campo */
+.eng-data{display:flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;border:1px dashed var(--f-border);
+  background:rgba(255,255,255,.02);color:#cfd6e4;font-size:13px;font-variant-numeric:tabular-nums;cursor:default}
+.eng-prob textarea{min-height:110px;resize:vertical;font-family:inherit}
+#eng .os-tbl tr[data-id]{cursor:pointer}
+#eng .os-tbl tr.sel td{background:rgba(166,226,46,.06)}
