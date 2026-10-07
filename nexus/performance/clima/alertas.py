@@ -112,25 +112,28 @@ class IndiceFocos:
         for f in focos:
             self._celulas[(math.floor(f.lat / celula), math.floor(f.lon / celula))].append(f)
 
-    def perto(self, lat, lon, raio_km=FOCO_KM):
-        """None se não há foco no raio. Senão: quantos (`n`), a distância do mais perto (`km`) com o satélite e a hora (UTC)
-        dele, e a detecção mais recente entre todos os do raio (`ultima`)."""
+    def no_raio(self, lat, lon, raio_km=FOCO_KM):
+        """Os focos a até `raio_km` da coordenada, cada um com a distância: [(km, Foco)], sem ordem; [] se não há. É o que o mapa
+        usa para pôr o anel no foco (e não na usina) e o `perto` resume."""
         graus_lat = raio_km / _KM_POR_GRAU_MINIMO
         graus_lon = raio_km / (_KM_POR_GRAU_MINIMO * max(math.cos(math.radians(lat)), 0.05))
         dl, dc = math.ceil(graus_lat / self.celula), math.ceil(graus_lon / self.celula)
         c0, c1 = math.floor(lat / self.celula), math.floor(lon / self.celula)
-        n, melhor, ultima = 0, None, None
+        achados = []
         for i in range(c0 - dl, c0 + dl + 1):
             for j in range(c1 - dc, c1 + dc + 1):
                 for f in self._celulas.get((i, j), ()):
                     d = geometria.distancia_km(lat, lon, f.lat, f.lon)
                     if d <= raio_km:
-                        n += 1
-                        if melhor is None or d < melhor[0]:
-                            melhor = (d, f)
-                        if ultima is None or f.data > ultima:
-                            ultima = f.data
-        if not n:
+                        achados.append((d, f))
+        return achados
+
+    def perto(self, lat, lon, raio_km=FOCO_KM):
+        """None se não há foco no raio. Senão: quantos (`n`), a distância do mais perto (`km`) com o satélite e a hora (UTC)
+        dele, e a detecção mais recente entre todos os do raio (`ultima`)."""
+        achados = self.no_raio(lat, lon, raio_km)
+        if not achados:
             return None
-        d, f = melhor
-        return {"n": n, "km": d, "satelite": f.satelite, "hora": f.data, "ultima": ultima}
+        d, f = min(achados, key=lambda par: par[0])           # no empate fica o primeiro achado, como antes
+        return {"n": len(achados), "km": d, "satelite": f.satelite, "hora": f.data,
+                "ultima": max(g.data for _, g in achados)}

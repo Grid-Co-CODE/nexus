@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='clima-mapa.css') }}">
+{# Mapa de risco (07/10/2026): o Clima e risco num mapa do Brasil. O SVG é escrito aqui, no servidor, sem JavaScript: as camadas
+   (estados do IBGE, avisos do INMET, focos do INPE, usinas) vêm prontas do `mapa.montar`, de trás para frente. Texto de terceiros
+   (evento do INMET, nome de usina e de cliente) só entra por {{ }} (escapado), nunca por |safe. NÚMERO de latitude ou longitude
+   nunca vira texto: a posição da usina é o cx/cy do ponto, em unidades do viewBox. A tela se recarrega como a da lista (60 s; 10 s
+   enquanto uma fonte é lida pela primeira vez); o que vai à rede é decidido pelo cache de cada fonte, o mesmo da lista. #}
+<meta http-equiv="refresh" content="{{ v.recarrega_em }}">
+<div class="cl mp">
+  <header class="cl-cab">
+    <div>
+      <p class="gc-eyebrow">{{ torre.nome }}</p>
+      <h1 class="cl-titulo">{{ tela.nome }}</h1>
+      <p class="cl-pergunta">{{ tela.pergunta }}</p>
+    </div>
+    <div class="mp-cab-lado">
+      <a class="gc-btn gc-btn--contorno" href="/t/performance/clima">Ver a lista</a>
+      <p class="cl-atualizada">Tela atualizada às {{ v.atualizada }}</p>
+    </div>
+  </header>
+
+  {% if v.erro_cadastro %}
+  <div class="cl-aviso" role="alert">Cadastro indisponível: {{ v.erro_cadastro }}</div>
+  {% elif v.sem_usinas %}
+  <p class="cl-aviso">Nenhuma usina em operação com coordenada no cadastro. Sem coordenada não há onde pôr a usina no mapa.</p>
+  {% else %}
+
+  <nav class="mp-regioes" aria-label="Região do mapa">
+    {% for r in v.regioes %}<a class="mp-regiao" href="{{ url_for('torre_performance.mapa_de_risco', regiao=(None if r.id == 'brasil' else r.id)) }}"{% if r.atual %} aria-current="page"{% endif %}>{{ r.nome }}</a>{% endfor %}
+  </nav>
+  <p class="cl-base">{{ v.n_usinas }} {{ "usina em operação com coordenada" if v.n_usinas == 1 else "usinas em operação com coordenada" }} no cadastro, cada uma na cor do nível de alerta dela. A coordenada não aparece nesta tela.{% if v.fora_do_recorte %} {{ v.fora_do_recorte }} {{ "usina em operação está fora deste recorte" if v.fora_do_recorte == 1 else "usinas em operação estão fora deste recorte" }}: escolha outra região ou o Brasil inteiro.{% endif %}</p>
+  {% if v.faltando %}<p class="cl-nota cl-nota--atencao">O mapa não inclui: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
+  {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. O mapa ainda não inclui essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
+  {% if v.erro_contorno %}<p class="cl-nota cl-nota--atencao" role="alert">{{ v.erro_contorno }}</p>{% endif %}
+
+  {% set av = v.camada_avisos %}
+  {% set fo = v.camada_focos %}
+  <div class="mp-corpo">
+    <figure class="mp-mapa">
+      <svg class="mp-svg mp-svg--{{ 'brasil' if v.regiao == 'brasil' else 'regiao' }}" viewBox="{{ v.viewbox }}" role="group" aria-labelledby="mp-titulo" preserveAspectRatio="xMidYMid meet">
+        <title id="mp-titulo">Mapa de risco: {{ v.regiao_nome }}</title>
+        <g class="mp-ufs">
+          {% for u in v.ufs %}<path class="mp-uf" d="{{ u.d }}"/>
+          {% endfor %}
+        </g>
+        {% if av.estado == "ok" %}
+        <g class="mp-avisos">
+          {% for g in av.grupos %}
+          <g class="mp-av mp-av-{{ g.nivel }}{% if g.futuro %} mp-av--futuro{% endif %}">
+            {% for a in g.itens %}<path fill-rule="evenodd" d="{{ a.d }}"><title>{{ a.titulo }}</title></path>
+            {% endfor %}
+          </g>
+          {% endfor %}
+        </g>
+        {% endif %}
+        <g class="mp-siglas" aria-hidden="true">
+          {% for u in v.ufs if u.x %}<text x="{{ u.x }}" y="{{ u.y }}">{{ u.sigla }}</text>
+          {% endfor %}
+        </g>
+        {% if fo.estado == "ok" %}
+        {% if fo.d %}<path class="mp-focos" d="{{ fo.d }}"/>{% endif %}
+        <g class="mp-aneis">
+          {% for a in fo.aneis %}<circle class="mp-anel" cx="{{ a.x }}" cy="{{ a.y }}" r="{{ a.r }}"/>
+          {% endfor %}
+        </g>
+        {% endif %}
+        <g class="mp-usinas">
+          {% for u in v.usinas %}<a href="{{ u.href }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/><circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
+          {% endfor %}
+        </g>
+      </svg>
+    </figure>
+
+    <aside class="mp-legenda" aria-label="Legenda">
+      <h2 class="mp-leg-h">Usinas{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>
+      <ul class="mp-leg-lista">
+        <li><span class="mp-chave mp-n-agir"></span><div class="mp-leg-txt"><strong>Agir agora</strong> <span class="mp-leg-n">{{ v.contagem.agir }}</span><span class="mp-leg-ajuda">foco a até 5 km, aviso Grande Perigo, ou aviso Perigo de um destes eventos: {{ eventos|join(", ") }}</span></div></li>
+        <li><span class="mp-chave mp-n-atencao"></span><div class="mp-leg-txt"><strong>Atenção</strong> <span class="mp-leg-n">{{ v.contagem.atencao }}</span><span class="mp-leg-ajuda">qualquer outro aviso do INMET, em vigor ou futuro, ou risco de fogo alto ou crítico em algum dos quatro dias</span></div></li>
+        {# Com uma fonte sem leitura ninguém pode ser "Sem alerta": a linha some, e quem seria vira "Sem leitura completa" abaixo. #}
+        {% if not v.sem_leitura_de %}
+        <li><span class="mp-chave mp-n-sem"></span><div class="mp-leg-txt"><strong>{{ v.rotulo_sem }}</strong> <span class="mp-leg-n">{{ v.contagem.sem }}</span><span class="mp-leg-ajuda">nenhum aviso, foco a até 5 km nem risco de fogo alto</span></div></li>
+        {% endif %}
+        {% if v.contagem.nx %}
+        <li><span class="mp-chave mp-n-nx"></span><div class="mp-leg-txt"><strong>Sem leitura completa</strong> <span class="mp-leg-n">{{ v.contagem.nx }}</span><span class="mp-leg-ajuda">sem leitura de {{ v.sem_leitura_de }}, não dá para dizer que não há alerta</span></div></li>
+        {% endif %}
+      </ul>
+
+      {% if av.estado == "ok" %}
+      <h2 class="mp-leg-h">Avisos do INMET</h2>
+      <ul class="mp-leg-lista mp-leg-lista--curta">
+        <li><span class="mp-chave mp-chave--aviso mp-av-1"></span><div class="mp-leg-txt">Perigo Potencial</div></li>
+        <li><span class="mp-chave mp-chave--aviso mp-av-2"></span><div class="mp-leg-txt">Perigo</div></li>
+        <li><span class="mp-chave mp-chave--aviso mp-av-3"></span><div class="mp-leg-txt">Grande Perigo</div></li>
+        <li><span class="mp-chave mp-chave--aviso mp-chave--futuro mp-av-2"></span><div class="mp-leg-txt">Contorno tracejado: o aviso ainda vai começar</div></li>
+      </ul>
+      <p class="mp-leg-nota">{{ av.n_vigor }} em vigor e {{ av.n_futuros }} a começar{% if v.regiao != "brasil" %} neste recorte{% endif %}.{% if av.ignorados %} {{ av.ignorados }} {{ "aviso sem polígono utilizável não aparece" if av.ignorados == 1 else "avisos sem polígono utilizável não aparecem" }} no mapa.{% endif %}{% for q in av.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
+      {% elif av.estado == "lendo" %}
+      <p class="mp-leg-nota mp-leg-nota--atencao"><strong>Avisos do INMET:</strong> lendo agora, a camada aparece quando a leitura terminar.</p>
+      {% else %}
+      <p class="mp-leg-nota mp-leg-nota--fora"><strong>Avisos do INMET:</strong> sem leitura boa, a camada não aparece no mapa.</p>
+      {% endif %}
+
+      {% if fo.estado == "ok" %}
+      <h2 class="mp-leg-h">Focos de queimada (INPE)</h2>
+      <ul class="mp-leg-lista mp-leg-lista--curta">
+        <li><span class="mp-chave mp-chave--foco"></span><div class="mp-leg-txt">Foco detectado na última hora</div></li>
+        <li><span class="mp-chave mp-chave--anel"></span><div class="mp-leg-txt">Foco a até 5 km de uma usina</div></li>
+      </ul>
+      <p class="mp-leg-nota">{{ fo.n }} {{ "foco" if fo.n == 1 else "focos" }} na última hora{% if v.regiao != "brasil" %} neste recorte{% endif %}, {{ fo.n_perto }} a até 5 km de uma usina.{% for q in fo.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
+      {% elif fo.estado == "lendo" %}
+      <p class="mp-leg-nota mp-leg-nota--atencao"><strong>Focos do INPE:</strong> lendo agora, a camada aparece quando a leitura terminar.</p>
+      {% else %}
+      <p class="mp-leg-nota mp-leg-nota--fora"><strong>Focos do INPE:</strong> sem leitura boa, a camada não aparece no mapa.</p>
+      {% endif %}
+
+      <p class="mp-leg-nota">O risco de fogo do INPE não é desenhado: ele entra na cor da usina (Atenção, quando alto ou crítico em algum dos quatro dias).</p>
+    </aside>
+  </div>
+
+  <h2 class="cl-h2">Fontes</h2>
+  <section class="cl-fontes" aria-label="Estado das fontes">
+    {% for f in v.fontes %}
+    <div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if v.sem_coordenada %}
+  <section class="cl-pendencia">
+    <h2 class="cl-h2">Sem coordenada no cadastro ({{ v.sem_coordenada|length }})</h2>
+    <p class="cl-nota">Usinas em operação sem latitude e longitude utilizáveis: não aparecem no mapa até o cadastro ser corrigido. {{ v.sem_coordenada|join(", ") }}.</p>
+  </section>
+  {% endif %}
+  {% if v.fora_do_brasil %}
+  <section class="cl-pendencia">
+    <h2 class="cl-h2">Coordenada fora do Brasil no cadastro ({{ v.fora_do_brasil|length }})</h2>
+    <p class="cl-nota">Provável erro de digitação (zero, sinal ou latitude e longitude trocadas); não aparecem no mapa até a correção. {{ v.fora_do_brasil|join(", ") }}.</p>
+  </section>
+  {% endif %}
+  {% if v.ilegiveis %}<p class="cl-nota">{{ v.ilegiveis }} {{ "ficha do cadastro não abriu" if v.ilegiveis == 1 else "fichas do cadastro não abriram" }} (a chave do cadastro não confere): fora do mapa.</p>{% endif %}
+
+  <footer class="cl-rodape">
+    <p><strong>Dados: IBGE, INMET, INPE (Programa Queimadas).</strong> Somente leitura: esta tela não grava nada.</p>
+    <ul>
+      <li>Estados: IBGE, Malhas territoriais (resolução mínima), guardadas no próprio Nexus. A projeção é equiretangular, com a escala do eixo leste-oeste corrigida pela latitude do recorte.</li>
+      <li>Posição das usinas: cadastro do Nexus, acessível só com login. Os números da coordenada não são mostrados.</li>
+      <li>Avisos: INMET, avisos meteorológicos ativos, cada um com o seu polígono. O contorno tracejado é o aviso que ainda vai começar.</li>
+      <li>Focos: INPE, Programa Queimadas, arquivos de 10 em 10 min da última hora. Um foco é um pixel com fogo detectado, não um incêndio confirmado.</li>
+      <li>Os níveis da usina são os da lista de Clima e risco: a mesma regra, as mesmas três fontes, o mesmo cache.</li>
+    </ul>
+  </footer>
+</div>
+{% endblock %}

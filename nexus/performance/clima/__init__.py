@@ -12,5 +12,6 @@ a ETM de cada usina ficam para a próxima etapa.
     leitura     cache por fonte (TTL, janela de falha, uma busca por vez, última leitura boa); a NASA, um por usina
     irradiacao  a série dos últimos 30 dias, o mês até agora e a geometria do gráfico (puro)
     usinas      usinas em operação e coordenadas, do cadastro
+    mapa        o Mapa de risco: contorno do IBGE, projeção, recorte por região e as camadas do SVG
     visao       o que a tela e a página da usina mostram
 """

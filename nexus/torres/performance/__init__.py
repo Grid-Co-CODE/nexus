@@ -45,6 +45,12 @@ TORRE = Torre(
         Tela("clima", "Clima e risco",
              "Onde há aviso do INMET, foco de queimada ou risco de fogo perto das usinas?",
              "INMET (avisos) e INPE (focos e risco de fogo), cruzados com as coordenadas do cadastro; só leitura"),
+        # O id tem barra de propósito: o endereço é /t/performance/clima/mapa, filho da lista (o placeholder `/<tela_id>` não
+        # casa com barra, e a view própria é a única que responde ali).
+        Tela("clima/mapa", "Mapa de risco",
+             "Onde, no mapa do Brasil, estão as usinas que pedem ação por aviso, foco ou risco de fogo?",
+             "IBGE (contorno dos estados), INMET (avisos) e INPE (focos e risco de fogo), com a posição das usinas do cadastro; "
+             "só leitura"),
     ],
 )
 
@@ -157,3 +163,5 @@ def plataforma(caminho: str):
 # Clima e risco (06/10/2026): alertas públicos por usina. A rota mora em clima_tela.py, importada aqui no fim porque precisa
 # do `bp` e da `TORRE` definidos acima; a regra mora em nexus/performance/clima/.
 from . import clima_tela  # noqa: E402,F401
+# Mapa de risco (07/10/2026): a mesma leitura do Clima e risco, num mapa do Brasil (/t/performance/clima/mapa).
+from . import mapa_tela  # noqa: E402,F401
