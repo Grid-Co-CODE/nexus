@@ -76,24 +76,27 @@ Aba Performance → Clima e risco (`/t/performance/clima`). O Levi trouxe o paco
 repositório) e escolheu (06/10) começar pelos **alertas**: avisos do INMET, focos de queimada do INPE e risco de fogo do
 INPE, todos públicos e de uso livre. A tela cruza isso com as usinas em operação do cadastro e se atualiza sozinha
 (recarrega a cada 60 s; o que vai à rede é decidido pelo cache, não pela recarga). Atribuição no rodapé: "Dados: INMET,
-INPE (Programa Queimadas)."
+INPE (Programa Queimadas)". A **página de cada usina** (`/t/performance/clima/usina/<id>`, 07/10) acrescenta a irradiação
+diária da NASA POWER (ver abaixo); a tela principal nunca chama a NASA.
 
 **A tela (leitura rápida, aprovada pelo Levi em 07/10/2026), na ordem:** cabeçalho (filtro de cliente, "atualizada às HH:MM");
 **faixa de 4 números** (Agir agora, Atenção, Sem alerta, Cobertura); **Agir agora**, um cartão por usina (motivo numa pílula,
 frase principal, prova, contexto); **Por estado**, uma grade de 27 quadrados (esquema, não é mapa; o número é de usinas com
 alerta no estado e a cor, a do pior nível); **Fontes** (de quando é cada dado); **Atenção**, uma matriz usina x aviso x foco x
 os quatro dias do risco de fogo (as 20 primeiras; "Ver todas (N)" é `?todas=1`). A grade de estados e a matriz rolam DENTRO
-da caixa em 375 px, nunca a página.
+da caixa em 375 px, nunca a página. Cada cartão e cada linha levam à página da usina.
 
 | Fonte | O que traz | Cache | Endereço (troca por `NEXUS_CLIMA_*_URL`) |
 |---|---|---|---|
 | INMET avisos | JSON `{hoje, futuro}`; cada aviso com evento, severidade, início, fim e polígono (texto de JSON) | 30 min | `apiprevmet3.inmet.gov.br/avisos/ativos` (não documentado oficialmente) |
 | INPE focos | CSV de 10 em 10 min (`lat,lon,satelite,data`, hora em UTC); vale a última hora = os 6 últimos arquivos | 10 min | `dataserver-coids.inpe.br/queimadas/queimadas/focos/csv/10min/` |
 | INPE risco de fogo | GeoTIFF por dia, `RF.PREV.T0..T3.tif` (hoje e D+1 a D+3), 0 a 1, pixel de ~1 km | 6 h se o T0 é o de hoje (sai ~06:30); **15 min enquanto não é** (pela data do arquivo, em Brasília: lido às 05:00, o arquivo de ontem não fica até as 11:01) | `dataserver-coids.inpe.br/.../riscofogo_meteorologia/previsto/risco_fogo/RF.PREV.T{d}.tif` |
+| NASA POWER (só a página da usina) | JSON `properties.parameter.ALLSKY_SFC_SW_DWN` = {AAAAMMDD: kWh/m²/dia} (GHI), `-999` = não publicado | **12 h por usina** (um cache por usina; uma busca por vez em cada) | `power.larc.nasa.gov/api/temporal/daily/point?...` (`NEXUS_CLIMA_POWER_URL` leva `{lat}`, `{lon}`, `{inicio}`, `{fim}`) |
 
 O código (sem Flask) está em `nexus/performance/clima/`: `geometria` (ponto em polígono e haversine), `geotiff` (leitor do
-COG), `fontes` (os três clientes), `alertas` (as regras), `leitura` (cache por fonte), `usinas` (cadastro), `visao` (o que a
-tela escreve). A rota é `nexus/torres/performance/clima_tela.py`; o CSS, `nexus/static/clima.css`.
+COG), `fontes` (os quatro clientes), `alertas` (as regras e os níveis), `leitura` (cache por fonte; o da NASA, por usina),
+`irradiacao` (a série de 30 dias, o mês até agora e a geometria do gráfico), `usinas` (cadastro), `visao` (o que a tela e a página
+da usina escrevem). As rotas são de `nexus/torres/performance/clima_tela.py`; o CSS, `nexus/static/clima.css`.
 
 **Regras que custaram caro**
 - **O Pillow não abre o GeoTIFF do INPE.** É um COG de 64 bits (BitsPerSample 64, LZW, tiles de 256, 8699 x 8899): o plugin
@@ -143,10 +146,41 @@ tela escreve). A rota é `nexus/torres/performance/clima_tela.py`; o CSS, `nexus
   localizável, caem na última leitura boa com o erro. Depois de uma falha, 60 s sem insistir; uma busca por vez (quem chega
   no meio recebe a última boa, sem esperar a rede); cada falha vai ao log (WARNING `clima: <fonte> fora: <motivo curto>`,
   uma linha por falha, sem dado de usina), e uma busca interrompida (Ctrl+C) solta a trava.
+- **Irradiação diária: NASA POWER (07/10/2026).** Escolhida pela medida contra as ETMs de 40 usinas (maio a setembro/2026, 2.642
+  dias válidos): erro mediano de 7,4% no dia e de 3,9% no mês, 84% dos meses dentro de 10%; melhor que o satélite cru do
+  Open-Meteo (5,7% no mês), grátis, sem chave e de uso livre (citar "NASA LaRC POWER"). A grade é de cerca de 50 km: vale para
+  o total do mês e para achar ETM fora, não para analisar uma hora; revalidar de outubro a março (a medida é de seca).
+  Formato conferido ao vivo: `properties.parameter.ALLSKY_SFC_SW_DWN` com chaves AAAAMMDD, a unidade em
+  `parameters.ALLSKY_SFC_SW_DWN.units` ("kW-hr/m^2/day") e `header.fill_value` -999. **A NASA atrasa uns 5 dias** (em 07/10, o último
+  dia era 02/10) e o que não saiu vem -999, que aqui é `None`, NUNCA zero; também vem um -999 ISOLADO no meio da série (visto em
+  07/09), que é buraco: parte a linha do gráfico e a soma do mês diz quantos dias faltaram. Um fim no futuro ela corta em hoje;
+  data ou latitude inválida volta HTTP 422. Formato diferente (não JSON, sem a série, data fora de AAAAMMDD, valor que não é
+  número, fora de 0 a 15 kWh/m²/dia, unidade que não é kWh/m²/dia, outro valor de preenchimento) é erro explícito, nunca número lido do jeito
+  errado. A coordenada vai no pedido com 2 casas (~1 km: a posição exata da usina não precisa chegar a um servidor de fora) e
+  nunca aparece na página nem no log. Só a página da usina chama (um pedido por usina, 12 h de cache, os 40 dias que terminam
+  hoje), com última leitura boa servida com a hora e 60 s sem insistir depois de falha, como as outras fontes.
+- **A página da usina:** cabeçalho (nome, cliente, UF, nível), os alertas dela (por que agir, avisos com a vigência, foco, risco dos
+  quatro dias), a irradiação (gráfico SVG feito no servidor com a conta do desenho aprovado, mês até agora com "até que dia a
+  NASA publicou" e quantos dias faltaram no meio, tabela dia a dia recolhida) e as fontes com a hora de cada uma. O que a NASA
+  ainda não publicou é uma FAIXA no fim do gráfico, nunca uma queda a zero. Usina que não existe: 404; sem coordenada ou com
+  coordenada fora do Brasil: 200 dizendo o que falta, sem ir a fonte nenhuma. NASA fora ou com formato diferente: a página
+  responde e os alertas seguem.
+- **Comparação com a ETM: próxima etapa (investigado em 07/10/2026, só leitura da API de dados).** O GHI medido da usina EXISTE:
+  a coluna `GHI (kWh/m²)` é a mesma nas abas por usina de `bd_thopen` (108 abas) e `bd_performance` (63), gravada pelo
+  coletor com o GHI integrado no dia da estação (`docs/api-pv-operation.md`: `day_meteo` hoje, `custom_query meteo` nos dias
+  passados), em kWh/m² por dia. A coluna e a unidade são certas (a coluna do IPOA, ao contrário, muda de nome: `IPOA (kWh/m²)`,
+  `... DEF`, `... ETM`). O que NÃO é certo é a **ligação usina do cadastro x aba**: no `bd_performance`, nenhuma das 136 chaves
+  ligadas do de-para (o código com prefixo do cliente, no formato `XXXX-ABC100`) é o nome de uma aba, e o nome da usina na Base UFV
+  só é o de uma aba em 17 de 122; no `bd_thopen`, 79 das 89 chaves ligadas são o nome exato de uma aba e 10 não (o nome com
+  número no de-para e a aba sem ele, ou o contrário), e 5 usinas têm duas chaves. Sem a ligação a tela NÃO compara: um "conferir a
+  ETM" na usina errada seria pior do que nenhum. Para fechar: guardar no de-para (ou numa decisão da tela Ligações) a aba do GHI
+  de cada usina; o resto é barato (a coluna, a unidade e o limite de 10% já estão decididos). Dado a ter em conta: o dia de hoje
+  é parcial, e a leitura vazia, zero ou acima de 12 kWh/m² não vale.
 - **Hoje, D+1, D+2 e D+3 pela data do calendário:** a data do arquivo (Last-Modified, em Brasília) mais k. Com o arquivo de
   ontem (lido antes das ~06:30), o T0 é "Ontem" e o T1 é "Hoje": chamar de "Hoje" a previsão de ontem seria mentir sobre o dia.
 - **Usinas e coordenadas** vêm do cadastro (`nexus/cadastro/`): em operação, latitude e longitude cifradas e abertas só no
-  processo do Nexus. A coordenada **nunca** vai à tela, ao log nem ao `repr` da usina. Usina em operação sem coordenada
+  processo do Nexus. A coordenada **nunca** vai à tela, ao log nem ao `repr` da usina (a única saída dela é o pedido à NASA, com 2
+  casas). Usina em operação sem coordenada
   utilizável, ou com coordenada fora do Brasil (0 e 0, sinal ou latitude e longitude trocadas), aparece numa linha própria:
   nunca some. O risco de fogo é lido para TODAS as usinas com coordenada (o cache vale pelo conjunto de pontos); o filtro
   por cliente é só da tela.
@@ -160,21 +194,24 @@ tela escreve). A rota é `nexus/torres/performance/clima_tela.py`; o CSS, `nexus
   pixel com fogo detectado, não um incêndio confirmado.
 - **Nenhum teste vai à rede:** `leitura.usar_sessao` e `leitura.usar_relogio` injetam a sessão falsa e o relógio; com
   `TESTING` e sem sessão injetada a fonte diz "sem fonte nos testes". O COG dos testes é montado no próprio teste
-  (`tests/clima_cog.py`: contêiner à mão, LZW comprimido pelo Pillow), sem binário no repositório. Teste sem
-  `NEXUS_ARMAZEM_LOCAL` se recusa a abrir o cadastro de verdade.
+  (`tests/clima_cog.py`: contêiner à mão, LZW comprimido pelo Pillow), sem binário no repositório; a NASA é
+  `tests/clima_power.py` (a série inventada, no formato real medido) e a tela e a página da usina dividem o mundo inventado de
+  `tests/clima_mundo.py`. Teste sem `NEXUS_ARMAZEM_LOCAL` se recusa a abrir o cadastro de verdade.
 
 **Fase 1 só lê, e nada é gravado no banco.** Histórico de aviso, foco ou risco seria fato novo da governança de dados
 (`nexus/dados/CLAUDE.md`: entra primeiro no catálogo, com grão e dimensões): é outra fase.
 
-**Fase 2 (fora desta entrega) e por quê:** previsão de vento, chuva e convecção, os testes T1 a T5 de confiabilidade do POA
-e do GHI e a substituição de ETM do `gridco_meteo` dependem do Open-Meteo, cuja API grátis é só para uso não comercial.
-Antes de ligar isso, decidir a licença: plano pago, ou servidor interno do Open-Meteo (ERA5 e previsão, uso comercial livre)
-mais o CAMS/SoDa para a radiação de satélite. Cada troca de fonte pede recalibrar os parâmetros.
+**Fase 2 (fora desta entrega) e por quê:** a irradiação DIÁRIA por usina entrou em 07/10 pela NASA POWER (grátis, sem licença
+a decidir); continuam fora a previsão de vento, chuva e convecção, os testes T1 a T5 de confiabilidade do POA e do GHI e a
+substituição de ETM do `gridco_meteo`, que dependem do Open-Meteo, cuja API grátis é só para uso não comercial. Antes de ligar
+isso, decidir a licença: plano pago, ou servidor interno do Open-Meteo (ERA5 e previsão, uso comercial livre) mais o CAMS/SoDa
+para a radiação de satélite. Cada troca de fonte pede recalibrar os parâmetros. A comparação com a ETM de cada usina também é
+próxima etapa (ver "Comparação com a ETM", acima).
 
-**Servidor da T.I.:** precisa de saída para `apiprevmet3.inmet.gov.br` e `dataserver-coids.inpe.br` (`DEPLOY.md`, seções 0 e
-7c); sem elas a tela abre e mostra as fontes como "fora agora".
+**Servidor da T.I.:** precisa de saída para `apiprevmet3.inmet.gov.br`, `dataserver-coids.inpe.br` e `power.larc.nasa.gov`
+(`DEPLOY.md`, seções 0 e 7c); sem elas a tela abre e mostra as fontes como "fora agora".
 
-Como provar: `python -m pytest -q tests/test_clima_*.py tests/test_torre_performance_clima.py`. Ao vivo (06/10/2026, 40
+Como provar: `python -m pytest -q tests/test_clima_*.py tests/test_torre_performance_clima*.py`. Ao vivo (06/10/2026, 40
 coordenadas de referência, só leitura): 25 usinas dentro de algum aviso, 1 com foco a 1,9 km, 18 com risco alto ou crítico;
 1,6 s e 0,7 MB por dia de risco. Mudou o leitor do GeoTIFF? Confira as tiles contra o Pillow (monte um mini-TIFF de uma faixa
 com `int32` no lugar de `double`: os bytes são os mesmos) antes de confiar.
