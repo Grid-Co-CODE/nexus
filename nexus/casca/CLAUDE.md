@@ -10,6 +10,7 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira 
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início), `/cadeira` (troca), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu) |
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` e o portão (`before_request`) |
+| `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/cadeiras.py` | as 10 cadeiras; diretoria e chefia caem na torre Comando |
 | `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular |
 | `nexus/static/nexus.css` | tokens do Design System Grid Co. e o subconjunto `gc-*` |
@@ -20,6 +21,13 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira 
 - **Rota pública é decisão consciente:** só o que está em `ROTAS_PUBLICAS` (entrar, saude, static). O teste
   `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
 - **Limite de senha:** 5 erros em 15 min por IP, guardado em `app.extensions` (estado global vazava entre testes).
+- **Login pelo Fracttal** (Levi, 06/10/2026: "Ao invés de uma senha difícil, no início faça a pessoa logar com
+  fractall"): e-mail e senha do Fracttal (a senha vai transformada ao Fracttal e não é guardada; só a conta da Grid Co.
+  entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (path /os, 12 h), assinado com a
+  chave do clone, e `/sair` apaga os dois. Sessão do Nexus: `logado`, `usuario` {email, nome, perfil} (o nome aparece
+  no topo), `admin` (só se o e-mail estiver em `NEXUS_ADMINS`) e `supervisor_padrao` (o filtro do Campo · App). A
+  senha de admin segue em "Entrar com a senha de administrador" (`/entrar?admin=1`) e é a porta do Cadastro. Quem
+  tem conta no Fracttal entra, técnico inclusive: restringir por perfil, se o Levi pedir, é aqui.
   Em produção o IP vem do `X-Forwarded-For` do proxy, por isso o `trusted_proxy` do `servir.py`.
 - **`next_seguro`:** o `?next=` só aceita caminho interno; nada de `//site` nem URL completa.
 - **`[hidden]{display:none!important}`** no CSS: um `display:flex` vencia o `hidden` e o filtro "não filtrava" (01/10).

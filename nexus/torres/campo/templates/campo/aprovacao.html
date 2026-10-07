@@ -39,7 +39,7 @@
       <option value="">todas as equipes</option>{% for e in equipes %}<option value="{{ e }}"{% if e == equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
     </select>
     <select class="gc-campo" name="supervisor" aria-label="Supervisor" onchange="this.form.submit()">
-      <option value="">todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
+      <option value="*"{% if not supervisor %} selected{% endif %}>todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>{% endif %}
     {% for x in ('vista', 'balde', 'idade', 'q') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>

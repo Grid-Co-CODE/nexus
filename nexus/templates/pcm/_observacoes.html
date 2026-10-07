@@ -17,7 +17,7 @@
       </p>
     </div>
     <div class="obs-topo-acoes">
-      {% if tem_anterior and not observacoes.strip() %}
+      {% if tem_anterior and (herdada_de or not observacoes.strip()) %}
       <form method="post" action="/t/pcm/gerar/observacoes/copiar">
         <input type="hidden" name="semana" value="{{ semana_sugerida }}">
         <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-copy"></i> Copiar da {{ semana_anterior }}</button>
@@ -25,6 +25,11 @@
       {% endif %}
     </div>
   </header>
+  {% if herdada_de %}
+  <div class="pcm-aviso pcm-aviso--ok obs-herdada"><i class="ph ph-arrow-bend-down-right"></i><div><strong>Dias por usina
+    herdados da {{ herdada_de }}</strong>, a última semana salva. A geração já usa estes mesmos dias; salve para fixar
+    nesta semana. OS fora e OS com dia fixo não passam de uma semana para a outra.</div></div>
+  {% endif %}
 
   <form id="obs-form" method="post" action="/t/pcm/gerar/observacoes">
     <input type="hidden" name="semana" value="{{ semana_sugerida }}">
@@ -60,23 +65,35 @@
         <span class="gc-ajuda obs-abrir">abrir a lista</span>
         <span class="gc-ajuda obs-fechar">recolher</span>
       </summary>
+      {# Só as usinas MARCADAS (com dia restrito) aparecem (05/10/2026, Levi: "quero que apareça só o que está marcado, o
+         que não estiver só vai aparecer por um botão adicionar"). As outras continuam na página, escondidas: o
+         "Adicionar usina" mostra a escolhida, que entra com os cinco dias e fica à vista até a página recarregar. #}
       <div class="obs-filtro">
-        <input class="obs-campo obs-busca" id="obs-busca" type="search" placeholder="Buscar usina" autocomplete="off">
-        <label class="obs-so"><input type="checkbox" id="obs-so-restritas"> Só com dia restrito</label>
-        <span class="obs-legenda" aria-hidden="true"><span><i class="obs-amostra obs-amostra--sim">S</i> atende (sem regra)</span>
-          <span><i class="obs-amostra obs-amostra--regra">S</i> dia escolhido</span>
+        <input class="obs-campo obs-busca" id="obs-busca" type="search" placeholder="Buscar nas marcadas" autocomplete="off">
+        <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" id="obs-add-usina-btn" aria-expanded="false"
+                aria-controls="obs-add-usina"><i class="ph ph-plus"></i> Adicionar usina</button>
+        <span class="obs-legenda" aria-hidden="true"><span><i class="obs-amostra obs-amostra--regra">S</i> atende</span>
           <span><i class="obs-amostra obs-amostra--nao">S</i> não atende</span></span>
       </div>
+      <div class="obs-add" id="obs-add-usina" hidden>
+        <input class="obs-campo obs-busca" id="obs-add-busca" type="search" placeholder="Buscar usina para restringir os dias" autocomplete="off">
+        <div class="obs-add-lista" id="obs-add-lista"></div>
+        <p class="gc-ajuda">A usina entra com os cinco dias marcados: desmarque os dias em que ela não pode ser atendida.</p>
+      </div>
+      <p class="gc-ajuda obs-vazio" id="obs-vazio"{% if usinas_restritas %} hidden{% endif %}>Nenhuma usina com dia restrito.
+        Use "Adicionar usina" para restringir os dias de uma.</p>
       <div class="obs-usinas obs-usinas--fracttal" id="obs-usinas">
         {% for u in usinas %}
-        <div class="obs-usina obs-ufr{{ ' obs-restrita' if u.dias|length < dias|length }}" data-cliente="{{ u.cliente }}" data-busca="{{ (u.nome ~ ' ' ~ u.fracttal)|lower }}"
+        <div class="obs-usina obs-ufr{{ ' obs-restrita' if u.dias|length < dias|length }}"{{ ' hidden' if u.dias|length == dias|length }} data-uid="{{ loop.index0 }}"
+             data-cliente="{{ u.cliente }}" data-nome="{{ u.nome }}" data-uf="{{ u.uf }}" data-busca="{{ (u.nome ~ ' ' ~ u.fracttal)|lower }}"
              data-regra="{{ u.regra if u.regra is not none else '' }}" data-nome-regra="{{ u.nome_regra }}" title="{{ u.fracttal }}">
           <span class="obs-nome">{{ u.nome }}<small class="obs-uf">{{ u.uf }}</small>{% if u.divide %}<small class="obs-divide" title="A mesma regra vale para: {{ u.divide|join(', ') }}">+{{ u.divide|length }}</small>{% endif %}</span>
           <span class="obs-dias">{{ dias_botoes(u.dias) }}</span>
         </div>
         {% endfor %}
       </div>
-      <p class="gc-ajuda">Lista do Fracttal de {{ fracttal_em }}. Segunda a sexta ligados quer dizer sem regra: o motor atende em qualquer dia.</p>
+      <p class="gc-ajuda">Aparecem só as usinas com dia restrito: as outras o motor atende em qualquer dia e entram pelo
+        "Adicionar usina". Lista do Fracttal de {{ fracttal_em }}.</p>
       {% if sem_usina %}
       <div class="obs-bloco-cab"><span class="gc-rotulo">Regras que não casam com nenhuma usina do Fracttal</span>
         <span class="gc-ajuda">o motor não aplica a nenhuma usina</span></div>
@@ -273,6 +290,7 @@
     });
   }
   function clicarUsina(card, botao) {
+    card.dataset.mostrar = "1";   // mexeu: fica à vista mesmo se voltar aos cinco dias, até recarregar
     var atuais = DIAS.filter(function (d) { return card.querySelector('.obs-dia[data-dia="' + d + '"][aria-pressed="true"]'); });
     var dia = botao.dataset.dia;
     var novos = atuais.indexOf(dia) >= 0 ? atuais.filter(function (d) { return d !== dia; }) : DIAS.filter(function (d) { return d === dia || atuais.indexOf(d) >= 0; });
@@ -317,15 +335,51 @@
       if (fn(v) !== false) input.value = "";
     });
   }
-  // filtro por cliente, busca e "só com dia restrito"
+  // filtro por cliente e busca; na lista, só as usinas marcadas (com dia restrito) e as que o "Adicionar" trouxe
   var cliente = "";
+  function naLista(c) { return c.classList.contains("obs-restrita") || c.dataset.mostrar === "1"; }
   function filtrar() {
-    var q = (document.getElementById("obs-busca") || {}).value || "", so = (document.getElementById("obs-so-restritas") || {}).checked;
-    q = q.trim().toLowerCase();
+    var q = ((document.getElementById("obs-busca") || {}).value || "").trim().toLowerCase(), n = 0;
     form.querySelectorAll(".obs-ufr").forEach(function (c) {
-      c.hidden = !((!cliente || c.dataset.cliente === cliente) && (!q || c.dataset.busca.indexOf(q) >= 0) && (!so || c.classList.contains("obs-restrita")));
+      var ver = naLista(c) && (!cliente || c.dataset.cliente === cliente) && (!q || c.dataset.busca.indexOf(q) >= 0);
+      c.hidden = !ver; if (ver) n++;
     });
+    var vazio = document.getElementById("obs-vazio"); if (vazio) vazio.hidden = n > 0;
+    candidatos();
   }
+  // "Adicionar usina": as que não estão na lista, com o mesmo filtro de cliente; a escolhida entra com os cinco dias
+  var addBox = document.getElementById("obs-add-usina"), addBusca = document.getElementById("obs-add-busca"),
+      addLista = document.getElementById("obs-add-lista"), addBtn = document.getElementById("obs-add-usina-btn");
+  function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
+  function candidatos() {
+    if (!addBox || addBox.hidden) return;
+    var q = (addBusca.value || "").trim().toLowerCase(), h = [], n = 0;
+    form.querySelectorAll(".obs-ufr").forEach(function (c) {
+      if (naLista(c) || (cliente && c.dataset.cliente !== cliente) || (q && c.dataset.busca.indexOf(q) < 0)) return;
+      if (++n > 80) return;
+      h.push('<button type="button" class="obs-add-item" data-uid="' + esc(c.dataset.uid) + '">' + esc(c.dataset.nome) +
+             ' <small>' + esc(c.dataset.uf) + ' · ' + esc(c.dataset.cliente) + '</small></button>');
+    });
+    addLista.innerHTML = h.length ? h.join("") + (n > 80 ? '<span class="gc-ajuda">e mais ' + (n - 80) + ': refine a busca</span>' : "")
+                                  : '<span class="gc-ajuda">Nenhuma usina para adicionar com esse filtro.</span>';
+  }
+  if (addBtn) addBtn.addEventListener("click", function () {
+    addBox.hidden = !addBox.hidden;
+    addBtn.setAttribute("aria-expanded", addBox.hidden ? "false" : "true");
+    if (!addBox.hidden) { candidatos(); addBusca.focus(); }
+  });
+  if (addBusca) {
+    addBusca.addEventListener("input", candidatos);
+    addBusca.addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); });
+  }
+  if (addLista) addLista.addEventListener("click", function (e) {
+    var b = e.target.closest(".obs-add-item"); if (!b) return;
+    var c = form.querySelector('.obs-ufr[data-uid="' + b.dataset.uid + '"]'); if (!c) return;
+    c.dataset.mostrar = "1"; c.classList.add("obs-recem");
+    filtrar();
+    c.scrollIntoView({block: "nearest"});
+    var d = c.querySelector(".obs-dia"); if (d) d.focus();
+  });
   form.querySelectorAll(".obs-cli").forEach(function (b) {
     b.addEventListener("click", function () {
       // clicar de novo no cliente que já está filtrado volta para Todos
@@ -338,7 +392,7 @@
   });
   var busca = document.getElementById("obs-busca");
   if (busca) { busca.addEventListener("input", filtrar); busca.addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); }); }
-  var so = document.getElementById("obs-so-restritas"); if (so) so.addEventListener("change", filtrar);
+  filtrar();
 
   if (document.getElementById("obs-nova-usina")) aoEnter(document.getElementById("obs-nova-usina"), function (nome) {
     var el = document.getElementById("obs-tpl-usina").content.firstElementChild.cloneNode(true);

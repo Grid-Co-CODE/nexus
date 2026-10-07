@@ -133,6 +133,19 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     distribuição por nível; vala, sombreamento e sensores sujos. Medido em 05/10 (30 dias): 96 de 128 usinas com
     leitura, 382 de 417 rondas com OS lidas; sujidade média 2,5 (21 usinas em 4 ou 5), vegetação 2,4 (16), vala suja
     ou parcial em 47. O caminho limpo é o App mandar essas colunas no livro de rondas (mudança no App).
+- **Cache quente** (Levi, 06/10: "O carregamento das abas está sendo muito lento... O certo seria carregar e ficar
+  carregado no cache!"; `visao._ler`, `manter_quente`): medido em 06/10, frias, Central 4,6 s, Rondas 3,0 s, Ranking
+  3,1 s (13, 7 e 8 leituras do banco); quentes, < 0,05 s. Agora: ao subir, as contas principais são feitas (3,8 s,
+  por trás); a cópia vencida (5 min) volta na hora e se refaz em segundo plano; a cada minuto, o que alguém usou nas
+  últimas 2 h é refeito antes de vencer; o mesmo livro do banco é lido uma vez por ciclo (2 min). Medido: abas em
+  0,01 a 0,13 s, também com as cópias vencidas. Só lê o banco do Nexus (nada de Fracttal). Desliga com
+  `NEXUS_CAMPO_AQUECER=0`, como o aquecimento da Aprovação.
+- **O supervisor que entra já vem filtrado** (Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para
+  a pessoa automaticamente, mas ela pode mudar o filtro se quiser"): no login pelo Fracttal (`nexus/auth/fracttal.py`),
+  `visao.supervisor_da_pessoa` acha a pessoa no cadastro (pelo e-mail da ficha; sem ele, pelo nome completo, curto ou
+  o do e-mail, só quando é de UMA pessoa) e, se ela é supervisor, guarda `supervisor_padrao` na sessão. Central, PT,
+  Rondas e Aprovação usam `_supervisor()`: sem filtro na URL, o dela; "Todos" vai como `supervisor=*`. Medido em
+  06/10: nenhum dos supervisores tem e-mail no cadastro, e os 7 são reconhecidos pelo nome.
 - **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão; parada = mais de 2 h.
 - **"Esperando o De acordo" é a MESMA tela da Central > Permissões de trabalho** (Levi, 05/10): as duas incluem
   `templates/campo/_pt_esperando.html` (cartões compactos por equipe; tabela com a OS em verde, Equipamento, Espera no fim

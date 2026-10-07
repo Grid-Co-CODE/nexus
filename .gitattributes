@@ -1,0 +1,2 @@
+# Script do servidor (Linux) sai sempre com fim de linha LF: com CRLF, vindo de um clone do Windows, o bash quebra.
+*.sh text eol=lf

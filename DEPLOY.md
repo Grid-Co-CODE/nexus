@@ -97,7 +97,9 @@ o servidor inteiro como uma só.
 ## 6. Conferir depois de subir
 
 1. `https://nexus.gridco.com.br/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
-2. Entrar com a senha de admin (a `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem).
+2. Entrar com o login do Fracttal (e-mail e senha de quem vai usar; desde 06/10/2026). A senha de admin (a
+   `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem) segue em "Entrar com a senha de administrador" e é ela que abre o
+   Cadastro, além dos e-mails em `NEXUS_ADMINS` (opcional, separados por vírgula).
 3. **Base → Registro mestre** abre a lista de usinas: a chave da cifra está certa.
 4. **PCM → Gerar a semana**: a lista de conferência diz "pronto" (motor, credencial do Fracttal, cadastro e insumos).
    A "Pasta do PCM" e as durações aprendidas aparecem como opcionais ausentes: é o esperado no servidor.
@@ -154,11 +156,27 @@ cadastro no servidor (`dados/cadastro_ensaio.json`). Os endereços têm padrão 
 
 ## 8. Atualizar
 
+Um comando, no servidor (desde 06/10/2026):
+
 ```
-cd /opt/nexus && sudo -u nexus git pull && sudo systemctl restart nexus
+sudo /opt/nexus/deploy/atualizar.sh
 ```
 
-O git não toca nos `.env` nem na `dados/`.
+Ele puxa do GitHub (`git pull --ff-only`, como o dono do clone), instala as dependências só quando o `requirements.txt`
+mudou, reinicia o serviço e confere no `/saude` que o commit novo está no ar. Sem commit novo, não reinicia; com
+`--forcar`, reinicia assim mesmo. Qualquer erro (por exemplo, arquivo mexido à mão no servidor) para tudo antes do
+restart, e o Nexus segue no ar com o código de antes. **O restart é obrigatório:** o Nexus não relê as telas com o
+processo rodando. Em 06/10, o servidor ficou com a tela antiga do PCM depois de só um `git pull`.
+
+**Na primeira vez** o clone do servidor ainda não tem o script. Puxe uma vez à mão e rode-o:
+
+```
+sudo -u nexus git -C /opt/nexus pull --ff-only && sudo bash /opt/nexus/deploy/atualizar.sh --forcar
+```
+
+O git não toca nos `.env` nem na `dados/`. Em 06/10 entrou o `pillow` no `requirements.txt` (miniaturas das fotos da
+ronda; sem ele as fotos aparecem do mesmo jeito, só mais pesadas): o script instala sozinho. Para atualizar a cada push
+sem ninguém rodar nada, chame o mesmo script num timer do systemd.
 
 **Depois da 1ª subida, a `dados/` do servidor é a original**: o que se edita no Nexus (cadastro, decisões do de-para,
 observações e gerações do PCM) mora lá. Se o Levi mandar um pacote novo, descompacte **só os `.env`**, a menos que ele
@@ -178,7 +196,8 @@ dado cifrado do cadastro (CPF, telefone, endereço, receita) não volta.**
 - **"Importar da pasta do PCM"**: a pasta é o OneDrive do PCM. Os insumos já moram no Nexus
   (`dados/pcm/insumos.json`) e a AUXILIAR sai do cadastro, então gerar a semana não depende mais da pasta. Só as
   durações aprendidas (opcionais, em sombra) ficam de fora.
-- **Login:** é por senha de admin. O login Microsoft ainda não está ligado.
+- **Login:** é pelo Fracttal (o mesmo do OS Creator: entra quem tem conta da Grid Co. no Fracttal; um login abre o
+  Nexus e o OS Creator). A senha de admin ficou como reserva. O login Microsoft não está ligado.
 
 - **Base → Ligações:** o pacote já traz o de-para calculado. O Fracttal entra pela foto da última semana gerada no
   Nexus (`dados/pcm/geracoes/*/`): só use "Ler as bases de novo" depois da 1ª geração no servidor. Antes dela, o

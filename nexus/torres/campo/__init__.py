@@ -57,6 +57,19 @@ bp = TORRE.criar_blueprint(__name__)
 bp.record_once(lambda estado: estado.app.register_blueprint(bp_assinatura))
 
 
+TODOS = "*"
+
+
+def _supervisor() -> str:
+    """O filtro de supervisor: o que a pessoa escolheu; sem escolha, o dela, se ela entrou pelo Fracttal e é
+    supervisor no cadastro (Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para a pessoa
+    automaticamente, mas ela pode mudar o filtro se quiser"). "Todos" é uma escolha também: vai como "*"."""
+    v = request.args.get("supervisor")
+    if v is None:
+        return session.get("supervisor_padrao", "")
+    return "" if v == TODOS else v
+
+
 def _url(**mudar) -> str:
     """O endereço desta tela com os filtros de agora, trocando só o que se pede (None tira o filtro)."""
     args = {k: v for k, v in request.args.items() if v}
@@ -128,7 +141,7 @@ def atencao():
     ids = [v[0] for v in VISTAS]
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
     f, regiao, equipe = request.args.get("f", ""), request.args.get("regiao", ""), request.args.get("equipe", "")
-    supervisor = request.args.get("supervisor", "")
+    supervisor = _supervisor()
     modo = "tabela" if request.args.get("modo") == "tabela" or equipe else "equipes"
     q = request.args.get("q", "").strip().lower()
     campos = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
@@ -172,7 +185,7 @@ def pt():
     leitura = visao.pts()
     d = leitura.dados
     aba = "historico" if request.args.get("aba") == "historico" else "esperando"
-    supervisor, equipe = request.args.get("supervisor", ""), request.args.get("equipe", "")
+    supervisor, equipe = _supervisor(), request.args.get("equipe", "")
     sit, q = request.args.get("sit", ""), request.args.get("q", "").strip().lower()
     modo = "tabela" if request.args.get("modo") == "tabela" or equipe or aba == "historico" else "equipes"
     dias = _dias((7, 30, 90), 30)
@@ -276,7 +289,7 @@ def rondas():
     dias = _dias((7, 14, 30), 30)
     leitura = visao.rondas()
     d = leitura.dados
-    regiao, supervisor = request.args.get("regiao", ""), request.args.get("supervisor", "")
+    regiao, supervisor = request.args.get("regiao", ""), _supervisor()
     # cliente pelo cadastro (Levi, 05/10: "filtro por cliente e a cobertura das rondas das UFVs do cliente. Essas usinas
     # tem que bater com as mesmas do registro mestre"): filtra as rondas E a base da cobertura
     cliente, cluster = request.args.get("cliente", ""), request.args.get("cluster", "")
@@ -499,7 +512,7 @@ def aprovacao():
     inteira pela `_fila_supervisao`); a equipe e o supervisor vêm do cadastro do Nexus, pela usina do Fracttal (de-para
     "Fracttal · Classificação 1"). Três visões: por supervisor (quem acumula), por técnico e a fila. Os indicadores e a
     barra da idade filtram a fila."""
-    equipe, supervisor = request.args.get("equipe", ""), request.args.get("supervisor", "")
+    equipe, supervisor = request.args.get("equipe", ""), _supervisor()
     dias = _dias((7, 30, 60, 90), 30)
     mapa = visao.usinas_do_fracttal()
     opcoes = mapa.dados or {}

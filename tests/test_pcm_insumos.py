@@ -173,6 +173,17 @@ def test_observacoes_sao_por_semana_e_editaveis(pcm):
     assert (rod / "Observacoes_Semana.txt").read_text(encoding="utf-8") == ""
 
 
+def test_semana_sem_observacao_entrega_ao_motor_os_dias_herdados(pcm):
+    """O padrão da tela é a última programação (05/10/2026): o motor tem de receber os MESMOS dias que a tela mostra."""
+    origem, trab, rod = pcm
+    I.importar(trab, origem, "2026-W41")
+    I.salvar_observacoes(trab, "2026-W41", "@usina Marabá 1 = seg, qua\n13480; não\n")
+    carimbos = I.materializar(trab, rod, "2026-W42")
+    assert (rod / "Observacoes_Semana.txt").read_text(encoding="utf-8") == "@usina Marabá 1 = seg, qua\n"
+    obs = [c for c in carimbos if c["nome"] == I.NOMES["observacoes"]][0]
+    assert "herdad" in obs["detalhe"] and "2026-W41" in obs["detalhe"]
+
+
 def test_sem_importar_nao_gera(pcm):
     _origem, trab, rod = pcm
     with pytest.raises(I.InsumoErro) as erro:

@@ -28,6 +28,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN",
              # camada de dados (05/10/2026): a carga de hora em hora liga onde há o token de escrita; "0" desliga
              "NEXUS_CARGA_DADOS",
+             # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
+             "NEXUS_ADMINS",
              # Performance -> Clima e risco (06/10/2026): endereços das fontes públicas (INMET, focos e risco de fogo do INPE);
              # vazios valem os padrões de nexus/performance/clima/fontes.py. O do risco leva {d} (o dia, de 0 a 3).
              "NEXUS_CLIMA_INMET_URL", "NEXUS_CLIMA_FOCOS_URL", "NEXUS_CLIMA_RISCO_URL")

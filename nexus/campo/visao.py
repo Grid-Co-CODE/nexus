@@ -55,17 +55,87 @@ _CACHE: dict = {}
 TTL_S = 300
 
 
-def _ler(chave, calcular) -> leitura.Leitura:
-    """Cópia de 5 min; leitura com erro não fica guardada e a tela diz qual fonte falhou."""
-    g = _CACHE.get(chave)
-    if g and time.time() - g.lido_em < TTL_S:
-        return g
+_CALCULOS: dict = {}         # chave -> a conta que a gerou (para renovar sem ninguém pedir)
+_USADO: dict = {}            # chave -> quando a tela pediu pela última vez
+_RENOVANDO: set = set()
+_LIVROS: dict = {}           # (livro, aba) -> (quando, linhas): as contas de um mesmo ciclo leem o banco uma vez
+LIVRO_S = 120
+USO_S = 2 * 3600             # conta que ninguém abriu em 2 h para de ser renovada (volta na próxima visita)
+_TRAVA = __import__("threading").Lock()
+
+
+def _calcular(chave, calcular) -> leitura.Leitura:
     try:
         r = leitura.Leitura(calcular(), time.time())
     except Exception as e:      # noqa: BLE001 — banco fora do ar: a tela avisa
         return leitura.Leitura({}, time.time(), f"Não consegui ler o banco do Nexus ({type(e).__name__})")
     _CACHE[chave] = r
     return r
+
+
+def _renovar(chave, app=None):
+    """Refaz uma conta em segundo plano (uma por vez por chave); a tela segue com a cópia anterior até lá."""
+    with _TRAVA:
+        if chave in _RENOVANDO or chave not in _CALCULOS:
+            return
+        _RENOVANDO.add(chave)
+    app = app or current_app._get_current_object()
+
+    def rodar():
+        try:
+            with app.app_context():
+                velha = _CACHE.get(chave)
+                nova = _calcular(chave, _CALCULOS[chave])
+                if nova.erro and velha:      # banco fora: fica a cópia boa, que a tela já mostra com a hora dela
+                    _CACHE[chave] = velha
+        finally:
+            with _TRAVA:
+                _RENOVANDO.discard(chave)
+    if app.config.get("TESTING"):
+        rodar()
+    else:
+        __import__("threading").Thread(target=rodar, daemon=True, name="nexus-campo-renovar").start()
+
+
+def _ler(chave, calcular) -> leitura.Leitura:
+    """As contas das telas ficam prontas na memória (Levi, 06/10: "O certo seria carregar e ficar carregado no
+    cache!"). Medido em 06/10: frias, Central 4,6 s, Rondas 3,0 s e Ranking 3,1 s (13, 7 e 8 leituras do banco);
+    quentes, menos de 0,05 s. A cópia vencida (5 min) volta NA HORA e a conta se refaz em segundo plano; `manter_quente`
+    refaz as contas usadas antes de vencerem e aquece as principais ao subir. Só a 1ª visita depois de subir, sem o
+    aquecimento, espera a conta. Leitura com erro não fica guardada (a tela diz qual fonte falhou)."""
+    _CALCULOS[chave] = calcular
+    _USADO[chave] = time.time()
+    g = _CACHE.get(chave)
+    if g:
+        if time.time() - g.lido_em >= TTL_S:
+            _renovar(chave)
+        return g
+    return _calcular(chave, calcular)
+
+
+def manter_quente(app, intervalo_s: int = 60):
+    """Ao subir, faz as contas das telas principais; depois, a cada minuto, refaz as que alguém usou nas últimas 2 h
+    e estão a 1 min de vencer. Lê só o banco do Nexus (nada de Fracttal)."""
+    def aquecer():
+        with app.app_context():
+            for f in (rondas, pts, zeladoria, lambda: ranking(), lambda: atencao(), usinas_do_fracttal):
+                try:
+                    f()
+                except Exception:       # noqa: BLE001 — a tela tenta de novo na visita
+                    pass
+
+    def laco():
+        aquecer()
+        while True:
+            time.sleep(intervalo_s)
+            agora = time.time()
+            for chave in list(_CALCULOS):
+                g = _CACHE.get(chave)
+                if agora - _USADO.get(chave, 0) > USO_S:
+                    continue
+                if not g or agora - g.lido_em >= TTL_S - intervalo_s:
+                    _renovar(chave, app)
+    __import__("threading").Thread(target=laco, daemon=True, name="nexus-campo-quente").start()
 
 
 def _sessao():
@@ -84,7 +154,14 @@ def _base() -> str:
 
 
 def _livro(nome, aba=None) -> list[dict]:
-    return livros.ler(_base(), _sessao(), nome, aba)
+    """Um livro do banco; o mesmo livro pedido por várias contas no mesmo ciclo é lido uma vez (2 min)."""
+    chave = (nome, aba)
+    g = _LIVROS.get(chave)
+    if g and time.time() - g[0] < LIVRO_S:
+        return g[1]
+    linhas = livros.ler(_base(), _sessao(), nome, aba)
+    _LIVROS[chave] = (time.time(), linhas)
+    return linhas
 
 
 def _agora() -> datetime:
@@ -116,6 +193,18 @@ def _int(v):
         return int(round(float(v)))
     except (TypeError, ValueError):
         return None
+
+
+def _norm_nome(s) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
+    return " ".join(s.split())
+
+
+def supervisor_da_pessoa(email: str, nome: str = "") -> str:
+    """Para o login pelo Fracttal (06/10/2026): o nome do supervisor que entrou, como os filtros mostram; vazio se ele
+    não é supervisor no cadastro (ou sem a chave do cadastro)."""
+    return _Base().supervisor_da_pessoa(email, nome)
 
 
 def nome_curto(nome) -> str:
@@ -176,7 +265,8 @@ class _Base:
         self.sem_mobilizacao = sorted(str(u.get("nome") or "") for uid, u in self.por_id.items()
                                       if uid not in self.mobilizadas
                                       and str(u.get("status") or "").strip().upper() == STATUS_OPERACAO)
-        self.time = self._time(_livro("cadastro_nexus", "pessoas"))
+        self.pessoas = _livro("cadastro_nexus", "pessoas")
+        self.time = self._time(self.pessoas)
         self.nome_cliente = {D._id(c.get("cliente_id")): str(c.get("nome") or "") for c in _livro("cadastro_nexus", "clientes")}
 
     def _time(self, pessoas) -> dict:
@@ -225,6 +315,42 @@ class _Base:
                     continue
                 out[pid] = nome_curto(s.get("nome_padrao") or s.get("nome"))
         return out
+
+    def supervisor_da_pessoa(self, email: str, nome: str = "") -> str:
+        """O nome (como as telas mostram) da pessoa que entrou, se ela é supervisor: pelo e-mail da ficha, ou pelo nome
+        quando ele é de UMA pessoa. Medido em 06/10: nenhum dos 10 supervisores tem e-mail no cadastro, então o nome
+        decide, comparado de três jeitos (completo, curto e o do e-mail: camila.viana@ -> "camila viana") contra o
+        nome e o "Nome padrão" da ficha. Supervisor = vínculo "Supervisor" ou o `supervisor_id` de alguém."""
+        chave = current_app.config.get("NEXUS_CHAVE_CADASTRO")
+        if not chave:
+            return ""
+        from ..cadastro.cifra import CifraErro, Cofre
+        cofre = Cofre(chave)
+        sups = {D._id(p.get("supervisor_id")) for p in self.pessoas if D._id(p.get("supervisor_id"))}
+        por_email, por_nome = [], []
+        alvo_email = str(email or "").strip().lower()
+        local = alvo_email.split("@")[0].replace(".", " ").replace("_", " ").replace("-", " ") if "@" in alvo_email else ""
+        alvos = {x for x in (_norm_nome(nome), _norm_nome(nome_curto(nome)), _norm_nome(local)) if x}
+        for p in self.pessoas:
+            pid = D._id(p.get("pessoa_id"))
+            if not pid or not p.get("sensivel_cifrado") or str(p.get("excluido") or "").strip().lower() == "sim":
+                continue
+            try:
+                s = json.loads(cofre.decifrar(p["sensivel_cifrado"], f"banco/pessoas/{pid}"))
+            except (CifraErro, ValueError):
+                continue
+            if alvo_email and str(s.get("email") or "").strip().lower() == alvo_email:
+                por_email.append((p, s))
+            elif alvos & {_norm_nome(x) for x in (s.get("nome"), s.get("nome_padrao"), nome_curto(s.get("nome")),
+                                                   nome_curto(s.get("nome_padrao"))) if x}:
+                por_nome.append((p, s))
+        achados = por_email or por_nome
+        if len(achados) != 1:
+            return ""
+        p, s = achados[0]
+        if str(p.get("vinculo") or "").strip() != "Supervisor" and D._id(p.get("pessoa_id")) not in sups:
+            return ""
+        return nome_curto(s.get("nome_padrao") or s.get("nome"))
 
     def equipe_da_usina(self, uid) -> str:
         u = self.por_id.get(uid) or {}
@@ -866,3 +992,6 @@ def por_equipe(usinas, pendentes, feitas, pts, times=None) -> list[dict]:
 
 def limpar():
     _CACHE.clear()
+    _LIVROS.clear()
+    _CALCULOS.clear()
+    _USADO.clear()

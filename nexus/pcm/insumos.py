@@ -228,6 +228,25 @@ def observacoes(pasta_trabalho: Path, semana: str) -> str:
     return (carregar(pasta_trabalho)["observacoes"].get(semana) or {}).get("texto", "")
 
 
+def observacoes_efetivas(pasta_trabalho: Path, semana: str) -> tuple[str, str | None]:
+    """(o texto que vale para a semana, a semana de onde ele foi herdado ou None).
+
+    O padrão é a última programação (05/10/2026, Levi: "quero como padrão marcado o que já estava marcado na última
+    programação semanal"). Semana sem observação salva herda, da semana salva mais recente antes dela, só os dias por
+    usina (`@usina`): é restrição de acesso da usina e vale até alguém mudar, como no arquivo único do PC do PCM. OS
+    fora e OS com dia fixo são decisão da semana e não passam. Semana salva, mesmo vazia, vale o que foi salvo.
+    A tela e o motor (`materializar`) leem daqui: o motor recebe os mesmos dias que a tela mostra."""
+    obs = carregar(pasta_trabalho)["observacoes"]
+    if semana in obs:
+        return (obs[semana] or {}).get("texto", ""), None
+    antes = sorted(s for s in obs if s < semana)
+    if not antes:
+        return "", None
+    de = antes[-1]
+    linhas = [l.strip() for l in (obs[de] or {}).get("texto", "").splitlines() if l.strip().lower().startswith("@usina")]
+    return ("\n".join(linhas) + "\n", de) if linhas else ("", None)
+
+
 # ── escrita para o motor (materializar) ─────────────────────────────────────────────────────────────────────
 
 def escrever_planilha(tab: dict, destino: Path) -> None:
@@ -270,10 +289,12 @@ def materializar(pasta_trabalho: Path, pasta_rodada: Path, semana: str) -> list[
         carimbos.append(_carimbo(chave, dados[chave]))
     escrever_feriados(dados["feriados"], pasta_rodada / FERIADOS_PASTA / FERIADOS_ARQ)
     carimbos.append(_carimbo("feriados", dados["feriados"]))
-    obs = dados["observacoes"].get(semana) or {}
-    (pasta_rodada / OBSERVACOES).write_text(obs.get("texto", ""), encoding="utf-8")
+    texto, herdada_de = observacoes_efetivas(pasta_trabalho, semana)
+    obs = dados["observacoes"].get(herdada_de or semana) or {}
+    (pasta_rodada / OBSERVACOES).write_text(texto, encoding="utf-8")
     carimbos.append({"nome": NOMES["observacoes"], "atualizado": (obs.get("atualizado_em") or "")[:16],
-                     "detalhe": "vazias" if not obs.get("texto", "").strip() else "da semana " + semana})
+                     "detalhe": ("dias por usina herdados da semana " + herdada_de) if herdada_de else
+                     ("vazias" if not texto.strip() else "da semana " + semana)})
     return carimbos
 
 
@@ -309,9 +330,13 @@ def estado(pasta_trabalho: Path, origem: Path | None, semana: str) -> list[dict]
             detalhe += f". O arquivo da pasta mudou em {_curto(_quando_arquivo(arq))}: importe de novo"
         itens.append({"nome": NOMES[chave], "ok": True, "obrigatorio": True, "aviso": mudou, "detalhe": detalhe})
     obs = dados["observacoes"].get(semana)
-    n = len([l for l in (obs or {}).get("texto", "").splitlines() if l.strip() and not l.strip().startswith("#")])
-    itens.append({"nome": NOMES["observacoes"], "ok": True, "obrigatorio": False, "aviso": False,
-                  "detalhe": (f"{n} para a semana {semana}" if obs else f"nenhuma para a semana {semana}")})
+    texto, herdada_de = observacoes_efetivas(pasta_trabalho, semana)
+    n = len([l for l in texto.splitlines() if l.strip() and not l.strip().startswith("#")])
+    if herdada_de:
+        detalhe = f"{n} {'usina' if n == 1 else 'usinas'} com dia, herdadas da {herdada_de} (ainda não salvas nesta semana)"
+    else:
+        detalhe = f"{n} para a semana {semana}" if obs else f"nenhuma para a semana {semana}"
+    itens.append({"nome": NOMES["observacoes"], "ok": True, "obrigatorio": False, "aviso": False, "detalhe": detalhe})
     return itens
 
 

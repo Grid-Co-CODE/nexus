@@ -37,7 +37,7 @@
       <option value="">todos os clientes</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
     <select class="gc-campo" name="supervisor" aria-label="Supervisor" onchange="this.form.submit()">
-      <option value="">todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
+      <option value="*"{% if not supervisor %} selected{% endif %}>todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>
     {% for x in ('aba', 'dur', 'cluster') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     <span class="cn-barra-fonte">livro de rondas do App · lido às {{ lido }}</span>
