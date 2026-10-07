@@ -1,6 +1,6 @@
-"""Torre Performance -> Clima e risco: a tela /t/performance/clima (06/10/2026).
+"""Torre Performance -> Clima e risco: a tela /t/performance/clima (06/10/2026; leitura rápida em 07/10/2026).
 
-Mundo inventado e pequeno: cinco usinas numa grade de 40 x 30 pixels, um aviso do INMET por cima de duas delas, um foco
+Mundo inventado e pequeno: sete usinas numa grade de 40 x 30 pixels, um aviso do INMET por cima de duas delas, um foco
 perto de uma, o risco de fogo em quatro dias. Tudo por sessão falsa (nenhum teste vai à rede) e relógio de mentira."""
 import json
 import re
@@ -43,7 +43,7 @@ def caixa_aviso(id_, nome, severidade, lon0, lon1, lat0, lat1, evento="Tempestad
 
 
 def inmet(extra_hoje=(), extra_futuro=()):
-    # nível 1 sobre A e B; nível 2 só sobre A
+    # nível 1 (Baixa Umidade) sobre A e B; nível 2 (Tempestade) só sobre A
     leve = caixa_aviso(1, "leve", "Perigo Potencial", -45.0, -44.88, -5.15, -5.0, evento="Baixa Umidade")
     forte = caixa_aviso(2, "forte", "Perigo", -45.0, -44.93, -5.08, -5.02)
     return json.dumps({"hoje": [leve, forte, *extra_hoje], "futuro": list(extra_futuro)}).encode()
@@ -111,8 +111,7 @@ class Relogio:
         return self.t
 
 
-@pytest.fixture
-def mundo(tmp_path, monkeypatch):
+def _mundo(tmp_path, monkeypatch, carga_, arquivos):
     chave = gerar_chave()
     app = create_app({"NEXUS_SECRET_KEY": "k", "NEXUS_SENHA_ADMIN": SENHA_TESTE, "NEXUS_CHAVE_CADASTRO": chave,
                       "NEXUS_ARMAZEM_LOCAL": str(tmp_path / "cadastro.json"),
@@ -120,15 +119,36 @@ def mundo(tmp_path, monkeypatch):
     app.config.update(TESTING=True, SESSION_COOKIE_SECURE=False)
     with app.app_context():
         from nexus.cadastro.telas import servico
-        servico().aplicar_carga(carga())
-    sessao = SessaoArquivos(arquivos_do_mundo())
+        servico().aplicar_carga(carga_)
+    sessao = SessaoArquivos(arquivos)
     L.limpar_cache()
     L.usar_relogio(Relogio(AGORA.timestamp()))
     L.usar_sessao(sessao)
     monkeypatch.setattr(V, "agora", lambda: AGORA)
     cliente = app.test_client()
     assert cliente.post("/entrar", data={"senha": SENHA_TESTE}).status_code == 302
-    yield cliente, sessao, app
+    return cliente, sessao, app
+
+
+@pytest.fixture
+def mundo(tmp_path, monkeypatch):
+    yield _mundo(tmp_path, monkeypatch, carga(), arquivos_do_mundo())
+    L.usar_sessao(None)
+    L.usar_relogio(None)
+    L.limpar_cache()
+
+
+def carga_de_25():
+    """25 usinas na mesma faixa de pixels (linha 22), todas debaixo de UM aviso Perigo Potencial e com risco baixo."""
+    usinas = [u(str(i), f"Usina {i:02d}", "1", (i - 1, 22)) for i in range(1, 26)]
+    return Carga(entidades={"clientes": [{"id": "1", "ordem": 1, "valores": {"nome": "Cliente X"}}], "usinas": usinas},
+                 listas={"status_usina": ["OPERAÇÃO"], "uf": ["PI"]})
+
+
+@pytest.fixture
+def mundo25(tmp_path, monkeypatch):
+    sobre_todas = caixa_aviso(1, "leve", "Perigo Potencial", -45.0, -44.70, -5.30, -5.20, evento="Baixa Umidade")
+    yield _mundo(tmp_path, monkeypatch, carga_de_25(), arquivos_do_mundo(json.dumps({"hoje": [sobre_todas], "futuro": []}).encode()))
     L.usar_sessao(None)
     L.usar_relogio(None)
     L.limpar_cache()
@@ -147,9 +167,31 @@ def texto(html):
 
 
 def cartoes(html):
-    """{nome da usina: trecho do cartão} na ordem em que aparecem na lista de alertas."""
+    """{nome da usina: trecho do cartão} dos cartões de "Agir agora", na ordem em que aparecem."""
     achados = re.findall(r'<article class="cl-usina[^"]*".*?</article>', html, flags=re.S)
     return {re.search(r'<h3 class="cl-nome">([^<]+)</h3>', a).group(1): a for a in achados}
+
+
+def linhas(html):
+    """{nome da usina: trecho da linha} da matriz de "Atenção", na ordem em que aparecem."""
+    achados = re.findall(r'<tr class="cl-lin".*?</tr>', html, flags=re.S)
+    return {re.search(r'<span class="cl-nome">([^<]+)</span>', a).group(1): a for a in achados}
+
+
+def faixa(html):
+    """{id: trecho} das quatro células da faixa do topo."""
+    secao = re.search(r'<section class="cl-faixa".*?</section>', html, flags=re.S).group(0)
+    return {m.group(1): m.group(0) for m in re.finditer(r'<div class="cl-cel[^"]*" data-id="(\w+)">.*?</div>', secao, flags=re.S)}
+
+
+def valor(celula):
+    return re.search(r'<span class="cl-valor">([^<]+)</span>', celula).group(1)
+
+
+def quadrados(html):
+    """{UF: trecho} dos 27 quadrados da grade por estado."""
+    return {re.search(r'<span class="cl-uf-sigla">(\w+)</span>', q).group(1): q
+            for q in re.findall(r'<div class="cl-uf[ "].*?</div>', html, flags=re.S)}
 
 
 # ── a tela ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -164,6 +206,7 @@ def test_a_tela_responde_com_titulo_pergunta_e_atualiza_sozinha(mundo):
     html = pagina(c)
     assert "Clima e risco" in html and "Em construção" not in html
     assert '<meta http-equiv="refresh" content="60">' in html
+    assert "atualizada às 15:00" in texto(html)
 
 
 def test_a_tela_aparece_como_pronta_no_menu(mundo):
@@ -171,72 +214,101 @@ def test_a_tela_aparece_como_pronta_no_menu(mundo):
     assert 'href="/t/performance/clima" class="com-conteudo"' in pagina(c, "/")
 
 
-def test_faixa_de_resumo_conta_usinas_por_tipo_de_alerta(mundo):
-    c, _, _ = mundo
-    t = texto(pagina(c))
-    # avisos: Alfa e Beta; focos: Alfa; risco alto ou crítico: Alfa (crítico), Gama (alto), Zeta (alto, pelo entorno)
-    resumo = re.search(r'<section class="cl-resumo".*?</section>', pagina(c), flags=re.S).group(0)
-    cartoes_resumo = {m.group(1): m.group(2) for m in re.finditer(
-        r'<div class="cl-num[^"]*" data-id="(\w+)">.*?<span class="cl-valor">([^<]+)</span>', resumo, flags=re.S)}
-    assert cartoes_resumo == {"avisos": "2", "focos": "1", "risco": "3"}
-    assert "Alertas calculados para 6 usinas em operação com coordenada" in t
-
-
-def test_resumo_do_risco_conta_cada_dia(mundo):
-    c, _, _ = mundo
-    t = texto(pagina(c))
-    # D0: Alfa, Gama (0,75), Zeta; D+1: Alfa, Gama (0,80), Zeta; D+2: Alfa, Zeta (Gama cai para médio); D+3: Alfa, Zeta
-    assert "hoje 3 · D+1 3 · D+2 2 · D+3 2" in t
-
-
-def test_lista_so_das_usinas_com_alerta_da_mais_grave_para_a_menos(mundo):
+def test_a_ordem_das_secoes_e_a_do_desenho_aprovado(mundo):
     c, _, _ = mundo
     html = pagina(c)
-    nomes = list(cartoes(html))
-    # Alfa: foco + crítico (nível 3); Gama e Zeta: risco alto (2); Beta: aviso Perigo Potencial (1). Delta e Eta não têm alerta.
-    assert nomes == ["Usina Alfa", "Usina Gama", "Usina Zeta", "Usina Beta"]
-    assert "Usina Delta" not in html and "Usina Eta" not in html.replace("Usina Eta.", "")     # a Eta só entra na linha de cobertura
-    assert "2 usinas sem alerta agora" in texto(html)
+    ordem = ['class="cl-faixa"', 'id="cl-agir"', 'id="cl-ufs"', 'id="cl-fontes"', 'id="cl-atencao"']
+    posicoes = [html.index(x) for x in ordem]
+    assert posicoes == sorted(posicoes)
 
 
-def test_cartao_do_aviso_mostra_evento_severidade_e_validade(mundo):
-    c, _, _ = mundo
-    alfa = texto(cartoes(pagina(c))["Usina Alfa"])
-    assert "Tempestade" in alfa and "Perigo" in alfa and "Baixa Umidade" in alfa and "Perigo Potencial" in alfa
-    assert "em vigor, até 23:59" in alfa
-
-
-def test_cartao_do_foco_mostra_quantos_o_mais_perto_satelite_e_hora(mundo):
-    c, _, _ = mundo
-    alfa = texto(cartoes(pagina(c))["Usina Alfa"])
-    assert "1 foco a até 5 km" in alfa and "o mais perto a 1,2 km" in alfa and "GOES-19" in alfa and "14:50" in alfa
-    assert "foco" not in texto(cartoes(pagina(c))["Usina Gama"]).lower().replace("focos de queimada", "")
-
-
-def test_cartao_do_risco_mostra_classe_e_valor_dos_quatro_dias(mundo):
-    c, _, _ = mundo
-    gama = texto(cartoes(pagina(c))["Usina Gama"])
-    assert "Hoje 0,75 alto" in gama and "D+1 0,80 alto" in gama and "D+2 0,60 médio" in gama and "D+3 0,40 médio" in gama
-    alfa = texto(cartoes(pagina(c))["Usina Alfa"])
-    assert alfa.count("0,97 crítico") == 4
-
-
-def test_pixel_mascarado_usa_o_entorno_e_diz_entorno(mundo):
-    c, _, _ = mundo
-    zeta = texto(cartoes(pagina(c))["Usina Zeta"])
-    assert "0,85 alto" in zeta and "entorno" in zeta
-    assert "entorno" not in texto(cartoes(pagina(c))["Usina Gama"])
-
-
-def test_sem_dado_nem_no_entorno_diz_sem_vegetacao_e_nao_e_alerta(mundo):
+def test_faixa_do_topo_conta_agir_atencao_sem_alerta_e_cobertura(mundo):
     c, _, _ = mundo
     html = pagina(c)
-    assert "Usina Eta" not in "".join(cartoes(html))          # sem alerta, não vira cartão
-    # mas a linha de cobertura diz quais usinas não têm dado de risco, e por quê
+    f = faixa(html)
+    # agir: Alfa; atenção: Gama (risco alto), Zeta (alto pelo entorno) e Beta (aviso Perigo Potencial); sem alerta: Delta e Eta
+    assert {i: valor(f[i]) for i in f} == {"agir": "1", "atencao": "3", "sem": "2", "cobertura": "6"}
+    t = texto(f["cobertura"])
+    assert "em operação com coordenada · 1 sem dado de risco · 1 sem coordenada" in t
+    assert "Agir agora" in texto(f["agir"]) and "foco a até 5 km, aviso vermelho do INMET" in texto(f["agir"])
+    assert "nas três fontes lidas" in texto(f["sem"])
+
+
+def test_agir_agora_so_tem_a_usina_do_foco_e_do_perigo_de_tempestade(mundo):
+    c, _, _ = mundo
+    html = pagina(c)
+    assert list(cartoes(html)) == ["Usina Alfa"]
+    assert list(linhas(html)) == ["Usina Gama", "Usina Zeta", "Usina Beta"]
+    for fora in ("Usina Delta", "Usina Eta"):
+        assert fora not in "".join(cartoes(html)) and fora not in "".join(linhas(html))
+
+
+def test_cartao_do_foco_mostra_motivo_frase_principal_e_prova(mundo):
+    c, _, _ = mundo
+    alfa = texto(cartoes(pagina(c))["Usina Alfa"])
+    assert "Foco a 1,2 km" in alfa and "1 foco de queimada a até 5 km" in alfa
+    assert "GOES-19 · 14:50 · o mais perto a 1,2 km" in alfa
+    assert "Cliente X · PI" in alfa
+
+
+def test_cartao_do_aviso_que_manda_agir_mostra_o_evento_o_nivel_e_a_vigencia(mundo):
+    c, _, _ = mundo
+    alfa = texto(cartoes(pagina(c))["Usina Alfa"])
+    assert "Tempestade · laranja" in alfa and "Tempestade, nível Perigo" in alfa and "em vigor, até 23:59" in alfa
+
+
+def test_contexto_do_cartao_traz_o_outro_aviso_e_o_risco_de_fogo(mundo):
+    c, _, _ = mundo
+    alfa = texto(cartoes(pagina(c))["Usina Alfa"])
+    assert "Baixa Umidade (amarelo): em vigor, até 23:59" in alfa
+    assert "Risco de fogo crítico de hoje a D+3 (0,97)" in alfa
+
+
+def test_matriz_da_atencao_mostra_os_quatro_dias_do_risco_com_a_cor_de_cada_um(mundo):
+    c, _, _ = mundo
+    gama = linhas(pagina(c))["Usina Gama"]
+    dias = re.findall(r'<span class="cl-c cl-c-(\w)"[^>]*>([^<]+)</span>', gama)
+    assert dias == [("a", "0,75"), ("a", "0,80"), ("n", "0,60"), ("n", "0,40")]
+    assert "Cliente Y · PI" in texto(gama)
+
+
+def test_a_matriz_diz_o_que_e_cada_coluna_e_os_dias_pelo_calendario(mundo):
+    c, sessao, _ = mundo
+    html = pagina(c)
+    assert "Risco de fogo · Hoje · D+1 · D+2 · D+3" in texto(html)
+    sessao.modificado = "Mon, 05 Oct 2026 09:32:00 GMT"
+    L.limpar_cache()
+    html = pagina(c)
+    assert "Risco de fogo · Ontem · Hoje · D+1 · D+2" in texto(html)
+    gama = linhas(html)["Usina Gama"]
+    assert re.findall(r'title="([^"]*)"', gama)[-4:] == ["Ontem: 0,75 (alto)", "Hoje: 0,80 (alto)", "D+1: 0,60 (médio)", "D+2: 0,40 (médio)"]
+
+
+def test_a_linha_da_atencao_com_aviso_mostra_o_evento_e_a_coluna_do_foco_diz_que_nao_ha(mundo):
+    c, _, _ = mundo
+    beta = linhas(pagina(c))["Usina Beta"]
+    assert "Baixa Umidade" in texto(beta) and 'title="Perigo Potencial · em vigor, até 23:59"' in beta
+    assert re.search(r'<td class="cl-col-foco">—</td>', beta) and re.search(r'<td class="cl-col-aviso">—</td>', linhas(pagina(c))["Usina Gama"])
+
+
+def test_pixel_mascarado_usa_o_entorno_e_marca_o_valor(mundo):
+    c, _, _ = mundo
+    html = pagina(c)
+    zeta, gama = linhas(html)["Usina Zeta"], linhas(html)["Usina Gama"]
+    assert re.findall(r'<span class="cl-c cl-c-a"[^>]*>([^<]+)</span>', zeta) == ["0,85*"] * 4
+    assert "*" not in "".join(re.findall(r'<span class="cl-c[^>]*>([^<]+)</span>', gama))
+    assert "Hoje: 0,85 (alto, entorno de 2 km)" in zeta
+    assert "* maior valor do entorno de 2 km" in texto(html)
+
+
+def test_sem_dado_nem_no_entorno_a_usina_fica_em_sem_alerta_e_a_cobertura_diz_por_que(mundo):
+    c, _, _ = mundo
+    html = pagina(c)
+    assert "Usina Eta" not in "".join(cartoes(html)) and "Usina Eta" not in "".join(linhas(html))
     assert "Risco de fogo sem dado (sem vegetação no entorno): Usina Eta." in texto(html)
 
 
-@pytest.mark.parametrize("origem,valor,esperado", [
+@pytest.mark.parametrize("origem,valor_,esperado", [
     ("ponto", 0.97, ("0,97", "crítico", "", 3)),
     ("ponto", 0.30, ("0,30", "baixo", "", 0)),
     ("entorno", 0.85, ("0,85", "alto", "entorno", 2)),
@@ -244,9 +316,8 @@ def test_sem_dado_nem_no_entorno_diz_sem_vegetacao_e_nao_e_alerta(mundo):
     ("indisponivel", None, ("indisponível", "", "", 0)),
     ("fora_da_grade", None, ("fora da grade do INPE", "", "", 0)),
 ])
-def test_cada_dia_de_risco_e_escrito_pela_origem_do_valor(origem, valor, esperado):
-    from nexus.performance.clima.geotiff import Amostra
-    c = V.celula_de_risco(2, Amostra(valor, origem))
+def test_cada_dia_de_risco_e_escrito_pela_origem_do_valor(origem, valor_, esperado):
+    c = V.celula_de_risco(2, Amostra(valor_, origem))
     assert c["rotulo"] == "D+2"
     assert (c["valor"], c["classe"], c["nota"], c["nivel"]) == esperado
 
@@ -256,6 +327,8 @@ def test_usina_sem_coordenada_aparece_numa_linha_e_a_coordenada_nunca_aparece(mu
     html = pagina(c)
     t = texto(html)
     assert "Sem coordenada no cadastro" in t and "Usina Epsilon" in t
+    # número impresso de coordenada: 3 casas decimais ou mais, com ponto ou vírgula, em qualquer lugar da página
+    assert not re.findall(r"\d+[.,]\d{3,}", re.sub(r"<(style|script)\b.*?</\1>", "", html, flags=re.S))
     for linha_col in (A, B, C, DD, F, G):
         lat, lon = centro(*linha_col)
         for numero in (f"{abs(lat):.3f}", f"{abs(lon):.3f}", f"{abs(lat):.3f}".replace(".", ","), f"{abs(lon):.3f}".replace(".", ",")):
@@ -265,11 +338,12 @@ def test_usina_sem_coordenada_aparece_numa_linha_e_a_coordenada_nunca_aparece(mu
 def test_filtro_por_cliente(mundo):
     c, _, _ = mundo
     html = pagina(c, cliente="Cliente Y")
-    assert list(cartoes(html)) == ["Usina Gama", "Usina Zeta"]
-    assert "Alertas calculados para 3 usinas em operação com coordenada" in texto(html)
+    assert list(cartoes(html)) == [] and list(linhas(html)) == ["Usina Gama", "Usina Zeta"]
+    assert valor(faixa(html)["cobertura"]) == "3"
     assert 'value="Cliente Y" selected' in html
     assert "Usina Epsilon" not in html                         # a sem coordenada de outro cliente não aparece
-    assert len(cartoes(pagina(c, cliente="Nao Existe"))) == 4                  # cliente inventado = sem filtro
+    sem_filtro = pagina(c, cliente="Nao Existe")                # cliente inventado = sem filtro
+    assert len(cartoes(sem_filtro)) + len(linhas(sem_filtro)) == 4
 
 
 def test_todos_os_clientes_estao_no_seletor(mundo):
@@ -298,7 +372,7 @@ def test_fonte_fora_diz_fora_e_a_hora_da_ultima_boa(mundo):
     assert "INMET fora agora; última leitura boa às 15:00" in t
     assert "HTTP 404" in t
     assert 'class="cl-fonte cl-atencao"' in html
-    assert len(cartoes(html)) == 4                                        # as outras fontes seguem valendo
+    assert len(cartoes(html)) + len(linhas(html)) == 4                    # as outras fontes seguem valendo
 
 
 def test_fonte_que_nunca_leu_diz_sem_leitura_boa_e_nao_mostra_zero(mundo):
@@ -307,15 +381,17 @@ def test_fonte_que_nunca_leu_diz_sem_leitura_boa_e_nao_mostra_zero(mundo):
     html = pagina(c)
     t = texto(html)
     assert "INMET fora agora; ainda sem leitura boa" in t
-    assert "A lista e os números acima não incluem: avisos do INMET." in t       # a lista diz que está incompleta
+    assert "Os números da faixa e as listas não incluem: avisos do INMET." in t       # a tela diz que está incompleta
     assert 'class="cl-fonte cl-fora"' in html
-    resumo = re.search(r'<section class="cl-resumo".*?</section>', html, flags=re.S).group(0)
-    assert re.search(r'data-id="avisos">.*?<span class="cl-valor">—</span>', resumo, flags=re.S)       # traço, nunca "0"
+    f = faixa(html)
+    assert valor(f["sem"]) == "—" and "não dá para dizer" in texto(f["sem"])           # traço, nunca "0" nem número solto
+    assert "sem leitura de avisos do INMET" in texto(f["atencao"])
+    assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" not in t     # há usinas nas duas listas: sem título de vazio
 
 
 def test_texto_do_inmet_e_de_terceiros_e_sai_escapado(mundo):
     c, sessao, _ = mundo
-    veneno = caixa_aviso(9, "x", "Perigo <b>Grande</b>", -45.0, -44.9, -5.15, -5.0, evento='<script>alert("oi")</script>')
+    veneno = caixa_aviso(9, "x", "Perigo <b>Grande</b>", -45.0, -44.88, -5.15, -5.0, evento='<script>alert("oi")</script>')
     sessao.arquivos[URL_INMET] = inmet(extra_hoje=[veneno])
     html = pagina(c)
     assert '<script>alert("oi")</script>' not in html and "<b>Grande</b>" not in html
@@ -335,8 +411,19 @@ def test_aviso_que_ainda_vai_comecar_diz_quando_comeca(mundo):
     futuro = caixa_aviso(9, "x", "Perigo", -45.0, -44.88, -5.15, -5.0, evento="Onda de Calor", inicio="2026-10-07 08:00",
                          fim="2026-10-08 20:00")
     sessao.arquivos[URL_INMET] = inmet(extra_futuro=[futuro])
-    beta = texto(cartoes(pagina(c))["Usina Beta"])
-    assert "Onda de Calor" in beta and "começa 07/10 08:00, até 08/10 20:00" in beta
+    beta = linhas(pagina(c))["Usina Beta"]
+    assert "Onda de Calor" in texto(beta) and "começa 07/10 08:00" in texto(beta)
+    assert 'title="Perigo · começa 07/10 08:00, até 08/10 20:00"' in beta
+
+
+def test_aviso_futuro_que_estraga_usina_ja_aparece_em_agir_agora_com_o_inicio(mundo):
+    c, sessao, _ = mundo
+    futuro = caixa_aviso(9, "x", "Perigo", -45.0, -44.88, -5.15, -5.0, evento="Vendaval", inicio="2026-10-07 08:00",
+                         fim="2026-10-08 20:00")
+    sessao.arquivos[URL_INMET] = inmet(extra_futuro=[futuro])
+    html = pagina(c)
+    assert list(cartoes(html)) == ["Usina Alfa", "Usina Beta"]
+    assert "Vendaval, nível Perigo" in texto(cartoes(html)["Usina Beta"]) and "começa 07/10 08:00, até 08/10 20:00" in texto(cartoes(html)["Usina Beta"])
 
 
 def test_previsao_de_risco_de_ontem_fica_em_atencao_e_diz_a_data(mundo):
@@ -356,6 +443,7 @@ def test_focos_sem_arquivo_novo_ha_mais_de_30_min_ficam_em_atencao(mundo):
     html = pagina(c)
     assert "o INPE não publica arquivo novo desde 14:10" in texto(html)
     assert 'class="cl-fonte cl-atencao"' in html
+    assert "focos: arquivos até 14:10" in texto(faixa(html)["agir"])
 
 
 def test_aviso_vencido_nao_conta(mundo):
@@ -371,6 +459,7 @@ def test_uma_so_leitura_da_rede_por_fonte_mesmo_com_varias_visitas(mundo):
     n = len(sessao.pedidos)
     pagina(c)
     pagina(c, "/t/performance/clima?cliente=Cliente X")                    # o filtro não muda o conjunto de pontos do risco
+    pagina(c, "/t/performance/clima?todas=1")                              # nem a lista inteira
     assert len(sessao.pedidos) == n
 
 
@@ -379,6 +468,69 @@ def test_rodape_com_as_fontes_e_a_atribuicao(mundo):
     t = texto(pagina(c))
     assert "Dados: INMET, INPE (Programa Queimadas)." in t
     assert "Programa Queimadas" in t and "somente leitura" in t.lower()
+    assert "que não aparecem na tela" in t
+
+
+# ── a grade por estado ───────────────────────────────────────────────────────────────────────────────────────────────
+
+def test_a_grade_por_estado_tem_27_quadrados_o_numero_de_usinas_com_alerta_e_a_cor_do_pior(mundo):
+    c, _, _ = mundo
+    html = pagina(c)
+    q = quadrados(html)
+    assert len(q) == 27 and set(q) == set(V.UFS_GRADE)
+    pi = q["PI"]
+    assert "cl-uf--agir" in pi and re.search(r'<span class="cl-uf-n">4</span>', pi)             # Alfa, Gama, Zeta e Beta
+    assert "grid-column:4;grid-row:3" in pi and 'title="PI: 4 usinas com alerta, 1 para agir agora"' in pi
+    pa = q["PA"]
+    assert "cl-uf--" not in pa and re.search(r'<span class="cl-uf-n">·</span>', pa)
+    assert "esquema, não é mapa" in texto(html)
+
+
+def test_legenda_da_grade(mundo):
+    c, _, _ = mundo
+    t = texto(pagina(c))
+    for frase in ("tem usina para agir agora", "só atenção", "sem usina com alerta", "número = usinas com alerta no estado"):
+        assert frase in t
+
+
+def test_a_grade_nao_diz_sem_usina_com_alerta_quando_uma_fonte_nao_foi_lida(mundo):
+    c, sessao, _ = mundo
+    del sessao.arquivos[URL_INMET]
+    html = pagina(c)
+    assert "sem usina com alerta nas fontes lidas" in texto(html)
+    assert 'title="PA: sem usina com alerta nas fontes lidas"' in quadrados(html)["PA"]
+
+
+# ── a matriz da Atenção: as 20 primeiras e "Ver todas" ───────────────────────────────────────────────────────────────
+
+def test_matriz_com_25_usinas_mostra_as_20_primeiras_e_o_link_para_ver_todas(mundo25):
+    c, _, _ = mundo25
+    html = pagina(c)
+    assert len(linhas(html)) == 20 and list(linhas(html))[0] == "Usina 01" and list(linhas(html))[-1] == "Usina 20"
+    t = texto(html)
+    assert "25 usinas, as 20 primeiras" in t and "Ver todas (25)" in t
+    assert 'href="/t/performance/clima?todas=1#cl-atencao"' in html
+
+
+def test_com_todas_a_matriz_mostra_as_25_e_oferece_voltar(mundo25):
+    c, _, _ = mundo25
+    html = pagina(c, todas="1")
+    assert len(linhas(html)) == 25 and list(linhas(html))[-1] == "Usina 25"
+    t = texto(html)
+    assert "25 usinas" in t and "25 usinas, as 20 primeiras" not in t and "Ver todas" not in t and "Ver só as 20 primeiras" in t
+    assert 'href="/t/performance/clima#cl-atencao"' in html
+
+
+def test_ver_todas_guarda_o_filtro_de_cliente(mundo25):
+    c, _, _ = mundo25
+    html = pagina(c, cliente="Cliente X")
+    assert 'href="/t/performance/clima?cliente=Cliente+X&amp;todas=1#cl-atencao"' in html
+
+
+def test_com_20_usinas_ou_menos_nao_ha_link_nem_corte(mundo):
+    c, _, _ = mundo
+    t = texto(pagina(c))
+    assert "Ver todas" not in t and "as 20 primeiras" not in t and "3 usinas" in t
 
 
 # ── 375 px ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -391,17 +543,32 @@ def test_375_px_a_tela_usa_as_classes_responsivas_e_o_css_as_quebra_em_uma_colun
     # as grades da tela viram uma coluna só abaixo de 700 px, e o texto de terceiros quebra em vez de alargar a página
     midia = re.search(r"@media\s*\(max-width:\s*(\d+)px\)\s*\{(.*)\}\s*$", css, flags=re.S)
     assert midia and 375 < int(midia.group(1)) <= 820
-    for classe in ("cl-resumo", "cl-fontes", "cl-lista", "cl-dias"):
+    for classe in ("cl-faixa", "cl-lista", "cl-duas", "cl-fontes"):
         assert classe in html and classe in midia.group(2), classe
     assert "overflow-wrap:anywhere" in css and "min-width:0" in css
+
+
+def test_375_px_a_grade_de_estados_e_a_matriz_rolam_dentro_da_caixa_e_nunca_a_pagina(mundo):
+    c, _, _ = mundo
+    html = pagina(c)
+    css = c.get("/static/clima.css").get_data(as_text=True)
+    fora_da_midia = re.sub(r"@media[^{]*\{.*\}\s*$", "", css, flags=re.S)
+    for caixa in ("cl-ufs-rolagem", "cl-matriz"):
+        assert f'class="{caixa}"' in html
+        assert re.search(r"\." + caixa + r"\{[^}]*overflow-x:auto", fora_da_midia), caixa
 
 
 def test_375_px_nenhuma_largura_fixa_passa_da_tela_do_celular(mundo):
     c, _, _ = mundo
     css = c.get("/static/clima.css").get_data(as_text=True)
-    fora_da_midia = re.sub(r"@media[^{]*\{.*\}\s*$", "", css, flags=re.S)
-    for m in re.finditer(r"(?<![-\w])(?:min-)?width:\s*(\d+)px", fora_da_midia):
-        assert int(m.group(1)) <= 340, m.group(0)
+    fora_da_midia = re.sub(r"/\*.*?\*/", "", re.sub(r"@media[^{]*\{.*\}\s*$", "", css, flags=re.S), flags=re.S)
+    largas = []
+    for regra in re.finditer(r"([^{}]+)\{([^{}]*)\}", fora_da_midia):
+        for m in re.finditer(r"(?<![-\w])(?:min-)?width:\s*(\d+)px", regra.group(2)):
+            if int(m.group(1)) > 340:
+                largas.append((regra.group(1).strip(), m.group(0)))
+    # a ÚNICA largura maior que o celular é a da tabela da matriz, que mora numa caixa com overflow-x:auto (testada acima)
+    assert largas == [(".cl-matriz table", "min-width:860px")]
 
 
 # ── sem cadastro ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -449,15 +616,18 @@ def _instalar(monkeypatch, avisos, focos, risco):
     monkeypatch.setattr(L, "risco", lambda config, pontos, sessao=None: risco)
 
 
-def test_sem_alerta_e_com_fonte_fora_a_tela_nao_diz_nenhuma_usina_com_alerta_agora(mundo, monkeypatch):
+def test_sem_alerta_e_com_fonte_fora_a_tela_nao_diz_nenhuma_usina_para_agir_agora(mundo, monkeypatch):
     c, _, _ = mundo
     _instalar(monkeypatch, L.Leitura(None, None, erro="HTTP 500"), _focos_vazio(), _risco())
     html = pagina(c)
     t = texto(html)
     assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" in t
-    assert "Nenhuma usina com alerta agora" not in t and "sem alerta agora" not in t
-    assert "usinas sem alerta nas fontes lidas." in t
-    assert "A lista e os números acima não incluem: avisos do INMET." in t and "Lendo agora" not in t
+    assert "Nenhuma usina para agir agora" not in t and "Nenhuma usina em atenção" not in t
+    f = faixa(html)
+    # o agir usa avisos e focos, o atenção usa avisos e risco: cada um perdeu o INMET e segue com o que leu, em âmbar e com a razão
+    assert (valor(f["agir"]), valor(f["atencao"]), valor(f["sem"])) == ("0", "0", "—")
+    assert "cl-na" in f["agir"] and "cl-na" in f["atencao"] and "sem leitura de avisos do INMET" in texto(f["agir"])
+    assert "Os números da faixa e as listas não incluem: avisos do INMET." in t and "Lendo agora" not in t
     assert '<meta http-equiv="refresh" content="60">' in html
 
 
@@ -467,32 +637,37 @@ def test_fonte_lendo_a_tela_recarrega_em_10_s_e_a_nota_diz_lendo_e_nao_fora(mund
     html = pagina(c)
     t = texto(html)
     assert '<meta http-equiv="refresh" content="10">' in html
-    assert "Lendo agora: avisos do INMET." in t and "A lista e os números acima não incluem" not in t
+    assert "Lendo agora: avisos do INMET." in t and "Os números da faixa e as listas não incluem" not in t
     assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" in t
+    assert "lendo avisos do INMET" in texto(faixa(html)["agir"])
 
 
-def test_tudo_lido_e_sem_alerta_a_tela_pode_dizer_agora(mundo, monkeypatch):
+def test_tudo_lido_e_sem_alerta_a_tela_pode_dizer_que_nao_ha(mundo, monkeypatch):
     c, _, _ = mundo
     _instalar(monkeypatch, _leitura({"avisos": [], "ignorados": [], "lidos": 0}), _focos_vazio(), _risco())
-    t = texto(pagina(c))
-    assert "Nenhuma usina com alerta agora" in t and "6 usinas sem alerta agora." in t
+    html = pagina(c)
+    t = texto(html)
+    assert "Nenhuma usina para agir agora" in t and "Nenhuma usina em atenção" in t
+    assert {i: valor(x) for i, x in faixa(html).items()} == {"agir": "0", "atencao": "0", "sem": "6", "cobertura": "6"}
 
 
-def test_fonte_pela_metade_deixa_o_cartao_ambar_e_diz_parcial(mundo, monkeypatch):
+def test_fonte_pela_metade_deixa_a_celula_ambar_e_diz_parcial(mundo, monkeypatch):
     c, _, _ = mundo
     avisos = _leitura({"avisos": [], "ignorados": ["aviso 7: sem polígono"], "lidos": 1})
     _instalar(monkeypatch, avisos, _focos_vazio(), _risco())
     html = pagina(c)
-    resumo = re.search(r'<section class="cl-resumo".*?</section>', html, flags=re.S).group(0)
-    assert re.search(r'<div class="cl-num cl-na" data-id="avisos">.*?nenhum aviso sobre as usinas · parcial', resumo, flags=re.S)
+    f = faixa(html)
+    assert 'class="cl-cel cl-agir cl-na"' in f["agir"] and "INMET: parcial" in texto(f["agir"])
+    assert 'class="cl-cel cl-atencao cl-na"' in f["atencao"] and "cl-na" in f["sem"] and "nas fontes lidas" in texto(f["sem"])
     assert 'class="cl-fonte cl-atencao"' in html and "1 aviso foi ignorado" in texto(html)
 
 
-def test_previsao_de_ontem_os_dias_do_cartao_dizem_ontem_e_hoje(mundo):
+def test_previsao_de_ontem_a_matriz_diz_ontem_e_hoje(mundo):
     c, sessao, _ = mundo
     sessao.modificado = "Mon, 05 Oct 2026 09:32:00 GMT"
-    gama = texto(cartoes(pagina(c))["Usina Gama"])
-    assert "Ontem 0,75 alto" in gama and "Hoje 0,80 alto" in gama and "D+1 0,60 médio" in gama and "D+2 0,40 médio" in gama
+    html = pagina(c)
+    assert "Ontem" in texto(html) and "Risco de fogo · Ontem · Hoje · D+1 · D+2" in texto(html)
+    assert re.findall(r'<span class="cl-c cl-c-a"[^>]*>([^<]+)</span>', linhas(html)["Usina Gama"]) == ["0,75", "0,80"]
 
 
 def test_usina_fora_da_grade_do_inpe_aparece_na_linha_de_cobertura_com_o_motivo(mundo, monkeypatch):
@@ -506,7 +681,7 @@ def test_usina_fora_da_grade_do_inpe_aparece_na_linha_de_cobertura_com_o_motivo(
     assert "Risco de fogo sem dado (fora da grade do INPE): Usina Eta." in t
 
 
-def test_o_css_tem_o_cartao_ambar_das_fontes_que_nao_estao_inteiras(mundo):
+def test_o_css_tem_a_celula_ambar_das_fontes_que_nao_estao_inteiras(mundo):
     c, _, _ = mundo
     css = c.get("/static/clima.css").get_data(as_text=True)
-    assert ".cl-num.cl-na{border-left-color:var(--cl-atencao)}" in css and ".cl-num.cl-na .cl-valor{color:var(--cl-atencao)}" in css
+    assert ".cl-cel.cl-na .cl-valor{color:var(--cl-atencao)}" in css and ".cl-fonte.cl-atencao{border-color:var(--alerta)}" in css

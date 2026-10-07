@@ -17,5 +17,6 @@ def clima():
     except Exception:                      # noqa: BLE001 — arquivo do cadastro corrompido, por exemplo: a tela diz, e o log guarda
         current_app.logger.exception("clima: o cadastro não abriu")
         cadastro, erro = None, "o cadastro não abriu (o motivo está no log do servidor)."
-    v = visao.montar(current_app.config, cadastro=cadastro, erro_cadastro=erro, cliente=request.args.get("cliente", ""))
+    v = visao.montar(current_app.config, cadastro=cadastro, erro_cadastro=erro, cliente=request.args.get("cliente", ""),
+                     todas=request.args.get("todas") == "1")
     return render_template("performance/clima.html", torre=TORRE, tela=TORRE.tela("clima"), v=v)

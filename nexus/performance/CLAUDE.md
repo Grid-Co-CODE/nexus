@@ -78,6 +78,13 @@ INPE, todos públicos e de uso livre. A tela cruza isso com as usinas em operaç
 (recarrega a cada 60 s; o que vai à rede é decidido pelo cache, não pela recarga). Atribuição no rodapé: "Dados: INMET,
 INPE (Programa Queimadas)."
 
+**A tela (leitura rápida, aprovada pelo Levi em 07/10/2026), na ordem:** cabeçalho (filtro de cliente, "atualizada às HH:MM");
+**faixa de 4 números** (Agir agora, Atenção, Sem alerta, Cobertura); **Agir agora**, um cartão por usina (motivo numa pílula,
+frase principal, prova, contexto); **Por estado**, uma grade de 27 quadrados (esquema, não é mapa; o número é de usinas com
+alerta no estado e a cor, a do pior nível); **Fontes** (de quando é cada dado); **Atenção**, uma matriz usina x aviso x foco x
+os quatro dias do risco de fogo (as 20 primeiras; "Ver todas (N)" é `?todas=1`). A grade de estados e a matriz rolam DENTRO
+da caixa em 375 px, nunca a página.
+
 | Fonte | O que traz | Cache | Endereço (troca por `NEXUS_CLIMA_*_URL`) |
 |---|---|---|---|
 | INMET avisos | JSON `{hoje, futuro}`; cada aviso com evento, severidade, início, fim e polígono (texto de JSON) | 30 min | `apiprevmet3.inmet.gov.br/avisos/ativos` (não documentado oficialmente) |
@@ -110,18 +117,28 @@ tela escreve). A rota é `nexus/torres/performance/clima_tela.py`; o CSS, `nexus
   crítico; o valor é arredondado a 9 casas antes de comparar (o 0,70 em double pode chegar 0,6999999999999). Valor ACIMA de 1
   derruba o dia: uma escala trocada (0 a 100) acenderia o "crítico" em toda usina.
 - **A borda do polígono conta como dentro** (o `contains` do shapely a exclui): um aviso que encosta na usina vale.
-- **Gravidade, três degraus (semáforo):** Crítico = "Grande Perigo", foco a até 5 km ou risco crítico; Alto = "Perigo" ou
-  risco alto; Atenção = "Perigo Potencial". O foco é sempre crítico (é evento, não previsão). Desempate: tem foco, mais
-  tipos de alerta, foco mais perto, aviso mais grave, nome. Risco médio não é alerta.
+- **Os três níveis da usina (07/10/2026), regra em `alertas.py`:** o caso que os criou foi 06/10, na seca: 145 das 154
+  usinas apareciam "com alerta" (baixa umidade e risco de fogo alto cobrindo o Nordeste e o Centro-Oeste) e só 3 pediam ação.
+  **Agir agora** = foco a até 5 km (é evento, não previsão); OU aviso do INMET "Grande Perigo" de qualquer evento; OU aviso
+  "Perigo" de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo (comparados sem acento,
+  sem caixa e pelo nome inteiro; evento fora da lista em Perigo vai para Atenção, nunca some). **Atenção** = qualquer outro
+  aviso, em vigor ou futuro; OU risco de fogo alto ou crítico em algum dos quatro dias. **Sem alerta** = nada disso, e só se
+  diz com as TRÊS fontes lidas. Aviso futuro conta (a tela diz quando começa). Dentro de cada nível, a ordem é a gravidade que já
+  existia (3 = Grande Perigo, foco ou risco crítico; 2 = Perigo ou risco alto; 1 = Perigo Potencial) e, no empate: tem foco,
+  mais tipos de alerta, foco mais perto, aviso mais grave, nome. Risco médio não é alerta. Com o arquivo de ontem do INPE (lido
+  antes das ~06:30) o dia "Ontem" ainda conta como um dos quatro (a fonte já está em atenção e o rótulo diz o dia certo).
 - **A tela não pode parecer "tudo bem" quando a fonte não foi lida inteira** (revisão de 06/10/2026). Fonte fora: a última
   leitura boa é servida com o erro e a hora ("INMET fora agora; última leitura boa às HH:MM"), nunca como fresca; sem leitura
-  boa, o número é "—" (nunca 0). Sem alerta algum e sem ter lido tudo, o título NÃO diz "nenhuma usina com alerta agora": diz
-  "Sem leitura de X: não dá para dizer que não há alerta", e a contagem vira "N usinas sem alerta nas fontes lidas". A nota
-  separa "Lendo agora: X" (a fonte ainda está sendo lida pela primeira vez; a tela volta em 10 s, não em 60) de "A lista e os
-  números acima não incluem: X" (a fonte está fora). Fonte lida só em parte (aviso sem polígono, arquivo de focos que falhou,
+  boa, o número é "—" (nunca 0). "Sem alerta" só é contado com as três fontes lidas (senão "—" e "não dá para dizer"); "Agir
+  agora" vive de avisos e focos, "Atenção" de avisos e risco de fogo, e cada um só vira "—" quando NENHUMA das suas fontes foi
+  lida. Seção vazia sem ter lido o que ela usa NÃO diz "nenhuma usina para agir agora": diz "Sem leitura de X: não dá para
+  dizer que não há alerta" (só das fontes que ELA usa: o risco de fogo velho não tira o "agir agora"). A nota separa "Lendo
+  agora: X" (a fonte ainda está sendo lida pela primeira vez; a tela volta em 10 s, não em 60) de "Os números da faixa e as
+  listas não incluem: X" (a fonte está fora). Fonte lida só em parte (aviso sem polígono, arquivo de focos que falhou,
   linhas ilegíveis, dia do risco sem leitura), velha ou com o dado atrasado (focos parados há mais de 30 min, previsão de
-  outro dia, sem Last-Modified) fica em atenção, nunca "ok": os três cartões do topo repetem o qualificador ("parcial", "dado
-  de HH:MM") e, quando não há alerta, ficam âmbar em vez de verdes; o dia do risco sem leitura aparece "—" no resumo. Uma
+  outro dia, sem Last-Modified) fica em atenção, nunca "ok": os números da faixa que dependem dela repetem o qualificador
+  ("INMET: parcial", "focos: arquivos até 14:10", "INMET: dado de HH:MM") e, quando o número é 0, ficam âmbar em vez de
+  verdes; na matriz, a célula de uma fonte sem leitura diz "sem leitura" (o "—" é "li e não há"). Uma
   fonte que "lê" mas não entende nada é erro, não "0": focos com todas as linhas ilegíveis, ou INMET com avisos e nenhum
   localizável, caem na última leitura boa com o erro. Depois de uma falha, 60 s sem insistir; uma busca por vez (quem chega
   no meio recebe a última boa, sem esperar a rede); cada falha vai ao log (WARNING `clima: <fonte> fora: <motivo curto>`,

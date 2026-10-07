@@ -1,7 +1,12 @@
 """O que a tela Clima e risco mostra (06/10/2026): junta as leituras das três fontes com as usinas do cadastro e escreve os
 textos, sem Flask (a view só chama `montar` e renderiza).
 
-Gravidade, a mesma régua de três degraus (semáforo) para os três tipos de alerta:
+Os níveis da usina (07/10/2026, regras e o porquê em `alertas.py`): Agir agora (foco a até 5 km, aviso vermelho, ou aviso
+laranja de um evento que estraga usina), Atenção (qualquer outro aviso, ou risco de fogo alto ou crítico) e Sem alerta. A tela
+mostra uma faixa de quatro números, um cartão por usina em "Agir agora", a grade por estado, as fontes e uma matriz das usinas
+em "Atenção" (as 20 primeiras, ou todas com `todas=True`).
+
+A ordem dentro de cada nível é a gravidade que já existia, a mesma régua de três degraus (semáforo) para os três tipos de alerta:
   3 crítico   aviso "Grande Perigo" do INMET; foco de queimada a até 5 km (é um evento, não uma previsão); risco de fogo crítico
   2 alto      aviso "Perigo"; risco de fogo alto
   1 atenção   aviso "Perigo Potencial"
@@ -9,12 +14,14 @@ A usina vale o pior dos seus alertas. No empate: a que tem foco primeiro, depois
 perto, o aviso mais grave e, por fim, o nome.
 
 A tela não pode parecer "tudo bem" quando a fonte não foi lida inteira (revisão de 06/10/2026):
-- onde a fonte não tem leitura, o número é "—", nunca "0" (zero é "li e não há alerta"), e a lista diz que não a inclui;
+- onde a fonte não tem leitura, o número é "—", nunca "0" (zero é "li e não há alerta"); "Sem alerta" só é contado com as três
+  fontes lidas, e "Agir agora" e "Atenção" só viram "—" quando NENHUMA das fontes de que dependem foi lida (o agir vive de
+  avisos e focos; o atenção, de avisos e risco de fogo);
 - fonte lida só em parte (aviso sem polígono, arquivo de focos que falhou, linhas ilegíveis, dia do risco sem leitura), velha
   (a última leitura boa, com a hora) ou com o dado atrasado (focos parados, previsão de outro dia, sem a data do arquivo)
-  fica em "atencao", nunca "ok", e os três cartões do topo repetem o qualificador ("parcial", "dado de HH:MM"...), em âmbar
-  no lugar do verde quando não há alerta;
-- sem alerta algum e sem ter lido tudo, o título não diz "nenhuma usina com alerta agora": diz que não dá para dizer.
+  fica em "atencao", nunca "ok", e os números da faixa que dependem dela repetem o qualificador ("INMET: parcial", "focos:
+  arquivos até 14:10"...), em âmbar no lugar do verde quando não há alerta;
+- sem alerta algum e sem ter lido tudo o que a seção usa, o texto não diz "nenhuma usina para agir agora": diz que não dá para dizer.
 """
 from datetime import datetime, timedelta, timezone
 
@@ -24,13 +31,26 @@ from . import leitura as L
 
 BRT = timezone(timedelta(hours=-3))
 DIAS = ("Hoje", "D+1", "D+2", "D+3")
-NIVEL_ROTULO = {3: "Crítico", 2: "Alto", 1: "Atenção"}
 FOCOS_ATRASO_MIN = 30          # o INPE publica a cada 10 min: sem arquivo novo há 30 min, algo está atrasado
 SEM_DADO = "sem dado (sem vegetação no entorno)"
 FORA_DA_GRADE = "fora da grade do INPE"
 MOTIVO_SEM_RISCO = {"sem_dado": "sem vegetação no entorno", "fora_da_grade": FORA_DA_GRADE}
 RECARGA_S = 60                 # a tela se recarrega a cada minuto...
 RECARGA_LENDO_S = 10           # ...e a cada 10 s enquanto alguma fonte está sendo lida pela primeira vez
+LIMITE_ATENCAO = 20            # a matriz da Atenção mostra as 20 primeiras; "Ver todas" (?todas=1) mostra a lista inteira
+COR_DO_AVISO = {1: "amarelo", 2: "laranja", 3: "vermelho"}      # a cor do INMET pelo nível; a cor que vem no aviso nunca é lida
+SUB_AGIR = (f"foco a até {A.FOCO_KM:g} km, aviso vermelho do INMET ou aviso laranja de tempestade, chuva, vento ou granizo")
+SUB_ATENCAO = "outro aviso do INMET ou risco de fogo alto ou crítico (hoje a D+3)"
+# De que fontes cada número da faixa depende: o "agir agora" vive de avisos e focos; o "atenção", de avisos e risco de fogo; o
+# "sem alerta" precisa das três. Uma fonte parcial ou atrasada só qualifica o número que a usa.
+FONTES_DO_NIVEL = {"agir": ("inmet", "focos"), "atencao": ("inmet", "risco"), "sem": ("inmet", "focos", "risco")}
+NOME_LONGO = {"inmet": "avisos do INMET", "focos": "focos do INPE", "risco": "risco de fogo do INPE"}
+NOME_CURTO = {"inmet": "INMET", "focos": "focos", "risco": "risco de fogo"}
+# A grade por estado do desenho aprovado em 07/10/2026 (esquema, não é mapa): UF -> (coluna, linha) numa grade de 7 x 8.
+UFS_GRADE = {"RR": (2, 1), "AP": (4, 1), "AM": (2, 2), "PA": (3, 2), "MA": (4, 2), "CE": (5, 2), "RN": (6, 2), "AC": (1, 3),
+             "RO": (2, 3), "TO": (3, 3), "PI": (4, 3), "PE": (5, 3), "PB": (6, 3), "MT": (2, 4), "GO": (3, 4), "BA": (4, 4),
+             "AL": (5, 4), "SE": (6, 4), "MS": (2, 5), "DF": (3, 5), "MG": (4, 5), "ES": (5, 5), "PR": (2, 6), "SP": (3, 6),
+             "RJ": (4, 6), "SC": (2, 7), "RS": (2, 8)}
 
 
 def agora() -> datetime:
@@ -89,11 +109,51 @@ def celula_de_risco(i: int, amostra, rotulos=DIAS) -> dict:
     rotulo = rotulos[i]
     if amostra.origem in ("ponto", "entorno") and amostra.valor is not None:
         classe = A.classe_risco_fogo(amostra.valor)
-        return {"rotulo": rotulo, "valor": numero(amostra.valor), "classe": classe, "nivel": A.nivel_do_risco(classe),
-                "nota": "entorno" if amostra.origem == "entorno" else "", "origem": amostra.origem}
+        nivel = A.nivel_do_risco(classe)
+        # `curto` e `cor` são da matriz da Atenção: o número sozinho e c (crítico, vermelho), a (alto, laranja) ou n (o resto)
+        return {"rotulo": rotulo, "valor": numero(amostra.valor), "curto": numero(amostra.valor), "classe": classe,
+                "nivel": nivel, "cor": {3: "c", 2: "a"}.get(nivel, "n"), "nota": "entorno" if amostra.origem == "entorno" else "",
+                "origem": amostra.origem, "_num": amostra.valor}
     texto = {"sem_dado": SEM_DADO, "indisponivel": "indisponível", "fora_da_grade": FORA_DA_GRADE}.get(
         amostra.origem, "sem dado")
-    return {"rotulo": rotulo, "valor": texto, "classe": "", "nivel": 0, "nota": "", "origem": amostra.origem}
+    return {"rotulo": rotulo, "valor": texto, "curto": "—", "classe": "", "nivel": 0, "cor": "n", "nota": "",
+            "origem": amostra.origem, "_num": None}
+
+
+def _dia_na_frase(rotulo: str) -> str:
+    return rotulo.lower() if rotulo in ("Hoje", "Ontem") else rotulo
+
+
+def _quando_dias(indices: list, dias: list) -> str:
+    """[0, 1, 2, 3] -> "de hoje a D+3"; [0, 1] -> "hoje e D+1"; [2] -> "em D+2". Só três ou mais dias seguidos viram "de X a Y"."""
+    rotulos = [_dia_na_frase(dias[i]["rotulo"]) for i in indices]
+    if len(indices) >= 3 and indices == list(range(indices[0], indices[-1] + 1)):
+        return f"de {rotulos[0]} a {rotulos[-1]}"
+    texto = _juntar(rotulos)
+    return texto if rotulos[0] in ("hoje", "ontem") else f"em {texto}"
+
+
+def frase_do_risco(dias: list):
+    """O risco de fogo dos quatro dias numa frase: "Risco de fogo crítico de hoje a D+3 (1,00)". A classe mais alta primeiro, com o
+    maior valor dela; o crítico leva atrás os dias de risco alto. Sem alto nem crítico, diz até onde o risco chega. None se
+    nenhum dia tem número (a causa, "sem vegetação" ou "fora da grade", é dita por quem chama)."""
+    por_nivel = {3: [], 2: []}
+    for i, c in enumerate(dias):
+        if c["nivel"] in por_nivel:
+            por_nivel[c["nivel"]].append(i)
+    pior = 3 if por_nivel[3] else 2 if por_nivel[2] else 0
+    if pior:
+        classe = "crítico" if pior == 3 else "alto"
+        maior = max(dias[i]["_num"] for i in por_nivel[pior])
+        frase = f"Risco de fogo {classe} {_quando_dias(por_nivel[pior], dias)} ({numero(maior)})"
+        if pior == 3 and por_nivel[2]:
+            frase += f"; alto {_quando_dias(por_nivel[2], dias)}"
+        return frase
+    com_numero = [c for c in dias if c["_num"] is not None]
+    if not com_numero:
+        return None
+    mais_alto = max(com_numero, key=lambda c: c["_num"])
+    return f"Risco de fogo até {mais_alto['classe']} ({mais_alto['valor']})"
 
 
 # ── o estado de cada fonte ───────────────────────────────────────────────────────────────────────────────────────────
@@ -196,6 +256,26 @@ def _validade(a, ref) -> str:
     return "em vigor" + fim if A.em_vigor(a, ref) else f"começa {hora(a.inicio, ref)}" + fim
 
 
+def _motivo_do_foco(foco: dict, ref) -> dict:
+    km = numero(foco["km"], 1)
+    return {"tipo": "foco", "pill": f"Foco a {km} km",
+            "principal": f"{_plural(foco['n'], 'foco de queimada', 'focos de queimada')} a até {A.FOCO_KM:g} km",
+            "prova": f"{foco['satelite']} · {hora(foco['hora'], ref)} · o mais perto a {km} km"}
+
+
+def _motivo_do_aviso(a, ref) -> dict:
+    return {"tipo": "aviso", "pill": f"{a.evento} · {COR_DO_AVISO[a.nivel]}", "principal": f"{a.evento}, nível {a.severidade}",
+            "prova": _validade(a, ref)}
+
+
+def _contexto_do_risco(dias, risco_linha, risco_lido: bool) -> str:
+    if dias is None:
+        return "Risco de fogo: sem dado para esta usina" if risco_lido else "Risco de fogo: sem leitura do INPE"
+    if risco_linha:
+        return f"Risco de fogo: {risco_linha}"
+    return frase_do_risco(dias) or "Risco de fogo: sem dado"
+
+
 def _usina(u, avisos_l, indice, risco_l, ref, rotulos):
     avisos = A.avisos_que_contem(u.lat, u.lon, avisos_l.dados["avisos"], ref) if avisos_l.dados else []
     foco = indice.perto(u.lat, u.lon) if indice is not None else None
@@ -205,22 +285,27 @@ def _usina(u, avisos_l, indice, risco_l, ref, rotulos):
     n_inmet = max((a.nivel for a in avisos), default=0)
     n_foco = 3 if foco else 0
     n_risco = max((c["nivel"] for c in dias or []), default=0)
-    nivel = max(n_inmet, n_foco, n_risco)
+    gravidade = max(n_inmet, n_foco, n_risco)          # a régua de três degraus de antes: segue ordenando DENTRO de cada nível
+    nivel = A.nivel_da_usina(avisos, foco is not None, n_risco > 0)
     # Os quatro dias sem número pelo mesmo motivo (sem vegetação em volta, ou fora da grade do INPE) viram UMA linha, e a usina
     # entra na lista de "risco de fogo sem dado" com o motivo.
     risco_linha = risco_origem = None
     if dias and dias[0]["origem"] in MOTIVO_SEM_RISCO and all(c["origem"] == dias[0]["origem"] for c in dias):
         risco_linha, risco_origem = dias[0]["valor"], dias[0]["origem"]
+    manda_agir = [a for a in avisos if A.aviso_manda_agir(a)]
     cartao = {
-        "nome": u.nome, "cliente": u.cliente, "uf": u.uf, "nivel": nivel, "rotulo": NIVEL_ROTULO.get(nivel, ""),
-        "avisos": [{"evento": a.evento, "severidade": a.severidade, "nivel": a.nivel, "validade": _validade(a, ref)}
-                   for a in avisos],
+        "id": u.id, "nome": u.nome, "cliente": u.cliente, "uf": u.uf, "onde": f"{u.cliente} · {u.uf}" if u.uf else u.cliente,
+        "nivel": nivel, "rotulo": A.ROTULO_NIVEL[nivel],
+        "avisos": [{"evento": a.evento, "severidade": a.severidade, "nivel": a.nivel, "cor": COR_DO_AVISO[a.nivel],
+                    "agir": A.aviso_manda_agir(a), "validade": _validade(a, ref),
+                    "comeca": hora(a.inicio, ref) if a.inicio is not None and not A.em_vigor(a, ref) else ""} for a in avisos],
         "foco": None, "dias": dias, "risco_linha": risco_linha, "risco_origem": risco_origem,
-        "_ordem": (-nivel, -(1 if foco else 0), -((n_inmet > 0) + (n_foco > 0) + (n_risco > 0)),
+        # por que a usina pede ação (o foco primeiro, depois os avisos que mandam agir, do mais grave) e o resto que ajuda a decidir
+        "motivos": ([_motivo_do_foco(foco, ref)] if foco else []) + [_motivo_do_aviso(a, ref) for a in manda_agir],
+        "contexto": [f"{a.evento} ({COR_DO_AVISO[a.nivel]}): {_validade(a, ref)}" for a in avisos if not A.aviso_manda_agir(a)]
+                    + [_contexto_do_risco(dias, risco_linha, risco_l.dados is not None)],
+        "_ordem": (-gravidade, -(1 if foco else 0), -((n_inmet > 0) + (n_foco > 0) + (n_risco > 0)),
                    foco["km"] if foco else float("inf"), -n_inmet, chave_texto(u.nome)),
-        "_tem_aviso": bool(avisos), "_em_vigor": any(A.em_vigor(a, ref) for a in avisos), "_n_inmet": n_inmet,
-        "_n_foco": n_foco, "_n_risco": n_risco, "_foco_km": foco["km"] if foco else None,
-        "_risco_por_dia": [c["nivel"] > 0 for c in dias] if dias else None,
     }
     if foco:
         cartao["foco"] = {"texto": f"{_plural(foco['n'], 'foco', 'focos')} a até {A.FOCO_KM:g} km · o mais perto a "
@@ -228,25 +313,98 @@ def _usina(u, avisos_l, indice, risco_l, ref, rotulos):
     return cartao
 
 
-def _cartao_resumo(id_, rotulo, leitura, fonte, valor, sub, nivel) -> dict:
-    """Um dos três números do topo. Sem leitura: "—" e a razão. Com leitura que não está inteira (`fonte["qualifica"]`), o
-    número fica, o qualificador vai no fim do texto, e a cor deixa de ser o verde do "zero alertas" (vira âmbar): a cor da
-    gravidade só some quando não há gravidade nenhuma a mostrar."""
-    if leitura.dados is None:
-        return {"id": id_, "rotulo": rotulo, "valor": "—", "classe": "cl-nx",
-                "sub": "lendo a fonte" if leitura.erro == L.LENDO else "fonte fora"}
-    qualifica = fonte["qualifica"]
-    return {"id": id_, "rotulo": rotulo, "valor": str(valor), "sub": " · ".join([sub, *qualifica]),
-            "classe": f"cl-n{nivel}" if (nivel or not qualifica) else "cl-na"}
+def _uf_da_grade(texto):
+    uf = str(texto or "").strip().upper()
+    return uf if uf in UFS_GRADE else None
 
 
-def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, sessao=None) -> dict:
-    """Tudo o que o template precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê)."""
+def _grade_ufs(com_alerta: list, completa: bool) -> tuple:
+    """(os 27 quadrados em ordem de leitura, quantas usinas com alerta ficaram sem UF válida). O número do quadrado é o de usinas
+    com alerta (agir agora e atenção) no estado; a cor é a do pior nível. Usina com alerta e UF que não é uma das 27 siglas não
+    some: o chamador diz quantas são."""
+    por_uf, sem_uf = {}, 0
+    for c in com_alerta:
+        uf = _uf_da_grade(c["uf"])
+        if uf is None:
+            sem_uf += 1
+            continue
+        n, agir = por_uf.get(uf, (0, 0))
+        por_uf[uf] = (n + 1, agir + (c["nivel"] == A.AGIR))
+    quadrados = []
+    for uf, (col, lin) in sorted(UFS_GRADE.items(), key=lambda kv: (kv[1][1], kv[1][0])):
+        n, agir = por_uf.get(uf, (0, 0))
+        if n:
+            titulo = f"{uf}: {_plural(n, 'usina com alerta', 'usinas com alerta')}" + (f", {agir} para agir agora" if agir else "")
+        else:
+            titulo = f"{uf}: sem usina com alerta" + ("" if completa else " nas fontes lidas")
+        quadrados.append({"uf": uf, "col": col, "row": lin, "n": n, "texto": str(n) if n else "·", "titulo": titulo,
+                          "nivel": "agir" if agir else "atencao" if n else ""})
+    return quadrados, sem_uf
+
+
+def _qualificadores(ids, leituras, por_id) -> list:
+    """O que a leitura das fontes `ids` tem de errado ou incompleto, para repetir no número da faixa que as usa: fonte sem leitura
+    ("sem leitura de avisos do INMET", ou "lendo ..." enquanto a primeira leitura não veio) e fonte com dado mas não inteiro
+    ("INMET: parcial", "focos: arquivos até 14:10", "INMET: dado de 14:00")."""
+    saida = []
+    for i in ids:
+        if leituras[i].dados is None:
+            saida.append(f"{'lendo' if leituras[i].erro == L.LENDO else 'sem leitura de'} {NOME_LONGO[i]}")
+        else:
+            saida += [f"{NOME_CURTO[i]}: {q}" for q in por_id[i]["qualifica"]]
+    return saida
+
+
+def _celula_da_faixa(id_: str, rotulo: str, n, sub: str, qual: list, *, traco: bool, ambar: bool) -> dict:
+    """Um dos quatro números do topo. `traco`: não há leitura para dizer o número ("—", nunca 0). `ambar`: o número vale, mas
+    veio de fonte que não está inteira, e a cor deixa de ser a do "tudo bem"."""
+    classe = f"cl-{id_}" + (" cl-nx" if traco else " cl-na" if ambar else "")
+    if traco:
+        return {"id": id_, "rotulo": rotulo, "valor": "—", "unidade": "", "sub": sub, "qual": qual, "classe": classe}
+    return {"id": id_, "rotulo": rotulo, "valor": str(n), "unidade": "usina" if n == 1 else "usinas", "sub": sub, "qual": qual,
+            "classe": classe}
+
+
+def _faixa(n_agir, n_atencao, n_sem, n_usinas, v, leituras, por_id) -> list:
+    ids = ("inmet", "focos", "risco")
+    ausentes = [i for i in ids if leituras[i].dados is None]
+
+    def qual(nivel):
+        return _qualificadores(FONTES_DO_NIVEL[nivel], leituras, por_id)
+
+    def sem_nenhuma(nivel):
+        return all(leituras[i].dados is None for i in FONTES_DO_NIVEL[nivel])
+
+    q_agir, q_atencao, q_sem = qual("agir"), qual("atencao"), qual("sem")
+    sub_sem = "não dá para dizer" if ausentes else "nas fontes lidas" if q_sem else "nas três fontes lidas"
+    n_sem_risco = sum(len(g["nomes"]) for g in v["sem_risco"])
+    cobertura = "em operação com coordenada"
+    if n_sem_risco:
+        cobertura += f" · {n_sem_risco} sem dado de risco"
+    if v["sem_coordenada"]:
+        cobertura += f" · {len(v['sem_coordenada'])} sem coordenada"
+    if v["fora_do_brasil"]:
+        cobertura += f" · {len(v['fora_do_brasil'])} com coordenada fora do Brasil"
+    return [
+        _celula_da_faixa("agir", "Agir agora", n_agir, SUB_AGIR, q_agir, traco=sem_nenhuma("agir"), ambar=bool(q_agir) and n_agir == 0),
+        _celula_da_faixa("atencao", "Atenção", n_atencao, SUB_ATENCAO, q_atencao, traco=sem_nenhuma("atencao"),
+                         ambar=bool(q_atencao) and n_atencao == 0),
+        _celula_da_faixa("sem", "Sem alerta", n_sem, sub_sem, q_sem, traco=bool(ausentes), ambar=bool(q_sem)),
+        _celula_da_faixa("cobertura", "Cobertura", n_usinas, cobertura, [], traco=False, ambar=False),
+    ]
+
+
+def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, sessao=None, todas=False) -> dict:
+    """Tudo o que o template precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê). `todas`:
+    a matriz da Atenção mostra a lista inteira, e não só as `LIMITE_ATENCAO` primeiras."""
     ref = ref or agora()
     v = {"erro_cadastro": erro_cadastro, "atualizada": hora(ref, ref), "clientes": [], "cliente": "", "n_usinas": 0,
-         "resumo": [], "fontes": [], "faltando": [], "lendo": [], "completa": True, "recarrega_em": RECARGA_S,
-         "titulo_lista": "", "sem_alerta_texto": "", "alertas": [], "sem_alerta": 0, "sem_risco": [],
-         "sem_coordenada": [], "fora_do_brasil": [], "ilegiveis": 0, "sem_usinas": False}
+         "faixa": [], "fontes": [], "faltando": [], "lendo": [], "completa": True, "recarrega_em": RECARGA_S,
+         "agir": [], "atencao": [], "alertas": [], "atencao_linhas": [], "n_atencao": 0, "atencao_resumida": False,
+         "vazio_agir": "", "vazio_atencao": "", "sem_alerta": None, "aviso_vazio": "—", "foco_vazio": "—",
+         "ufs": [], "ufs_legenda_sem": "", "ufs_sem_uf": 0, "sem_risco": [], "sem_coordenada": [], "fora_do_brasil": [],
+         "ilegiveis": 0, "sem_usinas": False, "rotulos": list(DIAS), "limite_atencao": LIMITE_ATENCAO,
+         "matriz_tem_entorno": False}
     if cadastro is None:
         return v
     v["clientes"] = cadastro.clientes()
@@ -269,56 +427,52 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     avisos_l = L.avisos(config, sessao)
     focos_l = L.focos(config, sessao)
     risco_l = L.risco(config, cadastro.pontos(), sessao)
+    leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
     indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
     rotulos = rotulos_dos_dias(_arquivo_t0(risco_l.dados) if risco_l.dados else None, ref)
     cartoes = [_usina(u, avisos_l, indice, risco_l, ref, rotulos) for u in usinas]
-    com_alerta = sorted((c for c in cartoes if c["nivel"] > 0), key=lambda c: c["_ordem"])
+    agir = sorted((c for c in cartoes if c["nivel"] == A.AGIR), key=lambda c: c["_ordem"])
+    atencao = sorted((c for c in cartoes if c["nivel"] == A.ATENCAO), key=lambda c: c["_ordem"])
     fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos)]
     por_id = {f["id"]: f for f in fontes}
 
-    com_aviso = [c for c in cartoes if c["_tem_aviso"]]
-    com_foco = [c for c in cartoes if c["_n_foco"]]
-    com_risco = [c for c in cartoes if c["_n_risco"]]
-    # Dia do risco sem leitura: "—", nunca 0 (zero é "li e não há alerta").
-    sem_leitura = set(risco_l.dados["erros"]) if risco_l.dados else set()
-    por_dia = ["—" if i in sem_leitura else str(sum(1 for c in cartoes if c["_risco_por_dia"] and c["_risco_por_dia"][i]))
-               for i in range(len(DIAS))]
-    sub_risco = " · ".join(f"{rotulos[i].lower() if rotulos[i] in ('Hoje', 'Ontem') else rotulos[i]} {por_dia[i]}"
-                           for i in range(len(DIAS)))
-    v["resumo"] = [
-        _cartao_resumo("avisos", "Aviso do INMET", avisos_l, por_id["inmet"], len(com_aviso),
-                       f"{sum(c['_em_vigor'] for c in com_aviso)} em vigor agora" if com_aviso
-                       else "nenhum aviso sobre as usinas", max((c["_n_inmet"] for c in cartoes), default=0)),
-        _cartao_resumo("focos", f"Foco a até {A.FOCO_KM:g} km", focos_l, por_id["focos"], len(com_foco),
-                       f"o mais perto a {numero(min(c['_foco_km'] for c in com_foco), 1)} km" if com_foco
-                       else f"nenhum foco a até {A.FOCO_KM:g} km", 3 if com_foco else 0),
-        _cartao_resumo("risco", "Risco de fogo alto ou crítico", risco_l, por_id["risco"], len(com_risco), sub_risco,
-                       max((c["_n_risco"] for c in cartoes), default=0)),
-    ]
     v["fontes"] = fontes
-    nomes_das_fontes = (("avisos do INMET", avisos_l), ("focos do INPE", focos_l), ("risco de fogo do INPE", risco_l))
-    # Fonte SEM leitura boa: ou ainda está sendo lida pela primeira vez ("lendo", a tela volta em 10 s) ou está fora. A lista
-    # e os números não a incluem, e a tela diz (uma lista curta demais parece "só essas têm alerta").
-    v["lendo"] = [n for n, leitura in nomes_das_fontes if leitura.dados is None and leitura.erro == L.LENDO]
-    v["faltando"] = [n for n, leitura in nomes_das_fontes if leitura.dados is None and leitura.erro != L.LENDO]
+    v["agir"], v["atencao"], v["alertas"] = agir, atencao, agir + atencao
+    v["n_atencao"] = len(atencao)
+    v["atencao_resumida"] = not todas and len(atencao) > LIMITE_ATENCAO
+    v["atencao_linhas"] = atencao[:LIMITE_ATENCAO] if v["atencao_resumida"] else atencao
+    v["rotulos"] = rotulos          # os quatro dias da matriz: pela data do arquivo do INPE, não fixos ("Ontem · Hoje · D+1 · D+2")
+    v["matriz_tem_entorno"] = any(d["nota"] for c in v["atencao_linhas"] for d in c["dias"] or [])
+    ausentes = [i for i in ("inmet", "focos", "risco") if leituras[i].dados is None]
+    # Fonte SEM leitura boa: ou ainda está sendo lida pela primeira vez ("lendo", a tela volta em 10 s) ou está fora. Os números
+    # não a incluem, e a tela diz (uma lista curta demais parece "só essas têm alerta").
+    v["lendo"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro == L.LENDO]
+    v["faltando"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro != L.LENDO]
     v["completa"] = all(f["estado"] == "ok" for f in fontes)
     v["recarrega_em"] = RECARGA_LENDO_S if v["lendo"] else RECARGA_S
-    v["alertas"] = com_alerta
-    v["sem_alerta"] = len(cartoes) - len(com_alerta)
-    ausentes = [n for n, leitura in nomes_das_fontes if leitura.dados is None]       # na ordem do painel das fontes
-    if com_alerta:
-        v["titulo_lista"] = f"Usinas com alerta ({len(com_alerta)}), da mais grave para a menos"
-    elif ausentes:
-        v["titulo_lista"] = f"Sem leitura de {_juntar(ausentes)}: não dá para dizer que não há alerta"
-    elif not v["completa"]:
-        v["titulo_lista"] = "Nenhuma usina com alerta nas leituras disponíveis (veja o estado das fontes)"
-    else:
-        v["titulo_lista"] = "Nenhuma usina com alerta agora"
-    v["sem_alerta_texto"] = (f"{_plural(v['sem_alerta'], 'usina sem alerta', 'usinas sem alerta')} "
-                             f"{'agora' if v['completa'] else 'nas fontes lidas'}.")
+
+    def vazio(texto, ids):
+        """O que a seção vazia diz. Só olha as fontes que ELA usa: o risco de fogo velho não tira o "nenhuma usina para agir"."""
+        faltam = [NOME_LONGO[i] for i in ids if leituras[i].dados is None]
+        if faltam:
+            return f"Sem leitura de {_juntar(faltam)}: não dá para dizer que não há alerta"
+        if any(por_id[i]["estado"] != "ok" for i in ids):
+            return f"{texto} nas leituras disponíveis (veja o estado das fontes)"
+        return texto
+
+    v["vazio_agir"] = "" if agir else vazio("Nenhuma usina para agir agora", FONTES_DO_NIVEL["agir"])
+    v["vazio_atencao"] = "" if atencao else vazio("Nenhuma usina em atenção", FONTES_DO_NIVEL["atencao"])
+    # "Sem alerta" só se diz com as três fontes lidas; com alguma fora, "—" (o número seria "sem alerta nas fontes lidas")
+    n_sem = len(cartoes) - len(agir) - len(atencao)
+    v["sem_alerta"] = None if ausentes else n_sem
+    v["aviso_vazio"] = "sem leitura" if avisos_l.dados is None else "—"
+    v["foco_vazio"] = "sem leitura" if focos_l.dados is None else "—"
     if risco_l.dados:
         for origem, motivo in MOTIVO_SEM_RISCO.items():
             nomes = [c["nome"] for c in cartoes if c["risco_origem"] == origem]
             if nomes:
                 v["sem_risco"].append({"motivo": motivo, "nomes": nomes})
+    v["faixa"] = _faixa(len(agir), len(atencao), n_sem, len(usinas), v, leituras, por_id)
+    v["ufs"], v["ufs_sem_uf"] = _grade_ufs(agir + atencao, v["completa"])
+    v["ufs_legenda_sem"] = "sem usina com alerta" + ("" if v["completa"] else " nas fontes lidas")
     return v

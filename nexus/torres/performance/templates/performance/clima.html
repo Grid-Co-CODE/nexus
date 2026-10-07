@@ -2,88 +2,147 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
-{# Clima e risco (06/10/2026): avisos do INMET, focos de queimada e risco de fogo do INPE por usina, só leitura. A tela se
-   recarrega a cada 60 s, como a Operação em tempo real; o que vai à rede é decidido pelo cache de cada fonte (30 min, 10 min
-   e 6 h), não por esta recarga. O base.html não tem bloco de head, e o navegador aceita o meta dentro do corpo.
-   Texto do INMET é de terceiros: só entra por {{ }} (escapado), nunca por |safe, e a cor do aviso nem é lida. #}
+{# Clima e risco (06/10/2026; leitura rápida em 07/10/2026): avisos do INMET, focos de queimada e risco de fogo do INPE por usina,
+   só leitura. A tela se recarrega a cada 60 s, como a Operação em tempo real; o que vai à rede é decidido pelo cache de cada
+   fonte (30 min, 10 min e 6 h), não por esta recarga. O base.html não tem bloco de head, e o navegador aceita o meta dentro do
+   corpo. Texto do INMET é de terceiros: só entra por {{ }} (escapado), nunca por |safe, e a cor do aviso nem é lida. #}
 <meta http-equiv="refresh" content="{{ v.recarrega_em }}">
 <div class="cl">
   <header class="cl-cab">
-    <div>
+    <div class="cl-cab-txt">
       <p class="gc-eyebrow">{{ torre.nome }}</p>
       <h1 class="cl-titulo">{{ tela.nome }}</h1>
       <p class="cl-pergunta">{{ tela.pergunta }}</p>
     </div>
-    <p class="cl-atualizada">Tela atualizada às {{ v.atualizada }}</p>
+    <div class="cl-cab-dir">
+      {% if v.clientes %}
+      <form class="cl-filtro" method="get" action="">
+        <label class="gc-rotulo" for="cl-cliente">Cliente</label>
+        <select id="cl-cliente" name="cliente" class="gc-campo" onchange="this.form.submit()">
+          <option value="">Todos os clientes</option>
+          {% for c in v.clientes %}<option value="{{ c }}"{% if c == v.cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+        <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
+      </form>
+      {% endif %}
+      <span class="cl-atualizada">atualizada às {{ v.atualizada }}</span>
+    </div>
   </header>
 
   {% if v.erro_cadastro %}
   <div class="cl-aviso" role="alert">Cadastro indisponível: {{ v.erro_cadastro }}</div>
   {% else %}
 
-  {% if v.clientes %}
-  <form class="cl-filtro" method="get" action="">
-    <label class="gc-rotulo" for="cl-cliente">Cliente</label>
-    <select id="cl-cliente" name="cliente" class="gc-campo" onchange="this.form.submit()">
-      <option value="">Todos os clientes</option>
-      {% for c in v.clientes %}<option value="{{ c }}"{% if c == v.cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
-    </select>
-    <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
-  </form>
-  {% endif %}
-
   {% if v.sem_usinas %}
   <p class="cl-aviso">Nenhuma usina em operação com coordenada no cadastro. Sem coordenada não há onde procurar aviso, foco nem risco de fogo.</p>
   {% else %}
-  <p class="cl-base">Alertas calculados para {{ v.n_usinas }} {{ "usina em operação com coordenada" if v.n_usinas == 1 else "usinas em operação com coordenada" }} no cadastro{% if v.cliente %} (cliente {{ v.cliente }}){% endif %}. A coordenada não aparece nesta tela.</p>
 
-  <section class="cl-resumo" aria-label="Resumo dos alertas">
-    {% for r in v.resumo %}
-    <div class="cl-num {{ r.classe }}" data-id="{{ r.id }}"><span class="cl-rotulo">{{ r.rotulo }}</span><span class="cl-valor">{{ r.valor }}</span><span class="cl-sub">{{ r.sub }}</span></div>
+  <section class="cl-faixa" aria-label="Resumo dos alertas">
+    {% for f in v.faixa %}
+    <div class="cl-cel {{ f.classe }}" data-id="{{ f.id }}">
+      <span class="cl-rotulo">{{ f.rotulo }}</span>
+      <span class="cl-numero"><span class="cl-valor">{{ f.valor }}</span>{% if f.unidade %} <span class="cl-un">{{ f.unidade }}</span>{% endif %}</span>
+      <span class="cl-sub">{{ f.sub }}</span>
+      {% if f.qual %}<span class="cl-qual">{{ f.qual|join(" · ") }}</span>{% endif %}
+    </div>
     {% endfor %}
   </section>
+  {% if v.faltando %}<p class="cl-nota cl-nota--atencao">Os números da faixa e as listas não incluem: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
+  {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. Os números da faixa e as listas ainda não incluem essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
 
-  <section class="cl-fontes" aria-label="Estado das fontes">
-    {% for f in v.fontes %}
-    <div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>
-    {% endfor %}
-  </section>
-  {% if v.faltando %}<p class="cl-nota cl-nota--atencao">A lista e os números acima não incluem: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
-  {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. A lista e os números acima ainda não incluem essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
-  {% for g in v.sem_risco %}<p class="cl-nota">Risco de fogo sem dado ({{ g.motivo }}): {{ g.nomes|join(", ") }}.</p>{% endfor %}
-
-  <h2 class="cl-h2">{{ v.titulo_lista }}</h2>
-  <section class="cl-lista" aria-label="Usinas com alerta">
-    {% for c in v.alertas %}
-    <article class="cl-usina cl-n{{ c.nivel }}">
-      <div class="cl-usina-cab">
-        <div class="cl-usina-id"><h3 class="cl-nome">{{ c.nome }}</h3><span class="cl-cliente">{{ c.cliente }}{% if c.uf %} · {{ c.uf }}{% endif %}</span></div>
-        <span class="cl-nivel cl-n{{ c.nivel }}">{{ c.rotulo }}</span>
-      </div>
-      {% if c.avisos or c.foco %}
-      <ul class="cl-linhas">
-        {% for a in c.avisos %}
-        <li class="cl-linha cl-n{{ a.nivel }}"><span class="cl-tipo">INMET</span> <strong>{{ a.evento }}</strong> · {{ a.severidade }} · {{ a.validade }}</li>
+  <section class="cl-secao" aria-labelledby="cl-agir">
+    <h2 class="cl-h2" id="cl-agir">Agir agora{% if v.agir %} <span class="cl-h2-sub">· da mais grave para a menos</span>{% endif %}</h2>
+    {% if v.agir %}
+    <div class="cl-lista">
+      {% for c in v.agir %}
+      {% set m = c.motivos[0] %}
+      <article class="cl-usina">
+        <div class="cl-usina-cab">
+          <div class="cl-usina-id"><h3 class="cl-nome">{{ c.nome }}</h3><span class="cl-onde">{{ c.onde }}</span></div>
+          <span class="cl-pill cl-pill--agir">{{ m.pill }}</span>
+        </div>
+        <p class="cl-principal">{{ m.principal }}</p>
+        <p class="cl-prova">{{ m.prova }}</p>
+        {% for o in c.motivos[1:] %}
+        <p class="cl-tambem"><span class="cl-pill cl-pill--agir">{{ o.pill }}</span> {{ o.principal }}<span class="cl-prova">{{ o.prova }}</span></p>
         {% endfor %}
-        {% if c.foco %}<li class="cl-linha cl-n3"><span class="cl-tipo">Foco</span> {{ c.foco.texto }}</li>{% endif %}
-      </ul>
-      {% endif %}
-      {% if c.dias %}
-      <p class="cl-rotulo-risco">Risco de fogo (INPE)</p>
-      {% if c.risco_linha %}
-      <p class="cl-linha cl-n0">{{ c.risco_linha }}</p>
-      {% else %}
-      <div class="cl-dias">
-        {% for d in c.dias %}
-        <div class="cl-dia cl-n{{ d.nivel }}"><span class="cl-dia-rot">{{ d.rotulo }}</span> <span class="cl-dia-val">{{ d.valor }}</span>{% if d.classe %} <span class="cl-dia-classe">{{ d.classe }}</span>{% endif %}{% if d.nota %} <span class="cl-dia-nota">{{ d.nota }}</span>{% endif %}</div>
+        <p class="cl-contexto">{{ c.contexto|join(" · ") }}</p>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="cl-nota">{{ v.vazio_agir }}</p>
+    {% endif %}
+  </section>
+
+  <div class="cl-duas">
+    <section class="cl-painel" aria-labelledby="cl-ufs">
+      <h2 class="cl-h2" id="cl-ufs">Por estado <span class="cl-h2-sub">· esquema, não é mapa</span></h2>
+      <div class="cl-ufs-rolagem">
+        <div class="cl-ufs">
+          {% for t in v.ufs %}
+          <div class="cl-uf{% if t.nivel %} cl-uf--{{ t.nivel }}{% endif %}" style="grid-column:{{ t.col }};grid-row:{{ t.row }}" title="{{ t.titulo }}" role="img" aria-label="{{ t.titulo }}"><span class="cl-uf-sigla">{{ t.uf }}</span><span class="cl-uf-n">{{ t.texto }}</span></div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="cl-legenda">
+        <span><i class="cl-leg cl-leg--agir"></i>tem usina para agir agora</span>
+        <span><i class="cl-leg cl-leg--atencao"></i>só atenção</span>
+        <span><i class="cl-leg cl-leg--nada"></i>{{ v.ufs_legenda_sem }}</span>
+        <span class="cl-mudo">número = usinas com alerta no estado</span>
+      </div>
+      {% if v.ufs_sem_uf %}<p class="cl-nota">{{ v.ufs_sem_uf }} {{ "usina com alerta está sem UF válida" if v.ufs_sem_uf == 1 else "usinas com alerta estão sem UF válida" }} no cadastro e fica fora da grade.</p>{% endif %}
+    </section>
+
+    <section class="cl-painel" aria-labelledby="cl-fontes">
+      <h2 class="cl-h2" id="cl-fontes">Fontes <span class="cl-h2-sub">· de quando é cada dado</span></h2>
+      <div class="cl-fontes">
+        {% for f in v.fontes %}
+        <div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>
         {% endfor %}
       </div>
+      {% for g in v.sem_risco %}<p class="cl-nota">Risco de fogo sem dado ({{ g.motivo }}): {{ g.nomes|join(", ") }}.</p>{% endfor %}
+      <p class="cl-nota">Fonte fora vira ponto vermelho com "fora agora; última leitura boa às HH:MM". A tela nunca diz "sem alerta" sobre uma fonte que não leu.</p>
+    </section>
+  </div>
+
+  <section class="cl-secao" aria-labelledby="cl-atencao">
+    <div class="cl-secao-cab">
+      <h2 class="cl-h2" id="cl-atencao">Atenção{% if v.n_atencao %} <span class="cl-h2-sub">· {{ v.n_atencao }} {{ "usina" if v.n_atencao == 1 else "usinas" }}{% if v.atencao_resumida %}, as {{ v.limite_atencao }} primeiras{% endif %}</span>{% endif %}</h2>
+      {% if v.atencao_resumida %}
+      <a class="cl-ver" href="{{ url_for('torre_performance.clima', cliente=(v.cliente or None), todas=1, _anchor='cl-atencao') }}">Ver todas ({{ v.n_atencao }})</a>
+      {% elif v.n_atencao > v.limite_atencao %}
+      <a class="cl-ver" href="{{ url_for('torre_performance.clima', cliente=(v.cliente or None), _anchor='cl-atencao') }}">Ver só as {{ v.limite_atencao }} primeiras</a>
       {% endif %}
-      {% endif %}
-    </article>
-    {% endfor %}
+    </div>
+    {% if v.atencao_linhas %}
+    <div class="cl-matriz">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Usina</th>
+            <th scope="col">Aviso do INMET</th>
+            <th scope="col">Foco ≤5 km</th>
+            <th scope="col">Risco de fogo · {{ v.rotulos|join(" · ") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in v.atencao_linhas %}
+          <tr class="cl-lin">
+            <th scope="row" class="cl-col-usina"><span class="cl-nome">{{ c.nome }}</span><span class="cl-onde">{{ c.onde }}</span></th>
+            <td class="cl-col-aviso">{% for a in c.avisos %}<span class="cl-av"><span class="cl-pill cl-pill--n{{ a.nivel }}" title="{{ a.severidade }} · {{ a.validade }}">{{ a.evento }}</span>{% if a.comeca %} <span class="cl-quando">começa {{ a.comeca }}</span>{% endif %}</span>{% else %}{{ v.aviso_vazio }}{% endfor %}</td>
+            <td class="cl-col-foco">{{ v.foco_vazio }}</td>
+            <td class="cl-col-risco">{% if c.dias %}<div class="cl-dias4">{% for d in c.dias %}<span class="cl-c cl-c-{{ d.cor }}" title="{{ d.rotulo }}: {{ d.valor }}{% if d.classe %} ({{ d.classe }}{% if d.nota %}, entorno de 2 km{% endif %}){% endif %}">{{ d.curto }}{% if d.nota %}*{% endif %}</span>{% endfor %}</div>{% else %}<span class="cl-semleitura">sem leitura</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if v.matriz_tem_entorno %}<p class="cl-nota">* maior valor do entorno de 2 km: o INPE não calcula o pixel da usina onde não há vegetação.</p>{% endif %}
+    {% else %}
+    <p class="cl-nota">{{ v.vazio_atencao }}</p>
+    {% endif %}
   </section>
-  <p class="cl-nota">{{ v.sem_alerta_texto }}</p>
   {% endif %}
 
   {% if v.sem_coordenada %}
@@ -102,11 +161,12 @@
   {% endif %}
 
   <footer class="cl-rodape">
-    <p><strong>Dados: INMET, INPE (Programa Queimadas).</strong> Somente leitura: esta tela não grava nada.</p>
+    <p><strong>Dados: INMET, INPE (Programa Queimadas).</strong> Somente leitura: esta tela não grava nada. Coordenadas do cadastro do Nexus, que não aparecem na tela.</p>
     <ul>
       <li>Avisos: INMET, avisos meteorológicos ativos, cada um com o seu polígono; o aviso vale para a usina cujo ponto está dentro dele. Fonte pública, de endereço não documentado oficialmente.</li>
       <li>Focos: INPE, Programa Queimadas, arquivos de 10 em 10 min com a detecção dos satélites. Um foco é um pixel com fogo detectado, não um incêndio confirmado; contam os que estão a até 5 km, nos arquivos da última hora.</li>
       <li>Risco de fogo: INPE, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1; alto a partir de 0,7, crítico acima de 0,95). Onde o INPE não calcula, por não haver vegetação, vale o maior valor do entorno de 2 km, marcado como entorno.</li>
+      <li>Níveis: "Agir agora" é foco a até 5 km, aviso vermelho, ou aviso laranja de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo; "Atenção" é qualquer outro aviso em vigor ou futuro, ou risco de fogo alto ou crítico de hoje a D+3; "Sem alerta" só se diz com as três fontes lidas.</li>
     </ul>
   </footer>
 </div>
