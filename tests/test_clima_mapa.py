@@ -103,6 +103,26 @@ def test_arquivo_fora_do_formato_falha_alto(tmp_path):
         M.estados(_arquivo(tmp_path, [ponto] + [_feature(c) for c in M.UFS if c != "11"], "ponto.geojson"))
 
 
+def test_anel_com_menos_de_4_pontos_falha_alto(tmp_path):
+    curto = _feature("11", anel=((-50, -10), (-49, -10), (-50, -10)))
+    with pytest.raises(ValueError, match="menos de 4"):
+        M.estados(_arquivo(tmp_path, [curto] + [_feature(c) for c in M.UFS if c != "11"], "curto.geojson"))
+
+
+def test_o_rotulo_fica_no_centroide_e_nao_no_meio_da_caixa(tmp_path):
+    triangulo = ((0, 0), (6, 0), (0, 3), (0, 0))                          # o centroide é (2, 1); o meio da caixa, (3, 1,5)
+    todos = [_feature("11", triangulo)] + [_feature(c) for c in M.UFS if c != "11"]
+    ro = next(e for e in M.estados(_arquivo(tmp_path, todos, "triangulo.geojson")) if e.sigla == "RO")
+    assert ro.centro == pytest.approx((2.0, 1.0))
+
+
+def test_anel_sem_area_nao_divide_por_zero_e_o_rotulo_vai_para_o_meio_da_caixa(tmp_path):
+    reto = ((0, 0), (4, 2), (2, 1), (0, 0))                               # três pontos na mesma reta: área zero
+    todos = [_feature("11", reto)] + [_feature(c) for c in M.UFS if c != "11"]
+    ro = next(e for e in M.estados(_arquivo(tmp_path, todos, "reto.geojson")) if e.sigla == "RO")
+    assert ro.centro == pytest.approx((2.0, 1.0))
+
+
 def test_multipolygon_e_aceito_e_o_rotulo_usa_o_maior_pedaco(tmp_path):
     grande = ((-50, -10), (-40, -10), (-40, 0), (-50, 0), (-50, -10))
     ilha = ((-30, -10), (-29, -10), (-29, -9), (-30, -9), (-30, -10))
@@ -268,6 +288,11 @@ def test_caminho_descarta_o_anel_que_nao_sobra_nada_para_desenhar():
     ponto_so = [(1, 1), (1.0001, 1), (1, 1.0001), (1, 1)]
     assert M.caminho([ponto_so], V10) == ""
     assert M.caminho([], V10) == ""
+
+
+def test_caminho_descarta_o_anel_que_virou_um_risco_de_dois_pontos():
+    risco = [(1, 1), (2, 1), (1.0001, 1.0001), (1, 1)]                    # ida e volta na mesma reta: não tem área
+    assert M.caminho([risco], V10) == ""
 
 
 def test_os_deslocamentos_reconstroem_o_desenho_sem_acumular_erro():

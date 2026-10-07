@@ -14,7 +14,8 @@ recorte, o y é a latitude. Sem o cosseno o Brasil ficaria 3% mais largo; no Sul
 média dele e refaz o viewBox, que tem sempre 1000 de largura: o tamanho dos pontos e dos traços, que o CSS decide em unidades
 do SVG, vale igual em todas as vistas. A conta fica em graus de latitude (1 = ~111 km) e a `Vista` a leva para o SVG.
 
-Função pura: nada aqui lê cadastro, fonte ou relógio. Quem junta isso com as usinas e as fontes é o `montar` (adiante).
+A primeira metade do módulo é geometria pura (contorno, projeção, vista, caminho). O `montar`, no fim, junta isso com as usinas
+do cadastro e as leituras das três fontes (as MESMAS da tela principal, pelo mesmo cache) e devolve o que o template desenha.
 """
 import json
 import math
@@ -22,6 +23,11 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import quote
+
+from . import alertas as A
+from . import leitura as L
+from . import visao as V
 
 ARQUIVO_UFS = Path(__file__).resolve().parents[2] / "static" / "clima" / "ibge-ufs-minima.geojson"
 LARGURA = 1000                     # a largura do viewBox de TODA vista; a altura sai da geografia
@@ -251,3 +257,187 @@ def ufs_da_vista(v: Vista) -> tuple:
         com_rotulo = v.dentro(x, y)
         saida.append(UfNoMapa(e.sigla, e.nome, d, _n(x) if com_rotulo else None, _n(y) if com_rotulo else None))
     return tuple(saida)
+
+
+# ── o que a tela desenha ─────────────────────────────────────────────────────────────────────────────────────────────
+
+URL_USINA = "/t/performance/clima/usina/{}"          # a página da usina (a tela principal a serve; o mapa só aponta para ela)
+NX = "nx"                                            # nível de quem ficaria "Sem alerta" mas teve fonte sem leitura
+ROTULO_NX = "Sem leitura completa"
+ORDEM_DE_DESENHO = {NX: 0, A.SEM_ALERTA: 1, A.ATENCAO: 2, A.AGIR: 3}     # o que pede ação por último: fica por cima
+# Raios em unidades do SVG (o viewBox tem 1000 de largura): a usina que pede ação é maior que a que está bem, e o anel do foco
+# cobre o ponto da usina que está a até 5 km dele. No celular o CSS os multiplica (o SVG ali tem uns 340 px, não 700).
+R_USINA = {A.AGIR: 7.5, A.ATENCAO: 6.0, A.SEM_ALERTA: 5.0, NX: 5.0}
+R_ALVO = 2.2                                         # o círculo invisível que aumenta a área de toque: R_ALVO vezes o raio
+R_ANEL = 12.0
+FOLGA_PONTO = 4.0                                    # foco um pouco fora do viewBox ainda desenha (o ponto tem espessura)
+MOTIVOS_NO_TITULO = 3
+_NOMES_DAS_FONTES = (("avisos do INMET", "inmet"), ("focos do INPE", "focos"), ("risco de fogo do INPE", "risco"))
+
+
+def _juntar(nomes: list) -> str:
+    """["a", "b", "c"] -> "a, b e c" (o mesmo da tela principal)."""
+    return nomes[0] if len(nomes) == 1 else ", ".join(nomes[:-1]) + " e " + nomes[-1]
+
+
+def _aneis_do_aviso(geometria_) -> list:
+    """Todos os anéis de um Polygon ou MultiPolygon do INMET (o de fora e os buracos de cada pedaço): o `evenodd` do SVG faz
+    do buraco um buraco. O `Aviso` só nasce com geometria que o `geometria.caixa` já aceitou."""
+    coords = geometria_["coordinates"]
+    poligonos = [coords] if geometria_["type"] == "Polygon" else coords
+    return [anel for poligono in poligonos for anel in poligono]
+
+
+def _estado_da_camada(leitura) -> str:
+    return "ok" if leitura.dados is not None else ("lendo" if leitura.erro == L.LENDO else "fora")
+
+
+def _camada_avisos(avisos_l, v: Vista, ref, qualifica: list) -> dict:
+    """Os polígonos do INMET que valem agora ou valerão (o vencido não desenha) e encostam no recorte, em grupos por nível e por
+    "já em vigor" ou "ainda vai começar": o grupo vira uma camada translúcida do CSS, e o aviso que ainda não começou vai só no
+    contorno. Do mais leve para o mais grave, que fica por cima."""
+    camada = {"estado": _estado_da_camada(avisos_l), "grupos": [], "n_vigor": 0, "n_futuros": 0, "ignorados": 0,
+              "qualifica": qualifica}
+    if avisos_l.dados is None:
+        return camada
+    camada["ignorados"] = len(avisos_l.dados["ignorados"])
+    grupos = {}
+    for a in avisos_l.dados["avisos"]:
+        if (a.fim is not None and a.fim < ref) or not v.cruza(a.caixa):
+            continue
+        d = caminho(_aneis_do_aviso(a.geometria), v)
+        if not d:
+            continue
+        futuro = not A.em_vigor(a, ref)
+        grupos.setdefault((futuro, a.nivel), []).append(
+            {"d": d, "titulo": f"{a.evento} · {a.severidade} · {V._validade(a, ref)}"})
+    for (futuro, nivel), itens in sorted(grupos.items()):
+        camada["grupos"].append({"nivel": nivel, "futuro": futuro, "itens": itens})
+        camada["n_futuros" if futuro else "n_vigor"] += len(itens)
+    return camada
+
+
+def _camada_focos(focos_l, indice, usinas: list, v: Vista, qualifica: list) -> dict:
+    """Todos os focos da última hora, cada um um ponto do tamanho do traço (o caminho `h.01` com ponta redonda: uns 5 mil focos
+    num `<path>` só pesam 70 KB, e como `<circle>` seriam 190 KB), e o anel nos que estão a até 5 km de ALGUMA usina do cadastro
+    (dentro ou fora do recorte: o foco é que tem de estar na vista). Foco em cima de foco, no desenho, vira um ponto só."""
+    camada = {"estado": _estado_da_camada(focos_l), "d": "", "n": 0, "n_perto": 0, "aneis": [], "r_anel": R_ANEL,
+              "qualifica": qualifica}
+    if indice is None:
+        return camada
+    pontos = set()
+    for f in focos_l.dados["focos"]:
+        x, y = v.ponto(f.lat, f.lon)
+        if v.dentro(x, y, FOLGA_PONTO):
+            camada["n"] += 1
+            pontos.add((round(x, 1), round(y, 1)))
+    camada["d"] = "".join(f"M{_n(x)} {_n(y)}h.01" for x, y in sorted(pontos))
+    aneis = set()
+    for u in usinas:
+        for _km, f in indice.no_raio(u.lat, u.lon):
+            x, y = v.ponto(f.lat, f.lon)
+            if v.dentro(x, y, FOLGA_PONTO):
+                aneis.add((round(x, 1), round(y, 1)))
+    camada["aneis"] = [{"x": _n(x), "y": _n(y), "r": R_ANEL} for x, y in sorted(aneis)]
+    camada["n_perto"] = len(aneis)
+    return camada
+
+
+def _motivos(avisos: list, foco, dias: list, ref) -> str:
+    """Por que a usina está no nível dela, em uma linha para o `<title>`: o foco, os avisos (os que mandam agir antes) e os dias
+    de risco de fogo alto. Sem repetir e com no máximo MOTIVOS_NO_TITULO: lista de 8 avisos de baixa umidade não cabe num balão."""
+    itens = []
+    if foco:
+        itens.append(f"foco de queimada a {V.numero(foco['km'], 1)} km")
+    for a in sorted(avisos, key=lambda a: not A.aviso_manda_agir(a)):
+        itens.append(f"{a.evento} ({a.severidade}, {V._validade(a, ref)})")
+    com_risco = [c for c in dias if c["nivel"] > 0]
+    if com_risco:
+        classe = "crítico" if any(c["classe"] == "crítico" for c in com_risco) else "alto"
+        itens.append(f"risco de fogo {classe} ({', '.join(c['rotulo'] for c in com_risco)})")
+    itens = list(dict.fromkeys(itens))
+    if len(itens) > MOTIVOS_NO_TITULO:
+        itens = itens[:MOTIVOS_NO_TITULO] + [f"e mais {len(itens) - MOTIVOS_NO_TITULO}"]
+    return "; ".join(itens)
+
+
+def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, sessao=None) -> dict:
+    """Tudo o que o template do mapa precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê).
+
+    O mapa lê as MESMAS três fontes da tela principal, pelo mesmo cache (uma visita a uma e outra não vai duas vezes à rede), e
+    o nível de cada usina vem da mesma regra (`alertas.nivel_da_usina`). O painel de frescor é o mesmo código da tela principal
+    (`visao._fonte_*`): o mapa não reescreve o texto de "lido às", "parcial" ou "fora agora".
+
+    A honestidade da tela principal vale aqui: a camada de uma fonte sem leitura some e a legenda diz por quê, e a usina que
+    ficaria "Sem alerta" com uma fonte sem leitura fica cinza ("Sem leitura completa"), nunca verde: sem ler os avisos, não
+    dá para dizer que não há aviso.
+    """
+    ref = ref or V.agora()
+    v = vista(regiao)
+    m = {"erro_cadastro": erro_cadastro, "atualizada": V.hora(ref, ref), "regiao": v.id, "regiao_nome": v.nome,
+         "regioes": [{"id": BRASIL, "nome": "Brasil", "atual": v.id == BRASIL},
+                     *({"id": r, "nome": n, "atual": v.id == r} for r, n in REGIOES.items())],
+         "viewbox": v.viewbox, "ufs": (), "usinas": [], "contagem": {A.AGIR: 0, A.ATENCAO: 0, A.SEM_ALERTA: 0, NX: 0},
+         "n_usinas": 0, "n_no_recorte": 0, "fora_do_recorte": 0, "sem_usinas": False, "rotulo_sem": "Sem alerta",
+         "sem_leitura_de": "", "camada_avisos": None, "camada_focos": None, "fontes": [], "faltando": [], "lendo": [],
+         "completa": True, "recarrega_em": V.RECARGA_S, "sem_coordenada": [], "fora_do_brasil": [], "ilegiveis": 0}
+    if cadastro is None:
+        return m
+    m["sem_coordenada"] = [u.nome for u in cadastro.sem_coordenada]
+    m["fora_do_brasil"] = [u.nome for u in cadastro.fora_do_brasil]
+    m["ilegiveis"] = cadastro.ilegiveis
+    m["n_usinas"] = len(cadastro.usinas)
+    if not cadastro.usinas:
+        m["sem_usinas"] = True            # nada a cruzar: nem se vai à rede
+        return m
+
+    avisos_l = L.avisos(config, sessao)
+    focos_l = L.focos(config, sessao)
+    risco_l = L.risco(config, cadastro.pontos(), sessao)
+    indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
+    rotulos = V.rotulos_dos_dias(V._arquivo_t0(risco_l.dados) if risco_l.dados else None, ref)
+    fontes = [V._fonte_inmet(avisos_l, ref), V._fonte_focos(focos_l, ref), V._fonte_risco(risco_l, ref, rotulos)]
+    por_id = {f["id"]: f for f in fontes}
+    leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
+    ausentes = [n for n, id_ in _NOMES_DAS_FONTES if leituras[id_].dados is None]       # na ordem do painel das fontes
+    m["fontes"] = fontes
+    m["lendo"] = [n for n, id_ in _NOMES_DAS_FONTES if leituras[id_].dados is None and leituras[id_].erro == L.LENDO]
+    m["faltando"] = [n for n, id_ in _NOMES_DAS_FONTES if leituras[id_].dados is None and leituras[id_].erro != L.LENDO]
+    m["completa"] = all(f["estado"] == "ok" for f in fontes)
+    m["recarrega_em"] = V.RECARGA_LENDO_S if m["lendo"] else V.RECARGA_S
+    m["sem_leitura_de"] = _juntar(ausentes) if ausentes else ""
+    m["rotulo_sem"] = "Sem alerta" if m["completa"] else "Sem alerta nas fontes lidas"
+    m["camada_avisos"] = _camada_avisos(avisos_l, v, ref, por_id["inmet"]["qualifica"])
+    m["camada_focos"] = _camada_focos(focos_l, indice, cadastro.usinas, v, por_id["focos"]["qualifica"])
+
+    todos_os_avisos = avisos_l.dados["avisos"] if avisos_l.dados else []
+    rotulo_do_nivel = {**A.ROTULO_NIVEL, A.SEM_ALERTA: m["rotulo_sem"], NX: ROTULO_NX}
+    desenhadas = []
+    for u in cadastro.usinas:
+        x, y = v.ponto(u.lat, u.lon)
+        if not v.dentro(x, y):
+            m["fora_do_recorte"] += 1
+            continue
+        avisos = A.avisos_que_contem(u.lat, u.lon, todos_os_avisos, ref)
+        foco = indice.perto(u.lat, u.lon) if indice is not None else None
+        dias = ([V.celula_de_risco(i, a, rotulos) for i, a in enumerate(risco_l.dados["por_ponto"].get(u.id, []))]
+                if risco_l.dados else [])
+        nivel = A.nivel_da_usina(avisos, foco is not None, any(c["nivel"] > 0 for c in dias))
+        if nivel == A.SEM_ALERTA:
+            if ausentes:
+                nivel = NX
+                motivo = f"sem leitura de {m['sem_leitura_de']}; não dá para dizer que não há alerta"
+            else:
+                motivo = "nenhum aviso, foco a até 5 km nem risco de fogo alto" + ("" if m["completa"] else " nas fontes lidas")
+        else:
+            motivo = _motivos(avisos, foco, dias, ref)
+        m["contagem"][nivel] += 1
+        desenhadas.append({
+            "id": u.id, "nome": u.nome, "nivel": nivel, "x": _n(x), "y": _n(y), "r": R_USINA[nivel],
+            "r_alvo": round(R_USINA[nivel] * R_ALVO, 1), "href": URL_USINA.format(quote(str(u.id), safe="")),
+            "titulo": f"{u.nome}\nCliente: {u.cliente}\nNível: {rotulo_do_nivel[nivel]}\nMotivo: {motivo}"})
+    desenhadas.sort(key=lambda d: (ORDEM_DE_DESENHO[d["nivel"]], d["nome"].casefold()))
+    m["usinas"] = desenhadas
+    m["n_no_recorte"] = len(desenhadas)
+    m["ufs"] = ufs_da_vista(v)
+    return m
