@@ -29,8 +29,9 @@ from .tipos import Legado
 
 ABAS = ("Operações", "Relação Geral Colaboradores", "Auxiliar", "Parametros")
 VINCULOS = ["Colaborador de campo", "Supervisor", "Gestor de contrato"]
-# A fórmula de receita de 70 usinas: preço fixo por MWp × potência contratual.
-_RE_PRECO = re.compile(r"^=\s*([\d.,]+)\s*\*\s*Operacoes\[\[#This Row\],\[POT[ÊE]NCIA CONTRATUAL \(MWp\)\]\]\s*$",
+# A fórmula de receita de 70 usinas: preço fixo por MWp × potência contratual. O nome da tabela não entra na
+# regra: em 07/10/2026 a tabela foi recriada como "Operacoes4" e o preço das 70 seria apagado.
+_RE_PRECO = re.compile(r"^=\s*([\d.,]+)\s*\*\s*(?:\w*\[\[#This Row\],|\[@)\[POT[ÊE]NCIA CONTRATUAL \(MWp\)\]\]\s*$",
                        re.I)
 # Conta com número fixo ("=9.633/3", "=2160+1080"): é digitação feita com calculadora, não regra.
 _RE_CONTA = re.compile(r"^=[\d\s.,+\-*/()]+$")
@@ -164,7 +165,7 @@ def _proximo(ids):
 
 
 def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Proposta:
-    avisos, formula_valor, faltando = [], Counter(), set()
+    avisos, formula_valor, faltando, cabecalho_no_valor = [], Counter(), set(), Counter()
     ops = abas.get("Operações") or Aba([], [])
     pes = abas.get("Relação Geral Colaboradores") or Aba([], [])
     aux = abas.get("Auxiliar") or Aba([], [])
@@ -304,11 +305,23 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
             avisos.append(f"Linha {i + 1} da aba Operações sem IDUsina: não importada.")
             continue
         id_ = u_atual[id_bd].id if id_bd in u_atual else next(gera_u)
+        antes = u_atual[id_bd].valores if id_bd in u_atual else {}
         valores = {}
         for c in USINAS.campos:
             if not c.coluna_bd or c.modo == "calculado":
                 continue
             x = cel(ops, ln, c.coluna_bd)
+            # Coluna que sumiu da planilha não apaga o campo: fica o valor do Nexus (07/10/2026: a "RESPONSÁVEL O&M"
+            # saiu do BD_Operações na reestruturação de 05/10 e a importação apagaria o responsável de 211 usinas,
+            # que a programação do PCM usa). E a célula com o próprio nome da coluna (a Matões 100 tinha "CÓDIGO"
+            # no código) é cabeçalho colado por engano: não desfaz o que foi corrigido no Nexus.
+            sumiu = bool(ops.linhas) and ops.indice(c.coluna_bd) is None
+            cabecalho = isinstance(x.valor, str) and chave_cab(x.valor) == chave_cab(c.coluna_bd)
+            if sumiu or cabecalho:
+                valores[c.id] = antes.get(c.id)
+                if ops.indice(c.coluna_bd) is not None:
+                    cabecalho_no_valor[c.coluna_bd] += 1
+                continue
             if c.id == "receita_mensal" and x.formula:
                 m = _RE_PRECO.match(x.formula)
                 if m:
@@ -373,7 +386,10 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
     for origem, n in sorted(criados.items()):
         avisos.append(f"{n} pessoa(s) criada(s) a partir da {origem} (só o nome; complete a ficha).")
     for f in sorted(faltando):
-        avisos.append(f"Coluna não encontrada: {f}.")
+        avisos.append(f"Coluna não encontrada: {f}. Ficou o valor que já estava no Nexus.")
+    for coluna, n in sorted(cabecalho_no_valor.items()):
+        avisos.append(f"{coluna}: {n} célula(s) com o próprio nome da coluna como valor; ficou o valor do Nexus "
+                      "(corrija na planilha).")
 
     carga = Carga(entidades={"clientes": clientes, "equipes": equipes, "pessoas": pessoas, "usinas": usinas},
                   listas=listas,

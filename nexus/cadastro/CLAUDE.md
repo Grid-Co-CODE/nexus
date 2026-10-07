@@ -40,7 +40,27 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 - **A chave de tudo é o ID numérico do cadastro** (decisão do Levi, 04/10: inner join por ID). O código da usina e o
   nome em cada sistema vivem na tabela `de_para`, nunca como chave. Plano: `docs/superpowers/plans/2026-10-04-governanca-ids.md`.
   Pelo código, 99% das linhas das outras bases casam; pelo nome, de 44% a 87%. 121 usinas estão sem código (52 em
-  operação) e uma tem "CÓDIGO" escrito como valor.
+  operação). A Matões 100 (usina 37) tem "CÓDIGO" escrito como valor na planilha; no Nexus é ATHN-MTS100 (04/10).
+
+## Importar o BD_Operações (`importar.py`)
+
+- Caminho: tela Base → Importar do Excel (prévia, depois gravar). Por comando, o mesmo é `montar` → conferir o
+  `resumo` → `srv.aplicar_carga(carga, quem=QUEM_IMPORTACAO)` + `srv.auditar(...)`, que guarda uma cópia em
+  `C:\GridcoAuto\nexus\backups\`. Depois, `ferramentas/publicar_cadastro.py --ensaio` e sem `--ensaio`. O Nexus no ar
+  relê o arquivo sozinho (o cache segue o mtime), sem reiniciar.
+- **A Singrid ainda mexe no BD_Operações** (reestruturação de 05/10). O Levi sobe as atualizações à mão até a
+  planilha ficar pronta (07/10). Em toda importação, olhe o que cada campo faria: preenche, apaga ou troca. Um campo
+  que **apaga** em bloco quase sempre quer dizer que a planilha mudou de forma, e não de dado.
+- **Coluna que sumiu não apaga o campo:** fica o valor do Nexus e o aviso diz qual coluna é. Em 07/10 a "RESPONSÁVEL
+  O&M" saiu da planilha, e importar apagaria o responsável de 211 usinas, que o PCM usa.
+- **Célula com o próprio nome da coluna** ("CÓDIGO" no código) é cabeçalho colado por engano: fica o valor do Nexus.
+- **Preço por MWp:** 70 usinas têm a receita como `=preço * POTÊNCIA CONTRATUAL`. O preço vira campo e a receita fica
+  automática. A regra não depende do nome da tabela do Excel: em 07/10 a tabela foi recriada como `Operacoes4`, e o
+  preço das 70 usinas seria apagado.
+- Importação de 07/10: o Gestor de Contrato foi preenchido em 159 usinas (coluna nova). A coluna nova "Supervisor
+  Campo" traz região ("SE — Oeste de SP") e não pessoa, por isso não é lida. Uma pessoa veio com "desistiu" na
+  coluna Cluster e virou a equipe 146. O certo é Status = Desligado; quando a planilha for corrigida, a próxima
+  importação marca essa equipe como excluída.
 
 ## No banco (PostgreSQL): `banco.py`
 

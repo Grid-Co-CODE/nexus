@@ -12,7 +12,7 @@ import pytest
 from nexus.cadastro.armazem import ArmazemLocal
 from nexus.cadastro.calculos import ERRO
 from nexus.cadastro.cifra import Cofre, gerar_chave
-from nexus.cadastro.importar import Aba, Celula, comparar, ler_xlsx, montar
+from nexus.cadastro.importar import _RE_PRECO, Aba, Celula, comparar, ler_xlsx, montar
 from nexus.cadastro.servico import Servico
 from nexus.cadastro.tipos import Legado
 
@@ -102,6 +102,17 @@ def test_receita_por_mwp_vira_preco_e_a_receita_fica_automatica(proposta):
     u10 = _usina(proposta.carga, "UFV-10")
     assert u10["valores"]["preco_mwp"] == 3915.51
     assert u10["valores"]["receita_mensal"] is None
+
+
+@pytest.mark.parametrize("formula", [
+    "=3915.51*Operacoes4[[#This Row],[POTÊNCIA CONTRATUAL (MWp)]]",   # tabela recriada ganha número
+    "=3915.51*[@[POTÊNCIA CONTRATUAL (MWp)]]",                          # a mesma referência, forma curta
+])
+def test_preco_por_mwp_nao_depende_do_nome_da_tabela(formula):
+    # 07/10/2026: a tabela do BD_Operações foi recriada, a fórmula passou a citar outro nome e a importação
+    # apagaria o preço de 70 usinas, deixando a receita congelada no valor do dia.
+    m = _RE_PRECO.match(formula)
+    assert m and m.group(1) == "3915.51"
 
 
 def test_formula_de_conta_fixa_entra_como_o_valor_mostrado():
@@ -235,3 +246,24 @@ def test_comparacao_trata_zero_do_excel_como_vazio():
     assert comparar("texto", "#N/A", ERRO)
     assert comparar("moeda", 704700.0, 704700.004)
     assert not comparar("texto", "Brodowski/SP", "Batatais/SP")
+
+
+def test_coluna_que_sumiu_e_cabecalho_no_valor_nao_apagam_o_nexus(srv):
+    """07/10/2026: a RESPONSÁVEL O&M saiu do BD_Operações (reestruturação de 05/10) e a importação apagaria o
+    responsável de 211 usinas; e a Matões 100 tinha "CÓDIGO" escrito no código, corrigido no Nexus. Nos dois casos fica
+    o valor do Nexus, com aviso."""
+    srv.aplicar_carga(montar(ler_xlsx(_xlsx()), srv, arquivo="BD_Operacoes.xlsx").carga)
+    antes = next(r for r in srv.registros("usinas") if r.valores.get("id_bd") == "UFV-10").valores
+    assert antes["responsavel_om"] and antes["codigo"] == "BRD100"
+    wb = openpyxl.load_workbook(io.BytesIO(_xlsx()))
+    op = wb["Operações"]
+    op.delete_cols(OPS.index("RESPONSÁVEL O&M") + 1)
+    op.cell(row=2, column=OPS.index("CÓDIGO") + 1, value="CÓDIGO")
+    buf = io.BytesIO()
+    wb.save(buf)
+    p = montar(ler_xlsx(buf.getvalue()), srv, arquivo="BD_Operacoes.xlsx")
+    u = _usina(p.carga, "UFV-10")["valores"]
+    assert u["responsavel_om"] == antes["responsavel_om"] and u["codigo"] == "BRD100"
+    assert any("Coluna não encontrada: RESPONSÁVEL O&M" in a and "Ficou o valor" in a for a in p.avisos)
+    assert any(a.startswith("CÓDIGO: 1 célula(s) com o próprio nome da coluna") for a in p.avisos)
+    assert p.resumo["usinas"]["alterados"] == 0
