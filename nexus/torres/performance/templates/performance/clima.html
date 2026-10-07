@@ -64,7 +64,7 @@
         <p class="cl-principal">{{ m.principal }}</p>
         <p class="cl-prova">{{ m.prova }}</p>
         {% for o in c.motivos[1:] %}
-        <p class="cl-tambem"><span class="cl-pill cl-pill--agir">{{ o.pill }}</span> {{ o.principal }}<span class="cl-prova">{{ o.prova }}</span></p>
+        <p class="cl-tambem"><strong>{{ o.principal }}</strong><span class="cl-prova">{{ o.prova }}</span></p>
         {% endfor %}
         <p class="cl-contexto">{{ c.contexto|join(" · ") }}</p>
       </article>

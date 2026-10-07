@@ -105,7 +105,10 @@ def test_cartao_do_foco_mostra_motivo_frase_principal_e_prova(mundo):
 def test_cartao_do_aviso_que_manda_agir_mostra_o_evento_o_nivel_e_a_vigencia(mundo):
     c, _, _ = mundo
     alfa = texto(cartoes(pagina(c))["Usina Alfa"])
-    assert "Tempestade · laranja" in alfa and "Tempestade, nível Perigo" in alfa and "em vigor, até 23:59" in alfa
+    # o foco abre o cartão (a pílula é dele); o aviso que manda agir vem logo abaixo, com a frase do nível e a vigência; o aviso
+    # que não manda agir (Perigo Potencial) não vira motivo, só contexto
+    assert "Foco a 1,2 km" in alfa and "Tempestade, nível Perigo" in alfa and "em vigor, até 23:59" in alfa
+    assert "Baixa Umidade, nível" not in alfa
 
 
 def test_contexto_do_cartao_traz_o_outro_aviso_e_o_risco_de_fogo(mundo):
@@ -274,7 +277,8 @@ def test_aviso_futuro_que_estraga_usina_ja_aparece_em_agir_agora_com_o_inicio(mu
     sessao.arquivos[URL_INMET] = inmet(extra_futuro=[futuro])
     html = pagina(c)
     assert list(cartoes(html)) == ["Usina Alfa", "Usina Beta"]
-    assert "Vendaval, nível Perigo" in texto(cartoes(html)["Usina Beta"]) and "começa 07/10 08:00, até 08/10 20:00" in texto(cartoes(html)["Usina Beta"])
+    beta = texto(cartoes(html)["Usina Beta"])
+    assert "Vendaval · laranja" in beta and "Vendaval, nível Perigo" in beta and "começa 07/10 08:00, até 08/10 20:00" in beta   # aviso como motivo principal: pílula com a cor
 
 
 def test_previsao_de_risco_de_ontem_fica_em_atencao_e_diz_a_data(mundo):

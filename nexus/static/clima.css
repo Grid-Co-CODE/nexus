@@ -56,8 +56,7 @@
 .cl-pill--n1{color:var(--cl-atencao);background:var(--cl-atencao-suave)}
 .cl-principal{margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
 .cl-prova{margin:0;font:500 12px/18px var(--font-mono);color:var(--mudo);overflow-wrap:anywhere}
-.cl-tambem{margin:0;font-size:13px;color:var(--tinta-2);overflow-wrap:anywhere}
-.cl-tambem .cl-prova{display:block;margin-top:2px}
+.cl-tambem{margin:0;font-size:13px;color:var(--tinta-2);overflow-wrap:anywhere;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
 .cl-contexto{margin:0;font-size:12px;color:var(--tinta-2);border-top:1px solid var(--linha);padding-top:8px;overflow-wrap:anywhere}
 
 /* por estado e fontes, lado a lado quando cabe */
