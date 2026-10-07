@@ -113,6 +113,48 @@
 .cl-c-c{background:rgba(255,91,110,.18);color:var(--cl-critico)}
 .cl-c-a{background:rgba(255,143,60,.16);color:var(--cl-alto)}
 
+/* a página de uma usina (07/10/2026): os alertas dela e a irradiação diária da NASA */
+.cl-link{color:inherit;text-decoration:none}
+.cl-link:hover{text-decoration:underline;text-decoration-color:var(--verde-texto)}
+.cl-voltar{margin:0 0 4px;font-size:13px}
+.cl-voltar a{color:var(--verde-texto)}
+.cl-pill--atencao{color:var(--cl-atencao);background:var(--cl-atencao-suave)}
+.cl-pill--sem{color:var(--cl-ok);background:var(--cl-ok-suave)}
+.cl-pill--duvida{color:var(--cl-atencao);background:transparent;border:1px solid var(--alerta)}
+.cl-usina-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cl-bloco{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:16px;min-width:0;
+  display:flex;flex-direction:column;gap:8px}
+.cl-rotulo-bloco{margin:6px 0 0;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cl-rotulo-bloco:first-child{margin-top:0}
+.cl-linhas{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.cl-linha{margin:0;font-size:13px;line-height:1.45;color:var(--tinta-2);overflow-wrap:anywhere}
+.cl-dia4{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cl-dia4-rot{font-size:11px;color:var(--mudo)}
+.cl-dia4-classe{font-size:11px;color:var(--mudo);overflow-wrap:anywhere}
+.cl-bloco .cl-dias4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.cl-painel--grafico{margin-top:0}
+.cl-grafico{display:block;width:100%;height:auto;max-width:100%}
+.cl-grade{stroke:rgba(255,255,255,.09);stroke-width:1}
+.cl-grade--zero{stroke:rgba(255,255,255,.16)}
+.cl-eixo{fill:#96a0b4;font:500 11px "IBM Plex Mono",monospace}
+.cl-eixo--faixa{font-size:10px}
+.cl-faixa-nasa{fill:rgba(255,255,255,.05)}
+.cl-nasa{fill:none;stroke:#c3cad7;stroke-width:2;stroke-dasharray:5 4;stroke-linejoin:round}
+.cl-nasa-ponto{fill:#c3cad7}
+.cl-etm{fill:none;stroke:#6ec1e4;stroke-width:2.5;stroke-linejoin:round}
+.cl-leg--nasa{width:18px;height:0;border-top:2px dashed #c3cad7;border-radius:0;margin-bottom:3px}
+.cl-leg--faixa{background:rgba(255,255,255,.08);border:1px solid var(--linha-forte)}
+.cl-minis{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+.cl-mini{flex:1 1 220px;max-width:320px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md);
+  padding:10px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.cl-mini .cl-valor{font-size:24px;line-height:30px}
+.cl-dias-tabela{margin-top:12px;font-size:13px}
+.cl-dias-tabela summary{cursor:pointer;color:var(--tinta-2)}
+.cl-dias-tabela table{border-collapse:collapse;margin-top:8px;max-width:100%}
+.cl-dias-tabela th,.cl-dias-tabela td{padding:4px 14px 4px 0;text-align:left;font-variant-numeric:tabular-nums}
+.cl-dias-tabela th{font:700 11px/16px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cl-secao .cl-painel{margin-top:12px}
+
 .cl-pendencia{margin-top:6px}
 .cl-rodape{margin-top:30px;padding-top:16px;border-top:1px solid var(--linha);font-size:12px;line-height:1.55;color:var(--mudo)}
 .cl-rodape p{margin:0 0 8px;color:var(--tinta-2)}
@@ -126,6 +168,13 @@
   .cl-duas{flex-direction:column}
   .cl-painel{flex-basis:auto}
   .cl-titulo{font-size:26px;line-height:32px}
+  .cl-usina-grade{grid-template-columns:minmax(0,1fr)}
+  /* o SVG encolhe com a largura (viewBox), e o texto dele junto: sobe o tamanho (em unidades do desenho) para as grades e as datas
+     continuarem legíveis em 375 px, e a legenda da faixa já diz o que ela é */
+  .cl-eixo{font-size:22px}
+  .cl-eixo--faixa{display:none}
+  .cl-minis{flex-direction:column}
+  .cl-mini{max-width:none;flex-basis:auto}
   .cl-cab-dir{width:100%}
   .cl-filtro{width:100%}
   .cl-filtro select{width:100%}

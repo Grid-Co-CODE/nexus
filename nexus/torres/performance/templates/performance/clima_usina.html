@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block titulo %}{% if v.nome %}{{ v.nome }} · {% endif %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
+{# A página de uma usina (07/10/2026): os alertas dela (os mesmos da tela principal) e a irradiação diária da NASA POWER. O gráfico
+   é um SVG escrito aqui com os números que o servidor já calculou (nada de JavaScript, nada de coordenada de usina: só posição no
+   desenho). Texto de terceiros (INMET, nome do cadastro) só entra por {{ }} (escapado), nunca por |safe. #}
+<meta http-equiv="refresh" content="{{ v.recarrega_em }}">
+<div class="cl">
+  <p class="cl-voltar"><a href="{{ url_for('torre_performance.clima', cliente=(v.cliente_filtro or None)) }}">Voltar para {{ tela.nome }}</a></p>
+
+  {% if v.erro_cadastro %}
+  <div class="cl-aviso" role="alert">Cadastro indisponível: {{ v.erro_cadastro }}</div>
+  {% elif v.nao_encontrada %}
+  <header class="cl-cab"><div class="cl-cab-txt"><p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p><h1 class="cl-titulo">Usina não encontrada</h1></div></header>
+  <p class="cl-aviso">Não há usina em operação com esse código no cadastro. Volte para a lista e escolha uma das usinas dela.</p>
+  {% else %}
+
+  <header class="cl-cab">
+    <div class="cl-cab-txt">
+      <p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p>
+      <h1 class="cl-titulo">{{ v.nome }}</h1>
+      <p class="cl-pergunta">{{ v.onde }}</p>
+    </div>
+    <div class="cl-cab-dir">
+      {% if v.nivel %}<span class="cl-pill cl-pill--{{ v.nivel }}" data-nivel="{{ v.nivel }}">{{ v.rotulo }}</span>{% endif %}
+      <span class="cl-atualizada">atualizada às {{ v.atualizada }}</span>
+    </div>
+  </header>
+
+  {% if v.pendencia %}
+  <div class="cl-aviso" role="alert">{{ v.pendencia }}</div>
+  {% else %}
+  {% set a = v.alertas %}
+  {% set ir = v.irradiacao %}
+  {% if v.faltando %}<p class="cl-nota cl-nota--atencao">Os alertas desta página não incluem: {{ v.faltando|join(", ") }}. A fonte está fora e a página tenta de novo sozinha.</p>{% endif %}
+  {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. Os alertas ainda não incluem essa leitura; a página se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
+
+  <section class="cl-secao" aria-labelledby="cl-alertas">
+    <h2 class="cl-h2" id="cl-alertas">Alertas desta usina</h2>
+    <div class="cl-usina-grade">
+      <div class="cl-bloco">
+        {% if v.card.motivos %}
+        <p class="cl-rotulo-bloco">Por que agir agora</p>
+        {% for m in v.card.motivos %}
+        <p class="cl-tambem"><span class="cl-pill cl-pill--agir">{{ m.pill }}</span> <strong>{{ m.principal }}</strong><span class="cl-prova">{{ m.prova }}</span></p>
+        {% endfor %}
+        {% endif %}
+        <p class="cl-rotulo-bloco">Aviso do INMET</p>
+        {% if a.avisos %}
+        <ul class="cl-linhas">
+          {% for x in a.avisos %}
+          <li class="cl-linha"><span class="cl-pill cl-pill--n{{ x.nivel }}">{{ x.evento }}</span> {{ x.severidade }} · {{ x.validade }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="cl-linha">{{ a.avisos_vazio }}</p>
+        {% endif %}
+        <p class="cl-rotulo-bloco">Foco de queimada</p>
+        <p class="cl-linha">{{ a.foco }}</p>
+      </div>
+      <div class="cl-bloco">
+        <p class="cl-rotulo-bloco">Risco de fogo (INPE), hoje e os três dias seguintes</p>
+        {% if a.dias and a.risco_linha %}
+        <p class="cl-linha">{{ a.risco_linha }}</p>
+        {% elif a.dias %}
+        <div class="cl-dias4">
+          {% for d in a.dias %}
+          <div class="cl-dia4"><span class="cl-dia4-rot">{{ d.rotulo }}</span><span class="cl-c cl-c-{{ d.cor }}" title="{{ d.rotulo }}: {{ d.valor }}{% if d.classe %} ({{ d.classe }}{% if d.nota %}, entorno de 2 km{% endif %}){% endif %}">{{ d.curto }}{% if d.nota %}*{% endif %}</span><span class="cl-dia4-classe">{{ d.classe or "sem dado" }}</span></div>
+          {% endfor %}
+        </div>
+        {% if v.card.dias|selectattr("nota")|list %}<p class="cl-nota">* maior valor do entorno de 2 km: o INPE não calcula o pixel da usina onde não há vegetação.</p>{% endif %}
+        {% else %}
+        <p class="cl-linha">{{ a.risco_vazio }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="cl-secao" aria-labelledby="cl-irradiacao">
+    <h2 class="cl-h2" id="cl-irradiacao">Irradiação diária <span class="cl-h2-sub">· GHI em kWh/m² por dia · NASA POWER</span></h2>
+    {% if ir.estado in ("fora", "lendo") %}
+    <p class="cl-nota cl-nota--atencao">{{ ir.texto }}{% if ir.erro %} ({{ ir.erro }}){% endif %}</p>
+    {% else %}
+    {% if ir.estado == "velha" %}<p class="cl-nota cl-nota--atencao">{{ ir.texto }}{% if ir.erro %} ({{ ir.erro }}){% endif %}. O gráfico mostra a última leitura boa.</p>{% endif %}
+    {% set g = ir.grafico %}
+    {% if g %}
+    <div class="cl-painel cl-painel--grafico">
+      <svg class="cl-grafico" viewBox="{{ g.viewbox }}" role="img" aria-label="{{ g.descricao }}">
+        {% for gr in g.grades %}<line class="cl-grade{% if loop.first %} cl-grade--zero{% endif %}" x1="40" y1="{{ gr.y }}" x2="610" y2="{{ gr.y }}"></line><text class="cl-eixo" x="32" y="{{ gr.y + 4 }}" text-anchor="end">{{ gr.rotulo }}</text>
+        {% endfor %}
+        {% for r in g.rotulos_x %}<text class="cl-eixo" x="{{ r.x }}" y="252" text-anchor="{{ r.ancora }}">{{ r.texto }}</text>
+        {% endfor %}
+        {% if g.faixa %}<rect class="cl-faixa-nasa" x="{{ g.faixa.x }}" y="{{ g.faixa.y }}" width="{{ g.faixa.largura }}" height="{{ g.faixa.altura }}"></rect><text class="cl-eixo cl-eixo--faixa" x="{{ g.faixa.x + g.faixa.largura / 2 }}" y="40" text-anchor="middle">não publicado</text>{% endif %}
+        {% for t in g.nasa.trechos %}<polyline class="cl-nasa" points="{{ t }}"></polyline>{% endfor %}
+        {% for p in g.nasa.isolados %}<circle class="cl-nasa-ponto" cx="{{ p[0] }}" cy="{{ p[1] }}" r="2.5"></circle>{% endfor %}
+        {% if g.etm %}{% for t in g.etm.trechos %}<polyline class="cl-etm" points="{{ t }}"></polyline>{% endfor %}{% endif %}
+      </svg>
+      <div class="cl-legenda">
+        <span><i class="cl-leg cl-leg--nasa"></i>NASA POWER (grade de cerca de 50 km)</span>
+        {% if g.faixa %}<span><i class="cl-leg cl-leg--faixa"></i>faixa = ainda não publicado pela NASA</span>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% set m = ir.mes %}
+    {% if m %}
+    <div class="cl-minis">
+      <div class="cl-mini" data-id="mes"><span class="cl-rotulo">NASA POWER · {{ m.rotulo }}</span><span class="cl-numero"><span class="cl-valor">{{ m.valor }}</span>{% if m.unidade %} <span class="cl-un">{{ m.unidade }}</span>{% endif %}</span><span class="cl-sub">{{ m.sub }}</span></div>
+    </div>
+    <p class="cl-nota">{{ m.texto }}.</p>
+    {% endif %}
+    {% if ir.tabela %}
+    <details class="cl-dias-tabela">
+      <summary>Valores dia a dia (kWh/m²)</summary>
+      <table>
+        <thead><tr><th scope="col">Dia</th><th scope="col">GHI</th></tr></thead>
+        <tbody>
+          {% for l in ir.tabela %}<tr><td>{{ l.dia }}</td><td>{{ l.valor }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+    {% endif %}
+    <p class="cl-nota" data-id="etm"><strong>{{ v.etm.texto }}.</strong> {{ v.etm.motivo }}</p>
+  </section>
+
+  <section class="cl-painel" aria-labelledby="cl-fontes">
+    <h2 class="cl-h2" id="cl-fontes">Fontes <span class="cl-h2-sub">· de quando é cada dado</span></h2>
+    <div class="cl-fontes">
+      {% for f in v.fontes %}
+      <div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% endif %}
+
+  <footer class="cl-rodape">
+    <p><strong>Dados: INMET, INPE (Programa Queimadas) e NASA LaRC POWER.</strong> Somente leitura: esta página não grava nada. A coordenada da usina, do cadastro do Nexus, não aparece na tela.</p>
+    <ul>
+      <li>Irradiação: NASA LaRC POWER (power.larc.nasa.gov), GHI diário (ALLSKY_SFC_SW_DWN), em kWh/m² por dia. A NASA publica com alguns dias de atraso (o fim do gráfico é o que ainda não saiu) e a grade é de cerca de 50 km: vale para o total do mês e para achar uma ETM fora, não para analisar uma hora. Medida contra as ETMs de 40 usinas (maio a setembro de 2026): erro mediano de 7,4% no dia e de 3,9% no mês.</li>
+      <li>Avisos, focos e risco de fogo: os mesmos da tela Clima e risco, com as mesmas regras de nível (Agir agora, Atenção, Sem alerta).</li>
+    </ul>
+  </footer>
+</div>
+{% endblock %}

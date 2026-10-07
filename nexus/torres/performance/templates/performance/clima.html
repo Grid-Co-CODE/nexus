@@ -58,7 +58,7 @@
       {% set m = c.motivos[0] %}
       <article class="cl-usina">
         <div class="cl-usina-cab">
-          <div class="cl-usina-id"><h3 class="cl-nome">{{ c.nome }}</h3><span class="cl-onde">{{ c.onde }}</span></div>
+          <div class="cl-usina-id"><h3 class="cl-nome"><a class="cl-link" href="{{ url_for('torre_performance.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></h3><span class="cl-onde">{{ c.onde }}</span></div>
           <span class="cl-pill cl-pill--agir">{{ m.pill }}</span>
         </div>
         <p class="cl-principal">{{ m.principal }}</p>
@@ -129,7 +129,7 @@
         <tbody>
           {% for c in v.atencao_linhas %}
           <tr class="cl-lin">
-            <th scope="row" class="cl-col-usina"><span class="cl-nome">{{ c.nome }}</span><span class="cl-onde">{{ c.onde }}</span></th>
+            <th scope="row" class="cl-col-usina"><span class="cl-nome"><a class="cl-link" href="{{ url_for('torre_performance.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></span><span class="cl-onde">{{ c.onde }}</span></th>
             <td class="cl-col-aviso">{% for a in c.avisos %}<span class="cl-av"><span class="cl-pill cl-pill--n{{ a.nivel }}" title="{{ a.severidade }} · {{ a.validade }}">{{ a.evento }}</span>{% if a.comeca %} <span class="cl-quando">começa {{ a.comeca }}</span>{% endif %}</span>{% else %}{{ v.aviso_vazio }}{% endfor %}</td>
             <td class="cl-col-foco">{{ v.foco_vazio }}</td>
             <td class="cl-col-risco">{% if c.dias %}<div class="cl-dias4">{% for d in c.dias %}<span class="cl-c cl-c-{{ d.cor }}" title="{{ d.rotulo }}: {{ d.valor }}{% if d.classe %} ({{ d.classe }}{% if d.nota %}, entorno de 2 km{% endif %}){% endif %}">{{ d.curto }}{% if d.nota %}*{% endif %}</span>{% endfor %}</div>{% else %}<span class="cl-semleitura">sem leitura</span>{% endif %}</td>

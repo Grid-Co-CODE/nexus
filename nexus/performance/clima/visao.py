@@ -6,6 +6,9 @@ laranja de um evento que estraga usina), Atenção (qualquer outro aviso, ou ris
 mostra uma faixa de quatro números, um cartão por usina em "Agir agora", a grade por estado, as fontes e uma matriz das usinas
 em "Atenção" (as 20 primeiras, ou todas com `todas=True`).
 
+Além da tela, `montar_usina` monta a PÁGINA de uma usina (07/10/2026): os alertas dela e a irradiação diária da NASA POWER
+(gráfico dos últimos 30 dias, mês até agora). A NASA só é chamada daqui, nunca por `montar`.
+
 A ordem dentro de cada nível é a gravidade que já existia, a mesma régua de três degraus (semáforo) para os três tipos de alerta:
   3 crítico   aviso "Grande Perigo" do INMET; foco de queimada a até 5 km (é um evento, não uma previsão); risco de fogo crítico
   2 alto      aviso "Perigo"; risco de fogo alto
@@ -27,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 
 from ...cadastro.servico import chave_texto
 from . import alertas as A
+from . import irradiacao as I
 from . import leitura as L
 
 BRT = timezone(timedelta(hours=-3))
@@ -475,4 +479,127 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     v["faixa"] = _faixa(len(agir), len(atencao), n_sem, len(usinas), v, leituras, por_id)
     v["ufs"], v["ufs_sem_uf"] = _grade_ufs(agir + atencao, v["completa"])
     v["ufs_legenda_sem"] = "sem usina com alerta" + ("" if v["completa"] else " nas fontes lidas")
+    return v
+
+
+# ── a página de uma usina ────────────────────────────────────────────────────────────────────────────────────────────
+
+SEM_COORDENADA = ("Sem coordenada no cadastro: sem latitude e longitude não há onde procurar aviso, foco, risco de fogo nem "
+                  "irradiação. Corrija a coordenada no cadastro.")
+FORA_DO_BRASIL = ("Coordenada fora do Brasil no cadastro: provável erro de digitação (zero, sinal ou latitude e longitude "
+                  "trocadas). Sem uma coordenada certa não há onde procurar aviso, foco, risco de fogo nem irradiação. Corrija a "
+                  "coordenada no cadastro.")
+ETM_PROXIMA_ETAPA = {
+    "texto": "Comparação com a ETM: próxima etapa",
+    # O que a investigação de 07/10/2026 achou (ver nexus/performance/CLAUDE.md): o dado existe, a ligação com a usina não é certa.
+    "motivo": ("O GHI medido da usina está nos livros BD_Thopen e BD_Performance (coluna \"GHI (kWh/m²)\", em kWh/m² por dia), mas ainda "
+               "não há uma ligação certa entre esta usina do cadastro e a aba dela: no BD_Performance nenhuma aba leva o código do "
+               "de-para, e no BD_Thopen o nome da aba nem sempre é o do de-para. Sem essa ligação a tela não compara, em vez de "
+               "arriscar um \"conferir a ETM\" na usina errada."),
+}
+
+
+def _mes_ate_agora(m: dict, publicado_ate) -> dict:
+    """O mês até agora, escrito para a página: o número, até que dia, e o que a soma NÃO tem (dia sem leitura no meio)."""
+    nome = m["mes"].split("/")[0]
+    if m["soma"] is None:
+        texto = (f"A NASA não publicou nenhum dia nos últimos {L.JANELA_POWER_DIAS} dias" if publicado_ate is None
+                 else f"A NASA ainda não publicou nenhum dia de {nome} (último dia publicado: {I.dd_mm(publicado_ate)})")
+        return {"rotulo": m["mes"], "valor": "—", "unidade": "", "sub": "nenhum dia publicado", "texto": texto, "avisos": []}
+    avisos = []
+    if m["buracos"]:
+        n = len(m["buracos"])
+        avisos.append(f"{n} {'dia' if n == 1 else 'dias'} sem leitura da NASA ({', '.join(I.dd_mm(d) for d in m['buracos'])})")
+    dias_ = _plural(m["n"], "dia", "dias")
+    texto = f"{numero(m['soma'], 1)} kWh/m² em {dias_}, até {I.dd_mm(m['ate'])} (o último dia que a NASA publicou)"
+    return {"rotulo": m["mes"], "valor": numero(m["soma"], 1), "unidade": "kWh/m²", "sub": f"{dias_}, até {I.dd_mm(m['ate'])}",
+            "texto": texto + "".join(f"; {a}" for a in avisos), "avisos": avisos}
+
+
+def _irradiacao(leitura, ref) -> dict:
+    """O bloco da NASA POWER da página: o estado da leitura, o gráfico, o mês até agora e a tabela dia a dia. Sem leitura boa não
+    há gráfico nem número (a página diz por quê); leitura velha mostra a última boa, dita velha, com a hora."""
+    hoje = ref.astimezone(BRT).date()
+    b = {"estado": "ok", "texto": "", "erro": "", "grafico": None, "mes": None, "tabela": []}
+    falha = _falha("NASA POWER", leitura, ref)
+    if leitura.dados is None:
+        if leitura.erro == L.LENDO:
+            b.update(estado="lendo", texto="Lendo a NASA POWER: a página se atualiza sozinha")
+        else:
+            b.update(estado="fora", texto=falha[1], erro=leitura.erro or "")
+        return b
+    publicado_ate = leitura.dados["publicado_ate"]
+    if falha is not None:
+        b.update(estado="velha", texto=falha[1], erro=leitura.erro or "")
+    else:
+        b["texto"] = (f"NASA LaRC POWER · lida às {hora(_quando(leitura.lido_em), ref)}"
+                      + (f" · publicada até {I.dd_mm(publicado_ate)}" if publicado_ate else ""))
+    serie = I.ultimos_dias(leitura.dados["dias"], hoje)
+    if publicado_ate is not None:
+        b["grafico"] = I.grafico(serie, publicado_ate)
+        b["tabela"] = [{"dia": I.dd_mm(d), "valor": numero(v) if v is not None else "—"} for d, v in serie]
+    b["mes"] = _mes_ate_agora(I.mes_ate_agora(leitura.dados["dias"], hoje), publicado_ate)
+    return b
+
+
+def _fonte_nasa(leitura, ref, irradiacao: dict) -> dict:
+    if leitura.dados is None or leitura.velha:
+        falha = _falha("NASA POWER", leitura, ref)
+        return {"id": "power", "estado": falha[0], "texto": falha[1], "detalhe": falha[2], "qualifica": []}
+    return {"id": "power", "estado": "ok", "texto": irradiacao["texto"], "detalhe": "", "qualifica": []}
+
+
+def montar_usina(config, *, cadastro, usina_id, cliente="", ref=None, sessao=None):
+    """Tudo o que a página de uma usina precisa, ou None se a usina não é uma das em operação do cadastro (a rota responde 404).
+    Usina sem coordenada utilizável (ou com coordenada fora do Brasil) vem com `pendencia` dizendo o que falta e NÃO vai a fonte
+    nenhuma. Os alertas são os da tela principal (o mesmo `_usina`, as mesmas leituras e o mesmo cache: o risco de fogo é lido para
+    todas as usinas do cadastro, não só para esta); a NASA é lida só aqui, pelo cache da usina."""
+    ref = ref or agora()
+    todas = cadastro.usinas + cadastro.sem_coordenada + cadastro.fora_do_brasil
+    u = next((x for x in todas if x.id == str(usina_id)), None)
+    if u is None:
+        return None
+    v = {"id": u.id, "nome": u.nome, "cliente": u.cliente, "uf": u.uf, "onde": f"{u.cliente} · {u.uf}" if u.uf else u.cliente,
+         "atualizada": hora(ref, ref), "cliente_filtro": cliente if cliente in cadastro.clientes() else "", "pendencia": "",
+         "recarrega_em": RECARGA_S, "nivel": "", "rotulo": "", "card": None, "alertas": None, "fontes": [], "faltando": [],
+         "lendo": [], "irradiacao": None, "etm": ETM_PROXIMA_ETAPA}
+    if u in cadastro.sem_coordenada:
+        v["pendencia"] = SEM_COORDENADA
+        return v
+    if u in cadastro.fora_do_brasil:
+        v["pendencia"] = FORA_DO_BRASIL
+        return v
+    avisos_l = L.avisos(config, sessao)
+    focos_l = L.focos(config, sessao)
+    risco_l = L.risco(config, cadastro.pontos(), sessao)
+    leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
+    indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
+    rotulos = rotulos_dos_dias(_arquivo_t0(risco_l.dados) if risco_l.dados else None, ref)
+    card = _usina(u, avisos_l, indice, risco_l, ref, rotulos)
+    fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos)]
+    nasa_l = L.irradiacao(config, u.id, u.lat, u.lon, ref.astimezone(BRT).date(), sessao)
+    irradiacao = _irradiacao(nasa_l, ref)
+    fontes.append(_fonte_nasa(nasa_l, ref, irradiacao))
+    ausentes = [i for i in ("inmet", "focos", "risco") if leituras[i].dados is None]
+    if card["nivel"] != A.SEM_ALERTA:
+        v["nivel"], v["rotulo"] = card["nivel"], card["rotulo"]
+    elif ausentes:                       # sem alerta nas fontes lidas não é "sem alerta" quando falta fonte
+        v["nivel"], v["rotulo"] = "duvida", "Sem leitura completa"
+    elif any(f["qualifica"] for f in fontes[:3]):
+        v["nivel"], v["rotulo"] = "sem", "Sem alerta nas fontes lidas"
+    else:
+        v["nivel"], v["rotulo"] = "sem", "Sem alerta"
+    v["card"], v["fontes"], v["irradiacao"] = card, fontes, irradiacao
+    v["alertas"] = {
+        "avisos": card["avisos"],
+        "avisos_vazio": "" if card["avisos"] else ("Sem leitura dos avisos do INMET" if avisos_l.dados is None
+                                                  else "Nenhum aviso do INMET sobre esta usina"),
+        "foco": (card["foco"]["texto"] if card["foco"] else "Sem leitura dos focos do INPE" if focos_l.dados is None
+                 else f"Nenhum foco a até {A.FOCO_KM:g} km"),
+        "dias": card["dias"], "risco_linha": card["risco_linha"],
+        "risco_vazio": None if card["dias"] else "Sem leitura do risco de fogo do INPE",
+    }
+    v["lendo"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro == L.LENDO]
+    v["faltando"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro != L.LENDO]
+    v["recarrega_em"] = RECARGA_LENDO_S if (v["lendo"] or irradiacao["estado"] == "lendo") else RECARGA_S
     return v
