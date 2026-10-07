@@ -36,9 +36,9 @@ def lei_avisos(*avisos, ignorados=()):
     return L.Leitura({"avisos": list(avisos), "ignorados": list(ignorados), "lidos": len(avisos)}, LIDO)
 
 
-def lei_focos(*focos, ate=None, falhos=()):
+def lei_focos(*focos, ate=None, falhos=(), ruins=0):
     ate = ate or datetime(2026, 10, 6, 17, 50, tzinfo=UTC)
-    return L.Leitura({"focos": list(focos), "arquivos": ["a.csv"], "falhos": list(falhos), "ate": ate, "linhas_ruins": 0}, LIDO)
+    return L.Leitura({"focos": list(focos), "arquivos": ["a.csv"], "falhos": list(falhos), "ate": ate, "linhas_ruins": ruins}, LIDO)
 
 
 def foco_a(km, lat=-5.0, lon=-45.0, sat="GOES-19"):
@@ -253,7 +253,7 @@ def test_cliente_sem_nenhuma_usina_no_mapa_mostra_so_as_pendencias_e_nao_vai_a_r
 def test_usina_sem_dado_de_risco_nos_quatro_dias_entra_na_cobertura(leituras):
     leituras(risco=lei_risco({"1": dias(None, None, None, None), "2": dias(0.1, None, 0.1, 0.1)}))
     v = V.montar({}, cadastro=cadastro(usina("1", "Toda sem dado"), usina("2", "Parcial", -5.5)), ref=REF)
-    assert v["sem_risco"] == ["Toda sem dado"]
+    assert v["sem_risco"] == [{"motivo": "sem vegetação no entorno", "nomes": ["Toda sem dado"]}]
 
 
 # ── frases ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -299,3 +299,195 @@ def test_previsao_de_dia_diferente_do_de_hoje_fica_em_atencao(leituras):
     anteontem = {0: datetime(2026, 10, 3, 9, 32, tzinfo=UTC)}
     leituras(risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}, arquivos=anteontem))
     assert "· de 03/10" in V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)["fontes"][2]["texto"]
+
+
+# ── I1: a lista só diz "não há alerta" depois de ler tudo ────────────────────────────────────────────────────────────
+
+def _baixo():
+    return lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)})
+
+
+def _cartoes(v):
+    return {r["id"]: r for r in v["resumo"]}
+
+
+def test_fonte_fora_e_sem_alerta_nao_diz_nenhuma_usina_com_alerta_agora(leituras):
+    leituras(focos=lei_focos(), risco=_baixo())                                     # o INMET está fora
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert v["alertas"] == [] and v["faltando"] == ["avisos do INMET"] and v["lendo"] == []
+    assert v["titulo_lista"] == "Sem leitura de avisos do INMET: não dá para dizer que não há alerta"
+    assert v["sem_alerta_texto"] == "1 usina sem alerta nas fontes lidas."
+    assert v["completa"] is False
+
+
+def test_fonte_lendo_nao_e_fonte_fora_e_a_tela_volta_em_10_s(leituras):
+    leituras(avisos=L.Leitura(None, None, erro=L.LENDO), focos=lei_focos(), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert v["lendo"] == ["avisos do INMET"] and v["faltando"] == []
+    assert v["titulo_lista"].startswith("Sem leitura de avisos do INMET")
+    assert v["recarrega_em"] == 10
+
+
+def test_uma_fonte_fora_e_outra_lendo_aparecem_cada_uma_na_sua_lista(leituras):
+    leituras(avisos=L.Leitura(None, None, erro=L.LENDO), focos=L.Leitura(None, None, erro="HTTP 500"), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert v["lendo"] == ["avisos do INMET"] and v["faltando"] == ["focos do INPE"]
+    assert v["titulo_lista"] == "Sem leitura de avisos do INMET e focos do INPE: não dá para dizer que não há alerta"
+
+
+def test_tudo_lido_e_sem_alerta_pode_dizer_agora(leituras):
+    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert v["titulo_lista"] == "Nenhuma usina com alerta agora" and v["sem_alerta_texto"] == "1 usina sem alerta agora."
+    assert v["completa"] is True and v["recarrega_em"] == 60 and v["lendo"] == []
+
+
+def test_leitura_velha_sem_alerta_nao_diz_agora(leituras):
+    velha = L.Leitura({"avisos": [], "ignorados": [], "lidos": 0}, LIDO - 3600, erro="tempo esgotado", velha=True)
+    leituras(avisos=velha, focos=lei_focos(), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert v["titulo_lista"] == "Nenhuma usina com alerta nas leituras disponíveis (veja o estado das fontes)"
+    assert v["sem_alerta_texto"] == "1 usina sem alerta nas fontes lidas."
+
+
+def test_com_alerta_o_titulo_conta_e_continua_dizendo_que_falta_fonte(leituras):
+    leituras(focos=lei_focos(), risco=lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1)}))
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert v["titulo_lista"] == "Usinas com alerta (1), da mais grave para a menos" and v["faltando"] == ["avisos do INMET"]
+
+
+# ── I3: degradação parcial não fica "ok", e os cartões do topo dizem ─────────────────────────────────────────────────
+
+def test_aviso_ignorado_deixa_o_inmet_em_atencao_e_o_cartao_parcial(leituras):
+    leituras(avisos=lei_avisos(aviso(2), ignorados=["aviso 7: sem polígono"]), focos=lei_focos(), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    f = v["fontes"][0]
+    assert f["estado"] == "atencao" and f["qualifica"] == ["parcial"] and "1 aviso foi ignorado" in f["detalhe"]
+    c = _cartoes(v)["avisos"]
+    assert c["sub"] == "1 em vigor agora · parcial" and c["classe"] == "cl-n2"       # com alerta, a cor segue a gravidade
+
+
+def test_cartao_de_fonte_em_atencao_sem_alerta_nao_fica_verde(leituras):
+    # "0" lido de uma fonte pela metade não é "tudo bem": âmbar, e com a razão
+    leituras(avisos=lei_avisos(ignorados=["aviso 7: sem polígono"]), focos=lei_focos(), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    c = _cartoes(v)
+    assert (c["avisos"]["valor"], c["avisos"]["sub"], c["avisos"]["classe"]) == ("0", "nenhum aviso sobre as usinas · parcial", "cl-na")
+    assert c["focos"]["classe"] == "cl-n0" and c["risco"]["classe"] == "cl-n0"          # as fontes inteiras seguem verdes
+
+
+def test_leitura_velha_o_cartao_diz_de_que_hora_e_o_dado(leituras):
+    velha = L.Leitura({"avisos": [aviso(2)], "ignorados": [], "lidos": 1}, LIDO - 3600, erro="tempo esgotado", velha=True)
+    leituras(avisos=velha, focos=lei_focos(), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    c = _cartoes(v)["avisos"]
+    assert c["sub"] == "1 em vigor agora · dado de 14:00" and c["classe"] == "cl-n2"
+    assert v["fontes"][0]["qualifica"] == ["dado de 14:00"]
+    sem = L.Leitura({"avisos": [], "ignorados": [], "lidos": 0}, LIDO - 3600, erro="tempo esgotado", velha=True)
+    leituras(avisos=sem, focos=lei_focos(), risco=_baixo())
+    c = _cartoes(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))["avisos"]
+    assert (c["valor"], c["sub"], c["classe"]) == ("0", "nenhum aviso sobre as usinas · dado de 14:00", "cl-na")
+
+
+def test_arquivo_de_focos_que_falhou_deixa_os_focos_em_atencao_e_o_cartao_parcial(leituras):
+    leituras(avisos=lei_avisos(), focos=lei_focos(falhos=["b.csv"]), risco=_baixo())
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    f = v["fontes"][1]
+    assert f["estado"] == "atencao" and "1 de 2 arquivos indisponíveis" in f["detalhe"]
+    c = _cartoes(v)["focos"]
+    assert c["sub"] == "nenhum foco a até 5 km · parcial" and c["classe"] == "cl-na"
+
+
+def test_linhas_ilegiveis_nos_focos_deixam_em_atencao_e_dizem_quantas(leituras):
+    leituras(avisos=lei_avisos(), focos=lei_focos(foco_a(1.0), ruins=3), risco=_baixo())
+    f = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)["fontes"][1]
+    assert f["estado"] == "atencao" and "3 linhas ilegíveis" in f["detalhe"] and f["qualifica"] == ["parcial"]
+    leituras(avisos=lei_avisos(), focos=lei_focos(foco_a(1.0), ruins=1), risco=_baixo())
+    assert "1 linha ilegível" in V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)["fontes"][1]["detalhe"]
+
+
+def test_focos_atrasados_o_cartao_diz_ate_que_hora_vai_o_dado(leituras):
+    leituras(avisos=lei_avisos(), focos=lei_focos(ate=datetime(2026, 10, 6, 17, 10, tzinfo=UTC)), risco=_baixo())      # 14:10
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert v["fontes"][1]["estado"] == "atencao"
+    c = _cartoes(v)["focos"]
+    assert "arquivos até 14:10" in c["sub"] and c["classe"] == "cl-na"
+
+
+def test_dia_do_risco_sem_leitura_aparece_com_traco_no_resumo_e_nunca_como_zero(leituras):
+    por = {"1": [Amostra(0.99, "ponto"), Amostra(0.99, "ponto"), Amostra(None, "indisponivel"), Amostra(0.99, "ponto")]}
+    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(por, erros={2: "HTTP 404"}))
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    c = _cartoes(v)["risco"]
+    assert c["sub"] == "hoje 1 · D+1 1 · D+2 — · D+3 1 · parcial" and c["classe"] == "cl-n3"
+    assert v["fontes"][2]["estado"] == "atencao" and v["fontes"][2]["detalhe"] == "D+2 indisponível (HTTP 404)"
+
+
+def test_fonte_inteira_nao_ganha_qualificador(leituras):
+    leituras(avisos=lei_avisos(aviso(2)), focos=lei_focos(foco_a(1.0)), risco=lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1)}))
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert [f["qualifica"] for f in v["fontes"]] == [[], [], []] and [f["estado"] for f in v["fontes"]] == ["ok"] * 3
+    assert _cartoes(v)["avisos"]["sub"] == "1 em vigor agora" and v["completa"] is True
+
+
+# ── M3: sem a data do arquivo do INPE ────────────────────────────────────────────────────────────────────────────────
+
+def test_risco_sem_a_data_do_arquivo_fica_em_atencao_e_diz_por_que(leituras):
+    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}, arquivos={0: None, 1: None}))
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    f = v["fontes"][2]
+    assert f["estado"] == "atencao" and "sem data do arquivo" in f["texto"] and f["qualifica"] == ["sem data do arquivo"]
+    assert "sem data do arquivo" in _cartoes(v)["risco"]["sub"]
+
+
+# ── M2: Hoje, D+1... pela data do calendário ─────────────────────────────────────────────────────────────────────────
+
+def test_rotulos_dos_dias_pela_data_do_calendario():
+    assert V.rotulos_dos_dias(datetime(2026, 10, 6, 9, 32, tzinfo=UTC), REF) == ["Hoje", "D+1", "D+2", "D+3"]
+    assert V.rotulos_dos_dias(datetime(2026, 10, 5, 9, 32, tzinfo=UTC), REF) == ["Ontem", "Hoje", "D+1", "D+2"]
+    assert V.rotulos_dos_dias(datetime(2026, 10, 3, 9, 32, tzinfo=UTC), REF) == ["03/10", "04/10", "Ontem", "Hoje"]
+    assert V.rotulos_dos_dias(None, REF) == ["Hoje", "D+1", "D+2", "D+3"]                  # sem a data, assume que é de hoje
+    assert V.rotulos_dos_dias(datetime(2026, 10, 6, 2, 30, tzinfo=UTC), REF)[0] == "Ontem"   # 02:30 UTC ainda é 23:30 de ontem
+
+
+def test_com_o_arquivo_de_ontem_os_dias_do_cartao_e_do_resumo_dizem_ontem_e_hoje(leituras):
+    ontem = {0: datetime(2026, 10, 5, 9, 32, tzinfo=UTC)}
+    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco({"1": dias(0.8, 0.9, 0.1, 0.1)}, arquivos=ontem))
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    assert [d["rotulo"] for d in v["alertas"][0]["dias"]] == ["Ontem", "Hoje", "D+1", "D+2"]
+    assert _cartoes(v)["risco"]["sub"].startswith("ontem 1 · hoje 1 · D+1 0 · D+2 0")
+
+
+def test_dia_que_falhou_leva_o_rotulo_do_calendario_no_detalhe(leituras):
+    ontem = {0: datetime(2026, 10, 5, 9, 32, tzinfo=UTC)}
+    por = {"1": [Amostra(0.8, "ponto"), Amostra(None, "indisponivel"), Amostra(0.8, "ponto"), Amostra(0.8, "ponto")]}
+    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(por, arquivos=ontem, erros={1: "HTTP 404"}))
+    assert V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)["fontes"][2]["detalhe"] == "Hoje indisponível (HTTP 404)"
+
+
+# ── M7: usina fora da grade do INPE ──────────────────────────────────────────────────────────────────────────────────
+
+def test_usina_fora_da_grade_do_inpe_nos_quatro_dias_entra_na_lista_sem_risco_com_o_motivo(leituras):
+    fora = [Amostra(None, "fora_da_grade")] * 4
+    leituras(avisos=lei_avisos(), focos=lei_focos(),
+             risco=lei_risco({"1": dias(None, None, None, None), "2": fora, "3": dias(0.1, 0.1, 0.1, 0.1)}))
+    cad = cadastro(usina("1", "Sem vegetação", -5.0), usina("2", "Fora da grade", -5.5), usina("3", "Normal", -5.8))
+    v = V.montar({}, cadastro=cad, ref=REF)
+    assert v["sem_risco"] == [{"motivo": "sem vegetação no entorno", "nomes": ["Sem vegetação"]},
+                              {"motivo": "fora da grade do INPE", "nomes": ["Fora da grade"]}]
+
+
+def test_cartao_de_usina_fora_da_grade_diz_uma_vez_so(leituras):
+    fora = [Amostra(None, "fora_da_grade")] * 4
+    leituras(avisos=lei_avisos(aviso(2)), focos=lei_focos(), risco=lei_risco({"1": fora}))
+    c = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)["alertas"][0]
+    assert c["risco_linha"] == "fora da grade do INPE"
+
+
+def test_dias_misturados_nao_viram_uma_linha_so_e_nao_entram_na_lista_sem_risco(leituras):
+    por = {"1": [Amostra(None, "sem_dado"), Amostra(0.9, "ponto"), Amostra(0.9, "ponto"), Amostra(0.9, "ponto")]}
+    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(por))
+    v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
+    c = v["alertas"][0]
+    assert c["risco_linha"] is None and [d["valor"] for d in c["dias"]][1:] == ["0,90"] * 3
+    assert v["sem_risco"] == []

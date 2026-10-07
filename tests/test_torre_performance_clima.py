@@ -14,6 +14,7 @@ from nexus.cadastro.cifra import Cofre, gerar_chave
 from nexus.cadastro.servico import Carga, Servico
 from nexus.performance.clima import leitura as L
 from nexus.performance.clima import visao as V
+from nexus.performance.clima.geotiff import Amostra
 
 from clima_cog import SessaoArquivos, montar_cog
 from conftest import SENHA_TESTE
@@ -425,3 +426,88 @@ def test_cadastro_sem_usina_com_coordenada_diz_isso(tmp_path, monkeypatch):
     cl.post("/entrar", data={"senha": SENHA_TESTE})
     t = texto(cl.get("/t/performance/clima").get_data(as_text=True))
     assert "Nenhuma usina em operação com coordenada" in t and "Usina Sozinha" in t
+
+
+# ── a tela não parece "tudo bem" quando a fonte não foi lida inteira ──────────────────────────────────────────────────
+
+def _leitura(dados, **kw):
+    return L.Leitura(dados, AGORA.timestamp(), **kw)
+
+
+def _focos_vazio():
+    return _leitura({"focos": [], "arquivos": ["a.csv"], "falhos": [], "ate": datetime(2026, 10, 6, 17, 50, tzinfo=timezone.utc),
+                     "linhas_ruins": 0})
+
+
+def _risco(por=None):
+    por = por or {str(i): [Amostra(0.1, "ponto")] * 4 for i in range(1, 8)}
+    return _leitura({"por_ponto": por, "arquivos": {0: datetime(2026, 10, 6, 9, 32, tzinfo=timezone.utc)}, "erros": {}})
+
+
+def _instalar(monkeypatch, avisos, focos, risco):
+    monkeypatch.setattr(L, "avisos", lambda config, sessao=None: avisos)
+    monkeypatch.setattr(L, "focos", lambda config, sessao=None: focos)
+    monkeypatch.setattr(L, "risco", lambda config, pontos, sessao=None: risco)
+
+
+def test_sem_alerta_e_com_fonte_fora_a_tela_nao_diz_nenhuma_usina_com_alerta_agora(mundo, monkeypatch):
+    c, _, _ = mundo
+    _instalar(monkeypatch, L.Leitura(None, None, erro="HTTP 500"), _focos_vazio(), _risco())
+    html = pagina(c)
+    t = texto(html)
+    assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" in t
+    assert "Nenhuma usina com alerta agora" not in t and "sem alerta agora" not in t
+    assert "usinas sem alerta nas fontes lidas." in t
+    assert "A lista e os números acima não incluem: avisos do INMET." in t and "Lendo agora" not in t
+    assert '<meta http-equiv="refresh" content="60">' in html
+
+
+def test_fonte_lendo_a_tela_recarrega_em_10_s_e_a_nota_diz_lendo_e_nao_fora(mundo, monkeypatch):
+    c, _, _ = mundo
+    _instalar(monkeypatch, L.Leitura(None, None, erro=L.LENDO), _focos_vazio(), _risco())
+    html = pagina(c)
+    t = texto(html)
+    assert '<meta http-equiv="refresh" content="10">' in html
+    assert "Lendo agora: avisos do INMET." in t and "A lista e os números acima não incluem" not in t
+    assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" in t
+
+
+def test_tudo_lido_e_sem_alerta_a_tela_pode_dizer_agora(mundo, monkeypatch):
+    c, _, _ = mundo
+    _instalar(monkeypatch, _leitura({"avisos": [], "ignorados": [], "lidos": 0}), _focos_vazio(), _risco())
+    t = texto(pagina(c))
+    assert "Nenhuma usina com alerta agora" in t and "6 usinas sem alerta agora." in t
+
+
+def test_fonte_pela_metade_deixa_o_cartao_ambar_e_diz_parcial(mundo, monkeypatch):
+    c, _, _ = mundo
+    avisos = _leitura({"avisos": [], "ignorados": ["aviso 7: sem polígono"], "lidos": 1})
+    _instalar(monkeypatch, avisos, _focos_vazio(), _risco())
+    html = pagina(c)
+    resumo = re.search(r'<section class="cl-resumo".*?</section>', html, flags=re.S).group(0)
+    assert re.search(r'<div class="cl-num cl-na" data-id="avisos">.*?nenhum aviso sobre as usinas · parcial', resumo, flags=re.S)
+    assert 'class="cl-fonte cl-atencao"' in html and "1 aviso foi ignorado" in texto(html)
+
+
+def test_previsao_de_ontem_os_dias_do_cartao_dizem_ontem_e_hoje(mundo):
+    c, sessao, _ = mundo
+    sessao.modificado = "Mon, 05 Oct 2026 09:32:00 GMT"
+    gama = texto(cartoes(pagina(c))["Usina Gama"])
+    assert "Ontem 0,75 alto" in gama and "Hoje 0,80 alto" in gama and "D+1 0,60 médio" in gama and "D+2 0,40 médio" in gama
+
+
+def test_usina_fora_da_grade_do_inpe_aparece_na_linha_de_cobertura_com_o_motivo(mundo, monkeypatch):
+    c, _, _ = mundo
+    por = {str(i): [Amostra(0.1, "ponto")] * 4 for i in range(1, 8)}
+    por["6"] = [Amostra(None, "sem_dado")] * 4                        # Zeta
+    por["7"] = [Amostra(None, "fora_da_grade")] * 4                   # Eta
+    _instalar(monkeypatch, _leitura({"avisos": [], "ignorados": [], "lidos": 0}), _focos_vazio(), _risco(por))
+    t = texto(pagina(c))
+    assert "Risco de fogo sem dado (sem vegetação no entorno): Usina Zeta." in t
+    assert "Risco de fogo sem dado (fora da grade do INPE): Usina Eta." in t
+
+
+def test_o_css_tem_o_cartao_ambar_das_fontes_que_nao_estao_inteiras(mundo):
+    c, _, _ = mundo
+    css = c.get("/static/clima.css").get_data(as_text=True)
+    assert ".cl-num.cl-na{border-left-color:var(--cl-atencao)}" in css and ".cl-num.cl-na .cl-valor{color:var(--cl-atencao)}" in css

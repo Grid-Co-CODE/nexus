@@ -6,7 +6,7 @@
    recarrega a cada 60 s, como a Operação em tempo real; o que vai à rede é decidido pelo cache de cada fonte (30 min, 10 min
    e 6 h), não por esta recarga. O base.html não tem bloco de head, e o navegador aceita o meta dentro do corpo.
    Texto do INMET é de terceiros: só entra por {{ }} (escapado), nunca por |safe, e a cor do aviso nem é lida. #}
-<meta http-equiv="refresh" content="60">
+<meta http-equiv="refresh" content="{{ v.recarrega_em }}">
 <div class="cl">
   <header class="cl-cab">
     <div>
@@ -49,9 +49,10 @@
     {% endfor %}
   </section>
   {% if v.faltando %}<p class="cl-nota cl-nota--atencao">A lista e os números acima não incluem: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
-  {% if v.sem_risco %}<p class="cl-nota">Risco de fogo sem dado (sem vegetação no entorno): {{ v.sem_risco|join(", ") }}.</p>{% endif %}
+  {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. A lista e os números acima ainda não incluem essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
+  {% for g in v.sem_risco %}<p class="cl-nota">Risco de fogo sem dado ({{ g.motivo }}): {{ g.nomes|join(", ") }}.</p>{% endfor %}
 
-  <h2 class="cl-h2">{% if v.alertas %}Usinas com alerta ({{ v.alertas|length }}), da mais grave para a menos{% else %}Nenhuma usina com alerta agora{% endif %}</h2>
+  <h2 class="cl-h2">{{ v.titulo_lista }}</h2>
   <section class="cl-lista" aria-label="Usinas com alerta">
     {% for c in v.alertas %}
     <article class="cl-usina cl-n{{ c.nivel }}">
@@ -69,8 +70,8 @@
       {% endif %}
       {% if c.dias %}
       <p class="cl-rotulo-risco">Risco de fogo (INPE)</p>
-      {% if c.risco_sem_dado %}
-      <p class="cl-linha cl-n0">{{ c.dias[0].valor }}</p>
+      {% if c.risco_linha %}
+      <p class="cl-linha cl-n0">{{ c.risco_linha }}</p>
       {% else %}
       <div class="cl-dias">
         {% for d in c.dias %}
@@ -82,7 +83,7 @@
     </article>
     {% endfor %}
   </section>
-  <p class="cl-nota">{{ v.sem_alerta }} {{ "usina sem alerta" if v.sem_alerta == 1 else "usinas sem alerta" }} agora.</p>
+  <p class="cl-nota">{{ v.sem_alerta_texto }}</p>
   {% endif %}
 
   {% if v.sem_coordenada %}
