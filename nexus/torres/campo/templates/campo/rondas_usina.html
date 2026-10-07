@@ -96,7 +96,7 @@
     <tbody>
     {% for r in hist %}{% set v = r.veredito %}
       <tr><td class="m"><b>{{ dia_curto(r.data) }}</b><span class="det">{{ r.ini_hm }}{% if r.fim_hm %} às {{ r.fim_hm }}{% endif %}</span></td>
-        <td><span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span></td>
+        <td><span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span>{% if r.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}</td>
         <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</td>
         <td class="m">{{ duracao(r.dur_min) }}</td>
         <td class="m">{{ '—' if r.nota is none else r.nota ~ '%' }}</td>
@@ -105,9 +105,9 @@
         {% else %}<td colspan="2" class="mudo" title="A OS {{ r.os }} ainda não foi lida no Fracttal">não lida</td>{% endif %}
         <td class="cn-menor">{{ r.vala or '—' }}</td>
         <td>{% if r.sensores_sujos %}<span class="cn-t-alerta">{{ r.sensores_sujos|join(', ') }}</span>{% elif r.lida %}<span class="mudo">limpos</span>{% else %}—{% endif %}</td>
-        <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia and r.pend_obs not in (r.falhas or '') %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if not r.falhas and not r.pendencia %}—{% endif %}</td>
-        <td class="m">{% if r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td>
-        <td>{% if r.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}">Fotos</button>{% else %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% endif %}</td></tr>
+        <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia and r.pend_obs not in (r.falhas or '') %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if r.avulsa and r.comentario %}<span class="mudo">{{ r.comentario }}</span>{% elif not r.falhas and not r.pendencia %}—{% endif %}</td>
+        <td class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td>
+        <td>{% if r.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}">Fotos</button>{% elif r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">—</span>{% else %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% endif %}</td></tr>
       {% if r.os %}<tr class="cn-fotos-linha" hidden><td colspan="13"></td></tr>{% endif %}
     {% else %}<tr><td colspan="13" class="mudo">Nenhuma ronda pelo App nos últimos 90 dias.</td></tr>{% endfor %}
     </tbody></table></div>

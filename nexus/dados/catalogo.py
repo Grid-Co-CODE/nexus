@@ -70,6 +70,14 @@ FATOS = (
          estado="conformado", conformado_em="nexus_rondas_checklist · fato_checklist_ronda",
          observacao="carga única de 06/10 (rondas de 11/08 a 06/10), do registro da ronda no App; a ronda com OS "
                     "tem as respostas no texto da OS do Fracttal. Liga ao livro de rondas por usina_id + inicio"),
+    # o Nexus é a FONTE deste (Levi, 07/10/2026): ronda lançada à mão por quem a fez, entrando com o login do Fracttal
+    Fato("ronda_avulsa", "Ronda avulsa", "campo", "nexus_rondas_avulsas · fato_ronda_avulsa",
+         "1 linha = 1 ronda avulsa lançada no Nexus, ou a anulação de uma (anula_id preenchido)",
+         _d(data=("id", "data_id"), usina=("id", "usina_id"), equipe=("id", "equipe_id"),
+            pessoa=("id", "pessoa_id; pessoa_hmac quando o cadastro não acha a pessoa")),
+         estado="conformado", conformado_em="nexus_rondas_avulsas · fato_ronda_avulsa",
+         observacao="sem fotos, GPS nem OS; conta na cobertura. Nome e comentário só cifrados (Cofre); a anulação é "
+                    "outra linha, o banco não apaga"),
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", "1 linha = 1 PT",
          _d(data=("cod", "Criada em"), usina=("nome", "Usina"), equipe=("nome", "Região"),
             pessoa=("hmac", "Solicitante, quem decidiu"), equipamento=("cod", "Código do ativo"), os=("cod", "OS"))),

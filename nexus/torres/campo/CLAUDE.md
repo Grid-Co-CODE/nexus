@@ -21,7 +21,8 @@ Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!"). Ver "Aprovaç�
 | Aprovação de OS | fila de verificação do Fracttal ao vivo (só GET) + nota do livro do App | regras copiadas do App |
 | Permissões de trabalho | `pt_app_campo`; a OS abre a aprovação (`/t/campo/pt/<número>`) | `visao.pts` (conta nossa) |
 | Ordens de serviço | `fechamentos_app_campo` | regras copiadas do App |
-| Rondas | `rondas_app_campo` + usinas mobilizadas do cadastro | `visao.rondas` (conta nossa) |
+| Rondas | `rondas_app_campo` + `nexus_rondas_avulsas` + usinas mobilizadas do cadastro | `visao.rondas` (conta nossa) |
+| Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
 | Zeladoria | `zeladoria_app_campo` | `visao.zeladoria` (conta nossa) |
 | Ranking | `fechamentos_app_campo` + cobertura de ronda | `visao.ranking` (conta nossa) |
 | Triagem de qualidade | `fechamentos_app_campo` + rondas | regras copiadas do App |
@@ -133,6 +134,21 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     distribuição por nível; vala, sombreamento e sensores sujos. Medido em 05/10 (30 dias): 96 de 128 usinas com
     leitura, 382 de 417 rondas com OS lidas; sujidade média 2,5 (21 usinas em 4 ou 5), vegetação 2,4 (16), vala suja
     ou parcial em 47. O caminho limpo é o App mandar essas colunas no livro de rondas (mudança no App).
+- **Ronda avulsa** (Levi, 07/10/2026: "a pessoa loga pelo fractal dela ... não terá imagens, só informações da
+  tabela, salva nome da pessoa, data e hora e diz que foi avulso, quando passa o mouse em cima de avulso explica o que
+  é"; `nexus/campo/ronda_avulsa.py`, botão "+ Ronda avulsa" na aba Registros). Quem entrou com o login do Fracttal
+  lança usina mobilizada, data (até 30 dias atrás, nunca no futuro), início e fim (até 8 h), tipo, sujidade e
+  vegetação 1 a 5, vala, sombreamento, sensores sujos e um comentário livre opcional (até 1.000 caracteres). Com a
+  senha geral do Nexus não lança (não dá para saber quem fez). **Conta na cobertura** (decisão do Levi, 07/10) e
+  entra na Sujidade e vegetação; não tem nota (sem foto nem GPS), então o veredito é "—", nunca o "Não está bom" de
+  nota zero, e não é a pendência "sem OS no Fracttal". O selo **Avulsa** tem `title` com `EXPLICACAO` (mouse e foco
+  do teclado) na tabela, no histórico da usina e na sujidade. A mesma pessoa não lança duas vezes a mesma usina no
+  mesmo início. Errou: anula (só quem lançou, pelo código do e-mail) e lança de novo; a anulação é OUTRA linha
+  (`anula_id`), o banco não apaga. No banco (`nexus_rondas_avulsas · fato_ronda_avulsa`, ver `nexus/dados/CLAUDE.md`)
+  só IDs: nome e e-mail cifrados em `quem_cifrado`, comentário em `comentario_cifrado` (Cofre com
+  `NEXUS_CHAVE_CADASTRO`), pessoa como `pessoa_id` + `pessoa_hmac`. **Precisa das duas chaves no `.env`:** sem
+  `NEXUS_PESSOA_HMAC` ou sem `NEXUS_CHAVE_CADASTRO` o lançamento é recusado com o motivo na tela (07/10: o servidor
+  ainda não tem a `NEXUS_PESSOA_HMAC`). O livro que ainda não existe lê vazio (conferido no banco real em 07/10).
 - **Cache quente** (Levi, 06/10: "O carregamento das abas está sendo muito lento... O certo seria carregar e ficar
   carregado no cache!"; `visao._ler`, `manter_quente`): medido em 06/10, frias, Central 4,6 s, Rondas 3,0 s, Ranking
   3,1 s (13, 7 e 8 leituras do banco); quentes, < 0,05 s. Agora: ao subir, as contas principais são feitas (3,8 s,
@@ -312,6 +328,6 @@ Aprovação, Ordens e Triagem usam a lógica do App copiada, não refeita, para 
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_visao.py` (as
-contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_ordens.py`,
+contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo), `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_ordens.py`,
 `test_campo_telas_pg.py`, `test_campo_livros_app.py`, `test_campo_fonte_pg.py`, `test_campo_nota_fracttal.py`,
 `test_campo_coletor.py` (`tests/pg_falso.py`).

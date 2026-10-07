@@ -93,7 +93,8 @@
       <a class="cn-link" href="{{ url(aba='cobertura', cob='sem') }}">ver as {{ k.usinas - k.cobertas }} sem ronda</a></div>{% endif %}
     <div class="cn-lista-cab"><h2>Rondas diárias</h2><span class="mudo">{{ [registros|length, limite]|min }} de {{ registros|length }}</span>
       {% if registros|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ registros|length }}</span>{% endif %}
-      <a class="cn-link cn-exportar" href="{{ url(csv='1') }}">Exportar CSV</a></div>
+      <a class="cn-link cn-exportar" href="{{ url(csv='1') }}">Exportar CSV</a>
+      <a class="gc-btn gc-btn--ui gc-btn--contorno cn-bt-avulsa" href="{{ url_for('torre_campo.ronda_avulsa_lancar') }}" title="{{ explicacao_avulsa }}">+ Ronda avulsa</a></div>
     <div class="cn-tab cn-tab--rondas"><table>
       <thead><tr><th>Data</th><th>Técnico</th><th>Usina</th><th>Equipe</th><th>Região</th><th>Tipo</th><th>Início</th><th>Fim</th><th>Duração</th><th>Qualidade</th><th>Veredito</th><th>Pendências</th><th>Trackers</th><th>OS</th></tr></thead>
       <tbody>
@@ -101,12 +102,12 @@
         <tr><td class="m"><b>{{ dia_curto(r.data) }}</b></td>
           <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</td>
           <td>{% if r.usina_id %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=r.usina_id) }}">{{ r.usina }}</a>{% else %}{{ r.usina }}{% endif %}</td><td class="cn-menor">{{ r.equipe or '—' }}</td><td class="cn-menor">{{ r.regiao_br or '—' }}</td>
-          <td><span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span></td>
+          <td><span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span>{% if r.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}</td>
           <td class="m cn-menor">{{ r.ini_hm or '—' }}</td><td class="m cn-menor">{{ r.fim_hm or '—' }}</td>
           <td><b class="{{ 'cn-t-critico' if r.dur_min is not none and r.dur_min < k.dur_min else '' }}">{{ duracao(r.dur_min) }}</b></td>
           <td>{% if r.nota is not none %}{% set c = 'ok' if r.nota >= 95 else ('alerta' if r.nota >= 85 else 'critico') %}<span class="cn-nota-barra"><b class="cn-t-{{ c }}">{{ r.nota }}%</b><span class="cn-barrinha"><span class="cn-b-{{ c }}" style="width: {{ r.nota }}%"></span></span></span>{% else %}—{% endif %}</td>
           <td><span class="cn-selo cn-selo--{{ v[0] }}" title="{{ r.falhas }}">{{ v[1] }}</span></td>
-          <td class="cn-pend">{% if r.pendencia %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% else %}—{% endif %}</td>
+          <td class="cn-pend">{% if r.pendencia %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% elif r.avulsa and r.comentario %}<span class="mudo">{{ r.comentario }}</span>{% else %}—{% endif %}</td>
           <td class="m">{{ r.trk_respondidos ~ '/' ~ r.trk_apontados if r.trk_apontados else '—' }}</td>
           <td class="m">{% if r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td></tr>
       {% else %}<tr><td colspan="14" class="mudo">Nenhuma ronda com esses filtros.</td></tr>{% endfor %}
@@ -141,7 +142,7 @@
           <td>{{ nivel(x.sujidade, x.sujidade_ant) }}</td><td>{{ nivel(x.vegetacao, x.vegetacao_ant) }}</td>
           <td class="cn-menor">{{ x.sombreamento or '—' }}</td><td class="cn-menor">{{ x.vala or '—' }}</td>
           <td>{% if x.sensores_sujos %}<span class="cn-t-alerta">{{ x.sensores_sujos|join(', ') }}</span>{% else %}<span class="mudo">limpos</span>{% endif %}</td>
-          <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico or '—' }}</td><td class="m">{{ x.os }}</td></tr>
+          <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico or '—' }}</td><td class="m">{% if x.avulsa %}<span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% else %}{{ x.os }}{% endif %}</td></tr>
       {% else %}<tr><td colspan="11" class="mudo">Nenhuma usina com leitura de sujidade ou vegetação com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>
     {% if s.sem_leitura %}<p class="mudo cn-rodape">{{ s.sem_leitura }} usinas mobilizadas sem leitura no período (sem ronda, ou a ronda não tem OS no Fracttal).</p>{% endif %}

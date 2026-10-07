@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block titulo %}Ronda avulsa{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Ronda avulsa (Levi, 07/10/2026: "a pessoa loga pelo fractal dela ... não terá imagens, só informações da tabela, salva
+   nome da pessoa, data e hora e diz que foi avulso"). Conta na cobertura; comentário livre opcional. As contas e as
+   recusas estão em nexus/campo/ronda_avulsa.py; o nome e o comentário vão cifrados para o banco. #}
+<div class="campo-nativa">
+  <p class="cn-voltar"><a class="cn-link" href="{{ url_for('torre_campo.rondas') }}">Voltar para Rondas</a></p>
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Rondas · Ronda avulsa</p>
+      <h1 class="cn-titulo">Lançar uma ronda avulsa</h1>
+      <p class="cn-pergunta">{{ explicacao_avulsa }} Ela conta na cobertura da usina e aparece nas Rondas com o selo
+        <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>.</p></div>
+  </div>
+  {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}</b></div>{% endif %}
+  {% if aviso %}<div class="cn-certo" role="status"><b>{{ aviso }}</b></div>{% endif %}
+
+  {% if not usuario %}
+  <div class="cn-erro cn-aviso" role="alert"><b>Para lançar, entre com o seu login do Fracttal.</b> A ronda avulsa fica
+    no nome de quem entrou; com a senha geral do Nexus não dá para saber quem fez.
+    <a class="cn-link" href="{{ url_for('auth.sair') }}">Sair e entrar com o Fracttal</a></div>
+  {% else %}
+  <div class="cn-avulsa-grade">
+    <form class="cn-cartao cn-form-avulsa" method="post" action="{{ url_for('torre_campo.ronda_avulsa_lancar') }}">
+      <h2>A ronda</h2>
+      <p class="mudo">Lançada por <b>{{ usuario.nome or usuario.email }}</b>, com a data e a hora de agora.</p>
+      <label class="cn-campo-avulsa cn-largo"><span>Usina</span>
+        <select class="gc-campo" name="usina_id" required>
+          <option value="">escolha a usina</option>
+          {% for u in usinas %}<option value="{{ u.usina_id }}"{% if form.get('usina_id') == u.usina_id|string %} selected{% endif %}>{{ u.nome }}{% if u.uf %} - {{ u.uf }}{% endif %}</option>{% endfor %}
+        </select></label>
+      <label class="cn-campo-avulsa"><span>Data</span>
+        <input class="gc-campo" type="date" name="data" min="{{ piso }}" max="{{ hoje }}" value="{{ form.get('data') or hoje }}" required></label>
+      <label class="cn-campo-avulsa"><span>Início</span>
+        <input class="gc-campo" type="time" name="inicio" value="{{ form.get('inicio', '') }}" required></label>
+      <label class="cn-campo-avulsa"><span>Fim</span>
+        <input class="gc-campo" type="time" name="fim" value="{{ form.get('fim', '') }}" required></label>
+      <fieldset class="cn-campo-avulsa"><legend>Tipo</legend>
+        <div class="cn-opcoes">{% for t in tipos %}<label><input type="radio" name="tipo" value="{{ t }}"{% if form.get('tipo', 'curta') == t %} checked{% endif %} required> {{ t }}</label>{% endfor %}</div></fieldset>
+      <fieldset class="cn-campo-avulsa"><legend>Sujidade dos módulos</legend>
+        <div class="cn-opcoes">{% for n in range(1, 6) %}<label class="cn-nivel-op"><input type="radio" name="sujidade" value="{{ n }}"{% if form.get('sujidade') == n|string %} checked{% endif %} required><span class="cn-nivel cn-nivel--{{ n }}">{{ n }}</span></label>{% endfor %}</div></fieldset>
+      <fieldset class="cn-campo-avulsa"><legend>Altura da vegetação</legend>
+        <div class="cn-opcoes">{% for n in range(1, 6) %}<label class="cn-nivel-op"><input type="radio" name="vegetacao" value="{{ n }}"{% if form.get('vegetacao') == n|string %} checked{% endif %} required><span class="cn-nivel cn-nivel--{{ n }}">{{ n }}</span></label>{% endfor %}</div></fieldset>
+      <label class="cn-campo-avulsa"><span>Vala de drenagem</span>
+        <select class="gc-campo" name="vala" required>{% for v in valas %}<option{% if form.get('vala') == v %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+      <fieldset class="cn-campo-avulsa"><legend>Sombreamento</legend>
+        <div class="cn-opcoes">{% for s in ('não', 'sim') %}<label><input type="radio" name="sombreamento" value="{{ s }}"{% if form.get('sombreamento', 'não') == s %} checked{% endif %}> {{ s }}</label>{% endfor %}</div></fieldset>
+      <fieldset class="cn-campo-avulsa cn-largo"><legend>Sensores sujos</legend>
+        <div class="cn-opcoes">{% for s in sensores %}<label><input type="checkbox" name="sensores" value="{{ s }}"{% if s in form.getlist('sensores') %} checked{% endif %}> {{ s }}</label>{% endfor %}
+          <span class="mudo">nenhum marcado = limpos</span></div></fieldset>
+      <label class="cn-campo-avulsa cn-largo"><span>Comentário <i class="mudo">(opcional)</i></span>
+        <textarea class="gc-campo" name="comentario" rows="3" maxlength="{{ comentario_max }}" placeholder="o que quiser registrar sobre a ronda">{{ form.get('comentario', '') }}</textarea></label>
+      <p class="mudo cn-largo">Nível de 1 (limpo, baixa) a 5, a mesma régua das fotos de referência do App. Até 30 dias para trás.</p>
+      <div class="cn-largo"><button class="gc-btn gc-btn--ui" type="submit">Lançar a ronda avulsa</button></div>
+    </form>
+
+    <section class="cn-cartao">
+      <h2>As que você lançou</h2>
+      {% if minhas %}
+      <ul class="cn-minhas">
+        {% for r in minhas %}
+        <li><span><b>{{ dia_curto(r.data) }}</b> · {{ r.usina }}</span><span class="det">{{ r.ini_hm }} às {{ r.fim_hm }} · {{ duracao(r.dur_min) }} · ronda {{ r.tipo }}</span>
+          <form method="post" action="{{ url_for('torre_campo.ronda_avulsa_anular', rid=r.avulsa_id) }}" onsubmit="return confirm('Anular esta ronda avulsa? Ela sai das telas e a anulação fica registrada.')">
+            <button class="cn-link cn-bt-anular" type="submit">Anular</button></form></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="mudo">Nenhuma ronda avulsa sua nos últimos 90 dias.</p>{% endif %}
+      <p class="mudo">Lançou errado? Anule e lance de novo. Só quem lançou pode anular.</p>
+    </section>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

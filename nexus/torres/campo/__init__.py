@@ -11,13 +11,14 @@ from urllib.parse import urlencode, urlsplit
 
 from flask import Response, redirect, render_template, request, session
 from markupsafe import Markup, escape
+from werkzeug.datastructures import ImmutableMultiDict
 
 from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
 from ...campo import ordens as campo_ordens
 from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
-from ...campo import decisao_pt, pt_fracttal, ronda_checklist, ronda_fotos
+from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
 from .assinatura import bp_assinatura
 
@@ -359,7 +360,7 @@ def rondas():
         trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES, supervisores=supervisores,
         duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, suj_f=suj_f,
         cliente=cliente, clientes=clientes, clusters=painel["clusters"], cluster_aberto=cluster_aberto,
-        filtros_sujidade=FILTROS_SUJIDADE))
+        filtros_sujidade=FILTROS_SUJIDADE, explicacao_avulsa=ronda_avulsa.EXPLICACAO))
 
 
 @bp.route("/rondas/usina/<int:usina_id>")
@@ -375,7 +376,52 @@ def rondas_usina(usina_id):
     lidas = [r for r in hist if r["sujidade"] is not None or r["vegetacao"] is not None]
     return render_template("campo/rondas_usina.html", **_comum(
         "rondas", leitura, usina=usina, usina_id=usina_id, hist=hist, lidas=lidas, duracao=_duracao, iniciais=_iniciais,
-        suj_estado=ronda_checklist.estado()))
+        suj_estado=ronda_checklist.estado(), explicacao_avulsa=ronda_avulsa.EXPLICACAO))
+
+
+@bp.route("/rondas/avulsa", methods=["GET", "POST"])
+def ronda_avulsa_lancar():
+    """Lançar uma ronda avulsa (Levi, 07/10/2026: "a pessoa loga pelo fractal dela ... não terá imagens, só informações
+    da tabela, salva nome da pessoa, data e hora e diz que foi avulso"). Recusa volta com o motivo e o que foi digitado
+    (400); o lançamento gravado e conferido no banco volta para esta página com o aviso (303)."""
+    usuario = session.get("usuario")
+    erro = None
+    if request.method == "POST":
+        try:
+            nova = ronda_avulsa.lancar(request.form, usuario)
+            session["avulsa_aviso"] = f"Ronda avulsa lançada: {_dia_curto(nova['data'])}, das {nova['inicio'][11:16]} às {nova['fim'][11:16]}."
+            return redirect("/t/campo/rondas/avulsa", code=303)
+        except ronda_avulsa.Recusada as e:
+            erro = str(e)
+        except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nada some calado
+            erro = f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes."
+    leitura = visao.rondas()
+    from ...campo.ligacao_cadastro import codigo_da_pessoa
+    from flask import current_app
+    meu = codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), (usuario or {}).get("email") or "") if usuario else ""
+    minhas = [r for r in (leitura.dados or {}).get("todas") or [] if r.get("avulsa") and meu and r.get("avulsa_hmac") == meu]
+    html = render_template("campo/ronda_avulsa.html", **_comum(
+        "rondas", leitura, usuario=usuario, erro=erro, aviso=session.pop("avulsa_aviso", None),
+        form=request.form if erro else ImmutableMultiDict(), usinas=ronda_avulsa.usinas_para_escolher() if usuario else [],
+        minhas=minhas, explicacao_avulsa=ronda_avulsa.EXPLICACAO, hoje=visao._agora().date().isoformat(),
+        piso=(visao._agora().date() - timedelta(days=ronda_avulsa.DIAS_ATRAS)).isoformat(),
+        tipos=ronda_avulsa.TIPOS, valas=ronda_avulsa.VALAS, sensores=[n for _c, n in ronda_avulsa.SENSORES],
+        duracao=_duracao, comentario_max=ronda_avulsa.COMENTARIO_MAX))
+    return (html, 400) if erro else html
+
+
+@bp.route("/rondas/avulsa/<rid>/anular", methods=["POST"])
+def ronda_avulsa_anular(rid):
+    """Anular a própria ronda avulsa: vira outra linha no banco (o banco não apaga)."""
+    try:
+        ronda_avulsa.anular(rid, session.get("usuario"))
+    except ronda_avulsa.Recusada as e:
+        return render_template("campo/ronda_avulsa.html", **_comum(
+            "rondas", visao.rondas(), usuario=session.get("usuario"), erro=str(e), aviso=None, form=ImmutableMultiDict(), usinas=[],
+            minhas=[], explicacao_avulsa=ronda_avulsa.EXPLICACAO, hoje="", piso="", tipos=(), valas=(), sensores=[],
+            duracao=_duracao, comentario_max=ronda_avulsa.COMENTARIO_MAX)), 400
+    session["avulsa_aviso"] = "Ronda avulsa anulada: ela sai das telas e a anulação fica registrada no banco."
+    return redirect("/t/campo/rondas/avulsa", code=303)
 
 
 @bp.route("/rondas/os/<int:os_>/fotos")

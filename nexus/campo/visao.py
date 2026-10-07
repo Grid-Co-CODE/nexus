@@ -413,6 +413,20 @@ def _rondas_ligadas(b: _Base) -> list[dict]:
                     "sem_os": sit.lower().startswith("não criada") or not r.get("OS"),
                     "mobilizada": uid in b.mobilizadas, "inicio": r.get("Início"), "fim": r.get("Fim"),
                     "checklist": None if r.get("OS") else sem_os.get((uid, str(r.get("Início") or "")))})
+    # a ronda AVULSA, lançada à mão no Nexus (07/10/2026, `ronda_avulsa`): mesma forma, respostas no `checklist`,
+    # sem OS por natureza (não é a pendência "sem OS no Fracttal") e sem nota (a do App depende de foto e GPS)
+    from . import ronda_avulsa
+    for a in ronda_avulsa.para_tela(_livro(ronda_avulsa.LIVRO, ronda_avulsa.ABA)):
+        uid = D._id(a.get("usina_id"))
+        out.append({"data": str(a.get("data") or "")[:10], "os": None, "usina_id": uid, **b.onde(uid), "regiao": "",
+                    "tecnico": nome_curto(a["nome"]), "tipo": a.get("tipo") or "", "nota": None, "falhas": "",
+                    "trk_apontados": 0, "trk_respondidos": 0, "situacao_os": "", "sem_os": False,
+                    "mobilizada": uid in b.mobilizadas, "inicio": a.get("inicio"), "fim": a.get("fim"),
+                    "checklist": {"sujidade": _int(a.get("sujidade")), "vegetacao": _int(a.get("vegetacao")),
+                                  "vala": str(a.get("vala") or ""), "sombreamento": str(a.get("sombreamento") or ""),
+                                  "sensores_sujos": [n for c, n in ronda_avulsa.SENSORES if _int(a.get(c)) == 1]},
+                    "avulsa": True, "avulsa_id": str(a.get("id") or ""), "avulsa_hmac": a.get("pessoa_hmac"),
+                    "comentario": a.get("comentario") or ""})
     return out
 
 
@@ -504,7 +518,8 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
         for r in todas:
             r["dur_min"] = _duracao_min(r)
             r["ini_hm"], r["fim_hm"] = _hm(r["inicio"]), _hm(r["fim"])
-            r["veredito"] = _veredito(r, lim)
+            # a avulsa não tem nota (sem foto nem GPS): veredito "—", nunca o "Não está bom" de nota zero
+            r["veredito"] = ("neutro", "—") if r.get("avulsa") else _veredito(r, lim)
             # o que ficou faltando na ronda (as "rondas feitas" que saíram da Central de atenção, 05/10)
             faltas = [f.strip() for f in r["falhas"].split(";") if f.strip() and f.strip().lower() != LONGA_PENDENTE]
             r["pendencia"] = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "")
@@ -666,7 +681,8 @@ def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: s
                        "tipo": r["tipo"], "sujidade": resp.get("sujidade"), "sujidade_ant": ant.get("sujidade"),
                        "vegetacao": resp.get("vegetacao"), "vegetacao_ant": ant.get("vegetacao"),
                        "vala": resp.get("vala") or "", "sombreamento": resp.get("sombreamento") or "",
-                       "dejeto": resp.get("dejeto") or "", "sensores_sujos": resp.get("sensores_sujos") or []})
+                       "dejeto": resp.get("dejeto") or "", "sensores_sujos": resp.get("sensores_sujos") or [],
+                       "avulsa": bool(r.get("avulsa"))})
     alto = lambda n: n is not None and n > 3
     linhas.sort(key=lambda x: (-max(x["sujidade"] or 0, x["vegetacao"] or 0), -(x["sujidade"] or 0), x["usina"]))
     dist = lambda k: {n: sum(1 for x in linhas if x[k] == n) for n in range(1, 6)}

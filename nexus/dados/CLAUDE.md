@@ -21,6 +21,7 @@ inversores. Esta pasta é o lugar onde esses dados viram uma base só, ligada po
 | Feriados locais | → `nexus_dimensoes · feriados_locais` | estaduais e municipais (UF, município), cruzam com a usina pela cidade |
 | Histórico (SCD tipo 2) | `historico.py` → `pessoas_historico`, `usinas_historico` | válido de / até de equipe, supervisor, cargo e status da pessoa; de cliente, equipe, responsáveis e região da usina |
 | Checklist da ronda sem OS (carga única) | `fatos.py` → `nexus_rondas_checklist · fato_checklist_ronda` | 1 linha = 1 ronda do App que ficou sem OS, com sujidade, vegetação, vala e sensores; liga ao `rondas_app_campo` por `usina_id` + `inicio`. **Não é rotina** (ver abaixo) |
+| Ronda avulsa | `campo/ronda_avulsa.py` → `nexus_rondas_avulsas · fato_ronda_avulsa` | 1 linha = 1 ronda lançada à mão no Nexus (login do Fracttal), ou a anulação de uma (`anula_id`). IDs `data_id`, `usina_id`, `equipe_id`, `pessoa_id` + `pessoa_hmac`; nome, e-mail e comentário só cifrados (Cofre). O Nexus é a FONTE; conta na cobertura (Levi, 07/10) |
 | 1º fato com IDs | `fatos.py` → `nexus_fatos · fato_fechamento` | o fechamento de OS do App, com `data_id`, `usina_id`, `equipe_id`, `pessoa_id` |
 | Qualidade da ligação | → `nexus_fatos · qualidade` | por fato: quanto ligou a cada dimensão e exemplos do que faltou |
 | Carga | `carga.py` (+ `ferramentas/carregar_dados.py`) | de hora em hora, aos :40, grava os dois livros e confere aba a aba |
