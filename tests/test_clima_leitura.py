@@ -3,7 +3,7 @@ falha, uma busca por vez, última leitura boa servida com o erro e a hora, e nen
 import json
 import logging
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 import requests
@@ -12,6 +12,7 @@ from nexus.performance.clima import fontes
 from nexus.performance.clima import leitura as L
 
 from clima_cog import SessaoArquivos, montar_cog
+from clima_power import SessaoPower
 
 BRT = timezone(timedelta(hours=-3))
 
@@ -449,3 +450,158 @@ def test_falha_dentro_da_janela_de_60_s_nao_loga_de_novo(relogio, caplog):
         for _ in range(5):
             c.ler(fora)
     assert fora.n == 1 and len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+
+
+# ── a irradiação da NASA POWER: um cache POR USINA, 12 h ─────────────────────────────────────────────────────────────
+
+HOJE = date(2026, 10, 7)
+PUBLICADO = date(2026, 10, 2)
+
+
+def cfg_testing(**extra):
+    return {"TESTING": True, **extra}
+
+
+def test_o_ttl_da_nasa_power_e_12_h_e_a_janela_e_de_40_dias():
+    assert L.TTL_POWER_S == 12 * 3600 and L.JANELA_POWER_DIAS == 40
+
+
+def test_pede_os_40_dias_que_terminam_hoje_e_so_uma_vez_pelo_ttl(relogio):
+    s = SessaoPower(PUBLICADO)
+    l = L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert l.erro is None and l.velha is False and l.lido_em == relogio.t
+    assert l.dados["publicado_ate"] == PUBLICADO and len(l.dados["dias"]) == 40
+    q = s.consulta()
+    assert (q["start"], q["end"]) == ("20260829", "20261007")
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert len(s.pedidos) == 1
+    relogio.avanca(12 * 3600 - 1)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert len(s.pedidos) == 1                                              # 11 h 59 min 59 s depois ainda vale
+    relogio.avanca(2)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert len(s.pedidos) == 2
+
+
+def test_virou_o_dia_com_o_cache_valido_nao_pede_de_novo(relogio):
+    s = SessaoPower(PUBLICADO)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    relogio.avanca(3600)
+    l = L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE + timedelta(days=1), s)       # a janela mudou, a leitura não
+    assert len(s.pedidos) == 1 and l.erro is None
+
+
+def test_cada_usina_tem_o_seu_cache_e_a_sua_coordenada(relogio):
+    s = SessaoPower(PUBLICADO)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    L.irradiacao(cfg_testing(), "2", -10.0, -40.0, HOJE, s)
+    assert len(s.pedidos) == 2
+    assert (s.consulta(0)["latitude"], s.consulta(0)["longitude"]) == ("-5.00", "-45.00")
+    assert (s.consulta(1)["latitude"], s.consulta(1)["longitude"]) == ("-10.00", "-40.00")
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    L.irradiacao(cfg_testing(), "2", -10.0, -40.0, HOJE, s)
+    assert len(s.pedidos) == 2
+
+
+def test_o_id_da_usina_vale_como_texto(relogio):
+    s = SessaoPower(PUBLICADO)
+    L.irradiacao(cfg_testing(), 7, -5.0, -45.0, HOJE, s)
+    L.irradiacao(cfg_testing(), 7, -5.0, -45.0, HOJE, s)
+    L.irradiacao(cfg_testing(), "7", -5.0, -45.0, HOJE, s)
+    assert len(s.pedidos) == 1
+
+
+def test_a_falha_de_uma_usina_nao_derruba_a_outra(relogio):
+    boa, ruim = SessaoPower(PUBLICADO), SessaoPower(PUBLICADO, status=503)
+    assert L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, boa).erro is None
+    l = L.irradiacao(cfg_testing(), "2", -10.0, -40.0, HOJE, ruim)
+    assert l.dados is None and l.erro == "HTTP 503" and l.velha is False
+    assert L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, boa).erro is None and len(boa.pedidos) == 1
+
+
+def test_falha_serve_a_ultima_leitura_boa_dizendo_o_erro_e_a_hora_dela(relogio):
+    s = SessaoPower(PUBLICADO)
+    boa = L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    relogio.avanca(13 * 3600)                                               # venceu
+    s.status = 500
+    l = L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert l.dados == boa.dados and l.velha is True and l.erro == "HTTP 500" and l.lido_em == boa.lido_em
+
+
+def test_nasa_dentro_de_60_s_da_falha_nao_insiste_e_depois_tenta_de_novo(relogio):
+    s = SessaoPower(PUBLICADO, status=503)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    relogio.avanca(59)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert len(s.pedidos) == 1
+    relogio.avanca(2)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert len(s.pedidos) == 2
+
+
+def test_formato_diferente_da_nasa_vira_erro_do_cache_e_nao_numero(relogio):
+    s = SessaoPower(PUBLICADO, corpo=b'{"properties": {}}')
+    l = L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert l.dados is None and "ALLSKY_SFC_SW_DWN" in l.erro
+
+
+def test_uma_busca_por_vez_em_cada_usina_e_as_outras_usinas_nao_esperam(relogio):
+    comecou, liberar = threading.Event(), threading.Event()
+
+    def segura(url):
+        comecou.set()
+        assert liberar.wait(10)
+
+    presa, livre, saida = SessaoPower(PUBLICADO, ao_pedir=segura), SessaoPower(PUBLICADO), []
+    t = threading.Thread(target=lambda: saida.append(L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, presa)))
+    t.start()
+    assert comecou.wait(10)
+    try:
+        mesma = L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, SessaoPower(PUBLICADO))
+        assert mesma.dados is None and mesma.erro == L.LENDO                  # quem chega no meio não espera a rede
+        outra = L.irradiacao(cfg_testing(), "2", -10.0, -40.0, HOJE, livre)
+        assert outra.erro is None and len(livre.pedidos) == 1               # a outra usina busca à parte, sem esperar a primeira
+    finally:
+        liberar.set()
+        t.join(10)
+    assert saida[0].erro is None and len(presa.pedidos) == 1
+
+
+def test_sem_sessao_nos_testes_a_nasa_nao_vai_a_rede(monkeypatch, relogio):
+    def nao(*a, **k):
+        raise AssertionError("foi à rede")
+    monkeypatch.setattr(fontes, "sessao_padrao", nao)
+    monkeypatch.setattr(requests.Session, "get", nao)
+    l = L.irradiacao({"TESTING": True}, "1", -5.0, -45.0, HOJE)
+    assert l.dados is None and l.erro == "sem fonte nos testes"
+
+
+def test_a_sessao_injetada_para_todos_vale_para_a_nasa(relogio):
+    s = SessaoPower(PUBLICADO)
+    L.usar_sessao(s)
+    assert L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE).erro is None and len(s.pedidos) == 1
+
+
+def test_o_endereco_da_nasa_vem_da_configuracao(relogio):
+    s = SessaoPower(PUBLICADO)
+    cfg = cfg_testing(NEXUS_CLIMA_POWER_URL="http://espelho.exemplo.test/p?x={lat},{lon}&a={inicio}&b={fim}")
+    assert L.irradiacao(cfg, "1", -5.0, -45.0, HOJE, s).erro is None
+    assert s.pedidos[0] == "http://espelho.exemplo.test/p?x=-5.00,-45.00&a=20260829&b=20261007"
+
+
+def test_limpar_o_cache_esquece_as_usinas_da_nasa(relogio):
+    s = SessaoPower(PUBLICADO)
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    L.limpar_cache()
+    L.irradiacao(cfg_testing(), "1", -5.0, -45.0, HOJE, s)
+    assert len(s.pedidos) == 2
+
+
+def test_a_falha_da_nasa_vai_ao_log_sem_coordenada_nem_usina(relogio, caplog):
+    s = SessaoPower(PUBLICADO, status=503)
+    with caplog.at_level(logging.WARNING, logger="nexus.performance.clima.leitura"):
+        L.irradiacao(cfg_testing(), "usina-secreta-77", -5.4321, -45.1234, HOJE, s)
+    mensagens = " | ".join(r.getMessage() for r in caplog.records)
+    assert "NASA POWER" in mensagens and "HTTP 503" in mensagens
+    for proibido in ("usina-secreta-77", "5.4321", "45.1234", "5,4321"):
+        assert proibido not in mensagens

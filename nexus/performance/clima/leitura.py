@@ -3,6 +3,10 @@
 - TTL por fonte: avisos do INMET 30 min, focos do INPE 10 min, risco de fogo 6 h (o INPE publica uma vez por dia, ~06:30).
   O TTL do risco conta da leitura, e a leitura de antes da publicação é do arquivo de ontem: lido às 05:00, ficaria com ele até
   as 11:01. Por isso, enquanto o T0 não é comprovadamente o de hoje (pela data do arquivo), o TTL é de 15 min.
+- A irradiação da NASA POWER (07/10/2026) é a única fonte com um cache POR USINA: 12 h cada, só quando alguém abre a página da
+  usina (a tela principal nunca a chama). A NASA publica com uns 5 dias de atraso e a série não muda de hora em hora; 12 h
+  deixa a página da usina leve sem esconder um dia novo por mais de meio dia. Uma busca por vez em cada usina: quem chega no
+  meio recebe "lendo" (ou a última boa), e as outras usinas buscam à parte, sem esperar.
 - Depois de uma falha, 60 s sem insistir: a fonte caída não leva um pedido por visita à tela.
 - Uma busca por vez: quem chega enquanto outra thread busca recebe a última leitura boa como está (ou "lendo a fonte"),
   sem esperar a rede. Uma busca de risco de fogo leva alguns segundos; sem isto, a fila de visitas esgotaria as threads.
@@ -16,7 +20,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from . import fontes
@@ -28,6 +32,9 @@ TTL_AVISOS_S = 30 * 60
 TTL_FOCOS_S = 10 * 60
 TTL_RISCO_S = 6 * 3600
 TTL_RISCO_DESATUALIZADO_S = 15 * 60     # enquanto o arquivo T0 do INPE não é comprovadamente o de hoje
+TTL_POWER_S = 12 * 3600                 # NASA POWER, por usina
+JANELA_POWER_DIAS = 40                  # os 40 dias que terminam hoje: cobrem os 30 do gráfico e o mês inteiro, e dão folga de um dia
+                                        # para o cache de até 12 h cuja janela já mudou
 FALHA_TTL_S = 60
 LENDO = "lendo a fonte"
 SEM_FONTE_NOS_TESTES = "sem fonte nos testes"
@@ -135,11 +142,24 @@ class Cache:
 _AVISOS = Cache(TTL_AVISOS_S, nome="INMET (avisos)")
 _FOCOS = Cache(TTL_FOCOS_S, nome="INPE (focos)")
 _RISCO = Cache(TTL_RISCO_S, nome="INPE (risco de fogo)", validade=_ttl_do_risco)
+_POWER: dict = {}                       # um Cache por usina; o id vem do cadastro (quem chama confere que a usina existe)
+_POWER_TRAVA = threading.Lock()
 
 
 def limpar_cache() -> None:
     for c in (_AVISOS, _FOCOS, _RISCO):
         c.limpar()
+    with _POWER_TRAVA:
+        _POWER.clear()
+
+
+def _cache_da_usina(usina_id) -> Cache:
+    # O nome do cache vai ao log quando a fonte falha: nunca leva o id nem a coordenada da usina.
+    with _POWER_TRAVA:
+        c = _POWER.get(str(usina_id))
+        if c is None:
+            c = _POWER[str(usina_id)] = Cache(TTL_POWER_S, nome="NASA POWER (irradiação)")
+        return c
 
 
 def _ler(cache, config, sessao, fabricar, chave=None) -> Leitura:
@@ -166,3 +186,11 @@ def risco(config, pontos, sessao=None) -> Leitura:
     chave = frozenset((c, lat, lon) for c, lat, lon in pontos)
     return _ler(_RISCO, config, sessao,
                 lambda s: fontes.inpe_risco_fogo(pontos, s, fontes.enderecos(config)["risco"]), chave)
+
+
+def irradiacao(config, usina_id, lat, lon, hoje: date, sessao=None) -> Leitura:
+    """O GHI diário da NASA POWER numa usina, dos 40 dias que terminam em `hoje` (data de Brasília): ver `fontes.nasa_power`.
+    O cache é o da usina: outra usina busca à parte, e a falha de uma não derruba a outra."""
+    inicio = hoje - timedelta(days=JANELA_POWER_DIAS - 1)
+    return _ler(_cache_da_usina(usina_id), config, sessao,
+                lambda s: fontes.nasa_power(lat, lon, inicio, hoje, s, fontes.enderecos(config)["power"]))
