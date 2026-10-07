@@ -7,7 +7,6 @@ import pytest
 import requests
 
 from nexus.performance.clima import fontes as F
-from nexus.performance.clima import geotiff as GT
 
 from clima_cog import SessaoArquivos, montar_cog
 

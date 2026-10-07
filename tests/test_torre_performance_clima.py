@@ -9,9 +9,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from nexus import create_app
-from nexus.cadastro.armazem import ArmazemLocal
-from nexus.cadastro.cifra import Cofre, gerar_chave
-from nexus.cadastro.servico import Carga, Servico
+from nexus.cadastro.cifra import gerar_chave
+from nexus.cadastro.servico import Carga
 from nexus.performance.clima import leitura as L
 from nexus.performance.clima import visao as V
 from nexus.performance.clima.geotiff import Amostra

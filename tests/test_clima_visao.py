@@ -1,5 +1,4 @@
 """Clima e risco: o view-model da tela (`visao.montar`), com leituras prontas no lugar das fontes. Sem rede, sem Flask."""
-import json
 from datetime import datetime, timedelta, timezone
 
 import pytest

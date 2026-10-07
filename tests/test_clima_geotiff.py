@@ -5,7 +5,6 @@ mesmo desenho (`clima_cog.montar_cog`: contêiner à mão, LZW do Pillow) e prov
 sair da rede, o entorno de 5 x 5 e o erro explícito quando o formato muda. Nenhum teste fala com a rede.
 """
 import math
-import struct
 from datetime import datetime, timezone
 
 import pytest

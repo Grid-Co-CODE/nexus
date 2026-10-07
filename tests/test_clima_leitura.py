@@ -11,7 +11,7 @@ import requests
 from nexus.performance.clima import fontes
 from nexus.performance.clima import leitura as L
 
-from clima_cog import Resposta, SessaoArquivos, montar_cog
+from clima_cog import SessaoArquivos, montar_cog
 
 BRT = timezone(timedelta(hours=-3))
 
