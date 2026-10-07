@@ -434,10 +434,10 @@ def test_o_modelo_diz_a_hora_da_tela_e_a_recarga_normal(leituras):
 
 
 def test_a_ilha_fora_do_recorte_do_brasil_e_dita_e_nao_some(leituras):
-    # Fernando de Noronha (-32,4 de longitude) cai fora do contorno "mínimo" do IBGE e fora do viewBox: a tela diz que não a
-    # desenha, em vez de a contar entre as do recorte.
+    # Uma usina numa ilha oceânica (o ponto é inventado, em pleno Atlântico a leste do continente) cai fora do contorno "mínimo"
+    # do IBGE, que não traz as ilhas, e fora do viewBox: a tela diz que não a desenha, em vez de a contar entre as do recorte.
     tudo_instalado(leituras)
-    m = montar(cadastro=cadastro(*mundo_de_usinas(), usina("9", "Usina Ilha", (-3.85, -32.4))))
+    m = montar(cadastro=cadastro(*mundo_de_usinas(), usina("9", "Usina Ilha", (-10.0, -30.0))))
     assert len(m["usinas"]) == 6 and m["fora_do_recorte"] == 1 and m["n_usinas"] == 7
 
 
