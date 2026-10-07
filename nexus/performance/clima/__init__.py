@@ -9,5 +9,6 @@ coordenadas do cadastro. Previsão e testes de irradiância ficam para a fase 2 
     alertas     as regras: aviso que contém a usina, foco a até 5 km, classe do risco de fogo
     leitura     cache por fonte (TTL, janela de falha, uma busca por vez, última leitura boa)
     usinas      usinas em operação e coordenadas, do cadastro
+    mapa        o Mapa de risco: contorno do IBGE, projeção, recorte por região e as camadas do SVG
     visao       o que a tela mostra
 """
