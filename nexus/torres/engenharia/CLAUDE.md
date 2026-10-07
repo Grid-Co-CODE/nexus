@@ -3,6 +3,29 @@
 Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje só a
 **Confiabilidade** é tela de verdade; as outras caem no placeholder da casca.
 
+## Quadro da equipe (06/10/2026)
+
+Levi: "uma tela que fique no setor de engenharia que agregue todas as OSs que estão abertas ou já foram fechadas ou que
+serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E SUPERCARDS, DEIXE ALGO BOM DE GERENCIAR!".
+`/t/engenharia/equipe`; leitura em `nexus/engenharia/os_equipe.py`; supercards em `supercards()` (torre); quadro em
+`templates/engenharia/equipe.html` (montado no navegador a partir de um JSON; classes `kb-*` em `engenharia.css`).
+
+- **Quem é da equipe:** os mesmos nomes da Nova solicitação | Engenharia do OS Creator (`OS_WEB_ENGENHARIA_RESPONSAVEIS`
+  no .env do OS Creator; `NEXUS_ENGENHARIA_RESPONSAVEIS` no .env do Nexus vale por cima). Nomes nunca no código
+  (repositório público). No servidor, a linha tem de estar no .env do OS Creator de lá.
+- **Leitura (medido em 06/10):** o REST filtra pelo nome do responsável (`personnel_description`, por trecho) e
+  IGNORA `id_personnel`. O nome vira a pessoa pela lista `personnel` (só se for UMA; guardada 24 h) e as OS vindas
+  pelo nome são conferidas pelo `id_personnel` (homônimo fora). Eram 55 linhas para os 6 (~8 pedidos), guardadas
+  5 min; a primeira visita lê na hora. Linha do REST é por tarefa; o cartão é por OS.
+- **Colunas:** A fazer (status 1, nada começou; a data programada diz atrasada, vence em 2 dias ou "abre em" = as que
+  vão abrir), Em execução (alguma tarefa começou), Em verificação (2; mostra a programada, não "atrasada": já foi
+  feita), Concluídas (3; as de 30 dias ou todas), Canceladas (4; escondidas).
+- **Supercards:** um por pessoa, com a cor dela; em aberto, a trilha por etapa, atrasadas, fechadas em 30 dias e a
+  faixa dos próximos 14 dias (um degrau por dia, um ponto por OS programada; fim de semana vazado, hoje marcado). O
+  clique filtra o quadro. Busca, Quadro/Por pessoa, concluídas de todo o período e canceladas sem recarregar.
+  Clique no cartão abre a gaveta (descrição, tarefas, link no Fracttal). O quadro só mostra: mudar a OS é no
+  Fracttal ou no OS Creator.
+
 ## Confiabilidade (06/10/2026)
 
 Levi: "traga a aba Confiabilidade do https://pcm.gridco.com.br/, não referenciando diretamente esse caminho mas

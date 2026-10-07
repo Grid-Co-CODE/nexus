@@ -23,6 +23,9 @@ TORRE = Torre(
         Tela("confiabilidade", "Confiabilidade",
              "Quais ativos falham mais e demoram mais a voltar?",
              "OS de falha do Fracttal, lidas pelo Nexus"),
+        Tela("equipe", "Quadro da equipe",
+             "Quem da engenharia está com o quê, o que atrasou e o que vem por aí?",
+             "OS do Fracttal dos responsáveis da engenharia"),
         Tela("criticidade", "Matriz de criticidade",
              "Qual ativo, se parar, dói mais?",
              "engenharia.json do painel PCM"),
@@ -156,3 +159,65 @@ def confiabilidade():
         janela=C.JANELA_DIAS, url=_url, h=_h, pct=_pct, est=os_falhas.estado(), sem_cadastro=g.get("sem_cadastro"),
         lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"),
         periodo=f"{d['periodo']['de'].astimezone(BRT):%d/%m} a {d['periodo']['ate'].astimezone(BRT):%d/%m/%Y}")
+
+
+# ── Quadro da equipe (06/10/2026) ───────────────────────────────────────────────────────────────────────────────────
+# Levi: "uma tela que fique no setor de engenharia que agregue todas as OSs que estão abertas ou já foram fechadas ou
+# que serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E SUPERCARDS, DEIXE ALGO BOM DE
+# GERENCIAR!". A leitura está em nexus/engenharia/os_equipe.py; aqui, os supercards (por pessoa) e o quadro.
+CORES_PESSOA = ("#7fb8ff", "#a3d900", "#f2b84b", "#4fd1c5", "#ff8a65", "#e88fb4", "#c7cede")
+DIAS_FAIXA = 14
+JANELA_CONCLUIDAS = 30
+
+
+def _iniciais(nome: str) -> str:
+    p = [x for x in str(nome or "").split() if x]
+    return (p[0][0] + (p[-1][0] if len(p) > 1 else "")).upper() if p else "?"
+
+
+def supercards(oss: list[dict], equipe: list[dict], hoje) -> list[dict]:
+    """Um supercard por pessoa: a carga por etapa, o que atrasou, o que fechou em 30 dias e a faixa dos próximos 14 dias
+    (as OS a fazer pela data programada: o "que serão abertas")."""
+    piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
+    out = []
+    for i, p in enumerate(equipe):
+        minhas = [o for o in oss if o["pid"] == p["id"]]
+        cont = {c: sum(1 for o in minhas if o["coluna"] == c) for c in ("fazer", "execucao", "verificacao", "concluida", "cancelada")}
+        faixa = []
+        for d in range(DIAS_FAIXA):
+            dia = hoje + timedelta(days=d)
+            n = [o for o in minhas if o["coluna"] in ("fazer", "execucao") and o["programada_iso"] == dia.isoformat()]
+            faixa.append({"dia": dia.strftime("%d/%m"), "sem": "STQQSSD"[dia.weekday()], "fim_de_semana": dia.weekday() >= 5,
+                          "n": len(n), "oss": ", ".join(o["os"] for o in n)})
+        abertas = [o for o in minhas if o["coluna"] in ("fazer", "execucao")]
+        proxima = min((o for o in abertas if o["dias"] is not None and o["dias"] >= 0), key=lambda o: o["dias"], default=None)
+        out.append({"id": p["id"], "nome": p["nome"], "nome_fracttal": p.get("nome_fracttal") or p["nome"],
+                    "iniciais": _iniciais(p.get("nome_fracttal") or p["nome"]), "cor": CORES_PESSOA[i % len(CORES_PESSOA)],
+                    "cont": cont, "carga": cont["fazer"] + cont["execucao"] + cont["verificacao"],
+                    "atrasadas": sum(1 for o in abertas if o["prazo"] == "atrasada"),
+                    "vence": sum(1 for o in abertas if o["prazo"] == "vence"),
+                    "fechadas30": sum(1 for o in minhas if o["coluna"] == "concluida" and (o["fim_iso"] or "") >= piso),
+                    "faixa": faixa, "proxima": proxima, "total": len(minhas)})
+    return out
+
+
+@bp.route("/equipe")
+def equipe():
+    from ...engenharia import os_equipe
+    os_equipe.pedir_releitura(esperar=not os_equipe.dados()["lido"])
+    d = os_equipe.dados()
+    hoje = datetime.now(BRT).date()
+    cards = supercards(d["os"], d["equipe"], hoje)
+    cor = {c["id"]: c["cor"] for c in cards}
+    ini = {c["id"]: c["iniciais"] for c in cards}          # as do supercard (pelo nome no Fracttal)
+    oss = [dict(o, cor=cor.get(o["pid"], CORES_PESSOA[-1]), iniciais=ini.get(o["pid"]) or _iniciais(o["pessoa"]))
+           for o in d["os"]]
+    piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
+    total = {"carga": sum(c["carga"] for c in cards), "atrasadas": sum(c["atrasadas"] for c in cards),
+             "vence": sum(c["vence"] for c in cards), "fechadas30": sum(c["fechadas30"] for c in cards),
+             "verificacao": sum(c["cont"]["verificacao"] for c in cards)}
+    return render_template(
+        "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss, total=total,
+        faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS,
+        hoje=hoje.isoformat(), piso_concluidas=piso, janela=JANELA_CONCLUIDAS, dias_faixa=DIAS_FAIXA,
+        lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")

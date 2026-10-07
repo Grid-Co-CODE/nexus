@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+{# Quadro da equipe de engenharia (06/10/2026): supercards por pessoa (carga, atrasadas, fechadas em 30 dias e a faixa dos
+   próximos 14 dias) e o kanban das OS, montado no navegador a partir do JSON abaixo (filtros sem recarregar). A leitura
+   está em nexus/engenharia/os_equipe.py. #}
+<div class="campo-nativa kb">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Quadro da equipe</p>
+      <h1 class="cn-titulo">Quem está com o quê</h1>
+      <p class="cn-pergunta">As OS de quem é da engenharia no Fracttal: as que vão abrir, as abertas, as em verificação e as
+        fechadas. Clique numa pessoa para ver só as dela.</p></div>
+    <div class="cn-frescor">OS do Fracttal<br><b>lidas às {{ lido }}</b></div>
+  </div>
+  {% if erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> Mostrando a última leitura; nova tentativa em 1 minuto.</div>{% endif %}
+  {% if faltam %}<div class="cn-erro cn-aviso" role="status"><b>Não achei no Fracttal: {{ faltam|join(', ') }}.</b> Confira o nome na lista de responsáveis da engenharia (a mesma da Nova solicitação | Engenharia).</div>{% endif %}
+
+  <section class="kb-resumo" aria-label="A equipe agora">
+    <div><b>{{ total.carga }}</b><span>em aberto</span></div>
+    <div class="{{ 'kb-ruim' if total.atrasadas }}"><b>{{ total.atrasadas }}</b><span>atrasadas</span></div>
+    <div class="{{ 'kb-atento' if total.vence }}"><b>{{ total.vence }}</b><span>vencem em 2 dias</span></div>
+    <div><b>{{ total.verificacao }}</b><span>esperando verificação</span></div>
+    <div class="kb-bom"><b>{{ total.fechadas30 }}</b><span>fechadas em {{ janela }} dias</span></div>
+  </section>
+
+  <section class="kb-pessoas" aria-label="Pessoas">
+    {% for c in cards %}
+    <button type="button" class="kb-super" data-pid="{{ c.id }}" style="--cor:{{ c.cor }}" aria-pressed="false" title="{{ c.nome_fracttal }}: mostrar só as OS dele(a)">
+      <span class="kb-super-cab"><span class="kb-av kb-av--grande">{{ c.iniciais }}</span>
+        <span class="kb-super-nome"><b>{{ c.nome }}</b><span>{{ c.total }} OS no Fracttal</span></span>
+        <span class="kb-super-carga"><b>{{ c.carga }}</b><span>em aberto</span></span></span>
+      {% set tot = (c.cont.fazer + c.cont.execucao + c.cont.verificacao) or 1 %}
+      <span class="kb-trilha" aria-hidden="true">
+        <i class="kb-t-fazer" style="width:{{ (100 * c.cont.fazer / tot)|round(1) }}%"></i><i class="kb-t-execucao" style="width:{{ (100 * c.cont.execucao / tot)|round(1) }}%"></i><i class="kb-t-verificacao" style="width:{{ (100 * c.cont.verificacao / tot)|round(1) }}%"></i></span>
+      <span class="kb-super-num">
+        <span><b>{{ c.cont.fazer }}</b>a fazer</span><span><b>{{ c.cont.execucao }}</b>em execução</span><span><b>{{ c.cont.verificacao }}</b>em verificação</span>
+        <span class="{{ 'kb-ruim' if c.atrasadas }}"><b>{{ c.atrasadas }}</b>atrasada{{ 's' if c.atrasadas != 1 }}</span><span class="kb-bom"><b>{{ c.fechadas30 }}</b>fechada{{ 's' if c.fechadas30 != 1 }} em {{ janela }}d</span></span>
+      {# a assinatura: os próximos 14 dias, cada dia um degrau com as OS programadas nele #}
+      <span class="kb-faixa" aria-label="Próximos {{ dias_faixa }} dias">
+        {% for f in c.faixa %}<span class="kb-dia{% if f.fim_de_semana %} kb-dia--fds{% endif %}{% if loop.first %} kb-dia--hoje{% endif %}" title="{{ f.dia }}{% if f.n %}: OS {{ f.oss }}{% endif %}">{% for _ in range(f.n if f.n < 4 else 4) %}<i></i>{% endfor %}</span>{% endfor %}
+      </span>
+      <span class="kb-faixa-legenda"><span>hoje</span><span>{{ c.faixa[7].dia }}</span><span>{{ c.faixa[-1].dia }}</span></span>
+      <span class="kb-proxima">{% if c.proxima %}Próxima: OS {{ c.proxima.os }} em {{ c.proxima.programada }}{% elif c.carga %}Nenhuma programada daqui para a frente{% else %}Sem OS em aberto{% endif %}</span>
+    </button>
+    {% else %}<p class="mudo">Nenhum responsável da engenharia achado no Fracttal.</p>{% endfor %}
+  </section>
+
+  <div class="kb-barra">
+    <input type="search" class="gc-campo kb-busca" placeholder="buscar OS, título, ativo, usina" aria-label="Buscar">
+    <div class="cn-seg kb-modo" role="group" aria-label="Como ver">
+      <a href="#" data-modo="quadro" aria-current="page">Quadro</a><a href="#" data-modo="pessoas">Por pessoa</a></div>
+    <label class="kb-marca"><input type="checkbox" class="kb-todas-concl"> concluídas de todo o período</label>
+    <label class="kb-marca"><input type="checkbox" class="kb-canceladas"> mostrar canceladas</label>
+    <button type="button" class="kb-limpar" hidden>Ver a equipe toda</button>
+  </div>
+  <div class="kb-quadro" aria-live="polite"></div>
+  <p class="mudo kb-rodape">Coluna: A fazer = aberta e não começou (a data programada diz se atrasou, se vence em 2 dias ou se
+    ainda vai abrir); Em execução = alguma tarefa começou; Em verificação = esperando a aprovação; Concluídas = aprovadas
+    (as dos últimos {{ janela }} dias, ou de todo o período). O quadro só mostra: mudar a OS é no Fracttal ou no OS Creator.</p>
+
+  <div class="eg-veu" hidden></div>
+  <aside class="eg-gaveta" role="dialog" aria-modal="true" aria-label="OS" hidden>
+    <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
+    <div class="eg-gav-corpo"></div>
+  </aside>
+</div>
+<script type="application/json" id="kb-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "piso": piso_concluidas}|tojson }}</script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById('kb-dados').textContent);
+  var quadro = document.querySelector('.kb-quadro');
+  var estado = {pessoa: null, q: '', modo: 'quadro', todas: false, canceladas: false};
+  var ROT = {fazer: 'A fazer', execucao: 'Em execução', verificacao: 'Em verificação', concluida: 'Concluídas', cancelada: 'Canceladas'};
+
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function prazoTexto(o) {
+    if (o.coluna === 'concluida') return o.fim ? 'fechada ' + o.fim.slice(0, 5) : 'fechada';
+    if (o.coluna === 'cancelada') return 'cancelada';
+    // em verificação a OS já foi feita: só espera a aprovação, então não está atrasada
+    if (o.coluna === 'verificacao') return o.programada ? 'programada ' + o.programada.slice(0, 5) : 'em verificação';
+    if (o.dias == null) return 'sem data';
+    if (o.dias < 0) return 'atrasada ' + (-o.dias) + ' d';
+    if (o.dias === 0) return 'vence hoje';
+    if (o.dias === 1) return 'vence amanhã';
+    return (o.coluna === 'fazer' ? 'abre em ' : 'vence em ') + o.dias + ' d';
+  }
+  function passa(o) {
+    if (estado.pessoa && String(o.pid) !== estado.pessoa) return false;
+    if (o.coluna === 'cancelada' && !estado.canceladas) return false;
+    if (o.coluna === 'concluida' && !estado.todas && (o.fim_iso || '') < D.piso) return false;
+    if (estado.q) {
+      var t = (o.os + ' ' + o.titulo + ' ' + o.ativo + ' ' + o.codigo + ' ' + o.usina + ' ' + o.tipo + ' ' + o.pessoa).toLowerCase();
+      if (t.indexOf(estado.q) < 0) return false;
+    }
+    return true;
+  }
+  function ordem(c) {
+    return function (a, b) {
+      if (c === 'concluida' || c === 'cancelada' || c === 'verificacao') return (b.fim_iso || b.programada_iso || '').localeCompare(a.fim_iso || a.programada_iso || '');
+      return (a.programada_iso || '9999').localeCompare(b.programada_iso || '9999');
+    };
+  }
+  function cartao(o) {
+    var c = el('article', 'kb-card kb-card--' + (o.prazo || o.coluna));
+    c.tabIndex = 0; c.dataset.os = o.os;
+    var cab = el('header', 'kb-card-cab');
+    var num = el('span', 'kb-os', 'OS ' + o.os); cab.appendChild(num);
+    cab.appendChild(el('span', 'kb-prazo', prazoTexto(o)));
+    c.appendChild(cab);
+    c.appendChild(el('h4', 'kb-card-tit', o.titulo || '(sem título)'));
+    var onde = [o.ativo, o.usina].filter(Boolean).join(' · ');
+    if (onde) c.appendChild(el('p', 'kb-onde', onde));
+    if (o.etiquetas.length) {
+      var et = el('div', 'kb-etq');
+      o.etiquetas.forEach(function (x) { var s = el('span', 'kb-etiqueta', x.nome); s.style.setProperty('--etq', x.cor); et.appendChild(s); });
+      c.appendChild(et);
+    }
+    var pe = el('footer', 'kb-card-pe');
+    var av = el('span', 'kb-av', o.iniciais); av.style.setProperty('--cor', o.cor); av.title = o.pessoa; pe.appendChild(av);
+    pe.appendChild(el('span', 'kb-tipo', o.tipo));
+    if (o.tarefas.length > 1) pe.appendChild(el('span', 'kb-n', o.tarefas.length + ' tarefas'));
+    c.appendChild(pe);
+    c.addEventListener('click', function (ev) { if (!ev.target.closest('a')) gaveta(o); });
+    c.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') gaveta(o); });
+    return c;
+  }
+  function colunasVisiveis() {
+    return D.colunas.map(function (c) { return c[0]; }).filter(function (c) { return c !== 'cancelada' || estado.canceladas; });
+  }
+  function bloco(cols, lista, titulo) {
+    var g = el('div', 'kb-colunas');
+    g.style.setProperty('--n', cols.length);
+    cols.forEach(function (c) {
+      var itens = lista.filter(function (o) { return o.coluna === c; }).sort(ordem(c));
+      var col = el('section', 'kb-col kb-col--' + c);
+      var h = el('header', 'kb-col-cab');
+      h.appendChild(el('h3', null, ROT[c]));
+      h.appendChild(el('span', 'kb-col-n', String(itens.length)));
+      if (c === 'fazer') {
+        var at = itens.filter(function (o) { return o.prazo === 'atrasada'; }).length;
+        if (at) h.appendChild(el('span', 'kb-col-alerta', at + ' atrasada' + (at > 1 ? 's' : '')));
+      }
+      col.appendChild(h);
+      var corpo = el('div', 'kb-col-corpo');
+      if (!itens.length) corpo.appendChild(el('p', 'kb-vazio', c === 'fazer' ? 'Nada a fazer.' : 'Nenhuma.'));
+      itens.forEach(function (o) { corpo.appendChild(cartao(o)); });
+      col.appendChild(corpo);
+      g.appendChild(col);
+    });
+    if (titulo) { var w = el('div', 'kb-raia'); w.appendChild(titulo); w.appendChild(g); return w; }
+    return g;
+  }
+  function desenha() {
+    var lista = D.oss.filter(passa), cols = colunasVisiveis();
+    quadro.replaceChildren();
+    if (estado.modo === 'pessoas') {
+      var pessoas = [];
+      lista.forEach(function (o) { if (pessoas.indexOf(o.pessoa) < 0) pessoas.push(o.pessoa); });
+      if (!pessoas.length) quadro.appendChild(el('p', 'kb-vazio', 'Nenhuma OS com esses filtros.'));
+      pessoas.forEach(function (p) {
+        var dela = lista.filter(function (o) { return o.pessoa === p; });
+        var t = el('h3', 'kb-raia-tit'); var av = el('span', 'kb-av', dela[0].iniciais); av.style.setProperty('--cor', dela[0].cor);
+        t.appendChild(av); t.appendChild(document.createTextNode(p + ' · ' + dela.length + ' OS'));
+        quadro.appendChild(bloco(cols, dela, t));
+      });
+    } else {
+      quadro.appendChild(bloco(cols, lista));
+    }
+  }
+  // a gaveta: o detalhe da OS
+  var gav = document.querySelector('.eg-gaveta'), veu = document.querySelector('.eg-veu'), corpo = gav.querySelector('.eg-gav-corpo');
+  function linha(dl, rot, val) { if (!val) return; dl.appendChild(el('dt', null, rot)); dl.appendChild(el('dd', null, val)); }
+  function gaveta(o) {
+    corpo.replaceChildren();
+    var cab = el('div', 'eg-gav-cab');
+    var av = el('span', 'kb-av kb-av--grande', o.iniciais); av.style.setProperty('--cor', o.cor); cab.appendChild(av);
+    var tx = el('div'); tx.appendChild(el('h2', null, o.titulo || 'OS ' + o.os));
+    var sub = el('p'); sub.textContent = 'OS ' + o.os + ' · ' + ROT[o.coluna] + ' · ' + prazoTexto(o); tx.appendChild(sub);
+    cab.appendChild(tx); corpo.appendChild(cab);
+    if (o.etiquetas.length) {
+      var et = el('div', 'kb-etq kb-etq--gav');
+      o.etiquetas.forEach(function (x) { var s = el('span', 'kb-etiqueta', x.nome); s.style.setProperty('--etq', x.cor); et.appendChild(s); });
+      corpo.appendChild(et);
+    }
+    var dl = el('dl', 'cn-dados eg-gav-dados');
+    linha(dl, 'Responsável', o.pessoa); linha(dl, 'Tipo', o.tipo); linha(dl, 'Prioridade', o.prioridade);
+    linha(dl, 'Ativo', [o.ativo, o.codigo].filter(Boolean).join(' · ')); linha(dl, 'Usina', o.usina);
+    linha(dl, 'Criada', o.criada); linha(dl, 'Programada', o.programada); linha(dl, 'Fechada', o.fim);
+    linha(dl, 'Solicitante', o.solicitante);
+    corpo.appendChild(dl);
+    if (o.nota) { corpo.appendChild(el('h3', null, 'Descrição')); corpo.appendChild(el('p', 'kb-nota', o.nota)); }
+    corpo.appendChild(el('h3', null, 'Tarefas (' + o.tarefas.length + ')'));
+    var ol = el('ol', 'eg-oss');
+    o.tarefas.forEach(function (t) {
+      var li = el('li'); var c = el('span', 'eg-os-cab'); c.appendChild(el('span', null, t.st === 'DONE' ? 'feita' : (t.st === 'NO_STARTED' ? 'não começou' : 'em andamento')));
+      li.appendChild(c); li.appendChild(el('b', null, t.t)); if (t.obs) li.appendChild(el('span', 'mudo', t.obs)); ol.appendChild(li);
+    });
+    corpo.appendChild(ol);
+    if (o.url) { var a = el('a', 'cn-link kb-abrir', 'Abrir a OS ' + o.os + ' no Fracttal'); a.href = o.url; a.target = '_blank'; a.rel = 'noopener'; corpo.appendChild(a); }
+    gav.hidden = false; veu.hidden = false; gav.querySelector('.eg-gav-fechar').focus();
+  }
+  function fecha() { gav.hidden = true; veu.hidden = true; }
+  gav.querySelector('.eg-gav-fechar').addEventListener('click', fecha);
+  veu.addEventListener('click', fecha);
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !gav.hidden) fecha(); });
+  // os controles
+  var limpar = document.querySelector('.kb-limpar');
+  document.querySelectorAll('.kb-super').forEach(function (b) {
+    b.addEventListener('click', function () {
+      estado.pessoa = estado.pessoa === b.dataset.pid ? null : b.dataset.pid;
+      document.querySelectorAll('.kb-super').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.pid === estado.pessoa)); });
+      document.querySelector('.kb-pessoas').classList.toggle('kb-pessoas--uma', !!estado.pessoa);
+      limpar.hidden = !estado.pessoa; desenha();
+    });
+  });
+  limpar.addEventListener('click', function () { var on = document.querySelector('.kb-super[aria-pressed="true"]'); if (on) on.click(); });
+  document.querySelector('.kb-busca').addEventListener('input', function (ev) { estado.q = ev.target.value.trim().toLowerCase(); desenha(); });
+  document.querySelectorAll('.kb-modo a').forEach(function (a) {
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault(); estado.modo = a.dataset.modo;
+      document.querySelectorAll('.kb-modo a').forEach(function (x) { if (x === a) x.setAttribute('aria-current', 'page'); else x.removeAttribute('aria-current'); });
+      desenha();
+    });
+  });
+  document.querySelector('.kb-todas-concl').addEventListener('change', function (ev) { estado.todas = ev.target.checked; desenha(); });
+  document.querySelector('.kb-canceladas').addEventListener('change', function (ev) { estado.canceladas = ev.target.checked; desenha(); });
+  desenha();
+})();
+</script>
+{% endblock %}
