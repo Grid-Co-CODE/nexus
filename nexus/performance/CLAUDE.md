@@ -161,3 +161,82 @@ Como provar: `python -m pytest -q tests/test_clima_*.py tests/test_torre_perform
 coordenadas de referência, só leitura): 25 usinas dentro de algum aviso, 1 com foco a 1,9 km, 18 com risco alto ou crítico;
 1,6 s e 0,7 MB por dia de risco. Mudou o leitor do GeoTIFF? Confira as tiles contra o Pillow (monte um mini-TIFF de uma faixa
 com `int32` no lugar de `double`: os bytes são os mesmos) antes de confiar.
+
+## Mapa de risco (07/10/2026): o Clima e risco num mapa do Brasil, só leitura
+
+Aba Performance → Mapa de risco (`/t/performance/clima/mapa`, filha da lista; o cabeçalho tem "Ver a lista"). Pedido do Levi
+(07/10), como tela à parte: a lista segue sendo a leitura detalhada, o mapa mostra ONDE. **Não é outra conta:**
+lê as MESMAS três fontes pelo MESMO cache (visitar a lista e o mapa não faz pedido a mais à rede) e o nível de cada usina vem da
+mesma regra (`alertas.nivel_da_usina`: Agir agora = vermelho, Atenção = amarelo, Sem alerta = verde).
+
+Código: `clima/mapa.py` (sem Flask: contorno, projeção, recorte, caminho e `montar`), `torres/performance/mapa_tela.py` (rota),
+`.../templates/performance/mapa.html`, `static/clima-mapa.css` (soma-se ao `clima.css`, que traz os tokens `--cl-*`, o
+cabeçalho, o painel das fontes e o rodapé). Provas: `tests/test_clima_mapa.py` (contorno, projeção, vista, caminho),
+`test_clima_mapa_camadas.py` (o modelo), `test_torre_performance_mapa.py` (a tela e a cadeia de verdade, por sessão falsa) e o
+mundo inventado de `tests/clima_mapa_mundo.py`. O id da `Tela` é `clima/mapa`, **com barra**, para o endereço ser esse (o
+placeholder `/<tela_id>` não casa com barra, e a view própria responde); por isso a vitrine estática exporta
+`t/performance/clima/mapa/index.html`, um nível abaixo, e o teste da vitrine conta `t/**/index.html`.
+
+**O contorno: fonte e licença.** IBGE, Malhas territoriais, API de malhas v3, divisão por UF, resolução mínima:
+`https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF`
+(só leitura, sem chave). Baixado UMA vez em 07/10/2026 e guardado como veio em `nexus/static/clima/ibge-ufs-minima.geojson`
+(98.502 bytes, 27 UFs, ~5.500 vértices com 4 casas, sha256 `07c671aa…e7c0f`), abaixo dos 300 KB do pedido, então sem
+simplificar. **Nada é buscado no IBGE em tempo de execução.** Dado público do IBGE, de uso livre com citação da fonte: a tela
+diz "Dados: IBGE, INMET, INPE (Programa Queimadas)" e o rodapé cita as Malhas territoriais. *Atenção: o texto oficial da licença
+não foi conferido (o único acesso à rede foi o download); antes de redistribuir o arquivo fora deste repositório, confirme os
+termos em `https://www.ibge.gov.br/acesso-informacao/dados-abertos.html`.* O IBGE manda só `codarea` (código da UF), sem sigla
+nem nome: a tabela `mapa.UFS` é a da divisão política. **Refazer o arquivo** (o IBGE publica uma malha por ano): o mesmo `curl`
+no mesmo caminho e `python -m pytest -q tests/test_clima_mapa.py`, que confere as 27 UFs, o tamanho, anéis fechados, só o
+continente e o rótulo de cada estado dentro dele. O teste do continente existe porque `qualidade=minima` não traz Trindade nem
+Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% de oceano, e quem trocou decide.
+
+**Regras do desenho**
+- **SVG do servidor, sem JavaScript, sem biblioteca, sem mapa de terceiros.** O viewBox tem SEMPRE 1000 de largura e a altura sai
+  da geografia: o CSS decide raios em unidades do SVG e traços em pixels de tela (`vector-effect:non-scaling-stroke`), e o
+  contorno fica fino em qualquer largura. O SVG ocupa 100% da largura (`height:auto`, `max-height:84vh` no desktop). Abaixo de
+  1100 px a legenda desce para baixo do mapa; abaixo de 820 px entram o `--mp-k` e o fim do `max-height`.
+- **Projeção equiretangular com a correção de cos(latitude média).** Cada recorte (Brasil e as cinco regiões, `?regiao=norte|
+  nordeste|centro-oeste|sudeste|sul`; vazio ou desconhecido cai no Brasil) usa a latitude do MEIO dele e refaz o viewBox: com o
+  cosseno do país inteiro (14 graus) o Sul (28) ficaria 10% largo demais. O seletor são links (`<a href="?regiao=...">`), então
+  funciona sem JS. O recorte é uma MOLDURA, não uma lista por UF: uma usina de São Paulo aparece no recorte do Centro-Oeste se a
+  moldura a pega, e a legenda diz quantas ficaram de fora.
+- **O caminho SVG vai em deslocamentos** medidos do ponto JÁ arredondado (uma casa), sem deriva, com os vértices que arredondam
+  para o mesmo ponto fora: o Brasil inteiro pesa 42 mil caracteres (a metade do absoluto). A página do Brasil, com 154 usinas,
+  5 mil focos e 60 avisos (dado inventado do tamanho do real, 07/10): 36 ms no servidor, 200 KB (49 KB comprimido); uma região,
+  de 11 a 22 ms. A primeira visita depois do boot soma ~25 ms (lê o JSON e escreve os caminhos, que ficam guardados por vista).
+- **Camadas, de trás para frente:** estados (com a sigla, que some no celular na visão do Brasil) → avisos do INMET → focos do
+  INPE → anéis → usinas. O aviso é um grupo por nível, e a transparência é do GRUPO: polígonos do mesmo nível não se somam onde se
+  cruzam (cem avisos de baixa umidade virariam uma mancha opaca). O aviso que AINDA VAI COMEÇAR vai só no contorno tracejado: a
+  usina em Atenção por aviso futuro precisa ter o motivo visível. O vencido não desenha. Os focos são pontos de ponta redonda
+  (`M x y h.01` num `<path>` só: 5 mil focos pesam 70 KB, como `<circle>` seriam 190 KB; foco em cima de foco, no desenho, vira um
+  ponto, e a contagem da legenda continua a da fonte). **O anel vai no FOCO, não na usina:** nos focos a até 5 km de ALGUMA
+  usina do cadastro (`IndiceFocos.no_raio`, que o `perto` também usa).
+- **Usina:** `<a href="/t/performance/clima/usina/<id>">` (id escapado, `quote(safe="")`) com `<title>` de quatro linhas (nome,
+  cliente, nível, motivo; no máximo 3 motivos, os que mandam agir primeiro, para o "e mais N" nunca esconder a causa). Desenhada
+  por nível, o que pede ação por cima e maior (cor, tamanho e palavra: nunca só a cor), com um círculo transparente de 2,2 raios
+  que aumenta a área de toque. No celular o `--mp-k` (1,5) escala pontos, alvos e anéis.
+- **Honestidade, a mesma da lista.** Fonte sem leitura (fora ou lendo): a camada some e a legenda diz por quê ("sem leitura
+  boa" ou "lendo agora"); a usina que ficaria "Sem alerta" fica CINZA ("Sem leitura completa", e a linha "Sem alerta" da legenda
+  some): sem ler os avisos, não dá para dizer que não há aviso. Fonte lida só em parte, velha ou atrasada: a camada fica, o verde
+  vira "Sem alerta nas fontes lidas" e a legenda traz o qualificador ("parcial", "dado de HH:MM", "N avisos sem polígono utilizável
+  não aparecem"). O painel de frescor é o MESMO CÓDIGO da lista (`visao._fonte_inmet/_fonte_focos/_fonte_risco`), e há teste que
+  compara os dois. O risco de fogo não é desenhado: entra na cor da usina (Atenção, se alto ou crítico em algum dos 4 dias).
+- **Coordenada:** a POSIÇÃO é permitida (atrás do login, como o cadastro); o NÚMERO de latitude ou longitude nunca vira texto (nem
+  no `<title>`, nem em atributo com nome de coordenada). O teste olha número de 3 casas ou mais NO TEXTO, e a fixture usa
+  coordenadas com 5 casas para o vazamento do número inteiro ser achado.
+- **Escape:** nome de usina e de cliente e evento do INMET só entram por `{{ }}` (autoescape do Jinja), nunca por `|safe`;
+  o `<title>` do polígono e o da usina têm teste com `<script>` e aspas.
+
+**Dependência que o mapa tem da tela principal (conferir ao mexer em `visao.py`):** `visao._fonte_inmet/_fonte_focos/
+_fonte_risco/_arquivo_t0/_validade` (privadas) e `visao.rotulos_dos_dias/celula_de_risco/numero/hora/agora` (públicas). Se uma
+for renomeada ou mudar de forma, quem quebra é `tests/test_clima_mapa_camadas.py` (e o `test_o_painel_das_fontes_e_o_mesmo_da_tela_
+principal` diz se os dois painéis divergiram). O CSS usa os tokens `--cl-*` do `clima.css` e os do `nexus.css`: renomear um deles
+quebra `test_o_css_do_mapa_so_usa_cores_que_o_clima_css_ou_o_nexus_css_definem`.
+
+**O que o mapa não faz, de propósito:** zoom e arrasto (o recorte por região resolve, sem JS); filtro por cliente (a lista tem);
+risco de fogo como camada (é um raster de pixels de ~1 km, e o Nexus lê só o pixel de cada usina); mostrar a coordenada; ilhas
+oceânicas (o contorno mínimo não as tem: uma usina ali cai em "fora deste recorte").
+
+Como provar: `python -m pytest -q tests/test_clima_mapa.py tests/test_clima_mapa_camadas.py tests/test_torre_performance_mapa.py`
+(63 + 58 + 53 testes, sem rede; 101 mutações no código, no template e no CSS novos, todas mortas). Na tela: `/t/performance/clima/mapa` no desktop e a 375 px
+(sem rolagem lateral; o SVG a 100% da largura).
