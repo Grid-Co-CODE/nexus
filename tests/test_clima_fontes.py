@@ -93,8 +93,44 @@ def test_inmet_o_mesmo_aviso_nas_duas_listas_conta_uma_vez():
 def test_inmet_aviso_ignorado_repetido_nas_duas_listas_tambem_conta_uma_vez():
     ruim = aviso(7)
     ruim["poligono"] = None
-    r = F.inmet_avisos(sessao_inmet(hoje=[ruim], futuro=[dict(ruim)]), URL_INMET)
-    assert r["lidos"] == 1 and len(r["ignorados"]) == 1
+    r = F.inmet_avisos(sessao_inmet(hoje=[ruim, aviso(1)], futuro=[dict(ruim)]), URL_INMET)
+    assert r["lidos"] == 2 and len(r["ignorados"]) == 1
+
+
+def test_inmet_avisos_diferentes_com_o_mesmo_id_nao_se_juntam():
+    # A chave do aviso é (id, polígono, início, fim): o mesmo id com polígono ou vigência diferente é OUTRO aviso, e juntar
+    # os dois sumia com um alerta de verdade.
+    outro_poligono = {"type": "Polygon", "coordinates": [[[-30, -5], [-29, -5], [-29, -4], [-30, -4], [-30, -5]]]}
+    r = F.inmet_avisos(sessao_inmet(hoje=[aviso(5), aviso(5, poligono=outro_poligono)],
+                                    futuro=[aviso(5, fim="2026-10-07 23:59"), aviso(5)]), URL_INMET)
+    assert len(r["avisos"]) == 3 and r["lidos"] == 3                       # o 4º é o 1º repetido na outra lista
+
+
+def test_inmet_o_mesmo_aviso_com_o_poligono_escrito_de_outro_jeito_continua_o_mesmo():
+    # o mesmo polígono, com as chaves em outra ordem e como objeto numa lista e texto na outra, é o mesmo aviso
+    geo = {"coordinates": [QUADRADO], "type": "Polygon"}
+    r = F.inmet_avisos(sessao_inmet(hoje=[aviso(5)], futuro=[aviso(5, poligono=geo)]), URL_INMET)
+    assert len(r["avisos"]) == 1
+
+
+def test_inmet_fim_so_com_data_vale_ate_o_fim_do_dia_e_o_inicio_so_com_data_desde_a_meia_noite():
+    # Brasília (UTC-3), o fuso em que o INMET escreve início e fim. "2026-10-06" como FIM não é 00:00 de 06/10: o aviso
+    # sumia da tela no primeiro minuto do dia em que ainda vale.
+    r = F.inmet_avisos(sessao_inmet(hoje=[aviso(1, inicio="2026-10-06", fim="2026-10-06")]), URL_INMET)
+    a = r["avisos"][0]
+    assert a.inicio == datetime(2026, 10, 6, 0, 0, tzinfo=BRT)
+    assert a.fim == datetime(2026, 10, 6, 23, 59, 59, tzinfo=BRT)
+    r = F.inmet_avisos(sessao_inmet(hoje=[aviso(2, inicio="2026-10-06 09:10", fim="2026-10-06 12:30")]), URL_INMET)
+    assert r["avisos"][0].fim == datetime(2026, 10, 6, 12, 30, tzinfo=BRT)         # com hora, a hora vale
+
+
+def test_inmet_avisos_lidos_e_nenhum_localizavel_e_erro_da_fonte_e_nao_lista_vazia():
+    # Antes a tela dizia "0 avisos ativos" em verde quando o INMET trazia avisos e nenhum tinha polígono utilizável.
+    sem, ilegivel = aviso(1), aviso(2)
+    sem["poligono"], ilegivel["poligono"] = None, "{nao e json"
+    with pytest.raises(F.FonteErro) as e:
+        F.inmet_avisos(sessao_inmet(hoje=[sem, ilegivel]), URL_INMET)
+    assert "nenhum dos 2 avisos" in str(e.value)
 
 
 def test_inmet_nao_guarda_o_icone_e_corta_texto_enorme():
@@ -182,6 +218,19 @@ def test_focos_linha_ruim_e_contada_e_pulada():
                                                   "-8.3,-75.6,GOES-19,ontem", "-95.0,-75.6,GOES-19,2026-10-06 18:50:00", "so,tres,campos")})
     r = F.inpe_focos(s, BASE_FOCOS)
     assert len(r["focos"]) == 1 and r["linhas_ruins"] == 4
+
+
+def test_focos_todas_as_linhas_ilegiveis_e_nenhum_foco_lido_e_erro_da_fonte_e_nao_zero_focos():
+    # O INPE troca o formato da data e todas as linhas ficam ilegíveis: antes a tela dizia "0 focos na última hora", em verde.
+    s = sessao_focos({nome_foco(19, 0): csv_focos("-8.3,-75.6,GOES-19,06/10/2026 18:50", "-9.0,-70.0,GOES-19,06/10/2026 18:40")})
+    with pytest.raises(F.FonteErro) as e:
+        F.inpe_focos(s, BASE_FOCOS)
+    assert "2 linhas" in str(e.value) and "formato" in str(e.value)
+
+
+def test_focos_arquivo_so_com_o_cabecalho_continua_sendo_zero_focos_de_verdade():
+    r = F.inpe_focos(sessao_focos({nome_foco(19, 0): csv_focos()}), BASE_FOCOS)
+    assert r["focos"] == [] and r["linhas_ruins"] == 0
 
 
 def test_focos_ate_quando_vai_o_dado_e_a_hora_do_arquivo_mais_novo_lido():
@@ -323,3 +372,23 @@ def test_enderecos_padrao_e_sobrescritos_pela_configuracao():
     assert e["risco"].endswith("/riscofogo_meteorologia/previsto/risco_fogo/RF.PREV.T{d}.tif")
     e = F.enderecos({"NEXUS_CLIMA_INMET_URL": "http://a/x", "NEXUS_CLIMA_FOCOS_URL": "http://b/y", "NEXUS_CLIMA_RISCO_URL": "http://c/{d}.tif"})
     assert (e["inmet"], e["focos"], e["risco"]) == ("http://a/x", "http://b/y/", "http://c/{d}.tif")
+
+
+def test_risco_valor_negativo_que_nao_e_o_nodata_e_sem_dado_so_naquele_ponto_e_o_dia_nao_cai():
+    # escala trocada (acima de 1) derruba o dia, como antes; um valor NEGATIVO solto não é o nodata (-999) nem prova de
+    # escala trocada: vale o entorno naquele ponto, e os outros pontos e dias seguem
+    g = plano(0.3)
+    g[10][10] = -5.0
+    s = sessao_risco({d: g for d in range(4)})
+    r = F.inpe_risco_fogo([("a", *centro(10, 10)), ("b", *centro(3, 3))], s, RISCO)
+    assert r["erros"] == {}
+    assert [(a.valor, a.origem) for a in r["por_ponto"]["a"]] == [(0.3, "entorno")] * 4
+    assert [a.valor for a in r["por_ponto"]["b"]] == [0.3] * 4
+
+
+def test_risco_ponto_so_com_negativos_em_volta_fica_sem_dado():
+    g = [[None] * 40 for _ in range(30)]
+    g[10][10] = -5.0
+    s = sessao_risco({d: g for d in range(4)})
+    r = F.inpe_risco_fogo([("a", *centro(10, 10))], s, RISCO)
+    assert [(a.valor, a.origem) for a in r["por_ponto"]["a"]] == [(None, "sem_dado")] * 4 and r["erros"] == {}

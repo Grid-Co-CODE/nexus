@@ -34,6 +34,7 @@ INPE_RISCO_FOGO = ("https://dataserver-coids.inpe.br/queimadas/queimadas/riscofo
 FOCOS_ARQUIVOS = 6                       # seis arquivos de 10 min = a última hora
 DIAS_DE_RISCO = (0, 1, 2, 3)             # RF.PREV.T0..T3: hoje e D+1 a D+3
 TRABALHADORES_POR_DIA = 2                # tiles pedidas ao mesmo tempo em cada dia; os 4 dias vão juntos: 8 conexões no máximo
+PISO_RISCO = -1e-9                       # o risco vale de 0 a 1: abaixo disto o pixel não é dado (ver GeoTiff.piso)
 _NIVEL_INMET = {"perigo potencial": 1, "perigo": 2, "grande perigo": 3}   # amarelo, laranja, vermelho
 
 
@@ -101,15 +102,38 @@ def _texto(valor, limite, padrao) -> str:
     return t[:limite] if t else padrao
 
 
-def _hora_brasilia(valor):
+_SO_DATA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _hora_brasilia(valor, *, fim_do_dia=False):
+    """O INMET escreve início e fim em horário de Brasília (UTC-3, sem horário de verão desde 2019) e sem fuso no texto: o
+    texto sem fuso é Brasília. Uma DATA sem hora no FIM vale até o fim do dia (23:59:59), e não até 00:00: "2026-10-06"
+    como fim fazia o aviso sumir da tela no primeiro minuto do dia em que ainda vale."""
+    texto = str(valor).strip() if valor is not None else ""
     try:
-        d = datetime.fromisoformat(str(valor).strip().replace(" ", "T"))
+        d = datetime.fromisoformat(texto.replace(" ", "T"))
     except ValueError:
         return None
+    if fim_do_dia and _SO_DATA.match(texto):
+        d = d.replace(hour=23, minute=59, second=59)
     return d if d.tzinfo else d.replace(tzinfo=BRT)
 
 
 # ── INMET ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def _ler_poligono(valor):
+    """(geometria, None) ou (None, motivo). O polígono vem como TEXTO de JSON; "" e "null" são "sem polígono"."""
+    if valor is None:
+        return None, "sem polígono"
+    if isinstance(valor, str):
+        if valor.strip() in ("", "null"):
+            return None, "sem polígono"
+        try:
+            return json.loads(valor), None
+        except ValueError:
+            return None, "polígono ilegível"
+    return valor, None
+
 
 def inmet_avisos(sessao, url=INMET_AVISOS, *, timeout=TEMPO_LIMITE_S) -> dict:
     """{"avisos": [Aviso], "ignorados": [motivo], "lidos": n}. O JSON é {"hoje": [...], "futuro": [...]}; o polígono de cada
@@ -136,23 +160,18 @@ def inmet_avisos(sessao, url=INMET_AVISOS, *, timeout=TEMPO_LIMITE_S) -> dict:
                 ignorados.append(f"aviso fora do formato na lista {quando}")
                 continue
             id_ = bruto.get("id", bruto.get("id_aviso"))
-            if id_ is not None:
-                if id_ in vistos:
-                    lidos -= 1              # o mesmo aviso nas duas listas conta uma vez (ignorado ou não)
-                    continue
-                vistos.add(id_)
-            geo = bruto.get("poligono")
-            if isinstance(geo, str):
-                if geo.strip() in ("", "null"):
-                    geo = None
-                else:
-                    try:
-                        geo = json.loads(geo)
-                    except ValueError:
-                        ignorados.append(f"aviso {id_}: polígono ilegível")
-                        continue
+            geo, motivo = _ler_poligono(bruto.get("poligono"))
+            # O mesmo aviso nas duas listas conta uma vez (ignorado ou não); o mesmo id com polígono ou vigência diferente é
+            # OUTRO aviso (juntar pelo id sozinho sumia com um alerta de verdade). O polígono entra na chave já lido, para
+            # o mesmo desenho escrito de outro jeito (chaves em outra ordem) continuar sendo o mesmo.
+            chave = (id_, json.dumps(geo, sort_keys=True, default=str) if geo is not None else str(bruto.get("poligono")).strip(),
+                     str(bruto.get("inicio")), str(bruto.get("fim")))
+            if chave in vistos:
+                lidos -= 1
+                continue
+            vistos.add(chave)
             if geo is None:
-                ignorados.append(f"aviso {id_}: sem polígono")
+                ignorados.append(f"aviso {id_}: {motivo}")
                 continue
             try:
                 caixa = geometria.caixa(geo)
@@ -162,7 +181,11 @@ def inmet_avisos(sessao, url=INMET_AVISOS, *, timeout=TEMPO_LIMITE_S) -> dict:
             severidade = _texto(bruto.get("severidade"), 60, "sem severidade")
             avisos.append(Aviso(id_, quando, _texto(bruto.get("descricao"), 120, "Aviso"), severidade,
                                 _NIVEL_INMET.get(_chave(severidade), 1), _hora_brasilia(bruto.get("inicio")),
-                                _hora_brasilia(bruto.get("fim")), geo, caixa))
+                                _hora_brasilia(bruto.get("fim"), fim_do_dia=True), geo, caixa))
+    if lidos and not avisos:
+        # Avisos vieram e nenhum dá para localizar: não é "nenhum aviso ativo". É a fonte que mudou (ou falhou), e a tela
+        # serve a última leitura boa com o erro em vez de mostrar "0 avisos" em verde.
+        raise FonteErro(f"nenhum dos {lidos} avisos do INMET tem polígono utilizável ({ignorados[0]})")
     return {"avisos": avisos, "ignorados": ignorados, "lidos": lidos}
 
 
@@ -218,6 +241,10 @@ def inpe_focos(sessao, url=INPE_FOCOS, *, ultimos=FOCOS_ARQUIVOS, timeout=TEMPO_
         lidos.append(nome)
     if not lidos:
         raise FonteErro(f"nenhum dos {len(nomes)} arquivos de focos pôde ser lido ({resumo_do_erro(ultimo_erro)})")
+    if ruins and not focos:
+        # Todas as linhas ilegíveis (a data em outro formato, por exemplo) não é "0 focos": é o formato que mudou.
+        raise FonteErro(f"{ruins} linhas dos arquivos de focos não puderam ser lidas e nenhum foco foi lido: o formato dos "
+                        "dados mudou?")
     return {"focos": focos, "arquivos": lidos, "falhos": falhos, "ate": _hora_do_arquivo(lidos[-1]),
             "linhas_ruins": ruins}
 
@@ -229,7 +256,8 @@ def inpe_risco_fogo(pontos, sessao, modelo_url=INPE_RISCO_FOGO, *, dias=DIAS_DE_
     """`pontos`: [(chave, lat, lon)]. {"por_ponto": {chave: [Amostra por dia]}, "arquivos": {dia: data do arquivo},
     "erros": {dia: motivo}}. Um dia que falha (arquivo ausente, formato mudado, valor fora de 0 a 1) vira
     `Amostra(None, "indisponivel")` com o motivo em `erros`, e os outros dias valem; se nenhum dia for lido, é FonteErro.
-    O valor fora de 0 a 1 é recusado porque uma escala trocada (0 a 100) acenderia o "crítico" em toda usina."""
+    Valor ACIMA de 1 derruba o dia: uma escala trocada (0 a 100) acenderia o "crítico" em toda usina. Valor NEGATIVO que
+    não é o nodata (-999) é "sem dado" só naquele ponto (vale o entorno), não prova de escala trocada."""
     pontos = list(pontos)
     if "{d}" not in modelo_url:
         raise FonteErro("o endereço do risco de fogo precisa de {d} (o dia, de 0 a 3)")
@@ -240,7 +268,8 @@ def inpe_risco_fogo(pontos, sessao, modelo_url=INPE_RISCO_FOGO, *, dias=DIAS_DE_
 
     def um_dia(d):
         try:
-            gt = GeoTiff(modelo_url.format(d=d), sessao, timeout=timeout, trabalhadores=TRABALHADORES_POR_DIA, **extra)
+            gt = GeoTiff(modelo_url.format(d=d), sessao, timeout=timeout, trabalhadores=TRABALHADORES_POR_DIA,
+                         piso=PISO_RISCO, **extra)
             resultado = gt.amostrar_varios(pontos)
             for a in resultado.values():
                 if a.valor is not None and not -1e-9 <= a.valor <= 1 + 1e-9:
