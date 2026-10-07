@@ -183,6 +183,15 @@ def test_mensagem_de_erro_do_corpo_422_nao_vira_serie():
 
 # ── o endereço troca pela configuração ──────────────────────────────────────────────────────────────────────────────
 
+@pytest.mark.parametrize("modelo", ["http://x/{lat}/{lon}/{inicio}/{fim}/{outro}", "http://x/{lat}/{lon}/{inicio}/{fim}/{",
+                                    "http://x/{lat}/{lon}/{inicio}/{fim}/{0}"])
+def test_modelo_com_outras_chaves_ou_chave_aberta_e_erro_claro_e_nao_excecao_crua(modelo):
+    s = SessaoPower(PUBLICADO)
+    with pytest.raises(F.FonteErro) as e:
+        ler(s, modelo_url=modelo)
+    assert "entre chaves" in str(e.value) and s.pedidos == []
+
+
 def test_endereco_padrao_e_o_da_nasa_e_troca_pela_configuracao():
     e = F.enderecos({})
     assert e["power"] == F.NASA_POWER and e["power"].startswith("https://power.larc.nasa.gov/api/temporal/daily/point?")

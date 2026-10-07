@@ -331,8 +331,11 @@ def nasa_power(lat, lon, inicio: date, fim: date, sessao, modelo_url=NASA_POWER,
         raise ValueError("a janela da NASA POWER termina antes de começar")
     if not all(f"{{{nome}}}" in modelo_url for nome in ("lat", "lon", "inicio", "fim")):
         raise FonteErro("o endereço da NASA POWER precisa de {lat}, {lon}, {inicio} e {fim}")
-    url = modelo_url.format(lat=f"{lat:.{POWER_CASAS}f}", lon=f"{lon:.{POWER_CASAS}f}", inicio=inicio.strftime("%Y%m%d"),
-                            fim=fim.strftime("%Y%m%d"))
+    try:
+        url = modelo_url.format(lat=f"{lat:.{POWER_CASAS}f}", lon=f"{lon:.{POWER_CASAS}f}", inicio=inicio.strftime("%Y%m%d"),
+                                fim=fim.strftime("%Y%m%d"))
+    except (KeyError, IndexError, ValueError):
+        raise FonteErro("o endereço da NASA POWER só pode ter {lat}, {lon}, {inicio} e {fim} entre chaves") from None
     r = sessao.get(url, headers={"Accept": "application/json"}, timeout=timeout)
     r.raise_for_status()
     try:
