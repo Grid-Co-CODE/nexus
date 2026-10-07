@@ -137,19 +137,27 @@ class Resposta:
 
 
 class SessaoArquivos:
-    """Sessão falsa: serve bytes por URL, com `Range` (206) ou, se `ignora_range`, o arquivo inteiro (200)."""
+    """Sessão falsa: serve bytes por URL, com `Range` (206) ou, se `ignora_range`, o arquivo inteiro (200).
+
+    Como um servidor de verdade, entende `If-Range`: se o validador (o Last-Modified) não é o do arquivo de agora, o
+    arquivo mudou, o Range é ignorado e vai o arquivo NOVO inteiro, com 200."""
 
     def __init__(self, arquivos, ignora_range=False, modificado="Tue, 06 Oct 2026 09:32:00 GMT"):
         self.arquivos, self.ignora_range, self.modificado = dict(arquivos), ignora_range, modificado
         self.pedidos = []                     # (url, faixa pedida ou None)
+        self.condicionais = []                # (url, If-Range recebido ou None), um por pedido
 
     def get(self, url, params=None, headers=None, timeout=None):
         faixa = (headers or {}).get("Range")
+        if_range = (headers or {}).get("If-Range")
         self.pedidos.append((url, faixa))
+        self.condicionais.append((url, if_range))
         if url not in self.arquivos:
             return Resposta(404, b"nao ha")
         corpo = self.arquivos[url]
         cab = {"Last-Modified": self.modificado, "Content-Type": "image/tiff"}
+        if faixa and if_range is not None and if_range != self.modificado:
+            return Resposta(200, corpo, cab)
         if faixa and not self.ignora_range:
             ini, fim = (int(x) for x in faixa.removeprefix("bytes=").split("-"))
             fatia = corpo[ini:fim + 1]

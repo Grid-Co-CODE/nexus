@@ -100,10 +100,15 @@ def descomprimir_lzw(dados: bytes, esperado: int) -> bytes:
 
 class GeoTiff:
     """Um COG lido por HTTP com `Range`. `sessao` tem `get(url, headers=..., timeout=...)` (um `requests.Session`; nos testes,
-    uma sessão falsa). Nada vai à rede até o primeiro uso."""
+    uma sessão falsa). Nada vai à rede até o primeiro uso.
 
-    def __init__(self, url, sessao, *, janela=JANELA_PADRAO, trabalhadores=TRABALHADORES, timeout=TEMPO_LIMITE_S):
-        self.url, self.sessao, self.timeout = url, sessao, timeout
+    `piso`: valor abaixo do qual o pixel não é dado (como o nodata). O risco de fogo vale de 0 a 1: um valor negativo que não é
+    o nodata declarado (-999) é "sem dado" SÓ naquele ponto, e o entorno de 5 x 5 vale no lugar, em vez de derrubar o dia."""
+
+    def __init__(self, url, sessao, *, janela=JANELA_PADRAO, trabalhadores=TRABALHADORES, timeout=TEMPO_LIMITE_S,
+                 piso=None):
+        self.url, self.sessao, self.timeout, self.piso = url, sessao, timeout, piso
+        self._modificado_http = None          # o Last-Modified da 1ª resposta, como veio: vai no If-Range dos pedidos seguintes
         self._janela_n, self.trabalhadores = int(janela), int(trabalhadores)
         self._nome = url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or url
         self._janela = b""                    # os primeiros bytes do arquivo, o cabeçalho
@@ -116,10 +121,19 @@ class GeoTiff:
     # ── rede ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
     def _pedir(self, ini, n):
-        r = self.sessao.get(self.url, headers={"Range": f"bytes={ini}-{ini + n - 1}"}, timeout=self.timeout)
+        cabecalhos = {"Range": f"bytes={ini}-{ini + n - 1}"}
+        if self._modificado_http:
+            # O cabeçalho (os offsets das tiles) é de UM arquivo. O INPE publica de novo todo dia, às ~06:30: se o arquivo
+            # trocar entre o cabeçalho e a tile, a tile do arquivo novo, lida pelos offsets do velho, daria lixo ou, pior, um
+            # número plausível de outro dia. Com If-Range o servidor só atende o Range se o arquivo é o mesmo.
+            cabecalhos["If-Range"] = self._modificado_http
+        r = self.sessao.get(self.url, headers=cabecalhos, timeout=self.timeout)
         if r.status_code == 200:
-            # O servidor ignorou o Range e mandou o arquivo inteiro (18 MB): fica com ele e fatia daqui para a frente,
-            # em vez de baixar de novo a cada tile.
+            if self._modificado_http and (getattr(r, "headers", None) or {}).get("Last-Modified") != self._modificado_http:
+                raise GeoTiffErro(f"{self._nome} foi trocado no meio da leitura (o INPE publicou de novo): a tela tenta "
+                                  "outra vez")
+            # O servidor ignorou o Range e mandou o arquivo inteiro (18 MB), e é o mesmo arquivo: fica com ele e fatia
+            # daqui para a frente, em vez de baixar de novo a cada tile.
             self._inteiro = r.content
             return self._inteiro[ini:ini + n], r
         if r.status_code != 206:
@@ -147,6 +161,7 @@ class GeoTiff:
         dados, resposta = self._pedir(0, self._janela_n)
         self._janela = dados
         bruto = (getattr(resposta, "headers", None) or {}).get("Last-Modified")
+        self._modificado_http = bruto or None
         try:
             self.modificado = parsedate_to_datetime(bruto) if bruto else None
         except (TypeError, ValueError):
@@ -310,6 +325,8 @@ class GeoTiff:
         bruto = self._tile((lin // th) * self._ao_lado + col // tw)
         v = struct.unpack_from("<d", bruto, ((lin % th) * tw + col % tw) * 8)[0]
         if not math.isfinite(v) or (self.nodata is not None and v == self.nodata):
+            return None
+        if self.piso is not None and v < self.piso:
             return None
         return v
 

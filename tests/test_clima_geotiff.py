@@ -364,3 +364,98 @@ def test_lzw_depois_da_limpeza_o_primeiro_codigo_e_um_byte():
 def test_lzw_curto_devolve_o_que_deu_e_quem_chama_confere_o_tamanho():
     (fluxo, _), = fluxos_lzw(bytes(range(200)) * 5, 200)
     assert len(GT.descomprimir_lzw(fluxo[:len(fluxo) // 2], 1000)) < 1000
+
+
+# ── o arquivo muda no meio da leitura (If-Range) ─────────────────────────────────────────────────────────────────────
+
+def test_o_primeiro_pedido_vai_sem_if_range_e_as_tiles_levam_o_last_modified_do_arquivo():
+    gt, sessao, _ = abrir()
+    gt.amostrar(*centro(20, 3))
+    assert sessao.condicionais[0] == (URL, None)                                   # o cabeçalho ainda não sabe a data
+    assert sessao.condicionais[1] == (URL, "Tue, 06 Oct 2026 09:32:00 GMT")        # a tile só vale se o arquivo é o mesmo
+
+
+def test_arquivo_trocado_entre_o_cabecalho_e_a_tile_e_erro_e_nao_numero_do_arquivo_errado():
+    # O INPE publica de novo todo dia, às ~06:30. Os offsets vieram do arquivo velho: se a tile viesse do novo, o LZW rendia
+    # lixo ou, pior, um número plausível de outro dia. Com If-Range o servidor manda o arquivo NOVO inteiro, e o leitor recusa.
+    gt, sessao, _ = abrir()
+    gt.abrir()
+    sessao.arquivos[URL] = montar_cog([[0.5] * 40 for _ in range(30)], origem=(X0, Y0), escala=D)
+    sessao.modificado = "Wed, 07 Oct 2026 09:32:00 GMT"
+    with pytest.raises(GT.GeoTiffErro) as e:
+        gt.amostrar(*centro(20, 3))
+    assert "trocado" in str(e.value).lower() and "RF.PREV.T0.tif" in str(e.value)       # diz qual arquivo foi trocado
+
+
+def test_servidor_que_ignora_o_range_mas_manda_o_mesmo_arquivo_vale():
+    # 200 com o MESMO Last-Modified é um servidor sem suporte a Range, não um arquivo trocado: serve o arquivo inteiro
+    gt, sessao, _ = abrir()
+    gt.abrir()
+    sessao.ignora_range = True
+    assert gt.amostrar(*centro(33, 29)).valor == valor(29, 33)
+    assert gt.amostrar(*centro(2, 2)).valor == valor(2, 2)
+    assert len(sessao.pedidos) == 2                                               # o cabeçalho e UM pedido que trouxe tudo
+
+
+def test_servidor_sem_last_modified_nao_manda_if_range_e_segue_funcionando():
+    cog = montar_cog(grade(), origem=(X0, Y0), escala=D)
+
+    class SemData(SessaoArquivos):
+        def get(self, url, params=None, headers=None, timeout=None):
+            r = super().get(url, params, headers, timeout)
+            r.headers.pop("Last-Modified", None)
+            return r
+    sessao = SemData({URL: cog})
+    gt = GT.GeoTiff(URL, sessao, janela=512)
+    assert gt.amostrar(*centro(20, 3)).valor == valor(3, 20)
+    assert [c for _, c in sessao.condicionais] == [None, None]
+    assert gt.modificado is None
+
+
+# ── valor negativo que não é o nodata ────────────────────────────────────────────────────────────────────────────────
+
+def _com_piso(g, **kw):
+    cog = montar_cog(g, origem=(X0, Y0), escala=D)
+    return GT.GeoTiff(URL, SessaoArquivos({URL: cog}), janela=512, **kw)
+
+
+def test_com_piso_valor_abaixo_dele_e_sem_dado_naquele_ponto_e_o_entorno_vale():
+    g = com({(20, 15): -5.0, (21, 15): 0.4, (19, 15): -7.0})
+    gt = _com_piso(g, piso=-1e-9)
+    assert gt.amostrar(*centro(20, 15)) == GT.Amostra(0.4, "entorno")           # o -5 não é dado; o vizinho vale
+    assert gt.amostrar(*centro(21, 15)) == GT.Amostra(0.4, "ponto")             # e o vizinho continua valendo no ponto dele
+
+
+def test_com_piso_o_entorno_so_de_negativos_e_sem_dado():
+    gt = _com_piso(com({(20, 15): -5.0, (21, 15): -3.0}), piso=-1e-9)
+    assert gt.amostrar(*centro(20, 15)) == GT.Amostra(None, "sem_dado")
+
+
+def test_sem_piso_o_negativo_e_um_valor_como_outro():
+    gt = _com_piso(com({(20, 15): -5.0}))
+    assert gt.amostrar(*centro(20, 15)) == GT.Amostra(-5.0, "ponto")
+
+
+def test_zero_e_o_ruido_perto_de_zero_nao_caem_no_piso():
+    gt = _com_piso(com({(20, 15): 0.0, (21, 15): -1e-12}), piso=-1e-9)
+    assert gt.amostrar(*centro(20, 15)) == GT.Amostra(0.0, "ponto")
+    assert gt.amostrar(*centro(21, 15)).origem == "ponto"
+
+
+def test_200_sem_last_modified_depois_de_um_cabecalho_com_data_tambem_e_arquivo_trocado():
+    # sem a data não há como saber que é o mesmo arquivo: na dúvida, recusa (um 200 a um pedido condicional)
+    cog = montar_cog(grade(), origem=(X0, Y0), escala=D)
+
+    class SemDataNoCorpoInteiro(SessaoArquivos):
+        def get(self, url, params=None, headers=None, timeout=None):
+            r = super().get(url, params, headers, timeout)
+            if r.status_code == 200:
+                r.headers.pop("Last-Modified", None)
+            return r
+    sessao = SemDataNoCorpoInteiro({URL: cog})
+    gt = GT.GeoTiff(URL, sessao, janela=512)
+    gt.abrir()
+    sessao.modificado = "Wed, 07 Oct 2026 09:32:00 GMT"
+    with pytest.raises(GT.GeoTiffErro) as e:
+        gt.amostrar(*centro(20, 3))
+    assert "trocado" in str(e.value).lower()
