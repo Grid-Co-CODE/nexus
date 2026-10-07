@@ -82,7 +82,7 @@ INPE (Programa Queimadas)."
 |---|---|---|---|
 | INMET avisos | JSON `{hoje, futuro}`; cada aviso com evento, severidade, início, fim e polígono (texto de JSON) | 30 min | `apiprevmet3.inmet.gov.br/avisos/ativos` (não documentado oficialmente) |
 | INPE focos | CSV de 10 em 10 min (`lat,lon,satelite,data`, hora em UTC); vale a última hora = os 6 últimos arquivos | 10 min | `dataserver-coids.inpe.br/queimadas/queimadas/focos/csv/10min/` |
-| INPE risco de fogo | GeoTIFF por dia, `RF.PREV.T0..T3.tif` (hoje e D+1 a D+3), 0 a 1, pixel de ~1 km | 6 h (sai ~06:30) | `dataserver-coids.inpe.br/.../riscofogo_meteorologia/previsto/risco_fogo/RF.PREV.T{d}.tif` |
+| INPE risco de fogo | GeoTIFF por dia, `RF.PREV.T0..T3.tif` (hoje e D+1 a D+3), 0 a 1, pixel de ~1 km | 6 h se o T0 é o de hoje (sai ~06:30); **15 min enquanto não é** (pela data do arquivo, em Brasília: lido às 05:00, o arquivo de ontem não fica até as 11:01) | `dataserver-coids.inpe.br/.../riscofogo_meteorologia/previsto/risco_fogo/RF.PREV.T{d}.tif` |
 
 O código (sem Flask) está em `nexus/performance/clima/`: `geometria` (ponto em polígono e haversine), `geotiff` (leitor do
 COG), `fontes` (os três clientes), `alertas` (as regras), `leitura` (cache por fonte), `usinas` (cadastro), `visao` (o que a
@@ -96,28 +96,51 @@ tela escreve). A rota é `nexus/torres/performance/clima_tela.py`; o CSS, `nexus
   (little-endian, tiles, LZW sem predictor, float64, EPSG:4326, PixelIsArea, escala + tiepoint no canto); o que mudar vira
   `GeoTiffErro` dizendo o que achou, e a tela diz que o formato do INPE mudou. Custo medido (160 usinas, 4 dias em paralelo):
   ~7 s e ~4,6 MB na leitura fria, uma vez a cada 6 h (ou quando o conjunto de usinas muda).
+- **O arquivo do INPE troca todo dia, às ~06:30, e o leitor sabe disso:** o cabeçalho (os offsets das tiles) é de um arquivo, e
+  as tiles saem por `Range` com `If-Range` = o Last-Modified da 1ª resposta. Se o arquivo mudar no meio, o servidor manda o
+  novo inteiro (200) e o leitor levanta `GeoTiffErro` ("foi trocado no meio da leitura"), em vez de decodificar a tile de um
+  arquivo pelos offsets de outro (lixo ou, pior, um número plausível de outro dia). Conferido ao vivo: o servidor do INPE
+  responde 206 ao `If-Range` com o Last-Modified exato. Sem Last-Modified a leitura funciona, e a fonte fica em atenção.
 - **Pixel sem dado (-999):** o INPE não calcula onde não há vegetação (cidades, água e, às vezes, a própria usina: 1 de 40
   coordenadas de referência). Vale o MAIOR valor do quadrado de 5 x 5 pixels (~2 km), com a nota "entorno"; se nem o
-  entorno tem dado, "sem dado (sem vegetação no entorno)" (não é alerta, e a tela lista essas usinas).
+  entorno tem dado, "sem dado (sem vegetação no entorno)" (não é alerta, e a tela lista essas usinas). Valor NEGATIVO que
+  não é o nodata (-999) também é "sem dado", só naquele ponto (`GeoTiff.piso`): vale o entorno, e o dia não cai. Uma usina
+  fora da grade do INPE nos quatro dias entra na mesma lista, com o motivo "fora da grade do INPE".
 - **Faixas do risco de fogo** (as do `config.ALERTA` do pacote): mínimo < 0,15 ≤ baixo < 0,4 ≤ médio < 0,7 ≤ alto ≤ 0,95 <
-  crítico; o valor é arredondado a 9 casas antes de comparar (o 0,70 em double pode chegar 0,6999999999999). Valor fora de
-  0 a 1 é recusado: uma escala trocada acenderia o "crítico" em toda usina.
+  crítico; o valor é arredondado a 9 casas antes de comparar (o 0,70 em double pode chegar 0,6999999999999). Valor ACIMA de 1
+  derruba o dia: uma escala trocada (0 a 100) acenderia o "crítico" em toda usina.
 - **A borda do polígono conta como dentro** (o `contains` do shapely a exclui): um aviso que encosta na usina vale.
 - **Gravidade, três degraus (semáforo):** Crítico = "Grande Perigo", foco a até 5 km ou risco crítico; Alto = "Perigo" ou
   risco alto; Atenção = "Perigo Potencial". O foco é sempre crítico (é evento, não previsão). Desempate: tem foco, mais
   tipos de alerta, foco mais perto, aviso mais grave, nome. Risco médio não é alerta.
-- **Fonte fora:** a última leitura boa é servida com o erro e a hora ("INMET fora agora; última leitura boa às HH:MM"), nunca
-  como fresca; sem leitura boa, o número é "—" (nunca 0) e a lista diz que não inclui aquela fonte. Depois de uma falha,
-  60 s sem insistir; uma busca por vez (quem chega no meio recebe a última boa, sem esperar a rede).
+- **A tela não pode parecer "tudo bem" quando a fonte não foi lida inteira** (revisão de 06/10/2026). Fonte fora: a última
+  leitura boa é servida com o erro e a hora ("INMET fora agora; última leitura boa às HH:MM"), nunca como fresca; sem leitura
+  boa, o número é "—" (nunca 0). Sem alerta algum e sem ter lido tudo, o título NÃO diz "nenhuma usina com alerta agora": diz
+  "Sem leitura de X: não dá para dizer que não há alerta", e a contagem vira "N usinas sem alerta nas fontes lidas". A nota
+  separa "Lendo agora: X" (a fonte ainda está sendo lida pela primeira vez; a tela volta em 10 s, não em 60) de "A lista e os
+  números acima não incluem: X" (a fonte está fora). Fonte lida só em parte (aviso sem polígono, arquivo de focos que falhou,
+  linhas ilegíveis, dia do risco sem leitura), velha ou com o dado atrasado (focos parados há mais de 30 min, previsão de
+  outro dia, sem Last-Modified) fica em atenção, nunca "ok": os três cartões do topo repetem o qualificador ("parcial", "dado
+  de HH:MM") e, quando não há alerta, ficam âmbar em vez de verdes; o dia do risco sem leitura aparece "—" no resumo. Uma
+  fonte que "lê" mas não entende nada é erro, não "0": focos com todas as linhas ilegíveis, ou INMET com avisos e nenhum
+  localizável, caem na última leitura boa com o erro. Depois de uma falha, 60 s sem insistir; uma busca por vez (quem chega
+  no meio recebe a última boa, sem esperar a rede); cada falha vai ao log (WARNING `clima: <fonte> fora: <motivo curto>`,
+  uma linha por falha, sem dado de usina), e uma busca interrompida (Ctrl+C) solta a trava.
+- **Hoje, D+1, D+2 e D+3 pela data do calendário:** a data do arquivo (Last-Modified, em Brasília) mais k. Com o arquivo de
+  ontem (lido antes das ~06:30), o T0 é "Ontem" e o T1 é "Hoje": chamar de "Hoje" a previsão de ontem seria mentir sobre o dia.
 - **Usinas e coordenadas** vêm do cadastro (`nexus/cadastro/`): em operação, latitude e longitude cifradas e abertas só no
   processo do Nexus. A coordenada **nunca** vai à tela, ao log nem ao `repr` da usina. Usina em operação sem coordenada
   utilizável, ou com coordenada fora do Brasil (0 e 0, sinal ou latitude e longitude trocadas), aparece numa linha própria:
   nunca some. O risco de fogo é lido para TODAS as usinas com coordenada (o cache vale pelo conjunto de pontos); o filtro
   por cliente é só da tela.
 - **O texto do aviso é de terceiros:** só entra escapado, e a cor do aviso nem é lida. Aviso sem polígono utilizável é
-  contado e dito na fonte, não some.
+  contado e dito na fonte (atenção), não some. O mesmo aviso nas duas listas (`hoje` e `futuro`) conta uma vez; a chave é
+  (id, polígono, início, fim), porque o mesmo id com polígono ou vigência diferente é OUTRO aviso. Início e fim vêm em horário
+  de Brasília (UTC-3, sem horário de verão desde 2019) e sem fuso no texto; uma data sem hora no FIM vale até 23:59:59 daquele
+  dia, e não até 00:00.
 - **Focos:** a hora vem da coluna `data` (UTC), não do nome do arquivo (satélite polar chega atrasado); sem arquivo novo há
-  mais de 30 min, a fonte fica em atenção. Um foco é um pixel com fogo detectado, não um incêndio confirmado.
+  mais de 30 min, a fonte fica em atenção, assim como arquivo que falhou ou linha ilegível (contadas e ditas). Um foco é um
+  pixel com fogo detectado, não um incêndio confirmado.
 - **Nenhum teste vai à rede:** `leitura.usar_sessao` e `leitura.usar_relogio` injetam a sessão falsa e o relógio; com
   `TESTING` e sem sessão injetada a fonte diz "sem fonte nos testes". O COG dos testes é montado no próprio teste
   (`tests/clima_cog.py`: contêiner à mão, LZW comprimido pelo Pillow), sem binário no repositório. Teste sem

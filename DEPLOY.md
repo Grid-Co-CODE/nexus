@@ -145,8 +145,10 @@ plataforma já tem guardado.
 A tela cruza as usinas em operação do cadastro (a latitude e a longitude são campos cifrados, abertos só no processo do
 Nexus com a `NEXUS_CHAVE_CADASTRO`, e nunca aparecem na tela) com os avisos do INMET, os focos de queimada e o risco de
 fogo do INPE. **Não grava nada**: nem em `dados/`, nem no banco; cada fonte fica só na memória do processo (avisos 30 min,
-focos 10 min, risco de fogo 6 h; depois de uma falha, 60 s sem insistir). Reiniciar o Nexus esvazia o cache e a primeira
-visita relê tudo (~10 s). Precisa da saída para `apiprevmet3.inmet.gov.br` e `dataserver-coids.inpe.br` (seção 0) e do
+focos 10 min, risco de fogo 6 h, ou 15 min enquanto o arquivo do INPE não é o de hoje: ele sai por volta das 06:30; depois
+de uma falha, 60 s sem insistir). Reiniciar o Nexus esvazia o cache e a primeira visita relê tudo (~10 s). Cada falha de fonte
+vai ao log (`journalctl -u nexus`) como uma linha de aviso, `clima: INMET (avisos) fora: sem conexão com o servidor`, sem dado
+de usina. Precisa da saída para `apiprevmet3.inmet.gov.br` e `dataserver-coids.inpe.br` (seção 0) e do
 cadastro no servidor (`dados/cadastro_ensaio.json`). Os endereços têm padrão e só se trocam para apontar a um espelho:
 `NEXUS_CLIMA_INMET_URL`, `NEXUS_CLIMA_FOCOS_URL` e `NEXUS_CLIMA_RISCO_URL` (este leva `{d}`, o dia de 0 a 3), no `.env`.
 
