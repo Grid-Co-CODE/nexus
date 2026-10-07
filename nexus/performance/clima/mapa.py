@@ -1,8 +1,8 @@
 """O Mapa de risco (07/10/2026): o contorno dos estados, a projeção e o recorte de cada região, sem Flask.
 
-Levi, 07/10: "ia ficar pica" — a lista do Clima e risco ganhou um mapa do Brasil com as usinas na cor do nível, os avisos do
-INMET e os focos do INPE. O SVG nasce no servidor: nada de biblioteca de JavaScript, de mapa de terceiros ou de dependência
-nova, e nenhuma busca ao IBGE em tempo de execução.
+Pedido do Levi (07/10): a lista do Clima e risco ganha um mapa do Brasil, com as usinas na cor do nível, os avisos do INMET e
+os focos do INPE. O SVG nasce no servidor: nada de biblioteca de JavaScript, de mapa de terceiros ou de dependência nova, e
+nenhuma busca ao IBGE em tempo de execução.
 
 O contorno é o do IBGE (Malhas territoriais, API v3, `qualidade=minima`, divisão por UF), baixado UMA vez e guardado em
 `nexus/static/clima/ibge-ufs-minima.geojson` (98 KB, 27 UFs, ~5.500 vértices com 4 casas). Como refazê-lo e a fonte: seção
@@ -197,7 +197,7 @@ def _vista(chave: str) -> Vista:
 
 def vista(regiao=None) -> Vista:
     """O recorte pedido (`?regiao=`). Vazio, desconhecido ou de outro tipo cai no Brasil, sem erro: o mesmo trato do
-    filtro de cliente da tela principal. Caixa e espaço em volta não contam."""
+    filtro de cliente da tela principal. Maiúscula e espaço em volta não contam."""
     chave = str(regiao or "").strip().lower()
     return _vista(chave if chave in REGIOES else BRASIL)
 
@@ -207,8 +207,9 @@ def vista(regiao=None) -> Vista:
 def caminho(aneis, v: Vista) -> str:
     """O `d` do SVG para uma lista de anéis de (lon, lat): `M x y l dx dy dx dy ... z` por anel, com os deslocamentos medidos
     do ponto JÁ arredondado anterior (a soma nunca deriva do desenho). Vértices que arredondam para o mesmo ponto saem, e o
-    anel que não sobra com 3 pontos não é escrito: um polígono do INMET tem vértice a cada 10 m, e o SVG a 0,4 km por
-    unidade só pesaria sem desenhar nada. Os deslocamentos pesam a metade das coordenadas absolutas."""
+    anel que não sobra com 3 pontos não é escrito: com ~0,4 km por unidade no Brasil inteiro, um vértice mais perto que isso
+    do anterior só pesaria sem desenhar nada (um aviso pequeno, ou um estado de contorno detalhado, vira um risco). Os
+    deslocamentos pesam a metade das coordenadas absolutas."""
     partes = []
     for anel in aneis:
         pontos = []

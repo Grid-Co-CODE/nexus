@@ -17,12 +17,13 @@ REF = datetime(2026, 10, 7, 15, 0, tzinfo=BRT)
 LIDO = REF.timestamp()
 UM_GRAU = 111.195
 
-ALFA = (-7.50, -41.50)         # Nordeste
-BETA = (-7.60, -41.40)         # Nordeste, a ~15 km da Alfa
-GAMA = (-28.00, -52.00)        # Sul
-DELTA = (-20.00, -45.00)       # Sudeste
-EPSILON = (-3.00, -60.00)      # Norte
-TETA = (-23.00, -46.00)        # Sudeste
+# Posições inventadas, com casas de sobra: o teste que procura coordenada impressa na tela acha o número inteiro (3 casas ou mais).
+ALFA = (-7.50417, -41.50342)       # Nordeste
+BETA = (-7.60283, -41.40519)       # Nordeste, a ~15 km da Alfa
+GAMA = (-28.00461, -52.00127)      # Sul
+DELTA = (-20.00538, -45.00269)     # Sudeste
+EPSILON = (-3.00718, -60.00391)    # Norte
+TETA = (-23.00826, -46.00154)      # Sudeste
 
 
 def usina(id_, nome, pos, cliente="Cliente X", uf="PI"):
