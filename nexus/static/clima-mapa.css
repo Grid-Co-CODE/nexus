@@ -3,7 +3,7 @@
    na cor. O SVG tem sempre 1000 unidades de largura, então os raios vêm em unidades e os traços em pixels de tela
    (vector-effect:non-scaling-stroke): o contorno fica fino em qualquer largura. No celular o SVG ocupa a largura da tela
    (uns 340 px) e o --mp-k aumenta pontos, alvos e anéis, para dar para ver e tocar. Nada de largura fixa maior que o celular. */
-.mp{--mp-mar:var(--barra);--mp-terra:var(--superficie-2);--mp-k:1;min-width:0}
+.mp{--mp-mar:var(--mapa-mar);--mp-terra:var(--mapa-terra);--mp-k:1;min-width:0}
 .mp-cab-lado{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
 .mp-regioes{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
 .mp-regiao{font:600 12px/16px var(--font-sans);padding:6px 14px;border-radius:999px;border:1px solid var(--linha-forte);
@@ -16,8 +16,8 @@
 .mp-svg{display:block;width:100%;height:auto;max-height:84vh;overflow:hidden}
 
 /* o desenho, de trás para frente */
-.mp-uf{fill:var(--mp-terra);stroke:rgba(255,255,255,.22);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.mp-siglas text{fill:rgba(233,238,246,.42);font:600 14px var(--font-sans);letter-spacing:.04em;text-anchor:middle;
+.mp-uf{fill:var(--mp-terra);stroke:var(--mapa-borda);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.mp-siglas text{fill:var(--mapa-sigla);font:600 14px var(--font-sans);letter-spacing:.04em;text-anchor:middle;
   dominant-baseline:central;pointer-events:none}
 .mp-svg--regiao .mp-siglas text{font-size:21px}
 /* Aviso: cada nível é um grupo, e a transparência é do GRUPO (os polígonos do mesmo nível não se somam onde se cruzam: cem
@@ -25,6 +25,9 @@
 .mp-av-1{color:var(--cl-atencao)}
 .mp-av-2{color:var(--cl-alto)}
 .mp-av-3{color:var(--cl-critico)}
+/* no claro o --cl-atencao é o âmbar escuro de TEXTO, que a 24% vira mancha marrom: o Perigo Potencial vai no âmbar de área,
+   para continuar amarelo (no escuro os dois são o mesmo #ffd83d) */
+:root[data-tema="claro"] .mp-av-1{color:var(--alerta-cheio)}
 .mp-av{opacity:.24}
 .mp-av path{fill:currentColor}
 .mp-av--futuro{opacity:1}
@@ -33,7 +36,7 @@
 /* Foco: um ponto discreto do tamanho do traço (caminho com ponta redonda); o anel vermelho é o foco a até 5 km de uma usina. */
 .mp-focos{fill:none;stroke:var(--cl-alto);stroke-opacity:.55;stroke-width:2px;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .mp-anel,.mp-alvo,.mp-ponto{transform-box:fill-box;transform-origin:center;transform:scale(var(--mp-k,1))}
-.mp-anel{fill:rgba(255,91,110,.12);stroke:var(--cl-critico);stroke-width:2px;vector-effect:non-scaling-stroke;pointer-events:none}
+.mp-anel{fill:var(--critico-a12);stroke:var(--cl-critico);stroke-width:2px;vector-effect:non-scaling-stroke;pointer-events:none}
 /* Usina: um link por ponto. O círculo transparente (.mp-alvo) aumenta a área de toque sem aumentar o ponto. */
 .mp-usinas a{cursor:pointer;outline:none}
 .mp-alvo{fill:transparent;stroke:none}
@@ -73,7 +76,7 @@
 .mp-chave--aviso{width:16px;height:12px;margin:3px 1px 0;border-radius:3px;border:1px solid currentColor;background:currentColor;opacity:.5}
 .mp-chave--futuro{background:transparent;border:1.5px dashed currentColor;opacity:1}
 .mp-chave--foco{width:5px;height:5px;margin:6px 6px 0;border:0;background:var(--cl-alto);opacity:.75}
-.mp-chave--anel{width:14px;height:14px;margin:2px 2px 0;border:2px solid var(--cl-critico);background:rgba(255,91,110,.12)}
+.mp-chave--anel{width:14px;height:14px;margin:2px 2px 0;border:2px solid var(--cl-critico);background:var(--critico-a12)}
 
 /* Abaixo de 1100 px o menu da casca já roubou a largura: a legenda desce para baixo do mapa, que ganha a largura toda. */
 @media (max-width:1100px){

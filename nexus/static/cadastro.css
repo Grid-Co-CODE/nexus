@@ -12,11 +12,11 @@
   padding:12px 14px;margin:0 0 16px;background:var(--superficie);color:var(--tinta-2);max-width:980px}
 .cad-aviso i{font-size:18px;margin-top:1px}
 .cad-aviso strong{color:var(--tinta)}
-.cad-aviso--ok{border-color:rgba(163,217,0,.35);background:var(--verde-suave)}
+.cad-aviso--ok{border-color:var(--verde-a35);background:var(--verde-suave)}
 .cad-aviso--ok i{color:var(--verde-texto)}
-.cad-aviso--alerta{border-color:rgba(255,216,61,.35);background:rgba(255,216,61,.08)}
+.cad-aviso--alerta{border-color:var(--alerta-a35);background:var(--alerta-a08)}
 .cad-aviso--alerta i{color:var(--alerta)}
-.cad-aviso--critico{border-color:rgba(255,91,110,.45);background:var(--critico-suave)}
+.cad-aviso--critico{border-color:var(--critico-a45);background:var(--critico-suave)}
 .cad-aviso--critico i{color:var(--critico)}
 .cad-aviso ul{margin:6px 0 0;padding-left:18px}
 
@@ -87,7 +87,7 @@
 .cad-colunas>summary::-webkit-details-marker{display:none}
 .cad-colunas-painel{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(560px,100%);
   max-height:60vh;overflow:auto;background:var(--superficie);border:1px solid var(--linha-forte);
-  border-radius:var(--raio-md);padding:14px 16px;box-shadow:0 12px 32px rgba(0,0,0,.35);
+  border-radius:var(--raio-md);padding:14px 16px;box-shadow:0 12px 32px var(--sombra);
   display:flex;flex-direction:column;gap:12px}
 .cad-colunas-painel .gc-ajuda{margin:0}
 .cad-colunas fieldset{border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
@@ -130,10 +130,10 @@
 .cad-cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin:0 0 24px}
 .cad-cartao{display:flex;flex-direction:column;gap:12px;padding:16px 18px 14px;min-width:0;
   background:linear-gradient(180deg,var(--superficie-2) 0%,var(--superficie) 100%);border:1px solid var(--linha);
-  border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 14px 30px -16px rgba(0,0,0,.85);
+  border-radius:14px;box-shadow:inset 0 1px 0 var(--cartao-brilho),0 14px 30px -16px var(--cartao-sombra);
   transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-.cad-cartao:hover,.cad-cartao:focus-within{transform:translateY(-3px);border-color:rgba(163,217,0,.4);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 22px 40px -16px rgba(0,0,0,.95),0 0 0 1px rgba(163,217,0,.12)}
+.cad-cartao:hover,.cad-cartao:focus-within{transform:translateY(-3px);border-color:var(--verde-a40);
+  box-shadow:inset 0 1px 0 var(--cartao-brilho-alto),0 22px 40px -16px var(--cartao-sombra-alta),0 0 0 1px var(--verde-suave)}
 .cad-cartao-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .cad-cartao-nome{font:700 15px/20px var(--font-sans);margin:0;color:var(--tinta);overflow-wrap:anywhere}
 .cad-cartao-nome a{color:inherit;text-decoration:none}
@@ -167,7 +167,7 @@
 .cad-chip{display:inline-flex;align-items:center;gap:6px;font:600 11px/16px var(--font-sans);padding:2px 8px;
   border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--tinta-2);white-space:nowrap}
 .cad-chip--operacao{background:var(--verde-suave);color:var(--verde-texto)}
-.cad-chip--alerta{background:rgba(255,216,61,.12);color:var(--alerta)}
+.cad-chip--alerta{background:var(--alerta-a12);color:var(--alerta)}
 .cad-chip--critico{background:var(--critico-suave);color:var(--critico)}
 .cad-chip--info{background:var(--superficie-3);color:var(--tinta-2)}
 
@@ -184,7 +184,7 @@
 .cad-campo textarea.gc-campo{resize:vertical;min-height:40px;font-family:var(--font-sans)}
 .cad-origem{font:600 10px/14px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;
   border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--mudo)}
-.cad-origem--sobreposto{background:rgba(255,216,61,.12);color:var(--alerta)}
+.cad-origem--sobreposto{background:var(--alerta-a12);color:var(--alerta)}
 .cad-origem--automatico,.cad-origem--calculado{background:var(--superficie-3);color:var(--tinta-2)}
 .cad-valor-fixo{font-size:13px;color:var(--tinta);padding:8px 0;min-height:36px;border-bottom:1px dashed var(--linha-forte)}
 .cad-valor-fixo.mono{font-family:var(--font-mono);letter-spacing:.02em}
@@ -250,7 +250,7 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .lig-card .det{font-size:11.5px;color:var(--mudo)}
 .lig-barra{display:block;height:6px;border-radius:3px;background:var(--linha);overflow:hidden}
 .lig-barra i{display:block;height:100%}
-.lig-barra i.ok{background:var(--verde)}.lig-barra i.al{background:var(--alerta)}.lig-barra i.er{background:var(--critico)}
+.lig-barra i.ok{background:var(--verde)}.lig-barra i.al{background:var(--alerta-cheio)}.lig-barra i.er{background:var(--critico-cheio)}
 .lig-abas{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--linha);margin:16px 0 10px}
 .lig-abas a{padding:8px 12px;text-decoration:none;color:var(--mudo);font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px}
 .lig-abas a:hover{color:var(--tinta)}

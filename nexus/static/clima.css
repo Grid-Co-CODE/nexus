@@ -2,9 +2,9 @@
    campo.css: a gravidade vai na cor E na palavra (Agir agora, Atenção, Sem alerta), nunca só na cor, e sem emoji. Nada de largura
    fixa maior que o celular: a tela de 375 px não rola para o lado, e texto de terceiros (INMET) quebra em vez de alargar a página.
    As duas únicas coisas mais largas que o celular, a grade por estado e a matriz da Atenção, rolam DENTRO da própria caixa. */
-.cl{--cl-ok:#4ade80;--cl-atencao:#ffd83d;--cl-alto:#ff9f43;--cl-critico:#ff5b6e;--cl-mudo:#767d92;
-  --cl-ok-suave:rgba(74,222,128,.12);--cl-atencao-suave:rgba(255,216,61,.12);--cl-alto-suave:rgba(255,159,67,.14);
-  --cl-critico-suave:rgba(255,91,110,.14);max-width:1280px;margin:0 auto;min-width:0}
+.cl{--cl-ok:var(--ok);--cl-atencao:var(--alerta);--cl-alto:var(--severo);--cl-critico:var(--critico);--cl-mudo:var(--fraco);
+  --cl-ok-suave:var(--ok-a12);--cl-atencao-suave:var(--alerta-a12);--cl-alto-suave:var(--severo-suave);
+  --cl-critico-suave:var(--critico-suave);max-width:1280px;margin:0 auto;min-width:0}
 .cl-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 16px}
 .cl-cab-txt{min-width:0}
 .cl-titulo{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}
@@ -43,7 +43,7 @@
 
 /* "Agir agora": um cartão por usina, o motivo numa pílula, a frase, a prova e o contexto */
 .cl-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}
-.cl-usina{background:var(--superficie);border:1px solid rgba(255,91,110,.45);border-radius:var(--raio-md);padding:16px;
+.cl-usina{background:var(--superficie);border:1px solid var(--critico-a45);border-radius:var(--raio-md);padding:16px;
   display:flex;flex-direction:column;gap:10px;min-width:0}
 .cl-usina-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .cl-usina-id{min-width:0}
@@ -70,13 +70,13 @@
   border:1px dashed var(--linha-forte);border-radius:8px;color:var(--fraco)}
 .cl-uf-sigla{font:700 12px/16px var(--font-sans)}
 .cl-uf-n{font:500 11px/14px var(--font-mono)}
-.cl-uf--agir{background:rgba(255,91,110,.30);border:1px solid var(--cl-critico);color:#fff}
-.cl-uf--atencao{background:rgba(255,216,61,.16);border:1px solid rgba(255,216,61,.55);color:var(--tinta)}
+.cl-uf--agir{background:var(--critico-a30);border:1px solid var(--cl-critico);color:var(--agir-tinta)}
+.cl-uf--atencao{background:var(--alerta-a16);border:1px solid var(--alerta-a55);color:var(--tinta)}
 .cl-legenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--tinta-2)}
 .cl-legenda .cl-mudo{color:var(--mudo)}
 .cl-leg{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline}
-.cl-leg--agir{background:rgba(255,91,110,.35);border:1px solid var(--cl-critico)}
-.cl-leg--atencao{background:rgba(255,216,61,.18);border:1px solid rgba(255,216,61,.6)}
+.cl-leg--agir{background:var(--critico-a35);border:1px solid var(--cl-critico)}
+.cl-leg--atencao{background:var(--alerta-a18);border:1px solid var(--alerta-a60)}
 .cl-leg--nada{border:1px dashed var(--linha-forte)}
 
 /* uma linha por fonte: de quando é o dado e, se falhou, que falhou */
@@ -108,9 +108,9 @@
 .cl-quando{font-size:11px;color:var(--mudo)}
 .cl-semleitura{font-size:12px;color:var(--cl-atencao)}
 .cl-dias4{display:grid;grid-template-columns:repeat(4,54px);gap:4px}
-.cl-c{display:block;text-align:center;border-radius:6px;padding:3px 0;font:500 12px/18px var(--font-mono);background:rgba(255,255,255,.04);color:var(--mudo)}
-.cl-c-c{background:rgba(255,91,110,.18);color:var(--cl-critico)}
-.cl-c-a{background:rgba(255,143,60,.16);color:var(--cl-alto)}
+.cl-c{display:block;text-align:center;border-radius:6px;padding:3px 0;font:500 12px/18px var(--font-mono);background:var(--clarao-a04);color:var(--mudo)}
+.cl-c-c{background:var(--critico-a18);color:var(--cl-critico)}
+.cl-c-a{background:var(--laranja-a16);color:var(--cl-alto)}
 
 /* a página de uma usina (07/10/2026): os alertas dela e a irradiação diária da NASA */
 .cl-link{color:inherit;text-decoration:none}
@@ -133,16 +133,16 @@
 .cl-bloco .cl-dias4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .cl-painel--grafico{margin-top:0}
 .cl-grafico{display:block;width:100%;height:auto;max-width:100%}
-.cl-grade{stroke:rgba(255,255,255,.09);stroke-width:1}
-.cl-grade--zero{stroke:rgba(255,255,255,.16)}
-.cl-eixo{fill:#96a0b4;font:500 11px "IBM Plex Mono",monospace}
+.cl-grade{stroke:var(--linha);stroke-width:1}
+.cl-grade--zero{stroke:var(--linha-forte)}
+.cl-eixo{fill:var(--mudo);font:500 11px "IBM Plex Mono",monospace}
 .cl-eixo--faixa{font-size:10px}
-.cl-faixa-nasa{fill:rgba(255,255,255,.05)}
-.cl-nasa{fill:none;stroke:#c3cad7;stroke-width:2;stroke-dasharray:5 4;stroke-linejoin:round}
-.cl-nasa-ponto{fill:#c3cad7}
-.cl-etm{fill:none;stroke:#6ec1e4;stroke-width:2.5;stroke-linejoin:round}
-.cl-leg--nasa{width:18px;height:0;border-top:2px dashed #c3cad7;border-radius:0;margin-bottom:3px}
-.cl-leg--faixa{background:rgba(255,255,255,.08);border:1px solid var(--linha-forte)}
+.cl-faixa-nasa{fill:var(--clarao-a05)}
+.cl-nasa{fill:none;stroke:var(--serie-nasa);stroke-width:2;stroke-dasharray:5 4;stroke-linejoin:round}
+.cl-nasa-ponto{fill:var(--serie-nasa)}
+.cl-etm{fill:none;stroke:var(--serie-etm);stroke-width:2.5;stroke-linejoin:round}
+.cl-leg--nasa{width:18px;height:0;border-top:2px dashed var(--serie-nasa);border-radius:0;margin-bottom:3px}
+.cl-leg--faixa{background:var(--clarao-a08);border:1px solid var(--linha-forte)}
 .cl-minis{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
 .cl-mini{flex:1 1 220px;max-width:320px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md);
   padding:10px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}

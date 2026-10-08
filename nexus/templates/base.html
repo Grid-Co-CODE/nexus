@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR" data-nexus>
+<html lang="pt-BR" data-nexus data-tema="{{ tema }}">
 <head>
   <meta charset="utf-8">
   <script>
@@ -17,6 +17,7 @@
     // Aplica o menu recolhido antes de pintar, para a página não piscar aberta e depois fechar.
     // localStorage pode faltar (janela privada, dado bloqueado): aí o menu só abre expandido.
     try { if (localStorage.getItem("nexus.menu") === "recolhido") document.documentElement.classList.add("menu-recolhido"); } catch (e) {}
+    {% include "_tema_cabeca.html" %}
   </script>
 </head>
 <body>
@@ -39,6 +40,19 @@
     </select>
     <input type="hidden" name="voltar" value="{{ caminho }}">
     <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno">Trocar</button></noscript>
+  </form>
+  {# Tema escuro (padrão) ou claro (08/10/2026): o botão diz o de agora. Sem JavaScript, o formulário troca pelo servidor.
+     O ícone (meio círculo cheio) é desenhado no CSS, sem <svg> no topo: as telas com gráfico procuram o primeiro <svg> da
+     página (os testes do Mapa de risco quebraram com um ícone em SVG aqui) e sem depender da fonte de ícones da CDN. #}
+  {% set outro_tema = 'escuro' if tema == 'claro' else 'claro' %}
+  <form class="troca-tema-form" method="post" action="/tema">
+    <input type="hidden" name="tema" value="{{ outro_tema }}">
+    <input type="hidden" name="voltar" value="{{ caminho_completo }}">
+    <button type="submit" id="troca-tema" class="gc-btn gc-btn--ui gc-btn--fantasma troca-tema"
+            aria-label="Tema: {{ tema }}. Trocar para o tema {{ outro_tema }}" title="Trocar para o tema {{ outro_tema }}">
+      <span class="tema-icone" aria-hidden="true"></span>
+      <span class="rotulo-tema">Tema: {{ 'Claro' if tema == 'claro' else 'Escuro' }}</span>
+    </button>
   </form>
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
   {% if session.usuario %}<span class="usuario-topo" title="{{ session.usuario.email }}{% if session.usuario.perfil %} · {{ session.usuario.perfil }}{% endif %}">{{ session.usuario.nome }}</span>{% endif %}
@@ -85,6 +99,32 @@
   document.addEventListener("keydown", function (ev) {
     var alvo = ev.target.tagName;
     if (ev.key === "[" && alvo !== "INPUT" && alvo !== "TEXTAREA" && alvo !== "SELECT") alternar();
+  });
+  // Troca de tema: na hora, sem recarregar; grava o cookie (o servidor desenha o tema certo na próxima página) e o
+  // localStorage (reserva). Outra aba aberta acompanha pelo evento storage.
+  var formTema = document.querySelector(".troca-tema-form");
+  var botaoTema = formTema.querySelector("button"), rotuloTema = formTema.querySelector(".rotulo-tema");
+  var campoTema = formTema.querySelector("input[name=tema]");
+  function mostrarTema(t) {
+    var outro = t === "claro" ? "escuro" : "claro";
+    raiz.setAttribute("data-tema", t);
+    rotuloTema.textContent = "Tema: " + (t === "claro" ? "Claro" : "Escuro");
+    botaoTema.setAttribute("aria-label", "Tema: " + t + ". Trocar para o tema " + outro);
+    botaoTema.title = "Trocar para o tema " + outro;
+    campoTema.value = outro;
+  }
+  // o tema pode ter vindo do localStorage (cookie apagado): o botão diz o que está na tela
+  mostrarTema(raiz.getAttribute("data-tema") === "claro" ? "claro" : "escuro");
+  formTema.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var novo = raiz.getAttribute("data-tema") === "claro" ? "escuro" : "claro";
+    if (window.NexusTema) window.NexusTema.gravar(novo);
+    var reduzir = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (document.startViewTransition && !reduzir) document.startViewTransition(function () { mostrarTema(novo); });
+    else mostrarTema(novo);
+  });
+  window.addEventListener("storage", function (ev) {
+    if (ev.key === "nexus.tema" && (ev.newValue === "claro" || ev.newValue === "escuro")) mostrarTema(ev.newValue);
   });
   // No trilho recolhido não há espaço para as sub-telas: o ícone leva direto à primeira tela.
   document.querySelectorAll(".torre summary").forEach(function (s) {

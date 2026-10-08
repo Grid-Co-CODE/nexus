@@ -7,7 +7,7 @@
 .pcm-semanas a{font:600 12px/16px var(--font-sans);padding:6px 10px;border:1px solid var(--linha);border-radius:var(--raio-tag);
   color:var(--tinta-2);text-decoration:none;white-space:nowrap}
 .pcm-semanas a:hover{border-color:var(--linha-forte);color:var(--tinta)}
-.pcm-semanas a[aria-current]{background:var(--verde-suave);border-color:rgba(163,217,0,.35);color:var(--tinta)}
+.pcm-semanas a[aria-current]{background:var(--verde-suave);border-color:var(--verde-a35);color:var(--tinta)}
 
 .pcm-fonte{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--mudo);margin:0 0 16px;max-width:760px}
 .pcm-fonte i{font-size:16px;margin-top:1px}
@@ -15,9 +15,9 @@
   padding:12px 14px;margin:0 0 16px;color:var(--tinta-2);font-size:14px;max-width:760px}
 .pcm-aviso i{font-size:18px;margin-top:1px}
 .pcm-aviso strong{color:var(--tinta)}
-.pcm-aviso--alerta{border-color:rgba(255,216,61,.35);background:rgba(255,216,61,.08)}
+.pcm-aviso--alerta{border-color:var(--alerta-a35);background:var(--alerta-a08)}
 .pcm-aviso--alerta i{color:var(--alerta)}
-.pcm-aviso--critico{border-color:rgba(255,91,110,.45);background:var(--critico-suave)}
+.pcm-aviso--critico{border-color:var(--critico-a45);background:var(--critico-suave)}
 .pcm-aviso--critico i{color:var(--critico)}
 
 .pcm-numeros{margin:0 0 22px}
@@ -60,14 +60,14 @@
   border-radius:var(--raio-tag);white-space:nowrap;color:var(--mudo);background:var(--superficie-2)}
 .pcm-sit::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .pcm-sit--feita{color:var(--verde-texto);background:var(--verde-suave)}
-.pcm-sit--andamento{color:var(--alerta);background:rgba(255,216,61,.10)}
+.pcm-sit--andamento{color:var(--alerta);background:var(--alerta-a10)}
 .pcm-paginas{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
 
 /* Gerar a semana (etapa 2) */
-.pcm-aviso--ok{border-color:rgba(163,217,0,.35);background:var(--verde-suave)}
+.pcm-aviso--ok{border-color:var(--verde-a35);background:var(--verde-suave)}
 .pcm-aviso--ok i{color:var(--verde-texto)}
 .pcm-sit--ok{color:var(--verde-texto);background:var(--verde-suave)}
-.pcm-sit--rodando{color:var(--alerta);background:rgba(255,216,61,.10)}
+.pcm-sit--rodando{color:var(--alerta);background:var(--alerta-a10)}
 .pcm-sit--falhou,.pcm-sit--interrompida{color:var(--critico);background:var(--critico-suave)}
 .pcm-rodada{border:1px solid var(--linha);border-radius:var(--raio-md);padding:16px 18px;margin:0 0 22px;display:grid;gap:10px}
 .pcm-rodada-topo{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -124,7 +124,7 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 .obs-legenda>span{display:inline-flex;align-items:center;gap:5px}
 .obs-amostra{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;border:1px solid var(--linha-forte);
   font:600 10.5px/1 var(--font-sans);font-style:normal;color:var(--fraco)}
-.obs-amostra--regra{background:rgba(163,217,0,.16);border-color:rgba(163,217,0,.42);color:var(--verde-texto)}
+.obs-amostra--regra{background:var(--verde-a16);border-color:var(--verde-a42);color:var(--verde-texto)}
 .obs-amostra--nao{border-color:var(--linha)}
 .obs-filtro .obs-busca{width:260px;flex:none}   /* o .obs-campo (100%) vem depois e jogava a legenda para baixo */
 /* "Adicionar usina": a lista mostra só as marcadas; as outras entram por aqui (05/10/2026) */
@@ -137,7 +137,7 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 .obs-add-item:hover{border-color:var(--verde);background:var(--verde-suave)}
 .obs-add-item small{font-weight:500;color:var(--mudo)}
 .obs-vazio{margin:4px 0 10px}
-.obs-ufr.obs-recem{border-style:dashed;border-color:rgba(163,217,0,.42)}
+.obs-ufr.obs-recem{border-style:dashed;border-color:var(--verde-a42)}
 .obs-herdada{margin:0 0 14px}
 .obs-fechar{display:none}
 .obs-bloco--usinas[open] .obs-fechar{display:inline;margin-left:auto}
@@ -186,13 +186,16 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
    atende; contorno apagado = não atende. */
 .obs-dia[aria-pressed="false"]{color:var(--fraco);border-color:var(--linha)}
 .obs-uf{margin-left:6px;font-size:10.5px;color:var(--mudo)}
-.obs-divide{margin-left:6px;font-size:10.5px;color:var(--info);cursor:help}
+/* o "+N" das usinas que dividem a regra herda a cor da linha: o var(--info) daqui nunca valeu (o --info só existia dentro
+   das telas do Campo), e a tela sempre mostrou a cor do nome. Com o --info no nexus.css (08/10/2026) ele ficaria azul de
+   repente no escuro, que não pode mudar; se um dia quiserem o azul, é trocar o inherit por var(--info). */
+.obs-divide{margin-left:6px;font-size:10.5px;color:inherit;cursor:help}
 .obs-nome{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .obs-dias{display:inline-flex;gap:2px;flex:none}
 .obs-dia{width:21px;height:21px;border-radius:6px;border:1px solid var(--linha-forte);background:transparent;
   color:var(--mudo);font:600 11px/1 var(--font-sans);cursor:pointer;padding:0}
-.obs-dia:hover{border-color:rgba(163,217,0,.6)}
-.obs-dia[aria-pressed="true"]{background:rgba(163,217,0,.16);border-color:rgba(163,217,0,.42);color:var(--verde-texto)}
+.obs-dia:hover{border-color:var(--verde-a60)}
+.obs-dia[aria-pressed="true"]{background:var(--verde-a16);border-color:var(--verde-a42);color:var(--verde-texto)}
 .obs-tirar{flex:none;width:22px;height:22px;border:0;background:transparent;color:var(--fraco);font-size:16px;line-height:1;
   cursor:pointer;border-radius:6px;padding:0}
 .obs-tirar:hover{color:var(--critico);background:var(--critico-suave)}
@@ -213,7 +216,7 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 .obs-notas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .obs-notas li{display:flex;gap:8px;align-items:center;padding:4px 6px 4px 10px;border:1px solid var(--linha);border-radius:6px}
 .obs-notas li .gc-dado{flex:1;min-width:0;overflow-wrap:anywhere}
-.obs-ruim{border-color:rgba(255,216,61,.5)!important}
+.obs-ruim{border-color:var(--alerta-a50)!important}
 .obs-problema{flex-basis:100%;font-size:11.5px;color:var(--alerta)}
 .obs-notas .obs-problema{flex-basis:auto}
 .obs-salvar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}
@@ -241,8 +244,8 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
    O bloco da aba Gestão PCM do painel do PCM (pg- de "plano e gestão"; nada aqui é compartilhado com outra tela).
    O painel é claro; aqui as mesmas faixas no navy: vermelho abaixo de 40%, amarelo de 40% a 99%, verde em 100%,
    cinza sem preventiva. Tabela larga rola dentro do .pg-rolo, nunca a página (375 px). */
-.pg{--pg-info:#7fb8ff;--pg-info-suave:rgba(91,157,255,.14);--pg-alerta-suave:rgba(255,216,61,.12);
-  --pg-laranja:#ff9f5a;--pg-laranja-suave:rgba(255,143,60,.16);min-width:0}
+.pg{--pg-info:var(--info);--pg-info-suave:var(--info-suave);--pg-alerta-suave:var(--alerta-a12);
+  --pg-laranja:var(--laranja);--pg-laranja-suave:var(--laranja-a16);min-width:0}
 .pg .pcm-topo{align-items:center}
 .pg-t--ok{color:var(--verde-texto)}.pg-t--and{color:var(--alerta)}.pg-t--crit{color:var(--critico)}.pg-t--nulo{color:var(--fraco)}
 .pg-par .v small{font-size:13px;font-weight:500;letter-spacing:0;color:var(--tinta-2)}
@@ -299,6 +302,7 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 .pg-tbl th a{display:inline-flex;align-items:center;gap:4px;color:inherit;text-decoration:none;padding:8px 0}
 .pg-tbl th a:hover,.pg-tbl th.ativo{color:var(--tinta)}
 .pg-tbl th small{font-weight:500;text-transform:none;letter-spacing:0;opacity:.8}
+:root[data-tema="claro"] .pg-tbl th small{opacity:1}   /* o "(Fracttal)" do cabeçalho: 3,6:1 com a opacidade, no claro */
 .pg-ord{font-size:11px;opacity:.45}
 .pg-tbl th.ativo .pg-ord{opacity:1;color:var(--verde-texto)}
 .pg-tbl .pg-rotlin{position:sticky;left:0;z-index:2;text-align:left;background:var(--superficie);min-width:230px;max-width:320px;
@@ -356,12 +360,15 @@ a.pg-frac:hover{outline:1px solid currentColor;outline-offset:-3px}
 .pg-lin[data-det]:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 .pg-lin[aria-expanded="true"] td{background:var(--superficie-2)}
 .pg-concl td{opacity:.55}
+/* No claro a concluída não esmaece: com a opacidade do escuro o texto caía a 2,6:1 no branco (medido em 08/10/2026; o
+   mínimo é 4,5:1). Vai no cinza das seções, com o texto no mudo; os selos seguem na cor deles. */
+:root[data-tema="claro"] .pg-concl td{opacity:1;background:var(--superficie-2);color:var(--mudo)}
 .pg-dt{font-variant-numeric:tabular-nums}
 .pg-nulo{color:var(--fraco)}
 .pg-ok{color:var(--verde-texto);font-size:15px;vertical-align:-2px}
 .pg-tipo{display:inline-block;border:1px solid var(--linha-forte);border-radius:var(--raio-tag);padding:0 6px;
   font:700 10.5px/16px var(--font-sans);color:var(--tinta)}
-.pg-div{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--alerta);margin-left:6px;vertical-align:1px}
+.pg-div{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--alerta-cheio);margin-left:6px;vertical-align:1px}
 .pg-atr{display:inline-block;border-radius:var(--raio-tag);padding:1px 8px;font:700 11px/16px var(--font-sans);
   font-variant-numeric:tabular-nums}
 .pg-atr--f0{color:var(--tinta-2)}

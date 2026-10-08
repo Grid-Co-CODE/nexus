@@ -24,8 +24,8 @@
 .eg-abas a{font:600 13.5px/18px var(--font-sans);color:var(--tinta-2);text-decoration:none;padding:8px 16px;border-radius:999px;
   border:1px solid var(--linha-forte);background:var(--superficie)}
 .eg-abas a:hover{color:var(--tinta);border-color:var(--verde)}
-.eg-abas a[aria-current="page"]{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde,#0b1220)}
-.eg-abas i{font-style:normal;font-size:11.5px;padding:1px 7px;border-radius:999px;margin-left:4px;background:rgba(0,0,0,.18)}
+.eg-abas a[aria-current="page"]{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.eg-abas i{font-style:normal;font-size:11.5px;padding:1px 7px;border-radius:999px;margin-left:4px;background:var(--contador-fundo)}
 
 /* indicadores: uma faixa com divisórias */
 .eg-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--linha)}
@@ -77,8 +77,8 @@
 .eg-barras a:hover,.eg-barras a[aria-current]{background:var(--superficie-2)}
 .eg-barras-nome{font:600 13px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .eg-barras-trilho{height:8px;border-radius:4px;background:var(--superficie-3);overflow:hidden}
-.eg-barras-trilho i{display:block;height:100%;border-radius:4px;background:var(--alerta)}
-.eg-barras-trilho--sinal i{background:var(--critico)}
+.eg-barras-trilho i{display:block;height:100%;border-radius:4px;background:var(--alerta-cheio)}
+.eg-barras-trilho--sinal i{background:var(--critico-cheio)}
 .eg-barras b{font:700 14px var(--font-sans);color:var(--tinta);font-variant-numeric:tabular-nums;text-align:right}
 .eg-barras-det{grid-column:2/4;font-size:11.5px;color:var(--mudo)}
 .eg-crit-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px 18px 6px}
@@ -93,10 +93,10 @@
 .eg-lado-nota{margin:0;padding:6px 18px 14px;font-size:12px;color:var(--mudo)}
 
 /* a gaveta */
-.eg-veu{position:fixed;inset:0;z-index:40;background:rgba(9,13,24,.55)}
+.eg-veu{position:fixed;inset:0;z-index:40;background:var(--veu)}
 .eg-veu[hidden],.eg-gaveta[hidden]{display:none}
 .eg-gaveta{position:fixed;top:0;right:0;bottom:0;z-index:41;width:min(560px,100vw);overflow-y:auto;background:var(--superficie);
-  border-left:1px solid var(--linha-forte);box-shadow:-12px 0 32px rgba(0,0,0,.35);padding:22px 24px 32px}
+  border-left:1px solid var(--linha-forte);box-shadow:-12px 0 32px var(--sombra);padding:22px 24px 32px}
 .eg-gav-fechar{position:absolute;top:14px;right:16px;width:36px;height:36px;border-radius:8px;border:1px solid var(--linha-forte);
   background:transparent;color:var(--tinta);font:600 20px/1 var(--font-sans);cursor:pointer}
 .eg-gav-fechar:hover{border-color:var(--verde)}
@@ -144,8 +144,8 @@
 .eg-mini{display:inline-block;height:5px;max-width:70px;border-radius:3px;background:var(--tinta-2);opacity:.35;vertical-align:middle;margin-right:8px}
 .eg-disp{position:relative;display:inline-block;width:80px;height:6px;border-radius:3px;background:var(--superficie-3);vertical-align:middle;
   margin-right:8px;overflow:visible}
-.eg-disp i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ok)}
-.eg-disp i.mal{background:var(--critico)}
+.eg-disp i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ok-cheio)}
+.eg-disp i.mal{background:var(--critico-cheio)}
 .eg-disp u{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--mudo)}
 .eg-leia{margin:0;padding:12px 18px;font-size:12.5px;color:var(--mudo);border-top:1px solid var(--linha);background:var(--superficie-2)}
 .eg-leia b{color:var(--tinta-2)}
@@ -176,13 +176,13 @@
 .kb-super-carga b{font:800 32px/1 var(--font-sans);color:var(--tinta)}
 .kb-super-carga span{font-size:11px;color:var(--mudo)}
 .kb-av{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;flex:0 0 auto;
-  font:800 11px/1 var(--font-sans);color:#0b1220;background:var(--cor,#c7cede)}
+  font:800 11px/1 var(--font-sans);color:var(--sobre-cheio);background:var(--cor,var(--pessoa-padrao))}
 .kb-av--grande{width:44px;height:44px;font-size:15px}
 .kb-trilha{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--superficie-3)}
 .kb-trilha i{display:block;height:100%}
-.kb-t-fazer{background:var(--alerta)}
+.kb-t-fazer{background:var(--alerta-cheio)}
 .kb-t-execucao{background:var(--verde)}
-.kb-t-verificacao{background:var(--info)}
+.kb-t-verificacao{background:var(--info-cheio)}
 .kb-super-num{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--tinta-2)}
 .kb-super-num b{font-weight:800;color:var(--tinta);margin-right:4px;font-variant-numeric:tabular-nums}
 /* a faixa dos próximos 14 dias: um degrau por dia, um ponto por OS programada */
@@ -209,23 +209,28 @@
 .kb-col-cab h3{margin:0;font:700 13.5px var(--font-sans);color:var(--tinta)}
 .kb-col-n{font:700 12px var(--font-sans);padding:1px 8px;border-radius:999px;background:var(--superficie-3);color:var(--tinta-2)}
 .kb-col-alerta{margin-left:auto;font:700 11px var(--font-sans);color:var(--critico)}
-.kb-col--fazer .kb-col-cab{box-shadow:inset 0 3px 0 var(--alerta)}
+.kb-col--fazer .kb-col-cab{box-shadow:inset 0 3px 0 var(--alerta-cheio)}
 .kb-col--execucao .kb-col-cab{box-shadow:inset 0 3px 0 var(--verde)}
-.kb-col--verificacao .kb-col-cab{box-shadow:inset 0 3px 0 var(--info)}
-.kb-col--concluida .kb-col-cab{box-shadow:inset 0 3px 0 var(--ok)}
+.kb-col--verificacao .kb-col-cab{box-shadow:inset 0 3px 0 var(--info-cheio)}
+.kb-col--concluida .kb-col-cab{box-shadow:inset 0 3px 0 var(--ok-cheio)}
 .kb-col--cancelada .kb-col-cab{box-shadow:inset 0 3px 0 var(--linha-forte)}
 .kb-col-corpo{display:grid;gap:10px;align-content:start;padding:10px;max-height:72vh;overflow-y:auto}
 .kb-vazio{margin:6px 4px;font-size:12.5px;color:var(--mudo)}
 .kb-card{display:grid;gap:7px;padding:12px 12px 10px;border-radius:12px;cursor:pointer;background:var(--superficie-2);
   border:1px solid var(--linha);box-shadow:inset 3px 0 0 var(--linha-forte)}
 .kb-card:hover,.kb-card:focus-visible{border-color:var(--linha-forte);outline:none;background:var(--superficie-3)}
-.kb-card--atrasada{box-shadow:inset 3px 0 0 var(--critico)}
-.kb-card--vence{box-shadow:inset 3px 0 0 var(--alerta)}
-.kb-card--futura{box-shadow:inset 3px 0 0 var(--info)}
+.kb-card--atrasada{box-shadow:inset 3px 0 0 var(--critico-cheio)}
+.kb-card--vence{box-shadow:inset 3px 0 0 var(--alerta-cheio)}
+.kb-card--futura{box-shadow:inset 3px 0 0 var(--info-cheio)}
 .kb-card--execucao{box-shadow:inset 3px 0 0 var(--verde)}
-.kb-card--verificacao{box-shadow:inset 3px 0 0 var(--info)}
-.kb-card--concluida{box-shadow:inset 3px 0 0 var(--ok);opacity:.85}
+.kb-card--verificacao{box-shadow:inset 3px 0 0 var(--info-cheio)}
+.kb-card--concluida{box-shadow:inset 3px 0 0 var(--ok-cheio);opacity:.85}
 .kb-card--cancelada{opacity:.55}
+/* No claro nada esmaece por opacidade (o texto cai abaixo de 4,5:1 no branco): a coluna já diz concluída ou cancelada, a
+   cancelada ganha a borda tracejada, e no filtro por pessoa o cartão escolhido é o que tem a borda na cor dela. */
+:root[data-tema="claro"] :is(.kb-card--concluida,.kb-card--cancelada,.eg-oss li.eg-os-servico){opacity:1}
+:root[data-tema="claro"] .kb-card--cancelada{border-style:dashed}
+:root[data-tema="claro"] .kb-pessoas--uma .kb-super[aria-pressed="false"]{opacity:1}
 .kb-card-cab{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .kb-os{font:700 12px var(--font-mono);color:var(--verde-texto)}
 a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº leva à página da OS no OS Creator */

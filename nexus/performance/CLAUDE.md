@@ -291,6 +291,11 @@ for renomeada ou mudar de forma, quem quebra é `tests/test_clima_mapa_camadas.p
 principal` diz se os dois painéis divergiram). O CSS usa os tokens `--cl-*` do `clima.css` e os do `nexus.css`: renomear um deles
 quebra `test_o_css_do_mapa_so_usa_cores_que_o_clima_css_ou_o_nexus_css_definem`.
 
+**Dois temas (08/10/2026):** `clima.css` e `clima-mapa.css` não têm cor fixa; os `--cl-*` apontam para o semáforo do
+`nexus.css` (no escuro, os mesmos valores de antes), e o mar, a terra, a borda e a sigla do estado são `--mapa-*`. No claro,
+o Perigo Potencial do mapa usa o âmbar de área (`--alerta-cheio`): o `--cl-atencao` do claro é o âmbar escuro de texto, e a 24%
+virava mancha marrom. A regra geral (cor só por token) está em `nexus/casca/CLAUDE.md`, seção Tema.
+
 **O que o mapa não faz, de propósito:** zoom e arrasto (o recorte por região resolve, sem JS); filtro por cliente (a lista tem);
 risco de fogo como camada (é um raster de pixels de ~1 km, e o Nexus lê só o pixel de cada usina); mostrar a coordenada; ilhas
 oceânicas (o contorno mínimo não as tem: uma usina ali cai em "fora deste recorte").

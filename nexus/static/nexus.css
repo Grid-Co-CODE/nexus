@@ -1,12 +1,98 @@
-/* Nexus — tema escuro do Design System Grid Co. (tokens gc-*, 29/09/2026).
-   Navy, nunca lilás: o navy arroxeado do mockup (#191528) não entra aqui. */
-:root{
+/* Nexus — Design System Grid Co. (tokens gc-*, 29/09/2026) em dois temas (08/10/2026).
+
+   ESCURO (navy) é o padrão e NÃO muda: cada valor abaixo é o que a tela já usava, um a um (as transparências diferentes
+   de cada tela viraram tokens próprios: --alerta-a08 é o âmbar a 8%). Navy, nunca lilás: o navy arroxeado do mockup
+   (#191528) não entra como fundo.
+   CLARO (Levi, 08/10/2026: "precisamos de um tema claro também"), na identidade do site da Grid Co.: página quase
+   branca, seções #f5f6f8, texto escuro; o topo continua navy com o logo claro (o bloco do escuro vale de novo dentro do
+   .topo); o verde Grid só como SUPERFÍCIE (botão com texto escuro, sublinhado, barra): verde em TEXTO é o musgo, porque o
+   #a9db21 puro dá 1,6:1 no branco. Semáforo por matiz, cada um com contraste AA (4,5:1) sobre o branco, o #f5f6f8, o
+   #eceef2 e o próprio "-suave": ok verde, alerta âmbar escuro, severo laranja, crítico vermelho, sem comunicação violeta,
+   info azul.
+   REGRA: cor só nos tokens. Toda cor de tela (os .css do Nexus e o estilo dos templates) é var(--token); token novo
+   entra nos DOIS blocos (tests/test_tema.py cobra o par, a cor fixa e o contraste do claro). */
+:root,:root[data-tema="claro"] .topo{
+  /* superfícies e texto */
   --fundo:#090d18; --superficie:#161d30; --superficie-2:#1c2640; --superficie-3:#243154;
   --barra:#0d1526; --tinta:#e9eef6; --tinta-2:#c3cad7; --mudo:#96a0b4; --fraco:#767d92;
   --linha:rgba(255,255,255,.09); --linha-forte:rgba(255,255,255,.16);
+  /* verde Grid */
   --verde:#a3d900; --verde-hover:#8bbf00; --verde-suave:rgba(163,217,0,.12); --verde-texto:#c4e755;
   --sobre-verde:#191528; --sobre-barra:#fff; --sobre-barra-mudo:#a6adb4; --foco:#a3d900;
-  --critico:#ff5b6e; --critico-suave:rgba(255,91,110,.14); --alerta:#ffd83d;
+  --verde-a16:rgba(163,217,0,.16); --verde-a35:rgba(163,217,0,.35); --verde-a40:rgba(163,217,0,.4);
+  --verde-a42:rgba(163,217,0,.42); --verde-a45:rgba(163,217,0,.45); --verde-a60:rgba(163,217,0,.6);
+  /* semáforo: a palavra colorida, o fundo suave e as transparências que cada tela usava */
+  --ok:#4ade80; --ok-suave:rgba(74,222,128,.14); --ok-a12:rgba(74,222,128,.12);
+  --alerta:#ffd83d; --alerta-suave:rgba(255,216,61,.14);
+  --alerta-a08:rgba(255,216,61,.08); --alerta-a10:rgba(255,216,61,.10); --alerta-a12:rgba(255,216,61,.12);
+  --alerta-a16:rgba(255,216,61,.16); --alerta-a18:rgba(255,216,61,.18); --alerta-a35:rgba(255,216,61,.35);
+  --alerta-a40:rgba(255,216,61,.4); --alerta-a45:rgba(255,216,61,.45); --alerta-a50:rgba(255,216,61,.5);
+  --alerta-a55:rgba(255,216,61,.55); --alerta-a60:rgba(255,216,61,.6);
+  --severo:#ff9f43; --severo-suave:rgba(255,159,67,.14); --laranja:#ff9f5a; --laranja-a16:rgba(255,143,60,.16);
+  --critico:#ff5b6e; --critico-suave:rgba(255,91,110,.14);
+  --critico-a12:rgba(255,91,110,.12); --critico-a18:rgba(255,91,110,.18); --critico-a30:rgba(255,91,110,.30);
+  --critico-a35:rgba(255,91,110,.35); --critico-a45:rgba(255,91,110,.45); --agir-tinta:#fff;
+  --erro:#ff7a7a; --erro-cheio:#ff7a7a; --erro-a08:rgba(255,122,122,.08); --erro-a42:rgba(255,122,122,.42); --erro-a55:rgba(255,122,122,.55);
+  --info:#7fb8ff; --info-suave:rgba(91,157,255,.14); --info-a10:rgba(127,184,255,.10); --info-a42:rgba(127,184,255,.42);
+  --semcom:#b39dff; --semcom-suave:rgba(179,157,255,.14);
+  /* severidade como ÁREA: barra, preenchimento com texto escuro por cima (a idade da fila, a distribuição dos níveis) e a
+     borda grossa de destaque do cartão. No claro é o tom médio do matiz: o de texto é escuro demais para área */
+  --ok-cheio:#4ade80; --lima-cheio:#a8e05f; --alerta-cheio:#ffd83d; --severo-cheio:#ff8f3c; --critico-cheio:#ff5b6e;
+  --info-cheio:#7fb8ff; --sobre-cheio:#0b1220;
+  /* séries dos gráficos e o mapa */
+  --serie-sujidade:#7fb8ff; --serie-vegetacao:#a3d900; --serie-nasa:#c3cad7; --serie-etm:#6ec1e4;
+  --mapa-mar:#0d1526; --mapa-terra:#1c2640; --mapa-borda:rgba(255,255,255,.22); --mapa-sigla:rgba(233,238,246,.42);
+  --clarao-a04:rgba(255,255,255,.04); --clarao-a05:rgba(255,255,255,.05); --clarao-a08:rgba(255,255,255,.08);
+  /* sombra, véu, contador, cartão, barra de rolagem e o fundo navy do logo */
+  --sombra:rgba(0,0,0,.35); --veu:rgba(9,13,24,.55); --contador-fundo:rgba(0,0,0,.18);
+  --cartao-brilho:rgba(255,255,255,.05); --cartao-brilho-alto:rgba(255,255,255,.06);
+  --cartao-sombra:rgba(0,0,0,.85); --cartao-sombra-alta:rgba(0,0,0,.95);
+  --rolagem:#243154; --rolagem-hover:#34426b; --pessoa-padrao:#c7cede; --marca-fundo:#0d1526;
+  /* iguais nos dois temas: a foto ampliada é sempre no escuro, e a assinatura é sempre em papel branco */
+  --foto-veu:rgba(9,13,24,.92); --foto-etiqueta:rgba(9,13,24,.78); --foto-tinta:#fff; --foto-legenda:#e6e9f2;
+  --foto-borda:rgba(255,255,255,.3); --foto-borda-hover:#a3d900;
+  --papel:#fff; --papel-mudo:#5b6475; --papel-link:#3d5c00;
+}
+:root[data-tema="claro"]{
+  /* superfícies e texto (o mudo e o fraco escurecidos até 4,5:1 também no #eceef2 de uma linha em hover) */
+  --fundo:#fcfcfc; --superficie:#ffffff; --superficie-2:#f5f6f8; --superficie-3:#eceef2;
+  --barra:#eef2f7; --tinta:#1f2937; --tinta-2:#475569; --mudo:#5a6475; --fraco:#606978;
+  --linha:rgba(15,23,42,.10); --linha-forte:rgba(15,23,42,.18);
+  /* verde Grid: o #a9db21 é superfície; o texto verde é o musgo #566610 (o #5e6f0e cai a 4,49:1 no verde-suave de uma
+     linha em hover; o #566610 é o mesmo musgo um tom abaixo, 5,1:1 ou mais em todas as combinações) */
+  --verde:#a9db21; --verde-hover:#9bcb1a; --verde-suave:rgba(169,219,33,.18); --verde-texto:#566610;
+  --sobre-verde:#0d1526; --sobre-barra:#fff; --sobre-barra-mudo:#a6adb4; --foco:#566610;
+  --verde-a16:rgba(169,219,33,.24); --verde-a35:rgba(107,138,0,.45); --verde-a40:rgba(107,138,0,.5);
+  --verde-a42:rgba(107,138,0,.5); --verde-a45:rgba(107,138,0,.5); --verde-a60:rgba(107,138,0,.7);
+  /* semáforo: os fundos (a08 a a18) viram o suave do matiz, as bordas (a35 a a60) um contorno mais firme */
+  --ok:#166b36; --ok-suave:rgba(31,136,61,.12); --ok-a12:rgba(31,136,61,.12);
+  --alerta:#7a5200; --alerta-suave:rgba(230,175,46,.18);
+  --alerta-a08:rgba(230,175,46,.12); --alerta-a10:rgba(230,175,46,.16); --alerta-a12:rgba(230,175,46,.16);
+  --alerta-a16:rgba(230,175,46,.22); --alerta-a18:rgba(230,175,46,.24); --alerta-a35:rgba(176,124,0,.45);
+  --alerta-a40:rgba(176,124,0,.45); --alerta-a45:rgba(176,124,0,.5); --alerta-a50:rgba(176,124,0,.55);
+  --alerta-a55:rgba(176,124,0,.55); --alerta-a60:rgba(176,124,0,.6);
+  --severo:#a33d00; --severo-suave:rgba(247,140,60,.16); --laranja:#a33d00; --laranja-a16:rgba(247,140,60,.16);
+  --critico:#b42230; --critico-suave:rgba(220,53,69,.09);
+  --critico-a12:rgba(220,53,69,.10); --critico-a18:rgba(220,53,69,.12); --critico-a30:rgba(220,53,69,.18);
+  --critico-a35:rgba(220,53,69,.22); --critico-a45:rgba(180,34,48,.40); --agir-tinta:#8a1822;
+  --erro:#b42230; --erro-cheio:#ef5d6e; --erro-a08:rgba(220,53,69,.07); --erro-a42:rgba(180,34,48,.38); --erro-a55:rgba(180,34,48,.5);
+  --info:#0a5fc4; --info-suave:rgba(9,105,218,.08); --info-a10:rgba(9,105,218,.07); --info-a42:rgba(10,95,196,.38);
+  --semcom:#7442d1; --semcom-suave:rgba(130,80,223,.08);
+  --ok-cheio:#3dbb68; --lima-cheio:#a8e05f; --alerta-cheio:#f0b429; --severo-cheio:#f59342; --critico-cheio:#ef5d6e;
+  --info-cheio:#5c9cf5; --sobre-cheio:#0b1220;
+  /* séries e mapa: o mar azulado e a terra branca; a sigla do estado passa 4,5:1 também sobre a mancha de um aviso */
+  --serie-sujidade:#1b64c4; --serie-vegetacao:#4a7300; --serie-nasa:#64748b; --serie-etm:#0e7490;
+  --mapa-mar:#e4ebf3; --mapa-terra:#ffffff; --mapa-borda:rgba(15,23,42,.28); --mapa-sigla:rgba(31,41,55,.8);
+  --clarao-a04:rgba(15,23,42,.04); --clarao-a05:rgba(15,23,42,.04); --clarao-a08:rgba(15,23,42,.06);
+  --sombra:rgba(15,23,42,.16); --veu:rgba(15,23,42,.32); --contador-fundo:rgba(15,23,42,.08);
+  --cartao-brilho:rgba(255,255,255,.8); --cartao-brilho-alto:rgba(255,255,255,.9);
+  --cartao-sombra:rgba(15,23,42,.22); --cartao-sombra-alta:rgba(15,23,42,.30);
+  --rolagem:#c3c9d3; --rolagem-hover:#a3abb8; --pessoa-padrao:#c7cede; --marca-fundo:#0d1526;
+  --foto-veu:rgba(9,13,24,.92); --foto-etiqueta:rgba(9,13,24,.78); --foto-tinta:#fff; --foto-legenda:#e6e9f2;
+  --foto-borda:rgba(255,255,255,.3); --foto-borda-hover:#a3d900;
+  --papel:#fff; --papel-mudo:#5b6475; --papel-link:#3d5c00;
+}
+:root{
   --font-display:"Raleway","Poppins",system-ui,sans-serif;
   --font-sans:"Poppins",system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-mono:"IBM Plex Mono","Cascadia Mono",Consolas,monospace;
@@ -114,13 +200,13 @@ a{color:inherit}
 /* Barra de rolagem fina e escura. A padrão do Windows (cinza claro, com setas) destoava do navy
    no menu lateral. scrollbar-color vale no Edge/Chrome atuais e no Firefox; o ::-webkit-scrollbar
    fica de reserva para navegador mais antigo. A do menu só acende quando o mouse está sobre ele. */
-html{scrollbar-width:thin;scrollbar-color:var(--superficie-3) transparent}
+html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .menu{scrollbar-width:thin;scrollbar-color:transparent transparent}
-.menu:hover,.menu:focus-within{scrollbar-color:var(--superficie-3) transparent}
+.menu:hover,.menu:focus-within{scrollbar-color:var(--rolagem) transparent}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--superficie-3);border-radius:8px}
-::-webkit-scrollbar-thumb:hover{background:#34426b}
+::-webkit-scrollbar-thumb{background:var(--rolagem);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--rolagem-hover)}
 ::-webkit-scrollbar-button{display:none}
 
 /* Início: botão direto no topo do menu, com a mesma altura de uma torre */
@@ -172,17 +258,22 @@ html{scrollbar-width:thin;scrollbar-color:var(--superficie-3) transparent}
 /* Celular: o menu sobe para cima do conteúdo */
 /* Tela média (notebook pequeno, janela lado a lado): menu mais estreito, nomes longos quebram. */
 @media (min-width:821px) and (max-width:1180px){.menu{max-width:196px}}
+/* Com o botão do tema (08/10/2026) o topo de 821 a 845 px passava da borda e a página rolava de lado (o Sair saía da
+   tela; conferido no navegador). O seletor de cadeira é quem cede: encolhe só o que faltar. */
+@media (min-width:821px) and (max-width:1180px){.cadeira,.cadeira select{min-width:0}}
 
 @media (max-width:820px){
   /* Linha 1: marca + Menu. Linha 2: seletor de cadeira + Sair (só o ícone).
      O select tem de poder encolher: a opção mais longa da lista forçava 365 px e a página
      ganhava rolagem lateral no celular de 375 px. */
-  .topo{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;padding:10px 16px;gap:10px}
+  /* Linha 2 desde 08/10/2026: cadeira + Tema (só o ícone) + Sair. */
+  .topo{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto auto;padding:10px 16px;gap:10px}
   .cadeira{margin-left:0;min-width:0;grid-column:1;grid-row:2}
-  .sair{grid-column:2;grid-row:2;justify-self:end}
+  .troca-tema-form{grid-column:2;grid-row:2}
+  .sair{grid-column:3;grid-row:2;justify-self:end}
   .cadeira .gc-rotulo{display:none}
   .cadeira select{width:100%;min-width:0;max-width:none}
-  .botao-menu{display:inline-flex;margin-left:auto}
+  .botao-menu{display:inline-flex;margin-left:auto;grid-column:2 / 4;grid-row:1;justify-self:end}
   /* No celular o menu já fica atrás do botão Menu; o trilho recolhido não se aplica. */
   .recolhe-menu{display:none}
   .menu-recolhido .menu{width:auto}
@@ -201,4 +292,23 @@ html{scrollbar-width:thin;scrollbar-color:var(--superficie-3) transparent}
 
 .entrar-alt{margin:14px 0 0;font-size:12.5px;line-height:1.5}
 .entrar-alt a{color:var(--verde-texto)}
-.usuario-topo{font-size:13px;color:var(--sobre-barra-mudo,#c7cede);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.usuario-topo{font-size:13px;color:var(--sobre-barra-mudo);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Troca de tema (08/10/2026) ──────────────────────────────────────────────────────────────────────────────────
+   O botão no topo diz o tema de agora ("Tema: Escuro"); o clique troca na hora, grava o cookie nexus_tema (o servidor já
+   desenha o <html data-tema> certo na próxima página, sem piscar o tema errado) e o localStorage nexus.tema (reserva).
+   Sem JavaScript, o mesmo botão é um formulário (POST /tema). Em tela média o rótulo sai e fica o ícone, como no Sair. */
+.troca-tema-form{display:flex;margin:0}
+/* o meio círculo cheio do ícone, na cor do texto do botão (o mesmo desenho nos dois temas) */
+.tema-icone{display:block;flex:none;width:16px;height:16px;border:1.6px solid currentColor;border-radius:50%;
+  background:linear-gradient(90deg,transparent 50%,currentColor 50%)}
+@media (max-width:1180px){.troca-tema{padding-left:10px;padding-right:10px}.rotulo-tema{display:none}}
+/* Um esmaecer curto entre os temas, só onde o navegador sabe (View Transitions) e nunca com o movimento reduzido do
+   sistema (o script nem pede): aí a troca é seca, e o *{transition:none} de cima continua valendo. */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
+
+/* No claro: o logo (branco) vai na faixa navy do alto do cartão de entrada, como no topo das telas; o texto de exemplo dos
+   campos usa o mudo (o cinza padrão do navegador, #757575, fica abaixo de 4,5:1 no #f5f6f8). */
+:root[data-tema="claro"] .entrar-logo{box-sizing:content-box;width:100%;margin:-28px -28px 22px;padding:22px 28px;
+  background:var(--marca-fundo);border-radius:13px 13px 0 0;object-fit:contain;object-position:left center}
+:root[data-tema="claro"] ::placeholder{color:var(--mudo);opacity:1}

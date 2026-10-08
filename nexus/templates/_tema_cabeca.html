@@ -1,0 +1,20 @@
+{# O tema no <head>, antes de pintar (08/10/2026). Só JavaScript: entra dentro de um <script> (base.html e entrar.html).
+   O servidor já desenha o <html data-tema> pelo cookie nexus_tema; sem o cookie (a limpeza do navegador apaga cookie e
+   deixa o localStorage), vale a reserva nexus.tema, aplicada aqui antes da primeira pintura, e o cookie volta. #}
+    (function () {
+      window.NexusTema = {
+        gravar: function (t) {
+          try { localStorage.setItem("nexus.tema", t); } catch (e) {}
+          document.cookie = "nexus_tema=" + t + "; Path=/; Max-Age=31536000; SameSite=Lax"
+            + (location.protocol === "https:" ? "; Secure" : "");
+        }
+      };
+      try {
+        var cookie = document.cookie.match(/(?:^|;\s*)nexus_tema=(claro|escuro)(?:;|$)/);
+        var tema = cookie ? cookie[1] : localStorage.getItem("nexus.tema");
+        if (tema === "claro" || tema === "escuro") {
+          document.documentElement.setAttribute("data-tema", tema);
+          if (!cookie) window.NexusTema.gravar(tema);
+        }
+      } catch (e) {}
+    })();

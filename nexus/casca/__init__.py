@@ -1,4 +1,4 @@
-"""A casca: Início, troca de cadeira, saúde e o que todo template recebe (menu, cadeira)."""
+"""A casca: Início, troca de cadeira e de tema, saúde e o que todo template recebe (menu, cadeira, tema)."""
 import os
 import subprocess
 from functools import lru_cache
@@ -11,6 +11,18 @@ from ..cadeiras import CADEIRAS
 from ..torres import montar_menu, telas_com_conteudo
 
 bp = Blueprint("casca", __name__)
+
+# Tema (08/10/2026, Levi: "precisamos de um tema claro também"): o escuro navy é o padrão; o claro é escolha da pessoa,
+# guardada no cookie (o servidor já desenha o <html data-tema> certo, sem piscar o tema errado ao carregar) e no
+# localStorage do navegador (reserva, aplicada pelo _tema_cabeca.html). Cookie desconhecido ou ausente = escuro.
+COOKIE_TEMA = "nexus_tema"
+TEMAS = ("escuro", "claro")
+UM_ANO_S = 365 * 24 * 3600
+
+
+def tema_do_pedido() -> str:
+    tema = request.cookies.get(COOKIE_TEMA, "")
+    return tema if tema in TEMAS else "escuro"
 
 
 @lru_cache(maxsize=1)
@@ -42,6 +54,20 @@ def cadeira():
     return redirect(next_seguro(request.form.get("voltar")))
 
 
+@bp.route("/tema", methods=["POST"])
+def tema():
+    """A troca de tema sem JavaScript (o botão do topo é um formulário). Com JavaScript a troca é na hora, no navegador,
+    que grava o mesmo cookie; aqui ele é gravado pelo servidor e a pessoa volta para a mesma tela."""
+    escolhido = request.form.get("tema", "")
+    if escolhido not in TEMAS:
+        abort(400)
+    resp = redirect(next_seguro(request.form.get("voltar")))
+    # sem HttpOnly de propósito: o botão troca o tema no navegador e grava este mesmo cookie
+    resp.set_cookie(COOKIE_TEMA, escolhido, max_age=UM_ANO_S, path="/", samesite="Lax",
+                    secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    return resp
+
+
 @bp.route("/saude")
 def saude():
     # Público de propósito (monitoramento do servidor). Não diz nada além de "está de pé" e o commit.
@@ -63,4 +89,7 @@ def instalar_contexto(app) -> None:
             "cadeira": CADEIRAS.get(cadeira_id) if cadeira_id else None,
             "cadeiras": list(CADEIRAS.values()),
             "caminho": request.path,
+            # a volta do formulário do tema (sem JavaScript) para a mesma tela, com os filtros
+            "caminho_completo": request.full_path.rstrip("?"),
+            "tema": tema_do_pedido(),
         }

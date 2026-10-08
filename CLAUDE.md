@@ -37,7 +37,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 
 | Área | `.md` |
 |---|---|
-| Casca, login, menu, servidor local | `nexus/casca/CLAUDE.md` |
+| Casca, login, menu, tema (escuro e claro), servidor local | `nexus/casca/CLAUDE.md` |
 | Torres (como criar tela) | `nexus/torres/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |
@@ -74,8 +74,8 @@ Sem o `.env` completo o app não sobe, e diz qual variável falta.
 - `nexus/auth/` — o portão de login. Toda rota exige sessão, exceto as de `ROTAS_PUBLICAS`.
   Rota pública nova entra ali, conscientemente; o teste `test_toda_rota_nao_publica_exige_login` pega o esquecimento.
 - `nexus/cadeiras.py` — catálogo de cadeiras. Cadeira nova no fim; id publicado nunca muda.
-- `nexus/casca/` — Início, troca de cadeira, `/saude`, contexto dos templates (menu).
-- `nexus/static/nexus.css` — tokens do Design System Grid Co., tema escuro.
+- `nexus/casca/` — Início, troca de cadeira e de tema, `/saude`, contexto dos templates (menu, tema).
+- `nexus/static/nexus.css` — tokens do Design System Grid Co. nos dois temas (escuro, o padrão, e claro).
 
 ## Regras
 
@@ -83,7 +83,9 @@ Sem o `.env` completo o app não sobe, e diz qual variável falta.
   A API é compartilhada por vários sistemas: nada que identifique pessoa vai para ela em claro
   (cifrado ou como HMAC).
 - **Sempre pt-BR**, inclusive comentários. **Sem emoji na interface**; severidade por cor e palavra.
-- Tema escuro **navy** (`#090d18` / `#161d30`) + verde Grid. Nunca lilás (o `#191528` do mockup não entra).
+- Tema escuro **navy** (`#090d18` / `#161d30`) + verde Grid, o padrão, que não muda. Nunca lilás (o `#191528` do mockup não
+  entra). O claro (08/10/2026) é escolha da pessoa, pelo botão do topo. **Cor só por token**, nos dois temas do
+  `nexus.css`: nada de `#hex` ou `rgba()` em regra de CSS nem em template (`nexus/casca/CLAUDE.md`, seção Tema).
 - Comentário de código explica **por quê**, de preferência com o caso real que motivou a regra.
 - **Nome de colega não entra em arquivo versionado** (o repositório é público; nome de técnico ou supervisor ao lado de
   nota, ronda ou pendência é dado pessoal ligado a desempenho): cite pelo papel ("um técnico", "o supervisor da equipe

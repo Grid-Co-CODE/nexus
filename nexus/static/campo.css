@@ -1,7 +1,8 @@
 /* Telas do Nexus da torre Campo · App (Central de atenção, 04/10/2026). Os tokens vêm do nexus.css; aqui só o desenho
    aprovado pelo Levi na proposta https://claude.ai/artifact/SBPyaREFJpHAEKimd7xnHv. Classes cn-* para não colidir. */
-.campo-nativa{--ok:#4ade80;--ok-suave:rgba(74,222,128,.14);--alerta-suave:rgba(255,216,61,.14);
-  --info:#7fb8ff;--info-suave:rgba(91,157,255,.14);min-width:0}
+/* O semáforo (--ok, --info e os -suave) mora no nexus.css desde 08/10/2026, com os mesmos valores no escuro e o par do
+   tema claro; aqui só se usa. */
+.campo-nativa{min-width:0}
 .campo-nativa .mudo{color:var(--mudo)}
 .cn-cab{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px}
 .cn-cab > div{min-width:0}
@@ -92,8 +93,8 @@
   border-radius:var(--raio-md);padding:14px 16px}
 .cn-grupo:hover{background:var(--superficie-2)}
 .cn-grupo[aria-current="page"]{border-color:var(--verde);box-shadow:inset 0 0 0 1px var(--verde)}
-.cn-g-ok{border-left-color:var(--ok)}
-.cn-g-alerta{border-left-color:var(--alerta)}
+.cn-g-ok{border-left-color:var(--ok-cheio)}
+.cn-g-alerta{border-left-color:var(--alerta-cheio)}
 .cn-grupo .q{font:600 27px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;grid-row:span 2}
 .cn-grupo .t{font:600 14px/20px var(--font-sans)}
 .cn-grupo .d{font-size:12px;color:var(--mudo);line-height:1.5}
@@ -103,9 +104,9 @@
 
 /* Permissões de trabalho: um cartão por PT esperando, com quem tem de assinar e há quanto tempo */
 .cn-pts{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:10px}
-.cn-pt{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--alerta);border-radius:var(--raio-md);
+.cn-pt{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--alerta-cheio);border-radius:var(--raio-md);
   padding:14px 16px;display:grid;gap:8px;min-width:0}
-.cn-pt.atrasada{border-left-color:var(--critico)}
+.cn-pt.atrasada{border-left-color:var(--critico-cheio)}
 .cn-pt .topo-pt{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .cn-pt .topo-pt b{font:600 15px/1.3 var(--font-sans)}
 .cn-pt .onde{color:var(--tinta-2);font-size:13px}
@@ -117,9 +118,9 @@
 /* Triagem de qualidade: o que exige decisão, o mais grave primeiro (rota gestao/prioridades do App) */
 .cn-duas{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;margin-top:10px;align-items:start}
 .cn-itens{display:grid;gap:10px}
-.cn-item{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--critico);border-radius:var(--raio-md);
+.cn-item{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--critico-cheio);border-radius:var(--raio-md);
   padding:12px 16px;display:grid;gap:6px;min-width:0}
-.cn-item.atencao{border-left-color:var(--alerta)}
+.cn-item.atencao{border-left-color:var(--alerta-cheio)}
 .cn-item .topo-it{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .cn-item .topo-it b{font:600 14px/1.3 var(--font-sans)}
 .cn-item .topo-it .q{margin-left:auto;font:600 13px/1 var(--font-mono)}
@@ -186,9 +187,9 @@
 .cn-equipe{display:grid;gap:12px;align-content:start;color:inherit;text-decoration:none;background:var(--superficie);
   border:1px solid var(--linha);border-left:4px solid var(--linha-forte);border-radius:var(--raio-md);padding:18px 20px;min-width:0}
 .cn-equipe:hover{background:var(--superficie-2);border-color:var(--verde)}
-.cn-equipe--ok{border-left-color:var(--ok)}
-.cn-equipe--alerta{border-left-color:var(--alerta)}
-.cn-equipe--critico{border-left-color:var(--critico)}
+.cn-equipe--ok{border-left-color:var(--ok-cheio)}
+.cn-equipe--alerta{border-left-color:var(--alerta-cheio)}
+.cn-equipe--critico{border-left-color:var(--critico-cheio)}
 .cn-eq-cab{display:grid;gap:2px}
 .cn-eq-titulo > b{font:700 18px/1.25 var(--font-display)}
 .cn-eq-cab span{font-size:12px;color:var(--mudo)}
@@ -198,8 +199,8 @@
 .cn-eq-num .v{font:600 34px/38px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .cn-eq-num .d{font-size:12px;color:var(--mudo)}
 .cn-barra{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--superficie-3)}
-.cn-barra .ok{background:var(--ok)}
-.cn-barra .pend{background:var(--critico)}
+.cn-barra .ok{background:var(--ok-cheio)}
+.cn-barra .pend{background:var(--critico-cheio)}
 .cn-eq-leg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;color:var(--mudo);font-variant-numeric:tabular-nums}
 .cn-eq-leg > span{display:grid;gap:1px}
 .cn-eq-leg > span:nth-child(2){text-align:center}
@@ -245,11 +246,11 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 @media (max-width:700px){.cn-pt-corpo{grid-template-columns:minmax(0,1fr)}}
 .cn-ass{margin:0;display:grid;gap:6px}
 .cn-ass figcaption{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
-.cn-ass-quadro{min-height:120px;display:grid;place-items:center;background:#fff;border-radius:var(--raio-md);padding:8px;
+.cn-ass-quadro{min-height:120px;display:grid;place-items:center;background:var(--papel);border-radius:var(--raio-md);padding:8px;
   border:1px solid var(--linha);text-align:center;font-size:12.5px}
 .cn-ass-quadro img{max-width:100%;max-height:150px;display:block}
-.cn-ass-quadro .mudo{color:#5b6475}
-.cn-ass-quadro .cn-link{color:#3d5c00}
+.cn-ass-quadro .mudo{color:var(--papel-mudo)}
+.cn-ass-quadro .cn-link{color:var(--papel-link)}
 .cn-ass-quem{font-size:12px;color:var(--tinta-2)}
 .cn-pt-pdf{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:16px 0 0;font-size:12.5px}
 
@@ -302,9 +303,9 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-nota-barra{display:inline-flex;align-items:center;gap:8px}
 .cn-barrinha{display:inline-block;width:56px;height:5px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
 .cn-barrinha span{display:block;height:100%}
-.cn-b-ok{background:var(--ok)}
-.cn-b-alerta{background:var(--alerta)}
-.cn-b-critico{background:var(--critico)}
+.cn-b-ok{background:var(--ok-cheio)}
+.cn-b-alerta{background:var(--alerta-cheio)}
+.cn-b-critico{background:var(--critico-cheio)}
 .cn-rodape{margin-top:10px;font-size:12px}
 .cn-pend{max-width:260px;font-size:12px}
 .cn-seg a b{margin-left:4px;font-variant-numeric:tabular-nums}
@@ -319,12 +320,12 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-nivel--5{color:var(--critico);background:var(--critico-suave)}
 .cn-seta{margin-left:6px;font-size:11.5px;font-weight:600}
 .cn-dist{display:flex;height:18px;margin-top:8px;border-radius:5px;overflow:hidden;font:700 10.5px/18px var(--font-sans);text-align:center}
-.cn-dist span{min-width:18px;color:#0b1220}
-.cn-nivel-fundo--1,.cn-nivel-fundo--2{background:var(--ok)}
+.cn-dist span{min-width:18px;color:var(--sobre-cheio)}
+.cn-nivel-fundo--1,.cn-nivel-fundo--2{background:var(--ok-cheio)}
 .cn-nivel-fundo--2{opacity:.75}
-.cn-nivel-fundo--3{background:var(--info)}
-.cn-nivel-fundo--4{background:var(--alerta)}
-.cn-nivel-fundo--5{background:var(--critico)}
+.cn-nivel-fundo--3{background:var(--info-cheio)}
+.cn-nivel-fundo--4{background:var(--alerta-cheio)}
+.cn-nivel-fundo--5{background:var(--critico-cheio)}
 
 /* indicador que filtra a tabela (Levi, 05/10): cartão inteiro clicável, o ativo com a borda verde */
 .cn-kpi--link{color:inherit;text-decoration:none;cursor:pointer}
@@ -334,22 +335,22 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-painel .cn-filtro-ativo{display:inline-block;margin-top:14px}
 
 /* Aprovação de OS (05/10/2026): os três grupos na barra do cartão e a idade da fila */
-.cn-barra--grupos .alerta{background:var(--alerta)}
+.cn-barra--grupos .alerta{background:var(--alerta-cheio)}
 .cn-barra--grupos .neutro{background:var(--linha-forte)}
 .cn-selo--neutro{color:var(--tinta-2);background:var(--superficie-3)}
 .cn-idades{display:grid;gap:8px;margin-top:14px;padding:14px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
 .cn-idades-barra{display:flex;gap:3px;min-height:46px}
 .cn-idade{display:grid;align-content:center;justify-items:center;min-width:70px;padding:6px 8px;border-radius:7px;text-decoration:none;
-  color:#0b1220;font-size:11px;line-height:1.25;text-align:center}
+  color:var(--sobre-cheio);font-size:11px;line-height:1.25;text-align:center}
 .cn-idade b{font:700 15px/1.1 var(--font-sans)}
 /* no celular as 5 faixas (mínimo de 70 px cada) não cabiam em 343 px e a página rolava de lado (conferido a 375 px em
    08/10/2026): quebram em duas linhas, cada uma com um terço da largura */
 @media (max-width:640px){.cn-idades-barra{flex-wrap:wrap}.cn-idade{flex:1 1 28% !important;min-width:0}}
-.cn-idade--0{background:var(--ok)}
-.cn-idade--1{background:#a8e05f}
-.cn-idade--2{background:var(--alerta)}
-.cn-idade--3{background:#ff8f3c}
-.cn-idade--4{background:var(--critico)}
+.cn-idade--0{background:var(--ok-cheio)}
+.cn-idade--1{background:var(--lima-cheio)}
+.cn-idade--2{background:var(--alerta-cheio)}
+.cn-idade--3{background:var(--severo-cheio)}
+.cn-idade--4{background:var(--critico-cheio)}
 .cn-idade:hover,.cn-idade.ativa{outline:2px solid var(--tinta);outline-offset:1px}
 
 /* o porquê do grupo e o Aprovar, na linha aberta da fila */
@@ -360,6 +361,8 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-aprovar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px}
 .cn-aprovar-msg{font-size:12.5px;max-width:52ch}
 tr.cn-aprovada td{opacity:.45}
+/* no claro a aprovada não esmaece (a opacidade derruba o texto abaixo de 4,5:1 no branco): cinza das seções e texto mudo */
+:root[data-tema="claro"] tr.cn-aprovada td{opacity:1;background:var(--superficie-2);color:var(--mudo)}
 .cn-tarefas-os{margin:0;padding:0;list-style:none;display:grid;gap:14px}
 .cn-tarefa-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:6px;font-size:13px}
 
@@ -371,7 +374,7 @@ tr.cn-aprovada td{opacity:.45}
 .cn-evolucao .cn-ponto.ativo circle{stroke:var(--tinta);stroke-width:2}
 .cn-evolucao .cn-guia{stroke:var(--mudo);stroke-width:1;stroke-dasharray:3 3}
 .cn-dica{position:absolute;z-index:5;display:grid;gap:3px;min-width:200px;max-width:280px;padding:10px 12px;
-  border:1px solid var(--linha);border-radius:10px;background:var(--superficie-3);box-shadow:0 8px 24px rgba(0,0,0,.35);
+  border:1px solid var(--linha);border-radius:10px;background:var(--superficie-3);box-shadow:0 8px 24px var(--sombra);
   font-size:12.5px;color:var(--tinta-2);pointer-events:none}
 .cn-dica[hidden]{display:none}
 .cn-dica-os{color:var(--verde-texto);font:700 13px var(--font-mono)}
@@ -380,21 +383,21 @@ tr.cn-aprovada td{opacity:.45}
 .cn-dica-niveis{display:flex;align-items:center;gap:5px;margin-top:3px}
 .cn-dica-niveis b{color:var(--tinta);margin-right:6px}
 .cn-dica-niveis i{display:inline-block;width:10px;height:3px;border-radius:2px}
-.cn-dica-niveis i.suj{background:#7fb8ff}
-.cn-dica-niveis i.veg{background:#a3d900}
+.cn-dica-niveis i.suj{background:var(--serie-sujidade)}
+.cn-dica-niveis i.veg{background:var(--serie-vegetacao)}
 .cn-evolucao .grade{stroke:var(--linha);stroke-width:1}
-.cn-evolucao .grade.limite{stroke:var(--alerta);stroke-dasharray:4 4}
+.cn-evolucao .grade.limite{stroke:var(--alerta-cheio);stroke-dasharray:4 4}
 .cn-evolucao .eixo{fill:var(--mudo);font:11px var(--font-mono)}
 .cn-evolucao .eixo.data{font-size:5.5px}
 .cn-evolucao polyline{fill:none;stroke-width:2}
-.cn-evolucao polyline.suj,.cn-evolucao circle.suj{stroke:#7fb8ff}
-.cn-evolucao circle.suj{fill:#7fb8ff}
-.cn-evolucao polyline.veg,.cn-evolucao circle.veg{stroke:#a3d900}
-.cn-evolucao circle.veg{fill:#a3d900}
+.cn-evolucao polyline.suj,.cn-evolucao circle.suj{stroke:var(--serie-sujidade)}
+.cn-evolucao circle.suj{fill:var(--serie-sujidade)}
+.cn-evolucao polyline.veg,.cn-evolucao circle.veg{stroke:var(--serie-vegetacao)}
+.cn-evolucao circle.veg{fill:var(--serie-vegetacao)}
 .cn-leg{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tinta-2)}
 .cn-leg i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-left:6px}
-.cn-leg i.suj{background:#7fb8ff}
-.cn-leg i.veg{background:#a3d900}
+.cn-leg i.suj{background:var(--serie-sujidade)}
+.cn-leg i.veg{background:var(--serie-vegetacao)}
 
 /* fotos da ronda no histórico da usina: miniaturas por grupo e a caixa que amplia (sem animação) */
 .cn-bt-fotos{font:600 12px var(--font-sans);color:var(--verde-texto);background:transparent;border:1px solid var(--linha);
@@ -403,25 +406,25 @@ tr.cn-aprovada td{opacity:.45}
 tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px 16px}
 .cn-fotos{display:grid;gap:14px}
 .cn-fotos-grupo h3{margin:0 0 8px;font:700 13px var(--font-sans);color:var(--tinta)}
-.cn-fotos-grupo--sujidade h3{color:#7fb8ff}
-.cn-fotos-grupo--vegetacao h3{color:#a3d900}
+.cn-fotos-grupo--sujidade h3{color:var(--serie-sujidade)}
+.cn-fotos-grupo--vegetacao h3{color:var(--serie-vegetacao)}
 .cn-fotos-grade{display:flex;flex-wrap:wrap;gap:8px}
 .cn-foto{position:relative;display:block;width:96px;height:96px;border-radius:8px;overflow:hidden;border:1px solid var(--linha);
   background:var(--superficie-3)}
 .cn-foto img{width:100%;height:100%;object-fit:cover;display:block}
 .cn-foto:hover,.cn-foto:focus{border-color:var(--verde-texto);outline:none}
 .cn-foto-resp{position:absolute;left:4px;bottom:4px;padding:1px 6px;border-radius:5px;font:700 11px var(--font-sans);
-  color:#fff;background:rgba(9,13,24,.78)}
+  color:var(--foto-tinta);background:var(--foto-etiqueta)}
 .cn-fotos-msg{margin:0}
 .cn-caixa-foto{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;gap:12px;
-  background:rgba(9,13,24,.92);padding:24px}
+  background:var(--foto-veu);padding:24px}
 .cn-caixa-foto[hidden]{display:none}
 .cn-caixa-foto figure{margin:0;display:grid;gap:8px;justify-items:center;max-width:min(1100px,88vw)}
 .cn-caixa-foto img{max-width:100%;max-height:80vh;border-radius:8px;object-fit:contain}
-.cn-caixa-foto figcaption{color:#e6e9f2;font:13px var(--font-sans);text-align:center}
-.cn-caixa-foto button{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;
+.cn-caixa-foto figcaption{color:var(--foto-legenda);font:13px var(--font-sans);text-align:center}
+.cn-caixa-foto button{background:transparent;border:1px solid var(--foto-borda);color:var(--foto-tinta);border-radius:8px;
   font:600 22px/1 var(--font-sans);width:44px;height:44px;cursor:pointer}
-.cn-caixa-foto button:hover{border-color:#a3d900}
+.cn-caixa-foto button:hover{border-color:var(--foto-borda-hover)}
 .cn-caixa-fechar{position:absolute;top:16px;right:16px}
 .cn-fotos-demais{border-top:1px solid var(--linha);padding-top:10px}
 .cn-fotos-demais summary{cursor:pointer;font:700 13px var(--font-sans);color:var(--tinta);list-style-position:inside}
@@ -453,6 +456,9 @@ tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px
 .cn-nivel-op .cn-nivel{opacity:.45;cursor:pointer}
 .cn-nivel-op input:checked+.cn-nivel{opacity:1;box-shadow:0 0 0 2px var(--tinta)}
 .cn-nivel-op input:focus-visible+.cn-nivel{outline:2px solid var(--verde);outline-offset:2px}
+/* no claro o nível não marcado fica cinza em vez de apagado (a opacidade de .45 deixava o número ilegível no branco) */
+:root[data-tema="claro"] .cn-nivel-op .cn-nivel{opacity:1;filter:grayscale(1)}
+:root[data-tema="claro"] .cn-nivel-op input:checked+.cn-nivel{filter:none}
 .cn-minhas{list-style:none;margin:10px 0;padding:0;display:grid;gap:10px}
 .cn-minhas li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding-bottom:10px;border-bottom:1px solid var(--linha);font-size:13px}
 .cn-minhas .det{grid-column:1;color:var(--mudo);font-size:12px}
@@ -473,7 +479,7 @@ td .cn-nivel-txt{font-size:15px}
 .cn-dur{cursor:help;border-bottom:1px dotted var(--linha-forte);padding-bottom:1px}
 .cn-dur:focus-visible{outline:2px solid var(--verde);outline-offset:2px;border-radius:3px}
 .cn-dica-flut{position:fixed;z-index:60;max-width:280px;padding:8px 12px;border:1px solid var(--linha);border-radius:8px;
-  background:var(--superficie-3);color:var(--tinta);font:500 12.5px/1.4 var(--font-sans);box-shadow:0 8px 24px rgba(0,0,0,.35);
+  background:var(--superficie-3);color:var(--tinta);font:500 12.5px/1.4 var(--font-sans);box-shadow:0 8px 24px var(--sombra);
   pointer-events:none}
 .cn-dica-flut[hidden]{display:none}
 /* o cabeçalho que ordena (Levi: "se a pessoa quiser ordenar ela clica na coluna que ordena e já era!") */
