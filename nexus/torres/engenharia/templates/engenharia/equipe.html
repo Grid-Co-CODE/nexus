@@ -5,13 +5,15 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
 {# Quadro da equipe de engenharia (06/10/2026): supercards por pessoa (carga, atrasadas, fechadas em 30 dias e a faixa dos
    próximos 14 dias) e o kanban das OS, montado no navegador a partir do JSON abaixo (filtros sem recarregar). A leitura
-   está em nexus/engenharia/os_equipe.py. #}
+   está em nexus/engenharia/os_equipe.py. O clique numa OS abre o card dela do OS Creator, o mesmo do Histórico (Levi,
+   08/10/2026: "precisamos fazer os setores se conversarem"): oscreator/card_os_abrir.html. #}
+{% include "oscreator/card_os_abrir.html" %}
 <div class="campo-nativa kb">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Quadro da equipe</p>
       <h1 class="cn-titulo">Quem está com o quê</h1>
       <p class="cn-pergunta">As OS de quem é da engenharia no Fracttal: as que vão abrir, as abertas, as em verificação e as
-        fechadas. Clique numa pessoa para ver só as dela.</p></div>
+        fechadas. Clique numa pessoa para ver só as dela, e numa OS para abrir o card dela no OS Creator.</p></div>
     <div class="cn-frescor">OS do Fracttal<br><b>lidas às {{ lido }}</b></div>
   </div>
   {% if erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> Mostrando a última leitura; nova tentativa em 1 minuto.</div>{% endif %}
@@ -58,13 +60,8 @@
   <div class="kb-quadro" aria-live="polite"></div>
   <p class="mudo kb-rodape">Coluna: A fazer = aberta e não começou (a data programada diz se atrasou, se vence em 2 dias ou se
     ainda vai abrir); Em execução = alguma tarefa começou; Em verificação = esperando a aprovação; Concluídas = aprovadas
-    (as dos últimos {{ janela }} dias, ou de todo o período). O quadro só mostra: mudar a OS é no Fracttal ou no OS Creator.</p>
-
-  <div class="eg-veu" hidden></div>
-  <aside class="eg-gaveta" role="dialog" aria-modal="true" aria-label="OS" hidden>
-    <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
-    <div class="eg-gav-corpo"></div>
-  </aside>
+    (as dos últimos {{ janela }} dias, ou de todo o período). O card da OS é o do Histórico do OS Creator: com o login do
+    Fracttal, dá para trocar o responsável, editar etiquetas e notas, concluir, cancelar e clonar ali mesmo.</p>
 </div>
 <script type="application/json" id="kb-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "piso": piso_concluidas}|tojson }}</script>
 <script>
@@ -102,11 +99,22 @@
       return (a.programada_iso || '9999').localeCompare(b.programada_iso || '9999');
     };
   }
+  // o card da OS do OS Creator (o mesmo do Histórico). O nº é o link da página da OS no OS Creator: Ctrl+clique ou o
+  // botão do meio a abrem numa aba nova, inteira. Quem mudou a OS pelo card volta com o quadro relido.
+  function abrirOs(o) {
+    if (o.wid && window.NexusOsCard) {
+      NexusOsCard.abrir(o.wid, {status: o.status, folio: o.os, aoFechar: function (mudou) {
+        if (mudou) location.replace(location.pathname + '?atualizar=1');
+      }});
+    } else if (o.url) window.open(o.url, '_blank', 'noopener');
+  }
   function cartao(o) {
     var c = el('article', 'kb-card kb-card--' + (o.prazo || o.coluna));
     c.tabIndex = 0; c.dataset.os = o.os;
     var cab = el('header', 'kb-card-cab');
-    var num = el('span', 'kb-os', 'OS ' + o.os); cab.appendChild(num);
+    var num = el(o.wid ? 'a' : 'span', 'kb-os', 'OS ' + o.os);
+    if (o.wid) { num.href = '/os/os/' + encodeURIComponent(o.wid) + '?status=' + encodeURIComponent(o.status || ''); num.tabIndex = -1; }
+    cab.appendChild(num);
     cab.appendChild(el('span', 'kb-prazo', prazoTexto(o)));
     c.appendChild(cab);
     c.appendChild(el('h4', 'kb-card-tit', o.titulo || '(sem título)'));
@@ -122,8 +130,11 @@
     pe.appendChild(el('span', 'kb-tipo', o.tipo));
     if (o.tarefas.length > 1) pe.appendChild(el('span', 'kb-n', o.tarefas.length + ' tarefas'));
     c.appendChild(pe);
-    c.addEventListener('click', function (ev) { if (!ev.target.closest('a')) gaveta(o); });
-    c.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') gaveta(o); });
+    c.addEventListener('click', function (ev) {
+      if (ev.target.closest('a') && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey)) return;   // aba nova: o navegador
+      ev.preventDefault(); abrirOs(o);
+    });
+    c.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); abrirOs(o); } });
     return c;
   }
   function colunasVisiveis() {
@@ -169,42 +180,6 @@
       quadro.appendChild(bloco(cols, lista));
     }
   }
-  // a gaveta: o detalhe da OS
-  var gav = document.querySelector('.eg-gaveta'), veu = document.querySelector('.eg-veu'), corpo = gav.querySelector('.eg-gav-corpo');
-  function linha(dl, rot, val) { if (!val) return; dl.appendChild(el('dt', null, rot)); dl.appendChild(el('dd', null, val)); }
-  function gaveta(o) {
-    corpo.replaceChildren();
-    var cab = el('div', 'eg-gav-cab');
-    var av = el('span', 'kb-av kb-av--grande', o.iniciais); av.style.setProperty('--cor', o.cor); cab.appendChild(av);
-    var tx = el('div'); tx.appendChild(el('h2', null, o.titulo || 'OS ' + o.os));
-    var sub = el('p'); sub.textContent = 'OS ' + o.os + ' · ' + ROT[o.coluna] + ' · ' + prazoTexto(o); tx.appendChild(sub);
-    cab.appendChild(tx); corpo.appendChild(cab);
-    if (o.etiquetas.length) {
-      var et = el('div', 'kb-etq kb-etq--gav');
-      o.etiquetas.forEach(function (x) { var s = el('span', 'kb-etiqueta', x.nome); s.style.setProperty('--etq', x.cor); et.appendChild(s); });
-      corpo.appendChild(et);
-    }
-    var dl = el('dl', 'cn-dados eg-gav-dados');
-    linha(dl, 'Responsável', o.pessoa); linha(dl, 'Tipo', o.tipo); linha(dl, 'Prioridade', o.prioridade);
-    linha(dl, 'Ativo', [o.ativo, o.codigo].filter(Boolean).join(' · ')); linha(dl, 'Usina', o.usina);
-    linha(dl, 'Criada', o.criada); linha(dl, 'Programada', o.programada); linha(dl, 'Fechada', o.fim);
-    linha(dl, 'Solicitante', o.solicitante);
-    corpo.appendChild(dl);
-    if (o.nota) { corpo.appendChild(el('h3', null, 'Descrição')); corpo.appendChild(el('p', 'kb-nota', o.nota)); }
-    corpo.appendChild(el('h3', null, 'Tarefas (' + o.tarefas.length + ')'));
-    var ol = el('ol', 'eg-oss');
-    o.tarefas.forEach(function (t) {
-      var li = el('li'); var c = el('span', 'eg-os-cab'); c.appendChild(el('span', null, t.st === 'DONE' ? 'feita' : (t.st === 'NO_STARTED' ? 'não começou' : 'em andamento')));
-      li.appendChild(c); li.appendChild(el('b', null, t.t)); if (t.obs) li.appendChild(el('span', 'mudo', t.obs)); ol.appendChild(li);
-    });
-    corpo.appendChild(ol);
-    if (o.url) { var a = el('a', 'cn-link kb-abrir', 'Abrir a OS ' + o.os + ' no Fracttal'); a.href = o.url; a.target = '_blank'; a.rel = 'noopener'; corpo.appendChild(a); }
-    gav.hidden = false; veu.hidden = false; gav.querySelector('.eg-gav-fechar').focus();
-  }
-  function fecha() { gav.hidden = true; veu.hidden = true; }
-  gav.querySelector('.eg-gav-fechar').addEventListener('click', fecha);
-  veu.addEventListener('click', fecha);
-  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !gav.hidden) fecha(); });
   // os controles
   var limpar = document.querySelector('.kb-limpar');
   document.querySelectorAll('.kb-super').forEach(function (b) {
@@ -226,6 +201,8 @@
   });
   document.querySelector('.kb-todas-concl').addEventListener('change', function (ev) { estado.todas = ev.target.checked; desenha(); });
   document.querySelector('.kb-canceladas').addEventListener('change', function (ev) { estado.canceladas = ev.target.checked; desenha(); });
+  // voltou do card com o quadro relido: o ?atualizar=1 sai do endereço, para o F5 não reler de novo
+  if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* sem history */ } }
   desenha();
 })();
 </script>

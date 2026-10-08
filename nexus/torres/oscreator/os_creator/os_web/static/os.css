@@ -151,7 +151,9 @@ body.os-modal-aberto{overflow:hidden}
 .os-modal{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:30px 16px}
 .os-modal-fundo{position:absolute;inset:0;background:rgba(4,7,14,.68)}
 .os-modal-card{position:relative;z-index:1;width:min(1020px,96vw);max-height:90vh;overflow:auto;background:var(--f-bg);border:1px solid var(--f-border);border-radius:16px;box-shadow:0 26px 70px rgba(0,0,0,.55)}
-.os-modal-x{position:absolute;top:12px;right:14px;z-index:2;width:34px;height:34px;border-radius:17px;border:1px solid var(--f-border);background:var(--f-card);color:var(--muted2);font-size:20px;line-height:1;cursor:pointer;transition:color .15s,border-color .15s}
+/* z-index 4: acima do cabeçalho fixo do card (.det-top, 3), que guarda o lugar dele (padding-right:58px) e o cobria —
+   o X não aparecia nem respondia ao clique (visto em 08/10/2026, ao abrir o card no Quadro da equipe do Nexus) */
+.os-modal-x{position:absolute;top:12px;right:14px;z-index:4;width:34px;height:34px;border-radius:17px;border:1px solid var(--f-border);background:var(--f-card);color:var(--muted2);font-size:20px;line-height:1;cursor:pointer;transition:color .15s,border-color .15s}
 .os-modal-x:hover{color:var(--verde);border-color:var(--verde)}
 /* ── Detalhe da OS: cópia da janela do app (steps/os_detalhe.py). Paleta --f-* = a do app; borda de card #222c46 ── */
 .det{display:flex;flex-direction:column;min-height:100%;background:var(--f-bg);color:#fff;font-size:13.5px}

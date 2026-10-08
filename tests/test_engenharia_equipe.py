@@ -67,3 +67,59 @@ def test_tela_do_quadro(app, logado, monkeypatch):
     html = logado.get("/t/engenharia/equipe").get_data(as_text=True)
     assert "Quem está com o quê" in html and 'class="kb-super"' in html and "Não achei no Fracttal: Carla" in html
     assert 'id="kb-dados"' in html and '"os": "1"' in html.replace("'", '"')
+
+
+# ── o card da OS do OS Creator no quadro (Levi, 08/10/2026: "Ao clicar na OS quero que abra o mesmo card que aparece
+# quando clicamos em uma OS no histórico do OS Creator Web") ─────────────────────────────────────────────────────────
+def test_cada_os_leva_o_id_e_o_status_do_card():
+    """O REST já traz o id da OS (sem pedido novo ao Fracttal só para isso) e o status vai com o nome do OS Creator."""
+    import sys
+
+    from nexus.torres.oscreator import ponte
+    if ponte.RAIZ_CLONE not in sys.path:
+        sys.path.append(ponte.RAIZ_CLONE)
+    import api                                                     # o api.py do clone (WO_STATUS)
+    assert E.STATUS_OS == api.WO_STATUS
+    oss = {o["os"]: o for o in E.montar([_w("1", 1), _w("5", 2), _w("6", 3), _w("7", 4)], {"id": 1, "nome": "Ana"}, AGORA)}
+    assert (oss["1"]["wid"], oss["1"]["status"]) == (9001, "Em Processo")
+    assert [oss[k]["status"] for k in "567"] == ["Em Verificação", "Concluída", "Cancelada"]
+
+
+def test_o_quadro_abre_o_card_do_os_creator(logado, monkeypatch):
+    oss = E.montar([_w("1", 1, prog_dias=-2)], {"id": 1, "nome": "Ana"}, AGORA)
+    monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
+    monkeypatch.setattr(E, "dados", lambda: {"os": oss, "equipe": [{"id": 1, "nome": "Ana", "nome_fracttal": "Ana Teste"}],
+                                             "faltam": [], "lido": 1.0, "lendo": False, "erro": ""})
+    html = logado.get("/t/engenharia/equipe").get_data(as_text=True)
+    # o componente que abre o card (oscreator/card_os_abrir.html) e a moldura dele, /os/_nexus/card/<id>
+    assert "window.NexusOsCard" in html and "'/os/_nexus/card/' + encodeURIComponent(wid)" in html
+    assert "NexusOsCard.abrir(o.wid, {status: o.status, folio: o.os" in html
+    # o nº da OS é o link da página dela no OS Creator (o mesmo do Histórico: /os/os/<id>?status=...)
+    assert "num.href = '/os/os/' + encodeURIComponent(o.wid) + '?status=' + encodeURIComponent(o.status || '')" in html
+    dados = html.split('id="kb-dados">', 1)[1].split("</script>", 1)[0]
+    assert '"wid": 9001' in dados and '"status": "Em Processo"' in dados and '"os": "1"' in dados
+    assert "eg-gaveta" not in html                                 # a gaveta própria saiu: o card é o do OS Creator
+
+
+def test_quem_mudou_a_os_pelo_card_volta_com_o_quadro_relido(logado, monkeypatch):
+    pedidos = []
+    monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False: pedidos.append((esperar, forcar)))
+    monkeypatch.setattr(E, "dados", lambda: {"os": [], "equipe": [], "faltam": [], "lido": 1.0, "lendo": False, "erro": ""})
+    logado.get("/t/engenharia/equipe")
+    logado.get("/t/engenharia/equipe?atualizar=1")
+    assert pedidos == [(False, False), (True, True)]
+
+
+def test_a_releitura_forcada_tem_um_piso(monkeypatch):
+    """Forçada, relê mesmo com a cópia nova; mas não mais de uma a cada FORCAR_S (cota do Fracttal é da empresa)."""
+    import time
+    lidas = []
+    monkeypatch.setattr(E, "_reler", lambda app: lidas.append(1) or E._EST.update(lendo=False))
+    monkeypatch.setitem(E._EST, "ts", time.time())
+    monkeypatch.setitem(E._EST, "erro_em", 0.0)
+    E.pedir_releitura(app=object(), esperar=True)                   # cópia nova: não relê
+    E.pedir_releitura(app=object(), esperar=True, forcar=True)      # forçada, mas a cópia tem menos de FORCAR_S
+    assert lidas == []
+    monkeypatch.setitem(E._EST, "ts", time.time() - E.FORCAR_S - 1)
+    E.pedir_releitura(app=object(), esperar=True, forcar=True)
+    assert lidas == [1]

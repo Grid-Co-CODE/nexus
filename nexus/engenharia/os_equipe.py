@@ -26,8 +26,13 @@ from urllib.parse import quote
 
 BRT = timezone(timedelta(hours=-3))
 VALIDADE_S = 300
+FORCAR_S = 5               # a releitura pedida pelo card (ver `pedir_releitura`) não passa de uma a cada 5 s
 PESSOAS_S = 24 * 3600
 OS_URL = "https://one.fracttal.com/tasks/wo/{id}"
+# O nome do status como o OS Creator escreve (`api.WO_STATUS` do clone; o teste confere que são iguais). O card da OS do
+# OS Creator, aberto pelo quadro, recebe o status pelo endereço, como na linha do Histórico: é dele que sai o selo e a
+# regra do "Editar" das notas (Levi, 08/10/2026: "Ao clicar na OS quero que abra o mesmo card ... do histórico").
+STATUS_OS = {1: "Em Processo", 2: "Em Verificação", 3: "Concluída", 4: "Cancelada"}
 COLUNAS = (("fazer", "A fazer"), ("execucao", "Em execução"), ("verificacao", "Em verificação"),
            ("concluida", "Concluídas"), ("cancelada", "Canceladas"))
 _EST = {"ts": 0.0, "pessoas_ts": 0.0, "pessoas": [], "os": [], "lendo": False, "erro": "", "erro_em": 0.0, "faltam": []}
@@ -121,8 +126,14 @@ def montar(linhas: list[dict], pessoa: dict, agora: datetime) -> list[dict]:
                 if isinstance(e, dict) and e.get("enabled", True) and e.get("description") and \
                         e["description"] not in [x["nome"] for x in etiquetas]:
                     etiquetas.append({"nome": e["description"], "cor": "#" + str(e.get("color") or "8892a6").lstrip("#")})
+        try:
+            status = STATUS_OS.get(int(w0.get("id_status_work_order") or 0), "")
+        except (TypeError, ValueError):
+            status = ""
         out.append({
             "os": folio, "url": OS_URL.format(id=w0["id_work_order"]) if w0.get("id_work_order") else "",
+            # o id da OS abre o card do OS Creator (/os/os/<id>); o REST já traz, sem pedido a mais ao Fracttal
+            "wid": w0.get("id_work_order"), "status": status,
             "titulo": str(w0.get("description") or "").strip()[:140], "pessoa": pessoa["nome"], "pid": pessoa["id"],
             "coluna": col, "tipo": str(w0.get("tasks_log_task_type_main") or ""),
             "ativo": str(w0.get("items_log_description") or "").split("{")[0].strip()[:80], "codigo": str(w0.get("code") or ""),
@@ -168,9 +179,13 @@ def _reler(app):
         a["lendo"] = False
 
 
-def pedir_releitura(app=None, esperar=False):
-    """Relê se a cópia tem mais de 5 min. Sem nenhuma cópia ainda, `esperar` lê na hora (são ~8 pedidos)."""
-    if time.time() - _EST["ts"] < VALIDADE_S:
+def pedir_releitura(app=None, esperar=False, forcar=False):
+    """Relê se a cópia tem mais de 5 min. Sem nenhuma cópia ainda, `esperar` lê na hora (são ~8 pedidos).
+
+    `forcar`: relê mesmo com a cópia nova (se tiver mais de FORCAR_S). É o que o quadro pede depois que alguém mudou uma
+    OS pelo card do OS Creator aberto nele (concluir, trocar o responsável...): sem isso, a OS ficaria até 5 min na
+    coluna velha."""
+    if time.time() - _EST["ts"] < (FORCAR_S if forcar else VALIDADE_S):
         return
     with _TRAVA:
         if _EST["lendo"] or time.time() - _EST["erro_em"] < 60:

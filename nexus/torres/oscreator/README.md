@@ -72,7 +72,9 @@ nesta pasta.
   | Clonagem de OS | `/os/clonar` |
 
   O "Setores" virou um item por setor e entrou "Ativos Fracttal" (Levi, 04/10/2026). Cada setor abre o mesmo
-  endereço do card dele na tela inicial do OS Creator.
+  endereço do card dele na tela inicial do OS Creator. Com `?abrir=/os/...`, a moldura abre nesse endereço (só
+  `/os/...`; o resto cai no destino da tela) e a casca do OS Creator o põe numa aba: é por onde o card da OS aberto em
+  outra torre leva ao "Clonar esta OS" e ao "Abrir chamado" (seção "O card da OS em qualquer torre").
 - **Menu lateral → aba nova** (Levi, 04/10: "os botões laterais devem contribuir em adicionar novas abas também na
   tela acima"). Com a casca do OS Creator de pé, o clique no menu não recarrega a página: manda à casca
   `{nexusOs: 1, url, rotulo}` e ela abre a tela numa aba nova (ou reativa a que já existe). A porta é posta no
@@ -100,8 +102,8 @@ nesta pasta.
   segredo novo. O cookie continua `os_sessao`, só em `/os`.
 - **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
   `/os/*` mostra um aviso e o resto do Nexus segue.
-- **Testes:** `tests/test_torre_oscreator.py`, `tests/test_oscreator_solic_engenharia.py` e
-  `tests/test_oscreator_busca_digitavel.py`. Nenhum teste fala com o Fracttal.
+- **Testes:** `tests/test_torre_oscreator.py`, `tests/test_oscreator_solic_engenharia.py`,
+  `tests/test_oscreator_busca_digitavel.py` e `tests/test_oscreator_desempenho.py`. Nenhum teste fala com o Fracttal.
 - **O que não funciona igual:**
   - o login pelo OAuth do Fracttal tem a volta configurada para o supervisório; e-mail e senha funcionam normal;
   - gravar ticket precisa do `GRIDCO_SQL_TOKEN`, que vem da variável ou do `%APPDATA%` da máquina.
@@ -226,6 +228,97 @@ filtro do histórico".
   - O comportamento foi conferido num Chrome sem janela, com perfil próprio, sobre as telas do clone com dados de
     mentira e a rede bloqueada. Foram 88 conferências a 1280 px e 88 numa moldura de 375 px: sem rolagem lateral, as
     listas dentro da tela e nenhum erro de JavaScript. Falta o olho do Levi nas telas de verdade.
+
+## Desempenho: Acompanhamento de chamados e o card da OS (08/10/2026)
+
+O pedido do Levi, de 08/10: "O carregamento de: Acompanhamento de chamados e a tela que abre quando clica na OS está
+demorando um pouco para carregar, verificar se dá para melhorar!". A cota do Fracttal é da empresa (200/min, dividida
+com o App de Campo): nada aqui faz pedido a mais, e o que fica guardado é **por pessoa**.
+
+- **O detalhe da OS em duas levas paralelas** (`api.get_os_detalhes`: o card do Histórico, a tela de um chamado e a
+  conferência antes de gravar o ticket). Eram até 5 pedidos em fila. Tarefas, subtarefas e cabeçalho vão juntos;
+  solicitação, OS pai e motivo do cancelamento vão juntos depois. Os mesmos pedidos, a mesma resposta.
+- **Leitura enxuta, por contexto:** `with api.enxuta("vinculos")` pula a 2ª leva (a tela de um chamado não mostra
+  solicitação nem OS pai); `with api.enxuta("url")` traz as listas de anexos sem a URL pré-assinada. É por contexto, e
+  não por argumento, porque as rotas chamam essas funções com um argumento só e os testes do oem as trocam por
+  `lambda wid: ...`: um argumento novo quebrava 11 deles (conferido).
+- **A contagem dos anexos do card não paga a URL de cada foto:** era um `s3_object_get` por arquivo só para mostrar o
+  número. A conta casa pelo caminho do arquivo, que vem sem a URL: o número é o mesmo. A lista (o clique) continua
+  com as URLs. As duas listas (subtarefas e OS) vão ao mesmo tempo, nas duas rotas.
+- **Acompanhamento de chamados** (`rotas_acomp.py`), tudo em `rotas._MEMO`, por pessoa:
+  - `("acomp_linhas", pessoa)`: as OS de acompanhamento sem os tickets, 3 min. A tela de um chamado usa só isto.
+    Antes, com o quadro vencido, ela relia o ticket de TODAS as OS para abrir uma. O quadro reaproveita estas linhas;
+  - `("acomp_tk", pessoa)`: o ticket das OS **concluídas**, 30 min. Concluída não volta e o Fracttal recusa editar OS
+    fechada (`api.editar_nota_os`). Então o "Atualizar" relê a lista, as abertas e as em verificação, e não as
+    concluídas dos 90 dias. Gravar ticket ou finalizar tira a OS da memória (`_esquecer(wid)`);
+  - na tela de um chamado, a lista, o detalhe e as observações (banco da Gridco) vão ao mesmo tempo. O id da OS vem
+    de uma leitura anterior da própria pessoa, mesmo vencida (o id de um nº não muda), e o detalhe é conferido pelo nº;
+  - os cartões dos "outros chamados" são montados uma vez por leitura (eram ~0,2 s de CPU a cada chamado aberto);
+  - **leitura feita com a sessão do Fracttal morta não fica na memória** (`_sessao_viva`, `_conferir_sessao`). A
+    listagem engole o erro de cada página e devolve vazio, e o quadro vazio ficaria 3 min guardado. Até 08/10 a busca
+    da etiqueta acusava a sessão morta; com a lista reaproveitada, o quadro pode nem passar por ela. Pelo mesmo motivo
+    o id da etiqueta CHAMADOS não é guardado (`api._label_id`).
+- `api.list_minhas_os` só busca quem é o logado quando o filtro é dele. "TODOS" (o Acompanhamento, a Visão COS) não
+  usa, e a primeira busca da pessoa no processo lia o pessoal inteiro do Fracttal para nada.
+
+**Medido** com um Fracttal falso a 300 ms por pedido: 150 OS com a etiqueta CHAMADOS, 80 de acompanhamento e 65
+tickets a ler; servidor de pé, memória vazia, mediana de 3. O de antes é o `HEAD` c12e0a9. As telas saíram **iguais
+byte a byte** nas duas versões, nos 9 passos:
+
+| Passo | Antes | Depois |
+|---|---|---|
+| Quadro, 1ª visita | 4,24 s / 71 pedidos | 3,65 s / 70 |
+| Quadro, "Atualizar" | 3,96 s / 70 | 2,44 s / 45 |
+| Quadro, depois de 3 min | 4,00 s / 70 | 2,53 s / 45 |
+| Tela de um chamado (quadro na memória) | 1,52 s / 5 | 0,32 s / 3 |
+| Tela de um chamado (quadro vencido) | 5,52 s / 75 | 0,95 s / 8 |
+| Card da OS (Histórico) | 1,51 s / 5 | 0,65 s / 5 |
+| Contagem dos anexos do card | 2,44 s / 20 | 0,61 s / 7 |
+| Lista dos anexos (o clique) | 2,44 s / 20 | 1,21 s / 20 |
+
+O que sobra na 1ª visita do quadro são os tickets, 8 de cada vez (2,7 s dos 3,65 s): é um pedido por OS, porque a
+subtarefa do ticket só vem por OS. Ler 16 de cada vez cortaria ~1,2 s com os mesmos pedidos, mas numa rajada maior na
+cota da empresa. Não foi feito: é decisão do Levi.
+
+**Como provar:** `tests/test_oscreator_desempenho.py` (7 testes, que falham todos no código de antes) e a suíte do oem
+(`tests/test_os_web_*.py` e `test_anexo_documento.py`, 681 testes) passando com os arquivos novos, numa cópia fora do
+oem.
+
+## O card da OS em qualquer torre do Nexus (08/10/2026)
+
+O pedido do Levi, de 08/10: "NEXUS > ENGENHARIA > QUADRO DE EQUIPE — Ao clicar na OS quero que abra o mesmo card que
+aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem parte do mesmo ambiente compartilhado
+(Nexus) precisamos fazer os setores se conversarem."
+
+- **É o mesmo card, sem cópia:** o fragmento `/os/os/<id>?parcial=1` do clone, as ações do `os_acoes.js` (trocar o
+  responsável, etiquetas, notas, fazer a tarefa, concluir, cancelar, fluxo, anexos), o `os.css` e o `os_acoes.css`,
+  dentro da mesma `.os-modal` do Histórico.
+- **Numa moldura própria:** `/os/_nexus/card/<id>?status=...&de=...` (`ponte.card_os`, template
+  `oscreator/card_os.html`). Ela cobre a janela, transparente, por cima da tela que a abriu. Assim o CSS do OS Creator
+  não vaza para o Nexus, os diálogos do card cobrem a tela inteira, e o cookie do Fracttal (`os_sessao`, só em `/os`)
+  vai junto, porque a moldura mora em `/os/_nexus`. Aberta sozinha, ela vira a página da OS no OS Creator.
+- **Para usar em outra tela:** `{% include "oscreator/card_os_abrir.html" %}` e
+  `NexusOsCard.abrir(id_work_order, {status, folio, aoFechar(mudou)})`. O status vai como na linha do Histórico (o selo
+  e a regra do "Editar" das notas saem dele). `mudou` diz se o card mudou a OS no Fracttal: a tela relê. Fecha pelo X,
+  pelo escuro em volta, pelo Fechar do card ou pelo Esc (com um diálogo aberto, o Esc é do diálogo).
+- **Sem o login do Fracttal** (entrou pela senha de admin), a moldura não busca a OS: diz "Para abrir a OS, entre pelo
+  Fracttal", com o botão para `/entrar?next=<a tela>`. Se a sessão do Fracttal vencer no meio, a ponte manda o pedido
+  do card para o login, e a moldura diz que venceu.
+- **Links do card** para outras telas do OS Creator ("Clonar esta OS", "Abrir chamado") passam por `/os/_nexus/ir`,
+  que abre a torre OS Creator do Nexus com a tela numa aba (`tela_do_endereco`). Com Ctrl, numa aba nova.
+- **O X do card** ficava escondido atrás do cabeçalho fixo dele, também no Histórico (`.os-modal-x` com z-index 2, o
+  `.det-top` com 3, e o clique caía no cabeçalho). Passou a 4, no `os.css`.
+- **Como provar:** `tests/test_torre_oscreator.py` (a moldura, o aviso sem login, o `ir`) e
+  `tests/test_engenharia_equipe.py` (o quadro carrega o componente; o nº aponta para `/os/os/<id>?status=`). Também foi
+  conferido num Chrome sem janela, sobre um Nexus de ensaio com o Fracttal falso:
+  - o card do quadro abre com os anexos contados;
+  - o diálogo de trocar o responsável tem a busca;
+  - o Esc fecha o diálogo e depois o card;
+  - concluir (de mentira) relê o quadro;
+  - "Clonar esta OS" abre `/t/os/clonagem` com a aba;
+  - sem login, aparece o aviso.
+
+  Tudo a 1280 e a 375 px, sem rolagem lateral e sem erro de JavaScript. Falta o olho do Levi com OS de verdade.
 
 ## Rodar sozinho (sem o Nexus e sem mexer no 5090)
 

@@ -165,6 +165,58 @@ def test_troca_vale_com_crlf():
         assert ponte._trocar(crlf, de, para) == (b"antes\n" + para + b"depois\n").replace(b"\n", b"\r\n")
 
 
+# ── o card da OS em outra torre (Levi, 08/10/2026: "precisamos fazer os setores se conversarem") ────────────────────
+def _login_do_fracttal(app, cliente):
+    """O cookie do OS Creator como o login do Nexus pelo Fracttal o deixa (JWT de mentira; nada vai ao Fracttal)."""
+    from nexus.torres.oscreator import ponte
+    clone = ponte.clone(app)
+    jwt = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.sig"
+    valor = clone.session_interface.get_signing_serializer(clone).dumps(
+        {"jwt": jwt, "conta": {"nome": "Pessoa Teste", "email": "teste@exemplo.invalid"}})
+    cliente.set_cookie("os_sessao", valor, path="/os")
+
+
+def test_o_card_da_os_e_o_do_historico_numa_moldura(app, logado):
+    """A moldura carrega o MESMO card do Histórico: o fragmento /os/os/<id>?parcial=1 (com o status, como a linha do
+    Histórico manda), as ações do os_acoes.js e o CSS do OS Creator, dentro da mesma .os-modal."""
+    _login_do_fracttal(app, logado)
+    r = logado.get("/os/_nexus/card/9001?status=Em%20Processo&de=/t/engenharia/equipe")
+    assert r.status_code == 200
+    h = r.get_data(as_text=True)
+    assert 'data-fragmento="/os/os/9001?parcial=1&amp;status=Em+Processo"' in h and "carregar();" in h
+    for peca in ('<script src="/os/static/os_acoes.js">', 'href="/os/static/os.css"', 'href="/os/static/os_acoes.css"',
+                 '<script src="/os/static/os_busca.js"', '<script src="/os/static/carga.js">', 'class="os-modal"',
+                 'class="os-modal-card os-form"', 'class="os-modal-x" data-fechar'):
+        assert peca in h, peca
+    assert 'data-pagina="/os/os/9001?status=Em+Processo"' in h      # aberta sozinha, vira a página da OS
+    assert "window.__osTopo" not in h                               # é página do Nexus, não passa pelas trocas da ponte
+
+
+def test_sem_o_login_do_fracttal_o_card_diz_para_entrar(logado):
+    """Quem entrou pela senha de admin não tem o JWT do Fracttal: a moldura não busca a OS e diz como entrar."""
+    h = logado.get("/os/_nexus/card/9001?status=Em%20Processo&de=/t/engenharia/equipe").get_data(as_text=True)
+    assert "Para abrir a OS, entre pelo Fracttal" in h and "carregar();" not in h
+    assert 'href="/entrar?next=/t/engenharia/equipe" target="_top"' in h
+    # de fora do Nexus não vira destino
+    h = logado.get("/os/_nexus/card/9001?de=//exemplo.invalid/x").get_data(as_text=True)
+    assert 'href="/entrar?next=/"' in h
+
+
+def test_link_do_card_abre_a_torre_os_creator_com_a_tela_numa_aba(logado):
+    from nexus.torres.oscreator import ponte
+    assert ponte.tela_do_endereco("/os/clonar?folio=15101") == "clonagem"
+    assert ponte.tela_do_endereco("/os/chamados/inspecao?pai=15101") == "chamados"
+    assert ponte.tela_do_endereco("/os/os/9001") == "inicio"
+    r = logado.get("/os/_nexus/ir?url=/os/clonar?folio=15101")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/os/clonagem?abrir=%2Fos%2Fclonar%3Ffolio%3D15101")
+    h = logado.get("/t/os/clonagem?abrir=/os/clonar?folio=15101").get_data(as_text=True)
+    assert '<iframe class="os-moldura" src="/os/clonar?folio=15101"' in h
+    # só endereço do próprio OS Creator: o resto cai no Início, e a moldura não sai do /os
+    assert logado.get("/os/_nexus/ir?url=https://exemplo.invalid").headers["Location"].endswith("/t/os/inicio?abrir=%2Fos%2F")
+    h = logado.get("/t/os/inicio?abrir=//exemplo.invalid").get_data(as_text=True)
+    assert '<iframe class="os-moldura" src="/os/"' in h
+
+
 # ── sincronia com o oem: o Nexus é a referência (Levi, 06/10/2026) ──────────────────────────────────────────────────
 def _arvore(raiz, arquivos):
     for rel, texto in arquivos.items():

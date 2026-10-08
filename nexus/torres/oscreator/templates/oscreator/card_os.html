@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OS · Grid Co.</title>
+{# O card da OS do OS Creator por cima de uma tela do Nexus (Levi, 08/10/2026: "Ao clicar na OS quero que abra o mesmo
+   card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os setores se
+   conversarem"). É o MESMO card, sem cópia: o fragmento do clone (/os/os/<id>?parcial=1), as ações do os_acoes.js e o
+   os.css + os_acoes.css, dentro da mesma moldura do Histórico (.os-modal). Esta página é só a moldura, numa janela
+   própria (o iframe que o oscreator/card_os_abrir.html põe na tela): o CSS do OS Creator não vaza para o Nexus, e o
+   cookie do Fracttal (os_sessao, só em /os) vai junto porque ela mora em /os/_nexus. Rota: ponte.card_os. #}
+<link rel="icon" href="/os/assets/grid-icon.png">
+<link rel="stylesheet" href="/os/static/os.css">
+<link rel="stylesheet" href="/os/static/os_acoes.css">
+<script src="/os/static/os_busca.js" defer></script>
+<script src="/os/static/carga.js"></script>
+{# se o carga.js não chegar, a busca segue sem o círculo (o mesmo socorro do base.html do clone) #}
+<script>window.OsCarga = window.OsCarga || {buscar: function (u, o) { return fetch(u, o); }, durante: function (p) { return p; },
+  girar: function () {}, mostrar: function () {}, esconder: function () {}, token: function () { return ""; }};</script>
+<style>
+  /* só a moldura: o escuro em volta é o .os-modal-fundo do próprio OS Creator, e a tela do Nexus aparece por baixo */
+  html, body.os-form { background: transparent; }
+  .nx-card-aviso { display: flex; flex-direction: column; gap: 12px; padding: 26px 24px 22px; padding-right: 64px; }
+  .nx-card-aviso .acoes-bts { justify-content: flex-start; flex-wrap: wrap; }
+</style>
+</head>
+<body class="os-form os-modal-aberto">
+<div class="os-modal" id="os_card" data-fragmento="{{ fragmento }}" data-pagina="{{ pagina }}">
+  <div class="os-modal-fundo" data-fechar></div>
+  <div class="os-modal-card os-form" role="dialog" aria-modal="true" aria-label="Detalhe da OS">
+    <button type="button" class="os-modal-x" data-fechar aria-label="Fechar">&times;</button>
+    <div class="os-modal-corpo" id="os_card_corpo">
+      {% if estado == "ok" %}
+      <p class="os-ajuda" style="padding:24px">Carregando a OS…</p>
+      {% elif estado == "fora" %}
+      <div class="nx-card-aviso"><div class="acoes-t">O OS Creator não abriu nesta máquina</div>
+        <div class="acoes-s">O card da OS é o do OS Creator, e ele não subiu agora. O resto do Nexus segue normal.</div>
+        <div class="acoes-bts"><button type="button" class="det-b ghost" data-fechar>Fechar</button></div></div>
+      {% else %}
+      <div class="nx-card-aviso"><div class="acoes-t">Para abrir a OS, entre pelo Fracttal</div>
+        <div class="acoes-s">O card da OS é o do OS Creator e lê e grava no Fracttal com o seu usuário. Esta sessão do
+          Nexus não tem o login do Fracttal (entrou pela senha de administrador): entre com o seu e-mail e senha do
+          Fracttal e volte a esta tela.</div>
+        <div class="acoes-bts"><a class="det-b verde" href="{{ entrar }}" target="_top">Entrar com o Fracttal</a>
+          <button type="button" class="det-b ghost" data-fechar>Fechar</button></div></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{# o login do Fracttal que venceu no meio do caminho: a ponte manda o pedido do card para o login, e a moldura diz isto #}
+<template id="nx_card_vencido">
+  <div class="nx-card-aviso"><div class="acoes-t">A sua sessão do Fracttal venceu</div>
+    <div class="acoes-s">Entre de novo com o seu e-mail e senha do Fracttal para abrir a OS.</div>
+    <div class="acoes-bts"><a class="det-b verde" href="{{ entrar }}" target="_top">Entrar com o Fracttal</a>
+      <button type="button" class="det-b ghost" data-fechar>Fechar</button></div></div>
+</template>
+<script src="/os/static/os_acoes.js"></script>
+<script>
+(function () {
+  'use strict';
+  var modal = document.getElementById('os_card'), corpo = document.getElementById('os_card_corpo');
+  var pagina = modal.getAttribute('data-pagina'), mudou = false;
+  // aberta sozinha (link copiado, aba nova): é a página da OS no OS Creator
+  if (window.parent === window) { location.replace(pagina); return; }
+  function avisar(tipo, extra) {
+    var m = {nexusCard: 1, tipo: tipo};
+    Object.keys(extra || {}).forEach(function (k) { m[k] = extra[k]; });
+    try { window.parent.postMessage(m, location.origin); } catch (e) { /* a tela de baixo foi embora */ }
+  }
+  function fechar() { avisar('fechar', {mudou: mudou}); }
+  function vencido() {
+    corpo.innerHTML = '';
+    corpo.appendChild(document.getElementById('nx_card_vencido').content.cloneNode(true));
+  }
+  // o abrir() do Histórico (historico.html): o fragmento do card no corpo da moldura e a contagem dos anexos depois
+  function carregar() {
+    OsCarga.buscar(modal.getAttribute('data-fragmento'), {headers: {'X-Requested-With': 'fetch'}, credentials: 'same-origin'}, 'Abrindo a OS…')
+      .then(function (r) {
+        // a sessão do Fracttal caiu: o clone (ou a ponte) manda o pedido para /os/login, e o fetch segue até lá
+        if (r.status === 401 || (r.redirected && new URL(r.url).pathname === '/os/login')) { vencido(); return null; }
+        return r.text();
+      })
+      .then(function (h) {
+        if (h === null) return;
+        corpo.innerHTML = h; corpo.scrollTop = 0;
+        var det = corpo.querySelector('.det');
+        if (det && window.OsAcoes) window.OsAcoes.contagem(det);
+      })
+      .catch(function () {
+        corpo.innerHTML = '<p class="os-erro" style="padding:24px">Não consegui carregar a OS aqui. <a class="os-link" href="'
+          + pagina + '" target="_blank" rel="noopener">Abrir no OS Creator</a></p>';
+      });
+  }
+  {% if estado == "ok" %}carregar();{% endif %}
+  // fechar: o X, o escuro em volta, o Fechar do card e o Esc (com um diálogo do card aberto, o Esc é dele: o os_acoes.js
+  // segura o Esc na captura) — como no Histórico
+  modal.addEventListener('click', function (e) { if (e.target.hasAttribute('data-fechar')) fechar(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fechar(); });
+  // concluiu, cancelou, trocou o responsável...: a tela de baixo relê ao fechar
+  document.addEventListener('os:alterada', function () { mudou = true; });
+  // os links do card para outras telas do OS Creator (Clonar esta OS, Abrir chamado) abrem a torre OS Creator do Nexus,
+  // com a tela numa aba, e não dentro desta moldura. O nó do Fluxo o os_acoes.js já trata (troca o card no lugar).
+  window.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0) return;
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.target || a.hasAttribute('download')) return;
+    var href = a.getAttribute('href') || '';
+    if (href.indexOf('/os/') !== 0) return;
+    e.preventDefault();
+    var ir = '/os/_nexus/ir?url=' + encodeURIComponent(href);
+    if (e.ctrlKey || e.metaKey || e.shiftKey) window.open(ir, '_blank', 'noopener');
+    else avisar('ir', {url: ir});
+  });
+  var x = modal.querySelector('.os-modal-x');
+  if (x) x.focus();
+})();
+</script>
+</body>
+</html>

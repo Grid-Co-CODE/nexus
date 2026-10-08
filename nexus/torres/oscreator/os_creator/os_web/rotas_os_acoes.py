@@ -71,9 +71,13 @@ _LISTA_TTL = 180
 def _anexos_da_os(wid, forcar=False):
     """(subs, oss) — as duas chamadas do `_carregar` do card (get_os_subtarefa_anexos + get_os_anexos), guardadas 3 min
     POR PESSOA. A lista sempre vem nova (`forcar`); quem reaproveita é o "Baixar todos" logo depois de abrir os anexos:
-    cada arquivo de subtarefa custa um s3_object_get, e o limite do Fracttal é de 200/min para a EMPRESA inteira."""
-    return _rotas._memo(("anexos", _email(), int(wid)), _LISTA_TTL,
-                        lambda: (api.get_os_subtarefa_anexos(wid) or [], api.get_os_anexos(wid) or []), forcar=forcar)
+    cada arquivo de subtarefa custa um s3_object_get, e o limite do Fracttal é de 200/min para a EMPRESA inteira.
+    As duas listas vão ao mesmo tempo (08/10/2026): uma não depende da outra."""
+    def _ler():
+        with api._ExecutorComContexto(max_workers=2) as ex:
+            f_subs, f_oss = ex.submit(api.get_os_subtarefa_anexos, wid), ex.submit(api.get_os_anexos, wid)
+            return f_subs.result() or [], f_oss.result() or []
+    return _rotas._memo(("anexos", _email(), int(wid)), _LISTA_TTL, _ler, forcar=forcar)
 
 
 @bp.route("/api/os/<int:wid>/anexos-lista")

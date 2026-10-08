@@ -1,0 +1,50 @@
+{# Abre o card da OS do OS Creator por cima de qualquer tela do Nexus (Levi, 08/10/2026: "precisamos fazer os setores se
+   conversarem"). A tela inclui este bloco e chama:
+
+     NexusOsCard.abrir(id_work_order, {status: "Em Processo", folio: "15000", aoFechar: function (mudou) { ... }})
+
+   O status vai como na linha do Histórico do OS Creator (o selo e a regra do "Editar" das notas saem dele). `mudou`
+   diz se o card mudou a OS no Fracttal (concluiu, cancelou, trocou o responsável...): a tela relê, como o Histórico
+   faz. O card mora numa moldura própria (/os/_nexus/card/<id>, ponte.py → oscreator/card_os.html) que cobre a janela,
+   transparente: o escuro, a caixa e os diálogos são os do OS Creator. #}
+<style>
+  .nexus-card-os { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; margin: 0; padding: 0;
+                   z-index: 2147483000; background: transparent; color-scheme: normal; }
+</style>
+<script>
+window.NexusOsCard = window.NexusOsCard || (function () {
+  'use strict';
+  var moldura = null, op = {}, rolagem = '', voltar = null;
+  function fechar(mudou) {
+    if (!moldura) return;
+    moldura.remove(); moldura = null;
+    document.documentElement.style.overflow = rolagem;
+    if (voltar && voltar.focus) { try { voltar.focus(); } catch (e) { /* o elemento saiu da tela */ } }
+    if (op.aoFechar) op.aoFechar(!!mudou);
+  }
+  function abrir(wid, opcoes) {
+    if (!wid) return false;
+    if (moldura) fechar(false);
+    op = opcoes || {}; voltar = document.activeElement;
+    var q = new URLSearchParams({status: op.status || '', de: location.pathname + location.search});
+    moldura = document.createElement('iframe');
+    moldura.className = 'nexus-card-os';
+    moldura.title = op.folio ? 'OS ' + op.folio : 'Detalhe da OS';
+    moldura.src = '/os/_nexus/card/' + encodeURIComponent(wid) + '?' + q.toString();
+    moldura.addEventListener('load', function () { try { moldura.contentWindow.focus(); } catch (e) { /* já fechou */ } });
+    document.body.appendChild(moldura);
+    rolagem = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'hidden';            // a tela de baixo não rola por trás do card
+    return true;
+  }
+  window.addEventListener('message', function (e) {
+    if (!moldura || e.origin !== location.origin || e.source !== moldura.contentWindow) return;
+    var d = e.data || {};
+    if (d.nexusCard !== 1) return;
+    if (d.tipo === 'fechar') fechar(d.mudou);
+    else if (d.tipo === 'ir' && typeof d.url === 'string' && d.url.indexOf('/os/_nexus/ir?') === 0) location.href = d.url;
+  });
+  document.addEventListener('keydown', function (e) { if (moldura && e.key === 'Escape') fechar(false); });
+  return {abrir: abrir, fechar: function () { fechar(false); }};
+})();
+</script>

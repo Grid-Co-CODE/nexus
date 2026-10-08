@@ -228,13 +228,13 @@
 .kb-card--cancelada{opacity:.55}
 .kb-card-cab{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .kb-os{font:700 12px var(--font-mono);color:var(--verde-texto)}
+a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº leva à página da OS no OS Creator */
 .kb-prazo{font:700 11px var(--font-sans);color:var(--tinta-2)}
 .kb-card--atrasada .kb-prazo{color:var(--critico)}
 .kb-card--vence .kb-prazo{color:var(--alerta)}
 .kb-card-tit{margin:0;font:600 13.5px/1.35 var(--font-sans);color:var(--tinta)}
 .kb-onde{margin:0;font-size:12px;color:var(--mudo);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kb-etq{display:flex;flex-wrap:wrap;gap:4px}
-.kb-etq--gav{margin-top:12px}
 .kb-etiqueta{display:inline-flex;align-items:center;gap:5px;font:600 10.5px/16px var(--font-sans);padding:1px 8px 1px 6px;
   border-radius:999px;color:var(--tinta-2);background:var(--superficie);border:1px solid var(--linha)}
 .kb-etiqueta::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--etq)}
@@ -243,6 +243,4 @@
 .kb-n{margin-left:auto;color:var(--mudo)}
 .kb-raia{display:grid;gap:10px}
 .kb-raia-tit{display:flex;align-items:center;gap:10px;margin:0;font:700 15px var(--font-sans);color:var(--tinta)}
-.kb-nota{margin:0;font-size:13.5px;line-height:1.5;color:var(--tinta);white-space:pre-wrap}
-.kb-abrir{display:inline-block;margin-top:18px;font-weight:600}
 .kb-rodape{font-size:12.5px;margin-top:14px}

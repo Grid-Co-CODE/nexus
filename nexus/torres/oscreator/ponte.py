@@ -191,12 +191,73 @@ def _de_volta_ao_login(app, resto: str, json: bool):
     return resp
 
 
+def _endereco_do_os(url) -> str:
+    """Só endereço do próprio OS Creator (/os/...): nada de mandar a moldura ou a janela para fora."""
+    url = str(url or "")
+    return url if url.startswith("/os/") and not url.startswith("//") and "\\" not in url else ""
+
+
+def tela_do_endereco(url: str) -> str:
+    """A tela da torre de um endereço do OS Creator: a de destino mais comprido que é começo dele (/os/clonar?folio=1 →
+    clonagem); o resto é o Início."""
+    caminho = url.split("?", 1)[0].split("#", 1)[0].rstrip("/")
+    achadas = [(len(d), t) for t, d in DESTINOS.items() if d != "/os/" and (caminho == d or caminho.startswith(d + "/"))]
+    return max(achadas)[1] if achadas else "inicio"
+
+
 def abrir(torre, tela_id: str):
-    """A view de uma tela da torre: a página do Nexus que leva ao OS Creator na seção da tela."""
+    """A view de uma tela da torre: a página do Nexus que leva ao OS Creator na seção da tela.
+
+    `?abrir=/os/...` abre a moldura nesse endereço, e a casca do OS Creator o põe numa aba (base.html do clone). É por
+    onde o card da OS, aberto em outra torre, leva ao "Clonar esta OS" e ao "Abrir chamado" sem sair do Nexus."""
     def view():
         # o mapa "item do menu → tela do OS Creator": com ele, o clique no menu abre uma aba na casca já aberta
         menu_os = {f"/t/{torre.id}/{t.id}": {"url": DESTINOS[t.id], "nome": t.nome} for t in torre.telas if t.id in DESTINOS}
         return render_template("oscreator/abrir.html", torre=torre, tela=torre.tela(tela_id),
-                               destino=DESTINOS[tela_id], menu_os=menu_os)
+                               destino=_endereco_do_os(request.args.get("abrir")) or DESTINOS[tela_id], menu_os=menu_os)
     view.__name__ = f"abrir_{tela_id}"
     return view
+
+
+# ── o card da OS em qualquer torre do Nexus (08/10/2026) ───────────────────────────────────────────────────────────
+# Levi: "NEXUS > ENGENHARIA > QUADRO DE EQUIPE — Ao clicar na OS quero que abra o mesmo card que aparece quando clicamos
+# em uma OS no histórico do OS Creator Web. Como fazem parte do mesmo ambiente compartilhado (Nexus) precisamos fazer os
+# setores se conversarem." O card é o do clone, inteiro e sem cópia: o fragmento /os/os/<id>?parcial=1, o os_acoes.js
+# (as ações), o os.css e o os_acoes.css. Ele vem numa moldura própria (`oscreator/card_os.html`), por cima da tela que
+# o abriu (`oscreator/card_os_abrir.html`, o NexusOsCard): a moldura separa o CSS do OS Creator do CSS do Nexus, e mora
+# em /os/_nexus porque o cookie do Fracttal (os_sessao) só vai para /os.
+def _tem_login_fracttal(alvo) -> bool:
+    """A sessão do OS Creator tem o JWT do Fracttal? Sem pedido ao Fracttal: se ele venceu, quem diz é o próprio card,
+    ao buscar a OS (a ponte manda para o login, e a moldura avisa)."""
+    s = alvo.session_interface.open_session(alvo, request) or {}
+    return bool(s.get("jwt"))
+
+
+@bp_raiz.route("/os/_nexus/card/<int:wid>")
+def card_os(wid: int):
+    from urllib.parse import quote, urlencode
+
+    from ...auth import next_seguro
+    status = " ".join(str(request.args.get("status") or "").split())[:40]
+    de = next_seguro(request.args.get("de"))
+    try:
+        estado = "ok" if _tem_login_fracttal(clone(current_app._get_current_object())) else "sem"
+    except Exception:            # noqa: BLE001 — clone que não sobe: a moldura diz, e a tela de baixo segue
+        logging.exception("OS Creator: o clone não subiu (card da OS)")
+        estado = "fora"
+    q = urlencode({"status": status}) if status else ""
+    return render_template("oscreator/card_os.html", wid=wid, estado=estado,
+                           fragmento=f"/os/os/{wid}?" + urlencode({"parcial": 1, "status": status}),
+                           pagina=f"/os/os/{wid}" + ("?" + q if q else ""),
+                           entrar="/entrar?next=" + quote(de, safe="/"))
+
+
+@bp_raiz.route("/os/_nexus/ir")
+def ir():
+    """Um link do card da OS para outra tela do OS Creator (Clonar esta OS, Abrir chamado): a torre OS Creator do Nexus,
+    com a tela numa aba da casca dele, e não o OS Creator solto, sem o menu do Nexus."""
+    from urllib.parse import urlencode
+
+    from flask import redirect
+    url = _endereco_do_os(request.args.get("url")) or "/os/"
+    return redirect(f"/t/os/{tela_do_endereco(url)}?" + urlencode({"abrir": url}))

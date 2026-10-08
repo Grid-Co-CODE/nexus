@@ -23,8 +23,15 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
 - **Supercards:** um por pessoa, com a cor dela; em aberto, a trilha por etapa, atrasadas, fechadas em 30 dias e a
   faixa dos próximos 14 dias (um degrau por dia, um ponto por OS programada; fim de semana vazado, hoje marcado). O
   clique filtra o quadro. Busca, Quadro/Por pessoa, concluídas de todo o período e canceladas sem recarregar.
-  Clique no cartão abre a gaveta (descrição, tarefas, link no Fracttal). O quadro só mostra: mudar a OS é no
-  Fracttal ou no OS Creator.
+- **Clique no cartão abre o card da OS do OS Creator, o mesmo do Histórico** (Levi, 08/10/2026: "Ao clicar na OS quero
+  que abra o mesmo card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os
+  setores se conversarem"). É o componente da torre OS Creator (`oscreator/card_os_abrir.html`, regra no README de lá),
+  com as ações dele: trocar o responsável, etiquetas, notas, concluir, cancelar, clonar. O id da OS (`wid`) e o status
+  com o nome do OS Creator (`STATUS_OS` = `api.WO_STATUS`) já vêm do REST, sem pedido a mais. O nº da OS é o link de
+  `/os/os/<id>?status=` (Ctrl+clique abre a página inteira numa aba nova). Sem o login do Fracttal (senha de admin), o
+  card diz para entrar pelo Fracttal. Quem mudou a OS pelo card volta com `?atualizar=1`: o quadro relê o Fracttal na
+  hora (`pedir_releitura(forcar=True)`, no máximo uma a cada 5 s). A gaveta própria (descrição, tarefas, link no
+  Fracttal) saiu.
 
 ## Confiabilidade (06/10/2026)
 

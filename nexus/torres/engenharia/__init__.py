@@ -203,8 +203,14 @@ def supercards(oss: list[dict], equipe: list[dict], hoje) -> list[dict]:
 
 @bp.route("/equipe")
 def equipe():
+    """O clique numa OS abre o card dela do OS Creator, o mesmo do Histórico (Levi, 08/10/2026: "Ao clicar na OS quero
+    que abra o mesmo card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os
+    setores se conversarem"). Quem muda a OS por ele volta com ?atualizar=1, e o quadro relê o Fracttal na hora."""
     from ...engenharia import os_equipe
-    os_equipe.pedir_releitura(esperar=not os_equipe.dados()["lido"])
+    if request.args.get("atualizar") == "1":
+        os_equipe.pedir_releitura(esperar=True, forcar=True)
+    else:
+        os_equipe.pedir_releitura(esperar=not os_equipe.dados()["lido"])
     d = os_equipe.dados()
     hoje = datetime.now(BRT).date()
     cards = supercards(d["os"], d["equipe"], hoje)
