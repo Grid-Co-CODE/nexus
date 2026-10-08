@@ -211,7 +211,12 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
     usinas, "2C-IPX100" de uma); nome do Fracttal ("Cliente - Usina - UF"); e, para base sem código, o casamento por
     nome de `casamento.py` (só dentro do cliente: E1 e Thopen têm usinas de mesmo nome e são usinas diferentes). A
     `dica` é a usina que outra fonte já conferida aponta (o de-para de trackers): sem casamento, ela liga; contra o
-    casamento, não liga ninguém. Nome ou código que serve a duas usinas não casa: ligação errada é pior que faltando."""
+    casamento, não liga ninguém. Nome ou código que serve a duas usinas não casa: ligação errada é pior que faltando.
+
+    Geração em linhas (08/10/2026): a aba do BD_Thopen que é a mesma usina de uma chave já casada de outro sistema traz
+    `igual_a` = (sistema, chave) e herda a ligação dela, decisões da tela inclusas (a fonte de referência vem antes em
+    `fontes`); o código achado em outra aba da mesma base (a "Info Geral" do BD_Performance) traz `codigo_de`, que fica
+    escrito no `casou_por` ("código (Info Geral)"), para a linhagem dizer de onde veio."""
     from . import casamento as K
     ignorar, ligar, desligar = _decisoes(regras)
     manual = {(d["sistema"], str(d["chave"])): d for d in ligar}
@@ -234,6 +239,7 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
     linhas = [[_id(u.id), "BD_Operações", u.valor("id_bd"), "id do BD"]
               for u in srv.registros("usinas") if u.valor("id_bd")]
     ligado_por_nome = {}                    # chave externa (ex.: nome no Fracttal) -> usina_id, para as dicas
+    ligado = {}                             # (sistema, chave) -> ([usina_id], como), para o `igual_a` de outra fonte
     for sistema, itens in fontes.items():
         vistos = set()
         for it in itens:
@@ -241,6 +247,8 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
             ids, como = [], None if m else ignorado(ignorar, sistema, it["chave"])
             cheio = str(it.get("codigo") or "").strip().upper()
             cod = sufixo_codigo(cheio)
+            ref = tuple(str(x) for x in it["igual_a"]) if it.get("igual_a") else None
+            ids_ref, como_ref = ligado.get(ref, ([], None)) if ref else ([], None)
             if m:                                   # quem corrigiu na tela vence qualquer regra automática
                 if int(m["usina_id"]) in existe:
                     ids, como = [int(m["usina_id"])], f"manual ({m.get('quem') or '?'}, {_quando_curto(m.get('quando'))})"
@@ -248,6 +256,10 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
                     como = "manual aponta usina que não existe mais"
             elif como:
                 pass
+            elif ids_ref:                           # a mesma usina de uma chave já casada: herda (1 ou 2 usinas)
+                ids, como = list(ids_ref), f"igual a {ref[0]}"
+            elif como_ref and como_ref.startswith("ignorado"):
+                como = como_ref                     # a chave de referência foi tirada da conta: a aba também
             elif "-" in cheio and len(por_cheio.get(cheio, ())) == 1:
                 ids, como = list(por_cheio[cheio]), "código"
             elif cod and len(por_cod.get(cod, ())) == 1:
@@ -273,6 +285,9 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
                 como = como if ids else "desligado à mão"
             if ids and it.get("origem") and not como.startswith(("código", "manual")):
                 como = f"{como} ({it['origem']})"       # o nome veio de outro campo (ex.: a localização no Fracttal)
+            if ids and como == "código" and it.get("codigo_de"):
+                como = f"código ({it['codigo_de']})"    # o código não é a chave: veio de outra aba da mesma base
+            ligado[(sistema, str(it["chave"]))] = (ids, como)
             if len(ids) == 1:
                 ligado_por_nome[it["chave"]] = ids[0]
             for uid in ids or [None]:

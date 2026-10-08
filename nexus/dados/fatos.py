@@ -14,8 +14,21 @@ qualidade, com exemplos do que faltou. Também vai a LINHAGEM: por onde a usina 
 - data: "Registrado em" vem em UTC; o dia é o de Brasília.
 Fora do fato, de propósito: nome de pessoa e a observação escrita no App (texto livre pode ter nome; a API do banco tem
 leitura aberta). Indicadores (sim/não) vão como 1/0, para somar e tirar média.
+
+08/10/2026 (auditoria Kimball, passos 2 a 6):
+- `equipamento_id` + `equipamento_ligado_por`, pelo código do ativo (`equipamento.ligar`): o código estava em 2.896 de
+  2.896 fechamentos e nenhum fato tinha o ID.
+- `tarefa_chave`: o texto da tarefa vira chave (o texto não entra), a MESMA conta da programação do PCM: programado ×
+  executado casa por (OS, código, tarefa_chave) em 715 de 716 pares.
+- Medida com a unidade no nome: `nota` → `nota_pts`, `fotos` → `fotos_qtd`, `pecas` → `pecas_qtd`, `xp` → `xp_pts`.
+  `vezes_reprogramada` → `vezes_programada_qtd`: o App grava ali o "vezes" da linha do PCM (function_app.py da v241,
+  o `vezes` do contexto da tarefa), que é o "Nº vezes programada" e CONTA A 1ª VEZ (as 1.381 linhas do PCM com
+  Reprogramada = Não têm todas 1); somado como "reprogramada" contaria a primeira programação como reprogramação.
+  0 leitores do `nexus_fatos` fora de `nexus/dados` (auditoria, grep): renomear agora não quebra ninguém.
 """
 import hashlib
+import json
+import unicodedata
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
@@ -24,15 +37,34 @@ from ..campo.ligacao_cadastro import _norm as norm_fracttal
 from .calendario import data_id as _data_id
 
 SISTEMA_FRACTTAL = "Fracttal · Classificação 1"
+# Foto acumulada, NÃO transação (revisão de 08/10/2026): a linha muda depois de entrar. Medido no livro do App em 08/10:
+# a "Revisão" anda de vazia (337 das 340 de até 1 dia) para aprovada, devolvida, cancelada ou "nota 72->100" (280, todas
+# com mais de 8 dias), e entre duas cargas seguidas 1 fechamento mudou a devolvida e a revisão com a mesma chave.
+# Declarado "transação" (nunca muda), o passo 0 só acrescentaria pela chave e congelaria a 1ª versão de cada linha.
+TIPO_FECHAMENTO = "snapshot_acumulado"
 _BRT = timezone(timedelta(hours=-3))
-CAB_FECHAMENTO = ["fechamento_id", "data_id", "usina_id", "equipe_id", "pessoa_id", "os", "id_os_fracttal",
-                  "codigo_ativo", "tipo_os", "criticidade", "nota", "pontual", "devolvida", "revisao", "fotos",
-                  "fotos_com_descricao", "observacao_suficiente", "gps_inicio_fim", "assinou", "obrigatorias_ok",
-                  "todas_ok", "pecas", "xp", "previsto_min", "execucao_min", "reprogramada", "vezes_reprogramada",
-                  "registrado_em", "hora_celular", "usina_ligada_por"]
+CAB_FECHAMENTO = ["fechamento_id", "data_id", "usina_id", "equipe_id", "pessoa_id", "equipamento_id",
+                  "equipamento_ligado_por", "os", "id_os_fracttal", "codigo_ativo", "tarefa_chave", "tipo_os",
+                  "criticidade", "nota_pts", "pontual", "devolvida", "revisao", "fotos_qtd", "fotos_com_descricao_qtd",
+                  "observacao_suficiente", "gps_inicio_fim", "assinou", "obrigatorias_ok", "todas_ok", "pecas_qtd",
+                  "xp_pts", "previsto_min", "execucao_min", "reprogramada", "vezes_programada_qtd", "registrado_em",
+                  "hora_celular", "usina_ligada_por"]
+# Para o catálogo (`catalogo.Medida`): (coluna, unidade, soma). A nota é por tarefa (média, nunca soma); o nº de vezes
+# programada é atributo da tarefa no PCM (somar não diz nada).
+MEDIDAS_FECHAMENTO = (("nota_pts", "pts", "nao"), ("fotos_qtd", "qtd", "aditiva"),
+                      ("fotos_com_descricao_qtd", "qtd", "aditiva"), ("pecas_qtd", "qtd", "aditiva"),
+                      ("xp_pts", "pts", "aditiva"), ("previsto_min", "min", "aditiva"),
+                      ("execucao_min", "min", "aditiva"), ("vezes_programada_qtd", "qtd", "nao"),
+                      *((c, "1/0", "aditiva") for c in ("pontual", "devolvida", "observacao_suficiente",
+                                                         "gps_inicio_fim", "assinou", "obrigatorias_ok", "todas_ok",
+                                                         "reprogramada")))
+# A qualidade é UMA aba para todos os fatos do livro. 08/10/2026: + equipamento, + "acha exatamente 1 versão no
+# histórico" (a junção da época: era 25,4% dos fechamentos por pessoa) e `extra` (JSON curto com o que só aquele fato
+# tem). Colunas novas no FIM: quem lê pela posição não muda. Percentual com 1 casa (o inteiro escondia 99,7 -> 100).
 CAB_QUALIDADE = ["fato", "livro_origem", "linhas", "com_data", "com_usina", "com_equipe", "com_pessoa", "pct_data",
                  "pct_usina", "pct_equipe", "pct_pessoa", "usina_por_de_para", "usina_por_codigo",
-                 "sem_usina_exemplos", "sem_equipe_exemplos", "origem_atualizada_em", "gerado_em"]
+                 "sem_usina_exemplos", "sem_equipe_exemplos", "origem_atualizada_em", "gerado_em",
+                 "com_equipamento", "pct_equipamento", "pct_usina_versao", "pct_pessoa_versao", "extra"]
 
 
 def _txt(v) -> str:
@@ -69,6 +101,30 @@ def data_do_registro(iso) -> int | None:
 
 def _norm_equipe(s) -> str:
     return " ".join(_txt(s).lower().split())
+
+
+def tarefa_chave(texto) -> str | None:
+    """O texto da tarefa vira chave (sha1 de 12 caracteres): sem acento, sem caixa, espaço único. O texto não vai ao
+    fato (pode citar gente; a API do banco tem leitura aberta). É a MESMA conta no fechamento do App e na programação do
+    PCM (`programacao.py` importa daqui): programado × executado casou a tarefa em 715 de 716 pares (OS, código) em
+    08/10/2026."""
+    n = " ".join(unicodedata.normalize("NFKD", _txt(texto)).encode("ascii", "ignore").decode().lower().split())
+    return hashlib.sha1(n.encode("utf-8")).hexdigest()[:12] if n else None
+
+
+def ligar_equipamento(equip, codigo) -> tuple[int | None, str | None]:
+    """(equipamento_id, por onde ligou). `equip` = código -> (ID, como) (o `equipamento.ligar` com o índice da carga),
+    código -> ID, ou um dicionário. Sem ele (ou sem código), (None, None): nunca o código no lugar do ID."""
+    cod = _txt(codigo)
+    if not equip or not cod:
+        return None, None
+    v = equip(cod) if callable(equip) else equip.get(cod)
+    if isinstance(v, tuple):
+        eid, como = (tuple(v) + (None, None))[:2]
+    else:
+        eid, como = v, None
+    eid = _id(eid)
+    return (eid, (como or "código do ativo")) if eid else (None, None)
 
 
 class Ligador:
@@ -110,16 +166,20 @@ class Ligador:
         return self.pessoas.get(primeiro) if primeiro else None
 
 
-def fato_fechamento(origem: list[dict], lig: Ligador) -> list[list]:
+def fato_fechamento(origem: list[dict], lig: Ligador, equip=None) -> list[list]:
+    """As linhas do fato (CAB_FECHAMENTO). `equip`: código do ativo -> (equipamento_id, como) (ver `ligar_equipamento`);
+    sem ele, `equipamento_id` vazio."""
     out = []
     for a in origem:
         reg = _txt(a.get("Registrado em"))
         uid, como = lig.usina(a.get("Usina"), a.get("Código do ativo"))
+        eid, eq_como = ligar_equipamento(equip, a.get("Código do ativo"))
         chave = f"{_txt(a.get('ID da OS no Fracttal'))}|{_txt(a.get('Tarefa'))}|{reg}"
         out.append([
             hashlib.sha1(chave.encode("utf-8")).hexdigest()[:16], data_do_registro(reg), uid,
-            lig.equipe(a.get("Região")), lig.pessoa(a.get("Técnico (HMAC)")), _txt(a.get("OS")) or None,
-            _txt(a.get("ID da OS no Fracttal")) or None, _txt(a.get("Código do ativo")) or None,
+            lig.equipe(a.get("Região")), lig.pessoa(a.get("Técnico (HMAC)")), eid, eq_como,
+            _txt(a.get("OS")) or None, _txt(a.get("ID da OS no Fracttal")) or None,
+            _txt(a.get("Código do ativo")) or None, tarefa_chave(a.get("Tarefa")),
             _txt(a.get("Tipo da OS")) or None, _txt(a.get("Criticidade")) or None, _int(a.get("Nota do painel")),
             _sim(a.get("Pontual")), _sim(a.get("Devolvida")), _txt(a.get("Revisão")) or None, _int(a.get("Fotos")),
             _int(a.get("Fotos com descrição")), _sim(a.get("Observação suficiente")),
@@ -130,22 +190,49 @@ def fato_fechamento(origem: list[dict], lig: Ligador) -> list[list]:
     return out
 
 
-def _pct(n, total) -> int:
-    return int(round(100.0 * n / total)) if total else 0
+def _pct(n, total) -> float:
+    """Percentual com 1 casa (auditoria DR-9, 08/10/2026: o inteiro mostrava 99,7% como 100%)."""
+    return round(100.0 * n / total, 1) if total else 0.0
 
 
-def qualidade(fato: str, livro: str, linhas: list[list], cab: list, origem: list[dict], origem_em, agora: str) -> list:
-    """Uma linha da aba `qualidade`: quanto do fato ligou a cada dimensão, e exemplos do que não ligou."""
+def pct_versao(linhas, cab, col_id, col_data, hist):
+    """% das linhas com ID e data que acham EXATAMENTE 1 versão no histórico no dia do fato (a junção da época:
+    `valido_de_id <= data_id < valido_ate_id`). `hist` = as linhas do `<entidade>_historico` (listas da carga ou dicts
+    do banco); sem histórico, None (não é 0%). Uma regra só: `historico.cobertura`."""
+    if hist is None:
+        return None
+    from . import historico
+    n, um = historico.cobertura(linhas, cab, col_id, col_data, hist)
+    return _pct(um, n) if n else None          # nenhuma linha com o ID: não há o que medir (0% enganaria)
+
+
+def _exemplos(c: Counter) -> str | None:
+    """Os 6 mais comuns; no empate, pela ordem do texto. O `most_common` desempata pela ordem de chegada, e a ordem
+    das linhas da API muda de leitura para leitura: o PC e o servidor gravavam exemplos diferentes para o mesmo banco
+    (revisão de 08/10, duas cargas com as entradas embaralhadas)."""
+    top = sorted(c.items(), key=lambda kv: (-kv[1], str(kv[0])))[:6]
+    return "; ".join(f"{k or '(vazio)'} ({v})" for k, v in top) or None
+
+
+def qualidade(fato: str, livro: str, linhas: list[list], cab: list, origem: list[dict], origem_em, agora: str, *,
+              hist: dict | None = None, extra: dict | None = None) -> list:
+    """Uma linha da aba `qualidade` (CAB_QUALIDADE): quanto do fato ligou a cada dimensão, exemplos do que não ligou,
+    quantos acham exatamente 1 versão no histórico (`hist` = {"pessoas": linhas, "usinas": linhas}) e o `extra`."""
     i = {c: cab.index(c) for c in cab}
     n = len(linhas)
     com = {c: sum(1 for l in linhas if l[i[c]] is not None) for c in ("data_id", "usina_id", "equipe_id", "pessoa_id")}
+    com_eq = sum(1 for l in linhas if l[i["equipamento_id"]] is not None) if "equipamento_id" in i else None
     como = Counter(l[i["usina_ligada_por"]] for l in linhas if "usina_ligada_por" in i)
     sem_u = Counter(_txt(o.get("Usina")) for o, l in zip(origem, linhas) if l[i["usina_id"]] is None)
     sem_e = Counter(_txt(o.get("Região")) for o, l in zip(origem, linhas) if l[i["equipe_id"]] is None)
-    ex = lambda c: "; ".join(f"{k or '(vazio)'} ({v})" for k, v in c.most_common(6)) or None
+    hist = hist or {}
     return [fato, livro, n, com["data_id"], com["usina_id"], com["equipe_id"], com["pessoa_id"],
             _pct(com["data_id"], n), _pct(com["usina_id"], n), _pct(com["equipe_id"], n), _pct(com["pessoa_id"], n),
-            como.get("de-para do Fracttal", 0), como.get("código do ativo", 0), ex(sem_u), ex(sem_e), origem_em, agora]
+            como.get("de-para do Fracttal", 0), como.get("código do ativo", 0), _exemplos(sem_u), _exemplos(sem_e),
+            origem_em, agora, com_eq, _pct(com_eq, n) if com_eq is not None else None,
+            pct_versao(linhas, cab, "usina_id", "data_id", hist.get("usinas")),
+            pct_versao(linhas, cab, "pessoa_id", "data_id", hist.get("pessoas")),
+            json.dumps(extra or {}, ensure_ascii=False, sort_keys=True)]
 
 
 # ── 2º fato (06/10/2026): o checklist das rondas que ficaram SEM OS ───────────────────────────────────────────────

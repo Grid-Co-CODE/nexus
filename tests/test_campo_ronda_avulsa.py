@@ -125,5 +125,7 @@ def test_quem_lancou_anula_e_ela_sai_da_tela_mas_fica_no_banco(app, tecnico, ban
 def test_catalogo_registra_o_fato_com_os_ids():
     from nexus.dados import catalogo
     f = next(x for x in catalogo.FATOS if x.id == "ronda_avulsa")
-    assert f.livro.startswith(RA.LIVRO) and f.estado == "conformado"
+    # 08/10/2026 (auditoria Kimball, GR-1): o livro da avulsa é FONTE do fato único de ronda (nexus_fatos · fato_ronda)
+    assert f.livro.startswith(RA.LIVRO) and f.estado == "parte" and f.parte_de == ("ronda",)
+    assert f"{RA.LIVRO} · {RA.ABA}" in catalogo.POR_ID["ronda"].fontes
     assert {k for k, (estado, _c) in f.dims.items() if estado == "id"} >= {"data", "usina", "equipe", "pessoa"}

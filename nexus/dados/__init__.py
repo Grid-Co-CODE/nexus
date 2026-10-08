@@ -1,9 +1,12 @@
 """A camada de dados do Nexus: dimensões conformadas e fatos com IDs (método Kimball). Regras em `CLAUDE.md` desta pasta.
 
-- `catalogo.py`: a matriz de barramento como dado (fonte única da tela, dos testes e da documentação).
-- `calendario.py`, `historico.py`: as dimensões que o Nexus gera (data, feriados, histórico de pessoas e usinas).
-- `fatos.py`: cada fato com os IDs e a qualidade da ligação. `livros.py`: ler e gravar na API do banco, conferindo.
-- `carga.py`: a carga de hora em hora (aos :40). `telas.py`: Base → Governança de dados.
+- `catalogo.py`: a matriz de barramento como dado (fonte única da tela, dos testes e da documentação): fatos com tipo,
+  chave e medidas, dimensões e os livros do Nexus (registrados antes de existir).
+- `calendario.py`, `historico.py`: as dimensões que o Nexus gera (data, feriados, histórico SCD2 de pessoas e usinas).
+- `equipamento.py`: a dimensão de equipamento (código do ativo do Fracttal) e os apelidos de cada sistema.
+- `fatos.py` (fechamento e a qualidade), `fato_ronda.py`, `fato_pt.py`, `programacao.py`, `geracao.py`: os fatos;
+  `dominios.py`: as listas fechadas de valores. `livros.py`: ler e gravar na API do banco, conferindo.
+- `carga.py`: a carga de hora em hora (aos :40) e a montagem diária da geração. `telas.py`: Base → Governança de dados.
 """
 
 

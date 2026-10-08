@@ -32,8 +32,20 @@ FONTES_API = (
     ("Tickets · Base de dados - Usinas", "tickets_performance", "Base de dados - Usinas", "Usina", "Código da usina", None),
     ("BD_Thopen · Dados Gerais Usinas", "bd_thopen", "Dados Gerais Usinas", "Usina", None, "Thopen"),
 )
+# Geração em linhas (passo 6c do Kimball, 08/10/2026): cada ABA de geração (uma por usina, um inversor por coluna) é
+# uma chave do de-para, e é por ela que o fato `nexus_geracao · fato_geracao_usina_dia` acha o usina_id. Medido em
+# 08/10: o sistema de antes (`BD_Performance · Base UFV`, chaves "XXXX-ABC100") casava 0 das 53 abas do BD_Performance,
+# porque a aba tem o NOME da usina; a ponte é a aba "Info Geral" da mesma base, que tem o nome e o "Código Fractal".
+# (sistema no de-para, workbook, aba de referência da mesma base)
+FONTES_ABA = (
+    ("BD_Thopen · aba", "bd_thopen", "Dados Gerais Usinas"),
+    ("BD_Performance · aba", "bd_performance", "Info Geral"),
+)
 # Base que só cobre um cliente: usina de outro cliente fora dela não é buraco.
-SO_DO_CLIENTE = {"BD_Thopen · Dados Gerais Usinas": "Thopen"}
+SO_DO_CLIENTE = {"BD_Thopen · Dados Gerais Usinas": "Thopen", "BD_Thopen · aba": "Thopen"}
+# Base que não cobre um cliente: as abas do BD_Performance não têm usina da Thopen (0 de 47 usinas ligadas em 08/10; a
+# geração delas está no BD_Thopen). Sem isto, a aba "Usinas fora" listaria as 80 da Thopen em operação.
+SEM_O_CLIENTE = {"BD_Performance · aba": "Thopen"}
 # Como o de_para diz que a ligação veio só do nome (o que vale conferir na tela).
 POR_NOME = ("nome", "única da cidade", "de-para de trackers")
 TIPOS = ("ligar", "desligar", "ignorar", "ausencia")
@@ -156,9 +168,11 @@ def fontes(config) -> dict:
         for t in _linhas_api(base, abas[("de_para_trackers", "Resumo por usina")]):
             if t.get("Fonte") == "Banco de Dados" and t.get("UFV Fracttal"):
                 dicas[B.norm(re.sub(r"^\(\d+\)\s*", "", str(t["UFV Supervisório"])))] = t["UFV Fracttal"]
+    lidas = {}
     for sistema, wb, aba, c_nome, c_cod, cliente in FONTES_API:
         itens = []
-        for d in _linhas_api(base, abas[(wb, aba)]):
+        lidas[(wb, aba)] = _linhas_api(base, abas[(wb, aba)])
+        for d in lidas[(wb, aba)]:
             nome, cod = d.get(c_nome), d.get(c_cod) if c_cod else None
             if not nome:
                 continue
@@ -171,6 +185,73 @@ def fontes(config) -> dict:
                            "dica": dicas.get(B.norm(nome)) or dicas.get(B.norm(d.get("Nome")))})
             itens.append(it)
         out[sistema] = itens
+    for sistema, wb, ref in FONTES_ABA:      # depois das FONTES_API: o `igual_a` aponta chaves já casadas
+        ids = {a: sid for (w, a), sid in abas.items() if w == wb}
+        if (wb, ref) not in lidas:
+            lidas[(wb, ref)] = _linhas_api(base, abas[(wb, ref)]) if (wb, ref) in abas else []
+        out[sistema] = itens_abas(sistema, _primeiras_linhas(base, ids), lidas[(wb, ref)], dicas)
+    return out
+
+
+def _primeiras_linhas(base, ids: dict) -> dict:
+    """{aba: [1ª linha]}: o cabeçalho e o nome na coluna "Usina" de cada aba, uma página de 1 linha por aba, em
+    paralelo. Ler as abas inteiras levaria ~1 min (76 mil linhas em 08/10); a tela de Ligações espera por isto."""
+    import requests
+    from concurrent.futures import ThreadPoolExecutor
+
+    def uma(item):
+        aba, sid = item
+        r = requests.get(f"{base}/api/sheets/{sid}/rows", params={"limit": 1, "offset": 0}, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+        rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
+        return aba, [dict(zip(x.get("headers") or [], x.get("values") or [])) for x in rows[:1]]
+
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        return dict(ex.map(uma, ids.items()))
+
+
+def itens_abas(sistema: str, primeiras: dict, referencia: list, dicas: dict | None = None) -> list[dict]:
+    """As chaves de um sistema de aba (`FONTES_ABA`): uma por aba de GERAÇÃO (o mesmo critério do fato,
+    `nexus.dados.geracao.abas_de_geracao`), e a chave é o nome da aba. `primeiras` = {aba: [1ª linha]};
+    `referencia` = as linhas da aba de referência da mesma base (a 3ª coluna de `FONTES_ABA`).
+    - Referência que já é sistema do de-para (o "Dados Gerais Usinas" do BD_Thopen): a aba cujo nome, ou a coluna
+      Usina, é o de uma linha dela é a MESMA usina daquela chave: vai `igual_a`, e herda a ligação e as decisões da tela
+      (98 de 100 abas em 08/10). Leva também cidade, estado, potência e a dica, para o casamento quando ela não liga.
+    - Referência que não é sistema (a "Info Geral" do BD_Performance, que tem o nome e o "Código Fractal"): a aba em
+      forma de código ("ABC100") é o próprio código; a aba com nome leva o código da Info Geral como `codigo` +
+      `codigo_de` (53 de 53 abas acham a linha em 08/10) e o cliente dela, para o casamento quando o código não liga.
+    Nome que está em 2 linhas da referência não é ponte: ligação errada é pior que faltando."""
+    from ..dados.geracao import abas_de_geracao
+    wb_ref = next(((w, r) for s, w, r in FONTES_ABA if s == sistema), None)
+    sistema_ref = next((s for s, w, a, *_ in FONTES_API if (w, a) == wb_ref), None)
+    cliente_fixo = SO_DO_CLIENTE.get(sistema)
+    idx = defaultdict(list)
+    for d in referencia or ():
+        if d.get("Usina") not in (None, ""):
+            idx[B.norm(d["Usina"])].append(d)
+    out = []
+    for aba, linhas, _cols in abas_de_geracao(primeiras):
+        na_coluna = next((str(l["Usina"]).strip() for l in linhas if l.get("Usina") not in (None, "")), "")
+        nomes = [aba] + ([na_coluna] if na_coluna and B.norm(na_coluna) != B.norm(aba) else [])
+        par = next((idx[B.norm(n)][0] for n in nomes if len(idx.get(B.norm(n), ())) == 1), None)
+        it = {"chave": aba, "nome": aba, "nomes": nomes}
+        if cliente_fixo:
+            it["cliente"] = cliente_fixo
+        if sistema_ref:
+            if par:
+                mwp = par.get("Potência (MWp)")
+                it.update({"igual_a": (sistema_ref, par["Usina"]), "cidade": par.get("Cidade"),
+                           "uf": par.get("Estado"), "mwp": float(mwp) if isinstance(mwp, (int, float)) else None})
+            it["dica"] = next((dicas[B.norm(n)] for n in nomes if B.norm(n) in (dicas or {})), None)
+        else:
+            if re.fullmatch(r"[A-Z]{3}\d{3}", aba.strip()):
+                it["codigo"] = aba.strip()
+            elif par and str(par.get("Código Fractal") or "").strip():
+                it.update({"codigo": str(par["Código Fractal"]).strip(), "codigo_de": wb_ref[1]})
+            if par and par.get("Cliente") and not cliente_fixo:
+                it["cliente"] = par["Cliente"]
+        out.append(it)
     return out
 
 
@@ -346,10 +427,11 @@ def panorama(srv, atual: dict | None, regras: dict) -> dict:
     for sistema, e in est.items():
         if sistema == "BD_Operações":
             continue
-        so = SO_DO_CLIENTE.get(sistema)
+        so, sem = SO_DO_CLIENTE.get(sistema), SEM_O_CLIENTE.get(sistema)
         esperadas = {(d.get("usina_id"), d.get("cliente_id")) for d in regras["ausencia"] if d.get("sistema") == sistema}
         fora = [u for u in usinas if u["status"] == "OPERAÇÃO" and u["id"] not in e["usinas"]
                 and (not so or B.norm(u["cliente"]) == B.norm(so))
+                and not (sem and B.norm(u["cliente"]) == B.norm(sem))
                 and (u["id"], None) not in esperadas and (None, u["cliente_id"]) not in esperadas]
         grupos = defaultdict(list)
         for u in fora:

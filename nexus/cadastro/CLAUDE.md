@@ -95,6 +95,15 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
   fontes lidas + o de_para; ~6–11 s); decidir reaplica sem rede; "Publicar no banco" manda ao `cadastro_nexus`. Abas:
   Buracos (com sugestões e ligar/ignorar), Ligado por nome (confirmar/desligar), Usinas fora (ausência esperada por
   cliente) e Decisões (desfazer).
+- **Geração em linhas (08/10/2026): sistemas `BD_Thopen · aba` e `BD_Performance · aba`** (`ligacoes.FONTES_ABA`;
+  chave = o nome da aba de geração, a mesma regra de `nexus.dados.geracao.abas_de_geracao`). A aba do BD_Thopen herda a
+  ligação da linha de mesmo nome do "Dados Gerais Usinas" (`igual_a`, decisões da tela inclusas; referência ignorada =
+  aba ignorada). A do BD_Performance vai pelo "Código Fractal" da aba "Info Geral" (`codigo_de`, casou_por
+  "código (Info Geral)"): 53/53 em 08/10, contra 0 pelo "Base UFV". `BD_Performance · aba` não cobre o
+  cliente do BD_Thopen (`SEM_O_CLIENTE`). "Ler as bases de novo" faz +171 leituras de 1 linha (~8 s). **Ainda não publicado** (é do Levi,
+  decisão 8 do desenho Kimball de 08/10): até lá o `usina_id` da geração fica 0%, de propósito. Calculado sem publicar:
+  BD_Thopen 86 de 100 abas a 1 usina, 2 a 2 usinas (não ligam), 11 ignoradas, 1 sem par; os sistemas antigos saem
+  idênticos (876 linhas, 0 diferenças contra o publicado).
 - **Sugestão nunca cruza cliente** nem passa pelas travas do casamento (número diferente, cidade diferente, potência
   40%+ diferente): na 1ª versão real (04/10) ela sugeria "E1 - Andradina 1" para a Andradina da Thopen, "Marajoara 1"
   a 100% para a Marajoara 2 e "Ouro Branco" (AL) para as de Bandeirantes (PR). Hoje os 73 buracos não têm par no
