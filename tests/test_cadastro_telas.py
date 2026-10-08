@@ -474,3 +474,21 @@ def test_colaboradores_operacao(cli):
 def test_sem_chave_o_cadastro_avisa_e_nao_quebra(logado):
     html = _html(logado.get("/t/base/registro-mestre"))
     assert "NEXUS_CHAVE_CADASTRO" in html
+
+
+def test_quem_entrou_pelo_fracttal_sem_ser_admin_ve_o_porque_e_o_caminho(app_cad):
+    """Levi, 08/10/2026: entrou pelo Fracttal, o e-mail dele não estava em NEXUS_ADMINS e o Cadastro devolvia o
+    "Forbidden" cru do Flask. Continua 403 (o Cadastro é só de admin), mas a página diz por quê e leva à senha de admin."""
+    c = app_cad.test_client()
+    with c.session_transaction() as s:
+        s["logado"] = True
+        s["usuario"] = {"email": "pessoa@exemplo.test", "nome": "Pessoa Exemplo", "perfil": ""}
+        s["admin"] = False
+    r = c.get("/t/base/registro-mestre")
+    assert r.status_code == 403
+    html = r.get_data(as_text=True)
+    assert "só para administradores" in html and "pessoa@exemplo.test" in html and "NEXUS_ADMINS" in html
+    assert "/entrar?admin=1" in html and "Forbidden" not in html
+    with c.session_transaction() as s:
+        s["admin"] = True                      # o e-mail em NEXUS_ADMINS vira admin no login pelo Fracttal
+    assert c.get("/t/base/registro-mestre").status_code == 200

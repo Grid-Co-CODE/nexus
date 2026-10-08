@@ -170,7 +170,10 @@ def _tela(titulo):
         @wraps(fn)
         def envolta(*a, **k):
             if not session.get("admin"):
-                abort(403)
+                # 403 que diz o porquê e o caminho (Levi, 08/10/2026, pelo Fracttal e fora do NEXUS_ADMINS: recebia o
+                # "Forbidden" cru do Flask e achou que o Nexus tinha quebrado)
+                return render_template("cadastro/sem_permissao.html", titulo=titulo,
+                                       email=(session.get("usuario") or {}).get("email", "")), 403
             try:
                 srv = servico()
             except SemCadastro as e:
