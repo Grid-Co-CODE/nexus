@@ -1,5 +1,5 @@
 """App de Campo no Nexus: a visão do Nexus sobre o campo. Sem Azure: o dado são os livros que o App grava no banco
-(livros_app.py). Atenção, PT, Rondas, Zeladoria e Ranking são contas nossas (visao.py); Aprovação, Ordens e Triagem usam
+(livros_app.py). Atenção, PT, Rondas e Zeladoria são contas nossas (visao.py); Aprovação e Triagem usam
 as regras do App copiadas (regras_app.py), que leem os livros pela fonte do banco (fonte_pg.py -> tabelas.py). O
 coletor do Fracttal (coletor.py, banco_campo.py) está aposentado. As telas moram na torre Campo · App
 (nexus/torres/campo/). Leia nexus/torres/campo/CLAUDE.md antes de mexer.

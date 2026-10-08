@@ -12,7 +12,7 @@ leitura fica ANOTADO: as regras do App engolem o erro e devolvem fila vazia, e a
 Primeira fonte de verdade (04/10/2026): os fechamentos que o Nexus calcula pelo Fracttal e grava na API do PG
 (fonte_pg.py). Ela serve a `qualidadelog` inteira e diz isso por `serve(nome)`; o resto vem vazio. `configurado` liga
 só a tela cujas tabelas EXIGIDAS a fonte serve. Desde 05/10/2026 nenhuma tela abre o painel do App: Atenção, PT,
-Rondas, Zeladoria e Ranking são contas do Nexus (visao.py) pelos livros que o App grava no banco.
+Rondas e Zeladoria são contas do Nexus (visao.py) pelos livros que o App grava no banco.
 """
 import re
 import threading

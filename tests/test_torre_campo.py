@@ -2,7 +2,8 @@
 referenciar o Azure e ter uma visão nossa!")."""
 from nexus.torres import descobrir_torres
 
-NOSSAS = ("atencao", "aprovacao", "pt", "os", "rondas", "zeladoria", "ranking", "triagem")
+# Ordens de serviço ("os"), Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "são redundantes")
+NOSSAS = ("atencao", "aprovacao", "pt", "rondas", "zeladoria", "triagem")
 
 
 def _campo():
@@ -39,7 +40,6 @@ def test_sem_banco_a_tela_avisa_e_nao_some(logado):
     assert "Não consegui ler o banco do Nexus" in html and "Rondas" in html
 
 
-def test_imagens_e_rotas_seguem_em_construcao(logado):
-    for tela_id in ("imagens", "rotas"):
-        html = logado.get(f"/t/campo/{tela_id}").get_data(as_text=True)
-        assert "Em construção" in html and "<iframe" not in html, tela_id
+def test_rotas_segue_em_construcao(logado):
+    html = logado.get("/t/campo/rotas").get_data(as_text=True)
+    assert "Em construção" in html and "<iframe" not in html

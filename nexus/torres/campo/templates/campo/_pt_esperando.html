@@ -1,8 +1,10 @@
 {# As PT esperando o De acordo: a MESMA tela na Central de atenção (aba Permissões de trabalho) e em Permissões de trabalho
    (aba Esperando o De acordo) (Levi, 05/10/2026: "a mesma tela do Central de atenção > Permissões de Trabalho").
-   Cartões compactos por equipe (o da Central) ou a tabela (a da tela de PT: só a OS, em verde, abre a PT; Equipamento;
-   Espera no fim; a linha abre o detalhe). Espera do contexto: modo, cartoes (visao.por_equipe), lista, contagem, total,
-   f, status (visao.PT_STATUS), situacoes (SITUACAO_PT), equipe, idade_min, url. #}
+   Cartões compactos por equipe (o da Central), por supervisor (Levi, 08/10/2026: "adicione mais um botão (por
+   supervisor). Faça o mesmo na tela permissões de trabalho") ou a tabela (a da tela de PT: só a OS, em verde, abre a
+   PT; Equipamento; Espera no fim; a linha abre o detalhe). Espera do contexto: modo, cartoes (visao.por_equipe),
+   cartoes_sup (visao.por_supervisor), sem_supervisor, lista, contagem, total, f, status (visao.PT_STATUS), situacoes
+   (SITUACAO_PT), equipe, idade_min, url. #}
 {% macro capacete_pt() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
@@ -18,6 +20,22 @@
       </div>
       <div class="cn-eq-num"><span><span class="v cn-t-{{ cor }}">{{ c.pts }}</span><span class="d">PT esperando o De acordo</span></span></div>
       <div class="cn-eq-pe"><span class="cn-st cn-t-critico">{{ c.parada }} parada{{ 's' if c.parada != 1 }} há mais de 2 h</span><span class="cn-st cn-t-alerta">{{ c.pts - c.parada }} aguardando</span></div>
+    </a>
+  {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
+</div>
+{% elif modo == 'supervisores' %}
+{# por supervisor: as equipes dele com PT esperando, somadas; o cartão leva à tabela do supervisor #}
+<div class="cn-equipes">
+  {% for s in cartoes_sup %}{% set cor = 'critico' if s.parada else 'alerta' %}
+    <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.supervisor == sem_supervisor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', supervisor=s.supervisor, equipe=None, f=None) }}">
+      <div class="cn-eq-cab">
+        <div class="cn-eq-titulo"><b>{{ 'Sem supervisor no cadastro' if s.supervisor == sem_supervisor else s.supervisor }}</b>
+          <span class="cn-eq-tec" title="{{ s.tecnicos }} técnico{{ 's' if s.tecnicos != 1 }} nas equipes com PT esperando (cadastro)">{{ capacete_pt() }}<b>{{ s.tecnicos }}</b></span></div>
+        <span>{{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }} com PT esperando · {{ s.tecnicos }} técnico{{ 's' if s.tecnicos != 1 }}{% if s.regioes %} · {{ s.regioes|join(', ') }}{% endif %}</span>
+        <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
+      </div>
+      <div class="cn-eq-num"><span><span class="v cn-t-{{ cor }}">{{ s.pts }}</span><span class="d">PT esperando o De acordo</span></span></div>
+      <div class="cn-eq-pe"><span class="cn-st cn-t-critico">{{ s.parada }} parada{{ 's' if s.parada != 1 }} há mais de 2 h</span><span class="cn-st cn-t-alerta">{{ s.pts - s.parada }} aguardando</span></div>
     </a>
   {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
 </div>

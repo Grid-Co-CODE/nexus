@@ -3,8 +3,8 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Permissões de trabalho, visão do Nexus (05/10/2026): o livro de PT que o App grava no banco (nexus/campo/visao.py,
-   pts e pts_por_equipe). Duas abas: esperando o De acordo (por equipe ou tabela) e o histórico das decididas. A OS em
-   verde abre a aprovação; clicar na linha abre o detalhe. #}
+   pts, por_equipe e por_supervisor). Duas abas: esperando o De acordo (por equipe, por supervisor ou tabela) e o
+   histórico das decididas. A OS em verde abre a aprovação; clicar na linha abre o detalhe. #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
@@ -57,6 +57,7 @@
     {% if aba == 'esperando' %}
     <div class="cn-seg" aria-label="Visão">
       <a href="{{ url(modo=None, equipe=None) }}"{% if modo == 'equipes' %} aria-current="page"{% endif %}>Por equipe</a>
+      <a href="{{ url(modo='supervisores', equipe=None) }}"{% if modo == 'supervisores' %} aria-current="page"{% endif %}>Por supervisor</a>
       <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
     </div>
     {% else %}

@@ -1,6 +1,6 @@
 """As telas da torre Campo · App ligadas no banco do Nexus (Levi, 04/10/2026: "pode gravar na API do PG e ligar as
-telas"): Aprovação de OS, Ordens de serviço e Triagem leem os fechamentos que o coletor grava; Atenção e PT continuam
-no painel do App, porque o dado delas nasce no App e não vai ao Fracttal.
+telas"): Aprovação de OS e Triagem leem os fechamentos que o coletor grava (Ordens de serviço saiu em 08/10/2026);
+Atenção e PT continuam no painel do App, porque o dado delas nasce no App e não vai ao Fracttal.
 """
 from datetime import datetime, timedelta, timezone
 
@@ -9,7 +9,7 @@ from pg_falso import ApiPGFalsa
 from test_campo_aprovacao import FracttalFalso, _os
 from test_campo_fonte_pg import BASE, CHAVE, _linha
 
-from nexus.campo import aprovacao, banco_campo, fonte_pg, fracttal, leitura, ordens, tabelas, triagem
+from nexus.campo import aprovacao, banco_campo, fonte_pg, fracttal, leitura, tabelas, triagem
 from nexus.torres.campo import _motivo
 
 
@@ -30,16 +30,6 @@ def banco():
     yield api
     tabelas.usar_fornecedor(None)
     leitura.limpar_cache()
-
-
-def test_ordens_de_servico_pelo_banco(logado, banco):
-    r = ordens.painel(7).dados["atual"]["resumo"]
-    assert r["os"] == 3 and r["qualidade_media"] == round((96 + 45 + 88) / 3)
-    assert r["pontualidade_pct"] is None              # o Fracttal não tem a hora de início no celular: sem dado, não 0%
-    html = logado.get("/t/campo/os?dias=7").get_data(as_text=True)
-    assert ">15102<" in html and ">15077<" in html and ">15002<" not in html    # fechada fora do App não entra
-    assert "notas do App" in html and "só no App (hora de início no celular)" in html
-    assert "<iframe" not in html
 
 
 def test_triagem_pelo_banco(logado, banco):

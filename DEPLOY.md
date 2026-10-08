@@ -106,15 +106,16 @@ o servidor inteiro como uma só.
    A "Pasta do PCM" e as durações aprendidas aparecem como opcionais ausentes: é o esperado no servidor.
 5. **OS Creator → Início** abre a entrada do OS Creator: cada pessoa entra com o próprio usuário do Fracttal, e
    depois disso **Ativos Fracttal** lista os ativos.
-6. **Campo · App → Ordens de serviço** mostra as OS da semana com a nota do painel do App (a fonte é o livro que o
-   App grava no banco; precisa da `NEXUS_PESSOA_HMAC` no `.env`, ver o passo 7).
+6. **Campo · App → Triagem de qualidade** mostra as OS do período com a nota do painel do App (a fonte é o livro que o
+   App grava no banco; precisa da `NEXUS_PESSOA_HMAC` no `.env`, ver o passo 7). A tela Ordens de serviço saiu em
+   08/10/2026.
 7. **Performance → Clima e risco** abre com as três fontes em verde (INMET, focos e risco de fogo do INPE). A primeira
    visita leva uns 10 s (lê o risco de fogo de todas as usinas); depois a tela é imediata. Fonte "fora agora": confira a
    saída para os dois endereços da seção 0 (ver a seção 7c).
 
 ## 7. Campo · App: o Nexus lê o que o App grava
 
-As telas Aprovação de OS, Ordens de serviço e Triagem leem o registro de cada fechamento **que o próprio App de Campo
+As telas Aprovação de OS e Triagem leem o registro de cada fechamento **que o próprio App de Campo
 grava no banco** (API db_performace, livros `fechamentos_app_campo` e `rondas_app_campo`, de hora em hora). O técnico
 vem como código (HMAC do e-mail): o `.env` do pacote já traz a `NEXUS_PESSOA_HMAC`, a MESMA chave da configuração do
 App. Sem ela, as telas seguiriam com o livro antigo do coletor (dados parados).

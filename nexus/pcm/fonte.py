@@ -10,6 +10,7 @@ import json
 import os
 import threading
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
@@ -18,7 +19,8 @@ URL_PADRAO = "https://raw.githubusercontent.com/fillipefigueiro-source/gridco-pc
 TTL_S = 300
 TIMEOUT_S = 30
 
-_cache: dict[str, tuple[float, dict, float]] = {}
+# fonte -> (monotonic da última conferência, dados, epoch do download, ETag do GitHub)
+_cache: dict[str, tuple[float, dict, float, str | None]] = {}
 _trava = threading.Lock()
 
 
@@ -47,20 +49,60 @@ def _validar(d) -> dict:
     return d
 
 
-def _baixar(fonte: str) -> dict:
+def _baixar(fonte: str, validar=_validar, etag: str | None = None) -> tuple[dict | None, str | None]:
+    """(dados, ETag). Com o ETag da cópia que já está em memória, o GitHub responde 304 se o arquivo não mudou, e os
+    dados vêm None: medido em 08/10/2026, o gestao_pcm.json (14,7 MB) levava 1,3 s para baixar e ler a cada 5 min;
+    a conferência que dá 304 leva ~40 ms."""
     if fonte.startswith(("http://", "https://")):
-        req = urllib.request.Request(fonte, headers={"User-Agent": "Nexus-GridCo/1 (programacao semanal)"})
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:        # noqa: S310 — endereço fixo ou do .env
-            bruto = r.read()
+        cab = {"User-Agent": "Nexus-GridCo/1 (programacao semanal)"}
+        if etag:
+            cab["If-None-Match"] = etag
+        try:
+            with urllib.request.urlopen(urllib.request.Request(fonte, headers=cab), timeout=TIMEOUT_S) as r:  # noqa: S310 — endereço fixo ou do .env
+                bruto, etag = r.read(), r.headers.get("ETag")
+        except urllib.error.HTTPError as ex:
+            if ex.code == 304 and etag:
+                return None, etag
+            raise
     else:
         with open(fonte, "rb") as f:
-            bruto = f.read()
-    return _validar(json.loads(bruto.decode("utf-8")))
+            bruto, etag = f.read(), None
+    return validar(json.loads(bruto.decode("utf-8"))), etag
 
 
 def ler(config) -> Leitura:
-    fonte = endereco(config)
-    if config.get("TESTING") and not (config.get("NEXUS_PCM_FONTE") or os.environ.get("NEXUS_PCM_FONTE")):
+    return _ler(config, "NEXUS_PCM_FONTE", URL_PADRAO, _validar)
+
+
+# Gestão PCM (07/10/2026): o gestao_pcm.json (as tarefas do ano, ~14 MB, que o robô gestao-pcm.yml regrava) e o
+# mpas.json (a planilha da Gerencial, CIFRADA: o repositório é público), do mesmo repositório do PCM.
+URL_GESTAO = URL_PADRAO.rsplit("/", 1)[0] + "/gestao_pcm.json"
+URL_MPAS = URL_PADRAO.rsplit("/", 1)[0] + "/mpas.json"
+
+
+def _validar_gestao(d) -> dict:
+    if not isinstance(d, dict) or not isinstance(d.get("tarefas"), list):
+        raise FonteErro("o arquivo não tem a lista de tarefas")
+    return d
+
+
+def _validar_mpas(d) -> dict:
+    if not isinstance(d, dict) or not all(d.get(k) for k in ("salt", "iv", "ct", "iter")):
+        raise FonteErro("o arquivo da Gerencial não tem o pacote cifrado")
+    return d
+
+
+def ler_gestao(config) -> Leitura:
+    return _ler(config, "NEXUS_PCM_GESTAO_FONTE", URL_GESTAO, _validar_gestao)
+
+
+def ler_mpas(config) -> Leitura:
+    return _ler(config, "NEXUS_PCM_MPAS_FONTE", URL_MPAS, _validar_mpas)
+
+
+def _ler(config, chave: str, padrao: str, validar) -> Leitura:
+    fonte = str(config.get(chave) or os.environ.get(chave) or padrao)
+    if config.get("TESTING") and not (config.get(chave) or os.environ.get(chave)):
         return Leitura(None, fonte, erro="sem fonte configurada nos testes")
     local = not fonte.startswith(("http://", "https://"))
     agora = time.monotonic()
@@ -69,13 +111,16 @@ def ler(config) -> Leitura:
         if em_cache and not local and agora - em_cache[0] < TTL_S:
             return Leitura(em_cache[1], fonte, baixado_em=em_cache[2])
         try:
-            dados = _baixar(fonte)
+            dados, etag = _baixar(fonte, validar, em_cache[3] if em_cache and not local else None)
         except FileNotFoundError:
             erro = "arquivo não encontrado"
         except Exception as ex:      # noqa: BLE001 — rede, JSON quebrado, formato errado: tudo vira aviso na tela
             erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         else:
-            _cache[fonte] = (agora, dados, time.time())
+            if dados is None:        # 304: o arquivo não mudou, a cópia em memória vale mais 5 min
+                _cache[fonte] = (agora, em_cache[1], em_cache[2], etag)
+                return Leitura(em_cache[1], fonte, baixado_em=em_cache[2])
+            _cache[fonte] = (agora, dados, time.time(), etag)
             return Leitura(dados, fonte, baixado_em=time.time())
         if em_cache:
             return Leitura(em_cache[1], fonte, baixado_em=em_cache[2], erro=erro, velha=True)

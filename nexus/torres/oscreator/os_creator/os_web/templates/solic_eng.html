@@ -58,8 +58,9 @@
 
   <div class="os-cardf"><div class="os-cardf-h"><span class="os-badge">4</span><span class="os-cardf-t">Responsável e datas</span></div>
     <div class="os-linha2">
-      <label class="os-campo"><span class="os-lbl">Responsável da Engenharia <i>*</i></span>
-        <select id="cb_resp" disabled><option value="">carregando…</option></select></label>
+      {# digitável (Levi, 08/10/2026), como o tipo de ativo acima: o valor continua sendo o id_personnel da <option> #}
+      <label class="os-campo"><span class="os-lbl">Responsável da Engenharia <i>*</i> <small>(digite p/ pesquisar)</small></span>
+        <select id="cb_resp" data-busca="1" disabled><option value="">carregando…</option></select></label>
       {# a data do EVENTO se edita, como na ETM (Levi, 06/10: "tem que ter data do evento"); padrão: agora #}
       <label class="os-campo"><span class="os-lbl">Data do evento <i>*</i></span>
         <input id="dt_evento" type="datetime-local" value="{{ evento }}"></label>

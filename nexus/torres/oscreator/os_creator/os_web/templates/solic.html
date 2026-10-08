@@ -70,7 +70,7 @@
       <label class="os-cell"><span class="os-lbl">Data Programada (Sugestão)</span>
         <input type="datetime-local" id="dt_sug" value="{{ sugerida }}"></label>
       <label class="os-cell"><span class="os-lbl">Técnico sugerido</span>
-        <select id="cb_tec"><option value="">— nenhum —</option>{% for p in pessoas %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}</select></label>
+        <select id="cb_tec" data-busca="1"><option value="">— nenhum —</option>{% for p in pessoas %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}</select></label>
     </div>
     <label class="os-check" style="margin-top:10px"><input type="checkbox" id="ck_urg"> Urgente</label>
   </div>

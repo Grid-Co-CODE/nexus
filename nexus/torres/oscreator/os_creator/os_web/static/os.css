@@ -281,6 +281,24 @@ body.os-modal-aberto{overflow:hidden}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .osb-op:hover,.osb-op.on{background:rgba(166,226,46,.16);color:#eaf3d6}
 .osb-vazio{padding:8px 10px;color:var(--muted);font-size:12.5px}
+/* Levi, 08/10/2026 ("conseguir digitar no responsável"; "digitar o nome da usina no filtro do histórico"): o texto que
+   não é de nenhuma opção volta e a tela diz por quê, em âmbar (atenção, não erro); o campo desligado parece desligado;
+   e a lista de marcar do Histórico ganha a busca no topo, parada enquanto a lista rola. */
+.osb-in:disabled{opacity:.5;cursor:not-allowed}
+.osb-aviso{margin-top:5px;font-size:11.5px;line-height:1.35;color:#f3d99b}
+.osb-aviso[hidden]{display:none}
+/* no diálogo do card (trocar responsável) a lista entra NO FLUXO: o diálogo rola (overflow-y:auto) e cortaria uma lista
+   solta por cima, deixando 2 nomes à vista */
+.acoes-dlg .osb-lista{position:static;margin-top:4px;max-height:min(280px,40vh);box-shadow:none}
+.os-multi-lista .osm-busca{position:sticky;top:-6px;z-index:1;display:block;width:100%;box-sizing:border-box;height:34px;
+  margin:-6px 0 6px;padding:0 10px;background:var(--f-input);border:1px solid var(--f-border);border-radius:8px;
+  color:#fff;font-size:13px;box-shadow:0 0 0 6px var(--f-card)}
+.os-multi-lista .osm-busca:focus{outline:none;border-color:var(--f-green)}
+.os-multi-lista .osm-busca::placeholder{color:var(--f-muted)}
+.os-multi-lista label.osm-fora{display:none}
+.os-multi-lista label.on{background:rgba(166,226,46,.16)}
+.osm-vazio{padding:6px 8px;color:var(--f-muted);font-size:12.5px}
+.osm-vazio[hidden]{display:none}
 
 /* caixa "Gerar ticket automaticamente" e a quantidade por ativo (Levi, 21/09) */
 .os-tk{display:flex;align-items:center;gap:8px;color:#cfd6e4;font-size:13px;cursor:pointer}

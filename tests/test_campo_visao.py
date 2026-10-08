@@ -1,4 +1,4 @@
-"""A visão do Nexus para o Campo · App (05/10/2026): Rondas, PT, Zeladoria, Ranking, Central de atenção e a aprovação da
+"""A visão do Nexus para o Campo · App (05/10/2026): Rondas, PT, Zeladoria, Central de atenção e a aprovação da
 PT, pelos livros que o App grava no banco e pelo cadastro do Nexus. Banco falso (pg_falso), datas relativas a hoje."""
 import base64
 import json
@@ -177,16 +177,6 @@ def test_pt_fila_da_mais_antiga_nome_resumido_e_local(banco):
     assert d["historico"][0]["espera_min"] == 60
 
 
-def test_ranking_so_pontua_quem_tem_nota_e_cobertura(banco):
-    d = visao.ranking(30).dados
-    reg = {a["nome"]: a for a in d["regioes"]}
-    assert reg["SP Norte 01"]["nota"] == 80 and reg["SP Norte 01"]["cobertura_pct"] == 100
-    assert reg["SP Norte 01"]["pontos"] == round(0.6 * 80 + 0.4 * 100)
-    assert reg["SC Oeste 01"]["pontos"] is None                        # sem fechamento: não ganha 100 pela cobertura
-    assert [a["nome"] for a in d["fora_do_cadastro"]] == ["Grid Co."]
-    assert d["colaboradores"][0]["nome"] == "Técnico Silva" and d["colaboradores"][0]["os"] == 3
-
-
 def test_central_em_tres_visoes(banco):
     d = visao.atencao(14).dados
     pend = {p["usina"]: p for p in d["pendentes"]}
@@ -210,7 +200,6 @@ def test_zeladoria_vazia_diz_por_que(banco, logado):
 def test_telas_mostram_o_dado_do_banco(banco, logado):
     assert "Coração 1" in logado.get("/t/campo/rondas").get_data(as_text=True)
     assert "PT-1" in logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
-    assert "SP Norte 01" in logado.get("/t/campo/ranking").get_data(as_text=True)
 
 
 def test_central_separa_ronda_de_pt_e_sem_hashtag_na_os(banco, logado):
@@ -452,8 +441,9 @@ def test_pt_ja_decidida_no_app_nao_recebe_decisao_e_outro_site_nao_decide(app, b
 def test_indicadores_da_ronda_filtram_a_tabela(banco, logado):
     """Levi, 05/10: "quero que esses botões sejam clicáveis e filtre a tabela"."""
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
-    assert html.count('class="cn-kpi cn-kpi--link"') == 6
-    assert 'href="?ind=qualidade"' in html and 'href="?aba=cobertura&amp;cob=sem"' in html and 'href="?dur=curta"' in html
+    # 08/10: o 7º indicador (nunca tiveram ronda) e a aba Sem ronda no lugar da Cobertura
+    assert html.count('class="cn-kpi cn-kpi--link"') == 7
+    assert 'href="?ind=qualidade"' in html and 'href="?aba=sem"' in html and 'href="?dur=curta"' in html
     html = logado.get("/t/campo/rondas?ind=hoje").get_data(as_text=True)
     assert "Só as de hoje" in html and "Nenhuma ronda com esses filtros" in html     # nenhuma ronda hoje no banco falso
     html = logado.get("/t/campo/rondas?ind=qualidade").get_data(as_text=True)
@@ -543,7 +533,7 @@ def test_ronda_sem_os_mostra_o_checklist_da_carga_unica(banco, logado):
     s = visao.sujidade_vegetacao(d["todas"], d["cobertura"], {}, 30, d["hoje"])
     assert [x["usina"] for x in s["linhas"]] == ["Brodowski 1"] and s["linhas"][0]["vegetacao"] == 5
     pag = logado.get("/t/campo/rondas/usina/2").get_data(as_text=True)
-    assert 'cn-nivel cn-nivel--5">5<' in pag and "não lida" not in pag
+    assert 'cn-nivel-txt cn-nivel-txt--5">5<' in pag and "não lida" not in pag     # 08/10: só a cor da fonte
 
 
 def test_eixo_de_datas_do_grafico_nao_encavala(banco, logado, monkeypatch):

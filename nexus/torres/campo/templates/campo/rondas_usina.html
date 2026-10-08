@@ -4,7 +4,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# O histórico de rondas de uma usina (Levi, 05/10/2026: "quando clicarmos no nome da usina já aparece o histórico de
    rondas com data e sujidade e vegetação, essas informações são importantes!"). nexus/campo/visao.py: historico_usina. #}
-{% macro nivel(n) %}{% if n is none %}<span class="mudo">—</span>{% else %}<span class="cn-nivel cn-nivel--{{ n }}">{{ n }}</span>{% endif %}{% endmacro %}
+{# nível só com a cor da fonte, como na aba Sujidade e vegetação (Levi, 08/10: "quero só a cor da fonte mesmo") #}
+{% macro nivel(n) %}{% if n is none %}<span class="mudo">—</span>{% else %}<b class="cn-nivel-txt cn-nivel-txt--{{ n }}">{{ n }}</b>{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <p class="cn-voltar"><a class="cn-link" href="{{ url_for('torre_campo.rondas') }}">Voltar para Rondas</a></p>
   <div class="cn-cab">
@@ -111,57 +112,8 @@
       {% if r.os %}<tr class="cn-fotos-linha" hidden><td colspan="13"></td></tr>{% endif %}
     {% else %}<tr><td colspan="13" class="mudo">Nenhuma ronda pelo App nos últimos 90 dias.</td></tr>{% endfor %}
     </tbody></table></div>
-  <div class="cn-caixa-foto" role="dialog" aria-modal="true" aria-label="Foto da ronda" hidden>
-    <button type="button" class="cn-caixa-fechar" aria-label="Fechar">×</button>
-    <button type="button" class="cn-caixa-ant" aria-label="Foto anterior">‹</button>
-    <figure><img alt=""><figcaption></figcaption></figure>
-    <button type="button" class="cn-caixa-prox" aria-label="Próxima foto">›</button>
-  </div>
-  <script>
-    // Fotos: o botão abre a linha e carrega as fotos da OS uma vez; a miniatura abre ampliada (Esc fecha, setas andam)
-    (function () {
-      document.querySelectorAll('.cn-bt-fotos').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var linha = b.closest('tr').nextElementSibling;
-          if (!linha || !linha.classList.contains('cn-fotos-linha')) return;
-          linha.hidden = !linha.hidden;
-          b.setAttribute('aria-expanded', String(!linha.hidden));
-          if (linha.hidden || linha.dataset.carregada) return;
-          linha.dataset.carregada = '1';
-          var td = linha.firstElementChild;
-          td.textContent = 'Buscando as fotos da OS no Fracttal...';
-          fetch(b.dataset.url, {credentials: 'same-origin'}).then(function (r) { return r.text(); })
-            .then(function (html) { td.innerHTML = html; })
-            .catch(function () { td.textContent = 'Não consegui buscar as fotos. Tente de novo.'; delete linha.dataset.carregada; });
-        });
-      });
-      var caixa = document.querySelector('.cn-caixa-foto'), img = caixa.querySelector('img'),
-          leg = caixa.querySelector('figcaption'), lista = [], atual = 0;
-      function mostra(k) {
-        atual = (k + lista.length) % lista.length;
-        img.src = lista[atual].href; img.alt = lista[atual].dataset.legenda || '';
-        leg.textContent = (lista[atual].dataset.legenda || '') + '  (' + (atual + 1) + ' de ' + lista.length + ')';
-      }
-      function fecha() { caixa.hidden = true; img.removeAttribute('src'); }
-      document.addEventListener('click', function (ev) {
-        var a = ev.target.closest('a.cn-foto');
-        if (!a) return;
-        ev.preventDefault();
-        lista = Array.prototype.slice.call(a.closest('.cn-fotos-grupo').querySelectorAll('a.cn-foto'));
-        caixa.hidden = false; mostra(lista.indexOf(a)); caixa.querySelector('.cn-caixa-fechar').focus();
-      });
-      caixa.querySelector('.cn-caixa-fechar').addEventListener('click', fecha);
-      caixa.querySelector('.cn-caixa-ant').addEventListener('click', function () { mostra(atual - 1); });
-      caixa.querySelector('.cn-caixa-prox').addEventListener('click', function () { mostra(atual + 1); });
-      caixa.addEventListener('click', function (ev) { if (ev.target === caixa) fecha(); });
-      document.addEventListener('keydown', function (ev) {
-        if (caixa.hidden) return;
-        if (ev.key === 'Escape') fecha();
-        else if (ev.key === 'ArrowLeft') mostra(atual - 1);
-        else if (ev.key === 'ArrowRight') mostra(atual + 1);
-      });
-    })();
-  </script>
+  {# o botão Fotos e a caixa que amplia: o mesmo componente da aba Registros (Levi, 08/10/2026) #}
+  {% include 'campo/_ronda_fotos_caixa.html' %}
   <div class="cn-nota"><b>De onde vem.</b> As rondas são as do livro do App (90 dias). Sujidade, vegetação, vala e sensores
     são as respostas do checklist que o App copia no texto da OS de ronda no Fracttal; o Nexus lê as OS em verificação
     e as aprovadas dos 90 dias. As rondas sem OS de 11/08 a 06/10 vieram do registro da ronda no App numa carga única

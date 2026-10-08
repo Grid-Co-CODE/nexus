@@ -1,0 +1,55 @@
+{# Ordenar a tabela pelo cabeçalho, no navegador, sem recarregar (Levi, 08/10/2026: "se a pessoa quiser ordenar ela
+   clica na coluna que ordena e já era!"). Vale para toda <table class="cn-ordenavel"> da página:
+   - o texto do <th> vira um botão; clicar ordena, clicar de novo inverte; `aria-sort` no <th> diz a ordem (a seta);
+   - a 1ª ordem é crescente, ou decrescente com `data-primeiro="desc"` (nível, nota, cobertura: o maior interessa);
+   - a célula traz `data-ordem` quando o que ela mostra não ordena sozinho ("05/10", "1h04", "nunca"); sem ela, o texto;
+   - vazio ("" ou "—") fica sempre no fim, nas duas ordens;
+   - a linha que acompanha a de cima (fotos, detalhe: `tr.cn-fotos-linha`, `tr.cn-detalhe`) anda junto com ela;
+   - <th data-sem-ordem> não ordena. A ordem que veio do servidor é a de quem tem `aria-sort` no HTML. #}
+<script>
+  (function () {
+    var ACOMPANHA = /(^|\s)(cn-fotos-linha|cn-detalhe)(\s|$)/;
+    function valor(tr, col) {
+      var td = tr.cells[col];
+      if (!td) return '';
+      return String(td.hasAttribute('data-ordem') ? td.getAttribute('data-ordem') : td.textContent).trim();
+    }
+    function vazio(v) { return v === '' || v === '—'; }
+    function compara(a, b) {
+      var na = Number(a.replace(',', '.')), nb = Number(b.replace(',', '.'));
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.localeCompare(b, 'pt-BR', {numeric: true, sensitivity: 'base'});
+    }
+    document.querySelectorAll('table.cn-ordenavel').forEach(function (tab) {
+      if (!tab.tHead || !tab.tBodies[0]) return;
+      var corpo = tab.tBodies[0], ths = tab.tHead.rows[0].cells;
+      Array.prototype.forEach.call(ths, function (th, col) {
+        if (th.hasAttribute('data-sem-ordem')) return;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cn-ordem';
+        while (th.firstChild) b.appendChild(th.firstChild);
+        th.appendChild(b);
+        b.addEventListener('click', function () {
+          var agora = th.getAttribute('aria-sort');
+          var desc = agora === 'ascending' ? true : (agora === 'descending' ? false : th.dataset.primeiro === 'desc');
+          // os grupos: a linha principal e as que a acompanham (fotos, detalhe)
+          var grupos = [];
+          Array.prototype.forEach.call(corpo.rows, function (tr) {
+            if (ACOMPANHA.test(tr.className) && grupos.length) grupos[grupos.length - 1].push(tr);
+            else grupos.push([tr]);
+          });
+          if (grupos.length < 2 || grupos.some(function (g) { return g[0].cells.length < 2; })) return;  // "nenhuma linha"
+          grupos.sort(function (x, y) {
+            var a = valor(x[0], col), c = valor(y[0], col);
+            if (vazio(a) || vazio(c)) return vazio(a) === vazio(c) ? 0 : (vazio(a) ? 1 : -1);
+            return desc ? compara(c, a) : compara(a, c);
+          });
+          grupos.forEach(function (g) { g.forEach(function (tr) { corpo.appendChild(tr); }); });
+          Array.prototype.forEach.call(ths, function (o) { if (o !== th) o.removeAttribute('aria-sort'); });
+          th.setAttribute('aria-sort', desc ? 'descending' : 'ascending');
+        });
+      });
+    });
+  })();
+</script>

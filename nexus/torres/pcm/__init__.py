@@ -1,8 +1,9 @@
 """Torre PCM: Programação semanal, aderência ao plano e capacidade das equipes.
 
-Desde 30/09/2026 a programação semanal está vindo para o Nexus (nexus/pcm/). Semana e Tarefas e OS já têm
-tela própria (leem a programação que está valendo); as outras ainda caem no placeholder da casca. Para dar vida a
-uma tela, crie a view com a mesma rota (ela vence a genérica) em nexus/pcm/telas.py.
+Desde 30/09/2026 a programação semanal está vindo para o Nexus (nexus/pcm/). Têm tela própria: Semana e Tarefas e
+OS (a programação que está valendo), Gerar a semana (o motor em sombra) e Gestão PCM (o bloco "Manutenções — Plano &
+Fila" do painel do PCM, desde 08/10/2026); as outras ainda caem no placeholder da casca. Para dar vida a uma tela,
+crie a view com a mesma rota (ela vence a genérica) em nexus/pcm/telas.py.
 """
 from ...pcm.telas import registrar_pcm
 from ..modelo import Tela, Torre
@@ -30,8 +31,8 @@ TORRE = Torre(
              "Quanto está aberto e atrasado em religamento, preventiva e garantia?",
              "banco_dados.json do painel PCM"),
         Tela("gestao", "Gestão PCM",
-             "Quanto das preventivas foi concluído por usina e sigla?",
-             "gestao_pcm.json do painel PCM"),
+             "Quanto do plano de manutenção está feito por usina, e que MPA ou MPS está envelhecendo?",
+             "gestao_pcm.json do painel PCM (e a planilha da Gerencial, cifrada)"),
         Tela("disponibilidade", "Disponibilidade",
              "De onde vem a indisponibilidade, da teórica ao recorte?",
              "gerencial.json do painel PCM"),

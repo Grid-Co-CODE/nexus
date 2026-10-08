@@ -118,7 +118,7 @@ def manter_quente(app, intervalo_s: int = 60):
     e estão a 1 min de vencer. Lê só o banco do Nexus (nada de Fracttal)."""
     def aquecer():
         with app.app_context():
-            for f in (rondas, pts, zeladoria, lambda: ranking(), lambda: atencao(), usinas_do_fracttal):
+            for f in (rondas, pts, zeladoria, lambda: atencao(), usinas_do_fracttal):
                 try:
                     f()
                 except Exception:       # noqa: BLE001 — a tela tenta de novo na visita
@@ -319,7 +319,7 @@ class _Base:
     def supervisor_da_pessoa(self, email: str, nome: str = "") -> str:
         """O nome (como as telas mostram) da pessoa que entrou, se ela é supervisor: pelo e-mail da ficha, ou pelo nome
         quando ele é de UMA pessoa. Medido em 06/10: nenhum dos 10 supervisores tem e-mail no cadastro, então o nome
-        decide, comparado de três jeitos (completo, curto e o do e-mail: camila.viana@ -> "camila viana") contra o
+        decide, comparado de três jeitos (completo, curto e o do e-mail: fulana.souza@ -> "fulana souza") contra o
         nome e o "Nome padrão" da ficha. Supervisor = vínculo "Supervisor" ou o `supervisor_id` de alguém."""
         chave = current_app.config.get("NEXUS_CHAVE_CADASTRO")
         if not chave:
@@ -507,6 +507,62 @@ def _hm(iso) -> str:
     return d.strftime("%H:%M") if d else ""
 
 
+def _tecnicos_por_equipe(b: _Base) -> dict:
+    """{equipe_id: [nome curto dos técnicos]} pelo cadastro de pessoas, com a regra de `_Base._time` (colaborador de
+    campo da equipe que não está Desligado). O nome é decifrado na hora (NEXUS_CHAVE_CADASTRO); sem a chave, as listas
+    vêm vazias e a tela mostra só quantos são."""
+    ids = {}
+    for p in b.pessoas:
+        eid = D._id(p.get("equipe_id"))
+        if (not eid or str(p.get("vinculo") or "").strip() != CAMPO
+                or str(p.get("status") or "").strip().lower() == "desligado"
+                or str(p.get("excluido") or "").strip().lower() == "sim"):
+            continue
+        ids.setdefault(eid, set()).add(D._id(p.get("pessoa_id")))
+    nomes = b._nomes({pid for s in ids.values() for pid in s}, b.pessoas)
+    return {eid: sorted({nomes[pid] for pid in pids if nomes.get(pid)}) for eid, pids in ids.items()}
+
+
+def _ultima_os_por_usina(b: _Base) -> dict:
+    """{usina_id: a última OS fechada pelo App na usina, de QUALQUER tipo}: número, dia, tipo e quem fez (Levi, 08/10:
+    "última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"). Vem do livro
+    `fechamentos_app_campo`, ligado à usina pelo `Ligador` (de-para do Fracttal; código do ativo de reserva). Limite:
+    só o que passou pelo App, e o livro guarda 90 dias; OS fechada direto no Fracttal não aparece."""
+    quem = _quem()
+    out = {}
+    for f in _livro("fechamentos_app_campo"):
+        uid, _como = b.lig.usina(f.get("Usina"), f.get("Código do ativo"))
+        quando = _dt(f.get("Registrado em"))
+        if not uid or not quando:
+            continue
+        if uid not in out or quando > out[uid]["quando"]:
+            out[uid] = {"os": str(f.get("OS") or "").strip(), "quando": quando, "data": quando.date().isoformat(),
+                        "tipo": str(f.get("Tipo da OS") or "").strip(), "tecnico": _nome(quem, f.get("Técnico (HMAC)"))}
+    return out
+
+
+def _registro_da_cobertura(b: _Base, cobertura: list[dict], ligadas: list[dict]) -> str:
+    """Completa cada usina da cobertura para a aba "Sem ronda" e o indicador "Nunca tiveram ronda" (Levi, 08/10/2026):
+    - `nunca`: nenhuma ronda em TODO o registro do Nexus, não só no período: o livro de rondas do App, as avulsas e a
+      carga única do checklist das rondas sem OS (`nexus_rondas_checklist`);
+    - `tecnicos` (nomes curtos) e `n_tecnicos`: os técnicos da equipe da usina, pelo cadastro;
+    - `ultima_os`: a última OS fechada pelo App na usina (`_ultima_os_por_usina`).
+    Devolve desde quando vai o registro (a data mais antiga das três fontes), que o indicador diz no `title`."""
+    carga = _livro("nexus_rondas_checklist", "fato_checklist_ronda")
+    com_ronda = {r["usina_id"] for r in ligadas if r["usina_id"]} | {D._id(f.get("usina_id")) for f in carga
+                                                                     if D._id(f.get("usina_id"))}
+    datas = [r["data"] for r in ligadas if _DATA_ISO.match(r["data"] or "")]
+    datas += [str(f.get("inicio") or "")[:10] for f in carga if _DATA_ISO.match(str(f.get("inicio") or ""))]
+    tecnicos, ultima_os = _tecnicos_por_equipe(b), _ultima_os_por_usina(b)
+    for c in cobertura:
+        eid = D._id((b.por_id.get(c["usina_id"]) or {}).get("equipe_id"))
+        c["nunca"] = c["usina_id"] not in com_ronda
+        c["tecnicos"] = tecnicos.get(eid, [])
+        c["n_tecnicos"] = (b.time.get(eid) or {}).get("tecnicos", 0)
+        c["ultima_os"] = ultima_os.get(c["usina_id"])
+    return min(datas, default="")
+
+
 def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
     """As rondas de usina mobilizada, cada uma com duração, horário de Brasília e veredito, e a cobertura das usinas.
     A conta do período (os indicadores) é `painel_rondas`, depois dos filtros da tela."""
@@ -514,7 +570,8 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
         b = _Base()
         hoje = _agora().date()
         lim = _limites()
-        todas = [r for r in _rondas_ligadas(b) if r["mobilizada"]]
+        ligadas = _rondas_ligadas(b)
+        todas = [r for r in ligadas if r["mobilizada"]]
         for r in todas:
             r["dur_min"] = _duracao_min(r)
             r["ini_hm"], r["fim_hm"] = _hm(r["inicio"]), _hm(r["fim"])
@@ -525,8 +582,10 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
             r["pendencia"] = "sem_os" if r["sem_os"] else ("incompleta" if faltas else "")
             r["pend_obs"] = "; ".join(([motivo_sem_os(r["situacao_os"])] if r["sem_os"] else []) + faltas)
         todas.sort(key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
-        return {"todas": todas, "cobertura": _cobertura(b, todas, hoje), "sem_mobilizacao": b.sem_mobilizacao,
-                "hoje": hoje.isoformat()}
+        cobertura = _cobertura(b, todas, hoje)
+        desde = _registro_da_cobertura(b, cobertura, ligadas)
+        return {"todas": todas, "cobertura": cobertura, "sem_mobilizacao": b.sem_mobilizacao,
+                "hoje": hoje.isoformat(), "registro_desde": desde}
     return _ler(("visao_rondas",), calcular)
 
 
@@ -542,6 +601,7 @@ def _resumo_rondas(rondas, lim) -> dict:
     return {"rondas": len(rondas), "longas": sum(1 for r in rondas if r["tipo"] == "longa"),
             "usinas_rondadas": len({r["usina_id"] or r["usina"] for r in rondas}),
             "nota": round(statistics.mean(notas)) if notas else None,
+            "dur_media": round(statistics.mean(durs)) if durs else None,
             "dur_mediana": round(statistics.median(durs)) if durs else None,
             "curtas": sum(1 for d in durs if d < lim["ronda_dur_min"]),
             "ultima": max((r["data"] for r in rondas), default="")}
@@ -551,15 +611,22 @@ def _por_cluster(periodo, cobertura, lim) -> list[dict]:
     """Quem ronda por cluster (Levi, 05/10: "seria melhor por cluster, aí nesse cluster clicando apareceria as mesmas
     informações porém por pessoa do cluster e também tem que ter um contador de usinas pendentes de ronda"). O cluster é
     o do cadastro (registro mestre), pela usina. Pendentes do cluster = usinas mobilizadas dele que pedem ronda (a regra
-    da Central). Pendentes da pessoa = as da equipe em que ela mais ronda (a equipe da usina, do cadastro)."""
-    pend_eq, usinas_cl, pend_cl, equipes_cl = {}, {}, {}, {}
-    for c in cobertura:
-        cl = c.get("cluster") or SEM_CLUSTER
+    da Central). Pendentes da pessoa = as da equipe em que ela mais ronda (a equipe da usina, do cadastro), e QUAIS são
+    (Levi, 08/10: "quando aparece o técnico tem tipo 'pendentes de ronda = 5' clicando na linha tem que aparecer quais
+    são essas 5"). Cobertura do cluster = usinas dele com ronda no período ÷ usinas dele, a mesma conta do indicador
+    "Cobertura de usinas" e do Painel (para o cartão do cluster bater com o resto da tela)."""
+    com_ronda = {r["usina_id"] for r in periodo if r["usina_id"]}
+    pend_eq, usinas_cl, pend_cl, equipes_cl, lista_eq, lista_cl, cobertas_cl = {}, {}, {}, {}, {}, {}, {}
+    for c in cobertura:                     # a cobertura já vem da mais atrasada para a menos
+        cl, eq = c.get("cluster") or SEM_CLUSTER, c.get("equipe") or SEM_EQUIPE
         usinas_cl[cl] = usinas_cl.get(cl, 0) + 1
-        equipes_cl.setdefault(cl, set()).add(c.get("equipe") or SEM_EQUIPE)
+        cobertas_cl[cl] = cobertas_cl.get(cl, 0) + (c["usina_id"] in com_ronda)
+        equipes_cl.setdefault(cl, set()).add(eq)
         if _pendente(c):
             pend_cl[cl] = pend_cl.get(cl, 0) + 1
-            pend_eq[c.get("equipe") or SEM_EQUIPE] = pend_eq.get(c.get("equipe") or SEM_EQUIPE, 0) + 1
+            pend_eq[eq] = pend_eq.get(eq, 0) + 1
+            lista_eq.setdefault(eq, []).append(_item_pendente(c))
+            lista_cl.setdefault(cl, []).append(_item_pendente(c))
     rondas_cl = {}
     for r in periodo:
         rondas_cl.setdefault(r.get("cluster") or SEM_CLUSTER, []).append(r)
@@ -575,11 +642,120 @@ def _por_cluster(periodo, cobertura, lim) -> list[dict]:
             for r in prs:
                 eqs[r["equipe"] or SEM_EQUIPE] = eqs.get(r["equipe"] or SEM_EQUIPE, 0) + 1
             equipe = max(eqs, key=eqs.get)
-            lista.append({"tecnico": nome, "equipe": equipe, "pendentes": pend_eq.get(equipe, 0), **_resumo_rondas(prs, lim)})
-        out.append({"cluster": cl, "usinas": usinas_cl.get(cl, 0), "pendentes": pend_cl.get(cl, 0),
+            lista.append({"tecnico": nome, "equipe": equipe, "pendentes": pend_eq.get(equipe, 0),
+                          "pendentes_usinas": lista_eq.get(equipe, []), **_resumo_rondas(prs, lim)})
+        n = usinas_cl.get(cl, 0)
+        out.append({"cluster": cl, "usinas": n, "pendentes": pend_cl.get(cl, 0), "pendentes_usinas": lista_cl.get(cl, []),
+                    "cobertas": cobertas_cl.get(cl, 0),
+                    "cobertura_pct": round(100 * cobertas_cl.get(cl, 0) / n) if n else None,
                     "equipes": sorted(equipes_cl.get(cl, set())), "tecnicos": len(pessoas),
                     "pessoas": sorted(lista, key=lambda q: (-q["rondas"], q["tecnico"])), **_resumo_rondas(rs, lim)})
     return sorted(out, key=lambda c: (-c["pendentes"], -c["rondas"], c["cluster"]))
+
+
+def _item_pendente(c) -> dict:
+    """Uma usina que pede ronda, com o porquê escrito como a Central de atenção escreve (`atencao`): o status
+    (`PENDENTE`) e a observação."""
+    longa = LONGA_PENDENTE in str(c.get("falhas") or "").lower()
+    if c["dias"] >= 999:
+        tipo, obs = "nunca", "Nenhuma ronda pelo App desde que a usina foi mobilizada"
+    elif c["dias"] >= DIAS_SEM_RONDA_ALERTA:
+        tipo, obs = "sem_ronda", f"Última ronda em {_dm(c.get('ultima'))}" + (
+            "; a ronda longa também está pendente" if longa else "")
+    else:
+        tipo, obs = "longa_pendente", f"O App pede a ronda longa (última ronda em {_dm(c.get('ultima'))})"
+    rot, cor = PENDENTE[tipo]
+    return {"usina": c["usina"], "usina_id": c["usina_id"], "equipe": c.get("equipe") or "", "dias": c["dias"],
+            "ultima": c.get("ultima"), "tipo": tipo, "longa": longa, "status": rot, "cor": cor, "obs": obs}
+
+
+# ── Painel: quem está melhor (Levi, 08/10/2026: "acho que deve inserir uma visão a mais, dashboards que mostre de
+# fato, regiões com melhores indicadores, melhores coberturas, quais equipes tem melhor qualidade e cobertura, qual
+# cliente, qual supervisor!") ────────────────────────────────────────────────────────────────────────────────────
+DIMENSOES = (("regiao_br", "Região do Brasil"), ("equipe", "Equipe"), ("cliente", "Cliente"), ("supervisor", "Supervisor"))
+# grupo com 1 ou 2 usinas mobilizadas: uma usina a mais ou a menos com ronda muda a cobertura em 50 pontos ou mais
+BASE_PEQUENA = 3
+
+
+def comparativos(periodo, cobertura, lim=None) -> dict:
+    """Os mesmos números do painel, agrupados por região do Brasil (pela UF), equipe, cliente e supervisor, todos do
+    cadastro, pela usina. Cobertura = usinas mobilizadas do grupo com ronda no período ÷ usinas do grupo (a conta do
+    indicador "Cobertura de usinas"); qualidade = a nota média das rondas do grupo; duração média = a média de fim −
+    início; pendentes = a regra da Central. Índice = 60% qualidade + 40% cobertura, a régua do ranking por região do
+    painel do App; grupo sem uma das duas não ganha índice, para não ganhar 100 pela outra metade. Melhor índice
+    primeiro. `base_pequena` marca o grupo com menos de `BASE_PEQUENA` usinas (o número dele oscila muito)."""
+    lim = lim or _limites()
+    com_ronda = {r["usina_id"] for r in periodo if r["usina_id"]}
+    out = {}
+    for chave, _rot in DIMENSOES:
+        g = {}
+        for c in cobertura:
+            a = g.setdefault(c.get(chave) or "—", {"nome": c.get(chave) or "—", "usinas": 0, "cobertas": 0,
+                                                    "pendentes": 0, "rs": []})
+            a["usinas"] += 1
+            a["cobertas"] += c["usina_id"] in com_ronda
+            a["pendentes"] += _pendente(c)
+        for r in periodo:
+            if (r.get(chave) or "—") in g:
+                g[r.get(chave) or "—"]["rs"].append(r)
+        lista = []
+        for a in g.values():
+            a.update(_resumo_rondas(a.pop("rs"), lim))
+            a["cobertura_pct"] = round(100 * a["cobertas"] / a["usinas"]) if a["usinas"] else None
+            a["indice"] = (round(PESO_QUALIDADE * a["nota"] + PESO_COBERTURA * a["cobertura_pct"])
+                           if a["nota"] is not None and a["cobertura_pct"] is not None else None)
+            a["base_pequena"] = a["usinas"] < BASE_PEQUENA
+            lista.append(a)
+        lista.sort(key=lambda a: (a["indice"] is None, -(a["indice"] or 0), -(a["cobertura_pct"] or 0), a["nome"]))
+        out[chave] = lista
+    return out
+
+
+# ── Sujidade e vegetação: o que está mais crítico ─────────────────────────────────────────────────────────────────
+# Levi, 08/10/2026: "quero que não fique ordenado pela data e sim pelo o que está mais crítico, um balanço entre
+# vegetação, sujidade, vala e sensores. Terá um status com atenção por exemplo (vegetação 4 = vegetação alta, vegetação
+# 5 = vegetação muito alta, alta sujidade, vala obstruída e etc.)". Os pesos (a soma é a nota de criticidade):
+# - sujidade e vegetação: nível 5 vale 5, nível 4 vale 3, nível 3 vale 1 (acima de 3 já pede ação no App; o 3 só
+#   desempata), 1 e 2 valem 0;
+# - vala obstruída (ou "suja", a palavra da ronda avulsa) vale 4; parcial, 2;
+# - cada sensor sujo (IPOA, albedômetro, GHI) vale 2: sensor sujo falseia a irradiação e o PR da usina inteira.
+# Assim vegetação 5 + vala obstruída (9) passa à frente de sujidade 5 sozinha (5), e uma usina com tudo no nível 4
+# (3 + 3 = 6) passa à frente de uma vala só obstruída (4). O sombreamento entra no Status, mas não pesa: em 804 rondas
+# lidas (07/10) só uma tinha a resposta, e era texto livre.
+PESO_NIVEL = {5: 5, 4: 3, 3: 1}
+PESO_VALA = {"obstruida": 4, "suja": 4, "parcial": 2}
+PESO_SENSOR = 2
+_SEM_SOMBRA = {"", "nao", "sem", "nenhum", "nenhuma", "ausente", "nao se aplica", "sem sombreamento", "nao ha", "ok",
+               "limpo", "none"}
+
+
+def criticidade(x) -> tuple[int, list[tuple[str, str]]]:
+    """(nota de criticidade, [(o que chama atenção, cor)]) de uma leitura de sujidade e vegetação, o mais grave
+    primeiro. Cor: "critico" (nível 5, vala obstruída), "alerta" (nível 4, vala parcial, sensor sujo), "info"
+    (sombreamento apontado). Sem nada: lista vazia (a tela diz "Sem alerta")."""
+    pontos, itens = 0, []
+    for campo, nome in (("vegetacao", "Vegetação"), ("sujidade", "Sujidade")):
+        n = x.get(campo)
+        pontos += PESO_NIVEL.get(n, 0)
+        if n == 5:
+            itens.append((f"{nome} muito alta", "critico"))
+        elif n == 4:
+            itens.append((f"{nome} alta", "alerta"))
+    vala = _norm_txt(x.get("vala"))
+    pontos += PESO_VALA.get(vala, 0)
+    if PESO_VALA.get(vala) == 4:
+        itens.append(("Vala obstruída", "critico"))
+    elif vala == "parcial":
+        itens.append(("Vala parcial", "alerta"))
+    sensores = list(x.get("sensores_sujos") or [])
+    if sensores:
+        pontos += PESO_SENSOR * len(sensores)
+        itens.append(("Sensor sujo (" + ", ".join(sensores) + ")", "alerta"))
+    if _norm_txt(x.get("sombreamento")) not in _SEM_SOMBRA:
+        itens.append(("Sombreamento", "info"))
+    ordem = {"critico": 0, "alerta": 1, "info": 2}
+    itens.sort(key=lambda i: ordem[i[1]])
+    return pontos, itens
 
 
 def historico_usina(todas, respostas: dict, usina_id) -> list[dict]:
@@ -645,7 +821,9 @@ def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
                 "dur_media": round(statistics.mean(durs)) if durs else None,
                 "dur_mediana": round(statistics.median(durs)) if durs else None,
                 "curtas": sum(1 for d in durs if d < lim["ronda_dur_min"]), "dur_min": lim["ronda_dur_min"],
-                "atrasada": atrasada, "nunca": sum(1 for c in cobertura if c["dias"] >= 999),
+                # nunca teve ronda em TODO o registro do Nexus, não só no período (Levi, 08/10: "em KPIs coloque mais
+                # um, quantas usinas nunca tiveram ronda"); `rondas` marca `nunca` com o livro, as avulsas e a carga
+                "atrasada": atrasada, "nunca": sum(1 for c in cobertura if c.get("nunca", c["dias"] >= 999)),
                 "sem_ronda_alerta": sum(1 for c in cobertura if c["dias"] >= DIAS_SEM_RONDA_ALERTA),
                 "sem_os": sum(1 for r in periodo if r["sem_os"])}}
 
@@ -683,8 +861,15 @@ def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: s
                        "vala": resp.get("vala") or "", "sombreamento": resp.get("sombreamento") or "",
                        "dejeto": resp.get("dejeto") or "", "sensores_sujos": resp.get("sensores_sujos") or [],
                        "avulsa": bool(r.get("avulsa"))})
+    for x in linhas:
+        x["pontos"], x["status"] = criticidade(x)
+        x["vala_peso"] = PESO_VALA.get(_norm_txt(x["vala"]), 0)      # a cor e a ordem da coluna Vala, sem acento
     alto = lambda n: n is not None and n > 3
-    linhas.sort(key=lambda x: (-max(x["sujidade"] or 0, x["vegetacao"] or 0), -(x["sujidade"] or 0), x["usina"]))
+    # o mais crítico primeiro (Levi, 08/10: "não fique ordenado pela data"); empate: o maior nível, depois a mais
+    # recente, depois o nome
+    linhas.sort(key=lambda x: x["usina"])
+    linhas.sort(key=lambda x: x["data"], reverse=True)          # ordenação estável: o critério principal fica por último
+    linhas.sort(key=lambda x: (-x["pontos"], -max(x["sujidade"] or 0, x["vegetacao"] or 0)))
     dist = lambda k: {n: sum(1 for x in linhas if x[k] == n) for n in range(1, 6)}
     media = lambda k: round(statistics.mean([x[k] for x in linhas if x[k] is not None]), 1) if any(x[k] is not None for x in linhas) else None
     return {"linhas": linhas,
@@ -806,68 +991,8 @@ def zeladoria() -> leitura.Leitura:
     return _ler(("visao_zeladoria",), calcular)
 
 
-# ── Ranking ──────────────────────────────────────────────────────────────────────────────────────────────────────
-def ranking(dias: int = 30) -> leitura.Leitura:
-    """Regiões: 60% a nota média dos fechamentos + 40% a cobertura de ronda (usinas mobilizadas da equipe com ronda nos
-    últimos 14 dias), a régua do painel do App. Colaboradores: nota média, fechamentos, pontualidade e devolvidas no
-    período, somados pelo código da pessoa (dois técnicos com o mesmo nome resumido não se misturam)."""
-    def calcular():
-        b = _Base()
-        quem = _quem()
-        agora = _agora()
-        piso = agora - timedelta(days=dias)
-        fech = [r for r in _livro("fechamentos_app_campo") if (_dt(r.get("Registrado em")) or agora) >= piso]
-        cob = _cobertura(b, [r for r in _rondas_ligadas(b) if r["mobilizada"]], agora.date())
-
-        def agrega(chave, nome=lambda k: k):
-            g = {}
-            for r in fech:
-                k = chave(r)
-                if not k:
-                    continue
-                a = g.setdefault(k, {"nome": nome(k), "os": 0, "notas": [], "pontuais": 0, "devolvidas": 0})
-                a["os"] += 1
-                if _int(r.get("Nota do painel")) is not None:
-                    a["notas"].append(_int(r.get("Nota do painel")))
-                a["pontuais"] += _sim(r.get("Pontual"))
-                a["devolvidas"] += _sim(r.get("Devolvida"))
-            for a in g.values():
-                a["nota"] = round(statistics.mean(a["notas"])) if a["notas"] else None
-                a["pontual_pct"] = round(100 * a["pontuais"] / a["os"]) if a["os"] else None
-                a["devolvidas_pct"] = round(100 * a["devolvidas"] / a["os"]) if a["os"] else None
-                del a["notas"]
-            return g
-
-        regioes = agrega(lambda r: str(r.get("Região") or "").strip())
-        do_cadastro = {n for n in b.nome_equipe.values() if n}
-        fora = sorted(({"nome": k, "os": a["os"]} for k, a in regioes.items() if k not in do_cadastro),
-                      key=lambda a: -a["os"])
-        regioes = {k: a for k, a in regioes.items() if k in do_cadastro}
-        por_equipe = {}
-        for c in cob:
-            if c["equipe"]:
-                e = por_equipe.setdefault(c["equipe"], {"usinas": 0, "cobertas": 0})
-                e["usinas"] += 1
-                e["cobertas"] += c["dias"] < DIAS_COBERTURA
-        for nome, e in por_equipe.items():
-            a = regioes.setdefault(nome, {"nome": nome, "os": 0, "pontuais": 0, "devolvidas": 0, "nota": None,
-                                          "pontual_pct": None, "devolvidas_pct": None})
-            a.update(usinas=e["usinas"], cobertas=e["cobertas"])
-        for a in regioes.values():
-            a.setdefault("usinas", 0)
-            a.setdefault("cobertas", 0)
-            a["cobertura_pct"] = round(100 * a["cobertas"] / a["usinas"]) if a["usinas"] else None
-            # só pontua quem tem as duas partes: região sem fechamento no período (ou sem usina mobilizada) não pode
-            # ganhar 100 só pela outra metade
-            a["pontos"] = (round(PESO_QUALIDADE * a["nota"] + PESO_COBERTURA * a["cobertura_pct"])
-                           if a["nota"] is not None and a["cobertura_pct"] is not None else None)
-        colab = {k: a for k, a in agrega(lambda r: _codigo(r.get("Técnico (HMAC)")),
-                                         lambda k: _nome(quem, k)).items() if a["nome"]}
-        ordem = lambda a: (-(a["pontos"] if a.get("pontos") is not None else -1), a["nome"])
-        return {"regioes": sorted(regioes.values(), key=ordem), "fora_do_cadastro": fora,
-                "colaboradores": sorted(colab.values(), key=lambda a: (-(a["nota"] or 0), -a["os"], a["nome"])),
-                "resumo": {"fechamentos": len(fech), "sem_nome": sum(1 for r in fech if not _nome(quem, r.get("Técnico (HMAC)")))}}
-    return _ler(("visao_ranking", dias), calcular)
+# (o Ranking saiu em 08/10/2026 com a tela dele, Levi: "ordens de serviço e imagens da ronda e ranking são
+# redundantes"; a régua 60/40 vive nos comparativos do Painel das Rondas)
 
 
 # ── Equipe e supervisor das usinas do Fracttal ───────────────────────────────────────────────────────────────────
@@ -1004,6 +1129,36 @@ def por_equipe(usinas, pendentes, feitas, pts, times=None) -> list[dict]:
         c["pct_feitas"] = round(100 * c["feitas"] / c["usinas"]) if c["usinas"] else None
         c["regioes"], c["ufs"] = sorted(c["regioes"]), sorted(c["ufs"])
     return list(eq.values())
+
+
+# Somados por supervisor (Levi, 08/10/2026: "além de por equipe e tabela, adicione mais um botão (por supervisor). Faça
+# o mesmo na tela permissões de trabalho"). Só os números que se somam; o % e as feitas são refeitos sobre a soma.
+_SOMA_SUPERVISOR = ("usinas", "pendentes", "nunca", "sem_ronda", "longa_pendente", "rondas", "ok", "sem_os",
+                    "incompleta", "pts", "parada", "tecnicos", "ativos")
+
+
+def por_supervisor(cartoes) -> list[dict]:
+    """Um cartão por supervisor, somando os cartões de equipe dele (`por_equipe`, já filtrados pela tela): usinas
+    pendentes, % feitas, o detalhe por status, PT esperando e paradas, técnicos e equipes. O supervisor da equipe é o
+    mesmo do cartão de equipe (o `supervisor_id` dos técnicos, no cadastro); equipe sem supervisor no cadastro vai para
+    o cartão próprio `SEM_SUPERVISOR`."""
+    g = {}
+    for c in cartoes:
+        nome = c.get("supervisor") or SEM_SUPERVISOR
+        s = g.setdefault(nome, {"supervisor": nome, "equipes": [], "regioes": set(), "ufs": set(),
+                                **dict.fromkeys(_SOMA_SUPERVISOR, 0)})
+        s["equipes"].append(c["equipe"])
+        for k in _SOMA_SUPERVISOR:
+            s[k] += c.get(k) or 0
+        s["regioes"].update(c.get("regioes") or [])
+        s["ufs"].update(c.get("ufs") or [])
+    for s in g.values():
+        s["equipes"] = sorted(s["equipes"])
+        s["n_equipes"] = len(s["equipes"])
+        s["feitas"] = max(0, s["usinas"] - s["pendentes"])
+        s["pct_feitas"] = round(100 * s["feitas"] / s["usinas"]) if s["usinas"] else None
+        s["regioes"], s["ufs"] = sorted(s["regioes"]), sorted(s["ufs"])
+    return list(g.values())
 
 
 def limpar():

@@ -3,8 +3,8 @@ Fracttal com métricas bem estabelecidas, é só copiar a regra e fazer um códi
 
 As réguas são as do App, copiadas sem mudar linha em regras_app.py, e são DUAS:
 - a do PAINEL, `_qualidade_os` (subtarefas obrigatórias 25, fotos 20 com 3 dando o total, descrição 10, assinatura 10,
-  observações 15, GPS no fechamento 20). É ela que o App grava no registro (`qualidade`) e que a Aprovação de OS, as
-  Ordens de serviço e a Triagem mostram;
+  observações 15, GPS no fechamento 20). É ela que o App grava no registro (`qualidade`) e que a Aprovação de OS e a
+  Triagem mostram;
 - a do PLACAR, `_qualidade_v2` (régua de 01/09/2026), que dá os pontos do ranking.
 (Na 1ª prova, de 04/10, a nota mostrada ao Levi foi a do placar: corrigido no mesmo dia.)
 
