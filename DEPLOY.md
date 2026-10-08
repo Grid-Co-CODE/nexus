@@ -112,6 +112,11 @@ o servidor inteiro como uma só.
 7. **Performance → Clima e risco** abre com as três fontes em verde (INMET, focos e risco de fogo do INPE). A primeira
    visita leva uns 10 s (lê o risco de fogo de todas as usinas); depois a tela é imediata. Fonte "fora agora": confira a
    saída para os dois endereços da seção 0 (ver a seção 7c).
+8. **OS Creator → Solicitação → Engenharia** mostra a escolha "Uma OS por ativo" × "Uma OS com todos os ativos" e o
+   campo de anexos (desde 08/10/2026), e o menu de Responsável traz os nomes da linha `OS_WEB_ENGENHARIA_RESPONSAVEIS`
+   do `.env` do OS Creator (06/10/2026; o Levi manda a linha, os nomes não vão ao GitHub). Menu vazio = falta a linha.
+   O envio com anexos aceita até 21 MB: o Nexus aceita 25 MB por pedido e o Caddy não limita; outro proxy na frente
+   precisa de pelo menos 25 MB de corpo.
 
 ## 7. Campo · App: o Nexus lê o que o App grava
 
@@ -119,6 +124,11 @@ As telas Aprovação de OS e Triagem leem o registro de cada fechamento **que o 
 grava no banco** (API db_performace, livros `fechamentos_app_campo` e `rondas_app_campo`, de hora em hora). O técnico
 vem como código (HMAC do e-mail): o `.env` do pacote já traz a `NEXUS_PESSOA_HMAC`, a MESMA chave da configuração do
 App. Sem ela, as telas seguiriam com o livro antigo do coletor (dados parados).
+
+**Ordem com o App (08/10/2026):** o livro de rondas do App ainda traz o nome do técnico; o pacote do App que passa a
+gravar só o código (`Técnico (HMAC)`) só pode ser publicado **depois** que o servidor do Nexus estiver no commit
+`371eb44` ou mais novo, que lê as duas colunas. Na ordem inversa, as telas de Rondas do servidor ficam sem o nome do
+técnico até a atualização.
 
 **O coletor do Fracttal está aposentado:** não ponha `NEXUS_CAMPO_COLETOR=1` no servidor (o pacote não tem). Ele lia o
 Fracttal com a cota da empresa inteira para recalcular uma nota que o App já grava.
@@ -129,9 +139,17 @@ incompleta; a tela continua de pé.
 
 ## 7a. Camada de dados: a carga de hora em hora
 
-O Nexus grava, aos :40 de cada hora, os livros `nexus_dimensoes` (calendário, feriados, histórico de pessoas e usinas) e
-`nexus_fatos` (os fatos com os IDs do cadastro e a qualidade da ligação) na API do banco. Liga sozinho onde há o
-`GRIDCO_SQL_TOKEN` no `.env` (o pacote tem); não precisa de nada a mais. Com o PC do Levi e o servidor no ar ao mesmo
+O Nexus grava, aos :40 de cada hora, na API do banco: `nexus_dimensoes` (calendário, feriados, histórico de pessoas e
+usinas), `nexus_fatos` (fechamento, ronda e PT com os IDs do cadastro, e a qualidade da ligação), `nexus_equipamentos`
+(a dimensão de equipamento, só quando muda) e `nexus_programacao` (a programação do PCM, juntando semana a semana: a
+semana que o arquivo do PCM ainda traz é trocada, as antigas ficam). Liga sozinho onde há o `GRIDCO_SQL_TOKEN` no `.env`
+(o pacote tem). Precisa também da `NEXUS_CHAVE_CADASTRO` (sem ela o técnico e o responsável da programação saem vazios)
+e da `NEXUS_PESSOA_HMAC` (sem ela a pessoa dos fatos do App não liga).
+
+**Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
+livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"
+(`inicio_presumido = 1` na 1ª versão de cada uma). Conferir em Base → Governança de dados, uma hora depois do restart:
+a hora da carga com a máquina "servidor", as barras de ligação de cada fato e a programação com 21 semanas ou mais. Com o PC do Levi e o servidor no ar ao mesmo
 tempo, só um grava por hora (o outro vê a hora da última carga no próprio livro e pula). Desligar numa máquina:
 `NEXUS_CARGA_DADOS=0`. Conferir: Base → **Governança de dados** mostra a hora da última carga e a máquina.
 
