@@ -10,8 +10,13 @@ Grão: 1 linha = 1 código de ativo do Fracttal, canônico (maiúsculo, sem espa
 Os dois formatos de código do Fracttal (exemplos inventados): "ABC100-INVR2.4" (só a usina) e "XYZ-ABC100-INVR11.1"
 (com o prefixo do cliente). `codigo_do_equipamento` (cadastro) lê os dois.
 
-ID estável SEM registro: `equipamento_id = int(sha1("fracttal:" + código).hexdigest()[:13], 16)` (52 bits, < 2^53:
-exato no JSON e no JavaScript). PC e servidor rodam a carga (41 cargas do PC e 37 do servidor na auditoria): com "maior
+ID estável SEM registro: `equipamento_id = int(sha1("fracttal:" + código).hexdigest()[:13], 16) >> 3` (49 bits: no
+máximo 562.949.953.421.311, 15 dígitos). 49 e não 52 (Levi, 08/10/2026, "conserte da melhor forma"): com 52 bits 77% dos
+IDs tinham 16 dígitos e o Excel, que guarda 15, trocava o último por 0 (2150948520386742 virava ...740) — quem cruzasse
+pelo Excel ligaria ao equipamento errado. 49 bits é o maior tamanho que sempre cabe em 15 dígitos; medido nos 22.353
+códigos das duas fotos: 0 colisões (chance teórica ~4e-7; ~9e-6 com 100 mil códigos), e a colisão que um dia vier
+recusa a dimensão (`test_colisao_de_id_recusa_a_dimensao`), nunca liga ao membro errado. Exato também no JSON e no
+JavaScript (< 2^53). PC e servidor rodam a carga (41 cargas do PC e 37 do servidor na auditoria): com "maior
 + 1" cada máquina daria o próximo número a um código diferente, o defeito que o cadastro já teve. Derivado do código, as
 duas calculam o mesmo número sem conversar, o fato põe o ID sem ler a dimensão e o membro que some e volta volta com o
 mesmo ID. Custo medido: o código renomeado no Fracttal vira membro novo (19 itens com outro código entre a foto de
@@ -101,11 +106,12 @@ def canon(codigo) -> str:
 
 
 def equipamento_id(codigo) -> int | None:
-    """52 bits do sha1 do código canônico: o mesmo número em qualquer máquina, em qualquer carga, sem registro."""
+    """49 bits do sha1 do código canônico (cabe nos 15 dígitos do Excel): o mesmo número em qualquer máquina, em
+    qualquer carga, sem registro."""
     c = canon(codigo)
     if not c:
         return None
-    return int(hashlib.sha1(f"fracttal:{c}".encode("utf-8")).hexdigest()[:13], 16)
+    return int(hashlib.sha1(f"fracttal:{c}".encode("utf-8")).hexdigest()[:13], 16) >> 3
 
 
 def valido(codigo, na_foto) -> bool:
@@ -471,7 +477,7 @@ def montar(foto, codigos_por_fonte: dict, usinas, de_para_trackers, gemeo_alias,
                "qualidade": (CAB_QUALIDADE, q)}
     sha = sha_linhas(tabelas)
     tabelas["atualizacao"] = (CAB_ATUALIZACAO, [[agora, maquina, None, len(dim), sha,
-                                                 "equipamento_id = sha1('fracttal:' + código)[:13 hex]; o fato liga "
+                                                 "equipamento_id = sha1('fracttal:' + código)[:13 hex] >> 3 (49 bits); o fato liga "
                                                  "pelo código; vazio = não ligou (ver qualidade)"]])
     i = {c: k for k, c in enumerate(CAB_DIM)}
     ix = indice(dim)

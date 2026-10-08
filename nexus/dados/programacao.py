@@ -111,7 +111,7 @@ def _num(v):
     if isinstance(v, bool) or v is None:
         return None
     if isinstance(v, int):
-        return v                       # sem passar por float: o equipamento_id tem 52 bits
+        return v                       # sem passar por float: o equipamento_id tem 49 bits
     if isinstance(v, float):
         x = v
     else:

@@ -69,11 +69,13 @@ def _dim():
 
 
 # ── o código e o ID ───────────────────────────────────────────────────────────────────────────────────────────────
-def test_id_derivado_do_codigo_canonico_cabe_em_53_bits():
+def test_id_derivado_do_codigo_canonico_cabe_nos_15_digitos_do_excel():
     assert eq.canon(" abc100-invr 2.4 ") == "ABC100-INVR2.4" and eq.canon(None) == ""
-    esperado = int(hashlib.sha1(b"fracttal:ABC100-INVR2.4").hexdigest()[:13], 16)
+    esperado = int(hashlib.sha1(b"fracttal:ABC100-INVR2.4").hexdigest()[:13], 16) >> 3
     assert eq.equipamento_id("abc100-invr 2.4") == eq.equipamento_id("ABC100-INVR2.4") == esperado
-    assert 0 < esperado < 2 ** 53
+    assert 0 < esperado < 2 ** 49
+    # o maior ID possível cabe nos 15 dígitos do Excel (com 52 bits, 77% tinham 16 e o Excel trocava o último por 0)
+    assert len(str(2 ** 49 - 1)) == 15
     assert eq.equipamento_id("") is None and eq.equipamento_id(None) is None
 
 
@@ -228,7 +230,7 @@ def _aba(api, livro, aba, linhas):
 
 
 def test_dimensao_montada_so_do_banco_e_o_id_sobrevive_ao_xlsx():
-    """O membro não depende da máquina: tudo sai do banco (aqui o falso, devolvendo TEXTO), e o ID de 52 bits volta
+    """O membro não depende da máquina: tudo sai do banco (aqui o falso, devolvendo TEXTO), e o ID de 49 bits volta
     exato depois do xlsx da gravação."""
     api = ApiPGFalsa(como_texto=True)
     livros.publicar(eq.LIVRO_FOTO, eq.NOME_FOTO, {eq.ABA_FOTO: (eq.CAB_FOTO, eq.foto_linhas(FOTO_SET, FOTO_JUN))},
