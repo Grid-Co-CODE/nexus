@@ -6,8 +6,8 @@ Quem é da equipe: os mesmos nomes da Nova solicitação | Engenharia do OS Crea
 .env do OS Creator, separados por ";"; o repositório é público, então os nomes não ficam no código). `NEXUS_ENGENHARIA_
 RESPONSAVEIS` no .env do Nexus vale por cima, se existir.
 
-Leitura (medido em 06/10): o REST filtra OS pelo nome do responsável (`personnel_description`, por trecho: "Aury" acha
-"Aury  Albuquerque"), mas IGNORA `id_personnel`. Então: cada nome vira a pessoa do Fracttal pela lista `personnel` (150
+Leitura (medido em 06/10): o REST filtra OS pelo nome do responsável (`personnel_description`, por trecho: "Fulano" acha
+"Fulano de Tal"), mas IGNORA `id_personnel`. Então: cada nome vira a pessoa do Fracttal pela lista `personnel` (150
 pessoas, guardada 24 h; nome igual ou começando pelo nome do .env, só se for UMA), e as OS vêm pelo nome e são
 conferidas pelo `id_personnel` dela (um homônimo não entra). Os 6 somavam 55 linhas: ~8 pedidos por leitura, guardada
 5 min. Nada vai para o banco.

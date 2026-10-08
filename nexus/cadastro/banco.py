@@ -203,6 +203,51 @@ def _quando_curto(iso) -> str:
         return ""
 
 
+def _pela_ponte(it: dict, ids: list, como, ligado: dict, por_norma: dict) -> tuple[list, str | None]:
+    """A `ponte` = (sistema, chave, via): a chave que OUTRA base dá a este item (a tabela de equipamentos do
+    BD_Performance dá à aba de geração o nome da usina no Fracttal). O item liga à usina a que aquele sistema ligou a
+    chave, se for UMA (Levi, 08/10/2026: "se liga ao fractall e aí você ligaria o fractal as usinas do BD_Operações e
+    fecharia esse ciclo"). `ids`/`como` = o que os caminhos antigos (igual_a, código, nome) deram.
+    - A ponte liga e o caminho antigo não diz nada, diz a mesma usina ou diz duas usinas entre as quais está a da ponte
+      (o casamento por potência que soma "X 1" e "X 2" numa linha não decide; a tabela decide): vale a ponte
+      (`casou_por` = o caminho).
+    - Os dois discordam: ninguém liga e o `casou_por` mostra os dois (ligação errada é pior que faltando).
+    - A ponte não fecha (sem linha na tabela, nome fora do de-para, chave do Fracttal ignorada, de 2 usinas ou sem par):
+      vale o caminho antigo; se ele também não liga, o `casou_por` diz o motivo da ponte.
+    O nome acha a chave exata ou, sem ela, a ÚNICA chave do sistema com o mesmo nome normalizado ("Athon -  Timon 1"
+    com dois espaços na tabela do Fracttal)."""
+    motivo = it.get("ponte_motivo")
+    ids_p, como_p = [], None
+    if it.get("ponte"):
+        sistema, nome, via = (str(x) for x in it["ponte"])
+        chave = nome if (sistema, nome) in ligado else None
+        if chave is None:
+            cands = por_norma.get((sistema, norm(nome)), set())
+            if len(cands) == 1:
+                chave = next(iter(cands))
+            else:
+                motivo = (f"nome do Fracttal casa {len(cands)} chaves do de-para" if cands
+                          else "nome do Fracttal fora do de-para")
+        if chave is not None:
+            ids_f, como_f = ligado[(sistema, chave)]
+            if str(como_f or "").startswith("ignorado"):
+                motivo = f"chave do Fracttal {como_f}"
+            elif len(ids_f) == 1:
+                ids_p, como_p = list(ids_f), f"{via} ({como_f})"
+            elif ids_f:
+                motivo = f"chave do Fracttal de {len(ids_f)} usinas"
+            else:
+                motivo = f"chave do Fracttal {como_f or SEM_PAR}"
+        motivo = f"{via}: {motivo}" if motivo else None
+    if ids_p:
+        if not ids or set(ids_p) <= set(ids):
+            return ids_p, como_p
+        return [], f"conflito: {como_p} = usina {ids_p[0]}; {como} = usina {'/'.join(str(i) for i in sorted(ids))}"
+    if ids:
+        return ids, como
+    return [], (f"{como or SEM_PAR} ({motivo})" if motivo else como)
+
+
 def de_para(srv, fontes: dict, regras=None) -> list[list]:
     """Uma linha por chave externa de cada base: a usina_id a que ela liga e COMO ligou, ou por que não ligou.
     `fontes` = {sistema: [{"chave", "codigo", "nome", "cliente", "nomes", "cidade", "uf", "mwp", "dica"}]}.
@@ -216,7 +261,8 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
     Geração em linhas (08/10/2026): a aba do BD_Thopen que é a mesma usina de uma chave já casada de outro sistema traz
     `igual_a` = (sistema, chave) e herda a ligação dela, decisões da tela inclusas (a fonte de referência vem antes em
     `fontes`); o código achado em outra aba da mesma base (a "Info Geral" do BD_Performance) traz `codigo_de`, que fica
-    escrito no `casou_por` ("código (Info Geral)"), para a linhagem dizer de onde veio."""
+    escrito no `casou_por` ("código (Info Geral)"), para a linhagem dizer de onde veio. A `ponte` (a tabela de
+    equipamentos do BD_Performance: aba -> nome no Fracttal) vem antes desses caminhos: ver `_pela_ponte`."""
     from . import casamento as K
     ignorar, ligar, desligar = _decisoes(regras)
     manual = {(d["sistema"], str(d["chave"])): d for d in ligar}
@@ -240,6 +286,7 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
               for u in srv.registros("usinas") if u.valor("id_bd")]
     ligado_por_nome = {}                    # chave externa (ex.: nome no Fracttal) -> usina_id, para as dicas
     ligado = {}                             # (sistema, chave) -> ([usina_id], como), para o `igual_a` de outra fonte
+    por_norma = {}                          # (sistema, chave normalizada) -> {chaves}, para a `ponte` achar a chave
     for sistema, itens in fontes.items():
         vistos = set()
         for it in itens:
@@ -280,6 +327,8 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
                 nome = norm(f"{it['cliente']} - {it['nome']}") if it.get("cliente") else norm(it["nome"])
                 if len(por_nome.get(nome, ())) == 1:
                     ids, como = list(por_nome[nome]), "nome"
+            if not m and (it.get("ponte") or it.get("ponte_motivo")) and not str(como or "").startswith("ignorado"):
+                ids, como = _pela_ponte(it, ids, como, ligado, por_norma)
             if ids and not m and any((sistema, str(it["chave"]), i) in vetado for i in ids):
                 ids = [i for i in ids if (sistema, str(it["chave"]), i) not in vetado]
                 como = como if ids else "desligado à mão"
@@ -288,6 +337,7 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
             if ids and como == "código" and it.get("codigo_de"):
                 como = f"código ({it['codigo_de']})"    # o código não é a chave: veio de outra aba da mesma base
             ligado[(sistema, str(it["chave"]))] = (ids, como)
+            por_norma.setdefault((sistema, norm(it["chave"])), set()).add(str(it["chave"]))
             if len(ids) == 1:
                 ligado_por_nome[it["chave"]] = ids[0]
             for uid in ids or [None]:

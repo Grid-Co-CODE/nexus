@@ -4,7 +4,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Ronda avulsa (Levi, 07/10/2026: "a pessoa loga pelo fractal dela ... não terá imagens, só informações da tabela, salva
    nome da pessoa, data e hora e diz que foi avulso"). Conta na cobertura; comentário livre opcional. As contas e as
-   recusas estão em nexus/campo/ronda_avulsa.py; o nome e o comentário vão cifrados para o banco. #}
+   recusas estão em nexus/campo/ronda_avulsa.py; o nome e o comentário vão cifrados para o banco.
+   08/10/2026 (decisão 3 do Levi, antes da 1ª gravação): a vala com as opções do App e sem opção marcada de saída (antes
+   o "Limpa" ia por padrão); cada sensor em três estados, com "Não verifiquei" marcado de saída, que vai VAZIO ao banco
+   (antes, sensor não marcado gravava "limpo" sem ninguém ter olhado). #}
 <div class="campo-nativa">
   <p class="cn-voltar"><a class="cn-link" href="{{ url_for('torre_campo.rondas') }}">Voltar para Rondas</a></p>
   <div class="cn-cab">
@@ -43,12 +46,14 @@
       <fieldset class="cn-campo-avulsa"><legend>Altura da vegetação</legend>
         <div class="cn-opcoes">{% for n in range(1, 6) %}<label class="cn-nivel-op"><input type="radio" name="vegetacao" value="{{ n }}"{% if form.get('vegetacao') == n|string %} checked{% endif %} required><span class="cn-nivel cn-nivel--{{ n }}">{{ n }}</span></label>{% endfor %}</div></fieldset>
       <label class="cn-campo-avulsa"><span>Vala de drenagem</span>
-        <select class="gc-campo" name="vala" required>{% for v in valas %}<option{% if form.get('vala') == v %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+        <select class="gc-campo" name="vala" required><option value="">escolha</option>{% for v in valas %}<option{% if form.get('vala') == v %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
       <fieldset class="cn-campo-avulsa"><legend>Sombreamento</legend>
         <div class="cn-opcoes">{% for s in ('não', 'sim') %}<label><input type="radio" name="sombreamento" value="{{ s }}"{% if form.get('sombreamento', 'não') == s %} checked{% endif %}> {{ s }}</label>{% endfor %}</div></fieldset>
-      <fieldset class="cn-campo-avulsa cn-largo"><legend>Sensores sujos</legend>
-        <div class="cn-opcoes">{% for s in sensores %}<label><input type="checkbox" name="sensores" value="{{ s }}"{% if s in form.getlist('sensores') %} checked{% endif %}> {{ s }}</label>{% endfor %}
-          <span class="mudo">nenhum marcado = limpos</span></div></fieldset>
+      <div class="cn-campo-avulsa cn-largo"><span>Sensores: marque só o que você olhou. "Não verifiquei" fica vazio no banco e nunca conta como limpo.</span></div>
+      {% for c, n in sensores %}
+      <fieldset class="cn-campo-avulsa"><legend>{{ n }}</legend>
+        <div class="cn-opcoes">{% for v, rotulo in estados_sensor %}<label><input type="radio" name="{{ c }}" value="{{ v }}"{% if form.get(c, '') == v %} checked{% endif %}> {{ rotulo }}</label>{% endfor %}</div></fieldset>
+      {% endfor %}
       <label class="cn-campo-avulsa cn-largo"><span>Comentário <i class="mudo">(opcional)</i></span>
         <textarea class="gc-campo" name="comentario" rows="3" maxlength="{{ comentario_max }}" placeholder="o que quiser registrar sobre a ronda">{{ form.get('comentario', '') }}</textarea></label>
       <p class="mudo cn-largo">Nível de 1 (limpo, baixa) a 5, a mesma régua das fotos de referência do App. Até 30 dias para trás.</p>

@@ -116,8 +116,22 @@ def ronda_os(r: dict) -> dict:
             "ativo": _txt(r.get("Ativo da usina no Fracttal"))}
 
 
-def ronda(r: dict) -> dict:
+def nome_do_tecnico(r: dict, quem: dict | None) -> str:
+    """O técnico da linha do livro de rondas: `Técnico` (o nome em claro, até a versão do App de 07/10/2026) ou
+    `Técnico (HMAC)` (o código do e-mail, pacote `rondas-tecnico-hmac` do App, 08/10), traduzido pelo cadastro do App
+    (`pessoas_por_codigo`) como nos outros livros. As DUAS colunas valem: na troca, uma leitura no meio do `sync-xlsx`
+    pega linha com o cabeçalho velho e linha com o novo. Código sem dono (pessoa fora do cadastro do App) ou sem a
+    chave NEXUS_PESSOA_HMAC: vazio, nunca o código."""
+    nome = _txt(r.get("Técnico"))
+    if nome:
+        return nome
+    codigo = _txt(r.get("Técnico (HMAC)")).split(";")[0].strip()
+    return _txt(((quem or {}).get(codigo) or ("", ""))[1]) if codigo else ""
+
+
+def ronda(r: dict, quem: dict | None = None) -> dict:
+    """`quem` = {código do App: (e-mail, nome)} (`pessoas_por_codigo`), para a linha que já vem com o código."""
     # sem `finalizada`, como antes: o par serve à fila; a ronda inteira (zonas, trackers) não vem no livro
     return {"PartitionKey": _txt(r.get("Data")), "RowKey": f"nexus-{_txt(r.get('OS'))}", "email": "",
-            "nome": _txt(r.get("Técnico")), "usina": _txt(r.get("Usina")), "cluster": _txt(r.get("Região")),
+            "nome": nome_do_tecnico(r, quem), "usina": _txt(r.get("Usina")), "cluster": _txt(r.get("Região")),
             "qualidade": _int(r.get("Nota da ronda")), "falhas": "[]", "tipo": _txt(r.get("Tipo"))}

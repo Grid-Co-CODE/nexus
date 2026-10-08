@@ -74,3 +74,11 @@ def test_sem_chave_do_cadastro_nao_gera(tmp_path, monkeypatch):
     monkeypatch.delenv("NEXUS_CHAVE_CADASTRO", raising=False)
     with pytest.raises(A.SemCadastro):
         A.servico({"NEXUS_ARMAZEM_LOCAL": str(tmp_path / "x.json")})
+
+
+def test_o_nome_do_arquivo_e_o_que_o_motor_procura():
+    """08/10/2026: o nome do arquivo da AUXILIAR leva o de quem montou a planilha e o repositório é público; o Nexus o lê
+    da cópia do motor (que não se edita) em vez de repeti-lo. Se o motor mudar o jeito de dizer o nome, isto acusa."""
+    from pathlib import Path
+    motor = (Path(A.__file__).parent / "motor" / "fonte_bd_api.py").read_text(encoding="utf-8")
+    assert A.NOME.startswith("AUXILIAR - ") and A.NOME.endswith(".xlsx") and f'"{A.NOME}"' in motor

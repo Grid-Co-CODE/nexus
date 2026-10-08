@@ -5,8 +5,14 @@ A programação semanal do PCM dentro do Nexus. O desenho e as etapas estão em
 manutenções) tem seção própria abaixo.
 
 **Regra de ouro:** o sistema atual segue no ar e intocado até o Nexus bater número a número com ele. Isso vale para o
-gerador no PC do Fabrício, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
+gerador no PC do programador do PCM, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
 Até a troca, tudo aqui é **sombra**: nada é publicado.
+
+**A programação publicada também está no banco (08/10/2026):** o `banco_dados.json` vira o fato
+`nexus_programacao · fato_programacao` (1 linha = 1 bloco de agenda), que a carga de hora em hora mantém pela mescla por
+semana (o arquivo guarda só 4 semanas); as semanas antigas, desde a W21, vieram do histórico do git do PCM
+(`ferramentas/carregar_programacao_historica.py`). Só lê o arquivo do robô, não muda nada desta pasta. Regras, a versão
+escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 
 ## Os módulos
 
@@ -18,7 +24,7 @@ Até a troca, tudo aqui é **sombra**: nada é publicado.
 | `semana.py` | as contas das telas Semana e Tarefas e OS: aderência, horas por equipe, fora da jornada |
 | `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal |
 | `insumos.py` | os insumos do motor guardados no Nexus, escritos na rodada no formato que o motor lê |
-| `comparar.py` | compara a semana do Nexus com a do Fabrício, linha a linha |
+| `comparar.py` | compara a semana do Nexus com a oficial (a do PCM), linha a linha |
 | `telas.py` | as telas, penduradas na torre PCM (`registrar_pcm(bp)`) |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá) |
 
@@ -39,8 +45,8 @@ do original. A AUXILIAR sai do cadastro do Nexus (`auxiliar.py`, desde 02/10/202
 
 - **Armazém:** `C:\GridcoAuto\nexus\pcm\insumos.json`, fora do OneDrive, com a versão anterior ao lado. Trocar pela
   API de dados é mexer só em `insumos.py`.
-- **Na sombra:** "Importar da pasta do PCM" traz os arquivos do Fabrício antes de gerar, para as duas semanas partirem
-  do mesmo dado. A tela avisa quando um arquivo dele mudou depois da importação.
+- **Na sombra:** "Importar da pasta do PCM" traz os arquivos da pasta do PCM antes de gerar, para as duas semanas partirem
+  do mesmo dado. A tela avisa quando um arquivo da pasta mudou depois da importação.
 - **Prova obrigatória** a cada mudança no formato: o que o motor lê do arquivo gerado pelo Nexus tem de ser igual ao
   que ele lia do original, com as mesmas leituras do `programacao_v7.py`. `tests/test_pcm_insumos.py` faz isso com
   dado de mentira; com os arquivos reais, rode a mesma comparação fora do repositório.

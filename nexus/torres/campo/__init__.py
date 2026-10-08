@@ -409,8 +409,10 @@ def rondas():
         # que já estão na fila da Aprovação de OS (nunca espera o Fracttal)
         campo_aprovacao._pedir_releitura()
         ronda_checklist.pedir_releitura()
+        # + a validação por foto (Levi, 08/10/2026): a leitura da usina naquele dia, no lugar da ronda do mesmo dia
         suj = visao.sujidade_vegetacao(filtra(d.get("todas") or []), cobertura, ronda_checklist.respostas(), dias,
-                                       d.get("hoje") or visao._agora().date().isoformat())
+                                       d.get("hoje") or visao._agora().date().isoformat(),
+                                       filtra(d.get("validacoes") or []))
         suj_estado = ronda_checklist.estado()
     comparativos = visao.comparativos(painel["periodo"], cobertura) if aba == "painel" else None
     return render_template("campo/rondas.html", **_comum(
@@ -424,7 +426,7 @@ def rondas():
         cliente=cliente, clientes=clientes, clusters=painel["clusters"], cluster_aberto=cluster_aberto,
         comparativos=comparativos, dimensoes=visao.DIMENSOES, base_pequena=visao.BASE_PEQUENA,
         filtro_da_dimensao={"regiao_br": "regiao", "equipe": "equipe", "cliente": "cliente", "supervisor": "supervisor"},
-        explicacao_avulsa=ronda_avulsa.EXPLICACAO))
+        explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO))
 
 
 @bp.route("/rondas/usina/<int:usina_id>")
@@ -435,12 +437,16 @@ def rondas_usina(usina_id):
     d = leitura.dados or {}
     ronda_checklist.pedir_releitura()
     campo_aprovacao._pedir_releitura()
-    hist = visao.historico_usina(d.get("todas") or [], ronda_checklist.respostas(), usina_id)
+    hist = visao.historico_usina(d.get("todas") or [], ronda_checklist.respostas(), usina_id, d.get("validacoes") or [])
     usina = next((c for c in d.get("cobertura") or [] if c["usina_id"] == usina_id), None) or (hist[0] if hist else None)
-    lidas = [r for r in hist if r["sujidade"] is not None or r["vegetacao"] is not None]
+    # a validação por foto (08/10/2026) é leitura, não ronda: fora da contagem de rondas; a ronda que ela revisou fica
+    # fora da evolução (no dia dela, vale o valor validado)
+    rondas_hist = [r for r in hist if not r.get("validada")]
+    lidas = [r for r in hist if (r["sujidade"] is not None or r["vegetacao"] is not None) and not r.get("revisada")]
     return render_template("campo/rondas_usina.html", **_comum(
-        "rondas", leitura, usina=usina, usina_id=usina_id, hist=hist, lidas=lidas, duracao=_duracao, iniciais=_iniciais,
-        suj_estado=ronda_checklist.estado(), explicacao_avulsa=ronda_avulsa.EXPLICACAO))
+        "rondas", leitura, usina=usina, usina_id=usina_id, hist=hist, rondas_hist=rondas_hist, lidas=lidas,
+        duracao=_duracao, iniciais=_iniciais, suj_estado=ronda_checklist.estado(),
+        explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO))
 
 
 @bp.route("/rondas/avulsa", methods=["GET", "POST"])
@@ -469,8 +475,8 @@ def ronda_avulsa_lancar():
         form=request.form if erro else ImmutableMultiDict(), usinas=ronda_avulsa.usinas_para_escolher() if usuario else [],
         minhas=minhas, explicacao_avulsa=ronda_avulsa.EXPLICACAO, hoje=visao._agora().date().isoformat(),
         piso=(visao._agora().date() - timedelta(days=ronda_avulsa.DIAS_ATRAS)).isoformat(),
-        tipos=ronda_avulsa.TIPOS, valas=ronda_avulsa.VALAS, sensores=[n for _c, n in ronda_avulsa.SENSORES],
-        duracao=_duracao, comentario_max=ronda_avulsa.COMENTARIO_MAX))
+        tipos=ronda_avulsa.TIPOS, valas=ronda_avulsa.VALAS, sensores=ronda_avulsa.SENSORES,
+        estados_sensor=ronda_avulsa.ESTADOS_SENSOR, duracao=_duracao, comentario_max=ronda_avulsa.COMENTARIO_MAX))
     return (html, 400) if erro else html
 
 

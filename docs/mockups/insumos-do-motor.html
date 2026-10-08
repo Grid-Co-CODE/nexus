@@ -76,7 +76,7 @@ h2{font:700 20px/28px var(--display);margin:34px 0 12px}
   <h2>Por que eles eram arquivos externos</h2>
   <div class="porque">
     <div><b><i class="ph ph-desktop"></i> O motor nasceu como script de PC</b>
-      <p>Ele roda na máquina do Fabrício e lê o que estiver na pasta do PCM no OneDrive. Não havia banco para guardar
+      <p>Ele roda na máquina do programador do PCM e lê o que estiver na pasta do PCM no OneDrive. Não havia banco para guardar
         estas informações, então cada uma virou um arquivo ao lado do script.</p></div>
     <div><b><i class="ph ph-users-three"></i> Cada insumo tem um dono diferente</b>
       <p>O cadastro vem do BD_Operações, a prioridade de uma análise das OS, a confiabilidade de outra, os feriados de
@@ -90,10 +90,10 @@ h2{font:700 20px/28px var(--display);margin:34px 0 12px}
   <div class="arquivos">
 
     <article class="arq">
-      <header><i class="ph ph-buildings"></i><h3>Cadastro das usinas<small>AUXILIAR - FABRICIO.xlsx</small></h3><span class="selo s-nexus">No Nexus</span></header>
+      <header><i class="ph ph-buildings"></i><h3>Cadastro das usinas<small>a planilha AUXILIAR do PCM</small></h3><span class="selo s-nexus">No Nexus</span></header>
       <div class="linha"><span>O que é</span><span>Uma linha por usina: o <b>responsável O&amp;M</b>, a <b>cidade</b> e o <b>porte em MWp</b>.</span></div>
       <div class="linha"><span>O motor usa para</span><span>Pôr o responsável em cada tarefa, achar o feriado municipal pela cidade e pesar a prioridade pelo tamanho da usina.</span></div>
-      <div class="linha"><span>De onde vem</span><span>Um Power Query no Excel do Fabrício, que puxa a aba Operações do BD_Operações.</span></div>
+      <div class="linha"><span>De onde vem</span><span>Um Power Query no Excel do programador do PCM, que puxa a aba Operações do BD_Operações.</span></div>
       <div class="linha"><span>Por que é arquivo</span><span>O motor não lê o BD_Operações direto: lê esta cópia filtrada, e a cópia parou de acompanhar a base (166 linhas contra 258; 52 usinas em operação faltam).</span></div>
       <div class="proximo"><b>Feito em 02/10:</b> a cada geração o Nexus escreve esta planilha a partir do cadastro (258 usinas). Na semana 41, com a mesma foto do Fracttal, a agenda saiu idêntica à oficial e 48 tarefas ganharam responsável. <b>Falta:</b> casar a usina pelo CÓDIGO, e não pelo nome (medido na semana 40: sem responsável cairia de 297 para 79).</div>
     </article>
@@ -130,7 +130,7 @@ h2{font:700 20px/28px var(--display);margin:34px 0 12px}
       <div class="linha"><span>O que é</span><span>Para cada tarefa (7.301), <b>em quais semanas ela já foi programada</b>.</span></div>
       <div class="linha"><span>O motor usa para</span><span>Marcar a tarefa como <b>reprogramada</b> e contar o <b>"Nº vezes programada"</b>: é o que mostra o que está rolando de semana em semana sem ser feito.</span></div>
       <div class="linha"><span>De onde vem</span><span>O próprio motor: ele lê, acrescenta a semana nova e grava de volta a cada geração.</span></div>
-      <div class="linha"><span>Por que era arquivo</span><span>Era a memória do script entre uma semana e outra. Por estar só naquele PC, é a peça que prendia a geração à máquina do Fabrício, e gerar duas vezes distorcia tudo.</span></div>
+      <div class="linha"><span>Por que era arquivo</span><span>Era a memória do script entre uma semana e outra. Por estar só naquele PC, é a peça que prendia a geração à máquina do programador do PCM, e gerar duas vezes distorcia tudo.</span></div>
       <div class="proximo"><b>No Nexus:</b> a rodada parte do histórico de <b>antes</b> da semana, então gerar de novo não marca mais tudo como reprogramado.</div>
     </article>
 
@@ -147,7 +147,7 @@ h2{font:700 20px/28px var(--display);margin:34px 0 12px}
       <header><i class="ph ph-note-pencil"></i><h3>Observações da semana<small>Observacoes_Semana.txt</small></h3><span class="selo s-nexus">No Nexus</span></header>
       <div class="linha"><span>O que é</span><span>Os recados do PCM para a semana: <b>dias de atendimento de cada usina</b>, <b>OS fora da semana</b> e <b>OS com dia fixo</b>.</span></div>
       <div class="linha"><span>O motor usa para</span><span>Obedecer ao que o PCM decidiu: só programar a usina nos dias dela, não programar a OS tirada, pôr a OS fixada no dia pedido.</span></div>
-      <div class="linha"><span>De onde vem</span><span>O Fabrício escreve no bloco de notas, numa gramática própria (<span class="dado">@usina Nome = seg, qua</span>).</span></div>
+      <div class="linha"><span>De onde vem</span><span>O programador do PCM escreve no bloco de notas, numa gramática própria (<span class="dado">@usina Nome = seg, qua</span>).</span></div>
       <div class="linha"><span>Por que era arquivo</span><span>Era o jeito mais rápido de passar instrução para um script. Um erro de digitação só aparecia no log, depois de gerar.</span></div>
       <div class="proximo"><b>No Nexus:</b> as 143 usinas do Fracttal com os dias clicáveis e filtro por cliente; problema aparece antes de gerar.</div>
     </article>

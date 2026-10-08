@@ -18,6 +18,11 @@ Chave: `ronda_id`.
   respostas não somem em ~09/11/2026.
 - avulsa: `ronda_id = sha1("avulsa|" + id)[:16]`. Só as válidas: a anulada não foi realizada e a linha de anulação não é
   ronda (o livro da avulsa é só-acréscimo; a anulação é outra linha).
+- validação por foto (Levi, 08/10/2026): o livro da avulsa recebe também a "criticidade validada pela foto" (níveis de
+  sujidade e vegetação revisados por um colega a partir das fotos das rondas do App, em nome de quem validou), com
+  `origem = "validacao_foto"`. NÃO é ronda realizada: fica fora deste fato (outro grão no mesmo livro, regra 1), não
+  conta em cobertura, duração nem Quem ronda; a qualidade conta quantas ficaram de fora (`validacao_foto`). As telas a
+  usam só como a leitura de sujidade e vegetação da usina naquele dia (`nexus/campo/visao.validacoes_por_foto`).
 - chave repetida = erro (`GraoDuplicado`): um fato com duas linhas para a mesma ronda conta errado em silêncio.
 
 Pessoa: o fato NUNCA leva o nome (a API do banco tem leitura aberta, regra 8). O HMAC do e-mail (`Técnico (HMAC)`,
@@ -67,6 +72,13 @@ MEDIDAS = (("duracao_min", "min", "aditiva"), ("nota_pts", "pts", "nao"), ("falh
            ("vala_nivel", "nível 1-3", "nao"), ("sombreamento", "1/0", "aditiva"), ("ipoa_sujo", "1/0", "aditiva"),
            ("ghi_sujo", "1/0", "aditiva"), ("albedo_sujo", "1/0", "aditiva"))
 SENSORES = ("ipoa_sujo", "ghi_sujo", "albedo_sujo")     # o mesmo nome no checklist, na avulsa e no fato
+# a linha do livro da avulsa que é validação por foto, não ronda (o valor exato que a importação grava em `origem`)
+ORIGEM_VALIDACAO_FOTO = "validacao_foto"
+
+
+def eh_validacao_foto(linha: dict) -> bool:
+    """A linha do livro da avulsa é a "criticidade validada pela foto" (não é ronda realizada)."""
+    return _txt(linha.get("origem")).lower() == ORIGEM_VALIDACAO_FOTO
 
 
 class OrigemQ(list):
@@ -245,6 +257,8 @@ def fato_ronda(app: list[dict], checklist: list[dict], avulsas: list[dict], lig,
                          "checklist": "so_no_livro"})
 
     for v in avulsas_validas(avulsas):
+        if eh_validacao_foto(v):
+            continue            # não é ronda realizada: a qualidade conta à parte (`qualidade_ronda`)
         rid = _txt(v.get("id"))
         if not rid:
             origem_q.append({"_fora": "avulsa_sem_id"})
@@ -322,6 +336,8 @@ def qualidade_ronda(linhas, origem_q, origem_em, agora, *, avulsas=(), hist=None
     org = Counter(l[i["origem"]] for l in linhas)
     anul = sum(1 for a in avulsas if a.get("anula_id"))
     extra = {**{o: org.get(o, 0) for o in DOM.ORIGEM_RONDA},
+             # as validações por foto do livro da avulsa: outro grão, fora do fato de propósito (não é ronda)
+             "validacao_foto": sum(1 for a in avulsas_validas(avulsas) if eh_validacao_foto(a)),
              "checklist": sum(1 for l in linhas if l[i["checklist_fonte"]]),
              "checklist_so_no_livro": sum(1 for o in oq if o.get("checklist") == "so_no_livro"),
              "checklist_conflito": sum(1 for o in oq if o.get("checklist") in ("conflito", "ambiguo"))

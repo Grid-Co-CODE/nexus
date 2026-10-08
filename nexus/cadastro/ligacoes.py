@@ -46,6 +46,14 @@ SO_DO_CLIENTE = {"BD_Thopen · Dados Gerais Usinas": "Thopen", "BD_Thopen · aba
 # Base que não cobre um cliente: as abas do BD_Performance não têm usina da Thopen (0 de 47 usinas ligadas em 08/10; a
 # geração delas está no BD_Thopen). Sem isto, a aba "Usinas fora" listaria as 80 da Thopen em operação.
 SEM_O_CLIENTE = {"BD_Performance · aba": "Thopen"}
+# A tabela de equipamentos do BD_Performance fecha o ciclo da aba de geração (Levi, 08/10/2026: "usa a tabela
+# equipamentos da BD_Performance como base de de-para, se liga ao fractall e aí você ligaria o fractal as usinas do
+# BD_Operações e fecharia esse ciclo"). Uma linha por equipamento (a "UFV", as UGs, os inversores), com a "Usina" (o
+# nome que as abas de geração das DUAS bases usam) e a "Usina Fractall" (a Classificação 1 do Fracttal, que é a chave
+# do sistema FRACTTAL deste de-para). Ciclo: aba -> "Usina" da tabela -> "Usina Fractall" -> a usina a que o FRACTTAL
+# liga aquela chave. (workbook, aba, coluna da usina, coluna do nome no Fracttal, coluna do cliente)
+EQUIPAMENTOS = ("bd_performance", "Equipamentos", "Usina", "Usina Fractall", "Cliente")
+VIA_EQUIPAMENTOS = "equipamentos → Fracttal"
 # Como o de_para diz que a ligação veio só do nome (o que vale conferir na tela).
 POR_NOME = ("nome", "única da cidade", "de-para de trackers")
 TIPOS = ("ligar", "desligar", "ignorar", "ausencia")
@@ -185,11 +193,13 @@ def fontes(config) -> dict:
                            "dica": dicas.get(B.norm(nome)) or dicas.get(B.norm(d.get("Nome")))})
             itens.append(it)
         out[sistema] = itens
+    # a tabela de equipamentos (a ponte aba -> Fracttal); sem a aba no banco, as abas casam como antes de 08/10
+    equipamentos = _linhas_api(base, abas[EQUIPAMENTOS[:2]]) if EQUIPAMENTOS[:2] in abas else None
     for sistema, wb, ref in FONTES_ABA:      # depois das FONTES_API: o `igual_a` aponta chaves já casadas
         ids = {a: sid for (w, a), sid in abas.items() if w == wb}
         if (wb, ref) not in lidas:
             lidas[(wb, ref)] = _linhas_api(base, abas[(wb, ref)]) if (wb, ref) in abas else []
-        out[sistema] = itens_abas(sistema, _primeiras_linhas(base, ids), lidas[(wb, ref)], dicas)
+        out[sistema] = itens_abas(sistema, _primeiras_linhas(base, ids), lidas[(wb, ref)], dicas, equipamentos)
     return out
 
 
@@ -211,10 +221,53 @@ def _primeiras_linhas(base, ids: dict) -> dict:
         return dict(ex.map(uma, ids.items()))
 
 
-def itens_abas(sistema: str, primeiras: dict, referencia: list, dicas: dict | None = None) -> list[dict]:
+def indice_equipamentos(linhas) -> dict:
+    """{nome da usina normalizado: [(cliente, nome no Fracttal ou None), ...]} da tabela de equipamentos (`EQUIPAMENTOS`),
+    uma entrada por linha (equipamento)."""
+    _wb, _aba, c_usina, c_fracttal, c_cliente = EQUIPAMENTOS
+    out = defaultdict(list)
+    for d in linhas or ():
+        if str(d.get(c_usina) or "").strip():
+            f = str(d.get(c_fracttal) or "").strip()
+            out[B.norm(d[c_usina])].append((str(d.get(c_cliente) or "").strip(), f or None))
+    return out
+
+
+def ponte_equipamentos(nomes, indice: dict, so_cliente: str | None = None,
+                       sem_cliente: str | None = None) -> tuple[str | None, str | None, str | None]:
+    """(nome no Fracttal, motivo de não ter, nome da usina na tabela) de uma aba pela tabela de equipamentos. Vale o 1º
+    dos `nomes` (a aba, depois a coluna Usina dela) que tem linha na tabela, só do cliente da base (`SO_DO_CLIENTE`,
+    `SEM_O_CLIENTE`: E1 não é Thopen). A usina tem de dar UM nome do Fracttal em todas as suas linhas: a "Rodrigues 2"
+    tinha 11 equipamentos em "Thopen - Rodrigues 2 - RN" e a linha UFV em "Thopen - Rodrigues 1 - RN" (08/10): escolher
+    um dos dois seria chutar, e a tabela é que se conserta."""
+    def do_cliente(c):
+        return (not so_cliente or B.norm(c) == B.norm(so_cliente)) and not (sem_cliente and B.norm(c) == B.norm(sem_cliente))
+    for n in nomes or ():
+        linhas = [f for c, f in indice.get(B.norm(n), ()) if do_cliente(c)]
+        if not linhas:
+            continue
+        unicos = {}
+        for f in linhas:
+            if f:
+                unicos.setdefault(" ".join(f.split()).casefold(), f)    # espaço e caixa não fazem outro nome
+        if len(unicos) == 1:
+            return next(iter(unicos.values())), None, n
+        if not unicos:
+            return None, "sem 'Usina Fractall' na tabela de equipamentos", n
+        return None, f"{len(unicos)} nomes do Fracttal na tabela de equipamentos", n
+    return None, "sem linha na tabela de equipamentos", None
+
+
+def itens_abas(sistema: str, primeiras: dict, referencia: list, dicas: dict | None = None,
+               equipamentos: list | None = None) -> list[dict]:
     """As chaves de um sistema de aba (`FONTES_ABA`): uma por aba de GERAÇÃO (o mesmo critério do fato,
     `nexus.dados.geracao.abas_de_geracao`), e a chave é o nome da aba. `primeiras` = {aba: [1ª linha]};
-    `referencia` = as linhas da aba de referência da mesma base (a 3ª coluna de `FONTES_ABA`).
+    `referencia` = as linhas da aba de referência da mesma base (a 3ª coluna de `FONTES_ABA`); `equipamentos` = as
+    linhas da tabela de equipamentos do BD_Performance (`EQUIPAMENTOS`; None = sem a ponte, como antes de 08/10).
+    - Tabela de equipamentos (o caminho principal, Levi 08/10): a aba cuja "Usina" na tabela dá UM nome do Fracttal
+      leva `ponte` = (FRACTTAL, nome, via); sem isso, `ponte_motivo` diz por quê. Quem resolve é `banco.de_para`, pela
+      ligação que o FRACTTAL deu àquele nome; os caminhos abaixo continuam montados, para conferir e para a aba que a
+      ponte não fecha.
     - Referência que já é sistema do de-para (o "Dados Gerais Usinas" do BD_Thopen): a aba cujo nome, ou a coluna
       Usina, é o de uma linha dela é a MESMA usina daquela chave: vai `igual_a`, e herda a ligação e as decisões da tela
       (98 de 100 abas em 08/10). Leva também cidade, estado, potência e a dica, para o casamento quando ela não liga.
@@ -226,6 +279,7 @@ def itens_abas(sistema: str, primeiras: dict, referencia: list, dicas: dict | No
     wb_ref = next(((w, r) for s, w, r in FONTES_ABA if s == sistema), None)
     sistema_ref = next((s for s, w, a, *_ in FONTES_API if (w, a) == wb_ref), None)
     cliente_fixo = SO_DO_CLIENTE.get(sistema)
+    idx_eq = indice_equipamentos(equipamentos) if equipamentos is not None else None
     idx = defaultdict(list)
     for d in referencia or ():
         if d.get("Usina") not in (None, ""):
@@ -251,6 +305,14 @@ def itens_abas(sistema: str, primeiras: dict, referencia: list, dicas: dict | No
                 it.update({"codigo": str(par["Código Fractal"]).strip(), "codigo_de": wb_ref[1]})
             if par and par.get("Cliente") and not cliente_fixo:
                 it["cliente"] = par["Cliente"]
+        if idx_eq is not None:
+            nome_f, motivo, usina_eq = ponte_equipamentos(nomes, idx_eq, cliente_fixo, SEM_O_CLIENTE.get(sistema))
+            if nome_f:
+                it["ponte"] = (FRACTTAL, nome_f, VIA_EQUIPAMENTOS)
+            else:
+                it["ponte_motivo"] = motivo
+            if usina_eq:
+                it["usina_equipamentos"] = usina_eq
         out.append(it)
     return out
 

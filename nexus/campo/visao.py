@@ -10,6 +10,10 @@ Tudo vem do banco (API db_performace), nunca do App nem do Azure:
 A pessoa vem do App como código do e-mail (HMAC): o nome sai do cadastro do App (`identidades.json`), na hora, no
 "Nome padrão" do cadastro (primeiro e último nome). Cópia de 5 min por tela; banco fora do ar = a tela avisa, não some.
 
+Desde 08/10/2026 (passo 4 do Kimball) a contagem e a ligação (usina_id, pessoa_id, data_id) de Rondas, Central de
+atenção e PT saem do FATO conformado (`nexus_fatos` · `fato_ronda`, `fato_pt`, `fato_fechamento`); o livro cru só dá o
+que o fato não tem (veredito, pendências, observação, horários), juntado pela chave do fato. Ver "Os fatos" abaixo.
+
 As contas são NOSSAS e estão escritas em cada função: quem quiser saber por que um número deu tanto lê aqui.
 """
 import collections
@@ -22,6 +26,10 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app
 
 from ..cadastro.calculos import nome_padrao
+from ..dados import carga as C
+from ..dados import dominios as DOM
+from ..dados import fato_pt as FPT
+from ..dados import fato_ronda as FR
 from ..dados import fatos as D
 from ..dados import livros
 from . import leitura, livros_app
@@ -30,7 +38,7 @@ _BRT = timezone(timedelta(hours=-3))
 STATUS_OPERACAO = "OPERAÇÃO"
 DIAS_SEM_RONDA_ALERTA = 7        # usina mobilizada sem ronda há 7 dias ou mais = ronda pendente
 DIAS_COBERTURA = 14              # janela da cobertura de ronda (a mesma do ranking por região)
-PT_PARADA_MIN = 120              # PT esperando o De acordo há mais de 2 h = parada
+PT_PARADA_MIN = DOM.PT_PARADA_MIN  # PT esperando o De acordo há mais de 2 h = parada (o mesmo limite do fato_pt)
 PESO_QUALIDADE, PESO_COBERTURA = 0.6, 0.4     # ranking por região, a mesma régua do painel do App
 _DATA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}")
 # Região do Brasil pela UF do cadastro (Levi, 05/10: "Adicione uma coluna de região do Brasil"). Pela UF, e não pela
@@ -67,6 +75,11 @@ _TRAVA = __import__("threading").Lock()
 def _calcular(chave, calcular) -> leitura.Leitura:
     try:
         r = leitura.Leitura(calcular(), time.time())
+    except FR.GraoDuplicado:
+        # o livro desta hora tem duas linhas para a mesma ronda (ou PT × ativo) e o banco ainda não tem um fato anterior:
+        # a tela não mostra número contado em dobro (passo 4, 08/10/2026); a qualidade da carga diz qual chave repetiu
+        return leitura.Leitura({}, time.time(), "O livro do App tem a mesma linha duas vezes (chave repetida no fato): "
+                                                "a tela não conta em dobro")
     except Exception as e:      # noqa: BLE001 — banco fora do ar: a tela avisa
         return leitura.Leitura({}, time.time(), f"Não consegui ler o banco do Nexus ({type(e).__name__})")
     _CACHE[chave] = r
@@ -256,7 +269,9 @@ class _Base:
     def __init__(self):
         self.usinas = _livro("cadastro_nexus", "usinas")
         self.equipes = _livro("cadastro_nexus", "equipes")
-        self.lig = D.Ligador(self.usinas, _livro("cadastro_nexus", "de_para"), self.equipes, {})
+        self.de_para = _livro("cadastro_nexus", "de_para")
+        self.lig = D.Ligador(self.usinas, self.de_para, self.equipes, {})
+        self._nomes_lidos, self._nomes_pedidos = {}, set()
         self.nome_equipe = {D._id(e.get("equipe_id")): str(e.get("nome") or "") for e in self.equipes}
         self.por_id = {D._id(u.get("usina_id")): u for u in self.usinas if D._id(u.get("usina_id"))}
         hoje = _agora().date().isoformat()
@@ -315,6 +330,15 @@ class _Base:
                     continue
                 out[pid] = nome_curto(s.get("nome_padrao") or s.get("nome"))
         return out
+
+    def nomes(self, ids) -> dict:
+        """{pessoa_id: "Nome padrão"} das pessoas pedidas, decifradas uma vez por cálculo (rondas, última OS e PT pedem
+        as mesmas pessoas). O `pessoa_id` vem do fato: o nome é atributo da pessoa, sai da ficha do cadastro."""
+        falta = {i for i in ids if i} - self._nomes_pedidos
+        if falta:
+            self._nomes_pedidos |= falta
+            self._nomes_lidos.update(self._nomes(falta, self.pessoas))
+        return self._nomes_lidos
 
     def supervisor_da_pessoa(self, email: str, nome: str = "") -> str:
         """O nome (como as telas mostram) da pessoa que entrou, se ela é supervisor: pelo e-mail da ficha, ou pelo nome
@@ -377,56 +401,253 @@ class _Base:
                 "cluster": nome_cluster(u.get("cluster")) if u else ""}
 
 
+# ── Os fatos (passo 4 do Kimball, 08/10/2026) ─────────────────────────────────────────────────────────────────────
+# Levi, 08/10: as telas tiram a contagem e a ligação (usina_id, pessoa_id, data_id) do fato conformado, e não refazendo
+# a ligação dos livros crus a cada conta. Antes, Rondas, Central e PT ligavam a usina de novo a cada cálculo, com um
+# `Ligador` próprio, e liam o checklist da carga única à parte: duas regras para a mesma conta (a da carga e a da tela).
+# Agora a tela usa o fato do banco quando ele é da MESMA versão dos livros de origem; senão (o banco ainda não tem o
+# fato, ou o App regravou o livro depois da carga, ou a carga falhou nele) monta o fato NA HORA com a mesma função da
+# carga (`carga.montar_*`) e diz isso, discretamente, no topo da tela. O que o fato não tem (veredito, pendências, a
+# observação, os horários, o texto das falhas) vem do livro cru, juntado pela chave do fato.
+LIVRO_FATOS = C.LIVRO_FATOS
+# fato -> (aba no banco, livro do App de onde vem, livros que só o Nexus grava e o fato também lê)
+FATOS_DA_TELA = {"ronda": ("fato_ronda", C.ORIGEM_RONDAS[0], (C.ORIGEM_AVULSAS[0], C.ORIGEM_CHECKLIST[0])),
+                 "pt": ("fato_pt", C.ORIGEM_PT[0], ()),
+                 "fechamento": ("fato_fechamento", C.ORIGEM_FECHAMENTOS[0], ())}
+_CAB_DO_FATO = {"ronda": FR.CAB_RONDA, "pt": FPT.CAB_PT, "fechamento": D.CAB_FECHAMENTO}
+FORCAR_MEMORIA = False          # monta sempre na hora (a medição antes × depois e os testes)
+
+
+def _ciclo(chave, ler):
+    """O mesmo dado pedido por várias contas no mesmo ciclo (2 min) é lido uma vez (como `_livro`)."""
+    g = _LIVROS.get(chave)
+    if g and time.time() - g[0] < LIVRO_S:
+        return g[1]
+    v = ler()
+    _LIVROS[chave] = (time.time(), v)
+    return v
+
+
+def _atualizados() -> dict:
+    """{livro: quando foi gravado} pela API (`/api/workbooks`)."""
+    def ler():
+        r = _sessao().get(f"{_base()}/api/workbooks", timeout=60)
+        r.raise_for_status()
+        return {w.get("key"): w.get("updated_at") or w.get("atualizado_em") for w in r.json()}
+    return _ciclo(("_workbooks",), ler)
+
+
+def _abas_dos_fatos() -> dict:
+    return _ciclo(("_abas", LIVRO_FATOS), lambda: livros.abas(_base(), _sessao(), LIVRO_FATOS))
+
+
+def _hm_brt(iso) -> str:
+    d = _dt(iso)
+    return d.strftime("%d/%m %H:%M") if d else "?"
+
+
+def _defasado(nome: str, q: dict | None) -> str:
+    """Vazio se o fato gravado no banco é da versão dos livros de origem que a API tem agora; senão, o porquê (vai
+    para o aviso discreto da tela). A carga grava `origem_atualizada_em` = a hora do livro do App que ela leu."""
+    if not q:
+        return "o banco ainda não tem"
+    if "falhou_nesta_carga" in str(q.get("extra") or ""):
+        return f"a carga das {_hm_brt(q.get('gerado_em'))} falhou neste fato"
+    _aba, origem, do_nexus = FATOS_DA_TELA[nome]
+    quando = _atualizados()
+    lido, agora = _dt(q.get("origem_atualizada_em")), _dt(quando.get(origem))
+    if not lido or not agora or lido != agora:
+        return (f"o banco tem a carga das {_hm_brt(q.get('gerado_em'))}, de antes do livro do App das "
+                f"{_hm_brt(quando.get(origem))}")
+    gerado = _dt(q.get("gerado_em"))
+    for livro in do_nexus:            # a avulsa é lançada no Nexus a qualquer hora: lançamento novo = fato velho
+        em = _dt(quando.get(livro))
+        if em and (not gerado or em > gerado):
+            return f"o banco tem a carga das {_hm_brt(q.get('gerado_em'))}, de antes do último lançamento no Nexus"
+    return ""
+
+
+def _montar_na_hora(nome: str, b: "_Base") -> list[dict]:
+    """O fato montado na memória com a MESMA função da carga (`carga.montar_*`), o mesmo `Ligador` e a mesma tradução
+    da pessoa (`carga.mapas_das_linhas`). Sem o `equipamento_id` (a tela não usa; montar a dimensão leria 15 abas)."""
+    m = _ciclo(("_mapas",), lambda: C.mapas_das_linhas(current_app.config, b.de_para, b.pessoas))
+    lig = C.ligador({"usinas": b.usinas, "de_para": b.de_para, "equipes": b.equipes}, m)
+
+    def ler(livro, aba):
+        return _livro(livro, aba)
+    if nome == "ronda":
+        linhas = C.montar_ronda(ler, lig, m)[0]
+    elif nome == "pt":
+        linhas = C.montar_pt(ler, lig, agora=_agora())[0]
+    else:
+        linhas = C.montar_fechamento(ler, lig)[0]
+    cab = _CAB_DO_FATO[nome]
+    return [dict(zip(cab, l)) for l in linhas]
+
+
+def _fato(nome: str, b: "_Base") -> dict:
+    """{"linhas": [{coluna: valor}], "de": "banco" | "memoria", "aviso": texto discreto para a tela}. Uma vez por ciclo.
+    As linhas do banco podem vir como texto (a API não garante o tipo): quem usa passa por `D._id`, `D._int`, `D._txt`."""
+    def ler():
+        aba = FATOS_DA_TELA[nome][0]
+        q = None
+        try:
+            abas = _abas_dos_fatos()
+            if aba in abas and "qualidade" in abas:
+                q = next((l for l in _livro(LIVRO_FATOS, "qualidade") if D._txt(l.get("fato")) == nome), None)
+            motivo = _defasado(nome, q) if aba in abas else "o banco ainda não tem"
+        except Exception:       # noqa: BLE001 — sem saber de que versão é o fato do banco, a conta é feita na hora
+            abas, motivo = {}, "não consegui conferir o fato do banco"
+        if not motivo and not FORCAR_MEMORIA:
+            return {"linhas": _livro(LIVRO_FATOS, aba), "de": "banco", "aviso": ""}
+        try:
+            return {"linhas": _montar_na_hora(nome, b), "de": "memoria",
+                    "aviso": f"{aba} calculado na hora; {motivo or 'medição'}"}
+        except FR.GraoDuplicado:
+            # o grão quebrou no livro desta hora: nunca número contado em dobro. Se o banco tem o da carga anterior, a
+            # tela mostra esse e diz; senão, a tela avisa o erro (`_calcular`)
+            if aba not in abas:
+                raise
+            return {"linhas": _livro(LIVRO_FATOS, aba), "de": "banco",
+                    "aviso": f"{aba}: o livro desta hora tem linha repetida; a tela mostra a carga das "
+                             f"{_hm_brt((q or {}).get('gerado_em'))}"}
+    return _ciclo(("_fato", nome), ler)
+
+
+def _avisos(*nomes) -> dict:
+    """{fato: aviso} dos fatos que a conta usou (vazio quando veio do banco)."""
+    return {n: (_LIVROS.get(("_fato", n)) or (0, {}))[1].get("aviso", "") for n in nomes}
+
+
+def _dia_do_fato(v) -> str:
+    """`data_id` (AAAAMMDD, o dia de Brasília) -> "AAAA-MM-DD"."""
+    i = D._id(v)
+    return f"{i // 10000:04d}-{i // 100 % 100:02d}-{i % 100:02d}" if i else ""
+
+
+# os sensores na ordem em que a tela sempre mostrou (IPOA, albedômetro, GHI)
+SENSORES_DA_TELA = (("ipoa_sujo", "IPOA"), ("albedo_sujo", "Albedômetro"), ("ghi_sujo", "GHI"))
+
+
+def _checklist_do_fato(x) -> dict | None:
+    """As respostas que o FATO tem (a carga única das rondas sem OS e a avulsa), no formato do
+    `ronda_checklist.ler_nota`. A ronda com OS não tem resposta no fato: vem do texto da OS no Fracttal."""
+    if not D._txt(x.get("checklist_fonte")):
+        return None
+    sombra = D._int(x.get("sombreamento"))
+    return {"sujidade": DOM.nivel(x.get("sujidade_nivel")), "vegetacao": DOM.nivel(x.get("vegetacao_nivel")),
+            "vala": DOM.VALA_ROTULO.get(D._int(x.get("vala_nivel")), ""),
+            "sombreamento": {1: "sim", 0: "não"}.get(sombra, ""),
+            "sensores_sujos": [n for c, n in SENSORES_DA_TELA if D._int(x.get(c)) == 1]}
+
+
 # ── Rondas ───────────────────────────────────────────────────────────────────────────────────────────────────────
-def _checklist_sem_os() -> dict:
-    """{(usina_id, início): respostas} das rondas sem OS (carga única de 06/10/2026, `nexus_rondas_checklist`), no
-    formato do `ronda_checklist.ler_nota`. A ronda com OS tem as respostas no texto da OS do Fracttal."""
-    sensores = (("ipoa_sujo", "IPOA"), ("albedo_sujo", "Albedômetro"), ("ghi_sujo", "GHI"))
-    out = {}
-    for f in _livro("nexus_rondas_checklist", "fato_checklist_ronda"):
-        uid = D._id(f.get("usina_id"))
-        if not uid or not f.get("inicio"):
-            continue
-        out[(uid, str(f["inicio"]))] = {"sujidade": _int(f.get("sujidade")), "vegetacao": _int(f.get("vegetacao")),
-                                        "vala": str(f.get("vala") or ""),
-                                        "sensores_sujos": [n for c, n in sensores if _int(f.get(c)) == 1]}
-    return out
+def _avulsas_da_tela() -> list[dict]:
+    """As linhas válidas do livro da avulsa com o nome e o comentário decifrados (`ronda_avulsa.para_tela`), uma vez por
+    ciclo: as rondas avulsas e as validações por foto moram no mesmo livro."""
+    from . import ronda_avulsa
+    return _ciclo(("_avulsas_tela",), lambda: ronda_avulsa.para_tela(_livro(ronda_avulsa.LIVRO, ronda_avulsa.ABA)))
 
 
 def resposta_da_ronda(r, respostas: dict) -> dict:
-    """As respostas do checklist de UMA ronda: pela OS (o texto da OS no Fracttal) ou, sem OS, as da carga única."""
+    """As respostas do checklist de UMA ronda: pela OS (o texto da OS no Fracttal) ou, sem OS, as do fato (a carga única
+    das rondas sem OS, a avulsa)."""
     return (respostas.get(str(r["os"])) if r.get("os") else None) or r.get("checklist") or {}
 
 
+def _nome_do_tecnico(r: dict, quem: dict) -> str:
+    """O nome que o livro de rondas traz: `Técnico` (o nome em claro, até o App trocar) ou `Técnico (HMAC)` (o código do
+    e-mail, a partir do pacote `rondas-tecnico-hmac` do App, 08/10/2026), pela mesma tradução dos outros livros do
+    App (`livros_app.nome_do_tecnico`, a mesma da fonte das regras copiadas). As DUAS colunas valem: na troca, uma
+    leitura no meio do `sync-xlsx` pode pegar linha com o cabeçalho velho e linha com o novo."""
+    return nome_curto(livros_app.nome_do_tecnico(r, quem))
+
+
 def _rondas_ligadas(b: _Base) -> list[dict]:
+    """As rondas pelo fato único de ronda (`fato_ronda`): uma linha por ronda realizada (App com e sem OS, a resposta
+    da carga única, a avulsa válida). Do fato: a ronda (`ronda_id`), o dia (`data_id`, dia de Brasília do início), a
+    usina (`usina_id`), a pessoa (`pessoa_id`), o tipo, a nota, os trackers, se ficou sem OS e as respostas que o fato
+    tem. Do livro cru, pela chave (a ronda do App pelo `Início`, a avulsa pelo `ronda_id` dela): o texto das falhas, a
+    situação da OS (o motivo), a região escrita pelo App, o nome e o comentário da avulsa. Equipe, estado, região do
+    Brasil, cliente e supervisor são os do cadastro pela usina (Levi, 05/10: nunca a "Região" que o App escreve; o
+    `equipe_id` do fato é o papel "registro", a equipe que o App anotou). O nome da pessoa é o "Nome padrão" da ficha
+    pelo `pessoa_id`; sem ele, o que o livro traz."""
+    f = _fato("ronda", b)
+    cru = {D._txt(r.get("Início")): r for r in _livro(*C.ORIGEM_RONDAS)}
+    avulsas = {FR.chave("avulsa", a.get("id")): a for a in _avulsas_da_tela()}
+    quem = _quem()
+    nomes = b.nomes({D._id(x.get("pessoa_id")) for x in f["linhas"]})
     out = []
-    sem_os = _checklist_sem_os()
-    for r in _livro("rondas_app_campo"):
-        uid, _como = b.lig.usina(r.get("Usina"), r.get("Ativo da usina no Fracttal"))
+    for x in f["linhas"]:
+        origem, rid = D._txt(x.get("origem")), D._txt(x.get("ronda_id"))
+        uid, pid = D._id(x.get("usina_id")), D._id(x.get("pessoa_id"))
+        base = {"ronda_id": rid, "origem": origem, "data": _dia_do_fato(x.get("data_id")), "usina_id": uid,
+                "pessoa_id": pid, "tipo": D._txt(x.get("tipo_ronda")), "mobilizada": uid in b.mobilizadas,
+                "inicio": D._txt(x.get("inicio")) or None, "fim": D._txt(x.get("fim")) or None,
+                "checklist": _checklist_do_fato(x)}
+        if origem == "avulsa":
+            # a ronda AVULSA, lançada à mão no Nexus (07/10/2026): sem OS por natureza (não é a pendência "sem OS no
+            # Fracttal") e sem nota (a do App depende de foto e GPS)
+            a = avulsas.get(rid) or {}
+            if FR.eh_validacao_foto(a):
+                continue        # uma carga antiga pode ter posto a validação por foto no fato: ela não é ronda
+            out.append({**base, "os": None, **b.onde(uid), "regiao": "",
+                        "tecnico": nomes.get(pid) or nome_curto(a.get("nome")), "nota": None, "falhas": "",
+                        "trk_apontados": 0, "trk_respondidos": 0, "situacao_os": "", "sem_os": False,
+                        "avulsa": True, "avulsa_id": str(a.get("id") or ""), "avulsa_hmac": a.get("pessoa_hmac"),
+                        "comentario": a.get("comentario") or ""})
+            continue
+        r = cru.get(D._txt(x.get("inicio"))) or {}
         sit = str(r.get("Situação da OS") or "")
-        out.append({"data": str(r.get("Data") or "")[:10], "os": r.get("OS"), "usina_id": uid,
-                    **b.onde(uid, r.get("Usina")), "regiao": r.get("Região") or "",
-                    "tecnico": nome_curto(r.get("Técnico")), "tipo": r.get("Tipo") or "",
-                    "nota": _int(r.get("Nota da ronda")), "falhas": str(r.get("Falhas") or "").strip(),
-                    "trk_apontados": _int(r.get("Trackers apontados")) or 0,
-                    "trk_respondidos": _int(r.get("Trackers respondidos")) or 0, "situacao_os": sit,
-                    "sem_os": sit.lower().startswith("não criada") or not r.get("OS"),
-                    "mobilizada": uid in b.mobilizadas, "inicio": r.get("Início"), "fim": r.get("Fim"),
-                    "checklist": None if r.get("OS") else sem_os.get((uid, str(r.get("Início") or "")))})
-    # a ronda AVULSA, lançada à mão no Nexus (07/10/2026, `ronda_avulsa`): mesma forma, respostas no `checklist`,
-    # sem OS por natureza (não é a pendência "sem OS no Fracttal") e sem nota (a do App depende de foto e GPS)
-    from . import ronda_avulsa
-    for a in ronda_avulsa.para_tela(_livro(ronda_avulsa.LIVRO, ronda_avulsa.ABA)):
+        out.append({**base, "os": D._txt(x.get("os")) or None, **b.onde(uid, r.get("Usina")),
+                    "regiao": r.get("Região") or "", "tecnico": nomes.get(pid) or _nome_do_tecnico(r, quem),
+                    "nota": D._int(x.get("nota_pts")), "falhas": str(r.get("Falhas") or "").strip(),
+                    "trk_apontados": D._int(x.get("trackers_apontados_qtd")) or 0,
+                    "trk_respondidos": D._int(x.get("trackers_respondidos_qtd")) or 0, "situacao_os": sit,
+                    "sem_os": origem == "app_sem_os" or D._txt(x.get("os_situacao")) == "nao_criada",
+                    "tecnico_codigo": bool(D._txt(r.get("Técnico (HMAC)")))})
+    return out
+
+
+# ── Validação por foto (Levi, 08/10/2026) ────────────────────────────────────────────────────────────────────────
+# O livro da avulsa recebe também linhas de "criticidade validada pela foto": níveis de sujidade e vegetação que um
+# colega revisou a partir das fotos das rondas do App, em nome de quem validou (`origem = "validacao_foto"`). NÃO é ronda
+# realizada: fora do fato_ronda, de Registros, cobertura, Quem ronda, Painel e duração. Entra só como a LEITURA de
+# sujidade e vegetação da usina naquele dia (aba Sujidade e vegetação e Histórico da usina), com o selo "Validada por
+# foto". Havendo ronda do App no mesmo dia na mesma usina, o valor validado é o que vale para a usina e a linha do
+# técnico aparece marcada como revisada.
+VALIDADA_EXPLICACAO = ("Validada por foto: níveis de sujidade e vegetação revisados a partir das fotos das rondas do "
+                       "App. Não é ronda nova.")
+
+
+def validacoes_por_foto(b: _Base) -> list[dict]:
+    """As validações por foto que valem (sem as anuladas), com a usina do cadastro e quem validou. Lidas do livro da
+    avulsa (são outro grão: não entram em fato nenhum por enquanto), com os domínios de `dominios.py`."""
+    linhas = [a for a in _avulsas_da_tela() if FR.eh_validacao_foto(a)]
+    nomes = b.nomes({D._id(a.get("pessoa_id")) for a in linhas})
+    out = []
+    for a in linhas:
         uid = D._id(a.get("usina_id"))
-        out.append({"data": str(a.get("data") or "")[:10], "os": None, "usina_id": uid, **b.onde(uid), "regiao": "",
-                    "tecnico": nome_curto(a["nome"]), "tipo": a.get("tipo") or "", "nota": None, "falhas": "",
-                    "trk_apontados": 0, "trk_respondidos": 0, "situacao_os": "", "sem_os": False,
-                    "mobilizada": uid in b.mobilizadas, "inicio": a.get("inicio"), "fim": a.get("fim"),
-                    "checklist": {"sujidade": _int(a.get("sujidade")), "vegetacao": _int(a.get("vegetacao")),
-                                  "vala": str(a.get("vala") or ""), "sombreamento": str(a.get("sombreamento") or ""),
-                                  "sensores_sujos": [n for c, n in ronda_avulsa.SENSORES if _int(a.get(c)) == 1]},
-                    "avulsa": True, "avulsa_id": str(a.get("id") or ""), "avulsa_hmac": a.get("pessoa_hmac"),
-                    "comentario": a.get("comentario") or ""})
+        dia = _dia_do_fato(a.get("data_id")) or str(a.get("data") or "")[:10]
+        if not uid or not _DATA_ISO.match(dia):
+            continue
+        out.append({"id": str(a.get("id") or ""), "data": dia, "usina_id": uid, **b.onde(uid),
+                    "mobilizada": uid in b.mobilizadas, "validada": True, "lancada_em": str(a.get("lancada_em") or ""),
+                    "tecnico": nomes.get(D._id(a.get("pessoa_id"))) or nome_curto(a.get("nome")),
+                    "sujidade": DOM.nivel(a.get("sujidade")), "vegetacao": DOM.nivel(a.get("vegetacao")),
+                    "vala": DOM.VALA_ROTULO.get(DOM.vala(a.get("vala")), ""),
+                    "sombreamento": {1: "sim", 0: "não"}.get(DOM.sim_nao(a.get("sombreamento")), ""),
+                    "sensores_sujos": [n for c, n in SENSORES_DA_TELA if DOM.sensor_avulsa(a.get(c)) == 1]})
+    # a mais recente do dia vence (duas validações da mesma usina no mesmo dia: vale a última lançada)
+    out.sort(key=lambda v: (v["data"], v["lancada_em"]), reverse=True)
+    return out
+
+
+def _validacao_do_dia(validacoes) -> dict:
+    """{(usina_id, dia): a validação que vale naquele dia} (a lista já vem da mais recente para a mais antiga)."""
+    out = {}
+    for v in validacoes:
+        out.setdefault((v["usina_id"], v["data"]), v)
     return out
 
 
@@ -434,7 +655,8 @@ def _cobertura(b: _Base, rondas: list[dict], hoje) -> list[dict]:
     """Uma linha por usina MOBILIZADA: a última ronda e há quantos dias. Nunca teve ronda = 999."""
     ultima = {}
     for r in rondas:
-        if r["usina_id"] and (r["usina_id"] not in ultima or r["data"] > ultima[r["usina_id"]]["data"]):
+        # ronda sem dia (o fato não achou o dia do início) não diz há quanto tempo foi: fica fora desta conta
+        if r["usina_id"] and r["data"] and (r["usina_id"] not in ultima or r["data"] > ultima[r["usina_id"]]["data"]):
             ultima[r["usina_id"]] = r
     out = []
     for uid in b.mobilizadas:
@@ -525,34 +747,38 @@ def _tecnicos_por_equipe(b: _Base) -> dict:
 
 def _ultima_os_por_usina(b: _Base) -> dict:
     """{usina_id: a última OS fechada pelo App na usina, de QUALQUER tipo}: número, dia, tipo e quem fez (Levi, 08/10:
-    "última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"). Vem do livro
-    `fechamentos_app_campo`, ligado à usina pelo `Ligador` (de-para do Fracttal; código do ativo de reserva). Limite:
-    só o que passou pelo App, e o livro guarda 90 dias; OS fechada direto no Fracttal não aparece."""
+    "última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"). Vem do fato
+    `fato_fechamento` (passo 4, 08/10/2026): a usina, a OS, o tipo, a hora e a pessoa (`pessoa_id`) são os do fato; o
+    nome de quem não ligou ao cadastro sai do código do App no livro cru, juntado pela chave do fato
+    (`fechamento_id`). Limite: só o que passou pelo App, e o livro guarda 90 dias; OS fechada direto no Fracttal não
+    aparece."""
+    f = _fato("fechamento", b)
+    cru = {D.chave_fechamento(a): a for a in _livro(*C.ORIGEM_FECHAMENTOS)}
     quem = _quem()
+    nomes = b.nomes({D._id(x.get("pessoa_id")) for x in f["linhas"]})
     out = {}
-    for f in _livro("fechamentos_app_campo"):
-        uid, _como = b.lig.usina(f.get("Usina"), f.get("Código do ativo"))
-        quando = _dt(f.get("Registrado em"))
+    for x in f["linhas"]:
+        uid, quando = D._id(x.get("usina_id")), _dt(x.get("registrado_em"))
         if not uid or not quando:
             continue
         if uid not in out or quando > out[uid]["quando"]:
-            out[uid] = {"os": str(f.get("OS") or "").strip(), "quando": quando, "data": quando.date().isoformat(),
-                        "tipo": str(f.get("Tipo da OS") or "").strip(), "tecnico": _nome(quem, f.get("Técnico (HMAC)"))}
+            pid = D._id(x.get("pessoa_id"))
+            nome = nomes.get(pid) or _nome(quem, (cru.get(D._txt(x.get("fechamento_id"))) or {}).get("Técnico (HMAC)"))
+            out[uid] = {"os": D._txt(x.get("os")), "quando": quando, "data": quando.date().isoformat(),
+                        "tipo": D._txt(x.get("tipo_os")), "tecnico": nome}
     return out
 
 
 def _registro_da_cobertura(b: _Base, cobertura: list[dict], ligadas: list[dict]) -> str:
     """Completa cada usina da cobertura para a aba "Sem ronda" e o indicador "Nunca tiveram ronda" (Levi, 08/10/2026):
-    - `nunca`: nenhuma ronda em TODO o registro do Nexus, não só no período: o livro de rondas do App, as avulsas e a
-      carga única do checklist das rondas sem OS (`nexus_rondas_checklist`);
+    - `nunca`: nenhuma ronda em TODO o registro do Nexus, não só no período. Desde o passo 4 (08/10) é o fato único de
+      ronda inteiro (`ligadas`): ele já une o livro de rondas do App, as avulsas e a carga única do checklist das
+      rondas sem OS (`nexus_rondas_checklist`), inclusive a ronda que já saiu da janela de 90 dias do App;
     - `tecnicos` (nomes curtos) e `n_tecnicos`: os técnicos da equipe da usina, pelo cadastro;
     - `ultima_os`: a última OS fechada pelo App na usina (`_ultima_os_por_usina`).
-    Devolve desde quando vai o registro (a data mais antiga das três fontes), que o indicador diz no `title`."""
-    carga = _livro("nexus_rondas_checklist", "fato_checklist_ronda")
-    com_ronda = {r["usina_id"] for r in ligadas if r["usina_id"]} | {D._id(f.get("usina_id")) for f in carga
-                                                                     if D._id(f.get("usina_id"))}
+    Devolve desde quando vai o registro (o dia mais antigo do fato), que o indicador diz no `title`."""
+    com_ronda = {r["usina_id"] for r in ligadas if r["usina_id"]}
     datas = [r["data"] for r in ligadas if _DATA_ISO.match(r["data"] or "")]
-    datas += [str(f.get("inicio") or "")[:10] for f in carga if _DATA_ISO.match(str(f.get("inicio") or ""))]
     tecnicos, ultima_os = _tecnicos_por_equipe(b), _ultima_os_por_usina(b)
     for c in cobertura:
         eid = D._id((b.por_id.get(c["usina_id"]) or {}).get("equipe_id"))
@@ -585,8 +811,27 @@ def rondas(dias: int = DIAS_COBERTURA) -> leitura.Leitura:
         cobertura = _cobertura(b, todas, hoje)
         desde = _registro_da_cobertura(b, cobertura, ligadas)
         return {"todas": todas, "cobertura": cobertura, "sem_mobilizacao": b.sem_mobilizacao,
-                "hoje": hoje.isoformat(), "registro_desde": desde}
+                "hoje": hoje.isoformat(), "registro_desde": desde,
+                "validacoes": [v for v in validacoes_por_foto(b) if v["mobilizada"]],
+                "fatos": _avisos("ronda", "fechamento"), "aviso_tecnico": _aviso_tecnico(ligadas)}
     return _ler(("visao_rondas",), calcular)
+
+
+def _aviso_tecnico(ligadas) -> str:
+    """O App passa a mandar o técnico das rondas como código (`Técnico (HMAC)`, pacote de 08/10/2026). Sem a chave
+    NEXUS_PESSOA_HMAC neste Nexus o código não vira nome: a tela não quebra e diz o que falta."""
+    sem_nome = sum(1 for r in ligadas if r.get("tecnico_codigo") and not r["tecnico"])
+    if not sem_nome or current_app.config.get("NEXUS_PESSOA_HMAC"):
+        return ""
+    return (f"O App manda o técnico das rondas como código (HMAC) e este Nexus não tem a chave NEXUS_PESSOA_HMAC: "
+            f"{sem_nome} ronda{'s' if sem_nome != 1 else ''} sem o nome do técnico.")
+
+
+def _quem_ronda(r) -> tuple:
+    """Quem fez a ronda, para agrupar (Quem ronda): o `pessoa_id` do fato; sem ele, o nome que o livro trouxe. Até
+    08/10/2026 o grupo era o nome escrito: a mesma pessoa com duas grafias virava duas linhas (79 grafias para 54
+    pessoas nos 90 dias medidos em 08/10)."""
+    return ("p", r["pessoa_id"]) if r.get("pessoa_id") else ("n", r["tecnico"] or "—")
 
 
 def _pendente(c) -> bool:
@@ -635,14 +880,14 @@ def _por_cluster(periodo, cobertura, lim) -> list[dict]:
         rs = rondas_cl.get(cl, [])
         pessoas = {}
         for r in rs:
-            pessoas.setdefault(r["tecnico"] or "—", []).append(r)
+            pessoas.setdefault(_quem_ronda(r), []).append(r)
         lista = []
-        for nome, prs in pessoas.items():
+        for prs in pessoas.values():
             eqs = {}
             for r in prs:
                 eqs[r["equipe"] or SEM_EQUIPE] = eqs.get(r["equipe"] or SEM_EQUIPE, 0) + 1
             equipe = max(eqs, key=eqs.get)
-            lista.append({"tecnico": nome, "equipe": equipe, "pendentes": pend_eq.get(equipe, 0),
+            lista.append({"tecnico": prs[0]["tecnico"] or "—", "equipe": equipe, "pendentes": pend_eq.get(equipe, 0),
                           "pendentes_usinas": lista_eq.get(equipe, []), **_resumo_rondas(prs, lim)})
         n = usinas_cl.get(cl, 0)
         out.append({"cluster": cl, "usinas": n, "pendentes": pend_cl.get(cl, 0), "pendentes_usinas": lista_cl.get(cl, []),
@@ -758,20 +1003,33 @@ def criticidade(x) -> tuple[int, list[tuple[str, str]]]:
     return pontos, itens
 
 
-def historico_usina(todas, respostas: dict, usina_id) -> list[dict]:
+def historico_usina(todas, respostas: dict, usina_id, validacoes=()) -> list[dict]:
     """O histórico de rondas de uma usina (Levi, 05/10: "quando clicarmos no nome da usina já aparece o histórico de
     rondas com data e sujidade e vegetação"): todas as rondas do livro (90 dias), a mais recente primeiro, com as
     respostas do checklist lidas da OS no Fracttal (`ronda_checklist`; só das OS que o Nexus leu: as em verificação e
-    as aprovadas dos últimos 45 dias)."""
+    as aprovadas dos últimos 45 dias).
+    Validação por foto (Levi, 08/10/2026): entra como uma linha própria (`validada`, a leitura da usina naquele dia,
+    em nome de quem validou), que não é ronda; a ronda do App do MESMO dia ganha `revisada` (os níveis dela foram
+    revisados: o que vale para a usina é a linha validada)."""
+    do_dia = {dia: v for (uid, dia), v in _validacao_do_dia(validacoes).items() if uid == usina_id}
     out = []
     for r in todas:
         if r["usina_id"] != usina_id:
             continue
         resp = resposta_da_ronda(r, respostas)
+        v = do_dia.get(r["data"])
         out.append({**r, "sujidade": resp.get("sujidade"), "vegetacao": resp.get("vegetacao"), "vala": resp.get("vala") or "",
                     "sombreamento": resp.get("sombreamento") or "", "sensores_sujos": resp.get("sensores_sujos") or [],
-                    "lida": bool(resp)})
-    return sorted(out, key=lambda r: (r["data"], r["fim"] or ""), reverse=True)
+                    "lida": bool(resp), "revisada": ({"por": v["tecnico"], "sujidade": v["sujidade"],
+                                                      "vegetacao": v["vegetacao"]} if v else None)})
+    for dia, v in do_dia.items():
+        revisa = [x for x in out if x["data"] == dia and x.get("revisada")]
+        out.append({**v, "tipo": "", "dur_min": None, "nota": None, "veredito": ("neutro", "—"), "falhas": "",
+                    "pendencia": "", "pend_obs": "", "os": None, "sem_os": False, "avulsa": False, "lida": True,
+                    "ini_hm": "", "fim_hm": "", "fim": None, "revisa": [{"tecnico": x["tecnico"], "os": x["os"]}
+                                                                       for x in revisa]})
+    # a validação fica em cima das rondas do dia dela: é o valor que vale para a usina
+    return sorted(out, key=lambda r: (r["data"], "~" if r.get("validada") else (r["fim"] or "")), reverse=True)
 
 
 def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
@@ -796,7 +1054,7 @@ def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
     atrasada = cobertura[0] if cobertura else None
     quem = {}
     for r in periodo:
-        q = quem.setdefault(r["tecnico"] or "—", {"tecnico": r["tecnico"] or "—", "rondas": 0, "usinas": set(), "notas": [],
+        q = quem.setdefault(_quem_ronda(r), {"tecnico": r["tecnico"] or "—", "rondas": 0, "usinas": set(), "notas": [],
                                                   "durs": [], "curtas": 0, "longas": 0, "ultima": "", "equipe": r["equipe"]})
         q["rondas"] += 1
         q["usinas"].add(r["usina"])
@@ -828,16 +1086,21 @@ def painel_rondas(todas, cobertura, dias: int, hoje_iso: str) -> dict:
                 "sem_os": sum(1 for r in periodo if r["sem_os"])}}
 
 
-def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: str) -> dict:
+def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: str, validacoes=()) -> dict:
     """Sujidade dos módulos e altura da vegetação por usina (Levi, 05/10: "é importante!"): a última leitura de cada
     usina mobilizada no período e a anterior a ela (a seta), pelas respostas da ronda que o App escreve na OS do
     Fracttal (`ronda_checklist`). Nível de 1 a 5; acima de 3 pede ação (o `alerta_acima` do App). Junto: vala de
-    drenagem, sombreamento, dejeto de pássaro e os sensores (IPOA, albedômetro, GHI) que a ronda achou sujos."""
+    drenagem, sombreamento, dejeto de pássaro e os sensores (IPOA, albedômetro, GHI) que a ronda achou sujos.
+    Validação por foto (Levi, 08/10/2026): é a leitura da usina naquele dia (`validada`, em nome de quem validou) e,
+    havendo ronda no mesmo dia, vale no lugar dela (a ronda do dia não é leitura da usina: foi revisada). Não conta nas
+    rondas lidas (não é ronda)."""
     hoje = datetime.fromisoformat(hoje_iso).date()
     piso = (hoje - timedelta(days=dias - 1)).isoformat()
     usinas = {c["usina_id"]: c for c in cobertura}
+    do_dia = {k: v for k, v in _validacao_do_dia(validacoes).items() if k[0] in usinas}
     leituras = {}
     com_os = lidas = 0
+    revisadas = {}
     for r in sorted(todas, key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
         if r["usina_id"] not in usinas or not (r["os"] or r.get("checklist")):
             continue
@@ -846,7 +1109,16 @@ def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: s
         if not resp or (resp.get("sujidade") is None and resp.get("vegetacao") is None):
             continue
         lidas += r["data"] >= piso
+        if (r["usina_id"], r["data"]) in do_dia:     # revisada pela foto: a validação do dia é a leitura da usina
+            revisadas.setdefault((r["usina_id"], r["data"]), []).append(r)
+            continue
         leituras.setdefault(r["usina_id"], []).append((r, resp))
+    for (uid, dia), v in do_dia.items():
+        leituras.setdefault(uid, []).append(({**v, "os": next((x["os"] for x in revisadas.get((uid, dia), []) if x["os"]), None),
+                                              "fim": None, "tipo": "", "revisa": [{"tecnico": x["tecnico"], "os": x["os"]}
+                                                                                for x in revisadas.get((uid, dia), [])]}, v))
+    for lst in leituras.values():
+        lst.sort(key=lambda par: (par[0]["data"], "~" if par[0].get("validada") else (par[0]["fim"] or "")), reverse=True)
     linhas = []
     for uid, lst in leituras.items():
         r, resp = lst[0]
@@ -860,7 +1132,8 @@ def sujidade_vegetacao(todas, cobertura, respostas: dict, dias: int, hoje_iso: s
                        "vegetacao": resp.get("vegetacao"), "vegetacao_ant": ant.get("vegetacao"),
                        "vala": resp.get("vala") or "", "sombreamento": resp.get("sombreamento") or "",
                        "dejeto": resp.get("dejeto") or "", "sensores_sujos": resp.get("sensores_sujos") or [],
-                       "avulsa": bool(r.get("avulsa"))})
+                       "avulsa": bool(r.get("avulsa")), "validada": bool(r.get("validada")),
+                       "revisa": r.get("revisa") or []})
     for x in linhas:
         x["pontos"], x["status"] = criticidade(x)
         x["vala_peso"] = PESO_VALA.get(_norm_txt(x["vala"]), 0)      # a cor e a ordem da coluna Vala, sem acento
@@ -890,29 +1163,41 @@ def _norm_txt(s) -> str:
 
 # ── Permissões de trabalho ───────────────────────────────────────────────────────────────────────────────────────
 def pts() -> leitura.Leitura:
-    """Todas as PT do livro do App. A PT NÃO passa pelo filtro de usina mobilizada: PT esperando decisão sempre aparece
-    (esconder deixaria o técnico parado no campo)."""
+    """Todas as PT, pelo fato conformado (`fato_pt`, passo 4 de 08/10/2026): 1 linha = 1 PT × ativo (o App decide por
+    linha), a mesma contagem de antes (linha do livro). Do fato: a PT, a usina (`usina_id`), a situação (o domínio de
+    `dominios.py`), as datas, a espera, o solicitante e o decisor (`*_pessoa_id`, `*_hmac`), as respostas NÃO e a
+    forçada. Do livro cru, pela chave do fato (`pt_linha_id` = Número + Código do ativo): tarefa, ativo, papel, motivo,
+    efeito, o que falta, as atividades e o 1º aviso. A idade de quem espera é a de AGORA (o `parada` do fato é a foto da
+    hora da carga; o limite é o mesmo, `dominios.PT_PARADA_MIN`). A PT NÃO passa pelo filtro de usina mobilizada: PT
+    esperando decisão sempre aparece (esconder deixaria o técnico parado no campo)."""
     def calcular():
         b = _Base()
         quem = _quem()
         agora = _agora()
+        f = _fato("pt", b)
+        cru = {FR.chave(D._txt(r.get("Número")), D._txt(r.get("Código do ativo"))): r for r in _livro(*C.ORIGEM_PT)}
+        nomes = b.nomes({D._id(x.get(c)) for x in f["linhas"] for c in ("solicitante_pessoa_id", "decisor_pessoa_id")})
         out = []
-        for r in _livro("pt_app_campo"):
-            criada, decidida = _dt(r.get("Criada em")), _dt(r.get("Decidida em"))
-            sit = str(r.get("Situação") or "").strip() or "aguardando"
-            uid, _como = b.lig.usina(r.get("Usina"), r.get("Código do ativo"))
-            out.append({"numero": str(r.get("Número") or ""), "os": r.get("OS"), "tarefa": r.get("Tarefa") or "",
+        for x in f["linhas"]:
+            r = cru.get(D._txt(x.get("pt_linha_id"))) or {}
+            criada, decidida = _dt(x.get("criada_em")), _dt(x.get("decidida_em"))
+            # situação fora do domínio (o App escreveu uma nova): o fato fica vazio; a tela mostra a palavra do App
+            sit = D._txt(x.get("situacao")) or str(r.get("Situação") or "").strip() or "aguardando"
+            uid = D._id(x.get("usina_id"))
+            out.append({"numero": D._txt(x.get("pt")), "os": D._txt(x.get("os")) or None, "tarefa": r.get("Tarefa") or "",
                         "usina_id": uid, **b.onde(uid, r.get("Usina")), "ativo": r.get("Ativo") or "",
-                        "codigo": r.get("Código do ativo") or "",
-                        "solicitante": _nome(quem, r.get("Solicitante (HMAC)")), "situacao": sit,
-                        "criada": criada, "decidida": decidida, "decidida_por": _nome(quem, r.get("Decidida por (HMAC)")),
+                        "codigo": D._txt(x.get("codigo_ativo")),
+                        "solicitante": nomes.get(D._id(x.get("solicitante_pessoa_id")))
+                        or _nome(quem, x.get("solicitante_hmac")), "situacao": sit,
+                        "criada": criada, "decidida": decidida,
+                        "decidida_por": nomes.get(D._id(x.get("decisor_pessoa_id"))) or _nome(quem, x.get("decisor_hmac")),
                         "papel": r.get("Papel de quem decidiu") or "", "motivo": r.get("Motivo") or "",
                         "efeito": r.get("Efeito") or "",
-                        "respostas_nao": _int(r.get("Respostas NÃO")) or 0, "faltam": r.get("Faltam") or "",
+                        "respostas_nao": D._int(x.get("respostas_nao_qtd")) or 0, "faltam": r.get("Faltam") or "",
                         "atividades": [a.strip() for a in str(r.get("Atividades") or "").split(";") if a.strip()],
-                        "forcada": _sim(r.get("Forçada")), "aviso_em": _dt(r.get("1º aviso em")),
+                        "forcada": D._int(x.get("forcada")) == 1, "aviso_em": _dt(r.get("1º aviso em")),
                         "aviso_motivo": r.get("1º aviso: motivo") or "",
-                        "espera_min": int((decidida - criada).total_seconds() // 60) if criada and decidida else None,
+                        "espera_min": D._int(x.get("espera_min")),
                         "idade_min": int((agora - criada).total_seconds() // 60) if criada and sit == "aguardando" else None})
         for p in out:
             p["parada"] = (p["idade_min"] or 0) > PT_PARADA_MIN
@@ -924,6 +1209,7 @@ def pts() -> leitura.Leitura:
         for p in out:
             situacoes[p["situacao"]] = situacoes.get(p["situacao"], 0) + 1
         return {"aguardando": aguardando, "historico": historico, "situacoes": situacoes, "times": b.times(),
+                "fatos": _avisos("pt"),
                 "resumo": {"aguardando": len(aguardando),
                            "mais_antiga_min": aguardando[0]["idade_min"] if aguardando else None,
                            "paradas": sum(1 for p in aguardando if p["parada"]),
@@ -1085,7 +1371,8 @@ def atencao(dias: int = 14) -> leitura.Leitura:
         if p.erro:
             raise SemBanco(p.erro)
         return {"pendentes": pendentes, "feitas": feitas, "pts": p.dados.get("aguardando") or [], "usinas": usinas,
-                "times": b.times(), "sem_mobilizacao": b.sem_mobilizacao}
+                "times": b.times(), "sem_mobilizacao": b.sem_mobilizacao,
+                "fatos": {**_avisos("ronda"), **(p.dados.get("fatos") or {})}}
     return _ler(("visao_atencao", dias), calcular)
 
 

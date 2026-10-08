@@ -1,5 +1,5 @@
 """Etapa 2: o Nexus gera a semana em SOMBRA, com o motor do PCM copiado sem mudança (nexus/pcm/motor), e compara
-com a semana do Fabrício. Nada é publicado.
+com a semana oficial do PCM. Nada é publicado.
 
 Os testes usam um MOTOR FALSO (um script que escreve uma planilha no formato do gerador): nenhum teste vai ao Fracttal.
 """
@@ -11,6 +11,7 @@ from datetime import date
 import openpyxl
 import pytest
 
+from nexus.pcm import auxiliar as A
 from nexus.pcm import comparar as C
 from nexus.pcm import geracao as G
 from nexus.pcm import insumos as I
@@ -65,7 +66,7 @@ def motor_falso(tmp_path, codigo_saida=0, espera=0.0):
         import json, os, sys, time
         import openpyxl
         base = os.environ["PCM_PROG_DIR"]
-        for nome in ("AUXILIAR - FABRICIO.xlsx", "Historico_Programacoes.xlsx", "Observacoes_Semana.txt"):
+        for nome in ("{A.NOME}", "Historico_Programacoes.xlsx", "Observacoes_Semana.txt"):
             assert os.path.exists(os.path.join(base, nome)), nome
         assert os.environ.get("FRACTTAL_CLIENT_ID") == "id-de-teste"
         assert os.environ.get("FRACTTAL_BASE_URL", "").endswith("/api/")
@@ -91,7 +92,7 @@ def motor_falso(tmp_path, codigo_saida=0, espera=0.0):
 
 @pytest.fixture
 def config(tmp_path, origem):
-    # na sombra, o Nexus importa os arquivos do Fabrício antes de gerar (insumos.importar)
+    # na sombra, o Nexus importa os arquivos da pasta do PCM antes de gerar (insumos.importar)
     I.importar(tmp_path / "trabalho", origem, "2026-W41")
     return {"TESTING": True, "NEXUS_PCM_ORIGEM": str(origem), "NEXUS_PCM_TRABALHO": str(tmp_path / "trabalho"),
             "NEXUS_PCM_MOTOR": str(motor_falso(tmp_path)),
@@ -109,7 +110,7 @@ def test_semana_padrao_e_a_proxima_segunda():
 
 def test_historico_volta_para_antes_da_semana_gerada(tmp_path):
     """Gerar a semana de novo marcava tudo como reprogramado (medido na semana 40: 415 tarefas). O Nexus gera a partir do
-    histórico de ANTES da semana, então tanto faz rodar antes ou depois do Fabrício."""
+    histórico de ANTES da semana, então tanto faz rodar antes ou depois do PCM."""
     src, dst = tmp_path / "h.xlsx", tmp_path / "h2.xlsx"
     historico(src, [["A|1", "2026-W39", "2026-W41", 3, "2026-W39,2026-W40,2026-W41"],
                     ["B|2", "2026-W41", "2026-W41", 1, "2026-W41"],
@@ -158,8 +159,8 @@ def test_servidor_sem_a_pasta_do_pcm_gera_mesmo_assim(config, tmp_path):
     assert "comparacao" not in st                     # sem a oficial, não há com o que comparar
 
 
-def test_gerar_em_sombra_e_comparar_com_a_do_fabricio(config, origem):
-    planilha(origem / "Programação Semana 41.xlsx")               # a semana oficial (a do Fabrício)
+def test_gerar_em_sombra_e_comparar_com_a_oficial(config, origem):
+    planilha(origem / "Programação Semana 41.xlsx")               # a semana oficial (a do PCM)
     r = G.iniciar(config, "2026-W41")
     st = G.aguardar(config, r["id"], 60)
     assert st["estado"] == "ok", st
@@ -170,9 +171,9 @@ def test_gerar_em_sombra_e_comparar_com_a_do_fabricio(config, origem):
     assert {i["nome"] for i in st["insumos"]} >= {"Cadastro de usinas (AUXILIAR)", I.NOMES["historico"], I.NOMES["feriados"]}
 
 
-def test_diferenca_com_a_do_fabricio_aparece_por_campo(config, origem):
+def test_diferenca_com_a_oficial_aparece_por_campo(config, origem):
     outra = [list(LINHAS[0]), list(LINHAS[1])]
-    outra[1][9] = "13:12"                                          # a do Fabrício saiu às 13:12
+    outra[1][9] = "13:12"                                          # a oficial saiu às 13:12
     planilha(origem / "Programação Semana 41.xlsx", outra)
     r = G.iniciar(config, "2026-W41")
     st = G.aguardar(config, r["id"], 60)

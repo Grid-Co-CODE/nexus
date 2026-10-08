@@ -40,9 +40,13 @@
         {{ base_pequena }} usinas: o número oscila muito.</li>
       <li><b>Sujidade e vegetação:</b> o mais crítico primeiro. Nota de criticidade: nível 5 vale 5, nível 4 vale 3,
         nível 3 vale 1 (sujidade e vegetação); vala obstruída 4, parcial 2; cada sensor sujo 2. O Status diz o porquê.</li>
+      <li><b>Validada por foto:</b> níveis de sujidade e vegetação revisados a partir das fotos das rondas do App, em
+        nome de quem validou. Não é ronda: não conta em rondas, cobertura nem duração; é a leitura da usina naquele dia e,
+        se houve ronda no mesmo dia, vale no lugar dela (a ronda aparece marcada como revisada no histórico da usina).</li>
     </ul>
   </details>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+  {% if d.get('aviso_tecnico') %}<div class="cn-erro cn-aviso" role="status">{{ d.aviso_tecnico }}</div>{% endif %}
 
   <form class="cn-barra-filtros" method="get">
     <span class="gc-rotulo">Gestão de campo</span>
@@ -59,7 +63,7 @@
     </select>
     {% for x in ('aba', 'dur', 'cluster', 'equipe', 'ver', 'cob') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
-    <span class="cn-barra-fonte">livro de rondas do App · lido às {{ lido }}</span>
+    <span class="cn-barra-fonte">livro de rondas do App · lido às {{ lido }}{% include 'campo/_aviso_fato.html' %}</span>
   </form>
 
   {% set atr = k.atrasada %}
@@ -235,12 +239,13 @@
         <tr><td class="m" data-ordem="{{ x.data }}">{{ dia_curto(x.data) }}</td>
           <td class="cn-pessoa" data-ordem="{{ x.tecnico }}"><span class="cn-avatar">{{ iniciais(x.tecnico) }}</span>{{ x.tecnico or '—' }}</td>
           <td><a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=x.usina_id) }}">{{ x.usina }}</a></td><td class="cn-menor">{{ x.equipe or '—' }}</td><td class="cn-menor">{{ x.regiao_br or '—' }}</td>
-          <td data-ordem="{{ x.tipo }}"><span class="cn-tipo{% if x.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ x.tipo or '—' }}</span>{% if x.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}</td>
+          {# a validação por foto (08/10/2026) é a leitura da usina, não uma ronda: o selo no lugar do tipo #}
+          <td data-ordem="{{ 'validada' if x.validada else x.tipo }}">{% if x.validada %}<span class="cn-validada" tabindex="0" title="{{ explicacao_validada }}{% if x.revisa %} Revisa a ronda de {{ x.revisa|map(attribute='tecnico')|reject('none')|join(', ') or '—' }} do mesmo dia.{% endif %}">Validada por foto</span>{% else %}<span class="cn-tipo{% if x.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ x.tipo or '—' }}</span>{% if x.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}{% endif %}</td>
           <td data-ordem="{{ '' if x.sujidade is none else x.sujidade }}">{{ nivel(x.sujidade, x.sujidade_ant) }}</td><td data-ordem="{{ '' if x.vegetacao is none else x.vegetacao }}">{{ nivel(x.vegetacao, x.vegetacao_ant) }}</td>
           <td class="cn-menor cn-sombra">{{ x.sombreamento or '—' }}</td>
           <td data-ordem="{{ x.vala_peso if x.vala else '' }}"><span class="cn-t-{{ 'critico' if x.vala_peso >= 4 else ('alerta' if x.vala_peso else 'neutro') }}">{{ x.vala or '—' }}</span></td>
           <td data-ordem="{{ x.sensores_sujos|length }}">{% if x.sensores_sujos %}<span class="cn-t-alerta">{{ x.sensores_sujos|join(', ') }}</span>{% else %}<span class="mudo">limpos</span>{% endif %}</td>
-          <td class="m">{% if x.avulsa %}<span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% else %}{{ x.os }}{% endif %}</td>
+          <td class="m">{% if x.avulsa %}<span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% elif x.validada %}{{ x.os or '—' }}{% else %}{{ x.os }}{% endif %}</td>
           <td class="cn-status" data-ordem="{{ x.pontos }}">{% for palavra, cor in x.status %}<span class="cn-st cn-t-{{ cor }}">{{ palavra }}</span>{% else %}<span class="cn-st cn-t-ok">Sem alerta</span>{% endfor %}</td></tr>
       {% else %}<tr><td colspan="13" class="mudo">Nenhuma usina com leitura de sujidade ou vegetação com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>

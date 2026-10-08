@@ -48,7 +48,7 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
   `resumo` → `srv.aplicar_carga(carga, quem=QUEM_IMPORTACAO)` + `srv.auditar(...)`, que guarda uma cópia em
   `C:\GridcoAuto\nexus\backups\`. Depois, `ferramentas/publicar_cadastro.py --ensaio` e sem `--ensaio`. O Nexus no ar
   relê o arquivo sozinho (o cache segue o mtime), sem reiniciar.
-- **A Singrid ainda mexe no BD_Operações** (reestruturação de 05/10). O Levi sobe as atualizações à mão até a
+- **A responsável pelo BD_Operações ainda mexe nele** (reestruturação de 05/10). O Levi sobe as atualizações à mão até a
   planilha ficar pronta (07/10). Em toda importação, olhe o que cada campo faria: preenche, apaga ou troca. Um campo
   que **apaga** em bloco quase sempre quer dizer que a planilha mudou de forma, e não de dado.
 - **Coluna que sumiu não apaga o campo:** fica o valor do Nexus e o aviso diz qual coluna é. Em 07/10 a "RESPONSÁVEL
@@ -96,14 +96,32 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
   Buracos (com sugestões e ligar/ignorar), Ligado por nome (confirmar/desligar), Usinas fora (ausência esperada por
   cliente) e Decisões (desfazer).
 - **Geração em linhas (08/10/2026): sistemas `BD_Thopen · aba` e `BD_Performance · aba`** (`ligacoes.FONTES_ABA`;
-  chave = o nome da aba de geração, a mesma regra de `nexus.dados.geracao.abas_de_geracao`). A aba do BD_Thopen herda a
-  ligação da linha de mesmo nome do "Dados Gerais Usinas" (`igual_a`, decisões da tela inclusas; referência ignorada =
-  aba ignorada). A do BD_Performance vai pelo "Código Fractal" da aba "Info Geral" (`codigo_de`, casou_por
-  "código (Info Geral)"): 53/53 em 08/10, contra 0 pelo "Base UFV". `BD_Performance · aba` não cobre o
-  cliente do BD_Thopen (`SEM_O_CLIENTE`). "Ler as bases de novo" faz +171 leituras de 1 linha (~8 s). **Ainda não publicado** (é do Levi,
-  decisão 8 do desenho Kimball de 08/10): até lá o `usina_id` da geração fica 0%, de propósito. Calculado sem publicar:
-  BD_Thopen 86 de 100 abas a 1 usina, 2 a 2 usinas (não ligam), 11 ignoradas, 1 sem par; os sistemas antigos saem
-  idênticos (876 linhas, 0 diferenças contra o publicado).
+  chave = o nome da aba de geração, a mesma regra de `nexus.dados.geracao.abas_de_geracao`). "Ler as bases de novo" faz
+  +171 leituras de 1 linha (~8 s) e lê a tabela Equipamentos. Os caminhos, nesta ordem:
+  1. **O ciclo pela tabela Equipamentos do BD_Performance** (Levi, 08/10: "usa a tabela equipamentos da BD_Performance
+     como base de de-para, se liga ao fractall e aí você ligaria o fractal as usinas do BD_Operações"). A "Usina" da
+     tabela é o nome que as abas das DUAS bases usam (a aba ou a coluna Usina dela); a "Usina Fractall" é a Classificação
+     1 do Fracttal, chave do sistema FRACTTAL. A aba leva `ponte` e `banco._pela_ponte` liga à usina a que o FRACTTAL
+     liga aquele nome (exato ou, sem ele, a ÚNICA chave de mesmo nome normalizado: "Saturnino 1  - RJ" com 2 espaços,
+     "Nobres 1 - CE" no Fracttal × "- MT" na tabela). `casou_por` = "equipamentos → Fracttal (<como o Fracttal ligou>)".
+     Não chuta: usina com 2 nomes do Fracttal na tabela (a "Rodrigues 2": a linha UFV diz Rodrigues 1), chave do Fracttal
+     de 2 usinas ou ignorada, e caminho antigo que diz OUTRA usina (`conflito: …`) não ligam pela ponte.
+  2. Sem a ponte, o de antes: a aba do BD_Thopen herda a linha de mesmo nome do "Dados Gerais Usinas" (`igual_a`); a do
+     BD_Performance vai pelo "Código Fractal" da "Info Geral" (`codigo_de`, "código (Info Geral)"); depois o nome.
+  Decisão da tela (ligar, ignorar) vence a ponte: a "AP. do Taboado" fecharia pelo ciclo, mas está ignorada (fora da
+  operação, 04/10). Medido em 08/10, calculado sem publicar (Fracttal = o publicado em 07/10): BD_Thopen 100 abas: 78
+  pelo ciclo, 9 pelo Dados Gerais, 1 pelo Dados Gerais a 2 usinas (Primavera: a geração não liga), 11 ignoradas, 1 sem
+  usina ("zz Rodrigues"); BD_Performance 53: 51 pelo ciclo, 2 pela Info Geral (Colíder 1 e 2). Onde o ciclo e o caminho
+  antigo ligam os dois (129 abas), dão a mesma usina em 128 e nenhum conflito; na 129ª, a "Nova Londrina 1", o Dados
+  Gerais dava 2 usinas e o ciclo decide uma. A lista das abas que o ciclo não fecha, com o motivo: `C:\GridcoAuto\nexus\
+  geracao_de_para_faltando.csv` (fora do git). Os sistemas antigos saem idênticos (876 linhas, 0 diferenças contra o
+  publicado). **Ainda não publicado** (é do Levi, passo 1/decisão 8): até lá o `usina_id` da geração fica 0%.
+- **A regra de ignorar "Grid Co." do Fracttal pega "RenoGrid - Colíder 1/2" por acaso** (`ignorado` compara texto
+  normalizado contido: "renoGRID COlider"). As duas chaves estão fora do de-para do Fracttal desde 04/10; trocar a regra
+  por chave exata na tela Ligações.
+- **A foto do Fracttal de 05/10 da pasta do PCM não abre neste PC** (`ModuleNotFoundError: pyarrow`: o motor do PCM a
+  gravou com strings do pyarrow). O `fracttal()` pega a mais nova e "Ler as bases de novo" quebra; as fotos das rodadas
+  do Nexus (02/10) abrem. Instalar o `pyarrow` ou apontar outra foto.
 - **Sugestão nunca cruza cliente** nem passa pelas travas do casamento (número diferente, cidade diferente, potência
   40%+ diferente): na 1ª versão real (04/10) ela sugeria "E1 - Andradina 1" para a Andradina da Thopen, "Marajoara 1"
   a 100% para a Marajoara 2 e "Ouro Branco" (AL) para as de Bandeirantes (PR). Hoje os 73 buracos não têm par no

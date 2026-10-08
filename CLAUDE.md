@@ -85,6 +85,11 @@ Sem o `.env` completo o app não sobe, e diz qual variável falta.
 - **Sempre pt-BR**, inclusive comentários. **Sem emoji na interface**; severidade por cor e palavra.
 - Tema escuro **navy** (`#090d18` / `#161d30`) + verde Grid. Nunca lilás (o `#191528` do mockup não entra).
 - Comentário de código explica **por quê**, de preferência com o caso real que motivou a regra.
+- **Nome de colega não entra em arquivo versionado** (o repositório é público; nome de técnico ou supervisor ao lado de
+  nota, ronda ou pendência é dado pessoal ligado a desempenho): cite pelo papel ("um técnico", "o supervisor da equipe
+  X", "o programador do PCM"); fixture de teste com nome fictício. `tests/test_sem_nomes_no_repositorio.py` monta a
+  lista de nomes só na memória (cadastro, App, livro de rondas) e falha com `caminho:linha`. O histórico do git
+  anterior a 08/10/2026 ainda tem nomes (não se reescreve).
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.
 - Commit só quando pedido. Quando houver deploy automático, push na `main` vai para produção.

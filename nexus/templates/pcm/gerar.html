@@ -10,8 +10,8 @@
 <div class="pcm-topo">
   <div>
     <h1 class="titulo-pagina">Gerar a semana</h1>
-    <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana do Fabrício. Nada é publicado: o campo continua
-      com a semana dele.</p>
+    <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana oficial do PCM. Nada é publicado: o campo continua
+      com a semana oficial.</p>
   </div>
   <form class="pcm-semana-sel" method="get" action="/t/pcm/gerar">
     <label class="gc-rotulo" for="ver-semana">Semana</label>
@@ -66,7 +66,7 @@
     <div><div class="r">Linhas geradas</div><div class="v gc-num">{{ sel.resumo.linhas }}</div><div class="d">{{ sel.resumo.equipes }} equipes</div></div>
     <div><div class="r">Pendentes</div><div class="v gc-num">{{ sel.resumo.pendentes }}</div><div class="d">o que não coube na semana</div></div>
     {% if sel.comparacao %}
-    <div><div class="r">Contra a do Fabrício</div><div class="v">{{ 'Idênticas' if sel.comparacao.identicas else 'Diferentes' }}</div>
+    <div><div class="r">Contra a oficial</div><div class="v">{{ 'Idênticas' if sel.comparacao.identicas else 'Diferentes' }}</div>
       <div class="d">{{ sel.comparacao.iguais }} de {{ sel.comparacao.comuns }} linhas iguais em tudo</div></div>
     {% endif %}
   </div>
@@ -108,7 +108,7 @@
   {% endif %}
   {% endif %}
   {% elif sel.estado == 'ok' %}
-  <p class="gc-ajuda">A semana oficial ainda não está na pasta do PCM. A comparação sai quando o Fabrício publicar: gere de novo depois.</p>
+  <p class="gc-ajuda">A semana oficial ainda não está na pasta do PCM. A comparação sai quando o PCM publicar: gere de novo depois.</p>
   {% endif %}
 
   {% if log %}
@@ -125,7 +125,7 @@
     <div class="pcm-passo-txt">
       <h2 class="pcm-passo-tit">O que o motor precisa</h2>
       <p class="pcm-passo-sub">Prioridades, Confiabilidade, Histórico, Feriados e Observações moram no Nexus: a cada geração o
-        Nexus escreve os arquivos que o motor lê. Enquanto o Fabrício gera pelo PC dele, importe os arquivos dele antes de
+        Nexus escreve os arquivos que o motor lê. Enquanto o PCM gera pelo PC, importe os arquivos da pasta do PCM antes de
         gerar, para as duas semanas partirem do mesmo dado.</p>
     </div>
     <span class="pcm-passo-estado pcm-passo-estado--{{ 'ok' if not n_falta else 'falta' }}">{% if not n_falta %}<i class="ph ph-check-circle"></i> tudo pronto{% else %}<i class="ph ph-x-circle"></i> {{ n_falta }} {{ 'falta' if n_falta == 1 else 'faltam' }}{% endif %}</span>
@@ -181,11 +181,11 @@
   <header class="pcm-passo-cab">
     <span class="pcm-passo-n">4</span>
     <div class="pcm-passo-txt"><h2 class="pcm-passo-tit">Últimas gerações</h2>
-      <p class="pcm-passo-sub">Clique no horário para abrir a rodada e a comparação com a semana do Fabrício.</p></div>
+      <p class="pcm-passo-sub">Clique no horário para abrir a rodada e a comparação com a semana oficial do PCM.</p></div>
   </header>
 <div class="pcm-rolagem">
   <table class="pcm-tabela">
-    <thead><tr><th>Começou</th><th>Semana</th><th>Situação</th><th class="num">Linhas</th><th>Contra a do Fabrício</th></tr></thead>
+    <thead><tr><th>Começou</th><th>Semana</th><th>Situação</th><th class="num">Linhas</th><th>Contra a oficial</th></tr></thead>
     <tbody>
     {% for u in ultimas %}
       <tr>

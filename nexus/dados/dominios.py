@@ -1,10 +1,13 @@
 """Os domínios dos fatos do Nexus: a lista fechada de valores de cada atributo, num lugar só.
 
 Auditoria Kimball de 08/10/2026 (GR-1, DR-5): a mesma coluna da ronda tinha significados diferentes conforme o livro.
-- Vala: o App e o checklist usam {Limpa, Parcial, Obstruída, Não se aplica}; a ronda avulsa (formulário de 07/10) usa
+- Vala: o App e o checklist usam {Limpa, Parcial, Obstruída, Não se aplica}; o formulário da ronda avulsa de 07/10 usava
   {Limpa, Parcial, Suja, Não se aplica}. "Suja" não existe no App e não soma com "Obstruída".
-- Sensor: no checklist 0 = verificado limpo e vazio = não se aplica; na avulsa 0 = "não marcado", que conta como limpo
-  sem ninguém ter olhado.
+- Sensor: no checklist 0 = verificado limpo e vazio = não se aplica; no formulário da avulsa de 07/10, 0 = "não
+  marcado", que contava como limpo sem ninguém ter olhado.
+A avulsa foi alinhada em 08/10, ANTES da 1ª gravação do livro dela (decisão 3 do Levi, spec seção 9): a vala com as
+opções do App (`VALA_OPCOES`) e o sensor em três estados, gravado como o texto do domínio (`SENSOR_ROTULO`: "Sujo",
+"Limpo"; vazio = não verificado), que se distingue do 1/0 do formulário de 07/10.
 Daqui em diante o fato importa ESTA definição (`fato_ronda`, `fato_pt`) e a fonte nova também deve importar. Valor fora
 da lista vira VAZIO e conta na qualidade: nunca se chuta o vizinho mais parecido (regra 4 do `nexus/dados/CLAUDE.md`).
 
@@ -36,9 +39,14 @@ CHECKLIST_FONTE = ("app", "carga_unica_sem_os", "avulsa", "carga_unica_texto_os"
 VALA = {"limpa": 1, "parcial": 2, "obstruida": 3}
 VALA_ROTULO = {1: "Limpa", 2: "Parcial", 3: "Obstruída"}
 VALA_NAO_SE_APLICA = "nao se aplica"
+# As opções que o App mostra para a vala, na ordem dele: o formulário da avulsa usa as mesmas (08/10/2026)
+VALA_OPCOES = (*VALA_ROTULO.values(), "Não se aplica")
 
 # Sensor (IPOA, GHI, albedômetro): 1 = sujo, 0 = VERIFICADO limpo, vazio = não verificado ou não se aplica.
 SENSOR = {"sujo": 1, "limpo": 0}
+# O que a avulsa grava no livro dela (08/10/2026): a palavra, como o App escreve no texto da OS ("IPOA ...: Limpo"). O
+# 0 do formulário de 07/10 não dizia se alguém olhou; a palavra diz, e as duas formas não se confundem no livro.
+SENSOR_ROTULO = {1: "Sujo", 0: "Limpo"}
 
 # As falhas que o App escreve na ronda ("Falhas", separadas por ";"). Medido em 08/10: 6 rótulos, 421 de 867 rondas com
 # alguma. Cada uma vira um indicador 1/0 no fato. "evidência incompleta (faltam fotos)" casa pelo começo.
@@ -59,14 +67,20 @@ MAPA_ANTIGO = {
     "vala": {
         # App (texto da OS) e checklist da carga única de 06/10 (`nexus_rondas_checklist`)
         "app_e_checklist": {"Limpa": 1, "Parcial": 2, "Obstruída": 3, "Não se aplica": None, "": None},
-        # formulário da avulsa de 07/10 (livro ainda com 0 linhas): "Suja" não tem par no App -> vazio até o Levi decidir
+        # formulário da avulsa de 07/10: nenhuma linha dele chegou ao banco (o livro não existia em 08/10, conferido por
+        # GET); a tradução fica porque um Nexus com o código velho na memória grava assim até ser reiniciado. "Suja"
+        # não tem par no App -> vazio (e conta em `vala_fora`)
         "avulsa_07_10": {"Limpa": 1, "Parcial": 2, "Suja": None, "Não se aplica": None, "": None},
+        # formulário da avulsa de 08/10 em diante: as opções do App (`VALA_OPCOES`)
+        "avulsa": {"Limpa": 1, "Parcial": 2, "Obstruída": 3, "Não se aplica": None, "": None},
     },
     "sensor": {
         # checklist: já 1/0/vazio com o significado certo
         "checklist": {1: 1, 0: 0, None: None, "Sujo": 1, "Limpo": 0, "Não se aplica": None},
         # avulsa de 07/10: grava int(marcado). 0 = não marcado, que NÃO é limpo verificado -> vazio
         "avulsa_07_10": {1: 1, 0: None, None: None},
+        # avulsa de 08/10 em diante (três estados): a palavra; vazio = não verificado
+        "avulsa": {"Sujo": 1, "Limpo": 0, "": None, None: None},
     },
 }
 
@@ -96,8 +110,8 @@ def sensor(v):
 
 
 def sensor_avulsa(v):
-    """A avulsa: texto do domínio ("Sujo", "Limpo") quando o formulário ganhar três estados; o 1/0 do formulário de 07/10
-    vale só no 1 (0 = não marcado, não verificado)."""
+    """A avulsa: o texto do domínio ("Sujo", "Limpo"; vazio = não verificado), que o formulário grava desde 08/10; o 1/0
+    do formulário de 07/10 vale só no 1 (0 = não marcado, não verificado)."""
     if isinstance(v, str) and norm(v) in SENSOR:
         return SENSOR[norm(v)]
     return 1 if sensor(v) == 1 else None

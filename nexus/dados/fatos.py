@@ -166,6 +166,13 @@ class Ligador:
         return self.pessoas.get(primeiro) if primeiro else None
 
 
+def chave_fechamento(a: dict) -> str:
+    """`fechamento_id` = sha1("ID da OS|Tarefa|Registrado em")[:16]. Uma função só: a carga põe a chave no fato e a tela
+    do Campo junta o livro cru ao fato por ela (passo 4 do Kimball, 08/10/2026)."""
+    chave = f"{_txt(a.get('ID da OS no Fracttal'))}|{_txt(a.get('Tarefa'))}|{_txt(a.get('Registrado em'))}"
+    return hashlib.sha1(chave.encode("utf-8")).hexdigest()[:16]
+
+
 def fato_fechamento(origem: list[dict], lig: Ligador, equip=None) -> list[list]:
     """As linhas do fato (CAB_FECHAMENTO). `equip`: código do ativo -> (equipamento_id, como) (ver `ligar_equipamento`);
     sem ele, `equipamento_id` vazio."""
@@ -174,9 +181,8 @@ def fato_fechamento(origem: list[dict], lig: Ligador, equip=None) -> list[list]:
         reg = _txt(a.get("Registrado em"))
         uid, como = lig.usina(a.get("Usina"), a.get("Código do ativo"))
         eid, eq_como = ligar_equipamento(equip, a.get("Código do ativo"))
-        chave = f"{_txt(a.get('ID da OS no Fracttal'))}|{_txt(a.get('Tarefa'))}|{reg}"
         out.append([
-            hashlib.sha1(chave.encode("utf-8")).hexdigest()[:16], data_do_registro(reg), uid,
+            chave_fechamento(a), data_do_registro(reg), uid,
             lig.equipe(a.get("Região")), lig.pessoa(a.get("Técnico (HMAC)")), eid, eq_como,
             _txt(a.get("OS")) or None, _txt(a.get("ID da OS no Fracttal")) or None,
             _txt(a.get("Código do ativo")) or None, tarefa_chave(a.get("Tarefa")),

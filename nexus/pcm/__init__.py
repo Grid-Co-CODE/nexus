@@ -6,5 +6,5 @@ moram em `telas.py` e se penduram na torre PCM (nexus/torres/pcm).
 
 Etapa 1 (esta): LER a programação que está valendo — o banco_dados.json que o App de Campo e o painel do PCM já
 leem — e mostrá-la no layout do Nexus. Nada é gravado e nada muda no sistema atual. A geração pelo Nexus vem depois,
-em sombra, comparada linha a linha com a do Fabrício antes de substituir qualquer coisa.
+em sombra, comparada linha a linha com a oficial do PCM antes de substituir qualquer coisa.
 """

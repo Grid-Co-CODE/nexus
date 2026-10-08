@@ -41,11 +41,14 @@ vira `criticidade_rotulo` e `criticidade_pts`.
 entra no fato e a chave casa programado × executado. Medido em 08/10 contra os fechamentos do App: dos 716 pares (OS,
 código) que estão nos dois, 715 casam também a tarefa.
 
-**Herda do passo 0 (o pior caso dos cinco fatos).** A fonte guarda só as 4 semanas mais recentes. Com a troca integral
-do livro a cada hora, o fato nunca passa de 4 semanas e cada semana some 4 semanas depois. Por isso a gravação NÃO
-liga sem a decisão do Levi: o passo 0 ou o `mesclar_semanas` (a semana da fonte substitui a mesma semana no banco; as
-outras ficam). A semana regerada troca as próprias linhas (o bloco que mudou de dia ou hora ganha outro
-`programacao_id`): é snapshot, de propósito.
+**A fonte guarda só as 4 semanas mais recentes (decisão 7, resolvida em 08/10/2026).** Levi: "Tem que ter as semanas
+antigas mesmo, precisamos desses dados pois em menos de duas semanas será full Nexus". Com a troca integral do livro,
+o fato nunca passaria de 4 semanas. Por isso a carga de hora em hora grava pela MESCLA POR SEMANA (`mesclar_semanas`):
+lê o fato que está no banco, troca só as semanas que o arquivo traz e mantém as outras; leitura do banco que falha, ou
+que volta vazia com o livro existente, não grava naquela hora (o fato não encolhe). As semanas que já tinham saído do
+arquivo vieram UMA vez do histórico do git público do PCM (`ferramentas/carregar_programacao_historica.py`). A semana
+regerada troca as próprias linhas (o bloco que mudou de dia ou hora ganha outro `programacao_id`): é snapshot, de
+propósito.
 """
 import hashlib
 import re
@@ -82,6 +85,9 @@ CAB_PROGRAMACAO = [
     "duracao_min", "deslocamento_min", "hora_inicio", "reprogramada", "vezes_programada_qtd", "termo", "paralelo",
     "nova_os", "rolada", "status_execucao", "status_os", "semana_gerada_em", "lido_em"]
 
+# a `atualizacao` do livro: `sha_linhas` = o fato gravado (sem o `lido_em`); `sha_fonte` = só as linhas do arquivo do PCM
+# naquela gravação (a carga não relê o fato do banco quando o arquivo não mudou); `semanas` = quantas o fato tem
+CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "sha_linhas", "sha_fonte", "semanas", "como_ler"]
 _BRT = timezone(timedelta(hours=-3))
 DIAS_CURTOS = ("seg", "ter", "qua", "qui", "sex", "sab", "dom")
 ROTULOS_CRITICIDADE = ("Baixo", "Médio", "Alto", "Muito alto")
@@ -287,6 +293,32 @@ def _pct(n, total) -> float:
 
 
 # ── o fato ────────────────────────────────────────────────────────────────────────────────────────────────────────
+def _base_do_bloco(week: str, r: dict) -> str:
+    """O texto de que sai o `programacao_id`: semana × OS × código × tarefa × dia × hora de início (o grão). Uma conta
+    só, para o fato e para a carga única do histórico, que compara versões do arquivo pelos mesmos IDs."""
+    i_dia, h_ini = dia_da_semana(r.get("dia")), _hora(r.get("h_ini"))
+    dia_chave = DIAS_CURTOS[i_dia] if i_dia is not None else _sem_acento(r.get("dia"))
+    return (f"{week}|{_os(r.get('os_id')) or ''}|{_codigo(r.get('codigo')) or ''}|{tarefa_chave(r.get('tarefa')) or ''}"
+            f"|{dia_chave}|{h_ini or _txt(r.get('h_ini'))}")
+
+
+def ids_dos_blocos(semana: dict) -> list[str]:
+    """Os `programacao_id` das linhas planejadas (sem `foraDoPlano`) de UMA semana do banco_dados.json, na ordem e com
+    a mesma conta do fato (o bloco repetido ganha o sufixo da ordem). Para comparar duas versões do arquivo sem montar o
+    fato: o bloco que mudou de dia ou hora muda de ID."""
+    week = _txt((semana or {}).get("week")).upper()
+    vistos, out = Counter(), []
+    for r in (semana or {}).get("rows") or []:
+        if not isinstance(r, dict) or r.get("foraDoPlano"):
+            continue
+        base = _base_do_bloco(week, r)
+        vistos[base] += 1
+        if vistos[base] > 1:
+            base += f"|{vistos[base]}"
+        out.append(hashlib.sha1(base.encode("utf-8")).hexdigest()[:16])
+    return out
+
+
 def fato_programacao(dados: dict | None, lig, pessoa_por_nome: dict | None, equip, lido_em) -> tuple[list, dict]:
     """(linhas no formato de CAB_PROGRAMACAO, relatório só com contagens).
 
@@ -317,7 +349,6 @@ def fato_programacao(dados: dict | None, lig, pessoa_por_nome: dict | None, equi
             codigo = _codigo(r.get("codigo"))
             os_ = _os(r.get("os_id"))
             tch = tarefa_chave(r.get("tarefa"))
-            i_dia = dia_da_semana(r.get("dia"))
             h_ini = _hora(r.get("h_ini"))
             dia_prog = data_do_bloco(s, r.get("dia"))
             if dia_prog is None:
@@ -339,8 +370,7 @@ def fato_programacao(dados: dict | None, lig, pessoa_por_nome: dict | None, equi
                 fora_dom["status_execucao"] += 1
             if st_os is None and _txt(r.get("statusPai")):
                 fora_dom["status_os"] += 1
-            dia_chave = DIAS_CURTOS[i_dia] if i_dia is not None else _sem_acento(r.get("dia"))
-            base = f"{week}|{os_ or ''}|{codigo or ''}|{tch or ''}|{dia_chave}|{h_ini or _txt(r.get('h_ini'))}"
+            base = _base_do_bloco(week, r)
             vistos[base] += 1
             if vistos[base] > 1:
                 # o mesmo bloco duas vezes na planilha (0 em 08/10): as duas linhas ficam, com IDs distintos e
@@ -420,8 +450,11 @@ def linha_qualidade(rel: dict, cab: list, origem_em, agora: str) -> list:
     import json
     com, pct = rel.get("com") or {}, rel.get("pct") or {}
     extra = {"tarefas": rel.get("tarefas"), "fora_do_plano": rel.get("fora_do_plano"), "semanas": rel.get("semanas"),
+             "semanas_qtd": len(rel.get("semanas") or ()),
              "com_responsavel": com.get("pessoa_id_responsavel"), "criticidade": rel.get("criticidade"),
              "fora_do_dominio": rel.get("fora_do_dominio"), "blocos_repetidos": rel.get("blocos_repetidos")}
+    if rel.get("ids_repetidos") is not None:
+        extra["ids_repetidos"] = rel["ids_repetidos"]
     valores = {
         "fato": "programacao", "livro_origem": LIVRO_ORIGEM, "linhas": rel.get("linhas"),
         "com_data": com.get("data_id_programada"), "com_usina": com.get("usina_id"),
@@ -449,7 +482,45 @@ def sha_linhas(linhas: list) -> str:
     return h.hexdigest()
 
 
-# ── a gravação por semana (só com a decisão do Levi) ──────────────────────────────────────────────────────────────
+# ── a gravação por semana (decisão 7, 08/10/2026) ─────────────────────────────────────────────────────────────────
+def semana_iso(data_id) -> str | None:
+    """20261005 (a segunda-feira) -> "2026-W41". Vazio ou inválido = None."""
+    x = _num(data_id)
+    if not isinstance(x, int):
+        return None
+    try:
+        a, s, _d = date(x // 10000, x // 100 % 100, x % 100).isocalendar()
+    except ValueError:
+        return None
+    return f"{a}-W{s:02d}"
+
+
+def resumo_das_linhas(linhas: list, rel_fonte: dict | None = None) -> dict:
+    """O relatório de `fato_programacao`, mas contado nas LINHAS: serve ao fato mesclado (as semanas que já
+    estavam no banco + as do arquivo). O que só a montagem sabe (fora do plano, criticidade, nomes, exemplos sem usina
+    ou equipe) vem de `rel_fonte` e vale só para as semanas do arquivo. `ids_repetidos` conta `programacao_id` repetido
+    no fato inteiro: tem de ser 0 (o ID leva a semana; repetido é grão quebrado)."""
+    ix = {c: CAB_PROGRAMACAO.index(c) for c in CAB_PROGRAMACAO}
+    n, rf = len(linhas), rel_fonte or {}
+    cols = ("data_id_semana", "data_id_programada", "usina_id", "equipe_id", "pessoa_id_tecnico",
+            "pessoa_id_responsavel", "equipamento_id")
+    com = {c: sum(1 for l in linhas if l[ix[c]] is not None) for c in cols}
+    por_semana = Counter(semana_iso(l[ix["data_id_semana"]]) or "(sem semana)" for l in linhas)
+    ids = Counter(l[ix["programacao_id"]] for l in linhas)
+    como = Counter(l[ix["usina_ligada_por"]] for l in linhas)
+    return {
+        "fonte_gerado_em": rf.get("fonte_gerado_em"), "semanas": sorted(por_semana), "linhas": n,
+        "por_semana": dict(sorted(por_semana.items())),
+        "tarefas": sum(int(_num(l[ix["primeiro_bloco"]]) or 0) for l in linhas),
+        "fora_do_plano": rf.get("fora_do_plano"), "com": com, "pct": {c: _pct(v, n) for c, v in com.items()},
+        "usina_por_de_para": como.get("de-para do Fracttal", 0), "usina_por_codigo": como.get("código do ativo", 0),
+        "sem_usina_exemplos": rf.get("sem_usina_exemplos"), "sem_equipe_exemplos": rf.get("sem_equipe_exemplos"),
+        "nomes_tecnico": rf.get("nomes_tecnico"), "nomes_responsavel": rf.get("nomes_responsavel"),
+        "criticidade": rf.get("criticidade"), "fora_do_dominio": rf.get("fora_do_dominio"),
+        "blocos_repetidos": rf.get("blocos_repetidos"), "ids_repetidos": sum(v - 1 for v in ids.values() if v > 1),
+    }
+
+
 def _no_tipo(c, v):
     if v is None or (isinstance(v, str) and not v.strip()):
         return None
@@ -468,17 +539,43 @@ def _no_tipo(c, v):
 def mesclar_semanas(no_banco: list, da_fonte: list) -> list:
     """A semana que está na fonte substitui a MESMA semana do banco; as outras semanas do banco ficam.
 
-    NÃO está ligado: só entra se o Levi aprovar gravar a programação antes do passo 0 (desenho de 08/10, decisão 7).
-    Sem isto, a troca integral deixa no banco só as 4 semanas que a fonte guarda. `no_banco`: as linhas lidas do
+    Ligado em 08/10/2026 (decisão 7: o Levi quer as semanas antigas): é como a carga de hora em hora grava o
+    `fato_programacao` (`carga._programacao`) e como a carga única do histórico junta as semanas do git às do arquivo.
+    Sem isto, a troca integral deixaria no banco só as 4 semanas que a fonte guarda. `no_banco`: as linhas lidas do
     banco (dicionários, valores às vezes como texto); `da_fonte`: as linhas de `fato_programacao`. Linha do banco sem
     semana não é descartada (não se sabe a que semana pertence). Não protege contra a fonte que publica uma semana
-    pela metade: recusar carga encolhida é o passo 1, adiado."""
+    pela metade nem contra a semana regerada depois de fechada (a W35, em 31/08): recusar carga encolhida é o passo 1,
+    adiado."""
     i_sem = CAB_PROGRAMACAO.index("data_id_semana")
     semanas_fonte = {_no_tipo("data_id_semana", l[i_sem]) for l in da_fonte}
     ficam = []
     for l in no_banco or []:
-        lin = [l.get(c) for c in CAB_PROGRAMACAO] if isinstance(l, dict) else list(l)
-        lin = [_no_tipo(c, v) for c, v in zip(CAB_PROGRAMACAO, lin)]
+        lin = _linha_tipada(l)
         if lin[i_sem] is None or lin[i_sem] not in semanas_fonte:
             ficam.append(lin)
     return ficam + [list(l) for l in da_fonte]
+
+
+def _linha_tipada(l) -> list:
+    lin = [l.get(c) for c in CAB_PROGRAMACAO] if isinstance(l, dict) else list(l)
+    return [_no_tipo(c, v) for c, v in zip(CAB_PROGRAMACAO, lin)]
+
+
+def manter_lido_em(linhas: list, no_banco: list) -> list:
+    """A linha que não mudou desde a gravação anterior (mesmo `programacao_id`, os mesmos valores tirando o `lido_em`)
+    volta com o `lido_em` que já está no banco: o `lido_em` passa a dizer em que leitura a linha ficou como está. Sem
+    isto, as ~3,5 mil linhas das 4 semanas do arquivo mudariam a cada gravação só pela hora da leitura, e a API, que
+    guarda o histórico de cada linha que muda, guardaria milhares de mudanças por dia que não são mudança (o mesmo
+    cuidado do texto cifrado do cadastro, `cadastro/banco.py`)."""
+    i_id, i_lido = CAB_PROGRAMACAO.index("programacao_id"), CAB_PROGRAMACAO.index("lido_em")
+    antes = {}
+    for l in no_banco or []:
+        lin = _linha_tipada(l)
+        antes[lin[i_id]] = lin
+    out = []
+    for l in linhas:
+        a = antes.get(l[i_id])
+        if a is not None and a[i_lido] and a[:i_lido] + a[i_lido + 1:] == list(l[:i_lido]) + list(l[i_lido + 1:]):
+            l = list(l[:i_lido]) + [a[i_lido]] + list(l[i_lido + 1:])
+        out.append(l)
+    return out

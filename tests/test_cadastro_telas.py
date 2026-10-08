@@ -203,7 +203,7 @@ def test_tecnico_digitado_na_usina_conta_para_a_equipe(app_cad):
     with app_cad.app_context():
         servico().aplicar_carga(Carga(entidades={
             "equipes": [{"id": "1", "ordem": 1, "valores": {"nome": "PR Oeste 01"}}],
-            "pessoas": [{"id": "1", "ordem": 1, "valores": {"nome": "Matheus Gois Prado", "cargo": "Técnico O&M",
+            "pessoas": [{"id": "1", "ordem": 1, "valores": {"nome": "Fulano Beltrano Prado", "cargo": "Técnico O&M",
                                                             "status": "Ativo", "vinculo": "Colaborador de campo"}}],
             "usinas": [{"id": "1", "ordem": 1, "valores": {"nome": "U1", "status": "OPERAÇÃO", "equipe": "1",
                                                            "tecnico_om": "1"}},
@@ -211,9 +211,9 @@ def test_tecnico_digitado_na_usina_conta_para_a_equipe(app_cad):
                                                            "tecnico_om": "N/I"}}]}, listas=None))
     c = app_cad.test_client()
     c.post("/entrar", data={"senha": SENHA_TESTE})
-    assert _coluna(_html(c.get("/t/base/equipes")), "Técnicos", "1") == "Matheus Prado"
+    assert _coluna(_html(c.get("/t/base/equipes")), "Técnicos", "1") == "Fulano Prado"
     ficha = _html(c.get("/t/base/equipe/1"))
-    assert "Técnicos" in ficha and "Matheus Prado" in ficha      # ele não é da equipe: só aparece pelo resumo
+    assert "Técnicos" in ficha and "Fulano Prado" in ficha      # ele não é da equipe: só aparece pelo resumo
 
 
 def _detalhe_do_aviso(html, texto):

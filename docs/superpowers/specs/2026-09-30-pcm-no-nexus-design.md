@@ -12,7 +12,7 @@ derruba a atual, quando eu ver que está funcional a gente substitui completamen
 | `nexus/templates/pcm/` + `nexus/static/pcm.css` | o layout |
 
 **Regra de ouro:** o sistema atual segue no ar e intocado até o Nexus bater número a número. Isso vale para o
-gerador no PC do Fabrício, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
+gerador no PC do programador do PCM, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
 
 ## Etapas
 
@@ -33,7 +33,7 @@ gerador no PC do Fabrício, o robô do GitHub, o painel pcm.gridco.com.br e o `b
      - a 1 pedido por segundo;
      - com o ambiente próprio.
    - A tela "Gerar a semana" mostra o que falta, a rodada, o log e a comparação linha a linha com a semana do
-     Fabrício (`comparar.py`).
+     PCM (`comparar.py`).
    - Credencial: a do OS Creator, sem login (decisão do Levi). Basta o `.env` dele em
      `nexus/torres/oscreator/os_creator/.env`, que o git ignora.
 3. **Ajustes no Nexus — 1ª fatia FEITA em 30/09 (`insumos.py`).**
@@ -41,7 +41,7 @@ gerador no PC do Fabrício, o robô do GitHub, o painel pcm.gridco.com.br e o `b
      `C:\GridcoAuto\nexus\pcm\insumos.json`, com a versão anterior ao lado; a API de dados vem depois, só neste módulo).
    - A cada geração o Nexus escreve os cinco arquivos na pasta da rodada, no formato exato do motor. Da pasta do PCM
      só vêm a AUXILIAR e as durações aprendidas.
-   - Na sombra, "Importar da pasta do PCM" traz os arquivos do Fabrício; a tela avisa quando um deles muda depois.
+   - Na sombra, "Importar da pasta do PCM" traz os arquivos da pasta do PCM; a tela avisa quando um deles muda depois.
    - Observações por semana, editáveis na tela "Gerar a semana".
    - Prova com os arquivos REAIS: o que o motor lê do arquivo gerado pelo Nexus é igual ao original (38 prioridades,
      15 categorias, 7.301 tarefas do histórico, 12 + 16 + 46 feriados, 57 observações com o nº da linha).
@@ -70,7 +70,7 @@ gerador no PC do Fabrício, o robô do GitHub, o painel pcm.gridco.com.br e o `b
 2. **Servidor:** terá. Primeiro a montagem.
 3. **Prioridades e Confiabilidade:** viram cadastro no Nexus. Veja o mockup.
 4. **Estado da programação:** API de dados.
-5. **Fabrício:** continua gerando no PC por enquanto.
+5. **Programador do PCM:** continua gerando no PC por enquanto.
 
 ## Riscos conhecidos
 

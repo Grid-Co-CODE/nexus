@@ -461,7 +461,7 @@ def test_motivo_de_ronda_sem_os_fala_do_tecnico():
     m = visao.motivo_sem_os("Não criada — Fracttal: Conecte sua conta Fracttal (Conectar conta Fracttal)")
     assert m == "OS não criada: o técnico não tinha conectado a conta Fracttal dele no App"
     assert "sessão vencida" in visao.motivo_sem_os("Não criada — Fracttal: Sessão Fracttal expirada — reconecte sua conta")
-    assert "(Isake Costa)" in visao.motivo_sem_os("Não criada — responsável não resolvido no Fracttal para 'Isake Costa'")
+    assert "(Fulano de Tal)" in visao.motivo_sem_os("Não criada — responsável não resolvido no Fracttal para 'Fulano de Tal'")
 
 
 def test_quem_ronda_por_cluster_com_pendentes_por_pessoa(banco):
@@ -543,7 +543,7 @@ def test_eixo_de_datas_do_grafico_nao_encavala(banco, logado, monkeypatch):
     base = visao.rondas().dados["todas"][0]
     muitas = [dict(base, data=_dia(i), sujidade=3, vegetacao=2, lida=True, os=str(900 + i), sensores_sujos=[], vala="")
               for i in range(80)]
-    monkeypatch.setattr(visao, "historico_usina", lambda todas, resp, uid: muitas)
+    monkeypatch.setattr(visao, "historico_usina", lambda todas, resp, uid, validacoes=(): muitas)
     monkeypatch.setattr(ronda_checklist, "pedir_releitura", lambda app=None: None)
     pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
     datas = pag.count('class="eixo data"')

@@ -1,6 +1,6 @@
 """A AUXILIAR do motor sai do cadastro do Nexus, não da planilha da pasta do PCM.
 
-A "AUXILIAR - FABRICIO.xlsx" não tem dado próprio: é um Power Query da aba CONSULTA do BD_Operações, que por sua vez é
+A AUXILIAR da pasta do PCM (a planilha que o motor lê, `NOME`) não tem dado próprio: é um Power Query da aba CONSULTA do BD_Operações, que por sua vez é
 outro Power Query da aba Operações (UFV = CLIENTE - OPERAÇÃO). Só atualiza quando alguém abre a planilha no Excel e
 manda atualizar. Medido em 02/10/2026, contra o cadastro do Nexus (importado do BD em 29/09):
 - a AUXILIAR tinha 166 usinas, o cadastro 258; 20 nomes da AUXILIAR já não existem no BD;
@@ -23,7 +23,20 @@ import openpyxl
 from ..cadastro.tipos import Legado, marcador
 
 ABA = "Operacoes_1"
-NOME = "AUXILIAR - FABRICIO.xlsx"
+
+
+def _nome_que_o_motor_le() -> str:
+    """O nome do arquivo que o motor do PCM procura (`motor/fonte_bd_api.df_auxiliar`). O motor é cópia idêntica
+    do repositório do PCM e não se edita (motor/README.md), e o nome do arquivo leva o de quem montou a planilha:
+    é lido de lá, e não repetido aqui, porque o repositório é público e nome de colega fica fora dele (Levi,
+    08/10/2026). Se a cópia do motor trocar o nome, este acompanha; sem achar, um nome genérico, e o
+    `test_pcm_auxiliar` acusa."""
+    texto = (Path(__file__).parent / "motor" / "fonte_bd_api.py").read_text(encoding="utf-8")
+    m = re.search(r'BASE_DIR,\s*"(AUXILIAR - [^"]+\.xlsx)"', texto)
+    return m.group(1) if m else "AUXILIAR.xlsx"
+
+
+NOME = _nome_que_o_motor_le()
 # A ordem importa: o motor pega a PRIMEIRA coluna com "MWP" no nome e a que tem "RESPONS" e "O&M".
 COLUNAS = ("UFV", "CÓDIGO", "STATUS", "CLIENTE", "Equipe Cluster", "RESPONSÁVEL O&M", "CAPACIDADE INSTALADA (MWp)",
            "OPERAÇÃO", "CIDADE", "UF", "Base Equipe", "CLUSTER", "IDUsina")

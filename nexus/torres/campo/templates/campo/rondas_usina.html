@@ -17,8 +17,9 @@
   {% include 'campo/_aviso_checklist.html' %}
   {% set ult = lidas[0] if lidas else none %}
   <div class="cn-kpis">
-    <div class="cn-kpi"><span class="gc-rotulo">Rondas</span><span class="v">{{ hist|length }}</span><span class="d">nos últimos 90 dias</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Última ronda</span><span class="v">{{ dia_curto(hist[0].data) if hist else '—' }}</span><span class="d">{{ hist[0].tecnico if hist else 'nunca teve ronda pelo App' }}</span></div>
+    {# a validação por foto (08/10/2026) não é ronda: só as rondas contam aqui #}
+    <div class="cn-kpi"><span class="gc-rotulo">Rondas</span><span class="v">{{ rondas_hist|length }}</span><span class="d">nos últimos 90 dias</span></div>
+    <div class="cn-kpi"><span class="gc-rotulo">Última ronda</span><span class="v">{{ dia_curto(rondas_hist[0].data) if rondas_hist else '—' }}</span><span class="d">{{ rondas_hist[0].tecnico if rondas_hist else 'nunca teve ronda pelo App' }}</span></div>
     <div class="cn-kpi"><span class="gc-rotulo">Sujidade dos módulos</span><span class="v">{{ nivel(ult.sujidade if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></div>
     <div class="cn-kpi"><span class="gc-rotulo">Altura da vegetação</span><span class="v">{{ nivel(ult.vegetacao if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></div>
   </div>
@@ -41,7 +42,7 @@
       <line class="cn-guia" x1="0" x2="0" y1="10" y2="{{ h - 22 }}" visibility="hidden"/>
       {# um grupo por ronda: passar o mouse (ou o foco do teclado) mostra OS, quem fez e quando (Levi, 06/10) #}
       {% for p in pts %}
-      <g class="cn-ponto" tabindex="0" data-x="{{ x(loop.index0) }}" data-os="{{ p.os or 'sem OS' }}" data-tec="{{ p.tecnico or '—' }}"
+      <g class="cn-ponto" tabindex="0" data-x="{{ x(loop.index0) }}" data-os="{{ 'validada por foto' if p.validada else (p.os or 'sem OS') }}" data-tec="{{ p.tecnico or '—' }}"
          data-quando="{{ p.data[8:10] }}/{{ p.data[5:7] }}/{{ p.data[:4] }}{% if p.ini_hm %} às {{ p.ini_hm }}{% if p.fim_hm %} (até {{ p.fim_hm }}){% endif %}{% endif %}"
          data-suj="{{ '—' if p.sujidade is none else p.sujidade }}" data-veg="{{ '—' if p.vegetacao is none else p.vegetacao }}"
          aria-label="OS {{ p.os or 'sem OS' }}, {{ p.tecnico or '—' }}, {{ dia_curto(p.data) }}: sujidade {{ '—' if p.sujidade is none else p.sujidade }}, vegetação {{ '—' if p.vegetacao is none else p.vegetacao }}">
@@ -65,7 +66,7 @@
       function campo(c, v) { dica.querySelector(c).textContent = v; }
       function limpa() { sec.querySelectorAll('.cn-ponto.ativo').forEach(function (o) { o.classList.remove('ativo'); }); }
       function mostra(g) {
-        campo('.cn-dica-os', g.dataset.os === 'sem OS' ? 'Sem OS' : 'OS ' + g.dataset.os);
+        campo('.cn-dica-os', g.dataset.os === 'sem OS' ? 'Sem OS' : (g.dataset.os === 'validada por foto' ? 'Validada por foto' : 'OS ' + g.dataset.os));
         campo('.cn-dica-tec', g.dataset.tec); campo('.cn-dica-quando', g.dataset.quando);
         campo('.cn-dica-suj', g.dataset.suj); campo('.cn-dica-veg', g.dataset.veg);
         guia.setAttribute('x1', g.dataset.x); guia.setAttribute('x2', g.dataset.x); guia.setAttribute('visibility', 'visible');
@@ -97,7 +98,8 @@
     <tbody>
     {% for r in hist %}{% set v = r.veredito %}
       <tr><td class="m"><b>{{ dia_curto(r.data) }}</b><span class="det">{{ r.ini_hm }}{% if r.fim_hm %} às {{ r.fim_hm }}{% endif %}</span></td>
-        <td><span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span>{% if r.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}</td>
+        {# validação por foto (08/10/2026): a linha própria, com o selo; a ronda do mesmo dia leva a marca "revisada" #}
+        <td>{% if r.validada %}<span class="cn-validada" tabindex="0" title="{{ explicacao_validada }}{% if r.revisa %} Revisa a ronda de {{ r.revisa|map(attribute='tecnico')|reject('none')|join(', ') or '—' }} do mesmo dia.{% endif %}">Validada por foto</span>{% else %}<span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span>{% if r.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}{% if r.revisada %} <span class="cn-revisada" tabindex="0" title="Os níveis desta ronda foram revisados pela foto ({{ r.revisada.por or '—' }}): para a usina vale a linha Validada por foto do mesmo dia (sujidade {{ '—' if r.revisada.sujidade is none else r.revisada.sujidade }}, vegetação {{ '—' if r.revisada.vegetacao is none else r.revisada.vegetacao }}).">revisada</span>{% endif %}{% endif %}</td>
         <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</td>
         <td class="m">{{ duracao(r.dur_min) }}</td>
         <td class="m">{{ '—' if r.nota is none else r.nota ~ '%' }}</td>
@@ -107,8 +109,8 @@
         <td class="cn-menor">{{ r.vala or '—' }}</td>
         <td>{% if r.sensores_sujos %}<span class="cn-t-alerta">{{ r.sensores_sujos|join(', ') }}</span>{% elif r.lida %}<span class="mudo">limpos</span>{% else %}—{% endif %}</td>
         <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia and r.pend_obs not in (r.falhas or '') %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if r.avulsa and r.comentario %}<span class="mudo">{{ r.comentario }}</span>{% elif not r.falhas and not r.pendencia %}—{% endif %}</td>
-        <td class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td>
-        <td>{% if r.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}">Fotos</button>{% elif r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">—</span>{% else %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% endif %}</td></tr>
+        <td class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa</span>{% elif r.validada %}<span class="mudo" title="{{ explicacao_validada }}">—</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td>
+        <td>{% if r.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}">Fotos</button>{% elif r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">—</span>{% elif r.validada %}<span class="mudo" title="As fotos são as da ronda do App que a validação revisou">—</span>{% else %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% endif %}</td></tr>
       {% if r.os %}<tr class="cn-fotos-linha" hidden><td colspan="13"></td></tr>{% endif %}
     {% else %}<tr><td colspan="13" class="mudo">Nenhuma ronda pelo App nos últimos 90 dias.</td></tr>{% endfor %}
     </tbody></table></div>

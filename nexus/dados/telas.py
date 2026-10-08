@@ -14,7 +14,7 @@ from datetime import datetime
 
 from flask import current_app, render_template
 
-from . import carga, catalogo, equipamento, historico, livros
+from . import carga, catalogo, equipamento, historico, livros, programacao
 
 _CACHE = {"t": 0.0, "v": None}
 TTL_S = 300
@@ -35,6 +35,8 @@ def _ultima_qualidade():
     base = carga._base(current_app.config)
     try:
         q = {l.get("fato"): l for l in livros.ler(base, s, carga.LIVRO_FATOS, "qualidade")}
+        # a programação do PCM tem livro próprio desde 08/10/2026 (`nexus_programacao`, mescla por semana)
+        q.update({l.get("fato"): l for l in livros.ler(base, s, programacao.LIVRO, "qualidade")})
         at = next(iter(livros.ler(base, s, carga.LIVRO_FATOS, "atualizacao")), {})
         hq = livros.ler(base, s, carga.LIVRO_DIM, historico.ABA_QUALIDADE)
         eq = {(l.get("grupo"), l.get("item")): l for l in livros.ler(base, s, equipamento.LIVRO, "qualidade")}

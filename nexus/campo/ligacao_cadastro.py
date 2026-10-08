@@ -54,19 +54,27 @@ def mapas(config, sessao=None) -> dict:
     s = sessao or requests
     base = (config.get("GRIDCO_DB_API") or banco_campo.BASE_API).rstrip("/")
     abas = _abas(base, s)
+    de_para = banco_campo._linhas_da_aba(base, s, abas["de_para"]) if "de_para" in abas else []
+    pessoas = (banco_campo._linhas_da_aba(base, s, abas["pessoas"])
+               if config.get("NEXUS_CHAVE_CADASTRO") and "pessoas" in abas else [])
+    return mapas_de(config, de_para, pessoas)
+
+
+def mapas_de(config, de_para: list[dict], pessoas: list[dict]) -> dict:
+    """A conta de `mapas` com as linhas do cadastro já lidas. As telas do Campo (passo 4 do Kimball, 08/10/2026) montam
+    o fato na hora com as linhas que já leram: a MESMA tradução da carga, sem ler o cadastro duas vezes."""
     usina = {}
-    if "de_para" in abas:
-        for d in banco_campo._linhas_da_aba(base, s, abas["de_para"]):
-            if str(d.get("sistema") or "").strip() == SISTEMA_FRACTTAL and d.get("usina_id") not in (None, ""):
-                usina[_norm(d.get("chave_externa"))] = int(float(d["usina_id"]))
+    for d in de_para:
+        if str(d.get("sistema") or "").strip() == SISTEMA_FRACTTAL and d.get("usina_id") not in (None, ""):
+            usina[_norm(d.get("chave_externa"))] = int(float(d["usina_id"]))
     pessoa, por_codigo = {}, {}
     chave_hmac = config.get("NEXUS_PESSOA_HMAC")
     chave = config.get("NEXUS_CHAVE_CADASTRO")
-    if chave and "pessoas" in abas:
+    if chave and pessoas:
         from ..cadastro.cifra import CifraErro, Cofre
         cofre = Cofre(chave)
         donos, codigos = {}, {}
-        for p in banco_campo._linhas_da_aba(base, s, abas["pessoas"]):
+        for p in pessoas:
             if str(p.get("excluido") or "").strip().lower() == "sim" or not p.get("sensivel_cifrado"):
                 continue
             pid = int(float(p["pessoa_id"]))

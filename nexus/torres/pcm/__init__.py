@@ -25,7 +25,7 @@ TORRE = Torre(
              "Qual é a lista consolidada de OS e tarefas da semana?",
              "banco_dados.json do painel PCM"),
         Tela("gerar", "Gerar a semana",
-             "A semana que o Nexus gera bate com a do Fabrício?",
+             "A semana que o Nexus gera bate com a oficial do PCM?",
              "Motor do PCM rodando no Nexus, em sombra: nada é publicado"),
         Tela("etiquetas", "Chamados por etiqueta",
              "Quanto está aberto e atrasado em religamento, preventiva e garantia?",

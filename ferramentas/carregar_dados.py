@@ -5,8 +5,9 @@
     python ferramentas/carregar_dados.py              grava se a última carga tiver mais de 50 min
     python ferramentas/carregar_dados.py --forcar     grava agora
 
-O `--ensaio` mostra também o que ainda NÃO é gravado (08/10/2026, decisões 7 e 8 do Levi): a programação do PCM e a
-geração em linhas. Para cada aba: linhas, chave repetida (tem de ser 0) e o tamanho do xlsx que seria enviado.
+O `--ensaio` mostra também a programação do PCM já mesclada (o histórico do banco + as semanas do arquivo; desde
+08/10/2026 ela grava, pela mescla por semana) e o que ainda NÃO é gravado: a geração em linhas (decisão 8 do Levi).
+Para cada aba: linhas, chave repetida (tem de ser 0) e o tamanho do xlsx que seria enviado.
 """
 import json
 import sys

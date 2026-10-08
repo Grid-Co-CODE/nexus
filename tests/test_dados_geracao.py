@@ -354,6 +354,97 @@ def test_itens_das_abas_thopen_e_performance():
     assert L.SO_DO_CLIENTE[TH] == "Thopen" and [s for s, *_ in L.FONTES_ABA] == [TH, PF]
 
 
+# ── a ponte pela tabela Equipamentos do BD_Performance (Levi, 08/10/2026: "se liga ao fractall ... fecharia esse ciclo")
+EQUIP = [
+    {"Cliente": "Thopen", "Usina": "Exemplo Norte I", "Usina Fractall": "Thopen - Exemplo Norte 1 - SP", "Equipamento": "UFV"},
+    # espaço e caixa não fazem outro nome
+    {"Cliente": "Thopen", "Usina": "Exemplo Norte I", "Usina Fractall": " thopen  - Exemplo Norte 1 - SP", "Equipamento": "Inversor 1.1"},
+    {"Cliente": "Thopen", "Usina": "Sem Nome", "Usina Fractall": None, "Equipamento": "UFV"},
+    # a linha UFV com o nome de outra usina (a "Rodrigues 2" de 08/10): 2 nomes, não liga
+    {"Cliente": "Thopen", "Usina": "Duas", "Usina Fractall": "Thopen - Duas 1 - SP", "Equipamento": "UFV"},
+    {"Cliente": "Thopen", "Usina": "Duas", "Usina Fractall": "Thopen - Duas 2 - SP", "Equipamento": "Inversor 1.1"},
+    # o mesmo nome em outro cliente: a aba do BD_Thopen não o vê, e a do BD_Performance não vê o da Thopen
+    {"Cliente": "Cliente B", "Usina": "Exemplo Norte I", "Usina Fractall": "Cliente B - Outra - CE", "Equipamento": "UFV"},
+]
+
+
+def test_itens_das_abas_levam_a_ponte_da_tabela_de_equipamentos():
+    primeiras = {"Exemplo Norte I": [_linha("2026-08-01", Usina="Exemplo Norte I")],
+                 "Pela Coluna": [_linha("2026-08-01", Usina="Exemplo Norte I")],
+                 "Sem Nome": [_linha("2026-08-01", Usina="Sem Nome")], "Duas": [_linha("2026-08-01", Usina="Duas")],
+                 "Fora": [_linha("2026-08-01", Usina="Fora da tabela")]}
+    it = {i["chave"]: i for i in L.itens_abas(TH, primeiras, [], {}, EQUIP)}
+    assert it["Exemplo Norte I"]["ponte"] == (L.FRACTTAL, "Thopen - Exemplo Norte 1 - SP", L.VIA_EQUIPAMENTOS)
+    assert it["Pela Coluna"]["ponte"][1] == "Thopen - Exemplo Norte 1 - SP"        # pela coluna Usina da aba
+    assert it["Pela Coluna"]["usina_equipamentos"] == "Exemplo Norte I"
+    assert it["Sem Nome"]["ponte_motivo"].startswith("sem 'Usina Fractall'") and "ponte" not in it["Sem Nome"]
+    assert it["Duas"]["ponte_motivo"].startswith("2 nomes do Fracttal")
+    assert it["Fora"]["ponte_motivo"] == "sem linha na tabela de equipamentos"
+    # o BD_Performance não cobre a Thopen: a mesma "Usina" acha só a linha do outro cliente
+    ip = {i["chave"]: i for i in L.itens_abas(PF, {"Exemplo Norte I": [_linha("2026-08-01")]}, [], None, EQUIP)}
+    assert ip["Exemplo Norte I"]["ponte"][1] == "Cliente B - Outra - CE"
+    # sem a tabela, as abas casam como antes de 08/10
+    assert not any("ponte" in i or "ponte_motivo" in i for i in L.itens_abas(TH, primeiras, [], {}))
+
+
+def test_de_para_pela_ponte_liga_ao_que_o_fracttal_liga_e_nao_chuta():
+    v = L.VIA_EQUIPAMENTOS
+    fontes = {
+        L.FRACTTAL: [{"chave": "Thopen - Exemplo Norte 1 - SP", "nome": "Thopen - Exemplo Norte 1 - SP",
+                      "codigo": "THPN-ENT100"},
+                     {"chave": "Thopen - Exemplo Sul 1  - SP", "nome": "Thopen - Exemplo Sul 1  - SP",
+                      "codigo": "THPN-EXS100"},
+                     {"chave": "Thopen - Sem Cadastro - SP", "nome": "Thopen - Sem Cadastro - SP"},
+                     {"chave": "Thopen - Interna X - SP", "nome": "Thopen - Interna X - SP", "codigo": "THPN-ENT100"}],
+        "BD_Thopen · Dados Gerais Usinas": [{"chave": "Exemplo Sul I", "nome": "Exemplo Sul I",
+                                             "nomes": ["Exemplo Sul I"], "cliente": "Thopen"}],
+        TH: [{"chave": "A", "nome": "A", "ponte": (L.FRACTTAL, "Thopen - Exemplo Norte 1 - SP", v)},
+             # a chave do Fracttal tem dois espaços: o nome normalizado acha a ÚNICA chave
+             {"chave": "B", "nome": "B", "ponte": (L.FRACTTAL, "Thopen - Exemplo Sul 1 - SP", v)},
+             # a ponte diz a usina 1, o Dados Gerais diz a 2: ninguém liga
+             {"chave": "C", "nome": "C", "ponte": (L.FRACTTAL, "Thopen - Exemplo Norte 1 - SP", v),
+              "igual_a": ("BD_Thopen · Dados Gerais Usinas", "Exemplo Sul I")},
+             {"chave": "D", "nome": "D", "ponte": (L.FRACTTAL, "Thopen - Sem Cadastro - SP", v)},
+             {"chave": "E", "nome": "E", "codigo": "THPN-EXS100", "ponte_motivo": "sem linha na tabela de equipamentos"},
+             {"chave": "F teste", "nome": "F teste", "ponte": (L.FRACTTAL, "Thopen - Exemplo Norte 1 - SP", v)},
+             {"chave": "G", "nome": "G", "ponte": (L.FRACTTAL, "Thopen - Nunca Vista - SP", v)},
+             # a chave do Fracttal ignorada não ignora a aba: vale o caminho antigo
+             {"chave": "H", "nome": "H", "codigo": "THPN-EXS100", "ponte": (L.FRACTTAL, "Thopen - Interna X - SP", v)}]}
+    regras = {"ignorar": [{"contem": "teste", "motivo": "teste"},
+                          {"contem": "interna", "sistema": L.FRACTTAL, "motivo": "interna"}], "ligar": [], "desligar": []}
+
+    class S(_S):
+        def registros(self, ent, incluir_excluidos=False):
+            return super().registros(ent)[:2]
+    dp = {(l[1], l[2]): (l[0], l[3]) for l in B.de_para(S(), fontes, regras)}
+    assert dp[(TH, "A")] == (1, f"{v} (código)")
+    assert dp[(TH, "B")] == (2, f"{v} (código)")
+    assert dp[(TH, "C")][0] is None and dp[(TH, "C")][1].startswith("conflito:")
+    assert "usina 1" in dp[(TH, "C")][1] and "usina 2" in dp[(TH, "C")][1]
+    assert dp[(TH, "D")] == (None, f"{B.SEM_PAR} ({v}: chave do Fracttal {B.SEM_PAR})")
+    assert dp[(TH, "E")] == (2, "código")                                    # a ponte não fecha: o caminho antigo
+    assert dp[(TH, "F teste")] == (None, "ignorado: teste")                  # decisão da tela vence a ponte
+    assert dp[(TH, "G")] == (None, f"{B.SEM_PAR} ({v}: nome do Fracttal fora do de-para)")
+    assert dp[(TH, "H")] == (2, "código")
+    # o fato de geração herda o caminho na linhagem
+    t, _i, _r = G.montar({"bd_thopen": {"A": [_linha("2026-10-06")]}}, [_de(u, s, k, c) for (s, k), (u, c) in
+                                                                       dp.items() if u], [], HOJE, "agora")
+    assert t[G.ABA_USINA][1][0][3] == f"de-para ({v} (código))"
+
+
+def test_ponte_decide_entre_as_duas_usinas_que_o_caminho_antigo_somou():
+    """A "Nova Londrina 1" de 08/10: o Dados Gerais a ligava a 2 usinas (a soma do casamento por potência, que a
+    geração recusa); a tabela de equipamentos aponta UMA delas, e vale a dela."""
+    ligado = {(L.FRACTTAL, "Thopen - X 1 - PR"): ([101], "código")}
+    it = {"chave": "X 1", "ponte": (L.FRACTTAL, "Thopen - X 1 - PR", L.VIA_EQUIPAMENTOS)}
+    assert B._pela_ponte(it, [101, 103], "igual a BD_Thopen · Dados Gerais Usinas", ligado, {}) == (
+        [101], f"{L.VIA_EQUIPAMENTOS} (código)")
+    assert B._pela_ponte(it, [102, 103], "igual a X", ligado, {})[0] == []     # nenhuma das duas: conflito
+    duas = {(L.FRACTTAL, "Thopen - X 1 - PR"): ([101, 102], "nome")}
+    assert B._pela_ponte(it, [], None, duas, {}) == (
+        [], f"{B.SEM_PAR} ({L.VIA_EQUIPAMENTOS}: chave do Fracttal de 2 usinas)")
+
+
 def test_tela_ligacoes_nao_lista_como_fora_a_usina_do_cliente_que_a_base_nao_cobre():
     """As abas do BD_Performance não têm usina da Thopen (a geração delas é do BD_Thopen): não é buraco."""
     class S3(_S):

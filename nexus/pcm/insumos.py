@@ -16,7 +16,7 @@ A AUXILIAR sai pelo cadastro (etapa 4) e o duracoes_aprendidas.json é derivado;
 Como o motor não muda: a cada geração, o Nexus ESCREVE estes arquivos na pasta da rodada, no formato exato que o
 motor lê (mesma aba, mesma linha de cabeçalho, mesma posição de coluna). Ninguém edita mais os arquivos.
 
-Durante a sombra, o "Importar da pasta do PCM" traz para o Nexus o que o Fabrício tem hoje: as duas gerações partem
+Durante a sombra, o "Importar da pasta do PCM" traz para o Nexus o que a pasta do PCM tem hoje: as duas gerações partem
 do mesmo dado e a comparação continua justa. Na virada, para de importar e os arquivos morrem.
 
 Onde fica: um arquivo JSON na pasta de trabalho do PCM (fora do OneDrive), com cópia do anterior a cada gravação.
@@ -308,7 +308,7 @@ def _carimbo(chave: str, item: dict) -> dict:
 
 def estado(pasta_trabalho: Path, origem: Path | None, semana: str) -> list[dict]:
     """Um item por insumo: se está no Nexus, de quando, e se o arquivo da pasta do PCM mudou depois da importação
-    (na sombra, o Nexus precisa partir do mesmo dado que o Fabrício)."""
+    (na sombra, o Nexus precisa partir do mesmo dado que o PCM)."""
     dados = carregar(pasta_trabalho)
     itens = []
     for chave in ("prioridades", "confiabilidade", "historico", "feriados"):

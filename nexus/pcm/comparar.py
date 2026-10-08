@@ -1,4 +1,4 @@
-"""Compara duas gerações da MESMA semana, linha a linha: a oficial (a do Fabrício) e a do Nexus.
+"""Compara duas gerações da MESMA semana, linha a linha: a oficial (a do PCM) e a do Nexus.
 
 Chave da linha: OS + código do equipamento + tarefa (a mesma tarefa aparece em mais de um ativo da OS). Compara equipe,
 dia, hora, duração, reprogramada, nº de vezes e RPN; e as pendentes. É a mesma conta do sombra/comparar.py do plano,

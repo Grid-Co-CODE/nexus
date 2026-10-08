@@ -12,7 +12,7 @@ from nexus.cadastro.calculos import (ERRO, Contexto, cidade_estado_base, cidade_
 
 def test_nome_padrao_primeiro_e_ultimo():
     assert nome_padrao("Maria da Silva Souza") == "Maria Souza"
-    assert nome_padrao("João Silva") == "João Silva"
+    assert nome_padrao("Fulana Souza") == "Fulana Souza"
 
 
 def test_nome_padrao_sem_espaco_e_erro_como_no_excel():

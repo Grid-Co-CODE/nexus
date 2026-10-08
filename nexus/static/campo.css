@@ -534,3 +534,15 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 /* a tabela das OS do supervisor (11 colunas) usa o mínimo de 980 px do .cn-tab: no celular rola dentro do quadro */
 /* o Aprovar de quem não pode: o botão aparece apagado, com quem pode */
 .cn-aprovar--so-supervisor .gc-btn[disabled]{opacity:.5;cursor:not-allowed}
+
+/* ── Passo 4 do Kimball e validação por foto (08/10/2026) ──────────────────────────────────────────────────────────
+   O aviso discreto de que o fato foi calculado na hora (o banco ainda não tem o fato desta versão dos livros); o selo
+   "Validada por foto" (níveis revisados pela foto, não é ronda nova) e a marca "revisada" na ronda do mesmo dia. */
+.cn-frescor .cn-fato-na-hora{display:block;margin-top:2px;font-size:11px;color:var(--mudo)}
+.cn-barra-fonte .cn-fato-na-hora::before{content:" · "}
+.cn-fato-na-hora{cursor:help}
+.cn-validada{display:inline-block;font:700 10.5px/14px var(--font-sans);padding:2px 9px;border-radius:999px;cursor:help;
+  white-space:nowrap;color:var(--verde-texto);background:var(--verde-suave);border:1px dashed currentColor}
+.cn-validada:focus-visible,.cn-revisada:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.cn-revisada{display:inline-block;margin-left:4px;font:600 10.5px/14px var(--font-sans);padding:1px 7px;border-radius:999px;
+  cursor:help;color:var(--mudo);border:1px dotted currentColor}

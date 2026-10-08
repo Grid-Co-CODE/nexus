@@ -294,3 +294,137 @@ def test_cabecalho_sem_nome_e_com_unidade_nas_medidas():
 @pytest.mark.parametrize("v,esperado", [("Sim", 1), ("sim (BD)", 1), ("Não", 0), ("nao", 0), ("", None), (None, None)])
 def test_sim_nao(v, esperado):
     assert P._sim_nao(v) == esperado
+
+
+# ── a mescla por semana e a carga única do histórico (decisão 7, 08/10/2026) ─────────────────────────────────────────
+def test_ids_dos_blocos_sao_os_do_fato_e_mudam_com_o_dia():
+    """A carga única compara versões do arquivo pelos MESMOS IDs do fato, sem montá-lo."""
+    s = _semana("2026-W41", [_r(), _r(os_id="2"), _r(), _r(foraDoPlano=True, os_id="9")])
+    f, _rel, _ = _fato(_dados(s))
+    assert P.ids_dos_blocos(s) == [x["programacao_id"] for x in f]           # inclusive o bloco repetido
+    movido = _semana("2026-W41", [_r(dia="Terça-feira"), _r(os_id="2"), _r()])
+    assert P.ids_dos_blocos(movido)[0] not in P.ids_dos_blocos(s) and P.ids_dos_blocos(movido)[1] in P.ids_dos_blocos(s)
+
+
+def test_resumo_das_linhas_do_fato_mesclado():
+    _, rel_fonte, l41 = _fato(_dados(_semana("2026-W41", [_r(), _r(os_id="2", cluster="YY Sul 09")])))
+    _, _, l38 = _fato(_dados(_semana("2026-W38", [_r()])))
+    m = P.mesclar_semanas([dict(zip(P.CAB_PROGRAMACAO, l)) for l in l38], l41)
+    r = P.resumo_das_linhas(m, rel_fonte)
+    assert r["semanas"] == ["2026-W38", "2026-W41"] and r["por_semana"] == {"2026-W38": 1, "2026-W41": 2}
+    assert (r["linhas"], r["tarefas"], r["ids_repetidos"], r["com"]["equipe_id"]) == (3, 3, 0, 2)
+    assert r["sem_equipe_exemplos"] == rel_fonte["sem_equipe_exemplos"]       # só o arquivo sabe o nome
+    assert P.resumo_das_linhas(m + [m[0]])["ids_repetidos"] == 1
+    assert P.semana_iso(20261005) == "2026-W41" and P.semana_iso("20241230") == "2025-W01"
+    assert P.semana_iso(None) is None and P.semana_iso(20261399) is None
+
+
+def test_formato_antigo_do_painel_vira_o_atual_sem_inventar():
+    """De 28/05 a 12/06/2026 o arquivo dizia "Semana 21", a usina com UF vinha em `ativo` e a termografia e a
+    prioridade tinham outro nome. O 1º arquivo dizia "18–22 Mai 2025", mas 18/05/2025 foi um domingo: é a de 2026."""
+    from ferramentas import carregar_programacao_historica as H
+    linha = _r(usina="Cliente X - Usina Gama 1", ativo="Cliente X - Usina Gama 1 - PA", termografia="Sim",
+               prioridade="Alto")
+    for c in ("criticidade", "termo"):                 # o formato antigo não tinha estas chaves
+        linha.pop(c)
+    antiga = {"week": "Semana 21", "label": "Semana 21 · 18–22 Mai 2025",
+              "dates": {"seg": 18, "ter": 19, "qua": 20, "qui": 21, "sex": 22}, "rows": [linha]}
+    s = H.formato_atual(antiga, 2026)
+    assert s["week"] == "2026-W21" and s["dates"] is None
+    assert antiga["rows"][0]["usina"] == "Cliente X - Usina Gama 1"            # a original não muda
+    f, _rel, _ = _fato({"semanas": [s]})
+    assert (f[0]["data_id_semana"], f[0]["data_id_programada"], f[0]["usina_id"]) == (20260518, 20260518, 3)
+    assert (f[0]["usina_ligada_por"], f[0]["termo"], f[0]["criticidade_rotulo"]) == ("de-para do Fracttal", 1, "Alto")
+    s22 = H.formato_atual({"week": "Semana 22", "label": "Semana 22 · 25–29 Mai 2026",
+                           "dates": {"seg": 25, "mes": "Mai", "ano": 2026}, "rows": []})
+    assert s22["week"] == "2026-W22"
+    atual = _semana("2026-W41", [_r()])
+    assert H.formato_atual(atual) is atual and H.formato_atual({"week": "outra coisa"}) is None
+
+
+def test_escolha_da_versao_a_ultima_que_so_perdeu_blocos_depois_de_fechada():
+    """A W38 (14 a 20/09) fecha na segunda 21/09, 00:00 de Brasília. Depois disso a semana só pode PERDER bloco (OS
+    cancelada); bloco novo ou mudado de dia é regeração (a W25 em 29/06, a W35 em 31/08) e não conta. Regeração que
+    se desfaz (a W32 em 14/08) não congela a semana: vale a última versão que só perdeu blocos."""
+    from datetime import datetime, timezone
+    from ferramentas import carregar_programacao_historica as H
+    brt = timezone(timedelta(hours=-3))
+    ts = lambda dia, hora=12: int(datetime(2026, 9, dia, hora, tzinfo=brt).timestamp())    # noqa: E731
+    e = H.Escolha("2026-W38")
+    e.ver(0, ts(10), ["a", "b"])
+    e.ver(1, ts(20, 23), ["a", "b", "c"])        # domingo 23h: ainda é o fim da semana
+    e.ver(2, ts(25), ["a", "b"])                 # perdeu "c" (OS cancelada): vale
+    e.ver(3, ts(27), ["a", "b"])
+    assert e.escolhida == 3 and e.regra.startswith("a última versão") and e.fim_i == 1
+    e.ver(4, ts(28), ["a", "z"])                 # "z" não existia no fim da semana: regerada, não conta
+    e.ver(5, ts(29), ["a", "z"])
+    assert (e.escolhida, e.regerou_i, e.regerou, e.ultima) == (3, 4, 1, 5) and e.regra.startswith("mudou depois")
+    e.ver(6, ts(30), ["a"])                      # a regeração se desfez: a semana voltou a só ter perdido blocos
+    assert e.escolhida == 6 and e.regerou_i == 4 and e.regra.startswith("a última versão")
+    so_depois = H.Escolha("2026-W38")
+    so_depois.ver(7, ts(28), ["x"])
+    so_depois.ver(8, ts(29), ["x", "y"])
+    assert so_depois.escolhida == 8 and so_depois.regra.startswith("sem versão de dentro")
+
+
+def test_carga_historica_pelo_git_de_ponta_a_ponta(tmp_path):
+    """Um repositório git de mentira com 5 versões do banco_dados.json: a ferramenta lê o histórico, escolhe a versão
+    de cada semana e monta o fato com o mesmo código da carga."""
+    import os
+    import shutil
+    import subprocess
+    from datetime import datetime, timezone
+    from ferramentas import carregar_programacao_historica as H
+    if shutil.which("git") is None:
+        pytest.skip("sem git nesta máquina")
+    repo = tmp_path / "pcm"
+    repo.mkdir()
+    brt = timezone(timedelta(hours=-3))
+
+    def git(*a, quando=None):
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
+                   GIT_COMMITTER_EMAIL="t@t")
+        if quando:
+            env.update(GIT_AUTHOR_DATE=quando.isoformat(), GIT_COMMITTER_DATE=quando.isoformat())
+        subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True, env=env)
+    git("init", "-q", "-b", "main")
+    w38 = lambda *oss: _semana("2026-W38", [_r(os_id=o) for o in oss])         # noqa: E731
+    w39 = _semana("2026-W39", [_r(os_id="d")])
+    antiga = {"week": "Semana 37", "label": "Semana 37 · 7–11 Set 2026", "dates": {"seg": 7, "ano": 2026},
+              "rows": [_r(os_id="v", ativo="Cliente X - Usina Gama 1 - PA")]}
+    versoes = [(datetime(2026, 9, 10, 12, tzinfo=brt), [w38("a", "b"), antiga]),
+               (datetime(2026, 9, 20, 23, tzinfo=brt), [w38("a", "b", "c")]),
+               (datetime(2026, 9, 25, 12, tzinfo=brt), [w38("a", "b"), w39]),          # perdeu "c": vale
+               (datetime(2026, 10, 2, 12, tzinfo=brt), [w38("a", "z"), w39]),          # regerada depois de fechada
+               (datetime(2026, 10, 3, 12, tzinfo=brt), [w39])]
+    for quando, semanas in versoes:
+        (repo / H.ARQUIVO).write_text(json.dumps({"geradoEm": quando.isoformat(), "semanas": semanas}),
+                                      encoding="utf-8")
+        git("add", H.ARQUIVO)
+        git("commit", "-q", "-m", "dados", quando=quando)
+    vs = H.versoes(repo)
+    assert len(vs) == 5 and vs[0]["ts"] < vs[-1]["ts"]
+    esc = H.escolhas_por_semana(H.varrer(repo, vs))
+    assert set(esc) == {"2026-W37", "2026-W38", "2026-W39"}
+    assert esc["2026-W38"].escolhida == 2 and esc["2026-W38"].regerou_i == 3
+    assert esc["2026-W39"].escolhida == 4 and esc["2026-W37"].formato == "antigo"
+    dados = H.semana_da_versao(repo, vs[2], "2026-W38")
+    f, _rel, _ = _fato(dados)
+    assert sorted(x["os"] for x in f) == ["a", "b"] and {x["data_id_semana"] for x in f} == {20260914}
+    d37 = H.semana_da_versao(repo, vs[0], "2026-W37", "antigo")
+    f37, _rel, _ = _fato(d37)
+    assert (f37[0]["data_id_semana"], f37[0]["usina_id"]) == (20260907, 3)
+
+
+def test_linha_que_nao_mudou_guarda_o_lido_em_do_banco():
+    """A API guarda o histórico de cada linha que muda: a hora da leitura não pode fazer as ~3,5 mil linhas do arquivo
+    mudarem a cada gravação. Só a linha que mudou (aqui, o status da OS 2) ganha o lido_em novo."""
+    _, _, antes = _fato(_dados(_semana("2026-W41", [_r(), _r(os_id="2")])))
+    no_banco = [dict(zip(P.CAB_PROGRAMACAO, l)) for l in antes]
+    agora, _ = P.fato_programacao(_dados(_semana("2026-W41", [_r(), _r(os_id="2", status="Finalizados")])), _lig(),
+                                  PESSOAS, None, "13:00")
+    m = P.manter_lido_em(P.mesclar_semanas(no_banco, agora), no_banco)
+    i_os, i_lido = P.CAB_PROGRAMACAO.index("os"), P.CAB_PROGRAMACAO.index("lido_em")
+    assert {l[i_os]: l[i_lido] for l in m} == {"15001": "2026-10-08T12:00:00-03:00", "2": "13:00"}
+    assert P.sha_linhas(m) == P.sha_linhas(agora)                              # o lido_em não entra no sha
+    assert P.manter_lido_em(agora, []) == agora                                 # sem banco, nada muda

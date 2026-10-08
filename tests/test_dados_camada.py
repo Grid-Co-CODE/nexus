@@ -3,8 +3,9 @@ confere, e a tela Base → Governança de dados.
 
 08/10/2026 (passos 2 a 6 da auditoria Kimball, ligados na carga): o catálogo com tipo, chave e medidas em todo fato e os
 livros registrados antes de existir; o fato único de ronda, a PT conformada, a dimensão de equipamento (gravada só
-quando muda), o histórico SCD2 (as regras dele estão em `test_dados_historico.py`) e a programação do PCM, que é
-montada e NUNCA gravada daqui (decisão 7 do Levi). Códigos, usinas e PCM inventados."""
+quando muda), o histórico SCD2 (as regras dele estão em `test_dados_historico.py`) e a programação do PCM, gravada
+pela mescla por semana (decisão 7, resolvida em 08/10: mantém a semana antiga, troca a do arquivo, não grava com a
+leitura do banco vazia ou que falha). Códigos, usinas e PCM inventados."""
 import json
 from datetime import date, datetime, timedelta, timezone
 
@@ -38,7 +39,9 @@ def test_catalogo_declara_grao_estado_e_todas_as_dimensoes():
         assert all(p in catalogo.POR_ID and catalogo.POR_ID[p].estado not in ("parte", "aposentado")
                    for p in f.parte_de), f.id
     r = catalogo.resumo()
-    assert r["conformados"] >= 3 and r["montados"] >= 3
+    # a programação passou a gravar em 08/10 (decisão 7): montadas ficam as duas da geração (decisão 8)
+    assert r["conformados"] >= 4 and r["montados"] >= 2
+    assert catalogo.POR_ID["programacao"].estado == "conformado"
     # a auditoria de 08/10: ronda e PT tinham o grão errado; checklist e avulsa viraram fonte do fato único de ronda
     assert "OS de ronda" not in catalogo.POR_ID["ronda"].grao and "ativo" in catalogo.POR_ID["pt"].grao
     assert catalogo.POR_ID["ronda_checklist"].parte_de == catalogo.POR_ID["ronda_avulsa"].parte_de == ("ronda",)
@@ -311,10 +314,10 @@ def test_carga_grava_os_livros_registrados_e_confere(banco):
     assert r["gravado"]["nexus_fatos"]["fato_fechamento"] == 2 and r["pct_usina"] == 100
     assert r["gravado"]["nexus_dimensoes"]["dim_data"] == (calendario.FIM - calendario.INICIO).days + 1
     # cada livro gravado tem exatamente as abas registradas no catálogo (regra 10)
-    for livro in ("nexus_fatos", "nexus_dimensoes", "nexus_equipamentos"):
+    for livro in ("nexus_fatos", "nexus_dimensoes", "nexus_equipamentos", "nexus_programacao"):
         assert set(r["gravado"][livro]) == set(catalogo.LIVRO_POR_NOME[livro].abas), livro
-    # a programação e a geração são montadas só no ensaio: a carga de hora em hora nunca as grava (decisões 7 e 8)
-    assert "nexus_programacao" not in api.workbooks and "nexus_geracao" not in api.workbooks
+    # a programação grava pela mescla por semana (decisão 7, 08/10/2026); a geração, só no ensaio (decisão 8)
+    assert r["gravado"]["nexus_programacao"]["fato_programacao"] == 1 and "nexus_geracao" not in api.workbooks
     f = livros.ler(BASE, api, "nexus_fatos", "fato_fechamento")
     assert {x["usina_id"] for x in f} == {3} and {x["data_id"] for x in f} == {20260930}
     assert {x["equipamento_id"] for x in f} == {equipamento.equipamento_id("THPN-PRM200-PGINVR1")}
@@ -507,15 +510,72 @@ def test_origem_que_encolhe_aparece_e_ainda_grava(banco):
 def test_ensaio_monta_a_programacao_e_nao_grava_nada(banco):
     api, cfg = banco
     grava, montados, rel = carga.montar(cfg, api, datetime(2026, 10, 5, 15, 40, tzinfo=BRT), ensaio=True)
-    assert api.syncs == 0 and programacao.LIVRO not in grava
-    assert set(grava) <= {carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO}
-    cab, linhas = montados[programacao.LIVRO][programacao.ABA]
-    assert len(linhas) == 1 and rel["programacao"]["fora_do_plano"] == 1
+    assert api.syncs == 0                                              # montar nunca grava
+    assert set(grava) <= {carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO, programacao.LIVRO}
+    # o livro ainda não existe: a carga gravaria as semanas do arquivo
+    cab, linhas = grava[programacao.LIVRO][programacao.ABA]
+    assert len(linhas) == 1 and rel["programacao"]["fora_do_plano"] == 1 and rel["programacao"]["mudou"]
     p = dict(zip(cab, linhas[0]))
     assert (p["usina_id"], p["equipe_id"], p["data_id_programada"]) == (3, 41, 20261005)
     assert p["equipamento_id"] == equipamento.equipamento_id("THPN-PRM200-TRFR1")
     assert "Pessoa Inventada" not in json.dumps(linhas)
     assert carga.montar(cfg, api, datetime(2026, 10, 5, 15, 40, tzinfo=BRT))[1] == {}     # sem ensaio, nada a mais
+
+
+# ── a programação gravada pela mescla por semana (decisão 7, 08/10/2026) ────────────────────────────────────────────
+def _semana_velha(api, **kw):
+    """O banco com a programação de uma semana que o arquivo já não traz (W30) e uma versão VELHA da W41."""
+    cab = programacao.CAB_PROGRAMACAO
+    velha = dict.fromkeys(cab)
+    velha.update(programacao_id="aaaa000000000030", data_id_semana=20260720, data_id_programada=20260721,
+                 usina_id=3, os="14000", primeiro_bloco=1, duracao_min=60, hora_inicio="07:30", lido_em="antes", **kw)
+    w41 = dict(velha, programacao_id="bbbb000000000041", data_id_semana=20261005, data_id_programada=20261005,
+               os="15499")
+    _aba(api, programacao.LIVRO, programacao.ABA, [velha, w41])
+    _aba(api, programacao.LIVRO, "atualizacao", [{"gerado_em": "2026-10-05T14:40:00-03:00", "sha_linhas": "x",
+                                                  "sha_fonte": "y"}])
+
+
+def test_carga_mescla_mantem_semana_antiga_e_troca_a_semana_do_arquivo(banco):
+    api, cfg = banco
+    _semana_velha(api)
+    r = carga.rodar(cfg, api, agora=datetime(2026, 10, 5, 15, 40, tzinfo=BRT))
+    assert r["gravado"][programacao.LIVRO]["fato_programacao"] == 2
+    p = {x["data_id_semana"]: x for x in livros.ler(BASE, api, programacao.LIVRO, programacao.ABA)}
+    assert set(p) == {20260720, 20261005}
+    assert p[20260720]["programacao_id"] == "aaaa000000000030" and p[20260720]["lido_em"] == "antes"   # intocada
+    assert p[20261005]["os"] == "15500"                                 # a W41 é a do arquivo, não a velha do banco
+    at = livros.ler(BASE, api, programacao.LIVRO, "atualizacao")[0]
+    assert at["semanas"] == 2 and at["sha_linhas"] == programacao.sha_linhas(
+        programacao.mesclar_semanas(livros.ler(BASE, api, programacao.LIVRO, programacao.ABA), []))
+    # a hora seguinte, com o mesmo arquivo: nem relê o fato, não regrava
+    _g, _m, rel = carga.montar(cfg, api, datetime(2026, 10, 5, 16, 40, tzinfo=BRT))
+    assert programacao.LIVRO not in _g and rel["programacao"]["mudou"] is False
+
+
+def test_carga_nao_grava_a_programacao_se_o_fato_do_banco_vem_vazio_ou_falha(banco):
+    """O livro existe: gravar sem o fato do banco trocaria o histórico pelas 4 semanas do arquivo (o fato encolheria
+    e a API não devolve o que se apagou). Nessa hora a programação não grava; o resto da carga anda."""
+    api, cfg = banco
+    _aba(api, programacao.LIVRO, programacao.ABA, [])
+    _aba(api, programacao.LIVRO, "atualizacao", [{"gerado_em": "2026-10-05T14:40:00-03:00", "sha_fonte": "y"}])
+    r = carga.rodar(cfg, api, agora=datetime(2026, 10, 5, 15, 40, tzinfo=BRT))
+    assert programacao.LIVRO not in r["gravado"] and "vazio" in r["programacao"]["nao_grava"]
+    assert r["gravado"]["nexus_fatos"]["fato_fechamento"] == 2              # o resto andou
+    assert livros.ler(BASE, api, programacao.LIVRO, programacao.ABA) == []
+
+    class Falha(ApiPGFalsa):
+        def get(self, url, params=None, headers=None, timeout=None):
+            sid = self.abas.get((programacao.LIVRO, programacao.ABA), {}).get("id")
+            if sid is not None and url.endswith(f"/api/sheets/{sid}/rows"):
+                return Resposta(500, {})
+            return super().get(url, params, headers, timeout)
+    api2 = Falha()
+    api2.workbooks, api2.abas = api.workbooks, api.abas
+    _semana_velha(api2)
+    r = carga.rodar(cfg, api2, forcar=True, agora=datetime(2026, 10, 5, 17, 40, tzinfo=BRT))
+    assert programacao.LIVRO not in r["gravado"] and "falhou" in r["programacao"]["nao_grava"]
+    assert len(api2.abas[(programacao.LIVRO, programacao.ABA)]["linhas"]) == 2      # o fato do banco intocado
 
 
 def test_apelido_de_coluna_de_geracao_so_com_o_de_para_das_abas(banco):

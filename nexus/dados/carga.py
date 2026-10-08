@@ -15,10 +15,12 @@ Livros que esta carga mantém (registrados em `catalogo.LIVROS`):
 - `nexus_equipamentos` (08/10/2026): `dim_equipamento`, `equipamento_apelido`, `qualidade`, `atualizacao`. Montada
   ANTES dos fatos (eles levam o `equipamento_id`); gravada só quando o sha das linhas muda (muda por semana; ~1 MB) e
   só quando todas as fontes foram lidas (o PCM fora do ar numa hora tiraria da dimensão o que só ele tem).
+- `nexus_programacao` (08/10/2026, decisão 7): `fato_programacao`, `qualidade`, `atualizacao`, pela MESCLA POR SEMANA
+  (`_programacao`): a fonte guarda 4 semanas, então a carga lê o fato do banco, troca só as semanas do arquivo e mantém
+  as outras. Leitura que falha ou volta vazia com o livro existente não grava (o fato não encolhe); grava só quando o
+  sha das linhas muda.
 
-Montados e NÃO gravados (só `ferramentas/carregar_dados.py --ensaio`, até a decisão do Levi):
-- `nexus_programacao · fato_programacao` (decisão 7: a fonte guarda 4 semanas; com a troca integral o fato nunca
-  passaria disso: precisa do passo 0 ou da mescla por semana, `programacao.mesclar_semanas`).
+Montado e NÃO gravado (só `ferramentas/carregar_dados.py --ensaio`, até a decisão do Levi):
 - `nexus_geracao · fato_geracao_usina_dia` (`montar_geracao`, cadência DIÁRIA; decisão 8: publicar o de-para das abas,
   o teto, o IPOA; o inversor × dia não cabe em troca integral).
 
@@ -98,10 +100,52 @@ def _mapas(config, sessao) -> dict:
     if not config.get("NEXUS_CHAVE_CADASTRO"):
         return {}
     from ..campo.ligacao_cadastro import mapas
-    m = mapas(config, sessao)
+    return _sem_chave_sem_codigo(config, mapas(config, sessao))
+
+
+def mapas_das_linhas(config, de_para: list[dict], pessoas: list[dict]) -> dict:
+    """O `_mapas` com as linhas do cadastro que quem chama já leu: as telas do Campo montam o fato na hora (passo 4 do
+    Kimball, 08/10/2026) com a MESMA tradução da carga, sem reler o cadastro."""
+    if not config.get("NEXUS_CHAVE_CADASTRO"):
+        return {}
+    from ..campo.ligacao_cadastro import mapas_de
+    return _sem_chave_sem_codigo(config, mapas_de(config, de_para, pessoas))
+
+
+def _sem_chave_sem_codigo(config, m: dict) -> dict:
     if not config.get("NEXUS_PESSOA_HMAC"):
         m["hmac"] = {}
     return m
+
+
+def ligador(cad: dict, m: dict) -> fatos.Ligador:
+    """O `Ligador` dos fatos do Campo, o MESMO na carga e nas telas (passo 4 do Kimball, 08/10/2026): usina pelo de-para
+    do Fracttal (código do ativo de reserva), equipe pelo nome, pessoa pelo código HMAC do e-mail. `cad` = as abas
+    `usinas`, `de_para` e `equipes` do cadastro; `m` = `_mapas` / `mapas_das_linhas`."""
+    return fatos.Ligador(cad["usinas"], cad["de_para"], cad["equipes"], m.get("hmac") or {})
+
+
+# ── A montagem dos fatos do Campo: UMA só, para a carga (que grava) e para as telas (passo 4 do Kimball, 08/10/2026) ──
+# Levi, 08/10: as telas tiram a contagem e a ligação do fato conformado; enquanto o banco não tem o fato desta hora, a
+# tela monta o fato na hora com ESTAS funções. `ler(livro, aba)` lê a fonte: o `_Leitor` da carga ou o `_livro` da tela.
+def montar_fechamento(ler, lig, equip=None) -> tuple[list, list]:
+    """(linhas do `fato_fechamento`, linhas de origem)."""
+    fech = ler(*ORIGEM_FECHAMENTOS)
+    return fatos.fato_fechamento(fech, lig, equip), fech
+
+
+def montar_ronda(ler, lig, m: dict, equip=None) -> tuple[list, list, list]:
+    """(linhas do `fato_ronda`, origem_q, avulsas lidas). O nome em claro do livro só liga a pessoa na memória
+    (`m["pessoa"]`); o código do nome (`fato_ronda.codigo_do_nome`) segue desligado (decisão do Levi)."""
+    app_r, ck, av = ler(*ORIGEM_RONDAS), ler(*ORIGEM_CHECKLIST), ler(*ORIGEM_AVULSAS)
+    linhas, oq = fato_ronda.fato_ronda(app_r, ck, av, lig, m.get("pessoa") or {}, None, equip)
+    return linhas, oq, av
+
+
+def montar_pt(ler, lig, equip=None, *, agora=None) -> tuple[list, list]:
+    """(linhas do `fato_pt`, linhas de origem). `agora`: a hora da conta (a `parada` de quem ainda espera)."""
+    pt = ler(*ORIGEM_PT)
+    return fato_pt.fato_pt(pt, lig, equip, agora=agora), pt
 
 
 def _pessoas_por_codigo(config, sessao) -> dict:
@@ -270,8 +314,8 @@ def montar(config, sessao, agora: datetime | None = None, *, ensaio: bool = Fals
     """(livros a gravar {livro: tabelas}, montados sem gravar {livro: tabelas}, relatório só com contagens). Não grava.
 
     Os livros a gravar são os de hora em hora; o `nexus_equipamentos` só vem quando mudou e todas as fontes foram
-    lidas, e o `nexus_dimensoes` não vem quando o histórico tem de ser segurado. Com `ensaio`, monta também a
-    programação do PCM (nunca gravada daqui: decisão 7 do Levi)."""
+    lidas, e o `nexus_dimensoes` não vem quando o histórico tem de ser segurado. O `nexus_programacao` vem quando o fato
+    mesclado mudou (`_programacao`); com `ensaio`, ele vem montado mesmo sem mudar, para medir."""
     agora = agora or _agora()
     base = _base(config)
     iso = agora.isoformat(timespec="seconds")
@@ -279,7 +323,7 @@ def montar(config, sessao, agora: datetime | None = None, *, ensaio: bool = Fals
     le = _Leitor(base, sessao)
     cad = {a: le.ler(CADASTRO, a) for a in ("usinas", "equipes", "pessoas", "de_para")}
     m = _mapas(config, sessao)
-    lig = fatos.Ligador(cad["usinas"], cad["de_para"], cad["equipes"], m.get("hmac") or {})
+    lig = ligador(cad, m)
     fech = le.ler(*ORIGEM_FECHAMENTOS)
     dados_pcm, pcm_lido_em = _ler_pcm(config)
     # ISOLAMENTO (revisão de 08/10/2026): até o passo 2-6 a carga lia 5 abas e gravava o fechamento; agora lê ~15 e
@@ -315,18 +359,16 @@ def montar(config, sessao, agora: datetime | None = None, *, ensaio: bool = Fals
         tab_hist, rel_hist, hist_q = {}, {"segurar": True}, {}
 
     # ── os fatos ───────────────────────────────────────────────────────────────────────────────────────────────────
-    fato_f = fatos.fato_fechamento(fech, lig, equip)
+    fato_f, _fech = montar_fechamento(le.ler, lig, equip)
     q_antes = _ler_ou(le, LIVRO_FATOS, "qualidade", [])
 
     def _ronda():
-        app_r, ck, av = le.ler(*ORIGEM_RONDAS), le.ler(*ORIGEM_CHECKLIST), le.ler(*ORIGEM_AVULSAS)
-        linhas, oq = fato_ronda.fato_ronda(app_r, ck, av, lig, m.get("pessoa") or {}, None, equip)
+        linhas, oq, av = montar_ronda(le.ler, lig, m, equip)
         return linhas, fato_ronda.qualidade_ronda(linhas, oq, le.atualizado.get(ORIGEM_RONDAS[0]), iso, avulsas=av,
                                                   hist=hist_q)
 
     def _pt():
-        pt = le.ler(*ORIGEM_PT)
-        linhas = fato_pt.fato_pt(pt, lig, equip, agora=agora)
+        linhas, pt = montar_pt(le.ler, lig, equip, agora=agora)
         return linhas, fato_pt.qualidade_pt(linhas, pt, le.atualizado.get(ORIGEM_PT[0]), iso, hist=hist_q)
 
     # GraoDuplicado (ou a fonte fora do ar) num fato novo: a aba dele fica como está no banco nesta hora (gravar o
@@ -385,35 +427,93 @@ def montar(config, sessao, agora: datetime | None = None, *, ensaio: bool = Fals
         "grava": sorted(gravar)})
 
     nao_grava = {}
+    # ── a programação do PCM (passo 6b; decisão 7, 08/10/2026: mescla por semana) ─────────────────────────────────
+    # livro próprio e isolado (regra 13): o que falha aqui só deixa de gravar a programação nesta hora
+    try:
+        tab_p, grava_p, rel["programacao"] = _programacao(le, dados_pcm, pcm_lido_em, lig, m, equip, hist_q, iso,
+                                                          maquina, medir=ensaio)
+    except Exception as e:      # noqa: BLE001
+        falhou["programacao"] = _erro(e)
+        log.warning("carga de dados: programação falhou, não gravada nesta hora: %s", falhou["programacao"])
+        tab_p, grava_p, rel["programacao"] = None, False, {"erro": falhou["programacao"]}
+    if grava_p:
+        gravar[programacao.LIVRO] = tab_p
+        rel["grava"] = sorted(gravar)
+    elif ensaio and tab_p:
+        nao_grava[programacao.LIVRO] = tab_p
     if ensaio:
-        nao_grava[programacao.LIVRO], rel["programacao"] = _montar_programacao(
-            dados_pcm, pcm_lido_em, lig, m, equip, hist_q, iso, maquina)
         if eqt is not None and not publicar_eq:
             nao_grava[equipamento.LIVRO] = eqt          # para medir o tamanho; gravar, só quando mudar
     return gravar, nao_grava, rel
 
 
-def _montar_programacao(dados, lido_em, lig, m, equip, hist_q, iso, maquina) -> tuple[dict, dict]:
-    """O `nexus_programacao` montado (nunca gravado daqui: decisão 7 do Levi) e o resumo dele."""
-    if dados is None:
-        return {}, {"pulou": "sem a fonte do PCM (banco_dados.json) nesta máquina ou nesta hora"}
-    linhas, rp = programacao.fato_programacao(dados, lig, m.get("pessoa") or {}, equip, lido_em)
+def tabelas_programacao(linhas: list, rel_fonte: dict, hist_q: dict, iso: str, maquina: str,
+                        sha_fonte: str | None) -> tuple[dict, dict, dict]:
+    """(as três abas do `nexus_programacao`, o resumo das linhas, a linha de qualidade) para o fato MESCLADO (as semanas
+    do banco + as do arquivo). Uma conta só, para a carga de hora em hora e para a carga única do histórico
+    (`ferramentas/carregar_programacao_historica.py`). A `atualizacao` leva o sha das linhas (sem o `lido_em`: o
+    `geradoEm` do PCM muda a cada ~30 min sem nada mudar) e o sha das linhas do arquivo (`sha_fonte`), para a carga não
+    reler o fato do banco quando o arquivo não mudou."""
     cab = programacao.CAB_PROGRAMACAO
-    q = dict(zip(fatos.CAB_QUALIDADE, programacao.linha_qualidade(rp, fatos.CAB_QUALIDADE, None, iso)))
+    rm = programacao.resumo_das_linhas(linhas, rel_fonte)
+    q = dict(zip(fatos.CAB_QUALIDADE, programacao.linha_qualidade(rm, fatos.CAB_QUALIDADE, None, iso)))
     q["pct_usina_versao"] = fatos.pct_versao(linhas, cab, "usina_id", "data_id_programada", hist_q.get("usinas"))
     q["pct_pessoa_versao"] = fatos.pct_versao(linhas, cab, "pessoa_id_tecnico", "data_id_programada",
                                               hist_q.get("pessoas"))
     i = cab.index("equipamento_ligado_por")
     _extra(q, equipamento_fora_da_dimensao=sum(1 for l in linhas if l[i] == equipamento.FORA_DA_DIMENSAO))
-    # a `atualizacao` leva o sha das linhas (o geradoEm do PCM muda a cada ~30 min sem nada mudar): o mesmo molde do
-    # nexus_equipamentos, para gravar só quando a agenda mudar, quando a gravação ligar
     tab = {programacao.ABA: (cab, linhas),
            "qualidade": (fatos.CAB_QUALIDADE, [[q.get(c) for c in fatos.CAB_QUALIDADE]]),
-           "atualizacao": (equipamento.CAB_ATUALIZACAO,
-                           [[iso, maquina, None, len(linhas), programacao.sha_linhas(linhas),
-                             "1 linha = 1 bloco de agenda; foraDoPlano fora (outro grão)"]])}
-    return tab, {"linhas": len(linhas), "tarefas": rp.get("tarefas"), "fora_do_plano": rp.get("fora_do_plano"),
-                 "semanas": rp.get("semanas"), "pct": _resumo_q(q), "blocos_repetidos": rp.get("blocos_repetidos")}
+           "atualizacao": (programacao.CAB_ATUALIZACAO,
+                           [[iso, maquina, None, len(linhas), programacao.sha_linhas(linhas), sha_fonte,
+                             len(rm["semanas"]), "1 linha = 1 bloco de agenda; foraDoPlano fora (outro grão); "
+                                                 "data_id_semana = a segunda-feira da semana ISO"]])}
+    return tab, rm, q
+
+
+def _programacao(le: "_Leitor", dados, lido_em, lig, m, equip, hist_q, iso, maquina, *,
+                 medir: bool = False) -> tuple[dict | None, bool, dict]:
+    """(tabelas do `nexus_programacao` ou None, gravar nesta hora?, resumo só com contagens).
+
+    Decisão 7 (Levi, 08/10/2026: "Tem que ter as semanas antigas mesmo, precisamos desses dados pois em menos de duas
+    semanas será full Nexus"): o `banco_dados.json` guarda só 4 semanas, então a carga lê o fato que está no banco,
+    troca só as semanas que o arquivo traz e mantém as outras (`programacao.mesclar_semanas`). NÃO grava nesta hora:
+    - sem o arquivo do PCM;
+    - com o livro existente, se a leitura do fato falhou ou veio vazia: gravar trocaria o histórico pelas 4 semanas do
+      arquivo, e a API não devolve o que se apagou (o fato não encolhe);
+    - com `programacao_id` repetido no fato mesclado (grão quebrado);
+    - sem mudança: o sha das linhas do arquivo é o da última gravação (nem relê o fato) ou o do fato mesclado é.
+    `medir` (o `--ensaio`) monta o fato mesclado mesmo sem mudança, para medir."""
+    if dados is None:
+        return None, False, {"pulou": "sem a fonte do PCM (banco_dados.json) nesta máquina ou nesta hora"}
+    fonte, rp = programacao.fato_programacao(dados, lig, m.get("pessoa") or {}, equip, lido_em)
+    sha_fonte = programacao.sha_linhas(fonte)
+    rel = {"semanas_do_arquivo": rp.get("semanas"), "linhas_do_arquivo": len(fonte),
+           "fora_do_plano": rp.get("fora_do_plano"), "blocos_repetidos": rp.get("blocos_repetidos")}
+    existe = bool(le.abas(programacao.LIVRO))
+    ant = _ler_ou(le, programacao.LIVRO, "atualizacao", []) if existe else []
+    ant = dict(ant[0]) if ant else {}
+    if existe and not medir and ant and str(ant.get("sha_fonte") or "") == sha_fonte:
+        return None, False, dict(rel, mudou=False, motivo="o arquivo do PCM não mudou desde a última gravação")
+    no_banco = []
+    if existe:
+        try:
+            no_banco = le.ler(programacao.LIVRO, programacao.ABA)
+        except Exception as e:      # noqa: BLE001 — sem o fato do banco, gravar apagaria o histórico
+            return None, False, dict(rel, nao_grava=f"leitura do fato no banco falhou ({type(e).__name__}): "
+                                                    "o fato não encolhe")
+        if not no_banco:
+            return None, False, dict(rel, nao_grava="o livro existe e o fato veio vazio: o fato não encolhe")
+    # a linha que não mudou guarda o lido_em que já está no banco: a API guarda o histórico de cada linha que muda
+    linhas = programacao.manter_lido_em(programacao.mesclar_semanas(no_banco, fonte), no_banco)
+    tab, rm, q = tabelas_programacao(linhas, rp, hist_q, iso, maquina, sha_fonte)
+    mudou = str(ant.get("sha_linhas") or "") != tab["atualizacao"][1][0][programacao.CAB_ATUALIZACAO.index(
+        "sha_linhas")]
+    rel.update(linhas=len(linhas), linhas_no_banco=len(no_banco), semanas=len(rm["semanas"]),
+               tarefas=rm["tarefas"], ids_repetidos=rm["ids_repetidos"], mudou=mudou, pct=_resumo_q(q))
+    if rm["ids_repetidos"]:
+        return tab, False, dict(rel, nao_grava=f"{rm['ids_repetidos']} programacao_id repetidos no fato mesclado")
+    return tab, mudou, rel
 
 
 def montar_geracao(config, sessao, agora: datetime | None = None, *, apelidos=None, de_para=None) -> tuple:
@@ -460,9 +560,10 @@ def rodar(config, sessao=None, *, gravar=True, forcar=False, agora=None) -> dict
         dur = round(time.time() - t0, 1)
         for t in a_gravar.values():
             t["atualizacao"][1][0][2] = dur
-        nomes = {equipamento.LIVRO: equipamento.NOME, LIVRO_DIM: NOME_DIM, LIVRO_FATOS: NOME_FATOS}
-        # só estes três livros são desta carga; outro aqui (a programação, a geração) é erro de programação, nunca uma
-        # gravação calada: eles esperam decisão do Levi (7 e 8)
+        nomes = {equipamento.LIVRO: equipamento.NOME, LIVRO_DIM: NOME_DIM, LIVRO_FATOS: NOME_FATOS,
+                 programacao.LIVRO: programacao.NOME_LIVRO}
+        # só estes quatro livros são desta carga (a programação desde 08/10/2026, decisão 7: mescla por semana); outro
+        # aqui (a geração) é erro de programação, nunca uma gravação calada: espera a decisão 8 do Levi
         fora = set(a_gravar) - set(nomes)
         if fora:
             raise ValueError(f"livro que esta carga não grava: {sorted(fora)}")

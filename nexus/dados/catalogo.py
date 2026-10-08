@@ -148,15 +148,17 @@ FATOS = (
                     "de 90 dias do App"),
     # o Nexus é a FONTE deste (Levi, 07/10/2026): ronda lançada à mão por quem a fez, entrando com o login do Fracttal
     Fato("ronda_avulsa", "Ronda avulsa", "campo", "nexus_rondas_avulsas · fato_ronda_avulsa",
-         "1 linha = 1 ronda avulsa lançada no Nexus, ou a anulação de uma (anula_id preenchido)",
+         "1 linha = 1 lançamento no Nexus: ronda avulsa, nível validado pela foto (origem validacao_foto) ou a "
+         "anulação de um deles (anula_id preenchido)",
          _d(data=("id", "data_id"), usina=("id", "usina_id"),
             equipe=("id", "equipe_id (a equipe da usina, não a da ronda)"),
             pessoa=("id", "pessoa_id; pessoa_hmac quando o cadastro não acha a pessoa")),
          tipo="transacao", chave=("id",), estado="parte", parte_de=("ronda",),
-         observacao="sem fotos, GPS nem OS; conta na cobertura. Nome e comentário só cifrados (Cofre). Desde 08/10 "
-                    "entra no fato_ronda só a válida (a anulada e a linha de anulação ficam fora). 0 linhas no banco "
-                    "em 08/10: antes da 1ª gravação, vala sem 'Suja', sensor em 3 estados e a anulação sem "
-                    "data_id/usina_id (decisão 3 do Levi)"),
+         observacao="sem fotos, GPS nem OS; conta na cobertura. Nome e comentário só cifrados (Cofre). Entra no "
+                    "fato_ronda só a avulsa válida (fora: a anulada, a linha de anulação e a validação por foto). "
+                    "Domínio do App desde 08/10, antes da 1ª gravação (decisão 3 do Levi): vala sem 'Suja', sensor "
+                    "'Sujo'/'Limpo'/vazio (não verificado) e a anulação só com anula_id. Livro ainda inexistente em "
+                    "08/10 (GET)"),
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", fato_pt.GRAO,
          _d(data=("id", "data_id_criacao, data_id_decisao (papéis)"), usina=("id", "usina_id"),
             equipe=("id", "equipe_id: papel registro (Região)"),
@@ -296,10 +298,13 @@ FATOS = (
             equipamento=("id", "equipamento_id"), os=("cod", "os")),
          tipo=programacao.TIPO, chave=programacao.CHAVE, medidas=_m(programacao.MEDIDAS),
          fontes=_fontes(programacao.FONTES), janela_origem=programacao.JANELA_ORIGEM,
-         estado="montado", conformado_em="nexus_programacao · fato_programacao",
+         estado="conformado", conformado_em="nexus_programacao · fato_programacao",
          observacao="até 08/10: '1 linha = tarefa × semana'; o grão medido é o bloco de agenda. As linhas foraDoPlano "
-                    "(37%) são execução, outro grão: ficam fora. Grava só com a decisão 7 do Levi (passo 0 ou mescla "
-                    "por semana): a fonte guarda 4 semanas e a troca integral nunca passaria disso"),
+                    "são execução, outro grão: ficam fora. Decisão 7 (08/10, o Levi quer as semanas antigas): a fonte "
+                    "guarda 4 semanas, então a carga grava pela mescla por semana (troca só as semanas do arquivo) e "
+                    "não grava com a leitura do banco vazia ou que falha; as semanas desde a W21 vieram do git do PCM "
+                    "(carga única, ferramentas/carregar_programacao_historica.py). Usina e equipe são as ATUAIS do "
+                    "ativo (o robô reescreve): a da época sai do usinas_historico"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -331,14 +336,20 @@ LIVROS = (
           "ferramentas/carregar_ativos_fracttal.py --gravar", False,
           "renovar a foto exige ler o Fracttal: fora do horário de campo"),
     Livro("nexus_programacao", ("fato_programacao", "qualidade", "atualizacao"),
-          "de hora em hora quando ligar; só --ensaio até a decisão 7", "nexus/dados/carga.py + programacao.py", False),
+          "de hora em hora (:40), pela mescla por semana; grava só quando o sha das linhas muda",
+          "nexus/dados/carga.py + programacao.py (o histórico: ferramentas/carregar_programacao_historica.py)", True,
+          "criado em 08/10/2026 pela carga única: W21 a W41, 14.276 blocos (W21 a W37 do git do PCM + as 4 semanas "
+          "do arquivo), conferido por GET semana a semana"),
     Livro("nexus_geracao", ("fato_geracao_usina_dia", "qualidade", "atualizacao"),
           "diária (~01:40) quando ligar; só --ensaio até a decisão 8", "ferramentas/carregar_geracao.py + geracao.py",
           False),
     Livro("nexus_rondas_checklist", ("fato_checklist_ronda", "atualizacao"), "carga única (06/10/2026)",
           "ferramentas/carregar_checklist_rondas_sem_os.py", True),
-    Livro("nexus_rondas_avulsas", ("fato_ronda_avulsa",), "a cada lançamento no Nexus", "nexus/campo/ronda_avulsa.py",
-          False, "0 linhas em 08/10"),
+    Livro("nexus_rondas_avulsas", ("fato_ronda_avulsa",),
+          "a cada lançamento no Nexus; importação da validação por foto (só a pedido)",
+          "nexus/campo/ronda_avulsa.py + ferramentas/importar_avulsas_planilha.py --gravar", False,
+          "não existe no banco em 08/10 (GET): a importação de 08/10 parou no ensaio (a pessoa pedida não tem ficha "
+          "no cadastro)"),
     Livro("nexus_pt_decisoes", ("decisoes",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "0 linhas em 08/10"),
 )

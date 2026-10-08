@@ -19,7 +19,7 @@ Conferido pelo hash (SHA-256):
 
 ## Por que uma cópia, e não um motor novo
 
-O Nexus precisa gerar a **mesma** semana que o Fabrício gera, para a comparação linha a linha provar que pode
+O Nexus precisa gerar a **mesma** semana que o PCM gera, para a comparação linha a linha provar que pode
 substituir. Reescrever o motor tornaria a comparação inútil.
 
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois

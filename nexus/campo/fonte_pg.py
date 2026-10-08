@@ -158,10 +158,7 @@ class Fornecedor:
     def _do_app(self, nome):
         fech, rondas = self.livros()
         if nome == "qualidadelog":
-            try:
-                quem = livros_app.pessoas_por_codigo(self.chave_hmac)
-            except Exception:       # noqa: BLE001 — sem o cadastro do App, sai sem e-mail (e sem supervisor)
-                quem = {}
+            quem = self._quem()
             out = []
             for a in fech:
                 em, nm = quem.get(str(a.get("Técnico (HMAC)") or "").split(";")[0].strip(), ("", ""))
@@ -171,8 +168,17 @@ class Fornecedor:
         if nome == "rondaos":
             return TabelaSoLeitura(nome, [livros_app.ronda_os(r) for r in com_os])
         if nome == "rondas":
-            return TabelaSoLeitura(nome, [livros_app.ronda(r) for r in com_os])
+            # o técnico vem com o nome (`Técnico`) ou, desde o pacote de 08/10/2026 do App, com o código
+            # (`Técnico (HMAC)`): a mesma tradução do `qualidadelog`; as duas colunas valem (`livros_app.nome_do_tecnico`)
+            quem = self._quem() if any(r.get("Técnico (HMAC)") for r in com_os) else {}
+            return TabelaSoLeitura(nome, [livros_app.ronda(r, quem) for r in com_os])
         return TabelaSoLeitura(nome, [])
+
+    def _quem(self) -> dict:
+        try:
+            return livros_app.pessoas_por_codigo(self.chave_hmac)
+        except Exception:       # noqa: BLE001 — sem o cadastro do App, sai sem e-mail (e sem supervisor)
+            return {}
 
     # ── pessoas: na hora, nunca no banco ───────────────────────────────────────────────────────────────────────────
     def _nome(self, l) -> str:

@@ -4,14 +4,14 @@ O motor é o do PCM (programacao_v7.py e os dois leitores do Fracttal), copiado 
 1. confere o que o motor precisa: credencial, insumos e o próprio motor;
 2. monta uma pasta por rodada, FORA do OneDrive, e escreve nela os insumos que moram no Nexus (insumos.py:
    prioridades, confiabilidade, histórico, feriados e observações), no formato que o motor lê, e a AUXILIAR, que sai
-   do cadastro do Nexus (auxiliar.py). Da pasta do PCM só vêm as durações aprendidas. Na sombra, o Nexus importa os arquivos do Fabrício antes, para as duas
+   do cadastro do Nexus (auxiliar.py). Da pasta do PCM só vêm as durações aprendidas. Na sombra, o Nexus importa os arquivos da pasta do PCM antes, para as duas
    gerações partirem do mesmo ponto;
 3. volta o histórico para antes da semana: na 2ª geração o motor marcava tudo como reprogramado (415 tarefas na
-   semana 40), e assim tanto faz rodar antes ou depois do Fabrício;
+   semana 40), e assim tanto faz rodar antes ou depois do PCM;
 4. roda o motor num SUBPROCESSO, com ambiente próprio. O FRACTTAL_BASE_URL do motor tem /api/ e o do OS Creator, que
    roda dentro do Nexus, não; no mesmo processo um quebraria o outro. As variáveis NEXUS_* não vão para o motor;
 5. compara a planilha que saiu com a oficial da mesma semana, se ela já existir.
-Nada é publicado: a semana do campo continua sendo a do Fabrício.
+Nada é publicado: a semana do campo continua sendo a oficial do PCM.
 
 Credencial (decisão do Levi, 30/09: "pode usar do OS Creator, mesma lógica porém sem a parte de login"): o
 client_credentials do Fracttal que o OS Creator lê do .env da pasta dele. A leitura pela API não precisa do login de
@@ -43,7 +43,7 @@ MOTOR = AQUI / "motor" / "programacao_v7.py"
 ENV_OS_CREATOR = RAIZ / "nexus" / "torres" / "oscreator" / "os_creator" / ".env"
 # Fora do OneDrive e fora do AppData, como o ensaio do cadastro (o Claude desktop virtualiza o AppData).
 TRABALHO_PADRAO = Path(r"C:\GridcoAuto\nexus\pcm") if os.name == "nt" else RAIZ / "dados" / "pcm"
-# A pasta do PCM sincronizada nesta máquina: é de lá que o Fabrício gera. Na sombra, os insumos vêm dela.
+# A pasta do PCM sincronizada nesta máquina: é de lá que o PCM gera. Na sombra, os insumos vêm dela.
 ORIGEM_PADRAO = (Path.home() / "OneDrive - GRID CO" / "Área de Trabalho" / "Grid Co_ - 4. O&M" / "11.Pré-Operação"
                  / "6. PCM" / "09. Programação Semanal")
 # O que ainda vem da pasta do PCM. Prioridades, Confiabilidade, Histórico, Feriados e Observações moram no Nexus
@@ -154,7 +154,7 @@ def conferir(config, semana: str | None = None) -> dict:
     # Opcional desde 02/10: a AUXILIAR sai do cadastro e os insumos moram no Nexus. A pasta só traz a oficial (para
     # comparar) e as durações (sombra). Obrigatória, ela travava a geração no servidor, onde o OneDrive não existe.
     itens.append({"nome": "Pasta do PCM", "ok": True, "obrigatorio": False,
-                  "detalhe": "a mesma de onde o Fabrício gera: serve para comparar com a oficial" if tem_origem else
+                  "detalhe": "a mesma de onde o PCM gera: serve para comparar com a oficial" if tem_origem else
                   "não está nesta máquina: gera mesmo assim, sem comparar com a oficial"})
     for nome, obrig in INSUMOS:
         p = origem / nome if origem else None

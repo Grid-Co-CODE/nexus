@@ -1,0 +1,5 @@
+{# Passo 4 do Kimball (Levi, 08/10/2026): os números desta tela saem do fato conformado do banco (nexus_fatos).
+   Quando o banco ainda não tem o fato da versão dos livros que a API tem agora, a tela monta o fato na hora com o MESMO
+   código da carga de hora em hora (nexus/dados/carga.py, montar_*) e diz aqui, discretamente. #}
+{% set _avisos_fato = (d.get('fatos') or {}).values()|select|list %}
+{% if _avisos_fato %}<span class="cn-fato-na-hora" title="Os números saem do fato conformado do banco (nexus_fatos). Quando o banco ainda não tem o fato desta versão dos livros, a tela monta o fato na hora com o mesmo código da carga de hora em hora.">{{ _avisos_fato|join(' · ') }}</span>{% endif %}

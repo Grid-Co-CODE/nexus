@@ -192,7 +192,7 @@ def test_sem_importar_nao_gera(pcm):
 
 
 def test_estado_avisa_quando_o_arquivo_da_pasta_mudou(pcm):
-    """Na sombra, o Nexus precisa partir do mesmo dado que o Fabrício: se ele editou o arquivo depois da importação,
+    """Na sombra, o Nexus precisa partir do mesmo dado que o PCM: se alguém editou o arquivo depois da importação,
     a tela avisa para importar de novo."""
     origem, trab, _rod = pcm
     I.importar(trab, origem, "2026-W41")

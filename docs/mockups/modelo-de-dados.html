@@ -267,7 +267,7 @@ const T = [
    c:[["usina_id","fk:usina",""],["equipe_id","fk:equipe",""],["papel","","Responsável O&M, técnico, eletricista, mantenedor"],["pessoa_id","fk:pessoa",""],["inicio, fim","","Vigência"]],
    mata:"Colunas Responsável, Técnico, Eletricista e Mantenedor O&M"},
   {id:"cluster", d:"nucleo", s:"novo", desc:"Agrupamento regional das usinas. Hoje é uma lista solta, com grafias duplas.",
-   c:[["id","pk",""],["nome","","PA Leste 01"],["regiao","","Norte, Nordeste, Sudeste, Sul, Centro-Oeste"],["supervisor_id","fk:pessoa",""]], mata:"Coluna Cluster e a lista do AUXILIAR - FABRICIO"},
+   c:[["id","pk",""],["nome","","PA Leste 01"],["regiao","","Norte, Nordeste, Sudeste, Sul, Centro-Oeste"],["supervisor_id","fk:pessoa",""]], mata:"Coluna Cluster e a lista da AUXILIAR do PCM"},
   {id:"municipio", d:"nucleo", s:"novo", desc:"Cidade com UF e código do IBGE. Liga usina, equipe e feriado municipal.",
    c:[["id","pk","Código IBGE"],["nome","",""],["uf","",""]], mata:"Colunas Cidade e UF digitadas à mão"},
 
@@ -420,7 +420,7 @@ $("#mapa").innerHTML = DOMINIOS.map(d => {
 const ARQUIVOS = [
   ["BD_Operações.xlsx (aba Operações)","Todos os sistemas",["usina","contrato","contato","equipe_usina","apelido"]],
   ["BD_Operações.xlsx (Relação Geral Colaboradores)","Cadastro, App de Campo",["pessoa"]],
-  ["AUXILIAR - FABRICIO.xlsx","Motor do PCM",["usina","cluster","equipe_usina"]],
+  ["AUXILIAR do PCM (.xlsx)","Motor do PCM",["usina","cluster","equipe_usina"]],
   ["Gestao_Contratos_GridCo.xlsx","Contratos",["contrato"]],
   ["Lista_Prioridades_GridCo.xlsx","Motor do PCM",["prioridade"]],
   ["Planilha Confiabilidade R00.xlsx","Motor do PCM, Engenharia",["tempo_referencia"]],

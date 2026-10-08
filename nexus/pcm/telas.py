@@ -1,7 +1,7 @@
 """Telas da programação semanal, penduradas na torre PCM (a torre chama registrar_pcm(bp)).
 
 Etapa 1: Semana e Tarefas e OS mostram a programação que está valendo (a mesma do App de Campo).
-Etapa 2: Gerar a semana roda o motor do PCM no Nexus, em sombra, e compara com a semana do Fabrício.
+Etapa 2: Gerar a semana roda o motor do PCM no Nexus, em sombra, e compara com a semana oficial do PCM.
 """
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -110,7 +110,7 @@ def registrar_pcm(bp) -> None:
 
     @bp.route("/gerar/importar", methods=["POST"])
     def gerar_importar():
-        """Na sombra, traz para o Nexus os arquivos que o Fabrício tem hoje: as duas gerações partem do mesmo dado.
+        """Na sombra, traz para o Nexus os arquivos que a pasta do PCM tem hoje: as duas gerações partem do mesmo dado.
         As observações entram na semana escolhida."""
         cfg = current_app.config
         semana = _semana_do_form()
