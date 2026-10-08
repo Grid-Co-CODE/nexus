@@ -61,3 +61,196 @@
 .dd-tab th{color:var(--tinta-2);font-weight:600;font-size:12px}
 .dd-tab td.dd-ruim{color:var(--erro);font-weight:700}
 .dd-livros{min-width:860px}.dd-livros .obs{display:block;font-size:11.5px;color:var(--mudo)}
+
+/* ── Organograma (08/10/2026, Levi: "Quero uma visão de cima da governança também, teria como fazer um organograma??") ──
+   A mesma governança vista de cima: raiz, setores e fatos ligados por linhas que são bordas (cor de token, --org-linha).
+   Estreito (celular e janela média) é uma árvore vertical com o tronco à esquerda, recolhível por setor; com 1060 px ou
+   mais de largura útil vira organograma, com os setores lado a lado pelo barramento. É uma container query: o espaço que
+   conta é o da tela (o menu recolhido também dá largura), não o da janela. */
+.dd-topo{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:0 24px}
+.dd-ver{display:inline-flex;gap:2px;padding:3px;margin:0 0 10px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.dd-ver a{font:600 13px/18px var(--font-sans);color:var(--mudo);text-decoration:none;padding:7px 16px;border-radius:7px;white-space:nowrap}
+.dd-ver a:hover{color:var(--tinta)}
+.dd-ver a[aria-current="page"]{background:var(--verde);color:var(--sobre-verde)}
+
+.dd-org{container:dd-org / inline-size;--org-linha:var(--linha-forte);margin-top:6px}
+.dd-org-legenda{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:12.5px;color:var(--tinta-2);margin:4px 0 16px}
+.dd-org-legenda>span{display:inline-flex;align-items:center;gap:6px}
+.dd-org-legenda .gc-rotulo{display:inline}
+/* o estado do fato: a palavra, no tom do semáforo (verde, amarelo, laranja, vermelho); neutro = não conta mais */
+.dd-org-estado{display:inline-block;padding:0 8px;border-radius:99px;border:1px solid transparent;font:600 11px/17px var(--font-sans);
+  white-space:nowrap;color:var(--mudo);background:var(--superficie-2)}
+.dd-org-estado.ok{color:var(--ok);background:var(--ok-suave)}
+.dd-org-estado.alerta{color:var(--alerta);background:var(--alerta-suave)}
+.dd-org-estado.severo{color:var(--severo);background:var(--severo-suave)}
+.dd-org-estado.critico{color:var(--critico);background:var(--critico-suave)}
+.dd-org-estado.neutro{border:1px dashed var(--linha-forte)}
+
+/* a raiz */
+.dd-org-raiz{position:relative;background:var(--superficie);border:1px solid var(--linha-forte);border-top:3px solid var(--verde);
+  border-radius:12px;padding:12px 18px 12px}
+.dd-org-raiz-titulo{display:flex;align-items:center;gap:8px;margin:0 0 8px;font:700 16px/1.3 var(--font-display);color:var(--tinta)}
+.dd-org-raiz-titulo i{font-size:20px;color:var(--verde-texto)}
+.dd-org-contas{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 20px}
+.dd-org-contas li{display:flex;align-items:baseline;gap:6px;font-size:12.5px;color:var(--tinta-2)}
+.dd-org-contas b{font:700 22px/26px var(--font-sans);color:var(--tinta);font-variant-numeric:tabular-nums}
+.dd-org-contas .ok b{color:var(--ok)}.dd-org-contas .alerta b{color:var(--alerta)}
+.dd-org-contas .severo b{color:var(--severo)}.dd-org-contas .critico b{color:var(--critico)}
+.dd-org-carga{margin:8px 0 0;font-size:12.5px;color:var(--mudo)}
+.dd-org-carga b{color:var(--tinta-2);font-weight:600}
+/* a barra de estados (raiz, setor) e a de ligação (dimensão): área no tom "-cheio", o número em cima no --sobre-cheio */
+.dd-org-barra{display:flex;gap:2px;height:16px;margin-top:10px;border-radius:5px;overflow:hidden;background:var(--superficie-2)}
+.dd-org-barra i{display:flex;align-items:center;justify-content:center;flex-basis:0;min-width:18px;font:700 10.5px/1 var(--font-sans);
+  font-style:normal;color:var(--sobre-cheio)}
+.dd-org-barra i.ok,.dd-org-barra i.id{background:var(--ok-cheio)}
+.dd-org-barra i.alerta,.dd-org-barra i.outro{background:var(--alerta-cheio)}
+.dd-org-barra i.severo{background:var(--severo-cheio)}.dd-org-barra i.critico{background:var(--critico-cheio)}
+.dd-org-barra i.sem{background:var(--superficie-3)}
+.dd-org-barra--raiz{max-width:640px}
+
+/* a árvore estreita (o padrão): o tronco desce pela esquerda e cada nó ganha um galho */
+.dd-org-setores,.dd-org-fatos{list-style:none;margin:0;padding:0}
+.dd-org-setor{position:relative;padding:12px 0 0 28px}
+.dd-org-setor::before{content:"";position:absolute;left:14px;top:0;bottom:0;border-left:2px solid var(--org-linha)}
+.dd-org-setor::after{content:"";position:absolute;left:14px;top:34px;width:14px;border-top:2px solid var(--org-linha)}
+.dd-org-setor:last-child::before{bottom:auto;height:35px}
+.dd-org-no{display:flex;flex-direction:column;gap:2px;list-style:none;cursor:pointer;background:var(--superficie);
+  border:1px solid var(--linha-forte);border-radius:10px;padding:10px 12px 12px}
+.dd-org-no::-webkit-details-marker{display:none}
+.dd-org-no:hover{background:var(--superficie-3)}
+.dd-org-no-cab{display:flex;align-items:center;gap:8px;font:700 14px/22px var(--font-sans);color:var(--tinta)}
+.dd-org-no-cab>i:first-child{font-size:17px;color:var(--verde-texto)}
+.dd-org-seta{margin-left:auto;font-size:14px;color:var(--mudo)}
+.dd-org-galho:not([open])>.dd-org-no .dd-org-seta{transform:rotate(-90deg)}
+.dd-org-no-conta{font-size:12px;color:var(--tinta-2);white-space:nowrap}
+.dd-org-no-conta b{color:var(--tinta);font-variant-numeric:tabular-nums}
+.dd-org-fatos>li{position:relative;padding:8px 0 0 26px}
+.dd-org-fatos>li::before{content:"";position:absolute;left:12px;top:0;bottom:0;border-left:2px solid var(--org-linha)}
+.dd-org-fatos>li::after{content:"";position:absolute;left:12px;top:26px;width:14px;border-top:2px solid var(--org-linha)}
+.dd-org-fatos>li:last-child::before{bottom:auto;height:27px}
+
+/* o cartão do fato: um botão; a faixa da esquerda tem o tom do estado (a palavra vem no selo) */
+.dd-org-fato{display:flex;flex-direction:column;align-items:stretch;gap:5px;width:100%;margin:0;text-align:left;cursor:pointer;
+  font:400 12px/1.4 var(--font-sans);color:var(--tinta);background:var(--superficie);border:1px solid var(--linha);
+  border-left:3px solid var(--linha-forte);border-radius:9px;padding:8px 10px 9px}
+.dd-org-fato:hover{background:var(--superficie-3)}
+.dd-org-fato.ok{border-left-color:var(--ok-cheio)}.dd-org-fato.alerta{border-left-color:var(--alerta-cheio)}
+.dd-org-fato.severo{border-left-color:var(--severo-cheio)}.dd-org-fato.critico{border-left-color:var(--critico-cheio)}
+.dd-org-fato.neutro{border-left-style:dashed;background:var(--superficie-2)}
+.dd-org-fato.neutro:hover{background:var(--superficie-3)}
+.dd-org-nome{font:600 13px/1.35 var(--font-sans);color:var(--tinta)}
+.dd-org-linha{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0}
+.dd-org-tipo,.dd-org-de{font-size:11.5px;color:var(--tinta-2)}
+.dd-org-livro{display:flex;flex-direction:column;gap:1px;min-width:0}
+.dd-org-livro code{font:500 11px/1.4 var(--font-mono);color:var(--tinta-2);overflow-wrap:anywhere}
+.dd-org-nexus code{color:var(--verde-texto)}
+.dd-org-quem{font-size:11px;color:var(--mudo);overflow-wrap:anywhere}
+/* o que não conta mais (fonte de outro fato, aposentado): recolhido por setor, sem galho, com o cartão tracejado */
+.dd-org-mais{margin:8px 0 0 26px}
+.dd-org-mais>summary{display:flex;align-items:flex-start;gap:8px;list-style:none;cursor:pointer;font-size:11.5px;line-height:16px;
+  color:var(--mudo);padding:6px 10px;border:1px dashed var(--linha-forte);border-radius:9px}
+.dd-org-mais>summary::-webkit-details-marker{display:none}
+.dd-org-mais>summary:hover{background:var(--superficie-2)}
+.dd-org-mais>summary i{font-size:13px;line-height:16px;color:var(--tinta-2)}
+.dd-org-mais[open]>summary i{transform:rotate(45deg)}
+.dd-org-mais>summary b{display:block;font-size:12px;font-weight:600;color:var(--tinta-2)}
+.dd-org-mais>summary:hover b{color:var(--tinta)}
+.dd-org-mais .dd-org-fatos--mais{display:grid;gap:8px;margin-top:8px}
+.dd-org-fatos--mais>li{padding:0}
+.dd-org-fatos--mais>li::before,.dd-org-fatos--mais>li::after{display:none}
+
+/* a faixa das dimensões conformadas */
+.dd-org-dims{margin-top:24px}
+.dd-org-dims .dd-h2{margin-top:0}
+.dd-org-barramento{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.dd-org-dim{position:relative;display:flex;flex-direction:column;gap:5px;min-width:0;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:10px;padding:10px 12px;font-size:12.5px}
+.dd-org-dim-cab{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
+.dd-org-dim-cab b{font-size:14px;color:var(--tinta)}
+.dd-org-dim-cab code{font:500 11.5px/1.4 var(--font-mono);color:var(--verde-texto);overflow-wrap:anywhere}
+.dd-org-dim-mestre{font-size:11.5px;color:var(--mudo);overflow-wrap:anywhere}
+.dd-org-dim-conta{display:flex;flex-wrap:wrap;gap:2px 12px;color:var(--tinta-2)}
+.dd-org-dim-conta b{color:var(--tinta);font-variant-numeric:tabular-nums}
+.dd-org-dim-conta [data-conta="id"] b{color:var(--ok)}
+.dd-org-barra--dim{height:8px;margin-top:2px}
+.dd-org-barra--dim i{min-width:4px}
+.dd-org-dim-chips{display:flex;flex-wrap:wrap;gap:4px}
+.dd-org-dim-chips .dd-chip{min-width:0;white-space:nowrap}
+.dd-org-dim-setores{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:var(--mudo)}
+.dd-org-dim-setores b{color:var(--tinta-2);font-variant-numeric:tabular-nums}
+
+/* largo: organograma de cima para baixo. A raiz no centro, o tronco desce até o barramento dos setores, cada setor pende
+   dele; os fatos pendem do setor pela esquerda, em uma coluna (ou mais, quando o setor tem muitos fatos: --trilhas), com as
+   linhas das colunas alinhadas. As dimensões pendem do barramento delas. */
+@container dd-org (min-width:1060px){
+  .dd-org-raiz{max-width:880px;margin:0 auto}
+  .dd-org-contas{justify-content:center}
+  .dd-org-conta-sep{padding-left:20px;border-left:1px solid var(--linha-forte)}     /* os fatos | o que liga e onde grava */
+  .dd-org-raiz-titulo{justify-content:center}
+  .dd-org-carga{text-align:center}
+  .dd-org-barra--raiz{margin-left:auto;margin-right:auto}
+  .dd-org-setores{position:relative;display:grid;grid-template-columns:repeat(var(--org-trilhas),minmax(0,1fr));column-gap:14px;padding-top:14px}
+  .dd-org-setores::before{content:"";position:absolute;left:50%;top:0;height:14px;border-left:2px solid var(--org-linha)}
+  .dd-org-setor{grid-column:span var(--trilhas);min-width:0;padding:14px 0 0}
+  /* o nome do setor tem lugar para 2 linhas em todos ("Segurança · HSEQ" quebra numa coluna): os nós ficam da mesma
+     altura e os fatos de todos os setores começam na mesma linha */
+  .dd-org-no-cab{min-height:44px}
+  .dd-org-setor::before{left:-7px;right:50%;top:0;bottom:auto;width:auto;height:0;border-left:0;border-top:2px solid var(--org-linha)}
+  .dd-org-setor::after{left:50%;right:-7px;top:0;width:auto;height:14px;border-top:2px solid var(--org-linha);border-left:2px solid var(--org-linha)}
+  .dd-org-setor:first-child::before{display:none}
+  .dd-org-setor:last-child::before{height:0}
+  .dd-org-setor:last-child::after{border-top:0}
+  .dd-org-fatos{position:relative;display:grid;grid-template-columns:repeat(var(--trilhas),minmax(0,1fr));
+    grid-template-rows:repeat(var(--linhas),auto);grid-auto-flow:column;column-gap:14px;padding-top:14px}
+  /* o barramento das colunas de um setor largo: do tronco da 1ª coluna ao da última (largura 0 com uma coluna só) */
+  .dd-org-fatos::before{content:"";position:absolute;top:8px;left:12px;height:0;border-top:2px solid var(--org-linha);
+    width:calc((100% - (var(--trilhas) - 1) * 14px) / var(--trilhas) * (var(--trilhas) - 1) + (var(--trilhas) - 1) * 14px)}
+  .dd-org-fatos>li:last-child::before{bottom:0;height:auto}
+  .dd-org-fatos>li.dd-org-fim::before{bottom:auto;height:27px}
+  .dd-org-fatos>li.dd-org-topo::before{top:-6px}
+  .dd-org-fatos>li:first-child::before{top:-14px}
+  /* o "mostrar também" vira o rodapé do setor, da largura da coluna (recuado, o rótulo quebrava numa coluna estreita);
+     os cartões dele ficam nas mesmas colunas e no mesmo recuo dos ativos, sem barramento e sem galho */
+  .dd-org-mais{margin-left:0}
+  .dd-org-fatos.dd-org-fatos--mais{grid-template-rows:none;grid-auto-flow:row;column-gap:14px;padding-top:0}
+  .dd-org-fatos--mais::before{display:none}
+  .dd-org-fatos--mais>li{padding-left:26px}
+  .dd-org-barramento{position:relative;grid-template-columns:repeat(var(--org-dims),minmax(0,1fr));padding-top:16px;
+    border-top:3px solid var(--org-linha);margin-top:16px}
+  .dd-org-dim::before{content:"";position:absolute;left:50%;top:-16px;height:16px;border-left:2px solid var(--org-linha)}
+}
+
+/* a gaveta do fato (<dialog> modal: prende o foco e fecha com Esc) */
+.dd-gaveta{position:fixed;top:0;right:0;bottom:0;left:auto;margin:0;width:min(560px,100vw);max-width:100vw;height:auto;max-height:none;
+  padding:0;border:0;border-left:1px solid var(--linha-forte);background:var(--superficie);color:var(--tinta);
+  box-shadow:-12px 0 32px var(--sombra);overflow-y:auto}
+.dd-gaveta::backdrop{background:var(--veu)}
+.dd-gav-corpo{position:relative;min-height:100%;padding:22px 24px 32px}
+.dd-gav-fechar{position:absolute;top:14px;right:16px;width:36px;height:36px;border-radius:8px;border:1px solid var(--linha-forte);
+  background:transparent;color:var(--tinta);font:600 20px/1 var(--font-sans);cursor:pointer}
+.dd-gav-fechar:hover{border-color:var(--verde)}
+.dd-gav-conteudo>.gc-eyebrow{padding-right:48px}
+.dd-gav-titulo{margin:4px 48px 8px 0;font:700 19px/1.3 var(--font-sans);color:var(--tinta)}
+.dd-gav-estado{margin:6px 0 0;font-size:12.5px;color:var(--mudo)}
+.dd-gaveta h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:20px 0 8px}
+.dd-gav-grao{margin:0;font-size:14px;line-height:1.5;color:var(--tinta)}
+.dd-gav-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:10px 0 0;font-size:13px}
+.dd-gav-dl dt{color:var(--mudo)}
+.dd-gav-dl dd{margin:0;color:var(--tinta-2);min-width:0;overflow-wrap:anywhere}
+.dd-gav-dl dd b{color:var(--tinta);font-weight:600}
+.dd-gav-dl code,.dd-gav-tab code,.dd-gaveta .dd-mudo code{font:500 12px/1.4 var(--font-mono);color:var(--tinta)}
+.dd-gav-livros{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dd-gav-livros li{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--linha);
+  border-radius:8px;background:var(--superficie-2)}
+.dd-gav-papel{font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.dd-gav-livros code{font:500 12px/1.4 var(--font-mono);color:var(--tinta);overflow-wrap:anywhere}
+.dd-gav-nexus code{color:var(--verde-texto)}
+.dd-gav-quem{font-size:12px;color:var(--tinta-2);overflow-wrap:anywhere}
+.dd-gav-tab{font-size:12.5px}
+.dd-gav-dims th{font-weight:600;color:var(--tinta);white-space:nowrap}
+.dd-gav-dims .dd-chip{min-width:0}
+.dd-gav-pct{display:block;margin-top:3px;font-size:12px;color:var(--tinta-2);white-space:nowrap}
+.dd-gav-col{color:var(--mudo);font-size:12px;overflow-wrap:anywhere}
+.dd-gav-barras{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.dd-gav-barras .dd-barra{grid-template-columns:88px 1fr 48px}
+.dd-gav-obs{margin:0;font-size:13px;line-height:1.55;color:var(--tinta-2)}

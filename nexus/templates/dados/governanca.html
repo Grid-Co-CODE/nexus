@@ -10,8 +10,21 @@
 {% endmacro %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dados.css') }}">
-<p class="gc-eyebrow">Base · Governança de dados</p>
-<h1 class="titulo-pagina">Matriz de barramento</h1>
+{# Duas visões da mesma governança (08/10/2026): a matriz (o padrão, igual à de antes) e o organograma, a visão de cima
+   (`?ver=organograma`). A escolha vai na URL: o link leva a visão, e a troca de tema sem JavaScript volta para ela. #}
+<div class="dd-topo">
+  <div>
+    <p class="gc-eyebrow">Base · Governança de dados</p>
+    <h1 class="titulo-pagina">{{ 'Organograma da governança' if ver == 'organograma' else 'Matriz de barramento' }}</h1>
+  </div>
+  <nav class="dd-ver" aria-label="Visão da governança">
+    <a href="{{ url_matriz }}"{% if ver == 'matriz' %} aria-current="page"{% endif %}>Matriz</a>
+    <a href="{{ url_organograma }}"{% if ver == 'organograma' %} aria-current="page"{% endif %}>Organograma</a>
+  </nav>
+</div>
+{% if ver == 'organograma' %}
+{% include "dados/_organograma.html" %}
+{% else %}
 <p class="dd-sub">Cada acontecimento (um <b>fato</b>: um fechamento, uma ronda, a geração de um dia) ligado aos cadastros de
 referência (as <b>dimensões</b>: usina, pessoa, data…) por <b>ID</b>. Quando dois setores usam a mesma dimensão pelo mesmo
 ID, os dados deles se cruzam sem conversão. A matriz vem do catálogo do Nexus (<code>nexus/dados/catalogo.py</code>); a
@@ -134,4 +147,5 @@ de cada dia ou semana), <b>foto acumulada</b> (a linha muda até fechar, como a 
 </div>
 <p class="dd-mudo dd-rodape">Como entra um dado novo (chamados, engenharia, PCM, segurança…): o passo a passo está no
 <code>nexus/dados/CLAUDE.md</code>. Fonte nova entra primeiro no catálogo, com o grão, o tipo e as dimensões declarados.</p>
+{% endif %}
 {% endblock %}

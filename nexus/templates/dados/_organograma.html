@@ -1,0 +1,195 @@
+{# Organograma da governança (Levi, 08/10/2026: "Quero uma visão de cima da governança também, teria como fazer um
+   organograma??"). Tudo vem de `telas.organograma` (o catálogo e a qualidade da última carga), nada de lista à mão: a raiz
+   com os números do resumo, os setores (o `area` de cada fato, com o nome e o ícone da torre dona), os fatos de cada setor
+   e a faixa das dimensões conformadas. As linhas da árvore são bordas do CSS (dados.css, "Organograma"), na cor de token.
+   O cartão do fato é um <button> (clique, Enter ou Espaço): o detalhe vem do <template> dele e abre na gaveta (<dialog>).
+   Usa `barra`, `PCT` e `extra` da governanca.html, que inclui este arquivo. #}
+{% set conta = org.conta %}
+{% macro estado(c) %}<span class="dd-org-estado {{ c.tom }}">{{ c.estado_rotulo }}</span>{% endmacro %}
+{% macro cartao(c) %}
+<button type="button" class="dd-org-fato {{ c.tom }}" data-fato="{{ c.id }}" aria-haspopup="dialog" aria-controls="dd-gaveta">
+  <span class="dd-org-nome">{{ c.nome }}</span>
+  <span class="dd-org-linha">{{ estado(c) }}<span class="dd-org-tipo">{{ c.tipo }}</span></span>
+  {% if c.parte_de %}<span class="dd-org-de">fonte de {{ c.parte_de | join(', ') }}</span>{% endif %}
+  <span class="dd-org-livro"><code>{{ c.livros_card }}</code><span class="dd-org-quem">grava: {{ c.quem_card }}</span></span>
+  {% if c.nexus %}<span class="dd-org-livro dd-org-nexus"><code>{{ '→' if c.nexus.grava else 'vai para' }} {{ c.nexus.livro }}</code><span class="dd-org-quem">grava: {{ c.nexus.quem_curto }}</span></span>{% endif %}
+</button>
+{% endmacro %}
+{% macro detalhe(c) %}
+<template id="dd-det-{{ c.id }}">
+  <p class="gc-eyebrow">{{ c.setor }}</p>
+  <h2 class="dd-gav-titulo" id="dd-gaveta-titulo">{{ c.nome }}</h2>
+  <p class="dd-org-linha">{{ estado(c) }}<span class="dd-org-tipo">{{ c.tipo }}</span></p>
+  <p class="dd-gav-estado">{{ c.estado_explica }}</p>
+
+  <h3>O que é uma linha (o grão)</h3>
+  <p class="dd-gav-grao">{{ c.grao }}</p>
+  <dl class="dd-gav-dl">
+    <dt>Tipo</dt><dd><b>{{ c.tipo }}</b>{% if c.tipo_explica %}: {{ c.tipo_explica }}{% endif %}</dd>
+    <dt>Chave</dt><dd>{% if c.chave %}<code>{{ c.chave | join(' + ') }}</code>{% else %}sem chave (ver a observação){% endif %}</dd>
+    {% if c.janela %}<dt>A fonte guarda</dt><dd>{{ c.janela }}</dd>{% endif %}
+    {% if c.parte_de %}<dt>Virou fonte de</dt><dd>{{ c.parte_de | join(', ') }}</dd>{% endif %}
+  </dl>
+
+  <h3>Onde mora e quem grava</h3>
+  <ul class="dd-gav-livros">
+    {% for l in c.fontes %}<li><span class="dd-gav-papel">{{ 'origem' if loop.first else 'outra fonte' }}</span><code>{{ l.texto }}</code><span class="dd-gav-quem">grava: {{ l.quem }}{% if l.cadencia %} · {{ l.cadencia }}{% endif %}</span></li>
+    {% endfor %}
+    {% if c.nexus %}<li class="dd-gav-nexus"><span class="dd-gav-papel">{{ 'no Nexus, com os IDs' if c.nexus.grava else 'destino no Nexus, ainda sem gravar' }}</span><code>{{ c.nexus.texto }}</code><span class="dd-gav-quem">grava: {{ c.nexus.quem }}{% if c.nexus.cadencia %} · {{ c.nexus.cadencia }}{% endif %}</span></li>{% endif %}
+  </ul>
+
+  <h3>Medidas</h3>
+  {% if c.medidas %}
+  <table class="dd-tab dd-gav-tab"><thead><tr><th>Coluna</th><th>Unidade</th><th>Soma</th></tr></thead><tbody>
+    {% for m in c.medidas %}<tr><td><code>{{ m.coluna }}</code></td><td>{{ m.unidade }}</td><td>{{ m.soma }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<p class="dd-mudo">Nenhuma: o fato só registra que aconteceu (conta-se linhas).</p>{% endif %}
+
+  <h3>Por onde liga cada dimensão</h3>
+  <table class="dd-tab dd-gav-tab dd-gav-dims"><tbody>
+    {% for d in c.dims %}<tr data-dim="{{ d.id }}"><th scope="row">{{ d.nome }}</th>
+      <td><span class="dd-chip {{ d.estado }}">{{ d.rotulo }}</span>{% if d.pct %}<span class="dd-gav-pct">{{ d.pct }} ligado</span>{% endif %}</td>
+      <td class="dd-gav-col">{{ d.col }}</td></tr>
+    {% endfor %}
+  </tbody></table>
+
+  <h3>Qualidade da última carga</h3>
+  {% set l = c.q %}
+  {% if l %}
+  <p class="dd-mudo">{{ l.get('linhas') }} linhas{% if l.get('gerado_em') %} na carga de {{ hora(l.get('gerado_em')) }}{% endif %}. Vazio é "não ligou": nunca um ID chutado.</p>
+  <div class="dd-barras dd-gav-barras">
+    {% for d, rot in (("data", "Data"), ("usina", "Usina"), ("equipe", "Equipe"), ("pessoa", "Pessoa"), ("equipamento", "Equipamento")) %}
+    {% if d != "equipamento" or l.get('com_equipamento') not in (none, '') %}{{ barra(rot, l.get(PCT[d])) }}{% endif %}
+    {% endfor %}
+  </div>
+  {% if l.get('pct_usina_versao') not in (none, '') or l.get('pct_pessoa_versao') not in (none, '') %}
+  <p class="dd-mudo">Acham exatamente 1 versão no histórico no dia do fato (a junção "da época"):</p>
+  <div class="dd-barras dd-gav-barras">{{ barra("Usina", l.get('pct_usina_versao')) }}{{ barra("Pessoa", l.get('pct_pessoa_versao')) }}</div>
+  {% endif %}
+  {% set ex = extra(l.get('extra')) %}{% if ex %}<p class="dd-extra">{% for k, x in ex.items() %}<span><b>{{ k | replace('_', ' ') }}</b> {{ x }}</span>{% endfor %}</p>{% endif %}
+  {% elif c.estado == 'conformado' %}<p class="dd-mudo">A última carga lida não trouxe a linha deste fato{% if erro %} (o banco não respondeu){% endif %}.</p>
+  {% elif c.estado == 'montado' %}<p class="dd-mudo">Montado, sem gravar: a medida sai no ensaio (<code>python ferramentas/carregar_dados.py --ensaio</code>), não na carga de hora em hora.</p>
+  {% elif c.estado in ('parte', 'aposentado') %}<p class="dd-mudo">Não conta mais como fato: a qualidade é medida no fato que ficou no lugar dele.</p>
+  {% else %}<p class="dd-mudo">O Nexus ainda não monta este fato com os IDs: a qualidade aparece quando ele for montado.</p>{% endif %}
+
+  {% if c.observacao %}<h3>Observação</h3><p class="dd-gav-obs">{{ c.observacao }}</p>{% endif %}
+</template>
+{% endmacro %}
+
+<p class="dd-sub">A visão de cima: os setores (as torres donas de cada fato), os fatos de cada um pelo estado da governança e as
+dimensões em comum que os ligam. Clique num fato (ou Enter) para ver o grão, as medidas, por onde liga cada dimensão e a
+qualidade da última carga. Tudo vem do catálogo do Nexus (<code>nexus/dados/catalogo.py</code>).</p>
+{% if erro %}<p class="dd-aviso">Não consegui ler a qualidade no banco ({{ erro }}): o organograma abaixo é o do catálogo.</p>{% endif %}
+
+<div class="dd-org" style="--org-trilhas:{{ org.trilhas }};--org-dims:{{ org.dimensoes | length }}">
+  <p class="dd-org-legenda"><span class="gc-rotulo">Estado do fato</span>
+    {% for e, (rot, tom, explica) in estado_org.items() %}<span><span class="dd-org-estado {{ tom }}">{{ rot }}</span>{{ explica }}</span>{% endfor %}
+  </p>
+
+  <div class="dd-org-arvore">
+    <div class="dd-org-raiz">
+      <p class="dd-org-raiz-titulo"><i class="ph ph-tree-structure" aria-hidden="true"></i>Governança de dados</p>
+      <ul class="dd-org-contas">
+        <li data-conta="fatos"><b>{{ conta.fatos }}</b><span>fatos ativos</span></li>
+        {% for chave, rot, tom in (("conformados", "conformados", "ok"), ("montados", "montados", "alerta"), ("origem", "de origem", "severo"), ("fora", "fora do banco", "critico")) %}
+        <li data-conta="{{ chave }}" class="{{ tom if conta[chave] else '' }}"><b>{{ conta[chave] }}</b><span>{{ rot }}</span></li>
+        {% endfor %}
+        <li data-conta="dimensoes" class="dd-org-conta-sep"><b>{{ conta.dimensoes }}</b><span>dimensões</span></li>
+        <li data-conta="livros"><b>{{ conta.livros }}</b><span>livros do Nexus</span></li>
+      </ul>
+      <span class="dd-org-barra dd-org-barra--raiz" role="img" title="{{ conta.conformados }} conformados, {{ conta.montados }} montados, {{ conta.origem }} de origem, {{ conta.fora }} fora do banco"
+            aria-label="{{ conta.conformados }} conformados, {{ conta.montados }} montados, {{ conta.origem }} de origem, {{ conta.fora }} fora do banco">
+        {% for chave, tom in (("conformados", "ok"), ("montados", "alerta"), ("origem", "severo"), ("fora", "critico")) %}{% if conta[chave] %}<i class="{{ tom }}" style="flex-grow:{{ conta[chave] }}">{{ conta[chave] }}</i>{% endif %}{% endfor %}
+      </span>
+      <p class="dd-org-carga">Última carga: <b>{{ hora(atualizacao.get('gerado_em')) or '—' }}</b>{% if atualizacao.get('maquina') %} · {{ atualizacao.get('maquina') }}{% endif %}</p>
+    </div>
+
+    <ul class="dd-org-setores" aria-label="Setores">
+      {% for s in org.setores %}
+      <li class="dd-org-setor" data-setor="{{ s.id }}" style="--trilhas:{{ s.trilhas }};--linhas:{{ s.linhas }}">
+        <details class="dd-org-galho" open>
+          <summary class="dd-org-no">
+            <span class="dd-org-no-cab"><i class="ph ph-{{ s.icone }}" aria-hidden="true"></i><b>{{ s.rotulo }}</b><i class="ph ph-caret-down dd-org-seta" aria-hidden="true"></i></span>
+            <span class="dd-org-no-conta"><b>{{ s.n }}</b> {{ 'fato' if s.n == 1 else 'fatos' }} · <b>{{ s.conformados }}</b> {{ 'conformado' if s.conformados == 1 else 'conformados' }}</span>
+            <span class="dd-org-barra" role="img" title="{{ s.resumo_estados }}" aria-label="{{ s.resumo_estados }}">{% for e, um, varios in degraus %}{% if s.por_estado[e] %}<i class="{{ estado_org[e][1] }}" style="flex-grow:{{ s.por_estado[e] }}">{{ s.por_estado[e] }}</i>{% endif %}{% endfor %}</span>
+          </summary>
+          {% if s.ativos %}
+          <ul class="dd-org-fatos">
+            {% for c in s.ativos %}<li class="{{ 'dd-org-topo' if c.topo_de_coluna }}{{ ' dd-org-fim' if c.fim_de_coluna }}">{{ cartao(c) }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% if s.outros %}
+          <details class="dd-org-mais">
+            <summary><i class="ph ph-plus" aria-hidden="true"></i><span><b>Mostrar também {{ s.outros | length }}</b><span>{{ s.resumo_outros }}</span></span></summary>
+            <ul class="dd-org-fatos dd-org-fatos--mais">
+              {% for c in s.outros %}<li>{{ cartao(c) }}</li>
+              {% endfor %}
+            </ul>
+          </details>
+          {% endif %}
+        </details>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <script>
+    // No celular a árvore abre recolhida (a raiz e os setores, com as contas): toca no setor para ver os fatos. Roda logo
+    // depois da árvore, antes de pintar. Sem JavaScript ela fica aberta.
+    if (window.matchMedia && window.matchMedia("(max-width: 820px)").matches) {
+      document.querySelectorAll(".dd-org-setor > details").forEach(function (d) { d.open = false; });
+    }
+  </script>
+
+  <section class="dd-org-dims" aria-labelledby="dd-org-dims-titulo">
+    <h2 class="dd-h2" id="dd-org-dims-titulo">Dimensões conformadas: o que liga os setores</h2>
+    <p class="dd-mudo">Uma de cada assunto, com o mesmo ID para todos os setores. Em cada uma, quantos dos {{ conta.fatos }} fatos
+    ativos já ligam por ID e quantos ainda por outro caminho (código, código da pessoa, nome, colunas ou cadastro próprio).</p>
+    <ul class="dd-org-barramento">
+      {% for d in org.dimensoes %}
+      <li class="dd-org-dim" data-dim="{{ d.id }}">
+        <span class="dd-org-dim-cab"><b>{{ d.nome }}</b><code>{{ d.chave }}</code></span>
+        <span class="dd-org-dim-mestre">{{ d.mestre }}</span>
+        <span class="dd-org-dim-conta"><span data-conta="id"><b>{{ d.por_id }}</b> por ID</span><span data-conta="outro"><b>{{ d.por_outro }}</b> por outro caminho</span></span>
+        <span class="dd-org-barra dd-org-barra--dim" role="img" title="{{ d.por_id }} por ID, {{ d.por_outro }} por outro caminho, {{ d.sem }} sem esta dimensão"
+              aria-label="{{ d.por_id }} por ID, {{ d.por_outro }} por outro caminho, {{ d.sem }} sem esta dimensão">{% if d.por_id %}<i class="id" style="flex-grow:{{ d.por_id }}"></i>{% endif %}{% if d.por_outro %}<i class="outro" style="flex-grow:{{ d.por_outro }}"></i>{% endif %}{% if d.sem %}<i class="sem" style="flex-grow:{{ d.sem }}"></i>{% endif %}</span>
+        {% if d.outros %}<span class="dd-org-dim-chips">{% for e, rot, n in d.outros %}<span class="dd-chip {{ e }}">{{ rot }} {{ n }}</span>{% endfor %}</span>{% endif %}
+        {% if d.setores %}<span class="dd-org-dim-setores">{% for rot, n in d.setores %}<span>{{ rot }} <b>{{ n }}</b></span>{% endfor %}</span>
+        {% else %}<span class="dd-org-dim-setores dd-mudo">nenhum fato ativo usa</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+{% for s in org.setores %}{% for c in s.ativos + s.outros %}{{ detalhe(c) }}{% endfor %}{% endfor %}
+<dialog class="dd-gaveta" id="dd-gaveta" aria-labelledby="dd-gaveta-titulo">
+  <div class="dd-gav-corpo">
+    <button type="button" class="dd-gav-fechar" aria-label="Fechar o detalhe">×</button>
+    <div class="dd-gav-conteudo"></div>
+  </div>
+</dialog>
+<script>
+  (function () {
+    // A gaveta do fato: o clique no cartão (ou Enter/Espaço, é um <button>) copia o <template> dele para o <dialog>
+    // modal, que prende o foco e fecha com Esc; o clique no véu também fecha, e o foco volta ao cartão. Sem animação.
+    var dlg = document.getElementById("dd-gaveta");
+    if (!dlg || typeof dlg.showModal !== "function") return;
+    var conteudo = dlg.querySelector(".dd-gav-conteudo"), fechar = dlg.querySelector(".dd-gav-fechar"), ativo = null;
+    document.querySelectorAll(".dd-org-fato[data-fato]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var t = document.getElementById("dd-det-" + b.dataset.fato);
+        if (!t) return;
+        conteudo.replaceChildren(t.content.cloneNode(true));
+        ativo = b;
+        dlg.showModal();
+        dlg.scrollTop = 0;
+        fechar.focus();
+      });
+    });
+    fechar.addEventListener("click", function () { dlg.close(); });
+    // o <dialog> não tem margem interna: o clique que cai nele mesmo (e não no corpo) foi no véu
+    dlg.addEventListener("click", function (ev) { if (ev.target === dlg) dlg.close(); });
+    dlg.addEventListener("close", function () { if (ativo) ativo.focus(); ativo = null; });
+  })();
+</script>
