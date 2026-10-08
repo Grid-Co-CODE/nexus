@@ -6,7 +6,7 @@ import pytest
 from flask import Flask
 from pg_falso import ApiPGFalsa
 
-from nexus.campo import fonte_pg, livros_app, ordens, regras_app, tabelas
+from nexus.campo import fonte_pg, livros_app, regras_app, tabelas
 from nexus.campo.ligacao_cadastro import codigo_da_pessoa
 
 BASE = "http://pg.falso"
@@ -97,14 +97,12 @@ def test_frescor_e_o_fechamento_mais_recente(livros):
     assert f.coleta() == "2026-10-04T14:00:00.000Z"
 
 
-def test_ordens_de_servico_saem_do_livro_do_app(livros):
+def test_fechamentos_saem_do_livro_do_app(livros):
+    # a conta do App (`_gestao_os`, ainda na cópia das regras) lê os fechamentos do livro do App: a nota de cada OS e as
+    # devolvidas. A tela Ordens de serviço, que mostrava essa conta, saiu em 08/10/2026 (Levi: "são redundantes")
     d = regras_app._gestao_os(3650, {}, None, inteira=True)
     assert d["resumo"]["os"] == 4 and d["resumo"]["devolvidas"] >= 1
     assert {l["os"]: l["qualidade"] for l in d["linhas"]} == {"15377": 72, "15378": 90, "15379": 55, "15380": 40}
-    # o livro do App tem a pontualidade: a tela mostra o número (com o coletor, "sem dado"); não tem a situação nem
-    # as durações do Fracttal: "—", em vez de um número errado
-    a = ordens._ajuste_da_fonte(d)["resumo"]
-    assert a["pontualidade_pct"] == 100 and a["em_verificacao"] is None and a["tempo_vs_previsto_pct"] is None
 
 
 def test_sem_a_chave_do_codigo_segue_o_livro_do_coletor(tmp_path):

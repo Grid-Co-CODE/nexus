@@ -33,7 +33,10 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # Performance -> Clima e risco (06/10/2026): endereços das fontes públicas (INMET, focos e risco de fogo do INPE, e
              # a irradiação diária da NASA POWER, de 07/10); vazios valem os padrões de nexus/performance/clima/fontes.py. O do
              # risco leva {d} (o dia, de 0 a 3); o da NASA leva {lat}, {lon}, {inicio} e {fim}.
-             "NEXUS_CLIMA_INMET_URL", "NEXUS_CLIMA_FOCOS_URL", "NEXUS_CLIMA_RISCO_URL", "NEXUS_CLIMA_POWER_URL")
+             "NEXUS_CLIMA_INMET_URL", "NEXUS_CLIMA_FOCOS_URL", "NEXUS_CLIMA_RISCO_URL", "NEXUS_CLIMA_POWER_URL",
+             # PCM -> Gestão PCM (07/10/2026): a senha que abre o mpas.json da Gerencial (o mesmo do painel do PCM);
+             # sem ela a Fila mostra só o lado do Fracttal. As fontes trocam o endereço padrão (repositório do PCM).
+             "NEXUS_PCM_MPAS_SENHA", "NEXUS_PCM_GESTAO_FONTE", "NEXUS_PCM_MPAS_FONTE")
 
 
 class ConfigErro(RuntimeError):

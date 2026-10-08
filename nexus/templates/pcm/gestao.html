@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block titulo %}Gestão PCM{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# Gestão PCM (Levi, 07/10 e 08/10/2026: "traga a visão de acompanhamento de manutenção do aplicativo para o Nexus
+   conforme prints"): o bloco "Manutenções — Plano & Fila" da aba Gestão PCM do painel do PCM, com os filtros de cima
+   da aba. As contas estão em nexus/pcm/gestao.py, transcritas do js/preventivas.js e provadas célula a célula contra
+   ele (nexus/pcm/prova_gestao.py); os controles vão pela URL, então todo estado da tela tem endereço. #}
+<div class="pg">
+<p class="gc-eyebrow">PCM · Gestão PCM</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Manutenções: Plano &amp; Fila</h1>
+    {% if dados %}<p class="pcm-sub">{% if o.modo == 'plano' %}Quanto do plano está feito: preventivas, corretivas e demais
+      atividades por usina, de {{ rot_mes(meses[0]) }} a {{ rot_mes(meses[2]) }}.{% else %}O que está velho e por quê:
+      o envelhecimento das MPA e MPS, da mais antiga para a mais nova.{% endif %}</p>{% endif %}
+  </div>
+  {% if dados %}<nav class="pg-seg pg-modo" aria-label="Modo">
+    <a href="{{ url(modo='plano') }}"{% if o.modo == 'plano' %} aria-current="page"{% endif %}><i class="ph ph-table" aria-hidden="true"></i>Plano</a>
+    <a href="{{ url(modo='fila') }}"{% if o.modo == 'fila' %} aria-current="page"{% endif %}><i class="ph ph-hourglass-medium" aria-hidden="true"></i>Fila</a>
+  </nav>{% endif %}
+</div>
+
+{% if not dados %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler o gestao_pcm.json.</strong>
+  Motivo: {{ fonte_erro }}. O painel do PCM segue no ar; esta tela volta quando a leitura voltar.</div></div>
+{% else %}
+{% if fonte_velha %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-clock-counter-clockwise"></i><div><strong>Mostrando a última leitura boa.</strong>
+  A tentativa de agora falhou ({{ fonte_erro }}).</div></div>
+{% else %}<p class="pcm-fonte"><i class="ph ph-plug"></i><span>Lê o gestao_pcm.json do painel do PCM (as tarefas do Fracttal{% if corte %}
+  desde {{ data_curta(corte) }}{% endif %}){% if fonte_gerada %}, atualizado em {{ fonte_gerada }}{% endif %}. Concluída é o
+  estado da TAREFA (Finalizada), nunca o status da OS.</span></p>{% endif %}
+
+{# o PAR de números do topo, nunca uma média única (regra do painel) #}
+{% set rp = par.rotina %}
+<div class="gc-numeros pcm-numeros pg-par">
+  <div><div class="r">Rotina · MPM e MPT de {{ rot_mes(par.mes) }}</div>
+    <div class="v gc-num pg-t--{{ 'nulo' if rp is none else ('ok' if rp >= 75 else ('and' if rp >= 40 else 'crit')) }}">{{ '—' if rp is none else rp ~ '%' }}</div>
+    <div class="d">do plano do mês concluído</div></div>
+  <div><div class="r">Grandes · MPA e MPS{% if not tem_ger %} pelo Fracttal{% endif %}</div>
+    <div class="v gc-num pg-t--{{ 'crit' if par.atrasadas else 'ok' }}">{{ par.atrasadas }} <small>{{ 'OS ' if not tem_ger }}atrasada{{ 's' if par.atrasadas != 1 }}</small></div>
+    {# atrasada com 0 dia existe (venceu ontem e ainda não deu meio-dia, regra do painel): não dizer "nenhuma vencida" #}
+    <div class="d">{% if par.mais_antiga %}a mais antiga há <b>{{ par.mais_antiga }} dia{{ 's' if par.mais_antiga != 1 }}</b>{% elif par.atrasadas %}vencida{{ 's' if par.atrasadas != 1 }} há menos de 1 dia{% else %}nenhuma com a data vencida{% endif %}{{ ', pela Data Programada' if not tem_ger }}</div></div>
+  {% if tem_ger %}
+  <div><div class="r">Gestão</div>
+    <div class="v gc-num pg-t--{{ 'and' if par.crit_sem_data else 'ok' }}">{{ par.crit_sem_data }} <small>crítica{{ 's' if par.crit_sem_data != 1 }} sem data futura</small></div>
+    <div class="d">{{ par.sem_os }} sem OS no Fracttal</div></div>
+  {% else %}
+  <div><div class="r">Concluídas · MPA e MPS pelo Fracttal</div>
+    <div class="v gc-num">{{ kpis.concl }} <small>de {{ kpis.total }} OS</small></div>
+    <div class="d">todas as tarefas da OS finalizadas</div></div>
+  {% endif %}
+</div>
+{% if not tem_ger %}
+{# Sem a chave da Gerencial não é falha: a Fila funciona com o Fracttal (pedido de 08/10: dizer isso sem parecer erro).
+   Falha de verdade (chave configurada que não abriu, arquivo fora do ar) vai em amarelo. #}
+{% if ger_erro == 'sem_chave' %}<p class="pcm-fonte pg-nota"><i class="ph ph-info"></i><span>Prevista, criticidade e
+  observação de cada MPA e MPS vêm da planilha da Gerencial, que o painel guarda cifrada. Enquanto este Nexus não tem a chave
+  dela, a Fila mostra o lado do Fracttal: uma linha por OS, atraso pela Data Programada.</span></p>
+{% else %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-lock-simple"></i><div><strong>Sem a planilha da Gerencial agora:</strong>
+  {{ ger_erro }}. A Fila segue com o lado do Fracttal.</div></div>{% endif %}
+{% endif %}
+
+{# os filtros de cima da aba Gestão PCM do painel; valem nos dois modos #}
+<form class="pg-filtros" method="get" role="search" aria-label="Filtros">
+  {% for k, v in request.args.items() if k not in ('cliente', 'usina', 'cluster', 'responsavel', 'q') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  {% for nome, rot, vazio in (('cliente', 'Cliente', 'Todos'), ('usina', 'Usina', 'Todas'), ('cluster', 'Equipe cluster', 'Todas'), ('responsavel', 'Responsável O&M', 'Todos')) %}
+  <label class="pg-campo"><span>{{ rot }}</span>
+    <select class="gc-campo" name="{{ nome }}" onchange="this.form.submit()">
+      <option value="">{{ vazio }}</option>{% for x in escolhas[nome] %}<option{% if x|lower == topo[nome]|lower %} selected{% endif %}>{{ x }}</option>{% endfor %}
+    </select></label>{% endfor %}
+  <label class="pg-campo pg-busca"><span>Buscar</span>
+    <input class="gc-campo" type="search" name="q" value="{{ o.busca }}" placeholder="usina, cliente{{ ' ou OS' if o.modo == 'fila' else ', cluster ou responsável' }}"></label>
+  <button class="gc-btn gc-btn--contorno pg-ir" type="submit">Filtrar</button>
+  {% if tem_topo or o.busca %}<a class="pcm-link pg-limpar" href="{{ url(cliente=None, usina=None, cluster=None, responsavel=None, q=None) }}">Limpar filtros</a>{% endif %}
+</form>
+
+{% macro seg(campo, ops, atual, desligados=(), rotulo='') -%}
+<div class="pg-seg"{% if rotulo %} role="group" aria-label="{{ rotulo }}"{% endif %}>{% for v, r in ops %}{% if v in desligados %}<span class="off" title="sem data prevista na Gerencial: acompanhe no Plano">{{ r }}</span>{% else %}<a href="{{ url(**{campo: v}) }}"{% if v == atual %} aria-current="true"{% endif %}>{{ r }}</a>{% endif %}{% endfor %}</div>
+{%- endmacro %}
+<div class="pg-ctl">
+  <span class="pg-rot">Tipo</span>{{ seg('tipo', primarios, 'prev' if em_prev else o.tipo, ('corr', 'emerg', 'relig') if o.modo == 'fila' else (), 'Tipo') }}
+  <select class="gc-campo pg-mais{% if o.tipo in mais %} on{% endif %}" aria-label="Mais tipos"{% if o.modo == 'fila' %} disabled title="sem data prevista na Gerencial: acompanhe no Plano"{% endif %}
+    onchange="if(this.value)location.href=this.value">
+    <option value="">Mais…</option>{% for v in mais %}<option value="{{ url(tipo=v) }}"{% if o.tipo == v %} selected{% endif %}>{{ rot_tipo[v] }}</option>{% endfor %}
+  </select>
+  {% if em_prev %}{{ seg('tipo', sub_siglas, o.tipo, ('MPM', 'MPT') if o.modo == 'fila' else (), 'Sigla') }}{% endif %}
+  {% if o.modo == 'plano' and o.dim != 'usi' and mx.grupos %}<button type="button" class="pg-lnk" id="pg-expandir">Expandir tudo</button>{% endif %}
+</div>
+
+{% if o.modo == 'plano' %}
+{# ── modo Plano ── #}
+<div class="pg-ctl pg-ctl--2">
+  <span class="pg-rot">Linhas</span>{{ seg('dim', dims, o.dim, rotulo='Linhas') }}
+  <span class="pg-rot">Colunas</span>{% if eh_demanda %}<div class="pg-seg"><span class="off" title="siglas só existem em preventivas: demanda é sempre por mês">Tipo</span><a aria-current="true">Mês</a></div>{% else %}{{ seg('col', (('sig', 'Tipo'), ('mes', 'Mês')), o.col, rotulo='Colunas') }}{% endif %}
+  <span class="pg-rot">Valor</span>{{ seg('val', valores, o.val, rotulo='Valor') }}
+  <span class="pg-rot">Mês</span>{{ seg('mes', mes_ops, o.mes, rotulo='Mês') }}
+</div>
+{% if eh_demanda %}
+<p class="pg-guia"><span><b>{{ rot_tipo[o.tipo] }}</b> é demanda: o mês é o da criação da tarefa</span>
+  <span>% das ocorrências do mês já resolvidas: volume alto indica pressão na usina, não plano descumprido</span>
+  <span><b>Pendentes</b> o que falta, em número</span><span><b>Célula</b> {{ val_rot[o.val] }}</span></p>
+{% else %}
+<p class="pg-guia"><span><b>MPM</b> mensal</span><span><b>MPT</b> trimestral</span><span><b>MPS</b> semestral</span><span><b>MPA</b> anual</span>
+  {% if o.tipo == 'todos' and o.col == 'sig' %}<span><b>Corretivas</b> resolvidas/criadas (demanda; fora do Geral)</span>{% endif %}
+  <span><b>Geral</b> as quatro preventivas somadas</span><span><b>Pendentes</b> o que falta, em número</span>
+  <span><b>Célula</b> {{ val_rot[o.val] }}; MPA e MPS em fração: clique para abrir a Fila da usina</span></p>
+{% endif %}
+
+{% macro th(id, rot, cls='') -%}
+{%- set ativo = o.ordem == id -%}
+{%- if id == 'nome' %}{% set prox = '1' if ativo and not o.desc else '0' %}{% else %}{% set prox = '0' if ativo and o.desc else '1' %}{% endif -%}
+<th class="{{ cls }}{{ ' ativo' if ativo }}"{% if ativo %} aria-sort="{{ 'descending' if o.desc else 'ascending' }}"{% endif %}><a href="{{ url(ordem=id, desc=prox) }}">{{ rot }}<i class="ph {{ ('ph-caret-down' if o.desc else 'ph-caret-up') if ativo else 'ph-arrows-down-up' }} pg-ord" aria-hidden="true"></i></a></th>
+{%- endmacro %}
+{% macro td(c, usina=none, sig='') -%}
+<td>{% if c.drill %}<a class="pg-cel pg-fx--{{ c.cls }} pg-frac" href="{{ url(modo='fila', drill=usina, dt=sig, pend=None) }}" title="{{ c.os }}">{{ c.txt }}</a>{% else %}<span class="pg-cel pg-fx--{{ c.cls }}"{% if c.os %} title="{{ c.os }}"{% endif %}>{{ c.txt }}</span>{% endif %}</td>
+{%- endmacro %}
+{% macro fim(geral, tudo) -%}
+<td><span class="pg-cel pg-fx--{{ faixa(geral) }}">{{ '—' if geral is none else geral ~ '%' }}</span></td><td class="pg-pend">{{ tudo.t - tudo.f }}</td>
+{%- endmacro %}
+{% set ncol = mx.cols|length + 3 + (1 if tem_ger else 0) %}
+<div class="pg-rolo"><table class="pg-tbl">
+  <thead><tr>{{ th('nome', {'cli': 'Cliente ▸ Usina', 'clu': 'Equipe cluster ▸ Usina', 'res': 'Responsável ▸ Usina', 'usi': 'Usina'}[o.dim], 'pg-rotlin') }}
+    {% for c in mx.cols %}{{ th(c, rot_col(c)) }}{% endfor %}{{ th('geral', 'Geral') }}{{ th('pend', 'Pendentes') }}
+    {% if tem_ger %}<th class="pg-obs">Criticidade · observação</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for g in mx.grupos %}
+    {% set gi = loop.index %}
+    {% if o.dim != 'usi' %}
+    <tr class="pg-grupo" data-g="{{ gi }}" tabindex="0" aria-expanded="false"><td class="pg-rotlin" title="{{ g.nome }}"><i class="ph ph-caret-right pg-chev" aria-hidden="true"></i><b>{{ g.nome }}</b><span class="pg-mini">{{ g.filhos|length }} usina{{ 's' if g.filhos|length != 1 }}</span></td>
+      {% for c in g.tds %}{{ td(c) }}{% endfor %}{{ fim(g.geral, g.tudo) }}{% if tem_ger %}<td class="pg-obs"></td>{% endif %}</tr>
+    {% endif %}
+    {% for f in g.filhos %}
+    <tr class="pg-usina{{ ' pg-filho' if o.dim != 'usi' }}" data-g="{{ gi }}"{% if o.dim != 'usi' %} hidden{% endif %}><td class="pg-rotlin" title="{{ f.nome }}">{{ f.nome }}</td>
+      {% for c in f.tds %}{{ td(c, f.nome, mx.cols[loop.index0]) }}{% endfor %}{{ fim(f.geral, f.tudo) }}
+      {% if tem_ger %}<td class="pg-obs"{% if f.co and f.co.obs %} title="{{ f.co.obs }}"{% endif %}>{% if f.co %}{% if f.co.crit %}<span class="pg-critb pg-critb--{{ f.co.critCls }}">{{ f.co.crit }}</span>{% endif %}{{ (f.co.obs[:90] ~ ('…' if f.co.obs|length > 90 else '')) if f.co.obs else '—' }}{% else %}—{% endif %}</td>{% endif %}</tr>
+    {% endfor %}
+  {% else %}
+    <tr><td colspan="{{ ncol }}" class="pg-vazio">Nada com esse filtro.</td></tr>
+  {% endfor %}
+  <tr class="pg-total"><td class="pg-rotlin"><b>TOTAL GERAL</b><span class="pg-mini">{{ mx.usinas }} usinas</span></td>
+    {% for c in mx.total.tds %}{{ td(c) }}{% endfor %}{{ fim(mx.total.geral, mx.total.tudo) }}{% if tem_ger %}<td class="pg-obs"></td>{% endif %}</tr>
+  </tbody></table></div>
+<p class="pg-leg"><span><i class="pg-amostra pg-fx--crit"></i>abaixo de 40%</span><span><i class="pg-amostra pg-fx--and"></i>40% a 99%</span>
+  <span><i class="pg-amostra pg-fx--ok"></i>100%</span><span><i class="pg-amostra pg-fx--nulo"></i>sem preventiva no período</span>
+  {% if tem_ger %}<span><b>Criticidade · observação</b>: da Gerencial (aba MPAS), a última entrada datada do log</span>{% endif %}
+  <span class="pg-fim">clique no grupo para abrir as usinas · na fração de MPA e MPS para abrir a Fila · passe o mouse na célula para ver as OS</span></p>
+<script>
+  // abrir e fechar os grupos sem recarregar (como o painel, a matriz abre com os grupos fechados)
+  (function () {
+    var grupos = document.querySelectorAll('.pg-grupo'), bt = document.getElementById('pg-expandir');
+    function abre(g, sim) {
+      g.setAttribute('aria-expanded', String(sim));
+      document.querySelectorAll('.pg-filho[data-g="' + g.dataset.g + '"]').forEach(function (f) { f.hidden = !sim; });
+    }
+    function rotulo() { if (bt) bt.textContent = document.querySelector('.pg-grupo[aria-expanded="false"]') ? 'Expandir tudo' : 'Recolher tudo'; }
+    grupos.forEach(function (g) {
+      g.addEventListener('click', function (ev) { if (ev.target.closest('a')) return; abre(g, g.getAttribute('aria-expanded') !== 'true'); rotulo(); });
+      g.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); g.click(); } });
+    });
+    if (bt) bt.addEventListener('click', function () {
+      var algum = !!document.querySelector('.pg-grupo[aria-expanded="false"]');
+      grupos.forEach(function (g) { abre(g, algum); }); rotulo();
+    });
+  })();
+</script>
+
+{% else %}
+{# ── modo Fila ── #}
+{% macro kpi(id, v, rot, cls, total=none) -%}
+<a class="pg-kpi pg-kpi--{{ cls }}" href="{{ url(pend='todas' if o.pend == id else id) }}"{% if o.pend == id %} aria-current="true"{% endif %}>
+  <b class="gc-num">{{ v }}{% if total is not none %}<small>/{{ total }}</small>{% endif %}</b><span>{{ rot }}</span></a>
+{%- endmacro %}
+{# os KPIs SÃO os filtros (painel). Sem a Gerencial, "sem OS" e "crítica sem data" não existem: ficam só os dois do Fracttal #}
+<div class="pg-kpis">
+  {{ kpi('atraso', kpis.atraso, 'atrasadas', 'crit') }}
+  {% if tem_ger %}{{ kpi('semos', kpis.semos, 'sem OS no Fracttal', 'and') }}{{ kpi('critsem', kpis.critsem, 'críticas sem data futura', 'and') }}{% endif %}
+  {{ kpi('concl', kpis.concl, 'concluídas', 'ok', kpis.total) }}
+</div>
+<div class="pg-ctl pg-ctl--2">
+  {% if tem_ger %}<span class="pg-rot">Pendência</span>{{ seg('pend', pendencias, o.pend, rotulo='Pendência') }}{% endif %}
+  <span class="pg-n">{{ fila|length }} {% if tem_ger %}manutenç{{ 'ão' if fila|length == 1 else 'ões' }}{% else %}OS{% endif %}{% if o.pend != 'todas' %}
+    · <a class="pcm-link" href="{{ url(pend=None) }}">ver todas</a>{% endif %}</span>
+</div>
+{% if o.drill_usina %}<p class="pg-drill"><i class="ph ph-funnel" aria-hidden="true"></i><span>Filtrado: <b>{{ o.drill_usina }}{{ ' · ' ~ o.drill_tipo if o.drill_tipo }}</b></span>
+  <a class="pcm-link" href="{{ url(drill=None, dt=None) }}">tirar o filtro</a><a class="pcm-link" href="{{ url(modo='plano', drill=None, dt=None, pend=None) }}">voltar ao Plano</a></p>{% endif %}
+{% macro thf(id, rot, sub='') -%}
+{%- set ativo = o.ordem_f == id -%}
+<th class="{{ 'ativo' if ativo }}"{% if ativo %} aria-sort="{{ 'descending' if o.desc_f else 'ascending' }}"{% endif %}><a href="{{ url(ordemf=id, descf=('0' if o.desc_f else '1') if ativo else '0') }}">{{ rot }}{% if sub %} <small>{{ sub }}</small>{% endif %}<i class="ph {{ ('ph-caret-down' if o.desc_f else 'ph-caret-up') if ativo else 'ph-arrows-down-up' }} pg-ord" aria-hidden="true"></i></a></th>
+{%- endmacro %}
+{% set ncol = 9 if tem_ger else 7 %}
+<div class="pg-rolo"><table class="pg-tbl pg-fila">
+  <thead><tr>{{ thf('nome', 'Cliente – Usina') }}{{ thf('tipo', 'Tipo') }}{% if tem_ger %}{{ thf('crit', 'Criticidade') }}{{ thf('prev', 'Prevista', '(Gerencial)') }}{% endif %}
+    {{ thf('prog', 'Programada', '(Fracttal)') }}{{ thf('atraso', 'Atraso') }}<th>OS</th><th>Situação</th>
+    {% if tem_ger %}<th class="pg-obs">Última observação</th>{% else %}<th>Tarefas</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for x in fila %}
+    <tr class="pg-lin{{ ' pg-concl' if x.conclu }}"{% if tem_ger %} tabindex="0" data-det="{{ loop.index }}" aria-expanded="false"{% endif %}>
+      <td class="pg-rotlin" title="{{ x.nome }}">{{ x.nome }}</td><td><span class="pg-tipo">{{ x.tipo }}</span></td>
+      {% if tem_ger %}<td>{% if x.crit %}<span class="pg-critb pg-critb--{{ x.critCls }}">{{ x.crit }}</span>{% else %}<span class="pg-nulo">—</span>{% endif %}</td>
+        <td class="pg-dt">{{ data_curta(x.prev) if x.prev else '—' }}</td>{% endif %}
+      <td class="pg-dt">{% if x.prog %}{{ data_curta(x.prog) }}{% if x.diverge %}<span class="pg-div" title="a Programada difere da Prevista em mais de 30 dias" aria-label="difere da Prevista"></span>{% endif %}{% else %}<span class="pg-nulo"{% if x.semData %} title="OS criada, sem data programada no Fracttal"{% endif %}>—</span>{% endif %}</td>
+      <td>{% if x.atraso is not none %}<span class="pg-atr pg-atr--{{ faixa_atraso(x.atraso) or 'f0' }}">{{ x.atraso }} d</span>{% elif x.conclu %}<i class="ph ph-check pg-ok" aria-label="concluída"></i>{% else %}<span class="pg-nulo">—</span>{% endif %}</td>
+      <td class="pg-dt">{% if x.semOS %}<span class="pg-semos" title="atividade ainda sem OS criada no Fracttal">sem OS</span>{% elif x.osSemPar %}<span class="pg-semos" title="OS {{ x.os }} da planilha não localizada no Fracttal">{{ x.os }} ?</span>{% else %}{{ x.os }}{% endif %}</td>
+      <td><span class="pg-sit pg-sit--{{ x.sit.cls }}">{{ x.sit.k }}</span></td>
+      {% if tem_ger %}<td class="pg-obs"{% if x.obs %} title="{{ x.obs }}"{% endif %}>{% if x.obsIso %}<b class="{{ 'pg-obs-velha' if x.obsVelha }}">{{ data_curta(x.obsIso) }}</b> {% endif %}{{ x.obsTxt[:110] if x.obsTxt else '—' }}</td>
+      {% else %}<td class="pg-dt">{{ '%s/%s'|format(x.bdFin, x.bdTot) if x.bdTot is not none else '—' }}</td>{% endif %}</tr>
+    {% if tem_ger %}<tr class="pg-det" data-det="{{ loop.index }}" hidden><td colspan="{{ ncol }}">
+      {% if x.obs %}<p><b>Observação (última entrada):</b> {{ x.obs }}</p>{% endif %}
+      <p>{% if x.equipe %}<b>Equipe:</b> {{ x.equipe }} · {% endif %}{% if x.apoio %}<b>Apoio:</b> {{ x.apoio }} · {% endif %}{% if x.statusPlan %}<b>Status na planilha:</b> {{ x.statusPlan }} · {% endif %}{% if x.bdTot is not none %}<b>Tarefas no Fracttal:</b> {{ x.bdFin }}/{{ x.bdTot }} finalizadas{% endif %}</p></td></tr>{% endif %}
+  {% else %}
+    <tr><td colspan="{{ ncol }}" class="pg-vazio">Nada com esses filtros.</td></tr>
+  {% endfor %}
+  </tbody></table></div>
+<p class="pg-leg"><span><i class="pg-amostra pg-atr--f1"></i>atraso de 1 a 30 dias</span><span><i class="pg-amostra pg-atr--f2"></i>31 a 90</span>
+  <span><i class="pg-amostra pg-atr--f3"></i>mais de 90</span>
+  {% if tem_ger %}<span><span class="pg-semos">tracejado</span> pendência de gestão (sem OS, ou OS sem par no Fracttal)</span>{% endif %}
+  <span class="pg-fim">atraso = hoje menos a Data {{ 'Prevista' if tem_ger else 'Programada' }}{{ ' · clique na linha para o detalhe' if tem_ger }} · situação pela TAREFA, nunca pelo status da OS</span></p>
+{% if tem_ger %}<script>
+  (function () {
+    document.querySelectorAll('tr.pg-lin[data-det]').forEach(function (tr) {
+      function alterna() {
+        var d = document.querySelector('tr.pg-det[data-det="' + tr.dataset.det + '"]');
+        if (!d) return;
+        d.hidden = !d.hidden; tr.setAttribute('aria-expanded', String(!d.hidden));
+      }
+      tr.addEventListener('click', alterna);
+      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(); } });
+    });
+  })();
+</script>{% endif %}
+{% endif %}
+{% endif %}
+</div>
+{% endblock %}

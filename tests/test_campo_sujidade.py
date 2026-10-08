@@ -54,11 +54,11 @@ def test_aba_de_sujidade_e_vegetacao(banco, logado, monkeypatch):  # noqa: F811
     monkeypatch.setattr(aprovacao, "_pedir_releitura", lambda: None)
     html = logado.get("/t/campo/rondas?aba=sujidade").get_data(as_text=True)
     assert "Sujidade e vegetação" in html and "Altura da vegetação" in html
-    assert 'class="cn-nivel cn-nivel--4">4<' in html and "IPOA" in html and "Parcial" in html
-    html = logado.get("/t/campo/rondas?aba=sujidade&sv=vegetacao").get_data(as_text=True)
-    assert "Nenhuma usina com leitura" in html                       # vegetação 2: não é alta
-    html = logado.get("/t/campo/rondas?aba=sujidade&sv=sujidade").get_data(as_text=True)
-    assert "Altair" in html
+    # 08/10: o número só com a cor da fonte, e o Status diz o porquê (sujidade 4, vala parcial, IPOA sujo)
+    assert 'class="cn-nivel-txt cn-nivel-txt--4">4<' in html and "IPOA" in html and "Parcial" in html
+    assert "Sujidade alta" in html and "Vala parcial" in html and "Sensor sujo (IPOA)" in html
+    # os botões de filtro saíram (Levi: "se a pessoa quiser ordenar ela clica na coluna"): sv= não filtra mais
+    assert "sv=" not in html and "Altair" in logado.get("/t/campo/rondas?aba=sujidade&sv=vegetacao").get_data(as_text=True)
 
 
 def _pagina(inicio, n=100, fim="2026-10-05"):

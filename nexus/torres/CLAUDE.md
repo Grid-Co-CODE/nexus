@@ -8,9 +8,9 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 | `cos/` | em construção pelo dev do COS | `cos/CLAUDE.md` |
 | `oscreator/` | clone do OS Creator Web servido em `/os/*` | `oscreator/README.md` |
 | `performance/` | Tempo real = plataforma pela ponte, só leitura; Clima e risco = alertas públicos por usina (INMET e INPE), só leitura; as outras telas placeholder | `nexus/performance/CLAUDE.md` |
-| `pcm/` | telas da programação semanal | `nexus/pcm/CLAUDE.md` (o código mora em `nexus/pcm/`) |
+| `pcm/` | telas da programação semanal e a Gestão PCM (Plano & Fila das manutenções, do painel do PCM) | `nexus/pcm/CLAUDE.md` (o código mora em `nexus/pcm/`) |
 | `base/`, `pessoas/` | telas do cadastro (BD_Operações); Base → Governança de dados é da camada de dados | `nexus/cadastro/CLAUDE.md`, `nexus/dados/CLAUDE.md` |
-| `campo/` | Visão do Nexus sobre o campo, sem Azure nem moldura: Atenção, PT, Rondas, Zeladoria e Ranking são contas nossas (`nexus/campo/visao.py`); Aprovação, Ordens e Triagem usam as regras copiadas do App; tudo pelos livros que o App grava no banco | `campo/CLAUDE.md` |
+| `campo/` | Visão do Nexus sobre o campo, sem Azure nem moldura: Atenção, PT, Rondas e Zeladoria são contas nossas (`nexus/campo/visao.py`); Aprovação e Triagem usam as regras copiadas do App; tudo pelos livros que o App grava no banco (Ordens, Imagens e Ranking saíram em 08/10/2026) | `campo/CLAUDE.md` |
 | as demais | só placeholder | — |
 
 ## Como funciona

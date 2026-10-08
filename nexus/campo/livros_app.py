@@ -14,8 +14,8 @@ Ainda NÃO vêm no livro (o App guarda, de madrugada, no `_enriquecer_qlog`, e n
 as durações do Fracttal (prevista e real), a data de aprovação e a avaliação do supervisor. Ficam DESCONHECIDAS (0), não
 aproximadas: medido em 05/10, com a duração do celular no lugar da do Fracttal o "tempo vs. previsto" dava 5.726%, e com
 a situação tirada da revisão do painel, 402 de 447 OS apareciam "em verificação" (as aprovadas direto no Fracttal não
-passam pela revisão do painel). Na tela: "—" nesses cartões (`ordens._ajuste_da_fonte`); a Triagem não acusa demora nem
-divergência de supervisor até o App mandar. Aprovada pelo painel conta como aprovada.
+passam pela revisão do painel). A tela que mostrava esses cartões (Ordens de serviço) saiu em 08/10/2026; a
+Triagem não acusa demora nem divergência de supervisor até o App mandar. Aprovada pelo painel conta como aprovada.
 """
 import hashlib
 from datetime import datetime, timezone

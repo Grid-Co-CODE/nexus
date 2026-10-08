@@ -4,10 +4,11 @@ Etapa 1: Semana e Tarefas e OS mostram a programação que está valendo (a mesm
 Etapa 2: Gerar a semana roda o motor do PCM no Nexus, em sombra, e compara com a semana do Fabrício.
 """
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 from flask import abort, current_app, jsonify, redirect, render_template, request
 
-from . import fonte, geracao, insumos as I, observacoes as O, semana as S
+from . import fonte, geracao, gestao as G, insumos as I, observacoes as O, semana as S
 
 POR_PAGINA = 150
 _BRT = timezone(timedelta(hours=-3))
@@ -219,3 +220,91 @@ def registrar_pcm(bp) -> None:
         return render_template("pcm/tarefas.html", sem=sem, semanas=S.semanas(leitura.dados), linhas=linhas,
                                total=len(todas), total_semana=len(rows), pagina=pagina, paginas=paginas,
                                filtros=filtros, q=a.get("q") or "", opcoes=opcoes, **ctx)
+
+    @bp.route("/gestao")
+    def gestao():
+        return render_template("pcm/gestao.html", **_ctx_gestao(current_app.config, request.args))
+
+
+# ── Gestão PCM: o bloco "Manutenções — Plano & Fila" do painel (nexus/pcm/gestao.py) ──────────────────────────
+# As 28 mil tarefas do gestao_pcm.json não precisam ser revarridas a cada clique: o escopo e a base atômica ficam
+# guardados pela versão do arquivo (dataHash) e pelos filtros de cima; a Gerencial decifrada, pela versão do mpas.json.
+_G_CACHE: dict = {}
+
+
+def _guardado(chave, fazer):
+    # sem ler duas vezes do dicionário: outra requisição pode limpá-lo no meio (o servidor atende em paralelo)
+    v = _G_CACHE.get(chave)
+    if v is None:
+        v = fazer()
+        if len(_G_CACHE) > 40:
+            _G_CACHE.clear()
+        _G_CACHE[chave] = v
+    return v
+
+
+def _gerencial(cfg) -> tuple[dict | None, str]:
+    """A planilha da Gerencial aberta com a senha do .env (só em memória: nunca vai para o banco nem para a página)."""
+    senha = cfg.get("NEXUS_PCM_MPAS_SENHA")
+    if not senha:
+        return None, "sem_chave"
+    lm = fonte.ler_mpas(cfg)
+    if lm.dados is None:
+        return None, f"não consegui ler o mpas.json ({lm.erro})"
+    try:
+        return _guardado(("mpas", lm.dados.get("geradoEm"), lm.dados["ct"][:64]), lambda: G.decifrar(lm.dados, senha)), ""
+    except Exception:      # noqa: BLE001 — senha errada ou pacote novo: a tela diz, e a Fila segue com o Fracttal
+        return None, "a senha da Gerencial do .env não abriu o mpas.json"
+
+
+def _ctx_gestao(cfg, args) -> dict:
+    leitura = fonte.ler_gestao(cfg)
+    d = leitura.dados or {}
+    ctx = {"fonte_erro": leitura.erro, "fonte_velha": leitura.velha, "fonte_gerada": _quando(d.get("geradoEm")),
+           "dados": leitura.dados is not None}
+    if leitura.dados is None:
+        return ctx
+    h = G.hoje()
+    meses = G.meses(h)
+    o = G.opcoes(args, meses)
+    versao = d.get("dataHash") or d.get("geradoEm")
+    # arquivo novo do robô: o que foi guardado da versão anterior sai inteiro. Cada versão prende ~49 MB de tarefas
+    # (medido em 08/10/2026); sem isto, até 8 versões velhas ficariam na memória antes de o teto de 40 limpar
+    if _G_CACHE.get("versao") != versao:
+        _G_CACHE.clear()
+        _G_CACHE["versao"] = versao
+    escopo = _guardado(("escopo", versao), lambda: G.escopo(d.get("tarefas")))
+    escolhas = _guardado(("escolhas", versao), lambda: G.escolhas_topo(escopo))
+    topo = {k: str(args.get(k) or "")[:160] for k in G.TOPO}
+    tarefas = _guardado(("topo", versao, *topo.values()), lambda: G.filtrar_topo(escopo, **topo))
+    base = _guardado(("base", versao, *topo.values(), *meses), lambda: G.base(tarefas, meses))
+    mp, ger_erro = _gerencial(cfg)
+    # a Fila inteira (antes dos filtros do bloco): é dela que saem o par de números do topo e os KPIs. Sem a
+    # Gerencial, é o lado do Fracttal, e o par mostra as atrasadas pela Data Programada (o painel só mostra o cadeado)
+    # o atraso conta do meio-dia (regra do painel): a cópia guardada vale por meio dia, não pelo dia inteiro
+    ver_ger, meio_dia = (mp or {}).get("geradoEm"), G.agora().hour >= 12
+    fila = _guardado(("fila", versao, ver_ger, mp is not None, h, meio_dia, *topo.values()),
+                     lambda: G.fila_universo(tarefas, mp, topo, h))
+
+    def url(**mud):
+        q = {k: v for k, v in args.items() if v not in ("", None)}
+        for k, v in mud.items():
+            if v is None:
+                q.pop(k, None)
+            else:
+                q[k] = v
+        return "?" + urlencode(q) if q else "?"
+
+    ctx.update(o=o, meses=meses, rot_mes=G.rot_mes, par=G.par_topo(base, meses, fila), tem_ger=mp is not None,
+               ger_erro=ger_erro, topo=topo, url=url, primarios=G.PRIMARIOS, mais=G.MAIS, rot_tipo=G.ROT_TIPO,
+               sub_siglas=[("prev", "Todas")] + [(s, s) for s in G.SIGLAS], dims=G.DIMS, valores=G.VALORES,
+               val_rot=G.VAL_ROT, pendencias=G.PENDENCIAS, mes_ops=[("todos", "Todos")] + [(m, G.rot_mes(m)) for m in meses],
+               em_prev=o.tipo == "prev" or o.tipo in G.SIGLAS, eh_demanda=G.eh_demanda(o.tipo), data_curta=G.data_curta,
+               faixa_atraso=G.faixa_atraso, kpis=G.kpis_fila(fila), escolhas=escolhas,
+               tem_topo=any(topo.values()), corte=d.get("corteData"))
+    if o.modo == "plano":
+        ctx.update(mx=G.plano(base, o, meses, G.crit_obs(mp) if mp is not None else None), rot_col=G.rot_col,
+                   faixa=G.faixa)
+    else:
+        ctx.update(fila=G.fila_filtrada(fila, o))
+    return ctx

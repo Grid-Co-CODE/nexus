@@ -43,7 +43,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |
 | OS Creator embutido | `nexus/torres/oscreator/README.md` |
 | Performance (Tempo real pela ponte; Clima e risco, alertas públicos por usina) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
-| PCM (programação semanal) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
+| PCM (programação semanal; Gestão PCM, o Plano & Fila das manutenções) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
 | Engenharia (Confiabilidade dos ativos, pelas OS de falha do Fracttal) | `nexus/torres/engenharia/CLAUDE.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |

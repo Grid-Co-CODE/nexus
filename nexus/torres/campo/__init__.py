@@ -2,12 +2,14 @@
 
 Levi, 05/10/2026: "quero parar de referenciar o Azure e ter uma visão nossa!". Nenhuma tela abre mais o painel do App
 (que mora no Azure) nem aponta para ele: todas leem o banco do Nexus (API db_performace) — os livros que o próprio App
-grava de hora em hora e o cadastro do Nexus. Aprovação, Ordens e Triagem usam a cópia das regras do painel do App
-(`nexus/campo/regras_app.py`); Central de atenção, PT, Rondas, Zeladoria e Ranking são contas NOSSAS
-(`nexus/campo/visao.py`). Imagens da ronda e Rotas do dia ficam no placeholder: o dado delas ainda não chega ao banco.
+grava de hora em hora e o cadastro do Nexus. Aprovação e Triagem usam a cópia das regras do painel do App
+(`nexus/campo/regras_app.py`); Central de atenção, PT, Rondas e Zeladoria são contas NOSSAS (`nexus/campo/visao.py`).
+Rotas do dia fica no placeholder: o dado dela ainda não chega ao banco. Ordens de serviço, Imagens da ronda e Ranking
+saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da ronda e ranking são redundantes"); o endereço antigo leva
+à Central.
 """
-from datetime import datetime, timedelta
-from urllib.parse import urlencode, urlsplit
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 from flask import Response, redirect, render_template, request, session
 from markupsafe import Markup, escape
@@ -15,11 +17,11 @@ from werkzeug.datastructures import ImmutableMultiDict
 
 from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
-from ...campo import ordens as campo_ordens
 from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
+from .aprovar_os import bp_aprovar_os, pode_na_tela
 from .assinatura import bp_assinatura
 
 FONTE_APP = "Livros que o App de Campo grava no banco do Nexus + cadastro do Nexus"
@@ -34,20 +36,20 @@ TORRE = Torre(
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",
-             "Que OS em revisão posso aprovar em lote e qual pede meu olho?",
+             "Que OS esperam a aprovação de cada supervisor, qual dá para aprovar já e qual pede meu olho?",
              "Fila de verificação do Fracttal + notas do App no banco do Nexus"),
         # Levi, 04/10/2026: "crie para PT, ZELADORIA". A PT fica junto da aprovação de OS porque as duas são fila de
         # decisão do supervisor. A "APR e PT" da torre HSEQ é outra pergunta (OS de risco sem APR ou PT assinada).
         Tela("pt", "Permissões de trabalho",
              "Que PT está esperando o De acordo do supervisor, e há quanto tempo?", FONTE_APP),
-        Tela("os", "Ordens de serviço", "As OS estão sendo fechadas com evidência?", FONTE_APP),
+        # Ordens de serviço, Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da
+        # ronda e ranking são redundantes"): a qualidade do fechamento está na Aprovação e na Triagem, a comparação
+        # por região e equipe no Painel das Rondas e as fotos no histórico da usina. O endereço antigo leva à Central
+        # (TELAS_QUE_SAIRAM).
         Tela("rondas", "Rondas", "Que usina está sem ronda de campo há mais tempo?", FONTE_APP),
         Tela("zeladoria", "Zeladoria",
              "Que serviço de terceiro está parado, sem diária hoje ou com EPI pendente?", FONTE_APP),
-        Tela("ranking", "Ranking", "Qual região tem qualidade e cobertura melhores?", FONTE_APP),
         Tela("triagem", "Triagem de qualidade", "O que exige ação hoje na qualidade do fechamento?", FONTE_APP),
-        Tela("imagens", "Imagens da ronda", "Que foto de ronda mostra um problema?",
-             "Fotos da ronda: ainda só no App; entram quando ele mandar ao banco do Nexus"),
         Tela("rotas", "Rotas do dia", "Qual a melhor ordem de visitas para cada equipe?",
              "Programação do PCM + localização das usinas"),
     ],
@@ -56,9 +58,24 @@ TORRE = Torre(
 bp = TORRE.criar_blueprint(__name__)
 # as rotas de quem assina a PT moram em /os/_nexus (o cookie do login do Fracttal do OS Creator só vale em /os)
 bp.record_once(lambda estado: estado.app.register_blueprint(bp_assinatura))
+# e o portão de quem aprova a OS também (Levi, 08/10/2026: "só o supervisor ou ADM consegue aprovar a OS logando pelo
+# Fracttal"), pelo mesmo motivo: é ali que o servidor sabe quem entrou no Fracttal
+bp.record_once(lambda estado: estado.app.register_blueprint(bp_aprovar_os))
+
+# Ordens de serviço, Ranking e Imagens da ronda saíram do menu em 08/10/2026: quem guardou o endereço cai na Central
+TELAS_QUE_SAIRAM = ("os", "ranking", "imagens")
+
+
+def _tela_que_saiu():
+    return redirect("/t/campo/atencao")
+
+
+for _id in TELAS_QUE_SAIRAM:
+    bp.add_url_rule(f"/{_id}", f"saiu_{_id}", _tela_que_saiu)
 
 
 TODOS = "*"
+_BRT = timezone(timedelta(hours=-3))
 
 
 def _supervisor() -> str:
@@ -130,12 +147,33 @@ def _idade_min(m) -> str:
 
 ORDEM_DOS_CARTOES = {"pendentes": lambda c: (-c["pendentes"], c["pct_feitas"] or 0, c["equipe"]),
                      "pt": lambda c: (-c["parada"], -c["pts"], c["equipe"])}
+# Por supervisor (Levi, 08/10/2026: "além de por equipe e tabela, adicione mais um botão (por supervisor)"): a mesma
+# ordem dos cartões de equipe; o "sem supervisor no cadastro" fica sempre por último, num cartão próprio
+ORDEM_DOS_SUPERVISORES = {
+    "pendentes": lambda s: (s["supervisor"] == visao.SEM_SUPERVISOR, -s["pendentes"], s["pct_feitas"] or 0, s["supervisor"]),
+    "pt": lambda s: (s["supervisor"] == visao.SEM_SUPERVISOR, -s["parada"], -s["pts"], s["supervisor"])}
+
+
+def _modo(equipe, historico=False) -> str:
+    """As três visões da Central e da tela de PT: cartões por equipe (o padrão), por supervisor, ou a tabela (a equipe
+    escolhida no cartão abre a tabela dela)."""
+    pedido = request.args.get("modo")
+    if pedido == "tabela" or equipe or historico:
+        return "tabela"
+    return "supervisores" if pedido == "supervisores" else "equipes"
+
+
+def _do_supervisor(x, supervisor) -> bool:
+    """A linha é do supervisor escolhido. Linha sem supervisor (PT sem usina ligada ao cadastro, equipe sem técnico)
+    conta como "Sem supervisor": é o que o cartão próprio mostra, e o clique nele tem de achar as mesmas linhas."""
+    return not supervisor or (x.get("supervisor") or visao.SEM_SUPERVISOR) == supervisor
 
 
 @bp.route("/atencao")
 def atencao():
-    """Duas visões em cada aba (Levi, 05/10: "tem que ter a visão por equipe (CARDS grandes agrupados) e a visão da
-    tabela!"): cartões por equipe ou a tabela. Filtro pela região do Brasil; o cartão leva à tabela da equipe."""
+    """Três visões em cada aba (Levi, 05/10: "tem que ter a visão por equipe (CARDS grandes agrupados) e a visão da
+    tabela!"; 08/10: "adicione mais um botão (por supervisor)"): cartões por equipe, por supervisor, ou a tabela. Filtro
+    pela região do Brasil; o cartão da equipe leva à tabela da equipe, o do supervisor à tabela do supervisor."""
     dias = _dias((7, 14, 30), 14)
     leitura = visao.atencao(dias)
     d = leitura.dados
@@ -143,14 +181,14 @@ def atencao():
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
     f, regiao, equipe = request.args.get("f", ""), request.args.get("regiao", ""), request.args.get("equipe", "")
     supervisor = _supervisor()
-    modo = "tabela" if request.args.get("modo") == "tabela" or equipe else "equipes"
+    modo = _modo(equipe)
     q = request.args.get("q", "").strip().lower()
     campos = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
 
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
                 and (not equipe or x.get("equipe") == equipe)
-                and (not supervisor or x.get("supervisor") == supervisor)
+                and _do_supervisor(x, supervisor)
                 and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
     fontes = {"pendentes": filtra(d.get("pendentes") or []),
               "pt": filtra(d.get("pts") or [])}
@@ -164,14 +202,21 @@ def atencao():
     if vista == "pt":
         cartoes = [c for c in cartoes if c["pts"]]
     cartoes.sort(key=ORDEM_DOS_CARTOES[vista])
+    # os cartões por supervisor somam os de equipe (já filtrados): o número do supervisor é o da soma das equipes dele
+    cartoes_sup = sorted(visao.por_supervisor(cartoes), key=ORDEM_DOS_SUPERVISORES[vista])
     return render_template("campo/atencao.html", **_comum(
         "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
         status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
         lista=lista, f=f, regiao=regiao, equipe=equipe, modo=modo, cartoes=cartoes, regioes=visao.REGIOES,
-        situacoes=SITUACAO_PT,
-        supervisor=supervisor, supervisores=sorted({x.get("supervisor") for x in (d.get("usinas") or []) + (d.get("pts") or [])
-                                                    if x.get("supervisor")}),
+        cartoes_sup=cartoes_sup, sem_supervisor=visao.SEM_SUPERVISOR, situacoes=SITUACAO_PT,
+        supervisor=supervisor, supervisores=_opcoes_supervisor((d.get("usinas") or []) + (d.get("pts") or []), supervisor),
         q=request.args.get("q", ""), idade_min=_idade_min))
+
+
+def _opcoes_supervisor(linhas, escolhido) -> list[str]:
+    """Os supervisores do filtro. O escolhido entra sempre: o cartão "Sem supervisor no cadastro" leva a um supervisor
+    que pode não estar escrito em nenhuma linha (a PT sem usina ligada ao cadastro vem sem supervisor)."""
+    return sorted({x.get("supervisor") for x in linhas if x.get("supervisor")} | ({escolhido} if escolhido else set()))
 
 
 # ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────
@@ -181,20 +226,20 @@ SITUACAO_PT = {"aguardando": ("Aguardando", "alerta"), "de_acordo": ("De acordo"
 
 @bp.route("/pt")
 def pt():
-    """Duas abas (Levi, 05/10): as PT esperando o De acordo (por equipe ou em tabela, a linha abre o detalhe) e o
-    histórico das decididas. Filtro de supervisor; a equipe vem do cartão."""
+    """Duas abas (Levi, 05/10): as PT esperando o De acordo (por equipe, por supervisor ou em tabela, a linha abre o
+    detalhe) e o histórico das decididas. Filtro de supervisor; a equipe vem do cartão."""
     leitura = visao.pts()
     d = leitura.dados
     aba = "historico" if request.args.get("aba") == "historico" else "esperando"
     supervisor, equipe = _supervisor(), request.args.get("equipe", "")
     sit, q = request.args.get("sit", ""), request.args.get("q", "").strip().lower()
-    modo = "tabela" if request.args.get("modo") == "tabela" or equipe or aba == "historico" else "equipes"
+    modo = _modo(equipe, historico=aba == "historico")
     dias = _dias((7, 30, 90), 30)
     piso = visao._agora() - timedelta(days=dias)
     campos = ("os", "numero", "tarefa", "usina", "ativo", "codigo", "equipe", "solicitante", "decidida_por")
 
     def filtra(lista):
-        return [p for p in lista if (not supervisor or p.get("supervisor") == supervisor)
+        return [p for p in lista if _do_supervisor(p, supervisor)
                 and (not equipe or p.get("equipe") == equipe)
                 and (not q or q in " ".join(str(p.get(c) or "") for c in campos).lower())]
     aguardando = filtra(d.get("aguardando") or [])
@@ -206,6 +251,7 @@ def pt():
     contagem_pt = {s: sum(1 for p in aguardando if _status("pt", p) == s) for s in visao.PT_STATUS}
     cartoes_pt = sorted((c for c in visao.por_equipe([], [], [], aguardando, d.get("times") or {}) if c["pts"]),
                         key=ORDEM_DOS_CARTOES["pt"])
+    cartoes_sup = sorted(visao.por_supervisor(cartoes_pt), key=ORDEM_DOS_SUPERVISORES["pt"])
     lista_pt = [p for p in aguardando if not f or _status("pt", p) == f]
     historico = [p for p in filtra(d.get("historico") or []) if (p.get("criada") or piso) >= piso]
     contagem = {}
@@ -217,8 +263,9 @@ def pt():
         "pt", leitura, aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem_hist=contagem, sit=sit,
         dias=dias, supervisor=supervisor, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
         idade_min=_idade_min, cartoes=cartoes_pt, lista=lista_pt, contagem=contagem_pt, total=len(aguardando), f=f,
+        cartoes_sup=cartoes_sup, sem_supervisor=visao.SEM_SUPERVISOR,
         status=visao.PT_STATUS, regiao=regiao, regioes=visao.REGIOES,
-        supervisores=sorted({p.get("supervisor") for p in todas if p.get("supervisor")})))
+        supervisores=_opcoes_supervisor(todas, supervisor)))
 
 
 @bp.route("/pt/<numero>/pdf")
@@ -263,11 +310,14 @@ def pt_aprovar(numero):
         gravada=request.args.get("gravada") == "1", quando=visao._dt))
 
 
-# ── Rondas, Zeladoria e Ranking (visão nossa) ────────────────────────────────────────────────────────────────────
-ABAS_RONDAS = (("registros", "Registros"), ("sujidade", "Sujidade e vegetação"), ("cobertura", "Cobertura"),
-               ("trackers", "Trackers"), ("quem", "Quem ronda"))
-FILTROS_SUJIDADE = (("", "Todas"), ("sujidade", "Sujidade alta"), ("vegetacao", "Vegetação alta"),
-                    ("sensores", "Sensor sujo"), ("vala", "Vala de drenagem"))
+# ── Rondas e Zeladoria (visão nossa) ─────────────────────────────────────────────────────────────────────────────
+# Levi, 08/10/2026: a aba Cobertura saiu ("já não faz sentido tendo o histórico da usina") e entrou a "Sem ronda"; o
+# Painel é a "visão a mais, dashboards que mostre de fato" quem está melhor. Os botões de filtro da Sujidade saíram:
+# "se a pessoa quiser ordenar ela clica na coluna que ordena e já era!" (o clique no cabeçalho, `_ordenar.html`).
+ABAS_RONDAS = (("registros", "Registros"), ("painel", "Painel"), ("sujidade", "Sujidade e vegetação"),
+               ("sem", "Sem ronda"), ("trackers", "Trackers"), ("quem", "Quem ronda"))
+# a aba Sem ronda: sem ronda no período (o padrão), há 7 dias ou mais, ou nunca em todo o registro
+FILTROS_SEM_RONDA = ("sem", "atrasadas", "nunca")
 LIMITE_LINHAS = 300
 
 
@@ -283,28 +333,39 @@ def _iniciais(nome) -> str:
     return (partes[0][0] + (partes[-1][0] if len(partes) > 1 else "")).upper() if partes else "?"
 
 
+def _ordem_sem_ronda(c):
+    """A mais esquecida primeiro: há mais dias sem ronda (nunca = 999); no empate, a última OS mais antiga (ou nenhuma)."""
+    return (-c["dias"], (c.get("ultima_os") or {}).get("data") or "", c["usina"])
+
+
 @bp.route("/rondas")
 def rondas():
-    """Cobertura, duração e qualidade da ronda (Levi, 05/10: o estilo do painel de rondas, no tema do Nexus): seis
-    indicadores do período e quatro abas. Filtros de região do Brasil e de supervisor; Exportar CSV dos registros."""
+    """Cobertura, duração e qualidade da ronda (Levi, 05/10: o estilo do painel de rondas, no tema do Nexus): sete
+    indicadores do período e seis abas (Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers, Quem ronda).
+    Filtros de região do Brasil, cliente, supervisor e equipe (a equipe vem do Painel); Exportar CSV dos registros."""
     dias = _dias((7, 14, 30), 30)
     leitura = visao.rondas()
     d = leitura.dados
     regiao, supervisor = request.args.get("regiao", ""), _supervisor()
     # cliente pelo cadastro (Levi, 05/10: "filtro por cliente e a cobertura das rondas das UFVs do cliente. Essas usinas
     # tem que bater com as mesmas do registro mestre"): filtra as rondas E a base da cobertura
-    cliente, cluster = request.args.get("cliente", ""), request.args.get("cluster", "")
-    aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS_RONDAS) else "registros"
+    cliente, cluster, equipe = request.args.get("cliente", ""), request.args.get("cluster", ""), request.args.get("equipe", "")
+    pedida = "sem" if request.args.get("aba") == "cobertura" else request.args.get("aba")     # endereço antigo
+    aba = pedida if pedida in dict(ABAS_RONDAS) else "registros"
     dur, q = request.args.get("dur", ""), request.args.get("q", "").strip().lower()
     pend = request.args.get("pend", "") if request.args.get("pend") in visao.FEITA else ""
     # os indicadores filtram a tabela (Levi, 05/10: "quero que esses botões sejam clicáveis e filtre a tabela")
     ind = request.args.get("ind", "") if request.args.get("ind") in ("hoje", "qualidade", "duracao") else ""
-    cob = request.args.get("cob", "") if request.args.get("cob") in ("sem", "atrasadas") else ""
+    cob = request.args.get("cob", "") if request.args.get("cob") in FILTROS_SEM_RONDA else ""
+    # Quem ronda em blocos (o padrão) ou em tabela (Levi, 08/10: "traga também uma visão em blocos para que fique mais
+    # visual para os supervisores!")
+    ver = "tabela" if request.args.get("ver") == "tabela" else "blocos"
 
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
                 and (not supervisor or x.get("supervisor") == supervisor)
-                and (not cliente or x.get("cliente") == cliente)]
+                and (not cliente or x.get("cliente") == cliente)
+                and (not equipe or x.get("equipe") == equipe)]
     cobertura = filtra(d.get("cobertura") or [])
     painel = visao.painel_rondas(filtra(d.get("todas") or []), cobertura, dias, d.get("hoje") or visao._agora().date().isoformat())
     lim = painel["kpi"]["dur_min"]
@@ -317,10 +378,14 @@ def rondas():
                  and (not q or q in " ".join(str(r.get(c) or "") for c in ("tecnico", "usina", "equipe", "os")).lower())]
     if ind == "duracao":
         registros.sort(key=lambda r: -(r["dur_min"] if r["dur_min"] is not None else -1))
-    if cob == "sem":
-        cobertura = [c for c in cobertura if c["dias"] >= dias]
-    elif cob == "atrasadas":
-        cobertura = [c for c in cobertura if c["dias"] >= visao.DIAS_SEM_RONDA_ALERTA]
+    # a aba Sem ronda (Levi, 08/10: "troque por uma tabela chamada 'Sem ronda' que mostrará usina, equipe, técnicos,
+    # supervisor e última OS feita na usina"): sem ronda no período (padrão), há 7 dias ou mais, ou nunca
+    na_aba_sem = {"atrasadas": lambda c: c["dias"] >= visao.DIAS_SEM_RONDA_ALERTA,
+                  "nunca": lambda c: c.get("nunca", c["dias"] >= 999)}.get(cob, lambda c: c["dias"] >= dias)
+    sem_ronda = sorted((c for c in cobertura if na_aba_sem(c)), key=_ordem_sem_ronda)
+    n_sem = {"sem": sum(1 for c in cobertura if c["dias"] >= dias),
+             "atrasadas": sum(1 for c in cobertura if c["dias"] >= visao.DIAS_SEM_RONDA_ALERTA),
+             "nunca": painel["kpi"]["nunca"]}
     if request.args.get("csv") == "1":
         import csv
         import io
@@ -338,7 +403,7 @@ def rondas():
     supervisores = sorted({c.get("supervisor") for c in d.get("cobertura") or [] if c.get("supervisor")})
     clientes = sorted({c.get("cliente") for c in d.get("cobertura") or [] if c.get("cliente")})
     cluster_aberto = next((c for c in painel["clusters"] if c["cluster"] == cluster), None) if cluster else None
-    suj, suj_estado, suj_f = None, None, request.args.get("sv", "")
+    suj, suj_estado = None, None
     if aba == "sujidade":
         # as respostas vêm das OS de ronda no Fracttal: as aprovadas, relidas em segundo plano, e as em verificação,
         # que já estão na fila da Aprovação de OS (nunca espera o Fracttal)
@@ -347,20 +412,19 @@ def rondas():
         suj = visao.sujidade_vegetacao(filtra(d.get("todas") or []), cobertura, ronda_checklist.respostas(), dias,
                                        d.get("hoje") or visao._agora().date().isoformat())
         suj_estado = ronda_checklist.estado()
-        alto = lambda n: n is not None and n > 3
-        filtro = {"sujidade": lambda x: alto(x["sujidade"]), "vegetacao": lambda x: alto(x["vegetacao"]),
-                  "sensores": lambda x: x["sensores_sujos"],
-                  "vala": lambda x: x["vala"] and visao._norm_txt(x["vala"]) not in ("limpa", "ok", "nao se aplica")}.get(suj_f)
-        suj["filtradas"] = [x for x in suj["linhas"] if not filtro or filtro(x)]
+    comparativos = visao.comparativos(painel["periodo"], cobertura) if aba == "painel" else None
     return render_template("campo/rondas.html", **_comum(
         "rondas", leitura, dias=dias, regiao=regiao, supervisor=supervisor, aba=aba, abas=ABAS_RONDAS, dur=dur,
         pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"}, ind=ind, cob=cob,
         n_pend={k: sum(1 for r in painel["periodo"] if r["pendencia"] == k) for k in ("sem_os", "incompleta")},
         q=request.args.get("q", ""), k=painel["kpi"], registros=registros, limite=LIMITE_LINHAS, cobertura=cobertura,
+        sem_ronda=sem_ronda, n_sem=n_sem, registro_desde=d.get("registro_desde") or "",
         trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES, supervisores=supervisores,
-        duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, suj_f=suj_f,
+        duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, equipe=equipe, ver=ver,
         cliente=cliente, clientes=clientes, clusters=painel["clusters"], cluster_aberto=cluster_aberto,
-        filtros_sujidade=FILTROS_SUJIDADE, explicacao_avulsa=ronda_avulsa.EXPLICACAO))
+        comparativos=comparativos, dimensoes=visao.DIMENSOES, base_pequena=visao.BASE_PEQUENA,
+        filtro_da_dimensao={"regiao_br": "regiao", "equipe": "equipe", "cliente": "cliente", "supervisor": "supervisor"},
+        explicacao_avulsa=ronda_avulsa.EXPLICACAO))
 
 
 @bp.route("/rondas/usina/<int:usina_id>")
@@ -457,13 +521,6 @@ def zeladoria():
     return render_template("campo/zeladoria.html", **_comum("zeladoria", visao.zeladoria()))
 
 
-@bp.route("/ranking")
-def ranking():
-    dias = _dias((7, 30, 90), 30)
-    return render_template("campo/ranking.html", **_comum("ranking", visao.ranking(dias), dias=dias,
-                                                          vista=request.args.get("vista", "")))
-
-
 # ── Aprovação de OS (a fila e os grupos são os do App, nexus/campo/aprovacao.py) ─────────────────────────────────
 GRUPOS = (("completa", "Evidência completa", "ok",
            "Subtarefas respondidas, nota alta, tempo dentro do previsto, nenhuma foto marcada. Não pede análise, "
@@ -482,7 +539,12 @@ def _cor_espera(dias) -> str:
 
 IDADES = (("0-2", "até 2 dias", 0, 2), ("3-7", "3 a 7 dias", 3, 7), ("8-30", "8 a 30 dias", 8, 30),
           ("31-60", "31 a 60 dias", 31, 60), ("61-", "mais de 60 dias", 61, 10 ** 6))
-VISTAS_APROVACAO = (("supervisores", "Por supervisor"), ("tecnicos", "Por técnico"), ("fila", "Fila"))
+# O cartão "Paradas há 30 dias ou mais" filtra as MESMAS OS que conta (30 dias ou mais). Levava à faixa "31 a 60 dias":
+# com a fila inteira (Levi, 08/10/2026: "não deve ter filtro 'OS fechadas nos X dias'") a OS parada há 120 dias contava
+# no cartão e sumia no clique. Só o cartão usa esta faixa; a barra de idade segue com as cinco de cima.
+IDADE_PARADAS = ("30-", "há 30 dias ou mais", 30, 10 ** 6)
+# As visões "por técnico" e "fila" saíram em 08/10/2026 (Levi: "a visão de por técnico e fila pode matar, pode tirar que
+# é irrelevante!"): fica a de supervisor, e o cartão abre a tabela das OS dele (`ver=`), onde se aprova.
 SEM_CADASTRO = "Sem cadastro"
 
 
@@ -516,18 +578,40 @@ def _por_os(linhas) -> list[dict]:
         o["devolvida"] = any(t.get("foi_devolvida") for t in ts)
         o["ronda"] = any(t.get("ronda") for t in ts)
         o["n_por_grupo"] = {b: sum(1 for t in ts if t["balde"] == b) for b in ORDEM_DO_GRUPO}
+        # as colunas da tabela do supervisor (Levi, 08/10/2026: "a OS, dia, data da criação da OS, data fim, supervisor,
+        # prontas, pedem olho, fora do App, uso do App, nota média e devolvidas"): contadas nas tarefas da OS
+        o["criada"] = min((str(t.get("criada")) for t in ts if t.get("criada")), default="")
+        o["uso_app"] = round(100 * o["n_app"] / len(ts))
+        o["nota_media"] = round(sum(notas) / len(notas)) if notas else None
+        o["n_devolvidas"] = sum(1 for t in ts if t.get("foi_devolvida"))
     return sorted(g.values(), key=lambda o: -o["espera_d"])
 
 
+def _data_br(iso) -> str:
+    """dd/mm/aa no horário de Brasília. O Fracttal fala UTC: a data de fim vem sem fuso (o App corta em 19 caracteres)
+    e a de criação com "+00:00"; sem converter, a OS fechada às 22 h de Brasília aparecia no dia seguinte."""
+    s = str(iso or "").strip().replace("Z", "+00:00")
+    if not s:
+        return "—"
+    try:
+        d = datetime.fromisoformat(s)
+    except ValueError:
+        return s[:10]
+    d = d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    return d.astimezone(_BRT).strftime("%d/%m/%y")
+
+
 def _agrupa_os(oss, chaves) -> list[dict]:
-    """Uma linha por supervisor (ou técnico): as OS esperando, os três grupos, a idade e o uso do App, em OS."""
+    """Um cartão por supervisor (a chave que `chaves` der): as OS esperando, os três grupos, a idade e o uso do App,
+    em OS. (A nota, as devolvidas, a equipe e o supervisor "da maioria" serviam só à tabela por técnico, que saiu em
+    08/10/2026; o que é da OS está na tabela do supervisor, `_por_os`.)"""
     g = {}
     for o in oss:
         for k in chaves(o):
             k = k or SEM_CADASTRO
             a = g.setdefault(k, {"nome": k, "ordens": 0, "tarefas": 0, "completa": 0, "olho": 0, "fora_do_app": 0,
-                                 "aged7": 0, "aged30": 0, "espera_max": 0, "pelo_app": 0, "notas": [], "devolvidas": 0,
-                                 "equipes": {}, "supervisores": {}, "tecnicos": set()})
+                                 "aged7": 0, "aged30": 0, "espera_max": 0, "pelo_app": 0, "equipes": set(),
+                                 "tecnicos": set()})
             a["ordens"] += 1
             a["tarefas"] += len(o["tarefas"])
             a[o["balde"]] += 1
@@ -535,19 +619,11 @@ def _agrupa_os(oss, chaves) -> list[dict]:
             a["aged30"] += o["espera_d"] >= 30
             a["espera_max"] = max(a["espera_max"], o["espera_d"])
             a["pelo_app"] += o["pelo_app"]
-            a["notas"] += [o["nota"]] if o["nota"] is not None else []
-            a["devolvidas"] += o["devolvida"]
-            e, s = o.get("equipe_cad") or SEM_CADASTRO, o.get("supervisor_cad") or SEM_CADASTRO
-            a["equipes"][e] = a["equipes"].get(e, 0) + 1
-            a["supervisores"][s] = a["supervisores"].get(s, 0) + 1
+            a["equipes"].add(o.get("equipe_cad") or SEM_CADASTRO)
             a["tecnicos"].update(o["tecnicos"])
     for a in g.values():
         a["uso_app"] = round(100 * a["pelo_app"] / a["ordens"]) if a["ordens"] else None
-        a["nota"] = round(sum(a["notas"]) / len(a["notas"])) if a["notas"] else None
-        del a["notas"]
-        a["equipe"] = max(a["equipes"], key=a["equipes"].get)
-        a["supervisor"] = max(a["supervisores"], key=a["supervisores"].get)
-        a["n_equipes"], a["n_tecnicos"] = len(a["equipes"]), len(a.pop("tecnicos"))
+        a["n_equipes"], a["n_tecnicos"] = len(a.pop("equipes")), len(a.pop("tecnicos"))
     return list(g.values())
 
 
@@ -556,10 +632,12 @@ def aprovacao():
     """A fila de verificação do Fracttal para tirar insight (Levi, 05/10: "refaça essa parte de aprovação de OS para
     retirada de bons insights"), contada por OS, que é o que se aprova. Os grupos de cada tarefa são os do App (a fila
     inteira pela `_fila_supervisao`); a equipe e o supervisor vêm do cadastro do Nexus, pela usina do Fracttal (de-para
-    "Fracttal · Classificação 1"). Três visões: por supervisor (quem acumula), por técnico e a fila. Os indicadores e a
-    barra da idade filtram a fila."""
+    "Fracttal · Classificação 1").
+    Desde 08/10/2026 (Levi): a fila INTEIRA, sem "OS fechadas nos X dias"; uma visão só, os cartões por supervisor; o
+    cartão abre a tabela das OS dele (`ver=`), uma linha por OS que abre o porquê do grupo e o Aprovar, que só o
+    supervisor da OS ou um administrador usa (`aprovar_os.py`). Os indicadores e a barra da idade filtram cartões e
+    tabela."""
     equipe, supervisor = request.args.get("equipe", ""), _supervisor()
-    dias = _dias((7, 30, 60, 90), 30)
     mapa = visao.usinas_do_fracttal()
     opcoes = mapa.dados or {}
     usinas = None
@@ -567,7 +645,7 @@ def aprovacao():
         usinas = set(opcoes["equipes"][equipe])
     if supervisor and supervisor in (opcoes.get("supervisores") or {}):
         usinas = set(opcoes["supervisores"][supervisor]) & (usinas if usinas is not None else set(opcoes["supervisores"][supervisor]))
-    leitura = campo_aprovacao.fila_toda({"dias": dias}, usinas)
+    leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA, usinas)
     d = leitura.dados or {}
     por_nome = opcoes.get("por_nome") or {}
     todas = d.get("linhas") or []
@@ -576,87 +654,47 @@ def aprovacao():
         x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
         x["supervisor_cad"], x["regiao_br"] = cad.get("supervisor") or "", cad.get("regiao_br") or ""
     oss = _por_os(todas)
-    vista = request.args.get("vista") if request.args.get("vista") in dict(VISTAS_APROVACAO) else "supervisores"
     balde = request.args.get("balde") if request.args.get("balde") in ORDEM_DO_GRUPO else ""
-    idade = next((i for i in IDADES if i[0] == request.args.get("idade")), None)
-    q = request.args.get("q", "").strip().lower()
-    if balde or idade or q:
-        vista = "fila"
-    fila = [o for o in oss if (not balde or o["balde"] == balde)
-            and (not idade or idade[2] <= o["espera_d"] <= idade[3])
-            and (not q or q in " ".join([o["os"], o["usina_cad"]] + o["tecnicos"] + [t.get("tarefa") or "" for t in o["tarefas"]]).lower())]
+    idade = next((i for i in IDADES + (IDADE_PARADAS,) if i[0] == request.args.get("idade")), None)
+    # os indicadores e a idade filtram os cartões e a tabela; os números do topo seguem sobre a fila inteira
+    filtradas = [o for o in oss if (not balde or o["balde"] == balde)
+                 and (not idade or idade[2] <= o["espera_d"] <= idade[3])]
+    # o supervisor aberto (Levi, 08/10: "nessa visão por supervisor deve ser clicável, quando clica aparece a OS ...")
+    ver = request.args.get("ver", "")
+    tabela = [o for o in filtradas if (o.get("supervisor_cad") or SEM_CADASTRO) == ver] if ver else []
     nome_grupo = {g[0]: g[1] for g in GRUPOS}
     if request.args.get("csv") == "1":
         import csv
         import io
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
-        w.writerow(["OS", "Tarefas", "Técnicos", "Usina", "Equipe", "Supervisor", "Região", "Fechada em", "Espera (dias)",
-                    "Pior nota do registro", "Grupo", "Tarefas prontas", "Tarefas pedem olho", "Tarefas fora do App",
-                    "Devolvida"])
-        for o in fila:
+        w.writerow(["OS", "Dias esperando", "Criação da OS", "Data fim", "Supervisor", "Equipe", "Usina", "Técnicos",
+                    "Tarefas", "Prontas", "Pedem olho", "Fora do App", "Uso do App (%)", "Nota média",
+                    "Devolvidas", "Grupo da OS"])
+        for o in (tabela if ver else filtradas):
             n = o["n_por_grupo"]
-            w.writerow([o["os"], len(o["tarefas"]), ", ".join(o["tecnicos"]), o["usina_cad"], o["equipe_cad"],
-                        o["supervisor_cad"], o["regiao_br"], o["fim"][:10], o["espera_d"],
-                        "" if o["nota"] is None else o["nota"], nome_grupo.get(o["balde"]), n["completa"], n["olho"],
-                        n["fora_do_app"], "sim" if o["devolvida"] else ""])
+            w.writerow([o["os"], o["espera_d"], _data_br(o["criada"]) if o["criada"] else "", _data_br(o["fim"]),
+                        o["supervisor_cad"], o["equipe_cad"], o["usina_cad"], ", ".join(o["tecnicos"]),
+                        len(o["tarefas"]), n["completa"], n["olho"], n["fora_do_app"], o["uso_app"],
+                        "" if o["nota_media"] is None else o["nota_media"], o["n_devolvidas"],
+                        nome_grupo.get(o["balde"])])
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
-                        headers={"Content-Disposition": f'attachment; filename="aprovacao-os-{dias}d.csv"'})
+                        headers={"Content-Disposition": 'attachment; filename="aprovacao-os.csv"'})
     mais_antiga = oss[0] if oss else None
     k = {"ordens": len(oss), "tarefas": len(todas), "baldes": {b: sum(1 for o in oss if o["balde"] == b) for b in ORDEM_DO_GRUPO},
          "aged30": sum(1 for o in oss if o["espera_d"] >= 30), "espera_max": mais_antiga["espera_d"] if mais_antiga else 0,
          "mais_antiga": mais_antiga, "uso_app": round(100 * sum(o["pelo_app"] for o in oss) / len(oss)) if oss else None}
     idades = [(i, sum(1 for o in oss if i[2] <= o["espera_d"] <= i[3])) for i in IDADES]
-    supervisores_g = sorted(_agrupa_os(oss, lambda o: [o.get("supervisor_cad")]),
+    supervisores_g = sorted(_agrupa_os(filtradas, lambda o: [o.get("supervisor_cad")]),
                             key=lambda a: (-a["aged30"], -a["ordens"], a["nome"]))
-    tecnicos_g = sorted(_agrupa_os(oss, lambda o: o["tecnicos"]), key=lambda a: (-a["ordens"], a["nome"]))
+    aberto = next((a for a in supervisores_g if a["nome"] == ver), None) if ver else None
     return render_template("campo/aprovacao.html", **_comum(
         "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS}, balde=balde,
         cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), equipe=equipe, supervisor=supervisor,
         equipes=sorted(opcoes.get("equipes") or {}), supervisores=sorted(opcoes.get("supervisores") or {}),
-        mapa_erro=mapa.erro, dias=dias, vista=vista, vistas=VISTAS_APROVACAO, k=k, idades=idades, idade=idade,
-        q=request.args.get("q", ""), linhas_fila=fila, limite=LIMITE_LINHAS, por_supervisor=supervisores_g,
-        por_tecnico=tecnicos_g, iniciais=_iniciais, motivos=campo_aprovacao.motivos))
-
-
-@bp.route("/aprovacao/<int:id_wo>/tirar", methods=["POST"])
-def aprovacao_tirar(id_wo):
-    """Depois de o supervisor aprovar pelo Concluir do OS Creator, a OS sai da fila guardada do Nexus."""
-    origem = request.headers.get("Origin")
-    if origem and urlsplit(origem).netloc != request.host:
-        return "Origem recusada.", 403
-    return {"ok": True, "tarefas": campo_aprovacao.tirar_da_fila(id_wo)}
-
-
-# ── Ordens de serviço (os números e a lista são os do App, nexus/campo/ordens.py) ────────────────────────────────
-FAIXAS_OS = (("", "Todas"), ("bad", "Não está bom"), ("warn", "Atenção"), ("ok", "Bom"), ("dev", "Devolvidas"))
-
-
-def _situacao_os(x) -> tuple[str, str]:
-    if x.get("devolvida"):
-        return "Devolvida", "critico"
-    q = int(x.get("qualidade") or 0)
-    return ("Bom", "ok") if q >= 85 else (("Atenção", "alerta") if q >= 70 else ("Não está bom", "critico"))
-
-
-def _na_faixa(x, faixa) -> bool:
-    q = int(x.get("qualidade") or 0)
-    return {"": True, "dev": bool(x.get("devolvida")), "bad": q < 70, "warn": 70 <= q < 85, "ok": q >= 85}.get(faixa, True)
-
-
-@bp.route("/os")
-def ordens():
-    dias = _dias((7, 30, 90), 7)
-    leitura = campo_ordens.painel(dias)
-    atual = leitura.dados.get("atual") or {}
-    faixa, regiao, q = request.args.get("faixa", ""), request.args.get("regiao", ""), request.args.get("q", "").strip()
-    todas = atual.get("linhas") or []
-    lista = [x for x in todas if _na_faixa(x, faixa) and (not regiao or x.get("cluster") == regiao)
-             and (not q or q.lower() in " ".join(str(x.get(k) or "") for k in ("os", "tarefa", "tecnico", "usina")).lower())]
-    return render_template("campo/ordens.html", **_comum(
-        "os", leitura, dias=dias, r=atual.get("resumo") or {}, ra=leitura.dados.get("anterior") or {}, lista=lista,
-        total=len(todas), faixas=FAIXAS_OS, faixa=faixa, regiao=regiao, q=q, situacao=_situacao_os, coleta=_coleta(),
-        regioes=sorted({x.get("cluster") for x in todas if x.get("cluster")})))
+        mapa_erro=mapa.erro, k=k, idades=idades, idade=idade, ver=ver, aberto=aberto, tabela=tabela,
+        limite=LIMITE_LINHAS, por_supervisor=supervisores_g, sem_cadastro=SEM_CADASTRO, data_br=_data_br,
+        pode_aprovar=pode_na_tela, motivos=campo_aprovacao.motivos))
 
 
 # ── Triagem de qualidade (a mesa de triagem do App, nexus/campo/triagem.py) ──────────────────────────────────────

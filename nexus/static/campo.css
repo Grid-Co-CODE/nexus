@@ -101,12 +101,6 @@
 .cn-pag{display:flex;align-items:center;gap:12px;margin-top:10px;font-size:12.5px;color:var(--mudo)}
 .cn-pag a{color:var(--verde-texto);font-weight:600;text-decoration:none}
 
-/* Ordens de serviço: comparação com a janela anterior e o alerta de previsto/real */
-.cn-vs{display:block;font-size:12px;margin-top:2px;font-variant-numeric:tabular-nums;color:var(--mudo)}
-.cn-vs.melhor{color:var(--ok)}
-.cn-vs.pior{color:var(--critico)}
-.cn-tab td.cn-suspeito{color:var(--critico);font-weight:600}
-
 /* Permissões de trabalho: um cartão por PT esperando, com quem tem de assinar e há quanto tempo */
 .cn-pts{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:10px}
 .cn-pt{background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--alerta);border-radius:var(--raio-md);
@@ -270,7 +264,9 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-barra-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:16px;padding:12px 16px;
   background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
 .cn-barra-fonte{margin-left:auto;font-size:12px;color:var(--mudo)}
-.cn-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:14px}
+/* mínimo de 140 px: com o "Nunca tiveram ronda" (08/10/2026) a tela Rondas tem 7 indicadores, e com 170 px o 7º caía
+   sozinho numa segunda linha a 1440 px (conferido no navegador) */
+.cn-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:14px}
 .cn-kpi{display:grid;align-content:start;gap:4px;padding:16px 18px;background:var(--superficie);border:1px solid var(--linha);
   border-radius:var(--raio-md);min-width:0}
 .cn-kpi .v{font:600 30px/36px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
@@ -287,7 +283,16 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-painel-barra .mudo{margin-left:auto}
 .cn-busca{margin:0}
 .cn-exportar{margin-left:auto;font-size:12.5px}
-.cn-tab--rondas td{padding:10px 12px}
+:is(.cn-tab--rondas,.cn-tab--compacta) td{padding:10px 6px}
+/* conferido no navegador em 08/10/2026: a 1440 px a tabela de Registros passava 166 px do quadro e escondia OS e Fotos,
+   e a da Sujidade escondia o Status (a última coluna, a que mais importa). Cabeçalho e nome do técnico podem quebrar
+   linha e o respiro lateral é menor: as tabelas das abas de Rondas cabem inteiras a partir de ~1366 px */
+:is(.cn-tab--rondas,.cn-tab--compacta) th{padding-left:6px;padding-right:6px;white-space:normal;font-size:10.5px;letter-spacing:.02em}
+:is(.cn-tab--rondas,.cn-tab--compacta) :is(.cn-ordem,.cn-pessoa,.cn-menor){white-space:normal}
+/* "Sombreamento" (a palavra mais longa dos cabeçalhos) quebra com hífen (&shy; no template) e o Status das 13 colunas
+   da Sujidade aceita 120 px: com isso a tabela cabe a 1366 px */
+.cn-tab--rondas .cn-status{min-width:120px}
+.cn-tab--rondas .cn-status .cn-st{margin:2px 3px}
 .cn-pessoa{white-space:nowrap}
 .cn-avatar{display:inline-grid;place-items:center;width:24px;height:24px;margin-right:8px;border-radius:50%;vertical-align:middle;
   font:700 10px/1 var(--font-sans);color:var(--verde-texto);background:var(--verde-suave)}
@@ -337,6 +342,9 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-idade{display:grid;align-content:center;justify-items:center;min-width:70px;padding:6px 8px;border-radius:7px;text-decoration:none;
   color:#0b1220;font-size:11px;line-height:1.25;text-align:center}
 .cn-idade b{font:700 15px/1.1 var(--font-sans)}
+/* no celular as 5 faixas (mínimo de 70 px cada) não cabiam em 343 px e a página rolava de lado (conferido a 375 px em
+   08/10/2026): quebram em duas linhas, cada uma com um terço da largura */
+@media (max-width:640px){.cn-idades-barra{flex-wrap:wrap}.cn-idade{flex:1 1 28% !important;min-width:0}}
 .cn-idade--0{background:var(--ok)}
 .cn-idade--1{background:#a8e05f}
 .cn-idade--2{background:var(--alerta)}
@@ -451,3 +459,78 @@ tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px
 .cn-minhas form{grid-column:2;grid-row:1/3;align-self:center;margin:0}
 .cn-bt-anular{background:none;border:0;cursor:pointer;font-size:12.5px;color:var(--critico)}
 @media (max-width:860px){.cn-avulsa-grade{grid-template-columns:1fr}.cn-form-avulsa{grid-template-columns:1fr 1fr}}
+
+/* ── Rondas, pedido do Levi de 08/10/2026 (frente campo-rondas) ──────────────────────────────────────────────────
+   Nível só com a cor da fonte ("tire essa cor de fundo dos números de sujidade e vegetação"), a dica da duração,
+   o cabeçalho que ordena, a aba Sem ronda, o Painel e os pendentes do Quem ronda. */
+.cn-nivel-txt{font-weight:700;font-variant-numeric:tabular-nums}
+td .cn-nivel-txt{font-size:15px}
+.cn-nivel-txt--1,.cn-nivel-txt--2{color:var(--ok)}
+.cn-nivel-txt--3{color:var(--info)}
+.cn-nivel-txt--4{color:var(--alerta)}
+.cn-nivel-txt--5{color:var(--critico)}
+.cn-oculto{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.cn-dur{cursor:help;border-bottom:1px dotted var(--linha-forte);padding-bottom:1px}
+.cn-dur:focus-visible{outline:2px solid var(--verde);outline-offset:2px;border-radius:3px}
+.cn-dica-flut{position:fixed;z-index:60;max-width:280px;padding:8px 12px;border:1px solid var(--linha);border-radius:8px;
+  background:var(--superficie-3);color:var(--tinta);font:500 12.5px/1.4 var(--font-sans);box-shadow:0 8px 24px rgba(0,0,0,.35);
+  pointer-events:none}
+.cn-dica-flut[hidden]{display:none}
+/* o cabeçalho que ordena (Levi: "se a pessoa quiser ordenar ela clica na coluna que ordena e já era!") */
+.cn-ordem{display:inline-flex;align-items:center;gap:5px;padding:0;margin:0;border:0;background:none;cursor:pointer;
+  font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;white-space:nowrap}
+.cn-ordem::after{content:"▼";font-size:8px;opacity:.3}
+.cn-ordem:hover{color:var(--tinta)}
+.cn-ordem:focus-visible{outline:2px solid var(--verde);outline-offset:3px;border-radius:3px}
+th[aria-sort] .cn-ordem{color:var(--tinta)}
+th[aria-sort="ascending"] .cn-ordem::after{content:"▲";opacity:1;color:var(--verde-texto)}
+th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--verde-texto)}
+/* Sujidade e vegetação: o Status com o porquê, cada palavra na cor da gravidade */
+.cn-status{min-width:150px}
+.cn-tab td.cn-status{white-space:normal}
+.cn-status .cn-st{margin:2px 6px}
+.cn-sombra{max-width:200px;white-space:normal !important}
+/* Sem ronda: os técnicos da equipe pelo cadastro */
+.cn-tecnicos{max-width:280px;font-size:12.5px}
+/* Quem ronda: QUAIS são as usinas pendentes (na linha do técnico e no cluster) */
+.cn-pend-titulo{margin:0 0 8px;font-size:13px}
+.cn-pend-lista{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px;text-align:left}
+.cn-pend-lista li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.cn-pend-lista .cn-st{min-width:150px}
+.cn-pend-cluster{margin-top:12px;padding:10px 16px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+.cn-pend-cluster summary{cursor:pointer;font:600 13px/20px var(--font-sans);color:var(--verde-texto)}
+.cn-pend-cluster[open] summary{margin-bottom:10px}
+/* Painel: quem está melhor, por região do Brasil, equipe, cliente e supervisor */
+.cn-rank-destaques{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+.cn-rank-destaque{display:grid;gap:4px;align-content:start;padding:12px 14px;background:var(--superficie-2);
+  border:1px solid var(--linha);border-radius:var(--raio-md);font-size:13px;min-width:0}
+.cn-rank-destaque .m{color:var(--tinta-2)}
+/* lado a lado só quando cada tabela cabe inteira (620 px): pela largura da tela, a 1280 px com o menu cada coluna
+   ficava com ~470 px e as quatro tabelas rolavam de lado; no celular, uma coluna (o min() evita a rolagem da página) */
+.cn-rank-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(640px,100%),1fr));gap:16px;margin-top:14px}
+.cn-rank{min-width:0}
+.cn-rank h3{margin:0;font:600 14px/20px var(--font-sans)}
+.cn-rank-tab{max-height:480px;overflow:auto;margin-top:8px}
+.cn-rank-tab table{min-width:620px}
+.cn-rank-tab thead th{position:sticky;top:0;z-index:1}
+/* centralizado como toda coluna das tabelas do Campo (Levi, 05/10: "todas as colunas e cabeçalhos centralizados") */
+.cn-tab td.cn-rank-nome{min-width:170px}
+.cn-rank-cel{display:inline-flex;align-items:center;gap:8px}
+.cn-rank-barra{display:inline-block;width:72px;height:6px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.cn-rank-barra i{display:block;height:100%}
+.cn-b-neutro{background:var(--linha-forte)}
+.cn-base-pequena{display:inline-block;margin-left:6px;padding:0 7px;border:1px dashed currentColor;border-radius:999px;cursor:help;
+  font:600 10.5px/16px var(--font-sans);color:var(--alerta);white-space:nowrap}
+
+/* ── Aprovação de OS, Central de atenção e PT, pedido do Levi de 08/10/2026 (frente campo-aprovacao-central) ────────
+   Cartão por supervisor (Central e PT) e a tabela das OS do supervisor na Aprovação. */
+/* as equipes do supervisor no cartão: duas linhas no máximo, a lista inteira no title */
+.cn-eq-cab .cn-sup-equipes{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;color:var(--tinta-2)}
+/* "Sem supervisor no cadastro": cartão próprio, tracejado, para não passar por um supervisor de verdade */
+.cn-sup--sem{border-style:dashed;border-left-style:solid}
+/* a faixa do supervisor aberto na Aprovação: voltar aos cartões, quem é e os números dele */
+.cn-faixa-aprov{gap:8px 18px}
+.cn-faixa-aprov .cn-link{font-weight:600}
+/* a tabela das OS do supervisor (11 colunas) usa o mínimo de 980 px do .cn-tab: no celular rola dentro do quadro */
+/* o Aprovar de quem não pode: o botão aparece apagado, com quem pode */
+.cn-aprovar--so-supervisor .gc-btn[disabled]{opacity:.5;cursor:not-allowed}
