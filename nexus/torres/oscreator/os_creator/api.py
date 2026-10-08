@@ -1996,8 +1996,9 @@ def _juntos(tarefas: dict) -> dict:
 
 def get_os_detalhes(id_work_order) -> dict:
     """Detalhe de UMA OS p/ o histórico. → {'folio','descricao','tipo','event_date','responsavel',
-    'notas','subtarefas':[{'descricao','feito','tipo','resposta'}]}. event_date/notas da tarefa;
-    subtarefas (descrição + tipo + resposta dada) vêm dos form items; responsavel = atribuído da OS.
+    'notas','subtarefas':[{'descricao','feito','tipo','resposta','id_tarefa','id_form_item'}],'tarefas':[…]}.
+    event_date/notas da tarefa; subtarefas (descrição + tipo + resposta dada) vêm dos form items, uma vez cada,
+    agrupadas pela tarefa na ordem de `tarefas` (ver `ordem`); responsavel = atribuído da OS.
 
     Os pedidos vão em DUAS LEVAS PARALELAS (Levi, 08/10/2026: "a tela que abre quando clica na OS está demorando um
     pouco para carregar"). Eram até cinco, um atrás do outro. Tarefas, subtarefas e cabeçalho não dependem um do
@@ -2024,8 +2025,23 @@ def get_os_detalhes(id_work_order) -> dict:
             v = str(t.get(k) or "").strip()
             if v and v.lower() != "none" and v not in notas:
                 notas.append(v)
-    subtarefas = []
-    for it in sorted(items, key=lambda x: x.get("order_number") or 0):
+    # A ORDEM das subtarefas é a da TAREFA e, dentro dela, o `order_number` (Levi, 08/10/2026: "quando a OS tem mais que
+    # uma tarefa está duplicando as subtarefas"). O `order_number` recomeça em 1 em cada tarefa (REST, OS 8709: 13
+    # tarefas, cada uma de 1 a n), e a ordem só por ele intercalava as tarefas: na OS de 8 tarefas com o mesmo checklist
+    # (a coleta de geração, uma por inversor), a 1ª pergunta saía 8 vezes seguidas e depois a 2ª. Subtarefa de tarefa
+    # que não veio vai para o fim, sem sumir. E cada tarefa e cada form item entram UMA vez, pelo id: o REST não repete,
+    # o RPC daqui não deu para conferir, e a barra e o "X de Y" do Concluir contam esta lista.
+    ordem = {}
+    for i, t in enumerate(tasks):
+        if t.get("id") is not None:
+            ordem.setdefault(t.get("id"), i)
+    subtarefas, vistos = [], set()
+    for it in sorted(items, key=lambda x: (ordem.get(x.get("id_work_order_task"), len(tasks)),
+                                           x.get("order_number") or 0)):
+        fid = it.get("id_work_orders_tasks_form_items")
+        if fid is not None and fid in vistos:
+            continue
+        vistos.add(fid)
         desc = str(it.get("description") or "").strip()
         if not desc:
             continue
@@ -2106,7 +2122,8 @@ def get_os_detalhes(id_work_order) -> dict:
                 "duracao": str(t.get("duration") or "").strip(),
                 "gatilho": decodifica_gatilho(t.get("trigger_description")),
                 "nota": str(t.get("task_note") or t.get("note") or "").strip()}
-               for t in tasks]
+               for i, t in enumerate(tasks)
+               if t.get("id") is None or ordem.get(t.get("id")) == i]     # a mesma tarefa uma vez (ver `ordem`)
     canc = lev2.get("canc") or {"motivo": "", "nota": ""}
     return {"folio": t0.get("wo_folio"),
             "cancel_motivo": canc["motivo"], "cancel_nota": canc["nota"],

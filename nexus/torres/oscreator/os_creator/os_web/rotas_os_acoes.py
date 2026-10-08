@@ -45,6 +45,19 @@ def _tg_tarefas_pendentes(d):
     return regra.tarefas_pendentes(d)
 
 
+@bp.app_template_global("acoes_grupos_tarefas")
+def _tg_grupos_tarefas(d):
+    """As tarefas da OS, cada uma com as subtarefas dela ([] com uma tarefa só) — o card de uma OS de várias tarefas
+    (Levi, 08/10/2026: "tem que dividir por tarefa quando clicar!")."""
+    return regra.subtarefas_por_tarefa(d)
+
+
+@bp.app_template_global("acoes_rotulos_tarefas")
+def _tg_rotulos_tarefas(d):
+    """{id da tarefa: o nome que a distingue das outras} — a pendência do Concluir diz de qual tarefa é."""
+    return regra.rotulos_tarefas((d or {}).get("tarefas"))
+
+
 def _corpo() -> dict:
     return request.get_json(silent=True) or {}
 
