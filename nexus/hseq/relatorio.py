@@ -200,7 +200,7 @@ def _tabela_sem_foto(g, hoje, e):
     for x in g["extintores"]:
         sit = EXT.SITUACOES[x["situacao"]]
         st = EXT.STATUS_TST.get(x.get("status"))
-        linhas.append([Paragraph(f"<b>{_t(x['ext'])}</b><br/>{_tom(sit[0], sit[1])}", e["base"]),
+        linhas.append([Paragraph(f"<b>{_t(x['ext'])}</b> · {_tom(sit[0], sit[1])}", e["base"]),
                        Paragraph(_t(x.get("local") or "—"), e["base"]),
                        Paragraph(_t(x.get("classe") or "sem classe") + (f" · {_t(x['peso'])} kg" if x.get("peso")
                                                                         else ""), e["base"]),
@@ -209,7 +209,9 @@ def _tabela_sem_foto(g, hoje, e):
                        Paragraph((_tom(st[0], st[1], True) + (f"<br/>{_t(x['motivo_checklist'])}"
                                                                if x.get("motivo_checklist") else ""))
                                  if st else _tom("sem conferência", "neutro"), e["base"])])
-    t = Table(linhas, colWidths=[24 * mm, 30 * mm, 30 * mm, 36 * mm, 30 * mm, 32 * mm], repeatRows=1)
+    # a recarga ganha a largura para "03/2025 · venceu há 18 meses" caber numa linha (o Levi não quer o dado quebrado
+    # quando há espaço); o extintor e a situação, lado a lado
+    t = Table(linhas, colWidths=[30 * mm, 26 * mm, 26 * mm, 45 * mm, 26 * mm, 29 * mm], repeatRows=1)
     t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, LINHA), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
     return t
