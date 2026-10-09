@@ -12,3 +12,5 @@ PyQt6==6.11.0
 pandas==3.0.3
 # miniatura das fotos da ronda (nexus/campo/ronda_fotos.py); sem ele, a miniatura é a foto inteira
 pillow==12.2.0
+# relatório dos extintores em PDF (nexus/hseq/relatorio.py, Segurança · HSEQ, 09/10/2026)
+reportlab==5.0.0

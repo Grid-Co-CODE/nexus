@@ -194,7 +194,8 @@ def linha(x: dict, b, quem: dict, hoje: date) -> dict:
     return {"codigo": codigo, "ext": codigo.rsplit("-", 1)[-1], "usina_id": uid, **b.onde(uid, usina),
             "usina_fonte": usina, "tipo": _txt(x.get("Tipo de ativo")), "ativo": _txt(x.get("Ativo")),
             "local": _txt(x.get("Local")), "posicao": _txt(x.get("Posição")), "classe": _txt(x.get("Classe")),
-            "peso": _num(x.get("Peso (kg)")), "origem_conferencia": _txt(x.get("Origem da conferência")),
+            "peso": _num(x.get("Peso (kg)")), "carga": _txt(x.get("Carga")).upper().replace(" ", "_"),
+            "origem_conferencia": _txt(x.get("Origem da conferência")),
             "conferido_por": visao._nome(quem, x.get("Conferido por (HMAC)")), "fotos": visao._int(x.get("Fotos")),
             "info_adicional": visao._sim(x.get("Tem informação adicional")),
             "origem_cadastro": _txt(x.get("Origem do cadastro")), **situacao(x, hoje)}
@@ -238,6 +239,46 @@ def ordenar(lista, filtro: str = "") -> list:
                                             x["usina"], x["codigo"]))
     return sorted(lista, key=lambda x: (rank[x["situacao"]], x["dias_vence"] if x["dias_vence"] is not None else _LONGE,
                                         x["usina"], x["codigo"]))
+
+
+# ── Por usina e dia ───────────────────────────────────────────────────────────────────────────────────────────────
+# Levi, 09/10/2026, sobre a 1ª tabela (um extintor por linha): "queria agrupado por usina e dia! SITUAÇÃO | USINA |
+# QUANTIDADE DE EXTINTORES | RECARGA MAIS PRÓXIMA | ÚLTIMA CONFERÊNCIA | STATUS DO TST", e a visão por extintor depois.
+# O dia é o da última conferência: a ronda de extintores é feita usina por usina, num dia; extintor conferido noutro dia
+# (ou nunca) é outra linha da mesma usina. O relatório em PDF usa o mesmo agrupamento.
+ORDEM_STATUS = ("CRITICO", "ATENCAO", "OK_SEM_VALIDADE", "OK", "")     # do pior para o melhor; "" = sem conferência
+
+
+def por_usina_dia(lista) -> list[dict]:
+    """Uma linha por usina × dia da última conferência, com: a situação mais grave, a quantidade (e quantas em cada
+    situação), a recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a próxima a vencer),
+    a conferência e o status da TST mais grave (e quantos em cada um). Os extintores do grupo vão junto, na ordem da
+    tabela. Ordem: o mais grave primeiro, depois a recarga mais próxima, a usina e o dia mais recente."""
+    rank = {s: i for i, s in enumerate(SITUACOES)}
+    g = {}
+    for x in lista:
+        s = g.get((x["usina"], x["conferencia"]))
+        if s is None:
+            s = g[(x["usina"], x["conferencia"])] = {
+                "usina": x["usina"], "usina_id": x.get("usina_id"), "regiao_campo": x.get("regiao_campo", ""),
+                "supervisor_campo": x.get("supervisor_campo", ""), "gestor": x.get("gestor", ""),
+                "conferencia": x["conferencia"], "dias_conferencia": x["dias_conferencia"],
+                "sem_atualizacao": x["sem_atualizacao"], "origem_conferencia": x.get("origem_conferencia", ""),
+                "extintores": [], "status_qtd": dict.fromkeys(ORDEM_STATUS, 0), **dict.fromkeys(SITUACOES, 0)}
+        s["extintores"].append(x)
+        s[x["situacao"]] += 1
+        s["status_qtd"][x["status"] if x["status"] in ORDEM_STATUS else ""] += 1
+    for s in g.values():
+        exts = s["extintores"] = ordenar(s["extintores"])
+        s["qtd"] = len(exts)
+        s["situacao"] = exts[0]["situacao"]
+        com_data = [x for x in exts if x["fim2"]]
+        prox = min(com_data, key=lambda x: (x["fim2"], x["codigo"])) if com_data else None
+        s["recarga"], s["recarga_fim"], s["recarga_ext"] = ((prox["val2"], prox["fim2"], prox["ext"]) if prox
+                                                            else (SEM_DATA, None, ""))
+        s["status"] = next(st for st in ORDEM_STATUS if s["status_qtd"][st])
+    return sorted(g.values(), key=lambda s: (rank[s["situacao"]], s["recarga_fim"] or date.max, s["usina"],
+                                             -(s["conferencia"].toordinal() if s["conferencia"] else 0)))
 
 
 # ── Cartões por supervisor (região de campo) e por gestor de contrato ─────────────────────────────────────────────

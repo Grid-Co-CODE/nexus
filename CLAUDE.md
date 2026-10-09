@@ -48,7 +48,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Performance (Tempo real pela ponte; Clima e risco, alertas públicos por usina; Mapa de risco com camadas de calor e modo TV) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
 | PCM (programação semanal: gerar e, desde 09/10/2026, Publicar no App; Quadro da semana com a reprogramação de tarefas; Gestão PCM, o Plano & Fila das manutenções) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
 | Engenharia (Confiabilidade dos ativos, pelas OS de falha do Fracttal) | `nexus/torres/engenharia/CLAUDE.md` |
-| Segurança · HSEQ (Extintores: vencido, perto de vencer e sem conferência, por supervisor, pelo livro do App) | `nexus/torres/hseq/CLAUDE.md` |
+| Segurança · HSEQ (Extintores: por usina e dia, por supervisor e o relatório em PDF; EPI e EPC: as luvas isolantes pela ronda diária) | `nexus/torres/hseq/CLAUDE.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |
 | Servidor da T.I. | `DEPLOY.md` |

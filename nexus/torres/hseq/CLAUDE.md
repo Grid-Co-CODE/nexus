@@ -1,7 +1,7 @@
 # CLAUDE.md — Segurança · HSEQ
 
-Torre do menu "Segurança · HSEQ". Tela viva: **Extintores** (09/10/2026). Riscos da semana, APR e PT, DSS e Incidentes
-ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o template,
+Torre do menu "Segurança · HSEQ". Telas vivas: **Extintores** (com o relatório em PDF) e **EPI e EPC** (09/10/2026).
+Riscos da semana, APR e PT, DSS e Incidentes ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o template,
 aqui.
 
 ## Extintores
@@ -39,8 +39,13 @@ a tela diz qual falta e não mostra número.
   (`_ext_status`), com a carga e os 9 itens. Sem conferência nenhuma, não há status.
 
 **A tela.** Faixa de números (cada um filtra a tabela), "Por supervisor" (cartões por região de campo, com o Supervisor
-de Campo e o Coordenador ou a vaga, e a alternância para o gestor de contrato, como a Central de atenção) e Tabela (o
-mais grave primeiro; no filtro "sem atualização", a conferência mais antiga primeiro; 300 linhas). Filtros: região do
+de Campo e o Coordenador ou a vaga, e a alternância para o gestor de contrato, como a Central de atenção) e Tabela. A
+tabela abre **por usina e dia** (Levi, 09/10: "queria agrupado por usina e dia!"; `extintores.por_usina_dia`): uma linha
+por usina × dia da última conferência, com Situação (a mais grave), Usina, Quantidade de extintores (e quantos em cada
+situação), Recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a próxima), Última
+conferência e Status da TST (o mais grave, e quantos em cada); a linha abre os extintores dela logo abaixo. Ao lado, a
+visão **por extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
+primeiro). A faixa filtra as duas (no agrupamento, a linha conta só os extintores do filtro). 300 linhas. Filtros: região do
 Brasil, região de campo, gestor e busca. Quem entra pelo Fracttal já vem filtrado (o papel da sessão). Os filtros, os
 cartões e o aviso da estrutura são os do Campo (`nexus/torres/campo/__init__.py` e os pedaços `campo/_*.html`): mudou
 lá, muda aqui. O CSS é o `campo.css` e o `hseq.css` (só a tabela).
@@ -69,6 +74,43 @@ ligaram ao cadastro do Nexus; todas as regiões estavam com supervisor e coorden
   09/10: 424.377 comparações (773 × 549 dias, 01/08/2026 a 31/01/2028), 0 diferença; o status gravado no cadastro,
   773 de 773.
 
-**Pendências.** O App publicar o livro (pedido à sessão do App de Campo em 09/10, com este contrato). A cobrança mensal
-por usina (ronda de extintor feita ou não no mês) e o painel da TST (baixa e confirmação dos extintores novos) são do
-App; entram aqui quando houver o livro e o pedido.
+**Relatório em PDF** (`nexus/hseq/relatorio.py`, rota `/t/hseq/extintores/relatorio.pdf`; Levi, 09/10, com as
+observações da TST: "TODOS OS EXTINTORES, CRÍTICOS, ATENÇÃO, OK · DETALHES DO EXTINTOR · o padrão será as fotos ao lado
+de cada extintor, mas será possível puxar relatório só dos críticos"). O mesmo agrupamento por usina e dia e os mesmos
+filtros da tela; o filtro do relatório é o status da TST (`status=todos|criticos|atencao|ok`; o OK leva o "OK sem
+validade"; nunca conferido só entra em "todos"). Com fotos (o padrão): cada extintor num quadro, a foto ao lado dos
+detalhes; `fotos=0`: uma tabela por usina e dia. A FOTO é a de `<dados>/hseq/extintores/fotos/<código>.jpg`, reduzida a
+600 px: **em 09/10 o App ainda não envia** (as fotos ficam no App, e o Nexus não lê o Azure), e o quadro diz "Sem foto
+no Nexus". Biblioteca: reportlab (BSD, no `requirements.txt`). Medido em 09/10 com os 773: todos com fotos, 101 páginas,
+245 kB, 13 s; só os críticos, 43 páginas, 1,5 s; sem fotos, 57 páginas. Sem o livro do App, a rota volta para a tela.
+
+**Pendências.** O App publicar o livro (pedido à sessão do App de Campo em 09/10, com este contrato; ela faz na v257).
+As FOTOS no relatório: o App mandar a foto de cada conferência ao Nexus (proposta: o Nexus recebe por uma rota com
+token e guarda em `<dados>/hseq/extintores/fotos/`; o token é App Setting do Levi). A cobrança mensal por usina (ronda
+de extintor feita ou não no mês) e o painel da TST (baixa e confirmação dos extintores novos) são do App; entram aqui
+quando houver o livro e o pedido.
+
+## EPI e EPC
+
+Levi, 09/10/2026: "Gostaria que criasse um campo de EPI / EPC começando apenas por EPI, puxando as luvas das rondas
+diárias". A tela (`/t/hseq/epi`, contas em `nexus/hseq/epi.py`) tem a aba **EPI · luvas isolantes**; a aba **EPC** fica
+apagada até haver de onde ler.
+
+**De onde vem.** A ronda diária pergunta "As luvas isolantes estão disponíveis?" (item `infra_luvas` do App, v207,
+29/09/2026: Sim ou Não, foto sempre, sem "Não se aplica"; o Não já vira ponto na Central do App e e-mail à TST). Desde a
+v249 o App manda o checklist no `rondas_app_campo` (coluna "Checklist da ronda", "rótulo: valor; ..."), e a resposta sai
+do texto (`epi.resposta`). A ronda (dia, usina, OS, quem fez) é a do fato único de ronda (`visao._rondas_ligadas`),
+juntada ao livro cru pelo `Início`, como no Campo. A resposta ainda NÃO está no `fato_ronda`: se o App mudar o rótulo da
+pergunta, nenhuma casa e a tela avisa. As fotos são as dos anexos da OS da ronda no Fracttal (o botão Fotos, o mesmo das
+Rondas; a das luvas fica em Infraestrutura); ronda sem OS não tem foto no Nexus.
+
+**As contas** (por usina mobilizada, como a Central): **sem luvas** = a última ronda respondeu Não ("desde" = o 1º Não da
+sequência até ela; vale mesmo antiga, porque é o último dado); **sem verificação** = nenhuma resposta há 7 dias ou mais
+(a régua da ronda pendente), ou nunca; **com luvas** = a última respondeu Sim há menos de 7 dias. Na linha, as 8 últimas
+respostas (quadradinho verde = Sim, vermelho = Não) e quantos Não.
+
+**Números de 09/10/2026** (banco real): 240 respostas de 28/09 a 09/10 (188 Sim, 52 Não); 128 usinas mobilizadas, **18
+sem luvas**, 34 sem verificação, 76 com luvas.
+
+**Como provar.** `python -m pytest -q tests/test_hseq_epi.py` (a resposta pelo texto, a situação por usina, o Sim antigo,
+os cartões, a tabela com o botão de fotos, o aviso quando a pergunta some).

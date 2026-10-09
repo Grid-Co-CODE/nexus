@@ -173,7 +173,7 @@ def test_por_supervisor_cartoes_da_regiao_de_campo_e_do_gestor(com_livro, logado
 
 
 def test_a_tabela_poe_o_mais_grave_primeiro_e_filtra_pela_situacao(com_livro, logado):
-    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
+    html = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor").get_data(as_text=True)
     # atrasado (o vencido há mais tempo primeiro), perto, sem validade, em dia (o que vence antes primeiro)
     assert _linhas(html) == ["ALT100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02",
                              "BWK100-INFC1-PPCI-EXT01", "IRC200-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT03"]
@@ -187,13 +187,13 @@ def test_a_tabela_poe_o_mais_grave_primeiro_e_filtra_pela_situacao(com_livro, lo
     assert "Thopen - Irecê 2 - BA sem região" in t                             # fora do cadastro: o nome do App
     assert "05/10/2026 há 4 d · App Técnico Silva" in t                          # quem conferiu, pelo nome
     assert codigo_da_pessoa(CHAVE, "tec1@exemplo.test") not in html
-    atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)          # o filtro abre a tabela
+    atr = logado.get("/t/hseq/extintores?f=atrasado&ver=extintor").get_data(as_text=True)          # o filtro abre a tabela
     assert _linhas(atr) == ["ALT100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01"]
-    sem = logado.get("/t/hseq/extintores?f=sem_atualizacao").get_data(as_text=True)    # o mais antigo primeiro
+    sem = logado.get("/t/hseq/extintores?f=sem_atualizacao&ver=extintor").get_data(as_text=True)    # o mais antigo primeiro
     assert _linhas(sem) == ["BWK100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02"]
-    reg = logado.get("/t/hseq/extintores?modo=tabela&regiao_campo=Sul+01").get_data(as_text=True)
+    reg = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor&regiao_campo=Sul+01").get_data(as_text=True)
     assert _linhas(reg) == ["COR100-INFC1-PPCI-EXT01"] and '<option value="Sul 01" selected>' in reg
-    busca = logado.get("/t/hseq/extintores?modo=tabela&q=skid1").get_data(as_text=True)
+    busca = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor&q=skid1").get_data(as_text=True)
     assert _linhas(busca) == ["BWK100-INFC1-PPCI-EXT01"]
 
 
@@ -220,3 +220,103 @@ def test_a_tela_aparece_pronta_no_menu_da_torre(com_livro, logado):
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     assert "campo-nativa" in html and 'href="/t/hseq/extintores"' in html
     assert logado.get("/t/hseq/riscos").status_code == 200                       # as outras seguem no placeholder
+
+# ── por usina e dia (Levi, 09/10: "queria agrupado por usina e dia!") ─────────────────────────────────────────────
+DIA_DO_GRUPO = [
+    # dois de Altair conferidos no mesmo dia viram UMA linha (e o terceiro, noutro dia, outra)
+    _ext("ALT100-INFC1-PPCI-EXT04", "Thopen - Altair 1 - SP", "02/2026", "Sem selo", "2026-10-05", carga="SOBRECARGA"),
+    _ext("ALT100-INFC1-PPCI-EXT05", "Thopen - Altair 1 - SP", "Sem data", "Sem selo", "2026-10-05"),
+]
+
+
+def test_por_usina_e_dia_junta_os_extintores_da_mesma_conferencia():
+    g = {(x["usina"], x["conferencia"]): x for x in EXT.por_usina_dia(
+        [dict(EXT.situacao(e, HOJE), usina=e["Usina"], codigo=e["Código"], ext=e["Código"][-5:])
+         for e in LIVRO + DIA_DO_GRUPO])}
+    alt = g[("Thopen - Altair 1 - SP", date(2026, 10, 5))]
+    assert alt["qtd"] == 3 and [x["ext"] for x in alt["extintores"]] == ["EXT04", "EXT01", "EXT05"]
+    # a recarga mais próxima é a mais antiga (vencida há mais tempo): 02/2026, e não 08/2026
+    assert (alt["situacao"], alt["recarga"], alt["recarga_fim"], alt["recarga_ext"]) == (
+        "atrasado", "02/2026", date(2026, 2, 28), "EXT04")
+    assert (alt["atrasado"], alt["sem_validade"], alt["status"]) == (2, 1, "CRITICO")
+    assert alt["status_qtd"]["CRITICO"] == 2 and alt["status_qtd"]["OK_SEM_VALIDADE"] == 1
+    # a mesma usina noutro dia é outra linha; o grupo sem nenhuma recarga com data diz "Sem data"
+    assert g[("Thopen - Altair 1 - SP", date(2026, 8, 1))]["qtd"] == 1
+    bwk = g[("Thopen - Brodowski 1 - SP", None)]
+    assert (bwk["recarga"], bwk["recarga_fim"], bwk["status"]) == ("Sem data", None, "")
+    ordem = [(x["usina"][9:13], x["conferencia"]) for x in EXT.por_usina_dia(
+        [dict(EXT.situacao(e, HOJE), usina=e["Usina"], codigo=e["Código"], ext=e["Código"][-5:])
+         for e in LIVRO + DIA_DO_GRUPO])]
+    assert ordem[0] == ("Alta", date(2026, 10, 5))           # o atrasado com a recarga mais antiga primeiro
+
+
+def test_a_tabela_abre_por_usina_e_dia_e_a_linha_abre_os_extintores(com_livro, logado):
+    _aba(com_livro, EXT.LIVRO, EXT.ABA, LIVRO + DIA_DO_GRUPO)
+    visao.limpar()
+    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
+    assert 'aria-current="page">Por usina e dia</a>' in html and 'href="?modo=tabela&amp;ver=extintor"' in html
+    cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
+    assert cab == "Situação Usina Quantidade de extintores Recarga mais próxima Última conferência Status da TST"
+    linhas = html.count('<tr class="cn-linha"')
+    assert linhas == 6 and html.count('<tr class="cn-detalhe" hidden>') == 6       # Altair em 2 dias, mais 4 usinas
+    primeira = _texto(html[html.index('<tr class="cn-linha"'):html.index('<tr class="cn-detalhe"')])
+    assert primeira.startswith("Atrasado Altair Sudeste 03 · Supervisora Campo 3 2 atrasados · 1 sem validade")
+    assert "02/2026 venceu há 7 meses" in primeira and "05/10/2026 há 4 d" in primeira
+    assert "Crítico 2 críticos · 1 ok sem validade" in primeira
+    # a linha abre os extintores dela, sem repetir a usina nem a conferência
+    sub = html[html.index('<table class="ext-sub">'):html.index("</table>", html.index('<table class="ext-sub">'))]
+    assert re.findall(r'title="([A-Z]{3}\d{3}-INFC1-PPCI-EXT\d+)"', sub) == [
+        "ALT100-INFC1-PPCI-EXT04", "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT05"]
+    assert "Altair" not in _texto(sub) and "Sobrecarga" not in sub and "sobrecarga" in _texto(sub)
+    # o filtro da faixa vale para o agrupamento: só os atrasados entram na conta da linha
+    atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)
+    assert atr.count('<tr class="cn-linha"') == 2
+    assert _texto(atr[atr.index('<tr class="cn-linha"'):atr.index('<tr class="cn-detalhe"')]).startswith(
+        "Atrasado Altair Sudeste 03 · Supervisora Campo 2 2 atrasados")
+
+
+# ── o relatório em PDF (Levi, 09/10, com as observações da TST) ──────────────────────────────────────────────────
+def _pdf_texto(corpo):
+    pypdf = pytest.importorskip("pypdf")
+    import io
+    return " ".join(" ".join((p.extract_text() or "").split()) for p in pypdf.PdfReader(io.BytesIO(corpo)).pages)
+
+
+def test_relatorio_pdf_por_usina_e_dia_com_o_filtro_da_tst(com_livro, logado):
+    r = logado.get("/t/hseq/extintores/relatorio.pdf")
+    assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data[:4] == b"%PDF"
+    assert "inline" in r.headers["Content-Disposition"] and "extintores-todos-2026-10-09.pdf" in r.headers[
+        "Content-Disposition"]
+    t = _pdf_texto(r.data)
+    assert "Relatório de extintores" in t and "Todos os extintores · com as fotos ao lado de cada extintor" in t
+    assert "Altair" in t and "Coração 1" in t and "Thopen - Irecê 2 - BA" in t
+    assert "Sem foto no Nexus" in t                                   # o padrão é com fotos: o quadro diz que falta
+    assert "Recarga mais próxima" in t and "venceu há 39 d" in t
+    # só os críticos: o ALT EXT01 (recarga vencida) e o COR EXT01 (sem carga e hidrostático vencido)
+    crit = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos").data)
+    assert "Só os críticos" in crit and "ALT100-INFC1-PPCI-EXT01" in crit and "COR100-INFC1-PPCI-EXT01" in crit
+    assert "EXT02" not in crit and "IRC200" not in crit and "Brodowski" not in crit
+    # sem fotos: uma tabela por usina e dia, sem o quadro da foto; os filtros da tela valem e o PDF diz quais
+    sem = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?fotos=0&fotos=0&regiao_campo=Sul+01").data)
+    assert "sem fotos" in sem and "Sem foto no Nexus" not in sem and "Filtros: Região de campo: Sul 01" in sem
+    assert "Coração 1" in sem and "Altair" not in sem
+
+
+def test_relatorio_pdf_poe_a_foto_que_o_app_enviou_ao_lado_do_extintor(com_livro, logado, app, tmp_path):
+    from PIL import Image
+    pasta = tmp_path / "hseq" / "extintores" / "fotos"
+    pasta.mkdir(parents=True)
+    Image.new("RGB", (1200, 900), (200, 30, 30)).save(pasta / "ALT100-INFC1-PPCI-EXT01.jpg")
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    r = logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos")
+    pypdf = pytest.importorskip("pypdf")
+    import io
+    paginas = pypdf.PdfReader(io.BytesIO(r.data)).pages
+    fotos = [im for p in paginas for im in p.images if im.name.endswith(".jpg")]     # o logo do topo é PNG
+    assert len(fotos) == 1 and max(fotos[0].image.size) <= 600         # reduzida (a de 1200 px não entra inteira)
+    assert "Sem foto no Nexus" in _pdf_texto(r.data)                   # o outro crítico continua sem foto
+
+
+def test_sem_o_livro_o_relatorio_volta_para_a_tela(banco, logado):
+    r = logado.get("/t/hseq/extintores/relatorio.pdf")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/extintores")

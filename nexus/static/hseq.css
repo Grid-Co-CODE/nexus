@@ -22,3 +22,25 @@
 .ext-tab .det.cn-t-critico{color:var(--critico)}
 .ext-tab .det.cn-t-alerta{color:var(--alerta)}
 .ext-tab .det.cn-t-info{color:var(--info)}
+/* por usina e dia (Levi, 09/10/2026: "queria agrupado por usina e dia!"): a linha da usina abre os extintores dela
+   numa tabela menor, logo abaixo; a seta diz que abre. O `tr.cn-detalhe` no seletor vence o `.cn-tab tr.cn-detalhe td`
+   do Campo (16 px de respiro, texto à esquerda), que pegaria as células de dentro */
+.ext-seta{display:inline-block;width:0;height:0;margin-right:8px;border-left:5px solid var(--mudo);
+  border-top:4px solid transparent;border-bottom:4px solid transparent;vertical-align:middle}
+.ext-tab tr.cn-linha[aria-expanded="true"] .ext-seta{transform:rotate(90deg)}
+.ext-tab tr.cn-detalhe > td{padding:4px 12px 12px}
+.ext-sub{width:100%;min-width:0;border-collapse:collapse}
+.ext-tab tr.cn-detalhe .ext-sub th{font:700 10.5px/14px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;color:var(--mudo);
+  text-align:center;padding:8px 6px;border-bottom:1px solid var(--linha);background:none}
+.ext-tab tr.cn-detalhe .ext-sub td{text-align:center;padding:8px 6px;border-bottom:1px solid var(--linha);background:none}
+.ext-tab tr.cn-detalhe .ext-sub tr:last-child td{border-bottom:0}
+/* o relatório em PDF: uma linha discreta abaixo da faixa de números */
+.ext-relatorio{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:14px}
+.ext-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--tinta-2)}
+/* EPI e EPC (09/10/2026): as últimas respostas das luvas, da mais nova para a mais velha, num quadradinho cada (verde =
+   Sim, vermelho = Não; a data e quem respondeu no title); a aba do EPC fica apagada até haver de onde ler */
+.ext-tab .ext-par > .epi-hist{display:inline-flex;gap:3px}     /* vence o inline-block das partes */
+.epi-hist i{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--linha-forte)}
+.epi-hist i.sim{background:var(--ok-cheio)}
+.epi-hist i.nao{background:var(--critico-cheio)}
+.cn-abas a[aria-disabled="true"]{opacity:.45;cursor:default}

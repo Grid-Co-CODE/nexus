@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{# EPI e EPC (Segurança · HSEQ, 09/10/2026): começa pelo EPI, as luvas isolantes de cada usina pela ronda diária
+   (nexus/hseq/epi.py). O mesmo desenho dos Extintores e da Central de atenção: a faixa que filtra a tabela, os cartões
+   por região de campo (o Supervisor de Campo) com a alternância para o gestor de contrato, e a tabela. #}
+{% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna %}
+{% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
+{% macro numeros(s) %}
+        <div class="cn-eq-num">
+          <span><span class="v{% if s.sem_luvas %} cn-t-critico{% endif %}">{{ s.sem_luvas }}</span><span class="d">{{ 'usina sem luvas' if s.sem_luvas == 1 else 'usinas sem luvas' }}</span></span>
+          <span class="dir"><span class="v{% if s.sem_verificacao %} cn-t-info{% endif %}">{{ s.sem_verificacao }}</span><span class="d">sem verificar há {{ dias_sem }} d</span></span>
+        </div>
+        <div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ s.com_luvas }} com luvas, {{ s.sem_verificacao }} sem verificação e {{ s.sem_luvas }} sem luvas, de {{ s.usinas }} usinas">
+          {% if s.usinas %}<span class="ok" style="width: {{ (100 * s.com_luvas / s.usinas)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * s.sem_verificacao / s.usinas)|round(1) }}%"></span><span class="pend" style="width: {{ (100 * s.sem_luvas / s.usinas)|round(1) }}%"></span>{% endif %}
+        </div>
+        <div class="cn-eq-leg">
+          <span><b>{{ s.com_luvas }}</b>com luvas</span>
+          <span><b>{{ s.sem_verificacao }}</b>sem verificar</span>
+          <span><b>{{ s.usinas }}</b>usinas</span>
+        </div>
+{% endmacro %}
+{% set pronto = not leitura.erro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">rondas diárias do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
+  </div>
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
+  {% elif d.get('rondas_com_checklist') and not d.get('respostas') %}<div class="cn-erro" role="alert"><b>Nenhuma ronda respondeu a pergunta das luvas.</b>
+    As rondas trazem o checklist, mas nenhuma tem "{{ pergunta }}": o App pode ter mudado o texto da pergunta.</div>{% endif %}
+  {% include 'campo/_aviso_estrutura.html' %}
+
+  {# EPI e EPC: começa pelo EPI (as luvas isolantes); o EPC entra quando houver de onde ler #}
+  <nav class="cn-abas" aria-label="EPI e EPC">
+    <a href="{{ url() }}" aria-current="page">EPI · luvas isolantes<i>{{ contagem.sem_luvas }}</i></a>
+    <a aria-disabled="true" title="Ainda sem fonte de dados: entra quando houver de onde ler">EPC</a>
+  </nav>
+
+  <form class="cn-filtros" method="get">
+    <div class="cn-seg" aria-label="Visão">
+      <a href="{{ url(modo=None, f=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por supervisor</a>
+      <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
+    </div>
+    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
+    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, cidade ou equipe" aria-label="Buscar">
+    {% for k in ('f', 'modo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+  </form>
+
+  {% if pronto %}
+  <div class="cn-numeros cn-numeros--filtro">
+    <a href="{{ url(f=None, modo='tabela') }}"{% if not f and modo == 'tabela' %} aria-current="page"{% endif %}><span class="gc-rotulo">Usinas</span><span class="v">{{ contagem.usinas }}</span><span class="d">mobilizadas</span></a>
+    <a href="{{ url(f='sem_luvas', modo='tabela') }}"{% if f == 'sem_luvas' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem luvas</span><span class="v{% if contagem.sem_luvas %} cn-t-critico{% endif %}">{{ contagem.sem_luvas }}</span><span class="d">a última ronda respondeu Não</span></a>
+    <a href="{{ url(f='sem_verificacao', modo='tabela') }}"{% if f == 'sem_verificacao' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem verificação</span><span class="v{% if contagem.sem_verificacao %} cn-t-info{% endif %}">{{ contagem.sem_verificacao }}</span><span class="d">há {{ dias_sem }} dias ou mais, ou nunca</span></a>
+    <a href="{{ url(f='com_luvas', modo='tabela') }}"{% if f == 'com_luvas' %} aria-current="page"{% endif %}><span class="gc-rotulo">Com luvas</span><span class="v{% if contagem.com_luvas %} cn-t-ok{% endif %}">{{ contagem.com_luvas }}</span><span class="d">a última ronda respondeu Sim</span></a>
+  </div>
+
+  {% if modo in ('regioes', 'gestores') %}
+  {{ alterna(modo == 'gestores', url(modo=None, f=None), url(modo='gestores', f=None)) }}
+  <div class="cn-equipes">
+    {% if modo == 'regioes' %}
+    {% for s in cartoes_reg %}
+      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.regiao == sem_regiao %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', regiao_campo=s.regiao, f=None) }}">
+        {{ cab_regiao(s, sem_regiao, ' · ' ~ plural(s.usinas, 'usina', 'usinas')) }}
+        {{ numeros(s) }}
+      </a>
+    {% else %}<p class="mudo">Nenhuma usina com esses filtros.</p>{% endfor %}
+    {% else %}
+    {% for s in cartoes_gest %}
+      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.gestor == sem_gestor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', gestor=s.gestor, f=None) }}">
+        {{ cab_gestor(s, sem_gestor) }}
+        {{ numeros(s) }}
+      </a>
+    {% else %}<p class="mudo">Nenhuma usina com esses filtros.</p>{% endfor %}
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="cn-tab cn-tab--compacta ext-tab"><table>
+    <thead><tr><th>Situação</th><th>Usina</th><th>Luvas isolantes</th><th>Última verificação</th><th>Últimas rondas</th><th>Fotos da ronda</th></tr></thead>
+    <tbody>
+    {% for x in lista[:limite] %}{% set s = situacoes[x.situacao] %}{% set u = x.ultima %}
+      <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+        <td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span><span class="det">{{ x.regiao_campo if x.regiao_campo and x.regiao_campo != sem_regiao else 'sem região' }}{% if x.supervisor_campo and x.supervisor_campo != vaga %} · {{ x.supervisor_campo }}{% endif %}</span></span></td>
+        <td>{% if u %}<span class="ext-par"><span class="{{ 'cn-t-critico' if u.luvas is false else 'cn-t-ok' }}"><b>{{ 'Não' if u.luvas is false else 'Sim' }}</b></span>{% if x.desde %}<span class="det cn-t-critico">desde {{ x.desde.strftime('%d/%m') }} · há {{ tempo((d.hoje - x.desde).days) }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca verificada</span>{% endif %}</td>
+        <td>{% if u %}<span class="ext-par"><span class="m">{{ u.dia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.dias >= dias_sem }}">{{ 'hoje' if x.dias == 0 else 'há ' ~ tempo(x.dias) }}</span>{% if u.tecnico %}<span class="det">{{ u.tecnico }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">—</span>{% endif %}</td>
+        <td>{% if x.historico %}<span class="ext-par"><span class="epi-hist" role="img" aria-label="Últimas {{ x.historico|length }} rondas: {% for v in x.historico %}{{ v.dia.strftime('%d/%m') }} {{ 'Não' if v.luvas is false else 'Sim' }}{{ ', ' if not loop.last }}{% endfor %}">{% for v in x.historico %}<i class="{{ 'nao' if v.luvas is false else 'sim' }}" title="{{ v.dia.strftime('%d/%m') }}: {{ 'Não' if v.luvas is false else 'Sim' }}{% if v.tecnico %} ({{ v.tecnico }}){% endif %}"></i>{% endfor %}</span>{% if x.nao %}<span class="det cn-t-critico">{{ x.nao }} Não em {{ x.verificacoes }}</span>{% else %}<span class="det">{{ plural(x.verificacoes, 'resposta', 'respostas') }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">—</span>{% endif %}</td>
+        <td>{% if u and u.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=u.os|int) }}" title="As fotos da ronda de {{ u.dia.strftime('%d/%m') }} (a das luvas fica em Infraestrutura)">Fotos</button>{% elif u %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% else %}<span class="mudo">—</span>{% endif %}</td></tr>
+      {% if u and u.os %}<tr class="cn-fotos-linha" hidden><td colspan="6"></td></tr>{% endif %}
+    {% else %}<tr><td colspan="6" class="mudo">Nenhuma usina com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use a região de campo, o gestor ou a busca para afunilar.</p>{% endif %}
+  {% include 'campo/_ronda_fotos_caixa.html' %}
+  {% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>De onde vem.</b> A ronda diária pergunta "{{ pergunta }}" (Sim ou Não, com foto). <b>Sem
+    luvas</b>: a última ronda respondeu Não; "desde" é o primeiro Não da sequência até ela. <b>Sem verificação</b>:
+    nenhuma resposta há {{ dias_sem }} dias ou mais, ou nunca (a mesma régua da ronda pendente). <b>Com luvas</b>: a última
+    ronda respondeu Sim. O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda
+    junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal. A região de campo é a da
+    equipe da usina; o gestor de contrato é o da usina.
+  </div>
+</div>
+{% endblock %}

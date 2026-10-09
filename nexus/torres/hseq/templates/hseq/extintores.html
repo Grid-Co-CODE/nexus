@@ -29,6 +29,27 @@
 {# uma etiqueta (recarga ou hidrostático): o que está escrito nela e, ao lado, só o que pede ação: quando venceu, ou
    quanto falta se vence em até 30 dias. Vencer daqui a anos não precisa de frase (e alargava a coluna) #}
 {% macro etiqueta(v, fim) %}<span class="ext-par">{% if fim %}{% set n = (fim - d.hoje).days %}<span class="m">{{ v }}</span>{% if n <= alerta_dias %}<span class="det{{ ' cn-t-critico' if n < 0 else ' cn-t-alerta' }}">{% if n < 0 %}venceu há {{ tempo(n) }}{% elif n == 0 %}vence hoje{% else %}vence em {{ tempo(n) }}{% endif %}</span>{% endif %}{% else %}<span class="cn-t-neutro">{{ v }}</span>{% endif %}</span>{% endmacro %}
+{# as células de um extintor, iguais na tabela por extintor e dentro da linha da usina (cada parte lado a lado: Levi,
+   09/10, "se tem espaço para botar paralelo então deixe paralelo"). A região diz o supervisor só quando há alguém (a
+   vaga está nos cartões); o status da TST não repete a validade (está nas colunas ao lado): só a carga e os itens com
+   NÃO, e o motivo inteiro no title #}
+{% macro regiao_det(x) %}<span class="det">{{ x.regiao_campo if x.regiao_campo and x.regiao_campo != sem_regiao else 'sem região' }}{% if x.supervisor_campo and x.supervisor_campo != vaga %} · {{ x.supervisor_campo }}{% endif %}</span>{% endmacro %}
+{% macro conferencia(x) %}{% if x.conferencia %}<span class="ext-par"><span class="m">{{ x.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.sem_atualizacao }}">há {{ tempo(x.dias_conferencia) }}{% if x.origem_conferencia %} · <span title="{{ x.origem_conferencia }}">{{ 'Forms' if x.origem_conferencia.startswith('Forms') else x.origem_conferencia }}</span>{% endif %}</span>{% if x.conferido_por %}<span class="det">{{ x.conferido_por }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca conferido</span>{% endif %}{% endmacro %}
+{% macro linha_extintor(x, com_usina=true, com_conferencia=true) %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}
+      <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+        {% if com_usina %}<td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span>{{ regiao_det(x) }}</span></td>{% endif %}
+        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
+        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
+        <td>{{ etiqueta(x.val2, x.fim2) }}</td>
+        <td>{{ etiqueta(x.val3, x.fim3) }}</td>
+        {% if com_conferencia %}<td>{{ conferencia(x) }}</td>{% endif %}
+        <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
+{% endmacro %}
+{% set no_grupo = {'atrasado': ('atrasado', 'atrasados', 'critico'), 'perto': ('perto de vencer', 'perto de vencer', 'alerta'),
+                   'sem_validade': ('sem validade', 'sem validade', 'neutro'), 'em_dia': ('em dia', 'em dia', 'ok')} %}
+{% set status_no_grupo = {'CRITICO': ('crítico', 'críticos', 'critico'), 'ATENCAO': ('atenção', 'atenção', 'alerta'),
+                          'OK_SEM_VALIDADE': ('ok sem validade', 'ok sem validade', 'neutro'), 'OK': ('ok', 'ok', 'ok'),
+                          '': ('sem conferência', 'sem conferência', 'neutro')} %}
 {% set pronto = not leitura.erro and d.get('aba_existe') and not d.get('colunas_faltando') %}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -56,7 +77,7 @@
     </select>
     {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, extintor ou local" aria-label="Buscar">
-    {% for k in ('f', 'modo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+    {% for k in ('f', 'modo', 'ver') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
 
   {% if pronto %}
@@ -68,6 +89,20 @@
     <a href="{{ url(f='sem_atualizacao', modo='tabela') }}"{% if f == 'sem_atualizacao' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem atualização</span><span class="v{% if contagem.sem_atualizacao %} cn-t-info{% endif %}">{{ contagem.sem_atualizacao }}</span><span class="d">conferido há mais de {{ sem_atualizacao_dias }} dias, ou nunca</span></a>
     <a href="{{ url(f='sem_validade', modo='tabela') }}"{% if f == 'sem_validade' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem validade</span><span class="v">{{ contagem.sem_validade }}</span><span class="d">recarga sem data na etiqueta</span></a>
   </div>
+
+  {# o relatório em PDF (Levi, 09/10, com as observações da TST): agrupado por usina e dia, com os filtros da tela; o
+     status da TST escolhe quais entram e as fotos vão ao lado de cada extintor (o padrão). Abre noutra aba #}
+  <form class="ext-relatorio" method="get" action="{{ url_for('torre_hseq.extintores_relatorio') }}" target="_blank">
+    {% for k in ('regiao', 'regiao_campo', 'gestor', 'q') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+    <span class="gc-rotulo">Relatório em PDF</span>
+    <select class="gc-campo" name="status" aria-label="Quais extintores entram no relatório">
+      <option value="todos">Todos os extintores</option><option value="criticos">Só os críticos</option>
+      <option value="atencao">Só os de atenção</option><option value="ok">Só os OK</option>
+    </select>
+    <input type="hidden" name="fotos" value="0">
+    <label class="ext-check"><input type="checkbox" name="fotos" value="1" checked> com as fotos</label>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Gerar PDF</button>
+  </form>
 
   {% if modo in ('regioes', 'gestores') %}
   {# por supervisor: a região de campo (estrutura de O&M de 10/2026), com o Supervisor de Campo e o Coordenador; a
@@ -95,27 +130,62 @@
     {% endif %}
   </div>
   {% else %}
+  {# a tabela (Levi, 09/10: "queria agrupado por usina e dia!"): primeiro por usina e dia da última conferência, e a
+     linha da usina abre os extintores dela; a visão por extintor fica ao lado #}
+  <div class="cn-alterna" role="group" aria-label="Ver a tabela">
+    <span class="gc-rotulo">Ver</span>
+    <div class="cn-seg cn-seg--mini">
+      <a href="{{ url(ver=None) }}"{% if ver == 'usina' %} aria-current="page"{% endif %}>Por usina e dia</a>
+      <a href="{{ url(ver='extintor') }}"{% if ver == 'extintor' %} aria-current="page"{% endif %}>Por extintor</a>
+    </div>
+  </div>
+  {% if ver == 'usina' %}
+  <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande">
+    <thead><tr><th>Situação</th><th>Usina</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Última conferência</th><th>Status da TST</th></tr></thead>
+    <tbody>
+    {% for g in grupos[:limite] %}{% set s = situacoes[g.situacao] %}{% set t = status_tst.get(g.status) %}
+      <tr class="cn-linha" tabindex="0" aria-expanded="false" title="Ver os {{ g.qtd }} extintores">
+        <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+        <td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</span>{{ regiao_det(g) }}</span></td>
+        <td><span class="ext-par"><b>{{ g.qtd }}</b><span class="det">{% for k, (um, varios, cor) in no_grupo.items() if g[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g[k] }} {{ um if g[k] == 1 else varios }}</span>{% endfor %}</span></span></td>
+        <td>{% if g.recarga_fim %}{{ etiqueta(g.recarga, g.recarga_fim) }}{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}</td>
+        <td>{{ conferencia(g) }}</td>
+        <td><span class="ext-par">{% if t %}<span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}<span class="det">{% for k, (um, varios, cor) in status_no_grupo.items() if g.status_qtd[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g.status_qtd[k] }} {{ um if g.status_qtd[k] == 1 else varios }}</span>{% endfor %}</span></span></td>
+      </tr>
+      <tr class="cn-detalhe" hidden><td colspan="6">
+        <table class="ext-sub">
+          <thead><tr><th>Situação</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
+          <tbody>{% for x in g.extintores %}{{ linha_extintor(x, false, false) }}{% endfor %}</tbody>
+        </table>
+      </td></tr>
+    {% else %}<tr><td colspan="6" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if grupos|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ grupos|length }} usinas e dias: use a região de campo, o gestor, a situação ou a busca para afunilar.</p>{% endif %}
+  <script>
+    // a linha da usina abre (e fecha) os extintores dela logo abaixo; Enter e espaço também
+    document.querySelectorAll('.ext-tab table.cn-expande > tbody > tr.cn-linha').forEach(function (tr) {
+      function alterna(ev) {
+        if (ev.target.closest('a')) return;
+        var det = tr.nextElementSibling;
+        if (!det || !det.classList.contains('cn-detalhe')) return;
+        det.hidden = !det.hidden;
+        tr.setAttribute('aria-expanded', String(!det.hidden));
+      }
+      tr.addEventListener('click', alterna);
+      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
+    });
+  </script>
+  {% else %}
   <div class="cn-tab cn-tab--compacta ext-tab"><table>
     <thead><tr><th>Situação</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Última conferência</th><th>Status da TST</th></tr></thead>
     <tbody>
-    {% for x in lista[:limite] %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}
-      {# cada célula com as partes lado a lado (Levi, 09/10: "se tem espaço para botar paralelo então deixe paralelo"); a
-         parte inteira só desce de linha quando a coluna não comporta. A região de campo diz o supervisor só quando há
-         alguém (a vaga está nos cartões) #}
-      <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        <td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span><span class="det">{{ x.regiao_campo if x.regiao_campo and x.regiao_campo != sem_regiao else 'sem região' }}{% if x.supervisor_campo and x.supervisor_campo != vaga %} · {{ x.supervisor_campo }}{% endif %}</span></span></td>
-        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
-        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
-        <td>{{ etiqueta(x.val2, x.fim2) }}</td>
-        <td>{{ etiqueta(x.val3, x.fim3) }}</td>
-        <td>{% if x.conferencia %}<span class="ext-par"><span class="m">{{ x.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.sem_atualizacao }}">há {{ tempo(x.dias_conferencia) }}{% if x.origem_conferencia %} · <span title="{{ x.origem_conferencia }}">{{ 'Forms' if x.origem_conferencia.startswith('Forms') else x.origem_conferencia }}</span>{% endif %}</span>{% if x.conferido_por %}<span class="det">{{ x.conferido_por }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca conferido</span>{% endif %}</td>
-        {# o status da TST sem repetir a validade (ela já está nas duas colunas ao lado): só a carga e os itens com NÃO; o
-           motivo inteiro fica no title #}
-        <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
+    {% for x in lista[:limite] %}{{ linha_extintor(x) }}
     {% else %}<tr><td colspan="8" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
   {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use a região de campo, o gestor, a situação ou a busca para afunilar.</p>{% endif %}
+  {% endif %}
   {% endif %}
   {% endif %}
 
