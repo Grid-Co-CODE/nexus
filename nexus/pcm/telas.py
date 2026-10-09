@@ -2,13 +2,15 @@
 
 Etapa 1: Semana e Tarefas e OS mostram a programação que está valendo (a mesma do App de Campo).
 Etapa 2: Gerar a semana roda o motor do PCM no Nexus, em sombra, e compara com a semana oficial do PCM.
+Etapa 3 (09/10/2026, Levi: "semana que vem já quero full nexus sem falta"): Publicar no App manda a semana gerada para o
+repositório do PCM, pelo mesmo caminho do PC do PCM (`publicar.py`): só administrador, com a tela de confirmação.
 """
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import abort, current_app, jsonify, redirect, render_template, request
+from flask import abort, current_app, jsonify, redirect, render_template, request, session
 
-from . import fonte, geracao, gestao as G, insumos as I, observacoes as O, semana as S
+from . import fonte, geracao, gestao as G, insumos as I, observacoes as O, publicar as PB, semana as S
 
 POR_PAGINA = 150
 _BRT = timezone(timedelta(hours=-3))
@@ -62,7 +64,13 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
         c = clientes.setdefault(u["cliente"], {"nome": u["cliente"], "usinas": 0, "restritas": 0})
         c["usinas"] += 1
         c["restritas"] += len(u["dias"]) < len(O.DIAS)
+    app_sel = None
+    if sel and sel.get("publicacao"):
+        leitura = fonte.ler(cfg)                    # a semana já chegou ao App? (o banco_dados.json que ele lê)
+        app_sel = {"semana": PB.semana_no_app(leitura.dados, sel["semana"]), "erro": leitura.erro}
     return {"conf": geracao.conferir(cfg, semana), "ultimas": geracao.ultimas(cfg), "sel": sel,
+            "admin": bool(session.get("admin")), "app_sel": app_sel,
+            "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,
             "observacoes": texto_obs, "herdada_de": herdada_de,
             "regras": list(enumerate(regras)), "obs_resumo": O.resumo(regras),
@@ -77,6 +85,24 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
             "campo": geracao.horario_de_campo(), "erro": erro, "ok": ok}
 
 
+def _ctx_publicar(cfg, st: dict, motivos: list, erro: str | None = None) -> dict:
+    """O que a pessoa precisa ver antes de mandar a semana para o campo."""
+    pasta = geracao.pasta_trabalho(cfg) / "geracoes" / st["id"]
+    try:
+        regras = O.ler((pasta / I.OBSERVACOES).read_text(encoding="utf-8"))
+    except OSError:
+        regras = []
+    horas = None
+    try:
+        fim = datetime.fromisoformat(st.get("fim") or st.get("inicio"))
+        horas = int((datetime.now(_BRT) - fim).total_seconds() // 3600)
+    except (TypeError, ValueError):
+        pass
+    return {"st": st, "motivos": motivos, "erro": erro, "negado": False, "conf": st.get("conferencia") or {},
+            "obs": O.resumo(regras), "repo": PB.estado_no_repositorio(cfg, st["semana"]),
+            "planilha": PB.nome_planilha(st["semana"]), "horas_desde": horas, "ja_comecou": PB.ja_comecou(st["semana"])}
+
+
 def _semana_do_form() -> str | None:
     s = (request.form.get("semana") or "").strip()
     return s if geracao.SEMANA_RE.match(s) else None
@@ -88,7 +114,10 @@ def registrar_pcm(bp) -> None:
         cfg = current_app.config
         if request.method == "GET":
             avisos = {"importado": "Importado da pasta do PCM.", "observacoes": "Observações salvas.",
-                      "copiado": "Observações copiadas da semana anterior."}
+                      "copiado": "Observações copiadas da semana anterior.",
+                      "importado_repo": "Observações importadas do repositório do PCM.",
+                      "publicada": "Semana publicada no repositório do PCM. O robô do PCM regrava o banco_dados.json do "
+                                   "App em 5 a 10 minutos."}
             return render_template("pcm/gerar.html", **_ctx_gerar(
                 cfg, rodada=request.args.get("rodada"), semana=request.args.get("semana"),
                 ok=avisos.get(request.args.get("feito") or "")))
@@ -126,6 +155,60 @@ def registrar_pcm(bp) -> None:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
                                    erro=f"Não importei: {ex}")), 400
         return redirect(f"/t/pcm/gerar?semana={semana}&feito=importado", code=303)
+
+    @bp.route("/gerar/importar-repositorio", methods=["POST"])
+    def gerar_importar_repositorio():
+        """As observações que estão no repositório do PCM (o Observacoes_Semana.txt que o PC do PCM ou o painel mandou)
+        entram na semana escolhida. Funciona no servidor, onde a pasta do PCM não existe."""
+        cfg = current_app.config
+        semana = _semana_do_form()
+        if not semana:
+            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
+        ler = geracao.leitor_do_repositorio(cfg)
+        try:
+            dados = ler(I.OBSERVACOES) if ler else None
+        except Exception as ex:      # noqa: BLE001
+            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                                   erro=f"Não consegui ler o repositório do PCM ({type(ex).__name__}).")), 502
+        if not dados:
+            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                                   erro="O repositório do PCM não tem o Observacoes_Semana.txt.")), 404
+        repo, ramo = fonte.repositorio(cfg)
+        I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, dados.decode("utf-8", errors="replace"),
+                             autor="repositório do PCM", origem={"arquivo": f"{repo} · {I.OBSERVACOES}",
+                                                                  "importado_em": I._agora()})
+        return redirect(f"/t/pcm/gerar?semana={semana}&feito=importado_repo", code=303)
+
+    @bp.route("/gerar/publicar", methods=["GET", "POST"])
+    def gerar_publicar():
+        """Publicar no App: a confirmação (GET) e o envio (POST). Só administrador: muda a semana de todo o campo."""
+        cfg = current_app.config
+        rid = (request.values.get("rodada") or "").strip()
+        st = geracao.ler_status(cfg, rid)
+        if st is None:
+            abort(404)
+        if not session.get("admin"):
+            return render_template("pcm/publicar.html", st=st, negado=True), 403
+        motivos = PB.motivos_para_nao_publicar(cfg, rid)
+        if request.method == "POST":
+            repo_ja_tem = request.form.get("repo_ja_tem") == "1"
+            comecou = PB.ja_comecou(st["semana"])
+            if (not request.form.get("confirmo") or (repo_ja_tem and not request.form.get("substituir"))
+                    or (comecou and not request.form.get("ciente_comecou"))):
+                return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
+                                       erro="Marque a confirmação para publicar.")), 400
+            quem = (session.get("usuario") or {}).get("email") or "administrador (senha)"
+            try:
+                PB.publicar(cfg, rid, quem)
+            except PB.PublicacaoErro as ex:
+                return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
+                                       erro=f"Não publiquei: {ex}.")), 400
+            except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda na rodada
+                return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
+                                       erro=f"O GitHub não respondeu ({type(ex).__name__}): nada foi publicado, ou "
+                                            f"só parte; confira o repositório antes de tentar de novo.")), 502
+            return redirect(f"/t/pcm/gerar?rodada={rid}&feito=publicada", code=303)
+        return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos))
 
     @bp.route("/gerar/observacoes", methods=["POST"])
     def gerar_observacoes():

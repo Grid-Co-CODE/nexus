@@ -394,3 +394,14 @@ tr.pg-det p{margin:4px 0}
   .pg-tbl .pg-rotlin{min-width:150px;max-width:170px}
   .pg-fim{margin-left:0}
 }
+
+/* Publicar no App (09/10/2026): o botão na rodada e a tela de conferência antes de mandar a semana para o campo */
+.pcm-sit--publicada{color:var(--verde-texto);background:var(--verde-suave);margin-left:6px}
+.pcm-pub-barra{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pcm-pub-sub{max-width:760px;margin:0 0 16px}
+.pcm-pub-h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:10px 0 0}
+.pcm-pub-lista{margin:6px 0 0;padding-left:18px;display:grid;gap:6px;font-size:14px;color:var(--tinta-2);max-width:820px}
+.pcm-pub-ruim{color:var(--critico)}
+.pcm-pub-pre{margin:6px 0;max-height:180px;overflow:auto}
+.pcm-pub-form{display:grid;gap:10px;margin:0 0 22px;max-width:760px}
+.pcm-pub-acoes{display:flex;gap:10px;flex-wrap:wrap}

@@ -120,7 +120,9 @@ sem OS depois de 06/10 não entra ali.
    uma e por onde vai ligar. Sistema novo chamando usina de outro jeito = entra no `de_para` do cadastro (tela Base →
    Ligações), não num mapa escondido no código. Equipamento novo de outra fonte = apelido em `equipamento_apelido`.
 4. **Registrar no `catalogo.py`** (`Fato`, estado `origem`, com `tipo`, `chave`, `medidas`, `fontes`,
-   `janela_origem`) e, se for livro novo, em `LIVROS`. A tela já passa a mostrar a lacuna.
+   `janela_origem`) e, se for livro novo, em `LIVROS`; e o "para que serve" em `explica.py` (`RESUMO` e `PARA_QUE`; o
+   teste cobra). A tela já passa a mostrar a lacuna. Tabela que não é fato (cadastro, controle, apoio de outro sistema)
+   entra em `CONHECIDAS`, com o porquê. Sem isso, a tabela aparece como **nova** no radar da Governança.
 5. **Pessoa?** Confirmar que nada pessoal vai em claro (regra 8).
 6. **Construir o fato conformado** num módulo puro (`fato_<processo>.py`, com `CAB_`, `TIPO`, `GRAO`, `CHAVE`,
    `FONTES`, `MEDIDAS`, a linha de qualidade e `conferir_grao`) e ligar em `carga.montar` (estado `montado` enquanto a

@@ -15,6 +15,11 @@ import urllib.request
 from dataclasses import dataclass
 
 URL_PADRAO = "https://raw.githubusercontent.com/fillipefigueiro-source/gridco-pcm-data/main/banco_dados.json"
+# O repositório do PCM (o robô do App mora nele). A publicação da semana (publicar.py) e o plano publicado que o
+# histórico lê (historico_banco.py) vão nele; trocar de dono (o repositório sai da conta do Fillipe até 03/11) é mudar
+# NEXUS_PCM_REPO, sem tocar no código.
+REPO_PADRAO = "fillipefigueiro-source/gridco-pcm-data"
+RAMO_PADRAO = "main"
 # O robô publica a cada ~30 min; 5 min de cópia em memória poupa baixar 6 MB a cada clique sem ficar para trás.
 TTL_S = 300
 TIMEOUT_S = 30
@@ -35,6 +40,13 @@ class Leitura:
     baixado_em: float | None = None      # epoch da leitura que está em uso
     erro: str = ""                       # preenchido quando a última tentativa falhou
     velha: bool = False                  # True: a tentativa falhou e a tela mostra a última cópia boa
+
+
+def repositorio(config) -> tuple[str, str]:
+    """(dono/repositório, ramo) do repositório do PCM."""
+    repo = str(config.get("NEXUS_PCM_REPO") or os.environ.get("NEXUS_PCM_REPO") or REPO_PADRAO).strip("/")
+    ramo = str(config.get("NEXUS_PCM_RAMO") or os.environ.get("NEXUS_PCM_RAMO") or RAMO_PADRAO)
+    return repo, ramo
 
 
 def endereco(config) -> str:

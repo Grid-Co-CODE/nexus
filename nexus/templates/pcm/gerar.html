@@ -4,14 +4,14 @@
 {% macro hora(iso) %}{{ iso[8:10] ~ '/' ~ iso[5:7] ~ ' ' ~ iso[11:16] if iso else '' }}{% endmacro %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
-<p class="gc-eyebrow">PCM · Programação semanal · sombra</p>
+<p class="gc-eyebrow">PCM · Programação semanal</p>
 {# Em blocos numerados, na ordem do trabalho (05/10/2026, Levi: "está confuso, separe por blocos"): 1 insumos,
    2 observações, 3 gerar, 4 histórico. A semana é escolhida UMA vez, no topo, e vale para a página inteira. #}
 <div class="pcm-topo">
   <div>
     <h1 class="titulo-pagina">Gerar a semana</h1>
-    <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana oficial do PCM. Nada é publicado: o campo continua
-      com a semana oficial.</p>
+    <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana oficial. Gerar não muda nada no campo: a semana só
+      vai ao App pelo botão Publicar no App da rodada, com confirmação (só administrador).</p>
   </div>
   <form class="pcm-semana-sel" method="get" action="/t/pcm/gerar">
     <label class="gc-rotulo" for="ver-semana">Semana</label>
@@ -72,6 +72,29 @@
   </div>
   {% endif %}
 
+  {# publicar no App (09/10/2026): a situação da publicação ou o botão, e o que conferir antes #}
+  {% if sel.publicacao %}
+  {% set pb = sel.publicacao %}
+  <div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-paper-plane-tilt"></i><div><strong>Publicada no App</strong> em
+    {{ hora(pb.quando) }} ({{ pb.arquivos|map(attribute='nome')|join(' e ') }}, conferidos no repositório do PCM).
+    {% if app_sel and app_sel.semana %}O App já tem a semana {{ sel.semana }}: {{ app_sel.semana.linhas }} linhas,
+    {{ app_sel.semana.pendentes }} pendentes.{% elif app_sel and app_sel.erro %}Não consegui ler o banco_dados.json do App agora
+    ({{ app_sel.erro }}).{% else %}O banco_dados.json do App ainda não tem a semana: o robô do PCM leva de 5 a 10 minutos
+    depois da publicação.{% endif %}</div></div>
+  {% elif pode_publicar %}
+  <div class="pcm-pub-barra">
+    {% if admin %}<a class="gc-btn gc-btn--ui gc-btn--primario" href="/t/pcm/gerar/publicar?rodada={{ sel.id }}"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</a>
+    <span class="gc-ajuda">Abre a conferência antes de mandar a semana para o campo.</span>
+    {% else %}<span class="gc-ajuda">Esta semana pode ser publicada no App por um administrador.</span>{% endif %}
+  </div>
+  {% endif %}
+  {% if sel.conferencia and sel.conferencia.excede_hh_os %}
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Corretivas forçadas além das horas do dia:</strong>
+    {% for e in sel.conferencia.excede_hh_os %}OS {{ e.os }} ({{ e.tarefas }} {{ 'tarefa' if e.tarefas == 1 else 'tarefas' }},
+    {{ e.horas }} h, {{ e.equipe }}, {{ e.dia }}){{ ', ' if not loop.last }}{% endfor %}. Confira a duração estimada no Fracttal
+    ou fixe as tarefas em dias diferentes (bloco 2) e gere de novo.</div></div>
+  {% endif %}
+
   {% if sel.comparacao %}
   {% set c = sel.comparacao %}
   {% if c.identicas %}
@@ -124,9 +147,10 @@
     <span class="pcm-passo-n">1</span>
     <div class="pcm-passo-txt">
       <h2 class="pcm-passo-tit">O que o motor precisa</h2>
-      <p class="pcm-passo-sub">Prioridades, Confiabilidade, Histórico, Feriados e Observações moram no Nexus: a cada geração o
-        Nexus escreve os arquivos que o motor lê. Enquanto o PCM gera pelo PC, importe os arquivos da pasta do PCM antes de
-        gerar, para as duas semanas partirem do mesmo dado.</p>
+      <p class="pcm-passo-sub">Prioridades, Confiabilidade, Feriados e Observações moram no Nexus, e o Histórico sai do banco
+        (a programação que foi ao campo, semana a semana): a cada geração o Nexus escreve os arquivos que o motor lê.
+        Enquanto o PCM gera pelo PC, importe os arquivos da pasta do PCM antes de gerar, para as duas semanas partirem do
+        mesmo dado.</p>
     </div>
     <span class="pcm-passo-estado pcm-passo-estado--{{ 'ok' if not n_falta else 'falta' }}">{% if not n_falta %}<i class="ph ph-check-circle"></i> tudo pronto{% else %}<i class="ph ph-x-circle"></i> {{ n_falta }} {{ 'falta' if n_falta == 1 else 'faltam' }}{% endif %}</span>
   </header>
@@ -139,11 +163,18 @@
     </div>
     {% endfor %}
   </div>
+  <form class="pcm-passo-pe" method="post" action="/t/pcm/gerar/importar-repositorio">
+    <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-github-logo"></i> Importar observações do repositório do PCM</button>
+    <span class="gc-ajuda">O Observacoes_Semana.txt que o PC do PCM ou o painel mandou por último entra na semana
+      {{ semana_sugerida }} (por cima do que estiver salvo nela). Funciona também no servidor.</span>
+  </form>
   {% if tem_origem %}
   <form class="pcm-passo-pe" method="post" action="/t/pcm/gerar/importar">
     <input type="hidden" name="semana" value="{{ semana_sugerida }}">
     <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-download-simple"></i> Importar da pasta do PCM</button>
-    <span class="gc-ajuda">Traz os cinco arquivos de hoje; as observações entram na semana {{ semana_sugerida }}.</span>
+    <span class="gc-ajuda">Traz os quatro arquivos de hoje (o histórico não: ele vem do banco); as observações entram na
+      semana {{ semana_sugerida }}.</span>
   </form>
   {% endif %}
 </section>
@@ -158,7 +189,7 @@
     <div class="pcm-passo-txt">
       <h2 class="pcm-passo-tit">Gerar em sombra</h2>
       <p class="pcm-passo-sub">Leva alguns minutos: o motor lê o Fracttal inteiro, a 1 pedido por segundo. Pode sair desta
-        página. Nada é publicado.</p>
+        página. Gerar não publica: a semana só vai ao App pelo botão Publicar no App da rodada.</p>
     </div>
   </header>
   <form class="pcm-gerar" method="post" action="/t/pcm/gerar">
@@ -191,7 +222,8 @@
       <tr>
         <td><a class="linha" href="?rodada={{ u.id }}">{{ hora(u.inicio) }}</a></td>
         <td>{{ u.semana }}</td>
-        <td><span class="pcm-sit pcm-sit--{{ u.estado }}">{{ rotulo.get(u.estado, u.estado) }}</span></td>
+        <td><span class="pcm-sit pcm-sit--{{ u.estado }}">{{ rotulo.get(u.estado, u.estado) }}</span>{% if u.publicacao %}
+          <span class="pcm-sit pcm-sit--publicada">Publicada no App</span>{% endif %}</td>
         <td class="num">{{ u.resumo.linhas if u.resumo else '—' }}</td>
         <td>{% if u.comparacao %}{{ 'Idênticas' if u.comparacao.identicas else 'Diferentes' }}{% elif u.estado == 'ok' %}sem a oficial ainda{% else %}—{% endif %}</td>
       </tr>

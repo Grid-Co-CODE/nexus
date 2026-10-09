@@ -3,15 +3,21 @@
 O motor é o do PCM (programacao_v7.py e os dois leitores do Fracttal), copiado sem mudança em motor/. O Nexus:
 1. confere o que o motor precisa: credencial, insumos e o próprio motor;
 2. monta uma pasta por rodada, FORA do OneDrive, e escreve nela os insumos que moram no Nexus (insumos.py:
-   prioridades, confiabilidade, histórico, feriados e observações), no formato que o motor lê, e a AUXILIAR, que sai
+   prioridades, confiabilidade, feriados e observações), no formato que o motor lê, e a AUXILIAR, que sai
    do cadastro do Nexus (auxiliar.py). Da pasta do PCM só vêm as durações aprendidas. Na sombra, o Nexus importa os arquivos da pasta do PCM antes, para as duas
    gerações partirem do mesmo ponto;
-3. volta o histórico para antes da semana: na 2ª geração o motor marcava tudo como reprogramado (415 tarefas na
-   semana 40), e assim tanto faz rodar antes ou depois do PCM;
+3. escreve o histórico das programações a partir do BANCO (`historico_banco.py`, desde 08/10/2026), só com as semanas
+   de antes da gerada: na 2ª geração da mesma semana o motor marcava tudo como reprogramado (415 tarefas na semana 40),
+   e assim tanto faz rodar antes ou depois do PCM. Banco fora do ar: a reserva guardada no Nexus, voltada para antes
+   da semana (`preparar_historico`);
 4. roda o motor num SUBPROCESSO, com ambiente próprio. O FRACTTAL_BASE_URL do motor tem /api/ e o do OS Creator, que
    roda dentro do Nexus, não; no mesmo processo um quebraria o outro. As variáveis NEXUS_* não vão para o motor;
 5. compara a planilha que saiu com a oficial da mesma semana, se ela já existir.
 Nada é publicado: a semana do campo continua sendo a oficial do PCM.
+
+`gerar_com_foto` (ferramentas/gerar_semana_foto.py) faz o mesmo SEM ler o Fracttal: o motor recebe a foto que ele mesmo
+gravou na pasta do PCM e roda sem credencial. É a prova de mudança no motor ou nos insumos: ler o Fracttal horas depois
+muda a semana (S41: 157 tarefas a mais e 280 horários) e não prova nada.
 
 Credencial (decisão do Levi, 30/09: "pode usar do OS Creator, mesma lógica porém sem a parte de login"): o
 client_credentials do Fracttal que o OS Creator lê do .env da pasta dele. A leitura pela API não precisa do login de
@@ -35,6 +41,8 @@ from dotenv import dotenv_values
 
 from . import auxiliar as A
 from . import comparar
+from . import fonte
+from . import historico_banco as HB
 from . import insumos as I
 
 AQUI = Path(__file__).resolve().parent
@@ -59,6 +67,18 @@ TEMPO_MAX_S = 60 * 60
 SEMANA_RE = re.compile(r"^\d{4}-W\d{2}$")
 RODADA_RE = re.compile(r"^\d{8}-\d{6}-\d{4}-W\d{2}$")
 _BRT = timezone(timedelta(hours=-3))
+# A foto do Fracttal: os caches que o motor (fonte_bd_api) grava na pasta de trabalho ao ler o Fracttal. Com o
+# .cache_semanal_api.pkl "fresco" o motor nem abre conexão: devolve o DataFrame da foto, e as coordenadas saem do
+# _usinas_coordenadas_cache.json. Os outros vão junto para a rodada ser a mesma pasta que o PCM tinha.
+FOTO = (".cache_semanal_api.pkl", ".cache_hist_api.pkl", ".cache_bd_api.pkl", "_ativos_classificacao_cache.json",
+        "_usinas_coordenadas_cache.json")
+FOTO_OBRIGATORIA = ".cache_semanal_api.pkl"
+# "Fresco" para sempre (~100 anos): o TTL do motor é pela idade do arquivo, e a foto tem horas ou dias
+TTL_FOTO = {"PROG_API_TTL_MIN": "52560000", "PROG_HIST_TTL_H": "876000", "GESTAO_ATIVOS_TTL_H": "876000"}
+# Sem credencial e com o Fracttal num endereço que recusa conexão: se o motor tentar ler, ele FALHA, nunca lê. As vazias
+# também barram um .env perdido: o carregar_env do motor usa setdefault, e variável que já existe (mesmo vazia) vence.
+SEM_FRACTTAL = {"FRACTTAL_CLIENT_ID": "", "FRACTTAL_CLIENT_SECRET": "", "FRACTTAL_JWT_TOKEN": "",
+                "FRACTTAL_BASE_URL": "http://127.0.0.1:9/sem-fracttal/"}
 
 _trava = threading.Lock()
 _rodando: dict[str, tuple[str, threading.Thread]] = {}
@@ -227,6 +247,78 @@ def _oficial(origem: Path | None, semana: str) -> Path | None:
     return p if p.exists() else None
 
 
+def leitor_do_repositorio(config):
+    """Lê um arquivo da raiz do repositório do PCM (público: sem token). Nos testes, só o falso da config."""
+    if config.get("TESTING"):
+        return config.get("NEXUS_PCM_REPO_TESTE")
+    repo, ramo = fonte.repositorio(config)
+
+    def ler(nome: str) -> bytes | None:
+        import requests
+        from urllib.parse import quote
+        r = requests.get(f"https://raw.githubusercontent.com/{repo}/{ramo}/{quote(nome)}", timeout=60)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.content
+    return ler
+
+
+def _historico(config, pasta: Path, semana: str, trabalho: Path, origem: Path | None, modo: str = "banco") -> dict:
+    """Escreve o Historico_Programacoes.xlsx da rodada e devolve o carimbo. `modo` "banco" (o padrão desde 08/10/2026):
+    o fato_programacao do banco, com o plano publicado da semana que o banco ainda não fechou; se o banco não responder,
+    a reserva guardada no Nexus. `modo` "nexus": a reserva direto (o histórico de antes de 08/10, para comparar)."""
+    destino = pasta / HB.NOME
+    reserva = I.carregar(trabalho).get("historico")
+    erro = None
+    if modo == "banco":
+        try:
+            rel = HB.materializar(config, destino, semana, reserva=reserva, origem=origem,
+                                  ler_repo=leitor_do_repositorio(config))
+        except HB.HistoricoErro as ex:
+            erro = str(ex)
+        else:
+            # o relatório por semana (de onde veio cada uma, quantas chaves) fica na rodada para conferir depois
+            (pasta / "historico_banco.json").write_text(json.dumps(rel, ensure_ascii=False, indent=1), encoding="utf-8")
+            return {"nome": I.NOMES["historico"], "sha": _sha(destino), "atualizado": (rel.get("banco_ate") or "")[:16],
+                    "detalhe": rel["detalhe"], "aviso": bool(rel["avisos"])}
+    if not reserva:
+        raise NaoPronto("histórico: " + (f"o banco não respondeu ({erro}) e " if erro else "") + "não há reserva no Nexus")
+    preparar_historico(pasta / "historico_do_nexus.xlsx", destino, semana)
+    m = reserva.get("meta") or {}
+    return {"nome": I.NOMES["historico"], "sha": _sha(destino), "atualizado": (m.get("importado_em") or "")[:16],
+            "detalhe": "reserva do Nexus, voltada para antes da semana" + (f": o banco não respondeu ({erro})" if erro
+                                                                           else " (pedida na rodada)"),
+            "aviso": bool(erro)}
+
+
+def _preparar(config, semana: str, pasta: Path, trabalho: Path, origem: Path | None, historico: str = "banco") -> list:
+    """Escreve na pasta da rodada tudo o que o motor lê, menos o Fracttal. Devolve o carimbo de cada insumo (de onde
+    veio e de quando é o dado)."""
+    insumos = []
+    for nome, _obrig in INSUMOS:
+        p = origem / nome if origem else None
+        if not (p and p.exists()):
+            continue
+        shutil.copy2(p, pasta / nome)
+        insumos.append({"nome": nome, "sha": _sha(p), "atualizado": _quando(p.stat().st_mtime),
+                        "detalhe": "da pasta do PCM"})
+    # os outros saem do Nexus, no formato que o motor lê
+    try:
+        aux = A.escrever(A.servico(config), pasta / A.NOME)
+        insumos.append({"nome": "Cadastro de usinas (AUXILIAR)", "sha": _sha(pasta / A.NOME),
+                        "atualizado": datetime.now(_BRT).isoformat(timespec="minutes"),
+                        "detalhe": f"do cadastro do Nexus: {aux['usinas']} usinas, "
+                                   f"{aux['sem_responsavel']} sem responsável O&M"})
+        insumos += I.materializar(trabalho, pasta, semana)
+    except A.SemCadastro as ex:
+        raise NaoPronto(f"cadastro de usinas: {ex}") from ex
+    except I.InsumoErro as ex:
+        raise NaoPronto(str(ex)) from ex
+    insumos.append(_historico(config, pasta, semana, trabalho, origem, historico))
+    return insumos
+
+
 def iniciar(config, semana: str) -> dict:
     if not SEMANA_RE.match(semana or ""):
         raise ValueError("semana inválida")
@@ -243,29 +335,11 @@ def iniciar(config, semana: str) -> dict:
         pasta = trabalho / "geracoes" / rid
         (pasta / "saida").mkdir(parents=True, exist_ok=False)
         origem = pasta_origem(config)
-        insumos = []
-        for nome, _obrig in INSUMOS:
-            p = origem / nome if origem else None
-            if not (p and p.exists()):
-                continue
-            shutil.copy2(p, pasta / nome)
-            insumos.append({"nome": nome, "sha": _sha(p), "atualizado": _quando(p.stat().st_mtime),
-                            "detalhe": "da pasta do PCM"})
-        # os outros saem do Nexus, no formato que o motor lê; o histórico ainda volta para antes da semana
         try:
-            aux = A.escrever(A.servico(config), pasta / A.NOME)
-            insumos.append({"nome": "Cadastro de usinas (AUXILIAR)", "sha": _sha(pasta / A.NOME),
-                            "atualizado": datetime.now(_BRT).isoformat(timespec="minutes"),
-                            "detalhe": f"do cadastro do Nexus: {aux['usinas']} usinas, "
-                                       f"{aux['sem_responsavel']} sem responsável O&M"})
-            insumos += I.materializar(trabalho, pasta, semana)
-        except A.SemCadastro as ex:
+            insumos = _preparar(config, semana, pasta, trabalho, origem)
+        except NaoPronto:
             shutil.rmtree(pasta, ignore_errors=True)
-            raise NaoPronto(f"cadastro de usinas: {ex}") from ex
-        except I.InsumoErro as ex:
-            shutil.rmtree(pasta, ignore_errors=True)
-            raise NaoPronto(str(ex)) from ex
-        preparar_historico(pasta / "historico_do_nexus.xlsx", pasta / "Historico_Programacoes.xlsx", semana)
+            raise
         cred = credencial(config)
         st = {"id": rid, "semana": semana, "estado": "rodando", "inicio": datetime.now(_BRT).isoformat(timespec="seconds"),
               "credencial": cred.onde, "insumos": insumos, "motor": str(caminho_motor(config))}
@@ -289,6 +363,11 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
         if r.returncode == 0 and saida.exists():
             st["estado"] = "ok"
             st["resumo"] = comparar.resumo(saida)
+            # o que olhar antes de publicar (blocos fora da semana, horas estouradas por equipe e dia e por OS...)
+            try:
+                st["conferencia"] = comparar.conferir(saida, st["semana"])
+            except Exception as ex:      # noqa: BLE001 — a conferência não derruba a rodada; a publicação a exige
+                st["conferencia_erro"] = f"{type(ex).__name__}: {str(ex)[:200]}"
             oficial = _oficial(origem, st["semana"])
             if oficial:
                 shutil.copy2(oficial, pasta / "oficial.xlsx")
@@ -306,6 +385,61 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
     st["fim"] = datetime.now(_BRT).isoformat(timespec="seconds")
     st["duracao_s"] = int(time.monotonic() - t0)
     _gravar(pasta, st)
+
+
+def _ambiente_foto(pasta: Path, saida: Path) -> dict:
+    """O ambiente da rodada normal, sem credencial do Fracttal, com o endereço dele numa porta fechada e a foto
+    "fresca" para sempre: o motor lê a foto e, se tentar o Fracttal, falha (nunca lê)."""
+    env = _ambiente(Credencial(False, ""), pasta, saida)
+    env.update(SEM_FRACTTAL)
+    env.update(TTL_FOTO)
+    return env
+
+
+def gerar_com_foto(config, semana: str, foto: Path | None = None, historico: str = "banco", rotulo: str = "") -> dict:
+    """Gera a semana com a FOTO do Fracttal e espera terminar. Os insumos são os da geração da tela (`_preparar`: os do
+    Nexus, a AUXILIAR do cadastro, o histórico de antes da semana); o Fracttal é a foto que o motor do PCM gravou na
+    pasta dele (`FOTO`), copiada para a rodada (a pasta do PCM só é lida).
+
+    É o método da prova da S41 (02/10/2026): com a mesma foto da geração oficial, agenda e pendentes saíram idênticos.
+    Não gasta cota do Fracttal e pode rodar no horário de campo. A rodada leva o sufixo "-foto" e não entra na lista da
+    tela (`RODADA_RE`): é prova, não geração. `historico`: "banco" (o da geração) ou "nexus" (a reserva, o histórico de
+    antes de 08/10), para comparar os dois com a mesma foto."""
+    if not SEMANA_RE.match(semana or ""):
+        raise ValueError("semana inválida")
+    if historico not in ("banco", "nexus"):
+        raise ValueError("histórico: 'banco' ou 'nexus'")
+    origem = pasta_origem(config)
+    foto = Path(foto) if foto else origem
+    if not (foto and (foto / FOTO_OBRIGATORIA).exists()):
+        raise NaoPronto(f"não há foto do Fracttal ({FOTO_OBRIGATORIA}) em {foto}")
+    trabalho = pasta_trabalho(config)
+    sufixo = re.sub(r"[^a-z0-9]+", "-", (rotulo or "").lower()).strip("-")
+    rid = datetime.now(_BRT).strftime("%Y%m%d-%H%M%S") + f"-{semana}-foto" + (f"-{sufixo}" if sufixo else "")
+    pasta = trabalho / "geracoes" / rid
+    (pasta / "saida").mkdir(parents=True, exist_ok=False)
+    try:
+        insumos = _preparar(config, semana, pasta, trabalho, origem, historico)
+    except NaoPronto:
+        shutil.rmtree(pasta, ignore_errors=True)
+        raise
+    copiados = {}
+    for nome in FOTO:
+        p = foto / nome
+        if p.exists():
+            shutil.copy2(p, pasta / nome)       # copy2: a idade do arquivo vai junto (o TTL do motor é por ela)
+            copiados[nome] = {"sha": _sha(pasta / nome), "de": _quando(p.stat().st_mtime)}
+    st = {"id": rid, "semana": semana, "estado": "rodando", "inicio": datetime.now(_BRT).isoformat(timespec="seconds"),
+          "credencial": f"nenhuma: foto do Fracttal de {copiados[FOTO_OBRIGATORIA]['de']}", "insumos": insumos,
+          "motor": str(caminho_motor(config)), "historico": historico,
+          "foto": {"pasta": str(foto), "arquivos": copiados}}
+    _gravar(pasta, st)
+    saida = pasta / "saida" / "sombra.xlsx"
+    _executar(pasta, st, _ambiente_foto(pasta, saida), caminho_motor(config), origem, saida)
+    # a prova de que o Fracttal não foi lido: o motor regrava o cache quando lê, e aqui ele saiu como entrou
+    st["foto"]["intacta"] = all(_sha(pasta / n) == c["sha"] for n, c in copiados.items())
+    _gravar(pasta, st)
+    return st
 
 
 def _cauda(p: Path, n: int) -> str:

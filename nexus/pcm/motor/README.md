@@ -28,11 +28,18 @@ sistemas rodarem juntos, as duas cópias precisam ser iguais.
 ## Como o Nexus roda (`nexus/pcm/geracao.py`)
 
 - **Processo:** um subprocesso com o mesmo Python do Nexus.
-- **Pasta de trabalho:** uma por rodada, em `C:\GridcoAuto\nexus\pcm\geracoes\`, fora do OneDrive. Leva a cópia dos
-  insumos da pasta do PCM e o histórico de antes da semana.
+- **Pasta de trabalho:** uma por rodada, em `C:\GridcoAuto\nexus\pcm\geracoes\`, fora do OneDrive. Leva os insumos do
+  Nexus, a AUXILIAR do cadastro e o histórico de antes da semana, tirado do banco (`historico_banco.py`).
 - **Ambiente próprio:**
   - a credencial do Fracttal, a mesma do OS Creator, sem login;
   - `FRACTTAL_BASE_URL` com `/api/`;
   - 1 pedido por segundo;
   - nenhuma variável `NEXUS_*`.
+- **Com a foto** (`geracao.gerar_com_foto`, `ferramentas/gerar_semana_foto.py`): os caches que o motor gravou na pasta
+  do PCM vão para a rodada, os TTLs (`PROG_API_TTL_MIN`, `PROG_HIST_TTL_H`, `GESTAO_ATIVOS_TTL_H`) ficam em ~100 anos, a
+  credencial vai VAZIA (o `carregar_env` do `gerar_bd_via_api` usa `setdefault`: a variável vazia também barra um
+  `.env` achado no caminho) e o `FRACTTAL_BASE_URL` aponta para uma porta fechada. O motor lê a foto; se tentar o
+  Fracttal, falha.
 - **Saída:** a planilha fica em `saida/sombra.xlsx` e é comparada com a `Programação Semana NN.xlsx` oficial.
+- **Conferido em 09/10/2026:** sem o CR do Windows, os três arquivos são iguais aos do repositório do PCM no commit de
+  08/10 16:56 (`1d717cd`; a última mudança neles é de 25/09). O hash da tabela acima é o da cópia com CRLF.

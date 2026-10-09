@@ -9,7 +9,7 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace. Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace, o token do repositório do PCM para Publicar no App (`NEXUS_PCM_GITHUB_TOKEN`, desde 09/10/2026). Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e a fila da Aprovação de OS usam a mesma) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da tela Base → Ligações (o de-para entre as bases) |
@@ -24,7 +24,8 @@ ou grupo de conversa.
 
 - Linux com **Python 3.14**, `git` e `unzip`. Proxy com HTTPS na frente (exemplo abaixo com o Caddy).
 - Saída para a internet: `github.com` (código), `app.gridco.com.br` (API db_performace e plataforma de Performance),
-  `app.fracttal.com` e `one.fracttal.com` (Fracttal), `raw.githubusercontent.com` (banco do PCM),
+  `app.fracttal.com` e `one.fracttal.com` (Fracttal), `raw.githubusercontent.com` (banco do PCM), `api.github.com`
+  (Publicar no App: grava a semana no repositório do PCM),
   `apiprevmet3.inmet.gov.br` (avisos meteorológicos do INMET), `dataserver-coids.inpe.br` (focos de queimada e risco
   de fogo do INPE) e `power.larc.nasa.gov` (irradiação diária da NASA POWER): os três últimos são da tela Performance →
   Clima e risco, só HTTPS (443), leitura pública, sem chave. A NASA só é chamada pela PÁGINA de uma usina (um pedido por
@@ -137,6 +138,22 @@ A tela **Aprovação de OS** lê a fila do Fracttal ao vivo quando alguém a abr
 cada 10 minutos por servidor (os filtros reusam a mesma leitura). Em hora de pico da cota ela mostra o aviso de fila
 incompleta; a tela continua de pé.
 
+## 7d. PCM: publicar a semana no App (09/10/2026)
+
+Desde a W43 o Nexus gera E publica a programação semanal (Levi: "semana que vem já quero full nexus"). **PCM → Gerar a
+semana → a rodada → Publicar no App** manda a `Programação Semana NN.xlsx` e as observações para o repositório do PCM
+(`github.com/fillipefigueiro-source/gridco-pcm-data`), como o PC do PCM fazia; o robô do PCM leva ao App em 5 a 10 min.
+Só administrador, com uma tela de conferência antes. Precisa de:
+
+- `NEXUS_PCM_GITHUB_TOKEN` no `.env` (o Levi manda no pacote): token do GitHub só deste repositório, com escrita de
+  conteúdo. Sem ele o botão mostra "sem token" e nada é enviado.
+- Saída para `api.github.com` (seção 0).
+- **Nunca teste clicando em Publicar:** publicar troca a semana de todo o campo. A tela de confirmação já mostra o que o
+  repositório tem (só leitura); pare nela.
+- O `dados/pcm/insumos.json` do pacote é o do PC na data do pacote. Depois que o servidor publicar, a reserva do
+  histórico do servidor passa a ter as semanas que ele publicou; o histórico também lê o plano publicado direto do
+  repositório do PCM, então PC e servidor geram com o mesmo histórico.
+
 ## 7a. Camada de dados: a carga de hora em hora
 
 O Nexus grava, aos :40 de cada hora, na API do banco: `nexus_dimensoes` (calendário, feriados, histórico de pessoas e
@@ -231,7 +248,8 @@ dado cifrado do cadastro (CPF, telefone, endereço, receita) não volta.**
 
 - **"Importar da pasta do PCM"**: a pasta é o OneDrive do PCM. Os insumos já moram no Nexus
   (`dados/pcm/insumos.json`) e a AUXILIAR sai do cadastro, então gerar a semana não depende mais da pasta. Só as
-  durações aprendidas (opcionais, em sombra) ficam de fora.
+  durações aprendidas (opcionais, em sombra) ficam de fora. As observações vêm pelo **"Importar observações do
+  repositório do PCM"** (funciona no servidor) ou se escrevem no bloco 2 da tela.
 - **Login:** é pelo Fracttal (o mesmo do OS Creator: entra quem tem conta da Grid Co. no Fracttal; um login abre o
   Nexus e o OS Creator). A senha de admin ficou como reserva. O login Microsoft não está ligado.
 

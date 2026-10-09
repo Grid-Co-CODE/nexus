@@ -6,7 +6,10 @@ manutenções) tem seção própria abaixo.
 
 **Regra de ouro:** o sistema atual segue no ar e intocado até o Nexus bater número a número com ele. Isso vale para o
 gerador no PC do programador do PCM, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
-Até a troca, tudo aqui é **sombra**: nada é publicado.
+**A troca (Levi, 09/10/2026: "semana que vem já quero full nexus sem falta"):** a partir da W43 o Nexus gera E publica.
+Gerar continua sendo sombra (não muda nada no campo); a semana só vai ao App pelo **Publicar no App** da rodada (seção
+abaixo), um passo à parte, só de administrador, com a tela de conferência. Duas publicações da mesma semana (o PC do PCM
+e o Nexus) se atropelam: na semana da troca, o PC do PCM não publica.
 
 **A programação publicada também está no banco (08/10/2026):** o `banco_dados.json` vira o fato
 `nexus_programacao · fato_programacao` (1 linha = 1 bloco de agenda), que a carga de hora em hora mantém pela mescla por
@@ -22,18 +25,21 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `gestao.py` | as contas da Gestão PCM (Plano & Fila), transcritas do `js/preventivas.js` do painel |
 | `prova_gestao.py` + `.js` | a prova de que a Gestão PCM bate célula a célula com o painel (roda o JS dele no node) |
 | `semana.py` | as contas das telas Semana e Tarefas e OS: aderência, horas por equipe, fora da jornada |
-| `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal |
+| `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal; `gerar_com_foto`, o mesmo com a FOTO do Fracttal e sem credencial (a prova) |
 | `insumos.py` | os insumos do motor guardados no Nexus, escritos na rodada no formato que o motor lê |
-| `comparar.py` | compara a semana do Nexus com a oficial (a do PCM), linha a linha |
+| `historico_banco.py` | o histórico das programações que o motor lê, montado do `fato_programacao` do banco (desde 08/10/2026); o plano publicado da semana em andamento vem da reserva, do REPOSITÓRIO do PCM ou da pasta do PCM |
+| `comparar.py` | compara a semana do Nexus com a oficial (a do PCM), linha a linha; `conferir`: a conferência da semana gerada (dentro da semana, horas por equipe e dia, fora da jornada, repetidas, e `excede_hh_os`: a OS cuja corretiva o motor forçou além das horas do dia) |
+| `publicar.py` | **Publicar no App** (09/10/2026): a planilha e as observações da rodada vão para o repositório do PCM, conferidas relendo, e o plano vai para a reserva do histórico |
 | `telas.py` | as telas, penduradas na torre PCM (`registrar_pcm(bp)`) |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá) |
 
 ## Insumos: no Nexus, não em arquivo
 
-Prioridades, Confiabilidade, Histórico, Feriados e Observações (por semana) moram em `insumos.py`. A cada geração, o
-Nexus escreve os arquivos na pasta da rodada, com a mesma aba, a mesma linha de cabeçalho e a mesma posição de coluna
-do original. A AUXILIAR sai do cadastro do Nexus (`auxiliar.py`, desde 02/10/2026). Da pasta do PCM só vem ainda o
-`duracoes_aprendidas.json` (sombra: não muda a agenda).
+Prioridades, Confiabilidade, Feriados e Observações (por semana) moram em `insumos.py`; o Histórico sai do BANCO
+(`historico_banco.py`, desde 08/10/2026, abaixo). A cada geração, o Nexus escreve os arquivos na pasta da rodada, com a
+mesma aba, a mesma linha de cabeçalho e a mesma posição de coluna do original. A AUXILIAR sai do cadastro do Nexus
+(`auxiliar.py`, desde 02/10/2026). Da pasta do PCM só vem ainda o `duracoes_aprendidas.json` (sombra: não muda a
+agenda).
 
 - **AUXILIAR:** o motor lê seis colunas dela (UFV, RESPONSÁVEL O&M, CIDADE, a 1ª com "MWp", Equipe Cluster, Base
   Equipe). O MWp é a potência contratual. Equipe Cluster fora do padrão "UF Região NN" vai vazia: era uma aba vazia
@@ -42,17 +48,101 @@ do original. A AUXILIAR sai do cadastro do Nexus (`auxiliar.py`, desde 02/10/202
   sem pessoa** (estrutura de O&M de 10/2026): o BD_Operações traz a REGIÃO onde a vaga de Supervisor de Campo está
   aberta ("NE · Fortaleza-CE e Teresina-PI"); o cadastro guarda a pessoa vazia e a região em `responsavel_om_vaga`, e
   a AUXILIAR escreve a região, como a AUXILIAR do BD escreveria.
-- **Provar mudança no motor ou nos insumos:** rode com a FOTO do Fracttal da pasta do PCM (`.cache_semanal_api.pkl`,
-  `.cache_hist_api.pkl`, `_ativos_classificacao_cache.json`, `_usinas_coordenadas_cache.json`, TTLs altos, sem
-  credencial). Ler o Fracttal horas depois muda a semana (S41: 157 tarefas a mais e 280 horários) e não prova nada.
+- **Provar mudança no motor ou nos insumos: rode com a FOTO do Fracttal**, nunca lendo o Fracttal de novo (horas depois
+  a semana muda: S41, 157 tarefas a mais e 280 horários). `python ferramentas/gerar_semana_foto.py --semana 2026-W42
+  [--historico banco|nexus] [--rotulo x] [--contra <rodada ou planilha>]` (`geracao.gerar_com_foto`): os mesmos
+  insumos da tela; da pasta do PCM (só lida) vêm os caches que o motor gravou ao ler o Fracttal (`.cache_semanal_api.pkl`,
+  obrigatório, e `.cache_hist_api.pkl`, `.cache_bd_api.pkl`, `_ativos_classificacao_cache.json`,
+  `_usinas_coordenadas_cache.json`), copiados com a idade; TTLs de ~100 anos; credencial VAZIA e o Fracttal numa porta
+  fechada (se o motor tentar ler, falha); no fim, a rodada confere o sha da foto ("intacta": o motor regrava o cache
+  quando lê). A rodada leva "-foto" no nome e fica fora da lista da tela. Imprime a `comparar.conferir` da semana e o
+  que continua da semana anterior. 1ª vez: W42, 09/10 00:16, foto de 08/10 21:46, 10 s.
 
+- **Feriados do ano seguinte (09/10/2026):** a planilha do PCM só tem 2026 e a W53 de 2026 vai de 28/12 a 01/01/2027.
+  A rodada escreve, no MESMO arquivo que o motor lê (ele só olha a data), o ano seguinte ao da semana projetado
+  (`insumos.com_feriados_ate`): data fixa repetida; Carnaval (-47), Paixão (-2) e Corpus Christi (+60) pela Páscoa do
+  ano (`insumos.pascoa`), e o estadual do ES (Nossa Senhora da Penha, Páscoa + 8). Os municipais ficam na data: a
+  planilha não diz qual seria móvel. O ano que a planilha já tem não se projeta. 2027: 100 datas (Carnaval 09/02,
+  Paixão 26/03, Corpus Christi 27/05, ES 05/04). O carimbo da rodada diz "2027 projetado"; conferir com o calendário
+  oficial quando sair.
 - **Armazém:** `C:\GridcoAuto\nexus\pcm\insumos.json`, fora do OneDrive, com a versão anterior ao lado. Trocar pela
   API de dados é mexer só em `insumos.py`.
-- **Na sombra:** "Importar da pasta do PCM" traz os arquivos da pasta do PCM antes de gerar, para as duas semanas partirem
-  do mesmo dado. A tela avisa quando um arquivo da pasta mudou depois da importação.
+- **Na sombra:** "Importar da pasta do PCM" traz prioridades, confiabilidade, feriados e as observações da semana, para as
+  duas semanas partirem do mesmo dado. **"Importar observações do repositório do PCM"** (09/10/2026) traz o
+  `Observacoes_Semana.txt` que o PC do PCM ou o painel mandou por último (funciona no servidor); o leitor do Nexus
+  entende as 60 linhas do arquivo de 08/10 (49 `@usina`, 3 OS fora, 8 OS com dia fixo, com tarefa, turno e "só:").
+  No full Nexus, as observações da semana se escrevem no bloco 2, não no arquivo. **O histórico NÃO** (desde 08/10/2026): o arquivo do PC punha por cima a W41 das
+  duas gerações. A tela avisa quando um arquivo da pasta mudou depois da importação.
 - **Prova obrigatória** a cada mudança no formato: o que o motor lê do arquivo gerado pelo Nexus tem de ser igual ao
   que ele lia do original, com as mesmas leituras do `programacao_v7.py`. `tests/test_pcm_insumos.py` faz isso com
-  dado de mentira; com os arquivos reais, rode a mesma comparação fora do repositório.
+  dado de mentira (e `tests/test_pcm_historico_banco.py`, para o histórico do banco); com os arquivos reais, rode a
+  mesma comparação fora do repositório.
+
+## Histórico das programações: do banco (Levi, 08/10/2026: "PUXE O HISTÓRICO")
+
+O motor lê do `Historico_Programacoes.xlsx` só `task_key` (OS + código do equipamento, SEM a tarefa), `count` e
+`weeks`: "Nº vezes programada" = `count + 1`, "Reprogramada" = `count > 0`, o ÚLTIMO desempate da fila
+(`programacao_v7` l.2081, depois de tier, aging, sigla e RPN), e 0,75 × `count` no RPN dinâmico (sombra). Uma semana
+conta para a chave quando a chave teve bloco na AGENDA dela (o motor não grava as pendentes).
+
+- **De onde:** a geração monta o arquivo do `nexus_programacao · fato_programacao` (GET, `historico_banco.py`), só com as
+  semanas ANTES da gerada (gerar de novo a mesma semana não a conta). O banco começa na W21: a W20 do arquivo do PC não
+  entra. A chave é a do motor: o `codigo_ativo` do fato é canônico (maiúsculo, sem espaço) e, nas chaves do arquivo do
+  PC, igual ao texto do Fracttal; na foto de 08/10, 3 de 6.226 códigos têm espaço ou minúscula, nenhum na agenda nem nas
+  pendentes da W42. Código assim programado um dia não acharia o histórico (contaria como 1ª vez).
+- **Semana que o banco ainda não fechou** (terminou depois do `atualizacao.gerado_em` do livro): vale o PLANO PUBLICADO
+  dela: o da reserva (o Nexus põe lá o que ele publica); senão a `Programação Semana NN.xlsx` do REPOSITÓRIO do PCM (o
+  que foi ao App, publicado pelo PC do PCM ou pelo Nexus; funciona no servidor; só vale se o dia da semana bater com o
+  dd/mm, porque o nome não tem ano); senão a da pasta do PCM; sem nenhum, a do banco, com aviso. Medido em 09/10 (GET):
+  o repositório dá a W40 com 1.109 chaves e a W41 com 1.119, as publicadas. Por quê: no App a semana ATIVA muda toda noite (a "Rolagem" tira da agenda o que não coube no dia e põe nas
+  pendentes; Nova OS entra) e o robô só a refaz pelo plano quando ela fecha (W40: 858 chaves em 02/10 19:30, 1.356 às
+  22:10). O motor gera a semana N durante a N-1: a N-1 do banco é sempre um retrato do meio dela. A W41 gravada em
+  08/10 17:05 tinha 971 chaves contra 1.119 da S41 publicada: 159 de OS canceladas e 247 de OS vivas (229 nas pendentes
+  com "Rolagem: sem capacidade").
+- **Reserva:** o histórico guardado no Nexus (`insumos.json`; a W41 de lá é a S41 publicada, corrigida em 05/10). Vale se
+  o banco não responder (a rodada carimba com aviso) e dá o plano da semana em andamento. Sem banco e sem reserva, não
+  gera. `--historico nexus` na ferramenta da foto usa a reserva direto, para comparar.
+- **Banco × reserva × arquivo do PC (09/10, histórico da W42):** banco 7.999 chaves (W21-W41), reserva 7.865, PC 7.963.
+  Semana fechada no banco = plano publicado menos OS canceladas depois (W36-W39 só diferem disso: 64, 70, 133 e 174
+  chaves; a OS cancelada não volta ao Fracttal, não muda geração). O arquivo do PC (e a reserva, que é cópia dele) guarda
+  a UNIÃO das gerações (W40: 1.306 contra 799; 142 de outra geração e 365 de OS canceladas; W33: 180 de outra geração;
+  W41: 1.286 contra 1.119), não tem a W35 (o banco tem 890 chaves) e tem 377 linhas com `first_week`/`last_week` fora
+  de ordem (o motor não os usa). O banco tem 1.189 chaves de Nova OS que o robô deixava na semana fechada até agosto
+  (W22-W28, W32, W34, W35).
+- **Efeito na W42** (mesma foto, `--historico nexus` × `banco`): agenda e pendentes IGUAIS (924 blocos, 1.246 pendentes,
+  todas as colunas); mudam o "Nº vezes programada" em 65 linhas de 64 chaves (por causa, e uma chave pode ter mais de
+  uma: +1 pela W35 em 39; -1 por outra geração da W40 em 25, da W33 em 9 e da W27 em 1; W34 -1 em 7 e +1 em 1), a
+  "Reprogramada" em 9 (Sim -> Não: OS que só estavam na 1ª geração da W40, que não foi a campo) e o RPN (novo), em
+  sombra, em 15. O desempate não mexeu em nenhum horário nesta semana.
+
+## Publicar no App (`publicar.py`, `templates/pcm/publicar.html`, `/t/pcm/gerar/publicar`; 09/10/2026)
+
+O mesmo caminho do PC do PCM (`publicar_semana_github.py` do repositório do PCM): PUT na API de conteúdo do GitHub da
+`Programação Semana NN.xlsx` (a `saida/sombra.xlsx` da rodada) e do `Observacoes_Semana.txt` da rodada, na raiz do
+repositório (`NEXUS_PCM_REPO`, padrão `fillipefigueiro-source/gridco-pcm-data`, ramo `main`). O push dispara o
+`semanal.yml` do PCM na hora (gatilho `Programa*.xlsx` e `Observacoes_Semana*.txt`, sem o descanso de 30 min), que
+roda o `atualizacao_semanal.py` e o `gerar_pcm_json.py` e regrava o `banco_dados.json` do App em 5 a 10 min. O robô
+escolhe a semana ativa pela data de hoje: a W43 publicada na quinta vira a do App na segunda. Nada muda no App.
+
+- **Não manda** o `Observacoes_Semana_Atual.txt` (os ajustes da semana EM CURSO, gravados pelo painel do PCM): a tela
+  mostra o que está lá para a pessoa pedir a limpeza no painel.
+- **Barra** (`motivos_para_nao_publicar`): rodada que não terminou bem, rodada com a foto do Fracttal (prova), semana que
+  já acabou, rodada sem a conferência da semana (as de antes de 09/10), bloco fora da semana, arquivo que falta.
+- **Pede confirmação a mais:** a semana já começou (troca a programação no meio dela); o repositório já tem a planilha
+  da semana (mostra quando e por quem foi gravada). Avisa: geração com mais de 24 h (o Fracttal mudou), corretiva
+  forçada além das horas do dia (`excede_hh_os`), observações sem nenhuma OS fora ou com dia fixo.
+- **Depois:** relê cada arquivo do repositório e compara o sha256 (conferir depois de gravar); grava `publicacao.json`
+  na rodada e o `status.json`; põe o plano na reserva do histórico (`insumos.registrar_plano_publicado`: a semana
+  publicada de novo troca o plano). A rodada mostra "Publicada no App" e se o `banco_dados.json` já tem a semana.
+- **Só administrador** (`session["admin"]`: a senha de admin ou um e-mail de `NEXUS_ADMINS`). O commit não leva o
+  e-mail de quem publicou (o repositório é público); quem foi fica no `publicacao.json` da rodada.
+- **Token:** `NEXUS_PCM_GITHUB_TOKEN` (ambiente ou `.env` do Nexus; no servidor, um token só deste repositório, com
+  escrita de conteúdo). Sem ele, no PC, o login do `gh` da máquina (`gh auth token`). Nunca é impresso.
+- **Testar sem publicar:** a tela de confirmação lê o repositório de verdade (só GET). A cópia de conferência do
+  Claude troca a sessão do GitHub por uma que recusa gravar. Testes: `tests/test_pcm_publicar.py` (GitHub falso).
+- **OS 14331 (W42, 09/10):** 4 corretivas "Teste de comando remoto" de 6 h cada (a duração estimada no Fracttal; o
+  total de horas da OS é 1,5 h por tarefa) que o motor forçou numa quarta da PR Norte 01: 24,5 h. O conserto é na
+  origem (a duração no Fracttal) ou fixar as tarefas em dias diferentes no bloco 2; a conferência aponta a OS.
 
 ## A tela Gerar (`templates/pcm/gerar.html` + `_observacoes.html`, estilo em `static/pcm.css`)
 
@@ -145,7 +235,10 @@ vieram Tipo, Etiqueta, Estado, OS, Solicitação e Período.
 ## Armadilhas já vividas
 
 - **Gerar duas vezes a mesma semana distorcia tudo:** na S40, 415 tarefas viraram reprogramadas, e todas ganharam +1
-  no "Nº vezes". Por isso a rodada parte do histórico de **antes** da semana (`geracao.preparar_historico`).
+  no "Nº vezes". Por isso a rodada parte do histórico de **antes** da semana (`historico_banco.montar`: só as semanas
+  anteriores; na reserva, `geracao.preparar_historico`).
+- **O arquivo de histórico do PC não é registro do que foi a campo:** guarda toda geração (a S41 de 02/10 08:26, que
+  nunca foi ao campo, está lá), perdeu a W35 inteira e não se corrige sozinho. Daí o histórico vir do banco.
 - **Cota do Fracttal:** 200 pedidos por minuto para a **empresa inteira**, divididos com o App de Campo. O motor anda
   a 1 por segundo, e a tela pede confirmação no horário de campo (seg a sex, das 06h às 18h).
 - **Dois Fracttal no mesmo processo se quebram:** o `FRACTTAL_BASE_URL` do motor tem `/api/` e o do OS Creator não.

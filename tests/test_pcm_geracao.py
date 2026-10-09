@@ -90,14 +90,41 @@ def motor_falso(tmp_path, codigo_saida=0, espera=0.0):
     return m
 
 
+# o fato_programacao do banco de mentira: a 15021|ALT1-CAB01 programada na W39 e na W40, a 15020|ALT1-INV01 na W40.
+# Gravado em 06/10: a W40 já tinha fechado (a W41 é a semana gerada nos testes)
+FATO = {"linhas": [{"data_id_semana": "20260921", "os": "15021", "codigo_ativo": "ALT1-CAB01",
+                    "lido_em": "2026-10-06T10:00:00-03:00"},
+                   {"data_id_semana": "20260928", "os": "15021", "codigo_ativo": "ALT1-CAB01",
+                    "lido_em": "2026-10-06T10:00:00-03:00"},
+                   {"data_id_semana": "20260928", "os": "15020", "codigo_ativo": "ALT1-INV01",
+                    "lido_em": "2026-10-06T10:00:00-03:00"}],
+        "gerado_em": "2026-10-06T10:00:00-03:00"}
+
+
 @pytest.fixture
 def config(tmp_path, origem):
-    # na sombra, o Nexus importa os arquivos da pasta do PCM antes de gerar (insumos.importar)
+    # na sombra, o Nexus importa os arquivos da pasta do PCM antes de gerar (insumos.importar); o histórico vem do banco
     I.importar(tmp_path / "trabalho", origem, "2026-W41")
     return {"TESTING": True, "NEXUS_PCM_ORIGEM": str(origem), "NEXUS_PCM_TRABALHO": str(tmp_path / "trabalho"),
             "NEXUS_PCM_MOTOR": str(motor_falso(tmp_path)),
             "NEXUS_PCM_CADASTRO_TESTE": cadastro_de_teste(tmp_path / "cadastro.json"),
-            "NEXUS_PCM_FRACTTAL_TESTE": {"FRACTTAL_CLIENT_ID": "id-de-teste", "FRACTTAL_CLIENT_SECRET": "segredo"}}
+            "NEXUS_PCM_FRACTTAL_TESTE": {"FRACTTAL_CLIENT_ID": "id-de-teste", "FRACTTAL_CLIENT_SECRET": "segredo"},
+            "NEXUS_PCM_HISTORICO_TESTE": FATO}
+
+
+def guardar_reserva(config, linhas):
+    """A reserva do histórico no Nexus (o que era importado do arquivo do PC até 08/10)."""
+    trab = G.pasta_trabalho(config)
+    d = I.carregar(trab)
+    d["historico"] = {"aba": None, "preambulo": [], "colunas": ["task_key", "first_week", "last_week", "count", "weeks"],
+                      "linhas": linhas, "meta": {"importado_em": "2026-10-05T09:49:19-03:00"}}
+    I.salvar(trab, d)
+
+
+def historico_da_rodada(config, rid):
+    import pandas as pd
+    p = G.pasta_trabalho(config) / "geracoes" / rid / "Historico_Programacoes.xlsx"
+    return {str(r["task_key"]): (int(r["count"]), str(r["weeks"])) for _, r in pd.read_excel(p).iterrows()}
 
 
 # ── regras ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -134,17 +161,51 @@ def test_credencial_vem_do_ambiente_antes_dos_arquivos(config):
 def test_conferir_lista_o_que_falta(config, origem, tmp_path):
     ok = G.conferir(config)
     assert ok["pronto"], ok
-    # o histórico mora no Nexus: apagar o arquivo da pasta não faz falta à geração
+    # o histórico vem do banco: o arquivo da pasta do PCM não faz falta à geração
     (origem / "Historico_Programacoes.xlsx").unlink()
     assert G.conferir(config)["pronto"]
     # a AUXILIAR sai do cadastro do Nexus: a planilha da pasta não faz falta, o cadastro faz
     sem_cadastro = {k: v for k, v in config.items() if k != "NEXUS_PCM_CADASTRO_TESTE"}
     falta = G.conferir(sem_cadastro)
     assert [i["nome"] for i in falta["itens"] if not i["ok"]] == ["Cadastro de usinas (AUXILIAR)"]
-    # Nexus sem os insumos importados: cada um aparece como falta
+    # Nexus sem os insumos importados: cada um aparece como falta (o histórico não: é do banco, e a reserva é opcional)
     vazio = dict(config, NEXUS_PCM_TRABALHO=str(tmp_path / "outro"))
     nomes = [i["nome"] for i in G.conferir(vazio)["itens"] if not i["ok"]]
-    assert nomes == [I.NOMES[k] for k in ("prioridades", "confiabilidade", "historico", "feriados")]
+    assert nomes == [I.NOMES[k] for k in ("prioridades", "confiabilidade", "feriados")]
+    hist = [i for i in G.conferir(vazio)["itens"] if i["nome"] == I.NOMES["historico"]][0]
+    assert hist["ok"] and not hist["obrigatorio"] and "do banco" in hist["detalhe"]
+
+
+def test_historico_da_geracao_vem_do_banco(config):
+    """08/10/2026 ("PUXE O HISTÓRICO"): o motor recebe o histórico montado do fato_programacao, com as semanas de
+    antes da gerada, e a rodada guarda de onde veio cada semana."""
+    guardar_reserva(config, [["15021|ALT1-CAB01", "2026-W20", "2026-W41", 9, "2026-W20,2026-W41"]])
+    st = G.aguardar(config, G.iniciar(config, "2026-W41")["id"], 60)
+    assert st["estado"] == "ok", st
+    assert historico_da_rodada(config, st["id"]) == {"15021|ALT1-CAB01": (2, "2026-W39,2026-W40"),
+                                                     "15020|ALT1-INV01": (1, "2026-W40")}
+    carimbo = [i for i in st["insumos"] if i["nome"] == I.NOMES["historico"]][0]
+    assert "do banco" in carimbo["detalhe"] and not carimbo["aviso"]
+    rel = json.loads((G.pasta_trabalho(config) / "geracoes" / st["id"] / "historico_banco.json").read_text("utf-8"))
+    assert rel["semanas"]["2026-W40"]["origem"] == "banco"
+
+
+def test_banco_fora_do_ar_usa_a_reserva_de_antes_da_semana(config):
+    guardar_reserva(config, [["15021|ALT1-CAB01", "2026-W39", "2026-W41", 2, "2026-W39,2026-W41"]])
+    cfg = dict(config, NEXUS_PCM_HISTORICO_TESTE=RuntimeError("503"))
+    st = G.aguardar(cfg, G.iniciar(cfg, "2026-W41")["id"], 60)
+    assert st["estado"] == "ok", st
+    assert historico_da_rodada(cfg, st["id"]) == {"15021|ALT1-CAB01": (1, "2026-W39")}   # a W41 saiu
+    carimbo = [i for i in st["insumos"] if i["nome"] == I.NOMES["historico"]][0]
+    assert carimbo["aviso"] and "o banco não respondeu" in carimbo["detalhe"]
+
+
+def test_sem_banco_e_sem_reserva_nao_gera(config):
+    cfg = dict(config, NEXUS_PCM_HISTORICO_TESTE=RuntimeError("503"))
+    with pytest.raises(G.NaoPronto) as erro:
+        G.iniciar(cfg, "2026-W41")
+    assert "histórico" in str(erro.value) and "reserva" in str(erro.value)
+    assert not list((G.pasta_trabalho(cfg) / "geracoes").iterdir())     # a pasta da rodada não fica para trás
 
 
 def test_servidor_sem_a_pasta_do_pcm_gera_mesmo_assim(config, tmp_path):
@@ -193,6 +254,128 @@ def test_uma_geracao_por_vez(config, tmp_path):
     with pytest.raises(G.Ocupado):
         G.iniciar(cfg, "2026-W41")
     G.aguardar(cfg, r["id"], 60)
+
+
+# ── a geração com a FOTO do Fracttal (sem ler o Fracttal) ─────────────────────────────────────────────────────
+
+def motor_da_foto(tmp_path, regrava=False):
+    """O motor falso da rodada com foto: confere que ele NÃO tem como ler o Fracttal (sem credencial, endereço numa
+    porta fechada) e que a foto está na pasta com a idade de antes (o TTL do motor é pela idade do arquivo). Com
+    `regrava`, faz o que o motor de verdade faz quando LÊ o Fracttal: regrava o cache."""
+    m = tmp_path / f"motor_foto_{int(regrava)}.py"
+    m.write_text(textwrap.dedent(f"""
+        import json, os, time
+        import openpyxl
+        base = os.environ["PCM_PROG_DIR"]
+        assert os.environ["FRACTTAL_CLIENT_ID"] == "" and os.environ["FRACTTAL_CLIENT_SECRET"] == ""
+        assert os.environ["FRACTTAL_BASE_URL"].startswith("http://127.0.0.1:9/")
+        assert int(os.environ["PROG_API_TTL_MIN"]) > 60 * 24 * 365
+        foto = os.path.join(base, ".cache_semanal_api.pkl")
+        assert time.time() - os.path.getmtime(foto) > 3600, "a foto perdeu a idade"
+        assert os.path.exists(os.path.join(base, "Historico_Programacoes.xlsx"))
+        if {regrava}:
+            open(foto, "ab").write(b"lido de novo")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "SP Leste 02"
+        ws.append(json.loads({json.dumps(json.dumps(CAB))}))
+        for l in json.loads({json.dumps(json.dumps(LINHAS))}):
+            ws.append(l)
+        wb.save(os.environ["PCM_OUTPUT"])
+        print("OK")
+    """), encoding="utf-8")
+    return m
+
+
+@pytest.fixture
+def foto(origem):
+    """A foto que o motor do PCM grava na pasta dele ao ler o Fracttal, com a idade de uma foto de verdade."""
+    import os
+    import time
+    for nome in (".cache_semanal_api.pkl", "_usinas_coordenadas_cache.json"):
+        (origem / nome).write_bytes(b"foto de mentira")
+        velho = time.time() - 3 * 3600
+        os.utime(origem / nome, (velho, velho))
+    return origem
+
+
+def test_gerar_com_foto_nao_le_o_fracttal(config, foto, tmp_path):
+    cfg = dict(config, NEXUS_PCM_MOTOR=str(motor_da_foto(tmp_path)))
+    st = G.gerar_com_foto(cfg, "2026-W41")
+    assert st["estado"] == "ok", st
+    assert st["foto"]["intacta"] and set(st["foto"]["arquivos"]) == {".cache_semanal_api.pkl",
+                                                                     "_usinas_coordenadas_cache.json"}
+    assert st["credencial"].startswith("nenhuma") and st["id"].endswith("-2026-W41-foto")
+    assert st["conferencia"]["blocos"] == 2 and st["conferencia"]["fora_da_semana"] == 0
+    # é prova, não geração: fica fora da lista da tela
+    assert st["id"] not in [u["id"] for u in G.ultimas(cfg)]
+    # e a pasta do PCM só foi lida
+    assert (foto / ".cache_semanal_api.pkl").read_bytes() == b"foto de mentira"
+
+
+def test_foto_regravada_pelo_motor_nao_esta_intacta(config, foto, tmp_path):
+    """Se o motor tivesse lido o Fracttal, ele regravaria o cache: a rodada diz que a foto não ficou intacta."""
+    cfg = dict(config, NEXUS_PCM_MOTOR=str(motor_da_foto(tmp_path, regrava=True)))
+    st = G.gerar_com_foto(cfg, "2026-W41", rotulo="Teste 1")
+    assert st["estado"] == "ok" and st["foto"]["intacta"] is False
+    assert st["id"].endswith("-foto-teste-1")
+
+
+def test_foto_com_historico_da_reserva(config, foto, tmp_path):
+    guardar_reserva(config, [["15021|ALT1-CAB01", "2026-W39", "2026-W41", 2, "2026-W39,2026-W41"]])
+    cfg = dict(config, NEXUS_PCM_MOTOR=str(motor_da_foto(tmp_path)))
+    st = G.gerar_com_foto(cfg, "2026-W41", historico="nexus")
+    assert st["estado"] == "ok" and st["historico"] == "nexus"
+    assert historico_da_rodada(cfg, st["id"]) == {"15021|ALT1-CAB01": (1, "2026-W39")}
+
+
+def test_sem_foto_nao_roda(config, tmp_path):
+    with pytest.raises(G.NaoPronto):
+        G.gerar_com_foto(config, "2026-W41", foto=tmp_path / "vazia")
+    with pytest.raises(ValueError):
+        G.gerar_com_foto(config, "2026-W41", historico="planilha")
+
+
+def test_conferencia_da_semana_gerada(tmp_path):
+    """Os casos da W42 de 09/10/2026: a corretiva de MPA na janela da noite não conta no dia; a corretiva forçada que
+    passa da meia-noite começa fora da jornada; a tarefa partida ([PARCIAL]) tem dois blocos de propósito."""
+    cab = CAB + ["Paralelo (terceirizada)"]
+    linhas = [
+        ["SP Leste 02", "Segunda-feira (05/10)", 1, "U", "A", "Corretiva", "t1", "Não", 1, "07:30", "11:30", 4, 9, "Não"],
+        ["SP Leste 02", "Segunda-feira (05/10) [PARCIAL]", 2, "U", "B", "MPM", "t2", "Não", 1, "13:12", "16:12", 3, 9, "Não"],
+        ["SP Leste 02", "Terça-feira (06/10)", 2, "U", "B", "MPM", "t2", "Não", 1, "07:30", "08:00", 0.5, 9, "Não"],
+        ["SP Leste 02", "Segunda-feira (05/10) [NOTURNO]", 3, "U", "C", "Corretiva", "MPA x", "Sim", 2, "15:45", "23:45", 8, 9,
+         "Não"],
+        ["SP Leste 02", "Terça-feira (06/10) [EXCEDE HH]", 4, "U", "D", "Corretiva", "t4", "Não", 1, "03:15 (D+1)",
+         "09:15 (D+1)", 6, 9, "Não"],
+        ["SP Leste 02", "Terça-feira (06/10) [ZELADORIA/PARALELO]", 5, "U", "E", "Zeladoria", "t5", "Não", 1, "07:30",
+         "17:30", 20, 9, "Sim"],
+        ["SP Leste 02", "Segunda-feira (12/10)", 6, "U", "F", "MPM", "t6", "Não", 1, "07:30", "08:30", 1, 9, "Não"],
+        # o último MPS do dia, cortado pelo fim do expediente: 32 min no relógio e 1,3 h na coluna, sem [PARCIAL]
+        ["SP Leste 02", "Quarta-feira (07/10)", 7, "U", "G", "MPS", "t7", "Não", 1, "16:18", "16:50", 1.3, 9, "Não"],
+    ]
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "SP Leste 02"
+    ws.append(cab)
+    for l in linhas:
+        ws.append(l)
+    wb.create_sheet("_Pendentes").append(["Equipe", "OSs ID", "Código Equipamento", "Tarefa", "Motivo"])
+    wb["_Pendentes"].append(["SP Leste 02", 9, "Z", "t9", "não coube"])
+    wb.save(tmp_path / "s.xlsx")
+    c = C.conferir(tmp_path / "s.xlsx", "2026-W41")
+    assert c["blocos"] == 8 and c["pendentes"] == 1 and c["fora_da_semana"] == 1     # o 12/10 é da semana seguinte
+    # segunda: 4 h + 3 h (a corretiva de MPA das 15:45 ficou na janela da noite); terça: 0,5 h + 6 h (zeladoria fora)
+    assert c["acima_da_capacidade"] == 0 and c["horas_dia_max"] == 7.0 and c["dias_de_equipe"] == 3
+    assert c["acima_da_capacidade_pelo_relogio"] == 0 and c["horas_dia_max_pelo_relogio"] == 7.0
+    assert c["duracao_maior_que_o_horario"] == 1 and c["duracao_maior_que_o_horario_exemplos"][0]["os"] == "7"
+    assert c["horas_noite_max"] == 8
+    assert c["fora_da_jornada"] == 1                      # a forçada que começa às 03:15 do dia seguinte
+    assert c["tarefas_em_mais_de_um_bloco"] == 1 and c["repetidas_sem_parcial"] == 0
+    assert c["marcacoes"]["ZELADORIA (PARALELO)"] == 1 and c["reprogramadas"] == 1
+    assert C.entre_semanas(tmp_path / "s.xlsx", tmp_path / "s.xlsx") == {     # a chave do motor: OS + código
+        "anterior": 7, "atual": 7, "continuam": 7, "novas": 0, "sairam": 0}
+    assert C._no_relogio("11:15", "13:27") == 60 and C._no_relogio("03:15 (D+1)", "09:15 (D+1)") == 360
 
 
 def test_comparar_planilhas(tmp_path):

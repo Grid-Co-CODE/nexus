@@ -6,7 +6,7 @@ leituras abaixo são as do programacao_v7.py (pandas, mesma aba, mesma linha de 
 são de mentira, no formato dos reais: o repositório é público e não leva dado do PCM. A mesma prova rodou com os
 arquivos reais da pasta do PCM em 30/09/2026 e deu tudo igual.
 """
-from datetime import datetime
+from datetime import date, datetime
 
 import openpyxl
 import pandas as pd
@@ -122,6 +122,13 @@ def ler_feriados(p):
     return nac, est, mun
 
 
+def so_do_ano(fer, ano):
+    """(nacionais, estaduais, municipais) de `ler_feriados` só com as datas do ano."""
+    nac, est, mun = fer
+    return ({d for d in nac if d.year == ano}, {d: v for d, v in est.items() if d.year == ano},
+            {d: v for d, v in mun.items() if d.year == ano})
+
+
 def ler_obs(p):
     return [(i, l.strip()) for i, l in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
             if l.strip() and not l.strip().startswith("#")]
@@ -135,10 +142,19 @@ def pcm(tmp_path):
     return origem, trab, rod
 
 
+def guardar_reserva_do_arquivo(trab, origem):
+    """A reserva do histórico como ela ficou no Nexus (importada do arquivo do PC até 08/10; desde então o histórico
+    vem do banco e o importar não a toca)."""
+    d = I.carregar(trab)
+    d["historico"] = I.ler_planilha(origem / "Historico_Programacoes.xlsx", None, 1)
+    I.salvar(trab, d)
+
+
 def test_ida_e_volta_o_motor_le_igual(pcm):
     origem, trab, rod = pcm
     resumo = I.importar(trab, origem, "2026-W41")
-    assert resumo["historico"] == "2 linhas" and "3 municipais" in resumo["feriados"]
+    assert "não importado" in resumo["historico"] and "3 municipais" in resumo["feriados"]
+    guardar_reserva_do_arquivo(trab, origem)
     I.materializar(trab, rod, "2026-W41")
     pd.testing.assert_frame_equal(ler_prioridades(origem / "Lista_Prioridades_GridCo.xlsx"),
                                   ler_prioridades(rod / "Lista_Prioridades_GridCo.xlsx"))
@@ -147,7 +163,9 @@ def test_ida_e_volta_o_motor_le_igual(pcm):
     assert ler_historico(origem / "Historico_Programacoes.xlsx") == ler_historico(rod / "historico_do_nexus.xlsx")
     fa = ler_feriados(origem / "Feriados" / I.FERIADOS_ARQ)
     fb = ler_feriados(rod / "Feriados" / I.FERIADOS_ARQ)
-    assert fa == fb and len(fb[2]) == 3                      # Quixadá veio, mesmo sozinha na linha
+    # o ano da planilha sai igual; o seguinte vai projetado (09/10/2026: a W53 de 2026 termina em 01/01/2027)
+    assert so_do_ano(fb, 2026) == fa and len(fb[2]) == 3 + len(so_do_ano(fb, 2027)[2])   # Quixadá veio, mesmo sozinha
+    assert date(2027, 1, 1) in fb[0]
     assert ler_obs(origem / "Observacoes_Semana.txt") == ler_obs(rod / "Observacoes_Semana.txt")
 
 
@@ -188,7 +206,25 @@ def test_sem_importar_nao_gera(pcm):
     _origem, trab, rod = pcm
     with pytest.raises(I.InsumoErro) as erro:
         I.materializar(trab, rod, "2026-W41")
-    assert "Importe da pasta do PCM" in str(erro.value)
+    assert "Importe da pasta do PCM" in str(erro.value) and I.NOMES["historico"] not in str(erro.value)
+
+
+def test_importar_nao_traz_o_historico_do_pc_por_cima(pcm):
+    """08/10/2026 ("PUXE O HISTÓRICO"): o arquivo do PC guarda a união de todas as gerações (a W41 com as duas de 02/10:
+    1.286 tarefas, 167 que nunca foram ao campo). O histórico vem do banco; a reserva corrigida que está no Nexus não
+    pode ser trocada pelo arquivo do PC num clique de importar."""
+    origem, trab, rod = pcm
+    I.importar(trab, origem, "2026-W41")
+    assert "historico" not in I.carregar(trab)
+    d = I.carregar(trab)
+    d["historico"] = {"aba": None, "preambulo": [], "colunas": ["task_key", "first_week", "last_week", "count", "weeks"],
+                      "linhas": [["1|A", "2026-W41", "2026-W41", 1, "2026-W41"]], "meta": {"correcao": "S41"}}
+    I.salvar(trab, d)
+    I.importar(trab, origem, "2026-W41")
+    assert I.carregar(trab)["historico"]["linhas"] == [["1|A", "2026-W41", "2026-W41", 1, "2026-W41"]]
+    # a reserva vai para a rodada com outro nome, sem carimbo (o carimbo do histórico é da geração)
+    carimbos = I.materializar(trab, rod, "2026-W42")
+    assert (rod / "historico_do_nexus.xlsx").exists() and I.NOMES["historico"] not in [c["nome"] for c in carimbos]
 
 
 def test_estado_avisa_quando_o_arquivo_da_pasta_mudou(pcm):
@@ -229,7 +265,8 @@ def test_tela_importa_da_pasta_do_pcm(logado, tela):
     assert resp.status_code == 303 and "semana=2026-W41" in resp.headers["Location"]
     html = logado.get(resp.headers["Location"]).get_data(as_text=True)
     assert "ainda não está no Nexus" not in html and "Importado da pasta do PCM" in html
-    assert I.carregar(trab)["historico"]["linhas"]
+    # o histórico não é importado: a tela diz que ele vem do banco
+    assert "historico" not in I.carregar(trab) and "do banco a cada geração" in html
 
 
 def test_tela_edita_as_observacoes_da_semana(logado, tela):

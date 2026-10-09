@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block titulo %}Publicar no App{% endblock %}
+{% block conteudo %}
+{# Publicar no App (09/10/2026, Levi: "semana que vem já quero full nexus sem falta"): a semana gerada no Nexus vai para o
+   repositório do PCM, pelo mesmo caminho do PC do PCM, e o robô do PCM a leva ao banco_dados.json do App. Muda a semana de
+   todo o campo: só administrador, e tudo o que importa fica à vista antes do botão (`telas._ctx_publicar`). #}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+<p class="gc-eyebrow">PCM · Programação semanal</p>
+<h1 class="titulo-pagina">Publicar a semana {{ st.semana }} no App</h1>
+
+{% if negado %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-lock-key"></i><div><strong>Só administrador publica.</strong>
+  Publicar troca a semana de todo o campo no App. Entre com a senha de administrador ou peça a quem é.</div></div>
+<p><a class="pcm-link" href="/t/pcm/gerar?rodada={{ st.id }}">Voltar à rodada</a></p>
+{% else %}
+
+{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
+
+<p class="pcm-sub pcm-pub-sub">O Nexus manda a <span class="gc-dado">{{ planilha }}</span> e as observações desta rodada para o
+  repositório do PCM ({{ repo.repo }}), como o PC do PCM faz. O robô do PCM roda na hora e regrava o
+  <span class="gc-dado">banco_dados.json</span> que o App lê (5 a 10 minutos). A semana vira a do App na segunda-feira
+  dela.</p>
+
+{% if motivos %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-prohibit"></i><div><strong>Esta rodada não pode ser publicada.</strong>
+  <ul class="pcm-pub-lista">{% for m in motivos %}<li>{{ m }}</li>{% endfor %}</ul></div></div>
+{% endif %}
+
+<section class="pcm-rodada">
+  <h2 class="pcm-h2">A semana</h2>
+  <div class="gc-numeros pcm-numeros">
+    <div><div class="r">Blocos na agenda</div><div class="v gc-num">{{ conf.blocos or (st.resumo.linhas if st.resumo else '—') }}</div>
+      <div class="d">{{ conf.tarefas or '—' }} tarefas de {{ conf.os or '—' }} OS</div></div>
+    <div><div class="r">Pendentes</div><div class="v gc-num">{{ conf.pendentes if conf.pendentes is not none else (st.resumo.pendentes if st.resumo else '—') }}</div>
+      <div class="d">o que não coube na semana</div></div>
+    <div><div class="r">Equipes</div><div class="v gc-num">{{ conf.equipes_com_bloco or (st.resumo.equipes if st.resumo else '—') }}</div>
+      <div class="d">com ao menos um bloco</div></div>
+  </div>
+  <p class="gc-ajuda">Gerada em {{ st.inicio[8:10] }}/{{ st.inicio[5:7] }} às {{ st.inicio[11:16] }}{% if horas_desde is not none %}
+    (há {{ horas_desde }} h){% endif %}. Fracttal: {{ st.credencial }}.</p>
+  {% if ja_comecou %}
+  <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-calendar-x"></i><div><strong>A semana {{ st.semana }} já começou.</strong>
+    Publicar agora troca a programação que o campo está seguindo, no meio da semana. Só publique se for para corrigir a
+    semana de agora.</div></div>
+  {% endif %}
+  {% if horas_desde is not none and horas_desde >= 24 %}
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-clock-counter-clockwise"></i><div><strong>Gerada há mais de um dia.</strong>
+    O Fracttal mudou desde então: OS novas, finalizadas e canceladas depois disso não estão nesta semana. Se der, gere de novo
+    antes de publicar.</div></div>
+  {% endif %}
+
+  <h3 class="pcm-pub-h3">Confira antes</h3>
+  {% if not conf %}
+  <p class="gc-ajuda">Esta rodada não tem a conferência da semana (blocos fora da semana, horas por equipe, corretivas
+    forçadas): gere de novo para publicar.</p>
+  {% else %}
+  <ul class="pcm-pub-lista">
+    <li>{% if conf.fora_da_semana %}<strong class="pcm-pub-ruim">{{ conf.fora_da_semana }} blocos fora da semana</strong>{% else %}Todo bloco cai de segunda a sexta desta semana.{% endif %}</li>
+    <li>{% if conf.acima_da_capacidade %}{{ conf.acima_da_capacidade }} dias de equipe acima de 7 h pela coluna de duração
+      (o maior: {{ conf.horas_dia_max }} h){% else %}Nenhum dia de equipe acima de 7 h.{% endif %}</li>
+    {% if conf.excede_hh_os %}
+    <li><strong class="pcm-pub-ruim">Corretivas forçadas além das horas do dia:</strong>
+      {% for e in conf.excede_hh_os %}OS {{ e.os }} ({{ e.tarefas }} {{ 'tarefa' if e.tarefas == 1 else 'tarefas' }}, {{ e.horas }} h, {{ e.equipe }}, {{ e.dia }}){{ ', ' if not loop.last }}{% endfor %}.
+      Confira a duração estimada das tarefas no Fracttal ou fixe-as em dias diferentes nas observações, e gere de novo.</li>
+    {% endif %}
+    {% if conf.fora_da_jornada %}<li>{{ conf.fora_da_jornada }} blocos começam fora da jornada (07:00 às 17:00).</li>{% endif %}
+    <li>Observações: {{ obs.usinas }} usinas com dia de atendimento, {{ obs.fora }} OS fora e {{ obs.fixar }} OS com dia fixo{% if obs.problemas %};
+      <strong class="pcm-pub-ruim">{{ obs.problemas }} linhas que o motor não entende</strong>{% endif %}.
+      {% if not obs.fora and not obs.fixar %}Nenhuma OS fora nem com dia fixo: se o PCM tinha alguma, ela não entrou.{% endif %}</li>
+  </ul>
+  {% endif %}
+
+  <h3 class="pcm-pub-h3">O que o repositório do PCM tem hoje</h3>
+  {% if repo.erro %}
+  <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-plugs"></i><div><strong>Não consegui ler o repositório:</strong> {{ repo.erro }}.</div></div>
+  {% else %}
+  <ul class="pcm-pub-lista">
+    <li>{% if repo.existe %}<strong class="pcm-pub-ruim">Já existe uma {{ planilha }}</strong>{% if repo.commit %}, gravada em
+      {{ repo.commit.quando }} por {{ repo.commit.quem }} ({{ repo.commit.mensagem }}){% endif %}. Publicar troca a semana que o
+      App vai receber por esta.{% else %}Ainda não há {{ planilha }}: esta será a primeira.{% endif %}</li>
+    <li>Ajustes da semana em curso (<span class="gc-dado">Observacoes_Semana_Atual.txt</span>, gravado pelo painel do PCM):
+      o Nexus não mexe nele.{% if repo.obs_atual and repo.obs_atual.strip() %} Hoje ele tem:
+      <pre class="pcm-pre pcm-pub-pre">{{ repo.obs_atual }}</pre>Se forem da semana que termina, peça para limpar no painel.{% else %} Está vazio.{% endif %}</li>
+    <li>Token: {{ repo.token or 'nenhum' }}.</li>
+  </ul>
+  {% endif %}
+</section>
+
+{% if not motivos and not repo.erro %}
+<form class="pcm-pub-form" method="post" action="/t/pcm/gerar/publicar">
+  <input type="hidden" name="rodada" value="{{ st.id }}">
+  <input type="hidden" name="repo_ja_tem" value="{{ '1' if repo.existe else '0' }}">
+  <label class="pcm-confirma"><input type="checkbox" name="confirmo" value="1" required> Confirmo: esta é a semana {{ st.semana }}
+    que vai para o campo.</label>
+  {% if repo.existe %}
+  <label class="pcm-confirma"><input type="checkbox" name="substituir" value="1" required> Sei que ela substitui a {{ planilha }}
+    que já está no repositório.</label>
+  {% endif %}
+  {% if ja_comecou %}
+  <label class="pcm-confirma"><input type="checkbox" name="ciente_comecou" value="1" required> Sei que a semana já começou e
+    que o campo recebe a programação nova no meio dela.</label>
+  {% endif %}
+  <div class="pcm-pub-acoes">
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</button>
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/gerar?rodada={{ st.id }}">Cancelar</a>
+  </div>
+</form>
+{% else %}
+<p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/gerar?rodada={{ st.id }}">Voltar à rodada</a></p>
+{% endif %}
+{% endif %}
+{% endblock %}
