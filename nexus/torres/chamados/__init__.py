@@ -1,13 +1,15 @@
 """Torre Chamados: Chamados a fabricantes, tickets de performance e garantias.
 
-Telas ainda em construção: todas caem no placeholder da casca. Para dar vida a uma tela, crie uma
-view com a mesma rota (ela vence a genérica), por exemplo:
+Fabricantes e Garantias abrem telas do OS Creator Web (Levi, 08/10/2026): o Controle de fornecedores e o
+Acompanhamento de chamados continuam no OS Creator, com o atalho aqui (`ponte.ATALHOS`). As outras telas ainda caem no
+placeholder da casca; para dar vida a uma, crie uma view com a mesma rota (ela vence a genérica), por exemplo:
 
-    @bp.route("/fabricantes")
-    def fabricantes():
-        return render_template("chamados/fabricantes.html")
+    @bp.route("/tickets")
+    def tickets():
+        return render_template("chamados/tickets.html")
 """
 from ..modelo import Tela, Torre
+from ..oscreator.ponte import ATALHOS, abrir_em
 
 TORRE = Torre(
     id="chamados",
@@ -17,8 +19,8 @@ TORRE = Torre(
     descricao="Chamados a fabricantes, tickets de performance e garantias.",
     telas=[
         Tela("fabricantes", "Fabricantes",
-             "Qual chamado está parado com o fabricante e há quanto tempo?",
-             "Painel de chamados"),
+             "Como abrir o chamado com cada fabricante e o que a inspeção precisa levar?",
+             "Controle de fornecedores do OS Creator Web"),
         Tela("tickets", "Tickets de performance",
              "Qual ticket foi detectado e ainda não foi verificado?",
              "tickets_performance, via API"),
@@ -26,9 +28,13 @@ TORRE = Torre(
              "O que o cliente pediu e qual o prazo pelo contrato?",
              "Solicitações do Nexus"),
         Tela("garantias", "Garantias",
-             "Que falha tem garantia vigente e ninguém acionou?",
-             "Matriz de garantias"),
+             "Qual chamado de garantia está aberto, com quem e há quanto tempo?",
+             "Acompanhamento de chamados do OS Creator Web"),
     ],
 )
 
 bp = TORRE.criar_blueprint(__name__)
+
+# o atalho de cada tela do OS Creator que mora nesta torre (a tela continua no OS Creator, no mesmo endereço)
+for _tela_id in ATALHOS[TORRE.id]:
+    bp.add_url_rule(f"/{_tela_id}", endpoint=f"abrir_{_tela_id}", view_func=abrir_em(TORRE, _tela_id))

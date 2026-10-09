@@ -219,6 +219,29 @@ def abrir(torre, tela_id: str):
     return view
 
 
+# Telas do OS Creator com o atalho em OUTRA torre (Levi, 08/10/2026): "Controle de fornecedores do OS Creator Web tem
+# que estar no NEXUS > CHAMADOS > FABRICANTE"; "o mesmo com Acompanhamento de chamados, tem que estar em GARANTIAS";
+# "não que vão sair da visão do OS Creator Web, porém, quando for abrir essa janela o atalho deve ficar para a parte de
+# CHAMADOS". A tela continua no OS Creator (mesmo endereço, mesma casca); o item do menu do Nexus é que mora na torre.
+ATALHOS = {
+    "chamados": {"fabricantes": "/os/chamados/fornecedores", "garantias": "/os/chamados/acompanhamento"},
+}
+
+
+def abrir_em(torre, tela_id: str):
+    """Como `abrir`, para uma tela de outra torre que abre uma tela do OS Creator (ATALHOS): a moldura do OS Creator
+    com o menu lateral da torre dona do atalho (o item dela fica marcado), e o clique entre os atalhos da torre abre
+    aba nova na casca já aberta, como na torre OS Creator."""
+    destinos = ATALHOS[torre.id]
+
+    def view():
+        menu_os = {f"/t/{torre.id}/{t}": {"url": d, "nome": torre.tela(t).nome} for t, d in destinos.items()}
+        return render_template("oscreator/abrir.html", torre=torre, tela=torre.tela(tela_id),
+                               destino=_endereco_do_os(request.args.get("abrir")) or destinos[tela_id], menu_os=menu_os)
+    view.__name__ = f"abrir_{torre.id}_{tela_id}"
+    return view
+
+
 # ── o card da OS em qualquer torre do Nexus (08/10/2026) ───────────────────────────────────────────────────────────
 # Levi: "NEXUS > ENGENHARIA > QUADRO DE EQUIPE — Ao clicar na OS quero que abra o mesmo card que aparece quando clicamos
 # em uma OS no histórico do OS Creator Web. Como fazem parte do mesmo ambiente compartilhado (Nexus) precisamos fazer os

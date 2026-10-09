@@ -373,6 +373,16 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
 
   Tudo a 1280 e a 375 px, sem rolagem lateral e sem erro de JavaScript. Falta o olho do Levi com OS de verdade.
 
+## Telas do OS Creator com o atalho em outra torre (08/10/2026)
+
+Levi: "Controle de fornecedores do OS Creator Web tem que estar no NEXUS > CHAMADOS > FABRICANTE"; "o mesmo com
+Acompanhamento de chamados, tem que estar em GARANTIAS"; "não que vão sair da visão do OS Creator Web, porém, quando for
+abrir essa janela o atalho deve ficar para a parte de CHAMADOS". Em `ponte.ATALHOS`: Chamados → Fabricantes abre
+`/os/chamados/fornecedores` e Chamados → Garantias abre `/os/chamados/acompanhamento`, na mesma moldura da torre OS
+Creator (`abrir_em`), com o menu lateral marcando a torre Chamados; entre os dois atalhos o clique abre aba nova na casca
+já aberta. As telas continuam no OS Creator (mesmo endereço; o setor Chamados dele não mudou). Atalho novo para outra
+torre = uma linha em `ATALHOS` e o `add_url_rule` na torre dona. Prova: `tests/test_torre_chamados.py`.
+
 ## O card da OS com várias tarefas (08/10/2026)
 
 O pedido do Levi, de 08/10: "Nas OSs que aparecem no OS Creator Web quando a OS tem mais que uma tarefa está duplicando
