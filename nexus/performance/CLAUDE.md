@@ -79,12 +79,35 @@ INPE, todos públicos e de uso livre. A tela cruza isso com as usinas em operaç
 INPE (Programa Queimadas)". A **página de cada usina** (`/t/performance/clima/usina/<id>`, 07/10) acrescenta a irradiação
 diária da NASA POWER (ver abaixo); a tela principal nunca chama a NASA.
 
-**A tela (leitura rápida, aprovada pelo Levi em 07/10/2026), na ordem:** cabeçalho (filtro de cliente, "atualizada às HH:MM");
-**faixa de 4 números** (Agir agora, Atenção, Sem alerta, Cobertura); **Agir agora**, um cartão por usina (motivo numa pílula,
-frase principal, prova, contexto); **Por estado**, uma grade de 27 quadrados (esquema, não é mapa; o número é de usinas com
-alerta no estado e a cor, a do pior nível); **Fontes** (de quando é cada dado); **Atenção**, uma matriz usina x aviso x foco x
-os quatro dias do risco de fogo (as 20 primeiras; "Ver todas (N)" é `?todas=1`). A grade de estados e a matriz rolam DENTRO
-da caixa em 375 px, nunca a página. Cada cartão e cada linha levam à página da usina.
+**A tela (leitura rápida, aprovada pelo Levi em 07/10/2026; didática desde 09/10/2026), na ordem:** cabeçalho (filtro de
+cliente, "atualizada às HH:MM"); **faixa de 4 números** (Agir agora, Atenção, Sem alerta, Cobertura), cada nível com "O que
+fazer" quando tem usina (com zero ou com "—" não diz nada); o link "Como ler esta tela"; **Agir agora**, um cartão por usina
+(pílula, frase principal, "Quando:", "O que pode acontecer" e "O que conferir" do motivo principal, os outros motivos e o
+"Também"); **Por estado**, uma grade de 27 quadrados (cada quadrado é um estado, não é um mapa; o número é de usinas com alerta
+no estado e a cor, a do pior nível); **De onde vêm os dados** (de quando é cada um); **Atenção**, a tabela usina x "Por quê" x
+avisos x fogo a até 5 km x os quatro dias do risco de fogo (as 20 primeiras; "Ver todas (N)" é `?todas=1`); **Entenda os
+alertas** (os três níveis da tela com o que fazer, os níveis do INMET, foco, risco de fogo com a escala, os eventos que estão
+valendo agora e, recolhidos, os outros que o INMET publica). A grade de estados e a tabela rolam DENTRO da caixa em 375 px,
+nunca a página. Cada cartão e cada linha levam à página da usina.
+
+**Didática (09/10/2026, Levi: "estou achando um pouco limitado e pouco entendível para um leigo, deixe mais didático").** A tela
+dizia o QUE havia ("Tempestade · vermelho", "1,00") e não o que quer dizer nem o que conferir, e repetia o mesmo aviso (três
+"Baixa Umidade" numa usina). Regras:
+- **Os textos moram em `clima/explica.py`, uma vez só** (a lista, a página da usina e o mapa leem dali): o que é cada evento, o
+  que pode acontecer NA USINA e o que conferir (nunca ordem de serviço nem procedimento de segurança, que são do HSEQ e do
+  supervisor); evento que o INMET publicar e não estiver lá cai no texto genérico e continua aparecendo. Todo evento de
+  `alertas.EVENTOS_QUE_ESTRAGAM_USINA` tem texto próprio (teste).
+- **Nível pela palavra do INMET, nunca pela cor** (Perigo Potencial, Perigo, Grande Perigo, com o que cada um quer dizer); a
+  cor fica no desenho.
+- **Avisos iguais juntos:** `visao.agrupar_avisos` (mesmo evento e mesmo nível: a janela vai do primeiro início ao último fim,
+  com quantos são) e `visao.por_evento` (o mesmo evento em níveis diferentes vira um: o nível mais alto, a janela de todos e
+  quando vale cada nível no balão). O cartão tem UM motivo por evento que manda agir; os outros níveis vão para o "Também".
+- **Motivo resumido** (`visao.motivo_curto`): fogo perto, os eventos (os que mandam agir antes) e o risco de fogo alto, cortado
+  nos dois primeiros com "e mais N". É a coluna "Por quê" da Atenção e o motivo da tabela do mapa.
+- **Risco de fogo em palavra** (Mínimo, Baixo, Médio, Alto, Crítico) na célula; o número do INPE e o dia ficam no balão. Os dias
+  com o nome que se fala (`visao.dias_amigaveis`: "hoje", "amanhã", "sáb 11/10"; "ontem" com o arquivo de ontem); os rótulos
+  internos "D+1" seguem em `rotulos_dos_dias` para as regras de frescor.
+- Célula da Atenção que leu e não achou diz com palavra ("nenhum", "não"); sem leitura continua "sem leitura".
 
 | Fonte | O que traz | Cache | Endereço (troca por `NEXUS_CLIMA_*_URL`) |
 |---|---|---|---|
@@ -95,8 +118,9 @@ da caixa em 375 px, nunca a página. Cada cartão e cada linha levam à página 
 
 O código (sem Flask) está em `nexus/performance/clima/`: `geometria` (ponto em polígono e haversine), `geotiff` (leitor do
 COG), `fontes` (os quatro clientes), `alertas` (as regras e os níveis), `leitura` (cache por fonte; o da NASA, por usina),
-`irradiacao` (a série de 30 dias, o mês até agora e a geometria do gráfico), `usinas` (cadastro), `visao` (o que a tela e a página
-da usina escrevem). As rotas são de `nexus/torres/performance/clima_tela.py`; o CSS, `nexus/static/clima.css`.
+`irradiacao` (a série de 30 dias, o mês até agora e a geometria do gráfico), `usinas` (cadastro), `explica` (o que cada alerta
+quer dizer, em linguagem de quem não é da meteorologia), `visao` (o que a tela e a página da usina escrevem). As rotas são de
+`nexus/torres/performance/clima_tela.py`; o CSS, `nexus/static/clima.css`. Provas da didática: `tests/test_clima_explica.py`.
 
 **Regras que custaram caro**
 - **O Pillow não abre o GeoTIFF do INPE.** É um COG de 64 bits (BitsPerSample 64, LZW, tiles de 256, 8699 x 8899): o plugin
@@ -247,8 +271,16 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
 **Regras do desenho**
 - **SVG do servidor, sem JavaScript, sem biblioteca, sem mapa de terceiros.** O viewBox tem SEMPRE 1000 de largura e a altura sai
   da geografia: o CSS decide raios em unidades do SVG e traços em pixels de tela (`vector-effect:non-scaling-stroke`), e o
-  contorno fica fino em qualquer largura. O SVG ocupa 100% da largura (`height:auto`, `max-height:84vh` no desktop). Abaixo de
-  1100 px a legenda desce para baixo do mapa; abaixo de 820 px entram o `--mp-k` e o fim do `max-height`.
+  contorno fica fino em qualquer largura. O SVG ocupa 100% da largura (`height:auto`, `max-height:84vh` no desktop); abaixo de
+  820 px entram o `--mp-k` e o fim do `max-height`.
+- **Legenda à esquerda, mapa no meio, tabela à direita** (Levi, 09/10/2026: "jogue essa visão do anexo para a esquerda do mapa e
+  na direita uma tabela com o nome das usinas, os riscos e uma forma resumida do motivo do risco"). Container query no `.mp`
+  (conta a largura da tela, não a da janela): o padrão é uma coluna com o mapa primeiro; a partir de 760 px, legenda e mapa lado a
+  lado e a tabela embaixo; a partir de 1120 px, as três lado a lado, e a tabela rola por dentro na altura da linha (o
+  `contain:size` impede as 154 linhas de esticarem a página). A tabela (`m["tabela"]`) tem uma linha por usina do recorte, na
+  ordem Agir agora, Atenção, Sem leitura completa, Sem alerta e, dentro do nível, da mais grave para a menos (depois o nome); o
+  risco vai na cor, na bolinha e na palavra; o motivo é o `visao.motivo_curto` da lista ("Nada previsto" com as três fontes
+  lidas, "Sem leitura de X" sem elas); o nome leva à página da usina.
 - **Projeção equiretangular com a correção de cos(latitude média).** Cada recorte (Brasil e as cinco regiões, `?regiao=norte|
   nordeste|centro-oeste|sudeste|sul`; vazio ou desconhecido cai no Brasil) usa a latitude do MEIO dele e refaz o viewBox: com o
   cosseno do país inteiro (14 graus) o Sul (28) ficaria 10% largo demais. O seletor são links (`<a href="?regiao=...">`), então
@@ -301,5 +333,5 @@ risco de fogo como camada (é um raster de pixels de ~1 km, e o Nexus lê só o 
 oceânicas (o contorno mínimo não as tem: uma usina ali cai em "fora deste recorte").
 
 Como provar: `python -m pytest -q tests/test_clima_mapa.py tests/test_clima_mapa_camadas.py tests/test_torre_performance_mapa.py`
-(63 + 62 + 54 testes, sem rede; 109 mutações no código, no template e no CSS novos, todas mortas). Na tela: `/t/performance/clima/mapa` no desktop e a 375 px
+(63 + 62 + 59 testes, sem rede; 109 mutações no código, no template e no CSS de 07/10, todas mortas; em 09/10 a tabela e a legenda à esquerda ganharam 5 testes, e as mutações da ordem da tabela, por nível e por gravidade, morrem). Na tela: `/t/performance/clima/mapa` no desktop e a 375 px
 (sem rolagem lateral; o SVG a 100% da largura).

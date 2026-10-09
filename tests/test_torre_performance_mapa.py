@@ -471,26 +471,50 @@ def _blocos_de_midia(css):
     return achados
 
 
+def _blocos_de_container(css):
+    """([(largura mínima, corpo)] de cada `@container mp (min-width:Npx){...}`, o CSS sem esses blocos): desde 09/10/2026 o
+    estreito é o padrão e as colunas do largo (legenda, mapa, tabela) entram só por container query."""
+    achados, base, fim = [], [], 0
+    for m in re.finditer(r"@container\s+mp\s*\(min-width:\s*(\d+)px\)\s*\{", css):
+        i, nivel = m.end(), 1
+        while nivel:
+            nivel += {"{": 1, "}": -1}.get(css[i], 0)
+            i += 1
+        achados.append((int(m.group(1)), css[m.end():i - 1]))
+        base.append(css[fim:m.start()])
+        fim = i
+    base.append(css[fim:])
+    return achados, "".join(base)
+
+
 def test_375_px_o_css_do_mapa_quebra_em_uma_coluna_e_o_svg_ocupa_a_largura(mundo):
     html = pagina(mundo)
     assert 'href="/static/clima.css"' in html and 'href="/static/clima-mapa.css"' in html
     css = mundo.get("/static/clima-mapa.css").get_data(as_text=True)
     assert re.search(r"\.mp-svg\{[^}]*width:100%", css) and re.search(r"\.mp-svg\{[^}]*height:auto", css)
+    # o padrão é uma coluna com o mapa primeiro; as colunas só a partir de 760 px de tela útil, e nenhuma regra de largo vaza
+    largos, base = _blocos_de_container(css)
+    assert re.search(r"\.mp-corpo\{[^}]*grid-template-columns:minmax\(0,1fr\)", base) and re.search(r"\.mp-mapa\{order:-1\}", base)
+    assert largos and all(largura >= 760 for largura, _ in largos)
+    assert any("mp-corpo" in corpo and "mp-tabela" in corpo for _, corpo in largos)
     blocos = _blocos_de_midia(css)
     assert blocos and all(375 < largura <= 1200 for largura, _ in blocos)               # nenhuma regra só do desktop escondida
-    assert any(largura >= 820 and "mp-corpo" in corpo and "grid-template-columns:minmax(0,1fr)" in corpo for largura, corpo in blocos)
     assert any(largura <= 820 and "mp-legenda" in corpo for largura, corpo in blocos)
-    for classe in ("mp-corpo", "mp-legenda"):
+    for classe in ("mp-corpo", "mp-legenda", "mp-tabela"):
         assert classe in html, classe
     assert "overflow-wrap:anywhere" in css and "min-width:0" in css
 
 
 def test_375_px_nenhuma_largura_fixa_passa_da_tela_do_celular(mundo):
     css = mundo.get("/static/clima-mapa.css").get_data(as_text=True)
-    fora_da_midia = css.split("@media")[0]
-    for m in re.finditer(r"(?<![-\w])(?:min-)?width:\s*(\d+)px", fora_da_midia):
-        assert int(m.group(1)) <= 340, m.group(0)
-    assert not re.search(r"(?<![-\w])min-width:\s*\d{3,}px", css)
+    _largos, base = _blocos_de_container(css)
+    estreito = re.sub(r"/\*.*?\*/", "", base.split("@media")[0], flags=re.S)
+    for regra in re.finditer(r"([^{}]+)\{([^{}]*)\}", estreito):
+        seletor = regra.group(1).strip()
+        for m in re.finditer(r"(?<![-\w])(?:min-)?width:\s*(\d+)px", regra.group(2)):
+            # só a tabela das usinas pode pedir largura (colunas de nome e de motivo), e ela rola dentro da caixa dela
+            assert int(m.group(1)) <= 340 or seletor.startswith(".mp-tab"), (seletor, m.group(0))
+    assert re.search(r"\.mp-tab-rolagem\{[^}]*overflow:auto", css)
 
 
 def test_375_px_os_pontos_crescem_no_celular_para_dar_para_tocar(mundo):
@@ -640,3 +664,50 @@ def test_cadeia_real_fonte_que_cai_no_meio_vira_leitura_velha_no_mapa(cadeia):
     del sessao.arquivos[URL_INMET]
     html = pagina(c)
     assert 'class="mp-avisos"' in svg(html) and "INMET fora agora; última leitura boa às 15:00" in texto(html)
+
+
+# ── a legenda à esquerda e a tabela à direita (Levi, 09/10/2026) ─────────────────────────────────────────────────────
+
+def test_a_legenda_fica_a_esquerda_do_mapa_e_a_tabela_a_direita(mundo):
+    corpo = trecho(pagina(mundo), '<div class="mp-corpo">', '<h2 class="cl-h2">Fontes</h2>')
+    assert corpo.index('class="mp-legenda"') < corpo.index('class="mp-mapa"') < corpo.index('class="mp-tabela"')
+
+
+def test_a_tabela_traz_cada_usina_com_o_risco_e_o_motivo_curto_e_quem_pede_acao_vem_primeiro(mundo):
+    html = pagina(mundo)
+    tab = trecho(html, 'class="mp-tabela"', "</table>")
+    linhas = re.findall(r'<tr class="mp-tab-lin mp-tab--(\w+)">\s*<th scope="row"><a class="cl-link" href="([^"]+)">([^<]+)</a>'
+                        r'.*?<td class="mp-tab-motivo">([^<]*)</td>', tab, flags=re.S)
+    # quem pede ação primeiro, depois a atenção, e a usina sem alerta por último (a ordem escrita aqui, não a da constante)
+    assert [n for n, *_ in linhas] == ["agir", "agir", "atencao", "atencao", "atencao", "sem"]
+    assert len(linhas) == len(usinas_do_svg(html)) == 6                            # uma linha por usina desenhada no recorte
+    por = {nome: (nivel, href, motivo) for nivel, href, nome, motivo in linhas}
+    assert por["Usina Alfa"] == ("agir", "/t/performance/clima/usina/1", "Vendaval (Grande Perigo)")
+    assert por["Usina Delta"][0] == "agir" and por["Usina Delta"][2] == "Fogo a 1,0 km"
+    assert por["Usina Beta"][0] == "atencao" and por["Usina Beta"][2] == "Baixa umidade (Perigo)"
+    assert por["Usina Gama"][2] == "Onda de calor (Perigo Potencial, a partir de 08/10 15:00)"
+    assert por["Usina Epsilon"][2] == "Risco de fogo alto hoje"
+    assert por["Usina Teta"] == ("sem", "/t/performance/clima/usina/6", "Nada previsto")
+    assert ">Agir agora<" in tab and ">Atenção<" in tab and ">Sem alerta<" in tab        # o risco vai na palavra, não só na cor
+
+
+def test_a_tabela_segue_o_recorte_da_regiao(mundo):
+    tab = trecho(pagina(mundo, regiao="sul"), 'class="mp-tabela"', "</table>")
+    assert re.findall(r'<a class="cl-link" href="[^"]+">([^<]+)</a>', tab) == ["Usina Gama"]
+    assert "Usinas por risco nesta região (1)" in texto(tab)
+
+
+def test_sem_leitura_completa_a_tabela_nao_diz_nada_previsto(mundo, leituras):
+    leituras(avisos=None, focos=lei_focos(), risco=lei_risco(risco_baixo()))         # avisos do INMET fora
+    tab = trecho(pagina(mundo), 'class="mp-tabela"', "</table>")
+    assert "Nada previsto" not in tab and "Sem leitura de avisos do INMET" in tab and "mp-tab--nx" in tab
+
+
+def test_dentro_do_nivel_a_tabela_vai_do_mais_grave_ao_menos_e_nao_pelo_nome(mundo, leituras):
+    # Alfa em Perigo Potencial e Beta em Perigo (Baixa Umidade não manda agir): as duas em Atenção, a Beta primeiro, mesmo vindo
+    # depois no alfabeto
+    leituras(avisos=lei_avisos(aviso(1, "Baixa Umidade", ALFA), aviso(2, "Baixa Umidade", BETA)), focos=lei_focos(),
+             risco=lei_risco(risco_baixo()))
+    tab = trecho(pagina(mundo), 'class="mp-tabela"', "</table>")
+    nomes = re.findall(r'<a class="cl-link" href="[^"]+">([^<]+)</a>', tab)
+    assert nomes[:2] == ["Usina Beta", "Usina Alfa"]

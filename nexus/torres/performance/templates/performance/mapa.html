@@ -39,41 +39,9 @@
   {% set av = v.camada_avisos %}
   {% set fo = v.camada_focos %}
   <div class="mp-corpo">
-    <figure class="mp-mapa">
-      <svg class="mp-svg mp-svg--{{ 'brasil' if v.regiao == 'brasil' else 'regiao' }}" viewBox="{{ v.viewbox }}" role="group" aria-labelledby="mp-titulo" preserveAspectRatio="xMidYMid meet">
-        <title id="mp-titulo">Mapa de risco: {{ v.regiao_nome }}</title>
-        <g class="mp-ufs">
-          {% for u in v.ufs %}<path class="mp-uf" d="{{ u.d }}"/>
-          {% endfor %}
-        </g>
-        {% if av.estado == "ok" %}
-        <g class="mp-avisos">
-          {% for g in av.grupos %}
-          <g class="mp-av mp-av-{{ g.nivel }}{% if g.futuro %} mp-av--futuro{% endif %}">
-            {% for a in g.itens %}<path fill-rule="evenodd" d="{{ a.d }}"><title>{{ a.titulo }}</title></path>
-            {% endfor %}
-          </g>
-          {% endfor %}
-        </g>
-        {% endif %}
-        <g class="mp-siglas" aria-hidden="true">
-          {% for u in v.ufs if u.x %}<text x="{{ u.x }}" y="{{ u.y }}">{{ u.sigla }}</text>
-          {% endfor %}
-        </g>
-        {% if fo.estado == "ok" %}
-        {% if fo.d %}<path class="mp-focos" d="{{ fo.d }}"/>{% endif %}
-        <g class="mp-aneis">
-          {% for a in fo.aneis %}<circle class="mp-anel" cx="{{ a.x }}" cy="{{ a.y }}" r="{{ a.r }}"/>
-          {% endfor %}
-        </g>
-        {% endif %}
-        <g class="mp-usinas">
-          {% for u in v.usinas %}<a href="{{ u.href }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/><circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
-          {% endfor %}
-        </g>
-      </svg>
-    </figure>
-
+    {# Legenda à esquerda do mapa e, à direita, a tabela das usinas com o risco e o motivo resumido (Levi, 09/10/2026:
+       "jogue essa visão do anexo para a esquerda do mapa e na direita uma tabela com o nome das usinas, os riscos e uma
+       forma resumida do motivo do risco"). Estreito, as três descem uma embaixo da outra (clima-mapa.css). #}
     <aside class="mp-legenda" aria-label="Legenda">
       <h2 class="mp-leg-h">Usinas{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>
       <ul class="mp-leg-lista">
@@ -118,6 +86,58 @@
 
       <p class="mp-leg-nota">O risco de fogo do INPE não é desenhado: ele entra na cor da usina (Atenção, quando alto ou crítico em algum dos quatro dias).</p>
     </aside>
+    <figure class="mp-mapa">
+      <svg class="mp-svg mp-svg--{{ 'brasil' if v.regiao == 'brasil' else 'regiao' }}" viewBox="{{ v.viewbox }}" role="group" aria-labelledby="mp-titulo" preserveAspectRatio="xMidYMid meet">
+        <title id="mp-titulo">Mapa de risco: {{ v.regiao_nome }}</title>
+        <g class="mp-ufs">
+          {% for u in v.ufs %}<path class="mp-uf" d="{{ u.d }}"/>
+          {% endfor %}
+        </g>
+        {% if av.estado == "ok" %}
+        <g class="mp-avisos">
+          {% for g in av.grupos %}
+          <g class="mp-av mp-av-{{ g.nivel }}{% if g.futuro %} mp-av--futuro{% endif %}">
+            {% for a in g.itens %}<path fill-rule="evenodd" d="{{ a.d }}"><title>{{ a.titulo }}</title></path>
+            {% endfor %}
+          </g>
+          {% endfor %}
+        </g>
+        {% endif %}
+        <g class="mp-siglas" aria-hidden="true">
+          {% for u in v.ufs if u.x %}<text x="{{ u.x }}" y="{{ u.y }}">{{ u.sigla }}</text>
+          {% endfor %}
+        </g>
+        {% if fo.estado == "ok" %}
+        {% if fo.d %}<path class="mp-focos" d="{{ fo.d }}"/>{% endif %}
+        <g class="mp-aneis">
+          {% for a in fo.aneis %}<circle class="mp-anel" cx="{{ a.x }}" cy="{{ a.y }}" r="{{ a.r }}"/>
+          {% endfor %}
+        </g>
+        {% endif %}
+        <g class="mp-usinas">
+          {% for u in v.usinas %}<a href="{{ u.href }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/><circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
+          {% endfor %}
+        </g>
+      </svg>
+    </figure>
+    <section class="mp-tabela" aria-labelledby="mp-tabela-h">
+      <h2 class="mp-leg-h" id="mp-tabela-h">Usinas por risco{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>
+      <div class="mp-tab-rolagem">
+        <table class="mp-tab">
+          <thead><tr><th scope="col">Usina</th><th scope="col">Risco</th><th scope="col">Motivo</th></tr></thead>
+          <tbody>
+            {% for u in v.tabela %}
+            <tr class="mp-tab-lin mp-tab--{{ u.nivel }}">
+              <th scope="row"><a class="cl-link" href="{{ u.href }}">{{ u.nome }}</a><span class="cl-onde">{{ u.onde }}</span></th>
+              <td><span class="mp-risco mp-risco--{{ u.nivel }}"><span class="mp-chave mp-n-{{ u.nivel }}" aria-hidden="true"></span>{{ u.rotulo }}</span></td>
+              <td class="mp-tab-motivo">{{ u.motivo_curto }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
   </div>
 
   <h2 class="cl-h2">Fontes</h2>

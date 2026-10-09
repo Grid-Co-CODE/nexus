@@ -55,9 +55,9 @@
 .cl-pill--n2{color:var(--cl-alto);background:var(--cl-alto-suave)}
 .cl-pill--n1{color:var(--cl-atencao);background:var(--cl-atencao-suave)}
 .cl-principal{margin:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
-.cl-prova{margin:0;font:500 12px/18px var(--font-mono);color:var(--mudo);overflow-wrap:anywhere}
+.cl-prova{margin:0;font:500 12.5px/18px var(--font-sans);color:var(--mudo);overflow-wrap:anywhere}
 .cl-tambem{margin:0;font-size:13px;color:var(--tinta-2);overflow-wrap:anywhere;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
-.cl-contexto{margin:0;font-size:12px;color:var(--tinta-2);border-top:1px solid var(--linha);padding-top:8px;overflow-wrap:anywhere}
+.cl-contexto{list-style:none;margin:0;padding:8px 0 0;display:grid;gap:3px;font-size:12px;color:var(--tinta-2);border-top:1px solid var(--linha);overflow-wrap:anywhere}
 
 /* por estado e fontes, lado a lado quando cabe */
 .cl-duas{display:flex;flex-wrap:wrap;gap:20px;align-items:stretch;margin-top:28px}
@@ -94,7 +94,7 @@
 
 /* "Atenção": a matriz usina x aviso x foco x os quatro dias do risco de fogo */
 .cl-matriz{overflow-x:auto;max-width:100%;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
-.cl-matriz table{width:100%;min-width:860px;border-collapse:collapse;font-size:13px}
+.cl-matriz table{width:100%;min-width:1000px;border-collapse:collapse;font-size:13px}
 .cl-matriz thead tr{background:var(--superficie-2)}
 .cl-matriz th{padding:10px 14px;text-align:left;font:700 11px/16px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .cl-matriz tbody th{padding:9px 14px;font-size:13px;letter-spacing:0;text-transform:none;color:var(--tinta);vertical-align:top}
@@ -107,8 +107,8 @@
 .cl-av .cl-pill{max-width:none}
 .cl-quando{font-size:11px;color:var(--mudo)}
 .cl-semleitura{font-size:12px;color:var(--cl-atencao)}
-.cl-dias4{display:grid;grid-template-columns:repeat(4,54px);gap:4px}
-.cl-c{display:block;text-align:center;border-radius:6px;padding:3px 0;font:500 12px/18px var(--font-mono);background:var(--clarao-a04);color:var(--mudo)}
+.cl-dias4{display:grid;grid-template-columns:repeat(4,62px);gap:4px}
+.cl-c{display:block;text-align:center;border-radius:6px;padding:3px 0;font:600 11.5px/18px var(--font-sans);background:var(--clarao-a04);color:var(--mudo)}
 .cl-c-c{background:var(--critico-a18);color:var(--cl-critico)}
 .cl-c-a{background:var(--laranja-a16);color:var(--cl-alto)}
 
@@ -153,6 +153,36 @@
 .cl-dias-tabela th,.cl-dias-tabela td{padding:4px 14px 4px 0;text-align:left;font-variant-numeric:tabular-nums}
 .cl-dias-tabela th{font:700 11px/16px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .cl-secao .cl-painel{margin-top:12px}
+
+
+/* 09/10/2026 (Levi: "pouco entendível para um leigo, deixe mais didático"): o que fazer em cada número, o que pode acontecer e o
+   que conferir no cartão do "Agir agora", o porquê de cada usina da Atenção e o "Entenda os alertas" no pé da tela. */
+.cl-fazer{display:block;margin-top:2px;font-size:12px;line-height:1.45;color:var(--tinta-2);overflow-wrap:anywhere}
+.cl-fazer strong{color:var(--tinta);font-weight:600}
+.cl-como-ler{margin:10px 0 0;font-size:13px}
+.cl-como-ler a{color:var(--verde-texto)}
+.cl-explica{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;margin:0;padding:10px 12px;border-radius:var(--raio-controle);
+  background:var(--superficie-2)}
+.cl-explica dt{margin-top:6px;font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cl-explica dt:first-child{margin-top:0}
+.cl-explica dd{margin:0;font-size:13px;line-height:1.45;color:var(--tinta-2);overflow-wrap:anywhere}
+.cl-col-porque{min-width:220px;max-width:340px;color:var(--tinta);overflow-wrap:anywhere}
+.cl-entenda-niveis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.cl-entenda-nivel,.cl-evento{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px 16px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.cl-entenda-nivel p{margin:0;font-size:13px;line-height:1.5;color:var(--tinta-2);overflow-wrap:anywhere}
+.cl-entenda--agir{border-color:var(--critico-a45)}
+.cl-entenda-nivel .cl-pill{max-width:none}
+.cl-entenda-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:12px}
+.cl-linha strong{color:var(--tinta);font-weight:600}
+.cl-escala{display:flex;flex-wrap:wrap;gap:4px}
+.cl-escala .cl-c{padding:2px 10px}
+.cl-entenda-sub{margin:20px 0 10px}
+.cl-eventos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:12px}
+.cl-evento-nome{margin:0;font:600 14px/20px var(--font-sans);color:var(--tinta)}
+.cl-mais-eventos{margin-top:14px}
+.cl-mais-eventos>summary{cursor:pointer;font-size:13px;color:var(--tinta-2)}
+.cl-mais-eventos .cl-eventos{margin-top:10px}
 
 .cl-pendencia{margin-top:6px}
 .cl-rodape{margin-top:30px;padding-top:16px;border-top:1px solid var(--linha);font-size:12px;line-height:1.55;color:var(--mudo)}

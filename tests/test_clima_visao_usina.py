@@ -108,7 +108,7 @@ def test_o_nivel_da_usina_e_o_mesmo_da_tela_principal(leituras, nasa):
     nasa(lei_nasa())
     tudo_lido(leituras, focos=[foco_a(1.0)])
     v = pagina()
-    assert (v["nivel"], v["rotulo"]) == ("agir", "Agir agora") and v["card"]["motivos"][0]["pill"] == "Foco a 1,0 km"
+    assert (v["nivel"], v["rotulo"]) == ("agir", "Agir agora") and v["card"]["motivos"][0]["pill"] == "Fogo a 1,0 km"
     tudo_lido(leituras, avisos=[aviso(1, evento="Baixa Umidade")])
     assert (pagina()["nivel"], pagina()["rotulo"]) == ("atencao", "Atenção")
     tudo_lido(leituras)

@@ -30,11 +30,16 @@ from datetime import datetime, timedelta, timezone
 
 from ...cadastro.servico import chave_texto
 from . import alertas as A
+from . import explica as E
 from . import irradiacao as I
 from . import leitura as L
 
 BRT = timezone(timedelta(hours=-3))
 DIAS = ("Hoje", "D+1", "D+2", "D+3")
+_SEMANA = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
+# A palavra do risco de fogo na tabela da Atenção (09/10/2026, "deixe mais didático"): "1,00" não diz nada a quem não conhece a
+# escala do INPE; o número vai no balão da célula.
+PALAVRA_DO_RISCO = {"crítico": "Crítico", "alto": "Alto", "médio": "Médio", "baixo": "Baixo", "mínimo": "Mínimo"}
 FOCOS_ATRASO_MIN = 30          # o INPE publica a cada 10 min: sem arquivo novo há 30 min, algo está atrasado
 SEM_DADO = "sem dado (sem vegetação no entorno)"
 FORA_DA_GRADE = "fora da grade do INPE"
@@ -43,8 +48,9 @@ RECARGA_S = 60                 # a tela se recarrega a cada minuto...
 RECARGA_LENDO_S = 10           # ...e a cada 10 s enquanto alguma fonte está sendo lida pela primeira vez
 LIMITE_ATENCAO = 20            # a matriz da Atenção mostra as 20 primeiras; "Ver todas" (?todas=1) mostra a lista inteira
 COR_DO_AVISO = {1: "amarelo", 2: "laranja", 3: "vermelho"}      # a cor do INMET pelo nível; a cor que vem no aviso nunca é lida
-SUB_AGIR = (f"foco a até {A.FOCO_KM:g} km, aviso vermelho do INMET ou aviso laranja de tempestade, chuva, vento ou granizo")
-SUB_ATENCAO = "outro aviso do INMET ou risco de fogo alto ou crítico (hoje a D+3)"
+# Os subtítulos dos números do topo, na língua de quem não é da meteorologia (09/10/2026); a regra inteira está em "Como ler".
+SUB_AGIR = f"fogo a até {A.FOCO_KM:g} km ou aviso forte do INMET (tempestade, chuva forte, vento, granizo)"
+SUB_ATENCAO = "outro aviso do INMET ou risco de fogo alto nos próximos 4 dias: acompanhar"
 # De que fontes cada número da faixa depende: o "agir agora" vive de avisos e focos; o "atenção", de avisos e risco de fogo; o
 # "sem alerta" precisa das três. Uma fonte parcial ou atrasada só qualifica o número que a usa.
 FONTES_DO_NIVEL = {"agir": ("inmet", "focos"), "atencao": ("inmet", "risco"), "sem": ("inmet", "focos", "risco")}
@@ -107,21 +113,37 @@ def rotulos_dos_dias(arquivo, ref: datetime) -> list:
     return saida
 
 
-def celula_de_risco(i: int, amostra, rotulos=DIAS) -> dict:
+def dias_amigaveis(arquivo, ref: datetime) -> list:
+    """Os mesmos quatro dias de `rotulos_dos_dias`, com o nome que se fala (09/10/2026, "deixe mais didático"): "hoje", "amanhã"
+    e, depois, o dia da semana com a data ("sáb 11/10"); "ontem" com o arquivo de ontem. "D+2" é jargão de quem planeja."""
+    hoje = ref.astimezone(BRT).date()
+    base = arquivo.astimezone(BRT).date() if arquivo else hoje
+    saida = []
+    for k in range(len(DIAS)):
+        dia = base + timedelta(days=k)
+        delta = (dia - hoje).days
+        saida.append({0: "hoje", 1: "amanhã", -1: "ontem"}.get(delta) or f"{_SEMANA[dia.weekday()]} {dia:%d/%m}")
+    return saida
+
+
+def celula_de_risco(i: int, amostra, rotulos=DIAS, amigaveis=None) -> dict:
     """Um dos quatro dias do risco de fogo de uma usina, escrito pela origem do valor: o do pixel dela, o do entorno de
-    5 x 5 (quando o pixel é nodata: o INPE não calcula onde não há vegetação), ou a razão de não haver número."""
+    5 x 5 (quando o pixel é nodata: o INPE não calcula onde não há vegetação), ou a razão de não haver número. Com `amigaveis`
+    (os nomes de `dias_amigaveis`), a frase do risco fala "amanhã" e "sáb 11/10" no lugar de "D+1" e "D+2"."""
     rotulo = rotulos[i]
+    dia = amigaveis[i] if amigaveis else _dia_na_frase(rotulo)
     if amostra.origem in ("ponto", "entorno") and amostra.valor is not None:
         classe = A.classe_risco_fogo(amostra.valor)
         nivel = A.nivel_do_risco(classe)
-        # `curto` e `cor` são da matriz da Atenção: o número sozinho e c (crítico, vermelho), a (alto, laranja) ou n (o resto)
-        return {"rotulo": rotulo, "valor": numero(amostra.valor), "curto": numero(amostra.valor), "classe": classe,
-                "nivel": nivel, "cor": {3: "c", 2: "a"}.get(nivel, "n"), "nota": "entorno" if amostra.origem == "entorno" else "",
-                "origem": amostra.origem, "_num": amostra.valor}
+        # `curto` e `cor` são da matriz da Atenção: o número sozinho e c (crítico, vermelho), a (alto, laranja) ou n (o resto);
+        # `palavra` é o que a célula mostra desde 09/10 (o número vai no balão)
+        return {"rotulo": rotulo, "dia": dia, "valor": numero(amostra.valor), "curto": numero(amostra.valor), "classe": classe,
+                "palavra": PALAVRA_DO_RISCO.get(classe, classe), "nivel": nivel, "cor": {3: "c", 2: "a"}.get(nivel, "n"),
+                "nota": "entorno" if amostra.origem == "entorno" else "", "origem": amostra.origem, "_num": amostra.valor}
     texto = {"sem_dado": SEM_DADO, "indisponivel": "indisponível", "fora_da_grade": FORA_DA_GRADE}.get(
         amostra.origem, "sem dado")
-    return {"rotulo": rotulo, "valor": texto, "curto": "—", "classe": "", "nivel": 0, "cor": "n", "nota": "",
-            "origem": amostra.origem, "_num": None}
+    return {"rotulo": rotulo, "dia": dia, "valor": texto, "curto": "—", "classe": "", "palavra": "—", "nivel": 0, "cor": "n",
+            "nota": "", "origem": amostra.origem, "_num": None}
 
 
 def _dia_na_frase(rotulo: str) -> str:
@@ -129,12 +151,13 @@ def _dia_na_frase(rotulo: str) -> str:
 
 
 def _quando_dias(indices: list, dias: list) -> str:
-    """[0, 1, 2, 3] -> "de hoje a D+3"; [0, 1] -> "hoje e D+1"; [2] -> "em D+2". Só três ou mais dias seguidos viram "de X a Y"."""
-    rotulos = [_dia_na_frase(dias[i]["rotulo"]) for i in indices]
+    """[0, 1, 2, 3] -> "de hoje a D+3"; [0, 1] -> "hoje e D+1"; [2] -> "em D+2". Só três ou mais dias seguidos viram "de X a Y".
+    Com os nomes de `dias_amigaveis` na célula: "de hoje a dom 12/10", "hoje e amanhã", "em sáb 11/10"."""
+    rotulos = [dias[i].get("dia") or _dia_na_frase(dias[i]["rotulo"]) for i in indices]
     if len(indices) >= 3 and indices == list(range(indices[0], indices[-1] + 1)):
         return f"de {rotulos[0]} a {rotulos[-1]}"
     texto = _juntar(rotulos)
-    return texto if rotulos[0] in ("hoje", "ontem") else f"em {texto}"
+    return texto if rotulos[0] in ("hoje", "ontem", "amanhã") else f"em {texto}"
 
 
 def frase_do_risco(dias: list):
@@ -157,7 +180,8 @@ def frase_do_risco(dias: list):
     if not com_numero:
         return None
     mais_alto = max(com_numero, key=lambda c: c["_num"])
-    return f"Risco de fogo até {mais_alto['classe']} ({mais_alto['valor']})"
+    # "Risco de fogo até mínimo (0,01)" lia como erro (09/10/2026): a classe mais alta dos quatro dias, com o número dela
+    return f"Risco de fogo {mais_alto['classe']} nos 4 dias da previsão (no máximo {mais_alto['valor']})"
 
 
 # ── o estado de cada fonte ───────────────────────────────────────────────────────────────────────────────────────────
@@ -260,16 +284,111 @@ def _validade(a, ref) -> str:
     return "em vigor" + fim if A.em_vigor(a, ref) else f"começa {hora(a.inicio, ref)}" + fim
 
 
+def _janela(inicio, fim, vigor: bool, ref) -> str:
+    """"agora, até 23:59", "a partir de 10/10 00:00, até 10/10 23:59" ou "agora" (sem fim conhecido)."""
+    ate = f", até {hora(fim, ref)}" if fim else ""
+    if vigor or inicio is None:
+        return "agora" + ate
+    return f"a partir de {hora(inicio, ref)}" + ate
+
+
+def agrupar_avisos(avisos, ref) -> list:
+    """Os avisos de uma usina com o MESMO evento e o MESMO nível viram uma linha (09/10/2026, "deixe mais didático"): em 09/10 uma
+    usina tinha três avisos de "Baixa Umidade" (hoje, amanhã e depois) e a tela repetia a pílula três vezes, sem dizer que era a
+    mesma coisa. A janela vai do primeiro início ao último fim (um aviso sem início ou sem fim deixa a ponta aberta) e `n` diz
+    quantos avisos são. Os que mandam agir vêm antes; dentro deles, a ordem de `avisos_que_contem` (o mais grave primeiro)."""
+    grupos = {}
+    for a in avisos:
+        g = grupos.setdefault((chave_texto(a.evento), a.nivel), {
+            "evento": a.evento, "nome": E.nome_amigavel(a.evento), "severidade": a.severidade, "nivel": a.nivel,
+            "agir": A.aviso_manda_agir(a), "n": 0, "em_vigor": False, "_inicios": [], "_fins": []})
+        g["n"] += 1
+        g["em_vigor"] = g["em_vigor"] or A.em_vigor(a, ref)
+        g["_inicios"].append(a.inicio)
+        g["_fins"].append(a.fim)
+    saida = sorted(grupos.values(), key=lambda g: (not g["agir"], -g["nivel"]))
+    for g in saida:
+        inicios, fins = g.pop("_inicios"), g.pop("_fins")
+        _completar(g, None if None in inicios else min(inicios), None if None in fins else max(fins), ref)
+        g["quer_dizer"] = E.QUER_DIZER_NIVEL.get(g["nivel"], "")
+    return saida
+
+
+def _completar(g: dict, inicio, fim, ref) -> None:
+    """A janela de um grupo: `inicio` e `fim` (datas, para quem junta grupos), `comeca` ("" se já está valendo) e `quando`."""
+    g["inicio"], g["fim"] = inicio, fim
+    g["comeca"] = hora(inicio, ref) if inicio is not None and not g["em_vigor"] else ""
+    g["quando"] = _janela(inicio, fim, g["em_vigor"], ref) + (f" · {g['n']} avisos" if g["n"] > 1 else "")
+
+
+def por_evento(grupos: list, ref) -> list:
+    """Junta os grupos de `agrupar_avisos` do MESMO evento, em níveis diferentes (09/10/2026): na seca de 09/10 a "Baixa Umidade"
+    vinha em Perigo hoje e em Perigo Potencial amanhã, e o porquê da usina dizia "Baixa umidade (Perigo) · Baixa umidade
+    (Perigo Potencial)". Fica o nível mais alto (`nivel`, `severidade`), a janela de todos, a soma dos avisos e, em `niveis`, os
+    grupos de cada nível (o balão da pílula e o "Também" do cartão dizem quando vale cada um). Na ordem dos grupos: o evento que
+    manda agir primeiro."""
+    saida, por_chave = [], {}
+    for g in grupos:
+        e = por_chave.get(chave_texto(g["evento"]))
+        if e is None:
+            # o primeiro grupo de um evento é o mais grave dele: `agrupar_avisos` põe o que manda agir antes e, dentro, o nível mais
+            # alto primeiro, e dentro de um MESMO evento quem manda agir é sempre o nível mais alto (Perigo de evento que estraga
+            # usina implica Grande Perigo também mandando)
+            e = por_chave[chave_texto(g["evento"])] = {"evento": g["evento"], "nome": g["nome"], "nivel": g["nivel"],
+                                                       "severidade": g["severidade"], "agir": g["agir"], "n": 0,
+                                                       "em_vigor": False, "niveis": []}
+            saida.append(e)
+        e["n"] += g["n"]
+        e["em_vigor"] = e["em_vigor"] or g["em_vigor"]
+        e["niveis"].append(g)
+    for e in saida:
+        inicios, fins = [g["inicio"] for g in e["niveis"]], [g["fim"] for g in e["niveis"]]
+        _completar(e, None if None in inicios else min(inicios), None if None in fins else max(fins), ref)
+        e["quer_dizer"] = E.QUER_DIZER_NIVEL.get(e["nivel"], "")
+        e["detalhe"] = " · ".join(f"{g['severidade']}: {g['quando']}" for g in e["niveis"])
+    return saida
+
+
+def risco_curto(dias) -> str:
+    """O risco de fogo alto ou crítico em poucas palavras ("Risco de fogo crítico de hoje a dom 12/10"); "" sem alto nem crítico."""
+    if not dias:
+        return ""
+    por_nivel = {n: [i for i, c in enumerate(dias) if c["nivel"] == n] for n in (3, 2)}
+    pior = 3 if por_nivel[3] else 2 if por_nivel[2] else 0
+    if not pior:
+        return ""
+    return f"Risco de fogo {'crítico' if pior == 3 else 'alto'} {_quando_dias(por_nivel[pior], dias)}"
+
+
+MOTIVOS_CURTOS = 2      # o motivo resumido leva os dois mais importantes e "e mais N"
+
+
+def motivo_curto(avisos, foco, dias, ref) -> str:
+    """Por que a usina está no nível dela, numa linha curta e em língua de gente (09/10/2026): o fogo perto, os avisos (os que
+    mandam agir antes, iguais juntos) e o risco de fogo alto. É o "por quê" da tabela da Atenção e o motivo da tabela do mapa."""
+    itens = [f"Fogo a {numero(foco['km'], 1)} km"] if foco else []
+    for e in por_evento(agrupar_avisos(avisos, ref), ref):
+        itens.append(f"{e['nome']} ({e['severidade']}" + (f", a partir de {e['comeca']}" if e["comeca"] else "") + ")")
+    if risco_curto(dias):
+        itens.append(risco_curto(dias))
+    if len(itens) > MOTIVOS_CURTOS:
+        return " · ".join(itens[:MOTIVOS_CURTOS]) + f" · e mais {len(itens) - MOTIVOS_CURTOS}"
+    return " · ".join(itens)
+
+
 def _motivo_do_foco(foco: dict, ref) -> dict:
     km = numero(foco["km"], 1)
-    return {"tipo": "foco", "pill": f"Foco a {km} km",
-            "principal": f"{_plural(foco['n'], 'foco de queimada', 'focos de queimada')} a até {A.FOCO_KM:g} km",
-            "prova": f"{foco['satelite']} · {hora(foco['hora'], ref)} · o mais perto a {km} km"}
+    return {"tipo": "foco", "pill": f"Fogo a {km} km", "principal": f"Fogo a {km} km da usina",
+            "prova": (f"{_plural(foco['n'], 'foco de queimada', 'focos de queimada')} a até {A.FOCO_KM:g} km na última hora · "
+                      f"visto pelo satélite {foco['satelite']} às {hora(foco['hora'], ref)}"),
+            **E.FOCO}
 
 
-def _motivo_do_aviso(a, ref) -> dict:
-    return {"tipo": "aviso", "pill": f"{a.evento} · {COR_DO_AVISO[a.nivel]}", "principal": f"{a.evento}, nível {a.severidade}",
-            "prova": _validade(a, ref)}
+def _motivo_do_aviso(g: dict) -> dict:
+    """Um grupo de `agrupar_avisos` que manda agir: o nível com o que ele quer dizer e o texto do evento (`explica.py`)."""
+    return {"tipo": "aviso", "pill": f"{g['nome']} · {g['severidade']}",
+            "principal": f"{g['nome']}: {g['severidade']} ({g['quer_dizer']})", "prova": f"Quando: {g['quando']}",
+            **E.evento(g["evento"])}
 
 
 def _contexto_do_risco(dias, risco_linha, risco_lido: bool) -> str:
@@ -280,12 +399,13 @@ def _contexto_do_risco(dias, risco_linha, risco_lido: bool) -> str:
     return frase_do_risco(dias) or "Risco de fogo: sem dado"
 
 
-def _usina(u, avisos_l, indice, risco_l, ref, rotulos):
+def _usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis=None):
     avisos = A.avisos_que_contem(u.lat, u.lon, avisos_l.dados["avisos"], ref) if avisos_l.dados else []
     foco = indice.perto(u.lat, u.lon) if indice is not None else None
     dias = None
     if risco_l.dados:
-        dias = [celula_de_risco(i, a, rotulos) for i, a in enumerate(risco_l.dados["por_ponto"].get(u.id, []))] or None
+        dias = [celula_de_risco(i, a, rotulos, amigaveis)
+                for i, a in enumerate(risco_l.dados["por_ponto"].get(u.id, []))] or None
     n_inmet = max((a.nivel for a in avisos), default=0)
     n_foco = 3 if foco else 0
     n_risco = max((c["nivel"] for c in dias or []), default=0)
@@ -296,7 +416,20 @@ def _usina(u, avisos_l, indice, risco_l, ref, rotulos):
     risco_linha = risco_origem = None
     if dias and dias[0]["origem"] in MOTIVO_SEM_RISCO and all(c["origem"] == dias[0]["origem"] for c in dias):
         risco_linha, risco_origem = dias[0]["valor"], dias[0]["origem"]
-    manda_agir = [a for a in avisos if A.aviso_manda_agir(a)]
+    grupos = agrupar_avisos(avisos, ref)
+    eventos = por_evento(grupos, ref)
+    # Um motivo por EVENTO que manda agir (o grupo mais grave dele); os outros níveis do mesmo evento e os eventos que só pedem
+    # atenção vão para o "Também" (09/10/2026: o cartão repetia "Tempestade: Grande Perigo" e "Tempestade: Perigo", cada um
+    # com o mesmo "o que pode acontecer").
+    motivos = [_motivo_do_foco(foco, ref)] if foco else []
+    tambem = []
+    for e in eventos:
+        if e["agir"]:
+            principal = next(g for g in e["niveis"] if g["agir"])
+            motivos.append(_motivo_do_aviso(principal))
+            tambem += [f"Também: {g['nome']} ({g['severidade']}), {g['quando']}" for g in e["niveis"] if g is not principal]
+        else:
+            tambem.append(f"Também: {e['nome']} ({e['severidade']}), {e['quando']}")
     cartao = {
         "id": u.id, "nome": u.nome, "cliente": u.cliente, "uf": u.uf, "onde": f"{u.cliente} · {u.uf}" if u.uf else u.cliente,
         "nivel": nivel, "rotulo": A.ROTULO_NIVEL[nivel],
@@ -304,10 +437,14 @@ def _usina(u, avisos_l, indice, risco_l, ref, rotulos):
                     "agir": A.aviso_manda_agir(a), "validade": _validade(a, ref),
                     "comeca": hora(a.inicio, ref) if a.inicio is not None and not A.em_vigor(a, ref) else ""} for a in avisos],
         "foco": None, "dias": dias, "risco_linha": risco_linha, "risco_origem": risco_origem,
-        # por que a usina pede ação (o foco primeiro, depois os avisos que mandam agir, do mais grave) e o resto que ajuda a decidir
-        "motivos": ([_motivo_do_foco(foco, ref)] if foco else []) + [_motivo_do_aviso(a, ref) for a in manda_agir],
-        "contexto": [f"{a.evento} ({COR_DO_AVISO[a.nivel]}): {_validade(a, ref)}" for a in avisos if not A.aviso_manda_agir(a)]
-                    + [_contexto_do_risco(dias, risco_linha, risco_l.dados is not None)],
+        # os avisos iguais juntos (`grupos`: evento e nível) e um por evento (`eventos`: a tabela da Atenção mostra uma pílula por
+        # evento, no nível mais alto, com a janela de todos e quando vale cada nível no balão)
+        "grupos": grupos, "eventos": eventos,
+        # por que a usina pede ação (o foco primeiro, depois os eventos que mandam agir, do mais grave), cada motivo com o que pode
+        # acontecer na usina e o que conferir (`explica.py`), e o resto que ajuda a decidir
+        "motivos": motivos,
+        "contexto": tambem + [_contexto_do_risco(dias, risco_linha, risco_l.dados is not None)],
+        "por_que": motivo_curto(avisos, foco, dias, ref),
         "_ordem": (-gravidade, -(1 if foco else 0), -((n_inmet > 0) + (n_foco > 0) + (n_risco > 0)),
                    foco["km"] if foco else float("inf"), -n_inmet, chave_texto(u.nome)),
     }
@@ -364,9 +501,12 @@ def _celula_da_faixa(id_: str, rotulo: str, n, sub: str, qual: list, *, traco: b
     veio de fonte que não está inteira, e a cor deixa de ser a do "tudo bem"."""
     classe = f"cl-{id_}" + (" cl-nx" if traco else " cl-na" if ambar else "")
     if traco:
-        return {"id": id_, "rotulo": rotulo, "valor": "—", "unidade": "", "sub": sub, "qual": qual, "classe": classe}
+        return {"id": id_, "rotulo": rotulo, "valor": "—", "unidade": "", "sub": sub, "qual": qual, "classe": classe, "fazer": ""}
+    # "O que fazer" (09/10/2026, "deixe mais didático") só quando há usina no nível: "avisar o supervisor" com zero usinas, ou
+    # "nada" com o número em "—", diriam o contrário do que a tela sabe
+    fazer = next((c["fazer"] for c in E.COMO_LER if c["id"] == id_), "") if n else ""
     return {"id": id_, "rotulo": rotulo, "valor": str(n), "unidade": "usina" if n == 1 else "usinas", "sub": sub, "qual": qual,
-            "classe": classe}
+            "classe": classe, "fazer": fazer}
 
 
 def _faixa(n_agir, n_atencao, n_sem, n_usinas, v, leituras, por_id) -> list:
@@ -398,6 +538,22 @@ def _faixa(n_agir, n_atencao, n_sem, n_usinas, v, leituras, por_id) -> list:
     ]
 
 
+def glossario(cartoes: list) -> dict:
+    """O "Entenda os alertas" do pé da tela (09/10/2026, "deixe mais didático"): os três níveis do INMET, o foco de queimada, o
+    risco de fogo e cada evento: primeiro os que estão nos avisos de agora (na ordem em que aparecem), depois os outros que o
+    `explica.py` conhece. Evento que o INMET publicar e que o `explica.py` não conhece entra com o texto genérico, nunca some."""
+    agora_, vistos = [], set()
+    for c in cartoes:
+        for g in c["grupos"]:
+            k = chave_texto(g["evento"])
+            if k not in vistos:
+                vistos.add(k)
+                agora_.append({"nome": g["nome"], "conhecido": E.conhecido(g["evento"]), **E.evento(g["evento"])})
+    outros = [{"nome": E.nome_amigavel(nome), "conhecido": True, **E.evento(nome)}
+              for nome in E._EVENTOS if chave_texto(nome) not in vistos]
+    return {"niveis": E.NIVEIS_INMET, "foco": E.FOCO, "risco": E.RISCO_FOGO, "eventos_agora": agora_, "eventos_outros": outros}
+
+
 def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, sessao=None, todas=False) -> dict:
     """Tudo o que o template precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê). `todas`:
     a matriz da Atenção mostra a lista inteira, e não só as `LIMITE_ATENCAO` primeiras."""
@@ -408,7 +564,7 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
          "vazio_agir": "", "vazio_atencao": "", "sem_alerta": None, "aviso_vazio": "—", "foco_vazio": "—",
          "ufs": [], "ufs_legenda_sem": "", "ufs_sem_uf": 0, "sem_risco": [], "sem_coordenada": [], "fora_do_brasil": [],
          "ilegiveis": 0, "sem_usinas": False, "rotulos": list(DIAS), "limite_atencao": LIMITE_ATENCAO,
-         "matriz_tem_entorno": False}
+         "matriz_tem_entorno": False, "dias_amigaveis": [], "como_ler": E.COMO_LER, "glossario": glossario([])}
     if cadastro is None:
         return v
     v["clientes"] = cadastro.clientes()
@@ -433,8 +589,9 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     risco_l = L.risco(config, cadastro.pontos(), sessao)
     leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
     indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
-    rotulos = rotulos_dos_dias(_arquivo_t0(risco_l.dados) if risco_l.dados else None, ref)
-    cartoes = [_usina(u, avisos_l, indice, risco_l, ref, rotulos) for u in usinas]
+    arquivo = _arquivo_t0(risco_l.dados) if risco_l.dados else None
+    rotulos, amigaveis = rotulos_dos_dias(arquivo, ref), dias_amigaveis(arquivo, ref)
+    cartoes = [_usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis) for u in usinas]
     agir = sorted((c for c in cartoes if c["nivel"] == A.AGIR), key=lambda c: c["_ordem"])
     atencao = sorted((c for c in cartoes if c["nivel"] == A.ATENCAO), key=lambda c: c["_ordem"])
     fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos)]
@@ -446,6 +603,8 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     v["atencao_resumida"] = not todas and len(atencao) > LIMITE_ATENCAO
     v["atencao_linhas"] = atencao[:LIMITE_ATENCAO] if v["atencao_resumida"] else atencao
     v["rotulos"] = rotulos          # os quatro dias da matriz: pela data do arquivo do INPE, não fixos ("Ontem · Hoje · D+1 · D+2")
+    v["dias_amigaveis"] = amigaveis  # os mesmos dias com o nome que se fala ("hoje", "amanhã", "sáb 11/10"): o cabeçalho da matriz
+    v["glossario"] = glossario(cartoes)
     v["matriz_tem_entorno"] = any(d["nota"] for c in v["atencao_linhas"] for d in c["dias"] or [])
     ausentes = [i for i in ("inmet", "focos", "risco") if leituras[i].dados is None]
     # Fonte SEM leitura boa: ou ainda está sendo lida pela primeira vez ("lendo", a tela volta em 10 s) ou está fora. Os números
@@ -469,8 +628,9 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     # "Sem alerta" só se diz com as três fontes lidas; com alguma fora, "—" (o número seria "sem alerta nas fontes lidas")
     n_sem = len(cartoes) - len(agir) - len(atencao)
     v["sem_alerta"] = None if ausentes else n_sem
-    v["aviso_vazio"] = "sem leitura" if avisos_l.dados is None else "—"
-    v["foco_vazio"] = "sem leitura" if focos_l.dados is None else "—"
+    # na tabela da Atenção: "nenhum" e "não" dizem com palavra que a fonte foi lida e não há (09/10/2026; antes era "—")
+    v["aviso_vazio"] = "sem leitura" if avisos_l.dados is None else "nenhum"
+    v["foco_vazio"] = "sem leitura" if focos_l.dados is None else "não"
     if risco_l.dados:
         for origem, motivo in MOTIVO_SEM_RISCO.items():
             nomes = [c["nome"] for c in cartoes if c["risco_origem"] == origem]
@@ -574,8 +734,9 @@ def montar_usina(config, *, cadastro, usina_id, cliente="", ref=None, sessao=Non
     risco_l = L.risco(config, cadastro.pontos(), sessao)
     leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
     indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
-    rotulos = rotulos_dos_dias(_arquivo_t0(risco_l.dados) if risco_l.dados else None, ref)
-    card = _usina(u, avisos_l, indice, risco_l, ref, rotulos)
+    arquivo = _arquivo_t0(risco_l.dados) if risco_l.dados else None
+    rotulos = rotulos_dos_dias(arquivo, ref)
+    card = _usina(u, avisos_l, indice, risco_l, ref, rotulos, dias_amigaveis(arquivo, ref))
     fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos)]
     nasa_l = L.irradiacao(config, u.id, u.lat, u.lon, ref.astimezone(BRT).date(), sessao)
     irradiacao = _irradiacao(nasa_l, ref)

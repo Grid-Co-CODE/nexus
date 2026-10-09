@@ -271,6 +271,9 @@ URL_USINA = "/t/performance/clima/usina/{}"          # a página da usina (a tel
 NX = "nx"                                            # nível de quem ficaria "Sem alerta" mas teve fonte sem leitura
 ROTULO_NX = "Sem leitura completa"
 ORDEM_DE_DESENHO = {NX: 0, A.SEM_ALERTA: 1, A.ATENCAO: 2, A.AGIR: 3}     # o que pede ação por último: fica por cima
+# a ordem da tabela ao lado do mapa (09/10/2026): quem pede ação primeiro; quem não teve leitura completa antes de quem
+# está sem alerta (o cinza não é "tudo bem")
+ORDEM_DA_TABELA = {A.AGIR: 0, A.ATENCAO: 1, NX: 2, A.SEM_ALERTA: 3}
 # Raios em unidades do SVG (o viewBox tem 1000 de largura): a usina que pede ação é maior que a que está bem, e o anel do foco
 # cobre o ponto da usina que está a até 5 km dele. No celular o CSS os multiplica (o SVG ali tem uns 340 px, não 700).
 R_USINA = {A.AGIR: 7.5, A.ATENCAO: 6.0, A.SEM_ALERTA: 5.0, NX: 5.0}
@@ -396,7 +399,8 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
          "viewbox": v.viewbox, "ufs": ufs, "usinas": [], "contagem": {A.AGIR: 0, A.ATENCAO: 0, A.SEM_ALERTA: 0, NX: 0},
          "n_usinas": 0, "n_no_recorte": 0, "fora_do_recorte": 0, "sem_usinas": False, "rotulo_sem": "Sem alerta",
          "sem_leitura_de": "", "camada_avisos": None, "camada_focos": None, "fontes": [], "faltando": [], "lendo": [],
-         "completa": True, "recarrega_em": V.RECARGA_S, "sem_coordenada": [], "fora_do_brasil": [], "ilegiveis": 0}
+         "completa": True, "recarrega_em": V.RECARGA_S, "sem_coordenada": [], "fora_do_brasil": [], "ilegiveis": 0,
+         "tabela": []}
     if cadastro is None:
         return m
     m["sem_coordenada"] = [u.nome for u in cadastro.sem_coordenada]
@@ -411,7 +415,8 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     focos_l = L.focos(config, sessao)
     risco_l = L.risco(config, cadastro.pontos(), sessao)
     indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
-    rotulos = V.rotulos_dos_dias(V._arquivo_t0(risco_l.dados) if risco_l.dados else None, ref)
+    arquivo = V._arquivo_t0(risco_l.dados) if risco_l.dados else None
+    rotulos, amigaveis = V.rotulos_dos_dias(arquivo, ref), V.dias_amigaveis(arquivo, ref)
     fontes = [V._fonte_inmet(avisos_l, ref), V._fonte_focos(focos_l, ref), V._fonte_risco(risco_l, ref, rotulos)]
     por_id = {f["id"]: f for f in fontes}
     leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
@@ -436,22 +441,31 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
             continue
         avisos = A.avisos_que_contem(u.lat, u.lon, todos_os_avisos, ref)
         foco = indice.perto(u.lat, u.lon) if indice is not None else None
-        dias = ([V.celula_de_risco(i, a, rotulos) for i, a in enumerate(risco_l.dados["por_ponto"].get(u.id, []))]
+        dias = ([V.celula_de_risco(i, a, rotulos, amigaveis) for i, a in enumerate(risco_l.dados["por_ponto"].get(u.id, []))]
                 if risco_l.dados else [])
         nivel = A.nivel_da_usina(avisos, foco is not None, any(c["nivel"] > 0 for c in dias))
         if nivel == A.SEM_ALERTA:
             if ausentes:
                 nivel = NX
                 motivo = f"sem leitura de {m['sem_leitura_de']}; não dá para dizer que não há alerta"
+                curto = f"Sem leitura de {m['sem_leitura_de']}"
             else:
                 motivo = "nenhum aviso, foco a até 5 km nem risco de fogo alto" + ("" if m["completa"] else " nas fontes lidas")
+                curto = "Nada previsto" + ("" if m["completa"] else " nas fontes lidas")
         else:
             motivo = _motivos(avisos, foco, dias, ref)
+            curto = V.motivo_curto(avisos, foco, dias, ref)
         m["contagem"][nivel] += 1
+        gravidade = max([a.nivel for a in avisos] + [3 if foco else 0] + [c["nivel"] for c in dias] + [0])
         desenhadas.append({
             "id": u.id, "nome": u.nome, "nivel": nivel, "x": _n(x), "y": _n(y), "r": R_USINA[nivel],
             "r_alvo": round(R_USINA[nivel] * R_ALVO, 1), "href": URL_USINA.format(quote(str(u.id), safe="")),
-            "titulo": f"{u.nome}\nCliente: {u.cliente}\nNível: {rotulo_do_nivel[nivel]}\nMotivo: {motivo}"})
+            "titulo": f"{u.nome}\nCliente: {u.cliente}\nNível: {rotulo_do_nivel[nivel]}\nMotivo: {motivo}",
+            # a tabela ao lado do mapa (Levi, 09/10/2026: "na direita uma tabela com o nome das usinas, os riscos e uma forma
+            # resumida do motivo do risco"): o mesmo motivo curto da tabela da Atenção da lista
+            "onde": f"{u.cliente} · {u.uf}" if u.uf else u.cliente, "rotulo": rotulo_do_nivel[nivel], "motivo_curto": curto,
+            "_ordem": (ORDEM_DA_TABELA[nivel], -gravidade, u.nome.casefold())})
+    m["tabela"] = sorted(desenhadas, key=lambda d: d["_ordem"])
     desenhadas.sort(key=lambda d: (ORDEM_DE_DESENHO[d["nivel"]], d["nome"].casefold()))
     m["usinas"] = desenhadas
     m["n_no_recorte"] = len(desenhadas)

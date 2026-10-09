@@ -3,7 +3,7 @@
    na cor. O SVG tem sempre 1000 unidades de largura, então os raios vêm em unidades e os traços em pixels de tela
    (vector-effect:non-scaling-stroke): o contorno fica fino em qualquer largura. No celular o SVG ocupa a largura da tela
    (uns 340 px) e o --mp-k aumenta pontos, alvos e anéis, para dar para ver e tocar. Nada de largura fixa maior que o celular. */
-.mp{--mp-mar:var(--mapa-mar);--mp-terra:var(--mapa-terra);--mp-k:1;min-width:0}
+.mp{--mp-mar:var(--mapa-mar);--mp-terra:var(--mapa-terra);--mp-k:1;min-width:0;container:mp / inline-size}
 .mp-cab-lado{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
 .mp-regioes{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
 .mp-regiao{font:600 12px/16px var(--font-sans);padding:6px 14px;border-radius:999px;border:1px solid var(--linha-forte);
@@ -11,7 +11,11 @@
 .mp-regiao:hover{background:var(--superficie-3);color:var(--tinta)}
 .mp-regiao[aria-current="page"]{background:var(--verde-suave);border-color:var(--verde);color:var(--tinta)}
 
-.mp-corpo{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,310px);gap:16px;align-items:start;margin-top:14px}
+/* 09/10/2026 (Levi): a legenda à esquerda do mapa e, à direita, a tabela das usinas com o risco e o motivo resumido. Largo, as
+   três lado a lado e a tabela rola por dentro na altura do mapa; médio, legenda e mapa em cima e a tabela embaixo; estreito,
+   o mapa primeiro e o resto embaixo. É container query: conta a largura da tela (o menu recolhido também dá espaço). */
+.mp-corpo{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;margin-top:14px}
+.mp-mapa{order:-1}
 .mp-mapa{margin:0;min-width:0;background:var(--mp-mar);border:1px solid var(--linha);border-radius:var(--raio-md);padding:6px}
 .mp-svg{display:block;width:100%;height:auto;max-height:84vh;overflow:hidden}
 
@@ -78,9 +82,37 @@
 .mp-chave--foco{width:5px;height:5px;margin:6px 6px 0;border:0;background:var(--cl-alto);opacity:.75}
 .mp-chave--anel{width:14px;height:14px;margin:2px 2px 0;border:2px solid var(--cl-critico);background:var(--critico-a12)}
 
-/* Abaixo de 1100 px o menu da casca já roubou a largura: a legenda desce para baixo do mapa, que ganha a largura toda. */
-@media (max-width:1100px){
-  .mp-corpo{grid-template-columns:minmax(0,1fr)}
+/* a tabela das usinas (09/10/2026): o nome leva à página da usina; o risco vai na cor, na bolinha e na palavra */
+.mp-tabela{min-width:0;display:flex;flex-direction:column;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);padding-top:14px;overflow:hidden}
+.mp-tabela .mp-leg-h{margin:0 16px 10px}
+.mp-tab-rolagem{max-height:70vh;overflow:auto;border-top:1px solid var(--linha)}
+.mp-tab{width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.4}
+.mp-tab thead th{position:sticky;top:0;z-index:1;background:var(--superficie-2);padding:8px 12px;text-align:left;
+  font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.mp-tab tbody th,.mp-tab td{padding:8px 12px;border-top:1px solid var(--linha);vertical-align:top;text-align:left}
+.mp-tab tbody tr:first-child th,.mp-tab tbody tr:first-child td{border-top:0}
+.mp-tab tbody th{min-width:112px;font-weight:600;color:var(--tinta);overflow-wrap:break-word}
+.mp-tab tbody th .cl-onde{font-weight:400}
+.mp-risco{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-weight:600;color:var(--tinta-2)}
+.mp-risco .mp-chave{margin:0;flex:none}
+.mp-risco--agir{color:var(--cl-critico)}
+.mp-risco--atencao{color:var(--cl-atencao)}
+.mp-risco--sem{color:var(--cl-ok)}
+.mp-risco--nx{color:var(--cl-mudo)}
+.mp-tab-motivo{min-width:130px;color:var(--tinta-2);overflow-wrap:break-word}
+
+@container mp (min-width:760px){
+  .mp-corpo{grid-template-columns:minmax(200px,240px) minmax(0,1fr)}
+  .mp-mapa{order:0}
+  .mp-tabela{grid-column:1 / -1}
+}
+@container mp (min-width:1120px){
+  .mp-corpo{grid-template-columns:minmax(200px,230px) minmax(0,1fr) minmax(330px,400px);align-items:stretch}
+  .mp-tabela{grid-column:auto}
+  /* a tabela não dita a altura da linha (o mapa e a legenda ditam) e rola por dentro dela: sem o contain, 154 linhas
+     esticariam a página e o mapa ficaria sozinho no alto */
+  .mp-tab-rolagem{flex:1 1 auto;max-height:none;min-height:0;contain:size}
 }
 @media (max-width:820px){
   .mp-mapa{padding:4px}

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from nexus.performance.clima import explica as EX
 from nexus.performance.clima import geometria
 from nexus.performance.clima import leitura as L
 from nexus.performance.clima import visao as V
@@ -133,7 +134,7 @@ def test_aviso_que_ainda_vai_comecar_conta_e_diz_quando_comeca(leituras):
     futuro = aviso(2, evento="Vendaval", inicio=REF + timedelta(days=1), fim=REF + timedelta(days=1, hours=9))
     v = so_a_usina(leituras, avisos=[futuro])
     assert nivel(v) == "agir"
-    assert v["alertas"][0]["motivos"][0]["prova"] == "começa 07/10 15:00, até 08/10 00:00"
+    assert v["alertas"][0]["motivos"][0]["prova"] == "Quando: a partir de 07/10 15:00, até 08/10 00:00"
     potencial = aviso(1, evento="Tempestade", inicio=REF + timedelta(hours=30), fim=REF + timedelta(hours=40))
     assert nivel(so_a_usina(leituras, avisos=[potencial])) == "atencao"
 
@@ -258,8 +259,11 @@ def test_faixa_conta_os_niveis_e_a_cobertura_e_a_soma_fecha(leituras):
     assert [f[i]["valor"] for i in ("agir", "atencao", "sem", "cobertura")] == ["1", "1", "2", "4"]
     assert int(f["agir"]["valor"]) + int(f["atencao"]["valor"]) + int(f["sem"]["valor"]) == v["n_usinas"] == 4
     assert f["cobertura"]["sub"] == "em operação com coordenada · 1 sem coordenada"
-    assert f["agir"]["sub"] == "foco a até 5 km, aviso vermelho do INMET ou aviso laranja de tempestade, chuva, vento ou granizo"
-    assert f["atencao"]["sub"] == "outro aviso do INMET ou risco de fogo alto ou crítico (hoje a D+3)"
+    assert f["agir"]["sub"] == "fogo a até 5 km ou aviso forte do INMET (tempestade, chuva forte, vento, granizo)"
+    assert f["atencao"]["sub"] == "outro aviso do INMET ou risco de fogo alto nos próximos 4 dias: acompanhar"
+    # "O que fazer" (09/10/2026) em cada nível que tem usina; a cobertura não tem
+    assert f["agir"]["fazer"].startswith("Avisar o supervisor") and f["atencao"]["fazer"].startswith("Acompanhar")
+    assert f["sem"]["fazer"] == "Nada." and f["cobertura"]["fazer"] == ""
     assert (v["sem_alerta"], len(v["agir"]), len(v["atencao"])) == (2, 1, 1)
 
 
@@ -461,44 +465,49 @@ def test_previsao_de_dia_diferente_do_de_hoje_fica_em_atencao(leituras):
 def test_cartao_do_foco_tem_motivo_frase_principal_e_prova(leituras):
     v = so_a_usina(leituras, foco_km=0.2)
     c = v["agir"][0]
-    assert c["motivos"] == [{"tipo": "foco", "pill": "Foco a 0,2 km", "principal": "1 foco de queimada a até 5 km",
-                             "prova": "GOES-19 · 14:50 · o mais perto a 0,2 km"}]
+    # 09/10/2026 ("deixe mais didático"): a frase fala "fogo", e o motivo leva o que pode acontecer e o que conferir (explica.py)
+    assert c["motivos"] == [{"tipo": "foco", "pill": "Fogo a 0,2 km", "principal": "Fogo a 0,2 km da usina",
+                             "prova": "1 foco de queimada a até 5 km na última hora · visto pelo satélite GOES-19 às 14:50",
+                             **EX.FOCO}]
     assert (c["id"], c["nome"], c["cliente"], c["uf"], c["onde"]) == ("1", "U", "Cliente", "PI", "Cliente · PI")
 
 
 def test_cartao_do_foco_no_plural_e_com_o_mais_perto(leituras):
     tudo_lido(leituras, focos=[foco_a(3.8, sat="NOAA-21"), foco_a(0.5, sat="GOES-19")])
     c = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)["agir"][0]
-    assert c["motivos"][0]["pill"] == "Foco a 0,5 km" and c["motivos"][0]["principal"] == "2 focos de queimada a até 5 km"
-    assert c["motivos"][0]["prova"] == "GOES-19 · 14:50 · o mais perto a 0,5 km"
+    assert c["motivos"][0]["pill"] == "Fogo a 0,5 km" and c["motivos"][0]["principal"] == "Fogo a 0,5 km da usina"
+    assert c["motivos"][0]["prova"] == "2 focos de queimada a até 5 km na última hora · visto pelo satélite GOES-19 às 14:50"
 
 
-def test_cartao_do_aviso_tem_motivo_com_a_cor_frase_principal_e_prova(leituras):
+def test_cartao_do_aviso_tem_motivo_com_o_nivel_frase_principal_e_prova(leituras):
+    # o nível vai pela palavra do INMET, com o que ela quer dizer (a cor fica na tela), e o evento leva o texto do explica.py
     v = so_a_usina(leituras, avisos=[aviso(2, evento="Tempestade")])
-    assert v["agir"][0]["motivos"] == [{"tipo": "aviso", "pill": "Tempestade · laranja", "principal": "Tempestade, nível Perigo",
-                                        "prova": "em vigor, até 23:00"}]
+    assert v["agir"][0]["motivos"] == [{"tipo": "aviso", "pill": "Tempestade · Perigo",
+                                        "principal": "Tempestade: Perigo (é provável que cause estrago)",
+                                        "prova": "Quando: agora, até 23:00", **EX.evento("Tempestade")}]
     v = so_a_usina(leituras, avisos=[aviso(3, evento="Onda de Calor")])
-    assert v["agir"][0]["motivos"][0]["pill"] == "Onda de Calor · vermelho"
-    assert v["agir"][0]["motivos"][0]["principal"] == "Onda de Calor, nível Grande Perigo"
+    assert v["agir"][0]["motivos"][0]["pill"] == "Onda de calor · Grande Perigo"
+    assert v["agir"][0]["motivos"][0]["principal"] == "Onda de calor: Grande Perigo (o nível mais alto: risco de grande estrago)"
 
 
 def test_com_foco_e_aviso_o_foco_abre_e_os_avisos_que_mandam_agir_vem_depois_do_mais_grave(leituras):
     avisos = [aviso(2, evento="Vendaval"), aviso(3, evento="Granizo"), aviso(1, evento="Baixa Umidade")]
     c = so_a_usina(leituras, avisos=avisos, foco_km=1.0)["agir"][0]
     assert [m["tipo"] for m in c["motivos"]] == ["foco", "aviso", "aviso"]                      # o Perigo Potencial não é motivo
-    assert [m["pill"] for m in c["motivos"]][1:] == ["Granizo · vermelho", "Vendaval · laranja"]
-    assert c["contexto"][0].startswith("Baixa Umidade (amarelo)")
+    assert [m["pill"] for m in c["motivos"]][1:] == ["Granizo · Grande Perigo", "Vendaval · Perigo"]
+    assert c["contexto"][0].startswith("Também: Baixa umidade (Perigo Potencial)")
 
 
 def test_contexto_traz_os_outros_avisos_e_o_risco_de_fogo(leituras):
     avisos = [aviso(2, evento="Tempestade"), aviso(1, evento="Baixa Umidade")]
     c = so_a_usina(leituras, avisos=avisos, risco=(1.0, 1.0, 1.0, 1.0))["agir"][0]
-    assert c["contexto"] == ["Baixa Umidade (amarelo): em vigor, até 23:00", "Risco de fogo crítico de hoje a D+3 (1,00)"]
+    assert c["contexto"] == ["Também: Baixa umidade (Perigo Potencial), agora, até 23:00",
+                             "Risco de fogo crítico de hoje a sex 09/10 (1,00)"]
 
 
 def test_contexto_sem_risco_alto_diz_ate_onde_chega(leituras):
     c = so_a_usina(leituras, foco_km=1.0, risco=(0.5, 0.4, 0.3, 0.2))["agir"][0]
-    assert c["contexto"] == ["Risco de fogo até médio (0,50)"]
+    assert c["contexto"] == ["Risco de fogo médio nos 4 dias da previsão (no máximo 0,50)"]
 
 
 def test_contexto_quando_o_risco_nao_tem_dado_diz_por_que(leituras):
@@ -527,8 +536,8 @@ def test_contexto_sem_leitura_do_risco_nao_inventa_numero(leituras):
     ((0.1, 0.1, 0.8, 0.8), "Risco de fogo alto em D+2 e D+3 (0,80)"),
     ((0.8, 0.8, 0.1, 0.8), "Risco de fogo alto hoje, D+1 e D+3 (0,80)"),
     ((0.1, 0.8, 0.8, 0.1), "Risco de fogo alto em D+1 e D+2 (0,80)"),
-    ((0.5, 0.4, 0.3, 0.2), "Risco de fogo até médio (0,50)"),
-    ((0.1, 0.1, 0.1, 0.1), "Risco de fogo até mínimo (0,10)"),
+    ((0.5, 0.4, 0.3, 0.2), "Risco de fogo médio nos 4 dias da previsão (no máximo 0,50)"),
+    ((0.1, 0.1, 0.1, 0.1), "Risco de fogo mínimo nos 4 dias da previsão (no máximo 0,10)"),
 ])
 def test_frase_do_risco_de_fogo(valores, frase):
     rotulos = ["Hoje", "D+1", "D+2", "D+3"]
@@ -649,7 +658,10 @@ def test_a_linha_da_atencao_traz_o_aviso_o_foco_e_os_quatro_dias(leituras):
     assert [(a["evento"], a["cor"]) for a in c["avisos"]] == [("Onda de Calor", "laranja"), ("Baixa Umidade", "amarelo")]
     assert [(d["rotulo"], d["curto"], d["cor"]) for d in c["dias"]] == [("Hoje", "1,00", "c"), ("D+1", "0,82", "a"),
                                                                        ("D+2", "0,10", "n"), ("D+3", "—", "n")]
-    assert (v["aviso_vazio"], v["foco_vazio"]) == ("—", "—")
+    # a célula diz com palavra que leu e não há (09/10/2026; antes "—"), o risco vai em palavra e o porquê cabe numa linha
+    assert (v["aviso_vazio"], v["foco_vazio"]) == ("nenhum", "não")
+    assert [d["palavra"] for d in c["dias"]] == ["Crítico", "Alto", "Mínimo", "—"]
+    assert c["por_que"] == "Onda de calor (Perigo) · Baixa umidade (Perigo Potencial) · e mais 1"
 
 
 def test_celula_vazia_diz_sem_leitura_quando_a_fonte_nao_foi_lida(leituras):

@@ -56,8 +56,8 @@ def test_o_nivel_de_cada_usina_do_mundo(mundo_usina):
 def test_os_alertas_da_usina_com_foco_aviso_e_risco(mundo_usina):
     c, _, _, _ = mundo_usina
     t = texto(painel(usina_pagina(c, "1"), "cl-alertas"))
-    assert "Foco a 1,2 km" in t and "1 foco de queimada a até 5 km" in t and "GOES-19 · 14:50 · o mais perto a 1,2 km" in t
-    assert "Tempestade, nível Perigo" in t and "em vigor, até 23:59" in t
+    assert "Fogo a 1,2 km" in t and "1 foco de queimada a até 5 km" in t and "visto pelo satélite GOES-19 às 14:50" in t
+    assert "Tempestade: Perigo (é provável que cause estrago)" in t and "Quando: agora, até 23:59" in t
     assert "Baixa Umidade" in t and "Perigo Potencial" in t
     assert t.count("0,97") == 4 and "crítico" in t
 
@@ -159,7 +159,7 @@ def test_nasa_fora_a_pagina_responde_sem_grafico_e_os_alertas_seguem(mundo_usina
     t = texto(html)
     assert "NASA POWER fora agora; ainda sem leitura boa" in t and "HTTP 503" in t
     assert 'class="cl-grafico"' not in html and 'class="cl-fonte cl-fora"' in html
-    assert "Foco a 1,2 km" in t and re.search(r'cl-pill--agir"[^>]*>Agir agora<', html)            # os alertas não dependem da NASA
+    assert "Fogo a 1,2 km" in t and re.search(r'cl-pill--agir"[^>]*>Agir agora<', html)            # os alertas não dependem da NASA
 
 
 def test_nasa_com_formato_diferente_diz_o_que_viu_e_nao_mostra_numero(mundo_usina):
