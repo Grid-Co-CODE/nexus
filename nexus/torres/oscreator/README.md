@@ -103,8 +103,8 @@ nesta pasta.
 - **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
   `/os/*` mostra um aviso e o resto do Nexus segue.
 - **Testes:** `tests/test_torre_oscreator.py`, `tests/test_oscreator_solic_engenharia.py`,
-  `tests/test_oscreator_busca_digitavel.py`, `tests/test_oscreator_desempenho.py`, `tests/test_oscreator_card_tarefas.py`
-  e `tests/test_oscreator_acomp_quadro.py`. Nenhum teste fala com o Fracttal.
+  `tests/test_oscreator_busca_digitavel.py`, `tests/test_oscreator_desempenho.py`, `tests/test_oscreator_card_tarefas.py`,
+  `tests/test_oscreator_acomp_quadro.py` e `tests/test_oscreator_acomp_renovar.py`. Nenhum teste fala com o Fracttal.
 - **O que não funciona igual:**
   - o login pelo OAuth do Fracttal tem a volta configurada para o supervisório; e-mail e senha funcionam normal;
   - gravar ticket precisa do `GRIDCO_SQL_TOKEN`, que vem da variável ou do `%APPDATA%` da máquina.
@@ -311,6 +311,15 @@ com o App de Campo): nada aqui faz pedido a mais, e o que fica guardado é **por
     listagem engole o erro de cada página e devolve vazio, e o quadro vazio ficaria 3 min guardado. Até 08/10 a busca
     da etiqueta acusava a sessão morta; com a lista reaproveitada, o quadro pode nem passar por ela. Pelo mesmo motivo
     o id da etiqueta CHAMADOS não é guardado (`api._label_id`).
+  - **Passados os 3 min, o quadro abre na hora com a leitura anterior e relê por trás** (Levi, 09/10/2026: "teria
+    como utilizarmos essas requisições de forma mais inteligente?"; `_renovar_por_tras`). Ao lado da hora da leitura
+    aparece "· atualizando"; a nova vale na próxima abertura (ou no Atualizar, que lê na hora). A releitura roda numa
+    thread com o JWT e o e-mail da pessoa (`sessao.contexto`: a thread nasce sem o contexto da requisição), uma por
+    pessoa, com os mesmos pedidos que a tela faria na frente dela: nada a mais na cota. Vale até `VELHA_MAX` (2 h); mais
+    velho, a tela espera, como antes (quadro de horas atrás engana, mesmo com a hora). Erro do Fracttal: fica a leitura
+    anterior. Sessão caída: a cópia sai, e a próxima visita volta ao login. Gravação no meio da releitura (ticket,
+    finalizar): a cópia dela sai (`_ESQUECIDO`). Medido com o Fracttal falso a 300 ms por pedido (65 chamados): quadro
+    vencido de 4,8 s para 0,007 s. Prova: `tests/test_oscreator_acomp_renovar.py` (8 testes).
 - `api.list_minhas_os` só busca quem é o logado quando o filtro é dele. "TODOS" (o Acompanhamento, a Visão COS) não
   usa, e a primeira busca da pessoa no processo lia o pessoal inteiro do Fracttal para nada.
 
