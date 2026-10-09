@@ -11,8 +11,8 @@ As telas moram na torre Engenharia (`nexus/torres/engenharia/`). Leia o CLAUDE.m
 
 def instalar(app):
     """Na subida (app.py e servir.py, nunca o create_app: teste não fala com a rede), a leitura das OS de falha,
-    depois da fila da Aprovação (20 s) e das rondas aprovadas (90 s): as três não saem juntas. A mesma chave do
-    aquecimento do Campo desliga numa máquina (NEXUS_CAMPO_AQUECER=0)."""
+    depois da fila da Aprovação (20 s) e das rondas aprovadas (90 s): as três não saem juntas. A mesma chave das
+    leituras do Fracttal do Campo ao subir desliga numa máquina (NEXUS_CAMPO_AQUECER=0)."""
     import threading
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
         from . import os_falhas

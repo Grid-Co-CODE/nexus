@@ -153,6 +153,11 @@ a hora da carga com a máquina "servidor", as barras de ligação de cada fato e
 tempo, só um grava por hora (o outro vê a hora da última carga no próprio livro e pula). Desligar numa máquina:
 `NEXUS_CARGA_DADOS=0`. Conferir: Base → **Governança de dados** mostra a hora da última carga e a máquina.
 
+**Pré-carga das telas (09/10/2026): nada a fazer no servidor.** O Nexus deixa as telas do Campo · App prontas na memória
+logo depois de subir e as renova antes de vencer, lendo só o banco. No servidor **não** ponha `NEXUS_CAMPO_AQUECER` no
+`.env`: sem ela, o servidor também lê do Fracttal, ao subir, a fila da Aprovação, as rondas aprovadas e as OS de falha da
+Engenharia. `NEXUS_CAMPO_AQUECER=0` é só para o PC do Levi, para os dois não gastarem a cota do Fracttal em dobro.
+
 ## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
 
 A aba Performance → Tempo real do Nexus mostra a plataforma de Performance por uma chave só de leitura. O Nexus já leva a

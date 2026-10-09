@@ -20,7 +20,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_DADOS", "NEXUS_DE_PARA_REGRAS", "GRIDCO_SQL_TOKEN", "GRIDCO_DB_API",
              # torre Campo · App (04/10/2026): o coletor do Fracttal roda só onde NEXUS_CAMPO_COLETOR=1, a cada N minutos
              "NEXUS_CAMPO_COLETOR", "NEXUS_CAMPO_COLETOR_MIN",
-             # a fila da Aprovação de OS é lida ao subir (NEXUS_CAMPO_AQUECER=0 desliga numa máquina)
+             # as leituras do Fracttal ao subir: a fila da Aprovação de OS, as rondas aprovadas e as OS de falha da
+             # Engenharia (NEXUS_CAMPO_AQUECER=0 desliga numa máquina; a pré-carga das telas pelo banco fica sempre ligada)
              "NEXUS_CAMPO_AQUECER",
              # a pessoa nos workbooks que o App de Campo manda (v226): HMAC do e-mail, a mesma chave do App Setting
              "NEXUS_PESSOA_HMAC",

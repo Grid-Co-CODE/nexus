@@ -313,8 +313,13 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   3,1 s (13, 7 e 8 leituras do banco; o Ranking saiu em 08/10); quentes, < 0,05 s. Agora: ao subir, as contas principais são feitas (3,8 s,
   por trás); a cópia vencida (5 min) volta na hora e se refaz em segundo plano; a cada minuto, o que alguém usou nas
   últimas 2 h é refeito antes de vencer; o mesmo livro do banco é lido uma vez por ciclo (2 min). Medido: abas em
-  0,01 a 0,13 s, também com as cópias vencidas. Só lê o banco do Nexus (nada de Fracttal). Desliga com
-  `NEXUS_CAMPO_AQUECER=0`, como o aquecimento da Aprovação.
+  0,01 a 0,13 s, também com as cópias vencidas. Só lê o banco do Nexus (nada de Fracttal), então fica **sempre ligado,
+  em toda máquina** (09/10/2026, `nexus/campo/instalar`): o `NEXUS_CAMPO_AQUECER=0` desliga só as leituras do Fracttal
+  ao subir (fila da Aprovação, rondas aprovadas, OS de falha da Engenharia). Até 09/10 a chave desligava as duas coisas, e
+  o PC, que sobe com ela em 0, ficava sem: a 1ª visita à Central depois de cada reinício levava 9,7 s e a hora da leitura
+  era a do clique (Levi, 09/10: "quando clico em Central de atenção ... a hora fica praticamente a hora que cliquei").
+  Medido no PC depois, na 1ª visita de cada aba, 45 s após subir: Central 0,09 s, Rondas 0,19 s, PT 0,07 s, Zeladoria
+  0,01 s, com a hora da pré-carga. Prova: `tests/test_campo_instalar.py`.
 - **Quem entra já vem filtrado** (Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para a pessoa
   automaticamente, mas ela pode mudar o filtro se quiser"): no login pelo Fracttal (`nexus/auth/__init__.py`),
   `visao.papel_no_campo` acha a pessoa no cadastro (`pessoa_do_login`: pelo e-mail da ficha; sem ele, pelo nome
