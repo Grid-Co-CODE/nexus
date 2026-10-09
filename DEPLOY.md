@@ -227,8 +227,20 @@ sudo -u nexus git -C /opt/nexus pull --ff-only && sudo bash /opt/nexus/deploy/at
 ```
 
 O git não toca nos `.env` nem na `dados/`. Em 06/10 entrou o `pillow` no `requirements.txt` (miniaturas das fotos da
-ronda; sem ele as fotos aparecem do mesmo jeito, só mais pesadas): o script instala sozinho. Para atualizar a cada push
-sem ninguém rodar nada, chame o mesmo script num timer do systemd.
+ronda; sem ele as fotos aparecem do mesmo jeito, só mais pesadas): o script instala sozinho.
+
+**Deploy por push (09/10/2026, Levi: "não dá para subir com o commit?").** O timer `deploy/nexus-atualizar.timer` roda o
+mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min, sem ninguém rodar nada; sem commit
+novo, não reinicia. Instala uma vez (o 1º comando já sobe o que estiver no GitHub):
+
+```
+sudo /opt/nexus/deploy/atualizar.sh && sudo cp /opt/nexus/deploy/nexus-atualizar.service /opt/nexus/deploy/nexus-atualizar.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now nexus-atualizar.timer
+```
+
+Conferir: `systemctl list-timers nexus-atualizar.timer` (a próxima rodada) e `journalctl -u nexus-atualizar -n 30` (o
+que cada rodada fez). Desligar: `sudo systemctl disable --now nexus-atualizar.timer`. Não há suíte de testes no
+servidor: ela roda antes de cada push, na máquina de quem empurra. Commit que não sobe (o `/saude` não responde com ele)
+deixa o Nexus fora até o próximo commit consertar, como na plataforma.
 
 **Depois da 1ª subida, a `dados/` do servidor é a original**: o que se edita no Nexus (cadastro, decisões do de-para,
 observações e gerações do PCM) mora lá. Se o Levi mandar um pacote novo, descompacte **só os `.env`**, a menos que ele

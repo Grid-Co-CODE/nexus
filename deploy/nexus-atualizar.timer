@@ -1,0 +1,11 @@
+# A cada 2 minutos o nexus-atualizar.service confere o GitHub: push na main entra no ar em até ~3 min, sem ninguém
+# rodar nada no servidor. Sem commit novo, não reinicia. Instalação: DEPLOY.md, passo 8.
+[Unit]
+Description=Nexus: deploy por push (confere o GitHub a cada 2 min)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target
