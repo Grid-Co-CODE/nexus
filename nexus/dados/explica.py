@@ -22,6 +22,8 @@ RESUMO = {
     # ── Segurança · HSEQ ──
     "pt": "Cada Permissão de Trabalho pedida no App, por equipamento",
     "decisao_pt": "A decisão sobre uma PT tomada no Nexus pelo supervisor",
+    "extintor": "Cada extintor das usinas, com as validades e a última conferência",
+    "conferencia_extintor": "Cada conferência mensal de extintor feita pelo App",
     # ── Performance ──
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
@@ -67,6 +69,13 @@ PARA_QUE = {
     "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) sobre uma PT tomada no Nexus pelo supervisor. O "
                   "App de Campo lê esta tabela e aplica a decisão na PT do técnico. O motivo é gravado sem dado "
                   "pessoal, porque o técnico o lê.",
+    "extintor": "Lista cada extintor das usinas (o cadastro da TST e os que o técnico acha na ronda), com onde ele "
+                "fica, a classe, o peso, as duas validades (recarga e teste hidrostático) e a última conferência. "
+                "Serve para saber o que está vencido, o que vence nos próximos 30 dias e o que ninguém confere há mais "
+                "de 30 dias, por supervisor de campo e por gestor de contrato (a tela Extintores, em Segurança).",
+    "conferencia_extintor": "Guarda cada conferência de extintor feita na ronda mensal do App: a carga, os itens "
+                            "com \"não\", as validades lidas na etiqueta e quem conferiu. Serve para acompanhar, mês a "
+                            "mês, se a ronda de extintores está sendo feita e o que ela encontrou.",
     "geracao_usina_dia": "A energia que cada usina gerou em cada dia (kWh), com a irradiação e a chuva, tirada das "
                          "planilhas do coletor e posta uma linha por dia. É a base da análise de performance: comparar "
                          "com a meta, achar os dias ruins e calcular as perdas.",

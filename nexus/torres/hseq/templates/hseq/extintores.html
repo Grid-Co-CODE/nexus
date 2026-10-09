@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{# Extintores (Segurança · HSEQ, 09/10/2026): a situação de cada extintor das usinas, pelo livro que o App de Campo grava
+   no banco (nexus/hseq/extintores.py). O mesmo desenho da Central de atenção do Campo, a tela mais parecida: a faixa de
+   números que filtra a tabela, os cartões por região de campo (o Supervisor de Campo), com a alternância para o gestor
+   de contrato, e a tabela. Os filtros e os cartões vêm dos pedaços do Campo (uma regra só). #}
+{% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna %}
+{% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
+{# os números de um cartão: atrasados e perto de vencer em cima; a barra das quatro situações (somam o total) e a
+   legenda embaixo; no pé, o que não soma (sem atualização) e quantas usinas têm extintor atrasado #}
+{% macro numeros(s) %}
+        <div class="cn-eq-num">
+          <span><span class="v{% if s.atrasado %} cn-t-critico{% endif %}">{{ s.atrasado }}</span><span class="d">{{ 'extintor atrasado' if s.atrasado == 1 else 'extintores atrasados' }}</span></span>
+          <span class="dir"><span class="v{% if s.perto %} cn-t-alerta{% endif %}">{{ s.perto }}</span><span class="d">{{ 'vence' if s.perto == 1 else 'vencem' }} em até {{ alerta_dias }} dias</span></span>
+        </div>
+        <div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ s.em_dia }} em dia, {{ s.perto }} perto de vencer, {{ s.atrasado }} atrasados e {{ s.sem_validade }} sem validade, de {{ s.extintores }} extintores">
+          {% if s.extintores %}<span class="ok" style="width: {{ (100 * s.em_dia / s.extintores)|round(1) }}%"></span><span class="alerta" style="width: {{ (100 * s.perto / s.extintores)|round(1) }}%"></span><span class="pend" style="width: {{ (100 * s.atrasado / s.extintores)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * s.sem_validade / s.extintores)|round(1) }}%"></span>{% endif %}
+        </div>
+        <div class="cn-eq-leg">
+          <span><b>{{ s.em_dia }}</b>em dia</span>
+          <span><b>{{ s.sem_validade }}</b>sem validade</span>
+          <span><b>{{ s.extintores }}</b>total</span>
+        </div>
+        <div class="cn-eq-pe">{% if s.sem_atualizacao %}<span class="cn-st cn-t-info">{{ s.sem_atualizacao }} sem atualização há mais de {{ sem_atualizacao_dias }} dias</span>{% endif %}{% if s.usinas_atrasado %}<span class="cn-st cn-t-critico">{{ plural(s.usinas_atrasado, 'usina', 'usinas') }} com extintor atrasado</span>{% endif %}</div>
+{% endmacro %}
+{# uma etiqueta (recarga ou hidrostático): o que está escrito nela e, ao lado, só o que pede ação: quando venceu, ou
+   quanto falta se vence em até 30 dias. Vencer daqui a anos não precisa de frase (e alargava a coluna) #}
+{% macro etiqueta(v, fim) %}<span class="ext-par">{% if fim %}{% set n = (fim - d.hoje).days %}<span class="m">{{ v }}</span>{% if n <= alerta_dias %}<span class="det{{ ' cn-t-critico' if n < 0 else ' cn-t-alerta' }}">{% if n < 0 %}venceu há {{ tempo(n) }}{% elif n == 0 %}vence hoje{% else %}vence em {{ tempo(n) }}{% endif %}</span>{% endif %}{% else %}<span class="cn-t-neutro">{{ v }}</span>{% endif %}</span>{% endmacro %}
+{% set pronto = not leitura.erro and d.get('aba_existe') and not d.get('colunas_faltando') %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · App publicou em {{ d.publicado_em }}{% endif %}</div>
+  </div>
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
+  {% elif not d.get('livro_existe') %}<div class="cn-erro cn-aviso" role="status"><b>Os extintores ainda não chegaram ao banco do Nexus.</b>
+    O App de Campo guarda a ronda de extintores e passa a publicá-la no banco (o livro <span class="m">extintores_app_campo</span>,
+    de hora em hora, com os outros livros dele) a partir da versão que liga o envio. A tela se preenche sozinha na primeira publicação.</div>
+  {% elif not d.get('aba_existe') %}<div class="cn-erro" role="alert"><b>O livro dos extintores está no banco sem a aba Extintores.</b>
+    Sem ela não há o que contar: o App precisa publicar a aba com esse nome.</div>
+  {% elif d.get('colunas_faltando') %}<div class="cn-erro" role="alert"><b>O livro dos extintores chegou sem a coluna {{ d.colunas_faltando|join(', ') }}.</b>
+    Sem ela a conta sairia errada (validade vazia vira "sem validade"), então a tela não mostra número pela metade.</div>{% endif %}
+  {% include 'campo/_aviso_estrutura.html' %}
+
+  <form class="cn-filtros" method="get">
+    <div class="cn-seg" aria-label="Visão">
+      <a href="{{ url(modo=None, f=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por supervisor</a>
+      <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
+    </div>
+    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
+    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, extintor ou local" aria-label="Buscar">
+    {% for k in ('f', 'modo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+  </form>
+
+  {% if pronto %}
+  {# o pedido (Levi, 09/10): atrasado, perto de atrasar e sem atualização há mais de 30 dias; cada número filtra a tabela #}
+  <div class="cn-numeros cn-numeros--filtro">
+    <a href="{{ url(f=None, modo='tabela') }}"{% if not f and modo == 'tabela' %} aria-current="page"{% endif %}><span class="gc-rotulo">Extintores</span><span class="v">{{ contagem.total }}</span><span class="d">em {{ plural(contagem.usinas, 'usina', 'usinas') }}</span></a>
+    <a href="{{ url(f='atrasado', modo='tabela') }}"{% if f == 'atrasado' %} aria-current="page"{% endif %}><span class="gc-rotulo">Atrasados</span><span class="v{% if contagem.atrasado %} cn-t-critico{% endif %}">{{ contagem.atrasado }}</span><span class="d">recarga ou teste hidrostático vencido</span></a>
+    <a href="{{ url(f='perto', modo='tabela') }}"{% if f == 'perto' %} aria-current="page"{% endif %}><span class="gc-rotulo">Perto de vencer</span><span class="v{% if contagem.perto %} cn-t-alerta{% endif %}">{{ contagem.perto }}</span><span class="d">vencem em até {{ alerta_dias }} dias</span></a>
+    <a href="{{ url(f='sem_atualizacao', modo='tabela') }}"{% if f == 'sem_atualizacao' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem atualização</span><span class="v{% if contagem.sem_atualizacao %} cn-t-info{% endif %}">{{ contagem.sem_atualizacao }}</span><span class="d">conferido há mais de {{ sem_atualizacao_dias }} dias, ou nunca</span></a>
+    <a href="{{ url(f='sem_validade', modo='tabela') }}"{% if f == 'sem_validade' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem validade</span><span class="v">{{ contagem.sem_validade }}</span><span class="d">recarga sem data na etiqueta</span></a>
+  </div>
+
+  {% if modo in ('regioes', 'gestores') %}
+  {# por supervisor: a região de campo (estrutura de O&M de 10/2026), com o Supervisor de Campo e o Coordenador; a
+     alternância leva ao gestor de contrato (pelas usinas dele). O cartão leva à tabela da região ou do gestor #}
+  {{ alterna(modo == 'gestores', url(modo=None, f=None), url(modo='gestores', f=None)) }}
+  <div class="cn-equipes">
+    {% if modo == 'regioes' %}
+    {% for s in cartoes_reg %}
+      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.regiao == sem_regiao %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', regiao_campo=s.regiao, f=None) }}">
+        {{ cab_regiao(s, sem_regiao, ' · ' ~ plural(s.usinas, 'usina', 'usinas')) }}
+        {{ numeros(s) }}
+      </a>
+    {% else %}
+      <p class="mudo">Nenhum extintor com esses filtros.</p>
+    {% endfor %}
+    {% else %}
+    {% for s in cartoes_gest %}
+      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.gestor == sem_gestor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', gestor=s.gestor, f=None) }}">
+        {{ cab_gestor(s, sem_gestor) }}
+        {{ numeros(s) }}
+      </a>
+    {% else %}
+      <p class="mudo">Nenhum extintor com esses filtros.</p>
+    {% endfor %}
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="cn-tab cn-tab--compacta ext-tab"><table>
+    <thead><tr><th>Situação</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Última conferência</th><th>Status da TST</th></tr></thead>
+    <tbody>
+    {% for x in lista[:limite] %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}
+      {# cada célula com as partes lado a lado (Levi, 09/10: "se tem espaço para botar paralelo então deixe paralelo"); a
+         parte inteira só desce de linha quando a coluna não comporta. A região de campo diz o supervisor só quando há
+         alguém (a vaga está nos cartões) #}
+      <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+        <td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span><span class="det">{{ x.regiao_campo if x.regiao_campo and x.regiao_campo != sem_regiao else 'sem região' }}{% if x.supervisor_campo and x.supervisor_campo != vaga %} · {{ x.supervisor_campo }}{% endif %}</span></span></td>
+        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
+        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
+        <td>{{ etiqueta(x.val2, x.fim2) }}</td>
+        <td>{{ etiqueta(x.val3, x.fim3) }}</td>
+        <td>{% if x.conferencia %}<span class="ext-par"><span class="m">{{ x.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.sem_atualizacao }}">há {{ tempo(x.dias_conferencia) }}{% if x.origem_conferencia %} · <span title="{{ x.origem_conferencia }}">{{ 'Forms' if x.origem_conferencia.startswith('Forms') else x.origem_conferencia }}</span>{% endif %}</span>{% if x.conferido_por %}<span class="det">{{ x.conferido_por }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca conferido</span>{% endif %}</td>
+        {# o status da TST sem repetir a validade (ela já está nas duas colunas ao lado): só a carga e os itens com NÃO; o
+           motivo inteiro fica no title #}
+        <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="8" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use a região de campo, o gestor, a situação ou a busca para afunilar.</p>{% endif %}
+  {% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>Como cada extintor entra.</b> <b>Atrasado</b>: a recarga (2º nível) ou o teste hidrostático
+    (3º nível) venceu; a data da etiqueta vale até o último dia do mês, e só o ano vale até 31/12. <b>Perto de
+    vencer</b>: uma das duas vence nos próximos {{ alerta_dias }} dias. <b>Sem validade</b>: a etiqueta da recarga está sem
+    data e nada venceu: não dá para dizer se está em dia. <b>Sem atualização</b>: a última conferência (no App ou, antes
+    dele, no Forms da TST) foi há mais de {{ sem_atualizacao_dias }} dias, ou nunca houve; ela se soma às outras, por isso
+    os números da faixa não fecham o total. O <b>status da TST</b> é a regra da planilha de controle da TST, a mesma do App:
+    olha também a carga e os 9 itens do checklist. A região de campo é a da equipe da usina (o Supervisor de Campo lidera a
+    região); o gestor de contrato (Supervisor PM) é o da usina.
+  </div>
+</div>
+{% endblock %}

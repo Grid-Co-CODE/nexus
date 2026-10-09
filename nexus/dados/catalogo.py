@@ -184,6 +184,34 @@ FATOS = (
          observacao="PT pelo número (a chave do pt_app_campo); o motivo vai mascarado, porque o técnico lê. Pega a 1ª "
                     "linha da PT (GR-4): numa PT de 3 ativos não diz a qual vale. Antes da 1ª gravação: levar o "
                     "codigo_ativo e a aba fato_decisao_pt (decisão 4 do Levi)"),
+    # a ronda de extintores do App (v247, 08/10/2026), que substituiu o Forms da TST; registrados antes de o App
+    # publicar o livro (09/10/2026, a tela Extintores do HSEQ). O extintor é cadastro próprio do App, fora do Fracttal
+    # (a planilha da TST + os achados pelo técnico); o `Ativo` é o código do Fracttal de ONDE ele fica. Dois grãos, dois
+    # fatos, e um livro para cada um: o App sobe uma aba por livro (sync-xlsx com replace troca o livro inteiro)
+    Fato("extintor", "Extintor (situação)", "hseq", "extintores_app_campo · Extintores",
+         "1 linha = 1 extintor do cadastro, com a última conferência e as duas validades",
+         _d(data=("cod", "Última conferência (dia de Brasília)"),
+            usina=("nome", "Usina (nome do Fracttal; de reserva, o código do Ativo e o Código da usina)"),
+            pessoa=("hmac", "Conferido por"),
+            equipamento=("cod", "Ativo: o código do Fracttal de onde o extintor fica (ele mesmo é cadastro próprio)")),
+         tipo="snapshot_acumulado", chave=("Código",),
+         medidas=_m((("itens_nao_qtd", "qtd", "aditiva"), ("fotos_qtd", "qtd", "aditiva"))),
+         fontes=("extintores_app_campo · Extintores",), janela_origem="o cadastro inteiro, com a última conferência",
+         observacao="a linha muda a cada conferência e nunca fecha. Atrasado, perto de vencer e sem atualização são "
+                    "conta do Nexus no dia (nexus/hseq/extintores.py, a mesma regra da TST que o App usa); o Status do "
+                    "livro é o do App na hora da publicação. A observação do técnico não vai (só 'Tem informação "
+                    "adicional', sim/não). Até o App publicar, o livro não existe"),
+    Fato("conferencia_extintor", "Conferência de extintor", "hseq", "extintores_conferencias_app_campo · Conferências",
+         "1 linha = 1 extintor conferido num mês (reenviar no mesmo mês regrava a linha)",
+         _d(data=("cod", "Dia (de Brasília)"), usina=("nome", "Usina (nome do Fracttal; Código da usina)"),
+            pessoa=("hmac", "Conferido por"),
+            equipamento=("prop", "Código do extintor (cadastro próprio do App, fora do Fracttal)")),
+         tipo="snapshot_periodico", chave=("Código", "Mês"),
+         medidas=_m((("itens_nao_qtd", "qtd", "aditiva"), ("fotos_qtd", "qtd", "aditiva"))),
+         fontes=("extintores_conferencias_app_campo · Conferências",),
+         janela_origem="todas as conferências feitas pelo App",
+         observacao="o histórico das conferências pelo App (as do Forms da TST, antes dele, ficaram na planilha da "
+                    "TST). Mesma regra da observação: só sim/não. Até o App publicar, o livro não existe"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),

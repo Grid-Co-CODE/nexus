@@ -1,0 +1,24 @@
+/* Segurança · HSEQ. Só o que a torre tem de próprio: o resto é o vocabulário do Campo (campo.css, cn-*), porque a tela
+   de Extintores é a Central de atenção dos extintores (Levi, 08/10/2026: coisa parecida, o mesmo desenho). */
+
+/* Extintores (09/10/2026): as partes de cada célula LADO A LADO. Na 1ª versão o detalhe ia sempre para a linha de baixo
+   e o Levi pediu: "se tem espaço para botar paralelo então deixe paralelo". A parte é inteira (nunca quebra no meio) e
+   só desce para a linha de baixo quando a coluna não comporta. Para caber, o código do ativo foi para o title do Local,
+   a validade distante não ganha frase e o status da TST não repete a validade (o motivo inteiro fica no title) */
+/* Partes em linha comum, e não flex com quebra: para o flex-wrap o Chrome calcula a largura da coluna como se cada parte
+   fosse uma linha, e a 1920 px 718 de 2.100 células quebravam com a coluna do status sobrando (medido em 09/10). O
+   `.ext-tab` na frente vence o `.cn-tab .det{display:block}` do Campo */
+.ext-tab td{white-space:nowrap}
+.ext-tab .ext-par{white-space:normal}
+.ext-tab .ext-par > *{display:inline-block;white-space:nowrap;margin-top:0;vertical-align:middle}
+.ext-tab .ext-par > * + *{margin-left:8px}
+.ext-tab td.ext-usina{text-align:left}
+/* medido em 09/10 a 2600 px, a largura natural de cada coluna somava 1.953 px para os 1.658 que cabem a 1920: o que
+   estourava era o motivo longo do status (até 556 px, raro) e o "Sem região de campo". O motivo tem teto e quebra dentro
+   dele; a região sem nada vira "sem região"; a origem do Forms, "Forms" */
+.ext-tab td.ext-status .ext-par > .det{white-space:normal;max-width:240px}
+/* a frase ao lado do valor ("venceu há 18 meses", "há 44 d") leva a cor da gravidade: o `.cn-tab .det` do Campo é
+   cinza e, por ter duas classes, vencia o tom (na 1ª conferência, 09/10/2026, o vencido saía cinza) */
+.ext-tab .det.cn-t-critico{color:var(--critico)}
+.ext-tab .det.cn-t-alerta{color:var(--alerta)}
+.ext-tab .det.cn-t-info{color:var(--info)}
