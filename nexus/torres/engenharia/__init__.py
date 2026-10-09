@@ -265,6 +265,7 @@ def equipe():
     que abra o mesmo card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os
     setores se conversarem"). Quem muda a OS por ele volta com ?atualizar=1, e o quadro relê o Fracttal na hora."""
     from ...engenharia import os_equipe
+    os_equipe.marcar_uso()          # o quadro segue relido por trás nas próximas 2 h (`os_equipe.manter_quente`)
     if request.args.get("atualizar") == "1":
         os_equipe.pedir_releitura(esperar=True, forcar=True)
     else:

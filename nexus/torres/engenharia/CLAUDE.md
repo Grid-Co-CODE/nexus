@@ -17,7 +17,14 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
 - **Leitura (medido em 06/10):** o REST filtra pelo nome do responsável (`personnel_description`, por trecho) e
   IGNORA `id_personnel`. O nome vira a pessoa pela lista `personnel` (só se for UMA; guardada 24 h) e as OS vindas
   pelo nome são conferidas pelo `id_personnel` (homônimo fora). Eram 55 linhas para os 6 (~8 pedidos), guardadas
-  5 min; a primeira visita lê na hora. Linha do REST é por tarefa; o cartão é por OS.
+  5 min; a cópia vencida abre na hora e é relida por trás. Linha do REST é por tarefa; o cartão é por OS.
+- **Pronto antes de abrir** (Levi, 09/10/2026: "talvez um carregamento periódico que carregue em segundo plano e deixe
+  todos prontos"; `os_equipe.manter_quente`, `_tique`, `marcar_uso`): a cada minuto, se alguém abriu a tela nas últimas
+  2 h e a cópia passou dos 5 min, ela é relida por trás (~1,6 pedido por minuto, menos de 1% da cota da empresa);
+  ninguém em 2 h, para. Liga em toda máquina (só lê com alguém usando). No servidor o quadro também é lido ao subir,
+  210 s depois, após as OS de falha (`nexus/engenharia/instalar`; o PC, com `NEXUS_CAMPO_AQUECER=0`, não lê). Medido
+  no PC, 1ª visita depois de subir: 5,98 s lendo o Fracttal na hora; com a cópia pronta, 0,01 s. Prova:
+  `tests/test_engenharia_quente.py`.
 - **Colunas:** A fazer (status 1, nada começou; a data programada diz atrasada, vence em 2 dias ou "abre em" = as que
   vão abrir), Em execução (alguma tarefa começou), Em verificação (2; mostra a programada, não "atrasada": já foi
   feita), Concluídas (3; as de 30 dias ou todas), Canceladas (4; escondidas).

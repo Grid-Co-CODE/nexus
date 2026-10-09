@@ -315,9 +315,10 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   últimas 2 h é refeito antes de vencer; o mesmo livro do banco é lido uma vez por ciclo (2 min). Medido: abas em
   0,01 a 0,13 s, também com as cópias vencidas. Só lê o banco do Nexus (nada de Fracttal), então fica **sempre ligado,
   em toda máquina** (09/10/2026, `nexus/campo/instalar`): o `NEXUS_CAMPO_AQUECER=0` desliga só as leituras do Fracttal
-  ao subir (fila da Aprovação, rondas aprovadas, OS de falha da Engenharia). Até 09/10 a chave desligava as duas coisas, e
-  o PC, que sobe com ela em 0, ficava sem: a 1ª visita à Central depois de cada reinício levava 9,7 s e a hora da leitura
-  era a do clique (Levi, 09/10: "quando clico em Central de atenção ... a hora fica praticamente a hora que cliquei").
+  ao subir (fila da Aprovação, rondas aprovadas, OS de falha e Quadro da equipe da Engenharia). Até 09/10 a chave
+  desligava as duas coisas, e o PC, que sobe com ela em 0, ficava sem: a 1ª visita à Central depois de cada reinício
+  levava 9,7 s e a hora da leitura era a do clique (Levi, 09/10: "quando clico em Central de atenção ... a hora fica
+  praticamente a hora que cliquei").
   Medido no PC depois, na 1ª visita de cada aba, 45 s após subir: Central 0,09 s, Rondas 0,19 s, PT 0,07 s, Zeladoria
   0,01 s, com a hora da pré-carga. Prova: `tests/test_campo_instalar.py`.
 - **Quem entra já vem filtrado** (Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para a pessoa

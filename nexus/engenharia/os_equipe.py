@@ -28,6 +28,12 @@ BRT = timezone(timedelta(hours=-3))
 VALIDADE_S = 300
 FORCAR_S = 5               # a releitura pedida pelo card (ver `pedir_releitura`) não passa de uma a cada 5 s
 PESSOAS_S = 24 * 3600
+# O quadro pronto enquanto alguém o usa (Levi, 09/10/2026: "talvez um carregamento periódico que carregue em segundo
+# plano e deixe todos prontos"): a cada minuto, se alguém abriu o quadro nas últimas 2 h e a cópia passou dos 5 min,
+# ela é relida por trás (`manter_quente`). ~8 pedidos a cada 5 min = ~1,6 por minuto, menos de 1% da cota da empresa
+# (200/min); ninguém em 2 h, para, e volta na próxima visita.
+USO_S = 2 * 3600
+QUENTE_S = 60
 OS_URL = "https://one.fracttal.com/tasks/wo/{id}"
 # O nome do status como o OS Creator escreve (`api.WO_STATUS` do clone; o teste confere que são iguais). O card da OS do
 # OS Creator, aberto pelo quadro, recebe o status pelo endereço, como na linha do Histórico: é dele que sai o selo e a
@@ -35,7 +41,8 @@ OS_URL = "https://one.fracttal.com/tasks/wo/{id}"
 STATUS_OS = {1: "Em Processo", 2: "Em Verificação", 3: "Concluída", 4: "Cancelada"}
 COLUNAS = (("fazer", "A fazer"), ("execucao", "Em execução"), ("verificacao", "Em verificação"),
            ("concluida", "Concluídas"), ("cancelada", "Canceladas"))
-_EST = {"ts": 0.0, "pessoas_ts": 0.0, "pessoas": [], "os": [], "lendo": False, "erro": "", "erro_em": 0.0, "faltam": []}
+_EST = {"ts": 0.0, "pessoas_ts": 0.0, "pessoas": [], "os": [], "lendo": False, "erro": "", "erro_em": 0.0, "faltam": [],
+        "usado": 0.0}
 _TRAVA = threading.Lock()
 
 
@@ -200,10 +207,42 @@ def pedir_releitura(app=None, esperar=False, forcar=False):
         threading.Thread(target=_reler, args=(app,), daemon=True, name="nexus-os-equipe").start()
 
 
+def marcar_uso():
+    """A tela foi aberta agora: o `manter_quente` segue relendo por trás pelas próximas 2 h."""
+    _EST["usado"] = time.time()
+
+
+def _tique(app, agora: float | None = None) -> bool:
+    """Uma volta do `manter_quente`: relê por trás se alguém abriu o quadro nas últimas 2 h e a cópia passou dos 5 min.
+    Pelo `forcar` do `pedir_releitura` (o piso dele, FORCAR_S, e a espera depois de um erro valem igual). True se
+    pediu."""
+    agora = time.time() if agora is None else agora
+    if not _EST["usado"] or agora - _EST["usado"] > USO_S:
+        return False
+    if _EST["ts"] and agora - _EST["ts"] < VALIDADE_S:
+        return False
+    pedir_releitura(app, forcar=True)
+    return True
+
+
+def manter_quente(app):
+    """Liga, numa thread, a volta de cada minuto (`_tique`). Quem chama é o `instalar` (app.py e servir.py), nunca o
+    create_app: teste não fala com a rede."""
+    def laco():
+        while True:
+            time.sleep(QUENTE_S)
+            try:
+                _tique(app)
+            except Exception:       # noqa: BLE001 — a volta seguinte tenta de novo; a tela relê na visita
+                pass
+    threading.Thread(target=laco, daemon=True, name="nexus-os-equipe-quente").start()
+
+
 def dados() -> dict:
     return {"os": list(_EST["os"]), "equipe": list(_EST.get("equipe") or []), "faltam": list(_EST["faltam"]),
             "lido": _EST["ts"], "lendo": _EST["lendo"], "erro": _EST["erro"]}
 
 
 def limpar():
-    _EST.update(ts=0.0, pessoas_ts=0.0, pessoas=[], os=[], equipe=[], lendo=False, erro="", erro_em=0.0, faltam=[])
+    _EST.update(ts=0.0, pessoas_ts=0.0, pessoas=[], os=[], equipe=[], lendo=False, erro="", erro_em=0.0, faltam=[],
+                usado=0.0)
