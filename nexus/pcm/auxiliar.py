@@ -13,6 +13,11 @@ os mesmos cabeçalhos: o motor continua sem mudança nenhuma.
 
 O MWp da AUXILIAR ("CAPACIDADE INSTALADA (MWp)") é a POTÊNCIA CONTRATUAL do BD: bateu em 141 das 146 usinas; a
 potência real, em 64.
+
+09/10/2026 (motor do PCM `3ce6205`): o motor lê o porte da coluna `POTÊNCIA CONTRATUAL (MWp)` e o responsável da
+coluna `Gestor de Contrato` (a estrutura de O&M de 10/2026 pôs na RESPONSÁVEL O&M a região da vaga). A AUXILIAR da
+pasta do PCM tem as duas (o Gestor de Contrato preenchido nas 258 usinas); a do Nexus passou a escrevê-las do cadastro
+(`gestor_contrato`, `potencia_contratual`), senão a coluna Responsável da semana do Nexus sairia diferente da do PCM.
 """
 import os
 import re
@@ -38,8 +43,9 @@ def _nome_que_o_motor_le() -> str:
 
 NOME = _nome_que_o_motor_le()
 # A ordem importa: o motor pega a PRIMEIRA coluna com "MWP" no nome e a que tem "RESPONS" e "O&M".
-COLUNAS = ("UFV", "CÓDIGO", "STATUS", "CLIENTE", "Equipe Cluster", "RESPONSÁVEL O&M", "CAPACIDADE INSTALADA (MWp)",
-           "OPERAÇÃO", "CIDADE", "UF", "Base Equipe", "CLUSTER", "IDUsina")
+COLUNAS = ("UFV", "CÓDIGO", "STATUS", "CLIENTE", "Equipe Cluster", "Gestor de Contrato", "RESPONSÁVEL O&M",
+           "CAPACIDADE INSTALADA (MWp)", "POTÊNCIA CONTRATUAL (MWp)", "OPERAÇÃO", "CIDADE", "UF", "Base Equipe",
+           "CLUSTER", "IDUsina")
 # Equipe de campo do PCM: UF + região + número ("SP Oeste 03"). Todas as da AUXILIAR seguiam o padrão. No BD, 50 usinas
 # em operação têm na Equipe Cluster o próprio nome ou um código local ("Rio do Fogo 1", "MGLGPRT01-CA"): o Fracttal não
 # tem equipe com esse nome, e o motor abria uma aba vazia para cada uma (S41 de teste, 02/10/2026: 133 abas em vez de 70).
@@ -107,7 +113,9 @@ def linhas(srv) -> list[dict]:
             # Campo está aberta; o Nexus guarda a pessoa vazia e a região à parte)
             "RESPONSÁVEL O&M": (_texto(srv.titulo_de("pessoas", u.valor("responsavel_om")))
                                 or _texto(u.valor("responsavel_om_vaga"))),
+            "Gestor de Contrato": _texto(srv.titulo_de("pessoas", u.valor("gestor_contrato"))),
             "CAPACIDADE INSTALADA (MWp)": _numero(u.valor("potencia_contratual")),
+            "POTÊNCIA CONTRATUAL (MWp)": _numero(u.valor("potencia_contratual")),
             "OPERAÇÃO": operacao,
             "CIDADE": _texto(u.valor("cidade")),
             "UF": _texto(u.valor("uf")),

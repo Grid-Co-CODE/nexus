@@ -41,13 +41,16 @@ mesma aba, a mesma linha de cabeçalho e a mesma posição de coluna do original
 (`auxiliar.py`, desde 02/10/2026). Da pasta do PCM só vem ainda o `duracoes_aprendidas.json` (sombra: não muda a
 agenda).
 
-- **AUXILIAR:** o motor lê seis colunas dela (UFV, RESPONSÁVEL O&M, CIDADE, a 1ª com "MWp", Equipe Cluster, Base
-  Equipe). O MWp é a potência contratual. Equipe Cluster fora do padrão "UF Região NN" vai vazia: era uma aba vazia
+- **AUXILIAR:** o motor lê seis colunas dela: UFV; o responsável (desde o motor `3ce6205`, 09/10/2026, a coluna
+  `Gestor de Contrato`; sem ela, a que tem RESPONSÁVEL O&M); CIDADE; o porte (a coluna `POTÊNCIA CONTRATUAL (MWp)`;
+  sem ela, a 1ª com "MWp"; vazio e zero não entram: 67 usinas sem MWp derrubaram a W42 do PC do PCM em 08/10); Equipe
+  Cluster e Base Equipe. A AUXILIAR do Nexus escreve as duas colunas novas do cadastro (`gestor_contrato`,
+  `potencia_contratual`) e mantém as antigas. Equipe Cluster fora do padrão "UF Região NN" vai vazia: era uma aba vazia
   por usina com equipe local. Prova da S41 (02/10), com a mesma foto do Fracttal da geração oficial: agenda e pendentes
   idênticos; 48 linhas ganharam Responsável; mudam só as colunas de sombra (RPN novo e Desloc). **RESPONSÁVEL O&M
   sem pessoa** (estrutura de O&M de 10/2026): o BD_Operações traz a REGIÃO onde a vaga de Supervisor de Campo está
   aberta ("NE · Fortaleza-CE e Teresina-PI"); o cadastro guarda a pessoa vazia e a região em `responsavel_om_vaga`, e
-  a AUXILIAR escreve a região, como a AUXILIAR do BD escreveria.
+  a AUXILIAR escreve a região, como a AUXILIAR do BD escreveria (o motor não a usa mais para o Responsável).
 - **Provar mudança no motor ou nos insumos: rode com a FOTO do Fracttal**, nunca lendo o Fracttal de novo (horas depois
   a semana muda: S41, 157 tarefas a mais e 280 horários). `python ferramentas/gerar_semana_foto.py --semana 2026-W42
   [--historico banco|nexus] [--rotulo x] [--contra <rodada ou planilha>]` (`geracao.gerar_com_foto`): os mesmos

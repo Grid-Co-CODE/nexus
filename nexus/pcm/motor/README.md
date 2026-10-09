@@ -1,7 +1,7 @@
 # Motor da programação semanal (cópia)
 
 Estes três arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório `fillipefigueiro-source/gridco-pcm-data`
-no commit `8ee58d9` (30/09/2026):
+no commit `3ce6205` (09/10/2026 09:09; antes, `8ee58d9` de 30/09):
 
 | Arquivo | O que faz |
 |---|---|
@@ -13,7 +13,7 @@ Conferido pelo hash (SHA-256):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `17bd4926102b…` |
+| `programacao_v7.py` | `af884da8319c…` |
 | `fonte_bd_api.py` | `d8fb8806b1e8…` |
 | `gerar_bd_via_api.py` | `6c580738ab5e…` |
 
@@ -41,5 +41,10 @@ sistemas rodarem juntos, as duas cópias precisam ser iguais.
   `.env` achado no caminho) e o `FRACTTAL_BASE_URL` aponta para uma porta fechada. O motor lê a foto; se tentar o
   Fracttal, falha.
 - **Saída:** a planilha fica em `saida/sombra.xlsx` e é comparada com a `Programação Semana NN.xlsx` oficial.
-- **Conferido em 09/10/2026:** sem o CR do Windows, os três arquivos são iguais aos do repositório do PCM no commit de
-  08/10 16:56 (`1d717cd`; a última mudança neles é de 25/09). O hash da tabela acima é o da cópia com CRLF.
+- **Conferido em 09/10/2026:** sem o CR do Windows, os três arquivos são iguais aos do repositório do PCM no commit
+  `3ce6205` (09/10 09:09). O hash da tabela acima é o da cópia com CRLF.
+- **O que mudou em `3ce6205` (09/10/2026):** a W42 do PC do PCM quebrou na quinta (08/10 21:46, `ValueError: cannot
+  convert float NaN to integer` no RPN dinâmico): a AUXILIAR atualizada naquele dia tinha 67 usinas sem MWp, e o motor
+  guardava o vazio como NaN. O motor passou a ler o porte da coluna `POTÊNCIA CONTRATUAL (MWp)` (vazio e zero não
+  entram) e o responsável da coluna `Gestor de Contrato` (o RESPONSÁVEL O&M virou a região da vaga). A AUXILIAR do
+  Nexus (`auxiliar.py`) escreve as duas colunas.
