@@ -14,6 +14,8 @@ como queda a zero.
 import math
 from datetime import date, timedelta
 
+from . import fontes as F
+
 DIAS_DO_GRAFICO = 30
 MESES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro")
 
@@ -109,7 +111,7 @@ def grafico(serie: list, publicado_ate, *, etm: list | None = None) -> dict:
         x = max(X0, round(X0 + primeiro_sem * passo - passo / 2, 1))
         faixa = {"x": x, "largura": round(LARGURA - 10 - x, 1), "y": Y1, "altura": Y0 - Y1}
     primeiro, ultimo = serie[0][0], serie[-1][0]
-    descricao = (f"GHI diário de {dd_mm(primeiro)} a {dd_mm(ultimo)}, NASA POWER, em kWh/m²; " +
+    descricao = (f"GHI diário de {dd_mm(primeiro)} a {dd_mm(ultimo)}, {F.extenso('nasa_power')}, em kWh/m²; " +
                  (f"publicado até {dd_mm(publicado_ate)}" if publicado_ate is not None else "nenhum dia publicado nesta janela"))
     return {"viewbox": f"0 0 {LARGURA} {ALTURA}", "grades": grades, "rotulos_x": rotulos_x, "nasa": desenho(serie),
             "etm": desenho(etm) if etm else None, "faixa": faixa, "topo": topo, "descricao": descricao}

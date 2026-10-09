@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR" class="mp-tv-html" data-nexus data-tema="{{ tema }}">
+<head>
+  <meta charset="utf-8">
+  <script>
+    // O Nexus nunca fica dentro de moldura (o mesmo guarda do base.html): o modo TV também não.
+    try { if (window.top !== window.self) window.top.location.href = location.href; } catch (e) {}
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ tela.nome }} · modo TV · Grid Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='clima-mapa.css') }}">
+  <script>{% include "_tema_cabeca.html" %}</script>
+  {# Sem JavaScript o modo TV ainda se recarrega (60 s; 10 s enquanto uma fonte é lida pela primeira vez). Com ele, relê só o mapa
+     no ritmo dos caches das fontes (data-proxima-s), e diz na tela quando a sessão caiu ou o Nexus não responde. #}
+  <noscript><meta http-equiv="refresh" content="{{ v.recarrega_em }}"></noscript>
+</head>
+{# Modo TV do Mapa de risco (Levi, 09/10/2026: "Quero visão de tela cheia para colocar no video wall"): sem a casca do Nexus (sem
+   menu e sem topo), o mapa ocupando a tela, letras que se leem de longe (o tamanho segue a altura da tela: o mesmo desenho em
+   1920 x 1080 e em 3840 x 2160), relógio, "lido às" de cada fonte e nada de rolagem. O login continua valendo: esta página passa
+   pelo mesmo portão (sem sessão, vai para o Entrar e volta para cá). Os controles aparecem ao mexer o mouse ou apertar uma tecla. #}
+<body class="mp-tv-pagina">
+{% set rota = 'torre_performance.mapa_de_risco' %}
+{% set cr = v.calor_risco %}
+<div class="cl mp mp-tv{% for s in v.sobre if s not in v.ver %} mp-sem-{{ s }}{% endfor %}{% for n in v.ocultar %} mp-oculta-{{ n }}{% endfor %}" data-mapa data-tv data-fundo="{{ v.fundo }}" data-proxima-s="{{ v.proxima_s }}" data-girar="{{ v.girar or 0 }}">
+  <header class="mp-tv-cab">
+    <div class="mp-tv-titulo">
+      <p class="gc-eyebrow">Nexus · {{ torre.nome }}</p>
+      <h1>{{ tela.nome }} <span class="mp-tv-regiao" data-parte="tv-regiao">· {{ v.regiao_nome }}{% if v.cliente %} · {{ v.cliente }}{% endif %}</span></h1>
+    </div>
+    <div class="mp-tv-camada" data-parte="tv-camada">
+      {% if v.erro_cadastro or v.sem_usinas %}
+      <p class="mp-tv-camada-nome">Sem usinas para mostrar</p>
+      {% else %}
+      {% for f in (v.giro if v.girar else ([v.fundo] if v.fundo != "nenhum" else ["nenhum"])) %}
+      <p class="mp-tv-camada-nome" data-camada="{{ f }}">{% if f == "avisos" %}Avisos meteorológicos <span>do {{ v.nomes.inmet }}</span>{% elif f == "risco" %}Risco de fogo para {{ cr.dia_nome if cr else "hoje" }} <span>do {{ v.nomes.inpe }}</span>{% elif f == "densidade" %}Densidade de focos de queimada <span>da última hora, {{ v.nomes.inpe }}</span>{% else %}Usinas por nível de alerta{% endif %}</p>
+      {% endfor %}
+      {% endif %}
+      <p class="mp-tv-giro" hidden>Próxima camada em <span class="mp-tv-giro-s">{{ v.girar or 0 }}</span> s</p>
+    </div>
+    <div class="mp-tv-relogio" aria-label="Hora de agora">
+      <time class="mp-tv-hora">{{ v.atualizada }}</time>
+      <span class="mp-tv-data"></span>
+    </div>
+  </header>
+
+  <div class="mp-tv-estado" role="alert" hidden></div>
+
+  {% if v.erro_cadastro %}
+  <div class="cl-aviso mp-tv-aviso" role="alert">Cadastro indisponível: {{ v.erro_cadastro }}</div>
+  {% elif v.sem_usinas %}
+  <p class="cl-aviso mp-tv-aviso">Nenhuma usina em operação com coordenada no cadastro{% if v.cliente %} para este cliente{% endif %}.</p>
+  {% else %}
+  <main class="mp-tv-meio">
+    {% include "performance/_mapa_legenda.html" %}
+    <figure class="mp-mapa" id="mp-mapa" tabindex="0" aria-label="Mapa de risco: {{ v.regiao_nome }}">
+      {% include "performance/_mapa_svg.html" %}
+      <div class="mp-dica" id="mp-dica" role="tooltip" hidden></div>
+    </figure>
+    <section class="mp-tv-lado" aria-label="Usinas por nível">
+      <div class="mp-tv-contagem" data-parte="tv-contagem">
+        <div class="mp-tv-num mp-tv-num--agir"><span class="mp-chave mp-n-agir" aria-hidden="true"></span><strong>{{ v.contagem.agir }}</strong><span>Agir agora</span></div>
+        <div class="mp-tv-num mp-tv-num--atencao"><span class="mp-chave mp-n-atencao" aria-hidden="true"></span><strong>{{ v.contagem.atencao }}</strong><span>Atenção</span></div>
+        {% if v.sem_leitura_de %}
+        <div class="mp-tv-num mp-tv-num--nx"><span class="mp-chave mp-n-nx" aria-hidden="true"></span><strong>{{ v.contagem.nx }}</strong><span>Sem leitura completa</span></div>
+        {% else %}
+        <div class="mp-tv-num mp-tv-num--sem"><span class="mp-chave mp-n-sem" aria-hidden="true"></span><strong>{{ v.contagem.sem }}</strong><span>{{ v.rotulo_sem }}</span></div>
+        {% endif %}
+      </div>
+      {% include "performance/_mapa_tabela.html" %}
+    </section>
+  </main>
+  <footer class="mp-tv-rodape">
+    <div class="mp-tv-fontes" data-parte="fontes">
+      {% for f in v.fontes %}<div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>{% endfor %}
+    </div>
+    <p class="mp-tv-tela"><span data-parte="hora">Tela atualizada às {{ v.atualizada }}</span><span class="mp-tv-proxima"></span></p>
+    {% if v.faltando or v.lendo or v.erro_contorno %}
+    <p class="mp-tv-notas" data-parte="notas">{% if v.faltando %}O mapa não inclui: {{ v.faltando|join(", ") }}. {% endif %}{% if v.lendo %}Lendo agora: {{ v.lendo|join(", ") }}. {% endif %}{{ v.erro_contorno }}</p>
+    {% else %}
+    <p class="mp-tv-notas" data-parte="notas" hidden></p>
+    {% endif %}
+  </footer>
+  <script type="application/json" id="mp-dados" data-parte="dados">{{ v.dados_js|tojson }}</script>
+  {% endif %}
+
+  {# Os controles do video wall: aparecem ao mexer o mouse ou apertar uma tecla e somem sozinhos. Mudam o endereço (que guarda a
+     escolha: recarregar volta igual). #}
+  <div class="mp-tv-controles" hidden>
+    {% if not v.erro_cadastro and not v.sem_usinas %}
+    {% include "performance/_mapa_barra.html" %}
+    <div class="mp-grupo" role="group" aria-labelledby="mp-girar-r">
+      <span class="gc-rotulo" id="mp-girar-r">Alternar as camadas sozinho</span>
+      {% for s in [None, 15, 30, 60, 120] %}<a class="gc-chip mp-chip" data-acao="estado" href="{{ url_for(rota, **v.links.girar[s]) }}" aria-pressed="{{ 'true' if v.girar == s else 'false' }}" role="button">{{ "Desligado" if s is none else ("a cada %d s"|format(s) if s < 120 else "a cada 2 min") }}</a>{% endfor %}
+    </div>
+    {% endif %}
+    <div class="mp-grupo">
+      <button type="button" class="gc-btn gc-btn--contorno" data-acao="tela-cheia" aria-pressed="false" hidden>Tela cheia</button>
+      <button type="button" class="gc-btn gc-btn--contorno" data-acao="tema">Tema: {{ "Claro" if tema == "claro" else "Escuro" }}</button>
+      <a class="gc-btn gc-btn--contorno" href="{{ url_for(rota, **v.links.sair_tv) }}">Sair do modo TV</a>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='clima-mapa.js') }}" defer></script>
+</body>
+</html>

@@ -1,8 +1,11 @@
 """O Mapa de risco (07/10/2026): o contorno dos estados, a projeção e o recorte de cada região, sem Flask.
 
 Pedido do Levi (07/10): a lista do Clima e risco ganha um mapa do Brasil, com as usinas na cor do nível, os avisos do INMET e
-os focos do INPE. O SVG nasce no servidor: nada de biblioteca de JavaScript, de mapa de terceiros ou de dependência nova, e
-nenhuma busca ao IBGE em tempo de execução.
+os focos do INPE. O SVG nasce no servidor: nada de biblioteca de mapa, de mapa de terceiros ou de dependência nova, e nenhuma
+busca ao IBGE em tempo de execução. Desde 09/10/2026 (Levi: "Quero o mapa mais interativo", "visão de tela cheia para colocar no
+video wall", "uma outra visão tipo um mapa de calor") o mesmo SVG ganha as camadas de calor (`calor.py`) e o estado da tela no
+endereço (camada de fundo, camadas de cima, dia, cliente, filtros, modo TV); o zoom, a dica e o resto da interação são do
+`static/clima-mapa.js`, que só enfeita o que o servidor já desenhou (sem JavaScript, o mapa e os links continuam valendo).
 
 O contorno é o do IBGE (Malhas territoriais, API v3, `qualidade=minima`, divisão por UF), baixado UMA vez e guardado em
 `nexus/static/clima/ibge-ufs-minima.geojson` (98 KB, 27 UFs, ~5.500 vértices com 4 casas). Como refazê-lo e a fonte: seção
@@ -20,13 +23,19 @@ do cadastro e as leituras das três fontes (as MESMAS da tela principal, pelo me
 import json
 import logging
 import math
+import re
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import quote
 
+from ...cadastro.servico import chave_texto
 from . import alertas as A
+from . import calor as C
+from . import explica as E
+from . import fontes as F
 from . import leitura as L
 from . import visao as V
 
@@ -137,12 +146,9 @@ def projetar(lat: float, lon: float, lat_media: float) -> tuple:
     return lon * math.cos(math.radians(lat_media)), -lat
 
 
-def _n(v: float) -> str:
-    """Número do SVG: uma casa (0,1 unidade = ~0,4 km no Brasil inteiro e menos nas regiões), sem ".0" e sem "-0"."""
-    s = f"{v:.1f}"
-    if s in ("0.0", "-0.0"):
-        return "0"
-    return s[:-2] if s.endswith(".0") else s
+# Número do SVG: uma casa (0,1 unidade = ~0,4 km no Brasil inteiro e menos nas regiões), sem ".0" e sem "-0". Mora no calor.py
+# (que desenha as faixas das camadas de calor com o mesmo número) e vale aqui com o nome de sempre.
+_n = C.numero_svg
 
 
 @dataclass(frozen=True)
@@ -281,12 +287,95 @@ R_ALVO = 2.2                                         # o círculo invisível que
 R_ANEL = 12.0
 FOLGA_PONTO = 4.0                                    # foco um pouco fora do viewBox ainda desenha (o ponto tem espessura)
 MOTIVOS_NO_TITULO = 3
-_NOMES_DAS_FONTES = (("avisos do INMET", "inmet"), ("focos do INPE", "focos"), ("risco de fogo do INPE", "risco"))
+_FONTES = ("inmet", "focos", "risco")                # a ordem do painel das fontes (os nomes, por extenso, são os de visao.NOME_LONGO)
+
+# As camadas (Levi, 09/10/2026: "Além de tempestade conseguimos uma outra visão tipo um mapa de calor no mapa? quanto mais
+# versatilidade melhor!"). A camada de FUNDO é uma por vez: duas camadas de área juntas (o vermelho do aviso e o do calor) viram uma
+# mancha só, e ninguém sabe o que está lendo. Por cima dela, as usinas, os focos e as siglas ligam e desligam à vontade.
+FUNDOS = {"avisos": "Avisos meteorológicos", "risco": "Risco de fogo", "densidade": "Densidade de focos", "nenhum": "Nenhuma"}
+FUNDO_PADRAO = "avisos"
+GIRO = ("avisos", "risco", "densidade")              # o que o modo TV alterna sozinho (`girar`)
+SOBRE = {"usinas": "Usinas", "focos": "Focos", "siglas": "Siglas dos estados"}
+NIVEIS = (A.AGIR, A.ATENCAO, A.SEM_ALERTA, NX)
+GIRAR_MIN_S, GIRAR_MAX_S = 10, 600
+_SLUG = re.compile(r"^[a-z0-9-]{1,60}$")
 
 
 def _juntar(nomes: list) -> str:
     """["a", "b", "c"] -> "a, b e c" (o mesmo da tela principal)."""
     return nomes[0] if len(nomes) == 1 else ", ".join(nomes[:-1]) + " e " + nomes[-1]
+
+
+def slug_do_evento(evento) -> str:
+    """"Baixa Umidade" -> "baixa-umidade": a chave do evento no endereço (`sem_eventos`) e no atributo do desenho."""
+    return re.sub(r"[^a-z0-9]+", "-", chave_texto(evento)).strip("-")[:60] or "evento"
+
+
+def _lista(bruto, validos) -> frozenset:
+    return frozenset(x for x in (p.strip().lower() for p in str(bruto or "").split(",")) if x in validos)
+
+
+def estado_da_tela(args) -> dict:
+    """O estado da tela pelos parâmetros do endereço: o endereço guarda tudo (é assim que o video wall abre na camada certa, e o
+    recarregar não perde o que a pessoa escolheu). O que não é conhecido cai no padrão, sem erro, como a região."""
+    fundo = str(args.get("fundo") or "").strip().lower()
+    dia = str(args.get("dia") or "").strip()
+    girar = str(args.get("girar") or "").strip()
+    girar_s = int(girar) if girar.isdigit() and GIRAR_MIN_S <= int(girar) <= GIRAR_MAX_S else None
+    ver = args.get("ver")
+    return {"regiao": str(args.get("regiao") or ""), "fundo": fundo if fundo in FUNDOS else FUNDO_PADRAO,
+            "ver": None if ver is None else _lista(ver, SOBRE), "dia": int(dia) if dia in ("0", "1", "2", "3") else None,
+            "cliente": str(args.get("cliente") or "").strip(), "ocultar": _lista(args.get("ocultar"), NIVEIS),
+            "sem_eventos": frozenset(p.strip() for p in str(args.get("sem_eventos") or "").split(",") if _SLUG.match(p.strip())),
+            "tv": str(args.get("tv") or "") == "1", "girar": girar_s}
+
+
+def parametros(estado: dict, **trocas) -> dict:
+    """Os parâmetros do endereço do estado (com as `trocas`), só o que não é o padrão e numa ordem fixa: os links da tela (região,
+    camada, filtro) levam o resto do estado junto, e o estado padrão não acrescenta nada (o Brasil é o endereço puro)."""
+    e = {**estado, **trocas}
+    p = {}
+    if e.get("regiao") in REGIOES:
+        p["regiao"] = e["regiao"]
+    if e.get("fundo", FUNDO_PADRAO) != FUNDO_PADRAO:
+        p["fundo"] = e["fundo"]
+    if e.get("ver") is not None and set(e["ver"]) != set(SOBRE):
+        p["ver"] = ",".join(k for k in SOBRE if k in e["ver"])
+    if e.get("dia") is not None:
+        p["dia"] = e["dia"]
+    if e.get("cliente"):
+        p["cliente"] = e["cliente"]
+    if e.get("ocultar"):
+        p["ocultar"] = ",".join(k for k in NIVEIS if k in e["ocultar"])
+    if e.get("sem_eventos"):
+        p["sem_eventos"] = ",".join(sorted(e["sem_eventos"]))
+    if e.get("tv"):
+        p["tv"] = 1
+    if e.get("girar"):
+        p["girar"] = e["girar"]
+    return p
+
+
+def _alterna(conjunto, item) -> frozenset:
+    conjunto = frozenset(conjunto)
+    return conjunto - {item} if item in conjunto else conjunto | {item}
+
+
+def _links(estado: dict, eventos: list) -> dict:
+    """Os parâmetros de cada controle da tela (o template só chama `url_for` com eles): funcionam sem JavaScript, e o JavaScript
+    os usa para trocar a tela sem recarregar."""
+    ver = frozenset(SOBRE) if estado["ver"] is None else estado["ver"]
+    return {
+        "regiao": {r: parametros(estado, regiao=(r if r != BRASIL else "")) for r in (BRASIL, *REGIOES)},
+        "fundo": {f: parametros(estado, fundo=f) for f in FUNDOS},
+        "ver": {s: parametros(estado, ver=_alterna(ver, s)) for s in SOBRE},
+        "ocultar": {n: parametros(estado, ocultar=_alterna(estado["ocultar"], n)) for n in NIVEIS},
+        "dia": {d: parametros(estado, dia=d) for d in range(4)},
+        "sem_eventos": {e["ev"]: parametros(estado, sem_eventos=_alterna(estado["sem_eventos"], e["ev"])) for e in eventos},
+        "tv": parametros(estado, tv=True), "sair_tv": parametros(estado, tv=False, girar=None),
+        "girar": {s: parametros(estado, girar=s) for s in (None, 15, 30, 60, 120)},
+        "aqui": parametros(estado),
+    }
 
 
 def _aneis_do_aviso(geometria_) -> list:
@@ -301,16 +390,19 @@ def _estado_da_camada(leitura) -> str:
     return "ok" if leitura.dados is not None else ("lendo" if leitura.erro == L.LENDO else "fora")
 
 
-def _camada_avisos(avisos_l, v: Vista, ref, qualifica: list) -> dict:
+def _camada_avisos(avisos_l, v: Vista, ref, qualifica: list, sem_eventos=frozenset()) -> dict:
     """Os polígonos do INMET que valem agora ou valerão (o vencido não desenha) e encostam no recorte, em grupos por nível e por
     "já em vigor" ou "ainda vai começar": o grupo vira uma camada translúcida do CSS, e o aviso que ainda não começou vai só no
-    contorno. Do mais leve para o mais grave, que fica por cima."""
+    contorno. Do mais leve para o mais grave, que fica por cima. Cada polígono leva o evento (`ev`) para o filtro por evento da
+    legenda (09/10/2026), e `eventos` conta os do recorte, um por evento, do que manda agir ao que só pede atenção."""
     camada = {"estado": _estado_da_camada(avisos_l), "grupos": [], "n_vigor": 0, "n_futuros": 0, "ignorados": 0,
-              "qualifica": qualifica}
+              "qualifica": qualifica, "eventos": [], "lido": ""}
     if avisos_l.dados is None:
         return camada
     camada["ignorados"] = len(avisos_l.dados["ignorados"])
-    grupos = {}
+    # cada camada diz de quando é (09/10/2026): a legenda repete o "lido às" do painel das fontes
+    camada["lido"] = V.hora(datetime.fromtimestamp(avisos_l.lido_em, V.BRT), ref) if avisos_l.lido_em else ""
+    grupos, eventos = {}, {}
     for a in avisos_l.dados["avisos"]:
         if (a.fim is not None and a.fim < ref) or not v.cruza(a.caixa):
             continue
@@ -318,22 +410,30 @@ def _camada_avisos(avisos_l, v: Vista, ref, qualifica: list) -> dict:
         if not d:
             continue
         futuro = not A.em_vigor(a, ref)
+        ev = slug_do_evento(a.evento)
         grupos.setdefault((futuro, a.nivel), []).append(
-            {"d": d, "titulo": f"{a.evento} · {a.severidade} · {V._validade(a, ref)}"})
+            {"d": d, "titulo": f"{a.evento} · {a.severidade} · {V._validade(a, ref)}", "ev": ev, "oculto": ev in sem_eventos})
+        e = eventos.setdefault(ev, {"ev": ev, "nome": E.nome_amigavel(a.evento), "n": 0, "nivel": 0, "agir": False,
+                                    "oculto": ev in sem_eventos})
+        e["n"] += 1
+        e["nivel"] = max(e["nivel"], a.nivel)
+        e["agir"] = e["agir"] or A.aviso_manda_agir(a)
     for (futuro, nivel), itens in sorted(grupos.items()):
         camada["grupos"].append({"nivel": nivel, "futuro": futuro, "itens": itens})
         camada["n_futuros" if futuro else "n_vigor"] += len(itens)
+    camada["eventos"] = sorted(eventos.values(), key=lambda e: (not e["agir"], -e["nivel"], -e["n"], e["nome"]))
     return camada
 
 
-def _camada_focos(focos_l, indice, usinas: list, v: Vista, qualifica: list) -> dict:
+def _camada_focos(focos_l, indice, usinas: list, v: Vista, qualifica: list, ref=None) -> dict:
     """Todos os focos da última hora, cada um um ponto do tamanho do traço (o caminho `h.01` com ponta redonda: uns 5 mil focos
     num `<path>` só pesam 70 KB, e como `<circle>` seriam 190 KB), e o anel nos que estão a até 5 km de ALGUMA usina do cadastro
     (dentro ou fora do recorte: o foco é que tem de estar na vista). Foco em cima de foco, no desenho, vira um ponto só."""
     camada = {"estado": _estado_da_camada(focos_l), "d": "", "n": 0, "n_perto": 0, "aneis": [], "r_anel": R_ANEL,
-              "qualifica": qualifica}
+              "qualifica": qualifica, "lido": ""}
     if indice is None:
         return camada
+    camada["lido"] = V.hora(datetime.fromtimestamp(focos_l.lido_em, V.BRT), ref or V.agora()) if focos_l.lido_em else ""
     pontos = set()
     for f in focos_l.dados["focos"]:
         x, y = v.ponto(f.lat, f.lon)
@@ -351,6 +451,146 @@ def _camada_focos(focos_l, indice, usinas: list, v: Vista, qualifica: list) -> d
     camada["n_perto"] = len(aneis)
     return camada
 
+
+# ── as camadas de calor (09/10/2026) ─────────────────────────────────────────────────────────────────────────────────
+
+# A grade fixa que escolhe as tiles do INPE que encostam no Brasil (a máscara do contorno, em quadrados de 0,08 grau).
+_GRADE_BRASIL = C.grade_de_caixa(*LIMITES_BRASIL, F.GRADE_GRAUS)
+_DESENHOS: dict = {}                                 # o desenho de cada camada de calor, por leitura e por recorte
+_DESENHOS_MAX = 16
+
+
+def _guardado(chave, fazer):
+    """O desenho da camada de calor é a conta pesada da tela (até ~0,3 s no Brasil inteiro): sai uma vez por leitura da fonte e por
+    recorte, e as visitas seguintes (e o modo TV, que relê a página) o reaproveitam."""
+    if chave in _DESENHOS:
+        return _DESENHOS[chave]
+    valor = fazer()
+    while len(_DESENHOS) >= _DESENHOS_MAX:
+        _DESENHOS.pop(next(iter(_DESENHOS)), None)
+    _DESENHOS[chave] = valor
+    return valor
+
+
+@lru_cache(maxsize=1)
+def aneis_do_brasil() -> tuple:
+    """Todos os anéis dos 27 estados (o de fora e os buracos), para a máscara do calor: o desenho entra até a costa e a fronteira,
+    e o recorte do SVG corta no contorno."""
+    return tuple(anel for e in estados() for poligono in e.poligonos for anel in poligono)
+
+
+@lru_cache(maxsize=8)
+def divisas_da_vista(v: Vista) -> str:
+    """O contorno dos estados num caminho só, desenhado POR CIMA de uma camada de calor (que cobre a terra inteira)."""
+    return "".join(u.d for u in ufs_da_vista(v))
+
+
+def _pct(n: int, total: int) -> str:
+    if not total or not n:
+        return "0%"
+    p = 100 * n / total
+    return "menos de 1%" if p < 0.5 else f"{round(p)}%"
+
+
+def _desenhar_classes(classes, grade, v: Vista, aneis, tabela) -> dict:
+    desenhar = C.mascara(grade, aneis, 1) if aneis else None
+    contar = C.mascara(grade, aneis, 0) if aneis else None
+    f = C.faixas(classes, grade, v, desenhar=desenhar, contar=contar)
+    total = f["com_dado"] + f["sem_dado"]
+    return {"altura": f["altura"], "sem_dado_pct": _pct(f["sem_dado"], total), "com_dado": f["com_dado"],
+            "classes": [{**c, "d": f["caminhos"].get(c["id"], ""), "n": f["contagem"][c["id"]],
+                         "pct": _pct(f["contagem"][c["id"]], total)} for c in tabela],
+            "lado_km": round(grade.dlat * C.KM_POR_GRAU)}
+
+
+def _dia_padrao(rotulos: list) -> int:
+    """O dia "Hoje" do arquivo do INPE: o 0 quando o arquivo é de hoje, o 1 quando ainda é o de ontem (antes das ~06:30)."""
+    return rotulos.index("Hoje") if "Hoje" in rotulos else 0
+
+
+def _camada_risco(config, sessao, v: Vista, dia, ref, arquivo_dos_pontos, aneis) -> dict:
+    """O risco de fogo do INPE em quadrados, no dia escolhido (hoje por padrão; os quatro dias da previsão), lido ao fundo: a
+    primeira visita diz "lendo" e a tela se atualiza quando a leitura termina. O que a cor quer dizer, a data da previsão, a hora
+    da leitura e quanto da área ficou sem dado vão na legenda."""
+    precisa = C.precisa_de_tile(_GRADE_BRASIL, aneis) if aneis else None
+    # o dia padrão é o "Hoje" do arquivo que o risco por usina já leu; os nomes dos dias saem da data do arquivo do mapa de calor
+    # (no meio da troca diária os dois podem ser de dias diferentes por uns minutos, e o nome continua certo para o que se vê)
+    base = arquivo_dos_pontos
+    dia = _dia_padrao(V.rotulos_dos_dias(base, ref)) if dia is None else dia
+    leitura = L.risco_grade(config, dia, LIMITES_BRASIL, precisa, sessao)
+    dados = leitura.dados
+    if dados and dados.get("modificado"):
+        base = dados["modificado"]
+    nomes = V.dias_amigaveis(base, ref)
+    nome_fonte = f"{F.extenso('inpe')} · risco de fogo"
+    camada = {"estado": _estado_da_camada(leitura), "dia": dia, "dia_nome": nomes[dia],
+              "dias": [{"i": i, "nome": nomes[i], "atual": i == dia} for i in range(len(nomes))], "classes": [], "altura": "",
+              "texto": "", "detalhe": "", "qualifica": [], "sem_dado_pct": "", "lado_km": 0, "leitura": leitura}
+    falha = V._falha(nome_fonte, leitura, ref)
+    if dados is None:
+        camada["texto"] = (f"{nome_fonte}: lendo a área do Brasil no arquivo do INPE (leva alguns segundos; o mapa se atualiza "
+                           "sozinho)" if leitura.erro == L.LENDO else falha[1])
+        camada["detalhe"] = falha[2]
+        return camada
+    if falha is not None:                                         # a última leitura boa, dita velha, com a hora
+        camada["texto"], camada["detalhe"] = falha[1], falha[2]
+        camada["qualifica"].append(f"dado de {V.hora(datetime.fromtimestamp(leitura.lido_em, V.BRT), ref)}")
+    modificado = dados.get("modificado")
+    lido = V.hora(datetime.fromtimestamp(leitura.lido_em, V.BRT), ref)
+    if modificado is None:
+        camada["qualifica"].append("sem data do arquivo")
+        texto = f"{nome_fonte}: previsão para {nomes[dia]} · sem data do arquivo · lido às {lido}"
+    else:
+        a = modificado.astimezone(V.BRT)
+        texto = f"{nome_fonte}: previsão para {nomes[dia]}, do arquivo de {a:%d/%m} às {a:%H:%M} · lido às {lido}"
+        if a.date() != ref.astimezone(V.BRT).date():
+            camada["qualifica"].append(f"previsão de {a:%d/%m}")
+    if falha is None:
+        camada["texto"] = texto
+    k = C.JUNTA_NO_BRASIL if v.id == BRASIL else 1
+    chave = ("risco", dados.get("validador") or id(dados["grade"]), dados.get("url"), v.id, k)
+
+    def desenhar():
+        grade, soma, n = C.juntar(dados["grade"], k)
+        classes = C.classes_do_risco(soma, n, dados["grade"]["px_por_bloco"] * k * k)
+        return _desenhar_classes(classes, grade, v, aneis, C.CLASSES_RISCO)
+    camada.update(_guardado(chave, desenhar))
+    return camada
+
+
+def _camada_densidade(focos_l, v: Vista, aneis, qualifica: list, ref) -> dict:
+    """A densidade dos focos da última hora (o núcleo de 25 km), dos MESMOS focos da camada de pontos: sem leitura dos focos, sem
+    camada, e a legenda diz por quê."""
+    raio = C.RAIO_KM_BRASIL if v.id == BRASIL else C.RAIO_KM
+    pico = 3.0 / (math.pi * raio * raio) * C.POR_AREA_KM2       # o que um foco sozinho dá no centro dele (a régua da legenda)
+    camada = {"estado": _estado_da_camada(focos_l), "classes": [], "altura": "", "texto": "", "qualifica": qualifica,
+              "raio_km": raio, "pico_um": V.numero(pico, 2 if pico < 1 else 1), "n_focos": 0, "sem_dado_pct": "", "lado_km": 0}
+    nome_fonte = f"focos de queimada do {F.extenso('inpe')}"
+    if focos_l.dados is None:
+        camada["texto"] = (f"Lendo os {nome_fonte}: a densidade aparece quando a leitura terminar" if focos_l.erro == L.LENDO
+                           else f"Sem leitura boa dos {nome_fonte}: a densidade não aparece")
+        return camada
+    focos = focos_l.dados["focos"]
+    camada["n_focos"] = sum(1 for f in focos if v.lon_oeste <= f.lon <= v.lon_leste and v.lat_sul <= f.lat <= v.lat_norte)
+    ate = V.hora(focos_l.dados["ate"], ref)
+    lido = V.hora(datetime.fromtimestamp(focos_l.lido_em, V.BRT), ref)
+    camada["texto"] = (f"Calculada no Nexus com os {V.milhar(camada['n_focos'])} {'foco' if camada['n_focos'] == 1 else 'focos'} "
+                       f"da última hora do {F.extenso('inpe')} (arquivos até {ate}, lidos às {lido}): cada foco pesa até "
+                       f"{raio:g} km em volta dele.")
+    k = C.JUNTA_NO_BRASIL if v.id == BRASIL else 1
+    margem = raio / C.KM_POR_GRAU
+    grade = C.grade_de_caixa(v.lon_oeste - margem, v.lat_sul - margem, v.lon_leste + margem, v.lat_norte + margem,
+                             F.GRADE_GRAUS * k)
+    chave = ("densidade", focos_l.lido_em, len(focos), id(focos), v.id, k, raio)
+
+    def desenhar():
+        return _desenhar_classes(C.classes_da_densidade(C.densidade(focos, grade, raio)), grade, v, aneis,
+                                 C.CLASSES_DENSIDADE)
+    camada.update(_guardado(chave, desenhar))
+    return camada
+
+
+# ── a usina ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def _motivos(avisos: list, foco, dias: list, ref) -> str:
     """Por que a usina está no nível dela, em uma linha para o `<title>`: o foco, os avisos (os que mandam agir antes) e os dias
@@ -370,12 +610,40 @@ def _motivos(avisos: list, foco, dias: list, ref) -> str:
     return "; ".join(itens)
 
 
-def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, sessao=None) -> dict:
-    """Tudo o que o template do mapa precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê).
+def _fontes_que_pesaram(avisos, foco, dias, ref, sem_leitura_de: str, completa: bool) -> list:
+    """As fontes que pesaram no nível da usina, cada uma com o nome por extenso e o que ela trouxe (a dica do mapa, 09/10/2026:
+    "dica ao passar o mouse na usina (nome, nível, o motivo, as fontes que pesaram)"). [[fonte, o que trouxe], ...]."""
+    itens = []
+    for e in V.por_evento(V.agrupar_avisos(avisos, ref), ref):
+        itens.append([F.extenso("inmet"), f"{e['nome']} ({e['severidade']}), {e['quando']}"])
+    if foco:
+        itens.append([F.extenso("inpe"), f"foco de queimada a {V.numero(foco['km'], 1)} km, visto pelo satélite "
+                                         f"{foco['satelite']} às {V.hora(foco['hora'], ref)}"])
+    com_numero = [c for c in dias if c.get("_num") is not None]
+    if V.risco_curto(dias):
+        maior = max(c["_num"] for c in dias if c["nivel"] > 0)
+        itens.append([F.extenso("inpe"), f"{V.risco_curto(dias).lower()} (até {V.numero(maior)})"])
+    if itens:
+        return itens
+    if sem_leitura_de:
+        return [["", f"Sem leitura de {sem_leitura_de}: não dá para dizer que não há alerta"]]
+    maior = max((c["_num"] for c in com_numero), default=None)
+    risco = f"; risco de fogo até {V.numero(maior)}" if maior is not None else ""
+    return [["", "Nenhum aviso, nenhum foco a até 5 km e risco de fogo abaixo de alto" + ("" if completa else
+             " nas fontes lidas") + risco]]
+
+
+def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, sessao=None, fundo=FUNDO_PADRAO, ver=None,
+           dia=None, cliente="", ocultar=frozenset(), sem_eventos=frozenset(), tv=False, girar=None) -> dict:
+    """Tudo o que o template do mapa precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê); o
+    resto é o estado da tela (`estado_da_tela`): a camada de fundo, as de cima, o dia do risco de fogo, o cliente, os níveis e os
+    eventos escondidos, e o modo TV com o giro das camadas.
 
     O mapa lê as MESMAS três fontes da tela principal, pelo mesmo cache (uma visita a uma e outra não vai duas vezes à rede), e
     o nível de cada usina vem da mesma regra (`alertas.nivel_da_usina`). O painel de frescor é o mesmo código da tela principal
-    (`visao._fonte_*`): o mapa não reescreve o texto de "lido às", "parcial" ou "fora agora".
+    (`visao._fonte_*`): o mapa não reescreve o texto de "lido às", "parcial" ou "fora agora". As camadas de calor (09/10/2026) vêm
+    das mesmas fontes: o risco de fogo, do mesmo arquivo do INPE, lido na área (só quando a camada está ligada), e a densidade, dos
+    mesmos focos.
 
     A honestidade da tela principal vale aqui: a camada de uma fonte sem leitura some e a legenda diz por quê, e a usina que
     ficaria "Sem alerta" com uma fonte sem leitura fica cinza ("Sem leitura completa"), nunca verde: sem ler os avisos, não
@@ -385,34 +653,56 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     try:
         v = vista(regiao)
         ufs = ufs_da_vista(v)
+        aneis = aneis_do_brasil()
         erro_contorno = ""
     except (ValueError, OSError):
         # O contorno é um arquivo do repositório: se faltar ou vier quebrado, o mapa sai sem as divisas (e sem o recorte por
         # região, que sai das caixas dos estados), e a tela diz; o motivo vai ao log. Antes disto seria um 500.
         log.exception("clima: o contorno dos estados do IBGE não abriu")
-        v, ufs = vista_de_caixa(BRASIL, "Brasil", *LIMITES_BRASIL), ()
+        v, ufs, aneis = vista_de_caixa(BRASIL, "Brasil", *LIMITES_BRASIL), (), ()
         erro_contorno = ("O contorno dos estados não abriu (o motivo está no log do servidor): o mapa sai sem as divisas e sem o "
                          "recorte por região.")
-    m = {"erro_cadastro": erro_cadastro, "erro_contorno": erro_contorno, "atualizada": V.hora(ref, ref), "regiao": v.id, "regiao_nome": v.nome,
+    fundo = fundo if fundo in FUNDOS else FUNDO_PADRAO
+    ver = frozenset(SOBRE) if ver is None else frozenset(ver) & frozenset(SOBRE)
+    girar = girar if tv else None
+    # O que o SVG desenha: a camada de fundo escolhida; no modo TV com giro, as três (a troca é do navegador, sem pedir de novo).
+    fundos_no_svg = list(GIRO) if girar else ([fundo] if fundo != "nenhum" else [])
+    estado = {"regiao": v.id if v.id != BRASIL else "", "fundo": fundo, "ver": None if ver == frozenset(SOBRE) else ver,
+              "dia": dia, "cliente": "", "ocultar": frozenset(ocultar) & frozenset(NIVEIS), "sem_eventos": frozenset(sem_eventos),
+              "tv": bool(tv), "girar": girar}
+    m = {"erro_cadastro": erro_cadastro, "erro_contorno": erro_contorno, "atualizada": V.hora(ref, ref), "regiao": v.id,
+         "regiao_nome": v.nome,
          "regioes": [{"id": BRASIL, "nome": "Brasil", "atual": v.id == BRASIL},
                      *({"id": r, "nome": n, "atual": v.id == r} for r, n in REGIOES.items())],
          "viewbox": v.viewbox, "ufs": ufs, "usinas": [], "contagem": {A.AGIR: 0, A.ATENCAO: 0, A.SEM_ALERTA: 0, NX: 0},
          "n_usinas": 0, "n_no_recorte": 0, "fora_do_recorte": 0, "sem_usinas": False, "rotulo_sem": "Sem alerta",
          "sem_leitura_de": "", "camada_avisos": None, "camada_focos": None, "fontes": [], "faltando": [], "lendo": [],
          "completa": True, "recarrega_em": V.RECARGA_S, "sem_coordenada": [], "fora_do_brasil": [], "ilegiveis": 0,
-         "tabela": []}
+         "tabela": [], "fundo": fundo, "fundos": FUNDOS, "fundos_no_svg": fundos_no_svg, "giro": GIRO, "ver": ver,
+         "sobre": SOBRE, "ocultar": estado["ocultar"], "tv": bool(tv), "girar": girar, "calor_risco": None,
+         "calor_densidade": None, "divisas": "", "clientes": [], "cliente": "", "dados_js": {}, "proxima_s": V.RECARGA_S,
+         "nomes": {k: F.extenso(k) for k in F.NOMES}, "estado": estado, "links": _links(estado, [])}
     if cadastro is None:
         return m
-    m["sem_coordenada"] = [u.nome for u in cadastro.sem_coordenada]
-    m["fora_do_brasil"] = [u.nome for u in cadastro.fora_do_brasil]
+    m["clientes"] = cadastro.clientes()
+    m["cliente"] = estado["cliente"] = cliente if cliente in m["clientes"] else ""
+
+    def pertence(u):
+        return not m["cliente"] or u.cliente == m["cliente"]
+
+    usinas = [u for u in cadastro.usinas if pertence(u)]
+    m["sem_coordenada"] = [u.nome for u in cadastro.sem_coordenada if pertence(u)]
+    m["fora_do_brasil"] = [u.nome for u in cadastro.fora_do_brasil if pertence(u)]
     m["ilegiveis"] = cadastro.ilegiveis
-    m["n_usinas"] = len(cadastro.usinas)
-    if not cadastro.usinas:
+    m["n_usinas"] = len(usinas)
+    m["links"] = _links(estado, [])
+    if not usinas:
         m["sem_usinas"] = True            # nada a cruzar: nem se vai à rede
         return m
 
     avisos_l = L.avisos(config, sessao)
     focos_l = L.focos(config, sessao)
+    # o risco de fogo é lido para TODAS as usinas com coordenada (o cache vale pelo conjunto de pontos); o filtro é da tela
     risco_l = L.risco(config, cadastro.pontos(), sessao)
     indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
     arquivo = V._arquivo_t0(risco_l.dados) if risco_l.dados else None
@@ -420,21 +710,32 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     fontes = [V._fonte_inmet(avisos_l, ref), V._fonte_focos(focos_l, ref), V._fonte_risco(risco_l, ref, rotulos)]
     por_id = {f["id"]: f for f in fontes}
     leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
-    ausentes = [n for n, id_ in _NOMES_DAS_FONTES if leituras[id_].dados is None]       # na ordem do painel das fontes
+    ausentes = [V.NOME_LONGO[i] for i in _FONTES if leituras[i].dados is None]       # na ordem do painel das fontes
     m["fontes"] = fontes
-    m["lendo"] = [n for n, id_ in _NOMES_DAS_FONTES if leituras[id_].dados is None and leituras[id_].erro == L.LENDO]
-    m["faltando"] = [n for n, id_ in _NOMES_DAS_FONTES if leituras[id_].dados is None and leituras[id_].erro != L.LENDO]
+    m["lendo"] = [V.NOME_LONGO[i] for i in _FONTES if leituras[i].dados is None and leituras[i].erro == L.LENDO]
+    m["faltando"] = [V.NOME_LONGO[i] for i in _FONTES if leituras[i].dados is None and leituras[i].erro != L.LENDO]
     m["completa"] = all(f["estado"] == "ok" for f in fontes)
     m["recarrega_em"] = V.RECARGA_LENDO_S if m["lendo"] else V.RECARGA_S
     m["sem_leitura_de"] = _juntar(ausentes) if ausentes else ""
     m["rotulo_sem"] = "Sem alerta" if m["completa"] else "Sem alerta nas fontes lidas"
-    m["camada_avisos"] = _camada_avisos(avisos_l, v, ref, por_id["inmet"]["qualifica"])
-    m["camada_focos"] = _camada_focos(focos_l, indice, cadastro.usinas, v, por_id["focos"]["qualifica"])
+    m["camada_avisos"] = _camada_avisos(avisos_l, v, ref, por_id["inmet"]["qualifica"], estado["sem_eventos"])
+    m["camada_focos"] = _camada_focos(focos_l, indice, usinas, v, por_id["focos"]["qualifica"], ref)
+    m["links"] = _links(estado, m["camada_avisos"]["eventos"])
+    usadas = [avisos_l, focos_l, risco_l]
+    if "risco" in fundos_no_svg:
+        m["calor_risco"] = _camada_risco(config, sessao, v, dia, ref, arquivo, aneis)
+        usadas.append(m["calor_risco"].pop("leitura"))
+    if "densidade" in fundos_no_svg:
+        m["calor_densidade"] = _camada_densidade(focos_l, v, aneis, por_id["focos"]["qualifica"], ref)
+    if ufs and any(c and c.get("classes") for c in (m["calor_risco"], m["calor_densidade"])):
+        m["divisas"] = divisas_da_vista(v)           # só com uma camada de calor desenhada: ela cobre a terra e as divisas da terra
+    # a próxima atualização do mapa (e do modo TV): quando o cache da primeira fonte vencer, nunca antes (09/10/2026)
+    m["proxima_s"] = V.proxima_leitura_s(usadas)
 
     todos_os_avisos = avisos_l.dados["avisos"] if avisos_l.dados else []
     rotulo_do_nivel = {**A.ROTULO_NIVEL, A.SEM_ALERTA: m["rotulo_sem"], NX: ROTULO_NX}
-    desenhadas = []
-    for u in cadastro.usinas:
+    desenhadas, dicas = [], {}
+    for u in usinas:
         x, y = v.ponto(u.lat, u.lon)
         if not v.dentro(x, y):
             m["fora_do_recorte"] += 1
@@ -465,8 +766,41 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
             # resumida do motivo do risco"): o mesmo motivo curto da tabela da Atenção da lista
             "onde": f"{u.cliente} · {u.uf}" if u.uf else u.cliente, "rotulo": rotulo_do_nivel[nivel], "motivo_curto": curto,
             "_ordem": (ORDEM_DA_TABELA[nivel], -gravidade, u.nome.casefold())})
+        # a dica do mapa (09/10/2026): o nome, o nível, o motivo e as fontes que pesaram, cada uma por extenso. Vai num JSON da
+        # página (escapado pelo |tojson), lido pelo JavaScript; texto de terceiros entra no balão por textContent, nunca como HTML.
+        dicas[u.id] = {"n": u.nome, "o": desenhadas[-1]["onde"], "v": nivel, "r": rotulo_do_nivel[nivel], "m": curto,
+                       "f": _fontes_que_pesaram(avisos, foco, dias, ref, m["sem_leitura_de"] if nivel == NX else "",
+                                                m["completa"])}
     m["tabela"] = sorted(desenhadas, key=lambda d: d["_ordem"])
     desenhadas.sort(key=lambda d: (ORDEM_DE_DESENHO[d["nivel"]], d["nome"].casefold()))
     m["usinas"] = desenhadas
     m["n_no_recorte"] = len(desenhadas)
+    m["dados_js"] = _dados_js(m, v, dicas)
     return m
+
+
+def _caixa_svg(v: Vista, caixa) -> list:
+    """A caixa (lon mín., lat mín., lon máx., lat máx.) em unidades do SVG, [x0, y0, x1, y1]: o zoom do clique no estado."""
+    x0, y0 = v.ponto(caixa[3], caixa[0])
+    x1, y1 = v.ponto(caixa[1], caixa[2])
+    return [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)]
+
+
+def _dados_js(m: dict, v: Vista, dicas: dict) -> dict:
+    """O que o JavaScript do mapa lê da página: as dicas das usinas, o nome e a caixa (em unidades do desenho) de cada estado
+    para o clique aproximar, o que cada classe de calor quer dizer, os nomes das fontes por extenso e o giro do modo TV (a próxima
+    atualização vai no atributo data-proxima-s da página).
+    Nenhum número de latitude ou longitude: só posições no desenho, como o `cx`/`cy` dos pontos."""
+    caixas = {}
+    try:
+        caixas = {e.sigla: {"nome": e.nome, "caixa": _caixa_svg(v, e.caixa)} for e in estados() if v.cruza(e.caixa)}
+    except (ValueError, OSError):
+        pass
+    calor = {}
+    for chave, camada, unidade in (("risco", m["calor_risco"], "risco de fogo de 0 a 1"),
+                                   ("densidade", m["calor_densidade"], "focos por 1.000 km²")):
+        if camada and camada.get("classes"):
+            calor[chave] = {"classes": {str(c["id"]): f"{c['rotulo']}: {c['faixa']} ({unidade})" for c in camada["classes"]},
+                            "lado_km": camada["lado_km"]}
+    return {"usinas": dicas, "ufs": caixas, "calor": calor, "nomes": m["nomes"], "regiao": m["regiao"],
+            "giro": list(GIRO) if m["girar"] else [], "girar": m["girar"] or 0}

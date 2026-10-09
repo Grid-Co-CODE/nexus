@@ -120,7 +120,7 @@ def test_sem_alerta_com_fonte_faltando_nao_diz_sem_alerta(leituras, nasa):
     leituras(focos=lei_focos(), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}))              # o INMET está fora
     v = pagina()
     assert (v["nivel"], v["rotulo"]) == ("duvida", "Sem leitura completa")
-    assert v["faltando"] == ["avisos do INMET"] and v["alertas"]["avisos_vazio"] == "Sem leitura dos avisos do INMET"
+    assert v["faltando"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"] and v["alertas"]["avisos_vazio"] == "Sem leitura dos avisos do Instituto Nacional de Meteorologia (INMET)"
 
 
 def test_sem_alerta_com_fonte_pela_metade_diz_nas_fontes_lidas(leituras, nasa):
@@ -133,7 +133,7 @@ def test_com_alerta_o_nivel_vale_mesmo_com_fonte_faltando(leituras, nasa):
     nasa(lei_nasa())
     leituras(focos=lei_focos(foco_a(1.0)), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}))
     v = pagina()
-    assert (v["nivel"], v["rotulo"]) == ("agir", "Agir agora") and v["faltando"] == ["avisos do INMET"]
+    assert (v["nivel"], v["rotulo"]) == ("agir", "Agir agora") and v["faltando"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"]
 
 
 def test_o_bloco_de_alertas_diz_o_que_ha_e_o_que_nao_ha(leituras, nasa):
@@ -146,14 +146,14 @@ def test_o_bloco_de_alertas_diz_o_que_ha_e_o_que_nao_ha(leituras, nasa):
                                                                        ("D+3", "0,10", "n")]
     tudo_lido(leituras)
     a = pagina()["alertas"]
-    assert a["avisos"] == [] and a["avisos_vazio"] == "Nenhum aviso do INMET sobre esta usina" and a["foco"] == "Nenhum foco a até 5 km"
+    assert a["avisos"] == [] and a["avisos_vazio"] == "Nenhum aviso do Instituto Nacional de Meteorologia (INMET) sobre esta usina" and a["foco"] == "Nenhum foco a até 5 km"
 
 
 def test_sem_leitura_dos_focos_e_do_risco_o_bloco_nao_inventa(leituras, nasa):
     nasa(lei_nasa())
     leituras(avisos=lei_avisos())
     a = pagina()["alertas"]
-    assert a["foco"] == "Sem leitura dos focos do INPE" and a["dias"] is None and a["risco_vazio"] == "Sem leitura do risco de fogo do INPE"
+    assert a["foco"] == "Sem leitura dos focos do Instituto Nacional de Pesquisas Espaciais (INPE)" and a["dias"] is None and a["risco_vazio"] == "Sem leitura do risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)"
 
 
 def test_sem_dado_de_risco_nos_quatro_dias_diz_a_causa(leituras, nasa):
@@ -175,7 +175,7 @@ def test_as_fontes_da_pagina_dizem_de_quando_e_o_dado(leituras, nasa):
     tudo_lido(leituras)
     v = pagina()
     assert [f["id"] for f in v["fontes"]] == ["inmet", "focos", "risco", "power"] and [f["estado"] for f in v["fontes"]] == ["ok"] * 4
-    assert "lido às 15:00" in v["fontes"][0]["texto"] and v["fontes"][3]["texto"] == "NASA LaRC POWER · lida às 15:00 · publicada até 02/10"
+    assert "lido às 15:00" in v["fontes"][0]["texto"] and v["fontes"][3]["texto"] == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: lida às 15:00 · publicada até 02/10"
 
 
 # ── a irradiação ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ def test_leitura_boa_da_nasa_traz_grafico_mes_tabela_e_a_fonte(leituras, nasa):
     tudo_lido(leituras)
     nasa(lei_nasa())
     ir = pagina()["irradiacao"]
-    assert ir["estado"] == "ok" and ir["texto"] == "NASA LaRC POWER · lida às 15:00 · publicada até 02/10" and ir["erro"] == ""
+    assert ir["estado"] == "ok" and ir["texto"] == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: lida às 15:00 · publicada até 02/10" and ir["erro"] == ""
     g = ir["grafico"]
     assert g["viewbox"] == "0 0 620 270" and len(g["nasa"]["trechos"]) == 1 and len(g["nasa"]["trechos"][0].split()) == 26
     assert g["faixa"] is not None and "publicado até 02/10" in g["descricao"]
@@ -240,7 +240,7 @@ def test_a_nasa_nao_publicou_nenhum_dia_da_janela_inteira(leituras, nasa):
     nasa(lei_nasa(serie_nasa(ate=date(2026, 8, 1))))
     ir = pagina()["irradiacao"]
     assert ir["estado"] == "ok" and ir["grafico"] is None and ir["tabela"] == []
-    assert ir["texto"] == "NASA LaRC POWER · lida às 15:00"
+    assert ir["texto"] == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: lida às 15:00"
     assert ir["mes"]["texto"] == "A NASA não publicou nenhum dia nos últimos 40 dias" and ir["mes"]["valor"] == "—"
 
 
@@ -248,7 +248,7 @@ def test_a_nasa_fora_sem_nenhuma_leitura_boa(leituras, nasa):
     tudo_lido(leituras)
     nasa(L.Leitura(None, None, erro="HTTP 503"))
     ir = pagina()["irradiacao"]
-    assert ir["estado"] == "fora" and ir["texto"] == "NASA POWER fora agora; ainda sem leitura boa" and ir["erro"] == "HTTP 503"
+    assert ir["estado"] == "fora" and ir["texto"] == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: fora agora; ainda sem leitura boa" and ir["erro"] == "HTTP 503"
     assert ir["grafico"] is None and ir["mes"] is None and ir["tabela"] == []
     assert pagina()["nivel"] == "sem"                                              # os alertas não dependem da NASA
 
@@ -257,7 +257,7 @@ def test_a_nasa_lendo_a_pagina_volta_em_10_s(leituras, nasa):
     tudo_lido(leituras)
     nasa(L.Leitura(None, None, erro=L.LENDO))
     v = pagina()
-    assert v["irradiacao"]["estado"] == "lendo" and v["irradiacao"]["texto"].startswith("Lendo a NASA POWER") and v["recarrega_em"] == 10
+    assert v["irradiacao"]["estado"] == "lendo" and v["irradiacao"]["texto"].startswith("Lendo a irradiação do Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER)") and v["recarrega_em"] == 10
     nasa(lei_nasa())
     assert pagina()["recarrega_em"] == 60
 
@@ -265,7 +265,7 @@ def test_a_nasa_lendo_a_pagina_volta_em_10_s(leituras, nasa):
 def test_fonte_de_alerta_lendo_tambem_encurta_a_recarga(leituras, nasa):
     nasa(lei_nasa())
     leituras(avisos=L.Leitura(None, None, erro=L.LENDO), focos=lei_focos(), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}))
-    assert pagina()["recarrega_em"] == 10 and pagina()["lendo"] == ["avisos do INMET"]
+    assert pagina()["recarrega_em"] == 10 and pagina()["lendo"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"]
 
 
 def test_a_nasa_velha_mostra_a_ultima_leitura_boa_com_a_hora(leituras, nasa):
@@ -273,7 +273,7 @@ def test_a_nasa_velha_mostra_a_ultima_leitura_boa_com_a_hora(leituras, nasa):
     velha = L.Leitura(serie_nasa(), REF.timestamp() - 3600 * 20, erro="tempo esgotado", velha=True)           # 19:00 de ontem
     nasa(velha)
     ir = pagina()["irradiacao"]
-    assert ir["estado"] == "velha" and ir["texto"] == "NASA POWER fora agora; última leitura boa às 05/10 19:00" and ir["erro"] == "tempo esgotado"
+    assert ir["estado"] == "velha" and ir["texto"] == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: fora agora; última leitura boa às 05/10 19:00" and ir["erro"] == "tempo esgotado"
     assert ir["grafico"] is not None and ir["mes"]["valor"] == "3,0"                  # a série boa continua valendo, dita velha
 
 

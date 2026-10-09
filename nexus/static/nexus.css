@@ -42,6 +42,14 @@
   /* séries dos gráficos e o mapa */
   --serie-sujidade:#7fb8ff; --serie-vegetacao:#a3d900; --serie-nasa:#c3cad7; --serie-etm:#6ec1e4;
   --mapa-mar:#0d1526; --mapa-terra:#1c2640; --mapa-borda:rgba(255,255,255,.22); --mapa-sigla:rgba(233,238,246,.42);
+  /* as camadas de calor do Mapa de risco (09/10/2026): uma rampa por camada, do menor ao maior. No escuro, o mais alto é o mais
+     claro (brilha sobre o navy) e fica abaixo da luz dos pontos das usinas; um matiz por rampa (risco: âmbar a vermelho; densidade
+     de focos: petróleo a ciano, para não se confundir com o risco nem com o semáforo das usinas). Conferidas com o validador do
+     dataviz (luminosidade monótona, passos de 0,065, um matiz só); o primeiro passo fica perto da terra de propósito, mas
+     distinto dela (o "sem dado" é a terra sem cor) */
+  --calor-risco-1:#503f2b; --calor-risco-2:#724a26; --calor-risco-3:#985224; --calor-risco-4:#bf582b; --calor-risco-5:#e75b3c;
+  --calor-densidade-1:#234950; --calor-densidade-2:#1e5e68; --calor-densidade-3:#0e7580; --calor-densidade-4:#068b95;
+  --calor-densidade-5:#09a2a9;
   --clarao-a04:rgba(255,255,255,.04); --clarao-a05:rgba(255,255,255,.05); --clarao-a08:rgba(255,255,255,.08);
   /* sombra, véu, contador, cartão, barra de rolagem e o fundo navy do logo */
   --sombra:rgba(0,0,0,.35); --veu:rgba(9,13,24,.55); --contador-fundo:rgba(0,0,0,.18);
@@ -83,6 +91,10 @@
   /* séries e mapa: o mar azulado e a terra branca; a sigla do estado passa 4,5:1 também sobre a mancha de um aviso */
   --serie-sujidade:#1b64c4; --serie-vegetacao:#4a7300; --serie-nasa:#64748b; --serie-etm:#0e7490;
   --mapa-mar:#e4ebf3; --mapa-terra:#ffffff; --mapa-borda:rgba(15,23,42,.28); --mapa-sigla:rgba(31,41,55,.8);
+  /* no claro, o mais alto é o mais escuro, e fica mais claro que os pontos das usinas (que são o tom de texto do semáforo) */
+  --calor-risco-1:#f3e0c6; --calor-risco-2:#efc499; --calor-risco-3:#eda570; --calor-risco-4:#eb834d; --calor-risco-5:#e55d30;
+  --calor-densidade-1:#c9eaf1; --calor-densidade-2:#a0d8e5; --calor-densidade-3:#74c5db; --calor-densidade-4:#49b2d1;
+  --calor-densidade-5:#109dc5;
   --clarao-a04:rgba(15,23,42,.04); --clarao-a05:rgba(15,23,42,.04); --clarao-a08:rgba(15,23,42,.06);
   --sombra:rgba(15,23,42,.16); --veu:rgba(15,23,42,.32); --contador-fundo:rgba(15,23,42,.08);
   --cartao-brilho:rgba(255,255,255,.8); --cartao-brilho-alto:rgba(255,255,255,.9);

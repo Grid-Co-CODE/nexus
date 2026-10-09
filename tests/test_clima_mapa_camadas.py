@@ -333,15 +333,15 @@ def test_sem_leitura_do_inmet_a_camada_some_e_quem_ficaria_sem_alerta_vira_sem_l
     assert m["contagem"] == {"agir": 1, "atencao": 0, "sem": 0, "nx": 5}
     nx = por_nome(m)["Usina Teta"]
     assert nx["nivel"] == "nx" and "Nível: Sem leitura completa" in nx["titulo"]
-    assert "sem leitura de avisos do INMET; não dá para dizer que não há alerta" in nx["titulo"]
+    assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET); não dá para dizer que não há alerta" in nx["titulo"]
     assert por_nome(m)["Usina Delta"]["nivel"] == "agir"                      # o que as outras fontes provam continua valendo
-    assert m["sem_leitura_de"] == "avisos do INMET" and m["faltando"] == ["avisos do INMET"] and m["completa"] is False
+    assert m["sem_leitura_de"] == "avisos do Instituto Nacional de Meteorologia (INMET)" and m["faltando"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"] and m["completa"] is False
 
 
 def test_fonte_lendo_diz_lendo_e_a_tela_volta_em_10_segundos(leituras):
     leituras(avisos=L.Leitura(None, None, erro=L.LENDO), focos=lei_focos(), risco=lei_risco(risco_baixo()))
     m = montar()
-    assert m["camada_avisos"]["estado"] == "lendo" and m["lendo"] == ["avisos do INMET"] and m["faltando"] == []
+    assert m["camada_avisos"]["estado"] == "lendo" and m["lendo"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"] and m["faltando"] == []
     assert m["recarrega_em"] == 10
     tudo_instalado(leituras)
     assert montar()["recarrega_em"] == 60
@@ -352,21 +352,21 @@ def test_sem_leitura_dos_focos_somem_os_pontos_e_os_aneis(leituras):
     m = montar()
     fo = m["camada_focos"]
     assert fo["estado"] == "fora" and fo["d"] == "" and fo["aneis"] == [] and fo["n"] == 0
-    assert m["contagem"]["nx"] == 6 and m["sem_leitura_de"] == "focos do INPE"
+    assert m["contagem"]["nx"] == 6 and m["sem_leitura_de"] == "focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE)"
 
 
 def test_sem_leitura_do_risco_de_fogo_ninguem_fica_com_o_verde(leituras):
     leituras(avisos=lei_avisos(aviso(3, "Vendaval", ALFA)), focos=lei_focos(), risco=L.Leitura(None, None, erro="HTTP 503"))
     m = montar()
-    assert m["contagem"] == {"agir": 1, "atencao": 0, "sem": 0, "nx": 5} and m["sem_leitura_de"] == "risco de fogo do INPE"
+    assert m["contagem"] == {"agir": 1, "atencao": 0, "sem": 0, "nx": 5} and m["sem_leitura_de"] == "risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)"
     assert m["camada_avisos"]["estado"] == "ok" and m["camada_focos"]["estado"] == "ok"
 
 
 def test_duas_fontes_sem_leitura_dizem_as_duas_na_ordem_do_painel(leituras):
     leituras(avisos=L.Leitura(None, None, erro="x"), focos=lei_focos(), risco=L.Leitura(None, None, erro=L.LENDO))
     m = montar()
-    assert m["sem_leitura_de"] == "avisos do INMET e risco de fogo do INPE"
-    assert "sem leitura de avisos do INMET e risco de fogo do INPE" in por_nome(m)["Usina Teta"]["titulo"]
+    assert m["sem_leitura_de"] == "avisos do Instituto Nacional de Meteorologia (INMET) e risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)"
+    assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET) e risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)" in por_nome(m)["Usina Teta"]["titulo"]
 
 
 def test_tudo_lido_mas_com_fonte_parcial_o_verde_fica_e_diz_nas_fontes_lidas(leituras):
@@ -384,7 +384,7 @@ def test_leitura_velha_continua_no_mapa_e_o_painel_diz_a_hora_dela(leituras):
     leituras(avisos=velha, focos=lei_focos(), risco=lei_risco(risco_baixo()))
     m = montar()
     assert m["camada_avisos"]["estado"] == "ok" and m["camada_avisos"]["n_vigor"] == 1
-    assert "INMET fora agora; última leitura boa às 14:00" in m["fontes"][0]["texto"]
+    assert "Instituto Nacional de Meteorologia (INMET) · avisos: fora agora; última leitura boa às 14:00" in m["fontes"][0]["texto"]
     assert "dado de 14:00" in m["camada_avisos"]["qualifica"]
 
 

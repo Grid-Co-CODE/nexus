@@ -29,7 +29,8 @@ ou grupo de conversa.
   `apiprevmet3.inmet.gov.br` (avisos meteorológicos do INMET), `dataserver-coids.inpe.br` (focos de queimada e risco
   de fogo do INPE) e `power.larc.nasa.gov` (irradiação diária da NASA POWER): os três últimos são da tela Performance →
   Clima e risco, só HTTPS (443), leitura pública, sem chave. A NASA só é chamada pela PÁGINA de uma usina (um pedido por
-  usina, guardado por 12 h), nunca pela tela principal. Sem eles a tela abre e mostra as fontes como "fora agora".
+  usina, guardado por 12 h), nunca pela tela principal. Sem eles a tela abre e mostra as fontes como "fora agora". O mapa de
+  calor do risco de fogo (Mapa de risco, 09/10/2026) usa o mesmo `dataserver-coids.inpe.br`: nenhuma saída nova.
 - Disco: cada geração da programação semanal guarda ~65 MB em `dados/pcm/geracoes/` (uma por semana).
 - Fuso `America/Sao_Paulo` (o `deploy/nexus.service` já define).
 
@@ -191,7 +192,11 @@ A tela cruza as usinas em operação do cadastro (a latitude e a longitude são 
 Nexus com a `NEXUS_CHAVE_CADASTRO`, e nunca aparecem na tela) com os avisos do INMET, os focos de queimada e o risco de
 fogo do INPE. **Não grava nada**: nem em `dados/`, nem no banco; cada fonte fica só na memória do processo (avisos 30 min,
 focos 10 min, risco de fogo 6 h, ou 15 min enquanto o arquivo do INPE não é o de hoje: ele sai por volta das 06:30; depois
-de uma falha, 60 s sem insistir). Reiniciar o Nexus esvazia o cache e a primeira visita relê tudo (~10 s). A PÁGINA de cada
+de uma falha, 60 s sem insistir). Reiniciar o Nexus esvazia o cache e a primeira visita relê tudo (~10 s). O **Mapa de risco**
+(`/t/performance/clima/mapa`, e o modo TV `?tv=1` para o video wall) lê as mesmas fontes; a camada "Risco de fogo" lê a área do Brasil
+no mesmo arquivo do INPE, numa thread ao fundo, só quando alguém a liga (ou o modo TV gira por ela): ~8 MB e ~10 s (7 s de CPU) por
+dia de previsão escolhido, uma vez por arquivo (o INPE publica uma vez por dia); depois, a cada 6 h, só o cabeçalho (64 KB) para
+ver se o arquivo mudou. Fica na memória (até ~10 MB com os quatro dias); nada vai para o disco nem para o banco. A PÁGINA de cada
 usina (`/t/performance/clima/usina/<id>`) acrescenta a irradiação diária da **NASA POWER** (`power.larc.nasa.gov`): um pedido
 por usina, só quando alguém abre a página dela, guardado por 12 h na memória (a tela principal nunca chama a NASA); a latitude
 e a longitude vão no pedido com 2 casas. Cada falha de fonte vai ao log (`journalctl -u nexus`) como uma linha de aviso,

@@ -75,9 +75,20 @@ plataforma local — mesmo número do card nos dois no mesmo minuto.
 Aba Performance → Clima e risco (`/t/performance/clima`). O Levi trouxe o pacote `gridco_meteo` (referência, fora do
 repositório) e escolheu (06/10) começar pelos **alertas**: avisos do INMET, focos de queimada do INPE e risco de fogo do
 INPE, todos públicos e de uso livre. A tela cruza isso com as usinas em operação do cadastro e se atualiza sozinha
-(recarrega a cada 60 s; o que vai à rede é decidido pelo cache, não pela recarga). Atribuição no rodapé: "Dados: INMET,
-INPE (Programa Queimadas)". A **página de cada usina** (`/t/performance/clima/usina/<id>`, 07/10) acrescenta a irradiação
-diária da NASA POWER (ver abaixo); a tela principal nunca chama a NASA.
+(recarrega a cada 60 s; o que vai à rede é decidido pelo cache, não pela recarga). A **página de cada usina**
+(`/t/performance/clima/usina/<id>`, 07/10) acrescenta a irradiação diária da NASA POWER (ver abaixo); a tela principal nunca
+chama a NASA.
+
+**Fonte por extenso, de um lugar só (09/10/2026, Levi, olhando o bloco "Fontes" do mapa: "Quero as fontes por extenso também, não
+só sigla").** O nome de cada fonte mora em `fontes.NOMES` e sai por `fontes.extenso()`: "Instituto Nacional de Meteorologia
+(INMET)", "Instituto Nacional de Pesquisas Espaciais (INPE)", "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA
+POWER)" e "Instituto Brasileiro de Geografia e Estatística (IBGE)". A lista, a página da usina, o mapa (fontes, legendas, dicas,
+rodapé) e o modo TV escrevem por ele: no Python, `visao.NOME_LONGO` e `visao.ROTULO_DA_FONTE` (a linha de cada fonte começa pelo
+nome por extenso, "... (INMET) · avisos: lido às ..."); nos templates da torre, `fonte_nome.<fonte>` (context processor de
+`clima_tela.py`) e, no mapa, `v.nomes`. O qualificador dos números da faixa também ("avisos do ... (INMET): parcial"). A sigla
+sozinha só fica em mensagem de erro e no log (a linha da fonte que a mostra já começa pelo nome). `tests/test_clima_nomes.py` falha
+se o nome por extenso aparecer escrito à mão em outro arquivo do `nexus/` e confere, nas telas, que a primeira sigla vem com o nome.
+A citação que a NASA pede ("NASA LaRC POWER") continua no rodapé da página da usina.
 
 **A tela (leitura rápida, aprovada pelo Levi em 07/10/2026; didática desde 09/10/2026), na ordem:** cabeçalho (filtro de
 cliente, "atualizada às HH:MM"); **faixa de 4 números** (Agir agora, Atenção, Sem alerta, Cobertura), cada nível com "O que
@@ -242,16 +253,20 @@ com `int32` no lugar de `double`: os bytes são os mesmos) antes de confiar.
 
 ## Mapa de risco (07/10/2026): o Clima e risco num mapa do Brasil, só leitura
 
-Aba Performance → Mapa de risco (`/t/performance/clima/mapa`, filha da lista; o cabeçalho tem "Ver a lista", e o da lista tem "Ver no mapa"). Pedido do Levi
+Aba Performance → Mapa de risco (`/t/performance/clima/mapa`, filha da lista; o cabeçalho tem "Ver a lista" e "Modo TV", e o da lista tem "Ver no mapa"). Pedido do Levi
 (07/10), como tela à parte: a lista segue sendo a leitura detalhada, o mapa mostra ONDE. **Não é outra conta:**
 lê as MESMAS três fontes pelo MESMO cache (visitar a lista e o mapa não faz pedido a mais à rede) e o nível de cada usina vem da
 mesma regra (`alertas.nivel_da_usina`: Agir agora = vermelho, Atenção = amarelo, Sem alerta = verde).
 
-Código: `clima/mapa.py` (sem Flask: contorno, projeção, recorte, caminho e `montar`), `torres/performance/mapa_tela.py` (rota),
-`.../templates/performance/mapa.html`, `static/clima-mapa.css` (soma-se ao `clima.css`, que traz os tokens `--cl-*`, o
-cabeçalho, o painel das fontes e o rodapé). Provas: `tests/test_clima_mapa.py` (contorno, projeção, vista, caminho),
-`test_clima_mapa_camadas.py` (o modelo), `test_torre_performance_mapa.py` (a tela e a cadeia de verdade, por sessão falsa) e o
-mundo inventado de `tests/clima_mapa_mundo.py`. O id da `Tela` é `clima/mapa`, **com barra**, para o endereço ser esse (o
+Código: `clima/mapa.py` (sem Flask: contorno, projeção, recorte, caminho, o estado da tela e `montar`), `clima/calor.py` (as
+camadas de calor, 09/10), `torres/performance/mapa_tela.py` (rota; `?tv=1` troca o template), os templates
+`performance/mapa.html` (com a casca) e `mapa_tv.html` (sem), que dividem os pedaços `_mapa_barra.html`, `_mapa_legenda.html`,
+`_mapa_svg.html` e `_mapa_tabela.html`, `static/clima-mapa.css` (soma-se ao `clima.css`, que traz os tokens `--cl-*`, o
+cabeçalho, o painel das fontes e o rodapé) e `static/clima-mapa.js` (a interação, 09/10). Provas: `tests/test_clima_mapa.py`
+(contorno, projeção, vista, caminho), `test_clima_mapa_camadas.py` e `test_clima_mapa_calor.py` (o modelo), `test_clima_calor.py`
+(a leitura da área no COG, as classes, a densidade, a máscara, as faixas e as rampas de cor), `test_torre_performance_mapa.py` e
+`test_torre_performance_mapa_tv.py` (a tela, o modo TV e a cadeia de verdade, por sessão falsa), `test_clima_mapa_js.py` (as contas
+do JavaScript, no node) e o mundo inventado de `tests/clima_mapa_mundo.py`. O id da `Tela` é `clima/mapa`, **com barra**, para o endereço ser esse (o
 placeholder `/<tela_id>` não casa com barra, e a view própria responde); por isso a vitrine estática exporta
 `t/performance/clima/mapa/index.html`, um nível abaixo, e o teste da vitrine conta `t/**/index.html`.
 
@@ -269,10 +284,11 @@ continente e o rótulo de cada estado dentro dele. O teste do continente existe 
 Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% de oceano, e quem trocou decide.
 
 **Regras do desenho**
-- **SVG do servidor, sem JavaScript, sem biblioteca, sem mapa de terceiros.** O viewBox tem SEMPRE 1000 de largura e a altura sai
-  da geografia: o CSS decide raios em unidades do SVG e traços em pixels de tela (`vector-effect:non-scaling-stroke`), e o
-  contorno fica fino em qualquer largura. O SVG ocupa 100% da largura (`height:auto`, `max-height:84vh` no desktop); abaixo de
-  820 px entram o `--mp-k` e o fim do `max-height`.
+- **SVG do servidor, sem biblioteca de mapa, sem mapa de terceiros, sem CDN novo.** O viewBox tem SEMPRE 1000 de largura e a
+  altura sai da geografia: o CSS decide raios em unidades do SVG e traços em pixels de tela (`vector-effect:non-scaling-stroke`), e
+  o contorno fica fino em qualquer largura. O SVG ocupa 100% da largura (`height:auto`, `max-height:84vh` no desktop); abaixo de
+  820 px entram o `--mp-k` e o fim do `max-height`. O `clima-mapa.js` (09/10) só ENFEITA: sem ele, o mapa é o do servidor, os
+  controles são links e a página se recarrega (o `<meta refresh>` foi para dentro de `<noscript>`).
 - **Legenda à esquerda, mapa no meio, tabela à direita** (Levi, 09/10/2026: "jogue essa visão do anexo para a esquerda do mapa e
   na direita uma tabela com o nome das usinas, os riscos e uma forma resumida do motivo do risco"). Container query no `.mp`
   (conta a largura da tela, não a da janela): o padrão é uma coluna com o mapa primeiro; a partir de 760 px, legenda e mapa lado a
@@ -290,8 +306,8 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
   para o mesmo ponto fora: o Brasil inteiro pesa 42 mil caracteres (a metade do absoluto). A página do Brasil, com 154 usinas,
   5 mil focos e 60 avisos (dado inventado do tamanho do real, 07/10): 36 ms no servidor, 200 KB (49 KB comprimido); uma região,
   de 11 a 22 ms. A primeira visita depois do boot soma ~25 ms (lê o JSON e escreve os caminhos, que ficam guardados por vista).
-- **Camadas, de trás para frente:** estados (com a sigla, que some no celular na visão do Brasil) → avisos do INMET → focos do
-  INPE → anéis → usinas. O aviso é um grupo por nível, e a transparência é do GRUPO: polígonos do mesmo nível não se somam onde se
+- **Camadas, de trás para frente:** estados (com a sigla, que some no celular na visão do Brasil) → a camada de calor (quando é
+  ela o fundo) e as divisas por cima dela → avisos do INMET → siglas → focos do INPE → anéis → usinas → o aro da usina escolhida. O aviso é um grupo por nível, e a transparência é do GRUPO: polígonos do mesmo nível não se somam onde se
   cruzam (cem avisos de baixa umidade virariam uma mancha opaca). O aviso que AINDA VAI COMEÇAR vai só no contorno tracejado: a
   usina em Atenção por aviso futuro precisa ter o motivo visível. O vencido não desenha. Os focos são pontos de ponta redonda
   (`M x y h.01` num `<path>` só: 5 mil focos pesam 70 KB, como `<circle>` seriam 190 KB; foco em cima de foco, no desenho, vira um
@@ -306,7 +322,8 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
   some): sem ler os avisos, não dá para dizer que não há aviso. Fonte lida só em parte, velha ou atrasada: a camada fica, o verde
   vira "Sem alerta nas fontes lidas" e a legenda traz o qualificador ("parcial", "dado de HH:MM", "N avisos sem polígono utilizável
   não aparecem"). O painel de frescor é o MESMO CÓDIGO da lista (`visao._fonte_inmet/_fonte_focos/_fonte_risco`), e há teste que
-  compara os dois. O risco de fogo não é desenhado: entra na cor da usina (Atenção, se alto ou crítico em algum dos 4 dias).
+  compara os dois. O risco de fogo entra na cor da usina (Atenção, se alto ou crítico em algum dos 4 dias) e, desde 09/10, também é
+  uma camada de fundo (abaixo); a leitura da camada diz a hora dela na própria legenda, não no painel.
 - **Contorno que não abre** (arquivo ausente ou quebrado: `estados()` levanta `ValueError` ou `OSError`): a tela NÃO dá 500. O
   mapa sai sem as divisas e sem o recorte por região (a vista do Brasil vem de `LIMITES_BRASIL`, números fixos que um teste
   confere contra o arquivo), com a nota "O contorno dos estados não abriu...", e o motivo vai ao log (`clima: o contorno dos
@@ -328,10 +345,70 @@ quebra `test_o_css_do_mapa_so_usa_cores_que_o_clima_css_ou_o_nexus_css_definem`.
 o Perigo Potencial do mapa usa o âmbar de área (`--alerta-cheio`): o `--cl-atencao` do claro é o âmbar escuro de texto, e a 24%
 virava mancha marrom. A regra geral (cor só por token) está em `nexus/casca/CLAUDE.md`, seção Tema.
 
-**O que o mapa não faz, de propósito:** zoom e arrasto (o recorte por região resolve, sem JS); filtro por cliente (a lista tem);
-risco de fogo como camada (é um raster de pixels de ~1 km, e o Nexus lê só o pixel de cada usina); mostrar a coordenada; ilhas
-oceânicas (o contorno mínimo não as tem: uma usina ali cai em "fora deste recorte").
+**Interação, camadas e modo TV (09/10/2026).** Levi: "Quero o mapa mais interativo", "Além de tempestade conseguimos uma outra
+visão tipo um mapa de calor no mapa? quanto mais versatilidade melhor!" e "Quero visão de tela cheia para colocar no video wall".
+Celular ficou fora (Levi, 09/10: "não precisa de no celular, por hora"): nada foi feito só para ele, e o que já funcionava continua
+(o toque na usina abre a página, a página rola, sem rolagem lateral).
+- **O estado mora no endereço** (`mapa.estado_da_tela`, validado: o desconhecido cai no padrão): `fundo` (avisos, o padrão; risco;
+  densidade; nenhum), `ver` (usinas, focos, siglas; ausente = todos), `dia` (0 a 3, o dia do risco; ausente = o "Hoje" do arquivo),
+  `cliente` (o mesmo filtro da lista), `ocultar` (níveis escondidos), `sem_eventos` (eventos do INMET escondidos), `regiao`, `tv` e
+  `girar`. Cada controle é um link com o resto do estado (`mapa.parametros`; o estado padrão é o endereço puro, e os links de
+  região são os de antes). Com JavaScript, o clique muda o desenho na hora e relê a página no endereço novo.
+- **A camada de FUNDO é uma por vez:** duas camadas de área juntas (o vermelho do aviso e o do calor) viram uma mancha só. Por cima,
+  usinas, focos e siglas ligam e desligam à vontade. Os níveis (legenda) e os eventos dos avisos também escondem e mostram, no mapa
+  e na tabela (`:has()` no CSS).
+- **Risco de fogo do INPE em quadrados** (`calor.py`, `fontes.inpe_risco_grade`, `GeoTiff.somar_em_blocos`): o MESMO arquivo do risco
+  por usina, lido na área do Brasil (só as tiles que encostam no contorno: 148 de 289 em 09/10/2026, 8,1 MB), em blocos de 0,08 grau
+  (8 pixels); no Brasil inteiro, 2 x 2 (0,16 grau, ~18 km). A cor é a MÉDIA dos pixels com dado (soma e contagem, nunca média de
+  médias), nas cinco classes da régua das usinas (`alertas.classe_risco_fogo`); quadrado com menos de 1/4 dos pixels com dado fica
+  SEM COR (cidade, água: o INPE não calcula), e a legenda diz quanto da área ficou assim. A usina usa o pixel dela, então a cor do
+  ponto pode ser outra que a do quadrado (a legenda diz). Lido AO FUNDO (`leitura.risco_grade`, um cache por dia, TTL do risco): a
+  primeira visita diz "lendo" e o mapa volta em 10 s. Medido em 09/10/2026 no arquivo real: 10,5 s e 7,1 s de CPU (o LZW em Python)
+  numa thread, uma vez por arquivo; ao vencer, relê só o cabeçalho (64 KB) e, com o mesmo Last-Modified, não baixa tile nenhuma.
+  Só é lido quando alguém liga a camada (ou o modo TV gira por ela); os quatro dias são arquivos à parte, lidos só se escolhidos.
+- **Densidade de focos** (`calor.densidade`): os MESMOS focos da camada de pontos, num núcleo quártico (50 km no Brasil inteiro, 25 km
+  numa região: com 25 km no Brasil cada foco virava um pontinho de 2 pixels), em focos por 1.000 km², em cinco classes fixas (0,5,
+  2, 5 e 20). Sem foco no raio, zero e sem cor ("nenhum foco a até X km"). A legenda diz quanto um foco sozinho dá no centro.
+- **O desenho do calor** é vetorial: uma classe é UM `<path>` de faixas horizontais (`M x y h w`, as seguintes da linha por `m dx 0 h
+  w`, medidas do ponto já arredondado), com o traço da altura do quadrado mais 0,3 (`calor.SOBREPOR`: sem isso ficava uma fresta
+  escura entre linhas, vista em 09/10), recortado pelo contorno (`<clipPath>` com `<use>` de cada estado); a máscara do Brasil
+  (varredura por linha, dilatada em 1 quadrado) tira do desenho o que é mar ou vizinho. O desenho de cada leitura e recorte fica
+  guardado (`mapa._guardado`): 0,14 s no Brasil inteiro com o arquivo real, uma vez. As rampas de cor (`--calor-risco-1..5`,
+  `--calor-densidade-1..5`, nos dois temas) passaram no validador do skill de dataviz em modo ordinal (um matiz, luminosidade
+  monótona, passo >= 0,06; o primeiro passo encosta na terra de propósito, mas distinto dela); `test_clima_calor.py` repete a conta.
+  Sobre o risco, o foco vai em cinza (o laranja sumia no laranja).
+- **A interação** (`clima-mapa.js`): roda do mouse aproxima em volta do ponto, arrastar move, botões + / − / enquadrar / voltar, setas,
+  + − 0 e Backspace no teclado (o mapa recebe foco); clique no estado aproxima (a caixa dele, em unidades do desenho, vem no JSON da
+  página); a dica (usina: nome, nível, motivo e o que pesou, com a fonte por extenso; aviso, quadrado de calor, foco e estado também);
+  clique na usina marca a linha da tabela e o segundo clique abre a página (ctrl/cmd abre em outra aba; no celular o toque abre, como
+  antes); clique na linha (fora do link) marca a usina no mapa e a traz para a vista; o foco do teclado faz o mesmo; a busca leva até
+  a usina. O zoom só troca o viewBox; os pontos e as siglas não crescem com ele (`--mp-zp`, `--mp-zt`), e num mapa estreito (a 1440 px
+  ele tem ~390 px, com a tabela de 520) o ponto cresce até 1,8x (`--mp-k`). A dica não fica presa no mapa (cobria metade dele).
+- **A releitura sem recarregar, no ritmo dos caches:** cada `Leitura` diz quando vence (`vence_em`), e `visao.proxima_leitura_s` dá o
+  `data-proxima-s` da página (o vencimento do primeiro cache usado, mais 5 s; 10 s enquanto uma fonte é lida pela primeira vez; nunca
+  mais que 30 min). O JavaScript relê a MESMA URL com `redirect: "manual"` e troca só os pedaços `data-parte`, sem perder o zoom nem a
+  usina escolhida. Redirecionamento (o portão mandou para o Entrar) ou página sem o mapa = "a sessão terminou"; erro ou sem resposta =
+  "o Nexus não respondeu": a faixa diz desde quando é o dado e um véu (`--veu`) cobre o mapa, até a próxima leitura boa. A resposta vai
+  com `Cache-Control: no-store`.
+- **Tela cheia** (Fullscreen API): o palco (controles, legenda, mapa, tabela) ocupa a tela; o botão só aparece onde o navegador deixa.
+- **Modo TV** (`?tv=1`, `mapa_tv.html`): sem a casca (sem menu e sem topo; guarda anti-moldura e tema como na casca), sem rolagem,
+  a letra segue a altura da tela (`html.mp-tv-html{font-size:2.2vh}`: ~24 px em 1920 x 1080, ~48 px em 3840 x 2160), relógio, o
+  título da camada com a fonte por extenso, os três números (Agir agora, Atenção, Sem alerta), a tabela com as linhas que cabem e "e
+  mais N", e as fontes com "lido às" no rodapé. `girar=N` (10 a 600 s) alterna avisos, risco e densidade sozinho, sem pedir nada ao
+  servidor (as três vêm na página). Os controles aparecem ao mexer o mouse ou apertar uma tecla e somem em 6 s; o cursor some junto.
+  O login vale igual (a mesma rota; sem sessão vai para o Entrar e volta), e cada releitura renova a sessão de 12 h.
 
-Como provar: `python -m pytest -q tests/test_clima_mapa.py tests/test_clima_mapa_camadas.py tests/test_torre_performance_mapa.py`
-(63 + 62 + 59 testes, sem rede; 109 mutações no código, no template e no CSS de 07/10, todas mortas; em 09/10 a tabela e a legenda à esquerda ganharam 5 testes, e as mutações da ordem da tabela, por nível e por gravidade, morrem). Na tela: `/t/performance/clima/mapa` no desktop e a 375 px
-(sem rolagem lateral; o SVG a 100% da largura).
+**O que o mapa não faz, de propósito:** mostrar a coordenada; ilhas oceânicas (o contorno mínimo não as tem: uma usina ali cai em
+"fora deste recorte"); pinça no celular (fora do escopo de 09/10); a NASA POWER no mapa (um pedido por usina, 12 h: só na página da
+usina); quadrado de calor mais fino ao aproximar (o zoom do navegador amplia o desenho do recorte; uma região do servidor tem
+quadrados de 0,08 grau).
+
+Como provar: `python -m pytest -q tests/test_clima_mapa.py tests/test_clima_mapa_camadas.py tests/test_clima_mapa_calor.py
+tests/test_clima_calor.py tests/test_clima_nomes.py tests/test_clima_mapa_js.py tests/test_torre_performance_mapa.py
+tests/test_torre_performance_mapa_tv.py` (sem rede; os do JavaScript precisam do node). Na tela, com as fontes inventadas (o
+"mundo falso" da conferência, porta 5077): `/t/performance/clima/mapa` a 1440 px nos dois temas (zoom pela roda, dica, clique na
+usina e na linha, clique no estado, risco de fogo com a dica do quadrado, densidade, busca, teclado, filtro de nível, tela cheia) e
+`?tv=1` a 1920 x 1080 e 3840 x 2160 (sem rolagem, `?girar=15`, a sessão que cai), medindo os erros de JavaScript e a rolagem
+lateral. Abrir o mapa, medido em 09/10 com as mesmas fontes inventadas: servidor 24,7 -> 30,5 ms (HTML 201 -> 252 KB, 34 -> 42 KB
+com gzip); no navegador, DOMContentLoaded 578 -> 590 ms e load 742 -> 759 ms (o mapa fica pronto para a interação no próprio
+DOMContentLoaded).

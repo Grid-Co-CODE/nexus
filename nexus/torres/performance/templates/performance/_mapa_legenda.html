@@ -1,0 +1,107 @@
+{# A legenda do Mapa de risco, à esquerda do mapa (09/10/2026), a mesma na tela e no modo TV. Cada camada diz a fonte por extenso,
+   a hora da leitura e o que a cor quer dizer, com os números da escala; sem dado é sem cor, e a legenda diz. Os níveis das usinas e
+   os eventos dos avisos são botões que escondem e mostram (no mapa e na tabela): sem JavaScript, são links que recarregam com o
+   filtro no endereço. #}
+{% set av = v.camada_avisos %}
+{% set fo = v.camada_focos %}
+{% set cr = v.calor_risco %}
+{% set cd = v.calor_densidade %}
+{% set rota = 'torre_performance.mapa_de_risco' %}
+{% macro nivel(id, rotulo, n, ajuda) -%}
+<li><a class="mp-leg-filtro" href="{{ url_for('torre_performance.mapa_de_risco', **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}"></span><span class="mp-leg-txt"><strong>{{ rotulo }}</strong> <span class="mp-leg-n">{{ n }}</span><span class="mp-leg-ajuda">{{ ajuda }}</span></span></a></li>
+{%- endmacro %}
+<aside class="mp-legenda" aria-label="Legenda" data-parte="legenda">
+  <h2 class="mp-leg-h">Usinas{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>
+  <ul class="mp-leg-lista">
+    {{ nivel("agir", "Agir agora", v.contagem.agir, "foco a até 5 km, aviso Grande Perigo, ou aviso Perigo de um destes eventos: " ~ eventos|join(", ")) }}
+    {{ nivel("atencao", "Atenção", v.contagem.atencao, "qualquer outro aviso do " ~ v.nomes.inmet ~ ", em vigor ou futuro, ou risco de fogo alto ou crítico em algum dos quatro dias") }}
+    {# Com uma fonte sem leitura ninguém pode ser "Sem alerta": a linha some, e quem seria vira "Sem leitura completa" abaixo. #}
+    {% if not v.sem_leitura_de %}
+    {{ nivel("sem", v.rotulo_sem, v.contagem.sem, "nenhum aviso, foco a até 5 km nem risco de fogo alto") }}
+    {% endif %}
+    {% if v.contagem.nx %}
+    {{ nivel("nx", "Sem leitura completa", v.contagem.nx, "sem leitura de " ~ v.sem_leitura_de ~ ", não dá para dizer que não há alerta") }}
+    {% endif %}
+  </ul>
+  {% if v.ocultar %}<p class="mp-leg-nota mp-leg-nota--filtro">Escondidas: {% for n in ["agir", "atencao", "sem", "nx"] if n in v.ocultar %}{{ {"agir": "Agir agora", "atencao": "Atenção", "sem": "Sem alerta", "nx": "Sem leitura completa"}[n] }}{% if not loop.last %}, {% endif %}{% endfor %}. Clique de novo para mostrar.</p>{% endif %}
+
+  {% for f in (v.giro if v.girar else [v.fundo]) %}
+  <section class="mp-leg-camada" data-camada="{{ f }}">
+  {% if f == "avisos" %}
+    <h2 class="mp-leg-h">Avisos do {{ v.nomes.inmet }}</h2>
+    {% if av.estado == "ok" %}
+    <ul class="mp-leg-lista mp-leg-lista--curta">
+      <li><span class="mp-chave mp-chave--aviso mp-av-1"></span><div class="mp-leg-txt">Perigo Potencial</div></li>
+      <li><span class="mp-chave mp-chave--aviso mp-av-2"></span><div class="mp-leg-txt">Perigo</div></li>
+      <li><span class="mp-chave mp-chave--aviso mp-av-3"></span><div class="mp-leg-txt">Grande Perigo</div></li>
+      <li><span class="mp-chave mp-chave--aviso mp-chave--futuro mp-av-2"></span><div class="mp-leg-txt">Contorno tracejado: o aviso ainda vai começar</div></li>
+    </ul>
+    <p class="mp-leg-nota">{{ av.n_vigor }} em vigor e {{ av.n_futuros }} a começar{% if v.regiao != "brasil" %} neste recorte{% endif %}{% if av.lido %}, lidos às {{ av.lido }}{% endif %}.{% if av.ignorados %} {{ av.ignorados }} {{ "aviso sem polígono utilizável não aparece" if av.ignorados == 1 else "avisos sem polígono utilizável não aparecem" }} no mapa.{% endif %}{% for q in av.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
+    {% if av.eventos %}
+    <p class="mp-leg-sub" id="mp-eventos-r">Por evento: clique para esconder ou mostrar</p>
+    <ul class="mp-leg-eventos" aria-labelledby="mp-eventos-r">
+      {% for e in av.eventos %}<li><a class="mp-leg-evento" href="{{ url_for(rota, **v.links.sem_eventos[e.ev]) }}" role="button" aria-pressed="{{ 'false' if e.oculto else 'true' }}" data-acao="estado" data-ev="{{ e.ev }}"><span class="mp-chave mp-chave--aviso mp-av-{{ e.nivel }}"></span><span class="mp-leg-txt">{{ e.nome }} <span class="mp-leg-n">{{ e.n }}</span></span></a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% elif av.estado == "lendo" %}
+    <p class="mp-leg-nota mp-leg-nota--atencao"><strong>Avisos do {{ v.nomes.inmet }}:</strong> lendo agora, a camada aparece quando a leitura terminar.</p>
+    {% else %}
+    <p class="mp-leg-nota mp-leg-nota--fora"><strong>Avisos do {{ v.nomes.inmet }}:</strong> sem leitura boa, a camada não aparece no mapa.</p>
+    {% endif %}
+    <p class="mp-leg-nota mp-leg-nota--longa">O risco de fogo do {{ v.nomes.inpe }} entra na cor da usina (Atenção, quando alto ou crítico em algum dos quatro dias). Para vê-lo em quadrados, escolha a camada de fundo Risco de fogo.</p>
+  {% elif f == "risco" %}
+    <h2 class="mp-leg-h">Risco de fogo do {{ v.nomes.inpe }}</h2>
+    {% if cr %}
+    <div class="mp-dias" role="group" aria-label="Dia da previsão">{% for d in cr.dias %}<a class="mp-dia" href="{{ url_for(rota, **v.links.dia[d.i]) }}" data-acao="estado"{% if d.atual %} aria-current="true"{% endif %}>{{ d.nome }}</a>{% endfor %}</div>
+    {% if cr.estado == "ok" %}
+    <ul class="mp-escala" aria-label="Escala do risco de fogo, de 0 a 1">
+      {% for c in cr.classes %}<li><span class="mp-chave mp-chave--calor mp-cr-{{ c.id }}"></span><span class="mp-leg-txt"><strong>{{ c.rotulo }}</strong> {{ c.faixa }}<span class="mp-leg-pct">{{ c.pct }} da área</span></span></li>
+      {% endfor %}
+      <li><span class="mp-chave mp-chave--vazio"></span><span class="mp-leg-txt"><strong>Sem cor</strong> sem dado: o INPE não calcula onde não há vegetação (cidade, água){% if cr.sem_dado_pct %}<span class="mp-leg-pct">{{ cr.sem_dado_pct }} da área</span>{% endif %}</span></li>
+    </ul>
+    <p class="mp-leg-nota mp-leg-nota--longa">Cada quadrado tem cerca de {{ cr.lado_km }} km de lado e mostra a média dos pixels de ~1 km que têm dado. A usina usa o pixel dela: a cor do ponto pode ser outra que a do quadrado.</p>
+    <p class="mp-leg-nota mp-leg-fonte">{{ cr.texto }}{% for q in cr.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
+    {% elif cr.estado == "lendo" %}
+    <p class="mp-leg-nota mp-leg-nota--atencao">{{ cr.texto }}</p>
+    {% else %}
+    <p class="mp-leg-nota mp-leg-nota--fora">{{ cr.texto }}{% if cr.detalhe %} ({{ cr.detalhe }}){% endif %}. A camada não aparece no mapa.</p>
+    {% endif %}
+    {% endif %}
+  {% elif f == "densidade" %}
+    <h2 class="mp-leg-h">Densidade de focos de queimada</h2>
+    {% if cd and cd.estado == "ok" %}
+    <ul class="mp-escala" aria-label="Escala da densidade, em focos por 1.000 km²">
+      {% for c in cd.classes %}<li><span class="mp-chave mp-chave--calor mp-cd-{{ c.id }}"></span><span class="mp-leg-txt"><strong>{{ c.rotulo }}</strong> {{ c.faixa }} focos por 1.000 km²<span class="mp-leg-pct">{{ c.pct }} da área</span></span></li>
+      {% endfor %}
+      <li><span class="mp-chave mp-chave--vazio"></span><span class="mp-leg-txt"><strong>Sem cor</strong> nenhum foco a até {{ cd.raio_km|int }} km na última hora</span></li>
+    </ul>
+    <p class="mp-leg-nota">Cada foco pesa até {{ cd.raio_km|int }} km em volta dele: um foco sozinho dá até {{ cd.pico_um }} no centro, e os focos perto um do outro se somam. Quadrados de cerca de {{ cd.lado_km }} km.</p>
+    <p class="mp-leg-nota mp-leg-fonte">{{ cd.texto }}{% for q in cd.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
+    {% elif cd and cd.estado == "lendo" %}
+    <p class="mp-leg-nota mp-leg-nota--atencao">{{ cd.texto }}</p>
+    {% elif cd %}
+    <p class="mp-leg-nota mp-leg-nota--fora">{{ cd.texto }}.</p>
+    {% endif %}
+  {% else %}
+    <h2 class="mp-leg-h">Sem camada de fundo</h2>
+    <p class="mp-leg-nota">O mapa mostra só os estados e o que está ligado em Mostrar, acima do mapa.</p>
+  {% endif %}
+  </section>
+  {% endfor %}
+
+  {% if "focos" in v.ver %}
+  {% if fo.estado == "ok" %}
+  <h2 class="mp-leg-h">Focos de queimada do {{ v.nomes.inpe }}</h2>
+  <ul class="mp-leg-lista mp-leg-lista--curta">
+    <li><span class="mp-chave mp-chave--foco"></span><div class="mp-leg-txt">Foco detectado na última hora</div></li>
+    <li><span class="mp-chave mp-chave--anel"></span><div class="mp-leg-txt">Foco a até 5 km de uma usina</div></li>
+  </ul>
+  <p class="mp-leg-nota">{{ fo.n }} {{ "foco" if fo.n == 1 else "focos" }} na última hora{% if v.regiao != "brasil" %} neste recorte{% endif %}, {{ fo.n_perto }} a até 5 km de uma usina{% if fo.lido %}; lidos às {{ fo.lido }}{% endif %}.{% for q in fo.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
+  {% elif fo.estado == "lendo" %}
+  <p class="mp-leg-nota mp-leg-nota--atencao"><strong>Focos de queimada do {{ v.nomes.inpe }}:</strong> lendo agora, a camada aparece quando a leitura terminar.</p>
+  {% else %}
+  <p class="mp-leg-nota mp-leg-nota--fora"><strong>Focos de queimada do {{ v.nomes.inpe }}:</strong> sem leitura boa, a camada não aparece no mapa.</p>
+  {% endif %}
+  {% endif %}
+</aside>

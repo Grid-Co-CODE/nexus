@@ -22,8 +22,8 @@ A tela não pode parecer "tudo bem" quando a fonte não foi lida inteira (revis�
   avisos e focos; o atenção, de avisos e risco de fogo);
 - fonte lida só em parte (aviso sem polígono, arquivo de focos que falhou, linhas ilegíveis, dia do risco sem leitura), velha
   (a última leitura boa, com a hora) ou com o dado atrasado (focos parados, previsão de outro dia, sem a data do arquivo)
-  fica em "atencao", nunca "ok", e os números da faixa que dependem dela repetem o qualificador ("INMET: parcial", "focos:
-  arquivos até 14:10"...), em âmbar no lugar do verde quando não há alerta;
+  fica em "atencao", nunca "ok", e os números da faixa que dependem dela repetem o qualificador ("avisos do ... (INMET):
+  parcial", "focos de queimada do ... (INPE): arquivos até 14:10"...), em âmbar no lugar do verde quando não há alerta;
 - sem alerta algum e sem ter lido tudo o que a seção usa, o texto não diz "nenhuma usina para agir agora": diz que não dá para dizer.
 """
 from datetime import datetime, timedelta, timezone
@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from ...cadastro.servico import chave_texto
 from . import alertas as A
 from . import explica as E
+from . import fontes as F
 from . import irradiacao as I
 from . import leitura as L
 
@@ -42,20 +43,28 @@ _SEMANA = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
 PALAVRA_DO_RISCO = {"crítico": "Crítico", "alto": "Alto", "médio": "Médio", "baixo": "Baixo", "mínimo": "Mínimo"}
 FOCOS_ATRASO_MIN = 30          # o INPE publica a cada 10 min: sem arquivo novo há 30 min, algo está atrasado
 SEM_DADO = "sem dado (sem vegetação no entorno)"
-FORA_DA_GRADE = "fora da grade do INPE"
+FORA_DA_GRADE = f"fora da grade do {F.extenso('inpe')}"
 MOTIVO_SEM_RISCO = {"sem_dado": "sem vegetação no entorno", "fora_da_grade": FORA_DA_GRADE}
 RECARGA_S = 60                 # a tela se recarrega a cada minuto...
 RECARGA_LENDO_S = 10           # ...e a cada 10 s enquanto alguma fonte está sendo lida pela primeira vez
+FOLGA_PROXIMA_S = 5            # o mapa e o modo TV voltam 5 s depois de o cache da fonte vencer: aí a visita já relê
+PROXIMA_MAX_S = 30 * 60        # e nunca ficam mais de 30 min sem conferir (o TTL dos avisos)
 LIMITE_ATENCAO = 20            # a matriz da Atenção mostra as 20 primeiras; "Ver todas" (?todas=1) mostra a lista inteira
 COR_DO_AVISO = {1: "amarelo", 2: "laranja", 3: "vermelho"}      # a cor do INMET pelo nível; a cor que vem no aviso nunca é lida
 # Os subtítulos dos números do topo, na língua de quem não é da meteorologia (09/10/2026); a regra inteira está em "Como ler".
-SUB_AGIR = f"fogo a até {A.FOCO_KM:g} km ou aviso forte do INMET (tempestade, chuva forte, vento, granizo)"
-SUB_ATENCAO = "outro aviso do INMET ou risco de fogo alto nos próximos 4 dias: acompanhar"
+SUB_AGIR = f"fogo a até {A.FOCO_KM:g} km ou aviso forte (tempestade, chuva forte, vento, granizo) do {F.extenso('inmet')}"
+SUB_ATENCAO = f"outro aviso do {F.extenso('inmet')} ou risco de fogo alto nos próximos 4 dias: acompanhar"
 # De que fontes cada número da faixa depende: o "agir agora" vive de avisos e focos; o "atenção", de avisos e risco de fogo; o
 # "sem alerta" precisa das três. Uma fonte parcial ou atrasada só qualifica o número que a usa.
 FONTES_DO_NIVEL = {"agir": ("inmet", "focos"), "atencao": ("inmet", "risco"), "sem": ("inmet", "focos", "risco")}
-NOME_LONGO = {"inmet": "avisos do INMET", "focos": "focos do INPE", "risco": "risco de fogo do INPE"}
-NOME_CURTO = {"inmet": "INMET", "focos": "focos", "risco": "risco de fogo"}
+# O nome de cada fonte na frase, por extenso e com a sigla (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla"):
+# o nome mora em `fontes.NOMES`; aqui só se diz qual dado de qual instituto. Vale também para o qualificador dos números da faixa
+# ("avisos do Instituto ... (INMET): parcial"), que antes era só a sigla.
+NOME_LONGO = {"inmet": f"avisos do {F.extenso('inmet')}", "focos": f"focos de queimada do {F.extenso('inpe')}",
+              "risco": f"risco de fogo do {F.extenso('inpe')}"}
+# a linha de cada fonte no painel "De onde vêm os dados" e na legenda do mapa: o instituto por extenso e, depois do ponto, o dado
+ROTULO_DA_FONTE = {"inmet": f"{F.extenso('inmet')} · avisos", "focos": f"{F.extenso('inpe')} · focos de queimada",
+                   "risco": f"{F.extenso('inpe')} · risco de fogo", "power": f"{F.extenso('nasa_power')} · irradiação"}
 # A grade por estado do desenho aprovado em 07/10/2026 (esquema, não é mapa): UF -> (coluna, linha) numa grade de 7 x 8.
 UFS_GRADE = {"RR": (2, 1), "AP": (4, 1), "AM": (2, 2), "PA": (3, 2), "MA": (4, 2), "CE": (5, 2), "RN": (6, 2), "AC": (1, 3),
              "RO": (2, 3), "TO": (3, 3), "PI": (4, 3), "PE": (5, 3), "PB": (6, 3), "MT": (2, 4), "GO": (3, 4), "BA": (4, 4),
@@ -65,6 +74,25 @@ UFS_GRADE = {"RR": (2, 1), "AP": (4, 1), "AM": (2, 2), "PA": (3, 2), "MA": (4, 2
 
 def agora() -> datetime:
     return datetime.now(BRT)
+
+
+def proxima_leitura_s(leituras, momento=None) -> int:
+    """Em quantos segundos a tela deve reler, no ritmo do cache de cada fonte (09/10/2026, o modo TV: "atualização sozinha, no
+    ritmo dos caches de cada fonte; nunca mais do que eles"): quando a PRIMEIRA leitura vencer (`Leitura.vence_em`, mais
+    `FOLGA_PROXIMA_S`); 10 s enquanto alguma fonte é lida pela primeira vez (a leitura em curso não vai de novo à rede); 60 s sem
+    nenhuma data (leitura montada à mão). `momento` é o relógio dos caches (epoch)."""
+    momento = L.agora() if momento is None else momento
+    prazos = []
+    for leitura in leituras:
+        if leitura is None:
+            continue
+        if leitura.dados is None and leitura.erro == L.LENDO:
+            return RECARGA_LENDO_S
+        if leitura.vence_em is not None:
+            prazos.append(leitura.vence_em - momento)
+    if not prazos:
+        return RECARGA_S
+    return int(min(PROXIMA_MAX_S, max(RECARGA_LENDO_S, min(prazos) + FOLGA_PROXIMA_S)))
 
 
 def hora(d: datetime, ref: datetime) -> str:
@@ -192,9 +220,9 @@ def _falha(nome: str, leitura, ref: datetime):
     if leitura.dados is None:
         if leitura.erro == L.LENDO:
             return "atencao", f"{nome}: lendo a fonte (a tela se atualiza sozinha)", ""
-        return "fora", f"{nome} fora agora; ainda sem leitura boa", leitura.erro or ""
+        return "fora", f"{nome}: fora agora; ainda sem leitura boa", leitura.erro or ""
     if leitura.velha:
-        return ("atencao", f"{nome} fora agora; última leitura boa às {hora(_quando(leitura.lido_em), ref)}",
+        return ("atencao", f"{nome}: fora agora; última leitura boa às {hora(_quando(leitura.lido_em), ref)}",
                 leitura.erro or "")
     return None
 
@@ -223,12 +251,12 @@ def _arquivo_t0(dados: dict):
 
 
 def _fonte_inmet(leitura, ref) -> dict:
-    falha = _falha("INMET", leitura, ref)
+    falha = _falha(ROTULO_DA_FONTE["inmet"], leitura, ref)
     if leitura.dados is None:
         return _sem_dado("inmet", falha)
     d = leitura.dados
     n_hoje = sum(a.quando == "hoje" for a in d["avisos"])
-    texto = (f"INMET · avisos: lido às {hora(_quando(leitura.lido_em), ref)} · "
+    texto = (f"{ROTULO_DA_FONTE['inmet']}: lido às {hora(_quando(leitura.lido_em), ref)} · "
              f"{_plural(len(d['avisos']), 'aviso ativo', 'avisos ativos')} ({n_hoje} hoje, {len(d['avisos']) - n_hoje} futuros)")
     parciais = ([f"{_plural(len(d['ignorados']), 'aviso foi ignorado', 'avisos foram ignorados')} por falta de polígono utilizável"]
                 if d["ignorados"] else [])
@@ -236,7 +264,7 @@ def _fonte_inmet(leitura, ref) -> dict:
 
 
 def _fonte_focos(leitura, ref) -> dict:
-    falha = _falha("INPE (focos)", leitura, ref)
+    falha = _falha(ROTULO_DA_FONTE["focos"], leitura, ref)
     if leitura.dados is None:
         return _sem_dado("focos", falha)
     d = leitura.dados
@@ -247,17 +275,17 @@ def _fonte_focos(leitura, ref) -> dict:
     if d.get("linhas_ruins"):
         parciais.append(_plural(d["linhas_ruins"], "linha ilegível", "linhas ilegíveis"))
     if ref - ate.astimezone(BRT) > timedelta(minutes=FOCOS_ATRASO_MIN):
-        texto = f"INPE · focos de queimada: o INPE não publica arquivo novo desde {hora(ate, ref)} · lido às {lido}"
+        texto = f"{ROTULO_DA_FONTE['focos']}: o INPE não publica arquivo novo desde {hora(ate, ref)} · lido às {lido}"
         atrasos = [f"arquivos até {hora(ate, ref)}"]
     else:
-        texto = (f"INPE · focos de queimada: arquivos até {hora(ate, ref)} · lido às {lido} · "
+        texto = (f"{ROTULO_DA_FONTE['focos']}: arquivos até {hora(ate, ref)} · lido às {lido} · "
                  f"{_plural(len(d['focos']), 'foco', 'focos')} na última hora")
         atrasos = []
     return _fechar("focos", leitura, ref, falha, texto, parciais, atrasos)
 
 
 def _fonte_risco(leitura, ref, rotulos) -> dict:
-    falha = _falha("INPE (risco de fogo)", leitura, ref)
+    falha = _falha(ROTULO_DA_FONTE["risco"], leitura, ref)
     if leitura.dados is None:
         return _sem_dado("risco", falha)
     d = leitura.dados
@@ -265,11 +293,11 @@ def _fonte_risco(leitura, ref, rotulos) -> dict:
     arquivo, lido, atrasos = _arquivo_t0(d), hora(_quando(leitura.lido_em), ref), []
     if arquivo is None:
         # sem Last-Modified não há como dizer de que dia é a previsão (nem se o arquivo mudou no meio da leitura)
-        texto = f"INPE · risco de fogo: sem data do arquivo · lido às {lido}"
+        texto = f"{ROTULO_DA_FONTE['risco']}: sem data do arquivo · lido às {lido}"
         atrasos.append("sem data do arquivo")
     else:
         a = arquivo.astimezone(BRT)
-        texto = f"INPE · risco de fogo: previsão de {a:%d/%m} (arquivo das {a:%H:%M})"
+        texto = f"{ROTULO_DA_FONTE['risco']}: previsão de {a:%d/%m} (arquivo das {a:%H:%M})"
         if a.date() != ref.astimezone(BRT).date():
             atrasos.append(f"previsão de {a:%d/%m}")
             texto += " · de ontem" if a.date() == (ref - timedelta(days=1)).astimezone(BRT).date() else f" · de {a:%d/%m}"
@@ -393,7 +421,7 @@ def _motivo_do_aviso(g: dict) -> dict:
 
 def _contexto_do_risco(dias, risco_linha, risco_lido: bool) -> str:
     if dias is None:
-        return "Risco de fogo: sem dado para esta usina" if risco_lido else "Risco de fogo: sem leitura do INPE"
+        return "Risco de fogo: sem dado para esta usina" if risco_lido else f"Risco de fogo: sem leitura do {F.extenso('inpe')}"
     if risco_linha:
         return f"Risco de fogo: {risco_linha}"
     return frase_do_risco(dias) or "Risco de fogo: sem dado"
@@ -485,14 +513,15 @@ def _grade_ufs(com_alerta: list, completa: bool) -> tuple:
 
 def _qualificadores(ids, leituras, por_id) -> list:
     """O que a leitura das fontes `ids` tem de errado ou incompleto, para repetir no número da faixa que as usa: fonte sem leitura
-    ("sem leitura de avisos do INMET", ou "lendo ..." enquanto a primeira leitura não veio) e fonte com dado mas não inteiro
-    ("INMET: parcial", "focos: arquivos até 14:10", "INMET: dado de 14:00")."""
+    ("sem leitura de avisos do ... (INMET)", ou "lendo ..." enquanto a primeira leitura não veio) e fonte com dado mas não
+    inteiro ("avisos do ... (INMET): parcial", "focos de queimada do ... (INPE): arquivos até 14:10"): o nome por extenso, como
+    em toda a tela (09/10/2026)."""
     saida = []
     for i in ids:
         if leituras[i].dados is None:
             saida.append(f"{'lendo' if leituras[i].erro == L.LENDO else 'sem leitura de'} {NOME_LONGO[i]}")
         else:
-            saida += [f"{NOME_CURTO[i]}: {q}" for q in por_id[i]["qualifica"]]
+            saida += [f"{NOME_LONGO[i]}: {q}" for q in por_id[i]["qualifica"]]
     return saida
 
 
@@ -681,10 +710,10 @@ def _irradiacao(leitura, ref) -> dict:
     há gráfico nem número (a página diz por quê); leitura velha mostra a última boa, dita velha, com a hora."""
     hoje = ref.astimezone(BRT).date()
     b = {"estado": "ok", "texto": "", "erro": "", "grafico": None, "mes": None, "tabela": []}
-    falha = _falha("NASA POWER", leitura, ref)
+    falha = _falha(ROTULO_DA_FONTE["power"], leitura, ref)
     if leitura.dados is None:
         if leitura.erro == L.LENDO:
-            b.update(estado="lendo", texto="Lendo a NASA POWER: a página se atualiza sozinha")
+            b.update(estado="lendo", texto=f"Lendo a irradiação do {F.extenso('nasa_power')}: a página se atualiza sozinha")
         else:
             b.update(estado="fora", texto=falha[1], erro=leitura.erro or "")
         return b
@@ -692,7 +721,7 @@ def _irradiacao(leitura, ref) -> dict:
     if falha is not None:
         b.update(estado="velha", texto=falha[1], erro=leitura.erro or "")
     else:
-        b["texto"] = (f"NASA LaRC POWER · lida às {hora(_quando(leitura.lido_em), ref)}"
+        b["texto"] = (f"{ROTULO_DA_FONTE['power']}: lida às {hora(_quando(leitura.lido_em), ref)}"
                       + (f" · publicada até {I.dd_mm(publicado_ate)}" if publicado_ate else ""))
     serie = I.ultimos_dias(leitura.dados["dias"], hoje)
     if publicado_ate is not None:
@@ -704,7 +733,7 @@ def _irradiacao(leitura, ref) -> dict:
 
 def _fonte_nasa(leitura, ref, irradiacao: dict) -> dict:
     if leitura.dados is None or leitura.velha:
-        falha = _falha("NASA POWER", leitura, ref)
+        falha = _falha(ROTULO_DA_FONTE["power"], leitura, ref)
         return {"id": "power", "estado": falha[0], "texto": falha[1], "detalhe": falha[2], "qualifica": []}
     return {"id": "power", "estado": "ok", "texto": irradiacao["texto"], "detalhe": "", "qualifica": []}
 
@@ -753,12 +782,12 @@ def montar_usina(config, *, cadastro, usina_id, cliente="", ref=None, sessao=Non
     v["card"], v["fontes"], v["irradiacao"] = card, fontes, irradiacao
     v["alertas"] = {
         "avisos": card["avisos"],
-        "avisos_vazio": "" if card["avisos"] else ("Sem leitura dos avisos do INMET" if avisos_l.dados is None
-                                                  else "Nenhum aviso do INMET sobre esta usina"),
-        "foco": (card["foco"]["texto"] if card["foco"] else "Sem leitura dos focos do INPE" if focos_l.dados is None
+        "avisos_vazio": "" if card["avisos"] else (f"Sem leitura dos avisos do {F.extenso('inmet')}" if avisos_l.dados is None
+                                                  else f"Nenhum aviso do {F.extenso('inmet')} sobre esta usina"),
+        "foco": (card["foco"]["texto"] if card["foco"] else f"Sem leitura dos focos do {F.extenso('inpe')}" if focos_l.dados is None
                  else f"Nenhum foco a até {A.FOCO_KM:g} km"),
         "dias": card["dias"], "risco_linha": card["risco_linha"],
-        "risco_vazio": None if card["dias"] else "Sem leitura do risco de fogo do INPE",
+        "risco_vazio": None if card["dias"] else f"Sem leitura do risco de fogo do {F.extenso('inpe')}",
     }
     v["lendo"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro == L.LENDO]
     v["faltando"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro != L.LENDO]

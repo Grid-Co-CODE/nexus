@@ -65,7 +65,7 @@ def test_os_alertas_da_usina_com_foco_aviso_e_risco(mundo_usina):
 def test_usina_sem_alerta_diz_o_que_nao_ha(mundo_usina):
     c, _, _, _ = mundo_usina
     t = texto(painel(usina_pagina(c, "4"), "cl-alertas"))
-    assert "Nenhum aviso do INMET sobre esta usina" in t and "Nenhum foco a até 5 km" in t
+    assert "Nenhum aviso do Instituto Nacional de Meteorologia (INMET) sobre esta usina" in t and "Nenhum foco a até 5 km" in t
     assert "Foco a" not in t and "Agir agora" not in t
 
 
@@ -80,7 +80,7 @@ def test_a_pagina_tem_as_fontes_dos_alertas_e_a_da_nasa_com_a_hora(mundo_usina):
     html = usina_pagina(c, "1")
     t = texto(painel(html, "cl-fontes"))
     assert "INMET" in t and "lido às 15:00" in t and "arquivos até 14:50" in t
-    assert "NASA LaRC POWER · lida às 15:00 · publicada até 02/10" in t
+    assert "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: lida às 15:00 · publicada até 02/10" in t
     assert len(re.findall(r'class="cl-fonte cl-ok"', html)) == 4
 
 
@@ -124,7 +124,7 @@ def test_a_comparacao_com_a_etm_e_proxima_etapa_e_diz_por_que(mundo_usina):
 def test_o_rodape_cita_a_fonte_e_a_grade(mundo_usina):
     c, _, _, _ = mundo_usina
     t = texto(usina_pagina(c, "1"))
-    assert "NASA LaRC POWER" in t and "cerca de 50 km" in t and "Dados: INMET, INPE (Programa Queimadas)" in t
+    assert "NASA LaRC POWER" in t and "cerca de 50 km" in t and "Dados: Instituto Nacional de Meteorologia (INMET), Instituto Nacional de Pesquisas Espaciais (INPE) (Programa Queimadas)" in t
 
 
 def test_dia_sem_leitura_no_meio_do_mes_aparece_e_nao_vira_zero(mundo_usina):
@@ -157,7 +157,7 @@ def test_nasa_fora_a_pagina_responde_sem_grafico_e_os_alertas_seguem(mundo_usina
     power.status = 503
     html = usina_pagina(c, "1")
     t = texto(html)
-    assert "NASA POWER fora agora; ainda sem leitura boa" in t and "HTTP 503" in t
+    assert "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: fora agora; ainda sem leitura boa" in t and "HTTP 503" in t
     assert 'class="cl-grafico"' not in html and 'class="cl-fonte cl-fora"' in html
     assert "Fogo a 1,2 km" in t and re.search(r'cl-pill--agir"[^>]*>Agir agora<', html)            # os alertas não dependem da NASA
 
@@ -176,7 +176,7 @@ def test_nasa_que_cai_depois_de_uma_leitura_boa_mostra_a_ultima_com_a_hora(mundo
     power.status = 500
     html = usina_pagina(c, "1")
     t = texto(html)
-    assert "NASA POWER fora agora; última leitura boa às 15:00" in t and "HTTP 500" in t
+    assert "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: fora agora; última leitura boa às 15:00" in t and "HTTP 500" in t
     assert 'class="cl-grafico"' in html                                       # a série boa segue na tela, dita velha
     assert 'class="cl-fonte cl-atencao"' in html
 
@@ -185,7 +185,7 @@ def test_nasa_lendo_a_pagina_recarrega_em_10_s(mundo_usina, monkeypatch):
     c, _, _, _ = mundo_usina
     monkeypatch.setattr(L, "irradiacao", lambda *a, **k: L.Leitura(None, None, erro=L.LENDO))
     html = usina_pagina(c, "1")
-    assert '<meta http-equiv="refresh" content="10">' in html and "Lendo a NASA POWER" in texto(html)
+    assert '<meta http-equiv="refresh" content="10">' in html and "Lendo a irradiação do Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER)" in texto(html)
 
 
 def test_a_pagina_se_recarrega_sozinha_a_cada_minuto(mundo_usina):

@@ -46,7 +46,7 @@
         <p class="cl-tambem"><span class="cl-pill cl-pill--agir">{{ m.pill }}</span> <strong>{{ m.principal }}</strong><span class="cl-prova">{{ m.prova }}</span></p>
         {% endfor %}
         {% endif %}
-        <p class="cl-rotulo-bloco">Aviso do INMET</p>
+        <p class="cl-rotulo-bloco">Aviso do {{ fonte_nome.inmet }}</p>
         {% if a.avisos %}
         <ul class="cl-linhas">
           {% for x in a.avisos %}
@@ -60,7 +60,7 @@
         <p class="cl-linha">{{ a.foco }}</p>
       </div>
       <div class="cl-bloco">
-        <p class="cl-rotulo-bloco">Risco de fogo (INPE), hoje e os três dias seguintes</p>
+        <p class="cl-rotulo-bloco">Risco de fogo do {{ fonte_nome.inpe }}, hoje e os três dias seguintes</p>
         {% if a.dias and a.risco_linha %}
         <p class="cl-linha">{{ a.risco_linha }}</p>
         {% elif a.dias %}
@@ -69,7 +69,7 @@
           <div class="cl-dia4"><span class="cl-dia4-rot">{{ d.rotulo }}</span><span class="cl-c cl-c-{{ d.cor }}" title="{{ d.rotulo }}: {{ d.valor }}{% if d.classe %} ({{ d.classe }}{% if d.nota %}, entorno de 2 km{% endif %}){% endif %}">{{ d.curto }}{% if d.nota %}*{% endif %}</span><span class="cl-dia4-classe">{{ d.classe or "sem dado" }}</span></div>
           {% endfor %}
         </div>
-        {% if v.card.dias|selectattr("nota")|list %}<p class="cl-nota">* maior valor do entorno de 2 km: o INPE não calcula o pixel da usina onde não há vegetação.</p>{% endif %}
+        {% if v.card.dias|selectattr("nota")|list %}<p class="cl-nota">* maior valor do entorno de 2 km: o {{ fonte_nome.inpe }} não calcula o pixel da usina onde não há vegetação.</p>{% endif %}
         {% else %}
         <p class="cl-linha">{{ a.risco_vazio }}</p>
         {% endif %}
@@ -78,7 +78,7 @@
   </section>
 
   <section class="cl-secao" aria-labelledby="cl-irradiacao">
-    <h2 class="cl-h2" id="cl-irradiacao">Irradiação diária <span class="cl-h2-sub">· GHI em kWh/m² por dia · NASA POWER</span></h2>
+    <h2 class="cl-h2" id="cl-irradiacao">Irradiação diária <span class="cl-h2-sub">· GHI em kWh/m² por dia · {{ fonte_nome.nasa_power }}</span></h2>
     {% if ir.estado in ("fora", "lendo") %}
     <p class="cl-nota cl-nota--atencao">{{ ir.texto }}{% if ir.erro %} ({{ ir.erro }}){% endif %}</p>
     {% else %}
@@ -97,7 +97,7 @@
         {% if g.etm %}{% for t in g.etm.trechos %}<polyline class="cl-etm" points="{{ t }}"></polyline>{% endfor %}{% endif %}
       </svg>
       <div class="cl-legenda">
-        <span><i class="cl-leg cl-leg--nasa"></i>NASA POWER (grade de cerca de 50 km)</span>
+        <span><i class="cl-leg cl-leg--nasa"></i>{{ fonte_nome.nasa_power }}, grade de cerca de 50 km</span>
         {% if g.faixa %}<span><i class="cl-leg cl-leg--faixa"></i>faixa = ainda não publicado pela NASA</span>{% endif %}
       </div>
     </div>
@@ -105,7 +105,7 @@
     {% set m = ir.mes %}
     {% if m %}
     <div class="cl-minis">
-      <div class="cl-mini" data-id="mes"><span class="cl-rotulo">NASA POWER · {{ m.rotulo }}</span><span class="cl-numero"><span class="cl-valor">{{ m.valor }}</span>{% if m.unidade %} <span class="cl-un">{{ m.unidade }}</span>{% endif %}</span><span class="cl-sub">{{ m.sub }}</span></div>
+      <div class="cl-mini" data-id="mes"><span class="cl-rotulo">Irradiação no mês · {{ m.rotulo }}</span><span class="cl-numero"><span class="cl-valor">{{ m.valor }}</span>{% if m.unidade %} <span class="cl-un">{{ m.unidade }}</span>{% endif %}</span><span class="cl-sub">{{ m.sub }}</span></div>
     </div>
     <p class="cl-nota">{{ m.texto }}.</p>
     {% endif %}
@@ -137,9 +137,9 @@
   {% endif %}
 
   <footer class="cl-rodape">
-    <p><strong>Dados: INMET, INPE (Programa Queimadas) e NASA LaRC POWER.</strong> Somente leitura: esta página não grava nada. A coordenada da usina, do cadastro do Nexus, não aparece na tela.</p>
+    <p><strong>Dados: {{ fonte_nome.inmet }}, {{ fonte_nome.inpe }} (Programa Queimadas) e {{ fonte_nome.nasa_power }}, do Centro de Pesquisa Langley da NASA (citado como NASA LaRC POWER).</strong> Somente leitura: esta página não grava nada. A coordenada da usina, do cadastro do Nexus, não aparece na tela.</p>
     <ul>
-      <li>Irradiação: NASA LaRC POWER (power.larc.nasa.gov), GHI diário (ALLSKY_SFC_SW_DWN), em kWh/m² por dia. A NASA publica com alguns dias de atraso (o fim do gráfico é o que ainda não saiu) e a grade é de cerca de 50 km: vale para o total do mês e para achar uma ETM fora, não para analisar uma hora. Medida contra as ETMs de 40 usinas (maio a setembro de 2026): erro mediano de 7,4% no dia e de 3,9% no mês.</li>
+      <li>Irradiação: {{ fonte_nome.nasa_power }} (power.larc.nasa.gov), GHI diário (ALLSKY_SFC_SW_DWN), em kWh/m² por dia. A NASA publica com alguns dias de atraso (o fim do gráfico é o que ainda não saiu) e a grade é de cerca de 50 km: vale para o total do mês e para achar uma ETM fora, não para analisar uma hora. Medida contra as ETMs de 40 usinas (maio a setembro de 2026): erro mediano de 7,4% no dia e de 3,9% no mês.</li>
       <li>Avisos, focos e risco de fogo: os mesmos da tela Clima e risco, com as mesmas regras de nível (Agir agora, Atenção, Sem alerta).</li>
     </ul>
   </footer>

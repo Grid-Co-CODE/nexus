@@ -12,6 +12,7 @@ from datetime import datetime
 from flask import Response, current_app, jsonify, render_template, request
 
 from ...performance import ponte
+from ...performance.clima import fontes as F
 from ..modelo import Tela, Torre
 
 TORRE = Torre(
@@ -42,15 +43,17 @@ TORRE = Torre(
         Tela("gemeo", "Gêmeo digital",
              "Quanto a usina deveria ter gerado com o sol que teve?",
              "gemeo_digital, via API"),
+        # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
-             "Onde há aviso do INMET, foco de queimada ou risco de fogo perto das usinas?",
-             "INMET (avisos) e INPE (focos e risco de fogo), cruzados com as coordenadas do cadastro; só leitura"),
+             f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",
+             f"avisos do {F.extenso('inmet')}; focos e risco de fogo do {F.extenso('inpe')}; cruzados com as coordenadas do "
+             "cadastro; só leitura"),
         # O id tem barra de propósito: o endereço é /t/performance/clima/mapa, filho da lista (o placeholder `/<tela_id>` não
         # casa com barra, e a view própria é a única que responde ali).
         Tela("clima/mapa", "Mapa de risco",
              "Onde, no mapa do Brasil, estão as usinas que pedem ação por aviso, foco ou risco de fogo?",
-             "IBGE (contorno dos estados), INMET (avisos) e INPE (focos e risco de fogo), com a posição das usinas do cadastro; "
-             "só leitura"),
+             f"contorno dos estados do {F.extenso('ibge')}; avisos do {F.extenso('inmet')}; focos e risco de fogo do "
+             f"{F.extenso('inpe')}; com a posição das usinas do cadastro; só leitura"),
     ],
 )
 

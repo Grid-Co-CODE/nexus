@@ -170,7 +170,7 @@ def test_a_linha_da_etm_vai_por_cima_e_o_eixo_acomoda_o_maior_dos_dois():
 
 def test_descricao_para_quem_nao_ve_o_grafico():
     g = I.grafico(serie([4.0] * 30), date(2026, 10, 2))
-    assert g["descricao"] == "GHI diário de 07/09 a 06/10, NASA POWER, em kWh/m²; publicado até 02/10"
+    assert g["descricao"] == "GHI diário de 07/09 a 06/10, Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER), em kWh/m²; publicado até 02/10"
     assert "nenhum dia publicado" in I.grafico(serie([None] * 30), None)["descricao"]
 
 

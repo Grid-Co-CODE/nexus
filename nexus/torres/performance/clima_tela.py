@@ -5,7 +5,7 @@ Fica num módulo à parte e é importada no fim do `__init__` da torre, porque p
 """
 from flask import current_app, render_template, request
 
-from ...performance.clima import usinas, visao
+from ...performance.clima import fontes, usinas, visao
 from . import TORRE, bp
 
 
@@ -44,3 +44,10 @@ def usina_clima(usina_id):
         return render_template("performance/clima_usina.html", torre=TORRE, tela=TORRE.tela("clima"), v=v), 404
     v.update(erro_cadastro=None, nao_encontrada=False)
     return render_template("performance/clima_usina.html", torre=TORRE, tela=TORRE.tela("clima"), v=v)
+
+
+# Os nomes das fontes por extenso para os templates da torre (Levi, 09/10/2026: "Quero as fontes por extenso também, não só
+# sigla"): a lista, a página da usina e o mapa escrevem `fonte_nome.inmet` etc., que vêm do único lugar dos nomes (fontes.NOMES).
+@bp.context_processor
+def _nomes_das_fontes():
+    return {"fonte_nome": {k: fontes.extenso(k) for k in fontes.NOMES}}

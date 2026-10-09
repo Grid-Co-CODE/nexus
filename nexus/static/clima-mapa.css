@@ -3,7 +3,7 @@
    na cor. O SVG tem sempre 1000 unidades de largura, então os raios vêm em unidades e os traços em pixels de tela
    (vector-effect:non-scaling-stroke): o contorno fica fino em qualquer largura. No celular o SVG ocupa a largura da tela
    (uns 340 px) e o --mp-k aumenta pontos, alvos e anéis, para dar para ver e tocar. Nada de largura fixa maior que o celular. */
-.mp{--mp-mar:var(--mapa-mar);--mp-terra:var(--mapa-terra);--mp-k:1;min-width:0;container:mp / inline-size}
+.mp{--mp-mar:var(--mapa-mar);--mp-terra:var(--mapa-terra);--mp-k:1;--mp-zp:1;--mp-zt:1;min-width:0;container:mp / inline-size}
 .mp-cab-lado{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
 .mp-regioes{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
 .mp-regiao{font:600 12px/16px var(--font-sans);padding:6px 14px;border-radius:999px;border:1px solid var(--linha-forte);
@@ -17,13 +17,16 @@
 .mp-corpo{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;margin-top:14px}
 .mp-mapa{order:-1}
 .mp-mapa{margin:0;min-width:0;background:var(--mp-mar);border:1px solid var(--linha);border-radius:var(--raio-md);padding:6px}
-.mp-svg{display:block;width:100%;height:auto;max-height:84vh;overflow:hidden}
+.mp-svg{--mp-sigla:14px;display:block;width:100%;height:auto;max-height:84vh;overflow:hidden}
 
 /* o desenho, de trás para frente */
 .mp-uf{fill:var(--mp-terra);stroke:var(--mapa-borda);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.mp-siglas text{fill:var(--mapa-sigla);font:600 14px var(--font-sans);letter-spacing:.04em;text-anchor:middle;
-  dominant-baseline:central;pointer-events:none}
-.mp-svg--regiao .mp-siglas text{font-size:21px}
+/* a sigla do estado tem o tamanho de sempre na tela: com o zoom (09/10/2026), o --mp-zt (1 / zoom, do clima-mapa.js) desfaz a
+   ampliação; o contorno da cor da terra (paint-order) a deixa legível também sobre uma camada de calor */
+.mp-siglas text{fill:var(--mapa-sigla);font:600 14px var(--font-sans);font-size:calc(var(--mp-sigla) * var(--mp-zt,1));
+  letter-spacing:.04em;text-anchor:middle;dominant-baseline:central;pointer-events:none;paint-order:stroke;stroke:var(--mp-terra);
+  stroke-width:calc(3px * var(--mp-zt,1));stroke-linejoin:round}
+.mp-svg--regiao{--mp-sigla:21px}
 /* Aviso: cada nível é um grupo, e a transparência é do GRUPO (os polígonos do mesmo nível não se somam onde se cruzam: cem
    avisos de baixa umidade em cima do Nordeste virariam uma mancha opaca). O que ainda vai começar vai só no contorno. */
 .mp-av-1{color:var(--cl-atencao)}
@@ -39,7 +42,8 @@
   vector-effect:non-scaling-stroke}
 /* Foco: um ponto discreto do tamanho do traço (caminho com ponta redonda); o anel vermelho é o foco a até 5 km de uma usina. */
 .mp-focos{fill:none;stroke:var(--cl-alto);stroke-opacity:.55;stroke-width:2px;stroke-linecap:round;vector-effect:non-scaling-stroke}
-.mp-anel,.mp-alvo,.mp-ponto{transform-box:fill-box;transform-origin:center;transform:scale(var(--mp-k,1))}
+/* o --mp-zp (do clima-mapa.js) segura o tamanho do ponto quando o mapa aproxima: cresce um pouco, não oito vezes */
+.mp-anel,.mp-alvo,.mp-ponto{transform-box:fill-box;transform-origin:center;transform:scale(var(--mp-k,1)) scale(var(--mp-zp,1))}
 .mp-anel{fill:var(--critico-a12);stroke:var(--cl-critico);stroke-width:2px;vector-effect:non-scaling-stroke;pointer-events:none}
 /* Usina: um link por ponto. O círculo transparente (.mp-alvo) aumenta a área de toque sem aumentar o ponto. */
 .mp-usinas a{cursor:pointer;outline:none}
@@ -118,6 +122,219 @@
   .mp-mapa{padding:4px}
   .mp-svg{--mp-k:1.5;max-height:none}
   .mp-svg--brasil .mp-siglas{display:none}
-  .mp-svg--regiao .mp-siglas text{font-size:26px}
+  .mp-svg--regiao{--mp-sigla:26px}
   .mp-legenda{padding:12px 14px}
 }
+
+/* ── 09/10/2026: camadas, interação, tela cheia e modo TV ───────────────────────────────────────────────────────────────
+   Levi: "Quero o mapa mais interativo", "uma outra visão tipo um mapa de calor", "visão de tela cheia para colocar no video wall".
+   Cor só por token; nada anima (o Windows do Levi usa movimento reduzido, e um mapa que desliza sozinho é animação gratuita): o
+   zoom troca o viewBox na hora. */
+
+/* a faixa dos controles, acima do mapa: o filtro numa linha só, acima do que ele filtra */
+.mp-barra{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin-top:18px}
+.mp-barra .mp-regioes{margin:0}
+.mp-grupo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}
+.mp-grupo .gc-rotulo{display:inline-block;margin-right:2px}
+.mp-chip{display:inline-flex;align-items:center;text-decoration:none;white-space:nowrap}
+.mp-chip[aria-pressed="false"]{color:var(--tinta-2)}
+.mp-cliente{gap:6px 10px}
+.mp-cliente select{max-width:240px}
+.mp-busca{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px}
+.mp-busca .gc-campo{width:min(280px,100%)}
+.mp-busca-msg{font-size:12.5px;color:var(--tinta-2)}
+.mp-faixa-estado{margin:10px 0 0;padding:10px 14px;border:1px solid var(--alerta);border-radius:var(--raio-md);
+  background:var(--cl-atencao-suave);color:var(--tinta);font-size:13px}
+.mp-faixa-estado--fora{border-color:var(--critico);background:var(--critico-suave)}
+
+/* o mapa: ferramentas por cima, no canto, e a dica que segue o mouse */
+.mp-mapa{position:relative}
+.mp-mapa:focus{outline:none}
+.mp-mapa:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.mp-svg{cursor:grab;user-select:none;-webkit-user-select:none}
+.mp-svg.mp-arrastando{cursor:grabbing}
+.mp-ferramentas{position:absolute;top:10px;left:10px;right:10px;z-index:2;display:flex;justify-content:space-between;align-items:flex-start;
+  gap:8px;pointer-events:none}
+.mp-zoom{display:flex;flex-wrap:wrap;gap:4px;pointer-events:auto}
+.mp-bt{pointer-events:auto;min-width:32px;height:32px;padding:0 9px;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);
+  background:var(--superficie);color:var(--tinta);font:600 15px/1 var(--font-sans);cursor:pointer;box-shadow:0 1px 3px var(--sombra);
+  text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.mp-bt--texto{font-size:12.5px}
+.mp-bt:hover{background:var(--superficie-3)}
+.mp-bt:disabled{cursor:default;color:var(--mudo);background:var(--superficie-2);box-shadow:none}
+.mp-bt[aria-pressed="true"]{background:var(--verde-suave);border-color:var(--verde)}
+.mp-mapa-ajuda{margin:8px 4px 2px;font-size:12px;line-height:1.45;color:var(--mudo)}
+.mp-dica{position:absolute;z-index:3;left:0;top:0;width:max-content;max-width:min(300px,92%);padding:10px 12px;border-radius:var(--raio-md);
+  background:var(--superficie);border:1px solid var(--linha-forte);box-shadow:0 6px 18px var(--sombra);color:var(--tinta);
+  font-size:12.5px;line-height:1.45;pointer-events:none}
+.mp-dica.mp-dica--fixa{pointer-events:auto;border-color:var(--verde)}
+.mp-dica-nome{display:block;font:600 14px/1.3 var(--font-sans);color:var(--tinta)}
+.mp-dica-onde,.mp-dica-uf{display:block;color:var(--mudo);font-size:12px}
+.mp-dica-nivel{display:inline-flex;align-items:center;gap:6px;margin:6px 0 2px;font-weight:600}
+.mp-dica-nivel .mp-chave{margin:0}
+.mp-dica-motivo{display:block;color:var(--tinta-2)}
+.mp-dica-h{display:block;margin-top:8px;font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.mp-dica ul{margin:4px 0 0;padding-left:16px;display:grid;gap:3px;color:var(--tinta-2)}
+.mp-dica-fonte{color:var(--tinta);font-weight:600}
+.mp-dica-acao{display:block;margin-top:8px;color:var(--mudo);font-size:11.5px}
+.mp-dica a{color:var(--verde-texto);font-weight:600}
+
+/* as camadas de calor: faixas horizontais (o traço tem a altura do quadrado), recortadas pelo contorno; as divisas vêm por cima */
+.mp-cr,.mp-cd{fill:none;stroke-linecap:butt}
+.mp-cr-1{stroke:var(--calor-risco-1)}.mp-cr-2{stroke:var(--calor-risco-2)}.mp-cr-3{stroke:var(--calor-risco-3)}
+.mp-cr-4{stroke:var(--calor-risco-4)}.mp-cr-5{stroke:var(--calor-risco-5)}
+.mp-cd-1{stroke:var(--calor-densidade-1)}.mp-cd-2{stroke:var(--calor-densidade-2)}.mp-cd-3{stroke:var(--calor-densidade-3)}
+.mp-cd-4{stroke:var(--calor-densidade-4)}.mp-cd-5{stroke:var(--calor-densidade-5)}
+.mp-divisas{fill:none;stroke:var(--tinta);stroke-opacity:.35;stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke;
+  pointer-events:none}
+/* sobre o risco de fogo (laranja e vermelho), o foco laranja sumia: vai em cinza claro (no claro, ardósia), na legenda também */
+.mp[data-fundo="risco"] .mp-focos{stroke:var(--tinta-2);stroke-opacity:.8}
+.mp[data-fundo="risco"] .mp-chave--foco{background:var(--tinta-2)}
+/* a camada de fundo é uma por vez: no modo TV com o giro as três estão na página, e só a da vez aparece */
+.mp[data-fundo="avisos"] [data-camada]:not([data-camada="avisos"]),
+.mp[data-fundo="risco"] [data-camada]:not([data-camada="risco"]),
+.mp[data-fundo="densidade"] [data-camada]:not([data-camada="densidade"]),
+.mp[data-fundo="nenhum"] [data-camada]:not([data-camada="nenhum"]){display:none}
+.mp-av-oculto{display:none}
+/* o que vai por cima, ligado e desligado em "Mostrar", e os níveis escondidos pela legenda (no mapa e na tabela) */
+.mp-sem-usinas .mp-usinas,.mp-sem-usinas .mp-selecao{display:none}
+.mp-sem-focos .mp-focos,.mp-sem-focos .mp-aneis{display:none}
+.mp-sem-siglas .mp-siglas{display:none}
+.mp-oculta-agir .mp-usinas a:has(.mp-n-agir),.mp-oculta-agir .mp-tab--agir,
+.mp-oculta-atencao .mp-usinas a:has(.mp-n-atencao),.mp-oculta-atencao .mp-tab--atencao,
+.mp-oculta-sem .mp-usinas a:has(.mp-n-sem),.mp-oculta-sem .mp-tab--sem,
+.mp-oculta-nx .mp-usinas a:has(.mp-n-nx),.mp-oculta-nx .mp-tab--nx{display:none}
+/* a usina escolhida: um aro em volta dela no mapa e a linha marcada na tabela */
+.mp-sel{fill:none;stroke:var(--tinta);stroke-width:2.5px;vector-effect:non-scaling-stroke;pointer-events:none}
+.mp-tab-lin{cursor:pointer}
+.mp-tab-lin:hover{background:var(--superficie-2)}
+.mp-tab-lin.mp-tab--sel{background:var(--verde-suave)}
+.mp-tab-lin.mp-tab--sel th{box-shadow:inset 3px 0 0 var(--verde)}
+.mp-tab-mais{margin:0;padding:8px 12px;border-top:1px solid var(--linha);font-size:12.5px;color:var(--mudo)}
+
+/* a legenda: os níveis e os eventos são botões de mostrar e esconder; a escala de cada camada de calor, com os números */
+.mp-leg-lista li>.mp-leg-filtro{grid-column:1 / -1}
+.mp-leg-filtro,.mp-leg-evento{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;align-items:start;margin:-3px -6px;
+  padding:3px 6px;border-radius:var(--raio-controle);color:inherit;text-decoration:none;cursor:pointer}
+.mp-leg-filtro:hover,.mp-leg-evento:hover{background:var(--superficie-2)}
+.mp-leg-filtro[aria-pressed="false"] .mp-leg-txt,.mp-leg-evento[aria-pressed="false"] .mp-leg-txt,
+.mp-leg-filtro[aria-pressed="false"] .mp-leg-txt strong,.mp-leg-filtro[aria-pressed="false"] .mp-leg-n,
+.mp-leg-evento[aria-pressed="false"] .mp-leg-n{color:var(--mudo);text-decoration:line-through}
+.mp-leg-filtro[aria-pressed="false"] .mp-chave,.mp-leg-evento[aria-pressed="false"] .mp-chave{background:transparent;
+  border:1.5px dashed var(--fraco)}
+.mp-leg-nota--filtro{color:var(--tinta-2)}
+.mp-leg-sub{margin:12px 0 6px;font-size:12px;color:var(--mudo)}
+.mp-leg-eventos{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px;line-height:1.4;color:var(--tinta-2)}
+.mp-leg-camada{margin-top:4px}
+.mp-dias{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.mp-dia{font:600 12px/16px var(--font-sans);padding:4px 10px;border-radius:999px;border:1px solid var(--linha-forte);color:var(--tinta-2);
+  text-decoration:none}
+.mp-dia:hover{background:var(--superficie-3);color:var(--tinta)}
+.mp-dia[aria-current="true"]{background:var(--verde-suave);border-color:var(--verde);color:var(--tinta)}
+.mp-escala{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.mp-escala li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;font-size:13px;line-height:1.4;
+  color:var(--tinta-2)}
+.mp-chave--calor{width:20px;height:13px;margin:3px 0 0;border-radius:3px;border:1px solid var(--linha)}
+.mp-chave--calor.mp-cr-1{background:var(--calor-risco-1)}.mp-chave--calor.mp-cr-2{background:var(--calor-risco-2)}
+.mp-chave--calor.mp-cr-3{background:var(--calor-risco-3)}.mp-chave--calor.mp-cr-4{background:var(--calor-risco-4)}
+.mp-chave--calor.mp-cr-5{background:var(--calor-risco-5)}
+.mp-chave--calor.mp-cd-1{background:var(--calor-densidade-1)}.mp-chave--calor.mp-cd-2{background:var(--calor-densidade-2)}
+.mp-chave--calor.mp-cd-3{background:var(--calor-densidade-3)}.mp-chave--calor.mp-cd-4{background:var(--calor-densidade-4)}
+.mp-chave--calor.mp-cd-5{background:var(--calor-densidade-5)}
+.mp-chave--vazio{width:20px;height:13px;margin:3px 0 0;border-radius:3px;background:var(--mp-terra);border:1.5px dashed var(--fraco)}
+.mp-leg-pct{display:block;font-size:11.5px;color:var(--mudo);font-variant-numeric:tabular-nums}
+.mp-leg-fonte{color:var(--mudo)}
+
+/* o mapa que parou de atualizar (sessão caiu, Nexus sem resposta): um véu por cima, e a faixa diz desde quando é o dado */
+.mp-desatualizado .mp-mapa::after{content:"";position:absolute;inset:0;z-index:2;background:var(--veu);border-radius:var(--raio-md);
+  pointer-events:none}
+.mp-atualizando .mp-svg{cursor:progress}
+
+/* tela cheia (Fullscreen API): o palco (controles, legenda, mapa, tabela) ocupa a tela inteira, sem rolar a página */
+.mp-palco:fullscreen{background:var(--fundo);padding:16px 20px;overflow:auto;display:flex;flex-direction:column}
+.mp-palco:fullscreen .mp-corpo{flex:1 1 auto;min-height:0;grid-template-columns:minmax(220px,280px) minmax(0,1fr) minmax(320px,460px);
+  align-items:stretch}
+.mp-palco:fullscreen .mp-tabela{grid-column:auto}
+.mp-palco:fullscreen .mp-svg{max-height:calc(100vh - 210px)}
+.mp-palco:fullscreen .mp-tab-rolagem{flex:1 1 auto;max-height:none;min-height:0;contain:size}
+.mp-palco:fullscreen .mp-legenda{overflow:auto}
+
+/* ── o modo TV (?tv=1): sem a casca, sem rolagem, o tamanho da letra segue a altura da tela ─────────────────────────────
+   A conta é em vh: 2,2% da altura dá ~24 px em 1920 x 1080 (lê-se de uns 3 m) e ~48 px em 3840 x 2160; com a escala do Windows a
+   200%, a tela de 4K é 1920 x 1080 para o navegador e sai igual à de 1080. */
+html.mp-tv-html{height:100%;overflow:hidden;font-size:2.2vh}
+.mp-tv-pagina{margin:0;height:100%;overflow:hidden;background:var(--fundo)}
+.cl.mp.mp-tv{max-width:none;height:100%;margin:0;padding:1.6vh 1.6vw 1.2vh;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;
+  gap:1.2vh;font-size:1rem}
+/* cada parte na sua linha da grade: a faixa de estado escondida não pode empurrar o mapa para a linha do rodapé */
+.mp-tv-cab{grid-row:1}.mp-tv-estado{grid-row:2}.mp-tv-meio,.mp-tv-aviso{grid-row:3}.mp-tv-rodape{grid-row:4}
+.mp-tv-cab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;align-items:center;gap:2vw}
+.mp-tv-titulo h1{margin:.2rem 0 0;font:800 1.55rem/1.15 var(--font-display);color:var(--tinta)}
+.mp-tv-titulo .gc-eyebrow{font-size:.6rem;line-height:1.2}
+.mp-tv-regiao{font-weight:700;color:var(--tinta-2)}
+.mp-tv-camada{text-align:center;min-width:0}
+.mp-tv-camada-nome{margin:0;font:700 1.15rem/1.25 var(--font-sans);color:var(--tinta);overflow-wrap:anywhere}
+.mp-tv-camada-nome span{display:block;font-weight:500;font-size:.72rem;color:var(--tinta-2)}
+.mp-tv-giro{margin:.2rem 0 0;font-size:.62rem;color:var(--mudo)}
+.mp-tv-relogio{display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.mp-tv-hora{font:500 2.3rem/1 var(--font-mono);color:var(--tinta);font-variant-numeric:tabular-nums}
+.mp-tv-data{margin-top:.25rem;font-size:.7rem;color:var(--tinta-2)}
+.mp-tv-estado{padding:.5rem .9rem;border:2px solid var(--critico);border-radius:var(--raio-md);background:var(--critico-suave);
+  color:var(--tinta);font:600 .9rem/1.35 var(--font-sans)}
+.mp-tv-estado--atencao{border-color:var(--alerta);background:var(--cl-atencao-suave)}
+.mp-tv-aviso{font-size:1rem}
+.mp-tv-meio{display:grid;grid-template-columns:minmax(14rem,21vw) minmax(0,1fr) minmax(16rem,27vw);gap:1.4vw;min-height:0}
+.mp-tv .mp-legenda{overflow:hidden;padding:.8rem .9rem;font-size:.72rem}
+.mp-tv .mp-leg-h{font-size:.62rem;line-height:1.3;margin:.9rem 0 .45rem}
+.mp-tv .mp-leg-h:first-child{margin-top:0}
+.mp-tv .mp-leg-lista{gap:.45rem}
+.mp-tv .mp-leg-lista li,.mp-tv .mp-escala li,.mp-tv .mp-leg-eventos{font-size:.72rem}
+.mp-tv .mp-leg-lista li{grid-template-columns:1rem minmax(0,1fr)}
+.mp-tv .mp-leg-filtro,.mp-tv .mp-leg-evento{grid-template-columns:1rem minmax(0,1fr)}
+.mp-tv .mp-escala li{grid-template-columns:1.3rem minmax(0,1fr)}
+.mp-tv .mp-leg-n{font-size:.78rem}
+.mp-tv .mp-leg-ajuda,.mp-tv .mp-leg-nota,.mp-tv .mp-leg-pct,.mp-tv .mp-leg-sub{font-size:.6rem}
+/* de longe, a legenda fica com o que se lê: o nome de cada nível e de cada classe, os números e a fonte; a explicação longa de cada
+   nível e as notas de rodapé ficam na tela do computador */
+.mp-tv .mp-leg-ajuda,.mp-tv .mp-leg-sub,.mp-tv .mp-leg-nota--longa,.mp-tv .mp-leg-nota--filtro{display:none}
+.mp-tv .mp-chave{width:.62rem;height:.62rem;margin-top:.22rem}
+.mp-tv .mp-chave--calor,.mp-tv .mp-chave--vazio,.mp-tv .mp-chave--aviso{width:1.1rem;height:.7rem}
+.mp-tv .mp-dias{gap:.3rem;margin-bottom:.5rem}
+.mp-tv .mp-dia{font-size:.6rem;padding:.15rem .5rem}
+.mp-tv .mp-leg-q{font-size:.55rem}
+.mp-tv .mp-mapa{min-height:0;display:flex;align-items:center;justify-content:center;padding:.4vh}
+.mp-tv .mp-svg{--mp-k:1.35;width:100%;height:100%;max-height:none}
+.mp-tv .mp-svg--brasil .mp-siglas{display:block}
+.mp-tv-lado{display:flex;flex-direction:column;min-height:0;gap:1vh}
+.mp-tv-contagem{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--linha);border:1px solid var(--linha);
+  border-radius:var(--raio-md);overflow:hidden}
+.mp-tv-num{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"c n" "r r";align-items:center;gap:.15rem .4rem;
+  padding:.55rem .7rem;background:var(--superficie-2)}
+.mp-tv-num .mp-chave{grid-area:c;margin:0;width:.7rem;height:.7rem}
+.mp-tv-num strong{grid-area:n;font:600 1.6rem/1 var(--font-sans);color:var(--tinta)}
+.mp-tv-num span:last-child{grid-area:r;font-size:.6rem;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.mp-tv .mp-tabela{flex:1 1 auto;min-height:0;padding-top:.7rem}
+.mp-tv .mp-tabela .mp-leg-h{margin:0 .8rem .5rem}
+.mp-tv .mp-tab-rolagem{flex:1 1 auto;min-height:0;max-height:none;overflow:hidden}
+.mp-tv .mp-tab{font-size:.68rem}
+.mp-tv .mp-tab thead th{font-size:.52rem;padding:.35rem .6rem}
+.mp-tv .mp-tab tbody th,.mp-tv .mp-tab td{padding:.4rem .6rem}
+.mp-tv .mp-tab tbody th{min-width:0}
+.mp-tv .mp-tab-motivo{min-width:0}
+.mp-tv .cl-onde{font-size:.56rem}
+.mp-tv .mp-tab-mais{font-size:.62rem;padding:.4rem .7rem}
+.mp-tv-rodape{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.4vh 1.4vw;align-items:end;font-size:.6rem}
+.mp-tv-fontes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6vw}
+.mp-tv .cl-fonte{padding:.35rem .6rem;font-size:.58rem;line-height:1.35}
+.mp-tv .cl-fonte::before{width:.45rem;height:.45rem}
+.mp-tv .cl-detalhe{font-size:.52rem;padding-left:.9rem}
+.mp-tv-tela{margin:0;text-align:right;color:var(--tinta-2);white-space:nowrap}
+.mp-tv-proxima{display:block;color:var(--mudo)}
+.mp-tv-notas{grid-column:1 / -1;margin:0;color:var(--tinta);font-weight:600}
+.mp-tv-controles{position:fixed;left:1.6vw;right:1.6vw;bottom:1.6vh;z-index:5;display:flex;flex-direction:column;gap:.6rem;padding:.8rem 1rem;
+  background:var(--superficie);border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 8px 28px var(--sombra);
+  font-size:.62rem}
+.mp-tv-controles .mp-barra{margin:0}
+.mp-tv-controles .gc-chip,.mp-tv-controles .mp-regiao,.mp-tv-controles .gc-btn{font-size:.62rem}
+.mp-tv .mp-dica{font-size:.62rem;max-width:30vw}
+.mp-tv .mp-dica-nome{font-size:.72rem}

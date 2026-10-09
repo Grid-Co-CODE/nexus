@@ -89,7 +89,7 @@ def test_faixa_do_topo_conta_agir_atencao_sem_alerta_e_cobertura(mundo):
     assert {i: valor(f[i]) for i in f} == {"agir": "1", "atencao": "3", "sem": "2", "cobertura": "6"}
     t = texto(f["cobertura"])
     assert "em operação com coordenada · 1 sem dado de risco · 1 sem coordenada" in t
-    assert "Agir agora" in texto(f["agir"]) and "fogo a até 5 km ou aviso forte do INMET" in texto(f["agir"])
+    assert "Agir agora" in texto(f["agir"]) and "fogo a até 5 km ou aviso forte (tempestade, chuva forte, vento, granizo) do Instituto Nacional de Meteorologia (INMET)" in texto(f["agir"])
     assert "O que fazer: Avisar o supervisor da região" in texto(f["agir"]) and "O que fazer" not in texto(f["cobertura"])
     assert "nas três fontes lidas" in texto(f["sem"])
 
@@ -183,7 +183,7 @@ def test_sem_dado_nem_no_entorno_a_usina_fica_em_sem_alerta_e_a_cobertura_diz_po
     ("entorno", 0.85, ("0,85", "alto", "entorno", 2)),
     ("sem_dado", None, ("sem dado (sem vegetação no entorno)", "", "", 0)),
     ("indisponivel", None, ("indisponível", "", "", 0)),
-    ("fora_da_grade", None, ("fora da grade do INPE", "", "", 0)),
+    ("fora_da_grade", None, ("fora da grade do Instituto Nacional de Pesquisas Espaciais (INPE)", "", "", 0)),
 ])
 def test_cada_dia_de_risco_e_escrito_pela_origem_do_valor(origem, valor_, esperado):
     c = V.celula_de_risco(2, Amostra(valor_, origem))
@@ -238,7 +238,7 @@ def test_fonte_fora_diz_fora_e_a_hora_da_ultima_boa(mundo):
     del sessao.arquivos[URL_INMET]                                        # e agora dá 404
     html = pagina(c)
     t = texto(html)
-    assert "INMET fora agora; última leitura boa às 15:00" in t
+    assert "Instituto Nacional de Meteorologia (INMET) · avisos: fora agora; última leitura boa às 15:00" in t
     assert "HTTP 404" in t
     assert 'class="cl-fonte cl-atencao"' in html
     assert len(cartoes(html)) + len(linhas(html)) == 4                    # as outras fontes seguem valendo
@@ -249,13 +249,13 @@ def test_fonte_que_nunca_leu_diz_sem_leitura_boa_e_nao_mostra_zero(mundo):
     del sessao.arquivos[URL_INMET]
     html = pagina(c)
     t = texto(html)
-    assert "INMET fora agora; ainda sem leitura boa" in t
-    assert "Os números da faixa e as listas não incluem: avisos do INMET." in t       # a tela diz que está incompleta
+    assert "Instituto Nacional de Meteorologia (INMET) · avisos: fora agora; ainda sem leitura boa" in t
+    assert "Os números da faixa e as listas não incluem: avisos do Instituto Nacional de Meteorologia (INMET)." in t       # a tela diz que está incompleta
     assert 'class="cl-fonte cl-fora"' in html
     f = faixa(html)
     assert valor(f["sem"]) == "—" and "não dá para dizer" in texto(f["sem"])           # traço, nunca "0" nem número solto
-    assert "sem leitura de avisos do INMET" in texto(f["atencao"])
-    assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" not in t     # há usinas nas duas listas: sem título de vazio
+    assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in texto(f["atencao"])
+    assert "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta" not in t     # há usinas nas duas listas: sem título de vazio
 
 
 def test_texto_do_inmet_e_de_terceiros_e_sai_escapado(mundo):
@@ -314,7 +314,7 @@ def test_focos_sem_arquivo_novo_ha_mais_de_30_min_ficam_em_atencao(mundo):
     html = pagina(c)
     assert "o INPE não publica arquivo novo desde 14:10" in texto(html)
     assert 'class="cl-fonte cl-atencao"' in html
-    assert "focos: arquivos até 14:10" in texto(faixa(html)["agir"])
+    assert "focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE): arquivos até 14:10" in texto(faixa(html)["agir"])
 
 
 def test_aviso_vencido_nao_conta(mundo):
@@ -341,7 +341,7 @@ def test_uma_so_leitura_da_rede_por_fonte_mesmo_com_varias_visitas(mundo):
 def test_rodape_com_as_fontes_e_a_atribuicao(mundo):
     c, _, _ = mundo
     t = texto(pagina(c))
-    assert "Dados: INMET, INPE (Programa Queimadas)." in t
+    assert "Dados: Instituto Nacional de Meteorologia (INMET) e Instituto Nacional de Pesquisas Espaciais (INPE), Programa Queimadas." in t
     assert "Programa Queimadas" in t and "somente leitura" in t.lower()
     assert "que não aparecem na tela" in t
 
@@ -520,13 +520,13 @@ def test_sem_alerta_e_com_fonte_fora_a_tela_nao_diz_nenhuma_usina_para_agir_agor
     _instalar(monkeypatch, L.Leitura(None, None, erro="HTTP 500"), _focos_vazio(), _risco())
     html = pagina(c)
     t = texto(html)
-    assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" in t
+    assert "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta" in t
     assert "Nenhuma usina para agir agora" not in t and "Nenhuma usina em atenção" not in t
     f = faixa(html)
     # o agir usa avisos e focos, o atenção usa avisos e risco: cada um perdeu o INMET e segue com o que leu, em âmbar e com a razão
     assert (valor(f["agir"]), valor(f["atencao"]), valor(f["sem"])) == ("0", "0", "—")
-    assert "cl-na" in f["agir"] and "cl-na" in f["atencao"] and "sem leitura de avisos do INMET" in texto(f["agir"])
-    assert "Os números da faixa e as listas não incluem: avisos do INMET." in t and "Lendo agora" not in t
+    assert "cl-na" in f["agir"] and "cl-na" in f["atencao"] and "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in texto(f["agir"])
+    assert "Os números da faixa e as listas não incluem: avisos do Instituto Nacional de Meteorologia (INMET)." in t and "Lendo agora" not in t
     assert '<meta http-equiv="refresh" content="60">' in html
 
 
@@ -536,9 +536,9 @@ def test_fonte_lendo_a_tela_recarrega_em_10_s_e_a_nota_diz_lendo_e_nao_fora(mund
     html = pagina(c)
     t = texto(html)
     assert '<meta http-equiv="refresh" content="10">' in html
-    assert "Lendo agora: avisos do INMET." in t and "Os números da faixa e as listas não incluem" not in t
-    assert "Sem leitura de avisos do INMET: não dá para dizer que não há alerta" in t
-    assert "lendo avisos do INMET" in texto(faixa(html)["agir"])
+    assert "Lendo agora: avisos do Instituto Nacional de Meteorologia (INMET)." in t and "Os números da faixa e as listas não incluem" not in t
+    assert "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta" in t
+    assert "lendo avisos do Instituto Nacional de Meteorologia (INMET)" in texto(faixa(html)["agir"])
 
 
 def test_tudo_lido_e_sem_alerta_a_tela_pode_dizer_que_nao_ha(mundo, monkeypatch):
@@ -556,7 +556,7 @@ def test_fonte_pela_metade_deixa_a_celula_ambar_e_diz_parcial(mundo, monkeypatch
     _instalar(monkeypatch, avisos, _focos_vazio(), _risco())
     html = pagina(c)
     f = faixa(html)
-    assert 'class="cl-cel cl-agir cl-na"' in f["agir"] and "INMET: parcial" in texto(f["agir"])
+    assert 'class="cl-cel cl-agir cl-na"' in f["agir"] and "avisos do Instituto Nacional de Meteorologia (INMET): parcial" in texto(f["agir"])
     assert 'class="cl-cel cl-atencao cl-na"' in f["atencao"] and "cl-na" in f["sem"] and "nas fontes lidas" in texto(f["sem"])
     assert 'class="cl-fonte cl-atencao"' in html and "1 aviso foi ignorado" in texto(html)
 
@@ -577,7 +577,7 @@ def test_usina_fora_da_grade_do_inpe_aparece_na_linha_de_cobertura_com_o_motivo(
     _instalar(monkeypatch, _leitura({"avisos": [], "ignorados": [], "lidos": 0}), _focos_vazio(), _risco(por))
     t = texto(pagina(c))
     assert "Risco de fogo sem dado (sem vegetação no entorno): Usina Zeta." in t
-    assert "Risco de fogo sem dado (fora da grade do INPE): Usina Eta." in t
+    assert "Risco de fogo sem dado (fora da grade do Instituto Nacional de Pesquisas Espaciais (INPE)): Usina Eta." in t
 
 
 def test_o_css_tem_a_celula_ambar_das_fontes_que_nao_estao_inteiras(mundo):

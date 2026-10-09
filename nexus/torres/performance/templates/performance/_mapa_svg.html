@@ -1,0 +1,47 @@
+{# O SVG do Mapa de risco (07/10/2026; camadas de calor e interação em 09/10/2026), o mesmo na tela e no modo TV. As camadas vêm
+   prontas do `mapa.montar`, de trás para frente: estados do IBGE, a camada de fundo (risco de fogo ou densidade de focos em faixas,
+   recortadas pelo contorno, com as divisas por cima; ou os avisos do INMET), as siglas, os focos, os anéis e as usinas. Texto de
+   terceiros (evento do INMET, nome de usina e de cliente) só entra por {{ }} (escapado), nunca por |safe. NÚMERO de latitude ou
+   longitude nunca vira texto: a posição da usina é o cx/cy do ponto, em unidades do viewBox. O zoom (clima-mapa.js) só troca o
+   viewBox; sem JavaScript, o desenho é este. #}
+{% set av = v.camada_avisos %}
+{% set fo = v.camada_focos %}
+{% set cr = v.calor_risco %}
+{% set cd = v.calor_densidade %}
+<svg class="mp-svg mp-svg--{{ 'brasil' if v.regiao == 'brasil' else 'regiao' }}" viewBox="{{ v.viewbox }}" role="group" aria-labelledby="mp-titulo" preserveAspectRatio="xMidYMid meet" data-parte="svg">
+  <title id="mp-titulo">Mapa de risco: {{ v.regiao_nome }}</title>
+  {% if v.ufs and (cr or cd) %}<defs><clipPath id="mp-recorte">{% for u in v.ufs %}<use href="#mp-uf-{{ u.sigla }}"/>{% endfor %}</clipPath></defs>{% endif %}
+  <g class="mp-ufs">
+    {% for u in v.ufs %}<path class="mp-uf" id="mp-uf-{{ u.sigla }}" data-uf="{{ u.sigla }}" d="{{ u.d }}"/>
+    {% endfor %}
+  </g>
+  {% if cr and cr.classes %}<g class="mp-calor mp-calor--risco" data-camada="risco"{% if v.ufs %} clip-path="url(#mp-recorte)"{% endif %} shape-rendering="crispEdges">{% for c in cr.classes if c.d %}<path class="mp-cr mp-cr-{{ c.id }}" data-classe="{{ c.id }}" stroke-width="{{ cr.altura }}" d="{{ c.d }}"/>{% endfor %}</g>{% endif %}
+  {% if cd and cd.classes %}<g class="mp-calor mp-calor--densidade" data-camada="densidade"{% if v.ufs %} clip-path="url(#mp-recorte)"{% endif %} shape-rendering="crispEdges">{% for c in cd.classes if c.d %}<path class="mp-cd mp-cd-{{ c.id }}" data-classe="{{ c.id }}" stroke-width="{{ cd.altura }}" d="{{ c.d }}"/>{% endfor %}</g>{% endif %}
+  {% if v.divisas %}<path class="mp-divisas" d="{{ v.divisas }}"/>{% endif %}
+  {% if "avisos" in v.fundos_no_svg and av and av.estado == "ok" %}
+  <g class="mp-avisos" data-camada="avisos">
+    {% for g in av.grupos %}
+    <g class="mp-av mp-av-{{ g.nivel }}{% if g.futuro %} mp-av--futuro{% endif %}">
+      {% for a in g.itens %}<path fill-rule="evenodd" d="{{ a.d }}" data-ev="{{ a.ev }}"{% if a.oculto %} class="mp-av-oculto"{% endif %}><title>{{ a.titulo }}</title></path>
+      {% endfor %}
+    </g>
+    {% endfor %}
+  </g>
+  {% endif %}
+  <g class="mp-siglas" aria-hidden="true">
+    {% for u in v.ufs if u.x %}<text x="{{ u.x }}" y="{{ u.y }}">{{ u.sigla }}</text>
+    {% endfor %}
+  </g>
+  {% if fo and fo.estado == "ok" %}
+  {% if fo.d %}<path class="mp-focos" d="{{ fo.d }}"/>{% endif %}
+  <g class="mp-aneis">
+    {% for a in fo.aneis %}<circle class="mp-anel" cx="{{ a.x }}" cy="{{ a.y }}" r="{{ a.r }}"/>
+    {% endfor %}
+  </g>
+  {% endif %}
+  <g class="mp-usinas">
+    {% for u in v.usinas %}<a href="{{ u.href }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/><circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
+    {% endfor %}
+  </g>
+  <g class="mp-selecao" aria-hidden="true"></g>
+</svg>

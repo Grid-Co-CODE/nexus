@@ -5,9 +5,9 @@ Todos são só leitura (GET), sem chave e de uso livre; o formato abaixo é o me
 que fugir dele vira `FonteErro` (a tela diz que a fonte falhou) em vez de número lido do jeito errado. Quem recebe a sessão é
 quem chama: a sessão de verdade em produção, uma falsa nos testes (nenhum teste vai à rede).
 
-Atribuição que a tela mostra no rodapé: "Dados: INMET, INPE (Programa Queimadas)", e "NASA LaRC POWER" na página da usina. O
-endereço do INMET não é documentado oficialmente (é o que o próprio site de avisos usa); se ele sumir, a tela mostra o INMET
-como fora do ar.
+Atribuição que a tela mostra no rodapé: o nome de cada fonte por extenso, com a sigla (`NOMES`, abaixo), o Programa Queimadas
+do INPE e "NASA LaRC POWER" na página da usina. O endereço do INMET não é documentado oficialmente (é o que o próprio site de
+avisos usa); se ele sumir, a tela mostra o INMET como fora do ar.
 """
 import csv
 import io
@@ -26,6 +26,34 @@ from .geotiff import Amostra, GeoTiff, GeoTiffErro
 UTC = timezone.utc
 BRT = timezone(timedelta(hours=-3))      # o INMET escreve o horário dos avisos em Brasília
 TEMPO_LIMITE_S = 30
+
+# ── os nomes das fontes, por extenso (09/10/2026) ──────────────────────────────────────────────────────────────────────
+# Levi, 09/10/2026, olhando o bloco "Fontes" do Mapa de risco ("INMET · avisos", "INPE · focos de queimada"): "Quero as fontes
+# por extenso também, não só sigla". UM lugar só: a lista do Clima e risco, o mapa (fontes, legendas e dicas), o modo TV e a
+# página da usina escrevem o nome pelo `extenso()` daqui, e `tests/test_clima_nomes.py` falha se o nome por extenso aparecer
+# escrito à mão em outro arquivo do Nexus. A sigla sozinha só fica em mensagem de erro e no log (a linha da fonte que a mostra
+# na tela já começa pelo nome por extenso).
+NOMES = {
+    "inmet": {"sigla": "INMET", "nome": "Instituto Nacional de Meteorologia"},
+    "inpe": {"sigla": "INPE", "nome": "Instituto Nacional de Pesquisas Espaciais"},
+    # o projeto da NASA tem o nome dele por extenso (POWER = Prediction Of Worldwide Energy Resources); a citação que a NASA
+    # pede ("NASA LaRC POWER", do Centro de Pesquisa Langley) continua no rodapé da página da usina
+    "nasa_power": {"sigla": "NASA POWER", "nome": "Prediction Of Worldwide Energy Resources, projeto da NASA"},
+    "ibge": {"sigla": "IBGE", "nome": "Instituto Brasileiro de Geografia e Estatística"},
+}
+
+
+def sigla_de(orgao: str) -> str:
+    return NOMES[orgao]["sigla"]
+
+
+def nome_de(orgao: str) -> str:
+    return NOMES[orgao]["nome"]
+
+
+def extenso(orgao: str) -> str:
+    """"Instituto Nacional de Meteorologia (INMET)": o nome por extenso com a sigla, como a tela escreve toda fonte."""
+    return f"{nome_de(orgao)} ({sigla_de(orgao)})"
 
 # Endereços padrão; cada um pode ser trocado na configuração (`enderecos`), por exemplo para um espelho interno.
 INMET_AVISOS = "https://apiprevmet3.inmet.gov.br/avisos/ativos"
@@ -316,6 +344,33 @@ def inpe_risco_fogo(pontos, sessao, modelo_url=INPE_RISCO_FOGO, *, dias=DIAS_DE_
     if len(erros) == len(dias):
         raise FonteErro("nenhum dia do risco de fogo pôde ser lido: " + "; ".join(f"D{d}: {m}" for d, m in erros.items()))
     return {"por_ponto": por_ponto, "arquivos": arquivos, "erros": erros}
+
+
+# ── INPE: risco de fogo em toda a área, para o mapa de calor (09/10/2026) ──────────────────────────────────────────────
+
+GRADE_GRAUS = 0.08                       # o quadrado-base do mapa de calor: 8 pixels de 0,01 grau (~9 km); o Brasil inteiro junta 2 x 2
+TRABALHADORES_GRADE = 4                  # tiles pedidas ao mesmo tempo na leitura da área (o servidor é público: poucas)
+
+
+def inpe_risco_grade(sessao, url, caixa, *, passo=GRADE_GRAUS, precisa=None, anterior=None,
+                     timeout=TEMPO_LIMITE_S) -> dict:
+    """O risco de fogo de UM dia (o arquivo `url`, já com o dia) em blocos de `passo` graus na `caixa`: a soma e a contagem dos
+    pixels com dado de cada bloco (`GeoTiff.somar_em_blocos`), para o mapa de calor do Mapa de risco. É o mesmo arquivo que o
+    risco por usina lê; nenhuma saída nova para a internet.
+
+    `anterior` é a leitura boa de antes: se o arquivo do INPE não mudou (o mesmo Last-Modified, que o cabeçalho de 64 KB já
+    traz), ela volta como está e nenhuma tile é baixada. O arquivo muda uma vez por dia (~06:30); sem isto, a releitura de
+    15 em 15 min antes da publicação baixaria ~8 MB a cada vez para achar o mesmo arquivo.
+
+    {"modificado": datetime UTC do arquivo ou None, "validador": o Last-Modified como veio, "url", "grade": os blocos (ver
+    `somar_em_blocos`), "conferido": True quando veio da `anterior`}. Formato diferente do medido é GeoTiffErro, como no ponto."""
+    gt = GeoTiff(url, sessao, timeout=timeout, trabalhadores=TRABALHADORES_GRADE, piso=PISO_RISCO)
+    gt.abrir()
+    validador = gt.validador
+    if anterior and validador and anterior.get("validador") == validador and anterior.get("url") == url:
+        return {**anterior, "conferido": True}
+    grade = gt.somar_em_blocos(caixa, passo, precisa=precisa, teto=1 + 1e-9)
+    return {"modificado": gt.modificado, "validador": validador, "url": url, "grade": grade, "conferido": False}
 
 
 # ── NASA POWER: irradiação diária ────────────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,21 @@
+{# A tabela das usinas, à direita do mapa (09/10/2026): o nome leva à página da usina; o risco vai na cor, na bolinha e na palavra.
+   Clicar na linha destaca a usina no mapa, e clicar na usina destaca a linha (clima-mapa.js). No modo TV, as linhas que não cabem
+   na altura viram "e mais N" (sem rolagem). #}
+<section class="mp-tabela" aria-labelledby="mp-tabela-h" data-parte="tabela">
+  <h2 class="mp-leg-h" id="mp-tabela-h">Usinas por risco{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>
+  <div class="mp-tab-rolagem">
+    <table class="mp-tab">
+      <thead><tr><th scope="col">Usina</th><th scope="col">Risco</th><th scope="col">Motivo</th></tr></thead>
+      <tbody>
+        {% for u in v.tabela %}
+        <tr class="mp-tab-lin mp-tab--{{ u.nivel }}">
+          <th scope="row"><a class="cl-link" href="{{ u.href }}">{{ u.nome }}</a><span class="cl-onde">{{ u.onde }}</span></th>
+          <td><span class="mp-risco mp-risco--{{ u.nivel }}"><span class="mp-chave mp-n-{{ u.nivel }}" aria-hidden="true"></span>{{ u.rotulo }}</span></td>
+          <td class="mp-tab-motivo">{{ u.motivo_curto }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="mp-tab-mais" hidden></p>
+</section>

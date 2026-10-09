@@ -10,6 +10,7 @@ vai na tela; a palavra do INMET vai no texto). Evento que o INMET publicar e que
 tela continua mostrando o nome dele: nada some.
 """
 from ...cadastro.servico import chave_texto
+from . import fontes as F
 
 # Os três níveis do INMET (a severidade que vem no aviso), do mais leve ao mais grave.
 NIVEIS_INMET = (
@@ -63,28 +64,28 @@ _EVENTOS = {
         "A geração do começo da manhã; ela volta quando o gelo derrete."),
 }
 EVENTOS = {chave_texto(nome): {"o_que_e": a, "na_usina": b, "conferir": c} for nome, (a, b, c) in _EVENTOS.items()}
-GENERICO = {"o_que_e": "Aviso meteorológico do INMET para a região da usina.",
-            "na_usina": "Depende do evento: veja o aviso completo no portal de alertas do INMET.",
+GENERICO = {"o_que_e": f"Aviso meteorológico do {F.extenso('inmet')} para a região da usina.",
+            "na_usina": f"Depende do evento: veja o aviso completo no portal de alertas do {F.extenso('inmet')}.",
             "conferir": "A usina, quando o aviso terminar."}
 
 FOCO = {"o_que_e": "Um satélite viu fogo num ponto a até 5 km da usina na última hora. Nem todo foco é incêndio, mas fogo perto "
                    "é risco real.",
         "na_usina": "O fogo na vegetação pode chegar aos módulos, aos cabos e à cerca.",
         "conferir": "Quem estiver perto confere o local; aceiro, roçagem e extintores."}
-RISCO_FOGO = {"o_que_e": "Previsão do INPE, de 0 a 1, de quanto a vegetação em volta da usina pode pegar fogo, pelo tempo seco, "
-                         "pelo calor e pelos dias sem chuva. Alto a partir de 0,70; crítico acima de 0,95.",
+RISCO_FOGO = {"o_que_e": f"Previsão do {F.extenso('inpe')}, de 0 a 1, de quanto a vegetação em volta da usina pode pegar "
+                         "fogo, pelo tempo seco, pelo calor e pelos dias sem chuva. Alto a partir de 0,70; crítico acima de 0,95.",
               "na_usina": "Com risco alto ou crítico, qualquer faísca ou queimada vizinha pode virar incêndio perto dos módulos.",
               "conferir": "Roçagem e aceiro em dia e extintores no lugar."}
 
 # Os três níveis da USINA, na ordem da tela: o que quer dizer e o que fazer com ele.
 COMO_LER = (
     {"id": "agir", "rotulo": "Agir agora",
-     "quer_dizer": "Fogo a até 5 km da usina, ou aviso forte do INMET: Grande Perigo de qualquer tipo, ou Perigo de "
-                   "tempestade, chuva forte, vento ou granizo.",
+     "quer_dizer": f"Fogo a até 5 km da usina, ou aviso forte do {F.extenso('inmet')}: Grande Perigo de qualquer tipo, ou "
+                   "Perigo de tempestade, chuva forte, vento ou granizo.",
      "fazer": "Avisar o supervisor da região e conferir a usina assim que der."},
     {"id": "atencao", "rotulo": "Atenção",
-     "quer_dizer": "Algum outro aviso do INMET (agora ou nos próximos dias) ou risco de fogo alto ou crítico em algum dos "
-                   "próximos quatro dias.",
+     "quer_dizer": f"Algum outro aviso do {F.extenso('inmet')} (agora ou nos próximos dias) ou risco de fogo alto ou "
+                   "crítico em algum dos próximos quatro dias.",
      "fazer": "Acompanhar; nada a fazer agora."},
     {"id": "sem", "rotulo": "Sem alerta",
      "quer_dizer": "Nenhum aviso, nenhum fogo perto e risco de fogo abaixo de alto, com as três fontes lidas.",

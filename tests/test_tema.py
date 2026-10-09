@@ -64,6 +64,10 @@ ESCURO_DE_SEMPRE = {
     "--foto-etiqueta": "rgba(9,13,24,.78)", "--foto-tinta": "#fff", "--foto-legenda": "#e6e9f2",
     "--foto-borda": "rgba(255,255,255,.3)", "--foto-borda-hover": "#a3d900", "--papel": "#fff",
     "--papel-mudo": "#5b6475", "--papel-link": "#3d5c00",
+    # as camadas de calor do Mapa de risco (09/10/2026): tokens novos, nenhum valor de antes mudou
+    "--calor-risco-1": "#503f2b", "--calor-risco-2": "#724a26", "--calor-risco-3": "#985224", "--calor-risco-4": "#bf582b",
+    "--calor-risco-5": "#e75b3c", "--calor-densidade-1": "#234950", "--calor-densidade-2": "#1e5e68",
+    "--calor-densidade-3": "#0e7580", "--calor-densidade-4": "#068b95", "--calor-densidade-5": "#09a2a9",
 }
 
 COR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(", re.I)

@@ -85,18 +85,43 @@ def risco_baixo(ids=("1", "2", "3", "4", "5", "6")):
 
 
 def instalar_leituras(monkeypatch):
-    """O `instalar(avisos, focos, risco)` das leituras prontas: as três fontes do `leitura.py` passam a devolver o que o teste
-    manda (o que não vier é "fonte fora"), sem rede. Cada teste o embrulha numa fixture `leituras`. Devolve a lista das
-    fontes que foram pedidas."""
+    """O `instalar(avisos, focos, risco, grade)` das leituras prontas: as fontes do `leitura.py` passam a devolver o que o teste
+    manda (o que não vier é "fonte fora"), sem rede. `grade` é o mapa de calor do risco de fogo (09/10/2026), uma Leitura ou um
+    {dia: Leitura}. Cada teste o embrulha numa fixture `leituras`. Devolve a lista das fontes que foram pedidas."""
     chamadas = []
 
-    def instalar(avisos=None, focos=None, risco=None):
+    def instalar(avisos=None, focos=None, risco=None, grade=None):
         vazio = L.Leitura(None, None, erro="sem fonte nos testes")
         monkeypatch.setattr(L, "avisos", lambda config, sessao=None: chamadas.append("avisos") or avisos or vazio)
         monkeypatch.setattr(L, "focos", lambda config, sessao=None: chamadas.append("focos") or focos or vazio)
         monkeypatch.setattr(L, "risco", lambda config, pontos, sessao=None: chamadas.append("risco") or risco or vazio)
+
+        def da_grade(config, dia, caixa, precisa=None, sessao=None):
+            chamadas.append(f"grade{dia}")
+            g = grade.get(dia) if isinstance(grade, dict) else grade
+            return g or vazio
+        monkeypatch.setattr(L, "risco_grade", da_grade)
         return chamadas
     return instalar
+
+
+def lei_grade(valor, caixa=(-46.0, -24.0, -36.0, -4.0), passo=0.08, modificado=None, vence_em=None, **kw):
+    """O mapa de calor do risco de fogo pronto: blocos de `passo` graus na `caixa`, cada um com 64 pixels e o valor `valor(lat, lon)`
+    (None = sem dado). `modificado`: a data do arquivo do INPE (padrão: hoje, 06:32)."""
+    from array import array
+    lon0, lat0, lon1, lat1 = caixa
+    ncols, nrows = round((lon1 - lon0) / passo), round((lat1 - lat0) / passo)
+    soma, n = array("d", [0.0]) * (ncols * nrows), array("I", [0]) * (ncols * nrows)
+    for r in range(nrows):
+        for c in range(ncols):
+            v = valor(lat1 - (r + 0.5) * passo, lon0 + (c + 0.5) * passo)
+            if v is not None:
+                soma[r * ncols + c], n[r * ncols + c] = 64 * v, 64
+    blocos = {"oeste": lon0, "norte": lat1, "dlon": passo, "dlat": passo, "ncols": ncols, "nrows": nrows, "soma": soma, "n": n,
+              "px_por_bloco": 64, "tiles": 1, "bytes": 1}
+    modificado = modificado or datetime(2026, 10, 7, 9, 32, tzinfo=UTC)
+    return L.Leitura({"modificado": modificado, "validador": "teste", "url": "u", "grade": blocos, "conferido": False}, LIDO,
+                     vence_em=vence_em, **kw)
 
 
 def tudo_instalado(leituras, avisos=None, focos=None, risco=None):

@@ -1,0 +1,29 @@
+{# Os controles do Mapa de risco, numa faixa acima do mapa (09/10/2026; o filtro numa linha só, acima do que ele filtra): a região
+   (o recorte do servidor, com a projeção dela), a camada de fundo (uma por vez), o que vai por cima e o cliente (o mesmo filtro da
+   lista). Tudo é link ou formulário com o estado no endereço: funciona sem JavaScript, e o clima-mapa.js troca a tela sem
+   recarregar. #}
+{% set rota = 'torre_performance.mapa_de_risco' %}
+<div class="mp-barra" data-parte="barra">
+  <nav class="mp-regioes" aria-label="Região do mapa">
+    {% for r in v.regioes %}<a class="mp-regiao" data-acao="regiao" href="{{ url_for(rota, **v.links.regiao[r.id]) }}"{% if r.atual %} aria-current="page"{% endif %}>{{ r.nome }}</a>{% endfor %}
+  </nav>
+  <div class="mp-grupo" role="group" aria-labelledby="mp-fundo-r">
+    <span class="gc-rotulo" id="mp-fundo-r">Camada de fundo</span>
+    {% for f, nome in v.fundos.items() %}<a class="gc-chip mp-chip" id="mp-fundo-{{ f }}" data-acao="estado" data-fundo="{{ f }}" href="{{ url_for(rota, **v.links.fundo[f]) }}" aria-pressed="{{ 'true' if v.fundo == f else 'false' }}" role="button">{{ nome }}</a>{% endfor %}
+  </div>
+  <div class="mp-grupo" role="group" aria-labelledby="mp-sobre-r">
+    <span class="gc-rotulo" id="mp-sobre-r">Mostrar</span>
+    {% for s, nome in v.sobre.items() %}<a class="gc-chip mp-chip" id="mp-sobre-{{ s }}" data-acao="estado" data-sobre="{{ s }}" href="{{ url_for(rota, **v.links.ver[s]) }}" aria-pressed="{{ 'true' if s in v.ver else 'false' }}" role="button">{{ nome }}</a>{% endfor %}
+  </div>
+  {% if v.clientes %}
+  <form class="cl-filtro mp-cliente" method="get" action="{{ url_for(rota) }}">
+    <label class="gc-rotulo" for="mp-cliente">Cliente</label>
+    <select id="mp-cliente" name="cliente" class="gc-campo" data-acao="cliente">
+      <option value="">Todos os clientes</option>
+      {% for c in v.clientes %}<option value="{{ c }}"{% if c == v.cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    {% for k, valor in v.links.aqui.items() if k != "cliente" %}<input type="hidden" name="{{ k }}" value="{{ valor }}">{% endfor %}
+    <noscript><button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button></noscript>
+  </form>
+  {% endif %}
+</div>

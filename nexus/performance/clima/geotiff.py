@@ -20,6 +20,8 @@ Pillow nas 1190 tiles do T0 (10 s no arquivo inteiro), e o mapa decodificado tem
 """
 import math
 import struct
+import sys
+from array import array
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -117,6 +119,11 @@ class GeoTiff:
         self._comprimidas = {}                # tile -> bytes do fluxo LZW (pequenas; nunca se busca a mesma duas vezes)
         self._decodificadas = OrderedDict()   # tile -> bytes dos doubles (512 KB cada, poucas)
         self.modificado = None                # datetime UTC do Last-Modified do arquivo
+
+    @property
+    def validador(self):
+        """O Last-Modified da 1ª resposta, como o servidor o escreveu (None sem ele): diz se o arquivo é o mesmo de antes."""
+        return self._modificado_http
 
     # ── rede ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -360,3 +367,104 @@ class GeoTiff:
             com_pixel.append((tile if tile is not None else -1, chave, lat, lon))
         self._baixar_varias(sorted({t for t, *_ in com_pixel if t >= 0}))
         return {chave: self.amostrar(lat, lon, raio) for _, chave, lat, lon in sorted(com_pixel, key=lambda x: x[0])}
+
+    # ── a área inteira, em blocos (o mapa de calor do Mapa de risco, 09/10/2026) ──────────────────────────────────────
+
+    def somar_em_blocos(self, caixa, passo, *, precisa=None, teto=None) -> dict:
+        """A soma e a contagem dos pixels COM dado em blocos de `passo` graus (o bloco é um número inteiro de pixels, alinhado à
+        origem do arquivo), na `caixa` (lon mín., lat mín., lon máx., lat máx.). `precisa(oeste, sul, leste, norte)` diz se uma
+        tile é preciso ler (None = todas as da caixa): o mapa só pede as que encostam no Brasil.
+
+        Para que serve (Levi, 09/10/2026, "uma outra visão tipo um mapa de calor"): o risco por usina lê só a tile de cada usina;
+        o mapa de calor precisa da área. Medido em 09/10/2026 no arquivo real: a caixa do Brasil são 289 tiles e 11,8 MB por dia,
+        e o LZW em Python leva de 3 a 54 ms por tile. Pixel sem dado (nodata, abaixo do `piso`, NaN) não entra na soma nem na
+        contagem: o bloco sem nenhum pixel com dado fica com contagem 0, e quem desenha diz "sem dado" (nunca inventa 0).
+        Valor acima do `teto` levanta GeoTiffErro: uma escala trocada (0 a 100) acenderia o mapa inteiro.
+
+        Devolve {"oeste", "norte", "dlon", "dlat", "ncols", "nrows", "soma": array('d'), "n": array('I'), "px_por_bloco",
+        "tiles": quantas foram lidas, "bytes": quanto veio da rede}; a célula (linha r, coluna c) é o índice r * ncols + c."""
+        self.abrir()
+        (x0, y0), (dx, dy) = self.origem, self.escala
+        bx, by = max(1, round(passo / dx)), max(1, round(passo / dy))
+        lon0, lat0, lon1, lat1 = caixa
+        col0 = max(0, math.floor((lon0 - x0) / dx))
+        col1 = min(self.largura - 1, math.floor((lon1 - x0) / dx))
+        lin0 = max(0, math.floor((y0 - lat1) / dy))
+        lin1 = min(self.altura - 1, math.floor((y0 - lat0) / dy))
+        if col0 > col1 or lin0 > lin1:
+            raise GeoTiffErro(f"{self._nome} não cobre a área pedida")
+        bc0, bc1, br0, br1 = col0 // bx, col1 // bx, lin0 // by, lin1 // by
+        ncols, nrows = bc1 - bc0 + 1, br1 - br0 + 1
+        # os pixels que os blocos cobrem (o último bloco pode passar da borda do arquivo: só conta o que existe)
+        pc0, pc1 = bc0 * bx, min(self.largura, (bc1 + 1) * bx)
+        pl0, pl1 = br0 * by, min(self.altura, (br1 + 1) * by)
+        tw, th = self.tile
+        tiles = []
+        for ty in range(pl0 // th, (pl1 - 1) // th + 1):
+            for tx in range(pc0 // tw, (pc1 - 1) // tw + 1):
+                caixa_tile = (x0 + tx * tw * dx, y0 - (ty + 1) * th * dy, x0 + (tx + 1) * tw * dx, y0 - ty * th * dy)
+                if precisa is None or precisa(*caixa_tile):
+                    tiles.append((ty, tx))
+        indices = [ty * self._ao_lado + tx for ty, tx in tiles]
+        self._baixar_varias(indices)
+        soma = array("d", [0.0]) * (ncols * nrows)
+        n = array("I", [0]) * (ncols * nrows)
+        for (ty, tx), idx in zip(tiles, indices):
+            self._somar_tile(ty, tx, idx, soma, n, (bc0, br0, ncols, bx, by), (pc0, pc1, pl0, pl1), teto)
+            self._comprimidas.pop(idx, None)               # 8 a 12 MB de tiles comprimidas: solta cada uma depois de usar
+        return {"oeste": x0 + bc0 * bx * dx, "norte": y0 - br0 * by * dy, "dlon": bx * dx, "dlat": by * dy, "ncols": ncols,
+                "nrows": nrows, "soma": soma, "n": n, "px_por_bloco": bx * by, "tiles": len(tiles),
+                "bytes": sum(self._bytes[i] for i in indices)}
+
+    def _valido(self, v, teto) -> bool:
+        if not math.isfinite(v) or (self.nodata is not None and v == self.nodata):
+            return False
+        if self.piso is not None and v < self.piso:
+            return False
+        if teto is not None and v > teto:
+            raise GeoTiffErro(f"valor {v:g} acima de {teto:g} em {self._nome}: o INPE mudou a escala?")
+        return True
+
+    def _somar_tile(self, ty, tx, idx, soma, n, blocos, pixels, teto) -> None:
+        """Soma os pixels de uma tile nos blocos. Uma linha da tile inteira limpa (sem nodata, sem NaN, dentro do piso e do teto)
+        vai pelo caminho rápido (a `sum` do Python em cada pedaço de bloco); só a linha que mistura dado e nodata (costa, cidade,
+        água) é olhada pixel a pixel. Sem isso, as ~200 tiles do Brasil levavam o triplo."""
+        bc0, br0, ncols, bx, by = blocos
+        pc0, pc1, pl0, pl1 = pixels
+        tw, th = self.tile
+        bruto = descomprimir_lzw(self._comprimidas[idx], tw * th * 8)
+        if len(bruto) < tw * th * 8:
+            raise GeoTiffErro(f"tile {idx} truncada: o LZW rendeu {len(bruto)} dos {tw * th * 8} bytes")
+        valores = array("d")
+        valores.frombytes(bruto)
+        if sys.byteorder == "big":                          # o arquivo é little-endian (conferido no cabeçalho)
+            valores.byteswap()
+        c_ini, c_fim = max(pc0, tx * tw), min(pc1, (tx + 1) * tw)
+        if c_ini >= c_fim:
+            return
+        for ly in range(th):
+            lin = ty * th + ly
+            if lin < pl0 or lin >= pl1:
+                continue
+            base = (lin // by - br0) * ncols - bc0
+            linha = valores[ly * tw + c_ini - tx * tw: ly * tw + c_fim - tx * tw]
+            sem_dado = linha.count(self.nodata) if self.nodata is not None else 0
+            if sem_dado == len(linha):
+                continue
+            total = sum(linha)
+            limpa = (sem_dado == 0 and math.isfinite(total) and (self.piso is None or min(linha) >= self.piso)
+                     and (teto is None or max(linha) <= teto))
+            c = c_ini
+            while c < c_fim:
+                fim = min(c_fim, (c // bx + 1) * bx)
+                pedaco = linha[c - c_ini: fim - c_ini]
+                k = base + c // bx
+                if limpa:
+                    soma[k] += sum(pedaco)
+                    n[k] += len(pedaco)
+                else:
+                    for v in pedaco:
+                        if self._valido(v, teto):
+                            soma[k] += v
+                            n[k] += 1
+                c = fim
