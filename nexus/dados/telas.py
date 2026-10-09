@@ -9,9 +9,14 @@ somam) e quanto a fonte guarda; os livros do Nexus (registrados antes de existir
 (`nexus_dimensoes · qualidade_historico`) e o resumo da dimensão de equipamento (`nexus_equipamentos · qualidade`).
 
 08/10/2026, Levi: "Quero uma visão de cima da governança também, teria como fazer um organograma??". Segunda visão da
-mesma tela (`?ver=organograma`; a matriz continua o padrão): a raiz com os números do resumo, os setores (o `area` de
-cada fato, com o nome da torre dona), os fatos de cada setor pelo estado e as dimensões conformadas que ligam os
-setores. Tudo sai do catálogo (`organograma`), nada de lista à mão; a qualidade é a mesma da última carga.
+mesma tela: a raiz com os números do resumo, os setores (o `area` de cada fato, com o nome da torre dona), os fatos de
+cada setor pelo estado e as dimensões conformadas que ligam os setores. Tudo sai do catálogo (`organograma`), nada de
+lista à mão; a qualidade é a mesma da última carga.
+
+09/10/2026, Levi, depois de usar: o organograma é o padrão e a matriz a segunda (`?ver=matriz`); o aposentado some das
+duas visões ("se ele é inútil deixe em sua inutilidade"); as fontes de outro fato ficam abertas no setor (os dados delas
+são usados: alimentam o fato onde ganham os IDs); a gaveta cresce com o que tem a mostrar e fala para quem não é da área
+de dados (`explica.py`); e mostra a tabela de verdade, só para ler (`previa.py`).
 """
 import json
 import math
@@ -19,9 +24,9 @@ import re
 import time
 from datetime import datetime
 
-from flask import current_app, render_template, request, url_for
+from flask import abort, current_app, render_template, request, session, url_for
 
-from . import carga, catalogo, equipamento, historico, livros, programacao
+from . import carga, catalogo, equipamento, explica, historico, livros, previa, programacao, radar
 
 _CACHE = {"t": 0.0, "v": None}
 TTL_S = 300
@@ -37,7 +42,7 @@ def _ultima_qualidade():
     s = current_app.extensions.get("nexus_dados_sessao")
     if s is None and current_app.config.get("TESTING"):
         return {"qualidade": {}, "atualizacao": {}, "historico": [], "equipamento": [],
-                "erro": "teste sem banco"}     # teste nunca vai à rede
+                "erro": "teste sem banco", "radar": None, "radar_erro": "teste sem banco"}  # teste nunca vai à rede
     s = s or requests.Session()
     base = carga._base(current_app.config)
     try:
@@ -51,6 +56,11 @@ def _ultima_qualidade():
              "equipamento": [(item, eq[(g, item)]) for g, item in _EQ_RESUMO if (g, item) in eq], "erro": None}
     except Exception as e:      # noqa: BLE001 — banco fora do ar: a tela mostra o catálogo
         v = {"qualidade": {}, "atualizacao": {}, "historico": [], "equipamento": [], "erro": f"{type(e).__name__}"}
+    # o radar do banco (09/10/2026): a lista de todas as abas, comparada com o catálogo. Falhar aqui não apaga a qualidade
+    try:
+        v.update(radar=radar.resumo(previa._abas(base, s)), radar_erro=None)
+    except Exception as e:      # noqa: BLE001
+        v.update(radar=None, radar_erro=type(e).__name__)
     _CACHE.update(t=time.time(), v=v)
     return v
 
@@ -86,18 +96,33 @@ def _extra(v) -> dict:
 
 
 # ── o organograma (08/10/2026) ────────────────────────────────────────────────────────────────────────────────────
-VISOES = ("matriz", "organograma")      # a primeira é o padrão: a matriz continua sendo o que a tela abre
+# a primeira é o padrão (Levi, 09/10/2026: "Deixe organograma como padrão, Matriz em segundo")
+VISOES = ("organograma", "matriz")
 
 # O estado de cada fato na visão de cima: a palavra (nunca só a cor), o tom do semáforo da casa (tokens do nexus.css, um
 # matiz por degrau: conformado verde, montado amarelo, origem laranja, fora do banco vermelho) e o que quer dizer (o
-# docstring do catálogo, sem repetir a palavra). "Parte de" e "aposentado" ficam neutros: não contam mais
-# (`catalogo.ativos`) e vão recolhidos no "mostrar também" do setor.
+# docstring do catálogo, sem repetir a palavra). A fonte de outro fato fica neutra: não conta (`catalogo.ativos`), mas
+# aparece aberta no setor, porque os dados dela alimentam o fato onde ganham os IDs (Levi, 09/10: "estamos usando os
+# dados? fazemos ligações? Se sim já deixa expandido"). Era "parte de", que não dizia isso. O aposentado não aparece
+# (a entrada fica para o teste de que todo estado do catálogo tem palavra).
 ESTADO_ORG = {"conformado": ("conformado", "ok", "gravado no banco com os IDs do Nexus"),
               "montado": ("montado", "alerta", "o Nexus monta com os IDs; gravar espera decisão"),
               "origem": ("origem", "severo", "só como a fonte grava, sem os IDs do Nexus"),
               "fora": ("fora do banco", "critico", "nem no banco nem montado"),
-              "parte": ("parte de", "neutro", "virou fonte de outro fato"),
+              "parte": ("fonte", "neutro", "tabela crua que alimenta outro fato; as ligações por ID são feitas nele"),
               "aposentado": ("aposentado", "neutro", "a fonte não vale mais")}
+# A situação do fato em uma frase, na gaveta (09/10/2026: a linguagem para quem quer saber para que a tabela serve)
+ESTADO_FRASE = {
+    "conformado": "Pronta: o Nexus grava esta tabela no banco com os IDs dele, e ela se cruza com as dos outros "
+                  "setores sem conversão.",
+    "montado": "Quase pronta: o Nexus já monta esta tabela com os IDs, mas ainda não grava no banco (espera uma "
+               "decisão).",
+    "origem": "Como a fonte grava: o Nexus ainda não monta esta tabela no padrão dele (com os IDs em todas as "
+              "ligações). Cruzar com as outras depende de como cada coluna liga, na tabela abaixo.",
+    "fora": "Fora do banco: ainda não está no banco de dados nem é montada pelo Nexus.",
+    "parte": "Tabela de origem: os dados daqui alimentam {alimenta}, e é lá que ganham os IDs do Nexus.",
+    "aposentado": "Aposentada: a fonte não vale mais.",
+}
 # a ordem dos degraus na barra de cada setor (do pronto ao que falta) e o plural da contagem
 DEGRAUS = (("conformado", "conformado", "conformados"), ("montado", "montado", "montados"),
            ("origem", "de origem", "de origem"), ("fora", "fora do banco", "fora do banco"))
@@ -105,7 +130,20 @@ TIPO_EXPLICA = {"transacao": "1 linha por acontecimento, não muda depois",
                 "snapshot_periodico": "o estado no fim de cada período (dia, semana, mês)",
                 "snapshot_acumulado": "a linha muda até fechar (soma de duas cargas conta em dobro)",
                 "sem_medida": "só registra que aconteceu: conta-se linhas"}
-SOMA_ROTULO = {"aditiva": "soma", "semi": "soma num eixo só", "nao": "não soma"}
+# o mesmo tipo dito para quem não conhece o Kimball (a palavra técnica fica em "Para quem mantém o dado")
+TIPO_FRASE = {"transacao": "É um acontecimento por linha, que não muda depois de gravado.",
+              "snapshot_periodico": "É o retrato de um período (um dia, uma semana ou um mês).",
+              "snapshot_acumulado": "A linha muda até o caso fechar: por isso, somar duas cargas conta em dobro.",
+              "sem_medida": "Não tem número para somar: o que se conta é quantas vezes aconteceu."}
+SOMA_ROTULO = {"aditiva": "sim", "semi": "só num sentido (no tempo, de uma usina só)",
+               "nao": "não: use média, mínimo ou máximo"}
+# o que quer dizer cada jeito de ligar, na legenda da gaveta (só os que o fato usa)
+LIGA_FRASE = {"id": "liga direto ao cadastro do Nexus: o jeito certo",
+              "cod": "liga por um código de outro sistema, que precisa do de-para",
+              "hmac": "a pessoa como um código tirado do e-mail, sem o e-mail em claro",
+              "nome": "liga pelo nome escrito: grafia diferente quebra a ligação",
+              "largo": "um equipamento por coluna: precisa virar linhas antes de ligar",
+              "prop": "um cadastro que só esta tabela usa"}
 # o que a qualidade grava por dimensão (as mesmas colunas da matriz)
 PCT_DIM = {"data": "pct_data", "usina": "pct_usina", "equipe": "pct_equipe", "pessoa": "pct_pessoa",
            "equipamento": "pct_equipamento"}
@@ -147,8 +185,14 @@ def quem_grava(texto: str) -> tuple[str, str]:
 
 
 def _livro(texto: str) -> dict:
+    """O livro com quem grava. No livro do Nexus o `quem_grava` do catálogo é o caminho do código ("nexus/dados/carga.py"):
+    o cartão e a gaveta dizem "Nexus" (09/10/2026, a linguagem para quem não é da área de dados) e o caminho fica em
+    letra pequena na gaveta, para quem mantém."""
     quem, cadencia = quem_grava(texto)
-    return {"texto": texto, "livro": _nome_do_livro(texto), "quem": quem, "cadencia": cadencia}
+    nome = _nome_do_livro(texto)
+    do_nexus = nome in catalogo.LIVRO_POR_NOME
+    return {"texto": texto, "livro": nome, "quem": quem, "cadencia": cadencia,
+            "quem_amigavel": "Nexus" if do_nexus else quem, "quem_tecnico": quem if do_nexus else ""}
 
 
 def _setor(area: str, torres: dict) -> dict:
@@ -170,17 +214,14 @@ def _mais(itens: list) -> str:
     return " + ".join(itens) if len(itens) <= 2 else f"{itens[0]} +{len(itens) - 1}"
 
 
-# o "mostrar também" de cada setor diz o que está recolhido ("2 fontes de outro fato, 1 aposentado")
-OUTROS_ROTULO = {"parte": ("fonte de outro fato", "fontes de outro fato"), "aposentado": ("aposentado", "aposentados")}
-
-
 def _contagem(n: int, um: str, varios: str) -> str:
     return f"{n} {um if n == 1 else varios}"
 
 
 def _cartao(f: catalogo.Fato, ql: dict | None, setor: dict) -> dict:
     # estado que o catálogo ganhe depois desta tela: a palavra do catálogo, neutro, até alguém dar o tom dele aqui
-    estado, tom, explica = ESTADO_ORG.get(f.estado, (catalogo.ESTADOS_FATO.get(f.estado, f.estado), "neutro", ""))
+    estado, tom, explica_estado = ESTADO_ORG.get(f.estado,
+                                                 (catalogo.ESTADOS_FATO.get(f.estado, f.estado), "neutro", ""))
     # as fontes (o livro · aba de cada uma, com quem grava); sem `fontes` declaradas, o próprio `livro`. A programação do
     # PCM mora "fora do banco" e a fonte declarada é o arquivo do robô do PCM
     fontes = [_livro(x) for x in (f.fontes or (f.livro,))]
@@ -192,23 +233,41 @@ def _cartao(f: catalogo.Fato, ql: dict | None, setor: dict) -> dict:
     if f.conformado_em:
         nexus = _livro(f.conformado_em)
         nexus["grava"] = f.estado == "conformado"     # montado: o destino registrado, ainda sem gravar
-        nexus["quem_curto"] = _curto(nexus["quem"])
     dims = []
     for did, nome, _onde, _chave in catalogo.DIMENSOES:
         est, col = f.dims.get(did, ("nao", ""))
         v = ql.get(PCT_DIM[did]) if (ql and did in PCT_DIM and f.estado == "conformado") else None
         dims.append({"id": did, "nome": nome, "estado": est, "rotulo": catalogo.ESTADOS.get(est, est), "col": col,
                      "pct": _pct(v) if v not in (None, "") else ""})
+    # a gaveta mostra só as dimensões que o fato tem (as que faltam, numa linha), com a legenda dos jeitos que ele usa
+    com = [d for d in dims if d["estado"] != "nao"]
+    parte_de = [catalogo.POR_ID[p].nome if p in catalogo.POR_ID else p for p in f.parte_de]
+    frase = ESTADO_FRASE.get(f.estado, explica_estado)
+    if "{alimenta}" in frase:
+        frase = frase.format(alimenta=_lista(parte_de) or "outro fato")
     return {"id": f.id, "nome": f.nome, "estado": f.estado, "estado_rotulo": estado, "tom": tom,
-            "estado_explica": explica, "setor": setor["rotulo"],
+            "estado_explica": explica_estado, "estado_frase": frase, "setor": setor["rotulo"],
+            "resumo": explica.RESUMO.get(f.id, ""), "para_que": explica.PARA_QUE.get(f.id, ""),
             "tipo": catalogo.TIPO_ROTULO.get(f.tipo, f.tipo), "tipo_explica": TIPO_EXPLICA.get(f.tipo, ""),
-            "grao": f.grao, "chave": f.chave, "janela": f.janela_origem, "observacao": f.observacao,
-            "medidas": [{"coluna": m.coluna, "unidade": m.unidade, "soma": SOMA_ROTULO.get(m.soma, m.soma)}
+            "tipo_frase": TIPO_FRASE.get(f.tipo, ""),
+            "grao": f.grao, "grao_curto": re.sub(r"^1 linha = ", "", f.grao), "chave": f.chave,
+            "janela": f.janela_origem, "observacao": f.observacao,
+            "medidas": [{"coluna": m.coluna, "unidade": m.unidade,
+                         "soma": ("sim: a soma diz quantas" if m.unidade == "1/0" and m.soma == "aditiva"
+                                  else SOMA_ROTULO.get(m.soma, m.soma))}
                         for m in f.medidas],
             "fontes": fontes, "nexus": nexus, "livros_card": _mais(livros_card),
-            "quem_card": _mais([_curto(q) for q in dict.fromkeys(l["quem"] for l in fontes)]),
-            "parte_de": [catalogo.POR_ID[p].nome if p in catalogo.POR_ID else p for p in f.parte_de],
-            "dims": dims, "q": ql or None}
+            "quem_card": _mais([_curto(q) for q in dict.fromkeys(l["quem_amigavel"] for l in fontes)]),
+            "parte_de": parte_de, "alimenta": _lista(parte_de), "dims": dims, "dims_com": com,
+            "dims_sem": [d["nome"] for d in dims if d["estado"] == "nao"], "tem_pct": any(d["pct"] for d in com),
+            "legenda": [(e, catalogo.ESTADOS.get(e, e), LIGA_FRASE.get(e, ""))
+                        for e in dict.fromkeys(d["estado"] for d in com)],
+            "q": ql or None}
+
+
+def _lista(nomes: list) -> str:
+    """['a', 'b', 'c'] -> 'a, b e c'."""
+    return " e ".join(", ".join(nomes).rsplit(", ", 1)) if nomes else ""
 
 
 def organograma(torres, q: dict) -> dict:
@@ -222,10 +281,12 @@ def organograma(torres, q: dict) -> dict:
     conta = dict(catalogo.resumo(), origem=sum(1 for f in ativos if f.estado == "origem"))
     setores = {}
     for f in catalogo.FATOS:
+        if f.estado == "aposentado":        # Levi, 09/10/2026: "Não mostre aposentado"
+            continue
         s = setores.get(f.area)
         if s is None:
-            s = setores[f.area] = dict(_setor(f.area, por_torre), ativos=[], outros=[])
-        (s["ativos"] if f.id in ids_ativos else s["outros"]).append(_cartao(f, q.get(f.id), s))
+            s = setores[f.area] = dict(_setor(f.area, por_torre), ativos=[], fontes=[])
+        (s["ativos"] if f.id in ids_ativos else s["fontes"]).append(_cartao(f, q.get(f.id), s))
     for s in setores.values():
         n = len(s["ativos"])
         s["n"] = n
@@ -240,9 +301,6 @@ def organograma(torres, q: dict) -> dict:
         for i, c in enumerate(s["ativos"]):
             c["topo_de_coluna"] = i % s["linhas"] == 0
             c["fim_de_coluna"] = (i + 1) % s["linhas"] == 0 or i == n - 1
-        outros = [c["estado"] for c in s["outros"]]
-        s["resumo_outros"] = ", ".join(_contagem(outros.count(e), *OUTROS_ROTULO.get(e, (e, e)))
-                                       for e in dict.fromkeys(outros))
     lista = list(setores.values())
     dims = []
     ordem_estados = list(catalogo.ESTADOS)
@@ -270,11 +328,29 @@ def registrar_governanca(bp):
         ver = request.args.get("ver") if request.args.get("ver") in VISOES else VISOES[0]
         grupos = {}
         for f in catalogo.FATOS:
-            grupos.setdefault(f.area, []).append(f)
+            if f.estado != "aposentado":        # Levi, 09/10/2026: "Não mostre aposentado" (nas duas visões)
+                grupos.setdefault(f.area, []).append(f)
         org = organograma(current_app.extensions.get("nexus_torres"), v["qualidade"]) if ver == "organograma" else None
         return render_template("dados/governanca.html", torre=bp.name, catalogo=catalogo, grupos=grupos,
                                resumo=catalogo.resumo(), q=v["qualidade"], atualizacao=v["atualizacao"],
                                hist_q=v["historico"], eq_q=v["equipamento"], erro=v["erro"], hora=_hora, pct=_pct,
                                num=_num, extra=_extra, ver=ver, org=org, degraus=DEGRAUS, estado_org=ESTADO_ORG,
-                               url_matriz=url_for(f"{bp.name}.governanca"),
-                               url_organograma=url_for(f"{bp.name}.governanca", ver="organograma"))
+                               url_matriz=url_for(f"{bp.name}.governanca", ver="matriz"),
+                               url_organograma=url_for(f"{bp.name}.governanca"),
+                               url_tabela=url_for(f"{bp.name}.governanca_tabela"), radar=v.get("radar"),
+                               radar_erro=v.get("radar_erro"), admin=bool(session.get("admin")),
+                               milhar=previa._milhar)
+
+    @bp.route("/governanca/tabela")
+    def governanca_tabela():
+        """A tabela do fato, só para ler: o pedaço de HTML que a gaveta do organograma põe ao lado dela. Com `nova`, a
+        tabela nova do radar (só administrador, e só se ainda for nova)."""
+        if request.args.get("nova"):
+            r = previa.responder_nova(request.args.get("livro", ""), request.args.get("aba_nova", ""), request.args)
+            if r is None:
+                abort(404)
+            return r
+        f = catalogo.POR_ID.get(request.args.get("fato", ""))
+        if f is None or f.estado == "aposentado":
+            abort(404)
+        return previa.responder(f, request.args)

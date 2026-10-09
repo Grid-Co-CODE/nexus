@@ -24,7 +24,10 @@ análises correlacionadas". O modelo é o de **Kimball** (fato com IDs, dimensã
 `nexus/dados/` — **leia `nexus/dados/CLAUDE.md` antes de pôr qualquer dado novo no banco** (chamados, engenharia, PCM,
 segurança, mais inversores). Em uma linha: fonte nova entra primeiro no catálogo (`nexus/dados/catalogo.py`) com o grão
 e as dimensões declarados; o fato vai ao banco com `data_id`, `usina_id`, `pessoa_id`…, nunca com nome em claro nem ID
-chutado; a qualidade da ligação é medida e aparece em Base → Governança de dados.
+chutado; a qualidade da ligação é medida e aparece em Base → Governança de dados. **Toda tabela do banco tem dono no
+catálogo** (Levi, 09/10/2026: "verifique se aparece a cada tabela nova que aparece!"): o radar da Governança compara o
+banco com o catálogo e a tabela nova aparece sozinha, contada no alto do organograma, até virar fato, entrar no `LIVROS`
+ou ser declarada em `CONHECIDAS`.
 
 ## REGRA: um `.md` por área, sempre em dia (Levi, 03/10/2026)
 

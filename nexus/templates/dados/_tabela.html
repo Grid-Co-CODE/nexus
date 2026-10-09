@@ -1,0 +1,62 @@
+{# A tabela de um fato, só para ler (Levi, 09/10/2026: "Ficará somente para leitura, mas é importante para os
+   stakeholders entenderem o funcionamento e quais dados estão sendo salvos"). Pedaço de HTML que o JavaScript do
+   organograma põe ao lado da gaveta; quem escolhe o que ler é `previa.responder` (só tabelas do catálogo). Os controles
+   levam o estado em data-*: o JavaScript troca a tabela, a aba ou a página pedindo este pedaço de novo. #}
+<div class="dd-prev-raiz" data-previa data-t="{{ t }}" data-aba="{{ aba }}" data-ini="{{ dados.ini if dados else '' }}">
+  <div class="dd-prev-cab">
+    <div class="dd-prev-tit">
+      <p class="gc-eyebrow">Tabela · somente leitura</p>
+      <h2 id="dd-prev-titulo" tabindex="-1">{% if alvo and not alvo.get('fora') %}<code>{{ alvo.livro }}{% if aba %} · {{ aba }}{% endif %}</code>{% else %}{{ fato.nome if fato else '' }}{% endif %}</h2>
+      {% if dados %}<p class="dd-prev-sub">{{ {'nexus': 'A tabela do Nexus, com os IDs', 'nova': 'Tabela nova no banco, que o catálogo ainda não conhece'}.get(alvo.papel, 'A tabela de origem, como a fonte grava') }}
+        · <b>{{ milhar(dados.total) }}</b> {{ 'linha' if dados.total == 1 else 'linhas' }}
+        · <b>{{ dados.colunas | length }}</b> colunas{% if atualizada %} · gravada em {{ atualizada }}{% endif %}</p>{% endif %}
+    </div>
+    <button type="button" class="dd-prev-fechar" data-acao="fechar"><span class="dd-prev-fechar-largo">Fechar a tabela</span><span class="dd-prev-fechar-estreito"><i class="ph ph-arrow-left" aria-hidden="true"></i> Voltar ao detalhe</span></button>
+  </div>
+
+  {% if alvos | length > 1 or abas_usina %}
+  <div class="dd-prev-ctrl">
+    {% if alvos | length > 1 %}
+    <label class="dd-prev-campo"><span>Tabela</span>
+      <select data-param="t">{% for a in alvos %}<option value="{{ loop.index0 }}"{% if loop.index0 == t %} selected{% endif %}>{{ a.rotulo }}{% if not existe.get(loop.index0) and not a.get('fora') %} (ainda não está no banco){% endif %}</option>{% endfor %}</select>
+    </label>
+    {% endif %}
+    {% if abas_usina %}
+    <label class="dd-prev-campo"><span>Usina (aba)</span>
+      <select data-param="aba">{% for x in abas_usina %}<option{% if x == aba %} selected{% endif %}>{{ x }}</option>{% endfor %}</select>
+    </label>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if erro %}
+  <p class="dd-prev-aviso">Não consegui ler a tabela no banco ({{ erro }}). O detalhe ao lado continua valendo; tente de novo em instantes.</p>
+  {% elif alvo and alvo.get('fora') %}
+  <p class="dd-prev-aviso">{{ alvo.rotulo }}. Esta fonte não está no banco de dados, então não há tabela para mostrar.{% if alvos | length > 1 %} A tabela do Nexus está na lista acima.{% endif %}</p>
+  {% elif alvo and not existe.get(t) %}
+  <p class="dd-prev-aviso">A tabela <code>{{ alvo.livro }}{% if alvo.aba %} · {{ alvo.aba }}{% endif %}</code> ainda não está no banco.{% if alvo.papel == 'nexus' %} Ela passa a existir quando o Nexus gravar este fato.{% endif %}</p>
+  {% elif recusada %}
+  <p class="dd-prev-aviso">A aba <b>{{ aba }}</b> não é de geração por usina (não tem a coluna Data com os inversores ou a energia da usina): fica fora da prévia.</p>
+  {% elif dados and not dados.total %}
+  <p class="dd-prev-aviso">A tabela existe no banco, mas está vazia: nenhuma linha gravada ainda.</p>
+  {% elif dados %}
+    <div class="dd-prev-pag">
+    <span>Linhas <b>{{ milhar(dados.ini) }}</b> a <b>{{ milhar(dados.fim) }}</b> de <b>{{ milhar(dados.total) }}</b>{% if dados.no_fim and dados.no_comeco %} (a tabela inteira){% elif dados.no_fim %} (o fim da tabela){% elif dados.no_comeco %} (o começo da tabela){% endif %}</span>
+    <span class="dd-prev-pag-bot">
+      <button type="button" data-ini="1"{% if dados.no_comeco %} disabled{% endif %}>Início</button>
+      <button type="button" data-ini="{{ dados.anterior }}"{% if dados.no_comeco %} disabled{% endif %}><i class="ph ph-caret-left" aria-hidden="true"></i> Anteriores</button>
+      <button type="button" data-ini="{{ dados.proxima }}"{% if dados.no_fim %} disabled{% endif %}>Próximas <i class="ph ph-caret-right" aria-hidden="true"></i></button>
+      <button type="button" data-ini="{{ dados.ultimo }}"{% if dados.no_fim %} disabled{% endif %}>Fim</button>
+    </span>
+  </div>
+  <div class="dd-prev-moldura" tabindex="0" role="region" aria-label="Linhas da tabela, só para ler">
+    <table class="dd-prev-tab">
+      <thead><tr><th scope="col" class="dd-prev-num">#</th>{% for c in dados.colunas %}<th scope="col">{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for n, linha in dados.linhas %}
+        <tr><th scope="row" class="dd-prev-num">{{ n }}</th>{% for v, inteiro in linha %}<td{% if inteiro %} title="{{ inteiro }}"{% endif %}>{{ v }}</td>{% endfor %}</tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  <p class="dd-prev-nota">Célula vazia é dado que não veio ou não ligou: o Nexus nunca preenche com um valor chutado. E-mail aparece como [e-mail].</p>
+  {% endif %}
+</div>

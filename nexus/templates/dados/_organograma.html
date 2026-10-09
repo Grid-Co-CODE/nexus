@@ -3,87 +3,108 @@
    com os números do resumo, os setores (o `area` de cada fato, com o nome e o ícone da torre dona), os fatos de cada setor
    e a faixa das dimensões conformadas. As linhas da árvore são bordas do CSS (dados.css, "Organograma"), na cor de token.
    O cartão do fato é um <button> (clique, Enter ou Espaço): o detalhe vem do <template> dele e abre na gaveta (<dialog>).
-   Usa `barra`, `PCT` e `extra` da governanca.html, que inclui este arquivo. #}
+   Usa `barra`, `PCT` e `extra` da governanca.html, que inclui este arquivo.
+   09/10/2026 (Levi, depois de usar): é o padrão da tela; o aposentado não aparece; as fontes de outro fato ficam abertas;
+   a gaveta cresce com o que tem a mostrar, fala para quem não é da área de dados (`explica.py`) e tem o botão da tabela,
+   que abre a tabela de verdade, só para ler, à esquerda dela (`previa.py`, `_tabela.html`). E o radar do banco
+   (`radar.py`, `_radar.html`): a tabela nova no banco, fora do catálogo, aparece sozinha, contada no alto. #}
 {% set conta = org.conta %}
 {% macro estado(c) %}<span class="dd-org-estado {{ c.tom }}">{{ c.estado_rotulo }}</span>{% endmacro %}
 {% macro cartao(c) %}
-<button type="button" class="dd-org-fato {{ c.tom }}" data-fato="{{ c.id }}" aria-haspopup="dialog" aria-controls="dd-gaveta">
+<button type="button" class="dd-org-fato {{ c.tom }}" data-fato="{{ c.id }}" data-det="dd-det-{{ c.id }}" data-previa="fato={{ c.id }}" aria-haspopup="dialog" aria-controls="dd-gaveta">
   <span class="dd-org-nome">{{ c.nome }}</span>
-  <span class="dd-org-linha">{{ estado(c) }}<span class="dd-org-tipo">{{ c.tipo }}</span></span>
-  {% if c.parte_de %}<span class="dd-org-de">fonte de {{ c.parte_de | join(', ') }}</span>{% endif %}
+  <span class="dd-org-linha">{{ estado(c) }}</span>
+  {% if c.resumo %}<span class="dd-org-resumo">{{ c.resumo }}</span>{% endif %}
+  {% if c.parte_de %}<span class="dd-org-de">alimenta: {{ c.alimenta }}</span>{% endif %}
   <span class="dd-org-livro"><code>{{ c.livros_card }}</code><span class="dd-org-quem">grava: {{ c.quem_card }}</span></span>
-  {% if c.nexus %}<span class="dd-org-livro dd-org-nexus"><code>{{ '→' if c.nexus.grava else 'vai para' }} {{ c.nexus.livro }}</code><span class="dd-org-quem">grava: {{ c.nexus.quem_curto }}</span></span>{% endif %}
+  {% if c.nexus %}<span class="dd-org-livro dd-org-nexus"><code>{{ '→' if c.nexus.grava else 'vai para' }} {{ c.nexus.livro }}</code><span class="dd-org-quem">grava: {{ c.nexus.quem_amigavel }}</span></span>{% endif %}
 </button>
 {% endmacro %}
 {% macro detalhe(c) %}
 <template id="dd-det-{{ c.id }}">
   <p class="gc-eyebrow">{{ c.setor }}</p>
   <h2 class="dd-gav-titulo" id="dd-gaveta-titulo">{{ c.nome }}</h2>
-  <p class="dd-org-linha">{{ estado(c) }}<span class="dd-org-tipo">{{ c.tipo }}</span></p>
-  <p class="dd-gav-estado">{{ c.estado_explica }}</p>
+  <p class="dd-org-linha">{{ estado(c) }}</p>
+  <p class="dd-gav-frase">{{ c.estado_frase }}</p>
 
-  <h3>O que é uma linha (o grão)</h3>
-  <p class="dd-gav-grao">{{ c.grao }}</p>
-  <dl class="dd-gav-dl">
-    <dt>Tipo</dt><dd><b>{{ c.tipo }}</b>{% if c.tipo_explica %}: {{ c.tipo_explica }}{% endif %}</dd>
-    <dt>Chave</dt><dd>{% if c.chave %}<code>{{ c.chave | join(' + ') }}</code>{% else %}sem chave (ver a observação){% endif %}</dd>
-    {% if c.janela %}<dt>A fonte guarda</dt><dd>{{ c.janela }}</dd>{% endif %}
-    {% if c.parte_de %}<dt>Virou fonte de</dt><dd>{{ c.parte_de | join(', ') }}</dd>{% endif %}
-  </dl>
+  <h3>Para que serve</h3>
+  <p class="dd-gav-texto">{{ c.para_que }}</p>
 
-  <h3>Onde mora e quem grava</h3>
+  <h3>O que cada linha guarda</h3>
+  <p class="dd-gav-texto">Cada linha é <b>{{ c.grao_curto }}</b>.{% if c.tipo_frase %} {{ c.tipo_frase }}{% endif %}</p>
+
+  <h3>De onde vem e quem grava</h3>
   <ul class="dd-gav-livros">
-    {% for l in c.fontes %}<li><span class="dd-gav-papel">{{ 'origem' if loop.first else 'outra fonte' }}</span><code>{{ l.texto }}</code><span class="dd-gav-quem">grava: {{ l.quem }}{% if l.cadencia %} · {{ l.cadencia }}{% endif %}</span></li>
+    {% for l in c.fontes %}<li><span class="dd-gav-papel">{{ 'vem de' if loop.first else 'também vem de' }}</span><span class="dd-gav-quem-nome">{{ l.quem_amigavel }}</span><code>{{ l.texto }}</code>{% if l.quem_tecnico or l.cadencia %}<span class="dd-gav-quem">{{ l.quem_tecnico }}{% if l.quem_tecnico and l.cadencia %} · {% endif %}{{ l.cadencia }}</span>{% endif %}</li>
     {% endfor %}
-    {% if c.nexus %}<li class="dd-gav-nexus"><span class="dd-gav-papel">{{ 'no Nexus, com os IDs' if c.nexus.grava else 'destino no Nexus, ainda sem gravar' }}</span><code>{{ c.nexus.texto }}</code><span class="dd-gav-quem">grava: {{ c.nexus.quem }}{% if c.nexus.cadencia %} · {{ c.nexus.cadencia }}{% endif %}</span></li>{% endif %}
+    {% if c.nexus %}<li class="dd-gav-nexus"><span class="dd-gav-papel">{{ 'o Nexus grava, com os IDs, em' if c.nexus.grava else 'o Nexus vai gravar, com os IDs, em' }}</span><code>{{ c.nexus.texto }}</code><span class="dd-gav-quem">{{ c.nexus.quem }}{% if c.nexus.cadencia %} · {{ c.nexus.cadencia }}{% endif %}</span></li>{% endif %}
   </ul>
+  {% if c.janela %}<p class="dd-gav-mudo">Quanto a origem guarda: {{ c.janela }}.</p>{% endif %}
+  {% if c.parte_de %}<p class="dd-gav-mudo">Alimenta: <b>{{ c.alimenta }}</b>.</p>{% endif %}
 
-  <h3>Medidas</h3>
-  {% if c.medidas %}
-  <table class="dd-tab dd-gav-tab"><thead><tr><th>Coluna</th><th>Unidade</th><th>Soma</th></tr></thead><tbody>
-    {% for m in c.medidas %}<tr><td><code>{{ m.coluna }}</code></td><td>{{ m.unidade }}</td><td>{{ m.soma }}</td></tr>{% endfor %}
-  </tbody></table>
-  {% else %}<p class="dd-mudo">Nenhuma: o fato só registra que aconteceu (conta-se linhas).</p>{% endif %}
-
-  <h3>Por onde liga cada dimensão</h3>
-  <table class="dd-tab dd-gav-tab dd-gav-dims"><tbody>
-    {% for d in c.dims %}<tr data-dim="{{ d.id }}"><th scope="row">{{ d.nome }}</th>
-      <td><span class="dd-chip {{ d.estado }}">{{ d.rotulo }}</span>{% if d.pct %}<span class="dd-gav-pct">{{ d.pct }} ligado</span>{% endif %}</td>
+  <h3>Como se liga às outras tabelas</h3>
+  <p class="dd-gav-mudo">Os assuntos em comum (data, usina, pessoa…) são o que deixa cruzar esta tabela com as dos outros setores.</p>
+  <table class="dd-tab dd-gav-tab dd-gav-dims dd-gav-largo">
+    <thead><tr><th scope="col">Assunto</th><th scope="col">Liga por</th>{% if c.tem_pct %}<th scope="col">Ligado</th>{% endif %}<th scope="col">Pela coluna</th></tr></thead>
+    <tbody>
+    {% for d in c.dims_com %}<tr data-dim="{{ d.id }}"><th scope="row">{{ d.nome }}</th>
+      <td><span class="dd-chip {{ d.estado }}">{{ d.rotulo }}</span></td>{% if c.tem_pct %}
+      <td class="dd-gav-pct">{{ d.pct or '—' }}</td>{% endif %}
       <td class="dd-gav-col">{{ d.col }}</td></tr>
     {% endfor %}
-  </tbody></table>
+    </tbody>
+  </table>
+  {% if c.dims_sem %}<p class="dd-gav-mudo" data-sem>Não se liga a: {{ c.dims_sem | join(', ') }}.</p>{% endif %}
+  <ul class="dd-gav-legenda">{% for e, rot, frase in c.legenda %}<li><span class="dd-chip {{ e }}">{{ rot }}</span><span>{{ frase }}</span></li>{% endfor %}</ul>
 
-  <h3>Qualidade da última carga</h3>
+  <h3>O que dá para medir</h3>
+  {% if c.medidas %}
+  <table class="dd-tab dd-gav-tab dd-gav-largo"><thead><tr><th scope="col">Coluna</th><th scope="col">Unidade</th><th scope="col">Pode somar?</th></tr></thead><tbody>
+    {% for m in c.medidas %}<tr><td><code>{{ m.coluna }}</code></td><td>{{ m.unidade }}</td><td>{{ m.soma }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<p class="dd-gav-texto">Nada para somar: o que se conta é quantas vezes aconteceu (o número de linhas).</p>{% endif %}
+
+  <h3>Quão bem ligou na última carga</h3>
   {% set l = c.q %}
   {% if l %}
-  <p class="dd-mudo">{{ l.get('linhas') }} linhas{% if l.get('gerado_em') %} na carga de {{ hora(l.get('gerado_em')) }}{% endif %}. Vazio é "não ligou": nunca um ID chutado.</p>
+  <p class="dd-gav-mudo">{{ l.get('linhas') }} linhas na carga de {{ hora(l.get('gerado_em')) }}. Vazio quer dizer "não ligou": o Nexus nunca chuta um ID.</p>
   <div class="dd-barras dd-gav-barras">
     {% for d, rot in (("data", "Data"), ("usina", "Usina"), ("equipe", "Equipe"), ("pessoa", "Pessoa"), ("equipamento", "Equipamento")) %}
     {% if d != "equipamento" or l.get('com_equipamento') not in (none, '') %}{{ barra(rot, l.get(PCT[d])) }}{% endif %}
     {% endfor %}
   </div>
   {% if l.get('pct_usina_versao') not in (none, '') or l.get('pct_pessoa_versao') not in (none, '') %}
-  <p class="dd-mudo">Acham exatamente 1 versão no histórico no dia do fato (a junção "da época"):</p>
+  <p class="dd-gav-mudo">Acham exatamente 1 versão no histórico no dia do fato (a usina e a pessoa "da época"):</p>
   <div class="dd-barras dd-gav-barras">{{ barra("Usina", l.get('pct_usina_versao')) }}{{ barra("Pessoa", l.get('pct_pessoa_versao')) }}</div>
   {% endif %}
   {% set ex = extra(l.get('extra')) %}{% if ex %}<p class="dd-extra">{% for k, x in ex.items() %}<span><b>{{ k | replace('_', ' ') }}</b> {{ x }}</span>{% endfor %}</p>{% endif %}
-  {% elif c.estado == 'conformado' %}<p class="dd-mudo">A última carga lida não trouxe a linha deste fato{% if erro %} (o banco não respondeu){% endif %}.</p>
-  {% elif c.estado == 'montado' %}<p class="dd-mudo">Montado, sem gravar: a medida sai no ensaio (<code>python ferramentas/carregar_dados.py --ensaio</code>), não na carga de hora em hora.</p>
-  {% elif c.estado in ('parte', 'aposentado') %}<p class="dd-mudo">Não conta mais como fato: a qualidade é medida no fato que ficou no lugar dele.</p>
-  {% else %}<p class="dd-mudo">O Nexus ainda não monta este fato com os IDs: a qualidade aparece quando ele for montado.</p>{% endif %}
+  {% elif c.estado == 'conformado' %}<p class="dd-gav-mudo">A última carga lida não trouxe esta tabela{% if erro %} (o banco não respondeu){% endif %}: a qualidade aparece depois da próxima carga que a gravar.</p>
+  {% elif c.estado == 'montado' %}<p class="dd-gav-mudo">Como ainda não grava, a qualidade só é medida no ensaio da carga (<code>python ferramentas/carregar_dados.py --ensaio</code>), não na carga de hora em hora.</p>
+  {% elif c.estado == 'parte' %}<p class="dd-gav-mudo">A qualidade da ligação é medida em {{ c.alimenta }}, a tabela que esta alimenta.</p>
+  {% else %}<p class="dd-gav-mudo">O Nexus ainda não monta esta tabela com os IDs: a qualidade aparece quando ele montar.</p>{% endif %}
 
-  {% if c.observacao %}<h3>Observação</h3><p class="dd-gav-obs">{{ c.observacao }}</p>{% endif %}
+  <details class="dd-gav-tec">
+    <summary>Para quem mantém o dado</summary>
+    <dl class="dd-gav-dl">
+      <dt>Grão</dt><dd>{{ c.grao }}</dd>
+      <dt>Tipo</dt><dd><b>{{ c.tipo }}</b>{% if c.tipo_explica %}: {{ c.tipo_explica }}{% endif %}</dd>
+      <dt>Chave</dt><dd>{% if c.chave %}<code>{{ c.chave | join(' + ') }}</code>{% else %}sem chave (ver a observação){% endif %}</dd>
+      {% if c.janela %}<dt>A fonte guarda</dt><dd>{{ c.janela }}</dd>{% endif %}
+      {% if c.observacao %}<dt>Observação</dt><dd>{{ c.observacao }}</dd>{% endif %}
+    </dl>
+  </details>
 </template>
 {% endmacro %}
 
-<p class="dd-sub">A visão de cima: os setores (as torres donas de cada fato), os fatos de cada um pelo estado da governança e as
-dimensões em comum que os ligam. Clique num fato (ou Enter) para ver o grão, as medidas, por onde liga cada dimensão e a
-qualidade da última carga. Tudo vem do catálogo do Nexus (<code>nexus/dados/catalogo.py</code>).</p>
+<p class="dd-sub">A visão de cima dos dados da operação: os setores, as tabelas que cada um gera e o quanto cada uma já se
+liga às outras pelos IDs do Nexus. Clique numa tabela (ou Enter) para ver para que ela serve, de onde vem e como se liga;
+no detalhe, o botão <i class="ph ph-table" aria-hidden="true"></i> mostra as linhas de verdade, só para ler. Tudo vem do
+catálogo do Nexus (<code>nexus/dados/catalogo.py</code>).</p>
 {% if erro %}<p class="dd-aviso">Não consegui ler a qualidade no banco ({{ erro }}): o organograma abaixo é o do catálogo.</p>{% endif %}
 
 <div class="dd-org" style="--org-trilhas:{{ org.trilhas }};--org-dims:{{ org.dimensoes | length }}">
-  <p class="dd-org-legenda"><span class="gc-rotulo">Estado do fato</span>
-    {% for e, (rot, tom, explica) in estado_org.items() %}<span><span class="dd-org-estado {{ tom }}">{{ rot }}</span>{{ explica }}</span>{% endfor %}
+  <p class="dd-org-legenda"><span class="gc-rotulo">Estado da tabela</span>
+    {% for e, (rot, tom, explica) in estado_org.items() if e != 'aposentado' %}<span><span class="dd-org-estado {{ tom }}">{{ rot }}</span>{{ explica }}</span>{% endfor %}
   </p>
 
   <div class="dd-org-arvore">
@@ -102,6 +123,7 @@ qualidade da última carga. Tudo vem do catálogo do Nexus (<code>nexus/dados/ca
         {% for chave, tom in (("conformados", "ok"), ("montados", "alerta"), ("origem", "severo"), ("fora", "critico")) %}{% if conta[chave] %}<i class="{{ tom }}" style="flex-grow:{{ conta[chave] }}">{{ conta[chave] }}</i>{% endif %}{% endfor %}
       </span>
       <p class="dd-org-carga">Última carga: <b>{{ hora(atualizacao.get('gerado_em')) or '—' }}</b>{% if atualizacao.get('maquina') %} · {{ atualizacao.get('maquina') }}{% endif %}</p>
+      {% if radar %}<p class="dd-org-radar {{ 'critico' if radar.n.nova else 'ok' }}"><a href="#dd-radar">Radar do banco: {% if radar.n.nova %}<b>{{ radar.n.nova }}</b> {{ 'tabela nova' if radar.n.nova == 1 else 'tabelas novas' }}, fora do catálogo{% else %}nenhuma tabela nova; as {{ milhar(radar.total) }} têm dono{% endif %}</a></p>{% endif %}
     </div>
 
     <ul class="dd-org-setores" aria-label="Setores">
@@ -119,14 +141,16 @@ qualidade da última carga. Tudo vem do catálogo do Nexus (<code>nexus/dados/ca
             {% endfor %}
           </ul>
           {% endif %}
-          {% if s.outros %}
-          <details class="dd-org-mais">
-            <summary><i class="ph ph-plus" aria-hidden="true"></i><span><b>Mostrar também {{ s.outros | length }}</b><span>{{ s.resumo_outros }}</span></span></summary>
-            <ul class="dd-org-fatos dd-org-fatos--mais">
-              {% for c in s.outros %}<li>{{ cartao(c) }}</li>
+          {% if s.fontes %}
+          {# Levi, 09/10/2026: "estamos usando os dados? fazemos ligações? Se sim já deixa expandido e pronto". Sim: cada
+             uma alimenta um fato do setor, e é nele que a ligação por ID é feita. Por isso abertas, sem o "mostrar também" #}
+          <div class="dd-org-fontes">
+            <p class="dd-org-fontes-tit"><i class="ph ph-arrow-elbow-left-up" aria-hidden="true"></i><span><b>{{ s.fontes | length }} {{ 'tabela de origem' if s.fontes | length == 1 else 'tabelas de origem' }}</b> que {{ 'alimenta' if s.fontes | length == 1 else 'alimentam' }} os fatos acima; a ligação por ID é feita neles</span></p>
+            <ul class="dd-org-fatos dd-org-fatos--fontes">
+              {% for c in s.fontes %}<li>{{ cartao(c) }}</li>
               {% endfor %}
             </ul>
-          </details>
+          </div>
           {% endif %}
         </details>
       </li>
@@ -162,10 +186,20 @@ qualidade da última carga. Tudo vem do catálogo do Nexus (<code>nexus/dados/ca
   </section>
 </div>
 
-{% for s in org.setores %}{% for c in s.ativos + s.outros %}{{ detalhe(c) }}{% endfor %}{% endfor %}
-<dialog class="dd-gaveta" id="dd-gaveta" aria-labelledby="dd-gaveta-titulo">
+{% with com_gaveta = true %}{% include "dados/_radar.html" %}{% endwith %}
+
+{% for s in org.setores %}{% for c in s.ativos + s.fontes %}{{ detalhe(c) }}{% endfor %}{% endfor %}
+{# A gaveta e, à esquerda dela, a tabela (o botão de tabela ao lado do X). Um <dialog> só, modal: prende o foco nos dois
+   e fecha com Esc (com a tabela aberta, o 1º Esc fecha só a tabela). #}
+<dialog class="dd-gaveta" id="dd-gaveta" aria-labelledby="dd-gaveta-titulo" data-url-tabela="{{ url_tabela }}">
+  <section class="dd-prev" id="dd-prev" hidden aria-labelledby="dd-prev-titulo">
+    <div class="dd-prev-corpo"></div>
+  </section>
   <div class="dd-gav-corpo">
-    <button type="button" class="dd-gav-fechar" aria-label="Fechar o detalhe">×</button>
+    <div class="dd-gav-acoes"><div class="dd-gav-placa">
+      <button type="button" class="dd-gav-tabela" aria-pressed="false" aria-controls="dd-prev" aria-label="Ver a tabela, só para ler" title="Ver a tabela (só para ler)"><i class="ph ph-table" aria-hidden="true"></i></button>
+      <button type="button" class="dd-gav-fechar" aria-label="Fechar o detalhe" title="Fechar">×</button>
+    </div></div>
     <div class="dd-gav-conteudo"></div>
   </div>
 </dialog>
@@ -175,21 +209,105 @@ qualidade da última carga. Tudo vem do catálogo do Nexus (<code>nexus/dados/ca
     // modal, que prende o foco e fecha com Esc; o clique no véu também fecha, e o foco volta ao cartão. Sem animação.
     var dlg = document.getElementById("dd-gaveta");
     if (!dlg || typeof dlg.showModal !== "function") return;
-    var conteudo = dlg.querySelector(".dd-gav-conteudo"), fechar = dlg.querySelector(".dd-gav-fechar"), ativo = null;
-    document.querySelectorAll(".dd-org-fato[data-fato]").forEach(function (b) {
+    var conteudo = dlg.querySelector(".dd-gav-conteudo"), corpo = dlg.querySelector(".dd-gav-corpo");
+    var fechar = dlg.querySelector(".dd-gav-fechar"), botaoTabela = dlg.querySelector(".dd-gav-tabela");
+    var prev = document.getElementById("dd-prev"), prevCorpo = prev.querySelector(".dd-prev-corpo");
+    // `atual`: os parâmetros da tabela do cartão aberto ("fato=ronda", ou a tabela nova do radar); vazio = sem tabela
+    var urlTabela = dlg.dataset.urlTabela, ativo = null, atual = "", pedido = 0;
+
+    function previaAberta() { return !prev.hidden; }
+    function fecharPrevia(focar) {
+      pedido++;
+      prev.hidden = true;
+      prevCorpo.replaceChildren();
+      dlg.classList.remove("dd-gaveta--tabela");
+      botaoTabela.setAttribute("aria-pressed", "false");
+      if (focar) botaoTabela.focus();
+    }
+    function aviso(texto) {
+      var p = document.createElement("p");
+      p.className = "dd-prev-aviso";
+      p.textContent = texto;
+      prevCorpo.replaceChildren(p);
+    }
+    // Pede o pedaço de HTML da tabela (o servidor só aceita o fato e o número da tabela na lista dele) e o põe ao lado.
+    // Pedido velho que chega depois de um novo é descartado; sessão vencida devolve a página de entrar, que não entra aqui.
+    function carregar(extra, focar) {
+      var n = ++pedido, q = new URLSearchParams(atual);
+      Object.keys(extra || {}).forEach(function (k) { if (extra[k] !== undefined && extra[k] !== "") q.set(k, extra[k]); });
+      prevCorpo.setAttribute("aria-busy", "true");
+      fetch(urlTabela + "?" + q.toString(), { credentials: "same-origin", headers: { "Accept": "text/html" } })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.text();
+        })
+        .then(function (html) {
+          if (n !== pedido) return;
+          var tmp = document.createElement("template");
+          tmp.innerHTML = html;
+          var raiz = tmp.content.querySelector("[data-previa]");
+          if (!raiz) { aviso("A sessão venceu: entre de novo no Nexus para ver a tabela."); return; }
+          prevCorpo.replaceChildren(raiz);
+          if (focar) { var t = prev.querySelector("#dd-prev-titulo"); if (t) t.focus(); }
+        })
+        .catch(function (e) { if (n === pedido) aviso("Não consegui abrir a tabela (" + e.message + "). Tente de novo."); })
+        .finally(function () { if (n === pedido) prevCorpo.removeAttribute("aria-busy"); });
+    }
+    function abrirPrevia() {
+      prev.hidden = false;
+      dlg.classList.add("dd-gaveta--tabela");
+      botaoTabela.setAttribute("aria-pressed", "true");
+      aviso("Lendo a tabela no banco…");
+      carregar({}, true);
+    }
+    function estado() {
+      var r = prevCorpo.querySelector("[data-previa]");
+      return r ? { t: r.dataset.t, aba: r.dataset.aba, ini: r.dataset.ini } : {};
+    }
+
+    document.querySelectorAll("[data-det]").forEach(function (b) {
       b.addEventListener("click", function () {
-        var t = document.getElementById("dd-det-" + b.dataset.fato);
+        var t = document.getElementById(b.dataset.det);
         if (!t) return;
+        fecharPrevia(false);
         conteudo.replaceChildren(t.content.cloneNode(true));
         ativo = b;
+        atual = b.dataset.previa || "";
+        botaoTabela.hidden = !atual;          // tabela nova do radar, sem ser administrador: só o detalhe
         dlg.showModal();
-        dlg.scrollTop = 0;
+        corpo.scrollTop = 0;
         fechar.focus();
       });
     });
+    botaoTabela.addEventListener("click", function () { if (previaAberta()) fecharPrevia(true); else abrirPrevia(); });
     fechar.addEventListener("click", function () { dlg.close(); });
-    // o <dialog> não tem margem interna: o clique que cai nele mesmo (e não no corpo) foi no véu
+    // trocar de tabela, de aba de usina ou de página pede o pedaço de novo (a escolha nova volta para as mais novas)
+    prev.addEventListener("change", function (ev) {
+      var campo = ev.target.closest("select[data-param]");
+      if (!campo) return;
+      var e = estado();
+      carregar(campo.dataset.param === "t" ? { t: campo.value } : { t: e.t, aba: campo.value }, false);
+    });
+    prev.addEventListener("click", function (ev) {
+      var b = ev.target.closest("button");
+      if (!b) return;
+      if (b.dataset.acao === "fechar") { fecharPrevia(true); return; }
+      if (b.dataset.ini !== undefined && !b.disabled) {
+        var e = estado();
+        e.ini = b.dataset.ini;
+        carregar(e, false);
+      }
+    });
+    // Esc com a tabela aberta fecha só a tabela; o próximo fecha a gaveta
+    dlg.addEventListener("cancel", function (ev) {
+      if (previaAberta()) { ev.preventDefault(); fecharPrevia(true); }
+    });
+    // o <dialog> não tem margem interna: o clique que cai nele mesmo (e não no corpo nem na tabela) foi no véu
     dlg.addEventListener("click", function (ev) { if (ev.target === dlg) dlg.close(); });
-    dlg.addEventListener("close", function () { if (ativo) ativo.focus(); ativo = null; });
+    dlg.addEventListener("close", function () {
+      fecharPrevia(false);
+      if (ativo) ativo.focus();
+      ativo = null;
+    });
   })();
 </script>

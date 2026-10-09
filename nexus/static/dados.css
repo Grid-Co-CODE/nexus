@@ -141,23 +141,20 @@
 .dd-org-nome{font:600 13px/1.35 var(--font-sans);color:var(--tinta)}
 .dd-org-linha{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0}
 .dd-org-tipo,.dd-org-de{font-size:11.5px;color:var(--tinta-2)}
+.dd-org-resumo{font-size:12px;line-height:1.4;color:var(--tinta-2)}
 .dd-org-livro{display:flex;flex-direction:column;gap:1px;min-width:0}
 .dd-org-livro code{font:500 11px/1.4 var(--font-mono);color:var(--tinta-2);overflow-wrap:anywhere}
 .dd-org-nexus code{color:var(--verde-texto)}
 .dd-org-quem{font-size:11px;color:var(--mudo);overflow-wrap:anywhere}
-/* o que não conta mais (fonte de outro fato, aposentado): recolhido por setor, sem galho, com o cartão tracejado */
-.dd-org-mais{margin:8px 0 0 26px}
-.dd-org-mais>summary{display:flex;align-items:flex-start;gap:8px;list-style:none;cursor:pointer;font-size:11.5px;line-height:16px;
-  color:var(--mudo);padding:6px 10px;border:1px dashed var(--linha-forte);border-radius:9px}
-.dd-org-mais>summary::-webkit-details-marker{display:none}
-.dd-org-mais>summary:hover{background:var(--superficie-2)}
-.dd-org-mais>summary i{font-size:13px;line-height:16px;color:var(--tinta-2)}
-.dd-org-mais[open]>summary i{transform:rotate(45deg)}
-.dd-org-mais>summary b{display:block;font-size:12px;font-weight:600;color:var(--tinta-2)}
-.dd-org-mais>summary:hover b{color:var(--tinta)}
-.dd-org-mais .dd-org-fatos--mais{display:grid;gap:8px;margin-top:8px}
-.dd-org-fatos--mais>li{padding:0}
-.dd-org-fatos--mais>li::before,.dd-org-fatos--mais>li::after{display:none}
+/* as tabelas de origem (fonte de outro fato, 09/10/2026): não contam, mas ficam abertas no rodapé do setor, sem galho e
+   com o cartão tracejado. O aposentado não aparece em lugar nenhum */
+.dd-org-fontes{margin:12px 0 0 26px;padding-top:10px;border-top:1px dashed var(--linha-forte)}
+.dd-org-fontes-tit{display:flex;align-items:flex-start;gap:6px;margin:0 0 8px;font-size:11.5px;line-height:16px;color:var(--mudo)}
+.dd-org-fontes-tit i{font-size:13px;line-height:16px;color:var(--tinta-2)}
+.dd-org-fontes-tit b{font-weight:600;color:var(--tinta-2)}
+.dd-org-fatos--fontes{display:grid;gap:8px}
+.dd-org-fatos--fontes>li{padding:0}
+.dd-org-fatos--fontes>li::before,.dd-org-fatos--fontes>li::after{display:none}
 
 /* a faixa das dimensões conformadas */
 .dd-org-dims{margin-top:24px}
@@ -209,48 +206,169 @@
   .dd-org-fatos>li.dd-org-fim::before{bottom:auto;height:27px}
   .dd-org-fatos>li.dd-org-topo::before{top:-6px}
   .dd-org-fatos>li:first-child::before{top:-14px}
-  /* o "mostrar também" vira o rodapé do setor, da largura da coluna (recuado, o rótulo quebrava numa coluna estreita);
-     os cartões dele ficam nas mesmas colunas e no mesmo recuo dos ativos, sem barramento e sem galho */
-  .dd-org-mais{margin-left:0}
-  .dd-org-fatos.dd-org-fatos--mais{grid-template-rows:none;grid-auto-flow:row;column-gap:14px;padding-top:0}
-  .dd-org-fatos--mais::before{display:none}
-  .dd-org-fatos--mais>li{padding-left:26px}
+  /* as tabelas de origem são o rodapé do setor, da largura da coluna; os cartões ficam nas mesmas colunas e no mesmo
+     recuo dos ativos, sem barramento e sem galho */
+  .dd-org-fontes{margin-left:26px}
+  .dd-org-fatos.dd-org-fatos--fontes{grid-template-rows:none;grid-auto-flow:row;column-gap:14px;padding-top:0;margin-left:-26px}
+  .dd-org-fatos--fontes::before{display:none}
+  .dd-org-fatos--fontes>li{padding-left:26px}
   .dd-org-barramento{position:relative;grid-template-columns:repeat(var(--org-dims),minmax(0,1fr));padding-top:16px;
     border-top:3px solid var(--org-linha);margin-top:16px}
   .dd-org-dim::before{content:"";position:absolute;left:50%;top:-16px;height:16px;border-left:2px solid var(--org-linha)}
 }
 
-/* a gaveta do fato (<dialog> modal: prende o foco e fecha com Esc) */
-.dd-gaveta{position:fixed;top:0;right:0;bottom:0;left:auto;margin:0;width:min(560px,100vw);max-width:100vw;height:auto;max-height:none;
-  padding:0;border:0;border-left:1px solid var(--linha-forte);background:var(--superficie);color:var(--tinta);
-  box-shadow:-12px 0 32px var(--sombra);overflow-y:auto}
+/* o radar do banco (09/10/2026, Levi: "verifique se aparece a cada tabela nova que aparece!"): toda tabela do banco tem
+   dono no catálogo; a nova aparece sozinha, com a contagem no alto do organograma, no tom crítico */
+.dd-org-radar{margin:6px 0 0;font-size:12.5px}
+.dd-org-radar a{color:var(--tinta-2);text-decoration:none;border-bottom:1px dotted var(--linha-forte)}
+.dd-org-radar a:hover{color:var(--tinta)}
+.dd-org-radar.critico a{color:var(--critico);font-weight:600}
+.dd-org-radar b{font-variant-numeric:tabular-nums}
+.dd-radar{margin-top:28px}
+.dd-radar .dd-h2{margin-top:0}
+.dd-radar-contas{list-style:none;margin:10px 0 12px;padding:0;display:flex;flex-wrap:wrap;gap:6px 20px}
+.dd-radar-contas li{display:flex;align-items:baseline;gap:6px;font-size:12.5px;color:var(--tinta-2)}
+.dd-radar-contas b{font:700 20px/24px var(--font-sans);color:var(--tinta);font-variant-numeric:tabular-nums}
+.dd-radar-contas .critico b{color:var(--critico)}
+.dd-radar-contas .ok b{color:var(--ok)}
+.dd-radar-novas{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.dd-radar-nova code{font:600 12px/1.4 var(--font-mono);color:var(--tinta);overflow-wrap:anywhere}
+div.dd-org-fato{cursor:default}
+div.dd-org-fato:hover{background:var(--superficie)}
+.dd-radar-ok{margin:0 0 12px;font-size:13px;color:var(--ok)}
+.dd-radar-conhecidas{border:1px solid var(--linha);border-radius:10px;background:var(--superficie);padding:10px 14px}
+.dd-radar-conhecidas>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--tinta-2)}
+.dd-radar-conhecidas>summary:hover{color:var(--tinta)}
+.dd-radar-conhecidas h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:14px 0 6px}
+.dd-radar-conhecidas ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dd-radar-conhecidas li{display:flex;flex-direction:column;gap:1px;font-size:12.5px;min-width:0}
+.dd-radar-abas{color:var(--tinta);overflow-wrap:anywhere}
+.dd-radar-abas code{font:600 12px/1.4 var(--font-mono)}
+.dd-radar-motivo{color:var(--mudo)}
+.dd-gav-passos{margin:0;padding-left:18px;display:grid;gap:6px;font-size:13px;line-height:1.5;color:var(--tinta)}
+.dd-gav-passos code{font:500 12px/1.4 var(--font-mono)}
+
+/* a gaveta do fato (<dialog> modal: prende o foco e fecha com Esc).
+   09/10/2026 (Levi: "seria muito melhor se essa barra lateral aumentasse e diminuisse de acordo com a informação para não
+   perder compreensão"): a largura é a do conteúdo, entre 520 e 940 px. Quem manda nela são as tabelas (`.dd-gav-largo`:
+   por onde liga cada dimensão, as medidas): o texto corrido tem `contain:inline-size` e não empurra, só quebra na largura
+   que as tabelas pediram. Antes eram 560 px fixos, e a coluna "por onde liga" quebrava em 3 linhas.
+   Com a tabela aberta, o <dialog> ocupa a tela: a tabela à esquerda, a gaveta à direita com a mesma largura (sem pular
+   nem voltar a quebrar), desde que sobrem 480 px para a tabela. */
+.dd-gaveta{position:fixed;top:0;right:0;bottom:0;left:auto;margin:0;width:auto;max-width:100vw;height:100%;max-height:none;
+  padding:0;border:0;background:transparent;color:var(--tinta);overflow:visible}
+.dd-gaveta[open]{display:flex;justify-content:flex-end}
 .dd-gaveta::backdrop{background:var(--veu)}
-.dd-gav-corpo{position:relative;min-height:100%;padding:22px 24px 32px}
-.dd-gav-fechar{position:absolute;top:14px;right:16px;width:36px;height:36px;border-radius:8px;border:1px solid var(--linha-forte);
-  background:transparent;color:var(--tinta);font:600 20px/1 var(--font-sans);cursor:pointer}
-.dd-gav-fechar:hover{border-color:var(--verde)}
-.dd-gav-conteudo>.gc-eyebrow{padding-right:48px}
-.dd-gav-titulo{margin:4px 48px 8px 0;font:700 19px/1.3 var(--font-sans);color:var(--tinta)}
-.dd-gav-estado{margin:6px 0 0;font-size:12.5px;color:var(--mudo)}
-.dd-gaveta h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:20px 0 8px}
-.dd-gav-grao{margin:0;font-size:14px;line-height:1.5;color:var(--tinta)}
-.dd-gav-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:10px 0 0;font-size:13px}
-.dd-gav-dl dt{color:var(--mudo)}
-.dd-gav-dl dd{margin:0;color:var(--tinta-2);min-width:0;overflow-wrap:anywhere}
-.dd-gav-dl dd b{color:var(--tinta);font-weight:600}
-.dd-gav-dl code,.dd-gav-tab code,.dd-gaveta .dd-mudo code{font:500 12px/1.4 var(--font-mono);color:var(--tinta)}
+.dd-gaveta.dd-gaveta--tabela{left:0;width:100vw}
+.dd-gav-corpo{position:relative;box-sizing:border-box;flex:0 0 auto;width:max-content;min-width:min(520px,100vw);
+  max-width:min(940px,100vw);height:100%;overflow-y:auto;padding:16px 24px 32px;background:var(--superficie);
+  border-left:1px solid var(--linha-forte);box-shadow:-12px 0 32px var(--sombra)}
+.dd-gaveta--tabela .dd-gav-corpo{max-width:max(520px,min(940px,calc(100vw - 480px)));box-shadow:none}
+.dd-gav-conteudo>*{contain:inline-size}
+.dd-gav-conteudo>.dd-gav-largo{contain:none}
+/* os botões ficam no alto ao rolar, numa placa opaca: o texto que passa por baixo some, não aparece entre eles */
+.dd-gav-acoes{position:sticky;top:0;z-index:1;display:flex;justify-content:flex-end;margin:0 -14px 0 0;height:0}
+.dd-gav-placa{display:flex;gap:8px;height:max-content;margin-top:-6px;padding:6px;border-radius:12px;background:var(--superficie)}
+.dd-gav-acoes button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;
+  border:1px solid var(--linha-forte);background:var(--superficie);color:var(--tinta);font:600 20px/1 var(--font-sans);cursor:pointer}
+.dd-gav-acoes button i{font-size:19px}
+.dd-gav-acoes button:hover{border-color:var(--verde)}
+.dd-gav-tabela[aria-pressed="true"]{background:var(--verde-suave);border-color:var(--verde);color:var(--verde-texto)}
+.dd-gav-conteudo{padding-top:6px}
+.dd-gav-conteudo>.gc-eyebrow{padding-right:96px}
+.dd-gav-titulo{margin:4px 96px 8px 0;font:700 19px/1.3 var(--font-sans);color:var(--tinta)}
+.dd-gav-frase{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--tinta-2)}
+.dd-gaveta h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:22px 0 8px}
+.dd-gav-texto{margin:0;font-size:14px;line-height:1.55;color:var(--tinta)}
+.dd-gav-texto b{font-weight:600}
+.dd-gav-mudo{margin:8px 0 0;font-size:12.5px;line-height:1.5;color:var(--mudo)}
+.dd-gav-mudo b{color:var(--tinta-2);font-weight:600}
+.dd-gav-mudo code,.dd-gav-tab code{font:500 12px/1.4 var(--font-mono);color:var(--tinta)}
 .dd-gav-livros{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .dd-gav-livros li{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--linha);
   border-radius:8px;background:var(--superficie-2)}
 .dd-gav-papel{font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
-.dd-gav-livros code{font:500 12px/1.4 var(--font-mono);color:var(--tinta);overflow-wrap:anywhere}
+.dd-gav-quem-nome{font-size:13px;font-weight:600;color:var(--tinta)}
+.dd-gav-livros code{font:500 12px/1.4 var(--font-mono);color:var(--tinta-2);overflow-wrap:anywhere}
 .dd-gav-nexus code{color:var(--verde-texto)}
 .dd-gav-quem{font-size:12px;color:var(--tinta-2);overflow-wrap:anywhere}
 .dd-gav-tab{font-size:12.5px}
-.dd-gav-dims th{font-weight:600;color:var(--tinta);white-space:nowrap}
-.dd-gav-dims .dd-chip{min-width:0}
-.dd-gav-pct{display:block;margin-top:3px;font-size:12px;color:var(--tinta-2);white-space:nowrap}
-.dd-gav-col{color:var(--mudo);font-size:12px;overflow-wrap:anywhere}
+.dd-gav-tab thead th{font-size:11.5px;color:var(--mudo);font-weight:600;white-space:nowrap}
+.dd-gav-dims tbody th{font-weight:600;color:var(--tinta);white-space:nowrap}
+.dd-gav-dims .dd-chip{min-width:0;white-space:nowrap}
+.dd-gav-pct{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--tinta-2)}
+.dd-gav-col{color:var(--tinta-2);font-size:12px}
+.dd-gav-legenda{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px;font-size:12px;color:var(--mudo)}
+.dd-gav-legenda li{display:flex;align-items:baseline;gap:8px}
+.dd-gav-legenda .dd-chip{flex:0 0 auto;min-width:0;white-space:nowrap}
 .dd-gav-barras{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
 .dd-gav-barras .dd-barra{grid-template-columns:88px 1fr 48px}
-.dd-gav-obs{margin:0;font-size:13px;line-height:1.55;color:var(--tinta-2)}
+.dd-gav-tec{margin-top:24px;border-top:1px solid var(--linha);padding-top:12px}
+.dd-gav-tec>summary{cursor:pointer;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.dd-gav-tec>summary:hover{color:var(--tinta)}
+.dd-gav-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:12.5px}
+.dd-gav-dl dt{color:var(--mudo)}
+.dd-gav-dl dd{margin:0;color:var(--tinta-2);min-width:0;overflow-wrap:anywhere;line-height:1.5}
+.dd-gav-dl dd b{color:var(--tinta);font-weight:600}
+.dd-gav-dl code{font:500 12px/1.4 var(--font-mono);color:var(--tinta)}
+/* no celular a tabela "por onde liga" vira um bloco por assunto (assunto, como liga e o % numa linha; a coluna embaixo) */
+@media (max-width:600px){
+  .dd-gav-corpo{padding:14px 16px 28px}
+  .dd-gav-dims thead{display:none}
+  .dd-gav-dims,.dd-gav-dims tbody{display:block}
+  .dd-gav-dims tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 0;border-bottom:1px solid var(--linha)}
+  .dd-gav-dims th,.dd-gav-dims td{padding:0;border:0}
+  .dd-gav-dims td.dd-gav-col{flex-basis:100%}
+}
+
+/* a tabela de verdade, só para ler (09/10/2026, Levi: "preenche o lado esquerdo ao lado da visão lateral com a tabela
+   referida"). Rola nos dois sentidos dentro da moldura, com o cabeçalho e o número da linha presos */
+.dd-prev{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;background:var(--fundo);
+  border-right:1px solid var(--linha-forte)}
+.dd-prev[hidden]{display:none}
+.dd-prev-corpo{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.dd-prev-raiz{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;padding:16px 20px 14px}
+.dd-prev-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.dd-prev-tit{min-width:0}
+.dd-prev-tit h2{margin:2px 0 0;font:700 16px/1.35 var(--font-sans);color:var(--tinta);overflow-wrap:anywhere}
+.dd-prev-tit h2:focus{outline:none}
+.dd-prev-tit h2 code{font:600 15px/1.35 var(--font-mono);color:var(--tinta)}
+.dd-prev-sub{margin:4px 0 0;font-size:12.5px;color:var(--tinta-2)}
+.dd-prev-sub b{color:var(--tinta);font-variant-numeric:tabular-nums}
+.dd-prev-fechar{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;
+  border:1px solid var(--linha-forte);background:var(--superficie);color:var(--tinta);font:600 12.5px/1 var(--font-sans);cursor:pointer}
+.dd-prev-fechar:hover{border-color:var(--verde)}
+.dd-prev-fechar-estreito{display:none}
+.dd-prev-ctrl{display:flex;flex-wrap:wrap;gap:8px 16px}
+.dd-prev-campo{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:11px;font-weight:600;color:var(--mudo);
+  text-transform:uppercase;letter-spacing:.05em}
+.dd-prev-campo select{max-width:min(560px,100%);padding:6px 8px;border-radius:var(--raio-controle,8px);border:1px solid var(--linha-forte);
+  background:var(--superficie);color:var(--tinta);font:500 13px/1.3 var(--font-sans);text-transform:none;letter-spacing:0}
+.dd-prev-pag{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;font-size:12.5px;color:var(--tinta-2)}
+.dd-prev-pag b{color:var(--tinta);font-variant-numeric:tabular-nums}
+.dd-prev-pag-bot{display:inline-flex;gap:6px}
+.dd-prev-pag button{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--linha-forte);
+  background:var(--superficie);color:var(--tinta);font:600 12px/1 var(--font-sans);cursor:pointer}
+.dd-prev-pag button:hover:not(:disabled){border-color:var(--verde)}
+.dd-prev-pag button:disabled{color:var(--mudo);cursor:default;opacity:.6}
+.dd-prev-moldura{flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--linha);border-radius:10px;background:var(--superficie)}
+.dd-prev-moldura:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.dd-prev-tab{border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap}
+.dd-prev-tab th,.dd-prev-tab td{padding:5px 10px;border-bottom:1px solid var(--linha);text-align:left;vertical-align:top}
+.dd-prev-tab thead th{position:sticky;top:0;z-index:2;background:var(--superficie-2);color:var(--tinta-2);font:600 11.5px/1.3 var(--font-mono)}
+.dd-prev-tab td{font-variant-numeric:tabular-nums;color:var(--tinta)}
+.dd-prev-tab .dd-prev-num{position:sticky;left:0;z-index:1;background:var(--superficie-2);color:var(--mudo);font:500 11px/1.3 var(--font-mono);text-align:right}
+.dd-prev-tab thead .dd-prev-num{z-index:3}
+.dd-prev-tab tbody tr:hover td{background:var(--superficie-3)}
+.dd-prev-aviso{margin:16px 20px;font-size:13px;line-height:1.5;color:var(--tinta-2)}
+.dd-prev-raiz .dd-prev-aviso{margin:4px 0 0}
+.dd-prev-aviso code{font:500 12px/1.4 var(--font-mono);color:var(--tinta)}
+.dd-prev-nota{margin:0;font-size:11.5px;color:var(--mudo)}
+/* tela estreita (celular, janela pequena): sem lado para a tabela; ela ocupa a gaveta e o botão volta ao detalhe */
+@media (max-width:900px){
+  .dd-gaveta--tabela .dd-gav-corpo{display:none}
+  .dd-prev{border-right:0}
+  .dd-prev-raiz{padding:14px 16px 12px}
+  .dd-prev-fechar-largo{display:none}
+  .dd-prev-fechar-estreito{display:inline-flex;align-items:center;gap:6px}
+}

@@ -161,8 +161,8 @@ FATOS = (
          observacao="sem fotos, GPS nem OS; conta na cobertura. Nome e comentário só cifrados (Cofre). Entra no "
                     "fato_ronda só a avulsa válida (fora: a anulada, a linha de anulação e a validação por foto). "
                     "Domínio do App desde 08/10, antes da 1ª gravação (decisão 3 do Levi): vala sem 'Suja', sensor "
-                    "'Sujo'/'Limpo'/vazio (não verificado) e a anulação só com anula_id. Livro ainda inexistente em "
-                    "08/10 (GET)"),
+                    "'Sujo'/'Limpo'/vazio (não verificado) e a anulação só com anula_id. No banco desde 08/10: as 63 "
+                    "linhas da validação por foto (GET em 09/10)"),
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", fato_pt.GRAO,
          _d(data=("id", "data_id_criacao, data_id_decisao (papéis)"), usina=("id", "usina_id"),
             equipe=("id", "equipe_id: papel registro (Região)"),
@@ -347,13 +347,14 @@ LIVROS = (
     Livro("nexus_geracao", ("fato_geracao_usina_dia", "qualidade", "atualizacao"),
           "diária (~01:40) quando ligar; só --ensaio até a decisão 8", "ferramentas/carregar_geracao.py + geracao.py",
           False),
-    Livro("nexus_rondas_checklist", ("fato_checklist_ronda", "atualizacao"), "carga única (06/10/2026)",
-          "ferramentas/carregar_checklist_rondas_sem_os.py", True),
+    Livro("nexus_rondas_checklist", ("fato_checklist_ronda", "qualidade", "atualizacao"), "carga única (06/10/2026)",
+          "ferramentas/carregar_checklist_rondas_sem_os.py", True,
+          "a aba qualidade existe no banco desde a carga única e só entrou aqui em 09/10, quando o radar a achou"),
     Livro("nexus_rondas_avulsas", ("fato_ronda_avulsa",),
           "a cada lançamento no Nexus; importação da validação por foto (só a pedido)",
-          "nexus/campo/ronda_avulsa.py + ferramentas/importar_avulsas_planilha.py --gravar", False,
-          "não existe no banco em 08/10 (GET): a importação de 08/10 parou no ensaio (a pessoa pedida não tem ficha "
-          "no cadastro)"),
+          "nexus/campo/ronda_avulsa.py + ferramentas/importar_avulsas_planilha.py --gravar", True,
+          "criado em 08/10/2026 pela importação da validação por foto: 63 linhas (origem validacao_foto, usina_id "
+          "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10"),
     Livro("nexus_pt_decisoes", ("decisoes",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "0 linhas em 08/10"),
 )
@@ -366,6 +367,87 @@ ABAS_FORA_DA_REGRA = {
     "foto_ativos": "a foto dos ativos do Fracttal: insumo da dimensão de equipamento, carga única",
     "decisoes": "nasceu antes da regra (05/10); vira fato_decisao_pt antes da 1ª gravação (GS-6, decisão 4)",
 }
+
+
+# As tabelas do banco que NÃO são fato nem livro do Nexus, cada uma com o papel e o porquê (Levi, 09/10/2026: "verifique
+# se aparece a cada tabela nova que aparece"). O radar da Governança de dados (`radar.py`) compara a listagem do banco
+# com o catálogo: aba que não é fonte ou destino de fato (FATOS), nem aba de livro do Nexus (LIVROS), nem aba de usina
+# dos livros "1 aba por usina", nem está aqui, aparece como NOVA, sozinha. Para tirá-la de nova: vira fato, entra no LIVROS
+# ou é declarada aqui dizendo o que é. A declaração é aba por aba (a aba nova num livro conhecido também aparece); "*"
+# só no livro de teste. Nos livros "1 aba por usina", a aba declarada aqui não é aba de usina (a prévia não a lista).
+PAPEIS_CONHECIDA = {"dimensao": "dimensão ou de-para", "controle": "controle da carga",
+                    "apoio": "apoio do sistema de origem", "candidata": "candidata a fato",
+                    "aposentada": "aposentada", "teste": "teste"}
+
+
+@dataclass(frozen=True)
+class Conhecida:
+    livro: str
+    abas: tuple                # os nomes exatos das abas; ("*",) = o livro inteiro (só teste)
+    papel: str                 # PAPEIS_CONHECIDA
+    motivo: str
+
+
+CONHECIDAS = (
+    Conhecida("cadastro_nexus", ("clientes", "equipes", "pessoas", "usinas", "de_para", "regioes_campo"), "dimensao",
+              "o cadastro do Nexus: de onde saem as dimensões usina, cliente, equipe (com a região de campo) e pessoa, "
+              "e o de-para dos sistemas"),
+    Conhecida("cadastro_nexus", ("atualizacao",), "controle", "quando e de onde o cadastro foi publicado"),
+    Conhecida("de_para_trackers", ("De-Para Trackers", "Resumo por usina", "Pendências"), "dimensao",
+              "o de-para dos trackers do supervisório; a dimensão de equipamento lê dele o apelido 'Supervisório · "
+              "tracker'"),
+    Conhecida("falhas_performance", ("atualizacao",), "controle",
+              "o controle da publicação da plataforma: as linhas de cada aba no mês"),
+    Conhecida("campo_nexus", ("rondas", "atualizacao"), "aposentada",
+              "do coletor do Fracttal do Nexus, desligado em 05/10/2026 (o fato dele se aposentou); fica no banco "
+              "porque a API não apaga livro"),
+    Conhecida("gemeo_digital", ("usina", "equipamento", "alias", "modelo"), "apoio",
+              "o cadastro próprio do gêmeo digital: as 25 usinas, os equipamentos, os apelidos e os modelos dele"),
+    Conhecida("gemeo_digital", ("cascata_dia", "evento"), "candidata",
+              "o detalhe do cálculo de perda do gêmeo (a cascata por dia e os eventos); o fato catalogado é a "
+              "perda_dia"),
+    Conhecida("plataforma_series", ("trk_cobertura", "issues_history", "issues_active", "perdas_strings",
+                                    "paradas_book", "perdas_dias", "paradas_fontes"), "candidata",
+              "séries que a plataforma de performance grava e lê de volta (cobertura dos trackers, alertas, perdas de "
+              "string, paradas do book); o fato catalogado é a trk_eventos"),
+    Conhecida("plataforma_series", ("_meta",), "controle", "o controle da gravação das séries da plataforma"),
+    Conhecida("plataforma_estado", ("strings_trancadas", "verified", "manutencao", "tracking", "etm_tickets",
+                                    "os_atribuidas", "comentarios", "comments", "trackers_notas", "trackers_garantia",
+                                    "trackers_notas_local"), "apoio",
+              "o estado das telas da plataforma de performance (marcações, comentários e notas dos analistas)"),
+    Conhecida("plataforma_estado", ("_meta",), "controle", "o controle da gravação do estado da plataforma"),
+    Conhecida("tickets_performance", ("Home", "Aux", "Check", "Comentários", "Resumo - Trackers",
+                                      "Base de dados - Dashboard", "Base de dados - Usinas",
+                                      "Base de dados - Usinas (desatu)", "Tracker", "Edicoes do app",
+                                      "Edicoes do app v2", "Edicoes do app v3"), "apoio",
+              "abas de apoio da planilha de tickets: painéis, listas, cadastro de usinas e o histórico das edições"),
+    Conhecida("tickets_performance", ("Desligamentos", "Inv. com baixa perfor.", "Inv. com lim. de potência"),
+              "candidata", "listas de acompanhamento da planilha de tickets (desligamentos, inversores com baixa "
+                           "performance ou com limitação de potência), ainda sem fato no catálogo"),
+    Conhecida("bd_thopen", ("Dados Gerais Usinas", "Clientes", "zz Caroá - Cliente"), "apoio",
+              "o cadastro das usinas e dos clientes na planilha do coletor; o cadastro que vale é o do Nexus"),
+    Conhecida("bd_thopen", ("Dados Mensais 2026", "Histórico Carteira", "Histórico Polaris"), "candidata",
+              "históricos mensais (2026, por carteira, Polaris) que o fato Meta e histórico mensal ainda não lê"),
+    Conhecida("bd_performance", ("Info Geral", "Base UFV", "Equipamentos", "BD_Trackers", "Aux"), "apoio",
+              "o cadastro da planilha do coletor: as usinas (a Info Geral dá o Código Fractal das abas), os "
+              "equipamentos e os trackers"),
+    Conhecida("bd_performance", ("Info Mensal",), "candidata",
+              "os dados mensais das usinas do BD_Performance, ainda sem fato no catálogo"),
+    Conhecida("bd_performance", ("Ibirapuã I - Backup", "Falhas", "Trackers", "PVSyst", "Acumulado Anual"), "apoio",
+              "abas ocultas da planilha (cópia de segurança, falhas antigas, PVSyst, acumulado)"),
+    Conhecida("os_creator", ("temas", "plataforma", "chamados_obs"), "apoio",
+              "a configuração do OS Creator (temas, plataforma, observações dos chamados)"),
+    Conhecida("zz_teste_claude_apagar", ("*",), "teste",
+              "livro de teste da API, criado para provar a gravação; nunca é dado (a API não apaga livro)"),
+)
+
+
+def conhecida(livro: str, aba: str):
+    """A declaração da aba em CONHECIDAS, ou None."""
+    for c in CONHECIDAS:
+        if c.livro == livro and (aba in c.abas or c.abas == ("*",)):
+            return c
+    return None
 
 
 def aba_segue_a_regra(aba: str) -> bool:

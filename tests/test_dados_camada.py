@@ -624,7 +624,7 @@ def test_tela_mostra_a_matriz_o_tipo_os_livros_e_a_qualidade(app, banco):
         s["usuario"], s["admin"] = "admin", True
     from conftest import SENHA_TESTE
     c.post("/entrar", data={"senha": SENHA_TESTE})
-    html = c.get("/t/base/governanca").get_data(as_text=True)
+    html = c.get("/t/base/governanca?ver=matriz").get_data(as_text=True)     # o organograma é o padrão desde 09/10
     telas_dados._CACHE.update(t=0.0, v=None)
     assert "Matriz de barramento" in html and "Fechamento de OS" in html and "com IDs" in html
     assert "100% ligado" in html and "Programação semanal" in html

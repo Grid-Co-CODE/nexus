@@ -1,0 +1,64 @@
+{# O radar do banco (Levi, 09/10/2026: "verifique se aparece a cada tabela nova que aparece!"): cada tabela da listagem
+   do banco numa caixa (de fato, de usina, conhecida ou nova), pela regra de `radar.py`. A nova aparece aqui sozinha até
+   alguém dizer no catálogo o que ela é. Entra nas duas visões; com `com_gaveta` (o organograma), cada nova abre o detalhe
+   na gaveta e, para administrador, as linhas. #}
+<section class="dd-radar" id="dd-radar" aria-labelledby="dd-radar-titulo">
+  <h2 class="dd-h2" id="dd-radar-titulo">Radar do banco: toda tabela tem dono</h2>
+  {% if not radar %}
+  <p class="dd-mudo">Não consegui ler a lista de tabelas do banco{% if radar_erro %} ({{ radar_erro }}){% endif %}: o radar volta quando o banco responder.</p>
+  {% else %}
+  <p class="dd-mudo">Cada tabela do banco é conferida com o catálogo: é fonte ou destino de um fato, aba de usina da geração,
+  conhecida (o catálogo diz o que ela é e por que não é fato) ou nova. A nova aparece aqui sozinha até alguém dizer no
+  catálogo o que ela é (<code>nexus/dados/catalogo.py</code>).</p>
+  <ul class="dd-radar-contas">
+    <li data-radar="total"><b>{{ milhar(radar.total) }}</b><span>tabelas no banco</span></li>
+    <li data-radar="fato"><b>{{ radar.n.fato }}</b><span>de fatos e livros do Nexus</span></li>
+    <li data-radar="usina"><b>{{ radar.n.usina }}</b><span>abas de usina (geração)</span></li>
+    <li data-radar="conhecida"><b>{{ radar.n.conhecida }}</b><span>conhecidas, que não são fato</span></li>
+    <li data-radar="nova" class="{{ 'critico' if radar.n.nova else 'ok' }}"><b>{{ radar.n.nova }}</b><span>{{ 'nova' if radar.n.nova == 1 else 'novas' }}, fora do catálogo</span></li>
+  </ul>
+  {% if radar.novas %}
+  <ul class="dd-radar-novas">
+    {% for t in radar.novas %}
+    <li>{% if com_gaveta %}<button type="button" class="dd-org-fato critico dd-radar-nova" data-det="dd-det-nova-{{ loop.index }}"
+        data-previa="{{ {'nova': 1, 'livro': t.livro, 'aba_nova': t.aba} | urlencode if admin else '' }}" aria-haspopup="dialog" aria-controls="dd-gaveta">{% else %}<div class="dd-org-fato critico dd-radar-nova">{% endif %}
+      <span class="dd-org-nome"><code>{{ t.livro }} · {{ t.aba }}</code></span>
+      <span class="dd-org-linha"><span class="dd-org-estado critico">nova</span>{% if t.oculta %}<span class="dd-org-tipo">oculta na planilha</span>{% endif %}</span>
+      <span class="dd-org-resumo">{{ milhar(t.linhas or 0) }} linhas · {{ t.colunas or 0 }} colunas · o catálogo ainda não diz o que ela é</span>
+    {% if com_gaveta %}</button>{% else %}</div>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="dd-radar-ok">Nenhuma tabela nova: as {{ milhar(radar.total) }} tabelas do banco têm dono no catálogo.</p>
+  {% endif %}
+  {% if radar.conhecidas %}
+  <details class="dd-radar-conhecidas">
+    <summary>As tabelas conhecidas que não são fato, e por quê{% if radar.so_na_conta %} ({{ milhar(radar.so_na_conta) }} de teste ou aposentadas só entram na conta){% endif %}</summary>
+    {% for papel, decl in radar.conhecidas %}
+    <h3>{{ papel }}</h3>
+    <ul>{% for d in decl %}<li><span class="dd-radar-abas"><code>{{ d.livro }}</code> {{ d.abas | join(', ') }}</span><span class="dd-radar-motivo">{{ d.motivo }}</span></li>{% endfor %}</ul>
+    {% endfor %}
+  </details>
+  {% endif %}
+  {% endif %}
+</section>
+
+{% if com_gaveta and radar %}{% for t in radar.novas %}
+<template id="dd-det-nova-{{ loop.index }}">
+  <p class="gc-eyebrow">Radar do banco</p>
+  <h2 class="dd-gav-titulo" id="dd-gaveta-titulo">{{ t.livro }} · {{ t.aba }}</h2>
+  <p class="dd-org-linha"><span class="dd-org-estado critico">nova</span></p>
+  <p class="dd-gav-frase">Esta tabela está no banco, mas o catálogo do Nexus não diz o que ela é: de onde vem, o que é cada linha
+  e como se liga às outras.</p>
+  <h3>O que se sabe</h3>
+  <p class="dd-gav-texto">{{ milhar(t.linhas or 0) }} linhas e {{ t.colunas or 0 }} colunas{% if t.oculta %}, oculta na planilha{% endif %}, no livro <code>{{ t.livro }}</code>.</p>
+  <h3>O que fazer</h3>
+  <ul class="dd-gav-passos">
+    <li><b>É um acontecimento</b> (uma linha por evento, com data, usina, medida): vira fato em <code>FATOS</code>, com o grão, o tipo e as dimensões.</li>
+    <li><b>É um livro do Nexus</b>: registre em <code>LIVROS</code> (regra 10: o livro entra no catálogo antes de existir).</li>
+    <li><b>Não é fato</b> (cadastro, controle, apoio de outro sistema): declare em <code>CONHECIDAS</code>, dizendo o que é.</li>
+  </ul>
+  <p class="dd-gav-mudo">Tudo em <code>nexus/dados/catalogo.py</code>; o passo a passo está em <code>nexus/dados/CLAUDE.md</code>.</p>
+  {% if not admin %}<p class="dd-gav-mudo">As linhas de uma tabela que o catálogo ainda não conhece só aparecem para administrador.</p>{% endif %}
+</template>
+{% endfor %}{% endif %}
