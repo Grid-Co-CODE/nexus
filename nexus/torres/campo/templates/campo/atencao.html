@@ -3,8 +3,10 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Central de atenção, visão do Nexus (05/10/2026): só o que está pendente, em duas abas (rondas pendentes e PT), cada uma em cartões
-   por equipe, por supervisor (08/10/2026) ou em tabela (nexus/campo/visao.py: atencao, por_equipe, por_supervisor). Só
-   usina mobilizada; a PT esperando aparece sempre. #}
+   por equipe, por região de campo (com a alternância para gestor de contrato: a estrutura de O&M de 10/2026; antes, "por
+   supervisor") ou em tabela (nexus/campo/visao.py: atencao, por_equipe, por_regiao, por_gestor). Só usina mobilizada; a
+   PT esperando aparece sempre. #}
+{% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna, quem %}
 {# O "homem de capacete" (Levi, 05/10) é um ícone desenhado, não emoji: a regra da casa é sem emoji na interface #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% set no_cartao = {'nunca': ('nunca teve ronda', 'nunca tiveram ronda'), 'sem_ronda': ('sem ronda há 7 d ou mais', 'sem ronda há 7 d ou mais'),
@@ -33,6 +35,7 @@
     <div class="cn-frescor">rondas e PT do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+  {% include 'campo/_aviso_estrutura.html' %}
 
   <nav class="cn-abas" aria-label="Abas">
     {% for v, nome, n in vistas %}<a href="{{ url(vista=v, f=None) }}"{% if v == vista %} aria-current="page"{% endif %}>{{ nome }}<i>{{ n }}</i></a>{% endfor %}
@@ -42,17 +45,14 @@
     <input type="hidden" name="vista" value="{{ vista }}">
     <div class="cn-seg" aria-label="Visão">
       <a href="{{ url(modo=None, equipe=None) }}"{% if modo == 'equipes' %} aria-current="page"{% endif %}>Por equipe</a>
-      <a href="{{ url(modo='supervisores', equipe=None) }}"{% if modo == 'supervisores' %} aria-current="page"{% endif %}>Por supervisor</a>
+      <a href="{{ url(modo='regioes', equipe=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por região de campo</a>
       <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
     </div>
-    <label class="gc-rotulo" for="cn-regiao">Região</label>
+    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
     <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
       <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
-    <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
-    <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
-      <option value="*"{% if not supervisor %} selected{% endif %}>Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
-    </select>
+    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, equipe, cidade{{ ', OS ou técnico' if vista != 'pendentes' else '' }}" aria-label="Buscar">
     {% for k in ('f', 'modo', 'equipe') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
@@ -79,7 +79,7 @@
           <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>
             <span class="cn-eq-tec" title="{{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }} na equipe (cadastro){% for k, n in c.cargos.items() %}{{ ':' if loop.first else ',' }} {{ n }} {{ k }}{% endfor %}">{{ capacete() }}<b>{{ c.tecnicos }}</b></span></div>
           <span>{{ c.regioes|join(', ') or '—' }}{% if c.ufs %} · {{ c.ufs|join(', ') }}{% endif %}</span>
-          <span>Supervisor: <b class="cn-eq-sup">{{ c.supervisor }}</b></span>
+          {% if c.regiao_campo == sem_regiao %}<span>{{ sem_regiao }}</span>{% else %}<span>{% if c.codigo %}{{ c.codigo }} · {% endif %}{{ c.regiao_campo }} · Supervisor de Campo: {{ quem(c.supervisor_campo) }}</span>{% endif %}
         </div>
         {{ numeros_ronda(c) }}
       </a>
@@ -87,24 +87,33 @@
       <p class="mudo">Nenhuma equipe com esses filtros.</p>
     {% endfor %}
   </div>
-  {% elif modo == 'supervisores' %}
-  {# cartões por supervisor (Levi, 08/10: "além de por equipe e tabela, adicione mais um botão (por supervisor)"): a
-     soma das equipes dele; o cartão leva à tabela do supervisor #}
+  {% elif modo in ('regioes', 'gestores') %}
+  {# por região de campo (estrutura de O&M de 10/2026; era "por supervisor", Levi, 08/10): a soma das equipes da região,
+     com o Supervisor de Campo e o Coordenador (ou a vaga); a alternância leva aos cartões por gestor de contrato (pelas
+     usinas dele). O cartão leva à tabela da região ou do gestor #}
+  {{ alterna(modo == 'gestores', url(modo='regioes', equipe=None), url(modo='gestores', equipe=None)) }}
   <div class="cn-equipes">
-    {% for s in cartoes_sup %}
+    {% if modo == 'regioes' %}
+    {% for s in cartoes_reg %}
       {% set pct = s.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
-      <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.supervisor == sem_supervisor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', supervisor=s.supervisor, equipe=None, f=None) }}">
-        <div class="cn-eq-cab">
-          <div class="cn-eq-titulo"><b>{{ 'Sem supervisor no cadastro' if s.supervisor == sem_supervisor else s.supervisor }}</b>
-            <span class="cn-eq-tec" title="{{ s.tecnicos }} técnico{{ 's' if s.tecnicos != 1 }} nas equipes (cadastro)">{{ capacete() }}<b>{{ s.tecnicos }}</b></span></div>
-          <span>{{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }} · {{ s.tecnicos }} técnico{{ 's' if s.tecnicos != 1 }}{% if s.regioes %} · {{ s.regioes|join(', ') }}{% endif %}</span>
-          <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
-        </div>
+      <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.regiao == sem_regiao %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', regiao_campo=s.regiao, equipe=None, f=None) }}">
+        {{ cab_regiao(s, sem_regiao) }}
         {{ numeros_ronda(s) }}
       </a>
     {% else %}
-      <p class="mudo">Nenhum supervisor com esses filtros.</p>
+      <p class="mudo">Nenhuma região de campo com esses filtros.</p>
     {% endfor %}
+    {% else %}
+    {% for s in cartoes_gest %}
+      {% set pct = s.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
+      <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.gestor == sem_gestor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', gestor=s.gestor, equipe=None, f=None) }}">
+        {{ cab_gestor(s, sem_gestor) }}
+        {{ numeros_ronda(s) }}
+      </a>
+    {% else %}
+      <p class="mudo">Nenhum gestor de contrato com esses filtros.</p>
+    {% endfor %}
+    {% endif %}
   </div>
   {% else %}
   {% if vista != 'pendentes' %}
@@ -149,7 +158,8 @@
     mobilização e ficam de fora até a data entrar no cadastro.{% endif %}
   {% else %}<b>O que entra.</b> As PT esperando o De acordo, da mais antiga para a mais nova; parada = mais de 2 h. Clique
     na OS para abrir a PT e decidir. O livro de PT do App chega de hora em hora.{% endif %}
-    A região do Brasil sai do estado da usina no cadastro.
+    A região do Brasil sai do estado da usina no cadastro. A região de campo é a da equipe da usina (estrutura de O&amp;M de
+    10/2026: o Supervisor de Campo lidera a região e aprova as OS); o gestor de contrato (Supervisor PM) é o da usina.
   </div>
 </div>
 {% endblock %}

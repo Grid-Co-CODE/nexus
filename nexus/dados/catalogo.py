@@ -76,7 +76,11 @@ DIMENSOES = (
     # HIST-10 (auditoria 08/10): a usina tem histórico (equipe, responsáveis, região "da época") e a dimensão não o citava
     ("usina", "Usina", "cadastro_nexus · usinas (+ de_para; nexus_dimensoes · usinas_historico)", "usina_id"),
     ("cliente", "Cliente", "cadastro_nexus · clientes", "cliente_id"),
-    ("equipe", "Equipe / região", "cadastro_nexus · equipes", "equipe_id"),
+    # a região de campo (estrutura de O&M de 10/2026) é da EQUIPE: hierarquia da mesma dimensão (equipe -> região, com o
+    # Supervisor de Campo e o Coordenador por pessoa_id), não uma dimensão à parte; o fato chega à região pelo equipe_id.
+    # (O "região" do nome é a "Região" que o App escreve, que é a equipe; a região de campo é outra coisa.)
+    ("equipe", "Equipe / região", "cadastro_nexus · equipes (+ regioes_campo: a região de campo da equipe)",
+     "equipe_id (→ regiao_campo_id)"),
     ("pessoa", "Pessoa", "cadastro_nexus · pessoas (+ nexus_dimensoes · pessoas_historico)", "pessoa_id"),
     ("equipamento", "Equipamento", "nexus_equipamentos · dim_equipamento (+ equipamento_apelido)",
      "equipamento_id (sha1 do código do ativo do Fracttal)"),

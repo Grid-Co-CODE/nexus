@@ -1,0 +1,5 @@
+{# A estrutura de O&M de 10/2026 ainda não está no banco (a aba `regioes_campo` do cadastro_nexus): a tela não quebra e
+   diz o que falta. Até a publicação do cadastro tudo fica em "Sem região de campo" e só um administrador aprova OS. #}
+{% if not estrutura_publicada %}<div class="cn-erro cn-aviso" role="status"><b>Estrutura de campo ainda não publicada.</b>
+  As regiões de campo, com o Supervisor de Campo e o Coordenador, ainda não estão no cadastro publicado no banco do Nexus:
+  até a publicação, as usinas aparecem em "{{ sem_regiao }}" e só um administrador aprova OS. O filtro e os cartões de gestor de contrato já valem.</div>{% endif %}

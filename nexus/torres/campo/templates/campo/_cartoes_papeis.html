@@ -1,0 +1,36 @@
+{# O topo dos cartões da estrutura de O&M de 10/2026 (Central, PT e Aprovação): o da REGIÃO DE CAMPO diz quem é o
+   Supervisor de Campo e o Coordenador (ou "vaga", no azul tracejado, que não é erro) e as equipes; o do GESTOR DE CONTRATO
+   (Supervisor PM) diz as usinas e as equipes dele. O pé de cada cartão (rondas, PT, OS) é de cada tela. #}
+{% macro quem(nome) %}{% if not nome or nome == 'vaga' %}<span class="cn-vaga" title="Cargo sem ninguém no cadastro: vaga aberta">vaga</span>{% else %}<b class="cn-eq-sup">{{ nome }}</b>{% endif %}{% endmacro %}
+{% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
+{% macro cab_regiao(s, sem_regiao, extra='') %}
+      <div class="cn-eq-cab">
+        <div class="cn-eq-titulo"><b>{{ s.regiao }}</b>
+          <span class="cn-eq-tec" title="{{ s.tecnicos }} técnico{{ 's' if s.tecnicos != 1 }} nas equipes (cadastro)">{{ capacete() }}<b>{{ s.tecnicos }}</b></span></div>
+        {% if s.regiao == sem_regiao %}<span>equipes fora da estrutura de campo · {{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}</span>
+        {% else %}<span>Supervisor de Campo: {{ quem(s.supervisor_campo) }}</span>
+        <span>Coordenador: {{ quem(s.coordenador_campo) }}</span>
+        <span>{{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}{{ extra }}{% if s.base %} · base {{ s.base }}{% endif %}</span>{% endif %}
+        <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
+      </div>
+{% endmacro %}
+{% macro cab_gestor(s, sem_gestor, extra='') %}
+      <div class="cn-eq-cab">
+        <div class="cn-eq-titulo"><b>{{ s.gestor }}</b>
+          <span class="cn-eq-tec" title="{{ s.tecnicos }} técnico{{ 's' if s.tecnicos != 1 }} nas equipes das usinas (cadastro)">{{ capacete() }}<b>{{ s.tecnicos }}</b></span></div>
+        <span>{{ 'usinas sem gestor de contrato no cadastro' if s.gestor == sem_gestor else 'Gestor de contrato (Supervisor PM)' }}</span>
+        <span>{% if s.usinas %}{{ s.usinas }} usina{{ 's' if s.usinas != 1 }} · {% endif %}{{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}{{ extra }}</span>
+        <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
+      </div>
+{% endmacro %}
+{# a alternância dos cartões (o pedido: "por região de campo / Supervisor de Campo, com uma alternância para por Gestor de
+   contrato"); `href_regiao` e `href_gestor` vêm prontos de quem chama #}
+{% macro alterna(por_gestor, href_regiao, href_gestor) %}
+<div class="cn-alterna" role="group" aria-label="Agrupar os cartões por">
+  <span class="gc-rotulo">Agrupar por</span>
+  <div class="cn-seg cn-seg--mini">
+    <a href="{{ href_regiao }}"{% if not por_gestor %} aria-current="page"{% endif %}>Região de campo (Supervisor de Campo)</a>
+    <a href="{{ href_gestor }}"{% if por_gestor %} aria-current="page"{% endif %}>Gestor de contrato (Supervisor PM)</a>
+  </div>
+</div>
+{% endmacro %}

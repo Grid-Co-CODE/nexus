@@ -2,6 +2,12 @@
 
     python ferramentas/publicar_cadastro.py --ensaio   monta e confere, grava só o xlsx local (nada vai ao banco)
     python ferramentas/publicar_cadastro.py            publica
+    ... --bases-guardadas   usa as bases da última leitura da tela Base → Ligações, sem ler de novo (é o que o botão
+                            "Publicar no banco" da tela faz)
+
+`--bases-guardadas` existe porque a leitura das bases pode falhar numa máquina sem quebrar a publicação do cadastro: em
+08/10/2026 a foto do Fracttal da pasta do PCM não abria neste PC (sem o pyarrow) e o ensaio da estrutura de campo parou
+ali, antes de montar uma linha do cadastro.
 
 As bases são lidas e casadas por nexus/cadastro/ligacoes.py, o mesmo módulo da tela Base → Ligações; as decisões
 tomadas na tela (ligar, desligar, ignorar) entram aqui também. Lê do .env do Nexus: NEXUS_CHAVE_CADASTRO (abre o
@@ -26,6 +32,8 @@ from nexus.config import ler_ambiente  # noqa: E402
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ensaio", action="store_true", help="não envia; grava o xlsx local e confere")
+    ap.add_argument("--bases-guardadas", action="store_true",
+                    help="não lê as bases de novo: usa a última leitura da tela Ligações (de_para_atual.json)")
     a = ap.parse_args()
     env = ler_ambiente()
     if not env.get("NEXUS_CHAVE_CADASTRO"):
@@ -33,7 +41,11 @@ def main():
     cofre = Cofre(env["NEXUS_CHAVE_CADASTRO"])
     srv = Servico(ArmazemLocal(Path(env.get("NEXUS_ARMAZEM_LOCAL") or ARMAZEM_PADRAO)), cofre)
     base = (env.get("GRIDCO_DB_API") or L.BASE_API).rstrip("/")
-    atual = L.calcular(env, srv)                       # lê as bases e guarda para a tela
+    atual = L.ler(env) if a.bases_guardadas else L.calcular(env, srv)     # lê as bases e guarda para a tela
+    if not atual:
+        sys.exit("não há bases guardadas: leia as bases na tela Base → Ligações (ou rode sem --bases-guardadas)")
+    if a.bases_guardadas:
+        print("bases guardadas, lidas em", atual.get("gerado_em"))
     t = B.montar(srv, cofre, atual["fontes"], B.ler_anteriores(base), L.carregar_regras(env))
     for aba, (cab, linhas) in t.items():
         print(f"{aba}: {len(linhas)} linhas, {len(cab)} colunas")

@@ -17,12 +17,15 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from flask import abort, current_app, redirect, render_template, request, session
+from markupsafe import Markup
 
 from . import tipos
 from .armazem import ArmazemLocal
 from .calculos import CARGO_TECNICO, ERRO
 from .cifra import CifraErro, Cofre
-from .esquema import CLIENTES, ENTIDADES, EQUIPES, LISTAS, PESSOAS, USINAS
+from .esquema import (CLIENTES, ENTIDADES, EQUIPES, LISTAS, PESSOAS, REGIOES_CAMPO, USINAS, VINCULO_CAMPO,
+                      VINCULO_COORDENADOR_CAMPO, VINCULO_GESTOR, VINCULO_SUPERVISOR_CAMPO, VINCULO_SUPERVISOR_LEGADO,
+                      rotulo_lista)
 from .importar import ler_xlsx, montar
 from .servico import QUEM_IMPORTACAO, Servico, chave_texto
 from .tipos import Legado
@@ -76,7 +79,20 @@ def exibir_valor(srv: Servico, c, v) -> str:
         if m:
             return "Não se aplica" if m == "N/A" else m
         return srv.titulo_de(c.lista, v)
+    if c.tipo == "lista":
+        return rotulo_lista(c.lista, v)        # "Gestor de contrato (Supervisor PM)": o valor gravado não muda
     return tipos.exibir(c.tipo, v)
+
+
+# Que vínculo aparece primeiro na lista de pessoas de cada campo (estrutura de O&M de 10/2026): quem lidera a região é o
+# Supervisor de Campo; o Gestor de contrato é o Supervisor PM; o "Supervisor" de antes fica depois, como legado.
+_ORDEM_VINCULO = {
+    "supervisor_campo": [VINCULO_SUPERVISOR_CAMPO, VINCULO_COORDENADOR_CAMPO, VINCULO_SUPERVISOR_LEGADO],
+    "coordenador_campo": [VINCULO_COORDENADOR_CAMPO, VINCULO_SUPERVISOR_CAMPO, VINCULO_SUPERVISOR_LEGADO],
+    "responsavel_om": [VINCULO_SUPERVISOR_CAMPO, VINCULO_SUPERVISOR_LEGADO, VINCULO_GESTOR, VINCULO_CAMPO],
+    "gestor_contrato": [VINCULO_GESTOR, VINCULO_SUPERVISOR_LEGADO, VINCULO_SUPERVISOR_CAMPO, VINCULO_CAMPO],
+    "supervisor": [VINCULO_SUPERVISOR_LEGADO, VINCULO_SUPERVISOR_CAMPO, VINCULO_GESTOR, VINCULO_CAMPO],
+}
 
 
 def _opcoes_ref(srv: Servico, c):
@@ -87,11 +103,11 @@ def _opcoes_ref(srv: Servico, c):
         extra = r.valores.get("cargo") or ""
         grupos[r.valores.get("vinculo") or "Sem vínculo"].append(
             (r.id, r.titulo + (f" · {extra}" if extra else "")))
-    ordem = ["Supervisor", "Gestor de contrato", "Colaborador de campo"] if c.id in (
-        "responsavel_om", "gestor_contrato", "supervisor") else ["Colaborador de campo", "Supervisor",
-                                                                 "Gestor de contrato"]
+    ordem = _ORDEM_VINCULO.get(c.id, [VINCULO_CAMPO, VINCULO_SUPERVISOR_CAMPO, VINCULO_COORDENADOR_CAMPO,
+                                      VINCULO_GESTOR, VINCULO_SUPERVISOR_LEGADO])
     chaves = ordem + sorted(k for k in grupos if k not in ordem)
-    return [(k, sorted(grupos[k], key=lambda x: chave_texto(x[1]))) for k in chaves if grupos.get(k)]
+    return [(rotulo_lista("vinculo", k), sorted(grupos[k], key=lambda x: chave_texto(x[1])))
+            for k in chaves if grupos.get(k)]
 
 
 def _campo(srv: Servico, ent, reg, c, revelar, form=None, erros=None, novo=False, sugestoes=None) -> dict:
@@ -105,7 +121,9 @@ def _campo(srv: Servico, ent, reg, c, revelar, form=None, erros=None, novo=False
          "obrigatorio": c.obrigatorio, "erro": (erros or {}).get(c.id), "origem": origem,
          "legado": atual.texto if isinstance(atual, Legado) else None, "mascarado": mascarado,
          "exibido": tipos.mascarar(c.tipo, efetivo) if mascarado and c.tipo != "ref" else exibido,
-         "erro_calculo": efetivo is ERRO}
+         "erro_calculo": efetivo is ERRO,
+         # o cargo sem ninguém (Supervisor de Campo da região): a tela diz "Vaga", que não é erro nem pendência
+         "vaga": c.vazio if c.vazio and (efetivo is None or efetivo == "") else ""}
     if form is not None and c.id in form:
         d["valor"] = form[c.id]
     else:
@@ -114,14 +132,14 @@ def _campo(srv: Servico, ent, reg, c, revelar, form=None, erros=None, novo=False
         else ("Vazio = automático" if c.modo == "automatico" else "")
     if c.tipo == "lista":
         valores = srv.listas().get(c.lista, [])
-        d["opcoes"] = [("", "—")] + [(v, v) for v in valores]
+        d["opcoes"] = [("", "—")] + [(v, rotulo_lista(c.lista, v)) for v in valores]
         if d["valor"] and d["valor"] not in valores:
             d["opcoes"].insert(1, (d["valor"], f"{d['valor']} (fora da lista)"))
     elif c.tipo == "simnao":
         d["opcoes"] = [("", "—"), ("Sim", "Sim"), ("Não", "Não")]
     elif c.tipo == "ref":
         primeiro = [("", ("Automático: " + exibido) if c.modo == "automatico" and origem == "automatico" and exibido
-                     else ("Automático (pela equipe)" if c.modo == "automatico" else "—"))]
+                     else ("Automático (pela equipe)" if c.modo == "automatico" else (c.vazio or "—")))]
         if c.modo == "automatico":
             primeiro += [("N/A", "Não se aplica"), ("N/I", "Não informado")]
         if isinstance(atual, Legado):
@@ -221,7 +239,20 @@ def _visoes_nav(visoes, atual):
             for v, r in (visoes or [])]
 
 
-def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto_novo, extras=None, visoes=None):
+def _celula_vaga(r, f, texto) -> str:
+    """O texto da vaga numa célula vazia: o campo que diz o que o vazio quer dizer ("Vaga" no Supervisor de Campo da
+    região) ou o Responsável O&M da usina que a planilha trouxe como a região (estrutura de O&M de 10/2026)."""
+    if texto or isinstance(r.valores.get(f.id), Legado):
+        return ""
+    if f.vazio:
+        return f.vazio
+    if f.id == "responsavel_om" and r.valores.get("responsavel_om_vaga"):
+        return "Vaga · " + str(r.valores["responsavel_om_vaga"])
+    return ""
+
+
+def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto_novo, extras=None, visoes=None,
+           nota=""):
     q = request.args.get("q", "").strip()
     filtros = {k: request.args.get(k, "") for k, _, _ in filtros_def}
     # Os avisos vão inteiros para a linha: o clique na linha abre o que é (Levi, 30/09: "ao clicar na linha que
@@ -250,10 +281,11 @@ def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto
         for c in colunas:
             if c["campo"] is not None:
                 f = c["campo"]
-                celulas.append({"col": c["id"], "texto": exibir_valor(srv, f, r.valor(f.id)),
+                texto = exibir_valor(srv, f, r.valor(f.id))
+                celulas.append({"col": c["id"], "texto": texto, "vaga": _celula_vaga(r, f, texto),
                                 "legado": isinstance(r.valores.get(f.id), Legado)})
             else:
-                celulas.append({"col": c["id"], "texto": resumo[int(c["id"][6:])], "legado": False})
+                celulas.append({"col": c["id"], "texto": resumo[int(c["id"][6:])], "legado": False, "vaga": ""})
             celulas[-1].update(visivel=c["visivel"], esquerda=c["esquerda"], link=c["id"] == titulo_col,
                                chip=c["id"] == "status")
         avisos = pend.get((ent.id, r.id), [])
@@ -265,7 +297,7 @@ def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto
         if fonte in ENTIDADES:
             vals = [(e.id, e.titulo) for e in sorted(srv.registros(fonte), key=lambda e: chave_texto(e.titulo))]
         else:
-            vals = [(v, v) for v in srv.listas().get(fonte, [])]
+            vals = [(v, rotulo_lista(fonte, v)) for v in srv.listas().get(fonte, [])]
         opcoes.append({"id": k, "rotulo": rotulo, "valores": vals, "atual": filtros[k]})
     grupos = defaultdict(list)
     for c in colunas:
@@ -277,7 +309,7 @@ def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto
                            cols_atuais=",".join(c["id"] for c in colunas if c["visivel"]),
                            cols_padrao=",".join(c["id"] for c in colunas if c["padrao"]),
                            n_colunas=2 + sum(1 for c in colunas if c["visivel"]),
-                           nomes=NOMES_PENDENCIA, gravidades=GRAVIDADES)
+                           nomes=NOMES_PENDENCIA, gravidades=GRAVIDADES, nota=nota)
 
 
 # ── visões somadas: por cliente (Registro mestre) e por supervisor (Equipes) ──
@@ -462,6 +494,18 @@ def _tecnicos(srv: Servico, usinas, pessoas) -> list[str]:
     return sorted((n for n in nomes if n), key=chave_texto)
 
 
+def _vaga_html(texto="Vaga") -> Markup:
+    return Markup('<span class="cad-vaga">') + texto + Markup("</span>")
+
+
+def _lider(srv: Servico, reg, campo):
+    """Quem ocupa o cargo da região (o "Nome padrão" da ficha) ou a vaga, desenhada como vaga (não como erro)."""
+    v = reg.valores.get(campo) if reg else None
+    if isinstance(v, Legado):
+        return v.texto
+    return srv.titulo_de("pessoas", v) if v else _vaga_html(REGIOES_CAMPO.campo(campo).vazio)
+
+
 def _resumo_equipe(srv: Servico, eq):
     usinas = [u for u in srv.registros("usinas") if u.valores.get("equipe") == eq.id]
     pessoas = [p for p in srv.registros("pessoas") if p.valores.get("equipe") == eq.id]
@@ -469,8 +513,14 @@ def _resumo_equipe(srv: Servico, eq):
                    if u.valores.get("responsavel_om") and not tipos.marcador(u.valores.get("responsavel_om"))})
     tec = _tecnicos(srv, usinas, pessoas)
     base = next((u.valor("base_equipe") for u in usinas if u.valor("base_equipe")), "")
+    rid = eq.valores.get("regiao_campo")
+    regiao = srv.registro("regioes_campo", rid) if isinstance(rid, str) and rid else None
     return {"usinas": usinas, "pessoas": pessoas, "responsaveis": resp, "tecnicos": tec, "base": base,
-            "meta": [("Usinas", str(len(usinas))), ("Responsáveis", ", ".join(resp) or "—"),
+            "meta": [("Usinas", str(len(usinas))),
+                     # a estrutura de O&M de 10/2026: a região da equipe diz quem é o Supervisor de Campo
+                     ("Região de campo", regiao.titulo if regiao else "—"),
+                     ("Supervisor de Campo", _lider(srv, regiao, "supervisor_campo") if regiao else "—"),
+                     ("Responsáveis", ", ".join(resp) or "—"),
                      ("Técnicos", ", ".join(tec) or "—"), ("Base", base or "—")],
             "listas": [
                 {"titulo": "Usinas da equipe", "itens": [_item_usina(srv, u) for u in usinas]},
@@ -509,8 +559,60 @@ def _sub_usina(srv: Servico):
             partes.append("Cliente: " + srv.titulo_de("clientes", r.valores.get("cliente")))
         if r.valores.get("id_bd"):
             partes.append("ID do BD: " + str(r.valores.get("id_bd")))
+        eq = srv.registro("equipes", r.valores.get("equipe")) if isinstance(r.valores.get("equipe"), str) else None
+        if eq and isinstance(eq.valores.get("regiao_campo"), str) and eq.valores.get("regiao_campo"):
+            partes.append("Região de campo: " + srv.titulo_de("regioes_campo", eq.valores.get("regiao_campo")))
         return " · ".join(partes)
     return f
+
+
+# ── regiões de campo (estrutura de O&M de 10/2026) ──────────────────────────────────────────────────────────
+
+def _equipes_da_regiao(srv: Servico, reg) -> list:
+    return [e for e in srv.registros("equipes") if e.valores.get("regiao_campo") == reg.id]
+
+
+def _em_operacao_da_regiao(srv: Servico, equipes) -> list:
+    """As usinas em OPERAÇÃO das equipes da região (a região é da equipe; a usina vem pela equipe dela)."""
+    ids = {e.id for e in equipes}
+    return [u for u in srv.registros("usinas") if u.valores.get("equipe") in ids and u.valores.get("status") == "OPERAÇÃO"]
+
+
+def _resumo_regiao(srv: Servico, reg):
+    equipes = sorted(_equipes_da_regiao(srv, reg),
+                     key=lambda e: (str(e.valores.get("codigo") or "~"), chave_texto(e.titulo)))
+    em_op = _em_operacao_da_regiao(srv, equipes)
+    por_equipe = Counter(u.valores.get("equipe") for u in em_op)
+    return {"meta": [("Base", reg.valores.get("base") or "—"),
+                     ("Supervisor de Campo", _lider(srv, reg, "supervisor_campo")),
+                     ("Coordenador de Campo", _lider(srv, reg, "coordenador_campo")),
+                     ("Equipes", str(len(equipes))), ("Usinas em operação", str(len(em_op)))],
+            "listas": [{"titulo": "Equipes da região", "itens": [
+                {"url": EQUIPES.rota_ficha + e.id,
+                 "texto": (f"{e.valores.get('codigo')} · " if e.valores.get("codigo") else "") + e.titulo,
+                 "detalhe": f"{por_equipe.get(e.id, 0)} em operação", "chip": "", "chip_ok": False}
+                for e in equipes]}]}
+
+
+def _extras_regiao(srv: Servico):
+    def f(r):
+        if r is None:
+            return ["Equipes", "Usinas em operação"]
+        equipes = _equipes_da_regiao(srv, r)
+        return [str(len(equipes)), str(len(_em_operacao_da_regiao(srv, equipes)))]
+    return f
+
+
+def _nota_regioes(srv: Servico) -> str:
+    """Quantas equipes com usina em operação ainda não têm região: são as que o Campo · App mostra em "Sem região de
+    campo" (a carga de 10/2026 trouxe as equipes volantes; as equipes de uma usina só ficam de fora)."""
+    sem = {e.id for e in srv.registros("equipes") if not e.valores.get("regiao_campo")}
+    us = [u for u in srv.registros("usinas") if u.valores.get("status") == "OPERAÇÃO" and u.valores.get("equipe") in sem]
+    n = len({u.valores.get("equipe") for u in us})
+    if not n:
+        return ""
+    return (f"{n} equipe{'s' if n != 1 else ''} com usina em operação ainda sem região de campo ({len(us)} "
+            f"usina{'s' if len(us) != 1 else ''} em operação): a região entra na ficha da equipe.")
 
 
 def _extras_equipe(srv: Servico):
@@ -565,8 +667,9 @@ def registrar_base(bp):
         if request.args.get("visao") == "supervisor":
             return _visao(srv, "Equipes", EQUIPES, visoes, "supervisor", "Supervisor", "Supervisores", "pessoas",
                           "responsavel_om", "Sem responsável", [("Clusters", _clusters)])
-        return _lista(srv, EQUIPES, "Equipes", [], ["nome"], "/t/base/equipe/nova", "Nova equipe",
-                      extras=_extras_equipe(srv), visoes=visoes)
+        return _lista(srv, EQUIPES, "Equipes", [("regiao_campo", "Região de campo", "regioes_campo")],
+                      ["nome", "codigo"], "/t/base/equipe/nova", "Nova equipe", extras=_extras_equipe(srv),
+                      visoes=visoes)
 
     @_tela("Nova equipe")
     def equipe_nova(srv):
@@ -575,6 +678,21 @@ def registrar_base(bp):
     @_tela("Equipe")
     def equipe(srv, id_):
         return _ficha(srv, EQUIPES, id_, "Equipes", extra=lambda r: _resumo_equipe(srv, r))
+
+    # a estrutura de O&M de 10/2026: a região de campo, com o Supervisor de Campo e o Coordenador (vazio = vaga)
+    @_tela("Regiões de campo")
+    def regioes(srv):
+        return _lista(srv, REGIOES_CAMPO, "Regiões de campo", [],
+                      ["nome", "base", "supervisor_campo", "coordenador_campo"], "/t/base/regiao-campo/nova",
+                      "Nova região", extras=_extras_regiao(srv), nota=_nota_regioes(srv))
+
+    @_tela("Nova região de campo")
+    def regiao_nova(srv):
+        return _novo(srv, REGIOES_CAMPO, "Regiões de campo")
+
+    @_tela("Região de campo")
+    def regiao(srv, id_):
+        return _ficha(srv, REGIOES_CAMPO, id_, "Regiões de campo", extra=lambda r: _resumo_regiao(srv, r))
 
     @_tela("Listas")
     def listas(srv):
@@ -665,6 +783,9 @@ def registrar_base(bp):
     bp.add_url_rule("/equipes", "cad_equipes", equipes)
     bp.add_url_rule("/equipe/nova", "cad_equipe_nova", equipe_nova, methods=["GET", "POST"])
     bp.add_url_rule("/equipe/<id_>", "cad_equipe", equipe, methods=["GET", "POST"])
+    bp.add_url_rule("/regioes-campo", "cad_regioes", regioes)
+    bp.add_url_rule("/regiao-campo/nova", "cad_regiao_nova", regiao_nova, methods=["GET", "POST"])
+    bp.add_url_rule("/regiao-campo/<id_>", "cad_regiao", regiao, methods=["GET", "POST"])
     bp.add_url_rule("/listas", "cad_listas", listas, methods=["GET", "POST"])
     bp.add_url_rule("/importar", "cad_importar", importar, methods=["GET", "POST"])
     bp.add_url_rule("/importar/aplicar", "cad_importar_aplicar", importar_aplicar, methods=["POST"])

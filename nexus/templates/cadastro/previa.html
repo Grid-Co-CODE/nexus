@@ -37,6 +37,24 @@
   </div>
 </div>
 
+{% if p.vagas %}
+{# Estrutura de O&M de 10/2026: a RESPONSÁVEL O&M traz a região onde a vaga de Supervisor de Campo está aberta. Não é
+   pessoa: o responsável fica vazio (vaga) e a região fica anotada na usina. #}
+<div class="cad-bloco">
+  <h2>Vagas de Supervisor de Campo</h2>
+  <p class="cad-sub">A coluna RESPONSÁVEL O&amp;M traz a região no lugar da pessoa em {{ p.vagas|sum(attribute='usinas') }} usinas.
+    Nenhuma pessoa é criada: o Responsável O&amp;M fica como <span class="cad-vaga">vaga</span> e a região fica anotada na usina.</p>
+  <div class="cad-rolagem">
+    <table class="cad-tabela">
+      <thead><tr><th>Região na planilha</th><th class="num">Usinas</th><th class="num">Tinham pessoa no Nexus (sai)</th></tr></thead>
+      <tbody>
+        {% for v in p.vagas %}<tr><td>{{ v.rotulo }}</td><td class="num">{{ v.usinas }}</td><td class="num">{{ v.tinham_pessoa }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 {% set tot = p.comparacao|sum(attribute='total') %}
 {% set ig = p.comparacao|sum(attribute='iguais') %}
 <div class="cad-bloco">

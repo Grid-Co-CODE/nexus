@@ -1,7 +1,8 @@
 """Rondas, pedido do Levi de 08/10/2026 (Nexus > Campo App > Rondas): a tabela de registros sem Região, Início e Fim,
 com a Duração ao lado da Data e o início e o fim no mouse; o botão Fotos na tabela; o indicador "Nunca tiveram ronda";
 a aba "Sem ronda" no lugar da Cobertura; a Sujidade pela criticidade, com Status e Tipo; o Quem ronda com as pendentes
-de cada técnico e em blocos; e o Painel por região, equipe, cliente e supervisor. Banco falso (pg_falso)."""
+de cada técnico e em blocos; e o Painel por região, equipe, cliente e supervisor (com a estrutura de O&M de 10/2026, o
+supervisor virou a região de campo e o gestor de contrato). Banco falso (pg_falso)."""
 import json
 import pathlib
 import re
@@ -96,7 +97,7 @@ def _pessoas_com_nome():
             p(90, "Supervisor", None, None, None, "Beltrano Supervisor"), p(91, "Supervisor", None, None, None, "Ciclano Chefe")]
 
 
-def test_aba_sem_ronda_com_tecnicos_supervisor_e_ultima_os(banco, logado):
+def test_aba_sem_ronda_com_tecnicos_regiao_gestor_e_ultima_os(banco, logado):
     _aba(banco, "cadastro_nexus", "pessoas", _pessoas_com_nome())
     # Coração 1 sem ronda; duas OS fechadas pelo App nela (ligadas pelo código do ativo): a última é a 15001
     _aba(banco, "fechamentos_app_campo", "Fechamentos", [
@@ -110,10 +111,11 @@ def test_aba_sem_ronda_com_tecnicos_supervisor_e_ultima_os(banco, logado):
     assert cob["Altair"]["tecnicos"] == ["Ciclano Rocha", "Fulana Lima"]          # o desligado fica fora
     assert cob["Altair"]["ultima_os"]["tecnico"] == "Técnico Silva" and cob["Brodowski 1"]["ultima_os"] is None
     html = logado.get("/t/campo/rondas?aba=sem").get_data(as_text=True)
-    assert _cabecalho(html, "<h2>Sem ronda</h2>") == ["Usina", "Equipe", "Técnicos", "Supervisor", "Última OS na usina",
-                                                      "Última ronda"]
+    assert _cabecalho(html, "<h2>Sem ronda</h2>") == ["Usina", "Equipe", "Técnicos", "Região de campo",
+                                                      "Gestor de contrato", "Última OS na usina", "Última ronda"]
     tabela = html.split("<h2>Sem ronda</h2>", 1)[1].split("</table>", 1)[0]
-    assert "Coração 1" in tabela and "Beltrana Dias" in tabela and "Ciclano Chefe" in tabela
+    assert "Coração 1" in tabela and "Beltrana Dias" in tabela and "Ciclano Chefe" in tabela      # o gestor da usina
+    assert 'Sul 01<span class="det">Supervisor de Campo: <span class="cn-vaga">vaga</span></span>' in tabela
     assert "15001" in tabela and "Corretiva · Técnico Silva" in tabela and ">nunca<" in tabela
     assert "Altair" not in tabela and "Brodowski 1" not in tabela                     # tiveram ronda nos 30 dias
     assert "Cobertura</a>" not in html                                                # a aba Cobertura saiu
@@ -192,24 +194,32 @@ def test_quem_ronda_mostra_quais_sao_as_pendentes_e_abre_em_blocos(banco, logado
     assert "Ver a usina pendente de ronda do cluster" in pessoas
 
 
-# ── 9: o Painel, quem está melhor por região, equipe, cliente e supervisor ────────────────────────────────────────
-def test_painel_compara_regiao_equipe_cliente_e_supervisor(banco, logado):
+# ── 9: o Painel, quem está melhor por região, equipe, cliente, região de campo e gestor de contrato ────────────────
+def test_painel_compara_regiao_equipe_cliente_regiao_de_campo_e_gestor(banco, logado):
     d = visao.rondas().dados
     p = visao.painel_rondas(d["todas"], d["cobertura"], 30, d["hoje"])
     c = visao.comparativos(p["periodo"], d["cobertura"])
-    assert set(c) == {"regiao_br", "equipe", "cliente", "supervisor"}
+    # "Região de campo" e "Gestor de contrato" no lugar de "Supervisor" (estrutura de O&M de 10/2026)
+    assert set(c) == {"regiao_br", "equipe", "cliente", "regiao_campo", "gestor"}
+    rc = {a["nome"]: a for a in c["regiao_campo"]}
+    assert (rc["Sudeste 03"]["usinas"], rc["Sudeste 03"]["indice"], rc["Sudeste 03"]["sub"]) == (
+        2, 94, "Supervisor de Campo: Supervisora Campo")
+    assert rc["Sul 01"]["sub"] == "Supervisor de Campo: vaga"
+    assert [a["nome"] for a in c["gestor"]] == ["Beltrano Supervisor", "Ciclano Chefe"]
     eq = c["equipe"]
     # SP Norte 01: 2 de 2 com ronda, nota 90 -> índice 0,6 × 90 + 0,4 × 100 = 94; SC Oeste 01 sem ronda: sem índice
     assert [(a["nome"], a["indice"], a["cobertura_pct"], a["nota"], a["rondas"], a["dur_media"]) for a in eq] == [
         ("SP Norte 01", 94, 100, 90, 3, 60), ("SC Oeste 01", None, 0, None, 0, None)]
     assert eq[0]["base_pequena"] and [a["nome"] for a in c["regiao_br"]] == ["Sudeste", "Sul"]
     html = logado.get("/t/campo/rondas?aba=painel").get_data(as_text=True)
-    for titulo in ("Por região do Brasil", "Por equipe", "Por cliente", "Por supervisor"):
+    for titulo in ("Por região do Brasil", "Por equipe", "Por cliente", "Por região de campo", "Por gestor de contrato"):
         assert titulo in html, titulo
-    assert html.count('class="cn-ordenavel"') == 4 and "base pequena" in html
+    assert "Por supervisor" not in html
+    assert html.count('class="cn-ordenavel"') == 5 and "base pequena" in html
     for link in ('href="?equipe=SP+Norte+01"', 'href="?regiao=Sudeste"', 'href="?cliente=Thopen"',
-                 'href="?supervisor=Beltrano+Supervisor"'):
+                 'href="?regiao_campo=Sudeste+03"', 'href="?gestor=Beltrano+Supervisor"'):
         assert link in html, link
+    assert '<span class="det">Supervisor de Campo: vaga</span>' in html
     # o clique leva à tabela filtrada; a equipe vira um filtro da tela, com o × para tirar
     sem = logado.get("/t/campo/rondas?aba=sem&equipe=SC+Oeste+01").get_data(as_text=True)
     assert "Equipe: SC Oeste 01" in sem and "Coração 1" in sem
@@ -237,10 +247,11 @@ def test_ordem_inicial_marcada_pessoa_pelo_nome_veredito_pela_gravidade(banco, l
 
 
 def test_destaque_do_painel_com_base_pequena_e_titulo_dos_blocos(banco, logado):
-    # no banco falso toda região, equipe, cliente e supervisor tem menos de 3 usinas: há índice, mas só de base pequena
+    # no banco falso todo grupo (região, equipe, cliente, região de campo e gestor) tem menos de 3 usinas: há índice,
+    # mas só de base pequena
     html = logado.get("/t/campo/rondas?aba=painel").get_data(as_text=True)
     destaques = html.split('<div class="cn-rank-destaques">', 1)[1].split('<div class="cn-rank-grade">', 1)[0]
-    assert destaques.count("só grupos de base pequena (menos de 3 usinas)") == 4 and "sem índice no período" not in destaques
+    assert destaques.count("só grupos de base pequena (menos de 3 usinas)") == 5 and "sem índice no período" not in destaques
     blocos = logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
     assert 'title="1 técnico rondou neste cluster no período"' in blocos
     assert 'title="0 técnicos rondaram neste cluster no período"' in blocos

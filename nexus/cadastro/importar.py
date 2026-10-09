@@ -10,7 +10,8 @@ O que a importação garante:
 - id estável entre importações: usina pelo IDUsina, pessoa pelo e-mail (ou pelo nome), equipe pelo nome como o
   PROCV do Excel casa (sem diferenciar maiúscula). Importar de novo no ensaio não cria registro nem versão;
 - o que o Excel mostrava é comparado com o que o Nexus calcula, valor a valor, e a diferença vem com o motivo
-  quando ele é conhecido.
+  quando ele é conhecido;
+- rótulo de REGIÃO no lugar de pessoa (a RESPONSÁVEL O&M da estrutura de 10/2026) não vira pessoa: é vaga.
 """
 import hashlib
 import io
@@ -23,12 +24,36 @@ from typing import Any
 
 from . import calculos, tipos
 from .calculos import ERRO, UFS, Contexto
-from .esquema import ENTIDADES, PESSOAS, USINAS
+from .esquema import (ENTIDADES, PESSOAS, USINAS, VINCULO_GESTOR, VINCULO_SUPERVISOR_CAMPO,
+                      VINCULO_SUPERVISOR_LEGADO)
+from .esquema import VINCULOS as _VINCULOS_DO_ESQUEMA
 from .servico import QUEM_IMPORTACAO, Carga, chave_texto
 from .tipos import Legado
 
 ABAS = ("Operações", "Relação Geral Colaboradores", "Auxiliar", "Parametros")
-VINCULOS = ["Colaborador de campo", "Supervisor", "Gestor de contrato"]
+# os vínculos da lista (a estrutura de O&M de 10/2026 trouxe o Supervisor de Campo e o Coordenador de Campo)
+VINCULOS = list(_VINCULOS_DO_ESQUEMA)
+# Rótulo de região no lugar de pessoa. Na estrutura de O&M de 10/2026 a RESPONSÁVEL O&M do BD_Operações passou a trazer
+# a região onde a vaga de Supervisor de Campo está aberta ("NE · Fortaleza-CE e Teresina-PI", "Sul · Maringá-PR"; 213
+# usinas em 08/10) e, na de 07/10, a coluna "Supervisor Campo" trazia "SE — Oeste de SP". Sem esta regra, cada rótulo
+# virava uma PESSOA nova com vínculo de supervisor (e o técnico ganhava a "região" como supervisor).
+_RE_MACRO = r"(?:n|ne|co|se|s|sul|norte|nordeste|sudeste|centro ?-?oeste)"
+_RE_ROTULO_REGIAO = (re.compile(rf"^{_RE_MACRO} ?- ?\S"),             # "SE — Oeste de SP" (o travessão vira "-")
+                     re.compile(rf"^{_RE_MACRO}[ -]*\d{{1,2}}$"))       # o nome da região: "Nordeste 02", "Norte-01"
+
+
+def eh_rotulo_de_regiao(texto, regioes=()) -> bool:
+    """O texto é uma região, não uma pessoa: tem o "·" dos rótulos do BD, segue o padrão de região (macrorregião com
+    traço ou com número) ou é o nome de uma região de campo do cadastro (`regioes`). Quem chama confere ANTES se o
+    texto não é uma pessoa do cadastro."""
+    t = str(texto or "").strip()
+    if not t:
+        return False
+    if "·" in t:
+        return True
+    k = t.replace("—", "-").replace("–", "-")
+    k = re.sub(r"\s+", " ", unicodedata.normalize("NFKD", k).encode("ascii", "ignore").decode().lower()).strip()
+    return any(r.match(k) for r in _RE_ROTULO_REGIAO) or k in {chave_texto(r) for r in regioes}
 # A fórmula de receita de 70 usinas: preço fixo por MWp × potência contratual. O nome da tabela não entra na
 # regra: em 07/10/2026 a tabela foi recriada como "Operacoes4" e o preço das 70 seria apagado.
 _RE_PRECO = re.compile(r"^=\s*([\d.,]+)\s*\*\s*(?:\w*\[\[#This Row\],|\[@)\[POT[ÊE]NCIA CONTRATUAL \(MWp\)\]\]\s*$",
@@ -85,6 +110,8 @@ class Proposta:
     comparacao: list
     origem: dict
     pessoas_por_id: dict = field(default_factory=dict)
+    # a RESPONSÁVEL O&M com a região no lugar da pessoa: [{"rotulo", "usinas", "tinham_pessoa"}] (a prévia mostra)
+    vagas: list = field(default_factory=list)
 
 
 # ── leitura do arquivo ─────────────────────────────────────────────────────
@@ -171,6 +198,7 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
     aux = abas.get("Auxiliar") or Aba([], [])
     par = abas.get("Parametros") or Aba([], [])
     atuais = {eid: (srv.registros(eid, incluir_excluidos=True) if srv else []) for eid in ENTIDADES}
+    nomes_regioes = [r.valores.get("nome") for r in atuais["regioes_campo"] if r.valores.get("nome")]
 
     def cel(aba, linha, coluna):
         if aba.indice(coluna) is None and aba.linhas:
@@ -191,8 +219,10 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
         r = eq_atual.get(chave_equipe(nome))
         id_ = r.id if r else next(gera_eq)
         eq_id[chave_equipe(nome)] = id_
+        # código e região de campo não vêm da planilha (estrutura de O&M de 10/2026, carga única e a ficha da equipe):
+        # ficam os do Nexus. Sem isto, cada importação apagaria a região de todas as equipes
         equipes.append({"id": id_, "ordem": i, "valores": {
-            "nome": nome, "observacao": r.valores.get("observacao") if r else None}})
+            "nome": nome, **{k: (r.valores.get(k) if r else None) for k in ("codigo", "regiao_campo", "observacao")}}})
 
     def equipe_de(texto):
         t = _texto(texto)
@@ -275,12 +305,14 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
         criados[origem] += 1
         return id_
 
-    for coluna, vinculo in (("Supervisor", "Supervisor"), ("Gestor de Contrato", "Gestor de contrato")):
+    for coluna, vinculo in (("Supervisor", VINCULO_SUPERVISOR_LEGADO), ("Gestor de Contrato", VINCULO_GESTOR)):
         for nome in _juntar(aux.coluna(coluna)):
-            if achar_pessoa(nome) is None:
+            if achar_pessoa(nome) is None and not eh_rotulo_de_regiao(nome, nomes_regioes):
                 nova_pessoa(nome, vinculo, f"lista {coluna} do Auxiliar")
     for i, t in sup_digitado.items():
-        pessoas[i - 1]["valores"]["supervisor"] = tipos.marcador(t) or achar_pessoa(t) or Legado(t)
+        # a região digitada no supervisor da pessoa é a vaga do Supervisor de Campo: fica vazio (automático), não Legado
+        achado = tipos.marcador(t) or achar_pessoa(t)
+        pessoas[i - 1]["valores"]["supervisor"] = achado or (None if eh_rotulo_de_regiao(t, nomes_regioes) else Legado(t))
 
     # ── clientes: a coluna CLIENTE vira cadastro com ID (separa usinas de mesmo nome e clientes diferentes) ──
     cl_atual = {chave_texto(r.valores.get("nome")): r for r in atuais["clientes"]}
@@ -299,6 +331,7 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
     u_atual = {str(r.valores.get("id_bd")): r for r in atuais["usinas"] if r.valores.get("id_bd")}
     gera_u = _proximo([r.id for r in atuais["usinas"]])
     usinas = []
+    vagas = defaultdict(list)           # rótulo de região -> [(usina, o responsável que o Nexus tinha)]
     for i, ln in enumerate(ops.linhas, start=1):
         id_bd = _texto(cel(ops, ln, "IDUsina").valor)
         if not id_bd:
@@ -319,6 +352,8 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
             cabecalho = isinstance(x.valor, str) and chave_cab(x.valor) == chave_cab(c.coluna_bd)
             if sumiu or cabecalho:
                 valores[c.id] = antes.get(c.id)
+                if c.id == "responsavel_om":
+                    valores["responsavel_om_vaga"] = antes.get("responsavel_om_vaga")    # a vaga anda com ele
                 if ops.indice(c.coluna_bd) is not None:
                     cabecalho_no_valor[c.coluna_bd] += 1
                 continue
@@ -343,8 +378,19 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
                     valores[c.id] = cl_id.get(chave_texto(t)) or Legado(t)
                 else:
                     achada = achar_pessoa(t)
-                    if achada is None and c.id in ("responsavel_om", "gestor_contrato"):
-                        vinc = "Supervisor" if c.id == "responsavel_om" else "Gestor de contrato"
+                    if achada is None and c.id == "responsavel_om" and eh_rotulo_de_regiao(t, nomes_regioes):
+                        # a vaga de Supervisor de Campo da região (estrutura de O&M de 10/2026): o responsável fica
+                        # vazio e a região fica anotada; nada de pessoa nova chamada "NE · Fortaleza-CE e Teresina-PI"
+                        valores[c.id] = None
+                        valores["responsavel_om_vaga"] = t
+                        vagas[t].append((id_, antes.get(c.id)))
+                        continue
+                    if (achada is None and c.id in ("responsavel_om", "gestor_contrato")
+                            and not eh_rotulo_de_regiao(t, nomes_regioes)):
+                        # quem a RESPONSÁVEL O&M nomeia é, na estrutura de 10/2026, o Supervisor de Campo da região.
+                        # Região em outra coluna de pessoa (o Gestor de Contrato) também não vira pessoa: fica o texto
+                        # (Legado), à vista na Qualidade do cadastro
+                        vinc = VINCULO_SUPERVISOR_CAMPO if c.id == "responsavel_om" else VINCULO_GESTOR
                         achada = nova_pessoa(t, vinc, f"coluna {c.coluna_bd}")
                     valores[c.id] = achada or Legado(t)
                 continue
@@ -352,7 +398,19 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
                 formula_valor[c.coluna_bd] += 1
             valores[c.id] = tipos.do_excel(c.tipo, x.valor)
         valores.setdefault("preco_mwp", None)
+        valores.setdefault("responsavel_om_vaga", None)     # a planilha trouxe uma pessoa (ou nada): sem vaga anotada
         usinas.append({"id": id_, "ordem": i, "valores": valores})
+
+    lista_vagas = []
+    for rotulo, us in sorted(vagas.items(), key=lambda kv: (-len(kv[1]), chave_texto(kv[0]))):
+        tinham = sum(1 for _, antes_resp in us if isinstance(antes_resp, str) and antes_resp
+                     and not tipos.marcador(antes_resp))
+        lista_vagas.append({"rotulo": rotulo, "usinas": len(us), "tinham_pessoa": tinham})
+    if lista_vagas:
+        n, m = sum(v["usinas"] for v in lista_vagas), sum(v["tinham_pessoa"] for v in lista_vagas)
+        avisos.append(f"RESPONSÁVEL O&M: {n} usina(s) com a região no lugar da pessoa ({len(lista_vagas)} região(ões)): "
+                      "viram vaga de Supervisor de Campo, sem criar pessoa"
+                      + (f"; {m} delas tinham uma pessoa como responsável no Nexus, que sai" if m else "") + ".")
 
     # ── listas ──
     val = ops.validacoes
@@ -400,7 +458,7 @@ def montar(abas: dict, srv, arquivo: str = "", dados: bytes | None = None) -> Pr
               "sha256": carga.origem["sha256"],
               "quando": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     return Proposta(carga=carga, resumo=resumo, avisos=avisos, comparacao=comparacao, origem=origem,
-                    pessoas_por_id={p["id"]: p for p in pessoas})
+                    pessoas_por_id={p["id"]: p for p in pessoas}, vagas=lista_vagas)
 
 
 def _repr(ent, valores: dict) -> dict:
@@ -487,7 +545,7 @@ def _comparar_calculados(ops: Aba, pes: Aba, carga: Carga) -> list:
 
     saida = []
 
-    def bloco(entidade, campo, tipo, aba, linhas_regs, valor_nexus, motivo=None):
+    def bloco(entidade, campo, tipo, aba, linhas_regs, valor_nexus, motivo=None, igual=None):
         c = ENTIDADES[entidade].campo(campo)
         total, iguais, dif = 0, 0, []
         for ln, reg in linhas_regs:
@@ -496,7 +554,7 @@ def _comparar_calculados(ops: Aba, pes: Aba, carga: Carga) -> list:
                 continue
             total += 1
             nv = valor_nexus(reg)
-            if comparar(tipo, x.valor, nv):
+            if (igual or (lambda e, n: comparar(tipo, e, n)))(x.valor, nv):
                 iguais += 1
             else:
                 mostra = nv[0] if isinstance(nv, list) and nv else ("" if nv is ERRO or nv is None or nv == [] else nv)
@@ -527,7 +585,10 @@ def _comparar_calculados(ops: Aba, pes: Aba, carga: Carga) -> list:
 
     linhas_p = list(zip(pes.linhas, pessoas[:len(pes.linhas)]))
     bloco("pessoas", "nome_padrao", "texto", pes, linhas_p, lambda r: calc_p[r["id"]]["nome_padrao"])
-    bloco("pessoas", "supervisor", "ref", pes, linhas_p, lambda r: nomes(calc_p[r["id"]]["supervisor"]))
+    # o PROCX do Excel traz a RESPONSÁVEL O&M da 1ª usina da equipe, que pode ser a região da vaga ("NE · ..."): o
+    # Nexus tem a vaga (vazio). Os dois dizem o mesmo: vaga de Supervisor de Campo (estrutura de O&M de 10/2026)
+    bloco("pessoas", "supervisor", "ref", pes, linhas_p, lambda r: nomes(calc_p[r["id"]]["supervisor"]),
+          igual=lambda e, n: comparar("ref", e, n) or (eh_rotulo_de_regiao(e) and _vazio_cmp(n)))
     for campo in ("cidade_uf_endereco", "cidade_uf_fallback", "cidade_estado_base"):
         bloco("pessoas", campo, "texto", pes, linhas_p, lambda r, c=campo: calc_p[r["id"]][c])
     return saida

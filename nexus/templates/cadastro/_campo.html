@@ -6,6 +6,7 @@
     <span>{{ c.rotulo }}{% if c.obrigatorio %} *{% endif %}</span>
     {% if c.origem in rotulo_origem %}<span class="cad-origem cad-origem--{{ c.origem }}">{{ rotulo_origem[c.origem] }}</span>{% endif %}
     {% if c.sensivel %}<i class="ph ph-lock-simple" title="Dado sensível: gravado cifrado"></i>{% endif %}
+    {% if c.vaga %}<span class="cad-vaga" title="Cargo sem ninguém no cadastro: é vaga, não erro">{{ c.vaga }}</span>{% endif %}
   </label>
   {% if c.modo == 'calculado' or c.mascarado %}
     <div class="cad-valor-fixo{% if c.mascarado %} mono{% endif %}" id="f-{{ c.id }}">{{ c.exibido or '—' }}</div>

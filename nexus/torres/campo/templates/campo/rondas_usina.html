@@ -11,7 +11,7 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Rondas · Histórico da usina</p>
       <h1 class="cn-titulo">{{ usina.usina if usina else 'Usina ' ~ usina_id }}</h1>
-      <p class="cn-pergunta">{% if usina %}{{ usina.cliente or '—' }} · {{ usina.cluster or '—' }} · {{ usina.equipe or '—' }} · {{ usina.cidade }}{% if usina.uf %} - {{ usina.uf }}{% endif %} · supervisor {{ usina.supervisor or '—' }}{% endif %}</p></div>
+      <p class="cn-pergunta">{% if usina %}{{ usina.cliente or '—' }} · {{ usina.cluster or '—' }} · {{ usina.equipe or '—' }} · {{ usina.cidade }}{% if usina.uf %} - {{ usina.uf }}{% endif %} · região de campo {{ usina.regiao_campo or '—' }}{% if usina.supervisor_campo %} (Supervisor de Campo: {{ usina.supervisor_campo }}){% endif %} · gestor de contrato {{ usina.gestor or '—' }}{% endif %}</p></div>
     <div class="cn-frescor">livro de rondas do App + OS de ronda no Fracttal<br><b>lido às {{ lido }}</b></div>
   </div>
   {% include 'campo/_aviso_checklist.html' %}

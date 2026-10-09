@@ -28,6 +28,7 @@
 <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>O ensaio está vazio.</strong>
   <a href="/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
 {% endif %}
+{% if nota %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>{{ nota }}</div></div>{% endif %}
 
 <form class="cad-filtros" method="get" id="cad-filtros">
   <div class="campo busca">
@@ -84,6 +85,7 @@
           {%- if cel.link -%}<a class="linha" href="{{ l.url }}">{{ cel.texto or '(sem nome)' }}</a>
           {%- elif cel.chip and cel.texto -%}<span class="cad-chip{{ ' cad-chip--operacao' if cel.texto in ('OPERAÇÃO', 'Ativo') }}">{{ cel.texto }}</span>
           {%- elif cel.texto -%}{{ cel.texto }}
+          {%- elif cel.vaga -%}<span class="cad-vaga">{{ cel.vaga }}</span>
           {%- else -%}<span class="vazio">—</span>{%- endif -%}
         </td>
         {% endfor %}

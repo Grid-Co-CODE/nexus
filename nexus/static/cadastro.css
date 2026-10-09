@@ -170,6 +170,13 @@
 .cad-chip--alerta{background:var(--alerta-a12);color:var(--alerta)}
 .cad-chip--critico{background:var(--critico-suave);color:var(--critico)}
 .cad-chip--info{background:var(--superficie-3);color:var(--tinta-2)}
+/* Vaga (estrutura de O&M de 10/2026): cargo sem ninguém, que não é erro. Tracejado e no azul de informação, nunca no
+   vermelho do crítico: a região de campo com a vaga de Supervisor de Campo aberta é o estado normal até contratar. */
+.cad-vaga{display:inline-flex;align-items:center;font:600 11px/16px var(--font-sans);padding:1px 8px;white-space:nowrap;
+  border:1px dashed var(--info-a42);border-radius:var(--raio-tag);background:var(--info-suave);color:var(--info)}
+.cad-tabela--lista .cad-vaga{font-size:10px;line-height:14px;padding:0 6px}
+.cad-aviso--info{border-color:var(--info-a42);background:var(--info-suave)}
+.cad-aviso--info i{color:var(--info)}
 
 /* Ficha */
 .cad-ficha{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}

@@ -62,7 +62,8 @@ sem OS depois de 06/10 não entra ali.
 1. **Grão e tipo escritos antes de tudo** ("1 linha = …"; transação, foto periódica, foto acumulada ou sem medida).
    Fonte larga (um inversor por coluna, como o BD_Thopen) vira linhas antes de entrar. Fonte que mistura grãos são
    dois fatos (o PCM põe execução `foraDoPlano` na semana do plano: ficou fora da programação).
-2. **Dimensão é uma só.** Mestres: `cadastro_nexus` (usina, cliente, equipe, pessoa, e o `de_para` com o que cada
+2. **Dimensão é uma só.** Mestres: `cadastro_nexus` (usina, cliente, equipe, pessoa, a região de campo da equipe, aba
+   `regioes_campo` da estrutura de O&M de 10/2026, e o `de_para` com o que cada
    sistema chama de cada usina), `nexus_dimensoes` (data e os históricos) e `nexus_equipamentos` (o equipamento e os
    apelidos de cada sistema). Cópia de cadastro em outro livro (o "Dados Gerais Usinas" do BD_Thopen, a usina do
    gêmeo, a aba de usinas dos tickets) não é fonte: aponta para o ID.

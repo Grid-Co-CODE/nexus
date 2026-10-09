@@ -21,7 +21,7 @@ from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
-from .aprovar_os import bp_aprovar_os, pode_na_tela
+from .aprovar_os import bp_aprovar_os, papel_da_sessao, pode_na_tela
 from .assinatura import bp_assinatura
 
 FONTE_APP = "Livros que o App de Campo grava no banco do Nexus + cadastro do Nexus"
@@ -36,7 +36,7 @@ TORRE = Torre(
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",
-             "Que OS esperam a aprovação de cada supervisor, qual dá para aprovar já e qual pede meu olho?",
+             "Que OS esperam a aprovação de cada supervisor de campo, qual dá para aprovar já e qual pede meu olho?",
              "Fila de verificação do Fracttal + notas do App no banco do Nexus"),
         # Levi, 04/10/2026: "crie para PT, ZELADORIA". A PT fica junto da aprovação de OS porque as duas são fila de
         # decisão do supervisor. A "APR e PT" da torre HSEQ é outra pergunta (OS de risco sem APR ou PT assinada).
@@ -78,14 +78,61 @@ TODOS = "*"
 _BRT = timezone(timedelta(hours=-3))
 
 
-def _supervisor() -> str:
-    """O filtro de supervisor: o que a pessoa escolheu; sem escolha, o dela, se ela entrou pelo Fracttal e é
-    supervisor no cadastro (Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para a pessoa
-    automaticamente, mas ela pode mudar o filtro se quiser"). "Todos" é uma escolha também: vai como "*"."""
-    v = request.args.get("supervisor")
+# ── Os filtros da estrutura de O&M de 10/2026 ────────────────────────────────────────────────────────────────────
+# O filtro "Supervisor" virou dois: a REGIÃO DE CAMPO (com o Supervisor de Campo dela: "Nordeste 02 · vaga") e o GESTOR DE
+# CONTRATO (Supervisor PM, pela usina). Quem entra pelo Fracttal já vem filtrado (Levi, 06/10: "Quando um supervisor
+# logar, o filtro supervisor já fica para a pessoa automaticamente, mas ela pode mudar o filtro se quiser"): o Supervisor
+# de Campo na região dele, o Gestor de contrato nas usinas dele, o Coordenador em todas. "Todas" é uma escolha também:
+# vai como "*" (e vence o padrão).
+def _regiao_campo() -> str:
+    v = request.args.get("regiao_campo")
     if v is None:
-        return session.get("supervisor_padrao", "")
+        p = papel_da_sessao()
+        return (p.get("regioes") or [""])[0] if p.get("papel") == "supervisor_campo" else ""
     return "" if v == TODOS else v
+
+
+def _gestor() -> str:
+    v = request.args.get("gestor")
+    if v is None:
+        p = papel_da_sessao()
+        return p.get("gestor", "") if p.get("papel") == "gestor" else ""
+    return "" if v == TODOS else v
+
+
+def _do_papel(x, regiao_campo, gestor) -> bool:
+    """A linha é da região de campo e do gestor escolhidos. Linha sem região (equipe de fora da estrutura, PT sem usina
+    ligada ao cadastro) conta como "Sem região de campo", e sem gestor como "Sem gestor de contrato": é o que os cartões
+    próprios mostram, e o clique neles tem de achar as mesmas linhas."""
+    return ((not regiao_campo or (x.get("regiao_campo") or visao.SEM_REGIAO) == regiao_campo)
+            and (not gestor or (x.get("gestor") or visao.SEM_GESTOR) == gestor))
+
+
+def _opcoes_regiao(regioes, linhas, escolhida) -> list[tuple[str, str]]:
+    """As regiões de campo do filtro, na ordem da estrutura, com o Supervisor de Campo ("Nordeste 02 · vaga"); depois
+    "Sem região de campo", se alguma linha está nela, e a escolhida, se não for nenhuma das duas."""
+    out = [(r["nome"], r["rotulo"]) for r in regioes or ()]
+    nomes = {v for v, _ in out}
+    if any((x.get("regiao_campo") or visao.SEM_REGIAO) == visao.SEM_REGIAO for x in linhas) or escolhida == visao.SEM_REGIAO:
+        out.append((visao.SEM_REGIAO, visao.SEM_REGIAO))
+        nomes.add(visao.SEM_REGIAO)
+    if escolhida and escolhida not in nomes:
+        out.append((escolhida, escolhida))
+    return out
+
+
+def _opcoes_gestor(linhas, escolhido) -> list[str]:
+    """Os gestores de contrato do filtro (os das usinas das linhas), "Sem gestor de contrato" por último."""
+    nomes = {x.get("gestor") for x in linhas if x.get("gestor")} | ({escolhido} if escolhido else set())
+    return sorted(nomes - {visao.SEM_GESTOR}) + ([visao.SEM_GESTOR] if visao.SEM_GESTOR in nomes else [])
+
+
+def _papeis(d, linhas, regiao_campo, gestor) -> dict:
+    """O que os templates dos filtros e do aviso da estrutura precisam (`_filtros_papeis.html`, `_aviso_estrutura.html`)."""
+    return {"regiao_campo": regiao_campo, "gestor": gestor, "estrutura_publicada": d.get("estrutura_publicada", True),
+            "opcoes_regiao": _opcoes_regiao(d.get("regioes") or [], linhas, regiao_campo),
+            "opcoes_gestor": _opcoes_gestor(linhas, gestor), "regioes_info": d.get("regioes") or [],
+            "sem_regiao": visao.SEM_REGIAO, "sem_gestor": visao.SEM_GESTOR, "vaga": visao.VAGA}
 
 
 def _url(**mudar) -> str:
@@ -147,40 +194,42 @@ def _idade_min(m) -> str:
 
 ORDEM_DOS_CARTOES = {"pendentes": lambda c: (-c["pendentes"], c["pct_feitas"] or 0, c["equipe"]),
                      "pt": lambda c: (-c["parada"], -c["pts"], c["equipe"])}
-# Por supervisor (Levi, 08/10/2026: "além de por equipe e tabela, adicione mais um botão (por supervisor)"): a mesma
-# ordem dos cartões de equipe; o "sem supervisor no cadastro" fica sempre por último, num cartão próprio
-ORDEM_DOS_SUPERVISORES = {
-    "pendentes": lambda s: (s["supervisor"] == visao.SEM_SUPERVISOR, -s["pendentes"], s["pct_feitas"] or 0, s["supervisor"]),
-    "pt": lambda s: (s["supervisor"] == visao.SEM_SUPERVISOR, -s["parada"], -s["pts"], s["supervisor"])}
+# Por região de campo e por gestor de contrato (estrutura de O&M de 10/2026; era "por supervisor", Levi, 08/10/2026):
+# a mesma ordem dos cartões de equipe; "Sem região de campo" e "Sem gestor de contrato" sempre por último, num cartão
+# próprio
+ORDEM_DAS_REGIOES = {
+    "pendentes": lambda s: (s["regiao"] == visao.SEM_REGIAO, -s["pendentes"], s["pct_feitas"] or 0, s["ordem"], s["regiao"]),
+    "pt": lambda s: (s["regiao"] == visao.SEM_REGIAO, -s["parada"], -s["pts"], s["ordem"], s["regiao"])}
+ORDEM_DOS_GESTORES = {
+    "pendentes": lambda s: (s["gestor"] == visao.SEM_GESTOR, -s["pendentes"], s["pct_feitas"] or 0, s["gestor"]),
+    "pt": lambda s: (s["gestor"] == visao.SEM_GESTOR, -s["parada"], -s["pts"], s["gestor"])}
 
 
 def _modo(equipe, historico=False) -> str:
-    """As três visões da Central e da tela de PT: cartões por equipe (o padrão), por supervisor, ou a tabela (a equipe
-    escolhida no cartão abre a tabela dela)."""
+    """As visões da Central e da tela de PT: cartões por equipe (o padrão), por região de campo (com a alternância para
+    "por gestor de contrato") ou a tabela (a equipe escolhida no cartão abre a tabela dela). O endereço antigo
+    `modo=supervisores` cai em "por região de campo"."""
     pedido = request.args.get("modo")
     if pedido == "tabela" or equipe or historico:
         return "tabela"
-    return "supervisores" if pedido == "supervisores" else "equipes"
-
-
-def _do_supervisor(x, supervisor) -> bool:
-    """A linha é do supervisor escolhido. Linha sem supervisor (PT sem usina ligada ao cadastro, equipe sem técnico)
-    conta como "Sem supervisor": é o que o cartão próprio mostra, e o clique nele tem de achar as mesmas linhas."""
-    return not supervisor or (x.get("supervisor") or visao.SEM_SUPERVISOR) == supervisor
+    if pedido in ("regioes", "supervisores"):
+        return "regioes"
+    return "gestores" if pedido == "gestores" else "equipes"
 
 
 @bp.route("/atencao")
 def atencao():
     """Três visões em cada aba (Levi, 05/10: "tem que ter a visão por equipe (CARDS grandes agrupados) e a visão da
-    tabela!"; 08/10: "adicione mais um botão (por supervisor)"): cartões por equipe, por supervisor, ou a tabela. Filtro
-    pela região do Brasil; o cartão da equipe leva à tabela da equipe, o do supervisor à tabela do supervisor."""
+    tabela!"; 08/10: "adicione mais um botão (por supervisor)"): cartões por equipe, por região de campo (com a
+    alternância para por gestor de contrato: a estrutura de O&M de 10/2026) ou a tabela. Filtros da região do Brasil, da
+    região de campo e do gestor; o cartão leva à tabela da equipe, da região ou do gestor."""
     dias = _dias((7, 14, 30), 14)
     leitura = visao.atencao(dias)
     d = leitura.dados
     ids = [v[0] for v in VISTAS]
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
     f, regiao, equipe = request.args.get("f", ""), request.args.get("regiao", ""), request.args.get("equipe", "")
-    supervisor = _supervisor()
+    regiao_campo, gestor = _regiao_campo(), _gestor()
     modo = _modo(equipe)
     q = request.args.get("q", "").strip().lower()
     campos = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
@@ -188,7 +237,7 @@ def atencao():
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
                 and (not equipe or x.get("equipe") == equipe)
-                and _do_supervisor(x, supervisor)
+                and _do_papel(x, regiao_campo, gestor)
                 and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
     fontes = {"pendentes": filtra(d.get("pendentes") or []),
               "pt": filtra(d.get("pts") or [])}
@@ -197,26 +246,25 @@ def atencao():
     for x in base:
         contagem[_status(vista, x)] = contagem.get(_status(vista, x), 0) + 1
     lista = [x for x in base if not f or _status(vista, x) == f]
-    cartoes = visao.por_equipe(filtra(d.get("usinas") or []), fontes["pendentes"], [], fontes["pt"],
-                               d.get("times") or {})
+    usinas_f = filtra(d.get("usinas") or [])
+    cartoes = visao.por_equipe(usinas_f, fontes["pendentes"], [], fontes["pt"], d.get("times") or {})
     if vista == "pt":
         cartoes = [c for c in cartoes if c["pts"]]
     cartoes.sort(key=ORDEM_DOS_CARTOES[vista])
-    # os cartões por supervisor somam os de equipe (já filtrados): o número do supervisor é o da soma das equipes dele
-    cartoes_sup = sorted(visao.por_supervisor(cartoes), key=ORDEM_DOS_SUPERVISORES[vista])
+    # por região de campo: a soma dos cartões de equipe dela (já filtrados); por gestor: pelas usinas dele
+    cartoes_reg = sorted(visao.por_regiao(cartoes, d.get("regioes") or []), key=ORDEM_DAS_REGIOES[vista])
+    cartoes_gest = visao.por_gestor(*((usinas_f, fontes["pendentes"]) if vista == "pendentes" else ([], [])),
+                                    fontes["pt"], d.get("times") or {})
+    if vista == "pt":
+        cartoes_gest = [c for c in cartoes_gest if c["pts"]]
+    cartoes_gest.sort(key=ORDEM_DOS_GESTORES[vista])
     return render_template("campo/atencao.html", **_comum(
         "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
         status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
         lista=lista, f=f, regiao=regiao, equipe=equipe, modo=modo, cartoes=cartoes, regioes=visao.REGIOES,
-        cartoes_sup=cartoes_sup, sem_supervisor=visao.SEM_SUPERVISOR, situacoes=SITUACAO_PT,
-        supervisor=supervisor, supervisores=_opcoes_supervisor((d.get("usinas") or []) + (d.get("pts") or []), supervisor),
+        cartoes_reg=cartoes_reg, cartoes_gest=cartoes_gest, situacoes=SITUACAO_PT,
+        **_papeis(d, (d.get("usinas") or []) + (d.get("pts") or []), regiao_campo, gestor),
         q=request.args.get("q", ""), idade_min=_idade_min))
-
-
-def _opcoes_supervisor(linhas, escolhido) -> list[str]:
-    """Os supervisores do filtro. O escolhido entra sempre: o cartão "Sem supervisor no cadastro" leva a um supervisor
-    que pode não estar escrito em nenhuma linha (a PT sem usina ligada ao cadastro vem sem supervisor)."""
-    return sorted({x.get("supervisor") for x in linhas if x.get("supervisor")} | ({escolhido} if escolhido else set()))
 
 
 # ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────
@@ -226,12 +274,13 @@ SITUACAO_PT = {"aguardando": ("Aguardando", "alerta"), "de_acordo": ("De acordo"
 
 @bp.route("/pt")
 def pt():
-    """Duas abas (Levi, 05/10): as PT esperando o De acordo (por equipe, por supervisor ou em tabela, a linha abre o
-    detalhe) e o histórico das decididas. Filtro de supervisor; a equipe vem do cartão."""
+    """Duas abas (Levi, 05/10): as PT esperando o De acordo (por equipe, por região de campo ou por gestor de contrato,
+    ou em tabela, a linha abre o detalhe) e o histórico das decididas. Filtros de região de campo e de gestor; a equipe
+    vem do cartão."""
     leitura = visao.pts()
     d = leitura.dados
     aba = "historico" if request.args.get("aba") == "historico" else "esperando"
-    supervisor, equipe = _supervisor(), request.args.get("equipe", "")
+    regiao_campo, gestor, equipe = _regiao_campo(), _gestor(), request.args.get("equipe", "")
     sit, q = request.args.get("sit", ""), request.args.get("q", "").strip().lower()
     modo = _modo(equipe, historico=aba == "historico")
     dias = _dias((7, 30, 90), 30)
@@ -239,7 +288,7 @@ def pt():
     campos = ("os", "numero", "tarefa", "usina", "ativo", "codigo", "equipe", "solicitante", "decidida_por")
 
     def filtra(lista):
-        return [p for p in lista if _do_supervisor(p, supervisor)
+        return [p for p in lista if _do_papel(p, regiao_campo, gestor)
                 and (not equipe or p.get("equipe") == equipe)
                 and (not q or q in " ".join(str(p.get(c) or "") for c in campos).lower())]
     aguardando = filtra(d.get("aguardando") or [])
@@ -251,7 +300,9 @@ def pt():
     contagem_pt = {s: sum(1 for p in aguardando if _status("pt", p) == s) for s in visao.PT_STATUS}
     cartoes_pt = sorted((c for c in visao.por_equipe([], [], [], aguardando, d.get("times") or {}) if c["pts"]),
                         key=ORDEM_DOS_CARTOES["pt"])
-    cartoes_sup = sorted(visao.por_supervisor(cartoes_pt), key=ORDEM_DOS_SUPERVISORES["pt"])
+    cartoes_reg = sorted(visao.por_regiao(cartoes_pt, d.get("regioes") or []), key=ORDEM_DAS_REGIOES["pt"])
+    cartoes_gest = sorted((c for c in visao.por_gestor([], [], aguardando, d.get("times") or {}) if c["pts"]),
+                          key=ORDEM_DOS_GESTORES["pt"])
     lista_pt = [p for p in aguardando if not f or _status("pt", p) == f]
     historico = [p for p in filtra(d.get("historico") or []) if (p.get("criada") or piso) >= piso]
     contagem = {}
@@ -261,11 +312,10 @@ def pt():
     todas = (d.get("aguardando") or []) + (d.get("historico") or [])
     return render_template("campo/pt.html", **_comum(
         "pt", leitura, aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem_hist=contagem, sit=sit,
-        dias=dias, supervisor=supervisor, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
+        dias=dias, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
         idade_min=_idade_min, cartoes=cartoes_pt, lista=lista_pt, contagem=contagem_pt, total=len(aguardando), f=f,
-        cartoes_sup=cartoes_sup, sem_supervisor=visao.SEM_SUPERVISOR,
-        status=visao.PT_STATUS, regiao=regiao, regioes=visao.REGIOES,
-        supervisores=_opcoes_supervisor(todas, supervisor)))
+        cartoes_reg=cartoes_reg, cartoes_gest=cartoes_gest,
+        status=visao.PT_STATUS, regiao=regiao, regioes=visao.REGIOES, **_papeis(d, todas, regiao_campo, gestor)))
 
 
 @bp.route("/pt/<numero>/pdf")
@@ -342,11 +392,12 @@ def _ordem_sem_ronda(c):
 def rondas():
     """Cobertura, duração e qualidade da ronda (Levi, 05/10: o estilo do painel de rondas, no tema do Nexus): sete
     indicadores do período e seis abas (Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers, Quem ronda).
-    Filtros de região do Brasil, cliente, supervisor e equipe (a equipe vem do Painel); Exportar CSV dos registros."""
+    Filtros de região do Brasil, cliente, região de campo, gestor de contrato e equipe (a equipe vem do Painel);
+    Exportar CSV dos registros."""
     dias = _dias((7, 14, 30), 30)
     leitura = visao.rondas()
     d = leitura.dados
-    regiao, supervisor = request.args.get("regiao", ""), _supervisor()
+    regiao, regiao_campo, gestor = request.args.get("regiao", ""), _regiao_campo(), _gestor()
     # cliente pelo cadastro (Levi, 05/10: "filtro por cliente e a cobertura das rondas das UFVs do cliente. Essas usinas
     # tem que bater com as mesmas do registro mestre"): filtra as rondas E a base da cobertura
     cliente, cluster, equipe = request.args.get("cliente", ""), request.args.get("cluster", ""), request.args.get("equipe", "")
@@ -363,7 +414,7 @@ def rondas():
 
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
-                and (not supervisor or x.get("supervisor") == supervisor)
+                and _do_papel(x, regiao_campo, gestor)
                 and (not cliente or x.get("cliente") == cliente)
                 and (not equipe or x.get("equipe") == equipe)]
     cobertura = filtra(d.get("cobertura") or [])
@@ -392,15 +443,17 @@ def rondas():
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
         w.writerow(["Data", "Técnico", "Usina", "Equipe", "Estado", "Região", "Tipo", "Início", "Fim", "Duração (min)",
-                    "Qualidade (%)", "Veredito", "Trackers apontados", "Trackers respondidos", "OS", "Pendências"])
-        # (a coluna Pendências do CSV leva tudo o que o App anotou, inclusive a ronda longa pendente)
+                    "Qualidade (%)", "Veredito", "Trackers apontados", "Trackers respondidos", "OS", "Pendências",
+                    "Região de campo", "Supervisor de campo", "Gestor de contrato"])
+        # (a coluna Pendências do CSV leva tudo o que o App anotou, inclusive a ronda longa pendente; as colunas da
+        # estrutura de O&M de 10/2026 entraram no fim, para não mudar a posição das de antes)
         for r in registros:
             w.writerow([r["data"], r["tecnico"], r["usina"], r["equipe"], r["uf"], r["regiao_br"], r["tipo"], r["ini_hm"],
                         r["fim_hm"], r["dur_min"] if r["dur_min"] is not None else "", r["nota"] if r["nota"] is not None else "",
-                        r["veredito"][1], r["trk_apontados"], r["trk_respondidos"], r["os"] or "", r["falhas"]])
+                        r["veredito"][1], r["trk_apontados"], r["trk_respondidos"], r["os"] or "", r["falhas"],
+                        r.get("regiao_campo") or "", r.get("supervisor_campo") or "", r.get("gestor") or ""])
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="rondas-{dias}d.csv"'})
-    supervisores = sorted({c.get("supervisor") for c in d.get("cobertura") or [] if c.get("supervisor")})
     clientes = sorted({c.get("cliente") for c in d.get("cobertura") or [] if c.get("cliente")})
     cluster_aberto = next((c for c in painel["clusters"] if c["cluster"] == cluster), None) if cluster else None
     suj, suj_estado = None, None
@@ -416,16 +469,18 @@ def rondas():
         suj_estado = ronda_checklist.estado()
     comparativos = visao.comparativos(painel["periodo"], cobertura) if aba == "painel" else None
     return render_template("campo/rondas.html", **_comum(
-        "rondas", leitura, dias=dias, regiao=regiao, supervisor=supervisor, aba=aba, abas=ABAS_RONDAS, dur=dur,
+        "rondas", leitura, dias=dias, regiao=regiao, aba=aba, abas=ABAS_RONDAS, dur=dur,
         pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"}, ind=ind, cob=cob,
         n_pend={k: sum(1 for r in painel["periodo"] if r["pendencia"] == k) for k in ("sem_os", "incompleta")},
         q=request.args.get("q", ""), k=painel["kpi"], registros=registros, limite=LIMITE_LINHAS, cobertura=cobertura,
         sem_ronda=sem_ronda, n_sem=n_sem, registro_desde=d.get("registro_desde") or "",
-        trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES, supervisores=supervisores,
+        trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES,
+        **_papeis(d, d.get("cobertura") or [], regiao_campo, gestor),
         duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, equipe=equipe, ver=ver,
         cliente=cliente, clientes=clientes, clusters=painel["clusters"], cluster_aberto=cluster_aberto,
         comparativos=comparativos, dimensoes=visao.DIMENSOES, base_pequena=visao.BASE_PEQUENA,
-        filtro_da_dimensao={"regiao_br": "regiao", "equipe": "equipe", "cliente": "cliente", "supervisor": "supervisor"},
+        filtro_da_dimensao={"regiao_br": "regiao", "equipe": "equipe", "cliente": "cliente",
+                            "regiao_campo": "regiao_campo", "gestor": "gestor"},
         explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO))
 
 
@@ -550,8 +605,12 @@ IDADES = (("0-2", "até 2 dias", 0, 2), ("3-7", "3 a 7 dias", 3, 7), ("8-30", "8
 # no cartão e sumia no clique. Só o cartão usa esta faixa; a barra de idade segue com as cinco de cima.
 IDADE_PARADAS = ("30-", "há 30 dias ou mais", 30, 10 ** 6)
 # As visões "por técnico" e "fila" saíram em 08/10/2026 (Levi: "a visão de por técnico e fila pode matar, pode tirar que
-# é irrelevante!"): fica a de supervisor, e o cartão abre a tabela das OS dele (`ver=`), onde se aprova.
+# é irrelevante!"): ficam os cartões (hoje por região de campo ou por gestor), e o cartão abre a tabela das OS dele
+# (`ver=`), onde se aprova.
 SEM_CADASTRO = "Sem cadastro"
+# Os cartões da Aprovação: por região de campo (o padrão: é o Supervisor de Campo da região quem aprova) ou por gestor de
+# contrato (a alternância). `ver=` abre a tabela do cartão do agrupamento de agora.
+AGRUPAR = {"regiao": "regiao_cad", "gestor": "gestor_cad"}
 
 
 # O grupo da OS sai das tarefas dela: quem aprova, aprova a OS inteira (Levi, 05/10: "ele não consegue aprovar uma
@@ -575,8 +634,13 @@ def _por_os(linhas) -> list[dict]:
         o["fim"] = max(str(t.get("fim") or "") for t in ts)
         o["tecnicos"] = sorted({t.get("tecnico") or "—" for t in ts})
         primeira = next((t for t in ts if t.get("usina_cad")), ts[0])
-        for c in ("usina_cad", "equipe_cad", "supervisor_cad", "regiao_br"):
+        for c in ("usina_cad", "equipe_cad", "regiao_cad", "supervisor_campo_cad", "gestor_cad", "regiao_br"):
             o[c] = primeira.get(c) or ""
+        # quem aprova a OS: o das usinas das tarefas (OS em duas regiões, rara, é das duas)
+        o["aprovadores"] = []
+        for t in ts:
+            if t.get("aprovador") and t["aprovador"] not in o["aprovadores"]:
+                o["aprovadores"].append(t["aprovador"])
         notas = [int(t["qualidade"]) for t in ts if t.get("pelo_app") and t.get("qualidade") is not None]
         o["nota"] = min(notas) if notas else None                            # a pior tarefa
         o["pelo_app"] = all(t.get("pelo_app") for t in ts)
@@ -637,20 +701,22 @@ def _agrupa_os(oss, chaves) -> list[dict]:
 def aprovacao():
     """A fila de verificação do Fracttal para tirar insight (Levi, 05/10: "refaça essa parte de aprovação de OS para
     retirada de bons insights"), contada por OS, que é o que se aprova. Os grupos de cada tarefa são os do App (a fila
-    inteira pela `_fila_supervisao`); a equipe e o supervisor vêm do cadastro do Nexus, pela usina do Fracttal (de-para
-    "Fracttal · Classificação 1").
-    Desde 08/10/2026 (Levi): a fila INTEIRA, sem "OS fechadas nos X dias"; uma visão só, os cartões por supervisor; o
-    cartão abre a tabela das OS dele (`ver=`), uma linha por OS que abre o porquê do grupo e o Aprovar, que só o
-    supervisor da OS ou um administrador usa (`aprovar_os.py`). Os indicadores e a barra da idade filtram cartões e
-    tabela."""
-    equipe, supervisor = request.args.get("equipe", ""), _supervisor()
+    inteira pela `_fila_supervisao`); a equipe, a região de campo e o gestor vêm do cadastro do Nexus, pela usina do
+    Fracttal (de-para "Fracttal · Classificação 1").
+    Desde 08/10/2026 (Levi): a fila INTEIRA, sem "OS fechadas nos X dias"; uma visão só, os cartões (por região de campo,
+    a estrutura de O&M de 10/2026, com a alternância para gestor de contrato); o cartão abre a tabela das OS dele
+    (`ver=`), uma linha por OS que abre o porquê do grupo e o Aprovar, que só quem aprova a OS (o Supervisor de Campo da
+    região; com a vaga aberta, o Coordenador) ou um administrador usa (`aprovar_os.py`). Os indicadores e a barra da
+    idade filtram cartões e tabela."""
+    equipe, regiao_campo, gestor = request.args.get("equipe", ""), _regiao_campo(), _gestor()
+    por = "gestor" if request.args.get("por") == "gestor" else "regiao"
     mapa = visao.usinas_do_fracttal()
     opcoes = mapa.dados or {}
     usinas = None
-    if equipe and equipe in (opcoes.get("equipes") or {}):
-        usinas = set(opcoes["equipes"][equipe])
-    if supervisor and supervisor in (opcoes.get("supervisores") or {}):
-        usinas = set(opcoes["supervisores"][supervisor]) & (usinas if usinas is not None else set(opcoes["supervisores"][supervisor]))
+    for escolhido, grupo in ((equipe, "equipes"), (regiao_campo, "regioes"), (gestor, "gestores")):
+        if escolhido:
+            nomes = set((opcoes.get(grupo) or {}).get(escolhido) or [])
+            usinas = nomes if usinas is None else usinas & nomes
     leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA, usinas)
     d = leitura.dados or {}
     por_nome = opcoes.get("por_nome") or {}
@@ -658,7 +724,9 @@ def aprovacao():
     for x in todas:
         cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
         x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
-        x["supervisor_cad"], x["regiao_br"] = cad.get("supervisor") or "", cad.get("regiao_br") or ""
+        x["regiao_cad"], x["gestor_cad"] = cad.get("regiao_campo") or "", cad.get("gestor") or ""
+        x["supervisor_campo_cad"], x["regiao_br"] = cad.get("supervisor_campo") or "", cad.get("regiao_br") or ""
+        x["aprovador"] = cad.get("aprovador") or visao.aprovador_sem_cadastro()
     oss = _por_os(todas)
     balde = request.args.get("balde") if request.args.get("balde") in ORDEM_DO_GRUPO else ""
     idade = next((i for i in IDADES + (IDADE_PARADAS,) if i[0] == request.args.get("idade")), None)
@@ -667,23 +735,25 @@ def aprovacao():
                  and (not idade or idade[2] <= o["espera_d"] <= idade[3])]
     # o supervisor aberto (Levi, 08/10: "nessa visão por supervisor deve ser clicável, quando clica aparece a OS ...")
     ver = request.args.get("ver", "")
-    tabela = [o for o in filtradas if (o.get("supervisor_cad") or SEM_CADASTRO) == ver] if ver else []
+    tabela = [o for o in filtradas if (o.get(AGRUPAR[por]) or SEM_CADASTRO) == ver] if ver else []
     nome_grupo = {g[0]: g[1] for g in GRUPOS}
     if request.args.get("csv") == "1":
         import csv
         import io
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
-        w.writerow(["OS", "Dias esperando", "Criação da OS", "Data fim", "Supervisor", "Equipe", "Usina", "Técnicos",
+        w.writerow(["OS", "Dias esperando", "Criação da OS", "Data fim", "Região de campo", "Supervisor de campo",
+                    "Gestor de contrato", "Equipe", "Usina", "Técnicos",
                     "Tarefas", "Prontas", "Pedem olho", "Fora do App", "Uso do App (%)", "Nota média",
-                    "Devolvidas", "Grupo da OS"])
+                    "Devolvidas", "Grupo da OS", "Quem aprova"])
         for o in (tabela if ver else filtradas):
             n = o["n_por_grupo"]
             w.writerow([o["os"], o["espera_d"], _data_br(o["criada"]) if o["criada"] else "", _data_br(o["fim"]),
-                        o["supervisor_cad"], o["equipe_cad"], o["usina_cad"], ", ".join(o["tecnicos"]),
+                        o["regiao_cad"], o["supervisor_campo_cad"], o["gestor_cad"], o["equipe_cad"], o["usina_cad"],
+                        ", ".join(o["tecnicos"]),
                         len(o["tarefas"]), n["completa"], n["olho"], n["fora_do_app"], o["uso_app"],
                         "" if o["nota_media"] is None else o["nota_media"], o["n_devolvidas"],
-                        nome_grupo.get(o["balde"])])
+                        nome_grupo.get(o["balde"]), " ".join(a["texto"] for a in o["aprovadores"])])
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": 'attachment; filename="aprovacao-os.csv"'})
     mais_antiga = oss[0] if oss else None
@@ -691,15 +761,23 @@ def aprovacao():
          "aged30": sum(1 for o in oss if o["espera_d"] >= 30), "espera_max": mais_antiga["espera_d"] if mais_antiga else 0,
          "mais_antiga": mais_antiga, "uso_app": round(100 * sum(o["pelo_app"] for o in oss) / len(oss)) if oss else None}
     idades = [(i, sum(1 for o in oss if i[2] <= o["espera_d"] <= i[3])) for i in IDADES]
-    supervisores_g = sorted(_agrupa_os(filtradas, lambda o: [o.get("supervisor_cad")]),
-                            key=lambda a: (-a["aged30"], -a["ordens"], a["nome"]))
-    aberto = next((a for a in supervisores_g if a["nome"] == ver), None) if ver else None
+    info = {r["nome"]: r for r in opcoes.get("regioes_info") or []}
+    # sem cadastro (usina sem de-para), sem região de campo e sem gestor: cartões próprios, sempre por último
+    sem = (SEM_CADASTRO, visao.SEM_REGIAO, visao.SEM_GESTOR)
+    cartoes = sorted(_agrupa_os(filtradas, lambda o: [o.get(AGRUPAR[por])]),
+                     key=lambda a: (a["nome"] in sem, -a["aged30"], -a["ordens"], a["nome"]))
+    for a in cartoes:
+        a["regiao"] = info.get(a["nome"]) if por == "regiao" else None
+    aberto = next((a for a in cartoes if a["nome"] == ver), None) if ver else None
+    linhas_filtro = [{"regiao_campo": x["regiao_campo"], "gestor": x["gestor"]} for x in (opcoes.get("por_nome") or {}).values()]
     return render_template("campo/aprovacao.html", **_comum(
         "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS}, balde=balde,
-        cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), equipe=equipe, supervisor=supervisor,
-        equipes=sorted(opcoes.get("equipes") or {}), supervisores=sorted(opcoes.get("supervisores") or {}),
+        cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), equipe=equipe,
+        equipes=sorted(opcoes.get("equipes") or {}), por=por,
+        **_papeis({"regioes": opcoes.get("regioes_info") or [], "estrutura_publicada": opcoes.get("estrutura_publicada", True)},
+                  linhas_filtro, regiao_campo, gestor),
         mapa_erro=mapa.erro, k=k, idades=idades, idade=idade, ver=ver, aberto=aberto, tabela=tabela,
-        limite=LIMITE_LINHAS, por_supervisor=supervisores_g, sem_cadastro=SEM_CADASTRO, data_br=_data_br,
+        limite=LIMITE_LINHAS, cartoes=cartoes, sem_cadastro=SEM_CADASTRO, data_br=_data_br,
         pode_aprovar=pode_na_tela, motivos=campo_aprovacao.motivos))
 
 

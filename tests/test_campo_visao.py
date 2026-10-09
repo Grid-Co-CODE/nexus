@@ -32,26 +32,40 @@ def _aba(api, livro, aba, linhas):
 
 
 _MOB = "2025-10-01"
+# Estrutura de O&M de 10/2026: as usinas têm o gestor de contrato (Supervisor PM: os "supervisores" de antes, 90 e 91);
+# a SP Norte 01 é da região Sudeste 03 (Supervisor de Campo 92, coordenador 93) e a SC Oeste 01 da Sul 01, com a vaga de
+# supervisor aberta (aprova o coordenador 93)
 USINAS = [{"usina_id": 1, "nome": "Altair", "codigo": "THPN-ALT100", "status": "OPERAÇÃO", "equipe_id": 10,
-           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Altair", "cliente_id": 1, "cluster": "SP Norte"},
+           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Altair", "cliente_id": 1, "cluster": "SP Norte",
+           "gestor_contrato_id": 90},
           {"usina_id": 2, "nome": "Brodowski 1", "codigo": "THPN-BWK100", "status": "OPERAÇÃO", "equipe_id": 10,
-           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Brodowski", "cliente_id": 1, "cluster": "SP NORTE"},
+           "data_mobilizacao": _MOB, "uf": "SP", "cidade": "Brodowski", "cliente_id": 1, "cluster": "SP NORTE",
+           "gestor_contrato_id": 90},
           {"usina_id": 3, "nome": "Coração 1", "codigo": "THPN-COR100", "status": "OPERAÇÃO", "equipe_id": 20,
-           "data_mobilizacao": _MOB, "uf": "SC", "cidade": "Coração", "cliente_id": 2, "cluster": "SC oeste"},
+           "data_mobilizacao": _MOB, "uf": "SC", "cidade": "Coração", "cliente_id": 2, "cluster": "SC oeste",
+           "gestor_contrato_id": 91},
           {"usina_id": 4, "nome": "Nova", "codigo": "THPN-NOV100", "status": "A MOBILIZAR", "equipe_id": 20,
            "uf": "SC", "cidade": "Nova"},
           # em OPERAÇÃO no cadastro, mas sem data de mobilização: não é usina mobilizada (Levi, 05/10)
           {"usina_id": 5, "nome": "Sem Data", "codigo": "THPN-SDT100", "status": "OPERAÇÃO", "equipe_id": 20,
            "uf": "SC", "cidade": "Sem Data"}]
 CLIENTES = [{"cliente_id": 1, "nome": "Thopen"}, {"cliente_id": 2, "nome": "Outro Cliente"}]
-EQUIPES = [{"equipe_id": 10, "nome": "SP Norte 01"}, {"equipe_id": 20, "nome": "SC Oeste 01"}]
+EQUIPES = [{"equipe_id": 10, "nome": "SP Norte 01", "codigo": "E-31", "regiao_campo_id": 1},
+           {"equipe_id": 20, "nome": "SC Oeste 01", "codigo": "E-30", "regiao_campo_id": 2}]
+REGIOES = [{"regiao_campo_id": 1, "nome": "Sudeste 03", "base": "São José do Rio Preto/SP", "supervisor_campo_id": 92,
+            "supervisor_campo_vaga": "não", "coordenador_campo_id": 93, "coordenador_campo_vaga": "não", "ordem": 1,
+            "excluido": "não"},
+           {"regiao_campo_id": 2, "nome": "Sul 01", "base": "Maringá/PR", "supervisor_campo_id": None,
+            "supervisor_campo_vaga": "sim", "coordenador_campo_id": 93, "coordenador_campo_vaga": "não", "ordem": 2,
+            "excluido": "não"}]
 DE_PARA = [{"usina_id": 1, "sistema": "Fracttal · Classificação 1", "chave_externa": "Thopen - Altair 1 - SP"}]
 CHAVE_CADASTRO = gerar_chave()
 
 
 def _pessoas():
-    """Dois técnicos na SP Norte 01 (um Ativo, um sem status), um desligado (não conta), um na SC Oeste 01 e os dois
-    supervisores, com o nome só cifrado, como no banco."""
+    """Dois técnicos na SP Norte 01 (um Ativo, um sem status), um desligado (não conta), um na SC Oeste 01, os dois
+    "supervisores" de antes (na estrutura de O&M de 10/2026, os gestores de contrato das usinas), a supervisora de campo
+    da Sudeste 03 e o coordenador de campo, com o nome só cifrado, como no banco."""
     cofre = Cofre(CHAVE_CADASTRO)
 
     def p(pid, vinculo, cargo, equipe, status, sup, nome=None, email=None):
@@ -64,7 +78,9 @@ def _pessoas():
             p(3, "Colaborador de campo", "Técnico O&M", 10, "Desligado", 90),
             p(4, "Colaborador de campo", "Técnico O&M", 20, "Ativo", 91),
             p(90, "Supervisor", None, None, None, None, "Beltrano Supervisor", "beltrano@exemplo.test"),
-            p(91, "Supervisor", None, None, None, None, "Ciclano Chefe")]
+            p(91, "Supervisor", None, None, None, None, "Ciclano Chefe"),
+            p(92, "Supervisor de Campo", None, None, "Ativo", None, "Supervisora Campo", "supervisora@exemplo.test"),
+            p(93, "Coordenador de Campo", None, None, "Ativo", None, "Coordenador Campo", "coordenador@exemplo.test")]
 
 
 def _ronda(dia, usina="Thopen - Altair 1 - SP", ativo="THPN-ALT100", **kw):
@@ -104,6 +120,7 @@ def banco(app, tmp_path):
     _aba(api, "cadastro_nexus", "clientes", CLIENTES)
     _aba(api, "cadastro_nexus", "de_para", DE_PARA)
     _aba(api, "cadastro_nexus", "pessoas", _pessoas())
+    _aba(api, "cadastro_nexus", "regioes_campo", REGIOES)
     _aba(api, "rondas_app_campo", "OS de ronda", [
         _ronda(_dia(1), Falhas="ronda longa pendente; item sem foto de evidência"),
         _ronda(_dia(3), Falhas="ronda longa pendente"),
@@ -230,16 +247,20 @@ def test_regiao_do_brasil_pela_uf_e_cartoes_por_equipe(banco):
     assert (sc["usinas"], sc["pendentes"], sc["feitas"], sc["pct_feitas"]) == (1, 1, 0, 0)
     assert sp["longa_pendente"] == 1 and sc["nunca"] == 1 and sp["regioes"] == ["Sudeste"] and sp["ufs"] == ["SP"]
     assert sp["rondas"] == 3 and sp["sem_os"] == 1 and sp["incompleta"] == 1 and sp["pts"] == 2 and sp["parada"] == 1
-    # técnicos e supervisor pelo cadastro: o desligado não conta; o sem status conta (ver visao._Base._time)
-    assert (sp["tecnicos"], sp["ativos"], sp["supervisor"]) == (2, 1, "Beltrano Supervisor")
-    assert sp["cargos"] == {"Técnico O&M": 1, "Eletricista O&M": 1}
-    assert (sc["tecnicos"], sc["supervisor"]) == (1, "Ciclano Chefe")
+    # técnicos pelo cadastro: o desligado não conta; o sem status conta (ver visao._Base._time). A região de campo e o
+    # Supervisor de Campo são os da equipe (estrutura de O&M de 10/2026); vaga = "vaga"
+    assert (sp["tecnicos"], sp["ativos"], sp["regiao_campo"], sp["supervisor_campo"]) == (2, 1, "Sudeste 03",
+                                                                                       "Supervisora Campo")
+    assert sp["cargos"] == {"Técnico O&M": 1, "Eletricista O&M": 1} and sp["codigo"] == "E-31"
+    assert (sc["tecnicos"], sc["regiao_campo"], sc["supervisor_campo"]) == (1, "Sul 01", "vaga")
 
 
-def test_sem_a_chave_do_cadastro_o_supervisor_sai_pelo_numero(app, banco):
+def test_sem_a_chave_do_cadastro_a_pessoa_sai_pelo_numero(app, banco):
     app.config["NEXUS_CHAVE_CADASTRO"] = None
     visao.limpar()
-    assert {x["supervisor"] for x in visao.atencao(14).dados["usinas"]} == {"Supervisor 90", "Supervisor 91"}
+    us = visao.atencao(14).dados["usinas"]
+    assert {x["gestor"] for x in us} == {"Gestor 90", "Gestor 91"}
+    assert {x["supervisor_campo"] for x in us} == {"Supervisor 92", "vaga"}
 
 
 def test_central_abre_nos_cartoes_e_o_cartao_leva_a_tabela_da_equipe(banco, logado):
@@ -256,15 +277,18 @@ def test_central_abre_nos_cartoes_e_o_cartao_leva_a_tabela_da_equipe(banco, loga
     assert "PT esperando o De acordo" in html and "SC Oeste 01" not in html   # equipe sem PT não ganha cartão
 
 
-def test_cartao_tem_tecnicos_supervisor_e_total_e_filtro_de_supervisor(banco, logado):
+def test_cartao_tem_tecnicos_regiao_de_campo_e_total_e_os_dois_filtros(banco, logado):
     html = logado.get("/t/campo/atencao").get_data(as_text=True)
     assert 'class="cn-capacete"' in html and "<b>2</b>" in html and "2 técnicos na equipe" in html
-    assert "Supervisor: <b class=\"cn-eq-sup\">Beltrano Supervisor</b>" in html
+    assert 'E-31 · Sudeste 03 · Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
+    assert "E-30 · Sul 01 · Supervisor de Campo: <span class=\"cn-vaga\"" in html          # a vaga, como vaga
     assert "<b>2 usinas</b>total" in html and "<b>1 usina</b>pendente" in html
-    assert 'id="cn-supervisor"' in html and "Ciclano Chefe" in html
-    html = logado.get("/t/campo/atencao?supervisor=Ciclano+Chefe").get_data(as_text=True)
+    # o filtro "Supervisor" virou dois: região de campo (com o supervisor ou a vaga) e gestor de contrato
+    assert 'id="cn-supervisor"' not in html and 'id="cn-regiao-campo"' in html and 'id="cn-gestor"' in html
+    assert '<option value="Sul 01">Sul 01 · vaga</option>' in html and "Ciclano Chefe" in html
+    html = logado.get("/t/campo/atencao?regiao_campo=Sul+01").get_data(as_text=True)
     assert "SC Oeste 01" in html and "SP Norte 01" not in html
-    html = logado.get("/t/campo/atencao?supervisor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
+    html = logado.get("/t/campo/atencao?gestor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
     assert "Coração 1" in html and "Altair" not in html
 
 
@@ -272,7 +296,7 @@ def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
     """Levi, 05/10: divisão por equipe com o que está pendente, filtro de supervisor, linha que abre o detalhe,
     equipamento no lugar do estado, espera no fim e só o número da OS, em verde, no lugar do número da PT."""
     html = logado.get("/t/campo/pt").get_data(as_text=True)
-    assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "Beltrano Supervisor" in html
+    assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "Supervisora Campo" in html
     assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
     # a mesma tela da Central de atenção > Permissões de trabalho (Levi, 05/10)
     import re as _re
@@ -286,18 +310,19 @@ def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
     assert cab in html and "<th>Estado</th>" not in html and "<th>PT</th>" not in html
     assert 'class="cn-detalhe" hidden' in html and "Atividades críticas da APR" in html and "Eletricidade" in html
     assert "Inversor 1" in html and "THPN-ALT100-INVR1" in html
-    html = logado.get("/t/campo/pt?supervisor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
+    html = logado.get("/t/campo/pt?gestor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
     assert "Nenhuma PT esperando o De acordo com esses filtros" in html
     html = logado.get("/t/campo/pt?aba=historico").get_data(as_text=True)
     assert "<th>Situação</th>" in html and "De acordo" in html and "/t/campo/pt/PT-3" in html
     assert "/t/campo/pt/PT-3/pdf" in html and "<th>PDF</th>" in html
 
 
-def test_cartao_leva_a_tabela_da_equipe_com_o_supervisor(banco, logado):
+def test_cartao_leva_a_tabela_da_equipe_com_a_regiao_e_o_supervisor_de_campo(banco, logado):
     html = logado.get("/t/campo/pt").get_data(as_text=True)
     assert '<a class="cn-equipe cn-equipe--critico" href="?modo=tabela&amp;equipe=SP+Norte+01">' in html
     html = logado.get("/t/campo/pt?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
-    assert 'class="cn-faixa-equipe"' in html and "Supervisor: <b>Beltrano Supervisor</b>" in html and "2</b> técnicos" in html
+    assert 'class="cn-faixa-equipe"' in html and "2</b> técnicos" in html
+    assert 'Sudeste 03 · Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
 
 
 class _FracttalPT:
@@ -600,28 +625,47 @@ def _entra_fracttal(cliente, monkeypatch, email, nome):
     return cliente.post("/entrar", data={"email": email, "senha": "x"})
 
 
-def test_supervisor_que_entra_pelo_fracttal_ja_vem_filtrado(banco, cliente, monkeypatch):
+def test_supervisor_de_campo_que_entra_pelo_fracttal_ja_vem_na_regiao_dele(banco, cliente, monkeypatch):
     """Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para a pessoa automaticamente, mas ela pode
-    mudar o filtro se quiser". O supervisor é achado no cadastro pelo e-mail do Fracttal."""
-    r = _entra_fracttal(cliente, monkeypatch, "Beltrano@Exemplo.test".lower(), "Beltrano S.")
+    mudar o filtro se quiser". Estrutura de O&M de 10/2026: o Supervisor de Campo entra na região dele (achado no
+    cadastro pelo e-mail do Fracttal)."""
+    r = _entra_fracttal(cliente, monkeypatch, "Supervisora@Exemplo.test".lower(), "Supervisora C.")
     assert r.status_code == 302
     with cliente.session_transaction() as s:
-        assert s["supervisor_padrao"] == "Beltrano Supervisor" and s["usuario"]["nome"] == "Beltrano S."
-        assert not s.get("admin")
-    html = cliente.get("/t/campo/rondas?aba=cobertura").get_data(as_text=True)
-    assert '<option value="Beltrano Supervisor" selected>' in html and "Coração 1" not in html   # Coração é do Ciclano
-    todos = cliente.get("/t/campo/rondas?aba=cobertura&supervisor=*").get_data(as_text=True)
-    assert '<option value="*" selected>' in todos and "Coração 1" in todos                      # pode trocar
-    assert "Beltrano S." in html                                                                 # quem entrou, no topo
+        assert s["supervisor_padrao"] == {"pessoa_id": 92, "nome": "Supervisora Campo", "papel": "supervisor_campo",
+                                          "regioes": ["Sudeste 03"]}
+        assert s["usuario"]["nome"] == "Supervisora C." and not s.get("admin")
+    html = cliente.get("/t/campo/rondas?aba=sem&cob=nunca").get_data(as_text=True)
+    assert '<option value="Sudeste 03" selected>' in html and "Coração 1" not in html     # Coração é da Sul 01
+    todas = cliente.get("/t/campo/rondas?aba=sem&cob=nunca&regiao_campo=*").get_data(as_text=True)
+    assert "Coração 1" in todas                                                             # pode trocar
+    assert "Supervisora C." in html                                                         # quem entrou, no topo
 
 
-def test_quem_nao_e_supervisor_entra_sem_filtro(banco, cliente, monkeypatch):
+def test_gestor_de_contrato_entra_nas_usinas_dele_e_coordenador_ve_tudo(banco, cliente, monkeypatch):
+    # o "supervisor" de antes é, na prática, o gestor de contrato: entra filtrado nas usinas dele
+    _entra_fracttal(cliente, monkeypatch, "beltrano@exemplo.test", "Beltrano S.")
+    with cliente.session_transaction() as s:
+        assert s["supervisor_padrao"] == {"pessoa_id": 90, "nome": "Beltrano Supervisor", "papel": "gestor",
+                                          "gestor": "Beltrano Supervisor"}
+    html = cliente.get("/t/campo/rondas?aba=sem&cob=nunca").get_data(as_text=True)
+    assert '<option value="Beltrano Supervisor" selected>' in html and "Coração 1" not in html
+    # o coordenador vê todas as regiões (sem filtro)
+    _entra_fracttal(cliente, monkeypatch, "coordenador@exemplo.test", "Coordenador C.")
+    with cliente.session_transaction() as s:
+        assert s["supervisor_padrao"]["papel"] == "coordenador" and s["supervisor_padrao"]["regioes"] == ["Sudeste 03", "Sul 01"]
+    assert "Coração 1" in cliente.get("/t/campo/rondas?aba=sem&cob=nunca").get_data(as_text=True)
+
+
+def test_quem_nao_tem_papel_entra_sem_filtro(banco, cliente, monkeypatch):
     _entra_fracttal(cliente, monkeypatch, "tecnico@exemplo.test", "Fulano de Tal")
     with cliente.session_transaction() as s:
         assert s["logado"] and "supervisor_padrao" not in s
-    assert visao.supervisor_da_pessoa("", "Ciclano Chefe") == "Ciclano Chefe"       # sem e-mail, pelo nome (único)
-    assert visao.supervisor_da_pessoa("ciclano.chefe@gridco.test", "C. Chefe") == "Ciclano Chefe"   # pelo e-mail
-    assert visao.supervisor_da_pessoa("outra.pessoa@gridco.test", "Outra Pessoa") == ""
+    assert visao.pessoa_do_login("", "Ciclano Chefe") == 91                         # sem e-mail, pelo nome (único)
+    assert visao.pessoa_do_login("ciclano.chefe@gridco.test", "C. Chefe") == 91      # pelo nome do e-mail
+    assert visao.pessoa_do_login("outra.pessoa@gridco.test", "Outra Pessoa") is None
+    assert visao.papel_no_campo("ciclano.chefe@gridco.test", "C. Chefe")["papel"] == "gestor"
+    assert visao.papel_no_campo("outra.pessoa@gridco.test", "Outra Pessoa") == {}
 
 
 def test_tela_do_campo_volta_na_hora_e_se_renova_sozinha(banco, logado, monkeypatch):

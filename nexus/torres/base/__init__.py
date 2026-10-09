@@ -29,6 +29,10 @@ TORRE = Torre(
         Tela("equipes", "Equipes",
              "Quem trabalha em cada equipe e em quais usinas?",
              "Cadastro do Nexus (antes: Equipe Cluster do BD_Operações)"),
+        # Estrutura de O&M de 10/2026 (Levi, 08/10: "pode adaptar, deixa as vagas preparadas")
+        Tela("regioes-campo", "Regiões de campo",
+             "Quem é o Supervisor de Campo de cada região, que equipes ela tem e onde a vaga está aberta?",
+             "Cadastro do Nexus (estrutura de O&M de 10/2026)"),
         Tela("listas", "Listas",
              "Quais valores cada lista aceita?",
              "Cadastro do Nexus (antes: abas Auxiliar e Parametros)"),

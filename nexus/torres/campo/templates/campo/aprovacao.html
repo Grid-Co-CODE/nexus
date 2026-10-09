@@ -7,16 +7,19 @@
    e supervisor vêm do cadastro do Nexus pela usina do Fracttal.
    08/10/2026 (Levi): a fila inteira, sem "OS fechadas nos X dias"; só a visão por supervisor ("a visão de por técnico e
    fila pode matar"); o cartão abre a tabela das OS dele ("quando clica aparece a OS, dia, data da criação da OS, data
-   fim, supervisor, prontas, pedem olho, fora do App, uso do App, nota média e devolvidas"), e é nela que se aprova, só o
-   supervisor da OS ou um administrador (o portão é no servidor: nexus/torres/campo/aprovar_os.py). #}
+   fim, supervisor, prontas, pedem olho, fora do App, uso do App, nota média e devolvidas"), e é nela que se aprova.
+   Estrutura de O&M de 10/2026: os cartões são por região de campo (com a alternância para gestor de contrato) e quem
+   aprova é o Supervisor de Campo da região da usina da OS; com a vaga aberta, o Coordenador; sem os dois, só um
+   administrador (o portão é no servidor: nexus/torres/campo/aprovar_os.py). #}
+{% from 'campo/_cartoes_papeis.html' import alterna, quem %}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% macro barra_grupos(a) %}<div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ a.completa }} prontas, {{ a.olho }} pedem olho, {{ a.fora_do_app }} fora do App">{% if a.ordens %}<span class="ok" style="width: {{ (100 * a.completa / a.ordens)|round(1) }}%"></span><span class="alerta" style="width: {{ (100 * a.olho / a.ordens)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * a.fora_do_app / a.ordens)|round(1) }}%"></span>{% endif %}</div>{% endmacro %}
 {% macro cor_uso(u) %}{{ 'ok' if (u or 0) >= 80 else ('alerta' if (u or 0) >= 50 else 'critico') }}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
-      <p class="cn-pergunta">Toda OS fechada no Fracttal espera o supervisor aprovar. Quem está acumulando, o que dá para aprovar
-        já e o que precisa de olho?</p></div>
+      <p class="cn-pergunta">Toda OS fechada no Fracttal espera o supervisor de campo da região aprovar. Quem está acumulando,
+        o que dá para aprovar já e o que precisa de olho?</p></div>
     <div class="cn-frescor">fila de verificação do Fracttal, inteira{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}</div>
   </div>
 
@@ -34,6 +37,7 @@
     {{ fila.lida_em }}; o Nexus tenta de novo em 5 minutos.</div>
   {% endif %}
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+  {% include 'campo/_aviso_estrutura.html' %}
 
   {# sem período (Levi, 08/10: "não deve ter filtro 'OS fechadas nos X dias'"): a fila inteira, filtrada só por equipe
      e supervisor do cadastro #}
@@ -42,10 +46,8 @@
     <select class="gc-campo" name="equipe" aria-label="Equipe" onchange="this.form.submit()">
       <option value="">todas as equipes</option>{% for e in equipes %}<option value="{{ e }}"{% if e == equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
     </select>
-    <select class="gc-campo" name="supervisor" aria-label="Supervisor" onchange="this.form.submit()">
-      <option value="*"{% if not supervisor %} selected{% endif %}>todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
-    </select>{% endif %}
-    {% for x in ('balde', 'idade', 'ver') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+    {% with com_rotulo=false %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}{% endif %}
+    {% for x in ('balde', 'idade', 'ver', 'por') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>
   </form>
 
@@ -87,15 +89,23 @@
     {% endif %}
 
     {% if not ver %}
-    {# quem acumula: um cartão por supervisor (do cadastro, pela usina da OS), o que mais tem parada há 30 dias primeiro;
-       o cartão abre a tabela das OS dele #}
-    <div class="cn-lista-cab"><h2>Por supervisor</h2><span class="mudo">clique no supervisor para ver as OS dele e aprovar</span></div>
+    {# quem acumula: um cartão por região de campo (do cadastro, pela usina da OS: a equipe dela e a região da equipe), o
+       que mais tem parada há 30 dias primeiro, com quem aprova ali; a alternância leva aos cartões por gestor de contrato.
+       O cartão abre a tabela das OS dele #}
+    <div class="cn-lista-cab"><h2>{{ 'Por gestor de contrato' if por == 'gestor' else 'Por região de campo' }}</h2><span class="mudo">clique no cartão para ver as OS e aprovar</span></div>
+    {{ alterna(por == 'gestor', url(por=None, ver=None), url(por='gestor', ver=None)) }}
     <div class="cn-equipes">
-      {% for a in por_supervisor %}
+      {% for a in cartoes %}
         {% set cor = 'critico' if a.aged30 else ('alerta' if a.aged7 else 'ok') %}
-        <a class="cn-equipe cn-equipe--{{ cor }}" href="{{ url(ver=a.nome) }}" title="Ver as OS de {{ a.nome }}">
+        <a class="cn-equipe cn-equipe--{{ cor }}{% if a.nome in (sem_cadastro, sem_regiao, sem_gestor) %} cn-sup--sem{% endif %}" href="{{ url(ver=a.nome) }}" title="Ver as OS de {{ a.nome }}">
           <div class="cn-eq-cab">
             <div class="cn-eq-titulo"><b>{{ a.nome }}</b><span class="cn-eq-tec" title="{{ a.n_tecnicos }} técnicos com OS na fila">{{ capacete() }}<b>{{ a.n_tecnicos }}</b></span></div>
+            {% if a.regiao %}<span>Supervisor de Campo: {{ quem(a.regiao.supervisor) }}</span>
+            <span>Coordenador: {{ quem(a.regiao.coordenador) }}</span>
+            <span class="cn-quem-aprova">{{ a.regiao.aprovador.texto }}</span>
+            {% elif por == 'gestor' and a.nome not in (sem_cadastro, sem_gestor) %}<span>Gestor de contrato (Supervisor PM): não aprova OS</span>
+            {% elif a.nome == sem_cadastro %}<span>usina sem de-para do Fracttal: só um administrador aprova</span>
+            {% elif a.nome == sem_regiao %}<span>equipes fora da estrutura de campo: só um administrador aprova</span>{% endif %}
             <span>{{ a.n_equipes }} equipe{{ 's' if a.n_equipes != 1 }} · {{ a.tarefas }} tarefas</span>
           </div>
           <div class="cn-eq-num">
@@ -118,9 +128,9 @@
     </div>
 
     {% else %}
-    {# a tabela do supervisor aberto: uma linha por OS, a mais antiga primeiro; a linha abre o porquê e o Aprovar #}
+    {# a tabela do cartão aberto: uma linha por OS, a mais antiga primeiro; a linha abre o porquê e o Aprovar #}
     <div class="cn-faixa-equipe cn-faixa-aprov">
-      <a class="cn-link" href="{{ url(ver=None) }}">&larr; todos os supervisores</a>
+      <a class="cn-link" href="{{ url(ver=None) }}">&larr; {{ 'todos os gestores de contrato' if por == 'gestor' else 'todas as regiões de campo' }}</a>
       <b>{{ ver }}</b>
       {% if aberto %}<span><b>{{ aberto.ordens }}</b> OS esperando · <b class="cn-t-ok">{{ aberto.completa }}</b> prontas · <b class="cn-t-alerta">{{ aberto.olho }}</b> pedem olho · <b>{{ aberto.fora_do_app }}</b> fora do App</span>
       <span>a mais antiga há <b{% if aberto.espera_max >= 30 %} class="cn-t-critico"{% endif %}>{{ aberto.espera_max }} d</b> · uso do App <b>{{ aberto.uso_app }}%</b></span>{% endif %}
@@ -128,7 +138,7 @@
     <div class="cn-lista-cab"><h2>OS de {{ ver }}</h2><span class="mudo">{{ [tabela|length, limite]|min }} de {{ tabela|length }} OS, a mais antiga primeiro; clique na linha para ver o porquê e aprovar</span>
       {% if tabela|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ tabela|length }}</span>{% endif %}</div>
     <div class="cn-tab cn-tab--compacta"><table class="cn-expande cn-tab-aprov">
-      <thead><tr><th>OS</th><th title="Dias esperando aprovação, desde o fim da tarefa mais antiga da OS">Dia</th><th>Data da criação da OS</th><th>Data fim</th><th>Supervisor</th>
+      <thead><tr><th>OS</th><th title="Dias esperando aprovação, desde o fim da tarefa mais antiga da OS">Dia</th><th>Data da criação da OS</th><th>Data fim</th><th title="O Supervisor de Campo da região da usina da OS (estrutura de O&amp;M de 10/2026)">Supervisor de campo</th>
         <th title="Tarefas da OS com evidência completa">Prontas</th><th title="Tarefas da OS que pedem o seu olho">Pedem olho</th><th title="Tarefas da OS fechadas fora do App">Fora do App</th>
         <th title="Tarefas da OS feitas pelo App">Uso do App</th><th title="Nota média do registro das tarefas feitas pelo App">Nota média</th><th title="Tarefas da OS já devolvidas ao técnico">Devolvidas</th></tr></thead>
       <tbody>
@@ -138,7 +148,7 @@
           <td><span class="cn-st cn-t-{{ cor_espera(o.espera_d) }}">{{ 'hoje' if o.espera_d == 0 else o.espera_d ~ ' d' }}</span></td>
           <td class="m">{{ data_br(o.criada) }}</td>
           <td class="m">{{ data_br(o.fim) }}</td>
-          <td class="cn-menor">{{ o.supervisor_cad or '—' }}</td>
+          <td class="cn-menor">{% if o.supervisor_campo_cad == vaga %}<span class="cn-vaga">vaga</span>{% else %}{{ o.supervisor_campo_cad or '—' }}{% endif %}</td>
           <td class="m{% if n.completa %} cn-t-ok{% endif %}">{{ n.completa }}</td>
           <td class="m{% if n.olho %} cn-t-alerta{% endif %}">{{ n.olho }}</td>
           <td class="m">{{ n.fora_do_app }}</td>
@@ -162,12 +172,13 @@
                 <dt>OS</dt><dd class="m">{{ o.os }}{% if o.ronda %} · OS de ronda{% endif %}</dd>
                 <dt>Técnicos</dt><dd>{{ o.tecnicos|join(', ') }}</dd>
                 <dt>Usina</dt><dd>{{ o.usina_cad or '—' }}{% if o.equipe_cad %} · {{ o.equipe_cad }}{% endif %}</dd>
+                <dt>Região de campo</dt><dd>{{ o.regiao_cad or '—' }} · gestor de contrato {{ o.gestor_cad or '—' }}</dd>
                 <dt>Criada em</dt><dd>{{ data_br(o.criada) }}</dd>
                 <dt>Fechada em</dt><dd>{{ data_br(o.fim) }} · esperando há {{ o.espera_d }} dia{{ 's' if o.espera_d != 1 }}</dd>
                 <dt>Pelo App</dt><dd>{{ o.n_app }} de {{ o.tarefas|length }} tarefa{{ 's' if o.tarefas|length != 1 }}{% if o.devolvida %} · já devolvida{% endif %}</dd>
               </dl>
               {% if o.id_wo %}
-              {% if pode_aprovar(o.supervisor_cad) %}
+              {% if pode_aprovar(o.aprovadores) %}
               <div class="cn-aprovar" data-wo="{{ o.id_wo }}" data-os="{{ o.os }}">
                 <button class="gc-btn gc-btn--primario" type="button">Aprovar a OS {{ o.os }}</button>
                 <span class="cn-aprovar-msg mudo">Conclui a OS inteira no Fracttal{% if o.tarefas|length > 1 %} (as {{ o.tarefas|length }} tarefas){% endif %}, com o seu login do Fracttal (o mesmo do OS Creator). Não dá para desfazer.</span>
@@ -175,7 +186,7 @@
               {% else %}
               <div class="cn-aprovar cn-aprovar--so-supervisor">
                 <button class="gc-btn" type="button" disabled>Aprovar a OS {{ o.os }}</button>
-                <span class="mudo">Só o supervisor desta OS ({{ o.supervisor_cad or 'sem supervisor no cadastro' }}) ou um administrador aprova, entrando no Nexus com o login do Fracttal.</span>
+                <span class="mudo">{% for a in o.aprovadores %}{{ a.texto }} {% endfor %}Quem aprova entra no Nexus com o login do Fracttal.</span>
               </div>
               {% endif %}
               {% endif %}
@@ -191,9 +202,10 @@
     supervisor), inteira, relida pelo Nexus a cada 10 minutos, contada por OS, que é o que se aprova. Cada tarefa ganha o
     grupo pela regra do painel do App, e a OS fica no pior grupo das tarefas dela: <b>prontas</b> =
     subtarefas respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80,
-    tempo muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. O
-    supervisor e a equipe saem do cadastro do Nexus pela usina da OS. <b>Aprovar</b> conclui a OS no Fracttal com o login
-    do Fracttal de quem clica, e só vale para o supervisor da OS ou um administrador.</div>
+    tempo muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. A
+    equipe, a região de campo e o gestor de contrato saem do cadastro do Nexus pela usina da OS. <b>Aprovar</b> conclui a
+    OS no Fracttal com o login do Fracttal de quem clica, e só vale para o Supervisor de Campo da região da usina (com a
+    vaga aberta, o Coordenador de Campo) ou um administrador. O gestor de contrato (Supervisor PM) não aprova.</div>
 </div>
 <script>
   // clicar na linha abre o porquê do grupo e o Aprovar (Levi, 05/10)
@@ -229,7 +241,7 @@
             msg.appendChild(a); msg.appendChild(document.createTextNode('.'));
             bt.disabled = false; return;
           }
-          if (res.status === 403) { msg.textContent = (res.j && res.j.erro) || 'Só o supervisor desta OS ou um administrador aprova.'; msg.className = 'cn-aprovar-msg cn-t-critico'; return; }
+          if (res.status === 403) { msg.textContent = (res.j && res.j.erro) || 'Só quem aprova esta OS (o supervisor de campo da região) ou um administrador aprova.'; msg.className = 'cn-aprovar-msg cn-t-critico'; return; }
           if (!res.j || !res.j.ok) { msg.textContent = 'O Fracttal não aprovou: ' + ((res.j && (res.j.erro || res.j.msg)) || 'erro'); bt.disabled = false; return; }
           msg.textContent = res.j.mensagem || 'OS aprovada.';
           msg.className = 'cn-aprovar-msg cn-t-ok';

@@ -102,7 +102,11 @@ def linhas(srv) -> list[dict]:
             "STATUS": _texto(u.valor("status")),
             "CLIENTE": cliente,
             "Equipe Cluster": equipe if EQUIPE_PCM.match(equipe) else "",
-            "RESPONSÁVEL O&M": _texto(srv.titulo_de("pessoas", u.valor("responsavel_om"))),
+            # sem pessoa, a região da vaga ("NE · Fortaleza-CE e Teresina-PI"): é o que a AUXILIAR do BD_Operações
+            # traria (a estrutura de O&M de 10/2026 pôs a região na RESPONSÁVEL O&M onde a vaga de Supervisor de
+            # Campo está aberta; o Nexus guarda a pessoa vazia e a região à parte)
+            "RESPONSÁVEL O&M": (_texto(srv.titulo_de("pessoas", u.valor("responsavel_om")))
+                                or _texto(u.valor("responsavel_om_vaga"))),
             "CAPACIDADE INSTALADA (MWp)": _numero(u.valor("potencia_contratual")),
             "OPERAÇÃO": operacao,
             "CIDADE": _texto(u.valor("cidade")),

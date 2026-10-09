@@ -10,6 +10,11 @@ CNPJ, contatos, endereço, CEP, coordenadas); da pessoa, tudo menos vínculo, ca
 juntos, numa coluna `sensivel_cifrado` por linha, que só o Nexus abre (chave NEXUS_CHAVE_CADASTRO). Referência que não
 casou com ninguém (o nome do Excel que não tem ficha) fica sem ID e com o texto lá dentro.
 
+Estrutura de O&M de 10/2026: a aba `regioes_campo` (nome, base, `supervisor_campo_id` e `coordenador_campo_id`, com a
+vaga escrita em `*_vaga` = sim/não) e, na `equipes`, `codigo` e `regiao_campo_id`. Pessoa só por ID: o nome do
+supervisor e do coordenador fica no `sensivel_cifrado` da ficha dele, como o de todo mundo. As colunas novas das abas que
+já existiam vão no FIM (depois do `sensivel_cifrado`): quem lê por posição não se perde.
+
 A cifra usa nonce aleatório: cifrar de novo o mesmo texto daria outro valor, e a API guarda histórico por linha. Por
 isso o texto cifrado que já está no banco é reaproveitado quando o conteúdo não mudou.
 
@@ -23,7 +28,7 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from .calculos import ERRO
-from .esquema import CLIENTES, EQUIPES, PESSOAS, USINAS
+from .esquema import CLIENTES, EQUIPES, PESSOAS, REGIOES_CAMPO, USINAS
 from .tipos import TIPOS_COM_MARCADOR, Legado, marcador, para_api
 
 WORKBOOK = "cadastro_nexus"
@@ -32,19 +37,38 @@ MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 COL_CIFRA = "sensivel_cifrado"
 _BRT = timezone(timedelta(hours=-3))
 
-# (entidade, aba, coluna do ID). A ordem é a dos inner joins: quem é apontado vem antes.
+# (entidade, aba, coluna do ID). A ordem é a dos inner joins: quem é apontado vem antes. A região de campo (estrutura de
+# O&M de 10/2026) entrou por último: aba nova no fim, as de antes ficam onde estavam.
 TABELAS = ((CLIENTES, "clientes", "cliente_id"), (EQUIPES, "equipes", "equipe_id"),
-           (PESSOAS, "pessoas", "pessoa_id"), (USINAS, "usinas", "usina_id"))
+           (PESSOAS, "pessoas", "pessoa_id"), (USINAS, "usinas", "usina_id"),
+           (REGIOES_CAMPO, "regioes_campo", "regiao_campo_id"))
 # Da pessoa, só isto sai em claro: nada aqui identifica alguém sozinho.
 PESSOA_EM_CLARO = ("vinculo", "cargo", "equipe", "status", "supervisor")
 # Na usina, além dos `sensivel` do esquema: a coluna "Ucs" do BD guarda o NÚMERO da UC (7 a 10 dígitos, igual à
 # "Instalação", que é sensível), não a quantidade. Achado na conferência do 1º envio (04/10/2026): iria em claro em 9 usinas.
 USINA_CIFRADA_NO_BANCO = ("ucs",)
 # Para onde aponta cada referência (campo "ref" -> coluna de ID da tabela apontada).
-ID_DE = {"clientes": "cliente_id", "equipes": "equipe_id", "pessoas": "pessoa_id", "usinas": "usina_id"}
+ID_DE = {"clientes": "cliente_id", "equipes": "equipe_id", "pessoas": "pessoa_id", "usinas": "usina_id",
+         "regioes_campo": "regiao_campo_id"}
 CAB_DE_PARA = ["usina_id", "sistema", "chave_externa", "casou_por"]
+# `regioes_campo` (quantas regiões) entrou no fim da linha em 10/2026, pelo mesmo motivo das colunas novas
 CAB_ATUALIZACAO = ["publicado_em", "clientes", "equipes", "pessoas", "usinas", "de_para", "sem_id_na_referencia",
-                   "como_ler"]
+                   "como_ler", "regioes_campo"]
+# Campo que entrou depois da 1ª publicação vai no FIM da aba, depois do `sensivel_cifrado` (estrutura de O&M de 10/2026):
+# a posição das colunas de antes não muda para quem lê por posição.
+COLUNAS_NO_FIM = {"equipes": ("codigo", "regiao_campo"), "usinas": ("responsavel_om_vaga",)}
+
+
+def _vaga(v) -> str:
+    """A vaga escrita ("sim" = ninguém no cargo). Sem ela, quem lê o banco teria de deduzir a vaga do ID vazio."""
+    return "sim" if v is None or v == "" else "não"
+
+
+# Colunas que não são campo do esquema, calculadas na publicação: a vaga de cada cargo da região e a ordem da região na
+# estrutura (a ordem da carga única: a das telas que listam as regiões).
+DERIVADAS = {"regioes_campo": (("supervisor_campo_vaga", lambda r: _vaga(r.valor("supervisor_campo"))),
+                               ("coordenador_campo_vaga", lambda r: _vaga(r.valor("coordenador_campo"))),
+                               ("ordem", lambda r: r.ordem))}
 
 
 class BancoErro(RuntimeError):
@@ -84,12 +108,15 @@ def _em_claro(ent, c) -> bool:
     return not (ent is USINAS and c.id in USINA_CIFRADA_NO_BANCO)
 
 
-def _cabecalho(ent, col_id):
+def _cabecalho(ent, col_id, aba=None):
+    no_fim = COLUNAS_NO_FIM.get(aba, ())
     cab = [col_id]
     for c in ent.campos:
-        if _em_claro(ent, c):
+        if _em_claro(ent, c) and c.id not in no_fim:
             cab.append(_coluna(c))
-    return cab + ["excluido", "versao", "alterado_em", COL_CIFRA]
+    cab += [col for col, _ in DERIVADAS.get(aba, ())]
+    return (cab + ["excluido", "versao", "alterado_em", COL_CIFRA]
+            + [_coluna(ent.campo(cid)) for cid in no_fim if _em_claro(ent, ent.campo(cid))])
 
 
 def _cifra(cofre, ent, id_, segredo: dict, anteriores: dict):
@@ -112,7 +139,7 @@ def tabelas(srv, cofre, anteriores: dict | None = None) -> dict:
     anteriores = anteriores or {}
     out, sem_id = {}, 0
     for ent, aba, col_id in TABELAS:
-        cab = _cabecalho(ent, col_id)
+        cab = _cabecalho(ent, col_id, aba)
         linhas = []
         regs = sorted(srv.registros(ent.id, incluir_excluidos=True), key=lambda r: _id(r.id))
         for r in regs:
@@ -135,6 +162,8 @@ def tabelas(srv, cofre, anteriores: dict | None = None) -> dict:
                         sem_id += 1
                     continue
                 linha[_coluna(c)] = _valor(c, v)
+            for col, f in DERIVADAS.get(aba, ()):
+                linha[col] = f(r)
             linha.update({"excluido": "sim" if r.excluido else "não", "versao": r.versao,
                           "alterado_em": r.alterado_em or None,
                           COL_CIFRA: _cifra(cofre, ent, id_, segredo, anteriores.get(aba, {}))})
@@ -358,7 +387,8 @@ def montar(srv, cofre, fontes: dict | None = None, anteriores: dict | None = Non
     t["atualizacao"] = (CAB_ATUALIZACAO, [[agora, len(t["clientes"][1]), len(t["equipes"][1]), len(t["pessoas"][1]),
                                            len(t["usinas"][1]), len(dp), sem_id,
                                            "liga por ID: usinas.cliente_id = clientes.cliente_id; "
-                                           "sensivel_cifrado só abre no Nexus"]])
+                                           "equipes.regiao_campo_id = regioes_campo.regiao_campo_id; "
+                                           "sensivel_cifrado só abre no Nexus", len(t["regioes_campo"][1])]])
     return t
 
 

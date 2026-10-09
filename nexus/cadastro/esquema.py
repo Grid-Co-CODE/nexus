@@ -36,6 +36,7 @@ class Campo:
     ajuda: str = ""
     na_lista: bool = False             # aparece como coluna na tela de lista
     mascarar: bool | None = None       # None = segue o `sensivel`; False = cifrado, mas visível na tela
+    vazio: str = ""                    # o que o vazio QUER DIZER na tela ("Vaga" no supervisor de campo): não é erro
 
     @property
     def editavel(self) -> bool:
@@ -136,6 +137,12 @@ USINAS = Entidade(
         _c("base_equipe", "Base da equipe", "texto", "equipe", "Base Equipe", modo="automatico",
            ajuda="Vazia, é a cidade da primeira pessoa ativa da equipe."),
         _c("responsavel_om", "Responsável O&M", "ref", "equipe", "RESPONSÁVEL O&M", lista="pessoas", na_lista=True),
+        # Estrutura de O&M de 10/2026: na planilha, a RESPONSÁVEL O&M passou a trazer a REGIÃO ("NE · Fortaleza-CE e
+        # Teresina-PI") onde a vaga de Supervisor de Campo está aberta. Não é pessoa: a importação deixa o Responsável O&M
+        # vazio e anota a região aqui (sem coluna própria no BD: sai da RESPONSÁVEL O&M).
+        _c("responsavel_om_vaga", "Responsável O&M: vaga da região", "texto", "equipe",
+           ajuda="A planilha traz a região no lugar da pessoa: a vaga de Supervisor de Campo daquela região está "
+                 "aberta. Preenchido pela importação; some quando a planilha trouxer a pessoa."),
         _c("tecnico_om", "Técnico O&M", "ref", "equipe", "Técnico O&M", lista="pessoas", modo="automatico",
            ajuda="Automático: o técnico ativo da equipe."),
         _c("contato_tecnico", "Contato do técnico", "telefone", "equipe", "Contato Técnico", modo="automatico",
@@ -223,7 +230,8 @@ PESSOAS = Entidade(
         _c("nome_padrao", "Nome padrão", secao="identificacao", coluna_bd="Nome Padrão", modo="automatico",
            na_lista=True, ajuda="Automático: primeiro e último nome."),
         _c("vinculo", "Vínculo", "lista", "identificacao", lista="vinculo", obrigatorio=True, na_lista=True,
-           ajuda="Supervisores e gestores de contrato vinham só das listas do Auxiliar."),
+           ajuda="Estrutura de O&M de 10/2026: o Supervisor de Campo lidera a região de campo e aprova as OS; o Gestor "
+                 "de contrato (Supervisor PM) cuida do cliente e do contrato. \"Supervisor\" é o vínculo de antes."),
         _c("cargo", "Cargo", "lista", "identificacao", "Cargo", lista="cargos", na_lista=True),
         _c("equipe", "Equipe", "ref", "identificacao", "Cluster", lista="equipes", na_lista=True),
         _c("status", "Status de contratação", "lista", "identificacao", "Status de Contratação",
@@ -258,7 +266,34 @@ EQUIPES = Entidade(
     secoes=(Secao("identificacao", "Identificação"),),
     campos=(
         _c("nome", "Nome", secao="identificacao", obrigatorio=True, unico=True, na_lista=True),
+        # Estrutura de O&M de 10/2026 (Levi, 08/10: "pode adaptar, deixa as vagas preparadas"): a equipe volante tem
+        # código (E-01 a E-40) e pertence a uma região de campo, que tem o Supervisor de Campo
+        _c("codigo", "Código", secao="identificacao", unico=True, na_lista=True,
+           ajuda="O código da equipe volante na estrutura de O&M (E-01 a E-40)."),
+        _c("regiao_campo", "Região de campo", "ref", "identificacao", lista="regioes_campo", na_lista=True,
+           ajuda="A região de campo da equipe: é ela que diz quem é o Supervisor de Campo (e quem aprova as OS)."),
         _c("observacao", "Observação", "texto_longo", "identificacao"),
+    ),
+)
+
+# ── REGIÕES DE CAMPO (estrutura de O&M de 10/2026) ─────────────────────────────────────────────────────────
+# Diretoria → Gerência de O&M → Coordenação de Campo → Supervisor de Campo (1 por região) → equipes volantes. O antigo
+# "Supervisor de O&M" virou duas figuras: o Supervisor de Campo (região, equipe, aprova e fecha as OS) e o Supervisor PM
+# (o Gestor de contrato do BD_Operações: cliente, contrato, SLA). Nome e base vêm da estrutura (carga única,
+# `ferramentas/importar_estrutura_campo.py`); a pessoa entra aqui quando for contratada: vazio é VAGA, não erro.
+REGIOES_CAMPO = Entidade(
+    id="regioes_campo", singular="região de campo", plural="regiões de campo", aba_bd=None, prefixo_id="",
+    digitos_id=0, torre="base", rota_lista="/t/base/regioes-campo", rota_ficha="/t/base/regiao-campo/",
+    secoes=(Secao("identificacao", "Identificação"), Secao("lideranca", "Liderança")),
+    campos=(
+        _c("nome", "Nome", secao="identificacao", obrigatorio=True, unico=True, na_lista=True),
+        _c("base", "Base regional", secao="identificacao", na_lista=True,
+           ajuda="A cidade da base da região (Cidade/UF)."),
+        _c("supervisor_campo", "Supervisor de Campo", "ref", "lideranca", lista="pessoas", na_lista=True, vazio="Vaga",
+           ajuda="Lidera as equipes da região e aprova e fecha as OS. Vazio = vaga aberta: quem aprova é o "
+                 "Coordenador de Campo."),
+        _c("coordenador_campo", "Coordenador de Campo", "ref", "lideranca", lista="pessoas", na_lista=True,
+           vazio="Vaga", ajuda="A Coordenação de Campo acima do supervisor. Vazio = vaga aberta."),
     ),
 )
 
@@ -273,7 +308,25 @@ CLIENTES = Entidade(
     ),
 )
 
-ENTIDADES: dict[str, Entidade] = {e.id: e for e in (USINAS, CLIENTES, PESSOAS, EQUIPES)}
+ENTIDADES: dict[str, Entidade] = {e.id: e for e in (USINAS, CLIENTES, PESSOAS, EQUIPES, REGIOES_CAMPO)}
+
+# ── VÍNCULOS (estrutura de O&M de 10/2026) ──────────────────────────────────────────────────────────────────
+# O valor GRAVADO não muda (mudar quebraria as fichas e o banco, que leem a palavra); a tela mostra o rótulo. O
+# "Supervisor" de antes fica, como legado: as pessoas com ele são, na prática, os Gestores de contrato (Supervisor PM).
+VINCULO_CAMPO = "Colaborador de campo"
+VINCULO_SUPERVISOR_CAMPO = "Supervisor de Campo"
+VINCULO_COORDENADOR_CAMPO = "Coordenador de Campo"
+VINCULO_GESTOR = "Gestor de contrato"
+VINCULO_SUPERVISOR_LEGADO = "Supervisor"
+VINCULOS = [VINCULO_CAMPO, VINCULO_SUPERVISOR_CAMPO, VINCULO_COORDENADOR_CAMPO, VINCULO_GESTOR,
+            VINCULO_SUPERVISOR_LEGADO]
+ROTULOS_LISTA = {"vinculo": {VINCULO_GESTOR: "Gestor de contrato (Supervisor PM)",
+                             VINCULO_SUPERVISOR_LEGADO: "Supervisor (legado)"}}
+
+
+def rotulo_lista(lista: str, valor) -> str:
+    """O que a tela mostra para um valor de lista: o rótulo novo quando há (o valor gravado fica o mesmo)."""
+    return ROTULOS_LISTA.get(lista, {}).get(valor, "" if valor is None else str(valor))
 
 # ── LISTAS (Auxiliar, Parametros e as listas suspensas) ─────────────────────
 LISTAS: dict[str, str] = {

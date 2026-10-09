@@ -38,7 +38,10 @@ do original. A AUXILIAR sai do cadastro do Nexus (`auxiliar.py`, desde 02/10/202
 - **AUXILIAR:** o motor lê seis colunas dela (UFV, RESPONSÁVEL O&M, CIDADE, a 1ª com "MWp", Equipe Cluster, Base
   Equipe). O MWp é a potência contratual. Equipe Cluster fora do padrão "UF Região NN" vai vazia: era uma aba vazia
   por usina com equipe local. Prova da S41 (02/10), com a mesma foto do Fracttal da geração oficial: agenda e pendentes
-  idênticos; 48 linhas ganharam Responsável; mudam só as colunas de sombra (RPN novo e Desloc).
+  idênticos; 48 linhas ganharam Responsável; mudam só as colunas de sombra (RPN novo e Desloc). **RESPONSÁVEL O&M
+  sem pessoa** (estrutura de O&M de 10/2026): o BD_Operações traz a REGIÃO onde a vaga de Supervisor de Campo está
+  aberta ("NE · Fortaleza-CE e Teresina-PI"); o cadastro guarda a pessoa vazia e a região em `responsavel_om_vaga`, e
+  a AUXILIAR escreve a região, como a AUXILIAR do BD escreveria.
 - **Provar mudança no motor ou nos insumos:** rode com a FOTO do Fracttal da pasta do PCM (`.cache_semanal_api.pkl`,
   `.cache_hist_api.pkl`, `_ativos_classificacao_cache.json`, `_usinas_coordenadas_cache.json`, TTLs altos, sem
   credencial). Ler o Fracttal horas depois muda a semana (S41: 157 tarefas a mais e 280 horários) e não prova nada.

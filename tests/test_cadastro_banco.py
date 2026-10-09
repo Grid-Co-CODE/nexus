@@ -180,7 +180,8 @@ def test_codigo_da_usina_nos_dois_formatos_do_fracttal(bruto, esperado):
 
 def test_planilha_tem_cabecalho_e_nao_tem_texto_vazio(srv, cofre):
     wb = openpyxl.load_workbook(io.BytesIO(B.xlsx_bytes(B.montar(srv, cofre))))
-    assert wb.sheetnames == ["clientes", "equipes", "pessoas", "usinas", "de_para", "atualizacao"]
+    # a região de campo (estrutura de O&M de 10/2026) entrou como aba nova, depois das de antes
+    assert wb.sheetnames == ["clientes", "equipes", "pessoas", "usinas", "regioes_campo", "de_para", "atualizacao"]
     assert next(wb["usinas"].iter_rows(values_only=True))[0] == "usina_id"
     assert all(v != "" for ws in wb for row in ws.iter_rows(values_only=True) for v in row)
 

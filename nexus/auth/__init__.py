@@ -3,8 +3,8 @@
 Desde 06/10/2026 a pessoa entra com o login do Fracttal (Levi: "Ao invés de uma senha difícil, no início faça a pessoa
 logar com fractall"; `fracttal.py`). A senha de admin ficou como reserva ("Entrar com a senha de administrador"): é
 ela que abre o Cadastro (admin), além de quem estiver em NEXUS_ADMINS. As torres só enxergam a sessão:
-`logado`, `admin`, `usuario` {email, nome, perfil} e, para supervisor, `supervisor_padrao` (o filtro que já vem
-marcado no Campo · App).
+`logado`, `admin`, `usuario` {email, nome, perfil} e, para quem tem papel no campo, `supervisor_padrao` (o filtro que já
+vem marcado no Campo · App e quem pode aprovar OS; o papel da estrutura de O&M de 10/2026).
 """
 import hmac
 import time
@@ -53,14 +53,16 @@ def _admins() -> set[str]:
     return {e.strip().lower() for e in str(current_app.config.get("NEXUS_ADMINS") or "").split(",") if e.strip()}
 
 
-def _supervisor_padrao(email: str, nome: str) -> str:
-    """O nome do supervisor como o Campo · App mostra, se quem entrou é supervisor no cadastro (Levi, 06/10: "Quando um
-    supervisor logar, o filtro supervisor já fica para a pessoa automaticamente"). Falha aqui não impede a entrada."""
+def _supervisor_padrao(email: str, nome: str) -> dict:
+    """O papel de quem entrou na estrutura de O&M de 10/2026 (Levi, 06/10: "Quando um supervisor logar, o filtro
+    supervisor já fica para a pessoa automaticamente"): {"pessoa_id", "nome", "papel" (supervisor_campo, coordenador ou
+    gestor), "regioes" ou "gestor"}. O Supervisor de Campo entra filtrado na região dele, o Gestor de contrato nas usinas
+    dele e o Coordenador vê tudo (`nexus/campo/visao.py`, `papel_da_pessoa`). Falha aqui não impede a entrada."""
     try:
         from ..campo import visao
-        return visao.supervisor_da_pessoa(email, nome)
+        return visao.papel_no_campo(email, nome)
     except Exception:       # noqa: BLE001 — sem cadastro ou banco fora: entra sem o filtro
-        return ""
+        return {}
 
 
 def _entrar_fracttal(destino):

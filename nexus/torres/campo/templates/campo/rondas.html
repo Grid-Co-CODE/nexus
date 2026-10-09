@@ -35,7 +35,8 @@
       <li><b>Veredito:</b> a mesma régua do painel do App: sem GPS ou ronda curta sem devolutiva dos trackers = Não está bom;
         trackers apontados sem resposta = Sem devolutiva; nota 95% sem pendência = Muito bom; abaixo de 85% ou com
         pendência = Atenção.</li>
-      <li><b>Painel:</b> os mesmos números por região do Brasil, equipe, cliente e supervisor. Índice = 60% qualidade + 40%
+      <li><b>Painel:</b> os mesmos números por região do Brasil, equipe, cliente, região de campo (com o Supervisor de
+        Campo) e gestor de contrato (Supervisor PM). Índice = 60% qualidade + 40%
         cobertura (a régua do ranking do App); quem não tem uma das duas fica sem índice. "Base pequena" = menos de
         {{ base_pequena }} usinas: o número oscila muito.</li>
       <li><b>Sujidade e vegetação:</b> o mais crítico primeiro. Nota de criticidade: nível 5 vale 5, nível 4 vale 3,
@@ -46,21 +47,20 @@
     </ul>
   </details>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+  {% include 'campo/_aviso_estrutura.html' %}
   {% if d.get('aviso_tecnico') %}<div class="cn-erro cn-aviso" role="status">{{ d.aviso_tecnico }}</div>{% endif %}
 
   <form class="cn-barra-filtros" method="get">
     <span class="gc-rotulo">Gestão de campo</span>
     <div class="cn-seg">{% for p in (7, 14, 30) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>últimos {{ p }} dias</a>{% endfor %}</div>
     <input type="hidden" name="dias" value="{{ dias }}">
-    <select class="gc-campo" name="regiao" aria-label="Região" onchange="this.form.submit()">
-      <option value="">todas as regiões</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    <select class="gc-campo" name="regiao" aria-label="Região do Brasil" onchange="this.form.submit()">
+      <option value="">todas as regiões do Brasil</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
     <select class="gc-campo" name="cliente" aria-label="Cliente" onchange="this.form.submit()">
       <option value="">todos os clientes</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
-    <select class="gc-campo" name="supervisor" aria-label="Supervisor" onchange="this.form.submit()">
-      <option value="*"{% if not supervisor %} selected{% endif %}>todos os supervisores</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
-    </select>
+    {% with com_rotulo=false %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
     {% for x in ('aba', 'dur', 'cluster', 'equipe', 'ver', 'cob') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
     <span class="cn-barra-fonte">livro de rondas do App · lido às {{ lido }}{% include 'campo/_aviso_fato.html' %}</span>
@@ -111,7 +111,7 @@
         <a href="{{ url(pend=None) }}"{% if not pend %} aria-current="page"{% endif %}>Toda ronda</a>
         {% for p_, (rot, cor) in pendencias.items() %}<a href="{{ url(pend=p_) }}"{% if p_ == pend %} aria-current="page"{% endif %}>{{ rot }} <b>{{ n_pend[p_] }}</b></a>{% endfor %}
       </div>
-      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'supervisor', 'cliente', 'equipe', 'dur', 'pend') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'regiao_campo', 'gestor', 'cliente', 'equipe', 'dur', 'pend') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
         <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="técnico, usina, equipe ou OS" aria-label="Buscar"></form>
       <span class="mudo">Duração carimbada pelo aparelho (tempo de tela aberta); o mouse na duração mostra o início e o fim. Clique no cabeçalho para ordenar.</span>
     </div>
@@ -176,7 +176,8 @@
 
     {% elif aba == 'painel' %}
     {# Levi, 08/10: "inserir uma visão a mais, dashboards que mostre de fato, regiões com melhores indicadores, melhores
-       coberturas, quais equipes tem melhor qualidade e cobertura, qual cliente, qual supervisor!" #}
+       coberturas, quais equipes tem melhor qualidade e cobertura, qual cliente, qual supervisor!"; com a estrutura de
+       O&M de 10/2026 o "supervisor" virou a região de campo (com o Supervisor de Campo) e o gestor de contrato #}
     <div class="cn-lista-cab"><h2>Quem está melhor nos últimos {{ dias }} dias</h2>
       <span class="mudo">com os filtros acima · índice = 60% qualidade + 40% cobertura · melhor primeiro · clique no cabeçalho para ordenar, no nome para ver as rondas</span></div>
     {% macro barra(p, cor) %}<span class="cn-rank-barra" aria-hidden="true"><i class="cn-b-{{ cor }}" style="width: {{ p }}%"></i></span>{% endmacro %}
@@ -198,6 +199,7 @@
           <tbody>
           {% for a in lista %}
             <tr><td class="cn-rank-nome">{% if a.nome != '—' %}<a class="cn-link" href="{{ url(aba=None, cob=None, cluster=None, **{filtro: a.nome}) }}">{{ a.nome }}</a>{% else %}<span class="mudo">sem {{ titulo|lower }} no cadastro</span>{% endif %}
+                {% if a.sub %}<span class="det">{{ a.sub }}</span>{% endif %}
                 {% if a.base_pequena %}<span class="cn-base-pequena" title="Só {{ a.usinas }} usina{{ 's' if a.usinas != 1 }} mobilizada{{ 's' if a.usinas != 1 }}: uma ronda a mais ou a menos muda muito o número">base pequena</span>{% endif %}
                 <span class="det">{{ a.usinas }} usina{{ 's' if a.usinas != 1 }}{% if a.pendentes %} · {{ a.pendentes }} pendente{{ 's' if a.pendentes != 1 }}{% endif %}</span></td>
               <td data-ordem="{{ '' if a.indice is none else a.indice }}"><b class="cn-t-{{ cor_pct(a.indice, 85, 70) }}">{{ '—' if a.indice is none else a.indice }}</b></td>
@@ -210,7 +212,7 @@
       </section>
       {% endfor %}
     </div>
-    <p class="mudo cn-rodape">Região do Brasil pela UF do cadastro; equipe, cliente e supervisor do cadastro, pela usina. Cobertura = usinas do grupo com ronda no período ÷ usinas mobilizadas do grupo; qualidade = nota média das rondas; duração média = fim − início das rondas.</p>
+    <p class="mudo cn-rodape">Região do Brasil pela UF do cadastro; equipe, cliente e gestor de contrato do cadastro, pela usina; região de campo pela equipe da usina. Cobertura = usinas do grupo com ronda no período ÷ usinas mobilizadas do grupo; qualidade = nota média das rondas; duração média = fim − início das rondas.</p>
 
     {% elif aba == 'sujidade' %}
     {# Sujidade e vegetação (Levi, 05/10: "é importante!"): a última leitura de cada usina, pelas respostas da ronda que
@@ -254,7 +256,8 @@
     {% elif aba == 'sem' %}
     {# Levi, 08/10: "a tabela cobertura já não faz sentido tendo o histórico da usina, troque por uma tabela chamada 'Sem
        ronda' que mostrará usina, equipe, técnicos, supervisor e última OS feita na usina (para conseguir rastrear a
-       última vez que o técnico foi lá)" #}
+       última vez que o técnico foi lá)". O supervisor virou a região de campo (com o Supervisor de Campo ou a vaga) e o
+       gestor de contrato: a estrutura de O&M de 10/2026 #}
     <div class="cn-painel-barra">
       <div class="cn-seg" aria-label="Quais usinas">
         <a href="{{ url(cob=None) }}"{% if cob in ('', 'sem') %} aria-current="page"{% endif %}>Sem ronda nos últimos {{ dias }} dias <b>{{ n_sem.sem }}</b></a>
@@ -265,16 +268,17 @@
     </div>
     <div class="cn-lista-cab"><h2>Sem ronda</h2><span class="mudo">{{ sem_ronda|length }} de {{ k.usinas }} usinas mobilizadas{% if cob == 'nunca' %} sem nenhuma ronda no registro{% if registro_desde %} (desde {{ dia_curto(registro_desde) }}){% endif %}{% elif cob == 'atrasadas' %} sem ronda há 7 dias ou mais{% else %} sem ronda nos últimos {{ dias }} dias{% endif %}</span></div>
     <div class="cn-tab cn-tab--rondas"><table class="cn-ordenavel">
-      <thead><tr><th>Usina</th><th>Equipe</th><th>Técnicos</th><th>Supervisor</th><th data-primeiro="desc">Última OS na usina</th><th data-primeiro="desc" aria-sort="descending">Última ronda</th></tr></thead>
+      <thead><tr><th>Usina</th><th>Equipe</th><th>Técnicos</th><th>Região de campo</th><th>Gestor de contrato</th><th data-primeiro="desc">Última OS na usina</th><th data-primeiro="desc" aria-sort="descending">Última ronda</th></tr></thead>
       <tbody>
       {% for c in sem_ronda[:limite] %}{% set o = c.ultima_os %}
         <tr><td><a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=c.usina_id) }}">{{ c.usina }}</a><span class="det">{{ c.cidade }}{% if c.uf %} - {{ c.uf }}{% endif %}</span></td>
           <td class="cn-menor">{{ c.equipe or '—' }}</td>
           <td class="cn-tecnicos">{% if c.tecnicos %}{{ c.tecnicos|join(', ') }}{% elif c.n_tecnicos %}<span class="mudo">{{ c.n_tecnicos }} técnico{{ 's' if c.n_tecnicos != 1 }}</span>{% else %}<span class="mudo" title="Nenhum colaborador de campo desta equipe no cadastro">sem técnico no cadastro</span>{% endif %}</td>
-          <td class="cn-menor">{{ c.supervisor or '—' }}</td>
+          <td class="cn-menor">{{ c.regiao_campo or '—' }}{% if c.supervisor_campo %}<span class="det">Supervisor de Campo: {% if c.supervisor_campo == vaga %}<span class="cn-vaga">vaga</span>{% else %}{{ c.supervisor_campo }}{% endif %}</span>{% endif %}</td>
+          <td class="cn-menor">{{ c.gestor or '—' }}</td>
           <td data-ordem="{{ o.data if o else '' }}">{% if o %}<b class="m">{{ o.os or '—' }}</b><span class="det">{{ dia_curto(o.data) }}{% if o.tipo %} · {{ o.tipo }}{% endif %}{% if o.tecnico %} · {{ o.tecnico }}{% endif %}</span>{% else %}<span class="mudo" title="Nenhuma OS fechada pelo App nesta usina nos 90 dias do livro">nenhuma pelo App</span>{% endif %}</td>
           <td data-ordem="{{ c.dias }}"><span class="cn-st cn-t-{{ 'critico' if c.dias >= 14 else ('alerta' if c.dias >= 7 else 'ok') }}">{{ ha(c.dias) }}</span>{% if c.ultima %}<span class="det">{{ dia_curto(c.ultima) }}{% if c.tecnico %} · {{ c.tecnico }}{% endif %}</span>{% endif %}</td></tr>
-      {% else %}<tr><td colspan="6" class="mudo">Nenhuma usina mobilizada sem ronda com esses filtros.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="7" class="mudo">Nenhuma usina mobilizada sem ronda com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>
     <p class="mudo cn-rodape">Última OS na usina = a última OS de qualquer tipo fechada pelo App naquela usina (livro de fechamentos do App, 90 dias), com o dia, o tipo e quem fez. OS fechada direto no Fracttal, sem o App, não aparece. Técnicos = colaboradores de campo da equipe da usina no cadastro.</p>
 

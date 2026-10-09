@@ -532,8 +532,18 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
    Cartão por supervisor (Central e PT) e a tabela das OS do supervisor na Aprovação. */
 /* as equipes do supervisor no cartão: duas linhas no máximo, a lista inteira no title */
 .cn-eq-cab .cn-sup-equipes{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;color:var(--tinta-2)}
-/* "Sem supervisor no cadastro": cartão próprio, tracejado, para não passar por um supervisor de verdade */
+/* "Sem região de campo", "Sem gestor de contrato", "Sem cadastro": cartão próprio, tracejado, para não passar por uma
+   região (ou um gestor) de verdade */
 .cn-sup--sem{border-style:dashed;border-left-style:solid}
+/* Estrutura de O&M de 10/2026: a VAGA (Supervisor de Campo ou Coordenador sem ninguém) não é erro. Azul de informação e
+   tracejado, como no cadastro (.cad-vaga), nunca o vermelho do crítico */
+.cn-vaga{display:inline-flex;align-items:center;font:600 11px/16px var(--font-sans);padding:0 7px;white-space:nowrap;
+  border:1px dashed var(--info-a42);border-radius:999px;background:var(--info-suave);color:var(--info)}
+/* a alternância dos cartões: por região de campo ou por gestor de contrato */
+.cn-alterna{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:16px}
+.cn-seg--mini a{font-size:12px;padding:4px 10px;white-space:normal}
+/* quem aprova as OS da região, no cartão da Aprovação */
+.cn-eq-cab .cn-quem-aprova{color:var(--tinta-2)}
 /* a faixa do supervisor aberto na Aprovação: voltar aos cartões, quem é e os números dele */
 .cn-faixa-aprov{gap:8px 18px}
 .cn-faixa-aprov .cn-link{font-weight:600}

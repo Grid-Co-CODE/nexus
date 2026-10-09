@@ -1,0 +1,13 @@
+{# Os dois filtros da estrutura de O&M de 10/2026 no lugar do "Supervisor" de antes: a REGIÃO DE CAMPO (o Supervisor de
+   Campo dela, ou a vaga: "Nordeste 02 · vaga") e o GESTOR DE CONTRATO (Supervisor PM, pela usina). Central, PT, Rondas e
+   Aprovação usam este pedaço; "Todas" vai como "*" (vence o filtro que já vem marcado no login). Espera do contexto:
+   regiao_campo, opcoes_regiao [(valor, rótulo)], gestor, opcoes_gestor e `com_rotulo` (Central e PT escrevem o rótulo ao
+   lado; Rondas e Aprovação, só o aria-label). #}
+{% if com_rotulo %}<label class="gc-rotulo" for="cn-regiao-campo">Região de campo</label>{% endif %}
+<select class="gc-campo" id="cn-regiao-campo" name="regiao_campo" aria-label="Supervisor de campo / Região de campo" onchange="this.form.submit()">
+  <option value="*"{% if not regiao_campo %} selected{% endif %}>{{ 'Todas' if com_rotulo else 'todas as regiões de campo' }}</option>{% for v, rot in opcoes_regiao %}<option value="{{ v }}"{% if v == regiao_campo %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+</select>
+{% if com_rotulo %}<label class="gc-rotulo" for="cn-gestor" title="Supervisor PM">Gestor de contrato</label>{% endif %}
+<select class="gc-campo" id="cn-gestor" name="gestor" aria-label="Gestor de contrato (Supervisor PM)" onchange="this.form.submit()">
+  <option value="*"{% if not gestor %} selected{% endif %}>{{ 'Todos' if com_rotulo else 'todos os gestores de contrato' }}</option>{% for g in opcoes_gestor %}<option value="{{ g }}"{% if g == gestor %} selected{% endif %}>{{ g }}</option>{% endfor %}
+</select>

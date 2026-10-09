@@ -12,7 +12,8 @@ App nem no Fracttal. Devolver OS e encaminhar ponto continuam no App. Sem link p
 
 **Exceções: a decisão da PT** (Levi, 05/10: "Técnico faz APR e PT -> Chega no PG -> Atualiza para os steakholders ->
 Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!"; ver "Aprovação de PT no Nexus" abaixo) **e o Aprovar da
-Aprovação de OS** (o Concluir do OS Creator no Fracttal, só para o supervisor da OS ou um admin; ver "Aprovação de OS").
+Aprovação de OS** (o Concluir do OS Creator no Fracttal, só para quem aprova a OS: o Supervisor de Campo da região da
+usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação de OS" e "Estrutura de O&M de 10/2026").
 
 ## As telas
 
@@ -96,7 +97,8 @@ decisões, 766 rondas, zeladoria vazia.
   mobilização já passada (Levi, 05/10: "tem usina que nem mobilizada está"; medido: das 177 em OPERAÇÃO, 49 sem data
   de mobilização e nenhuma delas com ronda pelo App; as 107 com ronda têm a data). A PT não passa por esse filtro: PT
   esperando decisão aparece sempre. Onde a tela mostra a usina, mostra **Equipe, Estado e Região do Brasil** do
-  cadastro, nunca a "Região" que o App escreve (Levi: "uma hora é '-' outra é o nome da UFV, outra é o nome do
+  cadastro (e, da estrutura de O&M de 10/2026, a região de campo e o gestor de contrato: seção própria abaixo), nunca a
+  "Região" que o App escreve (Levi: "uma hora é '-' outra é o nome da UFV, outra é o nome do
   cluster"). A **região do Brasil sai da UF** (`visao.REGIAO_DA_UF`), não da coluna `regiao` do cadastro: medido em
   05/10, ela diz "Sudeste" para Alto Paraná 1 e 2 (PR), "Nordeste" para Ponto Belo 1 (ES), está vazia em Aquiraz e
   Cascavel (CE) e mistura "Centro Oeste" com "Centro-Oeste". Conserto da coluna é no cadastro. Pessoa aparece pelo
@@ -115,7 +117,8 @@ decisões, 766 rondas, zeladoria vazia.
 
 As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
 - **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou; refeita em 08/10 pelo pedido dele): sete
-  indicadores do período (`painel_rondas`, depois dos filtros de região, cliente, supervisor e equipe) e seis abas:
+  indicadores do período (`painel_rondas`, depois dos filtros de região do Brasil, cliente, região de campo, gestor de
+  contrato e equipe) e seis abas:
   Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers e Quem ronda. **A aba Cobertura saiu** (08/10: "já não
   faz sentido tendo o histórico da usina"); o endereço antigo `aba=cobertura` cai na Sem ronda. Toda tabela da tela
   ordena pelo cabeçalho, no navegador (`_ordenar.html`, `table.cn-ordenavel`: clicar de novo inverte, a seta é o
@@ -148,8 +151,8 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"): as mobilizadas sem ronda no
     período (padrão), há 7 dias ou mais (`cob=atrasadas`) ou nunca (`cob=nunca`), a mais esquecida primeiro (mais dias
     sem ronda; no empate, a última OS mais antiga). Colunas: Usina (link ao histórico), Equipe, Técnicos (colaboradores
-    de campo não desligados da equipe, nome curto decifrado; sem a chave do cadastro, só quantos são), Supervisor,
-    **Última OS na usina** e Última ronda (há quantos dias, o dia e quem fez). A última OS é a última de QUALQUER tipo
+    de campo não desligados da equipe, nome curto decifrado; sem a chave do cadastro, só quantos são), Região de campo
+    (com o Supervisor de Campo embaixo, ou a vaga), Gestor de contrato, **Última OS na usina** e Última ronda (há quantos dias, o dia e quem fez). A última OS é a última de QUALQUER tipo
     fechada pelo App na usina, do livro `fechamentos_app_campo` ligado pelo `Ligador` (`visao._ultima_os_por_usina`):
     número, dia, tipo e quem fez. **Limite:** só o que passou pelo App, e o livro guarda 90 dias; OS fechada direto no
     Fracttal não aparece ("nenhuma pelo App"). Medido em 08/10: 113 de 128 mobilizadas têm a última OS; sem ronda em
@@ -159,16 +162,20 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     plano (`manter_quente`) e a tela quente responde em 0,01 a 0,2 s.
   - **Painel** (08/10: "uma visão a mais, dashboards que mostre de fato, regiões com melhores indicadores, melhores
     coberturas, quais equipes tem melhor qualidade e cobertura, qual cliente, qual supervisor!"; `visao.comparativos`):
-    respeitando o período e os filtros, uma tabela por região do Brasil (UF), equipe, cliente e supervisor (do cadastro,
-    pela usina) com Índice, Cobertura (barra), Qualidade (barra), Rondas e Duração média, melhor índice primeiro; em
+    respeitando o período e os filtros, uma tabela por região do Brasil (UF), equipe, cliente, região de campo (com o
+    Supervisor de Campo embaixo do nome) e gestor de contrato (do cadastro: a região pela equipe da usina, o gestor pela
+    usina; a de "supervisor" saiu com a estrutura de O&M de 10/2026) com Índice, Cobertura (barra), Qualidade (barra), Rondas e Duração média, melhor índice primeiro; em
     cima, o melhor e o que pede atenção de cada uma (sem os de base pequena). Índice = 60% qualidade + 40% cobertura (a
     régua do ranking do App); grupo sem uma das duas fica sem índice. **Base pequena** = menos de 3 usinas
-    (`BASE_PEQUENA`). Clicar no nome leva aos Registros filtrados (`regiao=`, `equipe=`, `cliente=`, `supervisor=`; a
+    (`BASE_PEQUENA`). Clicar no nome leva aos Registros filtrados (`regiao=`, `equipe=`, `cliente=`, `regiao_campo=`,
+    `gestor=`; a
     equipe virou filtro da tela, com o ×). Barras em CSS feitas no servidor, sem biblioteca. As tabelas ficam lado a
     lado só quando cada uma cabe inteira (620 px); a 1280 px com o menu, duas colunas rolavam de lado. Com todos os
     grupos de base pequena, o destaque diz isso em vez de "sem índice". Medido em 08/10 (30 dias):
     5 regiões (índice 99 a 79; Sul com a menor cobertura, 58%), 53 equipes (47 com índice, 34 de base pequena), 12
-    clientes, 7 supervisores (índice 99 a 71); as somas batem com o total (128 usinas, 527 rondas).
+    clientes, 7 supervisores (índice 99 a 71); as somas batem com o total (128 usinas, 527 rondas). Com a estrutura
+    (conferência de 08/10, cadastro do ensaio da publicação): 9 grupos de região de campo (as 8 e "Sem região de
+    campo"; índice 99 a 82) e 5 gestores de contrato (98 a 87).
   - **Ronda sem OS, o motivo em português** (`visao.motivo_sem_os`; Levi, 05/10: "não entendi essa observação, minha
     conta fracttal já está conectada"): o App cria a OS de ronda com a conta Fracttal do TÉCNICO; "Conecte sua conta
     Fracttal" é a mensagem do App para o técnico. Medido em 05/10: 114 de 771 rondas (90 dias) sem OS por isso (os
@@ -308,23 +315,29 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   últimas 2 h é refeito antes de vencer; o mesmo livro do banco é lido uma vez por ciclo (2 min). Medido: abas em
   0,01 a 0,13 s, também com as cópias vencidas. Só lê o banco do Nexus (nada de Fracttal). Desliga com
   `NEXUS_CAMPO_AQUECER=0`, como o aquecimento da Aprovação.
-- **O supervisor que entra já vem filtrado** (Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para
-  a pessoa automaticamente, mas ela pode mudar o filtro se quiser"): no login pelo Fracttal (`nexus/auth/fracttal.py`),
-  `visao.supervisor_da_pessoa` acha a pessoa no cadastro (pelo e-mail da ficha; sem ele, pelo nome completo, curto ou
-  o do e-mail, só quando é de UMA pessoa) e, se ela é supervisor, guarda `supervisor_padrao` na sessão. Central, PT,
-  Rondas e Aprovação usam `_supervisor()`: sem filtro na URL, o dela; "Todos" vai como `supervisor=*`. Medido em
-  06/10: nenhum dos supervisores tem e-mail no cadastro, e os 7 são reconhecidos pelo nome.
+- **Quem entra já vem filtrado** (Levi, 06/10: "Quando um supervisor logar, o filtro supervisor já fica para a pessoa
+  automaticamente, mas ela pode mudar o filtro se quiser"): no login pelo Fracttal (`nexus/auth/__init__.py`),
+  `visao.papel_no_campo` acha a pessoa no cadastro (`pessoa_do_login`: pelo e-mail da ficha; sem ele, pelo nome
+  completo, curto ou o do e-mail, só quando é de UMA pessoa) e guarda o PAPEL dela em `supervisor_padrao`
+  ({pessoa_id, nome, papel, regioes ou gestor}; `papel_da_pessoa`, nesta ordem): **Coordenador de Campo** = todas as
+  regiões (sem filtro); **Supervisor de Campo** = a região dele (a 1ª pela ordem, se cobrir mais de uma); **Gestor de
+  contrato** = as usinas dele (o filtro de gestor). Central, PT, Rondas e Aprovação usam `_regiao_campo()` e
+  `_gestor()`: sem filtro na URL, o do papel; "Todas"/"Todos" vai como `*`. Sessão de antes (o nome do supervisor em
+  texto) não vale como papel. Medido em 06/10: nenhum dos supervisores de então tinha e-mail no cadastro; o e-mail do
+  Fracttal na ficha é o caminho seguro (o nome só vale se for de UMA pessoa).
 - **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão; parada = mais de 2 h.
 - **"Esperando o De acordo" é a MESMA tela da Central > Permissões de trabalho** (Levi, 05/10): as duas incluem
-  `templates/campo/_pt_esperando.html` (cartões compactos por equipe ou por supervisor; tabela com a OS em verde,
+  `templates/campo/_pt_esperando.html` (cartões compactos por equipe, por região de campo ou por gestor de contrato;
+  tabela com a OS em verde,
   Equipamento, Espera no fim e a linha que abre o detalhe). Mudou uma, mudou a outra (o teste compara os cartões das
   duas).
-- **Tela de PT** (Levi, 05/10): abas "Esperando o De acordo" (cartões por equipe, por supervisor ou tabela) e
-  "Histórico" (decididas, período 7/30/90 dias, por situação; só tabela). Filtro de supervisor; o cartão da equipe leva
-  à tabela da equipe, o do supervisor à tabela do supervisor. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
-  lugar do Estado; Espera na última coluna; clicar na linha abre o detalhe (PT, equipamento, equipe e supervisor,
+- **Tela de PT** (Levi, 05/10): abas "Esperando o De acordo" (cartões por equipe, por região de campo, por gestor de
+  contrato ou tabela) e "Histórico" (decididas, período 7/30/90 dias, por situação; só tabela). Filtros de região de
+  campo e de gestor; o cartão leva à tabela da equipe, da região ou do gestor. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
+  lugar do Estado; Espera na última coluna; clicar na linha abre o detalhe (PT, equipamento, equipe, região de campo
+  com o Supervisor de Campo, gestor de contrato,
   atividades críticas com sim/não/NA, respostas NÃO, 1º aviso, decisão e motivo). O cartão inteiro leva à tabela
-  da equipe, com a faixa de quem ela é (supervisor, técnicos, PT esperando e paradas).
+  da equipe, com a faixa de quem ela é (região de campo e Supervisor de Campo, técnicos, PT esperando e paradas).
 - **PDF e assinatura do técnico pelo Fracttal, sem App e sem Azure** (`nexus/campo/pt_fracttal.py`, 05/10):
   - **PDF** (Histórico e aprovação): no De acordo o App gera o PDF com as duas assinaturas e anexa na tarefa
     ("Permissão de Trabalho <número>"). O REST de anexos (credencial do OS Creator) traz o link já assinado (24 h); o
@@ -348,27 +361,63 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     da tabela!"; 08/10: "além de por equipe e tabela, adicione mais um botão (por supervisor). Faça o mesmo na tela
     permissões de trabalho"): abre nos **cartões por equipe** (`visao.por_equipe`): usinas pendentes de ronda, % feitas
     (= usinas da equipe que não estão pendentes ÷ usinas da equipe, com a barra feitas × pendentes), o detalhe por
-    status, as rondas do período e as PT esperando. O cartão leva à tabela da equipe (`?equipe=`). **Por supervisor**
-    (`modo=supervisores`, `visao.por_supervisor`): os cartões de equipe já filtrados, somados pelo supervisor do cartão
-    (o do cadastro); o % e as feitas refeitos sobre a soma; número de equipes, a lista delas e os técnicos. Na aba PT,
-    só as equipes com PT esperando. Equipe sem técnico no cadastro vai ao cartão próprio **"Sem supervisor no
-    cadastro"**, tracejado, sempre por último; a linha sem supervisor (PT sem usina ligada) conta como dele
-    (`_do_supervisor`), para o clique achar as mesmas linhas. O cartão leva à tabela do supervisor
-    (`?modo=tabela&supervisor=`). Filtro pela **região do Brasil** no lugar do estado. Medido em 05/10: 53 equipes;
-    PR Norte 02 com 6 de 6 usinas pendentes.
+    status, as rondas do período e as PT esperando. O cartão leva à tabela da equipe (`?equipe=`). **Por região de
+    campo** (era "por supervisor"; `modo=regioes`, e o endereço antigo `modo=supervisores` cai aqui;
+    `visao.por_regiao`): os cartões de equipe já filtrados, somados pela região de campo da equipe; o % e as feitas
+    refeitos sobre a soma; o Supervisor de Campo e o Coordenador (ou "vaga"), a base, as equipes (com o código) e os
+    técnicos. **Alternância "Agrupar por"** para **Gestor de contrato (Supervisor PM)** (`modo=gestores`,
+    `visao.por_gestor`): pelas USINAS do gestor (o gestor é da usina, não da equipe), com as equipes delas e os técnicos
+    de cada equipe uma vez. Na aba PT, só os grupos com PT esperando. **"Sem região de campo"** (equipe de fora da
+    estrutura) e **"Sem gestor de contrato"** são cartões próprios, tracejados, sempre por último; a linha sem região
+    ou sem gestor (PT sem usina ligada) conta como deles (`_do_papel`), para o clique achar as mesmas linhas. O cartão
+    leva à tabela da região ou do gestor (`?modo=tabela&regiao_campo=` / `&gestor=`). Filtro pela **região do Brasil**
+    no lugar do estado. Medido em 05/10: 53 equipes; PR Norte 02 com 6 de 6 usinas pendentes. Conferido em 08/10
+    (cadastro do ensaio da publicação): as somas dos cartões por equipe, por região e por gestor batem (128 usinas, 82
+    pendentes; 37 PT).
   - Todas as colunas e cabeçalhos das tabelas do campo **centralizados** (Levi, 05/10).
   - **No cartão, do cadastro de pessoas** (`visao._Base._time`): o ícone de homem de capacete com o número de
     técnicos (colaborador de campo da equipe que não está Desligado: os 28 sem status estão todos em equipes sem
-    nenhum Ativo) e o supervisor (o `supervisor_id` dos técnicos; o nome é o "Nome padrão" da ficha, decifrado com
-    `NEXUS_CHAVE_CADASTRO`; sem a chave, "Supervisor <id>"). O Levi pediu emoji; é ícone desenhado, pela regra sem
-    emoji na interface. **Filtro de supervisor** ao lado da região. Embaixo da barra, número em cima e o que ele é
-    embaixo ("feitas", "pendentes", "total"), para um leigo ler. Medido em 05/10: 6 supervisores; SP Oeste 03, PI Leste
-    01, MS Leste 01 sem técnico no cadastro (6 usinas sem supervisor).
+    nenhum Ativo) e, da estrutura de O&M de 10/2026, o código da equipe, a região de campo dela e o Supervisor de Campo
+    (o "Nome padrão" da ficha, decifrado com `NEXUS_CHAVE_CADASTRO`; sem a chave, "Supervisor <id>"; ninguém = "vaga").
+    O "supervisor" de antes (o `supervisor_id` dos técnicos, que na prática é o gestor de contrato) saiu das telas. O
+    Levi pediu emoji; é ícone desenhado, pela regra sem emoji na interface. **Filtros de região de campo e de gestor**
+    ao lado da região do Brasil. Embaixo da barra, número em cima e o que ele é embaixo ("feitas", "pendentes",
+    "total"), para um leigo ler. Medido em 05/10: SP Oeste 03, PI Leste 01, MS Leste 01 sem técnico no cadastro.
   - Os filtros (status) são só a palavra colorida, sem fundo (`.cn-st`). "Detalhe" virou "Observação"; "O quê" virou
     "Status"; a coluna "Quem" saiu. **Nota baixa de fechamento não entra:** é a fila da Aprovação, e o fechamento
     aprovado direto no Fracttal nunca tem decisão no painel, o que dava ponto falso.
 - Cópia de 5 min por tela; banco fora do ar = a tela avisa "Não consegui ler o banco do Nexus" e não some. Nos testes,
   sem `app.extensions["nexus_dados_sessao"]`, nunca vai à rede.
+
+## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
+
+Levi, 08/10, sobre a "Nova Estrutura O&M Equipe": "pode adaptar, deixa as vagas preparadas". O antigo "Supervisor de
+O&M" virou duas figuras: o **Supervisor de Campo** (1 por região de campo; lidera as equipes da região e aprova e fecha
+as OS) e o **Supervisor PM** = o Gestor de contrato do BD_Operações (cliente, contrato, SLA), por usina. As pessoas que
+eram "supervisor" (o `supervisor_id` dos técnicos) são, na prática, os gestores de contrato. Cadastro:
+`nexus/cadastro/CLAUDE.md`.
+- **De onde vem** (`visao._Base`): `cadastro_nexus` · `regioes_campo` (nome, base, `supervisor_campo_id`,
+  `coordenador_campo_id`, `ordem`), `equipes.regiao_campo_id` e `equipes.codigo`, e `usinas.gestor_contrato_id`. A
+  região da usina é a da EQUIPE dela; o gestor é da USINA. Nome de pessoa só pela ficha (`b.nomes`); ninguém = "vaga"
+  (`VAGA`), desenhado no azul tracejado (`.cn-vaga`), nunca como erro.
+- **Antes da publicação** (o banco sem a aba `regioes_campo`; ela entra quando o Levi publicar o cadastro): a tela não
+  quebra, diz "Estrutura de campo ainda não publicada" (`_aviso_estrutura.html`), tudo cai em "Sem região de campo" e
+  **só um administrador aprova OS** (o filtro e os cartões de gestor já valem: o gestor está no banco desde 07/10).
+  **Ordem:** publicar o cadastro antes do (ou junto com o) push deste código; senão, até publicar, só admin aprova.
+- **Filtros** (`_filtros_papeis.html`, Central, PT, Rondas e Aprovação): "Região de campo" (as regiões na ordem da
+  estrutura, com o supervisor: "Nordeste 02 · vaga") e "Gestor de contrato (Supervisor PM)"; parâmetros
+  `regiao_campo=` e `gestor=` (`*` = todas). O de região do Brasil (`regiao=`) continua, com o rótulo "Região do
+  Brasil".
+- **Cartões** (`_cartoes_papeis.html`): por região de campo (Supervisor de Campo, Coordenador, base, equipes com o
+  código) e, pela alternância, por gestor de contrato. Somas conferidas iguais às dos cartões por equipe.
+- **Quem aprova** (`_Base._aprovador`, a mesma para a tela e o portão): Supervisor de Campo da região; vaga aberta =
+  Coordenador de Campo da região; sem os dois, ou usina sem região, ou estrutura não publicada = só administrador.
+  Administrador aprova sempre. O texto do botão apagado e o do 403 dizem quem aprova aquela OS.
+- **Prova:** `test_campo_central_supervisor.py`, `test_campo_aprovacao_supervisor.py`, `test_campo_visao.py` (o
+  papel no login) e `test_campo_rondas_pedido_0810.py` (Painel e Sem ronda); mutações (coordenador aprovando com
+  supervisor no cargo, gestor aprovando, vaga que não passa ao coordenador, supervisor que não entra filtrado) acusadas.
+- **Falta:** a ficha do Supervisor de Campo e do Coordenador com o e-mail do Fracttal (é como o login acha a pessoa); o
+  App de Campo ainda escreve a "Região" dele (a equipe), sem a região de campo.
 
 ## Aprovação de PT no Nexus (05/10/2026)
 
@@ -455,16 +504,20 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     essa a conta que a releitura deixa pronta (antes, a de 30 dias). Seis indicadores (esperando, prontas para aprovar,
     pedem olho, paradas há 30 dias, espera máxima, uso do App) e a barra da idade da fila: os números são da fila toda;
     o clique filtra os cartões e a tabela, sempre as MESMAS OS que o número conta ("paradas há 30 dias" = `idade=30-`,
-    30 dias ou mais; até 08/10 levava à faixa 31 a 60 e, com a fila inteira, escondia as mais antigas). **Uma visão só, por supervisor** (08/10: "a visão de por técnico e fila pode
-    matar"): cartões, o que mais tem parada há 30 dias primeiro; o supervisor e a equipe saem do cadastro pela usina do
-    Fracttal; OS de usina sem de-para cai no cartão "Sem cadastro". **O cartão abre a tabela das OS dele** (`?ver=`;
+    30 dias ou mais; até 08/10 levava à faixa 31 a 60 e, com a fila inteira, escondia as mais antigas). **Uma visão só,
+    a dos cartões** (08/10: "a visão de por técnico e fila pode matar"), hoje **por região de campo** (estrutura de O&M
+    de 10/2026; alternância "por gestor de contrato", `por=gestor`), o que mais tem parada há 30 dias primeiro: a
+    equipe, a região e o gestor saem do cadastro pela usina do Fracttal; o cartão da região diz o Supervisor de Campo, o
+    Coordenador e quem aprova ali; OS de usina sem de-para cai no cartão "Sem cadastro" e a de equipe fora da estrutura
+    em "Sem região de campo", os dois por último. **O cartão abre a tabela das OS dele** (`?ver=`;
     08/10: "quando clica aparece a OS, dia, data da criação da OS, data fim, supervisor, prontas, pedem olho, fora do
     App, uso do App, nota média e devolvidas"), nessa ordem, uma linha por OS: Dia = dias esperando (a tarefa mais
     antiga); criação = `creation_date` da OS, que vem na MESMA linha do REST que a fila já lê (sem pedido novo;
     conferido em 08/10 nas 1.583 linhas em verificação guardadas pela Engenharia, todas com a data); datas em Brasília
     (o Fracttal fala UTC); Prontas, Pedem olho e Fora do App = tarefas da OS em cada grupo; Uso do App = % das tarefas
-    pelo App; Nota média = das tarefas pelo App; Devolvidas = tarefas já devolvidas. CSV com as mesmas colunas (do
-    supervisor aberto, ou de todos). Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas esperando; 937 prontas; 1.780
+    pelo App; Nota média = das tarefas pelo App; Devolvidas = tarefas já devolvidas. A coluna "supervisor" é hoje o
+    **Supervisor de campo** da região da usina (ou "vaga"). CSV com as mesmas colunas, mais região de campo, gestor de
+    contrato e "Quem aprova" (do cartão aberto, ou de todos). Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas esperando; 937 prontas; 1.780
     tarefas paradas há 30 dias ou mais; uso do App 41%; o supervisor com mais fila tinha 1.373 tarefas (uso do App 29%).
   - **Contada por OS, não por tarefa** (Levi, 05/10: "ele não consegue aprovar uma tarefa em si, e sim uma PT ou uma
     OS"; `_por_os`, `_agrupa_os`): a OS fica no pior grupo das tarefas dela (olho > fora do App > completa), a espera é
@@ -475,26 +528,31 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     do técnico, foto divergente; ou por que está completa). **Aprovar = o Concluir do OS Creator Web** ("usando o
     mesmo caminho que o OS Creator Web"), com o login do Fracttal de quem clica (status 3 + recalculate +
     reconferência da data de fim; IRREVERSÍVEL, pede confirmação). O id da OS vem da fila crua.
-  - **Só o supervisor da OS ou um administrador aprova** (Levi, 08/10: "deve ser possível só o supervisor ou ADM
-    conseguir aprovar a OS logando pelo Fracttal"; `nexus/torres/campo/aprovar_os.py`). A regra é no SERVIDOR: o botão
+  - **Só quem aprova a OS ou um administrador aprova** (Levi, 08/10: "deve ser possível só o supervisor ou ADM
+    conseguir aprovar a OS logando pelo Fracttal"; com a estrutura de O&M de 10/2026, "o supervisor" é o **Supervisor de
+    Campo da região da usina da OS**; com a vaga aberta, o **Coordenador de Campo** da região; sem os dois, só um
+    administrador; o Gestor de contrato NÃO aprova; `nexus/torres/campo/aprovar_os.py`). A regra é no SERVIDOR: o botão
     chama `POST /os/_nexus/aprovacao/<id>/aprovar` (mora em /os porque só lá chega o cookie `os_sessao` do login do
     Fracttal, como a assinatura da PT), que recusa: outra origem (403); sem login do Fracttal (401, a tela leva ao login
-    e volta por `/os/_nexus/voltar?para=`, só /t/campo/); OS fora da fila guardada (404); e quem não é admin nem o
-    supervisor da OS (403, também para quem montar o pedido à mão). Supervisor da OS = o da usina do Fracttal de cada
-    tarefa pelo cadastro (o mesmo que a tela mostra); quem clicou = `visao.supervisor_da_pessoa` do e-mail e nome do
-    login do Fracttal (vale quem entrou no Fracttal, não o filtro da sessão do Nexus). Admin = sessão de admin do Nexus
+    e volta por `/os/_nexus/voltar?para=`, só /t/campo/); OS fora da fila guardada (404); e quem não é admin nem quem
+    aprova a OS (403 com o texto de quem aprova aquela OS, inclusive "Vaga aberta de supervisor de campo na região X:
+    aprova o coordenador de campo (Y)", também para quem montar o pedido à mão). Quem aprova = `aprovador` da região
+    da usina do Fracttal de cada tarefa pelo cadastro (`visao._Base._aprovador`, a mesma conta da tela; OS em duas
+    regiões é das duas); quem clicou = `visao.pessoa_do_login` do e-mail e nome do login do Fracttal, comparado por
+    `pessoa_id` (vale quem entrou no Fracttal, não o filtro da sessão do Nexus). Admin = sessão de admin do Nexus
     (NEXUS_ADMINS ou a senha de admin, como o Cadastro) ou o e-mail do Fracttal em NEXUS_ADMINS. Passou: o portão
     repassa ao clone o MESMO POST de antes (`/os/api/os/<id>/concluir`, número da OS pela fila do servidor, cookie de
     quem clicou) e, aprovada, tira a OS da fila guardada na hora (a rota `/t/campo/aprovacao/<id>/tirar` saiu: deixava
-    qualquer um esconder OS da fila). Na tela, quem não pode vê o botão apagado com quem pode (`pode_na_tela`, pela
-    sessão do Nexus: admin ou `supervisor_padrao` igual ao da OS). **Fica aberta** a rota do clone
+    qualquer um esconder OS da fila). Na tela, quem não pode vê o botão apagado com o texto de quem aprova
+    (`pode_na_tela`, pela sessão do Nexus: admin ou o `pessoa_id` do papel igual ao de quem aprova a OS). **Fica aberta** a rota do clone
     `/os/api/os/<id>/concluir` para o próprio OS Creator (o Concluir do card dele): o portão vale para a Aprovação do
     Nexus, não para o OS Creator. Testes com Fracttal e Concluir falsos (`test_campo_aprovacao_supervisor.py`).
     **Até 08/10 o script desta tela não rodava**: o `confirm()` do Aprovar tinha uma quebra de linha dentro da string
     (SyntaxError no navegador), então nem a linha abria nem o Aprovar funcionava; um teste roda `node --check` no script.
     **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas; as rondas aprovadas vêm do arquivo desde 06/10); em 05/10, com
     muitos reinícios seguidos, o Fracttal passou a recusar (429). Em desenvolvimento, `NEXUS_CAMPO_AQUECER=0`.
-  - **Filtro de equipe e de supervisor** pelo cadastro: as usinas da equipe (ou do supervisor) pelo nome no Fracttal
+  - **Filtro de equipe, de região de campo e de gestor** pelo cadastro: as usinas da equipe (ou da região, ou do
+    gestor) pelo nome no Fracttal
     (de-para "Fracttal · Classificação 1", `visao.usinas_do_fracttal`) viram o escopo de usinas da conta do App
     (`_area_ok`, `clusters.usinas`): grupos, números e lista saem já filtrados. Usina sem de-para do Fracttal não entra
     em filtro nenhum (a lista sai em `sem_de_para`).
@@ -515,8 +573,11 @@ Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_visao.py` (as
 contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo; 08/10: vala do App, sensor em três estados, anulação sem dia nem usina, o caminho de gravação que a importação usa), `test_campo_importar_avulsas.py` (a importação da validação por foto com planilha sintética: de-para exato, data mais recente, "Sem foto", a pessoa que tem de ser uma ficha com e-mail, gravação, conferência linha a linha, idempotência, fora do fato de ronda), `test_campo_rondas_pedido_0810.py` (Rondas de 08/10: colunas e dica da duração, Fotos na tabela, nunca tiveram ronda, Sem ronda, criticidade, Quem ronda em blocos com as pendentes, Painel), `test_campo_sujidade.py`, `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_fila_rapida.py`,
-`test_campo_aprovacao_supervisor.py` (08/10: fila inteira, tabela do supervisor, o portão do Aprovar, script válido),
-`test_campo_central_supervisor.py` (08/10: Central e PT por supervisor, "Sem supervisor no cadastro"),
+`test_campo_aprovacao_supervisor.py` (08/10: fila inteira, cartões por região e por gestor, a tabela, o portão do
+Aprovar: supervisor de campo, coordenador com a vaga aberta, só admin sem os dois ou sem a estrutura publicada, gestor
+não aprova, sessão antiga, script válido),
+`test_campo_central_supervisor.py` (08/10: Central e PT por região de campo e por gestor de contrato, "Sem região de
+campo" e "Sem gestor de contrato", estrutura não publicada, filtros e CSV das Rondas, detalhe da PT e histórico),
 `test_campo_telas_pg.py`, `test_campo_livros_app.py`, `test_campo_fonte_pg.py`, `test_campo_nota_fracttal.py`,
 `test_campo_coletor.py` (`tests/pg_falso.py`), `test_campo_fatos_nas_telas.py` (08/10: o técnico pelo nome e pelo
 código no mesmo livro, a coluna nova sem a chave, o fato do banco da mesma versão vale e o velho não, a carga que

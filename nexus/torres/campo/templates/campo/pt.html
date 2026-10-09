@@ -3,8 +3,9 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Permissões de trabalho, visão do Nexus (05/10/2026): o livro de PT que o App grava no banco (nexus/campo/visao.py,
-   pts, por_equipe e por_supervisor). Duas abas: esperando o De acordo (por equipe, por supervisor ou tabela) e o
-   histórico das decididas. A OS em verde abre a aprovação; clicar na linha abre o detalhe. #}
+   pts, por_equipe, por_regiao e por_gestor). Duas abas: esperando o De acordo (por equipe, por região de campo, por
+   gestor de contrato ou tabela) e o histórico das decididas. A OS em verde abre a aprovação; clicar na linha abre o
+   detalhe. #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
@@ -16,7 +17,9 @@
         <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
         <dt>Equipamento</dt><dd>{{ equipamento(p) }}</dd>
         <dt>Usina</dt><dd>{{ p.usina }}{% if p.cidade %} · {{ p.cidade }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}</dd>
-        <dt>Equipe</dt><dd>{{ p.equipe or '—' }} · supervisor {{ p.supervisor or '—' }}</dd>
+        <dt>Equipe</dt><dd>{{ p.equipe or '—' }}</dd>
+        <dt>Região de campo</dt><dd>{{ p.regiao_campo or '—' }}{% if p.supervisor_campo %} · Supervisor de Campo {{ p.supervisor_campo }}{% endif %}</dd>
+        <dt>Gestor de contrato</dt><dd>{{ p.gestor or '—' }}</dd>
         <dt>Técnico</dt><dd>{{ p.solicitante or '—' }}</dd>
         <dt>Criada</dt><dd>{{ p.criada.strftime('%d/%m às %H:%M') if p.criada else '—' }}</dd>
         {% if p.situacao != 'aguardando' %}<dt>Decisão</dt><dd>{{ situacoes.get(p.situacao, (p.situacao,))[0] }}{% if p.decidida %} em {{ p.decidida.strftime('%d/%m às %H:%M') }}{% endif %}{% if p.decidida_por %} por {{ p.decidida_por }}{% endif %}{% if p.papel %} ({{ p.papel }}){% endif %}</dd>{% endif %}
@@ -39,6 +42,7 @@
     <div class="cn-frescor">livro de PT do App<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+  {% include 'campo/_aviso_estrutura.html' %}
   {% set r = d.get('resumo') or {} %}
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Aguardando</span><span class="v{% if r.get('aguardando') %} ruim{% endif %}">{{ r.get('aguardando', 0) }}</span><span class="d">o De acordo do supervisor</span></span>
@@ -57,7 +61,7 @@
     {% if aba == 'esperando' %}
     <div class="cn-seg" aria-label="Visão">
       <a href="{{ url(modo=None, equipe=None) }}"{% if modo == 'equipes' %} aria-current="page"{% endif %}>Por equipe</a>
-      <a href="{{ url(modo='supervisores', equipe=None) }}"{% if modo == 'supervisores' %} aria-current="page"{% endif %}>Por supervisor</a>
+      <a href="{{ url(modo='regioes', equipe=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por região de campo</a>
       <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
     </div>
     {% else %}
@@ -66,14 +70,11 @@
     <div class="cn-seg">{% for p in (7, 30, 90) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
     <input type="hidden" name="dias" value="{{ dias }}">
     {% endif %}
-    <label class="gc-rotulo" for="cn-regiao">Região</label>
+    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
     <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
       <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
-    <label class="gc-rotulo" for="cn-supervisor">Supervisor</label>
-    <select class="gc-campo" id="cn-supervisor" name="supervisor" onchange="this.form.submit()">
-      <option value="*"{% if not supervisor %} selected{% endif %}>Todos</option>{% for s in supervisores %}<option value="{{ s }}"{% if s == supervisor %} selected{% endif %}>{{ s }}</option>{% endfor %}
-    </select>
+    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, usina, equipamento ou técnico" aria-label="Buscar">
     {% for k in ('modo', 'equipe', 'sit', 'f') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
@@ -103,8 +104,8 @@
   {% endif %}
 
   <div class="cn-nota"><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
-    App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, supervisor e técnicos vêm do
-    cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
+    App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, região de campo (com o
+    Supervisor de Campo), gestor de contrato e técnicos vêm do cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
     {% if aba == 'historico' %}<br><b>PDF:</b> é o que o App anexou na tarefa do Fracttal no De acordo, com a assinatura
     do técnico e a de quem aceitou; o Nexus busca no Fracttal na hora do clique. PT não autorizada não tem PDF.{% endif %}</div>
 </div>
