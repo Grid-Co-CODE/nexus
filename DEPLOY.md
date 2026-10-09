@@ -210,6 +210,12 @@ diga o contrário:
 sudo unzip -o nexus-acessos-*.zip .env nexus/torres/oscreator/os_creator/.env -d /opt/nexus && sudo systemctl restart nexus
 ```
 
+**Estrutura de campo (08/10/2026):** as 8 regiões de campo, as vagas de Supervisor de Campo e de Coordenador e a região
+de cada equipe foram carregadas no cadastro do PC do Levi e publicadas no banco (`cadastro_nexus · regioes_campo`). O
+cadastro do servidor (`dados/cadastro_ensaio.json`) **não tem** essa estrutura: **não use "Publicar no banco" (Base →
+Ligações) no servidor** até o Levi mandar o cadastro novo, senão a publicação de lá apaga as regiões do banco. As telas
+do Campo do servidor leem o cadastro do banco e já mostram as regiões.
+
 ## 9. Cópia de segurança
 
 Copie todo dia a pasta `/opt/nexus/dados/` e guarde os dois `.env` num cofre. **Sem a `NEXUS_CHAVE_CADASTRO`, o
