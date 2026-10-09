@@ -25,19 +25,18 @@ DESTINO = RAIZ / "nexus" / "campo" / "regras_app.py"
 
 # O que as telas chamam no App. O resto vem pelo fecho.
 #   Aprovação de OS:    rota gestao/supervisao/fila
-#   Ordens de serviço:  rota gestao/os
+#   Triagem:            rota gestao/prioridades
 # Central de atenção e Permissões de trabalho saíram da cópia em 05/10/2026: são contas do próprio Nexus
 # (nexus/campo/visao.py), pelos livros que o App grava no banco (Levi: "quero parar de referenciar o Azure").
+# Ordens de serviço (rota gestao/os, `_gestao_os`) saiu na recópia de 09/10/2026 (App v256): a tela tinha saído em
+# 08/10 e a conta só levava junto o `_gestao_os` e os dois tetos dele.
 RAIZES = ("_fila_supervisao", "_janela", "TRIAGEM_NOTA_OK",
           "_cadastro_tab",          # o ident() do Nexus (nexus/campo/pessoas.py) usa o cadastro da tabela como o do App
-          # Ordens de serviço: rota gestao/os. A tela saiu em 08/10/2026: tire "_gestao_os" na próxima vez que o
-          # extrator rodar (rodar só para isso traria junto o que o App mudou desde a última cópia)
-          "_gestao_os", "_janela_str",
           # Nota do fechamento recalculada com o que o Fracttal guarda (nexus/campo/nota_fracttal.py): a do PAINEL é a
           # `_qualidade_os` (é ela que o App grava no registro, `qualidade`); a `_qualidade_v2` é só a do placar
           "_qualidade_os", "_qualidade_v2",
-          # Triagem de qualidade: rota gestao/prioridades
-          "_gestao_prioridades")
+          # Triagem de qualidade: rota gestao/prioridades (o período sai do `_janela_str`, como na rota do App)
+          "_gestao_prioridades", "_janela_str")
 # Trocados pelo Nexus (fim do arquivo gerado):
 #   _tabela  abre a conexão do Storage do App e ainda tenta CRIAR a tabela
 #   tabela   é a tabela dos TOKENS do Fracttal de cada pessoa; o Nexus só lê as partições cadastro e pt
@@ -48,7 +47,9 @@ RAIZES = ("_fila_supervisao", "_janela", "TRIAGEM_NOTA_OK",
 #                no armazenamento do Azure (blob "varredura"); o _fila_bruta a chama antes de ler o Fracttal. Copiada,
 #                arrastava o cliente do blob (abre a conexão do App) e mais 13 nomes. O Nexus não toca o Azure e relê a
 #                própria fila em segundo plano (nexus/campo/aprovacao.py): devolve False, que é o que o App faz numa
-#                cópia sem armazenamento ("cada cópia lê sozinha, como antes")
+#                cópia sem armazenamento ("cada cópia lê sozinha, como antes"). Revisto em 09/10/2026 (App v256): a do App
+#                passou a conferir o blob no máximo a cada 30 s e a trazer o teto que o relógio viu; sem armazenamento
+#                o `_varredura_props` dela ainda devolve None, e ela, False
 FORA = {"_tabela", "tabela", "fx", "ident", "tabela_qlog", "_varredura_carregar"}
 
 

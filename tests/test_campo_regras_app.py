@@ -1,4 +1,4 @@
-"""A cópia das regras do App (nexus/campo/regras_app.py), que Aprovação, Ordens e Triagem usam, e o que o Nexus nunca
+"""A cópia das regras do App (nexus/campo/regras_app.py), que Aprovação e Triagem usam, e o que o Nexus nunca
 toca do App: a biblioteca do Azure, a conexão do Storage e a partição dos tokens do Fracttal.
 
 Central de atenção e PT saíram da cópia em 05/10/2026: são contas do próprio Nexus (tests/test_campo_visao.py).

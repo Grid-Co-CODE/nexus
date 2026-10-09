@@ -98,11 +98,15 @@ def test_frescor_e_o_fechamento_mais_recente(livros):
 
 
 def test_fechamentos_saem_do_livro_do_app(livros):
-    # a conta do App (`_gestao_os`, ainda na cópia das regras) lê os fechamentos do livro do App: a nota de cada OS e as
-    # devolvidas. A tela Ordens de serviço, que mostrava essa conta, saiu em 08/10/2026 (Levi: "são redundantes")
-    d = regras_app._gestao_os(3650, {}, None, inteira=True)
-    assert d["resumo"]["os"] == 4 and d["resumo"]["devolvidas"] >= 1
-    assert {l["os"]: l["qualidade"] for l in d["linhas"]} == {"15377": 72, "15378": 90, "15379": 55, "15380": 40}
+    # a Triagem (a conta `_gestao_prioridades` do App, copiada) lê os fechamentos do livro do App: todas as OS do período
+    # e a nota de cada uma pelos limites do App (abaixo de 50 crítico, abaixo de 70 atenção). Até 09/10/2026 a prova era
+    # a `_gestao_os`, a conta da tela Ordens de serviço, que saiu em 08/10 (Levi: "são redundantes") e deixou a cópia na
+    # recópia de 09/10 (App v256). A devolvida chega no formato do App: test_situacao_pela_revisao_do_painel
+    d = regras_app._gestao_prioridades(3650, None)
+    assert d["resumo"]["os_periodo"] == 4
+    # 72 e 90, com foto, GPS e assinatura, não pedem nada; o código que o cadastro não conhece (15380) conta também
+    assert {i["id"]: (i["qualidade"], i["nivel"]) for i in d["itens"] if i["tipo"] == "os"} == {
+        "15379": (55, "atencao"), "15380": (40, "critico")}
 
 
 def test_sem_a_chave_do_codigo_segue_o_livro_do_coletor(tmp_path):

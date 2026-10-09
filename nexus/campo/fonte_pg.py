@@ -1,7 +1,7 @@
 """A fonte das telas da torre Campo · App que já têm dado no banco do Nexus (Levi, 04/10/2026: "pode gravar na API do
 PG e ligar as telas"): os fechamentos que o coletor calcula pelo Fracttal e grava na API do PG (banco_campo.py),
-entregues às regras copiadas do App no formato das tabelas DELE, para `_fila_supervisao`, `_gestao_os` e
-`_gestao_prioridades` rodarem sem mudar linha.
+entregues às regras copiadas do App no formato das tabelas DELE, para `_fila_supervisao` e `_gestao_prioridades`
+rodarem sem mudar linha.
 
 - `qualidadelog` (o registro do fechamento): só a tarefa fechada PELO APP e que não é ronda, como no App. A nota é a do
   painel (`_qualidade_os`). `pontual` não vem: é a hora de início no celular contra a programação, que o Fracttal não

@@ -1,13 +1,13 @@
 """CÓPIA da lógica de regras do App de Campo (function_app.py). NÃO EDITE: rode ferramentas/extrair_regras_campo.py.
 
-Origem: function_app.py do App, codigo e41fbad895cc8ff4 (o número que o /api/health do App mostra quando é esta a
-versão no ar). Copiado em 06/10/2026 10:19. Sem comentários nem docstrings (o repositório é
+Origem: function_app.py do App, codigo 92772066214dff23 (o número que o /api/health do App mostra quando é esta a
+versão no ar). Copiado em 09/10/2026 17:40. Sem comentários nem docstrings (o repositório é
 público); o porquê de cada regra está no código do App. Só o acesso a dado foi trocado (fim do arquivo).
 """
 # ruff: noqa
-CODIGO_APP = "e41fbad895cc8ff4"
-COPIADAS = ('ApiError', 'CADASTRO_TTL_S', 'ESTOURO_EXEC_MIN', 'ESTOURO_EXEC_X', 'ESTOURO_PREV_TETO', 'ESTOURO_PREV_X', 'FILA_TTL_S', 'GESTAO_OS_MAX', 'GESTAO_TODAS_MAX', 'LIMIARES_PADRAO', 'STATUS_IN_REVIEW', 'SUP_CAP_BACKLOG', 'TRIAGEM_ESTOURO', 'TRIAGEM_NOTA_OK', 'V2_PESOS', 'V2_PISO', '_CAD', '_CANON', '_CATOV', '_CL_USINA', '_FILA_CACHE', '_SUPCAN', '_agora_iso', '_area_ok', '_cadastro_tab', '_canon_cluster', '_casa_nome', '_catalogo_ov', '_cluster_da_usina', '_clusters_por_email', '_concentracao', '_contar_fotos', '_dias_entre', '_duracao_ronda', '_estouro', '_estouro_causa', '_fila_bruta', '_fila_do_app', '_fila_supervisao', '_filtro_pessoas', '_fora', '_fx_wo_paralelo', '_gestao_os', '_gestao_prioridades', '_hoje', '_int0', '_janela', '_janela_str', '_lim_cache', '_limiares', '_link_fracttal_os', '_no_escopo', '_norm', '_obs_do_fechamento', '_parse_iso', '_pessoa_por_nome', '_preenchido_item', '_qlog_por_os', '_qualidade_os', '_qualidade_v2', '_ronda_resumo', '_rondas_os_pares', '_rondas_os_por_folio', '_sup_canon', '_sup_canon_mapa', '_sup_norm', '_triagem', '_txt_tarefa', '_usinas_do_cluster', '_v2_achou_falha', '_v2_e_na', '_v2_pede_foto', '_veredito_os', '_veredito_ronda', '_veredito_usina', 'tabela_limiares', 'tabela_ronda', 'tabela_ronda_ativos', 'tabela_ronda_os')
-ASSINATURAS_TROCADAS = {'_tabela': '583740a7d68b3a65', '_varredura_carregar': '8aed24ae7d04f3b0', 'fx': 'df3a6bba0b68da47', 'ident': 'a47f156debb43b7c', 'tabela': '666a04282aab3cbf', 'tabela_qlog': '95a72f1f98b561d4'}
+CODIGO_APP = "92772066214dff23"
+COPIADAS = ('ApiError', 'CADASTRO_TTL_S', 'ESTOURO_EXEC_MIN', 'ESTOURO_EXEC_X', 'ESTOURO_PREV_TETO', 'ESTOURO_PREV_X', 'FILA_TTL_S', 'FxLimite', 'LIMIARES_PADRAO', 'STATUS_IN_REVIEW', 'SUP_CAP_BACKLOG', 'TRIAGEM_ESTOURO', 'TRIAGEM_NOTA_OK', 'V2_PESOS', 'V2_PISO', 'VARREDURA_ESPERA_S', '_CAD', '_CANON', '_CATOV', '_CL_USINA', '_FILA_CACHE', '_SUPCAN', '_VARR', '_agora_iso', '_area_ok', '_cadastro_tab', '_canon_cluster', '_casa_nome', '_catalogo_ov', '_cluster_da_usina', '_clusters_por_email', '_concentracao', '_contar_fotos', '_dias_entre', '_duracao_ronda', '_estouro', '_estouro_causa', '_fila_bruta', '_fila_do_app', '_fila_supervisao', '_filtro_pessoas', '_fora', '_fx_wo_paralelo', '_gestao_prioridades', '_hoje', '_int0', '_janela', '_janela_str', '_lim_cache', '_limiares', '_link_fracttal_os', '_no_escopo', '_norm', '_obs_do_fechamento', '_parse_iso', '_pessoa_por_nome', '_preenchido_item', '_qlog_por_os', '_qualidade_os', '_qualidade_v2', '_ronda_resumo', '_rondas_os_pares', '_rondas_os_por_folio', '_sup_canon', '_sup_canon_mapa', '_sup_norm', '_triagem', '_txt_tarefa', '_usinas_do_cluster', '_v2_achou_falha', '_v2_e_na', '_v2_pede_foto', '_veredito_os', '_veredito_ronda', '_veredito_usina', 'tabela_limiares', 'tabela_ronda', 'tabela_ronda_ativos', 'tabela_ronda_os')
+ASSINATURAS_TROCADAS = {'_tabela': '583740a7d68b3a65', '_varredura_carregar': '377c494f9c294aaf', 'fx': 'df3a6bba0b68da47', 'ident': 'a47f156debb43b7c', 'tabela': '666a04282aab3cbf', 'tabela_qlog': '95a72f1f98b561d4'}
 
 import base64
 import gzip
@@ -112,6 +112,10 @@ def _area_ok(linha, clusters, permitidos, campo='usina'):
     return _norm(linha.get('cluster') or '') in reg
 
 
+class FxLimite(ApiError):
+    pass
+
+
 def _contar_fotos(d):
     fotos = d.get('fotos')
     if not isinstance(fotos, list) or (not fotos and (d.get('fotosResumo') or d.get('fotoItens'))):
@@ -204,7 +208,7 @@ def _v2_achou_falha(checklist, items):
     return False
 
 
-def _qualidade_v2(ev, gps_inicio=False):
+def _qualidade_v2(ev, gps_inicio=False, gps_ronda=False):
     d = ev.get('dados') or {}
     checklist = d.get('checklist') or []
     items = d.get('items') or {}
@@ -232,8 +236,8 @@ def _qualidade_v2(ev, gps_inicio=False):
     q = int(round(100.0 * sum((p * f for _k, p, f, _d in partes)) / base))
     geo = ev.get('geo') or {}
     gps_fim = isinstance(geo, dict) and geo.get('lat') is not None
-    tem_gps = gps_fim or bool(gps_inicio)
-    return {'q': q, 'gps': tem_gps, 'base': base, 'gps_fonte': 'fechamento' if gps_fim else 'inicio' if tem_gps else '', 'pontos': max(0, q - 60) if q >= V2_PISO and tem_gps else 0, 'itens': [{'rot': k, 'peso': p, 'pts': round(p * f, 1), 'det': dd} for k, p, f, dd in partes]}
+    tem_gps = gps_fim or bool(gps_inicio) or bool(gps_ronda)
+    return {'q': q, 'gps': tem_gps, 'base': base, 'gps_fonte': 'fechamento' if gps_fim else 'inicio' if gps_inicio else 'ronda' if gps_ronda else '', 'pontos': max(0, q - 60) if q >= V2_PISO and tem_gps else 0, 'itens': [{'rot': k, 'peso': p, 'pts': round(p * f, 1), 'det': dd} for k, p, f, dd in partes]}
 
 
 def _qualidade_os(ev):
@@ -299,7 +303,7 @@ def _fora(ts, corte, teto):
     return bool(teto) and ts > teto
 
 
-SUP_CAP_BACKLOG = 6000
+SUP_CAP_BACKLOG = 20000
 
 
 def _dias_entre(a, b):
@@ -436,12 +440,6 @@ def _veredito_usina(u, dias, lim):
     return None
 
 
-GESTAO_OS_MAX = 200
-
-
-GESTAO_TODAS_MAX = int(os.environ.get('GESTAO_TODAS_MAX', '5000') or '5000')
-
-
 def _concentracao(itens, chave_fn, rotulo, sufixo):
     cont = {}
     for i in itens:
@@ -562,89 +560,6 @@ def _gestao_prioridades(dias=30, clusters=None, janela=None):
     return {'gerado_em': _agora_iso(), 'periodo_dias': int(dias), 'limiares': lim, 'resumo': {'total': len(itens), 'criticos': len(criticos), 'atencao': len(itens) - len(criticos), 'exemplares': len(exemplares), 'os_periodo': n_os, 'rondas_periodo': n_ronda, 'por_tipo': {t: len([i for i in itens if i['tipo'] == t]) for t in ('os', 'ronda', 'usina', 'supervisor')}}, 'concentracao': conc, 'itens': itens[:120], 'exemplares': exemplares[:12], 'totais': {'itens': len(itens), 'exemplares': len(exemplares)}}
 
 
-def _gestao_os(dias=30, filtros=None, clusters=None, janela=None, inteira=False):
-    from datetime import datetime, timedelta
-    f = filtros or {}
-    corte = (datetime.utcnow() - timedelta(days=int(dias))).strftime('%Y-%m-%dT%H:%M:%S')
-    teto = None
-    if janela:
-        corte, teto = (janela[0], janela[1])
-    permitidos, mapa = _filtro_pessoas(clusters)
-    I = ident()
-    sup_de = {str(em).lower(): _sup_canon((p or {}).get('supervisor')) for em, p in (I.get('porEmail') or {}).items()}
-    todas, linhas = ([], [])
-    try:
-        for e in tabela_qlog().query_entities("PartitionKey eq 'q'"):
-            if _fora(str(e.get('server_ts') or ''), corte, teto):
-                continue
-            em = str(e.get('email') or '').lower()
-            if not _no_escopo(em, permitidos, mapa):
-                continue
-            r = dict(e)
-            r['_sup'] = sup_de.get(em) or '(sem supervisor)'
-            r['_reg'] = str(r.get('cluster') or r.get('fx_area') or '').strip()
-            todas.append(r)
-    except Exception as ex:
-        logging.warning('gestao os: %s', ex)
-
-    def passa(r):
-        if f.get('email') and str(r.get('email') or '').lower() != str(f['email']).lower():
-            return False
-        if f.get('sup') and _norm(r['_sup']) != _norm(f['sup']):
-            return False
-        if f.get('cluster') and _norm(r.get('_reg') or '') != _norm(f['cluster']):
-            return False
-        if f.get('tipo') and _norm(r.get('fx_tipo') or '') != _norm(f['tipo']):
-            return False
-        if f.get('crit') and _norm(r.get('fx_crit') or '') != _norm(f['crit']):
-            return False
-        return True
-    linhas = [r for r in todas if passa(r)]
-
-    def opcoes(chave, rot=None):
-        vs = {}
-        for r in todas:
-            v = (rot(r) if rot else str(r.get(chave) or '')).strip()
-            if v:
-                vs[v] = vs.get(v, 0) + 1
-        return sorted([{'v': k, 'n': n} for k, n in vs.items()], key=lambda x: -x['n'])
-    n = len(linhas)
-    aprovadas = [r for r in linhas if str(r.get('rev') or '') == 'aprovada']
-    devolvidas = [r for r in linhas if r.get('foi_devolvida')]
-    primeira_ok = [r for r in aprovadas if not r.get('foi_devolvida')]
-    pontuais = [r for r in linhas if r.get('pontual')]
-    com_tempo = [r for r in linhas if int(r.get('fx_dur_real_min') or 0) > 0 and int(r.get('fx_dur_prev_min') or 0) > 0]
-    desvio_tempo = None
-    if com_tempo:
-        desvio_tempo = int(round(100.0 * sum((int(r['fx_dur_real_min']) / float(int(r['fx_dur_prev_min'])) for r in com_tempo)) / len(com_tempo)))
-
-    def _opcoes_pessoa(rows):
-        m = {}
-        for r in rows:
-            em = str(r.get('email') or '').lower()
-            if not em:
-                continue
-            a = m.setdefault(em, {'v': em, 'rot': r.get('nome') or em, 'n': 0})
-            a['n'] += 1
-        return sorted(m.values(), key=lambda x: -x['n'])
-
-    def agrupa(chave_fn, rotulo):
-        g = {}
-        for r in linhas:
-            k = chave_fn(r) or '—'
-            a = g.setdefault(k, {'nome': k, 'os': 0, 'q': 0, 'dev': 0, 'pont': 0})
-            a['os'] += 1
-            a['q'] += int(r.get('qualidade') or 0)
-            if r.get('foi_devolvida'):
-                a['dev'] += 1
-            if r.get('pontual'):
-                a['pont'] += 1
-        out = [{'nome': a['nome'], 'os': a['os'], 'qualidade': int(round(a['q'] / a['os'])) if a['os'] else 0, 'devolvidas': a['dev'], 'pontualidade': int(round(100.0 * a['pont'] / a['os'])) if a['os'] else 0} for a in g.values()]
-        out.sort(key=lambda x: (x['qualidade'], -x['devolvidas']))
-        return {'rotulo': rotulo, 'itens': out}
-    return {'gerado_em': _agora_iso(), 'periodo_dias': int(dias), 'filtros': f, 'opcoes': {'colaborador': _opcoes_pessoa(todas), 'supervisor': opcoes(None, lambda r: r['_sup']), 'regiao': opcoes(None, lambda r: r['_reg']), 'tipo': opcoes('fx_tipo'), 'criticidade': opcoes('fx_crit')}, 'resumo': {'os': n, 'qualidade_media': int(round(sum((int(r.get('qualidade') or 0) for r in linhas)) / n)) if n else 0, 'devolvidas': len(devolvidas), 'retrabalho_pct': int(round(100.0 * len(devolvidas) / n)) if n else 0, 'primeira_aprovacao_pct': int(round(100.0 * len(primeira_ok) / len(aprovadas))) if aprovadas else None, 'pontualidade_pct': int(round(100.0 * len(pontuais) / n)) if n else 0, 'tempo_vs_previsto_pct': desvio_tempo, 'em_verificacao': len([r for r in linhas if int(r.get('fx_status') or 0) == STATUS_IN_REVIEW])}, 'por_colaborador': agrupa(lambda r: r.get('nome') or r.get('email') or '', 'Colaborador'), 'por_supervisor': agrupa(lambda r: r['_sup'], 'Supervisor'), 'por_regiao': agrupa(lambda r: r['_reg'], 'Região'), 'por_tipo': agrupa(lambda r: r.get('fx_tipo') or '', 'Tipo de OS'), 'totais': {'linhas': len(linhas)}, 'linhas': [{'os': r.get('os'), 'tarefa': r.get('tarefa'), 'tecnico': r.get('nome') or r.get('email'), 'email': r.get('email'), 'supervisor': r['_sup'], 'cluster': r['_reg'], 'usina': r.get('usina') or r.get('fx_ativo') or '', 'tipo': r.get('fx_tipo') or '', 'crit': r.get('fx_crit') or '', 'qualidade': int(r.get('qualidade') or 0), 'pontual': bool(r.get('pontual')), 'devolvida': bool(r.get('foi_devolvida')), 'rev': r.get('rev') or '', 'dur_prev': int(r.get('fx_dur_prev_min') or 0), 'dur_real': int(r.get('fx_dur_real_min') or 0), 'quando': r.get('server_ts'), 'link': _link_fracttal_os(r.get('os'))} for r in sorted(linhas, key=lambda r: str(r.get('server_ts') or ''), reverse=True)[:GESTAO_TODAS_MAX if inteira else GESTAO_OS_MAX]]}
-
-
 def _sup_norm(nome):
     return ' '.join(str(nome or '').split()).strip()
 
@@ -712,40 +627,63 @@ FILA_TTL_S = 600
 _FILA_CACHE = {'ts': None, 'linhas': None, 't': 0.0}
 
 
-def _fx_wo_paralelo(status, sort, cap):
+def _fx_wo_paralelo(status, sort, cap, paciente=False, prazo=None, esperas=None, recusas=None):
     from concurrent.futures import ThreadPoolExecutor
-    res = fx('work_orders?id_status_work_order=%d&limit=1' % status)
+    if prazo is not None and time.time() > prazo:
+        raise ApiError(504, 'o prazo do relógio acabou antes de ler o status %d' % status)
+
+    def _ler(url):
+        return fx(url, _tentativa=1) if paciente else fx(url)
+    res = _ler('work_orders?id_status_work_order=%d&limit=1' % status)
     if not isinstance(res, dict) or res.get('total') is None:
         raise ApiError(502, 'o Fracttal não informou o total do status %d — fila não lida' % status)
-    total = min(int(res.get('total') or 0), int(cap))
+    total_fx = int(res.get('total') or 0)
+    total = min(total_fx, int(cap))
+    if total_fx > int(cap):
+        logging.error('varredura: TRUNCADA status %d — o Fracttal tem %d linhas e o teto é %d: as %d do fim da ordem (sort=%s, as mais recentes) ficam fora da fila do técnico, do painel e da zeladoria', status, total_fx, int(cap), total_fx - int(cap), sort)
+
+    def _marca(lidas):
+        _VARR.setdefault('teto', {})[str(status)] = {'total': total_fx, 'lidas': int(lidas), 'truncada': total_fx > int(cap), 't': round(time.time())}
     if total <= 0:
+        _marca(0)
         return []
     offsets = list(range(0, total, 100))
     falhas = []
+    parou = [False]
 
     def _pag(start):
+        if prazo is not None and time.time() > prazo:
+            falhas.append((start, 'prazo do relógio', 0))
+            return []
+        if parou[0]:
+            falhas.append((start, 'esperando a cota do Fracttal', 0))
+            return []
         try:
-            res = fx('work_orders?id_status_work_order=%d&limit=100&start=%d&sort=%s' % (status, start, sort))
+            res = _ler('work_orders?id_status_work_order=%d&limit=100&start=%d&sort=%s' % (status, start, sort))
             return (res.get('data') if isinstance(res, dict) else res) or []
         except Exception as e:
             falhas.append((start, str(e)[:90], int(getattr(e, 'espera', 0) or 0)))
+            if recusas is not None and isinstance(e, FxLimite):
+                recusas.append(start)
+            if paciente and isinstance(e, FxLimite):
+                parou[0] = True
             logging.warning('wo pagina %s@%d: %s', status, start, e)
             return []
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=2 if paciente else 6) as ex:
         partes = dict(zip(offsets, ex.map(_pag, offsets)))
-    _esperou = 0
-    for _rodada in range(2):
+    for _rodada in range(4 if paciente else 2):
         if not falhas:
             break
-        _pend = list(falhas)
+        _pend = [x[0] for x in falhas]
+        w = VARREDURA_ESPERA_S if paciente else min(max(max((x[2] for x in falhas)), 5), 30)
+        if prazo is not None and time.time() + w > prazo:
+            break
         del falhas[:]
-        for start, _msg, _esp in _pend:
-            w = min(max(_esp, 5), 30)
-            if _esperou + w > 60:
-                falhas.append((start, _msg, _esp))
-                continue
-            time.sleep(w)
-            _esperou += w
+        parou[0] = False
+        if esperas is not None:
+            esperas.append(w)
+        time.sleep(w)
+        for start in _pend:
             partes[start] = _pag(start)
     linhas = [x for s in offsets for x in partes.get(s) or []]
     if falhas:
@@ -753,6 +691,7 @@ def _fx_wo_paralelo(status, sort, cap):
         raise ApiError(502, 'fila do Fracttal veio incompleta (%d pagina(s) falharam)' % len(falhas))
     if len(linhas) < total:
         logging.warning('fila status %s: vieram %d de %d esperadas', status, len(linhas), total)
+    _marca(min(len(linhas), int(cap)))
     return linhas[:int(cap)]
 
 
@@ -772,6 +711,12 @@ def _fila_bruta(forcar=False):
     _FILA_CACHE['t'] = _FILA_CACHE['ts'] = agora
     _FILA_CACHE['linhas'] = linhas
     return linhas
+
+
+VARREDURA_ESPERA_S = int(os.environ.get('VARREDURA_ESPERA_S', '60') or '60')
+
+
+_VARR = {'cli': None, 'etag': None, 'checado': 0.0, 'teto': {}}
 
 
 def _pessoa_por_nome():
@@ -1080,7 +1025,7 @@ def tabela_ronda_os():
     return _tabela('rondaos', '_table_ronda_os')
 
 
-def _rondas_os_pares(piso=None):
+def _rondas_os_pares(piso=None, respostas=False):
     oss = [dict(e) for e in tabela_ronda_os().query_entities("PartitionKey eq 'os'", select=['RowKey', 'folio', 'id_work_order', 'usina', 'data', 'tipo', 'email', 'ativo', 'em_revisao', 'erro', 'criada_em', 'reservado_em'])]
     if piso:
         oss = [o for o in oss if str(o.get('data') or '') >= piso]
@@ -1088,7 +1033,7 @@ def _rondas_os_pares(piso=None):
         return []
     p = min((str(o.get('data') or '9999-12-31') for o in oss))
     ron = {}
-    for r in tabela_ronda().query_entities("PartitionKey ge '%s'" % p, select=['PartitionKey', 'RowKey', 'email', 'nome', 'usina', 'cluster', 'qualidade', 'falhas', 'trk_total', 'trk_resp', 'inicio', 'fim', 'tipo', 'geo']):
+    for r in tabela_ronda().query_entities("PartitionKey ge '%s'" % p, select=['PartitionKey', 'RowKey', 'email', 'nome', 'usina', 'cluster', 'qualidade', 'falhas', 'trk_total', 'trk_resp', 'inicio', 'fim', 'tipo', 'geo'] + (['respostas', 'multiItens'] if respostas else [])):
         ron[str(r.get('PartitionKey') or ''), str(r.get('email') or '').lower(), _norm(r.get('usina'))] = r
     return [(o, ron.get((str(o.get('data') or ''), str(o.get('email') or '').lower(), _norm(o.get('usina')))) or {}) for o in oss]
 

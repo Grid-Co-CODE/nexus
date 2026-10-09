@@ -32,8 +32,8 @@ usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação d
 ranking são redundantes"): a nota do fechamento está na Aprovação e na Triagem, a comparação por região, equipe e
 supervisor no Painel das Rondas, as fotos no histórico da usina. Saíram do menu, com rota, template, `campo/ordens.py`,
 `visao.ranking` e os testes delas; `/t/campo/os`, `/ranking` e `/imagens` levam à Central (`TELAS_QUE_SAIRAM`, para
-quem guardou o endereço). Na cópia das regras do App fica o `_gestao_os` (a conta da antiga Ordens): sai na próxima vez
-que o extrator rodar (ver "As contas copiadas do App"), porque rodar agora traria junto o que o App mudou desde 06/10.
+quem guardou o endereço). O `_gestao_os` (a conta da antiga Ordens) saiu da cópia das regras do App na recópia de 09/10
+(ver "As contas copiadas do App").
 
 Fora daqui: a "APR e PT" da torre HSEQ responde outra pergunta (OS de risco sem APR ou PT assinada).
 
@@ -448,11 +448,11 @@ respostas NÃO, falta, forçada) e a decisão.
 
 Aprovação e Triagem usam a lógica do App copiada, não refeita, para o número bater com o painel dele.
 - `ferramentas/extrair_regras_campo.py` copia do `function_app.py` do App o fecho das funções das rotas
-  `gestao/supervisao/fila`, `gestao/os` e `gestao/prioridades` e as duas réguas da nota. A tela da `gestao/os` (Ordens
-  de serviço) saiu em 08/10; tire `_gestao_os` de `RAIZES` na próxima vez que rodar o extrator (só
-  `test_campo_livros_app.py` ainda a usa, para provar que o livro de fechamentos chega no formato do App). **Atenção e PT saíram da
-  cópia em 05/10** (717 linhas a menos): agora são contas nossas. A cópia leva só a lógica (`ast.unparse`, sem
-  comentários: o repositório é público e os comentários do App citam colegas pelo nome).
+  `gestao/supervisao/fila` e `gestao/prioridades` e as duas réguas da nota. **Atenção e PT saíram da cópia em 05/10**
+  (717 linhas a menos): agora são contas nossas. **A `gestao/os` (`_gestao_os`) saiu das raízes em 09/10**, um dia
+  depois da tela Ordens de serviço: levou junto só os dois tetos dela; o `test_campo_livros_app.py` prova o livro de
+  fechamentos pela Triagem. A cópia leva só a lógica (`ast.unparse`, sem comentários: o repositório é público e os
+  comentários do App citam colegas pelo nome).
 - `tests/test_campo_regras_app.py` compara cada função com o App pela árvore do código. Falhou = o App mudou: rode o
   extrator e confira a tela. Em 05/10 o v230 mudou `_qualidade_v2` (GPS do início vale como prova); recopiado, código
   `68d4d468251f7d6a`.
@@ -466,17 +466,49 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   - **o relógio da fila:** o `_fila_bruta` mede a idade por `_FILA_CACHE["t"]` (segundos desde 1970), não mais pelo
     `ts` em datetime. O `aprovacao.py` passou a gravar e ler `t` (e `ts` igual, como o App). Sem isso, cada visita da
     Aprovação achava a fila velha e relia as 55 páginas do Fracttal na hora da tela (7 testes acusaram).
-  - **página recusada tenta de novo** (`_fx_wo_paralelo`): 2 rodadas, no máximo 60 s de espera somada, em vez de
-    jogar a fila inteira fora por uma página. No Nexus isso só roda na releitura em segundo plano, por cima das
-    esperas do `fracttal.py` (5 s e 10 s); o `Recusado` do Nexus não diz a espera, então o App espera 5 s.
+  - **página recusada tenta de novo** (`_fx_wo_paralelo`), em vez de jogar a fila inteira fora por uma página. Desde o
+    v236: 2 rodadas, UMA espera por rodada (a maior que as recusas pediram, de 5 a 30 s) e depois todas as páginas
+    recusadas de novo (no v235 eram 5 s por página, até 60 s somados). No Nexus isso só roda na releitura em segundo
+    plano, por cima das esperas do `fracttal.py` (5 s e 10 s); o `Recusado` do Nexus não diz a espera, então o App
+    espera 5 s por rodada.
   - Conferido com o banco real, cópia antiga × nova sobre a mesma leitura: Triagem (7, 30 e 90 dias), Ordens com a
     nota de cada OS (2.564 OS em 90 dias, nota média 79) e o veredito das 783 rondas da tela Rondas iguais, valor a
     valor. A fila da Aprovação (balde `_triagem`) não foi lida de verdade: pediria as 55 páginas no horário de campo;
     a função é a mesma árvore de código (o teste confere).
+- **09/10, App v256 (código `92772066214dff23`, o mesmo que o `/api/health` do App mostrava às 17:40; o que mudou no
+  fecho veio até a v255, a v256 não mexeu nele):** o teste acusou três nomes novos no fecho, `_VARR`, `FxLimite` e `VARREDURA_ESPERA_S`, todos puxados pelo `_fx_wo_paralelo` (v236 e v243), que
+  o Nexus chama direto (`aprovacao._reler`). Atrás dessa 1ª asserção havia mais: `SUP_CAP_BACKLOG`, `_qualidade_v2`,
+  `_rondas_os_pares` e a `_varredura_carregar` do App (a trocada). Decisão: **as três entram na cópia.** São um
+  dicionário, uma subclasse do `ApiError` e uma constante lida do ambiente; nada de Azure (o `_VARR["cli"]` só é
+  preenchido pelo `_blob_varredura`, que fica fora do fecho). Só agem no modo `paciente` do relógio do App, que o Nexus
+  não usa, e o `fx` do Nexus levanta `fracttal.Recusado`, nunca `FxLimite`. Trocar o `_fx_wo_paralelo` por um nosso
+  seria reinterpretar a regra.
+  - **O teto da fila:** `SUP_CAP_BACKLOG` foi de 6.000 para 20.000 (v243). O `/api/health` do App dizia, em 09/10 às
+    17:22, 6.177 tarefas em verificação; a cópia do v235 lia 6.000. O corte leva o FIM da lista, e com
+    `sort=final_date` o Fracttal a devolve da mais recente para a mais antiga (medido na fila real às 18:06: a 1ª linha
+    de hoje, a 6.000ª de 02/06; o comentário do App diz que o corte leva as mais recentes, a medida diz o contrário):
+    **sumiam da Aprovação do Nexus as mais ANTIGAS**, 175 das 178 tarefas cortadas com 30 dias ou mais, e 18 OS
+    paradas há 30 dias ou mais. Prova: `test_fila_de_mais_de_6_mil_tarefas_vem_inteira` (com a cópia velha, 6.000
+    contra 6.177).
+  - `_varredura_carregar` continua `False`: a do App passou a conferir o blob no máximo a cada 30 s e a trazer o teto
+    do relógio, mas sem armazenamento o `_varredura_props` dela devolve None, e ela, `False`. Assinatura nova em
+    `ASSINATURAS_TROCADAS`.
+  - `_qualidade_v2` (`gps_ronda`, v241) e `_rondas_os_pares` (`respostas`): parâmetro novo, com padrão que mantém o
+    resultado; o Nexus chama sem eles.
+  - Conferido com o banco real só por GET, as mesmas respostas para as duas cópias: Triagem de 7, 30 e 90 dias igual
+    valor a valor (913, 2.243 e 3.168 OS). Aprovação com a fila real lida UMA vez fora do horário de campo (09/10,
+    18:02: 6.178 tarefas em 16,8 s, as mesmas 6.178 do `/api/health` do App) e o relógio da conta congelado: cópia
+    velha × nova sobre a mesma fila iguais valor a valor nas cinco visões (cartões por região de campo e por gestor, o
+    CSV, `idade=30-` e `ver=Sem cadastro`): 2.235 OS, 6.134 tarefas (as 44 sem `final_date` a conta do App não conta),
+    661 prontas, 505 pedem olho, 1.069 fora do App, 784 paradas há 30 dias. A velha com o teto de 6.000 mostrava 2.217
+    OS, 5.956 tarefas e 766 paradas. O script ficou fora do repositório (ver o fim deste arquivo).
 - Trocados pelo Nexus no fim do arquivo gerado: `_tabela` e `tabela_qlog` (leem pela fonte do Nexus, `tabelas.py`),
   `tabela` (a dos tokens do Fracttal: só a partição `cadastro`; `tok` e `pt` recusadas), `fx` (Fracttal só GET,
   `fracttal.py`), `ident` (`pessoas.ident`) e `_varredura_carregar` (sempre `False`: sem blob do App).
-- O código do App que vale é o da pasta `App_Campo\middleware` do SharePoint.
+- O código do App que vale é o da pasta `App_Campo\middleware` do SharePoint. Para saber se é o que está no ar: o
+  `codigo` do `/api/health` do App (aberto, só números) tem de ser igual ao `CODIGO_APP` que o extrator grava na
+  cópia. O mesmo `/api/health` diz, em `varredura.status`, quantas tarefas o Fracttal tem em verificação (`"2"`) e se
+  o teto cortou.
 - O cartão "Tempo vs. previsto" do App mostra "+66%", mas a conta é real ÷ previsto: no Nexus sai "66% do previsto".
 
 ## Sem Azure, sem coletor
@@ -594,4 +626,10 @@ fato, a validação por foto fora das rondas e no lugar da ronda do mesmo dia) e
 feita com scripts fora do repositório (gravam o dado real com nome de pessoa): para repetir, rode as telas pelo
 `test_client` logado com `app.extensions["nexus_dados_sessao"]` = uma sessão só de GET, `visao._agora` congelado e
 `ronda_checklist.pedir_releitura`/`aprovacao._pedir_releitura` desligados (não ler o Fracttal), e compare o contexto dos
-templates (`flask.template_rendered`) da versão antiga com a nova.
+templates (`flask.template_rendered`) da versão antiga com a nova. **Para a recópia das regras do App** (09/10), três
+armadilhas: as duas cópias rodam no mesmo processo por um `sys.meta_path` que entrega a fonte escolhida ao
+`importlib.reload` do `leitura.limpar_cache`, sem trocar o arquivo do working tree (outras sessões trabalham nele); o
+relógio da conta do App só congela trocando `datetime.datetime` no módulo `datetime`, porque as regras fazem
+`from datetime import datetime` dentro da função (sem isso, com 6 mil tarefas, alguma vira de dia entre uma tela e a
+outra); e com `TESTING` ligado o `credencial()` do Fracttal só olha a credencial de teste. O receptor do
+`template_rendered` precisa de `weak=False` (o blinker guarda referência fraca e a lambda some).

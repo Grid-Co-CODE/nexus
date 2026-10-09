@@ -92,6 +92,22 @@ def test_nexus_so_le_o_fracttal_e_uma_vez_a_cada_10_min(campo):
         fracttal.ler("work_orders/15002", "PUT", {"id_status_work_order": 3})
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")     # o utcnow() do _quando, uma vez por tarefa
+def test_fila_de_mais_de_6_mil_tarefas_vem_inteira(campo):
+    """09/10/2026: o /api/health do App dizia 6.177 tarefas em verificação, e a cópia do v235 lia no máximo 6.000 (o
+    `SUP_CAP_BACKLOG` de então). O corte leva o FIM da lista, e com sort=final_date o Fracttal a devolve da mais recente
+    para a mais antiga (medido na fila real às 18:06: a 1ª linha de hoje, a 6.000ª de 02/06): das 178 cortadas, 175
+    tinham 30 dias ou mais, e 18 OS paradas há 30 dias ou mais sumiam da Aprovação do Nexus. O App subiu o teto para
+    20.000 (v243, 08/10); a recópia de 09/10 (App v256) o trouxe. A lista falsa vem na ordem do Fracttal."""
+    from nexus.campo import regras_app
+    campo.linhas = [_os(20000 + i, 1 + i * 39 / 6177) for i in range(6177)]
+    d = aprovacao.fila({"dias": "60"}).dados
+    assert len(regras_app._FILA_CACHE["linhas"]) == 6177 and d["resumo"]["tarefas"] == 6177
+    assert regras_app._FILA_CACHE["linhas"][-1]["wo_folio"] == "26176"          # a mais antiga, a do fim, está na fila
+    assert d["resumo"]["espera_max"] >= 39                                      # e é ela a espera máxima da tela
+    assert len([p for p in campo.pedidos if "start=" in p]) == 62               # uma página por 100 que existem
+
+
 def test_fracttal_recusou_vira_aviso(campo):
     campo.recusar = True
     leitura.limpar_cache()
