@@ -6,7 +6,7 @@ os_falhas.py`) e faz as contas (`nexus/engenharia/confiabilidade.py`). As outras
 Leia o CLAUDE.md desta pasta antes de mexer.
 """
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from flask import render_template, request
@@ -168,6 +168,7 @@ def confiabilidade():
 CORES_PESSOA = ("#7fb8ff", "#a3d900", "#f2b84b", "#4fd1c5", "#ff8a65", "#e88fb4", "#c7cede")
 DIAS_FAIXA = 14
 JANELA_CONCLUIDAS = 30
+ESPERA_VERIFICACAO = 7      # dias: a OS feita esperando a verificação há mais que isso pinta o número de âmbar
 
 
 def _iniciais(nome: str) -> str:
@@ -201,6 +202,63 @@ def supercards(oss: list[dict], equipe: list[dict], hoje) -> list[dict]:
     return out
 
 
+def _dias(n: int) -> str:
+    return "1 dia" if n == 1 else f"{n} dias"
+
+
+def faixa_kpis(oss: list[dict], hoje, janela: int = JANELA_CONCLUIDAS) -> list[dict]:
+    """A faixa de números do quadro no modelo do Acompanhamento de chamados do OS Creator (Levi, 08/10/2026: "Precisamos
+    padronizar a estética ... o card de KPIS eu gostei mais do de chamados"): o rótulo em cima, o número grande colorido
+    pela gravidade e, ao lado, o detalhe que diz por onde começar (a OS mais atrasada, a próxima a vencer, a que espera a
+    verificação há mais tempo). As contagens são as dos supercards: a coluna e o prazo de cada OS vêm do os_equipe.
+
+    Cada item: {rotulo, valor, grav ("critico" | "alerta" | "ok" | ""), nota: [(texto, negrito)]}. A nota vai em pedaços
+    para o template pôr o nº da OS em negrito sem montar HTML aqui (o título vem do Fracttal e é escapado lá)."""
+    col = {c: [o for o in oss if o["coluna"] == c] for c in ("fazer", "execucao", "verificacao", "concluida")}
+    abertas = col["fazer"] + col["execucao"]
+    piso = (hoje - timedelta(days=janela)).isoformat()
+    atrasadas = sorted((o for o in abertas if o["prazo"] == "atrasada"), key=lambda o: (o["dias"], o["os"]))
+    vencem = sorted((o for o in abertas if o["prazo"] == "vence"), key=lambda o: (o["dias"], o["os"]))
+    fechadas = sorted((o for o in col["concluida"] if (o["fim_iso"] or "") >= piso), key=lambda o: o["fim_iso"], reverse=True)
+    # em verificação a OS já foi feita: espera desde o fim da execução (a tarefa fechada); sem ele, a data programada
+    verif = sorted(col["verificacao"], key=lambda o: (o["fim_iso"] or o["programada_iso"] or "9999", o["os"]))
+    carga = len(abertas) + len(col["verificacao"])
+
+    def os_(o):
+        return (f"OS {o['os']}", True)
+
+    k_aberto = {"rotulo": "Em aberto", "valor": carga, "grav": "",
+                "nota": [(str(len(col["fazer"])), True), (" a fazer, ", False), (str(len(col["execucao"])), True),
+                         (" em execução e ", False), (str(len(col["verificacao"])), True), (" em verificação", False)]
+                if carga else [("nenhuma OS em aberto", False)]}
+    k_atraso = {"rotulo": "Atrasadas", "valor": len(atrasadas), "grav": "critico" if atrasadas else "",
+                "nota": [("a mais atrasada: ", False), os_(atrasadas[0]), (f", {_dias(-atrasadas[0]['dias'])}", False)]
+                if atrasadas else [("nenhuma passou da data programada", False)]}
+    if vencem:
+        d = vencem[0]["dias"]
+        nota_vence = [("a próxima: ", False), os_(vencem[0]),
+                      (", vence " + ("hoje" if d == 0 else "amanhã" if d == 1 else f"em {_dias(d)}"), False)]
+    else:
+        nota_vence = [(f"nenhuma até {hoje + timedelta(days=2):%d/%m}", False)]
+    k_vence = {"rotulo": "Vencem em 2 dias", "valor": len(vencem), "grav": "alerta" if vencem else "", "nota": nota_vence}
+    grav_verif, nota_verif = "", [("nenhuma esperando", False)]
+    if verif:
+        o = verif[0]
+        desde = o["fim_iso"] or o["programada_iso"]
+        espera = max(0, (hoje - date.fromisoformat(desde)).days) if desde else None
+        if o["fim_iso"]:
+            quando = "feita hoje" if espera == 0 else "feita ontem" if espera == 1 else f"feita há {_dias(espera)}"
+        else:
+            quando = f"programada {o['programada'][:5]}" if o["programada"] else "sem data"
+        nota_verif = [("a mais antiga: ", False), os_(o), (f", {quando}", False)]
+        grav_verif = "alerta" if espera is not None and espera > ESPERA_VERIFICACAO else ""
+    k_verif = {"rotulo": "Esperando verificação", "valor": len(verif), "grav": grav_verif, "nota": nota_verif}
+    k_fechadas = {"rotulo": f"Fechadas em {janela} dias", "valor": len(fechadas), "grav": "ok" if fechadas else "",
+                  "nota": [("a última: ", False), os_(fechadas[0]), (f", em {fechadas[0]['fim'][:5]}", False)]
+                  if fechadas else [(f"nenhuma nos últimos {janela} dias", False)]}
+    return [k_aberto, k_atraso, k_vence, k_verif, k_fechadas]
+
+
 @bp.route("/equipe")
 def equipe():
     """O clique numa OS abre o card dela do OS Creator, o mesmo do Histórico (Levi, 08/10/2026: "Ao clicar na OS quero
@@ -219,11 +277,9 @@ def equipe():
     oss = [dict(o, cor=cor.get(o["pid"], CORES_PESSOA[-1]), iniciais=ini.get(o["pid"]) or _iniciais(o["pessoa"]))
            for o in d["os"]]
     piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
-    total = {"carga": sum(c["carga"] for c in cards), "atrasadas": sum(c["atrasadas"] for c in cards),
-             "vence": sum(c["vence"] for c in cards), "fechadas30": sum(c["fechadas30"] for c in cards),
-             "verificacao": sum(c["cont"]["verificacao"] for c in cards)}
     return render_template(
-        "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss, total=total,
+        "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss,
+        kpis=faixa_kpis(oss, hoje, JANELA_CONCLUIDAS),
         faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS,
         hoje=hoje.isoformat(), piso_concluidas=piso, janela=JANELA_CONCLUIDAS, dias_faixa=DIAS_FAIXA,
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")

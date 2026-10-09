@@ -19,6 +19,20 @@
   {% if erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> Mostrando a última leitura; nova tentativa em 1 minuto.</div>{% endif %}
   {% if faltam %}<div class="cn-erro cn-aviso" role="status"><b>Não achei no Fracttal: {{ faltam|join(', ') }}.</b> Confira o nome na lista de responsáveis da engenharia (a mesma da Nova solicitação | Engenharia).</div>{% endif %}
 
+  {# A faixa de números no modelo do Acompanhamento de chamados do OS Creator (Levi, 08/10/2026: "o card de KPIS eu gostei
+     mais do de chamados"): o rótulo em cima, o número colorido pela gravidade e, ao lado, o detalhe que diz por onde
+     começar. As contas estão em faixa_kpis (torre). #}
+  {% if kpis is defined %}
+  <section class="kb-kpis" aria-label="A equipe agora">
+    {% for k in kpis %}<div class="kb-kpi">
+      <span class="kb-kpi-rot">{{ k.rotulo }}</span>
+      <span class="kb-kpi-linha"><b class="kb-kpi-v{{ ' kb-kpi-v--' ~ k.grav if k.grav }}">{{ k.valor }}</b><span class="kb-kpi-nota">
+        {%- for texto, negrito in k.nota %}{% if negrito %}<b>{{ texto }}</b>{% else %}{{ texto }}{% endif %}{% endfor -%}
+      </span></span>
+    </div>{% endfor %}
+  </section>
+  {% else %}{# o Python de antes na memória (o serviço leu este template antes de reiniciar): a faixa de antes, até o
+     reinício. Sai junto com o .kb-resumo do engenharia.css. #}
   <section class="kb-resumo" aria-label="A equipe agora">
     <div><b>{{ total.carga }}</b><span>em aberto</span></div>
     <div class="{{ 'kb-ruim' if total.atrasadas }}"><b>{{ total.atrasadas }}</b><span>atrasadas</span></div>
@@ -26,6 +40,7 @@
     <div><b>{{ total.verificacao }}</b><span>esperando verificação</span></div>
     <div class="kb-bom"><b>{{ total.fechadas30 }}</b><span>fechadas em {{ janela }} dias</span></div>
   </section>
+  {% endif %}
 
   <section class="kb-pessoas" aria-label="Pessoas">
     {% for c in cards %}

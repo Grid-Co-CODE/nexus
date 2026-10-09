@@ -7,8 +7,9 @@ Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa
 
 Levi: "uma tela que fique no setor de engenharia que agregue todas as OSs que estão abertas ou já foram fechadas ou que
 serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E SUPERCARDS, DEIXE ALGO BOM DE GERENCIAR!".
-`/t/engenharia/equipe`; leitura em `nexus/engenharia/os_equipe.py`; supercards em `supercards()` (torre); quadro em
-`templates/engenharia/equipe.html` (montado no navegador a partir de um JSON; classes `kb-*` em `engenharia.css`).
+`/t/engenharia/equipe`; leitura em `nexus/engenharia/os_equipe.py`; supercards em `supercards()` e a faixa de números em
+`faixa_kpis()` (torre); quadro em `templates/engenharia/equipe.html` (montado no navegador a partir de um JSON; classes
+`kb-*` em `engenharia.css`).
 
 - **Quem é da equipe:** os mesmos nomes da Nova solicitação | Engenharia do OS Creator (`OS_WEB_ENGENHARIA_RESPONSAVEIS`
   no .env do OS Creator; `NEXUS_ENGENHARIA_RESPONSAVEIS` no .env do Nexus vale por cima). Nomes nunca no código
@@ -20,9 +21,27 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
 - **Colunas:** A fazer (status 1, nada começou; a data programada diz atrasada, vence em 2 dias ou "abre em" = as que
   vão abrir), Em execução (alguma tarefa começou), Em verificação (2; mostra a programada, não "atrasada": já foi
   feita), Concluídas (3; as de 30 dias ou todas), Canceladas (4; escondidas).
+- **Faixa de números, no modelo do Acompanhamento de chamados do OS Creator** (Levi, 08/10/2026: "Precisamos padronizar
+  a estética para que coisas parecidas não pareçam completamente diferentes, nesse caso gostei mais da estética do da
+  engenharia porém o card de KPIS eu gostei mais do de chamados"). Era número em cima e rótulo embaixo; agora é o rótulo
+  em cima e, na mesma linha, o número colorido pela gravidade e o detalhe que diz por onde começar (classes `kb-kpi*`):
+  Em aberto (quantas a fazer, em execução e em verificação), Atrasadas (vermelho; a mais atrasada e há quantos dias),
+  Vencem em 2 dias (âmbar; a próxima), Esperando verificação (âmbar quando a mais antiga espera há mais de 7 dias,
+  `ESPERA_VERIFICACAO`, contados do fim da execução; sem ele vale a data programada, e a nota diz "programada") e
+  Fechadas em 30 dias (verde; a última). As contas são as dos supercards. Não filtram (nunca filtraram). Os 7 dias da
+  verificação foram escolha nossa (o mesmo corte do "HÁ MAIS DE 7 DIAS" dos chamados), mostrada ao Levi e aprovada com a
+  padronização (09/10). A nota usa o `--mudo` (AA nos dois temas), o mesmo tom da nota do OS Creator (`--mu`).
+  A faixa de antes (`.kb-resumo`) ficou no `engenharia.css` e no template (quando o Python não manda `kpis`) só porque o
+  5070 segue com o template e o Python de antes na memória até reiniciar, e o CSS vem do disco na hora: sai no primeiro
+  ajuste depois do reinício.
+- **O quadro é o padrão de quadro de OS:** o Acompanhamento de chamados do OS Creator copia as colunas e os cartões daqui
+  (`chamados.css` espelha o `kb-*`, porque o OS Creator não carrega o CSS do Nexus). Mudou o desenho do quadro aqui,
+  leve lá (regra em `nexus/torres/oscreator/README.md`).
 - **Supercards:** um por pessoa, com a cor dela; em aberto, a trilha por etapa, atrasadas, fechadas em 30 dias e a
   faixa dos próximos 14 dias (um degrau por dia, um ponto por OS programada; fim de semana vazado, hoje marcado). O
   clique filtra o quadro. Busca, Quadro/Por pessoa, concluídas de todo o período e canceladas sem recarregar.
+- **Como provar:** `python -m pytest -q tests/test_engenharia_equipe.py` (a faixa: número, gravidade e nota de cada um, e
+  a tela com rótulo + número + explicação nos cinco).
 - **Clique no cartão abre o card da OS do OS Creator, o mesmo do Histórico** (Levi, 08/10/2026: "Ao clicar na OS quero
   que abra o mesmo card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os
   setores se conversarem"). É o componente da torre OS Creator (`oscreator/card_os_abrir.html`, regra no README de lá),

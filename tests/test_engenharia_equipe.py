@@ -123,3 +123,72 @@ def test_a_releitura_forcada_tem_um_piso(monkeypatch):
     monkeypatch.setitem(E._EST, "ts", time.time() - E.FORCAR_S - 1)
     E.pedir_releitura(app=object(), esperar=True, forcar=True)
     assert lidas == [1]
+
+
+# ── a faixa de números no modelo do Acompanhamento de chamados (Levi, 08/10/2026: "Precisamos padronizar a estética ...
+# o card de KPIS eu gostei mais do de chamados"): rótulo em cima, número colorido pela gravidade, explicação ao lado ──
+def _quadro_para_a_faixa():
+    dias = lambda n: (AGORA + timedelta(days=n)).isoformat()            # noqa: E731
+    linhas = [_w("1", 1, prog_dias=-2), _w("2", 1, prog_dias=-5), _w("3", 1, prog_dias=1), _w("4", 1, prog_dias=0),
+              _w("5", 1, prog_dias=9), _w("6", 1, task="IN_PROGRESS", prog_dias=3),
+              _w("7", 2, prog_dias=-20, fim=dias(-10), task="DONE"), _w("8", 2, prog_dias=-20, fim=dias(-2), task="DONE"),
+              _w("9", 3, fim=dias(-3)), _w("10", 3, fim=dias(-1)), _w("11", 3, fim=dias(-40)), _w("12", 4)]
+    return E.montar(linhas, {"id": 1, "nome": "Ana"}, AGORA)
+
+
+def _texto(nota):
+    return "".join(t for t, _ in nota)
+
+
+def test_a_faixa_diz_o_numero_a_gravidade_e_por_onde_comecar():
+    from nexus.torres.engenharia import faixa_kpis
+    k = {x["rotulo"]: x for x in faixa_kpis(_quadro_para_a_faixa(), AGORA.astimezone(E.BRT).date(), 30)}
+    assert list(k) == ["Em aberto", "Atrasadas", "Vencem em 2 dias", "Esperando verificação", "Fechadas em 30 dias"]
+    assert (k["Em aberto"]["valor"], k["Em aberto"]["grav"]) == (8, "")
+    assert _texto(k["Em aberto"]["nota"]) == "5 a fazer, 1 em execução e 2 em verificação"
+    # a mais atrasada é a que passou mais da data (a 2, 5 dias), e o nº da OS vai em negrito
+    assert (k["Atrasadas"]["valor"], k["Atrasadas"]["grav"]) == (2, "critico")
+    assert k["Atrasadas"]["nota"] == [("a mais atrasada: ", False), ("OS 2", True), (", 5 dias", False)]
+    assert (k["Vencem em 2 dias"]["valor"], k["Vencem em 2 dias"]["grav"]) == (2, "alerta")
+    assert _texto(k["Vencem em 2 dias"]["nota"]) == "a próxima: OS 4, vence hoje"
+    # em verificação conta desde a execução terminada: a 7 espera há 10 dias, mais que os 7 da régua -> âmbar
+    assert (k["Esperando verificação"]["valor"], k["Esperando verificação"]["grav"]) == (2, "alerta")
+    assert _texto(k["Esperando verificação"]["nota"]) == "a mais antiga: OS 7, feita há 10 dias"
+    # a de 40 dias fica fora das 30; a última fechada é a 10
+    assert (k["Fechadas em 30 dias"]["valor"], k["Fechadas em 30 dias"]["grav"]) == (2, "ok")
+    assert _texto(k["Fechadas em 30 dias"]["nota"]) == "a última: OS 10, em 05/10"
+
+
+def test_a_faixa_vazia_explica_em_vez_de_inventar():
+    from nexus.torres.engenharia import faixa_kpis
+    hoje = AGORA.astimezone(E.BRT).date()
+    k = faixa_kpis([], hoje, 30)
+    assert [x["valor"] for x in k] == [0] * 5 and [x["grav"] for x in k] == [""] * 5
+    assert [_texto(x["nota"]) for x in k] == ["nenhuma OS em aberto", "nenhuma passou da data programada",
+                                              "nenhuma até 08/10", "nenhuma esperando", "nenhuma nos últimos 30 dias"]
+    # verificação recente (2 dias) não pinta; sem a execução terminada, vale a data programada, dita como tal
+    oss = E.montar([_w("8", 2, prog_dias=-20, fim=(AGORA - timedelta(days=2)).isoformat(), task="DONE")], {"id": 1, "nome": "Ana"}, AGORA)
+    v = faixa_kpis(oss, hoje, 30)[3]
+    assert (v["grav"], _texto(v["nota"])) == ("", "a mais antiga: OS 8, feita há 2 dias")
+    oss = E.montar([_w("9", 2, prog_dias=-12)], {"id": 1, "nome": "Ana"}, AGORA)
+    v = faixa_kpis(oss, hoje, 30)[3]
+    assert (v["grav"], _texto(v["nota"])) == ("alerta", "a mais antiga: OS 9, programada 24/09")
+
+
+def test_a_faixa_da_tela_tem_rotulo_numero_e_explicacao(logado, monkeypatch):
+    import re
+    oss = _quadro_para_a_faixa()
+    monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
+    monkeypatch.setattr(E, "dados", lambda: {"os": oss, "equipe": [{"id": 1, "nome": "Ana", "nome_fracttal": "Ana Teste"}],
+                                             "faltam": [], "lido": 1.0, "lendo": False, "erro": ""})
+    html = logado.get("/t/engenharia/equipe").get_data(as_text=True)
+    faixa = html.split('<section class="kb-kpis"', 1)[1].split("</section>", 1)[0]
+    blocos = faixa.split('<div class="kb-kpi">')[1:]
+    assert len(blocos) == 5
+    for b in blocos:
+        rotulo = re.search(r'<span class="kb-kpi-rot">([^<]+)</span>', b).group(1).strip()
+        numero = re.search(r'<b class="kb-kpi-v[^"]*">(\d+)</b>', b).group(1)
+        nota = re.sub(r"<[^>]+>", "", b.split('<span class="kb-kpi-nota">', 1)[1]).strip()
+        assert rotulo and numero.isdigit() and nota, b
+    assert '<b class="kb-kpi-v kb-kpi-v--critico">2</b>' in faixa and "a mais atrasada: <b>OS 2</b>, 5 dias" in faixa
+    assert "kb-resumo" not in html                                     # a faixa de antes (número em cima, rótulo embaixo) saiu

@@ -103,8 +103,8 @@ nesta pasta.
 - **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
   `/os/*` mostra um aviso e o resto do Nexus segue.
 - **Testes:** `tests/test_torre_oscreator.py`, `tests/test_oscreator_solic_engenharia.py`,
-  `tests/test_oscreator_busca_digitavel.py`, `tests/test_oscreator_desempenho.py` e `tests/test_oscreator_card_tarefas.py`.
-  Nenhum teste fala com o Fracttal.
+  `tests/test_oscreator_busca_digitavel.py`, `tests/test_oscreator_desempenho.py`, `tests/test_oscreator_card_tarefas.py`
+  e `tests/test_oscreator_acomp_quadro.py`. Nenhum teste fala com o Fracttal.
 - **O que não funciona igual:**
   - o login pelo OAuth do Fracttal tem a volta configurada para o supervisório; e-mail e senha funcionam normal;
   - gravar ticket precisa do `GRIDCO_SQL_TOKEN`, que vem da variável ou do `%APPDATA%` da máquina.
@@ -336,6 +336,45 @@ cota da empresa. Não foi feito: é decisão do Levi.
 **Como provar:** `tests/test_oscreator_desempenho.py` (7 testes, que falham todos no código de antes) e a suíte do oem
 (`tests/test_os_web_*.py` e `test_anexo_documento.py`, 681 testes) passando com os arquivos novos, numa cópia fora do
 oem.
+
+## Acompanhamento de chamados com o quadro da Engenharia (08/10/2026)
+
+O pedido do Levi, de 08/10: "Precisamos padronizar a estética para que coisas parecidas não pareçam completamente
+diferentes, nesse caso gostei mais da estética do da engenharia porém o card de KPIS eu gostei mais do de chamados, faça
+essas substituições". Aqui mudou o QUADRO; a faixa de números ficou como estava (é a que o Levi gosta, e virou o modelo da
+faixa do Quadro da equipe da Engenharia, `nexus/torres/engenharia/CLAUDE.md`).
+
+- **O desenho é o do Quadro da equipe** (`kb-*` em `nexus/static/engenharia.css`), espelhado no bloco "o quadro" do
+  `static/chamados.css` com a paleta daqui: o OS Creator não carrega o CSS do Nexus e roda sozinho no 5090. Mudou o quadro
+  da Engenharia, traga para cá.
+  - Coluna: um cartão com a faixa da cor no topo (Chegaram vermelho, Ticket aberto âmbar, Finalizados verde), o título,
+    a pílula da contagem e, à direita, o subtítulo de antes. No computador a coluna rola por dentro (72vh), como na
+    Engenharia; no celular (uma coluna embaixo da outra) quem rola é a página.
+  - Cartão: "OS 12875" em verde, mono; o estado no canto, colorido pela idade (`tempo_curto`: "35 d", "8 d sem
+    atualização", "atualizado hoje", "fechado 26/09", "em verificação 26/09"); o ativo em negrito; onde (código ·
+    cliente · usina); as etiquetas (fornecedor, tipo de ativo, inspeção de origem, ticket); o responsável com o avatar
+    das iniciais (cor fixa por pessoa, `acomp_web.cor_avatar`); "no nome de …" em âmbar quando não é da equipe; "não
+    consegui ler o ticket" como antes. O fio à esquerda segue a mesma régua da idade (`acomp_web.urgencia`).
+  - A frase inteira continua em `tempo` (o title do cartão e a tela do chamado).
+- **O que funciona hoje não mudou:** o `acomp.js` é o mesmo e acha tudo pelos mesmos ganchos (`.col`, `.card`,
+  `[data-n]`, `[data-vazio]` e os `data-*` do cartão); o cartão inteiro é o link do chamado. O vazio passou para dentro
+  da coluna. Filtros, Limpar filtros, busca, contagem, Atualizar e o clique conferidos iguais, antes e depois.
+- **Contraste:** o texto miúdo do quadro e a nota da faixa de números passaram do `--fa` (3,5:1) para o `--mu`
+  (5,9:1), o mesmo tom da nota da faixa do Quadro da equipe (mostrado ao Levi e aprovado com a padronização, 09/10). O
+  "lido do Fracttal às" continua no `--fa` (4,1:1).
+- **Sem reiniciar:** o CSS vem do disco na hora, e o 5090 e o 5070 seguem com o `acomp.html` e o `acomp_web.py` de antes
+  na memória até reiniciar. Para o cartão de antes não ficar sem estilo nesse meio-tempo, o `chamados.css` guarda as
+  regras dele (bloco "o cartão de antes"), que saem no primeiro ajuste depois do reinício. O HTML novo com o Python de
+  antes também funciona (o estado sai com o texto de antes, "35 dias").
+- **No oem:** o `tests/test_os_web_acomp.py` de lá (que não está no git do oem) conferia o estado de antes
+  (`<span class="tag u-a">7 dias</span>`); a linha passou a `7 d` junto com a sincronia.
+- **Como provar:** `tests/test_oscreator_acomp_quadro.py` (6 testes, com o Fracttal falso; todos falham no código de
+  antes): os campos do cartão, o que os filtros e o clique usam, a faixa de números intacta, o estado curto e a cor do
+  avatar, e que toda classe nova do cartão tem regra no CSS. A suíte do oem passa numa cópia com os arquivos novos (1.283).
+  Na bancada (o clone sozinho, Fracttal falso com 31 chamados inventados, rede bloqueada e relógio parado), num Chrome sem
+  janela a 1440, 1240 e 375 px: sem rolagem lateral, sem erro de JavaScript, e filtros, vazio, busca digitada, Limpar
+  filtros, Atualizar e o clique (abre o chamado numa aba) com o mesmo resultado no antes e no depois. Falta o olho do Levi
+  com os chamados de verdade.
 
 ## O card da OS em qualquer torre do Nexus (08/10/2026)
 

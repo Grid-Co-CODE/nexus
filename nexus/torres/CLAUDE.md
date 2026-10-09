@@ -23,5 +23,11 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 - **Abrir uma OS do Fracttal em qualquer tela** (os setores se conversam, Levi 08/10/2026): o card do Histórico do OS
   Creator, sem cópia. `{% include "oscreator/card_os_abrir.html" %}` e `NexusOsCard.abrir(id_work_order, {status})`;
   regra em `oscreator/README.md` ("O card da OS em qualquer torre"). Quem usa: o Quadro da equipe da Engenharia.
+- **Coisa parecida, o mesmo desenho** (Levi, 08/10/2026: "Precisamos padronizar a estética para que coisas parecidas
+  não pareçam completamente diferentes"). Quadro de OS (colunas e cartões): o do Quadro da equipe da Engenharia (`kb-*`
+  em `nexus/static/engenharia.css`), que o Acompanhamento de chamados do OS Creator já copia. Faixa de números: o modelo
+  do Acompanhamento de chamados (rótulo em cima, número colorido pela gravidade, o detalhe ao lado), que o Quadro da
+  equipe já usa (`kb-kpis`). Tela nova com quadro ou faixa de números parte de um deles; mudou o desenho num, leve ao
+  outro.
 - `montar_menu` põe a torre da cadeira escolhida primeiro.
 - O módulo-modelo chama `modelo.py`, não `base.py`: `base` colidia com o pacote da torre Base.
