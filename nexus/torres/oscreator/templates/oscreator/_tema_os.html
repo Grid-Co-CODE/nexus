@@ -1,0 +1,14 @@
+{# O tema do Nexus nas páginas do OS Creator (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está
+   sincronizando com o botão do Nexus"). Entra no <head> de toda página do clone pela ponte (ponte.encaminhar) e no do card
+   da OS (card_os.html). O servidor já desenha o <html data-tema> pelo cookie; isto refaz a conta antes de pintar com o
+   mesmo _tema_cabeca.html das páginas do Nexus (o cookie nexus_tema, ou a reserva do localStorage), para a página que
+   demorou a chegar (o Fracttal leva segundos e o tema pode ter mudado no meio) e a que volta do cache do navegador. E
+   acompanha a troca feita em outra aba (evento storage); a da mesma aba chega pelo botão do Nexus (base.html), moldura por
+   moldura. Só JavaScript: nada de cor aqui. #}
+<script>
+{% include "_tema_cabeca.html" %}
+    window.addEventListener("storage", function (e) {
+      if (e.key === "nexus.tema" && (e.newValue === "claro" || e.newValue === "escuro"))
+        document.documentElement.setAttribute("data-tema", e.newValue);
+    });
+</script>

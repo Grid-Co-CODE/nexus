@@ -102,9 +102,12 @@ nesta pasta.
   segredo novo. O cookie continua `os_sessao`, só em `/os`.
 - **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
   `/os/*` mostra um aviso e o resto do Nexus segue.
+- **Tema do Nexus (escuro e claro):** o OS Creator segue o botão do tema do Nexus, na moldura da torre, no card da OS e
+  em qualquer página `/os/` (seção "Tema claro, com o botão do Nexus").
 - **Testes:** `tests/test_torre_oscreator.py`, `tests/test_oscreator_solic_engenharia.py`,
   `tests/test_oscreator_busca_digitavel.py`, `tests/test_oscreator_desempenho.py`, `tests/test_oscreator_card_tarefas.py`,
-  `tests/test_oscreator_acomp_quadro.py` e `tests/test_oscreator_acomp_renovar.py`. Nenhum teste fala com o Fracttal.
+  `tests/test_oscreator_acomp_quadro.py`, `tests/test_oscreator_acomp_renovar.py`, `tests/test_oscreator_card_preparo.py`
+  e `tests/test_oscreator_tema_claro.py`. Nenhum teste fala com o Fracttal.
 - **O que não funciona igual:**
   - o login pelo OAuth do Fracttal tem a volta configurada para o supervisório; e-mail e senha funcionam normal;
   - gravar ticket precisa do `GRIDCO_SQL_TOKEN`, que vem da variável ou do `%APPDATA%` da máquina.
@@ -502,6 +505,86 @@ as subtarefas e não aparecendo as tarefas, tem que dividir por tarefa quando cl
     Concluir; o "Fazer a tarefa" com o checklist da tarefa certa; os anexos abrindo; nenhum erro de JavaScript.
   - A suíte do oem (681 testes) passa com os arquivos novos, numa cópia.
   - Falta o olho do Levi numa OS de verdade (a 8709, ou uma das de 08/10 com várias tarefas).
+
+## Tema claro, com o botão do Nexus (09/10/2026)
+
+O pedido do Levi, de 09/10: "faltou o tema claro do OS Creator Web, não está sincronizando com o botão do Nexus". Com o
+Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamente como era.
+
+- **Como o tema chega, sem piscar.** O clone não lê o cookie do Nexus: quem decide é o Nexus, pelo mesmo
+  `casca.tema_do_pedido` (cookie `nexus_tema`).
+  - **A ponte** (`ponte._com_o_tema`): com o Nexus no claro, o `<html>` da página do clone sai com `data-tema="claro"`;
+    no escuro (o padrão, cookie ausente ou desconhecido) o atributo não entra, e o HTML é o de sempre. Toda página leva
+    o `oscreator/_tema_os.html` logo depois do `<meta charset>` (o `_tema_cabeca.html` do Nexus e o evento `storage`):
+    ele refaz a conta antes de pintar, para a página que demorou (o Fracttal leva segundos e o tema pode ter mudado no
+    meio) e a que volta do cache, e acompanha a troca feita em outra aba do navegador.
+  - **O card da OS** (`card_os.html`, template do Nexus) desenha o mesmo atributo e inclui o mesmo script.
+  - **Ao vivo:** o botão do tema (`base.html`, `temaNasMolduras`) troca o atributo nas molduras abertas da mesma origem
+    cujo endereço é `/os/`, moldura dentro de moldura (a da torre, a casca e as abas dela; o card do Quadro da equipe).
+    A página da Plataforma no Tempo real (outro sistema) e moldura de outra origem ficam como estão. Página do OS
+    Creator aberta depois já nasce no tema novo: o cookie já mudou.
+- **Onde mora a cor: no clone**, e vai ao oem com a sincronia. Cada `.css` do `os_web/static` ganhou no fim o par do
+  claro de cada cor do escuro, em `:where(html[data-tema="claro"]) <o mesmo seletor>`; o bloco TEMA CLARO do fim do
+  `os.css` tem a paleta, `--osc-*`, que é a do tema claro do Nexus (`nexus.css`), e as variáveis de cada folha no claro.
+  No oem sozinho (5090) ninguém põe o atributo: nada disso vale, e a tela é a de sempre.
+  - `:where()` não soma especificidade: o par do claro vence o escuro só por vir depois, e o estado mais específico do
+    escuro (`.on`, `.sel`, `:hover`, `:focus`) continua vencendo. Com `html[data-tema="claro"] .x` solto, o `.x` do
+    claro passaria por cima do `.x.on` e do `:focus` (a borda de foco do campo sumia). Hover reescrito no claro leva
+    junto, depois dele, o estado que vinha depois no escuro (o foco depois do hover, o marcado depois do hover).
+  - Verde Grid (lima `#a9db21`) só como SUPERFÍCIE (botão, barra, marcação cheia) com texto escuro; verde em texto, foco
+    e borda de escolha é o musgo (`#566610`): o lima dá 1,6:1 no branco. As variáveis que o escuro usa para os dois
+    (`--f-green`, `--verde`, `--gr`) são o musgo no claro, e cada fundo verde ganhou o lima no par.
+  - Borda de campo (input, select, busca) a 3:1 contra o branco e o cinza de seção (`--osc-campo`).
+  - O conteúdo não esmaece por opacidade no claro (a pergunta de fora, o cartão finalizado, o setor que não chegou à
+    web, o detalhe da pendência): vira cinza de seção ou texto mudo. O controle desligado (`:disabled`) segue com a
+    opacidade do escuro.
+  - **Cor do dado** no `style` (o status do Fracttal no selo, a etiqueta, o placar dos Tickets, o status do ativo, o do
+    nó do Fluxo, o ciclo do painel de tickets): ela foi escolhida para o navy (o verde `#48D07A` dá 2:1 no branco). No
+    claro o texto é pintado com a mesma cor e a luminosidade do oklch no teto de 0,46
+    (`-webkit-text-fill-color: oklch(from currentColor min(l,.46) c h)`): a matiz e a saturação ficam (o vermelho segue
+    vermelho), só a cor clara demais escurece. Medido no Chrome: de 5,5:1 a 7,7:1 no fundo do selo com as cores do
+    Fracttal e do OS Creator, 4,9:1 no pior caso inventado (vermelho puro). Navegador sem a cor relativa fica na linha de
+    antes: a cor misturada meio a meio com o preto (a luminância por 8, acima de 6:1), legível mas quase preta. A borda e
+    o fundo do selo seguem os do dado.
+  - Ícones: o traço vem no `stroke="#…"` do `<svg>` (`lancador.icone`); o `os.css` remapeia cada cor no claro
+    (`svg[stroke="#A6E22E" i]` → musgo, o cinza-claro → o cinza do texto, o branco → a tinta).
+  - Cor fixa escrita num template (`engenharia.html`): o elemento ganhou uma classe (`eng-sup-nome`, `eng-titulo`,
+    `eng-sup-quadro`) e a classe ganhou o claro em `!important`; o `style` e o escuro não mudaram.
+  - A foto ampliada (o visor do card) fica escura nos dois temas, como a do Nexus: dentro dele as variáveis voltam ao
+    escuro.
+- **REGRA para quem mexer no CSS do clone:** cor nova no escuro ganha o par do claro no fim da mesma folha, por `--osc-*`;
+  cor nova de ícone ganha o `svg[stroke]` no `os.css`; `style` com cor num template ganha a classe com o claro em
+  `!important`; cor do dado no `style` ganha a regra `[style]` com o `-webkit-text-fill-color`. O
+  `tests/test_oscreator_tema_claro.py` cobra tudo isso.
+- **Vale quando:** o CSS vem do disco na hora, mas sem o atributo ele não muda nada; a ponte, o `card_os.html` e o
+  `base.html` valem depois de reiniciar o Nexus (5070) ou do deploy. No 5090 do supervisório nada muda.
+- **Como provar:**
+  - `tests/test_oscreator_tema_claro.py`: a ponte põe o atributo pelo cookie e não põe no escuro (o HTML do escuro não
+    depende do cookie); o card idem; o botão chama a troca, e a função dele, no node sobre um DOM falso, troca a casca,
+    a aba e o card e não a Plataforma nem a moldura de outra origem; o clone não importa o nexus; toda cor fixa do escuro
+    de cada folha tem o par do claro (vale a última declaração de cada seletor), toda variável de cor tem o valor do
+    claro, toda cor de ícone tem a do claro, toda cor escrita em template ou JS tem o gancho; o claro só existe em
+    `:where(html[data-tema="claro"])`; a paleta é a do Nexus; o contraste AA do texto do claro, regra a regra; a borda de
+    campo a 3:1. Doze mutações (tirar um par, cor nova sem par, claro sem `:where`, texto em lima, variável sem claro,
+    cor de dado e cor fixa em template, cor de dado no JS, ícone novo, a ponte e o card sem o atributo, a paleta
+    divergente) fazem o teste falhar.
+  - Na bancada (09/10): um Nexus de ensaio com o Fracttal falso e a rede bloqueada, no Chrome sem janela, 42 telas,
+    diálogos e estados do OS Creator (pela torre, pelos atalhos de Chamados e o card do Quadro da equipe), nos dois temas,
+    a 1440 e a 375 px, com o código de antes e o de depois. No claro, de 15.196 textos medidos, os abaixo de 4,5:1 foram
+    de 168 (o OS Creator navy dentro do Nexus claro) a 0; o menor é o "!" branco no círculo vermelho do painel de tickets
+    (4,8:1, igual nos dois temas). No escuro, as cores computadas de 32.006 elementos são as mesmas de antes, e os prints
+    só diferem no relógio (a hora da leitura, o "agora" das datas) e em 1 unidade de anti-serrilhado. Nenhum erro de
+    JavaScript. A troca ao vivo: o botão com o card aberto, aba nova depois da troca, a volta ao escuro igual ao de antes,
+    o card do Quadro da equipe e a outra aba do navegador.
+  - O oem sozinho (o clone sem o Nexus, como o 5090), com o cookie `nexus_tema=claro` no navegador (o mesmo host em outra
+    porta recebe o cookie): nunca ganha o atributo; 10.724 elementos com as mesmas cores do código de antes. A suíte web
+    do oem (`test_os_web_*.py` e `test_anexo_documento.py`, 681) passa com os arquivos novos, numa cópia fora dele.
+  - Já era assim antes, nos dois temas, e ficou de fora (mexer muda o oem): a 375 px a aba rola de lado na Visão COS (o
+    "N OS exibidas"), na Nova solicitação PCM (a grade da classificação), na tela de um chamado (a tabela), na Clonagem
+    (os campos) e no COS (a linha das datas); e o escuro tem 168 textos abaixo de 4,5:1 (a etiqueta do Fracttal com a
+    cor escura do dado, como ENGENHARIA a 2,5:1 e Remoto a 1,6:1; o `--fa` dos chamados, do Controle de fornecedores e
+    do Início, a 3,5–4,1:1; o texto de exemplo do login, cinza padrão do navegador).
+  - Falta o olho do Levi com os dados de verdade.
 
 ## Rodar sozinho (sem o Nexus e sem mexer no 5090)
 

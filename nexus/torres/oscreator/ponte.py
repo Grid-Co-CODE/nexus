@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 import sys
 import threading
 
@@ -77,6 +78,17 @@ _OUVIR_NEXUS = b"""    window.addEventListener('message', function (e) {
 _ANCORA_MENSAGEM = b"    window.addEventListener('message', function (e) {\n"
 _TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTopo() === window) casca();"),
                 (_ANCORA_MENSAGEM, _OUVIR_NEXUS + _ANCORA_MENSAGEM)]
+
+# Tema claro (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está sincronizando com o botão do Nexus"). O
+# clone não lê o cookie do Nexus: quem decide é a ponte, pelo mesmo casca.tema_do_pedido das páginas do Nexus.
+# - No claro, o <html> da página já sai com data-tema="claro": o servidor desenha, e a página nasce clara, sem piscar o navy.
+#   As cores moram no próprio clone (o par :where(html[data-tema="claro"]) no fim de cada .css do os_web/static), que
+#   vão ao oem junto: lá ninguém põe o atributo e nada muda.
+# - No escuro (o padrão, cookie ausente ou desconhecido) o atributo NÃO entra: o HTML do escuro é o de sempre.
+# - Em toda página, o oscreator/_tema_os.html (o _tema_cabeca.html do Nexus) refaz a conta antes de pintar e ouve a troca
+#   feita em outra aba. A troca na mesma aba chega pelo botão do Nexus (base.html), moldura por moldura.
+_HTML_ABRE = re.compile(rb"<html(?=[\s>])", re.I)
+_META_CHARSET = re.compile(rb"<meta charset=[^>]*>", re.I)
 
 _METODOS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
 # O aviso do app de DESKTOP quando o JWT do Fracttal venceu e não renovou (api._rpc_headers). Na web ele aparecia na
@@ -159,6 +171,7 @@ def encaminhar(resto: str):
             corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _ESTILO_NEXUS, 1)
             for de, para in _TROCAS_HTML:
                 corpo = corpo.replace(de, para)
+            corpo = _com_o_tema(app, corpo)
         resp.set_data(corpo)
     elif ajusta_js and resp.status_code == 200:
         corpo = resp.get_data()
@@ -173,6 +186,28 @@ def encaminhar(resto: str):
         resp.headers.pop("Last-Modified", None)
         resp.make_conditional(request)
     return resp
+
+
+def _script_do_tema(app) -> bytes:
+    """O <script> do tema (oscreator/_tema_os.html), montado uma vez por app: é só JavaScript, igual em todo pedido."""
+    js = app.extensions.get("os_tema_js")
+    if js is None:
+        texto = app.jinja_env.get_template("oscreator/_tema_os.html").render()
+        js = app.extensions["os_tema_js"] = "\n".join(l.strip() for l in texto.splitlines() if l.strip()).encode()
+    return js
+
+
+def _com_o_tema(app, corpo: bytes) -> bytes:
+    """A página do clone no tema do Nexus: o <html> com data-tema="claro" quando o Nexus está no claro (no escuro, sem o
+    atributo, como sempre), e o script do tema logo depois do <meta charset> (antes de pintar, e sem empurrar o charset para
+    além dos primeiros 1.024 bytes, o trecho que o navegador lê para achar a codificação)."""
+    from ...casca import tema_do_pedido
+    if tema_do_pedido() == "claro":
+        corpo = _HTML_ABRE.sub(b'<html data-tema="claro"', corpo, count=1)
+    m = _META_CHARSET.search(corpo)
+    if m:
+        return corpo[:m.end()] + b"\n" + _script_do_tema(app) + corpo[m.end():]
+    return corpo.replace(b"<head>\n", b"<head>\n" + _script_do_tema(app), 1)
 
 
 def _de_volta_ao_login(app, resto: str, json: bool):

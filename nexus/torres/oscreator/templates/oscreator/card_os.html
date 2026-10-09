@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="pt-BR">
+{# o tema do Nexus (09/10/2026): no claro a moldura já nasce clara, desenhada pelo servidor; no escuro, o <html> de sempre #}
+<html lang="pt-BR"{% if tema == "claro" %} data-tema="claro"{% endif %}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,6 +14,7 @@
 <link rel="icon" href="/os/assets/grid-icon.png">
 <link rel="stylesheet" href="/os/static/os.css">
 <link rel="stylesheet" href="/os/static/os_acoes.css">
+{% include "oscreator/_tema_os.html" %}
 <script src="/os/static/os_busca.js" defer></script>
 <script src="/os/static/carga.js"></script>
 {# se o carga.js não chegar, a busca segue sem o círculo (o mesmo socorro do base.html do clone) #}

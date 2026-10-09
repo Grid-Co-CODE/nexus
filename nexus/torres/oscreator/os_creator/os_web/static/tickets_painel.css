@@ -72,3 +72,23 @@ a.tp-tile:hover{border-color:var(--f-green)}
 .tp svg .tp-clicavel{cursor:pointer}
 #tp_tip{position:fixed;pointer-events:none;background:#0d1322;border:1px solid var(--tp-borda,#232a3d);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--txt);box-shadow:0 10px 26px rgba(0,0,0,.45);display:none;z-index:9;max-width:260px}
 #tp_tip .tp-t{color:var(--tp-mudo,#8a90a2);font-size:11px;margin-bottom:2px}
+
+/* ── tema claro (Nexus, 09/10/2026): a regra e a paleta --osc-* estão no bloco TEMA CLARO do fim do os.css. As cores das
+   SÉRIES (azul × laranja, azul × vermelho, o cinza do "sem OS") e as do ciclo de vida são do dado e valem nos dois temas:
+   todas passam de 3:1 no branco (a mais fraca, o azul #3987e5, dá 3,6:1). ── */
+:where(html[data-tema="claro"]) .tp{--tp-card:var(--osc-cartao);--tp-borda:var(--osc-linha-forte);--tp-grade:var(--osc-linha);
+  --tp-txt2:var(--osc-texto-2);--tp-mudo:var(--osc-mudo);--tp-s1:#3987e5;--tp-s2:#d95926;--tp-crit:#d03b3b;--tp-aviso:#fab219;
+  --tp-cinza:#56607a}
+:where(html[data-tema="claro"]) .tp-tit h1,:where(html[data-tema="claro"]) .tp-card h2,:where(html[data-tema="claro"]) .tp-hero .tp-v,
+:where(html[data-tema="claro"]) .tp-tile .tp-v,:where(html[data-tema="claro"]) .tp-alerta b,
+:where(html[data-tema="claro"]) .tp-qual li b{color:var(--osc-texto)}
+:where(html[data-tema="claro"]) .tp-erro{background:var(--osc-critico-suave);border:1px solid var(--osc-critico-borda);color:var(--osc-critico)}
+:where(html[data-tema="claro"]) .tp-alerta{background:var(--osc-critico-suave);border:1px solid var(--osc-critico-borda)}
+/* o "!" branco no círculo vermelho (4,9:1) e o escuro no círculo âmbar: iguais nos dois temas */
+:where(html[data-tema="claro"]) .tp-alerta .tp-ic{color:var(--osc-sobre-escuro)}
+:where(html[data-tema="claro"]) .tp-qual .tp-ic{color:var(--osc-sobre-cheio)}
+/* o número de cada etapa do ciclo vem com a cor do dado no style (tickets_painel.js): no claro, a mesma cor com a
+   luminosidade no teto (a regra do selo de status, no os.css) */
+:where(html[data-tema="claro"]) .tp-ciclo .tp-n[style]{-webkit-text-fill-color:color-mix(in oklab,currentColor 50%,#000);-webkit-text-fill-color:oklch(from currentColor min(l,.46) c h)}
+:where(html[data-tema="claro"]) #tp_tip{background:var(--osc-cartao);border-color:var(--osc-linha-forte);box-shadow:0 10px 26px var(--osc-sombra)}
+:where(html[data-tema="claro"]) #tp_tip .tp-t{color:var(--osc-mudo)}

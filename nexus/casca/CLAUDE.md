@@ -12,7 +12,7 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/cadeiras.py` | as 10 cadeiras; diretoria e chefia caem na torre Comando |
-| `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema |
+| `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base e entrar): a reserva do `localStorage` antes de pintar |
 | `nexus/static/nexus.css` | os tokens do Design System Grid Co. nos dois temas e o subconjunto `gc-*` |
 | `app.py` / `servir.py` | desenvolvimento (5070, IPv4 e IPv6, cookie sem Secure) / produção (atrás do proxy, cookie Secure) |
@@ -48,16 +48,23 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   volta. Com o movimento reduzido do sistema a troca é seca; sem ele, um esmaecer de 0,18 s (View Transitions). Até
   1180 px e no celular fica só o ícone; de 821 a 1180 px o seletor de cadeira é quem encolhe (sem isso o topo passava
   da borda de 821 a 845 px).
-- **Fica no escuro, de propósito:** o OS Creator embutido (`/os/*` e o card da OS) é a cópia idêntica do oem, com
-  ~470 cores fixas no CSS e ~55 nos templates: uma folha por cima pela ponte quebraria em silêncio a cada sincronização.
-  A página da Plataforma no Tempo real também (é outro sistema). A foto ampliada é sempre escura e a assinatura sempre
-  em papel branco, nos dois temas (`--foto-*`, `--papel-*`). Cores de DADO (a da pessoa no Quadro da equipe, a da
-  etiqueta do Fracttal) são as mesmas nos dois temas, com texto escuro por cima.
+- **O OS Creator embutido segue o tema** (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está
+  sincronizando com o botão do Nexus"): a ponte desenha o `data-tema="claro"` no `<html>` das páginas do clone pelo mesmo
+  `tema_do_pedido` (no escuro, sem o atributo), o card da OS (`card_os.html`) idem, e o botão troca ao vivo as molduras
+  abertas do `/os/` (`temaNasMolduras`, no `base.html`; moldura dentro de moldura). As cores do claro moram no próprio
+  clone, no par `:where(html[data-tema="claro"])` de cada `.css` dele, com a paleta `--osc-*` igual à do claro daqui (o
+  oem sozinho nunca recebe o atributo). Como e por quê: `nexus/torres/oscreator/README.md`, seção "Tema claro".
+- **Fica no escuro, de propósito:** a página da Plataforma no Tempo real (é outro sistema). A foto ampliada é sempre
+  escura (no Nexus e no visor do card da OS) e a assinatura sempre em papel branco, nos dois temas (`--foto-*`,
+  `--papel-*`). Cores de DADO (a da pessoa no Quadro da equipe, a da etiqueta do Fracttal) são as mesmas nos dois
+  temas, com texto escuro por cima; no OS Creator, a cor do dado usada como TEXTO é pintada no claro com a luminosidade
+  no teto (o README de lá).
 - **Prova:** `tests/test_tema.py` (cookie e atributo, botão, `POST /tema`, os dois blocos com os mesmos tokens, o escuro
   congelado em `ESCURO_DE_SEMPRE`, nenhuma cor fixa nos `.css` e templates, todo `var()` existe, contraste AA de cada par
-  de texto do claro). Na tela, ao mexer em cor: as telas principais nos dois temas, a 1440 e a 375 px, no Chrome sem
-  janela, medindo o contraste de todo texto visível contra o fundo efetivo, a rolagem lateral e os erros de JavaScript,
-  e as cores computadas do escuro comparadas com as de antes, elemento a elemento.
+  de texto do claro) e, para o OS Creator, `tests/test_oscreator_tema_claro.py`. Na tela, ao mexer em cor: as telas
+  principais nos dois temas, a 1440 e a 375 px, no Chrome sem janela, medindo o contraste de todo texto visível contra o
+  fundo efetivo, a rolagem lateral e os erros de JavaScript, e as cores computadas do escuro comparadas com as de antes,
+  elemento a elemento.
 
 ## Regras que já custaram caro
 

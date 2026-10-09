@@ -105,9 +105,25 @@
   var formTema = document.querySelector(".troca-tema-form");
   var botaoTema = formTema.querySelector("button"), rotuloTema = formTema.querySelector(".rotulo-tema");
   var campoTema = formTema.querySelector("input[name=tema]");
+  // As molduras do OS Creator trocam junto, na hora (Levi, 09/10/2026: "não está sincronizando com o botão do Nexus"): a da
+  // torre, a do card da OS e as abas da casca dentro delas (moldura dentro de moldura). Só as do /os/, da mesma origem: a
+  // página da Plataforma no Tempo real é outro sistema e fica no escuro dela; moldura de outra origem dá exceção e fica.
+  // A página do OS Creator aberta depois já nasce no tema novo: a ponte desenha pelo cookie, que o NexusTema.gravar mudou.
+  function temaNasMolduras(doc, t) {
+    var molduras = doc.getElementsByTagName("iframe");
+    for (var i = 0; i < molduras.length; i++) {
+      try {
+        var w = molduras[i].contentWindow, d = w && w.document;
+        if (!d || !d.documentElement || w.location.pathname.indexOf("/os/") !== 0) continue;
+        d.documentElement.setAttribute("data-tema", t);
+        temaNasMolduras(d, t);
+      } catch (e) { /* moldura de outra origem */ }
+    }
+  }
   function mostrarTema(t) {
     var outro = t === "claro" ? "escuro" : "claro";
     raiz.setAttribute("data-tema", t);
+    temaNasMolduras(document, t);
     rotuloTema.textContent = "Tema: " + (t === "claro" ? "Claro" : "Escuro");
     botaoTema.setAttribute("aria-label", "Tema: " + t + ". Trocar para o tema " + outro);
     botaoTema.title = "Trocar para o tema " + outro;
