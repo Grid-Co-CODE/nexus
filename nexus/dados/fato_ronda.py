@@ -25,8 +25,13 @@ Chave: `ronda_id`.
   usam só como a leitura de sujidade e vegetação da usina naquele dia (`nexus/campo/visao.validacoes_por_foto`).
 - chave repetida = erro (`GraoDuplicado`): um fato com duas linhas para a mesma ronda conta errado em silêncio.
 
-Pessoa: o fato NUNCA leva o nome (a API do banco tem leitura aberta, regra 8). O HMAC do e-mail (`Técnico (HMAC)`,
-quando o App mandar, passo 2) vence; depois o `pessoa_id` que o checklist/avulsa já gravaram (também do e-mail); por
+Checklist (sujidade, vegetação, vala, piranômetros): desde a v249 do App (09/10/2026; Levi: "faz meu mano", sobre o App
+mandar as respostas no `rondas_app_campo`, em colunas novas), a própria linha do App traz as respostas de TODA ronda da
+janela, com e sem OS (`APP_CHECKLIST`, `_respostas_do_app`): `checklist_fonte = "app"`, e vence a carga única (a mesma
+resposta, lida na fonte). Linha sem nenhuma resposta (livro de antes da v249): vale o checklist da carga única, como antes.
+
+Pessoa: o fato NUNCA leva o nome (a API do banco tem leitura aberta, regra 8). O HMAC do e-mail (`Técnico (HMAC)`, que
+o App manda desde a v249) vence; depois o `pessoa_id` que o checklist/avulsa já gravaram (também do e-mail); por
 último o nome em claro de hoje, que só liga se for de UMA pessoa do cadastro (homônimo não liga: ID errado é pior que
 ID nenhum). `pessoa_hmac` guarda o código para religar depois; só com o nome, ele sai de `codigo_do_nome` (o "n:" +
 HMAC do nome normalizado), que é decisão do Levi (spec, seção 9, item 2): sem ela, vazio.
@@ -72,6 +77,10 @@ MEDIDAS = (("duracao_min", "min", "aditiva"), ("nota_pts", "pts", "nao"), ("falh
            ("vala_nivel", "nível 1-3", "nao"), ("sombreamento", "1/0", "aditiva"), ("ipoa_sujo", "1/0", "aditiva"),
            ("ghi_sujo", "1/0", "aditiva"), ("albedo_sujo", "1/0", "aditiva"))
 SENSORES = ("ipoa_sujo", "ghi_sujo", "albedo_sujo")     # o mesmo nome no checklist, na avulsa e no fato
+# O checklist que o App manda na própria linha do livro desde a v249 (09/10/2026): o campo do fato -> a coluna do App
+APP_CHECKLIST = {"sujidade_nivel": "Sujidade dos módulos (1 a 5)", "vegetacao_nivel": "Altura da vegetação (1 a 5)",
+                 "vala_nivel": "Vala de drenagem", "ipoa_sujo": "Piranômetro IPOA", "ghi_sujo": "Piranômetro GHI",
+                 "albedo_sujo": "Albedômetro"}
 # a linha do livro da avulsa que é validação por foto, não ronda (o valor exato que a importação grava em `origem`)
 ORIGEM_VALIDACAO_FOTO = "validacao_foto"
 
@@ -169,6 +178,19 @@ def _respostas_checklist(ck) -> dict:
             "sombreamento": None, **{c: DOM.sensor(ck.get(c)) for c in SENSORES}}
 
 
+def _respostas_do_app(a) -> dict:
+    """O checklist que o App manda na própria linha do livro (v249 do App, 09/10/2026; Levi: "faz meu mano", sobre o App
+    mandar as respostas no `rondas_app_campo`, em colunas novas). Vem de TODA ronda da janela, com e sem OS, e vence a
+    carga única: é a mesma resposta, lida na fonte. Linha sem nenhuma resposta (livro de antes da v249, ronda sem
+    checklist): {} e vale o checklist da carga única, como antes."""
+    if not any(_txt(a.get(c)) for c in APP_CHECKLIST.values()):
+        return {}
+    return {"checklist_fonte": "app", "sujidade_nivel": DOM.nivel(a.get(APP_CHECKLIST["sujidade_nivel"])),
+            "vegetacao_nivel": DOM.nivel(a.get(APP_CHECKLIST["vegetacao_nivel"])),
+            "vala_nivel": DOM.vala(a.get(APP_CHECKLIST["vala_nivel"])), "sombreamento": None,
+            **{s: DOM.sensor(a.get(APP_CHECKLIST[s])) for s in SENSORES}}
+
+
 def _linha(**kw) -> list:
     return [kw.get(c) for c in CAB_RONDA]
 
@@ -219,7 +241,9 @@ def fato_ronda(app: list[dict], checklist: list[dict], avulsas: list[dict], lig,
         presentes, desconhecidas = DOM.falhas(a.get("Falhas"))
         rotulos = len(presentes) + len(desconhecidas)
         os_ = _txt(a.get("OS")) or None
-        resp = _respostas_checklist(ck) if ck is not None else {}
+        # o checklist do App na própria linha (v249) vence o da carga única: é a mesma resposta, lida na fonte
+        resp_app = _respostas_do_app(a)
+        resp = resp_app or (_respostas_checklist(ck) if ck is not None else {})
         eid, eq_como = _equip(equip, a.get("Ativo da usina no Fracttal"))     # a OS de ronda é sobre a usina
         linhas.append(_linha(
             ronda_id=chave("app", ini), origem="app_os" if os_ else "app_sem_os", data_id=data_do_registro(ini),
@@ -235,7 +259,8 @@ def fato_ronda(app: list[dict], checklist: list[dict], avulsas: list[dict], lig,
             trackers_respondidos_qtd=_int(a.get("Trackers respondidos")), **resp))
         origem_q.append({"fonte": "app", "Usina": _txt(a.get("Usina")), "Região": _txt(a.get("Região")),
                          "situacao": _txt(a.get("Situação da OS")), "falhas_desconhecidas": desconhecidas,
-                         "vala": _txt(ck.get("vala")) if ck is not None else "", "checklist": casou})
+                         "vala": _txt(a.get(APP_CHECKLIST["vala_nivel"])) if resp_app else
+                         (_txt(ck.get("vala")) if ck is not None else ""), "checklist": casou})
 
     # o checklist cuja ronda não está (mais) no livro do App: a resposta fica, com o mesmo ronda_id
     for ini, cks in por_inicio.items():

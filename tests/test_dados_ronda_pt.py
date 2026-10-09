@@ -368,3 +368,43 @@ def test_qualidade_da_pt_com_extra():
     e = json.loads(q["extra"])
     assert (e["pts"], e["situacao_de_acordo"], e["situacao_aguardando"], e["situacao_fora"]) == (3, 2, 1, 1)
     assert (e["decisor_ligado"], e["decisor_com_hmac"], e["decidida_em_outro_dia"], e["fora_sem_numero"]) == (0, 2, 2, 1)
+
+
+# ── o checklist que o App manda na própria linha (v249 do App, 09/10/2026: "faz meu mano") ───────────────────────────
+CK_APP = {"Sujidade dos módulos (1 a 5)": 2, "Tipos de sujidade": "Poeira / areia", "Altura da vegetação (1 a 5)": 5,
+          "Vala de drenagem": "Limpa", "Piranômetro GHI": "Sujo", "Piranômetro IPOA": "Limpo",
+          "Albedômetro": "Não se aplica", "Checklist da ronda": "Sujidade dos módulos: 2 [Poeira / areia]; Altura da vegetação: 5"}
+
+
+def test_checklist_do_app_na_linha_vence_a_carga_unica():
+    """A mesma ronda com o checklist na linha do App e na carga única (que diz outra coisa): vale o do App, a fonte."""
+    d, _, oq = _ronda([_app(**CK_APP)], [_ck()])
+    r = d[0]
+    assert (r["checklist_fonte"], r["sujidade_nivel"], r["vegetacao_nivel"], r["vala_nivel"]) == ("app", 2, 5, 1)
+    assert (r["ghi_sujo"], r["ipoa_sujo"], r["albedo_sujo"], r["sombreamento"]) == (1, 0, None, None)
+    assert oq[0]["vala"] == "Limpa" and len(d) == 1                  # a carga única não vira outra linha
+
+
+def test_linha_do_app_sem_checklist_usa_a_carga_unica_como_antes():
+    d, _, _ = _ronda([_app()], [_ck()])
+    assert (d[0]["checklist_fonte"], d[0]["sujidade_nivel"], d[0]["vala_nivel"]) == ("carga_unica_sem_os", 4, 3)
+
+
+def test_checklist_do_app_sem_carga_unica_e_nao_se_aplica():
+    d, _, _ = _ronda([_app(**{"Sujidade dos módulos (1 a 5)": None, "Altura da vegetação (1 a 5)": 3,
+                              "Vala de drenagem": "Não se aplica", "Piranômetro GHI": "Não se aplica"})])
+    r = d[0]
+    assert (r["checklist_fonte"], r["sujidade_nivel"], r["vegetacao_nivel"], r["vala_nivel"], r["ghi_sujo"]) == (
+        "app", None, 3, None, None)
+
+
+def test_colunas_do_app_vazias_nao_viram_checklist():
+    d, _, _ = _ronda([_app(**{c: "" for c in FR.APP_CHECKLIST.values()})])
+    assert d[0]["checklist_fonte"] is None and d[0]["sujidade_nivel"] is None
+
+
+def test_as_colunas_do_app_sao_as_que_o_app_manda():
+    """Os nomes casam com o RONDAS_WB_COLUNAS da v249 do App (function_app.py): mudou lá, muda aqui."""
+    assert set(FR.APP_CHECKLIST.values()) <= {
+        "Técnico (HMAC)", "Sujidade dos módulos (1 a 5)", "Tipos de sujidade", "Altura da vegetação (1 a 5)",
+        "Vala de drenagem", "Piranômetro GHI", "Piranômetro IPOA", "Albedômetro", "Checklist da ronda"}

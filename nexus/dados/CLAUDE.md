@@ -196,11 +196,13 @@ cadastro, recusar carga encolhida. **Nada disto está feito**; onde cada peça h
    depois do deploy do Nexus; o pedido à T.I. para apagar o histórico por linha da aba 446. **2b (08/10):** os nomes
    de técnico e supervisor saíram dos arquivos versionados do repositório público (`tests/test_sem_nomes_no_repositorio.py`
    guarda); o histórico do git continua com eles (não se reescreve).
-3. **Passo 3 — feito** (`fato_ronda`, `fato_pt`, `dominios.py`). Decisões do Levi que faltam: (1) checklist das rondas
-   com OS (o App mandar as respostas, recomendado, e/ou carga única das 602 do arquivo local: hoje 125/874 têm
-   checklist); (2) chave durável de quem só vem por nome (`fato_ronda.codigo_do_nome`, pronto e desligado); (4) a
-   decisão da PT do Nexus por ativo ou pela PT inteira, e quem são as 6 contas Admin (decisor 0%). A (3), a avulsa
-   antes da 1ª gravação, foi **feita em 08/10** (vala do App, sensor em 3 estados, anulação sem `data_id`/`usina_id`).
+3. **Passo 3 — feito** (`fato_ronda`, `fato_pt`, `dominios.py`). A (1), o checklist das rondas com OS, foi **decidida e
+   feita em 09/10** (Levi: "faz meu mano"): o App manda as respostas na própria linha do `rondas_app_campo` (v249 do
+   App, colunas novas no fim, com e sem OS) e o `fato_ronda` as lê com `checklist_fonte = app`, que vence a carga única
+   (`fato_ronda.APP_CHECKLIST`; linha sem resposta, de antes da v249, segue com a carga única). Decisões do Levi que
+   faltam: (2) chave durável de quem só vem por nome (`fato_ronda.codigo_do_nome`, pronto e desligado); (4) a decisão
+   da PT do Nexus por ativo ou pela PT inteira, e quem são as 6 contas Admin (decisor 0%). A (3), a avulsa antes da 1ª
+   gravação, foi **feita em 08/10** (vala do App, sensor em 3 estados, anulação sem `data_id`/`usina_id`).
    Falta para a 1ª gravação da validação por foto: a ficha de quem validou no cadastro (e o de-para do Fracttal, se
    as 2 usinas com espaço duplo devem entrar).
 4. **Passo 5 — feito** (SCD2). Falta: decisão 5 (aceitar o início presumido), HIST-4 (o fato é rechaveado pelo cadastro
