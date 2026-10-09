@@ -4,6 +4,10 @@
    (vector-effect:non-scaling-stroke): o contorno fica fino em qualquer largura. No celular o SVG ocupa a largura da tela
    (uns 340 px) e o --mp-k aumenta pontos, alvos e anéis, para dar para ver e tocar. Nada de largura fixa maior que o celular. */
 .mp{--mp-mar:var(--mapa-mar);--mp-terra:var(--mapa-terra);--mp-k:1;--mp-zp:1;--mp-zt:1;min-width:0;container:mp / inline-size}
+/* O mapa usa a largura que a tela tiver, até 1720 px (a lista fica nos 1280 do .cl): com a tabela à direita, os 1280 deixavam
+   o motivo de quase toda usina em duas ou três linhas (Levi, 09/10/2026: "aumente o tamanho de usinas em risco um pouco para a
+   direita para nem todos os motivos ficarem quebrados"). */
+.cl.mp{max-width:1720px}
 .mp-cab-lado{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
 .mp-regioes{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
 .mp-regiao{font:600 12px/16px var(--font-sans);padding:6px 14px;border-radius:999px;border:1px solid var(--linha-forte);
@@ -117,6 +121,11 @@
   /* a tabela não dita a altura da linha (o mapa e a legenda ditam) e rola por dentro dela: sem o contain, 154 linhas
      esticariam a página e o mapa ficaria sozinho no alto */
   .mp-tab-rolagem{flex:1 1 auto;max-height:none;min-height:0;contain:size}
+}
+/* Com folga (1300 px de tela útil ou mais), a tabela cresce até 520 px e o motivo cabe numa linha (Levi, 09/10/2026). Só com
+   folga: a 1440 px com o menu aberto, os 520 px deixavam o mapa com uns 390 px. */
+@container mp (min-width:1300px){
+  .mp-corpo{grid-template-columns:minmax(200px,230px) minmax(0,1fr) minmax(360px,520px)}
 }
 @media (max-width:820px){
   .mp-mapa{padding:4px}

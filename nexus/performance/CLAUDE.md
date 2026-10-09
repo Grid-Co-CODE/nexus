@@ -293,7 +293,10 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
   na direita uma tabela com o nome das usinas, os riscos e uma forma resumida do motivo do risco"). Container query no `.mp`
   (conta a largura da tela, não a da janela): o padrão é uma coluna com o mapa primeiro; a partir de 760 px, legenda e mapa lado a
   lado e a tabela embaixo; a partir de 1120 px, as três lado a lado, e a tabela rola por dentro na altura da linha (o
-  `contain:size` impede as 154 linhas de esticarem a página). A tabela (`m["tabela"]`) tem uma linha por usina do recorte, na
+  `contain:size` impede as 154 linhas de esticarem a página). A página do mapa vai até 1720 px (a lista fica nos 1280 do `.cl`),
+  e a tabela tem até 400 px; com 1300 px de tela útil ou mais, até 520 px, e o motivo cabe numa linha (Levi, 09/10: "aumente o
+  tamanho de usinas em risco um pouco para a direita"). Só com folga: a 1440 px com o menu aberto, 520 px deixavam o mapa com
+  uns 390 px; com o limite, ele fica com uns 520. A tabela (`m["tabela"]`) tem uma linha por usina do recorte, na
   ordem Agir agora, Atenção, Sem leitura completa, Sem alerta e, dentro do nível, da mais grave para a menos (depois o nome); o
   risco vai na cor, na bolinha e na palavra; o motivo é o `visao.motivo_curto` da lista ("Nada previsto" com as três fontes
   lidas, "Sem leitura de X" sem elas); o nome leva à página da usina.
