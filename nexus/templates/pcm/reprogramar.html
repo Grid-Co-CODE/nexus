@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block titulo %}Reprogramar a semana em curso{% endblock %}
+{% block conteudo %}
+{# A confirmação antes de gravar nos ajustes da semana em curso (nexus/pcm/quadro.py, `aplicar_na_semana_em_curso`):
+   muda o que o campo está fazendo nesta semana, então tudo o que importa fica à vista antes do botão. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+<p class="gc-eyebrow">PCM · Quadro da semana</p>
+<h1 class="titulo-pagina">Aplicar na semana {{ semana }} em curso</h1>
+
+{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
+
+<p class="pcm-sub pcm-pub-sub">As linhas vão para o <span class="gc-dado">Observacoes_Semana_Atual.txt</span> do repositório do PCM
+  ({{ atual.repo }}). O robô do PCM roda com a gravação e aplica na programação desta semana: põe a tarefa no dia e no turno
+  pedidos e empurra as que estavam no caminho, tira a OS da semana ou puxa a tarefa das pendentes. O App recebe em 5 a 15
+  minutos.</p>
+
+{% if problemas %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-prohibit"></i><div><strong>Itens da fila que não entram:</strong>
+  <ul class="pcm-pub-lista">{% for p in problemas %}<li>{{ p }}</li>{% endfor %}</ul>
+  Volte ao quadro, tire esses itens da fila e grave de novo.</div></div>
+{% endif %}
+
+<section class="pcm-rodada">
+  <h2 class="pcm-h2">O que entra ({{ linhas|length }} {{ 'linha' if linhas|length == 1 else 'linhas' }})</h2>
+  <pre class="pcm-pre q-pre">{{ linhas|join('\n') }}</pre>
+  {% if res.saem %}
+  <p class="gc-ajuda">Substituem estas linhas, que já estavam lá para as mesmas OS:</p>
+  <pre class="pcm-pre q-pre">{{ res.saem|join('\n') }}</pre>
+  {% endif %}
+
+  <h2 class="pcm-h2">O que o arquivo tem hoje</h2>
+  {% if atual.erro %}
+  <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-plugs"></i><div><strong>Não consegui ler o repositório:</strong> {{ atual.erro }}.</div></div>
+  {% elif not atual.texto.strip() %}
+  <p class="gc-ajuda">Está vazio.</p>
+  {% else %}
+  <pre class="pcm-pre q-pre">{{ atual.texto }}</pre>
+    {% if atual.semana and atual.semana != semana %}
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-calendar-x"></i><div><strong>Essas linhas são da semana {{ atual.semana }}.</strong>
+    O arquivo vale para qualquer semana que estiver em curso: elas saem, para não se aplicarem a esta.</div></div>
+    {% elif not atual.semana %}
+  <p class="gc-ajuda">Sem a semana no cabeçalho: foram gravadas pelo painel do PCM. Ficam, a não ser que você marque
+    para apagar (se forem de uma semana que já acabou, apague: o robô aplicaria nesta).</p>
+    {% endif %}
+  {% endif %}
+
+  {% if not atual.erro %}
+  <h2 class="pcm-h2">Como o arquivo fica</h2>
+  <pre class="pcm-pre q-pre">{{ novo }}</pre>
+  {% endif %}
+</section>
+
+{% if not atual.erro and linhas and not problemas %}
+<form class="pcm-pub-form" method="post" action="/t/pcm/quadro/reprogramar">
+  <input type="hidden" name="semana" value="{{ semana }}">
+  <input type="hidden" name="itens" value="{{ itens_json }}">
+  <input type="hidden" name="sha_visto" value="{{ atual.sha }}">
+  {% if atual.texto.strip() and not atual.semana %}
+  <label class="pcm-confirma"><input type="checkbox" name="apagar" value="1"> Apagar as linhas que já estavam no arquivo.</label>
+  {% endif %}
+  <label class="pcm-confirma"><input type="checkbox" name="confirmo" value="1" required> Confirmo: estas linhas mudam a
+    programação da semana {{ semana }}, que o campo está seguindo.</label>
+  <div class="pcm-pub-acoes">
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-floppy-disk"></i> Aplicar na semana em curso</button>
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/quadro?semana={{ semana }}">Voltar ao quadro</a>
+  </div>
+</form>
+{% else %}
+<p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/quadro?semana={{ semana }}">Voltar ao quadro</a></p>
+{% endif %}
+{% endblock %}

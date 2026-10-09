@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block titulo %}Quadro da semana{% endblock %}
+{% block conteudo %}
+{# Quadro da semana (09/10/2026, Levi: "Eles tem essa visão [...] no site de PCM, gostaria que tenhamos uma visão dessa no
+   Nexus também e consigamos reprogramar tarefas"). As contas estão em nexus/pcm/quadro.py; a janela da OS e a fila, em
+   static/pcm-quadro.js (dependem dos atributos data-* daqui). #}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+<p class="gc-eyebrow">PCM · Programação semanal</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Quadro da semana</h1>
+    {% if sem %}<p class="pcm-sub">{{ sem.label }} · {{ origem_txt }}</p>{% endif %}
+  </div>
+  {% if chips %}
+  <nav class="pcm-semanas" aria-label="Semanas">
+    {% for c in chips %}<a href="{{ c.href }}"{% if c.atual %} aria-current="page"{% endif %}>{{ c.rotulo }}</a>{% endfor %}
+  </nav>
+  {% endif %}
+</div>
+
+{% if rodada %}
+<p class="pcm-fonte"><i class="ph ph-file-xls"></i><span>Lê a planilha que o Nexus gerou nesta rodada, que ainda não é a
+  programação do App. Reprogramar daqui grava nas observações da semana, que valem na próxima geração.</span></p>
+{% else %}{% include "pcm/_fonte.html" %}{% endif %}
+{% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}{% if ok_link %}
+  <a class="pcm-link" href="{{ ok_link }}">Ver nas observações da semana</a>.{% endif %}</div></div>{% endif %}
+{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
+
+{% if sem %}
+<form class="pcm-filtros q-filtros" method="get">
+  <input type="hidden" name="semana" value="{{ sem.week }}">
+  {% if rodada %}<input type="hidden" name="rodada" value="{{ rodada }}">{% endif %}
+  <div class="campo busca">
+    <label class="gc-rotulo" for="q">Buscar</label>
+    <input id="q" name="q" class="gc-campo" value="{{ filtros.q or '' }}" placeholder="OS, usina, tarefa, equipamento…" autocomplete="off">
+  </div>
+  {% for campo, rot, todos in [("equipe", "Equipe", "Todas"), ("resp", "Responsável", "Todos"), ("cliente", "Cliente", "Todos"),
+                               ("tipo", "Tipo", "Todos"), ("estado", "Situação", "Todas"), ("turno", "Turno", "Todos")] %}
+  <div class="campo">
+    <label class="gc-rotulo" for="f-{{ campo }}">{{ rot }}</label>
+    <select id="f-{{ campo }}" name="{{ campo }}" class="gc-campo" onchange="this.form.submit()">
+      <option value="">{{ todos }}</option>
+      {% for v in q.opcoes[campo] %}<option value="{{ v }}"{% if v == filtros[campo] %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endfor %}
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
+  {% if tem_filtro %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ url_limpar }}">Limpar</a>{% endif %}
+</form>
+
+<div class="q-resumo">
+  <p class="pcm-conta"><b class="gc-num">{{ q.total }}</b>{% if q.total != q.total_semana %} de {{ q.total_semana }}{% endif %}
+    tarefas · {{ q.horas }} programadas{% if q.novas is not none %} · <b class="gc-num">{{ q.novas }}</b>
+    {{ 'criada' if q.novas == 1 else 'criadas' }} após o plano{% endif %}{% if q.sem_dia %} · {{ q.sem_dia }} sem dia{% endif %}{% if filtro_gestor %} · filtrado em
+    {{ filtros.resp }}, o gestor de contrato que entrou{% endif %}</p>
+  <p class="gc-ajuda q-janela"><i class="ph ph-calendar-dots"></i> A semana do PCM vai do sábado {{ q.janela[0].strftime('%d/%m') }} 00:00
+    à sexta {{ q.janela[1].strftime('%d/%m') }}: o plano fecha no fim da sexta anterior, e "criadas após o plano" conta as OS
+    criadas nesse intervalo.{% if q.novas is none %} Esta semana ainda não tem a data de criação das OS (o rascunho sai da
+      planilha gerada; a criação vem quando o robô do PCM publica).{% endif %}</p>
+</div>
+
+<div class="q-rolo" tabindex="0" aria-label="Quadro da semana, rolagem horizontal">
+  <div class="q-quadro" style="--cols:{{ q.colunas|length or 1 }}">
+  {% for c in q.colunas %}
+    <section class="q-col" aria-label="{{ c.nome }} {{ c.data }}">
+      <header class="q-col-cab">
+        <div class="q-col-dia">{{ c.nome }} <span>{{ c.data }}</span></div>
+        <div class="q-col-n gc-num">{{ c.n }}</div>
+        <div class="q-col-h">{{ c.horas }} programadas</div>
+        {% if c.novas is not none %}
+        <div class="q-col-novas{% if not c.novas %} q-zero{% endif %}"
+             title="OS criadas a partir do sábado {{ q.janela[0].strftime('%d/%m') }} 00:00, depois que o plano da semana fechou"><b class="gc-num">{{ c.novas }}</b>
+          {{ 'criada' if c.novas == 1 else 'criadas' }} após o plano</div>
+        {% endif %}
+        <div class="q-carga" title="{{ c.n }} tarefas{% if c.pico %}: o dia mais cheio{% endif %}"><i class="{% if c.pico %}q-pico{% endif %}" style="width:{{ c.carga }}%"></i></div>
+      </header>
+      <div class="q-cartoes">
+      {% for k in c.cartoes %}
+        <div class="q-cartao q-t--{{ k.tc }}" data-cartao="{{ k.i }}" data-os="{{ k.os }}" role="button" tabindex="0"
+             aria-label="Abrir a OS {{ k.os }}: {{ k.t }}">
+          <div class="q-c-topo">
+            <span class="q-c-os gc-num">OS {{ k.os }}</span>
+            <span class="q-st q-st--{{ {'Finalizada': 'feita', 'Em progresso': 'andamento', 'Pausada': 'pausada'}.get(k.st, 'nao') }}">{{ k.st }}</span>
+          </div>
+          <div class="q-c-tipo"><i class="q-ponto"></i>{{ k.tp or 'Sem tipo' }}</div>
+          <div class="q-c-usina">{{ k.uc }}</div>
+          <div class="q-c-tarefa">{{ k.t }}</div>
+          <div class="q-c-pe">
+            {% if k.ini %}<span class="gc-dado">{{ k.ini }}</span>{% endif %}
+            <span class="q-tur q-tur--{{ {'Manhã': 'manha', 'Tarde': 'tarde', 'Noite': 'noite'}.get(k.tur, 'sem') }}">{{ k.tur }}</span>
+            <span>{{ k.h }}</span>
+            {% if k.rep %}<span class="q-c-rep"><i class="ph ph-arrow-clockwise"></i> Reprog.</span>{% endif %}
+            <span class="q-c-n{% if k.rol >= 3 %} q-mal{% endif %}">{{ k.rol or 1 }}ª sem</span>
+          </div>
+        </div>
+      {% else %}
+        <p class="q-vazio">Nenhuma tarefa com esses filtros.</p>
+      {% endfor %}
+      {% if c.ocultos %}<a class="q-mais" href="{{ url_todos }}">+{{ c.ocultos }} não {{ 'exibida' if c.ocultos == 1 else 'exibidas' }} · mostrar todas</a>{% endif %}
+      </div>
+    </section>
+  {% else %}
+    <p class="q-vazio">A semana não tem tarefa na agenda.</p>
+  {% endfor %}
+  </div>
+</div>
+
+{% if q.pend_total %}
+<details class="q-pend" id="pendentes"{% if abrir_pendentes %} open{% endif %}>
+  <summary><i class="ph ph-caret-right q-seta"></i> Não couberam na semana <b class="gc-num">{{ q.pend_sel }}</b>
+    {% if q.pend_sel != q.pend_total %}<span class="q-pend-de">de {{ q.pend_total }}</span>{% endif %}
+    <span class="q-pend-obs">{% if destino.id %}escolha dia e turno e insira na fila{% else %}só para ver: {{ destino.texto|lower }}{% endif %}</span></summary>
+  <p class="gc-ajuda">Os filtros de responsável, situação e turno não valem aqui: as pendentes não têm esses campos.</p>
+  {% if not q.pend_mostradas %}
+  <p class="q-pend-abrir">São {{ q.pend_sel }} tarefas: filtre por equipe, cliente ou tipo para ver só as suas, ou
+    <a class="pcm-link" href="{{ url_pendentes }}">mostre todas</a> (a página fica pesada).</p>
+  {% endif %}
+  {% for g in q.pendentes %}
+  <div class="q-pend-u" data-usina="{{ g.usina }}">
+    <div class="q-pend-u-cab"><b>{{ g.uc }}</b> <span class="q-pend-n gc-num">{{ g.itens|length }}</span>
+      {% if destino.id and g.itens|length > 1 %}<span class="q-lote" data-lote="{{ g.itens|length }}"></span>{% endif %}
+    </div>
+    {% for p in g.itens %}
+    <div class="q-pend-l" data-pend="{{ p.i }}" data-os="{{ p.os }}">
+      <div class="q-pend-t">{{ p.t }}
+        <small>OS {{ p.os }} · {{ p.tp or 'sem tipo' }} · {{ p.h }}{% if p.mot %} · <i>{{ p.mot }}</i>{% endif %}</small></div>
+      {% if destino.id %}<div class="q-pend-ctr"></div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {% if q.pend_mostradas %}<p class="q-vazio q-pend-abrir">Nenhuma pendente com esses filtros.</p>{% endif %}
+  {% endfor %}
+  {# os controles de cada linha e de cada usina saem destes modelos (pcm-quadro.js): repetidos no HTML, as 1.697
+     pendentes da W41 davam 1,8 MB de página #}
+  <template id="q-tpl-pend"><select class="gc-campo" data-pend-dia aria-label="Dia"><option value="">dia…</option>{% for d, rot in dias_rp %}<option value="{{ d }}">{{ rot }}</option>{% endfor %}</select><select class="gc-campo" data-pend-turno aria-label="Turno"><option value="">turno do motor</option>{% for t in turnos %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-pend-inserir>Inserir</button></template>
+  <template id="q-tpl-lote"><select class="gc-campo" data-lote-dia aria-label="Dia para todas"><option value="">dia…</option>{% for d, rot in dias_rp %}<option value="{{ d }}">{{ rot }}</option>{% endfor %}</select><select class="gc-campo" data-lote-turno aria-label="Turno para todas"><option value="">turno do motor</option>{% for t in turnos %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-lote-inserir>Inserir todas</button></template>
+</details>
+{% endif %}
+
+{% if gravadas %}
+<details class="q-gravadas">
+  <summary><i class="ph ph-caret-right q-seta"></i> Já gravadas para esta semana <b class="gc-num">{{ gravadas|length }}</b></summary>
+  <ul>
+  {% for g in gravadas %}
+    <li><span class="q-grav-quando">{{ g.quando[8:10] }}/{{ g.quando[5:7] }} {{ g.quando[11:16] }}</span> · {{ g.quem }} ·
+      {{ 'ajustes da semana em curso' if g.destino == 'atual' else 'observações do Nexus' }}{% if g.commit %} (commit {{ g.commit }}){% endif %}
+      <pre class="pcm-pre q-pre">{{ g.linhas|join('\n') }}</pre></li>
+  {% endfor %}
+  </ul>
+</details>
+{% endif %}
+
+{# A fila de reprogramação: aparece com o primeiro item. Grava só administrador; os outros copiam e mandam ao PCM. #}
+<aside class="q-fila" id="q-fila" hidden aria-label="Fila de reprogramação">
+  <div class="q-fila-cab">
+    <span class="q-fila-n" data-fila-n></span>
+    <span class="q-fila-dest">{{ destino.texto }}</span>
+    <span class="q-fila-acoes">
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-fila-ver aria-expanded="false">Ver linhas</button>
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fila-copiar><i class="ph ph-copy"></i> Copiar tudo</button>
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-fila-limpar>Limpar</button>
+      {% if destino.id in ('atual', 'nexus') %}
+        {% if admin %}
+        <form method="post" action="/t/pcm/quadro/reprogramar" class="q-fila-form">
+          <input type="hidden" name="semana" value="{{ sem.week }}">
+          {% if rodada %}<input type="hidden" name="rodada" value="{{ rodada }}">{% endif %}
+          <input type="hidden" name="itens" value="[]">
+          {% for k, v in filtros.items() if v %}<input type="hidden" name="f_{{ k }}" value="{{ v }}">{% endfor %}
+          <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-floppy-disk"></i>
+            {% if destino.id == 'atual' %}Aplicar na semana em curso{% else %}Gravar nas observações da {{ sem.week }}{% endif %}</button>
+        </form>
+        {% else %}
+        <span class="q-fila-so"><i class="ph ph-lock-key"></i> Quem grava é o PCM (administrador): copie as linhas e mande ao PCM.</span>
+        {% endif %}
+      {% endif %}
+    </span>
+  </div>
+  <pre class="q-fila-linhas" data-fila-linhas></pre>
+</aside>
+
+<dialog class="q-det" id="q-det" aria-labelledby="q-det-titulo">
+  <div class="q-det-corpo">
+    <div class="q-det-acoes"><button type="button" data-det-fechar aria-label="Fechar"><i class="ph ph-x"></i></button></div>
+    <div data-det-corpo></div>
+  </div>
+</dialog>
+<div class="q-aviso" id="q-aviso" role="status" hidden></div>
+<script type="application/json" id="q-dados">{{ dados|tojson }}</script>
+<script src="{{ url_for('static', filename='pcm-quadro.js') }}"></script>
+{% endif %}
+{% endblock %}

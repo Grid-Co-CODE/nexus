@@ -71,6 +71,12 @@
     {% endif %}
   </div>
   {% endif %}
+  {% if sel.estado == 'ok' %}
+  {# a revisão de sexta (09/10/2026): supervisor, gestor de contrato e PCM olham o rascunho no quadro e reprogramam antes
+     da geração que substitui a de quinta #}
+  <p class="pcm-quadro-link"><a class="pcm-link" href="/t/pcm/quadro?rodada={{ sel.id }}"><i class="ph ph-kanban"></i> Ver esta
+    semana no Quadro da semana</a> <span class="gc-ajuda">para revisar e reprogramar antes de gerar de novo.</span></p>
+  {% endif %}
 
   {# publicar no App (09/10/2026): a situação da publicação ou o botão, e o que conferir antes #}
   {% if sel.publicacao %}

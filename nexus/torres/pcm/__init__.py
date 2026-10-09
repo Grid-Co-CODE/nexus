@@ -1,7 +1,8 @@
 """Torre PCM: Programação semanal, aderência ao plano e capacidade das equipes.
 
 Desde 30/09/2026 a programação semanal está vindo para o Nexus (nexus/pcm/). Têm tela própria: Semana e Tarefas e
-OS (a programação que está valendo), Gerar a semana (o motor em sombra) e Gestão PCM (o bloco "Manutenções — Plano &
+OS (a programação que está valendo), Quadro da semana (o quadro do painel do PCM, com a reprogramação de tarefas,
+desde 09/10/2026), Gerar a semana (o motor, com o Publicar no App) e Gestão PCM (o bloco "Manutenções — Plano &
 Fila" do painel do PCM, desde 08/10/2026); as outras ainda caem no placeholder da casca. Para dar vida a uma tela,
 crie a view com a mesma rota (ela vence a genérica) em nexus/pcm/telas.py.
 """
@@ -18,6 +19,9 @@ TORRE = Torre(
         Tela("semana", "Semana",
              "O plano cabe na semana e está sendo cumprido?",
              "banco_dados.json do painel PCM"),
+        Tela("quadro", "Quadro da semana",
+             "O que cada equipe faz em cada dia, e o que reprogramar?",
+             "banco_dados.json do painel PCM e as gerações do Nexus"),
         Tela("insights", "Insights do PCM",
              "Onde a aderência cai e que tarefa já rolou várias vezes?",
              "banco_dados.json do painel PCM"),

@@ -4,13 +4,17 @@ Etapa 1: Semana e Tarefas e OS mostram a programação que está valendo (a mesm
 Etapa 2: Gerar a semana roda o motor do PCM no Nexus, em sombra, e compara com a semana oficial do PCM.
 Etapa 3 (09/10/2026, Levi: "semana que vem já quero full nexus sem falta"): Publicar no App manda a semana gerada para o
 repositório do PCM, pelo mesmo caminho do PC do PCM (`publicar.py`): só administrador, com a tela de confirmação.
+Quadro da semana (09/10/2026): o quadro da aba Semana do painel do PCM e a reprogramação de tarefas (`quadro.py`).
 """
+import json
+import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, session
 
-from . import fonte, geracao, gestao as G, insumos as I, observacoes as O, publicar as PB, semana as S
+from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, observacoes as O, publicar as PB
+from . import quadro as Q, semana as S
 
 POR_PAGINA = 150
 _BRT = timezone(timedelta(hours=-3))
@@ -308,6 +312,67 @@ def registrar_pcm(bp) -> None:
     def gestao():
         return render_template("pcm/gestao.html", **_ctx_gestao(current_app.config, request.args))
 
+    @bp.route("/quadro")
+    def quadro():
+        ctx = _ctx_quadro(current_app.config, request.args)
+        if ctx is None:
+            abort(404)
+        return render_template("pcm/quadro.html", **ctx)
+
+    @bp.route("/quadro/reprogramar", methods=["POST"])
+    def quadro_reprogramar():
+        """Grava a fila de reprogramação da página. Só administrador. Semana que o Nexus gera: nas observações dela no
+        Nexus, direto. Semana em curso: nos ajustes da semana em curso do repositório do PCM, depois da confirmação."""
+        cfg = current_app.config
+        if not session.get("admin"):
+            abort(403)
+        f = request.form
+        base = _quadro_semana(cfg, (f.get("semana") or "").strip() or None, (f.get("rodada") or "").strip() or None)
+        sem = base["sem"]
+        if sem is None:
+            abort(404)
+        try:
+            itens = json.loads(f.get("itens") or "[]")
+        except ValueError:
+            itens = []
+        linhas, problemas = Q.linhas_da_fila(sem, itens)
+        dest = _destino_quadro(cfg, base)
+        quem = (session.get("usuario") or {}).get("email") or "administrador (senha)"
+        volta = {"semana": sem["week"]}
+        if base["rodada"]:
+            volta["rodada"] = base["rodada"]
+        # os filtros da tela voltam junto: quem reprogramou a equipe dele continua nela
+        volta.update({k: str(f.get("f_" + k))[:160] for k in Q.FILTROS if f.get("f_" + k)})
+        if dest["id"] == "nexus":
+            if problemas or not linhas:
+                ctx = _ctx_quadro(cfg, volta, erro="Nada foi gravado: " + ("; ".join(problemas) if problemas
+                                                                              else "a fila está vazia") + ".")
+                return render_template("pcm/quadro.html", **ctx), 400
+            Q.salvar_no_nexus(cfg, sem["week"], linhas, quem)
+            return redirect("/t/pcm/quadro?" + urlencode(dict(volta, feito="salvo", n=len(linhas))), code=303)
+        if dest["id"] != "atual":
+            ctx = _ctx_quadro(cfg, volta, erro="Esta semana não aceita gravar reprogramação: " + dest["texto"])
+            return render_template("pcm/quadro.html", **ctx), 400
+        itens_json = json.dumps(itens if isinstance(itens, list) else [], ensure_ascii=False)
+        if not f.get("confirmo"):
+            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(cfg, sem["week"], linhas, problemas,
+                                                                              itens_json))
+        if problemas or not linhas:
+            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
+                cfg, sem["week"], linhas, problemas, itens_json, erro="Nada foi gravado.")), 400
+        try:
+            res = Q.aplicar_na_semana_em_curso(cfg, sem["week"], linhas, quem, f.get("sha_visto") or "",
+                                               apagar_sem_semana=f.get("apagar") == "1")
+        except (Q.QuadroErro, PB.PublicacaoErro) as ex:
+            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
+                cfg, sem["week"], linhas, problemas, itens_json, erro=f"Não gravei: {ex}.")), 409
+        except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda
+            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
+                cfg, sem["week"], linhas, problemas, itens_json,
+                erro=f"O GitHub não respondeu ({type(ex).__name__}): confira o repositório antes de tentar de novo.")), 502
+        return redirect("/t/pcm/quadro?" + urlencode(dict(volta, feito="aplicado", n=len(linhas),
+                                                           commit=res.get("commit") or "")), code=303)
+
 
 # ── Gestão PCM: o bloco "Manutenções — Plano & Fila" do painel (nexus/pcm/gestao.py) ──────────────────────────
 # As 28 mil tarefas do gestao_pcm.json não precisam ser revarridas a cada clique: o escopo e a base atômica ficam
@@ -391,3 +456,151 @@ def _ctx_gestao(cfg, args) -> dict:
     else:
         ctx.update(fila=G.fila_filtrada(fila, o))
     return ctx
+
+
+# ── Quadro da semana (09/10/2026): o quadro da aba Semana do painel do PCM e a reprogramação (nexus/pcm/quadro.py) ────
+def _quadro_semana(cfg, semana_pedida: str | None, rodada_pedida: str | None) -> dict:
+    """A semana que o quadro mostra: a pedida (publicada no App ou rascunho do Nexus); sem pedir, a semana em curso do
+    App. Devolve {sem, fonte_sem ("publicada" | "rascunho"), rodada, st, publicadas, rasc, leitura, dia}."""
+    leitura = fonte.ler(cfg)
+    dados = leitura.dados or {}
+    publicadas = [s for s in dados.get("semanas") or [] if isinstance(s, dict) and s.get("week")]
+    dia = Q.hoje()
+    rasc = Q.rascunhos(cfg, dia)
+    out = {"leitura": leitura, "publicadas": publicadas, "rasc": rasc, "sem": None, "fonte_sem": "", "rodada": None,
+           "st": None, "dia": dia}
+    st = Q.rodada_ok(cfg, rodada_pedida) if rodada_pedida else None
+    if st is None and semana_pedida and not any(s["week"] == semana_pedida for s in publicadas):
+        r = next((x for x in rasc if x["semana"] == semana_pedida), None)
+        st = Q.rodada_ok(cfg, r["rodada"]) if r else None
+    if st is None and not semana_pedida and not publicadas and rasc:
+        st = Q.rodada_ok(cfg, rasc[-1]["rodada"])
+    if st is not None:
+        pasta = Q.pasta_da_rodada(cfg, st["id"])
+        out.update(sem=Q.semana_do_rascunho(pasta / "saida" / "sombra.xlsx", st["semana"]), fonte_sem="rascunho",
+                   rodada=st["id"], st=st)
+        return out
+    if semana_pedida:
+        sem = next((s for s in publicadas if s["week"] == semana_pedida), None)
+    else:
+        ativa = dados.get("semana_ativa")
+        sem = next((s for s in publicadas if s["week"] == ativa), None) or \
+            (max(publicadas, key=lambda s: s["week"]) if publicadas else None)
+    if sem is not None:
+        out.update(sem=sem, fonte_sem="publicada")
+    return out
+
+
+def _destino_quadro(cfg, base) -> dict:
+    w = base["sem"]["week"]
+    return Q.destino(w, base["fonte_sem"], base["fonte_sem"] == "rascunho" or Q.nexus_gera(cfg, w), base["dia"])
+
+
+def _num_semana(w: str) -> int:
+    return HB.segunda(w).isocalendar()[1]
+
+
+def _chips_quadro(base, extra: dict) -> list[dict]:
+    """As semanas para escolher: as do arquivo do App e os rascunhos do Nexus que ainda não foram ao App. Os filtros
+    vão junto (o gestor que entrou filtrado continua filtrado ao trocar de semana)."""
+    dia, sel = base["dia"], base["sem"]
+    chips = []
+    for s in base["publicadas"]:
+        seg = HB.segunda(s["week"])
+        quando = " · em curso" if seg <= dia <= seg + timedelta(days=4) else (" · próxima" if seg > dia else "")
+        chips.append({"w": s["week"], "o": 1, "rotulo": f"Semana {_num_semana(s['week'])}{quando}",
+                      "href": "?" + urlencode(dict(extra, semana=s["week"])),
+                      "atual": base["fonte_sem"] == "publicada" and sel is not None and sel["week"] == s["week"]})
+    no_app = {s["week"] for s in base["publicadas"]}
+    for r in base["rasc"]:
+        if r["semana"] in no_app and r["publicada"] and r["rodada"] != base["rodada"]:
+            continue
+        chips.append({"w": r["semana"], "o": 0, "rotulo": f"Semana {_num_semana(r['semana'])} · rascunho do Nexus",
+                      "href": "?" + urlencode(dict(extra, rodada=r["rodada"])), "atual": base["rodada"] == r["rodada"]})
+    if base["rodada"] and not any(c["atual"] for c in chips):          # rodada de prova aberta pelo endereço
+        w = base["sem"]["week"]
+        chips.append({"w": w, "o": 0, "rotulo": f"Semana {_num_semana(w)} · rodada de prova", "atual": True,
+                      "href": "?" + urlencode(dict(extra, rodada=base["rodada"]))})
+    return sorted(chips, key=lambda c: (c["w"], -c["o"]), reverse=True)
+
+
+def _gestor_da_sessao(sem) -> str:
+    """O gestor de contrato que entrou (estrutura de O&M de 10/2026), como ele aparece na coluna Responsável da
+    programação: o nome inteiro ou o primeiro e o último nome. Vazio se não casar com nenhum."""
+    sup = session.get("supervisor_padrao") or {}
+    if sup.get("papel") != "gestor" or not sup.get("nome"):
+        return ""
+    alvo = S._norm(sup["nome"]).split()
+    for r in sorted({str(x.get("responsavel") or "").strip() for x in sem.get("rows") or []} - {""}):
+        n = S._norm(r).split()
+        if n == alvo or (len(alvo) >= 2 and len(n) >= 2 and n[0] == alvo[0] and n[-1] == alvo[-1]):
+            return r
+    return ""
+
+
+def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
+    pedida = (args.get("semana") or "").strip() or None
+    base = _quadro_semana(cfg, pedida, (args.get("rodada") or "").strip() or None)
+    ctx = _contexto_fonte(base["leitura"])
+    sem = base["sem"]
+    if sem is None:
+        if pedida and base["leitura"].dados is not None:
+            return None
+        return dict(ctx, sem=None, chips=[], erro=erro, ok=None)
+    filtros = {k: str(args.get(k) or "").strip()[:160] for k in Q.FILTROS}
+    filtro_gestor = False
+    if not pedida and not any(filtros.values()) and not args.get("rodada"):
+        g = _gestor_da_sessao(sem)
+        if g:
+            filtros["resp"], filtro_gestor = g, True
+    todos = args.get("todos") == "1"
+    q = Q.montar(sem, base["publicadas"], filtros, todos=todos, mostrar_pendentes=True if args.get("pend") == "1" else None)
+    dest = _destino_quadro(cfg, base)
+    admin = bool(session.get("admin"))
+    extra = {k: v for k, v in filtros.items() if v}
+    sel_qs = dict(extra, **({"rodada": base["rodada"]} if base["rodada"] else {"semana": sem["week"]}))
+    feito = args.get("feito") or ""
+    n = int(args.get("n")) if str(args.get("n") or "").isdigit() else 0
+    commit = args.get("commit") if re.fullmatch(r"[0-9a-f]{4,40}", str(args.get("commit") or "")) else ""
+    ok = None
+    if feito == "salvo":
+        ok = (f"{n} {'linha gravada' if n == 1 else 'linhas gravadas'} nas observações da {sem['week']}. Valem na próxima "
+              f"geração da semana: gere de novo em Gerar a semana.")
+    elif feito == "aplicado":
+        ok = (f"{n} {'linha gravada' if n == 1 else 'linhas gravadas'} nos ajustes da semana em curso"
+              f"{f' (commit {commit})' if commit else ''}. O robô do PCM aplica na rodada seguinte (até 15 minutos); "
+              f"o quadro muda quando ele regravar a programação.")
+    if base["fonte_sem"] == "rascunho":
+        st = base["st"] or {}
+        quando = str(st.get("fim") or st.get("inicio") or "")
+        origem_txt = (f"rascunho do Nexus, gerado em {quando[8:10]}/{quando[5:7]} às {quando[11:16]}"
+                      + (", publicado no App" if st.get("publicacao") else ", ainda não publicado")
+                      + (" (rodada de prova)" if len(base["rodada"]) > 24 else ""))
+    else:
+        g = _quando(sem.get("geradaEm"))
+        origem_txt = "publicada no App" + (f", gerada em {g}" if g else "")
+    dados = {"semana": sem["week"], "rodada": base["rodada"] or "", "destino": dest["id"], "admin": admin,
+             "dias": [[d, Q.NOMES_DIA[d]] for d in Q.DIAS_REPROGRAMAR], "turnos": list(Q.TURNOS), "itens": q["itens"],
+             "oss": q["oss"],
+             "feito": feito in ("salvo", "aplicado")}
+    ctx["fonte_frase"] = ("Reprogramar daqui não muda nada na hora: vira linha de observação, que só o PCM grava, e vale "
+                          "onde a fila diz.")
+    ctx["ok_link"] = f"/t/pcm/gerar?semana={sem['week']}" if feito == "salvo" else ""
+    return dict(ctx, sem=sem, q=q, filtros=filtros, filtro_gestor=filtro_gestor, destino=dest, admin=admin,
+                rodada=base["rodada"], chips=_chips_quadro(base, extra), origem_txt=origem_txt, dados=dados,
+                tem_filtro=any(filtros.values()),
+                url_limpar="?" + urlencode({k: v for k, v in sel_qs.items() if k in ("semana", "rodada")}),
+                url_todos="?" + urlencode(dict(sel_qs, todos="1")),
+                url_pendentes="?" + urlencode(dict(sel_qs, pend="1", **({"todos": "1"} if todos else {}))) + "#pendentes",
+                abrir_pendentes=args.get("pend") == "1" or (any(filtros.values()) and q["pend_sel"] <= 80),
+                dias_rp=[(d, Q.NOMES_DIA[d]) for d in Q.DIAS_REPROGRAMAR], turnos=Q.TURNOS,
+                gravadas=Q.gravadas(cfg, sem["week"]) if admin else [], ok=ok, erro=erro)
+
+
+def _ctx_reprogramar(cfg, semana: str, linhas: list, problemas: list, itens_json: str, erro: str | None = None) -> dict:
+    atual = Q.ler_atual(cfg)
+    novo, res = ("", {"saem": [], "saem_outra_semana": []})
+    if not atual["erro"] and linhas:
+        novo, res = Q.novo_texto_atual(atual["texto"], semana, linhas)
+    return {"semana": semana, "linhas": linhas, "problemas": problemas, "itens_json": itens_json, "atual": atual,
+            "novo": novo, "res": res, "erro": erro}

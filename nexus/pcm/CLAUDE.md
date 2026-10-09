@@ -30,6 +30,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `historico_banco.py` | o histórico das programações que o motor lê, montado do `fato_programacao` do banco (desde 08/10/2026); o plano publicado da semana em andamento vem da reserva, do REPOSITÓRIO do PCM ou da pasta do PCM |
 | `comparar.py` | compara a semana do Nexus com a oficial (a do PCM), linha a linha; `conferir`: a conferência da semana gerada (dentro da semana, horas por equipe e dia, fora da jornada, repetidas, e `excede_hh_os`: a OS cuja corretiva o motor forçou além das horas do dia) |
 | `publicar.py` | **Publicar no App** (09/10/2026): a planilha e as observações da rodada vão para o repositório do PCM, conferidas relendo, e o plano vai para a reserva do histórico |
+| `quadro.py` | **Quadro da semana** (09/10/2026): a semana em colunas por dia, a janela da OS e a reprogramação (a linha do motor, a mescla nas observações, o arquivo da semana em curso) |
 | `telas.py` | as telas, penduradas na torre PCM (`registrar_pcm(bp)`) |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá) |
 
@@ -146,6 +147,56 @@ escolhe a semana ativa pela data de hoje: a W43 publicada na quinta vira a do Ap
 - **OS 14331 (W42, 09/10):** 4 corretivas "Teste de comando remoto" de 6 h cada (a duração estimada no Fracttal; o
   total de horas da OS é 1,5 h por tarefa) que o motor forçou numa quarta da PR Norte 01: 24,5 h. O conserto é na
   origem (a duração no Fracttal) ou fixar as tarefas em dias diferentes no bloco 2; a conferência aponta a OS.
+
+## Quadro da semana (`quadro.py`, `templates/pcm/quadro.html` e `reprogramar.html`, `static/pcm-quadro.js`; 09/10/2026)
+
+Levi: "Eles tem essa visão [...] no site de PCM, gostaria que tenhamos uma visão dessa no Nexus também e consigamos
+reprogramar tarefas que nem na imagem 1". É o quadro da aba Semana do painel do PCM (`novo.html`: `vSemana`, `cardHTML`,
+`abrirDet`, a fila `rp*`), com as mesmas contas: colunas pelos dias que a semana tem, contagem e horas do conjunto
+FILTRADO, cartões na ordem do relógio (40 por coluna; "mostrar todas" põe `todos=1`), turno pela hora de início (manhã
+07–12, tarde 12–17, noite 17–07), "Nª sem" pelo campo de vezes, trajetória da tarefa pelas semanas do arquivo (OS + 60
+caracteres da tarefa; vale a última da semana, como o `Map` do painel). Filtros: equipe, responsável, cliente, tipo,
+situação, turno e busca. O gestor de contrato que entra pelo Fracttal já vem filtrado nele (quando o nome casa com a
+coluna Responsável). Semanas: as do `banco_dados.json` e os rascunhos do Nexus (a rodada mais recente de cada semana que
+ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também as de prova).
+
+- **A semana do PCM vai do sábado 00:00 à sexta** (o processo, Levi com o programador do PCM: a programação nasce na quinta;
+  supervisor e gestor de contrato olham e passam ao PCM; o PCM altera; no fim da sexta ela é gerada de novo e substitui;
+  "o ideal é que inicie da meia-noite de sábado e finalize na sexta"). **Criadas após o plano** = OS com `dataCriacao`
+  do sábado antes da segunda até a sexta (a data basta: o arquivo traz a hora de Brasília sem fuso; as criações se
+  concentram das 8h às 17h). O painel corta na DATA da geração ou na sexta anterior, e contava a OS da sexta, que a
+  geração da sexta já levou: W41 pelo painel 81/104/126/125/249 por dia, pelo sábado 46/84/112/111/180 (533).
+- **Reprogramar = linha de observação**, a do `rpLinha` do painel (contrato com o motor e com o robô do PCM):
+  `OS; não` (sempre a OS inteira), `OS; dia[; ; turno]` (a OS inteira), `OS; dia; SIGLA; turno; só: equipamento` (MPA,
+  MPS, MPT, MPM, MPQ e Handover: o nome do equipamento depois do último " - "), `OS; dia; nome da tarefa; turno` (as
+  outras: o nome até a 1ª vírgula). Só segunda a sexta: o motor e o robô não entendem sábado (o painel oferece, e a
+  linha volta "dia não reconhecido"). `static/pcm-quadro.js` monta a mesma linha para mostrar na fila; o teste roda as
+  duas (node) com os mesmos casos.
+- **A fila** fica no navegador (localStorage, por semana), como no painel. Ao gravar, a página manda só {os, tarefa,
+  dia, turno}; o servidor refaz a linha com a tarefa e o tipo da SEMANA (`linhas_da_fila`): OS ou tarefa que a semana
+  não tem, dia ou turno inválido barram a gravação inteira (nenhum texto livre chega ao arquivo do motor).
+- **Para onde vai** (`destino`): semana em curso (de segunda a sexta dela) -> `Observacoes_Semana_Atual.txt` do
+  repositório do PCM, que o robô aplica na rodada seguinte (reposiciona e empurra as conflitantes, tira a OS, puxa das
+  pendentes); semana que o Nexus gera e ainda não começou (rascunho, ou com rodada do Nexus) -> as observações da semana
+  no Nexus (bloco 2 da tela Gerar), que valem na próxima geração; semana gerada no PC do PCM (a W42) -> só "Copiar
+  tudo", para o painel do PCM; semana que acabou -> só ver.
+- **A mescla** (`mesclar`): a linha nova substitui a do MESMO alvo (OS, tarefas e "só:"); `OS; não` tira todas as
+  linhas da OS; a OS inteira num dia tira as linhas por tarefa dela; qualquer linha da OS tira o `não`. O resto do texto
+  fica igual e na mesma ordem.
+- **O arquivo da semana em curso** vale para qualquer semana que estiver em curso: linha da semana passada se aplicaria
+  à nova. O Nexus escreve a semana no cabeçalho (`# Semana 2026-W42: ...`); cabeçalho de outra semana = o que estava lá
+  sai. Sem cabeçalho (gravado pelo painel do PCM): fica, a não ser que a pessoa marque para apagar. Em 09/10 ele tinha
+  3 linhas `OS; não` do painel, sem semana.
+- **Gravar é do PCM** (`session["admin"]`); os outros montam a fila e copiam para mandar ao PCM ("passa para o PCM").
+  A semana em curso passa por `reprogramar.html` (o que entra, o que o arquivo tem, como fica) e grava com o sha que a
+  pessoa conferiu (mudou no meio: não grava, 409), relê e confere o sha256. O commit não leva e-mail (repositório
+  público). Quem gravou o quê: `reprogramacoes.jsonl` na pasta de trabalho, e "Já gravadas para esta semana" na tela.
+- **Peso da página** (09/10, W41 real): 339 KB e ~160 ms com 200 cartões; as pendentes (1.697 na W41) vêm linha a linha
+  só filtradas (até 150) ou a pedido (`pend=1`, 1,4 MB): os seletores de dia e turno saem de um `<template>` clonado pelo
+  JS, e a lista de tarefas de cada OS vai uma vez em `oss` (antes, em cada cartão: 4,4 MB).
+- **Provar:** `tests/test_pcm_quadro.py` (26 testes; 24 mutações, todas pegas). Ver a tela: a cópia de conferência do
+  Claude, com o armazém do PCM numa CÓPIA (`NEXUS_PCM_TRABALHO` no `app.config`: não é chave do `.env`, e sem isso ela
+  lia o armazém real) e o GitHub que recusa gravar. Nunca testar clicando em Aplicar na semana em curso.
 
 ## A tela Gerar (`templates/pcm/gerar.html` + `_observacoes.html`, estilo em `static/pcm.css`)
 

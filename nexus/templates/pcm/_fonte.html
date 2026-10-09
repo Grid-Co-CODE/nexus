@@ -7,5 +7,5 @@
   A tentativa de agora falhou ({{ fonte_erro }}).</div></div>
 {% else %}
 <p class="pcm-fonte"><i class="ph ph-plug"></i><span>Lê a programação que está valendo, a mesma do App de Campo e do painel do
-  PCM{% if fonte_gerada %}, atualizada em {{ fonte_gerada }}{% endif %}. Nada nesta tela altera a programação.</span></p>
+  PCM{% if fonte_gerada %}, atualizada em {{ fonte_gerada }}{% endif %}. {{ fonte_frase or 'Nada nesta tela altera a programação.' }}</span></p>
 {% endif %}
