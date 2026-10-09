@@ -144,6 +144,8 @@ def _esquecer(wid=None):
                 if isinstance(k, tuple) and k and k[0] == "acomp_tk" and isinstance(v, dict):
                     v.pop(wid, None)
         _ESQUECIDO["em"] = time.monotonic()
+    if wid:
+        rotas._esquecer_preparo(wid)        # o detalhe lido antes da gravação (o mouse parado no cartão) também sai
 
 
 # ── a releitura por trás (Levi, 09/10/2026) ─────────────────────────────────────────────────────────────────────────
@@ -260,8 +262,12 @@ def _nota_da_os(det: dict, linha: dict) -> str:
     return str(det.get("notas") or (linha or {}).get("note") or "")
 
 
-def _detalhe_enxuto(wid) -> dict:
-    """O detalhe da OS sem a solicitação, a OS pai e o cancelamento (`api.enxuta`): esta tela não mostra os três."""
+def _detalhe_enxuto(wid, pessoa=None) -> dict:
+    """O detalhe da OS sem a solicitação, a OS pai e o cancelamento (`api.enxuta`): esta tela não mostra os três. O que
+    o mouse parado sobre o cartão do quadro já pediu (`rotas.preparado`, 09/10/2026) vale, uma vez."""
+    pronto = rotas.preparado(wid, "chamado", pessoa) if pessoa else None
+    if pronto is not None:
+        return pronto
     with api.enxuta("vinculos"):
         return api.get_os_detalhes(wid) or {}
 
@@ -321,7 +327,7 @@ def detalhe(folio):
     talvez = _wid_ja_lido(folio, pessoa)
     with api._ExecutorComContexto(max_workers=2) as ex:
         f_obs = ex.submit(_obs_do_os, folio)
-        f_det = ex.submit(_detalhe_enxuto, talvez) if talvez else None
+        f_det = ex.submit(_detalhe_enxuto, talvez, pessoa) if talvez else None
         d = _lista_da_tela(pessoa)
         linha = _linha_de(d, folio)
         wid = (linha or {}).get("id") or talvez or api._wo_id_por_folio(folio)
@@ -334,7 +340,7 @@ def detalhe(folio):
             if det.get("folio") and str(det["folio"]) != str(folio):     # não deve acontecer: o id de um nº não muda
                 det = None
         if det is None:
-            det = _detalhe_enxuto(wid)
+            det = _detalhe_enxuto(wid, pessoa)
         obs, erro_obs = f_obs.result()
     nota = _nota_da_os(det, linha)
     item = aw.item_do_ticket(det.get("subtarefas"))
@@ -351,6 +357,17 @@ def detalhe(folio):
                            tl=aw.linha_do_tempo(c, obs), outros=aw.outros(c, todos), canal=cs.CANAL.get(c["marca"], ""),
                            menos7=aw.menos_7d(n["data_falha"], hoje), copiar=aw.copiar_tudo(n["campos"]),
                            erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1])
+
+
+@bp.route("/chamados/acompanhamento/<int:folio>/preparar")
+@exige_sessao
+def preparar_chamado(folio):
+    """O mouse parado sobre o cartão do quadro (Levi, 09/10/2026): o detalhe desta OS começa a ser lido por trás
+    (`rotas.preparar`, enxuto, com o teto de lá). Só com o id que o quadro da própria pessoa já leu: sem ele, nada, e o
+    clique lê como sempre."""
+    pessoa = rotas._quem()
+    wid = _wid_ja_lido(folio, pessoa)
+    return jsonify({"pedido": bool(wid) and rotas.preparar(pessoa, wid, "chamado")}), 202
 
 
 # ── as três escritas ────────────────────────────────────────────────────────────────────────────────────────

@@ -57,7 +57,8 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
   `/os/os/<id>?status=` (Ctrl+clique abre a página inteira numa aba nova). Sem o login do Fracttal (senha de admin), o
   card diz para entrar pelo Fracttal. Quem mudou a OS pelo card volta com `?atualizar=1`: o quadro relê o Fracttal na
   hora (`pedir_releitura(forcar=True)`, no máximo uma a cada 5 s). A gaveta própria (descrição, tarefas, link no
-  Fracttal) saiu.
+  Fracttal) saiu. O mouse parado 250 ms no cartão já pede o card (`NexusOsCard.prepararAoParar`, 09/10/2026): o clique
+  pega a leitura pronta (regras e teto no README da torre OS Creator).
 
 ## Confiabilidade (06/10/2026)
 

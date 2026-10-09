@@ -346,6 +346,28 @@ cota da empresa. Não foi feito: é decisão do Levi.
 (`tests/test_os_web_*.py` e `test_anexo_documento.py`, 681 testes) passando com os arquivos novos, numa cópia fora do
 oem.
 
+## O card começa a carregar antes do clique (09/10/2026)
+
+Levi, 09/10: "teria como utilizarmos essas requisições de forma mais inteligente?". O mouse que PARA 250 ms em cima de um
+cartão pede o detalhe da OS por trás; o clique que vem depois pega essa leitura, ou espera a que já está em curso.
+
+- **Onde:** o Quadro da equipe da Engenharia do Nexus (`NexusOsCard.prepararAoParar(el, wid)`, no
+  `oscreator/card_os_abrir.html`, que chama `/os/api/os/<id>/preparar`) e o quadro do Acompanhamento de chamados
+  (`static/acomp.js`, que chama `/os/chamados/acompanhamento/<nº>/preparar`, lido enxuto e só com o id que o quadro da
+  própria pessoa já leu). O clique: `rotas.os_detalhe` (o card) e `rotas_acomp._detalhe_enxuto` (a tela de um chamado),
+  pelo `rotas.preparado`.
+- **Regras** (`rotas.preparar`), pela confiabilidade e pela cota da empresa:
+  - vale `PREPARO_S` (30 s) e UMA vez: o clique seguinte lê de novo, e o card mostra o que a pessoa acabou de mudar;
+  - toda rota POST com o id da OS (concluir, nota, responsável, etiquetas, tarefa, cancelar) joga fora o que foi lido
+    antes dela (`_gravou_esquece_preparo`, `after_app_request`); o ticket e o finalizar do Acompanhamento, pelo
+    `_esquecer(wid)`;
+  - teto por minuto: 6 por pessoa e 12 no total (no pior caso ~60 pedidos/min somando todo mundo; no uso normal, o que o
+    clique já faria). O mesmo cartão não pede duas vezes, e o navegador pede uma vez por cartão até abrir;
+  - com a sessão DA PESSOA no Fracttal (`sessao.contexto`), numa thread de 3 (`_executor_preparo`).
+- **Medido** com o Fracttal falso a 300 ms por pedido: clique sem o mouse parar antes, 0,67 s; com a leitura pedida
+  0,3 s antes do clique, 0,30 s; pedida 0,8 s antes, 0,00 s.
+- **Como provar:** `tests/test_oscreator_card_preparo.py` (10 testes).
+
 ## Acompanhamento de chamados com o quadro da Engenharia (08/10/2026)
 
 O pedido do Levi, de 08/10: "Precisamos padronizar a estética para que coisas parecidas não pareçam completamente

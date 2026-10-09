@@ -22,8 +22,30 @@ window.NexusOsCard = window.NexusOsCard || (function () {
     if (voltar && voltar.focus) { try { voltar.focus(); } catch (e) { /* o elemento saiu da tela */ } }
     if (op.aoFechar) op.aoFechar(!!mudou);
   }
+  // O card começa a ser lido quando o mouse PARA em cima do cartão (Levi, 09/10/2026: "teria como utilizarmos essas
+  // requisições de forma mais inteligente?"): o clique pega a leitura pronta (/os/api/os/<id>/preparar, rotas.preparar
+  // no clone, com o teto por pessoa de lá). Uma vez por OS até ela ser aberta; 250 ms parado, para o mouse que só
+  // atravessa o quadro não pedir nada.
+  var pedidos = {};
+  function preparar(wid) {
+    if (!wid || pedidos[wid] || !window.fetch) return;
+    pedidos[wid] = 1;
+    fetch('/os/api/os/' + encodeURIComponent(wid) + '/preparar', {credentials: 'same-origin', cache: 'no-store'})
+      .catch(function () { /* sem rede: o clique lê como sempre */ });
+  }
+  function prepararAoParar(el, wid) {
+    var t = null;
+    function parar() { if (t) { clearTimeout(t); t = null; } }
+    function esperar() { parar(); t = setTimeout(function () { t = null; preparar(wid); }, 250); }
+    el.addEventListener('mouseenter', esperar);
+    el.addEventListener('focus', esperar);
+    el.addEventListener('mouseleave', parar);
+    el.addEventListener('blur', parar);
+    el.addEventListener('touchstart', function () { preparar(wid); }, {passive: true});
+  }
   function abrir(wid, opcoes) {
     if (!wid) return false;
+    delete pedidos[wid];                                          // aberta: o próximo mouse parado nela lê de novo
     if (moldura) fechar(false);
     op = opcoes || {}; voltar = document.activeElement;
     var q = new URLSearchParams({status: op.status || '', de: location.pathname + location.search});
@@ -45,6 +67,6 @@ window.NexusOsCard = window.NexusOsCard || (function () {
     else if (d.tipo === 'ir' && typeof d.url === 'string' && d.url.indexOf('/os/_nexus/ir?') === 0) location.href = d.url;
   });
   document.addEventListener('keydown', function (e) { if (moldura && e.key === 'Escape') fechar(false); });
-  return {abrir: abrir, fechar: function () { fechar(false); }};
+  return {abrir: abrir, fechar: function () { fechar(false); }, preparar: preparar, prepararAoParar: prepararAoParar};
 })();
 </script>

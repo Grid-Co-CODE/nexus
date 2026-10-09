@@ -150,6 +150,8 @@
       ev.preventDefault(); abrirOs(o);
     });
     c.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); abrirOs(o); } });
+    // o card da OS começa a ser lido quando o mouse para em cima do cartão (Levi, 09/10/2026; NexusOsCard.prepararAoParar)
+    if (o.wid && window.NexusOsCard && NexusOsCard.prepararAoParar) NexusOsCard.prepararAoParar(c, o.wid);
     return c;
   }
   function colunasVisiveis() {

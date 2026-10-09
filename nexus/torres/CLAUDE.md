@@ -22,7 +22,9 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 - Templates em `nexus/torres/<torre>/templates/<torre>/`.
 - **Abrir uma OS do Fracttal em qualquer tela** (os setores se conversam, Levi 08/10/2026): o card do Histórico do OS
   Creator, sem cópia. `{% include "oscreator/card_os_abrir.html" %}` e `NexusOsCard.abrir(id_work_order, {status})`;
-  regra em `oscreator/README.md` ("O card da OS em qualquer torre"). Quem usa: o Quadro da equipe da Engenharia.
+  regra em `oscreator/README.md` ("O card da OS em qualquer torre"). Quem usa: o Quadro da equipe da Engenharia. Para o
+  card já estar lido quando a pessoa clicar, `NexusOsCard.prepararAoParar(elemento, id_work_order)` no cartão (o mouse
+  parado 250 ms pede a leitura; regras e teto em "O card começa a carregar antes do clique", no mesmo README).
 - **Coisa parecida, o mesmo desenho** (Levi, 08/10/2026: "Precisamos padronizar a estética para que coisas parecidas
   não pareçam completamente diferentes"). Quadro de OS (colunas e cartões): o do Quadro da equipe da Engenharia (`kb-*`
   em `nexus/static/engenharia.css`), que o Acompanhamento de chamados do OS Creator já copia. Faixa de números: o modelo

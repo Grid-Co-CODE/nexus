@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-09T01:01:42",
+ "atualizado_em": "2026-10-09T01:18:24",
  "arquivos": {
   "chamado_garantia/README.md": "0207d35ae741a620",
   "chamado_garantia/__init__.py": "2362f95d3b2fc918",
@@ -35,8 +35,8 @@
   "os_creator/os_web/pcm_web.py": "b87b0507492e1616",
   "os_creator/os_web/perf_web.py": "9eb6e1692d396fb8",
   "os_creator/os_web/relay/volta.html": "c59f69695a000fcd",
-  "os_creator/os_web/rotas.py": "1661bc29c144f530",
-  "os_creator/os_web/rotas_acomp.py": "654429e57ea20fce",
+  "os_creator/os_web/rotas.py": "28358f5f5a9a7424",
+  "os_creator/os_web/rotas_acomp.py": "8634f3a4585e9abe",
   "os_creator/os_web/rotas_ativos.py": "634267a40f35bff6",
   "os_creator/os_web/rotas_chamados.py": "cef3a791453ae646",
   "os_creator/os_web/rotas_clonar.py": "3128c448ae9d8083",
@@ -56,7 +56,7 @@
   "os_creator/os_web/sso.py": "9aa026041869a64e",
   "os_creator/os_web/static/abas.css": "8958dbcb60103cda",
   "os_creator/os_web/static/abas.js": "0be2674de70f8b02",
-  "os_creator/os_web/static/acomp.js": "81bb918ab0053482",
+  "os_creator/os_web/static/acomp.js": "bbcf1a042673777c",
   "os_creator/os_web/static/ativos.css": "667648e421e7eeba",
   "os_creator/os_web/static/ativos.js": "ade856c5b6f90f7f",
   "os_creator/os_web/static/carga.js": "0c17f78e7bb79c6e",
