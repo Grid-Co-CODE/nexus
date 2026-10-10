@@ -226,6 +226,15 @@ def test_p_fora_do_mapa_cai_na_tela_padrao(ruim):
     assert _form(h) is None and "Escolha uma usina" in h
 
 
+def test_p_com_ponto_ponto_codificado_cai_na_tela_padrao():
+    """Revisão de 10/10/2026: ?p=/gemeo/%252e%252e/<caminho> virava o destino '/gemeo/%2e%2e/<caminho>' no passe e no
+    "Abrir em outra aba", e o navegador o resolve como '..': a moldura ia a qualquer caminho da mesma origem."""
+    cli = _cliente()
+    for ruim in ("/gemeo/%2e%2e/%2e%2e/nexus/sair", "/gemeo/%2e%2e/tokens", "/gemeo/a%2fb"):
+        h = cli.get("/t/performance/gemeo", query_string={"p": ruim}).get_data(as_text=True)
+        assert _ler(_form(h)["passe"])["destino"] == "/gemeo/" and "%2e" not in h.lower(), ruim
+
+
 # ── só admin, Tempo real, menu ───────────────────────────────────────────────────────────────────────────────────────
 def test_chaves_das_fontes_so_para_admin(monkeypatch):
     cli = _fracttal(monkeypatch)

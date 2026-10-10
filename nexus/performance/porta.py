@@ -28,7 +28,7 @@ import re
 import secrets
 import time
 from collections import namedtuple
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 # ── 1. O mapa das telas ──────────────────────────────────────────────────────────────────────────────────────────────
 # torre e tela = o id no Nexus (`/t/<torre>/<tela>`); caminho = a entrada da tela na plataforma (padrão com `<x>` quando
@@ -114,8 +114,14 @@ def destino_permitido(destino) -> str | None:
     if not destino.startswith("/") or destino.startswith("//") or _RX_PROIBIDO.search(destino):
         return None
     caminho = destino.split("?", 1)[0]
-    if ".." in caminho.split("/"):
-        return None
+    # Segmento de ponto, escrito ou CODIFICADO (revisão de 10/10/2026): '/gemeo/%2e%2e/tokens' casava com
+    # /gemeo/<path:resto>, e o navegador resolve o %2e%2e como '..' (vai a /tokens); pelo `?p=/gemeo/%252e%252e/...` a
+    # moldura ia a qualquer caminho da mesma origem, fora do mapa. Barra e barra invertida codificadas também não: viram
+    # outro segmento numa camada que decodifica. O '%' de um nome de usina (o seletor do Diagnóstico) segue valendo.
+    for segmento in caminho.split("/"):
+        claro = unquote(segmento)
+        if claro in (".", "..") or "/" in claro or "\\" in claro:
+            return None
     return destino if tela_do_caminho(caminho) else None
 
 

@@ -72,9 +72,19 @@ def test_cada_caminho_cai_na_tela_certa(caminho, tela):
     "/os/", "/painel/nexus/entrar", "/painel/usina/", "/painel/usina/1/2", "/gemeo", "/tempo-real#x",
     "/tempo-real x", "/painel/usina/a'b", '/painel/usina/a"b', "/painel/usina/<b>", "/tempo-real/../tokens",
     "/painel/usina/1\n", "/" + "a" * 2048, "/api/macro", "/",
+    # revisão de 10/10/2026: o ponto CODIFICADO. '/gemeo/%2e%2e/tokens' casava com /gemeo/<path:resto> e o navegador
+    # resolve o %2e%2e como '..' (vai a /tokens); barra codificada vira outro segmento numa camada que decodifica
+    "/gemeo/%2e%2e/tokens", "/gemeo/%2E%2E/%2e%2e/nexus/sair", "/gemeo/.%2e/tokens", "/gemeo/%2e/x", "/gemeo/./x",
+    "/gemeo/%2e%2e%2ftokens", "/gemeo/x%5c..%5ctokens", "/painel/usina/%2e%2e",
 ])
 def test_destino_fora_do_mapa_e_recusado(ruim):
     assert porta.destino_permitido(ruim) is None
+
+
+@pytest.mark.parametrize("bom", ["/gemeo/usina/12", "/painel/usina/S%C3%A3o%20Bento?hist=1&nome=S%C3%A3o",
+                                 "/painel/usina/a.b", "/gemeo/usina/12?d=..", "/monitor?fonte=pv&embed=1"])
+def test_destino_com_porcento_de_nome_de_usina_segue_valendo(bom):
+    assert porta.destino_permitido(bom) == bom
 
 
 def test_padroes_do_navegador_valem_igual_no_python():
@@ -167,7 +177,8 @@ def test_com_o_clone_da_plataforma_o_mapa_e_a_regra_do_destino_sao_os_mesmos():
     casos = [t.caminho.replace("<id>", "297410") for t in porta.MAPA] + [
         "/monitor?fonte=pv&embed=1", "/gemeo/usina/1", "/painel/usina/a%20b?nome=X%27Y", "//evil.example", "/login",
         "/os/", "/tempo-real#x", "/painel/usina/a'b", "/tempo-real/../tokens", "/painel/nexus/entrar", "/", "",
-        "/tempo-real?x=<b>", "/api/macro"]
+        "/tempo-real?x=<b>", "/api/macro", "/gemeo/%2e%2e/tokens", "/gemeo/.%2E/x", "/gemeo/a%2fb", "/gemeo/a%5Cb",
+        "/painel/usina/S%C3%A3o?hist=1", "/gemeo/usina/1?d=.."]
     for c in casos:
         assert pn.destino_permitido(c) == porta.destino_permitido(c), c
 
