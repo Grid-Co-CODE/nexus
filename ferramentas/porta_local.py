@@ -27,6 +27,7 @@ PerformancePainel):
     python ferramentas/porta_local.py ... --modo raiz                      (fase 4)
 """
 import argparse
+import http.cookiejar
 import re
 
 import requests
@@ -81,6 +82,10 @@ def reescreve_corpo(texto: str, html: bool) -> str:
 
 def criar_app(nexus: str, plataforma: str, modo: str, reescrita: bool):
     sessao = requests.Session()
+    # Pote de cookies FECHADO (prova de 10/10/2026, tests/test_porta_local.py): com o pote padrão, o Set-Cookie de uma
+    # resposta ficava guardado aqui e voltava sozinho no pedido de quem chegasse sem cookie (curl, outra aba): a sessão
+    # de uma pessoa aparecia na de outra. O Caddy não guarda nada; o Cookie do navegador vai como veio, e só ele.
+    sessao.cookies.set_policy(http.cookiejar.DefaultCookiePolicy(allowed_domains=[]))
     sessao.mount("http://", requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=64))
     bases = {"nexus": nexus.rstrip("/"), "plataforma": plataforma.rstrip("/")}
 

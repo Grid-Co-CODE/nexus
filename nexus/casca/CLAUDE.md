@@ -18,7 +18,7 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base e entrar): a reserva do `localStorage` antes de pintar |
 | `nexus/static/nexus.css` | os tokens do Design System Grid Co. nos dois temas e o subconjunto `gc-*` |
 | `app.py` / `servir.py` | desenvolvimento (5070, IPv4 e IPv6, cookie sem Secure) / produção (atrás do proxy, cookie Secure) |
-| `ferramentas/subir_copia_de_prova.py` / `ferramentas/porta_local.py` | cópia de prova noutra porta (sem carga, sem Fracttal ao subir, trava de rede) / o papel do Caddy no PC, Nexus e plataforma numa origem só |
+| `ferramentas/subir_copia_de_prova.py` / `ferramentas/porta_local.py` | cópia de prova noutra porta (sem carga, sem Fracttal ao subir, trava de rede) / o papel do Caddy no PC, Nexus e plataforma numa origem só; só repassa, sem pote de cookies (10/10/2026: o pote guardava o `session` de uma resposta e o dava a quem chegasse sem cookie; `tests/test_porta_local.py`) |
 
 ## O prefixo `/nexus` e o cookie próprio (porta única, 09/10/2026)
 
