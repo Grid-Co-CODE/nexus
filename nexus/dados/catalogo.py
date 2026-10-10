@@ -200,7 +200,8 @@ FATOS = (
          observacao="a linha muda a cada conferência e nunca fecha. Atrasado, perto de vencer e sem atualização são "
                     "conta do Nexus no dia (nexus/hseq/extintores.py, a mesma regra da TST que o App usa); o Status do "
                     "livro é o do App na hora da publicação. A observação do técnico não vai (só 'Tem informação "
-                    "adicional', sim/não). Até o App publicar, o livro não existe"),
+                    "adicional', sim/não). Carga única em 09/10/2026 pelo Nexus, do cadastro do App (773, "
+                    "ferramentas/carregar_extintores_cadastro.py), até o App publicar (v257, que a substitui)"),
     Fato("conferencia_extintor", "Conferência de extintor", "hseq", "extintores_conferencias_app_campo · Conferências",
          "1 linha = 1 extintor conferido num mês (reenviar no mesmo mês regrava a linha)",
          _d(data=("cod", "Dia (de Brasília)"), usina=("nome", "Usina (nome do Fracttal; Código da usina)"),

@@ -54,7 +54,7 @@
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · App publicou em {{ d.publicado_em }}{% endif %}</div>
+    <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · livro gravado em {{ d.publicado_em }}{% endif %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
   {% elif not d.get('livro_existe') %}<div class="cn-erro cn-aviso" role="status"><b>Os extintores ainda não chegaram ao banco do Nexus.</b>
