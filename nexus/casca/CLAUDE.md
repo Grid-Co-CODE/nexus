@@ -176,4 +176,9 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   tela, ela fica verde sozinha. A torre da cadeira deixou de ser verde (era o mesmo sinal); fica só a etiqueta "sua".
   Exceção: as molduras da Performance (porta única) só contam com a `NEXUS_SSO_CHAVE` (`moldura.SO_COM_A_PORTA`):
   sem ela abrem o aviso "ainda não ligada" e o verde mentiria (revisão de 10/10/2026).
+- **O Início conta pela mesma régua** (auditoria A3 da porta única, 10/10/2026): é a primeira página de todos, e dizia
+  "fase 0" e "Com dado real: 0" com 40 telas prontas no ar. O número é "Telas prontas" (o tamanho de
+  `telas_com_conteudo`, o verde do menu); cada cartão leva à 1ª tela PRONTA da torre (no COS, com a porta ligada, o
+  Acompanhamento, e não a Mesa em construção), com "N de M prontas"; torre sem nenhuma (Comando, Contratos, Relatórios)
+  vira um cartão que não é link, tracejado, com "Em construção". Prova: `tests/test_casca_inicio.py`.
 - Edge "localhost recusou": o waitress tem de escutar em `127.0.0.1` **e** `[::1]`.

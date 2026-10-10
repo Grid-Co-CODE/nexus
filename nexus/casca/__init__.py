@@ -39,11 +39,29 @@ def _commit() -> str:
         return "local"
 
 
+def _telas_prontas(app) -> frozenset[str]:
+    """As telas com conteúdo (o verde do menu), calculadas uma vez: o mapa de rotas não muda depois do boot."""
+    if "nexus_telas_prontas" not in app.extensions:
+        app.extensions["nexus_telas_prontas"] = telas_com_conteudo(app)
+    return app.extensions["nexus_telas_prontas"]
+
+
 @bp.route("/")
 def inicio():
-    torres = current_app.extensions["nexus_torres"]
-    total_telas = sum(len(t.telas) for t in torres)
-    return render_template("inicio.html", torres=torres, total_telas=total_telas)
+    """O Início, a primeira página de todos. Honesto (auditoria A3 da porta única, 10/10/2026): até então dizia "fase 0"
+    e "Com dado real: 0" com 40 telas prontas no ar, e cada cartão abria a 1ª tela da torre, que em Comando, COS,
+    Contratos e Relatórios é "Em construção". O número agora é o das telas prontas, pela mesma conta do verde do menu
+    (`telas_com_conteudo`); o cartão leva à 1ª tela PRONTA da torre, e a torre sem nenhuma não vira link."""
+    app = current_app._get_current_object()
+    torres = app.extensions["nexus_torres"]
+    prontas = _telas_prontas(app)
+    cartoes = []
+    for t in torres:
+        urls = [f"/t/{t.id}/{s.id}" for s in t.telas]
+        das_prontas = [u for u in urls if u in prontas]
+        cartoes.append({"torre": t, "url": das_prontas[0] if das_prontas else None, "prontas": len(das_prontas)})
+    return render_template("inicio.html", torres=torres, cartoes=cartoes, total_prontas=len(prontas),
+                           total_telas=sum(len(t.telas) for t in torres))
 
 
 @bp.route("/cadeira", methods=["POST"])
@@ -81,12 +99,8 @@ def instalar_contexto(app) -> None:
         blueprint = request.blueprint or ""
         torre_atual = blueprint.removeprefix("torre_") if blueprint.startswith("torre_") else None
         cadeira_id = session.get("cadeira")
-        # O mapa de rotas não muda depois do boot: calcula uma vez, na primeira página.
-        if "nexus_telas_prontas" not in app.extensions:
-            app.extensions["nexus_telas_prontas"] = telas_com_conteudo(app)
         return {
-            "menu": montar_menu(app.extensions["nexus_torres"], cadeira_id, torre_atual,
-                                app.extensions["nexus_telas_prontas"]),
+            "menu": montar_menu(app.extensions["nexus_torres"], cadeira_id, torre_atual, _telas_prontas(app)),
             "cadeira": CADEIRAS.get(cadeira_id) if cadeira_id else None,
             "cadeiras": list(CADEIRAS.values()),
             "caminho": request.path,
