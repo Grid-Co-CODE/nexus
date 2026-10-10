@@ -25,6 +25,15 @@ _NEXT_DO_CLONE = re.compile(r"""(encodeURIComponent\(|var volta = )['"]/os/_nexu
 _LITERAL_DO_CLONE = re.compile(rb"""(value=)?([\"'`(])/os(?=[/\"'`?#)])""")
 
 
+def da_plataforma(caminho: str) -> bool:
+    """Endereço da Plataforma de Performance que o Nexus escreve DE PROPÓSITO na raiz (porta única, 09/10/2026): o
+    formulário do passe e o Sair (`/painel/nexus/...`) e as telas do mapa ("Abrir em outra aba"). No servidor a
+    plataforma mora na raiz, ao lado do Nexus em /nexus: com o prefixo, eles quebrariam. Não é página do Nexus, e o
+    rastreador não segue."""
+    from nexus.performance import porta
+    return caminho in (porta.ENTRAR, porta.SAIR) or porta.destino_permitido(caminho) is not None
+
+
 def _eh_caminho(valor: str, atributo: str) -> bool:
     if not valor.startswith("/") or valor.startswith("//"):
         return False
@@ -66,6 +75,7 @@ class Rastreio:
         self.visitados: dict[str, int] = {}
         self.ruins: list[tuple[str, str, str]] = []          # (página, onde, endereço)
         self.redirecionamentos: list[tuple[str, str]] = []
+        self.da_plataforma: list[tuple[str, str, str]] = []     # (página, onde, endereço da plataforma)
 
     def interno_certo(self, caminho: str) -> bool:
         if self.prefixo:
@@ -123,6 +133,9 @@ class Rastreio:
             for onde, caminho in caminhos_do_html(corpo.decode("utf-8", "replace")):
                 if eh_clone and onde == "js":
                     continue                    # o JavaScript do clone é conferido pelo literal (acima)
+                if onde != "js" and da_plataforma(caminho):
+                    self.da_plataforma.append((url, onde, caminho))
+                    continue                    # o endereço da plataforma, na raiz de propósito (moldura e passe)
                 if not self.interno_certo(caminho):
                     self.ruins.append((url, onde, caminho))
                     continue

@@ -18,6 +18,8 @@ O cookie sai sem `Secure` (http local), como no `app.py`. Variável `NEXUS_*` do
 Uso, da raiz do repositório:
     python ferramentas/subir_copia_de_prova.py                                   porta 5170
     python ferramentas/subir_copia_de_prova.py --porta 5171 --plataforma http://127.0.0.1:5150
+    python ferramentas/subir_copia_de_prova.py --porta 5171 --prefixo /nexus --plataforma ""     (a moldura da porta
+        única: a plataforma na mesma origem, atrás da ferramentas/porta_local.py; NEXUS_SSO_CHAVE pelo ambiente)
 """
 import argparse
 import os
@@ -76,7 +78,8 @@ def instalar_trava() -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description="Cópia de prova do Nexus noutra porta (sem carga, sem Fracttal ao subir).")
     p.add_argument("--porta", type=int, default=5170)
-    p.add_argument("--plataforma", help="NEXUS_PLATAFORMA_URL desta cópia (ex.: http://127.0.0.1:5150)")
+    p.add_argument("--plataforma", help="NEXUS_PLATAFORMA_URL desta cópia (ex.: http://127.0.0.1:5150). Vazio (\"\") = a "
+                                        "MESMA origem, como no servidor: a moldura da Performance, atrás da porta_local.py")
     p.add_argument("--prefixo", help="NEXUS_PREFIXO desta cópia (ex.: /nexus, como no servidor; atrás da porta_local.py)")
     args = p.parse_args()
     if args.porta == 5070:
@@ -85,7 +88,8 @@ def main() -> None:
     os.environ["NEXUS_CARGA_DADOS"] = "0"
     os.environ["NEXUS_CAMPO_AQUECER"] = "0"
     os.environ["NEXUS_CAMPO_COLETOR"] = ""
-    if args.plataforma:
+    if args.plataforma is not None:
+        # "" também vale: vence o .env (a moldura da porta única só abre na mesma origem; nexus/torres/moldura.py)
         os.environ["NEXUS_PLATAFORMA_URL"] = args.plataforma
     if args.prefixo is not None:
         os.environ["NEXUS_PREFIXO"] = args.prefixo

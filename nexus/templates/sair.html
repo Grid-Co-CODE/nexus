@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="{{ tema }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saindo · Nexus · Grid Co.</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  <script>
+    {% include "_tema_cabeca.html" %}
+    {% include "_raiz_js.html" %}
+  </script>
+</head>
+<body>
+{# Porta única (09/10/2026, spec 5.2): o Sair do Nexus encerra também a sessão que o passe abriu na Plataforma de
+   Performance, pelo POST em /painel/nexus/sair (mesma origem), e segue para o Entrar. O JavaScript faz o POST sem sair
+   da página e vai ao Entrar mesmo se a plataforma não responder (em 4 s); sem JavaScript, o botão faz o POST e a
+   plataforma devolve para o Entrar (campo volta). #}
+<main class="sair-caixa">
+  <h1>Saindo do Nexus</h1>
+  <p>Encerrando também a sessão da Plataforma de Performance neste navegador.</p>
+  <form id="sair-plataforma" method="post" action="{{ plataforma }}/painel/nexus/sair" data-entrar="{{ url_for('auth.entrar') }}">
+    <input type="hidden" name="volta" value="{{ url_for('auth.entrar') }}">
+    <noscript><button type="submit" class="gc-btn gc-btn--ui gc-btn--primario">Sair também da Performance</button></noscript>
+  </form>
+  <p class="mudo"><a href="{{ url_for('auth.entrar') }}">Ir para o Entrar</a></p>
+</main>
+<script>
+(function () {
+  var f = document.getElementById("sair-plataforma"), entrar = f.getAttribute("data-entrar"), foi = false;
+  function seguir() { if (!foi) { foi = true; location.replace(entrar); } }
+  setTimeout(seguir, 4000);
+  try {
+    // URL completa: no servidor, uma camada fora do repositório põe /nexus em todo fetch começado por "/"
+    fetch(new URL(f.getAttribute("action"), location.href).href,
+          {method: "POST", body: new URLSearchParams(new FormData(f)), credentials: "same-origin", redirect: "manual",
+           keepalive: true}).then(seguir, seguir);
+  } catch (e) { seguir(); }
+})();
+</script>
+</body>
+</html>

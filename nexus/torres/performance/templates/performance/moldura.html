@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block classe_conteudo %}conteudo--moldura{% endblock %}
+{% block conteudo %}
+{# Uma tela da Plataforma de Performance dentro do Nexus (porta única, 09/10/2026; Levi: "a partir de segunda quero o
+   Nexus como link principal"). O Nexus é a porta (menu, login, endereço); a plataforma desenha a tela na moldura. O
+   formulário escondido leva o passe (POST, nunca na URL) a /painel/nexus/entrar com alvo na moldura; o porta.js o envia
+   ao carregar, acompanha o caminho que a moldura avisa e, no Diagnóstico, lê a lista de usinas. Regra e porquês em
+   nexus/torres/moldura.py e nexus/performance/porta.py. #}
+<div class="porta" id="porta">
+  <div class="porta-faixa">
+    <span class="porta-origem"><strong>{{ tela.nome }}</strong> · Plataforma de Performance</span>
+    {% if visoes|length > 1 %}
+    <nav class="porta-visoes" aria-label="Visão do {{ tela.nome }}">
+      {% for v in visoes %}<a class="gc-chip" href="?ver={{ v.id }}" aria-pressed="{{ 'true' if v.id == ver else 'false' }}">{{ v.nome }}</a>{% endfor %}
+    </nav>
+    {% endif %}
+    {% if seletor and ligada and not recusa %}
+    <label class="porta-usina"><span class="gc-rotulo">Usina</span>
+      <select id="porta-usina" class="gc-campo" disabled><option value="">Lendo as usinas da Plataforma...</option></select>
+    </label>
+    <span class="porta-nota mudo" id="porta-usina-nota" role="status"></span>
+    {% endif %}
+    {% if ligada and destino and not recusa %}<a class="porta-fora" id="porta-fora" href="{{ plataforma }}{{ destino }}" target="_blank" rel="noopener">Abrir em outra aba</a>{% endif %}
+  </div>
+  <p class="porta-alerta" id="porta-alerta" role="alert" hidden></p>
+  {% if recusa %}
+  <div class="porta-aviso">
+    <h1>Só administradores do Nexus</h1>
+    <p>{{ recusa }}</p>
+  </div>
+  {% elif not ligada %}
+  <div class="porta-aviso" role="status">
+    <h1>Performance ainda não ligada neste servidor</h1>
+    <p>Esta tela é a da Plataforma de Performance, aberta dentro do Nexus. Para ligar: {{ motivo }}.</p>
+    <p class="mudo">O resto do Nexus funciona normalmente. A plataforma continua no endereço dela enquanto isso.</p>
+  </div>
+  {% elif not destino %}
+  <p class="porta-vazia" id="porta-vazia">Escolha uma usina, no alto, para abrir o diagnóstico dela.</p>
+  {% else %}
+  <form id="porta-passe" class="porta-passe" method="post" action="{{ plataforma }}/painel/nexus/entrar" target="porta-moldura">
+    <input type="hidden" name="passe" value="{{ passe }}">
+    <noscript><p class="porta-sem-js">Sem JavaScript a tela abre por este botão (o acesso vale 60 segundos; depois, clique de novo no menu):
+      <button type="submit" class="gc-btn gc-btn--primario">Abrir</button></p></noscript>
+  </form>
+  <iframe class="porta-moldura" id="porta-moldura" name="porta-moldura" title="{{ tela.nome }}: Plataforma de Performance"></iframe>
+  {% endif %}
+</div>
+{% if ligada and not recusa %}
+<script type="application/json" id="porta-dados">{{ dados|tojson }}</script>
+<script src="{{ url_for('static', filename='porta.js') }}"></script>
+{% endif %}
+{% endblock %}

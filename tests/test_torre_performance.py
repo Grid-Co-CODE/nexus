@@ -319,5 +319,7 @@ def test_url_da_plataforma_lida_como_o_requests_le_e_a_enganosa_e_recusada(url, 
 
 
 def test_sem_configuracao_a_aba_diz_o_que_falta(logado):
+    # Desde a porta única (09/10/2026) o Tempo real abre pela moldura com a NEXUS_SSO_CHAVE; sem ela e sem a ponte de
+    # 04/10 configurada, a tela diz o que falta para ligar (tests/test_porta_moldura.py cobre o resto).
     html = logado.get("/t/performance/tempo-real").get_data(as_text=True)
-    assert "NEXUS_PLATAFORMA_URL" in html
+    assert "Performance ainda não ligada neste servidor" in html and "NEXUS_SSO_CHAVE" in html

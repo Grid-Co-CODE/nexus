@@ -1,11 +1,9 @@
 """Torre Performance: Quanto gerou, o que caiu e qual a causa provável.
 
-Telas ainda em construção: todas caem no placeholder da casca. Para dar vida a uma tela, crie uma
-view com a mesma rota (ela vence a genérica), por exemplo:
-
-    @bp.route("/tempo-real")
-    def tempo_real():
-        return render_template("performance/tempo-real.html")
+Porta única (09/10/2026; Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo,
+precisamos trazer o tempo real de performance painel para o Nexus"): as telas da Plataforma de Performance abrem aqui
+numa moldura, uma por item do mapa (`nexus/performance/porta.py`; as views saem de `registrar_molduras`, em
+`nexus/torres/moldura.py`). Clima e risco e Mapa de risco são telas do próprio Nexus.
 """
 from datetime import datetime
 
@@ -15,6 +13,7 @@ from ...performance import ponte
 from ...performance.clima import fontes as F
 from ...prefixo import na_raiz
 from ..modelo import Tela, Torre
+from ..moldura import registrar_molduras
 
 TORRE = Torre(
     id="performance",
@@ -23,27 +22,41 @@ TORRE = Torre(
     icone="chart-line-up",
     descricao="Quanto gerou, o que caiu e qual a causa provável.",
     telas=[
+        # As telas da Plataforma de Performance (porta única, 09/10/2026): cada uma é uma moldura com a tela da plataforma,
+        # na ordem do mapa (nexus/performance/porta.py). Os ids que já existiam no menu não mudam (viram endereço).
         Tela("tempo-real", "Tempo real",
              "O que está fora do normal agora na frota?",
-             "Plataforma de Performance (app.gridco.com.br)"),
+             "Plataforma de Performance, ao vivo"),
         Tela("noc", "Painel NOC",
              "Como está a carteira inteira de relance?",
              "Plataforma de Performance"),
         Tela("diagnostico", "Diagnóstico",
              "Qual anomalia é falha real e qual é clima, e virou OS?",
-             "Plataforma de Performance + Fracttal"),
+             "Plataforma de Performance + Fracttal, por usina"),
         Tela("strings-trackers", "Strings e trackers",
              "Quais strings e trackers estão perdendo energia?",
-             "Plataforma de Performance (falhas_performance, via API)"),
+             "Plataforma de Performance"),
         Tela("gerencial", "Visão gerencial",
              "O mês fecha dentro da meta de PR e geração?",
-             "BD_Performance e BD_Thopen, via API"),
+             "Plataforma de Performance (BD_Performance e BD_Thopen)"),
+        Tela("disponibilidade", "Disponibilidade",
+             "Quanto tempo cada usina ficou disponível no mês, e o que a parou?",
+             "Plataforma de Performance (antes só pelo Gerencial)"),
         Tela("relatorio", "Criador de relatório",
              "Como monto o relatório do cliente com os números certos?",
              "Plataforma de Performance"),
+        Tela("relatorio-semanal", "Relatório semanal",
+             "Como foi a semana de cada usina no relatório do cliente?",
+             "Plataforma de Performance (antes só pelo Criador de relatório)"),
         Tela("gemeo", "Gêmeo digital",
              "Quanto a usina deveria ter gerado com o sol que teve?",
-             "gemeo_digital, via API"),
+             "Gêmeo digital, pela Plataforma de Performance"),
+        Tela("historico-plataforma", "Histórico da plataforma",
+             "Como cada usina da API PV andou, dia a dia?",
+             "Plataforma de Performance"),
+        Tela("monitor-ronda", "Monitor da ronda",
+             "A ronda dos trackers saiu em cada horário, e onde falhou?",
+             "Plataforma de Performance"),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
              f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",
@@ -71,11 +84,19 @@ def _config_ponte():
     return url, token, falta
 
 
-@bp.route("/tempo-real")
-def tempo_real():
+def _tempo_real_pela_ponte(motivo: str):
+    """A reserva do Tempo real com a porta desligada: a ponte de 04/10, como ela funcionava (nada afeta o que funciona
+    hoje, spec 10). Com a NEXUS_SSO_CHAVE o item abre a moldura e a ponte sai do menu; a rota dela (/plataforma/...)
+    fica no código até a Operação em tempo real entrar. Sem a ponte configurada, None: a tela diz que não está ligada."""
     url, _token, falta = _config_ponte()
+    if falta:
+        return None
     return render_template("performance/tempo_real.html", torre=TORRE, tela=TORRE.tela("tempo-real"),
-                           prefixo=ponte.PREFIXO, plataforma=url, falta=falta)
+                           prefixo=ponte.PREFIXO, plataforma=url, falta=falta, porta_motivo=motivo)
+
+
+# As molduras das telas da plataforma (uma view por item do mapa); o Tempo real cai na ponte enquanto a porta não liga.
+registrar_molduras(bp, TORRE, reserva={"tempo-real": _tempo_real_pela_ponte})
 
 
 _TITULO_PADRAO = "Plataforma de Performance sem resposta"

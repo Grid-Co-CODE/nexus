@@ -26,8 +26,14 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_CAMPO_AQUECER",
              # a pessoa nos workbooks que o App de Campo manda (v226): HMAC do e-mail, a mesma chave do App Setting
              "NEXUS_PESSOA_HMAC",
-             # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela
+             # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela (a ponte).
+             # Desde a porta única (09/10/2026) a NEXUS_PLATAFORMA_URL é também a base que o NAVEGADOR usa para abrir as
+             # telas da plataforma na moldura: vazia = a própria origem do Nexus (o servidor, app.gridco.com.br)
              "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN",
+             # porta única (09/10/2026, Levi: "a partir de segunda quero o Nexus como link principal"): a chave do passe que
+             # abre as telas da Performance dentro do Nexus (a MESMA no .env da plataforma; 32 caracteres ou mais). Sem
+             # ela as telas dizem "Performance ainda não ligada neste servidor" e o resto do Nexus segue igual
+             "NEXUS_SSO_CHAVE",
              # camada de dados (05/10/2026): a carga de hora em hora liga onde há o token de escrita; "0" desliga
              "NEXUS_CARGA_DADOS",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)

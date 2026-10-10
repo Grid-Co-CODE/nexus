@@ -10,7 +10,7 @@ import hmac
 import time
 from collections import defaultdict, deque
 
-from flask import (Blueprint, current_app, redirect, render_template, request, session,
+from flask import (Blueprint, current_app, make_response, redirect, render_template, request, session,
                    url_for)
 
 from . import fracttal
@@ -131,10 +131,29 @@ def entrar():
     return redirect(na_raiz(destino))
 
 
+def _plataforma_para_sair() -> str | None:
+    """A base da plataforma de Performance quando a porta única está ligada ('' = a mesma origem), ou None."""
+    from ..performance import porta
+    if porta.motivo_da_chave(current_app.config.get("NEXUS_SSO_CHAVE")):
+        return None
+    try:
+        return porta.base_da_plataforma(current_app.config.get("NEXUS_PLATAFORMA_URL"))
+    except ValueError:
+        return None
+
+
 @bp.route("/sair")
 def sair():
     session.clear()
-    resp = redirect(url_for("auth.entrar"))
+    plataforma = _plataforma_para_sair()
+    if plataforma is None:
+        resp = redirect(url_for("auth.entrar"))
+    else:
+        # Porta única (spec 5.2): o Sair do Nexus passa por /painel/nexus/sair da plataforma (POST, mesma origem), que
+        # encerra a sessão que o passe abriu lá; sem isso, quem sai do Nexus continuava gravando na Performance pelo
+        # mesmo navegador por até 12 h. A página faz o POST e segue para o Entrar (sem JavaScript, um botão).
+        resp = make_response(render_template("sair.html", plataforma=plataforma))
+        resp.headers["Cache-Control"] = "no-store"
     resp.delete_cookie("os_sessao", path=os_cookie_path())      # sai do OS Creator junto
     return resp
 

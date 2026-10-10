@@ -3,12 +3,15 @@
 {% block classe_conteudo %}conteudo--moldura{% endblock %}
 {% block conteudo %}
 {# A Entrada e o Monitoramento da Plataforma de Performance, só leitura, pela ponte (04/10/2026). As ações que gravam
-   (cadeado, ticket, OS) seguem na plataforma: "Abrir na plataforma" leva até lá. #}
+   (cadeado, ticket, OS) seguem na plataforma: "Abrir na plataforma" leva até lá. Desde a porta única (09/10/2026) esta é
+   só a RESERVA do Tempo real: aparece enquanto a NEXUS_SSO_CHAVE não está no servidor; com ela, o item abre a moldura
+   (performance/moldura.html) e a ponte sai do menu. #}
 <div class="ponte-recorte">
   <div class="ponte-faixa">
     <span class="ponte-origem">Plataforma de Performance · somente leitura</span>
     {% if plataforma %}<a class="ponte-fora" href="{{ plataforma }}/tempo-real" target="_blank" rel="noopener">Abrir na plataforma</a>{% endif %}
   </div>
+  {% if porta_motivo %}<p class="porta-reserva" title="Para ligar: {{ porta_motivo }}">Performance ainda não ligada neste servidor: até lá, o Tempo real abre pela leitura de 04/10, só leitura.</p>{% endif %}
   {% if falta %}
   <p class="ponte-falta">A aba ainda não está ligada à plataforma: falta {{ falta|join(" e ") }} no .env do Nexus.</p>
   {% else %}

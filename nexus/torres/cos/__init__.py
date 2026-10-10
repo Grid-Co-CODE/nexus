@@ -8,6 +8,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
         return render_template("cos/mesa.html")
 """
 from ..modelo import Tela, Torre
+from ..moldura import registrar_molduras
 
 TORRE = Torre(
     id="cos",
@@ -40,7 +41,13 @@ TORRE = Torre(
         Tela("turno", "Passagem de turno",
              "O que o próximo turno precisa saber e quem assumiu?",
              "Registros de passagem de turno do Nexus"),
+        # Porta única (09/10/2026): o /cos da Plataforma de Performance (MTTA das OS), numa moldura do Nexus. A view sai do
+        # mapa das telas da plataforma (nexus/performance/porta.py), pelo registrar_molduras abaixo.
+        Tela("acompanhamento", "Acompanhamento COS",
+             "As OS do COS estão sendo atendidas no prazo (MTTA)?",
+             "Plataforma de Performance (/cos)"),
     ],
 )
 
 bp = TORRE.criar_blueprint(__name__)
+registrar_molduras(bp, TORRE)

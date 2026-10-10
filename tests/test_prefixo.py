@@ -220,14 +220,14 @@ def sem_rede(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", recusa)
 
 
-def _app_com_dados(tmp_path, prefixo):
+def _app_com_dados(tmp_path, prefixo, **extra):
     """O app com um cadastro de mentira (as telas da Base com linhas e fichas, e os links delas) e a pasta de dados
     num diretório temporário."""
     from nexus.cadastro.cifra import gerar_chave
     from nexus.cadastro.servico import Carga
     from nexus.cadastro.telas import servico
     app = _app(prefixo, NEXUS_CHAVE_CADASTRO=gerar_chave(), NEXUS_ARMAZEM_LOCAL=str(tmp_path / "cadastro.json"),
-               NEXUS_DADOS=str(tmp_path))
+               NEXUS_DADOS=str(tmp_path), **extra)
     with app.app_context():
         servico().aplicar_carga(Carga(
             entidades={
@@ -302,6 +302,34 @@ def test_na_raiz_nada_ganha_o_prefixo(tmp_path, sem_rede):
     _logar(cli, app, "")
     rs = _rastrear(cli, "")
     assert rs.ruins == [], sorted(set(rs.ruins))[:30]
+
+
+@pytest.mark.parametrize("prefixo", [PREFIXO, None])
+def test_com_a_porta_da_performance_ligada_tambem(tmp_path, sem_rede, prefixo):
+    """Porta única (09/10/2026): com a NEXUS_SSO_CHAVE as telas da Performance viram molduras, e elas escrevem endereços
+    da PLATAFORMA (o formulário do passe, "Abrir em outra aba") na raiz de propósito: no servidor a plataforma mora na
+    raiz. O rastreador separa esses (da_plataforma) e continua sem achar endereço do Nexus fora do prefixo."""
+    from nexus.performance import porta
+    app = _app_com_dados(tmp_path, prefixo, NEXUS_SSO_CHAVE="c" * 40)
+    cli = Client(_caddy_corta(app) if prefixo else app)
+    p = prefixo or ""
+    _logar(cli, app, p)
+    rs = _rastrear(cli, p)
+    assert rs.ruins == [], sorted(set(rs.ruins))[:30]
+    # o rastreador não segue ".../relatorio" (é o nome dos downloads): essas telas passam por ele uma a uma
+    from rastreador_de_links import Rastreio
+    da_plataforma = list(rs.da_plataforma)
+    for t in porta.MAPA:
+        url = f"{p}/t/{t.torre}/{t.tela}"
+        if url not in rs.visitados:
+            um = Rastreio(cli, p, limite=1).percorrer(url)
+            assert um.visitados == {url: 200} and um.ruins == [], (t, um.ruins)
+            da_plataforma += um.da_plataforma
+        else:
+            assert rs.visitados[url] == 200, t
+    vistos = {(onde, c) for _, onde, c in da_plataforma}
+    assert ("action", "/painel/nexus/entrar") in vistos and ("href", "/tempo-real") in vistos
+    assert not any(c.startswith("/nexus") for _, c in vistos)
 
 
 def test_o_rastreador_pega_o_endereco_esquecido():
