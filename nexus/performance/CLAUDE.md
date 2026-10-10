@@ -117,6 +117,21 @@ navegador fala com cada sistema.
     em ~5 s pelos dois caminhos (as leituras da própria tela). O gêmeo deu 503 (não está de pé no PC). Nenhuma das duas
     páginas declara ícone: o navegador pede `/favicon.ico`, que cai na plataforma (404, ou 403 para o gestor); é ruído
     de console, não erro.
+- **Revisão adversarial, provada de novo no PC (10/10/2026, de madrugada)**, as mesmas cópias e o mesmo proxy, modos
+  prefixo e raiz:
+  - as 13 telas, o analista que grava, o gestor, o Sair e os passes (válido, repetido, adulterado, vencido, fora do
+    mapa, na URL, de outro site) seguem como na véspera;
+  - a página do Entrar encerra a sessão do passe na plataforma (`/api/state` 200 -> 401);
+  - com um `nexus_sessao` velho em `Path=/` ao lado do de `/nexus`, o Sair apaga os dois e `/nexus/t/cos/mesa` volta ao
+    Entrar;
+  - OS Creator embutido (sessão de teste do clone, a cópia sem saída para fora da máquina): o item Histórico e o item
+    Ativos da torre abrem a aba da tela, debaixo do `/nexus` e na raiz. Com a ponte de antes da correção, debaixo do
+    `/nexus`, só o Início abria e `ehTela` dava `false`;
+  - com a `NEXUS_PLATAFORMA_URL` em outra origem (`http://127.0.0.1:5052`, a plataforma direta), nenhum pedido sai
+    para ela (o passe, a lista do Diagnóstico, o Sair e o Entrar), e o aviso aparece; aberto por um endereço de fora
+    (cabeçalho Host), o servidor desliga a porta, diz por quê e o Tempo real cai na ponte;
+  - sem a chave: só o Tempo real fica verde no menu; o técnico lê "ainda não ligada" sem o nome da variável e o Tempo
+    real dele é a ponte sem a faixa; o admin vê o que falta.
 
 ## Ponte para a Plataforma de Performance (04/10/2026): hoje só a reserva do Tempo real
 

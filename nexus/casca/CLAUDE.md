@@ -135,4 +135,6 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   tela pronta fica verde, e a tela pronta também. "Pronta" = a rota `/t/<torre>/<tela>` cai numa view própria, não no
   `placeholder` da torre (`telas_com_conteudo`, calculado uma vez no primeiro pedido). Ninguém marca à mão: construiu a
   tela, ela fica verde sozinha. A torre da cadeira deixou de ser verde (era o mesmo sinal); fica só a etiqueta "sua".
+  Exceção: as molduras da Performance (porta única) só contam com a `NEXUS_SSO_CHAVE` (`moldura.SO_COM_A_PORTA`):
+  sem ela abrem o aviso "ainda não ligada" e o verde mentiria (revisão de 10/10/2026).
 - Edge "localhost recusou": o waitress tem de escutar em `127.0.0.1` **e** `[::1]`.
