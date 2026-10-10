@@ -16,6 +16,9 @@ página confere a cada 5 minutos (`/os/_nexus/sessao`) se ele não foi derrubado
 depende do Fracttal: só o "sair" a encerra.
 """
 import hmac
+import logging
+import re
+import secrets
 import threading
 import time
 from collections import defaultdict, deque
@@ -23,44 +26,64 @@ from urllib.parse import urlsplit
 
 from flask import (Blueprint, current_app, jsonify, make_response, redirect, render_template, request, session,
                    url_for)
+from itsdangerous import URLSafeTimedSerializer
 
 from . import fracttal
 from ..prefixo import na_raiz, raiz
 
 bp = Blueprint("auth", __name__)
+log = logging.getLogger(__name__)
 
 # a foto do extintor que o App envia (Segurança · HSEQ, 09/10/2026) não tem sessão: a rota confere a assinatura HMAC
 # dela antes de gravar qualquer coisa (`nexus/hseq/fotos.receber`); só ela passa sem login, e só por POST
 ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber"}
 
-# Limite de tentativas do Entrar (auditoria A2 da porta única, 10/10/2026). Até então era por IP: 5 erros de QUALQUER
-# pessoa no mesmo IP trancavam o Entrar de todos por 15 min, inclusive a senha de administrador, e até o 429 do Fracttal
-# contava como erro. Na segunda-feira em que o Nexus vira a porta principal todos entram de novo (o cookie é novo), muitos
-# atrás do mesmo IP público do escritório: um colega errando a senha cinco vezes deixava a sala inteira de fora. Agora:
-# - por E-MAIL: 5 senhas erradas do mesmo e-mail em 15 min trancam só aquele e-mail, e a 6ª nem vai ao Fracttal (que
-#   tem o próprio bloqueio da conta, de ~30 min, e cada tentativa a mais o prolonga);
-# - por IP, um TETO alto (50 em 15 min) contra força bruta de muitos e-mails a partir de uma máquina; o IP é o do
-#   visitante, que o waitress lê do X-Forwarded-For do proxy confiável (`servir.py`, `trusted_proxy`);
+# Limite de tentativas do Entrar (auditoria A2 da porta única e revisão adversarial, 10/10/2026). Até a A2 era por IP: 5
+# erros de QUALQUER pessoa no mesmo IP trancavam o Entrar de todos por 15 min, inclusive a senha de administrador, e até o
+# 429 do Fracttal contava como erro. Na segunda-feira em que o Nexus vira a porta principal todos entram de novo (o
+# cookie é novo), muitos atrás do mesmo IP público do escritório: um colega errando a senha cinco vezes deixava a sala
+# inteira de fora. A A2 passou a contar por e-mail, e a revisão adversarial achou o avesso: só por e-mail, e com a tranca
+# ANTES de o Fracttal conferir a senha, quem soubesse o e-mail de um supervisor (nome.sobrenome é previsível) mandava 5
+# senhas erradas de qualquer rede e o dono ficava 15 min de fora mesmo com a senha certa; repetindo, o dia todo. Agora:
+# - por E-MAIL E REDE: 5 senhas erradas do mesmo e-mail a partir do mesmo IP em 15 min trancam só esse par, e a 6ª nem
+#   vai ao Fracttal (que tem o próprio bloqueio da conta, de ~30 min, e cada tentativa a mais o prolonga). O dono, de
+#   outra rede, entra;
+# - por E-MAIL, um TETO de 20 em 15 min, de qualquer rede, contra as tentativas espalhadas por várias máquinas;
+# - o NAVEGADOR CONHECIDO (o cookie assinado `nexus_dispositivo`, gravado em todo login certo pelo Fracttal, com um
+#   resumo do e-mail feito com a chave do Nexus) não é barrado pelas duas travas do e-mail: tem um contador só dele (5).
+#   O atacante não tem esse cookie para o e-mail de outro, e o dono que já entrou naquele navegador não fica de fora
+#   (é o "device cookie" da OWASP). O Sair não o apaga: ele não abre sessão, só diz que ali já se entrou com a senha;
+# - por IP, um TETO alto (50 em 15 min) contra força bruta de muitos e-mails a partir de uma máquina, para todos, com
+#   cookie ou sem; o IP é o do visitante, que o waitress lê do X-Forwarded-For do proxy confiável (`servir.py`);
 # - a senha de administrador tem o PRÓPRIO contador (por IP): os colegas errando o Fracttal não a trancam, e quem a erra
 #   não tranca o Fracttal de ninguém;
-# - recusa em que a senha NÃO foi conferida (429/limite do Fracttal, rede fora: `fracttal.FracttalOcupado`) não conta:
-#   a pessoa vê "Fracttal ocupado, tente em instantes".
+# - recusa em que a senha NÃO foi conferida (429/limite do Fracttal, rede fora: `fracttal.FracttalOcupado`; a sessão que
+#   não veio: `fracttal.SessaoNaoVeio`) não conta, e o motivo vai para a tela e para o journal.
 # Em memória: zera no restart. Fica em app.extensions, não em variável global, para cada app (e cada teste) ter a sua.
-MAX_ERROS_POR_EMAIL = 5
+MAX_ERROS_POR_EMAIL = 5          # por e-mail E rede (e por navegador conhecido)
+TETO_POR_EMAIL = 20              # por e-mail, de qualquer rede
 MAX_ERROS_ADMIN = 5
 TETO_POR_IP = 50
 JANELA_S = 15 * 60
+# o navegador conhecido: 90 dias desde o último login certo nele; até 8 contas por navegador (o PC da sala do NOC)
+COOKIE_DISPOSITIVO = "nexus_dispositivo"
+DISPOSITIVO_S = 90 * 24 * 3600
+_DISPOSITIVO_MAX_CONTAS = 8
 # o e-mail é texto livre de quem tenta: acima disto, as chaves vencidas saem da memória
 _MAX_CHAVES = 5000
 # o waitress atende em 8 threads: duas tentativas ao mesmo tempo não podem limpar a mesma fila nem podar o dicionário
 # enquanto o outro o percorre
 _TRAVA_DOS_ERROS = threading.Lock()
 
-TEXTO_EMAIL_TRANCADO = "Muitas tentativas erradas com este e-mail. Aguarde 15 minutos e tente de novo."
+TEXTO_EMAIL_TRANCADO = ("Muitas tentativas erradas com este e-mail a partir desta rede. Aguarde 15 minutos e tente de "
+                        "novo.")
+TEXTO_EMAIL_TETO = ("Muitas tentativas erradas com este e-mail, vindas de várias redes. Aguarde 15 minutos e tente de "
+                    "novo. Se não foram suas, avise a T.I.")
+TEXTO_DISPOSITIVO_TRANCADO = ("Muitas tentativas erradas com este e-mail neste navegador. Aguarde 15 minutos e tente de "
+                              "novo.")
 TEXTO_IP_TRANCADO = "Muitas tentativas erradas a partir desta rede. Aguarde 15 minutos."
 TEXTO_ADMIN_TRANCADO = "Muitas tentativas erradas com a senha de administrador. Aguarde 15 minutos."
-TEXTO_FRACTTAL_OCUPADO = ("Fracttal ocupado, tente em instantes. A senha não chegou a ser conferida, e esta tentativa "
-                          "não conta como erro.")
+TEXTO_NAO_CONFERIDA = "A senha não chegou a ser conferida, e esta tentativa não conta como erro."
 
 # Por que a pessoa voltou ao login (o aviso no alto da tela de entrada). Só estes textos aparecem: o motivo que chega
 # pelo endereço é uma CHAVE daqui, nunca texto livre.
@@ -83,10 +106,53 @@ def _ip() -> str:
     return request.remote_addr or "?"
 
 
-def _chave_do_email(email: str) -> tuple:
+def _email_normal(email: str) -> str:
     """O e-mail como o Fracttal o trata (sem espaço nas pontas, sem diferença de maiúscula): "A@x" e " a@x" são a mesma
     conta e contam juntos."""
-    return ("email", email.strip().lower()[:254])
+    return email.strip().lower()[:254]
+
+
+def _serializador_do_dispositivo():
+    return URLSafeTimedSerializer(current_app.secret_key, salt="nexus-dispositivo")
+
+
+def _resumo_do_email(email: str) -> str:
+    """O e-mail no cookie do navegador conhecido: um HMAC com a chave do Nexus, e não o e-mail (o cookie é assinado, não
+    cifrado: quem o lê não descobre quem entrou naquele PC)."""
+    chave = str(current_app.secret_key or "").encode()
+    return hmac.new(chave, b"dispositivo:" + email.encode(), "sha256").hexdigest()[:24]
+
+
+def _dispositivo() -> dict | None:
+    """O cookie do navegador conhecido deste pedido, conferido (assinatura e prazo), ou None."""
+    bruto = request.cookies.get(COOKIE_DISPOSITIVO)
+    if not bruto:
+        return None
+    try:
+        dado = _serializador_do_dispositivo().loads(bruto, max_age=DISPOSITIVO_S)
+    except Exception:            # noqa: BLE001 — assinatura errada, vencido ou lixo: navegador desconhecido
+        return None
+    if not isinstance(dado, dict) or not isinstance(dado.get("d"), str) or not isinstance(dado.get("e"), list):
+        return None
+    return dado
+
+
+def _dispositivo_conhecido(email_n: str) -> str | None:
+    """O id deste navegador quando já se entrou nele com este e-mail pelo Fracttal; senão, None."""
+    dado = _dispositivo()
+    return dado["d"] if dado and _resumo_do_email(email_n) in dado["e"] else None
+
+
+def _gravar_dispositivo(resp, email_n: str):
+    """No login certo: este navegador passa a ser conhecido para este e-mail (o mais recente na frente), por 90 dias."""
+    dado = _dispositivo() or {}
+    resumo = _resumo_do_email(email_n)
+    contas = [resumo] + [r for r in dado.get("e", []) if r != resumo]
+    valor = _serializador_do_dispositivo().dumps({"d": dado.get("d") or secrets.token_urlsafe(12),
+                                                  "e": contas[:_DISPOSITIVO_MAX_CONTAS]})
+    resp.set_cookie(COOKIE_DISPOSITIVO, valor, max_age=DISPOSITIVO_S, path=raiz() or "/", httponly=True,
+                    samesite="Lax", secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    return resp
 
 
 def _erros_na_janela(chave: tuple) -> int:
@@ -117,9 +183,23 @@ def _zerar_erros(chave: tuple) -> None:
         _erros().pop(chave, None)
 
 
+# Caractere de controle (0x00-0x20, 0x7f) ou barra invertida em QUALQUER posição do `next` (revisão adversarial de
+# 10/10/2026). Só se recusava `//` e `/\` no começo, e um next `/` + TAB + `/outro.site/x` passava: o Werkzeug monta o
+# Location pelo `urlsplit` do Python, que tira TAB, LF e CR (a regra de URL dos navegadores, que também os tiram), e o
+# cabeçalho saía `//outro.site/x`. Na RAIZ (o Nexus como porta principal), a pessoa digitava a senha do Fracttal no
+# endereço da empresa e caía num site de fora; debaixo do /nexus o prefixo na frente escondia o problema. LF e CR davam
+# 500. É a mesma régua do `nexus_sair` (`performance/porta.py`) e do `_entrar_pelo_nexus_href` da plataforma. Um `%09`
+# ainda codificado no caminho é texto comum (o navegador não o decodifica), e o `?p=` da moldura vem assim.
+_NEXT_PROIBIDO = re.compile(r"[\x00-\x20\x7f\\]")
+
+
 def next_seguro(valor: str | None) -> str:
-    """Só aceita caminho do próprio site. '//x' e '/\\x' o navegador lê como outro domínio."""
-    if not valor or not valor.startswith("/") or valor.startswith("//") or valor.startswith("/\\"):
+    """Só aceita caminho do próprio site: começa com uma barra só, sem caractere de controle nem barra invertida em
+    lugar nenhum, e sem esquema nem servidor. Qualquer outro volta ao Início."""
+    if not valor or not valor.startswith("/") or valor.startswith("//") or _NEXT_PROIBIDO.search(valor):
+        return "/"
+    partes = urlsplit(valor)
+    if partes.scheme or partes.netloc:
         return "/"
     return valor
 
@@ -159,7 +239,7 @@ def _destino_do_pedido() -> str:
     if request.method == "GET":
         return request.full_path.rstrip("?")
     volta = request.form.get("volta") or ""
-    if volta.startswith("/") and not volta.startswith("//"):
+    if next_seguro(volta) != "/":
         return volta
     ref = urlsplit(request.referrer or "")
     return ref.path + (f"?{ref.query}" if ref.query else "") if ref.netloc == request.host and ref.path else "/"
@@ -235,25 +315,50 @@ def _supervisor_padrao(email: str, nome: str) -> dict:
         return {}
 
 
+def _texto_nao_conferida(e: "fracttal.FracttalOcupado") -> str:
+    """A tela quando a senha não chegou a ser conferida: o motivo curto, para a pessoa (e quem ela chamar) saber se é o
+    limite do Fracttal, que passa sozinho, ou a saída do servidor, que não passa (revisão adversarial de 10/10/2026)."""
+    if e.limite:
+        return f"Fracttal ocupado ({e.motivo}), tente em instantes. {TEXTO_NAO_CONFERIDA}"
+    return f"Sem resposta do Fracttal: {e.motivo}. {TEXTO_NAO_CONFERIDA} Tente em instantes; se continuar, avise a T.I."
+
+
 def _entrar_fracttal(destino):
     email = (request.form.get("email") or "").strip()
     senha = request.form.get("senha") or ""
     if not email or not senha:
         # nada foi ao Fracttal: não é uma senha tentada, não conta
         return _tela_entrar(erro="Informe o e-mail e a senha do Fracttal.", email=email, destino=destino), 400
-    chave = _chave_do_email(email)
-    if _erros_na_janela(chave) >= MAX_ERROS_POR_EMAIL:
-        return _tela_entrar(erro=TEXTO_EMAIL_TRANCADO, email=email, destino=destino), 429
+    email_n, ip = _email_normal(email), _ip()
+    disp = _dispositivo_conhecido(email_n)
+    if disp:
+        # o navegador em que a pessoa já entrou: as travas do e-mail não valem para ele, só o contador dele
+        travas = [(("disp", disp, email_n), MAX_ERROS_POR_EMAIL, TEXTO_DISPOSITIVO_TRANCADO)]
+    else:
+        travas = [(("email_ip", email_n, ip), MAX_ERROS_POR_EMAIL, TEXTO_EMAIL_TRANCADO),
+                  (("email", email_n), TETO_POR_EMAIL, TEXTO_EMAIL_TETO)]
+    for chave, limite, texto in travas:
+        if _erros_na_janela(chave) >= limite:
+            return _tela_entrar(erro=texto, email=email, destino=destino), 429
     try:
         conta = fracttal.entrar(current_app._get_current_object(), email, senha)
-    except fracttal.FracttalOcupado:
-        # o Fracttal não conferiu a senha (429 do limite da empresa, rede fora): tentar de novo é o certo, e não conta
-        return _tela_entrar(erro=TEXTO_FRACTTAL_OCUPADO, email=email, destino=destino), 503
+    except fracttal.FracttalOcupado as e:
+        # o Fracttal não conferiu a senha (429 do limite da empresa, rede, DNS, certificado): não conta. O erro de verdade
+        # vai para o journal (classe e mensagem, sem e-mail nem senha): antes ele era descartado e a tela só dizia
+        # "ocupado", e uma saída do servidor para o Fracttal quebrada passaria o dia como "tente em instantes"
+        log.warning("Entrar: o Fracttal não conferiu a senha (%s). Erro: %s", e.motivo, e.detalhe)
+        return _tela_entrar(erro=_texto_nao_conferida(e), email=email, destino=destino), 503
+    except fracttal.SessaoNaoVeio as e:
+        # a senha passou e a sessão do clone não veio: defeito do Nexus (a costura com o clone), não de quem digitou
+        log.error("Entrar: o Fracttal aceitou a senha e a sessão não chegou ao Nexus. %s", e.detalhe)
+        return _tela_entrar(erro=f"{e} {TEXTO_NAO_CONFERIDA} Tente de novo; se continuar, avise a T.I. (o erro ficou "
+                                 "registrado no servidor).", email=email, destino=destino), 500
     except fracttal.LoginRecusado as e:
-        _contar_erro(chave, ("ip", _ip()))
+        _contar_erro(*[chave for chave, _, _ in travas], ("ip", ip))
         return _tela_entrar(erro=str(e), email=email, destino=destino), 401
-    # acertou: o contador DESTE e-mail zera; o do IP fica (um login certo no meio não apaga a força bruta de outro)
-    _zerar_erros(chave)
+    # acertou: os contadores DESTE e-mail zeram; o do IP fica (um login certo no meio não apaga a força bruta de outro)
+    for chave in (("email_ip", email_n, ip), ("email", email_n)) + ((("disp", disp, email_n),) if disp else ()):
+        _zerar_erros(chave)
     session.clear()
     session.permanent = True
     session["logado"] = True
@@ -269,6 +374,8 @@ def _entrar_fracttal(destino):
     # a sessão do OS Creator (o JWT do Fracttal) nasce junto: o /os/ e a aprovação de PT abrem sem pedir de novo
     resp.set_cookie(nome, valor, max_age=idade, path=os_cookie_path(), httponly=True, samesite="Lax",
                     secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    # o navegador passa a ser conhecido para o e-mail digitado (o mesmo das travas)
+    _gravar_dispositivo(resp, email_n)
     return _sem_a_sessao_velha_da_raiz(resp)
 
 
