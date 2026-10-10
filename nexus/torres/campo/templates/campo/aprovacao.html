@@ -228,7 +228,7 @@
     bt.addEventListener('click', function () {
       if (!confirm('Aprovar a OS ' + box.dataset.os + '?\n\nEla é concluída no Fracttal com o seu login do Fracttal e isso não dá para desfazer.')) return;
       bt.disabled = true; msg.textContent = 'Aprovando no Fracttal…';
-      fetch('/os/_nexus/aprovacao/' + box.dataset.wo + '/aprovar', {method: 'POST', credentials: 'same-origin',
+      fetch(nexusRota('/os/_nexus/aprovacao/') + box.dataset.wo + '/aprovar', {method: 'POST', credentials: 'same-origin',
         headers: {'Content-Type': 'application/json'}, body: '{}'})
         .then(function (r) { return r.json().then(function (j) { return {status: r.status, j: j}; }, function () { return {status: r.status, j: null}; }); })
         .then(function (res) {
@@ -237,7 +237,7 @@
             var volta = '/os/_nexus/voltar?para=' + encodeURIComponent(location.pathname + location.search);
             msg.textContent = 'Para aprovar, ';
             var a = document.createElement('a');
-            a.className = 'cn-link'; a.href = '/os/login?next=' + encodeURIComponent(volta);
+            a.className = 'cn-link'; a.href = nexusRota('/os/login') + '?next=' + encodeURIComponent(volta);
             a.textContent = 'entre com o seu login do Fracttal';
             msg.appendChild(a); msg.appendChild(document.createTextNode('.'));
             bt.disabled = false; return;

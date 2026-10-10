@@ -89,7 +89,7 @@ def pode_passar(metodo: str, caminho: str) -> bool:
     return m == "POST" and (caminho or "").split("?", 1)[0].rstrip("/") in POSTS_DE_CONSULTA
 
 
-def montar_pedido(base_url, token, metodo, caminho, query, corpo, tipo) -> dict:
+def montar_pedido(base_url, token, metodo, caminho, query, corpo, tipo, prefixo: str = PREFIXO) -> dict:
     # A regra do caminho vive AQUI, e não só na rota: "@evil.com/x" colado na base viraria usuário "plat" no servidor
     # evil.com (a chave de leitura iria para fora), e "?"/"#" escondem query por fora do filtro de parâmetros abaixo.
     if not caminho.startswith("/") or "?" in caminho or "#" in caminho:
@@ -97,7 +97,9 @@ def montar_pedido(base_url, token, metodo, caminho, query, corpo, tipo) -> dict:
     # `force=1` refaz na hora o que o motor monta sozinho (no "Atualizar" dos trackers, curvas novas na SunOp); `run` e
     # `backfill` disparam coleta e histórico. Pelo Nexus, ler é ler o que já está pronto.
     params = [(k, v) for k, v in (query or []) if k not in PARAMETROS_QUE_DISPARAM]
-    cab = {"X-Nexus-Leitura": token, "X-Forwarded-Prefix": PREFIXO, "Accept": "*/*", "User-Agent": "nexus-ponte"}
+    # `prefixo` é o caminho da ponte como o navegador o vê: debaixo do /nexus do servidor, /nexus/t/performance/plataforma
+    # (a rota passa o dela); a plataforma escreve os links e o calço dela com ele
+    cab = {"X-Nexus-Leitura": token, "X-Forwarded-Prefix": prefixo, "Accept": "*/*", "User-Agent": "nexus-ponte"}
     pedido = {"method": metodo.upper(), "url": base_url.rstrip("/") + caminho, "params": params, "headers": cab,
               "timeout": TEMPO_LIMITE_S, "allow_redirects": False}
     if corpo is not None and pedido["method"] == "POST":
@@ -107,14 +109,14 @@ def montar_pedido(base_url, token, metodo, caminho, query, corpo, tipo) -> dict:
     return pedido
 
 
-def ajustar_resposta(status, cabecalhos, corpo):
+def ajustar_resposta(status, cabecalhos, corpo, prefixo: str = PREFIXO):
     # Nome de cabeçalho não tem caixa fixa: Cloudflare e HTTP/2 entregam tudo em minúsculo, e o `requests` mantém a
     # caixa de origem no `.items()`. Comparar com a caixa exata deixaria o HTML passar SEM o guarda de leitura (falha
     # aberta), então o casamento é por minúsculo e a resposta volta com o nome canônico.
     recebidos = {str(k).lower(): v for k, v in (cabecalhos or {}).items()}
     cab = {nome: recebidos[nome.lower()] for nome in _CABECALHOS_QUE_PASSAM if nome.lower() in recebidos}
     if str(cab.get("Content-Type", "")).lower().startswith("text/html"):
-        corpo = injetar(corpo.decode("utf-8", "replace")).encode("utf-8")
+        corpo = injetar(corpo.decode("utf-8", "replace"), prefixo).encode("utf-8")
     return status, cab, corpo
 
 
@@ -156,8 +158,8 @@ if(CONSULTA.indexOf(c)<0){aviso();return Promise.resolve(new Response(JSON.strin
 {status:403,headers:{'Content-Type':'application/json'}}));}}return _f.apply(this,arguments);};})();</script>"""
 
 
-def injetar(html: str) -> str:
-    extra = _VISUAL + _GUARDA % (json.dumps(sorted(POSTS_DE_CONSULTA)), json.dumps(PREFIXO))
+def injetar(html: str, prefixo: str = PREFIXO) -> str:
+    extra = _VISUAL + _GUARDA % (json.dumps(sorted(POSTS_DE_CONSULTA)), json.dumps(prefixo))
     i = html.lower().find("</head>")
     return html[:i] + extra + html[i:] if i >= 0 else extra + html
 

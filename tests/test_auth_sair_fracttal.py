@@ -241,6 +241,7 @@ def test_o_login_pelo_fracttal_guarda_o_prazo_do_token_e_so_ele_ganha_a_conferen
 
 def test_a_tela_de_entrada_sai_da_moldura_e_so_aceita_motivo_conhecido(cliente):
     html = cliente.get("/entrar?motivo=caiu").get_data(as_text=True)
-    assert 'window.top.location.replace("/entrar?next="' in html and 'motivo = "caiu"' in html
+    # o login pelo nexusRota (porta única, 10/10/2026): debaixo do /nexus, "/entrar" cru caía na plataforma
+    assert 'window.top.location.replace(nexusRota("/entrar") + "?next="' in html and 'motivo = "caiu"' in html
     estranho = cliente.get("/entrar?motivo=%3Cscript%3E").get_data(as_text=True)
     assert 'class="entrar-aviso"' not in estranho and "&lt;script" not in estranho and 'motivo = ""' in estranho

@@ -25,6 +25,9 @@ import time
 from urllib.parse import urlsplit
 
 from flask import Blueprint, current_app, render_template, request, session
+from flask.sessions import SecureCookieSessionInterface
+
+from ...prefixo import ja_na_raiz, na_raiz, raiz, sem_raiz
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 # O serviço original roda com a pasta atual em os_creator (os_web.cmd): é de lá que ele importa `api`, `steps`...
@@ -109,6 +112,49 @@ def _trocar(corpo: bytes, de: bytes, para: bytes) -> bytes:
     return corpo
 
 
+# ── o prefixo do Nexus no OS Creator embutido (09/10/2026, porta única) ───────────────────────────────────────────
+# Levi: "a partir de segunda quero o Nexus como link principal". No servidor o Nexus mora em /nexus (NEXUS_PREFIXO), e o
+# clone escreve /os/... na raiz em ~220 lugares (templates, .js e o JSON das rotas): seguidos ao pé da letra, eles levavam
+# à PLATAFORMA (que tem o próprio /os/). O clone fica IDÊNTICO ao do oem (ele roda sozinho na raiz, no 5090); quem põe o
+# prefixo é a ponte, na resposta, como já fazia com o resto:
+# - HTML, JavaScript e JSON: "/os, '/os, `/os e (/os ganham o prefixo (um caminho do clone começa sempre logo depois de
+#   aspas ou parêntese). Fica de fora o value="/os/...": é o `next` do formulário de login, que o clone só aceita sem o
+#   prefixo (`_destino_local`). O `next=/os/...` dentro de um endereço também fica (vem depois de "=").
+# - Location do redirecionamento que começa por /os ganha o prefixo (o url_for do clone já sai com ele: o clone recebe o
+#   SCRIPT_NAME do Nexus).
+# - O `next` que chega com o prefixo (o JavaScript do clone monta o next com o location.pathname) sai dele antes de ir ao
+#   clone.
+# - As EXPRESSÕES REGULARES do clone que testam o caminho (/^\/os\/[^/]/ no abas.js, /^\/os(\/|$)/ no carga.js) também
+#   ganham o prefixo, escrito como na expressão (^\/nexus\/os). Revisão de 10/10/2026: só as aspas e o parêntese eram
+#   cobertos; debaixo do /nexus o location.pathname é /nexus/os/..., as regras das abas davam "não é tela nossa", e todo
+#   item da torre OS Creator abria o Início, os cartões não abriam aba e o "Clonar esta OS" caía no Início.
+# Na raiz (o PC, a fase 4) nada disso roda: a resposta é a de sempre, byte a byte.
+_DO_CLONE = re.compile(rb"(value=)?([\"'`(])/os(?=[/\"'`?#)])")
+_REGEX_DO_CLONE = re.compile(rb"\^\\/os(?=\\/|[(?$])")
+_MIMES_COM_CAMINHO = ("text/html", "text/javascript", "application/javascript", "application/json")
+
+
+def _no_prefixo(corpo: bytes, base: str) -> bytes:
+    prefixo = base.encode()
+    corpo = _DO_CLONE.sub(lambda m: m.group(0) if m.group(1) else m.group(2) + prefixo + b"/os", corpo)
+    # na expressão regular a barra vai escapada e o ponto também (o prefixo só tem letra, número, ponto, hífen e _)
+    na_regex = prefixo.replace(b".", b"\\.").replace(b"/", b"\\/")
+    return _REGEX_DO_CLONE.sub(lambda m: b"^" + na_regex + b"\\/os", corpo)
+
+
+def _next_sem_prefixo(environ: dict, base: str) -> None:
+    """O `next` da consulta com o prefixo (/nexus/os/x) vira o do clone (/os/x): o login dele só devolve para /os/...;
+    com o prefixo, mandava a pessoa ao Início do OS Creator em vez da tela de onde ela veio."""
+    from urllib.parse import parse_qsl, urlencode
+    consulta = environ.get("QUERY_STRING") or ""
+    if "next=" not in consulta:
+        return
+    pares = parse_qsl(consulta, keep_blank_values=True)
+    novos = [(k, sem_raiz(v) if k == "next" and ja_na_raiz(v, base) else v) for k, v in pares]
+    if novos != pares:
+        environ["QUERY_STRING"] = urlencode(novos)
+
+
 _trava = threading.Lock()
 
 # Sem prefixo de propósito: o OS Creator gera links /os/... absolutos, e o cookie dele vale só em /os.
@@ -131,7 +177,15 @@ def _criar_clone(app):
     clone = criar_app(segredo=_segredo(app))
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
+    # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao
+    # /nexus/os/... e ia ao /os/ da PLATAFORMA; spec da porta única, 5.1). Na raiz, "/os" como sempre.
+    clone.session_interface = _SessaoDoClone()
     return clone
+
+
+class _SessaoDoClone(SecureCookieSessionInterface):
+    def get_cookie_path(self, app):
+        return raiz() + "/os"
 
 
 def clone(app):
@@ -185,7 +239,10 @@ def _fim_na_resposta(alvo, resp) -> str | None:
         exp = exp_do_jwt(jwt)
         if exp > float(session.get("fracttal_exp") or 0):
             session["fracttal_exp"] = exp
-    if resp.status_code in (301, 302, 303, 307, 308) and urlsplit(resp.headers.get("Location", "")).path == "/os/login":
+    # sem_raiz: debaixo do /nexus o url_for do clone já sai com o prefixo (ele recebe o SCRIPT_NAME do Nexus), e o login
+    # dele chega como /nexus/os/login; comparado cru, a sessão que o Fracttal derrubou não derrubava a do Nexus
+    if (resp.status_code in (301, 302, 303, 307, 308)
+            and sem_raiz(urlsplit(resp.headers.get("Location", "")).path) == "/os/login"):
         return "caiu"
     if resp.status_code == 401 and resp.mimetype == "application/json" and (resp.get_json(silent=True) or {}).get("login"):
         return "caiu"
@@ -201,10 +258,16 @@ def encaminhar(resto: str):
     except Exception as ex:      # noqa: BLE001 — qualquer falha do clone vira aviso, nunca derruba o Nexus
         logging.exception("OS Creator: o clone não subiu")
         return render_template("oscreator/fora.html", motivo=f"{type(ex).__name__}: {ex}"[:300]), 503
-    # cópia do environ: o clone monta o request dele sem mexer no do Nexus
+    # cópia do environ: o clone monta o request dele sem mexer no do Nexus. O SCRIPT_NAME vai junto: debaixo do prefixo,
+    # o url_for do clone já sai com ele, e o cookie dele fica no /os do Nexus (_SessaoDoClone)
     environ = dict(request.environ)
+    base = raiz()
     ajusta_js = resto == "static/abas.js"
-    if ajusta_js:
+    # debaixo do prefixo todo .js do clone sai reescrito, e a pergunta "mudou?" vale para a versão reescrita (abaixo)
+    reescreve_js = bool(base) and resto.startswith("static/") and resto.endswith(".js")
+    if base:
+        _next_sem_prefixo(environ, base)
+    if ajusta_js or reescreve_js:
         # O clone só conhece o arquivo ORIGINAL: perguntado "mudou?", ele diria 304 e o navegador seguiria com o
         # original em cache. A pergunta é respondida aqui, sobre a versão ajustada (30/09: todo botão voltava ao
         # Início do OS Creator, porque a casca rodava o abas.js antigo).
@@ -220,6 +283,10 @@ def encaminhar(resto: str):
             return encerrar(fim, destino, json=True if resp.mimetype == "application/json" else None)
     if resp.mimetype in ("text/html", "application/json") and _JWT_VENCIDO in resp.get_data():
         return _de_volta_ao_login(app, resto, resp.mimetype == "application/json")
+    if base:
+        destino = resp.headers.get("Location", "")
+        if destino.startswith("/os") and not ja_na_raiz(destino, base):
+            resp.headers["Location"] = base + destino
     if resp.mimetype == "text/html":
         corpo = _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA)
         if b"<head>" in corpo:
@@ -228,11 +295,16 @@ def encaminhar(resto: str):
             for de, para in _TROCAS_HTML:
                 corpo = corpo.replace(de, para)
             corpo = _com_o_tema(app, corpo)
+        if base:
+            corpo = _no_prefixo(corpo, base)
         resp.set_data(corpo)
-    elif ajusta_js and resp.status_code == 200:
+    elif (ajusta_js or reescreve_js) and resp.status_code == 200:
         corpo = resp.get_data()
-        for de, para in _TROCAS_ABAS:
-            corpo = _trocar(corpo, de, para)
+        if ajusta_js:
+            for de, para in _TROCAS_ABAS:
+                corpo = _trocar(corpo, de, para)
+        if base:
+            corpo = _no_prefixo(corpo, base)
         resp.set_data(corpo)
         # Marca de versão própria (a do original + "-nexus-" + o hash do que sai) e sem data: a data é a do arquivo
         # original, e um navegador que comparasse só a data acharia que nada mudou. O hash muda quando o ajuste muda
@@ -241,6 +313,8 @@ def encaminhar(resto: str):
         resp.set_etag(f"{etag or 'abas'}-nexus-{hashlib.sha256(corpo).hexdigest()[:10]}")
         resp.headers.pop("Last-Modified", None)
         resp.make_conditional(request)
+    elif base and resp.mimetype in _MIMES_COM_CAMINHO and resp.status_code == 200:
+        resp.set_data(_no_prefixo(resp.get_data(), base))
     return resp
 
 
@@ -272,13 +346,15 @@ def _de_volta_ao_login(app, resto: str, json: bool):
     Creator já entende ({"login": true})."""
     from urllib.parse import quote
     from flask import jsonify, redirect
+    from ...auth import os_cookie_path
     destino = "/os/" + resto + (("?" + request.query_string.decode()) if request.query_string else "")
     if json:
         resp = jsonify({"erro": "Sua sessão do Fracttal venceu. Entre de novo.", "login": True})
         resp.status_code = 401
     else:
-        resp = redirect("/os/login?next=" + quote(destino, safe=""))
-    resp.delete_cookie(clone(app).config["SESSION_COOKIE_NAME"], path="/os")
+        # o login no endereço do navegador (com o prefixo); o `next`, no do clone (sem ele: o clone só aceita /os/...)
+        resp = redirect(na_raiz("/os/login") + "?next=" + quote(destino, safe=""))
+    resp.delete_cookie(clone(app).config["SESSION_COOKIE_NAME"], path=os_cookie_path())
     return resp
 
 
@@ -345,8 +421,9 @@ def sessao_viva():
 
 
 def _endereco_do_os(url) -> str:
-    """Só endereço do próprio OS Creator (/os/...): nada de mandar a moldura ou a janela para fora."""
-    url = str(url or "")
+    """Só endereço do próprio OS Creator (/os/...): nada de mandar a moldura ou a janela para fora. Sai sem o prefixo
+    (o que chega com ele, como o link de um card já reescrito pela ponte, perde): quem desenha põe o do pedido."""
+    url = sem_raiz(str(url or ""))
     return url if url.startswith("/os/") and not url.startswith("//") and "\\" not in url else ""
 
 
@@ -365,7 +442,9 @@ def abrir(torre, tela_id: str):
     onde o card da OS, aberto em outra torre, leva ao "Clonar esta OS" e ao "Abrir chamado" sem sair do Nexus."""
     def view():
         # o mapa "item do menu → tela do OS Creator": com ele, o clique no menu abre uma aba na casca já aberta
-        menu_os = {f"/t/{torre.id}/{t.id}": {"url": DESTINOS[t.id], "nome": t.nome} for t in torre.telas if t.id in DESTINOS}
+        # chaves e endereços como o navegador os vê (com o prefixo): o href do menu e o que a casca do clone abre
+        menu_os = {na_raiz(f"/t/{torre.id}/{t.id}"): {"url": na_raiz(DESTINOS[t.id]), "nome": t.nome}
+                   for t in torre.telas if t.id in DESTINOS}
         return render_template("oscreator/abrir.html", torre=torre, tela=torre.tela(tela_id),
                                destino=_endereco_do_os(request.args.get("abrir")) or DESTINOS[tela_id], menu_os=menu_os)
     view.__name__ = f"abrir_{tela_id}"
@@ -388,7 +467,8 @@ def abrir_em(torre, tela_id: str):
     destinos = ATALHOS[torre.id]
 
     def view():
-        menu_os = {f"/t/{torre.id}/{t}": {"url": d, "nome": torre.tela(t).nome} for t, d in destinos.items()}
+        menu_os = {na_raiz(f"/t/{torre.id}/{t}"): {"url": na_raiz(d), "nome": torre.tela(t).nome}
+                   for t, d in destinos.items()}
         return render_template("oscreator/abrir.html", torre=torre, tela=torre.tela(tela_id),
                                destino=_endereco_do_os(request.args.get("abrir")) or destinos[tela_id], menu_os=menu_os)
     view.__name__ = f"abrir_{torre.id}_{tela_id}"
@@ -425,7 +505,7 @@ def card_os(wid: int):
     return render_template("oscreator/card_os.html", wid=wid, estado=estado,
                            fragmento=f"/os/os/{wid}?" + urlencode({"parcial": 1, "status": status}),
                            pagina=f"/os/os/{wid}" + ("?" + q if q else ""),
-                           entrar="/entrar?next=" + quote(de, safe="/"))
+                           entrar=na_raiz("/entrar") + "?next=" + quote(de, safe="/"))
 
 
 @bp_raiz.route("/os/_nexus/ir")
@@ -436,4 +516,4 @@ def ir():
 
     from flask import redirect
     url = _endereco_do_os(request.args.get("url")) or "/os/"
-    return redirect(f"/t/os/{tela_do_endereco(url)}?" + urlencode({"abrir": url}))
+    return redirect(na_raiz(f"/t/os/{tela_do_endereco(url)}") + "?" + urlencode({"abrir": url}))

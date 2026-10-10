@@ -99,10 +99,13 @@ nesta pasta.
   `p.id_account`, campo que a lista de responsáveis não tem; o oem corrigiu em 02/10 para `id_personnel`). Era o
   único arquivo diferente entre o clone e o oem.
 - **Sessão:** a chave da sessão do clone é derivada da `NEXUS_SECRET_KEY`. Não é a do supervisório e não precisa de
-  segredo novo. O cookie continua `os_sessao`, só em `/os`.
+  segredo novo. O cookie continua `os_sessao`, só no `/os` do Nexus (prefixo + `/os`: `/nexus/os` no servidor; seção
+  "Debaixo do /nexus").
 - **A sessão do Fracttal leva a do Nexus junto** (Levi, 09/10/2026: "quando deslogar do Fracttal deslogue do Nexus").
   A regra mora no portão (`nexus/casca/CLAUDE.md`, "Sair do Fracttal = sair do Nexus"); a ponte faz a parte dela:
-  - o "sair" do clone (`/os/logout`) nem chega a ele: o portão encerra as duas sessões e leva a janela ao login;
+  - o "sair" do clone (`/os/logout`) nem chega a ele: o portão encerra as duas sessões e leva a janela ao login (o
+    `os_sessao` é apagado no caminho do prefixo, `os_cookie_path()`; e o login do clone na resposta, `/os/login`, é
+    reconhecido com ou sem o `/nexus` na frente);
   - para quem entrou pelo Fracttal, a resposta do clone que tira o JWT do cookie, manda ao `/os/login` ou responde 401
     pedindo login encerra o Nexus (`_fim_na_resposta`: "caiu"; o aviso do JWT vencido do app de mesa: "venceu"); o
     token que o clone renovou estica o `fracttal_exp` da sessão do Nexus junto. Com a senha de administrador fica o de
@@ -597,6 +600,34 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
     cor escura do dado, como ENGENHARIA a 2,5:1 e Remoto a 1,6:1; o `--fa` dos chamados, do Controle de fornecedores e
     do Início, a 3,5–4,1:1; o texto de exemplo do login, cinza padrão do navegador).
   - Falta o olho do Levi com os dados de verdade.
+
+## Debaixo do /nexus (porta única, 09/10/2026)
+
+Levi: "a partir de segunda quero o Nexus como link principal". No servidor o Nexus mora em `app.gridco.com.br/nexus`
+(`NEXUS_PREFIXO=/nexus`, `nexus/casca/CLAUDE.md`), e o clone escreve `/os/...` a partir da raiz em ~220 lugares
+(templates, `.js` e o JSON das rotas): ao pé da letra, levavam ao `/os/` da PLATAFORMA. O clone continua idêntico ao do
+oem (roda sozinho na raiz, no 5090); quem põe o prefixo é a ponte, na resposta, só quando há prefixo:
+
+- o clone recebe o `SCRIPT_NAME` do Nexus: o `url_for` dele já sai com `/nexus`, e o cookie dele fica em `/nexus/os`
+  (`_SessaoDoClone`, que troca o `/os` fixo do `criar_app`);
+- HTML, JavaScript e JSON: `"/os`, `'/os`, `` `/os `` e `(/os` ganham o prefixo (`_no_prefixo`). Fica de fora o
+  `value="/os/..."`, que é o `next` do formulário de login: o clone só aceita `next` sem prefixo (`_destino_local`). O
+  `next=/os/...` dentro de um endereço também fica (vem depois de `=`);
+- as expressões regulares do clone que testam o caminho (`/^\/os\/[^/]/` e afins no `abas.js`, `/^\/os(\/|$)/` no
+  `carga.js`) também ganham o prefixo, escrito como na expressão (`^\/nexus\/os`). Revisão de 10/10/2026: só as aspas
+  e o parêntese eram cobertos, e debaixo do `/nexus` as regras das abas diziam "não é tela nossa": todo item da torre
+  OS Creator abria o Início, os cartões não abriam aba e o "Clonar esta OS" caía no Início
+  (`test_as_abas_do_os_creator_funcionam_debaixo_do_prefixo`, que roda as regras do `abas.js` servido no node);
+- todo `.js` do clone sai reescrito com marca de versão própria (a pergunta "mudou?" vale para a versão reescrita, como
+  já era com o `abas.js`);
+- o `Location` que começa por `/os` ganha o prefixo; o `next` da consulta que chega com ele (o JavaScript do clone monta
+  o `next` com o `location.pathname`) sai dele antes de ir ao clone;
+- as páginas do Nexus que falam com o clone (o menu da torre, o card da OS, a Aprovação de OS, a PT) mandam o endereço
+  com o prefixo e o `next` do login do OS Creator sem ele.
+
+Na raiz nada disso roda: a resposta é a de sempre, byte a byte (`test_todo_js_do_clone_sai_com_o_prefixo_e_na_raiz_sai_igual`).
+Prova: `tests/test_prefixo.py` (o rastreador entra no OS Creator embutido com um login de mentira e confere cada página e
+cada `.js` do clone).
 
 ## Rodar sozinho (sem o Nexus e sem mexer no 5090)
 

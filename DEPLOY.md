@@ -9,7 +9,7 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace, o token do repositório do PCM para Publicar no App (`NEXUS_PCM_GITHUB_TOKEN`, desde 09/10/2026). Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace, o token do repositório do PCM para Publicar no App (`NEXUS_PCM_GITHUB_TOKEN`, desde 09/10/2026). Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`), a chave do passe da porta única (`NEXUS_SSO_CHAVE`, desde 09/10/2026, a MESMA da plataforma; seção 7e) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e a fila da Aprovação de OS usam a mesma) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da tela Base → Ligações (o de-para entre as bases) |
@@ -85,22 +85,130 @@ para `dados/campo/identidades.json` por caminho relativo.
 
 ## 5. Endereço com HTTPS
 
-**Use um subdomínio próprio**, por exemplo `nexus.gridco.com.br`, e não um caminho dentro de `app.gridco.com.br`:
-o Nexus usa `/`, `/t/...`, `/os/...` e `/static/...`, que colidem com a plataforma. No Caddy:
+O Nexus está em **`https://app.gridco.com.br/nexus`**, ao lado da plataforma de Performance (na raiz do mesmo endereço).
+O cookie de sessão sai com `Secure`: o Nexus **precisa** de HTTPS na frente. O proxy tem de repassar `X-Forwarded-For`
+(o Caddy repassa por padrão): é por ele que o limite de tentativas de senha conta cada pessoa, e não o servidor inteiro
+como uma só.
+
+### 5a. O prefixo `/nexus` no próprio Nexus (`NEXUS_PREFIXO`, desde 09/10/2026)
+
+Até 09/10/2026 o Nexus não sabia que mora em `/nexus`: menu, Início, Sair e `fetch` saíam da raiz e caíam na plataforma,
+e quem consertava era uma reescrita das respostas no servidor (fora do repositório). Agora o Nexus põe o prefixo sozinho
+em todo link, redirecionamento e cookie, e o cookie de sessão tem nome próprio (`nexus_sessao`; o da plataforma é
+`session`), então entrar num não derruba mais o outro.
+
+**O que a T.I. faz, nesta ordem** (sem a variável, o código novo se comporta como sempre). **Ponha a variável no MESMO
+reinício em que o código novo sobe**: quem entrasse entre um e outro ganharia o cookie em `Path=/` e, depois da
+variável, um segundo em `Path=/nexus`. Desde 10/10/2026 o Sair e o Entrar apagam também o de `Path=/` (revisão: antes
+a pessoa saía e seguia logada pelo velho, por até 12 h), mas não há por que abrir essa janela.
+
+1. No `.env` do Nexus (ou como `Environment=NEXUS_PREFIXO=/nexus` no `nexus.service`), acrescente:
+   ```
+   NEXUS_PREFIXO=/nexus
+   ```
+   e reinicie: `sudo systemctl restart nexus`. O log diz `servido em /nexus`.
+2. Confira de fora:
+   ```
+   curl -sI https://app.gridco.com.br/nexus/ | grep -i '^location'
+   ```
+   tem de responder `location: /nexus/entrar?next=/nexus/`, **nunca** `/nexus/nexus/...`. Entre no Nexus: o cookie
+   `nexus_sessao` aparece com `Path=/nexus`; o menu, o Sair e o OS Creator abrem dentro de `/nexus/...`.
+3. Se dobrar (`/nexus/nexus`): tire a linha e reinicie; volta ao de antes. Avise o Levi.
+4. Com o passo 2 certo, a reescrita das respostas do Nexus no servidor (a camada que põe `/nexus` no `Location`, no HTML e
+   no JavaScript, e o calço do `fetch` no `<head>`) fica sem trabalho: pode ser tirada. Sem ela o Nexus segue igual;
+   com ela também (o Nexus não dobra o que ela reescreve).
+
+Todo mundo entra de novo **uma vez** depois do passo 1 (o cookie mudou de nome e de caminho). Debaixo do prefixo, o
+Sair e o Entrar apagam também o `nexus_sessao` de `Path=/` que tenha sobrado (`auth._sem_a_sessao_velha_da_raiz`).
+
+O Caddy pode cortar o `/nexus` antes de repassar (`handle_path`, como hoje) ou não (`handle`): o Nexus aceita os dois.
+O que ele **não** usa é cabeçalho de prefixo (`X-Forwarded-Prefix`): o prefixo vem só da variável. Exemplo do bloco:
 
 ```
-nexus.gridco.com.br {
-    reverse_proxy 127.0.0.1:5070
+app.gridco.com.br {
+    redir /nexus /nexus/ 308
+    handle_path /nexus/* {
+        reverse_proxy 127.0.0.1:5070
+    }
+    # ... o resto continua indo para a plataforma de Performance
 }
 ```
 
-O cookie de sessão sai com `Secure`: o Nexus **precisa** de HTTPS na frente. O proxy tem de repassar
-`X-Forwarded-For` (o Caddy repassa por padrão): é por ele que o limite de tentativas de senha conta cada pessoa, e não
-o servidor inteiro como uma só.
+**Na raiz** (a fase 4 do spec da porta única: o Nexus em `app.gridco.com.br`, dividindo os caminhos com a plataforma), é
+só tirar a `NEXUS_PREFIXO` e mudar o Caddy (seção 5b). Num subdomínio próprio (`nexus.gridco.com.br`,
+`reverse_proxy 127.0.0.1:5070`), também sem ela.
+
+### 5b. Fase 4: o Nexus na raiz de `app.gridco.com.br` (quando o Levi e a T.I. decidirem)
+
+Levi, 09/10/2026: "qnd tudo ficar pronto passar apenas para https://app.gridco.com.br". O Nexus passa a responder na
+raiz e a plataforma de Performance fica onde está: o Caddy divide **por caminho** (os caminhos dos dois foram medidos em
+09/10 e só colidem em `/`, `/os` e `/static`). Nenhuma linha de código muda; provado no PC em 10/10/2026 com um proxy que
+faz esta mesma divisão (as 13 telas da porta única, as duas sessões juntas, o Sair, os passes).
+
+- Para o **Nexus**: `/` (só a raiz exata), `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/cadeira`, `/os` e `/os/*`, e
+  `/static/*` **menos** os três estáticos da plataforma (`/static/fonts/*`, `/static/logos/*`, `/static/notif.js`; estático
+  novo na plataforma pede uma linha aqui).
+- Para a **plataforma**, como hoje: todo o resto, inclusive `/api/*`, `/versao`, `/healthz` e `/painel/nexus/*`. O
+  `/os/` dela (o proxy do OS Creator Web) deixa de ser alcançado: o `/os/` passa a ser o OS Creator do Nexus.
+- O `/nexus/...` antigo (favoritos, e-mails, o App de Campo) vai para o mesmo caminho na raiz (308, que mantém o POST).
+
+Trecho do Caddyfile (troca o bloco do `/nexus` e o que manda o resto à plataforma; os outros blocos que existem hoje, como
+o do `/db_performace` e os caminhos que o Caddy responde sozinho, ficam como estão; `<plataforma>` é o mesmo destino que
+a plataforma usa hoje):
+
+```
+app.gridco.com.br {
+    # o endereço antigo do Nexus leva ao mesmo lugar na raiz
+    redir /nexus / 308
+    @nexus_antigo path_regexp antigo ^/nexus(/.*)$
+    redir @nexus_antigo {re.antigo.1}{?query} 308
+
+    @nexus {
+        path / /entrar /sair /saude /tema /cadeira /os /t/* /os/* /static/*
+        not path /static/fonts/* /static/logos/* /static/notif.js
+    }
+    handle @nexus {
+        reverse_proxy 127.0.0.1:5070
+    }
+
+    handle {
+        reverse_proxy <plataforma>
+    }
+}
+```
+
+Não foi validado com o próprio Caddy (o PC de desenvolvimento não tem): rode `caddy validate` antes do `caddy reload` e
+guarde o Caddyfile de antes, que é a volta.
+
+**Ordem:** (1) no `.env` do Nexus, **sem** `NEXUS_PREFIXO` (tire a linha, se houver) e reinicie; (2) troque o Caddy (a
+reescrita das respostas do Nexus, que existia para o `/nexus`, sai junto); (3) na plataforma, a fase 3 é
+`NEXUS_PORTA_PRINCIPAL=https://app.gridco.com.br/` (endereço completo: `/` sozinho levaria o `/` ao próprio `/`, em laço,
+para quem chegasse direto à porta da plataforma). Todo mundo entra de novo uma vez no Nexus (o cookie passa a `Path=/`).
+
+**O que não pode cair: o `/db_performace`** (o App de Campo, o coletor e a carga do Nexus gravam nele). O bloco dele
+fica como está e tem de continuar sendo avaliado antes do `handle` sem filtro: se hoje ele usa `handle_path` ou outra
+forma, mantenha a estrutura que já funciona e confira pelo `curl` abaixo (Levi, 10/10/2026: "o que está pode cair",
+menos o banco). Conferido em 10/10/2026: as 122 rotas do Nexus caem todas no `@nexus`, e a plataforma perde só o `/`
+e o `/os/`. A `NEXUS_PORTA_PRINCIPAL` entra **depois** do Caddy: antes dele, o `/` da plataforma levaria a ela mesma.
+
+**Conferir:**
+```
+curl -s  https://app.gridco.com.br/db_performace/health                   # {"status":"ok",...}  (PRIMEIRO)
+curl -sI https://app.gridco.com.br/ | grep -i '^location'                # /entrar?next=/  (o Nexus)
+curl -s  https://app.gridco.com.br/saude                                  # {"ok": true, "commit": ...}
+curl -sI https://app.gridco.com.br/nexus/t/cos/mesa | grep -i '^location' # /t/cos/mesa (308)
+curl -s -o /dev/null -w '%{http_code}\n' https://app.gridco.com.br/static/notif.js   # 200 (da plataforma)
+curl -s -o /dev/null -w '%{http_code}\n' https://app.gridco.com.br/static/nexus.css  # 200 (do Nexus)
+curl -s https://app.gridco.com.br/versao                                  # a plataforma, como antes
+```
+E no navegador: entrar no Nexus, abrir as telas da Performance (moldura), o OS Creator e o Sair.
+
+**Voltar:** o Caddyfile de antes, `NEXUS_PREFIXO=/nexus` no `.env` do Nexus e reiniciar (seção 5a); na plataforma, a
+`NEXUS_PORTA_PRINCIPAL` volta a `/nexus/` (ou sai).
 
 ## 6. Conferir depois de subir
 
-1. `https://nexus.gridco.com.br/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
+1. `https://app.gridco.com.br/nexus/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
 2. Entrar com o login do Fracttal (e-mail e senha de quem vai usar; desde 06/10/2026). A senha de admin (a
    `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem) segue em "Entrar com a senha de administrador" e é ela que abre o
    Cadastro, além dos e-mails em `NEXUS_ADMINS` (opcional, separados por vírgula).
@@ -180,12 +288,55 @@ Fracttal em dobro.
 
 ## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
 
+*Desde 09/10/2026 esta é só a RESERVA do Tempo real: com a porta única ligada (seção 7e) o Tempo real abre a tela da plataforma numa moldura. A `NEXUS_PLATAFORMA_URL` fica como está no servidor (`https://app.gridco.com.br`): é ela que faz esta ponte voltar se a chave sair, e a moldura usa o mesmo endereço.*
+
 A aba Performance → Tempo real do Nexus mostra a plataforma de Performance por uma chave só de leitura. O Nexus já leva a
 chave; a plataforma precisa da mesma. No pacote vem à parte o arquivo `plataforma-tokens-nexus.txt`, com UMA linha
 `NEXUS_LEITURA_TOKEN=...`: acrescente no `tokens.txt` da raiz da plataforma, no servidor dela, e reinicie a plataforma.
 Conferir: no Nexus, **Performance → Tempo real** abre a Entrada da plataforma (antes disso, a aba diz "A plataforma
 recusou a chave"; o resto do Nexus não depende dela). Pelo Nexus, a API PV fica de fora por enquanto: só o que a
 plataforma já tem guardado.
+
+## 7e. Porta única: as telas da Performance dentro do Nexus (09/10/2026)
+
+Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo". O menu Performance do Nexus
+(e o Acompanhamento COS e as Chaves das fontes) abre as telas da plataforma de Performance numa moldura, com o login do
+Nexus: a página do Nexus manda um passe assinado (POST, vale 60 s, uma vez) a `/painel/nexus/entrar` da plataforma, que
+abre a sessão dela e mostra a tela. Os dois sistemas continuam onde estão (Nexus em `/nexus`, plataforma na raiz).
+
+**Tudo fica desligado até a T.I. pôr a chave nos DOIS.** Sem ela, no Nexus cada item diz "Performance ainda não ligada
+neste servidor" (o que falta só aparece para admin) e fica como "em construção" no menu, sem o verde; o Tempo real
+segue pela leitura de 04/10 (seção 7b), como hoje. Na plataforma, `/painel/nexus/*` responde 404. O que muda para quem
+usa o Nexus antes da chave: o menu ganha 6 itens novos em construção (Disponibilidade, Relatório semanal, Histórico da
+plataforma, Monitor da ronda, COS · Acompanhamento COS e Base · Chaves das fontes) e o Início conta 6 telas previstas a
+mais. Na plataforma, nada muda para ninguém.
+
+**O que a T.I. faz, nesta ordem** (o código dos dois já no ar):
+
+1. Gerar UMA chave aleatória de 32 caracteres ou mais (no próprio servidor; não mande por e-mail aberto nem grupo):
+   ```
+   python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+2. No `.env` do **Nexus**: `NEXUS_SSO_CHAVE=<a chave>`. **Não mexa na `NEXUS_PLATAFORMA_URL`**: ela fica
+   `https://app.gridco.com.br`, a mesma origem do Nexus, que é onde a moldura abre (vazia também serviria à moldura,
+   mas aí a ponte de 04/10, seção 7b, perde o endereço e a volta do passo 5 deixa o Nexus sem Tempo real). Nunca um
+   endereço interno (`http://127.0.0.1:...`): com ele o Nexus desliga a porta e diz por quê. Com a chave, o Tempo real
+   já é a moldura e a ponte sai do menu. Reinicie: `sudo systemctl restart nexus`.
+3. No `.env` (ou `tokens.txt`) da **plataforma**: a MESMA `NEXUS_SSO_CHAVE=<a chave>` e `PLATAFORMA_ANALISTAS=*` (decisão
+   do Levi, 09/10: todo login do Nexus entra como analista; restringir depois é trocar o `*` por e-mails). Reinicie a
+   plataforma.
+4. Conferir:
+   - `curl -s -D - -o /dev/null -X POST https://app.gridco.com.br/painel/nexus/entrar` responde da plataforma
+     (`Server: waitress`, com `Via` do Caddy), e não 502 vazio do Caddy: sem passe, 403 com a chave e 404 sem ela;
+   - entrar no Nexus, abrir **Performance → Tempo real**: a Entrada da plataforma aparece dentro do Nexus, sem o menu
+     dela, e o endereço segue o que se abre lá dentro (`?p=...`); **Performance → Diagnóstico** lista as usinas;
+   - o Nexus e a plataforma abertos juntos no mesmo navegador sem um derrubar o login do outro (`nexus_sessao` em
+     `/nexus`, `session` da plataforma em `/`);
+   - **Sair** do Nexus volta ao Entrar e encerra também a sessão aberta na plataforma.
+5. Se algo der errado: tirar a `NEXUS_SSO_CHAVE` dos dois e reiniciar volta tudo ao de antes (o Tempo real volta pela
+   ponte de 04/10, porque a `NEXUS_PLATAFORMA_URL` ficou como estava; revisão de 10/10/2026).
+
+Trocar a chave derruba as sessões abertas pelo passe (todos abrem de novo pelo menu), não a senha da plataforma.
 
 ## 7c. Performance → Clima e risco: só leitura de fontes públicas
 

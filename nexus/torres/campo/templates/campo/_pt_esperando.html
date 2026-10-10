@@ -88,7 +88,7 @@
           {% if p.aviso_em %}<dt>1º aviso</dt><dd>{{ p.aviso_em.strftime('%d/%m às %H:%M') }}{% if p.aviso_motivo %} · {{ p.aviso_motivo }}{% endif %}</dd>{% endif %}
         </dl>
         <div class="pt-det-ass">
-          <figure class="pt-ass" data-url="/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico">
+          <figure class="pt-ass" data-url="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico">
             <figcaption>Executante · assinatura da APR</figcaption>
             <div class="pt-ass-quadro"><span class="mudo">Buscando no Fracttal…</span></div>
             <span class="det">{{ p.solicitante or '—' }}{% if p.criada %} · {{ p.criada.strftime('%d/%m/%y %H:%M') }}{% endif %}</span>
@@ -99,7 +99,7 @@
             <span class="det pt-quem">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</span>
           </figure>
         </div>
-        <form class="pt-det-acoes" method="post" action="/os/_nexus/pt/{{ p.numero|urlencode }}/decidir">
+        <form class="pt-det-acoes" method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir">
           <input type="hidden" name="volta" value="{{ request.full_path.rstrip('?') }}">
           <input class="gc-campo pt-motivo" name="motivo" maxlength="400" placeholder="Motivo (obrigatório para Não autorizo; o técnico lê)" aria-label="Motivo">
           <button class="gc-btn gc-btn--primario" type="submit" name="decisao" value="de_acordo">De acordo</button>
@@ -134,7 +134,7 @@
     }
     var el = det.querySelector('.pt-quem');
     if (!el) return;
-    (quemAssina || (quemAssina = fetch('/os/_nexus/quem', {credentials: 'same-origin'}).then(function (r) { return r.json(); })))
+    (quemAssina || (quemAssina = fetch(nexusRota('/os/_nexus/quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); })))
       .then(function (q) {
         if (q.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(q.entrar); return; }
         el.textContent = q.email ? ('Assinando como ' + q.nome + ', pelo login do Fracttal.')

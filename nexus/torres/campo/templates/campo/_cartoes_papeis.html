@@ -29,8 +29,8 @@
 <div class="cn-alterna" role="group" aria-label="Agrupar os cartões por">
   <span class="gc-rotulo">Agrupar por</span>
   <div class="cn-seg cn-seg--mini">
-    <a href="{{ href_regiao }}"{% if not por_gestor %} aria-current="page"{% endif %}>Região de campo (Supervisor de Campo)</a>
-    <a href="{{ href_gestor }}"{% if por_gestor %} aria-current="page"{% endif %}>Gestor de contrato (Supervisor PM)</a>
+    <a href="{{ (href_regiao)|na_raiz }}"{% if not por_gestor %} aria-current="page"{% endif %}>Região de campo (Supervisor de Campo)</a>
+    <a href="{{ (href_gestor)|na_raiz }}"{% if por_gestor %} aria-current="page"{% endif %}>Gestor de contrato (Supervisor PM)</a>
   </div>
 </div>
 {% endmacro %}

@@ -28,7 +28,7 @@
   <div><div class="r">Pendentes</div><div class="v gc-num">{{ resumo.pendentes }}</div>
     <div class="d">{{ resumo.reprogramadas }} reprogramadas · {{ resumo.novas }} OS novas na semana</div></div>
   <div><div class="r">Fora do horário</div><div class="v gc-num">{{ resumo.fora_horario }}</div>
-    <div class="d"><a class="pcm-link" href="/t/pcm/tarefas?semana={{ sem.week }}&amp;horario=fora">começam antes das 07:00 ou depois das 17:00</a></div></div>
+    <div class="d"><a class="pcm-link" href="{{ raiz }}/t/pcm/tarefas?semana={{ sem.week }}&amp;horario=fora">começam antes das 07:00 ou depois das 17:00</a></div></div>
 </div>
 
 <h2 class="pcm-h2">Por equipe</h2>
@@ -44,7 +44,7 @@
     <tbody>
     {% for e in equipes %}
       <tr>
-        <td><a class="linha" href="/t/pcm/tarefas?semana={{ sem.week }}&amp;equipe={{ e.equipe|urlencode }}">{{ e.equipe }}</a>
+        <td><a class="linha" href="{{ raiz }}/t/pcm/tarefas?semana={{ sem.week }}&amp;equipe={{ e.equipe|urlencode }}">{{ e.equipe }}</a>
           <span class="pcm-mudo">{{ e.usinas }} usina{{ 's' if e.usinas != 1 }}</span></td>
         <td class="num">{{ e.linhas }}</td>
         <td class="num"><span class="pcm-barra" style="--p:{{ e.aderencia }}%"></span>{{ e.aderencia }}%</td>
@@ -59,7 +59,7 @@
 
 <h2 class="pcm-h2">Por tipo</h2>
 <div class="pcm-tipos">
-  {% for t, n in resumo.por_tipo %}<a class="pcm-tipo" href="/t/pcm/tarefas?semana={{ sem.week }}&amp;tipo={{ t|urlencode }}"><span>{{ t }}</span><b class="gc-num">{{ n }}</b></a>{% endfor %}
+  {% for t, n in resumo.por_tipo %}<a class="pcm-tipo" href="{{ raiz }}/t/pcm/tarefas?semana={{ sem.week }}&amp;tipo={{ t|urlencode }}"><span>{{ t }}</span><b class="gc-num">{{ n }}</b></a>{% endfor %}
 </div>
 {% endif %}
 {% endblock %}

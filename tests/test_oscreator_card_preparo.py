@@ -214,7 +214,7 @@ def test_gravar_o_ticket_joga_fora_a_leitura_de_antes(chamados):
 # ── o lado do navegador ──────────────────────────────────────────────────────────────────────────────────────────
 def test_os_dois_quadros_pedem_com_o_mouse_parado_250_ms():
     componente = (RAIZ / "nexus/torres/oscreator/templates/oscreator/card_os_abrir.html").read_text(encoding="utf-8")
-    assert "'/os/api/os/' + encodeURIComponent(wid) + '/preparar'" in componente and ", 250)" in componente
+    assert "nexusRota('/os/api/os/') + encodeURIComponent(wid) + '/preparar'" in componente and ", 250)" in componente
     assert "preparar: preparar, prepararAoParar: prepararAoParar" in componente
     assert "delete pedidos[wid];" in componente                          # aberta: o próximo mouse parado lê de novo
     equipe = (RAIZ / "nexus/torres/engenharia/templates/engenharia/equipe.html").read_text(encoding="utf-8")

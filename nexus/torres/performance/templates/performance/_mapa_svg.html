@@ -44,7 +44,7 @@
   </g>
   {% endif %}
   <g class="mp-usinas">
-    {% for u in v.usinas %}<a href="{{ u.href }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/>{% if u.fogo24 %}<circle class="mp-anel-nasa mp-anel-nasa--{{ u.fogo24 }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ (u.r + 3.5)|round(1) }}"/>{% endif %}<circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
+    {% for u in v.usinas %}<a href="{{ (u.href)|na_raiz }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/>{% if u.fogo24 %}<circle class="mp-anel-nasa mp-anel-nasa--{{ u.fogo24 }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ (u.r + 3.5)|round(1) }}"/>{% endif %}<circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
     {% endfor %}
   </g>
   <g class="mp-selecao" aria-hidden="true"></g>

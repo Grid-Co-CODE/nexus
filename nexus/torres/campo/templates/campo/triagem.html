@@ -31,7 +31,7 @@
     <span><span class="gc-rotulo">OS no período</span><span class="v">{{ r.get('os_periodo', 0) }}</span><span class="d">fechadas pelo App</span></span>
     <span><span class="gc-rotulo">Supervisores</span><span class="v">{{ r.get('por_tipo', {}).get('supervisor', 0) }}</span><span class="d">fila parada ou avaliação errada</span></span>
     <span><span class="gc-rotulo">Podem servir de exemplo</span><span class="v">{{ r.get('exemplares', 0) }}</span><span class="d">registros exemplares</span></span>
-    <span><span class="gc-rotulo">Rondas</span><span class="v">—</span><span class="d"><a class="cn-fora" href="/t/campo/rondas">ver a tela Rondas</a></span></span>
+    <span><span class="gc-rotulo">Rondas</span><span class="v">—</span><span class="d"><a class="cn-fora" href="{{ raiz }}/t/campo/rondas">ver a tela Rondas</a></span></span>
   </div>
 
   <div class="cn-duas">
@@ -82,6 +82,6 @@
   <div class="cn-nota"><b>De onde vem.</b> A mesma triagem do painel do App, com os limiares padrão dele. A nota de cada
     OS é a que o próprio App grava no banco do Nexus, de hora em hora. Demora e divergência de supervisor dependem da
     situação e da avaliação da OS no Fracttal, que o livro do App ainda não traz. Rondas e usinas sem ronda: tela
-    <a class="cn-fora" href="/t/campo/rondas">Rondas</a> e <a class="cn-fora" href="/t/campo/atencao">Central de atenção</a>.</div>
+    <a class="cn-fora" href="{{ raiz }}/t/campo/rondas">Rondas</a> e <a class="cn-fora" href="{{ raiz }}/t/campo/atencao">Central de atenção</a>.</div>
 </div>
 {% endblock %}

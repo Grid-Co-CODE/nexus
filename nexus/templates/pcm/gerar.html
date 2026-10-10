@@ -13,7 +13,7 @@
     <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana oficial. Gerar não muda nada no campo: a semana só
       vai ao App pelo botão Publicar no App da rodada, com confirmação (só administrador).</p>
   </div>
-  <form class="pcm-semana-sel" method="get" action="/t/pcm/gerar">
+  <form class="pcm-semana-sel" method="get" action="{{ raiz }}/t/pcm/gerar">
     <label class="gc-rotulo" for="ver-semana">Semana</label>
     <input id="ver-semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>
     <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Abrir</button>
@@ -43,7 +43,7 @@
   (function () {
     var id = {{ sel.id|tojson }};
     function ver() {
-      fetch("/t/pcm/gerar/estado?rodada=" + encodeURIComponent(id), {credentials: "same-origin"})
+      fetch(nexusRota("/t/pcm/gerar/estado") + "?rodada=" + encodeURIComponent(id), {credentials: "same-origin"})
         .then(function (r) { return r.json(); })
         .then(function (j) { if (j.estado !== "rodando") location.reload(); else setTimeout(ver, 5000); })
         .catch(function () { setTimeout(ver, 10000); });
@@ -74,7 +74,7 @@
   {% if sel.estado == 'ok' %}
   {# a revisão de sexta (09/10/2026): supervisor, gestor de contrato e PCM olham o rascunho no quadro e reprogramam antes
      da geração que substitui a de quinta #}
-  <p class="pcm-quadro-link"><a class="pcm-link" href="/t/pcm/quadro?rodada={{ sel.id }}"><i class="ph ph-kanban"></i> Ver esta
+  <p class="pcm-quadro-link"><a class="pcm-link" href="{{ raiz }}/t/pcm/quadro?rodada={{ sel.id }}"><i class="ph ph-kanban"></i> Ver esta
     semana no Quadro da semana</a> <span class="gc-ajuda">para revisar e reprogramar antes de gerar de novo.</span></p>
   {% endif %}
 
@@ -89,7 +89,7 @@
     depois da publicação.{% endif %}</div></div>
   {% elif pode_publicar %}
   <div class="pcm-pub-barra">
-    {% if admin %}<a class="gc-btn gc-btn--ui gc-btn--primario" href="/t/pcm/gerar/publicar?rodada={{ sel.id }}"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</a>
+    {% if admin %}<a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ raiz }}/t/pcm/gerar/publicar?rodada={{ sel.id }}"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</a>
     <span class="gc-ajuda">Abre a conferência antes de mandar a semana para o campo.</span>
     {% else %}<span class="gc-ajuda">Esta semana pode ser publicada no App por um administrador.</span>{% endif %}
   </div>
@@ -169,14 +169,14 @@
     </div>
     {% endfor %}
   </div>
-  <form class="pcm-passo-pe" method="post" action="/t/pcm/gerar/importar-repositorio">
+  <form class="pcm-passo-pe" method="post" action="{{ raiz }}/t/pcm/gerar/importar-repositorio">
     <input type="hidden" name="semana" value="{{ semana_sugerida }}">
     <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-github-logo"></i> Importar observações do repositório do PCM</button>
     <span class="gc-ajuda">O Observacoes_Semana.txt que o PC do PCM ou o painel mandou por último entra na semana
       {{ semana_sugerida }} (por cima do que estiver salvo nela). Funciona também no servidor.</span>
   </form>
   {% if tem_origem %}
-  <form class="pcm-passo-pe" method="post" action="/t/pcm/gerar/importar">
+  <form class="pcm-passo-pe" method="post" action="{{ raiz }}/t/pcm/gerar/importar">
     <input type="hidden" name="semana" value="{{ semana_sugerida }}">
     <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-download-simple"></i> Importar da pasta do PCM</button>
     <span class="gc-ajuda">Traz os quatro arquivos de hoje (o histórico não: ele vem do banco); as observações entram na
@@ -198,7 +198,7 @@
         página. Gerar não publica: a semana só vai ao App pelo botão Publicar no App da rodada.</p>
     </div>
   </header>
-  <form class="pcm-gerar" method="post" action="/t/pcm/gerar">
+  <form class="pcm-gerar" method="post" action="{{ raiz }}/t/pcm/gerar">
     <div class="campo">
       <label class="gc-rotulo" for="semana">Semana</label>
       <input id="semana" name="semana" class="gc-campo" value="{{ semana_sugerida }}" pattern="\d{4}-W\d{2}" required>

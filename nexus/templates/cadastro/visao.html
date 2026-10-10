@@ -12,12 +12,12 @@
 </div>
 
 <nav class="cad-visoes" aria-label="Visões">
-  {% for v in visoes %}<a href="{{ v.url }}"{% if v.atual %} aria-current="page"{% endif %}>{{ v.rotulo }}</a>{% endfor %}
+  {% for v in visoes %}<a href="{{ (v.url)|na_raiz }}"{% if v.atual %} aria-current="page"{% endif %}>{{ v.rotulo }}</a>{% endfor %}
 </nav>
 
 {% if vazio %}
 <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>O ensaio está vazio.</strong>
-  <a href="/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
+  <a href="{{ raiz }}/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
 {% endif %}
 
 <div class="cad-barra-visao">
@@ -55,7 +55,7 @@
   {% for c in cartoes %}
   <article class="cad-cartao" data-kwp="{{ c.kwp }}" data-usinas="{{ c.usinas }}" data-nome="{{ c.nome|lower }}"{% if revelar %} data-valor="{{ c.valor.bruto or 0 }}"{% endif %}>
     <header class="cad-cartao-topo">
-      <h2 class="cad-cartao-nome">{% if c.url %}<a href="{{ c.url }}">{{ c.nome }}</a>{% else %}{{ c.nome }}{% endif %}</h2>
+      <h2 class="cad-cartao-nome">{% if c.url %}<a href="{{ (c.url)|na_raiz }}">{{ c.nome }}</a>{% else %}{{ c.nome }}{% endif %}</h2>
       <span class="cad-cartao-parte gc-num" title="Parte do kWp {{ 'em operação' if so_operacao else 'da carteira' }}">{{ c.parte_txt }}</span>
     </header>
     <p class="cad-cartao-kwp"><span class="gc-num">{{ c.kwp_txt }}</span> <span class="u">kWp</span></p>
@@ -70,7 +70,7 @@
       {% endfor %}
     </dl>
     {% if c.nota %}<p class="cad-cartao-nota">{{ c.nota }}</p>{% endif %}
-    {% if c.url_usinas %}<a class="cad-cartao-ir" href="{{ c.url_usinas }}">Ver as usinas <i class="ph ph-arrow-right" aria-hidden="true"></i></a>{% endif %}
+    {% if c.url_usinas %}<a class="cad-cartao-ir" href="{{ (c.url_usinas)|na_raiz }}">Ver as usinas <i class="ph ph-arrow-right" aria-hidden="true"></i></a>{% endif %}
   </article>
   {% else %}
   <p class="cad-sub">Nenhuma usina{{ ' em operação' if so_operacao }}.</p>

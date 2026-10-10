@@ -6,16 +6,55 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 
 | Arquivo | O que faz |
 |---|---|
-| `nexus/__init__.py` | `create_app`: lê o `.env`, instala o portão e o contexto, descobre as torres |
+| `nexus/__init__.py` | `create_app`: lê o `.env`, o cookie `nexus_sessao`, o prefixo, instala o portão e o contexto, descobre as torres |
+| `nexus/prefixo.py` | o caminho em que o Nexus é servido (`NEXUS_PREFIXO`): o middleware, `na_raiz`/`sem_raiz` e o cookie no caminho certo |
+| `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início), `/cadeira` (troca), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu, `tema`) |
-| `nexus/auth/__init__.py` | `/entrar`, `/sair` e o portão (`before_request`) |
+| `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/cadeiras.py` | as 10 cadeiras; diretoria e chefia caem na torre Comando |
 | `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base e entrar): a reserva do `localStorage` antes de pintar |
 | `nexus/static/nexus.css` | os tokens do Design System Grid Co. nos dois temas e o subconjunto `gc-*` |
 | `app.py` / `servir.py` | desenvolvimento (5070, IPv4 e IPv6, cookie sem Secure) / produção (atrás do proxy, cookie Secure) |
+| `ferramentas/subir_copia_de_prova.py` / `ferramentas/porta_local.py` | cópia de prova noutra porta (sem carga, sem Fracttal ao subir, trava de rede) / o papel do Caddy no PC, Nexus e plataforma numa origem só; só repassa, sem pote de cookies (10/10/2026: o pote guardava o `session` de uma resposta e o dava a quem chegasse sem cookie; `tests/test_porta_local.py`) |
+
+## O prefixo `/nexus` e o cookie próprio (porta única, 09/10/2026)
+
+Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo". O servidor serve o Nexus em
+`app.gridco.com.br/nexus`, ao lado da plataforma de Performance na raiz (spec `docs/superpowers/specs/2026-10-09-performance-no-nexus-design.md`,
+seções 2 e 5.1). Até 09/10 o código não sabia do `/nexus`: o menu, o Início, o Sair e os `fetch` saíam da raiz e caíam
+na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho) se apagava a cada login.
+
+- **Cookie (passo 0):** `nexus_sessao` (nunca mais `session`, o da plataforma), no caminho em que o Nexus roda
+  (`SessaoNoPrefixo`: `/nexus` no servidor, `/` na raiz); o `os_sessao` do OS Creator embutido em prefixo + `/os`
+  (`auth.os_cookie_path`, e o `_SessaoDoClone` da ponte). Efeito único da troca: quem estava logado entra de novo uma vez.
+  Debaixo do prefixo, o Sair e o Entrar apagam também um `nexus_sessao` de `Path=/` que tenha sobrado da janela entre
+  publicar o código e pôr a variável (`auth._sem_a_sessao_velha_da_raiz`; revisão de 10/10/2026: ele seguia válido e a
+  pessoa saía e continuava logada).
+- **Prefixo:** `NEXUS_PREFIXO` (`.env` ou ambiente; vazio = raiz, o PC e a fase 4, cujo Caddy está pronto no
+  `DEPLOY.md`, seção 5b). O `create_app` põe o middleware
+  `Prefixo`: `SCRIPT_NAME` = prefixo, e o prefixo sai do `PATH_INFO` só quando vem (serve com o Caddy cortando o `/nexus`,
+  `handle_path`, e sem cortar). O `X-Forwarded-Prefix` do pedido NUNCA é lido (o Caddy repassa o do cliente). Sem a
+  variável, a resposta na raiz é a de antes: conferido em 09/10 página por página (135 páginas, mesmo status, mesmo
+  Location, mesmos href/src/action; só o JavaScript do `nexusRota` e o nome do cookie mudaram).
+- **Como cada endereço sai com ele:** template = `{{ raiz }}/t/...`, `url_for` ou `{{ x.url|na_raiz }}` (o que vem
+  montado do Python); Python = `na_raiz("/t/...")` em todo `redirect` (e `destino_seguro` para `next`/`voltar`);
+  JavaScript = `nexusRota("/t/...")`. Os três são IDEMPOTENTES: o que já começa com o prefixo não ganha outro. O `next`
+  do portão vai como o navegador vê (`/nexus/t/...`); um `next` sem o prefixo também volta certo.
+- **A camada da T.I.:** o servidor tem, FORA do repositório, uma camada que reescreve a resposta (o `Location` e os
+  caminhos do Nexus no HTML e no JavaScript ganham `/nexus`, e um calço põe `/nexus` em todo `fetch`). Ela não mexe no
+  que já sai com `/nexus`, e o `nexusRota` não dobra o que ela reescreveu: com a variável ligada e a camada ainda ativa,
+  nada sai `/nexus/nexus` (`test_com_a_reescrita_do_servidor_ligada_nada_sai_com_o_prefixo_dobrado`). Depois de ligar a
+  variável a camada vira inútil e a T.I. pode tirá-la (`DEPLOY.md`, seção 5). Local: `ferramentas/porta_local.py
+  --reescrita-do-servidor` a imita. O `/saude` do servidor já respondeu um commit enquanto os estáticos eram de outro: lá ele
+  não prova versão sozinho.
+- **O `nexus_tema` fica em `/`** (o botão grava pelo navegador; nome próprio, não colide).
+- **Endereço da PLATAFORMA é outra coisa** (porta única, 09/10/2026): as molduras da Performance escrevem, de propósito, endereços da plataforma na raiz (`/painel/nexus/entrar`, `/painel/nexus/sair` e as telas do mapa, como `/tempo-real` no "Abrir em outra aba"), porque ela mora na raiz ao lado do Nexus. Esses não levam `{{ raiz }}`: no template a variável se chama `plataforma` (`{{ plataforma }}/painel/nexus/entrar`, que o varredor estático aceita) e o rastreador os separa (`da_plataforma`). No JavaScript, a plataforma se pede por URL completa (o calço da camada da T.I. poria `/nexus` num `fetch("/api/...")`). Regra em `nexus/performance/CLAUDE.md`, seção "Porta única".
+- **Prova:** `tests/test_prefixo.py` (o rastreador `tests/rastreador_de_links.py` percorre todas as páginas a partir do
+  Início, logado como admin e no OS Creator embutido, nos modos Caddy cortando, sem cortar, `SCRIPT_NAME` por outro meio e
+  raiz, e falha com qualquer endereço interno fora do prefixo; mais o varredor estático de templates, `.js` e `redirect`).
 
 ## Tema escuro (padrão) e claro (08/10/2026)
 
@@ -68,13 +107,16 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 ## Regras que já custaram caro
 
+- **Endereço do Nexus nunca a partir da raiz** (09/10/2026): `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")`
+  crus caem na plataforma debaixo do `/nexus`. Use `{{ raiz }}`, `url_for`, `|na_raiz`, `na_raiz()` e `nexusRota()` (seção
+  do prefixo); `tests/test_prefixo.py` pega o esquecimento.
 - **Rota pública é decisão consciente:** só o que está em `ROTAS_PUBLICAS` (entrar, saude, static). O teste
   `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
 - **Limite de senha:** 5 erros em 15 min por IP, guardado em `app.extensions` (estado global vazava entre testes).
 - **Login pelo Fracttal** (Levi, 06/10/2026: "Ao invés de uma senha difícil, no início faça a pessoa logar com
   fractall"): e-mail e senha do Fracttal (a senha vai transformada ao Fracttal e não é guardada; só a conta da Grid Co.
-  entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (path /os, 12 h), assinado com a
-  chave do clone, e `/sair` apaga os dois. Sessão do Nexus: `logado`, `usuario` {email, nome, perfil} (o nome aparece
+  entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (caminho prefixo + `/os`,
+  12 h), assinado com a chave do clone, e `/sair` apaga os dois. Sessão do Nexus: `logado`, `usuario` {email, nome, perfil} (o nome aparece
   no topo), `admin` (só se o e-mail estiver em `NEXUS_ADMINS`) e `supervisor_padrao`: desde a estrutura de O&M de
   10/2026, o PAPEL de quem entrou no Campo · App ({pessoa_id, nome, papel: supervisor_campo | coordenador | gestor,
   regioes ou gestor}; o filtro que já vem marcado e quem vê o Aprovar; ver `nexus/torres/campo/CLAUDE.md`). Sessão de
@@ -101,6 +143,12 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   `fracttal_exp`) ganha o prazo no primeiro pedido de /os. Prova: `tests/test_auth_sair_fracttal.py`; na tela, uma
   cópia em 127.0.0.1 com o Fracttal simulado (09/10: sair do OS Creator, token derrubado e token de 45 s vencendo, os
   três levando a janela ao login com o aviso certo).
+  **Debaixo do `/nexus`** (a regra nasceu na raiz e entrou na porta única em 10/10/2026): o `encerrar` apaga o
+  `os_sessao` em `os_cookie_path()` (com `/os` fixo o delete não casava e o OS Creator ficava logado) e o `nexus_sessao`
+  velho de Path=/, e põe no `next` o caminho como o navegador o vê; o `/os/login` do clone já sai como
+  `/nexus/os/login` e conta como "caiu" (`sem_raiz` no `_fim_na_resposta`); o `entrar.html`, o
+  `nexusEntrarDeNovo` e a conferência da sessão pedem os endereços pelo `nexusRota`. Prova debaixo do prefixo, com o
+  Caddy cortando: `tests/test_prefixo_sair_fracttal.py`.
 - **`next_seguro`:** o `?next=` só aceita caminho interno; nada de `//site` nem URL completa.
 - **`[hidden]{display:none!important}`** no CSS: um `display:flex` vencia o `hidden` e o filtro "não filtrava" (01/10).
   Visível se confere pela geometria (`getBoundingClientRect`), não pelo atributo.
@@ -113,4 +161,6 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   tela pronta fica verde, e a tela pronta também. "Pronta" = a rota `/t/<torre>/<tela>` cai numa view própria, não no
   `placeholder` da torre (`telas_com_conteudo`, calculado uma vez no primeiro pedido). Ninguém marca à mão: construiu a
   tela, ela fica verde sozinha. A torre da cadeira deixou de ser verde (era o mesmo sinal); fica só a etiqueta "sua".
+  Exceção: as molduras da Performance (porta única) só contam com a `NEXUS_SSO_CHAVE` (`moldura.SO_COM_A_PORTA`):
+  sem ela abrem o aviso "ainda não ligada" e o verde mentiria (revisão de 10/10/2026).
 - Edge "localhost recusou": o waitress tem de escutar em `127.0.0.1` **e** `[::1]`.

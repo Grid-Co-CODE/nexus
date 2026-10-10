@@ -11,7 +11,7 @@
 {% if negado %}
 <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-lock-key"></i><div><strong>Só administrador publica.</strong>
   Publicar troca a semana de todo o campo no App. Entre com a senha de administrador ou peça a quem é.</div></div>
-<p><a class="pcm-link" href="/t/pcm/gerar?rodada={{ st.id }}">Voltar à rodada</a></p>
+<p><a class="pcm-link" href="{{ raiz }}/t/pcm/gerar?rodada={{ st.id }}">Voltar à rodada</a></p>
 {% else %}
 
 {% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
@@ -87,7 +87,7 @@
 </section>
 
 {% if not motivos and not repo.erro %}
-<form class="pcm-pub-form" method="post" action="/t/pcm/gerar/publicar">
+<form class="pcm-pub-form" method="post" action="{{ raiz }}/t/pcm/gerar/publicar">
   <input type="hidden" name="rodada" value="{{ st.id }}">
   <input type="hidden" name="repo_ja_tem" value="{{ '1' if repo.existe else '0' }}">
   <label class="pcm-confirma"><input type="checkbox" name="confirmo" value="1" required> Confirmo: esta é a semana {{ st.semana }}
@@ -102,11 +102,11 @@
   {% endif %}
   <div class="pcm-pub-acoes">
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</button>
-    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/gerar?rodada={{ st.id }}">Cancelar</a>
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/pcm/gerar?rodada={{ st.id }}">Cancelar</a>
   </div>
 </form>
 {% else %}
-<p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/gerar?rodada={{ st.id }}">Voltar à rodada</a></p>
+<p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/pcm/gerar?rodada={{ st.id }}">Voltar à rodada</a></p>
 {% endif %}
 {% endif %}
 {% endblock %}

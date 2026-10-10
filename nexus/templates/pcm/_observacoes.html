@@ -18,7 +18,7 @@
     </div>
     <div class="obs-topo-acoes">
       {% if tem_anterior and (herdada_de or not observacoes.strip()) %}
-      <form method="post" action="/t/pcm/gerar/observacoes/copiar">
+      <form method="post" action="{{ raiz }}/t/pcm/gerar/observacoes/copiar">
         <input type="hidden" name="semana" value="{{ semana_sugerida }}">
         <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-copy"></i> Copiar da {{ semana_anterior }}</button>
       </form>
@@ -31,7 +31,7 @@
     nesta semana. OS fora e OS com dia fixo não passam de uma semana para a outra.</div></div>
   {% endif %}
 
-  <form id="obs-form" method="post" action="/t/pcm/gerar/observacoes">
+  <form id="obs-form" method="post" action="{{ raiz }}/t/pcm/gerar/observacoes">
     <input type="hidden" name="semana" value="{{ semana_sugerida }}">
     <textarea name="texto" id="obs-saida" hidden>{{ observacoes }}</textarea>
 
@@ -198,7 +198,7 @@
 
   <details class="obs-texto">
     <summary>Editar como texto</summary>
-    <form method="post" action="/t/pcm/gerar/observacoes">
+    <form method="post" action="{{ raiz }}/t/pcm/gerar/observacoes">
       <input type="hidden" name="semana" value="{{ semana_sugerida }}">
       <p class="gc-ajuda">Uma regra por linha, na gramática do motor: <span class="gc-dado">@usina Nome = seg, qua</span> ·
         <span class="gc-dado">13480; não</span> · <span class="gc-dado">10369; qua; tarefas; manhã; só: X; sem: Y</span> · linha com # é comentário.</p>

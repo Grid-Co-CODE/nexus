@@ -13,7 +13,7 @@
   </div>
   {% if chips %}
   <nav class="pcm-semanas" aria-label="Semanas">
-    {% for c in chips %}<a href="{{ c.href }}"{% if c.atual %} aria-current="page"{% endif %}>{{ c.rotulo }}</a>{% endfor %}
+    {% for c in chips %}<a href="{{ (c.href)|na_raiz }}"{% if c.atual %} aria-current="page"{% endif %}>{{ c.rotulo }}</a>{% endfor %}
   </nav>
   {% endif %}
 </div>
@@ -21,11 +21,11 @@
 {% if rodada %}
 <p class="pcm-fonte"><i class="ph ph-file-xls"></i><span>Lê a planilha que o Nexus gerou nesta rodada, que ainda não é a
   programação do App. Reprogramar daqui grava nas observações da semana no Nexus (<a class="pcm-link"
-  href="/t/pcm/gerar?semana={{ sem.week }}">Gerar a semana, bloco 2</a>), que valem na próxima geração; o que já foi gravado
+  href="{{ raiz }}/t/pcm/gerar?semana={{ sem.week }}">Gerar a semana, bloco 2</a>), que valem na próxima geração; o que já foi gravado
   fica em "Já gravadas para esta semana", no fim da página.</span></p>
 {% else %}{% include "pcm/_fonte.html" %}{% endif %}
 {% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}{% if ok_link %}
-  <a class="pcm-link" href="{{ ok_link }}">Ver nas observações da semana</a>.{% endif %}</div></div>{% endif %}
+  <a class="pcm-link" href="{{ (ok_link)|na_raiz }}">Ver nas observações da semana</a>.{% endif %}</div></div>{% endif %}
 {% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
 
 {% if sem %}
@@ -47,7 +47,7 @@
   </div>
   {% endfor %}
   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
-  {% if tem_filtro %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ url_limpar }}">Limpar</a>{% endif %}
+  {% if tem_filtro %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ (url_limpar)|na_raiz }}">Limpar</a>{% endif %}
 </form>
 
 <div class="q-resumo">
@@ -98,7 +98,7 @@
       {% else %}
         <p class="q-vazio">Nenhuma tarefa com esses filtros.</p>
       {% endfor %}
-      {% if c.ocultos %}<a class="q-mais" href="{{ url_todos }}">+{{ c.ocultos }} não {{ 'exibida' if c.ocultos == 1 else 'exibidas' }} · mostrar todas</a>{% endif %}
+      {% if c.ocultos %}<a class="q-mais" href="{{ (url_todos)|na_raiz }}">+{{ c.ocultos }} não {{ 'exibida' if c.ocultos == 1 else 'exibidas' }} · mostrar todas</a>{% endif %}
       </div>
     </section>
   {% else %}
@@ -115,7 +115,7 @@
   <p class="gc-ajuda">Os filtros de responsável, situação e turno não valem aqui: as pendentes não têm esses campos.</p>
   {% if not q.pend_mostradas %}
   <p class="q-pend-abrir">São {{ q.pend_sel }} tarefas: filtre por equipe, cliente ou tipo para ver só as suas, ou
-    <a class="pcm-link" href="{{ url_pendentes }}">mostre todas</a> (a página fica pesada).</p>
+    <a class="pcm-link" href="{{ (url_pendentes)|na_raiz }}">mostre todas</a> (a página fica pesada).</p>
   {% endif %}
   {% for g in q.pendentes %}
   <div class="q-pend-u" data-usina="{{ g.usina }}">
@@ -148,7 +148,7 @@
   {% for g in gravadas %}
     <li><span class="q-grav-quando">{{ g.quando[8:10] }}/{{ g.quando[5:7] }} {{ g.quando[11:16] }}</span> · {{ g.quem }} · em
       {% if g.destino == 'atual' %}ajustes da semana em curso (Observacoes_Semana_Atual.txt do repositório do PCM){% if g.commit %},
-      commit {{ g.commit }}{% endif %}{% else %}<a class="pcm-link" href="/t/pcm/gerar?semana={{ sem.week }}">observações da
+      commit {{ g.commit }}{% endif %}{% else %}<a class="pcm-link" href="{{ raiz }}/t/pcm/gerar?semana={{ sem.week }}">observações da
       semana no Nexus (Gerar a semana, bloco 2)</a>{% endif %}
       <pre class="pcm-pre q-pre">{{ g.linhas|join('\n') }}</pre></li>
   {% endfor %}
@@ -167,7 +167,7 @@
       <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-fila-limpar>Limpar</button>
       {% if destino.id in ('atual', 'nexus') %}
         {% if admin %}
-        <form method="post" action="/t/pcm/quadro/reprogramar" class="q-fila-form">
+        <form method="post" action="{{ raiz }}/t/pcm/quadro/reprogramar" class="q-fila-form">
           <input type="hidden" name="semana" value="{{ sem.week }}">
           {% if rodada %}<input type="hidden" name="rodada" value="{{ rodada }}">{% endif %}
           <input type="hidden" name="itens" value="[]">

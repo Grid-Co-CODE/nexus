@@ -11,12 +11,13 @@
    os.css + os_acoes.css, dentro da mesma moldura do Histórico (.os-modal). Esta página é só a moldura, numa janela
    própria (o iframe que o oscreator/card_os_abrir.html põe na tela): o CSS do OS Creator não vaza para o Nexus, e o
    cookie do Fracttal (os_sessao, só em /os) vai junto porque ela mora em /os/_nexus. Rota: ponte.card_os. #}
-<link rel="icon" href="/os/assets/grid-icon.png">
-<link rel="stylesheet" href="/os/static/os.css">
-<link rel="stylesheet" href="/os/static/os_acoes.css">
+<link rel="icon" href="{{ raiz }}/os/assets/grid-icon.png">
+<link rel="stylesheet" href="{{ raiz }}/os/static/os.css">
+<link rel="stylesheet" href="{{ raiz }}/os/static/os_acoes.css">
 {% include "oscreator/_tema_os.html" %}
-<script src="/os/static/os_busca.js" defer></script>
-<script src="/os/static/carga.js"></script>
+<script>{% include "_raiz_js.html" %}</script>
+<script src="{{ raiz }}/os/static/os_busca.js" defer></script>
+<script src="{{ raiz }}/os/static/carga.js"></script>
 {# se o carga.js não chegar, a busca segue sem o círculo (o mesmo socorro do base.html do clone) #}
 <script>window.OsCarga = window.OsCarga || {buscar: function (u, o) { return fetch(u, o); }, durante: function (p) { return p; },
   girar: function () {}, mostrar: function () {}, esconder: function () {}, token: function () { return ""; }};</script>
@@ -28,7 +29,7 @@
 </style>
 </head>
 <body class="os-form os-modal-aberto">
-<div class="os-modal" id="os_card" data-fragmento="{{ fragmento }}" data-pagina="{{ pagina }}">
+<div class="os-modal" id="os_card" data-fragmento="{{ (fragmento)|na_raiz }}" data-pagina="{{ (pagina)|na_raiz }}">
   <div class="os-modal-fundo" data-fechar></div>
   <div class="os-modal-card os-form" role="dialog" aria-modal="true" aria-label="Detalhe da OS">
     <button type="button" class="os-modal-x" data-fechar aria-label="Fechar">&times;</button>
@@ -44,7 +45,7 @@
         <div class="acoes-s">O card da OS é o do OS Creator e lê e grava no Fracttal com o seu usuário. Esta sessão do
           Nexus não tem o login do Fracttal (entrou pela senha de administrador): entre com o seu e-mail e senha do
           Fracttal e volte a esta tela.</div>
-        <div class="acoes-bts"><a class="det-b verde" href="{{ entrar }}" target="_top">Entrar com o Fracttal</a>
+        <div class="acoes-bts"><a class="det-b verde" href="{{ (entrar)|na_raiz }}" target="_top">Entrar com o Fracttal</a>
           <button type="button" class="det-b ghost" data-fechar>Fechar</button></div></div>
       {% endif %}
     </div>
@@ -54,10 +55,10 @@
 <template id="nx_card_vencido">
   <div class="nx-card-aviso"><div class="acoes-t">A sua sessão do Fracttal venceu</div>
     <div class="acoes-s">Entre de novo com o seu e-mail e senha do Fracttal para abrir a OS.</div>
-    <div class="acoes-bts"><a class="det-b verde" href="{{ entrar }}" target="_top">Entrar com o Fracttal</a>
+    <div class="acoes-bts"><a class="det-b verde" href="{{ (entrar)|na_raiz }}" target="_top">Entrar com o Fracttal</a>
       <button type="button" class="det-b ghost" data-fechar>Fechar</button></div></div>
 </template>
-<script src="/os/static/os_acoes.js"></script>
+<script src="{{ raiz }}/os/static/os_acoes.js"></script>
 <script>
 (function () {
   'use strict';
@@ -80,7 +81,7 @@
     OsCarga.buscar(modal.getAttribute('data-fragmento'), {headers: {'X-Requested-With': 'fetch'}, credentials: 'same-origin'}, 'Abrindo a OS…')
       .then(function (r) {
         // a sessão do Fracttal caiu: o clone (ou a ponte) manda o pedido para /os/login, e o fetch segue até lá
-        if (r.status === 401 || (r.redirected && new URL(r.url).pathname === '/os/login')) { vencido(); return null; }
+        if (r.status === 401 || (r.redirected && new URL(r.url).pathname === nexusRota('/os/login'))) { vencido(); return null; }
         return r.text();
       })
       .then(function (h) {
@@ -108,9 +109,9 @@
     var a = e.target.closest && e.target.closest('a[href]');
     if (!a || a.target || a.hasAttribute('download')) return;
     var href = a.getAttribute('href') || '';
-    if (href.indexOf('/os/') !== 0) return;
+    if (href.indexOf(nexusRota('/os/')) !== 0) return;
     e.preventDefault();
-    var ir = '/os/_nexus/ir?url=' + encodeURIComponent(href);
+    var ir = nexusRota('/os/_nexus/ir') + '?url=' + encodeURIComponent(href);
     if (e.ctrlKey || e.metaKey || e.shiftKey) window.open(ir, '_blank', 'noopener');
     else avisar('ir', {url: ir});
   });

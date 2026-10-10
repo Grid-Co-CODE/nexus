@@ -11,6 +11,7 @@ from ...cadastro.telas import registrar_base
 from ...cadastro.telas_ligacoes import registrar_ligacoes
 from ...dados.telas import registrar_governanca
 from ..modelo import Tela, Torre
+from ..moldura import registrar_molduras
 
 TORRE = Torre(
     id="base",
@@ -52,6 +53,11 @@ TORRE = Torre(
         Tela("fracttal", "Integração Fracttal",
              "A cópia local do Fracttal está em dia?",
              "API do Fracttal"),
+        # Porta única (09/10/2026): o /tokens da Plataforma de Performance (as chaves de SunOp, Axis e Plataforma) numa
+        # moldura; só administrador do Nexus (spec 5.3). A view sai do mapa (nexus/performance/porta.py).
+        Tela("chaves-fontes", "Chaves das fontes",
+             "As chaves das fontes da Performance estão válidas, e quando vencem?",
+             "Plataforma de Performance (/tokens), só administrador"),
         Tela("ia", "Nexus IA",
              "O que a IA leu e sugeriu, e quanto custou?",
              "API do Claude (a definir)"),
@@ -74,3 +80,4 @@ bp = TORRE.criar_blueprint(__name__)
 registrar_base(bp)
 registrar_ligacoes(bp)
 registrar_governanca(bp)
+registrar_molduras(bp, TORRE)

@@ -51,9 +51,9 @@ def test_ponte_leva_o_pedido_e_devolve_sem_cookie(logado_ponte, monkeypatch):
     monkeypatch.setattr(ponte, "enviar", falso)
     r = logado_ponte.get(ponte.PREFIXO + "/api/pv/trackers/parados?force=1&data=x")
     assert r.status_code == 200
-    # O único cookie que sai é o da sessão do próprio Nexus (12 h deslizantes); o da plataforma não passa.
+    # O único cookie que sai é o da sessão do próprio Nexus (nexus_sessao, 12 h deslizantes); o da plataforma não passa.
     cookies = r.headers.getlist("Set-Cookie")
-    assert all(c.startswith("session=") for c in cookies) and not any("s=1" in c for c in cookies)
+    assert all(c.startswith("nexus_sessao=") for c in cookies) and not any("s=1" in c for c in cookies)
     assert visto["url"] == "https://plat:5050/api/pv/trackers/parados" and visto["params"] == [("data", "x")]
     assert visto["headers"]["X-Nexus-Leitura"] == "segredo-xyz"
 
@@ -319,5 +319,7 @@ def test_url_da_plataforma_lida_como_o_requests_le_e_a_enganosa_e_recusada(url, 
 
 
 def test_sem_configuracao_a_aba_diz_o_que_falta(logado):
+    # Desde a porta única (09/10/2026) o Tempo real abre pela moldura com a NEXUS_SSO_CHAVE; sem ela e sem a ponte de
+    # 04/10 configurada, a tela diz o que falta para ligar (tests/test_porta_moldura.py cobre o resto).
     html = logado.get("/t/performance/tempo-real").get_data(as_text=True)
-    assert "NEXUS_PLATAFORMA_URL" in html
+    assert "Performance ainda não ligada neste servidor" in html and "NEXUS_SSO_CHAVE" in html

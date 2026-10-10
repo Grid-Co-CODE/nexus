@@ -1,0 +1,13 @@
+{# O endereço do Nexus para o JavaScript (09/10/2026, porta única; Levi: "a partir de segunda quero o Nexus como link
+   principal"). Só JavaScript: entra dentro de um <script> no <head> (base, entrar, modo TV, card da OS). No servidor o
+   Nexus mora em /nexus (NEXUS_PREFIXO); na raiz, NEXUS_RAIZ é vazio e nada muda. Todo fetch, location e src com caminho
+   do Nexus passa por nexusRota("/t/..."), que é IDEMPOTENTE: enquanto a camada da T.I. no servidor reescrever os caminhos
+   do Nexus no JavaScript ("/t/..." vira "/nexus/t/..."), o caminho que já vem com o prefixo não ganha outro. Ver
+   nexus/prefixo.py, que faz o mesmo no Python. #}
+    window.NEXUS_RAIZ = {{ (raiz or '')|tojson }};
+    window.nexusRota = function (c) {
+      var r = window.NEXUS_RAIZ || "";
+      c = String(c == null ? "" : c);
+      if (!r || c.charAt(0) !== "/" || c.charAt(1) === "/" || c === r || c.indexOf(r + "/") === 0 || c.indexOf(r + "?") === 0) return c;
+      return r + c;
+    };

@@ -26,8 +26,15 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_CAMPO_AQUECER",
              # a pessoa nos workbooks que o App de Campo manda (v226): HMAC do e-mail, a mesma chave do App Setting
              "NEXUS_PESSOA_HMAC",
-             # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela
+             # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela (a ponte).
+             # Desde a porta única (09/10/2026) a NEXUS_PLATAFORMA_URL é também a base que o NAVEGADOR usa para abrir as
+             # telas da plataforma na moldura: no servidor, o próprio endereço (app.gridco.com.br), que também traz a ponte
+             # de volta se a chave sair (revisão de 10/10/2026); vazia = a própria origem do Nexus
              "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN",
+             # porta única (09/10/2026, Levi: "a partir de segunda quero o Nexus como link principal"): a chave do passe que
+             # abre as telas da Performance dentro do Nexus (a MESMA no .env da plataforma; 32 caracteres ou mais). Sem
+             # ela as telas dizem "Performance ainda não ligada neste servidor" e o resto do Nexus segue igual
+             "NEXUS_SSO_CHAVE",
              # camada de dados (05/10/2026): a carga de hora em hora liga onde há o token de escrita; "0" desliga
              "NEXUS_CARGA_DADOS",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
@@ -40,7 +47,10 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_CLIMA_FIRMS_URL",
              # PCM -> Gestão PCM (07/10/2026): a senha que abre o mpas.json da Gerencial (o mesmo do painel do PCM);
              # sem ela a Fila mostra só o lado do Fracttal. As fontes trocam o endereço padrão (repositório do PCM).
-             "NEXUS_PCM_MPAS_SENHA", "NEXUS_PCM_GESTAO_FONTE", "NEXUS_PCM_MPAS_FONTE")
+             "NEXUS_PCM_MPAS_SENHA", "NEXUS_PCM_GESTAO_FONTE", "NEXUS_PCM_MPAS_FONTE",
+             # o caminho em que o Nexus é servido (09/10/2026, "a partir de segunda quero o Nexus como link principal"):
+             # /nexus no servidor (app.gridco.com.br/nexus); vazio = a raiz, o PC e a fase 4. Ver nexus/prefixo.py
+             "NEXUS_PREFIXO")
 
 
 class ConfigErro(RuntimeError):

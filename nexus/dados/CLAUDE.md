@@ -60,6 +60,10 @@ ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) 
 `ferramentas/carregar_checklist_rondas_sem_os.py` num livro próprio (o `nexus_fatos` é regravado a cada hora). Ronda
 sem OS depois de 06/10 não entra ali.
 
+**Endereços das telas (porta única, 09/10/2026).** No servidor o Nexus mora em `/nexus`: a Governança de dados e
+o organograma escrevem os endereços com `{{ raiz }}`/`url_for`/`|na_raiz`, nunca a partir da raiz (cairiam na
+plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento quebra `tests/test_prefixo.py`.
+
 ## As regras (valem para todo dado novo)
 
 1. **Grão e tipo escritos antes de tudo** ("1 linha = …"; transação, foto periódica, foto acumulada ou sem medida).

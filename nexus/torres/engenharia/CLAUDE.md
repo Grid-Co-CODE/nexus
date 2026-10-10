@@ -3,6 +3,10 @@
 Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje só a
 **Confiabilidade** é tela de verdade; as outras caem no placeholder da casca.
 
+Endereços nunca a partir da raiz (porta única, 09/10/2026: no servidor o Nexus mora em `/nexus`): o link da OS na
+Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusRota` (regra das torres em
+`nexus/torres/CLAUDE.md`; o esquecimento quebra `tests/test_prefixo.py`).
+
 ## Quadro da equipe (06/10/2026)
 
 Levi: "uma tela que fique no setor de engenharia que agregue todas as OSs que estão abertas ou já foram fechadas ou que

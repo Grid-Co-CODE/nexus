@@ -3,7 +3,7 @@
 {% block titulo %}{{ reg.titulo if reg else 'Novo registro' }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
-<p class="gc-eyebrow"><a href="{{ ent.rota_lista }}">{{ titulo_tela }}</a></p>
+<p class="gc-eyebrow"><a href="{{ (ent.rota_lista)|na_raiz }}">{{ titulo_tela }}</a></p>
 <div class="cad-topo">
   <div>
     <h1 class="titulo-pagina">{{ reg.titulo if reg else ('Nova ' if ent.id != 'pessoas' else 'Novo ') ~ ent.singular }}</h1>
@@ -14,9 +14,9 @@
   {% if reg %}
   <div class="cad-acoes">
     {% if revelar %}
-    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url }}"><i class="ph ph-eye-slash"></i> Esconder dados sensíveis</a>
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ (url)|na_raiz }}"><i class="ph ph-eye-slash"></i> Esconder dados sensíveis</a>
     {% else %}
-    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url }}?sensiveis=1"><i class="ph ph-eye"></i> Mostrar dados sensíveis</a>
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ (url)|na_raiz }}?sensiveis=1"><i class="ph ph-eye"></i> Mostrar dados sensíveis</a>
     {% endif %}
   </div>
   {% endif %}
@@ -38,7 +38,7 @@
 {% endif %}
 
 <div class="cad-ficha">
-  <form method="post" action="{{ url }}">
+  <form method="post" action="{{ (url)|na_raiz }}">
     <input type="hidden" name="_versao" value="{{ reg.versao if reg else 0 }}">
     <input type="hidden" name="_revelado" value="{{ 1 if revelar else 0 }}">
     {% for s in secoes %}
@@ -49,7 +49,7 @@
     {% endfor %}
     <div class="cad-barra">
       <span class="dica">{% if reg and not revelar %}Os campos com cadeado estão escondidos e não mudam ao salvar.{% else %}* obrigatório{% endif %}</span>
-      <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ ent.rota_lista }}">Voltar</a>
+      <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ (ent.rota_lista)|na_raiz }}">Voltar</a>
       <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-floppy-disk"></i> {{ 'Criar' if not reg else 'Salvar' }}</button>
     </div>
   </form>
@@ -63,7 +63,7 @@
     {% for bloco in extra.listas %}
     <section class="cad-painel">
       <h3>{{ bloco.titulo }}</h3>
-      <ul>{% for i in bloco.itens %}<li><a href="{{ i.url }}">{{ i.texto }}</a>{% if i.detalhe %} <span class="mudo">· {{ i.detalhe }}</span>{% endif %}{% if i.chip %} <span class="cad-chip{{ ' cad-chip--operacao' if i.chip_ok else ' cad-chip--info' }}">{{ i.chip }}</span>{% endif %}</li>{% else %}<li class="mudo">Nenhum.</li>{% endfor %}</ul>
+      <ul>{% for i in bloco.itens %}<li><a href="{{ (i.url)|na_raiz }}">{{ i.texto }}</a>{% if i.detalhe %} <span class="mudo">· {{ i.detalhe }}</span>{% endif %}{% if i.chip %} <span class="cad-chip{{ ' cad-chip--operacao' if i.chip_ok else ' cad-chip--info' }}">{{ i.chip }}</span>{% endif %}</li>{% else %}<li class="mudo">Nenhum.</li>{% endfor %}</ul>
     </section>
     {% endfor %}
     {% endif %}

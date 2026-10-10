@@ -208,6 +208,33 @@ a{color:inherit}
 .ponte-falta{margin:24px 16px;color:var(--alerta)}
 .ponte-erro{padding:32px 24px;max-width:640px}
 .ponte-erro h1{font:600 20px/1.3 var(--font-display);margin:0 0 12px}
+/* Porta única (09/10/2026): cada tela da Plataforma de Performance numa moldura, com o login e o menu do Nexus
+   (nexus/torres/moldura.py). Faixa fina com o nome, o seletor de usina do Diagnóstico e o "Abrir em outra aba". */
+.porta{flex:1;min-width:0;height:calc(100vh - var(--topo));display:flex;flex-direction:column}
+.porta-faixa{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:6px 16px;min-height:44px;
+  border-bottom:1px solid var(--linha);font:500 13px/1.4 var(--font-sans)}
+.porta-origem{color:var(--mudo)}
+.porta-origem strong{color:var(--tinta);font-weight:600}
+.porta-visoes{display:flex;gap:6px}
+.porta-usina{display:flex;align-items:center;gap:8px;min-width:0}
+.porta-usina select{width:min(380px,70vw);padding:5px 10px}
+.porta-nota{font-size:12px}
+.porta-fora{margin-left:auto;color:var(--verde-texto);font-weight:600;text-decoration:none}
+.porta-fora:hover{text-decoration:underline}
+.porta-alerta{margin:0;padding:8px 16px;color:var(--alerta);background:var(--alerta-suave);border-bottom:1px solid var(--linha)}
+.porta-passe{margin:0}
+.porta-sem-js{margin:16px;color:var(--tinta-2)}
+.porta-moldura{flex:1;min-height:0;width:100%;border:0;display:block;background:var(--fundo)}
+.porta-aviso{padding:32px 24px;max-width:720px}
+.porta-aviso h1{font:600 20px/1.3 var(--font-display);margin:0 0 12px}
+.porta-aviso p{margin:0 0 10px;color:var(--tinta-2)}
+.porta-aviso p.mudo{color:var(--mudo)}
+.porta-vazia{margin:0;padding:32px 24px;color:var(--mudo)}
+.porta-reserva{margin:0;padding:6px 16px;font-size:12px;color:var(--mudo);border-bottom:1px solid var(--linha)}
+/* O Sair passa pela plataforma (encerra a sessão aberta pelo passe) antes de voltar ao Entrar */
+.sair-caixa{max-width:520px;margin:15vh auto 0;padding:24px}
+.sair-caixa h1{font:600 20px/1.3 var(--font-display);margin:0 0 12px}
+.sair-caixa p{color:var(--tinta-2)}
 /* Faixa que só a vitrine estática do GitHub Pages recebe (ferramentas/exportar_estatico.py). */
 .faixa-vitrine{padding:8px 24px;background:var(--superficie-2);border-bottom:1px solid var(--linha);
   font-size:12px;color:var(--tinta-2)}

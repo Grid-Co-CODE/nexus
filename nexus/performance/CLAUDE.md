@@ -1,13 +1,150 @@
 # CLAUDE.md — Performance (regra da torre, sem Flask)
 
-## Ponte para a Plataforma de Performance (04/10/2026)
+## Porta única (09/10/2026): as telas da plataforma numa moldura do Nexus
+
+Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo, precisamos trazer o tempo
+real de performance painel para o Nexus". Desenho "uma porta, dois motores"
+(`docs/superpowers/specs/2026-10-09-performance-no-nexus-design.md`): o Nexus é a porta (menu, login, endereço); a
+Plataforma de Performance (repositório PerformancePainel) continua o motor e desenha as próprias telas, com leitura e
+gravação, dentro de uma moldura (iframe) do Nexus. Nada da plataforma passa pelo processo do Nexus (a ponte passava): o
+navegador fala com cada sistema.
+
+- **O mapa** (`porta.py`, `MAPA`): as 13 telas, `torre · tela -> caminho na plataforma`. Fonte única: o Nexus é o dono;
+  a plataforma tem a cópia em `plataforma/porta_nexus.py`. Os dois comparam o mesmo texto canônico
+  (`texto_canonico_do_mapa`; `tests/test_porta_mapa.py` aqui e o teste da porta lá): mudou um, muda o outro e o texto dos
+  dois testes. Com `PLATAFORMA_REPO=<clone do PerformancePainel>` o teste daqui abre o módulo de lá e compara o mapa, a
+  regra do destino e o passe de verdade. O mesmo mapa dá o destino que o passe aceita (`destino_permitido`, a MESMA regra
+  da plataforma: só caminho local do mapa, sem aspas, espaço, controle, barra invertida nem fragmento; nada de
+  redirecionamento aberto), o `?p=` que o Nexus aceita e o item do menu que acende.
+
+  | torre · tela | plataforma |
+  |---|---|
+  | performance · `tempo-real` | `/tempo-real` (e `/tempo-real/<fonte>`, `/monitor`) |
+  | performance · `noc` | `/painel` |
+  | performance · `diagnostico` | `/painel/usina/<id>`, pelo seletor de usina |
+  | performance · `strings-trackers` | `/painel/falhas` |
+  | performance · `gerencial` e `disponibilidade` | `/gerencial` e `/gerencial/disponibilidade` |
+  | performance · `relatorio` e `relatorio-semanal` | `/relatorio` e `/relatorio/semanal` |
+  | performance · `gemeo` | `/gemeo/` (e tudo debaixo dele) |
+  | performance · `historico-plataforma` e `monitor-ronda` | `/historico-plataforma` e `/ronda/monitor` |
+  | cos · `acompanhamento` | `/cos` |
+  | base · `chaves-fontes` (só admin) | `/tokens` |
+
+  Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco e Mapa de risco são do Nexus e ficam fora.
+- **O passe** (`montar_passe`): `base64url(json) + "." + base64url(HMAC-SHA256(json))` com a `NEXUS_SSO_CHAVE` (a MESMA
+  no `.env` da plataforma; com menos de 32 caracteres vale como ausente, nos dois lados). O JSON leva `v`, `email`,
+  `nome`, `admin` (o `session["admin"]` do Nexus: `NEXUS_ADMINS` ou a senha de administrador), `destino`, `vence` (60 s)
+  e `numero` (novo a cada abertura; a plataforma recusa o repetido). Vai por **POST** no campo `passe` de
+  `/painel/nexus/entrar`, nunca na URL (leva o e-mail). Quem entrou pela senha de administrador não é uma pessoa: vai com
+  `admin@nexus.invalid` (domínio que não existe); com `PLATAFORMA_ANALISTAS=*` ele entra como analista.
+- **A tela** (`nexus/torres/moldura.py`, `registrar_molduras`): uma view por item do mapa, nas torres Performance, COS e
+  Base; o template `performance/moldura.html` (faixa fina e a moldura ocupando a tela, o padrão `.conteudo--moldura`) e o
+  `nexus/static/porta.js`. A página traz o formulário escondido (alvo = a moldura; o `porta.js` o envia ao carregar; sem
+  JavaScript, o botão "Abrir") e sai com `Cache-Control: no-store` (o passe vale 60 s e uma vez: voltar pelo navegador
+  gera outro). A plataforma confere, abre a sessão DELA (12 h) e responde 303 para a tela, no modo Nexus.
+- **O endereço acompanha:** a página da plataforma, em modo Nexus, manda `postMessage({tipo: "nexus:rota", caminho})` a
+  cada troca de caminho. O `porta.js` só aceita o aviso da própria moldura e da origem da plataforma; troca o endereço
+  (`history.replaceState`: o item dono do caminho, com `?p=` quando não é a entrada padrão dele), acende o item no menu e
+  leva o endereço novo ao "voltar" da cadeira e do tema e ao "Abrir em outra aba". Abrir com `?p=` (F5, favorito): do
+  mapa e do item, abre ali; de OUTRO item, 302 para o item dono; fora do mapa, a tela padrão do item (spec 7).
+- **Diagnóstico:** sem `?p=` a página mostra o seletor e "Escolha uma usina". A lista vem da PLATAFORMA, pelo navegador
+  (o processo do Nexus não busca): o mesmo `/api/macro` e `/api/gerencial` do Painel NOC, com a regra dele (o `FMAP` e o
+  `drillUrl` de `painel_portfolio.html`, copiados no `porta.js`: a usina de fonte ao vivo abre com `?fonte=`, a que só
+  existe no Gerencial abre com `?hist=1`; mudou lá, muda aqui e no `tests/test_porta_js.py`). Sem a sessão da plataforma
+  (401), o `porta.js` abre a sessão por `fetch` com um passe próprio da página (`passe_lista`, destino `/painel`, o 303
+  não é seguido) e lê de novo. Escolher a usina recarrega a página do Nexus com `?p=/painel/usina/<id>?...` (passe novo
+  para aquele destino).
+- **Tempo real:** a visão "Ao vivo" é a moldura. A alternância "Ao vivo | Pelo banco" (spec 5.7) está pronta em
+  `moldura.VISOES_DO_TEMPO_REAL` com a "Pelo banco" em `pronta=False`: só aparece quando a Operação em tempo real
+  (branch `operacao-tempo-real`) entrar, DEPOIS que a Ao vivo estiver no servidor. Até a `NEXUS_SSO_CHAVE` chegar, o
+  Tempo real cai na ponte de 04/10 (a reserva, abaixo), se ela estiver configurada: nada afeta o que funciona hoje.
+- **Chaves das fontes** (`/tokens`): só admin do Nexus; quem não é recebe 403 com o porquê (como as telas do Cadastro), e
+  a plataforma recusa de novo pelo `admin` do passe.
+- **Sem configuração:** sem a chave, com chave curta ou com a `NEXUS_PLATAFORMA_URL` inválida, cada item diz "Performance
+  ainda não ligada neste servidor"; o que falta (nunca o valor) só para admin, e no menu as molduras ficam sem o verde
+  (`moldura.SO_COM_A_PORTA` em `telas_com_conteudo`; o Tempo real, que tem a ponte de reserva, segue verde). Revisão
+  de 10/10/2026: antes os 12 itens ficavam verdes e o aviso mostrava a variável a qualquer um, técnico inclusive. O
+  resto do Nexus segue. A plataforma, sem a chave,
+  responde 404 em `/painel/nexus/*`: as duas pontas ficam inertes até a T.I. pôr a MESMA chave nas duas (`DEPLOY.md`,
+  seção 7e).
+- **Onde está a plataforma para o navegador** (`base_da_plataforma`): a `NEXUS_PLATAFORMA_URL`, a mesma da ponte. No
+  servidor ela FICA `https://app.gridco.com.br` (a mesma origem do Nexus): vazia também serviria à moldura, mas a ponte
+  perderia o endereço e tirar a chave deixaria o Nexus sem Tempo real (revisão de 10/10/2026, DEPLOY 7e). A moldura
+  **só abre na mesma origem**: a plataforma manda `frame-ancestors 'self'` e o aviso de rota vai só à origem dela. No PC
+  as duas cópias ficam atrás da `ferramentas/porta_local.py`, com a URL vazia (`subir_copia_de_prova.py --plataforma
+  ""`). Em outra origem NADA sai do navegador (o `porta.js` não envia o passe nem lê a lista do Diagnóstico, e o Sair
+  não faz o POST): só o aviso. E a base em loopback (`http://127.0.0.1:...`, o endereço interno) com o Nexus aberto por
+  fora desliga a porta no servidor (`porta.motivo_da_origem`): sem isso o navegador de quem visita mandaria o passe, com o
+  e-mail, à própria máquina. http só na máquina local.
+- **O Sair** (`nexus/auth`): com a chave, `/sair` encerra a sessão do Nexus e mostra uma página que faz POST em
+  `/painel/nexus/sair` (a plataforma encerra a sessão do passe; a da senha fica) e segue ao Entrar em até 4 s, responda a
+  plataforma ou não; sem JavaScript, um botão. Sem a chave, o `/sair` de sempre (302).
+- **O Entrar** (revisão de 10/10/2026): com a chave, a página do Entrar também faz o POST em `/painel/nexus/sair`
+  (`auth._tela_entrar`; só na mesma origem). Num PC compartilhado, A não clicava em Sair, a sessão dele no Nexus vencia, B
+  entrava, e a sessão do passe de A na plataforma (12 h) seguia valendo para todo acesso direto: o diário gravava A.
+- **A camada da T.I. e o calço do `fetch`:** no servidor, uma camada fora do repositório põe `/nexus` em todo `fetch`
+  começado por "/" (`nexus/casca/CLAUDE.md`). Por isso o `porta.js` e o Sair pedem a plataforma por URL COMPLETA
+  (`new URL(..., location.href)`); os endereços da plataforma no HTML (`/painel/nexus/...`, `/tempo-real`...) não são
+  caminhos do Nexus e a camada não os toca (`test_a_camada_do_servidor_nao_mexe_nos_enderecos_da_plataforma`).
+- **Prova:** `tests/test_porta_mapa.py` (mapa e passe; com `PLATAFORMA_REPO`, contra a plataforma de verdade),
+  `tests/test_porta_moldura.py` (cada tela nos dois modos, `?p=`, sem login, sem chave, só admin, Tempo real com e sem a
+  chave, Sair), `tests/test_porta_js.py` (no node: o seletor, o item que acende, o endereço) e
+  `tests/test_prefixo.py::test_com_a_porta_da_performance_ligada_tambem` (o rastreador com a porta ligada; os endereços
+  da plataforma escritos de propósito ficam em `Rastreio.da_plataforma`). No navegador: as duas cópias de prova atrás da
+  `porta_local.py` (o Nexus com `--prefixo /nexus --plataforma ""` e a plataforma na raiz, as duas com a mesma
+  `NEXUS_SSO_CHAVE` pelo ambiente e `PLATAFORMA_ANALISTAS=*` na plataforma), entrando por um nome `*.localhost` para os
+  cookies não se misturarem com os da 5050 e da 5070 em 127.0.0.1.
+- **Provado de ponta a ponta no PC (10/10/2026)**, a cópia de prova do Nexus e a da plataforma (as duas branches da porta
+  única) atrás de um proxy que imita o Caddy nos dois modos (prefixo `/nexus` cortado, o servidor de hoje, também com a
+  camada de reescrita da T.I. junto; e raiz, a fase 4), Chrome sem janela a 1440 px:
+  - entrar pela senha de administrador (o login do Fracttal NÃO: a cópia barra o POST ao Fracttal; quem não é admin foi
+    provado com uma sessão de teste no mesmo formato); `nexus_sessao` (em `/nexus` ou `/`) e o `session` da plataforma
+    vivem juntos, entrar num não derruba o outro;
+  - as 13 telas abrem na moldura em `modo-nexus`, com o item aceso; os números da moldura são os MESMOS da plataforma
+    direta no mesmo minuto (7 telas comparadas número a número); o endereço acompanha o clique dentro da tela (Tempo real
+    -> fonte com `?p=`; "investigar" do Painel NOC -> item Diagnóstico, com o seletor marcando a usina; "Visão Gerencial"
+    da Disponibilidade -> item Gerencial) e o F5 volta ao lugar; `?p=` de outro item vai ao dono, fora do mapa abre o
+    padrão; o `voltar` do tema leva o `?p=`;
+  - perfis: o analista grava (numa cópia de estado da plataforma), o gestor lê as 11 telas e leva 403 ao gravar, Chaves
+    das fontes só admin (aqui e na plataforma), fora das listas "Sem acesso"; os passes que o Nexus gera valem 60 s e uma
+    vez: repetido, adulterado, vencido, fora do mapa, na URL e de outro site são recusados sem abrir sessão;
+  - o Sair encerra as duas sessões (GET `/nexus/sair` e o POST em `/painel/nexus/sair`); sem a chave, as 13 telas avisam,
+    o Tempo real cai na ponte (com a ponte configurada, mostra a plataforma) e a plataforma responde 404;
+  - 100 páginas do Nexus (Início e todo o menu) e 12.744 endereços: no modo prefixo nenhum fora do `/nexus` (fora os da
+    plataforma escritos de propósito), com a camada da T.I. nenhum `/nexus/nexus`, no modo raiz nenhum `/nexus`; nenhum
+    erro de JavaScript; a 375 px nenhuma página do Nexus rola de lado;
+  - abrir pela moldura custa ~100 ms a mais que direto (a página do Nexus, o POST do passe e o 303); o Diagnóstico pronto
+    em ~5 s pelos dois caminhos (as leituras da própria tela). O gêmeo deu 503 (não está de pé no PC). Nenhuma das duas
+    páginas declara ícone: o navegador pede `/favicon.ico`, que cai na plataforma (404, ou 403 para o gestor); é ruído
+    de console, não erro.
+- **Revisão adversarial, provada de novo no PC (10/10/2026, de madrugada)**, as mesmas cópias e o mesmo proxy, modos
+  prefixo e raiz:
+  - as 13 telas, o analista que grava, o gestor, o Sair e os passes (válido, repetido, adulterado, vencido, fora do
+    mapa, na URL, de outro site) seguem como na véspera;
+  - a página do Entrar encerra a sessão do passe na plataforma (`/api/state` 200 -> 401);
+  - com um `nexus_sessao` velho em `Path=/` ao lado do de `/nexus`, o Sair apaga os dois e `/nexus/t/cos/mesa` volta ao
+    Entrar;
+  - OS Creator embutido (sessão de teste do clone, a cópia sem saída para fora da máquina): o item Histórico e o item
+    Ativos da torre abrem a aba da tela, debaixo do `/nexus` e na raiz. Com a ponte de antes da correção, debaixo do
+    `/nexus`, só o Início abria e `ehTela` dava `false`;
+  - com a `NEXUS_PLATAFORMA_URL` em outra origem (`http://127.0.0.1:5052`, a plataforma direta), nenhum pedido sai
+    para ela (o passe, a lista do Diagnóstico, o Sair e o Entrar), e o aviso aparece; aberto por um endereço de fora
+    (cabeçalho Host), o servidor desliga a porta, diz por quê e o Tempo real cai na ponte;
+  - sem a chave: só o Tempo real fica verde no menu; o técnico lê "ainda não ligada" sem o nome da variável e o Tempo
+    real dele é a ponte sem a faixa; o admin vê o que falta.
+
+## Ponte para a Plataforma de Performance (04/10/2026): hoje só a reserva do Tempo real
+
+Desde a porta única (09/10/2026, acima) a ponte saiu do menu: com a `NEXUS_SSO_CHAVE` o Tempo real abre a moldura. Ela fica no código como a RESERVA do Tempo real enquanto a chave não chega ao servidor, e sai de vez quando a Operação em tempo real entrar (spec 2026-10-09, fase 2).
 
 A aba Performance → Tempo real mostra a Entrada e o Monitoramento da própria plataforma (Levi: "tudo da plataforma,
 só leitura", "em paralelo por enquanto"). Fase 1 de cinco para a plataforma morar 100% no Nexus: ver o spec
 `docs/superpowers/specs/2026-10-04-tempo-real-no-nexus-design.md`, seção 10.
 
 - O navegador fala só com o Nexus. `ponte.py` leva o pedido à plataforma com `X-Nexus-Leitura`
-  (`NEXUS_PLATAFORMA_TOKEN` = `NEXUS_LEITURA_TOKEN` da plataforma) e `X-Forwarded-Prefix: /t/performance/plataforma`.
+  (`NEXUS_PLATAFORMA_TOKEN` = `NEXUS_LEITURA_TOKEN` da plataforma) e `X-Forwarded-Prefix: /t/performance/plataforma`
+  (com o prefixo em que o Nexus roda na frente: `/nexus/t/performance/plataforma` no servidor; o guarda de leitura usa o
+  mesmo, 09/10/2026).
   A plataforma devolve as páginas com o prefixo (`_SHIM_PREFIXO` + atributos): a ponte não reescreve HTML, só injeta
   o visual (`#nexus-visual`) e o guarda (`#nexus-leitura`).
 - **Só leitura em três camadas:** portão da plataforma (403 com a chave), `pode_passar` aqui, guarda no navegador.

@@ -111,7 +111,7 @@
           <h3>As últimas OS ({{ a.os|length }} de {{ a.n30 }} em {{ janela }} dias)</h3>
           <ol class="eg-oss">{% for o in a.os %}
             <li class="{{ 'eg-os-servico' if o.servico }}"><span class="eg-os-cab"><span class="m">{{ o.d }}</span>
-              {% if o.url %}<a class="cn-link m" href="{{ o.url }}" target="_blank" rel="noopener">OS {{ o.os }}</a>{% else %}<span class="m">OS {{ o.os }}</span>{% endif %}
+              {% if o.url %}<a class="cn-link m" href="{{ (o.url)|na_raiz }}" target="_blank" rel="noopener">OS {{ o.os }}</a>{% else %}<span class="m">OS {{ o.os }}</span>{% endif %}
               <span>{{ o.tipo }}</span>{% if o.servico %}{{ tag('serviço', 'info') }}{% endif %}<span class="mudo">{{ o.st }}</span></span>
               <b>{{ o.t }}</b>{% if o.nota %}<span class="mudo">{{ o.nota }}</span>{% endif %}{% if o.quem %}<span class="eg-quem">{{ o.quem }}</span>{% endif %}</li>
           {% endfor %}</ol>

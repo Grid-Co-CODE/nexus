@@ -30,7 +30,7 @@ window.NexusOsCard = window.NexusOsCard || (function () {
   function preparar(wid) {
     if (!wid || pedidos[wid] || !window.fetch) return;
     pedidos[wid] = 1;
-    fetch('/os/api/os/' + encodeURIComponent(wid) + '/preparar', {credentials: 'same-origin', cache: 'no-store'})
+    fetch(nexusRota('/os/api/os/') + encodeURIComponent(wid) + '/preparar', {credentials: 'same-origin', cache: 'no-store'})
       .catch(function () { /* sem rede: o clique lê como sempre */ });
   }
   function prepararAoParar(el, wid) {
@@ -52,7 +52,7 @@ window.NexusOsCard = window.NexusOsCard || (function () {
     moldura = document.createElement('iframe');
     moldura.className = 'nexus-card-os';
     moldura.title = op.folio ? 'OS ' + op.folio : 'Detalhe da OS';
-    moldura.src = '/os/_nexus/card/' + encodeURIComponent(wid) + '?' + q.toString();
+    moldura.src = nexusRota('/os/_nexus/card/') + encodeURIComponent(wid) + '?' + q.toString();
     moldura.addEventListener('load', function () { try { moldura.contentWindow.focus(); } catch (e) { /* já fechou */ } });
     document.body.appendChild(moldura);
     rolagem = document.documentElement.style.overflow;
@@ -64,7 +64,7 @@ window.NexusOsCard = window.NexusOsCard || (function () {
     var d = e.data || {};
     if (d.nexusCard !== 1) return;
     if (d.tipo === 'fechar') fechar(d.mudou);
-    else if (d.tipo === 'ir' && typeof d.url === 'string' && d.url.indexOf('/os/_nexus/ir?') === 0) location.href = d.url;
+    else if (d.tipo === 'ir' && typeof d.url === 'string' && d.url.indexOf(nexusRota('/os/_nexus/ir') + '?') === 0) location.href = d.url;
   });
   document.addEventListener('keydown', function (e) { if (moldura && e.key === 'Escape') fechar(false); });
   return {abrir: abrir, fechar: function () { fechar(false); }, preparar: preparar, prepararAoParar: prepararAoParar};

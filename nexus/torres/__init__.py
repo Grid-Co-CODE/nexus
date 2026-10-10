@@ -34,9 +34,16 @@ def telas_com_conteudo(app) -> frozenset[str]:
 
     É o que pinta de verde o menu, para o Levi ir vendo o progresso (04/10/2026). Sai do mapa de rotas, e não de uma
     lista à mão: quem constrói uma tela não precisa lembrar de marcá-la, e uma marca esquecida não mente.
+
+    As molduras da Performance (porta única) só contam com a porta ligada (`moldura.SO_COM_A_PORTA`): sem a chave elas
+    abrem o aviso "ainda não ligada", e o verde mentiria (revisão de 10/10/2026). A configuração não muda depois do boot,
+    então a conta continua sendo uma só.
     """
     from werkzeug.exceptions import HTTPException
 
+    from .moldura import SO_COM_A_PORTA, estado_da_porta
+
+    porta_ligada = estado_da_porta(app.config)["ligada"]
     rotas = app.url_map.bind("localhost")
     prontas = set()
     for torre in app.extensions["nexus_torres"]:
@@ -46,8 +53,9 @@ def telas_com_conteudo(app) -> frozenset[str]:
                 endpoint, _ = rotas.match(url, method="GET")
             except HTTPException:
                 continue
-            if endpoint != f"torre_{torre.id}.placeholder":
-                prontas.add(url)
+            if endpoint == f"torre_{torre.id}.placeholder" or (endpoint in SO_COM_A_PORTA and not porta_ligada):
+                continue
+            prontas.add(url)
     return frozenset(prontas)
 
 

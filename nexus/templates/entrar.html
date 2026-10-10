@@ -9,13 +9,16 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
   <script>
     {% include "_tema_cabeca.html" %}
+    {% include "_raiz_js.html" %}
     // O login nunca fica dentro de uma moldura do próprio Nexus (o OS Creator, o card da OS): quando a sessão acaba com
     // a pessoa numa delas, a JANELA vai ao login, que depois volta para a página que estava aberta, com o mesmo motivo.
+    // O endereço do login passa pelo nexusRota (debaixo do /nexus, escrito a partir da raiz, caía na plataforma); o
+    // `next` é o caminho da janela como o navegador o vê, que o Entrar aceita com ou sem o prefixo.
     (function () {
       try {
         if (window.top === window.self) return;
         var t = window.top.location, motivo = {{ (motivo or '')|tojson }};
-        window.top.location.replace("/entrar?next=" + encodeURIComponent(t.pathname + t.search)
+        window.top.location.replace(nexusRota("/entrar") + "?next=" + encodeURIComponent(t.pathname + t.search)
                                     + (motivo ? "&motivo=" + encodeURIComponent(motivo) : ""));
       } catch (e) {}
     })();
@@ -27,19 +30,19 @@
   <h1 class="titulo-pagina">Nexus</h1>
   <p class="mudo">Operação e manutenção da Grid Co. numa casca só.</p>
   {% if aviso %}<p class="entrar-aviso" role="status">{{ aviso }}</p>{% endif %}
-  {% set acao = '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
+  {% set acao = raiz ~ '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
   {% if admin %}
-  <form method="post" action="{{ acao }}">
+  <form method="post" action="{{ acao|na_raiz }}">
     <label class="gc-rotulo" for="senha">Senha de administrador</label>
     <input id="senha" name="senha" type="password" class="gc-campo" autocomplete="current-password"
            autofocus required {% if erro %}aria-invalid="true" aria-describedby="erro"{% endif %}>
     {% if erro %}<p id="erro" class="gc-ajuda gc-ajuda--erro">{{ erro }}</p>{% endif %}
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar</button>
   </form>
-  <p class="entrar-alt"><a href="/entrar{% if destino and destino != '/' %}?next={{ destino|urlencode }}{% endif %}">Entrar com o login do Fracttal</a></p>
+  <p class="entrar-alt"><a href="{{ raiz }}/entrar{% if destino and destino != '/' %}?next={{ destino|urlencode }}{% endif %}">Entrar com o login do Fracttal</a></p>
   {% else %}
   {# o login do Fracttal: o mesmo e-mail e a mesma senha do Fracttal e do OS Creator (06/10/2026) #}
-  <form method="post" action="{{ acao }}">
+  <form method="post" action="{{ acao|na_raiz }}">
     <label class="gc-rotulo" for="email">E-mail do Fracttal</label>
     <input id="email" name="email" type="email" class="gc-campo" autocomplete="username" value="{{ email or '' }}"
            {% if not email %}autofocus{% endif %} required>
@@ -50,8 +53,26 @@
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar com o Fracttal</button>
   </form>
   <p class="entrar-alt mudo">O mesmo login do Fracttal e do OS Creator. A senha vai direto ao Fracttal e não é guardada.<br>
-    <a href="/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
+    <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
   {% endif %}
 </main>
+{% if plataforma_sair is not none %}
+{# Porta única (revisão de 10/10/2026): quem chega ao Entrar não herda a sessão do passe de quem usou este navegador
+   antes. O POST em /painel/nexus/sair da plataforma (mesma origem, como o Sair) encerra a sessão do passe; a da senha
+   da plataforma fica. Em outra origem nada sai (a sessão do passe só existe na mesma). Regra em auth._tela_entrar. #}
+<form id="porta-sair-ao-entrar" method="post" action="{{ plataforma_sair }}/painel/nexus/sair" hidden></form>
+<script>
+(function () {
+  var f = document.getElementById("porta-sair-ao-entrar");
+  try {
+    // URL completa: no servidor, uma camada fora do repositório põe /nexus em todo fetch começado por "/"
+    var alvo = new URL(f.getAttribute("action"), location.href);
+    if (alvo.origin !== location.origin) return;
+    fetch(alvo.href, {method: "POST", credentials: "same-origin", redirect: "manual", keepalive: true})
+      .catch(function () { /* a plataforma fora: o Entrar segue */ });
+  } catch (e) { /* navegador sem URL/fetch: o Entrar segue */ }
+})();
+</script>
+{% endif %}
 </body>
 </html>

@@ -4,8 +4,8 @@
 {% block conteudo %}
 {# O OS Creator dentro do Nexus, com o menu lateral à vista (Levi, 30/09). A ponte (ponte.py) faz o clone tratar
    esta moldura como a janela dele: a casca liga as abas e o login fica aqui dentro. #}
-<iframe class="os-moldura" src="{{ destino }}" title="OS Creator: {{ tela.nome }}"></iframe>
-<noscript><p class="mudo">O OS Creator precisa de JavaScript. <a href="{{ destino }}">Abrir em tela cheia</a>.</p></noscript>
+<iframe class="os-moldura" src="{{ (destino)|na_raiz }}" title="OS Creator: {{ tela.nome }}"></iframe>
+<noscript><p class="mudo">O OS Creator precisa de JavaScript. <a href="{{ (destino)|na_raiz }}">Abrir em tela cheia</a>.</p></noscript>
 <script type="application/json" id="os-menu">{{ menu_os|tojson }}</script>
 <script>
 /* O menu lateral do OS Creator abre a tela como ABA NOVA na faixa do OS Creator já aberta, sem recarregar a página

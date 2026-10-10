@@ -20,10 +20,11 @@ import time
 from collections import defaultdict, deque
 from urllib.parse import urlsplit
 
-from flask import (Blueprint, current_app, jsonify, redirect, render_template, request, session,
+from flask import (Blueprint, current_app, jsonify, make_response, redirect, render_template, request, session,
                    url_for)
 
 from . import fracttal
+from ..prefixo import na_raiz, raiz
 
 bp = Blueprint("auth", __name__)
 
@@ -73,6 +74,18 @@ def next_seguro(valor: str | None) -> str:
     return valor
 
 
+def destino_seguro(valor: str | None) -> str:
+    """O `next_seguro` como o navegador o pede: debaixo do prefixo, `/t/x` vira `/nexus/t/x` (e o que já vem com ele,
+    como o `next` que a camada da T.I. reescreve, fica como está). Para todo redirecionamento a um `next`/`voltar`."""
+    return na_raiz(next_seguro(valor))
+
+
+def os_cookie_path() -> str:
+    """O caminho do cookie do OS Creator embutido (`os_sessao`): o /os do Nexus, debaixo do prefixo em que ele roda.
+    Com `/os` fixo, debaixo de `/nexus` ele não ia ao `/nexus/os/...` e ia ao `/os/` da PLATAFORMA (spec 5.1)."""
+    return raiz() + "/os"
+
+
 def _admins() -> set[str]:
     return {e.strip().lower() for e in str(current_app.config.get("NEXUS_ADMINS") or "").split(",") if e.strip()}
 
@@ -114,7 +127,8 @@ def encerrar(motivo: str | None = None, destino: str | None = None, json: bool |
         session["motivo_entrar"] = motivo
     q = {}
     if destino and not json and next_seguro(destino) != "/":
-        q["next"] = next_seguro(destino)
+        # o `next` como o navegador o vê (com o prefixo), como o do portão; o Entrar aceita com ou sem ele
+        q["next"] = destino_seguro(destino)
     if motivo:
         q["motivo"] = motivo
     url = url_for("auth.entrar", **q)
@@ -124,8 +138,11 @@ def encerrar(motivo: str | None = None, destino: str | None = None, json: bool |
         resp.status_code = 401
     else:
         resp = redirect(url)
-    resp.delete_cookie("os_sessao", path="/os")      # o OS Creator sai junto
-    return resp
+    # o OS Creator sai junto: o cookie dele mora no /os do Nexus, debaixo do prefixo (porta única, spec 5.1); com "/os"
+    # fixo, debaixo de /nexus o delete não casava com o cookie e a sessão do OS Creator ficava
+    resp.delete_cookie("os_sessao", path=os_cookie_path())
+    # e o nexus_sessao velho de Path=/ (entre publicar o código e pôr a NEXUS_PREFIXO), como no Sair
+    return _sem_a_sessao_velha_da_raiz(resp)
 
 
 def _fim_do_fracttal() -> tuple[str | None, object]:
@@ -151,7 +168,8 @@ def _fim_do_fracttal() -> tuple[str | None, object]:
     if caminho == "/os/login" and request.method == "GET":
         # o login do OS Creator é o do Nexus, e a pessoa já entrou nos dois: segue para onde ia (o "entre com o seu login
         # do Fracttal" das telas leva para cá com a volta no next)
-        return None, redirect(next_seguro(request.args.get("next")) if request.args.get("next") else "/os/")
+        # (o `next` do clone vem sem o prefixo; o redirecionamento sai com ele, como o navegador pede)
+        return None, redirect(destino_seguro(request.args.get("next")) if request.args.get("next") else na_raiz("/os/"))
     return None, None
 
 
@@ -173,7 +191,7 @@ def _entrar_fracttal(destino):
         conta = fracttal.entrar(current_app._get_current_object(), email, request.form.get("senha") or "")
     except fracttal.LoginRecusado as e:
         _erros()[_ip()].append(time.monotonic())
-        return render_template("entrar.html", erro=str(e), email=email, destino=destino), 401
+        return _tela_entrar(erro=str(e), email=email, destino=destino), 401
     _erros().pop(_ip(), None)
     session.clear()
     session.permanent = True
@@ -185,11 +203,27 @@ def _entrar_fracttal(destino):
     sup = _supervisor_padrao(conta["email"], conta["nome"])
     if sup:
         session["supervisor_padrao"] = sup
-    resp = redirect(destino)
+    resp = redirect(na_raiz(destino))
     nome, valor, idade = conta["cookie"]
     # a sessão do OS Creator (o JWT do Fracttal) nasce junto: o /os/ e a aprovação de PT abrem sem pedir de novo
-    resp.set_cookie(nome, valor, max_age=idade, path="/os", httponly=True, samesite="Lax",
+    resp.set_cookie(nome, valor, max_age=idade, path=os_cookie_path(), httponly=True, samesite="Lax",
                     secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    return _sem_a_sessao_velha_da_raiz(resp)
+
+
+def _sem_a_sessao_velha_da_raiz(resp):
+    """Debaixo do prefixo, apaga também o `nexus_sessao` de Path=/ (revisão de 10/10/2026).
+
+    Entre publicar o código e pôr a NEXUS_PREFIXO (DEPLOY 5a), quem entrou recebeu o cookie em Path=/ (atrás do Caddy
+    que corta o /nexus, a raiz é ''). Depois, o Nexus grava em Path=/nexus, mas o velho continua indo a /nexus/* e
+    continua válido (mesma NEXUS_SECRET_KEY, até 12 h): o Sair apagava só o novo, e a pessoa seguia logada, talvez
+    como admin; num PC de campo, o próximo entrava com a sessão do anterior. Na raiz (o PC, a fase 4) o cookie de Path=/
+    É o da sessão: nada a fazer. O nome é o do Nexus; o `session` da plataforma não é tocado. Só quando o pedido trouxe
+    o cookie (o navegador não diz o caminho dele): quem chega sem nenhum não ganha um Set-Cookie a mais."""
+    cfg = current_app.config
+    if raiz() and cfg["SESSION_COOKIE_NAME"] in request.cookies:
+        resp.delete_cookie(cfg["SESSION_COOKIE_NAME"], path="/", secure=bool(cfg.get("SESSION_COOKIE_SECURE")),
+                           httponly=True, samesite=cfg.get("SESSION_COOKIE_SAMESITE"))
     return resp
 
 
@@ -201,12 +235,11 @@ def entrar():
         guardado = session.pop("motivo_entrar", None)
         motivo = request.args.get("motivo")
         motivo = motivo if motivo in MOTIVOS else (guardado if guardado in MOTIVOS else None)
-        return render_template("entrar.html", erro=None, destino=destino, admin=admin, motivo=motivo,
-                               aviso=MOTIVOS.get(motivo))
+        return _tela_entrar(erro=None, destino=destino, admin=admin, motivo=motivo, aviso=MOTIVOS.get(motivo))
 
     ip = _ip()
     if _bloqueado(ip):
-        return render_template("entrar.html", erro="Muitas tentativas. Aguarde 15 minutos.",
+        return _tela_entrar(erro="Muitas tentativas. Aguarde 15 minutos.",
                                destino=destino, admin=admin), 429
 
     if request.form.get("email") is not None:
@@ -216,22 +249,47 @@ def entrar():
     certa = current_app.config["NEXUS_SENHA_ADMIN"]
     if not hmac.compare_digest(senha.encode(), certa.encode()):
         _erros()[ip].append(time.monotonic())
-        return render_template("entrar.html", erro="Senha incorreta.", destino=destino, admin=True), 401
+        return _tela_entrar(erro="Senha incorreta.", destino=destino, admin=True), 401
 
     _erros().pop(ip, None)
     session.clear()
     session.permanent = True
     session["logado"] = True
     session["admin"] = True
-    return redirect(destino)
+    return _sem_a_sessao_velha_da_raiz(redirect(na_raiz(destino)))
+
+
+def _tela_entrar(**contexto):
+    """A página do Entrar. Com a porta única ligada, ela encerra a sessão do passe que estiver aberta na plataforma neste
+    navegador (`plataforma_sair`, revisão de 10/10/2026): num PC compartilhado (a sala do NOC), A não clica em Sair, a
+    sessão dele no Nexus vence e B entra; a de A na plataforma valia mais 12 h, e todo acesso direto à plataforma
+    (favorito, aba aberta) seguia como A, com o e-mail de A no diário. Sem a chave, a página de sempre."""
+    return render_template("entrar.html", plataforma_sair=_plataforma_para_sair(), **contexto)
+
+
+def _plataforma_para_sair() -> str | None:
+    """A base da plataforma de Performance quando a porta única está ligada ('' = a mesma origem), ou None. A mesma
+    conta das telas (`estado_da_porta`, com a conferência da origem deste pedido, revisão de 10/10/2026): com a
+    NEXUS_PLATAFORMA_URL interna e o Nexus aberto por fora, o POST do Sair iria à máquina de quem está saindo."""
+    from ..torres.moldura import estado_da_porta
+    estado = estado_da_porta()
+    return estado["plataforma"] if estado["ligada"] else None
 
 
 @bp.route("/sair")
 def sair():
     session.clear()
-    resp = redirect(url_for("auth.entrar"))
-    resp.delete_cookie("os_sessao", path="/os")      # sai do OS Creator junto
-    return resp
+    plataforma = _plataforma_para_sair()
+    if plataforma is None:
+        resp = redirect(url_for("auth.entrar"))
+    else:
+        # Porta única (spec 5.2): o Sair do Nexus passa por /painel/nexus/sair da plataforma (POST, mesma origem), que
+        # encerra a sessão que o passe abriu lá; sem isso, quem sai do Nexus continuava gravando na Performance pelo
+        # mesmo navegador por até 12 h. A página faz o POST e segue para o Entrar (sem JavaScript, um botão).
+        resp = make_response(render_template("sair.html", plataforma=plataforma))
+        resp.headers["Cache-Control"] = "no-store"
+    resp.delete_cookie("os_sessao", path=os_cookie_path())      # sai do OS Creator junto
+    return _sem_a_sessao_velha_da_raiz(resp)
 
 
 def instalar_portao(app) -> None:
@@ -240,7 +298,8 @@ def instalar_portao(app) -> None:
         if request.endpoint in ROTAS_PUBLICAS:
             return None
         if not session.get("logado"):
-            return redirect(url_for("auth.entrar", next=request.full_path.rstrip("?")))
+            # o `next` como o navegador o vê (com o prefixo): o endereço a que a pessoa volta depois de entrar
+            return redirect(url_for("auth.entrar", next=na_raiz(request.full_path.rstrip("?"))))
         if request.path == "/os/logout":
             # o "sair" do OS Creator ("Sair do Fracttal nesta área") sai do Nexus também, como o Sair do Nexus sai do OS
             # Creator: sair, de qualquer lugar, sai de tudo

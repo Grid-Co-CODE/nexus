@@ -9,7 +9,7 @@
       <tbody>
         {% for u in v.tabela %}
         <tr class="mp-tab-lin mp-tab--{{ u.nivel }}">
-          <th scope="row"><a class="cl-link" href="{{ u.href }}">{{ u.nome }}</a><span class="cl-onde">{{ u.onde }}</span></th>
+          <th scope="row"><a class="cl-link" href="{{ (u.href)|na_raiz }}">{{ u.nome }}</a><span class="cl-onde">{{ u.onde }}</span></th>
           <td><span class="mp-risco mp-risco--{{ u.nivel }}"><span class="mp-chave mp-n-{{ u.nivel }}" aria-hidden="true"></span>{{ u.rotulo }}</span></td>
           <td class="mp-tab-motivo">{{ u.motivo_curto }}</td>
         </tr>

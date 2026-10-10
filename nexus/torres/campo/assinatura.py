@@ -14,6 +14,7 @@ from urllib.parse import quote, urlsplit
 from flask import Blueprint, current_app, jsonify, redirect, request, session
 
 from ...campo import decisao_pt, pt_fracttal, visao
+from ...prefixo import na_raiz, sem_raiz
 
 bp_assinatura = Blueprint("campo_assinatura", __name__)
 
@@ -73,12 +74,13 @@ def _rpc_de_quem_olha(jwt: str, email: str):
 
 
 def _tela(numero) -> str:
-    return f"/t/campo/pt/{quote(str(numero), safe='')}"
+    return na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
 
 
 def _login(numero) -> str:
-    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar
-    return "/os/login?next=" + quote(f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar", safe="")
+    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar. O `next` vai SEM o prefixo
+    # (é o caminho que o clone entende); o endereço do login, com ele (é o navegador que o pede)
+    return na_raiz("/os/login") + "?next=" + quote(f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar", safe="")
 
 
 @bp_assinatura.route("/os/_nexus/quem")
@@ -118,8 +120,9 @@ def assinatura_tecnico(numero):
 def voltar_para():
     """Depois do login do Fracttal (o OS Creator só devolve para /os/...), de volta à tela do Nexus de onde se veio.
     Só endereço da torre Campo: nada de mandar para fora."""
-    para = request.args.get("para") or ""
-    return redirect(para if para.startswith("/t/campo/") and not para.startswith("//") else "/t/campo/aprovacao")
+    # o `para` é o location.pathname da tela, que debaixo do prefixo vem com ele (/nexus/t/campo/...)
+    para = sem_raiz(request.args.get("para") or "")
+    return redirect(na_raiz(para if para.startswith("/t/campo/") and not para.startswith("//") else "/t/campo/aprovacao"))
 
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/voltar")
@@ -130,8 +133,11 @@ def voltar(numero):
 def _volta(numero) -> str:
     """De volta à tela de onde se decidiu (a lista de APR e PT do HSEQ, com os filtros dela) ou à da PT. Só endereço do
     próprio Nexus: nada de mandar para fora."""
-    para = request.form.get("volta") or ""
-    return para if para.startswith(("/t/hseq/", "/t/campo/")) and not para.startswith("//") else _tela(numero)
+    # O `volta` do formulário é o request.full_path da tela, SEM o prefixo (e a camada da T.I. pode tê-lo posto):
+    # confere sem ele e devolve com ele. Cru, debaixo do /nexus a decisão gravada mandava a pessoa à plataforma de
+    # Performance (porta única, 10/10/2026: "o Nexus como link principal")
+    para = sem_raiz(request.form.get("volta") or "")
+    return na_raiz(para) if para.startswith(("/t/hseq/", "/t/campo/")) and not para.startswith("//") else _tela(numero)
 
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/decidir", methods=["POST"])

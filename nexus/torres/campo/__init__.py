@@ -22,6 +22,7 @@ from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
+from ...prefixo import na_raiz
 from .aprovar_os import bp_aprovar_os, papel_da_sessao, pode_na_tela
 from .assinatura import bp_assinatura
 
@@ -67,7 +68,7 @@ TELAS_QUE_SAIRAM = ("os", "ranking", "imagens")
 
 
 def _tela_que_saiu():
-    return redirect("/t/campo/atencao")
+    return redirect(na_raiz("/t/campo/atencao"))
 
 
 for _id in TELAS_QUE_SAIRAM:
@@ -273,6 +274,8 @@ SITUACAO_PT = {"aguardando": ("Aguardando", "alerta"), "de_acordo": ("De acordo"
                "negada": ("Não autorizada", "critico"), "vencida": ("Vencida", "neutro")}
 
 
+# sem o prefixo, como o roteamento o entende; todo redirecionamento a ela passa pelo na_raiz (debaixo do /nexus, o
+# endereço cru levava à plataforma de Performance; porta única, 10/10/2026)
 TELA_PT = "/t/hseq/apr-pt"
 
 
@@ -299,7 +302,7 @@ def com_quem_assina(pts: list) -> list:
 @bp.route("/pt")
 def pt():
     """O endereço antigo das Permissões de trabalho: a tela foi para Segurança · HSEQ > APR e PT (09/10/2026)."""
-    return redirect(TELA_PT + ("?" + request.query_string.decode() if request.query_string else ""))
+    return redirect(na_raiz(TELA_PT) + ("?" + request.query_string.decode() if request.query_string else ""))
 
 
 def pagina_pt():
@@ -382,17 +385,17 @@ def pt_apr_pdf(numero):
         corpo, nome = pt_fracttal.apr_pdf(p["os"], p.get("criada"))
     except pt_fracttal.SemArquivo as e:
         session["pt_aviso"] = f"Sem a APR: {e}."
-        return redirect(request.referrer if (request.referrer or "").startswith(request.host_url) else TELA_PT)
+        return redirect(request.referrer if (request.referrer or "").startswith(request.host_url) else na_raiz(TELA_PT))
     except Exception as e:      # noqa: BLE001 — Fracttal fora ou recusando
         session["pt_aviso"] = f"Não consegui buscar a APR no Fracttal ({type(e).__name__}). Tente de novo em instantes."
-        return redirect(request.referrer if (request.referrer or "").startswith(request.host_url) else TELA_PT)
+        return redirect(request.referrer if (request.referrer or "").startswith(request.host_url) else na_raiz(TELA_PT))
     arq = re.sub(r"[^A-Za-z0-9._ -]+", "", nome).strip().replace(" ", "-") or f"APR-{numero}"
     return Response(corpo, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="{arq}.pdf"'})
 
 
 def url_for_pt(numero) -> str:
     from urllib.parse import quote
-    return f"/t/campo/pt/{quote(str(numero), safe='')}"
+    return na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
 
 
 @bp.route("/pt/<numero>")
@@ -569,7 +572,7 @@ def ronda_avulsa_lancar():
         try:
             nova = ronda_avulsa.lancar(request.form, usuario)
             session["avulsa_aviso"] = f"Ronda avulsa lançada: {_dia_curto(nova['data'])}, das {nova['inicio'][11:16]} às {nova['fim'][11:16]}."
-            return redirect("/t/campo/rondas/avulsa", code=303)
+            return redirect(na_raiz("/t/campo/rondas/avulsa"), code=303)
         except ronda_avulsa.Recusada as e:
             erro = str(e)
         except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nada some calado
@@ -600,7 +603,7 @@ def ronda_avulsa_anular(rid):
             minhas=[], explicacao_avulsa=ronda_avulsa.EXPLICACAO, hoje="", piso="", tipos=(), valas=(), sensores=[],
             duracao=_duracao, comentario_max=ronda_avulsa.COMENTARIO_MAX)), 400
     session["avulsa_aviso"] = "Ronda avulsa anulada: ela sai das telas e a anulação fica registrada no banco."
-    return redirect("/t/campo/rondas/avulsa", code=303)
+    return redirect(na_raiz("/t/campo/rondas/avulsa"), code=303)
 
 
 @bp.route("/rondas/os/<int:os_>/fotos")

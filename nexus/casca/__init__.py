@@ -6,7 +6,8 @@ from functools import lru_cache
 from flask import (Blueprint, abort, current_app, jsonify, redirect, render_template, request,
                    session)
 
-from ..auth import next_seguro
+from ..auth import destino_seguro
+from ..prefixo import raiz
 from ..cadeiras import CADEIRAS
 from ..torres import montar_menu, telas_com_conteudo
 
@@ -51,7 +52,7 @@ def cadeira():
     if escolhida and escolhida not in CADEIRAS:
         abort(400)
     session["cadeira"] = escolhida or None
-    return redirect(next_seguro(request.form.get("voltar")))
+    return redirect(destino_seguro(request.form.get("voltar")))
 
 
 @bp.route("/tema", methods=["POST"])
@@ -61,7 +62,7 @@ def tema():
     escolhido = request.form.get("tema", "")
     if escolhido not in TEMAS:
         abort(400)
-    resp = redirect(next_seguro(request.form.get("voltar")))
+    resp = redirect(destino_seguro(request.form.get("voltar")))
     # sem HttpOnly de propósito: o botão troca o tema no navegador e grava este mesmo cookie
     resp.set_cookie(COOKIE_TEMA, escolhido, max_age=UM_ANO_S, path="/", samesite="Lax",
                     secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
@@ -92,4 +93,7 @@ def instalar_contexto(app) -> None:
             # a volta do formulário do tema (sem JavaScript) para a mesma tela, com os filtros
             "caminho_completo": request.full_path.rstrip("?"),
             "tema": tema_do_pedido(),
+            # o prefixo em que o Nexus roda ('' na raiz, '/nexus' no servidor): todo href/src/action absoluto dos templates
+            # começa por ele, e o JavaScript o recebe em window.NEXUS_RAIZ (_raiz_js.html). Ver nexus/prefixo.py
+            "raiz": raiz(),
         }

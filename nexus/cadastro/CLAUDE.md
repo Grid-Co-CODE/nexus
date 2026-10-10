@@ -37,6 +37,12 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 
 ## Regras que já custaram caro
 
+- **Endereço nunca a partir da raiz** (porta única, 09/10/2026): as fichas, a lista, as Ligações, a Prévia, a
+  Qualidade e a Visão saem com `{{ raiz }}`/`url_for`/`|na_raiz`, e os redirecionamentos de `telas.py` e
+  `telas_ligacoes.py`, com `na_raiz` (no servidor o Nexus mora em `/nexus`).
+  Regra completa em `nexus/casca/CLAUDE.md` (o prefixo `/nexus`); o esquecimento quebra `tests/test_prefixo.py`.
+- **Base · Chaves das fontes** (`chaves-fontes`, 09/10/2026) não é tela do cadastro: é o `/tokens` da Plataforma de
+  Performance numa moldura, só para administrador do Nexus (`nexus/performance/CLAUDE.md`, seção "Porta única").
 - **ID simples por cadastro** (1, 2, 3...). O IDUsina da planilha (UFV-001) fica em `id_bd` e é a chave da
   reimportação. Cliente tem cadastro próprio, com ID, porque há usinas de mesmo nome de clientes diferentes.
 - **A chave de tudo é o ID numérico do cadastro** (decisão do Levi, 04/10: inner join por ID). O código da usina e o

@@ -140,6 +140,10 @@ também de APR". A tela das Permissões de trabalho do Campo · App veio para c�
 para cá com os filtros). O código continua em `nexus/torres/campo` (`pagina_pt`, a aprovação `/t/campo/pt/<número>`,
 os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra das contas é a de
 `nexus/torres/campo/CLAUDE.md`.
+- **Debaixo do `/nexus`** (porta única, 10/10/2026): o detalhe da PT esperando pede a assinatura, o `decidir` e o
+  `quem` com o prefixo (`{{ raiz }}` e `nexusRota`), e a volta depois da decisão sai do `na_raiz` (o `volta` do
+  formulário vem sem o prefixo; `nexus/torres/campo/CLAUDE.md`, "Debaixo do /nexus"). Os redirecionamentos da torre
+  (Extintores, relatório) também passam pelo `na_raiz`: regra das torres em `nexus/torres/CLAUDE.md`.
 - **Título:** "Permissões de trabalho e Análise Preliminar de Risco" (no menu, "APR e PT").
 - **Colunas PT e APR** no lugar do "PDF", cada uma com o Baixar dela: a PT é o PDF que o App anexa no De acordo
   ("Permissão de Trabalho <número>"; PT negada não tem); a APR é o PDF que o App anexa desde a v251 ("APR OS 15223

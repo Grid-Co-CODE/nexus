@@ -21,7 +21,7 @@
 <h2 class="ui-kicker">Torres</h2>
 <div class="grade-torres">
   {% for t in torres %}
-  <a class="card-torre" href="/t/{{ t.id }}/{{ t.telas[0].id }}">
+  <a class="card-torre" href="{{ raiz }}/t/{{ t.id }}/{{ t.telas[0].id }}">
     <div class="cab"><i class="ph ph-{{ t.icone }}"></i><span class="nome">{{ t.nome }}</span>
       <span class="qtd gc-num">{{ t.telas|length }} telas</span></div>
     <p>{{ t.descricao }}</p>

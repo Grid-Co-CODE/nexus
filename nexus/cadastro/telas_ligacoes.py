@@ -11,6 +11,7 @@ from flask import current_app, redirect, render_template, request
 
 from . import banco as B
 from . import ligacoes as L
+from ..prefixo import na_raiz
 from .telas import _quem, _tela
 
 ABAS = (("buracos", "Buracos"), ("por-nome", "Ligado por nome"), ("fora", "Usinas fora"), ("decisoes", "Decisões"))
@@ -31,7 +32,7 @@ def _hora(iso):
 def _volta(**k):
     q = {x: request.form.get(x, "") for x in ("aba", "sistema") if request.form.get(x)}
     q.update({x: y for x, y in k.items() if y})
-    return redirect("/t/base/ligacoes?" + urlencode(q), code=303)
+    return redirect(na_raiz("/t/base/ligacoes") + "?" + urlencode(q), code=303)
 
 
 def registrar_ligacoes(bp):
