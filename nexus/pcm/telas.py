@@ -299,10 +299,18 @@ def registrar_pcm(bp) -> None:
             linhas.append(dict(r, _dia=S.NOMES_DIA.get(d, r.get("dia") or ""), _situacao=S.situacao(r),
                                _duracao=_h(r.get("duracao"))))
         rows = sem.get("rows") or []
+        # as opções de cada filtro com os OUTROS aplicados, e quantas tarefas cada uma tem (09/10/2026)
+        fac = S.facetas(sem, filtros)
+
+        def _com(lista, campo):
+            return [x for x in lista if fac[campo].get(x[0]) or x[0] == filtros.get(campo)]
+
         opcoes = {
-            "equipes": sorted({str(r.get("cluster")) for r in rows if r.get("cluster")}),
-            "tipos": sorted({str(r.get("tipo")) for r in rows if r.get("tipo")}),
-            "dias": [(d, S.NOMES_DIA[d]) for d in S.DIAS], "situacoes": SITUACOES,
+            "equipes": _com([(e, fac["equipe"][e]) for e in sorted(set(fac["equipe"]) | {filtros["equipe"]} - {None})],
+                            "equipe"),
+            "tipos": _com([(t, fac["tipo"][t]) for t in sorted(set(fac["tipo"]) | {filtros["tipo"]} - {None})], "tipo"),
+            "dias": _com([(d, S.NOMES_DIA[d], fac["dia"][d]) for d in S.DIAS], "dia"),
+            "situacoes": _com([(v, rot, fac["status"][v]) for v, rot in SITUACOES], "status"),
         }
         return render_template("pcm/tarefas.html", sem=sem, semanas=S.semanas(leitura.dados), linhas=linhas,
                                total=len(todas), total_semana=len(rows), pagina=pagina, paginas=paginas,
@@ -422,8 +430,9 @@ def _ctx_gestao(cfg, args) -> dict:
         _G_CACHE.clear()
         _G_CACHE["versao"] = versao
     escopo = _guardado(("escopo", versao), lambda: G.escopo(d.get("tarefas")))
-    escolhas = _guardado(("escolhas", versao), lambda: G.escolhas_topo(escopo))
     topo = {k: str(args.get(k) or "")[:160] for k in G.TOPO}
+    # as opções de cada filtro de cima com os OUTROS aplicados (09/10/2026: "os filtros tem que se auto filtrar")
+    escolhas = _guardado(("escolhas", versao, *topo.values()), lambda: G.escolhas_topo(escopo, topo))
     tarefas = _guardado(("topo", versao, *topo.values()), lambda: G.filtrar_topo(escopo, **topo))
     base = _guardado(("base", versao, *topo.values(), *meses), lambda: G.base(tarefas, meses))
     mp, ger_erro = _gerencial(cfg)
@@ -452,7 +461,7 @@ def _ctx_gestao(cfg, args) -> dict:
                tem_topo=any(topo.values()), corte=d.get("corteData"))
     if o.modo == "plano":
         ctx.update(mx=G.plano(base, o, meses, G.crit_obs(mp) if mp is not None else None), rot_col=G.rot_col,
-                   faixa=G.faixa)
+                   faixa=G.faixa, tom=G.tom)
     else:
         ctx.update(fila=G.fila_filtrada(fila, o))
     return ctx
@@ -583,8 +592,17 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
              "dias": [[d, Q.NOMES_DIA[d]] for d in Q.DIAS_REPROGRAMAR], "turnos": list(Q.TURNOS), "itens": q["itens"],
              "oss": q["oss"],
              "feito": feito in ("salvo", "aplicado")}
-    ctx["fonte_frase"] = ("Reprogramar daqui não muda nada na hora: vira linha de observação, que só o PCM grava, e vale "
-                          "onde a fila diz.")
+    # para onde vai a reprogramação desta semana, dito com o nome do lugar (Levi, 09/10/2026, sobre a frase anterior,
+    # "vira linha de observação, que só o PCM grava, e vale onde a fila diz": "Onde o PCM tem essa informação?")
+    ctx["fonte_frase"] = {
+        "atual": "Reprogramar não muda o quadro na hora: o PCM grava a fila nos ajustes da semana em curso (o "
+                 "Observacoes_Semana_Atual.txt do repositório do PCM) e o robô do PCM aplica na rodada seguinte. O que já "
+                 "foi gravado fica em \"Já gravadas para esta semana\", no fim da página.",
+        "nexus": "Reprogramar não muda o quadro na hora: o PCM grava a fila nas observações desta semana no Nexus (Gerar "
+                 "a semana, bloco 2), que valem na próxima geração. O que já foi gravado fica em \"Já gravadas para esta "
+                 "semana\", no fim da página.",
+        "copiar": "Esta semana foi gerada no PC do PCM: a fila de reprogramação é para copiar e colar no painel do PCM.",
+    }.get(dest["id"], "A semana já acabou: aqui é só para consulta.")
     ctx["ok_link"] = f"/t/pcm/gerar?semana={sem['week']}" if feito == "salvo" else ""
     return dict(ctx, sem=sem, q=q, filtros=filtros, filtro_gestor=filtro_gestor, destino=dest, admin=admin,
                 rodada=base["rodada"], chips=_chips_quadro(base, extra), origem_txt=origem_txt, dados=dados,
@@ -594,7 +612,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
                 url_pendentes="?" + urlencode(dict(sel_qs, pend="1", **({"todos": "1"} if todos else {}))) + "#pendentes",
                 abrir_pendentes=args.get("pend") == "1" or (any(filtros.values()) and q["pend_sel"] <= 80),
                 dias_rp=[(d, Q.NOMES_DIA[d]) for d in Q.DIAS_REPROGRAMAR], turnos=Q.TURNOS,
-                gravadas=Q.gravadas(cfg, sem["week"]) if admin else [], ok=ok, erro=erro)
+                gravadas=Q.gravadas(cfg, sem["week"]), ok=ok, erro=erro)
 
 
 def _ctx_reprogramar(cfg, semana: str, linhas: list, problemas: list, itens_json: str, erro: str | None = None) -> dict:

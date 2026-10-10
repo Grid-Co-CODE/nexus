@@ -44,6 +44,10 @@
     {% endif %}
   {% endif %}
 
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>O painel do PC do PCM grava por cima.</strong>
+    Ele manda o arquivo da pasta do PC, sem ler o repositório: se alguém publicar ajustes por lá depois, as linhas gravadas
+    aqui somem. Com o Nexus gravando, os ajustes da semana em curso saem só daqui.</div></div>
+
   {% if not atual.erro %}
   <h2 class="pcm-h2">Como o arquivo fica</h2>
   <pre class="pcm-pre q-pre">{{ novo }}</pre>

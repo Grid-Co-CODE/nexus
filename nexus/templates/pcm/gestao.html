@@ -104,7 +104,7 @@
 <p class="pg-guia"><span><b>MPM</b> mensal</span><span><b>MPT</b> trimestral</span><span><b>MPS</b> semestral</span><span><b>MPA</b> anual</span>
   {% if o.tipo == 'todos' and o.col == 'sig' %}<span><b>Corretivas</b> resolvidas/criadas (demanda; fora do Geral)</span>{% endif %}
   <span><b>Geral</b> as quatro preventivas somadas</span><span><b>Pendentes</b> o que falta, em número</span>
-  <span><b>Célula</b> {{ val_rot[o.val] }}; MPA e MPS em fração: clique para abrir a Fila da usina</span></p>
+  <span><b>Célula</b> {{ val_rot[o.val] }}{% if o.val == 'pct' %} e, ao lado, feitas/total{% endif %}; na usina, MPA e MPS abrem a Fila</span></p>
 {% endif %}
 
 {% macro th(id, rot, cls='') -%}
@@ -112,14 +112,21 @@
 {%- if id == 'nome' %}{% set prox = '1' if ativo and not o.desc else '0' %}{% else %}{% set prox = '0' if ativo and o.desc else '1' %}{% endif -%}
 <th class="{{ cls }}{{ ' ativo' if ativo }}"{% if ativo %} aria-sort="{{ 'descending' if o.desc else 'ascending' }}"{% endif %}><a href="{{ url(ordem=id, desc=prox) }}">{{ rot }}<i class="ph {{ ('ph-caret-down' if o.desc else 'ph-caret-up') if ativo else 'ph-arrows-down-up' }} pg-ord" aria-hidden="true"></i></a></th>
 {%- endmacro %}
-{% macro td(c, usina=none, sig='') -%}
-<td>{% if c.drill %}<a class="pg-cel pg-fx--{{ c.cls }} pg-frac" href="{{ url(modo='fila', drill=usina, dt=sig, pend=None) }}" title="{{ c.os }}">{{ c.txt }}</a>{% else %}<span class="pg-cel pg-fx--{{ c.cls }}"{% if c.os %} title="{{ c.os }}"{% endif %}>{{ c.txt }}</span>{% endif %}</td>
+{# a célula (09/10/2026, Levi, com o print do painel novo do PCM: "gostaria de uma visão parecida com essa, tanto
+   percentual quanto acompanhamento e destacado por cor"): o % em negrito e, ao lado, feitas/total; o fundo na cor do
+   `tom` (90% ou mais verde, 50% a 89% âmbar, abaixo de 50% vermelho), misturada à superfície como o painel faz #}
+{% macro valor(c) -%}
+{%- if c.p is defined and o.val == 'pct' %}<b class="pg-pct">{{ c.p }}%</b><span class="pg-fr">({{ c.f }}/{{ c.t }})</span>
+{%- else %}{{ c.txt }}{% endif -%}
 {%- endmacro %}
-{% macro fim(geral, tudo) -%}
-<td><span class="pg-cel pg-fx--{{ faixa(geral) }}">{{ '—' if geral is none else geral ~ '%' }}</span></td><td class="pg-pend">{{ tudo.t - tudo.f }}</td>
+{% macro td(c, usina=none, sig='') -%}
+<td>{% if c.drill %}<a class="pg-cel pg-tom--{{ c.tom }} pg-frac" href="{{ url(modo='fila', drill=usina, dt=sig, pend=None) }}" title="{{ c.os }}">{{ valor(c) }}</a>{% else %}<span class="pg-cel pg-tom--{{ c.tom if c.tom is defined else 'nulo' }}"{% if c.os %} title="{{ c.os }}"{% endif %}>{{ valor(c) }}</span>{% endif %}</td>
+{%- endmacro %}
+{% macro fim(geral, tudo, mal=true) -%}
+<td><span class="pg-cel pg-tom--{{ tom(geral) }}">{% if geral is none %}—{% else %}<b class="pg-pct">{{ geral }}%</b><span class="pg-fr">({{ tudo.f }}/{{ tudo.t }})</span>{% endif %}</span></td><td class="pg-pend{{ ' pg-pend--mal' if mal and tudo.t - tudo.f > 0 }}">{{ tudo.t - tudo.f }}</td>
 {%- endmacro %}
 {% set ncol = mx.cols|length + 3 + (1 if tem_ger else 0) %}
-<div class="pg-rolo"><table class="pg-tbl">
+<div class="pg-rolo"><table class="pg-tbl pg-tbl--plano">
   <thead><tr>{{ th('nome', {'cli': 'Cliente ▸ Usina', 'clu': 'Equipe cluster ▸ Usina', 'res': 'Responsável ▸ Usina', 'usi': 'Usina'}[o.dim], 'pg-rotlin') }}
     {% for c in mx.cols %}{{ th(c, rot_col(c)) }}{% endfor %}{{ th('geral', 'Geral') }}{{ th('pend', 'Pendentes') }}
     {% if tem_ger %}<th class="pg-obs">Criticidade · observação</th>{% endif %}</tr></thead>
@@ -139,10 +146,11 @@
     <tr><td colspan="{{ ncol }}" class="pg-vazio">Nada com esse filtro.</td></tr>
   {% endfor %}
   <tr class="pg-total"><td class="pg-rotlin"><b>TOTAL GERAL</b><span class="pg-mini">{{ mx.usinas }} usinas</span></td>
-    {% for c in mx.total.tds %}{{ td(c) }}{% endfor %}{{ fim(mx.total.geral, mx.total.tudo) }}{% if tem_ger %}<td class="pg-obs"></td>{% endif %}</tr>
+    {% for c in mx.total.tds %}{{ td(c) }}{% endfor %}{{ fim(mx.total.geral, mx.total.tudo, false) }}{% if tem_ger %}<td class="pg-obs"></td>{% endif %}</tr>
   </tbody></table></div>
-<p class="pg-leg"><span><i class="pg-amostra pg-fx--crit"></i>abaixo de 40%</span><span><i class="pg-amostra pg-fx--and"></i>40% a 99%</span>
-  <span><i class="pg-amostra pg-fx--ok"></i>100%</span><span><i class="pg-amostra pg-fx--nulo"></i>sem preventiva no período</span>
+<p class="pg-leg"><span><i class="pg-amostra pg-tom--ok"></i>90% ou mais</span><span><i class="pg-amostra pg-tom--and"></i>50% a 89%</span>
+  <span><i class="pg-amostra pg-tom--crit"></i>abaixo de 50%</span><span><i class="pg-amostra pg-tom--nulo"></i>sem preventiva no período</span>
+  <span>ao lado do %, feitas/total</span>
   {% if tem_ger %}<span><b>Criticidade · observação</b>: da Gerencial (aba MPAS), a última entrada datada do log</span>{% endif %}
   <span class="pg-fim">clique no grupo para abrir as usinas · na fração de MPA e MPS para abrir a Fila · passe o mouse na célula para ver as OS</span></p>
 <script>

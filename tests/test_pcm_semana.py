@@ -165,3 +165,23 @@ def test_fonte_fora_do_ar_vira_aviso_e_nao_quebra(logado, app, tmp_path):
 def test_tela_sem_login_para_no_portao(cliente):
     resp = cliente.get("/t/pcm/semana")
     assert resp.status_code == 302 and "/entrar" in resp.headers["Location"]
+
+
+# ── filtros em cascata (Levi, 09/10/2026: "Os filtros tem que se auto filtrar também") ─────────────────────
+def test_filtros_de_tarefas_em_cascata():
+    sem = S.achar(banco(), "2026-W40")
+    f = {"equipe": "BA Sul 01", "dia": None, "status": None, "tipo": None, "busca": None, "horario": None}
+    fac = S.facetas(sem, f)
+    # com a equipe escolhida, Tipo e Dia só contam o que é dela
+    assert fac["tipo"] == {"MPS": 1, "Handover": 1, "MPM": 1} and set(fac["dia"]) == {"qua", "qui"}
+    # a equipe não se restringe a si mesma: dá para trocar de equipe sem limpar o resto
+    assert fac["equipe"] == {"SP Leste 02": 4, "BA Sul 01": 3}
+    assert S.facetas(sem, dict(f, equipe=None, tipo="MPA"))["equipe"] == {"SP Leste 02": 1}
+
+
+def test_tela_tarefas_lista_so_as_opcoes_da_equipe(logado, fonte):
+    html = logado.get("/t/pcm/tarefas?equipe=BA+Sul+01").get_data(as_text=True)
+    tipo = html.split('id="f-tipo"', 1)[1].split("</select>", 1)[0]
+    assert ">MPS (1)<" in tipo and "Corretiva" not in tipo and "MPA" not in tipo
+    equipe = html.split('id="f-equipe"', 1)[1].split("</select>", 1)[0]
+    assert ">SP Leste 02 (4)<" in equipe and ">BA Sul 01 (3)<" in equipe

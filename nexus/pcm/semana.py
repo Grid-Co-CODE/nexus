@@ -122,6 +122,21 @@ def por_equipe(sem) -> list[dict]:
     return out
 
 
+def facetas(sem, filtros: dict) -> dict:
+    """{filtro: Counter(valor -> tarefas)} de equipe, dia, status e tipo, cada um contado com os OUTROS filtros
+    aplicados (Levi, 09/10/2026: "Os filtros tem que se auto filtrar também"): escolhida a equipe, o Tipo só lista os
+    tipos dela. O filtro não conta a si mesmo, para dar para trocar de equipe sem limpar o resto."""
+    valor_de = {"equipe": lambda r: str(r.get("cluster") or ""), "dia": lambda r: dia_curto(r.get("dia")),
+                "status": situacao, "tipo": lambda r: str(r.get("tipo") or "")}
+    out = {}
+    for campo, de in valor_de.items():
+        outros = {k: v for k, v in filtros.items() if k != campo}
+        conta = Counter(de(r) for r in tarefas(sem, **outros))
+        conta.pop("", None)
+        out[campo] = conta
+    return out
+
+
 def tarefas(sem, equipe=None, dia=None, status=None, tipo=None, busca=None, horario=None) -> list[dict]:
     termo = _norm(busca)
     out = []

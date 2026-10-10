@@ -242,12 +242,18 @@ form#obs-form>.obs-sec:first-of-type{margin-top:0;padding-top:0;border-top:0}
 
 /* ── Gestão PCM: "Manutenções — Plano & Fila" (07–08/10/2026, frente pcm-gestao) ─────────────────────────────────
    O bloco da aba Gestão PCM do painel do PCM (pg- de "plano e gestão"; nada aqui é compartilhado com outra tela).
-   O painel é claro; aqui as mesmas faixas no navy: vermelho abaixo de 40%, amarelo de 40% a 99%, verde em 100%,
-   cinza sem preventiva. Tabela larga rola dentro do .pg-rolo, nunca a página (375 px). */
+   A célula da matriz (09/10/2026) é a do painel NOVO do PCM (novo.html, gpCel): o % em negrito e, ao lado,
+   feitas/total; o fundo é a cor do tom a 15% sobre a superfície (90% ou mais verde, 50% a 89% âmbar, abaixo de 50%
+   vermelho), com o texto neutro. A 1ª versão tingia o fundo em translúcido E pintava o texto: virava uma colcha de
+   bege, vinho e oliva nos dois temas. Verde = o do semáforo (--ok, frio), não o limão da marca, que colava no amarelo.
+   Tabela larga rola dentro do .pg-rolo, nunca a página (375 px). */
 .pg{--pg-info:var(--info);--pg-info-suave:var(--info-suave);--pg-alerta-suave:var(--alerta-a12);
-  --pg-laranja:var(--laranja);--pg-laranja-suave:var(--laranja-a16);min-width:0}
+  --pg-laranja:var(--laranja);--pg-laranja-suave:var(--laranja-a16);min-width:0;
+  /* o âmbar do tom: no navy o amarelo a 15% vira oliva; o laranja dá o castanho do painel. No claro, o amarelo cheio */
+  --pg-tom-and:var(--laranja)}
+:root[data-tema="claro"] .pg{--pg-tom-and:var(--alerta-cheio)}
 .pg .pcm-topo{align-items:center}
-.pg-t--ok{color:var(--verde-texto)}.pg-t--and{color:var(--alerta)}.pg-t--crit{color:var(--critico)}.pg-t--nulo{color:var(--fraco)}
+.pg-t--ok{color:var(--ok)}.pg-t--and{color:var(--alerta)}.pg-t--crit{color:var(--critico)}.pg-t--nulo{color:var(--fraco)}
 .pg-par .v small{font-size:13px;font-weight:500;letter-spacing:0;color:var(--tinta-2)}
 .pg-par{margin:0 0 12px}
 .pg-nota{margin:0 0 16px}
@@ -324,23 +330,31 @@ tr.pg-total td{position:sticky;bottom:0;z-index:2;background:var(--superficie-3)
   border-top:1px solid var(--linha-forte)}
 tr.pg-total td.pg-rotlin{z-index:3;background:var(--superficie-3)}
 
-/* a célula: a cor segue o percentual (a faixa é do painel) */
-.pg-cel{display:block;margin:0 -10px;padding:0 10px;line-height:32px;font-weight:700;font-size:12px;text-decoration:none;
-  color:inherit;cursor:help}
-.pg-fx--crit{background:var(--critico-suave);color:var(--critico)}
-.pg-fx--and{background:var(--pg-alerta-suave);color:var(--alerta)}
-.pg-fx--ok{background:var(--verde-suave);color:var(--verde-texto)}
-.pg-fx--nulo{color:var(--fraco);font-weight:500}
-a.pg-frac{cursor:pointer;text-decoration:underline dotted 1px;text-underline-offset:3px}
-a.pg-frac:hover{outline:1px solid currentColor;outline-offset:-3px}
+/* a célula: o % e as feitas/total, com o fundo no tom (o texto fica neutro); números à direita, como no painel */
+.pg-tbl--plano td:not(.pg-rotlin):not(.pg-obs):not(.pg-vazio){text-align:right}
+.pg-tbl--plano th:not(.pg-rotlin):not(.pg-obs){text-align:right}
+.pg-tbl--plano th:not(.pg-rotlin):not(.pg-obs) a{justify-content:flex-end}
+.pg-cel{display:block;margin:0 -10px;padding:0 10px;line-height:32px;font-size:12.5px;font-weight:500;text-decoration:none;
+  color:var(--tinta);cursor:help;font-variant-numeric:tabular-nums}
+.pg-pct{font-weight:700;color:var(--tinta)}
+.pg-fr{margin-left:4px;font-size:11px;color:var(--mudo)}
+.pg-tom--ok{background:color-mix(in srgb,var(--ok-cheio) 15%,var(--superficie))}
+.pg-tom--and{background:color-mix(in srgb,var(--pg-tom-and) 15%,var(--superficie))}
+.pg-tom--crit{background:color-mix(in srgb,var(--critico-cheio) 15%,var(--superficie))}
+.pg-tom--nulo{color:var(--fraco)}
+a.pg-frac{cursor:pointer}
+a.pg-frac .pg-fr{text-decoration:underline dotted 1px;text-underline-offset:3px}
+a.pg-frac:hover{box-shadow:inset 0 0 0 2px var(--linha-forte)}
+a.pg-frac:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.pg-tbl td.pg-pend--mal{color:var(--critico)}   /* o que falta, em vermelho quando há (o painel novo faz igual) */
 .pg-critb{display:inline-block;border-radius:var(--raio-tag);padding:1px 7px;font:700 10.5px/16px var(--font-sans);margin-right:7px;
   vertical-align:1px}
 .pg-critb--crit{background:var(--critico-suave);color:var(--critico)}
 .pg-critb--and{background:var(--pg-alerta-suave);color:var(--alerta)}
-.pg-critb--ok{background:var(--verde-suave);color:var(--verde-texto)}
+.pg-critb--ok{background:var(--ok-suave);color:var(--ok)}
 .pg-leg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:8px 0 0;font-size:12px;color:var(--tinta-2)}
 .pg-amostra{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid var(--linha-forte)}
-.pg-amostra.pg-fx--nulo{background:var(--superficie-2)}
+.pg-amostra.pg-tom--nulo{background:var(--superficie)}
 .pg-fim{margin-left:auto;color:var(--mudo)}
 
 /* modo Fila */
@@ -350,7 +364,7 @@ a.pg-frac:hover{outline:1px solid currentColor;outline-offset:-3px}
 .pg-kpi:hover{border-color:var(--linha-forte);background:var(--superficie-2)}
 .pg-kpi b{font:600 24px/30px var(--font-sans)}
 .pg-kpi b small{font-size:13px;font-weight:500;color:var(--mudo)}
-.pg-kpi--crit b{color:var(--critico)}.pg-kpi--and b{color:var(--alerta)}.pg-kpi--ok b{color:var(--verde-texto)}
+.pg-kpi--crit b{color:var(--critico)}.pg-kpi--and b{color:var(--alerta)}.pg-kpi--ok b{color:var(--ok)}
 .pg-kpi[aria-current]{border-color:var(--verde);box-shadow:inset 0 0 0 1px var(--verde)}
 .pg-drill{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:0;padding:8px 12px;border:1px solid var(--linha);
   border-top:0;background:var(--verde-suave);font-size:13px;color:var(--tinta)}
@@ -365,7 +379,7 @@ a.pg-frac:hover{outline:1px solid currentColor;outline-offset:-3px}
 :root[data-tema="claro"] .pg-concl td{opacity:1;background:var(--superficie-2);color:var(--mudo)}
 .pg-dt{font-variant-numeric:tabular-nums}
 .pg-nulo{color:var(--fraco)}
-.pg-ok{color:var(--verde-texto);font-size:15px;vertical-align:-2px}
+.pg-ok{color:var(--ok);font-size:15px;vertical-align:-2px}
 .pg-tipo{display:inline-block;border:1px solid var(--linha-forte);border-radius:var(--raio-tag);padding:0 6px;
   font:700 10.5px/16px var(--font-sans);color:var(--tinta)}
 .pg-div{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--alerta-cheio);margin-left:6px;vertical-align:1px}
@@ -378,7 +392,7 @@ a.pg-frac:hover{outline:1px solid currentColor;outline-offset:-3px}
 .pg-semos{display:inline-block;border:1px dashed var(--linha-forte);border-radius:var(--raio-tag);padding:0 7px;font-size:11px;
   color:var(--tinta-2);white-space:nowrap}
 .pg-sit{display:inline-block;border-radius:var(--raio-tag);padding:1px 8px;font:700 11px/16px var(--font-sans);white-space:nowrap}
-.pg-sit--ok{background:var(--verde-suave);color:var(--verde-texto)}
+.pg-sit--ok{background:var(--ok-suave);color:var(--ok)}
 .pg-sit--info{background:var(--pg-info-suave);color:var(--pg-info)}
 .pg-sit--and{background:var(--pg-alerta-suave);color:var(--alerta)}
 .pg-sit--crit{background:var(--critico-suave);color:var(--critico)}

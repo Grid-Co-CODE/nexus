@@ -219,18 +219,29 @@ def escopo(tarefas) -> list[dict]:
 TOPO = ("cliente", "usina", "cluster", "responsavel")      # os filtros de cima que o Nexus traz da aba do painel
 
 
-def escolhas_topo(tarefas) -> dict[str, list[str]]:
+def escolhas_topo(tarefas, topo: dict | None = None) -> dict[str, list[str]]:
     """As opções de cada filtro de cima. Grafias que só mudam na maiúscula viram UMA, a mais frequente (painel:
-    "PA Norte 01" × "PA NORTE 01"); o filtro compara sem maiúscula, então qualquer uma pega as duas."""
+    "PA Norte 01" × "PA NORTE 01"); o filtro compara sem maiúscula, então qualquer uma pega as duas.
+
+    Com `topo` (os filtros escolhidos), cada filtro lista só o que existe com os OUTROS aplicados (Levi, 09/10/2026:
+    "Os filtros tem que se auto filtrar também"): escolhido o cliente, a Usina e a Equipe cluster só listam as dele. O
+    filtro não restringe a si mesmo (dá para trocar de cliente sem limpar o resto), e o valor escolhido fica na lista."""
+    topo = topo or {}
     out = {}
     for campo in TOPO:
+        outros = {k: v for k, v in topo.items() if k != campo and k in TOPO}
+        base_ = filtrar_topo(tarefas, **outros) if any(outros.values()) else tarefas
         por_baixa: dict[str, dict[str, int]] = {}
-        for t in tarefas:
+        for t in base_:
             v = t.get(campo)
             if v:
                 g = por_baixa.setdefault(str(v).lower(), {})
                 g[str(v)] = g.get(str(v), 0) + 1
-        out[campo] = sorted((max(g, key=g.get) for g in por_baixa.values()), key=sem_acento)
+        valores = sorted((max(g, key=g.get) for g in por_baixa.values()), key=sem_acento)
+        escolhido = str(topo.get(campo) or "")
+        if escolhido and escolhido.lower() not in por_baixa:
+            valores.append(escolhido)
+        out[campo] = valores
     return out
 
 
@@ -288,6 +299,13 @@ def rot_col(c: str) -> str:
 
 def faixa(p) -> str:
     return "nulo" if p is None else ("ok" if p >= 100 else ("crit" if p < 40 else "and"))
+
+
+def tom(p) -> str:
+    """A cor da célula da matriz: a do painel NOVO do PCM (`novo.html`, `gpCel`), que o Levi pediu em 09/10/2026 ("uma
+    visão parecida com essa, tanto percentual quanto acompanhamento e destacado por cor"): 90% ou mais verde, de 50% a
+    89% âmbar, abaixo de 50% vermelho. A `faixa` (40/100, do `preventivas.js`) segue no dado e na prova."""
+    return "nulo" if p is None else ("ok" if p >= 90 else ("and" if p >= 50 else "crit"))
 
 
 def soma(cels) -> dict:
@@ -366,17 +384,19 @@ def celula(c, sig: str, o: Opcoes, usina=None) -> dict:
         return {"txt": "—", "cls": "nulo", "drill": False, "os": ""}
     p = _round(100 * c["f"] / c["t"])
     os_ = ("OS — " + "   ".join(sorted(set(c["os"])))) if c.get("os") else ""
+    # o que a tela mostra no %: o percentual e, ao lado, feitas/total (`p`, `f`, `t`), com o fundo pelo `tom`
+    tela = {"p": p, "f": c["f"], "t": c["t"], "tom": tom(p)}
     if sig == "CORR":
         return {"txt": f"{c['f']}/{c['t']}", "cls": faixa(p), "drill": False,
-                "os": "corretivas: resolvidas/criadas no período · " + os_}
+                "os": "corretivas: resolvidas/criadas no período · " + os_, **tela}
     if o.col == "sig" and sig in ("MPA", "MPS") and o.val == "pct":
         return {"txt": f"{c['f']}/{c['t']}", "cls": faixa(p), "drill": bool(usina),
-                "os": ("abrir a Fila desta usina · " if usina else "") + os_}
+                "os": ("abrir a Fila desta usina · " if usina else "") + os_, **tela}
     v = {"pct": f"{p}%", "pend": c["t"] - c["f"], "fei": c["f"]}.get(o.val, c["t"])
     # Diferença de propósito (revisão de 08/10/2026): o painel põe "sem preventiva no período" em toda célula sem
     # lista de OS, e isso só acontece nas linhas de grupo e no TOTAL GERAL, justamente as que TÊM tarefa ("68%" com a
     # dica dizendo que não há preventiva). Aqui essas células ficam sem dica; a prova desconta essa frase do painel.
-    return {"txt": str(v), "cls": faixa(p), "drill": False, "os": os_}
+    return {"txt": str(v), "cls": faixa(p), "drill": False, "os": os_, **tela}
 
 
 def plano(b, o: Opcoes, meses_, mapa: dict | None = None) -> dict:

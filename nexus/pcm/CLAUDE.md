@@ -34,6 +34,17 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `telas.py` | as telas, penduradas na torre PCM (`registrar_pcm(bp)`) |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá) |
 
+## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
+
+Levi: "Os filtros tem que se auto filtrar também, pelo o que vi nenhum tem relação alguma com outro, está só buscando
+uma string". Cada filtro lista só o que existe com os OUTROS filtros aplicados (escolhida a equipe, o Responsável e o
+Cliente só listam os dela); o filtro não restringe a si mesmo (dá para trocar de equipe sem limpar o resto); a opção
+escolhida fica na lista mesmo quando a combinação não tem nada (a tela não esconde o filtro que está valendo). Vale para:
+Quadro da semana (`quadro.opcoes`, com quantas tarefas cada opção tem), Tarefas e OS (`semana.facetas`, com as contas) e
+os filtros de cima da Gestão PCM (`gestao.escolhas_topo(tarefas, topo)`, sem contas: o número da matriz diz o resto). A
+Semana não tem filtro. Testes: `test_filtros_de_tarefas_em_cascata`, `test_filtros_do_quadro_em_cascata`,
+`test_filtros_de_cima_em_cascata`.
+
 ## Insumos: no Nexus, não em arquivo
 
 Prioridades, Confiabilidade, Feriados e Observações (por semana) moram em `insumos.py`; o Histórico sai do BANCO
@@ -156,8 +167,8 @@ reprogramar tarefas que nem na imagem 1". É o quadro da aba Semana do painel do
 FILTRADO, cartões na ordem do relógio (40 por coluna; "mostrar todas" põe `todos=1`), turno pela hora de início (manhã
 07–12, tarde 12–17, noite 17–07), "Nª sem" pelo campo de vezes, trajetória da tarefa pelas semanas do arquivo (OS + 60
 caracteres da tarefa; vale a última da semana, como o `Map` do painel). Filtros: equipe, responsável, cliente, tipo,
-situação, turno e busca. O gestor de contrato que entra pelo Fracttal já vem filtrado nele (quando o nome casa com a
-coluna Responsável). Semanas: as do `banco_dados.json` e os rascunhos do Nexus (a rodada mais recente de cada semana que
+situação, turno e busca, em cascata (seção acima). O gestor de contrato que entra pelo Fracttal já vem filtrado nele
+(quando o nome casa com a coluna Responsável). Semanas: as do `banco_dados.json` e os rascunhos do Nexus (a rodada mais recente de cada semana que
 ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também as de prova).
 
 - **A semana do PCM vai do sábado 00:00 à sexta** (o processo, Levi com o programador do PCM: a programação nasce na quinta;
@@ -190,7 +201,15 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
 - **Gravar é do PCM** (`session["admin"]`); os outros montam a fila e copiam para mandar ao PCM ("passa para o PCM").
   A semana em curso passa por `reprogramar.html` (o que entra, o que o arquivo tem, como fica) e grava com o sha que a
   pessoa conferiu (mudou no meio: não grava, 409), relê e confere o sha256. O commit não leva e-mail (repositório
-  público). Quem gravou o quê: `reprogramacoes.jsonl` na pasta de trabalho, e "Já gravadas para esta semana" na tela.
+  público). Quem gravou o quê: `reprogramacoes.jsonl` na pasta de trabalho, e "Já gravadas para esta semana" na tela,
+  À VISTA DE TODOS (só gravar é do PCM), cada uma com o lugar onde foi parar.
+- **Onde o PCM vê a reprogramação** (Levi, 09/10: "Onde o PCM tem essa informação?", sobre a frase "vira linha de
+  observação, que só o PCM grava"): a frase da fonte do quadro diz o lugar pelo nome, conforme a semana. Semana em
+  curso: o `Observacoes_Semana_Atual.txt` do repositório do PCM (o robô aplica). Semana que o Nexus gera: as
+  observações da semana no Nexus (Gerar a semana, bloco 2, com link). No painel do PCM a fila é só do navegador: vira
+  texto que o PCM cola no painel do PC, que grava os arquivos de observação da pasta do PC e os manda ao repositório
+  (`publicar_observacoes_github.py`) **sem ler o que está lá**: publicar ajustes pelo PC depois que o Nexus gravou apaga
+  as linhas do Nexus (a confirmação avisa). Com o Nexus gravando, os ajustes saem só do Nexus.
 - **Peso da página** (09/10, W41 real): 339 KB e ~160 ms com 200 cartões; as pendentes (1.697 na W41) vêm linha a linha
   só filtradas (até 150) ou a pedido (`pend=1`, 1,4 MB): os seletores de dia e turno saem de um `<template>` clonado pelo
   JS, e a lista de tarefas de cada OS vai uma vez em `oss` (antes, em cada cartão: 4,4 MB).
@@ -225,7 +244,8 @@ usina, OS fora, OS com dia fixo), **3** gerar em sombra, **4** últimas geraçõ
 
 Levi (07/10 e 08/10/2026): "traga a visão de acompanhamento de manutenção do aplicativo para o Nexus conforme prints".
 É o bloco **"Manutenções — Plano & Fila"** da aba Gestão PCM do painel do PCM (`js/preventivas.js` do gridco-pcm-data),
-com os filtros de cima da aba (Cliente, Usina, Equipe cluster, Responsável; um de cada, sem diferenciar maiúscula). Só
+com os filtros de cima da aba (Cliente, Usina, Equipe cluster, Responsável; um de cada, sem diferenciar maiúscula, em
+cascata desde 09/10/2026). Só
 lê: nada vai ao banco nem ao Fracttal. Os controles vão pela URL (`modo`, `tipo`, `dim`, `col`, `val`, `mes`, `q`,
 `ordem`/`desc`, `pend`, `ordemf`/`descf`; o drill da fração é `drill` + `dt`, porque `usina` é o filtro de cima).
 
@@ -238,7 +258,15 @@ lê: nada vai ao banco nem ao Fracttal. Os controles vão pela URL (`modo`, `tip
   Programada; demanda (corretiva, emergencial, religamento com o remoto, inspeção, preditiva, administrativa, zeladoria,
   handover) no mês da **criação**; "Teste" e preventiva sem sigla ficam fora. **MPA e MPS em fração** feitas/total (50%
   de 4 anuais não é 50% de 200 mensais), e a fração abre a Fila daquela usina. Geral = as quatro preventivas (as
-  Corretivas ficam fora). Faixas: abaixo de 40% vermelho, 40% a 99% amarelo, 100% verde.
+  Corretivas ficam fora). Faixas do `preventivas.js` (no dado, na `faixa`, e na prova): abaixo de 40% vermelho, 40% a
+  99% amarelo, 100% verde. **A célula na tela** (09/10/2026, Levi, com o print do painel NOVO do PCM, o `novo.html`:
+  "uma visão parecida com essa, tanto percentual quanto acompanhamento e destacado por cor") segue o `gpCel` do painel
+  novo: o % em negrito e, ao lado, feitas/total (inclusive MPA, MPS, Corretivas e Geral); o fundo é o `tom` (90% ou
+  mais verde, 50% a 89% âmbar, abaixo de 50% vermelho) a 15% sobre a superfície, com o texto neutro; Pendentes em
+  vermelho quando há; números à direita. Antes disso, a 1ª tentativa do dia (fundo translúcido e texto colorido) virou
+  uma colcha de bege, vinho e oliva nos dois temas, e a 2ª (só o número colorido e uma barra) não era a visão que ele
+  queria. No escuro o âmbar é o laranja (o amarelo a 15% sobre o navy dá oliva); o verde é o do semáforo (`--ok`),
+  também na Fila (selo Concluída, KPI, o check).
 - **Fila:** o envelhecimento das MPA e MPS. Com a Gerencial: Prevista × Programada, atraso pela Prevista (1–30, 31–90,
   mais de 90 dias), criticidade, última observação datada do log, e os KPIs são filtros. **Sem a chave** é o lado do
   Fracttal (uma linha por OS, atraso pela Programada) e a tela diz isso numa nota informativa, não num aviso: falta de

@@ -24,6 +24,7 @@ o robô do PCM também lê), e vai para onde a semana ainda muda (`destino`):
 import json
 import re
 import threading
+from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
@@ -360,11 +361,33 @@ def destino(semana: str, fonte: str, gera_no_nexus: bool, dia: date | None = Non
 
 
 # ── o quadro ────────────────────────────────────────────────────────────────────────────────────────────────
-def opcoes(rows: list[dict]) -> dict:
-    def _v(campo):
-        return sorted({str(r.get(campo) or "").strip() for r in rows} - {""}, key=_norm)
-    return {"equipe": _v("cluster"), "resp": _v("responsavel"), "cliente": _v("cliente"), "tipo": _v("tipo"),
-            "estado": list(ESTADOS), "turno": list(TURNOS_CARTAO)}
+# o valor de cada filtro numa linha da semana
+_DO_FILTRO = {"equipe": lambda r: str(r.get("cluster") or "").strip(),
+              "resp": lambda r: str(r.get("responsavel") or "").strip(),
+              "cliente": lambda r: str(r.get("cliente") or "").strip(),
+              "tipo": lambda r: str(r.get("tipo") or "").strip(),
+              "estado": lambda r: estado(r),
+              "turno": lambda r: turno(r.get("h_ini"))}
+
+
+def opcoes(rows: list[dict], filtros: dict | None = None) -> dict:
+    """{filtro: [(valor, tarefas)]}: as opções de cada filtro contadas com os OUTROS filtros aplicados (Levi,
+    09/10/2026: "Os filtros tem que se auto filtrar também, pelo o que vi nenhum tem relação alguma com outro"):
+    escolhida a equipe, o Responsável e o Cliente só listam os dela. O filtro não conta a si mesmo, para dar para
+    trocar de equipe sem limpar o resto. A opção escolhida fica na lista mesmo com 0 (a tela não esconde o filtro que
+    está valendo)."""
+    filtros = filtros or {}
+    out = {}
+    for campo, valor_de in _DO_FILTRO.items():
+        conta = Counter(valor_de(r) for r in filtrar(rows, {k: v for k, v in filtros.items() if k != campo}))
+        conta.pop("", None)
+        ordem = {"estado": ESTADOS, "turno": TURNOS_CARTAO}.get(campo)
+        valores = [v for v in ordem if conta.get(v)] if ordem else sorted(conta, key=_norm)
+        escolhido = filtros.get(campo)
+        if escolhido and escolhido not in valores:
+            valores.append(escolhido)
+        out[campo] = [(v, conta.get(v, 0)) for v in valores]
+    return out
 
 
 def filtrar(rows: list[dict], f: dict) -> list[dict]:
@@ -560,7 +583,7 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
             "pend_total": len(sem.get("pendentes") or []), "pend_sel": len(pend),
             "horas": _horas(sum(_num(r.get("duracao")) for r in sel)), "tem_criacao": tem_criacao,
             "novas": sum(1 for r in sel if criada_apos_o_plano(r, janela)) if tem_criacao else None,
-            "janela": janela, "opcoes": opcoes(rows)}
+            "janela": janela, "opcoes": opcoes(rows, filtros)}
 
 
 # ── a fila que volta da página ──────────────────────────────────────────────────────────────────────────────
