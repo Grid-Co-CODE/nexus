@@ -256,7 +256,7 @@ def test_a_tabela_abre_por_usina_e_dia_e_a_linha_abre_os_extintores(com_livro, l
     html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
     assert 'aria-current="page">Por usina e dia</a>' in html and 'href="?modo=tabela&amp;ver=extintor"' in html
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
-    assert cab == "Situação Usina Quantidade de extintores Recarga mais próxima Última conferência Status da TST"
+    assert cab == "Situação Usina Quantidade de extintores Recarga mais próxima Última conferência Status da TST PDF"
     linhas = html.count('<tr class="cn-linha"')
     assert linhas == 6 and html.count('<tr class="cn-detalhe" hidden>') == 6       # Altair em 2 dias, mais 4 usinas
     primeira = _texto(html[html.index('<tr class="cn-linha"'):html.index('<tr class="cn-detalhe"')])
@@ -264,7 +264,8 @@ def test_a_tabela_abre_por_usina_e_dia_e_a_linha_abre_os_extintores(com_livro, l
     assert "02/2026 venceu há 7 meses" in primeira and "05/10/2026 há 4 d" in primeira
     assert "Crítico 2 críticos · 1 ok sem validade" in primeira
     # a linha abre os extintores dela, sem repetir a usina nem a conferência
-    sub = html[html.index('<table class="ext-sub">'):html.index("</table>", html.index('<table class="ext-sub">'))]
+    ini = html.index('<table class="ext-sub cn-fotos-grupo">')
+    sub = html[ini:html.index("</table>", ini)]
     assert re.findall(r'title="([A-Z]{3}\d{3}-INFC1-PPCI-EXT\d+)"', sub) == [
         "ALT100-INFC1-PPCI-EXT04", "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT05"]
     assert "Altair" not in _texto(sub) and "Sobrecarga" not in sub and "sobrecarga" in _texto(sub)
@@ -320,3 +321,96 @@ def test_relatorio_pdf_poe_a_foto_que_o_app_enviou_ao_lado_do_extintor(com_livro
 def test_sem_o_livro_o_relatorio_volta_para_a_tela(banco, logado):
     r = logado.get("/t/hseq/extintores/relatorio.pdf")
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/extintores")
+
+
+# ── o "Baixar" de cada linha, o filtro de cliente e a foto do extintor (Levi, 09/10, depois da 1ª carga no banco) ──
+def test_baixar_de_cada_linha_traz_o_pdf_daquela_usina_e_dia(com_livro, logado):
+    _aba(com_livro, EXT.LIVRO, EXT.ABA, LIVRO + DIA_DO_GRUPO)
+    visao.limpar()
+    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
+    links = re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', html)
+    assert len(links) == 6
+    alt = next(h for h in links if "dia=2026-10-05" in h).replace("&amp;", "&")
+    assert "usina=Altair" in alt and "baixar=1" in alt
+    r = logado.get(alt)
+    assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("attachment;")
+    assert 'filename="extintores-altair-2026-10-05.pdf"' in r.headers["Content-Disposition"]
+    t = _pdf_texto(r.data)
+    assert "ALT100-INFC1-PPCI-EXT04" in t and "ALT100-INFC1-PPCI-EXT01" in t and "ALT100-INFC1-PPCI-EXT05" in t
+    assert "ALT100-INFC1-PPCI-EXT02" not in t and "Coração" not in t                    # outro dia, outra usina
+    assert "Usina: Altair" in t and "Dia da conferência: 05/10/2026" in t
+    # a usina nunca conferida também baixa (dia=nunca), e o filtro da faixa vai junto no link
+    bwk = next(h for h in links if "dia=nunca" in h).replace("&amp;", "&")
+    assert "BWK100-INFC1-PPCI-EXT01" in _pdf_texto(logado.get(bwk).data)
+    atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)
+    assert all("f=atrasado" in h for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', atr))
+
+
+def test_filtro_por_cliente_vale_na_tela_no_pdf_e_no_epi(com_livro, logado):
+    html = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor").get_data(as_text=True)
+    assert '<select class="gc-campo" id="cn-cliente" name="cliente"' in html
+    assert '<option value="Outro Cliente">Outro Cliente</option>' in html and '<option value="Thopen">Thopen</option>' in html
+    outro = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor&cliente=Outro+Cliente").get_data(as_text=True)
+    assert _linhas(outro) == ["COR100-INFC1-PPCI-EXT01"] and '<option value="Outro Cliente" selected>' in outro
+    pdf = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?cliente=Thopen").data)
+    assert "Filtros: Cliente: Thopen" in pdf and "Coração" not in pdf and "Altair" in pdf
+    # o formulário do PDF da tela leva o cliente escolhido
+    assert '<input type="hidden" name="cliente" value="Outro Cliente">' in outro
+    epi = logado.get("/t/hseq/epi?modo=tabela&cliente=Outro+Cliente").get_data(as_text=True)
+    assert '<select class="gc-campo" id="cn-cliente" name="cliente"' in epi and "Coração 1" in epi and "Altair" not in epi
+
+
+def _foto_jpeg():
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (2400, 1800), (40, 160, 90)).save(buf, "JPEG")
+    return buf.getvalue()
+
+
+def _enviar(cliente, app, codigo="ALT100-INFC1-PPCI-EXT01", dia="2026-10-08", ts=None, dados=None, assinatura=None):
+    import io
+    import time
+    from nexus.hseq import fotos as FOT
+    dados = _foto_jpeg() if dados is None else dados
+    ts = int(time.time()) if ts is None else ts
+    sig = assinatura or FOT.assinatura(FOT.chave(app.config), codigo, dia, ts, dados)
+    return cliente.post("/t/hseq/extintores/foto", data={"codigo": codigo, "dia": dia, "ts": str(ts),
+                                                         "assinatura": sig, "foto": (io.BytesIO(dados), "f.jpg")},
+                        content_type="multipart/form-data")
+
+
+def test_o_app_envia_a_foto_assinada_e_ela_aparece_na_tabela_e_no_pdf(com_livro, app, cliente, logado, tmp_path):
+    import time
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    # sem login (é o App), mas só com a assinatura certa, na hora certa e com imagem de verdade
+    anon = app.test_client()
+    assert _enviar(anon, app, assinatura="0" * 64).status_code == 401
+    assert _enviar(anon, app, ts=int(time.time()) - 3600).status_code == 401
+    assert _enviar(anon, app, dados=b"isto nao e imagem").status_code == 400
+    assert _enviar(anon, app, codigo="../../etc").status_code == 400
+    r = _enviar(anon, app)
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    guardada = tmp_path / "hseq" / "extintores" / "fotos" / "ALT100-INFC1-PPCI-EXT01.jpg"
+    from PIL import Image
+    assert guardada.is_file() and max(Image.open(guardada).size) == 1600                 # reduzida a 1600 px
+    # a foto de um dia mais velho não substitui a guardada
+    assert "mais nova" in _enviar(anon, app, dia="2026-09-01").get_json()["mensagem"]
+    # ver a foto pede login; a tabela mostra a miniatura e a caixa que amplia
+    assert anon.get("/t/hseq/extintores/foto/ALT100-INFC1-PPCI-EXT01.jpg").status_code == 302
+    assert logado.get("/t/hseq/extintores/foto/ALT100-INFC1-PPCI-EXT01.jpg").mimetype == "image/jpeg"
+    assert logado.get("/t/hseq/extintores/foto/ALT100-INFC1-PPCI-EXT02.jpg").status_code == 404
+    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
+    assert html.count('class="cn-foto ext-foto"') == 1 and "foto de 08/10/2026" in html
+    assert 'class="cn-caixa-foto"' in html and 'class="ext-sub cn-fotos-grupo"' in html
+    pypdf = pytest.importorskip("pypdf")
+    import io
+    paginas = pypdf.PdfReader(io.BytesIO(logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos").data)).pages
+    assert len([im for p in paginas for im in p.images if im.name.endswith(".jpg")]) == 1
+
+
+def test_sem_a_chave_o_recebimento_de_fotos_fica_desligado(com_livro, app, tmp_path):
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    app.config["NEXUS_PESSOA_HMAC"] = ""
+    r = app.test_client().post("/t/hseq/extintores/foto", data={"codigo": "ALT100-INFC1-PPCI-EXT01"})
+    assert r.status_code == 503 and "desligado" in r.get_json()["mensagem"]

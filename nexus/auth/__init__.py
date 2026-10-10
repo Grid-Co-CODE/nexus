@@ -17,7 +17,9 @@ from . import fracttal
 
 bp = Blueprint("auth", __name__)
 
-ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static"}
+# a foto do extintor que o App envia (Segurança · HSEQ, 09/10/2026) não tem sessão: a rota confere a assinatura HMAC
+# dela antes de gravar qualquer coisa (`nexus/hseq/fotos.receber`); só ela passa sem login, e só por POST
+ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber"}
 
 # Limite de tentativas por IP. Em memória: zera no restart, o que é aceitável enquanto só o admin
 # entra. Sem isso, a senha única ficaria aberta a tentativa em massa assim que o servidor subir.

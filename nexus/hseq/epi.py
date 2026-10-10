@@ -89,7 +89,8 @@ def luvas() -> leitura.Leitura:
             o = u["onde"]
             linhas.append({"usina_id": o.get("usina_id"), "usina": o.get("usina") or "", "uf": o.get("uf", ""),
                            "regiao_br": o.get("regiao_br", ""), "cidade": o.get("cidade", ""),
-                           "equipe": o.get("equipe", ""), **{k: o.get(k, "") for k in visao._PAPEIS},
+                           "equipe": o.get("equipe", ""), "cliente": o.get("cliente", ""),
+                           **{k: o.get(k, "") for k in visao._PAPEIS},
                            "mobilizada": o.get("usina_id") in b.mobilizadas, **_situacao(verifs, hoje),
                            "historico": verifs[:HISTORICO], "verificacoes": len(verifs),
                            "nao": sum(1 for v in verifs if v["luvas"] is False)})

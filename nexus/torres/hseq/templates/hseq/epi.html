@@ -48,6 +48,11 @@
     <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
       <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
+    {# o cliente pelo cadastro, pela usina (Levi, 09/10/2026: "Em extintores quero um filtro por cliente!") #}
+    <label class="gc-rotulo" for="cn-cliente">Cliente</label>
+    <select class="gc-campo" id="cn-cliente" name="cliente" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
     {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, cidade ou equipe" aria-label="Buscar">
     {% for k in ('f', 'modo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}

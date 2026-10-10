@@ -50,8 +50,11 @@ por usina × dia da última conferência, com Situação (a mais grave), Usina, 
 situação), Recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a próxima), Última
 conferência e Status da TST (o mais grave, e quantos em cada); a linha abre os extintores dela logo abaixo. Ao lado, a
 visão **por extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
-primeiro). A faixa filtra as duas (no agrupamento, a linha conta só os extintores do filtro). 300 linhas. Filtros: região do
-Brasil, região de campo, gestor e busca. Quem entra pelo Fracttal já vem filtrado (o papel da sessão). Os filtros, os
+primeiro). A faixa filtra as duas (no agrupamento, a linha conta só os extintores do filtro). Cada linha por usina e
+dia tem a coluna **PDF** com o **Baixar** (como a tabela de PT; Levi, 09/10): o relatório só daquela usina e daquele dia
+(`usina`, `dia` ou `dia=nunca`, `baixar=1`, com os filtros da tela e o da faixa), como anexo. 300 linhas. Filtros: região do
+Brasil, **cliente** (pelo cadastro, pela usina; Levi, 09/10: "Em extintores quero um filtro por cliente!"; vale também no
+EPI e no PDF), região de campo, gestor e busca. Quem entra pelo Fracttal já vem filtrado (o papel da sessão). Os filtros, os
 cartões e o aviso da estrutura são os do Campo (`nexus/torres/campo/__init__.py` e os pedaços `campo/_*.html`): mudou
 lá, muda aqui. O CSS é o `campo.css` e o `hseq.css` (só a tabela).
 
@@ -89,9 +92,19 @@ detalhes; `fotos=0`: uma tabela por usina e dia. A FOTO é a de `<dados>/hseq/ex
 no Nexus". Biblioteca: reportlab (BSD, no `requirements.txt`). Medido em 09/10 com os 773: todos com fotos, 101 páginas,
 245 kB, 13 s; só os críticos, 43 páginas, 1,5 s; sem fotos, 57 páginas. Sem o livro do App, a rota volta para a tela.
 
+**Fotos** (`nexus/hseq/fotos.py`; Levi, 09/10: "quando tiver foto (ronda de extintor feita no app) ao expandir a usina e
+aparecer os extintores deve ter a opção de visualizar foto"). A foto mora no App e o Nexus não lê o Azure: **o App envia**
+a foto de cada conferência num `POST /t/hseq/extintores/foto` (multipart: `codigo`, `dia` AAAA-MM-DD, `ts` epoch,
+`assinatura`, arquivo `foto`). Assinatura = HMAC-SHA256 hex de `"código|dia|ts|sha256 hex da foto"` com a chave
+`HMAC-SHA256(NEXUS_PESSOA_HMAC, "nexus:hseq:fotos-extintor")`: a chave que o App e o Nexus já têm, nenhuma configuração
+nova (sem ela a rota responde 503). O Nexus confere a assinatura e a hora (15 min), abre a imagem, regrava em JPEG de
+até 1600 px e guarda a mais recente de cada extintor em `<dados>/hseq/extintores/fotos/<código>.jpg` (+ `.json` com o
+dia); foto de dia mais velho não substitui. É a única rota sem login (`auth.ROTAS_PUBLICAS`), e só por POST. Na tabela
+(a linha da usina aberta e a visão por extintor), o extintor com foto ganha a miniatura antes do código; o clique abre a
+caixa das fotos da ronda (setas andam entre as fotos da usina). O PDF põe a mesma foto ao lado do extintor.
+
 **Pendências.** O App publicar o livro (pedido à sessão do App de Campo em 09/10, com este contrato; ela faz na v257).
-As FOTOS no relatório: o App mandar a foto de cada conferência ao Nexus (proposta: o Nexus recebe por uma rota com
-token e guarda em `<dados>/hseq/extintores/fotos/`; o token é App Setting do Levi). A cobrança mensal por usina (ronda
+O App enviar as fotos pelo contrato acima (a sessão do App de Campo estava fechada em 09/10: falta passar). A cobrança mensal por usina (ronda
 de extintor feita ou não no mês) e o painel da TST (baixa e confirmação dos extintores novos) são do App; entram aqui
 quando houver o livro e o pedido.
 
