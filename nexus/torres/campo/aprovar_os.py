@@ -113,7 +113,13 @@ def aprovar(id_wo):
         logging.warning("aprovação de OS recusada pelo portão: OS %s (não é quem aprova nem admin)", os_fila["os"])
         return jsonify({"ok": False, "erro": texto_de_quem_aprova(aprovadores)}), 403
     resp = _concluir_no_os_creator(id_wo, os_fila["os"])
+    from ...auth import encerrar, via_fracttal
     from ..oscreator import ponte
+    if via_fracttal():
+        # entrou no Nexus pelo Fracttal: a sessão do Fracttal que acabou no meio leva a do Nexus junto (09/10/2026)
+        fim = ponte._fim_na_resposta(ponte.clone(current_app._get_current_object()), resp)
+        if fim:
+            return encerrar(fim, json=True)
     if ponte._JWT_VENCIDO in resp.get_data():
         # a sessão do Fracttal venceu no meio: o mesmo tratamento da ponte (limpa o cookie, pede login)
         return ponte._de_volta_ao_login(current_app._get_current_object(), f"api/os/{int(id_wo)}/concluir", True)

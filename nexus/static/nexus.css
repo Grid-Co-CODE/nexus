@@ -303,6 +303,9 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 .entrar-alt{margin:14px 0 0;font-size:12.5px;line-height:1.5}
+/* por que a pessoa voltou ao login (a sessão do Fracttal saiu, caiu ou venceu): aviso, não erro */
+.entrar-aviso{margin:14px 0 0;padding:10px 12px;border:1px solid var(--linha);border-left:3px solid var(--alerta);
+  border-radius:8px;font-size:13px;line-height:1.45;color:var(--tinta-2)}
 .entrar-alt a{color:var(--verde-texto)}
 .usuario-topo{font-size:13px;color:var(--sobre-barra-mudo);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
 

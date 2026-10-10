@@ -53,6 +53,7 @@
       // a assinatura vem do Fracttal pelo login do OS Creator (cookie só em /os); sem login, o quadro diz como entrar
       fetch('/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico', {credentials: 'same-origin'})
         .then(function (r) { return r.json(); }).then(function (a) {
+          if (a.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(a.entrar); return; }
           var q = document.querySelector('#cn-ass-tec .cn-ass-quadro');
           q.textContent = '';
           if (a.ok) { var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img); return; }

@@ -9,6 +9,16 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
   <script>
     {% include "_tema_cabeca.html" %}
+    // O login nunca fica dentro de uma moldura do próprio Nexus (o OS Creator, o card da OS): quando a sessão acaba com
+    // a pessoa numa delas, a JANELA vai ao login, que depois volta para a página que estava aberta, com o mesmo motivo.
+    (function () {
+      try {
+        if (window.top === window.self) return;
+        var t = window.top.location, motivo = {{ (motivo or '')|tojson }};
+        window.top.location.replace("/entrar?next=" + encodeURIComponent(t.pathname + t.search)
+                                    + (motivo ? "&motivo=" + encodeURIComponent(motivo) : ""));
+      } catch (e) {}
+    })();
   </script>
 </head>
 <body class="pagina-entrar">
@@ -16,6 +26,7 @@
   <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co." class="entrar-logo">
   <h1 class="titulo-pagina">Nexus</h1>
   <p class="mudo">Operação e manutenção da Grid Co. numa casca só.</p>
+  {% if aviso %}<p class="entrar-aviso" role="status">{{ aviso }}</p>{% endif %}
   {% set acao = '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
   {% if admin %}
   <form method="post" action="{{ acao }}">

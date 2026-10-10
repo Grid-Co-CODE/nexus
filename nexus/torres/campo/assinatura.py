@@ -106,6 +106,10 @@ def assinatura_tecnico(numero):
     except pt_fracttal.SemArquivo as e:
         return jsonify({"ok": False, "motivo": str(e)})
     except Exception as e:      # noqa: BLE001 — Fracttal recusou ou o login caiu: a tela diz, a PT abre igual
+        if type(e).__name__ == "SessionExpired":
+            from ...auth import encerrar, via_fracttal
+            if via_fracttal():  # o Fracttal derrubou o token de quem entrou por ele: o Nexus sai junto (09/10/2026)
+                return encerrar("caiu", json=True)
         return jsonify({"ok": False, "motivo": f"o Fracttal não respondeu ({type(e).__name__})"})
     return jsonify({"ok": True, "img": img})
 

@@ -232,6 +232,7 @@
         headers: {'Content-Type': 'application/json'}, body: '{}'})
         .then(function (r) { return r.json().then(function (j) { return {status: r.status, j: j}; }, function () { return {status: r.status, j: null}; }); })
         .then(function (res) {
+          if (res.j && res.j.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(res.j.entrar); return; }
           if (res.status === 401 || (res.j && res.j.login)) {
             var volta = '/os/_nexus/voltar?para=' + encodeURIComponent(location.pathname + location.search);
             msg.textContent = 'Para aprovar, ';

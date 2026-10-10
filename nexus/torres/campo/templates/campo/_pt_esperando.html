@@ -123,6 +123,7 @@
       f.dataset.lido = '1';
       var q = f.querySelector('.pt-ass-quadro');
       fetch(f.dataset.url, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (a) {
+        if (a.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(a.entrar); return; }
         q.textContent = '';
         if (a.ok) { var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img); return; }
         var s = document.createElement('span'); s.className = 'mudo';
@@ -135,6 +136,7 @@
     if (!el) return;
     (quemAssina || (quemAssina = fetch('/os/_nexus/quem', {credentials: 'same-origin'}).then(function (r) { return r.json(); })))
       .then(function (q) {
+        if (q.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(q.entrar); return; }
         el.textContent = q.email ? ('Assinando como ' + q.nome + ', pelo login do Fracttal.')
                                  : 'Para decidir, entre com o seu login do Fracttal (o mesmo do OS Creator).';
       }).catch(function () {});

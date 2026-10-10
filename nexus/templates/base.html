@@ -6,6 +6,14 @@
     // data-nexus marca a casca para o OS Creator embutido (ponte.py). E o Nexus nunca fica dentro de moldura: se
     // um link do OS Creator trouxer uma página do Nexus para dentro dela, ela toma a janela.
     try { if (window.top !== window.self) window.top.location.href = location.href; } catch (e) {}
+    // A sessão acabou (o Fracttal saiu, venceu ou caiu): a JANELA vai ao login, que depois volta para a página aberta
+    window.nexusEntrarDeNovo = function (url) {
+      var w = window.top;
+      try { void w.location.pathname; } catch (e) { w = window; }
+      var u = new URL(url || "/entrar", location.origin);
+      u.searchParams.set("next", w.location.pathname + w.location.search);
+      w.location.href = u.pathname + u.search;
+    };
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Nexus{% endblock %} · Grid Co.</title>
@@ -142,6 +150,27 @@
   window.addEventListener("storage", function (ev) {
     if (ev.key === "nexus.tema" && (ev.newValue === "claro" || ev.newValue === "escuro")) mostrarTema(ev.newValue);
   });
+  {% if session.usuario %}
+  // A sessão do Nexus vale enquanto a do Fracttal valer (Levi, 09/10/2026: "quando deslogar do Fracttal deslogue do
+  // Nexus, tem que pedir para logar de novo"): a página pergunta ao abrir, ao voltar a ficar à vista e a cada 5 minutos.
+  // O servidor pergunta ao Fracttal no máximo a cada 5 minutos por sessão (ponte.py, /os/_nexus/sessao). Servidor fora
+  // ou rede caída não decide nada; só a sessão encerrada leva ao login.
+  var ultimaConferencia = 0;
+  function confereSessao() {
+    if (document.visibilityState === "hidden" || Date.now() - ultimaConferencia < 60000) return;
+    ultimaConferencia = Date.now();
+    fetch("/os/_nexus/sessao", {credentials: "same-origin", cache: "no-store", redirect: "manual"})
+      .then(function (r) {
+        // o portão respondeu com o login: a sessão do Nexus já tinha acabado
+        if (r.type === "opaqueredirect") { window.nexusEntrarDeNovo("/entrar"); return null; }
+        if (r.status !== 200 && r.status !== 401) return null;
+        return r.json().then(function (j) { if (j && j.sessao_encerrada) window.nexusEntrarDeNovo(j.entrar); });
+      }).catch(function () {});
+  }
+  confereSessao();
+  setInterval(confereSessao, 5 * 60 * 1000);
+  document.addEventListener("visibilitychange", confereSessao);
+  {% endif %}
   // No trilho recolhido não há espaço para as sub-telas: o ícone leva direto à primeira tela.
   document.querySelectorAll(".torre summary").forEach(function (s) {
     s.addEventListener("click", function (ev) {
