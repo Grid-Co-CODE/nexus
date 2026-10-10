@@ -6,7 +6,9 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 
 | Arquivo | O que faz |
 |---|---|
-| `nexus/__init__.py` | `create_app`: lê o `.env`, instala o portão e o contexto, descobre as torres |
+| `nexus/__init__.py` | `create_app`: lê o `.env`, o cookie `nexus_sessao`, o prefixo, instala o portão e o contexto, descobre as torres |
+| `nexus/prefixo.py` | o caminho em que o Nexus é servido (`NEXUS_PREFIXO`): o middleware, `na_raiz`/`sem_raiz` e o cookie no caminho certo |
+| `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início), `/cadeira` (troca), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu, `tema`) |
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` e o portão (`before_request`) |
@@ -18,21 +20,36 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 | `app.py` / `servir.py` | desenvolvimento (5070, IPv4 e IPv6, cookie sem Secure) / produção (atrás do proxy, cookie Secure) |
 | `ferramentas/subir_copia_de_prova.py` / `ferramentas/porta_local.py` | cópia de prova noutra porta (sem carga, sem Fracttal ao subir, trava de rede) / o papel do Caddy no PC, Nexus e plataforma numa origem só |
 
-## O `/nexus` do servidor (medido de fora em 09/10/2026)
+## O prefixo `/nexus` e o cookie próprio (porta única, 09/10/2026)
 
-O servidor serve o Nexus em `app.gridco.com.br/nexus`, e o código do Nexus **não sabe disso**: ele recebe o caminho sem
-o `/nexus` (`/nexus/nexus/saude` chega como `/nexus/saude`), não tem `SCRIPT_NAME` (o `url_for` gera `/entrar`) e uma
-camada FORA do repositório (no Caddy ou entre ele e o waitress; de fora não dá para saber) conserta a resposta: (1) o
-`Location` que começa por um caminho do Nexus ganha `/nexus`; (2) no HTML e no JavaScript, o caminho do Nexus depois de
-aspas ou de `=` ganha `/nexus` (o `action="/entrar"` fixo do `entrar.html` sai `/nexus/entrar`; o `"/entrar?next="` do
-`clima-mapa.js` também), e o que não é caminho do Nexus fica (`"/usina/"`, `next=/api/x`); (3) um calço no começo do
-`<head>` põe `/nexus` em todo `fetch` e XHR com caminho absoluto, de QUALQUER destino. Consequências: link da página do
-Nexus para a plataforma (`/tempo-real`, `/painel/...`) atravessa intacto, mas um `fetch` dele vira `/nexus/...`; o
-cookie `session` do Nexus sai no caminho `/` (o padrão do Flask, que nada no repositório muda) e colide com o `session`
-da plataforma, o passo 0 do spec da porta única (reproduzido no PC pela `porta_local.py`: entrar na plataforma derruba a
-sessão do Nexus); o `/saude` do servidor respondeu `df5aeaa` enquanto os estáticos servidos já eram os da `main`
-(`nexus.css` igual ao `2e01139`), então o `/saude` não é prova de versão lá. A prova local dessa camada é o
-`porta_local.py --reescrita-do-servidor`.
+Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo". O servidor serve o Nexus em
+`app.gridco.com.br/nexus`, ao lado da plataforma de Performance na raiz (spec `docs/superpowers/specs/2026-10-09-performance-no-nexus-design.md`,
+seções 2 e 5.1). Até 09/10 o código não sabia do `/nexus`: o menu, o Início, o Sair e os `fetch` saíam da raiz e caíam
+na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho) se apagava a cada login.
+
+- **Cookie (passo 0):** `nexus_sessao` (nunca mais `session`, o da plataforma), no caminho em que o Nexus roda
+  (`SessaoNoPrefixo`: `/nexus` no servidor, `/` na raiz); o `os_sessao` do OS Creator embutido em prefixo + `/os`
+  (`auth.os_cookie_path`, e o `_SessaoDoClone` da ponte). Efeito único da troca: quem estava logado entra de novo uma vez.
+- **Prefixo:** `NEXUS_PREFIXO` (`.env` ou ambiente; vazio = raiz, o PC e a fase 4). O `create_app` põe o middleware
+  `Prefixo`: `SCRIPT_NAME` = prefixo, e o prefixo sai do `PATH_INFO` só quando vem (serve com o Caddy cortando o `/nexus`,
+  `handle_path`, e sem cortar). O `X-Forwarded-Prefix` do pedido NUNCA é lido (o Caddy repassa o do cliente). Sem a
+  variável, a resposta na raiz é a de antes: conferido em 09/10 página por página (135 páginas, mesmo status, mesmo
+  Location, mesmos href/src/action; só o JavaScript do `nexusRota` e o nome do cookie mudaram).
+- **Como cada endereço sai com ele:** template = `{{ raiz }}/t/...`, `url_for` ou `{{ x.url|na_raiz }}` (o que vem
+  montado do Python); Python = `na_raiz("/t/...")` em todo `redirect` (e `destino_seguro` para `next`/`voltar`);
+  JavaScript = `nexusRota("/t/...")`. Os três são IDEMPOTENTES: o que já começa com o prefixo não ganha outro. O `next`
+  do portão vai como o navegador vê (`/nexus/t/...`); um `next` sem o prefixo também volta certo.
+- **A camada da T.I.:** o servidor tem, FORA do repositório, uma camada que reescreve a resposta (o `Location` e os
+  caminhos do Nexus no HTML e no JavaScript ganham `/nexus`, e um calço põe `/nexus` em todo `fetch`). Ela não mexe no
+  que já sai com `/nexus`, e o `nexusRota` não dobra o que ela reescreveu: com a variável ligada e a camada ainda ativa,
+  nada sai `/nexus/nexus` (`test_com_a_reescrita_do_servidor_ligada_nada_sai_com_o_prefixo_dobrado`). Depois de ligar a
+  variável a camada vira inútil e a T.I. pode tirá-la (`DEPLOY.md`, seção 5). Local: `ferramentas/porta_local.py
+  --reescrita-do-servidor` a imita. O `/saude` do servidor já respondeu um commit enquanto os estáticos eram de outro: lá ele
+  não prova versão sozinho.
+- **O `nexus_tema` fica em `/`** (o botão grava pelo navegador; nome próprio, não colide).
+- **Prova:** `tests/test_prefixo.py` (o rastreador `tests/rastreador_de_links.py` percorre todas as páginas a partir do
+  Início, logado como admin e no OS Creator embutido, nos modos Caddy cortando, sem cortar, `SCRIPT_NAME` por outro meio e
+  raiz, e falha com qualquer endereço interno fora do prefixo; mais o varredor estático de templates, `.js` e `redirect`).
 
 ## Tema escuro (padrão) e claro (08/10/2026)
 
@@ -85,13 +102,16 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 ## Regras que já custaram caro
 
+- **Endereço do Nexus nunca a partir da raiz** (09/10/2026): `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")`
+  crus caem na plataforma debaixo do `/nexus`. Use `{{ raiz }}`, `url_for`, `|na_raiz`, `na_raiz()` e `nexusRota()` (seção
+  do prefixo); `tests/test_prefixo.py` pega o esquecimento.
 - **Rota pública é decisão consciente:** só o que está em `ROTAS_PUBLICAS` (entrar, saude, static). O teste
   `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
 - **Limite de senha:** 5 erros em 15 min por IP, guardado em `app.extensions` (estado global vazava entre testes).
 - **Login pelo Fracttal** (Levi, 06/10/2026: "Ao invés de uma senha difícil, no início faça a pessoa logar com
   fractall"): e-mail e senha do Fracttal (a senha vai transformada ao Fracttal e não é guardada; só a conta da Grid Co.
-  entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (path /os, 12 h), assinado com a
-  chave do clone, e `/sair` apaga os dois. Sessão do Nexus: `logado`, `usuario` {email, nome, perfil} (o nome aparece
+  entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (caminho prefixo + `/os`,
+  12 h), assinado com a chave do clone, e `/sair` apaga os dois. Sessão do Nexus: `logado`, `usuario` {email, nome, perfil} (o nome aparece
   no topo), `admin` (só se o e-mail estiver em `NEXUS_ADMINS`) e `supervisor_padrao`: desde a estrutura de O&M de
   10/2026, o PAPEL de quem entrou no Campo · App ({pessoa_id, nome, papel: supervisor_campo | coordenador | gestor,
   regioes ou gestor}; o filtro que já vem marcado e quem vê o Aprovar; ver `nexus/torres/campo/CLAUDE.md`). Sessão de

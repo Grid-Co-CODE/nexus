@@ -84,22 +84,58 @@ para `dados/campo/identidades.json` por caminho relativo.
 
 ## 5. Endereço com HTTPS
 
-**Use um subdomínio próprio**, por exemplo `nexus.gridco.com.br`, e não um caminho dentro de `app.gridco.com.br`:
-o Nexus usa `/`, `/t/...`, `/os/...` e `/static/...`, que colidem com a plataforma. No Caddy:
+O Nexus está em **`https://app.gridco.com.br/nexus`**, ao lado da plataforma de Performance (na raiz do mesmo endereço).
+O cookie de sessão sai com `Secure`: o Nexus **precisa** de HTTPS na frente. O proxy tem de repassar `X-Forwarded-For`
+(o Caddy repassa por padrão): é por ele que o limite de tentativas de senha conta cada pessoa, e não o servidor inteiro
+como uma só.
+
+### 5a. O prefixo `/nexus` no próprio Nexus (`NEXUS_PREFIXO`, desde 09/10/2026)
+
+Até 09/10/2026 o Nexus não sabia que mora em `/nexus`: menu, Início, Sair e `fetch` saíam da raiz e caíam na plataforma,
+e quem consertava era uma reescrita das respostas no servidor (fora do repositório). Agora o Nexus põe o prefixo sozinho
+em todo link, redirecionamento e cookie, e o cookie de sessão tem nome próprio (`nexus_sessao`; o da plataforma é
+`session`), então entrar num não derruba mais o outro.
+
+**O que a T.I. faz, nesta ordem** (o código novo sobe antes e, sem a variável, se comporta como sempre):
+
+1. No `.env` do Nexus (ou como `Environment=NEXUS_PREFIXO=/nexus` no `nexus.service`), acrescente:
+   ```
+   NEXUS_PREFIXO=/nexus
+   ```
+   e reinicie: `sudo systemctl restart nexus`. O log diz `servido em /nexus`.
+2. Confira de fora:
+   ```
+   curl -sI https://app.gridco.com.br/nexus/ | grep -i '^location'
+   ```
+   tem de responder `location: /nexus/entrar?next=/nexus/`, **nunca** `/nexus/nexus/...`. Entre no Nexus: o cookie
+   `nexus_sessao` aparece com `Path=/nexus`; o menu, o Sair e o OS Creator abrem dentro de `/nexus/...`.
+3. Se dobrar (`/nexus/nexus`): tire a linha e reinicie; volta ao de antes. Avise o Levi.
+4. Com o passo 2 certo, a reescrita das respostas do Nexus no servidor (a camada que põe `/nexus` no `Location`, no HTML e
+   no JavaScript, e o calço do `fetch` no `<head>`) fica sem trabalho: pode ser tirada. Sem ela o Nexus segue igual;
+   com ela também (o Nexus não dobra o que ela reescreve).
+
+Todo mundo entra de novo **uma vez** depois do passo 1 (o cookie mudou de nome e de caminho).
+
+O Caddy pode cortar o `/nexus` antes de repassar (`handle_path`, como hoje) ou não (`handle`): o Nexus aceita os dois.
+O que ele **não** usa é cabeçalho de prefixo (`X-Forwarded-Prefix`): o prefixo vem só da variável. Exemplo do bloco:
 
 ```
-nexus.gridco.com.br {
-    reverse_proxy 127.0.0.1:5070
+app.gridco.com.br {
+    redir /nexus /nexus/ 308
+    handle_path /nexus/* {
+        reverse_proxy 127.0.0.1:5070
+    }
+    # ... o resto continua indo para a plataforma de Performance
 }
 ```
 
-O cookie de sessão sai com `Secure`: o Nexus **precisa** de HTTPS na frente. O proxy tem de repassar
-`X-Forwarded-For` (o Caddy repassa por padrão): é por ele que o limite de tentativas de senha conta cada pessoa, e não
-o servidor inteiro como uma só.
+**Na raiz** (a fase 4 do spec da porta única: o Nexus em `app.gridco.com.br`, dividindo os caminhos com a plataforma), é
+só tirar a `NEXUS_PREFIXO`. Num subdomínio próprio (`nexus.gridco.com.br`, `reverse_proxy 127.0.0.1:5070`), também sem
+ela.
 
 ## 6. Conferir depois de subir
 
-1. `https://nexus.gridco.com.br/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
+1. `https://app.gridco.com.br/nexus/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
 2. Entrar com o login do Fracttal (e-mail e senha de quem vai usar; desde 06/10/2026). A senha de admin (a
    `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem) segue em "Entrar com a senha de administrador" e é ela que abre o
    Cadastro, além dos e-mails em `NEXUS_ADMINS` (opcional, separados por vírgula).

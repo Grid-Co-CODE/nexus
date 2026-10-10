@@ -40,7 +40,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 
 | Área | `.md` |
 |---|---|
-| Casca, login, menu, tema (escuro e claro), servidor local | `nexus/casca/CLAUDE.md` |
+| Casca, login, menu, tema (escuro e claro), servidor local, o prefixo `/nexus` e o cookie `nexus_sessao` | `nexus/casca/CLAUDE.md` |
 | Torres (como criar tela) | `nexus/torres/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |
@@ -70,7 +70,8 @@ Sem o `.env` completo o app não sobe, e diz qual variável falta.
 o Fracttal ao subir; nada sai para SunOp/API PV nem grava fora da máquina; entra-se pela senha de administrador). O que
 depende da MESMA origem do servidor (moldura da plataforma, cookies, `postMessage`) se prova com as duas cópias atrás de
 `python ferramentas/porta_local.py` (o papel do Caddy: Nexus em `/nexus`, plataforma na raiz; `--modo raiz` é a fase 4;
-`--reescrita-do-servidor` imita a camada que o servidor tem hoje, ver `nexus/casca/CLAUDE.md`). A cópia da plataforma é
+`--reescrita-do-servidor` imita a camada que o servidor tem hoje, ver `nexus/casca/CLAUDE.md`; para o Nexus se ver
+debaixo do `/nexus` como no servidor, suba a cópia com `--prefixo /nexus`). A cópia da plataforma é
 a `plataforma/subir_copia_de_prova.py` do PerformancePainel.
 
 ## Como o código está organizado
@@ -91,6 +92,8 @@ a `plataforma/subir_copia_de_prova.py` do PerformancePainel.
 
 ## Regras
 
+- **Endereço do Nexus nunca a partir da raiz** (09/10/2026): no servidor ele mora em `/nexus` (`NEXUS_PREFIXO`). Template
+  `{{ raiz }}/...`, `url_for` ou `|na_raiz`; Python `na_raiz()`; JavaScript `nexusRota()` (`nexus/casca/CLAUDE.md`).
 - **Origem de dado:** nada de Excel nem OneDrive. Dado vem da API `db_performace` (PostgreSQL da T.I.).
   A API é compartilhada por vários sistemas: nada que identifique pessoa vai para ela em claro
   (cifrado ou como HMAC).

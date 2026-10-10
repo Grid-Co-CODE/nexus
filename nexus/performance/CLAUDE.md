@@ -7,7 +7,9 @@ só leitura", "em paralelo por enquanto"). Fase 1 de cinco para a plataforma mor
 `docs/superpowers/specs/2026-10-04-tempo-real-no-nexus-design.md`, seção 10.
 
 - O navegador fala só com o Nexus. `ponte.py` leva o pedido à plataforma com `X-Nexus-Leitura`
-  (`NEXUS_PLATAFORMA_TOKEN` = `NEXUS_LEITURA_TOKEN` da plataforma) e `X-Forwarded-Prefix: /t/performance/plataforma`.
+  (`NEXUS_PLATAFORMA_TOKEN` = `NEXUS_LEITURA_TOKEN` da plataforma) e `X-Forwarded-Prefix: /t/performance/plataforma`
+  (com o prefixo em que o Nexus roda na frente: `/nexus/t/performance/plataforma` no servidor; o guarda de leitura usa o
+  mesmo, 09/10/2026).
   A plataforma devolve as páginas com o prefixo (`_SHIM_PREFIXO` + atributos): a ponte não reescreve HTML, só injeta
   o visual (`#nexus-visual`) e o guarda (`#nexus-leitura`).
 - **Só leitura em três camadas:** portão da plataforma (403 com a chave), `pode_passar` aqui, guarda no navegador.

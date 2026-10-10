@@ -21,6 +21,12 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 - Toda tela nasce como placeholder genérico. **Para construir uma tela**, crie a view no `bp` da torre com a mesma
   rota (`@bp.route("/mesa")`): a específica vence o placeholder, e a tela fica verde no menu sozinha.
 - Templates em `nexus/torres/<torre>/templates/<torre>/`.
+- **Endereço nunca a partir da raiz** (09/10/2026): no servidor o Nexus mora em `/nexus` (`NEXUS_PREFIXO`), e um
+  `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")` cru cai na plataforma de Performance. No template,
+  `{{ raiz }}/t/...`, `url_for(...)` ou `{{ endereco|na_raiz }}` (o que vem montado do Python); no Python,
+  `na_raiz("/t/...")` (`nexus/prefixo.py`); no JavaScript, `nexusRota("/t/...")`. Endereço relativo (`?filtro=...`) não
+  precisa de nada. `tests/test_prefixo.py` percorre as telas e varre templates, `.js` e `redirect`: o esquecimento quebra
+  o teste. Regra completa em `nexus/casca/CLAUDE.md`, seção do prefixo.
 - **Abrir uma OS do Fracttal em qualquer tela** (os setores se conversam, Levi 08/10/2026): o card do Histórico do OS
   Creator, sem cópia. `{% include "oscreator/card_os_abrir.html" %}` e `NexusOsCard.abrir(id_work_order, {status})`;
   regra em `oscreator/README.md` ("O card da OS em qualquer torre"). Quem usa: o Quadro da equipe da Engenharia. Para o
