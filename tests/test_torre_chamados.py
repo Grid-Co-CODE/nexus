@@ -23,6 +23,7 @@ def test_as_telas_continuam_no_os_creator(logado):
     r = logado.get("/t/os/chamados")
     assert r.status_code == 200 and 'src="/os/chamados"' in r.get_data(as_text=True)
     assert ATALHOS["chamados"] == {"fabricantes": "/os/chamados/fornecedores",
+                                   "tickets": "/os/tickets",
                                    "garantias": "/os/chamados/acompanhamento"}
 
 
@@ -35,3 +36,19 @@ def test_abrir_outra_tela_do_os_creator_so_aceita_endereco_dele(logado):
 
 def test_sem_login_vai_para_a_entrada(cliente):
     assert cliente.get("/t/chamados/fabricantes").status_code == 302
+
+
+def test_tickets_de_performance_abre_os_tickets_do_os_creator_e_fica_verde(logado):
+    """Auditoria B8 da porta única (10/10/2026): o item "Tickets de performance" aparecia "Em construção", mas a tela já
+    existia no Nexus em /os/tickets (a do OS Creator Web). Agora é um atalho, como Fabricantes e Garantias."""
+    r = logado.get("/t/chamados/tickets")
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'class="os-moldura" src="/os/tickets"' in html and "Em construção" not in html
+    # o item fica verde no menu (tela com conteúdo) e o Início conta a torre com 3 prontas
+    assert 'href="/t/chamados/tickets" class="com-conteudo"' in html
+    assert "3 de 4 prontas" in logado.get("/").get_data(as_text=True)
+    # a rota existe de fato no clone (o atalho não leva a um 404); sem o login do Fracttal ela pede o login do OS Creator
+    # antes de ler qualquer coisa (nada vai à rede aqui)
+    r = logado.get("/os/tickets")
+    assert r.status_code == 302 and r.headers["Location"].startswith("/os/login?next=%2Fos%2Ftickets")

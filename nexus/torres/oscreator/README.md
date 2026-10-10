@@ -466,10 +466,12 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
 Levi: "Controle de fornecedores do OS Creator Web tem que estar no NEXUS > CHAMADOS > FABRICANTE"; "o mesmo com
 Acompanhamento de chamados, tem que estar em GARANTIAS"; "não que vão sair da visão do OS Creator Web, porém, quando for
 abrir essa janela o atalho deve ficar para a parte de CHAMADOS". Em `ponte.ATALHOS`: Chamados → Fabricantes abre
-`/os/chamados/fornecedores` e Chamados → Garantias abre `/os/chamados/acompanhamento`, na mesma moldura da torre OS
-Creator (`abrir_em`), com o menu lateral marcando a torre Chamados; entre os dois atalhos o clique abre aba nova na casca
-já aberta. As telas continuam no OS Creator (mesmo endereço; o setor Chamados dele não mudou). Atalho novo para outra
-torre = uma linha em `ATALHOS` e o `add_url_rule` na torre dona. Prova: `tests/test_torre_chamados.py`.
+`/os/chamados/fornecedores`, Chamados → Tickets de performance abre `/os/tickets` (auditoria B8 da porta única,
+10/10/2026: o item dizia "Em construção" com a tela pronta aqui) e Chamados → Garantias abre
+`/os/chamados/acompanhamento`, na mesma moldura da torre OS Creator (`abrir_em`), com o menu lateral marcando a torre
+Chamados; entre os atalhos o clique abre aba nova na casca já aberta. As telas continuam no OS Creator (mesmo endereço; o
+setor Chamados dele não mudou). Atalho novo para outra torre = uma linha em `ATALHOS` (a torre Chamados registra a
+rota de cada uma sozinha). Prova: `tests/test_torre_chamados.py`.
 
 ## O card da OS com várias tarefas (08/10/2026)
 
