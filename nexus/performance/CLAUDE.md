@@ -79,6 +79,9 @@ navegador fala com cada sistema.
 - **O Sair** (`nexus/auth`): com a chave, `/sair` encerra a sessão do Nexus e mostra uma página que faz POST em
   `/painel/nexus/sair` (a plataforma encerra a sessão do passe; a da senha fica) e segue ao Entrar em até 4 s, responda a
   plataforma ou não; sem JavaScript, um botão. Sem a chave, o `/sair` de sempre (302).
+- **O Entrar** (revisão de 10/10/2026): com a chave, a página do Entrar também faz o POST em `/painel/nexus/sair`
+  (`auth._tela_entrar`; só na mesma origem). Num PC compartilhado, A não clicava em Sair, a sessão dele no Nexus vencia, B
+  entrava, e a sessão do passe de A na plataforma (12 h) seguia valendo para todo acesso direto: o diário gravava A.
 - **A camada da T.I. e o calço do `fetch`:** no servidor, uma camada fora do repositório põe `/nexus` em todo `fetch`
   começado por "/" (`nexus/casca/CLAUDE.md`). Por isso o `porta.js` e o Sair pedem a plataforma por URL COMPLETA
   (`new URL(..., location.href)`); os endereços da plataforma no HTML (`/painel/nexus/...`, `/tempo-real`...) não são

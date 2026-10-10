@@ -84,7 +84,7 @@ def _entrar_fracttal(destino):
         conta = fracttal.entrar(current_app._get_current_object(), email, request.form.get("senha") or "")
     except fracttal.LoginRecusado as e:
         _erros()[_ip()].append(time.monotonic())
-        return render_template("entrar.html", erro=str(e), email=email, destino=destino), 401
+        return _tela_entrar(erro=str(e), email=email, destino=destino), 401
     _erros().pop(_ip(), None)
     session.clear()
     session.permanent = True
@@ -123,11 +123,11 @@ def entrar():
     destino = next_seguro(request.args.get("next"))
     admin = request.args.get("admin") == "1"
     if request.method == "GET":
-        return render_template("entrar.html", erro=None, destino=destino, admin=admin)
+        return _tela_entrar(erro=None, destino=destino, admin=admin)
 
     ip = _ip()
     if _bloqueado(ip):
-        return render_template("entrar.html", erro="Muitas tentativas. Aguarde 15 minutos.",
+        return _tela_entrar(erro="Muitas tentativas. Aguarde 15 minutos.",
                                destino=destino, admin=admin), 429
 
     if request.form.get("email") is not None:
@@ -137,7 +137,7 @@ def entrar():
     certa = current_app.config["NEXUS_SENHA_ADMIN"]
     if not hmac.compare_digest(senha.encode(), certa.encode()):
         _erros()[ip].append(time.monotonic())
-        return render_template("entrar.html", erro="Senha incorreta.", destino=destino, admin=True), 401
+        return _tela_entrar(erro="Senha incorreta.", destino=destino, admin=True), 401
 
     _erros().pop(ip, None)
     session.clear()
@@ -145,6 +145,14 @@ def entrar():
     session["logado"] = True
     session["admin"] = True
     return _sem_a_sessao_velha_da_raiz(redirect(na_raiz(destino)))
+
+
+def _tela_entrar(**contexto):
+    """A página do Entrar. Com a porta única ligada, ela encerra a sessão do passe que estiver aberta na plataforma neste
+    navegador (`plataforma_sair`, revisão de 10/10/2026): num PC compartilhado (a sala do NOC), A não clica em Sair, a
+    sessão dele no Nexus vence e B entra; a de A na plataforma valia mais 12 h, e todo acesso direto à plataforma
+    (favorito, aba aberta) seguia como A, com o e-mail de A no diário. Sem a chave, a página de sempre."""
+    return render_template("entrar.html", plataforma_sair=_plataforma_para_sair(), **contexto)
 
 
 def _plataforma_para_sair() -> str | None:

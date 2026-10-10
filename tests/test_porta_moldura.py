@@ -321,6 +321,9 @@ def test_a_camada_do_servidor_nao_mexe_nos_enderecos_da_plataforma():
         assert all(x["url"].startswith("/nexus/t/") for x in _dados(h)["telas"])
     h = pl.reescreve_corpo(cli.get(PREFIXO + "/sair").get_data(as_text=True), True)
     assert 'action="/painel/nexus/sair"' in h and "/nexus/nexus" not in h
+    # o Entrar (que encerra a sessão do passe de quem estava antes) também fica com o endereço da plataforma
+    h = pl.reescreve_corpo(_cliente(PREFIXO, logar=False).get(PREFIXO + "/entrar").get_data(as_text=True), True)
+    assert 'id="porta-sair-ao-entrar" method="post" action="/painel/nexus/sair"' in h and "/nexus/nexus" not in h
 
 
 # ── o passe não vai à máquina de quem visita (revisão de 10/10/2026) ─────────────────────────────────────────────────
@@ -328,14 +331,15 @@ def _script_do_sair(h: str) -> str:
     return re.findall(r"<script>(.*?)</script>", h, re.S)[-1]
 
 
-def _rodar_sair(script: str, acao: str) -> dict:
+def _rodar_sair(script: str, acao: str, id_form: str = "sair-plataforma") -> dict:
     import shutil
     import subprocess
     from pathlib import Path
     if not shutil.which("node"):
         pytest.skip("sem node nesta máquina")
     falsa = Path(__file__).resolve().parent / "porta_pagina_falsa.js"
-    cfg = {"modo": "sair", "pagina": "https://app.exemplo.test/nexus/sair", "acao": acao, "script": script}
+    cfg = {"modo": "sair", "pagina": "https://app.exemplo.test/nexus/sair", "acao": acao, "script": script,
+           "id": id_form}
     r = subprocess.run(["node", str(falsa), str(falsa), json.dumps(cfg)], capture_output=True, text=True,
                        encoding="utf-8", timeout=60)
     assert r.returncode == 0, r.stderr
@@ -432,4 +436,36 @@ def test_sem_a_chave_o_nome_da_variavel_so_aparece_para_admin(monkeypatch):
     admin = _cliente(NEXUS_SSO_CHAVE=None, **ponte)
     assert "falta a NEXUS_SSO_CHAVE" in admin.get("/t/performance/noc").get_data(as_text=True)
     assert "porta-reserva" in admin.get("/t/performance/tempo-real").get_data(as_text=True)
+
+
+# ── o Entrar encerra a sessão do passe de quem estava antes (revisão de 10/10/2026) ─────────────────────────────────
+def _script_do_entrar(h: str) -> str | None:
+    m = re.search(r'<form id="porta-sair-ao-entrar"[^>]*action="([^"]*)"', h)
+    if not m:
+        return None
+    return next(x for x in re.findall(r"<script>(.*?)</script>", h, re.S) if "porta-sair-ao-entrar" in x), m.group(1)
+
+
+@pytest.mark.parametrize("prefixo", ["", PREFIXO])
+def test_o_entrar_encerra_a_sessao_do_passe_de_quem_estava_antes(prefixo):
+    """PC compartilhado (sala do NOC): A não clica em Sair e a sessão dele no Nexus vence; B entra no Nexus. A sessão do
+    passe de A na plataforma valia mais 12 h: até B abrir um item da Performance, todo acesso direto à plataforma
+    (favorito, aba aberta) era feito como A, e o diário gravava o e-mail de A. A página do Entrar, com a porta ligada,
+    faz o POST em /painel/nexus/sair da plataforma (mesma origem; a sessão da senha da plataforma fica)."""
+    cli = _cliente(prefixo, logar=False)
+    script, acao = _script_do_entrar(cli.get(prefixo + "/entrar").get_data(as_text=True))
+    assert acao == "/painel/nexus/sair"                                  # endereço da plataforma, sem o prefixo do Nexus
+    feito = _rodar_sair(script, acao, "porta-sair-ao-entrar")
+    assert feito["pedidos"] == [{"url": "https://app.exemplo.test/painel/nexus/sair", "metodo": "POST"}]
+    assert feito["foiPara"] is None                                      # a pessoa fica no Entrar
+    # a página de erro do Entrar (senha errada) faz o mesmo
+    h = cli.post(prefixo + "/entrar", data={"senha": "errada"}).get_data(as_text=True)
+    assert _script_do_entrar(h) is not None
+
+
+def test_o_entrar_sem_a_chave_e_o_de_sempre_e_em_outra_origem_nada_sai():
+    assert "porta-sair-ao-entrar" not in _cliente(logar=False, NEXUS_SSO_CHAVE=None).get("/entrar").get_data(as_text=True)
+    cli = _cliente(logar=False, NEXUS_PLATAFORMA_URL="https://outra.exemplo.test")
+    script, acao = _script_do_entrar(cli.get("/entrar").get_data(as_text=True))
+    assert _rodar_sair(script, acao, "porta-sair-ao-entrar")["pedidos"] == []
 

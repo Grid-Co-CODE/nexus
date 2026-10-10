@@ -43,5 +43,23 @@
     <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
   {% endif %}
 </main>
+{% if plataforma_sair is not none %}
+{# Porta única (revisão de 10/10/2026): quem chega ao Entrar não herda a sessão do passe de quem usou este navegador
+   antes. O POST em /painel/nexus/sair da plataforma (mesma origem, como o Sair) encerra a sessão do passe; a da senha
+   da plataforma fica. Em outra origem nada sai (a sessão do passe só existe na mesma). Regra em auth._tela_entrar. #}
+<form id="porta-sair-ao-entrar" method="post" action="{{ plataforma_sair }}/painel/nexus/sair" hidden></form>
+<script>
+(function () {
+  var f = document.getElementById("porta-sair-ao-entrar");
+  try {
+    // URL completa: no servidor, uma camada fora do repositório põe /nexus em todo fetch começado por "/"
+    var alvo = new URL(f.getAttribute("action"), location.href);
+    if (alvo.origin !== location.origin) return;
+    fetch(alvo.href, {method: "POST", credentials: "same-origin", redirect: "manual", keepalive: true})
+      .catch(function () { /* a plataforma fora: o Entrar segue */ });
+  } catch (e) { /* navegador sem URL/fetch: o Entrar segue */ }
+})();
+</script>
+{% endif %}
 </body>
 </html>

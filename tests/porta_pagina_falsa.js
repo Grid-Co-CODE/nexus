@@ -5,7 +5,8 @@
    o e-mail dele, para a porta local da própria máquina. O que se confere aqui é que nada sai para outra origem.
 
    Uso: node porta_pagina_falsa.js <arquivo.js> '<config JSON>'
-   config: {pagina: "https://app.exemplo.test/nexus/t/...", modo: "porta" | "sair", dados, moldura, seletor, acao} */
+   config: {pagina: "https://app.exemplo.test/nexus/t/...", modo: "porta" | "sair", dados, moldura, seletor, acao, id,
+            script} */
 "use strict";
 const fs = require("fs");
 const vm = require("vm");
@@ -22,7 +23,8 @@ function elemento(id, extra) {
 
 const els = {};
 if (cfg.modo === "sair") {
-  els["sair-plataforma"] = elemento("sair-plataforma", {getAttribute: function (n) {
+  // o formulário do Sair (sair.html) ou o do Entrar (entrar.html: a sessão do passe de quem estava antes)
+  els[cfg.id || "sair-plataforma"] = elemento(cfg.id || "sair-plataforma", {getAttribute: function (n) {
     return n === "action" ? cfg.acao : n === "data-entrar" ? "/nexus/entrar" : null;
   }});
 } else {
