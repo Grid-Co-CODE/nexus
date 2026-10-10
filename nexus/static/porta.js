@@ -6,7 +6,12 @@
    2. a cada troca de caminho dentro da moldura a plataforma avisa ({tipo: "nexus:rota", caminho}); o endereço do Nexus
       acompanha (?p=, para F5 e favorito) e o item do menu certo acende, pela tabela do mapa;
    3. no Diagnóstico, o seletor de usina lê a lista da própria plataforma pelo navegador (a mesma do Painel NOC), sem o
-      processo do Nexus buscar nada.
+      processo do Nexus buscar nada;
+   4. a sessão que o passe abre na plataforma vale 12 h fixas (auditoria A5 da porta única, 10/10/2026: depois delas o
+      Painel NOC desenhava "Energia perdida 0,0 MWh", o 401 do /api/macro lido como zero). Quando a página da plataforma
+      leva 401 numa chamada de dado, ela avisa ({tipo: "nexus:sessao-vencida", caminho}); aqui se pede um passe NOVO ao
+      Nexus (POST em dados.renovar) e a moldura reabre a mesma tela, no máximo 1 vez a cada 60 s (sem laço). E, com a aba
+      aberta, a cada 11 h um passe novo abre outra sessão na plataforma por fetch, sem recarregar a tela.
    Endereço da plataforma sempre como URL COMPLETA (new URL(..., location.href)): no servidor, uma camada fora do
    repositório põe /nexus em todo fetch com caminho começado por "/" (nexus/casca/CLAUDE.md), e o /api/macro da
    plataforma viraria /nexus/api/macro. As funções puras ficam expostas ao node (tests/test_porta_js.py). */
@@ -82,9 +87,26 @@
     return String(a || "").split("?")[0] === String(b || "").split("?")[0];
   }
 
+  // A sessão do passe vale 12 h na plataforma (SESSAO_DO_PASSE_S): renova-se 1 h antes
+  var RENOVA_A_CADA_MS = 11 * 3600 * 1000;
+  // Se a sessão vence de novo logo depois de reaberta, algo está errado do lado da plataforma: reabrir outra vez seria um
+  // laço (cada volta, um passe novo e a tela inteira recarregada)
+  var ESPERA_ENTRE_REABERTURAS_MS = 60 * 1000;
+
+  function podeReabrir(ultima, agora) {
+    return !ultima || agora - ultima >= ESPERA_ENTRE_REABERTURAS_MS;
+  }
+
+  // O caminho a reabrir: o que a plataforma mandou, se for uma tela do mapa (só destas o Nexus dá passe); senão o último
+  // que a moldura avisou pelo nexus:rota (a plataforma pode estar no /login dela, fora do mapa)
+  function caminhoParaReabrir(telas, avisado, atual) {
+    return caminhoAceito(avisado) && telaDoCaminho(telas, avisado) ? avisado : (atual || "");
+  }
+
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {usinasDoSeletor: usinasDoSeletor, telaDoCaminho: telaDoCaminho, enderecoNoNexus: enderecoNoNexus,
-                      caminhoAceito: caminhoAceito, norm: norm, enc: enc};
+                      caminhoAceito: caminhoAceito, norm: norm, enc: enc, podeReabrir: podeReabrir,
+                      caminhoParaReabrir: caminhoParaReabrir, RENOVA_A_CADA_MS: RENOVA_A_CADA_MS};
     return;
   }
 
@@ -128,12 +150,17 @@
     if (nome) nome.textContent = tela.nome;
   }
 
+  // o caminho em que a moldura está agora (o da abertura, depois o de cada nexus:rota): é o que se reabre e se renova
+  var caminhoAtual = dados.destino || "";
+
   window.addEventListener("message", function (ev) {
     if (!moldura || ev.source !== moldura.contentWindow || ev.origin !== origem) return;
     var d = ev.data;
+    if (d && d.tipo === "nexus:sessao-vencida") { reabrir(d.caminho); return; }
     if (!d || d.tipo !== "nexus:rota" || !caminhoAceito(d.caminho)) return;
     var tela = telaDoCaminho(dados.telas || [], d.caminho);
     if (!tela) return;                       // fora do mapa (o login da plataforma, por exemplo): o endereço fica
+    caminhoAtual = d.caminho;
     var novo = enderecoNoNexus(tela, d.caminho);
     try { history.replaceState(history.state, "", novo); } catch (e) { /* endereço de outra origem: fica */ }
     // a troca de cadeira e de tema voltam para onde a pessoa está agora (o servidor aceita com ou sem o prefixo)
@@ -142,6 +169,88 @@
     acender(tela);
     marcarUsina(d.caminho);
   });
+
+  // ── a sessão da plataforma: reabrir quando vence, renovar antes de vencer ─────────────────────────────────────────
+  var campoPasse = formulario && formulario.querySelector ? formulario.querySelector('input[name="passe"]') : null;
+  var ultimaReabertura = 0;
+  var renovarEm = Date.now() + RENOVA_A_CADA_MS;
+
+  function entrarDeNovo(url) {
+    // a sessão do NEXUS acabou (o Fracttal saiu ou venceu): a janela vai ao login, que volta para esta tela (base.html)
+    if (typeof window.nexusEntrarDeNovo === "function") window.nexusEntrarDeNovo(url);
+    else location.reload();
+  }
+
+  // Um passe novo para `caminho`, pedido ao Nexus (a mesma regra da abertura da tela: 60 s, uso único). null quando a
+  // sessão do Nexus acabou (a janela já foi mandada ao login). URL completa: a camada da T.I. mexe em fetch com "/".
+  function pedirPasse(caminho) {
+    var corpo = new URLSearchParams();
+    corpo.set("p", caminho);
+    return fetch(new URL(dados.renovar, location.href).href, {method: "POST", body: corpo, credentials: "same-origin",
+                                                               redirect: "manual", cache: "no-store",
+                                                               headers: {"Accept": "application/json"}})
+      .then(function (r) {
+        if (r.type === "opaqueredirect") { entrarDeNovo(); return null; }      // o portão mandou ao Entrar
+        if (r.status === 401) {
+          return r.json().catch(function () { return {}; }).then(function (j) { entrarDeNovo(j && j.entrar); return null; });
+        }
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json().then(function (j) {
+          if (!j || !j.passe) throw new Error("sem passe");
+          return j.passe;
+        });
+      });
+  }
+
+  function reabrir(avisado) {
+    if (!formulario || !campoPasse || !dados.renovar || !mesmaOrigem) return;
+    var caminho = caminhoParaReabrir(dados.telas || [], avisado, caminhoAtual);
+    if (!caminho) return;
+    var agora = Date.now();
+    if (!podeReabrir(ultimaReabertura, agora)) {
+      avisar("A sessão da Plataforma de Performance venceu de novo logo depois de renovada. Clique no item do menu " +
+             "para abrir a tela outra vez; se continuar, avise o administrador.");
+      return;
+    }
+    ultimaReabertura = agora;
+    pedirPasse(caminho).then(function (passe) {
+      if (!passe) return;
+      campoPasse.value = passe;
+      formulario.submit();                   // a moldura abre o mesmo caminho com a sessão nova (o 303 da plataforma)
+      caminhoAtual = caminho;
+      renovarEm = Date.now() + RENOVA_A_CADA_MS;
+      if (alerta) alerta.hidden = true;
+    }).catch(function () {
+      avisar("A sessão da Plataforma de Performance venceu e o Nexus não conseguiu renová-la agora. Clique no item do " +
+             "menu para abrir a tela de novo.");
+    });
+  }
+
+  // Antes das 12 h: o passe novo vai por fetch (o 303 não é seguido, como no abrirSessao do Diagnóstico), a plataforma
+  // abre outra sessão e a tela segue como está, sem recarregar (a TV do NOC, a aba esquecida aberta). Falhou, tenta de
+  // novo em 10 min; se a sessão chegar a vencer, o aviso da plataforma reabre a tela.
+  function renovarSessao() {
+    renovarEm = Date.now() + RENOVA_A_CADA_MS;            // já: um pedido lento não dispara outro
+    pedirPasse(caminhoAtual).then(function (passe) {
+      if (!passe) return;
+      var corpo = new URLSearchParams();
+      corpo.set("passe", passe);
+      return fetch(urlDaPlataforma("/painel/nexus/entrar"), {method: "POST", body: corpo, credentials: "same-origin",
+                                                              redirect: "manual"})
+        .then(function (r) { if (r.type !== "opaqueredirect") throw new Error("HTTP " + r.status); });
+    }).catch(function () { renovarEm = Date.now() + 10 * 60 * 1000; });
+  }
+
+  function talvezRenovar() {
+    if (caminhoAtual && Date.now() >= renovarEm) renovarSessao();
+  }
+
+  if (moldura && formulario && mesmaOrigem && dados.renovar) {
+    // pelo relógio de parede, conferido a cada minuto e ao voltar à aba: um setTimeout de 11 h atrasa com o computador
+    // dormindo, e a sessão da plataforma conta as 12 h de verdade
+    setInterval(talvezRenovar, 60 * 1000);
+    document.addEventListener("visibilitychange", talvezRenovar);
+  }
 
   // ── Diagnóstico: o seletor de usina ───────────────────────────────────────────────────────────────────────────────
   var seletor = document.getElementById("porta-usina"), nota = document.getElementById("porta-usina-nota");
