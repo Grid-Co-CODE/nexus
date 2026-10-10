@@ -77,6 +77,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Cópia de prova do Nexus noutra porta (sem carga, sem Fracttal ao subir).")
     p.add_argument("--porta", type=int, default=5170)
     p.add_argument("--plataforma", help="NEXUS_PLATAFORMA_URL desta cópia (ex.: http://127.0.0.1:5150)")
+    p.add_argument("--prefixo", help="NEXUS_PREFIXO desta cópia (ex.: /nexus, como no servidor; atrás da porta_local.py)")
     args = p.parse_args()
     if args.porta == 5070:
         sys.exit("A 5070 é o Nexus do Levi: use outra porta.")
@@ -86,6 +87,8 @@ def main() -> None:
     os.environ["NEXUS_CAMPO_COLETOR"] = ""
     if args.plataforma:
         os.environ["NEXUS_PLATAFORMA_URL"] = args.plataforma
+    if args.prefixo is not None:
+        os.environ["NEXUS_PREFIXO"] = args.prefixo
     instalar_trava()
 
     sys.path.insert(0, str(RAIZ))
@@ -106,8 +109,8 @@ def main() -> None:
     instalar_campo(app)
     instalar_dados(app)
     instalar_engenharia(app)
-    print(f"Nexus (cópia de prova) em http://127.0.0.1:{args.porta}  plataforma: "
-          f"{app.config.get('NEXUS_PLATAFORMA_URL') or '(sem)'}", flush=True)
+    print(f"Nexus (cópia de prova) em http://127.0.0.1:{args.porta}  prefixo: {app.config.get('NEXUS_PREFIXO') or '(raiz)'}"
+          f"  plataforma: {app.config.get('NEXUS_PLATAFORMA_URL') or '(sem)'}", flush=True)
     serve(app, listen=f"127.0.0.1:{args.porta}", threads=8)
 
 

@@ -21,6 +21,7 @@ from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
+from ...prefixo import na_raiz
 from .aprovar_os import bp_aprovar_os, papel_da_sessao, pode_na_tela
 from .assinatura import bp_assinatura
 
@@ -67,7 +68,7 @@ TELAS_QUE_SAIRAM = ("os", "ranking", "imagens")
 
 
 def _tela_que_saiu():
-    return redirect("/t/campo/atencao")
+    return redirect(na_raiz("/t/campo/atencao"))
 
 
 for _id in TELAS_QUE_SAIRAM:
@@ -340,7 +341,7 @@ def pt_pdf(numero):
 
 def url_for_pt(numero) -> str:
     from urllib.parse import quote
-    return f"/t/campo/pt/{quote(str(numero), safe='')}"
+    return na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
 
 
 @bp.route("/pt/<numero>")
@@ -515,7 +516,7 @@ def ronda_avulsa_lancar():
         try:
             nova = ronda_avulsa.lancar(request.form, usuario)
             session["avulsa_aviso"] = f"Ronda avulsa lançada: {_dia_curto(nova['data'])}, das {nova['inicio'][11:16]} às {nova['fim'][11:16]}."
-            return redirect("/t/campo/rondas/avulsa", code=303)
+            return redirect(na_raiz("/t/campo/rondas/avulsa"), code=303)
         except ronda_avulsa.Recusada as e:
             erro = str(e)
         except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nada some calado
@@ -546,7 +547,7 @@ def ronda_avulsa_anular(rid):
             minhas=[], explicacao_avulsa=ronda_avulsa.EXPLICACAO, hoje="", piso="", tipos=(), valas=(), sensores=[],
             duracao=_duracao, comentario_max=ronda_avulsa.COMENTARIO_MAX)), 400
     session["avulsa_aviso"] = "Ronda avulsa anulada: ela sai das telas e a anulação fica registrada no banco."
-    return redirect("/t/campo/rondas/avulsa", code=303)
+    return redirect(na_raiz("/t/campo/rondas/avulsa"), code=303)
 
 
 @bp.route("/rondas/os/<int:os_>/fotos")

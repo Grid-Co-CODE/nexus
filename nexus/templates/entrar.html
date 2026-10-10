@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
   <script>
     {% include "_tema_cabeca.html" %}
+    {% include "_raiz_js.html" %}
   </script>
 </head>
 <body class="pagina-entrar">
@@ -16,19 +17,19 @@
   <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co." class="entrar-logo">
   <h1 class="titulo-pagina">Nexus</h1>
   <p class="mudo">Operação e manutenção da Grid Co. numa casca só.</p>
-  {% set acao = '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
+  {% set acao = raiz ~ '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
   {% if admin %}
-  <form method="post" action="{{ acao }}">
+  <form method="post" action="{{ acao|na_raiz }}">
     <label class="gc-rotulo" for="senha">Senha de administrador</label>
     <input id="senha" name="senha" type="password" class="gc-campo" autocomplete="current-password"
            autofocus required {% if erro %}aria-invalid="true" aria-describedby="erro"{% endif %}>
     {% if erro %}<p id="erro" class="gc-ajuda gc-ajuda--erro">{{ erro }}</p>{% endif %}
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar</button>
   </form>
-  <p class="entrar-alt"><a href="/entrar{% if destino and destino != '/' %}?next={{ destino|urlencode }}{% endif %}">Entrar com o login do Fracttal</a></p>
+  <p class="entrar-alt"><a href="{{ raiz }}/entrar{% if destino and destino != '/' %}?next={{ destino|urlencode }}{% endif %}">Entrar com o login do Fracttal</a></p>
   {% else %}
   {# o login do Fracttal: o mesmo e-mail e a mesma senha do Fracttal e do OS Creator (06/10/2026) #}
-  <form method="post" action="{{ acao }}">
+  <form method="post" action="{{ acao|na_raiz }}">
     <label class="gc-rotulo" for="email">E-mail do Fracttal</label>
     <input id="email" name="email" type="email" class="gc-campo" autocomplete="username" value="{{ email or '' }}"
            {% if not email %}autofocus{% endif %} required>
@@ -39,7 +40,7 @@
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar com o Fracttal</button>
   </form>
   <p class="entrar-alt mudo">O mesmo login do Fracttal e do OS Creator. A senha vai direto ao Fracttal e não é guardada.<br>
-    <a href="/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
+    <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
   {% endif %}
 </main>
 </body>

@@ -191,7 +191,7 @@ catálogo do Nexus (<code>nexus/dados/catalogo.py</code>).</p>
 {% for s in org.setores %}{% for c in s.ativos + s.fontes %}{{ detalhe(c) }}{% endfor %}{% endfor %}
 {# A gaveta e, à esquerda dela, a tabela (o botão de tabela ao lado do X). Um <dialog> só, modal: prende o foco nos dois
    e fecha com Esc (com a tabela aberta, o 1º Esc fecha só a tabela). #}
-<dialog class="dd-gaveta" id="dd-gaveta" aria-labelledby="dd-gaveta-titulo" data-url-tabela="{{ url_tabela }}">
+<dialog class="dd-gaveta" id="dd-gaveta" aria-labelledby="dd-gaveta-titulo" data-url-tabela="{{ (url_tabela)|na_raiz }}">
   <section class="dd-prev" id="dd-prev" hidden aria-labelledby="dd-prev-titulo">
     <div class="dd-prev-corpo"></div>
   </section>

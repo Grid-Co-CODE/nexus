@@ -644,7 +644,9 @@
     faixa.textContent = texto;
     if (motivo === "sessao" && !TV) {
       var entrar = el("a", null, " Entrar de novo");
-      entrar.href = "/entrar?next=" + encodeURIComponent(location.pathname + location.search);
+      // o Entrar do Nexus, debaixo do prefixo em que ele roda (nexusRota, do _raiz_js.html; sem ele, a raiz)
+      var rota = window.nexusRota || function (c) { return c; };
+      entrar.href = rota("/entrar") + "?next=" + encodeURIComponent(location.pathname + location.search);
       faixa.appendChild(entrar);
     }
     faixa.classList.toggle("mp-faixa-estado--fora", motivo === "sessao");

@@ -18,6 +18,7 @@
     // localStorage pode faltar (janela privada, dado bloqueado): aí o menu só abre expandido.
     try { if (localStorage.getItem("nexus.menu") === "recolhido") document.documentElement.classList.add("menu-recolhido"); } catch (e) {}
     {% include "_tema_cabeca.html" %}
+    {% include "_raiz_js.html" %}
   </script>
 </head>
 <body>
@@ -26,11 +27,11 @@
           aria-label="Recolher ou expandir o menu" title="Recolher ou expandir o menu ( [ )">
     <i class="ph ph-sidebar-simple"></i>
   </button>
-  <a class="marca" href="/">
+  <a class="marca" href="{{ raiz }}/">
     <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co.">
     <span class="marca-nexus">Nexus</span>
   </a>
-  <form class="cadeira" method="post" action="/cadeira">
+  <form class="cadeira" method="post" action="{{ raiz }}/cadeira">
     <label class="gc-rotulo" for="sel-cadeira">Cadeira</label>
     <select id="sel-cadeira" name="cadeira" class="gc-campo" onchange="this.form.submit()">
       <option value="" {% if not cadeira %}selected{% endif %}>Sem cadeira</option>
@@ -45,7 +46,7 @@
      O ícone (meio círculo cheio) é desenhado no CSS, sem <svg> no topo: as telas com gráfico procuram o primeiro <svg> da
      página (os testes do Mapa de risco quebraram com um ícone em SVG aqui) e sem depender da fonte de ícones da CDN. #}
   {% set outro_tema = 'escuro' if tema == 'claro' else 'claro' %}
-  <form class="troca-tema-form" method="post" action="/tema">
+  <form class="troca-tema-form" method="post" action="{{ raiz }}/tema">
     <input type="hidden" name="tema" value="{{ outro_tema }}">
     <input type="hidden" name="voltar" value="{{ caminho_completo }}">
     <button type="submit" id="troca-tema" class="gc-btn gc-btn--ui gc-btn--fantasma troca-tema"
@@ -56,27 +57,27 @@
   </form>
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
   {% if session.usuario %}<span class="usuario-topo" title="{{ session.usuario.email }}{% if session.usuario.perfil %} · {{ session.usuario.perfil }}{% endif %}">{{ session.usuario.nome }}</span>{% endif %}
-  <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
+  <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="{{ raiz }}/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
 </header>
 
 <div class="corpo">
   {# No celular o menu fica fechado atrás do botão Menu; sem JS, via checkbox. #}
   <input type="checkbox" id="abre-menu" class="abre-menu" hidden>
   <nav class="menu" aria-label="Torres">
-    <a class="item-inicio" href="/" {% if caminho == '/' %}aria-current="page"{% endif %} title="Início">
+    <a class="item-inicio" href="{{ raiz }}/" {% if caminho == '/' %}aria-current="page"{% endif %} title="Início">
       <i class="ph ph-house"></i><span>Início</span>
     </a>
     {% for t in menu %}
     {# Verde = a torre já tem tela com conteúdo (progresso, Levi 04/10/2026). #}
     <details class="torre{% if t.prontas %} com-conteudo{% endif %}" data-torre="{{ t.id }}" data-sua="{{ 1 if t.sua else 0 }}" {% if t.aberta %}open{% endif %}>
-      <summary title="{{ t.nome }}" data-primeira="{{ t.telas[0].url }}">
+      <summary title="{{ t.nome }}" data-primeira="{{ raiz }}{{ t.telas[0].url }}">
         <i class="ph ph-{{ t.icone }}"></i>
         <span>{{ t.nome }}</span>
         {% if t.sua %}<span class="sua">sua</span>{% endif %}
       </summary>
       <ul>
         {% for s in t.telas %}
-        <li><a href="{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
+        <li><a href="{{ raiz }}{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
         {% endfor %}
       </ul>
     </details>
@@ -110,11 +111,14 @@
   // página da Plataforma no Tempo real é outro sistema e fica no escuro dela; moldura de outra origem dá exceção e fica.
   // A página do OS Creator aberta depois já nasce no tema novo: a ponte desenha pelo cookie, que o NexusTema.gravar mudou.
   function temaNasMolduras(doc, t) {
+    // o /os/ do Nexus, com o prefixo em que ele roda (_raiz_js.html); sem o nexusRota (o teste roda a função sozinha), o /os/
+    var rota = typeof nexusRota === "function" ? nexusRota : function (c) { return c; };
+    var raizOs = rota("/os/");
     var molduras = doc.getElementsByTagName("iframe");
     for (var i = 0; i < molduras.length; i++) {
       try {
         var w = molduras[i].contentWindow, d = w && w.document;
-        if (!d || !d.documentElement || w.location.pathname.indexOf("/os/") !== 0) continue;
+        if (!d || !d.documentElement || w.location.pathname.indexOf(raizOs) !== 0) continue;
         d.documentElement.setAttribute("data-tema", t);
         temaNasMolduras(d, t);
       } catch (e) { /* moldura de outra origem */ }

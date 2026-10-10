@@ -21,7 +21,7 @@
   </summary>
   <div class="cad-rolagem" style="border:0;border-top:1px solid var(--linha);border-radius:0">
     <table class="cad-tabela">
-      <tbody>{% for p in itens %}<tr><td class="id">{{ p.id }}</td><td><a class="linha" href="{{ p.url }}">{{ p.titulo }}</a></td><td>{{ p.detalhe }}</td></tr>{% endfor %}</tbody>
+      <tbody>{% for p in itens %}<tr><td class="id">{{ p.id }}</td><td><a class="linha" href="{{ (p.url)|na_raiz }}">{{ p.titulo }}</a></td><td>{{ p.detalhe }}</td></tr>{% endfor %}</tbody>
     </table>
   </div>
 </details>

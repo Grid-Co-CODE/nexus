@@ -51,9 +51,9 @@ def test_ponte_leva_o_pedido_e_devolve_sem_cookie(logado_ponte, monkeypatch):
     monkeypatch.setattr(ponte, "enviar", falso)
     r = logado_ponte.get(ponte.PREFIXO + "/api/pv/trackers/parados?force=1&data=x")
     assert r.status_code == 200
-    # O único cookie que sai é o da sessão do próprio Nexus (12 h deslizantes); o da plataforma não passa.
+    # O único cookie que sai é o da sessão do próprio Nexus (nexus_sessao, 12 h deslizantes); o da plataforma não passa.
     cookies = r.headers.getlist("Set-Cookie")
-    assert all(c.startswith("session=") for c in cookies) and not any("s=1" in c for c in cookies)
+    assert all(c.startswith("nexus_sessao=") for c in cookies) and not any("s=1" in c for c in cookies)
     assert visto["url"] == "https://plat:5050/api/pv/trackers/parados" and visto["params"] == [("data", "x")]
     assert visto["headers"]["X-Nexus-Leitura"] == "segredo-xyz"
 

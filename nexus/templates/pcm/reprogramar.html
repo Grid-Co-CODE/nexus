@@ -51,7 +51,7 @@
 </section>
 
 {% if not atual.erro and linhas and not problemas %}
-<form class="pcm-pub-form" method="post" action="/t/pcm/quadro/reprogramar">
+<form class="pcm-pub-form" method="post" action="{{ raiz }}/t/pcm/quadro/reprogramar">
   <input type="hidden" name="semana" value="{{ semana }}">
   <input type="hidden" name="itens" value="{{ itens_json }}">
   <input type="hidden" name="sha_visto" value="{{ atual.sha }}">
@@ -62,10 +62,10 @@
     programação da semana {{ semana }}, que o campo está seguindo.</label>
   <div class="pcm-pub-acoes">
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-floppy-disk"></i> Aplicar na semana em curso</button>
-    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/quadro?semana={{ semana }}">Voltar ao quadro</a>
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/pcm/quadro?semana={{ semana }}">Voltar ao quadro</a>
   </div>
 </form>
 {% else %}
-<p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/pcm/quadro?semana={{ semana }}">Voltar ao quadro</a></p>
+<p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/pcm/quadro?semana={{ semana }}">Voltar ao quadro</a></p>
 {% endif %}
 {% endblock %}

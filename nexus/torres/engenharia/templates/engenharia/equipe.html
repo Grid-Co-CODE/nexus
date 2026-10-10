@@ -128,7 +128,7 @@
     c.tabIndex = 0; c.dataset.os = o.os;
     var cab = el('header', 'kb-card-cab');
     var num = el(o.wid ? 'a' : 'span', 'kb-os', 'OS ' + o.os);
-    if (o.wid) { num.href = '/os/os/' + encodeURIComponent(o.wid) + '?status=' + encodeURIComponent(o.status || ''); num.tabIndex = -1; }
+    if (o.wid) { num.href = nexusRota('/os/os/') + encodeURIComponent(o.wid) + '?status=' + encodeURIComponent(o.status || ''); num.tabIndex = -1; }
     cab.appendChild(num);
     cab.appendChild(el('span', 'kb-prazo', prazoTexto(o)));
     c.appendChild(cab);

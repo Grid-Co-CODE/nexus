@@ -10,8 +10,8 @@
     <p class="cad-sub">Que usina cada base chama de quê, e onde a ligação falta. A correção feita aqui entra no de_para na hora e vai ao banco quando você publicar.</p>
   </div>
   <div class="lig-acoes">
-    <form method="post" action="/t/base/ligacoes/recalcular">{{ alvo('') }}<button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-arrows-clockwise"></i> Ler as bases de novo</button></form>
-    <form method="post" action="/t/base/ligacoes/publicar">{{ alvo('') }}<button class="gc-btn gc-btn--primario" type="submit" {% if not pode_publicar or not gerado_em %}disabled title="Falta o token de escrita ou a leitura das bases"{% endif %}><i class="ph ph-cloud-arrow-up"></i> Publicar no banco</button></form>
+    <form method="post" action="{{ raiz }}/t/base/ligacoes/recalcular">{{ alvo('') }}<button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-arrows-clockwise"></i> Ler as bases de novo</button></form>
+    <form method="post" action="{{ raiz }}/t/base/ligacoes/publicar">{{ alvo('') }}<button class="gc-btn gc-btn--primario" type="submit" {% if not pode_publicar or not gerado_em %}disabled title="Falta o token de escrita ou a leitura das bases"{% endif %}><i class="ph ph-cloud-arrow-up"></i> Publicar no banco</button></form>
   </div>
 </div>
 {% if gerado_em %}<p class="lig-meta">Bases lidas em <span class="gc-num">{{ gerado_em }}</span> · {{ p.decisoes|length }} decisões gravadas</p>{% endif %}
@@ -55,21 +55,21 @@
     <td class="mudo">{{ b.motivo }}</td>
     <td>
       {% for g in b.sugestoes %}
-      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(b.sistema) }}
+      <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form">{{ alvo(b.sistema) }}
         <input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ b.chave }}"><input type="hidden" name="usina" value="{{ g.id }}">
         <button class="lig-sug" type="submit" title="Ligar a {{ g.titulo }}"><i class="ph ph-link"></i> {{ g.titulo }}<span class="gc-num">{{ g.nota }}%</span></button>
       </form>
       {% else %}<span class="mudo">nenhuma parecida</span>{% endfor %}
     </td>
     <td>
-      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form lig-linha">{{ alvo(b.sistema) }}
+      <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form lig-linha">{{ alvo(b.sistema) }}
         <input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ b.chave }}">
         <input class="gc-campo" name="usina" list="lig-usinas" placeholder="usina do cadastro (id ou nome)" required aria-label="Usina do cadastro para ligar">
         <button class="gc-btn gc-btn--contorno" type="submit">Ligar</button>
       </form>
     </td>
     <td>
-      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form lig-linha">{{ alvo(b.sistema) }}
+      <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form lig-linha">{{ alvo(b.sistema) }}
         <input type="hidden" name="acao" value="ignorar"><input type="hidden" name="chave" value="{{ b.chave }}">
         <input class="gc-campo" name="motivo" placeholder="por quê" required aria-label="Motivo para ignorar">
         <button class="gc-btn gc-btn--fantasma" type="submit">Ignorar</button>
@@ -94,8 +94,8 @@
     <td><span class="id">{{ x.usina_id }}</span> {{ x.usina }}</td>
     <td class="mudo">{{ x.como }}</td>
     <td class="lig-botoes">
-      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(x.sistema) }}<input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ x.chave }}"><input type="hidden" name="usina" value="{{ x.usina_id }}"><button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-check"></i> Confirmar</button></form>
-      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(x.sistema) }}<input type="hidden" name="acao" value="desligar"><input type="hidden" name="chave" value="{{ x.chave }}"><input type="hidden" name="usina" value="{{ x.usina_id }}"><button class="gc-btn gc-btn--fantasma" type="submit"><i class="ph ph-link-break"></i> Desligar</button></form>
+      <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form">{{ alvo(x.sistema) }}<input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ x.chave }}"><input type="hidden" name="usina" value="{{ x.usina_id }}"><button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-check"></i> Confirmar</button></form>
+      <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form">{{ alvo(x.sistema) }}<input type="hidden" name="acao" value="desligar"><input type="hidden" name="chave" value="{{ x.chave }}"><input type="hidden" name="usina" value="{{ x.usina_id }}"><button class="gc-btn gc-btn--fantasma" type="submit"><i class="ph ph-link-break"></i> Desligar</button></form>
     </td>
   </tr>
   {% else %}<tr><td colspan="5" class="vazio">Nada ligado só pelo nome aqui.</td></tr>{% endfor %}
@@ -111,7 +111,7 @@
 <details class="cad-secao lig-grupo"{% if loop.first %} open{% endif %}>
   <summary><strong>{{ cliente or 'sem cliente' }}</strong> <span class="mudo gc-num">· {{ us|length }} usinas</span>
     {% if cliente_id is not none %}
-    <form method="post" action="/t/base/ligacoes/decidir" class="lig-form lig-linha lig-direita">{{ alvo(s) }}
+    <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form lig-linha lig-direita">{{ alvo(s) }}
       <input type="hidden" name="acao" value="ausencia"><input type="hidden" name="cliente_id" value="{{ cliente_id }}">
       <input class="gc-campo" name="motivo" placeholder="por que esse cliente não está nesta base" required aria-label="Motivo da ausência">
       <button class="gc-btn gc-btn--contorno" type="submit">Ausência esperada</button>
@@ -119,7 +119,7 @@
   </summary>
   <div class="cad-rolagem" style="border:0;border-top:1px solid var(--linha);border-radius:0">
   <table class="cad-tabela"><thead><tr><th>ID</th><th>Usina</th><th>Código</th><th>Equipe</th><th>Cidade</th></tr></thead><tbody>
-  {% for u in us %}<tr><td class="id">{{ u.id }}</td><td><a class="linha" href="/t/base/usina/{{ u.id }}">{{ u.nome }}</a></td><td class="id">{{ u.codigo or '—' }}</td><td>{{ u.equipe }}</td><td>{{ u.cidade or '' }}{% if u.uf %}/{{ u.uf }}{% endif %}</td></tr>{% endfor %}
+  {% for u in us %}<tr><td class="id">{{ u.id }}</td><td><a class="linha" href="{{ raiz }}/t/base/usina/{{ u.id }}">{{ u.nome }}</a></td><td class="id">{{ u.codigo or '—' }}</td><td>{{ u.equipe }}</td><td>{{ u.cidade or '' }}{% if u.uf %}/{{ u.uf }}{% endif %}</td></tr>{% endfor %}
   </tbody></table>
   </div>
 </details>
@@ -141,7 +141,7 @@
     <td class="mudo">{{ d.motivo }}</td>
     <td class="mudo">{{ d.quem }}{% if d.quando %} · <span class="gc-num">{{ hora(d.quando) }}</span>{% endif %}</td>
     <td>{% if d.quem %}
-      <form method="post" action="/t/base/ligacoes/decidir" class="lig-form">{{ alvo(d.sistema) }}
+      <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form">{{ alvo(d.sistema) }}
         <input type="hidden" name="acao" value="desfazer"><input type="hidden" name="motivo" value="{{ d.tipo }}">
         {% if d.tipo in ('ligar', 'desligar', 'ignorar') %}<input type="hidden" name="chave" value="{{ d.chave }}">{% elif d.usina_id is not none %}<input type="hidden" name="usina" value="{{ d.usina_id }}">{% else %}<input type="hidden" name="cliente_id" value="{{ d.cliente_id }}">{% endif %}
         <button class="gc-btn gc-btn--fantasma" type="submit"><i class="ph ph-arrow-counter-clockwise"></i> Desfazer</button>

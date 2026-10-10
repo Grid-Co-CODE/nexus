@@ -18,7 +18,7 @@
       <p class="cl-pergunta">{{ tela.pergunta }}</p>
     </div>
     <div class="mp-cab-lado">
-      <a class="gc-btn gc-btn--contorno" href="/t/performance/clima{% if v.cliente %}?cliente={{ v.cliente|urlencode }}{% endif %}">Ver a lista</a>
+      <a class="gc-btn gc-btn--contorno" href="{{ raiz }}/t/performance/clima{% if v.cliente %}?cliente={{ v.cliente|urlencode }}{% endif %}">Ver a lista</a>
       {% if not v.erro_cadastro and not v.sem_usinas %}<a class="gc-btn gc-btn--contorno" data-acao="tv" href="{{ url_for('torre_performance.mapa_de_risco', **v.links.tv) }}">Modo TV</a>{% endif %}
       <p class="cl-atualizada" data-parte="hora">Tela atualizada às {{ v.atualizada }}</p>
     </div>

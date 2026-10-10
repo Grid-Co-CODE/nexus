@@ -2,16 +2,16 @@
 {% block titulo %}Importar do Excel{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
-<p class="gc-eyebrow"><a href="/t/base/importar">Importar do Excel</a></p>
+<p class="gc-eyebrow"><a href="{{ raiz }}/t/base/importar">Importar do Excel</a></p>
 <div class="cad-topo">
   <div>
     <h1 class="titulo-pagina">Prévia da importação</h1>
     <p class="cad-sub">{{ p.origem.arquivo }} · impressão digital <span class="gc-dado">{{ p.origem.sha256 }}</span> ·
       {% for aba, n in p.origem.abas.items() %}{{ aba }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %} linhas</p>
   </div>
-  <form class="cad-acoes" method="post" action="/t/base/importar/aplicar">
+  <form class="cad-acoes" method="post" action="{{ raiz }}/t/base/importar/aplicar">
     <input type="hidden" name="token" value="{{ token }}">
-    <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="/t/base/importar">Cancelar</a>
+    <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/base/importar">Cancelar</a>
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-check"></i> Aplicar no ensaio</button>
   </form>
 </div>

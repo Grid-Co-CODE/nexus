@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='clima-mapa.css') }}">
-  <script>{% include "_tema_cabeca.html" %}</script>
+  <script>{% include "_tema_cabeca.html" %}{% include "_raiz_js.html" %}</script>
   {# Sem JavaScript o modo TV ainda se recarrega (60 s; 10 s enquanto uma fonte é lida pela primeira vez). Com ele, relê só o mapa
      no ritmo dos caches das fontes (data-proxima-s), e diz na tela quando a sessão caiu ou o Nexus não responde. #}
   <noscript><meta http-equiv="refresh" content="{{ v.recarrega_em }}"></noscript>

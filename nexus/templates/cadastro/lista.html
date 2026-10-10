@@ -9,14 +9,14 @@
     <p class="cad-sub">Ensaio local: o BD_Operações continua sendo a fonte oficial até a virada.</p>
   </div>
   <div class="cad-acoes">
-    {% if ent.id == 'usinas' %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="/t/base/importar"><i class="ph ph-upload-simple"></i> Importar do Excel</a>{% endif %}
-    <a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ url_nova }}"><i class="ph ph-plus"></i> {{ texto_novo }}</a>
+    {% if ent.id == 'usinas' %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/base/importar"><i class="ph ph-upload-simple"></i> Importar do Excel</a>{% endif %}
+    <a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ (url_nova)|na_raiz }}"><i class="ph ph-plus"></i> {{ texto_novo }}</a>
   </div>
 </div>
 
 {% if visoes %}
 <nav class="cad-visoes" aria-label="Visões">
-  {% for v in visoes %}<a href="{{ v.url }}"{% if v.atual %} aria-current="page"{% endif %}>{{ v.rotulo }}</a>{% endfor %}
+  {% for v in visoes %}<a href="{{ (v.url)|na_raiz }}"{% if v.atual %} aria-current="page"{% endif %}>{{ v.rotulo }}</a>{% endfor %}
 </nav>
 {% endif %}
 
@@ -26,7 +26,7 @@
 {% endif %}
 {% if vazio %}
 <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>O ensaio está vazio.</strong>
-  <a href="/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
+  <a href="{{ raiz }}/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
 {% endif %}
 {% if nota %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>{{ nota }}</div></div>{% endif %}
 
@@ -46,7 +46,7 @@
   {% endfor %}
   <input type="hidden" name="cols" id="cad-cols" value="{{ cols_atuais }}">
   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
-  {% if q or filtros|selectattr('atual')|list %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ request.path }}">Limpar</a>{% endif %}
+  {% if q or filtros|selectattr('atual')|list %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ (request.path)|na_raiz }}">Limpar</a>{% endif %}
 </form>
 
 <div class="cad-barra-tabela">
@@ -82,7 +82,7 @@
         <td class="id">{{ l.id }}</td>
         {% for cel in l.celulas %}
         <td data-col="{{ cel.col }}" class="{{ 'esq' if cel.esquerda }}{{ ' legado' if cel.legado }}"{% if not cel.visivel %} hidden{% endif %}>
-          {%- if cel.link -%}<a class="linha" href="{{ l.url }}">{{ cel.texto or '(sem nome)' }}</a>
+          {%- if cel.link -%}<a class="linha" href="{{ (l.url)|na_raiz }}">{{ cel.texto or '(sem nome)' }}</a>
           {%- elif cel.chip and cel.texto -%}<span class="cad-chip{{ ' cad-chip--operacao' if cel.texto in ('OPERAÇÃO', 'Ativo') }}">{{ cel.texto }}</span>
           {%- elif cel.texto -%}{{ cel.texto }}
           {%- elif cel.vaga -%}<span class="cad-vaga">{{ cel.vaga }}</span>
@@ -105,7 +105,7 @@
               <strong>{{ nomes.get(p.tipo, p.tipo) }}</strong> <span>{{ p.detalhe }}</span></li>
             {% endfor %}
           </ul>
-          <a class="cad-detalhe-ir" href="{{ l.url }}">Abrir a ficha para corrigir <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+          <a class="cad-detalhe-ir" href="{{ (l.url)|na_raiz }}">Abrir a ficha para corrigir <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
         </td>
       </tr>
       {% endif %}

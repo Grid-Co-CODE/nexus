@@ -14,6 +14,7 @@ from urllib.parse import quote, urlsplit
 from flask import Blueprint, current_app, jsonify, redirect, request, session
 
 from ...campo import decisao_pt, pt_fracttal, visao
+from ...prefixo import na_raiz, sem_raiz
 
 bp_assinatura = Blueprint("campo_assinatura", __name__)
 
@@ -73,12 +74,13 @@ def _rpc_de_quem_olha(jwt: str, email: str):
 
 
 def _tela(numero) -> str:
-    return f"/t/campo/pt/{quote(str(numero), safe='')}"
+    return na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
 
 
 def _login(numero) -> str:
-    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar
-    return "/os/login?next=" + quote(f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar", safe="")
+    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar. O `next` vai SEM o prefixo
+    # (é o caminho que o clone entende); o endereço do login, com ele (é o navegador que o pede)
+    return na_raiz("/os/login") + "?next=" + quote(f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar", safe="")
 
 
 @bp_assinatura.route("/os/_nexus/quem")
@@ -114,8 +116,9 @@ def assinatura_tecnico(numero):
 def voltar_para():
     """Depois do login do Fracttal (o OS Creator só devolve para /os/...), de volta à tela do Nexus de onde se veio.
     Só endereço da torre Campo: nada de mandar para fora."""
-    para = request.args.get("para") or ""
-    return redirect(para if para.startswith("/t/campo/") and not para.startswith("//") else "/t/campo/aprovacao")
+    # o `para` é o location.pathname da tela, que debaixo do prefixo vem com ele (/nexus/t/campo/...)
+    para = sem_raiz(request.args.get("para") or "")
+    return redirect(na_raiz(para if para.startswith("/t/campo/") and not para.startswith("//") else "/t/campo/aprovacao"))
 
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/voltar")

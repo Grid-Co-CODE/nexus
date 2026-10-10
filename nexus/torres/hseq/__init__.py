@@ -21,6 +21,7 @@ from ...hseq import extintores as EXT
 from ...hseq import relatorio as REL
 from ..campo import _do_papel, _gestor, _lido, _papeis, _regiao_campo, _url
 from ..modelo import Tela, Torre
+from ...prefixo import na_raiz
 
 TORRE = Torre(
     id="hseq",
@@ -114,7 +115,7 @@ def extintores_relatorio():
     `fotos=0` tira). Sem o livro do App, volta para a tela, que diz o que falta."""
     leitura, d, todas, base, regiao, regiao_campo, gestor = _filtrados()
     if leitura.erro or not d.get("aba_existe") or d.get("colunas_faltando"):
-        return redirect("/t/hseq/extintores")
+        return redirect(na_raiz("/t/hseq/extintores"))
     filtro = request.args.get("status") if request.args.get("status") in REL.FILTROS else "todos"
     com_fotos = (request.args.getlist("fotos") or ["1"])[-1] != "0"
     filtros_tela = [f"{rot}: {v}" for rot, v in (("Região do Brasil", regiao), ("Região de campo", regiao_campo),

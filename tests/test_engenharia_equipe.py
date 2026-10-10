@@ -92,10 +92,10 @@ def test_o_quadro_abre_o_card_do_os_creator(logado, monkeypatch):
                                              "faltam": [], "lido": 1.0, "lendo": False, "erro": ""})
     html = logado.get("/t/engenharia/equipe").get_data(as_text=True)
     # o componente que abre o card (oscreator/card_os_abrir.html) e a moldura dele, /os/_nexus/card/<id>
-    assert "window.NexusOsCard" in html and "'/os/_nexus/card/' + encodeURIComponent(wid)" in html
+    assert "window.NexusOsCard" in html and "nexusRota('/os/_nexus/card/') + encodeURIComponent(wid)" in html
     assert "NexusOsCard.abrir(o.wid, {status: o.status, folio: o.os" in html
     # o nº da OS é o link da página dela no OS Creator (o mesmo do Histórico: /os/os/<id>?status=...)
-    assert "num.href = '/os/os/' + encodeURIComponent(o.wid) + '?status=' + encodeURIComponent(o.status || '')" in html
+    assert "num.href = nexusRota('/os/os/') + encodeURIComponent(o.wid) + '?status=' + encodeURIComponent(o.status || '')" in html
     dados = html.split('id="kb-dados">', 1)[1].split("</script>", 1)[0]
     assert '"wid": 9001' in dados and '"status": "Em Processo"' in dados and '"os": "1"' in dados
     assert "eg-gaveta" not in html                                 # a gaveta própria saiu: o card é o do OS Creator

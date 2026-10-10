@@ -14,6 +14,7 @@ from flask import (Blueprint, current_app, redirect, render_template, request, s
                    url_for)
 
 from . import fracttal
+from ..prefixo import na_raiz, raiz
 
 bp = Blueprint("auth", __name__)
 
@@ -49,6 +50,18 @@ def next_seguro(valor: str | None) -> str:
     return valor
 
 
+def destino_seguro(valor: str | None) -> str:
+    """O `next_seguro` como o navegador o pede: debaixo do prefixo, `/t/x` vira `/nexus/t/x` (e o que já vem com ele,
+    como o `next` que a camada da T.I. reescreve, fica como está). Para todo redirecionamento a um `next`/`voltar`."""
+    return na_raiz(next_seguro(valor))
+
+
+def os_cookie_path() -> str:
+    """O caminho do cookie do OS Creator embutido (`os_sessao`): o /os do Nexus, debaixo do prefixo em que ele roda.
+    Com `/os` fixo, debaixo de `/nexus` ele não ia ao `/nexus/os/...` e ia ao `/os/` da PLATAFORMA (spec 5.1)."""
+    return raiz() + "/os"
+
+
 def _admins() -> set[str]:
     return {e.strip().lower() for e in str(current_app.config.get("NEXUS_ADMINS") or "").split(",") if e.strip()}
 
@@ -81,10 +94,10 @@ def _entrar_fracttal(destino):
     sup = _supervisor_padrao(conta["email"], conta["nome"])
     if sup:
         session["supervisor_padrao"] = sup
-    resp = redirect(destino)
+    resp = redirect(na_raiz(destino))
     nome, valor, idade = conta["cookie"]
     # a sessão do OS Creator (o JWT do Fracttal) nasce junto: o /os/ e a aprovação de PT abrem sem pedir de novo
-    resp.set_cookie(nome, valor, max_age=idade, path="/os", httponly=True, samesite="Lax",
+    resp.set_cookie(nome, valor, max_age=idade, path=os_cookie_path(), httponly=True, samesite="Lax",
                     secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
     return resp
 
@@ -115,14 +128,14 @@ def entrar():
     session.permanent = True
     session["logado"] = True
     session["admin"] = True
-    return redirect(destino)
+    return redirect(na_raiz(destino))
 
 
 @bp.route("/sair")
 def sair():
     session.clear()
     resp = redirect(url_for("auth.entrar"))
-    resp.delete_cookie("os_sessao", path="/os")      # sai do OS Creator junto
+    resp.delete_cookie("os_sessao", path=os_cookie_path())      # sai do OS Creator junto
     return resp
 
 
@@ -131,6 +144,7 @@ def instalar_portao(app) -> None:
     def _portao():
         if request.endpoint in ROTAS_PUBLICAS or session.get("logado"):
             return None
-        return redirect(url_for("auth.entrar", next=request.full_path.rstrip("?")))
+        # o `next` como o navegador o vê (com o prefixo): o endereço a que a pessoa volta depois de entrar
+        return redirect(url_for("auth.entrar", next=na_raiz(request.full_path.rstrip("?"))))
 
     app.extensions["nexus_erros_login"] = defaultdict(deque)

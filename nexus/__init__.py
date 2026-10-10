@@ -4,14 +4,23 @@ from datetime import timedelta
 from flask import Flask
 
 from .config import OPCIONAIS, carregar_config
+from .prefixo import Prefixo, SessaoNoPrefixo, na_raiz, normalizar
 
 
 def create_app(config: dict | None = None) -> Flask:
     cfg = carregar_config(config)
+    prefixo = normalizar(cfg.get("NEXUS_PREFIXO"))
     app = Flask(__name__)
     app.config.update(
         SECRET_KEY=cfg["NEXUS_SECRET_KEY"],
         NEXUS_SENHA_ADMIN=cfg["NEXUS_SENHA_ADMIN"],
+        # Passo 0 da porta única (spec 2026-10-09, seção 5.1): o Nexus e a plataforma estão no mesmo endereço e os dois
+        # usavam o `session` do Flask em `/`; o navegador guardava um só, e entrar num apagava a sessão do outro. Nome
+        # próprio aqui, e o caminho é o do prefixo em que o Nexus roda (`SessaoNoPrefixo`). Efeito único: quem estava
+        # logado entra de novo uma vez.
+        SESSION_COOKIE_NAME="nexus_sessao",
+        NEXUS_PREFIXO=prefixo,
+        APPLICATION_ROOT=prefixo or "/",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         # Secure por padrão (servidor atrás de HTTPS). O app.py desliga só para rodar em
@@ -28,6 +37,12 @@ def create_app(config: dict | None = None) -> Flask:
     # As outras opcionais (tela Ligações: pasta de dados, regras, token do banco). Sem isto o teste que passava
     # NEXUS_DADOS gravava no arquivo de regras de verdade (04/10/2026).
     app.config.update({k: v for k, v in cfg.items() if k in OPCIONAIS and k not in app.config})
+    app.session_interface = SessaoNoPrefixo()
+    if prefixo:
+        # o servidor (app.gridco.com.br/nexus): o app se vê debaixo do prefixo, venha ele no caminho ou não (nexus/prefixo.py)
+        app.wsgi_app = Prefixo(app.wsgi_app, prefixo)
+    # o endereço do Nexus nos templates: {{ raiz }}/t/... e o filtro |na_raiz para o que vem montado do Python
+    app.jinja_env.filters["na_raiz"] = na_raiz
 
     from .auth import bp as auth_bp, instalar_portao
     from .casca import bp as casca_bp, instalar_contexto

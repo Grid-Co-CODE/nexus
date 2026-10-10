@@ -13,6 +13,7 @@ from flask import Response, current_app, jsonify, render_template, request
 
 from ...performance import ponte
 from ...performance.clima import fontes as F
+from ...prefixo import na_raiz
 from ..modelo import Tela, Torre
 
 TORRE = Torre(
@@ -137,8 +138,11 @@ def plataforma(caminho: str):
         return jsonify({"ok": False, "error": "somente leitura (Nexus)"}), 403
     if ponte.fora_por_api_pv(c):
         return jsonify({"ok": False, "error": ponte.AVISO_API_PV}), 403
+    # o caminho da ponte como o navegador o vê (com o prefixo em que o Nexus roda): a plataforma escreve os links com ele
+    prefixo = na_raiz(ponte.PREFIXO)
     pedido = ponte.montar_pedido(url, token, request.method, c, list(request.args.items(multi=True)),
-                                 request.get_data() if request.method == "POST" else None, request.content_type)
+                                 request.get_data() if request.method == "POST" else None, request.content_type,
+                                 prefixo=prefixo)
     try:
         r = ponte.enviar(**pedido)
     except ponte.Ocupada:
@@ -159,7 +163,7 @@ def plataforma(caminho: str):
     if 200 <= r.status_code < 300 and not _confirmou_a_chave(r):
         return _erro("A plataforma não confirmou a chave de leitura: ela pode estar aberta sem NEXUS_LEITURA_TOKEN. "
                      "Nada foi mostrado.", titulo="Plataforma não confirmou a chave")
-    status, cab, corpo = ponte.ajustar_resposta(r.status_code, dict(r.headers), r.content)
+    status, cab, corpo = ponte.ajustar_resposta(r.status_code, dict(r.headers), r.content, prefixo=prefixo)
     return Response(corpo, status=status, headers=cab)
 
 

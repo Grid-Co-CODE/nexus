@@ -15,6 +15,7 @@ from flask import abort, current_app, jsonify, redirect, render_template, reques
 
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, observacoes as O, publicar as PB
 from . import quadro as Q, semana as S
+from ..prefixo import na_raiz
 
 POR_PAGINA = 150
 _BRT = timezone(timedelta(hours=-3))
@@ -139,7 +140,7 @@ def registrar_pcm(bp) -> None:
         except geracao.Ocupado as ex:
             return render_template("pcm/gerar.html", **_ctx_gerar(
                 cfg, erro=f"Já tem uma geração rodando (rodada {ex}). Espere ela terminar.")), 409
-        return redirect("/t/pcm/gerar?rodada=" + r["id"], code=303)
+        return redirect(na_raiz("/t/pcm/gerar?rodada=") + r["id"], code=303)
 
     @bp.route("/gerar/importar", methods=["POST"])
     def gerar_importar():
@@ -158,7 +159,7 @@ def registrar_pcm(bp) -> None:
         except I.InsumoErro as ex:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
                                    erro=f"Não importei: {ex}")), 400
-        return redirect(f"/t/pcm/gerar?semana={semana}&feito=importado", code=303)
+        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=importado"), code=303)
 
     @bp.route("/gerar/importar-repositorio", methods=["POST"])
     def gerar_importar_repositorio():
@@ -181,7 +182,7 @@ def registrar_pcm(bp) -> None:
         I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, dados.decode("utf-8", errors="replace"),
                              autor="repositório do PCM", origem={"arquivo": f"{repo} · {I.OBSERVACOES}",
                                                                   "importado_em": I._agora()})
-        return redirect(f"/t/pcm/gerar?semana={semana}&feito=importado_repo", code=303)
+        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=importado_repo"), code=303)
 
     @bp.route("/gerar/publicar", methods=["GET", "POST"])
     def gerar_publicar():
@@ -211,7 +212,7 @@ def registrar_pcm(bp) -> None:
                 return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
                                        erro=f"O GitHub não respondeu ({type(ex).__name__}): nada foi publicado, ou "
                                             f"só parte; confira o repositório antes de tentar de novo.")), 502
-            return redirect(f"/t/pcm/gerar?rodada={rid}&feito=publicada", code=303)
+            return redirect(na_raiz(f"/t/pcm/gerar?rodada={rid}&feito=publicada"), code=303)
         return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos))
 
     @bp.route("/gerar/observacoes", methods=["POST"])
@@ -221,7 +222,7 @@ def registrar_pcm(bp) -> None:
         if not semana:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
         I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, request.form.get("texto") or "", autor="admin")
-        return redirect(f"/t/pcm/gerar?semana={semana}&feito=observacoes", code=303)
+        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=observacoes"), code=303)
 
     @bp.route("/gerar/observacoes/copiar", methods=["POST"])
     def gerar_observacoes_copiar():
@@ -241,7 +242,7 @@ def registrar_pcm(bp) -> None:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
                                    erro=f"A semana {anterior} não tem observações para copiar.")), 400
         I.salvar_observacoes(trab, semana, texto, autor="admin")
-        return redirect(f"/t/pcm/gerar?semana={semana}&feito=copiado", code=303)
+        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=copiado"), code=303)
 
     @bp.route("/gerar/estado")
     def gerar_estado():
@@ -349,7 +350,7 @@ def registrar_pcm(bp) -> None:
                                                                               else "a fila está vazia") + ".")
                 return render_template("pcm/quadro.html", **ctx), 400
             Q.salvar_no_nexus(cfg, sem["week"], linhas, quem)
-            return redirect("/t/pcm/quadro?" + urlencode(dict(volta, feito="salvo", n=len(linhas))), code=303)
+            return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="salvo", n=len(linhas))), code=303)
         if dest["id"] != "atual":
             ctx = _ctx_quadro(cfg, volta, erro="Esta semana não aceita gravar reprogramação: " + dest["texto"])
             return render_template("pcm/quadro.html", **ctx), 400
@@ -370,7 +371,7 @@ def registrar_pcm(bp) -> None:
             return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
                 cfg, sem["week"], linhas, problemas, itens_json,
                 erro=f"O GitHub não respondeu ({type(ex).__name__}): confira o repositório antes de tentar de novo.")), 502
-        return redirect("/t/pcm/quadro?" + urlencode(dict(volta, feito="aplicado", n=len(linhas),
+        return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="aplicado", n=len(linhas),
                                                            commit=res.get("commit") or "")), code=303)
 
 

@@ -29,6 +29,7 @@ from .esquema import (CLIENTES, ENTIDADES, EQUIPES, LISTAS, PESSOAS, REGIOES_CAM
 from .importar import ler_xlsx, montar
 from .servico import QUEM_IMPORTACAO, Servico, chave_texto
 from .tipos import Legado
+from ..prefixo import na_raiz
 
 # Fora do OneDrive e fora do AppData (o Claude desktop virtualiza o AppData: 03/09/2026, banco do gêmeo).
 ARMAZEM_PADRAO = (Path(r"C:\GridcoAuto\nexus\cadastro_ensaio.json") if os.name == "nt"
@@ -435,7 +436,7 @@ def _ficha(srv: Servico, ent, id_, titulo_tela, extra=None, sub=None):
         versao = request.form.get("_versao") or "0"
         res = srv.salvar(ent.id, id_, form, int(versao), quem=_quem())
         if res.ok:
-            return redirect(url + ("?sensiveis=1&salvo=1" if revelado else "?salvo=1"))
+            return redirect(na_raiz(url) + ("?sensiveis=1&salvo=1" if revelado else "?salvo=1"))
         if res.conflito is not None:
             atual = res.conflito
             return render_template(
@@ -465,7 +466,7 @@ def _novo(srv: Servico, ent, titulo_tela):
         form = {k: v for k, v in request.form.items() if not k.startswith("_")}
         res = srv.criar(ent.id, form, quem=_quem())
         if res.ok:
-            return redirect(ent.rota_ficha + res.registro.id)
+            return redirect(na_raiz(ent.rota_ficha + res.registro.id))
         return render_template("cadastro/ficha.html", ent=ent, reg=None, titulo_tela=titulo_tela, revelar=True,
                                secoes=_secoes(srv, ent, None, True, form, res.erros, novo=True), pendencias=[],
                                historico=[], novo=True, url=url, hora_br=hora_br), 422
@@ -700,7 +701,7 @@ def registrar_base(bp):
         if request.method == "POST":
             res = srv.adicionar_valor(request.form.get("lista", ""), request.form.get("valor", ""), quem=_quem())
             if res.ok:
-                return redirect("/t/base/listas?incluido=1")
+                return redirect(na_raiz("/t/base/listas?incluido=1"))
             erro = next(iter(res.erros.values()), "Não foi possível incluir.")
         uso = defaultdict(Counter)
         for eid, ent in ENTIDADES.items():
@@ -756,7 +757,7 @@ def registrar_base(bp):
         srv.aplicar_carga(proposta.carga, quem=QUEM_IMPORTACAO)
         srv.auditar(_quem(), "importou", "cadastro", proposta.origem.get("arquivo", ""),
                     [f"{k}: {v['novos']} novos, {v['alterados']} alterados" for k, v in proposta.resumo.items()])
-        return redirect("/t/base/registro-mestre?importado=1")
+        return redirect(na_raiz("/t/base/registro-mestre?importado=1"))
 
     @_tela("Qualidade do cadastro")
     def qualidade(srv):

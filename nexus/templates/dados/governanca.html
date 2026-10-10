@@ -20,8 +20,8 @@
     <h1 class="titulo-pagina">{{ 'Organograma da governança' if ver == 'organograma' else 'Matriz de barramento' }}</h1>
   </div>
   <nav class="dd-ver" aria-label="Visão da governança">
-    <a href="{{ url_organograma }}"{% if ver == 'organograma' %} aria-current="page"{% endif %}>Organograma</a>
-    <a href="{{ url_matriz }}"{% if ver == 'matriz' %} aria-current="page"{% endif %}>Matriz</a>
+    <a href="{{ (url_organograma)|na_raiz }}"{% if ver == 'organograma' %} aria-current="page"{% endif %}>Organograma</a>
+    <a href="{{ (url_matriz)|na_raiz }}"{% if ver == 'matriz' %} aria-current="page"{% endif %}>Matriz</a>
   </nav>
 </div>
 {% if ver == 'organograma' %}
