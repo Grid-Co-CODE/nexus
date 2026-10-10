@@ -84,6 +84,29 @@ navegador fala com cada sistema.
   `porta_local.py` (o Nexus com `--prefixo /nexus --plataforma ""` e a plataforma na raiz, as duas com a mesma
   `NEXUS_SSO_CHAVE` pelo ambiente e `PLATAFORMA_ANALISTAS=*` na plataforma), entrando por um nome `*.localhost` para os
   cookies não se misturarem com os da 5050 e da 5070 em 127.0.0.1.
+- **Provado de ponta a ponta no PC (10/10/2026)**, a cópia de prova do Nexus e a da plataforma (as duas branches da porta
+  única) atrás de um proxy que imita o Caddy nos dois modos (prefixo `/nexus` cortado, o servidor de hoje, também com a
+  camada de reescrita da T.I. junto; e raiz, a fase 4), Chrome sem janela a 1440 px:
+  - entrar pela senha de administrador (o login do Fracttal NÃO: a cópia barra o POST ao Fracttal; quem não é admin foi
+    provado com uma sessão de teste no mesmo formato); `nexus_sessao` (em `/nexus` ou `/`) e o `session` da plataforma
+    vivem juntos, entrar num não derruba o outro;
+  - as 13 telas abrem na moldura em `modo-nexus`, com o item aceso; os números da moldura são os MESMOS da plataforma
+    direta no mesmo minuto (7 telas comparadas número a número); o endereço acompanha o clique dentro da tela (Tempo real
+    -> fonte com `?p=`; "investigar" do Painel NOC -> item Diagnóstico, com o seletor marcando a usina; "Visão Gerencial"
+    da Disponibilidade -> item Gerencial) e o F5 volta ao lugar; `?p=` de outro item vai ao dono, fora do mapa abre o
+    padrão; o `voltar` do tema leva o `?p=`;
+  - perfis: o analista grava (numa cópia de estado da plataforma), o gestor lê as 11 telas e leva 403 ao gravar, Chaves
+    das fontes só admin (aqui e na plataforma), fora das listas "Sem acesso"; os passes que o Nexus gera valem 60 s e uma
+    vez: repetido, adulterado, vencido, fora do mapa, na URL e de outro site são recusados sem abrir sessão;
+  - o Sair encerra as duas sessões (GET `/nexus/sair` e o POST em `/painel/nexus/sair`); sem a chave, as 13 telas avisam,
+    o Tempo real cai na ponte (com a ponte configurada, mostra a plataforma) e a plataforma responde 404;
+  - 100 páginas do Nexus (Início e todo o menu) e 12.744 endereços: no modo prefixo nenhum fora do `/nexus` (fora os da
+    plataforma escritos de propósito), com a camada da T.I. nenhum `/nexus/nexus`, no modo raiz nenhum `/nexus`; nenhum
+    erro de JavaScript; a 375 px nenhuma página do Nexus rola de lado;
+  - abrir pela moldura custa ~100 ms a mais que direto (a página do Nexus, o POST do passe e o 303); o Diagnóstico pronto
+    em ~5 s pelos dois caminhos (as leituras da própria tela). O gêmeo deu 503 (não está de pé no PC). Nenhuma das duas
+    páginas declara ícone: o navegador pede `/favicon.ico`, que cai na plataforma (404, ou 403 para o gestor); é ruído
+    de console, não erro.
 
 ## Ponte para a Plataforma de Performance (04/10/2026): hoje só a reserva do Tempo real
 
