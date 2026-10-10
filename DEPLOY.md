@@ -135,8 +135,69 @@ app.gridco.com.br {
 ```
 
 **Na raiz** (a fase 4 do spec da porta única: o Nexus em `app.gridco.com.br`, dividindo os caminhos com a plataforma), é
-só tirar a `NEXUS_PREFIXO`. Num subdomínio próprio (`nexus.gridco.com.br`, `reverse_proxy 127.0.0.1:5070`), também sem
-ela.
+só tirar a `NEXUS_PREFIXO` e mudar o Caddy (seção 5b). Num subdomínio próprio (`nexus.gridco.com.br`,
+`reverse_proxy 127.0.0.1:5070`), também sem ela.
+
+### 5b. Fase 4: o Nexus na raiz de `app.gridco.com.br` (quando o Levi e a T.I. decidirem)
+
+Levi, 09/10/2026: "qnd tudo ficar pronto passar apenas para https://app.gridco.com.br". O Nexus passa a responder na
+raiz e a plataforma de Performance fica onde está: o Caddy divide **por caminho** (os caminhos dos dois foram medidos em
+09/10 e só colidem em `/`, `/os` e `/static`). Nenhuma linha de código muda; provado no PC em 10/10/2026 com um proxy que
+faz esta mesma divisão (as 13 telas da porta única, as duas sessões juntas, o Sair, os passes).
+
+- Para o **Nexus**: `/` (só a raiz exata), `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/cadeira`, `/os` e `/os/*`, e
+  `/static/*` **menos** os três estáticos da plataforma (`/static/fonts/*`, `/static/logos/*`, `/static/notif.js`; estático
+  novo na plataforma pede uma linha aqui).
+- Para a **plataforma**, como hoje: todo o resto, inclusive `/api/*`, `/versao`, `/healthz` e `/painel/nexus/*`. O
+  `/os/` dela (o proxy do OS Creator Web) deixa de ser alcançado: o `/os/` passa a ser o OS Creator do Nexus.
+- O `/nexus/...` antigo (favoritos, e-mails, o App de Campo) vai para o mesmo caminho na raiz (308, que mantém o POST).
+
+Trecho do Caddyfile (troca o bloco do `/nexus` e o que manda o resto à plataforma; os outros blocos que existem hoje, como
+o do `/db_performace` e os caminhos que o Caddy responde sozinho, ficam como estão; `<plataforma>` é o mesmo destino que
+a plataforma usa hoje):
+
+```
+app.gridco.com.br {
+    # o endereço antigo do Nexus leva ao mesmo lugar na raiz
+    redir /nexus / 308
+    @nexus_antigo path_regexp antigo ^/nexus(/.*)$
+    redir @nexus_antigo {re.antigo.1}{?query} 308
+
+    @nexus {
+        path / /entrar /sair /saude /tema /cadeira /os /t/* /os/* /static/*
+        not path /static/fonts/* /static/logos/* /static/notif.js
+    }
+    handle @nexus {
+        reverse_proxy 127.0.0.1:5070
+    }
+
+    handle {
+        reverse_proxy <plataforma>
+    }
+}
+```
+
+Não foi validado com o próprio Caddy (o PC de desenvolvimento não tem): rode `caddy validate` antes do `caddy reload` e
+guarde o Caddyfile de antes, que é a volta.
+
+**Ordem:** (1) no `.env` do Nexus, **sem** `NEXUS_PREFIXO` (tire a linha, se houver) e reinicie; (2) troque o Caddy (a
+reescrita das respostas do Nexus, que existia para o `/nexus`, sai junto); (3) na plataforma, a fase 3 é
+`NEXUS_PORTA_PRINCIPAL=https://app.gridco.com.br/` (endereço completo: `/` sozinho levaria o `/` ao próprio `/`, em laço,
+para quem chegasse direto à porta da plataforma). Todo mundo entra de novo uma vez no Nexus (o cookie passa a `Path=/`).
+
+**Conferir:**
+```
+curl -sI https://app.gridco.com.br/ | grep -i '^location'                # /entrar?next=/  (o Nexus)
+curl -s  https://app.gridco.com.br/saude                                  # {"ok": true, "commit": ...}
+curl -sI https://app.gridco.com.br/nexus/t/cos/mesa | grep -i '^location' # /t/cos/mesa (308)
+curl -s -o /dev/null -w '%{http_code}\n' https://app.gridco.com.br/static/notif.js   # 200 (da plataforma)
+curl -s -o /dev/null -w '%{http_code}\n' https://app.gridco.com.br/static/nexus.css  # 200 (do Nexus)
+curl -s https://app.gridco.com.br/versao                                  # a plataforma, como antes
+```
+E no navegador: entrar no Nexus, abrir as telas da Performance (moldura), o OS Creator e o Sair.
+
+**Voltar:** o Caddyfile de antes, `NEXUS_PREFIXO=/nexus` no `.env` do Nexus e reiniciar (seção 5a); na plataforma, a
+`NEXUS_PORTA_PRINCIPAL` volta a `/nexus/` (ou sai).
 
 ## 6. Conferir depois de subir
 

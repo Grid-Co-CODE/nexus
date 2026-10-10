@@ -33,7 +33,8 @@ na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho
   Debaixo do prefixo, o Sair e o Entrar apagam também um `nexus_sessao` de `Path=/` que tenha sobrado da janela entre
   publicar o código e pôr a variável (`auth._sem_a_sessao_velha_da_raiz`; revisão de 10/10/2026: ele seguia válido e a
   pessoa saía e continuava logada).
-- **Prefixo:** `NEXUS_PREFIXO` (`.env` ou ambiente; vazio = raiz, o PC e a fase 4). O `create_app` põe o middleware
+- **Prefixo:** `NEXUS_PREFIXO` (`.env` ou ambiente; vazio = raiz, o PC e a fase 4, cujo Caddy está pronto no
+  `DEPLOY.md`, seção 5b). O `create_app` põe o middleware
   `Prefixo`: `SCRIPT_NAME` = prefixo, e o prefixo sai do `PATH_INFO` só quando vem (serve com o Caddy cortando o `/nexus`,
   `handle_path`, e sem cortar). O `X-Forwarded-Prefix` do pedido NUNCA é lido (o Caddy repassa o do cliente). Sem a
   variável, a resposta na raiz é a de antes: conferido em 09/10 página por página (135 páginas, mesmo status, mesmo
