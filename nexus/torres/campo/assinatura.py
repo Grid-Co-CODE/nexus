@@ -123,6 +123,13 @@ def voltar(numero):
     return redirect(_tela(numero))
 
 
+def _volta(numero) -> str:
+    """De volta à tela de onde se decidiu (a lista de APR e PT do HSEQ, com os filtros dela) ou à da PT. Só endereço do
+    próprio Nexus: nada de mandar para fora."""
+    para = request.form.get("volta") or ""
+    return para if para.startswith(("/t/hseq/", "/t/campo/")) and not para.startswith("//") else _tela(numero)
+
+
 @bp_assinatura.route("/os/_nexus/pt/<numero>/decidir", methods=["POST"])
 def decidir(numero):
     # pedido de outro site não decide PT (o cookie Lax já barra; a origem confere de novo, porque é segurança do campo)
@@ -132,12 +139,17 @@ def decidir(numero):
     q = quem_assina()
     if not q:
         return redirect(_login(numero))
+    volta = _volta(numero)
     try:
-        decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"])
+        decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"],
+                           q.get("nome", ""), bool(session.get("admin")))
     except decisao_pt.Recusada as e:
-        session["pt_aviso"] = str(e)
-        return redirect(_tela(numero))
+        session["pt_aviso"] = f"{numero}: {e}" if volta != _tela(numero) else str(e)
+        return redirect(volta)
     except Exception as e:      # noqa: BLE001 — banco fora do ar: a tela diz, nada é dado como gravado
         session["pt_aviso"] = f"Não consegui gravar a decisão no banco ({type(e).__name__}). Nada foi salvo."
-        return redirect(_tela(numero))
+        return redirect(volta)
+    if volta != _tela(numero):
+        session["pt_gravada"] = numero
+        return redirect(volta)
     return redirect(_tela(numero) + "?gravada=1")

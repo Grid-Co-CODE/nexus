@@ -8,6 +8,7 @@ Rotas do dia fica no placeholder: o dado dela ainda não chega ao banco. Ordens 
 saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da ronda e ranking são redundantes"); o endereço antigo leva
 à Central.
 """
+import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
@@ -38,10 +39,9 @@ TORRE = Torre(
         Tela("aprovacao", "Aprovação de OS",
              "Que OS esperam a aprovação de cada supervisor de campo, qual dá para aprovar já e qual pede meu olho?",
              "Fila de verificação do Fracttal + notas do App no banco do Nexus"),
-        # Levi, 04/10/2026: "crie para PT, ZELADORIA". A PT fica junto da aprovação de OS porque as duas são fila de
-        # decisão do supervisor. A "APR e PT" da torre HSEQ é outra pergunta (OS de risco sem APR ou PT assinada).
-        Tela("pt", "Permissões de trabalho",
-             "Que PT está esperando o De acordo do supervisor, e há quanto tempo?", FONTE_APP),
+        # As Permissões de trabalho foram para Segurança · HSEQ > APR e PT em 09/10/2026 (Levi: "quero que esse visual e
+        # caminho vá para APR e PT de Segurança · HSEQ"): o código continua aqui (`pagina_pt`, a aprovação, os PDFs), a
+        # tela mora lá e o endereço antigo leva para lá.
         # Ordens de serviço, Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da
         # ronda e ranking são redundantes"): a qualidade do fechamento está na Aprovação e na Triagem, a comparação
         # por região e equipe no Painel das Rondas e as fotos no histórico da usina. O endereço antigo leva à Central
@@ -168,8 +168,9 @@ def _coleta() -> str:
 
 
 def _comum(tela_id, leitura, **k):
-    return dict(torre=TORRE, tela=TORRE.tela(tela_id), leitura=leitura, d=leitura.dados, lido=_lido(leitura), url=_url,
-                dia_curto=_dia_curto, **k)
+    base = dict(torre=TORRE, tela=TORRE.tela(tela_id), leitura=leitura, d=leitura.dados, lido=_lido(leitura), url=_url,
+                dia_curto=_dia_curto)
+    return {**base, **k}
 
 
 # ── Central de atenção (visão nossa) ─────────────────────────────────────────────────────────────────────────────
@@ -240,7 +241,7 @@ def atencao():
                 and _do_papel(x, regiao_campo, gestor)
                 and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
     fontes = {"pendentes": filtra(d.get("pendentes") or []),
-              "pt": filtra(d.get("pts") or [])}
+              "pt": com_quem_assina(filtra(d.get("pts") or [])) if vista == "pt" else filtra(d.get("pts") or [])}
     base = fontes[vista]
     contagem = {}
     for x in base:
@@ -272,11 +273,40 @@ SITUACAO_PT = {"aguardando": ("Aguardando", "alerta"), "de_acordo": ("De acordo"
                "negada": ("Não autorizada", "critico"), "vencida": ("Vencida", "neutro")}
 
 
+TELA_PT = "/t/hseq/apr-pt"
+
+
+def _onde_pt():
+    """A torre e a tela onde a PT mora desde 09/10/2026: Segurança · HSEQ > APR e PT (import tardio: a torre HSEQ
+    importa esta)."""
+    from ..hseq import TORRE as HSEQ
+    return HSEQ, HSEQ.tela("apr-pt")
+
+
+def com_quem_assina(pts: list) -> list:
+    """Põe em cada PT esperando o texto de quem pode dar o De acordo (`decisao_pt.aprovadores`), com um cadastro só."""
+    if not pts:
+        return pts
+    try:
+        b = visao._Base()
+        for p in pts:
+            p["quem_assina"] = decisao_pt.aprovadores(p, b)["texto"]
+    except Exception:       # noqa: BLE001 — sem o cadastro, o detalhe só não diz quem assina
+        pass
+    return pts
+
+
 @bp.route("/pt")
 def pt():
-    """Duas abas (Levi, 05/10): as PT esperando o De acordo (por equipe, por região de campo ou por gestor de contrato,
-    ou em tabela, a linha abre o detalhe) e o histórico das decididas. Filtros de região de campo e de gestor; a equipe
-    vem do cartão."""
+    """O endereço antigo das Permissões de trabalho: a tela foi para Segurança · HSEQ > APR e PT (09/10/2026)."""
+    return redirect(TELA_PT + ("?" + request.query_string.decode() if request.query_string else ""))
+
+
+def pagina_pt():
+    """Permissões de trabalho e Análise Preliminar de Risco (em Segurança · HSEQ desde 09/10/2026). Duas abas (Levi,
+    05/10): as PT esperando o De acordo (por equipe, por região de campo ou por gestor de contrato, ou em tabela, a linha
+    abre o detalhe com a assinatura do técnico e a decisão) e o histórico das decididas, com o PDF da PT e o da APR em
+    colunas (Levi, 09/10). Filtros de região de campo e de gestor; a equipe vem do cartão."""
     leitura = visao.pts()
     d = leitura.dados
     aba = "historico" if request.args.get("aba") == "historico" else "esperando"
@@ -291,7 +321,7 @@ def pt():
         return [p for p in lista if _do_papel(p, regiao_campo, gestor)
                 and (not equipe or p.get("equipe") == equipe)
                 and (not q or q in " ".join(str(p.get(c) or "") for c in campos).lower())]
-    aguardando = filtra(d.get("aguardando") or [])
+    aguardando = com_quem_assina(filtra(d.get("aguardando") or []))
     # a aba Esperando é a MESMA da Central de atenção > Permissões de trabalho (Levi, 05/10)
     f = request.args.get("f", "") if request.args.get("f") in visao.PT_STATUS else ""
     regiao = request.args.get("regiao", "")
@@ -310,8 +340,11 @@ def pt():
         contagem[p["situacao"]] = contagem.get(p["situacao"], 0) + 1
     historico = [p for p in historico if not sit or p.get("situacao") == sit]
     todas = (d.get("aguardando") or []) + (d.get("historico") or [])
+    torre, tela = _onde_pt()
     return render_template("campo/pt.html", **_comum(
-        "pt", leitura, aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem_hist=contagem, sit=sit,
+        "pt", leitura, torre=torre, tela=tela, titulo="Permissões de trabalho e Análise Preliminar de Risco",
+        aviso=session.pop("pt_aviso", ""), gravada=session.pop("pt_gravada", ""),
+        aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem_hist=contagem, sit=sit,
         dias=dias, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
         idade_min=_idade_min, cartoes=cartoes_pt, lista=lista_pt, contagem=contagem_pt, total=len(aguardando), f=f,
         cartoes_reg=cartoes_reg, cartoes_gest=cartoes_gest,
@@ -338,6 +371,25 @@ def pt_pdf(numero):
                     headers={"Content-Disposition": f'attachment; filename="{p["numero"]}.pdf"'})
 
 
+@bp.route("/pt/<numero>/apr.pdf")
+def pt_apr_pdf(numero):
+    """O PDF da APR que o App anexou na tarefa do Fracttal (desde a v251), ao lado do PDF da PT (Levi, 09/10/2026:
+    "terá como baixar o relatório de ambas individualmente"). O Nexus baixa e entrega: o link do Fracttal não sai."""
+    p = visao.pt(numero)
+    try:
+        if not p or not p.get("os"):
+            raise pt_fracttal.SemArquivo(f"{numero} não está no livro do App")
+        corpo, nome = pt_fracttal.apr_pdf(p["os"], p.get("criada"))
+    except pt_fracttal.SemArquivo as e:
+        session["pt_aviso"] = f"Sem a APR: {e}."
+        return redirect(request.referrer if (request.referrer or "").startswith(request.host_url) else TELA_PT)
+    except Exception as e:      # noqa: BLE001 — Fracttal fora ou recusando
+        session["pt_aviso"] = f"Não consegui buscar a APR no Fracttal ({type(e).__name__}). Tente de novo em instantes."
+        return redirect(request.referrer if (request.referrer or "").startswith(request.host_url) else TELA_PT)
+    arq = re.sub(r"[^A-Za-z0-9._ -]+", "", nome).strip().replace(" ", "-") or f"APR-{numero}"
+    return Response(corpo, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="{arq}.pdf"'})
+
+
 def url_for_pt(numero) -> str:
     from urllib.parse import quote
     return f"/t/campo/pt/{quote(str(numero), safe='')}"
@@ -354,8 +406,10 @@ def pt_aprovar(numero):
             nexus = decisao_pt.da_pt(p["numero"])
         except Exception as e:      # noqa: BLE001 — sem o livro de decisões, a tela abre e diz
             erro_nexus = f"Não consegui ler as decisões do Nexus ({type(e).__name__})"
+    torre, tela = _onde_pt()
     return render_template("campo/pt_aprovar.html", **_comum(
-        "pt", leitura, p=p, numero=numero, nexus=nexus, erro_nexus=erro_nexus, situacoes=SITUACAO_PT,
+        "pt", leitura, torre=torre, tela=tela, p=p, numero=numero, nexus=nexus, erro_nexus=erro_nexus,
+        situacoes=SITUACAO_PT, quem_assina=decisao_pt.aprovadores(p)["texto"] if p else "",
         idade_min=_idade_min, decisoes=decisao_pt.DECISOES, aviso=session.pop("pt_aviso", ""),
         gravada=request.args.get("gravada") == "1", quando=visao._dt))
 

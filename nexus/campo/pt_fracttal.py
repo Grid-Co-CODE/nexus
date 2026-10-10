@@ -17,6 +17,7 @@ import base64
 import re
 import time
 import unicodedata
+from datetime import datetime, timedelta, timezone
 
 from . import nota_fracttal
 
@@ -57,6 +58,41 @@ def pdf(os_, numero, ler=None) -> bytes:
     if not corpo.startswith(b"%PDF"):
         raise SemArquivo("o anexo do Fracttal não é um PDF")
     return corpo
+
+
+# ── o PDF da APR ─────────────────────────────────────────────────────────────────────────────────────────────────
+# Levi, 09/10/2026: "invés de PDF e baixar terá uma coluna de PT e APR, terá como baixar o relatório de ambas
+# individualmente". Desde a v251 o App anexa toda APR na tarefa como PDF, com a descrição "APR OS 15223 09-10-2026
+# 07h42" (+ " v2" na versão de Novo risco da APR do dia; `_aprpdf_nome` do App), no horário de Brasília.
+_APR_QUANDO = re.compile(r"(\d{2})-(\d{2})-(\d{4}) (\d{2})h(\d{2})")
+_BRT = timezone(timedelta(hours=-3))
+
+
+def _quando_apr(descricao) -> datetime | None:
+    m = _APR_QUANDO.search(str(descricao or ""))
+    try:
+        return datetime(int(m[3]), int(m[2]), int(m[1]), int(m[4]), int(m[5])) if m else None
+    except ValueError:
+        return None
+
+
+def apr_pdf(os_, criada=None, ler=None) -> tuple[bytes, str]:
+    """(o PDF, a descrição do anexo) da APR da OS. Com mais de uma APR na OS (tarefas ou dias diferentes), a de horário
+    mais perto da criação da PT: a APR que abre a PT nasce junto com ela. SemArquivo quando o App ainda não anexou."""
+    alvo = _norm(f"APR OS {os_}")
+    cands = [a for a in nota_fracttal.anexos_da_os(os_, ler)
+             if a.get("value") and (_norm(a.get("description")) == alvo or _norm(a.get("description")).startswith(alvo + " "))]
+    if not cands:
+        raise SemArquivo(f"a APR da OS {os_} ainda não está nos anexos do Fracttal (o App anexa o PDF minutos depois)")
+    if criada:
+        ref = (criada.astimezone(_BRT) if criada.tzinfo else criada).replace(tzinfo=None)
+        cands.sort(key=lambda a: abs((_quando_apr(a.get("description")) - ref).total_seconds())
+                   if _quando_apr(a.get("description")) else float("inf"))
+    a = cands[0]
+    corpo = _baixar(str(a["value"]), PDF_MAX)
+    if not corpo.startswith(b"%PDF"):
+        raise SemArquivo("o anexo da APR no Fracttal não é um PDF")
+    return corpo, str(a.get("description") or f"APR OS {os_}")
 
 
 # ── a assinatura do técnico na APR ───────────────────────────────────────────────────────────────────────────────

@@ -116,7 +116,7 @@ def test_coluna_nova_sem_a_chave_nao_quebra_e_diz_que_falta_a_chave(app, banco, 
 def test_sem_o_fato_no_banco_a_tela_monta_na_hora_e_diz(banco, logado):  # noqa: F811
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
     assert "fato_ronda calculado na hora; o banco ainda não tem" in html
-    assert "fato_pt calculado na hora; o banco ainda não tem" in logado.get("/t/campo/pt").get_data(as_text=True)
+    assert "fato_pt calculado na hora; o banco ainda não tem" in logado.get("/t/hseq/apr-pt").get_data(as_text=True)
     central = logado.get("/t/campo/atencao").get_data(as_text=True)
     assert "fato_ronda calculado na hora" in central and "fato_pt calculado na hora" in central
     assert visao.rondas().dados["fatos"]["fechamento"].startswith("fato_fechamento calculado na hora")

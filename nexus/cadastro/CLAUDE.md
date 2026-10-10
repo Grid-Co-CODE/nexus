@@ -91,7 +91,10 @@ Gestor de contrato.
   a da usina, a região (pela equipe). Filtro de região na lista de Equipes.
 - **Vínculos**: "Supervisor de Campo" e "Coordenador de Campo" entraram; "Gestor de contrato" aparece como "Gestor de
   contrato (Supervisor PM)" e "Supervisor" como "Supervisor (legado)" (`esquema.ROTULOS_LISTA`): o valor GRAVADO não
-  mudou, para não quebrar ficha, banco e telas.
+  mudou, para não quebrar ficha, banco e telas. **"COS"** entrou em 09/10/2026: é o campo da relação de quem é do COS
+  (Levi: a PT pode ser aprovada por "pessoa do COS ... precisamos ter um campo onde fazemos essa relação"); a pessoa
+  com esse vínculo (Pessoas > Colaborador, publicada no banco) pode dar o De acordo nas PT. Em 09/10 o cadastro não
+  tinha ninguém do COS (só os colaboradores de campo e os supervisores legados).
 - **Carga única** (`python ferramentas/importar_estrutura_campo.py <csv>`; ensaio por padrão, `--aplicar` grava no
   armazém LOCAL com cópia em `backups\<arquivo>_<data>_antes_estrutura_campo.json` e confere). O CSV
   (`C:\GridcoAuto\nexus\estrutura_campo_2026-10.csv`, fora do git) tem região, base, código e equipe. A equipe casa

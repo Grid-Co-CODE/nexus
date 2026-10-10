@@ -98,7 +98,7 @@ def test_cartao_sem_regiao_e_sem_gestor_e_proprio_e_acha_as_linhas(banco, logado
 
 
 def test_pt_por_regiao_e_por_gestor_na_tela_de_pt_e_na_central_e_a_mesma(banco, logado):
-    html = logado.get("/t/campo/pt?modo=regioes").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?modo=regioes").get_data(as_text=True)
     assert ">Por equipe</a>" in html and 'aria-current="page">Por região de campo</a>' in html and ">Tabela</a>" in html
     assert "<b>Sudeste 03</b>" in html and "<b>Sul 01</b>" not in html                 # a Sul 01 não tem PT
     assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
@@ -106,13 +106,13 @@ def test_pt_por_regiao_e_por_gestor_na_tela_de_pt_e_na_central_e_a_mesma(banco, 
     assert 'href="?modo=tabela&amp;regiao_campo=Sudeste+03"' in html
     # _pt_esperando.html é o mesmo nas duas telas (Levi, 05/10): mudou uma, mudou a outra
     for modo in ("regioes", "gestores"):
-        assert _cartoes(logado.get(f"/t/campo/pt?modo={modo}").get_data(as_text=True)) == _cartoes(
+        assert _cartoes(logado.get(f"/t/hseq/apr-pt?modo={modo}").get_data(as_text=True)) == _cartoes(
             logado.get(f"/t/campo/atencao?vista=pt&modo={modo}").get_data(as_text=True)), modo
-    gest = logado.get("/t/campo/pt?modo=gestores").get_data(as_text=True)
+    gest = logado.get("/t/hseq/apr-pt?modo=gestores").get_data(as_text=True)
     assert "<b>Beltrano Supervisor</b>" in gest and "Ciclano Chefe</b>" not in gest     # o Ciclano não tem PT
-    tabela = logado.get("/t/campo/pt?modo=tabela&regiao_campo=Sudeste+03").get_data(as_text=True)
+    tabela = logado.get("/t/hseq/apr-pt?modo=tabela&regiao_campo=Sudeste+03").get_data(as_text=True)
     assert tabela.count('class="cn-link cn-os"') == 2
-    tabela = logado.get("/t/campo/pt?modo=tabela&regiao_campo=Sul+01").get_data(as_text=True)
+    tabela = logado.get("/t/hseq/apr-pt?modo=tabela&regiao_campo=Sul+01").get_data(as_text=True)
     assert "Nenhuma PT esperando o De acordo com esses filtros" in tabela
 
 
@@ -121,7 +121,7 @@ def test_estrutura_nao_publicada_avisa_e_nao_quebra(banco, logado):
     "Sem região de campo" e o filtro de gestor (que já está no banco, pela usina) continua valendo."""
     _aba(banco, "cadastro_nexus", "regioes_campo", [])
     visao.limpar()
-    for url in ("/t/campo/atencao?modo=regioes", "/t/campo/pt", "/t/campo/rondas", "/t/campo/rondas?aba=painel"):
+    for url in ("/t/campo/atencao?modo=regioes", "/t/hseq/apr-pt", "/t/campo/rondas", "/t/campo/rondas?aba=painel"):
         html = logado.get(url).get_data(as_text=True)
         assert "Estrutura de campo ainda não publicada" in html, url
     html = logado.get("/t/campo/atencao?modo=regioes").get_data(as_text=True)
@@ -150,8 +150,8 @@ def test_rondas_filtram_por_regiao_de_campo_e_por_gestor_e_o_csv_leva_os_dois(ba
 
 
 def test_detalhe_da_pt_e_historico_da_usina_dizem_regiao_e_gestor(banco, logado):
-    html = logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
-    assert "<dt>Região de campo</dt><dd>Sudeste 03 · Supervisor de Campo Supervisora Campo</dd>" in html
+    html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
+    assert "<dt>Região de campo</dt><dd>Sudeste 03 · Supervisor de Campo: Supervisora Campo</dd>" in html
     assert "<dt>Gestor de contrato</dt><dd>Beltrano Supervisor</dd>" in html and "· supervisor " not in html
     hist = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
     assert ("região de campo Sudeste 03 (Supervisor de Campo: Supervisora Campo) · gestor de contrato Beltrano "
@@ -172,13 +172,13 @@ def test_ordens_imagens_e_ranking_sairam_do_menu_e_o_endereco_leva_a_central(log
 
 
 def test_historico_de_pt_continua_so_em_tabela(banco, logado):
-    html = logado.get("/t/campo/pt?aba=historico&modo=regioes").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?aba=historico&modo=regioes").get_data(as_text=True)
     assert "<th>Situação</th>" in html and "<b>Sudeste 03</b>" not in html
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="sem node nesta máquina")
-@pytest.mark.parametrize("url", ["/t/campo/atencao?vista=pt&modo=tabela", "/t/campo/pt?modo=tabela",
-                                 "/t/campo/pt?aba=historico"])
+@pytest.mark.parametrize("url", ["/t/campo/atencao?vista=pt&modo=tabela", "/t/hseq/apr-pt?modo=tabela",
+                                 "/t/hseq/apr-pt?aba=historico"])
 def test_scripts_da_central_e_da_pt_sao_javascript_valido(banco, logado, tmp_path, url):
     html = logado.get(url).get_data(as_text=True)
     scripts = re.findall(r"<script>(.*?)</script>", html, re.S)

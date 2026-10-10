@@ -38,9 +38,11 @@ TORRE = Torre(
         Tela("riscos", "Riscos da semana",
              "Que atividade da semana está liberada, condicionada ou bloqueada?",
              "Programação do PCM + Semanal de Segurança"),
+        # as Permissões de trabalho do Campo · App vieram para cá em 09/10/2026 (Levi: "quero que esse visual e caminho
+        # vá para APR e PT de Segurança · HSEQ"; "precisamos ter a visão também de APR")
         Tela("apr-pt", "APR e PT",
-             "Que OS de risco está sem APR ou PT assinada?",
-             "App de Campo"),
+             "Que PT está esperando o De acordo, e há quanto tempo? Onde estão a PT e a APR de cada tarefa?",
+             "Livro de PT do App + os PDFs da PT e da APR no Fracttal"),
         Tela("dss", "DSS",
              "Todos os clusters fizeram o DSS?",
              "Registros de DSS"),
@@ -163,6 +165,14 @@ def extintores_foto(codigo):
     if not dados:
         abort(404)
     return Response(dados, mimetype="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
+
+
+@bp.route("/apr-pt")
+def apr_pt():
+    """Permissões de trabalho e Análise Preliminar de Risco: a tela das PT que era do Campo · App (o mesmo visual e as
+    mesmas contas, `torres.campo.pagina_pt`), com as colunas PT e APR e o detalhe com a assinatura e a decisão."""
+    from ..campo import pagina_pt
+    return pagina_pt()
 
 
 @bp.route("/epi")

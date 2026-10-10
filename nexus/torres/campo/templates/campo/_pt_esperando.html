@@ -59,39 +59,86 @@
   {% for s, (rot, cor) in status.items() %}<a href="{{ url(f=s) }}"{% if s == f %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
 </div>
 <div class="cn-tab"><table class="cn-expande">
-  <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th></tr></thead>
+  <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th></tr></thead>
   <tbody>
   {% for p in lista %}
     <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
       <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.regiao_br or '—' }}</td>
       <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td>
-      <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td></tr>
-    <tr class="cn-detalhe" hidden><td colspan="9">
-      <div class="cn-detalhe-grade">
-        <dl class="cn-dados">
-          <dt>PT</dt><dd class="m">{{ p.numero }}</dd>
-          <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
-          <dt>Equipamento</dt><dd>{{ equipamento(p) }}</dd>
-          <dt>Usina</dt><dd>{{ p.usina }}{% if p.cidade %} · {{ p.cidade }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}</dd>
-          <dt>Equipe</dt><dd>{{ p.equipe or '—' }}</dd>
-          <dt>Região de campo</dt><dd>{{ p.regiao_campo or '—' }}{% if p.supervisor_campo %} · Supervisor de Campo {{ p.supervisor_campo }}{% endif %}</dd>
-          <dt>Gestor de contrato</dt><dd>{{ p.gestor or '—' }}</dd>
-          <dt>Técnico</dt><dd>{{ p.solicitante or '—' }}</dd>
-          <dt>Criada</dt><dd>{{ p.criada.strftime('%d/%m às %H:%M') if p.criada else '—' }}</dd>
-          {% if p.aviso_em %}<dt>1º aviso</dt><dd>{{ p.aviso_em.strftime('%d/%m às %H:%M') }}{% if p.aviso_motivo %} · {{ p.aviso_motivo }}{% endif %}</dd>{% endif %}
-          {% if p.forcada %}<dt>Forçada</dt><dd class="cn-t-alerta">sim (aberta pelo Forçar encontro)</dd>{% endif %}
-        </dl>
-        <div>
-          <h3>Atividades críticas da APR</h3>
-          <ul class="cn-ativ">{% for a in p.atividades %}<li>{{ a }}</li>{% else %}<li class="mudo">Sem atividade crítica marcada.</li>{% endfor %}</ul>
-          <p class="cn-detalhe-nao">{% if p.respostas_nao %}<span class="cn-t-alerta">{{ p.respostas_nao }} resposta{{ 's' if p.respostas_nao > 1 }} NÃO na APR</span>{% else %}Nenhuma resposta NÃO na APR{% endif %}{% if p.faltam %} · falta: {{ p.faltam }}{% endif %}</p>
-          <p><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">Abrir para aprovar</a></p>
+      <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td>
+      <td><span class="mudo" title="O PDF da PT sai no De acordo">—</span></td>
+      <td><a class="cn-link" href="{{ url_for('torre_campo.pt_apr_pdf', numero=p.numero) }}" title="O PDF da APR que o App anexou na tarefa do Fracttal">Baixar</a></td></tr>
+    {# o detalhe da PT esperando (Levi, 09/10/2026: "estou achando o atual muito cru, precisamos trazer a informação da
+       assinatura e a opção de aprovar logo de cara"): o que a PT diz, quem pode assinar, a assinatura do técnico na
+       APR (do Fracttal, pelo login de quem olha, carregada ao abrir) e a decisão ali mesmo, que volta para esta tela #}
+    <tr class="cn-detalhe" hidden><td colspan="11">
+      <div class="pt-det">
+        <div class="pt-det-cab">
+          <div><span class="m pt-num">{{ p.numero }}</span> · OS {{ p.os or '—' }} · {{ p.tarefa or '—' }}{% if p.ativo or p.codigo %} — {{ p.ativo or p.codigo }}{% endif %}
+            <span class="det">{{ p.solicitante or 'técnico não identificado' }} · {{ p.equipe or 'sem equipe' }} · {{ p.usina }}{% if p.uf %} · {{ p.uf }}{% endif %}{% if p.codigo %} · {{ p.codigo }}{% endif %}{% if p.criada %} · aberta {{ p.criada.strftime('%d/%m %H:%M') }}{% endif %}</span></div>
+          <span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">Aguardando · há {{ idade_min(p.idade_min) }}</span>
         </div>
+        <dl class="cn-dados pt-det-dados">
+          <dt>Atividades críticas</dt><dd>{% for a in p.atividades %}<span class="pt-chip">{{ a }}</span>{% else %}<span class="mudo">nenhuma marcada na APR</span>{% endfor %}</dd>
+          <dt>Respostas NÃO na APR</dt><dd>{% if p.respostas_nao %}<span class="cn-t-alerta">{{ p.respostas_nao }} resposta{{ 's' if p.respostas_nao > 1 }} NÃO</span>{% else %}nenhuma{% endif %}{% if p.faltam %} · falta: {{ p.faltam }}{% endif %}</dd>
+          {% if p.forcada %}<dt>Forçada</dt><dd class="cn-t-alerta">sim (aberta pelo Forçar encontro)</dd>{% endif %}
+          <dt>Região de campo</dt><dd>{{ p.regiao_campo or '—' }}{% if p.supervisor_campo %} · Supervisor de Campo: {{ p.supervisor_campo }}{% endif %}</dd>
+          <dt>Gestor de contrato</dt><dd>{{ p.gestor or '—' }}</dd>
+          <dt>Quem assina</dt><dd>{{ p.quem_assina or '—' }}</dd>
+          {% if p.aviso_em %}<dt>1º aviso</dt><dd>{{ p.aviso_em.strftime('%d/%m às %H:%M') }}{% if p.aviso_motivo %} · {{ p.aviso_motivo }}{% endif %}</dd>{% endif %}
+        </dl>
+        <div class="pt-det-ass">
+          <figure class="pt-ass" data-url="/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico">
+            <figcaption>Executante · assinatura da APR</figcaption>
+            <div class="pt-ass-quadro"><span class="mudo">Buscando no Fracttal…</span></div>
+            <span class="det">{{ p.solicitante or '—' }}{% if p.criada %} · {{ p.criada.strftime('%d/%m/%y %H:%M') }}{% endif %}</span>
+          </figure>
+          <figure class="pt-ass">
+            <figcaption>Aprovação</figcaption>
+            <div class="pt-ass-quadro pt-ass-quadro--vazio"><span class="mudo">Aguardando o De acordo de quem pode assinar.</span></div>
+            <span class="det pt-quem">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</span>
+          </figure>
+        </div>
+        <form class="pt-det-acoes" method="post" action="/os/_nexus/pt/{{ p.numero|urlencode }}/decidir">
+          <input type="hidden" name="volta" value="{{ request.full_path.rstrip('?') }}">
+          <input class="gc-campo pt-motivo" name="motivo" maxlength="400" placeholder="Motivo (obrigatório para Não autorizo; o técnico lê)" aria-label="Motivo">
+          <button class="gc-btn gc-btn--primario" type="submit" name="decisao" value="de_acordo">De acordo</button>
+          <button class="gc-btn gc-btn--contorno cn-btn-negar" type="submit" name="decisao" value="negada">Não autorizo</button>
+          <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">Ver PT</a>
+          <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_apr_pdf', numero=p.numero) }}">Baixar APR</a>
+        </form>
+        <p class="mudo pt-det-nota">A decisão fica salva no banco do Nexus com o código de quem assinou. <b>O App ainda não lê a
+          decisão do Nexus</b>: até a versão que lê, quem libera o técnico no campo é o De acordo dado pelo App.</p>
       </div>
     </td></tr>
-  {% else %}<tr><td colspan="9" class="mudo">Nenhuma PT esperando o De acordo com esses filtros.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="11" class="mudo">Nenhuma PT esperando o De acordo com esses filtros.</td></tr>{% endfor %}
   </tbody></table></div>
 <script>
+  // a assinatura do técnico na APR vem do Fracttal pelo login de quem olha (cookie só em /os): carrega ao abrir a PT,
+  // uma vez; quem está assinando (a sessão do OS Creator) aparece embaixo da Aprovação
+  var quemAssina = null;
+  function carregaDetalhe(det) {
+    var f = det.querySelector('.pt-ass[data-url]');
+    if (f && !f.dataset.lido) {
+      f.dataset.lido = '1';
+      var q = f.querySelector('.pt-ass-quadro');
+      fetch(f.dataset.url, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (a) {
+        q.textContent = '';
+        if (a.ok) { var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img); return; }
+        var s = document.createElement('span'); s.className = 'mudo';
+        if (a.login) { s.innerHTML = 'Para ver a assinatura, <a class="cn-link" href="' + a.entrar + '">entre com o seu login do Fracttal</a>.'; }
+        else { s.textContent = 'Sem a assinatura: ' + (a.motivo || 'o Fracttal não respondeu') + '.'; }
+        q.appendChild(s);
+      }).catch(function () { q.textContent = 'Não consegui buscar a assinatura.'; delete f.dataset.lido; });
+    }
+    var el = det.querySelector('.pt-quem');
+    if (!el) return;
+    (quemAssina || (quemAssina = fetch('/os/_nexus/quem', {credentials: 'same-origin'}).then(function (r) { return r.json(); })))
+      .then(function (q) {
+        el.textContent = q.email ? ('Assinando como ' + q.nome + ', pelo login do Fracttal.')
+                                 : 'Para decidir, entre com o seu login do Fracttal (o mesmo do OS Creator).';
+      }).catch(function () {});
+  }
   // clicar na linha abre o detalhe da PT logo abaixo; o link da OS continua indo para a aprovação
   document.querySelectorAll('table.cn-expande tr.cn-linha').forEach(function (tr) {
     function alterna(ev) {
@@ -100,6 +147,7 @@
       if (!det || !det.classList.contains('cn-detalhe')) return;
       det.hidden = !det.hidden;
       tr.setAttribute('aria-expanded', String(!det.hidden));
+      if (!det.hidden) carregaDetalhe(det);
     }
     tr.addEventListener('click', alterna);
     tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });

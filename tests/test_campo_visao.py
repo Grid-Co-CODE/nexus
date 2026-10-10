@@ -216,7 +216,7 @@ def test_zeladoria_vazia_diz_por_que(banco, logado):
 
 def test_telas_mostram_o_dado_do_banco(banco, logado):
     assert "Coração 1" in logado.get("/t/campo/rondas").get_data(as_text=True)
-    assert "PT-1" in logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
+    assert "PT-1" in logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
 
 
 def test_central_separa_ronda_de_pt_e_sem_hashtag_na_os(banco, logado):
@@ -231,7 +231,7 @@ def test_central_separa_ronda_de_pt_e_sem_hashtag_na_os(banco, logado):
     html = logado.get("/t/campo/rondas?pend=incompleta").get_data(as_text=True)
     assert "item sem foto de evidência" in html and ">500<" in html
     html = logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True)
-    assert 'class="cn-link" href="/t/campo/pt/PT-1"' in html and "Técnico Silva" in html
+    assert 'href="/t/campo/pt/PT-1">Ver PT</a>' in html and "Técnico Silva" in html
     assert "Ronda longa pendente" not in html                          # na visão de PT, só status de PT
     html = logado.get("/t/campo/atencao?vista=pt&modo=tabela&f=parada").get_data(as_text=True)
     assert "/t/campo/pt/PT-1" in html and "/t/campo/pt/PT-2" not in html
@@ -295,32 +295,33 @@ def test_cartao_tem_tecnicos_regiao_de_campo_e_total_e_os_dois_filtros(banco, lo
 def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
     """Levi, 05/10: divisão por equipe com o que está pendente, filtro de supervisor, linha que abre o detalhe,
     equipamento no lugar do estado, espera no fim e só o número da OS, em verde, no lugar do número da PT."""
-    html = logado.get("/t/campo/pt").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
     assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "Supervisora Campo" in html
     assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
     # a mesma tela da Central de atenção > Permissões de trabalho (Levi, 05/10)
     import re as _re
     corpo = lambda h: " ".join(_re.sub(r'href="[^"]*"', "", h[h.index('<div class="cn-equipes">'):h.index('<div class="cn-nota">')]).split())
     assert corpo(html) == corpo(logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True))
-    html = logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     assert html.count('class="cn-link cn-os"') == 2 and ">700<" in html                    # PT-1 e PT-2, pela OS
-    html = logado.get("/t/campo/pt?modo=tabela").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
+    # 09/10/2026: a PT e a APR em colunas (Levi: "invés de PDF e baixar terá uma coluna de PT e APR")
     cab = ("<th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th>"
-           "<th>Técnico</th><th>Respostas NÃO</th><th>Espera</th>")
-    assert cab in html and "<th>Estado</th>" not in html and "<th>PT</th>" not in html
-    assert 'class="cn-detalhe" hidden' in html and "Atividades críticas da APR" in html and "Eletricidade" in html
+           "<th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th>")
+    assert cab in html and "<th>Estado</th>" not in html and "/t/campo/pt/PT-1/apr.pdf" in html
+    assert 'class="cn-detalhe" hidden' in html and "Atividades críticas" in html and "Eletricidade" in html
     assert "Inversor 1" in html and "THPN-ALT100-INVR1" in html
-    html = logado.get("/t/campo/pt?gestor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?gestor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
     assert "Nenhuma PT esperando o De acordo com esses filtros" in html
-    html = logado.get("/t/campo/pt?aba=historico").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?aba=historico").get_data(as_text=True)
     assert "<th>Situação</th>" in html and "De acordo" in html and "/t/campo/pt/PT-3" in html
-    assert "/t/campo/pt/PT-3/pdf" in html and "<th>PDF</th>" in html
+    assert "/t/campo/pt/PT-3/pdf" in html and "<th>PT</th><th>APR</th>" in html and "/t/campo/pt/PT-3/apr.pdf" in html
 
 
 def test_cartao_leva_a_tabela_da_equipe_com_a_regiao_e_o_supervisor_de_campo(banco, logado):
-    html = logado.get("/t/campo/pt").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
     assert '<a class="cn-equipe cn-equipe--critico" href="?modo=tabela&amp;equipe=SP+Norte+01">' in html
-    html = logado.get("/t/campo/pt?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
     assert 'class="cn-faixa-equipe"' in html and "2</b> técnicos" in html
     assert 'Sudeste 03 · Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
 

@@ -1,7 +1,7 @@
 # CLAUDE.md — Segurança · HSEQ
 
-Torre do menu "Segurança · HSEQ". Telas vivas: **Extintores** (com o relatório em PDF) e **EPI e EPC** (09/10/2026).
-Riscos da semana, APR e PT, DSS e Incidentes ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o template,
+Torre do menu "Segurança · HSEQ". Telas vivas: **Extintores** (com o relatório em PDF), **EPI e EPC** e **APR e PT**
+(09/10/2026). Riscos da semana, DSS e Incidentes ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o template,
 aqui.
 
 ## Extintores
@@ -132,3 +132,39 @@ sem luvas**, 34 sem verificação, 76 com luvas.
 
 **Como provar.** `python -m pytest -q tests/test_hseq_epi.py` (a resposta pelo texto, a situação por usina, o Sim antigo,
 os cartões, a tabela com o botão de fotos, o aviso quando a pergunta some).
+
+## APR e PT
+
+Levi, 09/10/2026: "quero que esse visual e caminho vá para APR e PT de Segurança · HSEQ ... precisamos ter a visão
+também de APR". A tela das Permissões de trabalho do Campo · App veio para cá (`/t/hseq/apr-pt`; o `/t/campo/pt` leva
+para cá com os filtros). O código continua em `nexus/torres/campo` (`pagina_pt`, a aprovação `/t/campo/pt/<número>`,
+os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra das contas é a de
+`nexus/torres/campo/CLAUDE.md`.
+- **Título:** "Permissões de trabalho e Análise Preliminar de Risco" (no menu, "APR e PT").
+- **Colunas PT e APR** no lugar do "PDF", cada uma com o Baixar dela: a PT é o PDF que o App anexa no De acordo
+  ("Permissão de Trabalho <número>"; PT negada não tem); a APR é o PDF que o App anexa desde a v251 ("APR OS 15223
+  09-10-2026 07h42", + " v2" no Novo risco da APR do dia), e na OS com mais de uma APR vale a de horário mais perto da
+  criação da PT (`pt_fracttal.apr_pdf`, rota `/t/campo/pt/<número>/apr.pdf`). Na aba Esperando a PT ainda não tem PDF
+  (sai no De acordo); a APR já tem.
+- **O detalhe da PT esperando** (a linha abre; "estou achando o atual muito cru"): o cabeçalho da PT (número, OS,
+  tarefa, equipamento, técnico, equipe, usina, aberta), as atividades críticas, as respostas NÃO e o que falta, a
+  região de campo e o gestor, **quem assina**, as duas assinaturas lado a lado (a do técnico na APR, do Fracttal pelo
+  login de quem olha, carregada ao abrir; a da aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
+  com o motivo, Ver PT, Baixar APR), que volta para a lista com os filtros dela. É o mesmo pedaço da Central de atenção
+  > Permissões de trabalho (`campo/_pt_esperando.html`).
+- **Quem pode dar o De acordo** (Levi, 09/10): o Supervisor de Campo da região da usina (com a vaga aberta, o
+  Coordenador de Campo), o gestor de contrato da usina, quem é do COS e um administrador do Nexus
+  (`decisao_pt.aprovadores` / `pode_decidir`, conferido no servidor; quem não pode recebe a recusa dizendo quem pode).
+  **Quem é do COS** é o vínculo "COS" no cadastro de pessoas (Pessoas > Colaborador): é o "campo onde fazemos essa
+  relação". O responsável e o técnico da usina se trocam na ficha da usina (Base > Registro mestre).
+- **O App ainda não lê a decisão do Nexus** (`nexus_pt_decisoes`): até a versão que lê, quem libera o técnico é o De
+  acordo dado pelo App, e a tela diz isso no detalhe. Quando o App ler, o `_pt_pode_assinar` dele precisa aceitar o
+  mesmo conjunto (supervisor de campo, gestor de contrato, COS e administrador).
+- **O que o detalhe ainda não tem** (o painel do App mostra): riscos marcados, a atividade escrita, EPI e equipamentos
+  com e sem, envolvidos, foto da equipe, aptidão e clima e o checklist item a item. Esses dados moram no App; entram
+  quando o App mandar no livro de PT (sem nome em claro: a API tem leitura aberta).
+
+**Como provar.** `python -m pytest -q tests/test_hseq_apr_pt.py` (a tela no HSEQ com o título e as colunas, o detalhe
+com a assinatura e a decisão que volta, quem pode e quem não pode, o PDF da APR mais perto da PT, o vínculo COS) e os
+testes de PT do Campo (`test_campo_visao.py`, `test_campo_central_supervisor.py`), que agora abrem `/t/hseq/apr-pt`.
+

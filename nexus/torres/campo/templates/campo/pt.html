@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block titulo %}{{ titulo or tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Permissões de trabalho, visão do Nexus (05/10/2026): o livro de PT que o App grava no banco (nexus/campo/visao.py,
@@ -38,10 +38,12 @@
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ titulo or tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">livro de PT do App<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+  {% if aviso %}<div class="cn-erro" role="alert"><b>{{ aviso }}</b></div>{% endif %}
+  {% if gravada %}<div class="cn-certo" role="status"><b>Decisão da {{ gravada }} salva no banco.</b> O técnico vê quando o App aplicar a decisão.</div>{% endif %}
   {% include 'campo/_aviso_estrutura.html' %}
   {% set r = d.get('resumo') or {} %}
   <div class="cn-numeros">
@@ -88,7 +90,7 @@
     {% for s, (rot, cor) in situacoes.items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem_hist.get(s, 0) }}</b></a>{% endfor %}
   </div>
   <div class="cn-tab"><table class="cn-expande">
-    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th><th>PDF</th></tr></thead>
+    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th><th>PT</th><th>APR</th></tr></thead>
     <tbody>
     {% for p in historico[:300] %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
@@ -96,9 +98,10 @@
         <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ p.decidida_por or p.papel or '—' }}</td>
         <td class="m">{{ p.criada.strftime('%d/%m %H:%M') if p.criada else '—' }}</td>
         <td class="m">{{ '—' if p.espera_min is none else idade_min(p.espera_min) }}</td>
-        <td>{% if p.situacao in ('de_acordo', 'vencida') %}<a class="cn-link" href="{{ url_for('torre_campo.pt_pdf', numero=p.numero) }}" title="O PDF que o App anexou no Fracttal, com as assinaturas">Baixar</a>{% else %}—{% endif %}</td></tr>
-      {{ detalhe(p, 11) }}
-    {% else %}<tr><td colspan="11" class="mudo">Nenhuma PT decidida com esses filtros.</td></tr>{% endfor %}
+        <td>{% if p.situacao in ('de_acordo', 'vencida') %}<a class="cn-link" href="{{ url_for('torre_campo.pt_pdf', numero=p.numero) }}" title="O PDF da PT que o App anexou no Fracttal, com as assinaturas">Baixar</a>{% else %}<span class="mudo" title="PT não autorizada não tem PDF">—</span>{% endif %}</td>
+        <td><a class="cn-link" href="{{ url_for('torre_campo.pt_apr_pdf', numero=p.numero) }}" title="O PDF da APR que o App anexou na tarefa do Fracttal">Baixar</a></td></tr>
+      {{ detalhe(p, 12) }}
+    {% else %}<tr><td colspan="12" class="mudo">Nenhuma PT decidida com esses filtros.</td></tr>{% endfor %}
     </tbody></table></div>
   {% if historico|length > 300 %}<p class="mudo">Mostrando 300 de {{ historico|length }}: use o período, o supervisor ou a busca.</p>{% endif %}
   {% endif %}
@@ -106,8 +109,10 @@
   <div class="cn-nota"><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
     App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, região de campo (com o
     Supervisor de Campo), gestor de contrato e técnicos vêm do cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
-    {% if aba == 'historico' %}<br><b>PDF:</b> é o que o App anexou na tarefa do Fracttal no De acordo, com a assinatura
-    do técnico e a de quem aceitou; o Nexus busca no Fracttal na hora do clique. PT não autorizada não tem PDF.{% endif %}</div>
+    <br><b>PT e APR:</b> os PDFs que o App anexou na tarefa do Fracttal (a PT no De acordo, com a assinatura do técnico
+    e a de quem aceitou; a APR desde a v251 do App); o Nexus busca no Fracttal na hora do clique. PT não autorizada não
+    tem PDF. <b>Quem pode dar o De acordo:</b> o Supervisor de Campo da região da usina (com a vaga aberta, o
+    Coordenador), o gestor de contrato da usina, quem é do COS (o vínculo COS no cadastro de pessoas) e um administrador.</div>
 </div>
 {% if aba == 'historico' %}
 <script>

@@ -12,6 +12,13 @@ motivo (o que o técnico lê quando a PT é negada) vai mascarado e curto.
 Quem aplica a decisão no campo é o App: ele confere se quem assinou pode assinar aquela PT (`_pt_pode_assinar`), se a
 PT ainda está aguardando e se a decisão é recente, e só então libera ou nega (a pausa no Fracttal, o anexo). Até o App
 ler este livro, a decisão fica salva aqui e o técnico continua esperando a decisão pelo App.
+
+QUEM PODE DECIDIR (Levi, 09/10/2026: "A pessoa que pode aprovar a PT é: Supervisor de Campo, Gestor de contrato, admin
+ou pessoa do COS"): o Supervisor de Campo da região da usina (com a vaga aberta, o Coordenador de Campo), o gestor de
+contrato da usina, quem tem o vínculo COS no cadastro de pessoas e um administrador do Nexus (`aprovadores`,
+`pode_decidir`). Quem assina é a pessoa do login do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa
+(`_Base.pessoa_do_login`); sem a chave do cadastro, só o administrador decide. O App precisa aceitar o mesmo conjunto
+quando passar a ler este livro.
 """
 import re
 import threading
@@ -19,6 +26,8 @@ from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 
+from ..cadastro.esquema import VINCULO_COS
+from ..dados import fatos as D
 from ..dados import livros
 from . import visao
 from .ligacao_cadastro import codigo_da_pessoa
@@ -43,6 +52,48 @@ def mascarar(texto) -> str:
     return s[:MOTIVO_MAX]
 
 
+def aprovadores(p: dict, b=None) -> dict:
+    """Quem pode dar o De acordo nesta PT: {"ids": {papel: pessoa_id}, "cos": {pessoa_id}, "texto"}. O texto é o que a
+    tela e a recusa dizem ("Supervisor de Campo da Sudeste 03 (Fulana), gestor de contrato Beltrano, alguém do COS ou
+    um administrador")."""
+    b = b or visao._Base()
+    uid = D._id(p.get("usina_id"))
+    rid = b.regiao_da_usina(uid) if uid else None
+    r = b.regiao.get(rid) or {}
+    u = b.por_id.get(uid) or {}
+    ids = {"supervisor de campo": r.get("supervisor_id"),
+           "coordenador de campo": None if r.get("supervisor_id") else r.get("coordenador_id"),
+           "gestor de contrato": D._id(u.get("gestor_contrato_id"))}
+    cos = {D._id(x.get("pessoa_id")) for x in b.pessoas
+           if str(x.get("vinculo") or "").strip() == VINCULO_COS and str(x.get("excluido") or "").lower() != "sim"}
+    partes = []
+    if r:
+        sup = b.nome_da_pessoa(r.get("supervisor_id"), "Supervisor") if r.get("supervisor_id") else ""
+        coord = b.nome_da_pessoa(r.get("coordenador_id"), "Coordenador") if r.get("coordenador_id") else ""
+        partes.append(f"o Supervisor de Campo da {r['nome']} ({sup})" if sup else
+                      (f"o Coordenador de Campo da {r['nome']} ({coord}), com a vaga de supervisor aberta" if coord
+                       else f"o Supervisor de Campo da {r['nome']} (vaga)"))
+    if ids["gestor de contrato"]:
+        partes.append(f"o gestor de contrato ({b.nome_da_pessoa(ids['gestor de contrato'], 'Gestor')})")
+    partes.append("alguém do COS" if cos else "alguém do COS (ninguém com o vínculo COS no cadastro ainda)")
+    partes.append("um administrador")
+    texto = ", ".join(partes[:-1]) + " ou " + partes[-1]
+    return {"ids": {k: v for k, v in ids.items() if v}, "cos": cos, "texto": texto[0].upper() + texto[1:]}
+
+
+def pode_decidir(p: dict, email: str, nome: str = "", admin: bool = False, b=None) -> tuple[bool, str]:
+    """(pode, papel ou o porquê não). Administrador do Nexus sempre pode."""
+    if admin:
+        return True, "administrador"
+    b = b or visao._Base()
+    a = aprovadores(p, b)
+    pid = b.pessoa_do_login(email, nome)
+    papel = next((k for k, v in a["ids"].items() if pid and v == pid), None) or ("COS" if pid and pid in a["cos"] else None)
+    if papel:
+        return True, papel
+    return False, f"Quem pode dar o De acordo nesta PT: {a['texto'][0].lower()}{a['texto'][1:]}."
+
+
 def decisoes() -> list[dict]:
     """As decisões já gravadas pelo Nexus (sem cópia: quem decide precisa ver a última)."""
     return livros.ler(visao._base(), visao._sessao(), LIVRO, ABA)
@@ -53,9 +104,10 @@ def da_pt(numero) -> dict | None:
     return next((d for d in reversed(decisoes()) if str(d.get("pt") or "") == n), None)
 
 
-def decidir(numero, decisao: str, motivo: str, email: str) -> dict:
-    """Grava a decisão e confere no banco. Recusa: decisão inválida, negar sem motivo, PT que não existe, que já não
-    está aguardando no livro do App ou que já tem decisão do Nexus (o primeiro que decide vale, como no App)."""
+def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin: bool = False) -> dict:
+    """Grava a decisão e confere no banco. Recusa: decisão inválida, negar sem motivo, quem não pode decidir esta PT
+    (`pode_decidir`), PT que não existe, que já não está aguardando no livro do App ou que já tem decisão do Nexus (o
+    primeiro que decide vale, como no App)."""
     cfg = current_app.config
     if decisao not in DECISOES:
         raise Recusada("A decisão precisa ser De acordo ou Não autorizo.")
@@ -74,6 +126,9 @@ def decidir(numero, decisao: str, motivo: str, email: str) -> dict:
             raise Recusada(f"{numero} não está no livro do App.")
         if p["situacao"] != "aguardando":
             raise Recusada(f"{numero} já foi decidida no App ({p['situacao']}).")
+        pode, porque = pode_decidir(p, email, nome, admin)
+        if not pode:
+            raise Recusada(porque)
         linhas = decisoes()
         if any(str(d.get("pt") or "") == p["numero"] for d in linhas):
             raise Recusada(f"{numero} já tem decisão gravada pelo Nexus.")
