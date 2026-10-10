@@ -1,6 +1,7 @@
 # Deploy por push (Levi, 09/10/2026: "não dá para subir com o commit?"): roda o atualizar.sh, que puxa do GitHub e só
-# reinicia o Nexus se veio commit novo (erro antes do restart deixa o código de antes no ar). Quem chama é o
-# nexus-atualizar.timer. Instalação: DEPLOY.md, passo 8.
+# reinicia o Nexus se o commit do clone ainda não foi instalado (o pip e a conferência do boot vêm antes; erro antes do
+# restart deixa o código de antes no ar, e a rodada seguinte tenta de novo). Quem chama é o nexus-atualizar.timer.
+# Instalação: DEPLOY.md, passo 8.
 [Unit]
 Description=Nexus: puxa do GitHub e reinicia se houver commit novo
 After=network-online.target
