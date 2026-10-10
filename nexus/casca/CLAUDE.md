@@ -112,7 +112,20 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   do prefixo); `tests/test_prefixo.py` pega o esquecimento.
 - **Rota pública é decisão consciente:** só o que está em `ROTAS_PUBLICAS` (entrar, saude, static). O teste
   `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
-- **Limite de senha:** 5 erros em 15 min por IP, guardado em `app.extensions` (estado global vazava entre testes).
+- **Limite de tentativas do Entrar** (auditoria A2 da porta única, 10/10/2026). Era 5 erros por IP: um colega errando a
+  senha cinco vezes trancava o Entrar da sala inteira por 15 min (o escritório sai por um IP público só), inclusive a
+  senha de administrador, e até o 429 do Fracttal contava. Agora (`nexus/auth/__init__.py`):
+  - por **e-mail**: 5 senhas erradas do mesmo e-mail (sem espaço, sem diferença de maiúscula) em 15 min trancam só ele;
+    a 6ª nem vai ao Fracttal (que tem o bloqueio da conta dele, de ~30 min). Acertar zera o contador DESTE e-mail;
+  - por **IP**, um teto alto (`TETO_POR_IP` = 50 em 15 min) contra força bruta de muitos e-mails; um login certo no meio
+    não o zera. O IP é o do visitante: o `trusted_proxy` do `servir.py` lê o X-Forwarded-For do Caddy;
+  - a **senha de administrador** tem o próprio contador (5 por IP): o Fracttal dos colegas não a tranca, e ela não tranca o
+    Fracttal de ninguém;
+  - **Fracttal ocupado não conta** (`fracttal.FracttalOcupado`: 429/406, 5xx, limite, rede fora; lido da mensagem que o
+    clone monta, porque ele não devolve o status): a pessoa vê "Fracttal ocupado, tente em instantes" (503). E-mail ou
+    senha vazios nem vão ao Fracttal (400).
+  Em memória, em `app.extensions` (estado global vazava entre testes): zera no restart. Prova: `tests/test_auth_limite.py`
+  (inclusive pelo `api.fracttal_login` de verdade do clone, só com o `requests.post` falso).
 - **Login pelo Fracttal** (Levi, 06/10/2026: "Ao invés de uma senha difícil, no início faça a pessoa logar com
   fractall"): e-mail e senha do Fracttal (a senha vai transformada ao Fracttal e não é guardada; só a conta da Grid Co.
   entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (caminho prefixo + `/os`,

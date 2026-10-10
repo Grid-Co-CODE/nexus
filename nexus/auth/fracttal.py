@@ -12,6 +12,7 @@ o token vence, quando o Fracttal o recusa ou quando a pessoa sai pelo OS Creator
 """
 import base64
 import json
+import re
 
 
 def exp_do_jwt(jwt: str) -> float:
@@ -28,8 +29,29 @@ class LoginRecusado(Exception):
     """O Fracttal não aceitou: a mensagem é a dele (senha errada, conta bloqueada por tentativas...)."""
 
 
+class FracttalOcupado(LoginRecusado):
+    """O login nem foi conferido: o Fracttal respondeu com o limite (429/406, os 200 pedidos por minuto da EMPRESA,
+    divididos com o App de Campo), caiu (5xx) ou a rede não chegou. Não é senha errada: o limite de tentativas do Entrar
+    não conta esta (auditoria A2 da porta única, 10/10/2026) e a pessoa vê "Fracttal ocupado, tente em instantes"."""
+
+
+# O que o `api.fracttal_login` do clone monta quando a senha NÃO foi conferida. Ele não devolve o status HTTP, só a
+# mensagem: "Erro de conexão no login: <erro do requests>" (rede, tempo esgotado) ou "Login falhou: <message do Fracttal,
+# ou HTTP nnn quando ela não vem>". Um 5xx que traga uma mensagem própria fora desta lista conta como recusa (do lado
+# seguro: só se deixa de contar o que se sabe que não conferiu a senha). O clone fica idêntico ao do oem
+# (`nexus/torres/oscreator/README.md`), por isso a leitura é aqui, e não lá.
+_NAO_CONFERIU = re.compile(r"erro de conex|\bhttp (?:406|408|425|429|5\d\d)\b|too.?many|rate.?limit|limit.?exceeded"
+                           r"|bad gateway|service unavailable|gateway time|timed? ?out", re.I)
+
+
+def nao_conferiu(mensagem: str) -> bool:
+    """A recusa do clone é de Fracttal ocupado ou fora (e não de senha errada)?"""
+    return bool(_NAO_CONFERIU.search(str(mensagem or "")))
+
+
 def entrar(app, email: str, senha: str) -> dict:
-    """{"email", "nome", "perfil", "exp", "cookie": (nome, valor, max_age)} da pessoa. LoginRecusado com o motivo."""
+    """{"email", "nome", "perfil", "exp", "cookie": (nome, valor, max_age)} da pessoa. LoginRecusado com o motivo;
+    FracttalOcupado (que também é um LoginRecusado) quando a senha não chegou a ser conferida."""
     from ..torres.oscreator import ponte
     clone = ponte.clone(app)                     # põe o clone no sys.path e costura a sessão dele no `api`
     import api as os_api                         # noqa: E402 — o `api` do clone do OS Creator
@@ -39,10 +61,11 @@ def entrar(app, email: str, senha: str) -> dict:
             try:
                 os_api.fracttal_login(email, senha)
             except os_api.FracttalError as e:
-                raise LoginRecusado(str(e)) from None
+                raise (FracttalOcupado if nao_conferiu(str(e)) else LoginRecusado)(str(e)) from None
             jwt = os_sessao.jwt_atual()
             if not jwt:
-                raise LoginRecusado("O Fracttal não devolveu a sessão. Tente de novo.")
+                # a senha passou e a sessão não veio: não é erro de quem digitou, não conta no limite
+                raise FracttalOcupado("O Fracttal não devolveu a sessão. Tente de novo.")
             try:
                 conta = os_api.get_conta_info() or {}
             except Exception:                    # noqa: BLE001 — o perfil é enfeite; o login vale sem ele

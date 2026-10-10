@@ -16,6 +16,7 @@ página confere a cada 5 minutos (`/os/_nexus/sessao`) se ele não foi derrubado
 depende do Fracttal: só o "sair" a encerra.
 """
 import hmac
+import threading
 import time
 from collections import defaultdict, deque
 from urllib.parse import urlsplit
@@ -32,11 +33,34 @@ bp = Blueprint("auth", __name__)
 # dela antes de gravar qualquer coisa (`nexus/hseq/fotos.receber`); só ela passa sem login, e só por POST
 ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber"}
 
-# Limite de tentativas por IP. Em memória: zera no restart, o que é aceitável enquanto só o admin
-# entra. Sem isso, a senha única ficaria aberta a tentativa em massa assim que o servidor subir.
-# Fica em app.extensions, não em variável global, para cada app (e cada teste) ter a sua contagem.
-MAX_ERROS = 5
+# Limite de tentativas do Entrar (auditoria A2 da porta única, 10/10/2026). Até então era por IP: 5 erros de QUALQUER
+# pessoa no mesmo IP trancavam o Entrar de todos por 15 min, inclusive a senha de administrador, e até o 429 do Fracttal
+# contava como erro. Na segunda-feira em que o Nexus vira a porta principal todos entram de novo (o cookie é novo), muitos
+# atrás do mesmo IP público do escritório: um colega errando a senha cinco vezes deixava a sala inteira de fora. Agora:
+# - por E-MAIL: 5 senhas erradas do mesmo e-mail em 15 min trancam só aquele e-mail, e a 6ª nem vai ao Fracttal (que
+#   tem o próprio bloqueio da conta, de ~30 min, e cada tentativa a mais o prolonga);
+# - por IP, um TETO alto (50 em 15 min) contra força bruta de muitos e-mails a partir de uma máquina; o IP é o do
+#   visitante, que o waitress lê do X-Forwarded-For do proxy confiável (`servir.py`, `trusted_proxy`);
+# - a senha de administrador tem o PRÓPRIO contador (por IP): os colegas errando o Fracttal não a trancam, e quem a erra
+#   não tranca o Fracttal de ninguém;
+# - recusa em que a senha NÃO foi conferida (429/limite do Fracttal, rede fora: `fracttal.FracttalOcupado`) não conta:
+#   a pessoa vê "Fracttal ocupado, tente em instantes".
+# Em memória: zera no restart. Fica em app.extensions, não em variável global, para cada app (e cada teste) ter a sua.
+MAX_ERROS_POR_EMAIL = 5
+MAX_ERROS_ADMIN = 5
+TETO_POR_IP = 50
 JANELA_S = 15 * 60
+# o e-mail é texto livre de quem tenta: acima disto, as chaves vencidas saem da memória
+_MAX_CHAVES = 5000
+# o waitress atende em 8 threads: duas tentativas ao mesmo tempo não podem limpar a mesma fila nem podar o dicionário
+# enquanto o outro o percorre
+_TRAVA_DOS_ERROS = threading.Lock()
+
+TEXTO_EMAIL_TRANCADO = "Muitas tentativas erradas com este e-mail. Aguarde 15 minutos e tente de novo."
+TEXTO_IP_TRANCADO = "Muitas tentativas erradas a partir desta rede. Aguarde 15 minutos."
+TEXTO_ADMIN_TRANCADO = "Muitas tentativas erradas com a senha de administrador. Aguarde 15 minutos."
+TEXTO_FRACTTAL_OCUPADO = ("Fracttal ocupado, tente em instantes. A senha não chegou a ser conferida, e esta tentativa "
+                          "não conta como erro.")
 
 # Por que a pessoa voltou ao login (o aviso no alto da tela de entrada). Só estes textos aparecem: o motivo que chega
 # pelo endereço é uma CHAVE daqui, nunca texto livre.
@@ -51,7 +75,7 @@ MOTIVOS = {
 _DADOS_DO_OS = ("/os/api/", "/os/_nexus/quem", "/os/_nexus/sessao")
 
 
-def _erros() -> dict[str, deque]:
+def _erros() -> dict[tuple, deque]:
     return current_app.extensions["nexus_erros_login"]
 
 
@@ -59,12 +83,38 @@ def _ip() -> str:
     return request.remote_addr or "?"
 
 
-def _bloqueado(ip: str) -> bool:
-    fila = _erros()[ip]
-    agora = time.monotonic()
-    while fila and agora - fila[0] > JANELA_S:
-        fila.popleft()
-    return len(fila) >= MAX_ERROS
+def _chave_do_email(email: str) -> tuple:
+    """O e-mail como o Fracttal o trata (sem espaço nas pontas, sem diferença de maiúscula): "A@x" e " a@x" são a mesma
+    conta e contam juntos."""
+    return ("email", email.strip().lower()[:254])
+
+
+def _erros_na_janela(chave: tuple) -> int:
+    """Quantos erros desta chave caem na janela de 15 min. Só lê: conferir um e-mail novo não o põe na memória."""
+    with _TRAVA_DOS_ERROS:
+        fila = _erros().get(chave)
+        if not fila:
+            return 0
+        agora = time.monotonic()
+        while fila and agora - fila[0] > JANELA_S:
+            fila.popleft()
+        return len(fila)
+
+
+def _contar_erro(*chaves: tuple) -> None:
+    with _TRAVA_DOS_ERROS:
+        erros = _erros()
+        agora = time.monotonic()
+        for chave in chaves:
+            erros[chave].append(agora)
+        if len(erros) > _MAX_CHAVES:
+            for chave in [c for c, fila in list(erros.items()) if not fila or agora - fila[-1] > JANELA_S]:
+                erros.pop(chave, None)
+
+
+def _zerar_erros(chave: tuple) -> None:
+    with _TRAVA_DOS_ERROS:
+        _erros().pop(chave, None)
 
 
 def next_seguro(valor: str | None) -> str:
@@ -187,12 +237,23 @@ def _supervisor_padrao(email: str, nome: str) -> dict:
 
 def _entrar_fracttal(destino):
     email = (request.form.get("email") or "").strip()
+    senha = request.form.get("senha") or ""
+    if not email or not senha:
+        # nada foi ao Fracttal: não é uma senha tentada, não conta
+        return _tela_entrar(erro="Informe o e-mail e a senha do Fracttal.", email=email, destino=destino), 400
+    chave = _chave_do_email(email)
+    if _erros_na_janela(chave) >= MAX_ERROS_POR_EMAIL:
+        return _tela_entrar(erro=TEXTO_EMAIL_TRANCADO, email=email, destino=destino), 429
     try:
-        conta = fracttal.entrar(current_app._get_current_object(), email, request.form.get("senha") or "")
+        conta = fracttal.entrar(current_app._get_current_object(), email, senha)
+    except fracttal.FracttalOcupado:
+        # o Fracttal não conferiu a senha (429 do limite da empresa, rede fora): tentar de novo é o certo, e não conta
+        return _tela_entrar(erro=TEXTO_FRACTTAL_OCUPADO, email=email, destino=destino), 503
     except fracttal.LoginRecusado as e:
-        _erros()[_ip()].append(time.monotonic())
+        _contar_erro(chave, ("ip", _ip()))
         return _tela_entrar(erro=str(e), email=email, destino=destino), 401
-    _erros().pop(_ip(), None)
+    # acertou: o contador DESTE e-mail zera; o do IP fica (um login certo no meio não apaga a força bruta de outro)
+    _zerar_erros(chave)
     session.clear()
     session.permanent = True
     session["logado"] = True
@@ -238,20 +299,25 @@ def entrar():
         return _tela_entrar(erro=None, destino=destino, admin=admin, motivo=motivo, aviso=MOTIVOS.get(motivo))
 
     ip = _ip()
-    if _bloqueado(ip):
-        return _tela_entrar(erro="Muitas tentativas. Aguarde 15 minutos.",
-                               destino=destino, admin=admin), 429
+    pelo_fracttal = request.form.get("email") is not None
+    if _erros_na_janela(("ip", ip)) >= TETO_POR_IP:
+        return _tela_entrar(erro=TEXTO_IP_TRANCADO, email=(request.form.get("email") or "").strip(),
+                            destino=destino, admin=not pelo_fracttal), 429
 
-    if request.form.get("email") is not None:
+    if pelo_fracttal:
         return _entrar_fracttal(destino)
 
+    # a senha de administrador: contador próprio, por IP
+    chave = ("admin", ip)
+    if _erros_na_janela(chave) >= MAX_ERROS_ADMIN:
+        return _tela_entrar(erro=TEXTO_ADMIN_TRANCADO, destino=destino, admin=True), 429
     senha = request.form.get("senha", "")
     certa = current_app.config["NEXUS_SENHA_ADMIN"]
     if not hmac.compare_digest(senha.encode(), certa.encode()):
-        _erros()[ip].append(time.monotonic())
+        _contar_erro(chave, ("ip", ip))
         return _tela_entrar(erro="Senha incorreta.", destino=destino, admin=True), 401
 
-    _erros().pop(ip, None)
+    _zerar_erros(chave)
     session.clear()
     session.permanent = True
     session["logado"] = True
