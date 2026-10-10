@@ -61,7 +61,10 @@ navegador fala com cada sistema.
 - **Chaves das fontes** (`/tokens`): só admin do Nexus; quem não é recebe 403 com o porquê (como as telas do Cadastro), e
   a plataforma recusa de novo pelo `admin` do passe.
 - **Sem configuração:** sem a chave, com chave curta ou com a `NEXUS_PLATAFORMA_URL` inválida, cada item diz "Performance
-  ainda não ligada neste servidor" e o que falta (nunca o valor), e o resto do Nexus segue. A plataforma, sem a chave,
+  ainda não ligada neste servidor"; o que falta (nunca o valor) só para admin, e no menu as molduras ficam sem o verde
+  (`moldura.SO_COM_A_PORTA` em `telas_com_conteudo`; o Tempo real, que tem a ponte de reserva, segue verde). Revisão
+  de 10/10/2026: antes os 12 itens ficavam verdes e o aviso mostrava a variável a qualquer um, técnico inclusive. O
+  resto do Nexus segue. A plataforma, sem a chave,
   responde 404 em `/painel/nexus/*`: as duas pontas ficam inertes até a T.I. pôr a MESMA chave nas duas (`DEPLOY.md`,
   seção 7e).
 - **Onde está a plataforma para o navegador** (`base_da_plataforma`): a `NEXUS_PLATAFORMA_URL`, a mesma da ponte. No

@@ -232,8 +232,11 @@ Nexus: a página do Nexus manda um passe assinado (POST, vale 60 s, uma vez) a `
 abre a sessão dela e mostra a tela. Os dois sistemas continuam onde estão (Nexus em `/nexus`, plataforma na raiz).
 
 **Tudo fica desligado até a T.I. pôr a chave nos DOIS.** Sem ela, no Nexus cada item diz "Performance ainda não ligada
-neste servidor" (o Tempo real segue pela leitura de 04/10, seção 7b, se ela estiver ligada) e, na plataforma,
-`/painel/nexus/*` responde 404. Publicar o código antes não muda nada para ninguém.
+neste servidor" (o que falta só aparece para admin) e fica como "em construção" no menu, sem o verde; o Tempo real
+segue pela leitura de 04/10 (seção 7b), como hoje. Na plataforma, `/painel/nexus/*` responde 404. O que muda para quem
+usa o Nexus antes da chave: o menu ganha 6 itens novos em construção (Disponibilidade, Relatório semanal, Histórico da
+plataforma, Monitor da ronda, COS · Acompanhamento COS e Base · Chaves das fontes) e o Início conta 6 telas previstas a
+mais. Na plataforma, nada muda para ninguém.
 
 **O que a T.I. faz, nesta ordem** (o código dos dois já no ar):
 

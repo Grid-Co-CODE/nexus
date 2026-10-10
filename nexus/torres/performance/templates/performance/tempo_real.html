@@ -11,7 +11,8 @@
     <span class="ponte-origem">Plataforma de Performance · somente leitura</span>
     {% if plataforma %}<a class="ponte-fora" href="{{ plataforma }}/tempo-real" target="_blank" rel="noopener">Abrir na plataforma</a>{% endif %}
   </div>
-  {% if porta_motivo %}<p class="porta-reserva" title="Para ligar: {{ porta_motivo }}">Performance ainda não ligada neste servidor: até lá, o Tempo real abre pela leitura de 04/10, só leitura.</p>{% endif %}
+  {# a faixa da porta desligada só para admin (revisão de 10/10/2026): para quem usa, o Tempo real é o de antes #}
+  {% if porta_motivo and session.admin %}<p class="porta-reserva" title="Para ligar: {{ porta_motivo }}">Performance ainda não ligada neste servidor: até lá, o Tempo real abre pela leitura de 04/10, só leitura.</p>{% endif %}
   {% if falta %}
   <p class="ponte-falta">A aba ainda não está ligada à plataforma: falta {{ falta|join(" e ") }} no .env do Nexus.</p>
   {% else %}

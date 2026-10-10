@@ -32,7 +32,9 @@
   {% elif not ligada %}
   <div class="porta-aviso" role="status">
     <h1>Performance ainda não ligada neste servidor</h1>
-    <p>Esta tela é a da Plataforma de Performance, aberta dentro do Nexus. Para ligar: {{ motivo }}.</p>
+    {# o que falta (o nome da variável e do arquivo) só para admin: é recado para quem configura, não para o campo
+       (revisão de 10/10/2026) #}
+    <p>Esta tela é a da Plataforma de Performance, aberta dentro do Nexus.{% if session.admin %} Para ligar: {{ motivo }}.{% endif %}</p>
     <p class="mudo">O resto do Nexus funciona normalmente. A plataforma continua no endereço dela enquanto isso.</p>
   </div>
   {% elif not destino %}

@@ -396,3 +396,40 @@ def test_o_roteiro_do_deploy_7e_ida_e_volta_mantem_o_tempo_real():
     # o roteiro antigo (URL vazia), para registro: na volta, sem a URL, a ponte não abre
     assert _tempo_real_no_servidor(**{**hoje, "NEXUS_PLATAFORMA_URL": None}) == "não ligada"
 
+
+# ── sem a chave, o menu e as telas não mudam para quem usa (revisão de 10/10/2026) ───────────────────────────────────
+def _verde(h: str, url: str) -> bool:
+    return re.search(r'<a href="' + re.escape(url) + r'"[^>]*class="com-conteudo"', h) is not None
+
+
+def test_sem_a_chave_as_molduras_nao_ficam_verdes_no_menu(monkeypatch):
+    """O verde do menu ("uma marca esquecida não mente", 04/10) mentia: sem a chave, os 6 itens que eram "Em construção"
+    (Painel NOC, Diagnóstico...) e os 6 novos ficavam verdes e abriam o aviso. O Tempo real segue verde (a ponte de
+    04/10 é a reserva dele, como antes da porta); com a chave, todos verdes."""
+    ponte = {"NEXUS_PLATAFORMA_URL": "https://plat.exemplo.test", "NEXUS_PLATAFORMA_TOKEN": "segredo-xyz"}
+    h = _cliente(NEXUS_SSO_CHAVE=None, **ponte).get("/").get_data(as_text=True)
+    assert _verde(h, "/t/performance/tempo-real")
+    for t in porta.MAPA:
+        if t.tela != "tempo-real":
+            assert not _verde(h, f"/t/{t.torre}/{t.tela}"), t
+    h = _cliente(**ponte).get("/").get_data(as_text=True)
+    assert all(_verde(h, f"/t/{t.torre}/{t.tela}") for t in porta.MAPA)
+
+
+def test_sem_a_chave_o_nome_da_variavel_so_aparece_para_admin(monkeypatch):
+    """O aviso dizia "falta a NEXUS_SSO_CHAVE no .env do Nexus" a qualquer pessoa logada, técnico inclusive. Agora quem
+    não é admin lê só que ainda não está ligada; o admin lê o que falta. O mesmo na linha da reserva do Tempo real."""
+    ponte = {"NEXUS_PLATAFORMA_URL": "https://plat.exemplo.test", "NEXUS_PLATAFORMA_TOKEN": "segredo-xyz"}
+    from nexus.auth import fracttal
+    monkeypatch.setattr(fracttal, "entrar", lambda app, e, s: {"email": e, "nome": "Pessoa", "perfil": "",
+                                                                  "cookie": ("os_sessao", "valor", 3600)})
+    tecnico = _cliente(logar=False, NEXUS_SSO_CHAVE=None, **ponte)
+    assert tecnico.post("/entrar", data={"email": "tecnico@exemplo.test", "senha": "x"}).status_code == 302
+    h = tecnico.get("/t/performance/noc").get_data(as_text=True)
+    assert "Performance ainda não ligada neste servidor" in h and "NEXUS_SSO_CHAVE" not in h and ".env" not in h
+    h = tecnico.get("/t/performance/tempo-real").get_data(as_text=True)
+    assert 'src="/t/performance/plataforma/tempo-real"' in h and "NEXUS_SSO_CHAVE" not in h and "porta-reserva" not in h
+    admin = _cliente(NEXUS_SSO_CHAVE=None, **ponte)
+    assert "falta a NEXUS_SSO_CHAVE" in admin.get("/t/performance/noc").get_data(as_text=True)
+    assert "porta-reserva" in admin.get("/t/performance/tempo-real").get_data(as_text=True)
+

@@ -144,4 +144,14 @@ def registrar_molduras(bp, torre, reserva: dict | None = None) -> None:
 
         def view(_t=t):
             return _pagina(torre, _t, reserva.get(_t.tela))
-        bp.add_url_rule("/" + t.tela, endpoint="moldura_" + t.tela.replace("-", "_"), view_func=view)
+        endpoint = "moldura_" + t.tela.replace("-", "_")
+        bp.add_url_rule("/" + t.tela, endpoint=endpoint, view_func=view)
+        if t.tela not in reserva:
+            SO_COM_A_PORTA.add(f"{bp.name}.{endpoint}")
+
+
+# As views de moldura sem reserva: só têm conteúdo com a porta ligada. O verde do menu (`telas_com_conteudo`) as conta só
+# então (revisão de 10/10/2026: sem a chave, 12 itens ficavam verdes e abriam o aviso, e o verde, "uma marca esquecida
+# não mente", passava a mentir até a T.I. pôr a chave). O Tempo real tem a ponte de 04/10 como reserva: segue verde,
+# como antes da porta.
+SO_COM_A_PORTA: set[str] = set()
