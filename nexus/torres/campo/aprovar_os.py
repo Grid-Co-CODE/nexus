@@ -91,8 +91,9 @@ def _concluir_no_os_creator(id_wo: int, folio: str):
     """O mesmo POST que a tela fazia antes de 08/10 (o Concluir do card do OS Creator), com o cookie de quem clicou: a
     rota do clone abre a sessão do Fracttal dessa pessoa, conclui e devolve o JSON dela (ok/mensagem ou erro/login).
     O número da OS vai pela fila do servidor, não pelo que o navegador mandou."""
+    # base_url com o prefixo em que o Nexus roda (request.url_root): o cookie que o clone renovar fica no /os do Nexus
     env = EnvironBuilder(path=f"/os/api/os/{int(id_wo)}/concluir", method="POST", json={"folio": folio},
-                         base_url=request.host_url, headers={"Cookie": request.headers.get("Cookie", "")}).get_environ()
+                         base_url=request.url_root, headers={"Cookie": request.headers.get("Cookie", "")}).get_environ()
     return current_app.response_class.from_app(_clone(), env)
 
 
