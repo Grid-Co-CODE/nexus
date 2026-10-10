@@ -99,6 +99,22 @@ def _entrar_fracttal(destino):
     # a sessão do OS Creator (o JWT do Fracttal) nasce junto: o /os/ e a aprovação de PT abrem sem pedir de novo
     resp.set_cookie(nome, valor, max_age=idade, path=os_cookie_path(), httponly=True, samesite="Lax",
                     secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    return _sem_a_sessao_velha_da_raiz(resp)
+
+
+def _sem_a_sessao_velha_da_raiz(resp):
+    """Debaixo do prefixo, apaga também o `nexus_sessao` de Path=/ (revisão de 10/10/2026).
+
+    Entre publicar o código e pôr a NEXUS_PREFIXO (DEPLOY 5a), quem entrou recebeu o cookie em Path=/ (atrás do Caddy
+    que corta o /nexus, a raiz é ''). Depois, o Nexus grava em Path=/nexus, mas o velho continua indo a /nexus/* e
+    continua válido (mesma NEXUS_SECRET_KEY, até 12 h): o Sair apagava só o novo, e a pessoa seguia logada, talvez
+    como admin; num PC de campo, o próximo entrava com a sessão do anterior. Na raiz (o PC, a fase 4) o cookie de Path=/
+    É o da sessão: nada a fazer. O nome é o do Nexus; o `session` da plataforma não é tocado. Só quando o pedido trouxe
+    o cookie (o navegador não diz o caminho dele): quem chega sem nenhum não ganha um Set-Cookie a mais."""
+    cfg = current_app.config
+    if raiz() and cfg["SESSION_COOKIE_NAME"] in request.cookies:
+        resp.delete_cookie(cfg["SESSION_COOKIE_NAME"], path="/", secure=bool(cfg.get("SESSION_COOKIE_SECURE")),
+                           httponly=True, samesite=cfg.get("SESSION_COOKIE_SAMESITE"))
     return resp
 
 
@@ -128,7 +144,7 @@ def entrar():
     session.permanent = True
     session["logado"] = True
     session["admin"] = True
-    return redirect(na_raiz(destino))
+    return _sem_a_sessao_velha_da_raiz(redirect(na_raiz(destino)))
 
 
 def _plataforma_para_sair() -> str | None:
@@ -153,7 +169,7 @@ def sair():
         resp = make_response(render_template("sair.html", plataforma=plataforma))
         resp.headers["Cache-Control"] = "no-store"
     resp.delete_cookie("os_sessao", path=os_cookie_path())      # sai do OS Creator junto
-    return resp
+    return _sem_a_sessao_velha_da_raiz(resp)
 
 
 def instalar_portao(app) -> None:

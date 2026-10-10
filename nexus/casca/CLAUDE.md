@@ -30,6 +30,9 @@ na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho
 - **Cookie (passo 0):** `nexus_sessao` (nunca mais `session`, o da plataforma), no caminho em que o Nexus roda
   (`SessaoNoPrefixo`: `/nexus` no servidor, `/` na raiz); o `os_sessao` do OS Creator embutido em prefixo + `/os`
   (`auth.os_cookie_path`, e o `_SessaoDoClone` da ponte). Efeito único da troca: quem estava logado entra de novo uma vez.
+  Debaixo do prefixo, o Sair e o Entrar apagam também um `nexus_sessao` de `Path=/` que tenha sobrado da janela entre
+  publicar o código e pôr a variável (`auth._sem_a_sessao_velha_da_raiz`; revisão de 10/10/2026: ele seguia válido e a
+  pessoa saía e continuava logada).
 - **Prefixo:** `NEXUS_PREFIXO` (`.env` ou ambiente; vazio = raiz, o PC e a fase 4). O `create_app` põe o middleware
   `Prefixo`: `SCRIPT_NAME` = prefixo, e o prefixo sai do `PATH_INFO` só quando vem (serve com o Caddy cortando o `/nexus`,
   `handle_path`, e sem cortar). O `X-Forwarded-Prefix` do pedido NUNCA é lido (o Caddy repassa o do cliente). Sem a

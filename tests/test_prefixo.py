@@ -132,6 +132,40 @@ def test_a_sessao_da_plataforma_nao_derruba_a_do_nexus():
     assert cli.get("/nexus/t/cos/mesa").status_code == 200
 
 
+def _sessoes_apagadas(resp, nome="nexus_sessao"):
+    return sorted(c.split("Path=")[1].split(";")[0] for c in _biscoitos(resp, nome)
+                  if c.startswith(nome + "=;") or "Max-Age=0" in c or "1970" in c)
+
+
+def test_depois_de_por_o_prefixo_o_sair_apaga_tambem_a_sessao_velha_da_raiz():
+    """Revisão de 10/10/2026. O DEPLOY 5a sobe o código antes e põe a NEXUS_PREFIXO depois. Entre os dois, quem entra
+    recebe nexus_sessao em Path=/ (atrás do Caddy que corta o /nexus, a raiz é ''); depois, o Nexus grava em Path=/nexus,
+    mas o cookie velho continua indo a /nexus/* e continua válido (mesma NEXUS_SECRET_KEY, 12 h). O Sair apagava só o de
+    /nexus: a pessoa seguia logada, talvez como admin, e num PC de campo o próximo entrava com a sessão do anterior."""
+    cli = Client(_caddy_corta(_app(None)))                  # passo 1: o código novo, ainda sem NEXUS_PREFIXO
+    r = cli.post("/nexus/entrar", data={"senha": SENHA_TESTE})
+    assert r.status_code == 302 and "Path=/;" in _biscoitos(r, "nexus_sessao")[0] + ";"
+    cli.application = _caddy_corta(_app(PREFIXO))           # passo 2: NEXUS_PREFIXO=/nexus e reinício
+    assert cli.post("/nexus/cadeira", data={"cadeira": "", "voltar": "/"}).status_code == 302
+    r = cli.get("/nexus/sair")
+    assert _sessoes_apagadas(r) == ["/", "/nexus"]
+    r = cli.get("/nexus/t/cos/mesa")
+    assert r.status_code == 302 and r.headers["Location"].startswith("/nexus/entrar")
+
+
+def test_entrar_debaixo_do_prefixo_apaga_a_sessao_velha_da_raiz():
+    """O mesmo cookie velho de Path=/ sai também quando a pessoa entra (senão ele volta a valer quando o novo sai)."""
+    cli = Client(_caddy_corta(_app(None)))
+    cli.post("/nexus/entrar", data={"senha": SENHA_TESTE})
+    cli.application = _caddy_corta(_app(PREFIXO))
+    r = cli.post("/nexus/entrar", data={"senha": SENHA_TESTE})
+    assert r.status_code == 302 and _sessoes_apagadas(r) == ["/"]
+    # na raiz (o PC, a fase 4) o cookie da raiz é o da sessão: nada é apagado ao entrar
+    raiz = Client(_app(None))
+    r = raiz.post("/entrar", data={"senha": SENHA_TESTE})
+    assert _sessoes_apagadas(r) == []
+
+
 @pytest.mark.parametrize("prefixo", [PREFIXO, None])
 def test_o_login_do_fracttal_abre_o_os_creator_no_os_do_nexus(prefixo, monkeypatch):
     from nexus.auth import fracttal
@@ -425,7 +459,7 @@ process.stdout.write(JSON.stringify({
 
 
 def test_as_abas_do_os_creator_funcionam_debaixo_do_prefixo(sem_rede):
-    """Revisão de 10/10/2026: a ponte punha o prefixo em "/os, '/os, `/os e (/os, mas não nas expressões regulares do
+    r"""Revisão de 10/10/2026: a ponte punha o prefixo em "/os, '/os, `/os e (/os, mas não nas expressões regulares do
     clone (/^\/os\/[^/]/ e afins). Debaixo do /nexus o location.pathname é /nexus/os/...: ehTela dava false, normalizar e
     abaDoEndereco null e destino() 'seguir' onde devia 'abrir' ou 'topo'. Todo item da torre OS Creator abria o Início, os
     cartões não abriam aba e o "Clonar esta OS" caía no Início. Na raiz, nada muda."""

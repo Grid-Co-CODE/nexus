@@ -96,7 +96,10 @@ e quem consertava era uma reescrita das respostas no servidor (fora do repositó
 em todo link, redirecionamento e cookie, e o cookie de sessão tem nome próprio (`nexus_sessao`; o da plataforma é
 `session`), então entrar num não derruba mais o outro.
 
-**O que a T.I. faz, nesta ordem** (o código novo sobe antes e, sem a variável, se comporta como sempre):
+**O que a T.I. faz, nesta ordem** (sem a variável, o código novo se comporta como sempre). **Ponha a variável no MESMO
+reinício em que o código novo sobe**: quem entrasse entre um e outro ganharia o cookie em `Path=/` e, depois da
+variável, um segundo em `Path=/nexus`. Desde 10/10/2026 o Sair e o Entrar apagam também o de `Path=/` (revisão: antes
+a pessoa saía e seguia logada pelo velho, por até 12 h), mas não há por que abrir essa janela.
 
 1. No `.env` do Nexus (ou como `Environment=NEXUS_PREFIXO=/nexus` no `nexus.service`), acrescente:
    ```
@@ -114,7 +117,8 @@ em todo link, redirecionamento e cookie, e o cookie de sessão tem nome próprio
    no JavaScript, e o calço do `fetch` no `<head>`) fica sem trabalho: pode ser tirada. Sem ela o Nexus segue igual;
    com ela também (o Nexus não dobra o que ela reescreve).
 
-Todo mundo entra de novo **uma vez** depois do passo 1 (o cookie mudou de nome e de caminho).
+Todo mundo entra de novo **uma vez** depois do passo 1 (o cookie mudou de nome e de caminho). Debaixo do prefixo, o
+Sair e o Entrar apagam também o `nexus_sessao` de `Path=/` que tenha sobrado (`auth._sem_a_sessao_velha_da_raiz`).
 
 O Caddy pode cortar o `/nexus` antes de repassar (`handle_path`, como hoje) ou não (`handle`): o Nexus aceita os dois.
 O que ele **não** usa é cabeçalho de prefixo (`X-Forwarded-Prefix`): o prefixo vem só da variável. Exemplo do bloco:
