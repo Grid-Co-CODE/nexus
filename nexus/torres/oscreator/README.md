@@ -599,6 +599,11 @@ oem (roda sozinho na raiz, no 5090); quem põe o prefixo é a ponte, na resposta
 - HTML, JavaScript e JSON: `"/os`, `'/os`, `` `/os `` e `(/os` ganham o prefixo (`_no_prefixo`). Fica de fora o
   `value="/os/..."`, que é o `next` do formulário de login: o clone só aceita `next` sem prefixo (`_destino_local`). O
   `next=/os/...` dentro de um endereço também fica (vem depois de `=`);
+- as expressões regulares do clone que testam o caminho (`/^\/os\/[^/]/` e afins no `abas.js`, `/^\/os(\/|$)/` no
+  `carga.js`) também ganham o prefixo, escrito como na expressão (`^\/nexus\/os`). Revisão de 10/10/2026: só as aspas
+  e o parêntese eram cobertos, e debaixo do `/nexus` as regras das abas diziam "não é tela nossa": todo item da torre
+  OS Creator abria o Início, os cartões não abriam aba e o "Clonar esta OS" caía no Início
+  (`test_as_abas_do_os_creator_funcionam_debaixo_do_prefixo`, que roda as regras do `abas.js` servido no node);
 - todo `.js` do clone sai reescrito com marca de versão própria (a pergunta "mudou?" vale para a versão reescrita, como
   já era com o `abas.js`);
 - o `Location` que começa por `/os` ganha o prefixo; o `next` da consulta que chega com ele (o JavaScript do clone monta

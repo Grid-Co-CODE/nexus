@@ -122,14 +122,22 @@ def _trocar(corpo: bytes, de: bytes, para: bytes) -> bytes:
 #   SCRIPT_NAME do Nexus).
 # - O `next` que chega com o prefixo (o JavaScript do clone monta o next com o location.pathname) sai dele antes de ir ao
 #   clone.
+# - As EXPRESSÕES REGULARES do clone que testam o caminho (/^\/os\/[^/]/ no abas.js, /^\/os(\/|$)/ no carga.js) também
+#   ganham o prefixo, escrito como na expressão (^\/nexus\/os). Revisão de 10/10/2026: só as aspas e o parêntese eram
+#   cobertos; debaixo do /nexus o location.pathname é /nexus/os/..., as regras das abas davam "não é tela nossa", e todo
+#   item da torre OS Creator abria o Início, os cartões não abriam aba e o "Clonar esta OS" caía no Início.
 # Na raiz (o PC, a fase 4) nada disso roda: a resposta é a de sempre, byte a byte.
 _DO_CLONE = re.compile(rb"(value=)?([\"'`(])/os(?=[/\"'`?#)])")
+_REGEX_DO_CLONE = re.compile(rb"\^\\/os(?=\\/|[(?$])")
 _MIMES_COM_CAMINHO = ("text/html", "text/javascript", "application/javascript", "application/json")
 
 
 def _no_prefixo(corpo: bytes, base: str) -> bytes:
     prefixo = base.encode()
-    return _DO_CLONE.sub(lambda m: m.group(0) if m.group(1) else m.group(2) + prefixo + b"/os", corpo)
+    corpo = _DO_CLONE.sub(lambda m: m.group(0) if m.group(1) else m.group(2) + prefixo + b"/os", corpo)
+    # na expressão regular a barra vai escapada e o ponto também (o prefixo só tem letra, número, ponto, hífen e _)
+    na_regex = prefixo.replace(b".", b"\\.").replace(b"/", b"\\/")
+    return _REGEX_DO_CLONE.sub(lambda m: b"^" + na_regex + b"\\/os", corpo)
 
 
 def _next_sem_prefixo(environ: dict, base: str) -> None:

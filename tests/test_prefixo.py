@@ -11,6 +11,7 @@ e caíam na plataforma, e o cookie `session` dos dois se apagava (spec 2026-10-0
 - o varredor estático: nenhum template, .js ou redirecionamento escrito a partir da raiz.
 """
 import importlib.util
+import os
 import re
 import socket
 from pathlib import Path
@@ -375,12 +376,74 @@ def test_todo_js_do_clone_sai_com_o_prefixo_e_na_raiz_sai_igual(prefixo, sem_red
         original = (Path(ponte.RAIZ_CLONE) / "os_web" / "static" / nome).read_bytes()
         if prefixo:
             assert not re.search(rb"""[\"'`(]/os(?=[/\"'`?#)])""", corpo), nome
+            # nem nas expressões regulares (revisão de 10/10/2026: /^\/os\/.../ do abas.js e do carga.js ficavam sem o
+            # prefixo, e debaixo do /nexus as abas do OS Creator embutido paravam de funcionar)
+            assert rb"^\/os" not in corpo, nome
             assert corpo.count(b"/nexus/os") >= original.count(b"'/os") + original.count(b'"/os'), nome
             # a pergunta "mudou?" é sobre a versão reescrita: com a marca dela, 304; com a do original, o arquivo novo
             marca = r.headers["ETag"]
             assert cli.get(f"{p}/os/static/{nome}", headers={"If-None-Match": marca}).status_code == 304
         elif nome != "abas.js":
             assert corpo == original, nome                   # na raiz, byte a byte o de sempre
+
+
+def _regras_das_abas(js: str, p: str) -> dict:
+    """As regras puras do abas.js (como a ponte o serve) rodadas no node, com os caminhos debaixo de `p`."""
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+    if not shutil.which("node"):
+        pytest.skip("sem node nesta máquina")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(js)
+    base = "http://h.test" + p + "/os/"
+    script = """
+var window = {}; require(process.argv[1]);
+var P = window.OsAbas.puro, p = process.argv[2], base = process.argv[3];
+var tabela = [[p + "/os/historico", "hist"], [p + "/os/ativos", "ativos"]];
+var em = {pathname: p + "/os/historico", search: ""};
+process.stdout.write(JSON.stringify({
+  ehTela: [P.ehTela(p + "/os/historico"), P.ehTela(p + "/os/api/x"), P.ehTela(p + "/os/login"), P.ehTela(p + "/os/")],
+  normalizar: P.normalizar(p + "/os/historico?x=1&solo=1", base),
+  abaDoEndereco: P.abaDoEndereco("?aba=" + encodeURIComponent(p + "/os/historico"), base),
+  secao: [P.secaoDe(p + "/os/historico", tabela), P.secaoDe(p + "/os/clonar", []), P.secaoDe(p + "/os/", [])],
+  destino: [P.destino({href: p + "/os/ativos", target: "", botao: 0}, em, tabela, base),
+            P.destino({href: p + "/os/login", target: "", botao: 0}, em, tabela, base),
+            P.destino({href: p + "/os/", target: "", botao: 0}, em, tabela, base),
+            P.destino({href: p + "/os/historico?y=2", target: "", botao: 0}, em, tabela, base),
+            P.destino({href: "/tempo-real", target: "", botao: 0}, em, tabela, base)],
+}));
+"""
+    try:
+        r = subprocess.run(["node", "-e", script, f.name, p, base], capture_output=True, text=True, encoding="utf-8",
+                           timeout=60)
+    finally:
+        os.unlink(f.name)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_as_abas_do_os_creator_funcionam_debaixo_do_prefixo(sem_rede):
+    """Revisão de 10/10/2026: a ponte punha o prefixo em "/os, '/os, `/os e (/os, mas não nas expressões regulares do
+    clone (/^\/os\/[^/]/ e afins). Debaixo do /nexus o location.pathname é /nexus/os/...: ehTela dava false, normalizar e
+    abaDoEndereco null e destino() 'seguir' onde devia 'abrir' ou 'topo'. Todo item da torre OS Creator abria o Início, os
+    cartões não abriam aba e o "Clonar esta OS" caía no Início. Na raiz, nada muda."""
+    respostas = {}
+    for prefixo in (PREFIXO, None):
+        app = _app(prefixo)
+        cli = Client(_caddy_corta(app) if prefixo else app)
+        p = prefixo or ""
+        _logar(cli, app, p)
+        respostas[p] = _regras_das_abas(cli.get(f"{p}/os/static/abas.js").get_data(as_text=True), p)
+    raiz = respostas[""]
+    assert raiz["ehTela"] == [True, False, False, False] and raiz["destino"] == ["abrir", "topo", "inicio", "seguir", "topo"]
+    assert raiz["normalizar"] == "/os/historico?x=1" and raiz["abaDoEndereco"] == "/os/historico"
+    no_prefixo = respostas[PREFIXO]
+    assert no_prefixo["ehTela"] == raiz["ehTela"] and no_prefixo["destino"] == raiz["destino"]
+    assert no_prefixo["secao"] == raiz["secao"] == ["hist", "outra:clonar", "inicio"]
+    assert no_prefixo["normalizar"] == PREFIXO + raiz["normalizar"]
+    assert no_prefixo["abaDoEndereco"] == PREFIXO + raiz["abaDoEndereco"]
 
 
 def test_o_login_do_clone_volta_para_a_tela_sem_o_prefixo_no_next(sem_rede):
