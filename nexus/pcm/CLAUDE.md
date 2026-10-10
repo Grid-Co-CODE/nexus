@@ -288,6 +288,11 @@ vieram Tipo, Etiqueta, Estado, OS, Solicitação e Período.
 
 ## Armadilhas já vividas
 
+- **Endereço nunca a partir da raiz** (porta única, 09/10/2026): no servidor o Nexus mora em `/nexus`, e um
+  `/t/pcm/...` cru caía na plataforma de Performance. Os links e formulários de Gerar, Publicar, Quadro, Reprogramar e
+  Semana saem com `{{ raiz }}`/`url_for`/`|na_raiz`; os redirecionamentos de `telas.py`, com `na_raiz` (só a parte do
+  caminho: a consulta montada por `urlencode` vem depois).
+  Regra completa em `nexus/casca/CLAUDE.md` (o prefixo `/nexus`); o esquecimento quebra `tests/test_prefixo.py`.
 - **Gerar duas vezes a mesma semana distorcia tudo:** na S40, 415 tarefas viraram reprogramadas, e todas ganharam +1
   no "Nº vezes". Por isso a rodada parte do histórico de **antes** da semana (`historico_banco.montar`: só as semanas
   anteriores; na reserva, `geracao.preparar_historico`).
