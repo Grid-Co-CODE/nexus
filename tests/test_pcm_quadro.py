@@ -356,3 +356,17 @@ def test_tela_quadro_rascunho_grava_nas_observacoes_do_nexus(app, logado, config
         [{"os": "15021", "tarefa": "", "dia": "seg"}, {"os": "1", "tarefa": "", "dia": "seg"}])})
     assert r.status_code == 400 and "Nada foi gravado" in r.get_data(as_text=True)
     assert I.observacoes(trab, "2026-W41") == depois
+
+
+def test_filtros_do_quadro_em_cascata():
+    """Levi, 09/10/2026: "Os filtros tem que se auto filtrar também": escolhida a equipe, Cliente, Tipo, Situação e
+    Turno só listam o que existe nela; a equipe continua listando todas (com as contas pelos outros filtros)."""
+    sem = _semana_teste()
+    op = Q.montar(sem, [], {"equipe": "RN Sul 01"})["opcoes"]
+    assert op["tipo"] == [("MPA", 1)] and op["estado"] == [("Finalizada", 1)] and op["turno"] == [("Manhã", 1)]
+    assert op["equipe"] == [("RN Sul 01", 1), ("SP Leste 02", 5)]
+    op = Q.montar(sem, [], {"tipo": "MPM"})["opcoes"]
+    assert op["equipe"] == [("SP Leste 02", 2)] and op["turno"] == [("Noite", 2)]
+    # a opção escolhida fica na lista mesmo quando a combinação não tem nada (a tela não esconde o filtro valendo)
+    op = Q.montar(sem, [], {"equipe": "RN Sul 01", "tipo": "MPM"})["opcoes"]
+    assert ("MPM", 0) in op["tipo"] and ("RN Sul 01", 0) in op["equipe"]

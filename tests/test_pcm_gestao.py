@@ -355,3 +355,16 @@ def test_atrasada_ha_menos_de_um_dia_nao_vira_nenhuma_vencida(logado, com_fonte,
     html = logado.get("/t/pcm/gestao?modo=fila").get_data(as_text=True)
     assert "1 <small>OS atrasada</small>" in html and "vencida há menos de 1 dia" in html
     assert "nenhuma com a data vencida" not in html
+
+
+def test_filtros_de_cima_em_cascata():
+    """Levi, 09/10/2026: "Os filtros tem que se auto filtrar também": escolhido o cliente, Usina, Equipe cluster e
+    Responsável só listam os dele; o cliente não se restringe a si mesmo; o valor escolhido fica na lista."""
+    ts = [t(ALTAIR, "MPM", "Finalizada", cluster="SP Leste 02", resp="Responsável A"),
+          t(TUCANO, "MPM", "Finalizada", cluster="BA Sul 01", resp="Responsável B")]
+    e = G.escolhas_topo(ts, {"cliente": "thopen", "usina": "", "cluster": "", "responsavel": ""})
+    assert e["usina"] == [ALTAIR] and e["cluster"] == ["SP Leste 02"] and e["responsavel"] == ["Responsável A"]
+    assert e["cliente"] == ["Semp", "Thopen"]
+    e = G.escolhas_topo(ts, {"cliente": "Thopen", "usina": TUCANO, "cluster": "", "responsavel": ""})
+    assert TUCANO in e["usina"] and e["cluster"] == []
+    assert G.escolhas_topo(ts) == G.escolhas_topo(ts, {})          # sem filtro, tudo como antes

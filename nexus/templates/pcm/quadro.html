@@ -20,7 +20,9 @@
 
 {% if rodada %}
 <p class="pcm-fonte"><i class="ph ph-file-xls"></i><span>Lê a planilha que o Nexus gerou nesta rodada, que ainda não é a
-  programação do App. Reprogramar daqui grava nas observações da semana, que valem na próxima geração.</span></p>
+  programação do App. Reprogramar daqui grava nas observações da semana no Nexus (<a class="pcm-link"
+  href="/t/pcm/gerar?semana={{ sem.week }}">Gerar a semana, bloco 2</a>), que valem na próxima geração; o que já foi gravado
+  fica em "Já gravadas para esta semana", no fim da página.</span></p>
 {% else %}{% include "pcm/_fonte.html" %}{% endif %}
 {% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}{% if ok_link %}
   <a class="pcm-link" href="{{ (ok_link)|na_raiz }}">Ver nas observações da semana</a>.{% endif %}</div></div>{% endif %}
@@ -40,7 +42,7 @@
     <label class="gc-rotulo" for="f-{{ campo }}">{{ rot }}</label>
     <select id="f-{{ campo }}" name="{{ campo }}" class="gc-campo" onchange="this.form.submit()">
       <option value="">{{ todos }}</option>
-      {% for v in q.opcoes[campo] %}<option value="{{ v }}"{% if v == filtros[campo] %} selected{% endif %}>{{ v }}</option>{% endfor %}
+      {% for v, n in q.opcoes[campo] %}<option value="{{ v }}"{% if v == filtros[campo] %} selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
     </select>
   </div>
   {% endfor %}
@@ -139,12 +141,15 @@
 {% endif %}
 
 {% if gravadas %}
+{# o que o PCM já gravou para esta semana, à vista de todos (gravar continua sendo só do PCM) #}
 <details class="q-gravadas">
   <summary><i class="ph ph-caret-right q-seta"></i> Já gravadas para esta semana <b class="gc-num">{{ gravadas|length }}</b></summary>
   <ul>
   {% for g in gravadas %}
-    <li><span class="q-grav-quando">{{ g.quando[8:10] }}/{{ g.quando[5:7] }} {{ g.quando[11:16] }}</span> · {{ g.quem }} ·
-      {{ 'ajustes da semana em curso' if g.destino == 'atual' else 'observações do Nexus' }}{% if g.commit %} (commit {{ g.commit }}){% endif %}
+    <li><span class="q-grav-quando">{{ g.quando[8:10] }}/{{ g.quando[5:7] }} {{ g.quando[11:16] }}</span> · {{ g.quem }} · em
+      {% if g.destino == 'atual' %}ajustes da semana em curso (Observacoes_Semana_Atual.txt do repositório do PCM){% if g.commit %},
+      commit {{ g.commit }}{% endif %}{% else %}<a class="pcm-link" href="/t/pcm/gerar?semana={{ sem.week }}">observações da
+      semana no Nexus (Gerar a semana, bloco 2)</a>{% endif %}
       <pre class="pcm-pre q-pre">{{ g.linhas|join('\n') }}</pre></li>
   {% endfor %}
   </ul>
