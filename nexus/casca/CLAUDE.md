@@ -16,6 +16,23 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base e entrar): a reserva do `localStorage` antes de pintar |
 | `nexus/static/nexus.css` | os tokens do Design System Grid Co. nos dois temas e o subconjunto `gc-*` |
 | `app.py` / `servir.py` | desenvolvimento (5070, IPv4 e IPv6, cookie sem Secure) / produção (atrás do proxy, cookie Secure) |
+| `ferramentas/subir_copia_de_prova.py` / `ferramentas/porta_local.py` | cópia de prova noutra porta (sem carga, sem Fracttal ao subir, trava de rede) / o papel do Caddy no PC, Nexus e plataforma numa origem só |
+
+## O `/nexus` do servidor (medido de fora em 09/10/2026)
+
+O servidor serve o Nexus em `app.gridco.com.br/nexus`, e o código do Nexus **não sabe disso**: ele recebe o caminho sem
+o `/nexus` (`/nexus/nexus/saude` chega como `/nexus/saude`), não tem `SCRIPT_NAME` (o `url_for` gera `/entrar`) e uma
+camada FORA do repositório (no Caddy ou entre ele e o waitress; de fora não dá para saber) conserta a resposta: (1) o
+`Location` que começa por um caminho do Nexus ganha `/nexus`; (2) no HTML e no JavaScript, o caminho do Nexus depois de
+aspas ou de `=` ganha `/nexus` (o `action="/entrar"` fixo do `entrar.html` sai `/nexus/entrar`; o `"/entrar?next="` do
+`clima-mapa.js` também), e o que não é caminho do Nexus fica (`"/usina/"`, `next=/api/x`); (3) um calço no começo do
+`<head>` põe `/nexus` em todo `fetch` e XHR com caminho absoluto, de QUALQUER destino. Consequências: link da página do
+Nexus para a plataforma (`/tempo-real`, `/painel/...`) atravessa intacto, mas um `fetch` dele vira `/nexus/...`; o
+cookie `session` do Nexus sai no caminho `/` (o padrão do Flask, que nada no repositório muda) e colide com o `session`
+da plataforma, o passo 0 do spec da porta única (reproduzido no PC pela `porta_local.py`: entrar na plataforma derruba a
+sessão do Nexus); o `/saude` do servidor respondeu `df5aeaa` enquanto os estáticos servidos já eram os da `main`
+(`nexus.css` igual ao `2e01139`), então o `/saude` não é prova de versão lá. A prova local dessa camada é o
+`porta_local.py --reescrita-do-servidor`.
 
 ## Tema escuro (padrão) e claro (08/10/2026)
 

@@ -65,6 +65,14 @@ python -m pytest -q
 
 Sem o `.env` completo o app não sobe, e diz qual variável falta.
 
+**Para provar uma mudança, não reinicie a 5070** (é o Nexus que o Levi usa): suba a worktree noutra porta com
+`python ferramentas/subir_copia_de_prova.py --porta 5170 --plataforma http://127.0.0.1:5150` (sem carga no banco, sem ler
+o Fracttal ao subir; nada sai para SunOp/API PV nem grava fora da máquina; entra-se pela senha de administrador). O que
+depende da MESMA origem do servidor (moldura da plataforma, cookies, `postMessage`) se prova com as duas cópias atrás de
+`python ferramentas/porta_local.py` (o papel do Caddy: Nexus em `/nexus`, plataforma na raiz; `--modo raiz` é a fase 4;
+`--reescrita-do-servidor` imita a camada que o servidor tem hoje, ver `nexus/casca/CLAUDE.md`). A cópia da plataforma é
+a `plataforma/subir_copia_de_prova.py` do PerformancePainel.
+
 ## Como o código está organizado
 
 **Leia o `.md` da área em que for mexer** (tabela acima).
