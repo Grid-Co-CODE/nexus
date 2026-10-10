@@ -206,3 +206,25 @@ def base_da_plataforma(valor) -> str:
     if partes.scheme == "http" and partes.hostname not in _LOCAL:
         raise ValueError("NEXUS_PLATAFORMA_URL tem de ser https fora da máquina local: o passe leva o e-mail")
     return texto.rstrip("/")
+
+
+def _local(nome: str) -> bool:
+    nome = (nome or "").lower()
+    return nome in _LOCAL or nome.endswith(".localhost")
+
+
+def motivo_da_origem(base: str, host_do_pedido: str) -> str | None:
+    """Por que a base não serve a ESTE pedido (None = serve). Revisão de 10/10/2026: a base em loopback (a
+    NEXUS_PLATAFORMA_URL interna do servidor, que a ponte de 04/10 pode usar) com o Nexus aberto por um endereço de fora
+    faria o navegador de quem visita mandar o passe, com o e-mail dele, à porta local da PRÓPRIA máquina. No PC (o Nexus
+    aberto em localhost, ou num nome .localhost da porta local) a mesma base é a da cópia local e segue valendo. O
+    `porta.js` confere de novo a origem no navegador e não envia nada para outra."""
+    if not base:
+        return None
+    alvo = urlsplit(base).hostname or ""
+    quem = urlsplit("//" + str(host_do_pedido or "")).hostname or ""
+    if _local(alvo) and quem and not _local(quem):
+        return ("a NEXUS_PLATAFORMA_URL aponta para a própria máquina do servidor, e o Nexus foi aberto por outro "
+                "endereço: o navegador mandaria o passe à máquina de quem visita. Ela tem de ser o mesmo endereço do "
+                "Nexus (ou vazia)")
+    return None

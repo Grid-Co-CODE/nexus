@@ -321,3 +321,53 @@ def test_a_camada_do_servidor_nao_mexe_nos_enderecos_da_plataforma():
         assert all(x["url"].startswith("/nexus/t/") for x in _dados(h)["telas"])
     h = pl.reescreve_corpo(cli.get(PREFIXO + "/sair").get_data(as_text=True), True)
     assert 'action="/painel/nexus/sair"' in h and "/nexus/nexus" not in h
+
+
+# ── o passe não vai à máquina de quem visita (revisão de 10/10/2026) ─────────────────────────────────────────────────
+def _script_do_sair(h: str) -> str:
+    return re.findall(r"<script>(.*?)</script>", h, re.S)[-1]
+
+
+def _rodar_sair(script: str, acao: str) -> dict:
+    import shutil
+    import subprocess
+    from pathlib import Path
+    if not shutil.which("node"):
+        pytest.skip("sem node nesta máquina")
+    falsa = Path(__file__).resolve().parent / "porta_pagina_falsa.js"
+    cfg = {"modo": "sair", "pagina": "https://app.exemplo.test/nexus/sair", "acao": acao, "script": script}
+    r = subprocess.run(["node", str(falsa), str(falsa), json.dumps(cfg)], capture_output=True, text=True,
+                       encoding="utf-8", timeout=60)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_com_a_url_interna_e_o_nexus_aberto_por_fora_a_porta_fica_desligada():
+    """NEXUS_PLATAFORMA_URL em loopback (o endereço interno do servidor, que a ponte de 04/10 pode usar) e o Nexus aberto
+    por um endereço de fora: o formulário levaria o passe, com o e-mail, à porta local da máquina de quem visita. A tela
+    diz que não está ligada e o Tempo real segue pela ponte (a reserva), como antes da chave."""
+    cfg = {"NEXUS_PLATAFORMA_URL": "http://127.0.0.1:5050", "NEXUS_PLATAFORMA_TOKEN": "segredo-xyz"}
+    app = _app(**cfg)
+    fora = Client(app)
+    assert fora.post("/entrar", data={"senha": SENHA_TESTE}, base_url="https://app.exemplo.test").status_code == 302
+    h = fora.get("/t/performance/noc", base_url="https://app.exemplo.test").get_data(as_text=True)
+    assert _form(h) is None and "porta-dados" not in h and "Performance ainda não ligada" in h
+    assert "127.0.0.1:5050/painel" not in h
+    h = fora.get("/t/performance/tempo-real", base_url="https://app.exemplo.test").get_data(as_text=True)
+    assert 'src="/t/performance/plataforma/tempo-real"' in h and _form(h) is None
+    r = fora.get("/sair", base_url="https://app.exemplo.test")
+    assert r.status_code == 302                                   # sem POST à máquina de quem visita
+    # no PC (o Nexus aberto em localhost), a mesma URL é a da cópia local: segue valendo
+    local = _cliente(**cfg)
+    assert _form(local.get("/t/performance/noc").get_data(as_text=True))["action"] \
+        == "http://127.0.0.1:5050/painel/nexus/entrar"
+
+
+def test_o_sair_nao_manda_post_a_outra_origem():
+    cli = _cliente(NEXUS_PLATAFORMA_URL="https://outra.exemplo.test")
+    h = cli.get("/sair").get_data(as_text=True)
+    feito = _rodar_sair(_script_do_sair(h), "https://outra.exemplo.test/painel/nexus/sair")
+    assert feito["pedidos"] == [] and feito["foiPara"] == "/nexus/entrar"
+    feito = _rodar_sair(_script_do_sair(_cliente().get("/sair").get_data(as_text=True)), "/painel/nexus/sair")
+    assert feito["pedidos"] == [{"url": "https://app.exemplo.test/painel/nexus/sair", "metodo": "POST"}]
+

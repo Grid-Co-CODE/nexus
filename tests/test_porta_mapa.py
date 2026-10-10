@@ -157,6 +157,22 @@ def test_base_da_plataforma_recusa(ruim):
         porta.base_da_plataforma(ruim)
 
 
+@pytest.mark.parametrize("base, host, serve", [
+    ("", "app.exemplo.test", True), ("https://app.exemplo.test", "app.exemplo.test", True),
+    ("https://app.exemplo.test", "outro.exemplo.test", True),        # outra origem: quem recusa é o porta.js
+    ("http://127.0.0.1:5050", "localhost", True), ("http://127.0.0.1:5050", "127.0.0.1:5070", True),
+    ("http://127.0.0.1:5050", "prova.localhost:5192", True), ("http://localhost:5050", "[::1]:5070", True),
+    ("http://127.0.0.1:5050", "app.exemplo.test", False), ("http://localhost:5050", "app.exemplo.test:443", False),
+])
+def test_base_em_loopback_so_serve_a_quem_abre_o_nexus_na_mesma_maquina(base, host, serve):
+    """Revisão de 10/10/2026: com a NEXUS_PLATAFORMA_URL interna do servidor (http://127.0.0.1:...), o navegador de quem
+    abre o Nexus por fora mandaria o passe, com o e-mail, à porta local da própria máquina."""
+    motivo = porta.motivo_da_origem(base, host)
+    assert (motivo is None) is serve
+    if motivo:
+        assert "127.0.0.1" not in motivo and "5050" not in motivo
+
+
 # ── os dois lados de verdade (com o clone do PerformancePainel à mão) ────────────────────────────────────────────────
 def _modulo_da_plataforma():
     raiz = os.environ.get("PLATAFORMA_REPO", "")

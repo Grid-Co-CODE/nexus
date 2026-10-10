@@ -98,16 +98,21 @@
   try { origem = new URL(base || "/", location.href).origin; } catch (e) { origem = location.origin; }
   var alerta = document.getElementById("porta-alerta");
   function avisar(texto) { if (alerta) { alerta.textContent = texto; alerta.hidden = false; } }
-  if (origem !== location.origin) {
-    // A plataforma só se deixa emoldurar pela própria origem (frame-ancestors 'self') e só avisa a rota a ela.
+  // A plataforma só se deixa emoldurar pela própria origem (frame-ancestors 'self') e só avisa a rota a ela. Em outra
+  // origem NADA sai daqui: nem o passe, nem a lista do Diagnóstico (revisão de 10/10/2026: antes o aviso aparecia e o
+  // formulário ia assim mesmo; com a NEXUS_PLATAFORMA_URL interna do servidor, http://127.0.0.1:..., cada visitante
+  // mandava um passe válido, com o e-mail dele, à porta local da PRÓPRIA máquina).
+  var mesmaOrigem = origem === location.origin;
+  if (!mesmaOrigem) {
     avisar("A Plataforma de Performance está configurada em outra origem (" + origem + "): a tela não abre dentro do " +
-           "Nexus assim. No servidor, deixe NEXUS_PLATAFORMA_URL vazia; no PC, use a porta local (ferramentas/porta_local.py).");
+           "Nexus assim. No servidor, a NEXUS_PLATAFORMA_URL é o próprio endereço do Nexus (ou vazia); no PC, use a " +
+           "porta local (ferramentas/porta_local.py).");
   }
 
   var moldura = document.getElementById("porta-moldura");
   var formulario = document.getElementById("porta-passe");
   var fora = document.getElementById("porta-fora");
-  if (moldura && formulario) formulario.submit();
+  if (moldura && formulario && mesmaOrigem) formulario.submit();
 
   function acender(tela) {
     document.querySelectorAll(".menu a[aria-current]").forEach(function (a) { a.removeAttribute("aria-current"); });
@@ -170,7 +175,7 @@
 
   // O passe da lista: abre a sessão da plataforma sem carregar página nenhuma (o 303 não é seguido)
   function abrirSessao() {
-    if (!dados.passe_lista) return Promise.resolve();
+    if (!dados.passe_lista || !mesmaOrigem) return Promise.resolve();      // o passe nunca vai a outra origem
     var corpo = new URLSearchParams();
     corpo.set("passe", dados.passe_lista);
     dados.passe_lista = "";                  // uso único: a plataforma recusaria o mesmo passe de novo
@@ -235,7 +240,11 @@
       if (seletor.value) location.assign(dados.url + "?p=" + encodeURIComponent(seletor.value));
     });
     // Com a moldura abrindo, a lista espera a tela carregar (a sessão da plataforma já estará aberta pelo passe dela)
-    if (moldura) {
+    if (!mesmaOrigem) {
+      // em outra origem a lista não é lida (o aviso no alto diz por quê): nada sai daqui
+      seletor.innerHTML = "<option value=\"\">Lista indisponível</option>";
+      dizer("A Plataforma está configurada em outra origem: a lista de usinas não é lida daqui.");
+    } else if (moldura) {
       var uma = false;
       moldura.addEventListener("load", function () { if (!uma) { uma = true; carregarUsinas(); } });
     } else {

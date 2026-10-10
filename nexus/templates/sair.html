@@ -31,7 +31,11 @@
   setTimeout(seguir, 4000);
   try {
     // URL completa: no servidor, uma camada fora do repositório põe /nexus em todo fetch começado por "/"
-    fetch(new URL(f.getAttribute("action"), location.href).href,
+    var alvo = new URL(f.getAttribute("action"), location.href);
+    // Só na mesma origem (revisão de 10/10/2026): a sessão do passe só existe lá (frame-ancestors 'self'), e um POST a
+    // outra origem (a NEXUS_PLATAFORMA_URL interna, por exemplo) iria à máquina de quem está saindo.
+    if (alvo.origin !== location.origin) { seguir(); return; }
+    fetch(alvo.href,
           {method: "POST", body: new URLSearchParams(new FormData(f)), credentials: "same-origin", redirect: "manual",
            keepalive: true}).then(seguir, seguir);
   } catch (e) { seguir(); }

@@ -22,7 +22,7 @@ Mora em `nexus/torres/` (e não numa torre) porque três torres a usam: Performa
 """
 from urllib.parse import urlencode
 
-from flask import current_app, make_response, redirect, render_template, request, session
+from flask import current_app, has_request_context, make_response, redirect, render_template, request, session
 
 from ..performance import porta
 from ..prefixo import na_raiz
@@ -39,7 +39,11 @@ VISOES_DO_TEMPO_REAL = (
 
 def estado_da_porta(config=None) -> dict:
     """{"ligada": bool, "motivo": texto (desligada), "plataforma": base ('' = a própria origem)}. Nunca o valor da
-    chave: o motivo vai para a tela."""
+    chave: o motivo vai para a tela.
+
+    Sem `config` (uma tela, o Sair), confere também a base contra o endereço DESTE pedido (`porta.motivo_da_origem`,
+    revisão de 10/10/2026): a NEXUS_PLATAFORMA_URL interna do servidor com o Nexus aberto por fora desliga a porta, e o
+    Tempo real segue pela ponte. Com `config` (o menu, calculado uma vez), só a configuração."""
     cfg = current_app.config if config is None else config
     motivo = porta.motivo_da_chave(cfg.get("NEXUS_SSO_CHAVE"))
     if motivo:
@@ -48,6 +52,10 @@ def estado_da_porta(config=None) -> dict:
         base = porta.base_da_plataforma(cfg.get("NEXUS_PLATAFORMA_URL"))
     except ValueError as e:
         return {"ligada": False, "motivo": str(e), "plataforma": ""}
+    if config is None and has_request_context():
+        motivo = porta.motivo_da_origem(base, request.host)
+        if motivo:
+            return {"ligada": False, "motivo": motivo, "plataforma": ""}
     return {"ligada": True, "motivo": "", "plataforma": base}
 
 

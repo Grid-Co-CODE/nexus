@@ -132,14 +132,12 @@ def entrar():
 
 
 def _plataforma_para_sair() -> str | None:
-    """A base da plataforma de Performance quando a porta única está ligada ('' = a mesma origem), ou None."""
-    from ..performance import porta
-    if porta.motivo_da_chave(current_app.config.get("NEXUS_SSO_CHAVE")):
-        return None
-    try:
-        return porta.base_da_plataforma(current_app.config.get("NEXUS_PLATAFORMA_URL"))
-    except ValueError:
-        return None
+    """A base da plataforma de Performance quando a porta única está ligada ('' = a mesma origem), ou None. A mesma
+    conta das telas (`estado_da_porta`, com a conferência da origem deste pedido, revisão de 10/10/2026): com a
+    NEXUS_PLATAFORMA_URL interna e o Nexus aberto por fora, o POST do Sair iria à máquina de quem está saindo."""
+    from ..torres.moldura import estado_da_porta
+    estado = estado_da_porta()
+    return estado["plataforma"] if estado["ligada"] else None
 
 
 @bp.route("/sair")
