@@ -81,7 +81,7 @@ def test_a_pagina_tem_as_fontes_dos_alertas_e_a_da_nasa_com_a_hora(mundo_usina):
     t = texto(painel(html, "cl-fontes"))
     assert "INMET" in t and "lido às 15:00" in t and "arquivos até 14:50" in t
     assert "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: lida às 15:00 · publicada até 02/10" in t
-    assert len(re.findall(r'class="cl-fonte cl-ok"', html)) == 4
+    assert len(re.findall(r'class="cl-fonte cl-ok"', html)) == 5                # a NASA FIRMS desde 10/10/2026
 
 
 # ── a irradiação: gráfico, mês e fonte ───────────────────────────────────────────────────────────────────────────────

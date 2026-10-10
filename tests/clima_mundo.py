@@ -25,6 +25,9 @@ BASE_FOCOS = "https://inpe.exemplo.test/focos/"
 RISCO = "https://inpe.exemplo.test/risco/RF.PREV.T{d}.tif"
 URL_POWER = ("https://power.exemplo.test/api/temporal/daily/point?parameters=ALLSKY_SFC_SW_DWN&community=RE"
              "&longitude={lon}&latitude={lat}&start={inicio}&end={fim}&format=JSON")
+BASE_FIRMS = "https://firms.exemplo.test/active_fire/"
+CAB_VIIRS = "latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight"
+CAB_MODIS = "latitude,longitude,brightness,scan,track,acq_date,acq_time,satellite,confidence,version,bright_t31,frp,daynight"
 X0, Y0, D = -45.0, -5.0, 0.01
 
 
@@ -64,6 +67,24 @@ def focos():
     return {BASE_FOCOS: indice, **{BASE_FOCOS + n: c for n, c in arquivos.items()}}
 
 
+def firms(linhas_viirs=()):
+    """Os quatro arquivos do FIRMS (10/10/2026): lidos, cada um com um foco longe de tudo e recente (o mundo padrão é "a NASA não viu
+    fogo perto"); `linhas_viirs` entram no arquivo do NOAA-20."""
+    from nexus.performance.clima.fontes import FIRMS_ARQUIVOS
+    longe_viirs = "-9.00000,-40.00000,330.0,0.40,0.40,2026-10-06,1630,{sat},nominal,2.0NRT,295.0,3.10,D"
+    longe_modis = "-9.10000,-40.10000,320.0,1.00,1.00,2026-10-06,1600,A,70,6.1NRT,300.0,8.20,D"
+    a = {}
+    for sat, caminho in FIRMS_ARQUIVOS.items():
+        if sat == "MODIS":
+            corpo = CAB_MODIS + "\n" + longe_modis + "\n"
+        else:
+            codigo = {"S-NPP": "N", "NOAA-20": "N20", "NOAA-21": "N21"}[sat]
+            extra = "".join(l + "\n" for l in linhas_viirs) if sat == "NOAA-20" else ""
+            corpo = CAB_VIIRS + "\n" + longe_viirs.format(sat=codigo) + "\n" + extra
+        a[BASE_FIRMS + caminho] = corpo.encode()
+    return a
+
+
 def grade_risco(dia):
     g = [[0.05] * 40 for _ in range(30)]
     g[A[1]][A[0]] = 0.97
@@ -78,8 +99,8 @@ def grade_risco(dia):
     return g
 
 
-def arquivos_do_mundo(inmet_bytes=None, risco=True):
-    a = {URL_INMET: inmet_bytes if inmet_bytes is not None else inmet(), **focos()}
+def arquivos_do_mundo(inmet_bytes=None, risco=True, nasa=True):
+    a = {URL_INMET: inmet_bytes if inmet_bytes is not None else inmet(), **focos(), **(firms() if nasa else {})}
     if risco:
         for d in range(4):
             a[RISCO.format(d=d)] = montar_cog(grade_risco(d), origem=(X0, Y0), escala=D)
@@ -129,7 +150,7 @@ def _mundo(tmp_path, monkeypatch, carga_, arquivos, power=None):
     app = create_app({"NEXUS_SECRET_KEY": "k", "NEXUS_SENHA_ADMIN": SENHA_TESTE, "NEXUS_CHAVE_CADASTRO": chave,
                       "NEXUS_ARMAZEM_LOCAL": str(tmp_path / "cadastro.json"),
                       "NEXUS_CLIMA_INMET_URL": URL_INMET, "NEXUS_CLIMA_FOCOS_URL": BASE_FOCOS, "NEXUS_CLIMA_RISCO_URL": RISCO,
-                      "NEXUS_CLIMA_POWER_URL": URL_POWER})
+                      "NEXUS_CLIMA_POWER_URL": URL_POWER, "NEXUS_CLIMA_FIRMS_URL": BASE_FIRMS})
     app.config.update(TESTING=True, SESSION_COOKIE_SECURE=False)
     with app.app_context():
         from nexus.cadastro.telas import servico

@@ -11,7 +11,7 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 | `pcm/` | telas da programação semanal e a Gestão PCM (Plano & Fila das manutenções, do painel do PCM) | `nexus/pcm/CLAUDE.md` (o código mora em `nexus/pcm/`) |
 | `base/`, `pessoas/` | telas do cadastro (BD_Operações); Base → Governança de dados é da camada de dados | `nexus/cadastro/CLAUDE.md`, `nexus/dados/CLAUDE.md` |
 | `campo/` | Visão do Nexus sobre o campo, sem Azure nem moldura: Atenção, PT, Rondas e Zeladoria são contas nossas (`nexus/campo/visao.py`); Aprovação e Triagem usam as regras copiadas do App; tudo pelos livros que o App grava no banco (Ordens, Imagens e Ranking saíram em 08/10/2026) | `campo/CLAUDE.md` |
-| `hseq/` | Extintores (09/10/2026): vencido, perto de vencer e sem conferência há mais de 30 dias, por usina e dia, por supervisor de campo e por gestor de contrato, com o relatório em PDF; EPI e EPC: as luvas isolantes pela ronda diária; as outras telas placeholder | `hseq/CLAUDE.md` (as contas moram em `nexus/hseq/`) |
+| `hseq/` | Extintores (09/10/2026): vencido, perto de vencer e sem conferência há mais de 30 dias, por usina e dia, por supervisor de campo e por gestor de contrato, com o relatório em PDF; EPI e EPC: as luvas isolantes pela ronda diária; APR e PT: as Permissões de trabalho (vieram do Campo em 09/10, o código continua lá), com a PT e a APR; as outras telas placeholder | `hseq/CLAUDE.md` (as contas moram em `nexus/hseq/`) |
 | as demais | só placeholder | — |
 
 ## Como funciona

@@ -5,7 +5,7 @@
 {# Aprovação da PT no Nexus (05/10/2026): a PT do livro do App + a decisão assinada com o login do Fracttal do OS Creator,
    gravada no banco (nexus/campo/decisao_pt.py). Quem aplica no campo é o App. #}
 <div class="campo-nativa">
-  <p class="cn-voltar"><a class="cn-link" href="{{ url_for('torre_campo.atencao', vista='pt') }}">Voltar para as PT esperando</a></p>
+  <p class="cn-voltar"><a class="cn-link" href="{{ raiz }}/t/hseq/apr-pt">Voltar para APR e PT</a></p>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
   {% if not p and not leitura.erro %}
   <div class="cn-erro" role="alert"><b>{{ numero }} não está no livro do App.</b> O livro chega de hora em hora: se ela
@@ -53,6 +53,7 @@
       // a assinatura vem do Fracttal pelo login do OS Creator (cookie só em /os); sem login, o quadro diz como entrar
       fetch(nexusRota('/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico'), {credentials: 'same-origin'})
         .then(function (r) { return r.json(); }).then(function (a) {
+          if (a.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(a.entrar); return; }
           var q = document.querySelector('#cn-ass-tec .cn-ass-quadro');
           q.textContent = '';
           if (a.ok) { var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img); return; }
@@ -79,6 +80,7 @@
       {% else %}
       <form method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir" class="cn-form-decisao">
         <p class="cn-quem" id="cn-quem">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
+        {% if quem_assina %}<p class="mudo">Quem pode dar o De acordo: {{ quem_assina[0]|lower }}{{ quem_assina[1:] }}.</p>{% endif %}
         <label class="gc-rotulo" for="cn-motivo">Motivo <span class="mudo">(obrigatório para Não autorizo; o técnico lê)</span></label>
         <textarea class="gc-campo" id="cn-motivo" name="motivo" rows="3" maxlength="400"></textarea>
         <div class="cn-botoes">

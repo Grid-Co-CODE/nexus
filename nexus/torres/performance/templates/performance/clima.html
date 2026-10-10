@@ -107,7 +107,8 @@
     <section class="cl-painel" aria-labelledby="cl-fontes">
       <h2 class="cl-h2" id="cl-fontes">De onde vêm os dados <span class="cl-h2-sub">· e de quando é cada um</span></h2>
       <p class="cl-nota">Avisos do {{ fonte_nome.inmet }}, o serviço oficial de meteorologia; focos de queimada vistos por satélite e
-      a previsão de risco de fogo do {{ fonte_nome.inpe }}. A tela relê sozinha; o ponto verde quer dizer que a fonte foi lida agora.</p>
+      a previsão de risco de fogo do {{ fonte_nome.inpe }}; e o fogo das últimas 24 h dos satélites da {{ fonte_nome.nasa_firms }}, com a
+      força e a confiança de cada foco. A tela relê sozinha; o ponto verde quer dizer que a fonte foi lida agora.</p>
       <div class="cl-fontes">
         {% for f in v.fontes %}
         <div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>
@@ -147,7 +148,8 @@
             {# uma pílula por evento, no nível mais alto, com a janela de todos os avisos dele; quando vale cada nível fica no balão
                (09/10/2026: a mesma "Baixa umidade" em dois níveis eram duas pílulas iguais) #}
             <td class="cl-col-aviso">{% for e in c.eventos %}<span class="cl-av" title="{{ e.detalhe }}"><span class="cl-pill cl-pill--n{{ e.nivel }}">{{ e.nome }}</span> <span class="cl-quando">{{ e.severidade }}{% if e.niveis|length > 1 %} (e outro nível){% endif %} · {{ e.quando }}</span></span>{% else %}{{ v.aviso_vazio }}{% endfor %}</td>
-            <td class="cl-col-foco">{{ v.foco_vazio }}</td>
+            {# o fogo das últimas 24 h da NASA (10/10/2026): na Atenção não há foco da última hora (ele manda agir) #}
+            <td class="cl-col-foco">{% if c.fogo24 %}<span class="cl-fogo24 cl-fogo24--{{ c.fogo24.classe|replace('é', 'e') }}" title="{{ c.fogo24.detalhe }}">{{ c.fogo24.texto }}</span>{% else %}{{ v.foco_vazio }}{% endif %}</td>
             {# a palavra do risco na célula; o número do INPE (0 a 1) e o dia ficam no balão #}
             <td class="cl-col-risco">{% if c.dias %}<div class="cl-dias4">{% for d in c.dias %}<span class="cl-c cl-c-{{ d.cor }}" title="{{ d.dia }}: {{ d.valor }}{% if d.classe %} ({{ d.classe }}{% if d.nota %}, entorno de 2 km{% endif %}){% endif %}">{{ d.palavra }}{% if d.nota %}*{% endif %}</span>{% endfor %}</div>{% else %}<span class="cl-semleitura">sem leitura</span>{% endif %}</td>
           </tr>
@@ -188,6 +190,14 @@
         <p class="cl-linha">{{ gl.foco.o_que_e }}</p>
         <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.foco.na_usina }}</p>
         <p class="cl-linha"><strong>O que conferir:</strong> {{ gl.foco.conferir }}</p>
+      </div>
+      <div class="cl-bloco">
+        <h3 class="cl-rotulo-bloco">Fogo nas últimas 24 horas</h3>
+        <p class="cl-linha">{{ gl.fogo24.o_que_e }}</p>
+        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.fogo24.na_usina }}</p>
+        <p class="cl-linha"><strong>O que conferir:</strong> {{ gl.fogo24.conferir }}</p>
+        <p class="cl-linha">{{ gl.forca }}</p>
+        <p class="cl-linha">{{ gl.confianca }}</p>
       </div>
       <div class="cl-bloco">
         <h3 class="cl-rotulo-bloco">Risco de fogo</h3>
@@ -235,12 +245,13 @@
   {% endif %}
 
   <footer class="cl-rodape">
-    <p><strong>Dados: {{ fonte_nome.inmet }} e {{ fonte_nome.inpe }}, Programa Queimadas.</strong> Somente leitura: esta tela não grava nada. Coordenadas do cadastro do Nexus, que não aparecem na tela.</p>
+    <p><strong>Dados: {{ fonte_nome.inmet }} e {{ fonte_nome.inpe }}, Programa Queimadas.</strong> <strong>Fogo das últimas 24 h: {{ fonte_nome.nasa_firms }}.</strong> Somente leitura: esta tela não grava nada. Coordenadas do cadastro do Nexus, que não aparecem na tela.</p>
     <ul>
       <li>Avisos: {{ fonte_nome.inmet }}, avisos meteorológicos ativos, cada um com o seu polígono; o aviso vale para a usina cujo ponto está dentro dele. Fonte pública, de endereço não documentado oficialmente.</li>
       <li>Focos: {{ fonte_nome.inpe }}, Programa Queimadas, arquivos de 10 em 10 min com a detecção dos satélites. Um foco é um pixel com fogo detectado, não um incêndio confirmado; contam os que estão a até 5 km, nos arquivos da última hora.</li>
       <li>Risco de fogo: {{ fonte_nome.inpe }}, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1; alto a partir de 0,7, crítico acima de 0,95). Onde o INPE não calcula, por não haver vegetação, vale o maior valor do entorno de 2 km, marcado como entorno.</li>
-      <li>Níveis: "Agir agora" é foco a até 5 km, aviso vermelho, ou aviso laranja de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo; "Atenção" é qualquer outro aviso em vigor ou futuro, ou risco de fogo alto ou crítico de hoje a D+3; "Sem alerta" só se diz com as três fontes lidas.</li>
+      <li>Fogo das últimas 24 h: {{ fonte_nome.nasa_firms }}, focos dos satélites VIIRS (pixel de 375 m) e MODIS (1 km) das últimas passagens, com a força (FRP, em megawatts) e a confiança de cada um. Conta o que está a até 5 km da usina nas últimas 24 horas; o foco do {{ fonte_nome.inpe }} ganha a confirmação quando a NASA viu o mesmo fogo (a até 1 km e 1 hora). Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA.</li>
+      <li>Níveis: "Agir agora" é foco a até 5 km, aviso vermelho, ou aviso laranja de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo; "Atenção" é qualquer outro aviso em vigor ou futuro, risco de fogo alto ou crítico de hoje a D+3, ou fogo visto pela NASA a até 5 km nas últimas 24 h; "Sem alerta" só se diz com as quatro fontes lidas (sem a NASA, vira "sem alerta nas fontes lidas").</li>
     </ul>
   </footer>
 </div>

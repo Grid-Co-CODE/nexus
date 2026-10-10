@@ -10,6 +10,18 @@
   <script>
     {% include "_tema_cabeca.html" %}
     {% include "_raiz_js.html" %}
+    // O login nunca fica dentro de uma moldura do próprio Nexus (o OS Creator, o card da OS): quando a sessão acaba com
+    // a pessoa numa delas, a JANELA vai ao login, que depois volta para a página que estava aberta, com o mesmo motivo.
+    // O endereço do login passa pelo nexusRota (debaixo do /nexus, escrito a partir da raiz, caía na plataforma); o
+    // `next` é o caminho da janela como o navegador o vê, que o Entrar aceita com ou sem o prefixo.
+    (function () {
+      try {
+        if (window.top === window.self) return;
+        var t = window.top.location, motivo = {{ (motivo or '')|tojson }};
+        window.top.location.replace(nexusRota("/entrar") + "?next=" + encodeURIComponent(t.pathname + t.search)
+                                    + (motivo ? "&motivo=" + encodeURIComponent(motivo) : ""));
+      } catch (e) {}
+    })();
   </script>
 </head>
 <body class="pagina-entrar">
@@ -17,6 +29,7 @@
   <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co." class="entrar-logo">
   <h1 class="titulo-pagina">Nexus</h1>
   <p class="mudo">Operação e manutenção da Grid Co. numa casca só.</p>
+  {% if aviso %}<p class="entrar-aviso" role="status">{{ aviso }}</p>{% endif %}
   {% set acao = raiz ~ '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
   {% if admin %}
   <form method="post" action="{{ acao|na_raiz }}">

@@ -47,6 +47,7 @@ ESCURO_DE_SEMPRE = {
     "--critico": "#ff5b6e", "--critico-suave": "rgba(255,91,110,.14)", "--critico-a12": "rgba(255,91,110,.12)",
     "--critico-a18": "rgba(255,91,110,.18)", "--critico-a30": "rgba(255,91,110,.30)",
     "--critico-a35": "rgba(255,91,110,.35)", "--critico-a45": "rgba(255,91,110,.45)", "--agir-tinta": "#fff",
+    "--fogo-nasa": "#ff4f86",                    # o fogo das últimas 24 h da NASA no Clima e risco (token novo, 10/10/2026)
     "--erro": "#ff7a7a", "--erro-cheio": "#ff7a7a", "--erro-a08": "rgba(255,122,122,.08)",
     "--erro-a42": "rgba(255,122,122,.42)", "--erro-a55": "rgba(255,122,122,.55)", "--info": "#7fb8ff",
     "--info-suave": "rgba(91,157,255,.14)", "--info-a10": "rgba(127,184,255,.10)",

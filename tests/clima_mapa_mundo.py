@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from nexus.performance.clima import geometria
 from nexus.performance.clima import leitura as L
 from nexus.performance.clima import mapa as M
-from nexus.performance.clima.fontes import Aviso, Foco
+from nexus.performance.clima.fontes import Aviso, Foco, FocoNasa
 from nexus.performance.clima.geotiff import Amostra
 from nexus.performance.clima.usinas import Cadastro, Usina
 
@@ -71,6 +71,22 @@ def lei_focos(*focos, ate=None, falhos=(), ruins=0):
     return L.Leitura({"focos": list(focos), "arquivos": ["a.csv"], "falhos": list(falhos), "ate": ate, "linhas_ruins": ruins}, LIDO)
 
 
+def nasa_a(km, pos, frp=8.0, confianca="nominal", sat="NOAA-20", horas=6.0, dlon_km=0.0):
+    """Um foco do FIRMS a `km` ao norte de `pos`, de `horas` antes de REF (10/10/2026)."""
+    lat, lon = pos
+    return FocoNasa(lat + km / UM_GRAU, lon + dlon_km / (UM_GRAU * math.cos(math.radians(lat))), sat,
+                    (REF - timedelta(hours=horas)).astimezone(UTC), "VIIRS" if sat != "Aqua" else "MODIS", confianca, frp, True)
+
+
+def lei_firms(*focos, ate=None, falhos=None, ruins=0):
+    """O FIRMS lido (10/10/2026). Sem foco, um longe de tudo e recente: a NASA leu e não viu fogo perto das usinas."""
+    focos = list(focos) or [FocoNasa(-9.0, -40.0, "NOAA-20", (REF - timedelta(hours=2)).astimezone(UTC), "VIIRS", "nominal", 3.1,
+                                     True)]
+    ate = ate or max(f.data for f in focos)
+    return L.Leitura({"focos": focos, "arquivos": {"NOAA-20": {"etag": "e", "modificado": None, "focos": focos}},
+                      "falhos": falhos or {}, "ate": ate, "linhas_ruins": ruins}, LIDO)
+
+
 def lei_risco(por_ponto, arquivos=None, erros=None):
     arquivos = {0: datetime(2026, 10, 7, 9, 32, tzinfo=UTC)} if arquivos is None else arquivos
     return L.Leitura({"por_ponto": por_ponto, "arquivos": arquivos, "erros": erros or {}}, LIDO)
@@ -90,8 +106,12 @@ def instalar_leituras(monkeypatch):
     {dia: Leitura}. Cada teste o embrulha numa fixture `leituras`. Devolve a lista das fontes que foram pedidas."""
     chamadas = []
 
-    def instalar(avisos=None, focos=None, risco=None, grade=None):
+    def instalar(avisos=None, focos=None, risco=None, grade=None, firms=None):
         vazio = L.Leitura(None, None, erro="sem fonte nos testes")
+        # a NASA (10/10/2026), ao contrário das outras, vem LIDA e sem fogo perto quando o teste não diz nada: os testes de antes
+        # dela continuam medindo o que mediam; para a NASA fora, passe firms=L.Leitura(None, None, erro=...)
+        nasa = firms or lei_firms()
+        monkeypatch.setattr(L, "firms", lambda config, sessao=None: chamadas.append("firms") or nasa)
         monkeypatch.setattr(L, "avisos", lambda config, sessao=None: chamadas.append("avisos") or avisos or vazio)
         monkeypatch.setattr(L, "focos", lambda config, sessao=None: chamadas.append("focos") or focos or vazio)
         monkeypatch.setattr(L, "risco", lambda config, pontos, sessao=None: chamadas.append("risco") or risco or vazio)

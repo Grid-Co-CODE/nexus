@@ -91,7 +91,7 @@ def test_faixa_do_topo_conta_agir_atencao_sem_alerta_e_cobertura(mundo):
     assert "em operação com coordenada · 1 sem dado de risco · 1 sem coordenada" in t
     assert "Agir agora" in texto(f["agir"]) and "fogo a até 5 km ou aviso forte (tempestade, chuva forte, vento, granizo) do Instituto Nacional de Meteorologia (INMET)" in texto(f["agir"])
     assert "O que fazer: Avisar o supervisor da região" in texto(f["agir"]) and "O que fazer" not in texto(f["cobertura"])
-    assert "nas três fontes lidas" in texto(f["sem"])
+    assert "nas quatro fontes lidas" in texto(f["sem"])
 
 
 def test_agir_agora_so_tem_a_usina_do_foco_e_do_perigo_de_tempestade(mundo):
@@ -228,7 +228,7 @@ def test_cada_fonte_diz_de_quando_e_o_dado(mundo):
     assert "arquivos até 14:50" in t                                       # o arquivo é de 17:50 UTC = 14:50 em Brasília
     assert "previsão de 06/10 (arquivo das 06:32)" in t                    # Last-Modified da sessão falsa: 09:32 GMT = 06:32 em Brasília
     html = pagina(c)
-    assert len(re.findall(r'class="cl-fonte cl-ok"', html)) == 3
+    assert len(re.findall(r'class="cl-fonte cl-ok"', html)) == 4                # a NASA FIRMS desde 10/10/2026
 
 
 def test_fonte_fora_diz_fora_e_a_hora_da_ultima_boa(mundo):

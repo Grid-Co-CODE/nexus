@@ -263,6 +263,7 @@ dizia o QUE havia ("Tempestade · vermelho", "1,00") e não o que quer dizer nem
 | INPE focos | CSV de 10 em 10 min (`lat,lon,satelite,data`, hora em UTC); vale a última hora = os 6 últimos arquivos | 10 min | `dataserver-coids.inpe.br/queimadas/queimadas/focos/csv/10min/` |
 | INPE risco de fogo | GeoTIFF por dia, `RF.PREV.T0..T3.tif` (hoje e D+1 a D+3), 0 a 1, pixel de ~1 km | 6 h se o T0 é o de hoje (sai ~06:30); **15 min enquanto não é** (pela data do arquivo, em Brasília: lido às 05:00, o arquivo de ontem não fica até as 11:01) | `dataserver-coids.inpe.br/.../riscofogo_meteorologia/previsto/risco_fogo/RF.PREV.T{d}.tif` |
 | NASA POWER (só a página da usina) | JSON `properties.parameter.ALLSKY_SFC_SW_DWN` = {AAAAMMDD: kWh/m²/dia} (GHI), `-999` = não publicado | **12 h por usina** (um cache por usina; uma busca por vez em cada) | `power.larc.nasa.gov/api/temporal/daily/point?...` (`NEXUS_CLIMA_POWER_URL` leva `{lat}`, `{lon}`, `{inicio}`, `{fim}`) |
+| NASA FIRMS (10/10/2026) | 4 CSV de focos ativos da América do Sul (VIIRS S-NPP, NOAA-20, NOAA-21; MODIS Aqua/Terra), as últimas passagens (24 a 40 h), com FRP e confiança; colunas lidas pelo NOME | **30 min**; a releitura pergunta com HEAD e só baixa o arquivo cujo ETag mudou | `firms.modaps.eosdis.nasa.gov/data/active_fire/...` (`NEXUS_CLIMA_FIRMS_URL` = a base; `fontes.FIRMS_ARQUIVOS` vão depois dela) |
 
 O código (sem Flask) está em `nexus/performance/clima/`: `geometria` (ponto em polígono e haversine), `geotiff` (leitor do
 COG), `fontes` (os quatro clientes), `alertas` (as regras e os níveis), `leitura` (cache por fonte; o da NASA, por usina),
@@ -380,8 +381,54 @@ isso, decidir a licença: plano pago, ou servidor interno do Open-Meteo (ERA5 e 
 para a radiação de satélite. Cada troca de fonte pede recalibrar os parâmetros. A comparação com a ETM de cada usina também é
 próxima etapa (ver "Comparação com a ETM", acima).
 
-**Servidor da T.I.:** precisa de saída para `apiprevmet3.inmet.gov.br`, `dataserver-coids.inpe.br` e `power.larc.nasa.gov`
-(`DEPLOY.md`, seções 0 e 7c); sem elas a tela abre e mostra as fontes como "fora agora".
+**Fogo das últimas 24 h: NASA FIRMS (10/10/2026).** Levi trouxe um roteiro de outra conversa ("Integrar NASA FIRMS ao
+monitoramento de incêndio das usinas") e pediu: "veja se é viável para o que fazemos agora, se sim melhore e inclua coisas no
+mapa". Viável, de graça e SEM chave: os arquivos públicos de focos ativos da América do Sul, um por satélite. O roteiro foi
+adaptado ao que esta tela é (só leitura, cache por fonte, os três níveis aprovados):
+- **Por que vale:** o foco do INPE conta só na última hora (os arquivos de 10 min): um fogo visto às 13h30 some da tela às 14h30,
+  queimando ou não, e o satélite polar só volta umas 12 h depois. O FIRMS guarda as últimas passagens com a FORÇA (FRP, MW) e a
+  CONFIANÇA de cada foco, que o INPE não publica. Para os satélites polares os focos são os MESMOS do INPE (o FIRMS não detecta
+  mais; ele qualifica).
+- **A regra (alertas.py):** fogo da NASA a até 5 km nas últimas 24 h é **Atenção** (nunca "Agir agora" sozinho: agir continua sendo
+  o foco da última hora do INPE). Dentro da Atenção, o fogo forte (20 MW ou mais) ou a até 2 km com confiança nominal ou alta pesa 3
+  na ordem, o resto 2. Fraco < 5 MW <= médio < 20 MW <= forte (na seca de 10/10/2026: mediana de 6 MW, 90% abaixo de 25 MW).
+- **A confirmação:** o foco do INPE que manda agir ganha, na prova, "confirmado pela NASA (VIIRS NOAA-20, confiança alta, força 35 MW
+  (forte))" quando há foco da NASA a até 1 km e 1 h dele; sem ele, "ainda sem confirmação dos satélites da NASA (eles passam perto das
+  13h30 e da 01h30)". O mesmo fogo confirmado não se repete no "Também".
+- **A própria usina:** foco (do INPE ou da NASA) a até 400 m do ponto da usina leva "pode ser a própria usina (reflexo do sol nos
+  módulos ou telhado quente); confira antes de acionar" (o FAQ do FIRMS cita telhado metálico e reflexo solar). NÃO tira o nível: fogo
+  dentro da usina também existe. O roteiro mandava excluir; aqui marca.
+- **Honestidade:** a NASA é a quarta fonte do painel e entra no "Sem alerta" (a faixa diz "nas quatro fontes lidas"). Sem a leitura
+  dela a usina NÃO fica cinza (o agir e o resto da atenção não dependem dela): o verde vira "sem alerta nas fontes lidas", a faixa
+  qualifica ("sem leitura de fogo das últimas 24 h da ... (NASA FIRMS)") e a célula "Fogo a até 5 km" diz "não na última hora". A
+  escolha é de propósito: até a T.I. liberar `firms.modaps.eosdis.nasa.gov`, o servidor não lê a NASA, e o mapa inteiro cinza
+  esconderia o que as outras três fontes sabem. Sem foco novo há 18 h (as passagens são às ~13h30 e ~01h30, o dado chega em até
+  3 h), a fonte fica em atenção ("passagens até ..."); satélite que não veio é "parcial".
+- **O formato (medido em 10/10/2026):** VIIRS `latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,
+  version,bright_ti5,frp,daynight` (satélite N, N20, N21; confiança low/nominal/high); MODIS com `brightness`/`bright_t31` no meio
+  (satélite A/T; confiança 0 a 100: < 30 baixa, < 80 nominal). A hora é UTC (`acq_date` + `acq_time` HHMM). As colunas são achadas
+  pelo nome; faltou uma das lidas, `FonteErro`. Só a caixa do Brasil fica na memória (~100 mil focos em 40 h na seca, ~20 MB); a
+  janela de 24 h é de quem usa (`alertas.focos_nasa_24h`), e o índice das 24 h sai uma vez por leitura e por 5 min
+  (`visao.indice_nasa`). **O servidor da NASA IGNORA o If-None-Match e o If-Modified-Since** (200 com o arquivo inteiro, conferido
+  ao vivo): a releitura faz um HEAD por arquivo e só baixa o que mudou (4 HEADs em 0,25 s; a leitura fria, 4 arquivos em paralelo,
+  ~9 MB em ~3 s).
+- **O mapa:** os focos da NASA a até 25 km de alguma usina (o que interessa e o peso: 25 km pegam uns poucos milhares dos ~50 mil
+  do Brasil), um ponto por detecção, o tamanho pela força (3 caminhos `mp-na-fraco/medio/forte`), numa cor própria (`--cl-nasa`,
+  rosa-avermelhado: não é o laranja da última hora nem o vermelho do agir), ATRÁS dos focos do INPE e dos anéis. O botão "Focos"
+  liga e desliga as duas camadas. A legenda tem a seção "Fogo nas últimas 24 h" com a contagem (a até 25 km e a até 5 km) e o que é
+  a força; a dica da usina tem a linha da NASA; a tabela, o motivo ("Fogo a 3,0 km há 6 h").
+- **Fora desta entrega, e por quê:** o histórico por usina (VIIRS desde 2012, MODIS desde 2000, para planejar roçagem e aceiro antes
+  do pico) precisa da API por área com MAP_KEY (grátis, pedida com o e-mail de quem for dono) ou do download em lote, e de guardar no
+  banco: é fato novo da governança de dados (catálogo antes). A máscara de fontes de calor fixas (olaria, indústria) precisa desse
+  histórico. O vento contra a usina depende da decisão de licença do Open-Meteo (ver "Fase 2"). O relatório diário das 7h é outra
+  entrega.
+- **Ao vivo (10/10/2026, 00:45, seca, 154 usinas):** 48.632 focos da NASA no Brasil nas últimas 24 h; 9 usinas com fogo a até 5 km
+  (4 forte, 5 médio), todas já em Atenção por outro motivo (baixa umidade e risco de fogo): a faixa ficou a mesma (3 agir, 151
+  atenção), e o fogo virou o primeiro motivo delas.
+- Prova: `tests/test_clima_firms.py` (o leitor, o HEAD, a regra, a confirmação, a própria usina, a honestidade, a camada e as telas).
+
+**Servidor da T.I.:** precisa de saída para `apiprevmet3.inmet.gov.br`, `dataserver-coids.inpe.br`, `power.larc.nasa.gov` e, desde
+10/10/2026, `firms.modaps.eosdis.nasa.gov` (`DEPLOY.md`, seções 0 e 7c); sem elas a tela abre e mostra as fontes como "fora agora".
 
 Como provar: `python -m pytest -q tests/test_clima_*.py tests/test_torre_performance_clima*.py`. Ao vivo (06/10/2026, 40
 coordenadas de referência, só leitura): 25 usinas dentro de algum aviso, 1 com foco a 1,9 km, 18 com risco alto ou crítico;
@@ -446,6 +493,7 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
   para o mesmo ponto fora: o Brasil inteiro pesa 42 mil caracteres (a metade do absoluto). A página do Brasil, com 154 usinas,
   5 mil focos e 60 avisos (dado inventado do tamanho do real, 07/10): 36 ms no servidor, 200 KB (49 KB comprimido); uma região,
   de 11 a 22 ms. A primeira visita depois do boot soma ~25 ms (lê o JSON e escreve os caminhos, que ficam guardados por vista).
+- **O fogo das últimas 24 h da NASA (10/10/2026)** entra entre as siglas e os focos do INPE (ver "Fogo das últimas 24 h: NASA FIRMS").
 - **Camadas, de trás para frente:** estados (com a sigla, que some no celular na visão do Brasil) → a camada de calor (quando é
   ela o fundo) e as divisas por cima dela → avisos do INMET → siglas → focos do INPE → anéis → usinas → o aro da usina escolhida. O aviso é um grupo por nível, e a transparência é do GRUPO: polígonos do mesmo nível não se somam onde se
   cruzam (cem avisos de baixa umidade virariam uma mancha opaca). O aviso que AINDA VAI COMEÇAR vai só no contorno tracejado: a

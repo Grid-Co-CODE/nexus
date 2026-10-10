@@ -3,26 +3,27 @@ referenciar o Azure e ter uma visão nossa!")."""
 from nexus.torres import descobrir_torres
 
 # Ordens de serviço ("os"), Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "são redundantes")
-NOSSAS = ("atencao", "aprovacao", "pt", "rondas", "zeladoria", "triagem")
+NOSSAS = ("atencao", "aprovacao", "rondas", "zeladoria", "triagem")
 
 
 def _campo():
     return next(t for t in descobrir_torres() if t.id == "campo")
 
 
-def test_pt_e_zeladoria_tem_tela_na_torre_campo(logado):
-    # Levi, 04/10: "crie para PT, ZELADORIA".
-    for tela_id, nome in (("pt", "Permissões de trabalho"), ("zeladoria", "Zeladoria")):
-        assert _campo().tela(tela_id) is not None, tela_id
-        resp = logado.get(f"/t/campo/{tela_id}")
-        assert resp.status_code == 200, tela_id
-        assert nome in resp.get_data(as_text=True)
+def test_zeladoria_tem_tela_e_a_pt_foi_para_seguranca(logado):
+    # Levi, 04/10: "crie para PT, ZELADORIA". Em 09/10 a PT foi para Segurança · HSEQ > APR e PT ("quero que esse
+    # visual e caminho vá para APR e PT de Segurança · HSEQ"): o endereço antigo leva para lá, com os filtros
+    assert _campo().tela("zeladoria") is not None and "Zeladoria" in logado.get("/t/campo/zeladoria").get_data(as_text=True)
+    assert _campo().tela("pt") is None
+    r = logado.get("/t/campo/pt?aba=historico&dias=7")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/apr-pt?aba=historico&dias=7")
+    html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
+    assert "Permissões de trabalho e Análise Preliminar de Risco" in html and "Segurança · HSEQ" in html
 
 
-def test_pt_e_zeladoria_ficam_junto_das_telas_parecidas():
-    # A PT é fila de decisão, como a aprovação de OS; a zeladoria é acompanhamento do dia, como a ronda.
+def test_zeladoria_fica_junto_das_telas_parecidas():
+    # a zeladoria é acompanhamento do dia, como a ronda
     ids = [t.id for t in _campo().telas]
-    assert ids.index("pt") == ids.index("aprovacao") + 1
     assert ids.index("zeladoria") == ids.index("rondas") + 1
 
 

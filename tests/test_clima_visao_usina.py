@@ -84,7 +84,7 @@ def test_o_filtro_de_cliente_so_vale_se_o_cliente_existe(leituras, nasa):
 def test_usina_sem_coordenada_diz_o_que_falta_e_nao_vai_a_nenhuma_fonte(monkeypatch):
     def nao(*a, **k):
         raise AssertionError("foi buscar fonte para usina sem coordenada")
-    for f in ("avisos", "focos", "risco", "irradiacao"):
+    for f in ("avisos", "focos", "risco", "firms", "irradiacao"):
         monkeypatch.setattr(L, f, nao)
     cad = cadastro(usina("1", "Com"), sem=[usina("2", "Sem Coordenada", None, None)])
     v = V.montar_usina({}, cadastro=cad, usina_id="2", ref=REF)
@@ -96,7 +96,7 @@ def test_usina_sem_coordenada_diz_o_que_falta_e_nao_vai_a_nenhuma_fonte(monkeypa
 def test_usina_com_coordenada_fora_do_brasil_diz_o_que_falta(monkeypatch):
     def nao(*a, **k):
         raise AssertionError("foi buscar fonte")
-    for f in ("avisos", "focos", "risco", "irradiacao"):
+    for f in ("avisos", "focos", "risco", "firms", "irradiacao"):
         monkeypatch.setattr(L, f, nao)
     v = V.montar_usina({}, cadastro=cadastro(fora=[usina("3", "Zero", 0.0, 0.0)]), usina_id="3", ref=REF)
     assert v["pendencia"].startswith("Coordenada fora do Brasil no cadastro") and v["card"] is None
@@ -174,8 +174,8 @@ def test_as_fontes_da_pagina_dizem_de_quando_e_o_dado(leituras, nasa):
     nasa(lei_nasa())
     tudo_lido(leituras)
     v = pagina()
-    assert [f["id"] for f in v["fontes"]] == ["inmet", "focos", "risco", "power"] and [f["estado"] for f in v["fontes"]] == ["ok"] * 4
-    assert "lido às 15:00" in v["fontes"][0]["texto"] and v["fontes"][3]["texto"] == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: lida às 15:00 · publicada até 02/10"
+    assert [f["id"] for f in v["fontes"]] == ["inmet", "focos", "risco", "firms", "power"] and [f["estado"] for f in v["fontes"]] == ["ok"] * 5
+    assert "lido às 15:00" in v["fontes"][0]["texto"] and v["fontes"][4]["texto"] == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER) · irradiação: lida às 15:00 · publicada até 02/10"
 
 
 # ── a irradiação ─────────────────────────────────────────────────────────────────────────────────────────────────────

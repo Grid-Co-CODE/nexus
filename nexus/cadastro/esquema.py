@@ -318,8 +318,12 @@ VINCULO_SUPERVISOR_CAMPO = "Supervisor de Campo"
 VINCULO_COORDENADOR_CAMPO = "Coordenador de Campo"
 VINCULO_GESTOR = "Gestor de contrato"
 VINCULO_SUPERVISOR_LEGADO = "Supervisor"
+# quem é do COS (Levi, 09/10/2026: a PT pode ser aprovada pelo Supervisor de Campo, pelo gestor de contrato, por um
+# administrador "ou pessoa do COS ... precisamos ter um campo onde fazemos essa relação"): o vínculo da pessoa no
+# cadastro (Pessoas > Colaborador) é esse campo
+VINCULO_COS = "COS"
 VINCULOS = [VINCULO_CAMPO, VINCULO_SUPERVISOR_CAMPO, VINCULO_COORDENADOR_CAMPO, VINCULO_GESTOR,
-            VINCULO_SUPERVISOR_LEGADO]
+            VINCULO_SUPERVISOR_LEGADO, VINCULO_COS]
 ROTULOS_LISTA = {"vinculo": {VINCULO_GESTOR: "Gestor de contrato (Supervisor PM)",
                              VINCULO_SUPERVISOR_LEGADO: "Supervisor (legado)"}}
 

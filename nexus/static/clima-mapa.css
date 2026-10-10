@@ -47,7 +47,7 @@
 /* Foco: um ponto discreto do tamanho do traço (caminho com ponta redonda); o anel vermelho é o foco a até 5 km de uma usina. */
 .mp-focos{fill:none;stroke:var(--cl-alto);stroke-opacity:.55;stroke-width:2px;stroke-linecap:round;vector-effect:non-scaling-stroke}
 /* o --mp-zp (do clima-mapa.js) segura o tamanho do ponto quando o mapa aproxima: cresce um pouco, não oito vezes */
-.mp-anel,.mp-alvo,.mp-ponto{transform-box:fill-box;transform-origin:center;transform:scale(var(--mp-k,1)) scale(var(--mp-zp,1))}
+.mp-anel,.mp-alvo,.mp-ponto,.mp-anel-nasa{transform-box:fill-box;transform-origin:center;transform:scale(var(--mp-k,1)) scale(var(--mp-zp,1))}
 .mp-anel{fill:var(--critico-a12);stroke:var(--cl-critico);stroke-width:2px;vector-effect:non-scaling-stroke;pointer-events:none}
 /* Usina: um link por ponto. O círculo transparente (.mp-alvo) aumenta a área de toque sem aumentar o ponto. */
 .mp-usinas a{cursor:pointer;outline:none}
@@ -207,7 +207,7 @@
 .mp-av-oculto{display:none}
 /* o que vai por cima, ligado e desligado em "Mostrar", e os níveis escondidos pela legenda (no mapa e na tabela) */
 .mp-sem-usinas .mp-usinas,.mp-sem-usinas .mp-selecao{display:none}
-.mp-sem-focos .mp-focos,.mp-sem-focos .mp-aneis{display:none}
+.mp-sem-focos .mp-focos,.mp-sem-focos .mp-aneis,.mp-sem-focos .mp-nasa,.mp-sem-focos .mp-anel-nasa{display:none}
 .mp-sem-siglas .mp-siglas{display:none}
 .mp-oculta-agir .mp-usinas a:has(.mp-n-agir),.mp-oculta-agir .mp-tab--agir,
 .mp-oculta-atencao .mp-usinas a:has(.mp-n-atencao),.mp-oculta-atencao .mp-tab--atencao,
@@ -347,3 +347,20 @@ html.mp-tv-html{height:100%;overflow:hidden;font-size:2.2vh}
 .mp-tv-controles .gc-chip,.mp-tv-controles .mp-regiao,.mp-tv-controles .gc-btn{font-size:.62rem}
 .mp-tv .mp-dica{font-size:.62rem;max-width:30vw}
 .mp-tv .mp-dica-nome{font-size:.72rem}
+
+/* O fogo das últimas 24 h da NASA (FIRMS, 10/10/2026): pontos do tamanho do traço, como os focos do INPE, um tamanho por força (fraco,
+   médio, forte) e uma cor própria, para não se confundir com o laranja da última hora; atrás dos focos do INPE e dos anéis */
+.mp-na{fill:none;stroke:var(--cl-nasa);stroke-opacity:.7;stroke-linecap:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.mp-na-fraco{stroke-width:3px}
+.mp-na-medio{stroke-width:5px}
+.mp-na-forte{stroke-width:8px;stroke-opacity:.85}
+.mp[data-fundo="risco"] .mp-na{stroke:var(--tinta)}
+.mp-chave--nasa{border:0;border-radius:50%;background:var(--cl-nasa);opacity:.8}
+.mp-chave--na-fraco{width:4px;height:4px;margin:7px 7px 0}
+.mp-chave--na-medio{width:6px;height:6px;margin:6px 6px 0}
+.mp-chave--na-forte{width:10px;height:10px;margin:4px 4px 0}
+.mp[data-fundo="risco"] .mp-chave--nasa{background:var(--tinta)}
+/* o contorno da usina que teve fogo da NASA a até 5 km nas últimas 24 h: visível no Brasil inteiro, onde os pontos ficam embaixo dela */
+.mp-anel-nasa{fill:none;stroke:var(--cl-nasa);stroke-width:2.5px;vector-effect:non-scaling-stroke;pointer-events:none}
+.mp-anel-nasa--forte{stroke-width:3.5px}
+.mp-chave--anel-nasa{width:14px;height:14px;margin:2px 2px 0;border:2px solid var(--cl-nasa);background:transparent;border-radius:50%}

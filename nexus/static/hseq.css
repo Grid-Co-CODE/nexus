@@ -44,3 +44,5 @@
 .epi-hist i.sim{background:var(--ok-cheio)}
 .epi-hist i.nao{background:var(--critico-cheio)}
 .cn-abas a[aria-disabled="true"]{opacity:.45;cursor:default}
+/* a foto do extintor que o App enviou (09/10/2026): a miniatura antes do código; o clique abre a caixa das fotos */
+.ext-tab .ext-par > .ext-foto{width:32px;height:32px;border-radius:6px;vertical-align:middle}

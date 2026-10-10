@@ -123,6 +123,31 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   senha de admin segue em "Entrar com a senha de administrador" (`/entrar?admin=1`) e é a porta do Cadastro. Quem
   tem conta no Fracttal entra, técnico inclusive: restringir por perfil, se o Levi pedir, é aqui.
   Em produção o IP vem do `X-Forwarded-For` do proxy, por isso o `trusted_proxy` do `servir.py`.
+- **Sair do Fracttal = sair do Nexus** (Levi, 09/10/2026: "quando deslogar do Fracttal deslogue do Nexus, tem que pedir
+  para logar de novo"). A sessão que nasceu do login do Fracttal (a que tem `usuario`) acaba junto com a dele, e a tela
+  de entrada diz por quê (`auth.MOTIVOS`: saiu, caiu, venceu; o `?motivo=` só aceita essas chaves). Quem encerra é
+  `auth.encerrar` (limpa a sessão do Nexus e apaga o `os_sessao`; página = redirect ao login, fetch = 401 em JSON com
+  `sessao_encerrada` e o endereço do login). Os quatro gatilhos:
+  - o "sair" do OS Creator (`/os/logout`, "Sair do Fracttal nesta área"): o portão encerra antes do clone. Vale também
+    para a senha de administrador: sair, de qualquer lugar, sai de tudo (o Sair do Nexus já saía do OS Creator);
+  - o token venceu: o login guarda o `exp` do JWT em `fracttal_exp`, e o portão confere em TODO pedido;
+  - num pedido de /os (o único caminho que recebe o cookie do OS Creator) sem o JWT ou com ele vencido. O `/os/login`
+    de quem já entrou nos dois segue direto para o `next` (o login do OS Creator é o do Nexus);
+  - o Fracttal recusou o token: a ponte lê a resposta do clone (`ponte._fim_na_resposta`, também na aprovação de OS e
+    na assinatura da PT) e a página pergunta ao abrir, ao voltar a ficar à vista e a cada 5 minutos
+    (`/os/_nexus/sessao`, ver o README do OS Creator). Aba escondida não pergunta.
+  A senha de administrador não depende do Fracttal: só o sair a encerra. O login nunca fica numa moldura do Nexus (o
+  OS Creator, o card da OS): o `entrar.html` leva a JANELA ao login, com o `next` da página de cima e o mesmo motivo; a
+  casca tem `window.nexusEntrarDeNovo(url)` para as telas que recebem o 401. Sessão de antes desta regra (sem
+  `fracttal_exp`) ganha o prazo no primeiro pedido de /os. Prova: `tests/test_auth_sair_fracttal.py`; na tela, uma
+  cópia em 127.0.0.1 com o Fracttal simulado (09/10: sair do OS Creator, token derrubado e token de 45 s vencendo, os
+  três levando a janela ao login com o aviso certo).
+  **Debaixo do `/nexus`** (a regra nasceu na raiz e entrou na porta única em 10/10/2026): o `encerrar` apaga o
+  `os_sessao` em `os_cookie_path()` (com `/os` fixo o delete não casava e o OS Creator ficava logado) e o `nexus_sessao`
+  velho de Path=/, e põe no `next` o caminho como o navegador o vê; o `/os/login` do clone já sai como
+  `/nexus/os/login` e conta como "caiu" (`sem_raiz` no `_fim_na_resposta`); o `entrar.html`, o
+  `nexusEntrarDeNovo` e a conferência da sessão pedem os endereços pelo `nexusRota`. Prova debaixo do prefixo, com o
+  Caddy cortando: `tests/test_prefixo_sair_fracttal.py`.
 - **`next_seguro`:** o `?next=` só aceita caminho interno; nada de `//site` nem URL completa.
 - **`[hidden]{display:none!important}`** no CSS: um `display:flex` vencia o `hidden` e o filtro "não filtrava" (01/10).
   Visível se confere pela geometria (`getBoundingClientRect`), não pelo atributo.

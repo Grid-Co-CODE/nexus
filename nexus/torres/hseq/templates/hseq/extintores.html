@@ -38,7 +38,7 @@
 {% macro linha_extintor(x, com_usina=true, com_conferencia=true) %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}
       <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
         {% if com_usina %}<td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span>{{ regiao_det(x) }}</span></td>{% endif %}
-        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
+        <td><span class="ext-par">{% if fotos.get(x.codigo) is not none %}<a class="cn-foto ext-foto" href="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo) }}" data-legenda="{{ x.ext }} · {{ x.local or 'local não informado' }} · {{ x.usina }}{% if fotos[x.codigo] %} · foto de {{ fotos[x.codigo][8:10] }}/{{ fotos[x.codigo][5:7] }}/{{ fotos[x.codigo][:4] }}{% endif %}" title="Ver a foto do extintor"><img src="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo, mini=1) }}" alt="Foto do {{ x.ext }}" loading="lazy"></a>{% endif %}<span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
         <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
         <td>{{ etiqueta(x.val2, x.fim2) }}</td>
         <td>{{ etiqueta(x.val3, x.fim3) }}</td>
@@ -54,7 +54,7 @@
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · App publicou em {{ d.publicado_em }}{% endif %}</div>
+    <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · livro gravado em {{ d.publicado_em }}{% endif %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
   {% elif not d.get('livro_existe') %}<div class="cn-erro cn-aviso" role="status"><b>Os extintores ainda não chegaram ao banco do Nexus.</b>
@@ -75,6 +75,11 @@
     <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
       <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
+    {# o cliente pelo cadastro, pela usina (Levi, 09/10/2026: "Em extintores quero um filtro por cliente!") #}
+    <label class="gc-rotulo" for="cn-cliente">Cliente</label>
+    <select class="gc-campo" id="cn-cliente" name="cliente" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
     {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, extintor ou local" aria-label="Buscar">
     {% for k in ('f', 'modo', 'ver') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
@@ -93,7 +98,7 @@
   {# o relatório em PDF (Levi, 09/10, com as observações da TST): agrupado por usina e dia, com os filtros da tela; o
      status da TST escolhe quais entram e as fotos vão ao lado de cada extintor (o padrão). Abre noutra aba #}
   <form class="ext-relatorio" method="get" action="{{ url_for('torre_hseq.extintores_relatorio') }}" target="_blank">
-    {% for k in ('regiao', 'regiao_campo', 'gestor', 'q') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+    {% for k in ('regiao', 'cliente', 'regiao_campo', 'gestor', 'q') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
     <span class="gc-rotulo">Relatório em PDF</span>
     <select class="gc-campo" name="status" aria-label="Quais extintores entram no relatório">
       <option value="todos">Todos os extintores</option><option value="criticos">Só os críticos</option>
@@ -141,7 +146,7 @@
   </div>
   {% if ver == 'usina' %}
   <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande">
-    <thead><tr><th>Situação</th><th>Usina</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Última conferência</th><th>Status da TST</th></tr></thead>
+    <thead><tr><th>Situação</th><th>Usina</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Última conferência</th><th>Status da TST</th><th>PDF</th></tr></thead>
     <tbody>
     {% for g in grupos[:limite] %}{% set s = situacoes[g.situacao] %}{% set t = status_tst.get(g.status) %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false" title="Ver os {{ g.qtd }} extintores">
@@ -151,14 +156,15 @@
         <td>{% if g.recarga_fim %}{{ etiqueta(g.recarga, g.recarga_fim) }}{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}</td>
         <td>{{ conferencia(g) }}</td>
         <td><span class="ext-par">{% if t %}<span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}<span class="det">{% for k, (um, varios, cor) in status_no_grupo.items() if g.status_qtd[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g.status_qtd[k] }} {{ um if g.status_qtd[k] == 1 else varios }}</span>{% endfor %}</span></span></td>
+        <td><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', usina=g.usina, dia=(g.conferencia.isoformat() if g.conferencia else 'nunca'), baixar=1, **filtros_url) }}" title="O relatório desta usina e deste dia, com as fotos">Baixar</a></td>
       </tr>
-      <tr class="cn-detalhe" hidden><td colspan="6">
-        <table class="ext-sub">
+      <tr class="cn-detalhe" hidden><td colspan="7">
+        <table class="ext-sub cn-fotos-grupo">
           <thead><tr><th>Situação</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
           <tbody>{% for x in g.extintores %}{{ linha_extintor(x, false, false) }}{% endfor %}</tbody>
         </table>
       </td></tr>
-    {% else %}<tr><td colspan="6" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="7" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
   {% if grupos|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ grupos|length }} usinas e dias: use a região de campo, o gestor, a situação ou a busca para afunilar.</p>{% endif %}
@@ -177,7 +183,7 @@
     });
   </script>
   {% else %}
-  <div class="cn-tab cn-tab--compacta ext-tab"><table>
+  <div class="cn-tab cn-tab--compacta ext-tab cn-fotos-grupo"><table>
     <thead><tr><th>Situação</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Última conferência</th><th>Status da TST</th></tr></thead>
     <tbody>
     {% for x in lista[:limite] %}{{ linha_extintor(x) }}
@@ -186,6 +192,8 @@
   </table></div>
   {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use a região de campo, o gestor, a situação ou a busca para afunilar.</p>{% endif %}
   {% endif %}
+  {# a caixa que amplia a foto (a mesma das fotos da ronda): setas andam entre as fotos da usina, Esc fecha #}
+  {% include 'campo/_ronda_fotos_caixa.html' %}
   {% endif %}
   {% endif %}
 

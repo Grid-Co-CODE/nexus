@@ -18,7 +18,8 @@ from test_torre_performance_mapa import nova_app
 
 RAIZ = Path(__file__).resolve().parent.parent
 NOMES = {"inmet": "Instituto Nacional de Meteorologia", "inpe": "Instituto Nacional de Pesquisas Espaciais",
-         "nasa_power": "Prediction Of Worldwide Energy Resources", "ibge": "Instituto Brasileiro de Geografia e Estatística"}
+         "nasa_power": "Prediction Of Worldwide Energy Resources", "ibge": "Instituto Brasileiro de Geografia e Estatística",
+         "nasa_firms": "Fire Information for Resource Management System"}
 
 
 def test_cada_fonte_tem_nome_por_extenso_e_sigla():
@@ -26,6 +27,7 @@ def test_cada_fonte_tem_nome_por_extenso_e_sigla():
     assert F.extenso("inpe") == "Instituto Nacional de Pesquisas Espaciais (INPE)"
     assert F.extenso("ibge") == "Instituto Brasileiro de Geografia e Estatística (IBGE)"
     assert F.extenso("nasa_power") == "Prediction Of Worldwide Energy Resources, projeto da NASA (NASA POWER)"
+    assert F.extenso("nasa_firms") == "Fire Information for Resource Management System, sistema da NASA (NASA FIRMS)"
     assert set(F.NOMES) == set(NOMES)
 
 
@@ -65,8 +67,8 @@ def test_o_mapa_e_o_modo_tv_escrevem_o_nome_por_extenso_antes_de_qualquer_sigla(
     if not consulta.get("tv"):
         assert F.extenso("ibge") in t                                            # o contorno dos estados, no rodapé
     linhas = re.findall(r'<span class="cl-fonte-texto">([^<]*)', html)
-    assert len(linhas) == 3 and linhas[0].startswith(F.extenso("inmet")) and linhas[1].startswith(F.extenso("inpe"))
-    assert linhas[2].startswith(F.extenso("inpe"))
+    assert len(linhas) == 4 and linhas[0].startswith(F.extenso("inmet")) and linhas[1].startswith(F.extenso("inpe"))
+    assert linhas[2].startswith(F.extenso("inpe")) and linhas[3].startswith(F.extenso("nasa_firms"))
 
 
 def test_a_lista_do_clima_e_risco_escreve_o_nome_por_extenso(mundo):  # noqa: F811

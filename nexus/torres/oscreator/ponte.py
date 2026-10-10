@@ -21,8 +21,10 @@ import os
 import re
 import sys
 import threading
+import time
+from urllib.parse import urlsplit
 
-from flask import Blueprint, current_app, render_template, request
+from flask import Blueprint, current_app, render_template, request, session
 from flask.sessions import SecureCookieSessionInterface
 
 from ...prefixo import ja_na_raiz, na_raiz, raiz, sem_raiz
@@ -197,6 +199,56 @@ def clone(app):
     return ext["os_web_clone"]
 
 
+def sessao_do_os(app) -> dict:
+    """A sessão do OS Creator deste pedido (o cookie `os_sessao`, que o navegador só manda para /os), ou {}."""
+    alvo = clone(app)
+    return dict(alvo.session_interface.open_session(alvo, request) or {})
+
+
+def _sessao_os_na_resposta(alvo, resp) -> dict | None:
+    """A sessão do OS Creator que a resposta do clone grava (o Set-Cookie do `os_sessao`): {} quando ela apaga o cookie,
+    None quando não mexe nele (ou o valor não confere com a chave do clone)."""
+    nome = alvo.config["SESSION_COOKIE_NAME"]
+    for linha in resp.headers.getlist("Set-Cookie"):
+        chave, _, valor = linha.split(";", 1)[0].partition("=")
+        if chave.strip() != nome:
+            continue
+        valor = valor.strip().strip('"')
+        if not valor:
+            return {}
+        try:
+            return dict(alvo.session_interface.get_signing_serializer(alvo).loads(valor))
+        except Exception:        # noqa: BLE001 — valor estranho: como se não mexesse
+            return None
+    return None
+
+
+def _fim_na_resposta(alvo, resp) -> str | None:
+    """O que a resposta do clone diz da sessão do Fracttal, para o Nexus acabar junto (Levi, 09/10/2026: "quando
+    deslogar do Fracttal deslogue do Nexus"): "venceu" (o token venceu e não renovou), "caiu" (o Fracttal recusou o
+    token: o clone tirou o JWT do cookie, mandou ao login dele ou respondeu 401 pedindo login) ou None. O token que o
+    clone renovou estica o prazo da sessão do Nexus junto."""
+    if resp.mimetype in ("text/html", "application/json") and _JWT_VENCIDO in resp.get_data():
+        return "venceu"
+    nova = _sessao_os_na_resposta(alvo, resp)
+    if nova is not None:
+        jwt = str(nova.get("jwt") or "")
+        if not jwt:
+            return "caiu"
+        from ...auth.fracttal import exp_do_jwt
+        exp = exp_do_jwt(jwt)
+        if exp > float(session.get("fracttal_exp") or 0):
+            session["fracttal_exp"] = exp
+    # sem_raiz: debaixo do /nexus o url_for do clone já sai com o prefixo (ele recebe o SCRIPT_NAME do Nexus), e o login
+    # dele chega como /nexus/os/login; comparado cru, a sessão que o Fracttal derrubou não derrubava a do Nexus
+    if (resp.status_code in (301, 302, 303, 307, 308)
+            and sem_raiz(urlsplit(resp.headers.get("Location", "")).path) == "/os/login"):
+        return "caiu"
+    if resp.status_code == 401 and resp.mimetype == "application/json" and (resp.get_json(silent=True) or {}).get("login"):
+        return "caiu"
+    return None
+
+
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)
 @bp_raiz.route("/os/<path:resto>", methods=_METODOS)
 def encaminhar(resto: str):
@@ -222,6 +274,13 @@ def encaminhar(resto: str):
         environ.pop("HTTP_IF_NONE_MATCH", None)
         environ.pop("HTTP_IF_MODIFIED_SINCE", None)
     resp = app.response_class.from_app(alvo, environ)
+    from ...auth import encerrar, via_fracttal
+    if via_fracttal():
+        # entrou no Nexus pelo Fracttal: a sessão do Fracttal que acabou no meio do pedido leva a do Nexus junto
+        fim = _fim_na_resposta(alvo, resp)
+        if fim:
+            destino = "/os/" + resto + (("?" + request.query_string.decode()) if request.query_string else "")
+            return encerrar(fim, destino, json=True if resp.mimetype == "application/json" else None)
     if resp.mimetype in ("text/html", "application/json") and _JWT_VENCIDO in resp.get_data():
         return _de_volta_ao_login(app, resto, resp.mimetype == "application/json")
     if base:
@@ -297,6 +356,68 @@ def _de_volta_ao_login(app, resto: str, json: bool):
         resp = redirect(na_raiz("/os/login") + "?next=" + quote(destino, safe=""))
     resp.delete_cookie(clone(app).config["SESSION_COOKIE_NAME"], path=os_cookie_path())
     return resp
+
+
+# ── a conferência da página: a sessão do Fracttal ainda vale? (Levi, 09/10/2026) ─────────────────────────────────────
+# O portão já encerra quem chega a /os sem o JWT ou com ele vencido; o que só o Fracttal sabe é se o token foi derrubado
+# por fora (sair no app do Fracttal, por exemplo). A página do Nexus pergunta ao abrir e a cada 5 minutos à vista
+# (base.html), e o servidor pergunta ao Fracttal no máximo uma vez a cada 5 minutos por token: a cota é de 200 pedidos
+# por minuto para a EMPRESA inteira, App de Campo e robôs incluídos.
+_VIVO_S = 5 * 60
+_INCERTO_S = 60          # Fracttal fora ou recusando por cota: pergunta de novo em 1 minuto, sem derrubar ninguém
+_trava_vivo = threading.Lock()
+
+
+def vivo_no_fracttal(app, jwt: str, email: str = "") -> bool | None:
+    """True/False pelo Fracttal (1 pedido barato, o mesmo do `api.is_logged_in` do clone), guardado por 5 minutos; None
+    quando não dá para saber (rede, 429 da cota, token a 2 minutos de vencer, quando o prazo resolve e a pergunta faria o
+    clone tentar renovar o token). None nunca derruba ninguém: só o Fracttal dizendo que a sessão morreu derruba."""
+    if not jwt:
+        return False
+    from ...auth.fracttal import exp_do_jwt
+    exp = exp_do_jwt(jwt)
+    if exp and exp - time.time() < 120:
+        return None
+    chave = hashlib.sha256(jwt.encode()).hexdigest()
+    guardado = app.extensions.setdefault("os_fracttal_vivo", {})
+    agora = time.monotonic()
+    with _trava_vivo:
+        visto = guardado.get(chave)
+        if visto and agora < visto[0]:
+            return visto[1]
+    clone(app)                                   # põe o `api` do clone no sys.path
+    import api as os_api                         # noqa: E402
+    from os_web import sessao as os_sessao       # noqa: E402
+    with os_sessao.contexto(jwt, email):
+        try:
+            os_api._rpc_call(os_api.RPC_LABELS_LIST, {"sort": [], "page": 1, "limit": 1, "start": 0, "is_tree": False,
+                                                      "node": None, "id_work_order": 0, "only_enabled": True}, timeout=10)
+            vivo = True
+        except os_api.SessionExpired:
+            vivo = False
+        except Exception:                        # noqa: BLE001 — 429, rede, Fracttal fora: não sei
+            vivo = None
+    with _trava_vivo:
+        for k in [k for k, (ate, _v) in guardado.items() if ate <= agora]:
+            del guardado[k]
+        guardado[chave] = (agora + (_VIVO_S if vivo is not None else _INCERTO_S), vivo)
+    return vivo
+
+
+@bp_raiz.route("/os/_nexus/sessao")
+def sessao_viva():
+    """{"ok": true} enquanto a sessão do Fracttal de quem entrou por ele vale; a que o Fracttal diz que morreu encerra o
+    Nexus (401, {"sessao_encerrada": true, "entrar": ...}). Quem entrou com a senha de administrador não depende dela."""
+    from flask import jsonify
+
+    from ...auth import encerrar, via_fracttal
+    if not via_fracttal():
+        return jsonify({"ok": True})
+    app = current_app._get_current_object()
+    s = sessao_do_os(app)
+    if vivo_no_fracttal(app, str(s.get("jwt") or ""), str((s.get("conta") or {}).get("email") or "")) is False:
+        return encerrar("caiu", json=True)
+    return jsonify({"ok": True})
 
 
 def _endereco_do_os(url) -> str:

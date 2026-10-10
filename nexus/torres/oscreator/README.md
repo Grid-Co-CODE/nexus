@@ -101,14 +101,28 @@ nesta pasta.
 - **Sessão:** a chave da sessão do clone é derivada da `NEXUS_SECRET_KEY`. Não é a do supervisório e não precisa de
   segredo novo. O cookie continua `os_sessao`, só no `/os` do Nexus (prefixo + `/os`: `/nexus/os` no servidor; seção
   "Debaixo do /nexus").
+- **A sessão do Fracttal leva a do Nexus junto** (Levi, 09/10/2026: "quando deslogar do Fracttal deslogue do Nexus").
+  A regra mora no portão (`nexus/casca/CLAUDE.md`, "Sair do Fracttal = sair do Nexus"); a ponte faz a parte dela:
+  - o "sair" do clone (`/os/logout`) nem chega a ele: o portão encerra as duas sessões e leva a janela ao login (o
+    `os_sessao` é apagado no caminho do prefixo, `os_cookie_path()`; e o login do clone na resposta, `/os/login`, é
+    reconhecido com ou sem o `/nexus` na frente);
+  - para quem entrou pelo Fracttal, a resposta do clone que tira o JWT do cookie, manda ao `/os/login` ou responde 401
+    pedindo login encerra o Nexus (`_fim_na_resposta`: "caiu"; o aviso do JWT vencido do app de mesa: "venceu"); o
+    token que o clone renovou estica o `fracttal_exp` da sessão do Nexus junto. Com a senha de administrador fica o de
+    antes (`_de_volta_ao_login`, só o OS Creator volta ao login dele);
+  - `/os/_nexus/sessao`: a página do Nexus pergunta se o token ainda vale; o servidor pergunta ao Fracttal no máximo uma
+    vez a cada 5 minutos por token (`vivo_no_fracttal`, o mesmo pedido barato do `api.is_logged_in`; a cota é de 200
+    pedidos por minuto para a EMPRESA). Só a resposta "sessão morta" (`SessionExpired`) derruba; 429, rede ou token a 2
+    minutos de vencer não decidem nada (o prazo resolve, e perguntar faria o clone tentar renovar o token).
 - **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
   `/os/*` mostra um aviso e o resto do Nexus segue.
 - **Tema do Nexus (escuro e claro):** o OS Creator segue o botão do tema do Nexus, na moldura da torre, no card da OS e
   em qualquer página `/os/` (seção "Tema claro, com o botão do Nexus").
 - **Testes:** `tests/test_torre_oscreator.py`, `tests/test_oscreator_solic_engenharia.py`,
   `tests/test_oscreator_busca_digitavel.py`, `tests/test_oscreator_desempenho.py`, `tests/test_oscreator_card_tarefas.py`,
-  `tests/test_oscreator_acomp_quadro.py`, `tests/test_oscreator_acomp_renovar.py`, `tests/test_oscreator_card_preparo.py`
-  e `tests/test_oscreator_tema_claro.py`. Nenhum teste fala com o Fracttal.
+  `tests/test_oscreator_acomp_quadro.py`, `tests/test_oscreator_acomp_renovar.py`, `tests/test_oscreator_card_preparo.py`,
+  `tests/test_oscreator_tema_claro.py` e `tests/test_auth_sair_fracttal.py` (a sessão do Fracttal que acaba leva a do
+  Nexus). Nenhum teste fala com o Fracttal.
 - **O que não funciona igual:**
   - o login pelo OAuth do Fracttal tem a volta configurada para o supervisório; e-mail e senha funcionam normal;
   - gravar ticket precisa do `GRIDCO_SQL_TOKEN`, que vem da variável ou do `%APPDATA%` da máquina.
