@@ -112,7 +112,38 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   do prefixo); `tests/test_prefixo.py` pega o esquecimento.
 - **Rota pública é decisão consciente:** só o que está em `ROTAS_PUBLICAS` (entrar, saude, static). O teste
   `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
-- **Limite de senha:** 5 erros em 15 min por IP, guardado em `app.extensions` (estado global vazava entre testes).
+- **Limite de tentativas do Entrar** (auditoria A2 e revisão adversarial da porta única, 10/10/2026). Era 5 erros por
+  IP: um colega errando a senha cinco vezes trancava o Entrar da sala inteira por 15 min (o escritório sai por um IP
+  público só), inclusive a senha de administrador, e até o 429 do Fracttal contava. A A2 passou a contar só por e-mail, e
+  a revisão achou o avesso: quem soubesse o e-mail de alguém (nome.sobrenome é previsível) mandava 5 senhas erradas de
+  qualquer rede e o dono ficava 15 min de fora com a senha certa (provado: 5 erros de 203.0.113.9, e o dono, de
+  198.51.100.7, recebia 429); repetindo, o dia todo. Agora (`nexus/auth/__init__.py`):
+  - por **e-mail e rede**: 5 senhas erradas do mesmo e-mail (sem espaço, sem diferença de maiúscula) a partir do mesmo IP
+    em 15 min trancam só esse par; a 6ª nem vai ao Fracttal (que tem o bloqueio da conta dele, de ~30 min). O dono, de
+    outra rede, entra;
+  - por **e-mail**, um teto de 20 em 15 min (`TETO_POR_EMAIL`), de qualquer rede, contra tentativas espalhadas;
+  - o **navegador conhecido** (cookie `nexus_dispositivo`, assinado com a `NEXUS_SECRET_KEY`, gravado em todo login certo
+    pelo Fracttal, 90 dias, até 8 contas por navegador, só com um HMAC do e-mail e não o e-mail) não é barrado pelas duas
+    travas do e-mail: tem um contador só dele (5). É o "device cookie" da OWASP: o atacante não tem esse cookie para o
+    e-mail de outro. O Sair não o apaga (ele não abre sessão);
+  - por **IP**, um teto alto (`TETO_POR_IP` = 50 em 15 min) contra força bruta de muitos e-mails, para todos, com cookie
+    ou sem; um login certo no meio não o zera. O IP é o do visitante: o `trusted_proxy` do `servir.py` lê o
+    X-Forwarded-For do Caddy;
+  - acertar zera os contadores DESTE e-mail (o par com a rede, o teto e o do navegador);
+  - a **senha de administrador** tem o próprio contador (5 por IP): o Fracttal dos colegas não a tranca, e ela não tranca o
+    Fracttal de ninguém;
+  - **senha não conferida não conta**, e o motivo aparece. `fracttal.FracttalOcupado` (429/406, 5xx, limite, rede fora;
+    lido da mensagem que o clone monta, porque ele não devolve o status) leva `motivo` (DNS, certificado, proxy, tempo,
+    sem conexão, limite, Fracttal fora), `limite` e `detalhe` (a classe e a mensagem originais do `requests`, sem o
+    e-mail). A tela diz "Fracttal ocupado (limite de pedidos da empresa), tente em instantes" no limite, e "Sem resposta
+    do Fracttal: <motivo> ... se continuar, avise a T.I." no resto (503); o journal recebe um WARNING do logger
+    `nexus.auth` com o erro original. Até a revisão de 10/10 tudo virava "ocupado" e o erro era descartado: com a saída
+    do servidor para o Fracttal quebrada, todos veriam "tente em instantes" para sempre, sem log. A senha que passou com
+    o JWT que não chegou à sessão do clone é `fracttal.SessaoNaoVeio` (era um "ocupado" mudo): 500, a tela diz e o
+    journal registra um ERROR com de onde veio o `api._save_jwt` em uso. E-mail ou senha vazios nem vão ao Fracttal (400).
+  Em memória, em `app.extensions` (estado global vazava entre testes): zera no restart. Prova: `tests/test_auth_limite.py`
+  (inclusive pelo `api.fracttal_login` de verdade do clone, só com o `requests.post` falso: SSLError, DNS, proxy e
+  tempo esgotado chegam ao log).
 - **Login pelo Fracttal** (Levi, 06/10/2026: "Ao invés de uma senha difícil, no início faça a pessoa logar com
   fractall"): e-mail e senha do Fracttal (a senha vai transformada ao Fracttal e não é guardada; só a conta da Grid Co.
   entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (caminho prefixo + `/os`,
@@ -149,7 +180,13 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   `/nexus/os/login` e conta como "caiu" (`sem_raiz` no `_fim_na_resposta`); o `entrar.html`, o
   `nexusEntrarDeNovo` e a conferência da sessão pedem os endereços pelo `nexusRota`. Prova debaixo do prefixo, com o
   Caddy cortando: `tests/test_prefixo_sair_fracttal.py`.
-- **`next_seguro`:** o `?next=` só aceita caminho interno; nada de `//site` nem URL completa.
+- **`next_seguro`:** o `?next=` (e o `voltar` do tema e da cadeira, e o `/os/login?next=` de quem já entrou) só aceita
+  caminho interno: começa com uma barra só, sem caractere de controle (0x00-0x20, 0x7f) nem barra invertida em lugar
+  nenhum, e sem esquema nem servidor. O resto volta ao Início. Revisão adversarial de 10/10/2026: só se recusava `//` e
+  `/\` no começo, e `/` + TAB + `/outro.site/x` passava; o Werkzeug monta o Location pelo `urlsplit`, que tira TAB, LF e
+  CR, e o cabeçalho saía `//outro.site/x` (na raiz, a pessoa entrava com a senha do Fracttal e caía num site de fora;
+  debaixo do /nexus o prefixo escondia). LF e CR davam 500. Prova: `tests/test_auth_next.py`, nos dois modos. O
+  `_login_next` da plataforma tinha a mesma régua (o lado de lá se alinha à parte).
 - **`[hidden]{display:none!important}`** no CSS: um `display:flex` vencia o `hidden` e o filtro "não filtrava" (01/10).
   Visível se confere pela geometria (`getBoundingClientRect`), não pelo atributo.
 - **`<html data-nexus>`** + script anti-moldura: o OS Creator embutido não pode abrir o Nexus dentro do iframe dele.
@@ -163,4 +200,9 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   tela, ela fica verde sozinha. A torre da cadeira deixou de ser verde (era o mesmo sinal); fica só a etiqueta "sua".
   Exceção: as molduras da Performance (porta única) só contam com a `NEXUS_SSO_CHAVE` (`moldura.SO_COM_A_PORTA`):
   sem ela abrem o aviso "ainda não ligada" e o verde mentiria (revisão de 10/10/2026).
+- **O Início conta pela mesma régua** (auditoria A3 da porta única, 10/10/2026): é a primeira página de todos, e dizia
+  "fase 0" e "Com dado real: 0" com 40 telas prontas no ar. O número é "Telas prontas" (o tamanho de
+  `telas_com_conteudo`, o verde do menu); cada cartão leva à 1ª tela PRONTA da torre (no COS, com a porta ligada, o
+  Acompanhamento, e não a Mesa em construção), com "N de M prontas"; torre sem nenhuma (Comando, Contratos, Relatórios)
+  vira um cartão que não é link, tracejado, com "Em construção". Prova: `tests/test_casca_inicio.py`.
 - Edge "localhost recusou": o waitress tem de escutar em `127.0.0.1` **e** `[::1]`.

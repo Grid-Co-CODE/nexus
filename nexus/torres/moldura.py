@@ -20,9 +20,10 @@ o resto do Nexus segue igual; a plataforma, sem a mesma chave, responde 404 em `
 Mora em `nexus/torres/` (e não numa torre) porque três torres a usam: Performance, COS (Acompanhamento COS) e Base
 (Chaves das fontes). Um módulo solto aqui não vira torre: a descoberta só olha os pacotes.
 """
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
-from flask import current_app, has_request_context, make_response, redirect, render_template, request, session
+from flask import (current_app, has_request_context, jsonify, make_response, redirect, render_template, request, session,
+                   url_for)
 
 from ..performance import porta
 from ..prefixo import na_raiz
@@ -85,6 +86,8 @@ def _dados_do_navegador(t, estado: dict, destino: str | None, passe_lista: str |
     return {
         "plataforma": estado["plataforma"],
         "url": url_da_tela(t),
+        # onde pedir um passe novo quando a sessão da plataforma vence ou vai vencer (`_passe_novo`)
+        "renovar": url_for(f"{request.blueprint}.{_endpoint(t)}_passe"),
         "destino": destino or "",
         "telas": [{"url": url_da_tela(x), "nome": x.nome, "caminho": x.caminho if porta.concreto(x) else "",
                    "padroes": porta.padroes_do_navegador(x)} for x in porta.MAPA],
@@ -133,9 +136,61 @@ def _pagina(torre, t, reserva=None):
     return resp
 
 
+def _json_sem_cache(corpo: dict, status: int):
+    resp = jsonify(corpo)
+    resp.status_code = status
+    resp.headers["Cache-Control"] = "no-store"       # o passe leva o e-mail e vale uma vez: nada de cache
+    return resp
+
+
+def _de_outro_site() -> bool:
+    """O pedido NÃO veio de uma página deste mesmo endereço. A mesma regra do `_de_outra_origem` da plataforma: pelo
+    Sec-Fetch-Site, só 'same-origin' (o fetch do porta.js; 'same-site' não, porque todo subdomínio de gridco.com.br é
+    'same-site'); sem ele, o Origin tem de ser deste host ('null' não); sem os dois não é navegador, e não há cookie de
+    vítima para usar. A resposta é JSON que outro site não lê (sem CORS); isto fecha também o pedido às cegas."""
+    sfs = (request.headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if sfs:
+        return sfs != "same-origin"
+    origem = request.headers.get("Origin")
+    if origem is None:
+        return False
+    try:
+        de = urlsplit(origem.strip()).netloc.lower()
+    except ValueError:
+        return True
+    return not de or de != (request.host or "").lower()
+
+
+def _passe_novo(t):
+    """`POST /t/<torre>/<tela>/passe` (`p` = o caminho da plataforma): um passe novo, em JSON, para a moldura renovar a
+    sessão da plataforma (auditoria A5 da porta única, 10/10/2026).
+
+    O caso: a sessão que o passe abre na plataforma vale 12 h fixas; depois, o `/api/macro` do Painel NOC dava 401 e o
+    painel desenhava "Energia perdida 0,0 MWh", número falso numa tela de NOC ou de TV. Agora a página da plataforma avisa
+    a moldura (`nexus:sessao-vencida`) e o porta.js pede aqui um passe novo para reabrir a mesma tela, e renova sozinho a
+    cada 11 h. O passe é o da abertura da tela (60 s, uso único, quem está logado), para qualquer caminho do MAPA (a
+    moldura pode ter ido do Painel NOC ao diagnóstico de uma usina); as chaves das fontes, só para admin. Sessão do Nexus
+    encerrada: o portão já respondeu antes (401 em JSON, ou o salto ao Entrar), e o porta.js leva a janela ao login."""
+    if not estado_da_porta()["ligada"]:
+        return _json_sem_cache({"ok": False, "erro": "Performance ainda não ligada neste servidor."}, 404)
+    if _de_outro_site():
+        return _json_sem_cache({"ok": False, "erro": "Pedido de outro site."}, 403)
+    caminho = porta.destino_permitido(request.form.get("p"))
+    if not caminho:
+        return _json_sem_cache({"ok": False, "erro": "Caminho fora das telas da Performance."}, 400)
+    if (t.so_admin or porta.tela_do_caminho(caminho).so_admin) and not session.get("admin"):
+        return _json_sem_cache({"ok": False, "erro": "Só administradores do Nexus."}, 403)
+    return _json_sem_cache({"ok": True, "passe": _passe(caminho), "destino": caminho}, 200)
+
+
+def _endpoint(t) -> str:
+    return "moldura_" + t.tela.replace("-", "_")
+
+
 def registrar_molduras(bp, torre, reserva: dict | None = None) -> None:
-    """Uma view para cada tela do mapa que mora nesta torre (`/t/<torre>/<tela>`), vencendo o placeholder. A tela tem de
-    estar declarada na `TORRE` (é o que entra no menu): sem ela, o erro sai ao subir, não na mão de quem clica.
+    """Uma view para cada tela do mapa que mora nesta torre (`/t/<torre>/<tela>`), vencendo o placeholder, e a rota do
+    passe novo dela (`/t/<torre>/<tela>/passe`, só POST: `_passe_novo`). A tela tem de estar declarada na `TORRE` (é o
+    que entra no menu): sem ela, o erro sai ao subir, não na mão de quem clica.
     `reserva` = {tela: função(motivo) -> resposta ou None}, chamada com a porta desligada (o Tempo real pela ponte)."""
     reserva = reserva or {}
     for t in porta.da_torre(torre.id):
@@ -144,8 +199,12 @@ def registrar_molduras(bp, torre, reserva: dict | None = None) -> None:
 
         def view(_t=t):
             return _pagina(torre, _t, reserva.get(_t.tela))
-        endpoint = "moldura_" + t.tela.replace("-", "_")
+
+        def passe_novo(_t=t):
+            return _passe_novo(_t)
+        endpoint = _endpoint(t)
         bp.add_url_rule("/" + t.tela, endpoint=endpoint, view_func=view)
+        bp.add_url_rule("/" + t.tela + "/passe", endpoint=endpoint + "_passe", view_func=passe_novo, methods=["POST"])
         if t.tela not in reserva:
             SO_COM_A_PORTA.add(f"{bp.name}.{endpoint}")
 

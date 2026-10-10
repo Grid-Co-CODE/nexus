@@ -280,6 +280,11 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .card-torre .nome{font:600 14px/20px var(--font-sans)}
 .card-torre .qtd{margin-left:auto;font-size:12px;color:var(--mudo)}
 .card-torre p{margin:8px 0 0;font-size:13px;color:var(--tinta-2)}
+/* torre sem nenhuma tela pronta (auditoria A3, 10/10/2026): não é link, não reage ao mouse, borda tracejada */
+.card-torre--construcao{border-style:dashed}
+.card-torre--construcao:hover{background:var(--superficie)}
+.card-torre--construcao .cab i{color:var(--mudo)}
+.card-torre--construcao .gc-status{margin-left:auto}
 
 /* Tela placeholder */
 .bloco{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);margin:24px 0 16px;max-width:760px}

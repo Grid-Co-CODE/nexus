@@ -47,6 +47,25 @@ navegador fala com cada sistema.
   (`history.replaceState`: o item dono do caminho, com `?p=` quando não é a entrada padrão dele), acende o item no menu e
   leva o endereço novo ao "voltar" da cadeira e do tema e ao "Abrir em outra aba". Abrir com `?p=` (F5, favorito): do
   mapa e do item, abre ali; de OUTRO item, 302 para o item dono; fora do mapa, a tela padrão do item (spec 7).
+- **A sessão da plataforma vence em 12 h e a moldura a renova** (auditoria A5 da porta única, 10/10/2026). O caso: a
+  sessão que o passe abre vale 12 h fixas (`SESSAO_DO_PASSE_S` da plataforma); depois, o `/api/macro` do Painel NOC dava
+  401 e o painel, que relê a cada 60 s, desenhava "Energia perdida 0,0 MWh", número falso numa tela de NOC ou de TV. O
+  protocolo combinado entre os dois lados (mude nos dois juntos):
+  - a página da plataforma em modo Nexus, ao receber 401 numa chamada de dado, manda à moldura
+    `postMessage({tipo: "nexus:sessao-vencida", caminho: location.pathname + location.search}, <origem do Nexus>)`;
+  - o `porta.js` confere fonte e origem como no `nexus:rota`, pede um passe NOVO ao Nexus (`POST <tela>/passe` com
+    `p=<caminho>`, o endereço vem em `dados.renovar`) e reabre a mesma tela pelo formulário do passe. Caminho fora do
+    mapa (o `/login` dela): reabre o último que a moldura avisou. **No máximo 1 vez a cada 60 s**: se vencer de novo logo
+    depois, a faixa de alerta manda clicar no item do menu (sem laço);
+  - com a aba aberta, a cada 11 h (pelo relógio de parede, conferido a cada minuto e ao voltar à aba: um `setTimeout`
+    atrasa com o computador dormindo) o passe novo vai por `fetch` a `/painel/nexus/entrar` (o 303 não é seguido, como no
+    Diagnóstico) e a plataforma abre outra sessão de 12 h, sem recarregar a tela; falhou, tenta em 10 min;
+  - a rota do passe novo (`moldura._passe_novo`, uma por item, só POST, dentro de `/t/*` para o Caddy da raiz mandá-la ao
+    Nexus): o mesmo passe da abertura (60 s, uso único, quem está logado) para qualquer caminho do MAPA (a moldura pode ter
+    ido do Painel NOC ao diagnóstico de uma usina); Chaves das fontes só para admin; 400 fora do mapa, 404 sem a chave, 403
+    de outro site (`Sec-Fetch-Site` só `same-origin`; sem ele, o `Origin` deste host), `Cache-Control: no-store`. Sessão
+    do Nexus encerrada: o portão responde antes (401 em JSON, ou o salto ao Entrar) e o `porta.js` leva a JANELA ao
+    login (`nexusEntrarDeNovo`), que volta para a mesma tela.
 - **Diagnóstico:** sem `?p=` a página mostra o seletor e "Escolha uma usina". A lista vem da PLATAFORMA, pelo navegador
   (o processo do Nexus não busca): o mesmo `/api/macro` e `/api/gerencial` do Painel NOC, com a regra dele (o `FMAP` e o
   `drillUrl` de `painel_portfolio.html`, copiados no `porta.js`: a usina de fonte ao vivo abre com `?fonte=`, a que só
@@ -88,7 +107,9 @@ navegador fala com cada sistema.
   caminhos do Nexus e a camada não os toca (`test_a_camada_do_servidor_nao_mexe_nos_enderecos_da_plataforma`).
 - **Prova:** `tests/test_porta_mapa.py` (mapa e passe; com `PLATAFORMA_REPO`, contra a plataforma de verdade),
   `tests/test_porta_moldura.py` (cada tela nos dois modos, `?p=`, sem login, sem chave, só admin, Tempo real com e sem a
-  chave, Sair), `tests/test_porta_js.py` (no node: o seletor, o item que acende, o endereço) e
+  chave, Sair), `tests/test_porta_js.py` (no node: o seletor, o item que acende, o endereço, a reabertura pela sessão
+  vencida e a renovação de 11 h, com o relógio da página andando em `tests/porta_pagina_falsa.js`),
+  `tests/test_porta_renovar.py` (a rota do passe novo) e
   `tests/test_prefixo.py::test_com_a_porta_da_performance_ligada_tambem` (o rastreador com a porta ligada; os endereços
   da plataforma escritos de propósito ficam em `Rastreio.da_plataforma`). No navegador: as duas cópias de prova atrás da
   `porta_local.py` (o Nexus com `--prefixo /nexus --plataforma ""` e a plataforma na raiz, as duas com a mesma

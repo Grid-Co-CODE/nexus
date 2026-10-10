@@ -137,3 +137,111 @@ def test_o_diagnostico_em_outra_origem_nao_le_a_lista_nem_abre_sessao():
     assert [(x["metodo"], x["url"]) for x in feito["pedidos"][:2]] == [
         ("GET", "https://app.exemplo.test/api/macro"), ("POST", "https://app.exemplo.test/painel/nexus/entrar")]
 
+
+
+# ── a sessão da plataforma vencida ou vencendo (auditoria A5 da porta única, 10/10/2026) ──────────────────────────────
+# O protocolo combinado com a plataforma: a página dela em modo Nexus, ao receber 401 numa chamada de dado, manda
+# {tipo: "nexus:sessao-vencida", caminho} à moldura; a moldura pede um passe novo ao Nexus e reabre a mesma tela, no
+# máximo 1 vez a cada 60 s. E renova sozinha a cada 11 h (a sessão do passe vale 12 h). O caso: o Painel NOC desenhava
+# "Energia perdida 0,0 MWh" depois das 12 h.
+RENOVAR = "/nexus/t/performance/noc/passe"
+URL_RENOVAR = "https://app.exemplo.test" + RENOVAR
+ENTRAR_PLATAFORMA = "https://app.exemplo.test/painel/nexus/entrar"
+PASSE_NOVO = {URL_RENOVAR: {"status": 200, "json": {"ok": True, "passe": "passe-novo", "destino": "/painel"}}}
+VENCIDA = {"tipo": "nexus:sessao-vencida", "caminho": "/painel?x=1"}
+
+
+def _renova(passos, respostas=None, **extra):
+    return pagina(dados=_dados("", renovar=RENOVAR, **extra), moldura=True, respostas=respostas or PASSE_NOVO,
+                  passos=passos)
+
+
+def _corpos_para(feito, url):
+    return [c for p, c in zip(feito["pedidos"], feito["corpos"]) if p["url"] == url]
+
+
+def test_as_regras_puras_da_reabertura():
+    assert rodar("[P.podeReabrir(0, 5), P.podeReabrir(1000, 60999), P.podeReabrir(1000, 61000)]") == [True, False, True]
+    assert rodar("P.caminhoParaReabrir(V.telas, '/cos', '/painel')", telas=TELAS) == "/cos"
+    # fora do mapa (o login da plataforma) ou o que não é caminho local: o último caminho que a moldura avisou
+    for ruim in ["/login", "//evil.example/painel", "https://evil.example/painel", None, 5]:
+        assert rodar("P.caminhoParaReabrir(V.telas, V.r, '/painel')", telas=TELAS, r=ruim) == "/painel", ruim
+    assert rodar("P.RENOVA_A_CADA_MS") == 11 * 3600 * 1000
+
+
+def test_a_sessao_vencida_pede_passe_novo_e_reabre_a_mesma_tela():
+    feito = _renova([{"mensagem": VENCIDA}])
+    assert _corpos_para(feito, URL_RENOVAR) == ["p=%2Fpainel%3Fx%3D1"]          # o caminho que a plataforma mandou
+    # a moldura abriu na carga (o passe da página) e reabriu com o passe novo
+    assert feito["envios"] == 2 and feito["passes"] == ["passe-da-pagina", "passe-novo"]
+    assert feito["alerta"] is None
+
+
+def test_no_maximo_uma_reabertura_a_cada_60_s():
+    feito = _renova([{"mensagem": VENCIDA}, {"avancar": 30 * 1000}, {"mensagem": VENCIDA}])
+    assert len(_corpos_para(feito, URL_RENOVAR)) == 1 and feito["envios"] == 2
+    assert "venceu de novo" in feito["alerta"]
+    # passados os 60 s, reabre de novo
+    feito = _renova([{"mensagem": VENCIDA}, {"avancar": 61 * 1000}, {"mensagem": VENCIDA}])
+    assert len(_corpos_para(feito, URL_RENOVAR)) == 2 and feito["envios"] == 3
+
+
+@pytest.mark.parametrize("passo", [{"mensagem": VENCIDA, "origem": "https://outra.exemplo.test"},
+                                   {"mensagem": VENCIDA, "de": "outra"},
+                                   {"mensagem": {"tipo": "nexus:outra-coisa", "caminho": "/painel"}}])
+def test_aviso_de_outra_origem_ou_de_outra_janela_e_ignorado(passo):
+    """A mesma conferência do "nexus:rota": só a moldura, só a origem da plataforma."""
+    feito = _renova([passo])
+    assert _corpos_para(feito, URL_RENOVAR) == [] and feito["envios"] == 1
+
+
+def test_caminho_fora_do_mapa_reabre_o_ultimo_que_a_moldura_avisou():
+    feito = _renova([{"mensagem": {"tipo": "nexus:rota", "caminho": "/cos"}},
+                     {"mensagem": {"tipo": "nexus:sessao-vencida", "caminho": "/login?next=/cos"}}])
+    assert _corpos_para(feito, URL_RENOVAR) == ["p=%2Fcos"]
+
+
+def test_com_a_sessao_do_nexus_encerrada_a_janela_vai_ao_login():
+    respostas = {URL_RENOVAR: {"status": 401, "json": {"ok": False, "sessao_encerrada": True,
+                                                       "entrar": "/nexus/entrar?motivo=venceu"}}}
+    feito = _renova([{"mensagem": VENCIDA}], respostas)
+    assert feito["entrarDeNovo"] == "/nexus/entrar?motivo=venceu" and feito["envios"] == 1
+    # sem sessão nenhuma o portão responde com o salto ao Entrar (o fetch vê opaqueredirect)
+    feito = _renova([{"mensagem": VENCIDA}], {URL_RENOVAR: {"status": 0, "tipo": "opaqueredirect"}})
+    assert feito["entrarDeNovo"] == "" and feito["envios"] == 1
+
+
+def test_o_nexus_sem_passe_avisa_e_nao_mexe_na_moldura():
+    feito = _renova([{"mensagem": VENCIDA}], {URL_RENOVAR: {"status": 500}})
+    assert feito["envios"] == 1 and "não conseguiu renov" in feito["alerta"]
+
+
+def test_a_renovacao_sozinha_a_cada_11_h_sem_recarregar_a_tela():
+    """A aba aberta (a TV do NOC): antes das 12 h, um passe novo abre outra sessão na plataforma, por fetch (o 303 não é
+    seguido), sem recarregar a moldura (nada do que a pessoa tinha na tela se perde)."""
+    respostas = {**PASSE_NOVO, ENTRAR_PLATAFORMA: {"status": 0, "tipo": "opaqueredirect"}}
+    antes = _renova([{"avancar": 10 * 3600 * 1000}, {"intervalo": True}, {"visivel": True}], respostas)
+    assert antes["intervalos"] >= 1 and _corpos_para(antes, URL_RENOVAR) == []          # 10 h: ainda não
+    feito = _renova([{"avancar": 11 * 3600 * 1000}, {"intervalo": True}, {"intervalo": True}], respostas)
+    assert _corpos_para(feito, URL_RENOVAR) == ["p=%2Fpainel"]                          # uma vez só
+    assert _corpos_para(feito, ENTRAR_PLATAFORMA) == ["passe=passe-novo"]
+    assert feito["envios"] == 1                                                          # a moldura não recarregou
+    # e de novo 11 h depois
+    feito = _renova([{"avancar": 11 * 3600 * 1000}, {"intervalo": True}, {"avancar": 11 * 3600 * 1000},
+                     {"visivel": True}], respostas)
+    assert len(_corpos_para(feito, ENTRAR_PLATAFORMA)) == 2
+
+
+def test_a_renovacao_sozinha_acompanha_o_caminho_da_moldura():
+    respostas = {**PASSE_NOVO, ENTRAR_PLATAFORMA: {"status": 0, "tipo": "opaqueredirect"}}
+    feito = _renova([{"mensagem": {"tipo": "nexus:rota", "caminho": "/gerencial"}}, {"avancar": 11 * 3600 * 1000},
+                     {"intervalo": True}], respostas)
+    assert _corpos_para(feito, URL_RENOVAR) == ["p=%2Fgerencial"]
+
+
+@pytest.mark.parametrize("plataforma", ["http://127.0.0.1:5050", "https://outra.exemplo.test"])
+def test_em_outra_origem_nada_renova(plataforma):
+    feito = pagina(dados=_dados(plataforma, renovar=RENOVAR), moldura=True, respostas=PASSE_NOVO,
+                   passos=[{"mensagem": VENCIDA, "origem": plataforma}, {"avancar": 12 * 3600 * 1000},
+                           {"intervalo": True}])
+    assert feito["pedidos"] == [] and feito["envios"] == 0

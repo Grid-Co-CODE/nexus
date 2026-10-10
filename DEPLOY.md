@@ -368,24 +368,58 @@ Um comando, no servidor (desde 06/10/2026):
 sudo /opt/nexus/deploy/atualizar.sh
 ```
 
-Ele puxa do GitHub (`git pull --ff-only`, como o dono do clone), instala as dependências só quando o `requirements.txt`
-mudou, reinicia o serviço e confere no `/saude` que o commit novo está no ar. Sem commit novo, não reinicia; com
-`--forcar`, reinicia assim mesmo. Qualquer erro (por exemplo, arquivo mexido à mão no servidor) para tudo antes do
-restart, e o Nexus segue no ar com o código de antes. **O restart é obrigatório:** o Nexus não relê as telas com o
-processo rodando. Em 06/10, o servidor ficou com a tela antiga do PCM depois de só um `git pull`.
+Ele busca no GitHub (`git fetch`, como o dono do clone), confere o commit novo **fora da pasta do serviço** (dependências
+e boot), só então anda com a pasta (`git merge --ff-only`), reinicia o serviço e confere no `/saude` que o commit novo
+está no ar. Qualquer erro antes do restart (pip, conferência, arquivo mexido à mão no servidor) para tudo com a pasta do
+serviço no commit que está no ar: o Nexus de antes segue no ar, e um reboot ou um `systemctl restart nexus` sobe o mesmo
+Nexus. **O restart é obrigatório:** o Nexus não relê as telas com o processo rodando. Em 06/10, o servidor ficou com a
+tela antiga do PCM depois de só um `git pull`.
 
-**Na primeira vez** o clone do servidor ainda não tem o script. Puxe uma vez à mão e rode-o:
+**Dependências e boot, antes de todo restart e antes de mexer na pasta (auditoria A6 e revisão adversarial da porta
+única, 10/10/2026).** Até a A6 o pip só rodava quando o `requirements.txt` mudava entre o commit de antes e o de depois
+do pull: se ele falhasse na 1ª rodada (o `reportlab`, novo e importado no boot, sem saída para o pypi), a 2ª via o mesmo
+commit e dizia "nada a fazer", e com `--forcar` pulava o pip e reiniciava, deixando o Nexus fora. A A6 pôs o pip e a
+conferência antes do restart, mas o `git pull` continuava antes dos dois: com um deles falhando, o script parava sem
+reiniciar e a pasta já estava no commit que não sobe. O processo velho seguia lendo do disco novo (templates, o clone do
+OS Creator na 1ª visita a /os/), e qualquer restart fora do script (reboot, queda com `Restart=always`, o DESFAZER do
+5b) subia o código que não monta, com a raiz de app.gridco.com.br em 502. Agora, em toda rodada que vai reiniciar:
+1. `git fetch` e o commit do GitHub extraído numa pasta temporária (`git archive`); a pasta do serviço não muda;
+2. `pip install -q -r <pasta temporária>/requirements.txt` roda **sempre**, no `.venv` do serviço (é idempotente: sem
+   nada novo, só confere, em segundos; ele só acrescenta ou atualiza pacotes, como antes). Falhou, para ali;
+3. `<pasta temporária>/deploy/conferir_boot.py` importa, com o Python do `.venv`, as dependências e o Nexus DO COMMIT
+   NOVO como o `servir.py` o monta (sem ler o `.env`, sem rede, sem gravar). Falhou, para ali;
+4. aprovado: `git merge --ff-only` até o commit conferido (nem um a mais), o restart, e o commit fica marcado como
+   instalado (`.git/nexus-instalado`).
+
+Se o pip ou a conferência falham e a pasta do serviço estava fora do commit que está no ar (um `git pull` à mão, ou o
+script antigo, que puxava antes de conferir), ela **volta** a ele (`git reset --keep`): o que está no ar é a marca e, sem
+ela (a 1ª rodada depois do script antigo, que não a gravava), o commit que o `/saude` do processo rodando diz. O `--keep`
+não apaga arquivo mexido à mão (se houver conflito, recusa e avisa "Não reinicie o serviço até resolver").
+
+"Nada a fazer" é quando o commit do GitHub é o último **instalado** e a pasta está nele: a rodada que parou no pip ou na
+conferência é completada pela seguinte (o timer, 2 min depois), sem ninguém rodar `--forcar`. `--forcar` instala e
+reinicia mesmo sem nada novo. A 1ª rodada com este script (ainda sem a marca) instala e reinicia uma vez. Para conferir
+à mão se o servidor tem tudo, sem reiniciar nada:
+`sudo -u nexus /opt/nexus/.venv/bin/python -B /opt/nexus/deploy/conferir_boot.py` (diz o que falta na pasta do serviço;
+o pip precisa de saída para `pypi.org` e `files.pythonhosted.org`).
+
+**Na primeira vez** o servidor ainda tem o script antigo, que puxa antes de conferir. Não puxe à mão: tire o script novo
+do commit buscado e rode-o de fora, apontando para a pasta do serviço (`NEXUS_RAIZ`), e a primeira rodada já é conferida:
 
 ```
-sudo -u nexus git -C /opt/nexus pull --ff-only && sudo bash /opt/nexus/deploy/atualizar.sh --forcar
+sudo -u nexus git -C /opt/nexus fetch && sudo -u nexus git -C /opt/nexus show origin/main:deploy/atualizar.sh > /tmp/atualizar.sh
+sudo env NEXUS_RAIZ=/opt/nexus bash /tmp/atualizar.sh --forcar
 ```
 
-O git não toca nos `.env` nem na `dados/`. Em 06/10 entrou o `pillow` no `requirements.txt` (miniaturas das fotos da
-ronda; sem ele as fotos aparecem do mesmo jeito, só mais pesadas): o script instala sozinho.
+Se alguém já rodou o antigo e o pip dele falhou (a pasta ficou no commit novo, o processo velho no ar), a rodada
+seguinte do novo põe a pasta de volta no commit do `/saude`.
+
+O git não toca nos `.env` nem na `dados/`. Dependência nova no `requirements.txt` (o `pillow` em 06/10, o `reportlab` em
+09/10) o script instala sozinho.
 
 **Deploy por push (09/10/2026, Levi: "não dá para subir com o commit?").** O timer `deploy/nexus-atualizar.timer` roda o
 mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min, sem ninguém rodar nada; sem commit
-novo, não reinicia. Instala uma vez (o 1º comando já sobe o que estiver no GitHub):
+novo (e com o último já instalado), não reinicia. Instala uma vez (o 1º comando já sobe o que estiver no GitHub):
 
 ```
 sudo /opt/nexus/deploy/atualizar.sh && sudo cp /opt/nexus/deploy/nexus-atualizar.service /opt/nexus/deploy/nexus-atualizar.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now nexus-atualizar.timer
@@ -393,8 +427,10 @@ sudo /opt/nexus/deploy/atualizar.sh && sudo cp /opt/nexus/deploy/nexus-atualizar
 
 Conferir: `systemctl list-timers nexus-atualizar.timer` (a próxima rodada) e `journalctl -u nexus-atualizar -n 30` (o
 que cada rodada fez). Desligar: `sudo systemctl disable --now nexus-atualizar.timer`. Não há suíte de testes no
-servidor: ela roda antes de cada push, na máquina de quem empurra. Commit que não sobe (o `/saude` não responde com ele)
-deixa o Nexus fora até o próximo commit consertar, como na plataforma.
+servidor: ela roda antes de cada push, na máquina de quem empurra. Commit que não monta (import quebrado, dependência que
+não instalou) para na conferência do boot, sem restart e sem mexer na pasta do serviço. Commit que monta e mesmo assim não sobe (o `/saude` não responde
+com ele; o `.env`, por exemplo) deixa o Nexus fora até o próximo commit consertar, como na plataforma: ele já ficou
+marcado como instalado, para o timer não reiniciar a cada 2 min (cada boot relê a Aprovação no Fracttal).
 
 **Depois da 1ª subida, a `dados/` do servidor é a original**: o que se edita no Nexus (cadastro, decisões do de-para,
 observações e gerações do PCM) mora lá. Se o Levi mandar um pacote novo, descompacte **só os `.env`**, a menos que ele

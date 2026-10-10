@@ -3,14 +3,16 @@
 {% block conteudo %}
 <p class="gc-eyebrow">{{ cadeira.nome if cadeira else "Sem cadeira escolhida" }}</p>
 <h1 class="titulo-pagina">Início</h1>
+{# Honesto (auditoria A3 da porta única, 10/10/2026): o Início dizia "fase 0" e "Com dado real: 0" com 40 telas prontas
+   no ar. O número é o das telas prontas, pela mesma conta do verde do menu (casca.inicio). #}
 <p class="lead">O Nexus reúne Performance, PCM, App de Campo, Fracttal e COS numa casca só, organizada
-  pelas torres da Estrutura O&amp;M. Esta é a fase 0: as telas existem e dizem o que vão responder;
-  os dados entram torre a torre.</p>
+  pelas torres da Estrutura O&amp;M. Cada torre abre na primeira tela pronta; as que ainda estão em construção
+  aparecem no menu sem o verde e dizem o que vão responder.</p>
 
 <div class="gc-numeros gc-numeros--ui">
   <div><div class="r">Torres</div><div class="v gc-num">{{ torres|length }}</div><div class="d">organizadas pelo book R02</div></div>
   <div><div class="r">Telas previstas</div><div class="v gc-num">{{ total_telas }}</div><div class="d">das specs R00 a R13</div></div>
-  <div><div class="r">Com dado real</div><div class="v gc-num">0</div><div class="d">fonte: API db_performace</div></div>
+  <div><div class="r">Telas prontas</div><div class="v gc-num">{{ total_prontas }}</div><div class="d">as verdes do menu</div></div>
 </div>
 
 {% if not cadeira %}
@@ -20,12 +22,21 @@
 
 <h2 class="ui-kicker">Torres</h2>
 <div class="grade-torres">
-  {% for t in torres %}
-  <a class="card-torre" href="{{ raiz }}/t/{{ t.id }}/{{ t.telas[0].id }}">
+  {% for c in cartoes %}{% set t = c.torre %}
+  {% if c.url %}
+  <a class="card-torre" data-torre="{{ t.id }}" href="{{ c.url|na_raiz }}">
     <div class="cab"><i class="ph ph-{{ t.icone }}"></i><span class="nome">{{ t.nome }}</span>
-      <span class="qtd gc-num">{{ t.telas|length }} telas</span></div>
+      <span class="qtd gc-num">{{ c.prontas }} de {{ t.telas|length }} prontas</span></div>
     <p>{{ t.descricao }}</p>
   </a>
+  {% else %}
+  {# nenhuma tela pronta: o cartão não é link (levava a uma tela "Em construção") e diz por quê #}
+  <div class="card-torre card-torre--construcao" data-torre="{{ t.id }}">
+    <div class="cab"><i class="ph ph-{{ t.icone }}"></i><span class="nome">{{ t.nome }}</span>
+      <span class="gc-status gc-status--neutro">Em construção</span></div>
+    <p>{{ t.descricao }}</p>
+  </div>
+  {% endif %}
   {% endfor %}
 </div>
 {% endblock %}

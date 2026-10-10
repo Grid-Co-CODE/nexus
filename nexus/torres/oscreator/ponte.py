@@ -455,8 +455,11 @@ def abrir(torre, tela_id: str):
 # que estar no NEXUS > CHAMADOS > FABRICANTE"; "o mesmo com Acompanhamento de chamados, tem que estar em GARANTIAS";
 # "não que vão sair da visão do OS Creator Web, porém, quando for abrir essa janela o atalho deve ficar para a parte de
 # CHAMADOS". A tela continua no OS Creator (mesmo endereço, mesma casca); o item do menu do Nexus é que mora na torre.
+# Tickets de performance (auditoria B8 da porta única, 10/10/2026): o item aparecia "Em construção" com a tela pronta no
+# próprio Nexus, em /os/tickets (a dos tickets do OS Creator Web).
 ATALHOS = {
-    "chamados": {"fabricantes": "/os/chamados/fornecedores", "garantias": "/os/chamados/acompanhamento"},
+    "chamados": {"fabricantes": "/os/chamados/fornecedores", "tickets": "/os/tickets",
+                 "garantias": "/os/chamados/acompanhamento"},
 }
 
 
