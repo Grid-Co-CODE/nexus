@@ -185,8 +185,15 @@ reescrita das respostas do Nexus, que existia para o `/nexus`, sai junto); (3) n
 `NEXUS_PORTA_PRINCIPAL=https://app.gridco.com.br/` (endereço completo: `/` sozinho levaria o `/` ao próprio `/`, em laço,
 para quem chegasse direto à porta da plataforma). Todo mundo entra de novo uma vez no Nexus (o cookie passa a `Path=/`).
 
+**O que não pode cair: o `/db_performace`** (o App de Campo, o coletor e a carga do Nexus gravam nele). O bloco dele
+fica como está e tem de continuar sendo avaliado antes do `handle` sem filtro: se hoje ele usa `handle_path` ou outra
+forma, mantenha a estrutura que já funciona e confira pelo `curl` abaixo (Levi, 10/10/2026: "o que está pode cair",
+menos o banco). Conferido em 10/10/2026: as 122 rotas do Nexus caem todas no `@nexus`, e a plataforma perde só o `/`
+e o `/os/`. A `NEXUS_PORTA_PRINCIPAL` entra **depois** do Caddy: antes dele, o `/` da plataforma levaria a ela mesma.
+
 **Conferir:**
 ```
+curl -s  https://app.gridco.com.br/db_performace/health                   # {"status":"ok",...}  (PRIMEIRO)
 curl -sI https://app.gridco.com.br/ | grep -i '^location'                # /entrar?next=/  (o Nexus)
 curl -s  https://app.gridco.com.br/saude                                  # {"ok": true, "commit": ...}
 curl -sI https://app.gridco.com.br/nexus/t/cos/mesa | grep -i '^location' # /t/cos/mesa (308)
