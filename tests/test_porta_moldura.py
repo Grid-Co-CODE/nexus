@@ -371,3 +371,28 @@ def test_o_sair_nao_manda_post_a_outra_origem():
     feito = _rodar_sair(_script_do_sair(_cliente().get("/sair").get_data(as_text=True)), "/painel/nexus/sair")
     assert feito["pedidos"] == [{"url": "https://app.exemplo.test/painel/nexus/sair", "metodo": "POST"}]
 
+
+# ── o roteiro do DEPLOY 7e, ida e volta (revisão de 10/10/2026) ──────────────────────────────────────────────────────
+def _tempo_real_no_servidor(**cfg) -> str:
+    app = _app(**cfg)
+    cli = Client(app)
+    assert cli.post("/entrar", data={"senha": SENHA_TESTE}, base_url="https://app.exemplo.test").status_code == 302
+    h = cli.get("/t/performance/tempo-real", base_url="https://app.exemplo.test").get_data(as_text=True)
+    if 'src="/t/performance/plataforma/tempo-real"' in h:
+        return "ponte"
+    form = _form(h)
+    return ("moldura " + form["action"]) if form else "não ligada"
+
+
+def test_o_roteiro_do_deploy_7e_ida_e_volta_mantem_o_tempo_real():
+    """O 7e mandava esvaziar a NEXUS_PLATAFORMA_URL ao pôr a chave, e dizia que tirar a chave "volta tudo ao de antes".
+    Mas a ponte de 04/10 precisa da URL: depois dos passos 2 e 5, o Tempo real dizia "não ligada" em vez da ponte de
+    hoje. A URL do servidor (o próprio endereço) serve à moldura: o roteiro agora a mantém."""
+    hoje = {"NEXUS_SSO_CHAVE": None, "NEXUS_PLATAFORMA_URL": "https://app.exemplo.test", "NEXUS_PLATAFORMA_TOKEN": "t"}
+    assert _tempo_real_no_servidor(**hoje) == "ponte"
+    com_chave = {**hoje, "NEXUS_SSO_CHAVE": CHAVE}                                      # passo 2 (a URL fica)
+    assert _tempo_real_no_servidor(**com_chave) == "moldura https://app.exemplo.test/painel/nexus/entrar"
+    assert _tempo_real_no_servidor(**hoje) == "ponte"                                   # passo 5: a volta
+    # o roteiro antigo (URL vazia), para registro: na volta, sem a URL, a ponte não abre
+    assert _tempo_real_no_servidor(**{**hoje, "NEXUS_PLATAFORMA_URL": None}) == "não ligada"
+

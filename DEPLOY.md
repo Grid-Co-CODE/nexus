@@ -215,7 +215,7 @@ Fracttal em dobro.
 
 ## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
 
-*Desde 09/10/2026 esta é só a RESERVA do Tempo real: com a porta única ligada (seção 7e) o Tempo real abre a tela da plataforma numa moldura, e a `NEXUS_PLATAFORMA_URL` fica vazia no servidor (sem ela, esta ponte não abre).*
+*Desde 09/10/2026 esta é só a RESERVA do Tempo real: com a porta única ligada (seção 7e) o Tempo real abre a tela da plataforma numa moldura. A `NEXUS_PLATAFORMA_URL` fica como está no servidor (`https://app.gridco.com.br`): é ela que faz esta ponte voltar se a chave sair, e a moldura usa o mesmo endereço.*
 
 A aba Performance → Tempo real do Nexus mostra a plataforma de Performance por uma chave só de leitura. O Nexus já leva a
 chave; a plataforma precisa da mesma. No pacote vem à parte o arquivo `plataforma-tokens-nexus.txt`, com UMA linha
@@ -241,9 +241,11 @@ neste servidor" (o Tempo real segue pela leitura de 04/10, seção 7b, se ela es
    ```
    python3 -c "import secrets; print(secrets.token_urlsafe(48))"
    ```
-2. No `.env` do **Nexus**: `NEXUS_SSO_CHAVE=<a chave>` e `NEXUS_PLATAFORMA_URL=` **vazia** (vazia = a própria origem,
-   `app.gridco.com.br`; a moldura só abre na mesma origem). A ponte de 04/10 (seção 7b) deixa de ter endereço e sai: com
-   a chave, o Tempo real já é a moldura. Reinicie: `sudo systemctl restart nexus`.
+2. No `.env` do **Nexus**: `NEXUS_SSO_CHAVE=<a chave>`. **Não mexa na `NEXUS_PLATAFORMA_URL`**: ela fica
+   `https://app.gridco.com.br`, a mesma origem do Nexus, que é onde a moldura abre (vazia também serviria à moldura,
+   mas aí a ponte de 04/10, seção 7b, perde o endereço e a volta do passo 5 deixa o Nexus sem Tempo real). Nunca um
+   endereço interno (`http://127.0.0.1:...`): com ele o Nexus desliga a porta e diz por quê. Com a chave, o Tempo real
+   já é a moldura e a ponte sai do menu. Reinicie: `sudo systemctl restart nexus`.
 3. No `.env` (ou `tokens.txt`) da **plataforma**: a MESMA `NEXUS_SSO_CHAVE=<a chave>` e `PLATAFORMA_ANALISTAS=*` (decisão
    do Levi, 09/10: todo login do Nexus entra como analista; restringir depois é trocar o `*` por e-mails). Reinicie a
    plataforma.
@@ -255,7 +257,8 @@ neste servidor" (o Tempo real segue pela leitura de 04/10, seção 7b, se ela es
    - o Nexus e a plataforma abertos juntos no mesmo navegador sem um derrubar o login do outro (`nexus_sessao` em
      `/nexus`, `session` da plataforma em `/`);
    - **Sair** do Nexus volta ao Entrar e encerra também a sessão aberta na plataforma.
-5. Se algo der errado: tirar a `NEXUS_SSO_CHAVE` dos dois e reiniciar volta tudo ao de antes.
+5. Se algo der errado: tirar a `NEXUS_SSO_CHAVE` dos dois e reiniciar volta tudo ao de antes (o Tempo real volta pela
+   ponte de 04/10, porque a `NEXUS_PLATAFORMA_URL` ficou como estava; revisão de 10/10/2026).
 
 Trocar a chave derruba as sessões abertas pelo passe (todos abrem de novo pelo menu), não a senha da plataforma.
 

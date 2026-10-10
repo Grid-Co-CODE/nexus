@@ -28,7 +28,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_PESSOA_HMAC",
              # aba Tempo real (04/10/2026): onde está a plataforma de Performance e a chave só de leitura dela (a ponte).
              # Desde a porta única (09/10/2026) a NEXUS_PLATAFORMA_URL é também a base que o NAVEGADOR usa para abrir as
-             # telas da plataforma na moldura: vazia = a própria origem do Nexus (o servidor, app.gridco.com.br)
+             # telas da plataforma na moldura: no servidor, o próprio endereço (app.gridco.com.br), que também traz a ponte
+             # de volta se a chave sair (revisão de 10/10/2026); vazia = a própria origem do Nexus
              "NEXUS_PLATAFORMA_URL", "NEXUS_PLATAFORMA_TOKEN",
              # porta única (09/10/2026, Levi: "a partir de segunda quero o Nexus como link principal"): a chave do passe que
              # abre as telas da Performance dentro do Nexus (a MESMA no .env da plataforma; 32 caracteres ou mais). Sem

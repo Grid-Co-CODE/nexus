@@ -64,11 +64,15 @@ navegador fala com cada sistema.
   ainda não ligada neste servidor" e o que falta (nunca o valor), e o resto do Nexus segue. A plataforma, sem a chave,
   responde 404 em `/painel/nexus/*`: as duas pontas ficam inertes até a T.I. pôr a MESMA chave nas duas (`DEPLOY.md`,
   seção 7e).
-- **Onde está a plataforma para o navegador** (`base_da_plataforma`): `NEXUS_PLATAFORMA_URL` vazia = a própria origem do
-  Nexus (o servidor). A moldura **só abre na mesma origem**: a plataforma manda `frame-ancestors 'self'` e o aviso de rota
-  vai só à origem dela. No PC as duas cópias ficam atrás da `ferramentas/porta_local.py`, com a URL vazia
-  (`subir_copia_de_prova.py --plataforma ""`); com outra origem, a página mostra o aviso e a moldura fica em branco. http
-  só na máquina local (o passe leva o e-mail).
+- **Onde está a plataforma para o navegador** (`base_da_plataforma`): a `NEXUS_PLATAFORMA_URL`, a mesma da ponte. No
+  servidor ela FICA `https://app.gridco.com.br` (a mesma origem do Nexus): vazia também serviria à moldura, mas a ponte
+  perderia o endereço e tirar a chave deixaria o Nexus sem Tempo real (revisão de 10/10/2026, DEPLOY 7e). A moldura
+  **só abre na mesma origem**: a plataforma manda `frame-ancestors 'self'` e o aviso de rota vai só à origem dela. No PC
+  as duas cópias ficam atrás da `ferramentas/porta_local.py`, com a URL vazia (`subir_copia_de_prova.py --plataforma
+  ""`). Em outra origem NADA sai do navegador (o `porta.js` não envia o passe nem lê a lista do Diagnóstico, e o Sair
+  não faz o POST): só o aviso. E a base em loopback (`http://127.0.0.1:...`, o endereço interno) com o Nexus aberto por
+  fora desliga a porta no servidor (`porta.motivo_da_origem`): sem isso o navegador de quem visita mandaria o passe, com o
+  e-mail, à própria máquina. http só na máquina local.
 - **O Sair** (`nexus/auth`): com a chave, `/sair` encerra a sessão do Nexus e mostra uma página que faz POST em
   `/painel/nexus/sair` (a plataforma encerra a sessão do passe; a da senha fica) e segue ao Entrar em até 4 s, responda a
   plataforma ou não; sem JavaScript, um botão. Sem a chave, o `/sair` de sempre (302).
