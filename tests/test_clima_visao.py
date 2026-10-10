@@ -7,7 +7,7 @@ from nexus.performance.clima import explica as EX
 from nexus.performance.clima import geometria
 from nexus.performance.clima import leitura as L
 from nexus.performance.clima import visao as V
-from nexus.performance.clima.fontes import Aviso, Foco
+from nexus.performance.clima.fontes import Aviso, Foco, FocoNasa
 from nexus.performance.clima.geotiff import Amostra
 from nexus.performance.clima.usinas import Cadastro, Usina
 
@@ -45,6 +45,13 @@ def foco_a(km, lat=-5.0, lon=-45.0, sat="GOES-19"):
     return Foco(lat + km / 111.195, lon, sat, datetime(2026, 10, 6, 17, 50, tzinfo=UTC))
 
 
+def lei_firms(*focos, ate=None, falhos=None):
+    """O FIRMS lido (10/10/2026); sem foco, um longe de tudo e recente: a NASA leu e não viu fogo perto."""
+    focos = list(focos) or [FocoNasa(-9.0, -40.0, "NOAA-20", datetime(2026, 10, 6, 16, 30, tzinfo=UTC), "VIIRS", "nominal", 3.1, True)]
+    return L.Leitura({"focos": focos, "arquivos": {"NOAA-20": {"etag": "e", "modificado": None, "focos": focos}},
+                      "falhos": falhos or {}, "ate": ate or max(f.data for f in focos), "linhas_ruins": 0}, LIDO)
+
+
 def lei_risco(por_ponto, arquivos=None, erros=None):
     arquivos = {0: datetime(2026, 10, 6, 9, 32, tzinfo=UTC)} if arquivos is None else arquivos
     return L.Leitura({"por_ponto": por_ponto, "arquivos": arquivos, "erros": erros or {}}, LIDO)
@@ -58,8 +65,10 @@ def dias(*valores, origem="ponto"):
 def leituras(monkeypatch):
     pedidos = {"risco": []}
 
-    def instalar(avisos=None, focos=None, risco=None):
+    def instalar(avisos=None, focos=None, risco=None, firms=None):
         vazio = L.Leitura(None, None, erro="sem fonte nos testes")
+        nasa = firms or lei_firms()            # a NASA (10/10/2026) vem lida e sem fogo perto quando o teste não diz nada
+        monkeypatch.setattr(L, "firms", lambda config, sessao=None: nasa)
         monkeypatch.setattr(L, "avisos", lambda config, sessao=None: avisos or vazio)
         monkeypatch.setattr(L, "focos", lambda config, sessao=None: focos or vazio)
 
@@ -163,7 +172,7 @@ def test_sem_alerta_so_conta_com_as_tres_fontes_lidas(leituras):
     tudo_lido(leituras)
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     f = faixa(v)["sem"]
-    assert (v["sem_alerta"], f["valor"], f["sub"], f["qual"]) == (1, "1", "nas três fontes lidas", [])
+    assert (v["sem_alerta"], f["valor"], f["sub"], f["qual"]) == (1, "1", "nas quatro fontes lidas", [])
     leituras(focos=lei_focos(), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}))                  # o INMET está fora
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     f = faixa(v)["sem"]
@@ -260,7 +269,8 @@ def test_faixa_conta_os_niveis_e_a_cobertura_e_a_soma_fecha(leituras):
     assert int(f["agir"]["valor"]) + int(f["atencao"]["valor"]) + int(f["sem"]["valor"]) == v["n_usinas"] == 4
     assert f["cobertura"]["sub"] == "em operação com coordenada · 1 sem coordenada"
     assert f["agir"]["sub"] == "fogo a até 5 km ou aviso forte (tempestade, chuva forte, vento, granizo) do Instituto Nacional de Meteorologia (INMET)"
-    assert f["atencao"]["sub"] == "outro aviso do Instituto Nacional de Meteorologia (INMET) ou risco de fogo alto nos próximos 4 dias: acompanhar"
+    assert f["atencao"]["sub"] == ("outro aviso do Instituto Nacional de Meteorologia (INMET), risco de fogo alto nos próximos 4 dias ou "
+                                   "fogo a até 5 km nas últimas 24 h: acompanhar")
     # "O que fazer" (09/10/2026) em cada nível que tem usina; a cobertura não tem
     assert f["agir"]["fazer"].startswith("Avisar o supervisor") and f["atencao"]["fazer"].startswith("Acompanhar")
     assert f["sem"]["fazer"] == "Nada." and f["cobertura"]["fazer"] == ""
@@ -294,7 +304,7 @@ def test_fonte_sem_leitura_mostra_traco_e_as_outras_seguem(leituras):
     assert f["atencao"]["valor"] == "1"                                         # o risco foi lido, e o número vale
     assert f["atencao"]["qual"] == ["sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)"]
     assert f["sem"]["valor"] == "—"
-    assert [x["estado"] for x in v["fontes"]] == ["fora", "fora", "ok"]
+    assert [x["estado"] for x in v["fontes"]] == ["fora", "fora", "ok", "ok"]
     assert nomes(v) == ["U"]
 
 
@@ -307,10 +317,16 @@ def test_o_agir_so_vira_traco_quando_nem_os_avisos_nem_os_focos_foram_lidos(leit
     assert f["agir"]["valor"] == "0" and f["agir"]["qual"] == ["sem leitura de focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE)"] and "cl-na" in f["agir"]["classe"]
 
 
-def test_o_atencao_so_vira_traco_quando_nem_os_avisos_nem_o_risco_foram_lidos(leituras):
-    leituras(focos=lei_focos())
+def test_o_atencao_so_vira_traco_quando_nem_os_avisos_nem_o_risco_nem_a_nasa_foram_lidos(leituras):
+    leituras(focos=lei_focos(), firms=L.Leitura(None, None, erro="HTTP 503"))
     f = faixa(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))
     assert f["atencao"]["valor"] == "—" and f["agir"]["valor"] == "0"
+    # com a NASA lida o número vale (fogo das últimas 24 h é atenção), em âmbar e dizendo o que não foi lido (10/10/2026)
+    leituras(focos=lei_focos())
+    f = faixa(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))
+    assert f["atencao"]["valor"] == "0" and "cl-na" in f["atencao"]["classe"]
+    assert f["atencao"]["qual"] == ["sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)",
+                                    "sem leitura de risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)"]
 
 
 def test_zero_e_zero_quando_as_fontes_leram_e_nao_ha_alerta(leituras):
@@ -467,7 +483,9 @@ def test_cartao_do_foco_tem_motivo_frase_principal_e_prova(leituras):
     c = v["agir"][0]
     # 09/10/2026 ("deixe mais didático"): a frase fala "fogo", e o motivo leva o que pode acontecer e o que conferir (explica.py)
     assert c["motivos"] == [{"tipo": "foco", "pill": "Fogo a 0,2 km", "principal": "Fogo a 0,2 km da usina",
-                             "prova": "1 foco de queimada a até 5 km na última hora · visto pelo satélite GOES-19 às 14:50",
+                             "prova": ("1 foco de queimada a até 5 km na última hora · visto pelo satélite GOES-19 às 14:50"
+                                       + " · ainda sem confirmação dos satélites da NASA (eles passam perto das 13h30 e da 01h30)" + " · a menos de 400 m do ponto da usina: pode ser a própria "
+                                       "usina (reflexo do sol nos módulos ou telhado quente); confira antes de acionar"),
                              **EX.FOCO}]
     assert (c["id"], c["nome"], c["cliente"], c["uf"], c["onde"]) == ("1", "U", "Cliente", "PI", "Cliente · PI")
 
@@ -476,7 +494,8 @@ def test_cartao_do_foco_no_plural_e_com_o_mais_perto(leituras):
     tudo_lido(leituras, focos=[foco_a(3.8, sat="NOAA-21"), foco_a(0.5, sat="GOES-19")])
     c = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)["agir"][0]
     assert c["motivos"][0]["pill"] == "Fogo a 0,5 km" and c["motivos"][0]["principal"] == "Fogo a 0,5 km da usina"
-    assert c["motivos"][0]["prova"] == "2 focos de queimada a até 5 km na última hora · visto pelo satélite GOES-19 às 14:50"
+    assert c["motivos"][0]["prova"] == ("2 focos de queimada a até 5 km na última hora · visto pelo satélite GOES-19 às 14:50"
+                                        " · ainda sem confirmação dos satélites da NASA (eles passam perto das 13h30 e da 01h30)")
 
 
 def test_cartao_do_aviso_tem_motivo_com_o_nivel_frase_principal_e_prova(leituras):
@@ -815,7 +834,7 @@ def test_dia_do_risco_sem_leitura_deixa_o_atencao_parcial_e_o_dia_aparece_na_fon
 def test_fonte_inteira_nao_ganha_qualificador(leituras):
     leituras(avisos=lei_avisos(aviso(2)), focos=lei_focos(foco_a(1.0)), risco=lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1)}))
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
-    assert [f["qualifica"] for f in v["fontes"]] == [[], [], []] and [f["estado"] for f in v["fontes"]] == ["ok"] * 3
+    assert [f["qualifica"] for f in v["fontes"]] == [[], [], [], []] and [f["estado"] for f in v["fontes"]] == ["ok"] * 4
     assert all(faixa(v)[i]["qual"] == [] for i in ("agir", "atencao", "sem")) and v["completa"] is True
 
 

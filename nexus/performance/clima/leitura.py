@@ -18,6 +18,8 @@
   hora, e quem lê é uma thread), e só quando alguém liga a camada. Ao vencer, relê só o cabeçalho e, se o arquivo é o mesmo
   (Last-Modified), não baixa tile nenhuma.
 - Cada leitura diz quando vence (`vence_em`): o Mapa de risco e o modo TV marcam a próxima atualização por ela, nunca antes.
+- O fogo das últimas 24 h da NASA (FIRMS, 10/10/2026): 30 min. Os arquivos mudam a cada passagem de satélite (umas 4 vezes por dia
+  cada um), e a releitura manda o ETag da leitura anterior: o que não mudou volta 304, sem download e sem reler o CSV.
 
 Nada aqui grava em disco nem no banco: a fase 1 é só leitura, e histórico seria fato novo da governança de dados.
 """
@@ -38,6 +40,7 @@ TTL_FOCOS_S = 10 * 60
 TTL_RISCO_S = 6 * 3600
 TTL_RISCO_DESATUALIZADO_S = 15 * 60     # enquanto o arquivo T0 do INPE não é comprovadamente o de hoje
 TTL_POWER_S = 12 * 3600                 # NASA POWER, por usina
+TTL_FIRMS_S = 30 * 60                   # NASA FIRMS (o dado só muda depois de uma passagem de satélite)
 JANELA_POWER_DIAS = 40                  # os 40 dias que terminam hoje: cobrem os 30 do gráfico e o mês inteiro, e dão folga de um dia
                                         # para o cache de até 12 h cuja janela já mudou
 FALHA_TTL_S = 60
@@ -202,12 +205,13 @@ _RISCO = Cache(TTL_RISCO_S, nome="INPE (risco de fogo)", validade=_ttl_do_risco)
 # o mapa de calor do risco de fogo, um cache por dia de previsão (0 a 3): cada dia é um arquivo do INPE, lido só se alguém o escolhe
 _GRADES = {d: Cache(TTL_RISCO_S, nome=f"INPE (mapa de calor do risco de fogo, dia {d})", validade=_ttl_da_grade)
            for d in fontes.DIAS_DE_RISCO}
+_FIRMS = Cache(TTL_FIRMS_S, nome="NASA FIRMS (fogo das últimas 24 h)")
 _POWER: dict = {}                       # um Cache por usina; o id vem do cadastro (quem chama confere que a usina existe)
 _POWER_TRAVA = threading.Lock()
 
 
 def limpar_cache() -> None:
-    for c in (_AVISOS, _FOCOS, _RISCO, *_GRADES.values()):
+    for c in (_AVISOS, _FOCOS, _RISCO, _FIRMS, *_GRADES.values()):
         c.limpar()
     with _POWER_TRAVA:
         _POWER.clear()
@@ -237,6 +241,12 @@ def avisos(config, sessao=None) -> Leitura:
 
 def focos(config, sessao=None) -> Leitura:
     return _ler(_FOCOS, config, sessao, lambda s: fontes.inpe_focos(s, fontes.enderecos(config)["focos"]))
+
+
+def firms(config, sessao=None) -> Leitura:
+    """O fogo das últimas 24 h dos satélites da NASA (ver `fontes.nasa_firms`): a releitura leva o ETag da leitura boa anterior."""
+    anterior = _FIRMS.ultima_boa()
+    return _ler(_FIRMS, config, sessao, lambda s: fontes.nasa_firms(s, fontes.enderecos(config)["firms"], anterior=anterior))
 
 
 def risco(config, pontos, sessao=None) -> Leitura:

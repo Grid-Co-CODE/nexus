@@ -135,7 +135,7 @@ def test_sem_camada_de_fundo_nada_de_area_e_o_resto_continua(leituras):
     chamadas = tudo_instalado(leituras)
     m = montar(fundo="nenhum")
     assert m["fundos_no_svg"] == [] and m["calor_risco"] is None and m["calor_densidade"] is None and m["divisas"] == ""
-    assert len(m["usinas"]) == 6 and sorted(c for c in chamadas if not c.startswith("grade")) == ["avisos", "focos", "risco"]
+    assert len(m["usinas"]) == 6 and sorted(c for c in chamadas if not c.startswith("grade")) == ["avisos", "firms", "focos", "risco"]
 
 
 def test_fundo_desconhecido_cai_nos_avisos(leituras):

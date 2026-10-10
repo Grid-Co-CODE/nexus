@@ -58,6 +58,8 @@
         {% endif %}
         <p class="cl-rotulo-bloco">Foco de queimada</p>
         <p class="cl-linha">{{ a.foco }}</p>
+        <p class="cl-rotulo-bloco">Fogo nas últimas 24 h, satélites da NASA</p>
+        <p class="cl-linha">{{ a.fogo24 }}</p>
       </div>
       <div class="cl-bloco">
         <p class="cl-rotulo-bloco">Risco de fogo do {{ fonte_nome.inpe }}, hoje e os três dias seguintes</p>
@@ -141,6 +143,7 @@
     <ul>
       <li>Irradiação: {{ fonte_nome.nasa_power }} (power.larc.nasa.gov), GHI diário (ALLSKY_SFC_SW_DWN), em kWh/m² por dia. A NASA publica com alguns dias de atraso (o fim do gráfico é o que ainda não saiu) e a grade é de cerca de 50 km: vale para o total do mês e para achar uma ETM fora, não para analisar uma hora. Medida contra as ETMs de 40 usinas (maio a setembro de 2026): erro mediano de 7,4% no dia e de 3,9% no mês.</li>
       <li>Avisos, focos e risco de fogo: os mesmos da tela Clima e risco, com as mesmas regras de nível (Agir agora, Atenção, Sem alerta).</li>
+      <li>Fogo das últimas 24 h: {{ fonte_nome.nasa_firms }}, focos dos satélites VIIRS e MODIS com a força (FRP) e a confiança de cada um. Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA.</li>
     </ul>
   </footer>
 </div>

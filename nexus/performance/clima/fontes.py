@@ -1,5 +1,5 @@
-"""Os quatro clientes públicos do Clima e risco: avisos do INMET, focos de queimada do INPE, risco de fogo do INPE e a irradiação
-diária da NASA POWER.
+"""Os clientes públicos do Clima e risco: avisos do INMET, focos de queimada do INPE, risco de fogo do INPE, a irradiação diária
+da NASA POWER e, desde 10/10/2026, o fogo das últimas 24 h dos satélites da NASA (FIRMS), com a força e a confiança de cada foco.
 
 Todos são só leitura (GET), sem chave e de uso livre; o formato abaixo é o medido em 06/10/2026 (a NASA POWER, em 07/10), e o
 que fugir dele vira `FonteErro` (a tela diz que a fonte falhou) em vez de número lido do jeito errado. Quem recebe a sessão é
@@ -16,6 +16,7 @@ import re
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import NamedTuple
 
 import requests
@@ -40,6 +41,9 @@ NOMES = {
     # pede ("NASA LaRC POWER", do Centro de Pesquisa Langley) continua no rodapé da página da usina
     "nasa_power": {"sigla": "NASA POWER", "nome": "Prediction Of Worldwide Energy Resources, projeto da NASA"},
     "ibge": {"sigla": "IBGE", "nome": "Instituto Brasileiro de Geografia e Estatística"},
+    # FIRMS = Fire Information for Resource Management System (10/10/2026): os focos dos satélites VIIRS e MODIS da NASA, com a força
+    # (FRP) e a confiança de cada um
+    "nasa_firms": {"sigla": "NASA FIRMS", "nome": "Fire Information for Resource Management System, sistema da NASA"},
 }
 
 
@@ -72,6 +76,29 @@ POWER_MAXIMO = 15.0                      # kWh/m²/dia: acima disto não é GHI 
 POWER_CASAS = 2                          # a coordenada vai com 2 casas (~1 km): a grade da NASA é de dezenas de km, e a posição
                                          # exata da usina não precisa chegar a um servidor de fora
 
+# NASA FIRMS (10/10/2026, Levi: "veja se é viável para o que fazemos agora, se sim melhore e inclua coisas no mapa"). Os arquivos
+# públicos de focos ativos da América do Sul, um por satélite, com as últimas passagens (na prática de 24 a 40 h de dado): grátis, SEM
+# chave e de uso livre com citação. Medido em 10/10/2026 (seca): 2,5 a 2,9 MB por satélite VIIRS (~30 mil linhas, 95% na caixa do
+# Brasil) e 0,6 MB o MODIS. O servidor devolve ETag e Last-Modified mas IGNORA o If-None-Match e o If-Modified-Since (conferido em
+# 10/10/2026: 200 com o arquivo inteiro): por isso a releitura pergunta primeiro com um HEAD e só baixa o arquivo cujo ETag mudou
+# (muda a cada passagem, umas 4 vezes por dia por satélite). A API por área com MAP_KEY não ajuda aqui: uma caixa que pega todas as
+# usinas é quase o Brasil inteiro, o mesmo arquivo. Ela vale para o histórico por usina (outra fase).
+FIRMS_BASE = "https://firms.modaps.eosdis.nasa.gov/data/active_fire/"
+FIRMS_ARQUIVOS = {                       # o satélite (ou o par, no MODIS) -> o arquivo, relativo a FIRMS_BASE
+    "S-NPP": "suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_South_America_24h.csv",
+    "NOAA-20": "noaa-20-viirs-c2/csv/J1_VIIRS_C2_South_America_24h.csv",
+    "NOAA-21": "noaa-21-viirs-c2/csv/J2_VIIRS_C2_South_America_24h.csv",
+    "MODIS": "modis-c6.1/csv/MODIS_C6_1_South_America_24h.csv",
+}
+FIRMS_COLUNAS = ("latitude", "longitude", "scan", "track", "acq_date", "acq_time", "satellite", "confidence", "frp", "daynight")
+FIRMS_CAIXA = (-75.0, -35.0, -33.0, 6.5)  # oeste, sul, leste, norte: o Brasil com folga; o resto do continente não é lido
+# o código do satélite na coluna `satellite`: VIIRS escreve N (S-NPP), N20 e N21; o MODIS, A (Aqua) e T (Terra)
+_FIRMS_SATELITE = {"N": ("S-NPP", "VIIRS"), "N20": ("NOAA-20", "VIIRS"), "N21": ("NOAA-21", "VIIRS"),
+                   "A": ("Aqua", "MODIS"), "AQUA": ("Aqua", "MODIS"), "T": ("Terra", "MODIS"), "TERRA": ("Terra", "MODIS")}
+# a confiança: o VIIRS escreve low/nominal/high (ou l/n/h); o MODIS, de 0 a 100 (a divisa da própria NASA: < 30 baixa, < 80 nominal)
+_FIRMS_CONFIANCA = {"low": "baixa", "l": "baixa", "nominal": "nominal", "n": "nominal", "high": "alta", "h": "alta"}
+FIRMS_FRP_MAX = 50000.0                  # MW: acima disto não é o FRP de um pixel (o maior medido em 10/10/2026 foi 1.257)
+
 FOCOS_ARQUIVOS = 6                       # seis arquivos de 10 min = a última hora
 DIAS_DE_RISCO = (0, 1, 2, 3)             # RF.PREV.T0..T3: hoje e D+1 a D+3
 TRABALHADORES_POR_DIA = 2                # tiles pedidas ao mesmo tempo em cada dia; os 4 dias vão juntos: 8 conexões no máximo
@@ -88,6 +115,18 @@ class Foco(NamedTuple):
     lon: float
     satelite: str
     data: datetime                       # UTC, a hora da detecção
+
+
+class FocoNasa(NamedTuple):
+    """Um foco do FIRMS: o pixel de 375 m (VIIRS) ou de 1 km (MODIS) onde o satélite viu fogo."""
+    lat: float
+    lon: float
+    satelite: str                        # S-NPP, NOAA-20, NOAA-21, Aqua ou Terra
+    data: datetime                       # UTC, a hora da passagem (acq_date + acq_time)
+    sensor: str                          # VIIRS ou MODIS
+    confianca: str                       # baixa, nominal ou alta
+    frp: float                           # a força do fogo: a energia que ele irradia, em MW
+    dia: bool                            # passagem de dia (a de noite vê menos reflexo de sol, e o fogo de noite é mais certo)
 
 
 class Aviso:
@@ -107,10 +146,12 @@ def enderecos(config) -> dict:
         return str(cfg.get(chave) or "").strip() or padrao
 
     focos = de("NEXUS_CLIMA_FOCOS_URL", INPE_FOCOS)
+    firms = de("NEXUS_CLIMA_FIRMS_URL", FIRMS_BASE)
     return {"inmet": de("NEXUS_CLIMA_INMET_URL", INMET_AVISOS),
             "focos": focos if focos.endswith("/") else focos + "/",
             "risco": de("NEXUS_CLIMA_RISCO_URL", INPE_RISCO_FOGO),
-            "power": de("NEXUS_CLIMA_POWER_URL", NASA_POWER)}
+            "power": de("NEXUS_CLIMA_POWER_URL", NASA_POWER),
+            "firms": firms if firms.endswith("/") else firms + "/"}
 
 
 _sessao = None
@@ -294,6 +335,106 @@ def inpe_focos(sessao, url=INPE_FOCOS, *, ultimos=FOCOS_ARQUIVOS, timeout=TEMPO_
         raise FonteErro(f"{ruins} linhas dos arquivos de focos não puderam ser lidas e nenhum foco foi lido: o formato dos "
                         "dados mudou?")
     return {"focos": focos, "arquivos": lidos, "falhos": falhos, "ate": _hora_do_arquivo(lidos[-1]),
+            "linhas_ruins": ruins}
+
+
+# ── NASA FIRMS: o fogo das últimas 24 h, com força e confiança (10/10/2026) ──────────────────────────────────────────
+
+def _confianca_firms(bruto: str, sensor: str) -> str:
+    t = str(bruto or "").strip().lower()
+    if sensor == "MODIS":
+        n = int(float(t))                        # ValueError se não for número: a linha conta como ilegível
+        if not 0 <= n <= 100:
+            raise ValueError("confiança do MODIS fora de 0 a 100")
+        return "baixa" if n < 30 else "nominal" if n < 80 else "alta"
+    if t not in _FIRMS_CONFIANCA:
+        raise ValueError("confiança do VIIRS desconhecida")
+    return _FIRMS_CONFIANCA[t]
+
+
+def _ler_firms(conteudo: bytes, nome: str) -> tuple:
+    """(focos na caixa do Brasil, linhas ilegíveis) de um arquivo do FIRMS. A coluna é achada pelo NOME (o VIIRS e o MODIS têm
+    colunas diferentes no meio: bright_ti4 e brightness); faltou uma das que o leitor usa, o formato mudou (FonteErro)."""
+    leitor = csv.reader(io.StringIO(conteudo.decode("utf-8-sig", "replace")))
+    cabecalho = [c.strip().lower() for c in next(leitor, None) or []]
+    faltam = [c for c in FIRMS_COLUNAS if c not in cabecalho]
+    if faltam:
+        raise FonteErro(f"cabeçalho inesperado no arquivo {nome} do FIRMS: faltam {', '.join(faltam)}")
+    i = {c: cabecalho.index(c) for c in FIRMS_COLUNAS}
+    oeste, sul, leste, norte = FIRMS_CAIXA
+    focos, ruins = [], 0
+    for linha in leitor:
+        if not linha:
+            continue
+        try:
+            lat, lon = float(linha[i["latitude"]]), float(linha[i["longitude"]])
+            if not (sul <= lat <= norte and oeste <= lon <= leste):
+                continue                             # fora do Brasil: nem guarda
+            satelite, sensor = _FIRMS_SATELITE[linha[i["satellite"]].strip().upper()]
+            hhmm = linha[i["acq_time"]].strip().zfill(4)
+            data = datetime.strptime(linha[i["acq_date"]].strip() + hhmm, "%Y-%m-%d%H%M").replace(tzinfo=UTC)
+            frp = float(linha[i["frp"]])
+            if not 0 <= frp <= FIRMS_FRP_MAX:
+                raise ValueError("FRP fora da faixa")
+            dia = linha[i["daynight"]].strip().upper()
+            if dia not in ("D", "N"):
+                raise ValueError("dia/noite desconhecido")
+            focos.append(FocoNasa(lat, lon, satelite, data, sensor, _confianca_firms(linha[i["confidence"]], sensor), frp,
+                                  dia == "D"))
+        except (ValueError, IndexError, KeyError):
+            ruins += 1
+    return focos, ruins
+
+
+def nasa_firms(sessao, base=FIRMS_BASE, *, anterior=None, arquivos=None, timeout=TEMPO_LIMITE_S) -> dict:
+    """{"focos": [FocoNasa], "arquivos": {satélite: {"etag", "modificado", "focos"}}, "falhos": {satélite: motivo}, "ate": a hora
+    UTC do foco mais novo (ou None), "linhas_ruins": n}. Os arquivos (`FIRMS_ARQUIVOS`) vão juntos; `anterior` é a leitura boa de
+    antes: o arquivo cujo ETag não mudou (perguntado com um HEAD, porque o servidor ignora o If-None-Match) volta como estava, sem
+    baixar e sem reler. Um arquivo que falha fica em `falhos` e os outros valem; cabeçalho diferente do esperado é FonteErro (o
+    formato mudou); nenhum arquivo lido também. Só ficam os focos na caixa do Brasil (`FIRMS_CAIXA`); a janela de 24 h é de quem
+    usa."""
+    arquivos = FIRMS_ARQUIVOS if arquivos is None else arquivos
+    antes = (anterior or {}).get("arquivos") or {}
+
+    def um(par):
+        satelite, caminho = par
+        velho = antes.get(satelite)
+        cabeca = getattr(sessao, "head", None)
+        if velho and velho.get("etag") and callable(cabeca):
+            try:
+                h = cabeca(base + caminho, timeout=timeout)
+                if h.status_code == 200 and h.headers.get("ETag") == velho["etag"]:
+                    return satelite, velho, 0, None         # o mesmo arquivo: nem baixa
+            except (requests.RequestException, OSError):
+                pass                                        # o HEAD falhou: o GET decide
+        try:
+            r = sessao.get(base + caminho, headers={"Accept": "text/csv"}, timeout=timeout)
+            r.raise_for_status()
+        except (requests.RequestException, OSError) as e:
+            return satelite, None, 0, resumo_do_erro(e)
+        focos, ruins = _ler_firms(r.content, caminho.rsplit("/", 1)[-1])
+        modificado = None
+        try:
+            modificado = parsedate_to_datetime(r.headers.get("Last-Modified")) if r.headers.get("Last-Modified") else None
+        except (TypeError, ValueError):
+            modificado = None
+        return satelite, {"etag": r.headers.get("ETag"), "modificado": modificado, "focos": focos}, ruins, None
+
+    with ThreadPoolExecutor(max_workers=len(arquivos) or 1) as pool:
+        feitos = list(pool.map(um, arquivos.items()))
+    lidos, falhos, ruins = {}, {}, 0
+    for satelite, dados, n_ruins, erro in feitos:
+        if erro is not None:
+            falhos[satelite] = erro
+        else:
+            lidos[satelite] = dados
+            ruins += n_ruins
+    if not lidos:
+        raise FonteErro("nenhum arquivo do FIRMS pôde ser lido: " + "; ".join(f"{s}: {m}" for s, m in falhos.items()))
+    focos = [f for d in lidos.values() for f in d["focos"]]
+    if ruins and not focos:
+        raise FonteErro(f"{ruins} linhas do FIRMS não puderam ser lidas e nenhum foco foi lido: o formato dos dados mudou?")
+    return {"focos": focos, "arquivos": lidos, "falhos": falhos, "ate": max((f.data for f in focos), default=None),
             "linhas_ruins": ruins}
 
 

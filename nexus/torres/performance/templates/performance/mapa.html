@@ -93,14 +93,15 @@
   {% if v.ilegiveis %}<p class="cl-nota">{{ v.ilegiveis }} {{ "ficha do cadastro não abriu" if v.ilegiveis == 1 else "fichas do cadastro não abriram" }} (a chave do cadastro não confere): fora do mapa.</p>{% endif %}
 
   <footer class="cl-rodape">
-    <p><strong>Dados: {{ v.nomes.ibge }}, {{ v.nomes.inmet }} e {{ v.nomes.inpe }}, Programa Queimadas.</strong> Somente leitura: esta tela não grava nada.</p>
+    <p><strong>Dados: {{ v.nomes.ibge }}, {{ v.nomes.inmet }} e {{ v.nomes.inpe }}, Programa Queimadas.</strong> <strong>Fogo das últimas 24 h: {{ v.nomes.nasa_firms }}.</strong> Somente leitura: esta tela não grava nada.</p>
     <ul>
       <li>Estados: {{ v.nomes.ibge }}, Malhas territoriais (resolução mínima), guardadas no próprio Nexus. A projeção é equiretangular, com a escala do eixo leste-oeste corrigida pela latitude do recorte.</li>
       <li>Posição das usinas: cadastro do Nexus, acessível só com login. Os números da coordenada não são mostrados.</li>
       <li>Avisos: {{ v.nomes.inmet }}, avisos meteorológicos ativos, cada um com o seu polígono. O contorno tracejado é o aviso que ainda vai começar.</li>
       <li>Focos: {{ v.nomes.inpe }}, Programa Queimadas, arquivos de 10 em 10 min da última hora. Um foco é um pixel com fogo detectado, não um incêndio confirmado. A densidade de focos é calculada no Nexus com esses mesmos focos (núcleo de 25 km).</li>
       <li>Risco de fogo: {{ v.nomes.inpe }}, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1). Na camada de fundo, a média dos pixels com dado em quadrados de ~9 km (~18 km no Brasil inteiro); a usina usa o pixel dela.</li>
-      <li>Os níveis da usina são os da lista de Clima e risco: a mesma regra, as mesmas três fontes, o mesmo cache.</li>
+      <li>Fogo das últimas 24 h: {{ v.nomes.nasa_firms }}, focos dos satélites VIIRS (S-NPP, NOAA-20 e NOAA-21, pixel de 375 m) e MODIS (Aqua e Terra, pixel de 1 km), com a força (FRP) e a confiança de cada um; no mapa, só os que estão a até 25 km de uma usina. Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA.</li>
+      <li>Os níveis da usina são os da lista de Clima e risco: a mesma regra, as mesmas fontes, o mesmo cache.</li>
     </ul>
   </footer>
 </div>

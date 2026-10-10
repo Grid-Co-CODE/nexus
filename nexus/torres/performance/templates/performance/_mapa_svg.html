@@ -8,6 +8,7 @@
 {% set fo = v.camada_focos %}
 {% set cr = v.calor_risco %}
 {% set cd = v.calor_densidade %}
+{% set na = v.camada_nasa %}
 <svg class="mp-svg mp-svg--{{ 'brasil' if v.regiao == 'brasil' else 'regiao' }}" viewBox="{{ v.viewbox }}" role="group" aria-labelledby="mp-titulo" preserveAspectRatio="xMidYMid meet" data-parte="svg">
   <title id="mp-titulo">Mapa de risco: {{ v.regiao_nome }}</title>
   {% if v.ufs and (cr or cd) %}<defs><clipPath id="mp-recorte">{% for u in v.ufs %}<use href="#mp-uf-{{ u.sigla }}"/>{% endfor %}</clipPath></defs>{% endif %}
@@ -32,6 +33,9 @@
     {% for u in v.ufs if u.x %}<text x="{{ u.x }}" y="{{ u.y }}">{{ u.sigla }}</text>
     {% endfor %}
   </g>
+  {# o fogo das últimas 24 h da NASA (10/10/2026), atrás dos focos da última hora do INPE: um caminho por força (fraco, médio, forte).
+     SEM data-camada: esse atributo é das camadas de FUNDO, e o CSS esconde o grupo que não é o fundo escolhido #}
+  {% if na and na.estado == "ok" %}<g class="mp-nasa">{% for c in na.classes if c.d %}<path class="mp-na mp-na-{{ c.css }}" d="{{ c.d }}"/>{% endfor %}</g>{% endif %}
   {% if fo and fo.estado == "ok" %}
   {% if fo.d %}<path class="mp-focos" d="{{ fo.d }}"/>{% endif %}
   <g class="mp-aneis">
@@ -40,7 +44,7 @@
   </g>
   {% endif %}
   <g class="mp-usinas">
-    {% for u in v.usinas %}<a href="{{ u.href }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/><circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
+    {% for u in v.usinas %}<a href="{{ u.href }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/>{% if u.fogo24 %}<circle class="mp-anel-nasa mp-anel-nasa--{{ u.fogo24 }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ (u.r + 3.5)|round(1) }}"/>{% endif %}<circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
     {% endfor %}
   </g>
   <g class="mp-selecao" aria-hidden="true"></g>

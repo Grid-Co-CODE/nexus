@@ -27,8 +27,9 @@ ou grupo de conversa.
   `app.fracttal.com` e `one.fracttal.com` (Fracttal), `raw.githubusercontent.com` (banco do PCM), `api.github.com`
   (Publicar no App: grava a semana no repositório do PCM),
   `apiprevmet3.inmet.gov.br` (avisos meteorológicos do INMET), `dataserver-coids.inpe.br` (focos de queimada e risco
-  de fogo do INPE) e `power.larc.nasa.gov` (irradiação diária da NASA POWER): os três últimos são da tela Performance →
-  Clima e risco, só HTTPS (443), leitura pública, sem chave. A NASA só é chamada pela PÁGINA de uma usina (um pedido por
+  de fogo do INPE), `power.larc.nasa.gov` (irradiação diária da NASA POWER) e `firms.modaps.eosdis.nasa.gov` (fogo das
+  últimas 24 h dos satélites da NASA, desde 10/10/2026): os quatro últimos são da tela Performance → Clima e risco, só HTTPS
+  (443), leitura pública, sem chave. A NASA só é chamada pela PÁGINA de uma usina (um pedido por
   usina, guardado por 12 h), nunca pela tela principal. Sem eles a tela abre e mostra as fontes como "fora agora". O mapa de
   calor do risco de fogo (Mapa de risco, 09/10/2026) usa o mesmo `dataserver-coids.inpe.br`: nenhuma saída nova.
 - Disco: cada geração da programação semanal guarda ~65 MB em `dados/pcm/geracoes/` (uma por semana).
@@ -201,10 +202,12 @@ usina (`/t/performance/clima/usina/<id>`) acrescenta a irradiação diária da *
 por usina, só quando alguém abre a página dela, guardado por 12 h na memória (a tela principal nunca chama a NASA); a latitude
 e a longitude vão no pedido com 2 casas. Cada falha de fonte vai ao log (`journalctl -u nexus`) como uma linha de aviso,
 `clima: INMET (avisos) fora: sem conexão com o servidor`, sem dado de usina. Precisa da saída para `apiprevmet3.inmet.gov.br`,
-`dataserver-coids.inpe.br` e `power.larc.nasa.gov` (seção 0) e do cadastro no servidor (`dados/cadastro_ensaio.json`). Os
-endereços têm padrão e só se trocam para apontar a um espelho: `NEXUS_CLIMA_INMET_URL`, `NEXUS_CLIMA_FOCOS_URL`,
-`NEXUS_CLIMA_RISCO_URL` (este leva `{d}`, o dia de 0 a 3) e `NEXUS_CLIMA_POWER_URL` (leva `{lat}`, `{lon}`, `{inicio}` e `{fim}`,
-as datas em AAAAMMDD), no `.env`.
+`dataserver-coids.inpe.br`, `power.larc.nasa.gov` e `firms.modaps.eosdis.nasa.gov` (seção 0) e do cadastro no servidor
+(`dados/cadastro_ensaio.json`). O fogo das últimas 24 h da NASA (FIRMS, 10/10/2026) são 4 arquivos públicos de ~3 MB (~9 MB
+juntos), lidos a cada 30 min só quando mudaram (um HEAD por arquivo antes); ficam na memória (~20 MB na seca), nada vai ao disco
+nem ao banco. Os endereços têm padrão e só se trocam para apontar a um espelho: `NEXUS_CLIMA_INMET_URL`, `NEXUS_CLIMA_FOCOS_URL`,
+`NEXUS_CLIMA_RISCO_URL` (este leva `{d}`, o dia de 0 a 3), `NEXUS_CLIMA_POWER_URL` (leva `{lat}`, `{lon}`, `{inicio}` e `{fim}`,
+as datas em AAAAMMDD) e `NEXUS_CLIMA_FIRMS_URL` (a base dos arquivos do FIRMS), no `.env`.
 
 ## 8. Atualizar
 

@@ -296,7 +296,7 @@ def test_o_painel_de_frescor_e_o_mesmo_da_tela_principal(mundo):
     def fontes(html):
         return re.findall(r'<div class="cl-fonte cl-\w+">.*?</div>', html, flags=re.S)
     mapa, lista = fontes(pagina(mundo)), fontes(pagina(mundo, "/t/performance/clima"))
-    assert len(mapa) == 3 and mapa == lista
+    assert len(mapa) == 4 and mapa == lista                    # INMET, focos e risco do INPE e, desde 10/10/2026, a NASA FIRMS
     assert "lido às 15:00" in texto(pagina(mundo))
 
 

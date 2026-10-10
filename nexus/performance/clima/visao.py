@@ -16,6 +16,11 @@ A ordem dentro de cada nível é a gravidade que já existia, a mesma régua de 
 A usina vale o pior dos seus alertas. No empate: a que tem foco primeiro, depois a que tem mais tipos de alerta, o foco mais
 perto, o aviso mais grave e, por fim, o nome.
 
+O fogo das últimas 24 h dos satélites da NASA (FIRMS, 10/10/2026) entra como a quarta fonte: fogo a até 5 km nas últimas 24 h
+é Atenção, e o foco do INPE ganha a confirmação e a força (FRP) quando a NASA viu o mesmo fogo. Sem a leitura do FIRMS a usina não
+fica cinza (o agir e o resto da atenção não dependem dele), mas o verde vira "sem alerta nas fontes lidas": sem ler a NASA, não dá
+para dizer que não houve fogo perto nas últimas 24 h.
+
 A tela não pode parecer "tudo bem" quando a fonte não foi lida inteira (revisão de 06/10/2026):
 - onde a fonte não tem leitura, o número é "—", nunca "0" (zero é "li e não há alerta"); "Sem alerta" só é contado com as três
   fontes lidas, e "Agir agora" e "Atenção" só viram "—" quando NENHUMA das fontes de que dependem foi lida (o agir vive de
@@ -42,6 +47,8 @@ _SEMANA = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
 # escala do INPE; o número vai no balão da célula.
 PALAVRA_DO_RISCO = {"crítico": "Crítico", "alto": "Alto", "médio": "Médio", "baixo": "Baixo", "mínimo": "Mínimo"}
 FOCOS_ATRASO_MIN = 30          # o INPE publica a cada 10 min: sem arquivo novo há 30 min, algo está atrasado
+FIRMS_ATRASO_H = 18            # os satélites da NASA passam perto das 13h30 e da 01h30, e o dado chega em até 3 h: sem foco novo
+                               # há 18 h, alguma passagem se perdeu
 SEM_DADO = "sem dado (sem vegetação no entorno)"
 FORA_DA_GRADE = f"fora da grade do {F.extenso('inpe')}"
 MOTIVO_SEM_RISCO = {"sem_dado": "sem vegetação no entorno", "fora_da_grade": FORA_DA_GRADE}
@@ -53,18 +60,20 @@ LIMITE_ATENCAO = 20            # a matriz da Atenção mostra as 20 primeiras; "
 COR_DO_AVISO = {1: "amarelo", 2: "laranja", 3: "vermelho"}      # a cor do INMET pelo nível; a cor que vem no aviso nunca é lida
 # Os subtítulos dos números do topo, na língua de quem não é da meteorologia (09/10/2026); a regra inteira está em "Como ler".
 SUB_AGIR = f"fogo a até {A.FOCO_KM:g} km ou aviso forte (tempestade, chuva forte, vento, granizo) do {F.extenso('inmet')}"
-SUB_ATENCAO = f"outro aviso do {F.extenso('inmet')} ou risco de fogo alto nos próximos 4 dias: acompanhar"
+SUB_ATENCAO = (f"outro aviso do {F.extenso('inmet')}, risco de fogo alto nos próximos 4 dias ou fogo a até 5 km nas últimas "
+               "24 h: acompanhar")
 # De que fontes cada número da faixa depende: o "agir agora" vive de avisos e focos; o "atenção", de avisos e risco de fogo; o
 # "sem alerta" precisa das três. Uma fonte parcial ou atrasada só qualifica o número que a usa.
-FONTES_DO_NIVEL = {"agir": ("inmet", "focos"), "atencao": ("inmet", "risco"), "sem": ("inmet", "focos", "risco")}
+FONTES_DO_NIVEL = {"agir": ("inmet", "focos"), "atencao": ("inmet", "risco", "firms"), "sem": ("inmet", "focos", "risco", "firms")}
 # O nome de cada fonte na frase, por extenso e com a sigla (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla"):
 # o nome mora em `fontes.NOMES`; aqui só se diz qual dado de qual instituto. Vale também para o qualificador dos números da faixa
 # ("avisos do Instituto ... (INMET): parcial"), que antes era só a sigla.
 NOME_LONGO = {"inmet": f"avisos do {F.extenso('inmet')}", "focos": f"focos de queimada do {F.extenso('inpe')}",
-              "risco": f"risco de fogo do {F.extenso('inpe')}"}
+              "risco": f"risco de fogo do {F.extenso('inpe')}", "firms": f"fogo das últimas 24 h da {F.extenso('nasa_firms')}"}
 # a linha de cada fonte no painel "De onde vêm os dados" e na legenda do mapa: o instituto por extenso e, depois do ponto, o dado
 ROTULO_DA_FONTE = {"inmet": f"{F.extenso('inmet')} · avisos", "focos": f"{F.extenso('inpe')} · focos de queimada",
-                   "risco": f"{F.extenso('inpe')} · risco de fogo", "power": f"{F.extenso('nasa_power')} · irradiação"}
+                   "risco": f"{F.extenso('inpe')} · risco de fogo", "power": f"{F.extenso('nasa_power')} · irradiação",
+                   "firms": f"{F.extenso('nasa_firms')} · fogo das últimas 24 h"}
 # A grade por estado do desenho aprovado em 07/10/2026 (esquema, não é mapa): UF -> (coluna, linha) numa grade de 7 x 8.
 UFS_GRADE = {"RR": (2, 1), "AP": (4, 1), "AM": (2, 2), "PA": (3, 2), "MA": (4, 2), "CE": (5, 2), "RN": (6, 2), "AC": (1, 3),
              "RO": (2, 3), "TO": (3, 3), "PI": (4, 3), "PE": (5, 3), "PB": (6, 3), "MT": (2, 4), "GO": (3, 4), "BA": (4, 4),
@@ -305,6 +314,75 @@ def _fonte_risco(leitura, ref, rotulos) -> dict:
     return _fechar("risco", leitura, ref, falha, texto, parciais, atrasos)
 
 
+def _fonte_firms(leitura, ref) -> dict:
+    """O fogo das últimas 24 h da NASA (10/10/2026): de quando é a última passagem, quantos focos no Brasil nas últimas 24 h e os
+    satélites que não vieram. Sem foco novo há `FIRMS_ATRASO_H` horas, alguma passagem se perdeu: fica em atenção."""
+    falha = _falha(ROTULO_DA_FONTE["firms"], leitura, ref)
+    if leitura.dados is None:
+        return _sem_dado("firms", falha)
+    d = leitura.dados
+    lido, ate = hora(_quando(leitura.lido_em), ref), d.get("ate")
+    n24 = len(A.focos_nasa_24h(d["focos"], ref))
+    parciais = [f"{len(d['falhos'])} de {len(d['arquivos']) + len(d['falhos'])} satélites indisponíveis "
+                f"({_juntar(sorted(d['falhos']))})"] if d["falhos"] else []
+    if d.get("linhas_ruins"):
+        parciais.append(_plural(d["linhas_ruins"], "linha ilegível", "linhas ilegíveis"))
+    atrasos = []
+    if ate is None or ref - ate.astimezone(BRT) > timedelta(hours=FIRMS_ATRASO_H):
+        atrasos.append(f"passagens até {hora(ate, ref)}" if ate else "nenhum foco nos arquivos")
+    texto = (f"{ROTULO_DA_FONTE['firms']}: passagens até {hora(ate, ref) if ate else '—'} · lido às {lido} · "
+             f"{_plural(n24, 'foco', 'focos')} no Brasil nas últimas 24 h")
+    return _fechar("firms", leitura, ref, falha, texto, parciais, atrasos)
+
+
+_INDICE_NASA: dict = {}
+
+
+def indice_nasa(leitura, ref):
+    """O índice dos focos da NASA das últimas 24 h até `ref` (None sem leitura). Na seca são uns 100 mil focos no Brasil em 40 h de
+    arquivo: o índice sai uma vez por leitura e por janela de 5 min, e a lista, o mapa e a página da usina dividem."""
+    if leitura is None or leitura.dados is None:
+        return None
+    chave = (id(leitura.dados), int(ref.timestamp() // 300))
+    if chave not in _INDICE_NASA:
+        _INDICE_NASA.clear()
+        _INDICE_NASA[chave] = A.IndiceFocos(A.focos_nasa_24h(leitura.dados["focos"], ref))
+    return _INDICE_NASA[chave]
+
+
+def idade(d: datetime, ref: datetime) -> str:
+    """Há quanto tempo, em palavra curta: "há 40 min", "há 9 h"."""
+    minutos = max(0, int((ref - d).total_seconds() // 60))
+    return f"há {minutos} min" if minutos < 60 else f"há {minutos // 60} h"
+
+
+def do_satelite(f) -> str:
+    """"VIIRS NOAA-20, confiança alta, força 35 MW (forte)": o que a NASA diz do foco."""
+    return (f"{f.sensor} {f.satelite}, confiança {f.confianca}, força {numero(f.frp, 0 if f.frp >= 10 else 1)} MW "
+            f"({A.classe_frp(f.frp)})")
+
+
+def _na_usina(km: float) -> str:
+    return (f"a menos de {int(A.NA_USINA_KM * 1000)} m do ponto da usina: pode ser a própria usina (reflexo do sol nos módulos ou "
+            "telhado quente); confira antes de acionar") if km <= A.NA_USINA_KM else ""
+
+
+def fogo_curto(fogo: dict, ref) -> str:
+    """"Fogo a 2,3 km há 9 h": o fogo da NASA no motivo resumido."""
+    return f"Fogo a {numero(fogo['km'], 1)} km {idade(fogo['foco'].data, ref)}"
+
+
+def fogo_detalhe(fogo: dict, ref) -> str:
+    """O fogo da NASA por extenso: quantos, o mais perto (quando, satélite, confiança, força) e o mais forte."""
+    f = fogo["foco"]
+    texto = (f"{_plural(fogo['n'], 'foco', 'focos')} a até {A.FOGO_24H_KM:g} km nas últimas {A.FOGO_24H_H} h · o mais perto a "
+             f"{numero(fogo['km'], 1)} km, às {hora(f.data, ref)} ({do_satelite(f)})")
+    if fogo["frp_max"] > f.frp:
+        texto += f" · o mais forte com {numero(fogo['frp_max'], 0)} MW"
+    perto = _na_usina(fogo["km"])
+    return texto + (f" · {perto}" if perto else "")
+
+
 # ── a tela ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def _validade(a, ref) -> str:
@@ -391,10 +469,11 @@ def risco_curto(dias) -> str:
 MOTIVOS_CURTOS = 2      # o motivo resumido leva os dois mais importantes e "e mais N"
 
 
-def motivo_curto(avisos, foco, dias, ref) -> str:
-    """Por que a usina está no nível dela, numa linha curta e em língua de gente (09/10/2026): o fogo perto, os avisos (os que
-    mandam agir antes, iguais juntos) e o risco de fogo alto. É o "por quê" da tabela da Atenção e o motivo da tabela do mapa."""
-    itens = [f"Fogo a {numero(foco['km'], 1)} km"] if foco else []
+def motivo_curto(avisos, foco, dias, ref, fogo=None) -> str:
+    """Por que a usina está no nível dela, numa linha curta e em língua de gente (09/10/2026): o fogo perto (o da última hora do
+    INPE; sem ele, o das últimas 24 h da NASA, 10/10/2026), os avisos (os que mandam agir antes, iguais juntos) e o risco de fogo
+    alto. É o "por quê" da tabela da Atenção e o motivo da tabela do mapa."""
+    itens = [f"Fogo a {numero(foco['km'], 1)} km"] if foco else [fogo_curto(fogo, ref)] if fogo else []
     for e in por_evento(agrupar_avisos(avisos, ref), ref):
         itens.append(f"{e['nome']} ({e['severidade']}" + (f", a partir de {e['comeca']}" if e["comeca"] else "") + ")")
     if risco_curto(dias):
@@ -404,12 +483,19 @@ def motivo_curto(avisos, foco, dias, ref) -> str:
     return " · ".join(itens)
 
 
-def _motivo_do_foco(foco: dict, ref) -> dict:
+def _motivo_do_foco(foco: dict, ref, confirma=None, nasa_lida: bool = False) -> dict:
+    """O foco do INPE que manda agir. Com a NASA lida (10/10/2026), a prova diz se ela viu o mesmo fogo (a até 1 km e 1 h), com a
+    força e a confiança; e o foco a menos de 400 m do ponto da usina leva o aviso de que pode ser a própria usina."""
     km = numero(foco["km"], 1)
+    prova = (f"{_plural(foco['n'], 'foco de queimada', 'focos de queimada')} a até {A.FOCO_KM:g} km na última hora · "
+             f"visto pelo satélite {foco['satelite']} às {hora(foco['hora'], ref)}")
+    if confirma is not None:
+        prova += f" · confirmado pela NASA ({do_satelite(confirma)})"
+    elif nasa_lida:
+        prova += " · ainda sem confirmação dos satélites da NASA (eles passam perto das 13h30 e da 01h30)"
+    perto = _na_usina(foco["km"])
     return {"tipo": "foco", "pill": f"Fogo a {km} km", "principal": f"Fogo a {km} km da usina",
-            "prova": (f"{_plural(foco['n'], 'foco de queimada', 'focos de queimada')} a até {A.FOCO_KM:g} km na última hora · "
-                      f"visto pelo satélite {foco['satelite']} às {hora(foco['hora'], ref)}"),
-            **E.FOCO}
+            "prova": prova + (f" · {perto}" if perto else ""), **E.FOCO}
 
 
 def _motivo_do_aviso(g: dict) -> dict:
@@ -427,9 +513,12 @@ def _contexto_do_risco(dias, risco_linha, risco_lido: bool) -> str:
     return frase_do_risco(dias) or "Risco de fogo: sem dado"
 
 
-def _usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis=None):
+def _usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis=None, nasa=None):
+    """O cartão de uma usina. `nasa` é o índice dos focos da NASA das últimas 24 h (`indice_nasa`), ou None sem a leitura."""
     avisos = A.avisos_que_contem(u.lat, u.lon, avisos_l.dados["avisos"], ref) if avisos_l.dados else []
     foco = indice.perto(u.lat, u.lon) if indice is not None else None
+    fogo = A.fogo_24h(nasa, u.lat, u.lon) if nasa is not None else None
+    confirma = A.confirmacao(nasa, foco["foco"]) if foco and nasa is not None else None
     dias = None
     if risco_l.dados:
         dias = [celula_de_risco(i, a, rotulos, amigaveis)
@@ -437,8 +526,9 @@ def _usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis=None):
     n_inmet = max((a.nivel for a in avisos), default=0)
     n_foco = 3 if foco else 0
     n_risco = max((c["nivel"] for c in dias or []), default=0)
-    gravidade = max(n_inmet, n_foco, n_risco)          # a régua de três degraus de antes: segue ordenando DENTRO de cada nível
-    nivel = A.nivel_da_usina(avisos, foco is not None, n_risco > 0)
+    n_fogo = A.gravidade_do_fogo_24h(fogo) if fogo else 0
+    gravidade = max(n_inmet, n_foco, n_risco, n_fogo)  # a régua de três degraus de antes: segue ordenando DENTRO de cada nível
+    nivel = A.nivel_da_usina(avisos, foco is not None, n_risco > 0, fogo is not None)
     # Os quatro dias sem número pelo mesmo motivo (sem vegetação em volta, ou fora da grade do INPE) viram UMA linha, e a usina
     # entra na lista de "risco de fogo sem dado" com o motivo.
     risco_linha = risco_origem = None
@@ -449,8 +539,11 @@ def _usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis=None):
     # Um motivo por EVENTO que manda agir (o grupo mais grave dele); os outros níveis do mesmo evento e os eventos que só pedem
     # atenção vão para o "Também" (09/10/2026: o cartão repetia "Tempestade: Grande Perigo" e "Tempestade: Perigo", cada um
     # com o mesmo "o que pode acontecer").
-    motivos = [_motivo_do_foco(foco, ref)] if foco else []
+    motivos = [_motivo_do_foco(foco, ref, confirma, nasa is not None)] if foco else []
     tambem = []
+    if fogo and not confirma:
+        # o fogo das últimas 24 h da NASA que NÃO é o foco da última hora (esse já está na prova, confirmado)
+        tambem.append(f"Também: fogo visto pela NASA, {fogo_detalhe(fogo, ref)}")
     for e in eventos:
         if e["agir"]:
             principal = next(g for g in e["niveis"] if g["agir"])
@@ -472,9 +565,12 @@ def _usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis=None):
         # acontecer na usina e o que conferir (`explica.py`), e o resto que ajuda a decidir
         "motivos": motivos,
         "contexto": tambem + [_contexto_do_risco(dias, risco_linha, risco_l.dados is not None)],
-        "por_que": motivo_curto(avisos, foco, dias, ref),
-        "_ordem": (-gravidade, -(1 if foco else 0), -((n_inmet > 0) + (n_foco > 0) + (n_risco > 0)),
-                   foco["km"] if foco else float("inf"), -n_inmet, chave_texto(u.nome)),
+        "por_que": motivo_curto(avisos, foco, dias, ref, fogo),
+        # o fogo das últimas 24 h da NASA (10/10/2026): a célula "Fogo a até 5 km" da Atenção e a página da usina
+        "fogo24": ({"texto": f"a {numero(fogo['km'], 1)} km {idade(fogo['foco'].data, ref)}", "detalhe": fogo_detalhe(fogo, ref),
+                    "classe": A.classe_frp(fogo["frp_max"])} if fogo else None),
+        "_ordem": (-gravidade, -(1 if foco else 0), -((n_inmet > 0) + (n_foco > 0) + (n_risco > 0) + (n_fogo > 0)),
+                   foco["km"] if foco else fogo["km"] if fogo else float("inf"), -n_inmet, chave_texto(u.nome)),
     }
     if foco:
         cartao["foco"] = {"texto": f"{_plural(foco['n'], 'foco', 'focos')} a até {A.FOCO_KM:g} km · o mais perto a "
@@ -549,7 +645,7 @@ def _faixa(n_agir, n_atencao, n_sem, n_usinas, v, leituras, por_id) -> list:
         return all(leituras[i].dados is None for i in FONTES_DO_NIVEL[nivel])
 
     q_agir, q_atencao, q_sem = qual("agir"), qual("atencao"), qual("sem")
-    sub_sem = "não dá para dizer" if ausentes else "nas fontes lidas" if q_sem else "nas três fontes lidas"
+    sub_sem = "não dá para dizer" if ausentes else "nas fontes lidas" if q_sem else "nas quatro fontes lidas"
     n_sem_risco = sum(len(g["nomes"]) for g in v["sem_risco"])
     cobertura = "em operação com coordenada"
     if n_sem_risco:
@@ -580,7 +676,8 @@ def glossario(cartoes: list) -> dict:
                 agora_.append({"nome": g["nome"], "conhecido": E.conhecido(g["evento"]), **E.evento(g["evento"])})
     outros = [{"nome": E.nome_amigavel(nome), "conhecido": True, **E.evento(nome)}
               for nome in E._EVENTOS if chave_texto(nome) not in vistos]
-    return {"niveis": E.NIVEIS_INMET, "foco": E.FOCO, "risco": E.RISCO_FOGO, "eventos_agora": agora_, "eventos_outros": outros}
+    return {"niveis": E.NIVEIS_INMET, "foco": E.FOCO, "risco": E.RISCO_FOGO, "fogo24": E.FOGO_24H, "forca": E.FORCA_DO_FOGO,
+            "confianca": E.CONFIANCA, "eventos_agora": agora_, "eventos_outros": outros}
 
 
 def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, sessao=None, todas=False) -> dict:
@@ -616,14 +713,17 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     avisos_l = L.avisos(config, sessao)
     focos_l = L.focos(config, sessao)
     risco_l = L.risco(config, cadastro.pontos(), sessao)
-    leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
+    firms_l = L.firms(config, sessao)
+    leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l, "firms": firms_l}
     indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
+    nasa = indice_nasa(firms_l, ref)
     arquivo = _arquivo_t0(risco_l.dados) if risco_l.dados else None
     rotulos, amigaveis = rotulos_dos_dias(arquivo, ref), dias_amigaveis(arquivo, ref)
-    cartoes = [_usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis) for u in usinas]
+    cartoes = [_usina(u, avisos_l, indice, risco_l, ref, rotulos, amigaveis, nasa) for u in usinas]
     agir = sorted((c for c in cartoes if c["nivel"] == A.AGIR), key=lambda c: c["_ordem"])
     atencao = sorted((c for c in cartoes if c["nivel"] == A.ATENCAO), key=lambda c: c["_ordem"])
-    fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos)]
+    fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos),
+              _fonte_firms(firms_l, ref)]
     por_id = {f["id"]: f for f in fontes}
 
     v["fontes"] = fontes
@@ -637,9 +737,11 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     v["matriz_tem_entorno"] = any(d["nota"] for c in v["atencao_linhas"] for d in c["dias"] or [])
     ausentes = [i for i in ("inmet", "focos", "risco") if leituras[i].dados is None]
     # Fonte SEM leitura boa: ou ainda está sendo lida pela primeira vez ("lendo", a tela volta em 10 s) ou está fora. Os números
-    # não a incluem, e a tela diz (uma lista curta demais parece "só essas têm alerta").
-    v["lendo"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro == L.LENDO]
-    v["faltando"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro != L.LENDO]
+    # não a incluem, e a tela diz (uma lista curta demais parece "só essas têm alerta"). A NASA entra nesta nota, mas não em
+    # `ausentes`: sem ela a usina não fica cinza (ver o cabeçalho do módulo).
+    sem_leitura = ausentes + (["firms"] if firms_l.dados is None else [])
+    v["lendo"] = [NOME_LONGO[i] for i in sem_leitura if leituras[i].erro == L.LENDO]
+    v["faltando"] = [NOME_LONGO[i] for i in sem_leitura if leituras[i].erro != L.LENDO]
     v["completa"] = all(f["estado"] == "ok" for f in fontes)
     v["recarrega_em"] = RECARGA_LENDO_S if v["lendo"] else RECARGA_S
 
@@ -659,7 +761,8 @@ def montar(config, *, cadastro=None, erro_cadastro=None, cliente="", ref=None, s
     v["sem_alerta"] = None if ausentes else n_sem
     # na tabela da Atenção: "nenhum" e "não" dizem com palavra que a fonte foi lida e não há (09/10/2026; antes era "—")
     v["aviso_vazio"] = "sem leitura" if avisos_l.dados is None else "nenhum"
-    v["foco_vazio"] = "sem leitura" if focos_l.dados is None else "não"
+    # o fogo das últimas 24 h da NASA também mora nessa célula: sem lê-la, o "não" vale só para a última hora
+    v["foco_vazio"] = "sem leitura" if focos_l.dados is None else "não" if firms_l.dados is not None else "não na última hora"
     if risco_l.dados:
         for origem, motivo in MOTIVO_SEM_RISCO.items():
             nomes = [c["nome"] for c in cartoes if c["risco_origem"] == origem]
@@ -761,12 +864,14 @@ def montar_usina(config, *, cadastro, usina_id, cliente="", ref=None, sessao=Non
     avisos_l = L.avisos(config, sessao)
     focos_l = L.focos(config, sessao)
     risco_l = L.risco(config, cadastro.pontos(), sessao)
-    leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l}
+    firms_l = L.firms(config, sessao)
+    leituras = {"inmet": avisos_l, "focos": focos_l, "risco": risco_l, "firms": firms_l}
     indice = A.IndiceFocos(focos_l.dados["focos"]) if focos_l.dados else None
     arquivo = _arquivo_t0(risco_l.dados) if risco_l.dados else None
     rotulos = rotulos_dos_dias(arquivo, ref)
-    card = _usina(u, avisos_l, indice, risco_l, ref, rotulos, dias_amigaveis(arquivo, ref))
-    fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos)]
+    card = _usina(u, avisos_l, indice, risco_l, ref, rotulos, dias_amigaveis(arquivo, ref), indice_nasa(firms_l, ref))
+    fontes = [_fonte_inmet(avisos_l, ref), _fonte_focos(focos_l, ref), _fonte_risco(risco_l, ref, rotulos),
+              _fonte_firms(firms_l, ref)]
     nasa_l = L.irradiacao(config, u.id, u.lat, u.lon, ref.astimezone(BRT).date(), sessao)
     irradiacao = _irradiacao(nasa_l, ref)
     fontes.append(_fonte_nasa(nasa_l, ref, irradiacao))
@@ -775,7 +880,7 @@ def montar_usina(config, *, cadastro, usina_id, cliente="", ref=None, sessao=Non
         v["nivel"], v["rotulo"] = card["nivel"], card["rotulo"]
     elif ausentes:                       # sem alerta nas fontes lidas não é "sem alerta" quando falta fonte
         v["nivel"], v["rotulo"] = "duvida", "Sem leitura completa"
-    elif any(f["qualifica"] for f in fontes[:3]):
+    elif any(f["qualifica"] for f in fontes[:3]) or fontes[3]["estado"] != "ok":
         v["nivel"], v["rotulo"] = "sem", "Sem alerta nas fontes lidas"
     else:
         v["nivel"], v["rotulo"] = "sem", "Sem alerta"
@@ -786,10 +891,14 @@ def montar_usina(config, *, cadastro, usina_id, cliente="", ref=None, sessao=Non
                                                   else f"Nenhum aviso do {F.extenso('inmet')} sobre esta usina"),
         "foco": (card["foco"]["texto"] if card["foco"] else f"Sem leitura dos focos do {F.extenso('inpe')}" if focos_l.dados is None
                  else f"Nenhum foco a até {A.FOCO_KM:g} km"),
+        "fogo24": (card["fogo24"]["detalhe"] if card["fogo24"] else
+                   f"Sem leitura do fogo das últimas 24 h da {F.extenso('nasa_firms')}" if firms_l.dados is None
+                   else f"Nenhum fogo a até {A.FOGO_24H_KM:g} km nas últimas {A.FOGO_24H_H} h"),
         "dias": card["dias"], "risco_linha": card["risco_linha"],
         "risco_vazio": None if card["dias"] else f"Sem leitura do risco de fogo do {F.extenso('inpe')}",
     }
-    v["lendo"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro == L.LENDO]
-    v["faltando"] = [NOME_LONGO[i] for i in ausentes if leituras[i].erro != L.LENDO]
+    sem_leitura = ausentes + (["firms"] if firms_l.dados is None else [])
+    v["lendo"] = [NOME_LONGO[i] for i in sem_leitura if leituras[i].erro == L.LENDO]
+    v["faltando"] = [NOME_LONGO[i] for i in sem_leitura if leituras[i].erro != L.LENDO]
     v["recarrega_em"] = RECARGA_LENDO_S if (v["lendo"] or irradiacao["estado"] == "lendo") else RECARGA_S
     return v

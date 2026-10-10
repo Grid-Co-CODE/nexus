@@ -7,7 +7,7 @@ gravidade é o `visao.py`.
 """
 import math
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from ...cadastro.servico import chave_texto
 from . import geometria
@@ -16,6 +16,19 @@ FOCO_KM = 5.0              # foco de queimada a até 5 km da usina é alerta
 RISCO_ALTO = 0.7           # escala de 0 a 1 do INPE: alto >= 0,7 ...
 RISCO_CRITICO = 0.95       # ... e crítico > 0,95 (o 0,95 ainda é alto)
 
+# ── o fogo das últimas 24 h, pelos satélites da NASA (FIRMS, 10/10/2026) ──────────────────────────────────────────────
+# O foco do INPE conta só na última hora (os arquivos de 10 min): um fogo visto às 13h30 some da tela às 14h30, queimando ou não, e
+# o satélite polar só volta a passar umas 12 h depois. O FIRMS guarda as últimas passagens, com a força (FRP, em MW) e a confiança
+# de cada foco: fogo a até 5 km nas últimas 24 h é ATENÇÃO (o fogo pode estar vivo, ou ter queimado a vegetação até a cerca). Não
+# manda agir sozinho: agir continua sendo o foco da última hora do INPE, e o FIRMS diz se aquele foco foi confirmado e com que força.
+FOGO_24H_KM = 5.0          # fogo visto pela NASA a até 5 km da usina nas últimas 24 h: atenção
+FOGO_24H_H = 24
+NA_USINA_KM = 0.4          # foco a até 400 m do ponto da usina pode ser a PRÓPRIA usina: o reflexo do sol nos módulos ou um
+                           # telhado metálico quente viram foco (FAQ do FIRMS); continua contando, com o aviso de conferir
+CONFIRMA_KM, CONFIRMA_MIN = 1.0, 60     # foco do INPE e foco da NASA a até 1 km e 1 h: o mesmo fogo
+FRP_MEDIO_MW, FRP_FORTE_MW = 5.0, 20.0  # a força do fogo: fraco < 5 MW <= médio < 20 MW <= forte (medido em 10/10/2026, na seca:
+                                        # mediana de 6 MW, 90% abaixo de 25 MW)
+
 # ── os três níveis da usina (07/10/2026, Levi) ───────────────────────────────────────────────────────────────────────
 # O caso que os criou: em 06/10, no meio da seca, 145 das 154 usinas apareciam "com alerta" (aviso de baixa umidade e risco de
 # fogo alto cobrindo quase o Nordeste e o Centro-Oeste inteiros) e só 3 pediam alguma ação. Quando quase tudo é alerta, a lista
@@ -23,8 +36,9 @@ RISCO_CRITICO = 0.95       # ... e crítico > 0,95 (o 0,95 ainda é alto)
 #   Agir agora  foco de queimada a até 5 km (é um evento, não uma previsão); OU aviso do INMET "Grande Perigo" de qualquer
 #               evento; OU aviso "Perigo" de um evento que estraga usina (EVENTOS_QUE_ESTRAGAM_USINA)
 #   Atenção     qualquer outro aviso do INMET, em vigor ou futuro (Perigo Potencial; Perigo de evento fora da lista, que
-#               nunca some, só não manda agir); OU risco de fogo alto ou crítico em algum dos quatro dias (hoje a D+3)
-#   Sem alerta  nada disso, e só quando as três fontes foram lidas (a regra do "não dá para dizer" mora no visao.py)
+#               nunca some, só não manda agir); OU risco de fogo alto ou crítico em algum dos quatro dias (hoje a D+3); OU
+#               fogo visto pela NASA a até 5 km nas últimas 24 h (10/10/2026)
+#   Sem alerta  nada disso, e só quando as fontes foram lidas (a regra do "não dá para dizer" mora no visao.py)
 AGIR, ATENCAO, SEM_ALERTA = "agir", "atencao", "sem"
 ROTULO_NIVEL = {AGIR: "Agir agora", ATENCAO: "Atenção", SEM_ALERTA: "Sem alerta"}
 NIVEL_PERIGO, NIVEL_GRANDE_PERIGO = 2, 3        # os níveis do INMET: Perigo Potencial (1, amarelo), Perigo (2, laranja), Grande Perigo (3, vermelho)
@@ -89,12 +103,12 @@ def aviso_manda_agir(aviso) -> bool:
     return aviso.nivel == NIVEL_PERIGO and evento_estraga_usina(aviso.evento)
 
 
-def nivel_da_usina(avisos, tem_foco: bool, risco_alto: bool) -> str:
+def nivel_da_usina(avisos, tem_foco: bool, risco_alto: bool, fogo_24h: bool = False) -> str:
     """"agir", "atencao" ou "sem", pelos alertas que a usina TEM (os avisos já são os que a contêm, em vigor ou futuros). Se uma
     fonte não foi lida, "sem" não quer dizer "sem alerta": quem monta a tela é quem sabe disso (`visao.montar`)."""
     if tem_foco or any(aviso_manda_agir(a) for a in avisos):
         return AGIR
-    if avisos or risco_alto:
+    if avisos or risco_alto or fogo_24h:
         return ATENCAO
     return SEM_ALERTA
 
@@ -136,4 +150,45 @@ class IndiceFocos:
             return None
         d, f = min(achados, key=lambda par: par[0])           # no empate fica o primeiro achado, como antes
         return {"n": len(achados), "km": d, "satelite": f.satelite, "hora": f.data,
-                "ultima": max(g.data for _, g in achados)}
+                "ultima": max(g.data for _, g in achados), "foco": f}
+
+
+# ── o fogo da NASA (FIRMS, 10/10/2026) ───────────────────────────────────────────────────────────────────────────────
+
+def classe_frp(frp: float) -> str:
+    """A força do fogo em palavra: fraco < 5 MW <= médio < 20 MW <= forte."""
+    return "forte" if frp >= FRP_FORTE_MW else "médio" if frp >= FRP_MEDIO_MW else "fraco"
+
+
+def focos_nasa_24h(focos, ref):
+    """Os focos do FIRMS das últimas `FOGO_24H_H` horas até `ref` (com 10 min de folga para o relógio do satélite)."""
+    de, ate = ref - timedelta(hours=FOGO_24H_H), ref + timedelta(minutes=10)
+    return [f for f in focos if de <= f.data <= ate]
+
+
+def fogo_24h(indice, lat, lon, raio_km=FOGO_24H_KM):
+    """O fogo da NASA a até `raio_km` da usina (o `indice` já é só das últimas 24 h): None, ou o foco mais perto (`km`, `foco`),
+    quantos (`n`), o mais forte (`frp_max`) e o mais recente (`ultima`)."""
+    achados = indice.no_raio(lat, lon, raio_km)
+    if not achados:
+        return None
+    d, f = min(achados, key=lambda par: (par[0], -par[1].frp))
+    return {"n": len(achados), "km": d, "foco": f, "frp_max": max(g.frp for _, g in achados),
+            "ultima": max(g.data for _, g in achados)}
+
+
+def gravidade_do_fogo_24h(fogo: dict) -> int:
+    """Para a ordem dentro da Atenção (a régua de três degraus): 3 com fogo forte (20 MW ou mais) a até 5 km, ou com fogo a até 2 km
+    de confiança nominal ou alta; senão 2. Não muda o nível: fogo da NASA é atenção."""
+    perto_e_certo = fogo["km"] <= 2.0 and fogo["foco"].confianca != "baixa"
+    return 3 if fogo["frp_max"] >= FRP_FORTE_MW or perto_e_certo else 2
+
+
+def confirmacao(indice, foco):
+    """O foco da NASA que confirma um foco do INPE (a até `CONFIRMA_KM` e `CONFIRMA_MIN` dele): o de maior confiança e, no empate, o
+    mais forte; None sem confirmação. O VIIRS do INPE e o do FIRMS são a MESMA detecção (o INPE recebe o dado do mesmo satélite), e
+    aí o FIRMS traz o que o INPE não publica: a força e a confiança."""
+    ordem = {"alta": 2, "nominal": 1, "baixa": 0}
+    candidatos = [f for _d, f in indice.no_raio(foco.lat, foco.lon, CONFIRMA_KM)
+                  if abs((f.data - foco.data).total_seconds()) <= CONFIRMA_MIN * 60]
+    return max(candidatos, key=lambda f: (ordem.get(f.confianca, 0), f.frp)) if candidatos else None

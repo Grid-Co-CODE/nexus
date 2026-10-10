@@ -72,6 +72,17 @@ FOCO = {"o_que_e": "Um satélite viu fogo num ponto a até 5 km da usina na últ
                    "é risco real.",
         "na_usina": "O fogo na vegetação pode chegar aos módulos, aos cabos e à cerca.",
         "conferir": "Quem estiver perto confere o local; aceiro, roçagem e extintores."}
+# O fogo das últimas 24 h (10/10/2026): os focos dos satélites da NASA, que guardam as últimas passagens com a força e a confiança.
+FOGO_24H = {"o_que_e": f"Um satélite da NASA viu fogo a até 5 km da usina nas últimas 24 horas ({F.extenso('nasa_firms')}). Os "
+                       "satélites passam perto das 13h30 e da 01h30; o fogo pode ainda estar vivo ou já ter queimado o mato até perto "
+                       "da cerca.",
+            "na_usina": "Fogo que queimou perto pode voltar com o vento, e a vegetação queimada ou a fumaça sujam os módulos.",
+            "conferir": "Na próxima ronda: se o fogo chegou perto da cerca, o aceiro e a limpeza dos módulos."}
+# A força do fogo (FRP) e a confiança, no "Entenda os alertas" e na legenda do mapa
+FORCA_DO_FOGO = ("A força (FRP, em megawatts) é a energia que o fogo irradia, medida pelo satélite: quanto maior, maior o fogo. "
+                 "Fraco: abaixo de 5 MW. Médio: de 5 a 20 MW. Forte: 20 MW ou mais.")
+CONFIANCA = ("A confiança diz o quanto o satélite tem certeza de que é fogo: baixa (pode ser reflexo do sol ou telhado quente), "
+             "nominal ou alta. Foco a menos de 400 m da usina pode ser a própria usina: confira antes de acionar.")
 RISCO_FOGO = {"o_que_e": f"Previsão do {F.extenso('inpe')}, de 0 a 1, de quanto a vegetação em volta da usina pode pegar "
                          "fogo, pelo tempo seco, pelo calor e pelos dias sem chuva. Alto a partir de 0,70; crítico acima de 0,95.",
               "na_usina": "Com risco alto ou crítico, qualquer faísca ou queimada vizinha pode virar incêndio perto dos módulos.",
@@ -84,11 +95,11 @@ COMO_LER = (
                    "Perigo de tempestade, chuva forte, vento ou granizo.",
      "fazer": "Avisar o supervisor da região e conferir a usina assim que der."},
     {"id": "atencao", "rotulo": "Atenção",
-     "quer_dizer": f"Algum outro aviso do {F.extenso('inmet')} (agora ou nos próximos dias) ou risco de fogo alto ou "
-                   "crítico em algum dos próximos quatro dias.",
+     "quer_dizer": f"Algum outro aviso do {F.extenso('inmet')} (agora ou nos próximos dias), risco de fogo alto ou "
+                   "crítico em algum dos próximos quatro dias, ou fogo visto pelos satélites da NASA a até 5 km nas últimas 24 horas.",
      "fazer": "Acompanhar; nada a fazer agora."},
     {"id": "sem", "rotulo": "Sem alerta",
-     "quer_dizer": "Nenhum aviso, nenhum fogo perto e risco de fogo abaixo de alto, com as três fontes lidas.",
+     "quer_dizer": "Nenhum aviso, nenhum fogo perto e risco de fogo abaixo de alto, com as quatro fontes lidas.",
      "fazer": "Nada."},
 )
 

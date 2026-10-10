@@ -6,6 +6,7 @@
 {% set fo = v.camada_focos %}
 {% set cr = v.calor_risco %}
 {% set cd = v.calor_densidade %}
+{% set na = v.camada_nasa %}
 {% set rota = 'torre_performance.mapa_de_risco' %}
 {% macro nivel(id, rotulo, n, ajuda) -%}
 <li><a class="mp-leg-filtro" href="{{ url_for('torre_performance.mapa_de_risco', **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}"></span><span class="mp-leg-txt"><strong>{{ rotulo }}</strong> <span class="mp-leg-n">{{ n }}</span><span class="mp-leg-ajuda">{{ ajuda }}</span></span></a></li>
@@ -14,7 +15,7 @@
   <h2 class="mp-leg-h">Usinas{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>
   <ul class="mp-leg-lista">
     {{ nivel("agir", "Agir agora", v.contagem.agir, "foco a até 5 km, aviso Grande Perigo, ou aviso Perigo de um destes eventos: " ~ eventos|join(", ")) }}
-    {{ nivel("atencao", "Atenção", v.contagem.atencao, "qualquer outro aviso do " ~ v.nomes.inmet ~ ", em vigor ou futuro, ou risco de fogo alto ou crítico em algum dos quatro dias") }}
+    {{ nivel("atencao", "Atenção", v.contagem.atencao, "qualquer outro aviso do " ~ v.nomes.inmet ~ ", em vigor ou futuro, ou risco de fogo alto ou crítico em algum dos quatro dias, ou fogo visto pela NASA a até 5 km nas últimas 24 h") }}
     {# Com uma fonte sem leitura ninguém pode ser "Sem alerta": a linha some, e quem seria vira "Sem leitura completa" abaixo. #}
     {% if not v.sem_leitura_de %}
     {{ nivel("sem", v.rotulo_sem, v.contagem.sem, "nenhum aviso, foco a até 5 km nem risco de fogo alto") }}
@@ -102,6 +103,23 @@
   <p class="mp-leg-nota mp-leg-nota--atencao"><strong>Focos de queimada do {{ v.nomes.inpe }}:</strong> lendo agora, a camada aparece quando a leitura terminar.</p>
   {% else %}
   <p class="mp-leg-nota mp-leg-nota--fora"><strong>Focos de queimada do {{ v.nomes.inpe }}:</strong> sem leitura boa, a camada não aparece no mapa.</p>
+  {% endif %}
+  {# o fogo das últimas 24 h da NASA (10/10/2026): só a até 25 km das usinas, o tamanho do ponto é a força do fogo #}
+  {% if na %}
+  {% if na.estado == "ok" %}
+  <h2 class="mp-leg-h">Fogo nas últimas 24 h · {{ v.nomes.nasa_firms }}</h2>
+  <ul class="mp-leg-lista mp-leg-lista--curta mp-leg-nasa">
+    <li><span class="mp-chave mp-chave--anel-nasa"></span><div class="mp-leg-txt">Usina com fogo a até 5 km nas últimas 24 h</div></li>
+    {% for c in na.classes|reverse %}<li><span class="mp-chave mp-chave--nasa mp-chave--na-{{ c.css }}"></span><div class="mp-leg-txt"><strong>{{ c.rotulo }}</strong> {{ c.faixa }}</div></li>
+    {% endfor %}
+  </ul>
+  <p class="mp-leg-nota">{{ na.n }} {{ "detecção" if na.n == 1 else "detecções" }} a até {{ na.raio_km|int }} km das usinas nas últimas 24 h{% if v.regiao != "brasil" %} neste recorte{% endif %}, {{ na.n_perto }} a até 5 km{% if na.ate %}; passagens até {{ na.ate }}{% endif %}{% if na.lido %}; lidas às {{ na.lido }}{% endif %}.{% for q in na.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
+  <p class="mp-leg-nota">O tamanho é a força do fogo (FRP: a energia que ele irradia, em megawatts). Os satélites passam perto das 13h30 e da 01h30, e o dado chega em até 3 horas.</p>
+  {% elif na.estado == "lendo" %}
+  <p class="mp-leg-nota mp-leg-nota--atencao"><strong>Fogo nas últimas 24 h, {{ v.nomes.nasa_firms }}:</strong> lendo agora, a camada aparece quando a leitura terminar.</p>
+  {% else %}
+  <p class="mp-leg-nota mp-leg-nota--fora"><strong>Fogo nas últimas 24 h, {{ v.nomes.nasa_firms }}:</strong> sem leitura boa, a camada não aparece no mapa e o fogo das últimas 24 h não entra na cor das usinas.</p>
+  {% endif %}
   {% endif %}
   {% endif %}
 </aside>

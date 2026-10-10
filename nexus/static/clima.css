@@ -4,7 +4,10 @@
    As duas únicas coisas mais largas que o celular, a grade por estado e a matriz da Atenção, rolam DENTRO da própria caixa. */
 .cl{--cl-ok:var(--ok);--cl-atencao:var(--alerta);--cl-alto:var(--severo);--cl-critico:var(--critico);--cl-mudo:var(--fraco);
   --cl-ok-suave:var(--ok-a12);--cl-atencao-suave:var(--alerta-a12);--cl-alto-suave:var(--severo-suave);
-  --cl-critico-suave:var(--critico-suave);max-width:1280px;margin:0 auto;min-width:0}
+  --cl-critico-suave:var(--critico-suave);max-width:1280px;margin:0 auto;min-width:0;
+  /* o fogo das últimas 24 h da NASA (10/10/2026): um rosa-avermelhado quente, que não se confunde com o laranja dos focos da última
+     hora nem com o vermelho do "agir agora" */
+  --cl-nasa:var(--fogo-nasa)}
 .cl-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 16px}
 .cl-cab-txt{min-width:0}
 .cl-titulo{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}
@@ -216,3 +219,7 @@
   .cl-cel .cl-qual{grid-area:q;align-self:start}
   .cl-valor{font-size:28px;line-height:34px}
 }
+
+/* o fogo das últimas 24 h da NASA na célula "Fogo a até 5 km" da Atenção (10/10/2026): a força na espessura do sublinhado */
+.cl-fogo24{white-space:nowrap;border-bottom:2px solid var(--cl-nasa);cursor:help}
+.cl-fogo24--forte{border-bottom-width:3px;font-weight:600}

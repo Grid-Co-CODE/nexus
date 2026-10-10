@@ -398,10 +398,10 @@ def test_o_painel_das_fontes_e_o_mesmo_da_tela_principal(leituras):
         assert M.montar({}, cadastro=cad, ref=REF)["fontes"] == V.montar({}, cadastro=cad, ref=REF)["fontes"]
 
 
-def test_o_mapa_le_as_tres_fontes_pelo_cache_compartilhado_com_a_tela_principal(leituras):
+def test_o_mapa_le_as_fontes_pelo_cache_compartilhado_com_a_tela_principal(leituras):
     chamadas = tudo_instalado(leituras)
     montar()
-    assert sorted(chamadas) == ["avisos", "focos", "risco"]
+    assert sorted(chamadas) == ["avisos", "firms", "focos", "risco"]             # a NASA FIRMS desde 10/10/2026
 
 
 # ── o cadastro ───────────────────────────────────────────────────────────────────────────────────────────────────────

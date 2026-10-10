@@ -28,6 +28,8 @@
   --alerta-a16:rgba(255,216,61,.16); --alerta-a18:rgba(255,216,61,.18); --alerta-a35:rgba(255,216,61,.35);
   --alerta-a40:rgba(255,216,61,.4); --alerta-a45:rgba(255,216,61,.45); --alerta-a50:rgba(255,216,61,.5);
   --alerta-a55:rgba(255,216,61,.55); --alerta-a60:rgba(255,216,61,.6);
+  /* o fogo das últimas 24 h da NASA no Clima e risco (10/10/2026): não é o laranja do foco da última hora nem o vermelho do agir */
+  --fogo-nasa:#ff4f86;
   --severo:#ff9f43; --severo-suave:rgba(255,159,67,.14); --laranja:#ff9f5a; --laranja-a16:rgba(255,143,60,.16);
   --critico:#ff5b6e; --critico-suave:rgba(255,91,110,.14);
   --critico-a12:rgba(255,91,110,.12); --critico-a18:rgba(255,91,110,.18); --critico-a30:rgba(255,91,110,.30);
@@ -74,6 +76,7 @@
   --verde-a42:rgba(107,138,0,.5); --verde-a45:rgba(107,138,0,.5); --verde-a60:rgba(107,138,0,.7);
   /* semáforo: os fundos (a08 a a18) viram o suave do matiz, as bordas (a35 a a60) um contorno mais firme */
   --ok:#166b36; --ok-suave:rgba(31,136,61,.12); --ok-a12:rgba(31,136,61,.12);
+  --fogo-nasa:#c2185b;
   --alerta:#7a5200; --alerta-suave:rgba(230,175,46,.18);
   --alerta-a08:rgba(230,175,46,.12); --alerta-a10:rgba(230,175,46,.16); --alerta-a12:rgba(230,175,46,.16);
   --alerta-a16:rgba(230,175,46,.22); --alerta-a18:rgba(230,175,46,.24); --alerta-a35:rgba(176,124,0,.45);
