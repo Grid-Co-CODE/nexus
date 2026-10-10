@@ -20,6 +20,8 @@ a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gr
 - **R13, perfil de comunicação por cliente:** o que o cliente quer receber, quando e por onde, mais as regras dele
   (religamento suspenso, contato único). O mockup `Nexus_Mockup_GridCo_R13.html` mostra as telas.
 
+**Acompanhamento COS** (09/10/2026, porta única; não é para construir aqui): é a tela `/cos` da Plataforma de Performance (MTTA das OS), aberta numa moldura do Nexus. O `__init__.py` só declara a `Tela("acompanhamento")` e chama `registrar_molduras(bp, TORRE)`; a regra mora fora da área do COS (`nexus/torres/moldura.py` e `nexus/performance/porta.py`). Não renomeie o id: ele é o mesmo na plataforma.
+
 ## Como construir uma tela
 
 Crie uma view no `bp` desta torre **com a mesma rota da tela**. Ela vence o placeholder sozinha:

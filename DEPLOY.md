@@ -9,7 +9,7 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 
 | Caminho no pacote | O que é |
 |---|---|
-| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace, o token do repositório do PCM para Publicar no App (`NEXUS_PCM_GITHUB_TOKEN`, desde 09/10/2026). Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
+| `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace, o token do repositório do PCM para Publicar no App (`NEXUS_PCM_GITHUB_TOKEN`, desde 09/10/2026). Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`), a chave do passe da porta única (`NEXUS_SSO_CHAVE`, desde 09/10/2026, a MESMA da plataforma; seção 7e) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e a fila da Aprovação de OS usam a mesma) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
 | `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da tela Base → Ligações (o de-para entre as bases) |
@@ -215,12 +215,49 @@ Fracttal em dobro.
 
 ## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
 
+*Desde 09/10/2026 esta é só a RESERVA do Tempo real: com a porta única ligada (seção 7e) o Tempo real abre a tela da plataforma numa moldura, e a `NEXUS_PLATAFORMA_URL` fica vazia no servidor (sem ela, esta ponte não abre).*
+
 A aba Performance → Tempo real do Nexus mostra a plataforma de Performance por uma chave só de leitura. O Nexus já leva a
 chave; a plataforma precisa da mesma. No pacote vem à parte o arquivo `plataforma-tokens-nexus.txt`, com UMA linha
 `NEXUS_LEITURA_TOKEN=...`: acrescente no `tokens.txt` da raiz da plataforma, no servidor dela, e reinicie a plataforma.
 Conferir: no Nexus, **Performance → Tempo real** abre a Entrada da plataforma (antes disso, a aba diz "A plataforma
 recusou a chave"; o resto do Nexus não depende dela). Pelo Nexus, a API PV fica de fora por enquanto: só o que a
 plataforma já tem guardado.
+
+## 7e. Porta única: as telas da Performance dentro do Nexus (09/10/2026)
+
+Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo". O menu Performance do Nexus
+(e o Acompanhamento COS e as Chaves das fontes) abre as telas da plataforma de Performance numa moldura, com o login do
+Nexus: a página do Nexus manda um passe assinado (POST, vale 60 s, uma vez) a `/painel/nexus/entrar` da plataforma, que
+abre a sessão dela e mostra a tela. Os dois sistemas continuam onde estão (Nexus em `/nexus`, plataforma na raiz).
+
+**Tudo fica desligado até a T.I. pôr a chave nos DOIS.** Sem ela, no Nexus cada item diz "Performance ainda não ligada
+neste servidor" (o Tempo real segue pela leitura de 04/10, seção 7b, se ela estiver ligada) e, na plataforma,
+`/painel/nexus/*` responde 404. Publicar o código antes não muda nada para ninguém.
+
+**O que a T.I. faz, nesta ordem** (o código dos dois já no ar):
+
+1. Gerar UMA chave aleatória de 32 caracteres ou mais (no próprio servidor; não mande por e-mail aberto nem grupo):
+   ```
+   python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+2. No `.env` do **Nexus**: `NEXUS_SSO_CHAVE=<a chave>` e `NEXUS_PLATAFORMA_URL=` **vazia** (vazia = a própria origem,
+   `app.gridco.com.br`; a moldura só abre na mesma origem). A ponte de 04/10 (seção 7b) deixa de ter endereço e sai: com
+   a chave, o Tempo real já é a moldura. Reinicie: `sudo systemctl restart nexus`.
+3. No `.env` (ou `tokens.txt`) da **plataforma**: a MESMA `NEXUS_SSO_CHAVE=<a chave>` e `PLATAFORMA_ANALISTAS=*` (decisão
+   do Levi, 09/10: todo login do Nexus entra como analista; restringir depois é trocar o `*` por e-mails). Reinicie a
+   plataforma.
+4. Conferir:
+   - `curl -s -D - -o /dev/null -X POST https://app.gridco.com.br/painel/nexus/entrar` responde da plataforma
+     (`Server: waitress`, com `Via` do Caddy), e não 502 vazio do Caddy: sem passe, 403 com a chave e 404 sem ela;
+   - entrar no Nexus, abrir **Performance → Tempo real**: a Entrada da plataforma aparece dentro do Nexus, sem o menu
+     dela, e o endereço segue o que se abre lá dentro (`?p=...`); **Performance → Diagnóstico** lista as usinas;
+   - o Nexus e a plataforma abertos juntos no mesmo navegador sem um derrubar o login do outro (`nexus_sessao` em
+     `/nexus`, `session` da plataforma em `/`);
+   - **Sair** do Nexus volta ao Entrar e encerra também a sessão aberta na plataforma.
+5. Se algo der errado: tirar a `NEXUS_SSO_CHAVE` dos dois e reiniciar volta tudo ao de antes.
+
+Trocar a chave derruba as sessões abertas pelo passe (todos abrem de novo pelo menu), não a senha da plataforma.
 
 ## 7c. Performance → Clima e risco: só leitura de fontes públicas
 

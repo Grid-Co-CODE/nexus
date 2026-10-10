@@ -45,7 +45,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |
 | OS Creator embutido | `nexus/torres/oscreator/README.md` |
-| Performance (Tempo real pela ponte; Clima e risco, alertas públicos por usina; Mapa de risco com camadas de calor e modo TV) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
+| Performance (porta única: as telas da Plataforma de Performance numa moldura, com o passe `NEXUS_SSO_CHAVE`, o mapa das telas e a ponte de 04/10 como reserva do Tempo real; Clima e risco, alertas públicos por usina; Mapa de risco com camadas de calor e modo TV) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
 | PCM (programação semanal: gerar e, desde 09/10/2026, Publicar no App; Quadro da semana com a reprogramação de tarefas; Gestão PCM, o Plano & Fila das manutenções) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
 | Engenharia (Confiabilidade dos ativos, pelas OS de falha do Fracttal) | `nexus/torres/engenharia/CLAUDE.md` |
 | Segurança · HSEQ (Extintores: por usina e dia, por supervisor e o relatório em PDF; EPI e EPC: as luvas isolantes pela ronda diária) | `nexus/torres/hseq/CLAUDE.md` |
@@ -71,8 +71,10 @@ o Fracttal ao subir; nada sai para SunOp/API PV nem grava fora da máquina; entr
 depende da MESMA origem do servidor (moldura da plataforma, cookies, `postMessage`) se prova com as duas cópias atrás de
 `python ferramentas/porta_local.py` (o papel do Caddy: Nexus em `/nexus`, plataforma na raiz; `--modo raiz` é a fase 4;
 `--reescrita-do-servidor` imita a camada que o servidor tem hoje, ver `nexus/casca/CLAUDE.md`; para o Nexus se ver
-debaixo do `/nexus` como no servidor, suba a cópia com `--prefixo /nexus`). A cópia da plataforma é
-a `plataforma/subir_copia_de_prova.py` do PerformancePainel.
+debaixo do `/nexus` como no servidor, suba a cópia com `--prefixo /nexus`; para a moldura da Performance, com
+`--plataforma ""` e a mesma `NEXUS_SSO_CHAVE` pelo ambiente nas duas cópias, entrando por um nome `*.localhost` para os
+cookies não se misturarem com os da 5050 e da 5070). A cópia da plataforma é a `plataforma/subir_copia_de_prova.py` do
+PerformancePainel.
 
 ## Como o código está organizado
 

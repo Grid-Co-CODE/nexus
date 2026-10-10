@@ -5,9 +5,9 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 
 | Torre | Estado | Onde está a regra |
 |---|---|---|
-| `cos/` | em construção pelo dev do COS | `cos/CLAUDE.md` |
+| `cos/` | em construção pelo dev do COS; o Acompanhamento COS é a tela `/cos` da plataforma numa moldura (porta única) | `cos/CLAUDE.md` |
 | `oscreator/` | clone do OS Creator Web servido em `/os/*` | `oscreator/README.md` |
-| `performance/` | Tempo real = plataforma pela ponte, só leitura; Clima e risco = alertas públicos por usina (INMET e INPE), só leitura; as outras telas placeholder | `nexus/performance/CLAUDE.md` |
+| `performance/` | as telas da Plataforma de Performance (Tempo real, Painel NOC, Diagnóstico, Strings e trackers, Visão gerencial, Disponibilidade, Criador de relatório, Relatório semanal, Gêmeo digital, Histórico da plataforma, Monitor da ronda) numa moldura com o passe da porta única (09/10/2026); Clima e risco e Mapa de risco = alertas públicos por usina (INMET e INPE), só leitura | `nexus/performance/CLAUDE.md` (seção "Porta única") |
 | `pcm/` | telas da programação semanal e a Gestão PCM (Plano & Fila das manutenções, do painel do PCM) | `nexus/pcm/CLAUDE.md` (o código mora em `nexus/pcm/`) |
 | `base/`, `pessoas/` | telas do cadastro (BD_Operações); Base → Governança de dados é da camada de dados | `nexus/cadastro/CLAUDE.md`, `nexus/dados/CLAUDE.md` |
 | `campo/` | Visão do Nexus sobre o campo, sem Azure nem moldura: Atenção, PT, Rondas e Zeladoria são contas nossas (`nexus/campo/visao.py`); Aprovação e Triagem usam as regras copiadas do App; tudo pelos livros que o App grava no banco (Ordens, Imagens e Ranking saíram em 08/10/2026) | `campo/CLAUDE.md` |
@@ -38,5 +38,6 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
   do Acompanhamento de chamados (rótulo em cima, número colorido pela gravidade, o detalhe ao lado), que o Quadro da
   equipe já usa (`kb-kpis`). Tela nova com quadro ou faixa de números parte de um deles; mudou o desenho num, leve ao
   outro.
+- **Tela da Plataforma de Performance numa torre** (porta única, 09/10/2026): declare a `Tela` na `TORRE` com o id do mapa (`nexus/performance/porta.py`, `MAPA`) e chame `registrar_molduras(bp, TORRE)` (`nexus/torres/moldura.py`) depois do `criar_blueprint`; a view, o passe, o `?p=` e o item que acende vêm de lá. Tela nova no mapa muda também a cópia da plataforma (`plataforma/porta_nexus.py`) e o texto canônico dos dois testes. `moldura.py` é um módulo solto em `nexus/torres/`, como o `modelo.py`: a descoberta só olha os pacotes, então ele não vira torre.
 - `montar_menu` põe a torre da cadeira escolhida primeiro.
 - O módulo-modelo chama `modelo.py`, não `base.py`: `base` colidia com o pacote da torre Base.

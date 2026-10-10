@@ -11,7 +11,7 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início), `/cadeira` (troca), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu, `tema`) |
-| `nexus/auth/__init__.py` | `/entrar`, `/sair` e o portão (`before_request`) |
+| `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/cadeiras.py` | as 10 cadeiras; diretoria e chefia caem na torre Comando |
 | `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
@@ -47,6 +47,7 @@ na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho
   --reescrita-do-servidor` a imita. O `/saude` do servidor já respondeu um commit enquanto os estáticos eram de outro: lá ele
   não prova versão sozinho.
 - **O `nexus_tema` fica em `/`** (o botão grava pelo navegador; nome próprio, não colide).
+- **Endereço da PLATAFORMA é outra coisa** (porta única, 09/10/2026): as molduras da Performance escrevem, de propósito, endereços da plataforma na raiz (`/painel/nexus/entrar`, `/painel/nexus/sair` e as telas do mapa, como `/tempo-real` no "Abrir em outra aba"), porque ela mora na raiz ao lado do Nexus. Esses não levam `{{ raiz }}`: no template a variável se chama `plataforma` (`{{ plataforma }}/painel/nexus/entrar`, que o varredor estático aceita) e o rastreador os separa (`da_plataforma`). No JavaScript, a plataforma se pede por URL completa (o calço da camada da T.I. poria `/nexus` num `fetch("/api/...")`). Regra em `nexus/performance/CLAUDE.md`, seção "Porta única".
 - **Prova:** `tests/test_prefixo.py` (o rastreador `tests/rastreador_de_links.py` percorre todas as páginas a partir do
   Início, logado como admin e no OS Creator embutido, nos modos Caddy cortando, sem cortar, `SCRIPT_NAME` por outro meio e
   raiz, e falha com qualquer endereço interno fora do prefixo; mais o varredor estático de templates, `.js` e `redirect`).
