@@ -25,6 +25,7 @@ RESUMO = {
     "extintor": "Cada extintor das usinas, com as validades e a última conferência",
     "conferencia_extintor": "Cada conferência mensal de extintor feita pelo App",
     # ── Performance ──
+    "decisao_cobertura": "Que usina de cada fonte entra no tempo real, decidido pela tela",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -66,6 +67,9 @@ PARA_QUE = {
     "pt": "Guarda cada Permissão de Trabalho (PT) pedida pelo técnico no App, uma linha por equipamento: quem pediu, "
           "quem decidiu, quanto tempo esperou e se o equipamento precisou parar. Serve para acompanhar a segurança e "
           "o tempo de liberação do trabalho no campo.",
+    "decisao_cobertura": "Guarda cada decisão de incluir ou tirar uma usina de uma fonte do tempo real, tomada por um "
+                         "administrador na tela Fontes do tempo real. A Plataforma de Performance lê esta tabela e só "
+                         "coleta e mostra as usinas incluídas; usina nova numa fonte espera a liberação.",
     "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) sobre uma PT tomada no Nexus pelo supervisor. O "
                   "App de Campo lê esta tabela e aplica a decisão na PT do técnico. O motivo é gravado sem dado "
                   "pessoal, porque o técnico o lê.",

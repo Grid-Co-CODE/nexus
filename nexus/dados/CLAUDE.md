@@ -54,6 +54,14 @@ hora em hora do servidor passa a gravar o que está marcado "grava"). A exceçã
 o motivo vai mascarado (e-mail e número viram marcador), porque o técnico lê e a API é de leitura aberta. Ela grava
 por número e pega a 1ª linha da PT: antes da 1ª gravação, levar o `codigo_ativo` e a aba `fato_decisao_pt` (decisão 4).
 
+**Fontes do tempo real (11/10/2026):** a tela da plataforma `/admin/tempo-real` (no Nexus, Base · Fontes do tempo real, só
+admin) grava `nexus_tempo_real · fato_decisao_cobertura` (grão: 1 linha = 1 decisão de incluir ou excluir 1 usina de 1
+fonte; só acrescenta, o vigente é a última de cada fonte e chave). A usina vai pela chave NATIVA da fonte (plant_id da
+API PV, código da SunOp, site da SolarEdge, power_plant_id do banco, id do scadaGridco) e o `usina_id` fica vazio até o
+plant_id por fonte entrar no de_para (pendência 10). Sem pessoa no banco: quem decidiu fica no log da máquina da
+plataforma. Origem `migracao` = a foto do dia em que a fonte passou a ser controlada pela tela. Quem lê é a plataforma (PC
+e servidor), com cache de 60 s; a regra e as travas moram no `plataforma/CLAUDE.md` (seção "Fontes do tempo real").
+
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da
 ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) e gravadas por

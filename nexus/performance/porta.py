@@ -59,6 +59,10 @@ MAPA = (
     TelaDaPlataforma("cos", "acompanhamento", "Acompanhamento COS", "/cos", (), False),
     # /tokens grava as chaves das fontes (SunOp, Axis, Plataforma): administração, só admin do Nexus (spec 5.3)
     TelaDaPlataforma("base", "chaves-fontes", "Chaves das fontes", "/tokens", (), True),
+    # Fontes do tempo real (11/10/2026, Levi: "um espaço para administração do que entra no tempo real onde eu possa
+    # através da fonte permitir qual usina entra e qual não entra"): quais usinas de cada fonte a plataforma coleta e
+    # mostra. Administração: só admin do Nexus.
+    TelaDaPlataforma("base", "fontes-tempo-real", "Fontes do tempo real", "/admin/tempo-real", (), True),
 )
 
 # As duas rotas da porta na plataforma: não são telas, mas o Nexus as escreve (o formulário do passe e o Sair).

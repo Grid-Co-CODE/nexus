@@ -34,8 +34,9 @@ performance|relatorio-semanal|/relatorio/semanal||
 performance|gemeo|/gemeo/|/gemeo/<path:resto>|
 performance|monitor-ronda|/ronda/monitor||
 cos|acompanhamento|/cos||
-base|chaves-fontes|/tokens||admin"""
-ASSINATURA_DA_PLATAFORMA = "cf3d44320c8225cf"
+base|chaves-fontes|/tokens||admin
+base|fontes-tempo-real|/admin/tempo-real||admin"""
+ASSINATURA_DA_PLATAFORMA = "35c2ddcb8944b23a"
 
 
 def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
@@ -49,7 +50,7 @@ def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
 def test_o_mapa_e_o_mesmo_da_plataforma():
     assert porta.texto_canonico_do_mapa() == TEXTO_DA_PLATAFORMA
     assert porta.assinatura_do_mapa() == ASSINATURA_DA_PLATAFORMA
-    assert len(porta.MAPA) == 12 and len({(t.torre, t.tela) for t in porta.MAPA}) == 12
+    assert len(porta.MAPA) == 13 and len({(t.torre, t.tela) for t in porta.MAPA}) == 13
 
 
 @pytest.mark.parametrize("caminho, tela", [
@@ -59,7 +60,7 @@ def test_o_mapa_e_o_mesmo_da_plataforma():
     ("/gerencial", "gerencial"), ("/gerencial/disponibilidade", "disponibilidade"), ("/relatorio", "relatorio"),
     ("/relatorio/semanal", "relatorio-semanal"), ("/gemeo/", "gemeo"), ("/gemeo/usina/12", "gemeo"),
     ("/ronda/monitor", "monitor-ronda"), ("/cos", "acompanhamento"),
-    ("/tokens", "chaves-fontes"),
+    ("/tokens", "chaves-fontes"), ("/admin/tempo-real", "fontes-tempo-real"),
 ])
 def test_cada_caminho_cai_na_tela_certa(caminho, tela):
     assert porta.tela_do_caminho(caminho).tela == tela

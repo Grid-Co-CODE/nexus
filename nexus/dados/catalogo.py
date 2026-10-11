@@ -233,6 +233,23 @@ FATOS = (
                     "ativo dele ainda alimentam a dimensão de equipamento"),
     # ── Performance ────────────────────────────────────────────────────────────────────────────────────────────
     # geração em linhas (08/10/2026, passo 6c): a fonte larga (um inversor por coluna) vira dois fatos
+    # Fontes do tempo real (11/10/2026, Levi: "um espaço para administração do que entra no tempo real onde eu possa
+    # através da fonte permitir qual usina entra e qual não entra"). Quem grava é a tela da plataforma (/admin/tempo-real,
+    # só admin; plataforma/cobertura.py no PerformancePainel); a plataforma do PC e a do servidor leem com cache de 60 s e
+    # filtram a lista de cada fonte ANTES da coleta (Tempo real, Monitoramento, Painel NOC e ronda).
+    Fato("decisao_cobertura", "Decisão de cobertura do tempo real", "performance",
+         "nexus_tempo_real · fato_decisao_cobertura",
+         "1 linha = 1 decisão de incluir ou excluir 1 usina (a chave nativa da fonte) de 1 fonte do tempo real",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)"),
+            usina=("nao", "a chave nativa da fonte (plant_id da API PV, id da SunOp, site da SolarEdge, power_plant_id "
+                          "do banco, id do scadaGridco): o plant_id por fonte ainda não está no de_para (pendência 10)")),
+         tipo="sem_medida", chave=("decidida_em", "fonte", "chave"),
+         fontes=("nexus_tempo_real · fato_decisao_cobertura",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada fonte e chave)",
+         observacao="fonte = a chave da aba do Monitoramento (pv, pg, sunop, axis, solaredge, semp, alveslima, 2capi, "
+                    "greenyellow, salenergia); origem 'migracao' = a foto do dia em que a fonte passou a ser controlada "
+                    "pela tela, 'tela' = a decisão de um administrador. Quem decidiu fica no log da máquina "
+                    "(logs/cobertura.log da plataforma), não no banco (regra 8)"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -386,6 +403,9 @@ LIVROS = (
           "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10"),
     Livro("nexus_pt_decisoes", ("decisoes",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "0 linhas em 08/10"),
+    Livro("nexus_tempo_real", ("fato_decisao_cobertura",), "a cada decisão na tela Fontes do tempo real",
+          "plataforma/cobertura.py (PerformancePainel), pela tela /admin/tempo-real da plataforma", False,
+          "registrado em 11/10/2026, antes da 1ª gravação; a plataforma lê com cache de 60 s, no PC e no servidor"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # As abas que não são fato_/dim_/<dimensão>_historico/qualidade/atualizacao, e por quê (regra 10).

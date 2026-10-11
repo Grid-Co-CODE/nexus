@@ -59,6 +59,11 @@ TORRE = Torre(
         Tela("chaves-fontes", "Chaves das fontes",
              "As chaves das fontes da Performance estão válidas, e quando vencem?",
              "Plataforma de Performance (/tokens), só administrador"),
+        # Fontes do tempo real (11/10/2026): quais usinas de cada fonte entram no tempo real (e são coletadas), e as novas
+        # esperando liberação. A tela é da plataforma (/admin/tempo-real), numa moldura; só administrador.
+        Tela("fontes-tempo-real", "Fontes do tempo real",
+             "Quais usinas de cada fonte entram no tempo real, e quais estão esperando liberação?",
+             "Plataforma de Performance (/admin/tempo-real) e o livro nexus_tempo_real no banco, só administrador"),
         # Acessos (11/10/2026: "Tem algum canto do Nexus onde eu posso administrar isso?"): quem é administrador, dar e
         # tirar pela tela, e quem entrou em 30 dias. Só administrador. A view e as regras moram em nexus/auth/.
         Tela("acessos", "Acessos",
