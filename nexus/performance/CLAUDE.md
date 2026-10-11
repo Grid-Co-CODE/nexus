@@ -30,7 +30,7 @@ navegador fala com cada sistema.
   | cos · `acompanhamento` | `/cos` |
   | base · `chaves-fontes` (só admin) | `/tokens` |
   | base · `fontes-tempo-real` (só admin, 11/10/2026) | `/admin/tempo-real`: quais usinas de cada fonte entram no tempo real |
-  | base · `de-para-equipamentos` (só admin, 11/10/2026) | `/admin/de-para`: como cada usina de cada fonte se liga ao cadastro (fatia 1, só leitura) |
+  | base · `de-para-equipamentos` (só admin, 11/10/2026) | `/admin/de-para`: como cada usina de cada fonte se liga ao cadastro, e o editor (ponte pelo id, nome de cada inversor) |
 
   Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco e Mapa de risco são do Nexus e ficam fora.
   Em 11/10/2026 o Histórico da plataforma saiu do mapa, dos dois lados, com a rota e o template na plataforma (Levi:

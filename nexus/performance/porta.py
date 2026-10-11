@@ -64,7 +64,7 @@ MAPA = (
     # mostra. Administração: só admin do Nexus.
     TelaDaPlataforma("base", "fontes-tempo-real", "Fontes do tempo real", "/admin/tempo-real", (), True),
     # De-para de equipamentos (11/10/2026, Levi: "quero que o de-para da equipamentos seja feito na plataforma de forma
-    # intuitiva"): fatia 1, o diagnóstico (como cada usina de cada fonte se liga ao cadastro). Só admin do Nexus.
+    # intuitiva"): o diagnóstico e o editor (a ponte da usina pelo id e o nome de cada inversor). Só admin do Nexus.
     TelaDaPlataforma("base", "de-para-equipamentos", "De-para de equipamentos", "/admin/de-para", (), True),
 )
 

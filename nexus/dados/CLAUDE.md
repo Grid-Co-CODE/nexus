@@ -62,6 +62,13 @@ plant_id por fonte entrar no de_para (pendência 10). Sem pessoa no banco: quem 
 plataforma. Origem `migracao` = a foto do dia em que a fonte passou a ser controlada pela tela. Quem lê é a plataforma (PC
 e servidor), com cache de 60 s; a regra e as travas moram no `plataforma/CLAUDE.md` (seção "Fontes do tempo real").
 
+**De-para de equipamentos (11/10/2026):** a tela da plataforma `/admin/de-para` (no Nexus, Base · De-para de
+equipamentos, só admin) grava no livro `nexus_depara · fato_decisao_depara` (`catalogo.py`, sem medida): 1 linha = 1
+decisão de ligar 1 usina (id na fonte) ou 1 inversor (id na fonte) ao cadastro, pela chave de negócio do Equipamentos
+(Usina Supervisório, Equipamento Supervisório), que a plataforma confere antes de gravar. Vence o de-para em código da
+plataforma; livro ilegível = vale o código. Quando o de_para do cadastro ganhar o sistema plant_id (pendência 10), a ponte
+da usina migra para lá; a regra mora no `plataforma/CLAUDE.md` (seção "De-para de equipamentos").
+
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da
 ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) e gravadas por

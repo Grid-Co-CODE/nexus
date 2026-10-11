@@ -64,11 +64,12 @@ TORRE = Torre(
         Tela("fontes-tempo-real", "Fontes do tempo real",
              "Quais usinas de cada fonte entram no tempo real, e quais estão esperando liberação?",
              "Plataforma de Performance (/admin/tempo-real) e o livro nexus_tempo_real no banco, só administrador"),
-        # De-para de equipamentos (11/10/2026): como cada usina de cada fonte se liga ao cadastro (esperadas, inversores, de
-        # onde vem cada nome). Fatia 1: só leitura. A tela é da plataforma (/admin/de-para), numa moldura; só administrador.
+        # De-para de equipamentos (11/10/2026): como cada usina de cada fonte se liga ao cadastro, e o editor (a ponte da
+        # usina pelo id, o nome de cada inversor, a sugestão pelo kWh). A tela é da plataforma (/admin/de-para), numa
+        # moldura; grava no livro nexus_depara; só administrador.
         Tela("de-para-equipamentos", "De-para de equipamentos",
-             "Cada usina de cada fonte está ligada certo ao cadastro (esperadas, inversores, nomes)?",
-             "Plataforma de Performance (/admin/de-para) sobre a aba Equipamentos do BD_Performance, só administrador"),
+             "Ligar cada usina e cada inversor de cada fonte ao cadastro, com a sugestão pelo kWh do BD",
+             "Plataforma de Performance (/admin/de-para) e o livro nexus_depara no banco, só administrador"),
         # Acessos (11/10/2026: "Tem algum canto do Nexus onde eu posso administrar isso?"): quem é administrador, dar e
         # tirar pela tela, e quem entrou em 30 dias. Só administrador. A view e as regras moram em nexus/auth/.
         Tela("acessos", "Acessos",

@@ -250,6 +250,27 @@ FATOS = (
                     "greenyellow, salenergia); origem 'migracao' = a foto do dia em que a fonte passou a ser controlada "
                     "pela tela, 'tela' = a decisão de um administrador. Quem decidiu fica no log da máquina "
                     "(logs/cobertura.log da plataforma), não no banco (regra 8)"),
+    # De-para de equipamentos (11/10/2026, Levi: "quero que o de-para da equipamentos seja feito na plataforma de forma
+    # intuitiva"): a tela /admin/de-para da plataforma liga a usina que a API renomeou (pelo id) e o inversor que a fonte
+    # não nomeia (conta oem@ da API PV, scadaGridco) ao cadastro. A decisão vence o de-para em código da plataforma.
+    Fato("decisao_depara", "Decisão de de-para de equipamento", "performance",
+         "nexus_depara · fato_decisao_depara",
+         "1 linha = 1 decisão de ligar 1 usina (o id dela na fonte) ou 1 inversor (o id dele na fonte) de 1 fonte ao "
+         "cadastro (aba Equipamentos do BD_Performance)",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)"),
+            usina=("nao", "usina_fonte (o id na fonte) + usina_supervisorio (chave de negócio do Equipamentos); o "
+                          "plant_id por fonte ainda não está no de_para (pendência 10)"),
+            equipamento=("nao", "inversor_fonte (o id na fonte) + equipamento_supervisorio (chave de negócio do "
+                                "Equipamentos)")),
+         tipo="sem_medida", chave=("decidida_em", "fonte", "usina_fonte", "inversor_fonte"),
+         fontes=("nexus_depara · fato_decisao_depara",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada fonte, usina e inversor)",
+         observacao="fonte = a chave da aba do Monitoramento; a usina liga nas contas da API PV (pv, semp, alveslima, "
+                    "2capi) e o inversor na conta oem@ (semp, alveslima, 2capi) e no scadaGridco (greenyellow, "
+                    "salenergia). inversor_fonte vazio = a linha é da usina. Valor vazio = desfaz (vale o nome da API ou "
+                    "o de-para em código). O cadastro entra pela chave de negócio, que a plataforma confere antes de "
+                    "gravar (nunca texto livre). Quem decidiu fica no log da máquina (logs/depara.log da plataforma), "
+                    "não no banco (regra 8)"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -405,6 +426,9 @@ LIVROS = (
           "0 linhas em 08/10"),
     Livro("nexus_tempo_real", ("fato_decisao_cobertura",), "a cada decisão na tela Fontes do tempo real",
           "plataforma/cobertura.py (PerformancePainel), pela tela /admin/tempo-real da plataforma", False,
+          "registrado em 11/10/2026, antes da 1ª gravação; a plataforma lê com cache de 60 s, no PC e no servidor"),
+    Livro("nexus_depara", ("fato_decisao_depara",), "a cada decisão na tela De-para de equipamentos",
+          "plataforma/depara.py (PerformancePainel), pela tela /admin/de-para da plataforma", False,
           "registrado em 11/10/2026, antes da 1ª gravação; a plataforma lê com cache de 60 s, no PC e no servidor"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
