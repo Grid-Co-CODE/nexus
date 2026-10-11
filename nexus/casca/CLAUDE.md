@@ -138,6 +138,16 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
 - **Arquivo que não abre FECHA:** JSON corrompido = nenhum admin da tela (só os do servidor), a tela mostra o aviso
   crítico e se recusa a gravar por cima (409), porque gravar apagaria o que estava nele. Erro de disco passageiro não fica
   no cache: o próximo pedido tenta de novo.
+- **A leitura da lista nunca derruba o portão** (revisão de 11/10/2026). `acessos._ler` só levanta `Ilegivel`: o `stat`
+  e a leitura que dão qualquer `OSError` (a pasta de dados sem permissão de busca para o usuário do serviço; a
+  `NEXUS_DADOS` apontando para um arquivo, `NotADirectoryError` no Linux), bytes que não são UTF-8 (`UnicodeDecodeError`)
+  e JSON aninhado a fundo (`RecursionError`) viram "não abriu" ou "corrompido". O caso que criou a regra: só o
+  `FileNotFoundError` era tratado no `stat`, e o `PermissionError` subia por `admins_da_tela` → `_admin_em_dia` →
+  portão, 500 em TODO pedido de toda sessão do Fracttal (o Início e o login incluídos); a senha de administrador não
+  passa por `_admin_em_dia`, por isso quem testava com ela não via. `admins_da_tela` ainda tem um `except Exception` de
+  garantia, que fecha do mesmo jeito. O erro que persiste vai ao journal **uma vez** (`_avisar_uma_vez`), não a cada
+  pedido. Se o `stat` falhar depois de o arquivo já ter sido trocado, a gravação conta como feita (o cache sai), para a
+  tela não dizer "nada mudou" com a mudança no disco.
 - **POST só da própria página:** `Sec-Fetch-Site`/`Origin` com a régua da moldura (`moldura._de_outro_site`) e um código do
   formulário guardado na sessão (o login troca). E-mail validado: sem espaço nas pontas, minúsculas, nenhum espaço ou
   vírgula no meio, `nome@dominio.tld`, até 254 caracteres. Gravou: 303 de volta à tela (F5 não repete).
@@ -147,7 +157,8 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   dar acesso vira admin no login seguinte e já no próximo pedido; tirar vale no próximo pedido; auditoria e teto dela;
   escrita atômica com a troca falhando e com a escrita parando no meio; 20 threads sem perder mudança; corrompido fecha
   e não é sobrescrito; e-mails inválidos; POST de outro site ou sem o código; ninguém se tira sozinho por engano; o
-  registro de logins com teto e janela, e que falha sem barrar a entrada).
+  registro de logins com teto e janela, e que falha sem barrar a entrada; a pasta sem permissão, o arquivo que não é
+  UTF-8 e o aninhado a fundo deixam o Início em 200 e fecham, com o aviso na tela e uma linha só no journal).
 
 ## Regras que já custaram caro
 

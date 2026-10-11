@@ -369,3 +369,105 @@ def test_registro_de_logins_que_falha_nao_impede_a_entrada(app, fracttal_falso, 
     monkeypatch.setattr(A, "_gravar_atomico", falha)
     c = _pelo_fracttal(app, PESSOA)
     assert c.get("/").status_code == 200
+
+
+# ── pasta de dados que não abre (revisão de 11/10/2026) ────────────────────────────────────────────────────────
+
+
+def _stat_negado(monkeypatch, *nomes):
+    """O `stat` do arquivo (e só dele) dá PermissionError: é o que acontece com a pasta de dados sem permissão de busca
+    para o usuário do serviço; no Linux, a NEXUS_DADOS apontando para um arquivo dá NotADirectoryError no mesmo lugar."""
+    from pathlib import Path
+    original = Path.stat
+
+    def stat(self, *a, **k):
+        if self.name in nomes:
+            raise PermissionError(13, "Permission denied", str(self))
+        return original(self, *a, **k)
+    monkeypatch.setattr(Path, "stat", stat)
+
+
+def test_pasta_sem_permissao_nao_derruba_o_nexus_e_fecha(app, fracttal_falso, monkeypatch):
+    # antes da correção, o stat que não era FileNotFoundError subia pelo portão: 500 em TODO pedido de toda sessão do
+    # Fracttal (o Início incluído) e no próprio login; a senha de administrador não passa por _admin_em_dia, por isso
+    # quem testava com ela não via
+    A.adicionar(app.config, PESSOA, "teste", set())
+    pessoa = _pelo_fracttal(app, PESSOA)
+    assert _sessao(pessoa)["admin"] is True
+    _stat_negado(monkeypatch, A.ARQUIVO, A.ARQUIVO_LOGINS)
+    assert pessoa.get("/").status_code == 200                               # o Nexus segue de pé
+    assert _sessao(pessoa)["admin"] is False                                # e fecha: só os do servidor valem
+    assert A.admins_da_tela(app.config) == set()
+    assert pessoa.get(URL).status_code == 403
+    outra = _pelo_fracttal(app, OUTRA)                                      # o login também não cai
+    assert outra.get("/").status_code == 200 and _sessao(outra)["admin"] is False
+    assert _sessao(_pelo_fracttal(app, SERVIDOR))["admin"] is True          # o do servidor segue administrador
+    adm = _admin(app)
+    r = adm.get(URL)
+    assert r.status_code == 200                                             # a tela abre, com o aviso
+    html = r.get_data(as_text=True)
+    assert "A lista da tela não abriu" in html and "PermissionError" in html
+    assert 'name="acao" value="adicionar"' not in html
+    with adm.session_transaction() as s:
+        s["acessos_codigo"] = "codigo-certo"
+    r = adm.post(URL, data={"codigo": "codigo-certo", "acao": "adicionar", "email": OUTRA})
+    assert r.status_code == 409                                             # e não grava por cima do que não abriu
+    monkeypatch.undo()
+    assert A.admins_da_tela(app.config) == {PESSOA}                         # a permissão voltou: a lista volta
+
+
+def test_erro_de_pasta_vai_ao_log_uma_vez_e_nao_a_cada_pedido(app, monkeypatch, caplog):
+    # o portão consulta a lista a cada pedido: registrar a cada clique encheria o journal; uma linha por mudança basta
+    monkeypatch.setattr(A, "_AVISADO", {})
+    _stat_negado(monkeypatch, A.ARQUIVO)
+    with caplog.at_level("WARNING", logger=A.__name__):
+        for _ in range(5):
+            assert A.admins_da_tela(app.config) == set()
+    assert sum("não abriu agora" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_arquivo_que_nao_e_utf8_fecha_e_nao_derruba(app, fracttal_falso):
+    # bytes que não são UTF-8 (disco, ou salvo à mão em outra codificação) davam UnicodeDecodeError, que não é OSError
+    # nem passava pelo json: mesmo 500 em todo pedido do Fracttal
+    A.adicionar(app.config, PESSOA, "teste", set())
+    pessoa = _pelo_fracttal(app, PESSOA)
+    _arquivo(app).write_bytes(b'{"admins": [{"email": "\xff\xfe"}]}')
+    assert A.admins_da_tela(app.config) == set()
+    assert pessoa.get("/").status_code == 200 and _sessao(pessoa)["admin"] is False
+    assert "A lista da tela não abriu" in _admin(app).get(URL).get_data(as_text=True)
+
+
+def test_arquivo_aninhado_demais_fecha_e_nao_derruba(app, fracttal_falso):
+    # o json do Python estoura a recursão (RecursionError, não ValueError) num arquivo aninhado a fundo
+    pessoa = _pelo_fracttal(app, PESSOA)
+    _arquivo(app).parent.mkdir(parents=True, exist_ok=True)
+    _arquivo(app).write_text("[" * 200000 + "]" * 200000, encoding="utf-8")
+    assert A.admins_da_tela(app.config) == set()
+    assert pessoa.get("/").status_code == 200
+    assert "A lista da tela não abriu" in _admin(app).get(URL).get_data(as_text=True)
+
+
+def test_admins_da_tela_nunca_levanta(app, monkeypatch, caplog):
+    # a garantia do portão: qualquer erro inesperado na leitura fecha (nenhum da tela) e fica no journal
+    def explode(*a, **k):
+        raise KeyError("inesperado")
+    monkeypatch.setattr(A, "_AVISADO", {})
+    monkeypatch.setattr(A, "_ler", explode)
+    with caplog.at_level("ERROR", logger=A.__name__):
+        assert A.admins_da_tela(app.config) == set()
+        assert A.admins_da_tela(app.config) == set()
+    assert sum("KeyError" in r.getMessage() for r in caplog.records) == 1    # uma linha, não uma por pedido
+
+
+def test_gravou_mas_o_stat_depois_falhou_nao_diz_que_nada_mudou(app, monkeypatch):
+    # o arquivo já foi trocado: um erro do stat dali para a frente faria a tela dizer "nada mudou" com a mudança no disco
+    original = A._trocar
+
+    def trocar_e_negar(tmp, p):
+        original(tmp, p)
+        _stat_negado(monkeypatch, A.ARQUIVO)
+    monkeypatch.setattr(A, "_trocar", trocar_e_negar)
+    assert A.adicionar(app.config, PESSOA, "teste", set()) == PESSOA
+    monkeypatch.undo()
+    assert A.admins_da_tela(app.config) == {PESSOA}
+    assert [a["email"] for a in _lido(app)["admins"]] == [PESSOA]

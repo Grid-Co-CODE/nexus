@@ -50,6 +50,8 @@ _TRAVA = threading.RLock()
 # {caminho: ((mtime_ns, tamanho), dado)}: o portão consulta a lista a cada pedido; um stat por pedido, e o arquivo só é
 # relido quando muda
 _CACHE: dict[str, tuple] = {}
+# {chave: último aviso registrado}: o erro que persiste vai ao journal uma vez, não a cada pedido (`_avisar_uma_vez`)
+_AVISADO: dict[str, str] = {}
 _BRT = timezone(timedelta(hours=-3))
 
 
@@ -124,17 +126,46 @@ def _forma_logins(dado) -> dict:
     return {"versao": 1, "logins": {str(k): v for k, v in dado.get("logins", {}).items() if isinstance(v, str)}}
 
 
+def _avisar_uma_vez(chave: str, nivel: int, texto: str, exc_info: bool = False) -> None:
+    """Registra no journal só quando o aviso MUDA: o portão lê a lista a cada pedido, e um erro que persiste (a pasta
+    sem permissão) encheria o journal com uma linha por clique. `_esquecer_aviso` rearma quando volta a funcionar."""
+    if _AVISADO.get(chave) != texto:
+        _AVISADO[chave] = texto
+        log.log(nivel, "%s", texto, exc_info=exc_info)
+
+
+def _esquecer_aviso(chave: str) -> None:
+    _AVISADO.pop(chave, None)
+
+
+def _nao_abriu(p: Path, e: OSError) -> Ilegivel:
+    """O arquivo não abriu agora, por falha de disco ou de permissão e não de conteúdo: não vai ao cache (o próximo pedido
+    tenta de novo) e vai ao journal uma vez."""
+    erro = Ilegivel(f"o arquivo {p.name} não abriu agora ({type(e).__name__})")
+    _CACHE.pop(str(p), None)
+    _avisar_uma_vez(str(p), logging.WARNING, f"Acessos: {erro} ({e}); só os administradores do servidor "
+                                             "(NEXUS_ADMINS) valem enquanto isso.")
+    return erro
+
+
 def _ler(p: Path, forma) -> dict | None:
     """O arquivo já na forma certa (cópia do cache: quem recebe pode mexer), ou None se ele não existe.
-    Ilegivel se existe e não abre. Corrompido fica no cache até o arquivo mudar (o portão lê a cada pedido: nada de
-    reler e registrar o erro a cada clique); falha de disco passageira (o Windows recusa a abertura no meio de uma troca
-    por outro processo) não fica: o próximo pedido tenta de novo."""
+    Ilegivel se existe e não abre, e NADA além disso sobe daqui: o portão chama isto a cada pedido de toda sessão do
+    Fracttal, e um erro que escapasse viraria 500 no Nexus inteiro (revisão de 11/10/2026: a pasta de dados sem
+    permissão de busca dava PermissionError no stat, que não é FileNotFoundError, e derrubava até o Início).
+    Corrompido fica no cache até o arquivo mudar (o portão lê a cada pedido: nada de reler e registrar o erro a cada
+    clique); falha de disco ou de permissão (o Windows recusa a abertura no meio de uma troca por outro processo; a
+    pasta sem permissão; a NEXUS_DADOS apontando para um arquivo, NotADirectoryError no Linux) não fica: o próximo
+    pedido tenta de novo."""
     with _TRAVA:
         try:
             st = p.stat()
         except FileNotFoundError:
             _CACHE.pop(str(p), None)
+            _esquecer_aviso(str(p))
             return None
+        except OSError as e:
+            raise _nao_abriu(p, e) from None
         chave = (st.st_mtime_ns, st.st_size)
         guardado = _CACHE.get(str(p))
         if guardado and guardado[0] == chave:
@@ -142,12 +173,16 @@ def _ler(p: Path, forma) -> dict | None:
                 raise guardado[1]
             return copy.deepcopy(guardado[1])
         try:
-            texto = p.read_text(encoding="utf-8")
+            bruto = p.read_bytes()
         except OSError as e:
-            raise Ilegivel(f"o arquivo {p.name} não abriu agora ({type(e).__name__})") from None
+            raise _nao_abriu(p, e) from None
+        _esquecer_aviso(str(p))
         try:
-            dado = forma(json.loads(texto))
-        except ValueError as e:     # JSONDecodeError é ValueError
+            # o decode fica aqui dentro: bytes que não são UTF-8 (disco, ou o arquivo salvo à mão em outra codificação)
+            # dão UnicodeDecodeError, que é ValueError e NÃO OSError (com o read_text, escapava pelos dois except); e o
+            # json do Python estoura a recursão num arquivo aninhado a fundo (RecursionError, que não é ValueError)
+            dado = forma(json.loads(bruto.decode("utf-8")))
+        except (ValueError, RecursionError) as e:     # JSONDecodeError e UnicodeDecodeError são ValueError
             erro = Ilegivel(f"o arquivo {p.name} está corrompido ({type(e).__name__})")
             _CACHE[str(p)] = (chave, erro)
             log.error("Acessos: %s; só os administradores do servidor (NEXUS_ADMINS) valem até ele ser corrigido.", erro)
@@ -184,7 +219,13 @@ def _gravar_atomico(p: Path, dado: dict) -> None:
         with contextlib.suppress(OSError):
             os.unlink(tmp)
         raise
-    st = p.stat()
+    try:
+        st = p.stat()
+    except OSError:
+        # já gravou: um erro aqui faria a tela dizer "nada mudou" com a mudança no disco; sem a data do arquivo, o cache
+        # sai e a próxima leitura vai ao disco
+        _CACHE.pop(str(p), None)
+        return
     _CACHE[str(p)] = ((st.st_mtime_ns, st.st_size), copy.deepcopy(dado))
 
 
@@ -205,15 +246,26 @@ def estado(config) -> dict:
 
 
 def admins_da_tela(config) -> set[str]:
-    """Os e-mails que a tela fez administradores. Nunca levanta: arquivo que não abre = nenhum (fecha)."""
-    p = pasta(config)
-    if p is None:
-        return set()
+    """Os e-mails que a tela fez administradores. Nunca levanta: arquivo que não abre = nenhum (fecha).
+
+    É chamada pelo portão a cada pedido de toda sessão do Fracttal (`_admin_em_dia`) e no login: um erro que subisse
+    daqui derrubaria o Nexus inteiro, e não só a tela Acessos. O `_ler` já só levanta Ilegivel; o `except Exception` é a
+    garantia para o que ninguém previu, e fecha do mesmo jeito (só os do servidor valem), registrando no journal."""
     try:
+        p = pasta(config)
+        if p is None:
+            return set()
         dado = _ler(p / ARQUIVO, _forma_acessos)
+        admins = {a["email"] for a in (dado or _vazio())["admins"]}
     except Ilegivel:
         return set()
-    return {a["email"] for a in (dado or _vazio())["admins"]}
+    except Exception as e:      # noqa: BLE001 — a lista da tela nunca derruba o portão
+        _avisar_uma_vez("admins_da_tela", logging.ERROR,
+                        f"Acessos: erro inesperado ao ler a lista da tela ({type(e).__name__}: {e}); só os "
+                        "administradores do servidor (NEXUS_ADMINS) valem.", exc_info=True)
+        return set()
+    _esquecer_aviso("admins_da_tela")
+    return admins
 
 
 def _mudar(config, mudanca):
