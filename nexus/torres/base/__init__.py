@@ -7,6 +7,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
     def registro_mestre():
         return render_template("base/registro-mestre.html")
 """
+from ...auth.telas_acessos import registrar_acessos
 from ...cadastro.telas import registrar_base
 from ...cadastro.telas_ligacoes import registrar_ligacoes
 from ...dados.telas import registrar_governanca
@@ -58,6 +59,11 @@ TORRE = Torre(
         Tela("chaves-fontes", "Chaves das fontes",
              "As chaves das fontes da Performance estão válidas, e quando vencem?",
              "Plataforma de Performance (/tokens), só administrador"),
+        # Acessos (11/10/2026: "Tem algum canto do Nexus onde eu posso administrar isso?"): quem é administrador, dar e
+        # tirar pela tela, e quem entrou em 30 dias. Só administrador. A view e as regras moram em nexus/auth/.
+        Tela("acessos", "Acessos",
+             "Quem é administrador do Nexus, e quem já entrou nele nos últimos 30 dias?",
+             "NEXUS_ADMINS do servidor e a lista da tela (pasta de dados do Nexus), só administrador"),
         Tela("ia", "Nexus IA",
              "O que a IA leu e sugeriu, e quanto custou?",
              "API do Claude (a definir)"),
@@ -80,4 +86,5 @@ bp = TORRE.criar_blueprint(__name__)
 registrar_base(bp)
 registrar_ligacoes(bp)
 registrar_governanca(bp)
+registrar_acessos(bp)
 registrar_molduras(bp, TORRE)

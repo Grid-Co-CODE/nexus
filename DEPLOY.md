@@ -16,6 +16,7 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 | `dados/pcm/insumos.json` | os insumos da programação semanal do PCM (prioridades, confiabilidade, feriados e o histórico, já com a S41 publicada) |
 | `dados/pcm/_ativos_classificacao_cache.json` | a lista de usinas do Fracttal (a tela de observações do PCM usa) |
 | `dados/campo/identidades.json` | o cadastro do App de Campo (nome, e-mail e supervisor de cada técnico): **dado pessoal** |
+| `dados/acessos.json` e `dados/acessos_logins.json` | os administradores dados pela tela Base → Acessos (com a auditoria) e quem entrou nos últimos 30 dias (só e-mail e hora): **dado pessoal** |
 
 Os dois `.env` e a `dados/` nunca vão para o git (o `.gitignore` já barra), nem para pasta compartilhada, e-mail aberto
 ou grupo de conversa.
@@ -211,7 +212,8 @@ E no navegador: entrar no Nexus, abrir as telas da Performance (moldura), o OS C
 1. `https://app.gridco.com.br/nexus/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
 2. Entrar com o login do Fracttal (e-mail e senha de quem vai usar; desde 06/10/2026). A senha de admin (a
    `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem) segue em "Entrar com a senha de administrador" e é ela que abre o
-   Cadastro, além dos e-mails em `NEXUS_ADMINS` (opcional, separados por vírgula).
+   Cadastro, além dos e-mails em `NEXUS_ADMINS` (opcional, separados por vírgula) e dos que um administrador der na
+   tela **Base → Acessos** (11/10/2026; os da `NEXUS_ADMINS` aparecem lá como "do servidor" e não saem pela tela).
 3. **Base → Registro mestre** abre a lista de usinas: a chave da cifra está certa.
 4. **PCM → Gerar a semana**: a lista de conferência diz "pronto" (motor, credencial do Fracttal, cadastro e insumos).
    A "Pasta do PCM" e as durações aprendidas aparecem como opcionais ausentes: é o esperado no servidor.

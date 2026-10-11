@@ -43,6 +43,10 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
   Regra completa em `nexus/casca/CLAUDE.md` (o prefixo `/nexus`); o esquecimento quebra `tests/test_prefixo.py`.
 - **Base · Chaves das fontes** (`chaves-fontes`, 09/10/2026) não é tela do cadastro: é o `/tokens` da Plataforma de
   Performance numa moldura, só para administrador do Nexus (`nexus/performance/CLAUDE.md`, seção "Porta única").
+- **Base · Acessos** (`acessos`, 11/10/2026) também não é tela do cadastro: é quem é administrador do Nexus (a
+  `NEXUS_ADMINS` e a lista da tela, num JSON da pasta de dados, fora do banco de propósito) e quem entrou em 30 dias. O
+  código mora em `nexus/auth/` (`acessos.py`, `telas_acessos.py`); regras em `nexus/casca/CLAUDE.md`, seção "Acessos".
+  Usa a página "só para administradores" do Cadastro (`cadastro/sem_permissao.html`, com `area` e `eyebrow`).
 - **ID simples por cadastro** (1, 2, 3...). O IDUsina da planilha (UFV-001) fica em `id_bd` e é a chave da
   reimportação. Cliente tem cadastro próprio, com ID, porque há usinas de mesmo nome de clientes diferentes.
 - **A chave de tudo é o ID numérico do cadastro** (decisão do Levi, 04/10: inner join por ID). O código da usina e o

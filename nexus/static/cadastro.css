@@ -279,3 +279,26 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .lig-grupo summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;cursor:pointer}
 .lig-direita{margin-left:auto}
 @media (max-width:760px){.lig-linha{flex-wrap:wrap}.lig-linha .gc-campo{min-width:0;flex:1}}
+
+/* Base → Acessos (11/10/2026): os administradores do Nexus pela tela. O desenho é o do Cadastro; aqui só o encaixe da
+   tabela dentro da seção (sem borda dupla), o formulário no alto da seção e a etiqueta "do servidor" no azul de
+   informação (fixo, só a T.I. muda), ao lado do verde "pela tela". */
+.ace-secao{overflow:hidden}
+.ace-secao .ace-rolagem{border:0;border-radius:0}
+.ace-dar{padding:14px 16px 0;margin:0}
+.ace-ajuda{padding:0 16px 12px;margin:6px 0 0}
+.ace-dar+.ace-ajuda{margin-top:8px}
+.ace-tabela td{vertical-align:middle}
+/* o e-mail numa linha só: a tabela já rola de lado no celular, e "servidor@exemplo" / ".com" quebrado no meio confundia */
+.ace-email{white-space:nowrap}
+.ace-chip--servidor{background:var(--info-suave);color:var(--info)}
+.ace-acao{text-align:right;white-space:nowrap}
+.ace-tirar{display:inline-flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin:0}
+.ace-btn-tirar{padding:5px 10px;font-size:12px}
+.ace-btn-tirar:hover{border-color:var(--critico-a45);color:var(--critico)}
+.ace-confirmo{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--tinta-2);cursor:pointer}
+.ace-confirmo input{accent-color:var(--critico)}
+.ace-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:560px){
+  .ace-dar .gc-btn{flex:1 1 100%;justify-content:center}
+}
