@@ -119,7 +119,7 @@ def test_cada_tela_do_mapa_abre_a_moldura_com_o_formulario_certo(prefixo, t):
     assert f'href="{prefixo}/t/{t.torre}/{t.tela}" class="com-conteudo" aria-current="page"' in h
     dados = _dados(h)
     assert dados["url"] == f"{prefixo}/t/{t.torre}/{t.tela}" and dados["plataforma"] == ""
-    assert all(x["url"].startswith(f"{prefixo}/t/") for x in dados["telas"]) and len(dados["telas"]) == 13
+    assert all(x["url"].startswith(f"{prefixo}/t/") for x in dados["telas"]) and len(dados["telas"]) == 14
     assert f'src="{prefixo}/static/porta.js"' in h
     form = _form(h)
     if not porta.concreto(t):                                  # o Diagnóstico espera a usina do seletor

@@ -9,7 +9,7 @@ Plataforma de Performance (repositório PerformancePainel) continua o motor e de
 gravação, dentro de uma moldura (iframe) do Nexus. Nada da plataforma passa pelo processo do Nexus (a ponte passava): o
 navegador fala com cada sistema.
 
-- **O mapa** (`porta.py`, `MAPA`): as 13 telas, `torre · tela -> caminho na plataforma`. Fonte única: o Nexus é o dono;
+- **O mapa** (`porta.py`, `MAPA`): as 14 telas, `torre · tela -> caminho na plataforma`. Fonte única: o Nexus é o dono;
   a plataforma tem a cópia em `plataforma/porta_nexus.py`. Os dois comparam o mesmo texto canônico
   (`texto_canonico_do_mapa`; `tests/test_porta_mapa.py` aqui e o teste da porta lá): mudou um, muda o outro e o texto dos
   dois testes. Com `PLATAFORMA_REPO=<clone do PerformancePainel>` o teste daqui abre o módulo de lá e compara o mapa, a
@@ -30,6 +30,7 @@ navegador fala com cada sistema.
   | cos · `acompanhamento` | `/cos` |
   | base · `chaves-fontes` (só admin) | `/tokens` |
   | base · `fontes-tempo-real` (só admin, 11/10/2026) | `/admin/tempo-real`: quais usinas de cada fonte entram no tempo real |
+  | base · `de-para-equipamentos` (só admin, 11/10/2026) | `/admin/de-para`: como cada usina de cada fonte se liga ao cadastro (fatia 1, só leitura) |
 
   Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco e Mapa de risco são do Nexus e ficam fora.
   Em 11/10/2026 o Histórico da plataforma saiu do mapa, dos dois lados, com a rota e o template na plataforma (Levi:

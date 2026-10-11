@@ -11,7 +11,7 @@ servidor: os caminhos do Nexus ficam neste processo e o resto vai à plataforma 
 Nexus na raiz. Por quê (Levi, 10/10/2026, com o print do Tempo real dizendo "configurada em outra origem"): a moldura
 da Performance só abre na MESMA origem do Nexus (a plataforma manda `frame-ancestors 'self'`), e no PC cada porta é
 outra origem; antes era preciso abrir outro endereço (ferramentas/porta_local.py). Assim o localhost:5070 de sempre
-abre as 13 telas da Performance. Sem a variável, nada muda.
+abre as 14 telas da Performance. Sem a variável, nada muda.
 """
 import sys
 

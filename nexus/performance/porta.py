@@ -63,6 +63,9 @@ MAPA = (
     # através da fonte permitir qual usina entra e qual não entra"): quais usinas de cada fonte a plataforma coleta e
     # mostra. Administração: só admin do Nexus.
     TelaDaPlataforma("base", "fontes-tempo-real", "Fontes do tempo real", "/admin/tempo-real", (), True),
+    # De-para de equipamentos (11/10/2026, Levi: "quero que o de-para da equipamentos seja feito na plataforma de forma
+    # intuitiva"): fatia 1, o diagnóstico (como cada usina de cada fonte se liga ao cadastro). Só admin do Nexus.
+    TelaDaPlataforma("base", "de-para-equipamentos", "De-para de equipamentos", "/admin/de-para", (), True),
 )
 
 # As duas rotas da porta na plataforma: não são telas, mas o Nexus as escreve (o formulário do passe e o Sair).
