@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block titulo %}Acessos{% endblock %}
+{% block conteudo %}
+{# Base → Acessos (11/10/2026: "Tem algum canto do Nexus onde eu posso administrar isso?"). Até então os
+   administradores eram só a NEXUS_ADMINS do .env do servidor. O desenho é o das telas do Cadastro (cad-*): faixa de
+   números, seções com tabela, avisos por cor e palavra. Regras e o porquê em nexus/casca/CLAUDE.md, seção Acessos. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Acessos</p>
+<div class="cad-topo">
+  <div>
+    <h1 class="titulo-pagina">Acessos</h1>
+    <p class="cad-sub">Quem é administrador do Nexus, e quem já entrou nele nos últimos 30 dias.</p>
+  </div>
+</div>
+
+{% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
+{% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
+{% if arquivo_erro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>A lista da tela não abriu</strong> ({{ arquivo_erro }}). Até ser corrigida, só os administradores do servidor valem, e a tela não grava por cima. Avise a T.I.</div></div>{% endif %}
+{% if sem_pasta %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-folder-simple-dashed"></i><div><strong>Sem pasta de dados.</strong> Este Nexus não tem a <span class="gc-dado">NEXUS_DADOS</span>: a lista da tela e o registro de quem entrou não são lidos nem gravados.</div></div>{% endif %}
+
+<div class="cad-aviso cad-aviso--info ace-como"><i class="ph ph-info"></i><div>
+  <strong>Como vale.</strong> Dar ou tirar o acesso vale no próximo clique da pessoa no Nexus, sem ela precisar sair e entrar.
+  Os administradores <em>do servidor</em> (a <span class="gc-dado">NEXUS_ADMINS</span> do .env) só mudam com a T.I. e não saem por aqui;
+  a senha de administrador vale sempre. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes até
+  ser renovada (no máximo 11 horas).
+</div></div>
+
+<div class="cad-numeros ace-numeros">
+  <div><div class="r">Administradores</div><div class="v">{{ total_servidor + total_tela }}</div><div class="d">{{ total_servidor }} do servidor · {{ total_tela }} pela tela</div></div>
+  <div><div class="r">Entraram em 30 dias</div><div class="v">{{ pessoas_30d }}</div><div class="d">pessoas, pelo login do Fracttal</div></div>
+  <div><div class="r">Administradores ativos</div><div class="v">{{ admins_30d }}</div><div class="d">entraram nos últimos 30 dias</div></div>
+</div>
+
+<section class="cad-secao ace-secao" aria-labelledby="ace-admins">
+  <h2 id="ace-admins">Administradores</h2>
+  {% if pode_gravar %}
+  <form class="cad-filtros ace-dar" method="post" action="{{ url_for('torre_base.acessos') }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <input type="hidden" name="acao" value="adicionar">
+    <div class="campo busca">
+      <label class="gc-rotulo" for="ace-email">Dar acesso de administrador a</label>
+      <input id="ace-email" name="email" type="email" class="gc-campo" autocomplete="off" inputmode="email"
+             placeholder="nome@empresa.com.br" maxlength="254" required value="{{ email_digitado }}">
+    </div>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-user-plus"></i> Dar acesso</button>
+  </form>
+  <p class="gc-ajuda ace-ajuda">Use o e-mail do login do Fracttal da pessoa. Administrador abre o Cadastro, as Chaves das fontes, o Publicar no App do PCM e esta tela, e aprova qualquer OS.</p>
+  {% endif %}
+  <div class="cad-rolagem ace-rolagem">
+    <table class="cad-tabela ace-tabela">
+      <thead><tr><th>E-mail</th><th>Origem</th><th>Quem deu</th><th>Quando</th><th>Último login</th><th><span class="ace-oculto">Ação</span></th></tr></thead>
+      <tbody>
+      {% for a in admins %}
+      <tr>
+        <td class="ace-email"><span class="gc-dado">{{ a.email }}</span>{% if a.eu %} <span class="cad-chip cad-chip--info">você</span>{% endif %}</td>
+        <td>{% if a.origem == "servidor" %}<span class="cad-chip ace-chip--servidor">do servidor</span>{% else %}<span class="cad-chip cad-chip--operacao">pela tela</span>{% if a.tambem_servidor %} <span class="cad-chip ace-chip--servidor">também do servidor</span>{% endif %}{% endif %}</td>
+        <td>{% if a.origem == "servidor" %}<span class="mudo">NEXUS_ADMINS (.env)</span>{% else %}{{ a.por }}{% endif %}</td>
+        <td class="num">{{ a.quando or "—" }}</td>
+        <td class="num">{{ a.ultimo or "—" }}</td>
+        <td class="ace-acao">
+          {# também na NEXUS_ADMINS: tirar da lista da tela não tiraria o acesso (o servidor dá) e o pedido é recusado;
+             e o último da tela não tira a si mesmo. O botão some para a tela não oferecer o que o servidor recusa. #}
+          {% if a.origem == "servidor" or a.tambem_servidor %}<span class="mudo">só pela T.I.</span>
+          {% elif a.eu and n_tela == 1 %}<span class="mudo">o último da tela não tira o próprio acesso</span>
+          {% elif pode_gravar %}
+          <form method="post" action="{{ url_for('torre_base.acessos') }}" class="ace-tirar">
+            <input type="hidden" name="codigo" value="{{ codigo }}">
+            <input type="hidden" name="acao" value="remover">
+            <input type="hidden" name="email" value="{{ a.email }}">
+            {% if a.eu %}<label class="ace-confirmo"><input type="checkbox" name="confirmo" value="1" required> tirar o meu acesso</label>{% endif %}
+            <button class="gc-btn gc-btn--ui gc-btn--contorno ace-btn-tirar" type="submit" aria-label="Tirar o acesso de administrador de {{ a.email }}"><i class="ph ph-user-minus"></i> Tirar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="vazio">Nenhum administrador por e-mail: só a senha de administrador entra como administrador.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="cad-secao ace-secao" aria-labelledby="ace-registro">
+  <h2 id="ace-registro">Registro de mudanças</h2>
+  <p class="gc-ajuda ace-ajuda">Quem deu ou tirou acesso pela tela, e quando. A mais recente primeiro.</p>
+  <div class="cad-rolagem ace-rolagem">
+    <table class="cad-tabela ace-tabela">
+      <thead><tr><th>Quando</th><th>Quem fez</th><th>O que</th><th>E-mail</th></tr></thead>
+      <tbody>
+      {% for x in auditoria %}
+      <tr>
+        <td class="num">{{ x.quando_br }}</td>
+        <td>{{ x.quem }}</td>
+        <td>{% if x.acao == "adicionou" %}<span class="cad-chip cad-chip--operacao">deu acesso</span>{% else %}<span class="cad-chip cad-chip--alerta">tirou acesso</span>{% endif %}</td>
+        <td><span class="gc-dado">{{ x.email }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="vazio">Nenhuma mudança pela tela ainda.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="cad-secao ace-secao" aria-labelledby="ace-logins">
+  <h2 id="ace-logins">Quem entrou nos últimos 30 dias</h2>
+  <p class="gc-ajuda ace-ajuda">Só o e-mail e a hora do último login de cada pessoa (até {{ max_logins }} pessoas), guardados no servidor do Nexus, fora do banco.</p>
+  <div class="cad-rolagem ace-rolagem">
+    <table class="cad-tabela ace-tabela">
+      <thead><tr><th>E-mail</th><th>Último login</th><th>Administrador</th></tr></thead>
+      <tbody>
+      {% for x in logins %}
+      <tr>
+        <td class="ace-email">{% if x.senha %}<span class="mudo">senha de administrador</span>{% else %}<span class="gc-dado">{{ x.email }}</span>{% if x.email == eu %} <span class="cad-chip cad-chip--info">você</span>{% endif %}{% endif %}</td>
+        <td class="num">{{ x.quando_br }}</td>
+        <td>{% if x.admin == "do servidor" %}<span class="cad-chip ace-chip--servidor">do servidor</span>{% elif x.admin == "pela tela" %}<span class="cad-chip cad-chip--operacao">pela tela</span>{% elif x.admin == "sempre" %}<span class="cad-chip cad-chip--info">sempre</span>{% else %}<span class="mudo">não</span>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="vazio">Ninguém entrou nos últimos 30 dias (ou o registro começou agora).</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

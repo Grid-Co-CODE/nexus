@@ -11,7 +11,9 @@ print nem segredo em commit. Dado real mora em `dados/` e no armazém local, amb
 informações para conseguirmos fazer previsões e diagnósticos de forma que faça sentido. Sempre vamos focar em
 confiabilidade e governança dos dados, não podemos fazer nada nas coxas."
 - Todo setor grava e lê pela API de dados (PostgreSQL da T.I., `db_performace`), ligado por ID: o `cadastro_nexus` é a
-  chave comum (usina_id, pessoa_id, ...). Nada de JSON como banco, planilha no OneDrive nem Azure.
+  chave comum (usina_id, pessoa_id, ...). Nada de JSON como banco, planilha no OneDrive nem Azure. Exceção consciente
+  (11/10/2026): quem é administrador pela tela Base → Acessos mora num JSON da pasta de dados, porque é configuração de
+  acesso desta instalação, não dado de negócio (`nexus/casca/CLAUDE.md`, seção "Acessos").
 - Confiabilidade antes de tela: conferir antes e depois de gravar; número pela metade não vai para a tela (a torre
   Campo · App só sai da moldura com a coleta completa).
 - Governança: dado pessoal e sensível vai cifrado (cofre do cadastro); coluna nova em claro na API é revisada antes
@@ -40,7 +42,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 
 | Área | `.md` |
 |---|---|
-| Casca, login, menu, tema (escuro e claro), servidor local, o prefixo `/nexus` e o cookie `nexus_sessao` | `nexus/casca/CLAUDE.md` |
+| Casca, login, quem é administrador (Base → Acessos), menu, tema (escuro e claro), servidor local, o prefixo `/nexus` e o cookie `nexus_sessao` | `nexus/casca/CLAUDE.md` |
 | Torres (como criar tela) | `nexus/torres/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |

@@ -213,10 +213,17 @@ def _fracttal_de(app, cliente, email, nome):
 
 
 def _sessao_nexus(cliente, papel=None, admin=False):
-    """Quem entrou no Nexus pelo Fracttal (não admin), com o papel que o login grava (`supervisor_padrao`)."""
+    """Quem entrou no Nexus pelo Fracttal (não admin), com o papel que o login grava (`supervisor_padrao`).
+
+    Com `admin`, o e-mail vai para a NEXUS_ADMINS: desde a tela Base → Acessos (11/10/2026) o `admin` da sessão do
+    Fracttal segue a lista de administradores a cada pedido (`auth._admin_em_dia`), e forjar só a sessão não vale mais."""
+    email = "x@exemplo.test"
+    if admin:
+        cfg = cliente.application.config
+        cfg["NEXUS_ADMINS"] = ",".join(filter(None, [cfg.get("NEXUS_ADMINS"), email]))
     with cliente.session_transaction() as s:
         s.clear()
-        s.update(logado=True, admin=admin, usuario={"email": "x@exemplo.test", "nome": "X", "perfil": "Supervisor"})
+        s.update(logado=True, admin=admin, usuario={"email": email, "nome": "X", "perfil": "Supervisor"})
         if papel:
             s["supervisor_padrao"] = papel
 

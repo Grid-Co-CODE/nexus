@@ -488,7 +488,8 @@ def test_quem_entrou_pelo_fracttal_sem_ser_admin_ve_o_porque_e_o_caminho(app_cad
     assert r.status_code == 403
     html = r.get_data(as_text=True)
     assert "só para administradores" in html and "pessoa@exemplo.test" in html and "NEXUS_ADMINS" in html
-    assert "/entrar?admin=1" in html and "Forbidden" not in html
-    with c.session_transaction() as s:
-        s["admin"] = True                      # o e-mail em NEXUS_ADMINS vira admin no login pelo Fracttal
+    assert "/entrar?admin=1" in html and "Forbidden" not in html and "Base · Acessos" in html
+    # o e-mail em NEXUS_ADMINS vira admin: desde a tela Base → Acessos (11/10/2026) o `admin` da sessão do Fracttal
+    # segue a lista a cada pedido (forjar `admin` na sessão não vale mais; vale a lista)
+    app_cad.config["NEXUS_ADMINS"] = "pessoa@exemplo.test"
     assert c.get("/t/base/registro-mestre").status_code == 200

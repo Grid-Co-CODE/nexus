@@ -2,14 +2,16 @@
 {% block titulo %}{{ titulo }}{% endblock %}
 {% block conteudo %}
 {# O Cadastro (Base) é só de administrador. Até 08/10/2026 quem não era recebia o "Forbidden" cru do Flask, sem dizer
-   por quê nem o que fazer (Levi, entrando pelo Fracttal: "não consigo acessar os dados da base no nexus"). #}
+   por quê nem o que fazer (Levi, entrando pelo Fracttal: "não consigo acessar os dados da base no nexus"). A tela
+   Base → Acessos (11/10/2026) usa a mesma página (`area` e `eyebrow`), e o caminho agora inclui pedir a um
+   administrador pela tela, sem a T.I. mexer no .env. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
-<p class="gc-eyebrow">Cadastro</p>
+<p class="gc-eyebrow">{{ eyebrow or "Cadastro" }}</p>
 <h1 class="titulo-pagina">{{ titulo }}</h1>
-<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-lock-key"></i><div><strong>O Cadastro é só para administradores.</strong>
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-lock-key"></i><div><strong>{{ area or "O Cadastro" }} é só para administradores.</strong>
   {% if email %}Você entrou pelo Fracttal como <span class="gc-dado">{{ email }}</span>, e esse e-mail não está na lista de
-  administradores do Nexus (<span class="gc-dado">NEXUS_ADMINS</span> no .env do servidor).{% else %}Esta sessão não é de
+  administradores do Nexus (a <span class="gc-dado">NEXUS_ADMINS</span> do .env do servidor, ou a lista da tela Base · Acessos).{% else %}Esta sessão não é de
   administrador.{% endif %}
   Entre com a <a href="{{ url_for('auth.entrar', admin=1, next=request.full_path) }}">senha de administrador</a> ou peça
-  para pôr o seu e-mail em <span class="gc-dado">NEXUS_ADMINS</span>.</div></div>
+  a um administrador para dar o acesso ao seu e-mail em Base · Acessos (ou à T.I., na <span class="gc-dado">NEXUS_ADMINS</span>).</div></div>
 {% endblock %}

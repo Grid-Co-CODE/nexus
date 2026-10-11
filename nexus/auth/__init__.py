@@ -2,7 +2,8 @@
 
 Desde 06/10/2026 a pessoa entra com o login do Fracttal (Levi: "Ao invés de uma senha difícil, no início faça a pessoa
 logar com fractall"; `fracttal.py`). A senha de admin ficou como reserva ("Entrar com a senha de administrador"): é
-ela que abre o Cadastro (admin), além de quem estiver em NEXUS_ADMINS. As torres só enxergam a sessão:
+ela que abre o Cadastro (admin), além de quem estiver em NEXUS_ADMINS ou na lista da tela Base → Acessos (11/10/2026,
+`acessos.py`; a sessão do Fracttal acompanha a lista a cada pedido, `_admin_em_dia`). As torres só enxergam a sessão:
 `logado`, `admin`, `usuario` {email, nome, perfil} e, para quem tem papel no campo, `supervisor_padrao` (o filtro que já
 vem marcado no Campo · App e quem pode aprovar OS; o papel da estrutura de O&M de 10/2026).
 
@@ -28,7 +29,7 @@ from flask import (Blueprint, current_app, jsonify, make_response, redirect, ren
                    url_for)
 from itsdangerous import URLSafeTimedSerializer
 
-from . import fracttal
+from . import acessos, fracttal
 from ..prefixo import na_raiz, raiz
 
 bp = Blueprint("auth", __name__)
@@ -216,8 +217,30 @@ def os_cookie_path() -> str:
     return raiz() + "/os"
 
 
-def _admins() -> set[str]:
+def admins_do_servidor() -> set[str]:
+    """Os administradores fixos: a NEXUS_ADMINS do .env do servidor. Só a T.I. muda, e a tela não os tira."""
     return {e.strip().lower() for e in str(current_app.config.get("NEXUS_ADMINS") or "").split(",") if e.strip()}
+
+
+def _admins() -> set[str]:
+    """Quem é administrador agora: os do servidor e os dados pela tela Base → Acessos (11/10/2026; `acessos.py`)."""
+    return admins_do_servidor() | acessos.admins_da_tela(current_app.config)
+
+
+def _admin_em_dia() -> None:
+    """Para a sessão que nasceu do login do Fracttal: o `admin` da sessão segue a lista de AGORA, a cada pedido.
+
+    O `admin` é gravado no login, e a sessão vale até 12 h: sem isto, quem perdesse o acesso na tela Base → Acessos
+    seguiria administrador até sair, e quem ganhasse precisaria sair e entrar. A lista é relida só quando o arquivo
+    muda (um stat por pedido). Arquivo que não abre FECHA (só os do servidor valem). A senha de administrador não tem
+    e-mail nem passa por aqui: vale sempre, até o Sair."""
+    u = session.get("usuario")
+    email = str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
+    if not email:
+        return
+    agora = email in _admins()
+    if bool(session.get("admin")) != agora:
+        session["admin"] = agora
 
 
 def via_fracttal() -> bool:
@@ -369,6 +392,8 @@ def _entrar_fracttal(destino):
     sup = _supervisor_padrao(conta["email"], conta["nome"])
     if sup:
         session["supervisor_padrao"] = sup
+    # quem entrou nos últimos 30 dias (Base → Acessos): só o e-mail e a hora; falha aqui não impede a entrada
+    acessos.registrar_login(current_app.config, conta["email"])
     resp = redirect(na_raiz(destino))
     nome, valor, idade = conta["cookie"]
     # a sessão do OS Creator (o JWT do Fracttal) nasce junto: o /os/ e a aprovação de PT abrem sem pedir de novo
@@ -429,6 +454,7 @@ def entrar():
     session.permanent = True
     session["logado"] = True
     session["admin"] = True
+    acessos.registrar_login(current_app.config, acessos.SENHA_DE_ADMIN)
     return _sem_a_sessao_velha_da_raiz(redirect(na_raiz(destino)))
 
 
@@ -482,6 +508,7 @@ def instalar_portao(app) -> None:
         motivo, resposta = _fim_do_fracttal()
         if motivo:
             return encerrar(motivo, _destino_do_pedido())
+        _admin_em_dia()
         return resposta
 
     app.extensions["nexus_erros_login"] = defaultdict(deque)

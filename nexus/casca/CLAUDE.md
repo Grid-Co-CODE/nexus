@@ -1,6 +1,7 @@
 # CLAUDE.md — casca (moldura, login, menu e tema)
 
-O que envolve todas as torres: o layout, o portão de login, a troca de cadeira, o tema (escuro ou claro) e o `/saude`.
+O que envolve todas as torres: o layout, o portão de login, quem é administrador (a tela Base → Acessos), a troca de
+cadeira, o tema (escuro ou claro) e o `/saude`.
 
 ## Os arquivos
 
@@ -13,6 +14,7 @@ O que envolve todas as torres: o layout, o portão de login, a troca de cadeira,
 | `nexus/casca/__init__.py` | `/` (Início), `/cadeira` (troca), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu, `tema`) |
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
+| `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
 | `nexus/cadeiras.py` | as 10 cadeiras; diretoria e chefia caem na torre Comando |
 | `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base e entrar): a reserva do `localStorage` antes de pintar |
@@ -105,6 +107,48 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   fundo efetivo, a rolagem lateral e os erros de JavaScript, e as cores computadas do escuro comparadas com as de antes,
   elemento a elemento.
 
+## Acessos: quem é administrador (Base → Acessos, 11/10/2026)
+
+Pedido de 11/10/2026, na véspera de o Nexus virar a porta principal: "Tem algum canto do Nexus onde eu posso administrar
+isso?". Até então administrador era só a `NEXUS_ADMINS` do `.env` do servidor (pôr ou tirar alguém = a T.I. editar e
+reiniciar) ou a senha de administrador. A tela `/t/base/acessos` (só administrador; quem não é vê a página "só para
+administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e muda:
+
+- **Administradores = `NEXUS_ADMINS` ∪ a lista da tela** (`auth._admins`). Os do servidor aparecem "do servidor", só
+  leitura, e a tela não os tira (são a garantia de que sempre há administrador, mesmo com o arquivo apagado). Os da tela
+  ("pela tela") têm quem deu e quando, e o botão Tirar. Quem tira a si mesmo marca a confirmação, e não pode se for o
+  último da tela. A senha de administrador não é pessoa: vale sempre, até o Sair.
+- **Vale no próximo clique da pessoa**, sem sair e entrar: o portão confere o `admin` da sessão que nasceu do Fracttal
+  contra a lista de AGORA a cada pedido (`auth._admin_em_dia`; um `stat` por pedido, o arquivo só é relido quando muda).
+  Antes, o `admin` era gravado só no login e durava a sessão (12 h). Limite conhecido: nas telas da Performance, a sessão
+  que o passe já abriu na plataforma guarda o `admin` de antes até a moldura renovar (no máximo 11 h). Vale também para a
+  NEXUS_ADMINS: tirada do `.env` e reiniciado o serviço, a pessoa deixa de ser admin no clique seguinte.
+- **Registro (auditoria)** de quem deu ou tirou, quando (UTC no arquivo, Brasília na tela), as últimas 1.000.
+- **Quem entrou nos últimos 30 dias:** todo login certo grava só o e-mail (ou "senha de administrador") e a hora, no
+  `acessos_logins.json`; o mais antigo que 30 dias sai, e o teto é de 500 pessoas (as mais recentes). Falha ao gravar
+  nunca impede a entrada (vai ao journal).
+- **Onde mora:** `acessos.json` e `acessos_logins.json` na pasta de dados do Nexus (`NEXUS_DADOS`; sem ela, a mesma
+  padrão do cadastro e do de-para: `C:\GridcoAuto\nexus` no PC, `dados/` no servidor), fora do git. **Não vai ao banco,
+  de propósito:** é configuração de acesso desta instalação, não dado de negócio para cruzar com os setores; no banco
+  compartilhado ela seria lida por outros sistemas e o Nexus dependeria dele no ar para alguém conseguir administrar. É a
+  exceção consciente à regra "nada de JSON como banco" da raiz. Entra na cópia diária da `dados/` (`DEPLOY.md`).
+- **Escrita atômica e com trava:** temporário na mesma pasta + `fsync` + `os.replace` (com 5 tentativas no
+  `PermissionError` do Windows), dentro de uma `RLock` que cobre o ler-mudar-gravar inteiro (as 8 threads do waitress;
+  um processo só, como o servidor roda). Falhou no meio: o arquivo de antes fica intacto e o temporário sai.
+- **Arquivo que não abre FECHA:** JSON corrompido = nenhum admin da tela (só os do servidor), a tela mostra o aviso
+  crítico e se recusa a gravar por cima (409), porque gravar apagaria o que estava nele. Erro de disco passageiro não fica
+  no cache: o próximo pedido tenta de novo.
+- **POST só da própria página:** `Sec-Fetch-Site`/`Origin` com a régua da moldura (`moldura._de_outro_site`) e um código do
+  formulário guardado na sessão (o login troca). E-mail validado: sem espaço nas pontas, minúsculas, nenhum espaço ou
+  vírgula no meio, `nome@dominio.tld`, até 254 caracteres. Gravou: 303 de volta à tela (F5 não repete).
+- **Em teste sem `NEXUS_DADOS`** nada é lido nem gravado (`acessos.pasta` = None), como o de-para: um teste não pode
+  escrever na pasta de verdade.
+- **Prova:** `tests/test_base_acessos.py` (admin vê e grava; não-admin barrado e nada gravado; o do servidor não sai;
+  dar acesso vira admin no login seguinte e já no próximo pedido; tirar vale no próximo pedido; auditoria e teto dela;
+  escrita atômica com a troca falhando e com a escrita parando no meio; 20 threads sem perder mudança; corrompido fecha
+  e não é sobrescrito; e-mails inválidos; POST de outro site ou sem o código; ninguém se tira sozinho por engano; o
+  registro de logins com teto e janela, e que falha sem barrar a entrada).
+
 ## Regras que já custaram caro
 
 - **Endereço do Nexus nunca a partir da raiz** (09/10/2026): `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")`
@@ -148,7 +192,8 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   fractall"): e-mail e senha do Fracttal (a senha vai transformada ao Fracttal e não é guardada; só a conta da Grid Co.
   entra). Um login abre o Nexus e o OS Creator: o JWT vai no cookie `os_sessao` (caminho prefixo + `/os`,
   12 h), assinado com a chave do clone, e `/sair` apaga os dois. Sessão do Nexus: `logado`, `usuario` {email, nome, perfil} (o nome aparece
-  no topo), `admin` (só se o e-mail estiver em `NEXUS_ADMINS`) e `supervisor_padrao`: desde a estrutura de O&M de
+  no topo), `admin` (o e-mail em `NEXUS_ADMINS` ou na lista da tela Base → Acessos, conferido a cada pedido: seção
+  "Acessos") e `supervisor_padrao`: desde a estrutura de O&M de
   10/2026, o PAPEL de quem entrou no Campo · App ({pessoa_id, nome, papel: supervisor_campo | coordenador | gestor,
   regioes ou gestor}; o filtro que já vem marcado e quem vê o Aprovar; ver `nexus/torres/campo/CLAUDE.md`). Sessão de
   antes, com o nome do supervisor em texto, não vale como papel. A

@@ -116,7 +116,8 @@ def _pagina(torre, t, reserva=None):
     if t.so_admin and not session.get("admin"):
         # spec 5.3: as chaves das fontes são administração. A plataforma recusa de novo (o passe diz quem é admin).
         contexto.update(recusa="As chaves das fontes (SunOp, Axis e Plataforma) são administração: abrem só para "
-                               "quem é administrador do Nexus (NEXUS_ADMINS, ou a senha de administrador).")
+                               "quem é administrador do Nexus (NEXUS_ADMINS, a lista da tela Base · Acessos, ou a "
+                               "senha de administrador).")
         return render_template("performance/moldura.html", **contexto), 403
     if not estado["ligada"] and reserva:
         # o Tempo real que já funcionava pela ponte de 04/10 continua até a T.I. pôr a chave (nada afeta o que
