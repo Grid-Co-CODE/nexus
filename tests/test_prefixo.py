@@ -368,6 +368,29 @@ def test_com_a_porta_da_performance_ligada_tambem(tmp_path, sem_rede, prefixo):
     assert not any(c.startswith("/nexus") for _, c in vistos)
 
 
+@pytest.mark.parametrize("prefixo", [PREFIXO, None])
+def test_o_modo_tv_do_painel_noc_tambem(sem_rede, prefixo):
+    """Modo TV do Painel NOC (11/10/2026): a página sem a casca escreve os endereços dela (o porta.js, o "Sair do modo
+    TV", a rota do passe novo, o Entrar da sessão vencida) com o prefixo, e os da plataforma (o formulário do passe) na
+    raiz. O rastreador guarda a página pelo caminho (o ?tv=1 não conta) e não a visitaria: ela passa aqui, sozinha."""
+    from rastreador_de_links import Rastreio
+    app = _app(prefixo, NEXUS_SSO_CHAVE="c" * 40)
+    cli = Client(_caddy_corta(app) if prefixo else app)
+    p = prefixo or ""
+    assert cli.post(p + "/entrar", data={"senha": SENHA_TESTE}).status_code == 302
+    normal = cli.get(p + "/t/performance/noc").get_data(as_text=True)
+    assert f'id="porta-tv" href="{p}/t/performance/noc?tv=1"' in normal
+    um = Rastreio(cli, p, limite=1).percorrer(p + "/t/performance/noc?tv=1")
+    assert um.visitados == {p + "/t/performance/noc": 200} and um.ruins == [], um.ruins
+    vistos = {(onde, c) for _, onde, c in um.da_plataforma}
+    assert ("action", "/painel/nexus/entrar") in vistos and not any(c.startswith("/nexus") for _, c in vistos)
+    tv = cli.get(p + "/t/performance/noc?tv=1").get_data(as_text=True)
+    assert "porta-tv-html" in tv
+    achados = set(caminhos_do_html(tv))
+    assert ("href", p + "/t/performance/noc") in achados and ("src", p + "/static/porta.js") in achados
+    assert ("href", p + "/static/nexus.css") in achados
+
+
 def test_o_rastreador_pega_o_endereco_esquecido():
     """O rastreador não pode passar tudo: um href, um action, um data-url, um fetch e um Location da raiz aparecem."""
     pagina = ('<a href="/t/x">a</a><form action="/sair"></form><div data-url="/os/x"></div><a href="/nexus/t/ok"></a>'

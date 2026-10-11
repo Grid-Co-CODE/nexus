@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR" class="porta-tv-html" data-nexus data-tema="{{ tema }}">
+<head>
+  <meta charset="utf-8">
+  <script>
+    // O Nexus nunca fica dentro de moldura (o mesmo guarda do base.html): o modo TV também não.
+    try { if (window.top !== window.self) window.top.location.href = location.href; } catch (e) {}
+    {% include "_entrar_de_novo_js.html" %}
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ tela.nome }} · modo TV · Grid Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  <script>{% include "_tema_cabeca.html" %}{% include "_raiz_js.html" %}</script>
+  {# Sem <meta http-equiv="refresh">, de propósito (ao contrário do modo TV do Mapa): cada recarga gera um passe novo e
+     reabre a sessão da plataforma. Quem relê o dado é a própria tela da plataforma (o Painel NOC, a cada 60 s, mantendo o
+     último número com a faixa quando a leitura falha); quem reabre a sessão vencida é o porta.js, no máximo 1 vez a cada
+     60 s. Assim a TV não vira laço de recarga nem desenha número falso. #}
+</head>
+{# Modo TV do Painel NOC (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC
+   mesmo! não precisa de conta fixa"). O modelo é o modo TV do Mapa de risco (mapa_tv.html): sem a casca do Nexus (sem
+   menu e sem topo), a moldura ocupando a tela inteira e os controles (Tela cheia, Sair do modo TV) aparecendo ao mexer
+   o mouse ou apertar uma tecla. É a mesma moldura de moldura.html, com o mesmo porta.js: o passe, a renovação de 11 h e
+   o "nexus:sessao-vencida" valem igual, e renovam a sessão da PLATAFORMA. A TV fica de pé enquanto valer a sessão do
+   NEXUS de quem a abriu: pelo Fracttal, ~12 h a partir do LOGIN (não da abertura da TV), e nada que a TV faz a estica
+   (revisão de 11/10/2026: login às 07:00 e TV às 18:30 = 30 minutos de TV). Por isso o prazo fica à vista: nos controles
+   e, na última meia hora, no aviso fixo do canto. O login vale igual: a página passa pelo mesmo portão (sem sessão, vai
+   ao Entrar e volta para cá). Regra e porquês em nexus/torres/moldura.py e na seção "Modo TV do Painel NOC" de
+   nexus/performance/CLAUDE.md. #}
+<body class="porta-tv-pagina">
+<div class="porta porta--tv" id="porta">
+  <p class="porta-alerta" id="porta-alerta" role="alert" hidden></p>
+  {% if recusa %}
+  <div class="porta-aviso">
+    <h1>Só administradores do Nexus</h1>
+    <p>{{ recusa }}</p>
+  </div>
+  {% elif not ligada %}
+  <div class="porta-aviso" role="status">
+    <h1>Performance ainda não ligada neste servidor</h1>
+    <p>Esta tela é a da Plataforma de Performance, aberta dentro do Nexus.{% if session.admin %} Para ligar: {{ motivo }}.{% endif %}</p>
+    <p class="mudo">O resto do Nexus funciona normalmente. A plataforma continua no endereço dela enquanto isso.</p>
+  </div>
+  {% else %}
+  <form id="porta-passe" class="porta-passe" method="post" action="{{ plataforma }}/painel/nexus/entrar" target="porta-moldura">
+    <input type="hidden" name="passe" value="{{ passe }}">
+    <noscript><p class="porta-sem-js">Sem JavaScript a tela abre por este botão (o acesso vale 60 segundos; depois, recarregue a página):
+      <button type="submit" class="gc-btn gc-btn--primario">Abrir</button></p></noscript>
+  </form>
+  <iframe class="porta-moldura" id="porta-moldura" name="porta-moldura" title="{{ tela.nome }}: Plataforma de Performance"></iframe>
+  {% endif %}
+
+  {# Os controles da TV: com a moldura, o porta.js os mostra ao abrir e ao mexer o mouse (também dentro da moldura) e os
+     esconde sozinhos; sem a moldura (o aviso acima), ficam à vista. O "Sair" volta à tela de sempre, no caminho em que a
+     moldura está (o porta.js o acompanha). #}
+  <div class="porta-tv-controles" id="porta-tv-controles"{% if ligada and not recusa %} hidden{% endif %}>
+    <div class="porta-tv-quem">
+      <p class="porta-tv-nome"><strong>{{ tela.nome }}</strong> · modo TV</p>
+      {% if prazo_tv %}<p class="porta-tv-prazo" id="porta-tv-prazo">Sessão de {{ prazo_tv.nome }} até {{ prazo_tv.ate }}; depois, a TV pede login</p>{% endif %}
+    </div>
+    <button type="button" class="gc-btn gc-btn--contorno" data-acao="tela-cheia" aria-pressed="false" hidden>Tela cheia</button>
+    <a class="gc-btn gc-btn--contorno" id="porta-sair-tv" href="{{ sair_tv|na_raiz }}">Sair do modo TV</a>
+  </div>
+  {# Na última meia hora da sessão de quem abriu a TV, o aviso fica no canto sem precisar mexer o mouse (o porta.js o
+     mostra pelo `sessao_vence`): quem passa pela sala do NOC sabe antes que a TV vai pedir login. #}
+  {% if prazo_tv and ligada and not recusa %}
+  <p class="porta-tv-vence" id="porta-tv-vence" role="status" hidden>A sessão de {{ prazo_tv.nome }} vence {{ prazo_tv.quando }}: depois disso, a TV vai pedir login.</p>
+  {% endif %}
+</div>
+{% if ligada and not recusa %}
+<script type="application/json" id="porta-dados">{{ dados|tojson }}</script>
+<script src="{{ url_for('static', filename='porta.js') }}"></script>
+{% endif %}
+{% if session.usuario %}
+<script>
+{% include "_confere_sessao_js.html" %}
+</script>
+{% endif %}
+</body>
+</html>

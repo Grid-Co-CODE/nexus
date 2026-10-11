@@ -245,3 +245,100 @@ def test_em_outra_origem_nada_renova(plataforma):
                    passos=[{"mensagem": VENCIDA, "origem": plataforma}, {"avancar": 12 * 3600 * 1000},
                            {"intervalo": True}])
     assert feito["pedidos"] == [] and feito["envios"] == 0
+
+
+# ── o modo TV do Painel NOC (11/10/2026) ─────────────────────────────────────────────────────────────────────────────
+# Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC mesmo! não precisa de conta fixa". A
+# TV (/t/performance/noc?tv=1) roda o mesmo porta.js: o endereço guarda a TV (F5 e favorito voltam a ela), o "Sair do
+# modo TV" acompanha a moldura, os controles aparecem ao mexer o mouse (também DENTRO da moldura, que cobre a tela) e a
+# sessão vencida e a renovação de 11 h valem igual. Fora da TV, o botão "Modo TV" só fica à vista no Painel NOC.
+TELAS_TV = [{**t, "tv": t["url"].endswith("/noc")} for t in TELAS]
+NOC_NEXUS = "/nexus/t/performance/noc"
+ROTA = "nexus:rota"
+
+
+def test_o_endereco_na_tv_leva_o_tv_e_o_p_so_fora_da_entrada_padrao():
+    noc = next(t for t in TELAS if t["url"].endswith("/noc"))
+    assert rodar("P.enderecoNaTv(V.t, '/painel')", t=noc) == NOC_NEXUS + "?tv=1"
+    assert rodar("P.enderecoNaTv(V.t, '/painel?x=1')", t=noc) == NOC_NEXUS + "?tv=1&p=%2Fpainel%3Fx%3D1"
+
+
+def _tv(passos, respostas=None):
+    return pagina(dados=_dados("", renovar=RENOVAR, telas=TELAS_TV, tv=True), moldura=True,
+                  respostas=respostas or PASSE_NOVO, passos=passos,
+                  elementos={"porta-sair-tv": {"href": NOC_NEXUS}, "porta-tv-controles": {}})
+
+
+def test_na_tv_o_endereco_fica_na_tv_e_o_sair_acompanha_a_moldura():
+    feito = _tv([{"mensagem": {"tipo": ROTA, "caminho": "/painel?cliente=X"}},
+                 {"mensagem": {"tipo": ROTA, "caminho": "/painel/usina/1?fonte=pv"}}])
+    # no Painel NOC o endereço continua a TV (com o caminho); no diagnóstico, que não tem TV, fica o último da TV: o F5
+    # da TV volta à TV, e não à tela com menu
+    assert feito["enderecos"] == [NOC_NEXUS + "?tv=1&p=%2Fpainel%3Fcliente%3DX"]
+    # o Sair leva à tela de sempre onde a moldura está agora
+    assert feito["elementos"]["porta-sair-tv"]["href"] == \
+        "/nexus/t/performance/diagnostico?p=%2Fpainel%2Fusina%2F1%3Ffonte%3Dpv"
+    assert feito["envios"] == 1 and feito["alerta"] is None
+
+
+def test_fora_da_tv_o_botao_so_fica_a_vista_no_painel_noc():
+    def rodar_rotas(*caminhos):
+        return pagina(dados=_dados("", telas=TELAS_TV, tv=False), moldura=True,
+                      passos=[{"mensagem": {"tipo": ROTA, "caminho": c}} for c in caminhos],
+                      elementos={"porta-tv": {"hidden": False, "href": NOC_NEXUS + "?tv=1"}})
+    feito = rodar_rotas("/painel/falhas")
+    assert feito["elementos"]["porta-tv"]["hidden"] is True
+    assert feito["enderecos"] == ["/nexus/t/performance/strings-trackers"]                    # o de sempre
+    feito = rodar_rotas("/painel/falhas", "/painel?x=1")
+    assert feito["elementos"]["porta-tv"] == {"hidden": False, "href": NOC_NEXUS + "?tv=1&p=%2Fpainel%3Fx%3D1"}
+
+
+def test_na_tv_os_controles_aparecem_ao_mexer_o_mouse_tambem_dentro_da_moldura():
+    # ao abrir, aparecem (quem clicou vê o Sair e a Tela cheia) e somem sozinhos em 6 s (o relógio daqui não chega lá)
+    assert _tv([])["elementos"]["porta-tv-controles"]["hidden"] is False
+    esc = {"evento": "keydown", "tecla": "Escape"}
+    assert _tv([esc])["elementos"]["porta-tv-controles"]["hidden"] is True
+    # a moldura cobre a tela: o mouse mexe no documento da plataforma, que ganha o ouvinte a cada página carregada
+    feito = _tv([esc, {"carregar": True}, {"evento": "mousemove", "em": "moldura"}])
+    assert feito["elementos"]["porta-tv-controles"]["hidden"] is False
+    feito = _tv([esc, {"evento": "mousemove", "em": "moldura"}])                 # antes de carregar: nada ouvia ali
+    assert feito["elementos"]["porta-tv-controles"]["hidden"] is True
+    assert _tv([esc, {"evento": "mousemove"}])["elementos"]["porta-tv-controles"]["hidden"] is False
+
+
+def test_na_tv_a_sessao_vencida_e_a_renovacao_valem_igual():
+    """O que mantém a sessão da PLATAFORMA na TV: a sessão vencida reabre a tela com um passe novo (no máximo 1
+    vez a cada 60 s) e, 11 h depois, a sessão é renovada sem recarregar a moldura."""
+    respostas = {**PASSE_NOVO, ENTRAR_PLATAFORMA: {"status": 0, "tipo": "opaqueredirect"}}
+    feito = _tv([{"mensagem": VENCIDA}, {"avancar": 30 * 1000}, {"mensagem": VENCIDA}, {"avancar": 11 * 3600 * 1000},
+                 {"intervalo": True}], respostas)
+    assert feito["passes"] == ["passe-da-pagina", "passe-novo"]                       # reabriu uma vez só (sem laço)
+    assert _corpos_para(feito, URL_RENOVAR) == ["p=%2Fpainel%3Fx%3D1"] * 2
+    assert _corpos_para(feito, ENTRAR_PLATAFORMA) == ["passe=passe-novo"]
+    # a sessão do Nexus encerrada leva a janela da TV ao login (que volta para a TV)
+    feito = _tv([{"mensagem": VENCIDA}], {URL_RENOVAR: {"status": 401, "json": {"sessao_encerrada": True,
+                                                                               "entrar": "/nexus/entrar?motivo=venceu"}}})
+    assert feito["entrarDeNovo"] == "/nexus/entrar?motivo=venceu"
+
+
+def test_na_tv_o_aviso_do_prazo_aparece_na_ultima_meia_hora():
+    """Revisão de 11/10/2026: a TV fica de pé enquanto valer a sessão do Nexus de quem a abriu (pelo Fracttal, ~12 h a
+    partir do LOGIN). O aviso fixo do canto aparece na última meia hora, sem precisar mexer o mouse, conferido a cada
+    minuto pelo relógio de parede; sem prazo conhecido (a senha de administrador), nunca."""
+    assert rodar("[P.avisarVencimento(0, 0), P.avisarVencimento(3600, 0), P.avisarVencimento(1800, 0), "
+                 "P.avisarVencimento(1801, 0), P.avisarVencimento(10, 60000)]") == [False, False, True, False, True]
+    agora_s = 1760000000                                    # o relógio da página falsa (porta_pagina_falsa.js)
+
+    def tv(vence, passos):
+        return pagina(dados=_dados("", renovar=RENOVAR, telas=TELAS_TV, tv=True, sessao_vence=vence), moldura=True,
+                      respostas=PASSE_NOVO, passos=passos,
+                      elementos={"porta-tv-vence": {}, "porta-tv-controles": {}})["elementos"]["porta-tv-vence"]
+    assert tv(agora_s + 2 * 3600, [])["hidden"] is True
+    assert tv(agora_s + 2 * 3600, [{"avancar": 89 * 60 * 1000}, {"intervalo": True}])["hidden"] is True
+    assert tv(agora_s + 2 * 3600, [{"avancar": 91 * 60 * 1000}, {"intervalo": True}])["hidden"] is False
+    assert tv(agora_s + 10 * 60, [])["hidden"] is False         # aberta já na última meia hora
+    assert tv(0, [{"avancar": 13 * 3600 * 1000}, {"intervalo": True}])["hidden"] is True
+    # fora da TV o porta.js não mexe no aviso (que, de todo modo, só existe na página da TV)
+    fora = pagina(dados=_dados("", telas=TELAS_TV, tv=False, sessao_vence=agora_s + 60), moldura=True,
+                  elementos={"porta-tv-vence": {}})
+    assert fora["elementos"]["porta-tv-vence"]["hidden"] is True

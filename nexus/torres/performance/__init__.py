@@ -93,7 +93,9 @@ def _tempo_real_pela_ponte(motivo: str):
 
 
 # As molduras das telas da plataforma (uma view por item do mapa); o Tempo real cai na ponte enquanto a porta não liga.
-registrar_molduras(bp, TORRE, reserva={"tempo-real": _tempo_real_pela_ponte})
+# O Painel NOC tem modo TV (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC
+# mesmo! não precisa de conta fixa"): o botão "Modo TV" na faixa e o ?tv=1 sem a casca (o do Mapa mora em mapa_tela.py).
+registrar_molduras(bp, TORRE, reserva={"tempo-real": _tempo_real_pela_ponte}, tv={"noc"})
 
 
 _TITULO_PADRAO = "Plataforma de Performance sem resposta"

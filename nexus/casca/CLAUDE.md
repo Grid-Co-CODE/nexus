@@ -17,7 +17,8 @@ cadeira, o tema (escuro ou claro) e o `/saude`.
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
 | `nexus/cadeiras.py` | as 10 cadeiras; diretoria e chefia caem na torre Comando |
 | `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
-| `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base e entrar): a reserva do `localStorage` antes de pintar |
+| `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base, entrar e os dois modos TV): a reserva do `localStorage` antes de pintar |
+| `nexus/templates/_entrar_de_novo_js.html` e `_confere_sessao_js.html` | o `window.nexusEntrarDeNovo` (a janela ao login quando a sessão acaba) e a conferência da sessão do Fracttal a cada 5 minutos (só `session.usuario`). Saíram do `base.html` sem mudar (11/10/2026) para o modo TV do Painel NOC, que não tem a casca, valer igual: a TV de quem saiu do Fracttal vai ao login |
 | `nexus/static/nexus.css` | os tokens do Design System Grid Co. nos dois temas e o subconjunto `gc-*` |
 | `app.py` / `servir.py` | desenvolvimento (5070, IPv4 e IPv6, cookie sem Secure) / produção (atrás do proxy, cookie Secure) |
 | `ferramentas/subir_copia_de_prova.py` / `ferramentas/porta_local.py` | cópia de prova noutra porta (sem carga, sem Fracttal ao subir, trava de rede) / o papel do Caddy no PC, Nexus e plataforma numa origem só; só repassa, sem pote de cookies (10/10/2026: o pote guardava o `session` de uma resposta e o dava a quem chegasse sem cookie; `tests/test_porta_local.py`) |
@@ -53,7 +54,7 @@ na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho
   --reescrita-do-servidor` a imita. O `/saude` do servidor já respondeu um commit enquanto os estáticos eram de outro: lá ele
   não prova versão sozinho.
 - **O `nexus_tema` fica em `/`** (o botão grava pelo navegador; nome próprio, não colide).
-- **Endereço da PLATAFORMA é outra coisa** (porta única, 09/10/2026): as molduras da Performance escrevem, de propósito, endereços da plataforma na raiz (`/painel/nexus/entrar`, `/painel/nexus/sair` e as telas do mapa, como `/tempo-real` no "Abrir em outra aba"), porque ela mora na raiz ao lado do Nexus. Esses não levam `{{ raiz }}`: no template a variável se chama `plataforma` (`{{ plataforma }}/painel/nexus/entrar`, que o varredor estático aceita) e o rastreador os separa (`da_plataforma`). No JavaScript, a plataforma se pede por URL completa (o calço da camada da T.I. poria `/nexus` num `fetch("/api/...")`). Regra em `nexus/performance/CLAUDE.md`, seção "Porta única".
+- **Endereço da PLATAFORMA é outra coisa** (porta única, 09/10/2026): as molduras da Performance escrevem, de propósito, endereços da plataforma na raiz (`/painel/nexus/entrar`, `/painel/nexus/sair` e até 11/10/2026 as telas do mapa, como `/tempo-real` no "Abrir em outra aba", que saiu), porque ela mora na raiz ao lado do Nexus. Esses não levam `{{ raiz }}`: no template a variável se chama `plataforma` (`{{ plataforma }}/painel/nexus/entrar`, que o varredor estático aceita) e o rastreador os separa (`da_plataforma`). No JavaScript, a plataforma se pede por URL completa (o calço da camada da T.I. poria `/nexus` num `fetch("/api/...")`). Regra em `nexus/performance/CLAUDE.md`, seção "Porta única".
 - **Prova:** `tests/test_prefixo.py` (o rastreador `tests/rastreador_de_links.py` percorre todas as páginas a partir do
   Início, logado como admin e no OS Creator embutido, nos modos Caddy cortando, sem cortar, `SCRIPT_NAME` por outro meio e
   raiz, e falha com qualquer endereço interno fora do prefixo; mais o varredor estático de templates, `.js` e `redirect`).
@@ -226,7 +227,8 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
     (`/os/_nexus/sessao`, ver o README do OS Creator). Aba escondida não pergunta.
   A senha de administrador não depende do Fracttal: só o sair a encerra. O login nunca fica numa moldura do Nexus (o
   OS Creator, o card da OS): o `entrar.html` leva a JANELA ao login, com o `next` da página de cima e o mesmo motivo; a
-  casca tem `window.nexusEntrarDeNovo(url)` para as telas que recebem o 401. Sessão de antes desta regra (sem
+  casca tem `window.nexusEntrarDeNovo(url)` para as telas que recebem o 401 (`_entrar_de_novo_js.html`; o modo TV do
+  Painel NOC, sem a casca, inclui o mesmo e a conferência de 5 minutos). Sessão de antes desta regra (sem
   `fracttal_exp`) ganha o prazo no primeiro pedido de /os. Prova: `tests/test_auth_sair_fracttal.py`; na tela, uma
   cópia em 127.0.0.1 com o Fracttal simulado (09/10: sair do OS Creator, token derrubado e token de 45 s vencendo, os
   três levando a janela ao login com o aviso certo).

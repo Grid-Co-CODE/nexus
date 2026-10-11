@@ -4,26 +4,39 @@
    e o base_da_plataforma aceita http em loopback: com a NEXUS_PLATAFORMA_URL interna do servidor, cada visitante mandava
    um passe válido, com o e-mail dele, para a porta local da própria máquina. O que se confere aqui é que nada sai para
    outra origem. Auditoria A5 (10/10/2026): também a renovação da sessão da plataforma, pelos `passos` (mensagens da
-   moldura e o relógio andando).
+   moldura e o relógio andando). Modo TV do Painel NOC (11/10/2026): o endereço que a TV mantém, o botão "Modo TV" e o
+   "Sair do modo TV" que acompanham a moldura, e os controles que aparecem ao mexer o mouse (`elementos`, `evento`,
+   `carregar`).
 
    Uso: node porta_pagina_falsa.js <arquivo.js> '<config JSON>'
    config: {pagina: "https://app.exemplo.test/nexus/t/...", modo: "porta" | "sair", dados, moldura, seletor, acao, id,
-            script,
+            script, elementos: {"<id>": {hidden, href}} (outros elementos da página, devolvidos no fim),
             respostas: {"<url completa>": {status, tipo ("basic" | "opaqueredirect"), json}} (o resto: 401),
             passos: [{mensagem: {...}, origem: "<origem>" (padrão: a da página), de: "moldura" | "outra"}
-                     | {avancar: <ms no relógio>} | {intervalo: true} (roda os setInterval) | {visivel: true}]} */
+                     | {avancar: <ms no relógio>} | {intervalo: true} (roda os setInterval) | {visivel: true}
+                     | {evento: "mousemove" | "keydown" ..., em: "documento" | "moldura" (o documento da página dentro
+                        dela), tecla} | {carregar: true} (a moldura terminou de carregar uma página)]} */
 "use strict";
 const fs = require("fs");
 const vm = require("vm");
 
 const [arquivo, textoCfg] = process.argv.slice(2);
 const cfg = JSON.parse(textoCfg);
-const feito = {envios: 0, passes: [], pedidos: [], corpos: [], alerta: null, foiPara: null, entrarDeNovo: null};
+const feito = {envios: 0, passes: [], pedidos: [], corpos: [], alerta: null, foiPara: null, entrarDeNovo: null,
+               enderecos: []};
+
+const ouvintes = {janela: {}, documento: {}, moldura: {}};
+function ouvir(onde) {
+  return function (tipo, f) { (ouvintes[onde][tipo] = ouvintes[onde][tipo] || []).push(f); };
+}
 
 function elemento(id, extra) {
-  return Object.assign({id: id, hidden: true, textContent: "", innerHTML: "", options: [], disabled: false,
-                        addEventListener: function () {}, setAttribute: function () {}, removeAttribute: function () {},
+  const seus = {};                           // os ouvintes do elemento (o "load" da moldura, o "click" de um botão)
+  return Object.assign({id: id, hidden: true, textContent: "", innerHTML: "", options: [], disabled: false, _ouvintes: seus,
+                        addEventListener: function (t, f) { (seus[t] = seus[t] || []).push(f); },
+                        setAttribute: function () {}, removeAttribute: function () {},
                         appendChild: function () {}, getAttribute: function () { return null; },
+                        contains: function () { return false; },
                         querySelector: function () { return null; }}, extra || {});
 }
 
@@ -39,7 +52,7 @@ if (cfg.modo === "sair") {
   els["porta-dados"] = elemento("porta-dados", {textContent: JSON.stringify(cfg.dados || {})});
   els["porta-alerta"] = elemento("porta-alerta");
   if (cfg.moldura) {
-    els["porta-moldura"] = elemento("porta-moldura", {contentWindow: {}});
+    els["porta-moldura"] = elemento("porta-moldura", {contentWindow: {document: {addEventListener: ouvir("moldura")}}});
     els["porta-passe"] = elemento("porta-passe", {
       submit: function () { feito.envios++; feito.passes.push(campoPasse.value); },
       querySelector: function (sel) { return sel.indexOf("passe") >= 0 ? campoPasse : null; }});
@@ -48,6 +61,7 @@ if (cfg.modo === "sair") {
     els["porta-usina"] = elemento("porta-usina");
     els["porta-usina-nota"] = elemento("porta-usina-nota");
   }
+  Object.keys(cfg.elementos || {}).forEach(function (id) { els[id] = elemento(id, cfg.elementos[id]); });
 }
 
 // o relógio da página (Date.now) anda só pelos passos `avancar`
@@ -56,10 +70,6 @@ class DataFalsa extends Date {
   static now() { return agora; }
 }
 
-const ouvintes = {janela: {}, documento: {}};
-function ouvir(onde) {
-  return function (tipo, f) { (ouvintes[onde][tipo] = ouvintes[onde][tipo] || []).push(f); };
-}
 const intervalos = [];
 
 const pagina = new URL(cfg.pagina);
@@ -74,7 +84,7 @@ const caixa = {
   window: {addEventListener: ouvir("janela"),
            nexusEntrarDeNovo: function (u) { feito.entrarDeNovo = u == null ? "" : String(u); }},
   location: local,
-  history: {state: null, replaceState: function () {}},
+  history: {state: null, replaceState: function (_s, _t, u) { feito.enderecos.push(String(u)); }},
   fetch: function (url, opcoes) {
     feito.pedidos.push({url: String(url), metodo: (opcoes && opcoes.method) || "GET"});
     // o corpo de cada pedido, na mesma ordem (à parte: os testes de antes comparam os pedidos inteiros)
@@ -110,11 +120,20 @@ function esperar() { return new Promise(function (ok) { setTimeout(ok, 20); }); 
     if (passo.avancar) agora += passo.avancar;
     if (passo.intervalo) intervalos.forEach(function (f) { f(); });
     if (passo.visivel) (ouvintes.documento.visibilitychange || []).forEach(function (f) { f(); });
+    if (passo.carregar) ((els["porta-moldura"] || {_ouvintes: {}})._ouvintes.load || []).forEach(function (f) { f(); });
+    if (passo.evento) {
+      const ev = {type: passo.evento, key: passo.tecla || ""};
+      (ouvintes[passo.em || "documento"][passo.evento] || []).forEach(function (f) { f(ev); });
+    }
     await esperar();
   }
   await new Promise(function (ok) { setTimeout(ok, 50); });
   const alerta = els["porta-alerta"];
   feito.alerta = alerta && !alerta.hidden ? alerta.textContent : null;
   feito.intervalos = intervalos.length;
+  feito.elementos = {};
+  Object.keys(cfg.elementos || {}).forEach(function (id) {
+    feito.elementos[id] = {hidden: els[id].hidden, href: els[id].href == null ? null : String(els[id].href)};
+  });
   process.stdout.write(JSON.stringify(feito));
 })();

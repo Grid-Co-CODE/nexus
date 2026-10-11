@@ -78,6 +78,54 @@ navegador fala com cada sistema.
   (401), o `porta.js` abre a sessão por `fetch` com um passe próprio da página (`passe_lista`, destino `/painel`, o 303
   não é seguido) e lê de novo. Escolher a usina recarrega a página do Nexus com `?p=/painel/usina/<id>?...` (passe novo
   para aquele destino).
+- **Modo TV do Painel NOC** (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e
+  NOC mesmo! não precisa de conta fixa"). Só o Painel NOC e o Mapa de risco (o dele está na seção do Mapa) têm TV:
+  `registrar_molduras(bp, TORRE, ..., tv={"noc"})` marca a tela (`moldura.COM_TV`); tela nova com TV entra nesse
+  conjunto, sem mexer no mapa nem no texto canônico. Na faixa da moldura, por último e no canto direito dela (onde o
+  Mapa tem o dele; `.porta-faixa #porta-tv{margin-left:auto}` no `nexus.css`: quem o empurrava para lá era o "Abrir em
+  outra aba", que saiu no mesmo dia, e sem ele o botão colava no nome da tela), o botão "Modo TV" (a classe e o texto do
+  botão do Mapa) leva a `/t/performance/noc?tv=1`, com o `?p=` do caminho aberto. O
+  `?tv=1` responde `performance/moldura_tv.html`: sem a casca (sem menu e sem topo, o guarda anti-moldura e o tema como
+  na casca), a moldura em 100vw x 100vh sem rolagem e o MESMO `porta.js`, com o mesmo passe, a mesma renovação de 11 h e
+  o mesmo `nexus:sessao-vencida`, que cuidam da sessão da PLATAFORMA; a TV fica de pé enquanto valer a sessão do NEXUS
+  de quem a abriu, sem conta fixa (o limite está logo abaixo). Os
+  controles (o nome da tela, "Tela cheia" quando o navegador permite e "Sair do modo TV") aparecem ao abrir e ao mexer
+  o mouse ou apertar uma tecla, e somem em 6 s (Esc esconde); como a moldura cobre a tela, o `porta.js` ouve também o
+  documento da plataforma a cada página que a moldura carrega (mesma origem). Na TV o endereço guarda o `?tv=1`
+  enquanto a moldura fica no Painel NOC (o F5 volta à TV); se ela for ao diagnóstico de uma usina, o endereço fica o da
+  TV e o "Sair" leva à tela de sempre onde a moldura está. Fora da TV, o botão some quando a moldura sai do Painel NOC e
+  volta com ela (`tv` de cada item em `dados.telas`); a página aberta por outro item não tem o botão. Sem `<meta
+  refresh>`: cada recarga seria um passe novo, e quem relê o dado é o próprio NOC (que mantém o último número com a
+  faixa quando a leitura falha); a sessão vencida reabre no máximo 1 vez a cada 60 s. A TV de quem entrou pelo Fracttal
+  confere a sessão a cada 5 minutos como a casca (`_confere_sessao_js.html`) e vai ao login quando ela acaba (o login
+  volta à TV). Nas telas sem TV o `?tv=1` é ignorado.
+  - **O limite da TV: a sessão do Nexus de quem a abriu** (revisão de 11/10/2026). A primeira versão dizia que a
+    renovação de 11 h deixava a TV ligada o dia todo; ela renova só a sessão da PLATAFORMA. Quem entrou pelo Fracttal tem
+    a sessão do Nexus presa ao token dele (`fracttal_exp`, o `exp` do JWT, ~12 h a partir do LOGIN, não da abertura da
+    TV), que o portão confere em TODO pedido (`nexus/auth`, `_fim_do_fracttal`). Nada que a TV faz renova o token: a
+    conferência de 5 min (`/os/_nexus/sessao`) não passa pelo clone, o `vivo_no_fracttal` evita a renovação de propósito
+    e o POST de 11 h vai à rota do passe. O caso: login às 07:00 e TV às 08:00, por volta das 19:00 a conferência leva
+    401 com `sessao_encerrada` e a TV vai a `/entrar?motivo=venceu`, onde fica a noite toda até alguém entrar de novo;
+    com a TV aberta às 18:30, ela dura 30 minutos. Por isso a TV mostra o prazo (`moldura._prazo_da_tv`, no relógio de
+    Brasília, com o dia na frente quando não é hoje): nos controles, "Sessão de <nome> até HH:MM; depois, a TV pede
+    login", e, na última meia hora, o aviso fixo no canto esquerdo de baixo (`#porta-tv-vence`, que o `porta.js` mostra
+    pelo `dados.sessao_vence`, conferido a cada minuto pelo relógio de parede), sem precisar mexer o mouse. O nome, não o
+    e-mail: a TV fica numa sala com gente passando. A senha de administrador não tem esse limite (o POST de 11 h estica o
+    cookie permanente do Nexus) e não mostra prazo, mas é a senha compartilhada, não o login de uma pessoa; a sessão de
+    antes do `fracttal_exp` também não mostra. **Não provado:** se o Fracttal derruba o token quando a mesma pessoa entra
+    noutro aparelho (o `sso.py` do clone diz que o Fracttal aberto noutra aba renova a sessão e mata a cópia); se
+    derrubar, a conferência de 5 min leva a TV ao login antes do prazo. **Decisão do Levi, pendente:** TV 24 h com o
+    login de uma pessoa pede renovar o JWT pelo `/rpc/token` (o `_rpc_try_refresh` do clone) na conferência da TV, o que
+    é regra nova (hoje o Nexus vale enquanto o token valer, de propósito).
+  - Provas: `tests/test_porta_tv.py` (o servidor: o botão, o `?tv=1`, o prazo nos controles e no aviso, o token vencido
+    levando o F5, o passe novo e a conferência de 5 min ao Entrar com `motivo=venceu` e a volta à TV),
+    `tests/test_porta_js.py` (o endereço, o botão, o Sair, os controles e o aviso da última meia hora no node),
+    `tests/test_prefixo.py` (debaixo do `/nexus`); na tela, uma cópia na 5187 com uma plataforma de mentira na mesma
+    origem (11/10/2026: a moldura em 1440 x 860 sem rolagem, os controles somem em 6 s e voltam com o mouse em cima da
+    moldura, o diagnóstico aberto pelo NOC mantém o endereço da TV, o Sair volta à tela com menu, tema claro e escuro).
+    Depois do rebase sobre o b951816 e do prazo (11/10/2026), as páginas geradas pelo cliente de teste num servidor
+    estático: a faixa do NOC com 44 px e o "Modo TV" no canto direito (x 1341 a 1424 em 1440); o prazo nos controles e o
+    aviso do canto sem encostar um no outro em 1024, 1366 e 1440, sem rolagem, no escuro e no claro.
 - **Tempo real:** a visão "Ao vivo" é a moldura. A alternância "Ao vivo | Pelo banco" (spec 5.7) está pronta em
   `moldura.VISOES_DO_TEMPO_REAL` com a "Pelo banco" em `pronta=False`: só aparece quando a Operação em tempo real
   (branch `operacao-tempo-real`) entrar, DEPOIS que a Ao vivo estiver no servidor. Até a `NEXUS_SSO_CHAVE` chegar, o
@@ -610,7 +658,9 @@ Celular ficou fora (Levi, 09/10: "não precisa de no celular, por hora"): nada f
   título da camada com a fonte por extenso, os três números (Agir agora, Atenção, Sem alerta), a tabela com as linhas que cabem e "e
   mais N", e as fontes com "lido às" no rodapé. `girar=N` (10 a 600 s) alterna avisos, risco e densidade sozinho, sem pedir nada ao
   servidor (as três vêm na página). Os controles aparecem ao mexer o mouse ou apertar uma tecla e somem em 6 s; o cursor some junto.
-  O login vale igual (a mesma rota; sem sessão vai para o Entrar e volta), e cada releitura renova a sessão de 12 h.
+  O login vale igual (a mesma rota; sem sessão vai para o Entrar e volta), e cada releitura renova o cookie de 12 h do Nexus; quem
+  entrou pelo Fracttal cai mesmo assim no fim do token dele, ~12 h depois do LOGIN (o limite do modo TV do Painel NOC, que mostra o
+  prazo; o Mapa ainda não mostra). É o modelo do modo TV do Painel NOC (11/10/2026, seção "Modo TV do Painel NOC", lá em cima).
 
 **O que o mapa não faz, de propósito:** mostrar a coordenada; ilhas oceânicas (o contorno mínimo não as tem: uma usina ali cai em
 "fora deste recorte"); pinça no celular (fora do escopo de 09/10); a NASA POWER no mapa (um pedido por usina, 12 h: só na página da
