@@ -22,6 +22,11 @@
     </label>
     <span class="porta-nota mudo" id="porta-usina-nota" role="status"></span>
     {% endif %}
+    {# Modo TV (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC mesmo!"):
+       só na tela registrada com TV (moldura.py), com a classe e o texto do botão do Mapa de risco, por último na faixa
+       e no canto direito dela (nexus.css), onde o Mapa tem o dele. Leva o caminho aberto; o porta.js o acompanha e o
+       esconde quando a moldura vai a uma tela sem TV. #}
+    {% if tem_tv and ligada and destino and not recusa %}<a class="gc-btn gc-btn--contorno" id="porta-tv" href="{{ endereco_tv|na_raiz }}">Modo TV</a>{% endif %}
   </div>
   <p class="porta-alerta" id="porta-alerta" role="alert" hidden></p>
   {% if recusa %}

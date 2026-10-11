@@ -19,6 +19,13 @@ o resto do Nexus segue igual; a plataforma, sem a mesma chave, responde 404 em `
 
 Mora em `nexus/torres/` (e não numa torre) porque três torres a usam: Performance, COS (Acompanhamento COS) e Base
 (Chaves das fontes). Um módulo solto aqui não vira torre: a descoberta só olha os pacotes.
+
+Modo TV (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC mesmo! não
+precisa de conta fixa"): a tela registrada com TV (`registrar_molduras(..., tv={"noc"})`) ganha o botão "Modo TV" na
+faixa e responde `?tv=1` com `performance/moldura_tv.html`: a mesma moldura e o mesmo `porta.js`, sem a casca do Nexus.
+O passe, a renovação de 11 h e o `nexus:sessao-vencida` valem igual: é isso que deixa a TV ligada o dia todo com o login
+de quem a abriu, sem uma conta fixa. Nas telas sem TV o `?tv=1` é ignorado. O Mapa de risco tem o modo TV dele
+(`performance/mapa_tela.py`), que é o modelo deste.
 """
 from urllib.parse import urlencode, urlsplit
 
@@ -80,7 +87,7 @@ def _passe(destino: str) -> str:
     return porta.montar_passe(current_app.config["NEXUS_SSO_CHAVE"], email, nome, admin, destino)
 
 
-def _dados_do_navegador(t, estado: dict, destino: str | None, passe_lista: str | None) -> dict:
+def _dados_do_navegador(t, estado: dict, destino: str | None, passe_lista: str | None, na_tv: bool = False) -> dict:
     """O que o `porta.js` precisa: a base da plataforma, o item aberto, o destino e a tabela do mapa (o endereço de cada
     item no Nexus e as expressões dos caminhos dele, para acender o item certo quando a moldura avisa)."""
     return {
@@ -89,15 +96,27 @@ def _dados_do_navegador(t, estado: dict, destino: str | None, passe_lista: str |
         # onde pedir um passe novo quando a sessão da plataforma vence ou vai vencer (`_passe_novo`)
         "renovar": url_for(f"{request.blueprint}.{_endpoint(t)}_passe"),
         "destino": destino or "",
+        # a página é o modo TV: o endereço guarda o ?tv=1 enquanto a moldura fica numa tela com TV (porta.js)
+        "tv": na_tv,
+        # `tv` de cada item: o botão "Modo TV" da faixa some quando a moldura vai a uma tela sem TV e volta com ela
         "telas": [{"url": url_da_tela(x), "nome": x.nome, "caminho": x.caminho if porta.concreto(x) else "",
-                   "padroes": porta.padroes_do_navegador(x)} for x in porta.MAPA],
+                   "padroes": porta.padroes_do_navegador(x), "tv": (x.torre, x.tela) in COM_TV} for x in porta.MAPA],
         # Diagnóstico: o passe que abre a sessão da plataforma para ler a lista de usinas (o mesmo /api/macro do Painel
         # NOC, por isso o destino é o /painel; o 303 não é seguido). Só vai à rede se a lista voltar 401.
         "passe_lista": passe_lista or "",
     }
 
 
-def _pagina(torre, t, reserva=None):
+def _endereco(t, destino: str | None, tv: bool = False) -> str:
+    """O endereço do item no Nexus SEM o prefixo (o template põe com `|na_raiz`): o `?p=` só fora da entrada padrão,
+    como o `enderecoNoNexus` do porta.js, e o `?tv=1` do modo TV."""
+    consulta = {"tv": 1} if tv else {}
+    if destino and destino != t.caminho:
+        consulta["p"] = destino
+    return f"/t/{t.torre}/{t.tela}" + ("?" + urlencode(consulta) if consulta else "")
+
+
+def _pagina(torre, t, reserva=None, tem_tv: bool = False):
     tela = torre.tela(t.tela)
     estado = estado_da_porta()
     # `?p=` (favorito, F5, o endereço que a moldura acompanhou): só caminho do mapa. De outro item, vai ao item dono (o
@@ -109,16 +128,22 @@ def _pagina(torre, t, reserva=None):
         if (dono.torre, dono.tela) != (t.torre, t.tela):
             return redirect(url_da_tela(dono) + "?" + urlencode({"p": pedido}))
         destino = pedido
+    # O modo TV só na tela registrada com TV; nas outras o ?tv=1 é ignorado e a tela é a de sempre
+    na_tv = tem_tv and str(request.args.get("tv") or "") == "1"
+    modelo = "performance/moldura_tv.html" if na_tv else "performance/moldura.html"
     contexto = {"torre": torre, "tela": tela, "estado": estado, "ligada": estado["ligada"], "motivo": estado["motivo"],
                 "plataforma": estado["plataforma"], "destino": destino, "passe": None, "recusa": None,
                 "seletor": t.tela == "diagnostico", "ver": "ao-vivo",
-                "visoes": [v for v in VISOES_DO_TEMPO_REAL if v["pronta"]] if t.tela == "tempo-real" else []}
+                "visoes": [v for v in VISOES_DO_TEMPO_REAL if v["pronta"]] if t.tela == "tempo-real" else [],
+                # o botão "Modo TV" da faixa leva o caminho aberto; o "Sair do modo TV" volta à tela de sempre nele
+                "tem_tv": tem_tv, "endereco_tv": _endereco(t, destino, tv=True) if tem_tv else "",
+                "sair_tv": _endereco(t, destino)}
     if t.so_admin and not session.get("admin"):
         # spec 5.3: as chaves das fontes são administração. A plataforma recusa de novo (o passe diz quem é admin).
         contexto.update(recusa="As chaves das fontes (SunOp, Axis e Plataforma) são administração: abrem só para "
                                "quem é administrador do Nexus (NEXUS_ADMINS, a lista da tela Base · Acessos, ou a "
                                "senha de administrador).")
-        return render_template("performance/moldura.html", **contexto), 403
+        return render_template(modelo, **contexto), 403
     if not estado["ligada"] and reserva:
         # o Tempo real que já funcionava pela ponte de 04/10 continua até a T.I. pôr a chave (nada afeta o que
         # funciona hoje, spec 10); com a porta ligada a ponte sai do menu e fica só no código
@@ -129,8 +154,8 @@ def _pagina(torre, t, reserva=None):
         if destino:
             contexto["passe"] = _passe(destino)
         contexto["dados"] = _dados_do_navegador(t, estado, destino,
-                                                _passe("/painel") if contexto["seletor"] else None)
-    resp = make_response(render_template("performance/moldura.html", **contexto))
+                                                _passe("/painel") if contexto["seletor"] else None, na_tv)
+    resp = make_response(render_template(modelo, **contexto))
     # O passe vale 60 s e uma vez só: a página não fica em cache nenhum (voltar pelo navegador gera outro) e não é
     # guardada em disco com o e-mail dentro.
     resp.headers["Cache-Control"] = "no-store"
@@ -188,18 +213,24 @@ def _endpoint(t) -> str:
     return "moldura_" + t.tela.replace("-", "_")
 
 
-def registrar_molduras(bp, torre, reserva: dict | None = None) -> None:
+def registrar_molduras(bp, torre, reserva: dict | None = None, tv=()) -> None:
     """Uma view para cada tela do mapa que mora nesta torre (`/t/<torre>/<tela>`), vencendo o placeholder, e a rota do
     passe novo dela (`/t/<torre>/<tela>/passe`, só POST: `_passe_novo`). A tela tem de estar declarada na `TORRE` (é o
     que entra no menu): sem ela, o erro sai ao subir, não na mão de quem clica.
-    `reserva` = {tela: função(motivo) -> resposta ou None}, chamada com a porta desligada (o Tempo real pela ponte)."""
+    `reserva` = {tela: função(motivo) -> resposta ou None}, chamada com a porta desligada (o Tempo real pela ponte).
+    `tv` = as telas com modo TV (o botão "Modo TV" e o `?tv=1`); hoje só o Painel NOC."""
     reserva = reserva or {}
+    for nome in tv:
+        if nome not in {t.tela for t in porta.da_torre(torre.id)}:
+            raise RuntimeError(f"modo TV pedido para {nome!r}, que não é tela do mapa na torre {torre.id!r}")
     for t in porta.da_torre(torre.id):
         if torre.tela(t.tela) is None:
             raise RuntimeError(f"a tela {t.tela!r} do mapa da Performance não está declarada na torre {torre.id!r}")
+        if t.tela in tv:
+            COM_TV.add((t.torre, t.tela))
 
         def view(_t=t):
-            return _pagina(torre, _t, reserva.get(_t.tela))
+            return _pagina(torre, _t, reserva.get(_t.tela), tem_tv=_t.tela in tv)
 
         def passe_novo(_t=t):
             return _passe_novo(_t)
@@ -215,3 +246,5 @@ def registrar_molduras(bp, torre, reserva: dict | None = None) -> None:
 # não mente", passava a mentir até a T.I. pôr a chave). O Tempo real tem a ponte de 04/10 como reserva: segue verde,
 # como antes da porta.
 SO_COM_A_PORTA: set[str] = set()
+# (torre, tela) das telas com modo TV, de todas as torres: o porta.js recebe a marca de cada item do mapa
+COM_TV: set[tuple[str, str]] = set()

@@ -78,6 +78,11 @@
     return caminho === tela.caminho ? tela.url : tela.url + "?p=" + encodeURIComponent(caminho);
   }
 
+  // O mesmo endereço no modo TV (?tv=1, 11/10/2026): o F5 e o favorito da TV voltam à TV, no caminho em que ela estava.
+  function enderecoNaTv(tela, caminho) {
+    return tela.url + "?tv=1" + (caminho === tela.caminho ? "" : "&p=" + encodeURIComponent(caminho));
+  }
+
   // Só caminho local da plataforma: "/x", nunca "//outro" nem URL completa (o aviso vem de outro sistema).
   function caminhoAceito(c) {
     return typeof c === "string" && c.charAt(0) === "/" && c.charAt(1) !== "/" && c.charAt(1) !== "\\" && c.length < 2048;
@@ -105,7 +110,7 @@
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {usinasDoSeletor: usinasDoSeletor, telaDoCaminho: telaDoCaminho, enderecoNoNexus: enderecoNoNexus,
-                      caminhoAceito: caminhoAceito, norm: norm, enc: enc, podeReabrir: podeReabrir,
+                      enderecoNaTv: enderecoNaTv, caminhoAceito: caminhoAceito, norm: norm, enc: enc, podeReabrir: podeReabrir,
                       caminhoParaReabrir: caminhoParaReabrir, RENOVA_A_CADA_MS: RENOVA_A_CADA_MS};
     return;
   }
@@ -133,6 +138,9 @@
 
   var moldura = document.getElementById("porta-moldura");
   var formulario = document.getElementById("porta-passe");
+  // Modo TV (11/10/2026): na página normal, o botão "Modo TV" da faixa (só nas telas com TV); na TV, o "Sair do modo TV"
+  var naTv = dados.tv === true;
+  var botaoTv = document.getElementById("porta-tv"), sairTv = document.getElementById("porta-sair-tv");
   if (moldura && formulario && mesmaOrigem) formulario.submit();
 
   function acender(tela) {
@@ -143,7 +151,7 @@
       var torre = a.closest("details");
       if (torre) torre.open = true;
     });
-    document.title = tela.nome + " · Grid Co.";
+    document.title = tela.nome + (naTv ? " · modo TV" : "") + " · Grid Co.";
     // a faixa diz o item em que a pessoa está agora (a moldura pode ter ido do Tempo real ao Acompanhamento COS)
     var nome = document.querySelector(".porta-origem strong");
     if (nome) nome.textContent = tela.nome;
@@ -161,9 +169,21 @@
     if (!tela) return;                       // fora do mapa (o login da plataforma, por exemplo): o endereço fica
     caminhoAtual = d.caminho;
     var novo = enderecoNoNexus(tela, d.caminho);
-    try { history.replaceState(history.state, "", novo); } catch (e) { /* endereço de outra origem: fica */ }
+    // Na TV o endereço guarda o ?tv=1 enquanto a moldura fica numa tela com TV; numa sem TV (o diagnóstico aberto pelo
+    // clique numa usina do NOC) fica o último endereço da TV: o F5 da TV volta à TV, e não à tela com menu.
+    var aqui = !naTv ? novo : (tela.tv ? enderecoNaTv(tela, d.caminho) : null);
+    if (aqui) {
+      try { history.replaceState(history.state, "", aqui); } catch (e) { /* endereço de outra origem: fica */ }
+    }
     // a troca de cadeira e de tema voltam para onde a pessoa está agora (o servidor aceita com ou sem o prefixo)
     document.querySelectorAll('input[name="voltar"]').forEach(function (i) { i.value = novo; });
+    // o "Modo TV" só à vista numa tela com TV, levando o caminho; o "Sair do modo TV" leva à tela de sempre onde a
+    // moldura está agora
+    if (botaoTv) {
+      botaoTv.hidden = !tela.tv;
+      if (tela.tv) botaoTv.href = enderecoNaTv(tela, d.caminho);
+    }
+    if (sairTv) sairTv.href = novo;
     acender(tela);
     marcarUsina(d.caminho);
   });
@@ -248,6 +268,50 @@
     // dormindo, e a sessão da plataforma conta as 12 h de verdade
     setInterval(talvezRenovar, 60 * 1000);
     document.addEventListener("visibilitychange", talvezRenovar);
+  }
+
+  // ── o modo TV: os controles que aparecem ao mexer o mouse e a tela cheia (11/10/2026) ─────────────────────────────
+  // O modelo é o modo TV do Mapa de risco (clima-mapa.js): os controles aparecem ao abrir e a cada movimento do mouse,
+  // toque ou tecla, e somem sozinhos em 6 s (Esc esconde na hora). A moldura cobre a tela inteira, e o mouse que mexe em
+  // cima dela gera o evento no documento DA PLATAFORMA, não neste: cada página que a moldura carrega ganha o mesmo
+  // ouvinte (mesma origem, a única em que a moldura abre; se o navegador recusar, fica só o documento de cá). Nada aqui
+  // recarrega a página: quem reabre a sessão vencida é o reabrir() acima, no máximo 1 vez a cada 60 s.
+  var controles = document.getElementById("porta-tv-controles");
+  if (naTv && controles) {
+    var esconderEm = null;
+    var mostrarControles = function () {
+      controles.hidden = false;
+      clearTimeout(esconderEm);
+      esconderEm = setTimeout(function () {
+        if (controles.contains(document.activeElement)) return;      // o foco do teclado está num botão: fica
+        controles.hidden = true;
+      }, 6000);
+    };
+    var ouvirNo = function (doc) {
+      ["mousemove", "pointerdown", "keydown"].forEach(function (t) { doc.addEventListener(t, mostrarControles); });
+      doc.addEventListener("keydown", function (e) { if (e.key === "Escape") controles.hidden = true; });
+    };
+    ouvirNo(document);
+    if (moldura) {
+      moldura.addEventListener("load", function () {
+        try { ouvirNo(moldura.contentWindow.document); } catch (e) { /* outra origem: só o documento de cá */ }
+      });
+    }
+    mostrarControles();
+    var cheia = controles.querySelector('[data-acao="tela-cheia"]');
+    if (cheia && document.fullscreenEnabled) {
+      cheia.hidden = false;
+      cheia.addEventListener("click", function () {
+        if (document.fullscreenElement) { document.exitFullscreen(); return; }
+        var alvo = document.documentElement;
+        if (alvo.requestFullscreen) alvo.requestFullscreen().catch(function () {});
+      });
+      document.addEventListener("fullscreenchange", function () {
+        var ligada = !!document.fullscreenElement;
+        cheia.setAttribute("aria-pressed", String(ligada));
+        cheia.textContent = ligada ? "Sair da tela cheia" : "Tela cheia";
+      });
+    }
   }
 
   // ── Diagnóstico: o seletor de usina ───────────────────────────────────────────────────────────────────────────────

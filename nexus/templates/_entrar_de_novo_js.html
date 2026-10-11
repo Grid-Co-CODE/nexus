@@ -1,0 +1,14 @@
+{# A sessão do Nexus acabou: a JANELA vai ao login, que volta para a página aberta. Só JavaScript: entra dentro de um
+   <script> no <head> (base.html e o modo TV do Painel NOC, performance/moldura_tv.html, que não tem a casca e precisa
+   dela do mesmo jeito: o porta.js a chama quando o passe novo é recusado). Saiu do base.html em 11/10/2026, sem mudar. #}
+    // A sessão acabou (o Fracttal saiu, venceu ou caiu): a JANELA vai ao login, que depois volta para a página aberta
+    window.nexusEntrarDeNovo = function (url) {
+      var w = window.top;
+      try { void w.location.pathname; } catch (e) { w = window; }
+      // debaixo do /nexus, o login escrito a partir da raiz caía na plataforma: o endereço sai do nexusRota
+      // (_raiz_js.html, já carregado quando isto roda; o `url` que o servidor manda já vem com o prefixo)
+      var rota = typeof nexusRota === "function" ? nexusRota : function (c) { return c; };
+      var u = new URL(url || rota("/entrar"), location.origin);
+      u.searchParams.set("next", w.location.pathname + w.location.search);
+      w.location.href = u.pathname + u.search;
+    };

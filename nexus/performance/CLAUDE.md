@@ -77,6 +77,30 @@ navegador fala com cada sistema.
   (401), o `porta.js` abre a sessão por `fetch` com um passe próprio da página (`passe_lista`, destino `/painel`, o 303
   não é seguido) e lê de novo. Escolher a usina recarrega a página do Nexus com `?p=/painel/usina/<id>?...` (passe novo
   para aquele destino).
+- **Modo TV do Painel NOC** (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e
+  NOC mesmo! não precisa de conta fixa"). Só o Painel NOC e o Mapa de risco (o dele está na seção do Mapa) têm TV:
+  `registrar_molduras(bp, TORRE, ..., tv={"noc"})` marca a tela (`moldura.COM_TV`); tela nova com TV entra nesse
+  conjunto, sem mexer no mapa nem no texto canônico. Na faixa da moldura, por último e no canto direito dela (onde o
+  Mapa tem o dele; `.porta-faixa #porta-tv{margin-left:auto}` no `nexus.css`: quem o empurrava para lá era o "Abrir em
+  outra aba", que saiu no mesmo dia, e sem ele o botão colava no nome da tela), o botão "Modo TV" (a classe e o texto do
+  botão do Mapa) leva a `/t/performance/noc?tv=1`, com o `?p=` do caminho aberto. O
+  `?tv=1` responde `performance/moldura_tv.html`: sem a casca (sem menu e sem topo, o guarda anti-moldura e o tema como
+  na casca), a moldura em 100vw x 100vh sem rolagem e o MESMO `porta.js`, com o mesmo passe, a mesma renovação de 11 h e
+  o mesmo `nexus:sessao-vencida`: é isso que deixa a TV ligada o dia todo com o login de quem a abriu, sem conta fixa. Os
+  controles (o nome da tela, "Tela cheia" quando o navegador permite e "Sair do modo TV") aparecem ao abrir e ao mexer
+  o mouse ou apertar uma tecla, e somem em 6 s (Esc esconde); como a moldura cobre a tela, o `porta.js` ouve também o
+  documento da plataforma a cada página que a moldura carrega (mesma origem). Na TV o endereço guarda o `?tv=1`
+  enquanto a moldura fica no Painel NOC (o F5 volta à TV); se ela for ao diagnóstico de uma usina, o endereço fica o da
+  TV e o "Sair" leva à tela de sempre onde a moldura está. Fora da TV, o botão some quando a moldura sai do Painel NOC e
+  volta com ela (`tv` de cada item em `dados.telas`); a página aberta por outro item não tem o botão. Sem `<meta
+  refresh>`: cada recarga seria um passe novo, e quem relê o dado é o próprio NOC (que mantém o último número com a
+  faixa quando a leitura falha); a sessão vencida reabre no máximo 1 vez a cada 60 s. A TV de quem entrou pelo Fracttal
+  confere a sessão a cada 5 minutos como a casca (`_confere_sessao_js.html`) e vai ao login quando ela acaba (o login
+  volta à TV). Nas telas sem TV o `?tv=1` é ignorado. Provas: `tests/test_porta_tv.py` (o servidor),
+  `tests/test_porta_js.py` (o endereço, o botão, o Sair e os controles no node), `tests/test_prefixo.py` (debaixo do
+  `/nexus`); na tela, uma cópia na 5187 com uma plataforma de mentira na mesma origem (11/10/2026: a moldura em 1440 x
+  860 sem rolagem, os controles somem em 6 s e voltam com o mouse em cima da moldura, o diagnóstico aberto pelo NOC
+  mantém o endereço da TV, o Sair volta à tela com menu, tema claro e escuro).
 - **Tempo real:** a visão "Ao vivo" é a moldura. A alternância "Ao vivo | Pelo banco" (spec 5.7) está pronta em
   `moldura.VISOES_DO_TEMPO_REAL` com a "Pelo banco" em `pronta=False`: só aparece quando a Operação em tempo real
   (branch `operacao-tempo-real`) entrar, DEPOIS que a Ao vivo estiver no servidor. Até a `NEXUS_SSO_CHAVE` chegar, o
@@ -609,7 +633,8 @@ Celular ficou fora (Levi, 09/10: "não precisa de no celular, por hora"): nada f
   título da camada com a fonte por extenso, os três números (Agir agora, Atenção, Sem alerta), a tabela com as linhas que cabem e "e
   mais N", e as fontes com "lido às" no rodapé. `girar=N` (10 a 600 s) alterna avisos, risco e densidade sozinho, sem pedir nada ao
   servidor (as três vêm na página). Os controles aparecem ao mexer o mouse ou apertar uma tecla e somem em 6 s; o cursor some junto.
-  O login vale igual (a mesma rota; sem sessão vai para o Entrar e volta), e cada releitura renova a sessão de 12 h.
+  O login vale igual (a mesma rota; sem sessão vai para o Entrar e volta), e cada releitura renova a sessão de 12 h. É o modelo
+  do modo TV do Painel NOC (11/10/2026, seção "Modo TV do Painel NOC", lá em cima).
 
 **O que o mapa não faz, de propósito:** mostrar a coordenada; ilhas oceânicas (o contorno mínimo não as tem: uma usina ali cai em
 "fora deste recorte"); pinça no celular (fora do escopo de 09/10); a NASA POWER no mapa (um pedido por usina, 12 h: só na página da
