@@ -9,7 +9,7 @@ Plataforma de Performance (repositório PerformancePainel) continua o motor e de
 gravação, dentro de uma moldura (iframe) do Nexus. Nada da plataforma passa pelo processo do Nexus (a ponte passava): o
 navegador fala com cada sistema.
 
-- **O mapa** (`porta.py`, `MAPA`): as 13 telas, `torre · tela -> caminho na plataforma`. Fonte única: o Nexus é o dono;
+- **O mapa** (`porta.py`, `MAPA`): as 12 telas, `torre · tela -> caminho na plataforma`. Fonte única: o Nexus é o dono;
   a plataforma tem a cópia em `plataforma/porta_nexus.py`. Os dois comparam o mesmo texto canônico
   (`texto_canonico_do_mapa`; `tests/test_porta_mapa.py` aqui e o teste da porta lá): mudou um, muda o outro e o texto dos
   dois testes. Com `PLATAFORMA_REPO=<clone do PerformancePainel>` o teste daqui abre o módulo de lá e compara o mapa, a
@@ -26,11 +26,14 @@ navegador fala com cada sistema.
   | performance · `gerencial` e `disponibilidade` | `/gerencial` e `/gerencial/disponibilidade` |
   | performance · `relatorio` e `relatorio-semanal` | `/relatorio` e `/relatorio/semanal` |
   | performance · `gemeo` | `/gemeo/` (e tudo debaixo dele) |
-  | performance · `historico-plataforma` e `monitor-ronda` | `/historico-plataforma` e `/ronda/monitor` |
+  | performance · `monitor-ronda` (o item "Rondas de Trackers") | `/ronda/monitor` |
   | cos · `acompanhamento` | `/cos` |
   | base · `chaves-fontes` (só admin) | `/tokens` |
 
   Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco e Mapa de risco são do Nexus e ficam fora.
+  Em 11/10/2026 o Histórico da plataforma saiu do mapa, dos dois lados, com a rota e o template na plataforma (Levi:
+  "Pode matar a seção histórico da plataforma!"); o Monitor da ronda virou "Rondas de Trackers", com o mesmo id (o
+  endereço `/t/performance/monitor-ronda` e o favorito não quebram; o nome fica fora do texto canônico de propósito).
 - **O passe** (`montar_passe`): `base64url(json) + "." + base64url(HMAC-SHA256(json))` com a `NEXUS_SSO_CHAVE` (a MESMA
   no `.env` da plataforma; com menos de 32 caracteres vale como ausente, nos dois lados). O JSON leva `v`, `email`,
   `nome`, `admin` (o `session["admin"]` do Nexus: `NEXUS_ADMINS` ou a senha de administrador), `destino`, `vence` (60 s)
@@ -45,7 +48,8 @@ navegador fala com cada sistema.
 - **O endereço acompanha:** a página da plataforma, em modo Nexus, manda `postMessage({tipo: "nexus:rota", caminho})` a
   cada troca de caminho. O `porta.js` só aceita o aviso da própria moldura e da origem da plataforma; troca o endereço
   (`history.replaceState`: o item dono do caminho, com `?p=` quando não é a entrada padrão dele), acende o item no menu e
-  leva o endereço novo ao "voltar" da cadeira e do tema e ao "Abrir em outra aba". Abrir com `?p=` (F5, favorito): do
+  leva o endereço novo ao "voltar" da cadeira e do tema. **Sem "Abrir em outra aba"** desde 11/10/2026 (Levi: "Não tem
+  que ter essa opção, é só Nexus e já era!"): a faixa não oferece a tela fora da moldura. Abrir com `?p=` (F5, favorito): do
   mapa e do item, abre ali; de OUTRO item, 302 para o item dono; fora do mapa, a tela padrão do item (spec 7).
 - **A sessão da plataforma vence em 12 h e a moldura a renova** (auditoria A5 da porta única, 10/10/2026). O caso: a
   sessão que o passe abre vale 12 h fixas (`SESSAO_DO_PASSE_S` da plataforma); depois, o `/api/macro` do Painel NOC dava
@@ -129,7 +133,7 @@ navegador fala com cada sistema.
   - perfis: o analista grava (numa cópia de estado da plataforma), o gestor lê as 11 telas e leva 403 ao gravar, Chaves
     das fontes só admin (aqui e na plataforma), fora das listas "Sem acesso"; os passes que o Nexus gera valem 60 s e uma
     vez: repetido, adulterado, vencido, fora do mapa, na URL e de outro site são recusados sem abrir sessão;
-  - o Sair encerra as duas sessões (GET `/nexus/sair` e o POST em `/painel/nexus/sair`); sem a chave, as 13 telas avisam,
+  - o Sair encerra as duas sessões (GET `/nexus/sair` e o POST em `/painel/nexus/sair`); sem a chave, as telas avisam,
     o Tempo real cai na ponte (com a ponte configurada, mostra a plataforma) e a plataforma responde 404;
   - 100 páginas do Nexus (Início e todo o menu) e 12.744 endereços: no modo prefixo nenhum fora do `/nexus` (fora os da
     plataforma escritos de propósito), com a camada da T.I. nenhum `/nexus/nexus`, no modo raiz nenhum `/nexus`; nenhum

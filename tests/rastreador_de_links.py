@@ -27,7 +27,7 @@ _LITERAL_DO_CLONE = re.compile(rb"""(value=)?([\"'`(])/os(?=[/\"'`?#)])""")
 
 def da_plataforma(caminho: str) -> bool:
     """Endereço da Plataforma de Performance que o Nexus escreve DE PROPÓSITO na raiz (porta única, 09/10/2026): o
-    formulário do passe e o Sair (`/painel/nexus/...`) e as telas do mapa ("Abrir em outra aba"). No servidor a
+    formulário do passe e o Sair (`/painel/nexus/...`) e as telas do mapa (o "Abrir em outra aba", até 11/10/2026). No servidor a
     plataforma mora na raiz, ao lado do Nexus em /nexus: com o prefixo, eles quebrariam. Não é página do Nexus, e o
     rastreador não segue."""
     from nexus.performance import porta

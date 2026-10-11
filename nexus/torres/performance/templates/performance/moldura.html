@@ -6,7 +6,8 @@
    Nexus como link principal"). O Nexus é a porta (menu, login, endereço); a plataforma desenha a tela na moldura. O
    formulário escondido leva o passe (POST, nunca na URL) a /painel/nexus/entrar com alvo na moldura; o porta.js o envia
    ao carregar, acompanha o caminho que a moldura avisa e, no Diagnóstico, lê a lista de usinas. Regra e porquês em
-   nexus/torres/moldura.py e nexus/performance/porta.py. #}
+   nexus/torres/moldura.py e nexus/performance/porta.py. Sem "Abrir em outra aba" desde 11/10/2026 (Levi: "é só Nexus e
+   já era!"): a tela da plataforma só se abre dentro do Nexus. #}
 <div class="porta" id="porta">
   <div class="porta-faixa">
     <span class="porta-origem"><strong>{{ tela.nome }}</strong> · Plataforma de Performance</span>
@@ -21,7 +22,6 @@
     </label>
     <span class="porta-nota mudo" id="porta-usina-nota" role="status"></span>
     {% endif %}
-    {% if ligada and destino and not recusa %}<a class="porta-fora" id="porta-fora" href="{{ plataforma }}{{ destino }}" target="_blank" rel="noopener">Abrir em outra aba</a>{% endif %}
   </div>
   <p class="porta-alerta" id="porta-alerta" role="alert" hidden></p>
   {% if recusa %}

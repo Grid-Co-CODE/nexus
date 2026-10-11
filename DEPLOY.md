@@ -143,7 +143,7 @@ só tirar a `NEXUS_PREFIXO` e mudar o Caddy (seção 5b). Num subdomínio própr
 Levi, 09/10/2026: "qnd tudo ficar pronto passar apenas para https://app.gridco.com.br". O Nexus passa a responder na
 raiz e a plataforma de Performance fica onde está: o Caddy divide **por caminho** (os caminhos dos dois foram medidos em
 09/10 e só colidem em `/`, `/os` e `/static`). Nenhuma linha de código muda; provado no PC em 10/10/2026 com um proxy que
-faz esta mesma divisão (as 13 telas da porta única, as duas sessões juntas, o Sair, os passes).
+faz esta mesma divisão (as telas da porta única, 13 na época e 12 desde 11/10/2026, as duas sessões juntas, o Sair, os passes).
 
 - Para o **Nexus**: `/` (só a raiz exata), `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/cadeira`, `/os` e `/os/*`, e
   `/static/*` **menos** os três estáticos da plataforma (`/static/fonts/*`, `/static/logos/*`, `/static/notif.js`; estático
@@ -307,9 +307,8 @@ abre a sessão dela e mostra a tela. Os dois sistemas continuam onde estão (Nex
 **Tudo fica desligado até a T.I. pôr a chave nos DOIS.** Sem ela, no Nexus cada item diz "Performance ainda não ligada
 neste servidor" (o que falta só aparece para admin) e fica como "em construção" no menu, sem o verde; o Tempo real
 segue pela leitura de 04/10 (seção 7b), como hoje. Na plataforma, `/painel/nexus/*` responde 404. O que muda para quem
-usa o Nexus antes da chave: o menu ganha 6 itens novos em construção (Disponibilidade, Relatório semanal, Histórico da
-plataforma, Monitor da ronda, COS · Acompanhamento COS e Base · Chaves das fontes) e o Início conta 6 telas previstas a
-mais. Na plataforma, nada muda para ninguém.
+usa o Nexus antes da chave: o menu ganha 5 itens novos em construção (Disponibilidade, Relatório semanal, Rondas de
+Trackers, COS · Acompanhamento COS e Base · Chaves das fontes) e o Início conta 5 telas previstas a mais. Na plataforma, nada muda para ninguém.
 
 **O que a T.I. faz, nesta ordem** (o código dos dois já no ar):
 

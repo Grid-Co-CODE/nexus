@@ -51,10 +51,7 @@ TORRE = Torre(
         Tela("gemeo", "Gêmeo digital",
              "Quanto a usina deveria ter gerado com o sol que teve?",
              "Gêmeo digital, pela Plataforma de Performance"),
-        Tela("historico-plataforma", "Histórico da plataforma",
-             "Como cada usina da API PV andou, dia a dia?",
-             "Plataforma de Performance"),
-        Tela("monitor-ronda", "Monitor da ronda",
+        Tela("monitor-ronda", "Rondas de Trackers",
              "A ronda dos trackers saiu em cada horário, e onde falhou?",
              "Plataforma de Performance"),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")

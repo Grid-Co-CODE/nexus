@@ -67,7 +67,7 @@ Sem o `.env` completo o app não sobe, e diz qual variável falta.
 
 **A Performance no PC (10/10/2026).** Com `NEXUS_PLATAFORMA_LOCAL=http://127.0.0.1:5050` e a `NEXUS_PLATAFORMA_URL`
 vazia no `.env`, a 5070 junta o Nexus e a plataforma local num endereço só (a mesma divisão do Caddy com o Nexus na raiz,
-`app.juntar_com_a_plataforma`), e as 13 telas da Performance abrem em `localhost:5070`. Precisa da MESMA `NEXUS_SSO_CHAVE`
+`app.juntar_com_a_plataforma`), e as 12 telas da Performance abrem em `localhost:5070`. Precisa da MESMA `NEXUS_SSO_CHAVE`
 no `.env` do Nexus e no `tokens.txt` da plataforma, e a 5050 no código da porta única. Sem a variável, a 5070 é só o Nexus,
 e a moldura diz "configurada em outra origem" (o caso que motivou: o Levi abriu o Tempo real e viu esse aviso).
 

@@ -133,7 +133,6 @@
 
   var moldura = document.getElementById("porta-moldura");
   var formulario = document.getElementById("porta-passe");
-  var fora = document.getElementById("porta-fora");
   if (moldura && formulario && mesmaOrigem) formulario.submit();
 
   function acender(tela) {
@@ -165,7 +164,6 @@
     try { history.replaceState(history.state, "", novo); } catch (e) { /* endereço de outra origem: fica */ }
     // a troca de cadeira e de tema voltam para onde a pessoa está agora (o servidor aceita com ou sem o prefixo)
     document.querySelectorAll('input[name="voltar"]').forEach(function (i) { i.value = novo; });
-    if (fora) fora.href = urlDaPlataforma(d.caminho);
     acender(tela);
     marcarUsina(d.caminho);
   });

@@ -53,9 +53,9 @@ MAPA = (
     # O gêmeo é outro processo, servido pelo proxy /gemeo/* da plataforma: tudo debaixo dele é a mesma tela (o Painel
     # NOC abre /gemeo/usina/<id>).
     TelaDaPlataforma("performance", "gemeo", "Gêmeo digital", "/gemeo/", ("/gemeo/<path:resto>",), False),
-    TelaDaPlataforma("performance", "historico-plataforma", "Histórico da plataforma", "/historico-plataforma", (),
-                     False),
-    TelaDaPlataforma("performance", "monitor-ronda", "Monitor da ronda", "/ronda/monitor", (), False),
+    # O Histórico da plataforma saiu em 11/10/2026 (Levi: "Pode matar a seção histórico da plataforma!"). A ronda virou
+    # "Rondas de Trackers" no mesmo dia; o id (o endereço /t/performance/monitor-ronda) ficou, para o favorito não quebrar.
+    TelaDaPlataforma("performance", "monitor-ronda", "Rondas de Trackers", "/ronda/monitor", (), False),
     TelaDaPlataforma("cos", "acompanhamento", "Acompanhamento COS", "/cos", (), False),
     # /tokens grava as chaves das fontes (SunOp, Axis, Plataforma): administração, só admin do Nexus (spec 5.3)
     TelaDaPlataforma("base", "chaves-fontes", "Chaves das fontes", "/tokens", (), True),

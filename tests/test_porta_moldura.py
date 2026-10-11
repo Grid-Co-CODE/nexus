@@ -119,7 +119,7 @@ def test_cada_tela_do_mapa_abre_a_moldura_com_o_formulario_certo(prefixo, t):
     assert f'href="{prefixo}/t/{t.torre}/{t.tela}" class="com-conteudo" aria-current="page"' in h
     dados = _dados(h)
     assert dados["url"] == f"{prefixo}/t/{t.torre}/{t.tela}" and dados["plataforma"] == ""
-    assert all(x["url"].startswith(f"{prefixo}/t/") for x in dados["telas"]) and len(dados["telas"]) == 13
+    assert all(x["url"].startswith(f"{prefixo}/t/") for x in dados["telas"]) and len(dados["telas"]) == 12
     assert f'src="{prefixo}/static/porta.js"' in h
     form = _form(h)
     if not porta.concreto(t):                                  # o Diagnóstico espera a usina do seletor
@@ -132,7 +132,8 @@ def test_cada_tela_do_mapa_abre_a_moldura_com_o_formulario_certo(prefixo, t):
     p = _ler(form["passe"])
     assert p["destino"] == t.caminho and p["admin"] is True       # a senha de administrador
     assert p["email"] == porta.EMAIL_DA_SENHA_DE_ADMIN
-    assert f'href="{t.caminho}"' in h                           # "Abrir em outra aba", na plataforma
+    # sem "Abrir em outra aba" (Levi, 11/10/2026: "é só Nexus e já era!"): a tela da plataforma só abre na moldura
+    assert "Abrir em outra aba" not in h and "porta-fora" not in h and f'href="{t.caminho}"' not in h
     assert dados["passe_lista"] == "" and form["passe"] not in r.headers.get("Location", "")
 
 
@@ -160,7 +161,7 @@ def test_a_url_da_plataforma_configurada_vai_no_formulario():
     h = cli.get("/t/performance/tempo-real").get_data(as_text=True)
     assert _form(h)["action"] == "http://127.0.0.1:5150/painel/nexus/entrar"
     assert _dados(h)["plataforma"] == "http://127.0.0.1:5150"
-    assert 'href="http://127.0.0.1:5150/tempo-real"' in h
+    assert 'href="http://127.0.0.1:5150/tempo-real"' not in h        # sem "Abrir em outra aba" (11/10/2026)
 
 
 # ── sem login, sem chave, sem configuração ───────────────────────────────────────────────────────────────────────────
@@ -304,8 +305,8 @@ def test_o_sair_sem_a_chave_e_o_de_sempre():
 
 # ── a convivência com a camada da T.I. (que reescreve a resposta no servidor de hoje) ────────────────────────────────
 def test_a_camada_do_servidor_nao_mexe_nos_enderecos_da_plataforma():
-    """A camada fora do repositório põe /nexus nos caminhos DO NEXUS escritos no HTML; os da plataforma (o passe, o Sair
-    e o "Abrir em outra aba") ficam como estão, e nada sai /nexus/nexus."""
+    """A camada fora do repositório põe /nexus nos caminhos DO NEXUS escritos no HTML; os da plataforma (o passe e o
+    Sair) ficam como estão, e nada sai /nexus/nexus. (O "Abrir em outra aba" saiu em 11/10/2026.)"""
     import importlib.util
     from pathlib import Path
     arq = Path(__file__).resolve().parent.parent / "ferramentas" / "porta_local.py"
@@ -317,7 +318,7 @@ def test_a_camada_do_servidor_nao_mexe_nos_enderecos_da_plataforma():
         h = pl.reescreve_corpo(cli.get(f"{PREFIXO}/t/{t.torre}/{t.tela}").get_data(as_text=True), True)
         assert "/nexus/nexus" not in h, t
         if porta.concreto(t):
-            assert _form(h)["action"] == "/painel/nexus/entrar" and f'href="{t.caminho}"' in h, t
+            assert _form(h)["action"] == "/painel/nexus/entrar" and f'href="{t.caminho}"' not in h, t
         assert all(x["url"].startswith("/nexus/t/") for x in _dados(h)["telas"])
     h = pl.reescreve_corpo(cli.get(PREFIXO + "/sair").get_data(as_text=True), True)
     assert 'action="/painel/nexus/sair"' in h and "/nexus/nexus" not in h

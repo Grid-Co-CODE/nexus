@@ -32,11 +32,10 @@ performance|disponibilidade|/gerencial/disponibilidade||
 performance|relatorio|/relatorio||
 performance|relatorio-semanal|/relatorio/semanal||
 performance|gemeo|/gemeo/|/gemeo/<path:resto>|
-performance|historico-plataforma|/historico-plataforma||
 performance|monitor-ronda|/ronda/monitor||
 cos|acompanhamento|/cos||
 base|chaves-fontes|/tokens||admin"""
-ASSINATURA_DA_PLATAFORMA = "b80243d6133920c6"
+ASSINATURA_DA_PLATAFORMA = "cf3d44320c8225cf"
 
 
 def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
@@ -50,7 +49,7 @@ def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
 def test_o_mapa_e_o_mesmo_da_plataforma():
     assert porta.texto_canonico_do_mapa() == TEXTO_DA_PLATAFORMA
     assert porta.assinatura_do_mapa() == ASSINATURA_DA_PLATAFORMA
-    assert len(porta.MAPA) == 13 and len({(t.torre, t.tela) for t in porta.MAPA}) == 13
+    assert len(porta.MAPA) == 12 and len({(t.torre, t.tela) for t in porta.MAPA}) == 12
 
 
 @pytest.mark.parametrize("caminho, tela", [
@@ -59,7 +58,7 @@ def test_o_mapa_e_o_mesmo_da_plataforma():
     ("/painel/usina/abc?fonte=pg&nome=Usina%20X", "diagnostico"), ("/painel/falhas", "strings-trackers"),
     ("/gerencial", "gerencial"), ("/gerencial/disponibilidade", "disponibilidade"), ("/relatorio", "relatorio"),
     ("/relatorio/semanal", "relatorio-semanal"), ("/gemeo/", "gemeo"), ("/gemeo/usina/12", "gemeo"),
-    ("/historico-plataforma", "historico-plataforma"), ("/ronda/monitor", "monitor-ronda"), ("/cos", "acompanhamento"),
+    ("/ronda/monitor", "monitor-ronda"), ("/cos", "acompanhamento"),
     ("/tokens", "chaves-fontes"),
 ])
 def test_cada_caminho_cai_na_tela_certa(caminho, tela):
@@ -72,6 +71,7 @@ def test_cada_caminho_cai_na_tela_certa(caminho, tela):
     "/os/", "/painel/nexus/entrar", "/painel/usina/", "/painel/usina/1/2", "/gemeo", "/tempo-real#x",
     "/tempo-real x", "/painel/usina/a'b", '/painel/usina/a"b', "/painel/usina/<b>", "/tempo-real/../tokens",
     "/painel/usina/1\n", "/" + "a" * 2048, "/api/macro", "/",
+    "/historico-plataforma",                       # saiu do mapa em 11/10/2026 (Levi: "Pode matar a seção")
     # revisão de 10/10/2026: o ponto CODIFICADO. '/gemeo/%2e%2e/tokens' casava com /gemeo/<path:resto> e o navegador
     # resolve o %2e%2e como '..' (vai a /tokens); barra codificada vira outro segmento numa camada que decodifica
     "/gemeo/%2e%2e/tokens", "/gemeo/%2E%2E/%2e%2e/nexus/sair", "/gemeo/.%2e/tokens", "/gemeo/%2e/x", "/gemeo/./x",

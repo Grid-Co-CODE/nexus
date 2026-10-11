@@ -342,7 +342,7 @@ def test_na_raiz_nada_ganha_o_prefixo(tmp_path, sem_rede):
 @pytest.mark.parametrize("prefixo", [PREFIXO, None])
 def test_com_a_porta_da_performance_ligada_tambem(tmp_path, sem_rede, prefixo):
     """Porta única (09/10/2026): com a NEXUS_SSO_CHAVE as telas da Performance viram molduras, e elas escrevem endereços
-    da PLATAFORMA (o formulário do passe, "Abrir em outra aba") na raiz de propósito: no servidor a plataforma mora na
+    da PLATAFORMA (o formulário do passe) na raiz de propósito: no servidor a plataforma mora na
     raiz. O rastreador separa esses (da_plataforma) e continua sem achar endereço do Nexus fora do prefixo."""
     from nexus.performance import porta
     app = _app_com_dados(tmp_path, prefixo, NEXUS_SSO_CHAVE="c" * 40)
@@ -363,7 +363,8 @@ def test_com_a_porta_da_performance_ligada_tambem(tmp_path, sem_rede, prefixo):
         else:
             assert rs.visitados[url] == 200, t
     vistos = {(onde, c) for _, onde, c in da_plataforma}
-    assert ("action", "/painel/nexus/entrar") in vistos and ("href", "/tempo-real") in vistos
+    # sem link para a plataforma desde 11/10/2026 (o "Abrir em outra aba" saiu): só o formulário do passe a escreve
+    assert ("action", "/painel/nexus/entrar") in vistos and not any(onde == "href" for onde, _ in vistos)
     assert not any(c.startswith("/nexus") for _, c in vistos)
 
 
