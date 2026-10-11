@@ -116,7 +116,10 @@ def _prazo_da_tv(agora: datetime | None = None) -> dict | None:
         return None
     d = datetime.fromtimestamp(vence, _BRT)
     e_hoje = d.date() == (agora or datetime.now(_BRT)).astimezone(_BRT).date()
-    return {"nome": (usuario.get("nome") or "").strip() or "quem entrou",
+    # o login põe o e-mail no lugar do nome quando o Fracttal não devolve o nome (recusa ou limite de 200/min): na TV,
+    # nome com "@" também vira "quem entrou" (prova da TV, 11/10/2026: o e-mail aparecia nos controles)
+    nome = (usuario.get("nome") or "").strip()
+    return {"nome": nome if nome and "@" not in nome else "quem entrou",
             "ate": f"{d:%H:%M}" if e_hoje else f"{d:%d/%m} às {d:%H:%M}",
             "quando": f"às {d:%H:%M}" if e_hoje else f"em {d:%d/%m} às {d:%H:%M}", "vence": int(vence)}
 

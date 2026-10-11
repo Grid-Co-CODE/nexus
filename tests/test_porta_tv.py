@@ -213,6 +213,9 @@ def test_o_prazo_sai_no_relogio_de_brasilia_com_o_dia_quando_nao_e_hoje():
         # sem nome no Fracttal, não sai o e-mail (a TV fica numa sala com gente passando)
         session["usuario"] = {"email": "pessoa@exemplo.test", "nome": "", "perfil": ""}
         assert moldura._prazo_da_tv()["nome"] == "quem entrou"
+        # o login põe o e-mail no nome quando o Fracttal não devolve o nome: também não sai (prova de 11/10/2026)
+        session["usuario"] = {"email": "pessoa@exemplo.test", "nome": "pessoa@exemplo.test", "perfil": ""}
+        assert moldura._prazo_da_tv()["nome"] == "quem entrou"
         # a sessão de antes do fracttal_exp e a senha de administrador: sem prazo conhecido
         session.pop("fracttal_exp")
         assert moldura._prazo_da_tv() is None
