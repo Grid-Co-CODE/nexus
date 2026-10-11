@@ -307,7 +307,7 @@ def test_na_tv_os_controles_aparecem_ao_mexer_o_mouse_tambem_dentro_da_moldura()
 
 
 def test_na_tv_a_sessao_vencida_e_a_renovacao_valem_igual():
-    """O que deixa a TV ligada o dia todo sem conta fixa: a sessão vencida reabre a tela com um passe novo (no máximo 1
+    """O que mantém a sessão da PLATAFORMA na TV: a sessão vencida reabre a tela com um passe novo (no máximo 1
     vez a cada 60 s) e, 11 h depois, a sessão é renovada sem recarregar a moldura."""
     respostas = {**PASSE_NOVO, ENTRAR_PLATAFORMA: {"status": 0, "tipo": "opaqueredirect"}}
     feito = _tv([{"mensagem": VENCIDA}, {"avancar": 30 * 1000}, {"mensagem": VENCIDA}, {"avancar": 11 * 3600 * 1000},
@@ -319,3 +319,26 @@ def test_na_tv_a_sessao_vencida_e_a_renovacao_valem_igual():
     feito = _tv([{"mensagem": VENCIDA}], {URL_RENOVAR: {"status": 401, "json": {"sessao_encerrada": True,
                                                                                "entrar": "/nexus/entrar?motivo=venceu"}}})
     assert feito["entrarDeNovo"] == "/nexus/entrar?motivo=venceu"
+
+
+def test_na_tv_o_aviso_do_prazo_aparece_na_ultima_meia_hora():
+    """Revisão de 11/10/2026: a TV fica de pé enquanto valer a sessão do Nexus de quem a abriu (pelo Fracttal, ~12 h a
+    partir do LOGIN). O aviso fixo do canto aparece na última meia hora, sem precisar mexer o mouse, conferido a cada
+    minuto pelo relógio de parede; sem prazo conhecido (a senha de administrador), nunca."""
+    assert rodar("[P.avisarVencimento(0, 0), P.avisarVencimento(3600, 0), P.avisarVencimento(1800, 0), "
+                 "P.avisarVencimento(1801, 0), P.avisarVencimento(10, 60000)]") == [False, False, True, False, True]
+    agora_s = 1760000000                                    # o relógio da página falsa (porta_pagina_falsa.js)
+
+    def tv(vence, passos):
+        return pagina(dados=_dados("", renovar=RENOVAR, telas=TELAS_TV, tv=True, sessao_vence=vence), moldura=True,
+                      respostas=PASSE_NOVO, passos=passos,
+                      elementos={"porta-tv-vence": {}, "porta-tv-controles": {}})["elementos"]["porta-tv-vence"]
+    assert tv(agora_s + 2 * 3600, [])["hidden"] is True
+    assert tv(agora_s + 2 * 3600, [{"avancar": 89 * 60 * 1000}, {"intervalo": True}])["hidden"] is True
+    assert tv(agora_s + 2 * 3600, [{"avancar": 91 * 60 * 1000}, {"intervalo": True}])["hidden"] is False
+    assert tv(agora_s + 10 * 60, [])["hidden"] is False         # aberta já na última meia hora
+    assert tv(0, [{"avancar": 13 * 3600 * 1000}, {"intervalo": True}])["hidden"] is True
+    # fora da TV o porta.js não mexe no aviso (que, de todo modo, só existe na página da TV)
+    fora = pagina(dados=_dados("", telas=TELAS_TV, tv=False, sessao_vence=agora_s + 60), moldura=True,
+                  elementos={"porta-tv-vence": {}})
+    assert fora["elementos"]["porta-tv-vence"]["hidden"] is True

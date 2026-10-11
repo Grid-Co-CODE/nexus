@@ -108,10 +108,18 @@
     return caminhoAceito(avisado) && telaDoCaminho(telas, avisado) ? avisado : (atual || "");
   }
 
+  // Na TV, o aviso fixo do prazo da sessão aparece na última meia hora antes de ela vencer (e depois, até o portão levar
+  // a janela ao login). `venceS` em segundos (o fracttal_exp); 0 = sem prazo conhecido (a senha de administrador).
+  var AVISA_ANTES_MS = 30 * 60 * 1000;
+  function avisarVencimento(venceS, agoraMs) {
+    return venceS > 0 && venceS * 1000 - agoraMs <= AVISA_ANTES_MS;
+  }
+
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {usinasDoSeletor: usinasDoSeletor, telaDoCaminho: telaDoCaminho, enderecoNoNexus: enderecoNoNexus,
                       enderecoNaTv: enderecoNaTv, caminhoAceito: caminhoAceito, norm: norm, enc: enc, podeReabrir: podeReabrir,
-                      caminhoParaReabrir: caminhoParaReabrir, RENOVA_A_CADA_MS: RENOVA_A_CADA_MS};
+                      caminhoParaReabrir: caminhoParaReabrir, avisarVencimento: avisarVencimento,
+                      RENOVA_A_CADA_MS: RENOVA_A_CADA_MS};
     return;
   }
 
@@ -312,6 +320,19 @@
         cheia.textContent = ligada ? "Sair da tela cheia" : "Tela cheia";
       });
     }
+  }
+
+  // ── o modo TV: o prazo da sessão de quem a abriu (revisão de 11/10/2026) ──────────────────────────────────────────
+  // A TV fica de pé enquanto valer a sessão do NEXUS de quem a abriu; o passe e a renovação acima cuidam só da sessão da
+  // plataforma. Pelo Fracttal, o portão encerra a sessão no fracttal_exp (~12 h depois do LOGIN, não da abertura da TV),
+  // e nada daqui o adia: login às 07:00 e TV às 18:30 = 30 minutos de TV. O prazo vem do servidor (dados.sessao_vence) e
+  // está nos controles; na última meia hora, o aviso fixo do canto o mostra sem precisar mexer o mouse. Pelo relógio de
+  // parede, conferido a cada minuto (como a renovação: o computador pode dormir).
+  var avisoVence = document.getElementById("porta-tv-vence");
+  if (naTv && avisoVence && dados.sessao_vence > 0) {
+    var conferirVencimento = function () { avisoVence.hidden = !avisarVencimento(dados.sessao_vence, Date.now()); };
+    conferirVencimento();
+    setInterval(conferirVencimento, 60 * 1000);
   }
 
   // ── Diagnóstico: o seletor de usina ───────────────────────────────────────────────────────────────────────────────

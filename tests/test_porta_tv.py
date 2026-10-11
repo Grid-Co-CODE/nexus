@@ -4,25 +4,30 @@ Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e
 Mapa de risco já tinha o modo TV (`?tv=1`, mapa_tv.html); o Painel NOC ganha o dele: o botão "Modo TV" na faixa da
 moldura (no canto direito dela, a mesma classe e o mesmo texto do Mapa) leva a `/t/performance/noc?tv=1`, que
 sai SEM a casca do Nexus (sem menu e sem topo), com a moldura na tela inteira e o mesmo porta.js: o passe, a renovação de
-11 h e o "nexus:sessao-vencida" continuam valendo, e é isso que deixa a TV ligada o dia todo sem uma conta fixa. Aqui se
-prova:
+11 h e o "nexus:sessao-vencida" continuam valendo para a sessão da PLATAFORMA. A TV fica de pé enquanto valer a sessão do
+NEXUS de quem a abriu, sem conta fixa: pelo Fracttal, ~12 h a partir do LOGIN (o `fracttal_exp`), e nada que a TV faz a
+estica (revisão de 11/10/2026: login às 07:00 e TV às 18:30 = 30 minutos de TV). Aqui se prova:
 - o botão só no Painel NOC (e o do Mapa continua lá), levando o caminho aberto;
 - o `?tv=1` sem a casca, com a moldura, o formulário do passe, a rota de renovação, o "Sair do modo TV" e a "Tela cheia";
 - o `?tv=1` numa tela sem TV é a tela de sempre (nada muda nas outras telas);
 - o "Sair do modo TV" volta à tela normal;
 - sem login, o Entrar volta para a TV; sem a chave, a TV avisa e não recarrega sozinha (nada de laço);
+- o prazo da sessão de quem abriu a TV à vista (nos controles e no aviso do canto), e o token vencido levando a TV, o
+  passe novo e a conferência de 5 min ao login, que volta à TV;
 - tudo na raiz e debaixo do /nexus (o prefixo do servidor).
 O que o porta.js faz no modo TV (o endereço, os controles que aparecem ao mexer o mouse) está em `tests/test_porta_js.py`.
 """
 import html as _html
 import json
 import re
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 from nexus.performance import porta
-from test_porta_moldura import PREFIXO, _cliente, _dados, _form, _fracttal, _ler
+from test_porta_moldura import PREFIXO, _app, _cliente, _dados, _form, _fracttal, _ler
 
 NOC = "/t/performance/noc"
 CSS = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
@@ -173,6 +178,93 @@ def test_o_p_de_outro_item_sai_da_tv_para_o_item_dono():
     """O Diagnóstico de uma usina não tem TV: o favorito vai ao item dono, na tela de sempre."""
     r = _cliente().get(NOC, query_string={"tv": "1", "p": "/painel/falhas"})
     assert r.status_code == 302 and r.headers["Location"] == "/t/performance/strings-trackers?p=%2Fpainel%2Ffalhas"
+
+
+# ── o prazo da sessão de quem abriu a TV (revisão de 11/10/2026) ─────────────────────────────────────────────────────
+# A TV fica de pé enquanto valer a sessão do Nexus de quem a abriu. Pelo Fracttal, o portão confere o `fracttal_exp` (o
+# `exp` do JWT, ~12 h depois do LOGIN) em todo pedido, e nem a conferência de 5 min nem o passe de 11 h renovam o token.
+BRT = timezone(timedelta(hours=-3))
+
+
+def _fracttal_com_prazo(monkeypatch, exp, prefixo=""):
+    """O login pelo Fracttal (como o `_fracttal` de test_porta_moldura) com o `exp` do JWT dado."""
+    from nexus.auth import fracttal
+    monkeypatch.setattr(fracttal, "entrar", lambda app, e, s: {"email": e, "nome": "Pessoa Teste", "perfil": "", "exp": exp,
+                                                                "cookie": ("os_sessao", "valor", 3600)})
+    cli = _cliente(prefixo, logar=False)
+    assert cli.post(prefixo + "/entrar", data={"email": "pessoa@exemplo.test", "senha": "x"}).status_code == 302
+    return cli
+
+
+def test_o_prazo_sai_no_relogio_de_brasilia_com_o_dia_quando_nao_e_hoje():
+    from flask import session
+
+    from nexus.torres import moldura
+    vence = datetime(2026, 10, 11, 22, 0, tzinfo=timezone.utc).timestamp()          # 19:00 em Brasília
+    with _app("").test_request_context():
+        session["usuario"] = {"email": "pessoa@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
+        session["fracttal_exp"] = vence
+        assert moldura._prazo_da_tv(datetime(2026, 10, 11, 8, 0, tzinfo=BRT)) == {
+            "nome": "Pessoa Teste", "ate": "19:00", "quando": "às 19:00", "vence": int(vence)}
+        # login às 20:00: o token vence às 08:00 do dia seguinte, e o dia vai na frente
+        session["fracttal_exp"] = vence + 13 * 3600
+        p = moldura._prazo_da_tv(datetime(2026, 10, 11, 20, 0, tzinfo=BRT))
+        assert (p["ate"], p["quando"]) == ("12/10 às 08:00", "em 12/10 às 08:00")
+        # sem nome no Fracttal, não sai o e-mail (a TV fica numa sala com gente passando)
+        session["usuario"] = {"email": "pessoa@exemplo.test", "nome": "", "perfil": ""}
+        assert moldura._prazo_da_tv()["nome"] == "quem entrou"
+        # a sessão de antes do fracttal_exp e a senha de administrador: sem prazo conhecido
+        session.pop("fracttal_exp")
+        assert moldura._prazo_da_tv() is None
+        session["fracttal_exp"] = vence
+        session.pop("usuario")
+        assert moldura._prazo_da_tv() is None
+
+
+@pytest.mark.parametrize("prefixo", ["", PREFIXO])
+def test_a_tv_mostra_ate_quando_vale_a_sessao_de_quem_a_abriu(monkeypatch, prefixo):
+    exp = time.time() + 2 * 3600
+    cli = _fracttal_com_prazo(monkeypatch, exp, prefixo)
+    h = cli.get(prefixo + NOC, query_string={"tv": "1"}).get_data(as_text=True)
+    d = datetime.fromtimestamp(exp, BRT)
+    hoje = d.date() == datetime.now(BRT).date()
+    ate = d.strftime("%H:%M") if hoje else d.strftime("%d/%m às %H:%M")
+    quando = ("às " if hoje else "em ") + ate
+    # nos controles (aparecem ao abrir e ao mexer o mouse) e, na última meia hora, no aviso fixo do canto (o porta.js o
+    # mostra pelo sessao_vence: tests/test_porta_js.py)
+    assert (f'<p class="porta-tv-prazo" id="porta-tv-prazo">Sessão de Pessoa Teste até {ate}; depois, a TV pede '
+            "login</p>") in h
+    assert (f'<p class="porta-tv-vence" id="porta-tv-vence" role="status" hidden>A sessão de Pessoa Teste vence {quando}: '
+            "depois disso, a TV vai pedir login.</p>") in h
+    assert _dados(h)["sessao_vence"] == int(exp)
+    assert "pessoa@exemplo.test" not in h                      # o nome, não o e-mail
+    # fora da TV, a tela de sempre não ganha nada disso
+    h = cli.get(prefixo + NOC).get_data(as_text=True)
+    assert "porta-tv-prazo" not in h and "porta-tv-vence" not in h and _dados(h)["sessao_vence"] == 0
+
+
+def test_a_tv_da_senha_de_administrador_nao_tem_prazo():
+    """A senha de administrador não depende do Fracttal (só o Sair a encerra): nada de prazo nem de aviso."""
+    h = _cliente().get(NOC, query_string={"tv": "1"}).get_data(as_text=True)
+    assert "porta-tv-prazo" not in h and "porta-tv-vence" not in h and _dados(h)["sessao_vence"] == 0
+
+
+@pytest.mark.parametrize("prefixo", ["", PREFIXO])
+def test_com_o_token_do_fracttal_vencido_a_tv_vai_ao_login_e_volta_para_ela(monkeypatch, prefixo):
+    """O fim da TV: com o fracttal_exp vencido, o F5 da TV vai ao Entrar dizendo que a sessão venceu, e o login volta à
+    TV. É o que a TV aberta faz sozinha: o passe novo (sessão da plataforma vencida, renovação de 11 h) e a conferência de
+    5 min recebem o 401 com o endereço do Entrar, e o porta.js e o _confere_sessao_js.html levam a janela até ele."""
+    r = _fracttal_com_prazo(monkeypatch, time.time() - 60, prefixo).get(prefixo + NOC, query_string={"tv": "1"})
+    assert r.status_code == 302
+    loc = r.headers["Location"]
+    assert loc.startswith(f"{prefixo}/entrar?") and "motivo=venceu" in loc and "tv%3D1" in loc, loc
+    dados = {"Sec-Fetch-Dest": "empty", "Sec-Fetch-Site": "same-origin"}       # o fetch do navegador
+    for pedido in (lambda c: c.post(prefixo + NOC + "/passe", data={"p": "/painel"}, headers=dados),
+                   lambda c: c.get(prefixo + "/os/_nexus/sessao", headers=dados)):
+        r = pedido(_fracttal_com_prazo(monkeypatch, time.time() - 60, prefixo))
+        j = r.get_json()
+        assert r.status_code == 401 and j["sessao_encerrada"] is True, (r.status_code, j)
+        assert j["entrar"].startswith(f"{prefixo}/entrar?") and "motivo=venceu" in j["entrar"]
 
 
 # o Mapa de risco precisa do mundo de mentira dele (cadastro e leituras prontas, sem rede)
