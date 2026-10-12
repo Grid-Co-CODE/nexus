@@ -321,6 +321,20 @@ def organograma(torres, q: dict) -> dict:
     return {"conta": conta, "setores": lista, "dimensoes": dims, "trilhas": sum(s["trilhas"] for s in lista) or 1}
 
 
+def _secao_ligacoes() -> dict:
+    """A seção Ligações entre bases do fim da Governança (11/10/2026; antes a tela Base → Ligações): o mesmo de antes, só
+    para admin e com o cadastro ligado. {"so_admin": True}, {"sem_chave": motivo} ou o contexto da seção."""
+    if not session.get("admin"):
+        return {"so_admin": True}
+    from ..cadastro import telas_ligacoes
+    from ..cadastro.telas import SemCadastro, servico
+    try:
+        srv = servico()
+    except SemCadastro as e:
+        return {"sem_chave": str(e)}
+    return telas_ligacoes.contexto(srv, current_app.config, request.args)
+
+
 def registrar_governanca(bp):
     @bp.route("/governanca")
     def governanca():
@@ -331,7 +345,9 @@ def registrar_governanca(bp):
             if f.estado != "aposentado":        # Levi, 09/10/2026: "Não mostre aposentado" (nas duas visões)
                 grupos.setdefault(f.area, []).append(f)
         org = organograma(current_app.extensions.get("nexus_torres"), v["qualidade"]) if ver == "organograma" else None
-        return render_template("dados/governanca.html", torre=bp.name, catalogo=catalogo, grupos=grupos,
+        lig = _secao_ligacoes()
+        return render_template("dados/governanca.html", torre=bp.name, catalogo=catalogo, grupos=grupos, lig=lig,
+                               lig_ver=ver,
                                resumo=catalogo.resumo(), q=v["qualidade"], atualizacao=v["atualizacao"],
                                hist_q=v["historico"], eq_q=v["equipamento"], erro=v["erro"], hora=_hora, pct=_pct,
                                num=_num, extra=_extra, ver=ver, org=org, degraus=DEGRAUS, estado_org=ESTADO_ORG,

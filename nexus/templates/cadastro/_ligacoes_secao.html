@@ -1,12 +1,11 @@
-{% extends "base.html" %}
-{% block titulo %}Ligações entre bases{% endblock %}
+{# Ligações entre bases: seção do fim da Governança de dados (Levi, 11/10/2026: "essa visão de Base > Ligações entre
+   bases vire uma seção no final de Governança de dados"). Antes era a tela /t/base/ligacoes (hoje redireciona para cá).
+   Só admin com o cadastro ligado: o resto vê o aviso da Governança. #}
 {% macro alvo(sistema) %}<input type="hidden" name="alvo_sistema" value="{{ sistema }}"><input type="hidden" name="aba" value="{{ aba }}">{% if request.args.get('sistema') %}<input type="hidden" name="sistema" value="{{ request.args.get('sistema') }}">{% endif %}{% endmacro %}
-{% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
-<p class="gc-eyebrow">Base · Governança de dados</p>
 <div class="cad-topo">
   <div>
-    <h1 class="titulo-pagina">Ligações entre bases</h1>
+    <h2 class="dd-h2" style="margin-top:0">Ligações entre bases</h2>
     <p class="cad-sub">Que usina cada base chama de quê, e onde a ligação falta. A correção feita aqui entra no de_para na hora e vai ao banco quando você publicar.</p>
   </div>
   <div class="lig-acoes">
@@ -23,13 +22,13 @@
 {% else %}
 
 <div class="lig-cards">
-  <a class="lig-card{% if not sistema %} sel{% endif %}" href="?{{ {'aba': aba}|urlencode }}">
+  <a class="lig-card{% if not sistema %} sel{% endif %}" href="?{{ {'aba': aba, 'ver': lig_ver}|urlencode }}#ligacoes">
     <span class="nome">Todas as bases</span>
     <span class="pct gc-num">{{ contagem['buracos'] if not sistema else '' }}</span>
     <span class="det">buracos em aberto</span>
   </a>
   {% for s in p.sistemas %}
-  <a class="lig-card{% if sistema == s.nome %} sel{% endif %}" href="?{{ {'aba': aba, 'sistema': s.nome}|urlencode }}">
+  <a class="lig-card{% if sistema == s.nome %} sel{% endif %}" href="?{{ {'aba': aba, 'sistema': s.nome, 'ver': lig_ver}|urlencode }}#ligacoes">
     <span class="nome">{{ s.nome }}</span>
     <span class="pct gc-num {{ 'ok' if s.pct >= 90 else ('al' if s.pct >= 75 else 'er') }}">{{ ('%.1f' % s.pct).replace('.', ',') }}%</span>
     <span class="lig-barra"><i class="{{ 'ok' if s.pct >= 90 else ('al' if s.pct >= 75 else 'er') }}" style="width:{{ s.pct }}%"></i></span>
@@ -39,7 +38,7 @@
 </div>
 
 <nav class="lig-abas">
-  {% for id, nome in abas %}<a class="{{ 'sel' if aba == id }}" href="?{{ {'aba': id, 'sistema': sistema}|urlencode }}">{{ nome }} <span class="gc-num">{{ contagem[id] }}</span></a>{% endfor %}
+  {% for id, nome in abas %}<a class="{{ 'sel' if aba == id }}" href="?{{ {'aba': id, 'sistema': sistema, 'ver': lig_ver}|urlencode }}#ligacoes">{{ nome }} <span class="gc-num">{{ contagem[id] }}</span></a>{% endfor %}
 </nav>
 
 {% if aba == 'buracos' %}
@@ -155,4 +154,3 @@
 {% endif %}
 
 <datalist id="lig-usinas">{% for u in p.usinas %}<option value="{{ u.id }} · {{ u.titulo }}"></option>{% endfor %}</datalist>
-{% endblock %}

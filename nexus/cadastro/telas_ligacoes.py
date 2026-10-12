@@ -1,13 +1,16 @@
-"""Tela Base → Ligações entre bases: os buracos do de_para à vista, e a correção feita ali mesmo.
+"""Ligações entre bases: os buracos do de_para à vista, e a correção feita ali mesmo.
 
 Pedido do Levi (04/10/2026): "quero uma tela para fazer os de-para pelo Nexus, quero que esses buracos de ligação
-fiquem expostos para que possamos corrigir". A lógica mora em ligacoes.py; aqui só as rotas.
+fiquem expostos para que possamos corrigir". Desde 11/10/2026 é a SEÇÃO do fim de Base → Governança de dados ("essa
+visão de Base > Ligações entre bases vire uma seção no final de Governança de dados"): o `contexto` monta o que a seção
+mostra, a Governança o desenha, e o endereço antigo `/t/base/ligacoes` redireciona para lá. As ações (ler de novo,
+decidir, publicar) seguem nestas rotas e voltam à seção. A lógica mora em ligacoes.py.
 """
 import re
 from datetime import datetime
 from urllib.parse import urlencode
 
-from flask import current_app, redirect, render_template, request
+from flask import current_app, redirect, request
 
 from . import banco as B
 from . import ligacoes as L
@@ -30,30 +33,34 @@ def _hora(iso):
 
 
 def _volta(**k):
-    q = {x: request.form.get(x, "") for x in ("aba", "sistema") if request.form.get(x)}
+    q = {x: request.form.get(x, "") for x in ("aba", "sistema", "ver") if request.form.get(x)}
     q.update({x: y for x, y in k.items() if y})
-    return redirect(na_raiz("/t/base/ligacoes") + "?" + urlencode(q), code=303)
+    return redirect(na_raiz("/t/base/governanca") + "?" + urlencode(q) + "#ligacoes", code=303)
+
+
+def contexto(srv, cfg, args) -> dict:
+    """O que a seção Ligações entre bases da Governança mostra (antes, a tela inteira)."""
+    aba = args.get("aba") if args.get("aba") in dict(ABAS) else "buracos"
+    sistema = args.get("sistema") or ""
+    p = L.panorama(srv, L.ler(cfg), L.carregar_regras(cfg))
+
+    def filtra(xs):
+        return [x for x in xs if not sistema or x["sistema"] == sistema]
+    fora = [(s, sum(len(us) for _, us in g), g) for s, g in p["ausencias"].items()
+            if (not sistema or s == sistema) and g]
+    contagem = {"buracos": len(filtra(p["buracos"])), "por-nome": len(filtra(p["por_nome"])),
+                "fora": sum(t for _, t, _ in fora), "decisoes": len(p["decisoes"])}
+    return dict(p=p, aba=aba, abas=ABAS, sistema=sistema, buracos=filtra(p["buracos"]), por_nome=filtra(p["por_nome"]),
+                fora=fora, contagem=contagem, gerado_em=_hora(p["gerado_em"]), hora=_hora, ok=args.get("ok"),
+                erro=args.get("erro"), pode_publicar=bool(cfg.get("GRIDCO_SQL_TOKEN")))
 
 
 def registrar_ligacoes(bp):
     @bp.route("/ligacoes")
-    @_tela("Ligações entre bases")
-    def ligacoes(srv):
-        cfg = current_app.config
-        aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS) else "buracos"
-        sistema = request.args.get("sistema") or ""
-        p = L.panorama(srv, L.ler(cfg), L.carregar_regras(cfg))
-        def filtra(xs):
-            return [x for x in xs if not sistema or x["sistema"] == sistema]
-        fora = [(s, sum(len(us) for _, us in g), g) for s, g in p["ausencias"].items()
-                if (not sistema or s == sistema) and g]
-        contagem = {"buracos": len(filtra(p["buracos"])), "por-nome": len(filtra(p["por_nome"])),
-                    "fora": sum(t for _, t, _ in fora), "decisoes": len(p["decisoes"])}
-        return render_template("cadastro/ligacoes.html", p=p, aba=aba, abas=ABAS, sistema=sistema,
-                               buracos=filtra(p["buracos"]), por_nome=filtra(p["por_nome"]), fora=fora,
-                               contagem=contagem, gerado_em=_hora(p["gerado_em"]), hora=_hora,
-                               ok=request.args.get("ok"), erro=request.args.get("erro"),
-                               pode_publicar=bool(cfg.get("GRIDCO_SQL_TOKEN")))
+    def ligacoes():
+        # a tela virou a seção do fim da Governança (11/10/2026): favorito e link antigo caem nela, com os filtros
+        q = request.query_string.decode("utf-8", "replace")
+        return redirect(na_raiz("/t/base/governanca") + ("?" + q if q else "") + "#ligacoes", code=302)
 
     @bp.route("/ligacoes/recalcular", methods=["POST"])
     @_tela("Ligações entre bases")

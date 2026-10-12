@@ -54,16 +54,38 @@ def _linhas(app):
 
 def _decidir(cli, **form):
     r = cli.post("/t/base/ligacoes/decidir", data={"alvo_sistema": FR, **form})
-    assert r.status_code == 303
+    assert r.status_code == 303 and "/t/base/governanca?" in r.headers["Location"] and r.headers["Location"].endswith("#ligacoes")
     return parse_qs(urlparse(r.headers["Location"]).query)
 
 
 def test_tela_exige_login(app_lig):
-    assert app_lig.test_client().get("/t/base/ligacoes").status_code == 302
+    assert app_lig.test_client().get("/t/base/governanca").status_code == 302
+
+
+def test_a_tela_antiga_virou_secao_da_governanca(cli):
+    """Levi, 11/10/2026: "essa visão de Base > Ligações entre bases vire uma seção no final de Governança de dados"."""
+    r = cli.get("/t/base/ligacoes?aba=fora&sistema=x")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/base/governanca?aba=fora&sistema=x#ligacoes")
+    html = cli.get("/t/base/governanca").get_data(as_text=True)
+    secao = html.split('<section id="ligacoes"')[1]
+    assert "Ligações entre bases" in secao and "Ler as bases de novo" in secao and "Publicar no banco" in secao
+    depois = secao.split("</section>", 1)[1]
+    assert "dd-h2" not in depois and "dd-h2" in html.split('<section id="ligacoes"')[0], "a seção fica no FIM da Governança"
+    menu = html.split("</nav>")[0] if "</nav>" in html else html
+    assert 'href="/t/base/ligacoes"' not in menu, "o item saiu do menu"
+
+
+def test_quem_nao_e_admin_ve_so_o_aviso_da_secao(app_lig):
+    c = app_lig.test_client()
+    with c.session_transaction() as s:
+        s["logado"] = True; s["admin"] = False
+        s["usuario"] = {"email": "pessoa@exemplo.com", "nome": "Pessoa", "perfil": ""}
+    secao = c.get("/t/base/governanca").get_data(as_text=True).split('<section id="ligacoes"')[1]
+    assert "só administradores" in secao and "Publicar no banco" not in secao
 
 
 def test_buraco_aparece_com_a_sugestao_certa(cli):
-    html = cli.get("/t/base/ligacoes").get_data(as_text=True)
+    html = cli.get("/t/base/governanca").get_data(as_text=True).split('<section id="ligacoes"')[1]
     assert "Athon - Matões 1 - MA" in html and "843 tarefas" in html
     assert "Athon - Matões 100" in html                       # a sugestão (código "CÓDIGO" no cadastro: só o nome)
     assert "Thopen - Brodowski 1 - SP" not in html.split("lig-tabela")[1].split("</table>")[0]   # ligado: não é buraco
@@ -93,10 +115,10 @@ def test_ignorar_pede_motivo(app_lig, cli):
 
 def test_ausencia_esperada_por_cliente_some_da_aba_fora(app_lig, cli):
     """Faro Energy inteira fora do Fracttal (04/10: 36 usinas): marcada uma vez para o cliente, sai da lista."""
-    antes = cli.get("/t/base/ligacoes?aba=fora").get_data(as_text=True)
+    antes = cli.get("/t/base/governanca?aba=fora").get_data(as_text=True).split('<section id="ligacoes"')[1]
     assert 'href="/t/base/usina/3"' in antes                  # Pedra do Sal 1 (Faro) na tabela de fora
     _decidir(cli, acao="ausencia", cliente_id="2", motivo="operada fora do Fracttal")
-    depois = cli.get("/t/base/ligacoes?aba=fora").get_data(as_text=True)
+    depois = cli.get("/t/base/governanca?aba=fora").get_data(as_text=True).split('<section id="ligacoes"')[1]
     assert 'href="/t/base/usina/3"' not in depois and 'href="/t/base/usina/2"' in depois   # Matões continua
 
 

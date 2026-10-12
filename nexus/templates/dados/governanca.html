@@ -152,4 +152,19 @@ de cada dia ou semana), <b>foto acumulada</b> (a linha muda até fechar, como a 
 <p class="dd-mudo dd-rodape">Como entra um dado novo (chamados, engenharia, PCM, segurança…): o passo a passo está no
 <code>nexus/dados/CLAUDE.md</code>. Fonte nova entra primeiro no catálogo, com o grão, o tipo e as dimensões declarados.</p>
 {% endif %}
+
+<section id="ligacoes" class="dd-secao-ligacoes" style="margin-top:36px;scroll-margin-top:16px">
+{% if lig.so_admin %}
+  <h2 class="dd-h2">Ligações entre bases</h2>
+  <p class="dd-mudo">Que usina cada base chama de quê, e onde a ligação falta: só administradores do Nexus corrigem.</p>
+{% elif lig.sem_chave %}
+  <h2 class="dd-h2">Ligações entre bases</h2>
+  <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div>{{ lig.sem_chave }}</div></div>
+{% else %}
+{% with p=lig.p, aba=lig.aba, abas=lig.abas, sistema=lig.sistema, buracos=lig.buracos, por_nome=lig.por_nome, fora=lig.fora,
+        contagem=lig.contagem, gerado_em=lig.gerado_em, hora=lig.hora, ok=lig.ok, erro=lig.erro, pode_publicar=lig.pode_publicar %}
+{% include "cadastro/_ligacoes_secao.html" %}
+{% endwith %}
+{% endif %}
+</section>
 {% endblock %}

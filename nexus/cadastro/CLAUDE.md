@@ -17,7 +17,7 @@ Base (Registro mestre, Clientes, Equipes, Regiões de campo, Listas, Importar do
 | `servico.py` | ler, salvar e versionar registros; quem chama não fala com o armazém direto |
 | `banco.py` | publica o cadastro no PostgreSQL com ID e ligação por ID (`ferramentas/publicar_cadastro.py`) |
 | `casamento.py` | casa o nome de uma base sem código (BD_Thopen) com a usina do cadastro |
-| `ligacoes.py` + `telas_ligacoes.py` | tela Base → Ligações entre bases: lê as bases, mostra os buracos, grava as decisões |
+| `ligacoes.py` + `telas_ligacoes.py` | seção Ligações entre bases, no fim de Base → Governança de dados (até 11/10/2026 era a tela Base → Ligações): lê as bases, mostra os buracos, grava as decisões |
 | `importar.py` | importa o `BD_Operacoes.xlsx` e mostra a prévia do que muda antes de gravar |
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
@@ -168,7 +168,7 @@ Gestor de contrato.
 - **Decisões** moram em `C:\GridcoAuto\nexus\de_para_regras.json` (servidor: `dados/de_para_regras.json`), fora do
   git: `ignorar` (regra fixa "contem" ou chave exata da tela), `ligar` e `desligar` (chave → usina_id, vence o
   automático) e `ausencia` (usina ou cliente inteiro que a base não precisa ter). Fixas: teste, "Grid Co." e Porteiras.
-- **Tela Base → Ligações entre bases** (`/t/base/ligacoes`): "Ler as bases de novo" grava `de_para_atual.json` (as
+- **Ligações entre bases**, a seção do fim de Base → Governança de dados (`/t/base/governanca#ligacoes`; até 11/10/2026 a tela `/t/base/ligacoes`, que hoje redireciona para lá com os filtros — Levi: "essa visão de Base > Ligações entre bases vire uma seção no final de Governança de dados"; só admin com o cadastro ligado, os outros veem o aviso): "Ler as bases de novo" grava `de_para_atual.json` (as
   fontes lidas + o de_para; ~6–11 s); decidir reaplica sem rede; "Publicar no banco" manda ao `cadastro_nexus`. Abas:
   Buracos (com sugestões e ligar/ignorar), Ligado por nome (confirmar/desligar), Usinas fora (ausência esperada por
   cliente) e Decisões (desfazer).
