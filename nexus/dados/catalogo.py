@@ -267,7 +267,7 @@ FATOS = (
     # intuitiva"): a tela /admin/de-para da plataforma liga a usina que a API renomeou (pelo id) e o inversor que a fonte
     # não nomeia (conta oem@ da API PV, scadaGridco) ao cadastro. A decisão vence o de-para em código da plataforma.
     # 12/10/2026 (Levi: "precisamos trazer para o Nexus e deixar mais dinâmico com a plataforma"): também o APELIDO da
-    # usina que a fonte manda só pelo nome (Thopen do banco, Athon, Axis), que antes exigia editar o Excel do cadastro.
+    # usina que a fonte manda só pelo nome (Athon, Axis: a chave é o nome), que antes exigia editar o Excel do cadastro.
     Fato("decisao_depara", "Decisão de de-para de equipamento", "performance",
          "nexus_depara · fato_decisao_depara",
          "1 linha = 1 decisão de ligar 1 usina (o id dela na fonte, ou o nome nas fontes que mandam só o nome) ou 1 "
@@ -282,7 +282,7 @@ FATOS = (
          janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada fonte, usina e inversor)",
          observacao="fonte = a chave da aba do Monitoramento; a usina liga nas contas da API PV (pv, semp, alveslima, "
                     "2capi) e o inversor na conta oem@ (semp, alveslima, 2capi) e no scadaGridco (greenyellow, "
-                    "salenergia); o apelido pelo nome, nas fontes que mandam a usina só pelo nome (pg, sunop, axis: "
+                    "salenergia); o apelido pelo nome, nas fontes que mandam a usina só pelo nome (sunop, axis: "
                     "usina_fonte = o nome exatamente como a fonte escreve). inversor_fonte vazio = a linha é da usina. "
                     "Valor vazio = desfaz (vale o nome da API ou "
                     "o de-para em código). O cadastro entra pela chave de negócio, que a plataforma confere antes de "
