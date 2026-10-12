@@ -14,17 +14,23 @@ lida) com as colunas de antes e o `codigo_ativo` no fim. É o contrato que o App
 a pessoa vai só como o código do e-mail (`decidida_por_hmac`, `NEXUS_PESSOA_HMAC`, o mesmo do App), nunca nome nem
 e-mail; o motivo (o que o técnico lê quando a PT é negada) vai mascarado e curto.
 
-Quem aplica a decisão no campo é o App: ele acha a linha pela PT e pelo `codigo_ativo`, confere se quem assinou pode
-assinar aquela PT (`_pt_pode_assinar`), se a linha ainda está aguardando e se a decisão é recente, e só então libera ou
-nega (a pausa no Fracttal, o anexo). Até o App ler este livro, a decisão fica salva aqui e o técnico continua esperando
-a decisão pelo App.
+Quem aplica a decisão no campo é o App (a v257, pronta; o deploy é do Levi): de 2 em 2 minutos ele lê este livro e
+aplica como o painel dele (o mesmo status, a validade de 7 dias e o efeito no Fracttal: o PDF anexado no De acordo, a
+pausa no Não autorizo). O que ele confere, e por isso o Nexus confere ANTES de gravar (decisão que o App descarta fica
+gravada aqui, com a linha travada e o técnico esperando): (1) vale a 1ª decisão de cada linha, a mais antiga do livro
+para a mesma PT × ativo, e as outras nunca são aplicadas (aqui: o primeiro que decide a linha vale); (2) a linha é
+achada pela PT e pelo `codigo_ativo` e tem de ser uma só (aqui: `_linha`); (3) quem pediu a PT não a decide (aqui:
+`pode_decidir`); (4) decisão com mais de 7 dias não é aplicada. QUEM pode decidir o App NÃO confere (não tem os papéis
+da estrutura de O&M): a única trava é o `pode_decidir` daqui. Até a v257 entrar no ar, a decisão fica salva aqui e o
+técnico continua esperando a decisão pelo App.
 
 QUEM PODE DECIDIR (Levi, 09/10/2026: "A pessoa que pode aprovar a PT é: Supervisor de Campo, Gestor de contrato, admin
 ou pessoa do COS"): o Supervisor de Campo da região da usina (com a vaga aberta, o Coordenador de Campo), o gestor de
 contrato da usina, quem tem o vínculo COS no cadastro de pessoas e um administrador do Nexus (`aprovadores`,
 `pode_decidir`). Quem assina é a pessoa do login do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa
-(`_Base.pessoa_do_login`); sem a chave do cadastro, só o administrador decide. O App precisa aceitar o mesmo conjunto
-quando passar a ler este livro.
+(`_Base.pessoa_do_login`); sem a chave do cadastro, só o administrador decide. Quem PEDIU a PT nunca a decide, nem sendo
+administrador: é a regra do painel do App desde a 1ª PT real (28/09/2026, aprovada pelo próprio técnico, que também era
+administrador), e a v257 descarta calada a decisão de quem pediu.
 """
 import re
 import threading
@@ -90,8 +96,22 @@ def aprovadores(p: dict, b=None) -> dict:
     return {"ids": {k: v for k, v in ids.items() if v}, "cos": cos, "texto": texto[0].upper() + texto[1:]}
 
 
+QUEM_PEDIU = ("Quem pediu a PT não a decide: o De acordo ou o Não autorizo precisa ser de outra pessoa que pode "
+              "assinar.")
+
+
 def pode_decidir(p: dict, email: str, nome: str = "", admin: bool = False, b=None) -> tuple[bool, str]:
-    """(pode, papel ou o porquê não). Administrador do Nexus sempre pode."""
+    """(pode, papel ou o porquê não). Quem pediu a PT nunca a decide, nem sendo administrador; fora isso, o
+    administrador do Nexus sempre pode.
+
+    Quem pediu = o código do e-mail de quem assina igual ao `solicitante_hmac` da linha (o `Solicitante (HMAC)` do
+    pt_app_campo, o mesmo código que o App compara na regra 3). Revisão adversarial de 11/10/2026: o Nexus gravava a
+    decisão de quem pediu e dizia "salva"; o App a descartaria calado e, como só a 1ª decisão de cada linha vale, a do
+    gestor de contrato depois era recusada aqui ("já tem decisão") e nunca chegaria ao campo: a linha ficava travada e o
+    técnico, esperando."""
+    sol = D._txt(p.get("solicitante_hmac")).lower()
+    if sol and sol == (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or ""):
+        return False, QUEM_PEDIU
     if admin:
         return True, "administrador"
     b = b or visao._Base()
@@ -143,9 +163,10 @@ def _linha(numero, codigo) -> tuple[dict, int]:
 def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin: bool = False,
             codigo=None) -> dict:
     """Grava a decisão sobre UMA linha da PT (`codigo`: o código do ativo dela; ver `_linha`) e confere no banco.
-    Recusa: decisão inválida, negar sem motivo, quem não pode decidir esta PT (`pode_decidir`), PT ou linha que não
-    existe, que já não está aguardando no livro do App ou que já tem decisão do Nexus (o primeiro que decide vale, como
-    no App)."""
+    Recusa: decisão inválida, negar sem motivo, quem não pode decidir esta PT (`pode_decidir`, quem a pediu inclusive),
+    PT ou linha que não existe, que já não está aguardando no livro do App ou que já tem decisão do Nexus (o primeiro que
+    decide vale, como no App). O que o App descartaria e já se sabe na hora (a linha, quem pediu, a 1ª decisão) é
+    recusado aqui, antes de gravar; os 7 dias e o painel que decide no meio, só o App vê (ver o topo)."""
     cfg = current_app.config
     if decisao not in DECISOES:
         raise Recusada("A decisão precisa ser De acordo ou Não autorizo.")

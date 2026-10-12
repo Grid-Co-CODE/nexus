@@ -392,17 +392,17 @@ def test_assinatura_do_tecnico_vem_da_apr_pelo_login_de_quem_olha(app, banco, lo
 
 
 # ── aprovação da PT no Nexus ─────────────────────────────────────────────────────────────────────────────────────
-def _jwt(exp_s=3600):
-    corpo = base64.urlsafe_b64encode(json.dumps({"email": "sup@exemplo.test", "exp": time.time() + exp_s}).encode())
+def _jwt(exp_s=3600, email="sup@exemplo.test"):
+    corpo = base64.urlsafe_b64encode(json.dumps({"email": email, "exp": time.time() + exp_s}).encode())
     return "x." + corpo.decode().rstrip("=") + ".y"
 
 
-def _entrar_no_fracttal(app, cliente, jwt):
+def _entrar_no_fracttal(app, cliente, jwt, email="sup@exemplo.test", nome="Supervisor Teste"):
     """O cookie do OS Creator, como o login do Fracttal dele grava."""
     from nexus.torres.oscreator import ponte
     clone = ponte.clone(app)
     valor = clone.session_interface.get_signing_serializer(clone).dumps(
-        {"jwt": jwt, "conta": {"email": "sup@exemplo.test", "nome": "Supervisor Teste"}})
+        {"jwt": jwt, "conta": {"email": email, "nome": nome}})
     cliente.set_cookie("os_sessao", valor, path="/os")
 
 
@@ -459,14 +459,24 @@ def test_decisao_gravada_no_banco_com_codigo_e_sem_nome(app, banco, logado):
     assert decisao_pt.da_pt("PT-1", "THPN-ALT100-INVR1")["decisao"] == "negada"
 
 
-def test_pt_de_dois_equipamentos_tem_uma_decisao_por_linha(app, banco, logado):
-    """Decisão 4 do Levi (11/10/2026): o App decide por linha (PT × ativo), e a decisão do Nexus também, com o
-    codigo_ativo no banco. Sem dizer a linha, a PT de mais de um equipamento não se decide: pegar a 1ª seria chutar a
-    qual equipamento a decisão vale (GR-4)."""
+def _pt4_de_dois_equipamentos(banco):
+    """A PT-4 com dois equipamentos esperando, cada um na sua linha (no banco real de 11/10/2026: 7 PT de mais de uma
+    linha em 306, uma delas aguardando, com 2 linhas)."""
     inv2 = dict(_pt("PT-4", 2), **{"Código do ativo": "THPN-ALT100-INVR2", "Ativo": "Inversor 2"})
     _aba(banco, "pt_app_campo", "PT", [_pt("PT-1", 30), _pt("PT-2", 1), _pt("PT-3", 50, "de_acordo", 49),
                                        _pt("PT-4", 2), inv2])
     visao.limpar()
+
+
+# o login do Fracttal pedido na linha do INVR2 da PT-4: a volta (`next`) leva a linha
+ENTRAR_INVR2 = "/os/login?next=%2Fos%2F_nexus%2Fpt%2FPT-4%2Fvoltar%3Fativo%3DTHPN-ALT100-INVR2"
+
+
+def test_pt_de_dois_equipamentos_tem_uma_decisao_por_linha(app, banco, logado):
+    """Decisão 4 do Levi (11/10/2026): o App decide por linha (PT × ativo), e a decisão do Nexus também, com o
+    codigo_ativo no banco. Sem dizer a linha, a PT de mais de um equipamento não se decide: pegar a 1ª seria chutar a
+    qual equipamento a decisão vale (GR-4)."""
+    _pt4_de_dois_equipamentos(banco)
     _entrar_no_fracttal(app, logado, _jwt())
     # a lista leva a linha no formulário e no link de cada uma
     html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
@@ -502,6 +512,105 @@ def test_pt_de_dois_equipamentos_tem_uma_decisao_por_linha(app, banco, logado):
     # equipamento que a PT não tem: recusa, nada grava
     logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo", "codigo": "THPN-OUTRO"})
     assert len(banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")) == 2
+
+
+def test_a_volta_do_login_do_fracttal_traz_a_mesma_linha_da_pt(app, banco, logado):
+    """Revisão adversarial de 11/10/2026: o `next` do login do Fracttal só levava o número da PT. Quem abria a linha do
+    2º equipamento sem a sessão do Fracttal (token vencido, ou entrou no Nexus pela senha) e clicava De acordo voltava
+    do login para a 1ª linha, com o código DELA no formulário: o clique seguinte decidia o outro equipamento, e o App
+    aplicaria nele (num Não autorizo, pausaria a tarefa errada no Fracttal)."""
+    import importlib
+    from urllib.parse import parse_qs, urlsplit
+    from nexus.torres.oscreator import ponte
+    _pt4_de_dois_equipamentos(banco)
+    # a tela da linha do INVR2: o link de entrar e o pedido da assinatura do técnico levam a linha
+    html = logado.get("/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2").get_data(as_text=True)
+    assert f'"{ENTRAR_INVR2}"' in html
+    assert "/os/_nexus/pt/PT-4/assinatura-tecnico?ativo=THPN-ALT100-INVR2" in html
+    assert logado.get("/os/_nexus/pt/PT-4/assinatura-tecnico?ativo=THPN-ALT100-INVR2").get_json()["entrar"] == ENTRAR_INVR2
+    # a lista do HSEQ também pede a assinatura pela linha (o "entre com o seu login" de lá volta para ela)
+    lista = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
+    assert 'data-url="/os/_nexus/pt/PT-4/assinatura-tecnico?ativo=THPN-ALT100-INVR2"' in lista
+    # sem a sessão do Fracttal, o De acordo da linha do INVR2 vai ao login com a linha no `next`
+    r = logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR2"})
+    assert r.status_code == 302 and r.headers["Location"] == ENTRAR_INVR2
+    assert "nexus_pt_decisoes" not in banco.workbooks
+    prox = parse_qs(urlsplit(ENTRAR_INVR2).query)["next"][0]
+    assert prox == "/os/_nexus/pt/PT-4/voltar?ativo=THPN-ALT100-INVR2"
+    # o formulário de login do OS Creator guarda o `next` inteiro, e o clone devolve a ele depois de entrar
+    # (`_destino_local` aceita /os... com a consulta)
+    assert f'name="next" value="{prox}"' in logado.get(ENTRAR_INVR2).get_data(as_text=True)
+    clone = ponte.clone(app)
+    with clone.test_request_context("/os/login"):
+        assert importlib.import_module("os_web.rotas")._destino_local(prox) == prox
+    # entrou: a volta abre a MESMA linha, com o código dela no formulário, e a decisão cai no INVR2
+    _entrar_no_fracttal(app, logado, _jwt())
+    r = logado.get(prox)
+    assert r.headers["Location"] == "/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2"
+    html = logado.get(r.headers["Location"]).get_data(as_text=True)
+    assert '<input type="hidden" name="codigo" value="THPN-ALT100-INVR2">' in html
+    assert '<input type="hidden" name="codigo" value="THPN-ALT100-INVR1">' not in html
+    logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR2"})
+    linhas = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")
+    assert [(d["pt"], d["codigo_ativo"], d["decisao"]) for d in linhas] == [("PT-4", "THPN-ALT100-INVR2", "de_acordo")]
+
+
+def test_pt_de_mais_de_uma_linha_sem_a_linha_so_lista_os_equipamentos(app, banco, logado):
+    """Revisão adversarial de 11/10/2026: sem `?ativo=`, ou com um código que a PT não tem, a tela abria calada a 1ª
+    linha e o formulário mandava o código dela, por fora da recusa do `decidir` (sem a linha, a PT de mais de uma não se
+    decide). Agora ela só lista os equipamentos para escolher; a PT de uma linha abre a dela."""
+    _pt4_de_dois_equipamentos(banco)
+    for url in ("/t/campo/pt/PT-4", "/t/campo/pt/PT-4?ativo=THPN-OUTRO", "/t/campo/pt/PT-4?ativo="):
+        html = logado.get(url).get_data(as_text=True)
+        assert "Escolha o equipamento" in html, url
+        assert "/decidir" not in html and 'name="codigo"' not in html and "assinatura-tecnico" not in html, url
+        assert 'href="/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR1">Inversor 1</a>' in html, url
+        assert 'href="/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2">Inversor 2</a>' in html, url
+    assert "esta PT não tem" in logado.get("/t/campo/pt/PT-4?ativo=THPN-OUTRO").get_data(as_text=True)
+    # a volta do login sem a linha (o link de antes) cai na escolha, nunca na 1ª linha
+    _entrar_no_fracttal(app, logado, _jwt())
+    r = logado.get("/os/_nexus/pt/PT-4/voltar")
+    assert r.headers["Location"] == "/t/campo/pt/PT-4"
+    assert "/decidir" not in logado.get(r.headers["Location"]).get_data(as_text=True)
+    # o aviso da recusa aparece na escolha (o formulário sem a linha volta para cá)
+    r = logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo"})
+    html = logado.get(r.headers["Location"]).get_data(as_text=True)
+    assert "PT-4 tem 2 equipamentos" in html and "Escolha o equipamento" in html
+    assert "nexus_pt_decisoes" not in banco.workbooks
+    # a PT de uma linha abre a dela, com ou sem a linha no endereço
+    for url in ("/t/campo/pt/PT-1", "/t/campo/pt/PT-1?ativo=THPN-ALT100-INVR1"):
+        html = logado.get(url).get_data(as_text=True)
+        assert '<input type="hidden" name="codigo" value="THPN-ALT100-INVR1">' in html and "Escolha o equipamento" not in html
+
+
+def test_quem_pediu_a_pt_nao_a_decide(app, banco, logado):
+    """Revisão adversarial de 11/10/2026: o App (v257) não aplica a decisão de quem pediu a PT (regra do painel desde a
+    1ª PT real, uma OS de 28/09 aprovada pelo próprio técnico, que também era administrador) e, como vale a 1ª decisão
+    de cada linha, a de outra pessoa gravada depois também nunca seria aplicada. O Nexus gravava e dizia "salva": a linha
+    ficava travada aqui e o técnico, esperando. Agora quem pediu não decide no Nexus, nem sendo administrador."""
+    sup = codigo_da_pessoa(CHAVE, "supervisora@exemplo.test")
+    # a Supervisora de Campo da região pediu a PT-5 no App com o próprio e-mail
+    pedida = dict(_pt("PT-5", 2), **{"Solicitante (HMAC)": sup})
+    _aba(banco, "pt_app_campo", "PT", [_pt("PT-1", 30), _pt("PT-2", 1), _pt("PT-3", 50, "de_acordo", 49), pedida])
+    visao.limpar()
+    p = visao.pt("PT-5")
+    assert p["solicitante_hmac"] == sup                                  # o mesmo código que o App compara
+    ok, porque = decisao_pt.pode_decidir(p, "supervisora@exemplo.test")
+    assert ok is False and porque.startswith("Quem pediu a PT não a decide")
+    assert decisao_pt.pode_decidir(p, "Supervisora@Exemplo.test", admin=True)[0] is False   # nem sendo administradora
+    assert decisao_pt.pode_decidir(p, "beltrano@exemplo.test") == (True, "gestor de contrato")
+    assert decisao_pt.pode_decidir(visao.pt("PT-1"), "supervisora@exemplo.test") == (True, "supervisor de campo")
+    # pela tela (a sessão do Nexus é de administrador): recusa e nada grava
+    _entrar_no_fracttal(app, logado, _jwt(email="supervisora@exemplo.test"), "supervisora@exemplo.test", "Supervisora")
+    r = logado.post("/os/_nexus/pt/PT-5/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1"})
+    html = logado.get(r.headers["Location"]).get_data(as_text=True)
+    assert 'role="alert"><b>Quem pediu a PT não a decide' in html and 'action="/os/_nexus/pt/PT-5/decidir"' in html
+    assert "nexus_pt_decisoes" not in banco.workbooks
+    # o gestor de contrato decide a mesma linha depois: é a 1ª decisão dela, e o App a aplica
+    _entrar_no_fracttal(app, logado, _jwt(email="beltrano@exemplo.test"), "beltrano@exemplo.test", "Gestor")
+    logado.post("/os/_nexus/pt/PT-5/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1"})
+    linhas = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")
+    assert [(d["pt"], d["decidida_por_hmac"]) for d in linhas] == [("PT-5", codigo_da_pessoa(CHAVE, "beltrano@exemplo.test"))]
 
 
 def test_a_aba_antiga_decisoes_nao_e_lida(app, banco, logado):

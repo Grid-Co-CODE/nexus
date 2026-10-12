@@ -188,7 +188,10 @@ FATOS = (
          observacao="decisão 4 do Levi (11/10/2026): o contrato com o App, que lê este livro, é a PT pelo número e a "
                     "linha pelo codigo_ativo (as colunas de 05/10 e o codigo_ativo no fim); o motivo vai mascarado, "
                     "porque o técnico lê; quem decidiu só em HMAC. Até 11/10 gravava só o número e pegava a 1ª linha "
-                    "(GR-4: numa PT de 3 ativos não dizia a qual valia). O primeiro que decide a linha vale"),
+                    "(GR-4: numa PT de 3 ativos não dizia a qual valia). O primeiro que decide a linha vale (o App "
+                    "aplica só a 1ª de cada linha). Quem pediu a PT não a decide (decidida_por_hmac nunca é o "
+                    "solicitante_hmac da linha no fato pt; o App descarta essa decisão). O App (v257) não confere "
+                    "quem pode decidir: a trava é do Nexus, antes de gravar"),
     # a ronda de extintores do App (v247, 08/10/2026), que substituiu o Forms da TST; registrados antes de o App
     # publicar o livro (09/10/2026, a tela Extintores do HSEQ). O extintor é cadastro próprio do App, fora do Fracttal
     # (a planilha da TST + os achados pelo técnico); o `Ativo` é o código do Fracttal de ONDE ele fica. Dois grãos, dois

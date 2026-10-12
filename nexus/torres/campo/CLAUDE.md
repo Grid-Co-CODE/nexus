@@ -431,14 +431,23 @@ A OS da PT (verde) abre `/t/campo/pt/<número>?ativo=<código do ativo>`: a linh
 atividades da APR com sim/não/NA, respostas NÃO, falta, forçada) e a decisão dela. **A decisão é por linha** (decisão 4
 do Levi, 11/10/2026): o App decide cada PT × ativo à parte, e a PT de 3 ativos tem 3 linhas e 3 decisões. Todo link à
 tela e todo formulário de decidir levam a linha (`ativo` no link, `codigo` no formulário; "" = a linha sem ativo, como a
-da APR do dia); a tela da PT de mais de uma linha lista as outras para trocar (`visao.pt_linhas`). Sem a linha (link
-ou formulário de antes), a tela abre a 1ª, e o `decidir` só aceita a PT de uma linha: na de mais, escolher a 1ª seria
-chutar a qual ativo a decisão vale.
+da APR do dia); a tela da PT de mais de uma linha lista as outras para trocar (`visao.pt_linhas`). **Sem a linha** (link
+ou formulário de antes, ou um código que a PT não tem), a PT de uma linha abre a dela e a de mais de uma **só lista os
+equipamentos para escolher**, sem formulário; o `decidir` sem a linha também só aceita a PT de uma linha. Na de mais,
+escolher a 1ª seria chutar a qual ativo a decisão vale (revisão adversarial de 11/10/2026: a tela abria calada a 1ª e
+o formulário mandava o código dela, por fora da recusa do `decidir`).
 - **Quem assina: o login do Fracttal do OS Creator** (Levi: "utilize o login do fractal do OS Creator Web que já dá
   certo!"). O OS Creator roda dentro do Nexus com sessão própria (cookie `os_sessao`, só em /os); por isso as rotas de
   assinatura moram em `/os/_nexus/...` (`assinatura.py`): `quem` (o e-mail de quem entrou), `pt/<n>/decidir` (POST) e
   `pt/<n>/voltar` (o OS Creator só devolve para /os depois do login). Token do Fracttal vencido (`exp`) não assina;
   pedido de outra origem leva 403.
+- **A ida e a volta do login levam a linha** (revisão adversarial de 11/10/2026: só com o número no `next`, quem abria
+  a linha do 2º equipamento sem a sessão do Fracttal voltava do login para a 1ª, com o código dela no formulário, e o
+  clique seguinte decidia o outro equipamento; num Não autorizo, o App pausaria a tarefa errada). `_login(número,
+  código)` põe a linha no `next` (`/os/_nexus/pt/<n>/voltar?ativo=<código>`, que o `_destino_local` do clone aceita) e
+  o `voltar` devolve a ela. Levam a linha: o `decidir` sem login (o `codigo` do formulário), o "entre com o seu login do
+  Fracttal" da tela (montado no servidor) e o da assinatura do técnico (`assinatura-tecnico?ativo=`, na tela e no
+  detalhe da lista do HSEQ). Prova: `test_a_volta_do_login_do_fracttal_traz_a_mesma_linha_da_pt`.
 - **Debaixo do `/nexus`** (porta única, 10/10/2026; no servidor o Nexus mora em `/nexus`, e endereço cru cai na
   plataforma de Performance): o `volta` do formulário de decidir é o `request.full_path` da tela, SEM o prefixo;
   `assinatura._volta` confere sem ele (`sem_raiz`) e devolve com ele (`na_raiz`). O `next` do login do OS Creator
@@ -453,15 +462,25 @@ chutar a qual ativo a decisão vale.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador), o gestor de contrato da usina, quem tem o vínculo COS no cadastro e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). A pessoa é a do login
-  do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa.
-- **Falta o App aplicar** (próxima versão do App, decisão de publicar é do Levi): ler `nexus_pt_decisoes ·
-  fato_decisao_pt` a cada minuto; para cada decisão nova, achar a linha pela PT (o número) e pelo `codigo_ativo`,
-  conferir pelo HMAC se quem assinou pode assinar aquela PT (`_pt_pode_assinar`, que
-  precisa aceitar o mesmo conjunto: supervisor de campo, gestor de contrato, COS e administrador), se a
-  PT ainda está aguardando e se a decisão é recente (sugestão: 30 min; decisão velha não libera ninguém), aplicar como
-  o `gestao/pt/decidir` (pausa no Fracttal, anexo) e devolver o resultado no `pt_app_campo`. E mandar a PT ao banco na
-  hora em que nasce, não só no timer de hora em hora (hoje a PT chega ao Nexus com até 1 h de atraso). Até isso, a
-  tela diz: "O App ainda não lê esta decisão".
+  do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa. **Quem pediu a PT nunca a decide**, nem sendo
+  administrador: `pode_decidir` compara o código do e-mail de quem assina com o `solicitante_hmac` da linha
+  (`visao.pts`, o `Solicitante (HMAC)` do `pt_app_campo`, o mesmo código que o App compara). É a regra do painel do App
+  desde a 1ª PT real (28/09/2026, aprovada pelo próprio técnico, que também era administrador); o App descarta calado
+  a decisão de quem pediu e, como só a 1ª decisão de cada linha vale, a de outra pessoa gravada depois também nunca
+  chegaria ao campo (revisão adversarial de 11/10/2026: a supervisora que pediu dava o De acordo, o Nexus dizia
+  "salva", o gestor de contrato era recusado com "já tem decisão" e o técnico ficava esperando). Prova:
+  `test_quem_pediu_a_pt_nao_a_decide`.
+- **Quem aplica é o App, a partir da v257** (pronta numa cópia do middleware; o deploy é do Levi): um timer de 2 em 2
+  minutos lê `nexus_pt_decisoes · fato_decisao_pt` (GET aberto) e aplica como o painel dele (o mesmo status, a validade
+  de 7 dias a partir da decisão, o PDF anexado no De acordo e a pausa no Não autorizo). As regras dele: (1) vale a 1ª
+  decisão de cada PT × `codigo_ativo` (a mais antiga do livro; as outras nunca são aplicadas), decisão aplicada não se
+  desfaz e, se o painel decidiu antes, vale a do painel; (2) a linha é achada pela PT, pelo `codigo_ativo` e pela OS, e
+  tem de ser uma só; (3) quem pediu a PT não a decide; (4) decisão com mais de 7 dias não é aplicada; (5) **quem pode
+  decidir o App NÃO confere** (não tem os papéis da estrutura de O&M): a única trava é o `pode_decidir` do Nexus. Por
+  isso o Nexus recusa, antes de gravar, o que o App descartaria e já se sabe na hora (a linha, quem pediu, a 1ª
+  decisão): decisão gravada que o App descarta trava a linha aqui e deixa o técnico esperando. Até a v257 entrar no ar, a
+  tela diz: "O App ainda não lê esta decisão". Falta no App: mandar a PT ao banco na hora em que nasce, não só no timer
+  de hora em hora (hoje a PT chega ao Nexus com até 1 h de atraso).
 
 ## As contas copiadas do App (`nexus/campo/regras_app.py`)
 

@@ -58,7 +58,12 @@ sem ativo, como a da APR do dia), as colunas de 05/10 e o `codigo_ativo` no fim.
 1ª linha (GR-4: numa PT de 3 ativos não dizia a qual valia); a aba se chamava `decisoes`, nunca foi gravada (o livro não
 existe no banco, GET de 11/10) e não é mais lida: linha que aparecer nela (um Nexus velho decidindo antes do deploy)
 não vale e o radar a mostra como tabela nova. Sem a linha, a PT de mais de um ativo não se decide (escolher a 1ª seria
-chutar, regra 4). Prova: `tests/test_campo_visao.py` (as decisões) e `tests/test_dados_camada.py` (o catálogo).
+chutar, regra 4); a tela dela, sem a linha, só deixa escolher o equipamento, e a ida e a volta do login do Fracttal
+levam a linha. **O que o App descarta não se grava** (revisão adversarial de 11/10/2026): o App (v257) aplica só a 1ª
+decisão de cada linha, e não a de quem pediu a PT; gravada, essa linha travava aqui e nunca chegava ao campo. Por isso
+`decidida_por_hmac` nunca é o `solicitante_hmac` da linha no `fato_pt`, e o primeiro que decide a linha vale. Quem pode
+decidir, o App não confere: a trava é do Nexus, antes de gravar. Prova: `tests/test_campo_visao.py` (as decisões) e
+`tests/test_dados_camada.py` (o catálogo).
 
 **Fontes do tempo real (11/10/2026):** a tela da plataforma `/admin/tempo-real` (no Nexus, Base · Fontes do tempo real, só
 admin) grava `nexus_tempo_real · fato_decisao_cobertura` (grão: 1 linha = 1 decisão de incluir ou excluir 1 usina de 1

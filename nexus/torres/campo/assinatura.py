@@ -80,10 +80,17 @@ def _tela(numero, codigo=None) -> str:
     return url if codigo is None else url + "?ativo=" + quote(str(codigo), safe="")
 
 
-def _login(numero) -> str:
-    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar. O `next` vai SEM o prefixo
-    # (é o caminho que o clone entende); o endereço do login, com ele (é o navegador que o pede)
-    return na_raiz("/os/login") + "?next=" + quote(f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar", safe="")
+def _login(numero, codigo=None) -> str:
+    """O login do Fracttal do OS Creator, voltando à MESMA linha da PT (`codigo`: o código do ativo dela; "" = a linha
+    sem ativo; None = quem pediu não disse a linha). Revisão adversarial de 11/10/2026: com só o número no `next`, a
+    volta abria a 1ª linha com o código DELA no formulário, e o clique seguinte decidia o outro equipamento da PT."""
+    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar, com a linha na consulta (o
+    # `_destino_local` do clone aceita /os... com consulta). O `next` vai SEM o prefixo (é o caminho que o clone
+    # entende); o endereço do login, com ele (é o navegador que o pede)
+    volta = f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar"
+    if codigo is not None:
+        volta += "?ativo=" + quote(str(codigo), safe="")
+    return na_raiz("/os/login") + "?next=" + quote(volta, safe="")
 
 
 @bp_assinatura.route("/os/_nexus/quem")
@@ -95,10 +102,11 @@ def quem():
 @bp_assinatura.route("/os/_nexus/pt/<numero>/assinatura-tecnico")
 def assinatura_tecnico(numero):
     """A assinatura que o técnico desenhou na APR, para a tela da PT pôr ao lado de "A PT" (Levi, 05/10). JSON:
-    {"ok", "img"} ou {"ok": false, "login" | "motivo"}. Só com o login do Fracttal de quem olha."""
+    {"ok", "img"} ou {"ok": false, "login" | "motivo"}. Só com o login do Fracttal de quem olha. O `?ativo=` (a linha de
+    onde se pede) vai no "entre com o seu login do Fracttal", para a volta cair na mesma linha."""
     jwt, conta = _sessao_os()
     if not jwt:
-        return jsonify({"ok": False, "login": True, "entrar": _login(numero)})
+        return jsonify({"ok": False, "login": True, "entrar": _login(numero, request.args.get("ativo"))})
     p = visao.pt(numero)
     if not p or not p.get("os"):
         return jsonify({"ok": False, "motivo": "a PT não está no livro do App"})
@@ -130,7 +138,8 @@ def voltar_para():
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/voltar")
 def voltar(numero):
-    return redirect(_tela(numero))
+    # a linha que foi ao login (o `?ativo=` do `_login`); sem ela, a tela da PT de mais de uma linha só deixa escolher
+    return redirect(_tela(numero, request.args.get("ativo")))
 
 
 def _volta(numero, codigo=None) -> str:
@@ -150,12 +159,13 @@ def decidir(numero):
     origem = request.headers.get("Origin")
     if origem and urlsplit(origem).netloc != request.host:
         return "Origem recusada.", 403
-    q = quem_assina()
-    if not q:
-        return redirect(_login(numero))
     # a linha da PT que se decide: o código do ativo dela (o formulário de cada linha manda; "" = a linha sem ativo).
     # Sem o campo (formulário de antes de 11/10/2026), só a PT de uma linha se decide (`decisao_pt._linha`)
     codigo = request.form.get("codigo")
+    q = quem_assina()
+    if not q:
+        # sem o login do Fracttal: vai ao login e volta para a MESMA linha (revisão adversarial de 11/10/2026)
+        return redirect(_login(numero, codigo))
     volta, tela = _volta(numero, codigo), _tela(numero, codigo)
     try:
         decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"],

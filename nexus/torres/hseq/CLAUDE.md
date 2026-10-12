@@ -159,15 +159,18 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
 - **Quem pode dar o De acordo** (Levi, 09/10): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador de Campo), o gestor de contrato da usina, quem é do COS e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no servidor; quem não pode recebe a recusa dizendo quem pode).
-  **Quem é do COS** é o vínculo "COS" no cadastro de pessoas (Pessoas > Colaborador): é o "campo onde fazemos essa
-  relação". O responsável e o técnico da usina se trocam na ficha da usina (Base > Registro mestre).
+  **Quem pediu a PT nunca a decide**, nem sendo administrador (o App descarta essa decisão: regra e caso em
+  `nexus/torres/campo/CLAUDE.md`). **Quem é do COS** é o vínculo "COS" no cadastro de pessoas (Pessoas > Colaborador):
+  é o "campo onde fazemos essa relação". O responsável e o técnico da usina se trocam na ficha da usina (Base > Registro
+  mestre).
 - **A decisão é por linha** (decisão 4 do Levi, 11/10/2026): cada linha da lista é uma PT × equipamento, e o De acordo
   ou o Não autorizo dela vale para aquele equipamento (o formulário manda o código do ativo; no banco, `codigo_ativo`
-  em `nexus_pt_decisoes · fato_decisao_pt`). Regra e contrato com o App em `nexus/torres/campo/CLAUDE.md` ("Aprovação
-  de PT no Nexus") e em `nexus/dados/CLAUDE.md` ("O Nexus como fonte").
-- **O App ainda não lê a decisão do Nexus** (`nexus_pt_decisoes · fato_decisao_pt`): até a versão que lê, quem libera o
-  técnico é o De acordo dado pelo App, e a tela diz isso no detalhe. Quando o App ler, o `_pt_pode_assinar` dele
-  precisa aceitar o mesmo conjunto (supervisor de campo, gestor de contrato, COS e administrador).
+  em `nexus_pt_decisoes · fato_decisao_pt`). A assinatura do técnico é pedida pela linha (`?ativo=`): o "entre com o
+  seu login do Fracttal" que sai dela volta para a mesma linha. Regra e contrato com o App em
+  `nexus/torres/campo/CLAUDE.md` ("Aprovação de PT no Nexus") e em `nexus/dados/CLAUDE.md` ("O Nexus como fonte").
+- **O App ainda não lê a decisão do Nexus** (`nexus_pt_decisoes · fato_decisao_pt`): até a v257 entrar no ar, quem
+  libera o técnico é o De acordo dado pelo App, e a tela diz isso no detalhe. A v257 (pronta; o deploy é do Levi) NÃO
+  confere quem pode decidir: confia no `pode_decidir` do Nexus, a única trava de quem pode.
 - **O que o detalhe ainda não tem** (o painel do App mostra): riscos marcados, a atividade escrita, EPI e equipamentos
   com e sem, envolvidos, foto da equipe, aptidão e clima e o checklist item a item. Esses dados moram no App; entram
   quando o App mandar no livro de PT (sem nome em claro: a API tem leitura aberta).

@@ -1321,6 +1321,9 @@ def pts() -> leitura.Leitura:
                         "codigo": D._txt(x.get("codigo_ativo")),
                         "solicitante": nomes.get(D._id(x.get("solicitante_pessoa_id")))
                         or _nome(quem, x.get("solicitante_hmac")), "situacao": sit,
+                        # o código de quem pediu, o MESMO que o App compara: quem pediu a PT não a decide
+                        # (`decisao_pt.pode_decidir`; revisão adversarial de 11/10/2026)
+                        "solicitante_hmac": D._txt(x.get("solicitante_hmac")).lower(),
                         "criada": criada, "decidida": decidida,
                         "decidida_por": nomes.get(D._id(x.get("decisor_pessoa_id"))) or _nome(quem, x.get("decisor_hmac")),
                         "papel": r.get("Papel de quem decidiu") or "", "motivo": r.get("Motivo") or "",

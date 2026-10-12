@@ -56,7 +56,9 @@ def test_a_tela_mora_em_seguranca_com_o_titulo_novo_e_as_colunas_pt_e_apr(banco,
 
 def test_o_detalhe_traz_a_assinatura_quem_assina_e_a_decisao_que_volta_para_a_lista(banco, logado):
     html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
-    assert 'data-url="/os/_nexus/pt/PT-1/assinatura-tecnico"' in html and "Executante · assinatura da APR" in html
+    # a assinatura é pedida pela linha (o login que volta dela cai na mesma linha; revisão de 11/10/2026)
+    assert 'data-url="/os/_nexus/pt/PT-1/assinatura-tecnico?ativo=THPN-ALT100-INVR1"' in html
+    assert "Executante · assinatura da APR" in html
     assert 'action="/os/_nexus/pt/PT-1/decidir"' in html and '<input type="hidden" name="volta" value="/t/hseq/apr-pt?modo=tabela">' in html
     assert ("Quem assina</dt><dd>O Supervisor de Campo da Sudeste 03 (Supervisora Campo), o gestor de contrato "
             "(Beltrano Supervisor), alguém do COS (ninguém com o vínculo COS no cadastro ainda) ou um administrador") in html

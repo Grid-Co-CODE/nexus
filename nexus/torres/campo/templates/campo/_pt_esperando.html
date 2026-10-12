@@ -88,7 +88,9 @@
           {% if p.aviso_em %}<dt>1º aviso</dt><dd>{{ p.aviso_em.strftime('%d/%m às %H:%M') }}{% if p.aviso_motivo %} · {{ p.aviso_motivo }}{% endif %}</dd>{% endif %}
         </dl>
         <div class="pt-det-ass">
-          <figure class="pt-ass" data-url="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico">
+          {# a linha vai no pedido: o "entre com o seu login do Fracttal" que volta dele cai NESTA linha da PT (só com o
+             número, a volta abria a 1ª linha e a decisão caía no outro equipamento; revisão adversarial de 11/10/2026) #}
+          <figure class="pt-ass" data-url="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico?ativo={{ (p.codigo or '')|urlencode }}">
             <figcaption>Executante · assinatura da APR</figcaption>
             <div class="pt-ass-quadro"><span class="mudo">Buscando no Fracttal…</span></div>
             <span class="det">{{ p.solicitante or '—' }}{% if p.criada %} · {{ p.criada.strftime('%d/%m/%y %H:%M') }}{% endif %}</span>
