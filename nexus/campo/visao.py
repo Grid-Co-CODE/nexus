@@ -61,6 +61,9 @@ SEM_CLUSTER = "Sem cluster"
 # estrutura de O&M de 10/2026: a usina sem região (equipe de fora da estrutura) e sem gestor de contrato no cadastro
 SEM_REGIAO = "Sem região de campo"
 SEM_GESTOR = "Sem gestor de contrato"
+# o Responsável O&M da usina (a ficha da usina no cadastro, `usinas.responsavel_om_id`; Levi, 12/10/2026: "Precisamos
+# deixar filtrado por responsável"): usina sem ele vai para o cartão próprio
+SEM_RESPONSAVEL = "Sem responsável O&M"
 VAGA = "vaga"
 CAMPO = "Colaborador de campo"       # o vínculo de quem vai a campo no cadastro (técnico, eletricista, mantenedor)
 
@@ -480,6 +483,13 @@ class _Base:
         u = self.por_id.get(uid) or {}
         return self.nome_da_pessoa(D._id(u.get("gestor_contrato_id")), "Gestor") or SEM_GESTOR
 
+    def responsavel_da_usina(self, uid) -> str:
+        """O Responsável O&M da usina, pela ficha dela no cadastro (`usinas.responsavel_om_id`). Medido em 12/10/2026: 175
+        das 177 usinas em operação com ele, 9 pessoas (os supervisores de antes); não é o gestor de contrato (5 deles
+        também são gestores, de outras usinas)."""
+        u = self.por_id.get(uid) or {}
+        return self.nome_da_pessoa(D._id(u.get("responsavel_om_id")), "Responsável") or SEM_RESPONSAVEL
+
     def equipe_da_usina(self, uid) -> str:
         u = self.por_id.get(uid) or {}
         return self.nome_equipe.get(D._id(u.get("equipe_id")), "")
@@ -514,6 +524,7 @@ class _Base:
                 "regiao_campo": r.get("nome", ""), "supervisor_campo": r.get("supervisor", ""),
                 "coordenador_campo": r.get("coordenador", ""),
                 "gestor": self.gestor_da_usina(uid) if u else "",
+                "responsavel": self.responsavel_da_usina(uid) if u else "",
                 "cliente": self.nome_cliente.get(D._id(u.get("cliente_id")), "") if u else "",
                 "cluster": nome_cluster(u.get("cluster")) if u else ""}
 
@@ -1515,7 +1526,7 @@ FEITA = {"sem_os": ("Sem OS no Fracttal", "alerta"), "incompleta": ("Evidência 
 PT_STATUS = {"parada": ("Parada há mais de 2 h", "critico"), "aguardando": ("Aguardando", "alerta")}
 LONGA_PENDENTE = "ronda longa pendente"
 # os papéis da estrutura de O&M de 10/2026 que cada linha da Central leva (os filtros e os cartões leem daqui)
-_PAPEIS = ("regiao_campo", "supervisor_campo", "coordenador_campo", "gestor")
+_PAPEIS = ("regiao_campo", "supervisor_campo", "coordenador_campo", "gestor", "responsavel")
 
 
 def _dm(iso) -> str:
@@ -1548,10 +1559,13 @@ def atencao(dias: int = 14) -> leitura.Leitura:
                 tipo, obs = "longa_pendente", f"O App pede a ronda longa (última ronda em {_dm(c['ultima'])})"
             else:
                 continue
-            pendentes.append({"tipo": tipo, "usina": c["usina"], "uf": c["uf"], "cidade": c["cidade"],
-                              "equipe": c["equipe"], "regiao_br": c["regiao_br"], **{k: c[k] for k in _PAPEIS},
-                              "dias": c["dias"], "ultima": c["ultima"], "obs": obs})
-        usinas = [{k: c[k] for k in ("usina", "equipe", "uf", "regiao_br", "cidade", "dias") + _PAPEIS}
+            pendentes.append({"tipo": tipo, "usina": c["usina"], "usina_id": c["usina_id"], "uf": c["uf"],
+                              "cidade": c["cidade"], "equipe": c["equipe"], "regiao_br": c["regiao_br"],
+                              **{k: c[k] for k in _PAPEIS}, "dias": c["dias"], "ultima": c["ultima"],
+                              "tecnico": c["tecnico"], "obs": obs})
+        # a última ronda e quem a fez vão junto: o kanban do responsável mostra também as usinas em dia
+        usinas = [{k: c[k] for k in ("usina", "usina_id", "equipe", "uf", "regiao_br", "cidade", "dias", "ultima",
+                                     "tecnico") + _PAPEIS}
                   for c in _cobertura(b, rond, hoje)]
         feitas = []
         for r in sorted((r for r in rond if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
@@ -1684,6 +1698,58 @@ def por_gestor(usinas, pendentes, pts, times=None) -> list[dict]:
         tm = [(times or {}).get(e) or {} for e in s["equipes"]]
         s["tecnicos"], s["ativos"] = sum(t.get("tecnicos", 0) for t in tm), sum(t.get("ativos", 0) for t in tm)
     return [_fechar_soma(s) for s in g.values()]
+
+
+def por_responsavel(usinas, pendentes) -> list[dict]:
+    """Um cartão por Responsável O&M (Levi, 12/10/2026: "tem que mostrar usinas desse responsável que nunca tiveram
+    ronda, rondas pendentes e feitas!"), pelas USINAS dele (o responsável é da usina, como o gestor): usinas, pendentes
+    por status, feitas (= usinas dele que não estão pendentes, a regra dos cartões de equipe) e o %; as equipes das
+    usinas. Usina sem responsável no cadastro vai para o cartão próprio `SEM_RESPONSAVEL`. As listas chegam já filtradas
+    pela tela."""
+    g = {}
+
+    def card(nome):
+        return g.setdefault(nome or SEM_RESPONSAVEL, {"responsavel": nome or SEM_RESPONSAVEL, "equipes": [],
+                                                      "regioes": set(), "ufs": set(), **dict.fromkeys(_SOMA, 0)})
+    for u in usinas:
+        s = card(u.get("responsavel"))
+        s["usinas"] += 1
+        if u.get("equipe") and u["equipe"] not in s["equipes"]:
+            s["equipes"].append(u["equipe"])
+        s["ufs"].update([u["uf"]] if u.get("uf") else [])
+        s["regioes"].update([u["regiao_br"]] if u.get("regiao_br") else [])
+    for x in pendentes:
+        s = card(x.get("responsavel"))
+        s["pendentes"] += 1
+        s[x["tipo"]] += 1
+    return [_fechar_soma(s) for s in g.values()]
+
+
+# As três colunas do kanban do responsável (Levi, 12/10/2026: "Ao clicar aparecerá um kanban com essas três colunas!"):
+# o status sai da ronda, não se arrasta.
+COLUNAS_KANBAN = (("nunca", "Nunca teve ronda", "critico"), ("pendente", "Ronda pendente", "alerta"),
+                  ("feita", "Ronda feita", "ok"))
+
+
+def kanban(usinas, pendentes) -> dict:
+    """{"nunca", "pendente", "feita"}: as usinas (já filtradas pela tela, no caso pelo responsável) em três colunas.
+    Nunca = mobilizada e nenhuma ronda pelo App; pendente = sem ronda há 7 dias ou mais, ou com a ronda longa pendente
+    (`tipo` e `obs` da pendência); feita = as outras, com a última ronda e quem a fez. Ordem: a mais urgente em cima
+    (pendente pelos dias sem ronda; feita pela ronda mais recente; nunca pelo nome)."""
+    pend = {(x.get("usina_id"), x["usina"]): x for x in pendentes}
+    out = {"nunca": [], "pendente": [], "feita": []}
+    for u in usinas:
+        x = pend.get((u.get("usina_id"), u["usina"]))
+        if x and x["tipo"] == "nunca":
+            out["nunca"].append(dict(u, tipo="nunca", obs=x.get("obs", "")))
+        elif x:
+            out["pendente"].append(dict(u, tipo=x["tipo"], obs=x.get("obs", "")))
+        else:
+            out["feita"].append(dict(u, tipo="feita", obs=""))
+    out["nunca"].sort(key=lambda u: u["usina"])
+    out["pendente"].sort(key=lambda u: (-(u.get("dias") or 0), u["usina"]))
+    out["feita"].sort(key=lambda u: (u.get("dias") or 0, u["usina"]))
+    return out
 
 
 def limpar():

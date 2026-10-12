@@ -101,12 +101,21 @@ def _gestor() -> str:
     return "" if v == TODOS else v
 
 
-def _do_papel(x, regiao_campo, gestor) -> bool:
-    """A linha é da região de campo e do gestor escolhidos. Linha sem região (equipe de fora da estrutura, PT sem usina
-    ligada ao cadastro) conta como "Sem região de campo", e sem gestor como "Sem gestor de contrato": é o que os cartões
-    próprios mostram, e o clique neles tem de achar as mesmas linhas."""
+def _responsavel() -> str:
+    """O Responsável O&M escolhido na Central (Levi, 12/10/2026: "Precisamos deixar filtrado por responsável"): o da
+    ficha da usina. Sem padrão pelo login; "Todos" vai como "*"."""
+    v = request.args.get("responsavel") or ""
+    return "" if v == TODOS else v
+
+
+def _do_papel(x, regiao_campo, gestor, responsavel="") -> bool:
+    """A linha é da região de campo, do gestor e do responsável escolhidos. Linha sem região (equipe de fora da
+    estrutura, PT sem usina ligada ao cadastro) conta como "Sem região de campo", sem gestor como "Sem gestor de contrato"
+    e sem responsável como "Sem responsável O&M": é o que os cartões próprios mostram, e o clique neles tem de achar as
+    mesmas linhas."""
     return ((not regiao_campo or (x.get("regiao_campo") or visao.SEM_REGIAO) == regiao_campo)
-            and (not gestor or (x.get("gestor") or visao.SEM_GESTOR) == gestor))
+            and (not gestor or (x.get("gestor") or visao.SEM_GESTOR) == gestor)
+            and (not responsavel or (x.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel))
 
 
 def _opcoes_regiao(regioes, linhas, escolhida) -> list[tuple[str, str]]:
@@ -126,6 +135,12 @@ def _opcoes_gestor(linhas, escolhido) -> list[str]:
     """Os gestores de contrato do filtro (os das usinas das linhas), "Sem gestor de contrato" por último."""
     nomes = {x.get("gestor") for x in linhas if x.get("gestor")} | ({escolhido} if escolhido else set())
     return sorted(nomes - {visao.SEM_GESTOR}) + ([visao.SEM_GESTOR] if visao.SEM_GESTOR in nomes else [])
+
+
+def _opcoes_responsavel(linhas, escolhido) -> list[str]:
+    """Os Responsáveis O&M do filtro (os das usinas das linhas), "Sem responsável O&M" por último."""
+    nomes = {x.get("responsavel") for x in linhas if x.get("responsavel")} | ({escolhido} if escolhido else set())
+    return sorted(nomes - {visao.SEM_RESPONSAVEL}) + ([visao.SEM_RESPONSAVEL] if visao.SEM_RESPONSAVEL in nomes else [])
 
 
 def _papeis(d, linhas, regiao_campo, gestor) -> dict:
@@ -205,6 +220,9 @@ ORDEM_DAS_REGIOES = {
 ORDEM_DOS_GESTORES = {
     "pendentes": lambda s: (s["gestor"] == visao.SEM_GESTOR, -s["pendentes"], s["pct_feitas"] or 0, s["gestor"]),
     "pt": lambda s: (s["gestor"] == visao.SEM_GESTOR, -s["parada"], -s["pts"], s["gestor"])}
+# Por Responsável O&M (12/10/2026): a mesma ordem; "Sem responsável O&M" por último
+ORDEM_DOS_RESPONSAVEIS = lambda s: (s["responsavel"] == visao.SEM_RESPONSAVEL, -s["pendentes"], s["pct_feitas"] or 0,  # noqa: E731
+                                    s["responsavel"])
 
 
 def _modo(equipe, historico=False) -> str:
@@ -231,15 +249,23 @@ def atencao():
     ids = [v[0] for v in VISTAS]
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
     f, regiao, equipe = request.args.get("f", ""), request.args.get("regiao", ""), request.args.get("equipe", "")
-    regiao_campo, gestor = _regiao_campo(), _gestor()
+    regiao_campo, gestor, responsavel = _regiao_campo(), _gestor(), _responsavel()
     modo = _modo(equipe)
+    # Por Responsável O&M (Levi, 12/10/2026: "tem que mostrar usinas desse responsável que nunca tiveram ronda, rondas
+    # pendentes e feitas! Ao clicar aparecerá um kanban com essas três colunas!"): os cartões dos responsáveis e, com um
+    # escolhido (no cartão ou no filtro), o kanban das usinas dele. A tabela continua a um clique.
+    if vista == "pendentes" and not equipe:
+        if responsavel and request.args.get("modo") != "tabela":
+            modo = "kanban"
+        elif request.args.get("modo") == "responsaveis":
+            modo = "responsaveis"
     q = request.args.get("q", "").strip().lower()
     campos = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
 
     def filtra(lista):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
                 and (not equipe or x.get("equipe") == equipe)
-                and _do_papel(x, regiao_campo, gestor)
+                and _do_papel(x, regiao_campo, gestor, responsavel)
                 and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
     fontes = {"pendentes": filtra(d.get("pendentes") or []),
               "pt": com_quem_assina(filtra(d.get("pts") or [])) if vista == "pt" else filtra(d.get("pts") or [])}
@@ -260,11 +286,16 @@ def atencao():
     if vista == "pt":
         cartoes_gest = [c for c in cartoes_gest if c["pts"]]
     cartoes_gest.sort(key=ORDEM_DOS_GESTORES[vista])
+    cartoes_resp = sorted(visao.por_responsavel(usinas_f, fontes["pendentes"]), key=ORDEM_DOS_RESPONSAVEIS)
+    colunas = visao.kanban(usinas_f, fontes["pendentes"]) if modo == "kanban" else None
     return render_template("campo/atencao.html", **_comum(
         "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
         status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
         lista=lista, f=f, regiao=regiao, equipe=equipe, modo=modo, cartoes=cartoes, regioes=visao.REGIOES,
         cartoes_reg=cartoes_reg, cartoes_gest=cartoes_gest, situacoes=SITUACAO_PT,
+        responsavel=responsavel, opcoes_responsavel=_opcoes_responsavel(d.get("usinas") or [], responsavel),
+        sem_responsavel=visao.SEM_RESPONSAVEL, cartoes_resp=cartoes_resp, colunas=colunas,
+        colunas_kanban=visao.COLUNAS_KANBAN,
         **_papeis(d, (d.get("usinas") or []) + (d.get("pts") or []), regiao_campo, gestor),
         q=request.args.get("q", ""), idade_min=_idade_min))
 

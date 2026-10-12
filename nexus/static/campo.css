@@ -587,3 +587,27 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 .pt-det-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
 .pt-motivo{flex:1 1 320px;min-width:220px}
 .pt-det-nota{margin:0;font-size:12.5px}
+
+/* O kanban do Responsável O&M (Central de atenção, 12/10/2026): três colunas de status (nunca teve ronda, pendente, feita);
+   o status sai da ronda, não se arrasta; o cartão leva ao histórico de rondas da usina */
+.cn-kb-cab{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px}
+.cn-kb-cab > div{display:grid;gap:2px}
+.cn-kb-cab b{font:700 20px/1.25 var(--font-display);color:var(--tinta)}
+.cn-kb-cab .mudo{font-size:12px}
+.cn-kanban{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
+.cn-kb-col{display:grid;gap:10px;padding:12px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-top:3px solid var(--linha-forte);border-radius:var(--raio-md)}
+.cn-kb-col--critico{border-top-color:var(--critico-cheio)}
+.cn-kb-col--alerta{border-top-color:var(--alerta-cheio)}
+.cn-kb-col--ok{border-top-color:var(--ok-cheio)}
+.cn-kb-col h2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 2px;
+  font:600 13px/18px var(--font-sans)}
+.cn-kb-col h2 b{font-variant-numeric:tabular-nums;color:var(--tinta)}
+.cn-kb-card{display:grid;gap:3px;padding:10px 12px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);color:inherit;text-decoration:none}
+.cn-kb-card:hover,.cn-kb-card:focus-visible{border-color:var(--verde);outline:none}
+.cn-kb-card b{font:600 14px/1.3 var(--font-sans);color:var(--tinta)}
+.cn-kb-card .kb-sub{font-size:12px;color:var(--mudo)}
+.cn-kb-card .kb-st{font:600 12px/16px var(--font-sans)}
+.cn-kb-vazio{margin:0;font-size:12px}
+@media (max-width:900px){.cn-kanban{grid-template-columns:1fr}}

@@ -389,6 +389,21 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     no lugar do estado. Medido em 05/10: 53 equipes; PR Norte 02 com 6 de 6 usinas pendentes. Conferido em 08/10
     (cadastro do ensaio da publicação): as somas dos cartões por equipe, por região e por gestor batem (128 usinas, 82
     pendentes; 37 PT).
+  - **Por Responsável O&M, com o kanban** (Levi, 12/10/2026: "Precisamos deixar filtrado por responsável ... tem que
+    mostrar usinas desse responsável que nunca tiveram ronda, rondas pendentes e feitas! Ao clicar aparecerá um kanban
+    com essas três colunas!"). O responsável é o da **ficha da usina** (`usinas.responsavel_om_id`,
+    `_Base.responsavel_da_usina`, no `onde()` e no `_PAPEIS`), não o gestor de contrato: medido em 12/10, 175 das 177
+    usinas em operação com ele, 9 pessoas (os supervisores de antes; 5 delas também são gestores, de OUTRAS usinas).
+    Filtro "Responsável O&M" (`responsavel=`, sem padrão pelo login; `*` = todos) nas duas abas; a visão **Por
+    responsável** (`modo=responsaveis`, `visao.por_responsavel`: as usinas dele, pendentes por status, feitas = as não
+    pendentes, a regra dos cartões de equipe) e, com um responsável escolhido (o cartão ou o filtro), o **kanban**
+    (`visao.kanban`, `COLUNAS_KANBAN`): Nunca teve ronda | Ronda pendente (sem ronda há 7 d ou mais, ou a longa pendente,
+    com o motivo e quem fez a última) | Ronda feita (a usina em dia: a última ronda e quem fez). O status sai da ronda,
+    não se arrasta; o cartão da usina leva ao histórico de rondas dela; a Tabela continua a um clique (`modo=tabela`
+    mantém o responsável), e Por equipe / Por região de campo tiram o filtro. "Sem responsável O&M" tem cartão próprio.
+    **Medido em 12/10 (banco real):** 128 usinas mobilizadas, 89 pendentes, 6 responsáveis + 2 usinas sem responsável;
+    a soma dos cartões bate (128 / 89 / 39 feitas) e cada kanban bate com o cartão dele. Prova:
+    `tests/test_campo_central_responsavel.py`.
   - Todas as colunas e cabeçalhos das tabelas do campo **centralizados** (Levi, 05/10).
   - **No cartão, do cadastro de pessoas** (`visao._Base._time`): o ícone de homem de capacete com o número de
     técnicos (colaborador de campo da equipe que não está Desligado: os 28 sem status estão todos em equipes sem
