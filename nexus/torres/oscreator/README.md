@@ -604,19 +604,18 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
 
 ## Sem Tickets e sem a faixa de abas (12/10/2026)
 
-- **A tela de Tickets saiu, com o código dela** (Levi: "Chamados > Tickets de Performance -> pode excluir essa seção e o
-  código dela!"). Saíram da cópia: `os_web/rotas_tickets.py` (as 10 rotas `/tickets` e `/api/tickets/...`; o registro
-  automático das telas não acha mais o arquivo), `os_web/tickets_web.py`, `os_web/tickets_painel.py`, `tickets_calc.py`,
-  `templates/tickets.html` e `tickets_painel.html`, `static/tickets_painel.js` e `.css`, as regras `tk-*` do `os.css`
-  (escuro e claro), o card "Tickets" da Performance, o atalho dele no card do setor e a seção no `lancador.py`. E, no
-  Nexus, o item Chamados → Tickets de performance (`ATALHOS`).
+- **A tela de Tickets saiu do Nexus, com o código dela** (Levi: "Chamados > Tickets de Performance -> pode excluir essa
+  seção e o código dela!"; perguntado sobre o 5090: "Isso você não levará para o oem"). Saíram da cópia os arquivos só
+  da tela: `os_web/rotas_tickets.py` (as 10 rotas `/tickets` e `/api/tickets/...`; o registro automático das telas não
+  acha mais o arquivo), `os_web/tickets_web.py`, `os_web/tickets_painel.py`, `tickets_calc.py`, `templates/tickets.html`
+  e `tickets_painel.html`, `static/tickets_painel.js` e `.css`; e, no Nexus, o item Chamados → Tickets de performance
+  (`ATALHOS`). A sincronia lista os 8 como "apagado no Nexus" e não os apaga no oem: o 5090 segue com a tela.
+- **A cópia segue igual à do oem nos arquivos que ficaram**: o `lancador.py`, o `performance.html` e o `os.css` do oem
+  ainda desenham o card "Tickets" da Performance, a pílula dele no card do setor (Início) e as regras `tk-*`. Os links
+  saem na ponte, na resposta (`_SEM_TICKETS`: todo `<a href="/os/tickets...">`); as regras `tk-*` ficam sem uso.
 - **Fica** a linha de ticket que nasce junto da OS da Performance (a caixa "Gerar ticket", `api.nascer_ticket` →
   `tickets_nasce`, que usa `tickets_api`, `tickets_diario`, `tickets_escrita` e `tickets_spec`): é da criação de OS, não
   da tela. O `/os/api/acomp/<folio>/ticket` é o nº do chamado no fabricante (Acompanhamento de chamados) e também fica.
-- **No oem ainda não foi:** a sincronia (`ferramentas/sincronizar_oscreator.py --aplicar`) levaria o `lancador.py`, o
-  `performance.html` e o `os.css`; os arquivos apagados ela só lista ("apagado no Nexus, não apago no oem": lá mora o app
-  de desktop, que tem a tela de Tickets dele). Levar ou não ao 5090 é decisão do Levi; até lá o
-  `test_copia_do_os_creator_igual_ao_oem` acusa esses três arquivos neste PC.
 - **Sem a faixa de abas dentro do Nexus** (Levi: "quero que mantenha esse carregamento mas tire a visão de abas da parte
   de cima pois como já temos as abas laterais, fica redundante, para um sistema separado, quero passar a impressão de
   unidade!"). A ponte põe `.os-tabs{display:none}` no `_ESTILO_NEXUS` (some a faixa da casca e a da tela aberta

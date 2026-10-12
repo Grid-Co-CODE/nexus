@@ -38,7 +38,7 @@ CURTO_PERF = {"Geração e ETM": "Geração e ETM", "Inspeção Geral do Inverso
 def _portas_perf() -> list:
     from . import perf_web
     return ([{"rotulo": CURTO_PERF.get(p["titulo"], p["titulo"]), "href": "/os/performance/criar?" + urlencode({"frase": p["frase"]})}
-             for p in perf_web.PLANOS])
+             for p in perf_web.PLANOS] + [{"rotulo": "Tickets", "href": "/os/tickets"}])
 
 
 SETORES = [
@@ -154,12 +154,12 @@ ABAS_SECOES = [
     ("/os/setor/pcm", "pcm"), ("/os/pcm", "pcm"), ("/os/solicitacao/fila", "pcm"), ("/os/solicitacao/historico", "pcm"),
     ("/os/solicitacao", "solic"),
     ("/os/setor/chamados", "chamados"), ("/os/chamados", "chamados"), ("/os/inspecao", "chamados"),
-    ("/os/performance", "perf"), ("/os/historico", "hist"), ("/os/ativos", "ativos"),
+    ("/os/performance", "perf"), ("/os/tickets", "tickets"), ("/os/historico", "hist"), ("/os/ativos", "ativos"),
     ("/os/cos", "cos"), ("/os/engenharia", "eng"), ("/os/tradicional", "tradicional"), ("/os/clonar", "clonar"),
     ("/os/os", "os"), ("/os/buscar", "busca"), ("/os/em-breve", "embreve"),
 ]
 # o ícone de cada aba é o do card da tela inicial (a OS aberta, o documento; a busca, a lupa)
-ICONE_SECAO = {"pcm": "calendar", "solic": "clipboard", "chamados": "headset", "perf": "bolt",
+ICONE_SECAO = {"pcm": "calendar", "solic": "clipboard", "chamados": "headset", "perf": "bolt", "tickets": "ticket",
                "hist": "history", "ativos": "rack", "cos": "stack", "eng": "etm", "tradicional": "file", "clonar": "copy",
                "os": "doc", "busca": "search", "embreve": "doc"}
 
@@ -167,6 +167,7 @@ ICONE_SECAO = {"pcm": "calendar", "solic": "clipboard", "chamados": "headset", "
 NO_APP = {
     "cos": ("COS", "a OS de ocorrência: desligamento, religamento e inspeção, com as regras de proteção do COS"),
     "pcm": ("PCM", "a OS planejada por família de plano, para vários ativos de uma vez"),
+    "tickets": ("Tickets", "as ocorrências de trackers e strings da Gridco Performance API"),
 }
 
 # Ícones de linha (SVG), os MESMOS paths do `_ICO` do app.py (+ o "etm" da área de Engenharia).

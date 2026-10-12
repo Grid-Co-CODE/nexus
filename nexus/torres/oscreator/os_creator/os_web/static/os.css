@@ -383,6 +383,23 @@ body.os-form .os-sub .s-x{width:34px;padding:0;display:flex;align-items:center;j
 .os-hist tr.sol-l.on td{background:rgba(166,226,46,.07)}
 .os-hist tr.sol-l .os-folio{cursor:pointer}
 
+/* ── Tickets (templates/tickets.html) ─────────────────────────────────────────────────────── */
+.os-hist th.k-centro,.os-hist td.k-centro,.os-hist th.k-estado,.os-hist td.k-estado{text-align:center}
+.os-hist td.k-estado{white-space:nowrap}
+/* Aberta ha mais de 30 dias. Vermelho na CELULA e nao na linha inteira: o atraso e da ocorrencia,
+   e pintar a linha toda faria o resto do dado parecer suspeito tambem (steps/tickets.py). */
+.os-hist td.tk-alarme{color:#e05454;font-weight:600}
+/* A AUSENCIA de OS e o que esta tela cacar: vermelho, a cor do estado 'aberta' (steps/tickets.py).
+   Em verde ela lia como link e passava por uma OS que existe. */
+.tk-sem-os{color:#e05454;font-weight:600}
+.tk-os{color:var(--f-green);font-weight:600}
+.os-hist tr.tk-l{cursor:pointer}
+.os-hist tr.tk-l.on td{background:rgba(166,226,46,.07)}
+.os-hist tr.tk-l:hover td{background:rgba(255,255,255,.03)}
+.os-aviso-leitura{display:flex;align-items:center;gap:8px;background:rgba(235,139,87,.10);border:1px solid rgba(235,139,87,.32);border-radius:10px;padding:9px 12px;color:#e6e8ef}
+.os-analise .os-campo{display:flex;flex-direction:column;gap:4px;margin-bottom:9px}
+.os-analise .os-campo .os-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--f-muted);font-weight:600}
+
 /* Rodape da tabela de ativos: "mostrando N de M" + os dois botoes (Levi, 22/09) */
 .os-tbl tr.mais td{padding:10px 12px;background:var(--f-input);border-top:1px solid var(--f-border)}
 /* o flex vai no DIV, nunca no <td>: `display:flex` numa celula a tira do layout de tabela e o
@@ -390,6 +407,27 @@ body.os-form .os-sub .s-x{width:34px;padding:0;display:flex;align-items:center;j
 .os-tbl tr.mais .mais-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .os-tbl tr.mais .os-ajuda{margin-right:auto}
 .os-tbl tr.mais:hover td{background:var(--f-input)}
+
+/* Grupo de usina no drill-down dos Tickets (Levi, 22/09) */
+.os-hist tr.tk-g{cursor:pointer}
+.os-hist tr.tk-g td{background:#121a2c;border-top:1px solid var(--f-border);padding:9px 12px}
+.os-hist tr.tk-g:hover td{background:#16203a}
+.os-hist tr.tk-g.on td{background:rgba(166,226,46,.07)}
+.os-hist tr.tk-g:focus-visible td{outline:2px solid var(--f-green);outline-offset:-2px}
+.tk-g-in{display:flex;align-items:center;gap:10px}
+.tk-seta{color:var(--f-muted);transition:transform .14s ease;display:inline-block}
+.os-hist tr.tk-g.on .tk-seta{transform:rotate(90deg);color:var(--f-green)}
+.tk-g-usina{color:#fff;font-size:13.5px}
+.tk-g-cli{font-size:12px}
+/* o numero que a pessoa veio ver: quantos equipamentos estao parados nesta usina */
+.tk-g-qtd{color:#e05454;font-weight:700;font-size:13px;white-space:nowrap}
+.os-hist tr.tk-f td{padding-left:16px}
+.os-hist tr.tk-f td:first-child{border-left:2px solid var(--f-border)}
+
+/* Tickets: TODAS as colunas centralizadas, nas duas abas (Levi, 22/09) */
+#tab_tk th,#tab_tk td{text-align:center}
+#tab_tk tr.tk-g td{text-align:left}
+.tk-filtro{cursor:pointer}
 
 /* ── A BARRA DE ROLAGEM no tema escuro (Levi, 22/09: "esse scroll está muito feio em branco e
    cinza"). O navegador desenha a barra do sistema — clara — em cima do fundo navy, e ela vira o
@@ -406,6 +444,28 @@ html{scrollbar-color:#2c3a5c #0d1322;scrollbar-width:thin}
 /* a lista do combo: sem o "degrau" branco das setas do Windows */
 .osb-lista::-webkit-scrollbar-button{display:none;height:0;width:0}
 
+/* Tickets: o painel (vincular OS, trocar usina, excluir) — Levi, 22/09 */
+a.tk-os{color:var(--f-green);font-weight:600;text-decoration:none}
+/* "Sem OS" quebrava em duas linhas na coluna estreita (22/09) */
+.tk-sem-os,a.tk-os,.tk-os{white-space:nowrap}
+a.tk-os:hover{text-decoration:underline}
+.tk-p-usina{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.os-btn.tk-excluir{background:rgba(224,84,84,.14);color:#f08a8a;border:1px solid rgba(224,84,84,.4)}
+.os-btn.tk-excluir:hover{background:rgba(224,84,84,.24);color:#fff}
+.tk-confirma{background:rgba(224,84,84,.08);border:1px solid rgba(224,84,84,.35);border-radius:10px;padding:10px 12px;margin:6px 0 10px}
+.tk-confirma p{margin:0 0 8px;color:#e6e8ef;font-size:13px;line-height:1.5}
+.tk-vinc{border:1px solid var(--f-border);border-radius:10px;padding:9px 10px;margin:4px 0 10px}
+.tk-vinc-l{display:flex;gap:8px;margin-top:6px}
+.tk-vinc-l input{flex:1}
+.tk-vinc-res{display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:220px;overflow-y:auto}
+.tk-vinc-op,.tk-usi-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--f-input);border:1px solid var(--f-border);border-radius:8px;padding:6px 9px;color:#e6e8ef;font-size:12.5px;cursor:pointer}
+.tk-vinc-op:hover,.tk-usi-op:hover{border-color:var(--f-green)}
+.tk-vinc-ok{color:var(--f-green);font-size:12.5px;margin:4px 0}
+.tk-usi{border:1px solid var(--f-border);border-radius:10px;padding:9px 10px;margin:4px 0 10px}
+.tk-usi input{width:100%}
+.tk-usi-l{display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:280px;overflow-y:auto}
+.tk-usi-cli{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--f-muted);font-weight:600;margin:6px 0 2px}
+.tk-usi-op{flex-direction:row;align-items:center;justify-content:space-between}
 
 /* A JANELA DE IMAGENS do app (PerfAnexoDialog), comum ao Tradicional e à Performance. Estava no
    tradicional.css; veio para cá quando a Performance passou a usá-la (22/09). */
@@ -655,12 +715,25 @@ html[data-tema="claro"]{
 :where(html[data-tema="claro"]) .os-recusar[open] summary{color:var(--osc-texto)}
 :where(html[data-tema="claro"]) .os-painel-card.on{background:var(--osc-lima-suave)}
 :where(html[data-tema="claro"]) .os-hist tr.sol-l.on td{background:var(--osc-lima-suave)}
+/* Tickets */
+:where(html[data-tema="claro"]) .os-hist td.tk-alarme,:where(html[data-tema="claro"]) .tk-sem-os,:where(html[data-tema="claro"]) .tk-g-qtd{color:var(--osc-critico)}
+:where(html[data-tema="claro"]) .os-hist tr.tk-l.on td,:where(html[data-tema="claro"]) .os-hist tr.tk-g.on td{background:var(--osc-lima-suave)}
+:where(html[data-tema="claro"]) .os-hist tr.tk-l:hover td{background:var(--osc-clarao)}
+:where(html[data-tema="claro"]) .os-aviso-leitura{background:var(--osc-severo-suave);border:1px solid var(--osc-severo-borda);color:var(--osc-texto)}
+:where(html[data-tema="claro"]) .os-hist tr.tk-g td{background:var(--osc-secao)}
+:where(html[data-tema="claro"]) .os-hist tr.tk-g:hover td{background:var(--osc-secao-2)}
+:where(html[data-tema="claro"]) .tk-g-usina{color:var(--osc-texto)}
 /* a barra de rolagem: a mesma do Nexus no claro */
 :where(html[data-tema="claro"]) .osb-lista,:where(html[data-tema="claro"]) .os-multi-lista,:where(html[data-tema="claro"]) .os-tbl-wrap,
 :where(html[data-tema="claro"]) .os-analise,:where(html[data-tema="claro"]) .acoes-dlg,:where(html[data-tema="claro"]) .acoes-exec,
 :where(html[data-tema="claro"]) .os-modal-corpo,:where(html[data-tema="claro"]) textarea{scrollbar-color:var(--osc-rolagem) transparent}
 :where(html[data-tema="claro"])::-webkit-scrollbar-thumb,:where(html[data-tema="claro"]) ::-webkit-scrollbar-thumb{background:var(--osc-rolagem);background-clip:padding-box}
 :where(html[data-tema="claro"])::-webkit-scrollbar-thumb:hover,:where(html[data-tema="claro"]) ::-webkit-scrollbar-thumb:hover{background:var(--osc-rolagem-hover);background-clip:padding-box}
+/* Tickets: o painel (vincular OS, trocar usina, excluir) */
+:where(html[data-tema="claro"]) .os-btn.tk-excluir{background:var(--osc-critico-suave);color:var(--osc-critico);border:1px solid var(--osc-critico-borda)}
+:where(html[data-tema="claro"]) .os-btn.tk-excluir:hover{background:var(--osc-critico);color:var(--osc-sobre-escuro)}
+:where(html[data-tema="claro"]) .tk-confirma{background:var(--osc-critico-suave);border:1px solid var(--osc-critico-borda)}
+:where(html[data-tema="claro"]) .tk-confirma p,:where(html[data-tema="claro"]) .tk-vinc-op,:where(html[data-tema="claro"]) .tk-usi-op{color:var(--osc-texto)}
 /* Histórico: o teto e a busca colada na tabela */
 :where(html[data-tema="claro"]) .hf-teto{background:var(--osc-alerta-suave);border:1px solid var(--osc-alerta-borda);color:var(--osc-alerta)}
 :where(html[data-tema="claro"]) .hf-filtro{border-color:var(--osc-campo)}

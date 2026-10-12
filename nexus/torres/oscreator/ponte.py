@@ -55,6 +55,11 @@ DESTINOS = {
 # - sem o símbolo e o "Grid Co." (o topo do Nexus já tem), só o "Sistema de Ordens de Serviço", centralizado.
 _VOLTAR_DE = (b'<a class="os-topo-voltar" href="/" title="Voltar para a Plataforma de Performance">'
               b'&larr; Plataforma</a>')
+# Tickets de performance saiu do Nexus (Levi, 12/10/2026: "pode excluir essa seção e o código dela!" e "Isso você não
+# levará para o oem"): a tela foi apagada da cópia (a sincronia só lista o apagado, não apaga no oem), e os links que o
+# código do oem ainda desenha para ela (o card "Tickets" da Performance e a pílula no card do setor, no Início) saem
+# aqui, na resposta, para a cópia continuar igual à do oem.
+_SEM_TICKETS = re.compile(rb'<a\b[^>]*\bhref="/os/tickets(?:[?#][^"]*)?"[^>]*>.*?</a>\s*', re.S)
 _MARCA_DE = ('<img src="/os/assets/grid-icon.png" alt="" class="os-simbolo">\n'
              '    <div><div class="os-n1">Grid Co.</div><div class="os-n2">Sistema de Ordens de Serviço</div></div>').encode()
 _MARCA_PARA = '<div class="os-n2 os-n2--nexus">Sistema de Ordens de Serviço</div>'.encode()
@@ -312,7 +317,7 @@ def encaminhar(resto: str):
         if destino.startswith("/os") and not ja_na_raiz(destino, base):
             resp.headers["Location"] = base + destino
     if resp.mimetype == "text/html":
-        corpo = _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA)
+        corpo = _SEM_TICKETS.sub(b"", _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA))
         if b"<head>" in corpo:
             # a função entra antes de qualquer script da página, que já a usa no <head>
             corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _ESTILO_NEXUS, 1)
