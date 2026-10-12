@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block titulo %}Integração Fracttal{% endblock %}
+{% block conteudo %}
+{# Base > Integração Fracttal (12/10/2026, Levi: "Temos a relação do time de campo, precisamos da relação do pessoal do
+   fractall e também posteriormente vamos precisar relacionar os setores"). O pessoal do Fracttal ao lado do cadastro de
+   pessoas do Nexus, pelo critério do login. Regras em nexus/cadastro/fracttal_pessoal.py; desenho das telas do Cadastro
+   (cad-*). #}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Integração Fracttal</p>
+<div class="cad-topo">
+  <div>
+    <h1 class="titulo-pagina">Integração Fracttal</h1>
+    <p class="cad-sub">O pessoal do Fracttal e quem disso está no cadastro de pessoas do Nexus.</p>
+  </div>
+  <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_base.fracttal', reler=1) }}"><i class="ph ph-arrows-clockwise"></i> Ler o Fracttal de novo</a>
+</div>
+
+{% if erro %}<div class="cad-aviso cad-aviso--{{ 'alerta' if velha else 'critico' }}" role="alert"><i class="ph ph-plugs"></i><div>
+  <strong>{{ 'Mostrando a última leitura boa.' if velha else 'Não consegui ler o Fracttal.' }}</strong> {{ erro }}</div></div>{% endif %}
+{% if erro_cadastro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler o cadastro de pessoas do banco.</strong>
+  {{ erro_cadastro }}. A lista do Fracttal aparece, sem a ligação com as fichas.</div></div>{% endif %}
+{% if sem_chave %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a chave do cadastro.</strong>
+  Os nomes e e-mails das fichas vão cifrados no banco; sem a <span class="gc-dado">NEXUS_CHAVE_CADASTRO</span> nenhuma pessoa do Fracttal liga a uma ficha.</div></div>{% endif %}
+
+<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>
+  <strong>Como liga.</strong> Pelo mesmo critério do login do Nexus: o e-mail da ficha ou, sem ele, o nome de uma única
+  ficha (completo, primeiro e último nome, ou o do e-mail). Nome que serve a duas fichas não liga. O cadastro de pessoas
+  é a relação do time de campo (Pessoas · Colaboradores Operação); quem é do escritório (PCM, COS, engenharia, gestão)
+  ainda não tem ficha. <strong>Setor</strong>: o Fracttal não diz o setor de ninguém; a coluna fica a definir até haver a base.
+  {% if lido_em %}Fracttal lido em {{ lido_em }} (guardado por 1 hora).{% endif %}
+</div></div>
+
+<div class="cad-numeros">
+  <div><div class="r">No Fracttal</div><div class="v">{{ total }}</div><div class="d">{{ admins }} administradores · {{ leitura }} de leitura · {{ sem_acesso }} sem acesso</div></div>
+  <div><div class="r">Com ficha no Nexus</div><div class="v">{{ rel.ligadas }}</div><div class="d">ligadas pelo e-mail ou pelo nome</div></div>
+  <div><div class="r">Sem ficha no Nexus</div><div class="v">{{ rel.sem_ficha }}</div><div class="d">{{ sem_ficha_grid }} da Grid Co. · {{ sem_ficha_ext }} externos (clientes, e-mail pessoal){% if rel.ambiguas %} · {{ rel.ambiguas }} com nome de duas fichas{% endif %}</div></div>
+  <div><div class="r">Fichas sem conta no Fracttal</div><div class="v">{{ sem_conta_total }}</div><div class="d">do cadastro de pessoas</div></div>
+</div>
+
+<section class="cad-secao" aria-labelledby="fr-pessoal">
+  <h2 id="fr-pessoal">Pessoal do Fracttal</h2>
+  <form class="cad-filtros" method="get">
+    <div class="campo busca">
+      <label class="gc-rotulo" for="fr-q">Buscar</label>
+      <input id="fr-q" name="q" class="gc-campo" value="{{ q }}" placeholder="Nome, e-mail, código ou equipe" autocomplete="off">
+    </div>
+    <div class="campo">
+      <label class="gc-rotulo" for="fr-lig">No Nexus</label>
+      <select id="fr-lig" name="ligacao" class="gc-campo" onchange="this.form.submit()">
+        {% for v, rot in ligacoes %}<option value="{{ v }}"{% if v == ligacao %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label class="gc-rotulo" for="fr-ac">Acesso no Fracttal</label>
+      <select id="fr-ac" name="acesso" class="gc-campo" onchange="this.form.submit()">
+        <option value="">Todos</option>{% for v in acessos %}<option value="{{ v }}"{% if v == acesso %} selected{% endif %}>{{ v }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label class="gc-rotulo" for="fr-or">Origem</label>
+      <select id="fr-or" name="origem" class="gc-campo" onchange="this.form.submit()">
+        <option value="">Todas</option>{% for v in origens %}<option value="{{ v }}"{% if v == origem %} selected{% endif %}>{{ v }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
+  </form>
+  <p class="gc-ajuda">{{ linhas|length }} de {{ total }} pessoas. Origem pelo domínio do e-mail: gridco.com.br é da Grid Co.; o resto é externo.</p>
+  <div class="cad-rolagem">
+    <table class="cad-tabela fr-tabela">
+      <thead><tr><th>Nome no Fracttal</th><th>E-mail</th><th>Código</th><th>Acesso no Fracttal</th><th>Ficha no Nexus</th><th>Vínculo</th><th>Equipe</th><th>Setor</th></tr></thead>
+      <tbody>
+      {% for x in linhas %}
+      <tr>
+        <td>{{ x.nome or '—' }}{% if x.origem != 'Grid Co.' %} <span class="cad-chip cad-chip--operacao" title="{{ x.dominio }}">externo</span>{% endif %}</td>
+        <td><span class="gc-dado">{{ x.email or '—' }}</span></td>
+        <td class="num">{{ x.codigo or '—' }}</td>
+        <td>{% if x.conta_ativa %}{{ x.acesso }}{% else %}<span class="cad-chip cad-chip--alerta">{{ x.acesso }}{% if x.acesso != 'sem acesso' %} · conta inativa{% endif %}</span>{% endif %}</td>
+        <td>{% if x.ficha %}<a href="{{ url_for('torre_pessoas.cad_pessoa', id_=x.ficha.pessoa_id) }}">{{ x.ficha.nome_padrao or x.ficha.nome }}</a>
+          <span class="mudo">· pelo {{ x.por }}</span>{% if x.repetida %} <span class="cad-chip cad-chip--critico">mesma ficha de outra conta</span>{% endif %}
+          {% elif x.ambiguo %}<span class="cad-chip cad-chip--alerta">nome de duas fichas</span>{% else %}<span class="cad-chip cad-chip--info">sem ficha</span>{% endif %}</td>
+        <td>{{ x.ficha.vinculo if x.ficha else '—' }}</td>
+        <td class="fr-curta">{{ x.equipe or '—' }}</td>
+        <td class="mudo fr-curta">a definir</td>
+      </tr>
+      {% else %}<tr><td colspan="8" class="mudo">Ninguém com esses filtros.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="cad-secao" aria-labelledby="fr-sem-conta">
+  <h2 id="fr-sem-conta">Fichas do Nexus sem conta no Fracttal</h2>
+  <p class="gc-ajuda">Quem está na relação do time de campo e não achou conta no Fracttal pelo e-mail nem pelo nome.
+    {% if so_ativas %}Só as fichas com status Ativo: <a href="{{ url_for('torre_base.fracttal', todas_fichas=1, q=q or None, ligacao=ligacao or None, acesso=acesso or None) }}">ver todas ({{ sem_conta_total }})</a>.{% else %}Todas as fichas: <a href="{{ url_for('torre_base.fracttal', q=q or None, ligacao=ligacao or None, acesso=acesso or None) }}">só as ativas</a>.{% endif %}</p>
+  <div class="cad-rolagem">
+    <table class="cad-tabela">
+      <thead><tr><th>Ficha</th><th>Vínculo</th><th>Cargo</th><th>Equipe</th><th>Status</th><th>E-mail na ficha</th></tr></thead>
+      <tbody>
+      {% for f in sem_conta %}
+      <tr>
+        <td><a href="{{ url_for('torre_pessoas.cad_pessoa', id_=f.pessoa_id) }}">{{ f.nome_padrao or f.nome }}</a></td>
+        <td>{{ f.vinculo or '—' }}</td><td>{{ f.cargo or '—' }}</td><td>{{ f.equipe or '—' }}</td>
+        <td>{{ f.status or '—' }}</td><td>{% if f.email %}<span class="gc-dado">{{ f.email }}</span>{% else %}<span class="mudo">sem e-mail</span>{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="mudo">Todas as fichas têm conta no Fracttal.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

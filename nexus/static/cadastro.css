@@ -297,3 +297,5 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 @media (max-width:560px){
   .ace-dar .gc-btn{flex:1 1 100%;justify-content:center}
 }
+/* Base > Integração Fracttal (12/10/2026): equipe e setor numa linha só */
+.fr-tabela td.fr-curta{white-space:nowrap}

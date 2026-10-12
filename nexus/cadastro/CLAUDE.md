@@ -28,6 +28,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `ligacoes.py` + `telas_ligacoes.py` | seção Ligações entre bases, no fim de Base → Governança de dados (até 11/10/2026 era a tela Base → Ligações): lê as bases, mostra os buracos, grava as decisões |
 | `importar.py` | importa o `BD_Operacoes.xlsx` e mostra a prévia do que muda antes de gravar |
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
+| `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Integração Fracttal: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
 Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanham sozinhas.
@@ -136,6 +137,25 @@ Gestor de contrato.
   existirem (a ficha da pessoa com vínculo "Supervisor de Campo"/"Coordenador de Campo" e o e-mail do Fracttal, que é
   como o login acha a pessoa); publicar; o histórico (SCD2) da região da equipe e do supervisor da região ainda não
   existe (o `historico.py` guarda só pessoa e usina).
+
+## Integração Fracttal (`fracttal_pessoal.py`, `telas_fracttal.py`, `/t/base/fracttal`; 12/10/2026)
+
+Levi: "Temos a relação do time de campo, precisamos da relação do pessoal do fractall e também posteriormente vamos
+precisar relacionar os setores, mas não tenho uma base em mãos agora para setores". O cadastro de pessoas é a "Relação
+Geral Colaboradores" (o time de campo: 124 colaboradores de campo e 10 supervisores em 12/10); o Fracttal tem o pessoal
+inteiro. A tela põe as 150 pessoas do Fracttal (o `personnel`, 2 pedidos de 100, guardados por 1 hora; "Ler o Fracttal
+de novo" força) ao lado das fichas, pelo **critério do login** (`visao.pessoa_do_login`): o e-mail da ficha ou, sem ele,
+o nome de UMA ficha (completo, primeiro e último, ou o do e-mail); nome de duas fichas não liga, e a mesma ficha para
+duas contas fica marcada. Mostra também as fichas sem conta no Fracttal (as ativas; "ver todas" inclui desligado e sem
+status). **Medido em 12/10:** 150 no Fracttal (90 administradores, 54 de leitura, 6 sem acesso), 62 com ficha, 88 sem
+ficha, 72 fichas sem conta (19 ativas). 1ª visita 2,5 s; depois, 0,02 s. **Origem** pelo domínio do e-mail
+(`DOMINIOS_GRID`: gridco.com.br e gridco.com): das 88 sem ficha, 45 são da Grid Co. (o escritório: PCM, COS, engenharia,
+gestão; a falta de verdade) e 43 externas (clientes com acesso de leitura, pelo domínio da empresa deles, e
+e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
+- **Setor:** o Fracttal não diz o setor de ninguém (grupo 1, grupo 2 e campos próprios vazios nas 150): a coluna fica
+  "a definir" até haver a base. Quando vier, guardar a relação por ID (`id_personnel` -> `pessoa_id` e setor), não por
+  nome (ver `nexus/dados/CLAUDE.md` antes de pôr no banco).
+- **Só administrador** (nome e e-mail de todo o pessoal); nada vai ao banco. Prova: `tests/test_base_fracttal.py`.
 
 ## No banco (PostgreSQL): `banco.py`
 

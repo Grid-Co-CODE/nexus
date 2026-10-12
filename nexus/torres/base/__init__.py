@@ -9,6 +9,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
 """
 from ...auth.telas_acessos import registrar_acessos
 from ...cadastro.telas import registrar_base
+from ...cadastro.telas_fracttal import registrar_fracttal
 from ...cadastro.telas_ligacoes import registrar_ligacoes
 from ...dados.telas import registrar_governanca
 from ..modelo import Tela, Torre
@@ -48,9 +49,11 @@ TORRE = Torre(
         Tela("qualidade", "Qualidade do cadastro",
              "O que o Excel deixava passar calado?",
              "Cadastro do Nexus"),
+        # Integração Fracttal (12/10/2026, Levi: "precisamos da relação do pessoal do fractall"): o pessoal do Fracttal
+        # ao lado do cadastro de pessoas. A view mora em nexus/cadastro/telas_fracttal.py; só administrador.
         Tela("fracttal", "Integração Fracttal",
-             "A cópia local do Fracttal está em dia?",
-             "API do Fracttal"),
+             "Quem do pessoal do Fracttal está no cadastro do Nexus, e quem falta?",
+             "API do Fracttal (pessoal) e o cadastro de pessoas do Nexus, só administrador"),
         # Porta única (09/10/2026): o /tokens da Plataforma de Performance (as chaves de SunOp, Axis e Plataforma) numa
         # moldura; só administrador do Nexus (spec 5.3). A view sai do mapa (nexus/performance/porta.py).
         Tela("chaves-fontes", "Chaves das fontes",
@@ -92,6 +95,7 @@ TORRE = Torre(
 
 bp = TORRE.criar_blueprint(__name__)
 registrar_base(bp)
+registrar_fracttal(bp)
 registrar_ligacoes(bp)
 registrar_governanca(bp)
 registrar_acessos(bp)
