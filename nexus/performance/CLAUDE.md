@@ -47,6 +47,15 @@ navegador fala com cada sistema.
   `nexus/static/porta.js`. A página traz o formulário escondido (alvo = a moldura; o `porta.js` o envia ao carregar; sem
   JavaScript, o botão "Abrir") e sai com `Cache-Control: no-store` (o passe vale 60 s e uma vez: voltar pelo navegador
   gera outro). A plataforma confere, abre a sessão DELA (12 h) e responde 303 para a tela, no modo Nexus.
+- **Os responsáveis para a Visão gerencial (12/10/2026**, Levi: "Quero um filtro de responsável -> Visão gerencial"): a
+  tela da plataforma pede `{tipo: "nexus:pede-responsaveis"}` e o `porta.js` responde à moldura (só ela, só a mesma
+  origem) `{tipo: "nexus:responsaveis", mapa}`, com o mapa que a página trouxe em `dados.responsaveis`
+  (`responsaveis.do_cadastro()`: o cadastro decifrado aqui + o de-para publicado `cadastro_nexus · de_para`, 10 min de
+  cache; `None` sem a NEXUS_CHAVE_CADASTRO). Chave do nome = `responsaveis.chave` (sem acento, minúsculo, pontuação vira
+  espaço, romano vira número), a MESMA do `_chaveUsina` do gerencial.html da plataforma. Nome que alcança duas usinas só
+  entra se elas têm os mesmos responsáveis (a "Primavera" da planilha = Primavera 1 e 2). Medido em 12/10: 140 de 161
+  usinas do Gerencial casam. O nome da pessoa não sai do Nexus por outro caminho: nem banco, nem plataforma.
+  Teste: `tests/test_responsaveis_gerencial.py`.
 - **O endereço acompanha:** a página da plataforma, em modo Nexus, manda `postMessage({tipo: "nexus:rota", caminho})` a
   cada troca de caminho. O `porta.js` só aceita o aviso da própria moldura e da origem da plataforma; troca o endereço
   (`history.replaceState`: o item dono do caminho, com `?p=` quando não é a entrada padrão dele), acende o item no menu e

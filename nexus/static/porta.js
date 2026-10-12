@@ -172,6 +172,13 @@
     if (!moldura || ev.source !== moldura.contentWindow || ev.origin !== origem) return;
     var d = ev.data;
     if (d && d.tipo === "nexus:sessao-vencida") { reabrir(d.caminho); return; }
+    // a Visão gerencial pede os responsáveis de cada usina para o filtro dela (12/10/2026): o nome da pessoa só existe
+    // aqui no Nexus; vai só para a moldura, da mesma origem (os dois testes acima)
+    if (d && d.tipo === "nexus:pede-responsaveis") {
+      try { moldura.contentWindow.postMessage({tipo: "nexus:responsaveis", mapa: dados.responsaveis || null}, origem); }
+      catch (e) { /* a moldura saiu do ar no meio */ }
+      return;
+    }
     if (!d || d.tipo !== "nexus:rota" || !caminhoAceito(d.caminho)) return;
     var tela = telaDoCaminho(dados.telas || [], d.caminho);
     if (!tela) return;                       // fora do mapa (o login da plataforma, por exemplo): o endereço fica

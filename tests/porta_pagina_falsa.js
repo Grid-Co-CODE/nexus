@@ -22,7 +22,7 @@ const vm = require("vm");
 
 const [arquivo, textoCfg] = process.argv.slice(2);
 const cfg = JSON.parse(textoCfg);
-const feito = {envios: 0, passes: [], pedidos: [], corpos: [], alerta: null, foiPara: null, entrarDeNovo: null,
+const feito = {envios: 0, passes: [], pedidos: [], corpos: [], alerta: null, foiPara: null, entrarDeNovo: null, respostas: [],
                enderecos: []};
 
 const ouvintes = {janela: {}, documento: {}, moldura: {}};
@@ -52,7 +52,8 @@ if (cfg.modo === "sair") {
   els["porta-dados"] = elemento("porta-dados", {textContent: JSON.stringify(cfg.dados || {})});
   els["porta-alerta"] = elemento("porta-alerta");
   if (cfg.moldura) {
-    els["porta-moldura"] = elemento("porta-moldura", {contentWindow: {document: {addEventListener: ouvir("moldura")}}});
+    els["porta-moldura"] = elemento("porta-moldura", {contentWindow: {document: {addEventListener: ouvir("moldura")},
+      postMessage: function (m, origem) { feito.respostas.push({mensagem: m, origem: origem}); }}});
     els["porta-passe"] = elemento("porta-passe", {
       submit: function () { feito.envios++; feito.passes.push(campoPasse.value); },
       querySelector: function (sel) { return sel.indexOf("passe") >= 0 ? campoPasse : null; }});

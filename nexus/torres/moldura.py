@@ -145,7 +145,20 @@ def _dados_do_navegador(t, estado: dict, destino: str | None, passe_lista: str |
         # na TV, quando a sessão de quem a abriu vence (epoch em s; 0 = sem prazo conhecido): o porta.js mostra o aviso
         # fixo na última meia hora
         "sessao_vence": prazo["vence"] if prazo else 0,
+        # os responsáveis de cada usina, para o filtro da Visão gerencial (12/10/2026): o nome da pessoa só existe
+        # decifrado aqui; a moldura o entrega quando a tela pede (nexus:pede-responsaveis, ver porta.js). Vai em toda
+        # moldura porque a Visão gerencial também se abre por dentro de outra tela.
+        "responsaveis": _responsaveis(),
     }
+
+
+def _responsaveis():
+    try:
+        from ..performance import responsaveis
+        return responsaveis.do_cadastro()
+    except Exception as e:                        # noqa: BLE001 — sem o mapa, a Visão gerencial segue sem o filtro
+        current_app.logger.warning("responsáveis para a Visão gerencial: %s", type(e).__name__)
+        return None
 
 
 def _endereco(t, destino: str | None, tv: bool = False) -> str:
