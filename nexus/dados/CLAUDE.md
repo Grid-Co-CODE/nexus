@@ -92,6 +92,15 @@ Campo), pelo `pessoa_id` quando tem ficha (critério do login, `pessoa_ligada_po
 nunca (regra 8). As duas abas vão juntas a cada gravação (gravar sem uma a apagaria), sobre o livro relido do banco na
 hora (leitura que falha não grava). Registrado antes de existir: nasce com o 1º setor criado na tela.
 
+**Meta do mês por usina (12/10/2026):** para a Visão do responsável (Campo · App; Levi: "construa a visão dos
+responsáveis da usina!"), a plataforma publica o Gerencial no livro `nexus_performance · fato_meta_usina_mes`
+(`catalogo.py`, foto acumulada, chave `mes_id` + `usina`): 1 linha = 1 usina do Gerencial × 1 mês, com produção e meta em
+kWh (regra 3: o Gerencial mostra MWh), atingimento, PR e PR previsto, IPOA e os dias cobertos. Quem grava é o worker do
+servidor (`plataforma/gerencial_publicar.py` + `_ger_publicar` no app.py), de hora em hora e só quando o mês muda; o mês
+corrente se refaz até fechar e o anterior até o dia 5. O nome da usina é o do Gerencial (origem: a Visão do responsável
+liga pelo de-para das abas e pelo nome do cadastro, na hora). Sem pessoa nem texto livre (o motivo do PR sem confiança
+fica de fora). Registrado antes de existir: nasce na 1ª volta do worker depois do deploy da plataforma.
+
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da
 ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) e gravadas por

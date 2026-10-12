@@ -27,6 +27,7 @@ RESUMO = {
     # ── Performance ──
     "decisao_cobertura": "Que usina de cada fonte entra no tempo real, decidido pela tela",
     "decisao_depara": "Como cada usina e inversor de cada fonte liga ao cadastro",
+    "meta_usina_mes": "Quanto cada usina gerou no mês contra a meta, pelo Gerencial",
     # ── Base ──
     "decisao_setor": "O setor de cada pessoa do Fracttal, escolhido na tela",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
@@ -73,6 +74,9 @@ PARA_QUE = {
     "decisao_cobertura": "Guarda cada decisão de incluir ou tirar uma usina de uma fonte do tempo real, tomada por um "
                          "administrador na tela Fontes do tempo real. A Plataforma de Performance lê esta tabela e só "
                          "coleta e mostra as usinas incluídas; usina nova numa fonte espera a liberação.",
+    "meta_usina_mes": "Guarda, para cada usina e cada mês, a produção, a meta até os dias cobertos, o atingimento e o "
+                      "PR contra o PR previsto, os mesmos números da Visão gerencial da plataforma. É de onde a Visão "
+                      "do responsável do Nexus tira a meta do mês de cada usina.",
     "decisao_depara": "Guarda cada decisão de ligar uma usina ou um inversor de uma fonte ao cadastro, tomada por um "
                       "administrador na tela De-para de equipamentos (quando a fonte renomeia a usina ou não dá nome ao "
                       "inversor). A Plataforma de Performance lê esta tabela e ela vence o de-para escrito no código.",

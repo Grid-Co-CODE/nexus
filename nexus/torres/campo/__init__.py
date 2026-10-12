@@ -18,6 +18,7 @@ from werkzeug.datastructures import ImmutableMultiDict
 
 from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
+from ...campo import responsaveis as campo_resp
 from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
@@ -35,6 +36,10 @@ TORRE = Torre(
     icone="hard-hat",
     descricao="Visão do Nexus sobre o campo: aprovação, PT, rondas, zeladoria e qualidade.",
     telas=[
+        # A tela dos supervisores (Levi, 12/10/2026: "construa a visão dos responsáveis da usina!"): a 1ª do Campo
+        Tela("responsaveis", "Visão do responsável",
+             "Nas minhas usinas, onde focar primeiro e o que pode esperar?",
+             "Gerencial, Confiabilidade, COS, tickets, rondas e PT, no banco do Nexus"),
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",
@@ -298,6 +303,79 @@ def atencao():
         colunas_kanban=visao.COLUNAS_KANBAN,
         **_papeis(d, (d.get("usinas") or []) + (d.get("pts") or []), regiao_campo, gestor),
         q=request.args.get("q", ""), idade_min=_idade_min))
+
+
+# ── Visão do responsável (12/10/2026) ───────────────────────────────────────────────────────────────────────────
+# Levi: "Precisamos criar uma visão que os supervisores irão usar, uma visão que ele olha as usinas, as metas, os problemas,
+# onde ele deve focar, no que ele deve deixar. No caso seria separado por responsável". A conta mora em
+# nexus/campo/responsaveis.py (cada número da tela dona dele, com a régua de lá); aqui, os filtros e os três blocos.
+GRUPOS_DO_FOCO = (("critico", "Onde focar", "Crítico em alguma fonte, ou PT parada: resolver primeiro."),
+                  ("atencao", "Acompanhar", "Pede atenção, sem urgência."),
+                  ("ok", "Pode esperar", "Nada fora da régua nas fontes que têm dado da usina."))
+# o link de cada área leva à tela dona do número
+TELA_DONA = {"meta": "torre_performance.moldura_gerencial", "disp": "torre_performance.moldura_disponibilidade",
+             "ativos": "torre_engenharia.confiabilidade", "mtta": "torre_cos.moldura_acompanhamento",
+             "pt": "torre_hseq.apr_pt"}
+CAMPOS_DA_BUSCA = ("usina", "cidade", "equipe", "cliente", "uf", "responsavel", "gestor")
+
+
+def _responsavel_do_login(d) -> str:
+    """O Responsável O&M que entrou pelo Fracttal, para o filtro já vir marcado nele (como o Supervisor de Campo e o
+    Gestor nas outras telas do Campo); fica na sessão depois da 1ª conta. Quem não é responsável de nenhuma usina
+    mobilizada (o coordenador, o administrador) abre nos cartões de todos."""
+    if "responsavel_padrao" in session:
+        return session["responsavel_padrao"] or ""
+    pid = papel_da_sessao().get("pessoa_id")
+    if not pid:
+        u = session.get("usuario") or {}
+        if not u.get("email"):
+            return ""
+        try:
+            pid = visao.pessoa_do_login(u.get("email", ""), u.get("nome", ""))
+        except Exception:       # noqa: BLE001 — sem cadastro: abre sem o filtro
+            return ""
+    nome = (d.get("responsaveis_por_pessoa") or {}).get(pid, "")
+    session["responsavel_padrao"] = nome
+    return nome
+
+
+@bp.route("/responsaveis")
+def responsaveis():
+    """Os cartões dos responsáveis (o padrão de quem não é responsável) ou, com um escolhido (no cartão, no filtro, ou o
+    próprio, pelo login), as usinas dele em três blocos: Onde focar, Acompanhar e Pode esperar, e a tabela de todas.
+    Filtros de responsável, cliente e busca; "Todos" vai como "*"."""
+    leitura = campo_resp.visao_responsaveis()
+    d = leitura.dados
+    todas = d.get("usinas") or []
+    pedido = request.args.get("responsavel")
+    if pedido is None:
+        responsavel = "" if leitura.erro else _responsavel_do_login(d)
+    else:
+        responsavel = "" if pedido == TODOS else pedido
+    cliente = request.args.get("cliente", "")
+    q = request.args.get("q", "").strip().lower()
+
+    def passa(u):
+        return ((not cliente or u.get("cliente") == cliente)
+                and (not q or q in " ".join(str(u.get(c) or "") for c in CAMPOS_DA_BUSCA).lower()))
+    base = [u for u in todas if passa(u)]
+    usinas = [u for u in base if not responsavel or (u.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel]
+    modo = request.args.get("modo")
+    if modo not in ("cartoes", "foco"):
+        modo = "foco" if responsavel else "cartoes"
+    nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
+                   key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
+    return render_template("campo/responsaveis.html", **_comum(
+        "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
+        usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
+        grupos=[(g, nome, txt, [u for u in usinas if u["nivel"] == g]) for g, nome, txt in GRUPOS_DO_FOCO],
+        opcoes_responsavel=nomes, opcoes_cliente=sorted({u.get("cliente") for u in todas if u.get("cliente")}),
+        sem_responsavel=visao.SEM_RESPONSAVEL, reguas=campo_resp.REGUAS, rotulo_area=campo_resp.ROTULO_AREA,
+        tela_dona=TELA_DONA, info=d.get("info") or {}, erros=d.get("erros") or {}, mes_id=d.get("mes_id"),
+        limites={"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,
+                 "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO,
+                 "mtta_min": campo_resp.MTTA_ATENCAO_MIN},
+        idade_min=_idade_min))
 
 
 # ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────

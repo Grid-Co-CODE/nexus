@@ -611,3 +611,50 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 .cn-kb-card .kb-st{font:600 12px/16px var(--font-sans)}
 .cn-kb-vazio{margin:0;font-size:12px}
 @media (max-width:900px){.cn-kanban{grid-template-columns:1fr}}
+
+/* Visão do responsável (12/10/2026, Levi: "onde ele deve focar, no que ele deve deixar"): os cartões dos responsáveis
+   com a triagem (focar, acompanhar, pode esperar) e, com um escolhido, as usinas dele em três blocos */
+.cr-triagem{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--superficie-3)}
+.cr-triagem .c{background:var(--critico-cheio)}
+.cr-triagem .a{background:var(--alerta-cheio)}
+.cr-triagem .o{background:var(--ok-cheio)}
+.cr-mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px;margin:0;padding-top:10px;
+  border-top:1px solid var(--linha)}
+.cr-mini > div{min-width:0}
+.cr-mini dt{font-size:11.5px;color:var(--mudo)}
+.cr-mini dd{margin:2px 0 0;font:600 15px/20px var(--font-sans);font-variant-numeric:tabular-nums}
+.cr-mini small{font-size:11.5px;font-weight:500}
+.cr-pior{font-size:12px;color:var(--tinta-2)}
+.cr-grupo{margin-top:26px}
+.cr-grupo h2{display:flex;align-items:center;gap:8px}
+.cr-n{font-variant-numeric:tabular-nums}
+.cr-usinas{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-top:10px}
+.cr-usina{display:grid;gap:10px;align-content:start;min-width:0;padding:14px 16px;background:var(--superficie);
+  border:1px solid var(--linha);border-left:4px solid var(--linha-forte);border-radius:var(--raio-md)}
+.cr-usina--critico{border-left-color:var(--critico-cheio)}
+.cr-usina--alerta{border-left-color:var(--alerta-cheio)}
+.cr-usina header{display:grid;gap:2px}
+.cr-usina header b{font:700 16px/1.3 var(--font-display)}
+.cr-usina header .mudo{font-size:12px}
+.cr-alertas{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.cr-al{display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:10px;align-items:start;font-size:13px}
+.cr-al .t{min-width:0}
+.cr-al .det{display:block;color:var(--mudo);font-size:12px;margin-top:1px}
+.cr-it{display:block;font-size:12px;margin-top:2px}
+.cr-bem{margin:0;font-size:12px;color:var(--tinta-2)}
+.cr-espera{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.cr-espera li{display:grid;grid-template-columns:minmax(160px,220px) minmax(140px,260px) minmax(0,1fr);gap:12px;
+  align-items:baseline;font-size:13px;padding:9px 14px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md)}
+.cr-espera li.cr-vazio{display:block}
+.cr-vazio{margin:0}
+.cn-tab td.cr-nome{text-align:left;white-space:nowrap}
+.cr-reguas{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:10px 0}
+.cr-reguas dt{color:var(--tinta);font-weight:600}
+.cr-reguas dd{margin:0}
+@media (max-width:700px){
+  .cr-usinas,.cr-reguas{grid-template-columns:minmax(0,1fr)}
+  .cr-al{grid-template-columns:minmax(0,1fr)}
+  .cr-espera li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .cr-mini{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

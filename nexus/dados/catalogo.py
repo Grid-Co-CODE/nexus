@@ -381,6 +381,31 @@ FATOS = (
          tipo="snapshot_periodico", chave=("usina", "dia", "equipamento", "parcela"),
          medidas=_m((("perda_kwh", "kWh", "aditiva"),)), fontes=("gemeo_digital · perda_dia",),
          observacao="o tracker e o inversor do gêmeo já têm apelido na dimensão de equipamento (Gêmeo · equipamento)"),
+    # ── Meta do mês por usina (Gerencial da plataforma) ────────────────────────────────────────────────────────────
+    # Visão do responsável (12/10/2026, Levi: "construa a visão dos responsáveis da usina!"): a meta do mês de cada usina
+    # sai do Gerencial da plataforma, a MESMA conta da Visão gerencial (`_gerencial_payload`), publicada pelo worker do
+    # servidor de hora em hora e só quando muda (plataforma/gerencial_publicar.py). O Nexus só lê (Campo · App > Visão
+    # do responsável), ligando o nome à usina do cadastro na hora.
+    Fato("meta_usina_mes", "Meta do mês por usina (Gerencial)", "performance",
+         "nexus_performance · fato_meta_usina_mes",
+         "1 linha = 1 usina do Gerencial (a aba do BD ou a carteira do banco da Thopen) × 1 mês",
+         _d(data=("cod", "mes_id (AAAAMM)"),
+            usina=("nome", "usina (nome do Gerencial); a Visão do responsável liga pelo de_para das abas (BD_Thopen · "
+                           "aba, BD_Performance · aba e as duas de cadastro) e, sem ele, pelo nome do cadastro"),
+            cliente=("nome", "cliente, carteira")),
+         tipo="snapshot_acumulado", chave=("mes_id", "usina"),
+         medidas=_m((("prod_kwh", "kWh", "aditiva"), ("meta_kwh", "kWh", "aditiva"), ("atingimento_pct", "%", "nao"),
+                     ("pr_pct", "%", "nao"), ("pr_meta_pct", "%", "nao"), ("ipoa_kwh_m2", "kWh/m²", "semi"),
+                     ("ipoa_meta_kwh_m2", "kWh/m²", "semi"), ("dias_cobertos_qtd", "qtd", "nao"),
+                     ("dias_mes_qtd", "qtd", "nao"), ("meta_dias_qtd", "qtd", "nao"), ("full_om", "1/0", "nao"))),
+         fontes=("nexus_performance · fato_meta_usina_mes",),
+         janela_origem="os meses publicados desde 10/2026: o corrente se refaz de hora em hora e o anterior até o dia "
+                       "5; os outros ficam como foram publicados",
+         observacao="a meta é a do mês até os dias cobertos (o Gerencial prorrateia: atingimento = produção ÷ meta). "
+                    "fonte = de onde veio a produção (pg = banco da Thopen, bd = BD_Performance); meta_fonte = de onde "
+                    "veio a meta (BD_Thopen, Info Mensal ou o P50 anual ÷ 12). A energia vai em kWh (o Gerencial mostra "
+                    "MWh com 1 casa). O motivo do PR sem confiança (texto) fica de fora (regra 8). Grava só o worker do "
+                    "servidor (Linux); GER_PUBLICAR=1 força numa máquina"),
     # ── Tickets ────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("ticket", "Ticket de performance", "chamados",
          "tickets_performance · Tickets de Performance, Trackers, Strings indisp", "1 linha = 1 ticket",
@@ -479,6 +504,11 @@ LIVROS = (
           "plataforma/depara.py (PerformancePainel), pela tela /admin/de-para da plataforma", True,
           "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
           "no PC e no servidor"),
+    Livro("nexus_performance", ("fato_meta_usina_mes",), "de hora em hora, e só quando o mês muda",
+          "plataforma/gerencial_publicar.py (worker do servidor, `_ger_publicar` no app.py)", False,
+          "registrado em 12/10/2026 antes de existir: nasce na 1ª volta do worker do servidor depois do deploy da "
+          "plataforma (10 min depois de subir). A Visão do responsável do Nexus lê; sem o livro, ela diz que a meta "
+          "ainda não chegou"),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "

@@ -2,8 +2,9 @@
 referenciar o Azure e ter uma visão nossa!")."""
 from nexus.torres import descobrir_torres
 
-# Ordens de serviço ("os"), Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "são redundantes")
-NOSSAS = ("atencao", "aprovacao", "rondas", "zeladoria", "triagem")
+# Ordens de serviço ("os"), Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "são redundantes"); a Visão do
+# responsável entrou em 12/10/2026, a 1ª do Campo
+NOSSAS = ("responsaveis", "atencao", "aprovacao", "rondas", "zeladoria", "triagem")
 
 
 def _campo():
