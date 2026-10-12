@@ -44,7 +44,8 @@ plataforma) é outra tela e continua. A **Torre de controle** seria o painel das
 cadência, prazo e quem marca (gerar e publicar a semana toda sexta, inspeções semanais da GreenYellow toda quinta, subir
 as preventivas do mês seguinte, relatório mensal aos clientes no 5º dia útil, fechamento de KPIs, auditoria do Fracttal,
 MPS do semestre, MPA do ano, nova usina e saída de contrato...), e a página HTML de lá marcava o feito num `estado.json`
-que nunca recebeu marca (vazio desde 17/08).
+que nunca recebeu marca (vazio desde 17/08). **Não montar por enquanto** (Levi, 11/10/2026: "Não acho que valha a pena
+montar essa torre agora, vou falar com o time de PCM"): a tela segue placeholder no menu até ele decidir.
 
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
