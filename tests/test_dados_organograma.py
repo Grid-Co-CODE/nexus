@@ -286,8 +286,8 @@ def test_o_cartao_diz_onde_o_fato_mora_e_quem_grava(tela):
     assert "fechamentos_app_campo" in c and "grava: App de Campo" in c
     assert "→ nexus_fatos" in c and "grava: Nexus<" in c and "nexus/dados/carga.py" not in c
     assert _esc(catalogo.LIVRO_POR_NOME["nexus_fatos"].quem_grava) in _template(html, "fechamento")
-    # montado: o destino registrado, ainda sem gravar
-    assert "vai para nexus_geracao" in _cartao(html, "geracao_usina_dia")
+    # a geração grava desde 11/10/2026 (decisão 8): o cartão diz para onde e quem grava
+    assert "→ nexus_geracao" in _cartao(html, "geracao_usina_dia") and "grava: Nexus" in _cartao(html, "geracao_usina_dia")
     # de origem, em livro do Nexus
     assert "grava: Nexus<" in _cartao(html, "decisao_pt")
     det = _template(html, "decisao_pt")
@@ -372,7 +372,8 @@ def test_o_detalhe_mostra_a_qualidade_da_ultima_carga(tela, app):
     # fato sem linha na qualidade diz por quê, sem barra inventada nem coluna de % vazia
     ronda = _template(html, "ronda")
     assert 'class="dd-barra"' not in ronda and "não trouxe esta tabela" in ronda and ">Ligado<" not in ronda
-    assert "Como ainda não grava" in _template(html, "geracao_usina_dia")
+    g = _template(html, "geracao_usina_dia")                       # grava desde 11/10/2026 (decisão 8)
+    assert "Como ainda não grava" not in g and "nexus_geracao" in g
     assert "ainda não monta esta tabela" in _template(html, "ticket")
     assert "A qualidade da ligação é medida em Ronda" in _template(html, "ronda_avulsa")
     # a raiz diz a hora e a máquina da última carga

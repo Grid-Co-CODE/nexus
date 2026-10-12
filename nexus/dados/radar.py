@@ -32,7 +32,7 @@ def classificar(abas: dict) -> dict:
         t = {"livro": livro, "aba": aba, "linhas": meta.get("row_count"), "colunas": meta.get("column_count"),
              "oculta": (meta.get("visibility") or "visible") != "visible"}
         c = catalogo.conhecida(livro, aba)
-        if (livro, aba) in pares:
+        if (livro, aba) in pares or catalogo.da_familia(livro, aba):
             out["fato"].append(t)
         elif c is not None:
             out["conhecida"].append(dict(t, papel=c.papel, motivo=c.motivo))
