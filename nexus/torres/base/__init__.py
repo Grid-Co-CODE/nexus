@@ -52,8 +52,8 @@ TORRE = Torre(
         # Integração Fracttal (12/10/2026, Levi: "precisamos da relação do pessoal do fractall"): o pessoal do Fracttal
         # ao lado do cadastro de pessoas. A view mora em nexus/cadastro/telas_fracttal.py; só administrador.
         Tela("fracttal", "Integração Fracttal",
-             "Quem do pessoal do Fracttal está no cadastro do Nexus, e quem falta?",
-             "API do Fracttal (pessoal) e o cadastro de pessoas do Nexus, só administrador"),
+             "Quem do pessoal do Fracttal está no cadastro do Nexus, quem falta e o setor de cada um?",
+             "API do Fracttal (pessoal), o cadastro de pessoas do Nexus e o livro nexus_setores; só administrador"),
         # Porta única (09/10/2026): o /tokens da Plataforma de Performance (as chaves de SunOp, Axis e Plataforma) numa
         # moldura; só administrador do Nexus (spec 5.3). A view sai do mapa (nexus/performance/porta.py).
         Tela("chaves-fontes", "Chaves das fontes",

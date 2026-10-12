@@ -299,3 +299,52 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 }
 /* Base > Integração Fracttal (12/10/2026): equipe e setor numa linha só */
 .fr-tabela td.fr-curta{white-space:nowrap}
+.fr-tabela td{vertical-align:middle}
+.fr-tabela .gc-dado{font-size:12px}
+/* O "Como liga" virou a dica do (!) ao lado do botão (Levi: "invés de botar um texto ridículo de gigante"): aparece
+   ao passar o mouse e no foco do teclado (no celular, o toque foca); Esc fecha. Sem transição (Windows sem animação). */
+.fr-acoes{display:flex;align-items:center;gap:8px}
+.fr-dica{position:relative;display:inline-flex}
+.fr-dica-botao{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;
+  border:1px solid var(--linha-forte);border-radius:50%;background:var(--superficie);color:var(--mudo);font-size:18px;
+  cursor:help}
+.fr-dica-botao:hover,.fr-dica-botao:focus-visible{color:var(--tinta);border-color:var(--foco);outline:none}
+.fr-dica-texto{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:min(380px,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--superficie);
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 12px 32px var(--sombra);
+  font-size:12px;line-height:18px;color:var(--tinta-2);visibility:hidden}
+.fr-dica:hover .fr-dica-texto,.fr-dica:focus-within .fr-dica-texto{visibility:visible}
+.fr-dica-texto strong{color:var(--tinta)}
+/* o setor: escolher na linha (grava sem recarregar), marcar várias e aplicar pela barra, a lista no painel Setores */
+.fr-marca{width:34px;text-align:center}
+.fr-marca input{accent-color:var(--verde);width:15px;height:15px;cursor:pointer}
+.fr-form-setor{display:flex;align-items:center;gap:6px;margin:0}
+.fr-setor-sel.gc-campo{min-width:120px;max-width:180px;padding-top:4px;padding-bottom:4px;font-size:12px}
+.fr-setor-sel.gc-campo.fr-sel--ok{border-color:var(--verde)}
+.fr-setor-sel.gc-campo.fr-sel--erro{border-color:var(--critico)}
+/* o resultado de cada gravação: no canto de cima, longe da barra das marcadas (que fica embaixo) */
+.fr-toast{position:fixed;right:24px;top:calc(var(--topo) + 16px);z-index:40;max-width:min(420px,calc(100vw - 32px));
+  padding:10px 14px;border:1px solid var(--linha-forte);border-radius:var(--raio-md);background:var(--superficie);
+  box-shadow:0 12px 32px var(--sombra);font-size:13px;line-height:18px;color:var(--tinta)}
+.fr-toast[hidden]{display:none}
+.fr-toast--ok{border-color:var(--verde-a35);border-left:4px solid var(--verde)}
+.fr-toast--erro{border-color:var(--critico-a45);border-left:4px solid var(--critico)}
+.fr-lote{position:sticky;bottom:12px;z-index:15;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:10px 0 16px;padding:10px 14px;background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);box-shadow:0 8px 24px var(--sombra)}
+.fr-lote[hidden]{display:none}
+.fr-lote .gc-rotulo{margin:0}
+.fr-lote-conta{font-size:13px;color:var(--tinta-2);margin-right:4px}
+.fr-lote-conta b{color:var(--tinta)}
+.fr-setores-painel{width:min(560px,100%);gap:8px}
+.fr-setor-linha{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
+.fr-setor-linha .gc-campo{flex:1 1 180px;min-width:0}
+.fr-setor-n{font-size:12px;color:var(--mudo);white-space:nowrap;min-width:76px}
+.fr-setor-vazio{margin:0;font-size:12px}
+.fr-secao{margin-top:20px}
+.fr-corpo{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.fr-corpo .gc-ajuda{margin:0}
+@media (max-width:560px){
+  .fr-acoes{width:100%}
+  .fr-acoes .gc-btn{flex:1 1 auto;justify-content:center}
+}

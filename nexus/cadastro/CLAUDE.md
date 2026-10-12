@@ -29,6 +29,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `importar.py` | importa o `BD_Operacoes.xlsx` e mostra a prévia do que muda antes de gravar |
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Integração Fracttal: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
+| `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
 Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanham sozinhas.
@@ -152,10 +153,24 @@ ficha, 72 fichas sem conta (19 ativas). 1ª visita 2,5 s; depois, 0,02 s. **Orig
 (`DOMINIOS_GRID`: gridco.com.br e gridco.com): das 88 sem ficha, 45 são da Grid Co. (o escritório: PCM, COS, engenharia,
 gestão; a falta de verdade) e 43 externas (clientes com acesso de leitura, pelo domínio da empresa deles, e
 e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
-- **Setor:** o Fracttal não diz o setor de ninguém (grupo 1, grupo 2 e campos próprios vazios nas 150): a coluna fica
-  "a definir" até haver a base. Quando vier, guardar a relação por ID (`id_personnel` -> `pessoa_id` e setor), não por
-  nome (ver `nexus/dados/CLAUDE.md` antes de pôr no banco).
-- **Só administrador** (nome e e-mail de todo o pessoal); nada vai ao banco. Prova: `tests/test_base_fracttal.py`.
+- **Setor** (`setores.py`; Levi, 12/10: "Como faço para definir um setor???? tem que dar possibilidade"): o Fracttal
+  não diz o setor de ninguém (grupo 1, grupo 2 e campos próprios vazios nas 150) e não há base, então a lista nasce na
+  tela. Botão **Setores** (ao lado da contagem): criar, renomear, excluir (só setor sem ninguém; o ID do excluído não
+  volta). Na linha, a caixa Setor grava na hora, sem recarregar (fetch; o resultado no aviso do canto e na borda da
+  caixa: texto na linha mudava a largura da coluna); marcar várias abre a barra "Pôr no setor" embaixo. Filtro Setor (com
+  "Sem setor") e a busca acham pelo nome do setor. Grava no livro **`nexus_setores`** (`dim_setor` + `fato_decisao_setor`,
+  só acrescenta, vale a última decisão de cada pessoa; regras em `nexus/dados/CLAUDE.md`, "Setor do pessoal"): a pessoa
+  pelo `fracttal_id` (id_personnel), a ficha (`pessoa_id`, `pessoa_ligada_por`) e o código do e-mail, **nunca nome nem
+  e-mail**. Antes de gravar, relê o livro do banco; leitura que falha não grava (gravaria por cima). POST só da própria
+  página (`_de_outro_site`) e só administrador. Sem `GRIDCO_SQL_TOKEN` ou com o banco fora, a tela avisa e a caixa
+  fica só para ver. O livro nasce com o 1º setor criado (registrado no catálogo antes).
+- **Desenho (12/10, Levi):** sem o título "Pessoal do Fracttal" ("não serve de nada"; os filtros saíram do cartão, como
+  na lista de Colaboradores), sem a coluna Código e o "Como liga" virou a dica do (!) ao lado de "Ler o Fracttal de
+  novo" (passar o mouse ou focar; Esc fecha).
+- **Só administrador** (nome e e-mail de todo o pessoal ficam na tela e na memória, nunca no banco). Prova:
+  `tests/test_base_fracttal.py` (a ligação, o setor no banco falso, as recusas, a tela e o catálogo). Conferido em
+  12/10 numa cópia com o banco e o Fracttal reais e o livro dos setores num arquivo local (6 setores, 1 pela linha,
+  4 pela barra, filtro, celular).
 
 ## No banco (PostgreSQL): `banco.py`
 

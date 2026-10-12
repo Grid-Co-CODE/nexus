@@ -9,11 +9,11 @@ o MESMO critério do login (`visao.pessoa_do_login`): o e-mail da ficha ou, sem 
 curto ou o do e-mail, "fulana.souza@" -> "fulana souza"); nome que serve a duas fichas não liga. Medido em 12/10: 62 das
 150 ligam, 88 do Fracttal não têm ficha e 72 fichas não têm conta no Fracttal.
 
-Setores: o Fracttal não diz o setor da pessoa (grupo 1, grupo 2 e campos próprios vazios nas 150); a coluna fica "a
-definir" até haver a base.
+Setores: o Fracttal não diz o setor da pessoa (grupo 1, grupo 2 e campos próprios vazios nas 150). A lista de setores
+e o setor de cada pessoa nascem na tela e vão ao banco: `setores.py`.
 
-Só lê o Fracttal (o cliente de `nexus.campo.fracttal`, GET, 100 por página: 2 pedidos) e guarda por 1 hora. Nada vai ao
-banco: nomes e e-mails ficam na memória do servidor e na tela, que é só de administrador.
+Só lê o Fracttal (o cliente de `nexus.campo.fracttal`, GET, 100 por página: 2 pedidos) e guarda por 1 hora. Nomes e
+e-mails não vão ao banco: ficam na memória do servidor e na tela, que é só de administrador.
 """
 import json
 import threading
@@ -53,7 +53,6 @@ def da_api(p: dict) -> dict:
     dominio = email.split("@")[-1] if "@" in email else ""
     return {"id": p.get("id_personnel"), "nome": " ".join(str(p.get("full_name") or p.get("name") or "").split()),
             "email": email,
-            "codigo": str(p.get("code") or "").strip(),
             "acesso": ACESSO.get(acesso.lower(), acesso) if acesso else "sem acesso",
             "conta_ativa": p.get("account_active") is not False and bool(acesso),
             "dominio": dominio, "origem": ORIGENS[0] if dominio in DOMINIOS_GRID else ORIGENS[1]}
@@ -129,7 +128,7 @@ def ligar(pessoal: list[dict], fs: list[dict], nome_equipe: dict | None = None) 
         achados, por = (por_email, "e-mail") if por_email else (por_nome, "nome")
         ficha = achados[0] if len(achados) == 1 else None
         linha = dict(p, ficha=ficha, por=por if ficha else "", ambiguo=len(achados) > 1,
-                     equipe=nome_equipe.get(ficha["equipe_id"], "") if ficha else "", setor="")
+                     equipe=nome_equipe.get(ficha["equipe_id"], "") if ficha else "")
         linhas.append(linha)
         if ficha:
             usadas.setdefault(ficha["pessoa_id"], []).append(linha)
@@ -144,7 +143,9 @@ def ligar(pessoal: list[dict], fs: list[dict], nome_equipe: dict | None = None) 
             "repetidas": sum(1 for x in linhas if x.get("repetida"))}
 
 
-def filtrar(linhas: list[dict], q: str = "", ligacao: str = "", acesso: str = "", origem: str = "") -> list[dict]:
+def filtrar(linhas: list[dict], q: str = "", ligacao: str = "", acesso: str = "", origem: str = "",
+            setor: str = "") -> list[dict]:
+    """`setor`: "" = todos, "sem" = sem setor, ou o setor_id (texto) da linha (`setor_id`, posto pela tela)."""
     termo = _norm(q)
     out = []
     for x in linhas:
@@ -156,7 +157,11 @@ def filtrar(linhas: list[dict], q: str = "", ligacao: str = "", acesso: str = ""
             continue
         if origem and x["origem"] != origem:
             continue
-        if termo and termo not in _norm(" ".join((x["nome"], x["email"], x["codigo"], x["equipe"]))):
+        if setor == "sem" and x.get("setor_id"):
+            continue
+        if setor and setor != "sem" and str(x.get("setor_id") or "") != setor:
+            continue
+        if termo and termo not in _norm(" ".join((x["nome"], x["email"], x["equipe"], x.get("setor") or ""))):
             continue
         out.append(x)
     return out

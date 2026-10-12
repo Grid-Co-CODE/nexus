@@ -3,32 +3,43 @@
 {% block conteudo %}
 {# Base > Integração Fracttal (12/10/2026, Levi: "Temos a relação do time de campo, precisamos da relação do pessoal do
    fractall e também posteriormente vamos precisar relacionar os setores"). O pessoal do Fracttal ao lado do cadastro de
-   pessoas do Nexus, pelo critério do login. Regras em nexus/cadastro/fracttal_pessoal.py; desenho das telas do Cadastro
-   (cad-*). #}
+   pessoas do Nexus, pelo critério do login, e o setor de cada pessoa (no banco: nexus/cadastro/setores.py). Regras da
+   ligação em nexus/cadastro/fracttal_pessoal.py; desenho das telas do Cadastro (cad-*). 12/10, Levi: sem o título da
+   lista ("não serve de nada"), sem a coluna Código, e o "Como liga" vira a dica do (!) ao lado do botão. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 <p class="gc-eyebrow">Base · Integração Fracttal</p>
 <div class="cad-topo">
   <div>
     <h1 class="titulo-pagina">Integração Fracttal</h1>
-    <p class="cad-sub">O pessoal do Fracttal e quem disso está no cadastro de pessoas do Nexus.</p>
+    <p class="cad-sub">O pessoal do Fracttal, quem disso está no cadastro de pessoas do Nexus e o setor de cada um.{% if lido_em %} Fracttal lido em {{ lido_em }}.{% endif %}</p>
   </div>
-  <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_base.fracttal', reler=1) }}"><i class="ph ph-arrows-clockwise"></i> Ler o Fracttal de novo</a>
+  <div class="fr-acoes">
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_base.fracttal', reler=1) }}"><i class="ph ph-arrows-clockwise"></i> Ler o Fracttal de novo</a>
+    <span class="fr-dica">
+      <button type="button" class="fr-dica-botao" aria-label="Como esta tela funciona" aria-describedby="fr-dica-texto"><i class="ph ph-warning-circle" aria-hidden="true"></i></button>
+      <span class="fr-dica-texto" id="fr-dica-texto" role="tooltip">
+        <span><strong>Como liga.</strong> Pelo mesmo critério do login do Nexus: o e-mail da ficha ou, sem ele, o nome de
+          uma única ficha (completo, primeiro e último nome, ou o do e-mail). Nome que serve a duas fichas não liga. O
+          cadastro de pessoas é o time de campo: quem é do escritório ainda não tem ficha.</span>
+        <span><strong>Setor.</strong> O Fracttal não diz o setor de ninguém. Crie a lista em Setores e escolha o de cada
+          pessoa na coluna Setor, ou marque várias e aplique de uma vez. Vai para o banco, sem nome nem e-mail.</span>
+        <span><strong>Leitura.</strong> O Fracttal fica guardado por 1 hora; o botão ao lado lê de novo.</span>
+      </span>
+    </span>
+  </div>
 </div>
 
+{% if aviso %}<div class="cad-aviso cad-aviso--{{ aviso.tom }}" role="status"><i class="ph ph-{{ 'check-circle' if aviso.tom == 'ok' else 'x-circle' }}"></i><div>{{ aviso.texto }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--{{ 'alerta' if velha else 'critico' }}" role="alert"><i class="ph ph-plugs"></i><div>
   <strong>{{ 'Mostrando a última leitura boa.' if velha else 'Não consegui ler o Fracttal.' }}</strong> {{ erro }}</div></div>{% endif %}
 {% if erro_cadastro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler o cadastro de pessoas do banco.</strong>
   {{ erro_cadastro }}. A lista do Fracttal aparece, sem a ligação com as fichas.</div></div>{% endif %}
 {% if sem_chave %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a chave do cadastro.</strong>
   Os nomes e e-mails das fichas vão cifrados no banco; sem a <span class="gc-dado">NEXUS_CHAVE_CADASTRO</span> nenhuma pessoa do Fracttal liga a uma ficha.</div></div>{% endif %}
-
-<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>
-  <strong>Como liga.</strong> Pelo mesmo critério do login do Nexus: o e-mail da ficha ou, sem ele, o nome de uma única
-  ficha (completo, primeiro e último nome, ou o do e-mail). Nome que serve a duas fichas não liga. O cadastro de pessoas
-  é a relação do time de campo (Pessoas · Colaboradores Operação); quem é do escritório (PCM, COS, engenharia, gestão)
-  ainda não tem ficha. <strong>Setor</strong>: o Fracttal não diz o setor de ninguém; a coluna fica a definir até haver a base.
-  {% if lido_em %}Fracttal lido em {{ lido_em }} (guardado por 1 hora).{% endif %}
-</div></div>
+{% if erro_setores %}<div class="cad-aviso cad-aviso--{{ 'alerta' if setores_velha else 'critico' }}" role="alert"><i class="ph ph-database"></i><div>
+  <strong>{{ 'Setores da última leitura boa; para gravar, a leitura precisa voltar.' if setores_velha else 'Não consegui ler os setores do banco: o setor fica só para ver.' }}</strong> {{ erro_setores }}</div></div>
+{% elif sem_token %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Este Nexus não grava no banco.</strong>
+  Sem a <span class="gc-dado">GRIDCO_SQL_TOKEN</span>, o setor fica só para ver.</div></div>{% endif %}
 
 <div class="cad-numeros">
   <div><div class="r">No Fracttal</div><div class="v">{{ total }}</div><div class="d">{{ admins }} administradores · {{ leitura }} de leitura · {{ sem_acesso }} sem acesso</div></div>
@@ -37,74 +48,196 @@
   <div><div class="r">Fichas sem conta no Fracttal</div><div class="v">{{ sem_conta_total }}</div><div class="d">do cadastro de pessoas</div></div>
 </div>
 
-<section class="cad-secao" aria-labelledby="fr-pessoal">
-  <h2 id="fr-pessoal">Pessoal do Fracttal</h2>
-  <form class="cad-filtros" method="get">
-    <div class="campo busca">
-      <label class="gc-rotulo" for="fr-q">Buscar</label>
-      <input id="fr-q" name="q" class="gc-campo" value="{{ q }}" placeholder="Nome, e-mail, código ou equipe" autocomplete="off">
+<form class="cad-filtros" method="get">
+  <div class="campo busca">
+    <label class="gc-rotulo" for="fr-q">Buscar</label>
+    <input id="fr-q" name="q" class="gc-campo" value="{{ q }}" placeholder="Nome, e-mail, equipe ou setor" autocomplete="off">
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="fr-lig">No Nexus</label>
+    <select id="fr-lig" name="ligacao" class="gc-campo" onchange="this.form.submit()">
+      {% for v, rot in ligacoes %}<option value="{{ v }}"{% if v == ligacao %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="fr-ac">Acesso no Fracttal</label>
+    <select id="fr-ac" name="acesso" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for v in acessos %}<option value="{{ v }}"{% if v == acesso %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="fr-or">Origem</label>
+    <select id="fr-or" name="origem" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for v in origens %}<option value="{{ v }}"{% if v == origem %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="fr-se">Setor</label>
+    <select id="fr-se" name="setor" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      <option value="sem"{% if setor == 'sem' %} selected{% endif %}>Sem setor ({{ sem_setor }})</option>
+      {% for s in setores %}<option value="{{ s.setor_id }}"{% if setor == s.setor_id|string %} selected{% endif %}>{{ s.nome }} ({{ s.n }})</option>{% endfor %}
+    </select>
+  </div>
+  {% if not so_ativas %}<input type="hidden" name="todas_fichas" value="1">{% endif %}
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
+  {% if q or ligacao or acesso or origem or setor %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ url_for('torre_base.fracttal') }}">Limpar</a>{% endif %}
+</form>
+
+<div class="cad-barra-tabela">
+  <p class="cad-conta"><span class="gc-num">{{ linhas|length }}</span> de <span class="gc-num">{{ total }}</span> pessoas · <span class="gc-num">{{ sem_setor }}</span> sem setor. Origem pelo domínio do e-mail: gridco.com.br é da Grid Co.; o resto é externo.</p>
+  <details class="cad-colunas fr-setores" id="fr-setores"{% if abrir_setores %} open{% endif %}>
+    <summary class="gc-btn gc-btn--ui gc-btn--contorno"><i class="ph ph-tag"></i> Setores ({{ setores|length }})</summary>
+    <div class="cad-colunas-painel fr-setores-painel">
+      <p class="gc-ajuda">A lista de setores da casa. Excluir só vale para setor sem ninguém.</p>
+      {% for s in setores %}
+      <form method="post" action="{{ url_for('torre_base.fracttal_setores') }}" class="fr-setor-linha">
+        <input type="hidden" name="volta" value="{{ volta }}"><input type="hidden" name="setor_id" value="{{ s.setor_id }}">
+        <input class="gc-campo" name="nome" value="{{ s.nome }}" maxlength="60" required aria-label="Nome do setor {{ s.nome }}"{% if not pode_gravar_setor %} disabled{% endif %}>
+        <span class="fr-setor-n">{{ s.n }} {{ 'pessoa' if s.n == 1 else 'pessoas' }}</span>
+        <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="renomear"{% if not pode_gravar_setor %} disabled{% endif %}>Renomear</button>
+        <button class="gc-btn gc-btn--ui gc-btn--fantasma" type="submit" name="acao" value="excluir" formnovalidate{% if s.n or not pode_gravar_setor %} disabled{% endif %}{% if s.n %} title="Mude o setor {{ 'da pessoa' if s.n == 1 else 'das ' ~ s.n ~ ' pessoas' }} antes"{% endif %}>Excluir</button>
+      </form>
+      {% else %}<p class="mudo fr-setor-vazio">Nenhum setor ainda: crie o primeiro abaixo.</p>{% endfor %}
+      <form method="post" action="{{ url_for('torre_base.fracttal_setores') }}" class="fr-setor-linha">
+        <input type="hidden" name="volta" value="{{ volta }}"><input type="hidden" name="acao" value="criar">
+        <input class="gc-campo" name="nome" maxlength="60" required placeholder="Novo setor" aria-label="Nome do novo setor"{% if not pode_gravar_setor %} disabled{% endif %}>
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not pode_gravar_setor %} disabled{% endif %}><i class="ph ph-plus"></i> Incluir</button>
+      </form>
     </div>
-    <div class="campo">
-      <label class="gc-rotulo" for="fr-lig">No Nexus</label>
-      <select id="fr-lig" name="ligacao" class="gc-campo" onchange="this.form.submit()">
-        {% for v, rot in ligacoes %}<option value="{{ v }}"{% if v == ligacao %} selected{% endif %}>{{ rot }}</option>{% endfor %}
-      </select>
+  </details>
+</div>
+<div class="cad-rolagem">
+  <table class="cad-tabela fr-tabela">
+    <thead><tr>
+      <th class="fr-marca"><input type="checkbox" id="fr-todas" aria-label="Marcar todas as pessoas da lista"{% if not pode_gravar_setor or not setores %} disabled{% endif %}></th>
+      <th>Nome no Fracttal</th><th>E-mail</th><th>Acesso</th><th>Ficha no Nexus</th><th>Vínculo</th><th>Equipe</th><th>Setor</th>
+    </tr></thead>
+    <tbody>
+    {% for x in linhas %}
+    <tr id="p-{{ x.id }}">
+      <td class="fr-marca"><input type="checkbox" class="fr-marcar" name="pessoa" value="{{ x.id }}" form="fr-lote" aria-label="Marcar {{ x.nome }}"{% if not pode_gravar_setor or not setores %} disabled{% endif %}></td>
+      <td>{{ x.nome or '—' }}{% if x.origem != 'Grid Co.' %} <span class="cad-chip cad-chip--operacao" title="{{ x.dominio }}">externo</span>{% endif %}</td>
+      <td><span class="gc-dado">{{ x.email or '—' }}</span></td>
+      <td>{% if x.conta_ativa %}{{ x.acesso }}{% else %}<span class="cad-chip cad-chip--alerta">{{ x.acesso }}{% if x.acesso != 'sem acesso' %} · conta inativa{% endif %}</span>{% endif %}</td>
+      <td>{% if x.ficha %}<a href="{{ url_for('torre_pessoas.cad_pessoa', id_=x.ficha.pessoa_id) }}">{{ x.ficha.nome_padrao or x.ficha.nome }}</a>
+        <span class="mudo">· pelo {{ x.por }}</span>{% if x.repetida %} <span class="cad-chip cad-chip--critico">mesma ficha de outra conta</span>{% endif %}
+        {% elif x.ambiguo %}<span class="cad-chip cad-chip--alerta">nome de duas fichas</span>{% else %}<span class="cad-chip cad-chip--info">sem ficha</span>{% endif %}</td>
+      <td>{{ x.ficha.vinculo if x.ficha else '—' }}</td>
+      <td class="fr-curta">{{ x.equipe or '—' }}</td>
+      <td class="fr-setor">
+        <form method="post" action="{{ url_for('torre_base.fracttal_setor') }}" class="fr-form-setor">
+          <input type="hidden" name="pessoa" value="{{ x.id }}"><input type="hidden" name="volta" value="{{ volta }}">
+          <select name="setor_id" class="gc-campo fr-setor-sel" aria-label="Setor de {{ x.nome }}"{% if not pode_gravar_setor or (not setores and not x.setor_id) %} disabled{% endif %}>
+            <option value="">a definir</option>
+            {% for s in setores %}<option value="{{ s.setor_id }}"{% if s.setor_id == x.setor_id %} selected{% endif %}>{{ s.nome }}</option>{% endfor %}
+            {% if x.setor_id and x.setor_id not in ids_setores %}<option value="{{ x.setor_id }}" selected>{{ x.setor }} (fora da lista)</option>{% endif %}
+          </select>
+          <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Salvar</button></noscript>
+        </form>
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="mudo">Ninguém com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+<form method="post" action="{{ url_for('torre_base.fracttal_setor') }}" id="fr-lote" class="fr-lote">
+  <input type="hidden" name="volta" value="{{ volta }}">
+  <span class="fr-lote-conta"><b id="fr-lote-n" class="gc-num">0</b> marcadas</span>
+  <label class="gc-rotulo" for="fr-lote-setor">Pôr no setor</label>
+  <select id="fr-lote-setor" name="setor_id" class="gc-campo"{% if not pode_gravar_setor or not setores %} disabled{% endif %}>
+    {% for s in setores %}<option value="{{ s.setor_id }}">{{ s.nome }}</option>{% endfor %}
+    <option value="">a definir (tirar do setor)</option>
+  </select>
+  <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not pode_gravar_setor or not setores %} disabled{% endif %}>Aplicar às marcadas</button>
+  <button class="gc-btn gc-btn--ui gc-btn--fantasma" type="button" id="fr-lote-limpar">Desmarcar</button>
+</form>
+
+<div class="fr-toast" id="fr-toast" role="status" aria-live="polite" hidden></div>
+
+<section class="cad-secao fr-secao" aria-labelledby="fr-sem-conta">
+  <h2 id="fr-sem-conta">Fichas do Nexus sem conta no Fracttal</h2>
+  <div class="fr-corpo">
+    <p class="gc-ajuda">Quem está na relação do time de campo e não achou conta no Fracttal pelo e-mail nem pelo nome.
+      {% if so_ativas %}Só as fichas com status Ativo: <a href="{{ url_for('torre_base.fracttal', todas_fichas=1, q=q or None, ligacao=ligacao or None, acesso=acesso or None, origem=origem or None, setor=setor or None) }}">ver todas ({{ sem_conta_total }})</a>.{% else %}Todas as fichas: <a href="{{ url_for('torre_base.fracttal', q=q or None, ligacao=ligacao or None, acesso=acesso or None, origem=origem or None, setor=setor or None) }}">só as ativas</a>.{% endif %}</p>
+    <div class="cad-rolagem">
+      <table class="cad-tabela">
+        <thead><tr><th>Ficha</th><th>Vínculo</th><th>Cargo</th><th>Equipe</th><th>Status</th><th>E-mail na ficha</th></tr></thead>
+        <tbody>
+        {% for f in sem_conta %}
+        <tr>
+          <td><a href="{{ url_for('torre_pessoas.cad_pessoa', id_=f.pessoa_id) }}">{{ f.nome_padrao or f.nome }}</a></td>
+          <td>{{ f.vinculo or '—' }}</td><td>{{ f.cargo or '—' }}</td><td>{{ f.equipe or '—' }}</td>
+          <td>{{ f.status or '—' }}</td><td>{% if f.email %}<span class="gc-dado">{{ f.email }}</span>{% else %}<span class="mudo">sem e-mail</span>{% endif %}</td>
+        </tr>
+        {% else %}<tr><td colspan="6" class="mudo">Todas as fichas têm conta no Fracttal.</td></tr>{% endfor %}
+        </tbody>
+      </table>
     </div>
-    <div class="campo">
-      <label class="gc-rotulo" for="fr-ac">Acesso no Fracttal</label>
-      <select id="fr-ac" name="acesso" class="gc-campo" onchange="this.form.submit()">
-        <option value="">Todos</option>{% for v in acessos %}<option value="{{ v }}"{% if v == acesso %} selected{% endif %}>{{ v }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="campo">
-      <label class="gc-rotulo" for="fr-or">Origem</label>
-      <select id="fr-or" name="origem" class="gc-campo" onchange="this.form.submit()">
-        <option value="">Todas</option>{% for v in origens %}<option value="{{ v }}"{% if v == origem %} selected{% endif %}>{{ v }}</option>{% endfor %}
-      </select>
-    </div>
-    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
-  </form>
-  <p class="gc-ajuda">{{ linhas|length }} de {{ total }} pessoas. Origem pelo domínio do e-mail: gridco.com.br é da Grid Co.; o resto é externo.</p>
-  <div class="cad-rolagem">
-    <table class="cad-tabela fr-tabela">
-      <thead><tr><th>Nome no Fracttal</th><th>E-mail</th><th>Código</th><th>Acesso no Fracttal</th><th>Ficha no Nexus</th><th>Vínculo</th><th>Equipe</th><th>Setor</th></tr></thead>
-      <tbody>
-      {% for x in linhas %}
-      <tr>
-        <td>{{ x.nome or '—' }}{% if x.origem != 'Grid Co.' %} <span class="cad-chip cad-chip--operacao" title="{{ x.dominio }}">externo</span>{% endif %}</td>
-        <td><span class="gc-dado">{{ x.email or '—' }}</span></td>
-        <td class="num">{{ x.codigo or '—' }}</td>
-        <td>{% if x.conta_ativa %}{{ x.acesso }}{% else %}<span class="cad-chip cad-chip--alerta">{{ x.acesso }}{% if x.acesso != 'sem acesso' %} · conta inativa{% endif %}</span>{% endif %}</td>
-        <td>{% if x.ficha %}<a href="{{ url_for('torre_pessoas.cad_pessoa', id_=x.ficha.pessoa_id) }}">{{ x.ficha.nome_padrao or x.ficha.nome }}</a>
-          <span class="mudo">· pelo {{ x.por }}</span>{% if x.repetida %} <span class="cad-chip cad-chip--critico">mesma ficha de outra conta</span>{% endif %}
-          {% elif x.ambiguo %}<span class="cad-chip cad-chip--alerta">nome de duas fichas</span>{% else %}<span class="cad-chip cad-chip--info">sem ficha</span>{% endif %}</td>
-        <td>{{ x.ficha.vinculo if x.ficha else '—' }}</td>
-        <td class="fr-curta">{{ x.equipe or '—' }}</td>
-        <td class="mudo fr-curta">a definir</td>
-      </tr>
-      {% else %}<tr><td colspan="8" class="mudo">Ninguém com esses filtros.</td></tr>{% endfor %}
-      </tbody>
-    </table>
   </div>
 </section>
 
-<section class="cad-secao" aria-labelledby="fr-sem-conta">
-  <h2 id="fr-sem-conta">Fichas do Nexus sem conta no Fracttal</h2>
-  <p class="gc-ajuda">Quem está na relação do time de campo e não achou conta no Fracttal pelo e-mail nem pelo nome.
-    {% if so_ativas %}Só as fichas com status Ativo: <a href="{{ url_for('torre_base.fracttal', todas_fichas=1, q=q or None, ligacao=ligacao or None, acesso=acesso or None) }}">ver todas ({{ sem_conta_total }})</a>.{% else %}Todas as fichas: <a href="{{ url_for('torre_base.fracttal', q=q or None, ligacao=ligacao or None, acesso=acesso or None) }}">só as ativas</a>.{% endif %}</p>
-  <div class="cad-rolagem">
-    <table class="cad-tabela">
-      <thead><tr><th>Ficha</th><th>Vínculo</th><th>Cargo</th><th>Equipe</th><th>Status</th><th>E-mail na ficha</th></tr></thead>
-      <tbody>
-      {% for f in sem_conta %}
-      <tr>
-        <td><a href="{{ url_for('torre_pessoas.cad_pessoa', id_=f.pessoa_id) }}">{{ f.nome_padrao or f.nome }}</a></td>
-        <td>{{ f.vinculo or '—' }}</td><td>{{ f.cargo or '—' }}</td><td>{{ f.equipe or '—' }}</td>
-        <td>{{ f.status or '—' }}</td><td>{% if f.email %}<span class="gc-dado">{{ f.email }}</span>{% else %}<span class="mudo">sem e-mail</span>{% endif %}</td>
-      </tr>
-      {% else %}<tr><td colspan="6" class="mudo">Todas as fichas têm conta no Fracttal.</td></tr>{% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
+<script>
+/* Integração Fracttal: o setor de UMA pessoa grava na hora, sem recarregar (a lista tem 150 e recarregar perdia a
+   rolagem); o resultado vai no aviso do canto e na borda do campo (um texto na linha mudava a largura da coluna). As
+   marcadas vão pelo formulário da barra, que só aparece com alguém marcado. Sem JavaScript, tudo vira formulário comum
+   (o Salvar de cada linha e a barra sempre visível). */
+(function () {
+  var lote = document.getElementById('fr-lote');
+  var conta = document.getElementById('fr-lote-n');
+  var todas = document.getElementById('fr-todas');
+  var toast = document.getElementById('fr-toast'), relogio = null;
+  if (!lote) return;
+  function avisar(texto, ok) {
+    toast.textContent = texto;
+    toast.className = 'fr-toast fr-toast--' + (ok ? 'ok' : 'erro');
+    toast.hidden = false;
+    clearTimeout(relogio);
+    relogio = setTimeout(function () { toast.hidden = true; }, ok ? 4000 : 9000);
+  }
+  function caixas() { return Array.prototype.slice.call(document.querySelectorAll('.fr-marcar:not(:disabled)')); }
+  function atualizar() {
+    var cx = caixas(), n = cx.filter(function (c) { return c.checked; }).length;
+    conta.textContent = n;
+    lote.hidden = n === 0;
+    if (todas) { todas.checked = n > 0 && n === cx.length; todas.indeterminate = n > 0 && n < cx.length; }
+  }
+  function salvar(sel) {
+    var form = sel.form, antes = sel.getAttribute('data-antes') || '';
+    var dados = new FormData(form);          /* antes de desabilitar: select desabilitado não vai no FormData */
+    sel.disabled = true;
+    sel.classList.remove('fr-sel--ok', 'fr-sel--erro');
+    function erro(texto) {
+      sel.disabled = false; sel.value = antes;
+      sel.classList.add('fr-sel--erro'); sel.title = texto;
+      avisar(texto, false);
+    }
+    fetch(form.action, {method: 'POST', body: dados, headers: {'Accept': 'application/json'}, credentials: 'same-origin'})
+      .then(function (r) { return r.json().catch(function () { return {ok: false, erro: 'Resposta inesperada (' + r.status + '): não gravou.'}; }); })
+      .then(function (j) {
+        if (!j.ok) { erro(j.erro || 'Não gravou.'); return; }
+        sel.disabled = false; sel.setAttribute('data-antes', sel.value);
+        sel.classList.add('fr-sel--ok'); sel.removeAttribute('title');
+        avisar(j.aviso || 'Salvo.', true);
+      })
+      .catch(function () { erro('Sem conexão: não gravou.'); });
+  }
+  document.querySelectorAll('.fr-setor-sel').forEach(function (s) { s.setAttribute('data-antes', s.value); });
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t === todas) { caixas().forEach(function (c) { c.checked = todas.checked; }); atualizar(); return; }
+    if (t.classList.contains('fr-marcar')) { atualizar(); return; }
+    if (t.classList.contains('fr-setor-sel')) { salvar(t); }
+  });
+  document.getElementById('fr-lote-limpar').addEventListener('click', function () {
+    caixas().forEach(function (c) { c.checked = false; }); atualizar();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.activeElement && document.activeElement.classList.contains('fr-dica-botao')) {
+      document.activeElement.blur();
+    }
+  });
+  atualizar();
+})();
+</script>
 {% endblock %}

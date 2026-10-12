@@ -82,6 +82,16 @@ plataforma; livro ilegível = vale o código. Quando o de_para do cadastro ganha
 da usina migra para lá; a regra mora no `plataforma/CLAUDE.md` (seção "De-para de equipamentos"). No banco desde
 11/10/2026 (conferido por GET).
 
+**Setor do pessoal (12/10/2026):** Levi: "Como faço para definir um setor???? tem que dar possibilidade". O Fracttal não
+diz o setor de ninguém e ainda não há base, então a lista nasce no Nexus: a tela Base · Integração Fracttal (só admin)
+grava o livro `nexus_setores` (`nexus/cadastro/setores.py`), com `dim_setor` (1 linha = 1 setor; excluir marca
+`excluido = sim` e o ID não volta) e `fato_decisao_setor` (1 linha = 1 decisão de pôr 1 pessoa do Fracttal num setor, ou
+de tirá-la; só acrescenta, vale a última de cada pessoa). O setor é atributo da **pessoa** (como a região de campo é da
+equipe), não uma dimensão à parte. A pessoa vai pelo `fracttal_id` (o id_personnel, o mesmo `tecnico_id` do coletor do
+Campo), pelo `pessoa_id` quando tem ficha (critério do login, `pessoa_ligada_por`) e pelo `pessoa_hmac`; nome e e-mail
+nunca (regra 8). As duas abas vão juntas a cada gravação (gravar sem uma a apagaria), sobre o livro relido do banco na
+hora (leitura que falha não grava). Registrado antes de existir: nasce com o 1º setor criado na tela.
+
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da
 ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) e gravadas por

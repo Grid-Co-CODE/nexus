@@ -27,6 +27,8 @@ RESUMO = {
     # ── Performance ──
     "decisao_cobertura": "Que usina de cada fonte entra no tempo real, decidido pela tela",
     "decisao_depara": "Como cada usina e inversor de cada fonte liga ao cadastro",
+    # ── Base ──
+    "decisao_setor": "O setor de cada pessoa do Fracttal, escolhido na tela",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -74,6 +76,10 @@ PARA_QUE = {
     "decisao_depara": "Guarda cada decisão de ligar uma usina ou um inversor de uma fonte ao cadastro, tomada por um "
                       "administrador na tela De-para de equipamentos (quando a fonte renomeia a usina ou não dá nome ao "
                       "inversor). A Plataforma de Performance lê esta tabela e ela vence o de-para escrito no código.",
+    "decisao_setor": "Guarda cada decisão de pôr uma pessoa do Fracttal num setor (ou de tirá-la), tomada por um "
+                     "administrador na tela Integração Fracttal; a lista de setores fica no mesmo livro. O setor de cada "
+                     "pessoa é a última decisão dela, e as de antes contam quando ela mudou. Não guarda nome nem e-mail: "
+                     "a pessoa vai pelo número do Fracttal e pela ficha do cadastro.",
     "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) tomada no Nexus sobre uma PT, equipamento por "
                   "equipamento, como o App decide: a PT de três equipamentos tem três decisões. Decide o Supervisor "
                   "de Campo, o gestor de contrato, alguém do COS ou um administrador, nunca quem pediu a PT. O App "

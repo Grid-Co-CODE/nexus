@@ -82,7 +82,10 @@ DIMENSOES = (
     # (O "região" do nome é a "Região" que o App escreve, que é a equipe; a região de campo é outra coisa.)
     ("equipe", "Equipe / região", "cadastro_nexus · equipes (+ regioes_campo: a região de campo da equipe)",
      "equipe_id (→ regiao_campo_id)"),
-    ("pessoa", "Pessoa", "cadastro_nexus · pessoas (+ nexus_dimensoes · pessoas_historico)", "pessoa_id"),
+    # o setor (12/10/2026) é atributo da PESSOA, como a região de campo é da equipe: a lista em nexus_setores · dim_setor
+    # e o setor de cada pessoa do Fracttal em nexus_setores · fato_decisao_setor (vale a última decisão de cada uma)
+    ("pessoa", "Pessoa", "cadastro_nexus · pessoas (+ nexus_dimensoes · pessoas_historico; + nexus_setores: o setor "
+     "do pessoal do Fracttal)", "pessoa_id"),
     ("equipamento", "Equipamento", "nexus_equipamentos · dim_equipamento (+ equipamento_apelido)",
      "equipamento_id (sha1 do código do ativo do Fracttal)"),
     ("os", "OS", "o número no próprio fato (dimensão degenerada)", "os"),
@@ -281,6 +284,22 @@ FATOS = (
                     "o de-para em código). O cadastro entra pela chave de negócio, que a plataforma confere antes de "
                     "gravar (nunca texto livre). Quem decidiu fica no log da máquina (logs/depara.log da plataforma), "
                     "não no banco (regra 8)"),
+    # Setor do pessoal do Fracttal (12/10/2026, Levi: "Como faço para definir um setor???? tem que dar possibilidade"):
+    # o Fracttal não tem setor e ainda não há base; a tela Base > Integração Fracttal cria a lista (dim_setor, no mesmo
+    # livro) e põe cada pessoa num setor.
+    Fato("decisao_setor", "Decisão de setor do pessoal", "base", "nexus_setores · fato_decisao_setor",
+         "1 linha = 1 decisão de pôr 1 pessoa do Fracttal em 1 setor, ou de tirá-la (setor_id vazio), tomada por um "
+         "administrador na tela Integração Fracttal",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)"),
+            pessoa=("id", "pessoa_id quando a pessoa do Fracttal tem ficha (o critério do login; pessoa_ligada_por diz "
+                          "como; vazio = sem ficha) + fracttal_id (o id_personnel) + pessoa_hmac (o código do e-mail)")),
+         tipo="sem_medida", chave=("decidida_em", "fracttal_id"),
+         fontes=("nexus_setores · fato_decisao_setor",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o setor de cada pessoa é a última decisão dela)",
+         observacao="o setor liga pelo setor_id à dim_setor do mesmo livro (a lista nasce na tela; excluir marca "
+                    "excluido = sim e o ID não volta). As duas abas vão juntas a cada gravação (gravar sem uma a "
+                    "apagaria). Nada de nome nem e-mail (regra 8): quem decidiu vai em decidida_por_hmac e no log da "
+                    "máquina"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -456,6 +475,10 @@ LIVROS = (
           "plataforma/depara.py (PerformancePainel), pela tela /admin/de-para da plataforma", True,
           "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
           "no PC e no servidor"),
+    Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
+          "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
+          "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
+          "1 minuto e relê o banco antes de cada gravação"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
