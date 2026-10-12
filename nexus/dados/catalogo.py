@@ -281,7 +281,7 @@ FATOS = (
          fontes=("nexus_depara · fato_decisao_depara",),
          janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada fonte, usina e inversor)",
          observacao="fonte = a chave da aba do Monitoramento; a usina liga nas contas da API PV (pv, semp, alveslima, "
-                    "2capi) e o inversor na conta oem@ (semp, alveslima, 2capi) e no scadaGridco (greenyellow, "
+                    "2capi) e o inversor na conta principal (pv, desde 12/10/2026), na conta oem@ (semp, alveslima, 2capi) e no scadaGridco (greenyellow, "
                     "salenergia); o apelido pelo nome, nas fontes que mandam a usina só pelo nome (sunop, axis: "
                     "usina_fonte = o nome exatamente como a fonte escreve). inversor_fonte vazio = a linha é da usina. "
                     "Valor vazio = desfaz (vale o nome da API ou "
