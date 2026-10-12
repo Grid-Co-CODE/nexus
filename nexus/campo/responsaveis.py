@@ -326,6 +326,13 @@ def _dia(v) -> str:
     return s[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", s) else ""
 
 
+def _com_prefixo(prefixo: str, valor) -> str:
+    """ "Inversor 5.4" a partir de "5.4" ou de "Inversor 5.4" (a planilha escreve dos dois jeitos: sem isto, a tela
+    mostrava "Inversor Inversor 5.4")."""
+    v = str(valor or "").strip() or "—"
+    return v if v.lower().startswith(prefixo.lower()) else f"{prefixo} {v}"
+
+
 def chamados(nomes: Nomes, hoje_iso: str) -> tuple[dict, dict]:
     """{usina_id: abertos, de strings e de trackers, o mais antigo e a lista}: as ocorrências sem "Fim da ocorrência"
     nas abas Strings indisp e Trackers (na de trackers, sem o check periódico "Em conformidade"). A usina liga pelo
@@ -350,12 +357,12 @@ def chamados(nomes: Nomes, hoje_iso: str) -> tuple[dict, dict]:
             if ini and (not x["mais_antigo"] or ini < x["mais_antigo"]):
                 x["mais_antigo"] = ini
             if tipo == "strings":
-                o_que = f"Inversor {r.get('Inversor') or '—'}"
+                o_que = _com_prefixo("Inversor", r.get("Inversor"))
                 qtd = _int(r.get("Quantidade de strings no afetadas"))
                 if qtd:
                     o_que += f" · {qtd} string{'s' if qtd != 1 else ''}"
             else:
-                o_que = f"Tracker {r.get('Nº do tracker / Identificação') or '—'}"
+                o_que = _com_prefixo("Tracker", r.get("Nº do tracker / Identificação"))
                 qtd = _int(r.get("Quantidade de trackers parados"))
                 if qtd and qtd > 1:
                     o_que += f" · {qtd} parados"
@@ -414,11 +421,11 @@ def alertas(u: dict) -> tuple[list[dict], list[str]]:
     for nivel in ("critico", "atencao"):
         lista = [a for a in at.get("lista") or [] if a["nivel"] == nivel]
         if lista:
-            nomes = ", ".join(a["nome"] for a in lista[:3]) + (f" e mais {len(lista) - 3}" if len(lista) > 3 else "")
+            # o nome do ativo vai uma vez só, nos itens, com o porquê (no detalhe e nos itens ele aparecia duas vezes)
             al.append({"area": "ativos", "nivel": nivel,
                        "titulo": f"{len(lista)} ativo{'s' if len(lista) != 1 else ''} "
                                  f"{'em crítico' if nivel == 'critico' else 'pedindo atenção'}",
-                       "detalhe": nomes, "itens": lista[:5]})
+                       "detalhe": "", "itens": lista[:3], "n_itens": len(lista)})
     if at and not at.get("critico") and not at.get("atencao"):
         bem.append("nenhum ativo em crítico ou atenção")
     t = u.get("mtta")
@@ -434,7 +441,7 @@ def alertas(u: dict) -> tuple[list[dict], list[str]]:
         al.append({"area": "chamados", "nivel": "atencao",
                    "titulo": f"{c['abertos']} chamado{'s' if c['abertos'] != 1 else ''} aberto{'s' if c['abertos'] != 1 else ''}",
                    "detalhe": " e ".join(partes) + (f"; o mais antigo há {c['dias']} dias" if c.get("dias") else ""),
-                   "itens": c.get("lista", [])[:5]})
+                   "itens": c.get("lista", [])[:3], "n_itens": len(c.get("lista", []))})
     else:
         bem.append("sem chamado aberto")
     r = u.get("ronda") or {}
@@ -447,20 +454,19 @@ def alertas(u: dict) -> tuple[list[dict], list[str]]:
     elif r.get("dias") is not None and r["dias"] < 999:
         bem.append("ronda " + ("hoje" if r["dias"] == 0 else ("ontem" if r["dias"] == 1 else f"há {r['dias']} dias")))
     p = u.get("pt") or {}
-    if p.get("paradas_hoje"):
-        n = p["paradas_hoje"]
-        al.append({"area": "pt", "nivel": "agora", "titulo": f"{n} PT parada{'s' if n != 1 else ''} há mais de 2 h",
-                   "detalhe": "de hoje: técnico esperando o De acordo no campo",
-                   "itens": [x for x in p.get("lista", []) if x["hoje"]][:5]})
-    if p.get("paradas_antigas"):
-        n = p["paradas_antigas"]
-        al.append({"area": "pt", "nivel": "critico", "titulo": f"{n} PT sem decisão desde {_dm(p['desde'])}",
-                   "detalhe": "esperando o De acordo há mais de 2 h; de dias anteriores, confira se ainda está aberta "
-                              "no App", "itens": [x for x in p.get("lista", []) if not x["hoje"] and x["parada"]][:5]})
-    n = p.get("aguardando", 0) - p.get("paradas_hoje", 0) - p.get("paradas_antigas", 0)
-    if n > 0:
-        al.append({"area": "pt", "nivel": "atencao", "titulo": f"{n} PT esperando o De acordo",
-                   "detalhe": "há menos de 2 h", "itens": [x for x in p.get("lista", []) if not x["parada"]][:5]})
+    grupos_pt = (("agora", lambda x: x["hoje"] and x["parada"], "técnico esperando o De acordo"),
+                 ("critico", lambda x: not x["hoje"] and x["parada"], "confira se ainda está aberta no App"),
+                 ("atencao", lambda x: not x["parada"], "há menos de 2 h"))
+    for nivel, de_quem, detalhe in grupos_pt:
+        lista = [x for x in p.get("lista", []) if de_quem(x)]
+        if not lista:
+            continue
+        n = len(lista)
+        titulo = {"agora": f"{n} PT parada{'s' if n != 1 else ''} há mais de 2 h",
+                  "critico": f"{n} PT sem decisão desde {_dm(p.get('desde'))}",
+                  "atencao": f"{n} PT esperando o De acordo"}[nivel]
+        al.append({"area": "pt", "nivel": nivel, "titulo": titulo, "detalhe": detalhe, "itens": lista[:3],
+                   "n_itens": n})
     return al, bem
 
 
