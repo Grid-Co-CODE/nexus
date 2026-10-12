@@ -46,9 +46,12 @@ a tela diz qual falta e não mostra número.
 **A tela.** Faixa de números (cada um filtra a tabela), "Por supervisor" (cartões por região de campo, com o Supervisor
 de Campo e o Coordenador ou a vaga, e a alternância para o gestor de contrato, como a Central de atenção) e Tabela. A
 tabela abre **por usina e dia** (Levi, 09/10: "queria agrupado por usina e dia!"; `extintores.por_usina_dia`): uma linha
-por usina × dia da última conferência, com Situação (a mais grave), Usina, Quantidade de extintores (e quantos em cada
-situação), Recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a próxima), Última
-conferência e Status da TST (o mais grave, e quantos em cada); a linha abre os extintores dela logo abaixo. Ao lado, a
+por usina × dia da última conferência, com Situação (a mais grave), Última conferência, Usina, Quantidade de extintores
+(e quantos em cada situação), Recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a
+próxima), Status da TST (o mais grave, e quantos em cada) e PDF, nesta ordem (Levi, 11/10/2026); a linha abre os
+extintores dela logo abaixo. A visão por extintor segue a mesma ordem (Situação, Última conferência, Usina e o resto).
+A usina vai **sem a região ao lado** (Levi, 11/10: "Em usina pode tirar a região do lado, fica estranho!"): a região de
+campo está nos cartões e no filtro. Ao lado, a
 visão **por extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
 primeiro). A faixa filtra as duas (no agrupamento, a linha conta só os extintores do filtro). Cada linha por usina e
 dia tem a coluna **PDF** com o **Baixar** (como a tabela de PT; Levi, 09/10): o relatório só daquela usina e daquele dia
@@ -63,8 +66,7 @@ sempre na linha de baixo: "se tem espaço para botar paralelo então deixe paral
 linha quando a coluna não comporta. Medido em 09/10 com os 773: a 1920 px, 0 de 2.100 células quebram (41 px por
 linha); a 1440 px, a tabela cabe na largura e as partes descem onde falta espaço. Para caber a 1920: o código do ativo
 fica no title do Local, a validade distante não ganha frase, o status da TST não repete a validade (só a carga e os
-itens com NÃO; o motivo inteiro no title, com teto de 240 px), a região sem nada vira "sem região" e a origem do Forms,
-"Forms". As partes são `inline-block`, não flex: com `flex-wrap` o Chrome mede a coluna como se cada parte fosse uma
+itens com NÃO; o motivo inteiro no title, com teto de 240 px) e a origem do Forms, "Forms". As partes são `inline-block`, não flex: com `flex-wrap` o Chrome mede a coluna como se cada parte fosse uma
 linha e quebrava 718 células a 1920 px.
 
 **Números de 09/10/2026** (cópia de conferência com o cadastro da TST no lugar do livro): 773 extintores em 81 usinas,

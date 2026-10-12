@@ -30,19 +30,19 @@
    quanto falta se vence em até 30 dias. Vencer daqui a anos não precisa de frase (e alargava a coluna) #}
 {% macro etiqueta(v, fim) %}<span class="ext-par">{% if fim %}{% set n = (fim - d.hoje).days %}<span class="m">{{ v }}</span>{% if n <= alerta_dias %}<span class="det{{ ' cn-t-critico' if n < 0 else ' cn-t-alerta' }}">{% if n < 0 %}venceu há {{ tempo(n) }}{% elif n == 0 %}vence hoje{% else %}vence em {{ tempo(n) }}{% endif %}</span>{% endif %}{% else %}<span class="cn-t-neutro">{{ v }}</span>{% endif %}</span>{% endmacro %}
 {# as células de um extintor, iguais na tabela por extintor e dentro da linha da usina (cada parte lado a lado: Levi,
-   09/10, "se tem espaço para botar paralelo então deixe paralelo"). A região diz o supervisor só quando há alguém (a
-   vaga está nos cartões); o status da TST não repete a validade (está nas colunas ao lado): só a carga e os itens com
-   NÃO, e o motivo inteiro no title #}
-{% macro regiao_det(x) %}<span class="det">{{ x.regiao_campo if x.regiao_campo and x.regiao_campo != sem_regiao else 'sem região' }}{% if x.supervisor_campo and x.supervisor_campo != vaga %} · {{ x.supervisor_campo }}{% endif %}</span>{% endmacro %}
+   09/10, "se tem espaço para botar paralelo então deixe paralelo"). A usina vai sem a região ao lado (Levi, 11/10:
+   "Em usina pode tirar a região do lado, fica estranho!"; a região está nos cartões e no filtro); o status da TST não
+   repete a validade (está nas colunas ao lado): só a carga e os itens com NÃO, e o motivo inteiro no title.
+   Ordem das colunas (Levi, 11/10): Situação, Última conferência, Usina e o resto #}
 {% macro conferencia(x) %}{% if x.conferencia %}<span class="ext-par"><span class="m">{{ x.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.sem_atualizacao }}">há {{ tempo(x.dias_conferencia) }}{% if x.origem_conferencia %} · <span title="{{ x.origem_conferencia }}">{{ 'Forms' if x.origem_conferencia.startswith('Forms') else x.origem_conferencia }}</span>{% endif %}</span>{% if x.conferido_por %}<span class="det">{{ x.conferido_por }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca conferido</span>{% endif %}{% endmacro %}
 {% macro linha_extintor(x, com_usina=true, com_conferencia=true) %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}
       <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        {% if com_usina %}<td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span>{{ regiao_det(x) }}</span></td>{% endif %}
+        {% if com_conferencia %}<td>{{ conferencia(x) }}</td>{% endif %}
+        {% if com_usina %}<td class="ext-usina">{{ x.usina }}</td>{% endif %}
         <td><span class="ext-par">{% if fotos.get(x.codigo) is not none %}<a class="cn-foto ext-foto" href="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo) }}" data-legenda="{{ x.ext }} · {{ x.local or 'local não informado' }} · {{ x.usina }}{% if fotos[x.codigo] %} · foto de {{ fotos[x.codigo][8:10] }}/{{ fotos[x.codigo][5:7] }}/{{ fotos[x.codigo][:4] }}{% endif %}" title="Ver a foto do extintor"><img src="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo, mini=1) }}" alt="Foto do {{ x.ext }}" loading="lazy"></a>{% endif %}<span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
         <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
         <td>{{ etiqueta(x.val2, x.fim2) }}</td>
         <td>{{ etiqueta(x.val3, x.fim3) }}</td>
-        {% if com_conferencia %}<td>{{ conferencia(x) }}</td>{% endif %}
         <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
 {% endmacro %}
 {% set no_grupo = {'atrasado': ('atrasado', 'atrasados', 'critico'), 'perto': ('perto de vencer', 'perto de vencer', 'alerta'),
@@ -146,15 +146,15 @@
   </div>
   {% if ver == 'usina' %}
   <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande">
-    <thead><tr><th>Situação</th><th>Usina</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Última conferência</th><th>Status da TST</th><th>PDF</th></tr></thead>
+    <thead><tr><th>Situação</th><th>Última conferência</th><th>Usina</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status da TST</th><th>PDF</th></tr></thead>
     <tbody>
     {% for g in grupos[:limite] %}{% set s = situacoes[g.situacao] %}{% set t = status_tst.get(g.status) %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false" title="Ver os {{ g.qtd }} extintores">
         <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        <td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</span>{{ regiao_det(g) }}</span></td>
+        <td>{{ conferencia(g) }}</td>
+        <td class="ext-usina"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</td>
         <td><span class="ext-par"><b>{{ g.qtd }}</b><span class="det">{% for k, (um, varios, cor) in no_grupo.items() if g[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g[k] }} {{ um if g[k] == 1 else varios }}</span>{% endfor %}</span></span></td>
         <td>{% if g.recarga_fim %}{{ etiqueta(g.recarga, g.recarga_fim) }}{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}</td>
-        <td>{{ conferencia(g) }}</td>
         <td><span class="ext-par">{% if t %}<span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}<span class="det">{% for k, (um, varios, cor) in status_no_grupo.items() if g.status_qtd[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g.status_qtd[k] }} {{ um if g.status_qtd[k] == 1 else varios }}</span>{% endfor %}</span></span></td>
         <td><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', usina=g.usina, dia=(g.conferencia.isoformat() if g.conferencia else 'nunca'), baixar=1, **filtros_url) }}" title="O relatório desta usina e deste dia, com as fotos">Baixar</a></td>
       </tr>
@@ -184,7 +184,7 @@
   </script>
   {% else %}
   <div class="cn-tab cn-tab--compacta ext-tab cn-fotos-grupo"><table>
-    <thead><tr><th>Situação</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Última conferência</th><th>Status da TST</th></tr></thead>
+    <thead><tr><th>Situação</th><th>Última conferência</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
     <tbody>
     {% for x in lista[:limite] %}{{ linha_extintor(x) }}
     {% else %}<tr><td colspan="8" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}

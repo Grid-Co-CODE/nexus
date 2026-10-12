@@ -182,9 +182,11 @@ def test_a_tabela_poe_o_mais_grave_primeiro_e_filtra_pela_situacao(com_livro, lo
     # o status não repete a validade (está nas colunas ao lado): só a carga e os itens; o motivo inteiro, no title
     assert "Crítico sem carga" in t and 'title="sem carga · teste hidrostático vencido em 09/2026"' in html
     assert "Atenção difusor: Não" in t
-    # a região diz o supervisor quando há alguém; a vaga fica nos cartões
-    assert "Altair Sudeste 03 · Supervisora Campo" in t and "Coração 1 Sul 01" in t and "Sul 01 · vaga" not in t
-    assert "Thopen - Irecê 2 - BA sem região" in t                             # fora do cadastro: o nome do App
+    # a usina vai sem a região ao lado (Levi, 11/10: "fica estranho"); a região está nos cartões e no filtro
+    assert "Sudeste 03" not in t and "Supervisora Campo" not in t and "sem região" not in t
+    assert "Thopen - Irecê 2 - BA" in t                                        # fora do cadastro: o nome do App
+    cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
+    assert cab == "Situação Última conferência Usina Extintor Local Recarga Hidrostático Status da TST"
     assert "05/10/2026 há 4 d · App Técnico Silva" in t                          # quem conferiu, pelo nome
     assert codigo_da_pessoa(CHAVE, "tec1@exemplo.test") not in html
     atr = logado.get("/t/hseq/extintores?f=atrasado&ver=extintor").get_data(as_text=True)          # o filtro abre a tabela
@@ -256,12 +258,13 @@ def test_a_tabela_abre_por_usina_e_dia_e_a_linha_abre_os_extintores(com_livro, l
     html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
     assert 'aria-current="page">Por usina e dia</a>' in html and 'href="?modo=tabela&amp;ver=extintor"' in html
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
-    assert cab == "Situação Usina Quantidade de extintores Recarga mais próxima Última conferência Status da TST PDF"
+    # a ordem do Levi (11/10): Situação, Última conferência, Usina, quantidade, recarga mais próxima, Status da TST, PDF
+    assert cab == "Situação Última conferência Usina Quantidade de extintores Recarga mais próxima Status da TST PDF"
     linhas = html.count('<tr class="cn-linha"')
     assert linhas == 6 and html.count('<tr class="cn-detalhe" hidden>') == 6       # Altair em 2 dias, mais 4 usinas
     primeira = _texto(html[html.index('<tr class="cn-linha"'):html.index('<tr class="cn-detalhe"')])
-    assert primeira.startswith("Atrasado Altair Sudeste 03 · Supervisora Campo 3 2 atrasados · 1 sem validade")
-    assert "02/2026 venceu há 7 meses" in primeira and "05/10/2026 há 4 d" in primeira
+    assert primeira.startswith("Atrasado 05/10/2026 há 4 d") and "Altair 3 2 atrasados · 1 sem validade" in primeira
+    assert "02/2026 venceu há 7 meses" in primeira and "Sudeste 03" not in primeira
     assert "Crítico 2 críticos · 1 ok sem validade" in primeira
     # a linha abre os extintores dela, sem repetir a usina nem a conferência
     ini = html.index('<table class="ext-sub cn-fotos-grupo">')
@@ -272,8 +275,7 @@ def test_a_tabela_abre_por_usina_e_dia_e_a_linha_abre_os_extintores(com_livro, l
     # o filtro da faixa vale para o agrupamento: só os atrasados entram na conta da linha
     atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)
     assert atr.count('<tr class="cn-linha"') == 2
-    assert _texto(atr[atr.index('<tr class="cn-linha"'):atr.index('<tr class="cn-detalhe"')]).startswith(
-        "Atrasado Altair Sudeste 03 · Supervisora Campo 2 2 atrasados")
+    assert "Altair 2 2 atrasados" in _texto(atr[atr.index('<tr class="cn-linha"'):atr.index('<tr class="cn-detalhe"')])
 
 
 # ── o relatório em PDF (Levi, 09/10, com as observações da TST) ──────────────────────────────────────────────────
