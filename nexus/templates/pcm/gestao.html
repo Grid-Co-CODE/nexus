@@ -119,11 +119,18 @@
 {%- if c.p is defined and o.val == 'pct' %}<b class="pg-pct">{{ c.p }}%</b><span class="pg-fr">({{ c.f }}/{{ c.t }})</span>
 {%- else %}{{ c.txt }}{% endif -%}
 {%- endmacro %}
+{# na linha da usina, a célula com o que falta abre o painel das tarefas pendentes (12/10/2026, Levi: "Na versão antiga
+   ao clicar em cima do % do que tem pendente aparecia as tarefas pendentes"); MPA e MPS seguem abrindo a Fila, como no
+   painel. O endereço do painel é o desta tela com pu (a usina) e pc (a coluna; "*" = a coluna Pendentes) #}
 {% macro td(c, usina=none, sig='') -%}
-<td>{% if c.drill %}<a class="pg-cel pg-tom--{{ c.tom }} pg-frac" href="{{ url(modo='fila', drill=usina, dt=sig, pend=None) }}" title="{{ c.os }}">{{ valor(c) }}</a>{% else %}<span class="pg-cel pg-tom--{{ c.tom if c.tom is defined else 'nulo' }}"{% if c.os %} title="{{ c.os }}"{% endif %}>{{ valor(c) }}</span>{% endif %}</td>
+<td>{% if c.drill %}<a class="pg-cel pg-tom--{{ c.tom }} pg-frac" href="{{ url(modo='fila', drill=usina, dt=sig, pend=None) }}" title="{{ c.os }}">{{ valor(c) }}</a>
+{%- elif usina and c.t is defined and c.t > c.f %}<button type="button" class="pg-cel pg-tom--{{ c.tom }} pg-cel--pend" data-pend="{{ url(pu=usina, pc=sig) }}" aria-haspopup="dialog" title="{{ (c.os ~ ' · ') if c.os }}clique para ver {{ 'a tarefa pendente' if c.t - c.f == 1 else 'as ' ~ (c.t - c.f) ~ ' tarefas pendentes' }}">{{ valor(c) }}</button>
+{%- else %}<span class="pg-cel pg-tom--{{ c.tom if c.tom is defined else 'nulo' }}"{% if c.os %} title="{{ c.os }}"{% endif %}>{{ valor(c) }}</span>{% endif %}</td>
 {%- endmacro %}
-{% macro fim(geral, tudo, mal=true) -%}
-<td><span class="pg-cel pg-tom--{{ tom(geral) }}">{% if geral is none %}—{% else %}<b class="pg-pct">{{ geral }}%</b><span class="pg-fr">({{ tudo.f }}/{{ tudo.t }})</span>{% endif %}</span></td><td class="pg-pend{{ ' pg-pend--mal' if mal and tudo.t - tudo.f > 0 }}">{{ tudo.t - tudo.f }}</td>
+{% macro fim(geral, tudo, mal=true, usina=none) -%}
+<td><span class="pg-cel pg-tom--{{ tom(geral) }}">{% if geral is none %}—{% else %}<b class="pg-pct">{{ geral }}%</b><span class="pg-fr">({{ tudo.f }}/{{ tudo.t }})</span>{% endif %}</span></td><td class="pg-pend{{ ' pg-pend--mal' if mal and tudo.t - tudo.f > 0 }}">
+{%- if usina and tudo.t - tudo.f > 0 %}<button type="button" class="pg-pend-bt" data-pend="{{ url(pu=usina, pc='*') }}" aria-haspopup="dialog" title="Ver as {{ tudo.t - tudo.f }} tarefas pendentes do Geral">{{ tudo.t - tudo.f }}</button>
+{%- else %}{{ tudo.t - tudo.f }}{% endif %}</td>
 {%- endmacro %}
 {% set ncol = mx.cols|length + 3 + (1 if tem_ger else 0) %}
 <div class="pg-rolo"><table class="pg-tbl pg-tbl--plano">
@@ -139,7 +146,7 @@
     {% endif %}
     {% for f in g.filhos %}
     <tr class="pg-usina{{ ' pg-filho' if o.dim != 'usi' }}" data-g="{{ gi }}"{% if o.dim != 'usi' %} hidden{% endif %}><td class="pg-rotlin" title="{{ f.nome }}">{{ f.nome }}</td>
-      {% for c in f.tds %}{{ td(c, f.nome, mx.cols[loop.index0]) }}{% endfor %}{{ fim(f.geral, f.tudo) }}
+      {% for c in f.tds %}{{ td(c, f.nome, mx.cols[loop.index0]) }}{% endfor %}{{ fim(f.geral, f.tudo, true, f.nome) }}
       {% if tem_ger %}<td class="pg-obs"{% if f.co and f.co.obs %} title="{{ f.co.obs }}"{% endif %}>{% if f.co %}{% if f.co.crit %}<span class="pg-critb pg-critb--{{ f.co.critCls }}">{{ f.co.crit }}</span>{% endif %}{{ (f.co.obs[:90] ~ ('…' if f.co.obs|length > 90 else '')) if f.co.obs else '—' }}{% else %}—{% endif %}</td>{% endif %}</tr>
     {% endfor %}
   {% else %}
@@ -152,7 +159,56 @@
   <span><i class="pg-amostra pg-tom--crit"></i>abaixo de 50%</span><span><i class="pg-amostra pg-tom--nulo"></i>sem preventiva no período</span>
   <span>ao lado do %, feitas/total</span>
   {% if tem_ger %}<span><b>Criticidade · observação</b>: da Gerencial (aba MPAS), a última entrada datada do log</span>{% endif %}
-  <span class="pg-fim">clique no grupo para abrir as usinas · na fração de MPA e MPS para abrir a Fila · passe o mouse na célula para ver as OS</span></p>
+  <span class="pg-fim">clique no grupo para abrir as usinas · na célula da usina para ver as tarefas pendentes · na fração de MPA e MPS para abrir a Fila</span></p>
+{# o painel das tarefas pendentes (12/10/2026: "Faça maior e mais bonito"): lateral, largo, com a lista por OS; a OS abre
+   o card dela no Nexus (oscreator/card_os_abrir.html, o NexusOsCard das outras torres) #}
+<div class="pgp-veu" id="pgp-veu" hidden></div>
+<aside class="pgp" id="pgp" role="dialog" aria-modal="true" aria-labelledby="pgp-titulo" hidden>
+  <div class="pgp-corpo" id="pgp-corpo"></div>
+</aside>
+{% include "oscreator/card_os_abrir.html" %}
+<script>
+  // o painel das pendentes: o clique na célula pede a lista (o mesmo endereço da tela com pu/pc) e abre o painel;
+  // Esc, o X e o véu fecham, e o foco volta para a célula. A OS da lista abre o card dela no Nexus.
+  (function () {
+    var painel = document.getElementById('pgp'), corpo = document.getElementById('pgp-corpo'),
+        veu = document.getElementById('pgp-veu'), origem = null, pedido = 0;
+    function fechar() {
+      if (painel.hidden) return;
+      painel.hidden = true; veu.hidden = true; corpo.innerHTML = '';
+      document.documentElement.classList.remove('pgp-aberto');
+      if (origem) { try { origem.focus(); } catch (e) { /* saiu da tela */ } }
+    }
+    function abrir(bt) {
+      origem = bt; var meu = ++pedido;
+      corpo.innerHTML = '<p class="pgp-carga" role="status">Lendo as tarefas…</p>';
+      painel.hidden = false; veu.hidden = false;
+      document.documentElement.classList.add('pgp-aberto');
+      fetch(bt.dataset.pend, {credentials: 'same-origin', headers: {'Accept': 'text/html'}})
+        .then(function (r) { return r.text().then(function (t) { return {ok: r.ok, t: t}; }); })
+        .then(function (r) {
+          if (meu !== pedido) return;
+          corpo.innerHTML = r.ok || r.t.indexOf('pgp-cab') >= 0 ? r.t : '<p class="pgp-carga">Não consegui ler as tarefas (' + r.t.length + ').</p>';
+          var x = corpo.querySelector('[data-fechar]'); if (x) x.focus();
+          corpo.querySelectorAll('.pgp-os-n[data-wid]').forEach(function (b) {
+            if (window.NexusOsCard && NexusOsCard.prepararAoParar) NexusOsCard.prepararAoParar(b, b.dataset.wid);
+          });
+        })
+        .catch(function () { if (meu === pedido) corpo.innerHTML = '<p class="pgp-carga">Sem conexão: não consegui ler as tarefas.</p>'; });
+    }
+    document.addEventListener('click', function (ev) {
+      var bt = ev.target.closest('[data-pend]');
+      if (bt) { ev.preventDefault(); ev.stopPropagation(); abrir(bt); return; }
+      if (ev.target.closest('#pgp [data-fechar]') || ev.target === veu) { fechar(); return; }
+      var os = ev.target.closest('#pgp .pgp-os-n[data-wid]');
+      if (os && window.NexusOsCard) NexusOsCard.abrir(os.dataset.wid, {status: os.dataset.status, folio: os.dataset.folio});
+    });
+    document.addEventListener('keydown', function (ev) {
+      // o card da OS aberto por cima fecha primeiro (ele ouve o próprio Esc)
+      if (ev.key === 'Escape' && !painel.hidden && !document.querySelector('iframe.nexus-card-os')) fechar();
+    });
+  })();
+</script>
 <script>
   // abrir e fechar os grupos sem recarregar (como o painel, a matriz abre com os grupos fechados)
   (function () {

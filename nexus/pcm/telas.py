@@ -295,6 +295,13 @@ def registrar_pcm(bp) -> None:
 
     @bp.route("/gestao")
     def gestao():
+        # as tarefas pendentes de uma célula do Plano, para o painel lateral (12/10/2026): o mesmo endereço com
+        # pu=<usina>&pc=<coluna>, pedido pelo fetch da própria tela
+        if request.args.get("pu") is not None:
+            ctx = _ctx_pendentes(current_app.config, request.args)
+            if ctx is None:
+                return render_template("pcm/_gestao_pendentes_erro.html"), 503
+            return render_template("pcm/_gestao_pendentes.html", **ctx)
         return render_template("pcm/gestao.html", **_ctx_gestao(current_app.config, request.args))
 
     @bp.route("/quadro")
@@ -388,6 +395,32 @@ def _gerencial(cfg) -> tuple[dict | None, str]:
         return _guardado(("mpas", lm.dados.get("geradoEm"), lm.dados["ct"][:64]), lambda: G.decifrar(lm.dados, senha)), ""
     except Exception:      # noqa: BLE001 — senha errada ou pacote novo: a tela diz, e a Fila segue com o Fracttal
         return None, "a senha da Gerencial do .env não abriu o mpas.json"
+
+
+def _ctx_pendentes(cfg, args) -> dict | None:
+    """As tarefas pendentes de UMA célula do Plano (Levi, 12/10/2026: "Na versão antiga ao clicar em cima do % do que
+    tem pendente aparecia as tarefas pendentes"): a mesma leitura, os mesmos filtros de cima (a cópia guardada da tela)
+    e os mesmos recortes da matriz. `pu` = a usina; `pc` = a coluna (sigla, CORR ou mês) ou "*" (a coluna Pendentes).
+    Coluna que a matriz não tem = 404. None = o arquivo não está legível."""
+    leitura = fonte.ler_gestao(cfg)
+    d = leitura.dados
+    if d is None:
+        return None
+    meses = G.meses(G.hoje())
+    o = G.opcoes(args, meses)
+    versao = d.get("dataHash") or d.get("geradoEm")
+    if _G_CACHE.get("versao") != versao:
+        _G_CACHE.clear()
+        _G_CACHE["versao"] = versao
+    escopo = _guardado(("escopo", versao), lambda: G.escopo(d.get("tarefas")))
+    topo = {k: str(args.get(k) or "")[:160] for k in G.TOPO}
+    tarefas = _guardado(("topo", versao, *topo.values()), lambda: G.filtrar_topo(escopo, **topo))
+    col = str(args.get("pc") or "")[:12]
+    if col != "*" and col not in G.colunas(o, meses):
+        abort(404)
+    p = G.pendentes(tarefas, o, meses, str(args.get("pu") or "")[:200], col)
+    rot = "Geral" if col == "*" else G.rot_col(col)
+    return {"p": p, "rot_col": rot, "data_curta": G.data_curta}
 
 
 def _ctx_gestao(cfg, args) -> dict:

@@ -255,18 +255,24 @@ def filtrar_topo(tarefas, cliente="", cluster="", responsavel="", usina="") -> l
             and (not r or str(t.get("responsavel") or "").lower() == r)]
 
 
+def classificar(t) -> tuple[str, str] | None:
+    """(sigla, mês) da tarefa, a regra do painel: preventiva pela sigla no nome e o mês da Data Programada; demanda pelo
+    tipo e o mês da CRIAÇÃO; "Teste" e preventiva sem sigla, None. Uma regra só para a matriz e a lista de pendentes."""
+    m = _RX.search(str(t.get("tarefa") or ""))
+    if m:
+        return m.group(1), str(t.get("dataProg") or "")[:7]
+    sig = DEMANDA.get(sem_acento(t.get("tipo")))
+    return (sig, str(t.get("criacao") or "")[:7]) if sig else None
+
+
 def base(tarefas, meses_) -> list[dict]:
     """(cliente, usina, cluster, responsável, sigla, mês) -> feitas, total e as OS, na ordem em que aparecem."""
     reg: dict[tuple, dict] = {}
     for t in tarefas:
-        m = _RX.search(str(t.get("tarefa") or ""))
-        if m:
-            sig, mes = m.group(1), str(t.get("dataProg") or "")[:7]
-        else:
-            sig = DEMANDA.get(sem_acento(t.get("tipo")))
-            if not sig:
-                continue
-            mes = str(t.get("criacao") or "")[:7]
+        sm = classificar(t)
+        if not sm:
+            continue
+        sig, mes = sm
         if mes not in meses_:
             continue
         k = (t.get("cliente") or "—", t.get("usina") or "—", t.get("cluster") or "—", t.get("responsavel") or "—", sig, mes)
@@ -397,6 +403,87 @@ def celula(c, sig: str, o: Opcoes, usina=None) -> dict:
     # lista de OS, e isso só acontece nas linhas de grupo e no TOTAL GERAL, justamente as que TÊM tarefa ("68%" com a
     # dica dizendo que não há preventiva). Aqui essas células ficam sem dica; a prova desconta essa frase do painel.
     return {"txt": str(v), "cls": faixa(p), "drill": False, "os": os_, **tela}
+
+
+# ── as tarefas pendentes de uma célula (Levi, 12/10/2026: "Na versão antiga ao clicar em cima do % do que tem pendente
+# aparecia as tarefas pendentes, resolva isso por gentileza no Nexus! Faça maior e mais bonito") ─────────────────────
+# O status da OS no arquivo do PCM ("Em processo", "Verificação", "Finalizados") na grafia que o card da OS do OS Creator
+# usa (o selo e a regra do "Editar" saem dele: rotas.STATUS_COR do clone)
+STATUS_DO_CARD = {"em processo": "Em Processo", "verificacao": "Em Verificação", "em verificacao": "Em Verificação",
+                  "finalizados": "Concluída", "finalizada": "Concluída", "cancelados": "Cancelada",
+                  "cancelada": "Cancelada"}
+_STATUS_CLS = {"Em Processo": "info", "Em Verificação": "and", "Concluída": "ok", "Cancelada": "nulo"}
+ESTADO_CLS = {"nao iniciada": "and", "em progresso": "info", "pausada": "nulo"}
+_PREFIXO = re.compile(r"^\s*\[[^\]]*\]\s*-\s*")
+_SIGLA_NO_NOME = re.compile(r"^\s*MP[MSAT]\s*-\s*")
+
+
+def curto(tarefa) -> str:
+    """O nome da tarefa sem o "[Grid Co.] - MPM - " da frente ("Estação Solarimétrica"); o inteiro fica no title."""
+    s = _SIGLA_NO_NOME.sub("", _PREFIXO.sub("", str(tarefa or "")))
+    return s.strip() or str(tarefa or "").strip()
+
+
+def pendentes(tarefas, o: Opcoes, meses_, usina: str, col: str) -> dict:
+    """As tarefas que faltam numa célula do Plano: a usina × a coluna (a sigla, a "CORR" ou o mês; "*" = as colunas do
+    Geral, a conta da coluna Pendentes), com os mesmos recortes da matriz (tipo, mês e busca; os filtros de cima já vêm
+    aplicados em `tarefas`). Pendente = tarefa que não está Finalizada (a regra de ouro do painel), então o número bate
+    com o da célula. Agrupadas por OS: as atrasadas primeiro, depois pela Data Programada mais antiga."""
+    cs = colunas(o, meses_)
+    alvo = {c for c in cs if c != "CORR"} if col == "*" else {col}
+    fs = [*SIGLAS, "corr", "emerg"] if o.tipo == "todos" else (list(SIGLAS) if o.tipo == "prev" else [o.tipo])
+    por_sig = o.col == "sig" and not eh_demanda(o.tipo)
+    q = sem_acento(o.busca) if o.busca else ""
+    feitas = total = 0
+    oss: dict[str, dict] = {}
+    for t in tarefas:
+        if str(t.get("usina") or "") != usina:
+            continue
+        sm = classificar(t)
+        if not sm or sm[0] not in fs or sm[1] not in meses_ or (o.mes != "todos" and sm[1] != o.mes):
+            continue
+        if q and q not in sem_acento(f"{t.get('usina') or '—'} {t.get('cliente') or '—'} {t.get('cluster') or '—'} "
+                                      f"{t.get('responsavel') or '—'}"):
+            continue
+        k = ("CORR" if sm[0] in ("corr", "emerg") else sm[0]) if por_sig else sm[1]
+        if k not in alvo:
+            continue
+        total += 1
+        if str(t.get("estado") or "") == "Finalizada":
+            feitas += 1
+            continue
+        n = str(t.get("os") or "—")
+        st = STATUS_DO_CARD.get(sem_acento(t.get("osStatus")).strip(), str(t.get("osStatus") or ""))
+        g = oss.setdefault(n, {"os": n, "wid": t.get("idWO"), "status": st, "status_cls": _STATUS_CLS.get(st, "nulo"),
+                               "url": str(t.get("url") or ""), "programada": "", "atrasada": False, "tarefas": []})
+        prog = str(t.get("dataProg") or "")[:10]
+        if prog and (not g["programada"] or prog < g["programada"]):
+            g["programada"] = prog
+        g["atrasada"] = g["atrasada"] or bool(t.get("atrasado"))
+        estado = str(t.get("estado") or "—")
+        g["tarefas"].append({"tarefa": str(t.get("tarefa") or ""), "curto": curto(t.get("tarefa")), "sig": sm[0].upper()
+                             if sm[0] in SIGLAS else ROT_TIPO.get(sm[0], ""), "estado": estado,
+                             "cls": ESTADO_CLS.get(sem_acento(estado).strip(), "nulo"),
+                             "responsavel": str(t.get("responsavel") or "")})
+    ordem_estado = {"info": 0, "nulo": 1, "and": 2}
+    for g in oss.values():
+        # a mesma atividade em vários ativos da OS ("QGBT" quatro vezes: o arquivo não traz o ativo) vira UMA linha com
+        # quantas são (`n`); a conta de pendentes segue tarefa a tarefa
+        juntas: dict[tuple, dict] = {}
+        for x in g["tarefas"]:
+            j = juntas.setdefault((x["curto"], x["estado"], x["sig"]), dict(x, n=0))
+            j["n"] += 1
+        g["tarefas"] = sorted(juntas.values(), key=lambda x: (ordem_estado.get(x["cls"], 3), sem_acento(x["curto"])))
+        g["fechada"] = g["status"] == "Concluída"
+    lista = sorted(oss.values(), key=lambda g: (not g["atrasada"], g["programada"] or "9999", g["os"]))
+    tarefas_p = [x for g in lista for x in g["tarefas"] for _ in range(x["n"])]
+    return {"usina": usina, "col": col, "oss": lista, "n_os": len(lista), "n_tarefas": len(tarefas_p),
+            "feitas": feitas, "total": total, "pct": _round(100 * feitas / total) if total else None,
+            "atrasadas": sum(1 for g in lista if g["atrasada"]),
+            # (estado, quantas, classe da cor), na ordem do andamento: em progresso, pausada, não iniciada
+            "por_estado": sorted(((e, sum(1 for x in tarefas_p if x["estado"] == e),
+                                   ESTADO_CLS.get(sem_acento(e).strip(), "nulo")) for e in {x["estado"] for x in tarefas_p}),
+                                 key=lambda x: (ordem_estado.get(x[2], 3), x[0]))}
 
 
 def plano(b, o: Opcoes, meses_, mapa: dict | None = None) -> dict:

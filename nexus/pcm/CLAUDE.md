@@ -294,6 +294,20 @@ lê: nada vai ao banco nem ao Fracttal. Os controles vão pela URL (`modo`, `tip
   grava o `geradoEm` em UTC sem fuso e o painel o mostra como hora local: 12:42 lá é 09:42 aqui). Dois defeitos do
   painel que o Nexus não copia (revisão de 08/10): a dica "sem preventiva no período" nas células de grupo e do TOTAL,
   que têm tarefa (aqui ficam sem dica), e o cabeçalho Tipo da Fila, que lá não ordena nada (aqui ordena pelo tipo).
+- **As tarefas pendentes da célula** (Levi, 12/10/2026: "Na versão antiga ao clicar em cima do % do que tem pendente
+  aparecia as tarefas pendentes, resolva isso por gentileza no Nexus! Faça maior e mais bonito"): na linha da usina, a
+  célula com o que falta (MPM, MPT, Corretivas, os meses) e o número da coluna Pendentes abrem um **painel lateral**
+  (640 px; no celular, a tela toda) com as tarefas que não estão Finalizadas, por OS: as atrasadas primeiro, depois pela
+  Data Programada; o status da OS (na grafia do card do OS Creator: "Em processo" → Em Processo, "Verificação" → Em
+  Verificação, "Finalizados" → Concluída, com o aviso "OS finalizada no Fracttal com a tarefa em aberto"), Atrasada,
+  a programada e o Fracttal no ícone; a OS abre o **card dela no Nexus** (`oscreator/card_os_abrir.html`). O nome da
+  tarefa sem o "[Grid Co.] - MPM - " (o inteiro no title); a mesma atividade repetida na OS (uma por ativo: o arquivo
+  não traz o ativo) vira uma linha com "×4". **MPA e MPS seguem abrindo a Fila** (como no painel), e grupo e TOTAL não
+  abrem lista. A conta é `gestao.pendentes` (a regra `classificar`, a mesma da `base`, e os mesmos recortes da matriz:
+  tipo, mês, busca e os filtros de cima): o número da lista é o da célula, conferido em toda célula de usina pelo teste.
+  Endereço: o da própria tela com `pu` (usina) e `pc` (coluna; `*` = Pendentes), pedido por fetch; coluna que a matriz
+  não tem = 404. A `classificar` saiu da `base` sem mudar conta: a prova de 12/10 (356 casos, 434.725 valores) bateu
+  célula a célula. Prova: `tests/test_pcm_gestao_pendentes.py`.
 - **Fila: ordem do Atraso** é a do painel: a 1ª ordem (seta para cima) já põe a MAIS VELHA no alto
   (`?modo=fila&pend=atraso&ordemf=atraso`); `descf=1` inverte e põe a mais nova primeiro.
 

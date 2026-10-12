@@ -1,0 +1,41 @@
+{# As tarefas pendentes de uma célula do Plano (Levi, 12/10/2026: "Na versão antiga ao clicar em cima do % do que tem
+   pendente aparecia as tarefas pendentes, resolva isso por gentileza no Nexus! Faça maior e mais bonito"). Vem por
+   fetch (gestao?pu=<usina>&pc=<coluna>) e entra no painel lateral da gestao.html. A conta é a do gestao.pendentes: o
+   número de tarefas bate com o da célula. A OS abre o card dela no Nexus (NexusOsCard); o Fracttal fica no ícone. #}
+<header class="pgp-cab">
+  <div class="pgp-cab-txt">
+    <p class="gc-eyebrow">Tarefas pendentes · {{ rot_col }}</p>
+    <h2 class="pgp-titulo" id="pgp-titulo">{{ p.usina }}</h2>
+    <p class="pgp-sub">{% if p.total %}<b>{{ p.feitas }}</b> de <b>{{ p.total }}</b> finalizadas{% if p.pct is not none %} · {{ p.pct }}%{% endif %}{% endif %}</p>
+  </div>
+  <button type="button" class="pgp-x" data-fechar aria-label="Fechar as tarefas pendentes"><i class="ph ph-x" aria-hidden="true"></i></button>
+</header>
+<div class="pgp-numeros">
+  <div><b class="gc-num pgp-t--crit">{{ p.n_tarefas }}</b><span>tarefa{{ 's' if p.n_tarefas != 1 }} pendente{{ 's' if p.n_tarefas != 1 }}</span></div>
+  <div><b class="gc-num">{{ p.n_os }}</b><span>OS</span></div>
+  <div><b class="gc-num{{ ' pgp-t--crit' if p.atrasadas }}">{{ p.atrasadas }}</b><span>OS atrasada{{ 's' if p.atrasadas != 1 }}</span></div>
+</div>
+{% if p.por_estado %}<p class="pgp-estados">{% for e, n, cls in p.por_estado %}<span class="pgp-estado pgp-estado--{{ cls }}">{{ e }} · {{ n }}</span>{% endfor %}</p>{% endif %}
+<ol class="pgp-lista">
+  {% for o in p.oss %}
+  <li class="pgp-os{{ ' pgp-os--atrasada' if o.atrasada }}">
+    <div class="pgp-os-cab">
+      {% if o.wid %}<button type="button" class="pgp-os-n" data-wid="{{ o.wid }}" data-status="{{ o.status }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}">OS {{ o.os }}</button>
+      {% else %}<span class="pgp-os-n pgp-os-n--sem">OS {{ o.os }}</span>{% endif %}
+      {% if o.status %}<span class="pgp-chip pgp-chip--{{ o.status_cls }}">{{ o.status }}</span>{% endif %}
+      {% if o.atrasada %}<span class="pgp-chip pgp-chip--crit">Atrasada</span>{% endif %}
+      <span class="pgp-data">{% if o.programada %}Programada {{ data_curta(o.programada) }}{% else %}sem data programada{% endif %}</span>
+      {% if o.url %}<a class="pgp-fracttal" href="{{ o.url|na_raiz }}" target="_blank" rel="noopener" title="Abrir a OS {{ o.os }} no Fracttal" aria-label="Abrir a OS {{ o.os }} no Fracttal"><i class="ph ph-arrow-square-out" aria-hidden="true"></i></a>{% endif %}
+    </div>
+    <ul class="pgp-tarefas">
+      {% for x in o.tarefas %}
+      <li><span class="pgp-estado pgp-estado--{{ x.cls }}">{{ x.estado }}</span>
+        <span class="pgp-nome" title="{{ x.tarefa }}">{{ x.curto }}</span>{% if x.n > 1 %}<span class="pgp-vezes" title="{{ x.n }} tarefas com esta atividade na OS (uma por ativo)">×{{ x.n }}</span>{% endif %}{% if x.sig %}<span class="pgp-sig">{{ x.sig }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% if o.fechada %}<p class="pgp-nota"><i class="ph ph-info" aria-hidden="true"></i> A OS está finalizada no Fracttal com {{ 'esta tarefa' if o.tarefas|length == 1 else 'estas tarefas' }} em aberto.</p>{% endif %}
+  </li>
+  {% else %}
+  <li class="pgp-vazio">Nenhuma tarefa pendente nesta célula.</li>
+  {% endfor %}
+</ol>
