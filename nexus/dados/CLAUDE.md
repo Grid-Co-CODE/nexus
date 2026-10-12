@@ -259,7 +259,7 @@ cadastro, recusar carga encolhida. **Nada disto está feito**; onde cada peça h
 7. **Passo 6c — montado** (geração). Feito em 08/10, sem publicar: o ciclo pela tabela Equipamentos do BD_Performance
    (aba → "Usina Fractall" → a usina que o Fracttal liga; `cadastro/CLAUDE.md`) fecha 78 de 100 abas do BD_Thopen e
    51 de 53 do BD_Performance, sem nenhum conflito com os caminhos antigos; a lista das que não fecham, com o motivo, em
-   `C:\GridcoAuto\nexus\geracao_de_para_faltando.csv`. Falta a decisão 8: publicar o de-para (tela Ligações), conferir
+   `C:\GridcoAuto\nexus\geracao_de_para_faltando.csv`. Falta a decisão 8: publicar o de-para (seção Ligações da Governança), conferir
    as abas cópia; o teto de kWh/dia; o IPOA do BD_Performance (DEF); onde vai o inversor × dia (passo 0 ou livros
    mensais `nexus_geracao_inversor_AAAA_MM`); ligar o laço diário (~01:40).
 8. **Lacunas do cadastro** (05/10, ainda abertas): 1 equipe da região do App fora do cadastro; 1 usina do Fracttal e

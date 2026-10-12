@@ -40,10 +40,8 @@ TORRE = Torre(
         Tela("importar", "Importar do Excel",
              "O que muda no ensaio se eu importar o BD_Operações de hoje?",
              "BD_Operacoes.xlsx enviado pela tela"),
-        Tela("ligacoes", "Ligações entre bases",
-             "Que usina cada base chama de quê, e onde a ligação falta?",
-             "de_para do Nexus (cadastro_nexus no PostgreSQL)"),
         # Governança de dados (05/10/2026, Levi: "prioridade 0"): a matriz de barramento e a qualidade da ligação por ID.
+        # Desde 11/10/2026 traz no fim a seção Ligações entre bases (era a tela /t/base/ligacoes, que redireciona para lá).
         Tela("governanca", "Governança de dados",
              "Que dado temos, de onde vem, o que é cada linha e quanto dele liga por ID?",
              "Catálogo do Nexus (nexus/dados) e nexus_fatos · qualidade no banco"),

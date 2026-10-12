@@ -12,7 +12,7 @@ no GitHub** vem num pacote à parte que o Levi envia por canal privado, o `nexus
 | `.env` | os segredos do Nexus: chave da sessão, senha de entrada, chave da cifra do cadastro, token de escrita na API db_performace, o token do repositório do PCM para Publicar no App (`NEXUS_PCM_GITHUB_TOKEN`, desde 09/10/2026). Também leva o endereço e a chave só de leitura da plataforma de Performance (`NEXUS_PLATAFORMA_URL`, `NEXUS_PLATAFORMA_TOKEN`), a chave do passe da porta única (`NEXUS_SSO_CHAVE`, desde 09/10/2026, a MESMA da plataforma; seção 7e) e a chave do código da pessoa do App de Campo (`NEXUS_PESSOA_HMAC`) |
 | `nexus/torres/oscreator/os_creator/.env` | a credencial do Fracttal (OS Creator, motor do PCM e a fila da Aprovação de OS usam a mesma) |
 | `dados/cadastro_ensaio.json` | o cadastro do BD_Operações (o sensível vai cifrado; a chave está no `.env`) |
-| `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da tela Base → Ligações (o de-para entre as bases) |
+| `dados/de_para_regras.json` e `dados/de_para_atual.json` | as decisões e o estado da seção Ligações entre bases (Base → Governança de dados) (o de-para entre as bases) |
 | `dados/pcm/insumos.json` | os insumos da programação semanal do PCM (prioridades, confiabilidade, feriados e o histórico, já com a S41 publicada) |
 | `dados/pcm/_ativos_classificacao_cache.json` | a lista de usinas do Fracttal (a tela de observações do PCM usa) |
 | `dados/campo/identidades.json` | o cadastro do App de Campo (nome, e-mail e supervisor de cada técnico): **dado pessoal** |
@@ -461,7 +461,7 @@ dado cifrado do cadastro (CPF, telefone, endereço, receita) não volta.**
 - **Login:** é pelo Fracttal (o mesmo do OS Creator: entra quem tem conta da Grid Co. no Fracttal; um login abre o
   Nexus e o OS Creator). A senha de admin ficou como reserva. O login Microsoft não está ligado.
 
-- **Base → Ligações:** o pacote já traz o de-para calculado. O Fracttal entra pela foto da última semana gerada no
+- **Ligações entre bases (seção da Governança de dados):** o pacote já traz o de-para calculado. O Fracttal entra pela foto da última semana gerada no
   Nexus (`dados/pcm/geracoes/*/`): só use "Ler as bases de novo" depois da 1ª geração no servidor. Antes dela, o
   Fracttal liga só pelo nome das usinas (sem o código do equipamento, liga menos).
 - **Cadastro em dia:** os responsáveis ainda atualizam o BD_Operações no Excel. Para o Nexus acompanhar, use
