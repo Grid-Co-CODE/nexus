@@ -7,10 +7,14 @@
                                                                       publicar: quanto ligaria depois da publicação
     python ferramentas/carregar_geracao.py --ensaio --xlsx PASTA      grava os dois xlsx na PASTA, para medir o tamanho
 
-Gravar no banco está DESLIGADO de propósito (desenho de 08/10, seções 7 e 9): o servidor da T.I. troca os livros de
-hora em hora e o dado novo entra quando o código for ao servidor, depois das decisões do Levi (publicar o de-para com
-os sistemas de aba, o teto de kWh/dia, o IPOA do BD_Performance e o inversor × dia com o passo 0 ou em livros
-mensais). Só faz GET na API (leitura aberta); não lê o Fracttal. Imprime só contagens, nunca nome de usina.
+    python ferramentas/carregar_geracao.py --gravar [--forcar]       GRAVA (decisão 8 do Levi, 11/10/2026): o
+                                                                      `nexus_geracao` e os livros do mês que mudaram,
+                                                                      e confere; sem --forcar, pula se os BDs não
+                                                                      subiram e recusa aba encolhida
+
+No servidor quem grava é a carga de hora em hora (`carga.gerar_geracao`), só quando o BD_Thopen ou o BD_Performance
+subiu. Os BDs são a fonte (o Levi preenche por API e à mão e sobe ao PG): aqui só se lê deles. O ensaio só faz GET na
+API (leitura aberta); não lê o Fracttal. Imprime só contagens, nunca nome de usina.
 """
 import argparse
 import json
@@ -90,12 +94,19 @@ def medir(config, sessao=None, *, de_para_proprio=False, xlsx: Path | None = Non
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ensaio", action="store_true", help="monta e não grava (o único modo, até as decisões)")
+    ap.add_argument("--ensaio", action="store_true", help="monta e não grava")
+    ap.add_argument("--gravar", action="store_true", help="grava o nexus_geracao e os meses que mudaram (confere)")
+    ap.add_argument("--forcar", action="store_true", help="com --gravar: grava mesmo sem subida nova ou com aba encolhida")
     ap.add_argument("--de-para-local", action="store_true", help="usa o de-para calculado agora, sem publicar")
     ap.add_argument("--xlsx", type=Path, help="pasta onde gravar os xlsx para medir")
     a = ap.parse_args()
+    if a.gravar:
+        rel = carga.gerar_geracao(ler_ambiente(), gravar=True, forcar=a.forcar)
+        rel.pop("abas", None)
+        print(json.dumps(rel, ensure_ascii=False, indent=1, default=str))
+        return
     if not a.ensaio:
-        sys.exit("gravar está desligado até as decisões do Levi (desenho de 08/10, seção 9): use --ensaio")
+        sys.exit("diga o modo: --ensaio (mede, não grava) ou --gravar (grava e confere)")
     rel = medir(ler_ambiente(), de_para_proprio=a.de_para_local, xlsx=a.xlsx)
     print(json.dumps(rel, ensure_ascii=False, indent=1))
 

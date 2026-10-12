@@ -39,8 +39,9 @@ def test_catalogo_declara_grao_estado_e_todas_as_dimensoes():
         assert all(p in catalogo.POR_ID and catalogo.POR_ID[p].estado not in ("parte", "aposentado")
                    for p in f.parte_de), f.id
     r = catalogo.resumo()
-    # a programação passou a gravar em 08/10 (decisão 7): montadas ficam as duas da geração (decisão 8)
-    assert r["conformados"] >= 4 and r["montados"] >= 2
+    # a programação passou a gravar em 08/10 (decisão 7) e a geração em 11/10 (decisão 8): nada fica só montado
+    assert r["conformados"] >= 6 and r["montados"] == 0
+    assert catalogo.POR_ID["geracao_usina_dia"].estado == catalogo.POR_ID["geracao_inversor_dia"].estado == "conformado"
     assert catalogo.POR_ID["programacao"].estado == "conformado"
     # a auditoria de 08/10: ronda e PT tinham o grão errado; checklist e avulsa viraram fonte do fato único de ronda
     assert "OS de ronda" not in catalogo.POR_ID["ronda"].grao and "ativo" in catalogo.POR_ID["pt"].grao
@@ -647,7 +648,7 @@ def test_tela_mostra_a_matriz_o_tipo_os_livros_e_a_qualidade(app, banco):
     telas_dados._CACHE.update(t=0.0, v=None)
     assert "Matriz de barramento" in html and "Fechamento de OS" in html and "com IDs" in html
     assert "100% ligado" in html and "Programação semanal" in html
-    assert "foto acumulada" in html and "montado, sem gravar" in html and "fonte de ronda" in html
+    assert "foto acumulada" in html and "Geração diária por usina" in html and "fonte de ronda" in html
     assert "nexus_equipamentos" in html and "registrado, ainda não" in html
     assert "Histórico das dimensões" in html and "Dimensão de equipamento" in html
     assert "Qualidade da ligação · Ronda" in html and "Qualidade da ligação · Permissão de trabalho" in html

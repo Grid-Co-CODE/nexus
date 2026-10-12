@@ -98,6 +98,15 @@ COLUNAS_DA_USINA = (
     ("validado", ("Validação",)),
 )
 ENERGIA_DA_USINA = frozenset(COLUNAS_DA_USINA[0][1])
+# Por fonte, a medida que só aceita uma coluna (decisão 8 do Levi, 11/10/2026: "pode seguir com as 4 recomendações"): no
+# `bd_performance` o IPOA é SÓ o "DEF" (a decisão da Performance); aba sem ele fica com o IPOA vazio, nunca com o simples.
+COLUNAS_DA_FONTE = {"bd_performance": {"ipoa_kwh_m2": ("IPOA (kWh/m²) DEF",)}}
+
+# O inversor × dia (~700 mil linhas, 29 a 36 MB num livro só) vai em UM LIVRO POR MÊS (decisão 8, 11/10/2026): só o mês
+# que mudou é regravado. O `meses` do `nexus_geracao` guarda o sha de cada mês gravado, para a próxima montagem saber.
+PREFIXO_LIVRO_INVERSOR = "nexus_geracao_inversor_"
+ABA_MESES = "meses"
+CAB_MESES = ["livro", "mes", "linhas", "sha_linhas", "gravado_em"]
 # Limites físicos (o que passa disso não é medida do dia): irradiação diária acima do sol fora da atmosfera num plano
 # que o segue (~18 kWh/m² nos dias mais longos do Brasil) e negativa; chuva acima de 500 mm num dia (o pluviômetro do
 # `bd_performance` tem 40.209 "mm": é o acumulado); disponibilidade fora de 0 a 100%.
@@ -404,6 +413,7 @@ def linhas_usina_dia(fonte: str, aba: str, linhas: list[dict], usina, hoje: date
     cab = _cabecalho(linhas)
     pega = {}
     for medida, opcoes in COLUNAS_DA_USINA:
+        opcoes = COLUNAS_DA_FONTE.get(fonte, {}).get(medida, opcoes)
         k = next((c for c in (_coluna(cab, o) for o in opcoes) if c is not None), None)
         if k is not None:
             pega[medida] = k
@@ -586,9 +596,50 @@ def montar(abas_por_fonte: dict, de_para, usinas, hoje, agora: str, *, apelidos=
         "qualidade": (list(CAB_QUALIDADE), [linha_qualidade(q, CAB_QUALIDADE)]),
         "atualizacao": (CAB_ATUALIZACAO, [[agora, maquina, None, n_u,
                                            "data_id = AAAAMMDD; usina_id do de-para publicado (vazio = ver "
-                                           "usina_motivo); inversor × dia ainda fora do banco"]]),
+                                           "usina_motivo); o inversor × dia em nexus_geracao_inversor_AAAA_MM (um "
+                                           "livro por mês, lista na aba meses)"]]),
     }
     return tabelas, fato_i, rel
+
+
+def livro_do_mes(data_id) -> str:
+    """`nexus_geracao_inversor_AAAA_MM` do dia AAAAMMDD."""
+    d = int(data_id)
+    return f"{PREFIXO_LIVRO_INVERSOR}{d // 10000:04d}_{(d // 100) % 100:02d}"
+
+
+def inversor_por_mes(fato_i: list) -> dict:
+    """{livro do mês: linhas do inversor × dia daquele mês}, na ordem das linhas."""
+    i_dia = CAB_INVERSOR_DIA.index("data_id")
+    out = defaultdict(list)
+    for l in fato_i:
+        out[livro_do_mes(l[i_dia])].append(l)
+    return dict(out)
+
+
+def sha_linhas(linhas: list) -> str:
+    """O sha das linhas (na ordem), para saber se o mês mudou desde a última gravação."""
+    h = hashlib.sha1()
+    for l in linhas:
+        h.update(json.dumps(l, ensure_ascii=False, default=str, separators=(",", ":")).encode("utf-8"))
+    return h.hexdigest()
+
+
+def meses_que_mudaram(por_mes: dict, gravados: list) -> list:
+    """Os livros do mês cujo sha difere do gravado no `meses` (ou que nunca foram gravados), em ordem."""
+    antes = {_txt(g.get("livro")): _txt(g.get("sha_linhas")) for g in gravados or ()}
+    return sorted(m for m, ls in por_mes.items() if antes.get(m) != sha_linhas(ls))
+
+
+def linhas_meses(por_mes: dict, gravados: list, mudaram: list, agora: str) -> list:
+    """A aba `meses`: um livro do mês por linha; o que não mudou guarda a hora em que foi gravado."""
+    antes = {_txt(g.get("livro")): g for g in gravados or ()}
+    out = []
+    for m in sorted(por_mes):
+        ls = por_mes[m]
+        quando = agora if m in mudaram else (antes.get(m) or {}).get("gravado_em") or agora
+        out.append([m, int(m[-7:-3]) * 100 + int(m[-2:]), len(ls), sha_linhas(ls), quando])
+    return out
 
 
 def linha_qualidade(q: dict, cab: list) -> list:

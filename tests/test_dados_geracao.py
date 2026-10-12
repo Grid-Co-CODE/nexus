@@ -484,3 +484,69 @@ def test_ferramenta_recusa_gravar_e_o_adaptador_do_cadastro_serve_ao_de_para(mon
     dp = B.de_para(cad, {PF: [{"chave": "ABC100", "nome": "ABC100", "codigo": "ABC100"},
                               {"chave": "DEF100", "nome": "DEF100", "codigo": "DEF100"}]})
     assert [5, PF, "ABC100", "código"] in dp and [None, PF, "DEF100", B.SEM_PAR] in dp
+
+
+# ── decisão 8 do Levi (11/10/2026): IPOA só o DEF, inversor × dia por mês, grava depois de cada subida ───────────────
+def test_ipoa_do_bd_performance_so_o_def_e_o_thopen_segue_o_dele():
+    aba = [{"Usina": "X", "Data": "2026-10-06", "Multimedidor": 100, "IPOA (kWh/m²)": 5.0}]   # só o IPOA simples
+    perf, _ = G.linhas_usina_dia("bd_performance", "X", aba, None, HOJE)
+    th, _ = G.linhas_usina_dia("bd_thopen", "X", aba, None, HOJE)
+    i = G.CAB_USINA_DIA.index("ipoa_kwh_m2")
+    assert perf[0][i] is None and th[0][i] == 5.0
+    com_def = [dict(aba[0], **{"IPOA (kWh/m²) DEF": 5.9})]
+    assert G.linhas_usina_dia("bd_performance", "X", com_def, None, HOJE)[0][0][i] == 5.9
+
+
+def _inv(data_id, kwh):
+    l = [None] * len(G.CAB_INVERSOR_DIA)
+    l[G.CAB_INVERSOR_DIA.index("data_id")] = data_id
+    l[G.CAB_INVERSOR_DIA.index("energia_kwh")] = kwh
+    return l
+
+
+def test_inversor_por_mes_e_so_o_mes_que_mudou_e_regravado():
+    por_mes = G.inversor_por_mes([_inv(20260930, 1.0), _inv(20261001, 2.0), _inv(20261002, 3.0)])
+    assert sorted(por_mes) == ["nexus_geracao_inversor_2026_09", "nexus_geracao_inversor_2026_10"]
+    assert G.meses_que_mudaram(por_mes, []) == sorted(por_mes)                 # nada gravado: os dois
+    gravados = [dict(zip(G.CAB_MESES, l)) for l in G.linhas_meses(por_mes, [], sorted(por_mes), "t0")]
+    assert G.meses_que_mudaram(por_mes, gravados) == []
+    por_mes["nexus_geracao_inversor_2026_10"][0][G.CAB_INVERSOR_DIA.index("energia_kwh")] = 2.5   # correção manual
+    assert G.meses_que_mudaram(por_mes, gravados) == ["nexus_geracao_inversor_2026_10"]
+    novas = G.linhas_meses(por_mes, gravados, ["nexus_geracao_inversor_2026_10"], "t1")
+    assert [(l[0], l[1], l[4]) for l in novas] == [("nexus_geracao_inversor_2026_09", 202609, "t0"),
+                                                    ("nexus_geracao_inversor_2026_10", 202610, "t1")]
+
+
+def test_o_radar_reconhece_os_livros_do_mes():
+    from nexus.dados import catalogo
+    assert catalogo.da_familia("nexus_geracao_inversor_2026_10", G.ABA_INVERSOR)
+    assert not catalogo.da_familia("nexus_geracao_inversor_2026_10", "outra")
+    assert not catalogo.da_familia("nexus_geracao_inversor_x", G.ABA_INVERSOR)
+    assert catalogo.aba_segue_a_regra(G.ABA_MESES)
+
+
+def test_gerar_geracao_pula_sem_subida_recusa_encolhida_e_grava_so_o_mes_que_mudou(monkeypatch):
+    """Os BDs são a fonte (o Levi sobe ao PG): a geração monta só depois de uma subida, nunca grava aba encolhida e
+    regrava só o mês do inversor que mudou."""
+    from nexus.dados import carga
+    api = ApiPGFalsa()
+    cfg = {"GRIDCO_DB_API": "http://pg.falso", "GRIDCO_SQL_TOKEN": "t"}
+    estado = {"origem": "bd_thopen: t1; bd_performance: t1", "inv": [_inv(20260930, 1.0), _inv(20261001, 2.0)],
+              "encolhidas": 0}
+
+    def montar(config, sessao, agora=None, **kw):
+        t, _i, rel = G.montar(_fontes(), [], USINAS, HOJE, "agora", origem_em=estado["origem"])
+        rel["encolhidas"] = estado["encolhidas"]
+        return t, [list(l) for l in estado["inv"]], rel
+    monkeypatch.setattr(carga, "origem_da_geracao", lambda config, sessao: estado["origem"])
+    monkeypatch.setattr(carga, "montar_geracao", montar)
+    r = carga.gerar_geracao(cfg, api)
+    assert set(r["gravado"]) == {"nexus_geracao", "nexus_geracao_inversor_2026_09", "nexus_geracao_inversor_2026_10"}
+    assert len(livros.ler("http://pg.falso", api, G.LIVRO, G.ABA_MESES)) == 2
+    assert "pulou" in carga.gerar_geracao(cfg, api)                            # nada subiu desde a última montagem
+    estado.update(origem="bd_thopen: t2; bd_performance: t1", inv=[_inv(20260930, 1.0), _inv(20261001, 2.5)])
+    r = carga.gerar_geracao(cfg, api)                                          # subiu, e só outubro mudou
+    assert set(r["gravado"]) == {"nexus_geracao", "nexus_geracao_inversor_2026_10"}
+    estado.update(origem="bd_thopen: t3; bd_performance: t1", encolhidas=1)
+    r = carga.gerar_geracao(cfg, api)
+    assert "recusou" in r and "gravado" not in r                               # aba encolheu: nada grava

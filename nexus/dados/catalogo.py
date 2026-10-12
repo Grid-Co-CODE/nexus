@@ -30,6 +30,7 @@ Estados de cada fato (`ESTADOS_FATO`):
   aposentado  a fonte não vale mais
   fora        fora do banco e sem montagem
 """
+import re
 from dataclasses import dataclass
 
 from . import fato_pt, fato_ronda, fatos, geracao, programacao
@@ -286,18 +287,18 @@ FATOS = (
             usina=("id", "usina_id pelo de-para 'BD_Thopen · aba' / 'BD_Performance · aba' (vazio = usina_motivo)")),
          tipo=geracao.TIPO, chave=geracao.CHAVE_USINA, medidas=_m(geracao.MEDIDAS_USINA),
          fontes=("bd_thopen · 1 aba por usina", "bd_performance · 1 aba por usina"),
-         estado="montado", conformado_em="nexus_geracao · fato_geracao_usina_dia",
-         observacao="montado e medido no --ensaio; grava (diária, ~01:40) depois das decisões do Levi (8): publicar o "
-                    "de-para das abas, o teto de kWh/dia, o IPOA do BD_Performance. Até lá usina_id 0% de propósito. "
-                    "Os 3 agregados do inversor × dia não se somam com ele"),
+         estado="conformado", conformado_em="nexus_geracao · fato_geracao_usina_dia",
+         observacao="produto dos BDs, que seguem a fonte: grava depois de cada subida do bd_thopen ou do bd_performance "
+                    "(decisão 8 do Levi, 11/10/2026: de-para das abas publicado, teto = potência × 24 h, IPOA do "
+                    "bd_performance só o DEF). Aba que perde dias recusa a gravação. Os 3 agregados do inversor × dia "
+                    "não se somam com ele"),
     Fato("geracao_inversor_dia", "Geração diária por inversor", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_INVERSOR,
          _d(data=("id", "data_id"), usina=("id", "usina_id (o da aba)"),
             equipamento=("id", "equipamento_id pelo apelido 'BD_* · coluna'")),
          tipo=geracao.TIPO, chave=geracao.CHAVE_INVERSOR, medidas=_m(geracao.MEDIDAS_INVERSOR),
-         fontes=("bd_thopen · 1 aba por usina", "bd_performance · 1 aba por usina"), estado="montado",
-         observacao="~700 mil linhas (29 a 36 MB de xlsx): não cabe em troca integral. O destino é decisão do Levi: "
-                    "o passo 0 (acréscimo por dia) ou livros mensais nexus_geracao_inversor_AAAA_MM"),
+         fontes=("bd_thopen · 1 aba por usina", "bd_performance · 1 aba por usina"), estado="conformado", conformado_em="nexus_geracao_inversor_AAAA_MM · fato_geracao_inversor_dia",
+         observacao="~700 mil linhas (29 a 36 MB de xlsx) não cabiam em troca integral: um livro por mês, nexus_geracao_inversor_AAAA_MM (decisão 8 do Levi, 11/10/2026), e só o mês que mudou é regravado"),
     Fato("geracao_thopen", "Geração diária (Thopen)", "performance", "bd_thopen · 1 aba por usina",
          "1 linha = usina × dia",
          _d(data=("cod", "Data"), usina=("nome", "Usina (aba)"), equipamento=("largo", "SKID 1…, Inversor 1.1…")),
@@ -425,9 +426,17 @@ LIVROS = (
           "nexus/dados/carga.py + programacao.py (o histórico: ferramentas/carregar_programacao_historica.py)", True,
           "criado em 08/10/2026 pela carga única: W21 a W41, 14.276 blocos (W21 a W37 do git do PCM + as 4 semanas "
           "do arquivo), conferido por GET semana a semana"),
-    Livro("nexus_geracao", ("fato_geracao_usina_dia", "qualidade", "atualizacao"),
-          "diária (~01:40) quando ligar; só --ensaio até a decisão 8", "ferramentas/carregar_geracao.py + geracao.py",
-          False),
+    Livro("nexus_geracao", ("fato_geracao_usina_dia", "qualidade", "atualizacao", "meses"),
+          "depois de cada subida do bd_thopen ou do bd_performance (a carga de hora em hora confere o updated_at deles)",
+          "nexus/dados/carga.py (gerar_geracao) + geracao.py; à mão: ferramentas/carregar_geracao.py --gravar", True,
+          "produto DERIVADO dos BDs, que seguem a fonte (Levi, 11/10/2026: preenchidos por API e à mão e subidos ao PG; "
+          "nada do Nexus os substitui). Decisão 8 tomada em 11/10: de-para das abas publicado, teto = potência × 24 h, "
+          "IPOA do bd_performance só o DEF, inversor × dia em um livro por mês"),
+    # a família do inversor × dia: um livro por mês, nome nexus_geracao_inversor_AAAA_MM (o radar casa pelo padrão,
+    # `da_familia`); só o mês que mudou é regravado (a aba `meses` do nexus_geracao guarda o sha de cada um)
+    Livro("nexus_geracao_inversor_AAAA_MM", ("fato_geracao_inversor_dia",), "com o nexus_geracao, só o mês que mudou",
+          "nexus/dados/carga.py (gerar_geracao) + geracao.py", True,
+          "~700 mil linhas no total (29 a 36 MB num livro só não cabiam na troca integral); ~32 mil por mês"),
     Livro("nexus_rondas_checklist", ("fato_checklist_ronda", "qualidade", "atualizacao"), "carga única (06/10/2026)",
           "ferramentas/carregar_checklist_rondas_sem_os.py", True,
           "a aba qualidade existe no banco desde a carga única e só entrou aqui em 09/10, quando o radar a achou"),
@@ -449,12 +458,23 @@ LIVROS = (
           "no PC e no servidor"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
+# Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
+FAMILIAS = {re.compile(r"^nexus_geracao_inversor_\d{4}_\d{2}$"): "nexus_geracao_inversor_AAAA_MM"}
+
+
+def da_familia(livro: str, aba: str) -> bool:
+    """A aba é de um livro de família registrado (ex.: nexus_geracao_inversor_2026_10 · fato_geracao_inversor_dia)."""
+    for padrao, molde in FAMILIAS.items():
+        if padrao.match(livro or ""):
+            return aba in LIVRO_POR_NOME[molde].abas
+    return False
 # As abas que não são fato_/dim_/<dimensão>_historico/qualidade/atualizacao, e por quê (regra 10).
 ABAS_FORA_DA_REGRA = {
     "feriados_locais": "a lista de feriados estaduais e municipais (a dim_data só tem os nacionais)",
     "qualidade_historico": "a qualidade do histórico (SCD2): sobreposição, buraco e membro sem vigente",
     "equipamento_apelido": "o que cada sistema chama de cada equipamento (o modelo do de_para das usinas)",
     "foto_ativos": "a foto dos ativos do Fracttal: insumo da dimensão de equipamento, carga única",
+    "meses": "a lista dos livros do mês do inversor × dia, com o sha de cada um (a geração regrava só o mês que mudou)",
 }
 
 

@@ -517,9 +517,8 @@ def _programacao(le: "_Leitor", dados, lido_em, lig, m, equip, hist_q, iso, maqu
 
 
 def montar_geracao(config, sessao, agora: datetime | None = None, *, apelidos=None, de_para=None) -> tuple:
-    """(tabelas do `nexus_geracao`, linhas do inversor × dia, relatório). A cadência é DIÁRIA (depois da coleta noturna
-    que grava o `bd_thopen` e o `bd_performance`) e a gravação está DESLIGADA até as decisões do Levi (8): quem chama
-    é o `--ensaio` (`ferramentas/carregar_dados.py` e `ferramentas/carregar_geracao.py`). Lê as 171 abas inteiras
+    """(tabelas do `nexus_geracao`, linhas do inversor × dia, relatório). Quem grava é o `gerar_geracao` (depois de cada
+    subida do `bd_thopen` ou do `bd_performance`); o `--ensaio` das ferramentas só mede. Lê as 171 abas inteiras
     (43–65 s em 08/10). `apelidos`: os do `nexus_equipamentos` (sem eles, lê os publicados); `de_para`: um de-para
     calculado (sem ele, o publicado)."""
     agora = agora or _agora()
@@ -539,6 +538,58 @@ def montar_geracao(config, sessao, agora: datetime | None = None, *, apelidos=No
                                         apelidos=apelidos, anterior=anterior, maquina=_maquina(), origem_em=origem_em)
     rel["tempo_s"] = {"ler": t_ler, "montar": round(time.time() - t1, 1)}
     return tab, inversor, rel
+
+
+def origem_da_geracao(config, sessao) -> str:
+    """A hora da última subida do `bd_thopen` e do `bd_performance` (o `updated_at` dos livros), no texto que a montagem
+    grava em `qualidade.origem_atualizada_em`: igual = nada subiu desde a última montagem."""
+    le = _Leitor(_base(config), sessao)
+    return "; ".join(f"{f}: {le.atualizado.get(f)}" for f in geracao.FONTES)
+
+
+def gerar_geracao(config, sessao=None, *, gravar=True, forcar=False, agora=None) -> dict:
+    """A geração em linhas, DEPOIS DE CADA SUBIDA dos BDs (Levi, 11/10/2026: "BD_Performance e BD_Thopen são preenchidos
+    diariamente parte por API e parte manual; logo depois de serem preenchidos eu subo para o PG. Se você quiser fazer o
+    nexus_geração um produto do BD_Performance e BD_Thopen e usar apenas ele como referência eu apoio"). Os BDs seguem a
+    FONTE: aqui só se lê deles. Monta só quando o `updated_at` de um dos dois mudou desde a última montagem (a correção
+    manual de um dia passado entra na seguinte); aba que perdeu dias (leitura vazia ou menor que a anterior) recusa a
+    gravação inteira e diz qual foi; o inversor × dia vai em um livro por mês e só o mês que mudou é regravado. Relatório
+    só com contagens."""
+    import requests
+    s = sessao or requests.Session()
+    base = _base(config)
+    origem = origem_da_geracao(config, s)
+    if not forcar:
+        q = (livros.ler(base, s, geracao.LIVRO, "qualidade") or [{}])[0]
+        if q.get("origem_atualizada_em") == origem:
+            return {"pulou": "nenhuma subida nova do BD_Thopen nem do BD_Performance desde a última montagem",
+                    "origem": origem}
+    t0 = time.time()
+    tab, inversor, rel = montar_geracao(config, s, agora)
+    if rel.get("encolhidas") and not forcar:
+        return dict(rel, recusou="aba com menos dias que a gravada (leitura vazia ou encolhida): nada gravado; veja "
+                                 "'encolhidas' e grave com forcar depois de conferir")
+    por_mes = geracao.inversor_por_mes(inversor)
+    gravados = livros.ler(base, s, geracao.LIVRO, geracao.ABA_MESES)
+    mudaram = geracao.meses_que_mudaram(por_mes, gravados)
+    agora_txt = (agora or _agora()).isoformat(timespec="seconds")
+    tab[geracao.ABA_MESES] = (list(geracao.CAB_MESES), geracao.linhas_meses(por_mes, gravados, mudaram, agora_txt))
+    rel["meses"] = {"total": len(por_mes), "a_gravar": mudaram}
+    if not gravar:
+        return dict(rel, ensaio="montado com o dado real; nada gravado")
+    if not config.get("GRIDCO_SQL_TOKEN"):
+        return dict(rel, erro="sem GRIDCO_SQL_TOKEN: montado e não gravado")
+    gravado = {}
+    # os meses do inversor primeiro: o `nexus_geracao` (com a origem na qualidade) é a marca de montagem completa; se um
+    # mês falhar, a próxima volta monta de novo
+    for m in mudaram:
+        gravado[m] = livros.publicar(m, f"Nexus · geração por inversor e dia ({m[-7:-3]}-{m[-2:]})",
+                                     {geracao.ABA_INVERSOR: (list(geracao.CAB_INVERSOR_DIA), por_mes[m])}, base=base,
+                                     token=config["GRIDCO_SQL_TOKEN"], sessao=s)
+    gravado[geracao.LIVRO] = livros.publicar(geracao.LIVRO, geracao.NOME_LIVRO, tab, base=base,
+                                             token=config["GRIDCO_SQL_TOKEN"], sessao=s)
+    rel["gravado"], rel["duracao_s"] = gravado, round(time.time() - t0, 1)
+    return rel
 
 
 def rodar(config, sessao=None, *, gravar=True, forcar=False, agora=None) -> dict:
@@ -609,6 +660,14 @@ def ligar(app):
                 except Exception as e:      # noqa: BLE001 — o laço não morre por uma carga
                     _LACO["ultimo"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
                     log.exception("carga de dados")
+                # a geração é à parte: só monta quando um dos BDs subiu, e a falha dela não segura a carga da hora
+                try:
+                    _LACO["geracao"] = gerar_geracao(app.config)
+                    log.info("geração: %s", {k: v for k, v in _LACO["geracao"].items()
+                                             if k in ("pulou", "recusou", "gravado", "erro", "meses", "duracao_s")})
+                except Exception as e:      # noqa: BLE001
+                    _LACO["geracao"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
+                    log.exception("geração")
 
     _LACO["thread"] = threading.Thread(target=laco, name="nexus-carga-dados", daemon=True)
     _LACO["thread"].start()
