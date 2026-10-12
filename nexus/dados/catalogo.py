@@ -266,10 +266,12 @@ FATOS = (
     # De-para de equipamentos (11/10/2026, Levi: "quero que o de-para da equipamentos seja feito na plataforma de forma
     # intuitiva"): a tela /admin/de-para da plataforma liga a usina que a API renomeou (pelo id) e o inversor que a fonte
     # não nomeia (conta oem@ da API PV, scadaGridco) ao cadastro. A decisão vence o de-para em código da plataforma.
+    # 12/10/2026 (Levi: "precisamos trazer para o Nexus e deixar mais dinâmico com a plataforma"): também o APELIDO da
+    # usina que a fonte manda só pelo nome (Thopen do banco, Athon, Axis), que antes exigia editar o Excel do cadastro.
     Fato("decisao_depara", "Decisão de de-para de equipamento", "performance",
          "nexus_depara · fato_decisao_depara",
-         "1 linha = 1 decisão de ligar 1 usina (o id dela na fonte) ou 1 inversor (o id dele na fonte) de 1 fonte ao "
-         "cadastro (aba Equipamentos do BD_Performance)",
+         "1 linha = 1 decisão de ligar 1 usina (o id dela na fonte, ou o nome nas fontes que mandam só o nome) ou 1 "
+         "inversor (o id dele na fonte) de 1 fonte ao cadastro (aba Equipamentos do BD_Performance)",
          _d(data=("id", "data_id (o dia de Brasília da decisão)"),
             usina=("nao", "usina_fonte (o id na fonte) + usina_supervisorio (chave de negócio do Equipamentos); o "
                           "plant_id por fonte ainda não está no de_para (pendência 10)"),
@@ -280,7 +282,9 @@ FATOS = (
          janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada fonte, usina e inversor)",
          observacao="fonte = a chave da aba do Monitoramento; a usina liga nas contas da API PV (pv, semp, alveslima, "
                     "2capi) e o inversor na conta oem@ (semp, alveslima, 2capi) e no scadaGridco (greenyellow, "
-                    "salenergia). inversor_fonte vazio = a linha é da usina. Valor vazio = desfaz (vale o nome da API ou "
+                    "salenergia); o apelido pelo nome, nas fontes que mandam a usina só pelo nome (pg, sunop, axis: "
+                    "usina_fonte = o nome exatamente como a fonte escreve). inversor_fonte vazio = a linha é da usina. "
+                    "Valor vazio = desfaz (vale o nome da API ou "
                     "o de-para em código). O cadastro entra pela chave de negócio, que a plataforma confere antes de "
                     "gravar (nunca texto livre). Quem decidiu fica no log da máquina (logs/depara.log da plataforma), "
                     "não no banco (regra 8)"),
