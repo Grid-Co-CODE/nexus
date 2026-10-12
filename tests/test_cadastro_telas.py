@@ -167,14 +167,38 @@ def test_importar_arquivo_que_nao_e_xlsx_recusa(cli):
     assert resp.status_code == 400
 
 
-def test_qualidade_e_listas_abrem(cli):
+def test_qualidade_abre(cli):
     assert cli.get("/t/base/qualidade").status_code == 200
-    assert "OPERAÇÃO" in _html(cli.get("/t/base/listas"))
 
 
-def test_incluir_valor_na_lista(cli):
-    assert cli.post("/t/base/listas", data={"lista": "status_usina", "valor": "EM OBRA"}).status_code == 302
-    assert "EM OBRA" in _html(cli.get("/t/base/listas"))
+# ── Base → Listas saiu (Levi, 11/10/2026: "pode tirar listas pois a governança faz mais sentido") ──────────────────
+def test_listas_saiu_do_menu_e_o_endereco_leva_a_governanca(cli, app_cad):
+    from nexus.cadastro.telas import servico
+    html = _html(cli.get("/t/base/registro-mestre"))
+    assert 'href="/t/base/listas"' not in html and 'href="/t/base/governanca"' in html       # fora do menu
+    assert next(t for t in app_cad.extensions["nexus_torres"] if t.id == "base").tela("listas") is None
+    # quem tinha o endereço salvo (ou uma tela velha aberta, no "Incluir") cai na Governança, não num 404
+    for r in (cli.get("/t/base/listas"), cli.post("/t/base/listas", data={"lista": "status_usina", "valor": "EM OBRA"})):
+        assert r.status_code == 302 and r.headers["Location"] == "/t/base/governanca"
+    # nada foi gravado, e os valores das listas continuam no cadastro: a ficha os oferece
+    with app_cad.app_context():
+        assert servico().listas()["status_usina"] == ["OPERAÇÃO", "A MOBILIZAR"]
+    assert '<option value="A MOBILIZAR"' in _html(cli.get("/t/base/usina/1"))
+    # o recado do valor fora da lista não manda mais à tela que saiu
+    html = _html(cli.get("/t/base/usina/1"))
+    resp = cli.post("/t/base/usina/1", data={"_versao": _versao(html), "status": "EM OBRA"})
+    assert resp.status_code == 422 and "Inclua em Listas" not in _html(resp) and "Importar do Excel" in _html(resp)
+
+
+def test_pendencia_de_lista_aparece_na_qualidade_sem_link(cli, app_cad):
+    """Valores parecidos numa lista (só vêm da importação): sem a tela Listas, a pendência não tem para onde levar."""
+    from nexus.cadastro.telas import servico
+    with app_cad.app_context():
+        srv = servico()
+        srv.aplicar_carga(Carga(entidades={}, listas={**srv.listas(), "uf": ["SP", "sp"]}))
+    html = _html(cli.get("/t/base/qualidade"))
+    assert "Valores parecidos na mesma lista" in html and "SP × sp" in html
+    assert "/t/base/listas" not in html and '<td class="id">uf</td><td>UF</td>' in html
 
 
 def test_equipe_mostra_usinas_e_pessoas(cli):

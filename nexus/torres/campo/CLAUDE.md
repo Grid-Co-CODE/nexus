@@ -427,8 +427,13 @@ eram "supervisor" (o `supervisor_id` dos técnicos) são, na prática, os gestor
 
 ## Aprovação de PT no Nexus (05/10/2026)
 
-A OS da PT (verde) abre `/t/campo/pt/<número>`: a PT inteira (tarefa, ativo, técnico, atividades da APR com sim/não/NA,
-respostas NÃO, falta, forçada) e a decisão.
+A OS da PT (verde) abre `/t/campo/pt/<número>?ativo=<código do ativo>`: a linha da PT (tarefa, ativo, técnico,
+atividades da APR com sim/não/NA, respostas NÃO, falta, forçada) e a decisão dela. **A decisão é por linha** (decisão 4
+do Levi, 11/10/2026): o App decide cada PT × ativo à parte, e a PT de 3 ativos tem 3 linhas e 3 decisões. Todo link à
+tela e todo formulário de decidir levam a linha (`ativo` no link, `codigo` no formulário; "" = a linha sem ativo, como a
+da APR do dia); a tela da PT de mais de uma linha lista as outras para trocar (`visao.pt_linhas`). Sem a linha (link
+ou formulário de antes), a tela abre a 1ª, e o `decidir` só aceita a PT de uma linha: na de mais, escolher a 1ª seria
+chutar a qual ativo a decisão vale.
 - **Quem assina: o login do Fracttal do OS Creator** (Levi: "utilize o login do fractal do OS Creator Web que já dá
   certo!"). O OS Creator roda dentro do Nexus com sessão própria (cookie `os_sessao`, só em /os); por isso as rotas de
   assinatura moram em `/os/_nexus/...` (`assinatura.py`): `quem` (o e-mail de quem entrou), `pt/<n>/decidir` (POST) e
@@ -440,15 +445,18 @@ respostas NÃO, falta, forçada) e a decisão.
   (`_login`) vai sem o prefixo (é o caminho que o clone entende) e o endereço do login, com ele. A aprovação de OS chama
   o clone com `request.url_root` (o cookie que o clone renovar fica no `/nexus/os`). Todo redirecionamento à lista
   (`TELA_PT`) passa pelo `na_raiz`. Prova: `tests/test_prefixo_sair_fracttal.py` e `tests/test_prefixo.py`.
-- **Fica salvo:** `nexus_pt_decisoes · decisoes` (`nexus/campo/decisao_pt.py`; registrado no `catalogo.py` como
-  `decisao_pt`). Grão: 1 linha = 1 decisão. Pessoa só como HMAC do e-mail (o mesmo código do App); motivo mascarado. O
-  primeiro que decide vale: PT que já tem decisão do Nexus, ou que o livro do App já mostra decidida, recusa.
+- **Fica salvo:** `nexus_pt_decisoes · fato_decisao_pt` (`nexus/campo/decisao_pt.py`; registrado no `catalogo.py` como
+  `decisao_pt`, com o contrato). Grão: 1 linha = 1 decisão sobre 1 linha da PT: as colunas de 05/10 e o `codigo_ativo`
+  (o Código do ativo da linha no `pt_app_campo`) no fim. Pessoa só como HMAC do e-mail (`decidida_por_hmac`, o mesmo
+  código do App); motivo mascarado. O primeiro que decide a linha vale: linha que já tem decisão do Nexus, ou que o livro
+  do App já mostra decidida, recusa. A aba `decisoes` de antes (nunca gravada) não é lida.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador), o gestor de contrato da usina, quem tem o vínculo COS no cadastro e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). A pessoa é a do login
   do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa.
-- **Falta o App aplicar** (próxima versão do App, decisão de publicar é do Levi): ler `nexus_pt_decisoes` a cada
-  minuto; para cada decisão nova, conferir pelo HMAC se quem assinou pode assinar aquela PT (`_pt_pode_assinar`, que
+- **Falta o App aplicar** (próxima versão do App, decisão de publicar é do Levi): ler `nexus_pt_decisoes ·
+  fato_decisao_pt` a cada minuto; para cada decisão nova, achar a linha pela PT (o número) e pelo `codigo_ativo`,
+  conferir pelo HMAC se quem assinou pode assinar aquela PT (`_pt_pode_assinar`, que
   precisa aceitar o mesmo conjunto: supervisor de campo, gestor de contrato, COS e administrador), se a
   PT ainda está aguardando e se a decisão é recente (sugestão: 30 min; decisão velha não libera ninguém), aplicar como
   o `gestao/pt/decidir` (pausa no Fracttal, anexo) e devolver o resultado no `pt_app_campo`. E mandar a PT ao banco na

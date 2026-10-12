@@ -140,7 +140,7 @@
         <td>{{ x.usina }}</td><td>{{ x.equipe or '—' }}</td><td>{{ x.uf or '—' }}</td><td>{{ x.regiao_br or '—' }}</td>
         <td>{{ x.tarefa[:70] }}{% if x.respostas_nao %}<span class="det">{{ x.respostas_nao }} resposta{{ 's' if x.respostas_nao > 1 }} NÃO na APR</span>{% endif %}</td>
         <td>{{ x.solicitante or '—' }}</td>
-        <td class="m"><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=x.numero) }}" title="Abrir a PT {{ x.numero }} para aprovar">{{ x.os or x.numero }}</a></td></tr>
+        <td class="m"><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=x.numero, ativo=x.codigo) }}" title="Abrir a PT {{ x.numero }} para aprovar">{{ x.os or x.numero }}</a></td></tr>
     {% else %}<tr><td colspan="9" class="mudo">Nenhuma PT esperando o De acordo com esses filtros.</td></tr>{% endfor %}
     </tbody>
   {% endif %}

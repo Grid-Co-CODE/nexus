@@ -73,8 +73,11 @@ def _rpc_de_quem_olha(jwt: str, email: str):
     return rpc
 
 
-def _tela(numero) -> str:
-    return na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
+def _tela(numero, codigo=None) -> str:
+    """A tela da PT; com `codigo` (o código do ativo da linha decidida), a mesma linha (a PT de mais de um ativo tem
+    uma decisão por linha, decisão 4 de 11/10/2026)."""
+    url = na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
+    return url if codigo is None else url + "?ativo=" + quote(str(codigo), safe="")
 
 
 def _login(numero) -> str:
@@ -130,14 +133,15 @@ def voltar(numero):
     return redirect(_tela(numero))
 
 
-def _volta(numero) -> str:
+def _volta(numero, codigo=None) -> str:
     """De volta à tela de onde se decidiu (a lista de APR e PT do HSEQ, com os filtros dela) ou à da PT. Só endereço do
     próprio Nexus: nada de mandar para fora."""
     # O `volta` do formulário é o request.full_path da tela, SEM o prefixo (e a camada da T.I. pode tê-lo posto):
     # confere sem ele e devolve com ele. Cru, debaixo do /nexus a decisão gravada mandava a pessoa à plataforma de
     # Performance (porta única, 10/10/2026: "o Nexus como link principal")
     para = sem_raiz(request.form.get("volta") or "")
-    return na_raiz(para) if para.startswith(("/t/hseq/", "/t/campo/")) and not para.startswith("//") else _tela(numero)
+    return (na_raiz(para) if para.startswith(("/t/hseq/", "/t/campo/")) and not para.startswith("//")
+            else _tela(numero, codigo))
 
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/decidir", methods=["POST"])
@@ -149,17 +153,20 @@ def decidir(numero):
     q = quem_assina()
     if not q:
         return redirect(_login(numero))
-    volta = _volta(numero)
+    # a linha da PT que se decide: o código do ativo dela (o formulário de cada linha manda; "" = a linha sem ativo).
+    # Sem o campo (formulário de antes de 11/10/2026), só a PT de uma linha se decide (`decisao_pt._linha`)
+    codigo = request.form.get("codigo")
+    volta, tela = _volta(numero, codigo), _tela(numero, codigo)
     try:
         decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"],
-                           q.get("nome", ""), bool(session.get("admin")))
+                           q.get("nome", ""), bool(session.get("admin")), codigo=codigo)
     except decisao_pt.Recusada as e:
-        session["pt_aviso"] = f"{numero}: {e}" if volta != _tela(numero) else str(e)
+        session["pt_aviso"] = f"{numero}: {e}" if volta != tela else str(e)
         return redirect(volta)
     except Exception as e:      # noqa: BLE001 — banco fora do ar: a tela diz, nada é dado como gravado
         session["pt_aviso"] = f"Não consegui gravar a decisão no banco ({type(e).__name__}). Nada foi salvo."
         return redirect(volta)
-    if volta != _tela(numero):
+    if volta != tela:
         session["pt_gravada"] = numero
         return redirect(volta)
-    return redirect(_tela(numero) + "?gravada=1")
+    return redirect(tela + ("&" if "?" in tela else "?") + "gravada=1")

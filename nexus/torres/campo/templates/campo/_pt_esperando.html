@@ -8,7 +8,7 @@
    situacoes (SITUACAO_PT), equipe, idade_min, url. #}
 {% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna, quem %}
 {% macro capacete_pt() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
-{% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
+{% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
 {% if modo == 'equipes' %}
 <div class="cn-equipes">
@@ -101,10 +101,12 @@
         </div>
         <form class="pt-det-acoes" method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir">
           <input type="hidden" name="volta" value="{{ request.full_path.rstrip('?') }}">
+          {# a linha é uma PT × equipamento: a decisão vale para ESTE equipamento (codigo_ativo no banco, decisão 4) #}
+          <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
           <input class="gc-campo pt-motivo" name="motivo" maxlength="400" placeholder="Motivo (obrigatório para Não autorizo; o técnico lê)" aria-label="Motivo">
           <button class="gc-btn gc-btn--primario" type="submit" name="decisao" value="de_acordo">De acordo</button>
           <button class="gc-btn gc-btn--contorno cn-btn-negar" type="submit" name="decisao" value="negada">Não autorizo</button>
-          <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">Ver PT</a>
+          <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}">Ver PT</a>
           <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_apr_pdf', numero=p.numero) }}">Baixar APR</a>
         </form>
         <p class="mudo pt-det-nota">A decisão fica salva no banco do Nexus com o código de quem assinou. <b>O App ainda não lê a

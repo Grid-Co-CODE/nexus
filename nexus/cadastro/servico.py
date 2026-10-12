@@ -205,7 +205,10 @@ class Servico:
         if c.tipo == "lista":
             v = tipos.de_formulario("texto", texto)
             if v is not None and v not in self.listas().get(c.lista, []):
-                raise ValorInvalido(f"“{v}” não está na lista {LISTAS.get(c.lista, c.lista)}. Inclua em Listas.")
+                # a tela Listas saiu em 11/10/2026: a lista vem do BD_Operações (Importar do Excel) e do que o Nexus
+                # já incluiu; o recado não manda mais a uma tela que não existe
+                raise ValorInvalido(f"“{v}” não está na lista {LISTAS.get(c.lista, c.lista)}: escolha um dos valores "
+                                    "dela (a lista vem do BD_Operações, pela Importar do Excel).")
             return v
         if c.tipo == "ref":
             v = tipos.de_formulario("texto", texto)

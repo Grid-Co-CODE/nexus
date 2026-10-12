@@ -1370,11 +1370,22 @@ def pts_por_equipe(pts, times=None) -> list[dict]:
     return sorted(eq.values(), key=lambda c: (-c["parada"], -len(c["pts"]), c["equipe"]))
 
 
-def pt(numero) -> dict | None:
-    """Uma PT pelo número, do livro do App (a cópia de 5 min)."""
+def pt_linhas(numero) -> list[dict]:
+    """As linhas de uma PT pelo número, do livro do App (a cópia de 5 min): uma por ativo, porque o App decide POR LINHA
+    (a PT de 3 ativos tem 3 linhas, cada uma com a sua situação; auditoria de 08/10/2026, GR-4). As que esperam vêm
+    primeiro, da mais antiga."""
     d = pts().dados
     n = str(numero or "").strip()
-    return next((p for p in (d.get("aguardando") or []) + (d.get("historico") or []) if p["numero"] == n), None)
+    return [p for p in (d.get("aguardando") or []) + (d.get("historico") or []) if p["numero"] == n]
+
+
+def pt(numero, codigo=None) -> dict | None:
+    """Uma PT pelo número, do livro do App (a cópia de 5 min). Com `codigo` (o código do ativo da linha; "" = a linha
+    sem ativo, como a da APR do dia), aquela linha; sem ele, a 1ª (a que espera há mais tempo)."""
+    linhas = pt_linhas(numero)
+    if codigo is not None:
+        return next((p for p in linhas if (p.get("codigo") or "") == str(codigo).strip()), None)
+    return linhas[0] if linhas else None
 
 
 # ── Zeladoria ────────────────────────────────────────────────────────────────────────────────────────────────────

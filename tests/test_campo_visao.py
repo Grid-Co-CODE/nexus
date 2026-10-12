@@ -231,7 +231,8 @@ def test_central_separa_ronda_de_pt_e_sem_hashtag_na_os(banco, logado):
     html = logado.get("/t/campo/rondas?pend=incompleta").get_data(as_text=True)
     assert "item sem foto de evidência" in html and ">500<" in html
     html = logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True)
-    assert 'href="/t/campo/pt/PT-1">Ver PT</a>' in html and "Técnico Silva" in html
+    # o Ver PT leva à linha (PT × equipamento: decisão 4, 11/10/2026)
+    assert 'href="/t/campo/pt/PT-1?ativo=THPN-ALT100-INVR1">Ver PT</a>' in html and "Técnico Silva" in html
     assert "Ronda longa pendente" not in html                          # na visão de PT, só status de PT
     html = logado.get("/t/campo/atencao?vista=pt&modo=tabela&f=parada").get_data(as_text=True)
     assert "/t/campo/pt/PT-1" in html and "/t/campo/pt/PT-2" not in html
@@ -439,10 +440,13 @@ def test_decisao_gravada_no_banco_com_codigo_e_sem_nome(app, banco, logado):
     r = logado.post("/os/_nexus/pt/PT-1/decidir",
                     data={"decisao": "negada", "motivo": "Sem bloqueio; ligar para fulano@exemplo.test ou 11 99999-0000"})
     assert r.headers["Location"].endswith("?gravada=1")
-    linhas = banco.linhas("nexus_pt_decisoes", "decisoes")
-    assert len(linhas) == 1
+    # decisão 4 (11/10/2026): a aba é a fato_decisao_pt, com o código do ativo da linha no fim; a "decisoes" não existe
+    linhas = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")
+    assert len(linhas) == 1 and banco.linhas("nexus_pt_decisoes", "decisoes") == []
     d = linhas[0]
+    assert list(d) == list(decisao_pt.CAB) and list(d)[-1] == "codigo_ativo"
     assert d["pt"] == "PT-1" and d["decisao"] == "negada" and str(d["usina_id"]) == "1"
+    assert d["codigo_ativo"] == "THPN-ALT100-INVR1"                    # o Código do ativo da linha no pt_app_campo
     assert d["decidida_por_hmac"] == codigo_da_pessoa(CHAVE, "sup@exemplo.test")
     assert "exemplo.test" not in json.dumps(d, default=str) and "99999" not in d["motivo"]
     html = logado.get("/t/campo/pt/PT-1").get_data(as_text=True)
@@ -450,8 +454,69 @@ def test_decisao_gravada_no_banco_com_codigo_e_sem_nome(app, banco, logado):
     # o primeiro que decide vale
     logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo"})
     assert "já tem decisão gravada pelo Nexus" in logado.get("/t/campo/pt/PT-1").get_data(as_text=True)
-    assert len(banco.linhas("nexus_pt_decisoes", "decisoes")) == 1
+    assert len(banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")) == 1
     assert decisao_pt.da_pt("PT-1")["decisao"] == "negada"
+    assert decisao_pt.da_pt("PT-1", "THPN-ALT100-INVR1")["decisao"] == "negada"
+
+
+def test_pt_de_dois_equipamentos_tem_uma_decisao_por_linha(app, banco, logado):
+    """Decisão 4 do Levi (11/10/2026): o App decide por linha (PT × ativo), e a decisão do Nexus também, com o
+    codigo_ativo no banco. Sem dizer a linha, a PT de mais de um equipamento não se decide: pegar a 1ª seria chutar a
+    qual equipamento a decisão vale (GR-4)."""
+    inv2 = dict(_pt("PT-4", 2), **{"Código do ativo": "THPN-ALT100-INVR2", "Ativo": "Inversor 2"})
+    _aba(banco, "pt_app_campo", "PT", [_pt("PT-1", 30), _pt("PT-2", 1), _pt("PT-3", 50, "de_acordo", 49),
+                                       _pt("PT-4", 2), inv2])
+    visao.limpar()
+    _entrar_no_fracttal(app, logado, _jwt())
+    # a lista leva a linha no formulário e no link de cada uma
+    html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
+    assert '<input type="hidden" name="codigo" value="THPN-ALT100-INVR2">' in html
+    assert 'href="/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2"' in html
+    # a tela da PT mostra a linha pedida, com as outras para trocar
+    html = logado.get("/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2").get_data(as_text=True)
+    assert "Esta PT tem 2 equipamentos, e cada um tem a sua decisão" in html and "<b>Inversor 2</b>" in html
+    assert 'href="/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR1">Inversor 1</a>' in html
+    assert '<input type="hidden" name="codigo" value="THPN-ALT100-INVR2">' in html
+    # sem a linha (o formulário de antes): recusa e nada grava
+    r = logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo"})
+    assert "PT-4 tem 2 equipamentos" in logado.get(r.headers["Location"]).get_data(as_text=True)
+    assert "nexus_pt_decisoes" not in banco.workbooks
+    # com a linha: grava aquela, com o codigo_ativo, e volta para ela
+    r = logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR2"})
+    assert r.headers["Location"] == "/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2&gravada=1"
+    linhas = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")
+    assert [(d["pt"], d["codigo_ativo"], d["decisao"]) for d in linhas] == [("PT-4", "THPN-ALT100-INVR2", "de_acordo")]
+    # a outra linha continua esperando a decisão dela; a mesma linha não se decide duas vezes
+    html = logado.get("/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR1").get_data(as_text=True)
+    assert 'action="/os/_nexus/pt/PT-4/decidir"' in html and "no Nexus" not in html
+    logado.post("/os/_nexus/pt/PT-4/decidir",
+                data={"decisao": "negada", "motivo": "falta o bloqueio", "codigo": "THPN-ALT100-INVR1"})
+    logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "negada", "motivo": "de novo", "codigo": "THPN-ALT100-INVR2"})
+    html = logado.get("/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2").get_data(as_text=True)
+    assert "PT-4 (THPN-ALT100-INVR2) já tem decisão gravada pelo Nexus" in html
+    linhas = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")
+    assert [(d["codigo_ativo"], d["decisao"]) for d in linhas] == [("THPN-ALT100-INVR2", "de_acordo"),
+                                                                   ("THPN-ALT100-INVR1", "negada")]
+    assert decisao_pt.da_pt("PT-4", "THPN-ALT100-INVR1")["decisao"] == "negada"
+    assert decisao_pt.da_pt("PT-4", "THPN-ALT100-INVR2")["decisao"] == "de_acordo"
+    # equipamento que a PT não tem: recusa, nada grava
+    logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo", "codigo": "THPN-OUTRO"})
+    assert len(banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")) == 2
+
+
+def test_a_aba_antiga_decisoes_nao_e_lida(app, banco, logado):
+    """A aba `decisoes` de antes da decisão 4 nunca foi gravada (o livro não existe no banco, GET de 11/10/2026). Se uma
+    linha aparecer nela (um Nexus velho decidindo antes do deploy), não vale: o radar a mostra como tabela nova."""
+    _aba(banco, "nexus_pt_decisoes", "decisoes", [{"decidida_em": "2026-10-10T10:00:00Z", "pt": "PT-1",
+                                                   "decisao": "negada", "motivo": "velha"}])
+    visao.limpar()
+    assert decisao_pt.decisoes() == [] and decisao_pt.da_pt("PT-1") is None
+    html = logado.get("/t/campo/pt/PT-1").get_data(as_text=True)
+    assert 'action="/os/_nexus/pt/PT-1/decidir"' in html and "no Nexus" not in html
+    _entrar_no_fracttal(app, logado, _jwt())
+    logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1"})
+    assert [d["pt"] for d in banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")] == ["PT-1"]
+    assert banco.linhas("nexus_pt_decisoes", "decisoes")[0]["motivo"] == "velha"    # ninguém a lê nem a regrava
 
 
 def test_pt_ja_decidida_no_app_nao_recebe_decisao_e_outro_site_nao_decide(app, banco, logado):

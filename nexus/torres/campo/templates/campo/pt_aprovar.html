@@ -20,6 +20,14 @@
   </div>
   {% if aviso %}<div class="cn-erro" role="alert"><b>{{ aviso }}</b></div>{% endif %}
   {% if gravada %}<div class="cn-certo" role="status"><b>Decisão salva no banco.</b></div>{% endif %}
+  {# a PT de mais de um equipamento: uma linha e uma decisão por equipamento, como no App (decisão 4, 11/10/2026) #}
+  {% if linhas|length > 1 %}
+  <div class="cn-nota"><b>Esta PT tem {{ linhas|length }} equipamentos, e cada um tem a sua decisão.</b>
+    <ul class="cn-ativ">{% for l in linhas %}{% set sl = situacoes.get(l.situacao, (l.situacao, 'neutro')) %}
+      <li>{% if l.codigo == p.codigo %}<b>{{ l.ativo or l.codigo or 'sem equipamento' }}</b> <span class="mudo">(nesta tela)</span>{% else %}<a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=l.numero, ativo=l.codigo) }}">{{ l.ativo or l.codigo or 'sem equipamento' }}</a>{% endif %}
+        <span class="cn-st cn-t-{{ sl[1] }}">{{ sl[0] }}</span></li>{% endfor %}
+    </ul></div>
+  {% endif %}
 
   <div class="cn-pt-grade">
     <section class="cn-cartao">
@@ -79,6 +87,8 @@
       <p class="mudo">Salva no banco. O técnico vê quando o App aplicar a decisão.</p>
       {% else %}
       <form method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir" class="cn-form-decisao">
+        {# a linha decidida: o código do ativo dela vai para o banco (codigo_ativo), e o App acha a linha por ele #}
+        <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
         <p class="cn-quem" id="cn-quem">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
         {% if quem_assina %}<p class="mudo">Quem pode dar o De acordo: {{ quem_assina[0]|lower }}{{ quem_assina[1:] }}.</p>{% endif %}
         <label class="gc-rotulo" for="cn-motivo">Motivo <span class="mudo">(obrigatório para Não autorizo; o técnico lê)</span></label>

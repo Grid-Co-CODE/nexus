@@ -35,9 +35,8 @@ TORRE = Torre(
         Tela("regioes-campo", "Regiões de campo",
              "Quem é o Supervisor de Campo de cada região, que equipes ela tem e onde a vaga está aberta?",
              "Cadastro do Nexus (estrutura de O&M de 10/2026)"),
-        Tela("listas", "Listas",
-             "Quais valores cada lista aceita?",
-             "Cadastro do Nexus (antes: abas Auxiliar e Parametros)"),
+        # "Listas" saiu em 11/10/2026 (Levi: "pode tirar listas pois a governança faz mais sentido"): o endereço
+        # /t/base/listas leva à Governança de dados (nexus/cadastro/telas.py); os valores das listas ficam no cadastro.
         Tela("importar", "Importar do Excel",
              "O que muda no ensaio se eu importar o BD_Operações de hoje?",
              "BD_Operacoes.xlsx enviado pela tela"),

@@ -1,5 +1,6 @@
-"""As telas do cadastro, penduradas nas torres Base (usinas, equipes, listas, importação, qualidade) e Pessoas
-(colaboradores). As torres chamam registrar_base(bp) / registrar_pessoas(bp); o resto mora aqui.
+"""As telas do cadastro, penduradas nas torres Base (usinas, clientes, equipes, regiões de campo, importação,
+qualidade) e Pessoas (colaboradores). As torres chamam registrar_base(bp) / registrar_pessoas(bp); o resto mora aqui.
+A tela Listas saiu em 11/10/2026: o endereço dela leva à Governança de dados (`listas_saiu`).
 
 Regras de tela que valem para todas:
 - só entra quem é admin (nesta fase, quem entra pela senha; o login Microsoft troca isso depois);
@@ -23,7 +24,7 @@ from . import tipos
 from .armazem import ArmazemLocal
 from .calculos import CARGO_TECNICO, ERRO
 from .cifra import CifraErro, Cofre
-from .esquema import (CLIENTES, ENTIDADES, EQUIPES, LISTAS, PESSOAS, REGIOES_CAMPO, USINAS, VINCULO_CAMPO,
+from .esquema import (CLIENTES, ENTIDADES, EQUIPES, PESSOAS, REGIOES_CAMPO, USINAS, VINCULO_CAMPO,
                       VINCULO_COORDENADOR_CAMPO, VINCULO_GESTOR, VINCULO_SUPERVISOR_CAMPO, VINCULO_SUPERVISOR_LEGADO,
                       rotulo_lista)
 from .importar import ler_xlsx, montar
@@ -695,26 +696,12 @@ def registrar_base(bp):
     def regiao(srv, id_):
         return _ficha(srv, REGIOES_CAMPO, id_, "Regiões de campo", extra=lambda r: _resumo_regiao(srv, r))
 
-    @_tela("Listas")
-    def listas(srv):
-        erro = None
-        if request.method == "POST":
-            res = srv.adicionar_valor(request.form.get("lista", ""), request.form.get("valor", ""), quem=_quem())
-            if res.ok:
-                return redirect(na_raiz("/t/base/listas?incluido=1"))
-            erro = next(iter(res.erros.values()), "Não foi possível incluir.")
-        uso = defaultdict(Counter)
-        for eid, ent in ENTIDADES.items():
-            for c in ent.campos:
-                if c.tipo == "lista":
-                    for r in srv.registros(eid):
-                        v = r.valores.get(c.id)
-                        if isinstance(v, str) and v:
-                            uso[c.lista][v] += 1
-        grupos = [{"id": k, "nome": nome, "valores": [(v, uso[k].get(v, 0)) for v in srv.listas().get(k, [])]}
-                  for k, nome in LISTAS.items()]
-        return render_template("cadastro/listas.html", grupos=grupos, erro=erro,
-                               incluido=request.args.get("incluido")), (422 if erro else 200)
+    def listas_saiu():
+        """Base → Listas saiu do menu em 11/10/2026 (Levi: "pode tirar listas pois a governança faz mais sentido"):
+        quem tinha o endereço salvo cai na Governança de dados, não num 404. O POST (o "Incluir" de uma tela velha
+        aberta) também só redireciona: nada é gravado. Os valores das listas continuam no cadastro: as fichas, a
+        importação do BD_Operações e a estrutura de campo (`estrutura_campo.aplicar`) usam."""
+        return redirect(na_raiz("/t/base/governanca"))
 
     @_tela("Importar do Excel")
     def importar(srv):
@@ -766,7 +753,9 @@ def registrar_base(bp):
         grupos = defaultdict(list)
         for p in pend:
             ent = ENTIDADES.get(p["entidade"])
-            p["url"] = (ent.rota_ficha + p["id"]) if ent else "/t/base/listas"
+            # a pendência de lista (valores parecidos) não tem tela para abrir desde que Base → Listas saiu (11/10/2026):
+            # aparece sem link, em vez de levar a um endereço que só redireciona
+            p["url"] = (ent.rota_ficha + p["id"]) if ent else ""
             grupos[p["tipo"]].append(p)
         aud = srv.auditoria(60)
         for a in aud:
@@ -787,7 +776,7 @@ def registrar_base(bp):
     bp.add_url_rule("/regioes-campo", "cad_regioes", regioes)
     bp.add_url_rule("/regiao-campo/nova", "cad_regiao_nova", regiao_nova, methods=["GET", "POST"])
     bp.add_url_rule("/regiao-campo/<id_>", "cad_regiao", regiao, methods=["GET", "POST"])
-    bp.add_url_rule("/listas", "cad_listas", listas, methods=["GET", "POST"])
+    bp.add_url_rule("/listas", "cad_listas", listas_saiu, methods=["GET", "POST"])
     bp.add_url_rule("/importar", "cad_importar", importar, methods=["GET", "POST"])
     bp.add_url_rule("/importar/aplicar", "cad_importar_aplicar", importar_aplicar, methods=["POST"])
     bp.add_url_rule("/qualidade", "cad_qualidade", qualidade)

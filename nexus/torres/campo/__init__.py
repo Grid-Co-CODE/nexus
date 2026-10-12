@@ -400,18 +400,22 @@ def url_for_pt(numero) -> str:
 
 @bp.route("/pt/<numero>")
 def pt_aprovar(numero):
-    """A aprovação da PT no Nexus: a PT inteira e a decisão, assinada com o login do Fracttal do OS Creator."""
+    """A aprovação da PT no Nexus: uma linha da PT e a decisão dela, assinada com o login do Fracttal do OS Creator. A
+    PT de mais de um ativo tem uma linha (e uma decisão) por ativo, como no App: `?ativo=<código>` escolhe qual (decisão
+    4 do Levi, 11/10/2026); sem ele, ou com um código que a PT não tem, a 1ª. A tela lista as outras linhas."""
     leitura = visao.pts()
-    p = visao.pt(numero) if not leitura.erro else None
+    ativo = request.args.get("ativo")
+    p = (visao.pt(numero, ativo) or visao.pt(numero)) if not leitura.erro else None
+    linhas = visao.pt_linhas(numero) if p else []
     nexus, erro_nexus = None, ""
     if p:
         try:
-            nexus = decisao_pt.da_pt(p["numero"])
+            nexus = decisao_pt.da_pt(p["numero"], p.get("codigo") or "")
         except Exception as e:      # noqa: BLE001 — sem o livro de decisões, a tela abre e diz
             erro_nexus = f"Não consegui ler as decisões do Nexus ({type(e).__name__})"
     torre, tela = _onde_pt()
     return render_template("campo/pt_aprovar.html", **_comum(
-        "pt", leitura, torre=torre, tela=tela, p=p, numero=numero, nexus=nexus, erro_nexus=erro_nexus,
+        "pt", leitura, torre=torre, tela=tela, p=p, linhas=linhas, numero=numero, nexus=nexus, erro_nexus=erro_nexus,
         situacoes=SITUACAO_PT, quem_assina=decisao_pt.aprovadores(p)["texto"] if p else "",
         idade_min=_idade_min, decisoes=decisao_pt.DECISOES, aviso=session.pop("pt_aviso", ""),
         gravada=request.args.get("gravada") == "1", quando=visao._dt))

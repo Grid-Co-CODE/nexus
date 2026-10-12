@@ -27,13 +27,13 @@ hora em hora do servidor passa a gravar o que está marcado "grava"). A exceçã
 
 | Peça | Onde | Grava? | O que é |
 |---|---|---|---|
-| Catálogo (a matriz de barramento) | `catalogo.py` | — | os fatos ativos (a conta viva é a do `catalogo.resumo()`, que a tela mostra; os dois de extintor do HSEQ entraram em 09/10, antes de o App publicar o livro) + os que viraram fonte de outro, 7 dimensões e os **9 livros do Nexus** (`LIVROS`, registrados antes de existir). Todo fato declara `tipo`, `chave`, `medidas` (`Medida`: coluna com a unidade, unidade, soma `aditiva`/`semi`/`nao`), `fontes` e `janela_origem`. Mais as `CONHECIDAS` (09/10): as tabelas do banco que não são fato nem livro do Nexus, aba por aba, com o papel e o porquê (o radar). **Fonte única** da tela, dos testes e desta página |
+| Catálogo (a matriz de barramento) | `catalogo.py` | — | os fatos ativos (a conta viva é a do `catalogo.resumo()`, que a tela mostra; os dois de extintor do HSEQ entraram em 09/10, antes de o App publicar o livro) + os que viraram fonte de outro, 7 dimensões e os **11 livros do Nexus** (`LIVROS`, registrados antes de existir; `no_banco` diz quais já existem, conferido por GET: 9 em 11/10/2026, faltam `nexus_geracao` e `nexus_pt_decisoes`). Todo fato declara `tipo`, `chave`, `medidas` (`Medida`: coluna com a unidade, unidade, soma `aditiva`/`semi`/`nao`), `fontes` e `janela_origem`. Mais as `CONHECIDAS` (09/10): as tabelas do banco que não são fato nem livro do Nexus, aba por aba, com o papel e o porquê (o radar). **Fonte única** da tela, dos testes e desta página |
 | Domínios | `dominios.py` | — | a lista fechada de cada atributo (vala 1 limpa, 2 parcial, 3 obstruída; sensor 1 sujo, 0 VERIFICADO limpo, vazio = não verificado; situação da OS da ronda; as 6 falhas; situação da PT). Valor fora = vazio + conta na qualidade. `MAPA_ANTIGO` traduz o que cada fonte grava (inclusive o formulário da avulsa de 07/10, que nunca chegou ao banco). A avulsa usa as opções de vala do App (`VALA_OPCOES`) e grava o sensor como a palavra (`SENSOR_ROTULO`: "Sujo", "Limpo"; vazio = não verificado) desde 08/10 |
 | Calendário | `calendario.py` → `nexus_dimensoes · dim_data` | hora em hora | 1 linha por dia, 2025 a 2027: `data_id` (AAAAMMDD), semana ISO, mês, trimestre, fim de semana, feriado nacional, dia útil |
 | Feriados locais | → `nexus_dimensoes · feriados_locais` | hora em hora | estaduais e municipais (UF, município), cruzam com a usina pela cidade |
 | Histórico (SCD tipo 2) | `historico.py` → `pessoas_historico`, `usinas_historico`, `qualidade_historico` | hora em hora | **1 linha = 1 versão de 1 membro, troca no dia de Brasília.** Cabeçalho `<id>, <rastreados…>, versao, valido_de, valido_ate, valido_de_id, valido_ate_id, vigente, inicio_presumido`. A 1ª versão vale "desde sempre" (19000101) com `inicio_presumido = 1`. 1ª medida (08/10): fechamentos que acham exatamente 1 versão, pessoa 25,4% → 100%, usina 26,4% → 100%; checklist 6,2% → 100%. As 135 + 258 linhas gravadas migram sozinhas na 1ª carga com este código |
-| Equipamento (dimensão) | `equipamento.py` → `nexus_equipamentos · dim_equipamento`, `equipamento_apelido` | hora em hora, **só quando o sha das linhas muda** e o PCM foi lido | **1 linha = 1 código de ativo do Fracttal** (canônico). `equipamento_id = int(sha1("fracttal:"+código)[:13 hex]) >> 3` (49 bits, no máximo 15 dígitos: com 52 bits 77% tinham 16 e o Excel trocava o último dígito; Levi, 08/10): o mesmo número em qualquer máquina, sem registro; 0 colisões nos 22.353 códigos das fotos. Apelidos: `Supervisório · tracker`, `Gêmeo · equipamento`, `BD_Thopen · coluna`, `BD_Performance · coluna`. 1ª medida (08/10, sem a foto no banco): 8.314 membros, 98,9% com `usina_id`, 4.619 apelidos (tracker 4.287, gêmeo 332; coluna 0 até o de-para das abas). Com as duas fotos locais (medido pelo construtor): 22.356 membros, 87,6% com usina, 6.118 apelidos |
-| Foto dos ativos do Fracttal | `ferramentas/carregar_ativos_fracttal.py` → `nexus_ativos_fracttal · foto_ativos` | **carga única, quem grava é o Levi** | as fotos do OS Creator (22/09 + os 719 códigos que só a de 21/06 tem): 22.357 linhas. Renovar exige ler o Fracttal (fora do horário de campo) |
+| Equipamento (dimensão) | `equipamento.py` → `nexus_equipamentos · dim_equipamento`, `equipamento_apelido` | hora em hora, **só quando o sha das linhas muda** e o PCM foi lido | **1 linha = 1 código de ativo do Fracttal** (canônico). `equipamento_id = int(sha1("fracttal:"+código)[:13 hex]) >> 3` (49 bits, no máximo 15 dígitos: com 52 bits 77% tinham 16 e o Excel trocava o último dígito; Levi, 08/10): o mesmo número em qualquer máquina, sem registro; 0 colisões nos 22.353 códigos das fotos. Apelidos: `Supervisório · tracker`, `Gêmeo · equipamento`, `BD_Thopen · coluna`, `BD_Performance · coluna`. 1ª medida (08/10, sem a foto no banco): 8.314 membros, 98,9% com `usina_id`, 4.619 apelidos (tracker 4.287, gêmeo 332; coluna 0 até o de-para das abas). Com as duas fotos locais (medido pelo construtor): 22.356 membros, 87,6% com usina, 6.118 apelidos. **No banco** (GET em 11/10/2026: 8.395 membros e 4.619 apelidos, gravados às 20:42, antes da foto; a carga seguinte já lê a foto) |
+| Foto dos ativos do Fracttal | `ferramentas/carregar_ativos_fracttal.py` → `nexus_ativos_fracttal · foto_ativos` | carga única, quem grava é o Levi: **gravada em 11/10/2026** (GET: 22.357 linhas, às 21:06) | as fotos do OS Creator (22/09 + os 719 códigos que só a de 21/06 tem): 22.357 linhas. A carga de hora em hora lê a foto do banco para a dimensão de equipamento. Renovar exige ler o Fracttal (fora do horário de campo) |
 | Fechamento | `fatos.py` → `nexus_fatos · fato_fechamento` | hora em hora | 1 linha = 1 tarefa fechada pelo App. Foto acumulada (a revisão, aprovada/devolvida/nota corrigida, muda a linha depois: não é transação). 08/10: + `equipamento_id`/`equipamento_ligado_por`, + `tarefa_chave` (a mesma da programação), medidas com unidade (`nota_pts`, `fotos_qtd`, `pecas_qtd`, `xp_pts`; `vezes_programada_qtd`, que é o "Nº vezes programada" do PCM e conta a 1ª vez). Ensaio 08/10: 2.955 linhas, data 100%, usina 99,7%, equipe 97,7%, pessoa 94,4%, equipamento 99,7%, versão da época 100/100. Comparado valor a valor com o publicado às 12:40: 2.955 em comum, **0 diferenças** |
 | Ronda (fato único) | `fato_ronda.py` → `nexus_fatos · fato_ronda` | hora em hora | **1 linha = 1 ronda realizada**: App com e sem OS (`rondas_app_campo`), checklist da carga única e avulsa válida. Foto acumulada (a situação da OS anda de "em verificação" para "criada"), `ronda_id = sha1("app\|"+Início)`. Ensaio 08/10: 874 linhas (749 com OS, 125 sem), data 100%, usina 99,8%, equipe 98,7%, pessoa 91,8% (689 pelo nome de UMA pessoa, 113 pelo checklist), equipamento 85,7% (749/749 com OS; sem OS não há ativo), checklist 125, 1 rótulo de falha fora do domínio. A validação por foto do livro da avulsa (`origem = "validacao_foto"`) fica FORA (`fato_ronda.eh_validacao_foto`: outro grão, não é ronda realizada; a qualidade conta quantas em `extra.validacao_foto`). A pessoa vem do `Técnico (HMAC)` quando o App mandar (passo 2) e as telas do Campo leem este fato (passo 4) |
 | PT | `fato_pt.py` → `nexus_fatos · fato_pt` | hora em hora | **1 linha = 1 PT × ativo** (o App decide por linha). Foto acumulada. PTs = `SUM(primeira_linha_da_pt)`. Ensaio 08/10: 238 linhas = 232 PTs, data 100%, usina 99,2%, equipe 97,9%, solicitante 89,9%, decisor 0/201 (as 6 contas Admin estão fora do cadastro), equipamento 99,6%, paradas 132 |
@@ -50,9 +50,15 @@ hora em hora do servidor passa a gravar o que está marcado "grava"). A exceçã
 | Telas do Campo (passo 4, **feito em 08/10**) | `nexus/campo/visao.py` (`_fato`) + `carga.montar_ronda`, `montar_pt`, `montar_fechamento`, `carga.ligador`, `carga.mapas_das_linhas` | — | Rondas, Central de atenção e PT tiram a contagem e a ligação (`usina_id`, `pessoa_id`, `data_id`) do `fato_ronda`, `fato_pt` e `fato_fechamento`; o livro cru só dá o que o fato não tem, juntado pela chave do fato. Fato do banco da MESMA versão do livro de origem (`qualidade.origem_atualizada_em` = `updated_at`) ou montado NA HORA pela MESMA função da carga, com aviso discreto na tela: uma regra só. Prova (08/10, banco real por GET, 368 páginas antes × depois, 7/14/30 dias): números iguais salvo 3 diferenças da ligação do fato (1 ronda no dia de Brasília do início; 1 resposta da carga única casada pelo Início numa ronda que ganhou OS depois; o nome pela ficha do cadastro, 192 de 874 rondas, sem mudar número); tela quente igual. Detalhe em `nexus/torres/campo/CLAUDE.md` |
 
 **O Nexus como fonte (05/10/2026):** a decisão da PT assinada no Nexus (`nexus/campo/decisao_pt.py`) grava
-`nexus_pt_decisoes · decisoes` (grão: 1 linha = 1 decisão). Já nasce com `data_id`, `usina_id` e a pessoa como HMAC;
-o motivo vai mascarado (e-mail e número viram marcador), porque o técnico lê e a API é de leitura aberta. Ela grava
-por número e pega a 1ª linha da PT: antes da 1ª gravação, levar o `codigo_ativo` e a aba `fato_decisao_pt` (decisão 4).
+`nexus_pt_decisoes · fato_decisao_pt` (grão: 1 linha = 1 decisão sobre 1 linha da PT, a PT × ativo do `pt_app_campo`).
+Já nasce com `data_id`, `usina_id` e a pessoa como HMAC (`decidida_por_hmac`); o motivo vai mascarado (e-mail e número
+viram marcador), porque o técnico lê e a API é de leitura aberta. **Decisão 4 do Levi (11/10/2026), o contrato com o
+App, que lê este livro:** a PT pelo número e a linha pelo `codigo_ativo` (o Código do ativo daquela linha; vazio na PT
+sem ativo, como a da APR do dia), as colunas de 05/10 e o `codigo_ativo` no fim. Antes gravava só o número e pegava a
+1ª linha (GR-4: numa PT de 3 ativos não dizia a qual valia); a aba se chamava `decisoes`, nunca foi gravada (o livro não
+existe no banco, GET de 11/10) e não é mais lida: linha que aparecer nela (um Nexus velho decidindo antes do deploy)
+não vale e o radar a mostra como tabela nova. Sem a linha, a PT de mais de um ativo não se decide (escolher a 1ª seria
+chutar, regra 4). Prova: `tests/test_campo_visao.py` (as decisões) e `tests/test_dados_camada.py` (o catálogo).
 
 **Fontes do tempo real (11/10/2026):** a tela da plataforma `/admin/tempo-real` (no Nexus, Base · Fontes do tempo real, só
 admin) grava `nexus_tempo_real · fato_decisao_cobertura` (grão: 1 linha = 1 decisão de incluir ou excluir 1 usina de 1
@@ -61,13 +67,15 @@ API PV, código da SunOp, site da SolarEdge, power_plant_id do banco, id do scad
 plant_id por fonte entrar no de_para (pendência 10). Sem pessoa no banco: quem decidiu fica no log da máquina da
 plataforma. Origem `migracao` = a foto do dia em que a fonte passou a ser controlada pela tela. Quem lê é a plataforma (PC
 e servidor), com cache de 60 s; a regra e as travas moram no `plataforma/CLAUDE.md` (seção "Fontes do tempo real").
+No banco desde 11/10/2026 (conferido por GET).
 
 **De-para de equipamentos (11/10/2026):** a tela da plataforma `/admin/de-para` (no Nexus, Base · De-para de
 equipamentos, só admin) grava no livro `nexus_depara · fato_decisao_depara` (`catalogo.py`, sem medida): 1 linha = 1
 decisão de ligar 1 usina (id na fonte) ou 1 inversor (id na fonte) ao cadastro, pela chave de negócio do Equipamentos
 (Usina Supervisório, Equipamento Supervisório), que a plataforma confere antes de gravar. Vence o de-para em código da
 plataforma; livro ilegível = vale o código. Quando o de_para do cadastro ganhar o sistema plant_id (pendência 10), a ponte
-da usina migra para lá; a regra mora no `plataforma/CLAUDE.md` (seção "De-para de equipamentos").
+da usina migra para lá; a regra mora no `plataforma/CLAUDE.md` (seção "De-para de equipamentos"). No banco desde
+11/10/2026 (conferido por GET).
 
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da
@@ -219,18 +227,20 @@ cadastro, recusar carga encolhida. **Nada disto está feito**; onde cada peça h
    feita em 09/10** (Levi: "faz meu mano"): o App manda as respostas na própria linha do `rondas_app_campo` (v249 do
    App, colunas novas no fim, com e sem OS) e o `fato_ronda` as lê com `checklist_fonte = app`, que vence a carga única
    (`fato_ronda.APP_CHECKLIST`; linha sem resposta, de antes da v249, segue com a carga única). Decisões do Levi que
-   faltam: (2) chave durável de quem só vem por nome (`fato_ronda.codigo_do_nome`, pronto e desligado); (4) a decisão
-   da PT do Nexus por ativo ou pela PT inteira, e quem são as 6 contas Admin (decisor 0%). A (3), a avulsa antes da 1ª
-   gravação, foi **feita em 08/10** (vala do App, sensor em 3 estados, anulação sem `data_id`/`usina_id`).
+   faltam: (2) chave durável de quem só vem por nome (`fato_ronda.codigo_do_nome`, pronto e desligado); (4) quem são as
+   6 contas Admin (decisor 0%). A outra metade da (4), a decisão da PT do Nexus por ativo ou pela PT inteira, foi
+   **decidida em 11/10**: por linha, como o App (`fato_decisao_pt` com o `codigo_ativo`, "O Nexus como fonte" acima). A
+   (3), a avulsa antes da 1ª gravação, foi **feita em 08/10** (vala do App, sensor em 3 estados, anulação sem
+   `data_id`/`usina_id`).
    Falta para a 1ª gravação da validação por foto: a ficha de quem validou no cadastro (e o de-para do Fracttal, se
    as 2 usinas com espaço duplo devem entrar).
 4. **Passo 5 — feito** (SCD2). Falta: decisão 5 (aceitar o início presumido), HIST-4 (o fato é rechaveado pelo cadastro
    atual) e HIST-6 (tipo 2 para capacidade, mantenedor e eletricista).
-5. **Passo 6a — feito** (dimensão de equipamento). Falta: o Levi gravar a foto (`python
+5. **Passo 6a — feito** (dimensão de equipamento). A foto foi **gravada em 11/10/2026** (`python
    ferramentas/carregar_ativos_fracttal.py "<deploy-os-creator-web>\os_creator\assets_cache.json"
-   "<oem>\os_creator\assets_cache.json" --gravar`); renovar a foto (ler o Fracttal, fora do horário de campo); decidir
-   13 × 12 hex (77,4% dos IDs têm 16 dígitos e o Excel mostra o último errado; é a hora barata: livro e ID no banco são
-   para sempre); no cadastro, 15 códigos de usina fora (1.908 membros) e 1 código de usina de dois clientes (170).
+   "<oem>\os_creator\assets_cache.json" --gravar`; GET: 22.357 linhas) e o ID tem 49 bits (13 hex >> 3, no máximo 15
+   dígitos, decidido em 08/10). Falta: renovar a foto (ler o Fracttal, fora do horário de campo); no cadastro, 15
+   códigos de usina fora (1.908 membros) e 1 código de usina de dois clientes (170).
 6. **Passo 6b — feito** (programação no banco, decisão 7 resolvida em 08/10). A carga única leu as 5.901 versões do
    `banco_dados.json` no git do PCM (clone em `C:\GridcoAuto\nexus\pcm_git`, fora do OneDrive) e, por semana, ficou com
    a ÚLTIMA versão em que ela estava no arquivo; depois de fechada a semana só pode perder bloco (OS cancelada), então

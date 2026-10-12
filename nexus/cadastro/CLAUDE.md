@@ -2,8 +2,16 @@
 
 O registro mestre do Nexus: usinas, clientes, pessoas, equipes, regiões de campo e listas, com os mesmos dados do
 BD_Operações (a região de campo vem da estrutura de O&M de 10/2026), mas editáveis numa tela. As telas ficam nas torres
-Base (Registro mestre, Clientes, Equipes, Regiões de campo, Listas, Importar do Excel, Qualidade do cadastro) e Pessoas
+Base (Registro mestre, Clientes, Equipes, Regiões de campo, Importar do Excel, Qualidade do cadastro) e Pessoas
 (Colaboradores Operação).
+
+**A tela Listas saiu em 11/10/2026** (Levi: "pode tirar listas pois a governança faz mais sentido"): `/t/base/listas`
+responde um redirecionamento para Base → Governança de dados (quem tinha o endereço salvo não cai num 404; o POST de uma
+tela velha aberta também só redireciona, sem gravar). **As listas continuam no cadastro** (o `armazem` guarda,
+`srv.listas()` lê): as caixas de seleção das fichas, a importação do BD_Operações (que traz as listas das abas Auxiliar
+e Parametros e mantém o que o Nexus incluiu) e a estrutura de campo (`estrutura_campo.aplicar` inclui os vínculos novos
+por `srv.adicionar_valor`) usam. Valor fora da lista na ficha recusa dizendo que a lista vem do BD_Operações; a
+pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (não há tela para abrir).
 
 ## Os módulos
 
