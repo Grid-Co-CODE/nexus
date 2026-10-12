@@ -34,6 +34,18 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `telas.py` | as telas, penduradas na torre PCM (`registrar_pcm(bp)`) |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá) |
 
+## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
+
+Semana, Quadro da semana, Insights do PCM, Tarefas e OS, Gerar a semana, Gestão PCM, PCM 52 Semanas, Torre de controle e
+Peças e sobressalentes (Insights, 52 Semanas, Torre de controle e Peças ainda são placeholder). **Chamados por etiqueta e
+Disponibilidade saíram em 11/10/2026** (Levi: "tire essas seções"); a Disponibilidade da Performance (porta única com a
+plataforma) é outra tela e continua. A **Torre de controle** seria o painel das rotinas do PCM: a planilha "Controles PCM
+(editar aqui).xlsx" (pasta do PCM, 09. Programação Semanal/00. Torre de Controle PCM, 19/08/2026) lista 24 controles com
+cadência, prazo e quem marca (gerar e publicar a semana toda sexta, inspeções semanais da GreenYellow toda quinta, subir
+as preventivas do mês seguinte, relatório mensal aos clientes no 5º dia útil, fechamento de KPIs, auditoria do Fracttal,
+MPS do semestre, MPA do ano, nova usina e saída de contrato...), e a página HTML de lá marcava o feito num `estado.json`
+que nunca recebeu marca (vazio desde 17/08).
+
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
 Levi: "Os filtros tem que se auto filtrar também, pelo o que vi nenhum tem relação alguma com outro, está só buscando
