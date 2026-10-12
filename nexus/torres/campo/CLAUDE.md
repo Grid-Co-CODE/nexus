@@ -391,7 +391,8 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     pendentes; 37 PT).
   - **Por Responsável O&M, com o kanban** (Levi, 12/10/2026: "Precisamos deixar filtrado por responsável ... tem que
     mostrar usinas desse responsável que nunca tiveram ronda, rondas pendentes e feitas! Ao clicar aparecerá um kanban
-    com essas três colunas!"). O responsável é o da **ficha da usina** (`usinas.responsavel_om_id`,
+    com essas três colunas!"). O responsável é o **Responsável O&M da ficha da usina** (confirmado pelo Levi em 12/10:
+    "é o Responsável O&M mesmo"; `usinas.responsavel_om_id`,
     `_Base.responsavel_da_usina`, no `onde()` e no `_PAPEIS`), não o gestor de contrato: medido em 12/10, 175 das 177
     usinas em operação com ele, 9 pessoas (os supervisores de antes; 5 delas também são gestores, de OUTRAS usinas).
     Filtro "Responsável O&M" (`responsavel=`, sem padrão pelo login; `*` = todos) nas duas abas; a visão **Por
