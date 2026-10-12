@@ -186,7 +186,8 @@ FATOS = (
          tipo="sem_medida", chave=("decidida_em", "pt", "codigo_ativo"),
          fontes=("nexus_pt_decisoes · fato_decisao_pt",), janela_origem="o Nexus é a fonte",
          observacao="decisão 4 do Levi (11/10/2026): o contrato com o App, que lê este livro, é a PT pelo número e a "
-                    "linha pelo codigo_ativo (as colunas de 05/10 e o codigo_ativo no fim); o motivo vai mascarado, "
+                    "linha pelo codigo_ativo (as colunas de 05/10, o codigo_ativo e a assinatura no fim: o App v257 só aplica a "
+                    "linha assinada, HMAC da NEXUS_PESSOA_HMAC, decisao_pt.assinatura); o motivo vai mascarado, "
                     "porque o técnico lê; quem decidiu só em HMAC. Até 11/10 gravava só o número e pegava a 1ª linha "
                     "(GR-4: numa PT de 3 ativos não dizia a qual valia). O primeiro que decide a linha vale (o App "
                     "aplica só a 1ª de cada linha). Quem pediu a PT não a decide (decidida_por_hmac nunca é o "

@@ -1324,6 +1324,11 @@ def pts() -> leitura.Leitura:
                         # o código de quem pediu, o MESMO que o App compara: quem pediu a PT não a decide
                         # (`decisao_pt.pode_decidir`; revisão adversarial de 11/10/2026)
                         "solicitante_hmac": D._txt(x.get("solicitante_hmac")).lower(),
+                        "solicitante_pessoa_id": D._id(x.get("solicitante_pessoa_id")),
+                        # o que o App fez com a decisão do Nexus (v257): "aplicada", "recusada" ou vazio, a hora da
+                        # decisão a que respondeu e o porquê da recusa (`decisao_pt.recusada_pelo_app`)
+                        "nexus_app": D._txt(r.get("Decisão do Nexus")).lower(), "nexus_app_em": D._txt(r.get("Decisão do Nexus em")),
+                        "nexus_recusa": D._txt(r.get("Motivo da recusa")),
                         "criada": criada, "decidida": decidida,
                         "decidida_por": nomes.get(D._id(x.get("decisor_pessoa_id"))) or _nome(quem, x.get("decisor_hmac")),
                         "papel": r.get("Papel de quem decidiu") or "", "motivo": r.get("Motivo") or "",

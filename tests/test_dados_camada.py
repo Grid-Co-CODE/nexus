@@ -129,7 +129,8 @@ def test_decisao_da_pt_no_catalogo_e_o_contrato_com_o_app():
     assert f.livro == f"{decisao_pt.LIVRO} · {decisao_pt.ABA}" == "nexus_pt_decisoes · fato_decisao_pt"
     assert f.fontes == (f.livro,) and "codigo_ativo" in f.chave and all(c in decisao_pt.CAB for c in f.chave)
     assert f.dims["equipamento"][0] == "cod" and f.dims["pessoa"] == ("hmac", "decidida_por_hmac")
-    assert decisao_pt.CAB[-1] == "codigo_ativo" and decisao_pt.CAB[:-1] == (
+    # o codigo_ativo e, depois dele, a assinatura que o App v257 exige (prova do contrato, 11/10/2026)
+    assert decisao_pt.CAB[-2:] == ("codigo_ativo", "assinatura") and decisao_pt.CAB[:-2] == (
         "decidida_em", "data_id", "pt", "os", "usina_id", "decisao", "motivo", "decidida_por_hmac", "login", "origem")
     assert catalogo.LIVRO_POR_NOME[decisao_pt.LIVRO].abas == (decisao_pt.ABA,)
     assert "decisoes" not in catalogo.ABAS_FORA_DA_REGRA and not catalogo.aba_segue_a_regra("decisoes")

@@ -456,14 +456,22 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   (`TELA_PT`) passa pelo `na_raiz`. Prova: `tests/test_prefixo_sair_fracttal.py` e `tests/test_prefixo.py`.
 - **Fica salvo:** `nexus_pt_decisoes · fato_decisao_pt` (`nexus/campo/decisao_pt.py`; registrado no `catalogo.py` como
   `decisao_pt`, com o contrato). Grão: 1 linha = 1 decisão sobre 1 linha da PT: as colunas de 05/10 e o `codigo_ativo`
-  (o Código do ativo da linha no `pt_app_campo`) no fim. Pessoa só como HMAC do e-mail (`decidida_por_hmac`, o mesmo
-  código do App); motivo mascarado. O primeiro que decide a linha vale: linha que já tem decisão do Nexus, ou que o livro
-  do App já mostra decidida, recusa. A aba `decisoes` de antes (nunca gravada) não é lida.
+  (o Código do ativo da linha no `pt_app_campo`) e a **`assinatura`** no fim. Pessoa só como HMAC do e-mail
+  (`decidida_por_hmac`, o mesmo código do App); motivo mascarado. **Assinatura** (prova do contrato, 11/10/2026: sem ela o
+  App v257 leu as duas decisões e não aplicou nenhuma): HMAC-SHA256 com a `NEXUS_PESSOA_HMAC` do texto
+  `decisao_pt|pt|codigo_ativo|os|decisao|decidida_em|decidida_por_hmac|motivo` (`decisao_pt.assinatura`, a mesma conta do
+  `_nexus_pt_assinatura` do App; mudou num, muda no outro). O primeiro que decide a linha vale: linha que já tem decisão
+  do Nexus, ou que o livro do App já mostra decidida, recusa — **menos quando o App recusou a decisão do Nexus**: o App
+  escreve no `pt_app_campo` "Decisão do Nexus" = recusada, "Decisão do Nexus em" e "Motivo da recusa"; se nenhuma decisão
+  daqui for mais nova que a recusa, a tela mostra o porquê e libera uma decisão nova (`decisao_pt.recusada_pelo_app`). A
+  aba `decisoes` de antes (nunca gravada) não é lida.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador), o gestor de contrato da usina, quem tem o vínculo COS no cadastro e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). A pessoa é a do login
   do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa. **Quem pediu a PT nunca a decide**, nem sendo
-  administrador: `pode_decidir` compara o código do e-mail de quem assina com o `solicitante_hmac` da linha
+  administrador: `pode_decidir` compara o código do e-mail de quem assina com o `solicitante_hmac` da linha e, desde
+  11/10/2026, também a pessoa do cadastro (`solicitante_pessoa_id`: quem tem um e-mail no Microsoft e outro no Fracttal
+  passava)
   (`visao.pts`, o `Solicitante (HMAC)` do `pt_app_campo`, o mesmo código que o App compara). É a regra do painel do App
   desde a 1ª PT real (28/09/2026, aprovada pelo próprio técnico, que também era administrador); o App descarta calado
   a decisão de quem pediu e, como só a 1ª decisão de cada linha vale, a de outra pessoa gravada depois também nunca

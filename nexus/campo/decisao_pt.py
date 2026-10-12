@@ -48,7 +48,10 @@ LIVRO, NOME_LIVRO, ABA = "nexus_pt_decisoes", "Nexus · decisões de PT", "fato_
 # As colunas de 05/10/2026 e o `codigo_ativo` NO FIM (decisão 4, 11/10/2026): coluna nova entra depois das que existem,
 # para quem lê por posição não se perder.
 CAB = ("decidida_em", "data_id", "pt", "os", "usina_id", "decisao", "motivo", "decidida_por_hmac", "login", "origem",
-       "codigo_ativo")
+       "codigo_ativo", "assinatura")
+# `assinatura` (11/10/2026, prova do contrato com o App v257): sem ela o App não aplica a decisão — o livro é lido por GET
+# público, e só a chave da pessoa (NEXUS_PESSOA_HMAC, a mesma do App) prova que a linha saiu do Nexus. Na prova, as duas
+# decisões gravadas aqui voltaram do App como "nao_assinadas", e o técnico ficaria esperando para sempre.
 DECISOES = {"de_acordo": "De acordo", "negada": "Não autorizo"}
 MOTIVO_MAX = 400
 _BRT = timezone(timedelta(hours=-3))
@@ -112,15 +115,45 @@ def pode_decidir(p: dict, email: str, nome: str = "", admin: bool = False, b=Non
     sol = D._txt(p.get("solicitante_hmac")).lower()
     if sol and sol == (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or ""):
         return False, QUEM_PEDIU
+    # também pela pessoa do cadastro (README da v257): quem tem um e-mail no Microsoft e outro no Fracttal passava pelo
+    # HMAC acima e decidia a própria PT
+    b = b or visao._Base()
+    pid = b.pessoa_do_login(email, nome)
+    if pid and p.get("solicitante_pessoa_id") and pid == p.get("solicitante_pessoa_id"):
+        return False, QUEM_PEDIU
     if admin:
         return True, "administrador"
-    b = b or visao._Base()
     a = aprovadores(p, b)
-    pid = b.pessoa_do_login(email, nome)
     papel = next((k for k, v in a["ids"].items() if pid and v == pid), None) or ("COS" if pid and pid in a["cos"] else None)
     if papel:
         return True, papel
     return False, f"Quem pode dar o De acordo nesta PT: {a['texto'][0].lower()}{a['texto'][1:]}."
+
+
+def assinatura(linha: dict, chave: str) -> str:
+    """HMAC-SHA256 em hex minúsculo, com a NEXUS_PESSOA_HMAC, do texto
+    "decisao_pt|pt|codigo_ativo|os|decisao|decidida_em|decidida_por_hmac|motivo" — a MESMA conta do App
+    (`_nexus_pt_assinatura` no function_app.py da v257; mudou lá, muda aqui no mesmo trabalho). Código do ativo vazio
+    vira ""; o motivo entra como gravado (já mascarado), com os espaços normalizados como o App lê. Sem chave: ""."""
+    import hashlib
+    import hmac
+    chave = (chave or "").strip()
+    if not chave:
+        return ""
+    txt = "|".join(("decisao_pt", D._txt(linha.get("pt")), D._txt(linha.get("codigo_ativo")), D._txt(linha.get("os")),
+                    D._txt(linha.get("decisao")), D._txt(linha.get("decidida_em")),
+                    D._txt(linha.get("decidida_por_hmac")), " ".join(D._txt(linha.get("motivo")).split())))
+    return hmac.new(chave.encode("utf-8"), txt.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def recusada_pelo_app(p: dict, decididas: list) -> bool:
+    """O App recusou a decisão do Nexus nesta linha e nenhuma decisão daqui é mais nova que a recusa: a linha se decide de
+    novo. O App escreve no pt_app_campo "Decisão do Nexus" = "recusada", a hora da decisão a que respondeu ("Decisão do
+    Nexus em") e o porquê ("Motivo da recusa"; v257, 11/10/2026). Sem isso, a linha que o App recusou (por exemplo, a
+    decisão com mais de 7 dias) ficava travada aqui ("já tem decisão") e só o painel do App a decidia."""
+    em = D._txt(p.get("nexus_app_em"))
+    return (D._txt(p.get("nexus_app")).lower() == "recusada" and bool(em)
+            and all(D._txt(d.get("decidida_em")) <= em for d in decididas))
 
 
 def decisoes() -> list[dict]:
@@ -190,13 +223,15 @@ def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin
         if not pode:
             raise Recusada(porque)
         linhas = decisoes()
-        if any(_da_linha(d, p["numero"], cod) for d in linhas):
+        ja = [d for d in linhas if _da_linha(d, p["numero"], cod)]
+        if ja and not recusada_pelo_app(p, ja):
             raise Recusada(f"{qual} já tem decisão gravada pelo Nexus.")
         agora = datetime.now(timezone.utc)
         nova = {"decidida_em": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "pt": p["numero"], "os": str(p["os"] or ""),
                 "usina_id": p["usina_id"], "decisao": decisao, "motivo": motivo, "decidida_por_hmac": quem,
                 "login": "Fracttal (OS Creator)", "origem": "Nexus", "codigo_ativo": cod or None}
+        nova["assinatura"] = assinatura(nova, cfg.get("NEXUS_PESSOA_HMAC"))
         linhas = [[d.get(c) for c in CAB] for d in linhas] + [[nova[c] for c in CAB]]
         livros.publicar(LIVRO, NOME_LIVRO, {ABA: (list(CAB), linhas)}, base=visao._base(),
                         token=cfg["GRIDCO_SQL_TOKEN"], sessao=visao._sessao())

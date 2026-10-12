@@ -420,10 +420,14 @@ def pt_aprovar(numero):
             nexus = decisao_pt.da_pt(p["numero"], p.get("codigo") or "")
         except Exception as e:      # noqa: BLE001 — sem o livro de decisões, a tela abre e diz
             erro_nexus = f"Não consegui ler as decisões do Nexus ({type(e).__name__})"
+    # o App recusou a última decisão do Nexus nesta linha: a tela diz por quê e abre o formulário de novo (v257)
+    recusa_app = ""
+    if p and nexus and decisao_pt.recusada_pelo_app(p, [nexus]):
+        recusa_app, nexus = p.get("nexus_recusa") or "o App não aplicou a decisão", None
     torre, tela = _onde_pt()
     return render_template("campo/pt_aprovar.html", **_comum(
         "pt", leitura, torre=torre, tela=tela, p=p, linhas=linhas, escolher=escolher, ativo=ativo, numero=numero,
-        nexus=nexus, erro_nexus=erro_nexus, situacoes=SITUACAO_PT,
+        nexus=nexus, erro_nexus=erro_nexus, recusa_app=recusa_app, situacoes=SITUACAO_PT,
         quem_assina=decisao_pt.aprovadores(p)["texto"] if p else "",
         # o "entre com o seu login do Fracttal" da decisão volta para ESTA linha (`assinatura._login`)
         entrar=_login_da_pt(p["numero"], p.get("codigo") or "") if p else "",

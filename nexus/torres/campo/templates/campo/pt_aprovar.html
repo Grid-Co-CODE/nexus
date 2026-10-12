@@ -107,6 +107,7 @@
       {% if nexus.motivo %}<p class="mudo">Motivo: {{ nexus.motivo }}</p>{% endif %}
       <p class="mudo">Salva no banco. O técnico vê quando o App aplicar a decisão.</p>
       {% else %}
+      {% if recusa_app %}<div class="cn-erro" role="alert"><b>O App não aplicou a decisão anterior do Nexus:</b> {{ recusa_app }}. Decida de novo.</div>{% endif %}
       <form method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir" class="cn-form-decisao">
         {# a linha decidida: o código do ativo dela vai para o banco (codigo_ativo), e o App acha a linha por ele #}
         <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">

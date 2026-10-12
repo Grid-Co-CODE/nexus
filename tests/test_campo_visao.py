@@ -444,7 +444,8 @@ def test_decisao_gravada_no_banco_com_codigo_e_sem_nome(app, banco, logado):
     linhas = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")
     assert len(linhas) == 1 and banco.linhas("nexus_pt_decisoes", "decisoes") == []
     d = linhas[0]
-    assert list(d) == list(decisao_pt.CAB) and list(d)[-1] == "codigo_ativo"
+    # a assinatura entra depois do codigo_ativo (contrato com o App v257, 11/10/2026)
+    assert list(d) == list(decisao_pt.CAB) and list(d)[-2:] == ["codigo_ativo", "assinatura"]
     assert d["pt"] == "PT-1" and d["decisao"] == "negada" and str(d["usina_id"]) == "1"
     assert d["codigo_ativo"] == "THPN-ALT100-INVR1"                    # o Código do ativo da linha no pt_app_campo
     assert d["decidida_por_hmac"] == codigo_da_pessoa(CHAVE, "sup@exemplo.test")
@@ -855,3 +856,51 @@ def test_tela_do_campo_volta_na_hora_e_se_renova_sozinha(banco, logado, monkeypa
     assert visao.rondas() is antes                                    # volta na hora a cópia que havia...
     depois = visao.rondas()
     assert depois is not antes and len(depois.dados["todas"]) == 4 != n   # ...e a nova já está pronta
+
+
+# ── contrato com o App v257 (prova de 11/10/2026): a decisão assinada e a recusa do App ─────────────────────────────
+def test_a_decisao_sai_assinada_com_a_mesma_conta_do_app(app, banco, logado):
+    """Na prova, o App v257 leu as 2 decisões do Nexus e não aplicou nenhuma ("nao_assinadas"): o livro é lido por GET
+    público, e só a chave da pessoa prova que a linha saiu do Nexus. A conta aqui é escrita à mão, como o App faz."""
+    import hashlib, hmac
+    _entrar_no_fracttal(app, logado, _jwt())
+    logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "negada", "motivo": "falta   o bloqueio"})
+    d = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")[0]
+    assert "assinatura" in decisao_pt.CAB and decisao_pt.CAB[-1] == "assinatura"
+    txt = "|".join(("decisao_pt", d["pt"], d["codigo_ativo"] or "", str(d["os"]), d["decisao"], d["decidida_em"],
+                    d["decidida_por_hmac"], " ".join(str(d["motivo"]).split())))
+    assert d["assinatura"] == hmac.new(CHAVE.encode(), txt.encode(), hashlib.sha256).hexdigest()
+    assert decisao_pt.assinatura(d, "") == ""                  # sem chave nada confere
+
+
+def test_a_recusa_do_app_aparece_e_libera_uma_nova_decisao(app, banco, logado):
+    """v257: o App escreve no pt_app_campo "Decisão do Nexus" = recusada, a hora da decisão a que respondeu e o porquê.
+    Antes a linha ficava travada aqui ("já tem decisão gravada pelo Nexus") e só o painel do App a decidia."""
+    _entrar_no_fracttal(app, logado, _jwt())
+    logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo"})
+    d1 = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")[0]
+    recusa = {"Decisão do Nexus": "recusada", "Decisão do Nexus em": d1["decidida_em"],
+              "Motivo da recusa": "decisão com mais de 7 dias"}
+    _aba(banco, "pt_app_campo", "PT", [dict(_pt("PT-1", 30), **recusa), _pt("PT-2", 1)])
+    visao.limpar()
+    html = logado.get("/t/campo/pt/PT-1").get_data(as_text=True)
+    assert "O App não aplicou a decisão anterior do Nexus" in html and "decisão com mais de 7 dias" in html
+    assert 'action="/os/_nexus/pt/PT-1/decidir"' in html
+    import time; time.sleep(1.1)                                # a nova decisão é mais nova que a recusada
+    logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "negada", "motivo": "agora sem o bloqueio"})
+    linhas = banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")
+    assert [x["decisao"] for x in linhas] == ["de_acordo", "negada"]
+    # a decisão nova é mais nova que a recusa: a linha volta a ficar decidida até o App responder de novo
+    logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo"})
+    assert len(banco.linhas("nexus_pt_decisoes", "fato_decisao_pt")) == 2
+
+
+def test_quem_pediu_a_pt_nao_decide_nem_com_outro_email(app):
+    """README da v257: o App só compara o HMAC do e-mail; quem tem um e-mail no Microsoft e outro no Fracttal passava."""
+    class B:
+        def pessoa_do_login(self, email, nome):
+            return 42
+    with app.test_request_context():
+        pode, porque = decisao_pt.pode_decidir({"solicitante_hmac": "", "solicitante_pessoa_id": 42},
+                                               "outro@exemplo.test", "Fulano", admin=True, b=B())
+    assert pode is False and porque == decisao_pt.QUEM_PEDIU
