@@ -62,7 +62,7 @@
   <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th></tr></thead>
   <tbody>
   {% for p in lista %}
-    <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
+    <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}{% if p.apr_dia %}<span class="det">APR do dia {{ p.apr_dia }}</span>{% endif %}</td>
       <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.regiao_br or '—' }}</td>
       <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td>
       <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td>

@@ -14,7 +14,7 @@
     <div class="cn-detalhe-grade">
       <dl class="cn-dados">
         <dt>PT</dt><dd class="m">{{ p.numero }}</dd>
-        <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
+        <dt>Tarefa</dt><dd>{% if p.tarefas_os %}{% for t in p.tarefas_os %}{{ t.tarefa }}{% if t.estado %} <span class="m">· {{ t.estado }}</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}<span class="det">APR do dia {{ p.apr_dia }}: uma APR e uma PT para as tarefas da OS no dia (as do Fracttal)</span>{% else %}{{ p.tarefa or '—' }}{% if p.apr_dia %}<span class="det">APR do dia {{ p.apr_dia }}: as tarefas desta OS ainda não chegaram do Fracttal</span>{% endif %}{% endif %}</dd>
         <dt>Equipamento</dt><dd>{{ equipamento(p) }}</dd>
         <dt>Usina</dt><dd>{{ p.usina }}{% if p.cidade %} · {{ p.cidade }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}</dd>
         <dt>Equipe</dt><dd>{{ p.equipe or '—' }}</dd>
@@ -93,7 +93,7 @@
     <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th><th>PT</th><th>APR</th></tr></thead>
     <tbody>
     {% for p in historico[:300] %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
-      <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}</td>
+      <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}{% if p.apr_dia %}<span class="det">APR do dia {{ p.apr_dia }}</span>{% endif %}</td>
         <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.solicitante or '—' }}</td>
         <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ p.decidida_por or p.papel or '—' }}</td>
         <td class="m">{{ p.criada.strftime('%d/%m %H:%M') if p.criada else '—' }}</td>

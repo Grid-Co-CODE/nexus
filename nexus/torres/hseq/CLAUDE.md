@@ -150,6 +150,9 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   09-10-2026 07h42", + " v2" no Novo risco da APR do dia), e na OS com mais de uma APR vale a de horário mais perto da
   criação da PT (`pt_fracttal.apr_pdf`, rota `/t/campo/pt/<número>/apr.pdf`). Na aba Esperando a PT ainda não tem PDF
   (sai no De acordo); a APR já tem.
+- **A APR do dia** (11/10/2026, Levi: "Por qual motivo algumas tarefas aparece como 'APR do dia'?"): a PT da APR por OS
+  e dia chega do App sem tarefa nem ativo; a tela mostra as tarefas da OS no dia e os equipamentos, pelas tarefas do
+  Fracttal (regra e fonte em `nexus/torres/campo/CLAUDE.md`, "A PT da APR do dia").
 - **O detalhe da PT esperando** (a linha abre; "estou achando o atual muito cru"): o cabeçalho da PT (número, OS,
   tarefa, equipamento, técnico, equipe, usina, aberta), as atividades críticas, as respostas NÃO e o que falta, a
   região de campo e o gestor, **quem assina**, as duas assinaturas lado a lado (a do técnico na APR, do Fracttal pelo

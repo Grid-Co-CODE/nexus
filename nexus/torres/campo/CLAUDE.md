@@ -332,6 +332,15 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   texto) não vale como papel. Medido em 06/10: nenhum dos supervisores de então tinha e-mail no cadastro; o e-mail do
   Fracttal na ficha é o caminho seguro (o nome só vale se for de UMA pessoa).
 - **PT:** fila "aguardando" da mais antiga para a mais nova; espera = da criação à decisão; parada = mais de 2 h.
+- **A PT da APR do dia** (App v246; para todos desde a v256, 10/10/2026): uma APR e uma PT por técnico, OS e dia; o
+  App manda no livro de PT a tarefa "APR do dia AAAA-MM-DD" e o ativo vazio (29 das 315 PT em 11/10). O `visao.pts`
+  completa com as tarefas da OS no Fracttal (`nexus/campo/apr_dia.py`): as feitas no dia da APR (iniciadas ou finalizadas
+  nele), sem nenhuma as abertas no dia, sem nenhuma todas; o equipamento sai do colchete do nome da tarefa ("[Cabine 2] -
+  ..."; no "[Grid Co.] - MPM - X", o X). Fonte: o `gestao_pcm.json` da Gestão PCM (`pcm/fonte.ler_gestao`, o mesmo cache),
+  porque 25 das 29 OS eram do fim de semana, fora da programação. A linha mostra a 1ª tarefa (+ quantas mais), os
+  equipamentos e "APR do dia dd/mm" embaixo; o detalhe lista as tarefas com o estado. OS que ainda não chegou ao arquivo
+  fica como o App mandou, com o dia marcado. Levi, 11/10: "aparece como 'APR do dia'? sendo que está ligado a atividade de
+  um ativo no fractal".
 - **"Esperando o De acordo" é a MESMA tela da Central > Permissões de trabalho** (Levi, 05/10): as duas incluem
   `templates/campo/_pt_esperando.html` (cartões compactos por equipe, por região de campo ou por gestor de contrato;
   tabela com a OS em verde,

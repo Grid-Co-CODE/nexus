@@ -39,7 +39,7 @@ from ..dados import fato_pt as FPT
 from ..dados import fato_ronda as FR
 from ..dados import fatos as D
 from ..dados import livros
-from . import leitura, livros_app
+from . import apr_dia, leitura, livros_app
 
 _BRT = timezone(timedelta(hours=-3))
 STATUS_OPERACAO = "OPERAÇÃO"
@@ -1331,6 +1331,10 @@ def pts() -> leitura.Leitura:
                         "aviso_motivo": r.get("1º aviso: motivo") or "",
                         "espera_min": D._int(x.get("espera_min")),
                         "idade_min": int((agora - criada).total_seconds() // 60) if criada and sit == "aguardando" else None})
+        # a APR do dia (App v246, para todos desde a v256) não é de uma tarefa: as tarefas e os equipamentos vêm das
+        # tarefas da OS no Fracttal (Levi, 11/10/2026: "aparece como 'APR do dia'? sendo que está ligado a atividade de
+        # um ativo no fractal")
+        _completar_apr_dia(out)
         for p in out:
             p["parada"] = (p["idade_min"] or 0) > PT_PARADA_MIN
         aguardando = sorted((p for p in out if p["situacao"] == "aguardando"), key=lambda p: p["criada"] or agora)
@@ -1348,6 +1352,29 @@ def pts() -> leitura.Leitura:
                            "espera_mediana_min": round(statistics.median(esperas)) if esperas else None,
                            "com_nao": sum(1 for p in out if p["respostas_nao"])}}
     return _ler(("visao_pt",), calcular)
+
+
+_APR_DIA_INDICE: dict = {}
+
+
+def _completar_apr_dia(pts) -> None:
+    """As tarefas da OS nas PT da APR do dia (`apr_dia`), pelo gestao_pcm.json que a Gestão PCM já lê (cópia de 5 min,
+    conferida pelo ETag). Sem PT da APR do dia, não lê nada; sem o arquivo (fora do ar, ou nos testes sem a fonte), a
+    linha fica como o App mandou. O índice por OS fica guardado pela versão do arquivo."""
+    if not any(apr_dia.dia_da_apr(p.get("tarefa")) for p in pts):
+        return
+    try:
+        from ..pcm import fonte as pcm_fonte
+        lg = pcm_fonte.ler_gestao(current_app.config)
+    except Exception:       # noqa: BLE001 — sem as tarefas do Fracttal, a PT fica como o App mandou
+        return
+    if lg.dados is None:
+        return
+    versao = lg.dados.get("dataHash") or lg.dados.get("geradoEm") or id(lg.dados)
+    if _APR_DIA_INDICE.get("versao") != versao:
+        _APR_DIA_INDICE.clear()
+        _APR_DIA_INDICE.update(versao=versao, por_os=apr_dia.indice(lg.dados.get("tarefas")))
+    apr_dia.completar(pts, _APR_DIA_INDICE["por_os"])
 
 
 def pts_por_equipe(pts, times=None) -> list[dict]:

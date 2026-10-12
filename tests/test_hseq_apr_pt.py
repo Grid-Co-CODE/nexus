@@ -9,10 +9,10 @@ import time
 from datetime import datetime
 
 import pytest
-from test_campo_visao import CHAVE_CADASTRO, _aba, _pessoas, banco  # noqa: F401  (banco é fixture)
+from test_campo_visao import CHAVE_CADASTRO, _aba, _pessoas, _pt, banco  # noqa: F401  (banco é fixture)
 
 from nexus.cadastro.cifra import Cofre
-from nexus.campo import decisao_pt, nota_fracttal, pt_fracttal, visao
+from nexus.campo import apr_dia, decisao_pt, nota_fracttal, pt_fracttal, visao
 
 
 def _jwt(email, exp_s=3600):
@@ -121,3 +121,48 @@ def test_o_vinculo_cos_e_o_campo_da_relacao_no_cadastro():
     assert VINCULO_COS == "COS" and VINCULO_COS in VINCULOS
     assert pt_fracttal._quando_apr("APR OS 15223 09-10-2026 07h42 v2") == datetime(2026, 10, 9, 7, 42)
     assert pt_fracttal._quando_apr("APR OS 15223") is None
+
+
+# ── a APR do dia (Levi, 11/10/2026: "Por qual motivo algumas tarefas aparece como 'APR do dia'? sendo que está ligado a
+#    atividade de um ativo no fractal") ──────────────────────────────────────────────────────────────────────────
+def test_o_equipamento_vem_do_nome_da_tarefa_do_fracttal():
+    assert apr_dia.dia_da_apr("APR do dia 2026-10-11") == "2026-10-11" and apr_dia.dia_da_apr("Troca de string") is None
+    assert [apr_dia.equipamento(t) for t in ("[Cabine 2] - Religamento da Cabine 2", "[THPN-FZL100] - Religamento do THPN-FZL100",
+                                             "[Grid Co.] - MPM - Transformador Aéreo", "Tarefa modelo", "")] ==         ["Cabine 2", "THPN-FZL100", "Transformador Aéreo", "", ""]
+
+
+def test_quais_tarefas_entram_na_apr_do_dia():
+    ts = [{"tarefa": "a", "dataInicio": "2026-10-10", "dataFinal": "2026-10-10"},
+          {"tarefa": "b", "dataInicio": "2026-10-05", "dataFinal": ""},            # aberta desde antes
+          {"tarefa": "c", "dataInicio": "2026-10-01", "dataFinal": "2026-10-02"}]
+    assert [t["tarefa"] for t in apr_dia.tarefas_no_dia(ts, "2026-10-10")] == ["a"]          # as feitas no dia
+    assert [t["tarefa"] for t in apr_dia.tarefas_no_dia(ts, "2026-10-08")] == ["b"]          # sem feita: as abertas
+    assert [t["tarefa"] for t in apr_dia.tarefas_no_dia(ts[2:], "2026-10-08")] == ["c"]      # sem nada: todas da OS
+    # OS que ainda não chegou ao arquivo: a PT fica como o App mandou, com o dia marcado
+    p = {"tarefa": "APR do dia 2026-10-10", "os": "999", "ativo": ""}
+    assert apr_dia.completar([p], {}) == 0 and p["tarefa"] == "APR do dia 2026-10-10" and p["apr_dia"] == "10/10"
+
+
+def test_a_apr_do_dia_mostra_as_tarefas_da_os_do_fracttal(banco, logado, app, tmp_path):
+    gestao = tmp_path / "gestao_pcm.json"
+    gestao.write_text(json.dumps({"geradoEm": "2026-10-11T23:00:00", "tarefas": [
+        {"os": "900", "tarefa": "[Cabine 2] - Religamento da Cabine 2", "estado": "Finalizada",
+         "dataInicio": "2026-10-10", "dataFinal": "2026-10-10"},
+        {"os": "900", "tarefa": "[Cabine 3] - Religamento da Cabine 3", "estado": "Em progresso",
+         "dataInicio": "2026-10-10", "dataFinal": ""},
+        {"os": "900", "tarefa": "[Cabine 4] - Religamento da Cabine 4", "estado": "Finalizada",
+         "dataInicio": "2026-10-03", "dataFinal": "2026-10-03"}]}), encoding="utf-8")
+    app.config["NEXUS_PCM_GESTAO_FONTE"] = str(gestao)
+    apr = dict(_pt("PT-9", 50, "de_acordo", 49), **{"OS": "900", "Tarefa": "APR do dia 2026-10-10",
+                                                   "Código do ativo": None, "Ativo": None})
+    _aba(banco, "pt_app_campo", "PT", [_pt("PT-1", 30), _pt("PT-2", 1), _pt("PT-3", 50, "de_acordo", 49), apr])
+    visao.limpar()
+    p = next(x for x in visao.pts().dados["historico"] if x["numero"] == "PT-9")
+    # as duas tarefas feitas no dia da APR, com o equipamento de cada uma; a de outro dia fica fora
+    assert p["tarefa"] == "[Cabine 2] - Religamento da Cabine 2 (+1)" and p["ativo"] == "Cabine 2, Cabine 3"
+    assert [t["equipamento"] for t in p["tarefas_os"]] == ["Cabine 2", "Cabine 3"] and p["apr_dia"] == "10/10"
+    # a PT de uma tarefa continua igual
+    assert next(x for x in visao.pts().dados["historico"] if x["numero"] == "PT-3")["tarefa"] == "Troca de string"
+    html = logado.get("/t/hseq/apr-pt?aba=historico").get_data(as_text=True)
+    assert "Religamento da Cabine 2 (+1)" in html and "APR do dia 10/10" in html and "Cabine 2, Cabine 3" in html
+    assert "APR do dia 2026-10-10" not in html
