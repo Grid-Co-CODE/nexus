@@ -59,7 +59,7 @@ def test_tela_com_view_propria_conta_como_conteudo(app):
     """O verde do menu sai do mapa de rotas: view própria conta, placeholder não (Levi, 04/10/2026)."""
     prontas = telas_com_conteudo(app)
     assert "/t/base/governanca" in prontas        # view própria
-    assert "/t/pcm/semana" in prontas
+    assert "/t/pcm/quadro" in prontas
     assert "/t/cos/mesa" not in prontas           # ainda placeholder
     assert all(not u.startswith("/t/comando/") for u in prontas)
 

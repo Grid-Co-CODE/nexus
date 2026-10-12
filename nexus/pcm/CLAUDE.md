@@ -24,7 +24,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo) |
 | `gestao.py` | as contas da Gestão PCM (Plano & Fila), transcritas do `js/preventivas.js` do painel |
 | `prova_gestao.py` + `.js` | a prova de que a Gestão PCM bate célula a célula com o painel (roda o JS dele no node) |
-| `semana.py` | as contas das telas Semana e Tarefas e OS: aderência, horas por equipe, fora da jornada |
+| `semana.py` | as regras da semana que as telas Tarefas e OS, Quadro e Gerar usam: achar a semana, dia, situação, fora da jornada, filtros (a tela Semana saiu em 12/10/2026) |
 | `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal; `gerar_com_foto`, o mesmo com a FOTO do Fracttal e sem credencial (a prova) |
 | `insumos.py` | os insumos do motor guardados no Nexus, escritos na rodada no formato que o motor lê |
 | `historico_banco.py` | o histórico das programações que o motor lê, montado do `fato_programacao` do banco (desde 08/10/2026); o plano publicado da semana em andamento vem da reserva, do REPOSITÓRIO do PCM ou da pasta do PCM |
@@ -36,9 +36,12 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
 
-Semana, Quadro da semana, Insights do PCM, Tarefas e OS, Gerar a semana, Gestão PCM, PCM 52 Semanas, Torre de controle e
-Peças e sobressalentes (Insights, 52 Semanas, Torre de controle e Peças ainda são placeholder). **Chamados por etiqueta e
-Disponibilidade saíram em 11/10/2026** (Levi: "tire essas seções"); a Disponibilidade da Performance (porta única com a
+Quadro da semana, Insights do PCM, Tarefas e OS, Gerar a semana, Gestão PCM, PCM 52 Semanas, Torre de controle e Peças
+e sobressalentes (Insights, 52 Semanas, Torre de controle e Peças ainda são placeholder). **A Semana saiu em 12/10/2026
+com o código dela** (Levi: "PCM > Semana -> pode excluir essa seção e o código dela!"): a rota, o `semana.html`, o
+`resumo` e o `por_equipe` do `semana.py` (aderência e horas por equipe e dia, contra as 7 h) e o CSS só dela; as regras
+que as outras telas usam ficaram no `semana.py`. O 1º item do PCM (e o cartão do PCM no Início) passou a ser o Quadro
+da semana. **Chamados por etiqueta e Disponibilidade saíram em 11/10/2026** (Levi: "tire essas seções"); a Disponibilidade da Performance (porta única com a
 plataforma) é outra tela e continua. A **Torre de controle** seria o painel das rotinas do PCM: a planilha "Controles PCM
 (editar aqui).xlsx" (pasta do PCM, 09. Programação Semanal/00. Torre de Controle PCM, 19/08/2026) lista 24 controles com
 cadência, prazo e quem marca (gerar e publicar a semana toda sexta, inspeções semanais da GreenYellow toda quinta, subir
@@ -54,8 +57,8 @@ uma string". Cada filtro lista só o que existe com os OUTROS filtros aplicados 
 Cliente só listam os dela); o filtro não restringe a si mesmo (dá para trocar de equipe sem limpar o resto); a opção
 escolhida fica na lista mesmo quando a combinação não tem nada (a tela não esconde o filtro que está valendo). Vale para:
 Quadro da semana (`quadro.opcoes`, com quantas tarefas cada opção tem), Tarefas e OS (`semana.facetas`, com as contas) e
-os filtros de cima da Gestão PCM (`gestao.escolhas_topo(tarefas, topo)`, sem contas: o número da matriz diz o resto). A
-Semana não tem filtro. Testes: `test_filtros_de_tarefas_em_cascata`, `test_filtros_do_quadro_em_cascata`,
+os filtros de cima da Gestão PCM (`gestao.escolhas_topo(tarefas, topo)`, sem contas: o número da matriz diz o resto).
+Testes: `test_filtros_de_tarefas_em_cascata`, `test_filtros_do_quadro_em_cascata`,
 `test_filtros_de_cima_em_cascata`.
 
 ## Insumos: no Nexus, não em arquivo

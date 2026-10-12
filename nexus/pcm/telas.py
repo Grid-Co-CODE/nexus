@@ -43,11 +43,6 @@ def _contexto_fonte(leitura) -> dict:
             "fonte_padrao": leitura.fonte == fonte.URL_PADRAO}
 
 
-def _dias(sem) -> list[dict]:
-    datas = sem.get("dates") or {}
-    return [{"id": d, "nome": S.NOMES_DIA[d], "data": datas.get(d, "")} for d in S.DIAS]
-
-
 def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     sel = geracao.ler_status(cfg, rodada) if rodada else None
     if sel and sel.get("estado") == "rodando" and not geracao.ativa(cfg, sel["id"]):
@@ -254,25 +249,6 @@ def registrar_pcm(bp) -> None:
         if estado == "rodando" and not geracao.ativa(cfg, st["id"]):
             estado = "interrompida"
         return jsonify({"id": st["id"], "estado": estado, "duracao_s": st.get("duracao_s")})
-
-    @bp.route("/semana")
-    def semana():
-        leitura = fonte.ler(current_app.config)
-        ctx = _contexto_fonte(leitura)
-        if leitura.dados is None:
-            return render_template("pcm/semana.html", sem=None, **ctx)
-        pedida = request.args.get("semana") or None
-        sem = S.achar(leitura.dados, pedida)
-        if sem is None:
-            abort(404)
-        equipes = S.por_equipe(sem)
-        for e in equipes:
-            e["horas_txt"] = {d: (_h(h) if h else "") for d, h in e["horas_dia"].items()}
-            e["noite_txt"] = {d: (_h(h) if h else "") for d, h in e["horas_noite"].items()}
-        res = S.resumo(sem)
-        res["horas_txt"] = _h(res["horas"])
-        return render_template("pcm/semana.html", sem=sem, semanas=S.semanas(leitura.dados), resumo=res,
-                               equipes=equipes, dias=_dias(sem), capacidade=_h(S.CAPACIDADE_H), **ctx)
 
     @bp.route("/tarefas")
     def tarefas():

@@ -466,8 +466,7 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
 Levi: "Controle de fornecedores do OS Creator Web tem que estar no NEXUS > CHAMADOS > FABRICANTE"; "o mesmo com
 Acompanhamento de chamados, tem que estar em GARANTIAS"; "não que vão sair da visão do OS Creator Web, porém, quando for
 abrir essa janela o atalho deve ficar para a parte de CHAMADOS". Em `ponte.ATALHOS`: Chamados → Fabricantes abre
-`/os/chamados/fornecedores`, Chamados → Tickets de performance abre `/os/tickets` (auditoria B8 da porta única,
-10/10/2026: o item dizia "Em construção" com a tela pronta aqui) e Chamados → Garantias abre
+`/os/chamados/fornecedores` e Chamados → Garantias abre
 `/os/chamados/acompanhamento`, na mesma moldura da torre OS Creator (`abrir_em`), com o menu lateral marcando a torre
 Chamados; entre os atalhos o clique abre aba nova na casca já aberta. As telas continuam no OS Creator (mesmo endereço; o
 setor Chamados dele não mudou). Atalho novo para outra torre = uma linha em `ATALHOS` (a torre Chamados registra a
@@ -602,6 +601,29 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
     cor escura do dado, como ENGENHARIA a 2,5:1 e Remoto a 1,6:1; o `--fa` dos chamados, do Controle de fornecedores e
     do Início, a 3,5–4,1:1; o texto de exemplo do login, cinza padrão do navegador).
   - Falta o olho do Levi com os dados de verdade.
+
+## Sem Tickets e sem a faixa de abas (12/10/2026)
+
+- **A tela de Tickets saiu, com o código dela** (Levi: "Chamados > Tickets de Performance -> pode excluir essa seção e o
+  código dela!"). Saíram da cópia: `os_web/rotas_tickets.py` (as 10 rotas `/tickets` e `/api/tickets/...`; o registro
+  automático das telas não acha mais o arquivo), `os_web/tickets_web.py`, `os_web/tickets_painel.py`, `tickets_calc.py`,
+  `templates/tickets.html` e `tickets_painel.html`, `static/tickets_painel.js` e `.css`, as regras `tk-*` do `os.css`
+  (escuro e claro), o card "Tickets" da Performance, o atalho dele no card do setor e a seção no `lancador.py`. E, no
+  Nexus, o item Chamados → Tickets de performance (`ATALHOS`).
+- **Fica** a linha de ticket que nasce junto da OS da Performance (a caixa "Gerar ticket", `api.nascer_ticket` →
+  `tickets_nasce`, que usa `tickets_api`, `tickets_diario`, `tickets_escrita` e `tickets_spec`): é da criação de OS, não
+  da tela. O `/os/api/acomp/<folio>/ticket` é o nº do chamado no fabricante (Acompanhamento de chamados) e também fica.
+- **No oem ainda não foi:** a sincronia (`ferramentas/sincronizar_oscreator.py --aplicar`) levaria o `lancador.py`, o
+  `performance.html` e o `os.css`; os arquivos apagados ela só lista ("apagado no Nexus, não apago no oem": lá mora o app
+  de desktop, que tem a tela de Tickets dele). Levar ou não ao 5090 é decisão do Levi; até lá o
+  `test_copia_do_os_creator_igual_ao_oem` acusa esses três arquivos neste PC.
+- **Sem a faixa de abas dentro do Nexus** (Levi: "quero que mantenha esse carregamento mas tire a visão de abas da parte
+  de cima pois como já temos as abas laterais, fica redundante, para um sistema separado, quero passar a impressão de
+  unidade!"). A ponte põe `.os-tabs{display:none}` no `_ESTILO_NEXUS` (some a faixa da casca e a da tela aberta
+  sozinha); a casca continua guardando cada tela aberta, viva, e o menu lateral acende a de cada item já carregada. Sem
+  o X de fechar, a ponte põe um teto no `abas.js` (`_ABAS_MAX` = 12 além do Início: os 9 itens da torre e mais três): ao
+  abrir a 13ª, sai a acesa há mais tempo, nunca a ativa. Tudo na ponte: a cópia segue igual à do oem, e no 5090 a faixa
+  continua. Prova: `test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas`.
 
 ## Debaixo do /nexus (porta única, 09/10/2026)
 

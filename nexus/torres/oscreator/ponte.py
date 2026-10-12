@@ -58,7 +58,16 @@ _VOLTAR_DE = (b'<a class="os-topo-voltar" href="/" title="Voltar para a Platafor
 _MARCA_DE = ('<img src="/os/assets/grid-icon.png" alt="" class="os-simbolo">\n'
              '    <div><div class="os-n1">Grid Co.</div><div class="os-n2">Sistema de Ordens de Serviço</div></div>').encode()
 _MARCA_PARA = '<div class="os-n2 os-n2--nexus">Sistema de Ordens de Serviço</div>'.encode()
-_ESTILO_NEXUS = b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:center}</style>'
+# Sem a faixa de abas dentro do Nexus (Levi, 12/10/2026: "tire a visão de abas da parte de cima pois como já temos as
+# abas laterais, fica redundante, para um sistema separado, quero passar a impressão de unidade!"): some a faixa da casca
+# e a fixa da tela aberta sozinha (as duas são .os-tabs). As telas abertas continuam vivas na casca (o "carregamento" que
+# ele quer manter): o menu lateral acende a de cada item, já carregada. No 5090 do supervisório nada muda.
+# O botão de recolher o topo morava na faixa: quem tinha recolhido (o osTopoRecolhido do navegador) ficaria sem o topo e
+# sem como abri-lo; no Nexus o topo fica sempre à mostra (menos dentro de uma aba, onde a casca já o esconde).
+_ESTILO_NEXUS = (b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:center}'
+                 b'.os-tabs{display:none!important}'
+                 b'html:not(.os-embutido) body.os-sem-topo .os-header{display:flex!important}'
+                 b'html:not(.os-embutido) body.os-sem-topo .os-sep{display:block!important}</style>')
 
 # Sobe de moldura em moldura até a de baixo do Nexus (o <html data-nexus>). Sem Nexus em cima, chega ao topo e é o
 # window.top de sempre. Moldura de outro domínio (o supervisório embutido na Engenharia) para a subida no try.
@@ -81,8 +90,23 @@ _OUVIR_NEXUS = b"""    window.addEventListener('message', function (e) {
     });
 """
 _ANCORA_MENSAGEM = b"    window.addEventListener('message', function (e) {\n"
+# Sem a faixa (12/10/2026), ninguém fecha aba pelo X: a casca do Nexus guarda no máximo _ABAS_MAX telas além do Início, e
+# a que foi acesa há mais tempo sai quando abre uma a mais (a ativa nunca). 12 cabe os 9 itens do menu lateral da torre
+# e mais três (uma OS aberta, uma clonagem): cada aba é uma moldura viva, e sem teto elas se acumulavam a sessão inteira.
+_ABAS_MAX = 12
+_USO_DE = b"    let abas = [], ativa = 'inicio', seq = 0;\n"
+_USO_PARA = _USO_DE + b"    const uso = {}; let relogio = 0;                     // Nexus: quando cada aba foi acesa\n"
+_ACENDER_DE = b"      ativa = id;\n"
+_ACENDER_PARA = b"      ativa = id; uso[id] = ++relogio;\n"
+_LIMITE_DE = b"      seq += 1;\n"
+_LIMITE_PARA = (b"      if (abas.length >= %d) {                            // Nexus: sem a faixa, a mais antiga sai\n"
+                b"        const velha = abas.filter(function (b) { return b.id !== ativa; })\n"
+                b"          .sort(function (x, y) { return (uso[x.id] || 0) - (uso[y.id] || 0); })[0];\n"
+                b"        if (velha) fechar(velha.id);\n"
+                b"      }\n" % _ABAS_MAX) + _LIMITE_DE
 _TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTopo() === window) casca();"),
-                (_ANCORA_MENSAGEM, _OUVIR_NEXUS + _ANCORA_MENSAGEM)]
+                (_ANCORA_MENSAGEM, _OUVIR_NEXUS + _ANCORA_MENSAGEM),
+                (_USO_DE, _USO_PARA), (_ACENDER_DE, _ACENDER_PARA), (_LIMITE_DE, _LIMITE_PARA)]
 
 # Tema claro (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está sincronizando com o botão do Nexus"). O
 # clone não lê o cookie do Nexus: quem decide é a ponte, pelo mesmo casca.tema_do_pedido das páginas do Nexus.
@@ -455,11 +479,8 @@ def abrir(torre, tela_id: str):
 # que estar no NEXUS > CHAMADOS > FABRICANTE"; "o mesmo com Acompanhamento de chamados, tem que estar em GARANTIAS";
 # "não que vão sair da visão do OS Creator Web, porém, quando for abrir essa janela o atalho deve ficar para a parte de
 # CHAMADOS". A tela continua no OS Creator (mesmo endereço, mesma casca); o item do menu do Nexus é que mora na torre.
-# Tickets de performance (auditoria B8 da porta única, 10/10/2026): o item aparecia "Em construção" com a tela pronta no
-# próprio Nexus, em /os/tickets (a dos tickets do OS Creator Web).
 ATALHOS = {
-    "chamados": {"fabricantes": "/os/chamados/fornecedores", "tickets": "/os/tickets",
-                 "garantias": "/os/chamados/acompanhamento"},
+    "chamados": {"fabricantes": "/os/chamados/fornecedores", "garantias": "/os/chamados/acompanhamento"},
 }
 
 

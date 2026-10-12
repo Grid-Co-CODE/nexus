@@ -1,18 +1,17 @@
-"""Regras puras da tela da semana: a programação (formato do banco_dados.json do painel do PCM) por equipe e dia.
+"""Regras puras da programação da semana (formato do banco_dados.json do painel do PCM), usadas pelas telas Tarefas e
+OS, Quadro da semana e Gerar a semana. A tela Semana (o resumo e as horas por equipe e dia) saiu em 12/10/2026 com o
+código dela (Levi: "pode excluir essa seção e o código dela").
 
 Uma linha do arquivo é UMA tarefa programada. A equipe é o `cluster` (o nome da aba da planilha do PCM, "SP Leste 02"),
 o dia vem por extenso ("Terça-feira") e o status é o do Fracttal ("Finalizados", "Não Iniciada", "Em progresso",
 "pausado").
 """
 import unicodedata
-from collections import Counter, defaultdict
+from collections import Counter
 
 DIAS = ("seg", "ter", "qua", "qui", "sex")
 NOMES_DIA = {"seg": "Segunda", "ter": "Terça", "qua": "Quarta", "qui": "Quinta", "sex": "Sexta"}
-# O que cabe num dia de equipe: 80% das 8,8 h líquidas (07:00–17:00 menos o almoço), a mesma conta do gerador.
-CAPACIDADE_H = 7.0
-# A MPA roda na janela da noite (15:30 → 01:30; o gerador trunca o dia às 15:30) e não disputa as 7 h do dia.
-# Medido na semana 40: com ela na conta, 93 de 193 dias de equipe "passavam" de 7 h; sem ela, 46.
+# A MPA roda na janela da noite (15:30 → 01:30; o gerador trunca o dia às 15:30): não é tarefa fora do horário.
 TIPO_NOITE = "mpa"
 # A jornada do gerador é 07:00–17:00. Tarefa que começa fora disso (sem contar a MPA, que tem janela própria, e a
 # zeladoria, que é terceirizada) é sinal de cascata ou pino que empurrou a tarefa para a madrugada: na semana 40
@@ -69,57 +68,6 @@ def achar(dados, week: str | None = None) -> dict | None:
     ativa = (dados or {}).get("semana_ativa")
     return next((s for s in todas if s["week"] == ativa), None) or \
         (max(todas, key=lambda s: str(s["week"])) if todas else None)
-
-
-def _pct(parte, todo) -> int:
-    return int(round(100.0 * parte / todo)) if todo else 0
-
-
-def resumo(sem) -> dict:
-    rows = sem.get("rows") or []
-    sit = Counter(situacao(r) for r in rows)
-    return {
-        "linhas": len(rows),
-        "os": len({r.get("os_id") for r in rows if r.get("os_id")}),
-        "usinas": len({r.get("usina") for r in rows if r.get("usina")}),
-        "equipes": len({r.get("cluster") for r in rows if r.get("cluster")}),
-        "feitas": sit["feita"], "em_andamento": sit["andamento"], "nao_iniciadas": sit["nao_iniciada"],
-        "aderencia": _pct(sit["feita"], len(rows)),
-        "horas": round(sum(float(r.get("duracao") or 0) for r in rows), 2),
-        "pendentes": len(sem.get("pendentes") or []),
-        "reprogramadas": sum(1 for r in rows if _norm(r.get("reprog")) == "sim"),
-        "novas": sum(1 for r in rows if _norm(r.get("nova_os")).startswith("sim")),
-        "fora_horario": sum(1 for r in rows if fora_do_horario(r)),
-        "por_tipo": Counter(str(r.get("tipo") or "Sem tipo") for r in rows).most_common(),
-    }
-
-
-def por_equipe(sem) -> list[dict]:
-    grupos = defaultdict(list)
-    for r in sem.get("rows") or []:
-        grupos[str(r.get("cluster") or "Sem equipe")].append(r)
-    pend = Counter(str(p.get("cluster") or "Sem equipe") for p in sem.get("pendentes") or [])
-    out = []
-    for eq in sorted(set(grupos) | set(pend)):
-        rows = grupos.get(eq, [])
-        horas = {d: 0.0 for d in DIAS}
-        noite = {d: 0.0 for d in DIAS}
-        for r in rows:
-            d = dia_curto(r.get("dia"))
-            # a zeladoria é terceirizada e roda em paralelo: não gasta hora da equipe
-            if not d or _norm(r.get("paralelo")) == "sim":
-                continue
-            (noite if _norm(r.get("tipo")) == TIPO_NOITE else horas)[d] += float(r.get("duracao") or 0)
-        feitas = sum(1 for r in rows if situacao(r) == "feita")
-        out.append({
-            "equipe": eq, "linhas": len(rows), "feitas": feitas, "aderencia": _pct(feitas, len(rows)),
-            "usinas": len({r.get("usina") for r in rows if r.get("usina")}),
-            "horas_dia": {d: round(h, 2) for d, h in horas.items()},
-            "horas_noite": {d: round(h, 2) for d, h in noite.items()},
-            "estourou": [d for d in DIAS if horas[d] > CAPACIDADE_H + 1e-9],
-            "pendentes": pend.get(eq, 0),
-        })
-    return out
 
 
 def facetas(sem, filtros: dict) -> dict:

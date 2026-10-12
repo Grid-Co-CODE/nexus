@@ -1,5 +1,7 @@
 """Programação semanal no Nexus, etapa 1: ler a programação que está valendo (o banco_dados.json que o App de Campo
-e o painel do PCM leem) e mostrá-la por equipe e dia. Regras puras em nexus/pcm/semana.py; telas em nexus/pcm/telas.py.
+e o painel do PCM leem). Regras puras em nexus/pcm/semana.py; telas em nexus/pcm/telas.py. A tela Semana saiu em
+12/10/2026 com o código dela (Levi: "pode excluir essa seção e o código dela"); as regras que ficam são as das telas
+Tarefas e OS, Quadro da semana e Gerar a semana.
 
 Nenhum teste aqui vai à rede: a fonte é um arquivo local com o mesmo formato do banco_dados.json.
 """
@@ -78,38 +80,10 @@ def test_dia_curto_ignora_acento_e_o_resto():
     assert S.dia_curto("") == ""
 
 
-def test_resumo_da_semana():
-    r = S.resumo(S.achar(banco()))
-    assert (r["linhas"], r["os"], r["usinas"], r["equipes"]) == (7, 7, 2, 2)
-    assert (r["feitas"], r["em_andamento"], r["nao_iniciadas"]) == (2, 2, 3)
-    assert r["aderencia"] == 29                           # 2 de 7 finalizadas
-    assert r["horas"] == pytest.approx(15.65, abs=0.01)
-    assert (r["pendentes"], r["reprogramadas"], r["novas"]) == (1, 1, 1)
-
-
 def test_fora_do_horario_conta_a_madrugada_mas_nao_a_mpa():
     sem = S.achar(banco())
-    assert S.resumo(sem)["fora_horario"] == 1             # a MPM das 00:00; a MPA das 15:30 é janela própria
+    # a MPM das 00:00 é fora do horário; a MPA das 15:30 é janela própria
     assert [t["os_id"] for t in S.tarefas(sem, horario="fora")] == ["15033"]
-
-
-def test_por_equipe_mostra_horas_por_dia_e_o_dia_que_passa_da_capacidade():
-    eqs = S.por_equipe(S.achar(banco()))
-    assert [e["equipe"] for e in eqs] == ["BA Sul 01", "SP Leste 02"]
-    sp = eqs[1]
-    assert (sp["linhas"], sp["feitas"], sp["aderencia"], sp["usinas"]) == (4, 1, 25, 1)
-    assert sp["horas_dia"]["seg"] == pytest.approx(7.5)
-    assert sp["estourou"] == ["seg"]                     # 7,5 h > 7 h de capacidade (80% do dia)
-    assert eqs[0]["pendentes"] == 1 and sp["pendentes"] == 0
-
-
-def test_mpa_fica_na_janela_da_noite_e_fora_da_capacidade_do_dia():
-    """Medido na semana 40: com a MPA na conta, 93 de 193 dias de equipe passavam de 7 h; sem ela, 46. A MPA roda
-    das 15:30 à 01:30 (o gerador trunca o dia às 15:30), então não disputa as 7 h do dia."""
-    sp = S.por_equipe(S.achar(banco()))[1]
-    assert sp["horas_dia"]["ter"] == pytest.approx(1.1)   # só a MPM; a MPA de 4 h não entra
-    assert sp["horas_noite"]["ter"] == pytest.approx(4.0)
-    assert "ter" not in sp["estourou"]
 
 
 def test_tarefas_filtradas_e_na_ordem_do_dia():
@@ -133,20 +107,12 @@ def fonte(app, tmp_path):
     return arq
 
 
-def test_tela_semana_mostra_a_semana_ativa_por_equipe(logado, fonte):
-    html = logado.get("/t/pcm/semana").get_data(as_text=True)
-    assert "Semana 40" in html and "SP Leste 02" in html and "BA Sul 01" in html
-    assert "29%" in html                                  # aderência da semana
-    assert "horario=fora" in html                         # o atalho para as tarefas fora do horário
-    assert "+4 h de MPA" in html                          # a noite da terça, à parte
-    assert "pcm-estourou" in html                         # a segunda da SP Leste 02 passou de 7 h
-    assert "Em construção" not in html
-
-
-def test_tela_semana_troca_de_semana(logado, fonte):
-    html = logado.get("/t/pcm/semana?semana=2026-W39").get_data(as_text=True)
-    assert "Semana 39" in html
-    assert logado.get("/t/pcm/semana?semana=2026-W99").status_code == 404
+def test_tela_semana_saiu_do_pcm(logado, fonte):
+    """Levi, 12/10/2026: "PCM > Semana -> pode excluir essa seção e o código dela!"."""
+    assert logado.get("/t/pcm/semana").status_code == 404
+    html = logado.get("/t/pcm/tarefas").get_data(as_text=True)
+    assert 'href="/t/pcm/semana"' not in html and 'href="/t/pcm/quadro"' in html
+    assert not hasattr(S, "resumo") and not hasattr(S, "por_equipe")
 
 
 def test_tela_tarefas_filtra_por_equipe(logado, fonte):
@@ -157,13 +123,13 @@ def test_tela_tarefas_filtra_por_equipe(logado, fonte):
 
 def test_fonte_fora_do_ar_vira_aviso_e_nao_quebra(logado, app, tmp_path):
     app.config["NEXUS_PCM_FONTE"] = str(tmp_path / "nao-existe.json")
-    resp = logado.get("/t/pcm/semana")
+    resp = logado.get("/t/pcm/tarefas")
     assert resp.status_code == 200
     assert "Não consegui ler a programação" in resp.get_data(as_text=True)
 
 
 def test_tela_sem_login_para_no_portao(cliente):
-    resp = cliente.get("/t/pcm/semana")
+    resp = cliente.get("/t/pcm/tarefas")
     assert resp.status_code == 302 and "/entrar" in resp.headers["Location"]
 
 

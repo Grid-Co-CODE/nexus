@@ -79,4 +79,4 @@ def test_debaixo_do_prefixo_o_cartao_sai_com_ele():
     cli = Client(app)
     assert cli.post("/nexus/entrar", data={"senha": SENHA_TESTE}).status_code == 302
     cartoes = _cartoes(cli.get("/nexus/").get_data(as_text=True))
-    assert cartoes["pcm"][1] == "/nexus/t/pcm/semana"
+    assert cartoes["pcm"][1] == "/nexus/t/pcm/quadro"       # a Semana saiu em 12/10: o 1º item do PCM é o Quadro

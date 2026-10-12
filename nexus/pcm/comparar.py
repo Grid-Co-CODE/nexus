@@ -85,8 +85,8 @@ def resumo(caminho) -> dict:
 
 
 # ── a conferência da semana gerada (antes de alguém publicar) ─────────────────────────────────────────────────
-# A capacidade e a jornada são as da tela Semana (semana.py), que são as do gerador: 7 h por equipe e dia (80% das
-# 8,8 h líquidas), MPA na janela da noite fora da conta, zeladoria terceirizada fora da conta e da jornada.
+# A capacidade e a jornada são as do gerador: 7 h por equipe e dia (80% das 8,8 h líquidas), MPA na janela da noite
+# fora da conta, zeladoria terceirizada fora da conta e da jornada (a jornada é a mesma do fora_do_horario do semana.py).
 CAPACIDADE_H = 7.0
 JORNADA = ("07:00", "17:00")
 # o almoço do gerador (programacao_v7: 12:00 às 13:12): o bloco que o atravessa termina 72 min depois

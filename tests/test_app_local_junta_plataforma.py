@@ -37,7 +37,7 @@ def test_caminhos_do_nexus_ficam_no_processo_e_o_resto_vai_a_plataforma():
     srv = _plataforma_falsa()
     try:
         c = Client(app_local.juntar_com_a_plataforma(_nexus_falso, f"http://127.0.0.1:{srv.server_port}"))
-        for caminho in ("/", "/t/performance/tempo-real", "/entrar", "/os/tickets", "/static/nexus.css", "/saude"):
+        for caminho in ("/", "/t/performance/tempo-real", "/entrar", "/os/historico", "/static/nexus.css", "/saude"):
             assert c.get(caminho).get_data(as_text=True) == f"nexus {caminho}", caminho
         for caminho in ("/tempo-real", "/painel/nexus/entrar", "/api/macro", "/static/notif.js", "/static/logos/x.png",
                         "/healthz"):

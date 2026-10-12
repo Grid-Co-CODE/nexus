@@ -85,6 +85,25 @@ def test_menu_lateral_abre_aba_nova_na_casca(logado):
     assert abas.index("d.nexusOs !== 1") < abas.index("if (d.tipo === 'pagina')")     # dentro da casca, antes da original
 
 
+def test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas(logado):
+    """Levi, 12/10/2026: "quero que mantenha esse carregamento mas tire a visão de abas da parte de cima pois como já
+    temos as abas laterais, fica redundante ... quero passar a impressão de unidade!". A ponte esconde as duas faixas
+    (.os-tabs: a da casca e a da tela aberta sozinha) só no Nexus; a casca continua guardando cada tela aberta, e sem o X
+    de fechar ela guarda no máximo _ABAS_MAX (a acesa há mais tempo sai, nunca a ativa). O clone fica igual ao do oem."""
+    from nexus.torres.oscreator import ponte
+    html = logado.get("/os/login").get_data(as_text=True)
+    assert ".os-tabs{display:none!important}" in html
+    abas = logado.get("/os/static/abas.js").get_data(as_text=True)
+    assert abas.count("uso[id] = ++relogio;") == 1 and abas.count(f"if (abas.length >= {ponte._ABAS_MAX})") == 1
+    # o teto entra antes de a aba nova nascer (no abrir) e a ativa nunca é a que sai
+    assert abas.index(f"if (abas.length >= {ponte._ABAS_MAX})") < abas.index("seq += 1;")
+    assert "return b.id !== ativa;" in abas
+    # o arquivo do clone continua o do oem: tudo isso é da ponte
+    from pathlib import Path
+    original = (Path(ponte.RAIZ_CLONE) / "os_web" / "static" / "abas.js").read_text(encoding="utf-8")
+    assert "relogio" not in original and "os-tabs{display:none" not in original
+
+
 def test_fila_do_pcm_usa_o_id_que_a_lista_de_pessoas_tem():
     """04/10: clicar em PCM dava 500. A Fila pedia p.id_account, campo que a lista de responsáveis não tem; o oem já
     tinha corrigido em 02/10 (id_personnel) e o clone era de 30/09."""
