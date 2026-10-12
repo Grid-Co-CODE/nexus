@@ -24,7 +24,7 @@ from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ron
 from ..modelo import Tela, Torre
 from ...prefixo import na_raiz
 from .aprovar_os import bp_aprovar_os, papel_da_sessao, pode_na_tela
-from .assinatura import bp_assinatura
+from .assinatura import _login as _login_da_pt, _tela as _tela_da_pt, bp_assinatura
 
 FONTE_APP = "Livros que o App de Campo grava no banco do Nexus + cadastro do Nexus"
 
@@ -360,16 +360,18 @@ def pt_pdf(numero):
     05/10: "exportar o anexo do PDF ... conforme estava no Azure"). O Nexus baixa e entrega: o link do Fracttal não
     sai para o navegador."""
     p = visao.pt(numero)
+    # o aviso volta para a linha de onde se pediu o PDF (a PT de mais de uma linha, sem ela, só deixa escolher)
+    ativo = request.args.get("ativo")
     try:
         if not p or not p.get("os"):
             raise pt_fracttal.SemArquivo(f"{numero} não está no livro do App")
         corpo = pt_fracttal.pdf(p["os"], p["numero"])
     except pt_fracttal.SemArquivo as e:
         session["pt_aviso"] = f"Sem PDF: {e}."
-        return redirect(url_for_pt(numero))
+        return redirect(url_for_pt(numero, ativo))
     except Exception as e:      # noqa: BLE001 — Fracttal fora ou recusando
         session["pt_aviso"] = f"Não consegui buscar o PDF no Fracttal ({type(e).__name__}). Tente de novo em instantes."
-        return redirect(url_for_pt(numero))
+        return redirect(url_for_pt(numero, ativo))
     return Response(corpo, mimetype="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{p["numero"]}.pdf"'})
 
@@ -393,26 +395,42 @@ def pt_apr_pdf(numero):
     return Response(corpo, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="{arq}.pdf"'})
 
 
-def url_for_pt(numero) -> str:
-    from urllib.parse import quote
-    return na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
+def url_for_pt(numero, codigo=None) -> str:
+    """A tela da PT; com `codigo` (o código do ativo), a mesma linha (`assinatura._tela`)."""
+    return _tela_da_pt(numero, codigo)
 
 
 @bp.route("/pt/<numero>")
 def pt_aprovar(numero):
-    """A aprovação da PT no Nexus: a PT inteira e a decisão, assinada com o login do Fracttal do OS Creator."""
+    """A aprovação da PT no Nexus: uma linha da PT e a decisão dela, assinada com o login do Fracttal do OS Creator. A
+    PT de mais de um ativo tem uma linha (e uma decisão) por ativo, como no App: `?ativo=<código>` escolhe qual (decisão
+    4 do Levi, 11/10/2026), e a tela lista as outras linhas. Sem ele, ou com um código que a PT não tem, a PT de uma
+    linha abre a dela e a de mais de uma só lista os equipamentos para escolher: abrir a 1ª calada punha o código dela
+    no formulário, e a decisão caía no equipamento errado (revisão adversarial de 11/10/2026)."""
     leitura = visao.pts()
-    p = visao.pt(numero) if not leitura.erro else None
+    ativo = request.args.get("ativo")
+    linhas = visao.pt_linhas(numero) if not leitura.erro else []
+    p = visao.pt(numero, ativo) if linhas and ativo is not None else None
+    if p is None and len(linhas) == 1:
+        p = linhas[0]                       # uma linha só: não há o que escolher
+    escolher = bool(linhas) and p is None
     nexus, erro_nexus = None, ""
     if p:
         try:
-            nexus = decisao_pt.da_pt(p["numero"])
+            nexus = decisao_pt.da_pt(p["numero"], p.get("codigo") or "")
         except Exception as e:      # noqa: BLE001 — sem o livro de decisões, a tela abre e diz
             erro_nexus = f"Não consegui ler as decisões do Nexus ({type(e).__name__})"
+    # o App recusou a última decisão do Nexus nesta linha: a tela diz por quê e abre o formulário de novo (v257)
+    recusa_app = ""
+    if p and nexus and decisao_pt.recusada_pelo_app(p, [nexus]):
+        recusa_app, nexus = p.get("nexus_recusa") or "o App não aplicou a decisão", None
     torre, tela = _onde_pt()
     return render_template("campo/pt_aprovar.html", **_comum(
-        "pt", leitura, torre=torre, tela=tela, p=p, numero=numero, nexus=nexus, erro_nexus=erro_nexus,
-        situacoes=SITUACAO_PT, quem_assina=decisao_pt.aprovadores(p)["texto"] if p else "",
+        "pt", leitura, torre=torre, tela=tela, p=p, linhas=linhas, escolher=escolher, ativo=ativo, numero=numero,
+        nexus=nexus, erro_nexus=erro_nexus, recusa_app=recusa_app, situacoes=SITUACAO_PT,
+        quem_assina=decisao_pt.aprovadores(p)["texto"] if p else "",
+        # o "entre com o seu login do Fracttal" da decisão volta para ESTA linha (`assinatura._login`)
+        entrar=_login_da_pt(p["numero"], p.get("codigo") or "") if p else "",
         idade_min=_idade_min, decisoes=decisao_pt.DECISOES, aviso=session.pop("pt_aviso", ""),
         gravada=request.args.get("gravada") == "1", quando=visao._dt))
 

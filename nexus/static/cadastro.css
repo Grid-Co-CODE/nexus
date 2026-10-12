@@ -210,11 +210,6 @@
   padding:12px 0;background:linear-gradient(to top,var(--fundo) 70%,transparent);margin-top:4px}
 .cad-barra .dica{margin-right:auto;font-size:12px;color:var(--mudo)}
 
-/* Listas */
-.cad-listas{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.cad-valores{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 16px}
-.cad-valores .cad-chip span{color:var(--mudo);font-weight:500}
-
 /* Prévia da importação e qualidade */
 .cad-numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;background:var(--superficie-2);
   border:1px solid var(--linha);border-radius:var(--raio-md);margin:0 0 18px}

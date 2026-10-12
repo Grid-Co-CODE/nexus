@@ -174,16 +174,25 @@ FATOS = (
                     "= SUM(primeira_linha_da_pt). O decisor liga 0%: as 6 contas Admin estão fora do cadastro "
                     "(decisão 4). Sem o passo 0, a PT de 28/09 sai do fato em ~27/12"),
     # o Nexus é a FONTE deste: a decisão da PT assinada no Nexus com o login do Fracttal do OS Creator (05/10/2026);
-    # quem aplica no campo é o App (nexus/campo/decisao_pt.py)
-    Fato("decisao_pt", "Decisão de PT no Nexus", "hseq", "nexus_pt_decisoes · decisoes",
-         "1 linha = 1 decisão (De acordo ou Não autorizo) de uma PT, tomada no Nexus",
+    # quem aplica no campo é o App (nexus/campo/decisao_pt.py). Decisão 4 do Levi (11/10/2026): POR LINHA, como o App
+    # decide (a PT × ativo do pt_app_campo), na aba fato_decisao_pt (era "decisoes", nunca gravada) com o codigo_ativo
+    Fato("decisao_pt", "Decisão de PT no Nexus", "hseq", "nexus_pt_decisoes · fato_decisao_pt",
+         "1 linha = 1 decisão (De acordo ou Não autorizo) sobre 1 linha da PT (PT × ativo, como o App decide), tomada "
+         "no Nexus",
          _d(data=("id", "data_id"), usina=("id", "usina_id"), pessoa=("hmac", "decidida_por_hmac"),
-            os=("cod", "os")),
-         tipo="sem_medida", chave=("decidida_em", "pt"), fontes=("nexus_pt_decisoes · decisoes",),
-         janela_origem="o Nexus é a fonte",
-         observacao="PT pelo número (a chave do pt_app_campo); o motivo vai mascarado, porque o técnico lê. Pega a 1ª "
-                    "linha da PT (GR-4): numa PT de 3 ativos não diz a qual vale. Antes da 1ª gravação: levar o "
-                    "codigo_ativo e a aba fato_decisao_pt (decisão 4 do Levi)"),
+            equipamento=("cod", "codigo_ativo (o Código do ativo da linha no pt_app_campo; vazio na PT sem ativo, "
+                                "como a da APR do dia)"),
+            os=("cod", "os, pt")),
+         tipo="sem_medida", chave=("decidida_em", "pt", "codigo_ativo"),
+         fontes=("nexus_pt_decisoes · fato_decisao_pt",), janela_origem="o Nexus é a fonte",
+         observacao="decisão 4 do Levi (11/10/2026): o contrato com o App, que lê este livro, é a PT pelo número e a "
+                    "linha pelo codigo_ativo (as colunas de 05/10, o codigo_ativo e a assinatura no fim: o App v257 só aplica a "
+                    "linha assinada, HMAC da NEXUS_PESSOA_HMAC, decisao_pt.assinatura); o motivo vai mascarado, "
+                    "porque o técnico lê; quem decidiu só em HMAC. Até 11/10 gravava só o número e pegava a 1ª linha "
+                    "(GR-4: numa PT de 3 ativos não dizia a qual valia). O primeiro que decide a linha vale (o App "
+                    "aplica só a 1ª de cada linha). Quem pediu a PT não a decide (decidida_por_hmac nunca é o "
+                    "solicitante_hmac da linha no fato pt; o App descarta essa decisão). O App (v257) não confere "
+                    "quem pode decidir: a trava é do Nexus, antes de gravar"),
     # a ronda de extintores do App (v247, 08/10/2026), que substituiu o Forms da TST; registrados antes de o App
     # publicar o livro (09/10/2026, a tela Extintores do HSEQ). O extintor é cadastro próprio do App, fora do Fracttal
     # (a planilha da TST + os achados pelo técnico); o `Ativo` é o código do Fracttal de ONDE ele fica. Dois grãos, dois
@@ -400,12 +409,17 @@ LIVROS = (
     Livro("nexus_fatos", ("fato_fechamento", "fato_ronda", "fato_pt", "qualidade", "atualizacao"),
           "de hora em hora (:40)", "nexus/dados/carga.py", True,
           "fato_ronda e fato_pt entram na 1ª carga do servidor com o código de 08/10"),
+    # no_banco conferido por GET na listagem do banco em 11/10/2026 (aqui e nos três abaixo)
     Livro("nexus_equipamentos", ("dim_equipamento", "equipamento_apelido", "qualidade", "atualizacao"),
           "de hora em hora (:40); grava só quando o sha das linhas muda", "nexus/dados/carga.py + equipamento.py",
-          False, "sem a foto_ativos gravada, só os códigos dos livros do banco e do PCM (~8 mil)"),
+          True, "no banco (GET em 11/10/2026: dim_equipamento 8.395, equipamento_apelido 4.619, última gravação às "
+                "20:42, antes da foto_ativos): só os códigos dos livros do banco e do PCM. Com a foto gravada (21:06), "
+                "a carga seguinte lê a foto do banco e a dimensão cresce (medido em 08/10 com as fotos locais: "
+                "22.356)"),
     Livro("nexus_ativos_fracttal", ("foto_ativos", "atualizacao"), "carga única (quem grava é o Levi)",
-          "ferramentas/carregar_ativos_fracttal.py --gravar", False,
-          "renovar a foto exige ler o Fracttal: fora do horário de campo"),
+          "ferramentas/carregar_ativos_fracttal.py --gravar", True,
+          "gravada em 11/10/2026 (GET: foto_ativos 22.357 linhas, última gravação às 21:06). Renovar a foto exige "
+          "ler o Fracttal: fora do horário de campo"),
     Livro("nexus_programacao", ("fato_programacao", "qualidade", "atualizacao"),
           "de hora em hora (:40), pela mescla por semana; grava só quando o sha das linhas muda",
           "nexus/dados/carga.py + programacao.py (o histórico: ferramentas/carregar_programacao_historica.py)", True,
@@ -422,14 +436,17 @@ LIVROS = (
           "nexus/campo/ronda_avulsa.py + ferramentas/importar_avulsas_planilha.py --gravar", True,
           "criado em 08/10/2026 pela importação da validação por foto: 63 linhas (origem validacao_foto, usina_id "
           "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10"),
-    Livro("nexus_pt_decisoes", ("decisoes",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
-          "0 linhas em 08/10"),
+    Livro("nexus_pt_decisoes", ("fato_decisao_pt",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
+          "o livro não existe no banco (GET em 11/10/2026): nenhuma decisão gravada. A aba era 'decisoes' até a "
+          "decisão 4 (11/10/2026), nunca gravada; o App lê a fato_decisao_pt"),
     Livro("nexus_tempo_real", ("fato_decisao_cobertura",), "a cada decisão na tela Fontes do tempo real",
-          "plataforma/cobertura.py (PerformancePainel), pela tela /admin/tempo-real da plataforma", False,
-          "registrado em 11/10/2026, antes da 1ª gravação; a plataforma lê com cache de 60 s, no PC e no servidor"),
+          "plataforma/cobertura.py (PerformancePainel), pela tela /admin/tempo-real da plataforma", True,
+          "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
+          "no PC e no servidor"),
     Livro("nexus_depara", ("fato_decisao_depara",), "a cada decisão na tela De-para de equipamentos",
-          "plataforma/depara.py (PerformancePainel), pela tela /admin/de-para da plataforma", False,
-          "registrado em 11/10/2026, antes da 1ª gravação; a plataforma lê com cache de 60 s, no PC e no servidor"),
+          "plataforma/depara.py (PerformancePainel), pela tela /admin/de-para da plataforma", True,
+          "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
+          "no PC e no servidor"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # As abas que não são fato_/dim_/<dimensão>_historico/qualidade/atualizacao, e por quê (regra 10).
@@ -438,7 +455,6 @@ ABAS_FORA_DA_REGRA = {
     "qualidade_historico": "a qualidade do histórico (SCD2): sobreposição, buraco e membro sem vigente",
     "equipamento_apelido": "o que cada sistema chama de cada equipamento (o modelo do de_para das usinas)",
     "foto_ativos": "a foto dos ativos do Fracttal: insumo da dimensão de equipamento, carga única",
-    "decisoes": "nasceu antes da regra (05/10); vira fato_decisao_pt antes da 1ª gravação (GS-6, decisão 4)",
 }
 
 

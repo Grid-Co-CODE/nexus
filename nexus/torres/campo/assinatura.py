@@ -73,14 +73,24 @@ def _rpc_de_quem_olha(jwt: str, email: str):
     return rpc
 
 
-def _tela(numero) -> str:
-    return na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
+def _tela(numero, codigo=None) -> str:
+    """A tela da PT; com `codigo` (o código do ativo da linha decidida), a mesma linha (a PT de mais de um ativo tem
+    uma decisão por linha, decisão 4 de 11/10/2026)."""
+    url = na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}")
+    return url if codigo is None else url + "?ativo=" + quote(str(codigo), safe="")
 
 
-def _login(numero) -> str:
-    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar. O `next` vai SEM o prefixo
-    # (é o caminho que o clone entende); o endereço do login, com ele (é o navegador que o pede)
-    return na_raiz("/os/login") + "?next=" + quote(f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar", safe="")
+def _login(numero, codigo=None) -> str:
+    """O login do Fracttal do OS Creator, voltando à MESMA linha da PT (`codigo`: o código do ativo dela; "" = a linha
+    sem ativo; None = quem pediu não disse a linha). Revisão adversarial de 11/10/2026: com só o número no `next`, a
+    volta abria a 1ª linha com o código DELA no formulário, e o clique seguinte decidia o outro equipamento da PT."""
+    # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar, com a linha na consulta (o
+    # `_destino_local` do clone aceita /os... com consulta). O `next` vai SEM o prefixo (é o caminho que o clone
+    # entende); o endereço do login, com ele (é o navegador que o pede)
+    volta = f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar"
+    if codigo is not None:
+        volta += "?ativo=" + quote(str(codigo), safe="")
+    return na_raiz("/os/login") + "?next=" + quote(volta, safe="")
 
 
 @bp_assinatura.route("/os/_nexus/quem")
@@ -92,10 +102,11 @@ def quem():
 @bp_assinatura.route("/os/_nexus/pt/<numero>/assinatura-tecnico")
 def assinatura_tecnico(numero):
     """A assinatura que o técnico desenhou na APR, para a tela da PT pôr ao lado de "A PT" (Levi, 05/10). JSON:
-    {"ok", "img"} ou {"ok": false, "login" | "motivo"}. Só com o login do Fracttal de quem olha."""
+    {"ok", "img"} ou {"ok": false, "login" | "motivo"}. Só com o login do Fracttal de quem olha. O `?ativo=` (a linha de
+    onde se pede) vai no "entre com o seu login do Fracttal", para a volta cair na mesma linha."""
     jwt, conta = _sessao_os()
     if not jwt:
-        return jsonify({"ok": False, "login": True, "entrar": _login(numero)})
+        return jsonify({"ok": False, "login": True, "entrar": _login(numero, request.args.get("ativo"))})
     p = visao.pt(numero)
     if not p or not p.get("os"):
         return jsonify({"ok": False, "motivo": "a PT não está no livro do App"})
@@ -127,17 +138,19 @@ def voltar_para():
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/voltar")
 def voltar(numero):
-    return redirect(_tela(numero))
+    # a linha que foi ao login (o `?ativo=` do `_login`); sem ela, a tela da PT de mais de uma linha só deixa escolher
+    return redirect(_tela(numero, request.args.get("ativo")))
 
 
-def _volta(numero) -> str:
+def _volta(numero, codigo=None) -> str:
     """De volta à tela de onde se decidiu (a lista de APR e PT do HSEQ, com os filtros dela) ou à da PT. Só endereço do
     próprio Nexus: nada de mandar para fora."""
     # O `volta` do formulário é o request.full_path da tela, SEM o prefixo (e a camada da T.I. pode tê-lo posto):
     # confere sem ele e devolve com ele. Cru, debaixo do /nexus a decisão gravada mandava a pessoa à plataforma de
     # Performance (porta única, 10/10/2026: "o Nexus como link principal")
     para = sem_raiz(request.form.get("volta") or "")
-    return na_raiz(para) if para.startswith(("/t/hseq/", "/t/campo/")) and not para.startswith("//") else _tela(numero)
+    return (na_raiz(para) if para.startswith(("/t/hseq/", "/t/campo/")) and not para.startswith("//")
+            else _tela(numero, codigo))
 
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/decidir", methods=["POST"])
@@ -146,20 +159,24 @@ def decidir(numero):
     origem = request.headers.get("Origin")
     if origem and urlsplit(origem).netloc != request.host:
         return "Origem recusada.", 403
+    # a linha da PT que se decide: o código do ativo dela (o formulário de cada linha manda; "" = a linha sem ativo).
+    # Sem o campo (formulário de antes de 11/10/2026), só a PT de uma linha se decide (`decisao_pt._linha`)
+    codigo = request.form.get("codigo")
     q = quem_assina()
     if not q:
-        return redirect(_login(numero))
-    volta = _volta(numero)
+        # sem o login do Fracttal: vai ao login e volta para a MESMA linha (revisão adversarial de 11/10/2026)
+        return redirect(_login(numero, codigo))
+    volta, tela = _volta(numero, codigo), _tela(numero, codigo)
     try:
         decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"],
-                           q.get("nome", ""), bool(session.get("admin")))
+                           q.get("nome", ""), bool(session.get("admin")), codigo=codigo)
     except decisao_pt.Recusada as e:
-        session["pt_aviso"] = f"{numero}: {e}" if volta != _tela(numero) else str(e)
+        session["pt_aviso"] = f"{numero}: {e}" if volta != tela else str(e)
         return redirect(volta)
     except Exception as e:      # noqa: BLE001 — banco fora do ar: a tela diz, nada é dado como gravado
         session["pt_aviso"] = f"Não consegui gravar a decisão no banco ({type(e).__name__}). Nada foi salvo."
         return redirect(volta)
-    if volta != _tela(numero):
+    if volta != tela:
         session["pt_gravada"] = numero
         return redirect(volta)
-    return redirect(_tela(numero) + "?gravada=1")
+    return redirect(tela + ("&" if "?" in tela else "?") + "gravada=1")

@@ -20,6 +20,9 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
   `nexus/torres/__init__.py` descobre a pasta sozinho (`pkgutil`); não há lista para editar.
 - Toda tela nasce como placeholder genérico. **Para construir uma tela**, crie a view no `bp` da torre com a mesma
   rota (`@bp.route("/mesa")`): a específica vence o placeholder, e a tela fica verde no menu sozinha.
+- **Tela que sai não vira 404:** tire a `Tela` da `TORRE` (sai do menu e do Início) e deixe a rota respondendo um
+  redirecionamento (com `na_raiz`) para a tela que ficou no lugar, para quem tinha o endereço salvo. Caso: Base → Listas
+  saiu em 11/10/2026 e o `/t/base/listas` leva à Governança de dados (`nexus/cadastro/CLAUDE.md`).
 - Templates em `nexus/torres/<torre>/templates/<torre>/`.
 - **Endereço nunca a partir da raiz** (09/10/2026): no servidor o Nexus mora em `/nexus` (`NEXUS_PREFIXO`), e um
   `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")` cru cai na plataforma de Performance. No template,

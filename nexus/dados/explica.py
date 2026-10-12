@@ -21,7 +21,7 @@ RESUMO = {
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
     # ── Segurança · HSEQ ──
     "pt": "Cada Permissão de Trabalho pedida no App, por equipamento",
-    "decisao_pt": "A decisão sobre uma PT tomada no Nexus pelo supervisor",
+    "decisao_pt": "A decisão sobre cada equipamento de uma PT, tomada no Nexus",
     "extintor": "Cada extintor das usinas, com as validades e a última conferência",
     "conferencia_extintor": "Cada conferência mensal de extintor feita pelo App",
     # ── Performance ──
@@ -74,9 +74,11 @@ PARA_QUE = {
     "decisao_depara": "Guarda cada decisão de ligar uma usina ou um inversor de uma fonte ao cadastro, tomada por um "
                       "administrador na tela De-para de equipamentos (quando a fonte renomeia a usina ou não dá nome ao "
                       "inversor). A Plataforma de Performance lê esta tabela e ela vence o de-para escrito no código.",
-    "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) sobre uma PT tomada no Nexus pelo supervisor. O "
-                  "App de Campo lê esta tabela e aplica a decisão na PT do técnico. O motivo é gravado sem dado "
-                  "pessoal, porque o técnico o lê.",
+    "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) tomada no Nexus sobre uma PT, equipamento por "
+                  "equipamento, como o App decide: a PT de três equipamentos tem três decisões. Decide o Supervisor "
+                  "de Campo, o gestor de contrato, alguém do COS ou um administrador, nunca quem pediu a PT. O App "
+                  "de Campo lê esta tabela e aplica a decisão na PT do técnico. O motivo é gravado sem dado pessoal, "
+                  "porque o técnico o lê.",
     "extintor": "Lista cada extintor das usinas (o cadastro da TST e os que o técnico acha na ronda), com onde ele "
                 "fica, a classe, o peso, as duas validades (recarga e teste hidrostático) e a última conferência. "
                 "Serve para saber o que está vencido, o que vence nos próximos 30 dias e o que ninguém confere há mais "

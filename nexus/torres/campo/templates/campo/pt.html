@@ -7,7 +7,7 @@
    gestor de contrato ou tabela) e o histórico das decididas. A OS em verde abre a aprovação; clicar na linha abre o
    detalhe. #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
-{% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
+{% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
 {% macro detalhe(p, colunas) %}
   <tr class="cn-detalhe" hidden><td colspan="{{ colunas }}">
@@ -31,7 +31,7 @@
         <h3>Atividades críticas da APR</h3>
         <ul class="cn-ativ">{% for a in p.atividades %}<li>{{ a }}</li>{% else %}<li class="mudo">Sem atividade crítica marcada.</li>{% endfor %}</ul>
         <p class="cn-detalhe-nao">{% if p.respostas_nao %}<span class="cn-t-alerta">{{ p.respostas_nao }} resposta{{ 's' if p.respostas_nao > 1 }} NÃO na APR</span>{% else %}Nenhuma resposta NÃO na APR{% endif %}{% if p.faltam %} · falta: {{ p.faltam }}{% endif %}</p>
-        <p><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero) }}">{{ 'Abrir para aprovar' if p.situacao == 'aguardando' else 'Abrir a PT' }}</a></p>
+        <p><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}">{{ 'Abrir para aprovar' if p.situacao == 'aguardando' else 'Abrir a PT' }}</a></p>
       </div>
     </div>
   </td></tr>

@@ -545,6 +545,11 @@ def test_a_assinatura_da_pt_volta_para_a_tela_debaixo_do_prefixo():
         == "/nexus/t/campo/aprovacao"
     j = cli.get("/nexus/os/_nexus/pt/PT-1/assinatura-tecnico").get_json()
     assert j["entrar"] == "/nexus/os/login?next=%2Fos%2F_nexus%2Fpt%2FPT-1%2Fvoltar"
+    # a linha da PT vai e volta com o login (revisão de 11/10/2026): o `next` sem o prefixo, a volta com ele
+    j = cli.get("/nexus/os/_nexus/pt/PT-1/assinatura-tecnico", query_string={"ativo": "THPN-X-INVR2"}).get_json()
+    assert j["entrar"] == "/nexus/os/login?next=%2Fos%2F_nexus%2Fpt%2FPT-1%2Fvoltar%3Fativo%3DTHPN-X-INVR2"
+    r = cli.get("/nexus/os/_nexus/pt/PT-1/voltar", query_string={"ativo": "THPN-X-INVR2"})
+    assert r.headers["Location"] == "/nexus/t/campo/pt/PT-1?ativo=THPN-X-INVR2"
 
 
 def test_a_ponte_do_tempo_real_leva_o_prefixo_a_plataforma(monkeypatch):

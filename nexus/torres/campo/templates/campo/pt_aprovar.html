@@ -4,10 +4,33 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Aprovação da PT no Nexus (05/10/2026): a PT do livro do App + a decisão assinada com o login do Fracttal do OS Creator,
    gravada no banco (nexus/campo/decisao_pt.py). Quem aplica no campo é o App. #}
+{# as linhas da PT de mais de um equipamento, cada uma com a sua situação: a da tela (`atual`) em negrito, as outras com
+   o link de cada uma (`?ativo=`). Sem `atual`, todas com o link (a escolha) #}
+{% macro lista_de_linhas(linhas, situacoes, atual=none) %}
+    <ul class="cn-ativ">{% for l in linhas %}{% set sl = situacoes.get(l.situacao, (l.situacao, 'neutro')) %}
+      <li>{% if atual is not none and l.codigo == atual %}<b>{{ l.ativo or l.codigo or 'sem equipamento' }}</b> <span class="mudo">(nesta tela)</span>{% else %}<a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=l.numero, ativo=l.codigo) }}">{{ l.ativo or l.codigo or 'sem equipamento' }}</a>{% endif %}
+        <span class="cn-st cn-t-{{ sl[1] }}">{{ sl[0] }}</span></li>{% endfor %}
+    </ul>
+{%- endmacro %}
 <div class="campo-nativa">
   <p class="cn-voltar"><a class="cn-link" href="{{ raiz }}/t/hseq/apr-pt">Voltar para APR e PT</a></p>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
-  {% if not p and not leitura.erro %}
+  {% if escolher %}
+  {# a PT de mais de um equipamento sem dizer qual (link ou formulário de antes, ou um código que ela não tem): só a
+     escolha, sem formulário. Abrir a 1ª calada punha o código dela no formulário, e a decisão caía no equipamento errado
+     (revisão adversarial de 11/10/2026) #}
+  {% set p0 = linhas[0] %}
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Aprovação de PT</p>
+      <h1 class="cn-titulo">{{ p0.numero }}</h1>
+      <p class="cn-pergunta">{{ p0.usina }}{% if p0.equipe %} · {{ p0.equipe }}{% endif %}{% if p0.uf %} · {{ p0.uf }}{% endif %}{% if p0.regiao_br %} · {{ p0.regiao_br }}{% endif %}</p></div>
+    <div class="cn-frescor">livro de PT do App<br><b>lido às {{ lido }}</b></div>
+  </div>
+  {% if aviso %}<div class="cn-erro" role="alert"><b>{{ aviso }}</b></div>{% endif %}
+  <div class="cn-nota"><b>Esta PT tem {{ linhas|length }} equipamentos, e cada um tem a sua decisão.</b>
+    Escolha o equipamento para ver a PT e decidir{% if ativo is not none %} (o endereço pedia {{ ativo or 'a linha sem equipamento' }}, que esta PT não tem){% endif %}.
+    {{ lista_de_linhas(linhas, situacoes) }}</div>
+  {% elif not p and not leitura.erro %}
   <div class="cn-erro" role="alert"><b>{{ numero }} não está no livro do App.</b> O livro chega de hora em hora: se ela
     acabou de ser criada, ainda não chegou.</div>
   {% elif p %}
@@ -20,6 +43,11 @@
   </div>
   {% if aviso %}<div class="cn-erro" role="alert"><b>{{ aviso }}</b></div>{% endif %}
   {% if gravada %}<div class="cn-certo" role="status"><b>Decisão salva no banco.</b></div>{% endif %}
+  {# a PT de mais de um equipamento: uma linha e uma decisão por equipamento, como no App (decisão 4, 11/10/2026) #}
+  {% if linhas|length > 1 %}
+  <div class="cn-nota"><b>Esta PT tem {{ linhas|length }} equipamentos, e cada um tem a sua decisão.</b>
+    {{ lista_de_linhas(linhas, situacoes, p.codigo) }}</div>
+  {% endif %}
 
   <div class="cn-pt-grade">
     <section class="cn-cartao">
@@ -46,12 +74,13 @@
         <span class="cn-ass-quem">{{ p.solicitante or '—' }}{% if p.criada %} · {{ p.criada.strftime('%d/%m/%y %H:%M') }}{% endif %}</span>
       </figure>
       </div>
-      {% if p.situacao == 'de_acordo' %}<p class="cn-pt-pdf"><a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_pdf', numero=p.numero) }}">Baixar PDF da PT</a>
+      {% if p.situacao == 'de_acordo' %}<p class="cn-pt-pdf"><a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.pt_pdf', numero=p.numero, ativo=p.codigo) }}">Baixar PDF da PT</a>
         <span class="mudo">o que o App anexou no Fracttal, com a assinatura do técnico e a de quem aceitou</span></p>{% endif %}
     </section>
     <script>
-      // a assinatura vem do Fracttal pelo login do OS Creator (cookie só em /os); sem login, o quadro diz como entrar
-      fetch(nexusRota('/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico'), {credentials: 'same-origin'})
+      // a assinatura vem do Fracttal pelo login do OS Creator (cookie só em /os); sem login, o quadro diz como entrar,
+      // e o login volta para ESTA linha da PT (o `?ativo=` vai no pedido)
+      fetch(nexusRota('/os/_nexus/pt/{{ p.numero|urlencode }}/assinatura-tecnico?ativo={{ p.codigo|urlencode }}'), {credentials: 'same-origin'})
         .then(function (r) { return r.json(); }).then(function (a) {
           if (a.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(a.entrar); return; }
           var q = document.querySelector('#cn-ass-tec .cn-ass-quadro');
@@ -78,9 +107,12 @@
       {% if nexus.motivo %}<p class="mudo">Motivo: {{ nexus.motivo }}</p>{% endif %}
       <p class="mudo">Salva no banco. O técnico vê quando o App aplicar a decisão.</p>
       {% else %}
+      {% if recusa_app %}<div class="cn-erro" role="alert"><b>O App não aplicou a decisão anterior do Nexus:</b> {{ recusa_app }}. Decida de novo.</div>{% endif %}
       <form method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir" class="cn-form-decisao">
+        {# a linha decidida: o código do ativo dela vai para o banco (codigo_ativo), e o App acha a linha por ele #}
+        <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
         <p class="cn-quem" id="cn-quem">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
-        {% if quem_assina %}<p class="mudo">Quem pode dar o De acordo: {{ quem_assina[0]|lower }}{{ quem_assina[1:] }}.</p>{% endif %}
+        {% if quem_assina %}<p class="mudo">Quem pode dar o De acordo: {{ quem_assina[0]|lower }}{{ quem_assina[1:] }}. Quem pediu a PT não a decide.</p>{% endif %}
         <label class="gc-rotulo" for="cn-motivo">Motivo <span class="mudo">(obrigatório para Não autorizo; o técnico lê)</span></label>
         <textarea class="gc-campo" id="cn-motivo" name="motivo" rows="3" maxlength="400"></textarea>
         <div class="cn-botoes">
@@ -89,21 +121,30 @@
         </div>
       </form>
       <script>
-        // quem está assinando: a sessão do OS Creator (cookie só em /os); sem login, o botão leva ao login do Fracttal
+        // quem está assinando: a sessão do OS Creator (cookie só em /os); sem login, o link leva ao login do Fracttal e
+        // volta para ESTA linha da PT (o `next` leva o código do ativo: só com o número, a volta abria a 1ª linha e a
+        // decisão caía no outro equipamento; revisão adversarial de 11/10/2026)
         fetch(nexusRota('/os/_nexus/quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (q) {
           var el = document.getElementById('cn-quem');
           if (q.email) { el.textContent = 'Assinando como ' + q.nome + ' (' + q.email + '), pelo login do Fracttal.'; return; }
-          el.innerHTML = 'Para assinar, <a class="cn-link" href="' + nexusRota('/os/login') + '?next=' +
-            encodeURIComponent('/os/_nexus/pt/{{ p.numero|urlencode }}/voltar') + '">entre com o seu login do Fracttal</a> (o mesmo do OS Creator).';
+          var a = document.createElement('a');
+          a.className = 'cn-link'; a.href = {{ entrar|tojson }}; a.textContent = 'entre com o seu login do Fracttal';
+          el.textContent = 'Para assinar, ';
+          el.appendChild(a);
+          el.appendChild(document.createTextNode(' (o mesmo do OS Creator).'));
         }).catch(function () {});
       </script>
       {% endif %}
     </section>
   </div>
+  {# o que o App v257 confere ao aplicar (function_app.py, "A DECISÃO DE PT TOMADA NO NEXUS"): a 1ª decisão de cada
+     linha, a linha ainda esperando, menos de 7 dias e quem decidiu diferente de quem pediu. QUEM pode decidir ele não
+     confere (não tem os papéis da estrutura de O&M): a trava é o `decisao_pt.pode_decidir` daqui #}
   <div class="cn-nota"><b>Como a decisão chega ao campo.</b> A decisão fica salva no banco do Nexus com o código de quem
-    assinou. Quem libera ou nega o técnico é o App: ele confere se quem assinou pode assinar esta PT e se ela ainda está
-    esperando. <b>O App ainda não lê esta decisão</b> (é a próxima versão dele); até lá, a decisão do App continua sendo a
-    que vale no campo.</div>
+    assinou. Quem libera ou nega o técnico é o App: ele aplica a primeira decisão de cada equipamento se a PT ainda estiver
+    esperando, se a decisão tiver menos de 7 dias e se quem decidiu não for quem pediu a PT. Quem pode decidir, só o
+    Nexus confere. <b>O App ainda não lê esta decisão</b> (é a próxima versão dele); até lá, a decisão do App continua
+    sendo a que vale no campo.</div>
   {% endif %}
 </div>
 {% endblock %}

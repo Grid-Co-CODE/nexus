@@ -115,6 +115,25 @@ def test_livros_do_nexus_registrados_antes_de_existir_e_na_regra_10():
     assert programacao.ABA in catalogo.LIVRO_POR_NOME[programacao.LIVRO].abas
     assert historico.ABA_QUALIDADE in catalogo.LIVRO_POR_NOME[carga.LIVRO_DIM].abas
     assert not catalogo.aba_segue_a_regra("Planilha1")
+    # conferidos por GET na listagem do banco em 11/10/2026: já existem; o de decisões de PT, ainda não
+    for nome in ("nexus_equipamentos", "nexus_ativos_fracttal", "nexus_tempo_real", "nexus_depara"):
+        assert catalogo.LIVRO_POR_NOME[nome].no_banco, nome
+    assert not catalogo.LIVRO_POR_NOME[decisao_pt.LIVRO].no_banco
+
+
+def test_decisao_da_pt_no_catalogo_e_o_contrato_com_o_app():
+    """Decisão 4 do Levi (11/10/2026): a decisão da PT do Nexus vai por linha (PT × ativo, como o App decide), na aba
+    fato_decisao_pt, com as colunas de 05/10 e o codigo_ativo no fim. Catálogo, código e livro dizem a mesma coisa, e a
+    aba velha (`decisoes`, nunca gravada) saiu da exceção à regra 10."""
+    f = catalogo.POR_ID["decisao_pt"]
+    assert f.livro == f"{decisao_pt.LIVRO} · {decisao_pt.ABA}" == "nexus_pt_decisoes · fato_decisao_pt"
+    assert f.fontes == (f.livro,) and "codigo_ativo" in f.chave and all(c in decisao_pt.CAB for c in f.chave)
+    assert f.dims["equipamento"][0] == "cod" and f.dims["pessoa"] == ("hmac", "decidida_por_hmac")
+    # o codigo_ativo e, depois dele, a assinatura que o App v257 exige (prova do contrato, 11/10/2026)
+    assert decisao_pt.CAB[-2:] == ("codigo_ativo", "assinatura") and decisao_pt.CAB[:-2] == (
+        "decidida_em", "data_id", "pt", "os", "usina_id", "decisao", "motivo", "decidida_por_hmac", "login", "origem")
+    assert catalogo.LIVRO_POR_NOME[decisao_pt.LIVRO].abas == (decisao_pt.ABA,)
+    assert "decisoes" not in catalogo.ABAS_FORA_DA_REGRA and not catalogo.aba_segue_a_regra("decisoes")
 
 
 # ── calendário ────────────────────────────────────────────────────────────────────────────────────────────────────
