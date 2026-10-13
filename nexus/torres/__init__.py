@@ -70,8 +70,11 @@ def montar_menu(torres: list[Torre], torre_atual: str | None, prontas: frozenset
     """
     menu = []
     for t in sorted(torres, key=lambda t: t.ordem):
-        telas = [{"id": s.id, "nome": s.nome, "url": f"/t/{t.id}/{s.id}", "pronta": f"/t/{t.id}/{s.id}" in prontas}
-                 for s in t.telas if liberadas is None or f"{t.id}/{s.id}" in liberadas]
+        # a tela que abre por dentro de outra (`Tela.dentro_de`, os relatórios da Central de emissão, 13/10/2026) não é
+        # item: entra nas `filhas` da outra, que acende quando ela está aberta
+        telas = [{"id": s.id, "nome": s.nome, "url": f"/t/{t.id}/{s.id}", "pronta": f"/t/{t.id}/{s.id}" in prontas,
+                  "filhas": [f"/t/{t.id}/{f.id}" for f in t.telas if f.dentro_de == s.id]}
+                 for s in t.telas if not s.dentro_de and (liberadas is None or f"{t.id}/{s.id}" in liberadas)]
         if not telas:
             continue
         menu.append({

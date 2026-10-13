@@ -21,6 +21,10 @@ class Tela:
     nome: str
     pergunta: str   # a pergunta que a tela responde, na voz de quem usa
     fonte: str      # de onde o dado vai vir quando a tela for construída
+    # a tela que se abre POR DENTRO de outra da mesma torre (13/10/2026, os relatórios da Central de emissão; Levi: "Aí a
+    # pessoa escolhe que tipo de relatório ela quer!"): sem item próprio no menu, o item da outra acende quando ela está
+    # aberta, e quem tem ela liberada no setor vê a outra também (auth/setor_telas.py). Vazio = item do menu, como sempre
+    dentro_de: str = ""
 
 
 @dataclass

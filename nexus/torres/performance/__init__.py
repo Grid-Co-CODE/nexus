@@ -7,7 +7,7 @@ numa moldura, uma por item do mapa (`nexus/performance/porta.py`; as views saem 
 """
 from datetime import datetime
 
-from flask import Response, current_app, jsonify, render_template, request
+from flask import Response, current_app, jsonify, redirect, render_template, request
 
 from ...performance import ponte
 from ...performance.clima import fontes as F
@@ -42,12 +42,8 @@ TORRE = Torre(
         Tela("disponibilidade", "Disponibilidade",
              "Quanto tempo cada usina ficou disponível no mês, e o que a parou?",
              "Plataforma de Performance (antes só pelo Gerencial)"),
-        Tela("relatorio", "Criador de relatório",
-             "Como monto o relatório do cliente com os números certos?",
-             "Plataforma de Performance"),
-        Tela("relatorio-semanal", "Relatório semanal",
-             "Como foi a semana de cada usina no relatório do cliente?",
-             "Plataforma de Performance (antes só pelo Criador de relatório)"),
+        # O Criador de relatório e o Relatório semanal foram para Relatórios → Central de emissão em 13/10/2026 (Levi:
+        # "Sai da parte de Performance!"); os endereços antigos levam para lá (`_relatorio_mudou`, abaixo)
         Tela("gemeo", "Gêmeo digital",
              "Quanto a usina deveria ter gerado com o sol que teve?",
              "Gêmeo digital, pela Plataforma de Performance"),
@@ -96,6 +92,15 @@ def _tempo_real_pela_ponte(motivo: str):
 # O Painel NOC tem modo TV (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC
 # mesmo! não precisa de conta fixa"): o botão "Modo TV" na faixa e o ?tv=1 sem a casca (o do Mapa mora em mapa_tela.py).
 registrar_molduras(bp, TORRE, reserva={"tempo-real": _tempo_real_pela_ponte}, tv={"noc"})
+
+
+# Os relatórios saíram da Performance para Relatórios → Central de emissão (13/10/2026): o favorito e o link antigos
+# levam ao endereço novo, com o ?p= junto
+@bp.route("/relatorio", defaults={"tela": "relatorio"})
+@bp.route("/relatorio-semanal", defaults={"tela": "relatorio-semanal"})
+def _relatorio_mudou(tela):
+    consulta = request.query_string.decode("latin-1")
+    return redirect(na_raiz(f"/t/relatorios/{tela}") + ("?" + consulta if consulta else ""))
 
 
 _TITULO_PADRAO = "Plataforma de Performance sem resposta"

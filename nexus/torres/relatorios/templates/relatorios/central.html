@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{# A Central de emissão (13/10/2026, Levi: "Ficará filtrado no setor da pessoa, caso a pessoa seja administradora aparece
+   todos os relatórios. Aí a pessoa escolhe que tipo de relatório ela quer!"). Os cartões são as telas da torre que abrem
+   por dentro dela (nexus/torres/relatorios/__init__.py), filtradas pelo setor como o menu. #}
+<p class="gc-eyebrow">{{ torre.nome }}</p>
+<h1 class="titulo-pagina">{{ tela.nome }}</h1>
+<p class="lead">Escolha o relatório.
+  {% if todos %}Como administrador, você vê todos.{% elif setor %}Aparecem os liberados para o setor {{ setor.nome }}.{% endif %}</p>
+
+{% if not ligada and cartoes %}
+<p class="aviso">A Plataforma de Performance ainda não está ligada neste servidor: os relatórios abrem quando ela estiver
+  ({{ motivo }}).</p>
+{% endif %}
+
+{% if not cartoes %}
+<p class="aviso">Nenhum relatório liberado para o setor {{ setor.nome if setor else "" }}. Fale com o responsável.</p>
+{% else %}
+<div class="grade-torres grade-relatorios">
+  {% for c in cartoes %}
+  <a class="card-torre card-relatorio" data-relatorio="{{ c.tela.id }}" href="{{ c.url|na_raiz }}">
+    <div class="cab"><i class="ph ph-{{ c.icone }}"></i><span class="nome">{{ c.tela.nome }}</span>
+      {% if c.area %}<span class="qtd">{{ c.area }}</span>{% endif %}</div>
+    <p>{{ c.tela.pergunta }}</p>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

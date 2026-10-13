@@ -48,8 +48,15 @@ MAPA = (
     TelaDaPlataforma("performance", "strings-trackers", "Strings e trackers", "/painel/falhas", (), False),
     TelaDaPlataforma("performance", "gerencial", "Visão gerencial", "/gerencial", (), False),
     TelaDaPlataforma("performance", "disponibilidade", "Disponibilidade", "/gerencial/disponibilidade", (), False),
-    TelaDaPlataforma("performance", "relatorio", "Criador de relatório", "/relatorio", (), False),
-    TelaDaPlataforma("performance", "relatorio-semanal", "Relatório semanal", "/relatorio/semanal", (), False),
+    # Os relatórios moram na torre Relatórios desde 13/10/2026 (Levi: "Criador de relatório e relatório semanal vai para
+    # a central de emissão no Nexus > Relatórios [...] Sai da parte de Performance!"): abrem pela Central de emissão, que
+    # mostra os do setor da pessoa. Os endereços antigos (/t/performance/relatorio...) levam aos novos.
+    TelaDaPlataforma("relatorios", "relatorio", "Criador de relatório", "/relatorio", (), False),
+    TelaDaPlataforma("relatorios", "relatorio-semanal", "Relatório semanal", "/relatorio/semanal", (), False),
+    # Potência Ativa dos Inversores (13/10/2026, Levi: "pegando a potência ativa de cada inversor e sobrepondo por dia.
+    # Cada inversor terá uma cor diferente")
+    TelaDaPlataforma("relatorios", "potencia-ativa", "Potência Ativa dos Inversores", "/relatorio/potencia-ativa", (),
+                     False),
     # O gêmeo é outro processo, servido pelo proxy /gemeo/* da plataforma: tudo debaixo dele é a mesma tela (o Painel
     # NOC abre /gemeo/usina/<id>).
     TelaDaPlataforma("performance", "gemeo", "Gêmeo digital", "/gemeo/", ("/gemeo/<path:resto>",), False),

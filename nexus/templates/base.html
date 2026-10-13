@@ -77,7 +77,7 @@
       </summary>
       <ul>
         {% for s in t.telas %}
-        <li><a href="{{ raiz }}{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
+        <li><a href="{{ raiz }}{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url or caminho in s.filhas %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
         {% endfor %}
       </ul>
     </details>

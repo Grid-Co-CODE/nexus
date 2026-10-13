@@ -64,11 +64,13 @@ def test_cada_cartao_leva_a_primeira_tela_pronta_ou_diz_em_construcao(extra):
 
 def test_o_cos_com_a_porta_leva_ao_acompanhamento_e_nao_a_mesa_em_construcao():
     """O caso que criou a regra: o 1º item do COS (Mesa) é "Em construção"; o Acompanhamento COS (a moldura da
-    Performance) é o que está pronto com a porta ligada. Comando, Contratos e Relatórios não têm nenhuma pronta."""
+    Performance) é o que está pronto com a porta ligada. Comando e Contratos não têm nenhuma pronta; Relatórios leva à
+    Central de emissão (13/10/2026)."""
     _app, cli = _cliente(NEXUS_SSO_CHAVE="c" * 40)
     cartoes = _cartoes(cli.get("/").get_data(as_text=True))
     assert cartoes["cos"][1] == "/t/cos/acompanhamento"
-    for vazia in ("comando", "contratos", "relatorios"):
+    assert cartoes["relatorios"][1] == "/t/relatorios/central"
+    for vazia in ("comando", "contratos"):
         assert cartoes[vazia][0] == "div" and "Em construção" in cartoes[vazia][2]
 
 

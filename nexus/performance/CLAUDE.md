@@ -24,7 +24,7 @@ navegador fala com cada sistema.
   | performance · `diagnostico` | `/painel/usina/<id>`, pelo seletor de usina |
   | performance · `strings-trackers` | `/painel/falhas` |
   | performance · `gerencial` e `disponibilidade` | `/gerencial` e `/gerencial/disponibilidade` |
-  | performance · `relatorio` e `relatorio-semanal` | `/relatorio` e `/relatorio/semanal` |
+  | relatorios · `relatorio`, `relatorio-semanal` e `potencia-ativa` (pela Central de emissão, 13/10/2026) | `/relatorio`, `/relatorio/semanal` e `/relatorio/potencia-ativa` |
   | performance · `gemeo` | `/gemeo/` (e tudo debaixo dele) |
   | performance · `monitor-ronda` (o item "Rondas de Trackers") | `/ronda/monitor` |
   | cos · `acompanhamento` | `/cos` |
@@ -33,6 +33,12 @@ navegador fala com cada sistema.
   | base · `de-para-equipamentos` (só admin, 11/10/2026) | `/admin/de-para`: como cada usina de cada fonte se liga ao cadastro, e o editor (ponte pelo id, nome de cada inversor) |
 
   Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco e Mapa de risco são do Nexus e ficam fora.
+  Em 13/10/2026 o Criador de relatório e o Relatório semanal foram para a torre Relatórios (Levi: "vai para a central de
+  emissão no Nexus > Relatórios [...] Sai da parte de Performance!"), com o relatório novo Potência Ativa dos Inversores:
+  abrem por dentro da Central de emissão (`Tela.dentro_de`, sem item próprio no menu; a Central acende, no servidor e no
+  `porta.js` pelo campo `menu` da tabela), filtrados pelo setor como toda tela. `/t/performance/relatorio` e
+  `/t/performance/relatorio-semanal` levam aos endereços novos, e a marca de setor antiga vale para o relatório novo
+  (`setor_telas.RENOMEADAS`). Regra da Central em `nexus/torres/relatorios/__init__.py`.
   Em 11/10/2026 o Histórico da plataforma saiu do mapa, dos dois lados, com a rota e o template na plataforma (Levi:
   "Pode matar a seção histórico da plataforma!"); o Monitor da ronda virou "Rondas de Trackers", com o mesmo id (o
   endereço `/t/performance/monitor-ronda` e o favorito não quebram; o nome fica fora do texto canônico de propósito).

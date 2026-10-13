@@ -180,6 +180,11 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
   `decisao_tela_setor`): só acrescenta, e vale a última decisão de cada setor × tela; a tela é `torre/tela`, o endereço
   do menu. Setor novo nasce sem nada marcado. O Salvar relê o banco, grava só o que mudou e troca a aba inteira (o
   `livros.publicar` confere a contagem). O portão e a tela leem com cópia de 1 minuto.
+- **Tela que mudou de endereço e tela de dentro (13/10/2026, os relatórios na Central de emissão).** A decisão gravada
+  com o nome antigo vale para o novo (`setor_telas.RENOMEADAS`: `performance/relatorio` → `relatorios/relatorio`, e o
+  semanal), e a mais nova ganha, como sempre; quem já via o relatório na Performance continua vendo. A tela que abre por
+  dentro de outra (`Tela.dentro_de`) não é item do menu, mas é marcada na matriz como qualquer tela; quem tem ela
+  liberada vê a de fora sem marcá-la (`setor_telas.com_as_de_fora`, no `acesso`): o relatório liberado traz a Central.
 - **Quem vê o quê.** Administrador é **só** a lista de Administradores (`NEXUS_ADMINS`, a lista desta tela, a senha):
   vê tudo, com ou sem setor, porque é quem configura e não pode ficar trancado fora. **Setor nunca dá administrador**:
   um setor chamado "Administrador" é setor como os outros (existiu assim por algumas horas em 12/10/2026 e saiu), e o

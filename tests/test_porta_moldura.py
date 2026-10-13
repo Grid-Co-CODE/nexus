@@ -116,10 +116,12 @@ def test_cada_tela_do_mapa_abre_a_moldura_com_o_formulario_certo(prefixo, t):
     assert r.headers["Cache-Control"] == "no-store"            # o passe não fica em cache (voltar gera outro)
     h = r.get_data(as_text=True)
     assert t.nome in h and 'class="menu"' in h and "Em construção" not in h
-    assert f'href="{prefixo}/t/{t.torre}/{t.tela}" class="com-conteudo" aria-current="page"' in h
+    # o relatório abre por dentro da Central de emissão (13/10/2026): acende o item dela
+    no_menu = f"{t.torre}/central" if t.torre == "relatorios" else f"{t.torre}/{t.tela}"
+    assert f'href="{prefixo}/t/{no_menu}" class="com-conteudo" aria-current="page"' in h
     dados = _dados(h)
     assert dados["url"] == f"{prefixo}/t/{t.torre}/{t.tela}" and dados["plataforma"] == ""
-    assert all(x["url"].startswith(f"{prefixo}/t/") for x in dados["telas"]) and len(dados["telas"]) == 14
+    assert all(x["url"].startswith(f"{prefixo}/t/") for x in dados["telas"]) and len(dados["telas"]) == 15
     assert f'src="{prefixo}/static/porta.js"' in h
     form = _form(h)
     if not porta.concreto(t):                                  # o Diagnóstico espera a usina do seletor
@@ -278,7 +280,8 @@ def test_a_alternancia_pelo_banco_fica_escondida():
 def test_o_menu_traz_as_telas_novas_e_acende_o_item():
     h = _cliente().get("/t/performance/disponibilidade").get_data(as_text=True)
     for t in porta.MAPA:
-        assert f'href="/t/{t.torre}/{t.tela}"' in h, t
+        # os relatórios abrem pela Central de emissão (13/10/2026): o item é o dela
+        assert f'href="/t/{t.torre}/{"central" if t.torre == "relatorios" else t.tela}"' in h, t
     assert re.search(r'<details class="torre com-conteudo" data-torre="performance"[^>]*open', h)
     assert h.count('aria-current="page"') == 1
 
@@ -418,7 +421,8 @@ def test_sem_a_chave_as_molduras_nao_ficam_verdes_no_menu(monkeypatch):
         if t.tela != "tempo-real":
             assert not _verde(h, f"/t/{t.torre}/{t.tela}"), t
     h = _cliente(**ponte).get("/").get_data(as_text=True)
-    assert all(_verde(h, f"/t/{t.torre}/{t.tela}") for t in porta.MAPA)
+    assert all(_verde(h, f"/t/{t.torre}/{t.tela}") for t in porta.MAPA if t.torre != "relatorios")
+    assert _verde(h, "/t/relatorios/central")              # os relatórios abrem por ela (13/10/2026)
 
 
 def test_sem_a_chave_o_nome_da_variavel_so_aparece_para_admin(monkeypatch):

@@ -339,6 +339,9 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 /* torre sem nenhuma tela pronta (auditoria A3, 10/10/2026): não é link, não reage ao mouse, borda tracejada */
 .card-torre--construcao{border-style:dashed}
 .card-torre--construcao:hover{background:var(--superficie)}
+/* Relatórios → Central de emissão (13/10/2026): os relatórios do setor, um cartão por relatório */
+.grade-relatorios{margin-top:18px}
+.card-relatorio:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 .card-torre--construcao .cab i{color:var(--mudo)}
 .card-torre--construcao .gc-status{margin-left:auto}
 

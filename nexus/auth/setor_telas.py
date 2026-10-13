@@ -54,6 +54,11 @@ _TRAVA = threading.Lock()
 _CACHE: dict = {}
 # o que abre sem setor: entrar e sair, o tema, a saúde e os arquivos da página
 LIVRES = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static"})
+# Telas que mudaram de endereço: a decisão gravada com o nome antigo vale para o novo (a mais nova de cada setor × tela
+# ganha, pela hora, como sempre). 13/10/2026: o Criador de relatório e o Relatório semanal saíram da Performance para
+# Relatórios → Central de emissão (Levi: "Sai da parte de Performance!"); quem já os via continua vendo.
+RENOMEADAS = {"performance/relatorio": "relatorios/relatorio",
+              "performance/relatorio-semanal": "relatorios/relatorio-semanal"}
 
 
 class Recusada(ValueError):
@@ -118,7 +123,7 @@ def vigentes(decisoes: list[dict]) -> dict[int, set[str]]:
     """{setor_id: {telas liberadas}} pela última decisão de cada setor × tela (pela hora; empate fica na ordem do livro)."""
     ultima = {}
     for d in sorted(decisoes or [], key=lambda x: x["decidida_em"]):
-        ultima[(d["setor_id"], d["tela"])] = d["liberada"]
+        ultima[(d["setor_id"], RENOMEADAS.get(d["tela"], d["tela"]))] = d["liberada"]
     out: dict[int, set[str]] = {}
     for (sid, tela), lib in ultima.items():
         if lib:
@@ -297,7 +302,8 @@ def acesso() -> dict:
             if setor:
                 d = _telas_no_clique(base, sessao)
                 # erro só quando nunca houve leitura boa: com a cópia velha, vale ela
-                r = {"tudo": False, "telas": vigentes(d["decisoes"]).get(setor["id"], set()), "setor": setor,
+                r = {"tudo": False, "telas": com_as_de_fora(vigentes(d["decisoes"]).get(setor["id"], set())),
+                     "setor": setor,
                      "erro": d["erro"] if not d.get("lido_em") else ""}
             else:
                 r = {"tudo": False, "telas": set(), "setor": None, "erro": ""}
@@ -311,6 +317,19 @@ def acesso() -> dict:
             pass
     request._nexus_acesso = r
     return r
+
+
+def com_as_de_fora(telas: set[str]) -> set[str]:
+    """As telas liberadas mais a de fora de cada uma (`Tela.dentro_de`, 13/10/2026): quem tem um relatório liberado vê a
+    Central de emissão, que é por onde ele se abre, sem precisar marcá-la."""
+    torres = {t.id: t for t in current_app.extensions.get("nexus_torres", [])}
+    out = set(telas)
+    for k in telas:
+        torre_id, _, tela_id = k.partition("/")
+        decl = torres[torre_id].tela(tela_id) if torre_id in torres else None
+        if decl and decl.dentro_de:
+            out.add(chave(torre_id, decl.dentro_de))
+    return out
 
 
 def liberadas_do_menu() -> set[str] | None:

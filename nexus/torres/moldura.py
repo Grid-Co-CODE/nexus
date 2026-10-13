@@ -82,6 +82,14 @@ def url_da_tela(t) -> str:
     return na_raiz(f"/t/{t.torre}/{t.tela}")
 
 
+def url_no_menu(t) -> str:
+    """O item do menu que acende com a tela aberta: o dela, ou o da tela de que ela se abre por dentro (`Tela.dentro_de`:
+    os relatórios acendem a Central de emissão, 13/10/2026)."""
+    torre = next((x for x in current_app.extensions.get("nexus_torres", []) if x.id == t.torre), None)
+    decl = torre.tela(t.tela) if torre else None
+    return na_raiz(f"/t/{t.torre}/{decl.dentro_de}") if decl and decl.dentro_de else url_da_tela(t)
+
+
 def _quem() -> tuple[str, str, bool]:
     """E-mail, nome e se é admin, para o passe. Quem entrou pela senha de administrador não é uma pessoa: vai com o
     e-mail da reserva (`porta.EMAIL_DA_SENHA_DE_ADMIN`)."""
@@ -137,8 +145,11 @@ def _dados_do_navegador(t, estado: dict, destino: str | None, passe_lista: str |
         # a página é o modo TV: o endereço guarda o ?tv=1 enquanto a moldura fica numa tela com TV (porta.js)
         "tv": na_tv,
         # `tv` de cada item: o botão "Modo TV" da faixa some quando a moldura vai a uma tela sem TV e volta com ela
-        "telas": [{"url": url_da_tela(x), "nome": x.nome, "caminho": x.caminho if porta.concreto(x) else "",
-                   "padroes": porta.padroes_do_navegador(x), "tv": (x.torre, x.tela) in COM_TV} for x in porta.MAPA],
+        # `menu` = o item que acende (o da Central de emissão para os relatórios; o porta.js usa `url` sem ele)
+        "telas": [dict({"url": url_da_tela(x), "nome": x.nome, "caminho": x.caminho if porta.concreto(x) else "",
+                        "padroes": porta.padroes_do_navegador(x), "tv": (x.torre, x.tela) in COM_TV},
+                       **({"menu": url_no_menu(x)} if url_no_menu(x) != url_da_tela(x) else {}))
+                  for x in porta.MAPA],
         # Diagnóstico: o passe que abre a sessão da plataforma para ler a lista de usinas (o mesmo /api/macro do Painel
         # NOC, por isso o destino é o /painel; o 303 não é seguido). Só vai à rede se a lista voltar 401.
         "passe_lista": passe_lista or "",

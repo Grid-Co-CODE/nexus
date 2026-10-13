@@ -154,8 +154,10 @@
 
   function acender(tela) {
     document.querySelectorAll(".menu a[aria-current]").forEach(function (a) { a.removeAttribute("aria-current"); });
+    // a tela que abre por dentro de outra (os relatórios da Central de emissão, 13/10/2026) acende o item da outra
+    var alvo = tela.menu || tela.url;
     document.querySelectorAll(".menu .torre li a").forEach(function (a) {
-      if (a.getAttribute("href") !== tela.url) return;
+      if (a.getAttribute("href") !== alvo) return;
       a.setAttribute("aria-current", "page");
       var torre = a.closest("details");
       if (torre) torre.open = true;

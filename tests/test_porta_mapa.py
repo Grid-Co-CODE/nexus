@@ -29,15 +29,16 @@ performance|diagnostico|/painel/usina/<id>||
 performance|strings-trackers|/painel/falhas||
 performance|gerencial|/gerencial||
 performance|disponibilidade|/gerencial/disponibilidade||
-performance|relatorio|/relatorio||
-performance|relatorio-semanal|/relatorio/semanal||
+relatorios|relatorio|/relatorio||
+relatorios|relatorio-semanal|/relatorio/semanal||
+relatorios|potencia-ativa|/relatorio/potencia-ativa||
 performance|gemeo|/gemeo/|/gemeo/<path:resto>|
 performance|monitor-ronda|/ronda/monitor||
 cos|acompanhamento|/cos||
 base|chaves-fontes|/tokens||admin
 base|fontes-tempo-real|/admin/tempo-real||admin
 base|de-para-equipamentos|/admin/de-para||admin"""
-ASSINATURA_DA_PLATAFORMA = "585df9483ce29999"
+ASSINATURA_DA_PLATAFORMA = "69aca055f5d2c37a"
 
 
 def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
@@ -51,7 +52,7 @@ def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
 def test_o_mapa_e_o_mesmo_da_plataforma():
     assert porta.texto_canonico_do_mapa() == TEXTO_DA_PLATAFORMA
     assert porta.assinatura_do_mapa() == ASSINATURA_DA_PLATAFORMA
-    assert len(porta.MAPA) == 14 and len({(t.torre, t.tela) for t in porta.MAPA}) == 14
+    assert len(porta.MAPA) == 15 and len({(t.torre, t.tela) for t in porta.MAPA}) == 15
 
 
 @pytest.mark.parametrize("caminho, tela", [
@@ -59,7 +60,7 @@ def test_o_mapa_e_o_mesmo_da_plataforma():
     ("/monitor?fonte=pv&embed=1", "tempo-real"), ("/painel", "noc"), ("/painel/usina/297410", "diagnostico"),
     ("/painel/usina/abc?fonte=pg&nome=Usina%20X", "diagnostico"), ("/painel/falhas", "strings-trackers"),
     ("/gerencial", "gerencial"), ("/gerencial/disponibilidade", "disponibilidade"), ("/relatorio", "relatorio"),
-    ("/relatorio/semanal", "relatorio-semanal"), ("/gemeo/", "gemeo"), ("/gemeo/usina/12", "gemeo"),
+    ("/relatorio/semanal", "relatorio-semanal"), ("/relatorio/potencia-ativa", "potencia-ativa"), ("/gemeo/", "gemeo"), ("/gemeo/usina/12", "gemeo"),
     ("/ronda/monitor", "monitor-ronda"), ("/cos", "acompanhamento"),
     ("/tokens", "chaves-fontes"), ("/admin/tempo-real", "fontes-tempo-real"),
     ("/admin/de-para", "de-para-equipamentos"),
