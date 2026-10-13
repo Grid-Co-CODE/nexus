@@ -386,3 +386,98 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
   .fr-acoes{width:100%}
   .fr-acoes .gc-btn{flex:1 1 auto;justify-content:center}
 }
+
+/* Equipamentos das usinas (Base, 13/10/2026): a lista de usinas do Registro mestre à esquerda (fixa enquanto a página
+   rola), a usina aberta à direita em 3 passos (Fracttal, chaves do supervisório, estrutura). Sem animação. */
+.eq-grade{display:grid;grid-template-columns:minmax(230px,280px) minmax(0,1fr);gap:16px;align-items:start}
+.eq-lista{position:sticky;top:calc(var(--topo) + 12px);max-height:calc(100vh - var(--topo) - 24px);display:flex;
+  flex-direction:column;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.eq-lista-topo{display:flex;flex-direction:column;gap:7px;padding:12px;border-bottom:1px solid var(--linha);margin:0}
+.eq-lista-topo .gc-campo{width:100%;box-sizing:border-box}
+.eq-lista-conta{margin:0;font-size:11px;color:var(--mudo)}
+.eq-itens{list-style:none;margin:0;padding:6px;overflow:auto;flex:1 1 auto;min-height:120px}
+.eq-itens li[hidden]{display:none}
+.eq-item{display:block;padding:8px 10px;border-radius:var(--raio-controle);text-decoration:none;color:var(--tinta-2)}
+.eq-item:hover{background:var(--superficie-2);color:var(--tinta)}
+.eq-item:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.eq-item--sel{background:var(--verde-suave);color:var(--tinta);box-shadow:inset 3px 0 0 var(--verde)}
+.eq-item-nome{display:block;font:600 13px/18px var(--font-sans);color:var(--tinta)}
+.eq-item-cli{display:block;font-size:11px;line-height:16px;color:var(--mudo)}
+.eq-item-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.eq-item-chips .cad-chip{font-size:10px;line-height:14px;padding:1px 6px}
+.eq-vazio{margin:0;padding:6px 0;font-size:12px;color:var(--mudo)}
+.eq-painel{min-width:0}
+.eq-guia h2,.eq-passo>h2{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.eq-corpo{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.eq-corpo .gc-ajuda{margin:0}
+.eq-passos-guia{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:var(--tinta-2);font-size:13px}
+.eq-passos-guia strong{color:var(--tinta)}
+.eq-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+  background:var(--verde);color:var(--sobre-verde);font:700 12px/1 var(--font-sans)}
+.eq-cab-usina{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:0 0 14px}
+.eq-cliente{margin:0;font:600 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.eq-titulo{margin:2px 0 4px;font:700 22px/28px var(--font-sans);color:var(--tinta)}
+.eq-meta{margin:0;font-size:12px;color:var(--mudo)}
+.eq-meta a{color:var(--verde-texto)}
+.eq-kwp{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right}
+.eq-kwp .r{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.eq-kwp .v{font:600 22px/28px var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.eq-kwp .d{font-size:11px;color:var(--alerta)}
+.eq-kwp .m{font-size:11px;color:var(--mudo)}
+.eq-ligado{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 10px;border:1px solid var(--linha);
+  border-radius:var(--raio-controle);background:var(--superficie-2)}
+.eq-ligado .mudo{font-size:12px;flex:1 1 200px}
+.eq-form,.eq-form-inline{margin:0}
+.eq-form{display:flex;flex-direction:column;gap:6px}
+.eq-form-linha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.eq-form-linha select.gc-campo{flex:1 1 320px;min-width:0;max-width:560px}
+.eq-chave-nova.gc-campo{flex:1 1 220px;min-width:0;max-width:300px}
+.eq-ou{font-size:12px;color:var(--mudo)}
+.eq-ref summary{cursor:pointer;font-size:12px;color:var(--tinta-2)}
+.eq-ref[open] summary{margin-bottom:8px}
+/* o editor da estrutura */
+.eq-editor{display:flex;flex-direction:column;gap:14px}
+.eq-ed-sec{display:flex;flex-direction:column;gap:8px}
+.eq-ed-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.eq-ed-cab h3{margin:0;font:700 13px/18px var(--font-sans);color:var(--tinta);margin-right:auto}
+.eq-ed-cab .mudo{font-size:12px}
+.eq-n{font-weight:500;color:var(--mudo);margin-left:4px}
+.eq-pot{margin:0}
+.eq-pot .v small{font-size:12px;font-weight:500;color:var(--mudo)}
+.eq-pot .d{font-size:11px;color:var(--mudo)}
+.eq-v--fecha{color:var(--ok)}
+.eq-v--perto{color:var(--alerta)}
+.eq-v--nao_fecha{color:var(--critico)}
+.eq-tab td{padding:5px 8px;vertical-align:middle}
+.eq-tab th{padding:8px}
+.eq-tab .gc-campo{width:100%;min-width:0;box-sizing:border-box;padding:4px 7px;font-size:12px;line-height:18px}
+.eq-tab .gc-campo[aria-invalid="true"]{border-color:var(--critico)}
+.eq-tab .gc-btn{padding:4px 9px;font-size:12px}
+.eq-tab-inv{min-width:940px}
+.eq-w-nome{min-width:116px}
+.eq-w-chave{min-width:128px}
+.eq-w-sup{min-width:108px}
+.eq-w-cab{min-width:84px}
+.eq-w-num{width:82px}
+.eq-w-str{width:62px}
+.eq-w-ativo{min-width:180px}
+.eq-acoes-linha{white-space:nowrap}
+.eq-acoes-linha .gc-btn+.gc-btn{margin-left:4px}
+.eq-linha-falta td{background:var(--alerta-a08)}
+.eq-marca{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tinta-2);cursor:pointer}
+.eq-marca input{accent-color:var(--verde);width:15px;height:15px}
+.eq-familias{margin-left:0}
+.eq-gerar td{background:var(--superficie-2)}
+.eq-gerar-form{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.eq-gerar-form label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--mudo)}
+.eq-gerar-form .gc-campo{width:110px}
+.eq-gerar-form .mudo{font-size:11px;flex:1 1 200px}
+.eq-barra{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;
+  background:var(--superficie);border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 -6px 18px var(--sombra)}
+.eq-estado{margin-left:auto;font-size:12px;color:var(--mudo)}
+.eq-estado--sujo{color:var(--alerta);font-weight:600}
+@media (max-width:980px){
+  .eq-grade{grid-template-columns:1fr}
+  .eq-lista{position:static;max-height:380px}
+  .eq-kwp{align-items:flex-start;text-align:left}
+}

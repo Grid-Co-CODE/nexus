@@ -75,7 +75,10 @@ def _fontes(pares) -> tuple:
 DIMENSOES = (
     ("data", "Data", "nexus_dimensoes · dim_data", "data_id (AAAAMMDD)"),
     # HIST-10 (auditoria 08/10): a usina tem histórico (equipe, responsáveis, região "da época") e a dimensão não o citava
-    ("usina", "Usina", "cadastro_nexus · usinas (+ de_para; nexus_dimensoes · usinas_historico)", "usina_id"),
+    # a estrutura física da usina (13/10/2026) é hierarquia da MESMA dimensão (usina -> chave do supervisório, cabine,
+    # inversor), não um segundo cadastro de equipamento: o inversor aponta o ativo do Fracttal pelo equipamento_id
+    ("usina", "Usina", "cadastro_nexus · usinas (+ de_para; nexus_dimensoes · usinas_historico; nexus_estrutura_usina: "
+     "chaves do supervisório, cabines e inversores)", "usina_id"),
     ("cliente", "Cliente", "cadastro_nexus · clientes", "cliente_id"),
     # a região de campo (estrutura de O&M de 10/2026) é da EQUIPE: hierarquia da mesma dimensão (equipe -> região, com o
     # Supervisor de Campo e o Coordenador por pessoa_id), não uma dimensão à parte; o fato chega à região pelo equipe_id.
@@ -583,6 +586,12 @@ LIVROS = (
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
           "1 minuto e relê o banco antes de cada gravação"),
+    Livro("nexus_estrutura_usina", ("dim_supervisorio", "dim_cabine", "dim_inversor"),
+          "a cada ligação de chave e a cada Salvar da tela Equipamentos das usinas",
+          "nexus/cadastro/estrutura_usina.py, pela tela Base > Equipamentos das usinas", False,
+          "registrado em 13/10/2026 antes de existir: nasce com a 1ª chave do supervisório ligada na tela. Substitui, no "
+          "Nexus, a aba Equipamentos do bd_performance (que segue como referência e não muda); a tela lê com cache de "
+          "1 minuto e relê o banco antes de cada gravação. Quem mudou, só como HMAC (alterado_por_hmac)"),
     Livro("nexus_setor_telas", ("fato_decisao_tela_setor",), "a cada Salvar da seção Telas por setor (Base > Acessos)",
           "nexus/auth/setor_telas.py, pela tela Base > Acessos", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º Salvar na tela; o portão de cada pedido e a "

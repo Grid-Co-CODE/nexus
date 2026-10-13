@@ -95,7 +95,7 @@ def test_ligar_na_tela_vale_na_hora_e_fica_gravado_com_quem(app_lig, cli):
     q = _decidir(cli, acao="ligar", chave="Athon - Matões 1 - MA", usina="2 · Athon - Matões 100")
     assert "ok" in q
     linha = next(l for l in _linhas(app_lig) if l[2] == "Athon - Matões 1 - MA")
-    assert linha[0] == 2 and linha[3].startswith("manual (admin,")
+    assert linha[0] == 2 and linha[3].startswith("manual (") and "admin" not in linha[3]   # quem: só na decisão local
     regras = json.loads(L.caminho_regras(app_lig.config).read_text(encoding="utf-8"))
     assert regras["ligar"][0]["quem"] == "admin" and regras["ligar"][0]["usina_id"] == 2
 

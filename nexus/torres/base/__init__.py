@@ -9,6 +9,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
 """
 from ...auth.telas_acessos import registrar_acessos
 from ...cadastro.telas import registrar_base
+from ...cadastro.telas_equipamentos import registrar_equipamentos
 from ...cadastro.telas_fracttal import registrar_fracttal
 from ...cadastro.telas_ligacoes import registrar_ligacoes
 from ...dados.telas import registrar_governanca
@@ -32,6 +33,13 @@ TORRE = Torre(
         Tela("equipes", "Equipes",
              "Quem trabalha em cada equipe e em quais usinas?",
              "Cadastro do Nexus (antes: Equipe Cluster do BD_Operações)"),
+        # Equipamentos das usinas (13/10/2026, Levi: "Temos que substituir a aba equipamentos aproveitando o que tem lá e
+        # usando o Nexus como ponto de partida"): a usina ligada, à mão, ao Fracttal e às chaves do supervisório, e as
+        # cabines, inversores, strings e potência dela. A view mora em nexus/cadastro/telas_equipamentos.py; só administrador.
+        Tela("equipamentos", "Equipamentos das usinas",
+             "Que nome a usina tem no Fracttal e no supervisório, e quais cabines, inversores e strings ela tem?",
+             "Registro mestre, as Ligações (Fracttal) e o livro nexus_estrutura_usina; a aba Equipamentos só como "
+             "referência; só administrador"),
         # Estrutura de O&M de 10/2026 (Levi, 08/10: "pode adaptar, deixa as vagas preparadas")
         Tela("regioes-campo", "Regiões de campo",
              "Quem é o Supervisor de Campo de cada região, que equipes ela tem e onde a vaga está aberta?",
@@ -95,6 +103,7 @@ TORRE = Torre(
 
 bp = TORRE.criar_blueprint(__name__)
 registrar_base(bp)
+registrar_equipamentos(bp)
 registrar_fracttal(bp)
 registrar_ligacoes(bp)
 registrar_governanca(bp)

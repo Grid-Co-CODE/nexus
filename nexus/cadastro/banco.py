@@ -327,7 +327,11 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
             ids_ref, como_ref = ligado.get(ref, ([], None)) if ref else ([], None)
             if m:                                   # quem corrigiu na tela vence qualquer regra automática
                 if int(m["usina_id"]) in existe:
-                    ids, como = [int(m["usina_id"])], f"manual ({m.get('quem') or '?'}, {_quando_curto(m.get('quando'))})"
+                    # só o dia, nunca quem: o de_para é publicado, e a API do banco tem leitura aberta (regra 8; até
+                    # 13/10/2026 ia o "quem" da decisão, que no login pelo Fracttal é o e-mail e o nome). Quem decidiu
+                    # fica na decisão local (de_para_regras.json), que a seção Ligações mostra.
+                    dia = _quando_curto(m.get("quando"))
+                    ids, como = [int(m["usina_id"])], f"manual ({dia})" if dia else "manual"
                 else:
                     como = "manual aponta usina que não existe mais"
             elif como:

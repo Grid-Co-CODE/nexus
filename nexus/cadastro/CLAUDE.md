@@ -2,8 +2,8 @@
 
 O registro mestre do Nexus: usinas, clientes, pessoas, equipes, regiões de campo e listas, com os mesmos dados do
 BD_Operações (a região de campo vem da estrutura de O&M de 10/2026), mas editáveis numa tela. As telas ficam nas torres
-Base (Registro mestre, Clientes, Equipes, Regiões de campo, Importar do Excel, Qualidade do cadastro) e Pessoas
-(Colaboradores Operação).
+Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Regiões de campo, Importar do Excel, Qualidade do
+cadastro) e Pessoas (Colaboradores Operação).
 
 **A tela Listas saiu em 11/10/2026** (Levi: "pode tirar listas pois a governança faz mais sentido"): `/t/base/listas`
 responde um redirecionamento para Base → Governança de dados (quem tinha o endereço salvo não cai num 404; o POST de uma
@@ -30,6 +30,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Integração Fracttal: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
+| `estrutura_usina.py` + `telas_equipamentos.py` | tela Base → Equipamentos das usinas: a usina ligada à mão ao Fracttal e às chaves do supervisório, e as cabines, inversores, strings e potência dela, no livro `nexus_estrutura_usina` (13/10/2026) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
 Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanham sozinhas.
@@ -172,6 +173,64 @@ e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
   12/10 numa cópia com o banco e o Fracttal reais e o livro dos setores num arquivo local (6 setores, 1 pela linha,
   4 pela barra, filtro, celular).
 
+## Equipamentos das usinas (`estrutura_usina.py`, `telas_equipamentos.py`, `/t/base/equipamentos`; 13/10/2026)
+
+Levi, 13/10/2026 (o atalho do Tempo real abria o editor do de-para da plataforma na fonte errada): "Temos que substituir a
+aba equipamentos aproveitando o que tem lá e usando o Nexus como ponto de partida a partir daquele produto. Precisamos
+ligar a usina do Fractal com Usina cadastrada no registro mestre com usina do supervisório para aí poder ligar os
+inversores, quantidade de cabines, quantidade de inversor por cabine, quantidade de strings por inversor, potência sendo
+calculado pelo kwp da usina e das cabines... precisamos ter uma versatilidade no Nexus, não pode ser âncora". E: "Não
+quero que faça as conexões automaticamente, quero poder ver e fazer de forma versátil, pq se só você fizer vai ficar fácil
+de entender para você, quando eu for fazer não vou entender nada".
+
+- **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; filtros sem
+  Fracttal, sem chave, sem inversores, potência que não fecha); à direita, a usina aberta em 3 passos.
+- **1. Nome no Fracttal:** a MESMA decisão da seção Ligações entre bases (`ligacoes.decidir` + `reaplicar`, o arquivo
+  de regras local): um de-para só. Vale já no Nexus; no banco, no "Publicar no banco" de lá (que é do Levi). Ligar um
+  nome que hoje está em outra usina o passa para esta (a opção diz "hoje em X: passa para esta").
+- **2. Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que
+  a plataforma usa por dentro. Uma usina pode ter várias; **uma chave serve a uma usina só** (a de outra usina é
+  recusada). As opções vêm ordenadas, com o porquê escrito ("mesmo nome do Fracttal na aba", "nome parecido"), nenhuma
+  escolhida. Chave digitada que não está na aba liga, com aviso para conferir o nome exato. **Desligar a chave nunca
+  apaga inversor:** os que chegavam por ela ficam na usina sem chave, à vista para ganhar outra.
+- **3. Estrutura** (editor em JavaScript sobre um rascunho; só o Salvar grava, de uma vez, por fetch com JSON, e recebe
+  de volta o estado gravado com os IDs novos, sem recarregar). **A cabine é da usina** e o inversor diz a chave por onde
+  chega, o nome lá (`equipamento_supervisorio`), a cabine, kWp, strings esperadas e o ativo do Fracttal. Porque na aba a
+  UG fica numa chave e os inversores dela em outra (a Altair: "Altair" com a UFV e as 5 UG, e "Altair 1 (73)" a
+  "Altair 5 (77)" com os inversores; 1.311 dos 2.201 inversores da aba apontam para UG de outra chave). Ajudas, todas
+  só no rascunho: **Trazer da aba** (as chaves ligadas; só preenche o vazio e nunca apaga; nome repetido de outra chave
+  ganha a chave no nome), **Gerar inversores** numa cabine ("Inversor c.n", continuando a numeração), **Distribuir
+  potência** (cabine sem kWp = o que falta da usina ÷ as vazias; inversor sem kWp = o que falta da cabine ÷ os vazios) e
+  **Sugerir ativos pelo nome** (só o vazio, e só com UM ativo livre cuja descrição começa pelo nome: "Inversor 1.1
+  Huawei…" serve ao 1.1 e não ao 1.10). Os ativos são os da `nexus_equipamentos · dim_equipamento` da usina (INVR para
+  inversor; CABN e SKID para cabine; "todas as famílias" abre o resto), pedidos depois de desenhar (22 mil linhas, 1 hora
+  de cópia), com o de mesmo nome primeiro e marcado.
+- **Potência:** a da usina é a **real** do Registro mestre (`potencia_real`, MWp × 1.000) e, sem ela, a contratual (a
+  tela diz qual). Medido em 13/10: a aba bate com a real (Araputanga 1: real 3,469 MWp, contratual 3,25; UFV da aba
+  3.469,2 kWp); 68 das 258 usinas não têm a real. Conferência contra a soma das cabines e a dos inversores: até 0,5% fecha
+  (verde), até 5% perto (amarelo), acima não fecha (vermelho). Inversor sem kWp conta o da cabine ÷ os inversores dela,
+  e a soma diz quanto é calculado.
+- **O livro `nexus_estrutura_usina`** (no catálogo antes de existir; nasce com a 1ª chave ligada): `dim_supervisorio`,
+  `dim_cabine`, `dim_inversor`, estado atual (troca integral do livro inteiro, relido do banco sob trava antes de cada
+  gravação; leitura que falha não grava). ID = maior + 1 e não volta; excluir marca `excluido = sim`; indicador 1/0
+  (regra 3); quem mudou só em `alterado_por_hmac` (regra 8; o e-mail vai ao log da máquina). **Selo:** o Salvar leva a
+  impressão do que a usina tinha quando a tela abriu (só os campos do negócio, para a data relida não dar mudança
+  falsa); se outra aba ou pessoa mudou a usina no meio, nada grava e a tela pede para recarregar. A ordem é gravada
+  (tirar um inversor muda a ordem dos seguintes, e isso conta como mudança).
+- **A aba Equipamentos não muda** e continua sendo o que a plataforma lê. Medido em 13/10: 2.602 linhas, 301 chaves, 247
+  UG, 2.201 inversores (214 sem nome no supervisório), 85 usinas de exibição com mais de uma chave. **Fase 2 (a propor
+  ao Levi):** a plataforma ler o `nexus_estrutura_usina` no lugar da aba, em paralelo e por opção, comparando os
+  esperados antes de trocar.
+- **Só administrador** (o Registro mestre e a gravação no banco; `_tela`); os POST só da própria página
+  (`_de_outro_site`). Prova: `tests/test_base_equipamentos.py` (a aba agrupada, chave de uma usina só, desligar sem
+  apagar inversor, criar/atualizar/excluir com ID que não volta, as recusas sem gravar nada, selo, sem token e banco
+  fora, regra 8, ativos, a tela, a decisão do Fracttal pelas Ligações, catálogo e menu). Conferido em 13/10 numa cópia
+  (5071) com o Registro, o Fracttal das Ligações e o banco reais para LER e a gravação só na memória de um proxy (o livro
+  no banco é para sempre): Araputanga 1 de ponta a ponta (chave pela sugestão, Trazer da aba: 1 cabine, 10 inversores e
+  236 strings, potência fechando com a real, os 10 ativos pelo nome, salvar duas vezes = "Nada mudou") e Ipixuna do
+  Pará 1 à mão (chave digitada, 2 cabines, 8 inversores gerados, distribuir fechando 6.804 kWp, nome repetido recusado),
+  no celular sem rolagem lateral e no tema claro.
+
 ## No banco (PostgreSQL): `banco.py`
 
 - Workbook `cadastro_nexus` da API db_performace: `clientes`, `equipes`, `pessoas`, `usinas`, `regioes_campo`,
@@ -195,6 +254,11 @@ e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
   sem isso, cada envio regravaria todas as linhas. Reenvio sem mudança = 1 linha (a data).
 - **`de_para` tem uma linha por chave externa de cada base**, ligada ou não: `usina_id` vazio + `casou_por` diz por
   quê ("sem par no cadastro", "ignorado: …", "conflito com o de-para de trackers"). O "% ligado" sai daí.
+- **A decisão à mão vai como "manual (dd/mm)", sem quem** (13/10/2026): até então ia o `quem` da decisão, e no login
+  pelo Fracttal o `_quem()` era a sessão inteira (e-mail, nome e perfil) e caía no `casou_por` de um livro de leitura
+  aberta (regra 8). Agora o `_quem()` é só o e-mail (ou "admin"), que fica na decisão local (`de_para_regras.json`) e a
+  seção Ligações mostra; o banco recebe só o dia. As decisões guardadas até 13/10 tinham "Levi (pelo Claude)" e
+  "Levi (aprovado no chat em 06/10/2026)": o próximo Publicar no banco já sai sem o nome.
 - Ordem: regra de ignorar → código (com o prefixo do cliente, depois só "AAA999"; "IPX100" é de 2C e de Thopen, não
   casa) → nome do Fracttal → casamento por nome (`casamento.py`, para base sem código) → dica do de-para de trackers.
   Nome ou código que serve a duas usinas **não** casa.

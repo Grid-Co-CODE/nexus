@@ -92,6 +92,16 @@ Campo), pelo `pessoa_id` quando tem ficha (critério do login, `pessoa_ligada_po
 nunca (regra 8). As duas abas vão juntas a cada gravação (gravar sem uma a apagaria), sobre o livro relido do banco na
 hora (leitura que falha não grava). Registrado antes de existir: nasce com o 1º setor criado na tela.
 
+**Estrutura das usinas (13/10/2026):** a tela Base · Equipamentos das usinas (só admin) grava o livro
+`nexus_estrutura_usina` (`nexus/cadastro/estrutura_usina.py`): `dim_supervisorio` (1 linha = 1 chave do supervisório
+ligada a 1 usina; a chave é de uma usina só), `dim_cabine` (1 linha = 1 cabine da usina, com kWp) e `dim_inversor` (1
+linha = 1 inversor da usina: a chave por onde chega, a cabine, kWp, strings esperadas e o `equipamento_id` do ativo do
+Fracttal). É a estrutura física da USINA, hierarquia da mesma dimensão (usina → chave, cabine, inversor), e não um
+segundo cadastro de equipamento: o inversor aponta a dimensão de equipamento pelo `equipamento_id`. Estado atual (troca
+integral relida do banco antes de gravar), ID = maior + 1 que não volta, `excluido = sim`, quem mudou só como HMAC.
+Substitui no Nexus a aba Equipamentos do `bd_performance`, que segue como referência (e é o que a plataforma lê).
+Registrado antes de existir: nasce com a 1ª chave ligada na tela.
+
 **Meta do mês por usina (12/10/2026):** para a Visão do responsável (Campo · App; Levi: "construa a visão dos
 responsáveis da usina!"), a plataforma publica o Gerencial no livro `nexus_performance · fato_meta_usina_mes`
 (`catalogo.py`, foto acumulada, chave `mes_id` + `usina`): 1 linha = 1 usina do Gerencial × 1 mês, com produção e meta em

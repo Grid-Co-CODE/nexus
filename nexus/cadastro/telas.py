@@ -60,7 +60,13 @@ def servico() -> Servico:
 
 
 def _quem() -> str:
-    return session.get("usuario") or "admin"
+    """Quem fez, para a auditoria LOCAL do cadastro e as decisões das Ligações: o e-mail de quem entrou pelo Fracttal, ou
+    "admin" (senha de administrador). A sessão do Fracttal guarda um dict (e-mail, nome, perfil), e ele ia inteiro para a
+    decisão e, pelo `casou_por`, para o banco de leitura aberta (13/10/2026). O banco não recebe nem o e-mail (regra 8)."""
+    u = session.get("usuario")
+    if isinstance(u, dict):
+        return str(u.get("email") or "").strip() or "admin"
+    return u or "admin"
 
 
 def hora_br(iso: str) -> str:
