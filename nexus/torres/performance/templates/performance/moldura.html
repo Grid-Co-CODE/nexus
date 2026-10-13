@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block classe_conteudo %}conteudo--moldura{% endblock %}
+{# Modo TV (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC mesmo!"): só na
+   tela registrada com TV (moldura.py). Desde 13/10/2026 mora no topo do Nexus, ao lado do Tema: na faixa ele era uma
+   linha sozinha em cima da barra do Painel NOC, o 2º cabeçalho que o Levi pediu para sumir. Leva o caminho aberto; o
+   porta.js o acompanha e o esconde quando a moldura vai a uma tela sem TV. #}
+{% block topo_acoes %}{% if tem_tv and ligada and destino and not recusa %}<a class="gc-btn gc-btn--ui gc-btn--fantasma topo-tv" id="porta-tv" href="{{ endereco_tv|na_raiz }}"><i class="ph ph-television-simple"></i><span>Modo TV</span></a>{% endif %}{% endblock %}
 {% block conteudo %}
 {# Uma tela da Plataforma de Performance dentro do Nexus (porta única, 09/10/2026; Levi: "a partir de segunda quero o
    Nexus como link principal"). O Nexus é a porta (menu, login, endereço); a plataforma desenha a tela na moldura. O
@@ -9,25 +14,26 @@
    nexus/torres/moldura.py e nexus/performance/porta.py. Sem "Abrir em outra aba" desde 11/10/2026 (Levi: "é só Nexus e
    já era!"): a tela da plataforma só se abre dentro do Nexus. #}
 <div class="porta" id="porta">
-  <div class="porta-faixa">
-    <span class="porta-origem"><strong>{{ tela.nome }}</strong> · Plataforma de Performance</span>
+  {# Sem o 2º cabeçalho (13/10/2026, Levi: "suma esse 2° cabeçalho tanto de OS Creator Web quanto de plataforma de
+     performance! Dá a impressão que é uma tela dentro de uma tela!"): saiu o "<tela> · Plataforma de Performance" (o
+     menu lateral acende o item, e a tela da plataforma tem o título dela). A faixa só nasce com controle (as visões e o
+     seletor de usina do Diagnóstico), numa linha leve, sem cara de cabeçalho; o Modo TV foi para o topo do Nexus. #}
+  {% set seletor_aqui = seletor and ligada and not recusa %}
+  {% if visoes|length > 1 or seletor_aqui %}
+  <div class="porta-faixa" id="porta-faixa">
     {% if visoes|length > 1 %}
     <nav class="porta-visoes" aria-label="Visão do {{ tela.nome }}">
       {% for v in visoes %}<a class="gc-chip" href="?ver={{ v.id }}" aria-pressed="{{ 'true' if v.id == ver else 'false' }}">{{ v.nome }}</a>{% endfor %}
     </nav>
     {% endif %}
-    {% if seletor and ligada and not recusa %}
+    {% if seletor_aqui %}
     <label class="porta-usina"><span class="gc-rotulo">Usina</span>
       <select id="porta-usina" class="gc-campo" disabled><option value="">Lendo as usinas da Plataforma...</option></select>
     </label>
     <span class="porta-nota mudo" id="porta-usina-nota" role="status"></span>
     {% endif %}
-    {# Modo TV (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC mesmo!"):
-       só na tela registrada com TV (moldura.py), com a classe e o texto do botão do Mapa de risco, por último na faixa
-       e no canto direito dela (nexus.css), onde o Mapa tem o dele. Leva o caminho aberto; o porta.js o acompanha e o
-       esconde quando a moldura vai a uma tela sem TV. #}
-    {% if tem_tv and ligada and destino and not recusa %}<a class="gc-btn gc-btn--contorno" id="porta-tv" href="{{ endereco_tv|na_raiz }}">Modo TV</a>{% endif %}
   </div>
+  {% endif %}
   <p class="porta-alerta" id="porta-alerta" role="alert" hidden></p>
   {% if recusa %}
   <div class="porta-aviso">

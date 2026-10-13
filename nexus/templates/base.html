@@ -38,6 +38,8 @@
   {# Tema escuro (padrão) ou claro (08/10/2026): o botão diz o de agora. Sem JavaScript, o formulário troca pelo servidor.
      O ícone (meio círculo cheio) é desenhado no CSS, sem <svg> no topo: as telas com gráfico procuram o primeiro <svg> da
      página (os testes do Mapa de risco quebraram com um ícone em SVG aqui) e sem depender da fonte de ícones da CDN. #}
+  {# a ação da tela no topo (13/10/2026, sem o 2º cabeçalho): hoje só o "Modo TV" do Painel NOC (performance/moldura.html) #}
+  {% block topo_acoes %}{% endblock %}
   {% set outro_tema = 'escuro' if tema == 'claro' else 'claro' %}
   <form class="troca-tema-form" method="post" action="{{ raiz }}/tema">
     <input type="hidden" name="tema" value="{{ outro_tema }}">
@@ -49,7 +51,13 @@
     </button>
   </form>
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
-  {% if session.usuario %}<span class="usuario-topo" title="{{ session.usuario.email }}{% if session.usuario.perfil %} · {{ session.usuario.perfil }}{% endif %}">{{ session.usuario.nome }}</span>{% endif %}
+  {# Quem entrou, ao lado do Sair (13/10/2026, Levi: "Quero que essa visão de cabeçalho ao lado de sair vá para o
+     cabeçalho do Nexus e suma esse 2° cabeçalho"): o avatar, o nome e o perfil do Fracttal, como o topo do OS Creator,
+     que saiu de dentro do Nexus (ponte.py). O e-mail fica no title. Quem entrou pela senha de administrador não tem nome. #}
+  {% if session.usuario %}<span class="usuario-topo" title="{{ session.usuario.email }}">
+    <span class="usuario-avatar" aria-hidden="true">{{ session.usuario.nome|iniciais }}</span>
+    <span class="usuario-txt"><span class="usuario-nome">{{ session.usuario.nome }}</span>{% if session.usuario.perfil %}<span class="usuario-perfil">{{ session.usuario.perfil }}</span>{% endif %}</span>
+  </span>{% endif %}
   <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="{{ raiz }}/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
 </header>
 

@@ -19,7 +19,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
 | `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
 | `nexus/auth/pre_carga.py` | a pré-carga das telas de quem tem setor (seção "Pré-carga" abaixo) |
-| `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
+| `nexus/templates/base.html` | a moldura: o topo (o setor, a ação da tela no bloco `topo_acoes`, o Tema, quem entrou e o Sair; seção "Um cabeçalho só"), menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base, entrar e os dois modos TV): a reserva do `localStorage` antes de pintar |
 | `nexus/templates/_entrar_de_novo_js.html` e `_confere_sessao_js.html` | o `window.nexusEntrarDeNovo` (a janela ao login quando a sessão acaba) e a conferência da sessão do Fracttal a cada 5 minutos (só `session.usuario`). Saíram do `base.html` sem mudar (11/10/2026) para o modo TV do Painel NOC, que não tem a casca, valer igual: a TV de quem saiu do Fracttal vai ao login |
 | `nexus/static/nexus.css` | os tokens do Design System Grid Co. nos dois temas e o subconjunto `gc-*` |
@@ -286,6 +286,29 @@ acompanhar se está realmente subindo automático para o server". O 4º cartão 
   `/saude` continua enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
 - **Prova:** `tests/test_casca_versao.py` (a API e o git dublados; nada sai para a rede). No dado real, em 13/10/2026: a
   API e o `git ls-remote` deram a mesma resposta, em dia para o 648c100 e 4 atrás para o 5a6982a.
+
+## Um cabeçalho só: quem entrou no topo do Nexus (13/10/2026)
+
+Levi, com o print do topo do OS Creator dentro do Nexus: "Quero que essa visão de cabeçalho ao lado de sair vá para o
+cabeçalho do Nexus e suma esse 2° cabeçalho tanto de OS Creator Web quanto de plataforma de performance! Dá a impressão
+que é uma tela dentro de uma tela!".
+
+- **Quem entrou** (`base.html`, `.usuario-*` no `nexus.css`): entre o Tema e o Sair, o avatar com as iniciais (filtro
+  `iniciais` do `create_app`: primeiro + último nome, como o do OS Creator), o nome e o perfil do Fracttal (o
+  `session.usuario`, o mesmo `get_conta_info` que o OS Creator mostrava; o e-mail no `title`). Sem perfil, só o nome. Quem
+  entrou pela senha de administrador não tem nome: nada aparece. No celular, só o avatar, entre o Tema e o Sair (a regra
+  que esconde o nome fica DEPOIS das `.usuario-*`: dentro do bloco do celular, lá em cima, ela perdia e o nome seguia).
+- **A ação da tela no topo:** o bloco `topo_acoes`, antes do Tema. Hoje só o "Modo TV" do Painel NOC
+  (`performance/moldura.html`); no celular ele some.
+- **O OS Creator dentro do Nexus sem o topo dele:** a ponte (`torres/oscreator/ponte.py`, `_MARCA_NO_NEXUS`) marca com
+  `os-no-nexus` a tela logo abaixo do Nexus (a casca, o login, o card da OS) antes de pintar, e o topo some. Aberto sozinho
+  no navegador, o OS Creator fica com o topo (é o único lugar com o nome e o "sair").
+- **As telas da Plataforma de Performance sem a faixa** "<tela> · Plataforma de Performance": a faixa só nasce com
+  controle (o seletor de usina do Diagnóstico). Ver `nexus/performance/CLAUDE.md`.
+- **Prova:** `tests/test_sem_segundo_cabecalho_13_10.py` (7; 6 mutações pegas) e `tests/test_porta_tv.py`; no navegador,
+  uma cópia de prova com uma pessoa de mentira e a plataforma do PC: o topo com "PE Pessoa Exemplo ADMINISTRATOR", o
+  Performance do OS Creator começando no "← Voltar", o Tempo real e o Painel NOC sem a faixa (o "Modo TV" no topo), o
+  Diagnóstico só com o seletor, o OS Creator aberto sozinho com o topo dele, 375 px só com o avatar, escuro e claro.
 
 ## Pedidos presos: o que o Nexus esperava quando parou (13/10/2026)
 

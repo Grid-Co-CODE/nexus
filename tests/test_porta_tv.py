@@ -1,8 +1,9 @@
 """Modo TV do Painel NOC (11/10/2026), o lado do servidor.
 
 Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e NOC mesmo! não precisa de conta fixa". O
-Mapa de risco já tinha o modo TV (`?tv=1`, mapa_tv.html); o Painel NOC ganha o dele: o botão "Modo TV" na faixa da
-moldura (no canto direito dela, a mesma classe e o mesmo texto do Mapa) leva a `/t/performance/noc?tv=1`, que
+Mapa de risco já tinha o modo TV (`?tv=1`, mapa_tv.html); o Painel NOC ganha o dele: o botão "Modo TV" (desde 13/10/2026 no
+topo do Nexus, ao lado do Tema: na faixa da moldura ele era uma linha sozinha, o 2º cabeçalho que saiu) leva a
+`/t/performance/noc?tv=1`, que
 sai SEM a casca do Nexus (sem menu e sem topo), com a moldura na tela inteira e o mesmo porta.js: o passe, a renovação de
 11 h e o "nexus:sessao-vencida" continuam valendo para a sessão da PLATAFORMA. A TV fica de pé enquanto valer a sessão do
 NEXUS de quem a abriu, sem conta fixa: pelo Fracttal, ~12 h a partir do LOGIN (o `fracttal_exp`), e nada que a TV faz a
@@ -35,8 +36,9 @@ TELAS_SEM_TV = [t for t in porta.MAPA if (t.torre, t.tela) != ("performance", "n
 
 
 def _botao_tv(h: str) -> str | None:
-    """O href do botão "Modo TV" da faixa da moldura, ou None."""
-    m = re.search(r'<a class="gc-btn gc-btn--contorno" id="porta-tv" href="([^"]*)">Modo TV</a>', h)
+    """O href do botão "Modo TV" do topo do Nexus, ou None."""
+    m = re.search(r'<a class="gc-btn gc-btn--ui gc-btn--fantasma topo-tv" id="porta-tv" href="([^"]*)">'
+                  r'<i class="ph ph-television-simple"></i><span>Modo TV</span></a>', h)
     return _html.unescape(m.group(1)) if m else None
 
 
@@ -51,13 +53,12 @@ def test_o_botao_modo_tv_so_no_painel_noc(prefixo):
     cli = _cliente(prefixo)
     h = cli.get(prefixo + NOC).get_data(as_text=True)
     assert _botao_tv(h) == f"{prefixo}{NOC}?tv=1"
-    # o último item da faixa, sem o "Abrir em outra aba" (saiu em 11/10/2026: "é só Nexus e já era!"), e no canto
-    # direito dela como o do Mapa: quem o empurrava para lá era o margin-left:auto do .porta-fora, que saiu junto; sem a
-    # regra própria do botão (nexus.css), ele colava em "Painel NOC · Plataforma de Performance"
-    faixa = h.split('<div class="porta-faixa">', 1)[1].split("</div>", 1)[0]
-    assert "Abrir em outra aba" not in faixa and "porta-fora" not in faixa
-    assert faixa.rstrip().endswith('id="porta-tv" href="' + f"{prefixo}{NOC}?tv=1" + '">Modo TV</a>')
-    assert ".porta-faixa #porta-tv{margin-left:auto}" in CSS
+    # no topo do Nexus, antes do Tema (13/10/2026, Levi: "suma esse 2° cabeçalho"): no Painel NOC a faixa da moldura
+    # só tinha o botão, uma linha sozinha em cima da barra do NOC; ela não nasce mais, e o "Abrir em outra aba" segue fora
+    topo = h.split('<header class="topo">', 1)[1].split("</header>", 1)[0]
+    assert 'id="porta-tv"' in topo and topo.index('id="porta-tv"') < topo.index('class="troca-tema-form"')
+    assert 'class="porta-faixa"' not in h and "Abrir em outra aba" not in h and "porta-fora" not in h
+    assert "@media (max-width:820px){.usuario-txt,.topo-tv{display:none}}" in CSS        # no celular, sem TV
     # o porta.js sabe que tela tem TV (o botão some quando a moldura sai do Painel NOC e volta quando ela volta)
     assert [x["url"] for x in _dados(h)["telas"] if x.get("tv")] == [f"{prefixo}{NOC}"]
     assert _dados(h).get("tv") is False

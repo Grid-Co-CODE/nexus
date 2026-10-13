@@ -43,7 +43,9 @@ navegador fala com cada sistema.
   `/painel/nexus/entrar`, nunca na URL (leva o e-mail). Quem entrou pela senha de administrador não é uma pessoa: vai com
   `admin@nexus.invalid` (domínio que não existe); com `PLATAFORMA_ANALISTAS=*` ele entra como analista.
 - **A tela** (`nexus/torres/moldura.py`, `registrar_molduras`): uma view por item do mapa, nas torres Performance, COS e
-  Base; o template `performance/moldura.html` (faixa fina e a moldura ocupando a tela, o padrão `.conteudo--moldura`) e o
+  Base; o template `performance/moldura.html` (a moldura ocupando a tela, o padrão `.conteudo--moldura`; sem a faixa "<tela> ·
+  Plataforma de Performance" desde 13/10/2026, Levi: "suma esse 2° cabeçalho": a faixa só nasce com controle, hoje o
+  seletor de usina do Diagnóstico) e o
   `nexus/static/porta.js`. A página traz o formulário escondido (alvo = a moldura; o `porta.js` o envia ao carregar; sem
   JavaScript, o botão "Abrir") e sai com `Cache-Control: no-store` (o passe vale 60 s e uma vez: voltar pelo navegador
   gera outro). A plataforma confere, abre a sessão DELA (12 h) e responde 303 para a tela, no modo Nexus.
@@ -91,10 +93,9 @@ navegador fala com cada sistema.
 - **Modo TV do Painel NOC** (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e
   NOC mesmo! não precisa de conta fixa"). Só o Painel NOC e o Mapa de risco (o dele está na seção do Mapa) têm TV:
   `registrar_molduras(bp, TORRE, ..., tv={"noc"})` marca a tela (`moldura.COM_TV`); tela nova com TV entra nesse
-  conjunto, sem mexer no mapa nem no texto canônico. Na faixa da moldura, por último e no canto direito dela (onde o
-  Mapa tem o dele; `.porta-faixa #porta-tv{margin-left:auto}` no `nexus.css`: quem o empurrava para lá era o "Abrir em
-  outra aba", que saiu no mesmo dia, e sem ele o botão colava no nome da tela), o botão "Modo TV" (a classe e o texto do
-  botão do Mapa) leva a `/t/performance/noc?tv=1`, com o `?p=` do caminho aberto. O
+  conjunto, sem mexer no mapa nem no texto canônico. No topo do Nexus, ao lado do Tema (o bloco `topo_acoes` do
+  `base.html`, desde 13/10/2026: na faixa da moldura ele era uma linha sozinha em cima da barra do NOC, o 2º cabeçalho que
+  saiu; no celular ele some), o botão "Modo TV" leva a `/t/performance/noc?tv=1`, com o `?p=` do caminho aberto. O
   `?tv=1` responde `performance/moldura_tv.html`: sem a casca (sem menu e sem topo, o guarda anti-moldura e o tema como
   na casca), a moldura em 100vw x 100vh sem rolagem e o MESMO `porta.js`, com o mesmo passe, a mesma renovação de 11 h e
   o mesmo `nexus:sessao-vencida`, que cuidam da sessão da PLATAFORMA; a TV fica de pé enquanto valer a sessão do NEXUS

@@ -7,6 +7,15 @@ from .config import OPCIONAIS, carregar_config
 from .prefixo import Prefixo, SessaoNoPrefixo, na_raiz, normalizar
 
 
+def iniciais(nome) -> str:
+    """'Levi Maia' -> 'LM' (primeiro + último nome): o avatar do topo, o mesmo do cabeçalho do OS Creator, que saiu de
+    dentro do Nexus em 13/10/2026; sem nome, '?'."""
+    partes = [p for p in str(nome or "").split() if p]
+    if not partes:
+        return "?"
+    return (partes[0][0] + (partes[-1][0] if len(partes) > 1 else "")).upper()
+
+
 def create_app(config: dict | None = None) -> Flask:
     cfg = carregar_config(config)
     prefixo = normalizar(cfg.get("NEXUS_PREFIXO"))
@@ -43,6 +52,7 @@ def create_app(config: dict | None = None) -> Flask:
         app.wsgi_app = Prefixo(app.wsgi_app, prefixo)
     # o endereço do Nexus nos templates: {{ raiz }}/t/... e o filtro |na_raiz para o que vem montado do Python
     app.jinja_env.filters["na_raiz"] = na_raiz
+    app.jinja_env.filters["iniciais"] = iniciais
 
     from .auth import bp as auth_bp, instalar_portao
     from .casca import bp as casca_bp, instalar_contexto

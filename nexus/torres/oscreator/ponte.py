@@ -69,10 +69,19 @@ _MARCA_PARA = '<div class="os-n2 os-n2--nexus">Sistema de Ordens de Serviço</di
 # ele quer manter): o menu lateral acende a de cada item, já carregada. No 5090 do supervisório nada muda.
 # O botão de recolher o topo morava na faixa: quem tinha recolhido (o osTopoRecolhido do navegador) ficaria sem o topo e
 # sem como abri-lo; no Nexus o topo fica sempre à mostra (menos dentro de uma aba, onde a casca já o esconde).
+# Sem o 2º cabeçalho DENTRO do Nexus (13/10/2026, Levi: "suma esse 2° cabeçalho tanto de OS Creator Web quanto de
+# plataforma de performance! Dá a impressão que é uma tela dentro de uma tela!"): a tela logo abaixo do Nexus (a casca, o
+# login, o card da OS) marca o <html> com os-no-nexus antes de pintar, e o topo dela some; quem entrou (o avatar, o nome e
+# o perfil) e o Sair moram no topo do Nexus (base.html). Aberta sozinha no navegador, sem o Nexus em cima, a tela segue
+# com o topo: é o único lugar com o nome e o sair. As telas dentro de uma aba já não tinham topo (os-embutido).
+_MARCA_NO_NEXUS = (b'<script>try { if (window.parent !== window && '
+                   b'window.parent.document.documentElement.hasAttribute("data-nexus")) '
+                   b'document.documentElement.classList.add("os-no-nexus"); } catch (e) {}</script>')
 _ESTILO_NEXUS = (b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:center}'
                  b'.os-tabs{display:none!important}'
-                 b'html:not(.os-embutido) body.os-sem-topo .os-header{display:flex!important}'
-                 b'html:not(.os-embutido) body.os-sem-topo .os-sep{display:block!important}</style>')
+                 b'html:not(.os-embutido):not(.os-no-nexus) body.os-sem-topo .os-header{display:flex!important}'
+                 b'html:not(.os-embutido):not(.os-no-nexus) body.os-sem-topo .os-sep{display:block!important}'
+                 b'html.os-no-nexus .os-header,html.os-no-nexus .os-sep{display:none!important}</style>')
 
 # Sobe de moldura em moldura até a de baixo do Nexus (o <html data-nexus>). Sem Nexus em cima, chega ao topo e é o
 # window.top de sempre. Moldura de outro domínio (o supervisório embutido na Engenharia) para a subida no try.
@@ -361,7 +370,7 @@ def encaminhar(resto: str):
         corpo = _SEM_TICKETS.sub(b"", _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA))
         if b"<head>" in corpo:
             # a função entra antes de qualquer script da página, que já a usa no <head>
-            corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _ESTILO_NEXUS, 1)
+            corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _MARCA_NO_NEXUS + _ESTILO_NEXUS, 1)
             for de, para in _TROCAS_HTML:
                 corpo = corpo.replace(de, para)
             corpo = _com_o_tema(app, corpo)

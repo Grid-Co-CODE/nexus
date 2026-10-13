@@ -146,7 +146,8 @@
 
   var moldura = document.getElementById("porta-moldura");
   var formulario = document.getElementById("porta-passe");
-  // Modo TV (11/10/2026): na página normal, o botão "Modo TV" da faixa (só nas telas com TV); na TV, o "Sair do modo TV"
+  // Modo TV (11/10/2026): na página normal, o botão "Modo TV" do topo do Nexus (só nas telas com TV; até 13/10/2026 ele
+  // morava na faixa); na TV, o "Sair do modo TV"
   var naTv = dados.tv === true;
   var botaoTv = document.getElementById("porta-tv"), sairTv = document.getElementById("porta-sair-tv");
   if (moldura && formulario && mesmaOrigem) formulario.submit();
@@ -160,9 +161,6 @@
       if (torre) torre.open = true;
     });
     document.title = tela.nome + (naTv ? " · modo TV" : "") + " · Grid Co.";
-    // a faixa diz o item em que a pessoa está agora (a moldura pode ter ido do Tempo real ao Acompanhamento COS)
-    var nome = document.querySelector(".porta-origem strong");
-    if (nome) nome.textContent = tela.nome;
   }
 
   // o caminho em que a moldura está agora (o da abertura, depois o de cada nexus:rota): é o que se reabre e se renova
