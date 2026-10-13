@@ -40,7 +40,7 @@ def test_a_proposta_liga_pela_usina_fractall_e_nao_chuta():
            "AP. do Taboado": _g("AP. do Taboado", ["Thopen - Brodowski 1 - SP"]),
            "Brodowski Outra": _g("Brodowski Outra", ["Thopen - Brodowski 1 - SP"]),
            "Já": _g("Já", ["Thopen - Brodowski 1 - SP"])}
-    est = {"supervisorios": [{"usina_supervisorio": "Já", "usina_id": 1, "excluido": False}]}
+    est = {"supervisorios": [{"usina_supervisorio": "Já", "usina_id": 8, "excluido": False}]}   # ligada à mão, noutra
     p = E.proposta_pela_aba(aba, ATUAL, est, {1, 3, 4, 5, 7})
     assert p["ligar"] == {1: ["Brodowski", "Brodowski 1 (90)"], 3: ["Timon"]} and p["ja_ligadas"] == 1
     fora = {f["chave"]: f["motivo"] for f in p["fora"]}
@@ -53,6 +53,10 @@ def test_a_proposta_liga_pela_usina_fractall_e_nao_chuta():
     # a aba dá à AP. do Taboado o nome do Fracttal de outra usina: as Ligações a ignoram, e ela fica de fora
     assert fora["AP. do Taboado"].startswith("a chave está ignorada nas Ligações")
     assert fora["Brodowski Outra"] == "as Ligações ligam esta chave a outra usina (id 7)"
+    # a usina que já tem estrutura gravada não entra no botão: a chave nova dela vai para a lista, com o que fazer
+    est["inversores"] = [{"usina_id": 3, "excluido": False}]
+    p = E.proposta_pela_aba(aba, ATUAL, est, {1, 3, 4, 5, 7})
+    assert 3 not in p["ligar"] and "já tem estrutura gravada" in {f["chave"]: f["motivo"] for f in p["fora"]}["Timon"]
 
 
 def test_a_estrutura_vem_da_aba_como_o_trazer_da_tela():
@@ -93,7 +97,8 @@ def test_o_botao_liga_e_grava_a_estrutura_e_a_segunda_vez_nao_muda_nada(cli, ban
 def test_usina_com_estrutura_feita_a_mao_fica_como_esta(cli, banco):  # noqa: F811
     r = cli.post("/t/base/equipamentos/chave", data={"usina": 1, "acao": "ligar", "chave": "Outra Chave"})
     assert r.status_code == 303
+    html = cli.get("/t/base/equipamentos").get_data(as_text=True)
+    assert "Nada novo para ligar pela aba" in html and "já tem estrutura gravada" in html
     r = cli.post("/t/base/equipamentos/ligar-aba", data={})
-    aviso = cli.get(r.headers["Location"]).get_data(as_text=True)
-    assert "1 usina(s) já tinham estrutura gravada à mão" in aviso
+    assert "Nada novo para ligar pela aba" in cli.get(r.headers["Location"]).get_data(as_text=True)
     assert {s["usina_supervisorio"] for s in _estado(banco)["sup"]} == {"Outra Chave"}

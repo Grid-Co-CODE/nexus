@@ -793,6 +793,10 @@ def proposta_pela_aba(aba_chaves: dict, atual: dict | None, est: dict, usinas) -
         elif sistema in SISTEMAS_ABA:
             decisao.setdefault(norm(chave), []).append((uid, como))
     dono = {s["usina_supervisorio"] for s in est["supervisorios"] if not s["excluido"]}
+    # a usina que já tem estrutura gravada não recebe nada daqui (o ligar_pela_aba a pularia): a chave nova dela vai
+    # para a lista, para não oferecer no botão o que ele não faz (no servidor, 13/10: "Ligar 1 chave" que não ligava)
+    com_estrutura = {x["usina_id"] for k in ("supervisorios", "cabines", "inversores") for x in est.get(k) or []
+                     if not x.get("excluido")}
     usinas = set(usinas)
     ligar, fora, ja = {}, [], 0
     for chave in sorted(aba_chaves, key=natural):
@@ -835,6 +839,9 @@ def proposta_pela_aba(aba_chaves: dict, atual: dict | None, est: dict, usinas) -
                     motivo = f"a chave está ignorada nas Ligações ({ign})"
                 elif outra:
                     motivo = f"as Ligações ligam esta chave a outra usina (id {outra[0]})"
+                elif uid in com_estrutura:
+                    motivo = (f"a usina (id {uid}) já tem estrutura gravada: ligue esta chave nela e use o "
+                              "“Trazer da aba”")
         if motivo:
             fora.append({"chave": chave, "motivo": motivo})
         else:

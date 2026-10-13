@@ -202,11 +202,17 @@ de entender para você, quando eu for fazer não vou entender nada".
   é outra usina, fora da operação. A estrutura vem da aba como o "Trazer da aba" (`estrutura_da_aba`): a chave da usina
   é a única com a linha UFV, a cabine é da usina pelo nome (UG e Equipamento Parente), o nome de inversor repetido entre
   chaves ganha a chave no nome, e o mesmo nome no supervisório duas vezes na mesma chave fica só no 1º (aviso). **Só
-  usina SEM estrutura gravada**: a que já tem algo feito à mão fica como está (o "Trazer da aba" dela completa). Nasce
+  usina SEM estrutura gravada**: a que já tem algo (à mão ou de uma rodada anterior) fica como está, e a chave nova dela
+  vai para a lista "não ligam sozinhas" com o que fazer (ligar a chave e usar o "Trazer da aba"); o botão conta só o que
+  ele de fato grava (no servidor, logo depois da 1ª rodada, ele oferecia "Ligar 1 chave" e não ligava nada). Nasce
   FORA do lugar da aba (a visão segue vazia; os leitores não mudam até alguém marcar). Uma gravação só, com o livro
   relido dentro da trava. Medido no dado real em 13/10, com o de-para do PC de 12/10: 262 das 301 chaves em 123 usinas,
   251 cabines, 1.932 inversores, 29.148 strings; 38 de fora (19 sem Usina Fractall, 13 com o nome fora das Ligações, 5
-  ignoradas, 1 com dois nomes). Prova: `tests/test_equipamentos_ligar_pela_aba.py`.
+  ignoradas, 1 com dois nomes). **Gravado em 13/10/2026 pela 5070** (o livro tinha só a CPP100 que o Levi ligou à mão):
+  +262 chaves, +251 cabines, +1.932 inversores, +29.148 strings, visão e "no lugar da aba" seguem em 0. Conferido pela
+  tela: 160 das 263 chaves iguais à aba; as outras com as diferenças do modelo (a cabine é da usina e sai na chave da
+  usina, a potência da UFV é a do Registro mestre, o nome do Fracttal vem das Ligações, nome de inversor repetido entre
+  chaves). Prova: `tests/test_equipamentos_ligar_pela_aba.py`.
 - **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; filtros sem
   chave, sem inversores, potência que não fecha); à direita, a usina aberta em 2 passos.
 - **1. Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que
