@@ -1,0 +1,492 @@
+"""A Área PCM do OS Creator Web como a do app de mesa (Levi, 13/10/2026: "Fila do PCM não está levando para a fila do PCM,
+referência é a fila do app desktop, nem painel do PCM nem histórico nem temas. Também está demorando demais para
+carregar!").
+
+O que estes testes seguram:
+- as quatro páginas da `SolicPcmTab` (Painel, Fila do PCM, Histórico, Temas), a barra delas e as portas do setor PCM;
+- a régua do app: o Painel com as três colunas (até 40 cartões cada), a Fila só com as pendentes (a de outra coluna entra
+  só para ler), o título no padrão do tema, as subtarefas do bloco [PCM] com o anexo, o técnico e a data sugeridos;
+- as gravações: aprovar (com o anexo obrigatório, que a web perdia), mudar status / devolver (motivo obrigatório), a
+  observação com o bloco de volta (linha em branco, como o app), cancelar, e os temas (salvar, arquivar);
+- a VELOCIDADE: a lista é pedida UMA vez para Painel, Fila e Histórico; os catálogos, uma vez; quem grava esquece a
+  lista; a carga fria é paralela; e o catálogo de ativos vencido não segura a página (é renovado por trás).
+O api e o banco são dublês: nada vai à rede, nada é criado no Fracttal. Nomes e usinas são de mentira (repositório público)."""
+import json
+import re
+import threading
+import time
+from pathlib import Path
+
+import pytest
+
+from nexus.torres.oscreator import ponte
+
+pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
+import sys  # noqa: E402
+if ponte.RAIZ_CLONE not in sys.path:
+    sys.path.append(ponte.RAIZ_CLONE)
+
+import api  # noqa: E402 — o api.py do clone
+import solic_spec as sp  # noqa: E402
+import temas_store as ts  # noqa: E402
+from os_web import criar_app, lancador, rotas  # noqa: E402
+from os_web import rotas_solic as rs  # noqa: E402
+from os_web import solic_web as sw  # noqa: E402
+
+WEB = Path(ponte.RAIZ_CLONE, "os_web")
+JWT = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.sig"   # de mentira
+USINA = "Cliente X - Usina Teste 1 - UF"
+ATIVOS = [{"id": 11, "code": "TST-INV11", "description": "Inversor 1.1 Marca Teste", "tipo": "Inversor", "usina": USINA,
+           "cliente": "Cliente X"},
+          {"id": 12, "code": "TST-TRK1", "description": "Estrutura Trackers 1", "tipo": "Estrutura Trackers",
+           "usina": USINA, "cliente": "Cliente X"}]
+OBS = sp.observacao_com_bloco("Inversor desligando à tarde.", {
+    "tema": "inversor_inspecao", "tecnico": "Ana Teste Silva", "data": "15/10/2026",
+    "subtarefas": [{"tipo": "texto", "desc": "Medir isolação", "anexo": True}, {"tipo": "simnao", "desc": "Religou?"}]})
+
+
+def _linha(n, status="Aberta", os_=None, obs="", ativo="Inversor 1.1 Marca Teste", item=11, code="TST-INV11",
+           data="2026-10-13T11:00:00", quem="Pessoa Um"):
+    return {"id_code": n, "cliente": "Cliente X", "usina": "Usina Teste 1", "ativo": ativo, "id_item": item, "code": code,
+            "cor_status": "#F0B341", "tipo": "Inversor", "descricao": "Pedido %d" % n, "descricao_full": "Pedido %d inteiro" % n,
+            "observacao": obs, "criado_por": quem, "data": data, "status_id": 1, "status": status,
+            "os_folio": os_, "id_work_order": (9000 + n) if os_ else None}
+
+
+LINHAS = [_linha(5001, obs=OBS), _linha(5002, "OS em processo", os_=777, ativo="Estrutura Trackers 1", item=12,
+                                        code="TST-TRK1", quem="Pessoa Dois", data="2026-10-01T12:00:00"),
+          _linha(5003, "Reaberta (refazer)"), _linha(5004, "Cancelada"), _linha(5005, "Aberta", item=None, code="SEM-CAT")]
+
+
+def _cru(x):
+    return {"id_code": x["id_code"], "items_description": x["ativo"] + " { %s }" % x["code"], "code_item": x["code"],
+            "id_item": x["id_item"], "requests_x_status_description": x["status"], "description": x["descricao_full"],
+            "observation": x["observacao"], "requested_by": x["criado_por"], "date": x["data"], "id_status": 1,
+            "wo_folio": x["os_folio"], "id_work_order": x["id_work_order"]}
+
+
+@pytest.fixture
+def cli(monkeypatch, tmp_path):
+    """O clone com o Fracttal e o banco FALSOS, a memória zerada e a rede proibida: um pedido que escapasse dos dublês
+    derrubaria o teste em vez de ir ao Fracttal."""
+    import requests
+
+    def sem_rede(*a, **k):
+        raise AssertionError("o teste tentou ir à rede")
+    monkeypatch.setattr(requests.Session, "request", sem_rede)
+    rotas._MEMO.clear()
+    monkeypatch.setattr(rs, "_DISCO", {"mtime": None, "idx": None, "vence": 0.0})
+    monkeypatch.setattr(rs, "_TENTOU", {"quando": 0.0})
+    monkeypatch.setattr(api, "_code_loc", {})
+    cat = tmp_path / "assets_cache.json"
+    cat.write_text(json.dumps({"ts": time.time(), "ver": api._CACHE_VER, "assets": ATIVOS}), encoding="utf-8")
+    monkeypatch.setattr(api, "ASSETS_CACHE", str(cat))
+    chamadas, gravado = [], []
+
+    def conta(nome, valor):
+        def f(*a, **k):
+            chamadas.append(nome)
+            return valor() if callable(valor) else valor
+        return f
+    monkeypatch.setattr(api, "list_minhas_solicitacoes", conta("lista", lambda: [dict(x) for x in LINHAS]))
+    monkeypatch.setattr(api, "get_responsaveis", conta("pessoas", [{"name": "Bruno Souza", "id_personnel": 2},
+                                                                    {"name": "Ana Teste Silva", "id_personnel": 1},
+                                                                    {"name": "Sem Id", "id_personnel": None}]))
+    monkeypatch.setattr(api, "get_labels", conta("etiquetas", [{"id": 7, "description": "PERFORMANCE"},
+                                                               {"id": 8, "description": "GARANTIA"}]))
+    monkeypatch.setattr(api, "get_tipos_classif", conta("tipos", {"tipos": [{"description": "Corretiva"}],
+                                                                 "c1": [{"description": "Programada"}],
+                                                                 "c2": [{"description": "Elétrica"}]}))
+    monkeypatch.setattr(api, "status_solicitacao_catalogo", conta("status", list(api.STATUS_SOLICITACAO)))
+    monkeypatch.setattr(api, "get_conta_info", lambda: {"nome": "Pessoa Teste", "perfil": ""})
+    monkeypatch.setattr(api, "_solicitacao_row", lambda idc: next((_cru(x) for x in LINHAS if str(x["id_code"]) == str(idc)), None))
+    monkeypatch.setattr(api, "_code_to_loc", lambda: {a["code"]: ("Cliente X", "Usina Teste 1", a["tipo"]) for a in ATIVOS})
+    monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [dict(x) for x in ATIVOS])
+
+    def aprovar(asset, titulo, subs, idc, idr, nome, **k):
+        gravado.append(("aprovar", asset["code"], titulo, subs, idc, idr, nome, k))
+        return {"ok": True, "os": {"wo_folio": 4321, "id_work_order": 99}}
+    monkeypatch.setattr(api, "aprovar_solicitacao", aprovar)
+    monkeypatch.setattr(api, "mudar_status_solicitacao", lambda *a: gravado.append(("status",) + a) or {"ok": True})
+    monkeypatch.setattr(api, "editar_observacao_solicitacao", lambda *a: gravado.append(("obs",) + a) or {"ok": True})
+    monkeypatch.setattr(api, "cancelar_solicitacao", lambda *a: gravado.append(("cancelar",) + a) or {"ok": True})
+    monkeypatch.setattr(api, "get_solic_anexos", lambda idr: [{"nome": "foto.jpg", "url": "https://exemplo.invalid/f.jpg",
+                                                               "is_image": True}, {"nome": "laudo.pdf", "url": "", "is_image": False}])
+    monkeypatch.setattr(ts, "garantir", lambda: None)
+    c = criar_app(segredo="teste", testing=True).test_client()
+    with c.session_transaction() as s:
+        s["jwt"] = JWT
+        s["conta"] = {"nome": "Pessoa Teste", "email": "teste@exemplo.invalid", "perfil": ""}
+    c.chamadas, c.gravado = chamadas, gravado
+    return c
+
+
+def _dados(html, id_):
+    return json.loads(html.split('id="%s">' % id_, 1)[1].split("</script>", 1)[0])
+
+
+# ── a navegação: a barra da SolicPcmTab e as portas do setor ─────────────────────────────────────────────────────────
+def test_as_portas_do_setor_pcm_sao_as_da_area_pcm_do_app():
+    portas = lancador.PORTAS_SETOR["pcm"]["portas"]
+    assert [p["titulo"] for p in portas] == ["Painel", "Fila do PCM", "Histórico de solicitações", "Temas",
+                                            "Clonagem de planos"]
+    assert [p.get("href") for p in portas[:4]] == ["/os/solicitacao/painel", "/os/solicitacao/fila",
+                                                   "/os/solicitacao/historico", "/os/solicitacao/temas"]
+    assert [p["rodape"] for p in portas[:4]] == ["Acompanhar", "Aprovar", "Consultar", "Padronizar"]   # os selos do app
+    for p in portas:
+        assert p["icone"] in lancador.ICONES, p["icone"]
+    secoes = dict(lancador.ABAS_SECOES)
+    assert all(secoes[u] == "pcm" for u in ("/os/solicitacao/painel", "/os/solicitacao/fila", "/os/solicitacao/historico",
+                                           "/os/solicitacao/temas"))
+    card = next(s for s in lancador.SETORES if s["chave"] == "pcm")
+    assert [p["rotulo"] for p in card["portas"]][1:] == ["Painel", "Fila do PCM", "Histórico de solicitações", "Temas"]
+
+
+def test_a_barra_de_cima_e_a_do_app_e_marca_a_pagina(cli):
+    for url, marcada in (("/os/solicitacao/painel", "Painel"), ("/os/solicitacao/fila", "Fila do PCM"),
+                         ("/os/solicitacao/historico", "Histórico"), ("/os/solicitacao/temas", "Temas")):
+        h = cli.get(url).get_data(as_text=True)
+        nav = h.split('<nav class="spc-nav"', 1)[1].split("</nav>", 1)[0]
+        assert re.findall(r">([^<>]+)</a>", nav) == ["&lsaquo; PCM", "Nova solicitação", "Painel", "Fila do PCM",
+                                                     "Histórico", "Temas"], url
+        assert re.search(r'class="on" aria-current="page">%s</a>' % marcada, nav), url
+        assert 'href="/os/setor/pcm"' in nav
+
+
+def test_o_setor_pcm_aquece_a_lista_e_os_outros_nao(cli):
+    assert '"/os/api/solic/aquecer"' in cli.get("/os/setor/pcm").get_data(as_text=True)
+    assert cli.post("/os/api/solic/aquecer").status_code == 204
+    assert sorted(cli.chamadas) == ["etiquetas", "lista", "pessoas", "status", "tipos"]
+    # a porta escolhida abre com tudo na memória: nenhum pedido a mais
+    for url in ("/os/solicitacao/painel", "/os/solicitacao/fila", "/os/solicitacao/historico"):
+        assert cli.get(url).status_code == 200
+    assert len(cli.chamadas) == 5
+
+
+# ── a memória: uma lista para as três páginas, quem grava a esquece ──────────────────────────────────────────────────
+def test_a_lista_e_pedida_uma_vez_para_painel_fila_e_historico(cli):
+    for url in ("/os/solicitacao/painel", "/os/solicitacao/fila", "/os/solicitacao/historico",
+                "/os/solicitacao/fila?sel=5002"):
+        assert cli.get(url).status_code == 200, url
+    assert cli.chamadas.count("lista") == 1
+    assert sorted(set(cli.chamadas)) == ["etiquetas", "lista", "pessoas", "status", "tipos"]
+    assert all(cli.chamadas.count(n) == 1 for n in ("pessoas", "etiquetas", "status", "tipos"))
+    cli.get("/os/solicitacao/painel?atualizar=1")                     # o "Atualizar" vai ao Fracttal de novo
+    assert cli.chamadas.count("lista") == 2
+
+
+@pytest.mark.parametrize("pedido", [
+    ("/os/api/solic/5001/aprovar", {"id_responsible": 1, "responsavel": "Ana Teste Silva", "titulo": "T", "subtarefas": []}),
+    ("/os/api/solic/5001/status", {"codigo": "REJECTED", "motivo": "duplicada"}),
+    ("/os/api/solic/5001/observacao", {"relato": "novo"}),
+    ("/os/api/solic/5001/cancelar", {"nota": ""}),
+])
+def test_quem_grava_esquece_a_lista(cli, pedido):
+    cli.get("/os/solicitacao/fila")
+    url, corpo = pedido
+    assert cli.post(url, json=corpo).status_code == 200, url
+    cli.get("/os/solicitacao/painel")
+    assert cli.chamadas.count("lista") == 2, url
+
+
+def test_a_carga_fria_e_paralela(cli, monkeypatch):
+    """Cinco leituras de 0,3 s cada: em fila custariam 1,5 s; juntas, a mais lenta."""
+    def lento(nome, valor):
+        def f(*a, **k):
+            time.sleep(0.3)
+            return valor
+        return f
+    monkeypatch.setattr(api, "list_minhas_solicitacoes", lento("lista", [dict(x) for x in LINHAS]))
+    monkeypatch.setattr(api, "get_responsaveis", lento("pessoas", []))
+    monkeypatch.setattr(api, "get_labels", lento("etiquetas", []))
+    monkeypatch.setattr(api, "get_tipos_classif", lento("tipos", {}))
+    monkeypatch.setattr(api, "status_solicitacao_catalogo", lento("status", list(api.STATUS_SOLICITACAO)))
+    t0 = time.perf_counter()
+    assert cli.get("/os/solicitacao/fila").status_code == 200
+    fria = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    assert cli.get("/os/solicitacao/fila").status_code == 200
+    quente = time.perf_counter() - t0
+    assert fria < 1.0 and quente < 0.3, (fria, quente)
+
+
+def test_catalogo_vencido_nao_segura_a_pagina_e_renova_por_tras(cli, monkeypatch, tmp_path):
+    """O catálogo de ativos de ontem dá nome às solicitações NA HORA; o download dos ~22 mil ativos vai para uma thread."""
+    vencido = tmp_path / "vencido.json"
+    vencido.write_text(json.dumps({"ts": time.time() - 2 * api.ASSETS_TTL, "ver": api._CACHE_VER, "assets": ATIVOS}),
+                       encoding="utf-8")
+    monkeypatch.setattr(api, "ASSETS_CACHE", str(vencido))
+    baixou = threading.Event()
+
+    def baixar(force=False):          # o download de verdade leva minutos; aqui 1,5 s já denuncia quem esperar por ele
+        assert force is True
+        time.sleep(1.5)
+        baixou.set()
+        return ATIVOS
+    monkeypatch.setattr(api, "load_assets_cached", baixar)
+    t0 = time.perf_counter()
+    h = cli.get("/os/solicitacao/fila").get_data(as_text=True)
+    assert time.perf_counter() - t0 < 1.0
+    assert api._code_loc["TST-INV11"] == ("Cliente X", api._usina_curta(USINA), "Inversor")
+    assert _dados(h, "fl_dados")["fichas"][0]["tipo_ativo"] == "Inversor"
+    assert baixou.wait(5), "o catálogo vencido não foi renovado por trás"
+    rs._RENOVANDO.acquire(timeout=5)
+    rs._RENOVANDO.release()
+
+
+# ── Painel ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+def test_painel_tres_colunas_como_no_app(cli):
+    h = cli.get("/os/solicitacao/painel").get_data(as_text=True)
+    cols = {c: h.split('data-col="%s"' % c, 1)[1].split("</section>", 1)[0] for c in ("pendente", "andamento", "finalizada")}
+    assert [len(re.findall(r'class="spc-card(?: spc-escondido)?"', cols[c])) for c in ("pendente", "andamento", "finalizada")]         == [2, 1, 1]
+    # a devolvida fica fora do quadro e só conta em cima
+    assert "· 1 devolvidas para refazer, fora do quadro" in h and "Nº 5003" not in h
+    # o cartão abre a Fila nele: Analisar nas pendentes, Ver detalhes nas outras
+    assert 'href="/os/solicitacao/fila?sel=5001"' in cols["pendente"] and "Analisar" in cols["pendente"]
+    assert "Ver detalhes" in cols["andamento"] and "OS 777" in cols["andamento"]
+    assert "Inversor — inspeção e medição" in cols["pendente"]               # a linha do tema
+    assert 'class="spc-pill" style="color:#F0B341"' in cols["pendente"]      # a cor do status é a do Fracttal
+
+
+def test_painel_mostra_no_maximo_40_por_coluna(cli, monkeypatch):
+    muitas = [_linha(6000 + i) for i in range(45)]
+    monkeypatch.setattr(api, "list_minhas_solicitacoes", lambda *a, **k: [dict(x) for x in muitas])
+    h = cli.get("/os/solicitacao/painel").get_data(as_text=True)
+    col = h.split('data-col="pendente"', 1)[1].split("</section>", 1)[0]
+    assert col.count('class="spc-card"') == 40 and col.count('class="spc-card spc-escondido"') == 5
+    assert '<span class="spc-col-n" data-n>45</span>' in col
+
+
+# ── Fila do PCM ─────────────────────────────────────────────────────────────────────────────────────────────────────
+def test_fila_so_com_as_pendentes_e_a_ficha_lida(cli):
+    d = _dados(cli.get("/os/solicitacao/fila").get_data(as_text=True), "fl_dados")
+    assert [f["id"] for f in d["fichas"]] == [5001, 5005] and d["leitura"] == ""
+    f = d["fichas"][0]
+    assert f["titulo"] == sp.titulo("Usina Teste 1", "Inversor 1.1 Marca Teste", "inversor_inspecao")
+    assert f["titulo_orig"] == "Pedido 5001 inteiro" and f["tema"] == "inversor_inspecao"
+    assert f["relato"] == "Inversor desligando à tarde." and f["bloco"].startswith(sp.MARCADOR)
+    assert (f["tecnico"], f["data_sug"], f["data_sug_iso"]) == ("Ana Teste Silva", "15/10/2026", "2026-10-15T08:00")
+    assert f["subs"] == [{"tipo": "texto", "desc": "Medir isolação", "anexo": True},
+                         {"tipo": "simnao", "desc": "Religou?", "anexo": False}] and f["subs_do_bloco"]
+    assert f["ativo_ok"] and f["tipo_ativo"] == "Inversor"
+    # sem o ativo no catálogo: a ficha avisa, e a aprovação não acontece
+    assert d["fichas"][1]["ativo_ok"] is False
+    # o responsável é o id_personnel; quem não tem id não entra
+    assert d["pessoas"] == [{"id": 1, "nome": "Ana Teste Silva"}, {"id": 2, "nome": "Bruno Souza"}]   # pelo nome
+    assert [s["cod"] for s in d["status"]] == [c for _i, c, _r in api.STATUS_SOLICITACAO
+                                               if c not in ("OPEN_STATUS", "REQUEST_TODO")]
+    tema = next(t for t in d["temas"] if t["chave"] == "inversor_inspecao")
+    assert tema["disciplina"] == sp.classificacao("inversor_inspecao")["tipo"] and tema["motivo"]
+    assert next(t for t in d["temas"] if t["chave"].startswith("tracker"))["perf_tema"] is True
+    assert (d["tipo_padrao"], d["classif1_padrao"], d["nenhuma"]) == ("Corretiva", "Programada", "— nenhuma —")
+
+
+def test_fila_aberta_numa_de_outra_coluna_e_so_para_ler(cli):
+    d = _dados(cli.get("/os/solicitacao/fila?sel=5002").get_data(as_text=True), "fl_dados")
+    assert [f["id"] for f in d["fichas"]] == [5001, 5005, 5002] and d["leitura"] == "5002" and d["sel"] == "5002"
+    assert d["fichas"][2]["os_folio"] == 777
+    assert d["n_hoje"] == sum(sw.de_hoje(x["data"]) for x in LINHAS if x["id_code"] in (5001, 5005))
+    # nº que não existe: abre na primeira, sem inventar
+    d = _dados(cli.get("/os/solicitacao/fila?sel=999").get_data(as_text=True), "fl_dados")
+    assert d["sel"] == "" and d["leitura"] == ""
+
+
+def test_aprovar_leva_o_que_esta_na_ficha_com_o_anexo(cli):
+    corpo = {"id_responsible": 1, "responsavel": "Ana Teste Silva", "titulo": "[Usina Teste 1][Inversor 1.1] - Medir",
+             "subtarefas": [{"desc": "Medir isolação", "tipo": "texto", "anexo": True}, {"desc": "  ", "tipo": "texto"}],
+             "tipo": "Corretiva", "classif1": "Programada", "classif2": "", "etiquetas": [7], "id_parent": 880001}
+    r = cli.post("/os/api/solic/5001/aprovar", json=corpo)
+    assert r.status_code == 200 and r.get_json()["folio"] == 4321
+    _, code, titulo, subs, idc, idr, nome, k = cli.gravado[-1]
+    assert (code, titulo, idc, idr, nome) == ("TST-INV11", corpo["titulo"], 5001, 1, "Ana Teste Silva")
+    assert [(s["description"], s["attachments_required"]) for s in subs] == [("Medir isolação", True)]
+    assert k["classif"] == ("Programada", "") and k["etiqueta_ids"] == [7] and k["id_parent"] == 880001
+    assert k["tipo"] == "Corretiva" and k["note"] == OBS
+    # a ficha que esvaziou a lista leva a BASE, como o app; sem a chave, as do tema
+    cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, subtarefas=[]))
+    assert len(cli.gravado[-1][3]) == len(sp.subtarefas_base())
+    cli.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1})
+    assert cli.gravado[-1][3] == sw.subtarefas_do_tema("inversor_inspecao", "Inversor")
+
+
+def test_aprovar_recusa_sem_responsavel_sem_ativo_e_com_os_pai_ruim(cli):
+    assert cli.post("/os/api/solic/5001/aprovar", json={"titulo": "x"}).status_code == 400
+    assert "ativo" in cli.post("/os/api/solic/5005/aprovar", json={"id_responsible": 1}).get_json()["erro"]
+    r = cli.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1, "id_parent": "12a"})
+    assert r.status_code == 400 and "OS pai" in r.get_json()["erro"]
+    assert not [g for g in cli.gravado if g[0] == "aprovar"]
+
+
+def test_status_e_devolver_pedem_o_motivo(cli):
+    assert cli.post("/os/api/solic/5001/status", json={"codigo": "AGAIN_REQUEST_TODO"}).status_code == 400
+    assert cli.post("/os/api/solic/5001/status", json={"codigo": "XYZ", "motivo": "m"}).status_code == 400
+    r = cli.post("/os/api/solic/5001/status", json={"codigo": "AGAIN_REQUEST_TODO", "motivo": "faltou a foto"})
+    assert r.status_code == 200 and r.get_json()["status"] == "Reaberta (refazer)"
+    assert cli.gravado[-1] == ("status", "5001", 10, "AGAIN_REQUEST_TODO", "faltou a foto")
+
+
+def test_observacao_volta_com_o_bloco_e_a_linha_em_branco(cli):
+    assert cli.post("/os/api/solic/5001/observacao", json={"relato": " Relato novo "}).status_code == 200
+    _, idc, inteiro = cli.gravado[-1]
+    assert inteiro == "Relato novo\n\n" + sp.so_bloco(OBS)
+    assert sp.parse(inteiro)["tema"] == "inversor_inspecao" and sp.relato(inteiro) == "Relato novo"
+    cli.post("/os/api/solic/5002/observacao", json={"relato": "Sem bloco"})
+    assert cli.gravado[-1][2] == "Sem bloco"
+
+
+def test_o_js_da_fila_tem_a_mesma_regua_de_coluna(cli):
+    """A Fila tira da lista a que saiu dela depois de mudar o status; a régua do JS é a do `coluna_de`."""
+    js = (WEB / "static" / "solic_fila.js").read_text(encoding="utf-8")
+    for trecho in ("st.indexOf('cancelada') >= 0 || st.indexOf('rejeitada') >= 0) return 'finalizada'",
+                   "st.indexOf('reaberta') >= 0 && !f.id_work_order) return 'fora'", "if (!f.id_work_order) return 'pendente'",
+                   "(st.indexOf('conclu') >= 0 || st.indexOf('resolvid') >= 0) ? 'finalizada' : 'andamento'"):
+        assert trecho in js, trecho
+    for s, esperado in (("Cancelada", "finalizada"), ("Rejeitada", "finalizada"), ("Reaberta (refazer)", "fora"),
+                        ("Aberta", "pendente"), ("Resolvida sem OS", "pendente")):
+        assert sw.coluna_de({"status": s}) == esperado
+
+
+# ── Histórico ───────────────────────────────────────────────────────────────────────────────────────────────────────
+def test_historico_com_as_linhas_do_app(cli):
+    h = cli.get("/os/solicitacao/historico?busca=5002").get_data(as_text=True)
+    linhas = _dados(h, "hs_dados")["linhas"]
+    assert [l["id"] for l in linhas] == [5001, 5002, 5003, 5004, 5005]     # inclusive a devolvida, que o painel esconde
+    a = linhas[0]
+    assert (a["data"], a["dia"], a["cor"], a["cancelavel"]) == ("13/10/2026 08:00", "2026-10-13", "#F5A623", True)
+    assert linhas[3]["cancelavel"] is False and linhas[1]["os_folio"] == 777 and linhas[1]["id_work_order"] == 14002
+    assert 'value="5002"' in h                                              # a busca que veio no endereço
+    for rot in ("Criado por", "Buscar solicitação pelo nº — ignora filtros", "Atualiza a cada 15 min", "Exportar",
+                "Limpar filtros", "Todos os clientes", "Todas as usinas", "Todos os tipos", "Todos os status", "Período",
+                "ANEXOS DA SOLICITAÇÃO", "Cancelar solicitação", "Abrir OS ligada", "OS LIGADA"):
+        assert rot in h, rot
+    j = cli.get("/os/api/solic/historico").get_json()                       # o ↻ e os 15 min: força a lista de novo
+    assert len(j["linhas"]) == 5 and cli.chamadas.count("lista") == 2
+
+
+def test_anexos_e_cancelar_da_ficha(cli):
+    j = cli.get("/os/api/solic/5001/anexos").get_json()
+    assert j == {"anexos": [{"nome": "foto.jpg", "url": "https://exemplo.invalid/f.jpg", "imagem": True},
+                            {"nome": "laudo.pdf", "url": "", "imagem": False}]}
+    r = cli.post("/os/api/solic/5001/cancelar", json={"nota": " pedido em duplicidade "})
+    assert r.status_code == 200 and cli.gravado[-1] == ("cancelar", "5001", "pedido em duplicidade")
+
+
+def test_buscar_pelo_numero_fora_da_lista(cli):
+    j = cli.get("/os/api/solic/5002").get_json()
+    assert j["id_code"] == 5002 and j["os_folio"] == 777 and j["cancelavel"] is True and j["ativo_ok"] is True
+    assert cli.get("/os/api/solic/999").status_code == 404
+
+
+# ── Temas ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+@pytest.fixture
+def banco(monkeypatch):
+    """O livro dos temas num dicionário: ler devolve o que está nele, salvar grava nele (nunca o banco de verdade)."""
+    loja = {t["chave"]: dict(t, solicitacoes=t.get("solicitacoes", 0)) for t in ts.da_semente()[:3]}
+    loja["inversor_inspecao"]["etiquetas"] = ["PERFORMANCE"]
+    monkeypatch.setattr(ts, "do_banco", lambda buscar=None: [dict(v) for v in loja.values()])
+    monkeypatch.setattr(ts, "pode_gravar", lambda: True)
+
+    def salvar(tema, enviar=None):
+        loja[tema["chave"]] = dict(tema)
+        return {}
+    monkeypatch.setattr(ts, "salvar", salvar)
+
+    def arquivar(chave, on=True, **kw):
+        if chave not in loja:
+            raise KeyError(chave)
+        loja[chave]["arquivado"] = bool(on)
+        return {}
+    monkeypatch.setattr(ts, "arquivar", arquivar)
+    aplicados = []
+    monkeypatch.setattr(ts, "aplicar_no_spec", lambda itens=None: aplicados.append(itens) or True)
+    return loja, aplicados
+
+
+def test_temas_lista_o_banco_com_as_etiquetas_efetivas(cli, banco):
+    h = cli.get("/os/solicitacao/temas").get_data(as_text=True)
+    d = _dados(h, "tm_dados")
+    assert [t["chave"] for t in d["temas"]] == list(banco[0])
+    assert next(t for t in d["temas"] if t["chave"] == "inversor_inspecao")["etiquetas"] == ["PERFORMANCE"]
+    # tema que nunca foi salvo pela tela nova: a regra antiga da PERFORMANCE aparece (e quem salvar a leva)
+    trk = next((t for t in d["temas"] if t["chave"].startswith("tracker")), None)
+    if trk:
+        assert trk["etiquetas"] == ["PERFORMANCE"]
+    assert d["tipos"] == [["Inversor", 1], ["Estrutura Trackers", 1]] and d["pode_gravar"] is True
+    assert d["tipos_os"] == ["", "Elétrica", "Mecânica", "Civil", "Preditiva", "Outros"] and d["etiquetas"] == ["GARANTIA", "PERFORMANCE"]
+    for rot in ("+ novo tema", "Buscar tema…", "Nome do tema", "Tipo de equipamento", "Tipo de OS",
+                "Motivo (vira o título da OS)", "Classificação 1", "Etiquetas que a OS vai levar", "Salvar tema",
+                "Descartar alterações", "Arquivar"):
+        assert rot in h, rot
+
+
+def test_temas_com_o_banco_fora_mostra_os_do_app_e_avisa(cli, monkeypatch):
+    def fora(buscar=None):
+        raise ConnectionError("sem rede")
+    monkeypatch.setattr(ts, "do_banco", fora)
+    h = cli.get("/os/solicitacao/temas").get_data(as_text=True)
+    assert "Erro ao carregar do banco" in h and len(_dados(h, "tm_dados")["temas"]) == len(ts.da_semente())
+
+
+def test_salvar_tema_novo_e_editar_sem_trocar_a_chave(cli, banco):
+    loja, aplicados = banco
+    r = cli.post("/os/api/solic/temas/salvar", json={"nome": "Câmera — limpeza das lentes", "motivo": "Limpar câmera",
+                                                     "tipo_os": "Outros", "tipo_equipamento": "Inversor",
+                                                     "subtarefas": [{"desc": "Limpar", "tipo": "texto", "anexo": True},
+                                                                    {"desc": "", "tipo": "texto"}],
+                                                     "etiquetas": ["GARANTIA", "garantia", ""]})
+    assert r.status_code == 200, r.get_json()
+    novo = loja["camera_limpeza_das_lentes"]
+    assert (novo["nome"], novo["solicitacoes"], novo["arquivado"]) == ("Câmera — limpeza das lentes", 0, False)
+    assert novo["subtarefas"] == [{"desc": "Limpar", "tipo": "texto", "anexo": True}] and novo["etiquetas"] == ["GARANTIA"]
+    assert aplicados and r.get_json()["chave"] == "camera_limpeza_das_lentes"
+    assert any(t["chave"] == "camera_limpeza_das_lentes" for t in r.get_json()["temas"])
+    # nome repetido não entra; renomear um que existe mantém a chave e as solicitações
+    assert cli.post("/os/api/solic/temas/salvar", json={"nome": "Câmera: limpeza das lentes"}).status_code == 400
+    chave = next(iter(loja))
+    usos = loja[chave]["solicitacoes"]
+    assert cli.post("/os/api/solic/temas/salvar", json={"chave": chave, "nome": "Nome novo", "solicitacoes": 0}).status_code == 200
+    assert loja[chave]["nome"] == "Nome novo" and loja[chave]["solicitacoes"] == usos
+    assert cli.post("/os/api/solic/temas/salvar", json={"nome": "  "}).get_json()["erro"] == "O tema precisa de um nome."
+
+
+def test_salvar_sem_token_e_arquivar(cli, banco, monkeypatch):
+    loja, _ = banco
+
+    def sem_token(tema, enviar=None):
+        raise PermissionError("Sem o GRIDCO_SQL_TOKEN nesta máquina")
+    monkeypatch.setattr(ts, "salvar", sem_token)
+    r = cli.post("/os/api/solic/temas/salvar", json={"nome": "Outro tema"})
+    assert r.status_code == 403 and "GRIDCO_SQL_TOKEN" in r.get_json()["erro"]
+    chave = next(iter(loja))
+    assert cli.post("/os/api/solic/temas/%s/arquivar" % chave, json={"arquivar": True}).status_code == 200
+    assert loja[chave]["arquivado"] is True
+    assert cli.post("/os/api/solic/temas/%s/arquivar" % chave, json={"arquivar": False}).get_json()["mensagem"] == "desarquivado"
+    assert cli.post("/os/api/solic/temas/nao_existe/arquivar", json={}).status_code == 404
+
+
+# ── as regras puras ─────────────────────────────────────────────────────────────────────────────────────────────────
+def test_datas_em_brasilia_e_o_ha_quanto_do_app():
+    import datetime as dt
+    agora = dt.datetime(2026, 10, 13, 15, 0, tzinfo=dt.timezone.utc)
+    assert sw.data_br("2026-10-13T11:20:03") == "13/10/2026 08:20" and sw.data_br("") == "—"
+    assert [sw.ha_quanto(x, agora) for x in ("2026-10-13T14:30:00", "2026-10-13T10:00:00", "2026-10-12T10:00:00",
+                                             "2026-10-10T10:00:00", "2026-09-01T10:00:00")] == \
+        ["agora", "há 5 h", "ontem", "há 3 dias", "01/09"]
+    assert sw.de_hoje("2026-10-13T04:00:00", agora) and not sw.de_hoje("2026-10-13T02:00:00", agora)   # 23 h de ontem em Brasília
+
+
+def test_chave_do_tema_e_subtarefas_com_anexo():
+    assert sw.chave_de("Inversor — Inspeção & medição!") == "inversor_inspecao_medicao"
+    assert sw.chave_de("x" * 60) == "x" * 48 and sw.chave_de("—") == ""
+    api_ = sw.subs_para_api([{"desc": "Foto", "tipo": "texto", "anexo": True}, {"desc": "Sim?", "tipo": "simnao"}, {"desc": ""}])
+    assert [(s["description"], s["attachments_required"], s["is_required"]) for s in api_] == [("Foto", True, True),
+                                                                                              ("Sim?", False, True)]
+    assert api_[1]["id_task_form_item_type"] == sp.TIPO_ID["simnao"]
+
+
+def test_o_css_novo_entra_nas_paginas_e_o_js_existe():
+    for t in ("solic_painel", "solic_fila", "solic_hist", "solic_temas"):
+        h = (WEB / "templates" / f"{t}.html").read_text(encoding="utf-8")
+        assert '<link rel="stylesheet" href="/os/static/solic_pcm.css">' in h and '{% include "_solic_nav.html" %}' in h, t
+    for js in ("solic_pcm.js", "solic_fila.js", "solic_hist.js", "solic_temas.js"):
+        assert (WEB / "static" / js).exists(), js

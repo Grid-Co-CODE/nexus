@@ -58,7 +58,7 @@ RESPONSAVEL = [
     ("templates/insp.html", '<select id="cb_resp" data-busca="1">'),                    # Inspeção de chamados
     ("templates/pcm.html", '<select id="cb_resp" data-busca="1" autocomplete="off">'),  # PCM
     ("templates/cos.html", '<select id="cb_resp" data-busca="1" aria-label="Requerido por">'),   # COS
-    ("templates/solic_fila.html", '<select id="p_resp" data-busca="1">'),               # Fila do PCM: aprovar e criar
+    ("templates/solic_fila.html", '<select id="fl_resp" data-busca="1" aria-label="Técnico responsável pela OS">'),  # Fila do PCM (13/10)
     ("templates/solic.html", '<select id="cb_tec" data-busca="1">'),                    # Solicitação: técnico sugerido
     ("templates/os_detalhe_conteudo.html", '<select data-resp-sel data-busca="1" aria-label="Responsável">'),  # trocar
 ]

@@ -109,8 +109,10 @@ def test_fila_do_pcm_usa_o_id_que_a_lista_de_pessoas_tem():
     tinha corrigido em 02/10 (id_personnel) e o clone era de 30/09."""
     from pathlib import Path
     from nexus.torres.oscreator import ponte
-    fila = Path(ponte.RAIZ_CLONE, "os_web", "templates", "solic_fila.html").read_text(encoding="utf-8")
-    assert "p.id_account" not in fila.split("{#")[0] + fila.split("#}")[-1] and "p.id_personnel" in fila
+    # desde 13/10/2026 a Fila é a do app (lista e ficha) e a lista de pessoas sai pronta da rota (`rotas_solic.fila`)
+    rota = Path(ponte.RAIZ_CLONE, "os_web", "rotas_solic.py").read_text(encoding="utf-8")
+    fila = rota.split("def fila():", 1)[1].split("\n@bp.route", 1)[0]
+    assert "id_account" not in fila and '"id": p.get("id_personnel")' in fila
 
 
 def test_os_sem_login_do_nexus_para_no_portao(cliente):

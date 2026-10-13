@@ -624,6 +624,66 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
   abrir a 13ª, sai a acesa há mais tempo, nunca a ativa. Tudo na ponte: a cópia segue igual à do oem, e no 5090 a faixa
   continua. Prova: `test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas`.
 
+## A Área PCM como no app: Painel, Fila, Histórico e Temas (13/10/2026)
+
+Levi: "Fila do PCM não está levando para a fila do PCM, referência é a fila do app desktop, nem painel do PCM nem
+histórico nem temas. Também está demorando demais para carregar! Resolva". Desde 21/09 a web juntava o Painel e a Fila
+numa tabela com um painel de aprovação menor que a ficha do app; o Histórico era uma tabela sem filtro; os Temas não
+existiam. Agora são as páginas da `SolicPcmTab` (`steps/solic_pcm.py`, `historico_solic.py`, `temas.py` do app), com a
+barra dela no alto de cada uma (`_solic_nav.html`: "‹ PCM", Nova solicitação, Painel, Fila do PCM, Histórico, Temas):
+
+- **Portas do setor PCM** (`lancador.PORTAS_SETOR["pcm"]`, com os textos e os selos da Área PCM do app): Painel, Fila do
+  PCM, Histórico de solicitações, Temas e a Clonagem de planos. O card PCM da tela inicial ganhou Painel e Temas.
+- **Painel** (`/os/solicitacao/painel`): o kanban de três colunas com a régua do app (`coluna_de`), até 40 cartões por
+  coluna (a contagem diz o total), a busca na tela (250 ms), as devolvidas para refazer contadas no alto. O cartão
+  inteiro abre a Fila nele (`?sel=`): pendente para analisar, das outras colunas só para ler.
+- **Fila do PCM** (`/os/solicitacao/fila`, `static/solic_fila.js`): a lista "AGUARDANDO APROVAÇÃO" à esquerda (nº,
+  status, usina, ativo, quem e "há quanto", o tema) e a ficha à direita: o título no padrão do tema (clique edita; o
+  escrito à mão não é trocado pelo tema), "o supervisor escreveu: ~~…~~", O PEDIDO (a observação: só o relato, grava ao
+  sair do campo, com o bloco [PCM] de volta depois de uma linha em branco, como o app) e A DECISÃO (o técnico sugerido
+  pré-escolhido, a data pretendida, as etiquetas do tema marcadas "(tema)" e a regra da PERFORMANCE, Tipo de tarefa,
+  Classificação 1 = Programada e 2 = a disciplina do tema só em campo vazio, o Tema e a OS pai pela busca do
+  `buscar_os_pai`, que guarda o ID); as subtarefas editáveis em faixa inteira; Aprovar (e passa para a próxima), Devolver
+  ao supervisor e Mudar status (motivo obrigatório).
+- **Histórico** (`/os/solicitacao/historico`, `static/solic_hist.js`): Criado por, a busca direta pelo nº (ignora os
+  filtros; fora das 400 carregadas, busca no Fracttal), a busca ampla, Cliente / Usina em cascata / Tipo de ativo /
+  Status, o Período (últimos 30 dias), Exportar (CSV com ; e BOM), Limpar filtros, ↻ e a atualização de 15 em 15
+  minutos (por JSON: os filtros ficam); o Nº abre a ficha da solicitação (anexos, abrir a OS ligada, cancelar com nota) e
+  a OS ligada abre o card da OS, o mesmo do Histórico de OS.
+- **Temas** (`/os/solicitacao/temas`, `static/solic_temas.js`): a lista, a busca, "+ novo tema" e o cadastro do app
+  (nome, tipo de equipamento do cadastro de ativos, tipo de OS, motivo, Classificação 1, etiquetas, subtarefas);
+  Salvar / Descartar / Arquivar gravam pelo `temas_store`, o mesmo livro do app (o que se salva aqui vale para o app). As
+  validações do app (nome obrigatório, a chave nasce do nome e nunca muda, nome repetido não entra) estão no
+  `solic_web.tema_para_salvar`. Sem o `GRIDCO_SQL_TOKEN` no servidor a tela abre e não grava (403, com o motivo).
+
+**A mais que o app, de propósito:** as datas em horário de Brasília nas quatro páginas (o app mostra a do Fracttal crua
+no Painel e na Fila, 3 h adiantada); o "só para ler" vale para a solicitação aberta do Painel, não para a Fila inteira;
+o Devolver ao supervisor é a mudança para "Reaberta (refazer)" com o motivo (no app ele dizia "Ainda não implementado");
+trocar o tema traz as subtarefas dele (a lista editada só sai com a pessoa dizendo que sim — no app ela ficava);
+GARANTIA posta à mão traz a PERFORMANCE na hora; a OS pai digitada e não escolhida avisa em vez de sumir; o anexo
+obrigatório vai na aprovação (`solic_web.subs_para_api`: a web o perdia); Temas mostra o valor fora da lista fixa (o
+"Limpeza e Conservação" da Vegetação: no app o combo caía no vazio e salvar apagava) e pergunta antes de descartar
+alteração não salva.
+
+**A velocidade** (o "demorando demais"): cada abertura da Fila fazia de 7 a 10 pedidos ao Fracttal, um depois do outro
+e sem memória (as 400 solicitações, o pessoal de 100 em 100, as etiquetas, o catálogo de status), e o Histórico baixava
+as 400 de novo. Agora (`rotas_solic.py`):
+- Painel, Fila e Histórico leem a MESMA lista, guardada por `LISTA_TTL` (120 s) por pessoa; os catálogos por
+  `CATALOGO_TTL` (30 min); quem grava (criar, aprovar, status, observação, cancelar, tema) esquece a lista;
+- a carga fria pede tudo ao mesmo tempo (`_ao_mesmo_tempo`, com o executor que leva a sessão do Fracttal para as
+  threads): custa a leitura mais lenta, não a soma;
+- o catálogo de ativos VENCIDO (mais de 24 h) não segura mais a página: o nome das solicitações vem do arquivo como
+  estiver e o download dos ~22 mil ativos (mais de cem pedidos, minutos) vai para uma thread (`_indice_ativos`,
+  `_renovar_por_tras`). Quem resolve o ativo da OS na aprovação continua com o catálogo em dia (espera o download que
+  já está em curso, sem começar outro);
+- a página do setor PCM pede a lista ao abrir (`/os/api/solic/aquecer`): a porta escolhida já abre com ela.
+
+Prova: `tests/test_oscreator_solic_pcm.py` (29 testes: as páginas, as gravações, a lista pedida uma vez para as três
+páginas, a carga fria paralela — cinco leituras de 0,3 s em menos de 1 s —, o catálogo vencido que não segura a
+página; seis mutações, todas pegas). As telas foram conferidas no Chrome sem janela, no escuro, no claro e a 760 px,
+com o Fracttal de mentira, e os cliques (aprovar, mudar tema, observação, OS pai, devolver) pelo próprio JavaScript da
+página. Falta o olho do Levi com os dados de verdade (a sessão do Fracttal é dele).
+
 ## Debaixo do /nexus (porta única, 09/10/2026)
 
 Levi: "a partir de segunda quero o Nexus como link principal". No servidor o Nexus mora em `app.gridco.com.br/nexus`
