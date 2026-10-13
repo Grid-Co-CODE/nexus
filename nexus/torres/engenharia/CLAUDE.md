@@ -128,5 +128,8 @@ cuidado com `.m` (do campo.css, é fonte de código).
 
 ### Como provar
 - `python -m pytest -q tests/test_engenharia_confiabilidade.py`
+- A tela chama `calcular` sem `agora`: os 30 e os 7 dias contam do relógio de verdade. Teste da tela com OS de data fixa
+  fixa o relógio do `confiabilidade` (`monkeypatch.setattr(C, "datetime", ...)`); sem isso o `test_tela_de_confiabilidade`
+  caiu sozinho em 10/10/2026, quando as OS da fixture (de 03 a 05/10) saíram dos 7 dias.
 - Comparar com o `engenharia.json` do PCM (só para conferir, nunca como fonte): os níveis e as contagens dos 30 dias
   devem bater, salvo as OS canceladas e os ativos que o PCM casava errado pelo nome.

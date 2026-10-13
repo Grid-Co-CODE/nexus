@@ -107,6 +107,13 @@ def test_leitura_das_concluidas_guarda_e_continua(app, tmp_path, monkeypatch):
 
 
 def test_tela_de_confiabilidade(app, logado, monkeypatch):
+    # A tela chama `calcular` sem `agora`: os 30 e os 7 dias contam do relógio de verdade. As OS daqui são de dias antes de
+    # AGORA (06/10), e a partir de 10/10/2026 as três da semana saíram dos 7 dias e o "B · 3 em 7d" sumiu: o relógio fica em AGORA.
+    class Relogio(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return AGORA.astimezone(tz)
+    monkeypatch.setattr(C, "datetime", Relogio)
     linhas = [_os("IBI200-INVR1.3", d) for d in (1, 2, 3, 10)] + [_os("IBI200-TRK07", d) for d in (5, 20)]
     monkeypatch.setattr(os_falhas, "pedir_releitura", lambda app=None: None)
     monkeypatch.setattr(os_falhas, "linhas", lambda: linhas)

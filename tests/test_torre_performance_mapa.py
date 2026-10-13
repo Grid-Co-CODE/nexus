@@ -277,7 +277,9 @@ def test_a_legenda_explica_as_camadas_com_o_que_ha_no_recorte(mundo):
     assert "Perigo Potencial" in t and "Grande Perigo" in t and "tracejado" in t.lower()
     assert "2 em vigor e 1 a começar" in t                                                  # avisos
     assert "4 focos na última hora" in t and "2 a até 5 km de uma usina" in t              # focos
-    assert "O risco de fogo do INPE não é desenhado" in t
+    # desde 09/10/2026 o risco de fogo também é camada de fundo: a legenda dos avisos diz onde ele entra e como vê-lo
+    assert "O risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE) entra na cor da usina" in t
+    assert "escolha a camada de fundo Risco de fogo" in t
 
 
 def test_a_legenda_do_recorte_conta_so_o_que_esta_nele(mundo):
@@ -288,7 +290,8 @@ def test_a_legenda_do_recorte_conta_so_o_que_esta_nele(mundo):
 
 def test_o_rodape_cita_as_tres_fontes_do_mapa(mundo):
     t = texto(pagina(mundo))
-    assert "Dados: IBGE, INMET, INPE" in t and "somente leitura" in t.lower()
+    assert ("Dados: Instituto Brasileiro de Geografia e Estatística (IBGE), Instituto Nacional de Meteorologia (INMET) e "
+            "Instituto Nacional de Pesquisas Espaciais (INPE), Programa Queimadas.") in t and "somente leitura" in t.lower()
     assert "Malhas territoriais" in t
 
 
@@ -307,9 +310,10 @@ def test_fonte_fora_a_camada_some_e_a_legenda_diz_por_que(mundo, leituras):
     html = pagina(mundo)
     t = texto(html)
     assert 'class="mp-avisos"' not in svg(html)
-    assert "Avisos do INMET: sem leitura boa, a camada não aparece no mapa" in t
-    assert "INMET fora agora; ainda sem leitura boa" in t and 'class="cl-fonte cl-fora"' in html
-    assert "O mapa não inclui: avisos do INMET." in t and "Lendo agora" not in t
+    assert "Avisos do Instituto Nacional de Meteorologia (INMET): sem leitura boa, a camada não aparece no mapa" in t
+    assert "Instituto Nacional de Meteorologia (INMET) · avisos: fora agora; ainda sem leitura boa" in t
+    assert 'class="cl-fonte cl-fora"' in html
+    assert "O mapa não inclui: avisos do Instituto Nacional de Meteorologia (INMET)." in t and "Lendo agora" not in t
 
 
 def test_sem_ler_os_avisos_nenhuma_usina_aparece_em_verde(mundo, leituras):
@@ -319,7 +323,7 @@ def test_sem_ler_os_avisos_nenhuma_usina_aparece_em_verde(mundo, leituras):
     assert "mp-n-sem" not in svg(html) and "mp-n-nx" in svg(html)
     assert re.search(r"Sem leitura completa 6\b", t)                                         # as 6 estariam "sem alerta"
     assert "mp-chave mp-n-sem" not in html                                                   # e a linha "Sem alerta" nem aparece
-    assert "sem leitura de avisos do INMET, não dá para dizer que não há alerta" in t
+    assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET), não dá para dizer que não há alerta" in t
     assert "Usina Teta" in usinas_do_svg(html)
 
 
@@ -328,8 +332,8 @@ def test_fonte_lendo_a_tela_volta_em_10_s_e_diz_lendo_e_nao_fora(mundo, leituras
     html = pagina(mundo)
     t = texto(html)
     assert '<meta http-equiv="refresh" content="10">' in html
-    assert "Lendo agora: avisos do INMET." in t and "O mapa não inclui" not in t
-    assert "Avisos do INMET: lendo agora, a camada aparece quando a leitura terminar" in t
+    assert "Lendo agora: avisos do Instituto Nacional de Meteorologia (INMET)." in t and "O mapa não inclui" not in t
+    assert "Avisos do Instituto Nacional de Meteorologia (INMET): lendo agora, a camada aparece quando a leitura terminar" in t
 
 
 def test_sem_leitura_dos_focos_somem_os_pontos_e_os_aneis_e_a_legenda_diz(mundo, leituras):
@@ -337,13 +341,15 @@ def test_sem_leitura_dos_focos_somem_os_pontos_e_os_aneis_e_a_legenda_diz(mundo,
     html = pagina(mundo)
     s = svg(html)
     assert "mp-focos" not in s and "mp-anel" not in s and "mp-aneis" not in s and 'class="mp-avisos"' in s
-    assert "Focos do INPE: sem leitura boa, a camada não aparece no mapa" in texto(html)
+    assert ("Focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE): sem leitura boa, a camada não aparece "
+            "no mapa") in texto(html)
 
 
 def test_sem_ler_o_risco_de_fogo_a_legenda_diz_e_o_verde_some(mundo, leituras):
     leituras(avisos=lei_avisos(), focos=lei_focos(), risco=L.Leitura(None, None, erro="HTTP 503"))
     html = pagina(mundo)
-    assert "mp-n-sem" not in svg(html) and "sem leitura de risco de fogo do INPE" in texto(html)
+    assert "mp-n-sem" not in svg(html)
+    assert "sem leitura de risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)" in texto(html)
 
 
 def test_fonte_pela_metade_mantem_o_verde_mas_a_legenda_diz_nas_fontes_lidas(mundo, leituras):
@@ -360,7 +366,8 @@ def test_leitura_velha_continua_no_mapa_com_a_hora_dela_na_legenda(mundo, leitur
     leituras(avisos=velha, focos=lei_focos(), risco=lei_risco(risco_baixo()))
     html = pagina(mundo)
     t = texto(html)
-    assert 'class="mp-avisos"' in svg(html) and "dado de 14:00" in t and "INMET fora agora; última leitura boa às 14:00" in t
+    assert 'class="mp-avisos"' in svg(html) and "dado de 14:00" in t
+    assert "Instituto Nacional de Meteorologia (INMET) · avisos: fora agora; última leitura boa às 14:00" in t
 
 
 # ── a coordenada ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -663,7 +670,8 @@ def test_cadeia_real_fonte_que_cai_no_meio_vira_leitura_velha_no_mapa(cadeia):
     L.usar_relogio(lambda: REF.timestamp() + L.TTL_AVISOS_S + 60)
     del sessao.arquivos[URL_INMET]
     html = pagina(c)
-    assert 'class="mp-avisos"' in svg(html) and "INMET fora agora; última leitura boa às 15:00" in texto(html)
+    assert 'class="mp-avisos"' in svg(html)
+    assert "Instituto Nacional de Meteorologia (INMET) · avisos: fora agora; última leitura boa às 15:00" in texto(html)
 
 
 # ── a legenda à esquerda e a tabela à direita (Levi, 09/10/2026) ─────────────────────────────────────────────────────
@@ -700,7 +708,8 @@ def test_a_tabela_segue_o_recorte_da_regiao(mundo):
 def test_sem_leitura_completa_a_tabela_nao_diz_nada_previsto(mundo, leituras):
     leituras(avisos=None, focos=lei_focos(), risco=lei_risco(risco_baixo()))         # avisos do INMET fora
     tab = trecho(pagina(mundo), 'class="mp-tabela"', "</table>")
-    assert "Nada previsto" not in tab and "Sem leitura de avisos do INMET" in tab and "mp-tab--nx" in tab
+    assert "Nada previsto" not in tab and "mp-tab--nx" in tab
+    assert "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in tab
 
 
 def test_dentro_do_nivel_a_tabela_vai_do_mais_grave_ao_menos_e_nao_pelo_nome(mundo, leituras):

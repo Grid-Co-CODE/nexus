@@ -543,10 +543,11 @@ placeholder `/<tela_id>` não casa com barra, e a view própria responde); por i
 `https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF`
 (só leitura, sem chave). Baixado UMA vez em 07/10/2026 e guardado como veio em `nexus/static/clima/ibge-ufs-minima.geojson`
 (98.502 bytes, 27 UFs, ~5.500 vértices com 4 casas, sha256 `07c671aa…e7c0f`), abaixo dos 300 KB do pedido, então sem
-simplificar. **Nada é buscado no IBGE em tempo de execução.** Dado público do IBGE, de uso livre com citação da fonte: a tela
-diz "Dados: IBGE, INMET, INPE (Programa Queimadas)" e o rodapé cita as Malhas territoriais. *Atenção: o texto oficial da licença
-não foi conferido (o único acesso à rede foi o download); antes de redistribuir o arquivo fora deste repositório, confirme os
-termos em `https://www.ibge.gov.br/acesso-informacao/dados-abertos.html`.* O IBGE manda só `codarea` (código da UF), sem sigla
+simplificar. **Nada é buscado no IBGE em tempo de execução.** Dado público do IBGE, de uso livre com citação da fonte: o rodapé
+diz "Dados: IBGE, INMET e INPE, Programa Queimadas", com cada nome por extenso (`fontes.extenso`), e cita as Malhas
+territoriais. *Atenção: o texto oficial da licença não foi conferido (o único acesso à rede foi o download); antes de redistribuir
+o arquivo fora deste repositório, confirme os termos em `https://www.ibge.gov.br/acesso-informacao/dados-abertos.html`.* O IBGE
+manda só `codarea` (código da UF), sem sigla
 nem nome: a tabela `mapa.UFS` é a da divisão política. **Refazer o arquivo** (o IBGE publica uma malha por ano): o mesmo `curl`
 no mesmo caminho e `python -m pytest -q tests/test_clima_mapa.py`, que confere as 27 UFs, o tamanho, anéis fechados, só o
 continente e o rótulo de cada estado dentro dele. O teste do continente existe porque `qualidade=minima` não traz Trindade nem
