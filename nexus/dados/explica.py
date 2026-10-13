@@ -28,6 +28,8 @@ RESUMO = {
     "decisao_cobertura": "Que usina de cada fonte entra no tempo real, decidido pela tela",
     "decisao_depara": "Como cada usina e inversor de cada fonte liga ao cadastro",
     "meta_usina_mes": "Quanto cada usina gerou no mês contra a meta, pelo Gerencial",
+    "desempenho_usina_dia": "A geração, o POA e o PR de cada usina dia a dia, contra a meta",
+    "disponibilidade_os": "As OS de religamento e corretiva que tiraram disponibilidade",
     # ── Base ──
     "decisao_setor": "O setor de cada pessoa do Fracttal, escolhido na tela",
     "decisao_tela_setor": "Que telas do Nexus cada setor vê, marcado na tela Acessos",
@@ -79,6 +81,12 @@ PARA_QUE = {
     "meta_usina_mes": "Guarda, para cada usina e cada mês, a produção, a meta até os dias cobertos, o atingimento e o "
                       "PR contra o PR previsto, os mesmos números da Visão gerencial da plataforma. É de onde a Visão "
                       "do responsável do Nexus tira a meta do mês de cada usina.",
+    "desempenho_usina_dia": "Guarda, para cada usina e cada dia do mês, a geração, a meta do dia, o POA e o PR contra o "
+                            "PR previsto: a mesma série do PR diário do Painel NOC da plataforma. É de onde as janelas de "
+                            "Meta e de PR da Visão do responsável tiram o dia a dia.",
+    "disponibilidade_os": "Guarda cada OS de religamento ou de corretiva emergencial que entrou na conta da "
+                          "disponibilidade do mês: a usina, o equipamento, o tipo, o início, o fim, as horas de sol e a "
+                          "energia perdida. É o porquê do número que a janela de Disponibilidade mostra.",
     "decisao_depara": "Guarda cada decisão de ligar uma usina ou um inversor de uma fonte ao cadastro, tomada por um "
                       "administrador na tela De-para de equipamentos (quando a fonte renomeia a usina ou não dá nome ao "
                       "inversor). A Plataforma de Performance lê esta tabela e ela vence o de-para escrito no código.",

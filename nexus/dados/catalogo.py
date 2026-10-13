@@ -419,6 +419,39 @@ FATOS = (
                     "veio a meta (BD_Thopen, Info Mensal ou o P50 anual ÷ 12). A energia vai em kWh (o Gerencial mostra "
                     "MWh com 1 casa). O motivo do PR sem confiança (texto) fica de fora (regra 8). Grava só o worker do "
                     "servidor (Linux); GER_PUBLICAR=1 força numa máquina"),
+    # As janelas da Visão do responsável (12/10/2026, Levi: "PR ao clicar aparece um card (...) essa mesma visão do PAINEL
+    # NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO"; a meta "com uma tabelinha de dia do mês, geração meta, geração real"):
+    # a série do PR diário do Painel NOC (`/api/g/diario`), publicada com a meta do mês pelo worker do servidor
+    Fato("desempenho_usina_dia", "Desempenho da usina por dia (Painel NOC)", "performance",
+         "nexus_performance · fato_desempenho_usina_dia",
+         "1 linha = 1 usina do Gerencial × 1 dia com ponto no PR diário do Painel NOC",
+         _d(data=("cod", "data_id (o dia; mes_id = AAAAMM)"),
+            usina=("nome", "usina (nome do Gerencial); a Visão do responsável liga pelo de_para das abas e pelo nome do "
+                           "cadastro, como a meta do mês")),
+         tipo="snapshot_acumulado", chave=("mes_id", "usina", "data_id"),
+         medidas=_m((("geracao_kwh", "kWh", "aditiva"), ("meta_kwh", "kWh", "aditiva"), ("ipoa_kwh_m2", "kWh/m²", "semi"),
+                     ("ipoa_meta_kwh_m2", "kWh/m²", "semi"), ("pr_pct", "%", "nao"), ("pr_meta_pct", "%", "nao"))),
+         fontes=("nexus_performance · fato_desempenho_usina_dia",),
+         janela_origem="os meses publicados desde 10/2026 (o corrente de hora em hora; o anterior até o dia 5)",
+         observacao="a MESMA série que o gráfico expandido do Painel NOC desenha: a meta do dia é a meta do mês ÷ os dias "
+                    "do mês (igual em todos os dias); dia sem POA tem PR vazio; no banco da Thopen, o dia sem geração "
+                    "ou com POA até 0,3 não vem (a regra do gráfico). Grava o worker do servidor junto com a meta do mês"),
+    # O que formou a disponibilidade (12/10/2026, Levi: "Quero também que apareça todas as OSs listadas que formaram
+    # aquele valor"): as OS da conta do Gerencial › Disponibilidade, publicadas com o diário pela plataforma
+    Fato("disponibilidade_os", "OS que formaram a disponibilidade (Gerencial)", "performance",
+         "falhas_performance · disponibilidade_os",
+         "1 linha = 1 OS da conta da disponibilidade × 1 usina do escopo dela, no mês",
+         _d(data=("cod", "inicio, fim (hora de Brasília)"),
+            usina=("nome", "usina (nome do Gerencial); usina_fracttal liga pelo de_para (Fracttal · Classificação 1)"),
+            equipamento=("cod", "codigo_ativo"), os=("cod", "os")),
+         tipo="snapshot_acumulado", chave=("mes", "os", "usina"),
+         medidas=_m((("duracao_sol_min", "min", "aditiva"), ("perda_kwh", "kWh", "aditiva"))),
+         fontes=("falhas_performance · disponibilidade_os",),
+         janela_origem="o mês corrente e o anterior (o índice do Gerencial); mês que sai fica como foi publicado",
+         observacao="tipo = o tipo da tarefa (Religamento, Religamento Remoto, Corretiva Emergencial); origem = queda ou "
+                    "equipamento; escopo = usina inteira, cabine N ou inversor N.M; duracao_sol_min = as horas de sol "
+                    "(06–18 h) da OS dentro do mês; perda_kwh = kWp afetado × horas (sem a irradiação), repartida pela "
+                    "potência quando a OS pega duas usinas. Sem a descrição nem quem criou (regra 8)"),
     # ── Tickets ────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("ticket", "Ticket de performance", "chamados",
          "tickets_performance · Tickets de Performance, Trackers, Strings indisp", "1 linha = 1 ticket",
@@ -535,7 +568,7 @@ LIVROS = (
           "plataforma/depara.py (PerformancePainel), pela tela /admin/de-para da plataforma", True,
           "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
           "no PC e no servidor"),
-    Livro("nexus_performance", ("fato_meta_usina_mes",), "de hora em hora, e só quando o mês muda",
+    Livro("nexus_performance", ("fato_meta_usina_mes", "fato_desempenho_usina_dia"), "de hora em hora, e só quando muda",
           "plataforma/gerencial_publicar.py (worker do servidor, `_ger_publicar` no app.py)", True,
           "no banco desde 12/10/2026 19:55 (1ª volta do worker do servidor depois do deploy da plataforma, conferida "
           "por GET). A Visão do responsável do Nexus lê; sem o livro, ela diz que a meta ainda não chegou"),
