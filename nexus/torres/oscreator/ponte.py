@@ -83,6 +83,19 @@ _ESTILO_NEXUS = (b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:
                  b'html:not(.os-embutido):not(.os-no-nexus) body.os-sem-topo .os-sep{display:block!important}'
                  b'html.os-no-nexus .os-header,html.os-no-nexus .os-sep{display:none!important}</style>')
 
+# A janela POR CIMA do Tempo real (13/10/2026, Levi: "Em performance > tempo real > criar OS ao invés de direcionar para o
+# OS Creator aparece a tela de criação de OS sobrepondo toda a tela dando um blur de fundo, assim que a pessoa finaliza a
+# OS só aparece a notificação de criação!"): a plataforma abre a tela de criação com ?janela=1 num iframe que cobre a tela.
+# Aqui ela sai sem o topo (a marca os-no-nexus) e avisa a página de baixo quando o POST da criação responde ok
+# (`{gc: "os-criada", mensagem, detalhes}`), para a janela fechar e a notificação aparecer. O código do OS Creator não
+# muda (a cópia segue igual à do oem): quem embrulha o fetch é esta resposta.
+_JANELA_OS = (rb'<script>document.documentElement.classList.add("os-no-nexus","os-janela");'
+              rb'(function(){var f=window.fetch;if(!f)return;window.fetch=function(u,o){var p=f.apply(this,arguments);'
+              rb'try{if(/\/os\/api\/[a-z_-]+\/criar(\?|$)/.test(String(u))&&o&&String(o.method||"").toUpperCase()==="POST"){'
+              rb'p.then(function(r){return r.clone().json().then(function(j){if(r.ok&&j&&j.ok&&window.parent!==window)'
+              rb'window.parent.postMessage({gc:"os-criada",mensagem:j.mensagem||"",detalhes:j.detalhes||[]},'
+              rb'location.origin);});}).catch(function(){});}}catch(e){}return p;};})();</script>')
+
 # Sobe de moldura em moldura até a de baixo do Nexus (o <html data-nexus>). Sem Nexus em cima, chega ao topo e é o
 # window.top de sempre. Moldura de outro domínio (o supervisório embutido na Engenharia) para a subida no try.
 _TOPO_OS = (b'<script>window.__osTopo = function () { var w = window; try { while (w.parent !== w && '
@@ -370,7 +383,8 @@ def encaminhar(resto: str):
         corpo = _SEM_TICKETS.sub(b"", _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA))
         if b"<head>" in corpo:
             # a função entra antes de qualquer script da página, que já a usa no <head>
-            corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _MARCA_NO_NEXUS + _ESTILO_NEXUS, 1)
+            janela = _JANELA_OS if request.args.get("janela") == "1" else b""
+            corpo = corpo.replace(b"<head>", b"<head>\n" + _TOPO_OS + _MARCA_NO_NEXUS + janela + _ESTILO_NEXUS, 1)
             for de, para in _TROCAS_HTML:
                 corpo = corpo.replace(de, para)
             corpo = _com_o_tema(app, corpo)

@@ -298,6 +298,12 @@ que é uma tela dentro de uma tela!".
 - **O OS Creator dentro do Nexus sem o topo dele:** a ponte (`torres/oscreator/ponte.py`, `_MARCA_NO_NEXUS`) marca com
   `os-no-nexus` a tela logo abaixo do Nexus (a casca, o login, o card da OS) antes de pintar, e o topo some. Aberto sozinho
   no navegador, o OS Creator fica com o topo (é o único lugar com o nome e o "sair").
+- **A criação de OS numa janela por cima do Tempo real (13/10/2026)**, Levi: "Em performance > tempo real > criar OS ao
+  invés de direcionar para o OS Creator aparece a tela de criação de OS sobrepondo toda a tela dando um blur de fundo,
+  assim que a pessoa finaliza a OS só aparece a notificação de criação!". A plataforma abre `/os/performance/criar` com
+  `?janela=1` num iframe que cobre a tela; a ponte (`_JANELA_OS`) a entrega sem o topo e embrulha o `fetch`: o POST de
+  `/os/api/<x>/criar` que responde ok manda `{gc: "os-criada", mensagem, detalhes}` à página de baixo, que fecha a janela
+  e mostra a notificação. O código do OS Creator não muda (a cópia segue igual à do oem).
 - **As telas da Plataforma de Performance sem a faixa** "<tela> · Plataforma de Performance": a faixa só nasce com
   controle (o seletor de usina do Diagnóstico). Ver `nexus/performance/CLAUDE.md`.
 - **Prova:** `tests/test_sem_segundo_cabecalho_13_10.py` (7; 6 mutações pegas) e `tests/test_porta_tv.py`; no navegador,

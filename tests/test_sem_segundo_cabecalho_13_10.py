@@ -89,3 +89,45 @@ def test_nenhuma_tela_da_plataforma_tem_a_faixa_com_o_nome(prefixo):
             assert 'id="porta-usina"' in faixa and "Plataforma de Performance" not in faixa
         else:
             assert 'class="porta-faixa"' not in corpo, t
+
+
+# ── a criação de OS numa janela por cima do Tempo real (13/10/2026) ─────────────────────────────────────────────────
+def test_com_janela_a_tela_sai_sem_o_topo_e_avisa_quando_a_os_e_criada(logado):
+    """Levi: "Em performance > tempo real > criar OS ao invés de direcionar para o OS Creator aparece a tela de criação de
+    OS sobrepondo toda a tela dando um blur de fundo, assim que a pessoa finaliza a OS só aparece a notificação"."""
+    janela = ponte._JANELA_OS.decode()
+    assert janela not in logado.get("/os/login").get_data(as_text=True)              # sem ?janela=1, como antes
+    cabeca = logado.get("/os/login?janela=1").get_data(as_text=True).split("<head>", 1)[1]
+    assert janela in cabeca and cabeca.index(janela) < cabeca.index("<title>")
+    assert 'classList.add("os-no-nexus","os-janela")' in janela
+
+
+def test_o_aviso_da_janela_so_sai_quando_a_criacao_deu_certo():
+    import json
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node não instalado")
+    js = ponte._JANELA_OS.decode().removeprefix("<script>").removesuffix("</script>")
+    harness = """
+    const avisos = []; let resposta = {ok: true, json: {ok: true, mensagem: '2 OS criadas', detalhes: ['OS 101', 'OS 102']}};
+    globalThis.window = {fetch: async (u, o) => ({ok: resposta.ok, clone() { return this; }, json: async () => resposta.json})};
+    window.parent = {postMessage: (m, o) => avisos.push([m, o])};
+    globalThis.location = {origin: 'https://app.gridco.com.br'};
+    globalThis.document = {documentElement: {classList: {add() {}}}};
+    """ + js + """
+    (async () => {
+      await window.fetch('/os/api/performance/criar', {method: 'POST'});
+      await window.fetch('/os/api/performance/contagens', {method: 'POST'});      // outro POST: não avisa
+      resposta = {ok: true, json: {ok: false, erro: 'x'}};
+      await window.fetch('/os/api/performance/criar', {method: 'POST'});         // não criou: não avisa
+      await new Promise(r => setTimeout(r, 20));
+      process.stdout.write(JSON.stringify(avisos));
+    })();
+    """
+    p = subprocess.run([node, "-e", harness], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert p.returncode == 0, p.stderr
+    avisos = json.loads(p.stdout)
+    assert avisos == [[{"gc": "os-criada", "mensagem": "2 OS criadas", "detalhes": ["OS 101", "OS 102"]},
+                       "https://app.gridco.com.br"]]
