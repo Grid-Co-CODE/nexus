@@ -220,9 +220,9 @@ def test_painel_compara_regiao_equipe_cliente_regiao_de_campo_e_gestor(banco, lo
                  'href="?regiao_campo=Sudeste+03"', 'href="?gestor=Beltrano+Supervisor"'):
         assert link in html, link
     assert '<span class="det">Supervisor de Campo: vaga</span>' in html
-    # o clique leva à tabela filtrada; a equipe vira um filtro da tela, com o × para tirar
+    # o clique leva à tabela filtrada; a equipe vira um filtro da tela (desde 13/10/2026 a lista de equipes da barra)
     sem = logado.get("/t/campo/rondas?aba=sem&equipe=SC+Oeste+01").get_data(as_text=True)
-    assert "Equipe: SC Oeste 01" in sem and "Coração 1" in sem
+    assert '<option value="SC Oeste 01" selected>SC Oeste 01</option>' in sem and "Coração 1" in sem
     assert "Nenhuma usina mobilizada sem ronda" in logado.get("/t/campo/rondas?aba=sem&equipe=SP+Norte+01").get_data(as_text=True)
 
 

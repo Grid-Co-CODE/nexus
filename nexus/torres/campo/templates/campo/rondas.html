@@ -60,9 +60,19 @@
     <select class="gc-campo" name="cliente" aria-label="Cliente" onchange="this.form.submit()">
       <option value="">todos os clientes</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
+    {# usina, Responsável O&M e equipe (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável e equipe!"):
+       a lista de usinas encolhe com os outros filtros; o responsável é o da ficha da usina, o mesmo da Central #}
+    <select class="gc-campo" name="usina" aria-label="Usina" onchange="this.form.submit()">
+      <option value="">todas as usinas</option>{% for v, nome in opcoes_usina %}<option value="{{ v }}"{% if v == usina %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+    <select class="gc-campo" name="responsavel" aria-label="Responsável O&amp;M (da ficha da usina)" onchange="this.form.submit()">
+      <option value="*"{% if not responsavel %} selected{% endif %}>todos os responsáveis</option>{% for r in opcoes_responsavel %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+    <select class="gc-campo" name="equipe" aria-label="Equipe" onchange="this.form.submit()">
+      <option value="">todas as equipes</option>{% for e in equipes %}<option value="{{ e }}"{% if e == equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
+    </select>
     {% with com_rotulo=false %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
-    {% for x in ('aba', 'dur', 'cluster', 'equipe', 'ver', 'cob') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
-    {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
+    {% for x in ('aba', 'dur', 'cluster', 'ver', 'cob') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     <span class="cn-barra-fonte">livro de rondas do App · lido às {{ lido }}{% include 'campo/_aviso_fato.html' %}</span>
   </form>
 
@@ -111,7 +121,7 @@
         <a href="{{ url(pend=None) }}"{% if not pend %} aria-current="page"{% endif %}>Toda ronda</a>
         {% for p_, (rot, cor) in pendencias.items() %}<a href="{{ url(pend=p_) }}"{% if p_ == pend %} aria-current="page"{% endif %}>{{ rot }} <b>{{ n_pend[p_] }}</b></a>{% endfor %}
       </div>
-      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'regiao_campo', 'gestor', 'cliente', 'equipe', 'dur', 'pend') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+      <form method="get" class="cn-busca">{% for x in ('dias', 'regiao', 'regiao_campo', 'gestor', 'cliente', 'usina', 'responsavel', 'equipe', 'dur', 'pend') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
         <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="técnico, usina, equipe ou OS" aria-label="Buscar"></form>
       <span class="mudo">Duração carimbada pelo aparelho (tempo de tela aberta); o mouse na duração mostra o início e o fim. Clique no cabeçalho para ordenar.</span>
     </div>

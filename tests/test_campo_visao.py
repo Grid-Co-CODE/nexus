@@ -650,7 +650,8 @@ def test_indicadores_da_ronda_filtram_a_tabela(banco, logado):
     html = logado.get("/t/campo/rondas?ind=qualidade").get_data(as_text=True)
     assert "Qualidade abaixo de 85%" in html and "Nenhuma ronda com esses filtros" in html   # todas com 90%
     html = logado.get("/t/campo/rondas?aba=cobertura&cob=sem").get_data(as_text=True)
-    assert "Coração 1" in html and "Brodowski 1" not in html and 'aria-current="true"' in html
+    corpo = html.split('class="cn-barra-filtros"', 1)[1].split("</form>", 1)[1]    # sem a barra (a lista de usinas do filtro)
+    assert "Coração 1" in corpo and "Brodowski 1" not in corpo and 'aria-current="true"' in html
     html = logado.get("/t/campo/rondas?aba=cobertura&cob=atrasadas").get_data(as_text=True)
     assert "Coração 1" in html and "<td>Altair</td>" not in html
     html = logado.get("/t/campo/rondas?ind=duracao").get_data(as_text=True)

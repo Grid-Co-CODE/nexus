@@ -690,6 +690,12 @@ def _iniciais(nome) -> str:
     return (partes[0][0] + (partes[-1][0] if len(partes) > 1 else "")).upper() if partes else "?"
 
 
+def _ordem_do_nome(nome) -> str:
+    """Ordem alfabética sem acento e sem caixa ("Águas" junto de "Aguas", não no fim da lista)."""
+    import unicodedata
+    return unicodedata.normalize("NFKD", str(nome or "")).encode("ascii", "ignore").decode().lower()
+
+
 def _ordem_sem_ronda(c):
     """A mais esquecida primeiro: há mais dias sem ronda (nunca = 999); no empate, a última OS mais antiga (ou nenhuma)."""
     return (-c["dias"], (c.get("ultima_os") or {}).get("data") or "", c["usina"])
@@ -699,7 +705,7 @@ def _ordem_sem_ronda(c):
 def rondas():
     """Cobertura, duração e qualidade da ronda (Levi, 05/10: o estilo do painel de rondas, no tema do Nexus): sete
     indicadores do período e seis abas (Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers, Quem ronda).
-    Filtros de região do Brasil, cliente, região de campo, gestor de contrato e equipe (a equipe vem do Painel);
+    Filtros de região do Brasil, cliente, usina, Responsável O&M, equipe, região de campo e gestor de contrato;
     Exportar CSV dos registros."""
     dias = _dias((7, 14, 30), 30)
     leitura = visao.rondas()
@@ -708,6 +714,10 @@ def rondas():
     # cliente pelo cadastro (Levi, 05/10: "filtro por cliente e a cobertura das rondas das UFVs do cliente. Essas usinas
     # tem que bater com as mesmas do registro mestre"): filtra as rondas E a base da cobertura
     cliente, cluster, equipe = request.args.get("cliente", ""), request.args.get("cluster", ""), request.args.get("equipe", "")
+    # usina, Responsável O&M e equipe na barra (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável e
+    # equipe!"). O responsável é o da ficha da usina (`usinas.responsavel_om_id`), o mesmo da Central; a usina vai pelo
+    # id do cadastro (o nome do livro do App não é chave)
+    responsavel, usina = _responsavel(), request.args.get("usina", "")
     pedida = "sem" if request.args.get("aba") == "cobertura" else request.args.get("aba")     # endereço antigo
     aba = pedida if pedida in dict(ABAS_RONDAS) else "registros"
     dur, q = request.args.get("dur", ""), request.args.get("q", "").strip().lower()
@@ -719,11 +729,12 @@ def rondas():
     # visual para os supervisores!")
     ver = "tabela" if request.args.get("ver") == "tabela" else "blocos"
 
-    def filtra(lista):
+    def filtra(lista, sem_usina=False):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
-                and _do_papel(x, regiao_campo, gestor)
+                and _do_papel(x, regiao_campo, gestor, responsavel)
                 and (not cliente or x.get("cliente") == cliente)
-                and (not equipe or x.get("equipe") == equipe)]
+                and (not equipe or x.get("equipe") == equipe)
+                and (sem_usina or not usina or str(x.get("usina_id") or "") == usina)]
     cobertura = filtra(d.get("cobertura") or [])
     painel = visao.painel_rondas(filtra(d.get("todas") or []), cobertura, dias, d.get("hoje") or visao._agora().date().isoformat())
     lim = painel["kpi"]["dur_min"]
@@ -762,6 +773,18 @@ def rondas():
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="rondas-{dias}d.csv"'})
     clientes = sorted({c.get("cliente") for c in d.get("cobertura") or [] if c.get("cliente")})
+    # as usinas do filtro: as mobilizadas (e as que tiveram ronda) que passam pelos OUTROS filtros — escolher o cliente
+    # ou o responsável encurta a lista de usinas; a escolhida fica sempre
+    nomes_usina = {}
+    for x in filtra(d.get("cobertura") or [], sem_usina=True) + filtra(d.get("todas") or [], sem_usina=True):
+        if x.get("usina_id") and x.get("usina"):
+            nomes_usina.setdefault(str(x["usina_id"]), x["usina"])
+    if usina and usina not in nomes_usina:
+        uid_ = next((x for x in (d.get("cobertura") or []) + (d.get("todas") or []) if str(x.get("usina_id") or "") == usina), None)
+        nomes_usina[usina] = (uid_ or {}).get("usina") or f"usina {usina}"
+    opcoes_usina = sorted(nomes_usina.items(), key=lambda kv: _ordem_do_nome(kv[1]))
+    equipes = sorted({x.get("equipe") for x in (d.get("cobertura") or []) + (d.get("todas") or []) if x.get("equipe")}
+                     | ({equipe} if equipe else set()), key=_ordem_do_nome)
     cluster_aberto = next((c for c in painel["clusters"] if c["cluster"] == cluster), None) if cluster else None
     suj, suj_estado = None, None
     if aba == "sujidade":
@@ -785,6 +808,8 @@ def rondas():
         **_papeis(d, d.get("cobertura") or [], regiao_campo, gestor),
         duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, equipe=equipe, ver=ver,
         cliente=cliente, clientes=clientes, clusters=painel["clusters"], cluster_aberto=cluster_aberto,
+        responsavel=responsavel, opcoes_responsavel=_opcoes_responsavel(d.get("cobertura") or [], responsavel),
+        usina=usina, opcoes_usina=opcoes_usina, equipes=equipes,
         comparativos=comparativos, dimensoes=visao.DIMENSOES, base_pequena=visao.BASE_PEQUENA,
         filtro_da_dimensao={"regiao_br": "regiao", "equipe": "equipe", "cliente": "cliente",
                             "regiao_campo": "regiao_campo", "gestor": "gestor"},

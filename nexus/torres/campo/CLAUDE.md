@@ -118,8 +118,8 @@ decisões, 766 rondas, zeladoria vazia.
 
 As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
 - **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou; refeita em 08/10 pelo pedido dele): sete
-  indicadores do período (`painel_rondas`, depois dos filtros de região do Brasil, cliente, região de campo, gestor de
-  contrato e equipe) e seis abas:
+  indicadores do período (`painel_rondas`, depois dos filtros de região do Brasil, cliente, usina, Responsável O&M,
+  equipe, região de campo e gestor de contrato) e seis abas:
   Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers e Quem ronda. **A aba Cobertura saiu** (08/10: "já não
   faz sentido tendo o histórico da usina"); o endereço antigo `aba=cobertura` cai na Sem ronda. Toda tabela da tela
   ordena pelo cabeçalho, no navegador (`_ordenar.html`, `table.cn-ordenavel`: clicar de novo inverte, a seta é o
@@ -182,6 +182,13 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     Fracttal" é a mensagem do App para o técnico. Medido em 05/10: 114 de 771 rondas (90 dias) sem OS por isso (os
     cinco técnicos com mais somavam 74). O App tenta 5 vezes, uma por
     minuto, e desiste (`RONDA_OS_FILA_MAX`, `_MAX_H` 24 h): a ronda antiga não ganha OS quando o técnico conecta depois.
+  - **Usina, Responsável O&M e equipe na barra** (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável
+    e equipe!"): três listas ao lado da de cliente (`usina=` pelo id do cadastro; `responsavel=` é o Responsável O&M da
+    ficha da usina, o mesmo da Central, com "Sem responsável O&M" e `*` = todos; `equipe=` virou lista, no lugar do
+    filtro que só vinha do clique no Painel). Filtram as rondas E a base da cobertura (os sete indicadores e as seis
+    abas, inclusive a Sem ronda e o CSV). A lista de usinas encolhe com os outros filtros (as mobilizadas e as que
+    tiveram ronda que passam por eles; a escolhida fica sempre). Prova: `tests/test_campo_rondas_filtros_1310.py` (três
+    mutações pegas).
   - **Filtro por cliente** (Levi, 05/10: "a cobertura das rondas das UFVs do cliente. Essas usinas tem que bater com
     as mesmas do registro mestre!"): o cliente vem de `usinas.cliente_id` → `clientes.nome` do `cadastro_nexus`
     (`_Base.nome_cliente`), nunca do nome da usina no livro. Filtra as rondas E a base da cobertura; com cliente
