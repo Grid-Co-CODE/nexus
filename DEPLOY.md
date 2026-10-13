@@ -146,7 +146,7 @@ raiz e a plataforma de Performance fica onde está: o Caddy divide **por caminho
 09/10 e só colidem em `/`, `/os` e `/static`). Nenhuma linha de código muda; provado no PC em 10/10/2026 com um proxy que
 faz esta mesma divisão (as telas da porta única, 13 na época e 12 desde 11/10/2026, as duas sessões juntas, o Sair, os passes).
 
-- Para o **Nexus**: `/` (só a raiz exata), `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/cadeira`, `/os` e `/os/*`, e
+- Para o **Nexus**: `/` (só a raiz exata), `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/os` e `/os/*`, e
   `/static/*` **menos** os três estáticos da plataforma (`/static/fonts/*`, `/static/logos/*`, `/static/notif.js`; estático
   novo na plataforma pede uma linha aqui).
 - Para a **plataforma**, como hoje: todo o resto, inclusive `/api/*`, `/versao`, `/healthz` e `/painel/nexus/*`. O
@@ -165,7 +165,7 @@ app.gridco.com.br {
     redir @nexus_antigo {re.antigo.1}{?query} 308
 
     @nexus {
-        path / /entrar /sair /saude /tema /cadeira /os /t/* /os/* /static/*
+        path / /entrar /sair /saude /tema /os /t/* /os/* /static/*
         not path /static/fonts/* /static/logos/* /static/notif.js
     }
     handle @nexus {
@@ -299,6 +299,19 @@ Conferir: no Nexus, **Performance → Tempo real** abre a Entrada da plataforma 
 recusou a chave"; o resto do Nexus não depende dela). Pelo Nexus, a API PV fica de fora por enquanto: só o que a
 plataforma já tem guardado.
 
+**Os dois valores são iguais e foram trocados em 13/10/2026** (o anterior apareceu numa saída de ferramenta): a
+`NEXUS_PLATAFORMA_TOKEN` do `.env` do Nexus e a `NEXUS_LEITURA_TOKEN` do `tokens.txt` da plataforma. Trocar um sem o
+outro faz a plataforma responder 401 à reserva. Conferir sem mostrar o valor (no servidor):
+
+```
+T=$(sudo grep '^NEXUS_PLATAFORMA_TOKEN=' /opt/nexus/.env | cut -d= -f2-)
+curl -s -o /dev/null -D - -H "X-Nexus-Leitura: $T" https://app.gridco.com.br/api/state | grep -i -E '^HTTP|x-nexus-leitura-ok'
+unset T
+```
+
+200 com `X-Nexus-Leitura-Ok: 1`: os dois batem. 401: são diferentes. 302 para o login, sem o
+`X-Nexus-Leitura-Ok`: a plataforma não leu a `NEXUS_LEITURA_TOKEN` (falta reiniciar o web dela).
+
 ## 7e. Porta única: as telas da Performance dentro do Nexus (09/10/2026)
 
 Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo". O menu Performance do Nexus
@@ -360,6 +373,26 @@ juntos), lidos a cada 30 min só quando mudaram (um HEAD por arquivo antes); fic
 nem ao banco. Os endereços têm padrão e só se trocam para apontar a um espelho: `NEXUS_CLIMA_INMET_URL`, `NEXUS_CLIMA_FOCOS_URL`,
 `NEXUS_CLIMA_RISCO_URL` (este leva `{d}`, o dia de 0 a 3), `NEXUS_CLIMA_POWER_URL` (leva `{lat}`, `{lon}`, `{inicio}` e `{fim}`,
 as datas em AAAAMMDD) e `NEXUS_CLIMA_FIRMS_URL` (a base dos arquivos do FIRMS), no `.env`.
+
+## 7f. Telas por setor e pré-carga (12/10/2026)
+
+O que cada pessoa vê no Nexus é o **setor** dela (Base → Integração Fracttal), e o que cada setor vê é marcado pelo
+Levi em Base → Acessos (livros `nexus_setores` e `nexus_setor_telas` no banco, os mesmos para o PC e o servidor). Regras
+e porquês em `nexus/casca/CLAUDE.md`, seções "Telas por setor" e "Pré-carga".
+
+- **Quem não tem setor** vê só "Sem setor, fale com o responsável." em qualquer tela. É o esperado: o Levi põe a
+  pessoa num setor e vale no próximo clique.
+- **Administrador** (a `NEXUS_ADMINS` do `.env`, a lista da tela Base → Acessos e a senha de administrador) vê tudo,
+  com ou sem setor. A lista da tela mora em `dados/acessos.json`; na 1ª subida ela vai no pacote (a do PC), e depois
+  cada instalação guarda a sua.
+- **Pré-carga:** quem tem setor e não é administrador, ao entrar, tem as telas liberadas abertas por trás pelo próprio
+  Nexus (uma por vez), e de novo a cada 2 min enquanto usa; as que leem o Fracttal ao abrir ficam fora. Não pede nada
+  da T.I.: nenhuma saída nova, nenhuma variável.
+- **Variáveis (opcionais, padrão ligado: NÃO pôr no servidor)**: `NEXUS_ACESSO_POR_SETOR` (`0` = todos veem tudo, como
+  antes), `NEXUS_PRE_CARGA` (`0` = sem pré-carga) e `NEXUS_CHAMADOS_PUBLICAR` (`0` = esta máquina não publica os
+  chamados de garantia no banco aos :50). Só com `0`, e só se o Levi pedir; depois, `sudo systemctl restart nexus`.
+- **Conferir:** Base → Acessos mostra a seção "Telas por setor" com os setores e, depois que alguém com setor entrar, a
+  linha "Pré-carga: última volta em ...".
 
 ## 8. Atualizar
 
