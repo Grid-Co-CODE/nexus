@@ -421,10 +421,11 @@ FATOS = (
                     "servidor (Linux); GER_PUBLICAR=1 força numa máquina"),
     # As janelas da Visão do responsável (12/10/2026, Levi: "PR ao clicar aparece um card (...) essa mesma visão do PAINEL
     # NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO"; a meta "com uma tabelinha de dia do mês, geração meta, geração real"):
-    # a série do PR diário do Painel NOC (`/api/g/diario`), publicada com a meta do mês pelo worker do servidor
-    Fato("desempenho_usina_dia", "Desempenho da usina por dia (Painel NOC)", "performance",
+    # o dia a dia do Gerencial (a geração que fecha no atingimento, 13/10/2026) com o POA e o PR do PR diário do Painel
+    # NOC (`/api/g/diario`), publicado com a meta do mês pelo worker do servidor
+    Fato("desempenho_usina_dia", "Desempenho da usina por dia (Gerencial e Painel NOC)", "performance",
          "nexus_performance · fato_desempenho_usina_dia",
-         "1 linha = 1 usina do Gerencial × 1 dia com ponto no PR diário do Painel NOC",
+         "1 linha = 1 usina do Gerencial × 1 dia que o Gerencial conta no atingimento (ou com PR no PR diário)",
          _d(data=("cod", "data_id (o dia; mes_id = AAAAMM)"),
             usina=("nome", "usina (nome do Gerencial); a Visão do responsável liga pelo de_para das abas e pelo nome do "
                            "cadastro, como a meta do mês")),
@@ -433,9 +434,11 @@ FATOS = (
                      ("ipoa_meta_kwh_m2", "kWh/m²", "semi"), ("pr_pct", "%", "nao"), ("pr_meta_pct", "%", "nao"))),
          fontes=("nexus_performance · fato_desempenho_usina_dia",),
          janela_origem="os meses publicados desde 10/2026 (o corrente de hora em hora; o anterior até o dia 5)",
-         observacao="a MESMA série que o gráfico expandido do Painel NOC desenha: a meta do dia é a meta do mês ÷ os dias "
-                    "do mês (igual em todos os dias); dia sem POA tem PR vazio; no banco da Thopen, o dia sem geração "
-                    "ou com POA até 0,3 não vem (a regra do gráfico). Grava o worker do servidor junto com a meta do mês"),
+         observacao="geracao_kwh = a geração do dia que o Gerencial conta no atingimento: a soma dos dias fecha no "
+                    "prod do mês (vazio = dia só do PR diário, fora da conta); meta_kwh = a meta do mês ÷ os dias do mês "
+                    "(a do Gerencial, sem arredondar); POA e PR = os do PR diário do Painel NOC (vazios no dia com POA até "
+                    "0,3 na Thopen). Até 13/10/2026 a geração vinha do PR diário e a soma não fechava em 78 de 131 "
+                    "usinas. Grava o worker do servidor junto com a meta do mês"),
     # O que formou a disponibilidade (12/10/2026, Levi: "Quero também que apareça todas as OSs listadas que formaram
     # aquele valor"): as OS da conta do Gerencial › Disponibilidade, publicadas com o diário pela plataforma
     Fato("disponibilidade_os", "OS que formaram a disponibilidade (Gerencial)", "performance",

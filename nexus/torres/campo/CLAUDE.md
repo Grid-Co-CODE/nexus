@@ -473,13 +473,19 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   dia" do detalhe abrem um `<dialog>` (fundo `--veu` com `backdrop-filter: blur`), com o pedaço de página da rota
   `/t/campo/responsaveis/usina/<usina_id>/<meta|pr|disp>` (`responsaveis_painel`, template `_resp_painel.html`, sem a
   moldura; o script da tela busca e põe no `<dialog>`):
-  - **Meta**: a tabela do dia a dia (geração da meta, geração real, diferença, % do dia) e o total = a soma dos dias com
-    dado contra a meta dos mesmos dias (a conta do Gerencial). Fonte: `nexus_performance · fato_desempenho_usina_dia`, a
-    série do PR diário do Painel NOC publicada pela plataforma (a meta do dia é a do mês ÷ os dias do mês, como lá).
+  - **Meta**: a tabela do dia a dia (geração da meta, geração real, diferença, % do dia) e o total = a soma dos dias
+    contra a meta dos mesmos dias (a conta do Gerencial). Fonte: `nexus_performance · fato_desempenho_usina_dia`. As
+    linhas são os dias que o **Gerencial** conta no atingimento, com a geração dele (`ger_dia` do `_gerencial_payload` da
+    plataforma, 13/10/2026), e a meta do dia exata dele (a do mês ÷ os dias do mês): fecha nas 135 usinas com série
+    (produção, dias e %, provado com o Gerencial de outubro). Até 13/10 a geração vinha do PR diário e não fechava em 78
+    de 131 (a Thopen pula o dia com POA até 0,3: Indaiatuba 5 dias e 87% contra 12 dias e 66%; o BD_Performance escreve
+    0 no dia em branco: Castelo do Piauí 31 dias e 54,9% contra 9 e 189,1%). O dia só do PR diário (geração vazia) não
+    entra na tabela. A janela só mostra o mês corrente (no mês fechado o Gerencial cobra o mês inteiro).
   - **PR**: "essa mesma visão do PAINEL NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO PORÉM UMA MELHORIA": as barras da
     geração com a linha do POA (eixo da direita) e as metas tracejadas e, embaixo, a curva do PR com a meta. SVG montado no
     servidor (`nexus/campo/responsaveis_graficos.py`, sem biblioteca, como o resto do Nexus); a barra pela meta do dia
-    (97/90, a régua do Gerencial); dia sem valor quebra a linha; a dica de cada dia no `<title>` da coluna.
+    (97/90, a régua do Gerencial); dia sem valor quebra a linha; a dica de cada dia no `<title>` da coluna. A barra é a
+    geração do Gerencial; o POA e o PR, os do PR diário (o dia com POA até 0,3 fica com barra e sem PR).
   - **Disponibilidade**: o mapa diário da usina (a legenda do Gerencial › Disponibilidade: 100% sem evento, 99–100,
     95–99, 80–95, 50–80, abaixo de 50) e as OS que formaram o valor (`falhas_performance · disponibilidade_os`, publicada
     com o diário): OS, tipo, o que parou, início, fim, duração (do início ao fim), horas de sol (as que contam) e perda.

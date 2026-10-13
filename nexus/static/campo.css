@@ -731,7 +731,7 @@ button.cr-v:hover,button.cr-v:focus-visible{outline:2px solid var(--verde);outli
 .cr-jan-tab th{font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:right;
   padding:9px 12px;border-bottom:1px solid var(--linha);background:var(--superficie-2)}
 .cr-jan-tab td{padding:7px 12px;text-align:right;border-bottom:1px solid var(--linha)}
-.cr-jan-tab th:first-child,.cr-jan-tab td:first-child{text-align:left}
+.cr-jan-tab th:first-child,.cr-jan-tab td:first-child,.cr-jan-tab .t{text-align:left}
 .cr-jan-tab tbody tr:hover td{background:var(--superficie-2)}
 .cr-jan-tab tfoot td{font-weight:700;border-bottom:0;background:var(--superficie-2)}
 .cr-jan-tab .det{display:block;color:var(--mudo);font-size:11.5px}
@@ -783,4 +783,9 @@ button.cr-v:hover,button.cr-v:focus-visible{outline:2px solid var(--verde);outli
 .cr-mapa-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 6px;font-size:11.5px;color:var(--tinta-2)}
 .cr-mapa-leg i{display:inline-block;width:14px;height:10px;margin-right:5px;border-radius:3px;vertical-align:middle}
 .cr-pt{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px}
+/* na janela a PT tem metade da largura da tela dela: a assinatura vai embaixo dos dados, senão a coluna do texto ficava
+   com uma palavra por linha (13/10/2026); código longo (SN do inversor) quebra em vez de vazar */
+.cr-pt .cn-pt-corpo{grid-template-columns:minmax(0,1fr)}
+.cr-pt .cn-ass{max-width:360px}
+.cr-pt .cn-dados dd{overflow-wrap:anywhere}
 @media (max-width:800px){.cr-pt{grid-template-columns:minmax(0,1fr)}.cr-modal-corpo{padding:4px 14px 16px}}

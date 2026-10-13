@@ -32,7 +32,7 @@
       <td class="m {{ 'cn-t-critico' if tabela.total.dif is not none and tabela.total.dif < 0 else 'cn-t-ok' }}">{% if tabela.total.dif is not none %}{{ '+' if tabela.total.dif >= 0 }}{{ mwh(tabela.total.dif) }}{% else %}—{% endif %}</td>
       <td class="m"><span class="cr-v cr-v--{{ tabela.total.cls }}">{{ pct(tabela.total.pct, 1) }}</span></td></tr></tfoot>
   </table></div>
-  <p class="cr-jan-nota">A geração da meta de cada dia é a meta do mês ÷ os dias do mês (a do PR diário do Painel NOC); o total é a soma dos dias com dado contra a meta dos mesmos dias, a conta do Gerencial.{% if serie.usinas_gerencial|length > 1 %} Esta usina são {{ serie.usinas_gerencial|length }} no Gerencial ({{ serie.usinas_gerencial|join(' e ') }}): os dias somam as duas.{% endif %}</p>
+  <p class="cr-jan-nota">Os dias são os que o Gerencial conta no atingimento: o dia com geração, ou com zero confirmado pelo sol medido (usina parada); o dia ainda sem dado não entra. A geração da meta de cada dia é a meta do mês ÷ os dias do mês, e o total (a soma dos dias contra a meta dos mesmos dias) é o % do Gerencial.{% if serie.usinas_gerencial|length > 1 %} Esta usina são {{ serie.usinas_gerencial|length }} no Gerencial ({{ serie.usinas_gerencial|join(' e ') }}): os dias somam as duas.{% endif %}</p>
   {% endif %}
 {% elif painel == 'pr' %}
   {% if not serie.dias %}
@@ -61,12 +61,12 @@
       {% for a in q.area %}<polygon class="cr-area-pr" points="{{ a }}"/>{% endfor %}
       {% if q.meta_y is not none %}<line class="cr-meta" x1="{{ q.esq }}" x2="{{ q.dir }}" y1="{{ q.meta_y }}" y2="{{ q.meta_y }}"/>{% endif %}
       {% for t in q.linha %}<polyline class="cr-linha-pr" points="{{ t }}"/>{% endfor %}
-      {% for p in q.pontos %}<circle class="cr-ponto-pr cr-ponto-pr--{{ p.cls }}" cx="{{ p.x }}" cy="{{ p.y }}" r="3.5"/><text class="cr-rot" x="{{ p.x }}" y="{{ p.y - 8 }}" text-anchor="middle">{{ p.rotulo }}</text>{% endfor %}
+      {% for p in q.pontos %}<circle class="cr-ponto-pr cr-ponto-pr--{{ p.cls }}" cx="{{ p.x }}" cy="{{ p.y }}" r="3.5"/><text class="cr-rot" x="{{ p.x }}" y="{{ p.ry }}" text-anchor="middle">{{ p.rotulo }}</text>{% endfor %}
       {% for x in q.dias %}<text class="cr-eixo" x="{{ x.x }}" y="{{ q.base + 18 }}" text-anchor="middle">{{ x.rotulo }}</text>{% endfor %}
       {% for c in q.colunas %}<rect class="cr-coluna" x="{{ c.x }}" y="0" width="{{ c.w }}" height="{{ q.base }}"><title>{{ c.dica }}</title></rect>{% endfor %}
     </svg>
   </section>
-  <p class="cr-jan-nota">A barra é a geração do dia, verde quando chega a 97% da meta do dia, âmbar de 90% a 97% e vermelha abaixo de 90% (a régua do Gerencial); a linha azul é o POA (eixo da direita). É a série do PR diário do Painel NOC; no banco da Thopen, o dia sem geração ou com POA até 0,3 não entra (a regra de lá).</p>
+  <p class="cr-jan-nota">A barra é a geração que o Gerencial conta no dia, verde quando chega a 97% da meta do dia, âmbar de 90% a 97% e vermelha abaixo de 90% (a régua do Gerencial); a linha azul é o POA (eixo da direita). O POA e o PR são os do PR diário do Painel NOC: o dia com POA até 0,3 (sensor sem leitura) fica com a barra e sem PR.</p>
   {% endif %}
 {% else %}
   {% if not disp.dias %}
@@ -88,10 +88,10 @@
     <p class="cr-jan-vazio">Nenhuma OS tirou disponibilidade desta usina no mês.</p>
     {% else %}
     <div class="cr-jan-tab"><table>
-      <thead><tr><th>OS</th><th>Tipo</th><th>O que parou</th><th>Início</th><th>Fim</th><th>Duração</th><th>Horas de sol</th><th>Perda</th></tr></thead>
+      <thead><tr><th>OS</th><th class="t">Tipo</th><th class="t">O que parou</th><th>Início</th><th>Fim</th><th>Duração</th><th>Horas de sol</th><th>Perda</th></tr></thead>
       <tbody>
-        {% for o in oss.oss %}<tr><td class="m">{{ o.os }}</td><td>{{ o.tipo }}<span class="det">{{ 'queda' if o.origem == 'queda' else ('equipamento' if o.origem == 'equipamento' else '') }}</span></td>
-          <td>{{ o.escopo }}{% if o.codigo %}<span class="det m">{{ o.codigo }}</span>{% endif %}</td><td class="m">{{ o.inicio }}</td>
+        {% for o in oss.oss %}<tr><td class="m">{{ o.os }}</td><td class="t">{{ o.tipo }}<span class="det">{{ 'queda' if o.origem == 'queda' else ('equipamento' if o.origem == 'equipamento' else '') }}</span></td>
+          <td class="t">{{ o.escopo }}{% if o.codigo %}<span class="det m">{{ o.codigo }}</span>{% endif %}</td><td class="m">{{ o.inicio }}</td>
           <td class="m">{{ o.fim if o.fim and not o.aberta else '' }}{% if o.aberta %}<span class="cn-t-alerta">em aberto</span>{% endif %}</td>
           <td class="m">{{ duracao(o.duracao_min) if o.duracao_min is not none and not o.aberta else '—' }}</td>
           <td class="m">{{ duracao(o.sol_min) if o.sol_min is not none else '—' }}</td>

@@ -89,6 +89,9 @@ def tela(banco, monkeypatch):
          "ipoa_kwh_m2": 7.4, "ipoa_meta_kwh_m2": 7.7, "pr_pct": 74.3, "pr_meta_pct": 76.0},
         {"mes_id": MES_ID, "usina": "Altair", "data_id": int(d2.strftime("%Y%m%d")), "geracao_kwh": 5800, "meta_kwh": 40000,
          "ipoa_kwh_m2": 1.4, "ipoa_meta_kwh_m2": 7.7, "pr_pct": 61.3, "pr_meta_pct": 76.0},
+        # o dia só do PR diário (13/10/2026): sem geração, fora da conta do Gerencial e da tabela da Meta, com PR no gráfico
+        {"mes_id": MES_ID, "usina": "Altair", "data_id": int(HOJE.replace(day=3).strftime("%Y%m%d")), "geracao_kwh": None,
+         "meta_kwh": 40000, "ipoa_kwh_m2": 5.0, "ipoa_meta_kwh_m2": 7.7, "pr_pct": 70.0, "pr_meta_pct": 76.0},
         {"mes_id": MES_ID, "usina": "Coração 1", "data_id": int(d1.strftime("%Y%m%d")), "geracao_kwh": 1, "meta_kwh": 1,
          "ipoa_kwh_m2": 1, "ipoa_meta_kwh_m2": 1, "pr_pct": 1, "pr_meta_pct": 1}])
     _aba(banco, "falhas_performance", "disponibilidade_os", [
@@ -256,7 +259,8 @@ def test_dia_do_id():
 def test_a_tabela_da_meta_dia_a_dia_com_o_total_do_gerencial(tela):
     nomes = R.Nomes(visao._Base())
     serie = R.serie_diaria(1, MES_ID, nomes)
-    assert [d["dia"] for d in serie["dias"]] == [1, 2] and serie["usinas_gerencial"] == ["Altair"]
+    assert [d["dia"] for d in serie["dias"]] == [1, 2, 3] and serie["usinas_gerencial"] == ["Altair"]
+    assert serie["dias"][2]["geracao_kwh"] is None and serie["dias"][2]["pr"] == 70.0
     t = R.tabela_meta(serie)
     assert [(l["dia"], l["meta"], l["real"], l["pct"], l["cls"]) for l in t["linhas"]] == [
         (1, 40.0, 37.0, 92, "alerta"), (2, 40.0, 5.8, 14, "critico")]
@@ -276,6 +280,12 @@ def test_os_graficos_da_geracao_com_poa_e_da_curva_do_pr():
     assert len(g["poa"]) == 1 and len(g["poa_pontos"]) == 3 and g["meta_y"] is not None and g["meta"] == "40,0"
     q = G.pr(dias, 31)
     assert len(q["linha"]) == 1 and [p["cls"] for p in q["pontos"]] == ["ok", "alerta", "alerta"]
+    # os rótulos não se encavalam: o PR da Cipó Guaçu de outubro (13/10/2026), dia a dia
+    cipo = [36.0, 96.0, 82.0, 75.0, 94.8, 93.0, 88.7, 70.0, 72.1, 70.9, 91.0, 89.6]
+    q = G.pr([{"dia": i + 1, "pr": v, "pr_meta": 76.9} for i, v in enumerate(cipo)], 31)
+    pts = q["pontos"]
+    assert all(abs(a["x"] - b["x"]) >= G.ROT_LARG or abs(a["ry"] - b["ry"]) >= G.ROT_ALT for a, b in zip(pts, pts[1:]))
+    assert pts[0]["rotulo"] == "36,0" and pts[0]["ry"] < pts[0]["y"]          # sem o "%", e em cima quando cabe
     assert q["grades"][-1]["rotulo"] == "125%" and q["grades"][0]["rotulo"] == "0%"   # 94% + folga: 125%, não 200%
 
 

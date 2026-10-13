@@ -695,10 +695,11 @@ def _linhas_da_usina(linhas, uid, nomes, campo="usina", fracttal="usina_fracttal
 
 
 def serie_diaria(uid: int, mes_id: int, nomes: Nomes) -> dict:
-    """O dia a dia da usina no mês, a série do PR diário do Painel NOC (`nexus_performance · fato_desempenho_usina_dia`):
-    {dias: [{dia, geracao_kwh, meta_kwh, ipoa, ipoa_meta, pr, pr_meta}], usinas_gerencial, publicado}. Usina do cadastro
-    com duas usinas no Gerencial (Santarém 1 e 2): a geração e a meta somam por dia; o POA e o PR são a média pesada pela
-    meta (sem meta, a média simples)."""
+    """O dia a dia da usina no mês (`nexus_performance · fato_desempenho_usina_dia`): {dias: [{dia, geracao_kwh, meta_kwh,
+    ipoa, ipoa_meta, pr, pr_meta}], usinas_gerencial, publicado}. A geração é a do dia que o Gerencial conta no
+    atingimento (vazia no dia que só o PR diário tem); o POA e o PR, os do PR diário do Painel NOC. Usina do cadastro com
+    duas usinas no Gerencial (Santarém 1 e 2): a geração soma por dia, e a meta também, só das que têm geração no dia
+    (é a conta do Gerencial somada); o POA e o PR são a média pesada pela meta (sem meta, a média simples)."""
     todas = visao._livro(LIVRO_META, ABA_DIA)
     rs = _linhas_da_usina([r for r in todas if _int(r.get("mes_id")) == mes_id], uid, nomes)
     por = collections.defaultdict(list)
@@ -710,7 +711,8 @@ def serie_diaria(uid: int, mes_id: int, nomes: Nomes) -> dict:
     for dia in sorted(por):
         xs = por[dia]
         ger = [_num(r.get("geracao_kwh")) for r in xs if _num(r.get("geracao_kwh")) is not None]
-        meta = [_num(r.get("meta_kwh")) for r in xs if _num(r.get("meta_kwh")) is not None]
+        contam = [r for r in xs if _num(r.get("geracao_kwh")) is not None] or xs
+        meta = [_num(r.get("meta_kwh")) for r in contam if _num(r.get("meta_kwh")) is not None]
 
         def media(campo):
             vs = [(_num(r.get(campo)), _num(r.get("meta_kwh")) or 1.0) for r in xs if _num(r.get(campo)) is not None]
@@ -724,13 +726,17 @@ def serie_diaria(uid: int, mes_id: int, nomes: Nomes) -> dict:
 
 def tabela_meta(serie: dict) -> dict:
     """A tabela da janela da Meta (Levi: "uma tabelinha de dia do mês, geração meta, geração real do dia e um total no
-    final"): uma linha por dia com dado, em MWh, e o total (a soma dos dias e a meta dos mesmos dias: é a conta do
-    Gerencial, atingimento = produção ÷ meta dos dias cobertos)."""
+    final"): uma linha por dia que o Gerencial conta (o que tem geração), em MWh, e o total (a soma dos dias e a meta dos
+    mesmos dias: é a conta do Gerencial, atingimento = produção ÷ meta dos dias cobertos). Provado em 13/10/2026 com o
+    Gerencial de outubro: fecha nas 135 usinas com série (produção, dias e %). O dia só do PR diário (sem geração) fica
+    de fora: ele não entra na conta."""
     linhas, soma_meta, soma_real = [], 0.0, 0.0
     for d in serie.get("dias") or []:
         meta = None if d.get("meta_kwh") is None else d["meta_kwh"] / 1000
         real = None if d.get("geracao_kwh") is None else d["geracao_kwh"] / 1000
-        if meta is not None and real is not None:
+        if real is None:
+            continue
+        if meta is not None:
             soma_meta += meta
             soma_real += real
         pct = round(100 * real / meta) if meta and real is not None else None

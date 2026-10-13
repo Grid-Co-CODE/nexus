@@ -81,9 +81,9 @@ PARA_QUE = {
     "meta_usina_mes": "Guarda, para cada usina e cada mês, a produção, a meta até os dias cobertos, o atingimento e o "
                       "PR contra o PR previsto, os mesmos números da Visão gerencial da plataforma. É de onde a Visão "
                       "do responsável do Nexus tira a meta do mês de cada usina.",
-    "desempenho_usina_dia": "Guarda, para cada usina e cada dia do mês, a geração, a meta do dia, o POA e o PR contra o "
-                            "PR previsto: a mesma série do PR diário do Painel NOC da plataforma. É de onde as janelas de "
-                            "Meta e de PR da Visão do responsável tiram o dia a dia.",
+    "desempenho_usina_dia": "Guarda, para cada usina e cada dia do mês, a geração que o Gerencial conta, a meta do dia, "
+                            "o POA e o PR contra o PR previsto. É de onde as janelas de Meta e de PR da Visão do "
+                            "responsável tiram o dia a dia: a soma dos dias fecha no atingimento do Gerencial.",
     "disponibilidade_os": "Guarda cada OS de religamento ou de corretiva emergencial que entrou na conta da "
                           "disponibilidade do mês: a usina, o equipamento, o tipo, o início, o fim, as horas de sol e a "
                           "energia perdida. É o porquê do número que a janela de Disponibilidade mostra.",

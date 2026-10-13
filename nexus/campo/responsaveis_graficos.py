@@ -11,6 +11,7 @@ dois gráficos têm a mesma largura e o mesmo eixo dos dias, um embaixo do outro
 import math
 
 W, H = 760, 250
+ROT_LARG, ROT_ALT = 26, 11                     # o rótulo do ponto ("94,8" na fonte mono de 9,5 px) e a altura dele
 ESQ, TOPO, DIR, BAIXO = 54, 18, 54, 28        # as margens: os eixos da esquerda e da direita e os dias embaixo
 META_NA_META, META_ATENCAO = 0.97, 0.90       # a régua do Gerencial (atingimento do dia)
 
@@ -101,6 +102,24 @@ def geracao(dias: list[dict], dias_mes: int) -> dict:
                      if dias_mes <= 16 or d % 2 == 1 or d == dias_mes]}
 
 
+def _rotulos(pts: list[tuple[float, float]], base: float) -> list[float]:
+    """A altura do rótulo de cada ponto da curva: em cima, e embaixo só quando em cima bate no rótulo do vizinho (com 31
+    dias cabem uns 21 px por dia, e na Cipó Guaçu de 13/10/2026 "70,0% 72,1% 70,9%" saíam encavalados). Embaixo que
+    cairia nos dias do eixo não vale."""
+    out, ant = [], None
+    for x, y in pts:
+        cima, baixo = y - 8, y + 16
+
+        def bate(ry):
+            return ant is not None and abs(x - ant[0]) < ROT_LARG and abs(ry - ant[1]) < ROT_ALT
+        ry = cima
+        if bate(cima) and baixo <= base - 2 and not bate(baixo):
+            ry = baixo
+        out.append(round(ry, 1))
+        ant = (x, ry)
+    return out
+
+
 def pr(dias: list[dict], dias_mes: int) -> dict:
     """A curva do PR do dia (%), com a área embaixo e a meta de PR tracejada; dia sem PR quebra a curva."""
     pts = [(d["dia"], d.get("pr")) for d in dias]
@@ -114,8 +133,11 @@ def pr(dias: list[dict], dias_mes: int) -> dict:
     banda = (W - ESQ - DIR) / dias_mes
     return {"viewbox": f"0 0 {W} {H}", "base": H - BAIXO, "esq": ESQ, "dir": W - DIR,
             "linha": _segmentos(pts, dias_mes, topo), "area": area,
-            "pontos": [{"x": round(_x(d, dias_mes), 1), "y": round(_y(v, topo), 1), "rotulo": f"{_num(v)}%",
-                        "cls": "ok" if meta is None or v >= meta else "alerta"} for d, v in validos],
+            # o rótulo sem o "%" (o eixo e o título dizem): cabe na largura de um dia
+            "pontos": [{"x": round(_x(d, dias_mes), 1), "y": round(_y(v, topo), 1), "rotulo": _num(v), "ry": ry,
+                        "cls": "ok" if meta is None or v >= meta else "alerta"}
+                       for (d, v), ry in zip(validos, _rotulos([(_x(d, dias_mes), _y(v, topo)) for d, v in validos],
+                                                               H - BAIXO))],
             "colunas": [{"x": round(ESQ + banda * (d - 1), 1), "w": round(banda, 1),
                          "dica": f"Dia {d}: PR {_num(v)}%" + (f" (meta {_num(meta)}%)" if meta else "")}
                         for d, v in validos],
