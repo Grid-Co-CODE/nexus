@@ -541,6 +541,9 @@ body.os-sem-topo .os-recolher svg{transform:rotate(180deg)}
 .carga-pct{position:absolute;top:60px;left:0;right:0;text-align:center;font:700 19px/1 'Segoe UI',Arial,sans-serif;color:#fff}
 .carga-txt{margin-top:8px;font-size:13px;color:#e6e8ef}
 .carga-sub{font-size:11.5px;color:#8a90a2;min-height:15px}
+/* a espera contada e a saída no limite (carga.js, 13/10/2026): as cores são as da .carga-sub e dos .os-btn */
+.carga-espera{max-width:300px;margin:6px auto 0;line-height:1.45}.carga-espera:empty{display:none}
+.carga-acoes{display:flex;gap:8px;justify-content:center;margin-top:14px}
 /* Windows sem animação: o giro fica, mais lento (é ele que diz "está trabalhando"); a barra só não desliza */
 @media (prefers-reduced-motion:reduce){.carga-anel.ind{animation-duration:2.4s}.carga-arco{transition:none}}
 

@@ -723,6 +723,31 @@ página; seis mutações, todas pegas). As telas foram conferidas no Chrome sem 
 com o Fracttal de mentira, e os cliques (aprovar, mudar tema, observação, OS pai, devolver) pelo próprio JavaScript da
 página. Falta o olho do Levi com os dados de verdade (a sessão do Fracttal é dele).
 
+## O círculo de carga tem prazo (13/10/2026)
+
+Levi: "As vezes o OS Creator Web fica em um loop infinito, isso é por causa do fractal?". O print era o "Carregando…" do
+`carga.js` sobre o Performance, depois do clique num cartão. Não é laço: o círculo espera a página seguinte e não tinha
+prazo. Naquela tarde, das 16:50 às 16:53, o Nexus do servidor não respondeu nem o `/saude` (as 16 threads presas; desde
+então o `casca/presos.py` do Nexus anota em quê, e o administrador vê no Início). As contagens dos cartões já tinham
+chegado, então o catálogo de ativos não era a espera daquele clique.
+
+- **Aos 15 s** a caixa conta: "Esperando o servidor há N s" (numa linha própria, `.carga-espera`: a `.carga-sub` é do
+  progresso do Histórico).
+- **Aos 45 s** (o prazo de uma chamada ao Fracttal no `api._rpc_call`): "Está demorando mais que o normal ... O Fracttal
+  pode estar lento ou o Nexus, ocupado.", com **Tentar de novo** só onde repetir é seguro (abrir uma página por link;
+  formulário e `OsCarga.buscar` nunca, para não gravar duas vezes) e **Fechar** (o pedido segue; se a resposta chegar, a
+  página segue normal). Tentar de novo zera a conta.
+- **No Histórico**, que mostra o progresso, o prazo conta do último pedido ao Fracttal que terminou: busca grande andando
+  não é demora.
+- Onde o Fracttal segura uma página (para quem for mexer): a tela inicial (`/os/`) espera o selo
+  `api.contar_minhas_analises()` (até 2 chamadas de 45 s) antes de desenhar; e quem usa o `api.load_assets_cached()` com o
+  catálogo vencido (mais de 24 h) baixa os ~110 lotes de ativos DENTRO do pedido, sem trava: duas pessoas, duas baixas
+  (a Área PCM já lê o vencido e renova por trás, `rotas_solic._indice_ativos`).
+- **Prova** (13/10/2026): Nexus descartável com o RPC do Fracttal mudo, clique no cartão do Performance dentro do Nexus
+  (a moldura `/os/performance` dentro da casca `/os/`): aos 20 s "Esperando o servidor há 20 s"; aos 50 s a mensagem e os
+  dois botões; Tentar de novo zerou a conta e o círculo seguiu; aos 48 s de novo os botões; Fechar escondeu o círculo.
+  Testes do tema claro e da torre verdes; oem: `--aplicar` levou `carga.js` e `os.css`, 680 testes web verdes lá.
+
 ## Debaixo do /nexus (porta única, 09/10/2026)
 
 Levi: "a partir de segunda quero o Nexus como link principal". No servidor o Nexus mora em `app.gridco.com.br/nexus`

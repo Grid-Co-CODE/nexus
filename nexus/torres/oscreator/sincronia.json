@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-13T15:56:24",
+ "atualizado_em": "2026-10-13T17:33:12",
  "arquivos": {
   "chamado_garantia/README.md": "0207d35ae741a620",
   "chamado_garantia/__init__.py": "2362f95d3b2fc918",
@@ -58,7 +58,7 @@
   "os_creator/os_web/static/acomp.js": "bbcf1a042673777c",
   "os_creator/os_web/static/ativos.css": "6880fc9b2877824e",
   "os_creator/os_web/static/ativos.js": "ade856c5b6f90f7f",
-  "os_creator/os_web/static/carga.js": "0c17f78e7bb79c6e",
+  "os_creator/os_web/static/carga.js": "b50bf2e4f2fa6682",
   "os_creator/os_web/static/chamados.css": "0c9c5b7be18e0184",
   "os_creator/os_web/static/clonar.css": "184e2ba24e005a65",
   "os_creator/os_web/static/clonar.js": "a31709ed5c0fccdd",
@@ -68,7 +68,7 @@
   "os_creator/os_web/static/inicio.css": "9bdc6f2b45188452",
   "os_creator/os_web/static/insp.css": "3d24136894611c16",
   "os_creator/os_web/static/insp.js": "5a6b69143e8447d0",
-  "os_creator/os_web/static/os.css": "7497b44744c047fb",
+  "os_creator/os_web/static/os.css": "d5397afa984da7ee",
   "os_creator/os_web/static/os_acoes.css": "e385dfc6a970b64d",
   "os_creator/os_web/static/os_acoes.js": "5c29b7f3c129d497",
   "os_creator/os_web/static/os_busca.js": "c1c645f7fd9bb4bb",
