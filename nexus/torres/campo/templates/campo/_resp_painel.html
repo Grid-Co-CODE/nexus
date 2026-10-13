@@ -7,12 +7,13 @@
 {% macro mwh(v) %}{{ '—' if v is none else ('%.1f'|format(v))|replace('.', ',') }}{% endmacro %}
 {% macro pct(v, casas=0) %}{{ '—' if v is none else ('%.*f'|format(casas, v))|replace('.', ',') ~ '%' }}{% endmacro %}
 <header class="cr-jan-cab">
-  <div><p class="gc-eyebrow">{{ titulo }} · {{ mes_txt }}</p><h2>{{ u.usina }}</h2>
+  <div><p class="gc-eyebrow">{{ titulo }} · {{ ('últimos ' ~ at.janela ~ ' dias') if painel == 'ativos' and at else mes_txt }}</p><h2>{{ u.usina }}</h2>
     <p class="mudo">{{ u.cliente or '—' }} · {{ u.equipe or '—' }} · {{ u.cidade or '—' }}{% if u.uf %}/{{ u.uf }}{% endif %}</p></div>
   {% set m = u.meta or {} %}{% set d = u.disp or {} %}
   <div class="cr-jan-resumo">
     {% if painel == 'meta' %}<span class="gc-rotulo">Meta do mês (Gerencial)</span><b class="cr-v cr-v--{{ u.perf.valores.meta.cls }}">{{ pct(m.get('atingimento')) }}</b>
     {% elif painel == 'pr' %}<span class="gc-rotulo">PR do mês</span><b class="cr-v cr-v--{{ u.perf.valores.pr.cls }}">{{ pct(m.get('pr'), 1) }}</b><span class="mudo">previsto {{ pct(m.get('pr_meta'), 1) }}</span>
+    {% elif painel == 'ativos' %}{% if at %}<span class="gc-rotulo">Na Confiabilidade</span><b class="cr-v cr-v--{{ 'critico' if at.criticos else ('alerta' if at.atencao else 'neutro') }}">{% set partes = [] %}{% if at.criticos %}{% set _ = partes.append(at.criticos ~ ' crítico' ~ ('s' if at.criticos != 1 else '')) %}{% endif %}{% if at.atencao %}{% set _ = partes.append(at.atencao ~ ' em atenção') %}{% endif %}{{ partes|join(' · ') or 'nenhum' }}</b>{% if at.monitorar %}<span class="mudo">e {{ at.monitorar }} em monitorar</span>{% endif %}{% endif %}
     {% else %}<span class="gc-rotulo">Disponibilidade do mês</span><b class="cr-v cr-v--{{ u.perf.valores.disp.cls }}">{{ pct(d.get('disp'), 1) }}</b><span class="mudo">{{ num(d.get('h_perdidas')) }} h paradas</span>{% endif %}
   </div>
 </header>
@@ -39,6 +40,29 @@
   </table></div>
   <p class="cr-jan-nota">Os dias são os que o Gerencial conta no atingimento: o dia com geração, ou com zero confirmado pelo sol medido (usina parada); o dia ainda sem dado não entra. A geração da meta de cada dia é a meta do mês ÷ os dias do mês, e o total (a soma dos dias contra a meta dos mesmos dias) é o % do Gerencial. O POA DEF é a irradiação medida no dia (vazio quando o sensor não leu) e a Disponibilidade é a do dia fechado no Gerencial › Disponibilidade{% if tabela.disp_ate %} (até {{ tabela.disp_ate[8:10] }}/{{ tabela.disp_ate[5:7] }}){% endif %}: geração baixa com POA baixo é tempo; com disponibilidade baixa é parada. No total, o POA é a soma dos dias e a disponibilidade é a do mês.{% if serie.usinas_gerencial|length > 1 %} Esta usina são {{ serie.usinas_gerencial|length }} no Gerencial ({{ serie.usinas_gerencial|join(' e ') }}): os dias somam as duas.{% endif %}</p>
   {% endif %}
+  {# a Observação do responsável (Levi, 13/10/2026): fica no banco com o dia e a hora, cifrada, para os relatórios #}
+  <section class="cr-graf cr-obs" aria-labelledby="cr-obs-tit">
+    <div class="cr-graf-cab"><h3 id="cr-obs-tit">Observação do responsável</h3><span class="mudo">fica salva com o dia e a hora, para os relatórios</span></div>
+    {% if obs.aviso %}<p class="cr-obs-aviso cn-t-ok" role="status">{{ obs.aviso }}.</p>{% endif %}
+    {% if obs.erro %}<div class="cn-erro" role="alert"><b>{{ obs.erro }}.</b></div>{% endif %}
+    {% for o in obs.lista %}
+    <article class="cr-obs-item">
+      <p class="cr-obs-quem"><b>{{ o.nome or 'Responsável' }}</b>{% if not o.do_responsavel %} <span class="cr-tag cr-tag--neutro" title="Escrita por um responsável de outra usina, cobrindo esta (férias)">cobrindo</span>{% endif %} <span class="m mudo">{{ o.quando_txt }}</span></p>
+      <p class="cr-obs-texto">{{ o.texto or '(sem a chave do cadastro neste Nexus, o texto não abre)' }}</p>
+    </article>
+    {% else %}
+    <p class="mudo cr-obs-vazio">Nenhuma observação nesta usina ainda.</p>
+    {% endfor %}
+    {% if obs.pode %}
+    <form class="cr-obs-form" method="post" action="{{ url_for('torre_campo.responsaveis_observacao', usina_id=u.usina_id) }}" data-cr-obs>
+      <label class="gc-rotulo" for="cr-obs-txt">Nova observação <span class="mudo">(como {{ obs.quem }}{% if obs.cobrindo %}, cobrindo {{ obs.cobrindo }}{% endif %})</span></label>
+      <textarea class="gc-campo" id="cr-obs-txt" name="texto" rows="3" maxlength="2000" required>{{ obs.texto }}</textarea>
+      <div class="cn-botoes"><button class="gc-btn gc-btn--primario" type="submit">Salvar observação</button></div>
+    </form>
+    {% else %}
+    <p class="mudo cr-obs-so">Só os Responsáveis O&amp;M escrevem aqui, entrando com o login do Fracttal (o responsável de qualquer usina: quem cobre as férias de outro também).</p>
+    {% endif %}
+  </section>
 {% elif painel == 'pr' %}
   {% if not serie.dias %}
   <p class="cr-jan-vazio">{{ 'Sem a série do dia a dia desta usina no banco: o Painel NOC não tem o PR diário dela (sem aba no BD).' if serie.publicado else 'A série do dia a dia ainda não chegou ao banco: a plataforma publica com a meta do mês, de hora em hora.' }}</p>
@@ -73,7 +97,7 @@
   </section>
   <p class="cr-jan-nota">A barra é a geração que o Gerencial conta no dia, verde quando chega a 97% da meta do dia, âmbar de 90% a 97% e vermelha abaixo de 90% (a régua do Gerencial); a linha azul é o POA (eixo da direita). O POA e o PR são os do PR diário do Painel NOC: o dia com POA até 0,3 (sensor sem leitura) fica com a barra e sem PR.</p>
   {% endif %}
-{% else %}
+{% elif painel == 'disp' %}
   {% if not disp.dias %}
   <p class="cr-jan-vazio">Sem o diário da disponibilidade desta usina no banco (a usina não está no catálogo do Gerencial › Disponibilidade, que é só Full O&amp;M).</p>
   {% else %}
@@ -107,5 +131,46 @@
     {% endif %}
   </section>
   <p class="cr-jan-nota">A régua do Gerencial › Disponibilidade: as OS de religamento e de corretiva emergencial contam das 6 às 18 h, pesadas pela potência que pararam (usina inteira, cabine ou inversor). Horas de sol = as que caem nesse horário dentro do mês; perda = kWp parado × horas (sem a irradiação).</p>
+  {% endif %}
+{% else %}
+  {# os ativos falhando da Engenharia › Confiabilidade (Levi, 13/10/2026: "Para esses ativos falhando da engenharia,
+     conseguimos criar uma visão?"): a linha do tempo das OS dos 30 dias e, de cada ativo, o que a gaveta de lá mostra #}
+  {% if not at.ativos %}
+  <p class="cr-jan-vazio">Nenhum ativo desta usina em crítico ou atenção na Engenharia › Confiabilidade (OS de falha dos últimos {{ at.janela }} dias){% if at.monitorar %}; {{ at.monitorar }} em monitorar{% endif %}.{% if not at.completa %} A leitura das OS de falha do Fracttal ainda não terminou.{% endif %}</p>
+  {% else %}
+  <section class="cr-graf">
+    <div class="cr-graf-cab"><h3>As OS dos últimos {{ at.janela }} dias</h3>
+      <span class="cr-leg"><i class="cr-tl-f"></i>falha <i class="cr-tl-s"></i>serviço (fora da conta)</span></div>
+    <div class="cr-tl" style="--dias: {{ at.dias|length }}">
+      <span></span>{% for d in at.dias %}<span class="cr-tl-dia">{{ '%02d'|format(d.day) if (loop.index0 % 5 == 0 or loop.last) else '' }}</span>{% endfor %}
+      {% for a in at.ativos %}
+      <span class="cr-tl-nome" title="{{ a.nome }} · {{ a.cod }}"><i class="cr-dot cr-dot--{{ a.cls }}" aria-hidden="true"></i>{{ a.nome }}</span>
+      {% for c in a.linha %}<span class="cr-tl-cel{{ ' cr-tl-cel--hoje' if loop.last }}"{% if c.oss %} title="{{ c.dia.strftime('%d/%m') }}: {% for o in c.oss %}OS {{ o.os }} · {{ o.tipo }}{{ ' (serviço)' if o.servico }} · {{ o.st }}{{ '; ' if not loop.last }}{% endfor %}"{% endif %}>{% if c.falhas %}<i class="cr-tl-f">{{ c.falhas if c.falhas > 1 else '' }}</i>{% elif c.servicos %}<i class="cr-tl-s"></i>{% endif %}</span>{% endfor %}
+      {% endfor %}
+    </div>
+  </section>
+  {% for a in at.ativos %}
+  <section class="cr-graf cr-at">
+    <div class="cr-at-cab"><span class="cr-v cr-v--{{ a.cls }}">{{ a.nivel_txt }}</span>
+      <div><h3>{{ a.nome }}</h3><p class="mudo"><code>{{ a.cod }}</code> · {{ a.fam }}{% if a.crit %} · criticidade {{ a.crit }}{% endif %}{% if a.circuito %} · {{ a.circuito }}{% endif %}</p></div></div>
+    {% if a.porque %}<ul class="cr-at-porque">{% for p in a.porque %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}
+    <div class="cr-at-kpis">
+      <div><b>{{ a.falhas }}</b><span>falhas em {{ at.janela }} dias</span></div>
+      <div><b>{{ a.n7 }}</b><span>em 7 dias</span></div>
+      <div><b>{{ a.p90 if a.p90 is not none else '—' }}</b><span>P90 da família</span></div>
+      <div><b>{{ a.mtbf }}</b><span>MTBF</span></div>
+      <div><b>{{ a.mttr }}</b><span>MTTR</span></div>
+      <div><b class="cn-t-{{ a.disp_cls }}">{{ a.disp }}</b><span>disponibilidade do ativo</span></div>
+    </div>
+    <h4>As últimas OS ({{ a.os|length }} de {{ a.n30 }} em {{ at.janela }} dias)</h4>
+    <ol class="cr-at-oss">{% for o in a.os %}
+      <li class="{{ 'cr-at-servico' if o.servico }}"><span class="cr-at-os-cab"><span class="m">{{ o.d }}</span>
+        {% if o.url %}<a class="cn-link m" href="{{ o.url|na_raiz }}" target="_blank" rel="noopener">OS {{ o.os }}</a>{% else %}<span class="m">OS {{ o.os }}</span>{% endif %}
+        <span>{{ o.tipo }}</span>{% if o.servico %}<span class="cr-tag cr-tag--neutro">serviço</span>{% endif %}<span class="mudo">{{ o.st }}</span></span>
+        <b>{{ o.t }}</b>{% if o.nota %}<span class="mudo">{{ o.nota }}</span>{% endif %}</li>
+    {% endfor %}</ol>
+  </section>
+  {% endfor %}
+  <p class="cr-jan-nota">A régua da Engenharia › Confiabilidade (as OS de falha do Fracttal dos últimos {{ at.janela }} dias; a de serviço fica fora da conta): crítico com 4 falhas em 30 dias ou 3 em 7; atenção com 3 em 30, 2 em 7 ou acima do P90 da família (ou criticidade A com 2). Disponibilidade do ativo = MTBF ÷ (MTBF + MTTR), meta {{ (at.meta_disp * 100)|round|int }}%.{% if at.monitorar %} Mais {{ at.monitorar }} ativo{{ 's' if at.monitorar != 1 }} desta usina em monitorar.{% endif %}{% if not at.completa %} A leitura das OS de falha do Fracttal ainda não terminou: pode faltar OS.{% endif %} <a class="cn-link" href="{{ url_for(tela_confiabilidade) }}">Abrir a Confiabilidade</a></p>
   {% endif %}
 {% endif %}

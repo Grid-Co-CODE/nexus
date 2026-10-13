@@ -117,7 +117,7 @@
       {% for u in bl.linhas %}{% set x = u[b] %}
       <details class="cr-lin cr-lin--{{ x.nivel }}">
         <summary class="cr-g">
-          <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}{% if x.tag %}<em class="cr-tag cr-tag--{{ x.tag[0] }}">{{ x.tag[1] }}</em>{% endif %}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
+          <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}{% if x.tag %}{% if b == 'perf' %}<button type="button" class="cr-tag cr-tag--{{ x.tag[0] }} cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='ativos') }}" title="Ver os ativos falhando">{{ x.tag[1] }}</button>{% else %}<em class="cr-tag cr-tag--{{ x.tag[0] }}">{{ x.tag[1] }}</em>{% endif %}{% endif %}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
           {# na Performance, o valor abre a janela do dia a dia (Levi, 12/10/2026: "precisamos mostrar para o supervisor de
              onde está vindo!"); clicar fora do valor abre o detalhe da linha #}
           {% for k, rot in colunas[b] %}{% set v = x.valores[k] %}<span class="cr-col-{{ k }}">{% if b == 'perf' %}<button type="button" class="cr-v cr-v--{{ v.cls }} cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=k) }}" title="{{ rot }}: ver o dia a dia">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</button>{% else %}<span class="cr-v cr-v--{{ v.cls }}">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</span>{% endif %}</span>{% endfor %}
@@ -125,9 +125,9 @@
         </summary>
         <div class="cr-det">
           <dl class="cr-dl">
-            {% for i in x.det %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp'}.get(i.rot) if b == 'perf' else none %}
+            {% for i in x.det %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp', 'Ativos falhando': 'ativos'}.get(i.rot) if b == 'perf' else none %}
               <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
-              {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">dia a dia</button>{% endif %}
+              {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">{{ 'ver os ativos' if jan == 'ativos' else 'dia a dia' }}</button>{% endif %}
               {# a OS da PT abre a PT por cima, para aprovar sem sair da tela (Levi, 12/10/2026) #}
               {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
               {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
@@ -139,13 +139,8 @@
         </div>
       </details>
       {% else %}
-      <p class="mudo cr-vazio">Nenhuma usina pedindo algo neste bloco.</p>
+      <p class="mudo cr-vazio">Nenhuma usina neste filtro.</p>
       {% endfor %}
-      {% if bl.em_dia %}
-      <details class="cr-emdia"><summary><b>● {{ bl.em_dia|length }} usina{{ 's' if bl.em_dia|length != 1 }} em dia</b> · pode{{ 'm' if bl.em_dia|length != 1 }} esperar</summary>
-        <ul>{% for u in bl.em_dia %}<li>{{ u.usina }} <span>· {{ u[b].bem|join(', ') or 'sem dado das fontes deste bloco' }}</span></li>{% endfor %}</ul>
-      </details>
-      {% endif %}
     </section>
     {% endfor %}
   </div>
@@ -223,6 +218,28 @@
       completarPT();
     }).catch(function (e) {
       corpo.innerHTML = '<div class="cn-erro" role="alert"><b>Não consegui abrir agora (' + e.message + ').</b> Tente de novo.</div>';
+    });
+  });
+  // a Observação do responsável grava sem sair da janela: a resposta é a janela da Meta de novo, com a observação
+  // nova ou o motivo da recusa (a PT segue o envio normal: decide e volta à Visão)
+  dlg.addEventListener('submit', function (ev) {
+    var f = ev.target.closest('form[data-cr-obs]');
+    if (!f) { return; }
+    ev.preventDefault();
+    var bt = f.querySelector('button[type="submit"]');
+    if (bt) { bt.disabled = true; bt.textContent = 'Salvando…'; }
+    fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin'}).then(function (r) {
+      if (r.redirected && /\/entrar/.test(r.url)) { location.reload(); return null; }
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.text();
+    }).then(function (html) {
+      if (html !== null) { corpo.innerHTML = html; }
+    }).catch(function (e) {
+      if (bt) { bt.disabled = false; bt.textContent = 'Salvar observação'; }
+      var p = f.querySelector('.cr-obs-falha') || document.createElement('p');
+      p.className = 'cr-obs-falha cn-t-critico';
+      p.textContent = 'Não consegui salvar agora (' + e.message + '). O texto continua aqui: tente de novo.';
+      f.appendChild(p);
     });
   });
   dlg.addEventListener('click', function (ev) { if (ev.target === dlg) { dlg.close(); } });

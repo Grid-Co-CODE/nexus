@@ -256,6 +256,60 @@ def ativos() -> tuple[dict, dict]:
                        "sem_cadastro": g.get("sem_cadastro", False), "sinais": len(d.get("sinais") or [])}
 
 
+NIVEL_ATIVO = {"critico": "Crítico", "atencao": "Atenção", "monitorar": "Monitorar"}
+
+
+def _dia_da_os(d: str, hoje: date) -> date | None:
+    """O dia de uma OS da Confiabilidade ("13/10 09:30", sem o ano): o ano de hoje, ou o anterior se cair no futuro (a
+    janela é de 30 dias: a OS de 28/12 vista em 05/01 é do ano passado)."""
+    try:
+        dia, mes = (int(x) for x in str(d or "").split()[0].split("/")[:2])
+        x = date(hoje.year, mes, dia)
+    except (ValueError, IndexError):
+        return None
+    return x if x <= hoje else date(hoje.year - 1, mes, dia)
+
+
+def ativos_da_usina(uid: int, hoje: date) -> dict:
+    """A janela dos ativos falhando da usina (Levi, 13/10/2026: "Para esses ativos falhando da engenharia, conseguimos
+    criar uma visão?"): os sinais da Engenharia › Confiabilidade da usina em crítico e atenção (os mesmos do detalhe da
+    linha, na régua de lá, sem régua nova), cada um com o porquê, os números da gaveta de lá (falhas em 30 e em 7 dias,
+    o P90 da família, MTBF, MTTR e a disponibilidade do ativo) e as últimas OS; e a linha do tempo dos 30 dias (ativo ×
+    dia, a OS de falha e a de serviço). Os em monitorar só contados. Lê o que a Confiabilidade já leu (não refaz conta
+    nem lê o Fracttal de novo); não mexe nos dicionários dela (são o cache da tela de lá)."""
+    from ..engenharia import confiabilidade as C, os_falhas
+    from ..torres import engenharia as E
+    g = _engenharia()
+    sinais = [s for s in ((g.get("dados") or {}).get("sinais") or []) if s.get("usina_id") == uid]
+    dias = [hoje - timedelta(days=i) for i in range(C.JANELA_DIAS - 1, -1, -1)]
+    ordem = {"critico": 0, "atencao": 1}
+    ativos = []
+    for s in sorted((s for s in sinais if s.get("nivel") in ordem), key=lambda s: (ordem[s["nivel"]], -(s.get("nFalha") or 0))):
+        por_dia = collections.defaultdict(list)
+        for o in s.get("os") or []:
+            d = _dia_da_os(o.get("d"), hoje)
+            if d:
+                por_dia[d].append(o)
+        disp = s.get("disp")
+        ativos.append({
+            "nome": s.get("nome") or s.get("cod") or "", "cod": s.get("cod") or "", "fam": s.get("fam") or "",
+            "crit": s.get("crit") or "", "nivel": s["nivel"], "nivel_txt": NIVEL_ATIVO[s["nivel"]],
+            "cls": "critico" if s["nivel"] == "critico" else "alerta", "porque": list(s.get("porQue") or []),
+            "falhas": s.get("nFalha") or 0, "n7": s.get("n7") or 0, "n30": s.get("n30") or 0, "p90": s.get("p90"),
+            "servicos": s.get("nServico") or 0, "circuito": s.get("circuito") or "",
+            "mtbf": E._h(s.get("mtbf")), "mttr": E._h(s.get("mttr")), "disp": E._pct(disp),
+            "disp_cls": "neutro" if disp is None else ("ok" if disp >= C.META_DISP else "critico"),
+            "os": list(s.get("os") or []),
+            "linha": [{"dia": d, "oss": por_dia.get(d, []), "falhas": sum(1 for o in por_dia.get(d, []) if not o.get("servico")),
+                       "servicos": sum(1 for o in por_dia.get(d, []) if o.get("servico"))} for d in dias]})
+    est = os_falhas.estado()
+    return {"ativos": ativos, "dias": dias, "janela": C.JANELA_DIAS, "max_os": C.MAX_OS, "meta_disp": C.META_DISP,
+            "monitorar": sum(1 for s in sinais if s.get("nivel") == "monitorar"),
+            "criticos": sum(1 for a in ativos if a["nivel"] == "critico"),
+            "atencao": sum(1 for a in ativos if a["nivel"] == "atencao"),
+            "completa": est.get("completa", False), "sem_cadastro": g.get("sem_cadastro", False)}
+
+
 # ── Chamados (as OS de acompanhamento de chamado, no banco) ─────────────────────────────────────────────────────
 def chamados(hoje: date) -> tuple[dict, dict]:
     """{usina_id: abertos, em verificação e a lista}: o fato `nexus_chamados · fato_chamado` (o mesmo dado do quadro
@@ -613,15 +667,33 @@ def ordem_do_foco(u: dict):
 
 
 def bloco(usinas: list[dict], qual: str) -> dict:
-    """As linhas de um bloco: as que pedem algo (crítico, depois atenção, pelo peso do bloco; na Performance, no empate,
-    a mais longe da meta), as que podem esperar (em dia) e a triagem."""
-    def chave(u):
-        ating = (u.get("meta") or {}).get("atingimento")
-        return (-u[qual]["peso"], (ating if ating is not None else 999) if qual == "perf" else 0, u["usina"])
-    pedem = sorted((u for u in usinas if u[qual]["nivel"] != "ok"), key=chave)
-    em_dia = sorted((u for u in usinas if u[qual]["nivel"] == "ok"), key=lambda u: u["usina"])
+    """As linhas de um bloco e a triagem. TODAS as usinas viram linha, inclusive as em dia (Levi, 13/10/2026: "tem que
+    aparecer todas as usinas do responsável inclusive as que estão em dia"; até ali as em dia ficavam recolhidas no fim),
+    na ordem do bloco ("ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a
+    Performance pela meta do mês, da pior para a melhor (sem meta no fim); o Acompanhamento pela ronda (`ordem_da_ronda`).
+    A cor de cada linha continua a do nível dela."""
+    chave = ordem_da_meta if qual == "perf" else ordem_da_ronda
     tri = collections.Counter(u[qual]["nivel"] for u in usinas)
-    return {"linhas": pedem, "em_dia": em_dia, "tri": {n: tri.get(n, 0) for n in NIVEIS}}
+    return {"linhas": sorted(usinas, key=chave), "tri": {n: tri.get(n, 0) for n in NIVEIS}}
+
+
+def ordem_da_meta(u: dict):
+    """A Performance: da pior meta do mês para a melhor; sem meta publicada, no fim; no empate, o nome."""
+    ating = (u.get("meta") or {}).get("atingimento")
+    return (ating is None, ating if ating is not None else 0, u["usina"])
+
+
+RONDA_ORDEM = {"nunca": 0, "sem_ronda": 1, "longa_pendente": 2}
+
+
+def ordem_da_ronda(u: dict):
+    """O Acompanhamento pela ronda, a pior em cima, na régua da Central de atenção: nunca teve ronda; sem ronda há 7
+    dias ou mais (mais dias primeiro); ronda longa pendente; em dia (a mais antiga primeiro: "há 4 d" antes de "hoje");
+    sem dado de ronda no fim. No empate, o nome."""
+    r = u.get("ronda") or {}
+    dias = r.get("dias") if isinstance(r.get("dias"), (int, float)) and r.get("dias") < 999 else None
+    grupo = RONDA_ORDEM.get(r.get("tipo"), 3 if dias is not None else 4)
+    return (grupo, -(dias or 0), u["usina"])
 
 
 def soma(nome: str, usinas: list[dict]) -> dict:

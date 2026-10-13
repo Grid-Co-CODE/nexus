@@ -170,6 +170,18 @@ FATOS = (
                     "Domínio do App desde 08/10, antes da 1ª gravação (decisão 3 do Levi): vala sem 'Suja', sensor "
                     "'Sujo'/'Limpo'/vazio (não verificado) e a anulação só com anula_id. No banco desde 08/10: as 63 "
                     "linhas da validação por foto (GET em 09/10)"),
+    # o Nexus é a FONTE deste (Levi, 13/10/2026): a observação do Responsável O&M sobre a usina, escrita na janela da Meta
+    # da Visão do responsável, "salvo em algum canto do Nexus para posteriormente poder juntar esse comentário para
+    # relatórios"
+    Fato("observacao_responsavel", "Observação do responsável", "campo", "nexus_observacoes · fato_observacao_responsavel",
+         "1 linha = 1 observação escrita no Nexus por 1 Responsável O&M sobre 1 usina",
+         _d(data=("id", "data_id (o dia de Brasília em que foi escrita; mes_id = o mês que a janela mostrava)"),
+            usina=("id", "usina_id"), pessoa=("id", "pessoa_id; pessoa_hmac quando o cadastro não acha a pessoa")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_observacoes · fato_observacao_responsavel",),
+         janela_origem="o Nexus é a fonte",
+         observacao="o texto e o nome de quem escreveu só cifrados (Cofre, a chave do cadastro); do_responsavel = sim "
+                    "quando quem escreveu é o Responsável O&M da usina, não quando cobria outro (férias). Só "
+                    "responsável escreve (pelo login do Fracttal). O banco não apaga: nada se edita"),
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", fato_pt.GRAO,
          _d(data=("id", "data_id_criacao, data_id_decisao (papéis)"), usina=("id", "usina_id"),
             equipe=("id", "equipe_id: papel registro (Região)"),
@@ -563,6 +575,9 @@ LIVROS = (
           "nexus/campo/ronda_avulsa.py + ferramentas/importar_avulsas_planilha.py --gravar", True,
           "criado em 08/10/2026 pela importação da validação por foto: 63 linhas (origem validacao_foto, usina_id "
           "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10"),
+    Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
+          "nexus/campo/observacao_responsavel.py", False,
+          "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável"),
     Livro("nexus_pt_decisoes", ("fato_decisao_pt",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "o livro não existe no banco (GET em 11/10/2026): nenhuma decisão gravada. A aba era 'decisoes' até a "
           "decisão 4 (11/10/2026), nunca gravada; o App lê a fato_decisao_pt"),

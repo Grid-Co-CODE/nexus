@@ -433,9 +433,13 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
 - **Dois blocos lado a lado** (empilham abaixo de 1180 px): **Performance** (meta, PR, disponibilidade; os ativos
   falhando como etiqueta na linha e no detalhe) e **Acompanhamento** (rondas, PT, chamados, extintores). Cada usina é
   uma linha compacta com os valores coloridos pela régua; clicar abre o detalhe e os links das telas donas (`<details>`,
-  sem script). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só atenção; em dia) e a
-  própria ordem (o peso dos alertas do bloco: agora 20, crítico 10, atenção 3; na Performance, no empate, a mais longe
-  da meta); as em dia ficam recolhidas no fim do bloco, com o porquê ("na meta (101%), disponibilidade 100%").
+  sem script). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só atenção; em dia) e
+  **todas as usinas viram linha, inclusive as em dia** (Levi, 13/10/2026: "Tem que aparecer todas as usinas do
+  responsável inclusive as que estão em dia"; até ali as em dia ficavam recolhidas no fim do bloco). **A ordem de cada
+  bloco** ("Ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a Performance
+  pela meta do mês, da pior para a melhor, sem meta no fim (`ordem_da_meta`); o Acompanhamento pela ronda, a pior em
+  cima (`ordem_da_ronda`: nunca teve; sem ronda há 7 dias ou mais, mais dias primeiro; longa pendente; em dia, a mais
+  antiga primeiro; sem dado). A cor da linha continua a do nível dela.
 - **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
@@ -498,6 +502,26 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
     (`responsaveis_pt`, `_resp_pt.html`), a mesma linha e a mesma decisão da tela da PT, assinada com o login do
     Fracttal; o `volta` (só /t/campo/) traz de volta à Visão com os filtros. A página do Nexus não abre em iframe
     (`base.html` sai do iframe): por isso o pedaço de página, e o script da tela busca a assinatura e quem assina.
+  - **Ativos falhando** (Levi, 13/10/2026: "Para esses ativos falhando da engenharia, conseguimos criar uma visão?"):
+    a etiqueta "N ativo(s) crítico(s)/em atenção" da linha e o "ver os ativos" do detalhe abrem a janela `ativos`
+    (`ativos_da_usina`): os sinais da Engenharia › Confiabilidade da usina em crítico e atenção (os mesmos do detalhe,
+    na régua de lá; os em monitorar só contados), a **linha do tempo das OS dos 30 dias** (ativo × dia: a OS de falha
+    cheia, a de serviço vazada, o número quando há mais de uma no dia) e, de cada ativo, o que a gaveta de lá mostra: o
+    porquê, falhas em 30 e 7 dias, o P90 da família, MTBF, MTTR, a disponibilidade do ativo e as últimas OS (link do
+    Fracttal). Lê o que a Confiabilidade já leu (`engenharia._dados()`), sem ler o Fracttal de novo e sem mexer no cache
+    de lá; a data da OS vem sem o ano ("13/10 09:30": `_dia_da_os` põe o ano de hoje, ou o anterior se cair no futuro).
+  - **Observação do responsável** (Levi, 13/10/2026: "um campo para Observação do Responsável ... ficará salvo o dia e
+    hora, só os responsáveis podem comentar, incluindo responsáveis de outras usinas ... para caso de férias! ... salvo
+    em algum canto do Nexus para posteriormente poder juntar esse comentário para relatórios"): embaixo da tabela da
+    Meta, a lista (a mais nova em cima: quem, dia e hora; "cobrindo" quando quem escreveu não era o responsável da
+    usina) e o campo para escrever. Grava em `nexus_observacoes · fato_observacao_responsavel`
+    (`nexus/campo/observacao_responsavel.py`, o mesmo caminho da ronda avulsa): no BANCO, para o PC e o servidor
+    gravarem e lerem o mesmo livro; o texto e o nome só cifrados (o Cofre da chave do cadastro), a pessoa por
+    `pessoa_id` + `pessoa_hmac`, `do_responsavel` sim/não. **Quem escreve:** quem entrou pelo Fracttal e é Responsável
+    O&M de alguma usina, em qualquer usina; o administrador pela senha não escreve. A gravação devolve a janela da
+    Meta de novo (o script da tela envia sem sair da janela; recusa volta com o motivo e o texto digitado); pedido de
+    outro site é 403 (a régua da moldura). Para relatório: `para_relatorio(de, ate)` decifra no Nexus. O livro nasce na
+    1ª observação de um responsável (registrado no catálogo antes). Nada se edita nem se apaga.
   - Sem o dado no banco (a série ou as OS antes da 1ª publicação; a usina sem aba no BD), a janela diz por quê.
 - **Isolamento** (regra 13): cada fonte em `_ler_fonte`; a que falha volta vazia e a tela diz qual. Sem o livro da meta
   ou o dos chamados (antes da 1ª publicação), a tela avisa e não cobra por eles.

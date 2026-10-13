@@ -19,6 +19,7 @@ from werkzeug.datastructures import ImmutableMultiDict
 from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
 from ...campo import responsaveis as campo_resp
+from ...campo import observacao_responsavel as campo_obs
 from ...campo import responsaveis_graficos as campo_graficos
 from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
@@ -391,13 +392,57 @@ def responsaveis():
 # vindo!"): um pedaço de página (sem a moldura do Nexus) que a tela carrega num <dialog> com o fundo desfocado. Meta: a
 # tabela do dia a dia; PR: a geração com a linha do POA e a curva do PR; Disponibilidade: o mapa diário e as OS que
 # formaram o valor. Cada uma lê o MESMO dado da tela dona, publicado no banco pela plataforma.
-PAINEIS = {"meta": "Meta do mês", "pr": "PR do mês", "disp": "Disponibilidade do mês"}
+PAINEIS = {"meta": "Meta do mês", "pr": "PR do mês", "disp": "Disponibilidade do mês", "ativos": "Ativos falhando"}
 
 
 @bp.route("/responsaveis/usina/<int:usina_id>/<painel>")
 def responsaveis_painel(usina_id, painel):
     if painel not in PAINEIS:
         abort(404)
+    return _resp_painel(usina_id, painel)
+
+
+def _observacoes(u: dict, d: dict, aviso: str = "", erro: str = "", texto: str = "") -> dict:
+    """A Observação do responsável na janela da Meta (Levi, 13/10/2026): as da usina, a mais nova em cima, e se quem
+    está na tela pode escrever (Responsável O&M de alguma usina, pelo login do Fracttal; quem cobre outro também)."""
+    logado = _responsavel_do_login(d)
+    usuario = session.get("usuario") or {}
+    try:
+        lista, erro_leitura = campo_obs.da_usina(u["usina_id"]), ""
+    except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, o resto segue
+        lista, erro_leitura = [], f"Não consegui ler as observações no banco ({type(e).__name__})"
+    pode = bool(logado and usuario.get("email"))
+    return {"lista": lista, "pode": pode, "quem": usuario.get("nome") or logado, "aviso": aviso,
+            "erro": erro or erro_leitura, "texto": texto,
+            "cobrindo": u.get("responsavel") if pode and visao._norm_nome(logado) != visao._norm_nome(u.get("responsavel"))
+            else ""}
+
+
+@bp.route("/responsaveis/usina/<int:usina_id>/observacao", methods=["POST"])
+def responsaveis_observacao(usina_id):
+    """Grava a Observação do responsável e devolve a janela da Meta de novo (com a observação nova, ou com o motivo da
+    recusa e o texto digitado). Só da própria página (a régua da moldura: pedido de outro site é 403)."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    leitura = campo_resp.visao_responsaveis()
+    u = next((x for x in (leitura.dados or {}).get("usinas") or [] if x["usina_id"] == usina_id), None)
+    if u is None:
+        abort(404)
+    hoje = visao._agora().date()
+    texto = request.form.get("texto") or ""
+    try:
+        campo_obs.escrever(usina_id, texto, session.get("usuario"), _responsavel_do_login(leitura.dados or {}),
+                           u.get("responsavel") or "", hoje.year * 100 + hoje.month)
+    except campo_obs.Recusada as e:
+        return _resp_painel(usina_id, "meta", obs_erro=str(e), obs_texto=texto)
+    except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, o texto digitado não se perde
+        return _resp_painel(usina_id, "meta", obs_texto=texto,
+                            obs_erro=f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes")
+    return _resp_painel(usina_id, "meta", obs_aviso="Observação salva")
+
+
+def _resp_painel(usina_id, painel, obs_aviso="", obs_erro="", obs_texto=""):
     leitura = campo_resp.visao_responsaveis()
     u = next((x for x in (leitura.dados or {}).get("usinas") or [] if x["usina_id"] == usina_id), None)
     if u is None:
@@ -417,11 +462,16 @@ def responsaveis_painel(usina_id, painel):
             ctx.update(serie=serie, tabela=campo_resp.tabela_meta(serie, disp, (u.get("disp") or {}).get("disp")),
                        graf_ger=campo_graficos.geracao(serie["dias"], dias_mes) if serie["dias"] else None,
                        graf_pr=campo_graficos.pr(serie["dias"], dias_mes) if serie["dias"] else None)
-        else:
+        elif painel == "disp":
             ctx.update(disp=campo_resp.disp_diaria(usina_id, hoje.strftime("%Y-%m"), nomes),
                        oss=campo_resp.os_disponibilidade(usina_id, hoje.strftime("%Y-%m"), nomes))
+        else:       # os ativos falhando da Engenharia › Confiabilidade (Levi, 13/10/2026)
+            ctx.update(at=campo_resp.ativos_da_usina(usina_id, hoje),
+                       tela_confiabilidade="torre_engenharia.confiabilidade")
     except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, a tela segue
         ctx["erro"] = f"Não consegui ler o banco do Nexus ({type(e).__name__})"
+    if painel == "meta":
+        ctx["obs"] = _observacoes(u, leitura.dados or {}, obs_aviso, obs_erro, obs_texto)
     return render_template("campo/_resp_painel.html", **ctx, duracao=_idade_min)
 
 

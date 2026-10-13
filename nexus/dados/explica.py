@@ -17,6 +17,7 @@ RESUMO = {
     "ronda": "Cada ronda feita nas usinas, pelo App ou lançada no Nexus",
     "ronda_checklist": "As respostas das rondas antigas que ficaram sem OS",
     "ronda_avulsa": "Ronda lançada à mão no Nexus e o nível validado pela foto",
+    "observacao_responsavel": "A observação do Responsável O&M sobre a usina, com dia e hora",
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
     # ── Segurança · HSEQ ──
@@ -67,6 +68,9 @@ PARA_QUE = {
     "ronda_avulsa": "Recebe a ronda lançada à mão no Nexus por quem a fez (sem o App), o nível de vegetação e "
                     "sujidade validado pela foto e a anulação de um lançamento. A ronda avulsa válida entra na tabela "
                     "de Ronda e conta na cobertura; a validação pela foto fica fora, porque não é uma ronda feita.",
+    "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
+                              "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
+                              "serve para juntar as observações nos relatórios.",
     "decisao": "Registra as decisões tomadas no painel do App de Campo: a aprovação de uma tarefa, o tratamento de um "
                "alerta da Central de atenção e a devolução de uma tarefa ao técnico. Serve para saber quem decidiu o "
                "quê, quando e sobre qual OS.",

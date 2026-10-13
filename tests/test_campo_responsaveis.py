@@ -160,13 +160,28 @@ def test_os_dois_blocos_com_a_regua_da_tela_dona(tela):
     assert [i["rot"] for i in a["acomp"]["det"]] == ["Ronda", "PT", "Chamados", "Extintores"]
 
 
-def test_cada_bloco_ordena_o_proprio_foco_e_recolhe_o_que_esta_em_dia(tela):
+def test_cada_bloco_mostra_todas_as_usinas_na_ordem_dele(tela):
+    """Levi, 13/10/2026: "Tem que aparecer todas as usinas do responsável inclusive as que estão em dia" e "Ordene da
+    pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"."""
     us = R.visao_responsaveis().dados["usinas"]
     perf, acomp = R.bloco(us, "perf"), R.bloco(us, "acomp")
-    assert [u["usina"] for u in perf["linhas"]] == ["Altair"]
-    assert [u["usina"] for u in perf["em_dia"]] == ["Brodowski 1", "Coração 1"]
-    assert [u["usina"] for u in acomp["linhas"]] == ["Altair", "Coração 1"]     # peso 29 contra 16
+    # a meta: Altair 85%, Coração 1 99%, Brodowski 1 100% (as duas linhas do Gerencial somadas)
+    assert [u["usina"] for u in perf["linhas"]] == ["Altair", "Coração 1", "Brodowski 1"]
+    # a ronda: a Coração 1 nunca teve; a Altair tem a longa pendente; a Brodowski 1 por último
+    assert [u["usina"] for u in acomp["linhas"]] == ["Coração 1", "Altair", "Brodowski 1"]
+    assert "em_dia" not in perf
     assert perf["tri"] == {"critico": 1, "atencao": 0, "ok": 2} and acomp["tri"] == {"critico": 2, "atencao": 0, "ok": 1}
+
+
+def test_a_ordem_da_ronda_e_da_meta():
+    def u(nome, tipo=None, dias=None, ating=None):
+        return {"usina": nome, "ronda": {"tipo": tipo, "dias": dias}, "meta": {"atingimento": ating}}
+    us = [u("Hoje", dias=0), u("Quatro dias", dias=4), u("Sem dado", dias=999), u("Longa", "longa_pendente", 2),
+          u("Treze dias", "sem_ronda", 13), u("Oito dias", "sem_ronda", 8), u("Nunca", "nunca", 999)]
+    assert [x["usina"] for x in sorted(us, key=R.ordem_da_ronda)] == [
+        "Nunca", "Treze dias", "Oito dias", "Longa", "Quatro dias", "Hoje", "Sem dado"]
+    ms = [u("B", ating=99.0), u("Sem meta"), u("A", ating=45.0), u("C", ating=120.0)]
+    assert [x["usina"] for x in sorted(ms, key=R.ordem_da_meta)] == ["A", "B", "C", "Sem meta"]
 
 
 def test_pt_parada_de_hoje_e_agora_e_vai_para_o_topo():
@@ -219,7 +234,7 @@ def test_tela_dos_cartoes_e_a_dos_dois_blocos(tela, logado):
     perf = html[html.index('id="cr-perf"'):html.index('id="cr-acomp"')]
     acomp = html[html.index('id="cr-acomp"'):html.index('class="cn-nota"')]
     assert "Altair" in perf and "85%" in perf and "1 ativo crítico" in perf and "Meta do mês em" not in perf
-    assert "1 usina em dia" in perf and "Brodowski 1" in perf               # em dia, recolhida no fim do bloco
+    assert "Brodowski 1" in perf and "usina em dia</b>" not in perf          # em dia vira linha (13/10/2026)
     assert "1 vencido" in acomp and "Tracker 1 STI" in acomp and "aberto há 26 d" in acomp
     assert "Coração 1" not in html                                         # é do outro responsável
     assert "Tempo do COS" not in html and "Visão gerencial da plataforma" in html
@@ -347,3 +362,119 @@ def test_a_tela_abre_as_janelas_pelo_valor_e_pela_os_da_pt(tela, logado):
     assert 'id="cr-modal"' in html and "data-cr-painel=" in html
     assert "/t/campo/responsaveis/usina/1/meta" in html and "/t/campo/responsaveis/usina/1/disp" in html
     assert "/t/campo/responsaveis/pt/PT-1" in html and "dia a dia" in html
+
+
+
+# ── Os ativos falhando (Levi, 13/10/2026: "Para esses ativos falhando da engenharia, conseguimos criar uma visão?") ──
+def _sinal_com_os():
+    hoje = datetime.now(BRT)
+    d = lambda n: (hoje - timedelta(days=n)).strftime("%d/%m %H:%M")    # noqa: E731
+    return {"usina_id": 1, "nivel": "critico", "nome": "Inversor 2.4 Huawei SUN2000-215KTL-H3", "cod": "THPN-ALT100-INVR2.4",
+            "fam": "Inversor", "crit": "A", "circuito": "Cabine 2", "porQue": ["4 falhas em 30 dias", "2 falhas em 7 dias"],
+            "nFalha": 4, "n7": 2, "n30": 5, "nServico": 1, "p90": 2, "mtbf": 350.0, "mttr": 30.0, "disp": 0.92,
+            "os": [{"os": "15101", "t": "Inversor desligado", "nota": "religado", "url": "https://one.fracttal.com/tasks/wo/1",
+                    "d": d(1), "tipo": "Corretiva", "st": "Finalizada", "quem": "", "prio": "", "servico": False},
+                   {"os": "15102", "t": "Inversor desligado", "nota": "", "url": "", "d": d(1), "tipo": "Corretiva",
+                    "st": "Finalizada", "quem": "", "prio": "", "servico": False},
+                   {"os": "15050", "t": "Troca de fusível", "nota": "", "url": "", "d": d(12), "tipo": "Corretiva",
+                    "st": "Finalizada", "quem": "", "prio": "", "servico": True}]}
+
+
+def test_a_janela_dos_ativos_falhando(tela, logado, monkeypatch):
+    from nexus.engenharia import os_falhas
+    monkeypatch.setattr(R, "_engenharia", lambda: {"dados": {"sinais": [_sinal_com_os(), *SINAIS]}, "sem_cadastro": False})
+    monkeypatch.setattr(os_falhas, "estado", lambda: {"completa": True, "lendo": False})
+    hoje = datetime.now(BRT).date()
+    at = R.ativos_da_usina(1, hoje)
+    assert [a["nome"] for a in at["ativos"]] == ["Inversor 2.4 Huawei SUN2000-215KTL-H3", "Inversor 1"]
+    a = at["ativos"][0]
+    assert len(a["linha"]) == 30 and a["linha"][-1]["dia"] == hoje
+    assert a["linha"][-2]["falhas"] == 2 and a["linha"][-13]["servicos"] == 1            # ontem 2 falhas; há 12 dias, serviço
+    assert (a["mtbf"], a["mttr"], a["disp"], a["disp_cls"]) == ("350 h", "30,0 h", "92,0%", "ok")
+    html = logado.get("/t/campo/responsaveis/usina/1/ativos").get_data(as_text=True)
+    assert "<html" not in html and "Ativos falhando" in html and "2 críticos</b>" in html and "0 em atenção" not in html
+    assert "As OS dos últimos 30 dias" in html and 'class="cr-tl-f">2<' in html and "cr-tl-s" in html
+    assert "Inversor 2.4 Huawei SUN2000-215KTL-H3" in html and "P90 da família" in html and "4 falhas em 30 dias" in html
+    assert "https://one.fracttal.com/tasks/wo/1" in html and "Abrir a Confiabilidade" in html
+    # sem ativo em crítico ou atenção, a janela diz
+    html = logado.get("/t/campo/responsaveis/usina/2/ativos").get_data(as_text=True)
+    assert "Nenhum ativo desta usina em crítico ou atenção" in html and "1 em monitorar" in html
+
+
+def test_o_dia_da_os_sem_o_ano():
+    assert R._dia_da_os("28/12 10:00", date(2027, 1, 5)) == date(2026, 12, 28)
+    assert R._dia_da_os("03/01 08:00", date(2027, 1, 5)) == date(2027, 1, 3)
+    assert R._dia_da_os("", date(2027, 1, 5)) is None
+
+
+def test_a_etiqueta_e_o_detalhe_abrem_os_ativos(tela, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    assert html.count("/t/campo/responsaveis/usina/1/ativos") == 2           # a etiqueta e o "ver os ativos"
+    assert "ver os ativos" in html and 'class="cr-tag cr-tag--critico cr-abre"' in html
+
+
+# ── A Observação do responsável (Levi, 13/10/2026) ────────────────────────────────────────────────────────────────
+def _responsavel(cliente, email="beltrano@exemplo.test", nome="Beltrano Supervisor"):
+    from conftest import SENHA_TESTE
+    cliente.post("/entrar", data={"senha": SENHA_TESTE})
+    with cliente.session_transaction() as s:
+        s["usuario"] = {"email": email, "nome": nome, "perfil": ""}
+    return cliente
+
+
+def test_a_observacao_do_responsavel_vai_cifrada_com_dia_e_hora(tela, cliente, banco):
+    import json
+    from test_campo_visao import CHAVE_CADASTRO
+    from nexus.cadastro.cifra import Cofre
+    from nexus.campo import observacao_responsavel as O
+    c = _responsavel(cliente)
+    html = c.get("/t/campo/responsaveis/usina/3/meta").get_data(as_text=True)
+    assert "Observação do responsável" in html and "Nenhuma observação nesta usina ainda" in html
+    assert 'data-cr-obs' in html and "como Beltrano Supervisor)" in html                 # a usina é dele: sem "cobrindo"
+    r = c.post("/t/campo/responsaveis/usina/3/observacao", data={"texto": "Inversor 3 trocado; a geração volta amanhã."})
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Observação salva" in html and "Inversor 3 trocado" in html and "<html" not in html
+    linhas = O.ler_todas()
+    assert len(linhas) == 1
+    x = linhas[0]
+    assert (x["usina_id"], x["do_responsavel"], x["tela"]) == (3, "sim", "meta")
+    assert x["data_id"] == int(datetime.now(BRT).strftime("%Y%m%d")) and x["escrita_em"].endswith("Z")
+    bruto = json.dumps(x, ensure_ascii=False)
+    assert "Inversor 3" not in bruto and "Beltrano" not in bruto and "beltrano@" not in bruto     # nada em claro no banco
+    cofre = Cofre(CHAVE_CADASTRO)
+    assert cofre.decifrar(x["texto_cifrado"], f"banco/observacoes/{x['id']}/texto").startswith("Inversor 3 trocado")
+    assert json.loads(cofre.decifrar(x["quem_cifrado"], f"banco/observacoes/{x['id']}/quem"))["nome"] == "Beltrano Supervisor"
+    # para os relatórios: decifrada, com a usina do cadastro
+    with c.application.app_context():
+        rel = O.para_relatorio()
+    assert [(o["usina"], o["nome"], o["texto"][:10]) for o in rel] == [("Coração 1", "Beltrano Supervisor", "Inversor 3")]
+
+
+def test_responsavel_de_outra_usina_comenta_cobrindo_ferias(tela, cliente, banco):
+    from nexus.campo import observacao_responsavel as O
+    c = _responsavel(cliente)                                  # o Beltrano é da Coração 1; a Altair é do Ciclano
+    assert "cobrindo Ciclano Chefe" in c.get("/t/campo/responsaveis/usina/1/meta").get_data(as_text=True)
+    html = c.post("/t/campo/responsaveis/usina/1/observacao", data={"texto": "Cobrindo as férias do Ciclano."}).get_data(as_text=True)
+    assert "Observação salva" in html and ">cobrindo</span>" in html
+    assert O.ler_todas()[0]["do_responsavel"] == "não"
+
+
+def test_so_responsavel_escreve(tela, logado, banco):
+    from nexus.campo import observacao_responsavel as O
+    html = logado.get("/t/campo/responsaveis/usina/1/meta").get_data(as_text=True)    # o administrador, sem Fracttal
+    assert "Só os Responsáveis O&amp;M escrevem aqui" in html and "data-cr-obs" not in html
+    html = logado.post("/t/campo/responsaveis/usina/1/observacao", data={"texto": "teste"}).get_data(as_text=True)
+    assert "Só os Responsáveis O&amp;M escrevem a observação" in html and O.ler_todas() == []
+    # pedido de outro site não grava
+    r = logado.post("/t/campo/responsaveis/usina/1/observacao", data={"texto": "x"}, headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+
+
+def test_observacao_vazia_ou_comprida_e_recusada_e_o_texto_fica(tela, cliente, banco):
+    from nexus.campo import observacao_responsavel as O
+    c = _responsavel(cliente)
+    assert "Escreva a observação antes de salvar" in c.post("/t/campo/responsaveis/usina/3/observacao",
+                                                           data={"texto": "   "}).get_data(as_text=True)
+    longo = "x" * (O.TEXTO_MAX + 1)
+    html = c.post("/t/campo/responsaveis/usina/3/observacao", data={"texto": longo}).get_data(as_text=True)
+    assert "passou de 2000 caracteres" in html and longo in html and O.ler_todas() == []
