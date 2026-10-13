@@ -673,8 +673,12 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 .cr-v small{font-size:11px;font-weight:500;color:var(--mudo)}
 .cr-v--critico{color:var(--critico);background:var(--critico-suave)}
 .cr-v--alerta{color:var(--alerta);background:var(--alerta-suave)}
-.cr-v--ok{color:var(--ok)}
+.cr-v--ok{color:var(--verde);background:var(--verde-suave)}
+/* o positivo em pílula verde musgo com o texto verde Grid (Levi, 13/10/2026: no escuro estava fonte verde em fundo
+   branco, o do botão do navegador); no claro, o texto é o musgo #566610 (o --verde-texto, 5,1:1 no verde-suave) */
+:root[data-tema="claro"] .cr-v--ok{color:var(--verde-texto)}
 .cr-v--neutro{color:var(--mudo)}
+button.cr-v--neutro{background:transparent}
 .cr-seta{color:var(--mudo);font-size:13px}
 .cr-lin[open] .cr-seta{transform:rotate(180deg)}
 .cr-det{display:grid;gap:10px;padding:6px 16px 14px 33px;background:var(--superficie-2)}
