@@ -1467,8 +1467,69 @@ def zeladoria() -> leitura.Leitura:
     return _ler(("visao_zeladoria",), calcular)
 
 
-# (o Ranking saiu em 08/10/2026 com a tela dele, Levi: "ordens de serviço e imagens da ronda e ranking são
-# redundantes"; a régua 60/40 vive nos comparativos do Painel das Rondas)
+# (o Ranking de 06/10, a comparação por região e equipe, saiu em 08/10/2026 com a tela dele, Levi: "ordens de serviço e
+# imagens da ronda e ranking são redundantes"; a régua 60/40 vive nos comparativos do Painel das Rondas)
+
+
+# ── Ranking de pontos (13/10/2026) ────────────────────────────────────────────────────────────────────────────────
+# Levi: "Quero que traga o ranking de pontos dos técnicos para o Nexus. Cria uma seção de Ranking de Pontos no App de
+# Campo!". É o placar do CICLO do App (`_ciclo_v2` no function_app.py: a régua de 01/09/2026 revista em 30/09; o App
+# Setting `PLACAR_V2` diz se é ela que os técnicos veem): as melhores tarefas com o peso do tipo, a anulação pelas notas
+# abaixo do piso, as rondas num balde com teto, os bônus das semanas encerradas e os mínimos (quem não alcança fica FORA
+# DO CICLO, não em último). Quem calcula é o App; o Nexus mostra o que ele publica no livro `ranking_app_campo` (o mês
+# corrente e o anterior, de hora em hora aos :25), sem recalcular: recalcular já deu errado (a nota do coletor batia com a
+# do painel do App em 14% das tarefas, 05/10). A pessoa vem como HMAC do e-mail; o nome sai do cadastro do App, na hora,
+# e o código sem dono fica sem nome (nunca o código na tela). Não é o Ranking que saiu em 08/10 (comparação por região).
+LIVRO_RANKING = "ranking_app_campo"
+_MES_RANKING = re.compile(r"^\d{4}-\d{2}$")
+# a régua de cada mês vem nas colunas do próprio livro (o App a lê dos App Settings PLACAR_*): a tela explica com os números
+# que valem, e não com os de quando ela foi escrita
+_REGUA_RANKING = (("piso", "Piso da nota"), ("teto", "Teto de tarefas"), ("anula_max", "Anulação máxima"),
+                  ("ronda_teto", "Teto das rondas (pts)"), ("min_tarefas", "Mínimo de tarefas"),
+                  ("min_cumprimento", "Mínimo de cumprimento (%)"), ("bonus_prog", "Bônus programação (%)"),
+                  ("bonus_prev", "Bônus preventivas (%)"))
+
+
+def _pessoa_do_ranking(r: dict, nome: str) -> dict:
+    def n(col):
+        return _int(r.get(col)) or 0
+    return {"posicao": _int(r.get("Posição")), "tecnico": nome, "regiao": str(r.get("Região") or "").strip(),
+            "total": n("Total (pts)"), "tarefas_pts": n("Tarefas (pts)"), "rondas_pts": n("Rondas (pts)"),
+            "bonus": n("Bônus (pts)"), "bonus_prog": n("Bônus programação (pts)"),
+            "bonus_prev": n("Bônus preventivas (pts)"), "tarefas": n("Tarefas registradas"), "os": n("OS distintas"),
+            "contadas": n("Tarefas contadas"), "acima_do_teto": n("Acima do teto"), "abaixo_do_piso": n("Abaixo do piso"),
+            "anuladas": n("Anuladas"), "devolvidas": n("Devolvidas"), "nota_media": _int(r.get("Nota média")),
+            "rondas": n("Rondas"), "rondas_no_teto": _sim(r.get("Rondas no teto")), "programado": n("Programado"),
+            "concluido": n("Concluído"), "cumprimento": _int(r.get("Cumprimento (%)")),
+            "pontualidade": _int(r.get("Pontualidade (%)")), "sequencia": n("Sequência (dias)"), "sem_gps": n("Sem GPS"),
+            "motivo": str(r.get("Motivo fora do ciclo") or "").strip()}
+
+
+def ranking_pontos() -> leitura.Leitura:
+    """{"meses": [{"mes", "classificacao", "fora", "calculado_em", "regua", "vale"}], "sem_nome"}, o mês mais novo
+    primeiro. `classificacao` na ordem do App (a posição dele); `fora` = fora do ciclo, pelos pontos."""
+    def calcular():
+        quem = _quem()
+        meses, sem_nome = {}, 0
+        for r in _livro(LIVRO_RANKING):
+            mes = str(r.get("Mês") or "").strip()[:7]
+            if not _MES_RANKING.match(mes):
+                continue
+            m = meses.setdefault(mes, {"mes": mes, "classificacao": [], "fora": [], "calculado_em": "", "vale": "",
+                                       "regua": {}})
+            nome = _nome(quem, r.get("Técnico (HMAC)"))
+            sem_nome += 0 if nome else 1
+            (m["classificacao"] if _sim(r.get("No ciclo")) else m["fora"]).append(_pessoa_do_ranking(r, nome))
+            m["calculado_em"] = max(m["calculado_em"], str(r.get("Calculado em") or "").strip())
+            m["vale"] = m["vale"] or str(r.get("Régua") or "").strip().lower()
+            for k, col in _REGUA_RANKING:
+                if k not in m["regua"] and _int(r.get(col)) is not None:
+                    m["regua"][k] = _int(r.get(col))
+        for m in meses.values():
+            m["classificacao"].sort(key=lambda p: (p["posicao"] or 10 ** 6, -p["total"], p["tecnico"]))
+            m["fora"].sort(key=lambda p: (-p["total"], p["tecnico"]))
+        return {"meses": [meses[k] for k in sorted(meses, reverse=True)], "sem_nome": sem_nome}
+    return _ler(("visao_ranking_pontos",), calcular)
 
 
 # ── Equipe e supervisor das usinas do Fracttal ───────────────────────────────────────────────────────────────────

@@ -27,16 +27,44 @@ usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação d
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
 | Zeladoria | `zeladoria_app_campo` | `visao.zeladoria` (conta nossa) |
 | Triagem de qualidade | `fechamentos_app_campo` + rondas | regras copiadas do App |
+| **Ranking de pontos** (13/10/2026) | `ranking_app_campo` (o placar do ciclo, que o App publica) | **o App** (`_ciclo_v2`); o Nexus só mostra (ver "Ranking de pontos" abaixo) |
 | Rotas do dia | placeholder: programação do PCM + localização das usinas | — |
 
 **Saíram em 08/10/2026: Ordens de serviço, Imagens da ronda e Ranking** (Levi: "ordens de serviço e imagens da ronda e
 ranking são redundantes"): a nota do fechamento está na Aprovação e na Triagem, a comparação por região, equipe e
 supervisor no Painel das Rondas, as fotos no histórico da usina. Saíram do menu, com rota, template, `campo/ordens.py`,
-`visao.ranking` e os testes delas; `/t/campo/os`, `/ranking` e `/imagens` levam à Central (`TELAS_QUE_SAIRAM`, para
-quem guardou o endereço). O `_gestao_os` (a conta da antiga Ordens) saiu da cópia das regras do App na recópia de 09/10
+`visao.ranking` e os testes delas; `/t/campo/os` e `/imagens` levam à Central (`TELAS_QUE_SAIRAM`, para quem guardou o
+endereço). O `/ranking` voltou em 13/10/2026 com OUTRA tela, o Ranking de pontos (abaixo); a comparação por região e
+equipe não voltou. O `_gestao_os` (a conta da antiga Ordens) saiu da cópia das regras do App na recópia de 09/10
 (ver "As contas copiadas do App").
 
 Fora daqui: a "APR e PT" da torre HSEQ responde outra pergunta (OS de risco sem APR ou PT assinada).
+
+## Ranking de pontos (13/10/2026)
+
+Levi: "Quero que traga o ranking de pontos dos técnicos para o Nexus. Cria uma seção de Ranking de Pontos no App de
+Campo!". É o placar do CICLO do App: a régua de 01/09/2026 revista em 30/09 (`_ciclo_v2` no `function_app.py`; o App
+Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking por colaborador" do painel do App.
+
+- **Quem calcula é o App, e o Nexus não recalcula** (`visao.ranking_pontos`, `campo/ranking.html`): o App publica o
+  placar no livro `ranking_app_campo` (aba `Ranking`), de hora em hora aos :25, junto com os outros livros: 1 linha =
+  1 técnico × 1 mês (o corrente e o anterior), com quem está FORA DO CICLO (o motivo, sem posição). Recalcular já deu
+  errado aqui: a nota do coletor batia com a do painel do App em 14% das tarefas (05/10).
+- **Pessoa só pelo HMAC do e-mail** (`Técnico (HMAC)`, a API é de leitura aberta); o nome sai do cadastro do App na hora,
+  e código sem dono fica "—" (a tela diz quantas linhas vieram sem nome), nunca o código.
+- **As colunas são um contrato**: a tela lê pelo NOME, e `tests/test_campo_ranking_pontos.py` (`COLUNAS_DO_APP`) tem a
+  mesma lista do `NEXUS_COLUNAS["ranking"]` do App, na ordem dele. A régua do mês (piso, teto, anulação, teto das
+  rondas, mínimos, bônus) vem nas oito últimas colunas, e o "Como o App calcula" da tela usa esses números. Coluna nova
+  só no FIM, dos dois lados.
+- **Tela:** o mês (o corrente e o anterior) e a região que o App escreve; o pódio (os três primeiros), os números, a
+  classificação e o "Fora do ciclo". Com uma região escolhida, a posição continua a do ciclo inteiro ("3º lugar no
+  ciclo"): é a que o técnico vê no App. Régua em `sombra` no App = aviso de que o técnico ainda vê a pontuação de antes.
+  Sem o livro, a tela diz que o ranking ainda não chegou.
+- **O lado do App é o pacote** `C:\GridcoBuild\app-campo-docs\_propostas\ranking-pontos-nexus\` (`LEIA.md`,
+  `aplicar.py --conferir`, o `.diff` contra a v262 que casa também na v263, e o teste do App). Enquanto o App não
+  publicar com ele, o livro não existe e a tela diz isso; nada aqui depende da ordem.
+- **Prova:** `tests/test_campo_ranking_pontos.py` (9; 7 mutações pegas, uma delas a coluna com nome errado); no
+  navegador, com o banco falso dos testes: escuro, claro, região e 390 px.
 
 ## De onde vem o dado
 

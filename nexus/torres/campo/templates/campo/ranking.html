@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Ranking de pontos (13/10/2026, Levi: "Cria uma seção de Ranking de Pontos no App de Campo!"): o placar do ciclo que o
+   App calcula e publica no livro ranking_app_campo (nexus/campo/visao.py, ranking_pontos). Nada é recalculado aqui: a
+   posição, os pontos e quem está fora do ciclo são os do App, os mesmos que o técnico vê. #}
+{% macro pts(n) %}{{ '{:,}'.format(n or 0).replace(',', '.') }}{% endmacro %}
+{% macro pct(n) %}{{ (n ~ '%') if n is not none else '—' }}{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">placar do ciclo do App{% if calculado %}<br><b>calculado em {{ calculado }}</b>{% endif %}</div>
+  </div>
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
+
+  {% if not atual %}
+  <div class="cn-tab"><table><tbody><tr><td class="cn-vazio">O ranking ainda não chegou do App. O placar do ciclo é
+    calculado lá e chega ao Nexus de hora em hora, aos 25 minutos, a partir da versão do App que o publica.</td></tr>
+  </tbody></table></div>
+  {% else %}
+  <form class="cn-barra-filtros" method="get">
+    <span class="gc-rotulo">Ciclo</span>
+    <select class="gc-campo" name="mes" aria-label="Mês do ciclo" onchange="this.form.submit()">
+      {% for m in meses %}<option value="{{ m.mes }}"{% if m.mes == atual.mes %} selected{% endif %}>{{ nome_do_mes(m.mes) }}</option>{% endfor %}
+    </select>
+    <select class="gc-campo" name="regiao" aria-label="Região" onchange="this.form.submit()">
+      <option value="">todas as regiões</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+    <span class="cn-barra-fonte">livro do ranking do App · lido às {{ lido }}</span>
+  </form>
+  {% if atual.vale and atual.vale != 'ligado' %}
+  <div class="cn-erro cn-aviso" role="status">A régua deste placar está <b>{{ atual.vale }}</b> no App: os técnicos ainda
+    veem a pontuação de antes.</div>
+  {% endif %}
+
+  {% set podio = classificacao[:3] %}
+  {% if podio %}
+  <div class="rk-podio" aria-label="Pódio do ciclo">
+    {% for p in podio %}
+    <div class="rk-lugar rk-{{ loop.index }}">
+      <span class="rk-pos">{{ p.posicao }}º lugar{% if regiao %} no ciclo{% endif %}</span>
+      <span class="rk-nome">{{ p.tecnico or 'Sem nome no cadastro do App' }}</span>
+      <span class="rk-reg">{{ p.regiao or 'sem região' }}</span>
+      <span class="rk-pts">{{ pts(p.total) }} <small>pts</small></span>
+      <span class="rk-det">{{ pts(p.tarefas_pts) }} de tarefas · {{ pts(p.rondas_pts) }} de rondas · {{ pts(p.bonus) }} de bônus</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">No ciclo</span><span class="v">{{ classificacao|length }}</span><span class="d">técnicos classificados</span></span>
+    <span><span class="gc-rotulo">Fora do ciclo</span><span class="v">{{ fora|length }}</span><span class="d">sem o mínimo de tarefas ou do programado</span></span>
+    <span><span class="gc-rotulo">Líder</span><span class="v">{{ pts(classificacao[0].total) if classificacao else '—' }}</span><span class="d">pontos</span></span>
+    <span><span class="gc-rotulo">Média no ciclo</span><span class="v">{{ pts(media) if media is not none else '—' }}</span><span class="d">pontos por técnico classificado</span></span>
+  </div>
+
+  <h2 class="ui-kicker">Classificação</h2>
+  <div class="cn-tab"><table>
+    {# a região vai embaixo do nome e devolvidas e anuladas numa coluna só: com 13 colunas, a 1.400 px a última saía da
+       tela e o nome quebrava em três linhas (visto no navegador em 13/10/2026) #}
+    <thead><tr><th>Posição</th><th>Técnico</th><th>Total</th><th>Tarefas</th><th>Rondas</th><th>Bônus</th>
+      <th>Nota média</th><th>Cumprimento</th><th>Pontualidade</th><th>Sequência</th><th>Devolvidas · anuladas</th></tr></thead>
+    <tbody>
+    {% for p in classificacao %}
+      <tr><td class="m">{{ p.posicao }}º</td><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
+        <td><b>{{ pts(p.total) }}</b></td>
+        <td>{{ pts(p.tarefas_pts) }}<span class="det">{{ p.contadas }} de {{ p.tarefas }} tarefa{{ 's' if p.tarefas != 1 }}</span></td>
+        <td>{{ pts(p.rondas_pts) }}<span class="det">{{ p.rondas }} ronda{{ 's' if p.rondas != 1 }}{% if p.rondas_no_teto %} · no teto{% endif %}</span></td>
+        <td>{{ pts(p.bonus) }}</td>
+        <td>{{ p.nota_media if p.nota_media is not none else '—' }}</td>
+        <td>{{ pct(p.cumprimento) }}<span class="det">{{ p.concluido }} de {{ p.programado }} programada{{ 's' if p.programado != 1 }}</span></td>
+        <td>{{ pct(p.pontualidade) }}</td>
+        <td>{{ p.sequencia }} dia{{ 's' if p.sequencia != 1 }}</td>
+        <td>{{ p.devolvidas }} · {{ p.anuladas }}</td></tr>
+    {% else %}
+      <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}neste ciclo ainda.</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+
+  {% if fora %}
+  <h2 class="ui-kicker">Fora do ciclo</h2>
+  <div class="cn-tab"><table>
+    <thead><tr><th>Técnico</th><th>Pontos</th><th>Tarefas</th><th>Cumprimento</th><th>Por que está fora</th></tr></thead>
+    <tbody>
+    {% for p in fora %}
+      <tr><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td><td>{{ pts(p.total) }}</td><td>{{ p.tarefas }}</td>
+        <td>{{ pct(p.cumprimento) }}</td><td class="rk-motivo">{{ p.motivo or '—' }}</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% endif %}
+
+  {% if d.get('sem_nome') %}
+  <p class="cn-nota">{{ d.sem_nome }} linha{{ 's' if d.sem_nome != 1 }} do placar {{ 'vieram' if d.sem_nome != 1 else 'veio' }}
+    sem nome: o código da pessoa não bate com o cadastro do App, e ela aparece como "—".</p>
+  {% endif %}
+
+  {% set g = atual.regua %}
+  <div class="cn-nota"><b>Como o App calcula.</b> Cada tarefa pontua pela nota dela, se a nota chegou ao piso
+    {%- if g.get('piso') is not none %} ({{ g.piso }}){% endif %} e houve GPS; contam as
+    {% if g.get('teto') is not none %}{{ g.teto }} {% endif %}melhores do mês, com o peso do tipo (religamento e
+    administrativa valem menos). Cada tarefa com nota abaixo do piso anula uma das boas
+    {%- if g.get('anula_max') is not none %} (até {{ g.anula_max }}){% endif %}. As rondas somam num balde à parte
+    {%- if g.get('ronda_teto') is not none %}, com teto de {{ pts(g.ronda_teto) }} pontos{% endif %}. Nas semanas já
+    encerradas e sem devolução entra o bônus{% if g.get('bonus_prog') is not none %}: +{{ g.bonus_prog }}% com a
+    programação da semana completa{% endif %}{% if g.get('bonus_prev') is not none %} e até +{{ g.bonus_prev }}% pelas
+    preventivas feitas na semana{% endif %}. Fica fora do ciclo quem tem menos
+    {%- if g.get('min_tarefas') is not none %} de {{ g.min_tarefas }}{% endif %} tarefas registradas ou menos
+    {%- if g.get('min_cumprimento') is not none %} de {{ g.min_cumprimento }}%{% endif %} do programado. No empate, vence
+    quem teve mais tarefas contadas. A posição é a do ciclo inteiro, mesmo com uma região escolhida.</div>
+  {% endif %}
+</div>
+{% endblock %}

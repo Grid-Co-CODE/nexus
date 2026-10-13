@@ -159,13 +159,15 @@ def test_detalhe_da_pt_e_historico_da_usina_dizem_regiao_e_gestor(banco, logado)
 
 
 def test_ordens_imagens_e_ranking_sairam_do_menu_e_o_endereco_leva_a_central(logado):
-    """Levi, 08/10: "ordens de serviço e imagens da ronda e ranking são redundantes"."""
+    """Levi, 08/10: "ordens de serviço e imagens da ronda e ranking são redundantes". O /ranking voltou em 13/10/2026 com
+    OUTRA tela, o Ranking de pontos (o placar do ciclo do App; tests/test_campo_ranking_pontos.py): a comparação por
+    região e equipe que saiu em 08/10 não voltou."""
     from nexus.torres import descobrir_torres
     campo = next(t for t in descobrir_torres() if t.id == "campo")
-    assert not {"os", "imagens", "ranking"} & {t.id for t in campo.telas}
+    assert not {"os", "imagens"} & {t.id for t in campo.telas}
     menu = logado.get("/t/campo/atencao").get_data(as_text=True)
     assert "Ordens de serviço" not in menu and "Imagens da ronda" not in menu and ">Ranking<" not in menu
-    for tela in ("os", "imagens", "ranking"):
+    for tela in ("os", "imagens"):
         r = logado.get(f"/t/campo/{tela}")
         assert r.status_code == 302 and r.headers["Location"].endswith("/t/campo/atencao"), tela
     assert not hasattr(visao, "ranking")

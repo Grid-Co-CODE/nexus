@@ -61,6 +61,10 @@ TORRE = Torre(
         Tela("zeladoria", "Zeladoria",
              "Que serviço de terceiro está parado, sem diária hoje ou com EPI pendente?", FONTE_APP),
         Tela("triagem", "Triagem de qualidade", "O que exige ação hoje na qualidade do fechamento?", FONTE_APP),
+        # o placar do ciclo de pontos do App (Levi, 13/10/2026: "Cria uma seção de Ranking de Pontos no App de Campo!"):
+        # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
+        Tela("ranking", "Ranking de pontos", "Quem lidera o ciclo de pontos do App neste mês, e por quê?",
+             "Livro ranking_app_campo (o placar do ciclo do App) no banco do Nexus"),
         Tela("rotas", "Rotas do dia", "Qual a melhor ordem de visitas para cada equipe?",
              "Programação do PCM + localização das usinas"),
     ],
@@ -73,8 +77,9 @@ bp.record_once(lambda estado: estado.app.register_blueprint(bp_assinatura))
 # Fracttal"), pelo mesmo motivo: é ali que o servidor sabe quem entrou no Fracttal
 bp.record_once(lambda estado: estado.app.register_blueprint(bp_aprovar_os))
 
-# Ordens de serviço, Ranking e Imagens da ronda saíram do menu em 08/10/2026: quem guardou o endereço cai na Central
-TELAS_QUE_SAIRAM = ("os", "ranking", "imagens")
+# Ordens de serviço, Ranking e Imagens da ronda saíram do menu em 08/10/2026: quem guardou o endereço cai na Central. O
+# /ranking voltou em 13/10/2026 com outra tela, o Ranking de pontos (o placar do ciclo do App)
+TELAS_QUE_SAIRAM = ("os", "imagens")
 
 
 def _tela_que_saiu():
@@ -939,6 +944,52 @@ def ronda_foto(os_, i):
 @bp.route("/zeladoria")
 def zeladoria():
     return render_template("campo/zeladoria.html", **_comum("zeladoria", visao.zeladoria()))
+
+
+# ── Ranking de pontos (13/10/2026) ───────────────────────────────────────────────────────────────────────────────
+# Levi: "Quero que traga o ranking de pontos dos técnicos para o Nexus. Cria uma seção de Ranking de Pontos no App de
+# Campo!". O placar é o do ciclo do App, como ele publica (visao.ranking_pontos); aqui só o mês (o corrente e o anterior)
+# e a região que o App escreve. A posição é a do ciclo inteiro, mesmo com a região escolhida: é a que o técnico vê no App.
+MESES_PT = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+            "novembro", "dezembro")
+
+
+def _nome_do_mes(mes: str) -> str:
+    try:
+        ano, m = mes.split("-")
+        return f"{MESES_PT[int(m) - 1]} de {ano}"
+    except (ValueError, IndexError):
+        return mes
+
+
+def _hora_brt(iso: str) -> str:
+    """A hora (de Brasília) em que o App calculou o placar, "13/10 18:25"."""
+    try:
+        d = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return (d if d.tzinfo else d.replace(tzinfo=_BRT)).astimezone(_BRT).strftime("%d/%m %H:%M")
+
+
+@bp.route("/ranking")
+def ranking():
+    leitura = visao.ranking_pontos()
+    meses = leitura.dados.get("meses") or []
+    atual = next((m for m in meses if m["mes"] == request.args.get("mes")), meses[0] if meses else None)
+    todos = (atual["classificacao"] + atual["fora"]) if atual else []
+    regioes = sorted({p["regiao"] for p in todos if p["regiao"]}, key=str.lower)
+    regiao = request.args.get("regiao") or ""
+    if regiao not in regioes:
+        regiao = ""
+
+    def da_regiao(lista):
+        return [p for p in lista if not regiao or p["regiao"] == regiao]
+    classificacao = da_regiao(atual["classificacao"]) if atual else []
+    fora = da_regiao(atual["fora"]) if atual else []
+    return render_template("campo/ranking.html", **_comum(
+        "ranking", leitura, meses=meses, atual=atual, regioes=regioes, regiao=regiao, classificacao=classificacao,
+        fora=fora, nome_do_mes=_nome_do_mes, calculado=_hora_brt(atual["calculado_em"]) if atual else "",
+        media=round(sum(p["total"] for p in classificacao) / len(classificacao)) if classificacao else None))
 
 
 # ── Aprovação de OS (a fila e os grupos são os do App, nexus/campo/aprovacao.py) ─────────────────────────────────

@@ -252,6 +252,20 @@ FATOS = (
          tipo="transacao", medidas=_m((("fotos_qtd", "qtd", "aditiva"), ("respostas_nao_qtd", "qtd", "aditiva"))),
          fontes=("zeladoria_app_campo · Zeladoria",), janela_origem="90 dias (App)",
          observacao="sem chave: definir quando houver linha (vazio até 05/10: a tela é da v226 e ninguém registrou)"),
+    # o placar do ciclo de pontos do App (13/10/2026, Levi: "traga o ranking de pontos dos técnicos para o Nexus"): quem
+    # calcula é o App (`_ciclo_v2`, régua PLACAR_V2), que publica o mês corrente e o anterior de hora em hora; a linha do
+    # mês corrente muda a cada publicação até o mês fechar (foto acumulada). Tela: Campo · App > Ranking de pontos
+    Fato("ranking_pontos", "Ranking de pontos do ciclo", "campo", "ranking_app_campo · Ranking",
+         "1 linha = 1 técnico × 1 mês do ciclo de pontos (o placar como o App o calculou na hora da publicação)",
+         _d(data=("cod", "Mês (AAAA-MM)"), pessoa=("hmac", "Técnico (HMAC)"), equipe=("nome", "Região")),
+         tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)"),
+         medidas=_m((("total_pts", "pts", "aditiva"), ("tarefas_pts", "pts", "aditiva"), ("rondas_pts", "pts", "aditiva"),
+                     ("bonus_pts", "pts", "aditiva"), ("tarefas_qtd", "qtd", "aditiva"), ("rondas_qtd", "qtd", "aditiva"),
+                     ("devolvidas_qtd", "qtd", "aditiva"), ("nota_media_pts", "pts", "nao"),
+                     ("cumprimento_pct", "%", "nao"), ("pontualidade_pct", "%", "nao"))),
+         fontes=("ranking_app_campo · Ranking",), janela_origem="o mês corrente e o anterior (App)",
+         observacao="quem calcula é o App; o Nexus mostra, não recalcula (recalcular a nota deu 14% de acerto em 05/10). "
+                    "A régua do mês vem nas colunas do próprio livro. Até o App publicar, o livro não existe"),
     Fato("fechamento_coletor", "Fechamento pelo coletor", "campo", "campo_nexus · fechamentos",
          "1 linha = 1 tarefa da fila do Fracttal",
          _d(data=("cod", "fim"), usina=("id", "usina_id"), equipe=("nome", "regiao"), pessoa=("id", "pessoa_id"),
