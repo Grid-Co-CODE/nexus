@@ -11,7 +11,8 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/prefixo.py` | o caminho em que o Nexus é servido (`NEXUS_PREFIXO`): o middleware, `na_raiz`/`sem_raiz` e o cookie no caminho certo |
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
-| `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
+| `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
+| `nexus/casca/versao.py` | a versão no ar do Início: o commit, a hora dele, desde quando o processo está no ar e o semáforo com o `main` do GitHub (seção "Versão no ar" abaixo) |
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
@@ -258,6 +259,32 @@ pessoa abrir uma informação e analisar!". O código e as regras: `nexus/auth/p
   página reconfirmava cada arquivo (`no-cache`). Commit novo = endereço novo; sem o commit ("local") ou sem o `v`, fica
   como antes.
 - **Prova:** `tests/test_pre_carga.py` e `tests/test_nexus_servidor_13_10.py`.
+
+## Versão no ar no Início (13/10/2026)
+
+Levi, com o Nexus recém-subido no servidor: "Quero que no início do Nexus diga quando foi o último commit para eu
+acompanhar se está realmente subindo automático para o server". O 4º cartão dos números do Início (`casca/versao.py`,
+`templates/inicio.html`):
+
+- **a hora do commit** em execução (grande), o commit curto (o mesmo do `/saude`) e o assunto (uma linha; o texto inteiro
+  no `title`), pelo `git log -1` da própria pasta: no servidor, a `/opt/nexus` do usuário `nexus`, dono do clone;
+- **no ar desde**: a hora em que este processo subiu (o import da casca, no boot). Cada deploy reinicia o Nexus, então é
+  a hora em que a versão entrou;
+- **o semáforo com o `main` do GitHub**: verde "Em dia com o GitHub"; amarelo "Atualizando" nos 5 primeiros minutos em
+  que se vê o GitHub à frente (o timer do deploy roda a cada 2 min); vermelho "Atrasado há N min" depois disso, com o
+  commit do GitHub e quantos faltam: **é o sinal de que o deploy automático não pegou**. O relógio conta da 1ª vez que se
+  viu atrás e só zera em dia (commit novo no GitHub com o servidor parado não volta a "atualizando"; o restart do deploy
+  zera junto). Também: "À frente do GitHub" (commits só desta máquina, o normal no PC), "Diferente do GitHub" (dos dois
+  lados, vermelho), "Fora do GitHub" (o commit daqui não está lá) e "GitHub sem resposta" (com o motivo);
+- a conferência vai à API pública do GitHub (`compare main...<commit>`: a situação, quantos à frente e atrás e o commit
+  do `main`, numa chamada), **no máximo a cada 5 min e sempre por trás**: o Início nunca espera a rede (a 1ª visita
+  depois do boot já encontra a resposta, porque o `servir.py` e o `app.py` pedem uma ao subir). Sem a API (o servidor
+  pode não sair para api.github.com, e sem login o limite é de 60 por hora por IP), vai pelo `git ls-remote` no
+  github.com, o mesmo caminho do deploy; com o commit do GitHub já na pasta (o fetch do deploy), conta e data por ele.
+- `NEXUS_VERSAO_GITHUB=0` desliga a conferência numa máquina; nos testes (`TESTING`) ela fica desligada, e o
+  `/saude` continua enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
+- **Prova:** `tests/test_casca_versao.py` (a API e o git dublados; nada sai para a rede). No dado real, em 13/10/2026: a
+  API e o `git ls-remote` deram a mesma resposta, em dia para o 648c100 e 4 atrás para o 5a6982a.
 
 ## Regras que já custaram caro
 

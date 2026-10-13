@@ -13,6 +13,18 @@
   <div><div class="r">Torres</div><div class="v gc-num">{{ torres|length }}</div><div class="d">organizadas pelo book R02</div></div>
   <div><div class="r">Telas previstas</div><div class="v gc-num">{{ total_telas }}</div><div class="d">das specs R00 a R13</div></div>
   <div><div class="r">Telas prontas</div><div class="v gc-num">{{ total_prontas }}</div><div class="d">as verdes do menu</div></div>
+  {# a versão no ar (13/10/2026, Levi: "diga quando foi o último commit para eu acompanhar se está realmente subindo
+     automático para o server"): a hora do commit, desde quando este processo está no ar e o semáforo com o GitHub.
+     A vitrine estática (ferramentas/exportar_estatico.py) não tem processo no ar: lá o cartão não sai #}
+  {% if versao is defined %}{% set v = versao %}
+  <div class="versao-no-ar" data-versao="{{ v.situacao }}">
+    <div class="r">Versão no ar</div>
+    <div class="v gc-num" title="{{ v.assunto }}">{{ v.em_txt }}</div>
+    <div class="d">commit <code>{{ v.curto }}</code> · no ar desde {{ v.no_ar_desde_txt }}</div>
+    {% if v.assunto %}<div class="d versao-assunto" title="{{ v.assunto }}">{{ v.assunto }}</div>{% endif %}
+    <div class="versao-github"><span class="gc-status gc-status--{{ v.classe }}"{% if v.conferido_txt %} title="{{ v.conferido_txt }}"{% endif %}>{{ v.rotulo }}</span></div>
+    {% if v.detalhe %}<div class="d versao-detalhe">{{ v.detalhe }}</div>{% endif %}
+  </div>{% endif %}
 </div>
 
 

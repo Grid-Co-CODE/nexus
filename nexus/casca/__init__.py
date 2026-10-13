@@ -10,6 +10,8 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
 from ..auth import destino_seguro, setor_telas
 from ..prefixo import raiz
 from ..torres import montar_menu, telas_com_conteudo
+# no topo, e não dentro do Início: o "no ar desde" do cartão da versão é a hora do import, a do boot (13/10/2026)
+from . import versao
 
 bp = Blueprint("casca", __name__)
 
@@ -68,7 +70,9 @@ def inicio():
         prontas = frozenset(u for u in prontas if u[3:] in liberadas)
     return render_template("inicio.html", torres=torres, cartoes=cartoes, total_prontas=len(prontas),
                            total_telas=sum(len([s for s in t.telas if liberadas is None or f"{t.id}/{s.id}" in liberadas])
-                                           for t in torres))
+                                           for t in torres),
+                           # a versão no ar e se ela está em dia com o GitHub (casca/versao.py, 13/10/2026)
+                           versao=versao.cartao(app))
 
 
 @bp.route("/tema", methods=["POST"])

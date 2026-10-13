@@ -52,6 +52,8 @@ if __name__ == "__main__":
     instalar_engenharia(app)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)          # as telas quentes depois de subir (13/10/2026; 5 min, ver a função)
+    from nexus.casca import versao
+    versao.conferir(app)                     # a versão no ar conferida com o GitHub (13/10/2026)
     plataforma = (ler_ambiente().get("NEXUS_PLATAFORMA_LOCAL") or "").strip()
     alvo, threads = app, 8
     if plataforma:

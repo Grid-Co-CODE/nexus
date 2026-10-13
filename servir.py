@@ -31,6 +31,9 @@ if __name__ == "__main__":
     # as telas quentes depois de cada deploy (13/10/2026: a 1ª abertura do servidor recém-subido levou 27 s; 5 min)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)
+    # a versão no ar já conferida com o GitHub quando a 1ª pessoa abrir o Início (casca/versao.py, 13/10/2026)
+    from nexus.casca import versao
+    versao.conferir(app)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"
