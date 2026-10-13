@@ -428,10 +428,12 @@ def agrupar_aba(linhas) -> dict:
         tipo = _tipo_linha(d.get("Equipamento"))
         if not chave or not tipo:
             continue
-        g = out.setdefault(chave, {"chave": chave, "usina": texto(d.get("Usina")), "fracttal": "", "cliente": "",
-                                   "full_om": False, "string_box": False, "ufv_kwp": None, "ufv_inversores": None,
-                                   "cabines": [], "inversores": []})
+        g = out.setdefault(chave, {"chave": chave, "usina": texto(d.get("Usina")), "fracttal": "", "fracttais": [],
+                                   "cliente": "", "full_om": False, "string_box": False, "ufv_kwp": None,
+                                   "ufv_inversores": None, "cabines": [], "inversores": []})
         g["fracttal"] = g["fracttal"] or texto(d.get("Usina Fractall"))
+        if texto(d.get("Usina Fractall")) and texto(d.get("Usina Fractall")) not in g["fracttais"]:
+            g["fracttais"].append(texto(d.get("Usina Fractall")))     # todos: a chave com dois nomes não liga sozinha
         g["cliente"] = g["cliente"] or texto(d.get("Cliente"))
         g["full_om"] = g["full_om"] or _sim(d.get("Full O&M"))
         g["string_box"] = g["string_box"] or _sim(d.get("String Box"))
@@ -761,3 +763,184 @@ def republicar_visao(cfg, base, sessao, info: dict, quem_email: str = "") -> dic
     grava só se ela mudou."""
     return _gravar(lambda est, agora, quem: {"log": "conferiu a visão no formato da aba"}, cfg, base, sessao,
                    quem_email, info)
+
+# ── Ligar pela aba Equipamentos (13/10/2026) ───────────────────────────────────────────────────────────────────────────
+# Levi: "Em "Equipamentos da Usinas" ligue automaticamente pelos dados que temos na aba equipamenetos do BD_Performance!"
+# (de manhã tinha sido "não quero que faça as conexões automaticamente"; o automático agora é dele, e a tela segue
+# mostrando o que ligou e o que ficou de fora). O caminho é o MESMO ciclo das Ligações entre bases (08/10/2026): a
+# "Usina Fractall" da aba é a Classificação 1 do Fracttal, e o de-para do Fracttal das Ligações diz a usina do Registro
+# mestre. Não chuta: chave sem o nome do Fracttal, com dois nomes, com nome fora do de-para, ignorado ou de duas usinas,
+# e chave que as Ligações ignoram ou ligam a OUTRA usina nas abas de geração (a "AP. do Taboado" tem na aba o nome do
+# Fracttal da Aparecida do Taboado 1 e 2, mas é outra usina, fora da operação) ficam de fora, com o motivo.
+SISTEMAS_ABA = ("BD_Thopen · aba", "BD_Performance · aba")
+
+
+def proposta_pela_aba(aba_chaves: dict, atual: dict | None, est: dict, usinas) -> dict:
+    """{"ligar": {usina_id: [chaves]}, "fora": [{chave, motivo}], "ja_ligadas": n} das chaves da aba ainda sem usina
+    no livro. `atual` = o de-para calculado das Ligações (`ligacoes.ler`); `usinas` = os ids do Registro mestre."""
+    from .ligacoes import FRACTTAL
+    ligado, por_norma, decisao = {}, {}, {}
+    for linha in (atual or {}).get("linhas") or []:
+        if len(linha) < 3 or not linha[2]:
+            continue
+        uid, sistema, chave = D._id(linha[0]), linha[1], str(linha[2])
+        como = str(linha[3] or "") if len(linha) > 3 else ""
+        if sistema == FRACTTAL:
+            ids, _como = ligado.setdefault(chave, (set(), como))
+            if uid:
+                ids.add(uid)
+            por_norma.setdefault(norm(chave), set()).add(chave)
+        elif sistema in SISTEMAS_ABA:
+            decisao.setdefault(norm(chave), []).append((uid, como))
+    dono = {s["usina_supervisorio"] for s in est["supervisorios"] if not s["excluido"]}
+    usinas = set(usinas)
+    ligar, fora, ja = {}, [], 0
+    for chave in sorted(aba_chaves, key=natural):
+        if chave in dono:
+            ja += 1
+            continue
+        nomes = sorted(set(aba_chaves[chave].get("fracttais") or ([aba_chaves[chave]["fracttal"]]
+                                                                 if aba_chaves[chave].get("fracttal") else [])))
+        motivo, uid = "", None
+        if not nomes:
+            motivo = "sem a Usina Fractall na aba"
+        elif len(nomes) > 1:
+            motivo = f"{len(nomes)} nomes do Fracttal na aba ({', '.join(nomes)})"
+        else:
+            nome = nomes[0]
+            chave_fr = nome if nome in ligado else None
+            if chave_fr is None:
+                cands = por_norma.get(norm(nome), set())
+                if len(cands) == 1:
+                    chave_fr = next(iter(cands))
+                else:
+                    motivo = (f"o nome do Fracttal “{nome}” casa {len(cands)} chaves das Ligações" if cands
+                              else f"o nome do Fracttal “{nome}” não está nas Ligações")
+            if chave_fr is not None:
+                ids, como = ligado[chave_fr]
+                if como.startswith("ignorado"):
+                    motivo = f"o nome do Fracttal está ignorado nas Ligações ({como})"
+                elif len(ids) != 1:
+                    motivo = (f"o nome do Fracttal “{nome}” liga a {len(ids)} usinas nas Ligações" if ids
+                              else f"o nome do Fracttal “{nome}” não está ligado a nenhuma usina nas Ligações")
+                else:
+                    uid = next(iter(ids))
+            if uid is not None:
+                d = decisao.get(norm(chave), [])
+                ign = next((c for _u, c in d if c.startswith("ignorado")), "")
+                outra = sorted({u for u, _c in d if u and u != uid})
+                if uid not in usinas:
+                    motivo = "a usina do nome do Fracttal não está no Registro mestre"
+                elif ign:
+                    motivo = f"a chave está ignorada nas Ligações ({ign})"
+                elif outra:
+                    motivo = f"as Ligações ligam esta chave a outra usina (id {outra[0]})"
+        if motivo:
+            fora.append({"chave": chave, "motivo": motivo})
+        else:
+            ligar.setdefault(uid, []).append(chave)
+    return {"ligar": ligar, "fora": fora, "ja_ligadas": ja}
+
+
+def estrutura_da_aba(chaves: list, aba_chaves: dict) -> dict:
+    """As chaves, as cabines e os inversores de UMA usina a partir da aba, como o "Trazer da aba" da tela: a chave da
+    usina (UFV e cabines) é a única com a linha UFV (sem ela ou com mais de uma, a 1ª); a cabine é da usina, pelo nome
+    (as UG e o Equipamento Parente dos inversores); o inversor vai pela chave dele, e o nome que outra chave já usou
+    ganha a chave no nome. O mesmo nome no supervisório duas vezes na mesma chave fica só no 1º (a tela não salvaria a
+    usina com os dois) e vai para os avisos."""
+    chaves = sorted(chaves, key=natural)
+    com_ufv = [c for c in chaves if aba_chaves[c].get("ufv_kwp") is not None]
+    principal = com_ufv[0] if len(com_ufv) == 1 else chaves[0]
+    sups = [{"chave": c, "exibicao": texto(aba_chaves[c].get("usina")), "principal": c == principal,
+             "full_om": bool(aba_chaves[c].get("full_om")), "string_box": bool(aba_chaves[c].get("string_box"))}
+            for c in chaves]
+    cabs, cab_de = [], {}
+
+    def cabine(nome, kwp=None):
+        n = norm(nome)
+        if n not in cab_de:
+            cab_de[n] = {"nome": texto(nome), "potencia_kwp": kwp}
+            cabs.append(cab_de[n])
+        elif cab_de[n]["potencia_kwp"] is None and kwp is not None:
+            cab_de[n]["potencia_kwp"] = kwp
+        return cab_de[n]
+    for c in chaves:
+        for g in aba_chaves[c].get("cabines") or []:
+            if texto(g.get("nome")):
+                cabine(g["nome"], g.get("kwp"))
+    invs, nomes, sup_vistos, avisos = [], set(), set(), []
+    for c in chaves:
+        for a in aba_chaves[c].get("inversores") or []:
+            nome, sup = texto(a.get("nome")), texto(a.get("equipamento_supervisorio"))
+            if not nome:
+                continue
+            if sup and (c, norm(sup)) in sup_vistos:
+                avisos.append(f"{c}: “{sup}” duas vezes no supervisório (ficou o 1º)")
+                continue
+            if sup:
+                sup_vistos.add((c, norm(sup)))
+            final, k = nome, 1
+            while norm(final) in nomes:
+                k += 1
+                final = f"{nome} · {c}" if k == 2 else f"{nome} · {c} ({k - 1})"
+            nomes.add(norm(final))
+            pai = cabine(a["cabine"])["nome"] if texto(a.get("cabine")) else None
+            invs.append({"chave": c, "cabine": pai, "nome": final, "equipamento_supervisorio": sup,
+                         "potencia_kwp": a.get("kwp"), "strings_esperadas_qtd": a.get("strings")})
+    return {"supervisorios": sups, "cabines": cabs, "inversores": invs, "avisos": avisos}
+
+
+def ligar_pela_aba(proposta: dict, aba_chaves: dict, cfg, base, sessao, quem_email: str = "",
+                   info: dict | None = None) -> dict:
+    """Grava, de uma vez, as chaves da proposta e a estrutura da aba de cada usina AINDA SEM ESTRUTURA no livro (a usina
+    que já tem chave, cabine ou inversor gravado fica como está: lá vale o que foi feito à mão, e o "Trazer da aba" da
+    tela completa). Nasce FORA do lugar da aba: os leitores só passam a ler do Nexus a chave que alguém marcar. Chave que
+    alguém ligou enquanto isso, a outra usina, fica de fora (o livro é relido dentro da trava)."""
+    def mudar(est, agora, quem):
+        dono = {s["usina_supervisorio"] for s in est["supervisorios"] if not s["excluido"]}
+        ps, pc, pi = (_proximo(est["supervisorios"], "supervisorio_id"), _proximo(est["cabines"], "cabine_id"),
+                      _proximo(est["inversores"], "inversor_id"))
+        controle = {"criado_em": agora, "alterado_em": agora, "alterado_por_hmac": quem, "excluido": False}
+        usinas, n_ch, n_cab, n_inv, n_str, puladas, avisos = 0, 0, 0, 0, 0, [], []
+        for uid in sorted(proposta.get("ligar") or {}):
+            u = da_usina(est, uid)
+            if u["supervisorios"] or u["cabines"] or u["inversores"]:
+                puladas.append(uid)
+                continue
+            chaves = [c for c in proposta["ligar"][uid] if c not in dono and c in aba_chaves]
+            if not chaves:
+                continue
+            e = estrutura_da_aba(chaves, aba_chaves)
+            sid_de = {}
+            for s in e["supervisorios"]:
+                est["supervisorios"].append({"supervisorio_id": ps, "usina_id": uid, "usina_supervisorio": s["chave"],
+                                             "usina_exibicao": s["exibicao"], "principal": s["principal"],
+                                             "full_om": s["full_om"], "string_box": s["string_box"],
+                                             "substitui_aba": False, **controle})
+                sid_de[s["chave"]] = ps
+                dono.add(s["chave"])
+                ps += 1
+            cid_de = {}
+            for ordem, c in enumerate(e["cabines"], 1):
+                est["cabines"].append({"cabine_id": pc, "usina_id": uid, "nome": c["nome"],
+                                       "potencia_kwp": c["potencia_kwp"], "equipamento_id": None,
+                                       "codigo_fracttal": "", "ordem": ordem, **controle})
+                cid_de[norm(c["nome"])] = pc
+                pc += 1
+            for ordem, i in enumerate(e["inversores"], 1):
+                est["inversores"].append({"inversor_id": pi, "usina_id": uid, "supervisorio_id": sid_de[i["chave"]],
+                                          "cabine_id": cid_de.get(norm(i["cabine"])) if i["cabine"] else None,
+                                          "nome": i["nome"], "equipamento_supervisorio": i["equipamento_supervisorio"],
+                                          "potencia_kwp": i["potencia_kwp"],
+                                          "strings_esperadas_qtd": i["strings_esperadas_qtd"], "equipamento_id": None,
+                                          "codigo_fracttal": "", "ordem": ordem, **controle})
+                pi += 1
+                n_str += i["strings_esperadas_qtd"] or 0
+            usinas, n_ch = usinas + 1, n_ch + len(chaves)
+            n_cab, n_inv = n_cab + len(e["cabines"]), n_inv + len(e["inversores"])
+            avisos += e["avisos"]
+        return {"usinas": usinas, "chaves": n_ch, "cabines": n_cab, "inversores": n_inv, "strings": n_str,
+                "puladas": puladas, "avisos": avisos,
+                "log": f"ligou pela aba {n_ch} chave(s) em {usinas} usina(s), {n_cab} cabine(s), {n_inv} inversor(es)"}
+    return _gravar(mudar, cfg, base, sessao, quem_email, info)
+

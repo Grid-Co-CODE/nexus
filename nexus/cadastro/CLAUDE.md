@@ -190,6 +190,23 @@ de entender para você, quando eu for fazer não vou entender nada".
   cabine e inversor (com o "Sugerir ativos pelo nome") e a leitura dos ~22 mil ativos ao abrir a usina (6,7 s medidos do
   PC). As rotas `/equipamentos/fracttal` e `/equipamentos/ativos` e os campos `equipamento_id`/`codigo_fracttal` do
   livro ficam (o que já foi gravado segue no Salvar, intacto); a "Usina Fractall" da visão continua vindo das Ligações.
+- **Ligar pela aba Equipamentos (13/10/2026, à tarde; Levi: "Em "Equipamentos da Usinas" ligue automaticamente pelos
+  dados que temos na aba equipamentos do BD_Performance!" — o "não quero conexões automáticas" da manhã ficou para trás).**
+  A seção do topo da tela e o POST `/equipamentos/ligar-aba` (`estrutura_usina.proposta_pela_aba` +
+  `ligar_pela_aba`): cada chave da aba liga à usina do Registro mestre pela **Usina Fractall** dela, no de-para do
+  Fracttal das Ligações (`ligacoes.ler`; exato ou o ÚNICO de mesmo nome normalizado), o mesmo ciclo das Ligações entre
+  bases. **Não chuta** (cada uma sai na lista "não ligam sozinhas", com o motivo): chave sem Usina Fractall, com dois
+  nomes do Fracttal (a Rodrigues 2), com nome fora das Ligações, ignorado (Colíder: tarefa interna) ou de duas usinas,
+  usina fora do Registro mestre, e chave que as Ligações ignoram ou ligam a OUTRA usina nas abas de geração (`BD_Thopen
+  · aba`, `BD_Performance · aba`): a "AP. do Taboado" tem na aba o nome do Fracttal da Aparecida do Taboado 1 e 2, mas
+  é outra usina, fora da operação. A estrutura vem da aba como o "Trazer da aba" (`estrutura_da_aba`): a chave da usina
+  é a única com a linha UFV, a cabine é da usina pelo nome (UG e Equipamento Parente), o nome de inversor repetido entre
+  chaves ganha a chave no nome, e o mesmo nome no supervisório duas vezes na mesma chave fica só no 1º (aviso). **Só
+  usina SEM estrutura gravada**: a que já tem algo feito à mão fica como está (o "Trazer da aba" dela completa). Nasce
+  FORA do lugar da aba (a visão segue vazia; os leitores não mudam até alguém marcar). Uma gravação só, com o livro
+  relido dentro da trava. Medido no dado real em 13/10, com o de-para do PC de 12/10: 262 das 301 chaves em 123 usinas,
+  251 cabines, 1.932 inversores, 29.148 strings; 38 de fora (19 sem Usina Fractall, 13 com o nome fora das Ligações, 5
+  ignoradas, 1 com dois nomes). Prova: `tests/test_equipamentos_ligar_pela_aba.py`.
 - **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; filtros sem
   chave, sem inversores, potência que não fecha); à direita, a usina aberta em 2 passos.
 - **1. Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que

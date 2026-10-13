@@ -50,6 +50,29 @@
   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not pode_gravar %} disabled{% endif %}><i class="ph ph-arrows-clockwise"></i> Refazer a visão</button>
 </form>{% endif %}
 
+{# Ligar pela aba Equipamentos (13/10/2026, Levi: "ligue automaticamente pelos dados que temos na aba equipamentos do
+   BD_Performance!"): o mesmo ciclo das Ligações (a Usina Fractall da aba -> o de-para do Fracttal -> a usina). #}
+<section class="cad-secao eq-auto" id="ligar-pela-aba">
+  <h2>Ligar pela aba Equipamentos</h2>
+  <div class="eq-corpo">
+    <p class="gc-ajuda">Liga cada chave da aba à usina do Registro mestre pela <b>Usina Fractall</b> dela (o mesmo caminho das Ligações entre bases) e traz da aba a estrutura das usinas que ainda não têm: cabines, inversores, nome no supervisório, potência e strings. A usina que já tem algo gravado à mão fica como está. Nada vai "no lugar da aba": isso continua sendo marcado chave a chave.</p>
+    <form method="post" action="{{ url_for('torre_base.equipamentos_ligar_aba') }}" class="eq-form-inline eq-guarda" data-confirmar="Ligar {{ auto.n_chaves }} chave(s) da aba em {{ auto.n_usinas }} usina(s) e trazer a estrutura delas? Grava no banco.">
+      {{ mantem() }}
+      <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not pode_gravar or not auto.n_chaves %} disabled{% endif %}><i class="ph ph-link"></i> {% if auto.n_chaves %}Ligar {{ auto.n_chaves }} chave{{ 's' if auto.n_chaves > 1 }} em {{ auto.n_usinas }} usina{{ 's' if auto.n_usinas > 1 }}{% else %}Nada novo para ligar pela aba{% endif %}</button>
+      <span class="mudo">{{ auto.ja_ligadas }} chave{{ 's' if auto.ja_ligadas != 1 }} da aba já ligada{{ 's' if auto.ja_ligadas != 1 }}</span>
+    </form>
+    {% if auto.fora %}
+    <details class="eq-ref">
+      <summary>{{ auto.fora|length }} chave{{ 's' if auto.fora|length > 1 }} da aba não liga{{ 'm' if auto.fora|length > 1 }} sozinha{{ 's' if auto.fora|length > 1 }}: o motivo de cada uma</summary>
+      <div class="cad-rolagem"><table class="cad-tabela">
+        <thead><tr><th>Usina Supervisório</th><th>Por que não ligou</th></tr></thead>
+        <tbody>{% for f in auto.fora %}<tr><td><span class="gc-dado">{{ f.chave }}</span></td><td>{{ f.motivo }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+    {% endif %}
+  </div>
+</section>
+
 <div class="eq-grade">
   <aside class="eq-lista" aria-label="Usinas do Registro mestre">
     <form class="eq-lista-topo" method="get" action="{{ url_for('torre_base.equipamentos') }}">

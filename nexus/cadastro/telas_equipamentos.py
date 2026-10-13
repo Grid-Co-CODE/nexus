@@ -207,6 +207,10 @@ def contexto(srv, cfg, args) -> dict:
     painel = _painel(aberta, est, aba, fr_nomes, fr_dono, nome_usina, info) if aberta else None
     aviso = session.pop(_CHAVE_AVISO, None)
     pode_gravar = bool(cfg.get("GRIDCO_SQL_TOKEN")) and not est.get("erro")
+    # o que a "Ligar pela aba Equipamentos" ligaria agora, e o que fica de fora com o motivo (13/10/2026)
+    auto = E.proposta_pela_aba(aba["chaves"], L.ler(cfg), est, {u["id"] for u in usinas}) if not aba.get("erro") else \
+        {"ligar": {}, "fora": [], "ja_ligadas": 0}
+    auto = dict(auto, n_chaves=sum(len(v) for v in auto["ligar"].values()), n_usinas=len(auto["ligar"]))
     return {"lista": [x for x in lista if passa(x)], "total": len(lista), "q": q, "filtro": filtro, "filtros": FILTROS,
             "painel": painel, "aviso": aviso, "erro_livro": est.get("erro") or "", "livro_velho": est.get("velha", False),
             "erro_aba": aba.get("erro") or "", "aba_lida_em": _hora(aba.get("lido_em")), "fr_lido": fr_lido,
@@ -219,6 +223,7 @@ def contexto(srv, cfg, args) -> dict:
             "n_visao": len(est.get("visao") or []),
             "n_chaves_ligadas": sum(1 for c in aba["chaves"] if any(
                 s["usina_supervisorio"] == c and not s["excluido"] for s in est["supervisorios"])),
+            "auto": auto,
             "volta": {k: v for k, v in (("q", q), ("filtro", filtro)) if v}}
 
 
@@ -344,6 +349,46 @@ def _chave(srv):
     return _responder(True, texto, usina=uid, ancora="passo-chave")
 
 
+def _ligar_aba(srv):
+    """POST do "Ligar pela aba Equipamentos" (13/10/2026): a proposta de agora (relida, nunca a da página) e uma gravação
+    só. O que ficou de fora segue listado na tela, com o motivo."""
+    cfg = current_app.config
+    if _de_outro_site():
+        return _responder(False, "Pedido de outro site: nada foi gravado.", 403)
+    try:
+        base, sessao = _banco()
+        aba = E.aba_equipamentos(base, sessao)
+        if aba.get("erro"):
+            return _responder(False, f"Não consegui ler a aba Equipamentos ({aba['erro']}): nada foi gravado.", 503)
+        est = E.ler(base, sessao, forcar=True)
+        if est.get("erro"):
+            return _responder(False, "Não consegui ler a estrutura no banco: nada foi gravado.", 503)
+        usinas = _usinas(srv)
+        proposta = E.proposta_pela_aba(aba["chaves"], L.ler(cfg), est, {u["id"] for u in usinas})
+        if not proposta["ligar"]:
+            return _responder(True, "Nada novo para ligar pela aba: as chaves que ligam sozinhas já estão ligadas.")
+        r = E.ligar_pela_aba(proposta, aba["chaves"], cfg, base, sessao, quem_email=_meu_email(),
+                             info=_info_usinas(srv, cfg, usinas))
+    except E.Recusada as ex:
+        return _responder(False, str(ex), 409)
+    except Exception as ex:      # noqa: BLE001 — a gravação ou a conferência falhou: a tela diz, nada some calado
+        log.error("Equipamentos: a ligação pela aba não foi gravada (%s: %s).", type(ex).__name__, ex)
+        return _responder(False, f"A gravação no banco falhou ({type(ex).__name__}). Recarregue e veja o que ficou "
+                                 "ligado antes de tentar de novo.", 500)
+    strings = f"{r['strings']:,}".replace(",", ".")
+    texto = (f"Ligado pela aba Equipamentos: {r['chaves']} chave(s) em {r['usinas']} usina(s), com {r['cabines']} "
+             f"cabine(s), {r['inversores']} inversor(es) e {strings} strings esperadas, a potência e os nomes no "
+             "supervisório da aba.")
+    if r["puladas"]:
+        texto += (f" {len(r['puladas'])} usina(s) já tinham estrutura gravada à mão e ficaram como estavam (use o "
+                  "\"Trazer da aba\" nelas).")
+    if r["avisos"]:
+        texto += f" Avisos: {'; '.join(r['avisos'][:5])}."
+    if proposta["fora"]:
+        texto += f" {len(proposta['fora'])} chave(s) da aba não ligam sozinhas: a lista e o motivo estão na tela."
+    return _responder(True, texto)
+
+
 def _salvar(srv):
     cfg = current_app.config
     if _de_outro_site():
@@ -406,6 +451,11 @@ def registrar_equipamentos(bp) -> None:
     @_tela(TITULO)
     def equipamentos_visao(srv):
         return _visao(srv)
+
+    @bp.route("/equipamentos/ligar-aba", methods=["POST"])
+    @_tela(TITULO)
+    def equipamentos_ligar_aba(srv):
+        return _ligar_aba(srv)
 
     @bp.route("/equipamentos/salvar", methods=["POST"])
     @_tela(TITULO)
