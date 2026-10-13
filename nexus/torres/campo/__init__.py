@@ -412,7 +412,9 @@ def responsaveis_painel(usina_id, painel):
         nomes = campo_resp.Nomes(visao._Base())
         if painel in ("meta", "pr"):
             serie = campo_resp.serie_diaria(usina_id, hoje.year * 100 + hoje.month, nomes)
-            ctx.update(serie=serie, tabela=campo_resp.tabela_meta(serie),
+            # a Meta leva o POA e a disponibilidade de cada dia (Levi, 13/10/2026): o mapa diário da Disponibilidade
+            disp = campo_resp.disp_diaria(usina_id, hoje.strftime("%Y-%m"), nomes) if painel == "meta" else None
+            ctx.update(serie=serie, tabela=campo_resp.tabela_meta(serie, disp, (u.get("disp") or {}).get("disp")),
                        graf_ger=campo_graficos.geracao(serie["dias"], dias_mes) if serie["dias"] else None,
                        graf_pr=campo_graficos.pr(serie["dias"], dias_mes) if serie["dias"] else None)
         else:

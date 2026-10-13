@@ -264,7 +264,26 @@ def test_a_tabela_da_meta_dia_a_dia_com_o_total_do_gerencial(tela):
     t = R.tabela_meta(serie)
     assert [(l["dia"], l["meta"], l["real"], l["pct"], l["cls"]) for l in t["linhas"]] == [
         (1, 40.0, 37.0, 92, "alerta"), (2, 40.0, 5.8, 14, "critico")]
-    assert t["total"] == {"meta": 80.0, "real": 42.8, "dif": -37.2, "pct": 53.5, "cls": "critico"}
+    assert {k: t["total"][k] for k in ("meta", "real", "dif", "pct", "cls")} == {
+        "meta": 80.0, "real": 42.8, "dif": -37.2, "pct": 53.5, "cls": "critico"}
+    assert t["total"]["poa"] == 8.8                                    # 7,4 + 1,4: a soma do POA dos dias da tabela
+
+
+def test_a_tabela_da_meta_leva_o_poa_e_a_disponibilidade_do_dia():
+    """Levi, 13/10/2026: "na tabelinha da meta por dia você adicione o POA DEF e a disponibilidade!". O POA do dia vem da
+    série; a disponibilidade, do dia fechado (vazia antes de fechar); no total, a soma do POA e a disponibilidade do mês."""
+    serie = {"dias": [{"dia": 1, "geracao_kwh": 9000, "meta_kwh": 10000, "ipoa": 6.2},
+                      {"dia": 2, "geracao_kwh": 3000, "meta_kwh": 10000, "ipoa": None},
+                      {"dia": 3, "geracao_kwh": 2000, "meta_kwh": 10000, "ipoa": 1.1}]}
+    disp = {"dias": [{"dia": 1, "disp": 100.0}, {"dia": 2, "disp": 40.0}], "ate": "2026-10-02"}
+    t = R.tabela_meta(serie, disp, 70.0)
+    assert [(l["dia"], l["poa"], l["disp"], l["disp_cls"]) for l in t["linhas"]] == [
+        (1, 6.2, 100.0, "ok"), (2, None, 40.0, "critico"), (3, 1.1, None, "neutro")]
+    assert t["total"]["poa"] == 7.3 and t["total"]["disp"] == 70.0 and t["total"]["disp_cls"] == "critico"
+    assert t["disp_ate"] == "2026-10-02" and t["com_disp"]
+    # sem a disponibilidade (usina fora do Gerencial › Disponibilidade): a coluna fica vazia, a conta da meta é a mesma
+    t2 = R.tabela_meta(serie)
+    assert [l["disp"] for l in t2["linhas"]] == [None, None, None] and not t2["com_disp"] and t2["total"]["pct"] == t["total"]["pct"]
 
 
 def test_os_graficos_da_geracao_com_poa_e_da_curva_do_pr():
@@ -293,6 +312,7 @@ def test_as_janelas_de_meta_pr_e_disponibilidade(tela, logado):
     html = logado.get("/t/campo/responsaveis/usina/1/meta").get_data(as_text=True)
     assert "<html" not in html and "Meta do mês" in html and "Geração da meta" in html and "Total" in html
     assert "42,8 MWh" in html and "53,5%" in html
+    assert "POA DEF" in html and "Disponibilidade</th>" in html and "7,40" in html          # o POA do dia 1 da Altair
     html = logado.get("/t/campo/responsaveis/usina/1/pr").get_data(as_text=True)
     assert "<svg" in html and "cr-barra--alerta" in html and "cr-linha-poa" in html and "cr-linha-pr" in html
     html = logado.get("/t/campo/responsaveis/usina/1/disp").get_data(as_text=True)

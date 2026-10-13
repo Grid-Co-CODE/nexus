@@ -22,17 +22,22 @@
   <p class="cr-jan-vazio">{{ 'Sem a série do dia a dia desta usina no banco: o Painel NOC não tem o PR diário dela (sem aba no BD).' if serie.publicado else 'A série do dia a dia ainda não chegou ao banco: a plataforma publica com a meta do mês, de hora em hora.' }}</p>
   {% else %}
   <div class="cr-jan-tab"><table>
-    <thead><tr><th>Dia</th><th>Geração da meta</th><th>Geração real</th><th>Diferença</th><th>% da meta</th></tr></thead>
+    <thead><tr><th>Dia</th><th>Geração da meta</th><th>Geração real</th><th>Diferença</th><th>% da meta</th>
+      <th title="Irradiação no plano dos módulos medida no dia">POA DEF <span class="cr-un">kWh/m²</span></th><th>Disponibilidade</th></tr></thead>
     <tbody>
       {% for l in tabela.linhas %}<tr><td class="m">{{ '%02d'|format(l.dia) }}</td><td class="m">{{ mwh(l.meta) }} MWh</td><td class="m">{{ mwh(l.real) }} MWh</td>
         <td class="m {{ 'cn-t-critico' if l.dif is not none and l.dif < 0 else 'cn-t-ok' }}">{% if l.dif is not none %}{{ '+' if l.dif >= 0 }}{{ mwh(l.dif) }}{% else %}—{% endif %}</td>
-        <td class="m"><span class="cr-v cr-v--{{ l.cls }}">{{ pct(l.pct) }}</span></td></tr>{% endfor %}
+        <td class="m"><span class="cr-v cr-v--{{ l.cls }}">{{ pct(l.pct) }}</span></td>
+        <td class="m"{% if l.poa is none %} title="O sensor não leu o POA neste dia"{% endif %}>{{ num(l.poa, 2) }}</td>
+        <td class="m">{% if l.disp is not none %}<span class="cr-v cr-v--{{ l.disp_cls }}">{{ '100%' if l.disp >= 99.95 else pct(l.disp, 1) }}</span>{% else %}<span class="mudo" title="{{ 'O dia ainda não fechou na Disponibilidade' if tabela.com_disp else 'A usina não está no Gerencial › Disponibilidade' }}">—</span>{% endif %}</td></tr>{% endfor %}
     </tbody>
     <tfoot><tr><td>Total</td><td class="m">{{ mwh(tabela.total.meta) }} MWh</td><td class="m">{{ mwh(tabela.total.real) }} MWh</td>
       <td class="m {{ 'cn-t-critico' if tabela.total.dif is not none and tabela.total.dif < 0 else 'cn-t-ok' }}">{% if tabela.total.dif is not none %}{{ '+' if tabela.total.dif >= 0 }}{{ mwh(tabela.total.dif) }}{% else %}—{% endif %}</td>
-      <td class="m"><span class="cr-v cr-v--{{ tabela.total.cls }}">{{ pct(tabela.total.pct, 1) }}</span></td></tr></tfoot>
+      <td class="m"><span class="cr-v cr-v--{{ tabela.total.cls }}">{{ pct(tabela.total.pct, 1) }}</span></td>
+      <td class="m" title="A soma do POA dos dias da tabela">{{ num(tabela.total.poa, 1) }}</td>
+      <td class="m" title="A do mês: a média dos dias fechados, como no Gerencial › Disponibilidade">{% if tabela.total.disp is not none %}<span class="cr-v cr-v--{{ tabela.total.disp_cls }}">{{ pct(tabela.total.disp, 1) }}</span>{% else %}—{% endif %}</td></tr></tfoot>
   </table></div>
-  <p class="cr-jan-nota">Os dias são os que o Gerencial conta no atingimento: o dia com geração, ou com zero confirmado pelo sol medido (usina parada); o dia ainda sem dado não entra. A geração da meta de cada dia é a meta do mês ÷ os dias do mês, e o total (a soma dos dias contra a meta dos mesmos dias) é o % do Gerencial.{% if serie.usinas_gerencial|length > 1 %} Esta usina são {{ serie.usinas_gerencial|length }} no Gerencial ({{ serie.usinas_gerencial|join(' e ') }}): os dias somam as duas.{% endif %}</p>
+  <p class="cr-jan-nota">Os dias são os que o Gerencial conta no atingimento: o dia com geração, ou com zero confirmado pelo sol medido (usina parada); o dia ainda sem dado não entra. A geração da meta de cada dia é a meta do mês ÷ os dias do mês, e o total (a soma dos dias contra a meta dos mesmos dias) é o % do Gerencial. O POA DEF é a irradiação medida no dia (vazio quando o sensor não leu) e a Disponibilidade é a do dia fechado no Gerencial › Disponibilidade{% if tabela.disp_ate %} (até {{ tabela.disp_ate[8:10] }}/{{ tabela.disp_ate[5:7] }}){% endif %}: geração baixa com POA baixo é tempo; com disponibilidade baixa é parada. No total, o POA é a soma dos dias e a disponibilidade é a do mês.{% if serie.usinas_gerencial|length > 1 %} Esta usina são {{ serie.usinas_gerencial|length }} no Gerencial ({{ serie.usinas_gerencial|join(' e ') }}): os dias somam as duas.{% endif %}</p>
   {% endif %}
 {% elif painel == 'pr' %}
   {% if not serie.dias %}

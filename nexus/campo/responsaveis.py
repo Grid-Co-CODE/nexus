@@ -724,13 +724,20 @@ def serie_diaria(uid: int, mes_id: int, nomes: Nomes) -> dict:
     return {"dias": dias, "usinas_gerencial": sorted({str(r.get("usina") or "") for r in rs}), "publicado": bool(todas)}
 
 
-def tabela_meta(serie: dict) -> dict:
+def tabela_meta(serie: dict, disp: dict | None = None, disp_mes: float | None = None) -> dict:
     """A tabela da janela da Meta (Levi: "uma tabelinha de dia do mês, geração meta, geração real do dia e um total no
     final"): uma linha por dia que o Gerencial conta (o que tem geração), em MWh, e o total (a soma dos dias e a meta dos
     mesmos dias: é a conta do Gerencial, atingimento = produção ÷ meta dos dias cobertos). Provado em 13/10/2026 com o
     Gerencial de outubro: fecha nas 135 usinas com série (produção, dias e %). O dia só do PR diário (sem geração) fica
-    de fora: ele não entra na conta."""
-    linhas, soma_meta, soma_real = [], 0.0, 0.0
+    de fora: ele não entra na conta.
+
+    E o porquê do dia (Levi, 13/10/2026: "na tabelinha da meta por dia você adicione o POA DEF e a disponibilidade!"): o
+    POA do dia (o da série, o do PR diário; vazio quando o sensor não leu) e a disponibilidade do dia fechado (`disp` =
+    `disp_diaria`, a do Gerencial › Disponibilidade; vazia até o dia fechar). Geração baixa com POA baixo é tempo; com
+    disponibilidade baixa é parada. No total, o POA é a soma dos dias da tabela e a disponibilidade é a do mês
+    (`disp_mes`, a média dos dias fechados: o mesmo número da coluna Disp. da Visão)."""
+    por_dia = {x["dia"]: x for x in (disp or {}).get("dias") or []}
+    linhas, soma_meta, soma_real, soma_poa, com_poa = [], 0.0, 0.0, 0.0, 0
     for d in serie.get("dias") or []:
         meta = None if d.get("meta_kwh") is None else d["meta_kwh"] / 1000
         real = None if d.get("geracao_kwh") is None else d["geracao_kwh"] / 1000
@@ -740,12 +747,19 @@ def tabela_meta(serie: dict) -> dict:
             soma_meta += meta
             soma_real += real
         pct = round(100 * real / meta) if meta and real is not None else None
+        poa = d.get("ipoa")
+        if poa is not None:
+            soma_poa += poa
+            com_poa += 1
+        dd = (por_dia.get(d["dia"]) or {}).get("disp")
         linhas.append({"dia": d["dia"], "meta": meta, "real": real, "dif": None if meta is None or real is None else real - meta,
-                       "pct": pct, "cls": cls_meta(pct)})
+                       "pct": pct, "cls": cls_meta(pct), "poa": poa, "disp": dd, "disp_cls": cls_disp(dd)})
     pct = round(100 * soma_real / soma_meta, 1) if soma_meta else None
     return {"linhas": linhas, "total": {"meta": soma_meta or None, "real": soma_real if soma_meta else None,
                                         "dif": (soma_real - soma_meta) if soma_meta else None, "pct": pct,
-                                        "cls": cls_meta(pct)}}
+                                        "cls": cls_meta(pct), "poa": round(soma_poa, 2) if com_poa else None,
+                                        "disp": disp_mes, "disp_cls": cls_disp(disp_mes)},
+            "disp_ate": (disp or {}).get("ate") or "", "com_disp": bool(por_dia)}
 
 
 def disp_diaria(uid: int, mes: str, nomes: Nomes) -> dict:

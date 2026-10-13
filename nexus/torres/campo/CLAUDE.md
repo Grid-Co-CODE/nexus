@@ -480,7 +480,11 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
     (produção, dias e %, provado com o Gerencial de outubro). Até 13/10 a geração vinha do PR diário e não fechava em 78
     de 131 (a Thopen pula o dia com POA até 0,3: Indaiatuba 5 dias e 87% contra 12 dias e 66%; o BD_Performance escreve
     0 no dia em branco: Castelo do Piauí 31 dias e 54,9% contra 9 e 189,1%). O dia só do PR diário (geração vazia) não
-    entra na tabela. A janela só mostra o mês corrente (no mês fechado o Gerencial cobra o mês inteiro).
+    entra na tabela. A janela só mostra o mês corrente (no mês fechado o Gerencial cobra o mês inteiro). E o porquê de
+    cada dia (Levi, 13/10/2026: "na tabelinha da meta por dia você adicione o POA DEF e a disponibilidade!"): o POA do
+    dia (o da série; vazio quando o sensor não leu) e a disponibilidade do dia fechado (`disp_diaria`, o mapa da janela
+    da Disponibilidade; vazia até o dia fechar ou na usina fora do Gerencial › Disponibilidade), na régua 99/80 dela. No
+    total, o POA é a soma dos dias da tabela e a disponibilidade é a do mês (o mesmo número da coluna Disp.).
   - **PR**: "essa mesma visão do PAINEL NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO PORÉM UMA MELHORIA": as barras da
     geração com a linha do POA (eixo da direita) e as metas tracejadas e, embaixo, a curva do PR com a meta. SVG montado no
     servidor (`nexus/campo/responsaveis_graficos.py`, sem biblioteca, como o resto do Nexus); a barra pela meta do dia
