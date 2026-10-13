@@ -39,6 +39,10 @@ from . import visao
 LIVRO_META, ABA_META = "nexus_performance", "fato_meta_usina_mes"
 LIVRO_DISP, ABA_DISP = "falhas_performance", "disponibilidade_dia"
 LIVRO_CHAMADOS, ABA_CHAMADOS = "nexus_chamados", "fato_chamado"
+# as janelas (12/10/2026): a série do PR diário do Painel NOC e as OS que formaram a disponibilidade, publicadas pela
+# plataforma (plataforma/gerencial_publicar.py e falhas_publicar.py)
+ABA_DIA = "fato_desempenho_usina_dia"
+ABA_DISP_OS = "disponibilidade_os"
 LIVRO_EQUIP, ABA_EQUIP = "nexus_equipamentos", "dim_equipamento"
 # os sistemas do de-para em que a chave é o NOME da usina como a planilha escreve (o Gerencial e o diário da
 # disponibilidade usam esses nomes: "Santa Bárbara I", "Boa Esperança do Sul 1 e 2")
@@ -62,7 +66,7 @@ REGUAS = (
                                           "pode esperar."),
     ("acomp", "ronda", "Rondas", "Central de atenção: nunca teve ronda, ou sem ronda há 7 dias ou mais, é crítico; ronda "
                                  "longa pendente é atenção."),
-    ("acomp", "pt", "PT e APR", "APR e PT: PT esperando o De acordo há mais de 2 h é crítico; se é de hoje, vai para o "
+    ("acomp", "pt", "PT", "APR e PT: PT esperando o De acordo há mais de 2 h é crítico; se é de hoje, vai para o "
                                 "topo (técnico parado no campo agora). Esperando há menos de 2 h, atenção."),
     ("acomp", "chamados", "Chamados", "Acompanhamento de chamados: chamado de garantia em aberto com o fabricante é "
                                       "atenção (o mesmo dado do quadro, publicado no banco de hora em hora)."),
@@ -528,7 +532,7 @@ def linha_acompanhamento(u: dict) -> dict:
     if ronda_txt:
         det.append({"rot": "Ronda", "forte": "", "resto": ronda_txt, "itens": []})
     if p.get("aguardando"):
-        det.append({"rot": "PT e APR", "forte": "", "resto": f"{p['aguardando']} esperando o De acordo",
+        det.append({"rot": "PT", "forte": "", "resto": f"{p['aguardando']} esperando o De acordo",
                     "itens": [{"forte": f"OS {x['os'] or x['numero']}", "txt": f"há {_duracao(x['idade_min'])}",
                                "agora": x["hoje"] and x["parada"],
                                "sem_decisao": f"sem decisão desde {_dm(x['dia'])}" if x["parada"] and not x["hoje"] else "",
@@ -671,6 +675,134 @@ def por_responsavel(usinas: list[dict]) -> list[dict]:
     out.sort(key=lambda s: (s["responsavel"] == visao.SEM_RESPONSAVEL, -(s["perf"]["critico"] + s["acomp"]["critico"]),
                             -(s["perf"]["atencao"] + s["acomp"]["atencao"]), s["responsavel"]))
     return out
+
+
+# ── As janelas: o dia a dia de onde vem cada número (12/10/2026) ───────────────────────────────────────────────
+# Levi: "Precisamos de visuais que expliquem melhor para o supervisor o que está acontecendo, esses dados são muito
+# importantes e interessantes porém precisamos mostrar para o supervisor de onde está vindo!". Cada janela lê o MESMO dado
+# da tela dona, publicado no banco pela plataforma.
+def _linhas_da_usina(linhas, uid, nomes, campo="usina", fracttal="usina_fracttal") -> list[dict]:
+    """As linhas cujo nome (o da planilha) liga à usina `uid` do cadastro (`Nomes`, a mesma ligação da meta e da
+    disponibilidade); o nome de cada linha é resolvido uma vez."""
+    vistos, out = {}, []
+    for r in linhas:
+        n = str(r.get(campo) or "")
+        if n not in vistos:
+            vistos[n] = nomes.usina(n, fracttal=str(r.get(fracttal) or ""))[0]
+        if vistos[n] == uid:
+            out.append(r)
+    return out
+
+
+def serie_diaria(uid: int, mes_id: int, nomes: Nomes) -> dict:
+    """O dia a dia da usina no mês, a série do PR diário do Painel NOC (`nexus_performance · fato_desempenho_usina_dia`):
+    {dias: [{dia, geracao_kwh, meta_kwh, ipoa, ipoa_meta, pr, pr_meta}], usinas_gerencial, publicado}. Usina do cadastro
+    com duas usinas no Gerencial (Santarém 1 e 2): a geração e a meta somam por dia; o POA e o PR são a média pesada pela
+    meta (sem meta, a média simples)."""
+    todas = visao._livro(LIVRO_META, ABA_DIA)
+    rs = _linhas_da_usina([r for r in todas if _int(r.get("mes_id")) == mes_id], uid, nomes)
+    por = collections.defaultdict(list)
+    for r in rs:
+        d = _dia_do_id(r.get("data_id"))
+        if d:
+            por[d.day].append(r)
+    dias = []
+    for dia in sorted(por):
+        xs = por[dia]
+        ger = [_num(r.get("geracao_kwh")) for r in xs if _num(r.get("geracao_kwh")) is not None]
+        meta = [_num(r.get("meta_kwh")) for r in xs if _num(r.get("meta_kwh")) is not None]
+
+        def media(campo):
+            vs = [(_num(r.get(campo)), _num(r.get("meta_kwh")) or 1.0) for r in xs if _num(r.get(campo)) is not None]
+            peso = sum(w for _v, w in vs)
+            return round(sum(v * w for v, w in vs) / peso, 2) if peso else None
+        dias.append({"dia": dia, "geracao_kwh": sum(ger) if ger else None, "meta_kwh": sum(meta) if meta else None,
+                     "ipoa": media("ipoa_kwh_m2"), "ipoa_meta": media("ipoa_meta_kwh_m2"), "pr": media("pr_pct"),
+                     "pr_meta": media("pr_meta_pct")})
+    return {"dias": dias, "usinas_gerencial": sorted({str(r.get("usina") or "") for r in rs}), "publicado": bool(todas)}
+
+
+def tabela_meta(serie: dict) -> dict:
+    """A tabela da janela da Meta (Levi: "uma tabelinha de dia do mês, geração meta, geração real do dia e um total no
+    final"): uma linha por dia com dado, em MWh, e o total (a soma dos dias e a meta dos mesmos dias: é a conta do
+    Gerencial, atingimento = produção ÷ meta dos dias cobertos)."""
+    linhas, soma_meta, soma_real = [], 0.0, 0.0
+    for d in serie.get("dias") or []:
+        meta = None if d.get("meta_kwh") is None else d["meta_kwh"] / 1000
+        real = None if d.get("geracao_kwh") is None else d["geracao_kwh"] / 1000
+        if meta is not None and real is not None:
+            soma_meta += meta
+            soma_real += real
+        pct = round(100 * real / meta) if meta and real is not None else None
+        linhas.append({"dia": d["dia"], "meta": meta, "real": real, "dif": None if meta is None or real is None else real - meta,
+                       "pct": pct, "cls": cls_meta(pct)})
+    pct = round(100 * soma_real / soma_meta, 1) if soma_meta else None
+    return {"linhas": linhas, "total": {"meta": soma_meta or None, "real": soma_real if soma_meta else None,
+                                        "dif": (soma_real - soma_meta) if soma_meta else None, "pct": pct,
+                                        "cls": cls_meta(pct)}}
+
+
+def disp_diaria(uid: int, mes: str, nomes: Nomes) -> dict:
+    """O mapa diário da disponibilidade da usina no mês (o "Mapa diário · usina × dia" do Gerencial › Disponibilidade, só
+    esta usina): {dias: [{dia, disp, h}], ate}. Duas usinas do Gerencial na mesma do cadastro: pesadas pela potência."""
+    rs = _linhas_da_usina([r for r in visao._livro(LIVRO_DISP, ABA_DISP) if str(r.get("mes") or "") == mes], uid, nomes)
+    por = collections.defaultdict(list)
+    for r in rs:
+        dia = str(r.get("dia") or "")[:10]
+        if _num(r.get("disp")) is not None and dia:
+            por[dia].append(r)
+    dias = []
+    for dia in sorted(por):
+        xs = por[dia]
+        pesos = [(_num(r.get("pot_kwp")) or 1.0) for r in xs]
+        tot = sum(pesos)
+        disp = sum(p * _num(r.get("disp")) for p, r in zip(pesos, xs)) / tot
+        h = sum(p * (_num(r.get("h_perdidas")) or 0.0) for p, r in zip(pesos, xs)) / tot
+        dias.append({"dia": int(dia[8:10]), "data": dia, "disp": round(disp, 1), "h": round(h, 2),
+                     "faixa": faixa_disp(disp)})
+    return {"dias": dias, "ate": max(por) if por else ""}
+
+
+def faixa_disp(d) -> str:
+    """A faixa da legenda do mapa diário da Disponibilidade (a mesma de lá): 100% sem evento, 99–100%, 95–99%, 80–95%,
+    50–80% e abaixo de 50%."""
+    if d is None:
+        return "sem"
+    return ("c0" if d >= 99.95 else "c-ok" if d >= 99 else "c-a1" if d >= 95 else "c-a2" if d >= 80
+            else "c-r1" if d >= 50 else "c-r2")
+
+
+def _hora(iso) -> str:
+    s = str(iso or "")
+    return f"{s[8:10]}/{s[5:7]} {s[11:16]}" if len(s) >= 16 else (f"{s[8:10]}/{s[5:7]}" if len(s) >= 10 else "—")
+
+
+def os_disponibilidade(uid: int, mes: str, nomes: Nomes) -> dict:
+    """As OS que formaram a disponibilidade da usina no mês (`falhas_performance · disponibilidade_os`, a conta do
+    Gerencial): {oss: [{os, tipo, origem, escopo, inicio, fim, aberta, duracao_min, sol_min, perda_kwh}], totais,
+    publicado}. Duração = do início ao fim da OS (o relógio); horas de sol = as de 06–18 h dentro do mês (as que contam
+    na conta); perda = kWp afetado × horas (a régua de lá, sem a irradiação)."""
+    from datetime import datetime as _dt
+    todas = visao._livro(LIVRO_DISP, ABA_DISP_OS)
+    rs = _linhas_da_usina([r for r in todas if str(r.get("mes") or "") == mes], uid, nomes)
+    oss = []
+    for r in rs:
+        ini, fim = str(r.get("inicio") or ""), str(r.get("fim") or "")
+        dur = None
+        try:
+            if ini and fim:
+                dur = max(0, int((_dt.fromisoformat(fim[:19]) - _dt.fromisoformat(ini[:19])).total_seconds() // 60))
+        except ValueError:
+            dur = None
+        aberta = str(r.get("aberta") or "").strip().lower() in ("sim", "true", "1")
+        oss.append({"os": str(r.get("os") or ""), "tipo": str(r.get("tipo") or "—"), "origem": str(r.get("origem") or ""),
+                    "escopo": str(r.get("escopo") or "—"), "codigo": str(r.get("codigo_ativo") or ""),
+                    "inicio": _hora(ini), "fim": _hora(fim) if fim else "", "aberta": aberta, "duracao_min": dur,
+                    "sol_min": _int(r.get("duracao_sol_min")), "perda_kwh": _num(r.get("perda_kwh")), "_ini": ini})
+    oss.sort(key=lambda o: (o["_ini"], o["os"]))
+    return {"oss": oss, "publicado": bool(todas),
+            "total_perda": sum(o["perda_kwh"] or 0 for o in oss) if oss else None,
+            "total_sol_min": sum(o["sol_min"] or 0 for o in oss) if oss else None}
 
 
 def _ler_fonte(nome, f, erros):

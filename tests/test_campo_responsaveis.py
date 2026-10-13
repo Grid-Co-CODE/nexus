@@ -82,6 +82,23 @@ def tela(banco, monkeypatch):
         _ext("ALT100-EXT02", "Thopen - Altair 1 - SP", "12/2099", 5),   # em dia
         _ext("COR100-EXT01", "Coração", este_mes, 5, cb="THPN-COR100"),  # vence em até 30 dias
         _ext("COR100-EXT02", "Coração", "12/2099", 60, cb="THPN-COR100")])  # sem conferência há 60 dias
+    # as janelas (12/10/2026): a série do PR diário do Painel NOC e as OS que formaram a disponibilidade
+    d1, d2 = (HOJE.replace(day=1), HOJE.replace(day=2))
+    _aba(banco, "nexus_performance", "fato_desempenho_usina_dia", [
+        {"mes_id": MES_ID, "usina": "Altair", "data_id": int(d1.strftime("%Y%m%d")), "geracao_kwh": 37000, "meta_kwh": 40000,
+         "ipoa_kwh_m2": 7.4, "ipoa_meta_kwh_m2": 7.7, "pr_pct": 74.3, "pr_meta_pct": 76.0},
+        {"mes_id": MES_ID, "usina": "Altair", "data_id": int(d2.strftime("%Y%m%d")), "geracao_kwh": 5800, "meta_kwh": 40000,
+         "ipoa_kwh_m2": 1.4, "ipoa_meta_kwh_m2": 7.7, "pr_pct": 61.3, "pr_meta_pct": 76.0},
+        {"mes_id": MES_ID, "usina": "Coração 1", "data_id": int(d1.strftime("%Y%m%d")), "geracao_kwh": 1, "meta_kwh": 1,
+         "ipoa_kwh_m2": 1, "ipoa_meta_kwh_m2": 1, "pr_pct": 1, "pr_meta_pct": 1}])
+    _aba(banco, "falhas_performance", "disponibilidade_os", [
+        {"mes": MES, "os": "13001", "usina": "Altair", "usina_fracttal": "Thopen - Altair 1 - SP", "tipo": "Religamento Remoto",
+         "origem": "queda", "codigo_ativo": "THPN-ALT100", "escopo": "Usina inteira", "kwp": 6898,
+         "inicio": f"{MES}-01T09:00:00", "fim": f"{MES}-01T15:06:00", "aberta": "não", "duracao_sol_min": 366,
+         "perda_kwh": 42077},
+        {"mes": MES, "os": "13002", "usina": "Altair", "usina_fracttal": "Thopen - Altair 1 - SP",
+         "tipo": "Corretiva Emergencial", "origem": "equipamento", "codigo_ativo": "THPN-ALT100-INVR1", "escopo": "Inversor 1",
+         "kwp": 250, "inicio": f"{MES}-02T08:00:00", "fim": None, "aberta": "sim", "duracao_sol_min": 120, "perda_kwh": 500}])
     monkeypatch.setattr(R, "_engenharia", lambda: {"dados": {"sinais": SINAIS}, "sem_cadastro": False})
     visao.limpar()
     return banco
@@ -136,7 +153,8 @@ def test_os_dois_blocos_com_a_regua_da_tela_dona(tela):
     assert a["perf"]["valores"]["meta"] == {"txt": "85%", "cls": "critico", "sub": ""}
     assert a["acomp"]["valores"]["extintores"] == {"txt": "1 vencido", "cls": "critico", "sub": ""}
     assert a["perf"]["tag"] == ("critico", "1 ativo crítico")
-    assert [i["rot"] for i in a["acomp"]["det"]] == ["Ronda", "PT e APR", "Chamados", "Extintores"]
+    # esperando o De acordo é só PT (Levi, 12/10/2026: "na verdade esperando de acordo é só PT então mostra só PT")
+    assert [i["rot"] for i in a["acomp"]["det"]] == ["Ronda", "PT", "Chamados", "Extintores"]
 
 
 def test_cada_bloco_ordena_o_proprio_foco_e_recolhe_o_que_esta_em_dia(tela):
@@ -211,9 +229,11 @@ def test_quem_entra_pelo_fracttal_cai_nas_usinas_dele(tela, cliente):
         s["usuario"] = {"email": "beltrano@exemplo.test", "nome": "Beltrano Supervisor", "perfil": ""}
     html = cliente.get("/t/campo/responsaveis").get_data(as_text=True)
     assert '<option value="Beltrano Supervisor" selected>' in html and 'id="cr-perf"' in html
-    # "Todos" vence o padrão
-    html = cliente.get("/t/campo/responsaveis?responsavel=*").get_data(as_text=True)
-    assert 'id="cr-perf"' not in html and "Ciclano Chefe" in html
+    # o responsável logado não vê os cartões (Levi, 12/10/2026: "não vai aparecer por responsável, já vai direto para
+    # Onde Focar!"): nem pelo endereço; "Todos" mostra as usinas de todos, ainda nos dois blocos
+    assert ">Por responsável</a>" not in html
+    html = cliente.get("/t/campo/responsaveis?responsavel=*&modo=cartoes").get_data(as_text=True)
+    assert 'id="cr-perf"' in html and 'class="cn-equipes"' not in html and "Ciclano Chefe" in html
 
 
 def test_sem_a_meta_e_sem_os_chamados_no_banco_a_tela_avisa_e_nao_cobra(tela, logado):
@@ -230,3 +250,70 @@ def test_sem_a_meta_e_sem_os_chamados_no_banco_a_tela_avisa_e_nao_cobra(tela, lo
 
 def test_dia_do_id():
     assert R._dia_do_id(20261012) == date(2026, 10, 12) and R._dia_do_id(None) is None and R._dia_do_id(20261399) is None
+
+
+# ── As janelas por cima da tela (12/10/2026) ─────────────────────────────────────────────────────────────────────────
+def test_a_tabela_da_meta_dia_a_dia_com_o_total_do_gerencial(tela):
+    nomes = R.Nomes(visao._Base())
+    serie = R.serie_diaria(1, MES_ID, nomes)
+    assert [d["dia"] for d in serie["dias"]] == [1, 2] and serie["usinas_gerencial"] == ["Altair"]
+    t = R.tabela_meta(serie)
+    assert [(l["dia"], l["meta"], l["real"], l["pct"], l["cls"]) for l in t["linhas"]] == [
+        (1, 40.0, 37.0, 92, "alerta"), (2, 40.0, 5.8, 14, "critico")]
+    assert t["total"] == {"meta": 80.0, "real": 42.8, "dif": -37.2, "pct": 53.5, "cls": "critico"}
+
+
+def test_os_graficos_da_geracao_com_poa_e_da_curva_do_pr():
+    from nexus.campo import responsaveis_graficos as G
+    dias = [{"dia": 1, "geracao_kwh": 40000, "meta_kwh": 40000, "ipoa": 7.4, "ipoa_meta": 7.7, "pr": 94.0, "pr_meta": 76.0},
+            {"dia": 2, "geracao_kwh": 37000, "meta_kwh": 40000, "ipoa": 2.6, "ipoa_meta": 7.7, "pr": 74.3, "pr_meta": 76.0},
+            {"dia": 3, "geracao_kwh": 5800, "meta_kwh": 40000, "ipoa": None, "ipoa_meta": 7.7, "pr": None, "pr_meta": 76.0},
+            {"dia": 4, "geracao_kwh": 9000, "meta_kwh": 40000, "ipoa": 1.8, "ipoa_meta": 7.7, "pr": 61.3, "pr_meta": 76.0}]
+    g = G.geracao(dias, 31)
+    # a barra pela meta do dia, a régua do Gerencial: 100% ok, 92% atenção, 14% crítico
+    assert [b["cls"] for b in g["barras"]] == ["ok", "alerta", "critico", "critico"]
+    # o dia sem POA quebra a linha: o dia 4, sozinho depois do buraco, fica só como ponto
+    assert len(g["poa"]) == 1 and len(g["poa_pontos"]) == 3 and g["meta_y"] is not None and g["meta"] == "40,0"
+    q = G.pr(dias, 31)
+    assert len(q["linha"]) == 1 and [p["cls"] for p in q["pontos"]] == ["ok", "alerta", "alerta"]
+    assert q["grades"][-1]["rotulo"] == "125%" and q["grades"][0]["rotulo"] == "0%"   # 94% + folga: 125%, não 200%
+
+
+def test_as_janelas_de_meta_pr_e_disponibilidade(tela, logado):
+    html = logado.get("/t/campo/responsaveis/usina/1/meta").get_data(as_text=True)
+    assert "<html" not in html and "Meta do mês" in html and "Geração da meta" in html and "Total" in html
+    assert "42,8 MWh" in html and "53,5%" in html
+    html = logado.get("/t/campo/responsaveis/usina/1/pr").get_data(as_text=True)
+    assert "<svg" in html and "cr-barra--alerta" in html and "cr-linha-poa" in html and "cr-linha-pr" in html
+    html = logado.get("/t/campo/responsaveis/usina/1/disp").get_data(as_text=True)
+    assert "Mapa diário" in html and "cr-cel--" in html
+    assert "13001" in html and "Religamento Remoto" in html and "42077 kWh" in html and "em aberto" in html
+    assert "6 h 6 min" in html                                              # do início ao fim da OS 13001
+    assert logado.get("/t/campo/responsaveis/usina/1/outra").status_code == 404
+    assert logado.get("/t/campo/responsaveis/usina/999/meta").status_code == 404
+
+
+def test_a_janela_sem_a_serie_no_banco_diz_o_porque(tela, logado):
+    for livro, aba in (("nexus_performance", "fato_desempenho_usina_dia"), ("falhas_performance", "disponibilidade_os")):
+        tela.abas.pop((livro, aba))
+    visao.limpar()
+    assert "ainda não chegou ao banco" in logado.get("/t/campo/responsaveis/usina/1/pr").get_data(as_text=True)
+    assert "A lista de OS ainda não chegou" in logado.get("/t/campo/responsaveis/usina/1/disp").get_data(as_text=True)
+
+
+def test_a_pt_por_cima_decide_e_volta_para_a_visao(tela, logado):
+    volta = "/t/campo/responsaveis?responsavel=Ciclano+Chefe"
+    html = logado.get("/t/campo/responsaveis/pt/PT-1", query_string={"ativo": "THPN-ALT100-INVR1", "volta": volta}).get_data(as_text=True)
+    assert "<html" not in html and "PT-1" in html and "/os/_nexus/pt/PT-1/decidir" in html
+    assert f'name="volta" value="{volta}"'.replace("+", "+") in html.replace("&#43;", "+")
+    assert "data-cr-assinatura" in html and "data-cr-quem" in html
+    # volta para fora da Visão do responsável não vai no formulário
+    html = logado.get("/t/campo/responsaveis/pt/PT-1", query_string={"ativo": "THPN-ALT100-INVR1", "volta": "//fora.test"}).get_data(as_text=True)
+    assert 'name="volta"' not in html
+
+
+def test_a_tela_abre_as_janelas_pelo_valor_e_pela_os_da_pt(tela, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    assert 'id="cr-modal"' in html and "data-cr-painel=" in html
+    assert "/t/campo/responsaveis/usina/1/meta" in html and "/t/campo/responsaveis/usina/1/disp" in html
+    assert "/t/campo/responsaveis/pt/PT-1" in html and "dia a dia" in html

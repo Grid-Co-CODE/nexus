@@ -32,10 +32,11 @@
   {% endif %}
 
   <form class="cn-filtros" method="get">
-    <div class="cn-seg" aria-label="Visão">
+    {# o responsável que entrou pelo Fracttal não vê os cartões dos outros: vai direto para Onde focar #}
+    {% if not responsavel_logado %}<div class="cn-seg" aria-label="Visão">
       <a href="{{ url(modo='cartoes', responsavel='*') }}"{% if modo == 'cartoes' %} aria-current="page"{% endif %}>Por responsável</a>
       <a href="{{ url(modo='foco', responsavel=responsavel or '*') }}"{% if modo == 'foco' %} aria-current="page"{% endif %}>Onde focar</a>
-    </div>
+    </div>{% endif %}
     <label class="gc-rotulo" for="cr-responsavel">Responsável O&amp;M</label>
     <select class="gc-campo" id="cr-responsavel" name="responsavel" onchange="this.form.submit()">
       <option value="*"{% if not responsavel %} selected{% endif %}>Todos</option>{% for r in opcoes_responsavel %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
@@ -87,7 +88,8 @@
   <div class="cn-faixa-equipe">
     <b>{{ responsavel or 'Todos os responsáveis' }}</b>
     <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q %}, com os filtros{% endif %}</span>
-    {% if responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='cartoes') }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
+    {% if responsavel and responsavel_logado %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*') }}" title="As usinas de todos os responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>
+    {% elif responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='cartoes') }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
   </div>
 
   <div class="cr-blocos">
@@ -116,13 +118,18 @@
       <details class="cr-lin cr-lin--{{ x.nivel }}">
         <summary class="cr-g">
           <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}{% if x.tag %}<em class="cr-tag cr-tag--{{ x.tag[0] }}">{{ x.tag[1] }}</em>{% endif %}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
-          {% for k, rot in colunas[b] %}{% set v = x.valores[k] %}<span class="cr-col-{{ k }}"><span class="cr-v cr-v--{{ v.cls }}">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</span></span>{% endfor %}
+          {# na Performance, o valor abre a janela do dia a dia (Levi, 12/10/2026: "precisamos mostrar para o supervisor de
+             onde está vindo!"); clicar fora do valor abre o detalhe da linha #}
+          {% for k, rot in colunas[b] %}{% set v = x.valores[k] %}<span class="cr-col-{{ k }}">{% if b == 'perf' %}<button type="button" class="cr-v cr-v--{{ v.cls }} cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=k) }}" title="{{ rot }}: ver o dia a dia">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</button>{% else %}<span class="cr-v cr-v--{{ v.cls }}">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</span>{% endif %}</span>{% endfor %}
           <i class="ph ph-caret-down cr-seta" aria-hidden="true"></i>
         </summary>
         <div class="cr-det">
           <dl class="cr-dl">
-            {% for i in x.det %}<dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
-              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=it.numero, ativo=it.codigo) }}" title="{{ it.titulo }}">{{ it.forte }}</a>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
+            {% for i in x.det %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp'}.get(i.rot) if b == 'perf' else none %}
+              <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
+              {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">dia a dia</button>{% endif %}
+              {# a OS da PT abre a PT por cima, para aprovar sem sair da tela (Levi, 12/10/2026) #}
+              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
               {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
           </dl>
           <div class="cr-links">
@@ -159,5 +166,67 @@
     {% if info.get('extintores') and not info.extintores.publicado %}<br>O livro de extintores do App ainda não chegou ao banco: a coluna Extintores fica vazia.{% endif %}
     {% if info.get('ativos') and not info.ativos.completa %}<br>A leitura das OS de falha do Fracttal ainda não terminou: os ativos podem estar incompletos.{% endif %}
   </div>
+
+  {# as janelas por cima da tela, com o fundo desfocado: o pedaço de página vem da rota (`responsaveis_painel`,
+     `responsaveis_pt`) e entra aqui; Esc, o Fechar e o clique fora fecham #}
+  <dialog class="cr-modal" id="cr-modal" aria-label="Detalhe da usina">
+    <div class="cr-modal-barra"><button type="button" class="gc-btn gc-btn--contorno cr-modal-fechar">Fechar</button></div>
+    <div class="cr-modal-corpo"></div>
+  </dialog>
 </div>
+<script>
+(function () {
+  var dlg = document.getElementById('cr-modal');
+  if (!dlg) { return; }
+  var corpo = dlg.querySelector('.cr-modal-corpo');
+  // a PT na janela: a assinatura do técnico e quem assina vêm do login do Fracttal (cookie só em /os), como na tela da
+  // PT; o script que vem no pedaço de página não roda, então é daqui
+  function completarPT() {
+    var fig = corpo.querySelector('[data-cr-assinatura]');
+    if (fig) {
+      fetch(fig.getAttribute('data-cr-assinatura'), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (a) {
+        if (a.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(a.entrar); return; }
+        var q = fig.querySelector('.cn-ass-quadro');
+        q.textContent = '';
+        if (a.ok) { var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img); return; }
+        var s = document.createElement('span'); s.className = 'mudo';
+        if (a.login) {
+          var l = document.createElement('a'); l.className = 'cn-link'; l.href = a.entrar; l.textContent = 'entre com o seu login do Fracttal';
+          s.appendChild(document.createTextNode('Para ver a assinatura, ')); s.appendChild(l); s.appendChild(document.createTextNode('.'));
+        } else { s.textContent = 'Sem a assinatura: ' + (a.motivo || 'o Fracttal não respondeu') + '.'; }
+        q.appendChild(s);
+      }).catch(function () {});
+    }
+    var quem = corpo.querySelector('[data-cr-quem]');
+    if (quem) {
+      fetch(quem.getAttribute('data-cr-quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (q) {
+        if (q.email) { quem.textContent = 'Assinando como ' + q.nome + ' (' + q.email + '), pelo login do Fracttal.'; return; }
+        var a = document.createElement('a'); a.className = 'cn-link'; a.href = quem.getAttribute('data-cr-entrar');
+        a.textContent = 'entre com o seu login do Fracttal';
+        quem.textContent = 'Para assinar, '; quem.appendChild(a); quem.appendChild(document.createTextNode(' (o mesmo do OS Creator).'));
+      }).catch(function () {});
+    }
+  }
+  document.addEventListener('click', function (ev) {
+    var alvo = ev.target.closest('[data-cr-painel]');
+    if (!alvo) { return; }
+    ev.preventDefault(); ev.stopPropagation();          // o valor fica na linha que abre: não abre nem fecha a linha
+    corpo.innerHTML = '<p class="cr-jan-carregando">Carregando…</p>';
+    if (!dlg.open) { dlg.showModal(); }
+    fetch(alvo.getAttribute('data-cr-painel'), {credentials: 'same-origin'}).then(function (r) {
+      if (r.redirected && /\/entrar/.test(r.url)) { location.reload(); return null; }     // a sessão do Nexus caiu
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.text();
+    }).then(function (html) {
+      if (html === null) { return; }
+      corpo.innerHTML = html;
+      completarPT();
+    }).catch(function (e) {
+      corpo.innerHTML = '<div class="cn-erro" role="alert"><b>Não consegui abrir agora (' + e.message + ').</b> Tente de novo.</div>';
+    });
+  });
+  dlg.addEventListener('click', function (ev) { if (ev.target === dlg) { dlg.close(); } });
+  dlg.querySelector('.cr-modal-fechar').addEventListener('click', function () { dlg.close(); });
+})();
+</script>
 {% endblock %}

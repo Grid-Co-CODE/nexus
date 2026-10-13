@@ -12,13 +12,14 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import Response, redirect, render_template, request, session
+from flask import Response, abort, redirect, render_template, request, session
 from markupsafe import Markup, escape
 from werkzeug.datastructures import ImmutableMultiDict
 
 from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
 from ...campo import responsaveis as campo_resp
+from ...campo import responsaveis_graficos as campo_graficos
 from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
@@ -349,9 +350,13 @@ def responsaveis():
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados
     todas = d.get("usinas") or []
+    # o responsável que entrou pelo Fracttal vai direto para Onde focar, nas usinas dele, e não vê os cartões (Levi,
+    # 12/10/2026: "caso a pessoa que logue seja algum desses responsáveis não vai aparecer por responsável, já vai direto
+    # para Onde Focar!"); o filtro continua, para olhar as usinas de quem ele estiver cobrindo
+    logado = "" if leitura.erro else _responsavel_do_login(d)
     pedido = request.args.get("responsavel")
     if pedido is None:
-        responsavel = "" if leitura.erro else _responsavel_do_login(d)
+        responsavel = logado
     else:
         responsavel = "" if pedido == TODOS else pedido
     cliente = request.args.get("cliente", "")
@@ -363,12 +368,15 @@ def responsaveis():
     base = [u for u in todas if passa(u)]
     usinas = [u for u in base if not responsavel or (u.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel]
     modo = request.args.get("modo")
-    if modo not in ("cartoes", "foco"):
+    if logado:
+        modo = "foco"
+    elif modo not in ("cartoes", "foco"):
         modo = "foco" if responsavel else "cartoes"
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
     return render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
+        responsavel_logado=logado,
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
         opcoes_responsavel=nomes, opcoes_cliente=sorted({u.get("cliente") for u in todas if u.get("cliente")}),
@@ -377,6 +385,68 @@ def responsaveis():
         mes_id=d.get("mes_id"),
         limites={"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,
                  "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO}))
+
+
+# As janelas por cima da Visão do responsável (Levi, 12/10/2026: "precisamos mostrar para o supervisor de onde está
+# vindo!"): um pedaço de página (sem a moldura do Nexus) que a tela carrega num <dialog> com o fundo desfocado. Meta: a
+# tabela do dia a dia; PR: a geração com a linha do POA e a curva do PR; Disponibilidade: o mapa diário e as OS que
+# formaram o valor. Cada uma lê o MESMO dado da tela dona, publicado no banco pela plataforma.
+PAINEIS = {"meta": "Meta do mês", "pr": "PR do mês", "disp": "Disponibilidade do mês"}
+
+
+@bp.route("/responsaveis/usina/<int:usina_id>/<painel>")
+def responsaveis_painel(usina_id, painel):
+    if painel not in PAINEIS:
+        abort(404)
+    leitura = campo_resp.visao_responsaveis()
+    u = next((x for x in (leitura.dados or {}).get("usinas") or [] if x["usina_id"] == usina_id), None)
+    if u is None:
+        abort(404)
+    import calendar
+    hoje = visao._agora().date()
+    dias_mes = calendar.monthrange(hoje.year, hoje.month)[1]
+    ctx = {"u": u, "painel": painel, "titulo": PAINEIS[painel], "mes_txt": hoje.strftime("%m/%Y"), "erro": "",
+           "limites": {"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,
+                       "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO}}
+    try:
+        nomes = campo_resp.Nomes(visao._Base())
+        if painel in ("meta", "pr"):
+            serie = campo_resp.serie_diaria(usina_id, hoje.year * 100 + hoje.month, nomes)
+            ctx.update(serie=serie, tabela=campo_resp.tabela_meta(serie),
+                       graf_ger=campo_graficos.geracao(serie["dias"], dias_mes) if serie["dias"] else None,
+                       graf_pr=campo_graficos.pr(serie["dias"], dias_mes) if serie["dias"] else None)
+        else:
+            ctx.update(disp=campo_resp.disp_diaria(usina_id, hoje.strftime("%Y-%m"), nomes),
+                       oss=campo_resp.os_disponibilidade(usina_id, hoje.strftime("%Y-%m"), nomes))
+    except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, a tela segue
+        ctx["erro"] = f"Não consegui ler o banco do Nexus ({type(e).__name__})"
+    return render_template("campo/_resp_painel.html", **ctx, duracao=_idade_min)
+
+
+@bp.route("/responsaveis/pt/<numero>")
+def responsaveis_pt(numero):
+    """A PT por cima da Visão do responsável (Levi, 12/10/2026: "não tirar a pessoa da tela pois ela vai ter que voltar
+    para ver mais usinas, se pudesse aparecer sobreposto para o supervisor aprovar seria perfeito!"): a mesma linha da
+    PT e a mesma decisão da tela da PT (`pt_aprovar`), assinada com o login do Fracttal; o `volta` traz de volta à Visão
+    do responsável, com os filtros dela (o portão só aceita /t/campo/ e /t/hseq/)."""
+    ativo = request.args.get("ativo")
+    volta = request.args.get("volta") or ""
+    volta = volta if volta.startswith("/t/campo/") and not volta.startswith("//") else ""
+    leitura = visao.pts()
+    p = visao.pt(numero, ativo) if not leitura.erro else None
+    nexus, erro_nexus, recusa_app = None, "", ""
+    if p:
+        try:
+            nexus = decisao_pt.da_pt(p["numero"], p.get("codigo") or "")
+        except Exception as e:      # noqa: BLE001 — sem o livro de decisões, a janela abre e diz
+            erro_nexus = f"Não consegui ler as decisões do Nexus ({type(e).__name__})"
+        if nexus and decisao_pt.recusada_pelo_app(p, [nexus]):
+            recusa_app, nexus = p.get("nexus_recusa") or "o App não aplicou a decisão", None
+    return render_template("campo/_resp_pt.html", p=p, numero=numero, ativo=ativo, volta=volta, erro=leitura.erro,
+                           nexus=nexus, erro_nexus=erro_nexus, recusa_app=recusa_app, situacoes=SITUACAO_PT,
+                           quem_assina=decisao_pt.aprovadores(p)["texto"] if p else "",
+                           entrar=_login_da_pt(p["numero"], p.get("codigo") or "") if p else "",
+                           idade_min=_idade_min, decisoes=decisao_pt.DECISOES, quando=visao._dt)
 
 
 # ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────

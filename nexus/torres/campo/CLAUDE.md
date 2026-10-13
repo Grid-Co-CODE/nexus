@@ -461,8 +461,34 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
 - **Cartões por responsável** (o padrão de quem não é responsável): os dois blocos, cada um com a triagem e os números
   do grupo (meta, abaixo da meta, disponibilidade; rondas, PT paradas, chamados, extintores vencidos). Responsável O&M
   = `usinas.responsavel_om_id`, o mesmo da Central.
-- **Quem entra pelo Fracttal cai nas usinas dele**: `_responsavel_do_login`, guardado em `session["responsavel_padrao"]`.
-  "Todos" (`*`) vence.
+- **O responsável que entra pelo Fracttal vai direto para Onde focar** (Levi, 12/10/2026: "caso a pessoa que logue seja
+  algum desses responsáveis não vai aparecer por responsável, já vai direto para Onde Focar!"): `_responsavel_do_login`
+  (guardado em `session["responsavel_padrao"]`) marca o filtro nele, a aba "Por responsável" some e o `modo=cartoes` do
+  endereço não vale para ele; o filtro continua (para olhar as usinas de quem ele estiver cobrindo; "Todos" mostra as
+  de todos, ainda nos dois blocos). Quem não é responsável (admin, coordenador) segue com os cartões.
+- **Esperando o De acordo é só PT** (Levi, 12/10: "na verdade esperando de acordo é só PT então mostra só PT"): o rótulo
+  é "PT".
+- **As janelas por cima da tela** (Levi, 12/10/2026: "precisamos mostrar para o supervisor de onde está vindo!"; "ao
+  clicar aparece um card sobrepondo a tela dando um blur de fundo"). O valor da Performance (Meta, PR, Disp.) e o "dia a
+  dia" do detalhe abrem um `<dialog>` (fundo `--veu` com `backdrop-filter: blur`), com o pedaço de página da rota
+  `/t/campo/responsaveis/usina/<usina_id>/<meta|pr|disp>` (`responsaveis_painel`, template `_resp_painel.html`, sem a
+  moldura; o script da tela busca e põe no `<dialog>`):
+  - **Meta**: a tabela do dia a dia (geração da meta, geração real, diferença, % do dia) e o total = a soma dos dias com
+    dado contra a meta dos mesmos dias (a conta do Gerencial). Fonte: `nexus_performance · fato_desempenho_usina_dia`, a
+    série do PR diário do Painel NOC publicada pela plataforma (a meta do dia é a do mês ÷ os dias do mês, como lá).
+  - **PR**: "essa mesma visão do PAINEL NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO PORÉM UMA MELHORIA": as barras da
+    geração com a linha do POA (eixo da direita) e as metas tracejadas e, embaixo, a curva do PR com a meta. SVG montado no
+    servidor (`nexus/campo/responsaveis_graficos.py`, sem biblioteca, como o resto do Nexus); a barra pela meta do dia
+    (97/90, a régua do Gerencial); dia sem valor quebra a linha; a dica de cada dia no `<title>` da coluna.
+  - **Disponibilidade**: o mapa diário da usina (a legenda do Gerencial › Disponibilidade: 100% sem evento, 99–100,
+    95–99, 80–95, 50–80, abaixo de 50) e as OS que formaram o valor (`falhas_performance · disponibilidade_os`, publicada
+    com o diário): OS, tipo, o que parou, início, fim, duração (do início ao fim), horas de sol (as que contam) e perda.
+  - **PT**: a OS da PT no detalhe abre a PT por cima para aprovar sem sair da tela (Levi: "não tirar a pessoa da tela pois
+    ela vai ter que voltar para ver mais usinas"): `/t/campo/responsaveis/pt/<numero>?ativo=&volta=`
+    (`responsaveis_pt`, `_resp_pt.html`), a mesma linha e a mesma decisão da tela da PT, assinada com o login do
+    Fracttal; o `volta` (só /t/campo/) traz de volta à Visão com os filtros. A página do Nexus não abre em iframe
+    (`base.html` sai do iframe): por isso o pedaço de página, e o script da tela busca a assinatura e quem assina.
+  - Sem o dado no banco (a série ou as OS antes da 1ª publicação; a usina sem aba no BD), a janela diz por quê.
 - **Isolamento** (regra 13): cada fonte em `_ler_fonte`; a que falha volta vazia e a tela diz qual. Sem o livro da meta
   ou o dos chamados (antes da 1ª publicação), a tela avisa e não cobra por eles.
 - Custo: ~12 s fria, cópia de 5 min por `visao._ler`. NÃO entra no aquecimento do `manter_quente` (a conta chama a
@@ -741,7 +767,9 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 - `visao.py`: as contas nossas (acima), sobre os fatos (`_fato`, `_rondas_ligadas`, `pts`, `_ultima_os_por_usina`) e
   a validação por foto (`validacoes_por_foto`). `decisao_pt.py`: a decisão da PT no banco (acima).
 - `responsaveis.py`: a Visão do responsável (acima): `Nomes`, um leitor por fonte, os alertas e a linha de cada bloco,
-  `montar`, `bloco`, `soma`. `chamados_acompanhamento.py`: os chamados de garantia no banco (acima).
+  `montar`, `bloco`, `soma`, e os leitores das janelas (`serie_diaria`, `tabela_meta`, `disp_diaria`,
+  `os_disponibilidade`). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
+  `chamados_acompanhamento.py`: os chamados de garantia no banco (acima).
 - `livros_app.py`, `fonte_pg.py`, `tabelas.py`: os livros do App no formato que as regras copiadas consultam
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
 - `aprovacao.py`, `triagem.py`: as telas pelas regras copiadas (`aprovacao.os_na_fila` e `tirar_da_fila` servem ao

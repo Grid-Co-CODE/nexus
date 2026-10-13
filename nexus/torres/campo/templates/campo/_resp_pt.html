@@ -1,0 +1,73 @@
+{# A PT por cima da Visão do responsável (12/10/2026, Levi: "não tirar a pessoa da tela pois ela vai ter que voltar para
+   ver mais usinas, se pudesse aparecer sobreposto para o supervisor aprovar seria perfeito!"): a mesma linha da PT e a
+   mesma decisão da tela da PT (`pt_aprovar.html`), assinada com o login do Fracttal do OS Creator. Pedaço de página, sem
+   a moldura: o <dialog> da tela o mostra, e o script de lá busca a assinatura do técnico e quem assina (script que vem
+   no innerHTML não roda). Decidir grava e volta à Visão do responsável (`volta`), com os filtros dela. #}
+{% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}.</b></div>
+{% elif not p %}
+<div class="cn-erro" role="alert"><b>{{ numero }} não está no livro do App.</b> O livro chega de hora em hora: se ela acabou
+  de ser criada, ainda não chegou.</div>
+{% else %}
+{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
+<header class="cr-jan-cab">
+  <div><p class="gc-eyebrow">Permissão de trabalho</p><h2>{{ p.numero }} <span class="cn-st cn-t-{{ s[1] }} cn-st--titulo">{{ s[0] }}</span></h2>
+    <p class="mudo">{{ p.usina }}{% if p.equipe %} · {{ p.equipe }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}</p></div>
+  <div class="cr-jan-resumo"><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}">Abrir a tela da PT</a></div>
+</header>
+<div class="cr-pt">
+  <section class="cn-cartao">
+    <h2>A PT</h2>
+    <div class="cn-pt-corpo">
+      <div>
+        <dl class="cn-dados">
+          <dt>OS</dt><dd class="m">{{ p.os or '—' }}</dd>
+          <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
+          <dt>Ativo</dt><dd>{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}</dd>
+          <dt>Técnico</dt><dd>{{ p.solicitante or '—' }}</dd>
+          <dt>Criada</dt><dd>{{ p.criada.strftime('%d/%m às %H:%M') if p.criada else '—' }}{% if p.idade_min is not none %}<span class="det">esperando há {{ idade_min(p.idade_min) }}</span>{% endif %}</dd>
+          <dt>Respostas NÃO</dt><dd class="{{ 'cn-t-alerta' if p.respostas_nao else '' }}">{{ p.respostas_nao or 'nenhuma' }}</dd>
+          {% if p.faltam %}<dt>Falta</dt><dd>{{ p.faltam }}</dd>{% endif %}
+          {% if p.forcada %}<dt>Forçada</dt><dd class="cn-t-alerta">sim</dd>{% endif %}
+        </dl>
+        <h3>Atividades da APR</h3>
+        <ul class="cn-ativ">{% for a in p.atividades %}<li>{{ a }}</li>{% else %}<li class="mudo">Sem atividade crítica marcada.</li>{% endfor %}</ul>
+      </div>
+      {# a assinatura do técnico na APR, do Fracttal, pelo login de quem olha: quem busca é o script da Visão do responsável #}
+      <figure class="cn-ass" data-cr-assinatura="{{ url_for('campo_assinatura.assinatura_tecnico', numero=p.numero, ativo=p.codigo) }}">
+        <figcaption>Assinatura do técnico · APR</figcaption>
+        <div class="cn-ass-quadro"><span class="mudo">Buscando no Fracttal…</span></div>
+        <span class="cn-ass-quem">{{ p.solicitante or '—' }}{% if p.criada %} · {{ p.criada.strftime('%d/%m/%y %H:%M') }}{% endif %}</span>
+      </figure>
+    </div>
+  </section>
+  <section class="cn-cartao cn-decisao">
+    <h2>Decisão</h2>
+    {% if p.situacao != 'aguardando' %}
+    <p><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span> no App{% if p.decidida %}, em {{ p.decidida.strftime('%d/%m às %H:%M') }}{% endif %}{% if p.decidida_por %}, por {{ p.decidida_por }}{% endif %}{% if p.papel %} ({{ p.papel }}){% endif %}.</p>
+    {% if p.motivo %}<p class="mudo">Motivo: {{ p.motivo }}</p>{% endif %}
+    {% elif erro_nexus %}
+    <div class="cn-erro" role="alert"><b>{{ erro_nexus }}.</b> Sem saber se ela já foi decidida aqui, a decisão fica fechada.</div>
+    {% elif nexus %}
+    {% set dn = quando(nexus.decidida_em) %}
+    <p><span class="cn-st cn-t-{{ 'ok' if nexus.decisao == 'de_acordo' else 'critico' }}">{{ decisoes.get(nexus.decisao, nexus.decisao) }}</span>
+      no Nexus{% if dn %}, em {{ dn.strftime('%d/%m às %H:%M') }}{% endif %}.</p>
+    {% if nexus.motivo %}<p class="mudo">Motivo: {{ nexus.motivo }}</p>{% endif %}
+    <p class="mudo">Salva no banco. O técnico vê quando o App aplicar a decisão.</p>
+    {% else %}
+    {% if recusa_app %}<div class="cn-erro" role="alert"><b>O App não aplicou a decisão anterior do Nexus:</b> {{ recusa_app }}. Decida de novo.</div>{% endif %}
+    <form method="post" action="{{ url_for('campo_assinatura.decidir', numero=p.numero) }}" class="cn-form-decisao">
+      <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
+      {% if volta %}<input type="hidden" name="volta" value="{{ volta }}">{% endif %}
+      <p class="cn-quem" data-cr-quem="{{ url_for('campo_assinatura.quem') }}" data-cr-entrar="{{ entrar }}">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
+      {% if quem_assina %}<p class="mudo">Quem pode dar o De acordo: {{ quem_assina[0]|lower }}{{ quem_assina[1:] }}. Quem pediu a PT não a decide.</p>{% endif %}
+      <label class="gc-rotulo" for="cr-motivo">Motivo <span class="mudo">(obrigatório para Não autorizo; o técnico lê)</span></label>
+      <textarea class="gc-campo" id="cr-motivo" name="motivo" rows="3" maxlength="400"></textarea>
+      <div class="cn-botoes">
+        <button class="gc-btn gc-btn--primario" type="submit" name="decisao" value="de_acordo">De acordo</button>
+        <button class="gc-btn gc-btn--contorno cn-btn-negar" type="submit" name="decisao" value="negada">Não autorizo</button>
+      </div>
+    </form>
+    {% endif %}
+  </section>
+</div>
+{% endif %}

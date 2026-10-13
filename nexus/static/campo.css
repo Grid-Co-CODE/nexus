@@ -705,3 +705,82 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
   .cr-dl,.cr-reguas{grid-template-columns:minmax(0,1fr)}
   .cr-det{padding-left:16px}
 }
+
+/* As janelas por cima da Visão do responsável (12/10/2026, Levi: "ao clicar aparece um card sobrepondo a tela dando um
+   blur de fundo"): o valor da Performance e a OS da PT viram botões; o <dialog> mostra o pedaço de página da rota */
+.cr-abre{cursor:pointer;border:0;font-family:var(--font-mono)}
+button.cr-v:hover,button.cr-v:focus-visible{outline:2px solid var(--verde);outline-offset:1px}
+.cr-dia-a-dia{margin-left:8px;padding:0 8px;border:1px solid var(--linha-forte);border-radius:999px;background:transparent;
+  color:var(--verde-texto);font:600 11px/18px var(--font-sans);cursor:pointer}
+.cr-dia-a-dia:hover{border-color:var(--verde)}
+.cr-link-botao{background:none;border:0;padding:0;font:inherit;font-weight:600;cursor:pointer}
+.cr-modal{width:min(1000px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:0;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta);box-shadow:0 24px 60px var(--sombra);overflow:auto}
+.cr-modal::backdrop{background:var(--veu);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.cr-modal-barra{position:sticky;top:0;z-index:2;display:flex;justify-content:flex-end;padding:10px 14px 0;background:var(--superficie)}
+.cr-modal-corpo{padding:4px 22px 22px}
+.cr-jan-carregando{padding:30px 0;color:var(--mudo)}
+.cr-jan-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;margin-bottom:14px}
+.cr-jan-cab h2{margin:4px 0 2px;font:800 22px/1.2 var(--font-display)}
+.cr-jan-cab .mudo{margin:0;font-size:12.5px}
+.cr-jan-resumo{display:grid;justify-items:end;gap:3px}
+.cr-jan-resumo .cr-v{font-size:18px;line-height:28px;padding:0 10px}
+.cr-jan-resumo .mudo{font-size:12px}
+.cr-jan-tab{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.cr-jan-tab table{width:100%;border-collapse:collapse;font-size:13px}
+.cr-jan-tab th{font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);text-align:right;
+  padding:9px 12px;border-bottom:1px solid var(--linha);background:var(--superficie-2)}
+.cr-jan-tab td{padding:7px 12px;text-align:right;border-bottom:1px solid var(--linha)}
+.cr-jan-tab th:first-child,.cr-jan-tab td:first-child{text-align:left}
+.cr-jan-tab tbody tr:hover td{background:var(--superficie-2)}
+.cr-jan-tab tfoot td{font-weight:700;border-bottom:0;background:var(--superficie-2)}
+.cr-jan-tab .det{display:block;color:var(--mudo);font-size:11.5px}
+.cr-jan-nota{margin:12px 0 0;font-size:12px;color:var(--mudo)}
+.cr-jan-vazio{margin:6px 0;padding:14px 16px;border:1px dashed var(--linha-forte);border-radius:var(--raio-md);color:var(--mudo);font-size:13px}
+.cr-graf{margin-top:14px;padding:12px 14px 6px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie-2)}
+.cr-graf-cab{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px}
+.cr-graf-cab h3{margin:0;font:600 13.5px/20px var(--font-sans)}
+.cr-graf-cab .mudo{font-size:12px}
+.cr-leg{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:11.5px;color:var(--tinta-2)}
+.cr-leg i{display:inline-block;width:14px;height:8px;margin-right:4px;vertical-align:middle}
+.cr-leg-barra{background:var(--ok-cheio);border-radius:2px}
+.cr-leg-meta{border-top:2px dashed var(--tinta-2);height:0 !important}
+.cr-leg-poa{border-top:2px solid var(--info);height:0 !important}
+.cr-leg-meta-poa{border-top:2px dashed var(--info);height:0 !important}
+.cr-leg-pr{border-top:2px solid var(--verde);height:0 !important}
+.cr-svg{display:block;width:100%;height:auto;margin-top:6px}
+.cr-grade{stroke:var(--linha);stroke-width:1}
+.cr-eixo{fill:var(--mudo);font:500 10.5px var(--font-mono)}
+.cr-eixo--poa{fill:var(--info)}
+.cr-barra--ok{fill:var(--ok-cheio)}
+.cr-barra--alerta{fill:var(--alerta-cheio)}
+.cr-barra--critico{fill:var(--critico-cheio)}
+.cr-barra--neutro{fill:var(--verde)}
+.cr-rot{fill:var(--tinta-2);font:600 9.5px var(--font-mono)}
+.cr-meta{stroke:var(--tinta-2);stroke-width:1.4;stroke-dasharray:6 4}
+.cr-meta--poa{stroke:var(--info);opacity:.8}
+.cr-linha-poa{fill:none;stroke:var(--info);stroke-width:2.2;stroke-linejoin:round}
+.cr-ponto-poa{fill:var(--info)}
+.cr-area-pr{fill:var(--ok-a12)}
+.cr-linha-pr{fill:none;stroke:var(--verde);stroke-width:2.2;stroke-linejoin:round}
+.cr-ponto-pr--ok{fill:var(--verde)}
+.cr-ponto-pr--alerta{fill:var(--alerta-cheio)}
+.cr-coluna{fill:transparent}
+.cr-coluna:hover{fill:var(--clarao-a05)}
+/* o mapa diário da disponibilidade (a legenda do Gerencial › Disponibilidade) */
+.cr-mapa{display:grid;gap:3px;margin-top:10px}
+.cr-cel{display:grid;align-content:center;justify-items:center;min-height:44px;border-radius:5px;font-size:10.5px;
+  background:var(--superficie-3);color:var(--tinta-2)}
+.cr-cel span{font:500 10px var(--font-mono);color:var(--mudo)}
+.cr-cel b{font:700 10.5px var(--font-mono)}
+.cr-cel--c0{background:var(--superficie-3)}
+.cr-cel--c-ok{background:var(--ok-suave)}
+.cr-cel--c-a1{background:var(--alerta-a35)}
+.cr-cel--c-a2{background:var(--alerta-a60)}
+.cr-cel--c-r1{background:var(--critico-a45)}
+.cr-cel--c-r2{background:var(--critico-cheio);color:var(--sobre-cheio)}
+.cr-cel--c-r2 span,.cr-cel--c-r2 b{color:var(--sobre-cheio)}
+.cr-mapa-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 6px;font-size:11.5px;color:var(--tinta-2)}
+.cr-mapa-leg i{display:inline-block;width:14px;height:10px;margin-right:5px;border-radius:3px;vertical-align:middle}
+.cr-pt{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px}
+@media (max-width:800px){.cr-pt{grid-template-columns:minmax(0,1fr)}.cr-modal-corpo{padding:4px 14px 16px}}
