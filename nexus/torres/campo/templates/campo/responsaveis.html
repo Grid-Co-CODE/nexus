@@ -148,7 +148,7 @@
     <b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
     dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.
     {% for b, nome in (('perf', 'Performance'), ('acomp', 'Acompanhamento')) %}
-    <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt><dd></dd>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
+    <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
     {% endfor %}
     Responsável O&amp;M é o da ficha da usina no cadastro (o mesmo da Central de atenção); só usina mobilizada. Fonte sem
     dado da usina não alerta nem conta como em dia: fica "—". Usina com duas linhas no Gerencial (Santarém 1 e 2) soma

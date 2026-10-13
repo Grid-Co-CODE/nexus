@@ -523,14 +523,13 @@ LIVROS = (
           "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
           "no PC e no servidor"),
     Livro("nexus_performance", ("fato_meta_usina_mes",), "de hora em hora, e só quando o mês muda",
-          "plataforma/gerencial_publicar.py (worker do servidor, `_ger_publicar` no app.py)", False,
-          "registrado em 12/10/2026 antes de existir: nasce na 1ª volta do worker do servidor depois do deploy da "
-          "plataforma (10 min depois de subir). A Visão do responsável do Nexus lê; sem o livro, ela diz que a meta "
-          "ainda não chegou"),
+          "plataforma/gerencial_publicar.py (worker do servidor, `_ger_publicar` no app.py)", True,
+          "no banco desde 12/10/2026 19:55 (1ª volta do worker do servidor depois do deploy da plataforma, conferida "
+          "por GET). A Visão do responsável do Nexus lê; sem o livro, ela diz que a meta ainda não chegou"),
     Livro("nexus_chamados", ("fato_chamado",), "de hora em hora (:50), uma máquina por vez",
-          "nexus/campo/chamados_acompanhamento.py (laço do Campo; NEXUS_CHAMADOS_PUBLICAR=0 desliga numa máquina)", False,
-          "registrado em 12/10/2026 antes de existir: nasce na 1ª volta de um Nexus com este código (o do PC, enquanto "
-          "o servidor não atualiza); grava se a última gravação tiver mais de 50 min"),
+          "nexus/campo/chamados_acompanhamento.py (laço do Campo; NEXUS_CHAMADOS_PUBLICAR=0 desliga numa máquina)", True,
+          "no banco desde 12/10/2026 (1ª gravação pelo Nexus do PC, conferida por GET: 18 linhas, 17 abertas e 1 em "
+          "verificação, todas com usina); grava se a última gravação tiver mais de 50 min"),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
