@@ -24,6 +24,10 @@
     {% if v.assunto %}<div class="d versao-assunto" title="{{ v.assunto }}">{{ v.assunto }}</div>{% endif %}
     <div class="versao-github"><span class="gc-status gc-status--{{ v.classe }}"{% if v.conferido_txt %} title="{{ v.conferido_txt }}"{% endif %}>{{ v.rotulo }}</span></div>
     {% if v.detalhe %}<div class="d versao-detalhe">{{ v.detalhe }}</div>{% endif %}
+    {# os pedidos presos das últimas 24 h, só para o administrador (13/10/2026: o servidor parou de responder e de fora
+       não se via esperando o quê; casca/presos.py). O título lista os pedidos e a linha em que cada um esperava #}
+    {% if presos %}<div class="versao-github versao-presos"><span class="gc-status gc-status--{{ presos.classe }}"{% if presos.titulo %} title="{{ presos.titulo }}"{% endif %}>{{ presos.rotulo }}</span></div>
+    {% if presos.detalhe %}<div class="d versao-detalhe">{{ presos.detalhe }}</div>{% endif %}{% endif %}
   </div>{% endif %}
 </div>
 

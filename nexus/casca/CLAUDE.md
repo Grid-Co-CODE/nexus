@@ -13,6 +13,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
 | `nexus/casca/versao.py` | a versão no ar do Início: o commit, a hora dele, desde quando o processo está no ar e o semáforo com o `main` do GitHub (seção "Versão no ar" abaixo) |
+| `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log e, para o administrador, no cartão da versão (seção "Pedidos presos" abaixo) |
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
@@ -285,6 +286,44 @@ acompanhar se está realmente subindo automático para o server". O 4º cartão 
   `/saude` continua enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
 - **Prova:** `tests/test_casca_versao.py` (a API e o git dublados; nada sai para a rede). No dado real, em 13/10/2026: a
   API e o `git ls-remote` deram a mesma resposta, em dia para o 648c100 e 4 atrás para o 5a6982a.
+
+## Pedidos presos: o que o Nexus esperava quando parou (13/10/2026)
+
+Levi: "As vezes o OS Creator Web fica em um loop infinito, isso é por causa do fractal?". No print o círculo "Carregando…"
+girava sobre o Performance do OS Creator, e das 16:50 às 16:53 o Nexus do servidor não respondeu NEM o `/saude` (que não
+lê nada), com a plataforma, no mesmo servidor, em 0,2 s. Não era deploy (o último push foi às 16:02; o deploy por push
+entra em 1 a 5 min, conferido pelo `Last-Modified` dos estáticos do servidor) nem laço no código: o círculo do OS Creator
+não tem limite e espera a página seguinte, e o waitress tem 16 threads; com as 16 presas, todo pedido novo espera na
+fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
+
+- **registro:** o `ligar` embrulha o `wsgi_app` (método, caminho SEM a query, início, thread; sai no `close()` da
+  resposta). A pré-carga fica de fora (cabeçalho `X-Nexus-Pre-Carga`: ela roda no `test_client`, fora das threads do
+  waitress). Quem liga é o `servir.py` (com `THREADS` = 16, o mesmo número do `serve`) e o `app.py` (8, ou 32 com a
+  plataforma no PC; lá a conta das threads divide com a plataforma, então "fila cheia" é aproximada); o `create_app`
+  nunca liga, e os testes ficam sem.
+- **ronda:** a cada 5 s; pedido com mais de 30 s é PRESO. A pilha da thread dele (`sys._current_frames`) vira
+  `quem` (a linha NOSSA mais de dentro: Fracttal (OS Creator) no `os_creator/api.py`, Fracttal (Campo), fotos das
+  rondas, login do Fracttal, ou `arquivo:função`), `como` (a linha mais de dentro de todas: esperando a rede, outra
+  thread, o banco, em pausa, trabalhando) e `onde` (`arquivo:linha função`). Vai ao log (WARNING `Pedido preso há N s:
+  GET /caminho - quem, como (onde)`) quando prende e quando o rótulo muda.
+- **episódio:** do 1º preso até 15 s sem nenhum; começa no início do preso mais antigo. Guarda o máximo de presos
+  juntos, se a fila encheu (ocupadas >= threads) e os 40 pedidos que mais esperaram. Os últimos 30 ficam em
+  `dados/casca/pedidos_presos.json`, gravado também a cada 30 s DURANTE o episódio: se o processo cair no meio, o boot
+  seguinte o lê como "cortado" ("acabou com o Nexus reiniciando").
+- **cartão (só o administrador):** no "Versão no ar" do Início, um 2º semáforo: verde "Nenhum pedido preso em 24 h";
+  vermelho "Travou N vezes em 24 h" quando a fila encheu (ninguém mais era atendido) ou "Travado agora"; amarelo "Pedido
+  preso N vezes em 24 h" quando só a pessoa do pedido sentiu. A linha de baixo diz o último (hora, duração, quantos
+  juntos e onde a maioria esperava); o `title` lista os pedidos com a linha de cada um. Depois que os presos soltam, o
+  episódio ainda leva 15 s para fechar, e nesse meio o cartão já não diz "agora".
+- **O próprio waitress avisa a fila:** `waitress.queue WARNING Task queue depth is N` no log quando há pedido esperando
+  thread. No servidor, `journalctl -u nexus | grep "queue depth"` diz se um travamento antigo (de antes deste registro)
+  foi fila cheia.
+- **Prova:** `tests/test_casca_presos.py` (10; 7 mutações pegas) e, de ponta a ponta, um Nexus descartável com 4
+  threads e o RPC do Fracttal apontado para um servidor que aceita e nunca responde: 4 `GET /os/api/performance/contagens`
+  com o catálogo de ativos vencido ficaram 45 s presos no `_rpc_call`, o `/saude` ficou sem resposta dos 7 s aos 42 s, a
+  ronda escreveu "Fracttal (OS Creator), esperando a rede (nexus/torres/oscreator/os_creator/api.py:1093 _rpc_call)" e
+  o cartão disse "Travou 1 vez em 24 h ... durou 45 s: até 4 pedidos presos juntos, com as 4 threads ocupadas; todos em
+  Fracttal (OS Creator), esperando a rede".
 
 ## Regras que já custaram caro
 

@@ -11,7 +11,7 @@ from ..auth import destino_seguro, setor_telas
 from ..prefixo import raiz
 from ..torres import montar_menu, telas_com_conteudo
 # no topo, e não dentro do Início: o "no ar desde" do cartão da versão é a hora do import, a do boot (13/10/2026)
-from . import versao
+from . import presos, versao
 
 bp = Blueprint("casca", __name__)
 
@@ -72,7 +72,9 @@ def inicio():
                            total_telas=sum(len([s for s in t.telas if liberadas is None or f"{t.id}/{s.id}" in liberadas])
                                            for t in torres),
                            # a versão no ar e se ela está em dia com o GitHub (casca/versao.py, 13/10/2026)
-                           versao=versao.cartao(app))
+                           versao=versao.cartao(app),
+                           # os pedidos presos das últimas 24 h, só para o administrador (casca/presos.py, 13/10/2026)
+                           presos=presos.cartao(app) if session.get("admin") else None)
 
 
 @bp.route("/tema", methods=["POST"])

@@ -20,6 +20,10 @@ from nexus.dados import instalar as instalar_dados
 from nexus.engenharia import instalar as instalar_engenharia
 from nexus.config import ConfigErro
 
+# 16 threads (eram 8): os pedidos esperam a rede (banco, Fracttal, as fotos do S3), e com 8 presos numa tela lenta o resto
+# da empresa esperava na fila (13/10/2026). A mesma conta vai ao registro dos pedidos presos (casca/presos.py)
+THREADS = 16
+
 if __name__ == "__main__":
     try:
         app = create_app()
@@ -34,13 +38,15 @@ if __name__ == "__main__":
     # a versão no ar já conferida com o GitHub quando a 1ª pessoa abrir o Início (casca/versao.py, 13/10/2026)
     from nexus.casca import versao
     versao.conferir(app)
+    # o que cada pedido esperava quando o Nexus parou de responder (13/10/2026: das 16:50 às 16:53 nem o /saude
+    # respondia, e de fora não dava para ver esperando o quê); o administrador vê no cartão da versão do Início
+    from nexus.casca import presos
+    presos.ligar(app, THREADS)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"
     print(f"Nexus em produção: {host}:{porta}, servido em {prefixo} (cookie seguro, atrás do proxy HTTPS)", flush=True)
     # trusted_proxy: o IP do visitante vem do proxy; sem isso o teto por IP do Entrar e o contador da senha de
     # administrador (nexus/auth) contariam todo mundo como 127.0.0.1, e a empresa inteira dividiria um contador só.
-    # 16 threads (eram 8): os pedidos esperam a rede (banco, Fracttal, as fotos do S3), e com 8 presos numa tela lenta
-    # o resto da empresa esperava na fila (13/10/2026)
-    serve(app, host=host, port=porta, threads=16, trusted_proxy="127.0.0.1",
+    serve(app, host=host, port=porta, threads=THREADS, trusted_proxy="127.0.0.1",
           trusted_proxy_headers={"x-forwarded-for", "x-forwarded-proto"}, clear_untrusted_proxy_headers=True)

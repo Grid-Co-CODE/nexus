@@ -55,10 +55,13 @@ if __name__ == "__main__":
     from nexus.casca import versao
     versao.conferir(app)                     # a versão no ar conferida com o GitHub (13/10/2026)
     plataforma = (ler_ambiente().get("NEXUS_PLATAFORMA_LOCAL") or "").strip()
-    alvo, threads = app, 8
+    # a plataforma tem pedidos longos (trackers de um dia passam de minutos): mais threads para eles não segurarem o Nexus
+    threads = 32 if plataforma else 8
+    from nexus.casca import presos
+    presos.ligar(app, threads)               # o que cada pedido esperava quando o Nexus parou (13/10/2026)
+    alvo = app
     if plataforma:
-        # a plataforma tem pedidos longos (trackers de um dia passam de minutos): mais threads para eles não segurarem o Nexus
-        alvo, threads = juntar_com_a_plataforma(app, plataforma), 32
+        alvo = juntar_com_a_plataforma(app, plataforma)
         print(f"Nexus em http://localhost:{PORTA}, com a plataforma de {plataforma} no mesmo endereço", flush=True)
     else:
         print(f"Nexus em http://localhost:{PORTA}", flush=True)
