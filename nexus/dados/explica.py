@@ -88,7 +88,8 @@ PARA_QUE = {
                      "a pessoa vai pelo número do Fracttal e pela ficha do cadastro.",
     "decisao_tela_setor": "Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
-                          "nunca marcada fica fechada, e o setor Administrador vê tudo sem precisar de marca. O Nexus "
+                          "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "
+                          "O Nexus "
                           "lê esta tabela a cada clique (com cópia de 1 minuto) para montar o menu e abrir ou fechar "
                           "cada tela. Não guarda nome nem e-mail.",
     "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) tomada no Nexus sobre uma PT, equipamento por "

@@ -83,9 +83,9 @@ def _ler_setores():
                 {"decisoes": [], "erro": erro, "lido_em": None})
 
 
-def _secao_setores(escolhido: int | None, logins: list[dict]) -> dict:
+def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]) -> dict:
     """A seção Telas por setor: os setores (com quantas pessoas e telas), a árvore do menu marcada para o setor escolhido
-    e o que cada setor vê (para o "Copiar de"). Põe também o setor em cada login de 30 dias."""
+    e o que cada setor vê (para o "Copiar de"). Põe também o setor em cada login de 30 dias e em cada administrador."""
     from ..campo.ligacao_cadastro import codigo_da_pessoa
     from ..casca import _telas_prontas
     app = current_app._get_current_object()
@@ -96,12 +96,9 @@ def _secao_setores(escolhido: int | None, logins: list[dict]) -> dict:
     prontas = _telas_prontas(app)
     matriz = ST.vigentes(tl["decisoes"])
     pessoas = Counter(v for v in S.vigentes(st["decisoes"]).values() if v)
-    setores = [{"id": s["setor_id"], "nome": s["nome"], "admin": ST.eh_administrador(s["nome"]),
-                "pessoas": pessoas.get(s["setor_id"], 0), "telas": len(matriz.get(s["setor_id"], set()) & todas)}
-               for s in S.ativos(st["setores"])]
-    comuns = [s for s in setores if not s["admin"]]
-    sel = (next((s for s in setores if s["id"] == escolhido), None)
-           or (comuns[0] if comuns else setores[0] if setores else None))
+    setores = [{"id": s["setor_id"], "nome": s["nome"], "pessoas": pessoas.get(s["setor_id"], 0),
+                "telas": len(matriz.get(s["setor_id"], set()) & todas)} for s in S.ativos(st["setores"])]
+    sel = next((s for s in setores if s["id"] == escolhido), None) or (setores[0] if setores else None)
     marcadas = matriz.get(sel["id"], set()) if sel else set()
     arvore = []
     for t in torres:
@@ -109,21 +106,29 @@ def _secao_setores(escolhido: int | None, logins: list[dict]) -> dict:
                   "marcada": ST.chave(t.id, s.id) in marcadas} for s in t.telas]
         arvore.append({"id": t.id, "nome": t.nome, "icone": t.icone, "telas": telas,
                        "marcadas": sum(x["marcada"] for x in telas)})
-    # o setor de quem entrou: pelo código do e-mail, o mesmo que a decisão de setor grava (o e-mail não vai ao banco)
+    # o setor de quem entrou e de cada administrador: pelo código do e-mail, o mesmo que a decisão de setor grava (o
+    # e-mail não vai ao banco). Administrador com setor segue vendo tudo: o setor só aparece, não restringe.
     por_codigo = ST.setor_de_cada_codigo(st["decisoes"])
     nome_do = {s["id"]: s["nome"] for s in setores}
     chave_hmac = cfg.get("NEXUS_PESSOA_HMAC")
-    for x in logins:
-        cod = None if x["senha"] else codigo_da_pessoa(chave_hmac, x["email"])
+    for x in logins + admins:
+        cod = None if x.get("senha") else codigo_da_pessoa(chave_hmac, x["email"])
         x["setor"] = nome_do.get(por_codigo.get(cod)) if cod else None
-        if x["setor"] and ST.eh_administrador(x["setor"]) and not x["admin"]:
-            x["admin"] = "pelo setor"
     ilegivel = not st.get("lido_em") or not tl.get("lido_em")
+    from . import pre_carga as PC
+    pc = PC.resumo(app)
+    if pc["volta"]:
+        from datetime import datetime, timedelta, timezone
+        nomes = {f"{t.id}/{s.id}": f"{t.nome} → {s.nome}" for t in torres for s in t.telas}
+        v = pc["volta"]
+        v["hora"] = datetime.fromtimestamp(v["fim"], timezone(timedelta(hours=-3))).strftime("%d/%m %H:%M")
+        v["lenta"] = (nomes.get(v["mais_lenta"][0], v["mais_lenta"][0]), f"{v['mais_lenta'][1]:.1f}".replace(".", ","))
+        v["s_txt"] = f"{v['s']:.1f}".replace(".", ",")
     return {
+        "pre_carga": pc,
         "portao": ST.estado(cfg), "setores": setores, "setor_sel": sel, "arvore": arvore,
         "total_telas_menu": len(todas), "marcadas_sel": len(marcadas & todas),
-        "matriz_setores": {str(s["id"]): sorted(matriz.get(s["id"], set()) & todas) for s in comuns},
-        "n_comuns": len(comuns),
+        "matriz_setores": {str(s["id"]): sorted(matriz.get(s["id"], set()) & todas) for s in setores},
         "pessoas_com_setor": sum(pessoas.get(s["id"], 0) for s in setores),
         "setores_erro": " · ".join(e for e in (st.get("erro"), tl.get("erro")) if e),
         "pode_gravar_setores": bool(cfg.get("GRIDCO_SQL_TOKEN")) and not ilegivel,
@@ -145,14 +150,14 @@ def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = ""
                       else "pela tela" if x["email"] in da_tela else "")
     if setor_escolhido is None:
         setor_escolhido = request.args.get("setor", type=int)
-    secao = _secao_setores(setor_escolhido, logins)
     admins = _linhas_de_admins(servidor, est, ultimo)
+    secao = _secao_setores(setor_escolhido, logins, admins)
     contexto = {
         "admins": admins, "auditoria": [dict(x, quando_br=A.hora_br(x.get("quando"))) for x in est["auditoria"]],
         "logins": logins, "sem_pasta": est["sem_pasta"], "arquivo_erro": est["erro"],
         "total_servidor": len(servidor), "total_tela": len(da_tela - servidor), "n_tela": len(da_tela),
         "pessoas_30d": sum(1 for x in logins if not x["senha"]),
-        "admins_30d": sum(1 for x in logins if x["admin"] in ("do servidor", "pela tela", "pelo setor")),
+        "admins_30d": sum(1 for x in logins if x["admin"] in ("do servidor", "pela tela")),
         "codigo": _codigo(), "erro": erro, "aviso": session.pop(_CHAVE_AVISO, None),
         "email_digitado": email_digitado, "eu": _meu_email(), "max_logins": A.MAX_LOGINS,
         "pode_gravar": not est["sem_pasta"] and not est["erro"],
@@ -219,8 +224,6 @@ def _gravar_telas():
         setor = next((s for s in S.ativos(st["setores"]) if s["setor_id"] == sid), None)
         if not setor:
             raise ST.Recusada("Setor desconhecido ou excluído (a lista mudou desde que a tela abriu): nada foi gravado.")
-        if ST.eh_administrador(setor["nome"]):
-            raise ST.Recusada(f'O setor "{setor["nome"]}" vê todas as telas: não há o que marcar.')
         r = ST.gravar(sid, marcadas, _todas_as_telas(), cfg, base, sessao, _meu_email())
     except ST.Recusada as ex:
         return _pagina(erro=str(ex), status=400, setor_escolhido=sid)

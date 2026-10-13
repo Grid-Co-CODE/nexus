@@ -1,11 +1,13 @@
 """O que cada setor vê no Nexus (Base → Acessos, 12/10/2026). Levi: "gostaria de uma seção no BASE > ACESSOS onde eu possa
 controlar o que cada pessoa de setor pode ver ao logar no Nexus. A que não tiver setor vai aparecer a mensagem 'Sem setor,
 fale com o responsável' [...] Criarei um setor chamado 'Administrador' onde será liberado todas as seções para essas
-contas! Exclua a parte de cadeiras já que os setores irão substituir!"
+contas! Exclua a parte de cadeiras já que os setores irão substituir!". E depois, no mesmo dia: "não acho legal deixar
+como setores pois eu por exemplo sou da performance mas também sou administrador" (administrador é a lista, não setor).
 
 Provas: a matriz vale pela última decisão; sem setor, só a mensagem (página e dados); o setor vê só as telas marcadas
-(menu, Início, a tela, as sub-rotas da torre, o OS Creator); o setor Administrador vê tudo e é administrador; a tela grava
-só o que mudou, recusa o Administrador, o setor excluído e a tela desconhecida, e só administrador grava; banco ilegível
+(menu, Início, a tela, as sub-rotas da torre, o OS Creator); setor nenhum dá administrador, e o administrador que tem
+setor vê tudo; a tela grava só o que mudou, recusa o setor excluído e a tela desconhecida, e só administrador grava; banco
+ilegível
 não vira "sem setor"; sem a NEXUS_PESSOA_HMAC ou com NEXUS_ACESSO_POR_SETOR=0, todos veem tudo; e o livro está no
 catálogo, sem nada pessoal. O banco é o falso do test_campo_visao; nada vai ao banco de verdade nem ao Fracttal."""
 import re
@@ -23,7 +25,7 @@ from nexus.dados import catalogo
 URL = "/t/base/acessos"
 BASE = "http://pg.falso"
 ANA = "ana@exemplo.test"          # setor Performance
-BIA = "bia@exemplo.test"          # setor Administrador
+BIA = "bia@exemplo.test"          # setor chamado "Administrador": um setor como os outros
 CAIO = "caio@exemplo.test"        # sem setor
 DADOS = {"Sec-Fetch-Dest": "empty"}
 
@@ -161,12 +163,19 @@ def test_setor_sem_nenhuma_tela_ve_o_inicio_com_o_aviso(app, setores):
     assert 'data-torre="' not in html
 
 
-def test_o_setor_administrador_ve_tudo_e_e_administrador(app, setores):
+def test_setor_nao_da_administrador_e_administrador_com_setor_ve_tudo(app, setores):
+    """Levi, 12/10: "não acho legal deixar como setores pois eu por exemplo sou da performance mas também sou
+    administrador". Um setor chamado "Administrador" é setor comum; administrador é a lista, com ou sem setor."""
     c = _como(app, BIA)
+    assert c.get("/t/cos/ocorrencias").status_code == 403
+    assert c.get(URL).status_code == 403
+    with c.session_transaction() as s:
+        assert s["admin"] is False
+    app.config["NEXUS_ADMINS"] = ANA                                     # a Ana: Performance E administradora
+    c = _como(app, ANA)
     html = c.get("/").get_data(as_text=True)
-    assert html.count('<details class="torre') == 13 and "Setor: <b>Administrador</b>" in html
-    assert c.get("/t/cos/ocorrencias").status_code == 200
-    assert c.get(URL).status_code == 200                                 # Acessos é só de administrador
+    assert html.count('<details class="torre') == 13 and "Setor: <b>Performance</b>" in html
+    assert c.get("/t/cos/ocorrencias").status_code == 200 and c.get(URL).status_code == 200
     with c.session_transaction() as s:
         assert s["admin"] is True
 
@@ -244,12 +253,12 @@ def test_sem_a_chave_ou_desligado_todos_veem_tudo(app, setores):
 def test_a_secao_mostra_os_setores_e_a_arvore_do_menu(app, setores, logado):
     html = logado.get(URL).get_data(as_text=True)
     assert "Telas por setor" in html and 'id="ace-matriz"' in html
-    assert re.search(r'class="ace-setor ativo"[^>]*>\s*<span class="nome">Performance</span>', html)   # o 1º comum
-    assert "vê tudo" in html and "0 de " in html
+    assert re.search(r'class="ace-setor ativo"[^>]*>\s*<span class="nome">Administrador</span>', html)  # o 1º pelo nome
+    assert '<span class="det">vê tudo' not in html and "0 de " in html            # nenhum setor "vê tudo"
     assert html.count('<input type="checkbox" name="tela"') == sum(len(t.telas) for t in app.extensions["nexus_torres"])
     assert 'value="performance/clima/mapa"' in html and 'value="cos/mesa"' in html
-    adm = logado.get(URL + "?setor=2").get_data(as_text=True)
-    assert "Administrador vê tudo." in adm and 'id="ace-matriz"' not in adm
+    adm = logado.get(URL + "?setor=2").get_data(as_text=True)                  # o setor "Administrador": caixas
+    assert 'id="ace-matriz"' in adm and '<input type="hidden" name="setor" value="2">' in adm
     assert "Cadeira" not in html
 
 
@@ -278,8 +287,6 @@ def test_a_tela_grava_so_o_que_mudou(app, setores, logado):
 
 
 def test_a_tela_recusa_o_que_nao_deve_gravar(app, setores, logado):
-    r = _salvar(logado, 2, ["cos/mesa"])
-    assert r.status_code == 400 and "vê todas as telas" in r.get_data(as_text=True)
     r = _salvar(logado, 99, ["cos/mesa"])
     assert r.status_code == 400 and "Setor desconhecido" in r.get_data(as_text=True)
     r = _salvar(logado, 1, ["cos/mesa", "nao/existe"])
@@ -289,6 +296,9 @@ def test_a_tela_recusa_o_que_nao_deve_gravar(app, setores, logado):
     r = _salvar(logado, 1, ["cos/mesa"])
     assert r.status_code == 400 and "GRIDCO_SQL_TOKEN" in r.get_data(as_text=True)
     assert _linhas(setores) == []
+    app.config["GRIDCO_SQL_TOKEN"] = "token-de-teste"
+    assert _salvar(logado, 2, ["cos/mesa"]).status_code == 303                # o setor "Administrador" grava como os outros
+    assert [(x["setor_id"], x["tela"]) for x in _linhas(setores)] == [(2, "cos/mesa")]
     # quem não é administrador nem abre a tela, nem grava
     c = _como(app, ANA)
     assert c.post(URL, data={"acao": "telas_setor", "setor": "1", "tela": ["cos/mesa"]}).status_code == 403
@@ -302,9 +312,19 @@ def test_quem_entrou_aparece_com_o_setor(app, setores, logado, tmp_path):
     tabela = html[html.index("Quem entrou nos últimos 30 dias"):]
     linha = {e: re.search(re.escape(e) + r".*?</tr>", tabela, re.S).group(0) for e in (ANA, BIA, CAIO)}
     assert "<td>Performance</td>" in linha[ANA]
-    assert "<td>Administrador</td>" in linha[BIA] and "pelo setor" in linha[BIA]
+    assert "<td>Administrador</td>" in linha[BIA] and '<span class="mudo">não</span>' in linha[BIA]
+    assert "pelo setor" not in html
     assert "sem setor" in linha[CAIO] and "cad-chip--alerta" in linha[CAIO]
     assert re.search(r'<div class="r">Entraram sem setor</div><div class="v ace-v-alerta">1</div>', html)
+
+
+def test_cada_administrador_aparece_com_o_setor(app, setores, logado):
+    app.config["NEXUS_ADMINS"] = f"{ANA},fora@exemplo.test"
+    html = logado.get(URL).get_data(as_text=True)
+    tabela = html[html.index('id="ace-admins"'):html.index('id="ace-registro"')]
+    assert "<th>Setor</th>" in tabela
+    assert re.search(re.escape(ANA) + r".*?<td>Performance</td>", tabela, re.S)
+    assert re.search(r"fora@exemplo\.test.*?<td><span class=\"mudo\">—</span></td>", tabela, re.S)
 
 
 def test_o_livro_no_catalogo_da_governanca():

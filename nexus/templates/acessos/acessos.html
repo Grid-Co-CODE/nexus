@@ -21,8 +21,8 @@
 <div class="cad-aviso cad-aviso--info ace-como"><i class="ph ph-info"></i><div>
   <strong>Como vale.</strong> Dar ou tirar o acesso vale no próximo clique da pessoa no Nexus, sem ela precisar sair e entrar.
   Os administradores <em>do servidor</em> (a <span class="gc-dado">NEXUS_ADMINS</span> do .env) só mudam com a T.I. e não saem por aqui;
-  a senha de administrador vale sempre. Quem está no setor <strong>Administrador</strong> (Base → Integração Fracttal)
-  também é administrador. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes até
+  a senha de administrador vale sempre. Administrador vê tudo, com ou sem setor: o setor dele só aparece na lista, não
+  restringe. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes até
   ser renovada (no máximo 11 horas).
 </div></div>
 
@@ -40,7 +40,14 @@
   <h2 id="ace-setores-titulo">Telas por setor</h2>
   <p class="gc-ajuda ace-ajuda ace-ajuda--topo">Marque o que cada setor vê no menu ao entrar no Nexus; o Início é de todos.
     Quem não tem setor vê só “Sem setor, fale com o responsável”. O setor de cada pessoa se escolhe em
-    <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>. Administrador vê tudo, com ou sem setor.</p>
+    <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>. Quem está em Administradores (abaixo) vê tudo, com ou sem setor.</p>
+  {# a pré-carga (nexus/auth/pre_carga.py): abre por trás as telas do setor de quem entra, para o clique já achar tudo pronto #}
+  <p class="gc-ajuda ace-ajuda ace-pre-carga"><strong>Pré-carga:</strong>
+    {% if not pre_carga.ligada %}desligada neste Nexus (<span class="gc-dado">NEXUS_PRE_CARGA=0</span>).
+    {% elif pre_carga.trabalhando %}aquecendo agora ({{ pre_carga.na_fila }} tela{{ "s" if pre_carga.na_fila != 1 }} na fila).
+    {% elif pre_carga.volta %}última volta em {{ pre_carga.volta.hora }}: {{ pre_carga.volta.telas }} tela{{ "s" if pre_carga.volta.telas != 1 }} em {{ pre_carga.volta.s_txt }} s (a mais lenta, {{ pre_carga.volta.lenta[0] }}: {{ pre_carga.volta.lenta[1] }} s){% if pre_carga.volta.erros %}, {{ pre_carga.volta.erros }} com erro{% endif %}.
+    {% else %}nenhuma volta desde que o Nexus subiu (ninguém com setor entrou ainda).{% endif %}
+    Quando alguém com setor entra, o Nexus abre por trás as telas liberadas para ele, uma por vez, e repete a cada 2 minutos enquanto ele usa. Administradores e quem não tem setor ficam de fora, e também as telas que leem o Fracttal ao abrir, o OS Creator e as telas da plataforma.{% if pre_carga.fracttal %} Saíram por ler o Fracttal: {{ pre_carga.fracttal|join(", ") }}.{% endif %}</p>
   {% if portao == "desligado" %}
   <div class="cad-aviso cad-aviso--alerta ace-aviso-secao"><i class="ph ph-toggle-left"></i><div><strong>Desligado neste Nexus.</strong> A <span class="gc-dado">NEXUS_ACESSO_POR_SETOR</span> do .env está em 0: todos veem tudo. As marcas abaixo passam a valer quando ela for ligada.</div></div>
   {% elif portao == "sem_chave" %}
@@ -54,20 +61,17 @@
   {% endif %}
 
   {% if not setores %}
-  <p class="ace-vazio">Nenhum setor criado ainda. Crie os setores em <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>; o setor chamado <strong>Administrador</strong> vê tudo.</p>
+  <p class="ace-vazio">Nenhum setor criado ainda. Crie os setores em <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>.</p>
   {% else %}
   <nav class="ace-setores" aria-label="Escolha o setor">
     {% for s in setores %}
     <a class="ace-setor{% if s.id == setor_sel.id %} ativo{% endif %}" href="{{ url_for('torre_base.acessos', setor=s.id) }}#ace-setores"{% if s.id == setor_sel.id %} aria-current="true"{% endif %}>
       <span class="nome">{{ s.nome }}</span>
-      <span class="det">{% if s.admin %}vê tudo{% else %}{{ s.telas }} de {{ total_telas_menu }} telas{% endif %} · {{ s.pessoas }} pessoa{{ "s" if s.pessoas != 1 }}</span>
+      <span class="det">{{ s.telas }} de {{ total_telas_menu }} telas · {{ s.pessoas }} pessoa{{ "s" if s.pessoas != 1 }}</span>
     </a>
     {% endfor %}
   </nav>
 
-  {% if setor_sel.admin %}
-  <div class="cad-aviso cad-aviso--info ace-aviso-secao"><i class="ph ph-shield-check"></i><div><strong>{{ setor_sel.nome }} vê tudo.</strong> Quem está neste setor vê todas as telas, inclusive as que nascerem depois, e é administrador do Nexus: abre o Cadastro, esta tela e aprova qualquer OS. Não há o que marcar.</div></div>
-  {% else %}
   <form method="post" class="ace-matriz" id="ace-matriz" action="{{ url_for('torre_base.acessos') }}">
     <input type="hidden" name="codigo" value="{{ codigo }}">
     <input type="hidden" name="acao" value="telas_setor">
@@ -75,11 +79,11 @@
     <div class="ace-matriz-topo">
       <p class="ace-matriz-conta"><strong>{{ setor_sel.nome }}</strong> vê <b data-conta>{{ marcadas_sel }}</b> de {{ total_telas_menu }} telas</p>
       <div class="ace-matriz-acoes">
-        {% if n_comuns > 1 %}
+        {% if setores|length > 1 %}
         <label class="gc-rotulo" for="ace-copiar">Copiar de</label>
         <select id="ace-copiar" class="gc-campo">
           <option value="">outro setor…</option>
-          {% for s in setores if not s.admin and s.id != setor_sel.id %}<option value="{{ s.id }}">{{ s.nome }} ({{ s.telas }})</option>{% endfor %}
+          {% for s in setores if s.id != setor_sel.id %}<option value="{{ s.id }}">{{ s.nome }} ({{ s.telas }})</option>{% endfor %}
         </select>
         {% endif %}
         <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-marcar="tudo">Marcar tudo</button>
@@ -108,7 +112,6 @@
   </form>
   <script type="application/json" id="ace-matriz-dados">{{ matriz_setores|tojson }}</script>
   {% endif %}
-  {% endif %}
 </section>
 
 <section class="cad-secao ace-secao" aria-labelledby="ace-admins">
@@ -128,11 +131,12 @@
   {% endif %}
   <div class="cad-rolagem ace-rolagem">
     <table class="cad-tabela ace-tabela">
-      <thead><tr><th>E-mail</th><th>Origem</th><th>Quem deu</th><th>Quando</th><th>Último login</th><th><span class="ace-oculto">Ação</span></th></tr></thead>
+      <thead><tr><th>E-mail</th><th>Setor</th><th>Origem</th><th>Quem deu</th><th>Quando</th><th>Último login</th><th><span class="ace-oculto">Ação</span></th></tr></thead>
       <tbody>
       {% for a in admins %}
       <tr>
         <td class="ace-email"><span class="gc-dado">{{ a.email }}</span>{% if a.eu %} <span class="cad-chip cad-chip--info">você</span>{% endif %}</td>
+        <td>{% if a.setor %}{{ a.setor }}{% else %}<span class="mudo">—</span>{% endif %}</td>
         <td>{% if a.origem == "servidor" %}<span class="cad-chip ace-chip--servidor">do servidor</span>{% else %}<span class="cad-chip cad-chip--operacao">pela tela</span>{% if a.tambem_servidor %} <span class="cad-chip ace-chip--servidor">também do servidor</span>{% endif %}{% endif %}</td>
         <td>{% if a.origem == "servidor" %}<span class="mudo">NEXUS_ADMINS (.env)</span>{% else %}{{ a.por }}{% endif %}</td>
         <td class="num">{{ a.quando or "—" }}</td>
@@ -154,7 +158,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="vazio">Nenhum administrador por e-mail: só a senha de administrador entra como administrador.</td></tr>
+      <tr><td colspan="7" class="vazio">Nenhum administrador por e-mail: só a senha de administrador entra como administrador.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -195,7 +199,7 @@
         <td class="ace-email">{% if x.senha %}<span class="mudo">senha de administrador</span>{% else %}<span class="gc-dado">{{ x.email }}</span>{% if x.email == eu %} <span class="cad-chip cad-chip--info">você</span>{% endif %}{% endif %}</td>
         <td class="num">{{ x.quando_br }}</td>
         <td>{% if x.senha or not tem_hmac %}<span class="mudo">—</span>{% elif x.setor %}{{ x.setor }}{% elif x.admin %}<span class="mudo">sem setor</span>{% else %}<span class="cad-chip cad-chip--alerta">sem setor</span>{% endif %}</td>
-        <td>{% if x.admin == "do servidor" %}<span class="cad-chip ace-chip--servidor">do servidor</span>{% elif x.admin == "pela tela" %}<span class="cad-chip cad-chip--operacao">pela tela</span>{% elif x.admin == "pelo setor" %}<span class="cad-chip cad-chip--operacao">pelo setor</span>{% elif x.admin == "sempre" %}<span class="cad-chip cad-chip--info">sempre</span>{% else %}<span class="mudo">não</span>{% endif %}</td>
+        <td>{% if x.admin == "do servidor" %}<span class="cad-chip ace-chip--servidor">do servidor</span>{% elif x.admin == "pela tela" %}<span class="cad-chip cad-chip--operacao">pela tela</span>{% elif x.admin == "sempre" %}<span class="cad-chip cad-chip--info">sempre</span>{% else %}<span class="mudo">não</span>{% endif %}</td>
       </tr>
       {% else %}
       <tr><td colspan="4" class="vazio">Ninguém entrou nos últimos 30 dias (ou o registro começou agora).</td></tr>

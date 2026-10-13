@@ -10,11 +10,11 @@ As regras:
 - O setor da pessoa é o da tela Base → Integração Fracttal (`cadastro/setores.py`): a última decisão de cada pessoa do
   Fracttal. A pessoa do login se acha pelo código do e-mail (`pessoa_hmac`, com a NEXUS_PESSOA_HMAC), o mesmo que a
   decisão grava. Nome e e-mail nunca vão ao banco (regra 8 da governança).
-- Administrador do Nexus (a NEXUS_ADMINS, a lista desta tela e a senha de administrador) vê tudo, com ou sem setor: é quem
-  configura, e não pode ficar trancado fora.
-- O setor chamado "Administrador" vê tudo e é administrador (decisão do Levi). Não tem matriz: vale também para a tela
-  que nascer depois.
-- Os outros setores veem só as telas marcadas. Tela nunca marcada fica fechada (o setor novo nasce sem nada). O Início
+- Administrador do Nexus (a NEXUS_ADMINS, a lista de Administradores desta tela e a senha de administrador) vê tudo,
+  com ou sem setor: é quem configura, e não pode ficar trancado fora. Setor NÃO dá administrador (Levi, 12/10/2026:
+  "não acho legal deixar como setores pois eu por exemplo sou da performance mas também sou administrador"): um setor
+  chamado "Administrador" é um setor como os outros, e o administrador que tem setor segue vendo tudo.
+- Os setores veem só as telas marcadas. Tela nunca marcada fica fechada (o setor novo nasce sem nada). O Início
   é de todos, com os cartões das torres liberadas. Sem setor (ou com o setor excluído): só a mensagem.
 - O portão vale para as páginas e os dados de cada torre (`/t/<torre>/...`): o endereço que é de uma tela segue a marca
   dela; o resto da torre (os dados e as sub-rotas) abre para quem tem ao menos uma tela da torre. O OS Creator servido
@@ -48,7 +48,6 @@ log = logging.getLogger(__name__)
 LIVRO, NOME_LIVRO = "nexus_setor_telas", "Nexus · telas de cada setor"
 ABA = "fato_decisao_tela_setor"
 CAB = ("decidida_em", "data_id", "setor_id", "tela", "liberada", "decidida_por_hmac", "origem")
-ADMINISTRADOR = "administrador"
 TTL_S = 60
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
@@ -77,10 +76,6 @@ def ligado(cfg) -> bool:
 
 def chave(torre_id: str, tela_id: str) -> str:
     return f"{torre_id}/{tela_id}"
-
-
-def eh_administrador(nome) -> bool:
-    return S._norm(nome) == ADMINISTRADOR
 
 
 def _agora() -> datetime:
@@ -261,7 +256,7 @@ def setor_de_cada_codigo(decisoes: list[dict]) -> dict[str, int | None]:
 
 
 def setor_da_pessoa(cfg, email: str, base: str, sessao) -> dict | None:
-    """{"id", "nome", "admin"} do setor de agora da pessoa do login, ou None: sem setor, setor excluído, ou sem a
+    """{"id", "nome"} do setor de agora da pessoa do login, ou None: sem setor, setor excluído, ou sem a
     NEXUS_PESSOA_HMAC (sem ela não há como achar a pessoa nas decisões). O banco nunca lido levanta erro: "não consegui
     ler" não é "sem setor"."""
     from ..campo.ligacao_cadastro import codigo_da_pessoa
@@ -275,32 +270,12 @@ def setor_da_pessoa(cfg, email: str, base: str, sessao) -> dict | None:
     setor = next((s for s in S.ativos(st["setores"]) if s["setor_id"] == sid), None) if sid else None
     if not setor:
         return None
-    return {"id": setor["setor_id"], "nome": setor["nome"], "admin": eh_administrador(setor["nome"])}
+    return {"id": setor["setor_id"], "nome": setor["nome"]}
 
 
 def _email() -> str:
     u = session.get("usuario")
     return str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
-
-
-def admin_pelo_setor(email: str) -> bool:
-    """A pessoa está no setor "Administrador"? (o `_admin_em_dia` e o login perguntam; banco fora = não)"""
-    cfg = current_app.config
-    if not ligado(cfg) or not email:
-        return False
-    try:
-        s = setor_da_pessoa(cfg, email, *_banco())
-    except Exception as e:       # noqa: BLE001 — sem o banco, vale a lista de administradores de sempre
-        # uma linha a cada 5 minutos, não uma por clique (o banco fora é chamado a cada pedido de toda sessão)
-        with _TRAVA_FUNDO:
-            avisar = time.time() - _FUNDO.get("_aviso", 0.0) >= 300
-            if avisar:
-                _FUNDO["_aviso"] = time.time()
-        if avisar:
-            log.warning("Setor do login: não consegui ler os setores (%s); vale a lista de administradores.",
-                        type(e).__name__)
-        return False
-    return bool(s and s["admin"])
 
 
 def acesso() -> dict:
@@ -319,9 +294,7 @@ def acesso() -> dict:
         try:
             base, sessao = _banco()
             setor = setor_da_pessoa(cfg, _email(), base, sessao)
-            if setor and setor["admin"]:
-                r = {"tudo": True, "telas": set(), "setor": setor, "erro": ""}
-            elif setor:
+            if setor:
                 d = _telas_no_clique(base, sessao)
                 # erro só quando nunca houve leitura boa: com a cópia velha, vale ela
                 r = {"tudo": False, "telas": vigentes(d["decisoes"]).get(setor["id"], set()), "setor": setor,
@@ -394,6 +367,9 @@ def portao():
         if not _quer_pagina():
             return jsonify(ok=False, erro="Sem setor, fale com o responsável."), 403
         return render_template("sem_setor.html", leitura=bool(a["erro"])), 403
+    # as telas do setor esquentam por trás (pre_carga.py: no 1º pedido depois do login e a cada 2 min de uso)
+    from . import pre_carga
+    pre_carga.lembrar(a["telas"])
     if pode(request.path, a["telas"]):
         return None
     # sem ler as telas do setor no banco (nunca leu), a mensagem é de leitura, não de tela fechada

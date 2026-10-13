@@ -297,6 +297,8 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 /* Base > Acessos · Telas por setor (12/10/2026): um setor por vez, a árvore do menu em caixas */
 .ace-secao--setores{overflow:visible}
 .ace-ajuda--topo{padding-top:12px}
+.ace-pre-carga{margin-top:-4px}
+.ace-pre-carga strong{color:var(--tinta-2)}
 .ace-aviso-secao{margin:0 16px 12px}
 .ace-vazio{padding:0 16px 16px;margin:0;color:var(--tinta-2)}
 .ace-v-alerta{color:var(--alerta)}

@@ -239,8 +239,7 @@ def _admin_em_dia() -> None:
     email = str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
     if not email:
         return
-    # o setor "Administrador" (Base → Integração Fracttal) também é administrador (12/10/2026, ver setor_telas.py)
-    agora = email in _admins() or setor_telas.admin_pelo_setor(email)
+    agora = email in _admins()
     if bool(session.get("admin")) != agora:
         session["admin"] = agora
 
@@ -388,7 +387,7 @@ def _entrar_fracttal(destino):
     session.permanent = True
     session["logado"] = True
     session["usuario"] = {k: conta[k] for k in ("email", "nome", "perfil")}
-    session["admin"] = conta["email"] in _admins() or setor_telas.admin_pelo_setor(conta["email"])
+    session["admin"] = conta["email"] in _admins()
     if conta.get("exp"):
         session["fracttal_exp"] = conta["exp"]       # o Nexus vale enquanto o token do Fracttal valer
     sup = _supervisor_padrao(conta["email"], conta["nome"])

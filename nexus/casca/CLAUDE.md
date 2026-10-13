@@ -15,7 +15,8 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
-| `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor, o menu filtrado, o setor Administrador (seção "Telas por setor" abaixo) |
+| `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
+| `nexus/auth/pre_carga.py` | a pré-carga das telas de quem tem setor (seção "Pré-carga" abaixo) |
 | `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base, entrar e os dois modos TV): a reserva do `localStorage` antes de pintar |
 | `nexus/templates/_entrar_de_novo_js.html` e `_confere_sessao_js.html` | o `window.nexusEntrarDeNovo` (a janela ao login quando a sessão acaba) e a conferência da sessão do Fracttal a cada 5 minutos (só `session.usuario`). Saíram do `base.html` sem mudar (11/10/2026) para o modo TV do Painel NOC, que não tem a casca, valer igual: a TV de quem saiu do Fracttal vai ao login |
@@ -166,8 +167,9 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
 Pedido do Levi (12/10/2026): "gostaria de uma seção no BASE > ACESSOS onde eu possa controlar o que cada pessoa de setor
 pode ver ao logar no Nexus. A que não tiver setor vai aparecer a mensagem 'Sem setor, fale com o responsável' [...]
 Criarei um setor chamado 'Administrador' onde será liberado todas as seções para essas contas! Exclua a parte de
-cadeiras já que os setores irão substituir!". A cadeira (o seletor do topo, que só reordenava o menu) saiu: no lugar
-dela o topo mostra "Setor: X". O código: `nexus/auth/setor_telas.py` (regras e portão) e `telas_acessos.py` (a seção).
+cadeiras já que os setores irão substituir!". No mesmo dia ele voltou atrás no setor "Administrador": "não acho legal
+deixar como setores pois eu por exemplo sou da performance mas também sou administrador". A cadeira (o seletor do topo,
+que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O código: `nexus/auth/setor_telas.py` (regras e portão) e `telas_acessos.py` (a seção).
 
 - **O setor da pessoa** é o da tela Base → Integração Fracttal (`nexus/cadastro/setores.py`, livro `nexus_setores`). A
   pessoa do login se acha pelo código do e-mail (`pessoa_hmac`, com a `NEXUS_PESSOA_HMAC`), o mesmo que a decisão de
@@ -176,10 +178,11 @@ dela o topo mostra "Setor: X". O código: `nexus/auth/setor_telas.py` (regras e 
   `decisao_tela_setor`): só acrescenta, e vale a última decisão de cada setor × tela; a tela é `torre/tela`, o endereço
   do menu. Setor novo nasce sem nada marcado. O Salvar relê o banco, grava só o que mudou e troca a aba inteira (o
   `livros.publicar` confere a contagem). O portão e a tela leem com cópia de 1 minuto.
-- **Quem vê o quê.** Administrador (`NEXUS_ADMINS`, a lista desta tela, a senha) vê tudo, com ou sem setor: é quem
-  configura e não pode ficar trancado fora. O setor chamado "Administrador" (pelo nome, sem caixa nem acento) vê tudo,
-  inclusive a tela que nascer depois, e **é administrador** (o login e o `auth._admin_em_dia` perguntam
-  `setor_telas.admin_pelo_setor`). Os outros setores veem só as telas marcadas, no menu e no Início (os cartões e os
+- **Quem vê o quê.** Administrador é **só** a lista de Administradores (`NEXUS_ADMINS`, a lista desta tela, a senha):
+  vê tudo, com ou sem setor, porque é quem configura e não pode ficar trancado fora. **Setor nunca dá administrador**:
+  um setor chamado "Administrador" é setor como os outros (existiu assim por algumas horas em 12/10/2026 e saiu), e o
+  administrador que tem setor (o Levi, na Performance) segue vendo tudo; o setor dele só aparece no topo e na lista de
+  Administradores. Os setores veem só as telas marcadas, no menu e no Início (os cartões e os
   números contam só elas); setor sem nenhuma tela vê o Início com o aviso. Sem setor (ou com o setor excluído): toda
   página dá 403 com "Sem setor, fale com o responsável." (`templates/sem_setor.html`) e todo pedido de dados, 403 em
   JSON; abrem só entrar, sair, tema, saúde e static (`setor_telas.LIVRES`).
@@ -204,16 +207,46 @@ dela o topo mostra "Setor: X". O código: `nexus/auth/setor_telas.py` (regras e 
   administrador vazou para o pedido da pessoa do setor, que viu tudo; o teste pegou.
 - **A seção:** os setores em botões (quantas telas e quantas pessoas), o escolhido com a árvore do menu em caixas (a caixa
   da torre marca a torre inteira; "Copiar de" outro setor; Marcar tudo e Limpar; aviso de mudanças não salvas, e trocar
-  de setor com elas pergunta antes), e o Salvar. O Administrador aparece "vê tudo", sem caixas. Os números do topo
-  ganharam "Setores" e "Entraram sem setor"; a lista de quem entrou, a coluna Setor (pelo código do e-mail).
+  de setor com elas pergunta antes), e o Salvar. Os números do topo ganharam "Setores" e "Entraram sem setor"; a
+  lista de quem entrou e a de Administradores, a coluna Setor (pelo código do e-mail).
 - **Ao ligar num servidor** quem não tem setor passa a ver só a mensagem, e o setor sem telas marcadas, só o Início.
   Antes de o código novo subir, ponha as pessoas nos setores (Integração Fracttal) e marque as telas de cada setor.
 - **Prova:** `tests/test_setor_telas.py` (a matriz e o setor pela última decisão; o caminho segue a tela, a torre e o OS
-  Creator; sem setor só a mensagem; o setor vê só o marcado, em página e dados, e fechar vale no clique seguinte; o
-  Administrador vê tudo e é administrador; banco fora não vira "sem setor"; desligado ou sem a chave, todos veem tudo; a
-  seção grava só o que mudou e recusa o Administrador, setor excluído, tela desconhecida, sem token e sem o código; quem
-  entrou aparece com o setor; o livro no catálogo, sem nada pessoal) e `tests/test_torres.py` (o menu só com as telas
+  Creator; sem setor só a mensagem; o setor vê só o marcado, em página e dados, e fechar vale no clique seguinte; setor
+  nenhum dá administrador e o administrador com setor vê tudo; banco fora não vira "sem setor"; desligado ou sem a chave,
+  todos veem tudo; a seção grava só o que mudou e recusa setor excluído, tela desconhecida, sem token e sem o código; quem
+  entrou e cada administrador aparecem com o setor; o livro no catálogo, sem nada pessoal) e `tests/test_torres.py` (o menu só com as telas
   do setor).
+
+## Pré-carga das telas de quem tem setor (12/10/2026)
+
+Levi (12/10/2026): "para esses que tem setores, exceto sem setores e administradores - assim que entrar já pré carrega
+tudo o que está disponível para aquela pessoa, pode fazer por partes mas é interessante que fique cada vez mais leve da
+pessoa abrir uma informação e analisar!". O código e as regras: `nexus/auth/pre_carga.py`.
+
+- **Por que funciona:** medido em 12/10/2026 num processo novo, o 1º clique é que pesa (Clima e risco 9,8 a 15,9 s,
+  Visão do responsável 9,7 a 10,8 s, Confiabilidade 3,0 s, Rondas 2,6 a 2,9 s, Governança 2,4 s, Gestão PCM 0,9 a 1,0 s);
+  aberta de novo, toda tela fica abaixo de 0,1 s. O peso é encher as cópias do servidor (banco, INPE, INMET, NASA), e as
+  cópias são de todos.
+- **Quando e como:** o portão chama `pre_carga.lembrar` a cada pedido de quem tem setor e não é administrador (no máximo
+  uma vez por minuto por conjunto de telas). Uma thread só abre por dentro as telas liberadas que esfriaram (o
+  `test_client` do app, sessão interna de administrador sem login do Fracttal, com o cookie no cabeçalho e
+  `use_cookies=False`: com o pote, o Werkzeug apaga o cabeçalho e a sessão não chega), uma por vez e com 0,3 s entre
+  elas, a 1ª tela de cada torre primeiro. Enquanto a pessoa usa, repete a cada 2 min: a cópia que venceu é refeita por
+  trás (com 4 min, a cópia de 5 min revista aos 4 vencia aos 5 e só seria refeita no clique de alguém).
+- **Fora:** administradores e quem não tem setor (pedido do Levi); as telas que leem o Fracttal ao abrir (`FORA`:
+  Confiabilidade, Quadro da equipe, Aprovação de OS e Integração Fracttal; a cota de 200/min é da empresa e o App vive
+  dela); o OS Creator; e as telas da plataforma na moldura (o peso é da plataforma, que tem pré-carga própria). Tela que
+  leia o Fracttal na pré-carga assim mesmo é anotada pelo `campo.fracttal.marcar_pre_carga`, sai da volta até o Nexus
+  reiniciar e o log pede para pô-la na `FORA` (regra em `nexus/torres/CLAUDE.md`).
+- **Medido antes e depois** (12/10/2026, dado real, uma pessoa da Supervisão Campo com as 50 telas que o Levi marcou, o
+  Fracttal bloqueado): sem a pré-carga, os 40 primeiros cliques somaram 35,3 s (8 acima de 0,5 s); com ela, a volta abriu
+  35 telas em 39 s de relógio, sem erro e sem Fracttal, e os 40 cliques somaram 1,0 s (nenhum acima de 0,5 s; Clima
+  15,9 → 0,08 s).
+- **Onde ver:** a seção Telas por setor (Base → Acessos) diz se está ligada, se está aquecendo e a última volta (quantas
+  telas, quanto tempo, a mais lenta). `NEXUS_PRE_CARGA=0` desliga numa máquina; nos testes só liga quando pedido e roda
+  na hora, sem thread.
+- **Prova:** `tests/test_pre_carga.py`.
 
 ## Regras que já custaram caro
 

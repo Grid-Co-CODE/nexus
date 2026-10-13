@@ -27,6 +27,9 @@ _VAGAS = threading.BoundedSemaphore(SIMULTANEOS)
 _ULTIMO = [0.0]
 _TOKEN = {"v": "", "exp": 0.0}
 _FORNECEDOR = None           # testes: função path -> resposta (dict/list), sem rede
+# A pré-carga das telas (nexus/auth/pre_carga.py, 12/10/2026) não lê o Fracttal: ela marca a thread dela, e a tela que
+# chegar aqui assim mesmo é anotada e sai da pré-carga (a cota é da empresa inteira).
+_PRE_CARGA = threading.local()
 
 
 class Recusado(RuntimeError):
@@ -46,6 +49,13 @@ def _credencial():
     from ..pcm.geracao import credencial
     cred = credencial(current_app.config)
     return cred if cred.ok else None
+
+
+def marcar_pre_carga(ativa: bool) -> bool:
+    """Liga ou desliga a marca da pré-carga nesta thread; devolve se o Fracttal foi lido desde a marca anterior."""
+    leu = bool(getattr(_PRE_CARGA, "leu", False))
+    _PRE_CARGA.ativa, _PRE_CARGA.leu = ativa, False
+    return leu
 
 
 def configurado() -> bool:
@@ -73,6 +83,8 @@ def _token() -> str:
 
 
 def ler(path: str, method: str = "GET", body=None):
+    if getattr(_PRE_CARGA, "ativa", False):
+        _PRE_CARGA.leu = True
     if method.upper() != "GET" or body is not None:
         # defesa: as regras copiadas desta torre só leem; nada do Nexus escreve no Fracttal por aqui
         raise Recusado("o Nexus não escreve no Fracttal")

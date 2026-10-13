@@ -314,8 +314,8 @@ FATOS = (
          fontes=("nexus_setor_telas · fato_decisao_tela_setor",),
          janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada setor × tela)",
          observacao="o setor liga pelo setor_id à nexus_setores · dim_setor; a tela é o endereço do menu "
-                    "(torre/tela, o mesmo de /t/torre/tela). Tela nunca marcada = fechada; o setor 'Administrador' "
-                    "não tem matriz (vê tudo). Nada de nome nem e-mail (regra 8): quem decidiu vai em "
+                    "(torre/tela, o mesmo de /t/torre/tela). Tela nunca marcada = fechada; administrador do Nexus vê "
+                    "tudo sem precisar de marca (setor nenhum dá administrador). Nada de nome nem e-mail (regra 8): quem decidiu vai em "
                     "decidida_por_hmac e no log da máquina"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,

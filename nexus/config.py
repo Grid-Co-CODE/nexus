@@ -55,7 +55,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_PREFIXO",
              # o que cada setor vê (12/10/2026, Base → Acessos): padrão ligado; "0" desliga numa máquina (todos veem
              # tudo, como antes). Sem a NEXUS_PESSOA_HMAC fica desligado de qualquer jeito (nexus/auth/setor_telas.py)
-             "NEXUS_ACESSO_POR_SETOR")
+             "NEXUS_ACESSO_POR_SETOR",
+             # a pré-carga das telas de quem tem setor (12/10/2026, nexus/auth/pre_carga.py): padrão ligada; "0" desliga
+             "NEXUS_PRE_CARGA")
 
 
 class ConfigErro(RuntimeError):
