@@ -248,8 +248,10 @@ pessoa abrir uma informação e analisar!". O código e as regras: `nexus/auth/p
   na hora, sem thread.
 - **Ao subir, para todo mundo (13/10/2026, Levi: "o link do servidor demorou muito para carregar"):** cada deploy
   reinicia o Nexus e esfria as cópias (no servidor recém-subido a 1ª janela da Meta levou 27 s). O `servir.py` e o
-  `app.py` chamam `pre_carga.aquecer_ao_subir`: 30 s depois do boot, uma volta inteira pelas mesmas telas (as que não
-  leem o Fracttal). O `servir.py` passou de 8 para 16 threads (os pedidos esperam a rede; com 8 presos numa tela lenta,
+  `app.py` chamam `pre_carga.aquecer_ao_subir`: **5 min** depois do boot, uma volta inteira pelas mesmas telas. Não
+  30 s: a 1ª volta abre também as telas que pedem leitura ao Fracttal, e aos 30 s ela juntava as leituras que a subida
+  espaça de propósito (20 s a 210 s), estourando a cota da empresa (o 429 das fotos das rondas). Máquina com
+  `NEXUS_CAMPO_AQUECER=0` não roda. O `servir.py` passou de 8 para 16 threads (os pedidos esperam a rede; com 8 presos numa tela lenta,
   o resto esperava na fila).
 - **O estático com versão (13/10/2026):** todo `url_for('static', ...)` sai com `?v=<commit>` e, com ele, o navegador
   guarda o arquivo 1 ano (`public, max-age=31536000, immutable`, em `create_app._instalar_cache_estatico`); antes cada

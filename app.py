@@ -51,7 +51,7 @@ if __name__ == "__main__":
     instalar_dados(app)
     instalar_engenharia(app)
     from nexus.auth import pre_carga
-    pre_carga.aquecer_ao_subir(app)          # as telas quentes logo depois de subir (13/10/2026)
+    pre_carga.aquecer_ao_subir(app)          # as telas quentes depois de subir (13/10/2026; 5 min, ver a função)
     plataforma = (ler_ambiente().get("NEXUS_PLATAFORMA_LOCAL") or "").strip()
     alvo, threads = app, 8
     if plataforma:

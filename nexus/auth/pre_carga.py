@@ -103,13 +103,18 @@ def lembrar(telas) -> None:
         threading.Thread(target=_trabalhar, args=(app,), daemon=True, name="nexus-pre-carga").start()
 
 
-def aquecer_ao_subir(app, espera_s: int = 30) -> None:
-    """Uma volta inteira da pré-carga logo depois do boot, para todo mundo (13/10/2026, Levi: "o link do servidor
-    demorou muito para carregar"): cada deploy reinicia o Nexus e esfria todas as cópias, e no servidor recém-subido a
-    1ª janela da Meta levou 27 s. A volta é a de sempre (as telas que não leem o Fracttal, uma por vez, com pausa, por
-    trás); depois, quem tem setor segue mantendo as dele quentes. Quem chama é o servir.py e o app.py, nunca o
-    create_app (os testes não ligam nada). `NEXUS_PRE_CARGA=0` desliga junto."""
-    if not ligada(app.config):
+def aquecer_ao_subir(app, espera_s: int = 300) -> None:
+    """Uma volta inteira da pré-carga depois do boot, para todo mundo (13/10/2026, Levi: "o link do servidor demorou
+    muito para carregar"): cada deploy reinicia o Nexus e esfria todas as cópias, e no servidor recém-subido a 1ª janela
+    da Meta levou 27 s. A volta é a de sempre (uma tela por vez, com pausa, por trás); depois, quem tem setor segue
+    mantendo as dele quentes. Quem chama é o servir.py e o app.py, nunca o create_app (os testes não ligam nada).
+
+    **5 minutos, e não 30 s:** a 1ª volta abre também as telas que pedem leitura ao Fracttal (Rondas, Visão do
+    responsável, Engenharia), e as leituras da subida saem espaçadas de propósito (Aprovação 20 s, rondas 90 s, chamados
+    120 s, OS de falha 150 s, Quadro 210 s). Aos 30 s a volta juntava todas e a cota da empresa (200/min) estourava: o
+    "excesso de pedidos" que trava as fotos das rondas. Aos 5 min elas já rodaram e as telas acham tudo lido. Com
+    `NEXUS_CAMPO_AQUECER=0` (a máquina que não lê o Fracttal ao subir) não roda, e `NEXUS_PRE_CARGA=0` desliga junto."""
+    if not ligada(app.config) or str(app.config.get("NEXUS_CAMPO_AQUECER", "1")).strip() == "0":
         return
 
     def rodar():

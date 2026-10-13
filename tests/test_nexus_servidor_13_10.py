@@ -161,3 +161,11 @@ def test_pre_carga_ao_subir_aquece_as_telas(app, monkeypatch):
     app.config["NEXUS_PRE_CARGA"] = "1"
     pre_carga.aquecer_ao_subir(app, espera_s=0)
     assert pedidas and pedidas[0] == pre_carga.aqueciveis(app) and "base/fracttal" not in pedidas[0]
+    # a máquina que não lê o Fracttal ao subir não dá a volta (ela abriria as telas que pedem a leitura)
+    pedidas.clear()
+    app.config["NEXUS_CAMPO_AQUECER"] = "0"
+    pre_carga.aquecer_ao_subir(app, espera_s=0)
+    assert pedidas == []
+    # e a espera padrão passa das leituras espaçadas da subida (a última, o Quadro, aos 210 s)
+    import inspect
+    assert inspect.signature(pre_carga.aquecer_ao_subir).parameters["espera_s"].default > 210
