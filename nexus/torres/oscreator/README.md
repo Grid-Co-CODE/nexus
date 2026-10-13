@@ -247,6 +247,32 @@ Os pedidos do Levi, de 08/10: "Agrupar ativos em atividades por OS" e "Engenhari
   **Falta a prova ao vivo:** uma OS por ativo e uma agrupada de verdade em `TESTE - PA`, com um anexo de verdade,
   conferidas no Fracttal (o anexo abre no card) e canceladas no fim. E o 5090 precisa ser reiniciado para valer.
 
+## Performance: agrupar em UMA OS com várias tarefas (13/10/2026)
+
+O pedido do Levi, de 13/10: "No OS Creator Web não tem o mecanismo de quando é selecionado vários ativos, agrupar em uma
+só tarefa e vira uma atividade que nem no OS Creator Desktop! Veja o OS Creator Desktop e replique para o web". O
+Tradicional e a Engenharia da web já agrupavam; o Performance (todos os planos: Geração e ETM, Inspeção Geral do
+Inversor, Recomposição de String, Tracker parado) criava sempre uma OS por ativo (`perf_web.montar_itens` dizia
+"agrupar entra desligado"). Agora é o porte do `PerfCriar` do app de mesa (steps/performance.py):
+
+- **A caixa** "Agrupar em UMA OS com várias tarefas", no cartão do responsável, aparece com 2+ ativos marcados e **liga
+  sozinha** (`_auto_agrupar`, Levi 26/08: uma OS por ativo virou a exceção) **enquanto a pessoa não clicar nela**: o
+  clique é a decisão dela, e a tela não remarca o que ela desmarcou; tirar ativos não desliga o modo.
+- **Agrupado** (`_on_agrupar`): o nome digitado vale para a OS e para TODAS as tarefas, sem o prefixo [Ativo] (o Fracttal
+  ignora o título da OS e copia o da 1ª tarefa: é o único jeito de a OS se chamar assim); some a coluna OS Pai por ativo
+  e aparecem a **OS pai** e a **Observação da OS**, uma só para a OS inteira (a observação de cada ativo continua na
+  tabela, na tarefa dele); o contador diz "1 OS com N tarefas"; a confirmação diz o que muda (a OS só fecha quando
+  todas as tarefas forem concluídas; as tarefas nascem sem data de início/fim, o cronômetro preenche).
+- **No servidor:** `perf_web.quer_agrupar` (2+ ativos e a caixa), o título e a OS pai únicos no `montar_itens`, e a rota
+  `/os/api/performance/criar` chama o `api.create_performance_os_agrupada` (o mesmo do app: tarefas pendentes, uma OS,
+  etiquetas, imagens na tarefa de cada ativo e o ticket POR ATIVO) com a `note_os`; `perf_web.mensagem_agrupada` diz
+  "OS N criada com N tarefa(s)" ou que as tarefas existem SEM número (a tela limpa a seleção do mesmo jeito, para a
+  pessoa não criar tudo de novo).
+- **Prova (13/10):** `tests/test_oscreator_perf_agrupar.py` (payload, rota, mensagem, tela) e um ensaio num Chrome sem
+  janela com o Fracttal dublado, fora da suíte: 1 ativo, sem caixa; 2, a caixa liga e a tela muda; a pessoa desmarca e
+  o 3º ativo não religa; religada, o Criar chama a agrupada com os 3 títulos iguais, a OS pai e a observação da OS.
+  **Falta a prova ao vivo** numa usina de `TESTE - PA` (criar e cancelar). O 5090 só pega no próximo reinício.
+
 ## Digitar para achar: responsável e usina (08/10/2026)
 
 O pedido do Levi, de 08/10: "Conseguir digitar no responsável na criação de OS" e "Conseguir digitar o nome da usina no

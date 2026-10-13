@@ -335,6 +335,8 @@ body.os-modal-aberto{overflow:hidden}
 /* caixa "Gerar ticket automaticamente" e a quantidade por ativo (Levi, 21/09) */
 .os-tk{display:flex;align-items:center;gap:8px;color:#cfd6e4;font-size:13px;cursor:pointer}
 .os-tk small{color:var(--muted);font-size:11.5px}
+/* Performance agrupado (13/10/2026): sem a OS pai por ativo (é uma só, no campo da OS) e sem o prefixo [Ativo] no nome */
+.os-pagina.agrupada .os-tbl .c-pai,.os-pagina.agrupada #chip_prefixo{display:none}
 .os-tbl .qtd{width:62px;text-align:center;background:var(--f-input);border:1px solid var(--f-border);
   border-radius:7px;color:var(--txt);padding:4px 6px;font-size:13px}
 .os-tbl .qtd:disabled{opacity:.4}
