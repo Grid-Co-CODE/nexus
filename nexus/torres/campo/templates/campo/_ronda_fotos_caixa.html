@@ -10,30 +10,70 @@
   <button type="button" class="cn-caixa-prox" aria-label="Próxima foto">›</button>
 </div>
 <script>
-  // Fotos: o botão abre a linha e carrega as fotos da OS uma vez; a miniatura abre ampliada (Esc fecha, setas andam)
+  // Fotos: o botão abre a linha e carrega as fotos da OS; a miniatura abre ampliada (Esc fecha, setas andam).
+  // Se o Fracttal recusou (excesso de pedidos), o pedaço vem com data-erro: a linha não fica "carregada" (fechar e abrir
+  // busca de novo), aberta ela tenta sozinha em 1 minuto e o botão "Tentar de novo" busca na hora (13/10/2026, Levi:
+  // "atualmente só fica nessa mensagem até não sei quando").
   (function () {
+    function carregar(b, linha) {
+      clearInterval(linha._espera);
+      linha.dataset.carregada = '1';
+      var td = linha.firstElementChild;
+      td.textContent = 'Buscando as fotos da OS no Fracttal...';
+      fetch(b.dataset.url, {credentials: 'same-origin'}).then(function (r) { return r.text(); })
+        .then(function (html) {
+          td.innerHTML = html;
+          if (td.querySelector('[data-erro]')) { delete linha.dataset.carregada; esperar(b, linha); }
+        })
+        .catch(function () { td.textContent = 'Não consegui buscar as fotos. Feche e abra de novo.'; delete linha.dataset.carregada; });
+    }
+    function esperar(b, linha) {
+      var n = 60, conta = linha.querySelector('.cn-fotos-conta');
+      linha._espera = setInterval(function () {
+        if (linha.hidden) { clearInterval(linha._espera); return; }
+        n -= 1;
+        if (conta) conta.textContent = ' Tento de novo sozinho em ' + n + ' s.';
+        if (n <= 0) carregar(b, linha);
+      }, 1000);
+    }
     document.querySelectorAll('.cn-bt-fotos').forEach(function (b) {
+      var linha = b.closest('tr').nextElementSibling;
+      if (linha && linha.classList.contains('cn-fotos-linha')) linha._botao = b;
       b.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        var linha = b.closest('tr').nextElementSibling;
         if (!linha || !linha.classList.contains('cn-fotos-linha')) return;
         linha.hidden = !linha.hidden;
         b.setAttribute('aria-expanded', String(!linha.hidden));
-        if (linha.hidden || linha.dataset.carregada) return;
-        linha.dataset.carregada = '1';
-        var td = linha.firstElementChild;
-        td.textContent = 'Buscando as fotos da OS no Fracttal...';
-        fetch(b.dataset.url, {credentials: 'same-origin'}).then(function (r) { return r.text(); })
-          .then(function (html) { td.innerHTML = html; })
-          .catch(function () { td.textContent = 'Não consegui buscar as fotos. Tente de novo.'; delete linha.dataset.carregada; });
+        if (linha.hidden) { clearInterval(linha._espera); return; }
+        if (linha.dataset.carregada) return;
+        carregar(b, linha);
       });
+    });
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest && ev.target.closest('.cn-bt-tentar');
+      if (!t) return;
+      ev.stopPropagation();
+      var linha = t.closest('tr.cn-fotos-linha');
+      if (linha && linha._botao) carregar(linha._botao, linha);
+    });
+    // a ampliada da foto em que o mouse passa já vem pedida (a versão de tela fica pronta no servidor desde a grade)
+    document.addEventListener('mouseover', function (ev) {
+      var a = ev.target.closest && ev.target.closest('a.cn-foto');
+      if (a && !a.dataset.pedida) { a.dataset.pedida = '1'; (new Image()).src = a.href; }
     });
     var caixa = document.querySelector('.cn-caixa-foto'), img = caixa.querySelector('img'),
         leg = caixa.querySelector('figcaption'), lista = [], atual = 0;
     function mostra(k) {
       atual = (k + lista.length) % lista.length;
+      var texto = (lista[atual].dataset.legenda || '') + '  (' + (atual + 1) + ' de ' + lista.length + ')';
+      leg.textContent = texto + '  · carregando...';
+      img.onload = function () { leg.textContent = texto; };
       img.src = lista[atual].href; img.alt = lista[atual].dataset.legenda || '';
-      leg.textContent = (lista[atual].dataset.legenda || '') + '  (' + (atual + 1) + ' de ' + lista.length + ')';
+      // a anterior e a próxima já vêm pedidas: andar com as setas não espera
+      if (lista.length > 1) [1, -1].forEach(function (d) {
+        var a = lista[(atual + d + lista.length) % lista.length];
+        if (!a.dataset.pedida) { a.dataset.pedida = '1'; (new Image()).src = a.href; }
+      });
     }
     function fecha() { caixa.hidden = true; img.removeAttribute('src'); }
     document.addEventListener('click', function (ev) {

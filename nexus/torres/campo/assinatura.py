@@ -111,11 +111,11 @@ def assinatura_tecnico(numero):
     if not p or not p.get("os"):
         return jsonify({"ok": False, "motivo": "a PT não está no livro do App"})
     try:
-        id_wt = pt_fracttal.id_tarefa(p["os"], p.get("tarefa"))
-        if not id_wt:
+        ids = pt_fracttal.tarefas_candidatas(p["os"], p.get("tarefa"), p.get("codigo") or "")
+        if not ids:
             return jsonify({"ok": False, "motivo": "não achei a tarefa desta PT na OS do Fracttal"})
         email = str(conta.get("email") or (_carga(jwt) or {}).get("email") or "")
-        img = pt_fracttal.assinatura_do_tecnico(p["numero"], id_wt, _rpc_de_quem_olha(jwt, email))
+        img = pt_fracttal.assinatura_das_candidatas(p["numero"], ids, _rpc_de_quem_olha(jwt, email))
     except pt_fracttal.SemArquivo as e:
         return jsonify({"ok": False, "motivo": str(e)})
     except Exception as e:      # noqa: BLE001 — Fracttal recusou ou o login caiu: a tela diz, a PT abre igual

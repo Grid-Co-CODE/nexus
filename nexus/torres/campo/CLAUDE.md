@@ -229,6 +229,17 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     690 kB a foto inteira), feitas em paralelo assim que a grade é pedida; a mesma foto pedida duas vezes baixa uma vez
     (a chave de "em andamento" leva a cache: com a mesma chave a miniatura esperava por si mesma 60 s). Clicar amplia,
     com setas dentro do grupo e Esc. OS sem anexo existe (15055: as fotos não subiram); ronda sem OS: fotos só no App.
+    **Ampliar rápido (13/10/2026, Levi: "pré carrega bem pequeno porém na hora de ver expandido demora muito"):** a
+    memória guardava só 40 fotos inteiras e a ronda tem 45 a 50; o `preparar` baixava todas para as miniaturas e, na
+    última, as primeiras (sujidade, vegetação) já tinham saído: ampliar ia ao Fracttal (S3) a cada clique. Agora a
+    ampliada é a **versão de tela** (`tela`: lado maior 1.600 px, JPEG progressivo; a inteira com `?original=1`), feita
+    pelo `preparar` logo depois das miniaturas; as três (inteira, tela, miniatura) ficam **em disco**
+    (`dados/cache_fotos_ronda`, pelo arquivo do Fracttal sem a assinatura do link: sobrevive ao reinício de cada deploy;
+    passou de 6.000 arquivos, saem os mais antigos) e o endereço leva a versão do arquivo (`?v=`), que o navegador guarda
+    7 dias. A caixa pede a anterior e a próxima, e a ampliada da miniatura em que o mouse passa.
+    **Fracttal recusou (429):** o pedaço vem com `data-erro` e o botão "Tentar de novo"; a linha não fica "carregada"
+    (fechar e abrir busca de novo) e, aberta, tenta sozinha em 1 minuto (Levi: "atualmente só fica nessa mensagem até
+    não sei quando").
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
   - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não
@@ -371,6 +382,13 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     assina com `companies.s3_object_get`. A tarefa da PT sai do REST da OS (a única, ou a de mesma descrição; duas
     candidatas = não chuta). Guardada 1 h em memória, nunca no banco. **Sem prova com login real ainda** (os testes
     usam o RPC falso): o Levi entra com o login dele e abre uma PT.
+  - **A tarefa da PT (13/10/2026, PT-15067-1310-1106, "não achei a tarefa desta PT na OS do Fracttal"):** o REST de
+    work_orders traz o nome da tarefa em `description` ("[Grid Co.] - MPM - QGBT"); o `tasks_description` vem VAZIO, e
+    por ele nenhuma PT de OS com mais de uma tarefa achava a sua. A preventiva tem uma tarefa por ativo com a mesma
+    descrição (a OS 15067: 21 tarefas, QGBT 1, 2 e 3 iguais, só o 3 finalizado, o da PT; a PT diz só "QGBT", sem
+    código). `pt_fracttal.tarefas_candidatas`: o código do ativo (quando a linha da PT tem), a única da OS, ou as de
+    mesma descrição com a finalizada primeiro (depois a em andamento); a assinatura vem da 1ª candidata que a tiver (no
+    máximo 4 pedidos com o login de quem olha, `assinatura_das_candidatas`).
 - **Central de atenção, só o que está pendente** (as rondas feitas foram para a tela Rondas em 05/10; o texto abaixo descreve a origem) (Levi, 05/10: "separar Rondas feitas (histórico de rondas) e rondas
   pendentes, dando bastante atenção nas pendentes"; "separe o que é ronda e o que é Permissão de Trabalho"):
   - **Rondas pendentes** (abre nela, com números grandes que filtram): uma linha por usina mobilizada que pede ronda:
@@ -483,7 +501,10 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   clicar aparece um card sobrepondo a tela dando um blur de fundo"). O valor da Performance (Meta, PR, Disp.) e o "dia a
   dia" do detalhe abrem um `<dialog>` (fundo `--veu` com `backdrop-filter: blur`), com o pedaço de página da rota
   `/t/campo/responsaveis/usina/<usina_id>/<meta|pr|disp>` (`responsaveis_painel`, template `_resp_painel.html`, sem a
-  moldura; o script da tela busca e põe no `<dialog>`):
+  moldura; o script da tela busca e põe no `<dialog>`). **Nunca um 500 cru** (13/10/2026: no servidor recém-subido, no
+  9ec8fe3, toda janela da Meta dava "HTTP 500" e a mesma versão abria no PC com o mesmo banco; sem o texto do erro não
+  havia como achar a diferença): o que quebra ao montar vira, dentro da janela, "Não consegui montar esta janela" com o
+  tipo e o texto do erro, e o traceback vai ao log (`nexus.campo`); a leitura que falha diz também o texto do erro.
   - **Meta**: a tabela do dia a dia (geração da meta, geração real, diferença, % do dia) e o total = a soma dos dias
     contra a meta dos mesmos dias (a conta do Gerencial). Fonte: `nexus_performance · fato_desempenho_usina_dia`. As
     linhas são os dias que o **Gerencial** conta no atingimento, com a geração dele (`ger_dia` do `_gerencial_payload` da

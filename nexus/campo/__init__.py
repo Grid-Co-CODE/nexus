@@ -21,6 +21,11 @@ def instalar(app):
     # atenção depois de cada reinício levava 9,7 s e a hora da leitura era a do clique (Levi, 09/10: "quando clico em
     # Central de atenção ... a hora fica praticamente a hora que cliquei")
     threading.Timer(5, lambda: visao.manter_quente(app)).start()
+    # a cópia em disco das fotos da ronda (13/10/2026): a dados/ do Nexus, que sobrevive ao reinício de cada deploy
+    from pathlib import Path
+    from ..cadastro.ligacoes import DADOS_PADRAO
+    from . import ronda_fotos
+    ronda_fotos.configurar(Path(app.config.get("NEXUS_DADOS") or DADOS_PADRAO) / "cache_fotos_ronda")
     # os chamados de garantia no banco (12/10/2026): as OS de acompanhamento de chamado do Fracttal em
     # `nexus_chamados · fato_chamado`, de hora em hora, uma máquina por vez (NEXUS_CHAMADOS_PUBLICAR=0 desliga)
     from . import chamados_acompanhamento

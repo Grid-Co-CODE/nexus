@@ -14,6 +14,9 @@ from urllib.parse import urlencode
 
 from flask import Response, abort, redirect, render_template, request, session
 from markupsafe import Markup, escape
+
+import logging as _logging
+_log_campo = _logging.getLogger("nexus.campo")
 from werkzeug.datastructures import ImmutableMultiDict
 
 from ...campo import aprovacao as campo_aprovacao
@@ -443,6 +446,23 @@ def responsaveis_observacao(usina_id):
 
 
 def _resp_painel(usina_id, painel, obs_aviso="", obs_erro="", obs_texto=""):
+    """A janela da usina. O que quebrar ao montar vira a mensagem dentro dela, com o tipo e o texto do erro, e vai ao
+    log da máquina; nunca um 500 cru (13/10/2026: a janela da Meta dava "HTTP 500" em todas as usinas no servidor
+    recém-subido, e a mesma versão abria no PC: sem o texto do erro não havia como saber o que lá era diferente)."""
+    from werkzeug.exceptions import HTTPException
+    try:
+        return _resp_painel_montar(usina_id, painel, obs_aviso, obs_erro, obs_texto)
+    except HTTPException:
+        raise
+    except Exception as e:      # noqa: BLE001 — a janela diz o erro; a Visão segue
+        _log_campo.exception("Visão do responsável: a janela %s da usina %s não montou", painel, usina_id)
+        return (f'<header class="cr-jan-cab"><div><p class="gc-eyebrow">{escape(PAINEIS.get(painel, ""))}</p>'
+                f'<h2>Não consegui montar esta janela</h2></div></header>'
+                f'<div class="cn-erro" role="alert"><b>{escape(type(e).__name__)}: {escape(str(e)[:200])}.</b> Feche e '
+                f'abra de novo; se repetir, mande este texto a quem cuida do Nexus.</div>')
+
+
+def _resp_painel_montar(usina_id, painel, obs_aviso="", obs_erro="", obs_texto=""):
     leitura = campo_resp.visao_responsaveis()
     u = next((x for x in (leitura.dados or {}).get("usinas") or [] if x["usina_id"] == usina_id), None)
     if u is None:
@@ -469,7 +489,8 @@ def _resp_painel(usina_id, painel, obs_aviso="", obs_erro="", obs_texto=""):
             ctx.update(at=campo_resp.ativos_da_usina(usina_id, hoje),
                        tela_confiabilidade="torre_engenharia.confiabilidade")
     except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, a tela segue
-        ctx["erro"] = f"Não consegui ler o banco do Nexus ({type(e).__name__})"
+        _log_campo.exception("Visão do responsável: a leitura da janela %s da usina %s falhou", painel, usina_id)
+        ctx["erro"] = f"Não consegui ler o banco do Nexus ({type(e).__name__}: {str(e)[:160]})"
     if painel == "meta":
         ctx["obs"] = _observacoes(u, leitura.dados or {}, obs_aviso, obs_erro, obs_texto)
     return render_template("campo/_resp_painel.html", **ctx, duracao=_idade_min)
@@ -900,13 +921,19 @@ def ronda_fotos_os(os_):
 @bp.route("/rondas/os/<int:os_>/foto/<int:i>")
 def ronda_foto(os_, i):
     """Uma foto da OS de ronda: o Nexus baixa do Fracttal e entrega (o link assinado não sai para o navegador)."""
+    # a ampliada é a versão de tela (13/10/2026, Levi: "na hora de ver expandido demora muito para carregar"); a
+    # original, com ?original=1
+    fazer = (ronda_fotos.miniatura if request.args.get("mini")
+             else ronda_fotos.foto if request.args.get("original") else ronda_fotos.tela)
     try:
-        corpo, mime = (ronda_fotos.miniatura if request.args.get("mini") else ronda_fotos.foto)(os_, i)
+        corpo, mime = fazer(os_, i)
     except ronda_fotos.SemFoto as e:
         return Response(str(e), status=404, mimetype="text/plain")
     except Exception as e:      # noqa: BLE001
         return Response(f"Fracttal: {type(e).__name__}", status=502, mimetype="text/plain")
-    return Response(corpo, mimetype=mime, headers={"Cache-Control": "private, max-age=3600"})
+    # com a versão do arquivo no endereço (?v=, o mesmo arquivo do Fracttal), o navegador guarda 7 dias sem perguntar
+    guarda = "private, max-age=604800, immutable" if request.args.get("v") else "private, max-age=3600"
+    return Response(corpo, mimetype=mime, headers={"Cache-Control": guarda})
 
 
 @bp.route("/zeladoria")

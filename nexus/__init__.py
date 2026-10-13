@@ -53,4 +53,42 @@ def create_app(config: dict | None = None) -> Flask:
     registrar_torres(app)
     instalar_portao(app)
     instalar_contexto(app)
+    _instalar_cache_estatico(app)
     return app
+
+
+def _instalar_cache_estatico(app) -> None:
+    """O CSS, o JS e as imagens com a versão no endereço (`?v=<commit>`) e guardados 1 ano pelo navegador (13/10/2026,
+    Levi: "o link do servidor demorou muito para carregar"): antes, cada página reconfirmava cada arquivo com o servidor
+    (no-cache, um vaivém por arquivo). Commit novo = endereço novo, então nada fica velho depois de um deploy. Pasta sem
+    git (o commit "local"): fica como antes. O que não sai do `url_for` (sem o `v`) também fica como antes. Chave
+    `NEXUS_ESTATICO_VERSAO` (0 desliga); sem ela, ligado fora dos testes, como a pré-carga (os testes conferem o
+    endereço exato do arquivo)."""
+    from flask import current_app, request
+
+    from .casca import _commit
+
+    def _e_estatico(endpoint) -> bool:
+        return bool(endpoint) and (endpoint == "static" or endpoint.endswith(".static"))
+
+    def _ligada() -> bool:
+        v = current_app.config.get("NEXUS_ESTATICO_VERSAO")
+        if v is None:
+            return not current_app.config.get("TESTING")
+        return str(v).strip().lower() not in ("", "0", "false", "nao", "não", "desligado")
+
+    @app.url_defaults
+    def _versao_do_estatico(endpoint, values):
+        if _e_estatico(endpoint) and "v" not in values and _ligada():
+            v = _commit()
+            if v and v != "local":
+                values["v"] = v
+
+    @app.after_request
+    def _guardar_o_estatico(resp):
+        if _e_estatico(request.endpoint) and request.args.get("v") and resp.status_code == 200:
+            resp.cache_control.no_cache = None
+            resp.cache_control.public = True
+            resp.cache_control.max_age = 31536000
+            resp.cache_control.immutable = True
+        return resp

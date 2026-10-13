@@ -103,6 +103,25 @@ def lembrar(telas) -> None:
         threading.Thread(target=_trabalhar, args=(app,), daemon=True, name="nexus-pre-carga").start()
 
 
+def aquecer_ao_subir(app, espera_s: int = 30) -> None:
+    """Uma volta inteira da pré-carga logo depois do boot, para todo mundo (13/10/2026, Levi: "o link do servidor
+    demorou muito para carregar"): cada deploy reinicia o Nexus e esfria todas as cópias, e no servidor recém-subido a
+    1ª janela da Meta levou 27 s. A volta é a de sempre (as telas que não leem o Fracttal, uma por vez, com pausa, por
+    trás); depois, quem tem setor segue mantendo as dele quentes. Quem chama é o servir.py e o app.py, nunca o
+    create_app (os testes não ligam nada). `NEXUS_PRE_CARGA=0` desliga junto."""
+    if not ligada(app.config):
+        return
+
+    def rodar():
+        time.sleep(espera_s)
+        try:
+            with app.app_context():
+                lembrar(aqueciveis(app))
+        except Exception as ex:      # noqa: BLE001 — aquecer nunca derruba o Nexus
+            log.warning("Pré-carga ao subir não rodou (%s: %s).", type(ex).__name__, ex)
+    threading.Thread(target=rodar, daemon=True, name="nexus-pre-carga-boot").start()
+
+
 def _biscoito(app) -> str:
     """A sessão interna: administrador, sem login do Fracttal (nenhuma tela lê o Fracttal com o login de alguém),
     assinada com a chave do próprio Nexus. Vai no cabeçalho, e não no pote do cliente, porque no servidor o cookie é

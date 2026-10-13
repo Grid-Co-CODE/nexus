@@ -1,12 +1,12 @@
 {# As fotos de uma OS de ronda, separadas em sujidade, vegetação e as demais (Levi, 06/10/2026). Pedaço carregado pelo
    botão Fotos do histórico da usina e da aba Registros; a miniatura abre ampliada (a caixa e o script ficam no
    _ronda_fotos_caixa.html, que as duas páginas incluem). #}
-{% if erro %}<p class="cn-fotos-msg cn-t-alerta">{{ erro }}</p>
+{% if erro %}<p class="cn-fotos-msg cn-t-alerta" data-erro="1">{{ erro }} <button type="button" class="cn-bt-tentar">Tentar de novo</button><span class="mudo cn-fotos-conta"></span></p>
 {% elif not total %}<p class="cn-fotos-msg mudo">A OS {{ os_ }} não tem fotos anexadas no Fracttal.</p>
 {% else %}
 {% macro miniatura(f, legenda=false) %}
-      <a class="cn-foto{% if legenda %} cn-foto--legenda{% endif %}" href="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i) }}" data-legenda="{{ f.desc }}" title="{{ f.desc }}">
-        <img src="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i, mini=1) }}" alt="{{ f.desc }}" loading="lazy" width="96" height="96">
+      <a class="cn-foto{% if legenda %} cn-foto--legenda{% endif %}" href="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i, v=f.v) }}" data-legenda="{{ f.desc }}" title="{{ f.desc }}">
+        <img src="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i, mini=1, v=f.v) }}" alt="{{ f.desc }}" loading="lazy" width="96" height="96">
         {% if f.resposta %}<span class="cn-foto-resp">{{ f.resposta }}</span>{% endif %}
         {% if legenda %}<span class="cn-foto-rotulo">{{ f.rotulo }}</span>{% endif %}
       </a>{% endmacro %}

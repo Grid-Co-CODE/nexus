@@ -96,15 +96,42 @@ def apr_pdf(os_, criada=None, ler=None) -> tuple[bytes, str]:
 
 
 # ── a assinatura do técnico na APR ───────────────────────────────────────────────────────────────────────────────
-def id_tarefa(os_, tarefa, ler=None) -> int | None:
-    """A tarefa da OS a que a PT se refere: a única da OS, ou a de mesma descrição. Duas candidatas = não chuta."""
+def _descricao(t: dict) -> str:
+    """O nome da tarefa na OS. O REST de work_orders traz em `description` ("[Grid Co.] - MPM - QGBT"); o
+    `tasks_description` vem VAZIO (medido em 13/10/2026 na OS 15067, 21 tarefas): por ele, nenhuma PT de OS com mais de
+    uma tarefa achava a sua, e a tela dizia "não achei a tarefa desta PT na OS do Fracttal"."""
+    return str(t.get("description") or t.get("tasks_description") or "")
+
+
+# a ordem das tarefas de mesma descrição: a finalizada primeiro (é a que a PT liberou), depois a em andamento
+_ORDEM_STATUS = {"DONE": 0, "IN_PROGRESS": 1}
+
+
+def tarefas_candidatas(os_, tarefa, codigo: str = "", ler=None) -> list[int]:
+    """As tarefas da OS a que a PT pode se referir, da mais provável para a menos: a do código do ativo (quando a linha
+    da PT tem), a única da OS, ou as de mesma descrição, a finalizada primeiro. A preventiva tem uma tarefa por ativo
+    com a mesma descrição (a OS 15067: "[Grid Co.] - MPM - QGBT" nos QGBT 1, 2 e 3; só o 3 finalizado, o da PT)."""
     tarefas = [t for t in nota_fracttal.tarefas_da_os(os_, ler) if t.get("id_work_orders_tasks")]
-    ids = {int(float(t["id_work_orders_tasks"])) for t in tarefas}
-    if len(ids) == 1:
-        return ids.pop()
+
+    def tid(t):
+        return int(float(t["id_work_orders_tasks"]))
+    ids = list(dict.fromkeys(tid(t) for t in tarefas))
+    if len(ids) <= 1:
+        return ids
+    if codigo:
+        pelo_codigo = [tid(t) for t in tarefas if _norm(t.get("code")) == _norm(codigo)]
+        if pelo_codigo:
+            return pelo_codigo[:1]
     alvo = _norm(tarefa)
-    iguais = {int(float(t["id_work_orders_tasks"])) for t in tarefas if alvo and _norm(t.get("tasks_description")) == alvo}
-    return iguais.pop() if len(iguais) == 1 else None
+    iguais = [t for t in tarefas if alvo and _norm(_descricao(t)) == alvo]
+    iguais.sort(key=lambda t: (_ORDEM_STATUS.get(str(t.get("task_status") or "").upper(), 2), tid(t)))
+    return list(dict.fromkeys(tid(t) for t in iguais))
+
+
+def id_tarefa(os_, tarefa, ler=None) -> int | None:
+    """A tarefa da OS a que a PT se refere, quando é uma só (a única da OS, ou a única de mesma descrição)."""
+    c = tarefas_candidatas(os_, tarefa, ler=ler)
+    return c[0] if len(c) == 1 else None
 
 
 def _imagem(valor, rpc) -> str:
@@ -149,6 +176,18 @@ def assinatura_do_tecnico(numero, id_wt: int, rpc) -> str:
     img = _imagem(valor, rpc)
     _ASSINATURAS[numero] = (time.time(), img)
     return img
+
+
+def assinatura_das_candidatas(numero, ids, rpc, maximo: int = 4) -> str:
+    """A assinatura da APR da 1ª candidata que a tiver (na ordem de `tarefas_candidatas`; no máximo `maximo` pedidos ao
+    Fracttal, com o login de quem olha). Nenhuma tem: o motivo da última."""
+    ultimo = None
+    for i in list(ids)[:maximo]:
+        try:
+            return assinatura_do_tecnico(numero, i, rpc)
+        except SemArquivo as e:
+            ultimo = e
+    raise ultimo or SemArquivo("a APR desta tarefa não tem a assinatura do técnico")
 
 
 def limpar():

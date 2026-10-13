@@ -28,11 +28,16 @@ if __name__ == "__main__":
     instalar_campo(app)
     instalar_dados(app)
     instalar_engenharia(app)
+    # as telas quentes logo depois de cada deploy (13/10/2026: a 1ª abertura do servidor recém-subido levou 27 s)
+    from nexus.auth import pre_carga
+    pre_carga.aquecer_ao_subir(app)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"
     print(f"Nexus em produção: {host}:{porta}, servido em {prefixo} (cookie seguro, atrás do proxy HTTPS)", flush=True)
     # trusted_proxy: o IP do visitante vem do proxy; sem isso o teto por IP do Entrar e o contador da senha de
     # administrador (nexus/auth) contariam todo mundo como 127.0.0.1, e a empresa inteira dividiria um contador só.
-    serve(app, host=host, port=porta, threads=8, trusted_proxy="127.0.0.1",
+    # 16 threads (eram 8): os pedidos esperam a rede (banco, Fracttal, as fotos do S3), e com 8 presos numa tela lenta
+    # o resto da empresa esperava na fila (13/10/2026)
+    serve(app, host=host, port=porta, threads=16, trusted_proxy="127.0.0.1",
           trusted_proxy_headers={"x-forwarded-for", "x-forwarded-proto"}, clear_untrusted_proxy_headers=True)
