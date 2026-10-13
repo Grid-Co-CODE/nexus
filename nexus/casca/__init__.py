@@ -4,14 +4,13 @@ import os
 import subprocess
 from functools import lru_cache
 
-from flask import (Blueprint, abort, current_app, jsonify, redirect, render_template, request,
-                   session)
+from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request
 
 from ..auth import destino_seguro, setor_telas
 from ..prefixo import raiz
 from ..torres import montar_menu, telas_com_conteudo
 # no topo, e não dentro do Início: o "no ar desde" do cartão da versão é a hora do import, a do boot (13/10/2026)
-from . import presos, versao
+from . import versao
 
 bp = Blueprint("casca", __name__)
 
@@ -71,10 +70,20 @@ def inicio():
     return render_template("inicio.html", torres=torres, cartoes=cartoes, total_prontas=len(prontas),
                            total_telas=sum(len([s for s in t.telas if liberadas is None or f"{t.id}/{s.id}" in liberadas])
                                            for t in torres),
-                           # a versão no ar e se ela está em dia com o GitHub (casca/versao.py, 13/10/2026)
-                           versao=versao.cartao(app),
-                           # os pedidos presos das últimas 24 h, só para o administrador (casca/presos.py, 13/10/2026)
-                           presos=presos.cartao(app) if session.get("admin") else None)
+                           # a versão no ar: a hora do commit e desde quando está no ar; leva às Atualizações
+                           # (casca/versao.py, 13/10/2026). Os pedidos presos saíram do cartão a pedido do Levi
+                           # ("tire ... preso em 24hrs"): seguem no log, pelo casca/presos.py
+                           versao=versao.cartao(app), aba="inicio")
+
+
+@bp.route("/atualizacoes")
+def atualizacoes():
+    """A aba Atualizações do Início (13/10/2026, Levi: "Inclua no início uma sub aba de atualizações mostrando as últimas
+    atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva para lá!"): os últimos commits desta pasta,
+    por dia, com o que mudou."""
+    itens = versao.historico()
+    return render_template("atualizacoes.html", dias=versao.dias(itens), total=len(itens), versao=versao.cartao(
+        current_app._get_current_object()), aba="atualizacoes")
 
 
 @bp.route("/tema", methods=["POST"])

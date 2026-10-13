@@ -10,7 +10,6 @@ import traceback
 
 import pytest
 
-from nexus.auth import setor_telas
 from nexus.casca import presos
 
 RAIZ = presos._RAIZ
@@ -170,57 +169,59 @@ def _travamento(fim_ha_s=600, duracao_s=180, cortado=False):
     return ep
 
 
-def test_o_administrador_ve_o_travamento_no_cartao_da_versao(app, logado):
+def _cartao(app):
+    """O que o presos.cartao diz (13/10/2026, à noite: o Levi tirou o cartão do Início, "tire ... preso em 24hrs"; o
+    resumo segue aqui e no log, para quem for diagnosticar)."""
+    with app.app_context():
+        c = presos.cartao(app)
+    return c and " ".join(str(c.get(k) or "") for k in ("rotulo", "detalhe", "titulo"))
+
+
+def test_o_resumo_do_travamento(app):
     e = presos._Estado(16, None)
     app.extensions[presos.CHAVE] = e
-    html = logado.get("/").get_data(as_text=True)
-    assert "versao-presos" in html and "Nenhum pedido preso em 24 h" in html and "gc-status--ok" in html
+    assert _cartao(app).startswith("Nenhum pedido preso em 24 h")
     e.historico.append(_travamento())
-    html = logado.get("/").get_data(as_text=True)
-    assert "gc-status--critico" in html and "Travou 1 vez em 24 h" in html
+    t = _cartao(app)
+    assert "Travou 1 vez em 24 h" in t
     assert "e durou 3 min: até 16 pedidos presos juntos, com as 16 threads ocupadas; todos em Fracttal (OS Creator), " \
-           "esperando a rede." in html
-    assert "GET /os/api/performance/contagens (2 min 50 s, nexus/torres/oscreator/os_creator/api.py:1093 _rpc_call)" in html
+           "esperando a rede." in t
+    assert "GET /os/api/performance/contagens (2 min 50 s, nexus/torres/oscreator/os_creator/api.py:1093 _rpc_call)" in t
     # o de mais de 24 h sai da conta; o cortado pelo restart diz isso
     e.historico[:] = [_travamento(fim_ha_s=25 * 3600), _travamento(cortado=True)]
-    html = logado.get("/").get_data(as_text=True)
-    assert "Travou 1 vez em 24 h" in html and "acabou com o Nexus reiniciando" in html
+    t = _cartao(app)
+    assert "Travou 1 vez em 24 h" in t and "acabou com o Nexus reiniciando" in t
 
 
-def test_pedido_preso_sem_fila_cheia_e_o_aberto_agora(app, logado):
+def test_pedido_preso_sem_fila_cheia_e_o_aberto_agora(app):
     e = presos._Estado(16, None)
     app.extensions[presos.CHAVE] = e
     um = dict(_travamento(), fila_cheia=False, max_presos=1, max_ocupadas=3)
     um["pedidos"] = um["pedidos"][:1]
     e.historico.append(um)
-    html = logado.get("/").get_data(as_text=True)
-    assert "gc-status--alerta" in html and "Pedido preso 1 vez em 24 h" in html
-    assert "e durou 3 min: 1 pedido preso; em Fracttal (OS Creator), esperando a rede." in html
+    t = _cartao(app)
+    assert "Pedido preso 1 vez em 24 h" in t
+    assert "e durou 3 min: 1 pedido preso; em Fracttal (OS Creator), esperando a rede." in t
     seq = e.entrar(_pedido())
     _envelhecer(e, seq, 45)
     e.olhar()
-    html = logado.get("/").get_data(as_text=True)
-    assert "Pedido preso agora" in html and "(há 45 s)" in html
-    # soltou: nos 15 s até o episódio fechar o cartão já não diz "agora" (a prova de 13/10 mostrou "Travado agora" com
-    # o Nexus já respondendo)
+    t = _cartao(app)
+    assert "Pedido preso agora" in t and "(há 45 s)" in t
+    # soltou: nos 15 s até o episódio fechar já não diz "agora" (a prova de 13/10 mostrou "Travado agora" com o Nexus
+    # já respondendo)
     e.sair(seq)
-    html = logado.get("/").get_data(as_text=True)
-    assert "agora" not in html.split("versao-presos", 1)[1][:400] and "Pedido preso 2 vezes em 24 h" in html
-    assert "e durou 45 s: 1 pedido preso" in html
+    t = _cartao(app)
+    assert "agora" not in t and "Pedido preso 2 vezes em 24 h" in t and "e durou 45 s: 1 pedido preso" in t
 
 
-def test_quem_nao_e_administrador_nao_ve(app, logado, monkeypatch):
+def test_o_inicio_nao_mostra_os_pedidos_presos(app, logado):
+    """13/10/2026, Levi: "No início do Nexus, tire as informações de github, preso em 24hrs e essas observações"."""
     app.extensions[presos.CHAVE] = presos._Estado(16, None)
     app.extensions[presos.CHAVE].historico.append(_travamento())
-    monkeypatch.setattr(setor_telas, "liberadas_do_menu", lambda: None)
-    with logado.session_transaction() as s:
-        s["admin"] = False
-        s["usuario"] = {"email": "pessoa@exemplo.test", "nome": "Pessoa Exemplo", "perfil": ""}
     html = logado.get("/").get_data(as_text=True)
     assert "Versão no ar" in html and "versao-presos" not in html and "Travou" not in html
 
 
-def test_sem_o_registro_ligado_o_cartao_nao_muda(app, logado):
-    """Os testes e a vitrine estática não ligam o registro: o cartão sai como antes."""
-    assert presos.CHAVE not in app.extensions
-    assert "versao-presos" not in logado.get("/").get_data(as_text=True)
+def test_sem_o_registro_ligado_o_resumo_e_nada(app):
+    """Os testes e a vitrine estática não ligam o registro."""
+    assert presos.CHAVE not in app.extensions and _cartao(app) is None

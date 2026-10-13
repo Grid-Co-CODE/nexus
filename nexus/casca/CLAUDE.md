@@ -12,8 +12,8 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
-| `nexus/casca/versao.py` | a versão no ar do Início: o commit, a hora dele, desde quando o processo está no ar e o semáforo com o `main` do GitHub (seção "Versão no ar" abaixo) |
-| `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log e, para o administrador, no cartão da versão (seção "Pedidos presos" abaixo) |
+| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/atualizacoes`, os últimos commits por dia); seção "Versão no ar e Atualizações" abaixo |
+| `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
@@ -261,31 +261,26 @@ pessoa abrir uma informação e analisar!". O código e as regras: `nexus/auth/p
   como antes.
 - **Prova:** `tests/test_pre_carga.py` e `tests/test_nexus_servidor_13_10.py`.
 
-## Versão no ar no Início (13/10/2026)
+## Versão no ar e Atualizações no Início (13/10/2026)
 
-Levi, com o Nexus recém-subido no servidor: "Quero que no início do Nexus diga quando foi o último commit para eu
-acompanhar se está realmente subindo automático para o server". O 4º cartão dos números do Início (`casca/versao.py`,
-`templates/inicio.html`):
+À tarde, Levi: "Quero que no início do Nexus diga quando foi o último commit para eu acompanhar se está realmente subindo
+automático para o server". À noite, o cartão foi enxugado ("tire as informações de github, preso em 24hrs e essas
+observações abaixo do commit") e ganhou a aba ("Inclua no início uma sub aba de atualizações mostrando as últimas
+atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva para lá!"). Em `casca/versao.py`:
 
-- **a hora do commit** em execução (grande), o commit curto (o mesmo do `/saude`) e o assunto (uma linha; o texto inteiro
-  no `title`), pelo `git log -1` da própria pasta: no servidor, a `/opt/nexus` do usuário `nexus`, dono do clone;
-- **no ar desde**: a hora em que este processo subiu (o import da casca, no boot). Cada deploy reinicia o Nexus, então é
-  a hora em que a versão entrou;
-- **o semáforo com o `main` do GitHub**: verde "Em dia com o GitHub"; amarelo "Atualizando" nos 5 primeiros minutos em
-  que se vê o GitHub à frente (o timer do deploy roda a cada 2 min); vermelho "Atrasado há N min" depois disso, com o
-  commit do GitHub e quantos faltam: **é o sinal de que o deploy automático não pegou**. O relógio conta da 1ª vez que se
-  viu atrás e só zera em dia (commit novo no GitHub com o servidor parado não volta a "atualizando"; o restart do deploy
-  zera junto). Também: "À frente do GitHub" (commits só desta máquina, o normal no PC), "Diferente do GitHub" (dos dois
-  lados, vermelho), "Fora do GitHub" (o commit daqui não está lá) e "GitHub sem resposta" (com o motivo);
-- a conferência vai à API pública do GitHub (`compare main...<commit>`: a situação, quantos à frente e atrás e o commit
-  do `main`, numa chamada), **no máximo a cada 5 min e sempre por trás**: o Início nunca espera a rede (a 1ª visita
-  depois do boot já encontra a resposta, porque o `servir.py` e o `app.py` pedem uma ao subir). Sem a API (o servidor
-  pode não sair para api.github.com, e sem login o limite é de 60 por hora por IP), vai pelo `git ls-remote` no
-  github.com, o mesmo caminho do deploy; com o commit do GitHub já na pasta (o fetch do deploy), conta e data por ele.
-- `NEXUS_VERSAO_GITHUB=0` desliga a conferência numa máquina; nos testes (`TESTING`) ela fica desligada, e o
-  `/saude` continua enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
-- **Prova:** `tests/test_casca_versao.py` (a API e o git dublados; nada sai para a rede). No dado real, em 13/10/2026: a
-  API e o `git ls-remote` deram a mesma resposta, em dia para o 648c100 e 4 atrás para o 5a6982a.
+- **O cartão "Versão no ar"** (o 4º dos números do Início): a hora do commit em execução (grande), o commit curto (o mesmo
+  do `/saude`) e "no ar desde" (a hora em que este processo subiu, o import da casca; cada deploy reinicia o Nexus, então
+  é a hora em que a versão entrou). O cartão inteiro é o link para as Atualizações. Saíram o semáforo com o GitHub (e a
+  conferência por trás dele: API do GitHub e `git ls-remote`), o assunto do commit e os pedidos presos.
+- **As abas do Início** (`gc-subabas`, em `inicio.html` e `atualizacoes.html`): Visão geral | Atualizações.
+- **A aba Atualizações** (`/atualizacoes`, exige login como o Início): os últimos 60 commits desta pasta (`git log`, lido
+  uma vez por processo: o deploy reinicia e a lista nova vem junto), por dia ("Hoje", "Ontem", dd/mm/aaaa), do mais novo.
+  Cada um: a hora, o tipo traduzido do prefixo (feat = Novidade, fix = Correção, perf = Desempenho, docs = Documentação,
+  chore = Manutenção...), a área (o que vem entre parênteses), o commit, a manchete (o texto antes do " - ") e o resto, e
+  o corpo da mensagem num "O que mudou, em detalhe", sem as linhas de coautoria. O de cima leva "no ar".
+- Sem git (a vitrine estática, uma pasta copiada): o cartão diz "—" e a aba diz que não há histórico. O `/saude` segue
+  enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
+- **Prova:** `tests/test_casca_versao.py` (o git dublado).
 
 ## Um cabeçalho só: quem entrou no topo do Nexus (13/10/2026)
 
@@ -333,11 +328,11 @@ fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
   juntos, se a fila encheu (ocupadas >= threads) e os 40 pedidos que mais esperaram. Os últimos 30 ficam em
   `dados/casca/pedidos_presos.json`, gravado também a cada 30 s DURANTE o episódio: se o processo cair no meio, o boot
   seguinte o lê como "cortado" ("acabou com o Nexus reiniciando").
-- **cartão (só o administrador):** no "Versão no ar" do Início, um 2º semáforo: verde "Nenhum pedido preso em 24 h";
-  vermelho "Travou N vezes em 24 h" quando a fila encheu (ninguém mais era atendido) ou "Travado agora"; amarelo "Pedido
-  preso N vezes em 24 h" quando só a pessoa do pedido sentiu. A linha de baixo diz o último (hora, duração, quantos
-  juntos e onde a maioria esperava); o `title` lista os pedidos com a linha de cada um. Depois que os presos soltam, o
-  episódio ainda leva 15 s para fechar, e nesse meio o cartão já não diz "agora".
+- **o resumo (`presos.cartao`)**: "Nenhum pedido preso em 24 h"; "Travou N vezes em 24 h" quando a fila encheu (ninguém
+  mais era atendido) ou "Travado agora"; "Pedido preso N vezes em 24 h" quando só a pessoa do pedido sentiu; com o último
+  (hora, duração, quantos juntos e onde a maioria esperava) e os pedidos com a linha de cada um. **Saiu do cartão do
+  Início em 13/10/2026, à noite** (Levi: "tire as informações de github, preso em 24hrs"): o resumo segue para quem for
+  diagnosticar (os testes o chamam direto), e o episódio vai ao log e ao `pedidos_presos.json` como antes.
 - **O próprio waitress avisa a fila:** `waitress.queue WARNING Task queue depth is N` no log quando há pedido esperando
   thread. No servidor, `journalctl -u nexus | grep "queue depth"` diz se um travamento antigo (de antes deste registro)
   foi fila cheia.

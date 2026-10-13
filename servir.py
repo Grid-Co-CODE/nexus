@@ -35,9 +35,6 @@ if __name__ == "__main__":
     # as telas quentes depois de cada deploy (13/10/2026: a 1ª abertura do servidor recém-subido levou 27 s; 5 min)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)
-    # a versão no ar já conferida com o GitHub quando a 1ª pessoa abrir o Início (casca/versao.py, 13/10/2026)
-    from nexus.casca import versao
-    versao.conferir(app)
     # o que cada pedido esperava quando o Nexus parou de responder (13/10/2026: das 16:50 às 16:53 nem o /saude
     # respondia, e de fora não dava para ver esperando o quê); o administrador vê no cartão da versão do Início
     from nexus.casca import presos

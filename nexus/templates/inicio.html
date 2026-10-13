@@ -3,7 +3,12 @@
 {% block conteudo %}
 <p class="gc-eyebrow">{{ ("Setor " ~ setor.nome) if setor else "Nexus" }}</p>
 <h1 class="titulo-pagina">Início</h1>
-{# Honesto (auditoria A3 da porta única, 10/10/2026): o Início dizia "fase 0" e "Com dado real: 0" com 40 telas prontas
+{% if aba is defined %}{# as abas do Início (13/10/2026): a visão geral e as Atualizações (os últimos commits e o que mudou) #}
+<nav class="gc-subabas" aria-label="Início">
+  <a href="{{ url_for('casca.inicio') }}"{% if aba == 'inicio' %} aria-current="page"{% endif %}>Visão geral</a>
+  <a href="{{ url_for('casca.atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
+</nav>
+{% endif %}{# Honesto (auditoria A3 da porta única, 10/10/2026): o Início dizia "fase 0" e "Com dado real: 0" com 40 telas prontas
    no ar. O número é o das telas prontas, pela mesma conta do verde do menu (casca.inicio). #}
 <p class="lead">O Nexus reúne Performance, PCM, App de Campo, Fracttal e COS numa casca só, organizada
   pelas torres da Estrutura O&amp;M. Cada torre abre na primeira tela pronta; as que ainda estão em construção
@@ -14,21 +19,15 @@
   <div><div class="r">Telas previstas</div><div class="v gc-num">{{ total_telas }}</div><div class="d">das specs R00 a R13</div></div>
   <div><div class="r">Telas prontas</div><div class="v gc-num">{{ total_prontas }}</div><div class="d">as verdes do menu</div></div>
   {# a versão no ar (13/10/2026, Levi: "diga quando foi o último commit para eu acompanhar se está realmente subindo
-     automático para o server"): a hora do commit, desde quando este processo está no ar e o semáforo com o GitHub.
-     A vitrine estática (ferramentas/exportar_estatico.py) não tem processo no ar: lá o cartão não sai #}
+     automático para o server"): só a hora do commit, o commit e desde quando este processo está no ar ("tire as
+     informações de github, preso em 24hrs e essas observações abaixo do commit"); o cartão leva às Atualizações. A
+     vitrine estática (ferramentas/exportar_estatico.py) não tem processo no ar: lá o cartão não sai #}
   {% if versao is defined %}{% set v = versao %}
-  <div class="versao-no-ar" data-versao="{{ v.situacao }}">
+  <a class="versao-no-ar" href="{{ url_for('casca.atualizacoes') }}" title="Ver as últimas atualizações">
     <div class="r">Versão no ar</div>
-    <div class="v gc-num" title="{{ v.assunto }}">{{ v.em_txt }}</div>
+    <div class="v gc-num">{{ v.em_txt }}</div>
     <div class="d">commit <code>{{ v.curto }}</code> · no ar desde {{ v.no_ar_desde_txt }}</div>
-    {% if v.assunto %}<div class="d versao-assunto" title="{{ v.assunto }}">{{ v.assunto }}</div>{% endif %}
-    <div class="versao-github"><span class="gc-status gc-status--{{ v.classe }}"{% if v.conferido_txt %} title="{{ v.conferido_txt }}"{% endif %}>{{ v.rotulo }}</span></div>
-    {% if v.detalhe %}<div class="d versao-detalhe">{{ v.detalhe }}</div>{% endif %}
-    {# os pedidos presos das últimas 24 h, só para o administrador (13/10/2026: o servidor parou de responder e de fora
-       não se via esperando o quê; casca/presos.py). O título lista os pedidos e a linha em que cada um esperava #}
-    {% if presos %}<div class="versao-github versao-presos"><span class="gc-status gc-status--{{ presos.classe }}"{% if presos.titulo %} title="{{ presos.titulo }}"{% endif %}>{{ presos.rotulo }}</span></div>
-    {% if presos.detalhe %}<div class="d versao-detalhe">{{ presos.detalhe }}</div>{% endif %}{% endif %}
-  </div>{% endif %}
+  </a>{% endif %}
 </div>
 
 

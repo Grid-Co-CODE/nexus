@@ -158,12 +158,34 @@ a{color:inherit}
 .gc-numeros .r{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .gc-numeros .v{font:600 27px/32px var(--font-sans);letter-spacing:-.02em;color:var(--tinta);margin-top:6px}
 .gc-numeros .d{font-size:13px;color:var(--tinta-2);margin-top:2px}
-/* Versão no ar (Início, 13/10/2026): o assunto do commit numa linha só; o texto inteiro fica no title */
-.versao-no-ar{min-width:0}
+/* Versão no ar (Início, 13/10/2026): o cartão inteiro é o link para as Atualizações */
+.versao-no-ar{min-width:0;display:block;color:inherit;text-decoration:none}
+.versao-no-ar:hover,.versao-no-ar:focus-visible{background:var(--superficie-3)}
+.versao-no-ar:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 .versao-no-ar code{font:500 12px/16px var(--font-mono);color:var(--tinta)}
-.versao-no-ar .versao-assunto{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mudo)}
-.versao-no-ar .versao-github{margin-top:8px}
-.versao-no-ar .versao-detalhe{font-size:12px;line-height:1.4;margin-top:6px}
+/* as abas do Início (13/10/2026): Visão geral | Atualizações */
+.gc-subabas{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--linha);margin:14px 0 6px}
+.gc-subabas a{padding:8px 12px;text-decoration:none;color:var(--mudo);font-weight:600;font-size:13px;
+  border-bottom:2px solid transparent;margin-bottom:-1px}
+.gc-subabas a:hover{color:var(--tinta)}
+.gc-subabas a[aria-current="page"]{color:var(--tinta);border-bottom-color:var(--verde)}
+/* Atualizações: os commits por dia */
+.atualizacoes{max-width:920px;margin-top:18px}
+.atu-lista{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:10px}
+.atu-item{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:12px 16px}
+.atu-item--no-ar{border-color:var(--verde-a35)}
+.atu-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.atu-hora{font:600 12px/16px var(--font-mono);color:var(--mudo)}
+.atu-area{font:600 11px/16px var(--font-sans);color:var(--tinta-2);background:var(--superficie-2);padding:2px 8px;
+  border-radius:var(--raio-tag)}
+.atu-commit{font:500 11.5px/16px var(--font-mono);color:var(--mudo);margin-left:auto}
+.atu-manchete{margin:8px 0 0;font-weight:600;color:var(--tinta);line-height:1.45}
+.atu-resto{margin:4px 0 0;color:var(--tinta-2);font-size:13.5px;line-height:1.5}
+.atu-corpo{margin-top:8px}
+.atu-corpo summary{cursor:pointer;color:var(--mudo);font-size:12.5px}
+.atu-corpo pre{white-space:pre-wrap;font:13px/1.5 var(--font-sans);color:var(--tinta-2);margin:8px 0 0}
+.atu-rodape{margin-top:12px}
+.gc-status--info{color:var(--info);background:var(--info-suave)}
 
 /* Tipografia da casca */
 .titulo-pagina{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}

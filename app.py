@@ -52,8 +52,6 @@ if __name__ == "__main__":
     instalar_engenharia(app)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)          # as telas quentes depois de subir (13/10/2026; 5 min, ver a função)
-    from nexus.casca import versao
-    versao.conferir(app)                     # a versão no ar conferida com o GitHub (13/10/2026)
     plataforma = (ler_ambiente().get("NEXUS_PLATAFORMA_LOCAL") or "").strip()
     # a plataforma tem pedidos longos (trackers de um dia passam de minutos): mais threads para eles não segurarem o Nexus
     threads = 32 if plataforma else 8
