@@ -725,6 +725,17 @@ página; seis mutações, todas pegas). As telas foram conferidas no Chrome sem 
 com o Fracttal de mentira, e os cliques (aprovar, mudar tema, observação, OS pai, devolver) pelo próprio JavaScript da
 página. Falta o olho do Levi com os dados de verdade (a sessão do Fracttal é dele).
 
+## Sem o topo do OS Creator dentro do Nexus (13/10/2026)
+
+Levi, com o print do topo ("LM Levi Maia ADMINISTRATOR sair") embaixo do topo do Nexus: "Quero que essa visão de
+cabeçalho ao lado de sair vá para o cabeçalho do Nexus e suma esse 2° cabeçalho ... Dá a impressão que é uma tela dentro
+de uma tela!". A ponte põe no `<head>` o `_MARCA_NO_NEXUS`: a tela cujo pai é o Nexus (`<html data-nexus>`: a casca `/os/`,
+o login, o card da OS) ganha `os-no-nexus` antes de pintar, e o `_ESTILO_NEXUS` some com o `.os-header` e o `.os-sep` dela.
+O avatar, o nome, o perfil do Fracttal e o Sair moram no topo do Nexus (`nexus/casca/CLAUDE.md`, "Um cabeçalho só"). O
+"topo sempre à mostra" de quem o tinha recolhido vale só fora do Nexus. Aberto sozinho no navegador (sem o Nexus em
+cima), o OS Creator segue com o topo: é o único lugar com o nome e o "sair". O HTML do clone não muda (o oem segue igual).
+Prova: `tests/test_sem_segundo_cabecalho_13_10.py`.
+
 ## O círculo de carga tem prazo (13/10/2026)
 
 Levi: "As vezes o OS Creator Web fica em um loop infinito, isso é por causa do fractal?". O print era o "Carregando…" do
