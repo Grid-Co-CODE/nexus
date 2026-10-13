@@ -307,15 +307,16 @@ def atencao():
 
 # ── Visão do responsável (12/10/2026) ───────────────────────────────────────────────────────────────────────────
 # Levi: "Precisamos criar uma visão que os supervisores irão usar, uma visão que ele olha as usinas, as metas, os problemas,
-# onde ele deve focar, no que ele deve deixar. No caso seria separado por responsável". A conta mora em
-# nexus/campo/responsaveis.py (cada número da tela dona dele, com a régua de lá); aqui, os filtros e os três blocos.
-GRUPOS_DO_FOCO = (("critico", "Onde focar", "Crítico em alguma fonte, ou PT parada: resolver primeiro."),
-                  ("atencao", "Acompanhar", "Pede atenção, sem urgência."),
-                  ("ok", "Pode esperar", "Nada fora da régua nas fontes que têm dado da usina."))
+# onde ele deve focar, no que ele deve deixar. No caso seria separado por responsável"; e, no protótipo aprovado: "aposte
+# em um formato reduzido que quando eu expanda aparece mais informações / Separe a visão em dois blocos". A conta mora em
+# nexus/campo/responsaveis.py (cada número da tela dona dele, com a régua de lá); aqui, os filtros, os cartões e os dois
+# blocos (Performance e Acompanhamento), cada usina numa linha que abre o detalhe.
 # o link de cada área leva à tela dona do número
 TELA_DONA = {"meta": "torre_performance.moldura_gerencial", "disp": "torre_performance.moldura_disponibilidade",
-             "ativos": "torre_engenharia.confiabilidade", "mtta": "torre_cos.moldura_acompanhamento",
-             "pt": "torre_hseq.apr_pt"}
+             "ativos": "torre_engenharia.confiabilidade", "pt": "torre_hseq.apr_pt",
+             "chamados": "torre_chamados.abrir_garantias", "extintores": "torre_hseq.extintores"}
+LINKS_DO_BLOCO = {"perf": (("Visão gerencial", "meta"), ("Disponibilidade", "disp"), ("Confiabilidade", "ativos")),
+                  "acomp": (("APR e PT", "pt"), ("Acompanhamento de chamados", "chamados"), ("Extintores", "extintores"))}
 CAMPOS_DA_BUSCA = ("usina", "cidade", "equipe", "cliente", "uf", "responsavel", "gestor")
 
 
@@ -342,7 +343,8 @@ def _responsavel_do_login(d) -> str:
 @bp.route("/responsaveis")
 def responsaveis():
     """Os cartões dos responsáveis (o padrão de quem não é responsável) ou, com um escolhido (no cartão, no filtro, ou o
-    próprio, pelo login), as usinas dele em três blocos: Onde focar, Acompanhar e Pode esperar, e a tabela de todas.
+    próprio, pelo login), as usinas dele nos dois blocos: Performance (meta, PR, disponibilidade) e Acompanhamento
+    (rondas, PT, chamados, extintores); em cada um, o que pede foco, o que pede acompanhamento e o que pode esperar.
     Filtros de responsável, cliente e busca; "Todos" vai como "*"."""
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados
@@ -368,14 +370,13 @@ def responsaveis():
     return render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
-        grupos=[(g, nome, txt, [u for u in usinas if u["nivel"] == g]) for g, nome, txt in GRUPOS_DO_FOCO],
+        blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
         opcoes_responsavel=nomes, opcoes_cliente=sorted({u.get("cliente") for u in todas if u.get("cliente")}),
         sem_responsavel=visao.SEM_RESPONSAVEL, reguas=campo_resp.REGUAS, rotulo_area=campo_resp.ROTULO_AREA,
-        tela_dona=TELA_DONA, info=d.get("info") or {}, erros=d.get("erros") or {}, mes_id=d.get("mes_id"),
+        tela_dona=TELA_DONA, links_do_bloco=LINKS_DO_BLOCO, info=d.get("info") or {}, erros=d.get("erros") or {},
+        mes_id=d.get("mes_id"),
         limites={"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,
-                 "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO,
-                 "mtta_min": campo_resp.MTTA_ATENCAO_MIN},
-        idade_min=_idade_min))
+                 "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO}))
 
 
 # ── Permissões de trabalho (visão nossa) ─────────────────────────────────────────────────────────────────────────

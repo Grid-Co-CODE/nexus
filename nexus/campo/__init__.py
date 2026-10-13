@@ -21,6 +21,10 @@ def instalar(app):
     # atenção depois de cada reinício levava 9,7 s e a hora da leitura era a do clique (Levi, 09/10: "quando clico em
     # Central de atenção ... a hora fica praticamente a hora que cliquei")
     threading.Timer(5, lambda: visao.manter_quente(app)).start()
+    # os chamados de garantia no banco (12/10/2026): as OS de acompanhamento de chamado do Fracttal em
+    # `nexus_chamados · fato_chamado`, de hora em hora, uma máquina por vez (NEXUS_CHAMADOS_PUBLICAR=0 desliga)
+    from . import chamados_acompanhamento
+    chamados_acompanhamento.ligar(app)
     # NEXUS_CAMPO_AQUECER=0 desliga só o que vai ao Fracttal ao subir (a cota é de 200/min para a empresa inteira)
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
         from . import ronda_checklist

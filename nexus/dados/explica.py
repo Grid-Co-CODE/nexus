@@ -46,6 +46,7 @@ RESUMO = {
     "perda_equipamento": "Quanto cada equipamento deixou de gerar por dia",
     # ── Chamados ──
     "ticket": "Os tickets de performance abertos para cada falha",
+    "chamado": "Cada chamado de garantia aberto com o fabricante e em que pé está",
     # ── PCM ──
     "programacao": "A agenda semanal de manutenção montada pelo PCM",
 }
@@ -136,6 +137,9 @@ PARA_QUE = {
     "ticket": "Guarda os tickets de performance: cada problema aberto para acompanhamento, com o início, o tempo de "
               "indisponibilidade e a energia perdida. Serve para acompanhar o problema até fechar e medir o impacto "
               "de cada falha.",
+    "chamado": "Guarda cada chamado de garantia aberto com o fabricante (a OS de acompanhamento de chamado do "
+               "Fracttal): a usina, o equipamento, o fabricante e se está aberto, em verificação ou concluído. É de onde "
+               "a Visão do responsável conta os chamados de cada usina, os mesmos do quadro Acompanhamento de chamados.",
     "programacao": "A agenda semanal de manutenção que o PCM monta: que tarefa, em que usina, com qual equipe e em "
                    "que dia e hora. Serve para comparar o planejado com o que o campo fez e ver a carga de cada "
                    "equipe. O Nexus guarda as semanas desde a W21 de 2026, além das 4 que o arquivo do PCM guarda.",

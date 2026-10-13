@@ -101,6 +101,17 @@ corrente se refaz até fechar e o anterior até o dia 5. O nome da usina é o do
 liga pelo de-para das abas e pelo nome do cadastro, na hora). Sem pessoa nem texto livre (o motivo do PR sem confiança
 fica de fora). Registrado antes de existir: nasce na 1ª volta do worker depois do deploy da plataforma.
 
+**Chamados de garantia (12/10/2026):** Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se
+conversando!". O Nexus publica as OS de acompanhamento de chamado do Fracttal (o quadro Acompanhamento de chamados do OS
+Creator) no livro `nexus_chamados · fato_chamado` (`fato_chamado.py`, conformado, foto acumulada, chave `os`): 1 linha =
+1 OS de acompanhamento em processo, em verificação ou concluída nos últimos 90 dias, com `data_id_abertura`,
+`data_id_fim`, `usina_id` (de-para do Fracttal pelo site; código do ativo) e `equipamento_id` (o código na dimensão de
+equipamento), com a linhagem, o fabricante e o componente da marca da nota e a `duracao_min` da concluída. Quem grava é
+`nexus/campo/chamados_acompanhamento.py`, FORA da carga de hora em hora (aquela não toca no Fracttal): aos :50, uma
+máquina por vez (a última gravação do livro tem de ter mais de 50 min); `NEXUS_CHAMADOS_PUBLICAR=0` desliga. O REST não
+traz a subtarefa do ticket: "aguardando ticket" × "com o fabricante" fica só no quadro. A Visão do responsável lê daqui
+(até 12/10 contava pela planilha de tickets).
+
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da
 ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) e gravadas por

@@ -14,7 +14,7 @@ from pg_falso import ApiPGFalsa, Resposta
 
 from nexus.campo import decisao_pt, ronda_avulsa
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
-from nexus.dados import programacao
+from nexus.dados import fato_chamado, programacao
 from nexus.dados import telas as telas_dados
 
 BASE = "http://pg.falso"
@@ -73,7 +73,7 @@ def test_todo_fato_declara_tipo_chave_e_medidas_com_unidade():
 
 CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt": fato_pt.CAB_PT,
         "programacao": programacao.CAB_PROGRAMACAO, "geracao_usina_dia": geracao.CAB_USINA_DIA,
-        "geracao_inversor_dia": geracao.CAB_INVERSOR_DIA}
+        "geracao_inversor_dia": geracao.CAB_INVERSOR_DIA, "chamado": fato_chamado.CAB_CHAMADO}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 
@@ -108,7 +108,7 @@ def test_livros_do_nexus_registrados_antes_de_existir_e_na_regra_10():
         assert l.nome.startswith("nexus_"), l.nome
         assert l.abas and all(catalogo.aba_segue_a_regra(a) for a in l.abas), l.nome
     for nome in (carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO, equipamento.LIVRO_FOTO, programacao.LIVRO,
-                 geracao.LIVRO, ronda_avulsa.LIVRO, decisao_pt.LIVRO, "nexus_rondas_checklist"):
+                 geracao.LIVRO, ronda_avulsa.LIVRO, decisao_pt.LIVRO, "nexus_rondas_checklist", fato_chamado.LIVRO):
         assert nome in catalogo.LIVRO_POR_NOME, nome
     assert ronda_avulsa.ABA in catalogo.LIVRO_POR_NOME[ronda_avulsa.LIVRO].abas
     assert equipamento.ABA_FOTO in catalogo.LIVRO_POR_NOME[equipamento.LIVRO_FOTO].abas

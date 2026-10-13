@@ -33,7 +33,7 @@ Estados de cada fato (`ESTADOS_FATO`):
 import re
 from dataclasses import dataclass
 
-from . import fato_pt, fato_ronda, fatos, geracao, programacao
+from . import fato_chamado, fato_pt, fato_ronda, fatos, geracao, programacao
 
 ESTADOS = {"id": "ID", "cod": "código", "hmac": "código da pessoa", "nome": "nome", "largo": "em colunas",
            "prop": "cadastro próprio", "nao": "—"}
@@ -417,6 +417,24 @@ FATOS = (
          fontes=("tickets_performance · Tickets de Performance", "tickets_performance · Trackers",
                  "tickets_performance · Strings indisp"),
          observacao="o ID falta em 57 de 774 tickets; as abas Trackers e Strings indisp não têm ID"),
+    # Chamados de garantia no banco (12/10/2026, Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se
+    # conversando!"): as OS de acompanhamento de chamado do Fracttal (o quadro Acompanhamento de chamados do OS Creator),
+    # publicadas pelo Nexus de hora em hora (nexus/campo/chamados_acompanhamento.py). Quem só conta chamados (a Visão do
+    # responsável) lê daqui; o quadro continua ao vivo (é nele que se escreve o ticket e se finaliza)
+    Fato("chamado", "Chamado de garantia (OS de acompanhamento)", "chamados",
+         "fora do banco: API REST do Fracttal (OS de acompanhamento de chamado, tarefa Administrativa)",
+         fato_chamado.GRAO,
+         _d(data=("id", "data_id_abertura, data_id_fim (dia de Brasília)"),
+            usina=("id", "usina_id (de-para do Fracttal pelo site da OS; código do ativo)"),
+            equipamento=("id", "equipamento_id (o código do ativo na dimensão de equipamento)"),
+            os=("cod", "os (o nº da OS de acompanhamento)")),
+         tipo=fato_chamado.TIPO, chave=fato_chamado.CHAVE, medidas=_m(fato_chamado.MEDIDAS),
+         fontes=_fontes(fato_chamado.FONTES), janela_origem=fato_chamado.JANELA_ORIGEM,
+         estado="conformado", conformado_em="nexus_chamados · fato_chamado",
+         observacao="situacao = aberto (em processo), verificacao ou concluido; cancelada fica fora, como no quadro. O "
+                    "REST não traz a subtarefa do ticket (testado em 12/10/2026): 'aguardando ticket' × 'com o "
+                    "fabricante' só no quadro. fabricante e componente saem da marca da nota (categorias), nunca a "
+                    "nota; sem pessoa (regra 8)"),
     # ── PCM ────────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("programacao", "Programação semanal", "pcm", "fora do banco: banco_dados.json do PCM (GitHub público)",
          programacao.GRAO,
@@ -509,6 +527,10 @@ LIVROS = (
           "registrado em 12/10/2026 antes de existir: nasce na 1ª volta do worker do servidor depois do deploy da "
           "plataforma (10 min depois de subir). A Visão do responsável do Nexus lê; sem o livro, ela diz que a meta "
           "ainda não chegou"),
+    Livro("nexus_chamados", ("fato_chamado",), "de hora em hora (:50), uma máquina por vez",
+          "nexus/campo/chamados_acompanhamento.py (laço do Campo; NEXUS_CHAMADOS_PUBLICAR=0 desliga numa máquina)", False,
+          "registrado em 12/10/2026 antes de existir: nasce na 1ª volta de um Nexus com este código (o do PC, enquanto "
+          "o servidor não atualiza); grava se a última gravação tiver mais de 50 min"),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "

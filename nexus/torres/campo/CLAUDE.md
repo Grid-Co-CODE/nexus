@@ -19,7 +19,7 @@ usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação d
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
-| **Visão do responsável** (12/10/2026, a 1ª do Campo) | meta do Gerencial publicada (`nexus_performance`), diário da disponibilidade, sinais da Confiabilidade, OS de falha (tempo do COS), tickets, Central e PT | `campo/responsaveis.py` (junta; cada número é da tela dona) |
+| **Visão do responsável** (12/10/2026, a 1ª do Campo) | dois blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade) e Acompanhamento (Central e PT, chamados de `nexus_chamados`, extintores do HSEQ) | `campo/responsaveis.py` (junta; cada número é da tela dona) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App; Aprovar pelo portão `/os/_nexus/aprovacao/<id>/aprovar` | regras copiadas do App |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
@@ -423,58 +423,72 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
 
 ## Visão do responsável (12/10/2026)
 
-Levi: "Agora temos em um canto só as metas da performance, a disponibilidade, o tanto que o ativo parou, o tempo que o COS
-demora para abrir a OS, os chamados, rondas, PTs e APRs / Precisamos criar uma visão que os supervisores irão usar, uma
-visão que ele olha as usinas, as metas, os problemas, onde ele deve focar, no que ele deve deixar. No caso seria separado
-por responsável". `/t/campo/responsaveis`, a 1ª tela do Campo. Conta em `nexus/campo/responsaveis.py`.
+Levi: "Precisamos criar uma visão que os supervisores irão usar, uma visão que ele olha as usinas, as metas, os
+problemas, onde ele deve focar, no que ele deve deixar. No caso seria separado por responsável". Depois do 1º desenho:
+"aposte em um formato reduzido que quando eu expanda aparece mais informações / Separe a visão em dois blocos (...)
+Seria interessante também incluir os extintores", aprovado no protótipo com "só tira a parte de Tempo do COS". E: "O
+nexus é um ambiente centralizado e precisamos ter os dados se conversando!". `/t/campo/responsaveis`, a 1ª tela do
+Campo. Conta em `nexus/campo/responsaveis.py`.
 
-- **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela mesma fonte, e cada alerta usa a régua
-  de lá (`REGUAS`, mostradas na nota da tela). O que é nosso: juntar por `usina_id` e ordenar o foco.
+- **Dois blocos lado a lado** (empilham abaixo de 1180 px): **Performance** (meta, PR, disponibilidade; os ativos
+  falhando como etiqueta na linha e no detalhe) e **Acompanhamento** (rondas, PT, chamados, extintores). Cada usina é
+  uma linha compacta com os valores coloridos pela régua; clicar abre o detalhe e os links das telas donas (`<details>`,
+  sem script). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só atenção; em dia) e a
+  própria ordem (o peso dos alertas do bloco: agora 20, crítico 10, atenção 3; na Performance, no empate, a mais longe
+  da meta); as em dia ficam recolhidas no fim do bloco, com o porquê ("na meta (101%), disponibilidade 100%").
+- **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
+  alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
-    do servidor de hora em hora (`plataforma/gerencial_publicar.py`). Atingimento < 90% crítico, < 97% atenção (o
-    `atgTag` da Visão gerencial); PR abaixo do PR previsto, atenção. Usina com duas linhas no Gerencial (Santarém 1 e
-    2): produção e meta somam, atingimento refeito sobre a soma, PR pesado pela meta.
+    do servidor (`plataforma/gerencial_publicar.py`). < 90% crítico, < 97% atenção (o `atgTag` da Visão gerencial); PR
+    abaixo do previsto, atenção. Usina com duas linhas no Gerencial (Santarém 1 e 2): produção e meta somam,
+    atingimento refeito sobre a soma, PR pesado pela meta.
   - Disponibilidade: `falhas_performance · disponibilidade_dia`; o mês é a média dos dias fechados (a régua de lá é
-    `12 h × dias`, então a média dos dias é exata); duas usinas do Gerencial na mesma do cadastro, pesadas pela
-    potência. < 80% crítico, < 99% atenção (o `classePill` da Disponibilidade).
-  - Ativos: os `sinais` da Engenharia › Confiabilidade (`engenharia._dados()`, a mesma cópia de lá), o nível de lá;
-    "monitorar" não alerta.
-  - Tempo do COS: a régua do `mtta.py` da plataforma portada em `responsaveis.mtta`, sobre as OS de falha que o Nexus
-    já lê (`os_falhas.linhas()`): Religamento, Religamento Remoto e Corretiva Emergencial; cancelada e teste fora;
-    evento mais antigo da OS; evento depois da criação ou a menos de 10 s dela fora; **cada queda uma vez** (o lote:
-    mesmo operador, mesmo site, mesmo minuto de evento). Últimos 30 dias, mediana por usina. O COS não tem meta:
-    mediana > 1 h é atenção (régua nossa, dita na nota). Medido em 12/10: 116 usinas, mediana das medianas 34,5 min,
-    24 acima de 1 h.
-  - Chamados: abas Strings indisp e Trackers do `tickets_performance`, linha sem "Fim da ocorrência"; na Trackers, o
-    Status "Em conformidade" é check periódico e fica fora. Atenção.
-  - Rondas e PT: `visao.atencao(14)` e `visao.pts()`, as regras da Central. **PT parada de HOJE = "agora"** (topo do
-    foco, peso 20: técnico parado no campo); **parada de dias anteriores = crítico** "sem decisão desde DD/MM" (peso
-    10). Medido em 12/10: 33 das 34 PT esperando eram de 1 a 6 dias atrás (nunca decididas no App) e, todas no topo,
-    enterravam a única de hoje.
-- **A usina do nome** (`Nomes`): o de-para publicado dos sistemas de nome (`BD_Thopen · aba`, `BD_Performance · aba`, as
-  duas de cadastro e a dos Tickets), depois o nome do cadastro, por fim o Fracttal ou o código (a aba Strings indisp
-  escreve "ACB100" no lugar do nome). Nome sem acento, sem caixa, romano vira número ("Santa Bárbara I" = "santa
-  barbara 1"). Nome de duas usinas não liga. Medido em 12/10 com o Gerencial: 139 de 161 ligam; as 22 que sobram são
-  fora do Full O&M e não estão mobilizadas.
-- **Três blocos** por usina mobilizada: Onde focar (crítico ou PT parada), Acompanhar (só atenção) e Pode esperar (nada
-  fora da régua, com o porquê: "na meta (101%), disponibilidade 100%, ronda há 3 dias"). Fonte sem dado da usina não
-  alerta nem elogia ("—"). Foco = soma dos pesos (agora 20, crítico 10, atenção 3); no empate, a mais longe da meta.
-- **Cartões por responsável** (o padrão de quem não é responsável): a triagem (focar, acompanhar, pode esperar), a meta
-  do grupo (produção ÷ meta), a disponibilidade pela potência, PT paradas (de hoje à parte), rondas pendentes,
-  chamados, ativos em crítico. Responsável O&M = `usinas.responsavel_om_id`, o mesmo da Central.
-- **Quem entra pelo Fracttal cai nas usinas dele**: `_responsavel_do_login` (o `pessoa_id` do papel da sessão ou
-  `visao.pessoa_do_login` pelo e-mail/nome), guardado em `session["responsavel_padrao"]`. "Todos" (`*`) vence.
-- **Isolamento** (regra 13): cada fonte é lida em `_ler_fonte`; a que falha volta vazia e a tela diz qual. Banco do
-  cadastro fora = a tela inteira avisa (sem cadastro não há responsável).
-- **Sem o livro da meta** (antes do 1º deploy da plataforma com o `gerencial_publicar`), a tela avisa que a meta não
-  chegou e não cobra ninguém por ela.
-- Custo: 11,8 s fria (medido em 12/10, banco real, sem Fracttal), cópia de 5 min por `visao._ler`. NÃO entra no
-  aquecimento do `manter_quente`: a conta chama a Confiabilidade, que pede a releitura das OS de falha ao Fracttal (no
-  máximo a cada 30 min), e o PC sobe com `NEXUS_CAMPO_AQUECER=0` justamente para não ler o Fracttal sozinho.
-- Prova: `tests/test_campo_responsaveis.py` (cada fonte na usina certa, as réguas, o lote do COS, o nome que é código,
-  o check periódico fora, a PT de hoje no topo, os cartões e o resumo, a fonte que falha, o padrão pelo login, sem a
-  meta). Ensaio com o banco real: `create_app()` + `app_context()`, `os_falhas.pedir_releitura` desligado e
-  `responsaveis.visao_responsaveis()` (script fora do repositório: o resultado tem nome de responsável).
+    `12 h × dias`); duas usinas do Gerencial na mesma do cadastro, pesadas pela potência. < 80% crítico, < 99% atenção.
+    Provado em 12/10: 129 de 130 usinas iguais à tela da plataforma.
+  - Ativos: os `sinais` da Engenharia › Confiabilidade (`engenharia._dados()`), o nível de lá; "monitorar" não alerta.
+  - Rondas e PT: `visao.atencao(14)` e `visao.pts()`. **PT parada de HOJE = "agora"** (topo do foco: técnico parado no
+    campo); parada de dias anteriores = crítico "sem decisão desde DD/MM" (33 de 34 eram de 1 a 6 dias atrás em 12/10).
+  - **Chamados: `nexus_chamados · fato_chamado`** (abaixo), o mesmo dado do quadro Acompanhamento de chamados: em aberto
+    com o fabricante = atenção; o nome do equipamento pela dimensão de equipamento. **Até 12/10 vinham da planilha de
+    tickets** (mais de 1.000 "abertos", sem fim desde junho, contra 18 do quadro): o Levi pediu a troca.
+  - Extintores: a conta do HSEQ (`nexus/hseq/extintores.py`): vencido = crítico; vence em 30 dias ou sem conferência há
+    mais de 30 dias = atenção (a "sem conferência" só alerta se nada venceu nem vai vencer: o mesmo extintor não alerta
+    duas vezes).
+  - **O Tempo do COS saiu** no protótipo aprovado (12/10): a régua continua na tela do COS.
+- **A usina do nome** (`Nomes`, para a meta e a disponibilidade): o de-para publicado dos sistemas de nome, depois o nome
+  do cadastro, por fim o Fracttal ou o código. Nome sem acento, sem caixa, romano vira número. Nome de duas usinas não
+  liga. Medido em 12/10 com o Gerencial: 139 de 161 ligam; as 22 que sobram não estão mobilizadas.
+- **Cartões por responsável** (o padrão de quem não é responsável): os dois blocos, cada um com a triagem e os números
+  do grupo (meta, abaixo da meta, disponibilidade; rondas, PT paradas, chamados, extintores vencidos). Responsável O&M
+  = `usinas.responsavel_om_id`, o mesmo da Central.
+- **Quem entra pelo Fracttal cai nas usinas dele**: `_responsavel_do_login`, guardado em `session["responsavel_padrao"]`.
+  "Todos" (`*`) vence.
+- **Isolamento** (regra 13): cada fonte em `_ler_fonte`; a que falha volta vazia e a tela diz qual. Sem o livro da meta
+  ou o dos chamados (antes da 1ª publicação), a tela avisa e não cobra por eles.
+- Custo: ~12 s fria, cópia de 5 min por `visao._ler`. NÃO entra no aquecimento do `manter_quente` (a conta chama a
+  Confiabilidade, que pede a releitura das OS de falha ao Fracttal, e o PC sobe com `NEXUS_CAMPO_AQUECER=0`).
+- Prova: `tests/test_campo_responsaveis.py`. Protótipo e ensaio com o banco real: `create_app()` + `app_context()`,
+  `os_falhas.pedir_releitura` desligado e `responsaveis.visao_responsaveis()` (fora do repositório: o resultado tem nome
+  de responsável).
+
+### Os chamados de garantia no banco (`nexus_chamados · fato_chamado`, 12/10/2026)
+
+- O quadro **Acompanhamento de chamados** (OS Creator, `/os/chamados/acompanhamento`; no Nexus, Chamados › Garantias)
+  lê o Fracttal AO VIVO com a sessão de quem entrou: é nele que a analista de chamados escreve o ticket e finaliza. Quem
+  só CONTA chamados lê o fato, publicado por `nexus/campo/chamados_acompanhamento.py` (o fato puro e as regras:
+  `nexus/dados/fato_chamado.py`).
+- O que entra: as OS de acompanhamento de chamado (a "OS 3" do chamado de garantia: tipo Administrativa, a marca
+  "[CHAMADO] Acompanhamento — fabricante · componente" na nota; a mesma regra do quadro, `acomp_web.eh_os3`) em
+  processo (`aberto`), em verificação (`verificacao`) e concluídas nos últimos 90 dias (`concluido`). Cancelada fora.
+  Medido em 12/10/2026: 17 em processo e 1 em verificação.
+- **Limite**: a API REST do Fracttal (a credencial do Nexus) NÃO traz a subtarefa do ticket (os endpoints de subtarefa
+  dão 400 e o `completed_percentage` fica 0): "aguardando ticket" × "com o fabricante" só no quadro.
+- Fora da carga de hora em hora de propósito (aquela não toca no Fracttal). Laço próprio no `campo.instalar`: 1ª volta 2
+  min depois de subir, depois aos :50. Grava a máquina que chegar primeiro (regra 11: a última gravação do livro tem de
+  ter mais de 50 min). `NEXUS_CHAMADOS_PUBLICAR=0` desliga numa máquina. Fracttal que devolve 0 com o livro cheio não
+  apaga o livro. Enquanto o servidor não atualiza, quem publica é o Nexus do PC.
+- Sem pessoa e sem a nota (regra 8): o fabricante e o componente saem da marca (categorias).
+- Prova: `tests/test_campo_chamados_acompanhamento.py`.
 
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
@@ -726,7 +740,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 
 - `visao.py`: as contas nossas (acima), sobre os fatos (`_fato`, `_rondas_ligadas`, `pts`, `_ultima_os_por_usina`) e
   a validação por foto (`validacoes_por_foto`). `decisao_pt.py`: a decisão da PT no banco (acima).
-- `responsaveis.py`: a Visão do responsável (acima): `Nomes`, um leitor por fonte, `alertas`, `montar`, `soma`.
+- `responsaveis.py`: a Visão do responsável (acima): `Nomes`, um leitor por fonte, os alertas e a linha de cada bloco,
+  `montar`, `bloco`, `soma`. `chamados_acompanhamento.py`: os chamados de garantia no banco (acima).
 - `livros_app.py`, `fonte_pg.py`, `tabelas.py`: os livros do App no formato que as regras copiadas consultam
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
 - `aprovacao.py`, `triagem.py`: as telas pelas regras copiadas (`aprovacao.os_na_fila` e `tirar_da_fila` servem ao
@@ -738,7 +753,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_responsaveis.py`
-(a Visão do responsável), `test_campo_visao.py` (as
+(a Visão do responsável), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
 contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo; 08/10: vala do App, sensor em três estados, anulação sem dia nem usina, o caminho de gravação que a importação usa), `test_campo_importar_avulsas.py` (a importação da validação por foto com planilha sintética: de-para exato, data mais recente, "Sem foto", a pessoa que tem de ser uma ficha com e-mail, gravação, conferência linha a linha, idempotência, fora do fato de ronda), `test_campo_rondas_pedido_0810.py` (Rondas de 08/10: colunas e dica da duração, Fotos na tabela, nunca tiveram ronda, Sem ronda, criticidade, Quem ronda em blocos com as pendentes, Painel), `test_campo_sujidade.py`, `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_fila_rapida.py`,
 `test_campo_aprovacao_supervisor.py` (08/10: fila inteira, cartões por região e por gestor, a tabela, o portão do
 Aprovar: supervisor de campo, coordenador com a vaga aberta, só admin sem os dois ou sem a estrutura publicada, gestor

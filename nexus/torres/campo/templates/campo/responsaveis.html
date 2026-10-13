@@ -3,27 +3,32 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Visão do responsável (12/10/2026, Levi: "uma visão que ele olha as usinas, as metas, os problemas, onde ele deve focar,
-   no que ele deve deixar. No caso seria separado por responsável"). A conta é nexus/campo/responsaveis.py: cada número é o
-   da tela dona dele, com a régua de lá; aqui, os cartões por responsável e, com um escolhido, os três blocos (Onde
-   focar, Acompanhar, Pode esperar) e a tabela de todas as usinas dele. #}
+   no que ele deve deixar. No caso seria separado por responsável"; protótipo aprovado: "aposte em um formato reduzido que
+   quando eu expanda aparece mais informações / Separe a visão em dois blocos"). A conta é nexus/campo/responsaveis.py:
+   cada número é o da tela dona dele, com a régua de lá. Aqui: os cartões por responsável e, com um escolhido, os dois
+   blocos (Performance e Acompanhamento), cada usina numa linha que abre o detalhe (<details>, sem script). #}
 {% set cor = {'agora': 'critico', 'critico': 'critico', 'atencao': 'alerta', 'ok': 'ok'} %}
-{% set nivel_nome = {'agora': 'Agora', 'critico': 'Crítico', 'atencao': 'Atenção', 'ok': 'Em dia'} %}
 {% set fonte_nome = {'metas': 'a meta do mês', 'disp': 'a disponibilidade', 'ativos': 'os ativos da Confiabilidade',
-                     'mtta': 'o tempo do COS', 'chamados': 'os chamados', 'pt': 'as PT'} %}
+                     'chamados': 'os chamados', 'extintores': 'os extintores', 'pt': 'as PT'} %}
+{% set colunas = {'perf': (('meta', 'Meta'), ('pr', 'PR / prev.'), ('disp', 'Disp.')),
+                  'acomp': (('ronda', 'Ronda'), ('pt', 'PT'), ('chamados', 'Chamados'), ('extintores', 'Extintores'))} %}
 {% macro pct(x, casas=0) %}{{ '—' if x is none else ('%.*f'|format(casas, x))|replace('.', ',') ~ '%' }}{% endmacro %}
-{% macro mwh(kwh) %}{{ '—' if kwh is none else ('%.1f'|format(kwh / 1000))|replace('.', ',') ~ ' MWh' }}{% endmacro %}
 {% macro c_meta(a) %}{{ 'cn-t-neutro' if a is none else ('cn-t-ok' if a >= limites.meta_ok else ('cn-t-alerta' if a >= limites.meta_atencao else 'cn-t-critico')) }}{% endmacro %}
 {% macro c_disp(x) %}{{ 'cn-t-neutro' if x is none else ('cn-t-ok' if x >= limites.disp_ok else ('cn-t-alerta' if x >= limites.disp_critico else 'cn-t-critico')) }}{% endmacro %}
-{% macro dur(m) %}{{ '—' if m is none else idade_min(m|round|int) }}{% endmacro %}
+{% macro triagem(t) %}<div class="cr-triagem" role="img" aria-label="{{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} que podem esperar">{% if t.critico %}<span class="c" style="flex: {{ t.critico }}"></span>{% endif %}{% if t.atencao %}<span class="a" style="flex: {{ t.atencao }}"></span>{% endif %}{% if t.ok %}<span class="o" style="flex: {{ t.ok }}"></span>{% endif %}</div>{% endmacro %}
+{% macro triagem_leg(t) %}<div class="cr-tri-leg"><span><b class="cn-t-critico">{{ t.critico }}</b>focar</span><span><b class="cn-t-alerta">{{ t.atencao }}</b>acompanhar</span><span><b class="cn-t-ok">{{ t.ok }}</b>em dia</span></div>{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">Gerencial, Confiabilidade, COS, tickets,<br>rondas e PT, pelo banco do Nexus<br><b>lido às {{ lido }}</b></div>
+    <div class="cn-frescor">Gerencial, Confiabilidade, chamados, extintores,<br>rondas e PT, pelo banco do Nexus<br><b>lido às {{ lido }}</b></div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
   {% for f, e in erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ fonte_nome.get(f, f) }} ({{ e }}): essa parte ficou de fora, o resto da tela vale.</div>{% endfor %}
   {% if not leitura.erro and not (info.get('metas') or {}).get('publicado') %}
-  <div class="cn-erro cn-aviso" role="status"><b>A meta do mês ainda não chegou ao banco.</b> A plataforma de Performance publica o Gerencial no banco de hora em hora (livro nexus_performance); até lá, a coluna Meta fica vazia e nenhuma usina é cobrada por ela.</div>
+  <div class="cn-erro cn-aviso" role="status"><b>A meta do mês ainda não chegou ao banco.</b> A plataforma de Performance publica o Gerencial no banco de hora em hora (livro nexus_performance); até lá, a meta fica vazia e nenhuma usina é cobrada por ela.</div>
+  {% endif %}
+  {% if not leitura.erro and 'chamados' not in erros and not (info.get('chamados') or {}).get('publicado') %}
+  <div class="cn-erro cn-aviso" role="status"><b>Os chamados ainda não chegaram ao banco.</b> O Nexus publica as OS de acompanhamento de chamado de hora em hora (livro nexus_chamados); até lá, a coluna Chamados fica vazia.</div>
   {% endif %}
 
   <form class="cn-filtros" method="get">
@@ -44,8 +49,8 @@
   </form>
 
   {% if modo == 'cartoes' %}
-  {# um cartão por Responsável O&M: quantas usinas dele pedem foco, acompanhamento ou podem esperar, e os números do
-     grupo; o cartão abre as usinas dele #}
+  {# um cartão por Responsável O&M, com os dois blocos: quantas usinas pedem foco, acompanhamento ou podem esperar em
+     cada um e os números do grupo; o cartão abre as usinas dele #}
   <div class="cn-equipes">
     {% for c in cartoes %}
     <a class="cn-equipe cn-equipe--{{ cor[c.nivel] }} cn-sup{% if c.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=c.responsavel, modo=None) }}">
@@ -53,22 +58,25 @@
         <div class="cn-eq-titulo"><b>{{ c.responsavel }}</b></div>
         <span>{{ 'usinas sem responsável O&M no cadastro' if c.responsavel == sem_responsavel else 'Responsável O&M' }} · {{ c.usinas }} usina{{ 's' if c.usinas != 1 }} mobilizada{{ 's' if c.usinas != 1 }}</span>
       </div>
-      <div class="cr-triagem" role="img" aria-label="{{ c.critico }} para focar, {{ c.atencao }} para acompanhar e {{ c.ok }} que podem esperar">
-        {% if c.critico %}<span class="c" style="flex: {{ c.critico }}"></span>{% endif %}{% if c.atencao %}<span class="a" style="flex: {{ c.atencao }}"></span>{% endif %}{% if c.ok %}<span class="o" style="flex: {{ c.ok }}"></span>{% endif %}
+      <div class="cr-card-bloco">
+        <div class="cr-card-tit"><span>Performance</span>{{ triagem_leg(c.perf) }}</div>
+        {{ triagem(c.perf) }}
+        <dl class="cr-mini">
+          <div><dt>Meta do mês</dt><dd class="{{ c_meta(c.meta_pct) }}">{{ pct(c.meta_pct, 1) }}</dd></div>
+          <div><dt>Abaixo da meta</dt><dd>{{ c.abaixo_meta }}</dd></div>
+          <div><dt>Disponibilidade</dt><dd class="{{ c_disp(c.disp) }}">{{ pct(c.disp, 1) }}</dd></div>
+        </dl>
       </div>
-      <div class="cn-eq-leg">
-        <span><b class="cn-t-critico">{{ c.critico }}</b>focar</span>
-        <span><b class="cn-t-alerta">{{ c.atencao }}</b>acompanhar</span>
-        <span><b class="cn-t-ok">{{ c.ok }}</b>pode esperar</span>
+      <div class="cr-card-bloco">
+        <div class="cr-card-tit"><span>Acompanhamento</span>{{ triagem_leg(c.acomp) }}</div>
+        {{ triagem(c.acomp) }}
+        <dl class="cr-mini cr-mini--4">
+          <div><dt>Rondas pendentes</dt><dd>{{ c.rondas }}</dd></div>
+          <div><dt>PT paradas</dt><dd{% if c.agora %} class="cn-t-critico"{% endif %}>{{ c.paradas }}{% if c.agora %} <small>({{ c.agora }} hoje)</small>{% endif %}</dd></div>
+          <div><dt>Chamados</dt><dd>{{ c.chamados }}</dd></div>
+          <div><dt>Extintores vencidos</dt><dd{% if c.ext_vencidos %} class="cn-t-critico"{% endif %}>{{ c.ext_vencidos }}</dd></div>
+        </dl>
       </div>
-      <dl class="cr-mini">
-        <div><dt>Meta do mês</dt><dd class="{{ c_meta(c.meta_pct) }}">{{ pct(c.meta_pct, 1) }}</dd></div>
-        <div><dt>Disponibilidade</dt><dd class="{{ c_disp(c.disp) }}">{{ pct(c.disp, 1) }}</dd></div>
-        <div><dt>PT paradas</dt><dd{% if c.agora %} class="cn-t-critico"{% endif %}>{{ c.paradas }}{% if c.agora %} <small>({{ c.agora }} hoje)</small>{% endif %}</dd></div>
-        <div><dt>Rondas pendentes</dt><dd>{{ c.rondas }}</dd></div>
-        <div><dt>Chamados abertos</dt><dd>{{ c.chamados }}</dd></div>
-        <div><dt>Ativos em crítico</dt><dd{% if c.ativos_criticos %} class="cn-t-critico"{% endif %}>{{ c.ativos_criticos }}</dd></div>
-      </dl>
       {% if c.pior %}<span class="cr-pior">Primeiro: {{ c.pior|join(', ') }}</span>{% endif %}
     </a>
     {% else %}
@@ -81,98 +89,75 @@
     <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q %}, com os filtros{% endif %}</span>
     {% if responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='cartoes') }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
   </div>
-  <div class="cn-numeros cr-numeros">
-    <a href="#cr-critico"><span class="gc-rotulo">Onde focar</span><span class="v cn-t-critico">{{ resumo.critico }}</span><span class="d">usinas com crítico ou PT parada</span></a>
-    <a href="#cr-atencao"><span class="gc-rotulo">Acompanhar</span><span class="v cn-t-alerta">{{ resumo.atencao }}</span><span class="d">pedem atenção, sem urgência</span></a>
-    <a href="#cr-ok"><span class="gc-rotulo">Pode esperar</span><span class="v cn-t-ok">{{ resumo.ok }}</span><span class="d">tudo dentro da régua</span></a>
-    <span><span class="gc-rotulo">Meta do mês</span><span class="v {{ c_meta(resumo.meta_pct) }}">{{ pct(resumo.meta_pct, 1) }}</span><span class="d">produção ÷ meta até os dias cobertos</span></span>
-    <span><span class="gc-rotulo">Disponibilidade</span><span class="v {{ c_disp(resumo.disp) }}">{{ pct(resumo.disp, 1) }}</span><span class="d">média do mês, pela potência</span></span>
-    <span><span class="gc-rotulo">PT esperando</span><span class="v{% if resumo.agora %} cn-t-critico{% endif %}">{{ resumo.pts }}</span><span class="d">{{ resumo.agora }} parada{{ 's' if resumo.agora != 1 }} hoje · {{ resumo.paradas - resumo.agora }} de dias anteriores</span></span>
-    <span><span class="gc-rotulo">Chamados abertos</span><span class="v">{{ resumo.chamados }}</span><span class="d">strings e trackers sem fim</span></span>
-    <span><span class="gc-rotulo">Tempo do COS</span><span class="v">{{ dur(resumo.cos_min) }}</span><span class="d">do evento à OS, últimos 30 dias</span></span>
-  </div>
 
-  {% for g, nome, txt, lista in grupos %}
-  <section class="cr-grupo" aria-labelledby="cr-{{ g }}">
-    <div class="cn-lista-cab"><h2 id="cr-{{ g }}"><span class="cn-st cn-t-{{ cor[g] }}">{{ nome }}</span> <b class="cr-n">{{ lista|length }}</b></h2><span class="mudo">{{ txt }}</span></div>
-    {% if g == 'ok' %}
-    <ul class="cr-espera">
-      {% for u in lista %}
-      <li><b>{{ u.usina }}</b><span class="mudo">{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</span><span>{{ u.bem|join(', ') or 'sem dado das fontes para esta usina' }}</span></li>
+  <div class="cr-blocos">
+    {% for b, nome, txt, bl in blocos %}
+    <section class="cr-bloco cr-bloco--{{ b }}" aria-labelledby="cr-{{ b }}">
+      <header class="cr-cab">
+        <div class="cr-tit"><i class="ph ph-{{ 'chart-line-up' if b == 'perf' else 'clipboard-text' }}" aria-hidden="true"></i><h2 id="cr-{{ b }}">{{ nome }}</h2><p>{{ txt }}</p></div>
+        <div class="cr-resumo">
+          {% if b == 'perf' %}
+          <div><span class="r">Meta do mês</span><b class="{{ c_meta(resumo.meta_pct) }}">{{ pct(resumo.meta_pct, 1) }}</b><small>produção ÷ meta do grupo</small></div>
+          <div><span class="r">Abaixo da meta</span><b>{{ resumo.abaixo_meta }}</b><small>usinas com menos de 97%</small></div>
+          <div><span class="r">PR abaixo</span><b>{{ resumo.pr_abaixo }}</b><small>usinas abaixo do previsto</small></div>
+          <div><span class="r">Disponibilidade</span><b class="{{ c_disp(resumo.disp) }}">{{ pct(resumo.disp, 1) }}</b><small>média do mês, pela potência</small></div>
+          {% else %}
+          <div><span class="r">Rondas pendentes</span><b>{{ resumo.rondas }}</b><small>nunca, 7 dias ou mais, ou a longa</small></div>
+          <div><span class="r">PT esperando</span><b{% if resumo.agora %} class="cn-t-critico"{% endif %}>{{ resumo.pts }}</b><small>{{ resumo.agora }} parada{{ 's' if resumo.agora != 1 }} hoje</small></div>
+          <div><span class="r">Chamados</span><b>{{ resumo.chamados }}</b><small>em aberto com o fabricante</small></div>
+          <div><span class="r">Extintores</span><b{% if resumo.ext_vencidos %} class="cn-t-critico"{% endif %}>{{ resumo.ext_vencidos }}</b><small>vencidos (recarga ou hidrostático)</small></div>
+          {% endif %}
+        </div>
+        {{ triagem(bl.tri) }}
+        {{ triagem_leg(bl.tri) }}
+      </header>
+      <div class="cr-cols cr-g"><span>Usina</span>{% for k, rot in colunas[b] %}<span class="cr-col-{{ k }}">{{ rot }}</span>{% endfor %}<span></span></div>
+      {% for u in bl.linhas %}{% set x = u[b] %}
+      <details class="cr-lin cr-lin--{{ x.nivel }}">
+        <summary class="cr-g">
+          <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}{% if x.tag %}<em class="cr-tag cr-tag--{{ x.tag[0] }}">{{ x.tag[1] }}</em>{% endif %}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
+          {% for k, rot in colunas[b] %}{% set v = x.valores[k] %}<span class="cr-col-{{ k }}"><span class="cr-v cr-v--{{ v.cls }}">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</span></span>{% endfor %}
+          <i class="ph ph-caret-down cr-seta" aria-hidden="true"></i>
+        </summary>
+        <div class="cr-det">
+          <dl class="cr-dl">
+            {% for i in x.det %}<dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
+              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=it.numero, ativo=it.codigo) }}" title="{{ it.titulo }}">{{ it.forte }}</a>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
+              {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
+          </dl>
+          <div class="cr-links">
+            {% if b == 'acomp' %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}">Rondas da usina</a>{% endif %}
+            {% for rot, area in links_do_bloco[b] %}<a class="cn-link" href="{{ url_for(tela_dona[area]) }}">{{ rot }}</a>{% endfor %}
+          </div>
+        </div>
+      </details>
       {% else %}
-      <li class="cr-vazio mudo">Nenhuma usina com tudo dentro da régua.</li>
+      <p class="mudo cr-vazio">Nenhuma usina pedindo algo neste bloco.</p>
       {% endfor %}
-    </ul>
-    {% else %}
-    <div class="cr-usinas">
-      {% for u in lista %}
-      <article class="cr-usina cr-usina--{{ cor[g] }}">
-        <header>
-          <b>{{ u.usina }}</b>
-          <span class="mudo">{{ u.cliente or '—' }} · {{ u.equipe or '—' }} · {{ u.cidade or '—' }}{% if u.uf %}/{{ u.uf }}{% endif %}</span>
-          {% if not responsavel %}<span class="mudo">Responsável O&amp;M: {{ u.responsavel or sem_responsavel }}</span>{% endif %}
-        </header>
-        <ul class="cr-alertas">
-          {% for a in u.alertas %}
-          {# o título já diz a área ("Disponibilidade 55,2%", "Nunca teve ronda"): à esquerda, só o ponto da severidade #}
-          <li class="cr-al">
-            <span class="cr-sev cn-t-{{ cor[a.nivel] }}" role="img" aria-label="{{ nivel_nome[a.nivel] }}" title="{{ nivel_nome[a.nivel] }} · {{ rotulo_area[a.area] }}"></span>
-            <span class="t"><b>{% if a.nivel == 'agora' %}<span class="cr-agora">Agora</span>{% endif %}{{ a.titulo }}</b>{% if a.detalhe %}<span class="det">{{ a.detalhe }}</span>{% endif %}
-              {% if a.area == 'pt' %}{% for x in a.get('itens') or [] %}<a class="cn-link cr-it" href="{{ url_for('torre_campo.pt_aprovar', numero=x.numero, ativo=x.codigo) }}" title="{{ x.tarefa }}">OS {{ x.os or x.numero }}{% if x.idade_min %} · há {{ idade_min(x.idade_min) }}{% endif %}</a>{% endfor %}
-              {% elif a.area == 'chamados' %}{% for x in a.get('itens') or [] %}<span class="det">{{ x.o_que }}{% if x.inicio %} · desde {{ dia_curto(x.inicio) }}{% endif %}{% if x.causa %} · {{ x.causa }}{% endif %}</span>{% endfor %}
-              {% elif a.area == 'ativos' %}{% for x in a.get('itens') or [] %}<span class="det"><b class="cr-ativo">{{ x.nome }}</b>{% if x.porque %}: {{ x.porque }}{% endif %}</span>{% endfor %}{% endif %}
-              {% if (a.get('n_itens') or 0) > (a.get('itens') or [])|length %}<span class="det">e mais {{ a.n_itens - a.itens|length }}</span>{% endif %}
-            </span>
-            {% if a.area == 'ronda' %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}" title="Histórico de rondas de {{ u.usina }}">Rondas</a>
-            {% elif a.area in tela_dona %}<a class="cn-link" href="{{ url_for(tela_dona[a.area]) }}" title="Abrir {{ rotulo_area[a.area] }}, a tela dona deste número">Abrir</a>
-            {% else %}<span></span>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-        {% if u.bem %}<p class="cr-bem"><span class="cn-t-ok">Em dia:</span> {{ u.bem|join(', ') }}</p>{% endif %}
-      </article>
-      {% else %}
-      <p class="mudo cr-vazio">Nenhuma usina neste bloco.</p>
-      {% endfor %}
-    </div>
-    {% endif %}
-  </section>
-  {% endfor %}
-
-  <div class="cn-lista-cab"><h2>Todas as usinas</h2><span class="mudo">na ordem do foco: quem mais pede em cima</span></div>
-  <div class="cn-tab cr-tab"><table>
-    <thead><tr><th>Usina</th><th>Meta do mês</th><th>PR × previsto</th><th>Disponibilidade</th><th>Ativos</th><th>Tempo do COS</th><th>Chamados</th><th>Ronda</th><th>PT</th></tr></thead>
-    <tbody>
-    {% for u in usinas %}{% set m = u.meta or {} %}{% set dd = u.disp or {} %}{% set at = u.ativos or {} %}{% set r = u.ronda or {} %}{% set ch = u.chamados or {} %}{% set t = u.mtta or {} %}
-      <tr>
-        <td class="cr-nome"><span class="cn-st cn-t-{{ cor[u.nivel] }}">{{ u.usina }}</span><span class="det">{{ u.cliente or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</span></td>
-        <td class="m"><span class="{{ c_meta(m.get('atingimento')) }}">{{ pct(m.get('atingimento')) }}</span>{% if m.get('meta_kwh') %}<span class="det">{{ mwh(m.get('prod_kwh')) }} de {{ mwh(m.meta_kwh) }}</span>{% endif %}</td>
-        <td class="m">{% if m.get('pr') is not none %}<span class="{{ 'cn-t-alerta' if m.get('pr_meta') is not none and m.pr < m.pr_meta else 'cn-t-ok' }}">{{ pct(m.pr, 1) }}</span><span class="det">previsto {{ pct(m.get('pr_meta'), 1) }}</span>{% else %}—{% endif %}</td>
-        <td class="m"><span class="{{ c_disp(dd.get('disp')) }}">{{ pct(dd.get('disp'), 1) }}</span>{% if dd.get('h_perdidas') %}<span class="det">{{ ('%.1f'|format(dd.h_perdidas))|replace('.', ',') }} h paradas</span>{% endif %}</td>
-        <td class="m">{% if at.get('critico') %}<span class="cn-t-critico">{{ at.critico }} crítico{{ 's' if at.critico != 1 }}</span>{% if at.get('atencao') %}<span class="det">+ {{ at.atencao }} em atenção</span>{% endif %}{% elif at.get('atencao') %}<span class="cn-t-alerta">{{ at.atencao }} em atenção</span>{% elif at.get('monitorar') %}<span class="cn-t-info">{{ at.monitorar }} a monitorar</span>{% else %}<span class="cn-t-neutro">nenhum</span>{% endif %}</td>
-        <td class="m">{% if t.get('mediana_min') is not none %}<span class="{{ 'cn-t-alerta' if t.mediana_min > limites.mtta_min else 'cn-t-ok' }}">{{ dur(t.mediana_min) }}</span><span class="det">{{ t.n }} queda{{ 's' if t.n != 1 }}</span>{% else %}—{% endif %}</td>
-        <td class="m">{% if ch.get('abertos') %}<span class="cn-t-alerta">{{ ch.abertos }}</span>{% if ch.get('dias') %}<span class="det">o mais antigo há {{ ch.dias }} d</span>{% endif %}{% else %}<span class="cn-t-neutro">0</span>{% endif %}</td>
-        <td class="m">{% if r.get('tipo') == 'nunca' %}<span class="cn-t-critico">nunca</span>{% elif r.get('tipo') == 'sem_ronda' %}<span class="cn-t-critico">há {{ r.dias }} d</span>{% elif r.get('tipo') == 'longa_pendente' %}<span class="cn-t-alerta">longa pendente</span>{% elif r.get('dias') is not none and r.dias < 999 %}<span class="cn-t-ok">{{ 'hoje' if r.dias == 0 else 'há ' ~ r.dias ~ ' d' }}</span>{% else %}—{% endif %}</td>
-        <td class="m">{% if u.pt.paradas_hoje %}<span class="cn-t-critico">{{ u.pt.paradas_hoje }} parada{{ 's' if u.pt.paradas_hoje != 1 }} hoje</span>{% if u.pt.paradas_antigas %}<span class="det">+ {{ u.pt.paradas_antigas }} sem decisão</span>{% endif %}{% elif u.pt.paradas_antigas %}<span class="cn-t-critico">{{ u.pt.paradas_antigas }} sem decisão</span>{% elif u.pt.aguardando %}<span class="cn-t-alerta">{{ u.pt.aguardando }} esperando</span>{% else %}<span class="cn-t-neutro">0</span>{% endif %}</td>
-      </tr>
-    {% else %}
-      <tr><td colspan="9" class="mudo">Nenhuma usina com esses filtros.</td></tr>
+      {% if bl.em_dia %}
+      <details class="cr-emdia"><summary><b>● {{ bl.em_dia|length }} usina{{ 's' if bl.em_dia|length != 1 }} em dia</b> · pode{{ 'm' if bl.em_dia|length != 1 }} esperar</summary>
+        <ul>{% for u in bl.em_dia %}<li>{{ u.usina }} <span>· {{ u[b].bem|join(', ') or 'sem dado das fontes deste bloco' }}</span></li>{% endfor %}</ul>
+      </details>
+      {% endif %}
+    </section>
     {% endfor %}
-    </tbody>
-  </table></div>
+  </div>
   {% endif %}
 
   <div class="cn-nota">
     <b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
-    dona dele, e o alerta usa a régua de lá.
-    <dl class="cr-reguas">{% for a, r, t in reguas %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
+    dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.
+    {% for b, nome in (('perf', 'Performance'), ('acomp', 'Acompanhamento')) %}
+    <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt><dd></dd>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
+    {% endfor %}
     Responsável O&amp;M é o da ficha da usina no cadastro (o mesmo da Central de atenção); só usina mobilizada. Fonte sem
     dado da usina não alerta nem conta como em dia: fica "—". Usina com duas linhas no Gerencial (Santarém 1 e 2) soma
-    as duas; o tempo do COS do resumo é a mediana das medianas das usinas.
+    as duas.
     {% if (info.get('disp') or {}).get('ate') %}<br>Disponibilidade até {{ dia_curto(info.disp.ate) }} (dias fechados do mês).{% endif %}
     {% if (info.get('metas') or {}).get('sem_usina') %}<br>{{ info.metas.sem_usina|length }} usina{{ 's' if info.metas.sem_usina|length != 1 }} do Gerencial sem usina no cadastro (fora do de-para): {{ info.metas.sem_usina[:8]|join(', ') }}{% if info.metas.sem_usina|length > 8 %} e mais {{ info.metas.sem_usina|length - 8 }}{% endif %}.{% endif %}
-    {% if (info.get('chamados') or {}).get('sem_usina') %}<br>{{ info.chamados.sem_usina }} chamado{{ 's' if info.chamados.sem_usina != 1 }} aberto{{ 's' if info.chamados.sem_usina != 1 }} sem usina no cadastro (o nome da planilha serve a duas usinas, ou não está no de-para) ficou de fora.{% endif %}
-    {% if info.get('ativos') and not info.ativos.completa %}<br>A leitura das OS de falha do Fracttal ainda não terminou: os ativos e o tempo do COS podem estar incompletos.{% endif %}
+    {% if (info.get('chamados') or {}).get('sem_usina') %}<br>{{ info.chamados.sem_usina }} chamado{{ 's' if info.chamados.sem_usina != 1 }} em aberto sem usina no cadastro (o site do Fracttal fora do de-para) ficou de fora.{% endif %}
+    {% if info.get('extintores') and not info.extintores.publicado %}<br>O livro de extintores do App ainda não chegou ao banco: a coluna Extintores fica vazia.{% endif %}
+    {% if info.get('ativos') and not info.ativos.completa %}<br>A leitura das OS de falha do Fracttal ainda não terminou: os ativos podem estar incompletos.{% endif %}
   </div>
 </div>
 {% endblock %}

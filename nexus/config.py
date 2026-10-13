@@ -37,6 +37,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_SSO_CHAVE",
              # camada de dados (05/10/2026): a carga de hora em hora liga onde há o token de escrita; "0" desliga
              "NEXUS_CARGA_DADOS",
+             # os chamados de garantia no banco (12/10/2026, nexus/campo/chamados_acompanhamento.py): "0" desliga numa máquina
+             "NEXUS_CHAMADOS_PUBLICAR",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
              "NEXUS_ADMINS",
              # Performance -> Clima e risco (06/10/2026): endereços das fontes públicas (INMET, focos e risco de fogo do INPE, e

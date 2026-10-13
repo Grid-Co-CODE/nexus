@@ -1,16 +1,17 @@
 """Visão do responsável (Levi, 12/10/2026: "uma visão que ele olha as usinas, as metas, os problemas, onde ele deve focar,
-no que ele deve deixar. No caso seria separado por responsável"). Banco falso do test_campo_visao: a Altair e a
-Brodowski 1 são do responsável 91 (Ciclano Chefe) e a Coração 1 do 90 (Beltrano Supervisor). Por cima: a meta do mês
-(Gerencial publicado), o diário da disponibilidade, os tickets, os sinais da Confiabilidade e as OS de falha (dublados:
-nada vai ao Fracttal)."""
-from datetime import datetime, timedelta, timezone
+no que ele deve deixar. No caso seria separado por responsável"; protótipo aprovado: dois blocos, Performance e
+Acompanhamento, linha que abre o detalhe, extintores no acompanhamento e "só tira a parte de Tempo do COS").
+Banco falso do test_campo_visao: a Altair e a Brodowski 1 são do responsável 91 (Ciclano Chefe) e a Coração 1 do 90
+(Beltrano Supervisor). Por cima: a meta do mês (Gerencial publicado), o diário da disponibilidade, os chamados no banco
+(`nexus_chamados`), os extintores do App e os sinais da Confiabilidade (dublados: nada vai ao Fracttal)."""
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from test_campo_visao import USINAS, _aba, banco  # noqa: F401  (banco é fixture)
 
 from nexus.campo import responsaveis as R
 from nexus.campo import visao
-from nexus.engenharia import os_falhas
+from nexus.dados import fato_chamado as F
 
 BRT = timezone(timedelta(hours=-3))
 HOJE = datetime.now(BRT).date()
@@ -30,27 +31,27 @@ def _disp(usina, dia, disp, h, fracttal=""):
             "disp": disp, "h_perdidas": h}
 
 
-def _ticket(usina, inicio, fim=None, **kw):
-    d = {"Usina": usina, "Código da usina": None, "Início da ocorrência": inicio, "Fim da ocorrência": fim,
-         "Causa raiz": "", "Inversor": "1.1", "Quantidade de strings no afetadas": "2"}
-    d.update(kw)
-    return d
+def _chamado(os_, usina_id, situacao, dias_atras, equipamento_id=None, fab="STI", comp="Estrutura Trackers"):
+    d = HOJE - timedelta(days=dias_atras)
+    return dict(zip(F.CAB_CHAMADO, [os_, d.year * 10000 + d.month * 100 + d.day, None, usina_id, "de-para do Fracttal",
+                                    "Thopen - X - SP", equipamento_id, "código do ativo" if equipamento_id else None,
+                                    "THPN-ALT100-ETKR1", situacao, fab, comp, None]))
 
 
-def _os(folio, tipo, ev_min_antes, *, dias=1, status=3, code="THPN-BWK100-INVR1", op="Fulano COS", site=None):
-    cri = datetime.now(timezone.utc) - timedelta(days=dias)
-    return {"wo_folio": folio, "tasks_log_task_type_main": tipo, "id_status_work_order": status,
-            "creation_date": cri.isoformat(), "event_date": (cri - timedelta(minutes=ev_min_antes)).isoformat(),
-            "created_by": op, "code": code, "groups_1_description": site or "Thopen - Brodowski 1 - SP",
-            "parent_description": "", "items_log_description": ""}
+def _ext(codigo, usina, val2, conf_dias, cb=""):
+    """Uma linha do livro `extintores_app_campo · Extintores` (o contrato com o App, `hseq/extintores.COLUNAS`)."""
+    return {"Código": codigo, "Usina": usina, "Código da usina": cb, "Tipo de ativo": "CABN", "Ativo": "",
+            "Local": "Cabine", "Posição": "Interno", "Classe": "ABC pó", "Peso (kg)": 6, "Validade da recarga": val2,
+            "Validade do hidrostático": "2099", "Última conferência": (HOJE - timedelta(days=conf_dias)).isoformat(),
+            "Origem da conferência": "App", "Conferido por (HMAC)": None, "Carga": "CARREGADO", "Itens NÃO": None,
+            "Fotos": 1, "Tem informação adicional": "não", "Status": None, "Motivo": None,
+            "Origem do cadastro": "Planilha da TST"}
 
 
 SINAIS = [{"usina_id": 1, "nivel": "critico", "nome": "Inversor 1", "cod": "THPN-ALT100-INVR1", "fam": "Inversor",
-           "porQue": ["4 falhas em 30 dias"], "nFalha": 4, "os": [{"url": "https://exemplo.test/os/1"}]},
+           "porQue": ["4 falhas em 30 dias"], "nFalha": 4, "os": []},
           {"usina_id": 2, "nivel": "monitorar", "nome": "Tracker 9", "cod": "THPN-BWK100-TRK9", "fam": "Tracker",
-           "porQue": [], "nFalha": 2, "os": []},
-          {"usina_id": None, "nivel": "critico", "nome": "Sem usina", "cod": "X", "fam": "Outros", "porQue": [],
-           "nFalha": 5, "os": []}]
+           "porQue": [], "nFalha": 2, "os": []}]
 
 
 @pytest.fixture
@@ -69,18 +70,19 @@ def tela(banco, monkeypatch):
     _aba(banco, "falhas_performance", "disponibilidade_dia", [
         _disp("Altair", ontem, 100, 0, "Thopen - Altair 1 - SP"), _disp("Altair", ontem[:8] + "01", 70, 3.6),
         _disp("Brodowski 1", ontem, 100, 0), _disp("Coração 1", ontem, 99.5, 0.1)])
-    _aba(banco, "tickets_performance", "Strings indisp", [
-        _ticket("Altair", "2026-09-01 06:00:00"), _ticket("Altair", "2026-09-02 06:00:00", "2026-09-03 18:00:00"),
-        _ticket("Ibirapuã", "2026-09-01 06:00:00")])               # nome que não está no cadastro: fica de fora
-    _aba(banco, "tickets_performance", "Trackers", [
-        _ticket("COR100", "2026-10-01 06:00:00", Status="Parado", **{"Nº do tracker / Identificação": "T12"}),
-        _ticket("Coração 1", None, Status="Em conformidade")])     # check periódico, não é chamado
+    _aba(banco, "nexus_chamados", "fato_chamado", [
+        _chamado(16034, 1, "aberto", 26, equipamento_id=900), _chamado(16040, 2, "verificacao", 3),
+        _chamado(15000, 1, "concluido", 20), _chamado(16050, 3, "aberto", 2, fab="Convert", comp="Cabine"),
+        _chamado(16060, None, "aberto", 5)])                         # sem usina no cadastro: fica de fora, contado
+    _aba(banco, "nexus_equipamentos", "dim_equipamento", [
+        {"equipamento_id": 900, "codigo": "THPN-ALT100-ETKR1", "descricao": "Tracker 1 STI", "usina_id": 1}])
+    este_mes = f"{HOJE.month:02d}/{HOJE.year}"                        # vale até o fim do mês: vence em até 30 dias
+    _aba(banco, "extintores_app_campo", "Extintores", [
+        _ext("ALT100-EXT01", "Thopen - Altair 1 - SP", "01/2020", 5),   # vencido
+        _ext("ALT100-EXT02", "Thopen - Altair 1 - SP", "12/2099", 5),   # em dia
+        _ext("COR100-EXT01", "Coração", este_mes, 5, cb="THPN-COR100"),  # vence em até 30 dias
+        _ext("COR100-EXT02", "Coração", "12/2099", 60, cb="THPN-COR100")])  # sem conferência há 60 dias
     monkeypatch.setattr(R, "_engenharia", lambda: {"dados": {"sinais": SINAIS}, "sem_cadastro": False})
-    monkeypatch.setattr(os_falhas, "linhas", lambda: [
-        _os("1", "Religamento", 120), _os("2", "Religamento", 120),                       # o lote: conta uma vez
-        _os("3", "Religamento Remoto", 90), _os("4", "Religamento", -30),                  # evento depois: fora
-        _os("5", "Religamento", 300, status=4), _os("6", "Corretiva", 500),                # cancelada e tipo fora
-        _os("7", "Corretiva Emergencial", 400, dias=40), _os("8", "Religamento", 5, code="TESTE100-INVR1")])
     visao.limpar()
     return banco
 
@@ -97,33 +99,53 @@ def test_cada_fonte_chega_a_usina_do_cadastro(tela):
     # duas linhas no Gerencial: a produção e a meta somam, o atingimento é refeito e o PR é pesado pela meta
     assert (b["meta"]["prod_kwh"], b["meta"]["meta_kwh"], b["meta"]["atingimento"]) == (1000000, 1000000, 100.0)
     assert (b["meta"]["pr"], b["meta"]["pr_meta"]) == (80.0, 80.0)
-    # a disponibilidade do mês é a média dos dias (12 h de sol por dia na régua do Gerencial)
     assert (a["disp"]["disp"], a["disp"]["h_perdidas"], a["disp"]["dias"]) == (85.0, 3.6, 2)
     assert a["ativos"]["critico"] == 1 and b["ativos"]["monitorar"] == 1 and not c["ativos"]
-    # o COS: lote uma vez, evento depois e carimbo fora, cancelada, tipo fora, fora da janela e teste fora
-    assert b["mtta"] == {"mediana_min": 105.0, "n": 2, "max_min": 120.0}
-    # chamado aberto = sem fim; o nome que é código ("COR100") liga pelo código do cadastro; o check não conta
-    assert (a["chamados"]["abertos"], a["chamados"]["strings"]) == (1, 1)
-    assert (c["chamados"]["abertos"], c["chamados"]["trackers"]) == (1, 1)
+    # chamados = o fato do banco (as OS de acompanhamento), com o nome do equipamento pela dimensão; concluído não conta
+    assert (a["chamados"]["abertos"], a["chamados"]["verificacao"]) == (1, 0)
+    assert a["chamados"]["lista"][0] == {"os": 16034, "situacao": "aberto", "dias": 26, "equip": "Tracker 1 STI",
+                                         "fabricante": "STI", "componente": "Estrutura Trackers"}
+    assert (b["chamados"]["abertos"], b["chamados"]["verificacao"]) == (0, 1) and c["chamados"]["abertos"] == 1
+    # extintores = a conta do HSEQ
+    assert (a["extintores"]["total"], a["extintores"]["vencidos"]) == (2, 1)
+    assert (c["extintores"]["a_vencer"], c["extintores"]["sem_conferir"]) == (1, 1)
     assert c["ronda"]["tipo"] == "nunca" and a["ronda"]["tipo"] == "longa_pendente"
     assert (a["pt"]["aguardando"], a["pt"]["paradas"], a["pt"]["paradas_antigas"]) == (2, 1, 1)
     info = R.visao_responsaveis().dados["info"]
-    assert info["chamados"]["sem_usina"] == 1 and info["metas"]["publicado"]
+    assert info["chamados"] == {"publicado": True, "abertos": 3, "sem_usina": 1}
+    assert info["metas"]["publicado"] and info["extintores"]["publicado"]
 
 
-def test_alertas_com_a_regua_da_tela_dona_e_o_foco(tela):
+def test_os_dois_blocos_com_a_regua_da_tela_dona(tela):
     u = _por_usina()
-    al = {(x["area"], x["nivel"]) for x in u["Altair"]["alertas"]}
-    assert {("meta", "critico"), ("disp", "atencao"), ("ativos", "critico"), ("chamados", "atencao"),
-            ("ronda", "atencao"), ("pt", "critico"), ("pt", "atencao")} == al
+    a, b, c = u["Altair"], u["Brodowski 1"], u["Coração 1"]
+    assert {(x["area"], x["nivel"]) for x in a["perf"]["alertas"]} == {("meta", "critico"), ("disp", "atencao"),
+                                                                       ("ativos", "critico")}
+    assert {(x["area"], x["nivel"]) for x in a["acomp"]["alertas"]} == {
+        ("ronda", "atencao"), ("pt", "critico"), ("pt", "atencao"), ("chamados", "atencao"), ("extintores", "critico")}
     # a PT parada de dias anteriores é crítica, mas não "agora" (o técnico parado de hoje vai para o topo)
-    assert not any(x["nivel"] == "agora" for x in u["Altair"]["alertas"])
-    assert u["Altair"]["nivel"] == "critico" and u["Coração 1"]["nivel"] == "critico"
-    b = u["Brodowski 1"]
-    assert [(x["area"], x["nivel"]) for x in b["alertas"]] == [("mtta", "atencao")] and b["nivel"] == "atencao"
-    assert "na meta (100%)" in b["bem"] and "disponibilidade 100,0%" in b["bem"] and "sem chamado aberto" in b["bem"]
-    # o foco: quem tem mais peso em cima
-    assert [x["usina"] for x in R.visao_responsaveis().dados["usinas"]][0] == "Altair"
+    assert not any(x["nivel"] == "agora" for x in a["acomp"]["alertas"])
+    assert (b["perf"]["nivel"], b["acomp"]["nivel"]) == ("ok", "ok")
+    assert "na meta (100%)" in b["perf"]["bem"] and "sem chamado aberto" in b["acomp"]["bem"]
+    assert (c["perf"]["nivel"], c["acomp"]["nivel"]) == ("ok", "critico")
+    # a vencer pesa mais que "sem conferência": o do mesmo extintor não alerta duas vezes
+    assert [x["titulo"] for x in c["acomp"]["alertas"] if x["area"] == "extintores"] == ["1 extintor vence em até 30 dias"]
+    # o Tempo do COS saiu (protótipo aprovado, 12/10/2026)
+    assert all(a != "mtta" for _b, a, _r, _t in R.REGUAS) and not any("COS" in x["titulo"] for x in a["acomp"]["alertas"])
+    # a linha compacta e o detalhe
+    assert a["perf"]["valores"]["meta"] == {"txt": "85%", "cls": "critico", "sub": ""}
+    assert a["acomp"]["valores"]["extintores"] == {"txt": "1 vencido", "cls": "critico", "sub": ""}
+    assert a["perf"]["tag"] == ("critico", "1 ativo crítico")
+    assert [i["rot"] for i in a["acomp"]["det"]] == ["Ronda", "PT e APR", "Chamados", "Extintores"]
+
+
+def test_cada_bloco_ordena_o_proprio_foco_e_recolhe_o_que_esta_em_dia(tela):
+    us = R.visao_responsaveis().dados["usinas"]
+    perf, acomp = R.bloco(us, "perf"), R.bloco(us, "acomp")
+    assert [u["usina"] for u in perf["linhas"]] == ["Altair"]
+    assert [u["usina"] for u in perf["em_dia"]] == ["Brodowski 1", "Coração 1"]
+    assert [u["usina"] for u in acomp["linhas"]] == ["Altair", "Coração 1"]     # peso 29 contra 16
+    assert perf["tri"] == {"critico": 1, "atencao": 0, "ok": 2} and acomp["tri"] == {"critico": 2, "atencao": 0, "ok": 1}
 
 
 def test_pt_parada_de_hoje_e_agora_e_vai_para_o_topo():
@@ -138,45 +160,48 @@ def test_pt_parada_de_hoje_e_agora_e_vai_para_o_topo():
         def onde(uid):
             return {k: f"{k}{uid}" for k in ("usina", "uf", "cidade", "equipe", "cliente", "regiao_campo", "gestor",
                                              "responsavel", "cluster")}
-    vazias = {k: {} for k in ("metas", "disp", "ativos", "mtta", "chamados")}
+    vazias = {k: {} for k in ("metas", "disp", "ativos", "chamados", "extintores")}
     us = R.montar(B, [], [], pts, vazias, hoje.date())
-    assert us[0]["usina_id"] == 1 and us[0]["alertas"][0]["nivel"] == "agora"
-    assert us[1]["alertas"][0]["nivel"] == "critico" and "sem decisão desde 10/10" in us[1]["alertas"][0]["titulo"]
+    assert us[0]["usina_id"] == 1 and us[0]["acomp"]["alertas"][0]["nivel"] == "agora"
+    assert us[0]["acomp"]["det"][0]["itens"][0]["agora"]
+    assert "sem decisão desde 10/10" in us[1]["acomp"]["alertas"][0]["titulo"]
 
 
-def test_cartoes_por_responsavel_e_o_resumo(tela):
+def test_cartoes_por_responsavel_com_os_dois_blocos(tela):
     us = R.visao_responsaveis().dados["usinas"]
     c = {s["responsavel"]: s for s in R.por_responsavel(us)}
     ciclano, beltrano = c["Ciclano Chefe"], c["Beltrano Supervisor"]
-    assert (ciclano["usinas"], ciclano["critico"], ciclano["atencao"], ciclano["ok"]) == (2, 1, 1, 0)
-    assert ciclano["meta_pct"] == 92.5                                  # (850 + 1000) ÷ (1000 + 1000)
-    assert ciclano["disp"] == 92.5 and ciclano["ativos_criticos"] == 1 and ciclano["pior"] == ["Altair"]
-    assert (beltrano["usinas"], beltrano["critico"], beltrano["chamados"]) == (1, 1, 1)
+    assert ciclano["perf"] == {"critico": 1, "atencao": 0, "ok": 1} and ciclano["acomp"] == {"critico": 1, "atencao": 0, "ok": 1}
+    assert ciclano["meta_pct"] == 92.5 and ciclano["disp"] == 92.5                 # (850 + 1000) ÷ (1000 + 1000)
+    assert (ciclano["abaixo_meta"], ciclano["pr_abaixo"], ciclano["chamados"], ciclano["ext_vencidos"]) == (1, 0, 1, 1)
+    assert ciclano["ativos_criticos"] == 1 and ciclano["pior"] == ["Altair"]
+    assert beltrano["perf"] == {"critico": 0, "atencao": 0, "ok": 1} and beltrano["acomp"]["critico"] == 1
     assert list(c)[0] == "Ciclano Chefe"                                # quem tem mais usina pedindo foco primeiro
 
 
 def test_fonte_que_falha_nao_derruba_as_outras(tela, monkeypatch):
     def quebra(*a, **k):
-        raise ConnectionError("tickets fora")
+        raise ConnectionError("banco dos chamados fora")
     monkeypatch.setattr(R, "chamados", quebra)
     visao.limpar()
     d = R.visao_responsaveis().dados
-    assert "tickets fora" in d["erros"]["chamados"]
+    assert "banco dos chamados fora" in d["erros"]["chamados"]
     u = {x["usina"]: x for x in d["usinas"]}
     assert u["Altair"]["meta"]["atingimento"] == 85.0 and not u["Altair"]["chamados"]
 
 
-def test_tela_dos_cartoes_e_a_do_responsavel(tela, logado):
+def test_tela_dos_cartoes_e_a_dos_dois_blocos(tela, logado):
     html = logado.get("/t/campo/responsaveis").get_data(as_text=True)
     assert "Visão do responsável" in html and "Ciclano Chefe" in html and "Beltrano Supervisor" in html
-    assert "responsavel=Ciclano+Chefe" in html                          # o cartão abre as usinas dele
+    assert "responsavel=Ciclano+Chefe" in html and "Extintores vencidos" in html   # o cartão abre as usinas dele
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
-    focar = html[html.index('id="cr-critico"'):html.index('id="cr-atencao"')]
-    acompanhar = html[html.index('id="cr-atencao"'):html.index('id="cr-ok"')]
-    assert "Altair" in focar and "Meta do mês em 85%" in focar and "Brodowski 1" not in focar
-    assert "Brodowski 1" in acompanhar and "COS leva 1 h 45 min para abrir a OS" in acompanhar
-    assert "Coração 1" not in html.split("Todas as usinas")[1]          # é do outro responsável
-    assert "Visão gerencial da plataforma" in html                      # a régua aparece na nota
+    perf = html[html.index('id="cr-perf"'):html.index('id="cr-acomp"')]
+    acomp = html[html.index('id="cr-acomp"'):html.index('class="cn-nota"')]
+    assert "Altair" in perf and "85%" in perf and "1 ativo crítico" in perf and "Meta do mês em" not in perf
+    assert "1 usina em dia" in perf and "Brodowski 1" in perf               # em dia, recolhida no fim do bloco
+    assert "1 vencido" in acomp and "Tracker 1 STI" in acomp and "aberto há 26 d" in acomp
+    assert "Coração 1" not in html                                         # é do outro responsável
+    assert "Tempo do COS" not in html and "Visão gerencial da plataforma" in html
 
 
 def test_quem_entra_pelo_fracttal_cai_nas_usinas_dele(tela, cliente):
@@ -185,17 +210,23 @@ def test_quem_entra_pelo_fracttal_cai_nas_usinas_dele(tela, cliente):
     with cliente.session_transaction() as s:
         s["usuario"] = {"email": "beltrano@exemplo.test", "nome": "Beltrano Supervisor", "perfil": ""}
     html = cliente.get("/t/campo/responsaveis").get_data(as_text=True)
-    assert '<option value="Beltrano Supervisor" selected>' in html and 'id="cr-critico"' in html
+    assert '<option value="Beltrano Supervisor" selected>' in html and 'id="cr-perf"' in html
     # "Todos" vence o padrão
     html = cliente.get("/t/campo/responsaveis?responsavel=*").get_data(as_text=True)
-    assert 'id="cr-critico"' not in html and "Ciclano Chefe" in html
+    assert 'id="cr-perf"' not in html and "Ciclano Chefe" in html
 
 
-def test_sem_a_meta_publicada_a_tela_avisa_e_nao_cobra(tela, logado):
-    tela.abas.pop(("nexus_performance", "fato_meta_usina_mes"))      # o livro ainda não existe no banco
-    tela.workbooks.pop("nexus_performance")
+def test_sem_a_meta_e_sem_os_chamados_no_banco_a_tela_avisa_e_nao_cobra(tela, logado):
+    for livro, aba in (("nexus_performance", "fato_meta_usina_mes"), ("nexus_chamados", "fato_chamado")):
+        tela.abas.pop((livro, aba))                                        # os livros ainda não existem no banco
+        tela.workbooks.pop(livro)
     visao.limpar()
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
-    assert "A meta do mês ainda não chegou ao banco" in html
+    assert "A meta do mês ainda não chegou ao banco" in html and "Os chamados ainda não chegaram ao banco" in html
     u = _por_usina()
-    assert not u["Altair"]["meta"] and not any(a["area"] == "meta" for a in u["Altair"]["alertas"])
+    assert not u["Altair"]["meta"] and not any(a["area"] == "meta" for a in u["Altair"]["perf"]["alertas"])
+    assert not u["Altair"]["chamados"] and u["Altair"]["acomp"]["valores"]["chamados"]["txt"] == "—"
+
+
+def test_dia_do_id():
+    assert R._dia_do_id(20261012) == date(2026, 10, 12) and R._dia_do_id(None) is None and R._dia_do_id(20261399) is None

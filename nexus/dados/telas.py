@@ -159,6 +159,8 @@ QUEM_GRAVA_ORIGEM = (
     ("igual", "gemeo_digital", "gêmeo digital"),
     ("igual", "tickets_performance", "planilha de tickets (sincronizada) e OS Creator"),
     ("igual", "campo_nexus", "coletor do Fracttal do Nexus (desligado em 05/10)"),
+    # a API REST do Fracttal, que o Nexus só lê (os chamados de garantia, 12/10/2026: nexus/campo/chamados_acompanhamento.py)
+    ("igual", "Fracttal (API REST)", "Fracttal (o Nexus lê pela API REST, só leitura)"),
     ("prefixo", "nexus_", "Nexus"),                              # livro do Nexus fora do LIVROS: viola a regra 10
 )
 A_DECLARAR = "a declarar"
