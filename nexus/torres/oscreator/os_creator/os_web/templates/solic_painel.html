@@ -4,7 +4,8 @@
 {% block head %}<link rel="stylesheet" href="/os/static/solic_pcm.css">{% endblock %}
 {# O Painel do app (`steps/solic_pcm.py::_Painel`, Levi, 13/10/2026): o kanban de três colunas — Pendentes, Em andamento e
    Finalizadas, na ordem do Fracttal —, até 40 cartões por coluna (a contagem diz o total), e a busca na própria tela. O
-   cartão inteiro abre a Fila nele: pendente para analisar, das outras colunas só para ler. As devolvidas para refazer
+   cartão inteiro abre a Fila nele: pendente para analisar, das outras colunas só para ler (quem não é da Área PCM — o
+   setor PCM ou administrador, no Nexus — abre a ficha da solicitação no Histórico). As devolvidas para refazer
    ficam fora do quadro e só contam no alto: se sumissem de vez, os pedidos parados com o supervisor ficariam invisíveis. #}
 {% block conteudo %}
 <section class="spc spc-painel">
@@ -22,12 +23,12 @@
       <header class="spc-col-cab" title="{{ ajuda }}"><i class="spc-col-barra"></i><b>{{ rotulo }}</b><span class="spc-col-n" data-n>{{ cartoes[chave]|length }}</span></header>
       <div class="spc-col-lista">
         {% for c in cartoes[chave] %}
-        <a class="spc-card{% if loop.index > por_coluna %} spc-escondido{% endif %}" href="/os/solicitacao/fila?sel={{ c.id }}" data-busca="{{ c.busca }}">
+        <a class="spc-card{% if loop.index > por_coluna %} spc-escondido{% endif %}" href="{{ ('/os/solicitacao/fila?sel=%s' if pode_pcm else '/os/solicitacao/historico?ficha=%s') % c.id }}" data-busca="{{ c.busca }}">
           <span class="spc-card-topo"><b class="spc-num">Nº {{ c.id }}</b><span class="spc-pill"{% if c.cor %} style="color:{{ c.cor }}"{% endif %}>{{ c.status }}</span></span>
           <span class="spc-card-alvo">{{ c.alvo }}</span>
           <span class="spc-card-desc">{{ c.descricao }}</span>
           <span class="spc-card-tema{% if c.tem_tema %} sim{% endif %}">{{ c.tema }}</span>
-          <span class="spc-card-rod"><span class="spc-card-quem" title="{{ c.quem }}">{{ c.quem }}</span><span class="spc-card-dia">{{ c.dia }}</span><span class="spc-link">{{ "Analisar" if chave == "pendente" else "Ver detalhes" }}</span></span>
+          <span class="spc-card-rod"><span class="spc-card-quem" title="{{ c.quem }}">{{ c.quem }}</span><span class="spc-card-dia">{{ c.dia }}</span><span class="spc-link">{{ "Analisar" if chave == "pendente" and pode_pcm else "Ver detalhes" }}</span></span>
         </a>
         {% endfor %}
         <p class="spc-vazio" data-vazio{% if cartoes[chave] %} hidden{% endif %}>Nada nesta coluna.</p>

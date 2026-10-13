@@ -490,3 +490,122 @@ def test_o_css_novo_entra_nas_paginas_e_o_js_existe():
         assert '<link rel="stylesheet" href="/os/static/solic_pcm.css">' in h and '{% include "_solic_nav.html" %}' in h, t
     for js in ("solic_pcm.js", "solic_fila.js", "solic_hist.js", "solic_temas.js"):
         assert (WEB / "static" / js).exists(), js
+
+
+# ── a Área PCM: só o setor PCM ou administrador (Levi, 13/10/2026) ──────────────────────────────────────────────────
+# "Só o setor PCM ou administrador! Quem não é nenhum dos dois recebe a notificação!" O Nexus decide (`ponte.area_pcm`) e
+# põe a decisão no pedido; o clone mostra o aviso no lugar da Fila e dos Temas e recusa as gravações deles.
+NEGA = {"pode": False, "aviso": "A Fila do PCM e os Temas são do setor PCM. Você está no setor Engenharia."}
+
+
+def test_fora_da_area_pcm_a_fila_e_os_temas_dao_o_aviso(cli):
+    for url, titulo in (("/os/solicitacao/fila", "Fila do PCM"), ("/os/solicitacao/fila?sel=5002", "Fila do PCM"),
+                        ("/os/solicitacao/temas", "Temas"), ("/os/solicitacao/atualizar", "Fila do PCM")):
+        r = cli.get(url, environ_overrides={rs.AREA_PCM: NEGA})
+        h = r.get_data(as_text=True)
+        assert r.status_code == 403 and NEGA["aviso"] in h and "%s: só para a área do PCM" % titulo in h, url
+        assert 'class="on" aria-current="page">%s</a>' % titulo in h and 'role="alert"' in h        # a barra fica
+        assert 'href="/os/solicitacao/painel">Painel</a> e o' in h                                  # e o caminho de volta
+    assert cli.chamadas == []                                   # nem chega a pedir a lista ou os catálogos ao Fracttal
+
+
+def test_fora_da_area_pcm_as_gravacoes_voltam_403_e_nada_grava(cli, banco):
+    loja, aplicados = banco
+    antes = {k: dict(v) for k, v in loja.items()}
+    chave = next(iter(loja))
+    for url, corpo in (("/os/api/solic/5001/aprovar", {"id_responsible": 1, "titulo": "T", "subtarefas": []}),
+                       ("/os/api/solic/5001/status", {"codigo": "REJECTED", "motivo": "m"}),
+                       ("/os/api/solic/5001/observacao", {"relato": "novo"}),
+                       ("/os/api/solic/temas/salvar", {"nome": "Tema de quem não pode"}),
+                       ("/os/api/solic/temas/%s/arquivar" % chave, {"arquivar": True})):
+        r = cli.post(url, json=corpo, environ_overrides={rs.AREA_PCM: NEGA})
+        assert r.status_code == 403 and r.get_json() == {"erro": NEGA["aviso"], "area_pcm": False}, url
+    assert cli.gravado == [] and loja == antes and aplicados == []
+
+
+def test_fora_da_area_pcm_o_painel_e_o_historico_seguem(cli):
+    """O Painel, o Histórico e a Nova solicitação são a Área do Solicitante do app: abertos. O cartão do Painel abre a
+    ficha da solicitação no Histórico (`?ficha=`), e não a Fila; cancelar a própria solicitação continua."""
+    h = cli.get("/os/solicitacao/painel", environ_overrides={rs.AREA_PCM: NEGA}).get_data(as_text=True)
+    assert 'href="/os/solicitacao/historico?ficha=5001"' in h and "fila?sel=" not in h and ">Analisar<" not in h
+    assert cli.get("/os/solicitacao/historico?ficha=5001", environ_overrides={rs.AREA_PCM: NEGA}).status_code == 200
+    assert cli.post("/os/api/solic/5001/cancelar", json={"nota": ""}, environ_overrides={rs.AREA_PCM: NEGA}).status_code == 200
+    js = (WEB / "static" / "solic_hist.js").read_text(encoding="utf-8")
+    assert "new URLSearchParams(location.search).get('ficha')" in js
+    # liberada, ou sem ninguém para decidir (o OS Creator sozinho, o 5090): como antes
+    for extra in ({rs.AREA_PCM: {"pode": True, "aviso": ""}}, {}):
+        h = cli.get("/os/solicitacao/painel?atualizar=1", environ_overrides=extra).get_data(as_text=True)
+        assert 'href="/os/solicitacao/fila?sel=5001"' in h and ">Analisar<" in h
+        assert cli.get("/os/solicitacao/fila", environ_overrides=extra).status_code == 200
+
+
+@pytest.fixture
+def setor_de_mentira(app, monkeypatch):
+    """O setor da pessoa do login sem ir ao banco: `valor` é o que o cadastro devolveria (ou a exceção da leitura)."""
+    from nexus.auth import setor_telas
+    app.config["NEXUS_PESSOA_HMAC"] = "chave-de-teste"
+    monkeypatch.setattr(setor_telas, "_banco", lambda: (None, None))
+    caixa = {"valor": None, "lidos": []}
+
+    def da_pessoa(cfg, email, base, sessao):
+        caixa["lidos"].append(email)
+        if isinstance(caixa["valor"], Exception):
+            raise caixa["valor"]
+        return caixa["valor"]
+    monkeypatch.setattr(setor_telas, "setor_da_pessoa", da_pessoa)
+    return caixa
+
+
+def test_a_regra_do_nexus_setor_pcm_ou_administrador(app, setor_de_mentira):
+    from flask import session
+    with app.test_request_context("/os/solicitacao/fila"):
+        session["logado"], session["admin"] = True, True
+        assert ponte.area_pcm() == {"pode": True, "aviso": ""} and setor_de_mentira["lidos"] == []   # nem lê o setor
+        session["admin"] = False
+        session["usuario"] = {"email": "Pessoa.Teste@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
+        for nome in ("PCM", "pcm", " Pcm "):
+            setor_de_mentira["valor"] = {"id": 9, "nome": nome}
+            assert ponte.area_pcm() == {"pode": True, "aviso": ""}, nome
+        assert setor_de_mentira["lidos"][-1] == "pessoa.teste@exemplo.test"
+        setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
+        a = ponte.area_pcm()
+        assert a["pode"] is False and "Você está no setor Performance." in a["aviso"]
+        assert "setor PCM e dos administradores" in a["aviso"] and "Base → Integração Fracttal" in a["aviso"]
+        setor_de_mentira["valor"] = None
+        assert "Você está sem setor no Nexus." in ponte.area_pcm()["aviso"]
+        setor_de_mentira["valor"] = RuntimeError("setores ilegíveis no banco")
+        a = ponte.area_pcm()
+        assert a["pode"] is False and "Não consegui ler o seu setor agora" in a["aviso"]
+        app.config["NEXUS_PESSOA_HMAC"] = ""
+        a = ponte.area_pcm()
+        assert a["pode"] is False and "NEXUS_PESSOA_HMAC" in a["aviso"]
+
+
+def _sessao_do_fracttal(app, c, email="pessoa.teste@exemplo.test"):
+    """Um login do Nexus pelo Fracttal (não administrador) e o cookie do OS Creator com o JWT de mentira."""
+    with c.session_transaction() as s:
+        s["logado"], s["admin"] = True, False
+        s["usuario"] = {"email": email, "nome": "Pessoa Teste", "perfil": ""}
+    clone = ponte.clone(app)
+    valor = clone.session_interface.get_signing_serializer(clone).dumps(
+        {"jwt": JWT, "conta": {"nome": "Pessoa Teste", "email": email, "perfil": ""}})
+    c.set_cookie("os_sessao", valor, path="/os")
+
+
+def test_pela_ponte_quem_nao_e_do_pcm_recebe_o_aviso(app, cli, setor_de_mentira):
+    """De ponta a ponta no Nexus: a sessão do Fracttal de quem é da Engenharia leva o aviso na Fila e o 403 ao aprovar;
+    a do PCM passa. (O `cli` só põe os dublês do Fracttal no lugar.)"""
+    c = app.test_client()
+    _sessao_do_fracttal(app, c)
+    setor_de_mentira["valor"] = {"id": 1, "nome": "Engenharia"}
+    r = c.get("/os/solicitacao/fila")
+    h = r.get_data(as_text=True)
+    assert r.status_code == 403 and "Você está no setor Engenharia." in h and "Fila do PCM: só para a área do PCM" in h
+    r = c.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1, "titulo": "T", "subtarefas": []})
+    assert r.status_code == 403 and "setor PCM" in r.get_json()["erro"] and cli.gravado == []
+    assert c.get("/os/solicitacao/painel").status_code == 200 and c.get("/os/solicitacao/historico").status_code == 200
+    setor_de_mentira["valor"] = {"id": 9, "nome": "PCM"}
+    r = c.get("/os/solicitacao/fila")
+    assert r.status_code == 200 and 'id="fl_dados"' in r.get_data(as_text=True)
+    r = c.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1, "titulo": "T", "subtarefas": []})
+    assert r.status_code == 200 and cli.gravado[-1][0] == "aprovar"

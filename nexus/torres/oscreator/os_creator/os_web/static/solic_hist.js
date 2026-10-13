@@ -267,4 +267,7 @@
 
   encherFiltros();
   aplica();
+  // ?ficha=<nº>: o cartão do Painel de quem não é da Área PCM abre a ficha aqui (a Fila é do setor PCM no Nexus)
+  var ficha = new URLSearchParams(location.search).get('ficha');
+  if (ficha) { num.value = ficha; num.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'})); }
 })();

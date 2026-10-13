@@ -287,6 +287,12 @@ body.os-form select.spc-sub-tipo:hover{color:var(--spc-tinta);border-bottom:1px 
 .spc-grade3 input,.spc-grade3 select,.spc-grade2 input,.spc-grade2 select{width:100%}
 .spc-temas .spc-rot{margin-top:6px}
 
+/* ── o aviso da Área PCM para quem não pode (o setor PCM ou administrador, no Nexus) ── */
+.spc-negado{margin:28px 16px;max-width:760px;background:var(--spc-alerta-fundo);border:1px solid var(--spc-alerta-b);border-radius:12px;padding:18px 20px}
+.spc-negado-t{margin:0 0 8px;color:var(--spc-alerta);font-size:17px;font-weight:700}
+.spc-negado-txt{margin:0 0 10px;color:var(--spc-tinta);font-size:13.5px;line-height:1.5}
+.spc-negado a{color:var(--spc-verde);font-weight:600}
+
 /* ── telas estreitas: a lista vai para cima e a ficha embaixo; o kanban vira uma coluna ── */
 @media (max-width:900px){
   .spc-fila,.spc-painel,.spc-temas{height:auto}

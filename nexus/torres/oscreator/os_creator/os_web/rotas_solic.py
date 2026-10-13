@@ -63,6 +63,39 @@ def _temas_em_dia():
     ts.garantir()
 
 
+# ── quem pode a Área PCM (a Fila do PCM e os Temas) ──────────────────────────────────────────────────────────────────
+# Quem serve esta web pode fechar a Área PCM pondo a decisão no pedido: `request.environ["os_web.area_pcm"]` =
+# {"pode": bool, "aviso": str}. O Nexus põe (`ponte.area_pcm`: só o setor PCM ou administrador — Levi, 13/10/2026: "Só
+# o setor PCM ou administrador! Quem não é nenhum dos dois recebe a notificação!"): no lugar da tela vem o aviso, e as
+# gravações da Fila e dos Temas voltam 403 com ele. Sem a chave — o OS Creator servido sozinho, o 5090 — a área fica
+# aberta como sempre foi (no app ela pede a senha do PCM, `pcm_acesso`). O Painel, o Histórico e a Nova solicitação são
+# a Área do Solicitante do app: ficam abertos.
+AREA_PCM = "os_web.area_pcm"
+AVISO_PCM = "A Fila do PCM e os Temas são da área do PCM."
+
+
+def _area_pcm() -> dict:
+    v = request.environ.get(AREA_PCM)
+    return v if isinstance(v, dict) else {"pode": True, "aviso": ""}
+
+
+def _sem_area_pcm_api():
+    """A gravação da Área PCM pedida por quem não pode: 403 com o aviso (a tela o mostra no aviso de canto)."""
+    a = _area_pcm()
+    if a.get("pode", True):
+        return None
+    return jsonify({"erro": a.get("aviso") or AVISO_PCM, "area_pcm": False}), 403
+
+
+def _sem_area_pcm_pagina(titulo: str, nav: str):
+    """A página da Área PCM aberta por quem não pode: o aviso, com a barra de sempre (o Painel e o Histórico seguem)."""
+    a = _area_pcm()
+    if a.get("pode", True):
+        return None
+    return render_template("solic_sem_acesso.html", conta=_conta(), aba="solic", nav=nav, nav_pcm=sw.NAV_PCM,
+                           titulo=titulo, aviso=a.get("aviso") or AVISO_PCM), 403
+
+
 # ── a lista e os catálogos, na memória ───────────────────────────────────────────────────────────────────────────────
 def _lista(forcar: bool = False) -> list:
     """As 400 solicitações mais novas (de todo mundo, como no app), já lidas pela `sw.linha`. Guardadas POR PESSOA: a
@@ -292,7 +325,9 @@ def painel():
         else:                     # devolvidas para refazer: fora do quadro, só a contagem (e a busca as conta também)
             fora.append(sw.cartao(s)["busca"])
     return render_template("solic_painel.html", conta=_conta(), aba="solic", nav="painel", nav_pcm=sw.NAV_PCM,
-                           colunas=sw.COLUNAS, cartoes=cartoes, fora=fora, por_coluna=sw.POR_COLUNA)
+                           colunas=sw.COLUNAS, cartoes=cartoes, fora=fora, por_coluna=sw.POR_COLUNA,
+                           # fora da Área PCM o cartão abre a ficha da solicitação no Histórico, e não a Fila
+                           pode_pcm=bool(_area_pcm().get("pode", True)))
 
 
 # ── a fila do PCM ───────────────────────────────────────────────────────────────────────────
@@ -302,6 +337,9 @@ def fila():
     """A Fila do PCM (`_Fila`): as pendentes à esquerda, a ficha da escolhida à direita — o pedido, a decisão, o tema e as
     subtarefas —, e a OS nascendo na aprovação. `?sel=<nº>` abre nela; se ela já saiu da fila (o Painel abriu uma
     em andamento ou finalizada), ela entra no fim da lista SÓ PARA LER, como o `set_somente_leitura` do app."""
+    negado = _sem_area_pcm_pagina("Fila do PCM", "fila")
+    if negado:
+        return negado
     idx = _indice_ativos()
     forcar = request.args.get("atualizar") == "1"
     lista, pessoas, etiquetas, tipos, status = _ao_mesmo_tempo(lambda: _lista(forcar), _pessoas, _etiquetas, _tipos,
@@ -354,6 +392,9 @@ def api_detalhe(id_code):
 def api_aprovar(id_code):
     """Vira OS numerada (`_Fila._aprovar`). O ativo é resolvido AQUI, e não enviado pela tela (ver o topo do módulo); o
     título, as subtarefas (com o anexo), o tipo, as classificações, as etiquetas e a OS pai são os da ficha."""
+    negado = _sem_area_pcm_api()
+    if negado:
+        return negado
     corpo = request.get_json(silent=True) or {}
     if not corpo.get("id_responsible"):
         return jsonify({"erro": "Escolha o responsável pela OS. Sem responsável a tarefa é criada "
@@ -396,6 +437,9 @@ def api_status(id_code):
 
     É escolha, a mesma do app: status trocado sem motivo vira o tipo de registro que ninguém
     consegue explicar três meses depois."""
+    negado = _sem_area_pcm_api()
+    if negado:
+        return negado
     corpo = request.get_json(silent=True) or {}
     motivo = str(corpo.get("motivo") or "").strip()
     if not motivo:
@@ -417,6 +461,9 @@ def api_observacao(id_code):
 
     Gravar só o texto novo apagaria tema, técnico e subtarefas editadas — e a fila perderia a
     sugestão que justifica ela existir."""
+    negado = _sem_area_pcm_api()
+    if negado:
+        return negado
     corpo = request.get_json(silent=True) or {}
     row = api._solicitacao_row(id_code)
     if not row:
@@ -481,6 +528,9 @@ def _temas_da_tela(itens) -> list:
 def temas():
     """Os Temas (`TemasTab`): a lista à esquerda, o cadastro à direita, salvar por tema e arquivar em vez de excluir. Lê o
     BANCO na hora, como o app ao entrar na tela; com o banco fora mostra os temas do código, avisando, e não grava."""
+    negado = _sem_area_pcm_pagina("Temas", "temas")
+    if negado:
+        return negado
     idx = _indice_ativos()
     erro = ""
     try:
@@ -521,6 +571,9 @@ def _erro_banco(e):
 def api_tema_salvar():
     """"Salvar tema" (`TemasTab._salvar`): nome obrigatório, a chave nasce do nome e nunca muda depois, nome repetido
     não entra. RELÊ o banco antes (o `temas_store.salvar` acha a linha pela chave, nunca pelo número da linha)."""
+    negado = _sem_area_pcm_api()
+    if negado:
+        return negado
     try:
         atuais = ts.do_banco()
     except Exception as e:                                  # noqa: BLE001
@@ -541,6 +594,9 @@ def api_tema_salvar():
 def api_tema_arquivar(chave):
     """Arquivar (ou desarquivar): o tema some da escolha na Solicitação e na Fila, e as OS que já nasceram com ele não
     mudam. Excluir não existe — um tema usado em 751 solicitações não pode sumir."""
+    negado = _sem_area_pcm_api()
+    if negado:
+        return negado
     on = bool((request.get_json(silent=True) or {}).get("arquivar", True))
     try:
         ts.arquivar(chave, on)
@@ -559,6 +615,9 @@ def atualizar():
     """Recarrega o CATÁLOGO DE ATIVOS e volta à Fila (o aviso "não consegui identificar o ativo" da ficha leva aqui).
     Existe porque a causa mais comum desse aviso é catálogo velho — um ativo cadastrado hoje de manhã. Se o catálogo já
     está sendo baixado por trás, espera esse em vez de baixar duas vezes."""
+    negado = _sem_area_pcm_pagina("Fila do PCM", "fila")
+    if negado:
+        return negado
     ja_baixando = _RENOVANDO.locked()
     if _RENOVANDO.acquire(timeout=300):
         try:

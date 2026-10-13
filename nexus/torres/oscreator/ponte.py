@@ -278,6 +278,45 @@ def _fim_na_resposta(alvo, resp) -> str | None:
     return None
 
 
+# ── a Área PCM do OS Creator: só o setor PCM ou administrador (Levi, 13/10/2026) ───────────────────────────────────
+# "Só o setor PCM ou administrador! Quem não é nenhum dos dois recebe a notificação!". A Área PCM é a da `SolicPcmTab`
+# do app (a Fila do PCM, que aprova e cria a OS, e os Temas, que gravam no banco com a chave do servidor); no app ela
+# pede a senha do PCM. Aqui quem decide é o Nexus, e a decisão vai ao clone no pedido (`request.environ`), onde o
+# `rotas_solic` mostra o aviso no lugar da tela e recusa as gravações. O Painel, o Histórico e a Nova solicitação seguem
+# abertos (são a Área do Solicitante do app). O setor é o de Base → Integração Fracttal, pelo NOME ("PCM"); sem saber o
+# setor (banco fora, Nexus sem a NEXUS_PESSOA_HMAC), fecha: só o administrador passa.
+AREA_PCM = "os_web.area_pcm"
+SETOR_PCM = "pcm"
+
+
+def _sem_acento(t: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode().strip().lower()
+
+
+def area_pcm() -> dict:
+    """{"pode": bool, "aviso": str} da sessão do Nexus de agora."""
+    if session.get("admin"):
+        return {"pode": True, "aviso": ""}
+    regra = "A Fila do PCM e os Temas são do setor PCM e dos administradores do Nexus."
+    if not current_app.config.get("NEXUS_PESSOA_HMAC"):
+        return {"pode": False, "aviso": regra + " Este Nexus ainda não sabe o setor de cada pessoa (falta a "
+                                                "NEXUS_PESSOA_HMAC no servidor): por enquanto só o administrador entra."}
+    from ...auth import setor_telas
+    u = session.get("usuario")
+    email = str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
+    try:
+        setor = setor_telas.setor_da_pessoa(current_app.config, email, *setor_telas._banco())
+    except Exception as ex:      # noqa: BLE001 — sem saber o setor, fecha (e diz que é leitura, não falta de setor)
+        logging.warning("OS Creator: não consegui ler o setor para a Área PCM (%s)", type(ex).__name__)
+        return {"pode": False, "aviso": regra + " Não consegui ler o seu setor agora; tente de novo em instantes."}
+    if setor and _sem_acento(setor.get("nome")) == SETOR_PCM:
+        return {"pode": True, "aviso": ""}
+    onde = ("Você está no setor %s." % setor["nome"]) if setor else "Você está sem setor no Nexus."
+    return {"pode": False, "aviso": regra + " " + onde + " Quem põe você no setor PCM é o administrador "
+                                                         "(Base → Integração Fracttal)."}
+
+
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)
 @bp_raiz.route("/os/<path:resto>", methods=_METODOS)
 def encaminhar(resto: str):
@@ -290,6 +329,8 @@ def encaminhar(resto: str):
     # cópia do environ: o clone monta o request dele sem mexer no do Nexus. O SCRIPT_NAME vai junto: debaixo do prefixo,
     # o url_for do clone já sai com ele, e o cookie dele fica no /os do Nexus (_SessaoDoClone)
     environ = dict(request.environ)
+    if resto.startswith(("solicitacao", "api/solic")):
+        environ[AREA_PCM] = area_pcm()          # a Área PCM é do setor PCM ou do administrador (ver `area_pcm`)
     base = raiz()
     ajusta_js = resto == "static/abas.js"
     # debaixo do prefixo todo .js do clone sai reescrito, e a pergunta "mudou?" vale para a versão reescrita (abaixo)

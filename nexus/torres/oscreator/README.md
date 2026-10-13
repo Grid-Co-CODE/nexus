@@ -665,6 +665,19 @@ obrigatório vai na aprovação (`solic_web.subs_para_api`: a web o perdia); Tem
 "Limpeza e Conservação" da Vegetação: no app o combo caía no vazio e salvar apagava) e pergunta antes de descartar
 alteração não salva.
 
+**Quem entra na Área PCM** (Levi, 13/10/2026: "Só o setor PCM ou administrador! Quem não é nenhum dos dois recebe a
+notificação!"). A Fila do PCM (aprovar, devolver, mudar status, gravar a observação, recarregar o catálogo) e os Temas
+(salvar, arquivar) são do setor PCM e dos administradores do Nexus; no app essa área pede a senha do PCM. Quem decide é a
+ponte (`ponte.area_pcm`): administrador passa sem ler nada; o resto, pelo setor de Base → Integração Fracttal, pelo NOME
+("PCM", sem acento nem caixa). Sem saber o setor (banco fora, Nexus sem a `NEXUS_PESSOA_HMAC`), fecha — só o
+administrador passa. A decisão vai ao clone no pedido (`request.environ["os_web.area_pcm"]`): no lugar da Fila e dos
+Temas vem o aviso (`solic_sem_acesso.html`, com a barra de sempre e o setor da pessoa), e as gravações voltam 403 com o
+mesmo aviso (a tela mostra no aviso de canto). O Painel, o Histórico e a Nova solicitação seguem abertos (são a Área do
+Solicitante do app); fora da Área PCM o cartão do Painel abre a ficha no Histórico (`?ficha=`), e não a Fila. Sem a
+chave no pedido (o OS Creator sozinho, o 5090), a área fica aberta como sempre foi. Prova: os testes
+`test_fora_da_area_pcm_*`, `test_a_regra_do_nexus_setor_pcm_ou_administrador` e
+`test_pela_ponte_quem_nao_e_do_pcm_recebe_o_aviso` (cinco mutações, todas pegas).
+
 **A velocidade** (o "demorando demais"): cada abertura da Fila fazia de 7 a 10 pedidos ao Fracttal, um depois do outro
 e sem memória (as 400 solicitações, o pessoal de 100 em 100, as etiquetas, o catálogo de status), e o Histórico baixava
 as 400 de novo. Agora (`rotas_solic.py`):
