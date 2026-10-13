@@ -43,8 +43,9 @@ PESSOAS = [{"code": "A1", "name": "Ana Teste Silva", "id_personnel": 501}, {"cod
            {"code": "S0", "name": "Ana Teste Semid", "id_personnel": None}]
 CFG = "Ana Teste;Bruno;Zeca"
 AGORA = dt.datetime(2026, 10, 6, 10, 0, tzinfo=reg.BRT)
-ETIQ = [{"id": 1, "description": "PERFORMANCE"}, {"id": 900, "description": "ENGENHARIA"}, {"id": 901, "description": "Remoto"},
-        {"id": 902, "description": "Religamento Remoto"}, {"id": 2603, "description": "Dar prioridade"}]
+ETIQ = [{"id": 1, "description": "PERFORMANCE"}, {"id": 900, "description": "ENGENHARIA"}, {"id": 901, "description": "Backoffice"},
+        {"id": 902, "description": "Religamento Remoto"}, {"id": 2603, "description": "Dar prioridade"},
+        {"id": 904, "description": "Remoto"}]
 
 
 # ── regras ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -68,12 +69,18 @@ def test_responsavel_so_entre_os_nomes_da_engenharia():
     assert reg.nomes_configurados("") == [] and reg.nomes_configurados(" A ; B,C ") == ["A", "B", "C"]
 
 
-def test_etiquetas_so_remoto_e_engenharia_pelo_nome_exato():
-    """Levi, 06/10/2026: "Etiqueta de remoto e engenharia fixas sempre! só essas etiquetas viu, sem performance"."""
-    assert reg.ETIQUETAS == ("Remoto", "ENGENHARIA")
-    assert reg.etiquetas(ETIQ) == ([901, 900], [])
-    # sem a "Remoto" no catálogo, a "Religamento Remoto" NÃO serve no lugar: a falta é dita, e nada é criado
-    assert reg.etiquetas([e for e in ETIQ if e["id"] != 901]) == ([900], ["Remoto"])
+def test_etiquetas_so_backoffice_e_engenharia_pelo_nome_inteiro():
+    """Levi, 06/10/2026: "Etiqueta de remoto e engenharia fixas sempre! só essas etiquetas viu, sem performance"; e
+    13/10/2026: "SOLICITAÇÃO ENGENHARIA INVÉS DE REMOTO É Backoffice"."""
+    assert reg.ETIQUETAS == ("Backoffice", "ENGENHARIA")
+    assert reg.etiquetas(ETIQ) == ([901, 900], [])                  # a Remoto (904) está no catálogo e NÃO vai
+    # sem a "Backoffice" no catálogo, nenhuma outra serve no lugar: a falta é dita, e nada é criado
+    assert reg.etiquetas([e for e in ETIQ if e["id"] != 901]) == ([900], ["Backoffice"])
+    # o nome casa escrito de qualquer jeito (caixa, espaço, hífen), mas INTEIRO
+    for escrita in ("BACKOFFICE", "Back Office", "back-office", "Back_Office"):
+        assert reg.etiquetas([{"id": 77, "description": escrita}, {"id": 900, "description": "ENGENHARIA"}]) == ([77, 900], [])
+    assert reg.etiquetas([{"id": 78, "description": "Backoffice Remoto"}, {"id": 900, "description": "ENGENHARIA"}]) \
+        == ([900], ["Backoffice"])
     assert (reg.TIPO_TAREFA, reg.CLASSIF_1) == ("Administrativa", "Programada")
 
 
@@ -230,7 +237,7 @@ def test_criar_sai_como_a_os_de_analise_com_a_etiqueta_da_engenharia(cli):
     assert _perto(f["prog_date"], dt.datetime.now(reg.BRT) + dt.timedelta(days=7)) and f["event_date"] == ontem
     assert r.get_json()["mensagem"] == ("2 OS criada(s) para a Engenharia — Nº 15000, 15001 — programada(s) para %s."
                                         % f["prog_date"].strftime("%d/%m/%Y %H:%M"))
-    # tipo Administrativa, só a Classificação 1 (Programada) e só as etiquetas REMOTO + ENGENHARIA — sem PERFORMANCE
+    # tipo Administrativa, só a Classificação 1 (Programada) e só as etiquetas BACKOFFICE + ENGENHARIA — sem PERFORMANCE
     assert (f["task_type"], f["subtasks"], f["etiqueta_ids"]) == ("Administrativa", [], [901, 900])
     assert f["tipo"] == {"id_c1": 11, "desc_c1": "Programada"}
     assert (f["id_responsible"], f["responsible_name"], f["note"]) == (501, "Ana Teste Silva", "Desarma toda manhã.")
@@ -241,14 +248,14 @@ def test_urgente_so_muda_a_data_as_etiquetas_sao_as_mesmas(cli):
     r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(urgente=True, programada="2030-01-01T08:00"))
     assert r.status_code == 200
     assert _perto(cli.feito["prog_date"], dt.datetime.now(reg.BRT) + dt.timedelta(days=2))
-    assert cli.feito["etiqueta_ids"] == [901, 900]                  # sem "Dar prioridade": só REMOTO e ENGENHARIA
+    assert cli.feito["etiqueta_ids"] == [901, 900]                  # sem "Dar prioridade": só BACKOFFICE e ENGENHARIA
 
 
 def test_sem_a_etiqueta_no_fracttal_nenhuma_os_e_criada(cli, monkeypatch):
     monkeypatch.setattr(api, "get_labels", lambda: [dict(e) for e in ETIQ if e["id"] != 901])
     r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo())
     assert r.status_code == 400
-    assert r.get_json()["erro"] == "Não achei no Fracttal a etiqueta Remoto. Nenhuma OS foi criada."
+    assert r.get_json()["erro"] == "Não achei no Fracttal a etiqueta Backoffice. Nenhuma OS foi criada."
     assert cli.feito == {}
 
 
@@ -463,7 +470,7 @@ def test_anexos_passam_pela_ponte_do_nexus(cli, app, logado):
 # ── uma OS com todos os ativos (Levi, 08/10/2026: "Agrupar ativos em atividades por OS") ─────────────────────────────
 def test_uma_os_com_todos_os_ativos_uma_atividade_por_ativo(cli):
     """O `create_work_orders_agrupada`, o mesmo do "Agrupar em UMA OS" do Tradicional, com as regras de sempre:
-    Administrativa, só a Classificação 1 Programada, só REMOTO + ENGENHARIA e a data programada do servidor."""
+    Administrativa, só a Classificação 1 Programada, só BACKOFFICE + ENGENHARIA e a data programada do servidor."""
     r = cli.post(CRIAR, json=_corpo(agrupar=True, programada="2030-01-01T08:00"))
     assert r.status_code == 200 and cli.feito == {}                   # nada pelo caminho de uma OS por ativo
     g = cli.agrupada
