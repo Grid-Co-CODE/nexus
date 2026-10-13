@@ -9,7 +9,7 @@ anotados, e as funções que eles chamariam, trocadas por marcadores.
 import pytest
 
 import nexus.campo as campo
-from nexus.campo import aprovacao, chamados_acompanhamento, ronda_checklist, tabelas, visao
+from nexus.campo import aprovacao, chamados_acompanhamento, ronda_checklist, ronda_fotos, tabelas, visao
 
 
 class _App:
@@ -29,6 +29,9 @@ def chamadas(monkeypatch):
     # rodada e ia ao Fracttal e ao banco com a config deste teste (13/10/2026: só não foi porque o app falso não tem
     # app_context)
     monkeypatch.setattr(chamados_acompanhamento, "ligar", lambda app: feitas.append("Fracttal: chamados no banco"))
+    # a cópia em disco das fotos da ronda: o app falso não tem TESTING e apontava a pasta para a dados/ de verdade do
+    # PC, onde os testes seguintes gravavam as fotos falsas (13/10/2026)
+    monkeypatch.setattr(ronda_fotos, "configurar", lambda pasta: None)
 
     class _Timer:
         def __init__(self, segundos, fn):

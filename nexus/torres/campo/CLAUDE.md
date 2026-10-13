@@ -235,8 +235,10 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     ampliada é a **versão de tela** (`tela`: lado maior 1.600 px, JPEG progressivo; a inteira com `?original=1`), feita
     pelo `preparar` logo depois das miniaturas; as três (inteira, tela, miniatura) ficam **em disco**
     (`dados/cache_fotos_ronda`, pelo arquivo do Fracttal sem a assinatura do link: sobrevive ao reinício de cada deploy;
-    passou de 6.000 arquivos, saem os mais antigos) e o endereço leva a versão do arquivo (`?v=`), que o navegador guarda
-    7 dias. A caixa pede a anterior e a próxima, e a ampliada da miniatura em que o mouse passa.
+    passou de 6.000 arquivos, saem os mais antigos; nos testes, só a memória: app com `TESTING` não liga o disco, e o
+    `test_campo_instalar` dubla o `configurar`, senão as fotos falsas iam para a `dados/` de verdade do PC) e o endereço
+    leva a versão do arquivo (`?v=`), que o navegador guarda 7 dias. A caixa pede a anterior e a próxima, e a ampliada da
+    miniatura em que o mouse passa.
     **Fracttal recusou (429):** o pedaço vem com `data-erro` e o botão "Tentar de novo"; a linha não fica "carregada"
     (fechar e abrir busca de novo) e, aberta, tenta sozinha em 1 minuto (Levi: "atualmente só fica nessa mensagem até
     não sei quando").
