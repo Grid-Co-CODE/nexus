@@ -30,7 +30,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Integração Fracttal: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
-| `estrutura_usina.py` + `telas_equipamentos.py` | tela Base → Equipamentos das usinas: a usina ligada à mão ao Fracttal e às chaves do supervisório, e as cabines, inversores, strings e potência dela, no livro `nexus_estrutura_usina` (13/10/2026) |
+| `estrutura_usina.py` + `telas_equipamentos.py` | tela Base → Equipamentos das usinas: a usina ligada à mão às chaves do supervisório e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings, potência), no livro `nexus_estrutura_usina` (13/10/2026; sem Fracttal na tela) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
 Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanham sozinhas.
@@ -183,28 +183,29 @@ calculado pelo kwp da usina e das cabines... precisamos ter uma versatilidade no
 quero que faça as conexões automaticamente, quero poder ver e fazer de forma versátil, pq se só você fizer vai ficar fácil
 de entender para você, quando eu for fazer não vou entender nada".
 
+- **Sem Fracttal na tela (13/10/2026, Levi: "já temos a ligação com o Fractall pelo registro mestre que é o código da
+  UFV, só precisamos ligar o que aparece no repositório do que vai aparecer lá na plataforma de tempo real, então tem que
+  funcionar mais como uma tabela que nem era na TEquipamentos do BD_Performance, você está complicando sem necessidade
+  alguma!"; ligar ao OS Creator fica para depois).** Saíram o passo "Nome no Fracttal", o ativo do Fracttal de cada
+  cabine e inversor (com o "Sugerir ativos pelo nome") e a leitura dos ~22 mil ativos ao abrir a usina (6,7 s medidos do
+  PC). As rotas `/equipamentos/fracttal` e `/equipamentos/ativos` e os campos `equipamento_id`/`codigo_fracttal` do
+  livro ficam (o que já foi gravado segue no Salvar, intacto); a "Usina Fractall" da visão continua vindo das Ligações.
 - **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; filtros sem
-  Fracttal, sem chave, sem inversores, potência que não fecha); à direita, a usina aberta em 3 passos.
-- **1. Nome no Fracttal:** a MESMA decisão da seção Ligações entre bases (`ligacoes.decidir` + `reaplicar`, o arquivo
-  de regras local): um de-para só. Vale já no Nexus; no banco, no "Publicar no banco" de lá (que é do Levi). Ligar um
-  nome que hoje está em outra usina o passa para esta (a opção diz "hoje em X: passa para esta").
-- **2. Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que
+  chave, sem inversores, potência que não fecha); à direita, a usina aberta em 2 passos.
+- **1. Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que
   a plataforma usa por dentro. Uma usina pode ter várias; **uma chave serve a uma usina só** (a de outra usina é
-  recusada). As opções vêm ordenadas, com o porquê escrito ("mesmo nome do Fracttal na aba", "nome parecido"), nenhuma
-  escolhida. Chave digitada que não está na aba liga, com aviso para conferir o nome exato. **Desligar a chave nunca
+  recusada). As opções vêm ordenadas, com o porquê escrito ("nome parecido"), nenhuma escolhida. Chave digitada que não está na aba liga, com aviso para conferir o nome exato. **Desligar a chave nunca
   apaga inversor:** os que chegavam por ela ficam na usina sem chave, à vista para ganhar outra.
-- **3. Estrutura** (editor em JavaScript sobre um rascunho; só o Salvar grava, de uma vez, por fetch com JSON, e recebe
-  de volta o estado gravado com os IDs novos, sem recarregar). **A cabine é da usina** e o inversor diz a chave por onde
-  chega, o nome lá (`equipamento_supervisorio`), a cabine, kWp, strings esperadas e o ativo do Fracttal. Porque na aba a
+- **2. Equipamentos, nas colunas da aba** (editor em JavaScript sobre um rascunho; só o Salvar grava, de uma vez, por
+  fetch com JSON, e recebe de volta o estado gravado com os IDs novos, sem recarregar). As tabelas usam os nomes da aba:
+  Cabines (UG): Equipamento, Potência (kWp), N de Inversores; Inversores: Usina Supervisório, Equipamento, Equipamento
+  Supervisório, Equipamento Parente, Potência (kWp), Strings Ativas. **A cabine é da usina** e o inversor diz a chave por
+  onde chega, o nome lá (`equipamento_supervisorio`), a cabine, kWp e strings esperadas. Porque na aba a
   UG fica numa chave e os inversores dela em outra (a Altair: "Altair" com a UFV e as 5 UG, e "Altair 1 (73)" a
   "Altair 5 (77)" com os inversores; 1.311 dos 2.201 inversores da aba apontam para UG de outra chave). Ajudas, todas
   só no rascunho: **Trazer da aba** (as chaves ligadas; só preenche o vazio e nunca apaga; nome repetido de outra chave
   ganha a chave no nome), **Gerar inversores** numa cabine ("Inversor c.n", continuando a numeração), **Distribuir
-  potência** (cabine sem kWp = o que falta da usina ÷ as vazias; inversor sem kWp = o que falta da cabine ÷ os vazios) e
-  **Sugerir ativos pelo nome** (só o vazio, e só com UM ativo livre cuja descrição começa pelo nome: "Inversor 1.1
-  Huawei…" serve ao 1.1 e não ao 1.10). Os ativos são os da `nexus_equipamentos · dim_equipamento` da usina (INVR para
-  inversor; CABN e SKID para cabine; "todas as famílias" abre o resto), pedidos depois de desenhar (22 mil linhas, 1 hora
-  de cópia), com o de mesmo nome primeiro e marcado.
+  potência** (cabine sem kWp = o que falta da usina ÷ as vazias; inversor sem kWp = o que falta da cabine ÷ os vazios).
 - **Potência:** a da usina é a **real** do Registro mestre (`potencia_real`, MWp × 1.000) e, sem ela, a contratual (a
   tela diz qual). Medido em 13/10: a aba bate com a real (Araputanga 1: real 3,469 MWp, contratual 3,25; UFV da aba
   3.469,2 kWp); 68 das 258 usinas não têm a real. Conferência contra a soma das cabines e a dos inversores: até 0,5% fecha

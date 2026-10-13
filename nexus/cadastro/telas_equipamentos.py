@@ -1,7 +1,13 @@
-"""Tela Base > Equipamentos das usinas (13/10/2026): a usina do Registro mestre ligada, à mão, ao nome do Fracttal e às
-chaves do supervisório, e a estrutura dela (cabines, inversores, strings, potência). As regras e o livro do banco moram em
-`estrutura_usina.py`; o nome do Fracttal é a MESMA decisão da seção Ligações (`ligacoes.decidir`), vale na hora no Nexus
-e no banco depois do "Publicar no banco" de lá.
+"""Tela Base > Equipamentos das usinas (13/10/2026): a usina do Registro mestre ligada, à mão, às chaves do supervisório
+(a "Usina Supervisório"), e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings,
+potência). As regras e o livro do banco moram em `estrutura_usina.py`.
+
+**Sem Fracttal na tela** (Levi, 13/10/2026: "já temos a ligação com o Fractall pelo registro mestre que é o código da UFV,
+só precisamos ligar o que aparece no repositório do que vai aparecer lá na plataforma de tempo real, então tem que
+funcionar mais como uma tabela que nem era na TEquipamentos do BD_Performance"; ligar ao OS Creator fica para depois).
+Saíram o passo do nome do Fracttal e o ativo do Fracttal de cada cabine e inversor; as rotas `/fracttal` e `/ativos` e os
+campos `equipamento_id`/`codigo_fracttal` do livro ficam (o que já foi gravado não se perde). O nome do Fracttal da
+visão no formato da aba ("Usina Fractall") continua vindo das Ligações, sem passo na tela.
 
 Levi, 13/10/2026: "Não quero que faça as conexões automaticamente, quero poder ver e fazer de forma versátil, pq se só
 você fizer vai ficar fácil de entender para você, quando eu for fazer não vou entender nada". Por isso nada liga sozinho:
@@ -29,7 +35,7 @@ log = logging.getLogger(__name__)
 
 TITULO = "Equipamentos das usinas"
 _BRT = timezone(timedelta(hours=-3))
-FILTROS = (("", "Todas as usinas"), ("sem_fracttal", "Sem nome do Fracttal"), ("sem_chave", "Sem chave do supervisório"),
+FILTROS = (("", "Todas as usinas"), ("sem_chave", "Sem chave do supervisório"),
            ("sem_inversores", "Sem inversores"), ("potencia", "Potência que não fecha"))
 _CHAVE_AVISO = "equipamentos_aviso"
 
@@ -130,18 +136,9 @@ def editor_dados(d: dict) -> dict:
 
 
 def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict, info: dict) -> dict:
-    """O que a usina aberta mostra: os 3 passos (Fracttal, supervisório, estrutura) e as opções de cada um, ordenadas
-    pelo parecido com a usina, sem nada escolhido."""
+    """O que a usina aberta mostra: os 2 passos (as chaves do supervisório e os equipamentos) e as chaves da aba,
+    ordenadas pelo parecido com a usina, sem nada escolhido."""
     d = E.da_usina(est, u["id"])
-    meus_fr = {f["chave"] for f in u["fracttal"]}
-    fr_opcoes = []
-    for n in fr_nomes:
-        if n in meus_fr:
-            continue
-        outros = [nome_usina.get(x, f"usina {x}") for x in fr_dono.get(n, []) if x != u["id"]]
-        fr_opcoes.append({"chave": n, "dono": ", ".join(outros), "nota": _parecido(n, u["titulo"])})
-    fr_opcoes.sort(key=lambda x: (-round(x["nota"], 2), E.norm(x["chave"])))
-    sugeridos_fr = [x for x in fr_opcoes if x["nota"] >= 0.6][:8]
     # as chaves do supervisório: as da aba Equipamentos, as que têm motivo primeiro (o motivo vai escrito)
     dono_chave = {s["usina_supervisorio"]: s["usina_id"] for s in est["supervisorios"] if not s["excluido"]}
     minhas = {s["usina_supervisorio"] for s in d["supervisorios"]}
@@ -150,15 +147,13 @@ def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict, 
         if chave in minhas:
             continue
         dono = dono_chave.get(chave)
-        porque = []
-        if g["fracttal"] and g["fracttal"] in meus_fr:
-            porque.append("mesmo nome do Fracttal na aba")
+        porque = []          # sem o "mesmo nome do Fracttal na aba" (13/10/2026: a tela não fala de Fracttal)
         nota = max(_parecido(g["usina"], u["nome"]), _parecido(chave, u["nome"]))
         if nota >= 0.75:
             porque.append("nome parecido")
         item = {"chave": chave, "usina_aba": g["usina"], "fracttal": g["fracttal"], "porque": ", ".join(porque),
                 "dono": nome_usina.get(dono, f"usina {dono}") if dono else "", "inversores": len(g["inversores"]),
-                "cabines": len(g["cabines"]), "ufv_kwp": g["ufv_kwp"], "nota": nota + (1 if g["fracttal"] in meus_fr else 0)}
+                "cabines": len(g["cabines"]), "ufv_kwp": g["ufv_kwp"], "nota": nota}
         todas.append(item)
         if porque and not dono:
             sugeridas.append(item)
@@ -176,7 +171,7 @@ def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict, 
                 "inversores": len(g["inversores"]), "strings": sum(i["strings"] or 0 for i in g["inversores"]),
                 "sem_strings": sum(1 for i in g["inversores"] if i["strings"] is None), "full_om": g["full_om"]}
                for ch, g in ref_aba.items()]
-    return {"usina": u, "fr_opcoes": fr_opcoes, "fr_sugeridos": sugeridos_fr, "sugeridas": sugeridas[:10],
+    return {"usina": u, "sugeridas": sugeridas[:10],
             "todas": todas, "chaves": chaves, "ref_aba": ref_aba, "ref_tab": ref_tab,
             "editor": dict(editor_dados(d), usina_id=u["id"], kwp_usina=u["kwp"], kwp_de=u["kwp_de"], aba=ref_aba,
                            nome_registro=u["nome"],
@@ -204,7 +199,7 @@ def contexto(srv, cfg, args) -> dict:
         if q and E.norm(q) not in E.norm(f"{x['titulo']} {x['codigo']} {x['cidade'] or ''}"):
             return False
         r = x["resumo"]
-        return {"": True, "sem_fracttal": not x["fracttal"], "sem_chave": not r["chaves"],
+        return {"": True, "sem_chave": not r["chaves"],
                 "sem_inversores": not r["inversores"], "potencia": x["pot"] in ("perto", "nao_fecha")}[filtro]
     sel = D._id(args.get("usina"))
     aberta = next((x for x in lista if x["id"] == sel), None)
@@ -216,7 +211,6 @@ def contexto(srv, cfg, args) -> dict:
             "painel": painel, "aviso": aviso, "erro_livro": est.get("erro") or "", "livro_velho": est.get("velha", False),
             "erro_aba": aba.get("erro") or "", "aba_lida_em": _hora(aba.get("lido_em")), "fr_lido": fr_lido,
             "sem_token": not cfg.get("GRIDCO_SQL_TOKEN"), "pode_gravar": pode_gravar,
-            "n_fracttal": sum(1 for x in lista if x["fracttal"]),
             "n_chave": sum(1 for x in lista if x["resumo"]["chaves"]),
             "n_inversores": sum(1 for x in lista if x["resumo"]["inversores"]),
             "n_strings": sum(x["resumo"]["strings"] for x in lista),

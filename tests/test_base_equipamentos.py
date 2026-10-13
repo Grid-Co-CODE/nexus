@@ -292,17 +292,23 @@ def test_so_administrador(app_eq):
     assert app_eq.extensions["nexus_dados_sessao"].syncs == 0
 
 
-def test_a_tela_mostra_a_lista_e_os_tres_passos_sem_ligar_nada_sozinha(cli, banco):
+def test_a_tela_mostra_a_lista_e_os_dois_passos_sem_fracttal_e_sem_ligar_nada_sozinha(cli, banco):
     html = cli.get("/t/base/equipamentos").get_data(as_text=True)
     assert "Equipamentos das usinas" in html and "Como funciona" in html and "Matões 100" in html
-    assert "sem Fracttal" in html                                  # a Matões 100 não tem nome do Fracttal
+    # sem Fracttal na tela (Levi, 13/10/2026: a UFV já liga ao Fracttal pelo código no Registro mestre)
+    assert "sem Fracttal" not in html and "Com nome do Fracttal" not in html
     html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
-    for passo in ('id="passo-fracttal"', 'id="passo-chave"', 'id="passo-estrutura"', 'id="eq-dados"'):
+    for passo in ('id="passo-chave"', 'id="passo-estrutura"', 'id="eq-dados"'):
         assert passo in html
-    assert "Thopen - Brodowski 1 - SP" in html and "ligado por código" in html      # o Fracttal pelo código
+    assert 'id="passo-fracttal"' not in html and "ativos_url" not in html.split('id="eq-dados"')[0]
+    # a tabela nas colunas da aba Equipamentos, e o editor não pede os ativos do Fracttal
+    for col in ("Usina Supervisório", "Equipamento Supervisório", "Equipamento Parente", "Strings Ativas"):
+        assert col in html
+    assert "pedirAtivos" not in html and "Ativo no Fracttal" not in html
     # as chaves da aba com motivo vêm primeiro, com o porquê, e nenhuma vem escolhida
     sugeridas = html.split('label="Com motivo para esta usina"')[1].split("</optgroup>")[0]
-    assert "Brodowski 1 (90) — mesmo nome do Fracttal na aba" in sugeridas and " selected" not in sugeridas
+    assert "Brodowski 1 (90) — nome parecido" in sugeridas and " selected" not in sugeridas
+    assert "Fracttal" not in sugeridas
     assert "Nenhuma chave do supervisório ligada" in html
     dados = json.loads(html.split('id="eq-dados">')[1].split("</script>")[0])
     assert dados["usina_id"] == 1 and dados["kwp_usina"] == 1000.0 and dados["chaves"] == [] and dados["selo"]

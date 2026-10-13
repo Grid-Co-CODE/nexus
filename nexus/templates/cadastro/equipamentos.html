@@ -3,9 +3,12 @@
 {% block conteudo %}
 {# Base > Equipamentos das usinas (13/10/2026, Levi: "Temos que substituir a aba equipamentos aproveitando o que tem lá e
    usando o Nexus como ponto de partida"; "Não quero que faça as conexões automaticamente, quero poder ver e fazer de forma
-   versátil"). À esquerda, as usinas do Registro mestre; à direita, a usina aberta em 3 passos: o nome no Fracttal (a
-   decisão da seção Ligações), as chaves do supervisório e a estrutura (cabines, inversores, strings, potência). Nada liga
-   sozinho: as opções vêm ordenadas pelo parecido, com o porquê escrito. Regras em nexus/cadastro/estrutura_usina.py. #}
+   versátil"). À esquerda, as usinas do Registro mestre; à direita, a usina aberta em 2 passos: as chaves do supervisório
+   (a "Usina Supervisório") e a tabela dos equipamentos nas colunas da aba Equipamentos. Sem Fracttal (Levi, 13/10/2026:
+   "já temos a ligação com o Fractall pelo registro mestre que é o código da UFV [...] tem que funcionar mais como uma
+   tabela que nem era na TEquipamentos do BD_Performance"; ligar ao OS Creator fica para depois): saíram o passo do nome
+   do Fracttal e o ativo do Fracttal de cada cabine e inversor (a leitura dos ~22 mil ativos levava 6,7 s a cada usina
+   aberta). Nada liga sozinho. Regras em nexus/cadastro/estrutura_usina.py. #}
 {% macro kwp(v) %}{% if v is none %}—{% else %}{{ '{:,.1f}'.format(v).replace(',', 'X').replace('.', ',').replace('X', '.') }}{% endif %}{% endmacro %}
 {% macro mantem() %}{% for k, v in volta.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
@@ -13,16 +16,15 @@
 <div class="cad-topo">
   <div>
     <h1 class="titulo-pagina">Equipamentos das usinas</h1>
-    <p class="cad-sub">A usina do Registro mestre ligada ao Fracttal e ao supervisório, e a estrutura dela: cabines, inversores, strings e potência. A aba Equipamentos fica só como referência.{% if aba_lida_em %} Aba lida em {{ aba_lida_em }}.{% endif %}</p>
+    <p class="cad-sub">A usina do Registro mestre ligada ao supervisório (a plataforma de tempo real), com os equipamentos nas colunas da aba Equipamentos: cabines, inversores, strings e potência. A aba fica só como referência.{% if aba_lida_em %} Aba lida em {{ aba_lida_em }}.{% endif %}</p>
   </div>
   <div class="fr-acoes">
     <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_base.equipamentos', reler=1, usina=painel.usina.id if painel else None, **volta) }}"><i class="ph ph-arrows-clockwise"></i> Ler o banco de novo</a>
     <span class="fr-dica">
       <button type="button" class="fr-dica-botao" aria-label="Como esta tela funciona" aria-describedby="eq-dica-texto"><i class="ph ph-warning-circle" aria-hidden="true"></i></button>
       <span class="fr-dica-texto" id="eq-dica-texto" role="tooltip">
-        <span><strong>Nada liga sozinho.</strong> Em cada passo, as opções vêm ordenadas pelo nome parecido com a usina, com o porquê escrito; quem escolhe e liga é você.</span>
-        <span><strong>Fracttal.</strong> É a mesma decisão da seção Ligações entre bases (Governança de dados): vale já no Nexus e vai ao banco no Publicar no banco de lá.</span>
-        <span><strong>Supervisório e estrutura.</strong> Vão para o banco (livro nexus_estrutura_usina), sem nome nem e-mail de ninguém. A aba Equipamentos não muda.</span>
+        <span><strong>Nada liga sozinho.</strong> As chaves da aba vêm ordenadas pelo nome parecido com a usina, com o porquê escrito; quem escolhe e liga é você.</span>
+        <span><strong>Supervisório e equipamentos.</strong> Vão para o banco (livro nexus_estrutura_usina), sem nome nem e-mail de ninguém. A aba Equipamentos não muda.</span>
       </span>
     </span>
   </div>
@@ -35,19 +37,16 @@
   Sem a <span class="gc-dado">GRIDCO_SQL_TOKEN</span>, as chaves do supervisório e a estrutura ficam só para ver.</div></div>{% endif %}
 {% if erro_aba %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-table"></i><div><strong>Não consegui ler a aba Equipamentos.</strong>
   {{ erro_aba }}. As sugestões de chave e o "Trazer da aba" ficam sem ela.</div></div>{% endif %}
-{% if not fr_lido %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-plugs"></i><div><strong>As bases ainda não foram lidas pelas Ligações.</strong>
-  Sem isso, o passo do Fracttal fica parado: em <a href="{{ url_for('torre_base.governanca') }}#ligacoes">Governança de dados &gt; Ligações entre bases</a>, use "Ler as bases de novo".</div></div>{% endif %}
 
 <div class="cad-numeros">
   <div><div class="r">Usinas no Registro</div><div class="v">{{ total }}</div><div class="d">o ponto de partida</div></div>
-  <div><div class="r">Com nome do Fracttal</div><div class="v">{{ n_fracttal }}</div><div class="d">{{ total - n_fracttal }} sem</div></div>
   <div><div class="r">Com chave do supervisório</div><div class="v">{{ n_chave }}</div><div class="d">{{ n_chaves_ligadas }} de {{ n_chaves_aba }} chaves da aba ligadas</div></div>
   <div><div class="r">Com inversores</div><div class="v">{{ n_inversores }}</div><div class="d">{{ '{:,}'.format(n_strings).replace(',', '.') }} strings esperadas</div></div>
   <div><div class="r">No lugar da aba</div><div class="v">{{ n_no_lugar }}</div><div class="d">chaves que os leitores já leem do Nexus · {{ n_visao }} linhas na visão</div></div>
 </div>
 {% if n_no_lugar or n_visao %}<form method="post" action="{{ url_for('torre_base.equipamentos_visao') }}" class="eq-refazer">
   {% if painel %}<input type="hidden" name="usina" value="{{ painel.usina.id }}">{% endif %}{{ mantem() }}
-  <span class="mudo">A visão no formato da aba é refeita a cada gravação desta tela. Mudou o nome, o cliente ou a potência no Registro mestre, ou o Fracttal nas Ligações?</span>
+  <span class="mudo">A visão no formato da aba é refeita a cada gravação desta tela. Mudou o nome, o cliente ou a potência no Registro mestre?</span>
   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not pode_gravar %} disabled{% endif %}><i class="ph ph-arrows-clockwise"></i> Refazer a visão</button>
 </form>{% endif %}
 
@@ -70,7 +69,6 @@
           <span class="eq-item-nome">{{ x.nome }}</span>
           <span class="eq-item-cli">{{ x.cliente or 'sem cliente' }}{% if x.kwp %} · {{ kwp(x.kwp) }} kWp{% endif %}</span>
           <span class="eq-item-chips">
-            {% if x.fracttal %}<span class="cad-chip cad-chip--operacao">Fracttal</span>{% else %}<span class="cad-chip cad-chip--alerta">sem Fracttal</span>{% endif %}
             {% if x.resumo.chaves %}<span class="cad-chip cad-chip--info">{{ x.resumo.chaves }} chave{{ 's' if x.resumo.chaves > 1 }}</span>{% else %}<span class="cad-chip cad-chip--alerta">sem chave</span>{% endif %}
             {% if x.resumo.inversores %}<span class="cad-chip cad-chip--info">{{ x.resumo.inversores }} inv · {{ x.resumo.strings }} str</span>{% endif %}
             {% if x.resumo.no_lugar_da_aba %}<span class="cad-chip cad-chip--operacao">no lugar da aba</span>{% endif %}
@@ -89,11 +87,10 @@
       <div class="eq-corpo">
         <ol class="eq-passos-guia">
           <li><strong>Escolha a usina</strong> na lista ao lado: é a do Registro mestre, o ponto de partida.</li>
-          <li><strong>Ligue o nome do Fracttal</strong> (a Classificação 1). É a mesma decisão da seção Ligações entre bases.</li>
           <li><strong>Ligue as chaves do supervisório</strong>: o nome que o supervisório dá à usina (a "Usina Supervisório" da aba Equipamentos). Uma usina pode ter mais de uma.</li>
-          <li><strong>Monte a estrutura</strong>: cabines e inversores, com a chave, o nome no supervisório, kWp e strings de cada um. À mão, gerando os inversores de uma cabine, ou pelo "Trazer da aba". A potência confere com a do Registro mestre. Só o Salvar grava.</li>
+          <li><strong>Preencha a tabela dos equipamentos</strong>, nas colunas da aba Equipamentos: Usina Supervisório, Equipamento, Equipamento Supervisório, Equipamento Parente (a cabine), Potência e Strings. À mão, gerando os inversores de uma cabine, ou pelo "Trazer da aba". A potência confere com a do Registro mestre. Só o Salvar grava.</li>
         </ol>
-        <p class="gc-ajuda">Nada liga sozinho: a tela ordena as opções pelo nome parecido e escreve o porquê; quem escolhe é você.</p>
+        <p class="gc-ajuda">Nada liga sozinho: a tela ordena as chaves pelo nome parecido e escreve o porquê; quem escolhe é você. O Fracttal já está ligado pelo código da UFV no Registro mestre.</p>
       </div>
     </section>
   {% else %}{% set u = painel.usina %}
@@ -110,40 +107,8 @@
         {% elif u.kwp_contratual and u.kwp_contratual != u.kwp_real %}<span class="m">contratual {{ kwp(u.kwp_contratual) }} kWp</span>{% endif %}</div>
     </div>
 
-    <section class="cad-secao eq-passo" id="passo-fracttal">
-      <h2><span class="eq-num">1</span> Nome no Fracttal {% if u.fracttal %}<span class="cad-chip cad-chip--operacao">ligado</span>{% else %}<span class="cad-chip cad-chip--alerta">falta</span>{% endif %}</h2>
-      <div class="eq-corpo">
-        <p class="gc-ajuda">A Classificação 1 do Fracttal desta usina. É a mesma decisão da seção Ligações entre bases: vale já no Nexus e vai ao banco no Publicar no banco de lá.</p>
-        {% for f in u.fracttal %}
-        <div class="eq-ligado">
-          <span class="gc-dado">{{ f.chave }}</span><span class="mudo">ligado por {{ f.como or '—' }}</span>
-          <form method="post" action="{{ url_for('torre_base.equipamentos_fracttal') }}" class="eq-form-inline eq-guarda">
-            <input type="hidden" name="usina" value="{{ u.id }}"><input type="hidden" name="acao" value="desligar"><input type="hidden" name="chave" value="{{ f.chave }}">{{ mantem() }}
-            <button class="gc-btn gc-btn--ui gc-btn--fantasma" type="submit"{% if not fr_lido %} disabled{% endif %}><i class="ph ph-link-break"></i> Desligar</button>
-          </form>
-        </div>
-        {% else %}<p class="eq-vazio">Nenhum nome do Fracttal ligado a esta usina.</p>{% endfor %}
-        <form method="post" action="{{ url_for('torre_base.equipamentos_fracttal') }}" class="eq-form eq-guarda">
-          <input type="hidden" name="usina" value="{{ u.id }}"><input type="hidden" name="acao" value="ligar">{{ mantem() }}
-          <label class="gc-rotulo" for="eq-fr">{{ 'Ligar mais um nome do Fracttal' if u.fracttal else 'Ligar um nome do Fracttal' }}</label>
-          <div class="eq-form-linha">
-            <select id="eq-fr" name="chave" class="gc-campo" required{% if not fr_lido %} disabled{% endif %}>
-              <option value="">Escolha o nome…</option>
-              {% if painel.fr_sugeridos %}<optgroup label="Parecidos com o nome da usina">
-                {% for x in painel.fr_sugeridos %}<option value="{{ x.chave }}">{{ x.chave }}{% if x.dono %} (hoje em {{ x.dono }}: passa para esta){% endif %}</option>{% endfor %}
-              </optgroup>{% endif %}
-              <optgroup label="Todos os nomes do Fracttal (A–Z)">
-                {% for x in painel.fr_opcoes|sort(attribute='chave') %}<option value="{{ x.chave }}">{{ x.chave }}{% if x.dono %} (hoje em {{ x.dono }}: passa para esta){% endif %}</option>{% endfor %}
-              </optgroup>
-            </select>
-            <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not fr_lido %} disabled{% endif %}><i class="ph ph-link"></i> Ligar</button>
-          </div>
-        </form>
-      </div>
-    </section>
-
     <section class="cad-secao eq-passo" id="passo-chave">
-      <h2><span class="eq-num">2</span> Chaves do supervisório {% if painel.chaves %}<span class="cad-chip cad-chip--operacao">{{ painel.chaves|length }} ligada{{ 's' if painel.chaves|length > 1 }}</span>{% else %}<span class="cad-chip cad-chip--alerta">falta</span>{% endif %}</h2>
+      <h2><span class="eq-num">1</span> Chaves do supervisório (Usina Supervisório) {% if painel.chaves %}<span class="cad-chip cad-chip--operacao">{{ painel.chaves|length }} ligada{{ 's' if painel.chaves|length > 1 }}</span>{% else %}<span class="cad-chip cad-chip--alerta">falta</span>{% endif %}</h2>
       <div class="eq-corpo">
         <p class="gc-ajuda">O nome que o supervisório dá à usina (a "Usina Supervisório" da aba Equipamentos, a chave que a plataforma usa por dentro). Uma usina pode ter mais de uma: a Altair tem seis na aba, uma com as cabines e uma por cabine com os inversores. Cada chave serve a uma usina só.</p>
         {% for c in painel.chaves %}
@@ -178,19 +143,19 @@
     </section>
 
     <section class="cad-secao eq-passo" id="passo-estrutura">
-      <h2><span class="eq-num">3</span> Estrutura: cabines, inversores, strings e potência</h2>
+      <h2><span class="eq-num">2</span> Equipamentos, nas colunas da aba Equipamentos</h2>
       <div class="eq-corpo">
-        <p class="gc-ajuda">A cabine é da usina; cada inversor diz por qual chave do supervisório chega, o nome que tem lá, a cabine, kWp e strings esperadas. Sem o kWp do inversor, conta o da cabine dividido pelos inversores dela (calculado). Nada grava até o Salvar.</p>
+        <p class="gc-ajuda">Como na aba: cada inversor com a Usina Supervisório por onde chega, o Equipamento Supervisório (o nome que tem lá), o Equipamento Parente (a cabine), a Potência e as Strings. Sem a potência do inversor, conta a da cabine dividida pelos inversores dela (calculado). Nada grava até o Salvar.</p>
         <p class="gc-ajuda"><strong>No lugar da aba:</strong> a chave marcada passa a ser lida do Nexus pela plataforma, pelo gêmeo, pelas Ligações e pelo coletor (quando ligado nele), e não mais da aba Equipamentos. Antes de marcar, veja a coluna "Diferença com a aba": é o que muda para eles.</p>
         {% if painel.ref_tab %}
         <details class="eq-ref">
           <summary>O que a aba Equipamentos tem para {{ 'a chave ligada' if painel.ref_tab|length == 1 else 'as ' ~ painel.ref_tab|length ~ ' chaves ligadas' }}</summary>
           <div class="cad-rolagem">
             <table class="cad-tabela">
-              <thead><tr><th>Chave</th><th>Usina na aba</th><th>Nome no Fracttal</th><th class="num">UFV kWp</th><th>Cabines (UG)</th><th class="num">Inversores</th><th class="num">Strings</th><th>Full O&amp;M</th></tr></thead>
+              <thead><tr><th>Usina Supervisório</th><th>Usina na aba</th><th class="num">UFV kWp</th><th>Cabines (UG)</th><th class="num">Inversores</th><th class="num">Strings</th><th>Full O&amp;M</th></tr></thead>
               <tbody>
               {% for g in painel.ref_tab %}
-              <tr><td><span class="gc-dado">{{ g.chave }}</span></td><td>{{ g.usina }}</td><td>{{ g.fracttal or '—' }}</td><td class="num">{{ kwp(g.ufv_kwp) }}</td>
+              <tr><td><span class="gc-dado">{{ g.chave }}</span></td><td>{{ g.usina }}</td><td class="num">{{ kwp(g.ufv_kwp) }}</td>
                 <td>{% for c in g.cabines %}{{ c.nome }} ({{ kwp(c.kwp) }}){{ ', ' if not loop.last }}{% else %}—{% endfor %}</td>
                 <td class="num">{{ g.inversores }}</td><td class="num">{{ g.strings }}{% if g.sem_strings %} <span class="mudo">({{ g.sem_strings }} sem)</span>{% endif %}</td><td>{{ 'Sim' if g.full_om else 'Não' }}</td></tr>
               {% endfor %}
@@ -214,7 +179,7 @@
 <script>
 /* Base > Equipamentos das usinas. A lista filtra enquanto se digita. O editor da estrutura trabalha num rascunho: cada
    campo muda só o rascunho, e o Salvar manda tudo de uma vez (JSON) e recebe de volta o estado gravado, com os IDs novos.
-   Sair da página, ou usar um botão dos passos 1 e 2, com mudança não salva pede confirmação. */
+   Sair da página, ou usar um botão do passo 1, com mudança não salva pede confirmação. */
 (function () {
   var toast = document.getElementById('eq-toast'), relogio = null;
   function avisar(texto, ok) {
@@ -244,7 +209,7 @@
   var raiz = document.getElementById('eq-editor');
   var dados = document.getElementById('eq-dados');
   var sujo = function () { return false; };
-  /* passos 1 e 2: confirmação quando há rascunho não salvo, ou quando o formulário pede (desligar chave com inversores) */
+  /* passo 1: confirmação quando há rascunho não salvo, ou quando o formulário pede (desligar chave com inversores) */
   document.querySelectorAll('form.eq-guarda').forEach(function (f) {
     f.addEventListener('submit', function (e) {
       if (sujo() && !window.confirm('A estrutura tem mudanças não salvas, que se perdem. Continuar mesmo assim?')) { e.preventDefault(); return; }
@@ -261,7 +226,7 @@
 
   var D = JSON.parse(dados.textContent);
   var podeGravar = raiz.getAttribute('data-pode-gravar') === '1';
-  var st = null, base = '', ativos = null, erroAtivos = '', todasFamilias = false, seq = 0, gerando = null, cmpAberta = null;
+  var st = null, base = '', seq = 0, gerando = null, cmpAberta = null;
 
   function clonar(x) { return JSON.parse(JSON.stringify(x)); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
@@ -335,40 +300,6 @@
       caixaPot('Soma dos inversores', s.inv, s.calc ? 'com ' + fmt(s.calc) + ' kWp calculados' : (st.inversores.length ? 'inversor sem kWp não soma' : 'nenhum inversor'));
   }
 
-  /* ativos do Fracttal da usina (a dimensão de equipamento do Nexus), pedidos depois de desenhar */
-  function familiasDe(tipo) { return tipo === 'cab' ? ['CABN', 'SKID'] : ['INVR']; }
-  function usadoPor(eid, menos) {
-    var quem = null;
-    st.cabines.concat(st.inversores).forEach(function (x) { if (x !== menos && x.equipamento_id === eid) quem = x.nome; });
-    return quem;
-  }
-  /* o ativo cuja descrição começa pelo nome do equipamento ("Inversor 1.1 Huawei…" para o "Inversor 1.1"; o 1.10 não) */
-  function mesmoNome(a, x) {
-    var n = semAcento(x.nome), d = semAcento(a.descricao);
-    return !!n && (d === n || d.indexOf(n + ' ') === 0);
-  }
-  function selAtivo(tipo, idx, x) {
-    var attrs = ' class="gc-campo" data-tipo="' + tipo + '" data-i="' + idx + '" data-campo="ativo" aria-label="Ativo do Fracttal de ' + esc(x.nome) + '"';
-    if (ativos === null) return '<select' + attrs + ' disabled><option>' + (erroAtivos ? 'sem a lista de ativos' : 'carregando os ativos…') + '</option></select>';
-    var fam = familiasDe(tipo), op = '<option value="">—</option>', achou = false;
-    var lista = ativos.filter(function (a) { return todasFamilias || fam.indexOf(a.familia) >= 0 || a.equipamento_id === x.equipamento_id; });
-    lista = lista.filter(function (a) { return mesmoNome(a, x); }).concat(lista.filter(function (a) { return !mesmoNome(a, x); }));
-    lista.forEach(function (a) {
-      var uso = usadoPor(a.equipamento_id, x), sel = a.equipamento_id === x.equipamento_id;
-      if (sel) achou = true;
-      op += '<option value="' + a.equipamento_id + '"' + (sel ? ' selected' : '') + '>' + esc(a.codigo + (a.descricao ? ' · ' + a.descricao : '')) +
-        (todasFamilias ? ' [' + esc(a.familia) + ']' : '') + (mesmoNome(a, x) ? ' — mesmo nome' : '') + (uso ? ' (em ' + esc(uso) + ')' : '') + '</option>';
-    });
-    if (x.equipamento_id && !achou) op += '<option value="' + x.equipamento_id + '" selected>' + esc(x.codigo_fracttal || 'ativo salvo') + ' (fora da lista desta usina)</option>';
-    return '<select' + attrs + (podeGravar ? '' : ' disabled') + '>' + op + '</select>';
-  }
-  function pedirAtivos() {
-    fetch(D.ativos_url, {headers: {'Accept': 'application/json'}, credentials: 'same-origin'})
-      .then(function (r) { return r.json(); })
-      .then(function (j) { ativos = j.ativos || []; erroAtivos = j.erro || ''; desenhar(); })
-      .catch(function () { ativos = []; erroAtivos = 'sem conexão'; desenhar(); });
-  }
-
   /* o desenho do editor inteiro (as mudanças de valor só redesenham o que depende delas: `derivados`) */
   function campo(tipo, idx, nome, valor, extra) {
     return '<input class="gc-campo" data-tipo="' + tipo + '" data-i="' + idx + '" data-campo="' + nome + '" value="' + esc(valor) + '"' + (extra || '') + (podeGravar ? '' : ' disabled') + '>';
@@ -376,10 +307,10 @@
   function desenhar() {
     var s = somas(), h = '', ro = podeGravar ? '' : ' disabled';
     /* chaves */
-    h += '<div class="eq-ed-sec"><div class="eq-ed-cab"><h3>Chaves do supervisório</h3><span class="mudo">Tudo aqui vai no Salvar. Para ligar ou desligar uma chave, use o passo 2.</span></div>';
-    if (!st.chaves.length) h += '<p class="eq-vazio">Nenhuma chave ligada: ligue no passo 2 antes de montar os inversores (cada inversor diz por qual chave chega).</p>';
+    h += '<div class="eq-ed-sec"><div class="eq-ed-cab"><h3>Usina Supervisório</h3><span class="mudo">Tudo aqui vai no Salvar. Para ligar ou desligar uma chave, use o passo 1.</span></div>';
+    if (!st.chaves.length) h += '<p class="eq-vazio">Nenhuma chave ligada: ligue no passo 1 antes de montar os inversores (cada inversor diz por qual Usina Supervisório chega).</p>';
     else {
-      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-chaves"><thead><tr><th>Chave</th><th>Nome de exibição</th>' +
+      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-chaves"><thead><tr><th>Usina Supervisório</th><th>Usina (exibição)</th>' +
         '<th title="A linha da usina (UFV) e as das cabines saem nesta chave">Chave da usina</th><th class="num">Inversores</th>' +
         '<th>Full O&amp;M</th><th>String Box</th><th title="A plataforma, o gêmeo, as Ligações e o coletor (quando ligado) leem esta chave do Nexus">No lugar da aba</th><th>Diferença com a aba</th></tr></thead><tbody>';
       st.chaves.forEach(function (ch, i) {
@@ -404,26 +335,24 @@
     /* potência */
     h += '<div class="cad-numeros eq-pot" id="eq-pot">' + htmlPot() + '</div>';
     /* cabines */
-    h += '<div class="eq-ed-sec"><div class="eq-ed-cab"><h3>Cabines <span class="eq-n">' + st.cabines.length + '</span></h3>' +
-      '<label class="eq-marca eq-familias"><input type="checkbox" id="eq-todas-familias"' + (todasFamilias ? ' checked' : '') + '> ativos de todas as famílias</label>' +
+    h += '<div class="eq-ed-sec"><div class="eq-ed-cab"><h3>Cabines (UG) <span class="eq-n">' + st.cabines.length + '</span></h3>' +
       '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-acao="nova-cabine"' + ro + '><i class="ph ph-plus"></i> Adicionar cabine</button></div>';
     if (!st.cabines.length) h += '<p class="eq-vazio">Nenhuma cabine. Adicione, ou traga da aba.</p>';
     else {
-      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab"><thead><tr><th>#</th><th>Nome</th><th class="num">kWp</th><th class="num">Inversores</th><th>Ativo no Fracttal (CABN, SKID)</th><th></th></tr></thead><tbody>';
+      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab"><thead><tr><th>#</th><th>Equipamento</th><th class="num">Potência (kWp)</th><th class="num">N de Inversores</th><th></th></tr></thead><tbody>';
       st.cabines.forEach(function (c, i) {
         h += '<tr><td class="id">' + (i + 1) + '</td><td>' + campo('cab', i, 'nome', c.nome, ' maxlength="120" aria-label="Nome da cabine ' + (i + 1) + '"') + '</td>' +
           '<td class="eq-w-num">' + campo('cab', i, 'potencia_kwp', paraCampo(c.potencia_kwp), ' inputmode="decimal" aria-label="kWp da cabine ' + esc(c.nome) + '"') + '</td>' +
           '<td class="num" data-cont="' + esc(c.k) + '">' + invsDaCab(c.k).length + '</td>' +
-          '<td class="eq-w-ativo">' + selAtivo('cab', i, c) + '</td>' +
           '<td class="eq-acoes-linha"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-acao="gerar" data-i="' + i + '"' + ro + '>Gerar inversores</button>' +
           '<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-acao="tirar-cabine" data-i="' + i + '"' + ro + ' aria-label="Remover a cabine ' + esc(c.nome) + '"><i class="ph ph-trash"></i></button></td></tr>';
         if (gerando === c.k) {
           var opCh = '<option value="">sem chave</option>' + st.chaves.map(function (ch) { return '<option value="' + ch.supervisorio_id + '"' + (st.chaves.length === 1 ? ' selected' : '') + '>' + esc(ch.chave) + '</option>'; }).join('');
-          h += '<tr class="eq-gerar"><td></td><td colspan="5"><div class="eq-gerar-form">' +
+          h += '<tr class="eq-gerar"><td></td><td colspan="4"><div class="eq-gerar-form">' +
             '<label>Quantos <input class="gc-campo" id="eq-g-n" inputmode="numeric" value="10"></label>' +
             '<label>Strings cada <input class="gc-campo" id="eq-g-str" inputmode="numeric" placeholder="vazio = depois"></label>' +
             '<label>kWp cada <input class="gc-campo" id="eq-g-kwp" inputmode="decimal" placeholder="vazio = calculado"></label>' +
-            '<label>Chave <select class="gc-campo" id="eq-g-chave">' + opCh + '</select></label>' +
+            '<label>Usina Supervisório <select class="gc-campo" id="eq-g-chave">' + opCh + '</select></label>' +
             '<span class="mudo">Nomes "Inversor ' + (i + 1) + '.1", "' + (i + 1) + '.2"…, continuando os que a cabine já tem.</span>' +
             '<button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-acao="gerar-ok" data-i="' + i + '">Gerar</button>' +
             '<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-acao="gerar-cancela">Cancelar</button></div></td></tr>';
@@ -440,17 +369,16 @@
     else {
       var opChaves = function (v) { return '<option value="">sem chave</option>' + st.chaves.map(function (ch) { return '<option value="' + ch.supervisorio_id + '"' + (ch.supervisorio_id === v ? ' selected' : '') + '>' + esc(ch.chave) + '</option>'; }).join(''); };
       var opCabs = function (v) { return '<option value="">sem cabine</option>' + st.cabines.map(function (c) { return '<option value="' + esc(c.k) + '"' + (c.k === v ? ' selected' : '') + '>' + esc(c.nome) + '</option>'; }).join(''); };
-      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-inv"><thead><tr><th>#</th><th>Nome</th><th>Chave do supervisório</th><th>Nome no supervisório</th><th>Cabine</th><th class="num">kWp</th><th class="num">Strings</th><th>Ativo no Fracttal (INVR)</th><th></th></tr></thead><tbody>';
+      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-inv"><thead><tr><th>#</th><th>Usina Supervisório</th><th>Equipamento</th><th>Equipamento Supervisório</th><th>Equipamento Parente</th><th class="num">Potência (kWp)</th><th class="num">Strings Ativas</th><th></th></tr></thead><tbody>';
       st.inversores.forEach(function (x, i) {
         var calc = kwpCalculado(x);
         h += '<tr' + (!x.chave && st.chaves.length ? ' class="eq-linha-falta"' : '') + '><td class="id">' + (i + 1) + '</td>' +
-          '<td class="eq-w-nome">' + campo('inv', i, 'nome', x.nome, ' maxlength="120" aria-label="Nome do inversor ' + (i + 1) + '"') + '</td>' +
-          '<td class="eq-w-chave"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="chave" aria-label="Chave de ' + esc(x.nome) + '"' + ro + '>' + opChaves(x.chave) + '</select></td>' +
-          '<td class="eq-w-sup">' + campo('inv', i, 'equipamento_supervisorio', x.equipamento_supervisorio, ' maxlength="120" placeholder="ex.: INVERSOR01" aria-label="Nome no supervisório de ' + esc(x.nome) + '"') + '</td>' +
-          '<td class="eq-w-cab"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="cabine" aria-label="Cabine de ' + esc(x.nome) + '"' + ro + '>' + opCabs(x.cabine) + '</select></td>' +
+          '<td class="eq-w-chave"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="chave" aria-label="Usina Supervisório de ' + esc(x.nome) + '"' + ro + '>' + opChaves(x.chave) + '</select></td>' +
+          '<td class="eq-w-nome">' + campo('inv', i, 'nome', x.nome, ' maxlength="120" aria-label="Equipamento ' + (i + 1) + '"') + '</td>' +
+          '<td class="eq-w-sup">' + campo('inv', i, 'equipamento_supervisorio', x.equipamento_supervisorio, ' maxlength="120" placeholder="ex.: INVERSOR01" aria-label="Equipamento Supervisório de ' + esc(x.nome) + '"') + '</td>' +
+          '<td class="eq-w-cab"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="cabine" aria-label="Equipamento Parente de ' + esc(x.nome) + '"' + ro + '>' + opCabs(x.cabine) + '</select></td>' +
           '<td class="eq-w-num">' + campo('inv', i, 'potencia_kwp', paraCampo(x.potencia_kwp), ' inputmode="decimal" placeholder="' + (calc != null ? '≈ ' + fmt(calc) + ' calc.' : '') + '" aria-label="kWp de ' + esc(x.nome) + '"') + '</td>' +
-          '<td class="eq-w-str">' + campo('inv', i, 'strings_esperadas_qtd', x.strings_esperadas_qtd == null ? '' : x.strings_esperadas_qtd, ' inputmode="numeric" aria-label="Strings esperadas de ' + esc(x.nome) + '"') + '</td>' +
-          '<td class="eq-w-ativo">' + selAtivo('inv', i, x) + '</td>' +
+          '<td class="eq-w-str">' + campo('inv', i, 'strings_esperadas_qtd', x.strings_esperadas_qtd == null ? '' : x.strings_esperadas_qtd, ' inputmode="numeric" aria-label="Strings Ativas de ' + esc(x.nome) + '"') + '</td>' +
           '<td><button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-acao="tirar-inversor" data-i="' + i + '"' + ro + ' aria-label="Remover o inversor ' + esc(x.nome) + '"><i class="ph ph-trash"></i></button></td></tr>';
       });
       h += '</tbody></table></div>';
@@ -461,7 +389,6 @@
     h += '<div class="eq-barra">' +
       '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-acao="trazer"' + (temAba && podeGravar ? '' : ' disabled') + ' title="' + (temAba ? 'Preenche o rascunho com o que a aba tem para as chaves ligadas (só o que está vazio; nada é apagado)' : 'Nenhuma chave ligada está na aba') + '"><i class="ph ph-download-simple"></i> Trazer da aba</button>' +
       '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-acao="distribuir"' + ro + ' title="Preenche o kWp vazio: a cabine pelo que falta da usina, o inversor pelo que falta da cabine"><i class="ph ph-arrows-split"></i> Distribuir potência</button>' +
-      '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-acao="sugerir-ativos"' + (ativos && ativos.length && podeGravar ? '' : ' disabled') + ' title="Preenche o ativo vazio com o único ativo do Fracttal de mesmo nome, ainda livre. Nada grava até o Salvar"><i class="ph ph-magic-wand"></i> Sugerir ativos pelo nome</button>' +
       '<span class="eq-estado" id="eq-estado"></span>' +
       '<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-acao="descartar"' + ro + '>Descartar mudanças</button>' +
       '<button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-acao="salvar"' + ro + '><i class="ph ph-floppy-disk"></i> Salvar</button></div>';
@@ -523,11 +450,6 @@
       x.chave = t.value ? +t.value : null;
     } else if (c === 'cabine') {
       x.cabine = t.value || null;
-    } else if (c === 'ativo') {
-      var a = null; (ativos || []).forEach(function (y) { if (String(y.equipamento_id) === t.value) a = y; });
-      x.equipamento_id = t.value ? +t.value : null;
-      x.codigo_fracttal = a ? a.codigo : (t.value ? x.codigo_fracttal : '');
-      return 'redesenhar';               /* o "(em …)" dos outros seletores muda */
     } else {
       x[c] = t.value;
     }
@@ -540,10 +462,9 @@
   });
   raiz.addEventListener('change', function (e) {
     var t = e.target;
-    if (t.id === 'eq-todas-familias') { todasFamilias = t.checked; desenhar(); return; }
     if (!t.hasAttribute('data-campo') || (t.tagName !== 'SELECT' && t.type !== 'checkbox' && t.type !== 'radio')) return;
     var r = mudar(t);
-    if (r === 'redesenhar' || t.getAttribute('data-campo') === 'chave' || t.getAttribute('data-tipo') === 'chave') desenhar(); else if (r) derivados();
+    if (t.getAttribute('data-campo') === 'chave' || t.getAttribute('data-tipo') === 'chave') desenhar(); else if (r) derivados();
   });
 
   /* os botões */
@@ -631,21 +552,6 @@
     desenhar();
     avisar(nc || ni ? 'kWp preenchido em ' + nc + ' cabine(s) e ' + ni + ' inversor(es). Confira e salve.' : 'Nada para distribuir: não há kWp vazio com base para calcular.', !!(nc || ni));
   }
-  function sugerirAtivos() {
-    var n = 0, duvida = 0;
-    [['cab', st.cabines], ['inv', st.inversores]].forEach(function (par) {
-      var fam = familiasDe(par[0]);
-      par[1].forEach(function (x) {
-        if (x.equipamento_id) return;
-        var c = (ativos || []).filter(function (a) { return (todasFamilias || fam.indexOf(a.familia) >= 0) && mesmoNome(a, x) && !usadoPor(a.equipamento_id, x); });
-        if (c.length === 1) { x.equipamento_id = c[0].equipamento_id; x.codigo_fracttal = c[0].codigo; n++; }
-        else if (c.length > 1) duvida++;
-      });
-    });
-    desenhar();
-    avisar(n ? n + ' ativo' + (n > 1 ? 's' : '') + ' preenchido' + (n > 1 ? 's' : '') + ' pelo nome (só os vazios, com um único ativo livre de mesmo nome)' + (duvida ? '; ' + duvida + ' com mais de um candidato ficaram para você escolher' : '') + '. Confira e salve.'
-             : 'Nenhum ativo vazio com um único ativo livre de mesmo nome' + (duvida ? ' (' + duvida + ' com mais de um candidato)' : '') + '.', !!n);
-  }
   function salvar(botao) {
     var antes = JSON.parse(base).chaves;
     var novas = st.chaves.filter(function (ch) {
@@ -696,7 +602,6 @@
     else if (a === 'gerar-cancela') { gerando = null; desenhar(); }
     else if (a === 'trazer') { trazer(); }
     else if (a === 'distribuir') { distribuir(); }
-    else if (a === 'sugerir-ativos') { sugerirAtivos(); }
     else if (a === 'ver-cmp') { var sid = +b.getAttribute('data-sid'); cmpAberta = cmpAberta === sid ? null : sid; desenhar(); }
     else if (a === 'descartar') { if (!sujo() || window.confirm('Descartar as mudanças não salvas?')) { st = JSON.parse(base); gerando = null; desenhar(); } }
     else if (a === 'salvar') { salvar(b); }
@@ -707,7 +612,6 @@
   });
 
   carregar(D);
-  pedirAtivos();
 })();
 </script>
 {% endblock %}
