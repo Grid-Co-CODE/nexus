@@ -601,12 +601,15 @@ LIVROS = (
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
           "1 minuto e relê o banco antes de cada gravação"),
-    Livro("nexus_estrutura_usina", ("dim_supervisorio", "dim_cabine", "dim_inversor"),
+    Livro("nexus_estrutura_usina", ("dim_supervisorio", "dim_cabine", "dim_inversor", "aba_equipamentos"),
           "a cada ligação de chave e a cada Salvar da tela Equipamentos das usinas",
           "nexus/cadastro/estrutura_usina.py, pela tela Base > Equipamentos das usinas", False,
           "registrado em 13/10/2026 antes de existir: nasce com a 1ª chave do supervisório ligada na tela. Substitui, no "
           "Nexus, a aba Equipamentos do bd_performance (que segue como referência e não muda); a tela lê com cache de "
-          "1 minuto e relê o banco antes de cada gravação. Quem mudou, só como HMAC (alterado_por_hmac)"),
+          "1 minuto e relê o banco antes de cada gravação. Quem mudou, só como HMAC (alterado_por_hmac). A aba "
+          "aba_equipamentos é a VISÃO no formato da aba Equipamentos das chaves marcadas \"no lugar da aba\", refeita a "
+          "cada gravação: a plataforma, o gêmeo, as Ligações e o coletor (quando ligado nele) trocam as linhas dessas "
+          "chaves por ela"),
     Livro("nexus_setor_telas", ("fato_decisao_tela_setor",), "a cada Salvar da seção Telas por setor (Base > Acessos)",
           "nexus/auth/setor_telas.py, pela tela Base > Acessos", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º Salvar na tela; o portão de cada pedido e a "
@@ -630,6 +633,9 @@ ABAS_FORA_DA_REGRA = {
     "equipamento_apelido": "o que cada sistema chama de cada equipamento (o modelo do de_para das usinas)",
     "foto_ativos": "a foto dos ativos do Fracttal: insumo da dimensão de equipamento, carga única",
     "meses": "a lista dos livros do mês do inversor × dia, com o sha de cada um (a geração regrava só o mês que mudou)",
+    "aba_equipamentos": "a visão da estrutura das usinas no formato da aba Equipamentos do bd_performance (as mesmas "
+                        "colunas, com os IDs no fim), só das chaves marcadas \"no lugar da aba\": é o que deixa cada "
+                        "leitor antigo da aba trocar a fonte sem ser reescrito (nexus/cadastro/estrutura_usina.py)",
 }
 
 

@@ -43,7 +43,13 @@
   <div><div class="r">Com nome do Fracttal</div><div class="v">{{ n_fracttal }}</div><div class="d">{{ total - n_fracttal }} sem</div></div>
   <div><div class="r">Com chave do supervisório</div><div class="v">{{ n_chave }}</div><div class="d">{{ n_chaves_ligadas }} de {{ n_chaves_aba }} chaves da aba ligadas</div></div>
   <div><div class="r">Com inversores</div><div class="v">{{ n_inversores }}</div><div class="d">{{ '{:,}'.format(n_strings).replace(',', '.') }} strings esperadas</div></div>
+  <div><div class="r">No lugar da aba</div><div class="v">{{ n_no_lugar }}</div><div class="d">chaves que os leitores já leem do Nexus · {{ n_visao }} linhas na visão</div></div>
 </div>
+{% if n_no_lugar or n_visao %}<form method="post" action="{{ url_for('torre_base.equipamentos_visao') }}" class="eq-refazer">
+  {% if painel %}<input type="hidden" name="usina" value="{{ painel.usina.id }}">{% endif %}{{ mantem() }}
+  <span class="mudo">A visão no formato da aba é refeita a cada gravação desta tela. Mudou o nome, o cliente ou a potência no Registro mestre, ou o Fracttal nas Ligações?</span>
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not pode_gravar %} disabled{% endif %}><i class="ph ph-arrows-clockwise"></i> Refazer a visão</button>
+</form>{% endif %}
 
 <div class="eq-grade">
   <aside class="eq-lista" aria-label="Usinas do Registro mestre">
@@ -67,6 +73,7 @@
             {% if x.fracttal %}<span class="cad-chip cad-chip--operacao">Fracttal</span>{% else %}<span class="cad-chip cad-chip--alerta">sem Fracttal</span>{% endif %}
             {% if x.resumo.chaves %}<span class="cad-chip cad-chip--info">{{ x.resumo.chaves }} chave{{ 's' if x.resumo.chaves > 1 }}</span>{% else %}<span class="cad-chip cad-chip--alerta">sem chave</span>{% endif %}
             {% if x.resumo.inversores %}<span class="cad-chip cad-chip--info">{{ x.resumo.inversores }} inv · {{ x.resumo.strings }} str</span>{% endif %}
+            {% if x.resumo.no_lugar_da_aba %}<span class="cad-chip cad-chip--operacao">no lugar da aba</span>{% endif %}
             {% if x.pot == 'fecha' %}<span class="cad-chip cad-chip--operacao">kWp fecha</span>{% elif x.pot == 'perto' %}<span class="cad-chip cad-chip--alerta">kWp perto</span>{% elif x.pot == 'nao_fecha' %}<span class="cad-chip cad-chip--critico">kWp não fecha</span>{% endif %}
           </span>
         </a>
@@ -174,6 +181,7 @@
       <h2><span class="eq-num">3</span> Estrutura: cabines, inversores, strings e potência</h2>
       <div class="eq-corpo">
         <p class="gc-ajuda">A cabine é da usina; cada inversor diz por qual chave do supervisório chega, o nome que tem lá, a cabine, kWp e strings esperadas. Sem o kWp do inversor, conta o da cabine dividido pelos inversores dela (calculado). Nada grava até o Salvar.</p>
+        <p class="gc-ajuda"><strong>No lugar da aba:</strong> a chave marcada passa a ser lida do Nexus pela plataforma, pelo gêmeo, pelas Ligações e pelo coletor (quando ligado nele), e não mais da aba Equipamentos. Antes de marcar, veja a coluna "Diferença com a aba": é o que muda para eles.</p>
         {% if painel.ref_tab %}
         <details class="eq-ref">
           <summary>O que a aba Equipamentos tem para {{ 'a chave ligada' if painel.ref_tab|length == 1 else 'as ' ~ painel.ref_tab|length ~ ' chaves ligadas' }}</summary>
@@ -253,7 +261,7 @@
 
   var D = JSON.parse(dados.textContent);
   var podeGravar = raiz.getAttribute('data-pode-gravar') === '1';
-  var st = null, base = '', ativos = null, erroAtivos = '', todasFamilias = false, seq = 0, gerando = null;
+  var st = null, base = '', ativos = null, erroAtivos = '', todasFamilias = false, seq = 0, gerando = null, cmpAberta = null;
 
   function clonar(x) { return JSON.parse(JSON.stringify(x)); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
@@ -368,15 +376,27 @@
   function desenhar() {
     var s = somas(), h = '', ro = podeGravar ? '' : ' disabled';
     /* chaves */
-    h += '<div class="eq-ed-sec"><div class="eq-ed-cab"><h3>Chaves do supervisório</h3><span class="mudo">Full O&amp;M e String Box de cada uma vão no Salvar. Para ligar ou desligar uma chave, use o passo 2.</span></div>';
+    h += '<div class="eq-ed-sec"><div class="eq-ed-cab"><h3>Chaves do supervisório</h3><span class="mudo">Tudo aqui vai no Salvar. Para ligar ou desligar uma chave, use o passo 2.</span></div>';
     if (!st.chaves.length) h += '<p class="eq-vazio">Nenhuma chave ligada: ligue no passo 2 antes de montar os inversores (cada inversor diz por qual chave chega).</p>';
     else {
-      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab"><thead><tr><th>Chave</th><th class="num">Inversores</th><th>Full O&amp;M</th><th>String Box</th></tr></thead><tbody>';
+      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-chaves"><thead><tr><th>Chave</th><th>Nome de exibição</th>' +
+        '<th title="A linha da usina (UFV) e as das cabines saem nesta chave">Chave da usina</th><th class="num">Inversores</th>' +
+        '<th>Full O&amp;M</th><th>String Box</th><th title="A plataforma, o gêmeo, as Ligações e o coletor (quando ligado) leem esta chave do Nexus">No lugar da aba</th><th>Diferença com a aba</th></tr></thead><tbody>';
       st.chaves.forEach(function (ch, i) {
         var n = st.inversores.filter(function (x) { return x.chave === ch.supervisorio_id; }).length;
-        h += '<tr><td><span class="gc-dado">' + esc(ch.chave) + '</span></td><td class="num">' + n + '</td>' +
+        var ab = (D.aba || {})[ch.chave], ph = (ab && ab.usina) || D.nome_registro || '';
+        var cmp = (D.comparacao || {})[ch.supervisorio_id];
+        h += '<tr><td><span class="gc-dado">' + esc(ch.chave) + '</span></td>' +
+          '<td class="eq-w-exib">' + campo('chave', i, 'usina_exibicao', ch.usina_exibicao, ' maxlength="120" placeholder="' + esc(ph) + '" aria-label="Nome de exibição da chave ' + esc(ch.chave) + '"') + '</td>' +
+          '<td class="eq-centro"><input type="radio" name="eq-principal" data-tipo="chave" data-i="' + i + '" data-campo="principal"' + (ch.principal ? ' checked' : '') + ro + ' aria-label="Chave da usina: ' + esc(ch.chave) + '"></td>' +
+          '<td class="num">' + n + '</td>' +
           '<td><label class="eq-marca"><input type="checkbox" data-tipo="chave" data-i="' + i + '" data-campo="full_om"' + (ch.full_om ? ' checked' : '') + ro + '> Sim</label></td>' +
-          '<td><label class="eq-marca"><input type="checkbox" data-tipo="chave" data-i="' + i + '" data-campo="string_box"' + (ch.string_box ? ' checked' : '') + ro + '> Sim</label></td></tr>';
+          '<td><label class="eq-marca"><input type="checkbox" data-tipo="chave" data-i="' + i + '" data-campo="string_box"' + (ch.string_box ? ' checked' : '') + ro + '> Sim</label></td>' +
+          '<td><label class="eq-marca"><input type="checkbox" data-tipo="chave" data-i="' + i + '" data-campo="substitui_aba"' + (ch.substitui_aba ? ' checked' : '') + ro + '> Sim</label></td>' +
+          '<td>' + htmlCmp(ch, cmp) + '</td></tr>';
+        if (cmpAberta === ch.supervisorio_id && cmp && cmp.dif && cmp.dif.length) {
+          h += '<tr class="eq-cmp-linha"><td colspan="8"><ul class="eq-cmp-lista">' + cmp.dif.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></td></tr>';
+        }
       });
       h += '</tbody></table></div>';
     }
@@ -448,6 +468,15 @@
     raiz.innerHTML = h;
     estado();
   }
+  /* A comparação é do que está SALVO (o servidor monta a visão e compara com a aba): com mudança no rascunho, diz isso. */
+  function htmlCmp(ch, cmp) {
+    if (!cmp) return '<span class="mudo">—</span>';
+    var nota = sujo() ? ' <span class="mudo eq-cmp-nota">(do que está salvo)</span>' : '';
+    if (!cmp.na_aba) return '<span class="cad-chip cad-chip--alerta" title="' + esc(cmp.dif[0] || '') + '">fora da aba</span>' + nota;
+    if (cmp.iguais) return '<span class="cad-chip cad-chip--operacao">igual à aba</span>' + nota;
+    return '<button type="button" class="eq-cmp-botao" data-acao="ver-cmp" data-sid="' + ch.supervisorio_id + '" aria-expanded="' + (cmpAberta === ch.supervisorio_id) + '">' +
+      '<span class="cad-chip cad-chip--alerta">' + cmp.n + ' diferença' + (cmp.n > 1 ? 's' : '') + '</span> ' + (cmpAberta === ch.supervisorio_id ? 'esconder' : 'ver') + '</button>' + nota;
+  }
   function faltas(s) {
     var p = [];
     if (s.semChave && st.chaves.length) p.push(s.semChave + ' sem chave');
@@ -485,7 +514,10 @@
       var v = lerNumero(t.value);
       if (v !== null && (isNaN(v) || (c === 'strings_esperadas_qtd' && v !== Math.round(v)))) { t.setAttribute('aria-invalid', 'true'); return false; }
       x[c] = v;
-    } else if (c === 'full_om' || c === 'string_box') {
+    } else if (c === 'principal') {
+      st.chaves.forEach(function (o) { o.principal = false; });
+      x.principal = true;
+    } else if (t.type === 'checkbox') {
       x[c] = t.checked;
     } else if (c === 'chave') {
       x.chave = t.value ? +t.value : null;
@@ -503,15 +535,15 @@
   }
   raiz.addEventListener('input', function (e) {
     var t = e.target;
-    if (!t.hasAttribute('data-campo') || t.tagName === 'SELECT' || t.type === 'checkbox') return;
+    if (!t.hasAttribute('data-campo') || t.tagName === 'SELECT' || t.type === 'checkbox' || t.type === 'radio') return;
     if (mudar(t)) derivados(); else estado();
   });
   raiz.addEventListener('change', function (e) {
     var t = e.target;
     if (t.id === 'eq-todas-familias') { todasFamilias = t.checked; desenhar(); return; }
-    if (!t.hasAttribute('data-campo') || (t.tagName !== 'SELECT' && t.type !== 'checkbox')) return;
+    if (!t.hasAttribute('data-campo') || (t.tagName !== 'SELECT' && t.type !== 'checkbox' && t.type !== 'radio')) return;
     var r = mudar(t);
-    if (r === 'redesenhar' || t.getAttribute('data-campo') === 'chave') desenhar(); else if (r) derivados();
+    if (r === 'redesenhar' || t.getAttribute('data-campo') === 'chave' || t.getAttribute('data-tipo') === 'chave') desenhar(); else if (r) derivados();
   });
 
   /* os botões */
@@ -535,8 +567,16 @@
   }
   function trazer() {
     var aba = D.aba || {}, cabNovas = 0, invNovos = 0, preench = 0, renomeados = 0;
+    /* a chave da usina é a que tem a linha UFV na aba, se for uma só entre as ligadas */
+    var comUfv = st.chaves.filter(function (ch) { var g = aba[ch.chave]; return g && g.ufv_kwp != null; });
+    var principalAntes = st.chaves.filter(function (ch) { return ch.principal; })[0];
+    if (comUfv.length === 1 && comUfv[0] !== principalAntes) {
+      st.chaves.forEach(function (ch) { ch.principal = false; });
+      comUfv[0].principal = true; preench++;
+    }
     st.chaves.forEach(function (ch) {
       var g = aba[ch.chave]; if (!g) return;
+      if (!ch.usina_exibicao && g.usina) { ch.usina_exibicao = g.usina; preench++; }
       if (g.full_om && !ch.full_om) { ch.full_om = true; preench++; }
       if (g.string_box && !ch.string_box) { ch.string_box = true; preench++; }
       g.cabines.forEach(function (a) {
@@ -607,6 +647,14 @@
              : 'Nenhum ativo vazio com um único ativo livre de mesmo nome' + (duvida ? ' (' + duvida + ' com mais de um candidato)' : '') + '.', !!n);
   }
   function salvar(botao) {
+    var antes = JSON.parse(base).chaves;
+    var novas = st.chaves.filter(function (ch) {
+      var b = antes.filter(function (x) { return x.supervisorio_id === ch.supervisorio_id; })[0];
+      return ch.substitui_aba && !(b && b.substitui_aba);
+    });
+    var comDif = novas.filter(function (ch) { var c = (D.comparacao || {})[ch.supervisorio_id]; return !c || !c.iguais; });
+    if (comDif.length && !window.confirm('Com o Salvar, ' + comDif.map(function (ch) { return ch.chave; }).join(', ') +
+        ' passa' + (comDif.length > 1 ? 'm' : '') + ' a ser lida' + (comDif.length > 1 ? 's' : '') + ' do Nexus, e não da aba, e a coluna "Diferença com a aba" mostra diferenças (do que está salvo). Salvar mesmo assim?')) return;
     var corpo = {usina_id: D.usina_id, selo: D.selo, chaves: st.chaves, cabines: st.cabines, inversores: st.inversores};
     botao.disabled = true;
     fetch(D.salvar_url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
@@ -615,6 +663,7 @@
       .then(function (j) {
         botao.disabled = false;
         if (!j.ok) { avisar(j.erro || 'Não gravou.', false); return; }
+        if (j.comparacao) D.comparacao = j.comparacao;
         carregar(j.editor);
         avisar(j.aviso || 'Salvo.', true);
       })
@@ -648,6 +697,7 @@
     else if (a === 'trazer') { trazer(); }
     else if (a === 'distribuir') { distribuir(); }
     else if (a === 'sugerir-ativos') { sugerirAtivos(); }
+    else if (a === 'ver-cmp') { var sid = +b.getAttribute('data-sid'); cmpAberta = cmpAberta === sid ? null : sid; desenhar(); }
     else if (a === 'descartar') { if (!sujo() || window.confirm('Descartar as mudanças não salvas?')) { st = JSON.parse(base); gerando = null; desenhar(); } }
     else if (a === 'salvar') { salvar(b); }
   });

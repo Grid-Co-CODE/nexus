@@ -100,8 +100,11 @@ linha = 1 inversor da usina: a chave por onde chega, a cabine, kWp, strings espe
 Fracttal). É a estrutura física da USINA, hierarquia da mesma dimensão (usina → chave, cabine, inversor), e não um
 segundo cadastro de equipamento: o inversor aponta a dimensão de equipamento pelo `equipamento_id`. Estado atual (troca
 integral relida do banco antes de gravar), ID = maior + 1 que não volta, `excluido = sim`, quem mudou só como HMAC.
-Substitui no Nexus a aba Equipamentos do `bd_performance`, que segue como referência (e é o que a plataforma lê).
-Registrado antes de existir: nasce com a 1ª chave ligada na tela.
+Substitui no Nexus a aba Equipamentos do `bd_performance`, que segue como referência. A 4ª aba, `aba_equipamentos`
+(exceção à regra 10, declarada em `ABAS_FORA_DA_REGRA`), é a VISÃO no formato da aba Equipamentos das chaves marcadas "no
+lugar da aba", refeita a cada gravação: os leitores antigos da aba (a plataforma, o gêmeo, as Ligações e o coletor,
+quando ligado nele) trocam as linhas dessas chaves por ela. Registrado antes de existir: nasce com a 1ª chave ligada na
+tela.
 
 **Meta do mês por usina (12/10/2026):** para a Visão do responsável (Campo · App; Levi: "construa a visão dos
 responsáveis da usina!"), a plataforma publica o Gerencial no livro `nexus_performance · fato_meta_usina_mes`

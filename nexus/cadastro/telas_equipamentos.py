@@ -75,6 +75,15 @@ def _usinas(srv) -> list[dict]:
     return out
 
 
+def _info_usinas(srv, cfg, usinas: list | None = None) -> dict:
+    """{usina_id: {nome, cliente, kwp, fracttal}}: o que a visão no formato da aba leva de cada usina, do Registro mestre
+    (o nome, o cliente e a potência da conferência) e das Ligações (o 1º nome do Fracttal ligado)."""
+    _nomes, fr_da_usina, _dono, _lido = _fracttal(cfg)
+    return {u["id"]: {"nome": u["nome"], "cliente": u["cliente"], "kwp": u["kwp"],
+                      "fracttal": (fr_da_usina.get(u["id"]) or [{}])[0].get("chave", "")}
+            for u in (usinas if usinas is not None else _usinas(srv))}
+
+
 def _leituras(forcar: bool = False) -> tuple:
     """(estrutura gravada, aba Equipamentos agrupada, pode gravar?). Banco fora (ou teste sem banco): as duas vazias com o
     erro, e nada se grava sem saber o que já está lá."""
@@ -107,7 +116,9 @@ def editor_dados(d: dict) -> dict:
     inversor aponta a cabine por ela e a chave pelo `supervisorio_id`."""
     return {"selo": E.selo(d),
             "chaves": [{"supervisorio_id": s["supervisorio_id"], "chave": s["usina_supervisorio"],
-                        "full_om": s["full_om"], "string_box": s["string_box"]} for s in d["supervisorios"]],
+                        "usina_exibicao": s["usina_exibicao"], "principal": s["principal"],
+                        "full_om": s["full_om"], "string_box": s["string_box"], "substitui_aba": s["substitui_aba"]}
+                       for s in d["supervisorios"]],
             "cabines": [{"id": c["cabine_id"], "k": f"c{c['cabine_id']}", "nome": c["nome"],
                          "potencia_kwp": c["potencia_kwp"], "equipamento_id": c["equipamento_id"],
                          "codigo_fracttal": c["codigo_fracttal"]} for c in d["cabines"]],
@@ -118,7 +129,7 @@ def editor_dados(d: dict) -> dict:
                             "codigo_fracttal": i["codigo_fracttal"]} for i in d["inversores"]]}
 
 
-def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict) -> dict:
+def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict, info: dict) -> dict:
     """O que a usina aberta mostra: os 3 passos (Fracttal, supervisório, estrutura) e as opções de cada um, ordenadas
     pelo parecido com a usina, sem nada escolhido."""
     d = E.da_usina(est, u["id"])
@@ -168,6 +179,8 @@ def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict) 
     return {"usina": u, "fr_opcoes": fr_opcoes, "fr_sugeridos": sugeridos_fr, "sugeridas": sugeridas[:10],
             "todas": todas, "chaves": chaves, "ref_aba": ref_aba, "ref_tab": ref_tab,
             "editor": dict(editor_dados(d), usina_id=u["id"], kwp_usina=u["kwp"], kwp_de=u["kwp_de"], aba=ref_aba,
+                           nome_registro=u["nome"],
+                           comparacao=E.comparar_usina(d, info.get(u["id"]), aba["chaves"]) if not aba.get("erro") else {},
                            ativos_url=url_for("torre_base.equipamentos_ativos", usina=u["id"]),
                            salvar_url=url_for("torre_base.equipamentos_salvar"))}
 
@@ -195,7 +208,8 @@ def contexto(srv, cfg, args) -> dict:
                 "sem_inversores": not r["inversores"], "potencia": x["pot"] in ("perto", "nao_fecha")}[filtro]
     sel = D._id(args.get("usina"))
     aberta = next((x for x in lista if x["id"] == sel), None)
-    painel = _painel(aberta, est, aba, fr_nomes, fr_dono, nome_usina) if aberta else None
+    info = _info_usinas(srv, cfg, usinas)
+    painel = _painel(aberta, est, aba, fr_nomes, fr_dono, nome_usina, info) if aberta else None
     aviso = session.pop(_CHAVE_AVISO, None)
     pode_gravar = bool(cfg.get("GRIDCO_SQL_TOKEN")) and not est.get("erro")
     return {"lista": [x for x in lista if passa(x)], "total": len(lista), "q": q, "filtro": filtro, "filtros": FILTROS,
@@ -207,6 +221,8 @@ def contexto(srv, cfg, args) -> dict:
             "n_inversores": sum(1 for x in lista if x["resumo"]["inversores"]),
             "n_strings": sum(x["resumo"]["strings"] for x in lista),
             "n_chaves_aba": len(aba["chaves"]),
+            "n_no_lugar": sum(1 for s in est["supervisorios"] if s["substitui_aba"] and not s["excluido"]),
+            "n_visao": len(est.get("visao") or []),
             "n_chaves_ligadas": sum(1 for c in aba["chaves"] if any(
                 s["usina_supervisorio"] == c and not s["excluido"] for s in est["supervisorios"])),
             "volta": {k: v for k, v in (("q", q), ("filtro", filtro)) if v}}
@@ -258,8 +274,41 @@ def _ligar_fracttal(srv):
         return _responder(False, str(ex), 400, uid, "passo-fracttal")
     L.reaplicar(cfg, srv)
     feito = "ligado a esta usina" if acao == "ligar" else "desligado desta usina"
+    extra = _refazer_visao(srv, cfg)
     return _responder(True, f"“{chave}” {feito}. Vale já no Nexus; no banco, depois do Publicar no banco (Governança de "
-                            "dados > Ligações entre bases).", usina=uid, ancora="passo-fracttal")
+                            f"dados > Ligações entre bases).{extra}", usina=uid, ancora="passo-fracttal")
+
+
+def _refazer_visao(srv, cfg) -> str:
+    """Refaz a visão no formato da aba (o nome no Fracttal ou a potência mudaram fora da estrutura). Grava só se mudou;
+    falha aqui não desfaz o que já foi decidido, só avisa."""
+    try:
+        est = E.ler(*_banco(), forcar=True)
+    except Exception as ex:      # noqa: BLE001 — sem banco: não há visão a refazer daqui
+        log.error("Equipamentos: a estrutura não foi lida para refazer a visão (%s).", type(ex).__name__)
+        return ""
+    if not any(s["substitui_aba"] and not s["excluido"] for s in est["supervisorios"]) and not est.get("visao"):
+        return ""
+    try:
+        r = E.republicar_visao(cfg, *_banco(), _info_usinas(srv, cfg), quem_email=_meu_email())
+    except E.Recusada as ex:
+        return f" A visão no formato da aba não foi refeita: {ex}"
+    except Exception as ex:      # noqa: BLE001
+        log.error("Equipamentos: a visão não foi refeita (%s: %s).", type(ex).__name__, ex)
+        return f" A visão no formato da aba não foi refeita ({type(ex).__name__}): tente de novo pelo botão da tela."
+    return f" A visão no formato da aba foi refeita ({r['visao_linhas']} linhas)." if r.get("visao_mudou") else ""
+
+
+def _visao(srv):
+    """POST do botão "Refazer a visão": o Registro mestre (nome, cliente, potência) mudou e nenhuma estrutura foi salva."""
+    uid = D._id(request.form.get("usina"))
+    if _de_outro_site():
+        return _responder(False, "Pedido de outro site: nada foi gravado.", 403, uid)
+    try:
+        texto = _refazer_visao(srv, current_app.config).strip() or "A visão no formato da aba já estava em dia."
+    except Exception as ex:      # noqa: BLE001 — banco fora
+        return _responder(False, f"Não consegui ler a estrutura no banco ({type(ex).__name__}).", 503, uid)
+    return _responder(not texto.startswith("A visão no formato da aba não"), texto, usina=uid)
 
 
 def _chave(srv):
@@ -272,19 +321,24 @@ def _chave(srv):
     acao = f.get("acao")
     try:
         base, sessao = _banco()
+        info = _info_usinas(srv, cfg)
         if acao == "ligar":
             chave = f.get("chave_nova") or f.get("chave") or ""
-            r = E.ligar_supervisorio(uid, chave, cfg, base, sessao, quem_email=_meu_email())
-            na_aba = E.texto(chave) in E.aba_equipamentos(base, sessao)["chaves"]
+            grupo = E.aba_equipamentos(base, sessao)["chaves"].get(E.texto(chave))
+            r = E.ligar_supervisorio(uid, chave, cfg, base, sessao, quem_email=_meu_email(),
+                                     exibicao_aba=(grupo or {}).get("usina", ""), info=info)
+            na_aba = grupo is not None
             texto = (f"Chave “{E.texto(chave)}” {'ligada' if r['novo'] else 'já estava ligada'} a esta usina."
                      + ("" if na_aba else " Ela não está na aba Equipamentos: confira se é o nome exato que o "
                                           "supervisório usa."))
         elif acao == "desligar":
             r = E.desligar_supervisorio(D._id(f.get("supervisorio_id")), uid, cfg, base, sessao,
-                                        quem_email=_meu_email())
+                                        quem_email=_meu_email(), info=info)
             texto = (f"Chave “{r['chave']}” desligada."
                      + (f" {r['inversores_sem_chave']} inversor(es) ficaram sem chave: escolha outra para eles na "
-                        "estrutura e salve." if r["inversores_sem_chave"] else ""))
+                        "estrutura e salve." if r["inversores_sem_chave"] else "")
+                     + (f" A chave da usina (UFV e cabines) passou a ser “{r['nova_principal']}”."
+                        if r["nova_principal"] else ""))
         else:
             return _responder(False, "Ação desconhecida: nada foi gravado.", 400, uid)
     except E.Recusada as ex:
@@ -308,7 +362,9 @@ def _salvar(srv):
         return jsonify(ok=False, erro="Usina fora do Registro mestre: nada foi gravado."), 400
     try:
         base, sessao = _banco()
-        r = E.salvar_usina(uid, dados, str(dados.get("selo") or ""), cfg, base, sessao, quem_email=_meu_email())
+        info = _info_usinas(srv, cfg)
+        r = E.salvar_usina(uid, dados, str(dados.get("selo") or ""), cfg, base, sessao, quem_email=_meu_email(),
+                           info=info)
     except E.Recusada as ex:
         return jsonify(ok=False, erro=str(ex)), 409
     except Exception as ex:      # noqa: BLE001
@@ -317,7 +373,11 @@ def _salvar(srv):
                                       "estrutura não mudou, tente de novo."), 500
     n = r["mudancas"]
     aviso = "Nada mudou: a estrutura já estava assim." if not n else f"Salvo: {n} mudança{'s' if n > 1 else ''} gravada{'s' if n > 1 else ''} no banco."
-    return jsonify(ok=True, aviso=aviso, resumo=r["resumo"], editor=editor_dados(r["usina"]))
+    if r.get("visao_mudou"):
+        aviso += f" A visão no formato da aba foi refeita ({r['visao_linhas']} linhas): os leitores pegam no próximo minuto."
+    aba = E.aba_equipamentos(base, sessao)
+    return jsonify(ok=True, aviso=aviso, resumo=r["resumo"], editor=editor_dados(r["usina"]),
+                   comparacao=E.comparar_usina(r["usina"], info.get(uid), aba["chaves"]) if not aba.get("erro") else {})
 
 
 def _ativos():
@@ -347,6 +407,11 @@ def registrar_equipamentos(bp) -> None:
     @_tela(TITULO)
     def equipamentos_chave(srv):
         return _chave(srv)
+
+    @bp.route("/equipamentos/visao", methods=["POST"])
+    @_tela(TITULO)
+    def equipamentos_visao(srv):
+        return _visao(srv)
 
     @bp.route("/equipamentos/salvar", methods=["POST"])
     @_tela(TITULO)

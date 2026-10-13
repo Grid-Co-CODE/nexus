@@ -131,7 +131,8 @@ def test_a_aba_agrupa_por_chave_do_supervisorio():
 # ── as chaves do supervisório ────────────────────────────────────────────────────────────────────────────────────────
 def test_ligar_chave_uma_usina_por_chave_e_o_id_nao_volta(cfg, banco):
     r = E.ligar_supervisorio(1, " Brodowski  1 (90) ", cfg, BASE, banco, quem_email="admin@exemplo.test")
-    assert r == {"supervisorio_id": 1, "novo": True, "log": "ligou a chave Brodowski 1 (90) à usina 1"}
+    assert {k: r[k] for k in ("supervisorio_id", "novo", "log")} == {
+        "supervisorio_id": 1, "novo": True, "log": "ligou a chave Brodowski 1 (90) à usina 1"}
     assert E.ligar_supervisorio(1, "Brodowski 1 (90)", cfg, BASE, banco)["novo"] is False      # já estava
     with pytest.raises(E.Recusada, match="já está ligada a outra usina"):
         E.ligar_supervisorio(2, "Brodowski 1 (90)", cfg, BASE, banco)
@@ -141,7 +142,8 @@ def test_ligar_chave_uma_usina_por_chave_e_o_id_nao_volta(cfg, banco):
     assert E.ligar_supervisorio(2, "Brodowski 1 (90)", cfg, BASE, banco)["supervisorio_id"] == 2   # o 1 não volta
     sup = _estado(banco)["sup"]
     assert [(x["supervisorio_id"], x["usina_id"], x["excluido"]) for x in sup] == [(1, 1, "sim"), (2, 2, None)]
-    assert list(sup[0]) == list(E.CAB_SUP) and sup[0]["full_om"] == 0
+    assert list(sup[0]) == list(E.CAB_SUP) and sup[0]["full_om"] == 0 and sup[0]["substitui_aba"] == 0
+    assert sup[1]["principal"] == 1                               # a 1ª chave da usina 2 é a da usina
 
 
 def test_desligar_a_chave_deixa_os_inversores_na_usina_sem_chave(cfg, banco):
@@ -158,7 +160,7 @@ def test_desligar_a_chave_deixa_os_inversores_na_usina_sem_chave(cfg, banco):
 def _montar(cfg, banco):
     s1 = E.ligar_supervisorio(1, "Brodowski 1 (90)", cfg, BASE, banco)["supervisorio_id"]
     s2 = E.ligar_supervisorio(1, "Brodowski 2 (91)", cfg, BASE, banco)["supervisorio_id"]
-    dados = {"chaves": [{"supervisorio_id": s1, "full_om": True, "string_box": False}],
+    dados = {"chaves": [{"supervisorio_id": s1, "full_om": True, "string_box": False, "principal": True}],
              "cabines": [{"k": "n1", "nome": "UG 01", "potencia_kwp": "500"}, {"k": "n2", "nome": "UG 02", "potencia_kwp": 500}],
              "inversores": [
                  {"nome": "Inversor 1.1", "chave": s1, "cabine": "n1", "equipamento_supervisorio": "INVERSOR01",
@@ -202,8 +204,8 @@ def test_salvar_de_novo_atualiza_o_que_mudou_exclui_o_que_saiu_e_o_id_nao_volta(
     u = _editor(cfg, banco, 1)
     antes = {i["nome"]: i for i in _estado(banco)["inv"]}
     # sem mexer: nada muda (abrir e salvar não gera alteração)
-    ed = {"chaves": [{"supervisorio_id": s["supervisorio_id"], "full_om": s["full_om"], "string_box": s["string_box"]}
-                     for s in u["supervisorios"]],
+    ed = {"chaves": [{k: s[k] for k in ("supervisorio_id", "usina_exibicao", "principal", "full_om", "string_box",
+                                        "substitui_aba")} for s in u["supervisorios"]],
           "cabines": [{"id": c["cabine_id"], "k": f"c{c['cabine_id']}", **{k: c[k] for k in ("nome", "potencia_kwp",
                        "equipamento_id", "codigo_fracttal")}} for c in u["cabines"]],
           "inversores": [{"id": i["inversor_id"], "chave": i["supervisorio_id"], "cabine": f"c{i['cabine_id']}",
@@ -367,6 +369,169 @@ def test_os_ativos_da_usina_pela_tela(cli):
 
 def test_catalogo_e_menu():
     livro = catalogo.LIVRO_POR_NOME["nexus_estrutura_usina"]
-    assert livro.abas == (E.ABA_SUP, E.ABA_CAB, E.ABA_INV) and livro.no_banco is False
+    assert livro.abas == (E.ABA_SUP, E.ABA_CAB, E.ABA_INV, E.ABA_VISAO) and livro.no_banco is False
+    assert catalogo.aba_segue_a_regra(E.ABA_VISAO)                  # exceção declarada, com o porquê
     from nexus.torres.base import TORRE
     assert "equipamentos" in [t.id for t in TORRE.telas]
+
+
+# ── no lugar da aba: a visão, a sobreposição e a comparação (13/10/2026) ─────────────────────────────────────────────
+INFO = {1: {"nome": "Brodowski", "cliente": "Thopen", "kwp": 1000.0, "fracttal": "Thopen - Brodowski 1 - SP"}}
+
+
+def _igual_a_aba(cfg, banco, marcar=True):
+    """A Brodowski montada no Nexus exatamente como a aba a tem (é o que o "Trazer da aba" faz), com as três chaves."""
+    ids = [E.ligar_supervisorio(1, k, cfg, BASE, banco, exibicao_aba="Brodowski", info=INFO)["supervisorio_id"]
+           for k in ("Brodowski", "Brodowski 1 (90)", "Brodowski 2 (91)")]
+    u = _editor(cfg, banco, 1)
+    assert [s["principal"] for s in u["supervisorios"]] == [True, False, False]      # a 1ª ligada é a da usina
+    dados = {"chaves": [{"supervisorio_id": s, "usina_exibicao": "Brodowski", "principal": s == ids[0], "full_om": True,
+                         "string_box": False, "substitui_aba": marcar} for s in ids],
+             "cabines": [{"k": "n1", "nome": "UG 01", "potencia_kwp": 500}, {"k": "n2", "nome": "UG 02", "potencia_kwp": 500}],
+             "inversores": [
+                 {"nome": "Inversor 1.1", "chave": ids[1], "cabine": "n1", "equipamento_supervisorio": "INVERSOR01",
+                  "potencia_kwp": 250, "strings_esperadas_qtd": 20},
+                 {"nome": "Inversor 1.2", "chave": ids[1], "cabine": "n1", "equipamento_supervisorio": "INVERSOR02",
+                  "potencia_kwp": 250, "strings_esperadas_qtd": 20},
+                 {"nome": "Inversor 2.1", "chave": ids[2], "cabine": "n2", "equipamento_supervisorio": "INVERSOR01",
+                  "strings_esperadas_qtd": 18},
+                 {"nome": "Inversor 2.2", "chave": ids[2], "cabine": "n2", "equipamento_supervisorio": "INVERSOR02"}]}
+    r = E.salvar_usina(1, dados, E.selo(u), cfg, BASE, banco, info=INFO)
+    return ids, r
+
+
+def test_a_visao_tem_o_formato_da_aba_e_so_as_chaves_marcadas(cfg, banco):
+    ids, r = _igual_a_aba(cfg, banco, marcar=False)
+    assert r["visao_linhas"] == 0 and banco.linhas(E.LIVRO, E.ABA_VISAO) == []          # nada marcado, visão vazia
+    u = _editor(cfg, banco, 1)
+    linhas = E.visao_da_usina(u, INFO[1], todas=True)
+    assert list(linhas[0]) == list(E.CAB_VISAO)
+    ufv = linhas[0]
+    # a chave da usina é o próprio nome de exibição: a UFV sai sem "Usina Supervisório", como 103 das 146 da aba
+    assert (ufv["Equipamento"], ufv["Usina Supervisório"], ufv["Usina"], ufv["Potência (kWp)"], ufv["N de Inversores"],
+            ufv["Chave 2"], ufv["Full O&M"], ufv["Usina Fractall"]) == (
+        "UFV", None, "Brodowski", 1000.0, 4, "UFV", "Sim", "Thopen - Brodowski 1 - SP")
+    ug = [x for x in linhas if x["Equipamento"].startswith("UG")]
+    assert [(x["Equipamento"], x["Equipamento Parente"], x["N de Inversores"]) for x in ug] == [
+        ("UG 01", "UFV", 2), ("UG 02", "UFV", 2)]
+    inv = next(x for x in linhas if x["Equipamento"] == "Inversor 1.1")
+    assert (inv["Usina Supervisório"], inv["Equipamento Supervisório"], inv["Equipamento Parente"], inv["Chave"],
+            inv["Chave 2"], inv["Strings Ativas"]) == (
+        "Brodowski 1 (90)", "INVERSOR01", "UG 01", "Brodowski 1 (90)INVERSOR01", "Brodowski 1 (90)Inversor 1.1", 20)
+    # marcar duas chaves: a visão leva só as delas, gravada junto do estado
+    dados = {"chaves": [{"supervisorio_id": s["supervisorio_id"], "usina_exibicao": s["usina_exibicao"],
+                         "principal": s["principal"], "full_om": s["full_om"], "string_box": s["string_box"],
+                         "substitui_aba": s["supervisorio_id"] != ids[2]} for s in u["supervisorios"]],
+             **{k: v for k, v in _payload_de(u).items() if k != "chaves"}}
+    r = E.salvar_usina(1, dados, E.selo(u), cfg, BASE, banco, info=INFO)
+    gravada = banco.linhas(E.LIVRO, E.ABA_VISAO)
+    assert r["visao_mudou"] and r["visao_linhas"] == len(gravada) == 5        # UFV + 2 UG + 2 inversores da chave 90
+    assert {E.chave_efetiva(x) for x in gravada} == {"Brodowski", "Brodowski 1 (90)"}
+    # nome que não começa por "Inversor": os leitores só contam o que começa assim
+    assert E.nome_de_inversor("INV 7") == "Inversor INV 7" and E.nome_de_inversor("inversor 3") == "inversor 3"
+
+
+def _payload_de(u):
+    return {"chaves": [{k: s[k] for k in ("supervisorio_id", "usina_exibicao", "principal", "full_om", "string_box",
+                                          "substitui_aba")} for s in u["supervisorios"]],
+            "cabines": [{"id": c["cabine_id"], "k": f"c{c['cabine_id']}", **{k: c[k] for k in (
+                "nome", "potencia_kwp", "equipamento_id", "codigo_fracttal")}} for c in u["cabines"]],
+            "inversores": [{"id": i["inversor_id"], "chave": i["supervisorio_id"],
+                            "cabine": f"c{i['cabine_id']}" if i["cabine_id"] else None,
+                            **{k: i[k] for k in ("nome", "equipamento_supervisorio", "potencia_kwp",
+                                                 "strings_esperadas_qtd", "equipamento_id", "codigo_fracttal")}}
+                           for i in u["inversores"]]}
+
+
+def test_montada_igual_a_aba_a_comparacao_diz_igual_e_a_sobreposicao_nao_muda_nada(cfg, banco):
+    """A prova da troca: a Brodowski montada no Nexus como a aba a tem, as três chaves no lugar da aba, e o leitor vê
+    exatamente o que via (agrupar_aba é o leitor de referência: chave, exibição, Fracttal, cliente, UFV, UG, inversores)."""
+    ids, _r = _igual_a_aba(cfg, banco)
+    u = _editor(cfg, banco, 1)
+    cmp = E.comparar_usina(u, INFO[1], E.agrupar_aba(ABA))
+    assert all(c["iguais"] for c in cmp.values()), cmp
+    visao = banco.linhas(E.LIVRO, E.ABA_VISAO)
+    assert len(visao) == 7                                       # UFV, 2 UG e 4 inversores
+    junta = E.sobrepor(ABA, visao)
+    assert E.agrupar_aba(junta) == E.agrupar_aba(ABA)
+    assert sum(1 for x in junta if x.get("Equipamento") == "Medidor") == 1     # o que não é UFV, UG nem inversor fica
+    # a Pedra do Sal, fora da visão, segue da aba
+    assert [x for x in junta if E.chave_efetiva(x) == "Pedra do Sal"] == [x for x in ABA if E.chave_efetiva(x) == "Pedra do Sal"]
+
+
+def test_a_comparacao_aponta_cada_diferenca(cfg, banco):
+    ids, _r = _igual_a_aba(cfg, banco)
+    u = _editor(cfg, banco, 1)
+    p = _payload_de(u)
+    p["inversores"][0]["strings_esperadas_qtd"] = 22                  # Inversor 1.1: 20 na aba
+    p["inversores"] = [i for i in p["inversores"] if i["nome"] != "Inversor 2.2"]
+    p["chaves"][1]["usina_exibicao"] = "Brodowski Norte"
+    E.salvar_usina(1, p, E.selo(u), cfg, BASE, banco, info=INFO)
+    cmp = E.comparar_usina(_editor(cfg, banco, 1), INFO[1], E.agrupar_aba(ABA))
+    c90, c91 = cmp[ids[1]], cmp[ids[2]]
+    assert not c90["iguais"] and "INVERSOR01: strings: 20 na aba, 22 no Nexus." in c90["dif"]
+    assert "Nome de exibição: “Brodowski” na aba, “Brodowski Norte” no Nexus." in c90["dif"]
+    assert "INVERSOR02 (Inversor 2.2) está na aba e não no Nexus." in c91["dif"]
+    # a chave da usina também acusa: a UFV conta os inversores da usina inteira
+    assert cmp[ids[0]]["dif"] == ["Inversores da usina: 4 na aba, 3 no Nexus."]
+    fora = E.comparar_chave(None, [])
+    assert not fora["na_aba"] and "não está na aba" in fora["dif"][0]
+
+
+def test_a_chave_da_usina_uma_so_e_desligar_passa_para_outra(cfg, banco):
+    ids, _r = _igual_a_aba(cfg, banco)
+    u = _editor(cfg, banco, 1)
+    p = _payload_de(u)
+    for c in p["chaves"]:
+        c["principal"] = True
+    with pytest.raises(E.Recusada, match="Só uma chave"):
+        E.salvar_usina(1, p, E.selo(u), cfg, BASE, banco, info=INFO)
+    p = _payload_de(u)
+    for c in p["chaves"]:
+        c["principal"] = c["supervisorio_id"] == ids[2]
+    E.salvar_usina(1, p, E.selo(u), cfg, BASE, banco, info=INFO)
+    u = _editor(cfg, banco, 1)
+    assert {s["supervisorio_id"]: s["principal"] for s in u["supervisorios"]} == {ids[0]: False, ids[1]: False, ids[2]: True}
+    r = E.desligar_supervisorio(ids[2], 1, cfg, BASE, banco, info=INFO)
+    assert r["nova_principal"] == "Brodowski"                     # a 1ª das que ficam, pelo nome
+    # a visão acompanhou: a chave desligada saiu, e a UFV voltou para a "Brodowski"
+    visao = banco.linhas(E.LIVRO, E.ABA_VISAO)
+    assert "Brodowski 2 (91)" not in {E.chave_efetiva(x) for x in visao}
+    assert next(x for x in visao if x["Equipamento"] == "UFV")["supervisorio_id"] == ids[0]
+
+
+def test_a_visao_so_e_regravada_quando_muda(cfg, banco):
+    _igual_a_aba(cfg, banco)
+    antes = banco.syncs
+    r = E.republicar_visao(cfg, BASE, banco, INFO)
+    assert not r["visao_mudou"] and banco.syncs == antes           # nada mudou: não grava
+    r = E.republicar_visao(cfg, BASE, banco, {1: dict(INFO[1], kwp=1100.0)})
+    assert r["visao_mudou"] and banco.syncs == antes + 1           # a potência do Registro mestre mudou
+    assert next(x for x in banco.linhas(E.LIVRO, E.ABA_VISAO) if x["Equipamento"] == "UFV")["Potência (kWp)"] == 1100
+
+
+def test_a_tela_mostra_a_comparacao_e_o_salvar_devolve_a_nova(cli, banco):
+    cli.post("/t/base/equipamentos/chave", data={"usina": 1, "acao": "ligar", "chave": "Brodowski 1 (90)"})
+    html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
+    dados = json.loads(html.split('id="eq-dados">')[1].split("</script>")[0])
+    ch = dados["chaves"][0]
+    # a chave nasce com o nome de exibição da aba, como a da usina e fora do lugar da aba
+    assert (ch["usina_exibicao"], ch["principal"], ch["substitui_aba"]) == ("Brodowski", True, False)
+    cmp = dados["comparacao"][str(ch["supervisorio_id"])]
+    assert cmp["na_aba"] and not cmp["iguais"]                    # nada montado ainda: os 2 inversores da aba faltam
+    corpo = {"usina_id": 1, "selo": dados["selo"],
+             "chaves": [dict(ch, substitui_aba=True, full_om=True)],
+             "cabines": [{"k": "n1", "nome": "UG 01", "potencia_kwp": 500}],
+             "inversores": [{"nome": f"Inversor 1.{n}", "chave": ch["supervisorio_id"], "cabine": "n1",
+                             "equipamento_supervisorio": f"INVERSOR0{n}", "potencia_kwp": 250, "strings_esperadas_qtd": 20}
+                            for n in (1, 2)]}
+    j = cli.post("/t/base/equipamentos/salvar", json=corpo, headers=JSON_).get_json()
+    assert j["ok"] and "visão no formato da aba foi refeita" in j["aviso"]
+    c = j["comparacao"][str(ch["supervisorio_id"])]
+    assert any("linha da usina" in t for t in c["dif"])           # a UFV fica na "Brodowski" na aba
+    assert not any("INVERSOR0" in t for t in c["dif"])              # os dois inversores agora batem
+    assert len(banco.linhas(E.LIVRO, E.ABA_VISAO)) == 4             # UFV, UG 01 e os 2 inversores
+    html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
+    assert "no lugar da aba" in html and "Refazer a visão" in html
+    r = cli.post("/t/base/equipamentos/visao", data={"usina": 1})
+    assert "já estava em dia" in cli.get(r.headers["Location"]).get_data(as_text=True)

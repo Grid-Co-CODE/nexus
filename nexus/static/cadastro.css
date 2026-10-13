@@ -462,6 +462,19 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .eq-w-str{width:62px}
 .eq-w-ativo{min-width:180px}
 .eq-acoes-linha{white-space:nowrap}
+/* as chaves: nome de exibição, chave da usina, no lugar da aba e a diferença com a aba (13/10/2026) */
+.eq-tab-chaves{min-width:860px}
+.eq-w-exib{min-width:150px}
+.eq-centro{text-align:center}
+.eq-centro input{accent-color:var(--verde);width:15px;height:15px;cursor:pointer}
+.eq-cmp-botao{display:inline-flex;align-items:center;gap:6px;padding:0;border:0;background:none;color:var(--tinta-2);
+  font:500 12px/16px var(--font-sans);cursor:pointer}
+.eq-cmp-botao:hover,.eq-cmp-botao:focus-visible{color:var(--tinta);outline:none;text-decoration:underline}
+.eq-cmp-nota{font-size:11px}
+.eq-cmp-linha td{background:var(--superficie-2)}
+.eq-cmp-lista{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--tinta-2)}
+.eq-refazer{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 14px}
+.eq-refazer .mudo{font-size:12px}
 .eq-acoes-linha .gc-btn+.gc-btn{margin-left:4px}
 .eq-linha-falta td{background:var(--alerta-a08)}
 .eq-marca{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tinta-2);cursor:pointer}

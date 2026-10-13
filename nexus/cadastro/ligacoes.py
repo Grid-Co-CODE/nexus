@@ -195,6 +195,11 @@ def fontes(config) -> dict:
         out[sistema] = itens
     # a tabela de equipamentos (a ponte aba -> Fracttal); sem a aba no banco, as abas casam como antes de 08/10
     equipamentos = _linhas_api(base, abas[EQUIPAMENTOS[:2]]) if EQUIPAMENTOS[:2] in abas else None
+    # as chaves que a tela Equipamentos das usinas pôs "no lugar da aba" (13/10/2026): a visão do Nexus troca as linhas
+    # delas, como em todo leitor da aba (estrutura_usina.sobrepor)
+    from . import estrutura_usina as EU
+    if (EU.LIVRO, EU.ABA_VISAO) in abas:
+        equipamentos = EU.sobrepor(equipamentos or [], _linhas_api(base, abas[(EU.LIVRO, EU.ABA_VISAO)]))
     for sistema, wb, ref in FONTES_ABA:      # depois das FONTES_API: o `igual_a` aponta chaves já casadas
         ids = {a: sid for (w, a), sid in abas.items() if w == wb}
         if (wb, ref) not in lidas:

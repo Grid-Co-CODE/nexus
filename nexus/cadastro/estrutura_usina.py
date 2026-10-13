@@ -22,8 +22,17 @@ O que é:
 - A aba Equipamentos (`bd_performance · Equipamentos`, no banco) é SÓ referência: o "Trazer da aba" da tela preenche o
   rascunho, e nada é gravado sem o Salvar de quem decide.
 
+No lugar da aba (13/10/2026, Levi: "pode fazer todas as fases! vamos pra cima!"): cada chave tem a marca
+`substitui_aba`. As chaves marcadas saem também numa VISÃO no formato da aba Equipamentos (`aba_equipamentos`, as mesmas
+colunas, com os IDs no fim), e cada leitor da aba (a plataforma, o gêmeo, o coletor, a ponte das Ligações) troca as linhas
+daquelas chaves pelas da visão (`sobrepor`): o resto do leitor não muda. A chave de cada linha é a da plataforma, "Usina
+Supervisório" e, sem ela, "Usina". A linha da usina (UFV) e as das cabines (UG) saem na chave da usina (`principal`), com
+"Usina Supervisório" vazia quando a chave é o próprio nome de exibição (como 103 das 146 UFV da aba); a do inversor, sempre
+com a chave. O nome de exibição é o da chave (`usina_exibicao`, o "Usina" da aba; vazio = o do Registro mestre). A tela
+mostra, chave a chave, o que muda para os leitores (`comparar_chave`) antes de marcar.
+
 O dado: livro `nexus_estrutura_usina` (catálogo do Nexus), três abas de estado: `dim_supervisorio`, `dim_cabine`,
-`dim_inversor`. Gravar troca o livro inteiro (relido do banco antes, sob trava: nunca a cópia de 1 minuto) e o
+`dim_inversor`, e a visão `aba_equipamentos`, refeita a cada gravação. Gravar troca o livro inteiro (relido do banco antes, sob trava: nunca a cópia de 1 minuto) e o
 `livros.publicar` confere a contagem. ID novo = maior + 1 e não volta; excluir marca `excluido = sim`. O Salvar leva o
 selo da usina que a tela abriu: se a usina mudou no meio (outra aba, outra pessoa), nada é gravado. Quem mudou vai em
 `alterado_por_hmac` (regra 8: nada de e-mail no banco, que tem leitura aberta) e no log da máquina.
@@ -45,12 +54,18 @@ from ..dados import livros
 log = logging.getLogger(__name__)
 
 LIVRO, NOME_LIVRO = "nexus_estrutura_usina", "Nexus · estrutura das usinas"
-ABA_SUP, ABA_CAB, ABA_INV = "dim_supervisorio", "dim_cabine", "dim_inversor"
+ABA_SUP, ABA_CAB, ABA_INV, ABA_VISAO = "dim_supervisorio", "dim_cabine", "dim_inversor", "aba_equipamentos"
 _CONTROLE = ("criado_em", "alterado_em", "alterado_por_hmac", "excluido")
-CAB_SUP = ("supervisorio_id", "usina_id", "usina_supervisorio", "full_om", "string_box") + _CONTROLE
+CAB_SUP = ("supervisorio_id", "usina_id", "usina_supervisorio", "usina_exibicao", "principal", "full_om", "string_box",
+           "substitui_aba") + _CONTROLE
 CAB_CAB = ("cabine_id", "usina_id", "nome", "potencia_kwp", "equipamento_id", "codigo_fracttal", "ordem") + _CONTROLE
 CAB_INV = ("inversor_id", "usina_id", "supervisorio_id", "cabine_id", "nome", "equipamento_supervisorio",
            "potencia_kwp", "strings_esperadas_qtd", "equipamento_id", "codigo_fracttal", "ordem") + _CONTROLE
+# a visão: as colunas da aba Equipamentos que os leitores usam, com o MESMO nome ("Chave" e "Chave 2" são as
+# concatenações que a aba tem; "Observações" é texto livre e fica fora: regra 8), e os IDs do Nexus no fim
+CAB_VISAO = ("Cliente", "Usina", "Usina Supervisório", "Usina Fractall", "Equipamento", "Equipamento Supervisório",
+             "Equipamento Parente", "Chave", "Chave 2", "Potência (kWp)", "N de Inversores", "String Box", "Full O&M",
+             "Strings Ativas", "usina_id", "supervisorio_id", "cabine_id", "inversor_id")
 ABA_EQUIPAMENTOS = ("bd_performance", "Equipamentos")
 ABA_ATIVOS = ("nexus_equipamentos", "dim_equipamento")
 TTL_S, TTL_ABA_S, TTL_ATIVOS_S = 60, 600, 3600
@@ -110,7 +125,9 @@ def _sup(x: dict):
     if not sid or not chave:
         return None
     return {"supervisorio_id": sid, "usina_id": D._id(x.get("usina_id")), "usina_supervisorio": chave,
-            "full_om": _sim(x.get("full_om")), "string_box": _sim(x.get("string_box")), **_controle(x)}
+            "usina_exibicao": texto(x.get("usina_exibicao")), "principal": _sim(x.get("principal")),
+            "full_om": _sim(x.get("full_om")), "string_box": _sim(x.get("string_box")),
+            "substitui_aba": _sim(x.get("substitui_aba")), **_controle(x)}
 
 
 def _cab(x: dict):
@@ -139,7 +156,8 @@ def _ler_banco(base: str, sessao) -> dict:
 
     def le(aba, f):
         return [y for y in (f(x) for x in livros._linhas(base, sessao, a[aba])) if y] if aba in a else []
-    return {"supervisorios": le(ABA_SUP, _sup), "cabines": le(ABA_CAB, _cab), "inversores": le(ABA_INV, _inv)}
+    return {"supervisorios": le(ABA_SUP, _sup), "cabines": le(ABA_CAB, _cab), "inversores": le(ABA_INV, _inv),
+            "visao": livros._linhas(base, sessao, a[ABA_VISAO]) if ABA_VISAO in a else []}
 
 
 def ler(base: str, sessao, forcar: bool = False) -> dict:
@@ -154,7 +172,7 @@ def ler(base: str, sessao, forcar: bool = False) -> dict:
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         if c:
             return dict(c, erro=erro, velha=True)
-        return {"supervisorios": [], "cabines": [], "inversores": [], "lido_em": None, "erro": erro}
+        return {"supervisorios": [], "cabines": [], "inversores": [], "visao": [], "lido_em": None, "erro": erro}
     c = dict(d, lido_em=time.time(), erro="")
     _CACHE["livro"] = c
     return c
@@ -193,7 +211,8 @@ def resumo(u: dict) -> dict:
         elif c and c["potencia_kwp"] is not None:
             kwp_calc += c["potencia_kwp"] / n_na_cab[c["cabine_id"]]
     com_kwp = [c["potencia_kwp"] for c in cabs if c["potencia_kwp"] is not None]
-    return {"chaves": len(u["supervisorios"]), "cabines": len(cabs), "inversores": len(invs),
+    return {"chaves": len(u["supervisorios"]), "no_lugar_da_aba": sum(1 for s in u["supervisorios"] if s["substitui_aba"]),
+            "cabines": len(cabs), "inversores": len(invs),
             "strings": sum(i["strings_esperadas_qtd"] or 0 for i in invs),
             "kwp_cabines": round(sum(com_kwp), 3) if com_kwp else None,
             "kwp_inversores": round(kwp_inf + kwp_calc, 3) if invs and (kwp_inf or kwp_calc) else None,
@@ -209,6 +228,182 @@ def conferir_potencia(kwp_usina, kwp) -> str:
         return ""
     d = abs(kwp - kwp_usina) / kwp_usina
     return "fecha" if d <= 0.005 else ("perto" if d <= 0.05 else "nao_fecha")
+
+
+# ── a visão no formato da aba Equipamentos (o que os leitores da aba passam a ler) ───────────────────────────────────
+def exibicao(s: dict, info_u: dict | None) -> str:
+    """O nome de exibição da chave: o dela ("Usina" da aba), senão o da usina no Registro mestre."""
+    return s["usina_exibicao"] or texto((info_u or {}).get("nome"))
+
+
+def nome_de_inversor(nome: str) -> str:
+    """Os leitores da aba só contam como inversor a linha cujo Equipamento começa por "Inversor" (a plataforma, o gêmeo e
+    o coletor): o nome que não começa assim sai com o prefixo, e a comparação mostra."""
+    return nome if norm(nome).startswith("inversor") else f"Inversor {nome}"
+
+
+def chave_efetiva(linha: dict) -> str:
+    """A chave de uma linha no formato da aba, como a plataforma a lê: "Usina Supervisório" e, sem ela, "Usina"."""
+    return texto(linha.get("Usina Supervisório")) or texto(linha.get("Usina"))
+
+
+def visao_da_usina(u: dict, info_u: dict | None, todas: bool = False) -> list[dict]:
+    """As linhas no formato da aba Equipamentos das chaves da usina marcadas "no lugar da aba" (todas, com `todas`: é o
+    que a comparação usa). A usina (UFV, com a potência do Registro mestre ou, sem ela, a soma das cabines) e as cabines
+    (UG) saem na chave da usina; cada inversor, na chave dele. Inversor sem chave não sai (não é de leitor nenhum)."""
+    info_u = info_u or {}
+    pega = [s for s in u["supervisorios"] if todas or s["substitui_aba"]]
+    cliente, fr = texto(info_u.get("cliente")) or None, texto(info_u.get("fracttal")) or None
+    n_na_cab = Counter(i["cabine_id"] for i in u["inversores"] if i["cabine_id"])
+    cab = {c["cabine_id"]: c for c in u["cabines"]}
+    out = []
+    for s in pega:
+        disp = exibicao(s, info_u) or s["usina_supervisorio"]
+        comum = {"Cliente": cliente, "Usina": disp, "Usina Fractall": fr, "String Box": "Sim" if s["string_box"] else "Não",
+                 "Full O&M": "Sim" if s["full_om"] else "Não", "usina_id": s["usina_id"],
+                 "supervisorio_id": s["supervisorio_id"]}
+        if s["principal"]:
+            sup = "" if norm(s["usina_supervisorio"]) == norm(disp) else s["usina_supervisorio"]
+            kwp = info_u.get("kwp")
+            if kwp is None and any(c["potencia_kwp"] is not None for c in u["cabines"]):
+                kwp = round(sum(c["potencia_kwp"] or 0 for c in u["cabines"]), 3)
+            out.append(dict(comum, **{"Usina Supervisório": sup or None, "Equipamento": "UFV", "Chave 2": f"{sup}UFV",
+                                      "Potência (kWp)": kwp, "N de Inversores": len(u["inversores"]) or None}))
+            for c in u["cabines"]:
+                out.append(dict(comum, **{"Usina Supervisório": sup or None, "Equipamento": c["nome"],
+                                          "Equipamento Parente": "UFV", "Chave 2": f"{sup}{c['nome']}",
+                                          "Potência (kWp)": c["potencia_kwp"],
+                                          "N de Inversores": n_na_cab.get(c["cabine_id"]) or None,
+                                          "cabine_id": c["cabine_id"]}))
+        for i in u["inversores"]:
+            if i["supervisorio_id"] != s["supervisorio_id"]:
+                continue
+            eq, esup, chave = nome_de_inversor(i["nome"]), i["equipamento_supervisorio"], s["usina_supervisorio"]
+            c = cab.get(i["cabine_id"])
+            out.append(dict(comum, **{"Usina Supervisório": chave, "Equipamento": eq, "Equipamento Supervisório": esup or None,
+                                      "Equipamento Parente": c["nome"] if c else None,
+                                      "Chave": f"{chave}{esup}" if esup else None, "Chave 2": f"{chave}{eq}",
+                                      "Potência (kWp)": i["potencia_kwp"], "Strings Ativas": i["strings_esperadas_qtd"],
+                                      "cabine_id": i["cabine_id"], "inversor_id": i["inversor_id"]}))
+    return [{c: x.get(c) for c in CAB_VISAO} for x in out]
+
+
+def visao_aba(est: dict, info: dict | None) -> list[dict]:
+    """A visão inteira: as usinas com alguma chave "no lugar da aba", na ordem do ID (o sha não muda de máquina)."""
+    usinas = sorted({s["usina_id"] for s in est["supervisorios"] if not s["excluido"] and s["substitui_aba"]})
+    return [x for uid in usinas for x in visao_da_usina(da_usina(est, uid), (info or {}).get(uid))]
+
+
+def sobrepor(linhas_aba, linhas_visao) -> list[dict]:
+    """A aba com as chaves da visão trocadas: tira da aba as linhas de UFV, UG e inversor das chaves que a visão traz e
+    põe as da visão. É o mesmo que cada leitor da aba faz do lado dele (a plataforma, o gêmeo, o coletor)."""
+    visao = list(linhas_visao or ())
+    chaves = {chave_efetiva(x) for x in visao}
+    if not chaves:
+        return list(linhas_aba or ())
+    return [x for x in linhas_aba or () if chave_efetiva(x) not in chaves or not _tipo_linha(x.get("Equipamento"))] + visao
+
+
+def _celula(v):
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    if isinstance(v, bool):
+        return int(v)
+    if isinstance(v, (int, float)):
+        return round(float(v), 3)
+    s = str(v).strip()
+    try:
+        return round(float(s.replace(",", ".")), 3) if re.fullmatch(r"-?\d+([.,]\d+)?", s) else s
+    except ValueError:
+        return s
+
+
+def _mesma_visao(a, b) -> bool:
+    """As duas listas dizem o mesmo (o banco devolve número como texto, inteiro como real...)."""
+    def n(linhas):
+        return [[_celula(x.get(c)) for c in CAB_VISAO] for x in linhas or ()]
+    return n(a) == n(b)
+
+
+def comparar_chave(g: dict | None, linhas: list[dict]) -> dict:
+    """O que muda para os leitores da aba se a chave passar a vir do Nexus: o grupo dela na aba (`agrupar_aba`) contra as
+    linhas da visão dela. {"na_aba", "iguais", "n", "dif": [textos]} (até 40 textos)."""
+    if g is None:
+        return {"na_aba": False, "iguais": False, "n": 1,
+                "dif": ["A chave não está na aba Equipamentos: marcada, os leitores passam a conhecê-la só pelo Nexus."]}
+    dif = []
+
+    def num(v):
+        x = _num(v)
+        return None if x is None else round(x, 2)
+
+    def txt(rotulo, a, n):
+        if norm(a) != norm(n):
+            dif.append(f"{rotulo}: “{a or '—'}” na aba, “{n or '—'}” no Nexus.")
+
+    def val(rotulo, a, n):
+        if (a is None) != (n is None) or (a is not None and abs(a - n) > 0.05):
+            dif.append(f"{rotulo}: {a if a is not None else '—'} na aba, {n if n is not None else '—'} no Nexus.")
+    ufv = next((x for x in linhas if x["Equipamento"] == "UFV"), None)
+    ugs = [x for x in linhas if x.get("cabine_id") and not x.get("inversor_id")]
+    invs = [x for x in linhas if x.get("inversor_id")]
+    um = linhas[0] if linhas else {}
+    if linhas:
+        txt("Nome de exibição", g["usina"], um.get("Usina"))
+        txt("Nome no Fracttal", g["fracttal"], um.get("Usina Fractall"))
+        txt("Cliente", g["cliente"], um.get("Cliente"))
+        if g["full_om"] != (um.get("Full O&M") == "Sim"):
+            dif.append(f"Full O&M: {'Sim' if g['full_om'] else 'Não'} na aba, {um.get('Full O&M')} no Nexus.")
+        if g["string_box"] != (um.get("String Box") == "Sim"):
+            dif.append(f"String Box: {'Sim' if g['string_box'] else 'Não'} na aba, {um.get('String Box')} no Nexus.")
+    if g["ufv_kwp"] is not None or ufv:
+        if not ufv:
+            dif.append(f"A linha da usina (UFV, {g['ufv_kwp']} kWp) está nesta chave na aba; no Nexus, esta não é a chave "
+                       "da usina.")
+        elif g["ufv_kwp"] is None and not g["cabines"]:
+            dif.append("No Nexus esta é a chave da usina (UFV e cabines); na aba, a linha da usina fica em outra chave.")
+        else:
+            val("Potência da usina (kWp)", num(g["ufv_kwp"]), num(ufv["Potência (kWp)"]))
+            val("Inversores da usina", g["ufv_inversores"], _int(ufv["N de Inversores"]))
+    if g["cabines"] or ugs:
+        a = {norm(c["nome"]): c for c in g["cabines"]}
+        n = {norm(x["Equipamento"]): x for x in ugs}
+        for k in a.keys() - n.keys():
+            dif.append(f"Cabine {a[k]['nome']} está na aba e não no Nexus.")
+        for k in n.keys() - a.keys():
+            dif.append(f"Cabine {n[k]['Equipamento']} está no Nexus e não na aba.")
+        for k in a.keys() & n.keys():
+            val(f"Cabine {a[k]['nome']} (kWp)", num(a[k]["kwp"]), num(n[k]["Potência (kWp)"]))
+
+    def chave_inv(sup, nome):
+        return ("s", norm(sup)) if sup else ("n", norm(nome))
+    a = {chave_inv(i["equipamento_supervisorio"], i["nome"]): i for i in g["inversores"]}
+    n = {chave_inv(x["Equipamento Supervisório"], x["Equipamento"]): x for x in invs}
+    for k in sorted(a.keys() - n.keys(), key=lambda k: natural(k[1])):
+        i = a[k]
+        dif.append(f"{i['equipamento_supervisorio'] or i['nome']} ({i['nome']}) está na aba e não no Nexus.")
+    for k in sorted(n.keys() - a.keys(), key=lambda k: natural(k[1])):
+        x = n[k]
+        dif.append(f"{x['Equipamento Supervisório'] or x['Equipamento']} ({x['Equipamento']}) está no Nexus e não na aba.")
+    for k in sorted(a.keys() & n.keys(), key=lambda k: natural(k[1])):
+        i, x = a[k], n[k]
+        quem = i["equipamento_supervisorio"] or i["nome"]
+        txt(f"{quem}: nome", i["nome"], x["Equipamento"])
+        txt(f"{quem}: cabine", i["cabine"], x["Equipamento Parente"])
+        val(f"{quem}: kWp", num(i["kwp"]), num(x["Potência (kWp)"]))
+        val(f"{quem}: strings", i["strings"], _int(x["Strings Ativas"]))
+    return {"na_aba": True, "iguais": not dif, "n": len(dif),
+            "dif": dif[:40] + ([f"... e mais {len(dif) - 40} diferenças."] if len(dif) > 40 else [])}
+
+
+def comparar_usina(u: dict, info_u: dict | None, aba_chaves: dict) -> dict:
+    """{supervisorio_id: comparar_chave} de todas as chaves da usina (marcadas ou não: é o que a tela mostra antes)."""
+    linhas = visao_da_usina(u, info_u, todas=True)
+    out = {}
+    for s in u["supervisorios"]:
+        out[s["supervisorio_id"]] = comparar_chave(aba_chaves.get(s["usina_supervisorio"]),
+                                                   [x for x in linhas if x["supervisorio_id"] == s["supervisorio_id"]])
+    return out
 
 
 # ── a aba Equipamentos (referência) e os ativos do Fracttal ──────────────────────────────────────────────────────────
@@ -308,26 +503,31 @@ def _quem(cfg, email: str) -> str:
     return codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email) or ""
 
 
-def _linhas_do_livro(est: dict) -> dict:
-    """As três abas ordenadas pelo ID (o sha do livro não muda de máquina para máquina). Indicador como 1/0 (regra 3);
-    `excluido` como na casa: "sim" ou vazio."""
+def _linhas_do_livro(est: dict, visao: list[dict]) -> dict:
+    """As três abas ordenadas pelo ID (o sha do livro não muda de máquina para máquina) e a visão. Indicador como 1/0
+    (regra 3); `excluido` como na casa: "sim" ou vazio."""
+    def vazio(v):
+        return None if v in ("", None) else v
+
     def valor(c, v):
-        if c in ("full_om", "string_box"):
+        if c in ("full_om", "string_box", "principal", "substitui_aba"):
             return 1 if v else 0
         if c == "excluido":
             return "sim" if v else None
-        return None if v in ("", None) else v
+        return vazio(v)
 
     def tab(itens, cab, chave_id):
         return (list(cab), [[valor(c, x.get(c)) for c in cab] for x in sorted(itens, key=lambda x: x[chave_id])])
     return {ABA_SUP: tab(est["supervisorios"], CAB_SUP, "supervisorio_id"),
             ABA_CAB: tab(est["cabines"], CAB_CAB, "cabine_id"),
-            ABA_INV: tab(est["inversores"], CAB_INV, "inversor_id")}
+            ABA_INV: tab(est["inversores"], CAB_INV, "inversor_id"),
+            ABA_VISAO: (list(CAB_VISAO), [[vazio(x.get(c)) for c in CAB_VISAO] for x in visao])}
 
 
-def _gravar(mudar, cfg, base, sessao, quem_email: str = "") -> dict:
-    """Relê o banco (nunca a cópia de 1 minuto), aplica a mudança e grava o livro inteiro se algo mudou. Sem a chave de
-    gravação, ou sem conseguir ler, nada é gravado."""
+def _gravar(mudar, cfg, base, sessao, quem_email: str = "", info: dict | None = None) -> dict:
+    """Relê o banco (nunca a cópia de 1 minuto), aplica a mudança e grava o livro inteiro se algo mudou: as três abas de
+    estado ou a visão, refeita com `info` ({usina_id: nome, cliente, kwp, fracttal}, o que a tela sabe do Registro mestre
+    e das Ligações; sem `info`, a visão gravada segue como está). Sem a chave de gravação, ou sem ler, nada é gravado."""
     token = cfg.get("GRIDCO_SQL_TOKEN")
     if not token:
         raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN): nada foi gravado.")
@@ -337,10 +537,15 @@ def _gravar(mudar, cfg, base, sessao, quem_email: str = "") -> dict:
         except Exception as ex:  # noqa: BLE001
             raise Recusada(f"Não consegui ler a estrutura no banco ({type(ex).__name__}): nada foi gravado, para não "
                            "apagar o que já está lá.") from ex
-        antes = copy.deepcopy(est)
+        estado = ("supervisorios", "cabines", "inversores")
+        antes = copy.deepcopy({k: est[k] for k in estado})
         resultado = mudar(est, _agora(), _quem(cfg, quem_email))
-        if est != antes:
-            livros.publicar(LIVRO, NOME_LIVRO, _linhas_do_livro(est), base=base, token=token, sessao=sessao)
+        visao = visao_aba(est, info) if info is not None else est["visao"]
+        visao_mudou = info is not None and not _mesma_visao(visao, est["visao"])
+        if {k: est[k] for k in estado} != antes or visao_mudou:
+            livros.publicar(LIVRO, NOME_LIVRO, _linhas_do_livro(est, visao), base=base, token=token, sessao=sessao)
+            est["visao"] = visao
+        resultado.update(visao_linhas=len(est["visao"]), visao_mudou=visao_mudou)
         _CACHE["livro"] = dict(est, lido_em=time.time(), erro="")
     log.info("Estrutura das usinas: %s, por %s.", resultado.get("log", "sem mudança"),
              quem_email or "senha de administrador")
@@ -351,10 +556,12 @@ def _proximo(itens, chave_id) -> int:
     return max((x[chave_id] for x in itens), default=0) + 1
 
 
-def ligar_supervisorio(usina_id: int, chave: str, cfg, base, sessao, quem_email: str = "") -> dict:
+def ligar_supervisorio(usina_id: int, chave: str, cfg, base, sessao, quem_email: str = "", exibicao_aba: str = "",
+                       info: dict | None = None) -> dict:
     """Liga uma chave do supervisório à usina do Registro mestre. Chave ligada a OUTRA usina é recusada (uma chave, uma
     usina: é por ela que a plataforma acha a usina); ligada a esta, nada muda. A chave pode não estar na aba (usina
-    nova): quem decide é a pessoa, e a tela avisa."""
+    nova): quem decide é a pessoa, e a tela avisa. Nasce com o nome de exibição da aba (`exibicao_aba`, vazio = o do
+    Registro mestre), como a chave da usina se a usina ainda não tem uma, e FORA do lugar da aba (marcar é decisão)."""
     chave = texto(chave)
     if not chave:
         raise Recusada("Escolha ou digite a chave do supervisório.")
@@ -369,31 +576,44 @@ def ligar_supervisorio(usina_id: int, chave: str, cfg, base, sessao, quem_email:
         if ativa:
             return {"supervisorio_id": ativa["supervisorio_id"], "novo": False, "log": "a chave já estava ligada"}
         sid = _proximo(est["supervisorios"], "supervisorio_id")
+        tem_principal = any(s["usina_id"] == usina_id and s["principal"] and not s["excluido"] for s in est["supervisorios"])
         est["supervisorios"].append({"supervisorio_id": sid, "usina_id": usina_id, "usina_supervisorio": chave,
-                                     "full_om": False, "string_box": False, "criado_em": agora, "alterado_em": agora,
-                                     "alterado_por_hmac": quem, "excluido": False})
+                                     "usina_exibicao": texto(exibicao_aba), "principal": not tem_principal,
+                                     "full_om": False, "string_box": False, "substitui_aba": False, "criado_em": agora,
+                                     "alterado_em": agora, "alterado_por_hmac": quem, "excluido": False})
         return {"supervisorio_id": sid, "novo": True, "log": f"ligou a chave {chave} à usina {usina_id}"}
-    return _gravar(mudar, cfg, base, sessao, quem_email)
+    return _gravar(mudar, cfg, base, sessao, quem_email, info)
 
 
-def desligar_supervisorio(supervisorio_id: int, usina_id: int, cfg, base, sessao, quem_email: str = "") -> dict:
+def desligar_supervisorio(supervisorio_id: int, usina_id: int, cfg, base, sessao, quem_email: str = "",
+                          info: dict | None = None) -> dict:
     """Tira a chave da usina (ela passa a excluída; o ID não volta). Os inversores que chegavam por ela ficam na usina,
-    sem chave, à vista na tela para ganhar outra: desligar uma chave nunca apaga inversor."""
+    sem chave, à vista na tela para ganhar outra: desligar uma chave nunca apaga inversor. Se era a chave da usina, a
+    1ª das que ficam passa a ser (a tela diz)."""
     def mudar(est, agora, quem):
         s = next((s for s in est["supervisorios"] if s["supervisorio_id"] == supervisorio_id and not s["excluido"]), None)
         if not s or s["usina_id"] != usina_id:
             raise Recusada("Esta chave já não está ligada a esta usina (a lista mudou desde que a tela abriu): nada foi "
                            "gravado.")
-        s.update(excluido=True, alterado_em=agora, alterado_por_hmac=quem)
+        era_principal = s["principal"]
+        s.update(excluido=True, principal=False, substitui_aba=False, alterado_em=agora, alterado_por_hmac=quem)
         soltos = 0
         for i in est["inversores"]:
             if i["supervisorio_id"] == supervisorio_id and not i["excluido"]:
                 i.update(supervisorio_id=None, alterado_em=agora, alterado_por_hmac=quem)
                 soltos += 1
+        nova = None
+        if era_principal:
+            restam = sorted((x for x in est["supervisorios"] if x["usina_id"] == usina_id and not x["excluido"]),
+                            key=lambda x: norm(x["usina_supervisorio"]))
+            if restam:
+                nova = restam[0]
+                nova.update(principal=True, alterado_em=agora, alterado_por_hmac=quem)
         return {"chave": s["usina_supervisorio"], "usina_id": s["usina_id"], "inversores_sem_chave": soltos,
+                "nova_principal": nova["usina_supervisorio"] if nova else "",
                 "log": f"desligou a chave {s['usina_supervisorio']} da usina {s['usina_id']} ({soltos} inversor(es) "
                        "ficaram sem chave)"}
-    return _gravar(mudar, cfg, base, sessao, quem_email)
+    return _gravar(mudar, cfg, base, sessao, quem_email, info)
 
 
 def _validar(dados: dict) -> tuple[dict, list, list]:
@@ -404,7 +624,11 @@ def _validar(dados: dict) -> tuple[dict, list, list]:
     for c in list(dados.get("chaves") or [])[:200]:
         sid = D._id(c.get("supervisorio_id"))
         if sid:
-            chaves[sid] = (bool(c.get("full_om")), bool(c.get("string_box")))
+            chaves[sid] = {"full_om": bool(c.get("full_om")), "string_box": bool(c.get("string_box")),
+                           "usina_exibicao": texto(c.get("usina_exibicao")), "principal": bool(c.get("principal")),
+                           "substitui_aba": bool(c.get("substitui_aba"))}
+    if sum(1 for c in chaves.values() if c["principal"]) > 1:
+        raise Recusada("Só uma chave pode ser a da usina (a da UFV e das cabines): nada foi gravado.")
     cabs, invs = list(dados.get("cabines") or []), list(dados.get("inversores") or [])
     if len(cabs) > MAX_CABINES or len(invs) > MAX_INVERSORES:
         raise Recusada("Estrutura grande demais para uma usina: nada foi gravado.")
@@ -459,7 +683,8 @@ def _validar(dados: dict) -> tuple[dict, list, list]:
     return chaves, limpas, limpos
 
 
-def salvar_usina(usina_id: int, dados: dict, selo_tela: str, cfg, base, sessao, quem_email: str = "") -> dict:
+def salvar_usina(usina_id: int, dados: dict, selo_tela: str, cfg, base, sessao, quem_email: str = "",
+                 info: dict | None = None) -> dict:
     """Grava a estrutura da usina como a tela mandou: o que veio com id atualiza (e só ganha `alterado_em` se mudou), o
     que veio sem id nasce com id novo, e o que estava gravado e não veio passa a excluído. Só grava se o banco ainda
     estiver como a tela abriu (`selo_tela`)."""
@@ -478,11 +703,17 @@ def salvar_usina(usina_id: int, dados: dict, selo_tela: str, cfg, base, sessao, 
                 raise Recusada(f"O inversor “{i['nome']}” aponta para uma chave do supervisório que não é desta usina: "
                                "nada foi gravado.")
         mudou = 0
-        for sid, (full_om, string_box) in chaves.items():
+        for sid, novo in chaves.items():
             s = minhas.get(sid)
-            if s and (s["full_om"], s["string_box"]) != (full_om, string_box):
-                s.update(full_om=full_om, string_box=string_box, alterado_em=agora, alterado_por_hmac=quem)
+            if s and any(s[k] != v for k, v in novo.items()):
+                s.update(novo, alterado_em=agora, alterado_por_hmac=quem)
                 mudou += 1
+        escolhida = next((sid for sid, c in chaves.items() if c["principal"] and sid in minhas), None)
+        if escolhida:
+            for s in minhas.values():
+                if s["principal"] and s["supervisorio_id"] != escolhida:
+                    s.update(principal=False, alterado_em=agora, alterado_por_hmac=quem)
+                    mudou += 1
         gravadas = {c["cabine_id"]: c for c in u["cabines"]}
         id_da_k, prox = {}, _proximo(est["cabines"], "cabine_id")
         for c in cabs:
@@ -522,4 +753,11 @@ def salvar_usina(usina_id: int, dados: dict, selo_tela: str, cfg, base, sessao, 
         depois = da_usina(est, usina_id)
         return {"mudancas": mudou, "selo": selo(depois), "resumo": resumo(depois), "usina": depois,
                 "log": f"{mudou} mudança(s) na usina {usina_id}"}
-    return _gravar(mudar, cfg, base, sessao, quem_email)
+    return _gravar(mudar, cfg, base, sessao, quem_email, info)
+
+
+def republicar_visao(cfg, base, sessao, info: dict, quem_email: str = "") -> dict:
+    """Refaz a visão com o que a tela sabe agora (o nome no Fracttal mudou nas Ligações, a potência no Registro mestre) e
+    grava só se ela mudou."""
+    return _gravar(lambda est, agora, quem: {"log": "conferiu a visão no formato da aba"}, cfg, base, sessao,
+                   quem_email, info)

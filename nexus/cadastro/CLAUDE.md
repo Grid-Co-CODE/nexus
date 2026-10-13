@@ -217,10 +217,40 @@ de entender para você, quando eu for fazer não vou entender nada".
   impressão do que a usina tinha quando a tela abriu (só os campos do negócio, para a data relida não dar mudança
   falsa); se outra aba ou pessoa mudou a usina no meio, nada grava e a tela pede para recarregar. A ordem é gravada
   (tirar um inversor muda a ordem dos seguintes, e isso conta como mudança).
-- **A aba Equipamentos não muda** e continua sendo o que a plataforma lê. Medido em 13/10: 2.602 linhas, 301 chaves, 247
-  UG, 2.201 inversores (214 sem nome no supervisório), 85 usinas de exibição com mais de uma chave. **Fase 2 (a propor
-  ao Levi):** a plataforma ler o `nexus_estrutura_usina` no lugar da aba, em paralelo e por opção, comparando os
-  esperados antes de trocar.
+- **A aba Equipamentos não muda** (o BD é do Levi e da equipe, nunca se mata). Medido em 13/10: 2.602 linhas, 301
+  chaves, 247 UG, 2.201 inversores (214 sem nome no supervisório), 85 usinas de exibição com mais de uma chave, só UFV,
+  UG e inversor (e 8 linhas vazias); "Chave" e "Chave 2" são concatenações de fórmula e "Observações" é texto livre.
+- **No lugar da aba (as fases 2 a 5, 13/10/2026; Levi: "pode fazer todas as fases! vamos pra cima!").** Cada chave tem,
+  no `dim_supervisorio`: o **nome de exibição** (`usina_exibicao`, o "Usina" da aba: nasce dela ao ligar e no Trazer da
+  aba; vazio = o do Registro mestre), a **chave da usina** (`principal`, uma por usina: a 1ª ligada; o Trazer da aba a
+  passa para a chave que tem a UFV na aba; desligá-la passa para a 1ª das que ficam) e a marca **no lugar da aba**
+  (`substitui_aba`, nasce desmarcada: marcar é decisão). As marcadas saem numa **visão no formato da aba**
+  (`aba_equipamentos`: as colunas da aba, com os IDs no fim), refeita a cada gravação da tela com o que ela sabe do
+  Registro mestre e das Ligações (`info`: nome, cliente, potência real/contratual, 1º nome do Fracttal); só regrava se
+  mudou. A UFV e as UG saem na chave da usina, com "Usina Supervisório" vazia quando a chave é o próprio nome de
+  exibição (como 103 das 146 UFV da aba); o inversor sai sempre com a chave e com "Inversor " na frente se o nome não
+  começar assim (os leitores só contam o que começa). Inversor sem chave não sai.
+- **Os leitores trocam as linhas das chaves da visão** (tiram da aba as de UFV, UG e inversor dessas chaves, pela chave
+  efetiva "Usina Supervisório" ou, sem ela, "Usina", e põem as da visão; o resto segue da aba): a **plataforma**
+  (`plataforma/estrutura_nexus.py`: o cadastro, o mapa do "Usina Fractall" e a disponibilidade; relê sozinha quando a
+  visão muda; `ESTRUTURA_NEXUS=0` desliga; `/api/estrutura-nexus` diz o que entrou), o **gêmeo** (`gemeo/gemeo/ingest/
+  cadastro.py`, a versão do cadastro leva o `updated_at` do livro), as **Ligações** daqui (a ponte aba → Fracttal) e o
+  **coletor** (`load_name_mapping`, DESLIGADO por padrão: liga com `COLETOR_ESTRUTURA_NEXUS=1` ou `[nexus]
+  estrutura_no_lugar_da_aba = sim` no config.ini, e na 22:30 só depois de build e release, que são do Levi). A mesma
+  regra (`sobrepor`) nos quatro: mudou num, muda nos outros.
+- **Antes de marcar, a tela compara** (`comparar_usina` → `comparar_chave`): chave a chave, a aba contra a visão do que
+  está SALVO (nome de exibição, Fracttal, cliente, Full O&M, String Box, UFV e o total de inversores, cabines e kWp, e
+  cada inversor: nome, cabine, kWp, strings, o que só está de um lado). Coluna "Diferença com a aba": "igual à aba", "N
+  diferenças" (clique abre a lista) ou "fora da aba"; com rascunho não salvo diz "(do que está salvo)". Salvar uma chave
+  recém-marcada que ainda tem diferença pede confirmação. O botão **Refazer a visão** (no topo, com chave marcada) é para
+  quando o Registro mestre ou o Fracttal mudaram fora da tela.
+- **Provas (13/10):** `tests/test_base_equipamentos.py` (20, entre eles a usina montada igual à aba: a comparação diz
+  igual e `agrupar_aba(sobrepor(aba, visão)) == agrupar_aba(aba)`); na plataforma, `tests/test_estrutura_nexus.py` (os 13
+  mapas do cadastro iguais com a estrutura igual à aba, e a esperada acompanha o Nexus quando muda); no gêmeo e no
+  coletor, os testes de cada um. Com dado real, numa cópia (5071) com o banco só na memória: a **Altair** (6 chaves, 5
+  cabines, 40 inversores) pelo Trazer da aba deu "igual à aba" nas 6 e, com as 6 no lugar da aba (46 linhas na visão), o
+  cadastro da plataforma carregado com a aba real ficou com os **13 mapas iguais** (a UFV difere em 5e-12 kWp: a aba guarda
+  o resultado de uma fórmula, o Nexus usa a potência real do Registro mestre).
 - **Só administrador** (o Registro mestre e a gravação no banco; `_tela`); os POST só da própria página
   (`_de_outro_site`). Prova: `tests/test_base_equipamentos.py` (a aba agrupada, chave de uma usina só, desligar sem
   apagar inversor, criar/atualizar/excluir com ID que não volta, as recusas sem gravar nada, selo, sem token e banco
