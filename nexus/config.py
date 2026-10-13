@@ -52,7 +52,10 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_PCM_MPAS_SENHA", "NEXUS_PCM_GESTAO_FONTE", "NEXUS_PCM_MPAS_FONTE",
              # o caminho em que o Nexus é servido (09/10/2026, "a partir de segunda quero o Nexus como link principal"):
              # /nexus no servidor (app.gridco.com.br/nexus); vazio = a raiz, o PC e a fase 4. Ver nexus/prefixo.py
-             "NEXUS_PREFIXO")
+             "NEXUS_PREFIXO",
+             # o que cada setor vê (12/10/2026, Base → Acessos): padrão ligado; "0" desliga numa máquina (todos veem
+             # tudo, como antes). Sem a NEXUS_PESSOA_HMAC fica desligado de qualquer jeito (nexus/auth/setor_telas.py)
+             "NEXUS_ACESSO_POR_SETOR")
 
 
 class ConfigErro(RuntimeError):

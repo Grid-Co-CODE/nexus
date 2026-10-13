@@ -294,8 +294,44 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .ace-confirmo{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--tinta-2);cursor:pointer}
 .ace-confirmo input{accent-color:var(--critico)}
 .ace-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* Base > Acessos · Telas por setor (12/10/2026): um setor por vez, a árvore do menu em caixas */
+.ace-secao--setores{overflow:visible}
+.ace-ajuda--topo{padding-top:12px}
+.ace-aviso-secao{margin:0 16px 12px}
+.ace-vazio{padding:0 16px 16px;margin:0;color:var(--tinta-2)}
+.ace-v-alerta{color:var(--alerta)}
+.ace-setores{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 14px}
+.ace-setor{display:flex;flex-direction:column;gap:1px;min-width:0;padding:7px 12px;border:1px solid var(--linha);
+  border-radius:var(--raio-md);background:var(--superficie-2);color:var(--tinta);text-decoration:none}
+.ace-setor:hover{border-color:var(--verde)}
+.ace-setor.ativo{border-color:var(--verde);background:var(--verde-suave)}
+.ace-setor .nome{font-weight:600;font-size:13px}
+.ace-setor .det{font-size:12px;color:var(--tinta-2)}
+.ace-matriz{padding:0 16px;border-top:1px solid var(--linha)}
+.ace-matriz-topo{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:12px 0}
+.ace-matriz-conta{margin:0;color:var(--tinta-2)}
+.ace-matriz-conta strong,.ace-matriz-conta b{color:var(--tinta)}
+.ace-matriz-acoes{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ace-matriz-acoes select.gc-campo{max-width:220px}
+.ace-torres{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-items:start}
+.ace-torre{min-width:0;margin:0;padding:6px 12px 10px;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.ace-torre legend{display:flex;gap:10px;align-items:center;padding:0 6px;font-weight:600}
+.ace-torre label{display:inline-flex;gap:8px;align-items:center;cursor:pointer}
+.ace-torre input{accent-color:var(--verde);width:15px;height:15px;margin:0}
+.ace-torre legend i{font-size:16px;color:var(--mudo)}
+.ace-qtd{font-size:12px;font-weight:400;color:var(--mudo);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ace-torre ul{list-style:none;margin:4px 0 0;padding:0}
+/* a etiqueta "em construção" na ponta da linha, sem quebrar embaixo do nome (a prévia de 12/10 quebrava) */
+.ace-torre li{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:3px 0;font-size:13px}
+.ace-torre li label{min-width:0}
+.ace-construcao{flex:none;font-size:11px;color:var(--mudo);white-space:nowrap}
+.ace-matriz-rodape{position:sticky;bottom:0;z-index:1;display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  justify-content:flex-end;margin:12px -16px 0;padding:12px 16px;border-top:1px solid var(--linha);
+  background:var(--superficie);border-radius:0 0 var(--raio-md) var(--raio-md)}
+.ace-mudou{color:var(--alerta);font-size:13px;font-weight:600}
 @media (max-width:560px){
   .ace-dar .gc-btn{flex:1 1 100%;justify-content:center}
+  .ace-matriz-rodape .gc-btn{flex:1 1 100%;justify-content:center}
 }
 /* Base > Integração Fracttal (12/10/2026): equipe e setor numa linha só */
 .fr-tabela td.fr-curta{white-space:nowrap}

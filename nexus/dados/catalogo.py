@@ -304,6 +304,19 @@ FATOS = (
                     "excluido = sim e o ID não volta). As duas abas vão juntas a cada gravação (gravar sem uma a "
                     "apagaria). Nada de nome nem e-mail (regra 8): quem decidiu vai em decidida_por_hmac e no log da "
                     "máquina"),
+    # O que cada setor vê no Nexus (12/10/2026, Levi: "uma seção no BASE > ACESSOS onde eu possa controlar o que cada
+    # pessoa de setor pode ver ao logar no Nexus"): a matriz setor × tela do menu, marcada na tela Base > Acessos.
+    Fato("decisao_tela_setor", "Decisão de tela por setor", "base", "nexus_setor_telas · fato_decisao_tela_setor",
+         "1 linha = 1 decisão de liberar (liberada = sim) ou fechar (nao) 1 tela do menu do Nexus para 1 setor, tomada "
+         "por um administrador na tela Acessos",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)")),
+         tipo="sem_medida", chave=("decidida_em", "setor_id", "tela"),
+         fontes=("nexus_setor_telas · fato_decisao_tela_setor",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada setor × tela)",
+         observacao="o setor liga pelo setor_id à nexus_setores · dim_setor; a tela é o endereço do menu "
+                    "(torre/tela, o mesmo de /t/torre/tela). Tela nunca marcada = fechada; o setor 'Administrador' "
+                    "não tem matriz (vê tudo). Nada de nome nem e-mail (regra 8): quem decidiu vai em "
+                    "decidida_por_hmac e no log da máquina"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -534,6 +547,10 @@ LIVROS = (
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
           "1 minuto e relê o banco antes de cada gravação"),
+    Livro("nexus_setor_telas", ("fato_decisao_tela_setor",), "a cada Salvar da seção Telas por setor (Base > Acessos)",
+          "nexus/auth/setor_telas.py, pela tela Base > Acessos", False,
+          "registrado em 12/10/2026 antes de existir: nasce com o 1º Salvar na tela; o portão de cada pedido e a "
+          "tela leem com cache de 1 minuto, e a gravação relê o banco antes"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.

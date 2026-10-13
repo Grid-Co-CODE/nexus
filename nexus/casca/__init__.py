@@ -1,4 +1,5 @@
-"""A casca: Início, troca de cadeira e de tema, saúde e o que todo template recebe (menu, cadeira, tema)."""
+"""A casca: Início, troca de tema, saúde e o que todo template recebe (menu, setor, tema). A cadeira saiu em 12/10/2026:
+os setores (Base → Acessos) dizem o que cada pessoa vê."""
 import os
 import subprocess
 from functools import lru_cache
@@ -6,9 +7,8 @@ from functools import lru_cache
 from flask import (Blueprint, abort, current_app, jsonify, redirect, render_template, request,
                    session)
 
-from ..auth import destino_seguro
+from ..auth import destino_seguro, setor_telas
 from ..prefixo import raiz
-from ..cadeiras import CADEIRAS
 from ..torres import montar_menu, telas_com_conteudo
 
 bp = Blueprint("casca", __name__)
@@ -53,24 +53,22 @@ def inicio():
     Contratos e Relatórios é "Em construção". O número agora é o das telas prontas, pela mesma conta do verde do menu
     (`telas_com_conteudo`); o cartão leva à 1ª tela PRONTA da torre, e a torre sem nenhuma não vira link."""
     app = current_app._get_current_object()
-    torres = app.extensions["nexus_torres"]
+    liberadas = setor_telas.liberadas_do_menu()
+    # só as torres e as telas que o setor da pessoa vê (o administrador vê tudo)
+    torres = [t for t in app.extensions["nexus_torres"]
+              if liberadas is None or any(f"{t.id}/{s.id}" in liberadas for s in t.telas)]
     prontas = _telas_prontas(app)
     cartoes = []
     for t in torres:
-        urls = [f"/t/{t.id}/{s.id}" for s in t.telas]
+        urls = [f"/t/{t.id}/{s.id}" for s in t.telas if liberadas is None or f"{t.id}/{s.id}" in liberadas]
         das_prontas = [u for u in urls if u in prontas]
-        cartoes.append({"torre": t, "url": das_prontas[0] if das_prontas else None, "prontas": len(das_prontas)})
+        cartoes.append({"torre": t, "url": das_prontas[0] if das_prontas else None, "prontas": len(das_prontas),
+                        "total": len(urls)})
+    if liberadas is not None:
+        prontas = frozenset(u for u in prontas if u[3:] in liberadas)
     return render_template("inicio.html", torres=torres, cartoes=cartoes, total_prontas=len(prontas),
-                           total_telas=sum(len(t.telas) for t in torres))
-
-
-@bp.route("/cadeira", methods=["POST"])
-def cadeira():
-    escolhida = request.form.get("cadeira", "")
-    if escolhida and escolhida not in CADEIRAS:
-        abort(400)
-    session["cadeira"] = escolhida or None
-    return redirect(destino_seguro(request.form.get("voltar")))
+                           total_telas=sum(len([s for s in t.telas if liberadas is None or f"{t.id}/{s.id}" in liberadas])
+                                           for t in torres))
 
 
 @bp.route("/tema", methods=["POST"])
@@ -98,11 +96,12 @@ def instalar_contexto(app) -> None:
     def _contexto():
         blueprint = request.blueprint or ""
         torre_atual = blueprint.removeprefix("torre_") if blueprint.startswith("torre_") else None
-        cadeira_id = session.get("cadeira")
+        a = setor_telas.acesso()
         return {
-            "menu": montar_menu(app.extensions["nexus_torres"], cadeira_id, torre_atual, _telas_prontas(app)),
-            "cadeira": CADEIRAS.get(cadeira_id) if cadeira_id else None,
-            "cadeiras": list(CADEIRAS.values()),
+            "menu": montar_menu(app.extensions["nexus_torres"], torre_atual, _telas_prontas(app),
+                                None if a["tudo"] else a["telas"]),
+            # o setor da pessoa, no topo (Base → Integração Fracttal); o administrador sem setor não mostra nada
+            "setor": a["setor"],
             "caminho": request.path,
             # a volta do formulário do tema (sem JavaScript) para a mesma tela, com os filtros
             "caminho_completo": request.full_path.rstrip("?"),

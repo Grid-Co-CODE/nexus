@@ -30,6 +30,7 @@ RESUMO = {
     "meta_usina_mes": "Quanto cada usina gerou no mês contra a meta, pelo Gerencial",
     # ── Base ──
     "decisao_setor": "O setor de cada pessoa do Fracttal, escolhido na tela",
+    "decisao_tela_setor": "Que telas do Nexus cada setor vê, marcado na tela Acessos",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -85,6 +86,11 @@ PARA_QUE = {
                      "administrador na tela Integração Fracttal; a lista de setores fica no mesmo livro. O setor de cada "
                      "pessoa é a última decisão dela, e as de antes contam quando ela mudou. Não guarda nome nem e-mail: "
                      "a pessoa vai pelo número do Fracttal e pela ficha do cadastro.",
+    "decisao_tela_setor": "Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
+                          "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
+                          "nunca marcada fica fechada, e o setor Administrador vê tudo sem precisar de marca. O Nexus "
+                          "lê esta tabela a cada clique (com cópia de 1 minuto) para montar o menu e abrir ou fechar "
+                          "cada tela. Não guarda nome nem e-mail.",
     "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) tomada no Nexus sobre uma PT, equipamento por "
                   "equipamento, como o App decide: a PT de três equipamentos tem três decisões. Decide o Supervisor "
                   "de Campo, o gestor de contrato, alguém do COS ou um administrador, nunca quem pediu a PT. O App "

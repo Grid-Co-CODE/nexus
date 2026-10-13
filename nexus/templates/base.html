@@ -32,17 +32,9 @@
     <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co.">
     <span class="marca-nexus">Nexus</span>
   </a>
-  <form class="cadeira" method="post" action="{{ raiz }}/cadeira">
-    <label class="gc-rotulo" for="sel-cadeira">Cadeira</label>
-    <select id="sel-cadeira" name="cadeira" class="gc-campo" onchange="this.form.submit()">
-      <option value="" {% if not cadeira %}selected{% endif %}>Sem cadeira</option>
-      {% for c in cadeiras %}
-      <option value="{{ c.id }}" {% if cadeira and cadeira.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
-      {% endfor %}
-    </select>
-    <input type="hidden" name="voltar" value="{{ caminho }}">
-    <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno">Trocar</button></noscript>
-  </form>
+  {# O setor da pessoa (Base → Integração Fracttal), no lugar da cadeira, que saiu em 12/10/2026: é o setor que diz o
+     que ela vê (Base → Acessos). O espaço fica mesmo sem setor: é ele que empurra o resto do topo para a direita. #}
+  <span class="setor-topo">{% if setor %}Setor: <b>{{ setor.nome }}</b>{% endif %}</span>
   {# Tema escuro (padrão) ou claro (08/10/2026): o botão diz o de agora. Sem JavaScript, o formulário troca pelo servidor.
      O ícone (meio círculo cheio) é desenhado no CSS, sem <svg> no topo: as telas com gráfico procuram o primeiro <svg> da
      página (os testes do Mapa de risco quebraram com um ícone em SVG aqui) e sem depender da fonte de ícones da CDN. #}
@@ -70,11 +62,10 @@
     </a>
     {% for t in menu %}
     {# Verde = a torre já tem tela com conteúdo (progresso, Levi 04/10/2026). #}
-    <details class="torre{% if t.prontas %} com-conteudo{% endif %}" data-torre="{{ t.id }}" data-sua="{{ 1 if t.sua else 0 }}" {% if t.aberta %}open{% endif %}>
+    <details class="torre{% if t.prontas %} com-conteudo{% endif %}" data-torre="{{ t.id }}" {% if t.aberta %}open{% endif %}>
       <summary title="{{ t.nome }}" data-primeira="{{ raiz }}{{ t.telas[0].url }}">
         <i class="ph ph-{{ t.icone }}"></i>
         <span>{{ t.nome }}</span>
-        {% if t.sua %}<span class="sua">sua</span>{% endif %}
       </summary>
       <ul>
         {% for s in t.telas %}

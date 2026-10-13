@@ -1,7 +1,7 @@
 # CLAUDE.md — casca (moldura, login, menu e tema)
 
-O que envolve todas as torres: o layout, o portão de login, quem é administrador (a tela Base → Acessos), a troca de
-cadeira, o tema (escuro ou claro) e o `/saude`.
+O que envolve todas as torres: o layout, o portão de login, quem é administrador e o que cada setor vê (a tela
+Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/10/2026: os setores a substituíram.
 
 ## Os arquivos
 
@@ -11,11 +11,11 @@ cadeira, o tema (escuro ou claro) e o `/saude`.
 | `nexus/prefixo.py` | o caminho em que o Nexus é servido (`NEXUS_PREFIXO`): o middleware, `na_raiz`/`sem_raiz` e o cookie no caminho certo |
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
-| `nexus/casca/__init__.py` | `/` (Início), `/cadeira` (troca), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu, `tema`) |
+| `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
 | `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
-| `nexus/cadeiras.py` | as 10 cadeiras; diretoria e chefia caem na torre Comando |
+| `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor, o menu filtrado, o setor Administrador (seção "Telas por setor" abaixo) |
 | `nexus/templates/base.html` | a moldura: menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base, entrar e os dois modos TV): a reserva do `localStorage` antes de pintar |
 | `nexus/templates/_entrar_de_novo_js.html` e `_confere_sessao_js.html` | o `window.nexusEntrarDeNovo` (a janela ao login quando a sessão acaba) e a conferência da sessão do Fracttal a cada 5 minutos (só `session.usuario`). Saíram do `base.html` sem mudar (11/10/2026) para o modo TV do Painel NOC, que não tem a casca, valer igual: a TV de quem saiu do Fracttal vai ao login |
@@ -88,7 +88,7 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   `.tema-icone`). Troca na hora, sem recarregar, grava cookie e `localStorage`, e outra aba aberta acompanha (evento
   `storage`). Sem JavaScript é um formulário: `POST /tema` (`tema`, `voltar` com os filtros da tela) grava o cookie e
   volta. Com o movimento reduzido do sistema a troca é seca; sem ele, um esmaecer de 0,18 s (View Transitions). Até
-  1180 px e no celular fica só o ícone; de 821 a 1180 px o seletor de cadeira é quem encolhe (sem isso o topo passava
+  1180 px e no celular fica só o ícone; de 821 a 1180 px o setor do topo é quem encolhe (sem isso o topo passava
   da borda de 821 a 845 px).
 - **O OS Creator embutido segue o tema** (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está
   sincronizando com o botão do Nexus"): a ponte desenha o `data-tema="claro"` no `<html>` das páginas do clone pelo mesmo
@@ -160,6 +160,60 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   e não é sobrescrito; e-mails inválidos; POST de outro site ou sem o código; ninguém se tira sozinho por engano; o
   registro de logins com teto e janela, e que falha sem barrar a entrada; a pasta sem permissão, o arquivo que não é
   UTF-8 e o aninhado a fundo deixam o Início em 200 e fecham, com o aviso na tela e uma linha só no journal).
+
+## Telas por setor: o que cada pessoa vê (Base → Acessos, 12/10/2026)
+
+Pedido do Levi (12/10/2026): "gostaria de uma seção no BASE > ACESSOS onde eu possa controlar o que cada pessoa de setor
+pode ver ao logar no Nexus. A que não tiver setor vai aparecer a mensagem 'Sem setor, fale com o responsável' [...]
+Criarei um setor chamado 'Administrador' onde será liberado todas as seções para essas contas! Exclua a parte de
+cadeiras já que os setores irão substituir!". A cadeira (o seletor do topo, que só reordenava o menu) saiu: no lugar
+dela o topo mostra "Setor: X". O código: `nexus/auth/setor_telas.py` (regras e portão) e `telas_acessos.py` (a seção).
+
+- **O setor da pessoa** é o da tela Base → Integração Fracttal (`nexus/cadastro/setores.py`, livro `nexus_setores`). A
+  pessoa do login se acha pelo código do e-mail (`pessoa_hmac`, com a `NEXUS_PESSOA_HMAC`), o mesmo que a decisão de
+  setor grava; nome e e-mail nunca vão ao banco (regra 8).
+- **A matriz** setor × tela mora no livro `nexus_setor_telas · fato_decisao_tela_setor` (catálogo: fato
+  `decisao_tela_setor`): só acrescenta, e vale a última decisão de cada setor × tela; a tela é `torre/tela`, o endereço
+  do menu. Setor novo nasce sem nada marcado. O Salvar relê o banco, grava só o que mudou e troca a aba inteira (o
+  `livros.publicar` confere a contagem). O portão e a tela leem com cópia de 1 minuto.
+- **Quem vê o quê.** Administrador (`NEXUS_ADMINS`, a lista desta tela, a senha) vê tudo, com ou sem setor: é quem
+  configura e não pode ficar trancado fora. O setor chamado "Administrador" (pelo nome, sem caixa nem acento) vê tudo,
+  inclusive a tela que nascer depois, e **é administrador** (o login e o `auth._admin_em_dia` perguntam
+  `setor_telas.admin_pelo_setor`). Os outros setores veem só as telas marcadas, no menu e no Início (os cartões e os
+  números contam só elas); setor sem nenhuma tela vê o Início com o aviso. Sem setor (ou com o setor excluído): toda
+  página dá 403 com "Sem setor, fale com o responsável." (`templates/sem_setor.html`) e todo pedido de dados, 403 em
+  JSON; abrem só entrar, sair, tema, saúde e static (`setor_telas.LIVRES`).
+- **O portão** (`setor_telas.portao`, no fim do `instalar_portao`; só a sessão que nasceu do Fracttal passa por ele): a
+  rota de uma tela segue a marca dela (o id mais longo que casa: `performance/clima/mapa` tem barra); o resto da torre
+  (dados, sub-rotas, o `/passe` da moldura) abre para quem tem ao menos uma tela da torre; `/os/*` é a torre OS (as telas
+  `/t/os/*` abrem nele), menos as ações `/os/_nexus/*`, que são do Campo e do HSEQ e seguem a régua de cada uma. A
+  sessão que o passe já abriu na plataforma (telas da Performance) segue o login de lá até a moldura renovar.
+- **Banco que não responde não é "sem setor":** sem nenhuma leitura boa, a página diz "Não consegui ler o seu setor
+  agora" (o administrador entra igual); com a cópia velha, vale ela.
+- **A leitura nunca prende o clique** (`setor_telas._no_clique`). O portão lê os setores e as telas a cada clique de
+  toda sessão do Fracttal (o `_admin_em_dia` também), e os livros esperam até 60 s por pedido, sem renovar a cópia
+  quando falham: com o banco lento, todo clique, até o do administrador, ficaria preso. Por isso: cópia fresca (1 min),
+  ela; cópia vencida, ela na hora e a releitura em segundo plano (uma de cada vez, no máximo a cada 30 s); sem cópia, lê
+  com prazo de 8 s por pedido (`_Curta`), e a falha faz os cliques dos 30 s seguintes responderem "não consegui ler" sem
+  ir ao banco. A tela Acessos lê do jeito normal (é de administrador e precisa do dado de agora).
+- **Liga e desliga:** `NEXUS_ACESSO_POR_SETOR` (vazio = ligado; `0` = todos veem tudo nesta máquina). Sem a
+  `NEXUS_PESSOA_HMAC` fica desligado, porque sem ela ninguém teria setor e todos ficariam trancados fora. A seção diz
+  qual é o caso. Nos testes (TESTING) só liga quando o teste pede.
+- **O acesso de cada pedido fica no próprio pedido, não no `g`** (12/10/2026): o `g` é do contexto da aplicação, e um
+  contexto já aberto (o do teste com o banco falso, um job) é emprestado a vários pedidos. Guardado no `g`, o acesso do
+  administrador vazou para o pedido da pessoa do setor, que viu tudo; o teste pegou.
+- **A seção:** os setores em botões (quantas telas e quantas pessoas), o escolhido com a árvore do menu em caixas (a caixa
+  da torre marca a torre inteira; "Copiar de" outro setor; Marcar tudo e Limpar; aviso de mudanças não salvas, e trocar
+  de setor com elas pergunta antes), e o Salvar. O Administrador aparece "vê tudo", sem caixas. Os números do topo
+  ganharam "Setores" e "Entraram sem setor"; a lista de quem entrou, a coluna Setor (pelo código do e-mail).
+- **Ao ligar num servidor** quem não tem setor passa a ver só a mensagem, e o setor sem telas marcadas, só o Início.
+  Antes de o código novo subir, ponha as pessoas nos setores (Integração Fracttal) e marque as telas de cada setor.
+- **Prova:** `tests/test_setor_telas.py` (a matriz e o setor pela última decisão; o caminho segue a tela, a torre e o OS
+  Creator; sem setor só a mensagem; o setor vê só o marcado, em página e dados, e fechar vale no clique seguinte; o
+  Administrador vê tudo e é administrador; banco fora não vira "sem setor"; desligado ou sem a chave, todos veem tudo; a
+  seção grava só o que mudou e recusa o Administrador, setor excluído, tela desconhecida, sem token e sem o código; quem
+  entrou aparece com o setor; o livro no catálogo, sem nada pessoal) e `tests/test_torres.py` (o menu só com as telas
+  do setor).
 
 ## Regras que já custaram caro
 
@@ -238,7 +292,7 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   `/nexus/os/login` e conta como "caiu" (`sem_raiz` no `_fim_na_resposta`); o `entrar.html`, o
   `nexusEntrarDeNovo` e a conferência da sessão pedem os endereços pelo `nexusRota`. Prova debaixo do prefixo, com o
   Caddy cortando: `tests/test_prefixo_sair_fracttal.py`.
-- **`next_seguro`:** o `?next=` (e o `voltar` do tema e da cadeira, e o `/os/login?next=` de quem já entrou) só aceita
+- **`next_seguro`:** o `?next=` (e o `voltar` do tema, e o `/os/login?next=` de quem já entrou) só aceita
   caminho interno: começa com uma barra só, sem caractere de controle (0x00-0x20, 0x7f) nem barra invertida em lugar
   nenhum, e sem esquema nem servidor. O resto volta ao Início. Revisão adversarial de 10/10/2026: só se recusava `//` e
   `/\` no começo, e `/` + TAB + `/outro.site/x` passava; o Werkzeug monta o Location pelo `urlsplit`, que tira TAB, LF e
@@ -255,7 +309,7 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
 - **Verde no menu = tela com conteúdo** (Levi, 04/10/2026, "para eu ir vendo o progresso"): torre com ao menos uma
   tela pronta fica verde, e a tela pronta também. "Pronta" = a rota `/t/<torre>/<tela>` cai numa view própria, não no
   `placeholder` da torre (`telas_com_conteudo`, calculado uma vez no primeiro pedido). Ninguém marca à mão: construiu a
-  tela, ela fica verde sozinha. A torre da cadeira deixou de ser verde (era o mesmo sinal); fica só a etiqueta "sua".
+  tela, ela fica verde sozinha.
   Exceção: as molduras da Performance (porta única) só contam com a `NEXUS_SSO_CHAVE` (`moldura.SO_COM_A_PORTA`):
   sem ela abrem o aviso "ainda não ligada" e o verde mentiria (revisão de 10/10/2026).
 - **O Início conta pela mesma régua** (auditoria A3 da porta única, 10/10/2026): é a primeira página de todos, e dizia

@@ -30,7 +30,9 @@ TORRE = Torre(
         Tela("equipes", "Equipes e capacidade",
              "Onde falta gente para a carga da semana?",
              "Clusters e PCM"),
-        Tela("cadeiras", "Cadeiras e RACI",
+        # "Cadeiras e RACI" até 12/10/2026: a cadeira saiu do Nexus (os setores a substituíram, Base → Acessos); o id
+        # fica, porque é endereço
+        Tela("cadeiras", "RACI dos processos",
              "Quem é R e A em cada processo do book?",
              "Estrutura O&M (book R02)"),
         Tela("academy", "Academy",

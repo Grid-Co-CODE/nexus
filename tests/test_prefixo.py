@@ -146,7 +146,7 @@ def test_depois_de_por_o_prefixo_o_sair_apaga_tambem_a_sessao_velha_da_raiz():
     r = cli.post("/nexus/entrar", data={"senha": SENHA_TESTE})
     assert r.status_code == 302 and "Path=/;" in _biscoitos(r, "nexus_sessao")[0] + ";"
     cli.application = _caddy_corta(_app(PREFIXO))           # passo 2: NEXUS_PREFIXO=/nexus e reinício
-    assert cli.post("/nexus/cadeira", data={"cadeira": "", "voltar": "/"}).status_code == 302
+    assert cli.post("/nexus/tema", data={"tema": "claro", "voltar": "/"}).status_code == 302
     r = cli.get("/nexus/sair")
     assert _sessoes_apagadas(r) == ["/", "/nexus"]
     r = cli.get("/nexus/t/cos/mesa")
@@ -202,12 +202,10 @@ def test_o_portao_e_o_entrar_voltam_para_a_tela_debaixo_do_prefixo():
             == destino
 
 
-def test_cadeira_e_tema_voltam_para_a_tela_debaixo_do_prefixo():
+def test_o_tema_volta_para_a_tela_debaixo_do_prefixo():
     app = _app()
     cli = Client(_caddy_corta(app))
     cli.post("/nexus/entrar", data={"senha": SENHA_TESTE})
-    assert cli.post("/nexus/cadeira", data={"cadeira": "pcm", "voltar": "/t/pcm/semana"}).headers["Location"] \
-        == "/nexus/t/pcm/semana"
     assert cli.post("/nexus/tema", data={"tema": "claro", "voltar": "/t/pcm/semana?x=1"}).headers["Location"] \
         == "/nexus/t/pcm/semana?x=1"
 

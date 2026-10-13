@@ -190,7 +190,7 @@
     if (aqui) {
       try { history.replaceState(history.state, "", aqui); } catch (e) { /* endereço de outra origem: fica */ }
     }
-    // a troca de cadeira e de tema voltam para onde a pessoa está agora (o servidor aceita com ou sem o prefixo)
+    // a troca de tema volta para onde a pessoa está agora (o servidor aceita com ou sem o prefixo)
     document.querySelectorAll('input[name="voltar"]').forEach(function (i) { i.value = novo; });
     // o "Modo TV" só à vista numa tela com TV, levando o caminho; o "Sair do modo TV" leva à tela de sempre onde a
     // moldura está agora

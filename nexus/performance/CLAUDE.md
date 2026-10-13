@@ -59,7 +59,7 @@ navegador fala com cada sistema.
 - **O endereço acompanha:** a página da plataforma, em modo Nexus, manda `postMessage({tipo: "nexus:rota", caminho})` a
   cada troca de caminho. O `porta.js` só aceita o aviso da própria moldura e da origem da plataforma; troca o endereço
   (`history.replaceState`: o item dono do caminho, com `?p=` quando não é a entrada padrão dele), acende o item no menu e
-  leva o endereço novo ao "voltar" da cadeira e do tema. **Sem "Abrir em outra aba"** desde 11/10/2026 (Levi: "Não tem
+  leva o endereço novo ao "voltar" do tema. **Sem "Abrir em outra aba"** desde 11/10/2026 (Levi: "Não tem
   que ter essa opção, é só Nexus e já era!"): a faixa não oferece a tela fora da moldura. Abrir com `?p=` (F5, favorito): do
   mapa e do item, abre ali; de OUTRO item, 302 para o item dono; fora do mapa, a tela padrão do item (spec 7).
 - **A sessão da plataforma vence em 12 h e a moldura a renova** (auditoria A5 da porta única, 10/10/2026). O caso: a

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Início{% endblock %}
 {% block conteudo %}
-<p class="gc-eyebrow">{{ cadeira.nome if cadeira else "Sem cadeira escolhida" }}</p>
+<p class="gc-eyebrow">{{ ("Setor " ~ setor.nome) if setor else "Nexus" }}</p>
 <h1 class="titulo-pagina">Início</h1>
 {# Honesto (auditoria A3 da porta única, 10/10/2026): o Início dizia "fase 0" e "Com dado real: 0" com 40 telas prontas
    no ar. O número é o das telas prontas, pela mesma conta do verde do menu (casca.inicio). #}
@@ -15,18 +15,18 @@
   <div><div class="r">Telas prontas</div><div class="v gc-num">{{ total_prontas }}</div><div class="d">as verdes do menu</div></div>
 </div>
 
-{% if not cadeira %}
-<p class="aviso">Escolha uma cadeira na barra superior para ver o menu como aquela cadeira vê: a torre dela
-  sobe para o topo do menu, aberta.</p>
-{% endif %}
 
+{% if not cartoes %}
+{# setor sem nenhuma tela marcada em Base → Acessos (12/10/2026): o menu vem vazio, e o Início diz por quê #}
+<p class="aviso">O setor {{ setor.nome if setor else "" }} ainda não tem telas liberadas. Fale com o responsável.</p>
+{% else %}
 <h2 class="ui-kicker">Torres</h2>
 <div class="grade-torres">
   {% for c in cartoes %}{% set t = c.torre %}
   {% if c.url %}
   <a class="card-torre" data-torre="{{ t.id }}" href="{{ c.url|na_raiz }}">
     <div class="cab"><i class="ph ph-{{ t.icone }}"></i><span class="nome">{{ t.nome }}</span>
-      <span class="qtd gc-num">{{ c.prontas }} de {{ t.telas|length }} prontas</span></div>
+      <span class="qtd gc-num">{{ c.prontas }} de {{ c.total }} prontas</span></div>
     <p>{{ t.descricao }}</p>
   </a>
   {% else %}
@@ -39,4 +39,5 @@
   {% endif %}
   {% endfor %}
 </div>
+{% endif %}
 {% endblock %}

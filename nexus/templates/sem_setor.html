@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}{{ "Tela fechada para o seu setor" if bloqueada else "Sem setor" }}{% endblock %}
+{% block conteudo %}
+{# O portão por setor (nexus/auth/setor_telas.py, 12/10/2026). Levi: "A que não tiver setor vai aparecer a mensagem
+   'Sem setor, fale com o responsável'". O menu já vem só com o que o setor vê (vazio sem setor). #}
+<section class="sem-setor" aria-labelledby="sem-setor-titulo">
+  <i class="ph ph-lock-key" aria-hidden="true"></i>
+  {% if bloqueada %}
+  <h1 id="sem-setor-titulo">Esta tela não está liberada para o seu setor</h1>
+  <p>O setor <strong>{{ setor.nome }}</strong> não vê esta tela. Fale com o responsável.</p>
+  <p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/">Voltar ao Início</a></p>
+  {% elif leitura %}
+  <h1 id="sem-setor-titulo">Não consegui ler o seu setor agora</h1>
+  <p>O banco do Nexus não respondeu. Tente de novo em instantes; se continuar, fale com o responsável.</p>
+  {% else %}
+  <h1 id="sem-setor-titulo">Sem setor, fale com o responsável.</h1>
+  <p>O seu acesso ao Nexus ainda não tem setor. Quem é administrador escolhe o setor em Base → Integração Fracttal.</p>
+  {% endif %}
+</section>
+{% endblock %}

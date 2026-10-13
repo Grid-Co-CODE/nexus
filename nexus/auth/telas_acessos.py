@@ -6,15 +6,23 @@ as regras moram em `acessos.py`; aqui ficam a página e o portão do POST:
   código do formulário guardado na sessão (o cookie `Lax` já barra o POST de outro site; dar administrador é a ação
   mais sensível do Nexus, então confere duas vezes);
 - POST que grava volta por 303 à tela (F5 não repete), com o aviso guardado na sessão.
+
+Telas por setor (12/10/2026, Levi: "uma seção no BASE > ACESSOS onde eu possa controlar o que cada pessoa de setor pode
+ver ao logar no Nexus"): um setor por vez, com a árvore do menu em caixas de marcar; o Salvar grava só o que mudou no
+livro `nexus_setor_telas` (regras e portão em `setor_telas.py`). O setor de cada pessoa é o da tela Integração Fracttal;
+aqui aparece também na lista de quem entrou, pelo código do e-mail (sem o e-mail ir ao banco).
 """
 import hmac
 import logging
 import secrets
+from collections import Counter
 
 from flask import current_app, redirect, render_template, request, session, url_for
 
+from ..cadastro import setores as S
 from . import acessos as A
 from . import admins_do_servidor
+from . import setor_telas as ST
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +63,76 @@ def _linhas_de_admins(servidor: set[str], est: dict, ultimo: dict) -> list[dict]
     return linhas
 
 
-def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = ""):
+def _torres():
+    """As torres do menu, na ordem dele: a árvore que a matriz de cada setor marca."""
+    return sorted(current_app.extensions["nexus_torres"], key=lambda t: t.ordem)
+
+
+def _todas_as_telas() -> set[str]:
+    return {ST.chave(t.id, s.id) for t in _torres() for s in t.telas}
+
+
+def _ler_setores():
+    """(setores, telas) do banco, cada um {"...", "erro", "lido_em"}; o banco fora vira erro na tela, nunca exceção."""
+    try:
+        base, sessao = ST._banco()
+        return S.ler(base, sessao), ST.ler(base, sessao)
+    except Exception as ex:      # noqa: BLE001 — sem o endereço do banco, por exemplo
+        erro = type(ex).__name__
+        return ({"setores": [], "decisoes": [], "erro": erro, "lido_em": None},
+                {"decisoes": [], "erro": erro, "lido_em": None})
+
+
+def _secao_setores(escolhido: int | None, logins: list[dict]) -> dict:
+    """A seção Telas por setor: os setores (com quantas pessoas e telas), a árvore do menu marcada para o setor escolhido
+    e o que cada setor vê (para o "Copiar de"). Põe também o setor em cada login de 30 dias."""
+    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..casca import _telas_prontas
+    app = current_app._get_current_object()
+    cfg = current_app.config
+    st, tl = _ler_setores()
+    torres = _torres()
+    todas = {ST.chave(t.id, s.id) for t in torres for s in t.telas}
+    prontas = _telas_prontas(app)
+    matriz = ST.vigentes(tl["decisoes"])
+    pessoas = Counter(v for v in S.vigentes(st["decisoes"]).values() if v)
+    setores = [{"id": s["setor_id"], "nome": s["nome"], "admin": ST.eh_administrador(s["nome"]),
+                "pessoas": pessoas.get(s["setor_id"], 0), "telas": len(matriz.get(s["setor_id"], set()) & todas)}
+               for s in S.ativos(st["setores"])]
+    comuns = [s for s in setores if not s["admin"]]
+    sel = (next((s for s in setores if s["id"] == escolhido), None)
+           or (comuns[0] if comuns else setores[0] if setores else None))
+    marcadas = matriz.get(sel["id"], set()) if sel else set()
+    arvore = []
+    for t in torres:
+        telas = [{"chave": ST.chave(t.id, s.id), "nome": s.nome, "pronta": f"/t/{t.id}/{s.id}" in prontas,
+                  "marcada": ST.chave(t.id, s.id) in marcadas} for s in t.telas]
+        arvore.append({"id": t.id, "nome": t.nome, "icone": t.icone, "telas": telas,
+                       "marcadas": sum(x["marcada"] for x in telas)})
+    # o setor de quem entrou: pelo código do e-mail, o mesmo que a decisão de setor grava (o e-mail não vai ao banco)
+    por_codigo = ST.setor_de_cada_codigo(st["decisoes"])
+    nome_do = {s["id"]: s["nome"] for s in setores}
+    chave_hmac = cfg.get("NEXUS_PESSOA_HMAC")
+    for x in logins:
+        cod = None if x["senha"] else codigo_da_pessoa(chave_hmac, x["email"])
+        x["setor"] = nome_do.get(por_codigo.get(cod)) if cod else None
+        if x["setor"] and ST.eh_administrador(x["setor"]) and not x["admin"]:
+            x["admin"] = "pelo setor"
+    ilegivel = not st.get("lido_em") or not tl.get("lido_em")
+    return {
+        "portao": ST.estado(cfg), "setores": setores, "setor_sel": sel, "arvore": arvore,
+        "total_telas_menu": len(todas), "marcadas_sel": len(marcadas & todas),
+        "matriz_setores": {str(s["id"]): sorted(matriz.get(s["id"], set()) & todas) for s in comuns},
+        "n_comuns": len(comuns),
+        "pessoas_com_setor": sum(pessoas.get(s["id"], 0) for s in setores),
+        "setores_erro": " · ".join(e for e in (st.get("erro"), tl.get("erro")) if e),
+        "pode_gravar_setores": bool(cfg.get("GRIDCO_SQL_TOKEN")) and not ilegivel,
+        "sem_token": not cfg.get("GRIDCO_SQL_TOKEN"), "tem_hmac": bool(chave_hmac),
+        "sem_setor_30d": sum(1 for x in logins if not x["senha"] and not x["setor"] and not x["admin"]),
+    }
+
+
+def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = "", setor_escolhido: int | None = None):
     cfg = current_app.config
     servidor = admins_do_servidor()
     est = A.estado(cfg)
@@ -66,16 +143,20 @@ def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = ""
         x["senha"] = x["email"] == A.SENHA_DE_ADMIN
         x["admin"] = ("sempre" if x["senha"] else "do servidor" if x["email"] in servidor
                       else "pela tela" if x["email"] in da_tela else "")
+    if setor_escolhido is None:
+        setor_escolhido = request.args.get("setor", type=int)
+    secao = _secao_setores(setor_escolhido, logins)
     admins = _linhas_de_admins(servidor, est, ultimo)
     contexto = {
         "admins": admins, "auditoria": [dict(x, quando_br=A.hora_br(x.get("quando"))) for x in est["auditoria"]],
         "logins": logins, "sem_pasta": est["sem_pasta"], "arquivo_erro": est["erro"],
         "total_servidor": len(servidor), "total_tela": len(da_tela - servidor), "n_tela": len(da_tela),
         "pessoas_30d": sum(1 for x in logins if not x["senha"]),
-        "admins_30d": sum(1 for x in logins if x["admin"] in ("do servidor", "pela tela")),
+        "admins_30d": sum(1 for x in logins if x["admin"] in ("do servidor", "pela tela", "pelo setor")),
         "codigo": _codigo(), "erro": erro, "aviso": session.pop(_CHAVE_AVISO, None),
         "email_digitado": email_digitado, "eu": _meu_email(), "max_logins": A.MAX_LOGINS,
         "pode_gravar": not est["sem_pasta"] and not est["erro"],
+        **secao,
     }
     return render_template("acessos/acessos.html", **contexto), status
 
@@ -95,6 +176,8 @@ def _gravar():
                             "gravado.", status=403)
     cfg = current_app.config
     acao = request.form.get("acao")
+    if acao == "telas_setor":
+        return _gravar_telas()
     digitado = (request.form.get("email") or "")[:300]
     try:
         if acao == "adicionar":
@@ -121,6 +204,39 @@ def _gravar():
         return redirect(url_for("casca.inicio"), code=303)
     session[_CHAVE_AVISO] = aviso
     return redirect(url_for("torre_base.acessos"), code=303)
+
+
+def _gravar_telas():
+    """O Salvar da seção Telas por setor: as caixas marcadas são as telas que o setor vê; a que não veio marcada fecha."""
+    cfg = current_app.config
+    sid = request.form.get("setor", type=int)
+    marcadas = request.form.getlist("tela")
+    try:
+        base, sessao = ST._banco()
+        st = S.ler(base, sessao, forcar=True)
+        if st.get("erro"):
+            raise ST.Recusada(f"Não consegui ler os setores no banco ({st['erro'][:80]}): nada foi gravado.")
+        setor = next((s for s in S.ativos(st["setores"]) if s["setor_id"] == sid), None)
+        if not setor:
+            raise ST.Recusada("Setor desconhecido ou excluído (a lista mudou desde que a tela abriu): nada foi gravado.")
+        if ST.eh_administrador(setor["nome"]):
+            raise ST.Recusada(f'O setor "{setor["nome"]}" vê todas as telas: não há o que marcar.')
+        r = ST.gravar(sid, marcadas, _todas_as_telas(), cfg, base, sessao, _meu_email())
+    except ST.Recusada as ex:
+        return _pagina(erro=str(ex), status=400, setor_escolhido=sid)
+    except Exception as ex:      # noqa: BLE001 — a publicação no banco falhou: nada mudou (o livro é trocado inteiro)
+        log.error("Telas por setor: a gravação falhou (%s: %s); nada mudou.", type(ex).__name__, ex)
+        return _pagina(erro=f"Não consegui gravar no banco ({type(ex).__name__}): nada mudou. Tente de novo; se "
+                            "continuar, avise a T.I.", status=500, setor_escolhido=sid)
+    n = r["liberadas"]
+    telas = "nenhuma tela" if not n else "1 tela" if n == 1 else f"{n} telas"
+    if r["gravadas"]:
+        aviso = (f"{setor['nome']} agora vê {telas} ({r['gravadas']} mudança{'s' if r['gravadas'] != 1 else ''}). "
+                 "Vale no próximo clique de quem é do setor (até 1 minuto).")
+    else:
+        aviso = f"Nada mudou: {setor['nome']} já via {telas}."
+    session[_CHAVE_AVISO] = aviso
+    return redirect(url_for("torre_base.acessos", setor=sid, _anchor="ace-setores"), code=303)
 
 
 def registrar_acessos(bp) -> None:

@@ -20,8 +20,8 @@ def test_toda_rota_nao_publica_exige_login(app, cliente):
     assert verificadas >= 3
 
 
-def test_post_de_cadeira_sem_login_tambem_barra(cliente):
-    resp = cliente.post("/cadeira", data={"cadeira": "cos"})
+def test_post_sem_login_tambem_barra(cliente):
+    resp = cliente.post("/tema", data={"tema": "claro"})
     assert resp.status_code == 302
     assert "/entrar" in resp.headers["Location"]
 

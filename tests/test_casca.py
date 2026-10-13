@@ -4,17 +4,13 @@ def test_saude_publica_e_enxuta(cliente):
     assert set(resp.get_json()) == {"ok", "commit"}
 
 
-def test_cadeira_inexistente_recusada(logado):
-    assert logado.post("/cadeira", data={"cadeira": "rei"}).status_code == 400
-
-
-def test_trocar_cadeira_muda_o_menu(logado):
-    resp = logado.post("/cadeira", data={"cadeira": "pcm", "voltar": "/"})
-    assert resp.status_code == 302
+def test_a_cadeira_saiu(logado):
+    """12/10/2026, Levi: "Exclua a parte de cadeiras já que os setores irão substituir!" (Base → Acessos)."""
+    assert logado.post("/cadeira", data={"cadeira": "pcm"}).status_code == 404
     html = logado.get("/").get_data(as_text=True)
-    assert "Coordenador de PCM" in html
-    # A torre da cadeira vem marcada como "sua" no menu.
-    assert 'data-torre="pcm" data-sua="1"' in html
+    assert 'class="cadeira"' not in html and "Cadeira" not in html and "data-sua" not in html
+    # a senha de administrador não tem setor: o espaço do setor no topo fica vazio
+    assert '<span class="setor-topo"></span>' in html
 
 
 def test_inicio_logado(logado):

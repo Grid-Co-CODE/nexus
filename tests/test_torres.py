@@ -1,4 +1,3 @@
-from nexus.cadeiras import CADEIRAS
 import re
 
 from nexus.torres import descobrir_torres, montar_menu, telas_com_conteudo
@@ -28,31 +27,27 @@ def test_tela_inexistente_404(logado):
     assert logado.get("/t/cos/nao-existe").status_code == 404
 
 
-def test_torre_inicial_de_toda_cadeira_existe():
-    ids = {t.id for t in descobrir_torres()}
-    for cadeira in CADEIRAS.values():
-        assert cadeira.torre_inicial in ids, cadeira.id
-
-
-def test_menu_poe_torre_da_cadeira_primeiro():
-    menu = montar_menu(descobrir_torres(), "cos", None)
-    assert menu[0]["id"] == "cos"
-    assert menu[0]["sua"] and menu[0]["aberta"]
-    assert not any(m["sua"] for m in menu[1:])
-    assert not any(m["aberta"] for m in menu[1:])
-
-
-def test_menu_sem_cadeira_segue_catalogo():
+def test_menu_segue_o_catalogo():
     torres = descobrir_torres()
-    menu = montar_menu(torres, None, None)
+    menu = montar_menu(torres, None)
     assert [m["id"] for m in menu] == [t.id for t in torres]
-    assert not any(m["sua"] for m in menu)
+    assert not any(m["aberta"] for m in menu)
+    assert not any("sua" in m for m in menu)          # a cadeira saiu em 12/10/2026: os setores a substituíram
 
 
 def test_menu_abre_a_torre_atual():
-    menu = montar_menu(descobrir_torres(), "cos", "pcm")
-    pcm = next(m for m in menu if m["id"] == "pcm")
-    assert pcm["aberta"] and not pcm["sua"]
+    menu = montar_menu(descobrir_torres(), "pcm")
+    assert [m["id"] for m in menu if m["aberta"]] == ["pcm"]
+
+
+def test_menu_so_com_as_telas_do_setor():
+    """Base → Acessos (12/10/2026): só as telas liberadas; torre sem nenhuma some; None = tudo (o administrador)."""
+    torres = descobrir_torres()
+    menu = montar_menu(torres, None, liberadas={"pcm/quadro", "cos/mesa", "performance/clima/mapa"})
+    assert [m["id"] for m in menu] == ["cos", "pcm", "performance"]
+    assert [[s["id"] for s in m["telas"]] for m in menu] == [["mesa"], ["quadro"], ["clima/mapa"]]
+    assert montar_menu(torres, None, liberadas=set()) == []
+    assert len(montar_menu(torres, None, liberadas=None)) == len(torres)
 
 
 def test_tela_com_view_propria_conta_como_conteudo(app):

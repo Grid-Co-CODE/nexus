@@ -34,7 +34,7 @@ def mesa():
     return render_template("cos/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"))
 ```
 
-- O template vai em `templates/cos/<tela>.html` e estende `base.html`. Login, menu, cadeira e tema vêm prontos.
+- O template vai em `templates/cos/<tela>.html` e estende `base.html`. Login, menu (pelo setor) e tema vêm prontos.
 - Tela nova: acrescente um `Tela(...)` em `TORRE.telas`. O id publicado não muda depois, porque vira endereço.
 - **A regra fica fora daqui**: leitura de dado, cálculo do ciclo e prazos vão num módulo sem Flask (por exemplo,
   `nexus/cos/`), testável sem subir o servidor. É o padrão de `nexus/cadastro/` e `nexus/pcm/`. Esta pasta fica com

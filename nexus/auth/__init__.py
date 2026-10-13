@@ -30,6 +30,7 @@ from flask import (Blueprint, current_app, jsonify, make_response, redirect, ren
 from itsdangerous import URLSafeTimedSerializer
 
 from . import acessos, fracttal
+from . import setor_telas
 from ..prefixo import na_raiz, raiz
 
 bp = Blueprint("auth", __name__)
@@ -238,7 +239,8 @@ def _admin_em_dia() -> None:
     email = str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
     if not email:
         return
-    agora = email in _admins()
+    # o setor "Administrador" (Base → Integração Fracttal) também é administrador (12/10/2026, ver setor_telas.py)
+    agora = email in _admins() or setor_telas.admin_pelo_setor(email)
     if bool(session.get("admin")) != agora:
         session["admin"] = agora
 
@@ -386,7 +388,7 @@ def _entrar_fracttal(destino):
     session.permanent = True
     session["logado"] = True
     session["usuario"] = {k: conta[k] for k in ("email", "nome", "perfil")}
-    session["admin"] = conta["email"] in _admins()
+    session["admin"] = conta["email"] in _admins() or setor_telas.admin_pelo_setor(conta["email"])
     if conta.get("exp"):
         session["fracttal_exp"] = conta["exp"]       # o Nexus vale enquanto o token do Fracttal valer
     sup = _supervisor_padrao(conta["email"], conta["nome"])
@@ -509,6 +511,9 @@ def instalar_portao(app) -> None:
         if motivo:
             return encerrar(motivo, _destino_do_pedido())
         _admin_em_dia()
-        return resposta
+        if resposta is not None:
+            return resposta
+        # o que o setor da pessoa vê (Base → Acessos, 12/10/2026): sem setor, só a mensagem; tela fora do setor, 403
+        return setor_telas.portao()
 
     app.extensions["nexus_erros_login"] = defaultdict(deque)

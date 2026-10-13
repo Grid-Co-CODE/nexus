@@ -59,29 +59,26 @@ def telas_com_conteudo(app) -> frozenset[str]:
     return frozenset(prontas)
 
 
-def montar_menu(torres: list[Torre], cadeira_id: str | None, torre_atual: str | None,
-                prontas: frozenset[str] = frozenset()) -> list[dict]:
-    """A torre da cadeira primeiro, aberta e marcada; o resto na ordem do catálogo.
+def montar_menu(torres: list[Torre], torre_atual: str | None, prontas: frozenset[str] = frozenset(),
+                liberadas: set[str] | None = None) -> list[dict]:
+    """As torres na ordem do catálogo, só com as telas que o setor da pessoa vê (`liberadas`, chaves `torre/tela`; None =
+    tudo, o administrador). Torre sem nenhuma tela liberada some. A cadeira (a torre dela subia para o topo) saiu em
+    12/10/2026: os setores a substituíram (Base → Acessos).
 
     O Início não entra aqui: é um botão da casca, fixo no topo do menu. Antes era uma torre cujo
     primeiro sub-item era o próprio Início, o que não fazia sentido para quem usa (Levi, 29/09).
     """
-    from ..cadeiras import CADEIRAS
-
-    cadeira = CADEIRAS.get(cadeira_id) if cadeira_id else None
-    da_cadeira = cadeira.torre_inicial if cadeira else None
-
     menu = []
-    for t in sorted(torres, key=lambda t: (t.id != da_cadeira, t.ordem)):
-        sua = t.id == da_cadeira
+    for t in sorted(torres, key=lambda t: t.ordem):
         telas = [{"id": s.id, "nome": s.nome, "url": f"/t/{t.id}/{s.id}", "pronta": f"/t/{t.id}/{s.id}" in prontas}
-                 for s in t.telas]
+                 for s in t.telas if liberadas is None or f"{t.id}/{s.id}" in liberadas]
+        if not telas:
+            continue
         menu.append({
             "id": t.id,
             "nome": t.nome,
             "icone": t.icone,
-            "sua": sua,
-            "aberta": sua or t.id == torre_atual,
+            "aberta": t.id == torre_atual,
             "telas": telas,
             "prontas": sum(s["pronta"] for s in telas),
         })

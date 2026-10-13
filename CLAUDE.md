@@ -96,8 +96,8 @@ PerformancePainel.
   idêntico ao do oem de propósito.
 - `nexus/auth/` — o portão de login. Toda rota exige sessão, exceto as de `ROTAS_PUBLICAS`.
   Rota pública nova entra ali, conscientemente; o teste `test_toda_rota_nao_publica_exige_login` pega o esquecimento.
-- `nexus/cadeiras.py` — catálogo de cadeiras. Cadeira nova no fim; id publicado nunca muda.
-- `nexus/casca/` — Início, troca de cadeira e de tema, `/saude`, contexto dos templates (menu, tema).
+- `nexus/casca/` — Início, troca de tema, `/saude`, contexto dos templates (menu, setor, tema). A cadeira saiu em
+  12/10/2026: o que cada pessoa vê é o setor dela (`nexus/auth/setor_telas.py`, Base → Acessos; `nexus/casca/CLAUDE.md`).
 - `nexus/static/nexus.css` — tokens do Design System Grid Co. nos dois temas (escuro, o padrão, e claro).
 
 ## Regras

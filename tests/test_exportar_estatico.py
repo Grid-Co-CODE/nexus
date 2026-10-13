@@ -11,7 +11,7 @@ def test_vitrine_sem_login_sem_dado_e_com_links_do_pages(tmp_path):
     assert (tmp_path / "t" / "performance" / "clima" / "mapa" / "index.html").is_file()
     for pagina in tmp_path.rglob("*.html"):
         html = pagina.read_text(encoding="utf-8")
-        assert 'class="cadeira"' not in html and 'href="/sair"' not in html, pagina
+        assert '/cadeira"' not in html and 'href="/sair"' not in html, pagina      # a troca de cadeira saiu (12/10)
         assert 'name="senha"' not in html, pagina
         for nome, padrao in PROIBIDOS.items():
             assert not padrao.search(html), (nome, pagina)

@@ -9,7 +9,7 @@
 <div class="cad-topo">
   <div>
     <h1 class="titulo-pagina">Acessos</h1>
-    <p class="cad-sub">Quem é administrador do Nexus, e quem já entrou nele nos últimos 30 dias.</p>
+    <p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>
   </div>
 </div>
 
@@ -21,15 +21,95 @@
 <div class="cad-aviso cad-aviso--info ace-como"><i class="ph ph-info"></i><div>
   <strong>Como vale.</strong> Dar ou tirar o acesso vale no próximo clique da pessoa no Nexus, sem ela precisar sair e entrar.
   Os administradores <em>do servidor</em> (a <span class="gc-dado">NEXUS_ADMINS</span> do .env) só mudam com a T.I. e não saem por aqui;
-  a senha de administrador vale sempre. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes até
+  a senha de administrador vale sempre. Quem está no setor <strong>Administrador</strong> (Base → Integração Fracttal)
+  também é administrador. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes até
   ser renovada (no máximo 11 horas).
 </div></div>
 
 <div class="cad-numeros ace-numeros">
+  <div><div class="r">Setores</div><div class="v">{{ setores|length }}</div><div class="d">{{ pessoas_com_setor }} pessoa{{ "s" if pessoas_com_setor != 1 }} do Fracttal com setor</div></div>
+  <div><div class="r">Entraram sem setor</div><div class="v{% if sem_setor_30d and portao == 'ligado' %} ace-v-alerta{% endif %}">{{ sem_setor_30d if tem_hmac else "—" }}</div><div class="d">{% if not tem_hmac %}sem a NEXUS_PESSOA_HMAC não dá para saber{% elif portao == "ligado" %}em 30 dias: veem só “Sem setor”{% else %}em 30 dias (o controle está desligado){% endif %}</div></div>
   <div><div class="r">Administradores</div><div class="v">{{ total_servidor + total_tela }}</div><div class="d">{{ total_servidor }} do servidor · {{ total_tela }} pela tela</div></div>
   <div><div class="r">Entraram em 30 dias</div><div class="v">{{ pessoas_30d }}</div><div class="d">pessoas, pelo login do Fracttal</div></div>
   <div><div class="r">Administradores ativos</div><div class="v">{{ admins_30d }}</div><div class="d">entraram nos últimos 30 dias</div></div>
 </div>
+
+<section class="cad-secao ace-secao ace-secao--setores" id="ace-setores" aria-labelledby="ace-setores-titulo">
+  {# Telas por setor (12/10/2026, Levi: "uma seção no BASE > ACESSOS onde eu possa controlar o que cada pessoa de setor
+     pode ver ao logar no Nexus"). Um setor por vez; o Salvar grava só o que mudou (nexus/auth/setor_telas.py). #}
+  <h2 id="ace-setores-titulo">Telas por setor</h2>
+  <p class="gc-ajuda ace-ajuda ace-ajuda--topo">Marque o que cada setor vê no menu ao entrar no Nexus; o Início é de todos.
+    Quem não tem setor vê só “Sem setor, fale com o responsável”. O setor de cada pessoa se escolhe em
+    <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>. Administrador vê tudo, com ou sem setor.</p>
+  {% if portao == "desligado" %}
+  <div class="cad-aviso cad-aviso--alerta ace-aviso-secao"><i class="ph ph-toggle-left"></i><div><strong>Desligado neste Nexus.</strong> A <span class="gc-dado">NEXUS_ACESSO_POR_SETOR</span> do .env está em 0: todos veem tudo. As marcas abaixo passam a valer quando ela for ligada.</div></div>
+  {% elif portao == "sem_chave" %}
+  <div class="cad-aviso cad-aviso--alerta ace-aviso-secao"><i class="ph ph-key"></i><div><strong>Desligado: falta a NEXUS_PESSOA_HMAC.</strong> Sem ela não há como achar o setor de quem entra, então todos veem tudo. Avise a T.I.</div></div>
+  {% endif %}
+  {% if setores_erro %}
+  <div class="cad-aviso cad-aviso--critico ace-aviso-secao" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>O banco não respondeu</strong> ({{ setores_erro }}). {% if pode_gravar_setores %}A tela mostra a última leitura boa.{% else %}Sem saber o que já está gravado, o Salvar fica travado.{% endif %}</div></div>
+  {% endif %}
+  {% if sem_token %}
+  <div class="cad-aviso cad-aviso--alerta ace-aviso-secao"><i class="ph ph-lock"></i><div><strong>Só leitura.</strong> Este Nexus não tem a chave de gravação do banco (<span class="gc-dado">GRIDCO_SQL_TOKEN</span>).</div></div>
+  {% endif %}
+
+  {% if not setores %}
+  <p class="ace-vazio">Nenhum setor criado ainda. Crie os setores em <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>; o setor chamado <strong>Administrador</strong> vê tudo.</p>
+  {% else %}
+  <nav class="ace-setores" aria-label="Escolha o setor">
+    {% for s in setores %}
+    <a class="ace-setor{% if s.id == setor_sel.id %} ativo{% endif %}" href="{{ url_for('torre_base.acessos', setor=s.id) }}#ace-setores"{% if s.id == setor_sel.id %} aria-current="true"{% endif %}>
+      <span class="nome">{{ s.nome }}</span>
+      <span class="det">{% if s.admin %}vê tudo{% else %}{{ s.telas }} de {{ total_telas_menu }} telas{% endif %} · {{ s.pessoas }} pessoa{{ "s" if s.pessoas != 1 }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+
+  {% if setor_sel.admin %}
+  <div class="cad-aviso cad-aviso--info ace-aviso-secao"><i class="ph ph-shield-check"></i><div><strong>{{ setor_sel.nome }} vê tudo.</strong> Quem está neste setor vê todas as telas, inclusive as que nascerem depois, e é administrador do Nexus: abre o Cadastro, esta tela e aprova qualquer OS. Não há o que marcar.</div></div>
+  {% else %}
+  <form method="post" class="ace-matriz" id="ace-matriz" action="{{ url_for('torre_base.acessos') }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <input type="hidden" name="acao" value="telas_setor">
+    <input type="hidden" name="setor" value="{{ setor_sel.id }}">
+    <div class="ace-matriz-topo">
+      <p class="ace-matriz-conta"><strong>{{ setor_sel.nome }}</strong> vê <b data-conta>{{ marcadas_sel }}</b> de {{ total_telas_menu }} telas</p>
+      <div class="ace-matriz-acoes">
+        {% if n_comuns > 1 %}
+        <label class="gc-rotulo" for="ace-copiar">Copiar de</label>
+        <select id="ace-copiar" class="gc-campo">
+          <option value="">outro setor…</option>
+          {% for s in setores if not s.admin and s.id != setor_sel.id %}<option value="{{ s.id }}">{{ s.nome }} ({{ s.telas }})</option>{% endfor %}
+        </select>
+        {% endif %}
+        <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-marcar="tudo">Marcar tudo</button>
+        <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-marcar="nada">Limpar</button>
+      </div>
+    </div>
+    <div class="ace-torres">
+      {% for t in arvore %}
+      <fieldset class="ace-torre" data-torre="{{ t.id }}">
+        <legend>
+          <label><input type="checkbox" data-toda {% if t.marcadas == t.telas|length %}checked{% endif %} aria-label="Todas as telas de {{ t.nome }}"><i class="ph ph-{{ t.icone }}" aria-hidden="true"></i> {{ t.nome }}</label>
+          <span class="ace-qtd"><span data-conta-torre>{{ t.marcadas }}</span> de {{ t.telas|length }}</span>
+        </legend>
+        <ul>
+          {% for s in t.telas %}
+          <li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </fieldset>
+      {% endfor %}
+    </div>
+    <div class="ace-matriz-rodape">
+      <span class="ace-mudou" data-mudou hidden>Mudanças ainda não salvas</span>
+      <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" {% if not pode_gravar_setores %}disabled{% endif %}><i class="ph ph-floppy-disk"></i> Salvar as telas de {{ setor_sel.nome }}</button>
+    </div>
+  </form>
+  <script type="application/json" id="ace-matriz-dados">{{ matriz_setores|tojson }}</script>
+  {% endif %}
+  {% endif %}
+</section>
 
 <section class="cad-secao ace-secao" aria-labelledby="ace-admins">
   <h2 id="ace-admins">Administradores</h2>
@@ -108,19 +188,82 @@
   <p class="gc-ajuda ace-ajuda">Só o e-mail e a hora do último login de cada pessoa (até {{ max_logins }} pessoas), guardados no servidor do Nexus, fora do banco.</p>
   <div class="cad-rolagem ace-rolagem">
     <table class="cad-tabela ace-tabela">
-      <thead><tr><th>E-mail</th><th>Último login</th><th>Administrador</th></tr></thead>
+      <thead><tr><th>E-mail</th><th>Último login</th><th>Setor</th><th>Administrador</th></tr></thead>
       <tbody>
       {% for x in logins %}
       <tr>
         <td class="ace-email">{% if x.senha %}<span class="mudo">senha de administrador</span>{% else %}<span class="gc-dado">{{ x.email }}</span>{% if x.email == eu %} <span class="cad-chip cad-chip--info">você</span>{% endif %}{% endif %}</td>
         <td class="num">{{ x.quando_br }}</td>
-        <td>{% if x.admin == "do servidor" %}<span class="cad-chip ace-chip--servidor">do servidor</span>{% elif x.admin == "pela tela" %}<span class="cad-chip cad-chip--operacao">pela tela</span>{% elif x.admin == "sempre" %}<span class="cad-chip cad-chip--info">sempre</span>{% else %}<span class="mudo">não</span>{% endif %}</td>
+        <td>{% if x.senha or not tem_hmac %}<span class="mudo">—</span>{% elif x.setor %}{{ x.setor }}{% elif x.admin %}<span class="mudo">sem setor</span>{% else %}<span class="cad-chip cad-chip--alerta">sem setor</span>{% endif %}</td>
+        <td>{% if x.admin == "do servidor" %}<span class="cad-chip ace-chip--servidor">do servidor</span>{% elif x.admin == "pela tela" %}<span class="cad-chip cad-chip--operacao">pela tela</span>{% elif x.admin == "pelo setor" %}<span class="cad-chip cad-chip--operacao">pelo setor</span>{% elif x.admin == "sempre" %}<span class="cad-chip cad-chip--info">sempre</span>{% else %}<span class="mudo">não</span>{% endif %}</td>
       </tr>
       {% else %}
-      <tr><td colspan="3" class="vazio">Ninguém entrou nos últimos 30 dias (ou o registro começou agora).</td></tr>
+      <tr><td colspan="4" class="vazio">Ninguém entrou nos últimos 30 dias (ou o registro começou agora).</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
+<script>
+/* Telas por setor (12/10/2026): a caixa da torre marca ou limpa a torre inteira (fica "meio marcada" com parte); a conta
+   e o aviso de mudanças não salvas acompanham; "Copiar de" põe as marcas de outro setor, que só gravam no Salvar. Sem
+   JavaScript, as caixas de cada tela e o Salvar bastam. */
+(function () {
+  var form = document.getElementById('ace-matriz');
+  if (!form) return;
+  var dados = {};
+  try { dados = JSON.parse(document.getElementById('ace-matriz-dados').textContent || '{}'); } catch (e) { dados = {}; }
+  var telas = Array.prototype.slice.call(form.querySelectorAll('input[name="tela"]'));
+  var inicial = telas.map(function (c) { return c.checked; });
+  var conta = form.querySelector('[data-conta]');
+  var mudou = form.querySelector('[data-mudou]');
+  var salvando = false;
+  function alterado() { return telas.some(function (c, i) { return c.checked !== inicial[i]; }); }
+  function atualizar() {
+    var n = 0;
+    Array.prototype.forEach.call(form.querySelectorAll('.ace-torre'), function (f) {
+      var cx = f.querySelectorAll('input[name="tela"]'), m = 0;
+      Array.prototype.forEach.call(cx, function (c) { if (c.checked) m++; });
+      n += m;
+      var toda = f.querySelector('[data-toda]');
+      toda.checked = m > 0 && m === cx.length;
+      toda.indeterminate = m > 0 && m < cx.length;
+      f.querySelector('[data-conta-torre]').textContent = m;
+    });
+    conta.textContent = n;
+    mudou.hidden = !alterado();
+  }
+  form.addEventListener('change', function (ev) {
+    var t = ev.target;
+    if (t.hasAttribute('data-toda')) {
+      Array.prototype.forEach.call(t.closest('.ace-torre').querySelectorAll('input[name="tela"]'),
+        function (c) { c.checked = t.checked; });
+    }
+    atualizar();
+  });
+  Array.prototype.forEach.call(form.querySelectorAll('[data-marcar]'), function (b) {
+    b.addEventListener('click', function () {
+      var tudo = b.getAttribute('data-marcar') === 'tudo';
+      telas.forEach(function (c) { c.checked = tudo; });
+      atualizar();
+    });
+  });
+  var copiar = document.getElementById('ace-copiar');
+  if (copiar) copiar.addEventListener('change', function () {
+    var de = dados[copiar.value];
+    if (!de) return;
+    var tem = {};
+    de.forEach(function (k) { tem[k] = true; });
+    telas.forEach(function (c) { c.checked = !!tem[c.value]; });
+    copiar.value = '';
+    atualizar();
+  });
+  form.addEventListener('submit', function () { salvando = true; });
+  // trocar de setor (ou sair) com marcas não salvas pergunta antes
+  window.addEventListener('beforeunload', function (ev) {
+    if (!salvando && alterado()) { ev.preventDefault(); ev.returnValue = ''; }
+  });
+  atualizar();
+})();
+</script>
 {% endblock %}

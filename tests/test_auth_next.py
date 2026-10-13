@@ -107,8 +107,8 @@ def test_o_login_do_os_creator_de_quem_ja_entrou_nao_redireciona_para_fora(app, 
     _ficou_em_casa(r.headers["Location"], "")
 
 
-@pytest.mark.parametrize("rota, campo", [("/tema", {"tema": "escuro"}), ("/cadeira", {"cadeira": ""})])
-def test_tema_e_cadeira_voltam_so_para_o_nexus(logado, rota, campo):
+@pytest.mark.parametrize("rota, campo", [("/tema", {"tema": "escuro"})])
+def test_o_tema_volta_so_para_o_nexus(logado, rota, campo):
     for valor in NEXTS_RUINS:
         r = logado.post(rota, data=dict(campo, voltar=valor))
         assert r.status_code == 302

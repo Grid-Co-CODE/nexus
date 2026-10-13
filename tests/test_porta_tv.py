@@ -90,7 +90,7 @@ def test_o_modo_tv_sai_sem_a_casca_e_com_a_moldura(prefixo):
     r = _cliente(prefixo).get(prefixo + NOC, query_string={"tv": "1"})
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
     h = r.get_data(as_text=True)
-    # sem a casca: nem topo, nem menu, nem a troca de cadeira e tema da casca
+    # sem a casca: nem topo, nem menu, nem o setor e a troca de tema da casca
     assert '<header class="topo">' not in h and 'class="menu"' not in h and 'name="voltar"' not in h
     assert re.search(r'<html lang="pt-BR" class="porta-tv-html" data-nexus data-tema="escuro">', h)
     assert "window.top !== window.self" in h                     # o Nexus nunca fica dentro de moldura

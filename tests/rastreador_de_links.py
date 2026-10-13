@@ -17,7 +17,7 @@ _ATRIBUTO = re.compile(r'\s(href|src|action|formaction|poster|data-[\w-]+)="([^"
 _SCRIPT = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.I | re.S)
 _COMENTARIO_HTML = re.compile(r"<!--.*?-->", re.S)
 # um caminho do Nexus entre aspas, no JavaScript: os primeiros segmentos que são dele (spec 2026-10-09, seção 2)
-SEGMENTOS = ("t", "os", "static", "entrar", "sair", "tema", "cadeira", "saude")
+SEGMENTOS = ("t", "os", "static", "entrar", "sair", "tema", "saude")
 _LITERAL_JS = re.compile(r"""(?P<q>['"`])/(?:%s)(?=[/'"`?#])""" % "|".join(SEGMENTOS))
 # O `next` do login do OS Creator vai SEM o prefixo, de propósito: o clone só devolve para /os/... e a ponte tira o
 # prefixo do que chegar com ele. É o único caminho do Nexus que o JavaScript escreve cru.
