@@ -11,8 +11,18 @@ infinito"). Medido no log: a fila tem 55 páginas (5.495 tarefas), lida uma pág
 noite o Fracttal recusava (429) de 4 a 26 páginas; a leitura incompleta não ficava guardada e cada visita recomeçava
 do zero. Agora a fila é relida EM SEGUNDO PLANO, uma leitura por vez, quando a última tem mais de 10 min; a tela mostra
 a última fila boa e quando ela foi lida. Depois de uma recusa, 5 min sem tentar (a cota é da empresa inteira).
+
+**Sem rajada e sem reler a cada deploy** (13/10/2026, com o deploy automático: cada push reinicia o servidor). A
+releitura saía em 6 de uma vez (no teto de 4 por segundo do `fracttal.py`: as ~60 páginas em ~15 s, acima dos 200 por
+minuto da empresa, e o App e o OS Creator recebiam o 429), ao subir e a cada 10 min com alguém em Rondas ou Aprovação.
+Agora sai em 2 de uma vez, com 1 min de pausa depois de uma recusa (`paciente`), e a última fila boa fica em disco
+(`dados/campo/fila_aprovacao.json.gz`): o reinício a põe na memória na hora e só relê se ela tem mais de 10 min.
 """
 import contextlib
+import gzip
+import json
+import logging
+import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -82,11 +92,14 @@ def _reler(app):
     """Relê a fila inteira e só troca a guardada se veio completa. Falha = anota e espera para tentar de novo."""
     try:
         with app.app_context() if app else contextlib.nullcontext():
-            linhas = regras_app._fx_wo_paralelo(2, "final_date", regras_app.SUP_CAP_BACKLOG)
+            # paciente: 2 de uma vez e 1 min de pausa depois de uma recusa (era 6 de uma vez: rajada na cota da empresa)
+            linhas = regras_app._fx_wo_paralelo(2, "final_date", regras_app.SUP_CAP_BACKLOG, paciente=True)
         agora = time.time()
         regras_app._FILA_CACHE.update(t=agora, ts=agora, linhas=linhas)     # como o _fila_bruta do App grava
         _ESTADO.update(erro="", erro_em=0.0)
         if app:
+            with app.app_context():
+                _gravar_no_disco()
             # a conta da tela (a fila inteira pela regra do App) fica pronta: a 1ª visita depois da releitura não espera
             # os ~4 s dela (medido em 05/10). Desde 08/10 a tela não tem período: a conta pronta é a da fila toda
             try:
@@ -120,9 +133,66 @@ def estado() -> dict:
             "lida_em": datetime.fromtimestamp(lida, _BRT).strftime("%d/%m %H:%M") if lida else ""}
 
 
+def _arquivo():
+    """A última fila boa em disco, na pasta de dados do Nexus (fora do git). Teste sem pasta própria: só memória."""
+    if not has_app_context():
+        return None
+    from ..cadastro.ligacoes import pasta_dados
+    try:
+        return pasta_dados(current_app.config) / "campo" / "fila_aprovacao.json.gz"
+    except RuntimeError:
+        return None
+
+
+def _gravar_no_disco():
+    """Grava a fila da memória (com a hora em que foi lida). Comprimida: são ~5.500 tarefas."""
+    arq = _arquivo()
+    linhas = regras_app._FILA_CACHE.get("linhas")
+    if arq is None or linhas is None:
+        return
+    try:
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        tmp = arq.with_name(arq.name + ".tmp")
+        with gzip.open(tmp, "wt", encoding="utf-8") as f:
+            json.dump({"t": regras_app._FILA_CACHE.get("t"), "linhas": linhas}, f, ensure_ascii=False)
+        os.replace(tmp, arq)
+    except OSError as e:
+        logging.warning("fila da Aprovação: não gravei a cópia em disco (%s)", e)
+
+
+def carregar_do_disco(app) -> bool:
+    """A última fila boa do disco para a memória, se a memória ainda não tem fila (o boot). Devolve se carregou."""
+    with app.app_context():
+        if regras_app._FILA_CACHE.get("linhas") is not None:
+            return False
+        arq = _arquivo()
+        if arq is None or not arq.exists():
+            return False
+        try:
+            with gzip.open(arq, "rt", encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, ValueError, EOFError) as e:
+            logging.warning("fila da Aprovação: cópia em disco ilegível (%s)", e)
+            return False
+    t, linhas = float(d.get("t") or 0), d.get("linhas")
+    if not t or not isinstance(linhas, list):
+        return False
+    with _TRAVA:
+        if regras_app._FILA_CACHE.get("linhas") is not None:      # uma releitura chegou antes: vale a dela
+            return False
+        regras_app._FILA_CACHE.update(t=t, ts=t, linhas=linhas)
+    logging.info("fila da Aprovação: %d tarefas do disco, lidas em %s", len(linhas),
+                 datetime.fromtimestamp(t, _BRT).strftime("%d/%m %H:%M"))
+    return True
+
+
 def aquecer(app):
-    """Lê a fila ao subir o Nexus, em segundo plano: a 1ª visita depois de um reinício não espera (05/10: "fila ainda
-    não lida" logo depois de cada reinício)."""
+    """Ao subir o Nexus: a última fila boa do disco na hora, e a releitura (em segundo plano) só se ela tem mais de 10
+    min (05/10: "fila ainda não lida" logo depois de cada reinício; 13/10: cada deploy relia a fila inteira)."""
+    carregar_do_disco(app)
+    lida = _lida_em()
+    if lida and time.time() - lida < VALIDADE_S:
+        return
     with _TRAVA:
         if _ESTADO["lendo"]:
             return
@@ -233,6 +303,14 @@ def tirar_da_fila(id_wo) -> int:
     restam = [w for w in linhas if str(w.get("id_work_order")) != str(id_wo)]
     regras_app._FILA_CACHE["linhas"] = restam
     leitura.limpar()
+    if has_app_context() and len(restam) != len(linhas):
+        # a cópia em disco também: um reinício logo depois não pode trazer de volta a OS que acabou de ser aprovada
+        app = current_app._get_current_object()
+
+        def regravar():
+            with app.app_context():
+                _gravar_no_disco()
+        em_segundo_plano(regravar)
     return len(linhas) - len(restam)
 
 

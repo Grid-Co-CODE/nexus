@@ -758,6 +758,13 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   vez, quando a fila tem mais de 10 min; mostra a última fila boa e quando foi lida; depois de recusa, 5 min sem
   tentar. A cópia do App nunca relê na hora da tela (`FILA_TTL_S` vai para "sempre" a cada visita). Medido em 05/10:
   a visita responde em 0,01 s. Não abra essa tela em teste no horário de campo.
+  - **Sem rajada e sem reler a cada deploy (13/10/2026)**: com o deploy automático, cada push reinicia o servidor. A
+    releitura saía em 6 de uma vez (no teto de 4 por segundo do `fracttal.py`: ~60 páginas em ~15 s, acima dos 200 por
+    minuto da empresa: o 429 do App, do OS Creator e das fotos), ao subir e a cada 10 min com alguém em Rondas ou
+    Aprovação. Agora sai `paciente` (2 de uma vez, 1 min de pausa depois de uma recusa), e a última fila boa fica em
+    `dados/campo/fila_aprovacao.json.gz` (com a hora da leitura; a OS aprovada pelo Nexus sai dela também): o boot a
+    põe na memória em toda máquina, sem Fracttal, e o `aquecer` só relê se ela tem mais de 10 min. Prova:
+    `tests/test_subida_sem_rajada_13_10.py`.
   - **O gargalo** (Levi, 05/10: "por que demora se o histórico do OS Creator carrega tão rápido?"): o REST do Fracttal
     entrega no máximo 100 tarefas por pedido (limit=1000 devolve 99) e a fila tem ~5.500, então são 55 páginas de
     ~1,1 s; até 05/10 saíam uma por vez com 0,5 s de folga (~90 s). O histórico do OS Creator pergunta outra coisa: o RPC

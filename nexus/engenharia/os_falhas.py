@@ -80,7 +80,9 @@ def _carregar():
         for k in ("concluidas", "vivas", "ate", "retomar", "topo"):
             _EST[k] = d.get(k) or {}
         _EST["vivas_em"] = float(d.get("vivas_em") or 0)
-        _EST["ts"] = time.time() if all(_EST["ate"].get(t) for t in TIPOS) else 0.0
+        # a idade de verdade (a hora em que as vivas foram lidas), e não "agora": o reinício de cada deploy relia tudo,
+        # porque o pedir_releitura decidia antes de carregar o arquivo (13/10/2026)
+        _EST["ts"] = _EST["vivas_em"] if all(_EST["ate"].get(t) for t in TIPOS) else 0.0
 
 
 def _gravar():
@@ -170,6 +172,16 @@ def _reler():
 
 
 def pedir_releitura(app=None):
+    if not _EST["carregado"]:
+        # o arquivo antes de decidir: lido há menos de 30 min (o deploy que acabou de reiniciar), não relê
+        try:
+            if app is not None:
+                with app.app_context():
+                    _carregar()
+            else:
+                _carregar()
+        except RuntimeError:        # fora de um app (não acontece na subida): decide pelo que há na memória
+            pass
     if time.time() - _EST["ts"] < VALIDADE_S:
         return
     with _TRAVA:

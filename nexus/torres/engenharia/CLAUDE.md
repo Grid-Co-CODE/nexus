@@ -83,7 +83,9 @@ construindo algo nosso!". Então o Nexus **não lê o site nem o JSON dele**: l�
   até 20/10/2025 e fica no arquivo; depois, por `final_date` decrescente, só o que fechou desde a última leitura
   completa menos 3 dias. **Canceladas** (4): fora. 429 no meio: o que veio fica e continua de onde parou.
 - 1 pedido por segundo (a cota de 200/min é da empresa toda), releitura no máximo a cada 30 min, primeira leitura 150 s
-  depois de subir (`nexus/engenharia/instalar`, desliga com `NEXUS_CAMPO_AQUECER=0`).
+  depois de subir (`nexus/engenharia/instalar`, desliga com `NEXUS_CAMPO_AQUECER=0`). **O reinício não relê o que
+  acabou de ler (13/10/2026)**: o `pedir_releitura` decidia antes de carregar o arquivo, e cada deploy relia tudo; agora
+  carrega antes, e a idade é a da última leitura das vivas (`vivas_em`, no arquivo), não "agora".
 - O robô do PCM (`gerar_engenharia_json.py`) pagina a conta INTEIRA a cada rodada; aqui não.
 
 ### As regras (as do robô do PCM, para os números baterem)

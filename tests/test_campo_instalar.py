@@ -32,6 +32,8 @@ def chamadas(monkeypatch):
     # a cópia em disco das fotos da ronda: o app falso não tem TESTING e apontava a pasta para a dados/ de verdade do
     # PC, onde os testes seguintes gravavam as fotos falsas (13/10/2026)
     monkeypatch.setattr(ronda_fotos, "configurar", lambda pasta: None)
+    # a fila da Aprovação do disco (13/10/2026): uma thread com o app falso, que não tem app_context
+    monkeypatch.setattr(aprovacao, "carregar_do_disco", lambda app: None)
 
     class _Timer:
         def __init__(self, segundos, fn):

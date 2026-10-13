@@ -32,6 +32,8 @@ def instalar(app):
     # `nexus_chamados · fato_chamado`, de hora em hora, uma máquina por vez (NEXUS_CHAMADOS_PUBLICAR=0 desliga)
     from . import chamados_acompanhamento
     chamados_acompanhamento.ligar(app)
+    # a última fila boa da Aprovação, do disco, já no boot e em toda máquina: não vai ao Fracttal (13/10/2026)
+    threading.Thread(target=lambda: aprovacao.carregar_do_disco(app), daemon=True, name="nexus-fila-disco").start()
     # NEXUS_CAMPO_AQUECER=0 desliga só o que vai ao Fracttal ao subir (a cota é de 200/min para a empresa inteira)
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
         from . import ronda_checklist
