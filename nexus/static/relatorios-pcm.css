@@ -1,0 +1,42 @@
+/* Relatórios do PCM na Central (14/10/2026): o desenho da tela Relatórios do painel do PCM (js/relatorios.js: a coluna
+   da esquerda com "1 · Tipo", "2 · Período e recorte" e os emitidos; a folha à direita, no papel), nas cores do tema do
+   Nexus. A folha em si é um documento à parte, na moldura, com as cores de papel do PCM (nexus/pcm/relatorios). */
+.rp-tela{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;align-items:start;margin-top:18px}
+@media (max-width:1100px){.rp-tela{grid-template-columns:minmax(0,1fr)}}
+/* a folha (largura fixa de A4) não pode alargar a coluna: ela é reduzida para caber (o script da tela) */
+.rp-esq,.rp-dir{min-width:0}
+.rp-card{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px 16px;
+  margin-bottom:12px}
+.rp-card h2{margin:0 0 10px;font:700 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--mudo)}
+.rp-tipos{display:grid;gap:8px}
+.rp-tipo{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--linha);border-radius:var(--raio-controle);
+  padding:9px 11px;color:var(--tinta);text-decoration:none}
+.rp-tipo:hover{border-color:var(--linha-forte)}
+.rp-tipo.on{border-color:var(--verde);background:var(--verde-a16)}
+.rp-tipo b{display:block;font-size:13.5px}
+.rp-tipo span span{font-size:12px;color:var(--mudo)}
+.rp-tipo .ic{width:30px;height:30px;border-radius:7px;background:var(--superficie-2);display:flex;align-items:center;
+  justify-content:center;font-weight:800;font-size:12px;color:var(--tinta-2);flex:none}
+.rp-tipo.on .ic{background:var(--verde);color:var(--sobre-verde)}
+.rp-linha{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.rp-linha .gc-rotulo{margin-bottom:4px}
+.rp-linha .gc-campo{width:100%;box-sizing:border-box}
+.rp-acoes{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.rp-hist{width:100%;border-collapse:collapse;font-size:12.5px}
+.rp-hist th{text-align:left;font-size:11px;color:var(--mudo);text-transform:uppercase;letter-spacing:.04em;
+  padding:6px 8px;border-bottom:1px solid var(--linha-forte)}
+.rp-hist td{padding:6px 8px;border-bottom:1px solid var(--linha)}
+.rp-hist a{color:var(--verde-texto)}
+.rp-vazio{color:var(--mudo);font-size:12.5px;margin:0}
+.rp-prev{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden}
+.rp-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--linha);
+  background:var(--superficie-2)}
+.rp-dica{color:var(--mudo);font-size:12px;margin-left:auto;text-align:right}
+.rp-papel{background:var(--superficie-3);padding:22px;overflow:auto}
+.rp-escala{margin:0 auto;overflow:hidden;box-shadow:0 6px 24px var(--sombra)}
+.rp-papel iframe{display:block;width:210mm;height:297mm;border:0;background:var(--papel);transform-origin:0 0}
+.rp-sem-folha,.rp-montando{padding:40px;text-align:center}
+.rp-nota{margin-top:12px;background:var(--verde-a16);border-left:3px solid var(--verde);padding:8px 11px;font-size:12.5px;
+  color:var(--tinta-2);border-radius:0 var(--raio-controle) var(--raio-controle) 0}
+@media (max-width:640px){.rp-linha{grid-template-columns:1fr}.rp-papel{padding:10px}}

@@ -50,6 +50,8 @@ if __name__ == "__main__":
     instalar_campo(app)
     instalar_dados(app)
     instalar_engenharia(app)
+    from nexus.pcm.relatorios import agenda as relatorios_pcm
+    relatorios_pcm.ligar(app)                # os relatórios do PCM nos horários de lá (14/10/2026; 0 = desliga)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)          # as telas quentes depois de subir (13/10/2026; 5 min, ver a função)
     plataforma = (ler_ambiente().get("NEXUS_PLATAFORMA_LOCAL") or "").strip()

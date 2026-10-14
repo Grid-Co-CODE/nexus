@@ -112,6 +112,43 @@ def ler_mpas(config) -> Leitura:
     return _ler(config, "NEXUS_PCM_MPAS_FONTE", URL_MPAS, _validar_mpas)
 
 
+# Os relatórios do PCM (14/10/2026, nexus/pcm/relatorios): a Gerencial (religamentos), a Confiabilidade (engenharia), o
+# BD de Operações (cidade da usina e pessoas do cluster) e os feriados que o robô do PCM exporta da planilha, do mesmo
+# repositório e com a mesma cópia de 5 min. Sem eles a folha sai com a parte deles vazia, como no PCM.
+URL_GERENCIAL = URL_PADRAO.rsplit("/", 1)[0] + "/gerencial.json"
+URL_ENGENHARIA = URL_PADRAO.rsplit("/", 1)[0] + "/engenharia.json"
+URL_OPERACOES = URL_PADRAO.rsplit("/", 1)[0] + "/operacoes.json"
+URL_FERIADOS = URL_PADRAO.rsplit("/", 1)[0] + "/relatorios/feriados.json"
+
+
+def _validar_dict(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("o arquivo não é um objeto JSON")
+    return d
+
+
+def _validar_lista(d):
+    if not isinstance(d, list):
+        raise FonteErro("o arquivo não é uma lista JSON")
+    return d
+
+
+def ler_gerencial(config) -> Leitura:
+    return _ler(config, "NEXUS_PCM_GERENCIAL_FONTE", URL_GERENCIAL, _validar_dict)
+
+
+def ler_engenharia(config) -> Leitura:
+    return _ler(config, "NEXUS_PCM_ENGENHARIA_FONTE", URL_ENGENHARIA, _validar_dict)
+
+
+def ler_operacoes(config) -> Leitura:
+    return _ler(config, "NEXUS_PCM_OPERACOES_FONTE", URL_OPERACOES, _validar_dict)
+
+
+def ler_feriados(config) -> Leitura:
+    return _ler(config, "NEXUS_PCM_FERIADOS_FONTE", URL_FERIADOS, _validar_lista)
+
+
 def _ler(config, chave: str, padrao: str, validar) -> Leitura:
     fonte = str(config.get(chave) or os.environ.get(chave) or padrao)
     if config.get("TESTING") and not (config.get(chave) or os.environ.get(chave)):

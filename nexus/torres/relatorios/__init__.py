@@ -13,10 +13,17 @@ escolhe que tipo de relatório ela quer! Sai da parte de Performance!"
   todos. Quem tem um relatório vê a Central (a tela de fora) sem marcá-la. As marcas de antes, quando os relatórios eram
   da Performance (`performance/relatorio`...), valem para os daqui (`setor_telas.RENOMEADAS`).
 - Relatório novo: uma `Tela(..., dentro_de="central", do_setor="<setor dono>")` aqui e o ícone em RELATORIOS.
+- Os quatro do PCM (14/10/2026, Levi: "Quero trazer esses quatro relatórios para a plataforma, com as mesmas métricas e
+  parâmetros e estilos"): Relatório diário de manutenção, Recuperação da tarde, Fechamento da semana e Alerta da
+  programação, do setor PCM, NATIVOS do Nexus (não da plataforma): as telas e a folha em `nexus/pcm/relatorios`
+  (`telas.registrar`), com a emissão automática nos horários do PCM (`agenda.py`).
 """
 from flask import render_template
 
 from ...auth import setor_telas
+from ...pcm.relatorios import TIPOS as TIPOS_PCM
+from ...pcm.relatorios import telas as telas_pcm
+from ...performance import porta
 from ..modelo import Tela, Torre
 from ..moldura import estado_da_porta, registrar_molduras
 
@@ -40,6 +47,9 @@ TORRE = Torre(
              "Como a potência ativa de cada inversor se comportou, dia a dia?",
              "Plataforma de Performance (as leituras das curvas do Tempo real)", dentro_de="central",
              do_setor="Performance"),
+        *[Tela(t.tela_id, t.nome, t.pergunta,
+               "o robô do PCM: Programação Semanal, Gestão PCM, Gerencial e Confiabilidade", dentro_de="central",
+               do_setor="PCM") for t in TIPOS_PCM.values()],
     ],
 )
 
@@ -48,6 +58,10 @@ RELATORIOS = {
     "relatorio": "file-text",
     "relatorio-semanal": "calendar-check",
     "potencia-ativa": "chart-line",
+    "pcm-diario": "sun-horizon",
+    "pcm-tarde": "clock-afternoon",
+    "pcm-semanal": "calendar-check",
+    "pcm-alerta": "warning",
 }
 
 bp = TORRE.criar_blueprint(__name__)
@@ -57,13 +71,19 @@ bp = TORRE.criar_blueprint(__name__)
 def central():
     """Os relatórios que a pessoa pode emitir: os do setor dela (todos, para o administrador), na ordem da torre."""
     liberadas = setor_telas.liberadas_do_menu()
-    cartoes = [{"tela": t, "url": f"/t/{TORRE.id}/{t.id}", "area": t.do_setor, "icone": RELATORIOS.get(t.id, "file-text")}
+    molduras = {t.tela for t in porta.da_torre(TORRE.id)}
+    cartoes = [{"tela": t, "url": f"/t/{TORRE.id}/{t.id}", "area": t.do_setor, "icone": RELATORIOS.get(t.id, "file-text"),
+                "moldura": t.id in molduras}
                for t in TORRE.telas
                if t.dentro_de == "central" and (liberadas is None or setor_telas.chave(TORRE.id, t.id) in liberadas)]
     estado = estado_da_porta()
+    # o aviso da plataforma desligada é só dos relatórios dela (os do PCM são do Nexus e abrem sempre)
     return render_template("relatorios/central.html", torre=TORRE, tela=TORRE.tela("central"), cartoes=cartoes,
-                           todos=liberadas is None, ligada=estado["ligada"], motivo=estado["motivo"])
+                           todos=liberadas is None, ligada=estado["ligada"], motivo=estado["motivo"],
+                           com_moldura=any(c["moldura"] for c in cartoes))
 
 
 # Os relatórios da Plataforma de Performance, cada um na moldura (porta única)
 registrar_molduras(bp, TORRE)
+# Os quatro do PCM, nativos (nexus/pcm/relatorios)
+telas_pcm.registrar(bp, TORRE)

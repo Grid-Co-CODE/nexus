@@ -9,7 +9,7 @@
 <p class="lead">Escolha o relatório.
   {% if todos %}Como administrador, você vê todos.{% elif setor %}Aparecem os do setor {{ setor.nome }} e os liberados para ele.{% endif %}</p>
 
-{% if not ligada and cartoes %}
+{% if not ligada and com_moldura %}
 <p class="aviso">A Plataforma de Performance ainda não está ligada neste servidor: os relatórios abrem quando ela estiver
   ({{ motivo }}).</p>
 {% endif %}

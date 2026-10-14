@@ -90,7 +90,9 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     assert c.get("/t/relatorios/potencia-ativa").status_code == 200
     with app.app_context():
         assert ST.das_do_setor("performance") == ST.das_do_setor("Performance") == {f"relatorios/{t}" for t in RELATORIOS}
-        assert ST.das_do_setor("PCM") == set() and ST.das_do_setor("") == set()
+        # os quatro do PCM (14/10/2026) são do setor PCM: nexus/pcm/relatorios, tests/test_relatorios_pcm.py
+        assert ST.das_do_setor("PCM") == {f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta")}
+        assert ST.das_do_setor("") == set()
 
 
 def test_na_matriz_os_relatorios_da_performance_ficam_marcados_e_o_salvar_nao_grava_decisao_para_eles(app, setores,

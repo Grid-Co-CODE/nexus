@@ -87,6 +87,7 @@ def main() -> None:
 
     os.environ["NEXUS_CARGA_DADOS"] = "0"
     os.environ["NEXUS_CAMPO_AQUECER"] = "0"
+    os.environ["NEXUS_PCM_RELATORIOS_AUTO"] = "0"       # a emissão automática dos relatórios do PCM
     os.environ["NEXUS_CAMPO_COLETOR"] = ""
     if args.plataforma is not None:
         # "" também vale: vence o .env (a moldura da porta única só abre na mesma origem; nexus/torres/moldura.py)

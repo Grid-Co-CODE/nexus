@@ -454,6 +454,15 @@ da Microsoft cai em "Sem setor" até o Levi conferir em Base → Acessos.
 **Desfazer:** tirar as quatro linhas `NEXUS_MS_*` do `.env` e `sudo systemctl restart nexus`; a porta volta a ser a do
 Fracttal.
 
+## 7h. Relatórios do PCM na Central (14/10/2026)
+
+Os quatro relatórios do PCM (diário, recuperação da tarde, fechamento da semana e alerta da programação) estão em
+Relatórios → Central de emissão, e o Nexus os emite sozinho nos horários do PCM (diário 06:00, tarde 13:00 de dia útil,
+fechamento sexta 17:00, alerta quando a semana é publicada), guardando as folhas em `dados/pcm/relatorios/`. **Nada a
+fazer da T.I.:** leem os arquivos do repositório do PCM pela saída que o Nexus já tem (`raw.githubusercontent.com`) e não
+mandam e-mail. `NEXUS_PCM_RELATORIOS_AUTO=0` no `.env` desliga a emissão automática numa máquina (a tela segue). Regras:
+`nexus/pcm/relatorios/CLAUDE.md`.
+
 ## 8. Atualizar
 
 Um comando, no servidor (desde 06/10/2026):

@@ -54,6 +54,11 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # PCM -> Gestão PCM (07/10/2026): a senha que abre o mpas.json da Gerencial (o mesmo do painel do PCM);
              # sem ela a Fila mostra só o lado do Fracttal. As fontes trocam o endereço padrão (repositório do PCM).
              "NEXUS_PCM_MPAS_SENHA", "NEXUS_PCM_GESTAO_FONTE", "NEXUS_PCM_MPAS_FONTE",
+             # os relatórios do PCM na Central (14/10/2026, nexus/pcm/relatorios): "0" desliga a emissão automática numa
+             # máquina; as fontes trocam o endereço padrão (repositório do PCM) da Gerencial, da Confiabilidade, do BD de
+             # Operações e dos feriados
+             "NEXUS_PCM_RELATORIOS_AUTO", "NEXUS_PCM_GERENCIAL_FONTE", "NEXUS_PCM_ENGENHARIA_FONTE",
+             "NEXUS_PCM_OPERACOES_FONTE", "NEXUS_PCM_FERIADOS_FONTE",
              # o caminho em que o Nexus é servido (09/10/2026, "a partir de segunda quero o Nexus como link principal"):
              # /nexus no servidor (app.gridco.com.br/nexus); vazio = a raiz, o PC e a fase 4. Ver nexus/prefixo.py
              "NEXUS_PREFIXO",
