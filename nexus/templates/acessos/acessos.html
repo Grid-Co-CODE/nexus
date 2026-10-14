@@ -99,7 +99,9 @@
         </legend>
         <ul>
           {% for s in t.telas %}
-          <li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>
+          {# a tela que é DO setor (Tela.do_setor, 13/10/2026): ele a vê sempre; a caixa fica marcada e presa, sem ir ao Salvar #}
+          {% if s.do_setor %}<li><label><input type="checkbox" data-do-setor checked disabled> {{ s.nome }}</label><span class="ace-do-setor" title="Tela do setor {{ setor_sel.nome }}: quem é dele vê sem marcar">do setor</span></li>
+          {% else %}<li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>{% endif %}
           {% endfor %}
         </ul>
       </fieldset>
@@ -226,7 +228,7 @@
   function atualizar() {
     var n = 0;
     Array.prototype.forEach.call(form.querySelectorAll('.ace-torre'), function (f) {
-      var cx = f.querySelectorAll('input[name="tela"]'), m = 0;
+      var cx = f.querySelectorAll('input[name="tela"], input[data-do-setor]'), m = 0;
       Array.prototype.forEach.call(cx, function (c) { if (c.checked) m++; });
       n += m;
       var toda = f.querySelector('[data-toda]');

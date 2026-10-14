@@ -7,7 +7,7 @@
 <p class="gc-eyebrow">{{ torre.nome }}</p>
 <h1 class="titulo-pagina">{{ tela.nome }}</h1>
 <p class="lead">Escolha o relatório.
-  {% if todos %}Como administrador, você vê todos.{% elif setor %}Aparecem os liberados para o setor {{ setor.nome }}.{% endif %}</p>
+  {% if todos %}Como administrador, você vê todos.{% elif setor %}Aparecem os do setor {{ setor.nome }} e os liberados para ele.{% endif %}</p>
 
 {% if not ligada and cartoes %}
 <p class="aviso">A Plataforma de Performance ainda não está ligada neste servidor: os relatórios abrem quando ela estiver

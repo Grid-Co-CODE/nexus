@@ -302,8 +302,9 @@ def acesso() -> dict:
             if setor:
                 d = _telas_no_clique(base, sessao)
                 # erro só quando nunca houve leitura boa: com a cópia velha, vale ela
-                r = {"tudo": False, "telas": com_as_de_fora(vigentes(d["decisoes"]).get(setor["id"], set())),
-                     "setor": setor,
+                # as marcas do setor, as telas que são DELE (Tela.do_setor) e a de fora de cada uma
+                telas = vigentes(d["decisoes"]).get(setor["id"], set()) | das_do_setor(setor["nome"])
+                r = {"tudo": False, "telas": com_as_de_fora(telas), "setor": setor,
                      "erro": d["erro"] if not d.get("lido_em") else ""}
             else:
                 r = {"tudo": False, "telas": set(), "setor": None, "erro": ""}
@@ -317,6 +318,23 @@ def acesso() -> dict:
             pass
     request._nexus_acesso = r
     return r
+
+
+def _sem_acento(texto) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", str(texto or "")) if unicodedata.category(c) != "Mn").strip().lower()
+
+
+def das_do_setor(nome_setor) -> set[str]:
+    """As telas que são DO setor (`Tela.do_setor`, pelo nome, sem acento nem caixa): quem é dele as vê sem marcar
+    (13/10/2026, Levi, sobre os relatórios da Central de emissão: "Potência ativa faz parte da performance!" e "Esses
+    dois são do setor performance"). Setor de outro nome não ganha nada; a marca em Base → Acessos segue valendo para
+    ele."""
+    alvo = _sem_acento(nome_setor)
+    if not alvo:
+        return set()
+    return {chave(t.id, s.id) for t in current_app.extensions.get("nexus_torres", []) for s in t.telas
+            if s.do_setor and _sem_acento(s.do_setor) == alvo}
 
 
 def com_as_de_fora(telas: set[str]) -> set[str]:

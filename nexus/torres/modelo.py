@@ -25,6 +25,10 @@ class Tela:
     # pessoa escolhe que tipo de relatório ela quer!"): sem item próprio no menu, o item da outra acende quando ela está
     # aberta, e quem tem ela liberada no setor vê a outra também (auth/setor_telas.py). Vazio = item do menu, como sempre
     dentro_de: str = ""
+    # o setor DONO da tela, pelo nome (o da tela Base → Integração Fracttal; sem acento nem caixa): quem é dele vê a tela
+    # sem marcá-la em Base → Acessos (13/10/2026, Levi, sobre os relatórios da Central: "Potência ativa faz parte da
+    # performance!" e "Esses dois são do setor performance"). Vazio = só as marcas, como sempre
+    do_setor: str = ""
 
 
 @dataclass

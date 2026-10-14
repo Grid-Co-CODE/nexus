@@ -5,12 +5,14 @@ relatório novo "Potência Ativa dos Inversores".
 
 Provas: os relatórios estão no mapa na torre Relatórios e saíram da Performance (menu e endereço antigo, que leva ao
 novo); o menu de Relatórios tem só a Central, que acende com o relatório aberto (no servidor e no porta.js); o
-administrador vê todos os cartões; o setor vê os marcados e a Central sem marcá-la; a marca de antes (da Performance)
-vale para o relatório daqui. O banco é o falso do test_campo_visao; nada vai à rede."""
+administrador vê todos os cartões; os três são DO setor Performance (Levi: "Potência ativa faz parte da performance!",
+"Esses dois são do setor performance"), que os vê sem marcar; outro setor vê os marcados e a Central sem marcá-la; a
+marca de antes (da Performance) vale para o relatório daqui. Nos testes, a Ana é da Performance e a Bia de um setor
+chamado "Administrador" (um setor como os outros). O banco é o falso do test_campo_visao; nada vai à rede."""
 import pytest
 from test_campo_visao import banco  # noqa: F401  (fixture)
 from test_porta_moldura import _cliente, _dados
-from test_setor_telas import ANA, _como, _salvar, _sem_copias, setores  # noqa: F401  (fixtures)
+from test_setor_telas import ANA, BIA, URL, _como, _linhas, _salvar, _sem_copias, setores  # noqa: F401  (fixtures)
 
 from nexus.auth import setor_telas as ST
 from nexus.performance import porta
@@ -76,23 +78,51 @@ def test_o_porta_js_acende_o_item_do_menu_da_tela():
 
 
 # ── o setor ─────────────────────────────────────────────────────────────────────────────────────────────────────────
-def test_o_setor_ve_so_os_relatorios_marcados_e_a_central_sem_marcar(app, setores, logado):
-    assert _salvar(logado, 1, ["relatorios/relatorio-semanal"]).status_code == 303
+def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     c = _como(app, ANA)
+    r = c.get("/t/relatorios/central")
+    assert r.status_code == 200
+    h = r.get_data(as_text=True)
+    for tela in RELATORIOS:
+        assert f'href="/t/relatorios/{tela}"' in h
+    assert "Aparecem os do setor Performance e os liberados para ele." in h
+    assert ">Central de emissão</a>" in _menu(c.get("/").get_data(as_text=True))
+    assert c.get("/t/relatorios/potencia-ativa").status_code == 200
+    with app.app_context():
+        assert ST.das_do_setor("performance") == ST.das_do_setor("Performance") == {f"relatorios/{t}" for t in RELATORIOS}
+        assert ST.das_do_setor("PCM") == set() and ST.das_do_setor("") == set()
+
+
+def test_na_matriz_os_relatorios_da_performance_ficam_marcados_e_o_salvar_nao_grava_decisao_para_eles(app, setores,
+                                                                                                         logado):
+    h = logado.get(URL + "?setor=1").get_data(as_text=True)
+    for tela in RELATORIOS:
+        i = h.index(f"{dict(zip(RELATORIOS, NOMES))[tela]}</label>")
+        assert "data-do-setor checked disabled" in h[i - 160:i] and "do setor" in h[i:i + 200], tela
+    assert _salvar(logado, 1, ["cos/mesa"]).status_code == 303
+    assert {x["tela"] for x in _linhas(setores) if x["setor_id"] in (1, "1")} == {"cos/mesa"}
+    # mesmo que a caixa presa venha no formulário, não vira decisão nem erro
+    assert _salvar(logado, 1, ["cos/mesa", "relatorios/potencia-ativa"]).status_code == 303
+    assert not any(x["tela"].startswith("relatorios/") for x in _linhas(setores))
+
+
+def test_o_setor_ve_so_os_relatorios_marcados_e_a_central_sem_marcar(app, setores, logado):
+    assert _salvar(logado, 2, ["relatorios/relatorio-semanal"]).status_code == 303
+    c = _como(app, BIA)
     r = c.get("/t/relatorios/central")
     assert r.status_code == 200
     h = r.get_data(as_text=True)
     assert 'href="/t/relatorios/relatorio-semanal"' in h
     assert 'href="/t/relatorios/relatorio"' not in h and 'href="/t/relatorios/potencia-ativa"' not in h
-    assert "Aparecem os liberados para o setor Performance." in h
+    assert "Aparecem os do setor Administrador e os liberados para ele." in h
     assert ">Central de emissão</a>" in _menu(c.get("/").get_data(as_text=True))
     assert c.get("/t/relatorios/relatorio-semanal").status_code == 200
     assert c.get("/t/relatorios/potencia-ativa").status_code == 403
 
 
 def test_setor_sem_relatorio_nao_ve_a_central(app, setores, logado):
-    assert _salvar(logado, 1, ["cos/mesa"]).status_code == 303
-    c = _como(app, ANA)
+    assert _salvar(logado, 2, ["cos/mesa"]).status_code == 303
+    c = _como(app, BIA)
     assert 'data-torre="relatorios"' not in _menu(c.get("/").get_data(as_text=True))
     assert c.get("/t/relatorios/central").status_code == 403
 
@@ -111,12 +141,12 @@ def test_quem_tinha_o_relatorio_na_performance_continua_vendo(app, setores, monk
     lido = ST._ler_banco
 
     def com_a_marca_antiga(base, sessao):
-        return lido(base, sessao) + [{"decidida_em": "2026-10-12T10:00:00Z", "data_id": 20261012, "setor_id": 1,
+        return lido(base, sessao) + [{"decidida_em": "2026-10-12T10:00:00Z", "data_id": 20261012, "setor_id": 2,
                                       "tela": "performance/relatorio", "liberada": True, "decidida_por_hmac": "",
                                       "origem": "tela"}]
     monkeypatch.setattr(ST, "_ler_banco", com_a_marca_antiga)
     ST.limpar()
-    c = _como(app, ANA)
+    c = _como(app, BIA)
     h = c.get("/t/relatorios/central").get_data(as_text=True)
     assert 'href="/t/relatorios/relatorio"' in h and 'href="/t/relatorios/relatorio-semanal"' not in h
 

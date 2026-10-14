@@ -96,14 +96,18 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
     prontas = _telas_prontas(app)
     matriz = ST.vigentes(tl["decisoes"])
     pessoas = Counter(v for v in S.vigentes(st["decisoes"]).values() if v)
+    # a conta de cada setor leva as telas que são DELE (Tela.do_setor, 13/10/2026): ele as vê sem marcar
     setores = [{"id": s["setor_id"], "nome": s["nome"], "pessoas": pessoas.get(s["setor_id"], 0),
-                "telas": len(matriz.get(s["setor_id"], set()) & todas)} for s in S.ativos(st["setores"])]
+                "telas": len((matriz.get(s["setor_id"], set()) | ST.das_do_setor(s["nome"])) & todas)}
+               for s in S.ativos(st["setores"])]
     sel = next((s for s in setores if s["id"] == escolhido), None) or (setores[0] if setores else None)
-    marcadas = matriz.get(sel["id"], set()) if sel else set()
+    do_setor = ST.das_do_setor(sel["nome"]) if sel else set()
+    marcadas = (matriz.get(sel["id"], set()) if sel else set()) | do_setor
     arvore = []
     for t in torres:
         telas = [{"chave": ST.chave(t.id, s.id), "nome": s.nome, "pronta": f"/t/{t.id}/{s.id}" in prontas,
-                  "marcada": ST.chave(t.id, s.id) in marcadas} for s in t.telas]
+                  "marcada": ST.chave(t.id, s.id) in marcadas, "do_setor": ST.chave(t.id, s.id) in do_setor}
+                 for s in t.telas]
         arvore.append({"id": t.id, "nome": t.nome, "icone": t.icone, "telas": telas,
                        "marcadas": sum(x["marcada"] for x in telas)})
     # o setor de quem entrou e de cada administrador: pelo código do e-mail, o mesmo que a decisão de setor grava (o
@@ -224,7 +228,10 @@ def _gravar_telas():
         setor = next((s for s in S.ativos(st["setores"]) if s["setor_id"] == sid), None)
         if not setor:
             raise ST.Recusada("Setor desconhecido ou excluído (a lista mudou desde que a tela abriu): nada foi gravado.")
-        r = ST.gravar(sid, marcadas, _todas_as_telas(), cfg, base, sessao, _meu_email())
+        # as telas que são DO setor (Tela.do_setor) não passam pela matriz: ele as vê sempre, marcadas ou não
+        do_setor = ST.das_do_setor(setor["nome"])
+        r = ST.gravar(sid, [m for m in marcadas if m not in do_setor], _todas_as_telas() - do_setor, cfg, base, sessao,
+                      _meu_email())
     except ST.Recusada as ex:
         return _pagina(erro=str(ex), status=400, setor_escolhido=sid)
     except Exception as ex:      # noqa: BLE001 — a publicação no banco falhou: nada mudou (o livro é trocado inteiro)

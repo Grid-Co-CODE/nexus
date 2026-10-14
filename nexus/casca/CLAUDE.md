@@ -185,6 +185,10 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
   semanal), e a mais nova ganha, como sempre; quem já via o relatório na Performance continua vendo. A tela que abre por
   dentro de outra (`Tela.dentro_de`) não é item do menu, mas é marcada na matriz como qualquer tela; quem tem ela
   liberada vê a de fora sem marcá-la (`setor_telas.com_as_de_fora`, no `acesso`): o relatório liberado traz a Central.
+- **Tela do setor (13/10/2026).** `Tela.do_setor` = o setor dono, pelo nome (sem acento nem caixa): quem é dele vê a
+  tela SEM marca (`setor_telas.das_do_setor`, somada às marcas no `acesso`). Os três relatórios da Central são da
+  Performance (Levi: "Potência ativa faz parte da performance!", "Esses dois são do setor performance"). Na matriz a caixa
+  dela aparece marcada e presa, com "do setor", e o Salvar não grava decisão para ela; outro setor segue pela marca.
 - **Quem vê o quê.** Administrador é **só** a lista de Administradores (`NEXUS_ADMINS`, a lista desta tela, a senha):
   vê tudo, com ou sem setor, porque é quem configura e não pode ficar trancado fora. **Setor nunca dá administrador**:
   um setor chamado "Administrador" é setor como os outros (existiu assim por algumas horas em 12/10/2026 e saiu), e o

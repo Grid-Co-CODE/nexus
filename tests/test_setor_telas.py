@@ -156,10 +156,12 @@ def test_o_setor_ve_so_as_telas_marcadas(app, setores, logado):
 
 
 def test_setor_sem_nenhuma_tela_ve_o_inicio_com_o_aviso(app, setores):
-    r = _como(app, ANA).get("/")
+    # a Bia: o setor dela (chamado "Administrador") não é dono de tela nenhuma; a Performance é dona dos relatórios da
+    # Central de emissão desde 13/10/2026 (Tela.do_setor) e já nasce com eles
+    r = _como(app, BIA).get("/")
     assert r.status_code == 200
     html = r.get_data(as_text=True)
-    assert "O setor Performance ainda não tem telas liberadas. Fale com o responsável." in html
+    assert "O setor Administrador ainda não tem telas liberadas. Fale com o responsável." in html
     assert 'data-torre="' not in html
 
 
