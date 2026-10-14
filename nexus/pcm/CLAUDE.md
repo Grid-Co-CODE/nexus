@@ -33,6 +33,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `quadro.py` | **Quadro da semana** (09/10/2026): a semana em colunas por dia, a janela da OS e a reprogramação (a linha do motor, a mescla nas observações, o arquivo da semana em curso) |
 | `telas.py` | as telas, penduradas na torre PCM (`registrar_pcm(bp)`) |
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
+| `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste) numa moldura, com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado; regras e como atualizar no `relatorio_exec/CLAUDE.md` |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá) |
 
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)

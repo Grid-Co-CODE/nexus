@@ -1,0 +1,1297 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// relatorio_exec.js — Relatório Executivo sob demanda (17/09/2026)
+// Script clássico, carrega DEPOIS de app.js e preventivas.js (escopo global).
+//
+// Botão na aba Gestão PCM → modal (período com presets + cliente/cluster/
+// usinas) → relatório A4 imprimível gerado 100% no navegador a partir do
+// gestao_pcm.json (+ resumo MPA/MPS da Gerencial quando decifrada).
+//
+// NARRATIVA (spec dos agentes, 17/09): síntese de 1 linha + números-farol →
+// saúde do plano preventivo → pressão corretiva com o ranking "Usinas que
+// pedem atenção" (criadas no período ordena; tendência ▲▼ vs período anterior
+// dá o contexto justo) → grandes manutenções (Gerencial) → esforço → AÇÕES.
+// Termina em ação, não em dado. Versão CLIENTE (1 cliente no recorte ou login
+// de cliente): sem responsáveis, sem Gerencial, sem comparação entre clientes.
+//
+// REGRA DE OURO: concluído = estado 'Finalizada' (TAREFA), nunca o Status da OS.
+// Corretivas contam OS DISTINTA por usina (tarefa duplicada não infla ranking).
+// Prefixo rex- em tudo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+let REX = { de: '', ate: '', cliente: '', cluster: '', usinas: [], tipo: 'interno' };
+// tipo: 'cliente' = sem dados internos (responsáveis, Gerencial, esforço,
+// cliente×supervisor) · 'interno' = versão Grid completa. Login de cliente é
+// SEMPRE 'cliente', sem escolha.
+function rexTipo(t) {
+  REX.tipo = t;
+  document.querySelectorAll('#rex-modal .rex-chip-t').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  // Abertura da Semana: a semana vem do banco_dados (programador) — período não se aplica
+  const sem = t === 'semana';
+  ['rex-per', 'rex-per2'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = sem ? 'none' : ''; });
+  const n = document.getElementById('rex-semnota'); if (n) n.style.display = sem ? '' : 'none';
+}
+
+const rexEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rexIso = d => d.toISOString().slice(0, 10);
+const rexFmt = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '—';
+const rexHoje = () => rexIso(new Date());
+const rexN = n => Number(n || 0).toLocaleString('pt-BR');
+
+// ── presets de período ───────────────────────────────────────────────────────
+function rexPreset(p) {
+  const hj = new Date(); hj.setHours(12);
+  const d = new Date(hj);
+  if (p === 'sem') { d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); REX.de = rexIso(d); REX.ate = rexHoje(); }
+  else if (p === 'semp') { d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7); const f = new Date(d); f.setDate(f.getDate() + 6); REX.de = rexIso(d); REX.ate = rexIso(f); }
+  else if (p === 'mes') { REX.de = rexIso(new Date(d.getFullYear(), d.getMonth(), 1, 12)); REX.ate = rexHoje(); }
+  else if (p === 'mesp') { REX.de = rexIso(new Date(d.getFullYear(), d.getMonth() - 1, 1, 12)); REX.ate = rexIso(new Date(d.getFullYear(), d.getMonth(), 0, 12)); }
+  else if (p === '30d') { d.setDate(d.getDate() - 29); REX.de = rexIso(d); REX.ate = rexHoje(); }
+  const de = document.getElementById('rex-de'), ate = document.getElementById('rex-ate');
+  if (de) de.value = REX.de; if (ate) ate.value = REX.ate;
+  document.querySelectorAll('#rex-modal .rex-chip[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+}
+
+// ── modal ────────────────────────────────────────────────────────────────────
+function rexAbrirModal() {
+  rexFecharModal();
+  const F = (GESTAO_DB && GESTAO_DB.filtros) || {};
+  const ehCliente = (typeof S !== 'undefined' && S && S.isAdmin === false);
+  const clientes = ehCliente ? [] : (F.clientes || []);
+  const opt = (arr, sel) => arr.map(v => '<option value="' + rexEsc(v) + '"' + (sel === v ? ' selected' : '') + '>' + rexEsc(v) + '</option>').join('');
+  const m = document.createElement('div');
+  m.id = 'rex-modal';
+  m.innerHTML = '<div class="rex-m-fundo" onclick="rexFecharModal()"></div>'
+    + '<div class="rex-m-caixa">'
+    + '<h3>&#128196; Relatório executivo</h3>'
+    + (ehCliente ? '' : '<div class="rex-m-sec">Tipo de relatório</div><div class="rex-chips">'
+      + [['interno', '&#127970; Interno Grid'], ['cliente', '&#129309; Cliente'], ['semana', '&#128197; Abertura da Semana']].map(([t, r]) =>
+          '<button type="button" class="rex-chip rex-chip-t' + (REX.tipo === t ? ' on' : '') + '" data-t="' + t
+          + '" onclick="rexTipo(&quot;' + t + '&quot;)">' + r + '</button>').join('')
+      + '</div>')
+    + '<div id="rex-semnota" class="rex-m-op"' + (REX.tipo === 'semana' && !ehCliente ? '' : ' style="display:none"')
+    + '>Abertura da Semana usa a semana mais recente da programação (banco de dados); o período é ignorado. O escopo abaixo vale.</div>'
+    + '<div id="rex-per"' + (REX.tipo === 'semana' && !ehCliente ? ' style="display:none"' : '') + '>'
+    + '<div class="rex-m-sec">Período</div>'
+    + '<div class="rex-chips">'
+    + [['sem', 'Esta semana'], ['semp', 'Semana passada'], ['mes', 'Este mês'], ['mesp', 'Mês passado'], ['30d', 'Últimos 30 dias']]
+      .map(([p, r]) => '<button type="button" class="rex-chip" data-p="' + p + '" onclick="rexPreset(\'' + p + '\')">' + r + '</button>').join('')
+    + '</div>'
+    + '<div class="rex-m-linha"><label>De <input type="date" id="rex-de"></label>'
+    + '<label>Até <input type="date" id="rex-ate"></label></div></div>'
+    + '<div class="rex-m-sec">Escopo <small>(deixe em Todos para o portfólio)</small></div>'
+    + (ehCliente ? '' : '<div class="rex-m-linha"><label>Cliente <select id="rex-cli" onchange="rexEscopoMuda()">'
+      + '<option value="">Todos os clientes</option>' + opt(clientes) + '</select></label>'
+      + '<label>Equipe Cluster <select id="rex-clu"><option value="">Todos</option>' + opt(F.clusters || []) + '</select></label></div>')
+    + '<label class="rex-m-usinas">Usinas <small>(ctrl+clique para várias; vazio = todas do escopo)</small>'
+    + '<select id="rex-usi" multiple size="7">' + opt(F.usinas || []) + '</select></label>'
+    + '<label class="rex-m-op" id="rex-per2"' + (REX.tipo === 'semana' && !ehCliente ? ' style="display:none"' : '') + '><input type="checkbox" id="rex-semprev"' + (REX.semPrevNovas ? ' checked' : '') + '> '
+    + 'Desconsiderar preventivas <b>criadas no período</b> <small>(ex.: MPMs do mês seguinte já lançadas)</small></label>'
+    + '<div class="rex-m-acoes"><button type="button" class="rex-btn-2" onclick="rexFecharModal()">Cancelar</button>'
+    + '<button type="button" class="rex-btn" onclick="rexGerar()">Gerar relatório</button></div>'
+    + '</div>';
+  document.body.appendChild(m);
+  rexPreset('mes');                               // default: "como estão as coisas" deste mês
+}
+function rexFecharModal() { const m = document.getElementById('rex-modal'); if (m) m.remove(); }
+function rexEscopoMuda() {
+  // cascata: escolher o cliente filtra a lista de usinas
+  const cli = (document.getElementById('rex-cli') || {}).value || '';
+  const sel = document.getElementById('rex-usi');
+  if (!sel) return;
+  const F = (GESTAO_DB && GESTAO_DB.filtros) || {};
+  const usinas = (F.usinas || []).filter(u => !cli || String(u).startsWith(cli));
+  sel.innerHTML = usinas.map(v => '<option value="' + rexEsc(v) + '">' + rexEsc(v) + '</option>').join('');
+}
+
+// ── modelo: tudo calculado do gestao_pcm.json (escopo + período) ─────────────
+const rexCorretiva = t => String(t.tipo || '').toLowerCase().indexOf('corretiva') >= 0;
+const rexEmerg = t => String(t.tipo || '').toLowerCase().indexOf('emergencial') >= 0;
+const rexRelig = t => String(t.tipo || '').toLowerCase().indexOf('religa') >= 0;
+const rexFin = t => String(t.estado || '') === 'Finalizada';
+// "aberta de verdade" = tarefa aberta E a OS ainda viva. Tarefa aberta dentro
+// de OS já concluída é registro histórico (ninguém vai agir nela) — não entra
+// em ranking, listas nem cards de backlog (pedido de 22/09, caso OS 6308).
+const rexAbertaViva = t => t.aberta && String(t.osStatus || '') !== 'Finalizados';
+const rexRange = (v, a, b) => { const d = String(v || '').slice(0, 10); return d >= a && d <= b; };
+
+function rexEscopoFiltro(t) {
+  if (/^\s*teste\s*$/i.test(String(t.tipo || ''))) return false;   // cadastro de teste: nunca conta
+  // opção do modal: preventivas CRIADAS dentro do período (ex.: MPMs do mês
+  // seguinte lançadas antes da semana delas) saem de todas as contas — 02/10
+  if (REX.semPrevNovas && rexGrupoBd(t.tipo) === 'Preventivas'
+      && rexRange(t.criacao || t.dataCriacao, REX.de, REX.ate)) return false;
+  if (REX.cliente && t.cliente !== REX.cliente) return false;
+  if (REX.cluster && t.cluster !== REX.cluster) return false;
+  if (REX.usinas.length && REX.usinas.indexOf(t.usina) < 0) return false;
+  return true;
+}
+
+// ── programação semanal: banco_dados.json (a foto do programador que abastece
+// pcm.gridco.com.br — mesmo repo, mesmos nomes de cliente/usina/cluster).
+// Guarda as últimas 4 semanas; "planejado" = o que estava no programador,
+// "executado" = tarefa Finalizada. Pedido das reuniões de 21/09 (Ilaneide:
+// planejadas × executadas × corretivas por semana; Davi: rolagem e fora do plano).
+let REX_BD = { estado: 'nao', dados: null };   // nao|ok|erro
+async function rexBdCarregar() {
+  if (REX_BD.estado !== 'nao') return REX_BD.dados;
+  try {
+    const r = await fetch('banco_dados.json', { cache: 'no-store' });
+    REX_BD.dados = await r.json();
+    REX_BD.estado = 'ok';
+  } catch (e) { REX_BD.estado = 'erro'; REX_BD.dados = null; }
+  return REX_BD.dados;
+}
+function rexSemanaSeg(week) {          // '2026-W38' -> segunda-feira ISO
+  const m = /^(\d{4})-W(\d{1,2})$/.exec(String(week || ''));
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], 0, 4));               // 4/jan está sempre na W1
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + (+m[2] - 1) * 7);
+  return d.toISOString().slice(0, 10);
+}
+const rexFinBd = s => String(s || '').toLowerCase().indexOf('finaliz') >= 0;
+// grupos da tabela da semana. Religamento REMOTO é tratado à parte: não entra
+// em nenhum cálculo (não mobiliza campo) — vira só nota informativa.
+const REX_GRUPOS = ['Preventivas', 'Corretiva', 'Corretiva Emergencial', 'Religamento',
+                    'Inspeção', 'Handover', 'Administrativa', 'Zeladoria', 'Preditiva', 'Outros'];
+function rexGrupoBd(tipo) {
+  const t = String(tipo || '');
+  if (/^Religamento Remoto/i.test(t)) return 'Remoto';
+  if (/^Religamento/i.test(t)) return 'Religamento';
+  if (/^Corretiva Emergencial/i.test(t)) return 'Corretiva Emergencial';
+  if (/^Corretiva/i.test(t)) return 'Corretiva';
+  if (/^MP/i.test(t) || /^Preventiva/i.test(t)) return 'Preventivas';
+  const sem = t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (sem.startsWith('inspec')) return 'Inspeção';
+  if (sem.startsWith('handover')) return 'Handover';
+  if (sem.startsWith('administ')) return 'Administrativa';
+  if (sem.startsWith('zelad')) return 'Zeladoria';
+  if (sem.startsWith('predit')) return 'Preditiva';
+  return 'Outros';
+}
+const REX_DIA = { 'Segunda-feira': 'Seg', 'Terça-feira': 'Ter', 'Quarta-feira': 'Qua',
+                  'Quinta-feira': 'Qui', 'Sexta-feira': 'Sex', 'Sábado': 'Sáb', 'Domingo': 'Dom' };
+const REX_DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
+// aderência: meta 85% (verde), 60–84 âmbar, <60 vermelho — reusa as classes gpv-cel
+const rexFx = p => p >= 85 ? 'ok' : p >= 60 ? 'and' : 'crit';
+// cluster com grafia única (Fracttal tem "PA Leste 01" e "PA LESTE 01" na mesma equipe)
+const rexClu = c => String(c || '').trim().replace(/\s+/g, ' ').toUpperCase() || '—';
+const rexUsiCurta = u => String(u || '').replace(/\s*-\s*[A-Z]{2}\s*$/, '').replace(/^[^-]+-\s*/, '');
+function rexSemanas(bd) {
+  if (!bd || !bd.semanas) return [];
+  const out = [];
+  bd.semanas.forEach(w => {
+    const seg = rexSemanaSeg(w.week);
+    if (!seg) return;
+    const sex = rexIso(new Date(new Date(seg + 'T12:00:00').getTime() + 4 * 86400000));
+    if (sex < REX.de || seg > REX.ate) return;             // fora do período pedido
+    // PLANO = a planilha da Programação da semana (ajustes até o fechamento
+    // contam — não é foto de sexta 8h). O gerador injeta linhas extras com
+    // foraDoPlano:true, mas só de seg→sáb 00h; por isso o "fora do plano"
+    // daqui é recalculado do Fracttal com a semana CHEIA (seg→dom).
+    const rowsAll = (w.rows || []).filter(r => rexEscopoFiltro(r) && !r.foraDoPlano);
+    if (!rowsAll.length) return;
+    const rows = rowsAll.filter(r => rexGrupoBd(r.tipo) !== 'Remoto');   // remoto fora do cálculo
+    const dom = rexIso(new Date(new Date(seg + 'T12:00:00').getTime() + 6 * 86400000));
+    // CORTE DO PLANO = quando a planilha da semana foi GERADA (carimbo interno
+    // do xlsx, w.geradaEm, em UTC) — mesma régua do card "criadas após o plano"
+    // do pcm.gridco.com.br. Sem carimbo (semanas antigas): sexta anterior 00h.
+    const _loc = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+    const corte = w.geradaEm && !isNaN(new Date(w.geradaEm))
+      ? _loc(new Date(w.geradaEm))
+      : rexIso(new Date(new Date(seg + 'T12:00:00').getTime() - 3 * 86400000)) + 'T00:00:00';
+    const osPlan = new Set(rowsAll.map(r => String(r.os_id)));
+    // plano da semana: por grupo + por cluster/dia (tático) + abertas do plano.
+    // OS CRIADA DEPOIS DO CORTE (geração da planilha) não pode ter estado no plano da
+    // sexta — mesmo encaixada na planilha (relida continuamente), conta como
+    // NÃO PLANEJADA (caso OS 14478, 24/09; o congelamento real fica p/ depois)
+    const G = {}, NP = {}, CLM = new Map(), abertasPlano = [];
+    // mesmas contas abertas por CLIENTE e por SUPERVISOR (Responsável O&M) —
+    // só no relatório interno; {p,f} = do plano, {np,nf} = fora do plano
+    const GC = {}, GR = {};
+    const dim = (M, k, plano, feito) => {
+      const o = M[k || '—'] || (M[k || '—'] = { p: 0, f: 0, np: 0, nf: 0 });
+      if (plano) { o.p++; if (feito) o.f++; } else { o.np++; if (feito) o.nf++; }
+    };
+    let plan = 0, fin = 0, npT = 0, npF = 0;
+    rows.forEach(r => {
+      const feito = rexFinBd(r.status);
+      const gk = rexGrupoBd(r.tipo);
+      if (String(r.dataCriacao || '').slice(0, 19) >= corte) {   // nasceu depois do plano
+        const o = NP[gk] || (NP[gk] = { p: 0, f: 0 });
+        o.p++; npT++;
+        if (feito) { o.f++; npF++; }
+        dim(GC, r.cliente, false, feito); dim(GR, rexClu(r.cluster), false, feito);
+        return;
+      }
+      const g = G[gk] || (G[gk] = { p: 0, f: 0 });
+      g.p++; plan++;
+      if (feito) { g.f++; fin++; }
+      dim(GC, r.cliente, true, feito); dim(GR, rexClu(r.cluster), true, feito);
+      const cl = CLM.get(r.cluster) || { cluster: r.cluster || '—', usinas: new Set(), p: 0, f: 0, dias: {} };
+      cl.usinas.add(rexUsiCurta(r.usina)); cl.p++;
+      const dk = REX_DIA[String(r.dia || '')] || '—';
+      const dd = cl.dias[dk] || (cl.dias[dk] = { p: 0, f: 0 });
+      dd.p++;
+      if (feito) { cl.f++; dd.f++; }
+      CLM.set(r.cluster, cl);
+      if (!feito) abertasPlano.push({ tarefa: r.tarefa, usina: rexUsiCurta(r.usina),
+        cluster: r.cluster || '—', tipo: r.tipo, dia: dk, os: String(r.os_id) });
+    });
+    const CL = Array.from(CLM.values()).map(c => ({ ...c, usinas: Array.from(c.usinas).sort() }))
+      .sort((x, y) => (x.p ? x.f / x.p : 1) - (y.p ? y.f / y.p : 1) || String(x.cluster).localeCompare(y.cluster));
+    // não planejadas: tarefas com atividade na semana CHEIA (seg→dom) fora da
+    // planilha — criadas na semana ou finalizadas nela; remoto vira só a nota
+    const T = gpScopedTarefas().filter(rexEscopoFiltro);
+    let remotos = 0;
+    T.forEach(t => {
+      const g = rexGrupoBd(t.tipo);
+      const fimSem = rexFin(t) && rexRange(t.dataFinal, seg, dom);
+      if (g === 'Remoto') { if (fimSem) remotos++; return; }
+      if (osPlan.has(String(t.os))) return;
+      // criada após o corte conta como surgida NESTA semana só se ainda estava
+      // viva na segunda: o que nasceu e foi resolvido entre o corte e domingo
+      // anterior é trabalho da semana passada (65 religamentos na S39, 24/09)
+      const fimAntes = rexFin(t) && String(t.dataFinal || '').slice(0, 10) < seg;
+      // surgida = criada na janela E programada PARA a própria semana (02/10):
+      // criada agora mas programada p/ semanas futuras é planejamento, não imprevisto.
+      // Executada na semana fora da planilha (fimSem) continua contando sempre.
+      const criSem = rexRange(t.criacao, corte.slice(0, 10), dom) && !fimAntes
+        && rexRange(t.dataProg, seg, dom);
+      if (!criSem && !fimSem) return;
+      const o = NP[g] || (NP[g] = { p: 0, f: 0 });
+      o.p++; npT++;
+      if (fimSem) { o.f++; npF++; }
+      dim(GC, t.cliente, false, fimSem); dim(GR, rexClu(t.cluster), false, fimSem);
+    });
+    // reprogramadas: 1 linha por OS, com o maior nº de vezes
+    const porOS = new Map();
+    rows.forEach(r => {
+      const v = +r.vezes || 0, k = String(r.os_id);
+      const cur = porOS.get(k);
+      if (!cur || v > cur.vezes)
+        porOS.set(k, { os: k, usina: r.usina, tarefa: r.tarefa, tipo: r.tipo,
+                       vezes: v, fin: rexFinBd(r.status) });
+    });
+    // situação ATUAL pelo Fracttal (gestao_pcm), não pela foto da planilha:
+    // OS cancelada some da base do painel → sai do Top 10; finalizada → "feita"
+    const atual = new Map();
+    T.forEach(t => { const k = String(t.os); const a = atual.get(k) || { n: 0, fin: 0 };
+      a.n++; if (rexFin(t)) a.fin++; atual.set(k, a); });
+    porOS.forEach(x => { const a = atual.get(x.os); x.cancel = !a; if (a) x.fin = a.fin === a.n; });
+    const rolagens = Array.from(porOS.values()).filter(x => x.vezes >= 2 && !x.cancel)
+      .sort((x, y) => y.vezes - x.vezes).slice(0, 10);
+    // não coube na semana + motivos (o programador registra o porquê)
+    const pend = (w.pendentes || []).filter(rexEscopoFiltro);
+    const motivos = {};
+    pend.forEach(p => { const m = String(p.motivo || '—'); motivos[m] = (motivos[m] || 0) + 1; });
+    const topMot = Object.entries(motivos).sort((x, y) => y[1] - x[1]).slice(0, 3);
+    out.push({ week: w.week, label: w.label, seg, sex, plan, fin, G, NP, npT, npF,
+      remotos, CL, abertasPlano, rolagens, corte, GC, GR, pend: pend.length, topMot,
+      atual: bd.semana_ativa === w.week });
+  });
+  return out.sort((x, y) => (x.week < y.week ? -1 : 1));
+}
+
+function rexModelo() {
+  const a = REX.de, b = REX.ate;
+  const T = gpScopedTarefas().filter(rexEscopoFiltro);
+  const criadas = T.filter(t => rexRange(t.criacao, a, b));
+  const finalizadas = T.filter(t => rexFin(t) && rexRange(t.dataFinal, a, b));
+  const prog = T.filter(t => rexRange(t.dataProg, a, b));
+  const progFin = prog.filter(rexFin);
+  const corrAbertas = T.filter(t => rexCorretiva(t) && rexAbertaViva(t));
+  const mais30 = T.filter(t => rexAbertaViva(t) && (t.dias || 0) > 30);
+  const horas = finalizadas.reduce((s, t) => s + (+t.dur || 0), 0);
+
+  // plano preventivo do período, por sigla (fração p/ MPA/MPS — spec Plano&Fila)
+  const sig = {};
+  prog.forEach(t => {
+    const m = GPV_RX.exec(String(t.tarefa || ''));
+    if (!m) return;
+    const s = sig[m[1]] || (sig[m[1]] = { f: 0, t: 0 });
+    s.t++; if (rexFin(t)) s.f++;
+  });
+
+  // ranking "usinas que pedem atenção": TAREFAS EM ABERTO hoje (todos os
+  // tipos) ordena; mais antiga dá a profundidade; OSs corretivas criadas no
+  // período ficam de contexto (spec 22/09 — antes ordenava por criadas)
+  const porUsina = new Map();
+  const u = n => { let x = porUsina.get(n); if (!x) { x = { abertas: 0, corrAb: new Set(), criadas: new Set(), emerg: new Set(), maisAntiga: 0, tarefas: [] }; porUsina.set(n, x); } return x; };
+  T.forEach(t => {
+    const x = u(t.usina);
+    if (rexAbertaViva(t)) {
+      x.abertas++;
+      if (rexCorretiva(t)) x.corrAb.add(t.os);
+      if ((t.dias || 0) > x.maisAntiga) x.maisAntiga = t.dias || 0;
+      x.tarefas.push(t);                       // p/ a lista tática das críticas
+    }
+    if (rexCorretiva(t) && rexRange(t.criacao, a, b)) {
+      x.criadas.add(t.os);
+      if (rexEmerg(t)) x.emerg.add(t.os);
+    }
+  });
+  let rank = Array.from(porUsina, ([usina, x]) => ({ usina,
+    abertas: x.abertas, corrAb: x.corrAb.size, criadas: x.criadas.size,
+    emerg: x.emerg.size, maisAntiga: x.maisAntiga,
+    tarefas: x.tarefas.sort((p, q) => (q.dias || 0) - (p.dias || 0)) }))
+    .filter(x => x.abertas > 0 || x.criadas > 0)
+    .sort((x, y) => y.abertas - x.abertas || y.maisAntiga - x.maisAntiga);
+
+  // emergenciais do período (OS distinta)
+  const emergVistas = new Set();
+  const emergs = criadas.filter(t => rexEmerg(t) && !emergVistas.has(t.os) && emergVistas.add(t.os));
+
+  // tendência semanal criadas × finalizadas
+  const semanas = [];
+  for (let d = new Date(a + 'T12:00:00'); rexIso(d) <= b;) {
+    const ini = rexIso(d); d.setDate(d.getDate() + 6);
+    const fim = rexIso(d) <= b ? rexIso(d) : b; d.setDate(d.getDate() + 1);
+    semanas.push({ rot: ini.slice(8, 10) + '/' + ini.slice(5, 7),
+      criadas: criadas.filter(t => rexRange(t.criacao, ini, fim)).length,
+      fin: finalizadas.filter(t => rexRange(t.dataFinal, ini, fim)).length });
+  }
+
+  // volume por tipo (agrupando a cauda em "Outros")
+  const tipos = {};
+  const tipoDe = t => rexEmerg(t) ? 'Corretiva Emergencial' : rexCorretiva(t) ? 'Corretiva'
+    : rexRelig(t) ? 'Religamentos' : /prevent|inspe|predit/i.test(t.tipo || '') ? 'Preventiva/Inspeção' : 'Outros';
+  // "abertas" = das CRIADAS NO PERÍODO, as que seguem abertas (não a foto de
+  // hoje inteira — senão preventivas futuras programadas inflavam o número)
+  T.forEach(t => {
+    const cri = rexRange(t.criacao, a, b), fin = rexFin(t) && rexRange(t.dataFinal, a, b);
+    if (!cri && !fin) return;
+    const k = tipoDe(t);
+    const o = tipos[k] || (tipos[k] = { criadas: 0, fin: 0, abertas: 0 });
+    if (cri) o.criadas++; if (fin) o.fin++; if (cri && rexAbertaViva(t)) o.abertas++;
+  });
+
+  // grandes (Gerencial), quando decifrada — respeitando o escopo
+  let ger = null;
+  try {
+    if (typeof GPV_MP !== 'undefined' && GPV_MP.estado === 'ok' && MP) {
+      let fila = gpvFilaLinhas();
+      if (REX.cliente) fila = fila.filter(x => gpvMpNorm(x.nome).startsWith(gpvMpNorm(REX.cliente)));
+      if (REX.usinas.length) {
+        const alvos = REX.usinas.map(gpvMpNorm);
+        fila = fila.filter(x => alvos.some(al => { const k = gpvMpNorm(x.nome); return k === al || k.startsWith(al) || al.startsWith(k) || (k.length >= 8 && al.indexOf(k) >= 0) || (al.length >= 8 && k.indexOf(al) >= 0); }));
+      }
+      ger = { atr: fila.filter(x => x.sit.k === 'Atrasada'),
+              semos: fila.filter(x => (x.semOS || x.osSemPar) && !x.conclu).length,
+              csd: fila.filter(x => x.critSemData).sort((x, y) => (y.atraso || 0) - (x.atraso || 0)) };
+    }
+  } catch (e) { ger = null; }
+
+  return { a, b, T, criadas, finalizadas, prog, progFin, corrAbertas, mais30,
+           horas, sig, rank, emergs, semanas, tipos, ger,
+           osCriadas: new Set(criadas.map(t => t.os)).size,
+           osFin: new Set(finalizadas.map(t => t.os)).size };
+}
+
+// ── confiabilidade por FAMÍLIA de ativo (pedido Athon 21/09) ─────────────────
+// confiabilidade.json: clientes → usinas → ativos {mtbf, mttr, disp, n}.
+// Família = palavra-chave no nome do ativo. Agregação ponderada pelo nº de
+// falhas: mtbf_fam = Σ(mtbf·n)/Σn (= uptime total ÷ falhas totais — mantém a
+// fórmula oficial), idem mttr; disp_fam = mtbf/(mtbf+mttr).
+let REX_CF = { estado: 'nao', dados: null };
+async function rexCfCarregar() {
+  if (REX_CF.estado !== 'nao') return REX_CF.dados;
+  try {
+    const r = await fetch('confiabilidade.json', { cache: 'no-store' });
+    REX_CF.dados = await r.json();
+    REX_CF.estado = 'ok';
+  } catch (e) { REX_CF.estado = 'erro'; REX_CF.dados = null; }
+  return REX_CF.dados;
+}
+function rexFamilia(ativo, usina) {
+  const a = String(ativo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (ativo && usina && ativo === usina) return 'Usina (religamentos)';
+  if (a.indexOf('inversor') >= 0) return 'Inversores';
+  if (a.indexOf('cabine') >= 0) return 'Cabines';
+  if (a.indexOf('transformador') >= 0 || a.indexOf('trafo') >= 0) return 'Transformadores';
+  if (a.indexOf('tracker') >= 0 || a.indexOf('rastread') >= 0) return 'Trackers';
+  if (a.indexOf('meteo') >= 0 || a.indexOf('estacao') >= 0) return 'Estação Meteorológica';
+  if (a.indexOf('string') >= 0 || a.indexOf('modulo') >= 0) return 'Strings / Módulos';
+  if (a.indexOf('qgbt') >= 0) return 'QGBT';
+  if (a.indexOf('cftv') >= 0 || a.indexOf('camera') >= 0) return 'CFTV / Segurança';
+  return 'Outros';
+}
+function rexFamilias(cf) {
+  if (!cf || !cf.clientes) return null;
+  // cluster não existe no confiabilidade.json — derivamos as usinas do cluster
+  // a partir do gestao_pcm.json quando o recorte pede
+  let usinasCluster = null;
+  if (REX.cluster) {
+    usinasCluster = new Set();
+    gpScopedTarefas().forEach(t => { if (t.cluster === REX.cluster) usinasCluster.add(t.usina); });
+  }
+  const fam = {}, ativos = [], porUsina = [];
+  cf.clientes.forEach(c => {
+    if (REX.cliente && c.cliente !== REX.cliente) return;
+    (c.usinas || []).forEach(u => {
+      if (REX.usinas.length && REX.usinas.indexOf(u.usina) < 0) return;
+      if (usinasCluster && !usinasCluster.has(u.usina)) return;
+      const ativosU = [];
+      (u.ativos || []).forEach(at => {
+        const n = +at.n || 0;
+        if (!n) return;
+        const f = rexFamilia(at.ativo, u.usina);
+        const o = fam[f] || (fam[f] = { n: 0, up: 0, rep: 0, ativos: 0 });
+        o.n += n; o.up += (+at.mtbf || 0) * n; o.rep += (+at.mttr || 0) * n; o.ativos++;
+        const reg = { ativo: at.ativo, usina: u.usina, n, mtbf: +at.mtbf || 0,
+                      mttr: +at.mttr || 0, disp: +at.disp || 0, tarefas: at.tarefas || [],
+                      fam: rexFamilia(at.ativo, u.usina) };
+        ativos.push(reg); ativosU.push(reg);
+      });
+      if (ativosU.length)
+        porUsina.push({ usina: u.usina, mtbf: +u.mtbf || 0, mttr: +u.mttr || 0,
+          disp: +u.disp || 0, n: +u.n || 0,
+          ativos: ativosU.sort((x, y) => y.n - x.n) });
+    });
+  });
+  porUsina.sort((x, y) => y.n - x.n);
+  const linhas = Object.entries(fam).map(([f, o]) => {
+    const mtbf = o.up / o.n, mttr = o.rep / o.n;
+    return { fam: f, ativos: o.ativos, n: o.n, mtbf, mttr,
+             disp: (mtbf + mttr) ? mtbf / (mtbf + mttr) : 0 };
+  }).sort((x, y) => y.n - x.n);
+  // piores ativos individuais (mín. 3 falhas — 1 azar não é tendência)
+  const piores = ativos.filter(x => x.n >= 3).sort((x, y) => x.disp - y.disp).slice(0, 5);
+
+  // ── RECORTE DO PERÍODO (05/10): mesma régua do gerar_confiabilidade_json,
+  // mas a janela é De→Até do modal (até "agora" se o Até for hoje/futuro).
+  // falha = tarefa com início dentro da janela · MTTR = média das horas de
+  // reparo (incidente→conclusão, regra 12 h/dia) · MTBF = (h da janela −
+  // h paradas) ÷ falhas · Disp = MTBF ÷ (MTBF + MTTR). No período o MTBF
+  // usa janela ÷ falhas (sem descontar paradas sobrepostas — ver nota).
+  const W0 = new Date(REX.de + 'T00:00:00'), W1 = new Date(Math.min(new Date(REX.ate + 'T23:59:59'), new Date()));
+  const winH = Math.max(0, (W1 - W0) / 3600000);
+  const perAt = ativos.map(a => {
+    const F = a.tarefas.filter(t => t.inicio && rexRange(t.inicio, REX.de, REX.ate));
+    if (!F.length) return null;
+    const rep = F.reduce((s2, t) => s2 + (+t.horas || 0), 0);
+    const comH = F.filter(t => t.horas != null && !isNaN(+t.horas));
+    const mttr = comH.length ? comH.reduce((s2, t) => s2 + (+t.horas), 0) / comH.length : null;
+    // janela curta: reparos SOBREPOSTOS (vários religamentos ao mesmo tempo)
+    // somam mais que a janela e zerariam o MTBF — no período usa janela ÷ falhas
+    const up = winH;
+    const mtbf = up / F.length;
+    return { ...a, pn: F.length, pup: up, prep: rep, pnh: comH.length, pmtbf: mtbf, pmttr: mttr,
+             pdisp: mttr != null && (mtbf + mttr) > 0 ? mtbf / (mtbf + mttr) : null };
+  }).filter(Boolean);
+  const famP = {};
+  perAt.forEach(a => {
+    const o = famP[a.fam] || (famP[a.fam] = { n: 0, up: 0, rep: 0, nh: 0, ativos: 0 });
+    o.n += a.pn; o.up += a.pup; o.rep += (a.pmttr != null ? a.pmttr * a.pnh : 0); o.nh += a.pnh; o.ativos++;
+  });
+  const linhasP = Object.entries(famP).map(([f, o]) => {
+    const mtbf = o.up / o.n, mttr = o.nh ? o.rep / o.nh : null;
+    return { fam: f, ativos: o.ativos, n: o.n, mtbf, mttr,
+             disp: mttr != null && (mtbf + mttr) ? mtbf / (mtbf + mttr) : null };
+  }).sort((x, y) => y.n - x.n);
+  const pioresP = perAt.filter(x => x.pn >= 2 && x.pdisp != null).sort((x, y) => x.pdisp - y.pdisp).slice(0, 5);
+  const porUsinaP = new Map();
+  perAt.forEach(a => { (porUsinaP.get(a.usina) || porUsinaP.set(a.usina, []).get(a.usina)).push(a); });
+  porUsinaP.forEach(L => L.sort((x, y) => y.pn - x.pn));
+  const periodo = { linhas: linhasP, piores: pioresP, porUsina: porUsinaP, winH };
+  return linhas.length ? { linhas, piores, porUsina, periodo, geradoEm: cf.geradoEm || '' } : null;
+}
+
+// ── tabela "Do plano | Fora do plano" genérica (tipo, cliente, supervisor) ──
+// linhas = [[rótulo, {p, f, np, nf}]]; % no formato "50% (20/40)" + TOTAL
+function rexTabAdesao(rotulo, linhas) {
+  const pc = (f, t) => t ? Math.round(100 * f / t) : 0;
+  const mut = '<span class="rex-mut">—</span>';
+  const pctCel = (f, t) => {
+    if (!t) return '<td>' + mut + '</td>';
+    const p = pc(f, t);
+    return '<td class="' + (p < 60 ? 'rex-red' : p >= 85 ? 'rex-grn' : '') + '"><b>' + p + '%</b> <small>('
+      + rexN(f) + '/' + rexN(t) + ')</small></td>';
+  };
+  const tot = { p: 0, f: 0, np: 0, nf: 0 };
+  const corpo = linhas.map(([k, x]) => {
+    tot.p += x.p; tot.f += x.f; tot.np += x.np; tot.nf += x.nf;
+    return '<tr><td class="rex-esq">' + rexEsc(k) + '</td>'
+      + '<td class="rex-div">' + (x.p ? rexN(x.p) : mut) + '</td>'
+      + '<td>' + (x.p ? rexN(x.f) : mut) + '</td>' + pctCel(x.f, x.p)
+      + '<td class="rex-div">' + (x.np ? rexN(x.np) : mut) + '</td>'
+      + '<td>' + (x.np ? rexN(x.nf) : mut) + '</td>' + pctCel(x.nf, x.np) + '</tr>';
+  }).join('');
+  return '<table class="rex-tbl rex-tipos">'
+    + '<colgroup><col style="width:22%"><col style="width:12%"><col style="width:12%">'
+    + '<col style="width:15%"><col style="width:12%"><col style="width:12%"><col style="width:15%"></colgroup>'
+    + '<tr><th rowspan="2" style="vertical-align:bottom">' + rotulo + '</th>'
+    + '<th colspan="3" class="rex-th-g rex-div">Do plano da semana</th>'
+    + '<th colspan="3" class="rex-th-g rex-th-g2 rex-div">Fora do plano</th></tr>'
+    + '<tr><th class="rex-div">Planejadas</th><th>Executadas</th><th>%</th>'
+    + '<th class="rex-div rex-th-g2">Não planejadas</th><th class="rex-th-g2">Executadas</th><th class="rex-th-g2">%</th></tr>'
+    + corpo
+    + '<tr class="rex-total"><td class="rex-esq"><b>TOTAL</b></td>'
+    + '<td class="rex-div"><b>' + rexN(tot.p) + '</b></td><td><b>' + rexN(tot.f) + '</b></td>' + pctCel(tot.f, tot.p)
+    + '<td class="rex-div"><b>' + rexN(tot.np) + '</b></td><td><b>' + rexN(tot.nf) + '</b></td>' + pctCel(tot.nf, tot.np)
+    + '</tr></table>';
+}
+
+// ── render do relatório ─────────────────────────────────────────────────────
+async function rexGerar() {
+  REX.de = (document.getElementById('rex-de') || {}).value || REX.de;
+  REX.ate = (document.getElementById('rex-ate') || {}).value || REX.ate;
+  REX.cliente = (document.getElementById('rex-cli') || {}).value || '';
+  REX.cluster = (document.getElementById('rex-clu') || {}).value || '';
+  const sel = document.getElementById('rex-usi');
+  REX.usinas = sel ? Array.from(sel.selectedOptions).map(o => o.value) : [];
+  REX.semPrevNovas = !!(document.getElementById('rex-semprev') || {}).checked;
+  if (REX.tipo === 'semana' && !(typeof S !== 'undefined' && S && S.isAdmin === false)) {
+    REX.semPrevNovas = false;                    // a semana é fixa; opção do período não se aplica
+    rexFecharModal();
+    return rexGerarSemana();
+  }
+  if (!REX.de || !REX.ate || REX.de > REX.ate) { alert('Confira o período.'); return; }
+  rexFecharModal();
+
+  const ehCliente = (typeof S !== 'undefined' && S && S.isAdmin === false);
+  const modoCliente = ehCliente || REX.tipo === 'cliente';   // escolha explícita no modal
+  const M = rexModelo();
+  const SEM = rexSemanas(await rexBdCarregar());    // semanas do programador no período
+  const CF = rexFamilias(await rexCfCarregar());    // confiabilidade por família
+  let nsec = 0;
+  const sec = t => (++nsec) + ' · ' + t;
+  const escopo = [REX.cliente || (ehCliente ? S.user : 'Todos os clientes'),
+                  REX.cluster, REX.usinas.length ? REX.usinas.length + ' usina(s)' : '',
+                  REX.semPrevNovas ? 'sem preventivas criadas no período' : '']
+                 .filter(Boolean).join(' · ');
+  const pctPlano = M.prog.length ? Math.round(100 * M.progFin.length / M.prog.length) : null;
+
+  // síntese automática (template da narrativa)
+  const topo = M.rank[0];
+  const pctT = (f, t) => t ? Math.round(100 * f / t) : 0;
+  const SW = SEM.length ? SEM[SEM.length - 1] : null;   // semana mais recente (Tático)
+  const sintese = 'Em ' + rexFmt(M.a) + '–' + rexFmt(M.b) + ', ' + escopo + ' executou <b>'
+    + rexN(M.osFin) + ' OSs</b>'
+    + (SW && SW.plan
+      ? '; na ' + rexEsc(SW.label.split(' · ')[0]).toLowerCase() + ', aderência ao plano <b>'
+        + pctT(SW.fin, SW.plan) + '%</b> e execução total <b>' + pctT(SW.fin + SW.npF, SW.plan + SW.npT) + '%</b>'
+      : (pctPlano !== null ? ' (' + pctPlano + '% do programado no Fracttal no período)' : ''))
+    + '; <b>' + rexN(new Set(M.corrAbertas.map(t => t.os)).size) + ' corretivas abertas</b>'
+    + (topo && topo.abertas ? ' — <b>' + rexEsc(topo.usina.replace(/\s*-\s*[A-Z]{2}\s*$/, ''))
+      + '</b> lidera o backlog (' + topo.abertas + ' tarefas em aberto, mais antiga '
+      + topo.maisAntiga + ' d)' : '') + '.';
+
+  const kpi = (v, l, cls) => '<div class="rex-kpi ' + (cls || '') + '"><b>' + v + '</b><span>' + l + '</span></div>';
+  const logo = (document.querySelector('.a-logo, .l-logo') || {}).src || '';
+
+  let h = '<div class="rex-bar"><button class="rex-btn-2" onclick="rexFechar()">&#8592; Voltar ao painel</button>'
+    + '<span>' + (modoCliente ? 'versão cliente — sem dados internos' : 'versão interna') + '</span>'
+    + '<button class="rex-btn" onclick="window.print()">&#128424; Imprimir / PDF</button></div>'
+    + '<div class="rex-a4">';
+
+  // P1 — cabeçalho + síntese + farol
+  h += '<header class="rex-cab">' + (logo ? '<img src="' + logo + '" alt="Grid Co.">' : '<b class="rex-marca">Grid Co.</b>')
+    + '<div><h1>' + (modoCliente ? 'Relatório de O&M — o que entregamos e o que vem a seguir'
+                                  : 'Relatório Executivo PCM — o que rodou, o que travou, onde agir') + '</h1>'
+    + '<div class="rex-meta">' + rexFmt(M.a) + ' a ' + rexFmt(M.b) + ' · ' + rexEsc(escopo)
+    + ' · emitido em ' + new Date().toLocaleString('pt-BR').slice(0, 16) + '</div></div></header>'
+    + '<p class="rex-sintese">' + sintese + '</p>'
+    + '<div class="rex-kpis">'
+    + kpi(rexN(M.osCriadas), 'OSs criadas no período')
+    + kpi(rexN(M.osFin), 'OSs finalizadas', 'grn')
+    + (SW && SW.plan
+      ? kpi(pctT(SW.fin, SW.plan) + '%', 'aderência ao plano da semana · ' + rexN(SW.fin) + '/' + rexN(SW.plan),
+            pctT(SW.fin, SW.plan) < 60 ? 'red' : pctT(SW.fin, SW.plan) < 85 ? 'amb' : 'grn')
+      : kpi(pctPlano === null ? '—' : pctPlano + '%', 'do programado no Fracttal concluído (sem planilha no período)',
+            pctPlano !== null && pctPlano < 60 ? 'red' : pctPlano < 85 ? 'amb' : 'grn'))
+    + kpi(rexN(new Set(M.corrAbertas.map(t => t.os)).size), 'corretivas abertas hoje', 'red')
+    + (M.ger && !modoCliente ? kpi(rexN(M.ger.atr.length), 'MPA/MPS atrasadas', 'amb') : kpi(rexN(M.mais30.length), 'tarefas abertas há +30 dias', 'amb'))
+    + '</div>';
+
+  // ═════════ PARTE 1 · VISÃO GERENCIAL ═════════
+  h += '<div class="rex-parte">Visão Gerencial — a semana em um olhar</div>';
+
+  // G1+G2 — programação da semana: execução total + tabela de tipos
+  if (SEM.length) {
+    h += '<section><h2>' + sec('Programação da semana — planejado × executado')
+      + ' <small>foto do programador semanal · religamentos remotos fora do cálculo</small></h2>';
+    SEM.forEach(s => {
+      const adP = pctT(s.fin, s.plan), adN = pctT(s.npF, s.npT), adT = pctT(s.fin + s.npF, s.plan + s.npT);
+      const _c = s.corte || '';
+      h += '<div class="rex-h3">' + rexEsc(s.label) + (s.atual ? ' <em>— semana corrente, parcial</em>' : '')
+        + (_c ? ' <em>· plano fechado em ' + _c.slice(8, 10) + '/' + _c.slice(5, 7) + ' às ' + _c.slice(11, 16) + '</em>' : '') + '</div>'
+        // card largo: manchete "Execução total" + as duas componentes com micro-barras
+        + '<div class="rex-ade"><div class="rex-ade-m"><b class="' + rexFx(adT) + '">' + adT + '%</b>'
+        + '<span>Execução total<br><small>tudo que foi feito ÷ tudo que havia · '
+        + rexN(s.fin + s.npF) + '/' + rexN(s.plan + s.npT) + '</small></span></div>'
+        + '<div class="rex-ade-c">'
+        + '<div class="rex-ade-l"><span>Aderência ao plano <small>executadas ÷ planejadas na semana</small></span>'
+        + '<i><b class="' + rexFx(adP) + '" style="width:' + adP + '%"></b></i><em>' + adP + '% · ' + rexN(s.fin) + '/' + rexN(s.plan) + '</em></div>'
+        + '<div class="rex-ade-l"><span>Resposta ao imprevisto <small>resolvidas ÷ surgidas fora do plano</small></span>'
+        + '<i><b class="' + rexFx(adN) + '" style="width:' + adN + '%"></b></i><em>' + adN + '% · ' + rexN(s.npF) + '/' + rexN(s.npT) + '</em></div>'
+        + '</div></div>'
+        // tabela de tipos — grupos "Do plano | Fora do plano" com divisória
+        // vertical, "Resolvidas" à direita (evita 2× "Executadas") e TOTAL
+        + rexTabAdesao('Tipo', REX_GRUPOS.filter(g => s.G[g] || s.NP[g]).map(g => {
+            const x = s.G[g] || { p: 0, f: 0 }, n = s.NP[g] || { p: 0, f: 0 };
+            return [g, { p: x.p, f: x.f, np: n.p, nf: n.f }];
+          }))
+        + '<div class="rex-nota"><b>Religamentos remotos na semana: ' + rexN(s.remotos)
+        + '</b> — não entram no cálculo: atendimento remoto, sem mobilização do time de campo.</div>'
+        + (s.pend ? '<div class="rex-nota"><b>Não coube na semana:</b> ' + rexN(s.pend) + ' tarefa(s)'
+            + (s.topMot.length ? ' — motivos: ' + s.topMot.map(([m, n]) => rexEsc(m) + ' (' + n + ')').join('; ') : '') + '</div>' : '');
+      if (!modoCliente) {
+        const ordena = M_ => Object.entries(M_).filter(([, v]) => v.p + v.np > 0)
+          .sort((a, b) => (b[1].p - a[1].p) || (b[1].np - a[1].np));
+        h += '<div class="rex-h3">Aderência por cliente <em>· mesma régua da tabela acima</em></div>'
+          + rexTabAdesao('Cliente', ordena(s.GC))
+          + '<div class="rex-h3">Aderência por cluster <em>· mesma régua</em></div>'
+          + rexTabAdesao('Cluster', ordena(s.GR).map(([k, v]) => [k === '—' ? 'sem cluster no Fracttal' : k, v]));
+      }
+    });
+    h += '<div class="rex-nota">Plano = a planilha da Programação da semana; tarefa criada DEPOIS do fechamento do plano '
+      + '(momento em que a planilha foi gerada) conta como não planejada, mesmo quando encaixada nela · executado = tarefa Finalizada · '
+      + 'não planejada = criada após o fechamento E programada para a própria semana, ou executada sem estar na planilha (até domingo) · '
+      + 'preventiva mede cumprimento do plano; corretiva mede resposta à demanda.</div></section>';
+  }
+
+  // confiabilidade por família de equipamento (base histórica — não recorta pelo período)
+  if (CF) {
+    const nfmt = (v, c) => v.toFixed(c).replace('.', ',');
+    const dispMin = Math.min(...CF.linhas.filter(x => x.n >= 10).map(x => x.disp), 1);
+    h += '<section><h2>' + sec('Confiabilidade por família de equipamento')
+      + ' <small>falhas = corretivas, emergenciais e religamentos · base histórica desde a mobilização de cada usina</small></h2>'
+      + '<table class="rex-tbl"><tr><th>Família</th><th>Ativos</th><th>Falhas</th><th>MTBF (h)</th><th>MTTR (h)</th><th>Disp. inerente</th></tr>'
+      + CF.linhas.map(x => '<tr><td class="rex-esq">' + rexEsc(x.fam) + '</td>'
+        + '<td>' + rexN(x.ativos) + '</td><td>' + rexN(x.n) + '</td>'
+        + '<td>' + nfmt(x.mtbf, 1) + '</td><td>' + nfmt(x.mttr, 2) + '</td>'
+        + '<td class="' + (x.n >= 10 && x.disp === dispMin ? 'rex-red' : '') + '"><b>'
+        + nfmt(100 * x.disp, 1) + '%</b></td></tr>').join('')
+      + '</table>'
+      + (CF.piores.length ? '<table class="rex-tbl" style="margin-top:8px"><tr>'
+        + '<th>Ativos com pior disponibilidade <small>(mín. 3 falhas)</small></th><th>Usina</th><th>Falhas</th><th>MTTR (h)</th><th>Disp.</th></tr>'
+        + CF.piores.map(p => '<tr><td class="rex-esq">' + rexEsc(String(p.ativo).slice(0, 45)) + '</td>'
+          + '<td class="rex-esq">' + rexEsc(rexUsiCurta(p.usina)) + '</td><td>' + p.n + '</td>'
+          + '<td>' + nfmt(p.mttr, 2) + '</td><td class="rex-red"><b>' + nfmt(100 * p.disp, 1) + '%</b></td></tr>').join('')
+        + '</table>' : '')
+      + '<div class="rex-nota"><b>Os indicadores por família são um termômetro da tendência geral; a leitura '
+      + 'conclusiva de confiabilidade é feita ativo a ativo</b> (Parte Tática) — o agregado não substitui essa análise. '
+      + 'MTBF = tempo médio entre falhas · MTTR = tempo médio de reparo · Disp. inerente = MTBF ÷ (MTBF + MTTR) · '
+      + 'agregação ponderada pelo nº de falhas · dados de ' + rexEsc(String(CF.geradoEm).slice(0, 16).replace('T', ' ')) + '.</div></section>';
+
+    // mesma leitura, só com as falhas do PERÍODO do relatório (05/10)
+    const P = CF.periodo, nf2 = (v, c) => v == null ? '<span class="rex-mut">—</span>' : nfmt(v, c);
+    const pc = v => v == null ? '<span class="rex-mut">—</span>' : nfmt(100 * v, 1) + '%';
+    h += '<section><h2>' + sec('Confiabilidade no período') + ' <small>' + rexFmt(REX.de) + ' a ' + rexFmt(REX.ate)
+      + ' · só as falhas que começaram dentro do período</small></h2>'
+      + (P && P.linhas.length
+        ? '<table class="rex-tbl"><tr><th>Família</th><th>Ativos com falha</th><th>Falhas</th><th>MTBF (h)</th><th>MTTR (h)</th><th>Disp. inerente</th></tr>'
+          + P.linhas.map(x => '<tr><td class="rex-esq">' + rexEsc(x.fam) + '</td><td>' + rexN(x.ativos) + '</td><td>' + rexN(x.n) + '</td>'
+            + '<td>' + nf2(x.mtbf, 1) + '</td><td>' + nf2(x.mttr, 2) + '</td>'
+            + '<td class="' + (x.disp != null && x.disp < 0.9 ? 'rex-red' : '') + '"><b>' + pc(x.disp) + '</b></td></tr>').join('')
+          + '</table>'
+          + (P.piores.length ? '<table class="rex-tbl" style="margin-top:8px"><tr>'
+            + '<th>Ativos com pior disponibilidade no período <small>(mín. 2 falhas)</small></th><th>Usina</th><th>Falhas</th><th>MTBF (h)</th><th>MTTR (h)</th><th>Disp.</th></tr>'
+            + P.piores.map(a => '<tr><td class="rex-esq">' + rexEsc(String(a.ativo).slice(0, 45)) + '</td>'
+              + '<td class="rex-esq">' + rexEsc(rexUsiCurta(a.usina)) + '</td><td>' + a.pn + '</td>'
+              + '<td>' + nf2(a.pmtbf, 1) + '</td><td>' + nf2(a.pmttr, 2) + '</td><td class="rex-red"><b>' + pc(a.pdisp) + '</b></td></tr>').join('')
+            + '</table>' : '')
+          + '<div class="rex-nota">Janela de ' + rexN(Math.round(P.winH)) + ' h: o MTBF do período nunca passa do tamanho da janela '
+            + '(com 1 falha numa semana, MTBF ≈ 168 h). Compare família com família e com a base histórica acima, não com períodos de tamanho diferente. '
+            + 'MTTR na régua oficial (incidente à conclusão, 12 h/dia em eventos de vários dias); no período, MTBF = horas da janela ÷ falhas, '
+            + 'sem descontar o tempo parado, porque reparos simultâneos se sobrepõem e somariam mais que a própria janela.</div>'
+        : '<p class="rex-nota">Nenhuma falha (corretiva, emergencial ou religamento) começou dentro do período no recorte.</p>')
+      + '</section>';
+  }
+
+  // G4 — usinas que pedem atenção (ordena por TAREFAS EM ABERTO — spec 22/09)
+  const top = M.rank.slice(0, 10);
+  const resto = M.rank.slice(10);
+  const mxR = Math.max(1, ...top.map(x => x.abertas));
+  h += '<section class="rex-quebra"><h2>' + sec('Usinas que pedem atenção')
+    + ' <small>ordenado por tarefas em aberto hoje · detalhe das tarefas na Parte Tática</small></h2>'
+    + '<table class="rex-tbl rex-rank"><tr><th>#</th><th>Usina</th><th>Tarefas em aberto</th><th>OSs corretivas abertas</th><th>Mais antiga</th><th>OSs corretivas criadas no período</th></tr>'
+    + top.map((x, i) => '<tr><td>' + (i + 1) + '</td><td class="rex-esq">' + rexEsc(x.usina) + '</td>'
+      + '<td class="rex-esq"><i class="rex-barra" style="width:' + Math.round(100 * x.abertas / mxR) + '%"></i><b>' + rexN(x.abertas) + '</b></td>'
+      + '<td>' + (x.corrAb ? '<b class="rex-red">' + x.corrAb + '</b>' : '—') + '</td>'
+      + '<td>' + (x.maisAntiga ? x.maisAntiga + ' d' : '—') + '</td>'
+      + '<td>' + (x.criadas || '—') + (x.emerg ? ' <small>(' + x.emerg + ' emerg.)</small>' : '') + '</td></tr>').join('')
+    + (resto.length ? '<tr class="rex-resto"><td></td><td class="rex-esq">demais usinas (' + resto.length + ')</td><td class="rex-esq"><b>'
+      + resto.reduce((s, x) => s + x.abertas, 0) + '</b></td><td>' + resto.reduce((s, x) => s + x.corrAb, 0) + '</td><td></td><td>'
+      + resto.reduce((s, x) => s + x.criadas, 0) + '</td></tr>' : '')
+    + '</table></section>';
+
+  // G5 — top 10 que mais rolaram (todas as semanas do período, 1 linha por OS)
+  const rolMap = new Map();
+  SEM.forEach(s => s.rolagens.forEach(x => {
+    const cur = rolMap.get(x.os);
+    if (!cur || x.vezes > cur.vezes) rolMap.set(x.os, x);
+  }));
+  const rol10 = Array.from(rolMap.values()).sort((x, y) => y.vezes - x.vezes).slice(0, 10);
+  if (rol10.length) {
+    h += '<section><h2>' + sec('Top 10 — tarefas que mais rolaram')
+      + ' <small>nº de semanas em que a OS entrou na programação</small></h2>'
+      + '<table class="rex-tbl rex-fit rex-top10"><colgroup><col style="width:8%"><col style="width:17%"><col style="width:41%">'
+      + '<col style="width:11%"><col style="width:9%"><col style="width:14%"></colgroup>'
+      + '<tr><th>OS</th><th>Usina</th><th>Tarefa</th><th>Tipo</th><th>Rolag.</th><th>Situação</th></tr>'
+      + rol10.map(x => '<tr><td>' + rexEsc(x.os) + '</td><td class="rex-esq">' + rexEsc(rexUsiCurta(x.usina)) + '</td>'
+        + '<td class="rex-esq">' + rexEsc(String(x.tarefa || '').replace(/^\[[^\]]*\]\s*-?\s*/, '').slice(0, 55)) + '</td>'
+        + '<td>' + rexEsc(x.tipo) + '</td><td><b class="' + (x.vezes >= 6 ? 'rex-red' : '') + '">' + x.vezes + '×</b></td>'
+        + '<td>' + (x.fin ? '<span class="gpv-cel ok">feita</span>' : '<span class="gpv-cel crit">em aberto</span>') + '</td></tr>').join('')
+      + '</table></section>';
+  }
+
+  // ═════════ PARTE 2 · VISÃO TÁTICA ═════════
+  if (SW || (CF && CF.porUsina && CF.porUsina.length)) {
+    h += '<div class="rex-parte rex-quebra">Visão Tática — cluster a cluster, usina a usina'
+      + '<small>A partir daqui, os mesmos resultados abertos no detalhe: cada cluster, cada usina, cada atividade em aberto.</small></div>';
+  }
+
+  // T1 — programação por cluster × dia (heatmap da semana mais recente)
+  if (SW && SW.CL.length) {
+    h += '<section><h2>' + sec('Programação por cluster e dia') + ' <small>' + rexEsc(SW.label)
+      + ' · executadas/planejadas por dia · pior aderência primeiro</small></h2>'
+      + '<table class="rex-tbl"><tr><th>Cluster</th>' + REX_DIAS.map(d => '<th>' + d + '</th>').join('')
+      + '<th>Semana</th></tr>'
+      + SW.CL.map(c => {
+          const p = pctT(c.f, c.p);
+          return '<tr><td class="rex-esq"><b>' + rexEsc(c.cluster) + '</b><br><small>'
+            + rexEsc(c.usinas.join(', ').slice(0, 90)) + '</small></td>'
+            + REX_DIAS.map(d => {
+                const x = c.dias[d];
+                if (!x || !x.p) return '<td><span class="gpv-cel nulo">—</span></td>';
+                return '<td><span class="gpv-cel ' + rexFx(pctT(x.f, x.p)) + '">' + x.f + '/' + x.p + '</span></td>';
+              }).join('')
+            + '<td><span class="gpv-cel ' + rexFx(p) + '"><b>' + p + '%</b></span></td></tr>';
+        }).join('')
+      + '</table></section>';
+  }
+
+  // T2 — INTERNO GRID: OS com tarefa atrasada há +35 dias (pedido 02/10;
+  // agrupado POR OS em 05/10). Dias = tarefa mais antiga da OS (régua do
+  // "Só atrasadas"); Faltam = tarefas abertas / total da OS; Tarefa = sigla
+  // comum uma vez + nomes do que FALTA; etiquetas unidas; obs da OS.
+  if (!modoCliente) {
+    const LIM = 35;
+    const limpa = x => String(x || '').replace(/^(\s*\[[^\]]*\])+\s*[-–—]?\s*/, '').trim();
+    const porOS = new Map();
+    M.T.forEach(t => {
+      const k = String(t.os);
+      const o = porOS.get(k) || { os: k, usina: t.usina, tot: 0, ab: [], dias: 0, etq: new Set(), obs: '' };
+      o.tot++;
+      if (rexAbertaViva(t)) { o.ab.push(t); o.dias = Math.max(o.dias, t.dias || 0); }
+      (t.etiquetas || []).forEach(e => o.etq.add(e));
+      if (!o.obs && t.obs) o.obs = t.obs;
+      porOS.set(k, o);
+    });
+    const linhas = Array.from(porOS.values()).filter(o => o.ab.length && o.dias > LIM)
+      .sort((a, b) => b.dias - a.dias || a.os.localeCompare(b.os));
+    const titulo = o => {
+      const nomes = [...new Set(o.ab.map(t => limpa(t.tarefa)).filter(Boolean))];
+      const m = nomes.map(n => /^(MP[MSAT])\s*[-–—]\s*(.+)$/.exec(n));
+      let pre = '', itens = nomes;
+      if (m.length && m.every(x => x && x[1] === m[0][1])) { pre = m[0][1] + ' — '; itens = m.map(x => x[2]); }
+      let txt = pre, n = 0;
+      for (const it of itens) {
+        if ((txt + it).length > 130 && n) break;
+        txt += (n ? ', ' : '') + it; n++;
+      }
+      return txt + (itens.length > n ? ' (+' + (itens.length - n) + ')' : '');
+    };
+    const nTar = linhas.reduce((s, o) => s + o.ab.length, 0);
+    h += '<section><h2>' + sec('Atrasadas há mais de ' + LIM + ' dias')
+      + ' <small>' + rexN(linhas.length) + ' OS · ' + rexN(nTar) + ' tarefa(s) em aberto · da mais antiga para a mais nova · foto de hoje</small></h2>'
+      + (linhas.length ? '<table class="rex-tbl rex-atr"><tr><th>Dias</th><th>OS</th><th>Cliente – Usina</th><th>Tarefa(s) em aberto</th><th>Faltam</th><th>Etiqueta</th><th>Observação da OS</th></tr>'
+        + linhas.map(o => {
+            const etq = [...o.etq].join(', ');
+            return '<tr><td class="rex-red"><b>' + o.dias + ' d</b></td><td>' + rexEsc(o.os) + '</td>'
+              + '<td class="rex-esq">' + rexEsc(String(o.usina || '').replace(/\s*-\s*[A-Z]{2}\s*$/, '')) + '</td>'
+              + '<td class="rex-esq">' + rexEsc(titulo(o)) + '</td>'
+              + '<td title="tarefas em aberto / total da OS"><b>' + o.ab.length + '/' + o.tot + '</b></td>'
+              + '<td class="rex-esq rex-obs">' + (etq ? rexEsc(etq) : '<span class="rex-mut">—</span>') + '</td>'
+              + '<td class="rex-esq rex-obs">' + (o.obs ? rexEsc(o.obs) : '<span class="rex-mut">sem observação</span>') + '</td></tr>';
+          }).join('') + '</table>'
+          + '<div class="rex-nota">Faltam = tarefas em aberto ÷ total de tarefas da OS · dias contados desde a data programada da tarefa mais antiga.</div>'
+        : '<p class="rex-nota">Nenhuma OS com tarefa atrasada há mais de ' + LIM + ' dias no recorte.</p>')
+      + '</section>';
+  }
+
+  // T2 (versão Cliente) — tarefas do plano da semana ainda em aberto
+  if (modoCliente && SW && SW.abertasPlano.length) {
+    const ab = SW.abertasPlano.slice(0, 40);
+    h += '<section><h2>' + sec('O que ficou em aberto do plano da semana')
+      + ' <small>' + rexN(SW.abertasPlano.length) + ' tarefa(s) · ' + rexEsc(SW.label) + '</small></h2>'
+      + '<table class="rex-tbl"><tr><th>Cluster</th><th>Usina</th><th>Tarefa</th><th>Tipo</th><th>Dia</th><th>OS</th></tr>'
+      + ab.map(x => '<tr><td class="rex-esq">' + rexEsc(x.cluster) + '</td><td class="rex-esq">' + rexEsc(x.usina) + '</td>'
+        + '<td class="rex-esq">' + rexEsc(String(x.tarefa || '').replace(/^\[[^\]]*\]\s*-?\s*/, '').slice(0, 50)) + '</td>'
+        + '<td>' + rexEsc(x.tipo) + '</td><td>' + x.dia + '</td><td>' + rexEsc(x.os) + '</td></tr>').join('')
+      + (SW.abertasPlano.length > 40 ? '<tr class="rex-resto"><td></td><td class="rex-esq" colspan="5">+'
+        + (SW.abertasPlano.length - 40) + ' não listadas — a lista completa vai no Excel da semana</td></tr>' : '')
+      + '</table></section>';
+  }
+
+  // T3 — confiabilidade por usina: top 5 usinas (por falhas) × top 5 ativos
+  if (CF && CF.porUsina && CF.porUsina.length) {
+    const nf = (v, c) => (+v).toFixed(c).replace('.', ',');
+    const topU = CF.porUsina.slice(0, 5);
+    const restoU = CF.porUsina.slice(5);
+    h += '<section><h2>' + sec('Confiabilidade ativo a ativo — usinas com mais falhas')
+      + ' <small>top 5 usinas · top 5 ativos de cada · ordem por nº de falhas</small></h2>';
+    topU.forEach(u => {
+      const at = u.ativos.slice(0, 5);
+      const restoN = u.ativos.slice(5).reduce((s, x) => s + x.n, 0);
+      h += '<div class="rex-h3">' + rexEsc(u.usina) + ' <em>· MTBF ' + nf(u.mtbf, 0) + ' h · MTTR '
+        + nf(u.mttr, 2) + ' h · Disp. ' + nf(100 * u.disp, 1) + '% · ' + rexN(u.n) + ' falhas</em></div>'
+        + '<table class="rex-tbl"><tr><th>Ativo</th><th>Falhas</th><th>MTBF (h)</th><th>MTTR (h)</th><th>Disp. inerente</th></tr>'
+        + at.map(x => '<tr><td class="rex-esq">' + rexEsc(String(x.ativo).slice(0, 55)) + '</td><td>' + rexN(x.n) + '</td>'
+          + '<td>' + nf(x.mtbf, 0) + '</td><td>' + nf(x.mttr, 2) + '</td>'
+          + '<td class="' + (x.disp < 0.9 ? 'rex-red' : '') + '"><b>' + nf(100 * x.disp, 1) + '%</b></td></tr>').join('')
+        + (restoN ? '<tr class="rex-resto"><td class="rex-esq">demais ativos (' + (u.ativos.length - 5) + ')</td><td>'
+          + rexN(restoN) + '</td><td></td><td></td><td></td></tr>' : '')
+        + '</table>';
+      // mesma usina, só as falhas do período do relatório (05/10)
+      const LP = (CF.periodo && CF.periodo.porUsina.get(u.usina)) || [];
+      const nfp = (v, c) => v == null ? '—' : nf(v, c);
+      h += '<div class="rex-sub-per">No período ' + rexFmt(REX.de) + ' a ' + rexFmt(REX.ate) + '</div>'
+        + (LP.length
+          ? '<table class="rex-tbl rex-tbl-per"><tr><th>Ativo</th><th>Falhas</th><th>MTBF (h)</th><th>MTTR (h)</th><th>Disp. inerente</th></tr>'
+            + LP.slice(0, 5).map(x => '<tr><td class="rex-esq">' + rexEsc(String(x.ativo).slice(0, 55)) + '</td><td>' + rexN(x.pn) + '</td>'
+              + '<td>' + nfp(x.pmtbf, 0) + '</td><td>' + nfp(x.pmttr, 2) + '</td>'
+              + '<td class="' + (x.pdisp != null && x.pdisp < 0.9 ? 'rex-red' : '') + '"><b>' + (x.pdisp == null ? '—' : nf(100 * x.pdisp, 1) + '%') + '</b></td></tr>').join('')
+            + (LP.length > 5 ? '<tr class="rex-resto"><td class="rex-esq">demais ativos com falha no período (' + (LP.length - 5) + ')</td><td>'
+              + rexN(LP.slice(5).reduce((s2, x) => s2 + x.pn, 0)) + '</td><td></td><td></td><td></td></tr>' : '')
+            + '</table>'
+          : '<p class="rex-nota">Nenhuma falha nesta usina dentro do período.</p>');
+    });
+    if (restoU.length)
+      h += '<div class="rex-nota">Demais usinas do recorte (falhas): '
+        + restoU.slice(0, 30).map(u => rexEsc(rexUsiCurta(u.usina)) + ' (' + u.n + ')').join(', ')
+        + (restoU.length > 30 ? '…' : '') + '.</div>';
+    h += '</section>';
+  }
+
+  // T4 — tarefas em aberto das usinas críticas (top 5 do ranking)
+  const criticas = M.rank.filter(x => x.abertas > 0).slice(0, 5);
+  if (criticas.length) {
+    h += '<section><h2>' + sec('Usinas críticas — o que está em aberto')
+      + ' <small>top 5 do ranking · até 8 tarefas por usina, da mais antiga para a mais nova</small></h2>';
+    criticas.forEach(x => {
+      h += '<div class="rex-h3">' + rexEsc(x.usina) + ' <em>· ' + rexN(x.abertas) + ' em aberto · mais antiga '
+        + (x.maisAntiga || 0) + ' d</em></div>'
+        + '<table class="rex-tbl"><tr><th>Tarefa</th><th>Tipo</th><th>Aberta há</th><th>OS</th></tr>'
+        + x.tarefas.slice(0, 8).map(t => '<tr><td class="rex-esq">'
+          + rexEsc(String(t.tarefa || '').replace(/^\[[^\]]*\]\s*-?\s*/, '').slice(0, 60)) + '</td>'
+          + '<td>' + rexEsc(t.tipo) + '</td><td>' + ((t.dias || 0) + ' d') + '</td><td>' + rexEsc(t.os) + '</td></tr>').join('')
+        + (x.abertas > 8 ? '<tr class="rex-resto"><td class="rex-esq" colspan="4">+' + (x.abertas - 8) + ' tarefas não listadas</td></tr>' : '')
+        + '</table>';
+    });
+    h += '</section>';
+  }
+
+  // INTERNO GRID: HH empregado por usina (05/10 — substituiu Grandes
+  // manutenções, Esforço e Ações). HH = tempo REAL de execução (campo hh) das
+  // tarefas FINALIZADAS no período; cronômetro esquecido aberto (>24 h numa
+  // tarefa) cai p/ a duração estimada, se ela for razoável, senão fica fora.
+  if (!modoCliente) {
+    const col = t => { const g = rexGrupoBd(t.tipo);
+      return g === 'Preventivas' ? 'prev' : (g === 'Corretiva' || g === 'Corretiva Emergencial') ? 'corr'
+           : (g === 'Religamento' || g === 'Remoto') ? 'relig' : g === 'Inspeção' ? 'insp' : 'out'; };
+    let corrigidas = 0, semHH = 0;
+    const hhDe = t => {
+      let v = +t.hh || 0;
+      if (v > 24) { corrigidas++; v = (+t.dur || 0) <= 24 ? (+t.dur || 0) : 0; }
+      if (!t.hh && t.hh !== 0) semHH++;
+      return v;
+    };
+    const U = new Map();
+    M.finalizadas.forEach(t => {
+      const u = U.get(t.usina) || { usina: t.usina, cluster: t.cluster, n: 0, tot: 0, prev: 0, corr: 0, relig: 0, insp: 0, out: 0 };
+      const v = hhDe(t); u.n++; u.tot += v; u[col(t)] += v; U.set(t.usina, u);
+    });
+    const L = Array.from(U.values()).sort((a, b) => b.tot - a.tot);
+    const T0 = L.reduce((s, u) => { ['n', 'tot', 'prev', 'corr', 'relig', 'insp', 'out'].forEach(k => s[k] += u[k]); return s; },
+      { n: 0, tot: 0, prev: 0, corr: 0, relig: 0, insp: 0, out: 0 });
+    const f = v => v ? (v >= 10 ? rexN(Math.round(v)) : v.toFixed(1).replace('.', ',')) : '<span class="rex-mut">—</span>';
+    const mx = Math.max(1, ...L.map(u => u.tot));
+    h += '<section><h2>' + sec('HH empregado por usina') + ' <small>' + f(T0.tot) + ' h em ' + rexN(T0.n)
+      + ' tarefas finalizadas no período · tempo real de execução</small></h2>'
+      + '<table class="rex-tbl rex-rank rex-fit rex-hh"><colgroup><col style="width:23%"><col style="width:12%"><col style="width:8%">'
+      + '<col style="width:13%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:8%"></colgroup>'
+      + '<tr><th>Cliente – Usina</th><th>Cluster</th><th>Tarefas</th><th>HH total</th>'
+      + '<th>Prev.</th><th>Corr.</th><th>Relig.</th><th>Insp.</th><th>Outros</th></tr>'
+      + L.map(u => '<tr><td class="rex-esq">' + rexEsc(String(u.usina || '').replace(/\s*-\s*[A-Z]{2}\s*$/, '')) + '</td>'
+        + '<td class="rex-esq">' + rexEsc(u.cluster || '—') + '</td><td>' + rexN(u.n) + '</td>'
+        + '<td class="rex-esq"><i class="rex-barra" style="width:' + Math.round(100 * u.tot / mx) + '%"></i><b>' + f(u.tot) + ' h</b></td>'
+        + '<td>' + f(u.prev) + '</td><td>' + f(u.corr) + '</td><td>' + f(u.relig) + '</td><td>' + f(u.insp) + '</td><td>' + f(u.out) + '</td></tr>').join('')
+      + '<tr class="rex-total"><td class="rex-esq"><b>TOTAL</b></td><td></td><td><b>' + rexN(T0.n) + '</b></td><td class="rex-esq"><b>' + f(T0.tot) + ' h</b></td>'
+      + '<td><b>' + f(T0.prev) + '</b></td><td><b>' + f(T0.corr) + '</b></td><td><b>' + f(T0.relig) + '</b></td><td><b>' + f(T0.insp) + '</b></td><td><b>' + f(T0.out) + '</b></td></tr>'
+      + '</table><div class="rex-nota">HH = tempo real de execução registrado no Fracttal (tarefas finalizadas no período) · '
+      + 'Corretiva inclui emergenciais; Religamento inclui remotos · '
+      + (corrigidas ? corrigidas + ' tarefa(s) com cronômetro acima de 24 h usaram a duração estimada · ' : '')
+      + (semHH ? semHH + ' tarefa(s) sem tempo registrado contam 0 h.' : '') + '</div></section>';
+  }
+
+  // ações — só na versão Cliente (no Interno Grid saiu em 05/10)
+  if (modoCliente) {
+    h += '<section class="rex-acoes"><h2>' + sec('Ações e compromissos') + '</h2>'
+      + '<div class="rex-acao-l">1. ____________________________________________ resp.: __________ até __/__</div>'
+      + '<div class="rex-acao-l">2. ____________________________________________ resp.: __________ até __/__</div>'
+      + '<div class="rex-acao-l">3. ____________________________________________ resp.: __________ até __/__</div></section>';
+  }
+
+  h += '<footer class="rex-pe">Fonte: CMMS Fracttal via gestao_pcm.json (dados de '
+    + rexEsc((GESTAO_DB && GESTAO_DB.geradoEm || '').slice(0, 16).replace('T', ' ')) + ')'
+    + (M.ger && !modoCliente ? ' + Gerencial (aba MPAS)' : '')
+    + ' · corretivas contadas por OS distinta · concluído = tarefa Finalizada (nunca o Status da OS) · '
+    + 'tarefas de OS já concluída não contam como abertas · Grid Co. — PCM</footer>'
+    + '</div>';
+
+  let v = document.getElementById('rex-view');
+  if (!v) { v = document.createElement('div'); v.id = 'rex-view'; document.body.appendChild(v); }
+  v.innerHTML = h;
+  document.body.classList.add('rex-on');
+  window.scrollTo(0, 0);
+}
+// ═════════ ABERTURA DA SEMANA (09/10) ═════════════════════════════════════════
+// Folha de 2 páginas A4 para abrir a semana com o time: mesma base do Interno
+// Grid, recortada na semana MAIS RECENTE do banco_dados (programador). Tudo
+// calculado dos dados — nenhum texto editorial escrito à mão.
+const REX_SW_LIM = 35;
+const rexUsiNome = u => { const s = String(u || ''); const c = s.split(' - ')[0];
+  return rexUsiCurta(s) + (c && c !== s ? ' (' + c + ')' : ''); };
+const rexLimpaTar = x => String(x || '').replace(/^(\s*\[[^\]]*\])+\s*[-–—]?\s*/, '').trim();
+const rexDiasCls = d => d > 60 ? 'red' : d > REX_SW_LIM ? 'amber' : '';
+// "MPA — Módulos, QGBT (+2)": texto curto gerado dos nomes das tarefas
+function rexSwItens(lista, max) {
+  const nomes = [...new Set(lista.map(t => rexLimpaTar(t.tarefa)).filter(Boolean))];
+  const m = nomes.map(n => /^(MP[MSAT])\s*[-–—]\s*(.+)$/.exec(n));
+  let pre = '', itens = nomes;
+  if (m.length && m.every(x => x && x[1] === m[0][1])) { pre = m[0][1] + ' — '; itens = m.map(x => x[2]); }
+  let txt = pre, n = 0;
+  for (const it of itens) { if ((txt + it).length > max && n) break; txt += (n ? ', ' : '') + it; n++; }
+  return txt + (itens.length > n ? ' (+' + (itens.length - n) + ')' : '');
+}
+function rexSwModelo(bd, Tall) {
+  const W = ((bd && bd.semanas) || []).filter(w => rexSemanaSeg(w.week))
+    .sort((a, b) => (a.week < b.week ? 1 : -1));
+  const w = W[0];
+  if (!w) return null;
+  const seg = rexSemanaSeg(w.week);
+  const sex = rexIso(new Date(new Date(seg + 'T12:00:00').getTime() + 4 * 86400000));
+  const num = +w.week.split('-W')[1];
+  // carimbo da planilha (UTC) → horário de Brasília (−3 h)
+  let fechado = null;
+  if (w.geradaEm && !isNaN(new Date(w.geradaEm))) {
+    const d = new Date(new Date(w.geradaEm).getTime() - 3 * 3600000);
+    const p = x => String(x).padStart(2, '0');
+    fechado = p(d.getUTCDate()) + '/' + p(d.getUTCMonth() + 1) + ' às ' + p(d.getUTCHours()) + 'h' + p(d.getUTCMinutes());
+  }
+  // responsável da OS (designado no Fracttal) vem da planilha; semanas mais novas prevalecem
+  const respOS = new Map();
+  W.slice().reverse().forEach(x => (x.rows || []).forEach(r => { if (r.resp_os) respOS.set(String(r.os_id), r.resp_os); }));
+  const rows = (w.rows || []).filter(rexEscopoFiltro);
+  const T = Tall.filter(rexEscopoFiltro);
+  const viva = T.filter(rexAbertaViva);
+
+  // por OS (só OS com tarefa aberta viva) — base das seções 3 e 4
+  const porOS = new Map();
+  T.forEach(t => {
+    const k = String(t.os);
+    const o = porOS.get(k) || { os: k, usina: t.usina, cliente: t.cliente, tot: 0, ab: [], dias: 0, etq: new Set(), obs: '', sup: '' };
+    o.tot++;
+    if (rexAbertaViva(t)) { o.ab.push(t); if ((t.dias || 0) >= o.dias) { o.dias = t.dias || 0; o.sup = t.responsavel || o.sup; } }
+    (t.etiquetas || []).forEach(e => o.etq.add(e));
+    if (!o.obs && t.obs) o.obs = t.obs;
+    porOS.set(k, o);
+  });
+  const OS = Array.from(porOS.values()).filter(o => o.ab.length);
+
+  // 1 · ranking por tarefas em aberto
+  const U = new Map();
+  viva.forEach(t => {
+    const x = U.get(t.usina) || { usina: t.usina, abertas: 0, corr: new Set(), velha: 0, tarefas: [] };
+    x.abertas++; if (rexCorretiva(t)) x.corr.add(String(t.os));
+    x.velha = Math.max(x.velha, t.dias || 0); x.tarefas.push(t); U.set(t.usina, x);
+  });
+  const rank = Array.from(U.values()).sort((a, b) => b.abertas - a.abertas || b.velha - a.velha);
+
+  // 3 · atrasadas > 35 d agrupadas por OS (dias = tarefa aberta mais antiga)
+  const atr = OS.filter(o => o.dias > REX_SW_LIM).sort((a, b) => b.dias - a.dias || a.os.localeCompare(b.os));
+  // 4 · religamentos (inclui remoto) com OS viva; os de OS concluída ficam só na nota
+  const relOS = OS.filter(o => o.ab.some(rexRelig)).map(o => {
+    const ab = o.ab.filter(rexRelig);
+    return { ...o, ab, dias: Math.max(0, ...ab.map(t => t.dias || 0)) };
+  }).sort((a, b) => b.dias - a.dias || a.os.localeCompare(b.os));
+  const relMortas = [...new Set(T.filter(t => rexRelig(t) && t.aberta && !rexAbertaViva(t)).map(t => String(t.os)))];
+  // 5 · MPA/MPS atrasadas, uma linha por usina
+  const mp = viva.filter(t => t.atrasado && /\bMP[AS]\b/.test(String(t.tarefa || '')));
+  const MU = new Map();
+  mp.forEach(t => {
+    const x = MU.get(t.usina) || { usina: t.usina, sig: new Set(), os: new Map(), n: 0, dias: 0, osVelha: '', sup: '' };
+    x.n++; x.sig.add(/\bMP[AS]\b/.exec(t.tarefa)[0]);
+    const k = String(t.os); x.os.set(k, Math.max(x.os.get(k) || 0, t.dias || 0));
+    if ((t.dias || 0) >= x.dias) { x.dias = t.dias || 0; x.osVelha = k; x.sup = t.responsavel || ''; }
+    MU.set(t.usina, x);
+  });
+  const mpU = Array.from(MU.values()).sort((a, b) => b.dias - a.dias || b.n - a.n);
+  const corrOS = new Set(viva.filter(rexCorretiva).map(t => String(t.os)));
+  // OS na programação desta semana (plano + encaixes), por número
+  const osSem = new Set((w.rows || []).map(r => String(r.os_id)));
+  return { w, seg, sex, num, fechado, respOS, rows, osSem, T, rank, atr, relOS, relMortas, mp, mpU, OS, corrOS,
+    nAtrTar: atr.reduce((s, o) => s + o.ab.filter(t => (t.dias || 0) > REX_SW_LIM).length, 0),
+    nMpOS: new Set(mp.map(t => String(t.os))).size,
+    nRelTar: relOS.reduce((s, o) => s + o.ab.length, 0) };
+}
+async function rexGerarSemana() {
+  const bd = await rexBdCarregar();
+  const Z = bd ? rexSwModelo(bd, gpScopedTarefas()) : null;
+  if (!Z) { alert('Não encontrei a programação semanal (banco_dados.json).'); return; }
+  // Top 10 rolagens: régua do Interno Grid (situação atual pelo Fracttal), só desta semana
+  REX.de = Z.seg; REX.ate = Z.sex;
+  const SEM = rexSemanas(bd).filter(s => s.week === Z.w.week);
+  const rol = SEM.length ? SEM[0].rolagens : [];
+  const escopo = [REX.cliente || 'Todos os clientes', REX.cluster,
+                  REX.usinas.length ? REX.usinas.length + ' usina(s)' : ''].filter(Boolean).join(' · ');
+  const MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const dd = iso => iso.slice(8, 10) + ' ' + MES[+iso.slice(5, 7) - 1];
+  const agora = new Date();
+  const foto = agora.toLocaleDateString('pt-BR').slice(0, 5) + ', ' + agora.toTimeString().slice(0, 5).replace(':', 'h');
+  const dtGestao = (GESTAO_DB && GESTAO_DB.geradoEm || '').slice(0, 16).replace('T', ' ');
+  const E = rexEsc, N = rexN;
+  const dcel = d => '<td class="n ' + rexDiasCls(d) + '">' + d + ' d</td>';
+  const card = (tag, h2, corpo, nota) => '<div class="rsw-card"><div class="rsw-tag">' + tag + '</div><h2>' + h2 + '</h2>'
+    + corpo + (nota ? '<div class="rsw-nota">' + nota + '</div>' : '') + '</div>';
+  const selo = os => Z.osSem.has(String(os)) ? ' <span class="rsw-selo">&#128197; S' + Z.num + '</span>' : '';
+  const kpi = (v, l, c) => '<div class="rsw-kpi"><div class="v ' + c + '">' + v + '</div><div class="l">' + l + '</div></div>';
+  const nRelOS = Z.relOS.length, relAcima = Z.relOS.filter(o => o.dias > REX_SW_LIM).length;
+  const nMpU = Z.mpU.length;
+
+  let h = '<div class="rex-bar"><button class="rex-btn-2" onclick="rexFechar()">&#8592; Voltar ao painel</button>'
+    + '<span>Abertura da Semana — A4 (páginas 1–2 + backlog por região)</span>'
+    + '<button class="rex-btn" onclick="window.print()">&#128424; Imprimir / PDF</button></div>'
+    + '<div class="rex-a4 rsw">';
+  // ── página 1 ──
+  h += '<div class="rsw-head"><div><div class="rsw-kicker">GRID CO. · OPERAÇÃO DE ATIVOS · PCM</div>'
+    + '<h1>Semana ' + Z.num + ': atenção, rolagens e atrasos</h1>'
+    + '<div class="rsw-sub">' + E(escopo) + ' · foto de ' + foto + '</div></div>'
+    + '<div class="rsw-chips"><span class="rsw-chip dark">Semana ' + Z.num + ' · ' + dd(Z.seg) + ' a ' + dd(Z.sex) + '</span>'
+    + (Z.fechado ? '<span class="rsw-chip line">Plano fechado em ' + Z.fechado + '</span>' : '')
+    + '<span class="rsw-chip soft">Emitido em ' + agora.toLocaleDateString('pt-BR') + '</span></div></div>'
+    + '<div class="rsw-kpis">'
+    + kpi(N(Z.rows.length), 'tarefas na programação da semana (plano + encaixes)', 'navy')
+    + kpi(N(Z.corrOS.size), 'corretivas abertas hoje, emergenciais incluídas', 'red')
+    + kpi(N(Z.nAtrTar), 'tarefas atrasadas há mais de ' + REX_SW_LIM + ' dias, em ' + N(Z.atr.length) + ' OS', 'red')
+    + kpi(N(Z.mp.length), 'tarefas de MPA/MPS atrasadas, em ' + N(nMpU) + ' usinas (' + N(Z.nMpOS) + ' OS)', Z.mp.length ? 'red' : 'green')
+    + kpi(N(Z.nRelTar), 'religamentos em aberto com OS viva (' + N(nRelOS) + ' OS)'
+      + (nRelOS ? (relAcima ? '; ' + relAcima + ' acima de ' + REX_SW_LIM + ' dias' : '; todos com menos de ' + REX_SW_LIM + ' dias') : ''),
+      relAcima ? 'red' : 'green')
+    + '</div>'
+    + '<div class="rsw-leg"><span class="rsw-selo">&#128197; S' + Z.num + '</span> = OS que está na programação desta semana; sem selo = backlog ainda sem data na semana.</div>';
+
+  const top = Z.rank.slice(0, 10), resto = Z.rank.slice(10);
+  const s1 = card('1 · USINAS QUE PEDEM ATENÇÃO', 'Ordenado por tarefas em aberto hoje',
+    '<table><tr><th>#</th><th>Usina</th><th class="n">Em aberto</th><th class="n">Corr.+Emerg.</th><th class="n">Mais antiga</th></tr>'
+    + top.map((x, i) => '<tr><td>' + (i + 1) + '</td><td class="navy">' + E(rexUsiNome(x.usina)) + '</td><td class="n">' + N(x.abertas)
+      + '</td><td class="n">' + (x.corr.size || '—') + '</td>' + dcel(x.velha) + '</tr>').join('') + '</table>',
+    'Corr.+Emerg. = OS corretivas abertas, emergenciais incluídas.'
+    + (resto.length ? ' As demais ' + resto.length + ' usinas somam ' + N(resto.reduce((s, x) => s + x.abertas, 0)) + ' tarefas em aberto.' : ''));
+  const nRolAb = rol.filter(x => !x.fin).length;
+  const s2 = card('2 · TOP 10 · TAREFAS QUE MAIS ROLARAM', 'Nº de semanas em que a OS entrou na programação',
+    rol.length ? '<table><tr><th>OS</th><th>Usina</th><th>Tarefa</th><th>Tipo</th><th class="n">Rolag.</th></tr>'
+      + rol.map(x => '<tr><td class="navy">' + E(x.os) + selo(x.os) + '</td><td>' + E(rexUsiCurta(x.usina)) + '</td><td>'
+        + E(rexLimpaTar(x.tarefa).slice(0, 48)) + (x.fin ? ' <span class="rsw-etq">FEITA</span>' : '') + '</td><td>' + E(x.tipo) + '</td>'
+        + '<td class="n ' + (x.vezes >= 10 ? 'red' : x.vezes >= 6 ? 'amber' : '') + '">' + x.vezes + '×</td></tr>').join('') + '</table>'
+      : '<p class="rsw-nota">Nenhuma OS com 2 ou mais rolagens nesta semana.</p>',
+    rol.length ? (nRolAb === rol.length ? 'As ' + rol.length + ' seguem em aberto.' : nRolAb + ' de ' + rol.length + ' seguem em aberto.')
+      + ' Rolagem = a OS voltou para a programação em outra semana sem ser concluída.' : '');
+  const atr8 = Z.atr.slice(0, 8);
+  const s3 = card('3 · ATRASADAS HÁ MAIS DE ' + REX_SW_LIM + ' DIAS · AGRUPADAS POR OS',
+    Z.atr.length ? 'As ' + atr8.length + ' OS mais antigas (de ' + Z.atr.length + ')' : 'Nenhuma OS acima de ' + REX_SW_LIM + ' dias',
+    atr8.length ? '<table><tr><th class="n">Dias</th><th>OS</th><th>Cliente · usina</th><th>Tarefa(s) em aberto</th><th class="n">Faltam</th><th>Observação da OS</th></tr>'
+      + atr8.map(o => '<tr>' + dcel(o.dias) + '<td class="navy">' + E(o.os) + selo(o.os) + '</td><td>' + E(o.cliente + ' · ' + rexUsiCurta(o.usina)) + '</td>'
+        + '<td>' + E(rexSwItens(o.ab, 70)) + [...o.etq].slice(0, 2).map(e => ' <span class="rsw-etq">' + E(String(e).toUpperCase()) + '</span>').join('') + '</td>'
+        + '<td class="n ' + (o.ab.length === o.tot ? 'red' : 'navy') + '">' + o.ab.length + '/' + o.tot + '</td>'
+        + '<td class="obs">' + (o.obs ? E(String(o.obs).slice(0, 115)) + (String(o.obs).length > 115 ? '…' : '') : 'Sem observação registrada na OS.') + '</td></tr>').join('') + '</table>' : '',
+    'Faltam = tarefas abertas ÷ total da OS. Carteira toda: ' + N(Z.nAtrTar) + ' tarefas em ' + N(Z.atr.length) + ' OS.');
+  const rel10 = Z.relOS.slice(0, 10);
+  const s4 = card('4 · RELIGAMENTOS EM ABERTO',
+    nRelOS ? (relAcima ? N(nRelOS) + ' OS vivas, ' + relAcima + ' acima de ' + REX_SW_LIM + ' dias' : 'Em dia: ' + N(nRelOS) + ' OS vivas, nenhuma acima de ' + REX_SW_LIM + ' dias')
+      : 'Nenhum religamento em aberto',
+    rel10.length ? '<table><tr><th class="n">Dias</th><th>OS</th><th>Usina</th><th>Tipo</th><th>Responsável</th><th>Supervisor</th></tr>'
+      + rel10.map(o => '<tr><td class="n ' + (o.dias > REX_SW_LIM ? 'red' : o.dias >= 20 ? 'amber' : '') + '">' + o.dias + ' d</td>'
+        + '<td class="navy">' + E(o.os) + selo(o.os) + '</td><td>' + E(rexUsiNome(o.usina)) + '</td><td>' + E(/remoto/i.test(o.ab[0].tipo) ? 'Relig. Remoto' : 'Religamento') + '</td>'
+        + '<td class="navy">' + E(Z.respOS.get(o.os) || '—') + '</td><td>' + E(o.sup || '—') + '</td></tr>').join('') + '</table>' : '',
+    'Considera só religamentos cuja OS segue viva' + (nRelOS > 10 ? ' (10 mais antigos de ' + nRelOS + ')' : '') + '.'
+    + (Z.relMortas.length ? ' ' + Z.relMortas.length + ' registro(s) têm a OS concluída com a tarefa aberta e são tratados como finalizados'
+      + ' (OS ' + Z.relMortas.slice(0, 15).join(', ') + (Z.relMortas.length > 15 ? '…' : '') + ').' : '')
+    + ' Responsável = designado da OS na programação; Supervisor = responsável da tarefa no Fracttal.');
+  h += '<div class="rsw-row">' + s1 + s2 + '</div>' + s3 + s4
+    + '<div class="rsw-foot"><span>Grid Co. · PCM · Semana ' + Z.num + ' · página 1</span><span>continua: MPAS atrasadas, usinas críticas, handovers e backlog atrasado por região</span></div>';
+
+  // ── página 2 ──
+  h += '<div class="rsw-p2"><div class="rsw-mini"><div><div class="rsw-kicker">GRID CO. · OPERAÇÃO DE ATIVOS · PCM · SEMANA ' + Z.num + ' · CONTINUAÇÃO</div>'
+    + '<div class="t">MPAS atrasadas, handovers em andamento e usinas críticas</div></div><div class="rsw-meta">Página 2 · foto de ' + foto + '</div></div>';
+  const mp12 = Z.mpU.slice(0, 12);
+  h += card('5 · MPAS ATRASADAS · UMA LINHA POR USINA',
+    nMpU ? 'Anuais e semestrais atrasadas: ' + mp12.length + ' usinas mais antigas (de ' + nMpU + ')' : 'Nenhuma MPA/MPS atrasada no recorte',
+    mp12.length ? '<table><tr><th>Usina</th><th>Tipo</th><th>OS</th><th class="n">Tarefas abertas</th><th class="n">Mais antiga</th><th>Responsável</th><th>Supervisor</th></tr>'
+      + mp12.map(x => '<tr><td class="navy">' + E(rexUsiNome(x.usina)) + '</td><td>' + [...x.sig].sort().join('/') + '</td>'
+        + '<td>' + Array.from(x.os.entries()).sort((a, b) => b[1] - a[1]).map(e => E(e[0]) + selo(e[0])).slice(0, 4).join(', ') + '</td>'
+        + '<td class="n">' + N(x.n) + '</td>' + dcel(x.dias)
+        + '<td class="navy">' + E(Z.respOS.get(x.osVelha) || '—') + '</td><td>' + E(x.sup || '—') + '</td></tr>').join('') + '</table>' : '',
+    'Carteira toda: ' + N(Z.mp.length) + ' tarefas de MPA/MPS atrasadas em ' + N(nMpU) + ' usinas (' + N(Z.nMpOS) + ' OS). '
+    + 'Idade = tarefa mais antiga da usina. Responsável = designado da OS mais antiga; Supervisor = responsável da tarefa no Fracttal.');
+  const crit = Z.rank.slice(0, 4);
+  h += card('6 · USINAS CRÍTICAS · O QUE ESTÁ EM ABERTO', 'Top ' + crit.length + ' do ranking, itens mais antigos',
+    '<div class="rsw-crit">' + crit.map(x => {
+      const g = new Map();
+      x.tarefas.forEach(t => { const k = String(t.os); const o = g.get(k) || { os: k, ts: [], dias: 0, tipo: t.tipo };
+        o.ts.push(t); o.dias = Math.max(o.dias, t.dias || 0); g.set(k, o); });
+      const L = Array.from(g.values()).sort((a, b) => b.dias - a.dias || b.ts.length - a.ts.length);
+      const nCorr = L.slice(4).filter(o => o.ts.some(rexCorretiva)).length;
+      return '<div class="rsw-ub"><div class="u">' + E(rexUsiNome(x.usina)) + ' · ' + N(x.abertas) + ' em aberto · <small>mais antiga ' + x.velha + ' d</small></div>'
+        + '<ul class="itens">' + L.slice(0, 4).map(o => '<li><b>OS ' + E(o.os) + '</b>' + selo(o.os) + ' · ' + E(o.tipo) + ' · ' + o.dias + ' d · '
+          + (o.ts.length > 1 ? o.ts.length + ' tarefas: ' : '') + E(rexSwItens(o.ts, 110)) + '</li>').join('')
+        + (L.length > 4 ? '<li class="mais">+ ' + (L.length - 4) + ' OS em aberto nesta usina' + (nCorr ? ' (' + nCorr + ' corretiva(s))' : '') + '</li>' : '')
+        + '</ul></div>';
+    }).join('') + '</div>');
+  // 7 · handovers em andamento: 1 linha por usina × OS (só OS vivas)
+  const HO = new Map();
+  Z.T.filter(t => rexAbertaViva(t) && rexGrupoBd(t.tipo) === 'Handover').forEach(t => {
+    const k = t.usina + '|' + t.os;
+    const o = HO.get(k) || { usina: t.usina, cliente: t.cliente, os: String(t.os), n: 0, atr: 0, dias: 0, sup: '' };
+    o.n++; if (t.atrasado) o.atr++;
+    if ((t.dias || 0) >= o.dias) { o.dias = t.dias || 0; o.sup = t.responsavel || o.sup; }
+    HO.set(k, o);
+  });
+  const hoL = Array.from(HO.values()).sort((a, b) => b.dias - a.dias || b.n - a.n);
+  if (hoL.length) {
+    const hoTar = hoL.reduce((s, o) => s + o.n, 0);
+    const hoU = new Set(hoL.map(o => o.usina)).size, hoOS = new Set(hoL.map(o => o.os)).size;
+    const hoCli = [...new Set(hoL.map(o => o.cliente))];
+    const maior = hoL.slice().sort((a, b) => b.n - a.n)[0];
+    h += card('7 · HANDOVERS EM ANDAMENTO',
+      'Entrada de usinas: ' + N(hoTar) + ' tarefas vivas em ' + hoU + ' usinas (' + hoOS + ' OS)' + (hoCli.length === 1 ? ', todas ' + E(hoCli[0]) : ''),
+      '<table><tr><th>Usina</th><th>OS</th><th class="n">Tarefas</th><th class="n">Atrasadas</th><th class="n">Mais antiga</th><th>Responsável</th><th>Supervisor</th></tr>'
+      + hoL.map(o => '<tr><td class="navy">' + E(rexUsiNome(o.usina)) + '</td><td class="navy">OS ' + E(o.os) + selo(o.os) + '</td><td class="n">' + N(o.n)
+        + '</td><td class="n">' + N(o.atr) + '</td>' + dcel(o.dias) + '<td class="navy">' + E(Z.respOS.get(o.os) || '—') + '</td><td>' + E(o.sup || '—') + '</td></tr>').join('')
+      + '</table>',
+      'Só OS vivas (handover de OS finalizada não conta). Maior pacote: ' + E(rexUsiNome(maior.usina)) + ' (' + maior.n + ' tarefas); mais antigo: '
+      + E(rexUsiNome(hoL[0].usina)) + ' (' + hoL[0].dias + ' d).');
+  }
+  h += '<div class="rsw-foot"><span>Grid Co. · PCM · Semana ' + Z.num + ' · página 2 · Fonte: Fracttal via gestao_pcm.json ('
+    + E(dtGestao) + ') + programação semanal (banco_dados.json)</span><span>tarefas de OS já concluída não contam como abertas · '
+    + 'cadastros de Teste ficam fora</span></div></div>';
+  // 8 · backlog atrasado por SUPERVISOR → região → cluster → usina (só OS vivas).
+  // Supervisor = responsavel da PRÓPRIA tarefa (Gestor de Contrato): a mesma
+  // usina pode aparecer sob dois supervisores. Dentro de cada supervisor, a usina
+  // com mais atrasadas puxa o cluster dela e depois a região (regra do one-page).
+  const cluNome = new Map();
+  Z.T.forEach(t => { const k = rexClu(t.cluster); if (!cluNome.has(k) && t.cluster) cluNome.set(k, String(t.cluster).trim()); });
+  const reg = c => (/^([A-Z]{2})\b/.exec(c) || [0, 'Outros'])[1];
+  const trunc = (s, n) => { s = String(s || '').trim(); if (s.length <= n) return s;
+    return s.slice(0, n).replace(/\s+\S*$/, '').replace(/[ ,;·-]+$/, '') + '…'; };
+  const semSup = s => !s || /^(tbd|-+|—|sem supervisor)$/i.test(s);
+  const SUP = new Map();
+  Z.T.filter(rexAbertaViva).forEach(t => {
+    const s = String(t.responsavel || '').trim().replace(/\s+/g, ' ');
+    const k = semSup(s) ? 'Sem supervisor' : s;
+    (SUP.get(k) || SUP.set(k, []).get(k)).push(t);
+  });
+  const blocoSup = tarefas => {
+    const US = new Map();
+    tarefas.forEach(t => {
+      const e = US.get(t.usina) || { usina: t.usina, n: 0, atr: 0, dias: 0, cluster: rexClu(t.cluster), oss: new Map() };
+      e.n++; e.dias = Math.max(e.dias, t.dias || 0);
+      if (t.atrasado) {
+        e.atr++;
+        const o = e.oss.get(String(t.os)) || { os: String(t.os), n: 0, dias: 0, tipo: '', tit: '' };
+        o.n++;
+        if ((t.dias || 0) >= o.dias) { o.dias = t.dias || 0; o.tipo = t.tipo || ''; o.tit = t.tarefa || ''; }
+        e.oss.set(o.os, o);
+      }
+      US.set(t.usina, e);
+    });
+    const emSem = e => Array.from(e.oss.keys()).filter(k => Z.osSem.has(k)).length;
+    const CLs = new Map();
+    US.forEach(e => { (CLs.get(e.cluster) || CLs.set(e.cluster, []).get(e.cluster)).push(e); });
+    const cst = c => { const us = CLs.get(c);
+      return { sem: us.reduce((s, e) => s + emSem(e), 0), atr: us.reduce((s, e) => s + e.atr, 0), n: us.reduce((s, e) => s + e.n, 0), dias: Math.max(0, ...us.map(e => e.dias)) }; };
+    const seq = [], feitas = new Set();
+    Array.from(US.values()).sort((a, b) => b.atr - a.atr || b.dias - a.dias || b.n - a.n).forEach(e => {
+      const r = reg(e.cluster);
+      if (feitas.has(r)) return;
+      feitas.add(r);
+      const resto = [...CLs.keys()].filter(c => reg(c) === r && c !== e.cluster)
+        .sort((a, b) => cst(b).atr - cst(a).atr || cst(b).dias - cst(a).dias);
+      seq.push([r, [e.cluster, ...resto]]);
+    });
+    let out = '', nReg = 0;
+    seq.forEach(([r, cls]) => {
+      const totR = cls.reduce((s, c) => s + cst(c).atr, 0);
+      if (!totR) return;
+      nReg++;
+      out += '<div class="rsw-reg">' + E(r) + ' · ' + N(totR) + ' tarefas atrasadas · ' + cls.filter(c => cst(c).atr).length + ' cluster(s)</div>';
+      cls.forEach(c => {
+        const s = cst(c);
+        if (!s.atr) return;
+        out += '<div class="rsw-cl"><div class="rsw-clh"><span>' + E(cluNome.get(c) || c) + '</span><span>' + N(s.atr) + ' atrasadas · ' + N(s.n)
+          + ' abertas · mais antiga ' + s.dias + 'd · ' + N(s.sem) + ' na S' + Z.num + '</span></div>';
+        CLs.get(c).filter(e => e.atr).sort((a, b) => b.atr - a.atr || b.dias - a.dias).forEach(e => {
+          const oss = Array.from(e.oss.values()).sort((a, b) => b.dias - a.dias);
+          out += '<div class="rsw-us"><span class="nm">' + E(rexUsiCurta(e.usina)) + ' <span class="cli">(' + E(String(e.usina).split(' - ')[0]) + ')</span></span>'
+            + '<span>' + N(e.atr) + ' atrasadas de ' + N(e.n) + ' abertas · mais antiga <b class="' + rexDiasCls(e.dias) + '">' + e.dias + 'd</b> · ' + N(emSem(e)) + ' na S' + Z.num + '</span></div>'
+            + '<table class="rsw-bk">' + oss.slice(0, 6).map(o => '<tr><td class="n ' + rexDiasCls(o.dias) + '">' + o.dias + 'd</td>'
+              + '<td class="osn">OS ' + E(o.os) + selo(o.os) + '</td><td class="tp">' + E(trunc(o.tipo, 20)) + '</td>'
+              + '<td>' + E(trunc(o.tit, 70)) + (o.n > 1 ? ' <span class="xmul">· ' + o.n + ' tarefas</span>' : '') + '</td>'
+              + '<td class="resp">' + E(trunc(Z.respOS.get(o.os) || '—', 22)) + '</td></tr>').join('')
+            + (oss.length > 6 ? '<tr><td></td><td colspan="4" class="mais">+ ' + (oss.length - 6) + ' OS atrasadas nesta usina</td></tr>' : '')
+            + '</table>';
+        });
+        out += '</div>';
+      });
+    });
+    const atr = Array.from(US.values()).reduce((s, e) => s + e.atr, 0);
+    const nUs = Array.from(US.values()).filter(e => e.atr).length;
+    const osT = Array.from(US.values()).reduce((s, e) => s + e.oss.size, 0);
+    const osS = Array.from(US.values()).reduce((s, e) => s + emSem(e), 0);
+    return { out, atr, nReg, nUs, osT, osS };
+  };
+  const sups = Array.from(SUP.entries()).map(([k, ts]) => ({ k, ...blocoSup(ts) })).filter(x => x.atr)
+    .sort((a, b) => (a.k === 'Sem supervisor') - (b.k === 'Sem supervisor') || b.atr - a.atr || a.k.localeCompare(b.k));
+  Z.supBacklog = sups.map(x => ({ sup: x.k, atr: x.atr, reg: x.nReg, us: x.nUs, osT: x.osT, osS: x.osS }));
+  const b8 = sups.map(x => '<div class="rsw-sup">' + E(x.k) + ' · ' + N(x.atr) + ' tarefas atrasadas · ' + x.nReg + ' região(ões) · '
+    + x.nUs + ' usina' + (x.nUs === 1 ? '' : 's') + ' · ' + N(x.osS) + ' na S' + Z.num + '</div>' + x.out).join('');
+  h += '<div class="rsw-p2"><div class="rsw-mini"><div><div class="rsw-kicker">GRID CO. · OPERAÇÃO DE ATIVOS · PCM · SEMANA ' + Z.num + ' · CONTINUAÇÃO</div>'
+    + '<div class="t">8 · Backlog atrasado por supervisor, região, cluster e usina</div></div><div class="rsw-meta">Só tarefas atrasadas, de OS vivas · supervisor = responsável da tarefa (Gestor de Contrato) · '
+    + 'dentro de cada supervisor, a usina mais pendente puxa o cluster e a região · OS com várias tarefas viram uma linha · última coluna: responsável da OS · foto de ' + foto + '</div></div>'
+    + (b8 || '<p class="rsw-nota">Nenhuma tarefa atrasada no recorte.</p>')
+    + '<div class="rsw-foot"><span>Grid Co. · PCM · Semana ' + Z.num + ' · Backlog atrasado por supervisor</span>'
+    + '<span>Fonte: Gestão PCM · tarefas de OS já finalizada não contam</span></div></div>';
+  h += '</div>';
+
+  let v = document.getElementById('rex-view');
+  if (!v) { v = document.createElement('div'); v.id = 'rex-view'; document.body.appendChild(v); }
+  v.innerHTML = h;
+  document.body.classList.add('rex-on');
+  window.scrollTo(0, 0);
+}
+function rexFechar() {
+  const v = document.getElementById('rex-view'); if (v) v.remove();
+  document.body.classList.remove('rex-on');
+}
+
+// ── botão na aba Gestão PCM (injeta ao lado do "Limpar") ────────────────────
+function rexBotao() {
+  if (document.getElementById('rex-abrir')) return;
+  const ref = document.querySelector('#s-gestaopcm .gp-clear, .gp-clear');
+  if (!ref) return;
+  const b = document.createElement('button');
+  b.id = 'rex-abrir'; b.className = 'rex-btn'; b.type = 'button';
+  b.innerHTML = '&#128196; Relatório executivo';
+  b.onclick = rexAbrirModal;
+  ref.parentNode.insertBefore(b, ref.nextSibling);
+}
+if (typeof renderGestao === 'function') {
+  const _renderGestaoOrigRex = renderGestao;
+  renderGestao = function () {
+    _renderGestaoOrigRex.apply(this, arguments);
+    try { rexBotao(); } catch (e) { console.warn('relatorio_exec:', e); }
+  };
+}

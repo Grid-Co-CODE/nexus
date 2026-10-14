@@ -4,7 +4,8 @@ Levi, 14/10/2026, com o print da tela Relatórios do painel do PCM (pcm.gridco.c
 relatórios para a plataforma, com as mesmas métricas e parâmetros e estilos. Comece a desenvolver para o Nexus".
 Os quatro: **Relatório diário de manutenção**, **Recuperação da tarde**, **Fechamento da semana** e **Alerta da
 programação**. No mesmo pedido vieram os três tipos do "Relatório executivo" da aba Gestão PCM do painel (Interno Grid,
-Cliente, Abertura da Semana): ainda não vieram (são outro código, só em JavaScript, `js/relatorio_exec.js` do PCM).
+Cliente, Abertura da Semana): são outro código, só em JavaScript (`js/relatorio_exec.js` do PCM), e vieram como cópia
+numa moldura em `nexus/pcm/relatorio_exec` (tela `pcm-executivo`, ver o CLAUDE.md de lá).
 
 ## De onde vem cada coisa
 

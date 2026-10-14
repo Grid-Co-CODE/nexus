@@ -58,7 +58,7 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # máquina; as fontes trocam o endereço padrão (repositório do PCM) da Gerencial, da Confiabilidade, do BD de
              # Operações e dos feriados
              "NEXUS_PCM_RELATORIOS_AUTO", "NEXUS_PCM_GERENCIAL_FONTE", "NEXUS_PCM_ENGENHARIA_FONTE",
-             "NEXUS_PCM_OPERACOES_FONTE", "NEXUS_PCM_FERIADOS_FONTE",
+             "NEXUS_PCM_OPERACOES_FONTE", "NEXUS_PCM_FERIADOS_FONTE", "NEXUS_PCM_CONFIABILIDADE_FONTE",
              # o caminho em que o Nexus é servido (09/10/2026, "a partir de segunda quero o Nexus como link principal"):
              # /nexus no servidor (app.gridco.com.br/nexus); vazio = a raiz, o PC e a fase 4. Ver nexus/prefixo.py
              "NEXUS_PREFIXO",

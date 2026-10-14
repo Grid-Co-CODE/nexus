@@ -1,0 +1,7 @@
+/* célula colorida — a cor sempre segue o percentual */
+.gpv-cel { display: block; margin: 0 -9px; padding: 0 9px; height: 100%;
+  line-height: 29px; cursor: help; font-weight: 700; font-size: 12px }
+.gpv-cel.crit { background: #fbe0e0; color: #8f2323 }
+.gpv-cel.and  { background: #fdf0d4; color: #7d5106 }
+.gpv-cel.ok   { background: #dcf2de; color: #166030 }
+.gpv-cel.nulo { color: #b0aebe; font-weight: 500 }

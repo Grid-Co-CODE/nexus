@@ -13,6 +13,8 @@ escolhe que tipo de relatório ela quer! Sai da parte de Performance!"
   todos. Quem tem um relatório vê a Central (a tela de fora) sem marcá-la. As marcas de antes, quando os relatórios eram
   da Performance (`performance/relatorio`...), valem para os daqui (`setor_telas.RENOMEADAS`).
 - Relatório novo: uma `Tela(..., dentro_de="central", do_setor="<setor dono>")` aqui e o ícone em RELATORIOS.
+- O Relatório executivo do PCM (14/10/2026: Interno Grid, Cliente, Abertura da Semana) é a CÓPIA do JavaScript do painel
+  do PCM numa moldura (`nexus/pcm/relatorio_exec`), também do setor PCM.
 - O setor dono escolhido na tela (14/10/2026, Levi: "adicione a opção de eu escolher de qual setor é o relatório! Apenas
   administradores podem editar!"): a seção "Setor de cada relatório", embaixo dos cartões, só para administrador. A
   escolha vale por cima do `do_setor` do código (`auth/dono_relatorio.py`, `setor_telas.das_do_setor`).
@@ -28,6 +30,7 @@ from flask import current_app, redirect, render_template, request, session, url_
 from ...auth import dono_relatorio as DR
 from ...auth import setor_telas
 from ...cadastro import setores as S
+from ...pcm import relatorio_exec
 from ...pcm.relatorios import TIPOS as TIPOS_PCM
 from ...pcm.relatorios import telas as telas_pcm
 from ...performance import porta
@@ -57,6 +60,9 @@ TORRE = Torre(
         *[Tela(t.tela_id, t.nome, t.pergunta,
                "o robô do PCM: Programação Semanal, Gestão PCM, Gerencial e Confiabilidade", dentro_de="central",
                do_setor="PCM") for t in TIPOS_PCM.values()],
+        Tela(relatorio_exec.TELA_ID, "Relatório executivo do PCM",
+             "O que rodou, o que travou e onde agir: Interno Grid, Cliente ou Abertura da Semana?",
+             "o painel do PCM: Gestão PCM, programação semanal e Confiabilidade", dentro_de="central", do_setor="PCM"),
     ],
 )
 
@@ -69,6 +75,7 @@ RELATORIOS = {
     "pcm-tarde": "clock-afternoon",
     "pcm-semanal": "calendar-check",
     "pcm-alerta": "warning",
+    "pcm-executivo": "presentation-chart",
 }
 
 bp = TORRE.criar_blueprint(__name__)
@@ -182,3 +189,5 @@ def _gravar_donos():
 registrar_molduras(bp, TORRE)
 # Os quatro do PCM, nativos (nexus/pcm/relatorios)
 telas_pcm.registrar(bp, TORRE)
+# O Relatório executivo do PCM, a cópia do painel numa moldura (nexus/pcm/relatorio_exec)
+relatorio_exec.registrar(bp, TORRE)

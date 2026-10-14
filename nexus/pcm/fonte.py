@@ -119,6 +119,8 @@ URL_GERENCIAL = URL_PADRAO.rsplit("/", 1)[0] + "/gerencial.json"
 URL_ENGENHARIA = URL_PADRAO.rsplit("/", 1)[0] + "/engenharia.json"
 URL_OPERACOES = URL_PADRAO.rsplit("/", 1)[0] + "/operacoes.json"
 URL_FERIADOS = URL_PADRAO.rsplit("/", 1)[0] + "/relatorios/feriados.json"
+# o Relatório executivo (nexus/pcm/relatorio_exec): a Confiabilidade por usina e ativo, a mesma do painel
+URL_CONFIABILIDADE = URL_PADRAO.rsplit("/", 1)[0] + "/confiabilidade.json"
 
 
 def _validar_dict(d) -> dict:
@@ -147,6 +149,10 @@ def ler_operacoes(config) -> Leitura:
 
 def ler_feriados(config) -> Leitura:
     return _ler(config, "NEXUS_PCM_FERIADOS_FONTE", URL_FERIADOS, _validar_lista)
+
+
+def ler_confiabilidade(config) -> Leitura:
+    return _ler(config, "NEXUS_PCM_CONFIABILIDADE_FONTE", URL_CONFIABILIDADE, _validar_dict)
 
 
 def _ler(config, chave: str, padrao: str, validar) -> Leitura:

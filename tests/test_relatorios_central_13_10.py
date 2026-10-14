@@ -91,7 +91,7 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     with app.app_context():
         assert ST.das_do_setor("performance") == ST.das_do_setor("Performance") == {f"relatorios/{t}" for t in RELATORIOS}
         # os quatro do PCM (14/10/2026) são do setor PCM: nexus/pcm/relatorios, tests/test_relatorios_pcm.py
-        assert ST.das_do_setor("PCM") == {f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta")}
+        assert ST.das_do_setor("PCM") == {f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
         assert ST.das_do_setor("") == set()
 
 

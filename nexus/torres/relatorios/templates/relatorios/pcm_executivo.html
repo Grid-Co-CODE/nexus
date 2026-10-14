@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{# O Relatório executivo do PCM (14/10/2026, Levi: "Quero trazer esses três relatórios para a plataforma, com as mesmas
+   métricas e parâmetros e estilos"): a cópia do js/relatorio_exec.js do painel, numa moldura (nexus/pcm/relatorio_exec).
+   O modal, os tipos (Interno Grid, Cliente, Abertura da Semana), o período, o escopo e a folha são os do PCM. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='relatorios-pcm.css') }}">
+<p class="gc-eyebrow">{{ torre.nome }} · PCM</p>
+<h1 class="titulo-pagina">{{ tela.nome }}</h1>
+<p class="lead">O relatório executivo da aba Gestão PCM do painel do PCM: Interno Grid, Cliente ou Abertura da Semana, com
+  o período e o escopo de lá. Gerado com o dado de agora da Gestão PCM, da programação semanal e da Confiabilidade; "Imprimir
+  / PDF" imprime só a folha.</p>
+<iframe class="rp-moldura" title="{{ tela.nome }}" src="{{ painel|na_raiz }}"></iframe>
+{% endblock %}

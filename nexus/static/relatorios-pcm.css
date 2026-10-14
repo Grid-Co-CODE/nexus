@@ -40,3 +40,6 @@
 .rp-nota{margin-top:12px;background:var(--verde-a16);border-left:3px solid var(--verde);padding:8px 11px;font-size:12.5px;
   color:var(--tinta-2);border-radius:0 var(--raio-controle) var(--raio-controle) 0}
 @media (max-width:640px){.rp-linha{grid-template-columns:1fr}.rp-papel{padding:10px}}
+/* o Relatório executivo (14/10/2026): o do PCM, inteiro numa moldura (a tela de partida, o modal e a folha) */
+.rp-moldura{display:block;width:100%;height:calc(100vh - 210px);min-height:560px;margin-top:14px;border:1px solid var(--linha);
+  border-radius:var(--raio-md);background:var(--fundo)}
