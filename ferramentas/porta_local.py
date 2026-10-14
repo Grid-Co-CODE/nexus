@@ -10,7 +10,7 @@ Modos (`--modo`):
   prefixo (o padrão, o servidor de hoje): `/nexus` → 308 para `/nexus/`; `/nexus/*` → Nexus SEM o `/nexus` no caminho
       (medido de fora em 09/10/2026: o Nexus do servidor recebe `/entrar`, não `/nexus/entrar`); o resto → plataforma.
   raiz (a fase 4 do spec 2026-10-09-performance-no-nexus-design.md): `/` exato, `/t/*`, `/entrar`, `/sair`, `/saude`,
-      `/tema`, `/cadeira`, `/os/*` e `/static/*` → Nexus, menos `/static/fonts/*`, `/static/logos/*` e
+      `/tema`, `/os/*` e `/static/*` → Nexus, menos `/static/fonts/*`, `/static/logos/*` e
       `/static/notif.js`, que são da plataforma; o resto → plataforma.
 
 `--reescrita-do-servidor` (só no modo prefixo): imita a camada que o servidor tem HOJE fora do repositório, medida de
@@ -33,8 +33,11 @@ import re
 import requests
 
 PREFIXO = "/nexus"
-# Primeiro segmento de cada caminho do Nexus (spec, seção 2). "/" exato também é dele no modo raiz.
-SEGMENTOS_NEXUS = ("t", "entrar", "sair", "saude", "tema", "cadeira", "os", "static")
+# Primeiro segmento de cada caminho do Nexus (spec, seção 2). "/" exato também é dele no modo raiz. É a cópia do
+# `@nexus` do Caddy (DEPLOY.md, 5b), e o tests/test_rotas_no_caminho_do_nexus.py prova cada rota do Nexus por ela:
+# segmento a mais aqui deixa passar rota que, no servidor, cai na plataforma. A `/cadeira` saiu em 13/10/2026 (a
+# cadeira saiu do Nexus em 12/10 e o Caddy não a manda ao Nexus: no servidor, `/cadeira` vai ao `/login` da plataforma).
+SEGMENTOS_NEXUS = ("t", "entrar", "sair", "saude", "tema", "os", "static")
 ESTATICOS_DA_PLATAFORMA = ("/static/fonts/", "/static/logos/", "/static/notif.js")
 SALTO_A_SALTO = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "trailers",
                  "transfer-encoding", "upgrade"}
