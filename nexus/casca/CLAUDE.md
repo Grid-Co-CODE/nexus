@@ -278,7 +278,7 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   é a hora em que a versão entrou). O cartão inteiro é o link para as Atualizações. Saíram o semáforo com o GitHub (e a
   conferência por trás dele: API do GitHub e `git ls-remote`), o assunto do commit e os pedidos presos.
 - **As abas do Início** (`gc-subabas`, em `inicio.html` e `atualizacoes.html`): Visão geral | Atualizações.
-- **A aba Atualizações** (`/atualizacoes`, exige login como o Início): os últimos 60 commits desta pasta (`git log`, lido
+- **A aba Atualizações** (`/?aba=atualizacoes`, exige login como o Início; era `/atualizacoes`, que no servidor ia à plataforma, ver "Regras que já custaram caro"): os últimos 60 commits desta pasta (`git log`, lido
   uma vez por processo: o deploy reinicia e a lista nova vem junto), por dia ("Hoje", "Ontem", dd/mm/aaaa), do mais novo.
   Cada um: a hora, o tipo traduzido do prefixo (feat = Novidade, fix = Correção, perf = Desempenho, docs = Documentação,
   chore = Manutenção...), a área (o que vem entre parênteses), o commit, a manchete (o texto antes do " - ") e o resto, e
@@ -356,6 +356,13 @@ fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
 
 ## Regras que já custaram caro
 
+- **Rota nova só nos caminhos que o Caddy manda ao Nexus** (13/10/2026, "Atualizações não carrega"): no servidor o
+  Caddy divide por caminho (DEPLOY.md, 5b) e só a raiz exata, `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/os/*` e
+  `/static/*` (menos os três da plataforma) chegam ao Nexus. A aba Atualizações nasceu em `/atualizacoes`: abria nos testes
+  e na 5070 direta, e no servidor caía na plataforma ("Not Found"). Virou `/?aba=atualizacoes`. A aba do Início é
+  `/?aba=...`; tela de torre é `/t/<torre>/<tela>`; segmento novo na raiz pede a linha do Caddy com a T.I. e o
+  `SEGMENTOS_NEXUS` da `ferramentas/porta_local.py` no mesmo trabalho. `tests/test_rotas_no_caminho_do_nexus.py` passa
+  cada rota pela `porta_local.destino` (a mesma divisão) e pega a rota que o servidor não entregaria.
 - **Endereço do Nexus nunca a partir da raiz** (09/10/2026): `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")`
   crus caem na plataforma debaixo do `/nexus`. Use `{{ raiz }}`, `url_for`, `|na_raiz`, `na_raiz()` e `nexusRota()` (seção
   do prefixo); `tests/test_prefixo.py` pega o esquecimento.

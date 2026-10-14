@@ -9,7 +9,7 @@
 {# as abas do Início (13/10/2026): a visão geral e as Atualizações (os últimos commits e o que mudou) #}
 <nav class="gc-subabas" aria-label="Início">
   <a href="{{ url_for('casca.inicio') }}"{% if aba == 'inicio' %} aria-current="page"{% endif %}>Visão geral</a>
-  <a href="{{ url_for('casca.atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
+  <a href="{{ url_for('casca.inicio', aba='atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
 </nav>
 
 <p class="lead">O que mudou no Nexus, do mais novo para o mais antigo. A versão no ar é a de cima: commit

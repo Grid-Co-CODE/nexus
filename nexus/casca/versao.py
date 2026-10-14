@@ -7,7 +7,7 @@ observações abaixo do commit") e ganhou a aba de baixo ("Inclua no início uma
 
 - o cartão "Versão no ar": a hora do commit em execução, o commit curto (o mesmo do /saude) e desde quando ESTE processo
   está no ar (o deploy reinicia o Nexus: é a hora em que a versão entrou). Clicar leva às Atualizações;
-- a aba **Atualizações** (`/atualizacoes`): os últimos commits desta pasta, do mais novo, por dia, com o tipo (novidade,
+- a aba **Atualizações** (`/?aba=atualizacoes`): os últimos commits desta pasta, do mais novo, por dia, com o tipo (novidade,
   correção...), a área e o que mudou (o título e, aberto, o resto da mensagem sem as linhas de coautoria).
 
 Tudo sai do git da própria pasta (no servidor, a /opt/nexus, do usuário do serviço), lido uma vez por processo: cada

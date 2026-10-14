@@ -52,7 +52,13 @@ def inicio():
     """O Início, a primeira página de todos. Honesto (auditoria A3 da porta única, 10/10/2026): até então dizia "fase 0"
     e "Com dado real: 0" com 40 telas prontas no ar, e cada cartão abria a 1ª tela da torre, que em Comando, COS,
     Contratos e Relatórios é "Em construção". O número agora é o das telas prontas, pela mesma conta do verde do menu
-    (`telas_com_conteudo`); o cartão leva à 1ª tela PRONTA da torre, e a torre sem nenhuma não vira link."""
+    (`telas_com_conteudo`); o cartão leva à 1ª tela PRONTA da torre, e a torre sem nenhuma não vira link.
+
+    A aba Atualizações é `/?aba=atualizacoes` (13/10/2026): nasceu em /atualizacoes, e no servidor o Caddy só manda ao
+    Nexus a raiz exata e os caminhos do Nexus (DEPLOY.md, 5b): /atualizacoes ia à plataforma, que respondia "Not Found"
+    (tests/test_rotas_no_caminho_do_nexus.py)."""
+    if request.args.get("aba") == "atualizacoes":
+        return _atualizacoes()
     app = current_app._get_current_object()
     liberadas = setor_telas.liberadas_do_menu()
     # só as torres e as telas que o setor da pessoa vê (o administrador vê tudo)
@@ -76,8 +82,7 @@ def inicio():
                            versao=versao.cartao(app), aba="inicio")
 
 
-@bp.route("/atualizacoes")
-def atualizacoes():
+def _atualizacoes():
     """A aba Atualizações do Início (13/10/2026, Levi: "Inclua no início uma sub aba de atualizações mostrando as últimas
     atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva para lá!"): os últimos commits desta pasta,
     por dia, com o que mudou."""

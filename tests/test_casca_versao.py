@@ -36,7 +36,7 @@ def test_o_cartao_so_tem_a_hora_o_commit_e_o_no_ar_desde_e_leva_as_atualizacoes(
     cartao = html.split('class="versao-no-ar"', 1)[1].split("</a>", 1)[0]
     assert "Versão no ar" in cartao and "13/10 14:45" in cartao and "<code>648c100</code>" in cartao
     assert "no ar desde" in cartao
-    assert '<a class="versao-no-ar" href="/atualizacoes"' in html
+    assert '<a class="versao-no-ar" href="/?aba=atualizacoes"' in html
     # nem GitHub, nem pedidos presos, nem o assunto do commit embaixo
     for fora in ("GitHub", "preso", "Equipamentos das usinas liga pela aba", "gc-status"):
         assert fora not in cartao
@@ -49,7 +49,7 @@ def test_a_aba_atualizacoes_lista_os_commits_por_dia_com_o_que_mudou(app, logado
         def now(cls, tz=None):
             return datetime(2026, 10, 13, 20, 0, tzinfo=tz)
     monkeypatch.setattr(versao, "datetime", Hoje)
-    html = logado.get("/atualizacoes").get_data(as_text=True)
+    html = logado.get("/?aba=atualizacoes").get_data(as_text=True)
     assert 'aria-current="page">Atualizações</a>' in html
     assert ">Hoje</h2>" in html and ">Ontem</h2>" in html
     assert "Novidade" in html and "Correção" in html and ">base<" in html
@@ -67,11 +67,11 @@ def test_sem_git_o_cartao_diz_traco_e_a_aba_diz_por_que(app, logado, monkeypatch
     versao.historico.cache_clear()
     try:
         assert "—" in logado.get("/").get_data(as_text=True).split('class="versao-no-ar"', 1)[1][:300]
-        assert "Sem o histórico de atualizações" in logado.get("/atualizacoes").get_data(as_text=True)
+        assert "Sem o histórico de atualizações" in logado.get("/?aba=atualizacoes").get_data(as_text=True)
     finally:
         versao.local.cache_clear()
         versao.historico.cache_clear()
 
 
 def test_a_aba_exige_login(cliente):
-    assert cliente.get("/atualizacoes").status_code in (302, 401)
+    assert cliente.get("/?aba=atualizacoes").status_code in (302, 401)
