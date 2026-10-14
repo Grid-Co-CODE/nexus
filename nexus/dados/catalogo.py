@@ -233,9 +233,9 @@ FATOS = (
     # fatos, e um livro para cada um: o App sobe uma aba por livro (sync-xlsx com replace troca o livro inteiro)
     Fato("extintor", "Extintor (situação)", "hseq", "extintores_app_campo · Extintores",
          "1 linha = 1 extintor do cadastro, com a última conferência e as duas validades",
-         _d(data=("cod", "Última conferência (dia de Brasília)"),
+         _d(data=("cod", "Última conferência (dia de Brasília); papel 2: Não reconhecido em"),
             usina=("nome", "Usina (nome do Fracttal; de reserva, o código do Ativo e o Código da usina)"),
-            pessoa=("hmac", "Conferido por"),
+            pessoa=("hmac", "Conferido por; papel 2: Não reconhecido por"),
             equipamento=("cod", "Ativo: o código do Fracttal de onde o extintor fica (ele mesmo é cadastro próprio)")),
          tipo="snapshot_acumulado", chave=("Código",),
          medidas=_m((("itens_nao_qtd", "qtd", "aditiva"), ("fotos_qtd", "qtd", "aditiva"))),
@@ -244,7 +244,10 @@ FATOS = (
                     "conta do Nexus no dia (nexus/hseq/extintores.py, a mesma regra da TST que o App usa); o Status do "
                     "livro é o do App na hora da publicação. A observação do técnico não vai (só 'Tem informação "
                     "adicional', sim/não). Carga única em 09/10/2026 pelo Nexus, do cadastro do App (773, "
-                    "ferramentas/carregar_extintores_cadastro.py), até o App publicar (v257, que a substitui)"),
+                    "ferramentas/carregar_extintores_cadastro.py), até o App publicar (v257, que a substitui). Não "
+                    "reconhecido em/por (14/10/2026, duas colunas no fim): a equipe não achou o extintor na usina; "
+                    "conferência depois da marca a desfaz, e o Nexus o tira de todas as contas e o lista à parte para "
+                    "a TST conferir o cadastro"),
     Fato("conferencia_extintor", "Conferência de extintor", "hseq", "extintores_conferencias_app_campo · Conferências",
          "1 linha = 1 extintor conferido num mês (reenviar no mesmo mês regrava a linha)",
          _d(data=("cod", "Dia (de Brasília)"), usina=("nome", "Usina (nome do Fracttal; Código da usina)"),

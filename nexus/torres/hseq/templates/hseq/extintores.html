@@ -93,7 +93,29 @@
     <a href="{{ url(f='perto', modo='tabela') }}"{% if f == 'perto' %} aria-current="page"{% endif %}><span class="gc-rotulo">Perto de vencer</span><span class="v{% if contagem.perto %} cn-t-alerta{% endif %}">{{ contagem.perto }}</span><span class="d">vencem em até {{ alerta_dias }} dias</span></a>
     <a href="{{ url(f='sem_atualizacao', modo='tabela') }}"{% if f == 'sem_atualizacao' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem atualização</span><span class="v{% if contagem.sem_atualizacao %} cn-t-info{% endif %}">{{ contagem.sem_atualizacao }}</span><span class="d">conferido há mais de {{ sem_atualizacao_dias }} dias, ou nunca</span></a>
     <a href="{{ url(f='sem_validade', modo='tabela') }}"{% if f == 'sem_validade' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem validade</span><span class="v">{{ contagem.sem_validade }}</span><span class="d">recarga sem data na etiqueta</span></a>
+    {% if nao_rec %}<a href="#nao-reconhecidos"><span class="gc-rotulo">Não reconhecidos</span><span class="v cn-t-alerta">{{ nao_rec|length }}</span><span class="d">a equipe não achou na usina</span></a>{% endif %}
   </div>
+
+  {% if nao_rec %}
+  {# Não reconhecidos em campo (Levi, 14/10/2026, na Axis Linhares 1: a equipe só achou 4 dos 17 extintores do
+     cadastro, "e aí apareceria para a pessoa da Segurança"): o "Não reconhecido" da ronda de extintores do App. Ficam
+     fora de todas as contas da tela; a TST confere o cadastro. A marca mais nova primeiro #}
+  <section class="ext-naorec" id="nao-reconhecidos" aria-labelledby="ext-naorec-t">
+    <p class="ext-naorec-t" id="ext-naorec-t"><b>{{ plural(nao_rec|length, 'extintor não reconhecido', 'extintores não reconhecidos') }} em campo</b></p>
+    <p class="ext-naorec-d">A equipe não achou estes extintores na usina (o "Não reconhecido" da ronda de extintores do App). Eles ficam fora das contas desta tela até a TST conferir o cadastro: dar baixa, mudar de usina ou corrigir o código.</p>
+    <div class="cn-tab cn-tab--compacta ext-tab"><table class="ext-naorec-tab">
+      <thead><tr><th>Não reconhecido em</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Conferência antes</th></tr></thead>
+      <tbody>{% for x in nao_rec[:limite] %}
+        <tr><td><span class="ext-par"><span class="m">{{ x.nao_reconhecido.strftime('%d/%m/%Y') }}</span><span class="det">há {{ tempo(x.dias_nao_reconhecido) }}</span>{% if x.nao_reconhecido_por %}<span class="det">{{ x.nao_reconhecido_por }}</span>{% endif %}</span></td>
+          <td class="ext-usina">{{ x.usina }}</td>
+          <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
+          <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
+          <td>{{ conferencia(x) }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% if nao_rec|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ nao_rec|length }}: use a região de campo, o gestor ou a busca para afunilar.</p>{% endif %}
+  </section>
+  {% endif %}
 
   {# o relatório em PDF (Levi, 09/10, com as observações da TST): agrupado por usina e dia, com os filtros da tela; o
      status da TST escolhe quais entram e as fotos vão ao lado de cada extintor (o padrão). Abre noutra aba #}
@@ -202,7 +224,8 @@
     vencer</b>: uma das duas vence nos próximos {{ alerta_dias }} dias. <b>Sem validade</b>: a etiqueta da recarga está sem
     data e nada venceu: não dá para dizer se está em dia. <b>Sem atualização</b>: a última conferência (no App ou, antes
     dele, no Forms da TST) foi há mais de {{ sem_atualizacao_dias }} dias, ou nunca houve; ela se soma às outras, por isso
-    os números da faixa não fecham o total. O <b>status da TST</b> é a regra da planilha de controle da TST, a mesma do App:
+    os números da faixa não fecham o total. <b>Não reconhecido</b>: a equipe marcou na ronda do App que não achou o
+    extintor na usina; ele sai de todas as contas e fica na caixa própria até a TST conferir o cadastro. O <b>status da TST</b> é a regra da planilha de controle da TST, a mesma do App:
     olha também a carga e os 9 itens do checklist. A região de campo é a da equipe da usina (o Supervisor de Campo lidera a
     região); o gestor de contrato (Supervisor PM) é o da usina.
   </div>

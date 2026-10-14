@@ -118,8 +118,26 @@ Nexus de produção: 90 extintores com miniatura, em 16 usinas, e o PDF da Aquir
 com a foto ao lado. Prova de uma foto: `GET /t/hseq/extintores/foto/<código>.jpg` (com login) e a miniatura na Tabela
 (a visão Por supervisor não tem foto).
 
+**Não reconhecido em campo** (Levi, 14/10/2026). Na Axis Linhares 1 - ES a equipe fez a ronda e só achou 4 dos 17
+extintores do cadastro, e o App não tinha como dizer isso ("pode ter um botão no app de campo de 'Não reconhecido' para
+o extintor e aí apareceria para a pessoa da Segurança"). O contrato com o App, duas colunas no FIM do livro
+`Extintores`: `Não reconhecido em` (AAAA-MM-DD de Brasília, a marca que vale) e `Não reconhecido por (HMAC)` (a pessoa,
+como o `Conferido por`); vazias quando não há marca ou quando uma conferência depois dela a desfez (o App limpa;
+`extintores.nao_reconhecido` é a defesa: conferência depois da marca ganha, no mesmo dia vale a marca). O que o Nexus
+faz:
+- o não reconhecido sai de TODAS as contas: situações, sem atualização, cartões, Visão do responsável e o PDF por
+  status (pode não existir);
+- a tela o lista numa caixa âmbar logo abaixo da faixa (a marca mais nova primeiro, com quem marcou e a conferência de
+  antes), e a faixa ganha o número "Não reconhecidos", que leva a ela;
+- o PDF de todos põe uma seção à parte no fim e o número na casa que sobrava do resumo; o "Baixar" de uma usina e dia
+  leva os daquela usina marcados naquele dia; o de só críticos/atenção/OK e o da faixa, não;
+- livro sem as duas colunas (o App antes da versão que as publica): ninguém é não reconhecido.
+A TST resolve no cadastro (dar baixa, mudar de usina ou corrigir o código), que hoje é do App. Prova:
+`tests/test_hseq_extintores.py` (os três testes do não reconhecido).
+
 **Pendências.** A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (baixa e
-confirmação dos extintores novos) são do App; entram aqui quando houver o livro e o pedido.
+confirmação dos extintores novos) são do App; entram aqui quando houver o livro e o pedido. A baixa do não reconhecido
+pela TST no Nexus (como a decisão da PT, assinada, que o App lê) fica para quando o Levi pedir.
 
 ## EPI e EPC
 

@@ -23,6 +23,15 @@ Essas quatro são exclusivas (cada extintor em uma, nessa ordem) e somam o total
 - SEM ATUALIZAÇÃO: a última conferência foi há mais de 30 dias, ou nunca houve. Soma-se às outras (um extintor pode
   estar atrasado E sem atualização): as contagens da faixa não somam ao total.
 
+NÃO RECONHECIDO (Levi, 14/10/2026, na Axis Linhares 1 - ES: a equipe fez a ronda e só achou 4 dos 17 extintores do
+cadastro; "pode ter um botão no app de campo de 'Não reconhecido' para o extintor e aí apareceria para a pessoa da
+Segurança"). O App marca o extintor que a equipe não achou na usina e publica `Não reconhecido em` (o dia de Brasília da
+marca) e `Não reconhecido por (HMAC)`. Conferência depois da marca a desfaz (o extintor foi achado: o App limpa a marca;
+`nao_reconhecido` é a defesa). O não reconhecido sai de TODAS as contas (as situações, a sem atualização, os cartões, a
+Visão do responsável e o PDF por status), porque pode não existir, e a tela o lista à parte para a TST conferir o
+cadastro (dar baixa, mudar de usina ou corrigir o código). Livro sem as duas colunas (o App antes da versão que as
+publica): ninguém é não reconhecido.
+
 O status da TST (crítico, atenção, ok, ok sem validade), que olha também a carga e os itens do checklist, é a MESMA
 regra do App (`_ext_status` no function_app.py, conferida 831 de 831 com o "Status geral" da planilha da TST em
 08/10/2026): `status_tst`. Prova de 09/10/2026, fora do repositório (o cadastro tem nome de usina e o repositório é
@@ -44,7 +53,7 @@ ABA = "Extintores"
 COLUNAS = ("Código", "Usina", "Código da usina", "Tipo de ativo", "Ativo", "Local", "Posição", "Classe", "Peso (kg)",
            "Validade da recarga", "Validade do hidrostático", "Última conferência", "Origem da conferência",
            "Conferido por (HMAC)", "Carga", "Itens NÃO", "Fotos", "Tem informação adicional", "Status", "Motivo",
-           "Origem do cadastro")
+           "Origem do cadastro", "Não reconhecido em", "Não reconhecido por (HMAC)")
 # sem estas, a conta sairia errada sem aviso (validade vazia vira "sem validade"): a tela não conta pela metade
 ESSENCIAIS = ("Código", "Usina", "Validade da recarga", "Validade do hidrostático", "Última conferência")
 ALERTA_DIAS = 30            # o "Alerta de vencimento (dias)" da aba Legenda da TST (EXT_ALERTA_DIAS no App)
@@ -175,6 +184,13 @@ def situacao(x: dict, hoje: date) -> dict:
             "status": st, "motivo": motivo, "motivo_checklist": checklist, "itens_nao": sorted(nao)}
 
 
+def nao_reconhecido(x: dict, conf: date | None) -> date | None:
+    """O dia em que a equipe marcou o extintor como não reconhecido na usina (ver o topo do módulo), ou None. Conferência
+    depois da marca a desfaz: o extintor foi achado. No mesmo dia vale a marca (o App só a publica quando é a última)."""
+    d = _data(x.get("Não reconhecido em"))
+    return d if d and (conf is None or conf <= d) else None
+
+
 def _num(v):
     try:
         f = float(str(v).replace(",", "."))
@@ -191,6 +207,8 @@ def linha(x: dict, b, quem: dict, hoje: date) -> dict:
     região nem gestor (cai em "Sem região de campo" e "Sem gestor de contrato")."""
     codigo, usina = _txt(x.get("Código")), _txt(x.get("Usina"))
     uid, _como = b.lig.usina(usina, _txt(x.get("Ativo")) or _txt(x.get("Código da usina")))
+    sit = situacao(x, hoje)
+    nr = nao_reconhecido(x, sit["conferencia"])
     return {"codigo": codigo, "ext": codigo.rsplit("-", 1)[-1], "usina_id": uid, **b.onde(uid, usina),
             "usina_fonte": usina, "tipo": _txt(x.get("Tipo de ativo")), "ativo": _txt(x.get("Ativo")),
             "local": _txt(x.get("Local")), "posicao": _txt(x.get("Posição")), "classe": _txt(x.get("Classe")),
@@ -198,7 +216,9 @@ def linha(x: dict, b, quem: dict, hoje: date) -> dict:
             "origem_conferencia": _txt(x.get("Origem da conferência")),
             "conferido_por": visao._nome(quem, x.get("Conferido por (HMAC)")), "fotos": visao._int(x.get("Fotos")),
             "info_adicional": visao._sim(x.get("Tem informação adicional")),
-            "origem_cadastro": _txt(x.get("Origem do cadastro")), **situacao(x, hoje)}
+            "origem_cadastro": _txt(x.get("Origem do cadastro")),
+            "nao_reconhecido": nr, "dias_nao_reconhecido": (hoje - nr).days if nr else None,
+            "nao_reconhecido_por": visao._nome(quem, x.get("Não reconhecido por (HMAC)")) if nr else "", **sit}
 
 
 def extintores() -> leitura.Leitura:
@@ -215,9 +235,13 @@ def extintores() -> leitura.Leitura:
         # o livro chegou sem uma coluna da conta (o App mudou o nome?): nenhum número, e a tela diz qual falta
         d["colunas_faltando"] = [c for c in ESSENCIAIS if linhas and c not in linhas[0]]
         if d["colunas_faltando"]:
-            return {**d, "extintores": []}
-        quem = visao._quem() if any(_txt(x.get("Conferido por (HMAC)")) for x in linhas) else {}
-        return {**d, "extintores": [linha(x, b, quem, hoje) for x in linhas if _txt(x.get("Código"))]}
+            return {**d, "extintores": [], "nao_reconhecidos": []}
+        hmacs = ("Conferido por (HMAC)", "Não reconhecido por (HMAC)")
+        quem = visao._quem() if any(_txt(x.get(c)) for x in linhas for c in hmacs) else {}
+        todos = [linha(x, b, quem, hoje) for x in linhas if _txt(x.get("Código"))]
+        # o não reconhecido fica fora de todas as contas; a tela o lista à parte (ver o topo do módulo)
+        return {**d, "extintores": [x for x in todos if not x["nao_reconhecido"]],
+                "nao_reconhecidos": ordenar_nao_reconhecidos(x for x in todos if x["nao_reconhecido"])}
     return visao._ler(("hseq_extintores",), calcular)
 
 
@@ -227,6 +251,11 @@ def contar(lista) -> dict:
          "sem_atualizacao": sum(x["sem_atualizacao"] for x in lista)}
     c.update({s: sum(x["situacao"] == s for x in lista) for s in SITUACOES})
     return c
+
+
+def ordenar_nao_reconhecidos(lista) -> list:
+    """Os não reconhecidos na ordem da lista da TST: a marca mais nova primeiro, depois a usina e o código."""
+    return sorted(lista, key=lambda x: (-x["nao_reconhecido"].toordinal(), x["usina"], x["codigo"]))
 
 
 def ordenar(lista, filtro: str = "") -> list:

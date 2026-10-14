@@ -46,3 +46,10 @@
 .cn-abas a[aria-disabled="true"]{opacity:.45;cursor:default}
 /* a foto do extintor que o App enviou (09/10/2026): a miniatura antes do código; o clique abre a caixa das fotos */
 .ext-tab .ext-par > .ext-foto{width:32px;height:32px;border-radius:6px;vertical-align:middle}
+/* Não reconhecidos em campo (14/10/2026; na Axis Linhares 1 a equipe só achou 4 dos 17 extintores do cadastro): a caixa
+   âmbar logo abaixo da faixa, a mesma cor do aviso do Campo, com a tabela do que a TST precisa conferir no cadastro */
+.ext-naorec{margin-top:16px;padding:12px 16px 14px;border:1px solid var(--alerta);border-radius:var(--raio-md);
+  background:var(--alerta-suave)}
+.ext-naorec-t{margin:0;font-size:14px}
+.ext-naorec-d{margin:4px 0 10px;font-size:13px;color:var(--tinta-2)}
+.ext-naorec .cn-tab{margin-top:0}

@@ -13,6 +13,8 @@ RELATÓRIO O PADRÃO SERÁ AS FOTOS AO LADO DE CADA EXTINTOR MAS SERÁ POSSÍVEL
   extintor sem foto enviada sai com o quadro vazio, dizendo isso. Foto de 600 px (JPEG 75; com as 773 fotos inteiras o
   arquivo passaria de 70 MB): a rota passa a cópia já reduzida (`fotos.foto_pdf`), e `_foto_reduzida` só reduz a que
   vier maior.
+- Os NÃO RECONHECIDOS em campo (14/10/2026: a equipe não achou o extintor na usina; `extintores.nao_reconhecido`) não
+  entram nas contas nem nos grupos: vão numa seção à parte, no fim, só no relatório de todos (não têm status da TST).
 - As imagens e páginas vão em binário (`rl_config.useA85 = 0`): o padrão do reportlab, ASCII85, aumenta o arquivo em
   25% e, sem o acelerador em C (não instalado), custava ~20 ms por foto em Python puro (14/10/2026, com as 90 primeiras
   fotos do App). O reportlab só é usado aqui no Nexus.
@@ -217,8 +219,9 @@ def _tabela_sem_foto(g, hoje, e):
     return t
 
 
-def _resumo(lista, e):
-    """Os números do relatório: por status da TST e por situação."""
+def _resumo(lista, e, n_nao_reconhecidos=0):
+    """Os números do relatório: por status da TST e por situação; na casa que sobrava, os não reconhecidos em campo
+    (fora das outras contas)."""
     st = {k: sum(1 for x in lista if (x.get("status") or "") == k) for k in EXT.ORDEM_STATUS}
     sit = {k: sum(1 for x in lista if x["situacao"] == k) for k in EXT.SITUACOES}
     sem_at = sum(1 for x in lista if x["sem_atualizacao"])
@@ -227,7 +230,8 @@ def _resumo(lista, e):
             (st["OK"] + st["OK_SEM_VALIDADE"], "OK", "ok"), (st[""], "sem conferência", "neutro")]
     nums2 = [(sit["atrasado"], "atrasados", "critico"), (sit["perto"], "perto de vencer", "alerta"),
              (sit["sem_validade"], "sem validade", "neutro"), (sit["em_dia"], "em dia", "ok"),
-             (sem_at, "sem atualização há +30 d", "info"), ("", "", "neutro")]
+             (sem_at, "sem atualização há +30 d", "info"),
+             (n_nao_reconhecidos, "não reconhecidos em campo", "alerta") if n_nao_reconhecidos else ("", "", "neutro")]
 
     def celula(n, rot, c):
         return [Paragraph(_tom(str(n), c, True) if n != "" else "", e["num"]), Paragraph(_t(rot), e["num_rot"])]
@@ -238,10 +242,38 @@ def _resumo(lista, e):
     return t
 
 
+def _nao_reconhecidos(lista, e) -> list:
+    """A seção dos não reconhecidos em campo: o cabeçalho com o que a TST faz e a tabela (a marca, a usina, o extintor,
+    o local e a conferência de antes da marca)."""
+    n = len(lista)
+    linha1 = (f"<b>Não reconhecidos em campo</b> &nbsp; "
+              + _tom(f"{n} extintor{'es' if n != 1 else ''}", "alerta", True))
+    linha2 = _t('A equipe não achou estes extintores na usina (o "Não reconhecido" da ronda de extintores do App). '
+                "Ficam fora das contas deste relatório até a TST conferir o cadastro: dar baixa, mudar de usina ou "
+                "corrigir o código.")
+    cab = Table([[Paragraph(linha1, e["grupo"])], [Paragraph(linha2, e["base"])]], colWidths=[182 * mm])
+    cab.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), FUNDO), ("LINEBEFORE", (0, 0), (0, -1), 3, TOM["alerta"]),
+                             ("LEFTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 4),
+                             ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+    linhas = [[Paragraph(c, e["cab"]) for c in ("NÃO RECONHECIDO EM", "USINA", "EXTINTOR", "LOCAL",
+                                                 "CONFERÊNCIA ANTES")]]
+    for x in lista:
+        quem = f"<br/>{_t(x['nao_reconhecido_por'])}" if x.get("nao_reconhecido_por") else ""
+        linhas.append([Paragraph(x["nao_reconhecido"].strftime("%d/%m/%Y") + quem, e["base"]),
+                       Paragraph(_t(x["usina"]), e["base"]),
+                       Paragraph(f"<b>{_t(x['ext'])}</b> · {_t(x['codigo'])}", e["base"]),
+                       Paragraph(_t(x.get("local") or "—"), e["base"]), Paragraph(_conferencia(x), e["base"])])
+    t = Table(linhas, colWidths=[30 * mm, 42 * mm, 50 * mm, 24 * mm, 36 * mm], repeatRows=1)
+    t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, LINHA), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                           ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
+    return [CondPageBreak(45 * mm), cab, Spacer(1, 1.5 * mm), t, Spacer(1, 5 * mm)]
+
+
 def gerar(lista, *, filtro: str, com_fotos: bool, filtros_tela: list[str], hoje: date, gerado_em: str,
-          logo: str | None = None, foto=None) -> bytes:
-    """O PDF: o resumo, depois cada usina × dia com os extintores dela. `lista` = os extintores já com os filtros da
-    tela; `filtro` = o status da TST (FILTROS); `foto(codigo)` -> bytes da foto ou None."""
+          logo: str | None = None, foto=None, nao_reconhecidos=()) -> bytes:
+    """O PDF: o resumo, depois cada usina × dia com os extintores dela e, no fim, os não reconhecidos em campo. `lista`
+    = os extintores já com os filtros da tela; `filtro` = o status da TST (FILTROS); `foto(codigo)` -> bytes da foto ou
+    None; `nao_reconhecidos` = os da seção à parte (a rota manda só no relatório de todos)."""
     e = _estilos()
     lista = filtrar(lista, filtro)
     grupos = EXT.por_usina_dia(lista)
@@ -277,7 +309,7 @@ def gerar(lista, *, filtro: str, com_fotos: bool, filtros_tela: list[str], hoje:
                           f"agrupado por usina e dia da última conferência"), e["sub"]),
              Paragraph(_t("Filtros: " + (", ".join(filtros_tela) if filtros_tela else "nenhum (todas as usinas)")),
                        e["mudo"]),
-             Spacer(1, 4 * mm), _resumo(lista, e), Spacer(1, 5 * mm)]
+             Spacer(1, 4 * mm), _resumo(lista, e, len(nao_reconhecidos)), Spacer(1, 5 * mm)]
     if not grupos:
         story.append(Paragraph("Nenhum extintor com esses filtros.", e["sub"]))
     for g in grupos:
@@ -291,6 +323,8 @@ def gerar(lista, *, filtro: str, com_fotos: bool, filtros_tela: list[str], hoje:
             # Com KeepTogether, a 1ª usina (19 extintores) não cabia embaixo do resumo e a página 1 saía em branco
             story += [CondPageBreak(45 * mm), _cab_grupo(g, hoje, e), Spacer(1, 1.5 * mm), _tabela_sem_foto(g, hoje, e)]
         story.append(Spacer(1, 5 * mm))
+    if nao_reconhecidos:
+        story += _nao_reconhecidos(nao_reconhecidos, e)
     story.append(Paragraph(_t(
         "Como cada extintor entra. Atrasado: a recarga (2º nível) ou o teste hidrostático (3º nível) venceu; a data "
         "da etiqueta vale até o último dia do mês, e só o ano vale até 31/12. Perto de vencer: uma das duas vence nos "

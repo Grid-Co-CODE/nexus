@@ -450,3 +450,70 @@ def test_sem_a_chave_o_recebimento_de_fotos_fica_desligado(com_livro, app, tmp_p
     app.config["NEXUS_PESSOA_HMAC"] = ""
     r = app.test_client().post("/t/hseq/extintores/foto", data={"codigo": "ALT100-INFC1-PPCI-EXT01"})
     assert r.status_code == 503 and "desligado" in r.get_json()["mensagem"]
+
+
+# ── não reconhecido em campo (Levi, 14/10/2026, na Axis Linhares 1: a equipe só achou 4 dos 17 extintores do cadastro,
+#    "pode ter um botão no app de campo de 'Não reconhecido' para o extintor e aí apareceria para a pessoa da Segurança") ──
+@pytest.fixture
+def com_nao_reconhecido(banco, monkeypatch):
+    """O livro com as duas colunas do não reconhecido: o EXT02 da Altair não foi achado na ronda de 05/10 (a mesma em que
+    o EXT01 foi conferido); a marca do Coração (01/02) é mais velha que a conferência dele (01/03) e não vale."""
+    monkeypatch.setattr(visao, "_agora", lambda: datetime(2026, 10, 9, 10, 0, tzinfo=BRT))
+    quem = codigo_da_pessoa(CHAVE, "tec1@exemplo.test")
+    marcas = {"ALT100-INFC1-PPCI-EXT02": "2026-10-05", "COR100-INFC1-PPCI-EXT01": "2026-02-01"}
+    livro = [{**x, "Não reconhecido em": marcas.get(x["Código"]),
+              "Não reconhecido por (HMAC)": quem if x["Código"] in marcas else None} for x in LIVRO]
+    _aba(banco, EXT.LIVRO, EXT.ABA, livro)
+    visao.limpar()
+    return banco
+
+
+def test_nao_reconhecido_sai_das_contas_e_vai_para_a_caixa_da_tst(com_nao_reconhecido, logado):
+    html = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor").get_data(as_text=True)
+    caixa = html[html.index('id="nao-reconhecidos"'):html.index("</section>")]
+    assert _linhas(caixa) == ["ALT100-INFC1-PPCI-EXT02"]                 # a marca velha do Coração não vale
+    t = _texto(caixa)
+    assert "1 extintor não reconhecido em campo" in t and "a TST conferir o cadastro" in t
+    assert "05/10/2026 há 4 d Técnico Silva" in t                           # quando e quem marcou, pelo nome
+    assert "01/08/2026" in t                                                # a conferência de antes da marca
+    assert codigo_da_pessoa(CHAVE, "tec1@exemplo.test") not in html
+    # fora de TODAS as contas: a tabela, o total da faixa (5, não 6) e o perto de vencer (o EXT02 vencia em 22 dias)
+    assert _linhas(html[html.index("</section>"):]) == ["ALT100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01",
+                                                        "BWK100-INFC1-PPCI-EXT01", "IRC200-INFC1-PPCI-EXT01",
+                                                        "ALT100-INFC1-PPCI-EXT03"]
+    faixa = _texto(html[html.index("cn-numeros"):html.index('id="nao-reconhecidos"')])
+    assert "Extintores 5" in faixa and "Perto de vencer 0" in faixa and "Não reconhecidos 1" in faixa
+    sem = logado.get("/t/hseq/extintores?f=sem_atualizacao&ver=extintor").get_data(as_text=True)
+    assert "ALT100-INFC1-PPCI-EXT02" not in _linhas(sem[sem.index("</section>"):])
+    # os filtros da tela valem na caixa: a região do Coração (Sul 01) não tem não reconhecido, e a caixa some
+    sul = logado.get("/t/hseq/extintores?regiao_campo=Sul+01").get_data(as_text=True)
+    assert 'id="nao-reconhecidos"' not in sul and "Não reconhecidos" not in sul
+
+
+def test_sem_as_colunas_novas_ninguem_e_nao_reconhecido(com_livro, logado):
+    """O livro do App antes da versão que publica as duas colunas: a tela segue igual, sem a caixa."""
+    html = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor").get_data(as_text=True)
+    assert 'id="nao-reconhecidos"' not in html and len(_linhas(html)) == 6
+    assert EXT.nao_reconhecido({"Não reconhecido em": "2026-10-05"}, date(2026, 10, 6)) is None    # achado depois
+    assert EXT.nao_reconhecido({"Não reconhecido em": "2026-10-05"}, date(2026, 10, 5)) == date(2026, 10, 5)
+    assert EXT.nao_reconhecido({"Não reconhecido em": "2026-10-05"}, None) == date(2026, 10, 5)
+    assert EXT.nao_reconhecido({}, None) is None and EXT.COLUNAS[-2:] == ("Não reconhecido em",
+                                                                          "Não reconhecido por (HMAC)")
+
+
+def test_nao_reconhecido_no_pdf_vai_a_parte_so_no_relatorio_de_todos(com_nao_reconhecido, logado):
+    t = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?fotos=0").data)
+    assert "Não reconhecidos em campo 1 extintor" in t and "EXT02 · ALT100-INFC1-PPCI-EXT02" in t
+    assert "05/10/2026 Técnico Silva" in t and "1 não reconhecidos em campo" in t     # e a casa no resumo
+    # só os críticos (sem status da TST, o não reconhecido não entra) e o filtro da faixa: sem a seção
+    assert "Não reconhecidos em campo" not in _pdf_texto(
+        logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos&fotos=0").data)
+    assert "Não reconhecidos em campo" not in _pdf_texto(
+        logado.get("/t/hseq/extintores/relatorio.pdf?f=atrasado&fotos=0").data)
+    # o "Baixar" da Altair de 05/10 (a ronda em que o EXT02 não foi achado) leva a seção; o de 01/10, não
+    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
+    links = [h.replace("&amp;", "&") for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', html)]
+    dia05 = _pdf_texto(logado.get(next(h for h in links if "dia=2026-10-05" in h)).data)
+    assert "Não reconhecidos em campo 1 extintor" in dia05 and "ALT100-INFC1-PPCI-EXT02" in dia05
+    dia01 = _pdf_texto(logado.get(next(h for h in links if "dia=2026-10-01" in h)).data)
+    assert "Não reconhecidos em campo" not in dia01

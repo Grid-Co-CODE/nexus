@@ -70,18 +70,23 @@ def _clientes(linhas) -> list[str]:
 
 def _filtrados():
     """A leitura e os extintores com os filtros da tela (região do Brasil, cliente, região de campo, gestor e busca): a
-    tela, o relatório em PDF e o "Baixar" de cada linha contam o mesmo."""
+    tela, o relatório em PDF e o "Baixar" de cada linha contam o mesmo. Os não reconhecidos em campo (14/10/2026) vêm à
+    parte, com os mesmos filtros: estão fora de todas as contas (`extintores.nao_reconhecido`)."""
     leitura = EXT.extintores()
     d = leitura.dados
     regiao, cliente = request.args.get("regiao", ""), request.args.get("cliente", "")
     regiao_campo, gestor = _regiao_campo(), _gestor()
     q = request.args.get("q", "").strip().lower()
+
+    def passa(x):
+        return ((not regiao or x.get("regiao_br") == regiao) and (not cliente or x.get("cliente") == cliente)
+                and _do_papel(x, regiao_campo, gestor)
+                and (not q or q in " ".join(str(x.get(c) or "") for c in BUSCA).lower()))
     todas = d.get("extintores") or []
-    base = [x for x in todas if (not regiao or x.get("regiao_br") == regiao)
-            and (not cliente or x.get("cliente") == cliente) and _do_papel(x, regiao_campo, gestor)
-            and (not q or q in " ".join(str(x.get(c) or "") for c in BUSCA).lower())]
-    return leitura, d, todas, base, {"regiao": regiao, "cliente": cliente, "regiao_campo": regiao_campo,
-                                     "gestor": gestor}
+    base = [x for x in todas if passa(x)]
+    nao_rec = [x for x in d.get("nao_reconhecidos") or [] if passa(x)]
+    return leitura, d, todas, base, nao_rec, {"regiao": regiao, "cliente": cliente, "regiao_campo": regiao_campo,
+                                              "gestor": gestor}
 
 
 @bp.route("/extintores")
@@ -91,8 +96,9 @@ def extintores():
     última conferência (Levi, 09/10: "queria agrupado por usina e dia!"; a linha da usina abre os extintores dela, com a
     foto de cada um quando o App a enviou, e tem o PDF dela em "Baixar") e tem ao lado a visão por extintor. A faixa de
     números filtra a tabela pelas situações do pedido: atrasado, perto de vencer, sem atualização há mais de 30 dias (e
-    sem validade). Os filtros da região do Brasil, do cliente, da região de campo, do gestor e a busca valem em tudo."""
-    leitura, d, todas, base, fl = _filtrados()
+    sem validade). Os filtros da região do Brasil, do cliente, da região de campo, do gestor e a busca valem em tudo.
+    Os não reconhecidos em campo (14/10/2026) ganham a caixa deles logo abaixo da faixa, para a TST."""
+    leitura, d, todas, base, nao_rec, fl = _filtrados()
     f = request.args.get("f") if request.args.get("f") in EXT.FILTROS else ""
     pedido = request.args.get("modo")
     modo = "tabela" if pedido == "tabela" or f else ("gestores" if pedido == "gestores" else "regioes")
@@ -107,7 +113,7 @@ def extintores():
         cartoes_gest=EXT.por_gestor(base, d.get("times") or {}), situacoes=EXT.SITUACOES,
         status_tst=EXT.STATUS_TST, tempo=EXT.tempo, alerta_dias=EXT.ALERTA_DIAS,
         sem_atualizacao_dias=EXT.SEM_ATUALIZACAO_DIAS, fotos=FOT.disponiveis(current_app.config),
-        filtros_url={k: request.args.get(k) for k in FILTROS_URL if request.args.get(k)},
+        filtros_url={k: request.args.get(k) for k in FILTROS_URL if request.args.get(k)}, nao_rec=nao_rec,
         **_papeis(d, todas, fl["regiao_campo"], fl["gestor"]))
 
 
@@ -121,8 +127,10 @@ def extintores_relatorio():
     """O relatório em PDF (Levi, 09/10/2026, com as observações da TST): agrupado por usina e dia, com os filtros da
     tela, o filtro do status da TST (todos, críticos, atenção, OK) e as fotos ao lado de cada extintor (o padrão;
     `fotos=0` tira). O "Baixar" de cada linha da tabela (como o PDF da tabela de PT) pede só aquela usina e aquele dia
-    (`usina`, `dia`, `baixar=1`; o filtro da faixa, `f`, vem junto). Sem o livro do App, volta para a tela."""
-    leitura, d, todas, base, fl = _filtrados()
+    (`usina`, `dia`, `baixar=1`; o filtro da faixa, `f`, vem junto). Sem o livro do App, volta para a tela. Os não
+    reconhecidos em campo vão numa seção à parte, só no relatório de todos e sem o filtro da faixa (não têm status da
+    TST); no "Baixar", os daquela usina marcados naquele dia."""
+    leitura, d, todas, base, nao_rec, fl = _filtrados()
     if leitura.erro or not d.get("aba_existe") or d.get("colunas_faltando"):
         return redirect(na_raiz("/t/hseq/extintores"))
     filtro = request.args.get("status") if request.args.get("status") in REL.FILTROS else "todos"
@@ -138,7 +146,10 @@ def extintores_relatorio():
         ("Cliente", fl["cliente"]), ("Região de campo", fl["regiao_campo"]), ("Gestor de contrato", fl["gestor"]),
         ("Situação", rotulo_f), ("Busca", request.args.get("q", "").strip())) if v]
     hoje = d.get("hoje") or visao._agora().date()
+    nr = [x for x in nao_rec if (not usina or x["usina"] == usina)
+          and (not dia or x["nao_reconhecido"].isoformat() == dia)] if filtro == "todos" and not f else []
     pdf = REL.gerar(EXT.ordenar(lista), filtro=filtro, com_fotos=com_fotos, filtros_tela=filtros_tela, hoje=hoje,
+                    nao_reconhecidos=nr,
                     gerado_em=visao._agora().strftime("%d/%m/%Y %H:%M"),
                     logo=str(current_app.static_folder) + "/grid-h-branco.png",
                     foto=lambda c: FOT.foto_pdf(current_app.config, c))   # a cópia de 600 px, feita uma vez por foto
