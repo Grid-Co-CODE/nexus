@@ -541,3 +541,33 @@ def test_a_tela_mostra_a_comparacao_e_o_salvar_devolve_a_nova(cli, banco):
     assert "no lugar da aba" in html and "Refazer a visão" in html
     r = cli.post("/t/base/equipamentos/visao", data={"usina": 1})
     assert "já estava em dia" in cli.get(r.headers["Location"]).get_data(as_text=True)
+
+
+# ── o filtro de cliente (13/10/2026, Levi: "tem que dar para filtrar o cliente!") ─────────────────────────────────────
+def _itens(html: str) -> str:
+    return html.split('id="eq-itens"')[1].split("</ul>")[0]
+
+
+def test_filtra_pelo_cliente_do_registro_mestre(cli):
+    html = cli.get("/t/base/equipamentos").get_data(as_text=True)
+    assert '<option value="Athon">Athon (1)</option>' in html and '<option value="Thopen">Thopen (1)</option>' in html
+    assert "Brodowski" in _itens(html) and "Matões 100" in _itens(html)
+    html = cli.get("/t/base/equipamentos?cliente=Thopen").get_data(as_text=True)
+    assert "Brodowski" in _itens(html) and "Matões 100" not in _itens(html)
+    assert '<option value="Thopen" selected>' in html and '1</span> de 2 usinas' in html
+    assert "cliente=Thopen" in _itens(html)                         # abrir a usina mantém o filtro
+    # cliente que não está na lista não filtra nada (nem quebra a tela)
+    html = cli.get("/t/base/equipamentos?cliente=Outro").get_data(as_text=True)
+    assert "Brodowski" in _itens(html) and "Matões 100" in _itens(html) and " selected>" not in html.split(
+        'name="cliente"')[1].split("</select>")[0]
+
+
+def test_o_post_volta_a_tela_com_o_cliente(app_eq):
+    from urllib.parse import parse_qs, urlsplit
+
+    from nexus.cadastro import telas_equipamentos as T
+    with app_eq.test_request_context("/t/base/equipamentos/chave", method="POST",
+                                     data={"q": "bro", "cliente": "Thopen"}):
+        u = urlsplit(T._volta(usina=1, ancora="passo-chave"))
+    assert u.path == "/t/base/equipamentos" and u.fragment == "passo-chave"
+    assert parse_qs(u.query) == {"q": ["bro"], "cliente": ["Thopen"], "usina": ["1"]}

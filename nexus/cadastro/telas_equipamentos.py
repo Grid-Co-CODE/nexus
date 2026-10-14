@@ -20,7 +20,7 @@ sem recarregar (a lista de inversores de uma usina grande passa de 40 linhas: re
 """
 import difflib
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app, jsonify, redirect, render_template, request, session, url_for
@@ -37,6 +37,7 @@ TITULO = "Equipamentos das usinas"
 _BRT = timezone(timedelta(hours=-3))
 FILTROS = (("", "Todas as usinas"), ("sem_chave", "Sem chave do supervisório"),
            ("sem_inversores", "Sem inversores"), ("potencia", "Potência que não fecha"))
+SEM_CLIENTE = "-"            # o valor do filtro de cliente para as usinas sem cliente no Registro mestre
 _CHAVE_AVISO = "equipamentos_aviso"
 
 
@@ -194,8 +195,18 @@ def contexto(srv, cfg, args) -> dict:
     lista.sort(key=lambda x: E.norm(x["titulo"]))
     q = str(args.get("q") or "").strip()[:120]
     filtro = args.get("filtro") if args.get("filtro") in dict(FILTROS) else ""
+    # o cliente (13/10/2026, Levi: "tem que dar para filtrar o cliente!"): o do Registro mestre de cada usina, com
+    # quantas usinas ele tem; SEM_CLIENTE = as usinas sem cliente na ficha. Só vale um cliente que está na lista
+    por_cliente = Counter(x["cliente"] or "" for x in lista)
+    clientes = sorted(((c or SEM_CLIENTE, c or "Sem cliente", n) for c, n in por_cliente.items()),
+                      key=lambda c: (c[0] == SEM_CLIENTE, E.norm(c[1])))
+    cliente = str(args.get("cliente") or "")
+    if cliente not in {c[0] for c in clientes}:
+        cliente = ""
 
     def passa(x):
+        if cliente and (x["cliente"] or SEM_CLIENTE) != cliente:
+            return False
         if q and E.norm(q) not in E.norm(f"{x['titulo']} {x['codigo']} {x['cidade'] or ''}"):
             return False
         r = x["resumo"]
@@ -212,6 +223,7 @@ def contexto(srv, cfg, args) -> dict:
         {"ligar": {}, "fora": [], "ja_ligadas": 0}
     auto = dict(auto, n_chaves=sum(len(v) for v in auto["ligar"].values()), n_usinas=len(auto["ligar"]))
     return {"lista": [x for x in lista if passa(x)], "total": len(lista), "q": q, "filtro": filtro, "filtros": FILTROS,
+            "cliente": cliente, "clientes": clientes,
             "painel": painel, "aviso": aviso, "erro_livro": est.get("erro") or "", "livro_velho": est.get("velha", False),
             "erro_aba": aba.get("erro") or "", "aba_lida_em": _hora(aba.get("lido_em")), "fr_lido": fr_lido,
             "sem_token": not cfg.get("GRIDCO_SQL_TOKEN"), "pode_gravar": pode_gravar,
@@ -224,7 +236,7 @@ def contexto(srv, cfg, args) -> dict:
             "n_chaves_ligadas": sum(1 for c in aba["chaves"] if any(
                 s["usina_supervisorio"] == c and not s["excluido"] for s in est["supervisorios"])),
             "auto": auto,
-            "volta": {k: v for k, v in (("q", q), ("filtro", filtro)) if v}}
+            "volta": {k: v for k, v in (("q", q), ("filtro", filtro), ("cliente", cliente)) if v}}
 
 
 def _volta(usina=None, ancora: str = "") -> str:
@@ -235,6 +247,9 @@ def _volta(usina=None, ancora: str = "") -> str:
         q["q"] = busca
     if request.form.get("filtro") in dict(FILTROS) and request.form.get("filtro"):
         q["filtro"] = request.form["filtro"]
+    cliente = (request.form.get("cliente") or "").strip()[:120]
+    if cliente:                                     # vai como parâmetro do endereço (url_for codifica); a tela confere
+        q["cliente"] = cliente
     if usina:
         q["usina"] = usina
     return url_for("torre_base.equipamentos", **q) + (f"#{ancora}" if ancora else "")

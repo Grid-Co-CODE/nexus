@@ -79,6 +79,11 @@
       {% if painel %}<input type="hidden" name="usina" value="{{ painel.usina.id }}">{% endif %}
       <label class="gc-rotulo" for="eq-q">Buscar usina</label>
       <input id="eq-q" name="q" class="gc-campo" value="{{ q }}" placeholder="Nome, código ou cidade" autocomplete="off">
+      {# o cliente (13/10/2026, Levi: "tem que dar para filtrar o cliente!"), com quantas usinas cada um tem #}
+      <select name="cliente" class="gc-campo" aria-label="Cliente" onchange="this.form.submit()">
+        <option value="">Todos os clientes</option>
+        {% for v, rot, n in clientes %}<option value="{{ v }}"{% if v == cliente %} selected{% endif %}>{{ rot }} ({{ n }})</option>{% endfor %}
+      </select>
       <select name="filtro" class="gc-campo" aria-label="Mostrar" onchange="this.form.submit()">
         {% for v, rot in filtros %}<option value="{{ v }}"{% if v == filtro %} selected{% endif %}>{{ rot }}</option>{% endfor %}
       </select>

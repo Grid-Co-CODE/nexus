@@ -213,8 +213,10 @@ de entender para você, quando eu for fazer não vou entender nada".
   tela: 160 das 263 chaves iguais à aba; as outras com as diferenças do modelo (a cabine é da usina e sai na chave da
   usina, a potência da UFV é a do Registro mestre, o nome do Fracttal vem das Ligações, nome de inversor repetido entre
   chaves). Prova: `tests/test_equipamentos_ligar_pela_aba.py`.
-- **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; filtros sem
-  chave, sem inversores, potência que não fecha); à direita, a usina aberta em 2 passos.
+- **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; filtro de
+  CLIENTE, o da ficha no Registro mestre, com quantas usinas cada um tem e "Sem cliente" (13/10/2026, Levi: "tem que dar
+  para filtrar o cliente!"); filtros sem chave, sem inversores, potência que não fecha; os filtros seguem ao abrir uma
+  usina e depois de cada gravação); à direita, a usina aberta em 2 passos.
 - **1. Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que
   a plataforma usa por dentro. Uma usina pode ter várias; **uma chave serve a uma usina só** (a de outra usina é
   recusada). As opções vêm ordenadas, com o porquê escrito ("nome parecido"), nenhuma escolhida. Chave digitada que não está na aba liga, com aviso para conferir o nome exato. **Desligar a chave nunca
