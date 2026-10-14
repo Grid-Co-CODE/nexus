@@ -110,16 +110,15 @@ _BRT = timezone(timedelta(hours=-3))
 
 
 def _prazo_da_tv(agora: datetime | None = None) -> dict | None:
-    """O prazo da sessão de quem entrou pelo Fracttal: {"nome", "ate" ("HH:MM" em Brasília, ou "DD/MM às HH:MM" quando
+    """O prazo da sessão de quem entrou pelo Fracttal ou pela Microsoft (`auth.prazo_da_sessao`: o `fracttal_exp` ou as
+    12 h do login, 14/10/2026): {"nome", "ate" ("HH:MM" em Brasília, ou "DD/MM às HH:MM" quando
     não é hoje), "quando" ("às HH:MM" ou "em DD/MM às HH:MM"), "vence" (epoch em s)}, ou None (a senha de administrador
     e a sessão de antes do `fracttal_exp` não têm prazo conhecido). É o fim da TV: o portão encerra a sessão no
     `fracttal_exp` e nada que a TV faz o adia (docstring do módulo). O nome, e não o e-mail: a TV fica numa sala com
     gente passando."""
+    from ..auth import prazo_da_sessao
     usuario = session.get("usuario") or {}
-    try:
-        vence = float(session.get("fracttal_exp") or 0)
-    except (TypeError, ValueError):
-        return None
+    vence = prazo_da_sessao()
     if not usuario or vence <= 0:
         return None
     d = datetime.fromtimestamp(vence, _BRT)

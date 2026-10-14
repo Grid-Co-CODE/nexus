@@ -39,7 +39,16 @@
     {% if erro %}<p id="erro" class="gc-ajuda gc-ajuda--erro">{{ erro }}</p>{% endif %}
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar</button>
   </form>
-  <p class="entrar-alt"><a href="{{ raiz }}/entrar{% if destino and destino != '/' %}?next={{ destino|urlencode }}{% endif %}">Entrar com o login do Fracttal</a></p>
+  <p class="entrar-alt"><a href="{{ raiz }}/entrar{% if destino and destino != '/' %}?next={{ destino|urlencode }}{% endif %}">{% if ms %}Entrar com a conta Microsoft da Grid Co.{% else %}Entrar com o login do Fracttal{% endif %}</a></p>
+  {% elif ms %}
+  {# a porta é a conta Microsoft da Grid Co. (14/10/2026, nexus/auth/microsoft.py): o Fracttal sai da porta e fica no
+     OS Creator. É um link (GET): o servidor guarda a ida e leva a JANELA à Microsoft (que não abre dentro de moldura;
+     o script do <head> já tira o Entrar de qualquer moldura do Nexus) #}
+  {% if erro %}<p id="erro" class="gc-ajuda gc-ajuda--erro entrar-erro" role="alert">{{ erro }}</p>{% endif %}
+  <a class="gc-btn gc-btn--ui gc-btn--primario entrar-ms" href="{{ raiz }}/entrar?ms=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a Microsoft</a>
+  <p class="entrar-alt mudo">Com a sua conta da Grid Co. ({{ ms_dominios }}). O OS Creator pede o login do Fracttal na
+    primeira vez que você o abrir.<br>
+    <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
   {% else %}
   {# o login do Fracttal: o mesmo e-mail e a mesma senha do Fracttal e do OS Creator (06/10/2026) #}
   <form method="post" action="{{ acao|na_raiz }}">

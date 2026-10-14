@@ -109,7 +109,8 @@
   }
 
   // Na TV, o aviso fixo do prazo da sessão aparece na última meia hora antes de ela vencer (e depois, até o portão levar
-  // a janela ao login). `venceS` em segundos (o fracttal_exp); 0 = sem prazo conhecido (a senha de administrador).
+  // a janela ao login). `venceS` em segundos (o fracttal_exp, ou as 12 h do login pela Microsoft); 0 = sem prazo
+  // conhecido (a senha de administrador).
   var AVISA_ANTES_MS = 30 * 60 * 1000;
   function avisarVencimento(venceS, agoraMs) {
     return venceS > 0 && venceS * 1000 - agoraMs <= AVISA_ANTES_MS;

@@ -394,6 +394,57 @@ e porquês em `nexus/casca/CLAUDE.md`, seções "Telas por setor" e "Pré-carga"
 - **Conferir:** Base → Acessos mostra a seção "Telas por setor" com os setores e, depois que alguém com setor entrar, a
   linha "Pré-carga: última volta em ...".
 
+## 7g. Entrar com a Microsoft da Grid Co. (14/10/2026)
+
+O Levi pediu que o Nexus entre com a conta Microsoft da Grid, e só quem é da Grid. O código já está no GitHub e
+**desligado**: sem as quatro variáveis abaixo, a porta segue a do Fracttal. Regras e porquês em
+`nexus/auth/microsoft.py` e em `nexus/casca/CLAUDE.md` (seção "Entrar com a Microsoft").
+
+**1. Registrar o Nexus no Entra ID** (entra.microsoft.com → Identidade → Aplicativos → Registros de aplicativo → Novo
+registro; precisa de quem pode registrar aplicativos no diretório da Grid):
+- Nome: `Nexus Grid Co.`
+- Tipos de conta: **"Contas somente neste diretório organizacional (locatário único)"**. É a primeira trava: conta de
+  outro diretório nem chega ao Nexus.
+- URI de redirecionamento, plataforma **Web**: `https://app.gridco.com.br/entrar`, EXATO (sem barra no fim, sem
+  `/nexus`). Para o Nexus do PC do Levi, acrescentar também `http://localhost:5070/entrar`.
+- Depois de criar, em **Certificados e segredos → Novo segredo do cliente** (até 24 meses): copiar o **Valor** (não o
+  ID do segredo) na hora, porque ele não aparece de novo. **Anotar a data de vencimento**: nesse dia o login pela
+  Microsoft para (a tela diz "A chave do Nexus na Microsoft venceu...") e só a senha de administrador entra até trocar.
+- **Permissões de API:** a que já vem (`User.Read`) basta; o Nexus pede só `openid profile email`. Se o diretório não
+  deixa a pessoa consentir sozinha, clicar em "Conceder consentimento de administrador".
+- **Recomendado:** em **Configuração de token → Adicionar declaração opcional → ID → `acct`**. Com ela, o Nexus barra
+  também o convidado criado dentro do diretório da Grid (que tem e-mail @gridco.com.br); sem ela, o resto das
+  conferências vale igual.
+- **Opcional, mais fechado:** em Aplicativos empresariais → Nexus Grid Co. → Propriedades, "Atribuição obrigatória?" =
+  **Sim**, e atribuir o grupo de quem usa o Nexus. Sem isso, toda conta da Grid entra (o Nexus ainda barra convidado e
+  e-mail fora de @gridco.com.br).
+
+**2. No `.env` do Nexus no servidor**, e depois `sudo systemctl restart nexus`:
+
+```
+NEXUS_MS_CLIENT_ID=<ID do aplicativo (cliente), na Visão geral do registro>
+NEXUS_MS_TENANT_ID=<ID do diretório (locatário): o GUID da Visão geral, não o domínio>
+NEXUS_MS_CLIENT_SECRET=<o Valor do segredo>
+NEXUS_MS_VOLTA=https://app.gridco.com.br/entrar
+```
+
+Opcional: `NEXUS_MS_DOMINIOS` (padrão `gridco.com.br`; outro domínio da Grid entra separado por vírgula).
+
+**3. Conferir:** `curl -s https://app.gridco.com.br/entrar | grep -c "Entrar com a Microsoft"` dá `1`, e
+`curl -sI "https://app.gridco.com.br/entrar?ms=1" | grep -i ^location` aponta para
+`login.microsoftonline.com/<o GUID>/oauth2/v2.0/authorize`. Uma conta da Grid entra e cai no Início; cada recusa vai ao
+journal (`journalctl -u nexus`) como "Entrar com a Microsoft recusado: <motivo>", sem e-mail.
+
+**O que muda para quem usa:** a porta tem só "Entrar com a Microsoft" (e a senha de administrador, de reserva), e
+toda entrada pede a senha da Microsoft. O login do Fracttal sai da porta e fica no OS Creator, que o pede na primeira
+vez que a pessoa o abre (criar OS, aprovar OS e PT: a OS nasce no nome de quem a criou, e o Fracttal só aceita a
+sessão dele). Quem estiver dentro pelo Fracttal na hora da troca volta à tela de entrada, com o aviso. A sessão dura
+12 h a partir do login. O setor e o administrador são achados pelo e-mail: quem usa no Fracttal um e-mail diferente do
+da Microsoft cai em "Sem setor" até o Levi conferir em Base → Acessos.
+
+**Desfazer:** tirar as quatro linhas `NEXUS_MS_*` do `.env` e `sudo systemctl restart nexus`; a porta volta a ser a do
+Fracttal.
+
 ## 8. Atualizar
 
 Um comando, no servidor (desde 06/10/2026):

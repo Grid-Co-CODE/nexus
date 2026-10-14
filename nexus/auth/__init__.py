@@ -15,6 +15,12 @@ Fracttal deslogue do Nexus, tem que pedir para logar de novo"). O portão encerr
 A ponte do OS Creator (`torres/oscreator/ponte.py`) encerra quando o Fracttal recusa o token no meio de um pedido, e a
 página confere a cada 5 minutos (`/os/_nexus/sessao`) se ele não foi derrubado por fora. A senha de administrador não
 depende do Fracttal: só o "sair" a encerra.
+
+Desde 14/10/2026 a porta pode ser a conta Microsoft da Grid Co. (Levi, 13/10: "Conseguimos fazer o login do Nexus ser
+via microsoft só aceitando quem é da grid?"; `microsoft.py`). Desligada sem as quatro variáveis NEXUS_MS_*. Ligada, o
+Fracttal sai da porta (o POST dele é recusado) e fica só no OS Creator, que o pede na primeira vez; a sessão que nasceu
+da Microsoft (`via` = "microsoft") não cai com a do Fracttal, dura 12 h a partir do login (`ms_ate`) e passa pelo
+mesmo portão de setor e de administrador. O "sair", de qualquer lugar, segue saindo de tudo.
 """
 import hmac
 import logging
@@ -29,7 +35,7 @@ from flask import (Blueprint, current_app, jsonify, make_response, redirect, ren
                    url_for)
 from itsdangerous import URLSafeTimedSerializer
 
-from . import acessos, fracttal
+from . import acessos, fracttal, microsoft
 from . import setor_telas
 from ..prefixo import na_raiz, raiz
 
@@ -94,7 +100,16 @@ MOTIVOS = {
     "caiu": "A sua sessão do Fracttal terminou, e o Nexus saiu junto. Entre de novo para continuar.",
     "venceu": "A sua sessão do Fracttal venceu (ela dura cerca de 12 horas), e o Nexus saiu junto. Entre de novo para "
               "continuar.",
+    # a sessão que nasceu da Microsoft (14/10/2026): 12 h a partir do login, como a do Fracttal
+    "expirou": "A sua sessão do Nexus venceu (ela dura 12 horas a partir do login). Entre de novo para continuar.",
+    # a Microsoft ligou com a pessoa dentro pelo Fracttal (14/10/2026): a porta só aceita quem é da Grid
+    "porta_microsoft": "O Nexus agora entra com a conta Microsoft da Grid Co. Entre de novo, com ela, para continuar.",
 }
+# A sessão que nasceu da Microsoft dura 12 h a partir do LOGIN (não do último clique): é o prazo que a do Fracttal já
+# tinha, e é o que tira do Nexus, em até 12 h, quem saiu da empresa (a conta desligada no Entra não entra de novo)
+SESSAO_MS_S = 12 * 3600
+TEXTO_FRACTTAL_FORA = ("O Nexus agora entra com a conta Microsoft da Grid Co. O login do Fracttal fica para o OS "
+                       "Creator, que o pede quando você o abrir.")
 # Pedidos de DADOS de /os quando o navegador não diz o destino (Sec-Fetch-Dest): a resposta vira 401 em JSON, não a
 # página de login
 _DADOS_DO_OS = ("/os/api/", "/os/_nexus/quem", "/os/_nexus/sessao")
@@ -229,7 +244,7 @@ def _admins() -> set[str]:
 
 
 def _admin_em_dia() -> None:
-    """Para a sessão que nasceu do login do Fracttal: o `admin` da sessão segue a lista de AGORA, a cada pedido.
+    """Para a sessão de uma pessoa (Fracttal ou Microsoft): o `admin` da sessão segue a lista de AGORA, a cada pedido.
 
     O `admin` é gravado no login, e a sessão vale até 12 h: sem isto, quem perdesse o acesso na tela Base → Acessos
     seguiria administrador até sair, e quem ganhasse precisaria sair e entrar. A lista é relida só quando o arquivo
@@ -244,9 +259,31 @@ def _admin_em_dia() -> None:
         session["admin"] = agora
 
 
-def via_fracttal() -> bool:
-    """A sessão do Nexus nasceu do login do Fracttal? (a senha de administrador não põe `usuario`)"""
+def com_pessoa() -> bool:
+    """A sessão é de uma pessoa (Fracttal ou Microsoft)? A senha de administrador não põe `usuario`."""
     return bool(session.get("logado") and session.get("usuario"))
+
+
+def via_fracttal() -> bool:
+    """A sessão do Nexus nasceu do login do Fracttal? É a que acaba junto com a dele. A sessão de antes da Microsoft
+    (14/10/2026) não tem `via` e era do Fracttal."""
+    return com_pessoa() and session.get("via", "fracttal") == "fracttal"
+
+
+def via_microsoft() -> bool:
+    """A sessão do Nexus nasceu da conta Microsoft da Grid (`microsoft.py`)? Ela não cai com a do Fracttal."""
+    return com_pessoa() and session.get("via") == "microsoft"
+
+
+def prazo_da_sessao() -> float:
+    """Quando a sessão de quem entrou acaba (epoch, s): o `exp` do token do Fracttal ou as 12 h do login pela Microsoft.
+    0 = sem prazo conhecido (a senha de administrador e a sessão de antes do `fracttal_exp`)."""
+    if not session.get("usuario"):
+        return 0.0
+    try:
+        return float(session.get("ms_ate" if session.get("via") == "microsoft" else "fracttal_exp") or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def quer_pagina() -> bool:
@@ -325,6 +362,16 @@ def _fim_do_fracttal() -> tuple[str | None, object]:
         # (o `next` do clone vem sem o prefixo; o redirecionamento sai com ele, como o navegador pede)
         return None, redirect(destino_seguro(request.args.get("next")) if request.args.get("next") else na_raiz("/os/"))
     return None, None
+
+
+def _fim_da_microsoft() -> str | None:
+    """Para a sessão que nasceu da Microsoft: "expirou" passadas as 12 h do login; senão None. Sem um `ms_ate` que se
+    leia, acaba também (a sessão é assinada; isto só não deixa um formato estranho valer para sempre)."""
+    try:
+        ate = float(session.get("ms_ate") or 0)
+    except (TypeError, ValueError):
+        ate = 0.0
+    return "expirou" if time.time() >= ate else None
 
 
 def _supervisor_padrao(email: str, nome: str) -> dict:
@@ -421,11 +468,77 @@ def _sem_a_sessao_velha_da_raiz(resp):
     return resp
 
 
+def _ida_para_a_microsoft(destino: str):
+    """`/entrar?ms=1`: guarda a ida na sessão e leva o navegador à Microsoft. Desligada, volta ao Entrar de sempre."""
+    cfg = current_app.config
+    if not microsoft.ligado(cfg):
+        return redirect(url_for("auth.entrar", **({"next": destino} if destino != "/" else {})))
+    pedido = microsoft.novo_pedido(destino)
+    session["ms_pedidos"] = microsoft.guardar(session.get("ms_pedidos"), pedido)
+    resp = redirect(microsoft.endereco_de_entrada(cfg, pedido))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+def _volta_da_microsoft():
+    """A volta da Microsoft no próprio `/entrar` (`?code=&state=` ou `?error=`): confere tudo (`microsoft.concluir`) e
+    abre a sessão da pessoa. O pedido sai da sessão aqui, dê certo ou não: cada ida vale uma volta só."""
+    cfg = current_app.config
+    pedidos = dict(session.get("ms_pedidos") or {})
+    state = str(request.args.get("state") or "")
+    pedido = pedidos.pop(state, None) if state else None
+    if pedidos:
+        session["ms_pedidos"] = pedidos
+    else:
+        session.pop("ms_pedidos", None)
+    destino = next_seguro(pedido.get("next") if isinstance(pedido, dict) else None)
+    # o teto por rede da volta é só dela: as recusas da Microsoft não trancam a senha de administrador, a reserva para
+    # quando a Microsoft é que está com defeito
+    chave = ("ms", _ip())
+    if _erros_na_janela(chave) >= TETO_POR_IP:
+        return _tela_entrar(erro=TEXTO_IP_TRANCADO, destino=destino), 429
+    try:
+        conta = microsoft.concluir(cfg, request.args, pedido)
+    except microsoft.SemResposta as e:
+        log.warning("Entrar com a Microsoft: sem resposta (%s)", e.detalhe)
+        return _tela_entrar(erro=str(e), destino=destino), 503
+    except microsoft.Recusado as e:
+        # no journal, o motivo sem e-mail nem nome (o código AADSTS e o domínio, sim)
+        log.warning("Entrar com a Microsoft recusado: %s", e.detalhe)
+        if e.contar:
+            _contar_erro(chave)
+        return _tela_entrar(erro=str(e), destino=destino), 403
+    session.clear()
+    session.permanent = True
+    session["logado"] = True
+    session["via"] = "microsoft"
+    session["usuario"] = {"email": conta["email"], "nome": conta["nome"], "perfil": ""}
+    session["admin"] = conta["email"] in _admins()
+    session["ms_ate"] = time.time() + SESSAO_MS_S
+    sup = _supervisor_padrao(conta["email"], conta["nome"])
+    if sup:
+        session["supervisor_padrao"] = sup
+    acessos.registrar_login(cfg, conta["email"])
+    resp = redirect(na_raiz(destino))
+    # o OS Creator de quem usou este navegador antes não passa para quem entrou agora (o PC da sala do NOC): o
+    # `os_sessao` é a sessão do Fracttal de outra pessoa, e a OS nasceria no nome dela
+    resp.delete_cookie("os_sessao", path=os_cookie_path())
+    return _sem_a_sessao_velha_da_raiz(resp)
+
+
 @bp.route("/entrar", methods=["GET", "POST"])
 def entrar():
     destino = next_seguro(request.args.get("next"))
     admin = request.args.get("admin") == "1"
-    if request.method == "GET":
+    # HEAD é o GET sem corpo (o Werkzeug o põe em toda rota GET). Antes ele caía no ramo da senha de administrador: 5
+    # HEAD de uma rede (um `curl -I`, a prévia de link de um chat) trancavam a reserva por 15 min (revisão de 14/10/2026)
+    leitura = request.method in ("GET", "HEAD")
+    if leitura and microsoft.ligado(current_app.config) and (
+            request.args.get("code") is not None or request.args.get("error") is not None):
+        return _volta_da_microsoft()
+    if leitura and request.args.get("ms") == "1":
+        return _ida_para_a_microsoft(destino)
+    if leitura:
         guardado = session.pop("motivo_entrar", None)
         motivo = request.args.get("motivo")
         motivo = motivo if motivo in MOTIVOS else (guardado if guardado in MOTIVOS else None)
@@ -438,6 +551,10 @@ def entrar():
                             destino=destino, admin=not pelo_fracttal), 429
 
     if pelo_fracttal:
+        if microsoft.ligado(current_app.config):
+            # a porta é a Microsoft ("só aceitando quem é da grid"): recusa também o POST feito sem a tela, porque o
+            # Fracttal tem conta de gente de fora da Grid. Nada vai ao Fracttal, e não conta como senha errada
+            return _tela_entrar(erro=TEXTO_FRACTTAL_FORA, destino=destino), 403
         return _entrar_fracttal(destino)
 
     # a senha de administrador: contador próprio, por IP
@@ -464,7 +581,9 @@ def _tela_entrar(**contexto):
     navegador (`plataforma_sair`, revisão de 10/10/2026): num PC compartilhado (a sala do NOC), A não clica em Sair, a
     sessão dele no Nexus vence e B entra; a de A na plataforma valia mais 12 h, e todo acesso direto à plataforma
     (favorito, aba aberta) seguia como A, com o e-mail de A no diário. Sem a chave, a página de sempre."""
-    return render_template("entrar.html", plataforma_sair=_plataforma_para_sair(), **contexto)
+    cfg = current_app.config
+    return render_template("entrar.html", plataforma_sair=_plataforma_para_sair(), ms=microsoft.ligado(cfg),
+                           ms_dominios=", ".join("@" + d for d in microsoft.dominios(cfg)), **contexto)
 
 
 def _plataforma_para_sair() -> str | None:
@@ -504,9 +623,16 @@ def instalar_portao(app) -> None:
             # o "sair" do OS Creator ("Sair do Fracttal nesta área") sai do Nexus também, como o Sair do Nexus sai do OS
             # Creator: sair, de qualquer lugar, sai de tudo
             return encerrar("saiu", json=False)
-        if request.endpoint == "auth.sair" or not via_fracttal():
+        if request.endpoint == "auth.sair" or not com_pessoa():
             return None
-        motivo, resposta = _fim_do_fracttal()
+        # a sessão do Fracttal acaba junto com a dele; a da Microsoft, nas 12 h do login (o Fracttal fica só no OS
+        # Creator, que pede o login dele de novo quando precisa, como para a senha de administrador)
+        if via_fracttal() and microsoft.ligado(current_app.config):
+            # a porta virou a Microsoft com a pessoa dentro pelo Fracttal: sem isto, toda sessão do Fracttal seguia até o
+            # fim do token (e cada token que o clone renova estica o prazo), inclusive a de quem não é da Grid (revisão
+            # adversarial de 14/10/2026). Sai junto o OS Creator, como em todo `encerrar`
+            return encerrar("porta_microsoft", _destino_do_pedido())
+        motivo, resposta = _fim_do_fracttal() if via_fracttal() else (_fim_da_microsoft(), None)
         if motivo:
             return encerrar(motivo, _destino_do_pedido())
         _admin_em_dia()

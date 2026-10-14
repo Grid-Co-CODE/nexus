@@ -369,6 +369,9 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .entrar-logo{height:26px;display:block;margin-bottom:18px}
 .entrar form{display:flex;flex-direction:column;gap:8px;margin-top:18px}
 .entrar .gc-btn{justify-content:center;margin-top:8px}
+/* a porta da Microsoft (14/10/2026): o botão é um link (GET), na largura do cartão, como o do formulário */
+.entrar .entrar-ms{display:flex;width:100%;box-sizing:border-box;margin-top:18px;text-decoration:none}
+.entrar .entrar-erro{margin:14px 0 0}
 
 /* Celular: o menu sobe para cima do conteúdo */
 /* Tela média (notebook pequeno, janela lado a lado): menu mais estreito, nomes longos quebram. */

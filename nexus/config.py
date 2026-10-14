@@ -41,6 +41,10 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_CHAMADOS_PUBLICAR",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
              "NEXUS_ADMINS",
+             # Entrar com a Microsoft da Grid Co. (14/10/2026, nexus/auth/microsoft.py): as QUATRO primeiras ligam a porta
+             # da Microsoft, e o Fracttal sai da porta; sem qualquer uma delas, a porta segue a do Fracttal. O diretório é
+             # o ID (GUID) do Entra; a volta é o /entrar EXATO que a T.I. registrou. Domínios: padrão gridco.com.br
+             "NEXUS_MS_CLIENT_ID", "NEXUS_MS_TENANT_ID", "NEXUS_MS_CLIENT_SECRET", "NEXUS_MS_VOLTA", "NEXUS_MS_DOMINIOS",
              # Performance -> Clima e risco (06/10/2026): endereços das fontes públicas (INMET, focos e risco de fogo do INPE, e
              # a irradiação diária da NASA POWER, de 07/10); vazios valem os padrões de nexus/performance/clima/fontes.py. O do
              # risco leva {d} (o dia, de 0 a 3); o da NASA leva {lat}, {lon}, {inicio} e {fim}. O do FIRMS (10/10/2026) é a base dos

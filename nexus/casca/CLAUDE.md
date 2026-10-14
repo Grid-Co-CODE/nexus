@@ -12,9 +12,10 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
-| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/atualizacoes`, os últimos commits por dia); seção "Versão no ar e Atualizações" abaixo |
+| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, os últimos commits por dia); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
-| `nexus/auth/__init__.py` | `/entrar`, `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
+| `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
+| `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
 | `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
@@ -394,6 +395,58 @@ fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
   o cartão disse "Travou 1 vez em 24 h ... durou 45 s: até 4 pedidos presos juntos, com as 4 threads ocupadas; todos em
   Fracttal (OS Creator), esperando a rede".
 
+## Entrar com a Microsoft da Grid Co. (14/10/2026)
+
+Levi, 13/10/2026: "Conseguimos fazer o login do Nexus ser via microsoft só aceitando quem é da grid?". O fluxo e as
+conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no portão (`nexus/auth/__init__.py`). Prova:
+`tests/test_auth_microsoft.py` (em 14/10, 25 de 25 mutações das conferências pegas, depois da revisão adversarial). Passo a passo da T.I.: DEPLOY.md, 7g.
+
+- **Liga com quatro variáveis:** `NEXUS_MS_CLIENT_ID`, `NEXUS_MS_TENANT_ID` (o GUID do diretório), `NEXUS_MS_CLIENT_SECRET`
+  e `NEXUS_MS_VOLTA`. Faltando uma, ou com o diretório escrito como domínio (nunca casaria com o `tid`), fica desligada
+  e a porta é a do Fracttal, como antes.
+- **Ligada, o Fracttal sai da porta**, também no servidor: o POST com e-mail dá 403, sem ir ao Fracttal e sem contar
+  como senha errada. Ele fica no OS Creator: quem entrou pela Microsoft abre o OS Creator e o clone pede o login do
+  Fracttal, como já pedia para a senha de administrador. A OS continua nascendo no nome de quem a cria (decisão de
+  09/2026 para a plataforma: dois logins, "faz parte!"; o id_token da Microsoft não vale no Fracttal). Quem estava
+  dentro pelo Fracttal quando a Microsoft ligou sai no próximo clique (`MOTIVOS["porta_microsoft"]`, também a sessão de
+  antes, sem `via`): sem isso, ela seguia até o fim do token (que o clone renova), inclusive a de quem não é da Grid.
+- **A volta é o próprio `/entrar`** (`?code=&state=`), porque o Caddy só manda ao Nexus o `/entrar` exato (regra "Rota
+  nova só nos caminhos que o Caddy manda ao Nexus", abaixo). `response_mode=query`: com `form_post` a volta seria um POST
+  de outro site, e o cookie Lax da sessão não iria junto.
+- **Quem é da Grid:** o registro é de locatário único (o Entra recusa conta de outro diretório), e o Nexus confere de
+  novo: `tid` e `iss` do diretório; não convidado (`idp` de outra casa, `#EXT#` no nome de usuário ou a declaração
+  opcional `acct` diferente de 0, que pega o convidado criado dentro do diretório; a T.I. a liga no registro); e-mail de um
+  domínio de `NEXUS_MS_DOMINIOS` (padrão gridco.com.br), comparado inteiro. Também confere `aud`, `nonce` e o prazo. A
+  assinatura do id_token não é conferida porque ele vem direto do endpoint de token, por TLS, em troca do código, do
+  segredo e do verificador PKCE (OpenID Connect Core, 3.1.3.7, item 6). Nada aceita id_token vindo do navegador.
+- **Cada ida vale uma volta:** `state`, `nonce` e o verificador PKCE ficam em `ms_pedidos` na sessão (até 3 idas, 10 min
+  cada), e a volta tira a dela, dê certo ou não. Uma volta sem a ida neste navegador (o código de outra pessoa num link)
+  nem vai à Microsoft.
+- **A sessão:** `via` = "microsoft", `usuario` {email, nome, perfil ""} e `ms_ate` = login + 12 h (`MOTIVOS["expirou"]`).
+  Passa pelo `_admin_em_dia` e pelo portão de setor, como a do Fracttal, e NÃO cai com o Fracttal: `via_fracttal()` é
+  falso para ela, e o `_fim_do_fracttal`, a ponte, a aprovação de OS, a assinatura da PT e a conferência de 5 minutos só
+  derrubam quem entrou pelo Fracttal. Sessão de antes, sem `via`, é do Fracttal. O "sair", de qualquer lugar (o do OS
+  Creator inclusive), sai de tudo. O login apaga o `os_sessao`: o Fracttal de quem usou o navegador antes não passa
+  para quem entrou. O prazo da TV vem de `auth.prazo_da_sessao()` (o `fracttal_exp` ou o `ms_ate`).
+- **`prompt=login`: toda entrada pede a senha da Microsoft**, como o Fracttal já pedia. A primeira versão usava o
+  `select_account`, e a revisão adversarial de 14/10/2026 mostrou o furo: no PC da sala do NOC, A (administrador) sai,
+  a conta de A segue no navegador e B a escolhe na lista e entra como A, sem senha. O Sair do Nexus não sai da
+  Microsoft do navegador (sairia também do Outlook e do Teams da pessoa), e com a senha pedida não precisa.
+- **Teto da volta por rede** (`("ms", ip)`, 50 em 15 min): só conta a recusa que custou uma ida ao endpoint de token por
+  causa de quem tentou (código de lixo, conta de fora). Segredo vencido (`invalid_client`, AADSTS7000215/7000222) e
+  Microsoft fora não contam, porque aí todo mundo falharia e a rede do escritório trancaria. Nada disso tranca a senha
+  de administrador, que tem o contador dela.
+- **Journal:** "Entrar com a Microsoft recusado: <motivo>", com o código AADSTS e o domínio, nunca o e-mail. O
+  `error` da volta é texto de quem chama (qualquer um tem uma ida pelo `/entrar?ms=1`): só vai ao journal no formato da
+  especificação (`[a-z_]`, até 40, inteiro), senão "desconhecido", e a volta com erro conta no teto.
+- **HEAD é GET:** o Werkzeug põe HEAD em toda rota GET, e o `/entrar` só olhava `== "GET"`: o HEAD caía no ramo da
+  senha de administrador, respondia 401 e contava erro (5 HEAD de uma rede, um `curl -I` ou a prévia de link de um
+  chat, trancavam a reserva por 15 min). Desde 14/10 o `/entrar` trata HEAD como GET.
+- **Antes de ligar:** o administrador, o setor e o papel no Campo são achados pelo e-mail. Quem usa no Fracttal um
+  e-mail diferente do da Microsoft cai em "Sem setor" depois da troca: conferir em Base → Acessos.
+- **O segredo vence** (até 24 meses no Entra): no dia, a tela diz "A chave do Nexus na Microsoft venceu..." e só a
+  senha de administrador entra até a T.I. trocar a `NEXUS_MS_CLIENT_SECRET`.
+
 ## Regras que já custaram caro
 
 - **Rota nova só nos caminhos que o Caddy manda ao Nexus** (13/10/2026, "Atualizações não carrega"): no servidor o
@@ -450,7 +503,8 @@ fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
   regioes ou gestor}; o filtro que já vem marcado e quem vê o Aprovar; ver `nexus/torres/campo/CLAUDE.md`). Sessão de
   antes, com o nome do supervisor em texto, não vale como papel. A
   senha de admin segue em "Entrar com a senha de administrador" (`/entrar?admin=1`) e é a porta do Cadastro. Quem
-  tem conta no Fracttal entra, técnico inclusive: restringir por perfil, se o Levi pedir, é aqui.
+  tem conta no Fracttal entra, técnico inclusive: restringir por perfil, se o Levi pedir, é aqui. Com a Microsoft
+  ligada (seção "Entrar com a Microsoft"), o Fracttal sai da porta e só entra quem é da Grid.
   Em produção o IP vem do `X-Forwarded-For` do proxy, por isso o `trusted_proxy` do `servir.py`.
 - **Sair do Fracttal = sair do Nexus** (Levi, 09/10/2026: "quando deslogar do Fracttal deslogue do Nexus, tem que pedir
   para logar de novo"). A sessão que nasceu do login do Fracttal (a que tem `usuario`) acaba junto com a dele, e a tela
