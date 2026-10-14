@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block titulo %}Raio-X do Nexus{% endblock %}
+{% block conteudo %}
+{# O Raio-X (14/10/2026, Levi: "O nexus está muito lento, carregando bem devagar"): o que o processo faz agora. Só
+   administrador, fora do menu. Regra e porquê em nexus/casca/raio_x.py. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<p class="gc-eyebrow">Base · Raio-X</p>
+<h1 class="titulo-pagina">Raio-X do Nexus</h1>
+<p class="cad-sub">O que este processo está fazendo agora ({{ quando }}). <a href="{{ url_for('torre_base.raio_x') }}">Ler de novo</a></p>
+
+<div class="cad-numeros">
+  <div><div class="r">Pedidos em andamento</div><div class="v gc-num">{{ pedidos|length }}{% if threads %} de {{ threads }}{% endif %}</div><div class="d">{% if threads and pedidos|length >= threads %}todas as threads ocupadas: a fila espera{% else %}threads do waitress{% endif %}</div></div>
+  <div><div class="r">Processador do Nexus</div><div class="v gc-num">{{ cpu.pct }}%</div><div class="d">em 1 s; 100% = um núcleo inteiro{% if cpu.nucleos %} (a máquina tem {{ cpu.nucleos }}){% endif %}</div></div>
+  <div><div class="r">Carga da máquina</div><div class="v gc-num">{{ cpu.carga|join(" · ") if cpu.carga else "—" }}</div><div class="d">1, 5 e 15 min{% if not cpu.carga %} (só no Linux){% endif %}</div></div>
+</div>
+
+{% if travamentos %}<div class="cad-aviso cad-aviso--{{ 'critico' if travamentos.classe == 'critico' else ('alerta' if travamentos.classe == 'alerta' else 'ok') }}"><i class="ph ph-clock-countdown"></i><div><strong>{{ travamentos.rotulo }}.</strong> {{ travamentos.detalhe }}{% if travamentos.titulo %}<br><span class="mudo">{{ travamentos.titulo }}</span>{% endif %}</div></div>{% endif %}
+{% if not ligado %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>O registro dos pedidos só liga no servidor (servir.py): aqui não há pedidos para mostrar.</div></div>{% endif %}
+
+<section class="cad-secao">
+  <h2>Pedidos em andamento, do mais antigo</h2>
+  {% if pedidos %}
+  <table class="cad-tabela">
+    <thead><tr><th>Há</th><th>Pedido</th><th>Onde está</th><th>Esperando</th></tr></thead>
+    <tbody>{% for p in pedidos %}
+      <tr><td class="gc-num">{{ p.ha }}</td><td><span class="gc-dado">{{ p.metodo }} {{ p.caminho }}</span></td><td>{{ p.quem }}<br><span class="mudo">{{ p.onde }}</span></td><td>{{ p.como }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="cad-vazio">Nenhum pedido em andamento além deste.</p>{% endif %}
+</section>
+
+<section class="cad-secao">
+  <h2>Tarefas de fundo</h2>
+  {% if outras %}
+  <table class="cad-tabela">
+    <thead><tr><th>Tarefa</th><th>Onde está</th><th>Fazendo</th></tr></thead>
+    <tbody>{% for t in outras %}
+      <tr><td><span class="gc-dado">{{ t.nome }}</span></td><td>{{ t.quem }}<br><span class="mudo">{{ t.onde }}</span></td><td>{{ t.como }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="cad-vazio">Nenhuma tarefa de fundo agora.</p>{% endif %}
+</section>
+{% endblock %}

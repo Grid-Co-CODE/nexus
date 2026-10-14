@@ -9,6 +9,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
 """
 from ...auth.chaves import aba_nexus, registrar_chaves
 from ...auth.telas_acessos import registrar_acessos
+from ...casca.raio_x import registrar_raio_x
 from ...cadastro.telas import registrar_base
 from ...cadastro.telas_equipamentos import registrar_equipamentos
 from ...cadastro.telas_fracttal import registrar_fracttal
@@ -112,5 +113,6 @@ registrar_ligacoes(bp)
 registrar_governanca(bp)
 registrar_acessos(bp)
 registrar_chaves(bp)
+registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
 registrar_molduras(bp, TORRE, abas={"chaves-fontes": {"primeira": "Fontes da Performance",
                                                          "outras": [("nexus", "Nexus", aba_nexus)]}})
