@@ -16,12 +16,19 @@ escolhe que tipo de relatório ela quer! Sai da parte de Performance!"
 - O Relatório executivo do PCM (14/10/2026: Interno Grid, Cliente, Abertura da Semana) é a CÓPIA do JavaScript do painel
   do PCM numa moldura (`nexus/pcm/relatorio_exec`), também do setor PCM.
 - O setor dono escolhido na tela (14/10/2026, Levi: "adicione a opção de eu escolher de qual setor é o relatório! Apenas
-  administradores podem editar!"): a seção "Setor de cada relatório", embaixo dos cartões, só para administrador. A
+  administradores podem editar!"): a seção "Setor de cada relatório", embaixo das colunas, só para administrador. A
   escolha vale por cima do `do_setor` do código (`auth/dono_relatorio.py`, `setor_telas.das_do_setor`).
 - Os quatro do PCM (14/10/2026, Levi: "Quero trazer esses quatro relatórios para a plataforma, com as mesmas métricas e
   parâmetros e estilos"): Relatório diário de manutenção, Recuperação da tarde, Fechamento da semana e Alerta da
   programação, do setor PCM, NATIVOS do Nexus (não da plataforma): as telas e a folha em `nexus/pcm/relatorios`
   (`telas.registrar`), com a emissão automática nos horários do PCM (`agenda.py`).
+- UMA estrutura para todas as telas da Central (14/10/2026, Levi: "Use a mesma estrutura do print 1 para todos os
+  relatórios de todos os setores e aí vai ficar filtrado por setor"; o print 1 era a tela do Relatório diário): à
+  esquerda, os BLOCOS (`BLOCOS`, montados por `lado`), só com o que a pessoa pode ver, e embaixo deles o período e o
+  recorte do relatório aberto; à direita, a folha ou a tela. Para o PCM, "Relatórios Padrão PCM" (os quatro) e, abaixo,
+  "Relatório Gerencial PCM" (os três tipos do Relatório executivo). Relatório novo entra num bloco (o teste reprova
+  relatório da Central fora de bloco). Os da plataforma vêm na moldura dentro da coluna da direita
+  (`relatorios/moldura.html`), com o período e o recorte dentro da própria tela da plataforma.
 """
 import hmac
 
@@ -60,9 +67,11 @@ TORRE = Torre(
         *[Tela(t.tela_id, t.nome, t.pergunta,
                "o robô do PCM: Programação Semanal, Gestão PCM, Gerencial e Confiabilidade", dentro_de="central",
                do_setor="PCM") for t in TIPOS_PCM.values()],
-        Tela(relatorio_exec.TELA_ID, "Relatório executivo do PCM",
+        # o Relatório executivo do painel do PCM, com o nome do bloco que o Levi deu (14/10/2026): "Relatório Gerencial PCM"
+        Tela(relatorio_exec.TELA_ID, "Relatório Gerencial PCM",
              "O que rodou, o que travou e onde agir: Interno Grid, Cliente ou Abertura da Semana?",
-             "o painel do PCM: Gestão PCM, programação semanal e Confiabilidade", dentro_de="central", do_setor="PCM"),
+             "o painel do PCM: Gestão PCM, programação semanal, Confiabilidade e Gerencial", dentro_de="central",
+             do_setor="PCM"),
     ],
 )
 
@@ -77,6 +86,26 @@ RELATORIOS = {
     "pcm-alerta": "warning",
     "pcm-executivo": "presentation-chart",
 }
+
+# Os blocos da coluna da esquerda, na ordem (14/10/2026; Levi, para o PCM: "um bloco lateral ... com o título 'Relatórios
+# Padrão PCM' e abaixo terá um bloco 'Relatório Gerencial PCM' onde terá os três tipos de relatório"). Item: a tela, o
+# `sub` (o `?tipo=` das telas com mais de um tipo), o nome, a linha de baixo e a marca (a letra do PCM ou um ícone).
+# `setor` = o setor do bloco: o item que o administrador passou para outro setor mostra o nome do setor novo.
+BLOCOS = (
+    {"id": "pcm-padrao", "titulo": "Relatórios Padrão PCM", "setor": "PCM",
+     "itens": [{"tela": t.tela_id, "nome": t.nome, "descricao": t.descricao, "letra": t.letra}
+               for t in TIPOS_PCM.values()]},
+    {"id": "pcm-gerencial", "titulo": "Relatório Gerencial PCM", "setor": "PCM",
+     "itens": [{"tela": relatorio_exec.TELA_ID, "sub": k, "nome": v["nome"], "descricao": v["descricao"],
+                "icone": v["icone"]} for k, v in relatorio_exec.TIPOS.items()]},
+    {"id": "performance", "titulo": "Relatórios Performance", "setor": "Performance",
+     "itens": [{"tela": "relatorio", "nome": "Criador de relatório", "icone": RELATORIOS["relatorio"],
+                "descricao": "o relatório do cliente, montado com os números da plataforma"},
+               {"tela": "relatorio-semanal", "nome": "Relatório semanal", "icone": RELATORIOS["relatorio-semanal"],
+                "descricao": "a semana de cada usina, no relatório do cliente"},
+               {"tela": "potencia-ativa", "nome": "Potência Ativa dos Inversores", "icone": RELATORIOS["potencia-ativa"],
+                "descricao": "a potência ativa de cada inversor, dia a dia"}]},
+)
 
 bp = TORRE.criar_blueprint(__name__)
 
@@ -96,6 +125,37 @@ def _setores_ativos(forcar: bool = False) -> tuple[list[dict], str]:
 
 def _relatorios():
     return [t for t in TORRE.telas if t.dentro_de == "central"]
+
+
+def lado(atual: str = "", sub: str = "") -> list[dict]:
+    """Os blocos da coluna da esquerda com o que quem entrou pode ver (todos, para o administrador), na ordem de
+    BLOCOS; bloco sem nada liberado não aparece. `atual` e `sub`: o relatório aberto, que acende. A mesma régua do menu
+    (`setor_telas.liberadas_do_menu`): a lista e a porta do setor nunca discordam."""
+    liberadas = setor_telas.liberadas_do_menu()
+    escolhas = setor_telas.escolhas_de_dono()
+    setores, _erro = _setores_ativos()
+    blocos = []
+    for b in BLOCOS:
+        itens = []
+        for it in b["itens"]:
+            t = TORRE.tela(it["tela"])
+            if liberadas is not None and setor_telas.chave(TORRE.id, t.id) not in liberadas:
+                continue
+            dono = setor_telas.dono_de(TORRE.id, t, escolhas, setores)
+            # o setor só aparece no item quando o administrador o tirou do setor do bloco (a escolha da Central)
+            fora = dono["escolhido"] and (dono["setor_id"] is None or
+                                          setor_telas._sem_acento(dono["nome"]) != setor_telas._sem_acento(b["setor"]))
+            itens.append(dict(it, url=f"/t/{TORRE.id}/{t.id}" + (f"?tipo={it['sub']}" if it.get("sub") else ""),
+                              on=t.id == atual and it.get("sub", "") == sub,
+                              tag=(dono["nome"] or "Nenhum setor") if fora else ""))
+        if itens:
+            blocos.append(dict(b, itens=itens))
+    return blocos
+
+
+def _moldura_extra(t) -> dict:
+    """O que a tela da plataforma na Central leva além da moldura: os blocos da esquerda, com ela acesa."""
+    return {"lado": lado(t.tela)}
 
 
 @bp.route("/central", methods=["GET", "POST"])
@@ -123,7 +183,7 @@ def central():
         codigo = _codigo()
     # o aviso da plataforma desligada é só dos relatórios dela (os do PCM são do Nexus e abrem sempre)
     return render_template("relatorios/central.html", torre=TORRE, tela=TORRE.tela("central"), cartoes=cartoes,
-                           todos=liberadas is None, ligada=estado["ligada"], motivo=estado["motivo"],
+                           lado=lado(), todos=liberadas is None, ligada=estado["ligada"], motivo=estado["motivo"],
                            com_moldura=any(c["moldura"] for c in cartoes), admin=admin, setores=setores,
                            erro_setores=erro_setores, codigo=codigo, aviso=session.pop(_CHAVE_AVISO, None),
                            pode_gravar=bool(current_app.config.get("GRIDCO_SQL_TOKEN")) and not erro_setores)
@@ -185,9 +245,9 @@ def _gravar_donos():
                    "(até 1 minuto).")
 
 
-# Os relatórios da Plataforma de Performance, cada um na moldura (porta única)
-registrar_molduras(bp, TORRE)
+# Os relatórios da Plataforma de Performance, cada um na moldura (porta única), na coluna da direita da Central
+registrar_molduras(bp, TORRE, modelo="relatorios/moldura.html", extra=_moldura_extra)
 # Os quatro do PCM, nativos (nexus/pcm/relatorios)
-telas_pcm.registrar(bp, TORRE)
+telas_pcm.registrar(bp, TORRE, lado)
 # O Relatório executivo do PCM, a cópia do painel numa moldura (nexus/pcm/relatorio_exec)
-relatorio_exec.registrar(bp, TORRE)
+relatorio_exec.registrar(bp, TORRE, lado)

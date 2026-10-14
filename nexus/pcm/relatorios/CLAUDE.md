@@ -19,9 +19,16 @@ numa moldura em `nexus/pcm/relatorio_exec` (tela `pcm-executivo`, ver o CLAUDE.m
 - **O setor:** os quatro nascem do setor PCM (quem é do PCM os vê sem marcar); o administrador troca o setor de cada
   um na Central de emissão, seção "Setor de cada relatório" (`nexus/auth/dono_relatorio.py`).
 - **A tela** é a da tela Relatórios do painel (`telas.py`, `templates/relatorios/pcm.html` da torre Relatórios,
-  `static/relatorios-pcm.css`): "1 · Tipo", "2 · Período e recorte" (dia ou semana, cliente, cluster ou supervisor,
-  em cascata como as outras telas do PCM), Gerar, a folha ao lado (na moldura, reduzida inteira para caber, como a
+  `static/relatorios-pcm.css` e `static/relatorios.js`): os blocos da Central no lugar do "1 · Tipo" (14/10/2026, Levi:
+  "Use a mesma estrutura do print 1 para todos os relatórios de todos os setores": "Relatórios Padrão PCM" com os
+  quatro e, abaixo, "Relatório Gerencial PCM"), "Período e recorte" (dia ou semana, cliente, cluster ou supervisor, em
+  cascata como as outras telas do PCM), Gerar, a folha ao lado (na moldura, reduzida inteira para caber, como a
   impressão do Chrome) com "Imprimir / PDF" e "Abrir em nova aba", e os emitidos automaticamente.
+- **A margem da prévia** (Levi, 14/10/2026: "deixa o texto comendo um pouco a margem da página ... quando eu transformo
+  em PDF fica normal!"): tabela que não quebra linha passa da largura do A4 e a prévia alarga a folha até o conteúdo;
+  o `scrollWidth` não conta a margem da direita do papel, e o texto encostava na borda, com uma barra de rolagem por
+  cima. Agora a folha alargada ganha a mesma margem dos dois lados e não rola por dentro (`ajustar` no
+  `static/relatorios.js`). Medido no diário de 13/10: 45 px de cada lado, a folha com 974 px.
 - **A emissão automática** (`agenda.py`) segue os horários do robô do PCM: diário na 1ª volta depois das 06:00 (sobre
   ontem, todo dia); tarde depois das 13:00 de dia útil (feriado não pula); fechamento na sexta depois das 17:00, sem
   recuperar no sábado; alerta quando aparece semana mais nova que a ativa no banco_dados (publicada pelo Nexus ou pelo

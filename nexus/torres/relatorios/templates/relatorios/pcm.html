@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+{% from "relatorios/_lado.html" import blocos %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {# Os relatórios do PCM na Central (14/10/2026, Levi: "Quero trazer esses quatro relatórios para a plataforma, com as
    mesmas métricas e parâmetros e estilos"). O desenho é o da tela Relatórios do painel do PCM (js/relatorios.js); a
-   folha é a do PCM (nexus/pcm/relatorios), dentro da moldura, e a impressão sai só dela. #}
+   folha é a do PCM (nexus/pcm/relatorios), dentro da moldura, e a impressão sai só dela. Desde 14/10/2026 a coluna da
+   esquerda é a de toda a Central: os blocos (relatorios/_lado.html) no lugar do "1 · Tipo". #}
 <link rel="stylesheet" href="{{ url_for('static', filename='relatorios-pcm.css') }}">
 <p class="gc-eyebrow">{{ torre.nome }} · PCM</p>
 <h1 class="titulo-pagina">{{ tela.nome }}</h1>
@@ -14,20 +16,10 @@
 
 <div class="rp-tela">
   <div class="rp-esq">
-    <section class="rp-card" aria-labelledby="rp-t1">
-      <h2 id="rp-t1">1 · Tipo</h2>
-      <div class="rp-tipos">
-        {% for t in tipos %}
-        <a class="rp-tipo{% if t.id == tipo.id %} on{% endif %}" href="{{ ('/t/' ~ torre.id ~ '/' ~ t.tela_id)|na_raiz }}"
-           {% if t.id == tipo.id %}aria-current="page"{% endif %}>
-          <span class="ic" aria-hidden="true">{{ t.letra }}</span><span><b>{{ t.nome }}</b><span>{{ t.descricao }}</span></span>
-        </a>
-        {% endfor %}
-      </div>
-    </section>
+    {{ blocos(lado) }}
 
     <section class="rp-card" aria-labelledby="rp-t2">
-      <h2 id="rp-t2">2 · Período e recorte</h2>
+      <h2 id="rp-t2">Período e recorte</h2>
       <form method="get" action="{{ base|na_raiz }}">
         <div class="rp-linha">
           <div>
@@ -106,46 +98,5 @@
   </div>
 </div>
 
-<script>
-(function () {
-  var folha = document.getElementById("rp-folha"), escala = document.getElementById("rp-escala"),
-      imprimir = document.getElementById("rp-imprimir"), montando = document.getElementById("rp-montando");
-  // A folha é A4 de largura fixa, como no papel: numa tela estreita ela é reduzida inteira para caber (a prévia de
-  // impressão), em vez de cortar a direita; a impressão sai sempre no tamanho certo (é a folha, não a prévia). Tabela
-  // que não quebra linha (a dos religamentos com +30 linhas, 13/10/2026) passa da largura do A4: o Chrome encolhe a
-  // página para caber ao imprimir, e a prévia faz o mesmo, alargando a folha até o conteúdo e reduzindo o todo.
-  function ajustar() {
-    try {
-      var d = folha.contentDocument;
-      folha.style.width = "";
-      for (var i = 0; i < 3 && d.documentElement.scrollWidth > folha.offsetWidth; i++) {
-        folha.style.width = d.documentElement.scrollWidth + "px";
-      }
-      var alt = Math.max(d.documentElement.scrollHeight, d.body ? d.body.scrollHeight : 0);
-      folha.style.height = alt + "px";
-      var cabe = escala.parentNode.clientWidth - 2 * parseFloat(getComputedStyle(escala.parentNode).paddingLeft || 0);
-      var s = Math.min(1, cabe / folha.offsetWidth);
-      folha.style.transform = s < 1 ? "scale(" + s + ")" : "";
-      escala.style.width = (folha.offsetWidth * s) + "px";
-      escala.style.height = (alt * s) + "px";
-    } catch (e) { /* folha de outra origem: fica o tamanho do CSS */ }
-  }
-  if (folha) {
-    folha.addEventListener("load", function () {
-      ajustar();
-      if (montando) montando.hidden = true;
-      imprimir.disabled = false;
-    });
-    window.addEventListener("resize", ajustar);
-    imprimir.addEventListener("click", function () {
-      try { folha.contentWindow.focus(); folha.contentWindow.print(); }
-      catch (e) { window.open(folha.src, "_blank", "noopener"); }
-    });
-  }
-  // o recorte em cascata: trocar o cliente ou o cluster recarrega as listas (sem gerar a folha)
-  document.querySelectorAll("[data-rp-cascata]").forEach(function (s) {
-    s.addEventListener("change", function () { s.form.submit(); });
-  });
-})();
-</script>
+<script src="{{ url_for('static', filename='relatorios.js') }}"></script>
 {% endblock %}

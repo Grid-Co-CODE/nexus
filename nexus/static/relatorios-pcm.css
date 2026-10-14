@@ -1,6 +1,8 @@
-/* Relatórios do PCM na Central (14/10/2026): o desenho da tela Relatórios do painel do PCM (js/relatorios.js: a coluna
-   da esquerda com "1 · Tipo", "2 · Período e recorte" e os emitidos; a folha à direita, no papel), nas cores do tema do
-   Nexus. A folha em si é um documento à parte, na moldura, com as cores de papel do PCM (nexus/pcm/relatorios). */
+/* As telas da Central de emissão (14/10/2026): o desenho da tela Relatórios do painel do PCM (js/relatorios.js: a coluna
+   da esquerda com os tipos, o período e o recorte e os emitidos; a folha à direita, no papel), nas cores do tema do
+   Nexus, para TODOS os relatórios (Levi: "Use a mesma estrutura do print 1 para todos os relatórios de todos os
+   setores"): à esquerda, os blocos de cada setor. A folha em si é um documento à parte, na moldura, com as cores de
+   papel do PCM (nexus/pcm/relatorios e nexus/pcm/relatorio_exec). */
 .rp-tela{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;align-items:start;margin-top:18px}
 @media (max-width:1100px){.rp-tela{grid-template-columns:minmax(0,1fr)}}
 /* a folha (largura fixa de A4) não pode alargar a coluna: ela é reduzida para caber (o script da tela) */
@@ -40,6 +42,23 @@
 .rp-nota{margin-top:12px;background:var(--verde-a16);border-left:3px solid var(--verde);padding:8px 11px;font-size:12.5px;
   color:var(--tinta-2);border-radius:0 var(--raio-controle) var(--raio-controle) 0}
 @media (max-width:640px){.rp-linha{grid-template-columns:1fr}.rp-papel{padding:10px}}
-/* o Relatório executivo (14/10/2026): o do PCM, inteiro numa moldura (a tela de partida, o modal e a folha) */
-.rp-moldura{display:block;width:100%;height:calc(100vh - 210px);min-height:560px;margin-top:14px;border:1px solid var(--linha);
-  border-radius:var(--raio-md);background:var(--fundo)}
+/* os blocos: a marca é a letra do PCM ou um ícone; o setor só aparece no item que o administrador mudou de setor */
+.rp-tipo .ic i{font-size:16px}
+.rp-tipo .qtd{display:table;margin-top:5px;font-size:11px;line-height:15px;padding:1px 8px;border-radius:999px;
+  border:1px solid var(--linha-forte);color:var(--tinta-2)}
+/* o Relatório executivo: os períodos prontos, as usinas e a opção das preventivas, como no modal do painel */
+.rp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.rp-usinas{margin-top:8px}
+.rp-usinas .gc-rotulo{margin-bottom:4px}
+.rp-usinas .gc-campo{width:100%;box-sizing:border-box}
+.rp-check{display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:12.5px;color:var(--tinta-2)}
+.rp-check input{margin-top:2px}
+.rp-esq .aviso{margin-top:10px;padding:8px 11px;font-size:12.5px}
+/* a folha do executivo se monta depois de ler os dados: fica escondida (mas medida) até avisar que acabou */
+.rp-escala--montando{visibility:hidden;height:0}
+.rp-erro{color:var(--critico)}
+/* os relatórios da plataforma: a tela dela na coluna da direita, pela moldura da porta única, sem título do Nexus em
+   cima (o 2º cabeçalho saiu em 13/10/2026): a grade começa no alto da página */
+.rp-tela--moldura{margin-top:0}
+.rp-dir--moldura .porta{height:calc(100vh - var(--topo) - 48px);min-height:600px;border:1px solid var(--linha);
+  border-radius:var(--raio-md);overflow:hidden;background:var(--fundo)}

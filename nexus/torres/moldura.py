@@ -189,7 +189,7 @@ def abas_da_tela(t, primeira: str, outras, atual: str = "") -> list[dict]:
     return out
 
 
-def _pagina(torre, t, reserva=None, tem_tv: bool = False, abas=None):
+def _pagina(torre, t, reserva=None, tem_tv: bool = False, abas=None, modelo_da_torre=None, extra=None):
     tela = torre.tela(t.tela)
     # As abas da tela (14/10/2026; Levi, sobre as chaves do Nexus: "bote essa informação na seção Chave das fontes!"): a
     # tela da plataforma é a aba padrão; `?aba=<id>` de uma página do Nexus abre a página dela, com as mesmas abas no topo
@@ -210,7 +210,7 @@ def _pagina(torre, t, reserva=None, tem_tv: bool = False, abas=None):
         destino = pedido
     # O modo TV só na tela registrada com TV; nas outras o ?tv=1 é ignorado e a tela é a de sempre
     na_tv = tem_tv and str(request.args.get("tv") or "") == "1"
-    modelo = "performance/moldura_tv.html" if na_tv else "performance/moldura.html"
+    modelo = "performance/moldura_tv.html" if na_tv else (modelo_da_torre or "performance/moldura.html")
     prazo = _prazo_da_tv() if na_tv else None
     contexto = {"torre": torre, "tela": tela, "estado": estado, "ligada": estado["ligada"], "motivo": estado["motivo"],
                 "plataforma": estado["plataforma"], "destino": destino, "passe": None, "recusa": None,
@@ -220,6 +220,8 @@ def _pagina(torre, t, reserva=None, tem_tv: bool = False, abas=None):
                 "tem_tv": tem_tv, "endereco_tv": _endereco(t, destino, tv=True) if tem_tv else "",
                 "sair_tv": _endereco(t, destino), "prazo_tv": prazo,
                 "abas": abas_da_tela(t, abas["primeira"], abas["outras"]) if abas else []}
+    if extra and not na_tv:
+        contexto.update(extra(t))
     if t.so_admin and not session.get("admin"):
         # spec 5.3: as chaves das fontes são administração. A plataforma recusa de novo (o passe diz quem é admin).
         contexto.update(recusa="As chaves das fontes (SunOp, Axis e Plataforma) são administração: abrem só para "
@@ -295,7 +297,8 @@ def _endpoint(t) -> str:
     return "moldura_" + t.tela.replace("-", "_")
 
 
-def registrar_molduras(bp, torre, reserva: dict | None = None, tv=(), abas: dict | None = None) -> None:
+def registrar_molduras(bp, torre, reserva: dict | None = None, tv=(), abas: dict | None = None, modelo: str | None = None,
+                       extra=None) -> None:
     """Uma view para cada tela do mapa que mora nesta torre (`/t/<torre>/<tela>`), vencendo o placeholder, e a rota do
     passe novo dela (`/t/<torre>/<tela>/passe`, só POST: `_passe_novo`). A tela tem de estar declarada na `TORRE` (é o
     que entra no menu): sem ela, o erro sai ao subir, não na mão de quem clica.
@@ -303,7 +306,9 @@ def registrar_molduras(bp, torre, reserva: dict | None = None, tv=(), abas: dict
     `tv` = as telas com modo TV (o botão "Modo TV" e o `?tv=1`); hoje só o Painel NOC.
     `abas` = {tela: {"primeira": nome da aba da plataforma, "outras": [(id, nome, função(abas) -> resposta)]}}: a tela
     da plataforma vira a 1ª aba e `?aba=<id>` abre a página do Nexus (14/10/2026: as Chaves do Nexus dentro das Chaves das
-    fontes)."""
+    fontes).
+    `modelo` e `extra` = a página da torre no lugar da `performance/moldura.html` e o que mais ela leva (função(t) ->
+    dict): os relatórios da plataforma na estrutura da Central de emissão (14/10/2026, os blocos à esquerda)."""
     abas = abas or {}
     reserva = reserva or {}
     for nome in tv:
@@ -316,7 +321,8 @@ def registrar_molduras(bp, torre, reserva: dict | None = None, tv=(), abas: dict
             COM_TV.add((t.torre, t.tela))
 
         def view(_t=t):
-            return _pagina(torre, _t, reserva.get(_t.tela), tem_tv=_t.tela in tv, abas=abas.get(_t.tela))
+            return _pagina(torre, _t, reserva.get(_t.tela), tem_tv=_t.tela in tv, abas=abas.get(_t.tela),
+                           modelo_da_torre=modelo, extra=extra)
 
         def passe_novo(_t=t):
             return _passe_novo(_t)

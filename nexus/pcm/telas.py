@@ -384,7 +384,9 @@ def _guardado(chave, fazer):
 
 
 def _gerencial(cfg) -> tuple[dict | None, str]:
-    """A planilha da Gerencial aberta com a senha do .env (só em memória: nunca vai para o banco nem para a página)."""
+    """A planilha da Gerencial aberta com a senha do .env (só em memória: nunca vai para o banco). Para a página, só a
+    Fila do Relatório executivo (o `manut` e o `bd`, nexus/pcm/relatorio_exec, 14/10/2026), porque o JS do painel faz a
+    conta no navegador, como o painel faz com a senha do login de administrador; e só para quem a tela deixa entrar."""
     senha = cfg.get("NEXUS_PCM_MPAS_SENHA")
     if not senha:
         return None, "sem_chave"

@@ -191,8 +191,11 @@ def test_o_setor_pcm_ve_os_quatro_sem_marcar_e_a_performance_nao(app, setores, p
 
 def test_a_tela_tem_o_tipo_o_periodo_o_recorte_e_so_gera_quando_pede(logado, pcm):
     html = logado.get("/t/relatorios/pcm-semanal").get_data(as_text=True)
-    assert "1 · Tipo" in html and "2 · Período e recorte" in html and "Emitidos automaticamente" in html
-    assert all(t.nome in html for t in TIPOS.values()) and 'aria-current="page"' in html
+    # a coluna da esquerda é a de toda a Central desde 14/10/2026: os blocos no lugar do "1 · Tipo" do painel
+    assert "Relatórios Padrão PCM" in html and "Relatório Gerencial PCM" in html and "1 · Tipo" not in html
+    assert "Período e recorte" in html and "Emitidos automaticamente" in html
+    assert all(t.nome in html for t in TIPOS.values())
+    assert 'class="rp-tipo on" data-relatorio="pcm-semanal"' in html and 'aria-current="page"' in html
     assert '<option value="2026-W42" selected>' in html                    # o fechamento traz a semana ativa
     assert "Cliente B" in html and "Pessoa Dois" in html and '<iframe id="rp-folha"' not in html
     html = logado.get("/t/relatorios/pcm-alerta").get_data(as_text=True)

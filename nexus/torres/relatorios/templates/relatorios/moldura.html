@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "relatorios/_lado.html" import blocos %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{# Um relatório da Plataforma de Performance na Central de emissão (14/10/2026, Levi: "Use a mesma estrutura do print 1
+   para todos os relatórios de todos os setores"): os blocos à esquerda, como nos do PCM, e a tela da plataforma na
+   coluna da direita, pela mesma moldura da porta única (performance/_porta.html). Sem título do Nexus em cima: a tela da
+   plataforma tem o dela, e o 2º cabeçalho saiu em 13/10/2026 ("Dá a impressão que é uma tela dentro de uma tela!").
+   O período e o recorte destes ficam dentro da própria tela da plataforma. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='relatorios-pcm.css') }}">
+<div class="rp-tela rp-tela--moldura">
+  <div class="rp-esq">{{ blocos(lado) }}</div>
+  <div class="rp-dir rp-dir--moldura">
+    {% include "performance/_porta.html" %}
+  </div>
+</div>
+{% endblock %}

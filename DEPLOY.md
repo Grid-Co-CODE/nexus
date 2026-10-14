@@ -463,6 +463,18 @@ fazer da T.I.:** leem os arquivos do repositório do PCM pela saída que o Nexus
 mandam e-mail. `NEXUS_PCM_RELATORIOS_AUTO=0` no `.env` desliga a emissão automática numa máquina (a tela segue). Regras:
 `nexus/pcm/relatorios/CLAUDE.md`.
 
+O Relatório executivo do PCM (Interno Grid, Cliente e Abertura da Semana, no bloco "Relatório Gerencial PCM" da mesma
+Central) mostra "MPA/MPS atrasadas" quando o servidor abre a planilha Gerencial do PCM (o `mpas.json`, cifrado no
+repositório público de lá). Para isso, **uma linha no `.env`** (o Levi passa o valor por fora; é segredo):
+
+```
+NEXUS_PCM_MPAS_SENHA=<a senha do login de administrador do painel do PCM>
+```
+
+e reiniciar. A mesma linha liga a criticidade e a observação da Gerencial na Gestão PCM do Nexus. Sem ela tudo funciona,
+e o relatório mostra "tarefas abertas há +30 dias" no lugar, como o painel do PCM sem a senha. Senha errada: a Gestão PCM
+avisa "a senha da Gerencial do .env não abriu o mpas.json". Regras: `nexus/pcm/relatorio_exec/CLAUDE.md`.
+
 ## 8. Atualizar
 
 Um comando, no servidor (desde 06/10/2026):

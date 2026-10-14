@@ -1,39 +1,42 @@
 {% extends "base.html" %}
+{% from "relatorios/_lado.html" import blocos %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {# A Central de emissão (13/10/2026, Levi: "Ficará filtrado no setor da pessoa, caso a pessoa seja administradora aparece
-   todos os relatórios. Aí a pessoa escolhe que tipo de relatório ela quer!"). Os cartões são as telas da torre que abrem
-   por dentro dela (nexus/torres/relatorios/__init__.py), filtradas pelo setor como o menu. #}
+   todos os relatórios. Aí a pessoa escolhe que tipo de relatório ela quer!"). Desde 14/10/2026 na estrutura de todas as
+   telas de relatório ("Use a mesma estrutura do print 1 para todos os relatórios de todos os setores"): os blocos à
+   esquerda (nexus/torres/relatorios/__init__.py, `lado`), filtrados pelo setor como o menu, e a folha à direita. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='relatorios-pcm.css') }}">
 <p class="gc-eyebrow">{{ torre.nome }}</p>
 <h1 class="titulo-pagina">{{ tela.nome }}</h1>
-<p class="lead">Escolha o relatório.
+<p class="lead">Escolha o relatório na coluna ao lado.
   {% if todos %}Como administrador, você vê todos.{% elif setor %}Aparecem os do setor {{ setor.nome }} e os liberados para ele.{% endif %}</p>
 
 {% if aviso %}<p class="aviso" role="status">{{ aviso }}</p>{% endif %}
 
 {% if not ligada and com_moldura %}
-<p class="aviso">A Plataforma de Performance ainda não está ligada neste servidor: os relatórios abrem quando ela estiver
-  ({{ motivo }}).</p>
+<p class="aviso">A Plataforma de Performance ainda não está ligada neste servidor: os relatórios dela abrem quando ela
+  estiver ({{ motivo }}).</p>
 {% endif %}
 
-{% if not cartoes %}
+{% if not lado %}
 <p class="aviso">Nenhum relatório liberado para o setor {{ setor.nome if setor else "" }}. Fale com o responsável.</p>
 {% else %}
-<div class="grade-torres grade-relatorios">
-  {% for c in cartoes %}
-  <a class="card-torre card-relatorio" data-relatorio="{{ c.tela.id }}" href="{{ c.url|na_raiz }}">
-    <div class="cab"><i class="ph ph-{{ c.icone }}"></i><span class="nome">{{ c.tela.nome }}</span>
-      {% if c.area %}<span class="qtd">{{ c.area }}</span>{% endif %}</div>
-    <p>{{ c.tela.pergunta }}</p>
-  </a>
-  {% endfor %}
+<div class="rp-tela">
+  <div class="rp-esq">{{ blocos(lado) }}</div>
+  <div class="rp-dir">
+    <div class="rp-prev">
+      <div class="rp-papel"><p class="rp-vazio rp-sem-folha">Escolha o relatório na coluna ao lado: o período e o recorte
+        aparecem embaixo dele, e a folha, aqui.</p></div>
+    </div>
+  </div>
 </div>
 {% endif %}
 
 {% if admin and cartoes %}
 {# O setor de cada relatório (14/10/2026, Levi: "adicione a opção de eu escolher de qual setor é o relatório! Apenas
-   administradores podem editar!"): o setor dono vê o relatório sem marcar em Base → Acessos e aparece no cartão. A
-   escolha vale por cima do padrão do código (nexus/auth/dono_relatorio.py); só o que mudou vai ao banco. #}
+   administradores podem editar!"): o setor dono vê o relatório sem marcar em Base → Acessos. A escolha vale por cima do
+   padrão do código (nexus/auth/dono_relatorio.py); só o que mudou vai ao banco. #}
 <section class="bloco setor-relatorios" id="setor-dos-relatorios" aria-labelledby="sr-titulo">
   <div class="linha-bloco">
     <h2 id="sr-titulo">Setor de cada relatório</h2>

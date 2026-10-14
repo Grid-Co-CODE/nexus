@@ -1,6 +1,7 @@
 """As telas dos relatórios do PCM na Central de emissão (torre Relatórios), no desenho da tela Relatórios do painel do PCM:
-"1 · Tipo", "2 · Período e recorte" (dia ou semana, cliente, cluster ou supervisor), Gerar, a folha ao lado com
-"Imprimir / PDF" e "Abrir em nova aba", e os emitidos automaticamente.
+os blocos de relatórios da Central (no lugar do "1 · Tipo" do painel, 14/10/2026: a mesma coluna em toda a Central), o
+"Período e recorte" (dia ou semana, cliente, cluster ou supervisor), Gerar, a folha ao lado com "Imprimir / PDF" e
+"Abrir em nova aba", e os emitidos automaticamente.
 
 - `/t/relatorios/pcm-<tipo>`: a tela. É leve (a pré-carga a abre a cada 2 min para quem é do setor): lê só o
   banco_dados.json (cópia de 5 min) para as semanas e o recorte, e nunca monta a folha sozinha;
@@ -15,7 +16,6 @@ from urllib.parse import urlencode
 
 from flask import Response, abort, current_app, render_template, request
 
-from ...auth import setor_telas
 from .. import fonte
 from . import TIPOS, arquivo, dados, emitir
 from .alerta import semana_nova
@@ -72,7 +72,7 @@ def _folha_simples(titulo: str, texto: str, status: int = 200) -> Response:
     return Response(corpo, status=status, mimetype="text/html", headers={"Cache-Control": "no-store"})
 
 
-def pagina(torre, tipo_id: str):
+def pagina(torre, tipo_id: str, lado):
     tipo = TIPOS[tipo_id]
     cfg = current_app.config
     leitura = fonte.ler(cfg)
@@ -86,9 +86,6 @@ def pagina(torre, tipo_id: str):
         q = {("dia" if tipo.por == "dia" else "semana"): ref}
         q.update({k: v for k, v in (("cliente", cliente), ("grupo", grupo)) if v})
         folha_url = f"{base}/folha?{urlencode(q)}"
-    liberadas = setor_telas.liberadas_do_menu()
-    tipos = [t for t in TIPOS.values()
-             if liberadas is None or setor_telas.chave(torre.id, t.tela_id) in liberadas]
     try:
         guardados = arquivo.listar(cfg, [tipo.id])
     except RuntimeError:            # teste sem pasta de dados: a lista fica vazia
@@ -96,7 +93,8 @@ def pagina(torre, tipo_id: str):
     emitidos = [{"ref": e["ref"], "rotulo": _rotulo(tipo, e["ref"], bd),
                  "quando": e["gerado"].strftime("%d/%m %H:%M") if e["gerado"] else "",
                  "url": f"{base}/emitido/{e['ref']}"} for e in guardados]
-    return render_template("relatorios/pcm.html", torre=torre, tela=torre.tela(tipo.tela_id), tipo=tipo, tipos=tipos,
+    return render_template("relatorios/pcm.html", torre=torre, tela=torre.tela(tipo.tela_id), tipo=tipo,
+                           lado=lado(tipo.tela_id),
                            base=base, ref=ref, cliente=cliente, grupo=grupo, semanas=dados.semanas(bd),
                            opcoes=dados.opcoes(bd, cliente, grupo), folha_url=folha_url, emitidos=emitidos,
                            rotulo_ref=_rotulo(tipo, ref, bd) if ref else "",
@@ -133,10 +131,11 @@ def emitido(tipo_id: str, ref: str):
     return Response(_com_margem_de_tela(html), mimetype="text/html")
 
 
-def registrar(bp, torre) -> None:
-    """As rotas das quatro telas na torre Relatórios (vencem o placeholder `/<tela_id>` da torre)."""
+def registrar(bp, torre, lado) -> None:
+    """As rotas das quatro telas na torre Relatórios (vencem o placeholder `/<tela_id>` da torre). `lado` = os blocos da
+    coluna da esquerda da Central (`nexus/torres/relatorios`, função(tela_id) -> blocos)."""
     for tipo in TIPOS.values():
-        bp.add_url_rule(f"/{tipo.tela_id}", endpoint=f"{tipo.tela_id}", view_func=partial(pagina, torre, tipo.id))
+        bp.add_url_rule(f"/{tipo.tela_id}", endpoint=f"{tipo.tela_id}", view_func=partial(pagina, torre, tipo.id, lado))
         bp.add_url_rule(f"/{tipo.tela_id}/folha", endpoint=f"{tipo.tela_id}_folha", view_func=partial(folha, tipo.id))
         bp.add_url_rule(f"/{tipo.tela_id}/emitido/<ref>", endpoint=f"{tipo.tela_id}_emitido",
                         view_func=partial(emitido, tipo.id))

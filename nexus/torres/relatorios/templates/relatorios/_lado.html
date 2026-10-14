@@ -1,0 +1,20 @@
+{# A coluna da esquerda de todas as telas da Central de emissão (14/10/2026, Levi: "Use a mesma estrutura do print 1 para
+   todos os relatórios de todos os setores e aí vai ficar filtrado por setor"): os blocos com os relatórios que quem
+   entrou pode ver (todos, para o administrador). Montados em nexus/torres/relatorios/__init__.py (`lado`). O setor só
+   aparece no item que o administrador tirou do setor do bloco. #}
+{% macro blocos(lado) %}
+{% for b in lado %}
+<section class="rp-card rp-bloco" aria-labelledby="rp-b-{{ b.id }}">
+  <h2 id="rp-b-{{ b.id }}">{{ b.titulo }}</h2>
+  <div class="rp-tipos">
+    {% for it in b.itens %}
+    <a class="rp-tipo{% if it.on %} on{% endif %}" data-relatorio="{{ it.tela }}" href="{{ it.url|na_raiz }}"
+       {% if it.on %}aria-current="page"{% endif %}>
+      <span class="ic" aria-hidden="true">{% if it.icone %}<i class="ph ph-{{ it.icone }}"></i>{% else %}{{ it.letra }}{% endif %}</span>
+      <span><b>{{ it.nome }}</b><span>{{ it.descricao }}</span>{% if it.tag %}<span class="qtd">{{ it.tag }}</span>{% endif %}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endmacro %}

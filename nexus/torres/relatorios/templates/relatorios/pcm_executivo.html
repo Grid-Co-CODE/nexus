@@ -1,14 +1,102 @@
 {% extends "base.html" %}
-{% block titulo %}{{ tela.nome }}{% endblock %}
+{% from "relatorios/_lado.html" import blocos %}
+{% block titulo %}{{ tipo.nome }} · Relatório Gerencial PCM{% endblock %}
 {% block conteudo %}
 {# O Relatório executivo do PCM (14/10/2026, Levi: "Quero trazer esses três relatórios para a plataforma, com as mesmas
-   métricas e parâmetros e estilos"): a cópia do js/relatorio_exec.js do painel, numa moldura (nexus/pcm/relatorio_exec).
-   O modal, os tipos (Interno Grid, Cliente, Abertura da Semana), o período, o escopo e a folha são os do PCM. #}
+   métricas e parâmetros e estilos"): a cópia do js/relatorio_exec.js do painel (nexus/pcm/relatorio_exec). Na estrutura
+   de toda a Central ("Use a mesma estrutura do print 1 para todos os relatórios"): os três tipos são itens do bloco
+   "Relatório Gerencial PCM", o período e o escopo do modal do painel ficam aqui na coluna (os mesmos campos, os mesmos
+   presets, a mesma cascata cliente → usinas) e a folha é a do PCM, montada na moldura da direita. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='relatorios-pcm.css') }}">
-<p class="gc-eyebrow">{{ torre.nome }} · PCM</p>
-<h1 class="titulo-pagina">{{ tela.nome }}</h1>
-<p class="lead">O relatório executivo da aba Gestão PCM do painel do PCM: Interno Grid, Cliente ou Abertura da Semana, com
-  o período e o escopo de lá. Gerado com o dado de agora da Gestão PCM, da programação semanal e da Confiabilidade; "Imprimir
-  / PDF" imprime só a folha.</p>
-<iframe class="rp-moldura" title="{{ tela.nome }}" src="{{ painel|na_raiz }}"></iframe>
+<p class="gc-eyebrow">{{ torre.nome }} · Relatório Gerencial PCM</p>
+<h1 class="titulo-pagina">{{ tipo.nome }}</h1>
+<p class="lead">{{ tipo.descricao[:1]|upper }}{{ tipo.descricao[1:] }}. Gerado com o dado de agora da Gestão PCM, da
+  programação semanal, da Confiabilidade e da Gerencial; as regras são as do relatório executivo do painel do PCM.</p>
+{% if erro_fonte %}<p class="aviso">Não consegui ler a Gestão PCM agora ({{ erro_fonte }}): as listas de cliente, cluster e
+  usina ficam vazias até ela voltar.</p>{% endif %}
+
+<div class="rp-tela">
+  <div class="rp-esq">
+    {{ blocos(lado) }}
+
+    <section class="rp-card" aria-labelledby="rx-t2">
+      <h2 id="rx-t2">{% if tipo.id == 'semana' %}Escopo{% else %}Período e escopo{% endif %}</h2>
+      <form method="get" action="{{ base|na_raiz }}" id="rx-form">
+        <input type="hidden" name="tipo" value="{{ tipo.id }}">
+        {% if tipo.id == 'semana' %}
+        <p class="rp-vazio">A Abertura da Semana usa a semana mais recente da programação (banco de dados); o período não
+          se aplica. O escopo abaixo vale.</p>
+        {% else %}
+        <div class="rp-chips" role="group" aria-label="Período pronto">
+          {% for k, rotulo in presets %}<button type="button" class="gc-chip" data-p="{{ k }}" aria-pressed="false">{{ rotulo }}</button>{% endfor %}
+        </div>
+        <div class="rp-linha">
+          <div>
+            <label class="gc-rotulo" for="rx-de">De</label>
+            <input class="gc-campo" type="date" id="rx-de" name="de" value="{{ p.de }}" required>
+          </div>
+          <div>
+            <label class="gc-rotulo" for="rx-ate">Até</label>
+            <input class="gc-campo" type="date" id="rx-ate" name="ate" value="{{ p.ate }}" required>
+          </div>
+        </div>
+        {% endif %}
+        <div class="rp-linha">
+          <div>
+            <label class="gc-rotulo" for="rx-cli">Cliente</label>
+            <select class="gc-campo" id="rx-cli" name="cli">
+              <option value="">Todos os clientes</option>
+              {% for c in clientes %}<option {% if c == p.cli %}selected{% endif %}>{{ c }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="gc-rotulo" for="rx-clu">Equipe Cluster</label>
+            <select class="gc-campo" id="rx-clu" name="clu">
+              <option value="">Todos</option>
+              {% for c in clusters %}<option {% if c == p.clu %}selected{% endif %}>{{ c }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="rp-usinas">
+          <label class="gc-rotulo" for="rx-usi">Usinas <span class="mudo">(ctrl+clique para várias; vazio = todas do escopo)</span></label>
+          <select class="gc-campo" id="rx-usi" name="usi" multiple size="7">
+            {% for u in usinas %}<option {% if u in p.usi %}selected{% endif %}>{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        {% if tipo.id != 'semana' %}
+        <label class="rp-check"><input type="checkbox" name="semprev" value="1" {% if p.semprev %}checked{% endif %}>
+          <span>Desconsiderar preventivas <b>criadas no período</b> <span class="mudo">(ex.: MPMs do mês seguinte já lançadas)</span></span></label>
+        {% endif %}
+        <p class="aviso" id="rx-aviso" role="alert" {% if not erro %}hidden{% endif %}>{{ erro }}</p>
+        <div class="rp-acoes">
+          <button class="gc-btn gc-btn--primario" type="submit" name="gerar" value="1">Gerar</button>
+          {% if aba_url %}<a class="gc-btn gc-btn--contorno" href="{{ aba_url|na_raiz }}" target="_blank" rel="noopener">Abrir em nova aba</a>{% endif %}
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="rp-dir">
+    <div class="rp-prev">
+      <div class="rp-bar">
+        <button class="gc-btn gc-btn--primario" type="button" id="rp-imprimir" disabled>Imprimir / PDF</button>
+        <span class="rp-dica">{% if folha_url %}{{ dica }}{% else %}escolha o período e o escopo e clique em Gerar{% endif %}</span>
+      </div>
+      <div class="rp-papel">
+        {% if folha_url %}
+        <p class="rp-vazio rp-montando" id="rp-montando">Montando a folha com o dado de agora do PCM…</p>
+        <div class="rp-escala rp-escala--montando" id="rp-escala"><iframe id="rp-folha" title="{{ tipo.nome }}"
+          src="{{ folha_url|na_raiz }}" data-espera="aviso" data-margem=".rex-a4"></iframe></div>
+        {% else %}
+        <p class="rp-vazio rp-sem-folha">A folha aparece aqui.</p>
+        {% endif %}
+      </div>
+    </div>
+    <p class="rp-nota"><b>Como funciona:</b> a folha é a do relatório executivo do painel do PCM, montada com os mesmos
+      dados e as mesmas contas. "Imprimir / PDF" imprime só a folha; para guardar, escolha "Salvar como PDF" na impressão.
+      Nada é gravado ao gerar.</p>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='relatorios.js') }}"></script>
 {% endblock %}

@@ -12,7 +12,7 @@ from . import alerta, dados, diario, fechamento, tarde
 @dataclass(frozen=True)
 class Tipo:
     id: str            # o do arquivo e do endereço: /t/relatorios/pcm-<id>
-    letra: str         # o ícone da lista "1 · Tipo", como no painel do PCM
+    letra: str         # a marca do item no bloco "Relatórios Padrão PCM" (a do "1 · Tipo" do painel do PCM)
     nome: str
     descricao: str     # a linha de baixo da lista, a mesma do painel
     por: str           # "dia" ou "semana": o que se escolhe para emitir
