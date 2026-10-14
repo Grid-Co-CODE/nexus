@@ -241,6 +241,20 @@ def _telas_no_clique(base: str, sessao) -> dict:
                       lambda: ler(base, sessao, forcar=True))
 
 
+def escolhas_de_dono() -> dict[str, int | None]:
+    """{torre/tela: setor_id ou None} dos relatórios cujo setor dono o administrador escolheu na Central de emissão
+    (14/10/2026, `dono_relatorio.py`); o que não está aqui segue o `Tela.do_setor` do código. No caminho do clique, com a
+    mesma cópia de 1 minuto e releitura em segundo plano das telas por setor; banco fora = só o padrão do código."""
+    from . import dono_relatorio as DR
+    try:
+        base, sessao = _banco()
+        d = _no_clique("donos", DR._CACHE, DR.TTL_S, lambda: DR.ler(base, _Curta(sessao), forcar=True),
+                       lambda: DR.ler(base, sessao, forcar=True))
+    except Exception:            # noqa: BLE001 — sem o endereço do banco (os testes de cada tela), por exemplo
+        return {}
+    return DR.vigentes(d.get("decisoes") or [])
+
+
 # ── a pessoa do login ───────────────────────────────────────────────────────────────────────────────────────────────
 def _banco():
     from ..campo import visao
@@ -303,7 +317,7 @@ def acesso() -> dict:
                 d = _telas_no_clique(base, sessao)
                 # erro só quando nunca houve leitura boa: com a cópia velha, vale ela
                 # as marcas do setor, as telas que são DELE (Tela.do_setor) e a de fora de cada uma
-                telas = vigentes(d["decisoes"]).get(setor["id"], set()) | das_do_setor(setor["nome"])
+                telas = vigentes(d["decisoes"]).get(setor["id"], set()) | das_do_setor(setor)
                 r = {"tudo": False, "telas": com_as_de_fora(telas), "setor": setor,
                      "erro": d["erro"] if not d.get("lido_em") else ""}
             else:
@@ -325,16 +339,51 @@ def _sem_acento(texto) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", str(texto or "")) if unicodedata.category(c) != "Mn").strip().lower()
 
 
-def das_do_setor(nome_setor) -> set[str]:
-    """As telas que são DO setor (`Tela.do_setor`, pelo nome, sem acento nem caixa): quem é dele as vê sem marcar
-    (13/10/2026, Levi, sobre os relatórios da Central de emissão: "Potência ativa faz parte da performance!" e "Esses
-    dois são do setor performance"). Setor de outro nome não ganha nada; a marca em Base → Acessos segue valendo para
-    ele."""
-    alvo = _sem_acento(nome_setor)
-    if not alvo:
+def das_do_setor(setor) -> set[str]:
+    """As telas que são DO setor: quem é dele as vê sem marcar (13/10/2026, Levi, sobre os relatórios da Central de
+    emissão: "Potência ativa faz parte da performance!" e "Esses dois são do setor performance"). Setor de outro nome
+    não ganha nada; a marca em Base → Acessos segue valendo para ele.
+    O dono é o que o administrador escolheu na Central (14/10/2026, `escolhas_de_dono`, pelo setor_id: o setor renomeado
+    continua dono) e, sem escolha, o `Tela.do_setor` do código, pelo nome (sem acento nem caixa). `setor` é o dict
+    {"id", "nome"} da pessoa ou só o nome (aí a escolha casa pelo nome de agora do setor escolhido)."""
+    nome = setor.get("nome") if isinstance(setor, dict) else setor
+    sid = setor.get("id") if isinstance(setor, dict) else None
+    alvo = _sem_acento(nome)
+    if not alvo and sid is None:
         return set()
-    return {chave(t.id, s.id) for t in current_app.extensions.get("nexus_torres", []) for s in t.telas
-            if s.do_setor and _sem_acento(s.do_setor) == alvo}
+    escolhas = escolhas_de_dono()
+    nomes: dict = {}
+    if escolhas and sid is None:
+        try:
+            st = _setores_no_clique(*_banco())
+            nomes = {s["setor_id"]: s["nome"] for s in S.ativos(st.get("setores") or [])}
+        except Exception:        # noqa: BLE001 — sem os nomes, a escolha não casa por nome
+            nomes = {}
+    out = set()
+    for t in current_app.extensions.get("nexus_torres", []):
+        for s in t.telas:
+            k = chave(t.id, s.id)
+            if k in escolhas:
+                dono = escolhas[k]
+                if dono is not None and (dono == sid or (sid is None and _sem_acento(nomes.get(dono)) == alvo)):
+                    out.add(k)
+            elif alvo and s.do_setor and _sem_acento(s.do_setor) == alvo:
+                out.add(k)
+    return out
+
+
+def dono_de(torre_id: str, tela, escolhas: dict, setores: list[dict]) -> dict:
+    """O dono de agora de um relatório, para a Central: {"setor_id" (None = nenhum), "nome", "escolhido" (a escolha da
+    Central) ou False (o padrão do código, pelo nome)}. `setores` = os ativos ({setor_id, nome})."""
+    k = chave(torre_id, tela.id)
+    if k in escolhas:
+        sid = escolhas[k]
+        nome = next((s["nome"] for s in setores if s["setor_id"] == sid), "setor excluído" if sid is not None else "")
+        return {"setor_id": sid, "nome": nome, "escolhido": True}
+    alvo = _sem_acento(tela.do_setor)
+    s = next((s for s in setores if alvo and _sem_acento(s["nome"]) == alvo), None)
+    return {"setor_id": s["setor_id"] if s else None, "nome": s["nome"] if s else (tela.do_setor or ""),
+            "escolhido": False}
 
 
 def com_as_de_fora(telas: set[str]) -> set[str]:

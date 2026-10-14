@@ -361,6 +361,20 @@ FATOS = (
                     "(torre/tela, o mesmo de /t/torre/tela). Tela nunca marcada = fechada; administrador do Nexus vê "
                     "tudo sem precisar de marca (setor nenhum dá administrador). Nada de nome nem e-mail (regra 8): quem decidiu vai em "
                     "decidida_por_hmac e no log da máquina"),
+    # O setor dono de cada relatório da Central de emissão (14/10/2026, Levi: "adicione a opção de eu escolher de qual
+    # setor é o relatório! Apenas administradores podem editar!"): por cima do padrão do código (Tela.do_setor).
+    Fato("decisao_dono_relatorio", "Setor dono de cada relatório", "base",
+         "nexus_relatorio_setor · fato_decisao_dono_relatorio",
+         "1 linha = 1 decisão do setor dono de 1 relatório da Central de emissão (setor vazio = nenhum setor), tomada "
+         "por um administrador na própria Central",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)")),
+         tipo="sem_medida", chave=("decidida_em", "tela"),
+         fontes=("nexus_relatorio_setor · fato_decisao_dono_relatorio",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada relatório)",
+         observacao="o setor liga pelo setor_id à nexus_setores · dim_setor; a tela é o endereço do relatório "
+                    "(relatorios/<tela>). O setor dono vê o relatório sem marca na matriz de Base > Acessos; sem "
+                    "decisão vale o setor padrão do código, pelo nome. Nada de nome nem e-mail (regra 8): quem decidiu "
+                    "vai em decidida_por_hmac e no log da máquina"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -721,6 +735,12 @@ LIVROS = (
           "nexus/auth/setor_telas.py, pela tela Base > Acessos", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º Salvar na tela; o portão de cada pedido e a "
           "tela leem com cache de 1 minuto, e a gravação relê o banco antes"),
+    Livro("nexus_relatorio_setor", ("fato_decisao_dono_relatorio",),
+          "a cada Salvar da seção Setor de cada relatório (Relatórios > Central de emissão)",
+          "nexus/auth/dono_relatorio.py, pela Central de emissão", False,
+          "registrado em 14/10/2026 antes de existir: nasce com o 1º Salvar; livro próprio porque gravar troca o livro "
+          "inteiro (no nexus_setor_telas uma gravação apagaria a outra aba); o portão e a Central leem com cache de 1 "
+          "minuto, e a gravação relê o banco antes"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.

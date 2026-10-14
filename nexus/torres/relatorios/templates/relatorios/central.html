@@ -9,6 +9,8 @@
 <p class="lead">Escolha o relatório.
   {% if todos %}Como administrador, você vê todos.{% elif setor %}Aparecem os do setor {{ setor.nome }} e os liberados para ele.{% endif %}</p>
 
+{% if aviso %}<p class="aviso" role="status">{{ aviso }}</p>{% endif %}
+
 {% if not ligada and com_moldura %}
 <p class="aviso">A Plataforma de Performance ainda não está ligada neste servidor: os relatórios abrem quando ela estiver
   ({{ motivo }}).</p>
@@ -26,5 +28,43 @@
   </a>
   {% endfor %}
 </div>
+{% endif %}
+
+{% if admin and cartoes %}
+{# O setor de cada relatório (14/10/2026, Levi: "adicione a opção de eu escolher de qual setor é o relatório! Apenas
+   administradores podem editar!"): o setor dono vê o relatório sem marcar em Base → Acessos e aparece no cartão. A
+   escolha vale por cima do padrão do código (nexus/auth/dono_relatorio.py); só o que mudou vai ao banco. #}
+<section class="bloco setor-relatorios" id="setor-dos-relatorios" aria-labelledby="sr-titulo">
+  <div class="linha-bloco">
+    <h2 id="sr-titulo">Setor de cada relatório</h2>
+    <p class="mudo">Só administradores veem e mudam. O setor dono vê o relatório sem marcar nada em Base → Acessos;
+      outro setor só vê se for marcado lá. "Nenhum setor": só os administradores e os setores marcados.</p>
+  </div>
+  {% if erro_setores %}
+  <div class="linha-bloco"><span></span><p class="aviso">Não consegui ler os setores no banco ({{ erro_setores }}): a
+    escolha fica para quando ele voltar.</p></div>
+  {% else %}
+  <form method="post" action="{{ ('/t/' ~ torre.id ~ '/central')|na_raiz }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    {% for c in cartoes %}
+    <div class="linha-bloco">
+      <label for="dono-{{ c.tela.id }}">{{ c.tela.nome }}</label>
+      <div>
+        <select class="gc-campo" id="dono-{{ c.tela.id }}" name="dono:{{ c.tela.id }}">
+          <option value="" {% if c.dono.setor_id is none %}selected{% endif %}>Nenhum setor</option>
+          {% for s in setores %}<option value="{{ s.setor_id }}" {% if c.dono.setor_id == s.setor_id %}selected{% endif %}>{{ s.nome }}</option>{% endfor %}
+        </select>
+        {% if not c.dono.escolhido %}<span class="mudo">padrão{% if c.dono.setor_id is none and c.tela.do_setor %}: {{ c.tela.do_setor }} (não há setor com esse nome){% endif %}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    <div class="linha-bloco">
+      <span></span>
+      <div><button class="gc-btn gc-btn--primario" type="submit" {% if not pode_gravar %}disabled{% endif %}>Salvar</button>
+        {% if not pode_gravar %}<span class="mudo">este Nexus não tem a chave de gravação do banco</span>{% endif %}</div>
+    </div>
+  </form>
+  {% endif %}
+</section>
 {% endif %}
 {% endblock %}

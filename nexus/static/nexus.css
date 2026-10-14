@@ -347,6 +347,10 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .card-torre--construcao:hover{background:var(--superficie)}
 /* Relatórios → Central de emissão (13/10/2026): os relatórios do setor, um cartão por relatório */
 .grade-relatorios{margin-top:18px}
+/* O setor de cada relatório (14/10/2026): a escolha do administrador, embaixo dos cartões da Central */
+.setor-relatorios h2{margin:0;font:600 15px/20px var(--font-sans);color:var(--tinta)}
+.setor-relatorios .mudo{margin:0}
+.setor-relatorios select{min-width:220px;max-width:100%}
 /* Base → Acessos: a tela que é DO setor (Tela.do_setor), marcada e presa */
 .ace-do-setor{margin-left:8px;font-size:11.5px;color:var(--verde-texto);background:var(--verde-suave);padding:1px 7px;
   border-radius:var(--raio-tag)}

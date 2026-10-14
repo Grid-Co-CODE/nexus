@@ -36,6 +36,7 @@ RESUMO = {
     # ── Base ──
     "decisao_setor": "O setor de cada pessoa do Fracttal, escolhido na tela",
     "decisao_tela_setor": "Que telas do Nexus cada setor vê, marcado na tela Acessos",
+    "decisao_dono_relatorio": "O setor dono de cada relatório, escolhido na Central",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -108,6 +109,10 @@ PARA_QUE = {
                      "administrador na tela Integração Fracttal; a lista de setores fica no mesmo livro. O setor de cada "
                      "pessoa é a última decisão dela, e as de antes contam quando ela mudou. Não guarda nome nem e-mail: "
                      "a pessoa vai pelo número do Fracttal e pela ficha do cadastro.",
+    "decisao_dono_relatorio": "Guarda cada escolha do setor dono de um relatório da Central de emissão, feita por um "
+                              "administrador na própria Central. O setor dono vê o relatório sem marcar nada em "
+                              "Acessos e aparece no cartão; sem escolha, vale o setor padrão de cada relatório. Não "
+                              "guarda nome nem e-mail de quem escolheu.",
     "decisao_tela_setor": "Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
                           "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "

@@ -223,9 +223,15 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
   dentro de outra (`Tela.dentro_de`) não é item do menu, mas é marcada na matriz como qualquer tela; quem tem ela
   liberada vê a de fora sem marcá-la (`setor_telas.com_as_de_fora`, no `acesso`): o relatório liberado traz a Central.
 - **Tela do setor (13/10/2026).** `Tela.do_setor` = o setor dono, pelo nome (sem acento nem caixa): quem é dele vê a
-  tela SEM marca (`setor_telas.das_do_setor`, somada às marcas no `acesso`). Os três relatórios da Central são da
-  Performance (Levi: "Potência ativa faz parte da performance!", "Esses dois são do setor performance"). Na matriz a caixa
-  dela aparece marcada e presa, com "do setor", e o Salvar não grava decisão para ela; outro setor segue pela marca.
+  tela SEM marca (`setor_telas.das_do_setor`, somada às marcas no `acesso`). Os três relatórios da plataforma na Central
+  são da Performance (Levi: "Potência ativa faz parte da performance!", "Esses dois são do setor performance") e os quatro
+  do PCM, do PCM. Na matriz a caixa dela aparece marcada e presa, com "do setor", e o Salvar não grava decisão para ela;
+  outro setor segue pela marca. **O dono de cada relatório se escolhe na Central** (14/10/2026, Levi: "adicione a opção
+  de eu escolher de qual setor é o relatório! Apenas administradores podem editar!"): a seção "Setor de cada relatório",
+  só para administrador, grava no livro PRÓPRIO `nexus_relatorio_setor` (`auth/dono_relatorio.py`; não no
+  `nexus_setor_telas`, porque gravar troca o livro inteiro e uma gravação apagaria a outra aba). A escolha vale por cima do
+  `do_setor` do código, pelo `setor_id` (o setor renomeado continua dono; `setor_telas.escolhas_de_dono`, cópia de 1 min
+  como a das telas); "Nenhum setor" = só o administrador e os marcados. Prova: `tests/test_relatorios_dono_setor.py`.
 - **Quem vê o quê.** Administrador é **só** a lista de Administradores (`NEXUS_ADMINS`, a lista desta tela, a senha):
   vê tudo, com ou sem setor, porque é quem configura e não pode ficar trancado fora. **Setor nunca dá administrador**:
   um setor chamado "Administrador" é setor como os outros (existiu assim por algumas horas em 12/10/2026 e saiu), e o

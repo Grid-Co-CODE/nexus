@@ -98,10 +98,11 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
     pessoas = Counter(v for v in S.vigentes(st["decisoes"]).values() if v)
     # a conta de cada setor leva as telas que são DELE (Tela.do_setor, 13/10/2026): ele as vê sem marcar
     setores = [{"id": s["setor_id"], "nome": s["nome"], "pessoas": pessoas.get(s["setor_id"], 0),
-                "telas": len((matriz.get(s["setor_id"], set()) | ST.das_do_setor(s["nome"])) & todas)}
+                "telas": len((matriz.get(s["setor_id"], set()) | ST.das_do_setor({"id": s["setor_id"], "nome": s["nome"]}))
+                             & todas)}
                for s in S.ativos(st["setores"])]
     sel = next((s for s in setores if s["id"] == escolhido), None) or (setores[0] if setores else None)
-    do_setor = ST.das_do_setor(sel["nome"]) if sel else set()
+    do_setor = ST.das_do_setor(sel) if sel else set()
     marcadas = (matriz.get(sel["id"], set()) if sel else set()) | do_setor
     arvore = []
     for t in torres:
@@ -229,7 +230,7 @@ def _gravar_telas():
         if not setor:
             raise ST.Recusada("Setor desconhecido ou excluído (a lista mudou desde que a tela abriu): nada foi gravado.")
         # as telas que são DO setor (Tela.do_setor) não passam pela matriz: ele as vê sempre, marcadas ou não
-        do_setor = ST.das_do_setor(setor["nome"])
+        do_setor = ST.das_do_setor({"id": setor["setor_id"], "nome": setor["nome"]})
         r = ST.gravar(sid, [m for m in marcadas if m not in do_setor], _todas_as_telas() - do_setor, cfg, base, sessao,
                       _meu_email())
     except ST.Recusada as ex:

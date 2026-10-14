@@ -15,6 +15,8 @@ Cliente, Abertura da Semana): ainda não vieram (são outro código, só em Java
 - **As entradas** são os mesmos arquivos do mesmo repositório (`dados.py`, pelo `nexus/pcm/fonte.py`, cópia de 5 min):
   `banco_dados.json` e `gestao_pcm.json` (obrigatórios), `gerencial.json`, `engenharia.json`, `operacoes.json` e
   `relatorios/feriados.json` (sem eles a parte deles sai vazia, como no PCM). Nada vai ao Fracttal.
+- **O setor:** os quatro nascem do setor PCM (quem é do PCM os vê sem marcar); o administrador troca o setor de cada
+  um na Central de emissão, seção "Setor de cada relatório" (`nexus/auth/dono_relatorio.py`).
 - **A tela** é a da tela Relatórios do painel (`telas.py`, `templates/relatorios/pcm.html` da torre Relatórios,
   `static/relatorios-pcm.css`): "1 · Tipo", "2 · Período e recorte" (dia ou semana, cliente, cluster ou supervisor,
   em cascata como as outras telas do PCM), Gerar, a folha ao lado (na moldura, reduzida inteira para caber, como a
