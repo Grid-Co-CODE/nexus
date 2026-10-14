@@ -21,8 +21,9 @@
     <div class="cn-frescor">Dashboard Thopen<br><b>livro thopen_contestacoes</b></div>
   </div>
   {% if d.erro %}<div class="cn-erro" role="alert"><b>{{ d.erro }}.</b></div>{% endif %}
-  {% if d.sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave das contestações (NEXUS_CONTESTACAO_CHAVE_PRIVADA).</b>
-    As contestações aparecem sem o nome, o contato e a mensagem do cliente, que vão cifrados no banco.</div>{% endif %}
+  {% if d.sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave das contestações.</b>
+    As contestações aparecem sem o nome, o contato e a mensagem do cliente, que vão cifrados no banco. Um administrador
+    cola a chave em <a href="{{ raiz }}/t/base/chaves-nexus">Base → Chaves do Nexus</a>, sem a T.I.</div>{% endif %}
 
   <nav class="cn-abas" aria-label="Setor">
     {% for s, rot in setores %}<a href="?setor={{ s }}"{% if s == setor %} aria-current="page"{% endif %}>{{ rot }}<i>{{ d.contagem.get(s, 0) }}</i></a>{% endfor %}

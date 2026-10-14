@@ -17,8 +17,6 @@ import base64
 import json
 from datetime import datetime, timedelta, timezone
 
-from flask import current_app
-
 from ..dados import fatos as D
 from ..dados import livros
 
@@ -112,7 +110,9 @@ def contestacoes(linhas: list[dict] | None = None) -> dict:
         except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nunca um "nenhuma contestação" falso
             out["erro"] = f"Não consegui ler as contestações do banco ({type(e).__name__})"
             linhas = []
-    privada = current_app.config.get(CHAVE)
+    # a da tela Base → Chaves do Nexus (14/10/2026) e, sem ela, a do .env
+    from ..auth import chaves as K
+    privada = K.valor(CHAVE)
     out["sem_chave"] = not privada
     for l in linhas:
         x = _linha(l, privada)

@@ -7,6 +7,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
     def registro_mestre():
         return render_template("base/registro-mestre.html")
 """
+from ...auth.chaves import registrar_chaves
 from ...auth.telas_acessos import registrar_acessos
 from ...cadastro.telas import registrar_base
 from ...cadastro.telas_equipamentos import registrar_equipamentos
@@ -67,6 +68,12 @@ TORRE = Torre(
         Tela("chaves-fontes", "Chaves das fontes",
              "As chaves das fontes da Performance estão válidas, e quando vencem?",
              "Plataforma de Performance (/tokens), só administrador"),
+        # Chaves do Nexus (14/10/2026, Levi: "Se precisa de TI então vou ter que mandar um arquivo novo de deploy para a TI
+        # ué!"): o administrador cola a chave aqui, cifrada na pasta de dados do servidor, sem a T.I. e sem reiniciar
+        # (nexus/auth/chaves.py). Hoje, a privada das Contestações.
+        Tela("chaves-nexus", "Chaves do Nexus",
+             "Que chave o Nexus usa, e ela já está posta neste servidor?",
+             "a pasta de dados do Nexus no servidor, cifrada; só administrador"),
         # Fontes do tempo real (11/10/2026): quais usinas de cada fonte entram no tempo real (e são coletadas), e as novas
         # esperando liberação. A tela é da plataforma (/admin/tempo-real), numa moldura; só administrador.
         Tela("fontes-tempo-real", "Fontes do tempo real",
@@ -108,4 +115,5 @@ registrar_fracttal(bp)
 registrar_ligacoes(bp)
 registrar_governanca(bp)
 registrar_acessos(bp)
+registrar_chaves(bp)
 registrar_molduras(bp, TORRE)

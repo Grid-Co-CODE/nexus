@@ -164,6 +164,22 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   registro de logins com teto e janela, e que falha sem barrar a entrada; a pasta sem permissão, o arquivo que não é
   UTF-8 e o aninhado a fundo deixam o Início em 200 e fecham, com o aviso na tela e uma linha só no journal).
 
+## Chaves do Nexus (Base → Chaves do Nexus, 14/10/2026)
+
+Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo
+de deploy para a TI ué!". A tela `/t/base/chaves-nexus` (só administrador; código em `nexus/auth/chaves.py`) recebe a
+chave colada, confere e grava em `chaves.json` na pasta de dados (`NEXUS_DADOS`, fora do git), CIFRADA com AES-256-GCM
+numa chave derivada da `NEXUS_SECRET_KEY` (HKDF) e presa ao nome. Vale na hora (relida a cada 30 s e logo depois de
+gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valor; o log diz quem gravou qual, sem o valor.
+- **Só as chaves de `chaves.CHAVES`**, cada uma com a conferência dela: hoje a `NEXUS_CONTESTACAO_CHAVE_PRIVADA` (32 bytes
+  em base64 que viram X25519 e, havendo contestação no banco, abrem pelo menos uma; a de outro par é recusada). A tela não
+  edita o .env: nome fora da lista é recusado.
+- **Quem lê usa `chaves.valor(nome)`** (a da tela e, sem ela, a do .env), nunca `config.get` direto: as Contestações
+  (`nexus/contratos/contestacoes.py`) já leem assim.
+- **NEXUS_SECRET_KEY trocada:** a gravada não abre; vale a do .env (ou nenhuma), e a tela diz "não abre, cole de novo".
+- **Chave nova na tela:** uma entrada em `CHAVES` com o nome, o para quê, o arquivo de onde vem e a conferência, e quem
+  lê passa a usar `chaves.valor`. Prova: `tests/test_chaves_nexus_14_10.py`.
+
 ## Telas por setor: o que cada pessoa vê (Base → Acessos, 12/10/2026)
 
 Pedido do Levi (12/10/2026): "gostaria de uma seção no BASE > ACESSOS onde eu possa controlar o que cada pessoa de setor
