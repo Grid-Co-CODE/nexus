@@ -18,6 +18,10 @@
      performance! Dá a impressão que é uma tela dentro de uma tela!"): saiu o "<tela> · Plataforma de Performance" (o
      menu lateral acende o item, e a tela da plataforma tem o título dela). A faixa só nasce com controle (as visões e o
      seletor de usina do Diagnóstico), numa linha leve, sem cara de cabeçalho; o Modo TV foi para o topo do Nexus. #}
+  {# as abas da tela (14/10/2026): a da plataforma e as páginas do Nexus ao lado (Chaves das fontes → Nexus) #}
+  {% if abas %}<nav class="gc-subabas porta-abas" aria-label="{{ tela.nome }}">
+    {% for a in abas %}<a href="{{ a.url|na_raiz }}"{% if a.atual %} aria-current="page"{% endif %}>{{ a.nome }}</a>{% endfor %}
+  </nav>{% endif %}
   {% set seletor_aqui = seletor and ligada and not recusa %}
   {% if visoes|length > 1 or seletor_aqui %}
   <div class="porta-faixa" id="porta-faixa">

@@ -33,6 +33,9 @@ navegador fala com cada sistema.
   | base · `de-para-equipamentos` (só admin, 11/10/2026) | `/admin/de-para`: como cada usina de cada fonte se liga ao cadastro, e o editor (ponte pelo id, nome de cada inversor) |
 
   Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco e Mapa de risco são do Nexus e ficam fora.
+  **Abas numa tela de moldura (14/10/2026):** `registrar_molduras(..., abas={tela: {"primeira", "outras"}})` põe a tela da
+  plataforma como 1ª aba e páginas do Nexus ao lado (`?aba=<id>`), com as mesmas abas no topo (`gc-subabas`). Hoje só as
+  Chaves das fontes: "Fontes da Performance" (o /tokens) e "Nexus" (as Chaves do Nexus, `nexus/auth/chaves.py`).
   Em 13/10/2026 o Criador de relatório e o Relatório semanal foram para a torre Relatórios (Levi: "vai para a central de
   emissão no Nexus > Relatórios [...] Sai da parte de Performance!"), com o relatório novo Potência Ativa dos Inversores:
   abrem por dentro da Central de emissão (`Tela.dentro_de`, sem item próprio no menu; a Central acende, no servidor e no

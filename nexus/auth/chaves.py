@@ -27,7 +27,7 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from flask import current_app, redirect, render_template, request, session, url_for
+from flask import current_app, redirect, render_template, request, session
 
 from . import acessos as A
 
@@ -242,14 +242,37 @@ def _quem() -> str:
     return e or A.SENHA_DE_ADMIN
 
 
-def _pagina(erro: str | None = None, status: int = 200):
+# o endereço da página: a aba "Nexus" de Base → Chaves das fontes (14/10/2026, Levi: "bote essa informação na seção
+# Chave das fontes!"); o /t/base/chaves-nexus de antes só recebe o formulário e leva para cá
+ENDERECO = "/t/base/chaves-fontes?aba=nexus"
+
+
+def _pagina(erro: str | None = None, status: int = 200, abas=None):
     from ..torres.base import TORRE
+    from ..torres.moldura import abas_da_tela
+    from ..performance import porta
+    if abas is None:
+        t = next(x for x in porta.da_torre("base") if x.tela == "chaves-fontes")
+        abas = abas_da_tela(t, "Fontes da Performance", [("nexus", "Nexus", None)], "nexus")
     resp = current_app.make_response((render_template(
-        "acessos/chaves.html", torre=TORRE, tela=TORRE.tela("chaves-nexus"), chaves=estado(current_app.config),
-        sem_pasta=_caminho(current_app.config) is None, codigo=_codigo(), erro=erro,
+        "acessos/chaves.html", torre=TORRE, tela=TORRE.tela("chaves-fontes"), abas=abas, chaves=estado(current_app.config),
+        sem_pasta=_caminho(current_app.config) is None, codigo=_codigo(), erro=erro, acao="/t/base/chaves-nexus",
         aviso=session.pop(_CHAVE_AVISO, None)), status))
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
+
+def _sem_permissao():
+    from .telas_acessos import _meu_email
+    return render_template("cadastro/sem_permissao.html", titulo="Chaves das fontes", eyebrow="Base · Chaves das fontes",
+                           area="As chaves", email=_meu_email()), 403
+
+
+def aba_nexus(abas):
+    """A aba "Nexus" de Base → Chaves das fontes (`registrar_molduras(..., abas=...)`): só administrador."""
+    if not session.get("admin"):
+        return _sem_permissao()
+    return _pagina(abas=abas)
 
 
 def _post():
@@ -271,17 +294,18 @@ def _post():
     except Recusada as ex:
         return _pagina(erro=str(ex), status=400)
     session[_CHAVE_AVISO] = aviso
-    return redirect(url_for("torre_base.chaves_nexus"), code=303)
+    from ..prefixo import na_raiz
+    return redirect(na_raiz(ENDERECO), code=303)
 
 
 def registrar_chaves(bp) -> None:
-    """Pendura a tela na torre Base (`/t/base/chaves-nexus`), vencendo o placeholder. Só administrador."""
+    """O formulário das chaves (`/t/base/chaves-nexus`, só POST de administrador). A página é a aba "Nexus" das Chaves das
+    fontes (`aba_nexus`); o GET daqui leva para lá (o endereço da 1ª versão, 14/10/2026, não vira 404)."""
     @bp.route("/chaves-nexus", methods=["GET", "POST"])
     def chaves_nexus():
         if not session.get("admin"):
-            from .telas_acessos import _meu_email
-            return render_template("cadastro/sem_permissao.html", titulo="Chaves do Nexus", eyebrow="Base · Chaves do Nexus",
-                                   area="A tela Chaves do Nexus", email=_meu_email()), 403
+            return _sem_permissao()
         if request.method == "POST":
             return _post()
-        return _pagina()
+        from ..prefixo import na_raiz
+        return redirect(na_raiz(ENDERECO))

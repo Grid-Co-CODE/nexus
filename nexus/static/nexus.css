@@ -253,6 +253,7 @@ a{color:inherit}
 .porta{flex:1;min-width:0;height:calc(100vh - var(--topo));display:flex;flex-direction:column}
 /* Sem o nome da tela desde 13/10/2026 ("suma esse 2° cabeçalho"): a faixa só existe com controle e não tem linha de
    baixo, para não parecer um 2º cabeçalho em cima da tela da plataforma */
+.porta-abas{margin:0;padding:6px 16px 0}
 .porta-faixa{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:8px 16px 4px;min-height:44px;
   font:500 13px/1.4 var(--font-sans)}
 .porta-visoes{display:flex;gap:6px}

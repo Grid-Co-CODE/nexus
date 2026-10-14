@@ -181,8 +181,24 @@ def _endereco(t, destino: str | None, tv: bool = False) -> str:
     return f"/t/{t.torre}/{t.tela}" + ("?" + urlencode(consulta) if consulta else "")
 
 
-def _pagina(torre, t, reserva=None, tem_tv: bool = False):
+def abas_da_tela(t, primeira: str, outras, atual: str = "") -> list[dict]:
+    """As abas de uma tela de moldura (14/10/2026): [{id, nome, url, atual}], a da plataforma primeiro (sem `?aba`). A
+    `url` sai sem o prefixo: o template põe com `|na_raiz`."""
+    base = f"/t/{t.torre}/{t.tela}"
+    out = [{"id": "", "nome": primeira, "url": base, "atual": not atual}]
+    out += [{"id": i, "nome": nome, "url": f"{base}?aba={i}", "atual": atual == i} for i, nome, _f in outras]
+    return out
+
+
+def _pagina(torre, t, reserva=None, tem_tv: bool = False, abas=None):
     tela = torre.tela(t.tela)
+    # As abas da tela (14/10/2026; Levi, sobre as chaves do Nexus: "bote essa informação na seção Chave das fontes!"): a
+    # tela da plataforma é a aba padrão; `?aba=<id>` de uma página do Nexus abre a página dela, com as mesmas abas no topo
+    if abas:
+        pedida = str(request.args.get("aba") or "")
+        outra = next((f for i, _n, f in abas["outras"] if i == pedida), None)
+        if outra is not None:
+            return outra(abas_da_tela(t, abas["primeira"], abas["outras"], pedida))
     estado = estado_da_porta()
     # `?p=` (favorito, F5, o endereço que a moldura acompanhou): só caminho do mapa. De outro item, vai ao item dono (o
     # menu acende o certo); fora do mapa, a tela padrão do item (spec 7: "sem seguir o caminho").
@@ -203,7 +219,8 @@ def _pagina(torre, t, reserva=None, tem_tv: bool = False):
                 "visoes": [v for v in VISOES_DO_TEMPO_REAL if v["pronta"]] if t.tela == "tempo-real" else [],
                 # o botão "Modo TV" da faixa leva o caminho aberto; o "Sair do modo TV" volta à tela de sempre nele
                 "tem_tv": tem_tv, "endereco_tv": _endereco(t, destino, tv=True) if tem_tv else "",
-                "sair_tv": _endereco(t, destino), "prazo_tv": prazo}
+                "sair_tv": _endereco(t, destino), "prazo_tv": prazo,
+                "abas": abas_da_tela(t, abas["primeira"], abas["outras"]) if abas else []}
     if t.so_admin and not session.get("admin"):
         # spec 5.3: as chaves das fontes são administração. A plataforma recusa de novo (o passe diz quem é admin).
         contexto.update(recusa="As chaves das fontes (SunOp, Axis e Plataforma) são administração: abrem só para "
@@ -279,12 +296,16 @@ def _endpoint(t) -> str:
     return "moldura_" + t.tela.replace("-", "_")
 
 
-def registrar_molduras(bp, torre, reserva: dict | None = None, tv=()) -> None:
+def registrar_molduras(bp, torre, reserva: dict | None = None, tv=(), abas: dict | None = None) -> None:
     """Uma view para cada tela do mapa que mora nesta torre (`/t/<torre>/<tela>`), vencendo o placeholder, e a rota do
     passe novo dela (`/t/<torre>/<tela>/passe`, só POST: `_passe_novo`). A tela tem de estar declarada na `TORRE` (é o
     que entra no menu): sem ela, o erro sai ao subir, não na mão de quem clica.
     `reserva` = {tela: função(motivo) -> resposta ou None}, chamada com a porta desligada (o Tempo real pela ponte).
-    `tv` = as telas com modo TV (o botão "Modo TV" e o `?tv=1`); hoje só o Painel NOC."""
+    `tv` = as telas com modo TV (o botão "Modo TV" e o `?tv=1`); hoje só o Painel NOC.
+    `abas` = {tela: {"primeira": nome da aba da plataforma, "outras": [(id, nome, função(abas) -> resposta)]}}: a tela
+    da plataforma vira a 1ª aba e `?aba=<id>` abre a página do Nexus (14/10/2026: as Chaves do Nexus dentro das Chaves das
+    fontes)."""
+    abas = abas or {}
     reserva = reserva or {}
     for nome in tv:
         if nome not in {t.tela for t in porta.da_torre(torre.id)}:
@@ -296,7 +317,7 @@ def registrar_molduras(bp, torre, reserva: dict | None = None, tv=()) -> None:
             COM_TV.add((t.torre, t.tela))
 
         def view(_t=t):
-            return _pagina(torre, _t, reserva.get(_t.tela), tem_tv=_t.tela in tv)
+            return _pagina(torre, _t, reserva.get(_t.tela), tem_tv=_t.tela in tv, abas=abas.get(_t.tela))
 
         def passe_novo(_t=t):
             return _passe_novo(_t)

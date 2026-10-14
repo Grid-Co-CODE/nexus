@@ -6,12 +6,12 @@
    nunca mostra o valor. Regras em nexus/auth/chaves.py e na seção "Chaves do Nexus" do nexus/casca/CLAUDE.md. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 <p class="gc-eyebrow">Base · {{ tela.nome }}</p>
-<div class="cad-topo">
-  <div>
-    <h1 class="titulo-pagina">{{ tela.nome }}</h1>
-    <p class="cad-sub">As chaves que o Nexus usa, postas aqui sem a T.I. e sem reiniciar. O valor nunca aparece de volta.</p>
-  </div>
-</div>
+<h1 class="titulo-pagina">{{ tela.nome }}</h1>
+{# as abas das Chaves das fontes (14/10/2026): as da Performance (a tela da plataforma) e as do Nexus, aqui #}
+<nav class="gc-subabas" aria-label="{{ tela.nome }}">
+  {% for a in abas %}<a href="{{ a.url|na_raiz }}"{% if a.atual %} aria-current="page"{% endif %}>{{ a.nome }}</a>{% endfor %}
+</nav>
+<p class="cad-sub chv-sub">As chaves que o Nexus usa, postas aqui sem a T.I. e sem reiniciar. O valor nunca aparece de volta.</p>
 
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Feito.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
@@ -34,7 +34,7 @@
   <p class="chv-para">Para {{ c.para }}. Variável <span class="gc-dado">{{ c.id }}</span>; vem do arquivo <span class="gc-dado">{{ c.arquivo }}</span>.</p>
   {% if c.origem == 'tela' %}<p class="chv-quando">Gravada em {{ c.quando }}{% if c.por %} por {{ c.por }}{% endif %}.{% if c.env_tambem %} O .env também tem uma; vale a da tela.{% endif %}</p>{% endif %}
   {% if c.nao_abre %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>A chave gravada pela tela não abre.</strong> A NEXUS_SECRET_KEY deste servidor mudou depois que ela foi gravada{% if c.origem == 'env' %}; vale a do .env{% endif %}. Cole a chave de novo.</div></div>{% endif %}
-  <form method="post" class="chv-form" autocomplete="off">
+  <form method="post" action="{{ acao|na_raiz }}" class="chv-form" autocomplete="off">
     <input type="hidden" name="codigo" value="{{ codigo }}">
     <input type="hidden" name="chave" value="{{ c.id }}">
     <label class="gc-rotulo" for="{{ c.id }}-v">{{ 'Trocar a chave' if c.origem else 'Colar a chave' }}</label>
@@ -49,6 +49,7 @@
 {% endfor %}
 
 <style>
+  .chv-sub{margin:12px 0 4px}
   .chv-chave{max-width:760px;margin-top:18px;padding:14px 16px}
   .chv-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .chv-cab h2{margin:0}

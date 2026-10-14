@@ -17,7 +17,8 @@ from nexus import create_app
 from nexus.auth import chaves as K
 from nexus.contratos import contestacoes as CT
 
-URL = "/t/base/chaves-nexus"
+URL = "/t/base/chaves-nexus"               # o formulário (POST)
+PAGINA = "/t/base/chaves-fontes?aba=nexus"  # a página: a aba "Nexus" das Chaves das fontes (14/10/2026)
 NOME = "NEXUS_CONTESTACAO_CHAVE_PRIVADA"
 PRIV, PUB = _par()
 OUTRA_PRIV, _OUTRA_PUB = _par()
@@ -62,7 +63,7 @@ def admin(app):
 
 
 def _codigo(c) -> str:
-    return re.search(r'name="codigo" value="([^"]+)"', c.get(URL).get_data(as_text=True)).group(1)
+    return re.search(r'name="codigo" value="([^"]+)"', c.get(PAGINA).get_data(as_text=True)).group(1)
 
 
 def _gravar(c, valor, codigo=None, **headers):
@@ -71,22 +72,22 @@ def _gravar(c, valor, codigo=None, **headers):
 
 
 def test_so_administrador(app):
-    assert app.test_client().get(URL).status_code == 302                       # sem login: vai ao Entrar
+    assert app.test_client().get(PAGINA).status_code == 302                    # sem login: vai ao Entrar
     c = app.test_client()
     with c.session_transaction() as s:
         s["logado"], s["admin"] = True, False
         s["usuario"] = {"email": "pessoa@exemplo.test", "nome": "Pessoa", "perfil": ""}
-    r = c.get(URL)
+    r = c.get(PAGINA)
     assert r.status_code == 403 and "só para administradores" in r.get_data(as_text=True)
     assert c.post(URL, data={"chave": NOME, "acao": "gravar", "valor": PRIV}).status_code == 403
 
 
 def test_grava_cifrada_vale_na_hora_e_a_tela_nunca_mostra_o_valor(app, admin, livro, tmp_path):
-    h = admin.get(URL).get_data(as_text=True)
+    h = admin.get(PAGINA).get_data(as_text=True)
     assert "Não posta" in h and 'type="password"' in h
     r = _gravar(admin, f"  {PRIV}\n")                                           # espaço e quebra colados junto
     assert r.status_code == 303
-    h = admin.get(URL).get_data(as_text=True)
+    h = admin.get(PAGINA).get_data(as_text=True)
     assert "abre 2 de 2 contestações" in h and "Posta pela tela" in h and "senha de administrador" in h
     assert PRIV not in h and PRIV[:12] not in h
     arquivo = (tmp_path / "dados" / K.ARQUIVO).read_text(encoding="utf-8")
@@ -111,19 +112,19 @@ def test_chave_que_nao_e_chave_ou_de_outro_par_nao_grava(app, admin, livro, tmp_
 def test_sem_contestacao_no_banco_grava_e_diz_que_nao_conferiu(app, admin, monkeypatch):
     monkeypatch.setattr(CT.livros, "ler", lambda *a, **k: [])
     assert _gravar(admin, PRIV).status_code == 303
-    assert "ainda não há contestação no banco" in admin.get(URL).get_data(as_text=True)
+    assert "ainda não há contestação no banco" in admin.get(PAGINA).get_data(as_text=True)
 
 
 def test_a_da_tela_vence_a_do_env_e_apagar_volta_a_ela(app, admin, livro):
     app.config[NOME] = OUTRA_PRIV
-    assert "Posta no .env do servidor" in admin.get(URL).get_data(as_text=True)
+    assert "Posta no .env do servidor" in admin.get(PAGINA).get_data(as_text=True)
     assert _gravar(admin, PRIV).status_code == 303
-    h = admin.get(URL).get_data(as_text=True)
+    h = admin.get(PAGINA).get_data(as_text=True)
     assert "Posta pela tela" in h and "O .env também tem uma; vale a da tela." in h
     with app.app_context():
         assert K.valor(NOME) == PRIV
     r = admin.post(URL, data={"codigo": _codigo(admin), "chave": NOME, "acao": "apagar"})
-    assert r.status_code == 303 and "vale a do .env" in admin.get(URL).get_data(as_text=True)
+    assert r.status_code == 303 and "vale a do .env" in admin.get(PAGINA).get_data(as_text=True)
     with app.app_context():
         assert K.valor(NOME) == OUTRA_PRIV
 
@@ -143,8 +144,20 @@ def test_formulario_vencido_ou_de_outro_site_nao_grava(app, admin, livro, tmp_pa
     assert not (tmp_path / "dados" / K.ARQUIVO).exists()
 
 
-def test_o_menu_da_base_tem_a_tela_e_as_contestacoes_apontam_para_ela(app, admin, monkeypatch):
+def test_as_chaves_moram_na_aba_nexus_das_chaves_das_fontes(app, admin, monkeypatch):
+    """14/10/2026, Levi: "bote essa informação na seção Chave das fontes!": sem item próprio no menu; a página é a aba
+    "Nexus" das Chaves das fontes, e o endereço da 1ª versão leva a ela."""
     monkeypatch.setattr(CT.livros, "ler", lambda *a, **k: [_linha(1)])
-    assert 'href="/t/base/chaves-nexus"' in admin.get("/").get_data(as_text=True)
+    menu = admin.get("/").get_data(as_text=True).split('class="menu"', 1)[1].split("</nav>", 1)[0]
+    assert "chaves-nexus" not in menu and 'href="/t/base/chaves-fontes"' in menu
+    h = admin.get(PAGINA).get_data(as_text=True)
+    assert '<a href="/t/base/chaves-fontes">Fontes da Performance</a>' in h
+    assert '<a href="/t/base/chaves-fontes?aba=nexus" aria-current="page">Nexus</a>' in h
+    assert 'action="/t/base/chaves-nexus"' in h and 'aria-current="page">Chaves das fontes</a>' in h   # o menu acende
+    r = admin.get(URL)
+    assert r.status_code == 302 and r.headers["Location"].endswith(PAGINA)
+    # a aba da plataforma (a moldura) mostra as mesmas abas no topo
+    h = admin.get("/t/base/chaves-fontes").get_data(as_text=True)
+    assert '<a href="/t/base/chaves-fontes" aria-current="page">Fontes da Performance</a>' in h
     h = admin.get("/t/contratos/contestacoes").get_data(as_text=True)
     assert "Este Nexus não tem a chave das contestações." in h and "/t/base/chaves-nexus" in h

@@ -164,11 +164,14 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   registro de logins com teto e janela, e que falha sem barrar a entrada; a pasta sem permissão, o arquivo que não é
   UTF-8 e o aninhado a fundo deixam o Início em 200 e fecham, com o aviso na tela e uma linha só no journal).
 
-## Chaves do Nexus (Base → Chaves do Nexus, 14/10/2026)
+## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo
-de deploy para a TI ué!". A tela `/t/base/chaves-nexus` (só administrador; código em `nexus/auth/chaves.py`) recebe a
-chave colada, confere e grava em `chaves.json` na pasta de dados (`NEXUS_DADOS`, fora do git), CIFRADA com AES-256-GCM
+de deploy para a TI ué!". Depois de colar a 1ª ("deu certo"): "bote essa informação na seção Chave das fontes!" — a
+página é a aba **Nexus** de Base → Chaves das fontes (`/t/base/chaves-fontes?aba=nexus`, ao lado da aba "Fontes da
+Performance", a tela /tokens da plataforma; as abas saem do `registrar_molduras(..., abas=...)`). O `/t/base/chaves-nexus`
+recebe o formulário (POST, só administrador; o GET leva à aba). Código em `nexus/auth/chaves.py`: a chave colada é
+conferida e gravada em `chaves.json` na pasta de dados (`NEXUS_DADOS`, fora do git), CIFRADA com AES-256-GCM
 numa chave derivada da `NEXUS_SECRET_KEY` (HKDF) e presa ao nome. Vale na hora (relida a cada 30 s e logo depois de
 gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valor; o log diz quem gravou qual, sem o valor.
 - **Só as chaves de `chaves.CHAVES`**, cada uma com a conferência dela: hoje a `NEXUS_CONTESTACAO_CHAVE_PRIVADA` (32 bytes
