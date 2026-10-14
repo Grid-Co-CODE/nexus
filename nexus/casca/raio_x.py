@@ -73,7 +73,11 @@ def registrar_raio_x(bp) -> None:
         app = current_app._get_current_object()
         estado = app.extensions.get(P.CHAVE)
         pedidos, outras = _threads(estado)
-        return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None,
+        teto = app.extensions.get("nexus_teto_os")
+        teto = teto.estado() if teto is not None else None
+        if teto and teto["ultimo_recusado"]:
+            teto["ultimo_txt"] = time.strftime("%d/%m %H:%M", time.localtime(teto["ultimo_recusado"]))
+        return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(),
                                travamentos=P.cartao(app) if estado is not None else None,
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

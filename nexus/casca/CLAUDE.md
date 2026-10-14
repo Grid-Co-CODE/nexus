@@ -164,6 +164,23 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   registro de logins com teto e janela, e que falha sem barrar a entrada; a pasta sem permissão, o arquivo que não é
   UTF-8 e o aninhado a fundo deixam o Início em 200 e fecham, com o aviso na tela e uma linha só no journal).
 
+## Nexus lento: Raio-X e o teto do OS Creator (14/10/2026)
+
+Levi, 14/10/2026 às 09:20: "O nexus está muito lento"; "quando clico no OS Creator, fica carregando por um bom tempo"; e
+"pq depende da TI se o OS Creator Web faz parte do Nexus???". Medido de fora: o /saude do Nexus de 0,5 a 30 s (às vezes 60
+s), a plataforma e a API do banco, no mesmo servidor, em 0,2 s: as threads do waitress presas esperando o Fracttal pelo
+OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
+- **Raio-X** (`/t/base/raio-x`, `casca/raio_x.py`; só administrador, sem item no menu): os pedidos em andamento e onde
+  cada um espera, as tarefas de fundo, o processador, a carga da máquina, o teto do OS Creator e os travamentos de 24 h.
+  Nexus lento de novo = pedir o print dele na hora.
+- **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
+  `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
+  recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O
+  resto do Nexus nunca fica sem thread por causa dele. Separar o OS Creator num serviço próprio pediria a T.I. (serviço e
+  Caddy); o teto dá o mesmo efeito sem ela.
+- **No OS Creator** (README da torre, 14/10/2026): a tela inicial não espera mais o selo do Fracttal, e as contagens da
+  Performance ficam 6 h na memória.
+
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo

@@ -11,6 +11,7 @@
 <div class="cad-numeros">
   <div><div class="r">Pedidos em andamento</div><div class="v gc-num">{{ pedidos|length }}{% if threads %} de {{ threads }}{% endif %}</div><div class="d">{% if threads and pedidos|length >= threads %}todas as threads ocupadas: a fila espera{% else %}threads do waitress{% endif %}</div></div>
   <div><div class="r">Processador do Nexus</div><div class="v gc-num">{{ cpu.pct }}%</div><div class="d">em 1 s; 100% = um núcleo inteiro{% if cpu.nucleos %} (a máquina tem {{ cpu.nucleos }}){% endif %}</div></div>
+  {% if teto %}<div><div class="r">OS Creator</div><div class="v gc-num">{{ teto.em_uso }} de {{ teto.teto }}</div><div class="d">threads em uso agora; {{ teto.recusados }} pedido{{ "s" if teto.recusados != 1 }} voltou{{ "aram" if teto.recusados != 1 }} "ocupado"{% if teto.ultimo_txt %} (o último às {{ teto.ultimo_txt }}){% endif %}</div></div>{% endif %}
   <div><div class="r">Carga da máquina</div><div class="v gc-num">{{ cpu.carga|join(" · ") if cpu.carga else "—" }}</div><div class="d">1, 5 e 15 min{% if not cpu.carga %} (só no Linux){% endif %}</div></div>
 </div>
 

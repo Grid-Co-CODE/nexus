@@ -20,9 +20,10 @@ from nexus.dados import instalar as instalar_dados
 from nexus.engenharia import instalar as instalar_engenharia
 from nexus.config import ConfigErro
 
-# 16 threads (eram 8): os pedidos esperam a rede (banco, Fracttal, as fotos do S3), e com 8 presos numa tela lenta o resto
-# da empresa esperava na fila (13/10/2026). A mesma conta vai ao registro dos pedidos presos (casca/presos.py)
-THREADS = 16
+# 32 threads (eram 16, e 8 antes de 13/10/2026): os pedidos esperam a rede (banco, Fracttal, as fotos do S3). Em 14/10 o
+# OS Creator, que roda dentro do Nexus, prendia as 16 esperando o Fracttal e o /saude chegou a 60 s; agora o OS Creator usa
+# no máximo 16 (casca/teto_os.py) e as outras ficam para o resto do Nexus. A mesma conta vai aos pedidos presos.
+THREADS = 32
 
 if __name__ == "__main__":
     try:
@@ -37,6 +38,10 @@ if __name__ == "__main__":
     pre_carga.aquecer_ao_subir(app)
     # o que cada pedido esperava quando o Nexus parou de responder (13/10/2026: das 16:50 às 16:53 nem o /saude
     # respondia, e de fora não dava para ver esperando o quê); o administrador vê no cartão da versão do Início
+    # o OS Creator com teto de threads (14/10/2026, Levi: "pq depende da TI se o OS Creator Web faz parte do Nexus???"):
+    # antes do registro dos pedidos, que fica por fora e vê todos
+    from nexus.casca import teto_os
+    teto_os.ligar(app, teto=THREADS // 2)
     from nexus.casca import presos
     presos.ligar(app, THREADS)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
