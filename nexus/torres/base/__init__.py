@@ -46,9 +46,9 @@ TORRE = Torre(
              "Cadastro do Nexus (estrutura de O&M de 10/2026)"),
         # "Listas" saiu em 11/10/2026 (Levi: "pode tirar listas pois a governança faz mais sentido"): o endereço
         # /t/base/listas leva à Governança de dados (nexus/cadastro/telas.py); os valores das listas ficam no cadastro.
-        Tela("importar", "Importar do Excel",
-             "O que muda no ensaio se eu importar o BD_Operações de hoje?",
-             "BD_Operacoes.xlsx enviado pela tela"),
+        # "Importar do Excel" saiu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"): o endereço
+        # /t/base/importar leva ao Registro mestre (nexus/cadastro/telas.py); a importação do BD_Operações segue por
+        # comando (nexus/cadastro/CLAUDE.md, "Importar o BD_Operações").
         # Governança de dados (05/10/2026, Levi: "prioridade 0"): a matriz de barramento e a qualidade da ligação por ID.
         # Desde 11/10/2026 traz no fim a seção Ligações entre bases (era a tela /t/base/ligacoes, que redireciona para lá).
         Tela("governanca", "Governança de dados",

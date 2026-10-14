@@ -9,7 +9,6 @@
     <p class="cad-sub">Ensaio local: o BD_Operações continua sendo a fonte oficial até a virada.</p>
   </div>
   <div class="cad-acoes">
-    {% if ent.id == 'usinas' %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/base/importar"><i class="ph ph-upload-simple"></i> Importar do Excel</a>{% endif %}
     <a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ (url_nova)|na_raiz }}"><i class="ph ph-plus"></i> {{ texto_novo }}</a>
   </div>
 </div>
@@ -20,13 +19,9 @@
 </nav>
 {% endif %}
 
-{% if importado %}
-<div class="cad-aviso cad-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>Importação aplicada no ensaio.</strong>
-  A cópia do ensaio anterior ficou guardada em backups/, ao lado do arquivo.</div></div>
-{% endif %}
 {% if vazio %}
 <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>O ensaio está vazio.</strong>
-  <a href="{{ raiz }}/t/base/importar">Importe o BD_Operações</a> para começar.</div></div>
+  A carga do BD_Operações é por comando (o "Importar do Excel" saiu em 14/10/2026).</div></div>
 {% endif %}
 {% if nota %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>{{ nota }}</div></div>{% endif %}
 

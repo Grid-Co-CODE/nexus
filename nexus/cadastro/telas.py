@@ -9,8 +9,6 @@ Regras de tela que valem para todas:
 - sem NEXUS_CHAVE_CADASTRO, a tela diz o que falta em vez de quebrar.
 """
 import os
-import secrets
-import time
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -27,15 +25,13 @@ from .cifra import CifraErro, Cofre
 from .esquema import (CLIENTES, ENTIDADES, EQUIPES, PESSOAS, REGIOES_CAMPO, USINAS, VINCULO_CAMPO,
                       VINCULO_COORDENADOR_CAMPO, VINCULO_GESTOR, VINCULO_SUPERVISOR_CAMPO, VINCULO_SUPERVISOR_LEGADO,
                       rotulo_lista)
-from .importar import ler_xlsx, montar
-from .servico import QUEM_IMPORTACAO, Servico, chave_texto
+from .servico import Servico, chave_texto
 from .tipos import Legado
 from ..prefixo import na_raiz
 
 # Fora do OneDrive e fora do AppData (o Claude desktop virtualiza o AppData: 03/09/2026, banco do gêmeo).
 ARMAZEM_PADRAO = (Path(r"C:\GridcoAuto\nexus\cadastro_ensaio.json") if os.name == "nt"
                   else Path(__file__).resolve().parents[2] / "dados" / "cadastro_ensaio.json")
-PREVIA_TTL_S = 30 * 60
 
 
 class SemCadastro(RuntimeError):
@@ -312,7 +308,7 @@ def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto
         grupos[c["secao"]].append(c)
     return render_template("cadastro/lista.html", titulo=titulo, ent=ent, colunas=colunas, linhas=linhas,
                            total=len(total), q=q, filtros=opcoes, url_nova=url_nova, texto_novo=texto_novo,
-                           vazio=srv.vazio(), importado=request.args.get("importado"),
+                           vazio=srv.vazio(),
                            grupos_colunas=list(grupos.items()), visoes=_visoes_nav(visoes, ""),
                            cols_atuais=",".join(c["id"] for c in colunas if c["visivel"]),
                            cols_padrao=",".join(c["id"] for c in colunas if c["padrao"]),
@@ -709,48 +705,11 @@ def registrar_base(bp):
         importação do BD_Operações e a estrutura de campo (`estrutura_campo.aplicar`) usam."""
         return redirect(na_raiz("/t/base/governanca"))
 
-    @_tela("Importar do Excel")
-    def importar(srv):
-        if request.method == "GET":
-            imps = srv.importacoes()
-            for x in imps:
-                x["quando_br"] = hora_br(x.get("quando", ""))
-            return render_template("cadastro/importar.html", importacoes=imps, erro=None)
-        f = request.files.get("arquivo")
-        nome = (f.filename if f else "") or ""
-        if not f or not nome.lower().endswith((".xlsx", ".xlsm")):
-            return render_template("cadastro/importar.html", importacoes=[],
-                                   erro="Envie o BD_Operacoes.xlsx (arquivo .xlsx)."), 400
-        dados = f.read()
-        try:
-            abas = ler_xlsx(dados)
-        except Exception as e:                        # arquivo corrompido ou não é Excel
-            return render_template("cadastro/importar.html", importacoes=[],
-                                   erro=f"Não consegui ler o arquivo: {str(e)[:160]}"), 400
-        if "Operações" not in abas:
-            return render_template("cadastro/importar.html", importacoes=[],
-                                   erro="O arquivo não tem a aba Operações: é mesmo o BD_Operações?"), 400
-        proposta = montar(abas, srv, arquivo=nome, dados=dados)
-        previas = current_app.extensions.setdefault("nexus_cadastro_previas", {})
-        agora = time.time()
-        for k in [k for k, (_, t) in previas.items() if agora - t > PREVIA_TTL_S]:
-            previas.pop(k, None)
-        token = secrets.token_urlsafe(16)
-        previas[token] = (proposta, agora)
-        return render_template("cadastro/previa.html", p=proposta, token=token, ENTIDADES=ENTIDADES)
-
-    @_tela("Importar do Excel")
-    def importar_aplicar(srv):
-        previas = current_app.extensions.setdefault("nexus_cadastro_previas", {})
-        item = previas.pop(request.form.get("token", ""), None)
-        if item is None:
-            return render_template("cadastro/importar.html", importacoes=[],
-                                   erro="A prévia expirou (30 min). Envie o arquivo de novo."), 410
-        proposta = item[0]
-        srv.aplicar_carga(proposta.carga, quem=QUEM_IMPORTACAO)
-        srv.auditar(_quem(), "importou", "cadastro", proposta.origem.get("arquivo", ""),
-                    [f"{k}: {v['novos']} novos, {v['alterados']} alterados" for k, v in proposta.resumo.items()])
-        return redirect(na_raiz("/t/base/registro-mestre?importado=1"))
+    def importar_saiu():
+        """Base → Importar do Excel saiu do menu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"): quem
+        tinha o endereço salvo, ou uma prévia aberta, cai no Registro mestre, não num 404, e nada é importado. A
+        importação do BD_Operações segue por comando (`importar.montar` → `srv.aplicar_carga`, nexus/cadastro/CLAUDE.md)."""
+        return redirect(na_raiz("/t/base/registro-mestre"))
 
     @_tela("Qualidade do cadastro")
     def qualidade(srv):
@@ -783,8 +742,8 @@ def registrar_base(bp):
     bp.add_url_rule("/regiao-campo/nova", "cad_regiao_nova", regiao_nova, methods=["GET", "POST"])
     bp.add_url_rule("/regiao-campo/<id_>", "cad_regiao", regiao, methods=["GET", "POST"])
     bp.add_url_rule("/listas", "cad_listas", listas_saiu, methods=["GET", "POST"])
-    bp.add_url_rule("/importar", "cad_importar", importar, methods=["GET", "POST"])
-    bp.add_url_rule("/importar/aplicar", "cad_importar_aplicar", importar_aplicar, methods=["POST"])
+    bp.add_url_rule("/importar", "cad_importar", importar_saiu, methods=["GET", "POST"])
+    bp.add_url_rule("/importar/aplicar", "cad_importar_aplicar", importar_saiu, methods=["GET", "POST"])
     bp.add_url_rule("/qualidade", "cad_qualidade", qualidade)
 
 

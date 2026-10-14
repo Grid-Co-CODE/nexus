@@ -3,7 +3,6 @@ campo com o Supervisor de Campo e o Coordenador (vazio = vaga, nunca erro), o c�
 novos, a RESPONSÁVEL O&M com a região no lugar da pessoa (vira vaga, não pessoa), a publicação no banco sem nome em claro
 e a carga única do CSV da estrutura (nome exato, sem acento/caixa/espaço, e o resto "fora", sem chutar).
 Planilha e CSV sintéticos; pessoas fictícias."""
-import io
 import json
 import re
 
@@ -227,15 +226,15 @@ def test_regiao_na_responsavel_om_vira_vaga_e_nao_pessoa(tmp_path):
     assert p2.vagas[0] == {"rotulo": "NE · Fortaleza-CE e Teresina-PI", "usinas": 1, "tinham_pessoa": 1}
 
 
-def test_previa_mostra_as_vagas(cli):
-    r = cli.post("/t/base/importar", data={"arquivo": (io.BytesIO(_xlsx(extra=[VAGA_NE])), "BD_Operacoes.xlsx")},
-                 content_type="multipart/form-data")
-    html = _h(r)
-    assert r.status_code == 200 and "Vagas de Supervisor de Campo" in html
-    assert "<td>NE · Fortaleza-CE e Teresina-PI</td>" in html
-    # e a usina, aplicada, mostra "Vaga · <região>" na coluna Responsável O&amp;M
-    token = re.search(r'name="token" value="([^"]+)"', html).group(1)
-    assert cli.post("/t/base/importar/aplicar", data={"token": token}).status_code == 302
+def test_a_vaga_importada_aparece_no_registro_mestre(app_cad, cli):
+    """A importação é por comando desde 14/10/2026 (a tela Importar do Excel saiu): `montar` → `aplicar_carga`. A usina
+    com região no lugar da pessoa mostra "Vaga · <região>" na coluna Responsável O&M."""
+    from nexus.cadastro.telas import servico
+    with app_cad.app_context():
+        srv = servico()
+        p = montar(ler_xlsx(_xlsx(extra=[VAGA_NE])), srv, arquivo="BD_Operacoes.xlsx")
+        assert [v["rotulo"] for v in p.vagas] == ["NE · Fortaleza-CE e Teresina-PI"]
+        srv.aplicar_carga(p.carga)
     assert '<span class="cad-vaga">Vaga · NE · Fortaleza-CE e Teresina-PI</span>' in _h(cli.get("/t/base/registro-mestre"))
 
 

@@ -2,8 +2,9 @@
 
 O registro mestre do Nexus: usinas, clientes, pessoas, equipes, regiões de campo e listas, com os mesmos dados do
 BD_Operações (a região de campo vem da estrutura de O&M de 10/2026), mas editáveis numa tela. As telas ficam nas torres
-Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Regiões de campo, Importar do Excel, Qualidade do
-cadastro) e Pessoas (Colaboradores Operação).
+Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Regiões de campo, Qualidade do cadastro) e Pessoas
+(Colaboradores Operação). A tela Importar do Excel saiu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"):
+`/t/base/importar` leva ao Registro mestre, sem importar nada; a importação segue por comando (abaixo).
 
 **A tela Listas saiu em 11/10/2026** (Levi: "pode tirar listas pois a governança faz mais sentido"): `/t/base/listas`
 responde um redirecionamento para Base → Governança de dados (quem tinha o endereço salvo não cai num 404; o POST de uma
@@ -26,7 +27,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `banco.py` | publica o cadastro no PostgreSQL com ID e ligação por ID (`ferramentas/publicar_cadastro.py`) |
 | `casamento.py` | casa o nome de uma base sem código (BD_Thopen) com a usina do cadastro |
 | `ligacoes.py` + `telas_ligacoes.py` | seção Ligações entre bases, no fim de Base → Governança de dados (até 11/10/2026 era a tela Base → Ligações): lê as bases, mostra os buracos, grava as decisões |
-| `importar.py` | importa o `BD_Operacoes.xlsx` e mostra a prévia do que muda antes de gravar |
+| `importar.py` | importa o `BD_Operacoes.xlsx` (por comando desde 14/10/2026: a tela saiu) e monta a prévia do que muda antes de gravar |
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Integração Fracttal: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
@@ -67,7 +68,7 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 
 ## Importar o BD_Operações (`importar.py`)
 
-- Caminho: tela Base → Importar do Excel (prévia, depois gravar). Por comando, o mesmo é `montar` → conferir o
+- Caminho: por comando (a tela Base → Importar do Excel saiu em 14/10/2026, a pedido do Levi): `montar` → conferir o
   `resumo` → `srv.aplicar_carga(carga, quem=QUEM_IMPORTACAO)` + `srv.auditar(...)`, que guarda uma cópia em
   `C:\GridcoAuto\nexus\backups\`. Depois, `ferramentas/publicar_cadastro.py --ensaio` e sem `--ensaio`. O Nexus no ar
   relê o arquivo sozinho (o cache segue o mtime), sem reiniciar.

@@ -150,21 +150,15 @@ def test_criar_usina_pela_tela(cli):
     assert resp.status_code == 302 and resp.headers["Location"].endswith("/t/base/usina/2")
 
 
-def test_importar_mostra_previa_e_so_grava_ao_aplicar(cli):
-    resp = cli.post("/t/base/importar", data={"arquivo": (io.BytesIO(_xlsx()), "BD_Operacoes.xlsx")},
-                    content_type="multipart/form-data")
-    html = _html(resp)
-    assert resp.status_code == 200 and "Comparação" in html
-    assert "UFV-10" not in _html(cli.get("/t/base/registro-mestre"))      # prévia não grava
-    token = re.search(r'name="token" value="([^"]+)"', html).group(1)
-    assert cli.post("/t/base/importar/aplicar", data={"token": token}).status_code == 302
-    assert "UFV-10" in _html(cli.get("/t/base/registro-mestre"))
-
-
-def test_importar_arquivo_que_nao_e_xlsx_recusa(cli):
-    resp = cli.post("/t/base/importar", data={"arquivo": (io.BytesIO(b"oi"), "BD.csv")},
-                    content_type="multipart/form-data")
-    assert resp.status_code == 400
+# ── Base → Importar do Excel saiu (Levi, 14/10/2026: "Tire 'Importar do Excel' do módulo base") ───────────────────
+def test_importar_saiu_do_menu_e_o_endereco_leva_ao_registro_mestre_sem_importar_nada(cli):
+    html = _html(cli.get("/t/base/registro-mestre"))
+    assert "Importar do Excel" not in html and "/t/base/importar" not in html
+    for metodo, url in (("get", "/t/base/importar"), ("post", "/t/base/importar"), ("post", "/t/base/importar/aplicar")):
+        r = getattr(cli, metodo)(url, data={"arquivo": (io.BytesIO(_xlsx()), "BD_Operacoes.xlsx")} if metodo == "post"
+                                 else None, content_type="multipart/form-data" if metodo == "post" else None)
+        assert r.status_code == 302 and r.headers["Location"].endswith("/t/base/registro-mestre"), (metodo, url)
+    assert "UFV-10" not in _html(cli.get("/t/base/registro-mestre"))       # o arquivo enviado não foi importado
 
 
 def test_qualidade_abre(cli):
