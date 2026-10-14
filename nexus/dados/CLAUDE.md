@@ -115,6 +115,16 @@ corrente se refaz até fechar e o anterior até o dia 5. O nome da usina é o do
 liga pelo de-para das abas e pelo nome do cadastro, na hora). Sem pessoa nem texto livre (o motivo do PR sem confiança
 fica de fora). Registrado antes de existir: nasce na 1ª volta do worker depois do deploy da plataforma.
 
+**As OS da disponibilidade (12/10/2026):** a plataforma publica com o diário da disponibilidade o
+`falhas_performance · disponibilidade_os` (`plataforma/falhas_publicar.py`, `_disp_os_linhas`): 1 linha = 1 OS × 1 usina
+do escopo, no mês, lido pela janela de Disponibilidade da Visão do responsável. **O `perda_kwh` é a perda da OS NAQUELA
+usina** (13/10/2026: o `kwh_usina` do índice da Disponibilidade da plataforma), pela régua do Gerencial (kWp afetado ×
+horas de sol, sem a irradiação, fora o dia que a geração desmente): as linhas de uma usina somam a perda dela no
+Gerencial, e a usina do escopo em que a OS não perdeu nada fica com 0. Antes era a perda da OS repartida pela potência,
+que errava quando a geração desmentia o dia numa usina só ou o teto de 100% pegava uma e não a outra (setembro: 47.893
+kWh na usina errada entre Rodrigues 1 e 2; outubro: ~2,5 MWh na Boa Esperança do Sul 1 e 2 e ~5,2 MWh na Rodrigues). O
+índice publicado antes do campo ainda reparte pela potência. Mudou a regra lá, muda a `observacao` do catálogo junto.
+
 **Chamados de garantia (12/10/2026):** Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se
 conversando!". O Nexus publica as OS de acompanhamento de chamado do Fracttal (o quadro Acompanhamento de chamados do OS
 Creator) no livro `nexus_chamados · fato_chamado` (`fato_chamado.py`, conformado, foto acumulada, chave `os`): 1 linha =

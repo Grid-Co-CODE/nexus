@@ -469,7 +469,10 @@ FATOS = (
                     "0,3 na Thopen). Até 13/10/2026 a geração vinha do PR diário e a soma não fechava em 78 de 131 "
                     "usinas. Grava o worker do servidor junto com a meta do mês"),
     # O que formou a disponibilidade (12/10/2026, Levi: "Quero também que apareça todas as OSs listadas que formaram
-    # aquele valor"): as OS da conta do Gerencial › Disponibilidade, publicadas com o diário pela plataforma
+    # aquele valor"): as OS da conta do Gerencial › Disponibilidade, publicadas com o diário pela plataforma. A perda de
+    # cada linha é a da OS naquela usina desde 13/10/2026 (`kwh_usina` do índice da Disponibilidade): repartida pela
+    # potência, a OS de duas usinas punha a perda na usina errada quando a geração desmentia o dia numa só, ou o teto de
+    # 100% pegava uma e não a outra
     Fato("disponibilidade_os", "OS que formaram a disponibilidade (Gerencial)", "performance",
          "falhas_performance · disponibilidade_os",
          "1 linha = 1 OS da conta da disponibilidade × 1 usina do escopo dela, no mês",
@@ -482,8 +485,12 @@ FATOS = (
          janela_origem="o mês corrente e o anterior (o índice do Gerencial); mês que sai fica como foi publicado",
          observacao="tipo = o tipo da tarefa (Religamento, Religamento Remoto, Corretiva Emergencial); origem = queda ou "
                     "equipamento; escopo = usina inteira, cabine N ou inversor N.M; duracao_sol_min = as horas de sol "
-                    "(06–18 h) da OS dentro do mês; perda_kwh = kWp afetado × horas (sem a irradiação), repartida pela "
-                    "potência quando a OS pega duas usinas. Sem a descrição nem quem criou (regra 8)"),
+                    "(06–18 h) da OS dentro do mês, as mesmas em cada usina dela; perda_kwh = a perda da OS naquela "
+                    "usina pela régua do Gerencial (kWp afetado × horas de sol, sem a irradiação, fora o dia que a "
+                    "geração desmente): as linhas de uma usina somam a perda dela no Gerencial, e a usina do escopo em "
+                    "que a OS não perdeu nada (todo dia desmentido) fica com 0. Até 13/10/2026 era a perda da OS "
+                    "repartida pela potência (setembro: 47.893 kWh na usina errada entre Rodrigues 1 e 2). Sem a "
+                    "descrição nem quem criou (regra 8)"),
     # ── Tickets ────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("ticket", "Ticket de performance", "chamados",
          "tickets_performance · Tickets de Performance, Trackers, Strings indisp", "1 linha = 1 ticket",

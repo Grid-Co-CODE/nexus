@@ -872,8 +872,11 @@ def _hora(iso) -> str:
 def os_disponibilidade(uid: int, mes: str, nomes: Nomes) -> dict:
     """As OS que formaram a disponibilidade da usina no mês (`falhas_performance · disponibilidade_os`, a conta do
     Gerencial): {oss: [{os, tipo, origem, escopo, inicio, fim, aberta, duracao_min, sol_min, perda_kwh}], totais,
-    publicado}. Duração = do início ao fim da OS (o relógio); horas de sol = as de 06–18 h dentro do mês (as que contam
-    na conta); perda = kWp afetado × horas (a régua de lá, sem a irradiação)."""
+    publicado}. Duração = do início ao fim da OS (o relógio); horas de sol = as de 06–18 h da OS dentro do mês (as que
+    contam na conta), as mesmas em cada usina dela; perda = a da OS NESTA usina pela régua de lá (kWp afetado × horas de
+    sol, sem a irradiação, fora o dia que a geração desmente; 0 quando todos foram desmentidos), e por isso o total é a
+    perda da usina no Gerencial. Até 13/10/2026 a plataforma repartia a perda da OS de duas usinas pela potência, e o
+    total errava quando a geração desmentia o dia numa usina só (setembro: 47.893 kWh entre Rodrigues 1 e 2)."""
     from datetime import datetime as _dt
     todas = visao._livro(LIVRO_DISP, ABA_DISP_OS)
     rs = _linhas_da_usina([r for r in todas if str(r.get("mes") or "") == mes], uid, nomes)
