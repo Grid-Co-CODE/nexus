@@ -161,6 +161,8 @@ QUEM_GRAVA_ORIGEM = (
     ("igual", "campo_nexus", "coletor do Fracttal do Nexus (desligado em 05/10)"),
     # a API REST do Fracttal, que o Nexus só lê (os chamados de garantia, 12/10/2026: nexus/campo/chamados_acompanhamento.py)
     ("igual", "Fracttal (API REST)", "Fracttal (o Nexus lê pela API REST, só leitura)"),
+    # as contestações do cliente (13/10/2026): o 5080 grava a cada contestação (thopen/contestacao_banco.py)
+    ("igual", "thopen_contestacoes", "Dashboard Thopen (5080)"),
     ("prefixo", "nexus_", "Nexus"),                              # livro do Nexus fora do LIVROS: viola a regra 10
 )
 A_DECLARAR = "a declarar"

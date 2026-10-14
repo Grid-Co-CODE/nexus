@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Contestações dos clientes (Levi, 13/10/2026: "em contratos e clientes no Nexus pode ter um lugar para essas
+   contestações separando setores!"). Uma aba por setor; a mais nova em cima. O que é do cliente (nome, contato,
+   mensagem, o que ele via) vem cifrado do banco e só abre com a chave privada deste Nexus (nexus/contratos/contestacoes.py). #}
+<style>
+  .ct-tab td{vertical-align:top}
+  .ct-tab td.ct-esq, .ct-tab th.ct-esq{text-align:left}
+  .ct-tab .ct-usina{white-space:nowrap}
+  .ct-tab .ct-msg{max-width:360px;white-space:pre-wrap}
+  .ct-tab .ct-tela{margin:0;padding:0;list-style:none;font-size:12px;color:var(--mudo)}
+  .ct-tab .ct-tela b{color:var(--tinta-2);font-weight:600}
+  .ct-itens{display:flex;flex-wrap:wrap;gap:4px}
+  .ct-item{font:600 11px/18px var(--font-sans);padding:0 7px;border-radius:9px;background:var(--superficie-3);color:var(--tinta-2)}
+</style>
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Dashboard Thopen<br><b>livro thopen_contestacoes</b></div>
+  </div>
+  {% if d.erro %}<div class="cn-erro" role="alert"><b>{{ d.erro }}.</b></div>{% endif %}
+  {% if d.sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave das contestações (NEXUS_CONTESTACAO_CHAVE_PRIVADA).</b>
+    As contestações aparecem sem o nome, o contato e a mensagem do cliente, que vão cifrados no banco.</div>{% endif %}
+
+  <nav class="cn-abas" aria-label="Setor">
+    {% for s, rot in setores %}<a href="?setor={{ s }}"{% if s == setor %} aria-current="page"{% endif %}>{{ rot }}<i>{{ d.contagem.get(s, 0) }}</i></a>{% endfor %}
+  </nav>
+
+  <div class="cn-tab cn-tab--compacta ct-tab"><table>
+    <thead><tr><th>Recebida</th><th>Usina</th><th>Dia contestado</th><th>Contesta</th><th>Cliente</th><th class="ct-esq">Mensagem</th><th class="ct-esq">Na tela do cliente</th><th>Teams</th></tr></thead>
+    <tbody>
+    {% for x in lista %}
+      <tr><td><span class="ext-par"><span class="m">{{ x.quando.strftime('%d/%m/%Y') if x.quando else '—' }}</span><span class="det">{{ x.quando.strftime('%H:%M') if x.quando else '' }}</span></span></td>
+        <td class="ct-usina">{{ x.usina }}</td>
+        <td class="m">{% if x.ini %}{{ x.ini.strftime('%d/%m/%Y') }}{% if x.fim and x.fim != x.ini %} a {{ x.fim.strftime('%d/%m') }}{% endif %}{% else %}—{% endif %}</td>
+        <td><span class="ct-itens">{% for i in x.itens %}<span class="ct-item">{{ i }}</span>{% endfor %}</span></td>
+        <td>{% if x.aberto %}<span class="ext-par"><span>{{ x.nome }}</span><span class="det">{{ x.contato }}</span></span>{% elif x.aberto is false %}<span class="cn-t-critico" title="A cifra desta linha não abre com a chave deste Nexus">não abre</span>{% else %}<span class="mudo">cifrado</span>{% endif %}</td>
+        <td class="ct-msg ct-esq">{% if x.aberto %}{{ x.mensagem or '—' }}{% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td class="ct-esq">{% if x.tela %}<ul class="ct-tela">{% for rot, v in x.tela %}<li><b>{{ rot }}</b> {{ v }}</li>{% endfor %}</ul>{% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td>{% if x.avisado %}<span class="cn-t-ok">recebeu</span>{% else %}<span class="cn-t-critico" title="O Teams recusou o aviso: a contestação só está aqui">não recebeu</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="8" class="mudo">Nenhuma contestação para este setor.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

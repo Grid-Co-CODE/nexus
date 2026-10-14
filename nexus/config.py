@@ -57,7 +57,11 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # tudo, como antes). Sem a NEXUS_PESSOA_HMAC fica desligado de qualquer jeito (nexus/auth/setor_telas.py)
              "NEXUS_ACESSO_POR_SETOR",
              # a pré-carga das telas de quem tem setor (12/10/2026, nexus/auth/pre_carga.py): padrão ligada; "0" desliga
-             "NEXUS_PRE_CARGA")
+             "NEXUS_PRE_CARGA",
+             # Contratos e clientes → Contestações (13/10/2026): a chave PRIVADA (X25519, base64) que abre o nome, o
+             # contato e a mensagem do cliente que o Dashboard Thopen grava cifrados com a pública. Sem ela, a tela lista
+             # as contestações sem esses dados (nexus/contratos/contestacoes.py)
+             "NEXUS_CONTESTACAO_CHAVE_PRIVADA")
 
 
 class ConfigErro(RuntimeError):

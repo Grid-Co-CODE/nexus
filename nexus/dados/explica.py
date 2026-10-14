@@ -18,6 +18,7 @@ RESUMO = {
     "ronda_checklist": "As respostas das rondas antigas que ficaram sem OS",
     "ronda_avulsa": "Ronda lançada à mão no Nexus e o nível validado pela foto",
     "observacao_responsavel": "A observação do Responsável O&M sobre a usina, com dia e hora",
+    "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
     "ranking_pontos": "O placar de pontos do ciclo de cada técnico, como o App calcula",
@@ -47,6 +48,7 @@ RESUMO = {
     "falha_tracker_dia": "Quantos trackers ficaram parados por usina e por dia",
     "cobertura_falhas": "Que usinas a plataforma de fato monitorou em cada mês",
     "os_string": "Cada OS de recomposição de string aberta no Fracttal",
+    "disponibilidade_dia": "A disponibilidade de cada usina por dia, pela régua do Gerencial",
     "parada_tracker": "Cada parada de tracker registrada pela plataforma",
     "perda_equipamento": "Quanto cada equipamento deixou de gerar por dia",
     # ── Chamados ──
@@ -69,6 +71,10 @@ PARA_QUE = {
     "ronda_avulsa": "Recebe a ronda lançada à mão no Nexus por quem a fez (sem o App), o nível de vegetação e "
                     "sujidade validado pela foto e a anulação de um lançamento. A ronda avulsa válida entra na tabela "
                     "de Ronda e conta na cobertura; a validação pela foto fica fora, porque não é uma ronda feita.",
+    "contestacao_cliente": "Guarda cada contestação que o cliente fez no Dashboard Thopen (geração, disponibilidade, "
+                           "desligamento, string, tracker ou ronda de um dia), separada pelo setor que responde: "
+                           "Performance ou Zeladoria. Quem é o cliente, o contato e a mensagem vão cifrados; só o Nexus "
+                           "abre, na tela Contratos e clientes → Contestações.",
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
                               "serve para juntar as observações nos relatórios.",
@@ -153,6 +159,9 @@ PARA_QUE = {
     "os_string": "Guarda cada OS de recomposição de string do Fracttal, pela data do evento, com quantas strings ela "
                  "cita. É de onde o Dashboard Thopen tira as strings do mês; a OS sem quantidade fica vazia, nunca "
                  "zero.",
+    "disponibilidade_dia": "Guarda a disponibilidade de cada usina em cada dia fechado do mês, pelas horas paradas "
+                           "das OS do Fracttal (a mesma conta do Gerencial da plataforma). É a coluna Disp (%) e a "
+                           "disponibilidade do mês do Dashboard Thopen, de 10/2026 em diante.",
     "parada_tracker": "Guarda cada parada de tracker que a plataforma de performance registrou, com a duração. Serve "
                       "para acompanhar a disponibilidade dos trackers de cada usina.",
     "perda_equipamento": "O gêmeo digital calcula, para cada dia, quanto cada equipamento deixou de gerar em cada "

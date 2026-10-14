@@ -182,6 +182,21 @@ FATOS = (
          observacao="o texto e o nome de quem escreveu só cifrados (Cofre, a chave do cadastro); do_responsavel = sim "
                     "quando quem escreveu é o Responsável O&M da usina, não quando cobria outro (férias). Só "
                     "responsável escreve (pelo login do Fracttal). O banco não apaga: nada se edita"),
+    # Contratos e clientes → Contestações (Levi, 13/10/2026: "contestação ligada ao Nexus"; "ficaria na API do PG"). O
+    # Dashboard Thopen (5080) é a FONTE: grava 1 linha por contestação × setor, a mesma divisão das mensagens do Teams.
+    # Registrado antes da 1ª gravação. O que é do cliente vai só cifrado com a chave PÚBLICA (o 5080 não abre nada)
+    Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
+         "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance ou "
+         "Zeladoria)",
+         _d(data=("cod", "data_id_recebida; data_id_contestada_ini e _fim (papéis)"),
+            usina=("id", "usina_id (o de-para do 5080; vazio quando a usina tem dois ids, como Primavera); usina em "
+                         "nome")),
+         tipo="sem_medida", chave=("id",), fontes=("thopen_contestacoes · contestacoes",),
+         janela_origem="o 5080 é a fonte (tudo desde a 1ª contestação)",
+         observacao="contestacao_id junta as linhas de uma contestação que foi aos dois setores. Nome, contato, "
+                    "mensagem e o que o cliente via só em dados_cifrados (X25519 + AES-GCM; abre com "
+                    "NEXUS_CONTESTACAO_CHAVE_PRIVADA, no Nexus). avisado_teams = sim/não: o Teams do setor recebeu. "
+                    "O livro é trocado inteiro a cada contestação, relido antes e conferido depois"),
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", fato_pt.GRAO,
          _d(data=("id", "data_id_criacao, data_id_decisao (papéis)"), usina=("id", "usina_id"),
             equipe=("id", "equipe_id: papel registro (Região)"),
@@ -383,33 +398,104 @@ FATOS = (
          tipo="snapshot_periodico", chave=("Usina", "Mês"),
          medidas=_m((("meta_kwh", "kWh", "aditiva"), ("pr_pct", "%", "nao"), ("ipoa_meta_kwh_m2", "kWh/m²", "semi"))),
          fontes=("bd_thopen · Dados Mensais", "bd_thopen · Historico")),
+    # plant_id no FIM das abas de episódio (08/10/2026, Operação no Mês do Dashboard Thopen): pelo nome, a Brodowski
+    # junta os dois cadastros dela na API PV (uma metade com 52 trackers parados, a outra com 51) e dá 52 trackers em
+    # vez de 103. Por isso a chave dos episódios é pelo plant_id: pelo nome, a do tracker repetia (medido nos pacotes
+    # do PC em 08/10: 243 chaves em setembro e 132 em outubro, Brodowski, Fernandópolis, Barretos, Assis; pelo
+    # plant_id, 0). O strings_inversor_dia agrega usina × inversor × dia e continua sem plant_id.
+    # Campo novo vazio é NÃO MEDIDO (mês montado antes do deploy da plataforma; a janela está em nexus/dados/CLAUDE.md,
+    # "Falhas da plataforma com plant_id"): lido como 0, viraria o "nenhum tracker parou com a usina comunicando" ou o
+    # "nenhuma usina monitorada" que o spec da Operação no Mês manda barrar
     # GR-2 (auditoria 08/10): um registro só para dois grãos; virou fonte dos dois fatos abaixo, sem apagar a história
     Fato("falha_string", "Falha de string", "performance",
          "falhas_performance · strings_episodios, strings_inversor_dia", "1 linha = 1 episódio · inversor × dia",
-         _d(data=("cod", "saiu / dia"), usina=("nome", "usina (+ fonte)"), cliente=("nome", "cliente"),
-            equipamento=("nome", "inversor, string")),
+         _d(data=("cod", "saiu / dia"), usina=("cod", "plant_id nos episódios (08/10/2026); usina em nome"),
+            cliente=("nome", "cliente"), equipamento=("nome", "inversor, string")),
          tipo="snapshot_acumulado", estado="parte", parte_de=("falha_string_episodio", "falha_string_inversor_dia"),
          observacao="até 08/10 um registro só para dois grãos (GR-2): episódio e inversor × dia são dois fatos"),
     Fato("falha_string_episodio", "Falha de string (episódio)", "performance", "falhas_performance · strings_episodios",
          "1 linha = 1 episódio de string fora (saiu → voltou)",
-         _d(data=("cod", "saiu"), usina=("nome", "usina (+ fonte)"), cliente=("nome", "cliente"),
-            equipamento=("nome", "inversor, string")),
-         tipo="snapshot_acumulado", chave=("fonte", "usina", "inversor", "string", "saiu"),
+         _d(data=("cod", "saiu"), usina=("cod", "plant_id nos episódios (08/10/2026); usina em nome"),
+            cliente=("nome", "cliente"), equipamento=("nome", "inversor, string")),
+         tipo="snapshot_acumulado", chave=("fonte", "plant_id", "inversor", "string", "saiu"),
          medidas=_m((("perda_kwh", "kWh", "aditiva"),)), fontes=("falhas_performance · strings_episodios",),
-         observacao="o episódio aberto muda até voltar (foto acumulada)"),
+         observacao="o episódio aberto muda até voltar (foto acumulada). plant_id em todo mês publicado (o pacote do "
+                    "mês já o trazia)"),
     Fato("falha_string_inversor_dia", "Falha de string (inversor × dia)", "performance",
          "falhas_performance · strings_inversor_dia", "1 linha = 1 inversor × 1 dia com string fora",
          _d(data=("cod", "dia"), usina=("nome", "usina (+ fonte)"), cliente=("nome", "cliente"),
             equipamento=("nome", "inversor")),
          tipo="snapshot_periodico", chave=("fonte", "usina", "inversor", "dia"),
-         medidas=_m((("perda_kwh", "kWh", "aditiva"),)), fontes=("falhas_performance · strings_inversor_dia",)),
+         medidas=_m((("perda_kwh", "kWh", "aditiva"),)), fontes=("falhas_performance · strings_inversor_dia",),
+         observacao="agrega usina × inversor × dia e continua sem plant_id (liga só pelo nome)"),
     Fato("falha_tracker", "Falha de tracker", "performance", "falhas_performance · trackers_episodios",
          "1 linha = 1 episódio",
-         _d(data=("cod", "parou"), usina=("nome", "usina"), cliente=("nome", "cliente"),
-            equipamento=("nome", "tracker, inversor")),
-         tipo="snapshot_acumulado", chave=("fonte", "usina", "tracker", "parou"),
+         _d(data=("cod", "parou"), usina=("cod", "plant_id da fonte (08/10/2026); usina em nome"),
+            cliente=("nome", "cliente"), equipamento=("nome", "tracker, inversor")),
+         tipo="snapshot_acumulado", chave=("fonte", "plant_id", "tracker", "parou"),
          medidas=_m((("perda_kwh", "kWh", "aditiva"), ("duracao_min", "min", "aditiva"))),
-         fontes=("falhas_performance · trackers_episodios",)),
+         fontes=("falhas_performance · trackers_episodios",),
+         observacao="dias_comunicou: dias do episódio, no mês, em que a USINA (qualquer fonte e cadastro dela) leu "
+                    "string ou gerou. dias_sem_prova: dias do episódio ainda não fechados e sem prova (volta a 0 quando "
+                    "o dia fecha). Vazio = não medido, nunca 0"),
+    # tracker × dia (08/10/2026, revisão da tarde: a análise de performance pediu a tabela do Diário por dia). Grão
+    # diferente do episódio:
+    # outro fato (regra 1, como a falha de string), e o falha_tracker fica com o id dele
+    Fato("falha_tracker_dia", "Falha de tracker (usina × dia)", "performance", "falhas_performance · trackers_dia",
+         "1 linha = 1 usina × fonte × plant_id × 1 dia com tracker parado e a usina comunicando",
+         _d(data=("cod", "dia"), usina=("cod", "plant_id da fonte; usina em nome"), cliente=("nome", "cliente"),
+            equipamento=("nome", "trackers (lista)")),
+         tipo="snapshot_periodico", chave=("fonte", "plant_id", "dia"), fontes=("falhas_performance · trackers_dia",),
+         # na fonte a coluna é qtd; conformada vira trackers_qtd. Soma entre plant_id e usinas no mesmo dia; no tempo dá
+         # tracker × dia, e não trackers distintos (o card do Dashboard Thopen conta os distintos pela lista)
+         medidas=_m((("trackers_qtd", "qtd", "semi"),)),
+         observacao="comunicou: 'sim' (a usina leu string ou gerou) ou 'sem prova' (dia corrente sem geração "
+                    "fechada); o dia em que a usina não comunicou não entra. Trackers distintos no mês pela lista, "
+                    "nunca pela soma da qtd"),
+    # Levi, 08/10/2026: usina sem linha nos episódios não é "usina sem falha" — pode ser usina que a plataforma nem
+    # mede. Sem esta aba, o card do Dashboard Thopen mostraria 0 onde o certo é "sem monitoramento"
+    Fato("cobertura_falhas", "Cobertura do registro de falhas", "performance", "falhas_performance · cobertura",
+         "1 linha = mês × fonte × plant_id (dias medidos de strings e de trackers)",
+         _d(data=("cod", "mes"), usina=("cod", "plant_id da fonte; usina em nome"), cliente=("nome", "cliente")),
+         tipo="snapshot_periodico", chave=("mes", "fonte", "plant_id"), fontes=("falhas_performance · cobertura",),
+         # na fonte a coluna é dias_comunicou; conformada vira dias_comunicou_qtd (regra 3: unidade no nome). É da usina,
+         # repetida em cada plant_id dela: não soma entre linhas
+         medidas=_m((("dias_comunicou_qtd", "dias", "nao"),)),
+         observacao="Separa 'sem falha' de 'sem monitoramento'. atualizacao.cobertura vazio = não medido; com número, "
+                    "o plant_id sem linha = sem monitoramento. dias_comunicou é da USINA, repetido em cada plant_id "
+                    "dela: não somar entre linhas"),
+    # "Strings é OS" (Levi, 08/10/2026, revisão da tarde): a string do Dashboard Thopen vem da OS de recomposição do
+    # Fracttal, pela data do evento, e não da régua de 2 h da plataforma. Outro processo (a ordem de serviço, não o
+    # episódio medido): outro fato. 'texto' é a linha "Strings sem corrente: N (Ipv3, ...)" que o OS Creator escreve
+    # nas observações; 'estimado' é a Grid completando as OS de outubro/2026 pelo monitoramento, sem tocar no Fracttal
+    Fato("os_string", "OS de string", "performance", "falhas_performance · strings_os",
+         "1 linha = 1 OS de recomposição de string do Fracttal com a data do evento no mês",
+         _d(data=("cod", "data_evento (event_date do Fracttal, dia de Brasília)"),
+            usina=("cod", "plant_id; usina em nome"), cliente=("nome", "cliente"),
+            equipamento=("nome", "inversor; strings (lista)"), os=("cod", "os (dimensão degenerada)")),
+         tipo="snapshot_acumulado", chave=("mes", "os"), fontes=("falhas_performance · strings_os",),
+         # na fonte a coluna é qtd; conformada vira strings_qtd. A soma é strings × OS: a mesma string em duas OS conta
+         # duas vezes (strings distintas saem da lista)
+         medidas=_m((("strings_qtd", "qtd", "aditiva"),)),
+         observacao="origem: texto, citadas, estimado ou sem_quantidade. Sem quantidade = qtd vazio, nunca 0. A OS "
+                    "muda até fechar (status; a quantidade escrita depois troca a origem)"),
+    # Rodada 4 do Dashboard Thopen (Levi, 09/10/2026): a coluna Disp (%) da tabela do Diário "calculada pelo Fracttal, da
+    # mesma forma que calculamos pelo gerencial da plataforma". A plataforma publica o diário do índice do Gerencial ›
+    # Disponibilidade (frac_disp_index.json), sem chamada nova ao Fracttal; o dia sem OS vem escrito (100 e 0 h)
+    Fato("disponibilidade_dia", "Disponibilidade da usina por dia (Gerencial)", "performance",
+         "falhas_performance · disponibilidade_dia",
+         "1 linha = 1 usina do catálogo do Gerencial × 1 dia fechado do mês",
+         _d(data=("cod", "dia"), usina=("nome", "usina (nome do Gerencial); usina_fracttal liga pelo de_para "
+                                                "(Fracttal · Classificação 1)"),
+            cliente=("nome", "cliente")),
+         tipo="snapshot_periodico", chave=("mes", "dia", "usina"), fontes=("falhas_performance · disponibilidade_dia",),
+         # na fonte: disp (%) e h_perdidas (horas equivalentes das OS, ponderadas pela potência). A % não soma; as horas
+         # somam no tempo de uma usina, não entre usinas
+         medidas=_m((("disp_pct", "%", "nao"), ("indisponibilidade_min", "min", "semi"))),
+         janela_origem="o mês corrente e o anterior (o índice do Gerencial); mês que sai fica como foi publicado",
+         observacao="disp = 100·(1 − h_perdidas/12); o 5080 calcula pelas horas (o disp de 1 casa desviava a média do "
+                    "mês). Um site do Fracttal pode ser de duas usinas (Aparecida do Taboado 1 e 2): ligar pelo nome "
+                    "primeiro"),
     Fato("parada_tracker", "Parada de tracker", "performance", "plataforma_series · trk_eventos",
          "1 linha = 1 parada", _d(data=("cod", "dia"), usina=("cod", "plant_id da fonte"),
                                   equipamento=("nome", "tracker")),
