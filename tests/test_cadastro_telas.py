@@ -178,10 +178,11 @@ def test_listas_saiu_do_menu_e_o_endereco_leva_a_governanca(cli, app_cad):
     with app_cad.app_context():
         assert servico().listas()["status_usina"] == ["OPERAÇÃO", "A MOBILIZAR"]
     assert '<option value="A MOBILIZAR"' in _html(cli.get("/t/base/usina/1"))
-    # o recado do valor fora da lista não manda mais à tela que saiu
+    # o recado do valor fora da lista não manda mais a uma tela que saiu (nem Listas, nem o Importar do Excel, 14/10/2026)
     html = _html(cli.get("/t/base/usina/1"))
     resp = cli.post("/t/base/usina/1", data={"_versao": _versao(html), "status": "EM OBRA"})
-    assert resp.status_code == 422 and "Inclua em Listas" not in _html(resp) and "Importar do Excel" in _html(resp)
+    assert resp.status_code == 422 and "a lista vem do BD_Operações" in _html(resp)
+    assert "Inclua em Listas" not in _html(resp) and "Importar do Excel" not in _html(resp)
 
 
 def test_pendencia_de_lista_aparece_na_qualidade_sem_link(cli, app_cad):
