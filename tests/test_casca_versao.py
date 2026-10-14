@@ -75,3 +75,52 @@ def test_sem_git_o_cartao_diz_traco_e_a_aba_diz_por_que(app, logado, monkeypatch
 
 def test_a_aba_exige_login(cliente):
     assert cliente.get("/?aba=atualizacoes").status_code in (302, 401)
+
+
+CORPO_REAL = """Levi, 14/10/2026: "Tire 'Importar do Excel' do módulo base".
+
+- O item sai do menu da Base; /t/base/importar e /t/base/importar/aplicar (GET ou POST) levam ao Registro mestre, sem
+  importar nada (favorito antigo ou prévia aberta não viram 404).
+- Saem as views e os templates.
+* E o recado da lista não manda mais a ela.
+
+Prova: tests/test_cadastro_telas.py (o endereço leva ao Registro mestre) e o teste da vaga.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+"""
+
+
+def test_o_corpo_vira_topicos_com_o_pedido_em_destaque_e_sem_a_prova():
+    """14/10/2026, Levi: "Esse 'O que mudou em detalhe' está muito feio e bagunçado, poderia pontuar mais bonito para
+    ficar melhor de ler. Não precisa desse Prova!"."""
+    b = versao.blocos(CORPO_REAL)
+    assert [x["tipo"] for x in b] == ["pedido", "lista"]
+    assert b[0]["texto"] == "Levi, 14/10/2026: \"Tire 'Importar do Excel' do módulo base\"."
+    assert b[1]["itens"] == [
+        "O item sai do menu da Base; /t/base/importar e /t/base/importar/aplicar (GET ou POST) levam ao Registro mestre, "
+        "sem importar nada (favorito antigo ou prévia aberta não viram 404).",
+        "Saem as views e os templates.", "E o recado da lista não manda mais a ela."]
+    assert versao.blocos("Só um parágrafo\nquebrado em duas linhas.") == [
+        {"tipo": "paragrafo", "texto": "Só um parágrafo quebrado em duas linhas."}]
+    assert versao.blocos("") == [] and versao.blocos("Provas: só isto.") == []
+
+
+def test_a_aba_nao_mostra_horario_e_mostra_os_topicos(app, logado, monkeypatch):
+    import re as _re
+    log = (f"{SHA}\x1f2026-10-14T03:10:00Z\x1ffeat(base): sai a tela Importar do Excel - o endereco leva ao Registro"
+           f"\x1f{CORPO_REAL}\x1e")
+    monkeypatch.setattr(versao, "_git", lambda *a, **k: log if a[1] != "-1" else
+                        f"{SHA}\x1f2026-10-14T03:10:00Z\x1ffeat(base): sai a tela\n")
+    monkeypatch.setattr(casca, "_commit", lambda: "648c100")
+    versao.local.cache_clear()
+    versao.historico.cache_clear()
+    try:
+        html = logado.get("/?aba=atualizacoes").get_data(as_text=True)
+    finally:
+        versao.local.cache_clear()
+        versao.historico.cache_clear()
+    aba = html.split('class="lead"', 1)[1].split('atu-rodape', 1)[0]
+    assert not _re.search(r"\b\d{2}:\d{2}\b", aba)                          # nenhum horário na aba
+    assert '<blockquote class="atu-pedido">' in aba and "<li>Saem as views e os templates.</li>" in aba
+    assert "Prova" not in aba and "Co-Authored-By" not in aba and "<pre>" not in aba
+    assert "<summary>O que mudou</summary>" in aba

@@ -12,8 +12,8 @@
   <a href="{{ url_for('casca.inicio', aba='atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
 </nav>
 
-<p class="lead">O que mudou no Nexus, do mais novo para o mais antigo. A versão no ar é a de cima: commit
-  <code>{{ versao.curto }}</code>, de {{ versao.em_txt }}, no ar desde {{ versao.no_ar_desde_txt }}.</p>
+{# sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa, e a de cima é a versão no ar #}
+<p class="lead">O que mudou no Nexus, do mais novo para o mais antigo. A de cima é a versão no ar.</p>
 
 {% if not dias %}
 <p class="aviso">Sem o histórico de atualizações nesta máquina (o Nexus não está num clone do repositório).</p>
@@ -26,7 +26,6 @@
       {% for x in itens %}
       <li class="atu-item{% if loop.first and loop.index0 == 0 and rotulo == dias[0][0] %} atu-item--no-ar{% endif %}">
         <div class="atu-cab">
-          <span class="atu-hora gc-num">{{ x.em.strftime('%H:%M') if x.em else '' }}</span>
           {% if x.tipo %}<span class="gc-status gc-status--{{ {'feat': 'ok', 'fix': 'alerta', 'perf': 'info'}.get(x.tipo_id, 'neutro') }}">{{ x.tipo }}</span>{% endif %}
           {% if x.area %}<span class="atu-area">{{ x.area }}</span>{% endif %}
           <code class="atu-commit">{{ x.curto }}</code>
@@ -34,7 +33,16 @@
         </div>
         <p class="atu-manchete">{{ x.manchete }}</p>
         {% if x.resto %}<p class="atu-resto">{{ x.resto }}</p>{% endif %}
-        {% if x.corpo %}<details class="atu-corpo"><summary>O que mudou, em detalhe</summary><pre>{{ x.corpo }}</pre></details>{% endif %}
+        {# o corpo do commit em tópicos (14/10/2026): o pedido em destaque, a lista com marcadores, sem a prova (versao.blocos) #}
+        {% if x.detalhe %}<details class="atu-corpo"><summary>O que mudou</summary>
+          <div class="atu-detalhe">
+            {% for b in x.detalhe %}
+            {% if b.tipo == 'pedido' %}<blockquote class="atu-pedido">{{ b.texto }}</blockquote>
+            {% elif b.tipo == 'lista' %}<ul>{% for i in b.itens %}<li>{{ i }}</li>{% endfor %}</ul>
+            {% else %}<p>{{ b.texto }}</p>{% endif %}
+            {% endfor %}
+          </div>
+        </details>{% endif %}
       </li>
       {% endfor %}
     </ol>

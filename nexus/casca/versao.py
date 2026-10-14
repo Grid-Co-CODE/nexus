@@ -8,7 +8,8 @@ observações abaixo do commit") e ganhou a aba de baixo ("Inclua no início uma
 - o cartão "Versão no ar": a hora do commit em execução, o commit curto (o mesmo do /saude) e desde quando ESTE processo
   está no ar (o deploy reinicia o Nexus: é a hora em que a versão entrou). Clicar leva às Atualizações;
 - a aba **Atualizações** (`/?aba=atualizacoes`): os últimos commits desta pasta, do mais novo, por dia, com o tipo (novidade,
-  correção...), a área e o que mudou (o título e, aberto, o resto da mensagem sem as linhas de coautoria).
+  correção...), a área e o que mudou (o título e, aberto, o resto da mensagem em tópicos, sem a prova nem a coautoria:
+  `blocos`). Sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa.
 
 Tudo sai do git da própria pasta (no servidor, a /opt/nexus, do usuário do serviço), lido uma vez por processo: cada
 deploy reinicia o Nexus, e a lista nova vem junto. Sem git (a vitrine estática, uma pasta copiada), o cartão diz "—" e a
@@ -30,6 +31,36 @@ TIPOS = {"feat": "Novidade", "fix": "Correção", "perf": "Desempenho", "docs": 
          "test": "Teste", "refactor": "Ajuste interno", "style": "Visual", "revert": "Desfeito"}
 _TITULO = re.compile(r"^(?P<tipo>[a-z]+)(?:\((?P<area>[^)]*)\))?!?:\s*(?P<texto>.+)$")
 _TRAILER = ("co-authored-by:", "signed-off-by:")
+# o parágrafo da prova (os testes que provam a mudança) é para quem revisa o código, não para quem lê a aba (14/10/2026,
+# Levi: "Não precisa desse Prova!")
+_PROVA = re.compile(r"^provas?\b", re.I)
+_MARCADOR = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+
+
+def blocos(corpo: str) -> list[dict]:
+    """O corpo do commit pronto para ler (14/10/2026, Levi: "Esse 'O que mudou em detalhe' está muito feio e bagunçado,
+    poderia pontuar mais bonito"): [{"tipo": "pedido" | "lista" | "paragrafo", "texto" | "itens"}]. O texto do commit é
+    quebrado a cada ~120 colunas: as linhas de um parágrafo ou de um item viram uma só. O 1º parágrafo que cita o pedido
+    ("Levi, 14/10/2026: ...") é o pedido; "- " abre um item da lista (a linha seguinte sem marcador continua o item); o
+    parágrafo da prova e as linhas de coautoria saem."""
+    out = []
+    for bloco in re.split(r"\n\s*\n", str(corpo or "").strip()):
+        linhas = [x for x in bloco.splitlines() if x.strip() and not x.strip().lower().startswith(_TRAILER)]
+        if not linhas or _PROVA.match(linhas[0].strip()):
+            continue
+        if _MARCADOR.match(linhas[0]):
+            itens = []
+            for x in linhas:
+                if _MARCADOR.match(x):
+                    itens.append(_MARCADOR.sub("", x, count=1).strip())
+                elif itens:
+                    itens[-1] += " " + x.strip()
+            out.append({"tipo": "lista", "itens": itens})
+            continue
+        texto = " ".join(x.strip() for x in linhas)
+        pedido = not out and re.match(r"^Levi\b", texto)
+        out.append({"tipo": "pedido" if pedido else "paragrafo", "texto": texto})
+    return out
 
 
 def _git(*args, timeout: float = 5) -> str:
@@ -66,7 +97,8 @@ def _item(sha: str, em: str, titulo: str, corpo: str) -> dict:
     manchete, _, resto = texto.partition(" - ")
     linhas = [x for x in corpo.splitlines() if not x.strip().lower().startswith(_TRAILER)]
     return {"sha": sha, "curto": sha[:7], "em": _data(em), "tipo": TIPOS.get(tipo, ""), "tipo_id": tipo if tipo in TIPOS else "",
-            "area": area, "manchete": manchete.strip(), "resto": resto.strip(), "corpo": "\n".join(linhas).strip()}
+            "area": area, "manchete": manchete.strip(), "resto": resto.strip(), "corpo": "\n".join(linhas).strip(),
+            "detalhe": blocos(corpo)}
 
 
 @lru_cache(maxsize=1)

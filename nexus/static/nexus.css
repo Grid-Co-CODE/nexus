@@ -175,7 +175,6 @@ a{color:inherit}
 .atu-item{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:12px 16px}
 .atu-item--no-ar{border-color:var(--verde-a35)}
 .atu-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.atu-hora{font:600 12px/16px var(--font-mono);color:var(--mudo)}
 .atu-area{font:600 11px/16px var(--font-sans);color:var(--tinta-2);background:var(--superficie-2);padding:2px 8px;
   border-radius:var(--raio-tag)}
 .atu-commit{font:500 11.5px/16px var(--font-mono);color:var(--mudo);margin-left:auto}
@@ -183,7 +182,13 @@ a{color:inherit}
 .atu-resto{margin:4px 0 0;color:var(--tinta-2);font-size:13.5px;line-height:1.5}
 .atu-corpo{margin-top:8px}
 .atu-corpo summary{cursor:pointer;color:var(--mudo);font-size:12.5px}
-.atu-corpo pre{white-space:pre-wrap;font:13px/1.5 var(--font-sans);color:var(--tinta-2);margin:8px 0 0}
+/* o que mudou, em tópicos (14/10/2026): o pedido em destaque, a lista com marcadores e respiro entre os itens */
+.atu-detalhe{margin-top:10px;display:grid;gap:10px;font-size:13.5px;line-height:1.55;color:var(--tinta-2);max-width:820px}
+.atu-detalhe p{margin:0}
+.atu-detalhe ul{margin:0;padding-left:20px;display:grid;gap:6px}
+.atu-detalhe li::marker{color:var(--verde-texto)}
+.atu-pedido{margin:0;padding:8px 12px;border-left:3px solid var(--verde);background:var(--superficie-2);
+  border-radius:0 var(--raio-md) var(--raio-md) 0;color:var(--tinta);font-style:italic}
 .atu-rodape{margin-top:12px}
 .gc-status--info{color:var(--info);background:var(--info-suave)}
 
