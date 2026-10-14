@@ -124,3 +124,10 @@ def test_a_aba_nao_mostra_horario_e_mostra_os_topicos(app, logado, monkeypatch):
     assert '<blockquote class="atu-pedido">' in aba and "<li>Saem as views e os templates.</li>" in aba
     assert "Prova" not in aba and "Co-Authored-By" not in aba and "<pre>" not in aba
     assert "<summary>O que mudou</summary>" in aba
+
+
+def test_o_cartao_da_versao_tem_o_mesmo_recheio_das_outras_caixas():
+    """14/10/2026, Levi: "Centralize esse Versão no Ar que está no início do Nexus, tá feião": o cartão é um link, e o
+    espaço interno e a linha das caixas valiam só para <div>."""
+    css = open("nexus/static/nexus.css", encoding="utf-8").read()
+    assert ".gc-numeros>div,.gc-numeros>a{padding:18px 22px;border-left:1px solid var(--linha)}" in css
