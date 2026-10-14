@@ -33,6 +33,9 @@ ou grupo de conversa.
   (443), leitura pública, sem chave. A NASA só é chamada pela PÁGINA de uma usina (um pedido por
   usina, guardado por 12 h), nunca pela tela principal. Sem eles a tela abre e mostra as fontes como "fora agora". O mapa de
   calor do risco de fogo (Mapa de risco, 09/10/2026) usa o mesmo `dataserver-coids.inpe.br`: nenhuma saída nova.
+- Saída para `login.microsoftonline.com` (HTTPS, 443) quando o Entrar com a Microsoft for ligado (seção 7g, 14/10/2026):
+  a troca do código pelo login é feita pelo próprio servidor. Sem ela, ninguém entra pela Microsoft (a tela diz "Sem
+  resposta da Microsoft") e só a senha de administrador abre o Nexus.
 - Disco: cada geração da programação semanal guarda ~65 MB em `dados/pcm/geracoes/` (uma por semana).
 - Fuso `America/Sao_Paulo` (o `deploy/nexus.service` já define).
 
@@ -401,7 +404,10 @@ O Levi pediu que o Nexus entre com a conta Microsoft da Grid, e só quem é da G
 `nexus/auth/microsoft.py` e em `nexus/casca/CLAUDE.md` (seção "Entrar com a Microsoft").
 
 **1. Registrar o Nexus no Entra ID** (entra.microsoft.com → Identidade → Aplicativos → Registros de aplicativo → Novo
-registro; precisa de quem pode registrar aplicativos no diretório da Grid):
+registro). Pode ser feito por quem pode registrar aplicativos no diretório da Grid: por padrão da Microsoft, qualquer
+pessoa da empresa (o papel "Proprietário" de uma assinatura do Azure não é o que conta; o que conta é o Entra deixar o
+"Novo registro" ativo). Quem registra vira dono do registro e cria o segredo. O consentimento de administrador (abaixo) é
+de quem tem papel de administrador no Entra:
 - Nome: `Nexus Grid Co.`
 - Tipos de conta: **"Contas somente neste diretório organizacional (locatário único)"**. É a primeira trava: conta de
   outro diretório nem chega ao Nexus.
@@ -419,7 +425,10 @@ registro; precisa de quem pode registrar aplicativos no diretório da Grid):
   **Sim**, e atribuir o grupo de quem usa o Nexus. Sem isso, toda conta da Grid entra (o Nexus ainda barra convidado e
   e-mail fora de @gridco.com.br).
 
-**2. No `.env` do Nexus no servidor**, e depois `sudo systemctl restart nexus`:
+**2. No `.env` do Nexus no servidor**, e depois `sudo systemctl restart nexus`. Antes, conferir a saída do servidor
+para a Microsoft (seção 0): `curl -s -o /dev/null -w "%{http_code}\n"
+https://login.microsoftonline.com/<o GUID>/v2.0/.well-known/openid-configuration` dá `200`; sem isso, ligar as
+variáveis tranca a porta de todo mundo (só a senha de administrador entra).
 
 ```
 NEXUS_MS_CLIENT_ID=<ID do aplicativo (cliente), na Visão geral do registro>
