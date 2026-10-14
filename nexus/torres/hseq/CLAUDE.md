@@ -89,10 +89,15 @@ observações da TST: "TODOS OS EXTINTORES, CRÍTICOS, ATENÇÃO, OK · DETALHES
 de cada extintor, mas será possível puxar relatório só dos críticos"). O mesmo agrupamento por usina e dia e os mesmos
 filtros da tela; o filtro do relatório é o status da TST (`status=todos|criticos|atencao|ok`; o OK leva o "OK sem
 validade"; nunca conferido só entra em "todos"). Com fotos (o padrão): cada extintor num quadro, a foto ao lado dos
-detalhes; `fotos=0`: uma tabela por usina e dia. A FOTO é a de `<dados>/hseq/extintores/fotos/<código>.jpg`, reduzida a
-600 px: **em 09/10 o App ainda não envia** (as fotos ficam no App, e o Nexus não lê o Azure), e o quadro diz "Sem foto
-no Nexus". Biblioteca: reportlab (BSD, no `requirements.txt`). Medido em 09/10 com os 773: todos com fotos, 101 páginas,
-245 kB, 13 s; só os críticos, 43 páginas, 1,5 s; sem fotos, 57 páginas. Sem o livro do App, a rota volta para a tela.
+detalhes; `fotos=0`: uma tabela por usina e dia. A FOTO é a cópia de 600 px em
+`<dados>/hseq/extintores/fotos/pdf/<código>.jpg` (`fotos.foto_pdf`), feita UMA vez por foto recebida e refeita quando o
+App manda outra (a inteira fica mais nova que a cópia); extintor sem foto sai com "Sem foto no Nexus". O PDF vai em
+binário (`rl_config.useA85 = 0`): o ASCII85 padrão do reportlab, em Python puro (sem o acelerador em C), custava ~20 ms
+por foto e +25% no arquivo. Por quê (14/10, com as 90 primeiras fotos da v265 do App): o PDF de todos reduzia as 90
+fotos de 1600 px a cada pedido — 64,7 s no servidor, crescendo a cada conferência. Medido no PC com os 778 e 90 fotos
+diferentes: todos, de 6,9 s e 3,5 MB para 4,6 s e 2,7 MB (o 1º pedido depois de foto nova, 5,5 s: faz as cópias); só os
+críticos, de 2,0 s para 1,6 s; ~4,0 s do PDF de todos é a montagem das 108 páginas, com ou sem foto. Biblioteca:
+reportlab (BSD, no `requirements.txt`). Sem o livro do App, a rota volta para a tela.
 
 **Fotos** (`nexus/hseq/fotos.py`; Levi, 09/10: "quando tiver foto (ronda de extintor feita no app) ao expandir a usina e
 aparecer os extintores deve ter a opção de visualizar foto"). A foto mora no App e o Nexus não lê o Azure: **o App envia**
@@ -105,10 +110,16 @@ dia); foto de dia mais velho não substitui. É a única rota sem login (`auth.R
 (a linha da usina aberta e a visão por extintor), o extintor com foto ganha a miniatura antes do código; o clique abre a
 caixa das fotos da ronda (setas andam entre as fotos da usina). O PDF põe a mesma foto ao lado do extintor.
 
-**Pendências.** O App publicar o livro (pedido à sessão do App de Campo em 09/10, com este contrato; ela faz na v257).
-O App enviar as fotos pelo contrato acima (a sessão do App de Campo estava fechada em 09/10: falta passar). A cobrança mensal por usina (ronda
-de extintor feita ou não no mês) e o painel da TST (baixa e confirmação dos extintores novos) são do App; entram aqui
-quando houver o livro e o pedido.
+**O App envia desde a v265 (14/10/2026).** Até ali a foto ficava só no App: o técnico fotografava, e o PDF de 13/10 saía
+sem foto (Levi, 14/10: "o Nexus precisa receber a foto!"). Um timer do App, a cada 10 min (minutos 4, 14, 24...), manda
+as conferências com foto que o Nexus ainda não aceitou, da mais velha para a mais nova; a conferência refeita com outra
+foto vai de novo. A 1ª volta (03:54Z) mandou as 90 pendentes desde a v257, todas "200 foto guardada". Conferido no
+Nexus de produção: 90 extintores com miniatura, em 16 usinas, e o PDF da Aquiraz 2 (CRS200-INFC1-PPCI-EXT01) de 13/10
+com a foto ao lado. Prova de uma foto: `GET /t/hseq/extintores/foto/<código>.jpg` (com login) e a miniatura na Tabela
+(a visão Por supervisor não tem foto).
+
+**Pendências.** A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (baixa e
+confirmação dos extintores novos) são do App; entram aqui quando houver o livro e o pedido.
 
 ## EPI e EPC
 

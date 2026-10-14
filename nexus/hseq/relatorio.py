@@ -9,15 +9,20 @@ RELATÓRIO O PADRÃO SERÁ AS FOTOS AO LADO DE CADA EXTINTOR MAS SERÁ POSSÍVEL
 - O filtro do relatório é o STATUS DA TST (`FILTROS`): todos, críticos, atenção ou OK (o OK leva o "OK sem validade",
   que também é checklist limpo). Extintor nunca conferido não tem status: só entra em "todos".
 - Com fotos (o padrão): cada extintor num quadro, a foto ao lado dos detalhes. Sem fotos: uma tabela por usina e dia.
-- A FOTO vem de `foto(codigo)`: a da última conferência que o App enviar ao Nexus. Em 09/10/2026 nenhuma chega ainda (o
-  App guarda as fotos dele, e o Nexus não lê o Azure): o quadro sai vazio, dizendo isso, e se preenche quando o envio
-  existir. Foto reduzida a 600 px (JPEG 75): com as 773 fotos inteiras o arquivo passaria de 70 MB.
+- A FOTO vem de `foto(codigo)`: a da última conferência que o App enviou ao Nexus (desde a v265 do App, 14/10/2026);
+  extintor sem foto enviada sai com o quadro vazio, dizendo isso. Foto de 600 px (JPEG 75; com as 773 fotos inteiras o
+  arquivo passaria de 70 MB): a rota passa a cópia já reduzida (`fotos.foto_pdf`), e `_foto_reduzida` só reduz a que
+  vier maior.
+- As imagens e páginas vão em binário (`rl_config.useA85 = 0`): o padrão do reportlab, ASCII85, aumenta o arquivo em
+  25% e, sem o acelerador em C (não instalado), custava ~20 ms por foto em Python puro (14/10/2026, com as 90 primeiras
+  fotos do App). O reportlab só é usado aqui no Nexus.
 
 Fonte Helvetica (padrão do PDF, cobre o português); o "CO₂" das classes vira "CO2" (o ₂ não existe nela).
 """
 import io
 from datetime import date
 
+from reportlab import rl_config
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
@@ -28,11 +33,14 @@ from reportlab.platypus import (CondPageBreak, Image, KeepTogether, Paragraph, S
 from xml.sax.saxutils import escape
 
 from . import extintores as EXT
+from . import fotos as FOT
+
+rl_config.useA85 = 0        # binário, sem ASCII85: ver o cabeçalho
 
 # o filtro do relatório (as opções da TST): rótulo e os status que entram (None = todos)
 FILTROS = {"todos": ("Todos os extintores", None), "criticos": ("Só os críticos", ("CRITICO",)),
            "atencao": ("Só os de atenção", ("ATENCAO",)), "ok": ("Só os OK", ("OK", "OK_SEM_VALIDADE"))}
-FOTO_PX, FOTO_QUALIDADE = 600, 75
+FOTO_PX, FOTO_QUALIDADE = FOT.PDF_PX, FOT.PDF_QUALIDADE
 NAVY, NAVY_2, VERDE = colors.HexColor("#090d18"), colors.HexColor("#161d30"), colors.HexColor("#b5d334")
 TOM = {"critico": colors.HexColor("#c8102e"), "alerta": colors.HexColor("#b26a00"), "ok": colors.HexColor("#1f7a3f"),
        "info": colors.HexColor("#1f5fa8"), "neutro": colors.HexColor("#5b6475")}
@@ -85,17 +93,9 @@ def _estilos():
 
 
 def _foto_reduzida(dados: bytes):
-    """A foto em JPEG de até FOTO_PX no lado maior; None se não for imagem."""
-    try:
-        from PIL import Image as PILImage
-        im = PILImage.open(io.BytesIO(dados))
-        im = im.convert("RGB")
-        im.thumbnail((FOTO_PX, FOTO_PX))
-        out = io.BytesIO()
-        im.save(out, "JPEG", quality=FOTO_QUALIDADE, optimize=True)
-        return out.getvalue(), im.size
-    except Exception:       # noqa: BLE001 — foto ilegível sai como "sem foto"
-        return None
+    """A foto em JPEG de até FOTO_PX no lado maior; None se não for imagem. A que já vem reduzida (`fotos.foto_pdf`)
+    passa sem ser decodificada."""
+    return FOT.reduzir(dados, FOTO_PX, FOTO_QUALIDADE)
 
 
 def _quando(fim, hoje) -> tuple[str, str]:

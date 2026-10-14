@@ -11,12 +11,17 @@ a imagem, regrava em JPEG de até 1600 px e guarda a mais recente de cada extint
 (`<código>.jpg` e `<código>.json` com o dia). Foto de um dia mais velho que a guardada não substitui. A rota é pública só
 para quem assina (o portão de login a deixa passar: `auth.ROTAS_PUBLICAS`). A foto não vai ao banco (a API tem leitura
 aberta e foto não é tabela).
+
+O App envia desde a v265 (14/10/2026). O PDF usa uma cópia de 600 px (`foto_pdf`, em `pdf/<código>.jpg`), feita UMA vez
+por foto recebida: com as 90 primeiras fotos, o PDF de todos os extintores reduzia as 90 a cada pedido (~30 ms cada no
+PC, várias vezes isso no servidor), e o custo crescia com cada conferência nova.
 """
 import hashlib
 import hmac
 import io
 import json
 import re
+import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -28,6 +33,7 @@ JANELA_S = 15 * 60
 LADO_MAX, QUALIDADE = 1600, 82
 TAMANHO_MAX = 8 * 1024 * 1024
 MINI_PX = 160                                  # a miniatura da tabela (a tela mostra 32 px; 160 fica nítido)
+PDF_PX, PDF_QUALIDADE = 600, 75                # a do PDF: o quadro tem 40 mm (600 px = 380 dpi impresso)
 CODIGO = re.compile(r"[A-Z0-9][A-Z0-9.\-]{2,60}")
 DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
 _MINIS: OrderedDict = OrderedDict()            # (código, dia) -> JPEG da miniatura; as últimas 600 na memória
@@ -103,6 +109,56 @@ def foto(config, codigo) -> bytes | None:
         return None
     arq = p / f"{codigo}.jpg"
     return arq.read_bytes() if arq.is_file() else None
+
+
+def reduzir(dados: bytes, px: int, qualidade: int):
+    """(JPEG de até `px` no lado maior, (largura, altura)), ou None se não for imagem. O JPEG que já cabe passa como veio
+    (só o cabeçalho é lido); o maior é decodificado já na escala do próprio JPEG (`draft`: a de 1/2, 1/4 ou 1/8 que
+    ainda cobre `px`), com 4x menos pixels que a foto de 1600 px, e só então reduzido."""
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(dados))
+        if im.format == "JPEG" and im.mode in ("RGB", "L") and max(im.size) <= px:
+            return dados, im.size
+        im.draft("RGB", (px, px))
+        im = im.convert("RGB")
+        im.thumbnail((px, px))
+        out = io.BytesIO()
+        im.save(out, "JPEG", quality=qualidade, optimize=True)
+        return out.getvalue(), im.size
+    except Exception:       # noqa: BLE001 — foto ilegível sai como "sem foto"
+        return None
+
+
+def foto_pdf(config, codigo) -> bytes | None:
+    """A foto do PDF (`reduzir` a PDF_PX), guardada em `pdf/<código>.jpg` ao lado da inteira e refeita só quando a
+    inteira muda (a inteira mais nova que a cópia: o App mandou outra). Sem conseguir gravar a cópia, devolve a reduzida
+    do mesmo jeito. Por que existe: ver o cabeçalho do módulo (14/10/2026)."""
+    p = pasta(config)
+    codigo = str(codigo or "")
+    if p is None or not CODIGO.fullmatch(codigo):
+        return None
+    arq, copia = p / f"{codigo}.jpg", p / "pdf" / f"{codigo}.jpg"
+    try:
+        if copia.stat().st_mtime_ns >= arq.stat().st_mtime_ns:
+            return copia.read_bytes()
+    except OSError:         # sem a cópia (ou sem a foto): segue
+        pass
+    dados = foto(config, codigo)
+    red = reduzir(dados, PDF_PX, PDF_QUALIDADE) if dados else None
+    if not red:
+        return None
+    tmp = copia.with_name(f"{codigo}.jpg.{threading.get_ident()}.parcial")    # dois PDFs ao mesmo tempo não se cruzam
+    try:
+        copia.parent.mkdir(exist_ok=True)
+        tmp.write_bytes(red[0])
+        tmp.replace(copia)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return red[0]
 
 
 def mini(config, codigo) -> bytes | None:

@@ -320,6 +320,40 @@ def test_relatorio_pdf_poe_a_foto_que_o_app_enviou_ao_lado_do_extintor(com_livro
     assert "Sem foto no Nexus" in _pdf_texto(r.data)                   # o outro crítico continua sem foto
 
 
+def test_o_pdf_usa_a_copia_de_600_px_feita_uma_vez_por_foto(com_livro, logado, app, tmp_path):
+    """14/10/2026, com as 90 primeiras fotos do App: o PDF de todos os extintores reduzia as 90 a cada pedido (65 s no
+    servidor). A cópia de 600 px é feita uma vez e refeita só quando o App manda outra foto; o PDF sai em binário."""
+    import io
+    import os
+    from PIL import Image
+    from nexus.hseq import fotos as FOT
+    cod = "ALT100-INFC1-PPCI-EXT01"
+    pasta = tmp_path / "hseq" / "extintores" / "fotos"
+    pasta.mkdir(parents=True)
+    Image.new("RGB", (1200, 1600), (200, 30, 30)).save(pasta / f"{cod}.jpg", quality=82)
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    r = logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos")
+    copia = pasta / "pdf" / f"{cod}.jpg"
+    assert r.status_code == 200 and copia.is_file() and Image.open(copia).size == (450, 600)
+    assert b"/ASCII85Decode" not in r.data and b"/DCTDecode" in r.data   # binário: sem o ASCII85 do reportlab
+    antes = copia.stat().st_mtime_ns
+    logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos")
+    assert copia.stat().st_mtime_ns == antes                            # o 2º PDF não refaz a cópia
+    dados = copia.read_bytes()
+    assert FOT.reduzir(dados, 600, 75)[0] is dados                      # e ela entra no PDF sem ser decodificada
+    assert sorted(p.name for p in pasta.iterdir()) == [f"{cod}.jpg", "pdf"]   # a miniatura e a tela não veem a cópia
+    assert [p.name for p in (pasta / "pdf").iterdir()] == [f"{cod}.jpg"]      # e nenhum .parcial esquecido
+    assert FOT.disponiveis(app.config) == {cod: ""}
+    # o App mandou outra foto (a inteira fica mais nova que a cópia): a cópia é refeita
+    Image.new("RGB", (1600, 900), (40, 160, 90)).save(pasta / f"{cod}.jpg", quality=82)
+    os.utime(pasta / f"{cod}.jpg", ns=(antes + 10**9, antes + 10**9))
+    larg, alt = Image.open(io.BytesIO(FOT.foto_pdf(app.config, cod))).size
+    assert larg == 600 and alt < larg and Image.open(copia).size == (larg, alt)
+    # sem a foto, a cópia velha não aparece
+    (pasta / f"{cod}.jpg").unlink()
+    assert FOT.foto_pdf(app.config, cod) is None
+
+
 def test_sem_o_livro_o_relatorio_volta_para_a_tela(banco, logado):
     r = logado.get("/t/hseq/extintores/relatorio.pdf")
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/extintores")

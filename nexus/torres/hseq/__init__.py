@@ -141,7 +141,7 @@ def extintores_relatorio():
     pdf = REL.gerar(EXT.ordenar(lista), filtro=filtro, com_fotos=com_fotos, filtros_tela=filtros_tela, hoje=hoje,
                     gerado_em=visao._agora().strftime("%d/%m/%Y %H:%M"),
                     logo=str(current_app.static_folder) + "/grid-h-branco.png",
-                    foto=lambda c: FOT.foto(current_app.config, c))
+                    foto=lambda c: FOT.foto_pdf(current_app.config, c))   # a cópia de 600 px, feita uma vez por foto
     nome = (f"extintores-{_slug(usina)}-{dia or 'todos'}.pdf" if usina
             else f"extintores-{filtro}-{hoje:%Y-%m-%d}.pdf")
     modo = "attachment" if request.args.get("baixar") else "inline"
