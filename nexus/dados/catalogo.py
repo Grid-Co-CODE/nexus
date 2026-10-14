@@ -594,6 +594,28 @@ FATOS = (
                     "que a OS não perdeu nada (todo dia desmentido) fica com 0. Até 13/10/2026 era a perda da OS "
                     "repartida pela potência (setembro: 47.893 kWh na usina errada entre Rodrigues 1 e 2). Sem a "
                     "descrição nem quem criou (regra 8)"),
+    # A parcela de cada OS em cada dia (14/10/2026, Dashboard Thopen, Levi: "A partir de outubro quero os comentários 100%
+    # OS Fracttal. Comentários e disponibilidade!"): sai da MESMA varredura da disponibilidade_dia (disponibilidade._varrer
+    # da plataforma), por isso as linhas de uma usina num dia somam o h_perdidas dela. É o que o 5080 escreve no
+    # comentário de cada dia. Registrado antes da 1ª gravação (nasce na 1ª volta do worker depois do deploy da plataforma)
+    Fato("disponibilidade_os_dia", "Parcela de cada OS na disponibilidade do dia (Gerencial)", "performance",
+         "falhas_performance · disponibilidade_os_dia",
+         "1 linha = 1 OS da conta da disponibilidade × 1 usina × 1 dia em que ela tirou disponibilidade",
+         _d(data=("cod", "dia; inicio, fim da OS (hora de Brasília)"),
+            usina=("nome", "usina (nome do Gerencial); usina_fracttal liga pelo de_para (Fracttal · Classificação 1)"),
+            os=("cod", "os")),
+         tipo="snapshot_periodico", chave=("mes", "dia", "usina", "os"),
+         # na fonte: h_perdidas (horas equivalentes da OS no dia). Somam entre as OS de uma usina no dia e no tempo de
+         # uma usina, não entre usinas (a mesma regra da disponibilidade_dia)
+         medidas=_m((("indisponibilidade_min", "min", "semi"),)),
+         fontes=("falhas_performance · disponibilidade_os_dia",),
+         janela_origem="o mês corrente e o anterior (o índice do Gerencial); mês que sai fica como foi publicado",
+         observacao="h_perdidas = as horas equivalentes que a OS tirou da usina naquele dia (fração da potência × "
+                    "horas de sol, 06–18 h), na mesma conta da disponibilidade_dia: somadas, as linhas de uma usina num "
+                    "dia dão o h_perdidas dela, e a disponibilidade do dia é 100 × (1 − h ÷ 12). trechos = os horários "
+                    "do dia em que a OS foi dona da perda (\"06:00-08:06; 10:55-12:05\"): a OS de cabine coberta por "
+                    "uma de usina inteira só conta fora dela, e o dia que a geração desmente não tem linha. tipo, "
+                    "origem, escopo e kWp são os da OS naquela usina. Sem a descrição nem quem criou (regra 8)"),
     # ── Tickets ────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("ticket", "Ticket de performance", "chamados",
          "tickets_performance · Tickets de Performance, Trackers, Strings indisp", "1 linha = 1 ticket",

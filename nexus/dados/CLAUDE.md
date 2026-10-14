@@ -159,6 +159,14 @@ que errava quando a geração desmentia o dia numa usina só ou o teto de 100% p
 kWh na usina errada entre Rodrigues 1 e 2; outubro: ~2,5 MWh na Boa Esperança do Sul 1 e 2 e ~5,2 MWh na Rodrigues). O
 índice publicado antes do campo ainda reparte pela potência. Mudou a regra lá, muda a `observacao` do catálogo junto.
 
+**A parcela de cada OS em cada dia (14/10/2026):** `falhas_performance · disponibilidade_os_dia` (fato
+`disponibilidade_os_dia`, `plataforma/falhas_publicar.py`, `_disp_os_dia_linhas`): 1 linha = 1 OS × 1 usina × 1 dia em
+que ela tirou disponibilidade, com os trechos das 06–18 h em que foi dona da perda e as horas equivalentes. Sai da MESMA
+varredura da `disponibilidade_dia` (`disponibilidade._varrer`): as linhas de uma usina num dia somam o `h_perdidas` dela
+(provado no índice real de 14/10: 1.203 dias-usina com perda em setembro e outubro, todos fechando). O Dashboard Thopen
+escreve com ela o comentário de cada dia (Levi, 14/10/2026: "A partir de outubro quero os comentários 100% OS Fracttal.
+Comentários e disponibilidade!"). Índice de antes do código conta VAZIO na `atualizacao` (não publicada), nunca 0.
+
 **Chamados de garantia (12/10/2026):** Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se
 conversando!". O Nexus publica as OS de acompanhamento de chamado do Fracttal (o quadro Acompanhamento de chamados do OS
 Creator) no livro `nexus_chamados · fato_chamado` (`fato_chamado.py`, conformado, foto acumulada, chave `os`): 1 linha =
