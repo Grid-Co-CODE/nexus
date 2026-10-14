@@ -829,3 +829,19 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
   supervisório a chave da sessão e o token do banco.
 - Precisa do PyQt6 instalado, porque a tela de Engenharia importa `steps/engenharia`, que puxa `steps/ui.py`.
+
+## A tela inicial não espera o Fracttal (14/10/2026)
+
+Levi, 14/10/2026 às 09:30: "quando clico no OS Creator, fica carregando por um bom tempo". No mesmo minuto o /saude do
+Nexus do servidor (que não lê nada) levou de 0,5 a 17 s e chegou a estourar 60 s, com a plataforma e a API do banco, no
+mesmo servidor, em 0,2 s: as threads do Nexus estavam presas. A tela inicial (`/os/`) só saía depois do selo "N
+atribuídas a você" do card Performance, um pedido ao Fracttal (até 45 s com ele lento), e cada abertura da Performance
+pedia de novo os planos e as subtarefas (o "GET /os/api/performance/contagens, 2 min 50 s" dos pedidos presos de 13/10).
+
+- A tela inicial sai na hora: o selo vem da memória (2 min por pessoa, `rotas._selo_guardado`) e, sem ele, o navegador o
+  pede depois em `/os/api/selo`; o selo nunca segura a tela nem a derruba.
+- As subtarefas de cada plano da Performance (os "N subtarefas" dos cards) ficam 6 h na memória (`CONTAGENS_TTL_S`): são
+  as mesmas para todo mundo e só mudam quando o PCM mexe num plano. Erro não fica guardado.
+- Levado ao oem pela `ferramentas/sincronizar_oscreator.py --aplicar` (sem commit lá: o oem é público).
+- Prova: `tests/test_oscreator_abre_sem_esperar_14_10.py` (a tela não pede nada ao Fracttal; o selo uma vez a cada 2 min;
+  o Fracttal fora não fica guardado; a contagem uma vez em 6 h).

@@ -254,18 +254,45 @@ def _pilulas_ativos(agora) -> list:
     return out
 
 
+# O selo "N atribuídas a você" do card Performance pede o Fracttal (até 45 s com ele lento). Até 14/10/2026 a tela inicial
+# esperava por ele antes de sair, e era o "quando clico no OS Creator, fica carregando por um bom tempo" do Levi: com o
+# Fracttal lento, cada pessoa que abria o OS Creator prendia uma thread do Nexus até ele responder, e com algumas juntas o
+# Nexus inteiro ficava lento (o /saude chegou a 17 s). Agora a tela sai na hora com o selo da memória (2 min, por pessoa)
+# e, sem ele, o navegador pede depois em /api/selo.
+SELO_TTL_S = 120
+
+
+def _chave_selo():
+    return ("selo", sessao.email_do_jwt(session.get("jwt") or "") or (session.get("conta") or {}).get("nome") or "")
+
+
+def _selo_guardado() -> str:
+    """O selo da memória, se ainda vale; nunca vai ao Fracttal."""
+    with _MEMO_LOCK:
+        v = _MEMO.get(_chave_selo())
+    return lancador.texto_selo(v[1]) if v and time.monotonic() - v[0] < SELO_TTL_S else ""
+
+
+@bp.route("/api/selo")
+@exige_sessao
+def api_selo():
+    """O selo do card Performance, pedido pelo navegador depois que a tela inicial abriu (memória de 2 min por pessoa)."""
+    try:
+        n = _memo(_chave_selo(), SELO_TTL_S, api.contar_minhas_analises)
+    except api.FracttalError:
+        if sessao.morta():                              # a sessão morreu no Fracttal: o tratador leva ao login
+            raise
+        return jsonify({"selo": ""})
+    except Exception:                                   # noqa: BLE001 — o selo é informativo, nunca derruba a tela
+        return jsonify({"selo": ""})
+    return jsonify({"selo": lancador.texto_selo(n)})
+
+
 @bp.route("/")
 @exige_sessao
 def home():
     conta = _conta()
-    try:
-        selo = lancador.texto_selo(api.contar_minhas_analises())
-    except api.FracttalError:
-        if sessao.morta():                              # a sessão morreu no Fracttal: melhor saber já na porta
-            raise
-        selo = ""                                       # o selo é informativo, nunca derruba a tela
-    except Exception:                                   # noqa: BLE001
-        selo = ""
+    selo = _selo_guardado()                             # sem ele, o navegador pede em /api/selo (acima)
     agora = dt.datetime.now(_BRT)
     try:
         pilulas = _pilulas_ativos(agora)
@@ -410,11 +437,19 @@ def api_plano():
     return jsonify({"resumo": perf_web.resumo_plano(plan)})
 
 
+# As subtarefas de cada plano da Performance (o "N subtarefas" dos cards) são as mesmas para todo mundo e mudam quando o
+# PCM mexe num plano: ficam 6 h na memória. Até 14/10/2026 cada abertura da tela pedia ao Fracttal os planos e as
+# subtarefas de novo, e com o Fracttal lento o pedido prendia uma thread por minutos (o "GET /os/api/performance/
+# contagens, 2 min 50 s" dos pedidos presos de 13/10). Erro não fica guardado.
+CONTAGENS_TTL_S = 6 * 3600
+
+
 @bp.route("/api/performance/contagens")
 @exige_sessao
 def api_contagens():
     try:
-        d = perf_web.contar_subtarefas(api.load_assets_cached())
+        d = _memo(("perf_contagens",), CONTAGENS_TTL_S,
+                  lambda: perf_web.contar_subtarefas(api.load_assets_cached()))
     except Exception as e:                              # noqa: BLE001 — a contagem é enfeite do card
         return jsonify({"contagens": {}, "erro": str(e)})
     return jsonify({"contagens": d})

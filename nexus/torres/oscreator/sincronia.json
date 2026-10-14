@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-13T18:05:45",
+ "atualizado_em": "2026-10-14T09:36:08",
  "arquivos": {
   "chamado_garantia/README.md": "0207d35ae741a620",
   "chamado_garantia/__init__.py": "2362f95d3b2fc918",
@@ -35,7 +35,7 @@
   "os_creator/os_web/pcm_web.py": "b87b0507492e1616",
   "os_creator/os_web/perf_web.py": "1cb148f505192ddb",
   "os_creator/os_web/relay/volta.html": "c59f69695a000fcd",
-  "os_creator/os_web/rotas.py": "e2eb421f8d67b25f",
+  "os_creator/os_web/rotas.py": "22b9cb7d5987e818",
   "os_creator/os_web/rotas_acomp.py": "8634f3a4585e9abe",
   "os_creator/os_web/rotas_ativos.py": "634267a40f35bff6",
   "os_creator/os_web/rotas_chamados.py": "cef3a791453ae646",
@@ -97,7 +97,7 @@
   "os_creator/os_web/templates/erro.html": "30c966d47683634f",
   "os_creator/os_web/templates/fornecedores.html": "0ba3f37417b1a222",
   "os_creator/os_web/templates/historico.html": "e6929bafcdccc940",
-  "os_creator/os_web/templates/home.html": "323020e7744f634c",
+  "os_creator/os_web/templates/home.html": "eac2af0016e75caa",
   "os_creator/os_web/templates/insp.html": "32c0bad1de380c0c",
   "os_creator/os_web/templates/login.html": "e52abf45390e2c86",
   "os_creator/os_web/templates/oauth_diag.html": "4378b7f24cb58a36",

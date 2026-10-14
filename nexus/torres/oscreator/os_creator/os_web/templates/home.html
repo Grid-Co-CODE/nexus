@@ -38,7 +38,7 @@
       {% for s in setores %}
       <div class="setor{% if s.fora %} fora{% endif %}" data-chave="{{ s.chave }}">
         <div class="l1"><span class="ic">{{ icone(s.icone, '#94a3b8' if s.fora else '#b8e84a', 21) }}</span>
-          {% if s.chave == 'perf' and selo %}<span class="tag g" title="as análises de Performance no seu nome">{{ selo }}</span>
+          {% if s.chave == 'perf' and not s.fora %}<span class="tag g" data-selo title="as análises de Performance no seu nome"{% if not selo %} hidden{% endif %}>{{ selo }}</span>
           {% elif s.fora %}<span class="tag m" title="esta parte ainda só existe no OS Creator instalado">no app de mesa</span>
           {% elif s.etiqueta %}<span class="tag m">{{ s.etiqueta }}</span>{% endif %}</div>
         <h3><a href="{{ s.href }}">{{ s.titulo }}</a></h3>
@@ -62,4 +62,15 @@
     </div>
   </section>
 </section>
+{# o selo do card Performance chega depois da tela (14/10/2026): ela não espera o Fracttal para abrir #}
+<script>
+(function () {
+  var tag = document.querySelector('[data-selo]');
+  if (!tag || !tag.hidden) return;
+  fetch('/os/api/selo', {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { if (j && j.selo) { tag.textContent = j.selo; tag.hidden = false; } })
+    .catch(function () {});
+})();
+</script>
 {% endblock %}
