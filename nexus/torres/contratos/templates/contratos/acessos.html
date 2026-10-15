@@ -50,7 +50,7 @@
     <thead><tr><th class="ac-esq">Pessoa</th><th class="ac-esq">Carteiras</th><th>Papel</th><th>Situação</th><th>Senha</th>{% if admin %}<th></th>{% endif %}</tr></thead>
     <tbody>
     {% for c in d.contas %}
-      <tr><td class="ac-esq">{% if c.abre %}<span class="ext-par"><span>{{ c.nome or '—' }}</span><span class="det">{{ c.email }}</span></span>{% else %}<span class="cn-t-critico" title="O nome e o e-mail desta conta não abrem com a chave do cadastro deste Nexus">não abre</span>{% endif %}</td>
+      <tr><td class="ac-esq">{% if c.abre %}<span class="ext-par"><span>{{ c.nome or '—' }}</span><span class="det">{{ c.usuario }}</span></span>{% else %}<span class="cn-t-critico" title="O nome e o e-mail desta conta não abrem com a chave do cadastro deste Nexus">não abre</span>{% endif %}</td>
         <td class="ac-esq"><span class="ac-cart">{% if c.papel == 'grid' %}<span class="ac-item">todas</span>{% else %}{% for k in c.carteiras %}<span class="ac-item">{{ k }}</span>{% endfor %}{% endif %}</span></td>
         <td>{{ papeis.get(c.papel, c.papel) }}</td>
         <td>{% if c.ativa %}<span class="cn-t-ok">ativa</span>{% else %}<span class="cn-t-critico">desativada</span>{% endif %}</td>
@@ -81,8 +81,9 @@
       <div class="ac-grade">
         <div><label class="gc-rotulo" for="acNome">Nome</label>
           <input id="acNome" name="nome" class="gc-campo" required maxlength="120" value="{{ form.nome or '' }}"></div>
-        <div><label class="gc-rotulo" for="acEmail">E-mail</label>
-          <input id="acEmail" name="email" type="email" class="gc-campo" required maxlength="160" value="{{ form.email or '' }}"></div>
+        <div><label class="gc-rotulo" for="acEmail">Usuário (o de hoje do cliente) ou e-mail</label>
+          <input id="acEmail" name="email" type="text" class="gc-campo" required maxlength="160" autocapitalize="none"
+                 spellcheck="false" value="{{ form.email or '' }}"></div>
         <div class="ac-larga"><span class="gc-rotulo">Carteiras que a pessoa vê</span>
           <div class="ac-marcas">{% for k in carteiras %}<label><input type="checkbox" name="carteira" value="{{ k }}" {% if k in (form.carteiras or []) %}checked{% endif %}> {{ k }}</label>{% endfor %}</div></div>
         <div><label class="gc-rotulo" for="acPapel">Papel</label>

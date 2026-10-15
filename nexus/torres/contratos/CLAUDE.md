@@ -89,6 +89,12 @@ leva todas), `papel` (`cliente` ou `grid`: só a Grid força a releitura e grava
 `alterada_em`, `alterada_por_hmac` (`NEXUS_PESSOA_HMAC` do e-mail; "admin" na senha de administrador), `dados_5080` e
 `dados_nexus`.
 
+**Usuário de entrar** (15/10/2026, Levi: o cliente segue com "o acesso atual que utilizam" — o login da T.I. em
+`/performance` pede Usuário e Senha — "Mesmo usuário e senha de hoje"): a conta guarda `usuario` (um e-mail ou um nome
+de usuário de 3 a 60 letras, números, ponto, hífen ou sublinhado, sem caixa) e `email` (só quando o usuário é um
+e-mail; a contestação do painel usa como contato). As contas de antes (só `email`) entram pelo e-mail. Repetido =
+recusado. A senha de hoje a pessoa define pelo link (o painel aceita a partir de 6 caracteres).
+
 **O que é da pessoa vai só cifrado** (regra 8), duas vezes: `dados_5080` selado para a PÚBLICA do painel
 (`NEXUS_ACESSOS_5080_PUBLICA`, colada em Base → Chaves do Nexus; X25519 + HKDF-SHA256 + AES-256-GCM, a receita do
 `thopen/acessos.py`, info `thopen-acessos/v1`, contexto `nexus_acessos_clientes/<conta_id>/dados_5080`) e `dados_nexus`

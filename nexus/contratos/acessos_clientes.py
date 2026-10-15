@@ -48,6 +48,9 @@ PREFIXO = "cx1:"
 _INFO = b"thopen-acessos/v1"
 _TRAVA = threading.Lock()
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# o usuário de entrar (15/10/2026, Levi: o cliente segue com "o acesso atual que utilizam" — o login da T.I. em
+# /performance pede Usuário e Senha): um e-mail ou um nome de usuário (letras, números, ponto, hífen e sublinhado)
+_USUARIO = re.compile(r"^[a-z0-9][a-z0-9._-]{2,59}$")
 _BRT = timezone(timedelta(hours=-3))
 
 
@@ -180,6 +183,8 @@ def contas() -> dict:
         expira, h = _quando(l.get("convite_expira")), str(l.get("convite_hash") or "")
         out["contas"].append({
             "conta_id": cid, "nome": dados.get("nome") or "", "email": dados.get("email") or "",
+            # o usuário de entrar: o "usuario" (desde 15/10/2026) ou, nas contas de antes, o e-mail
+            "usuario": dados.get("usuario") or dados.get("email") or "",
             "carteiras": [c for c in str(l.get("carteiras") or "").split(";") if c],
             "papel": l.get("papel") or "cliente", "ativa": str(l.get("status") or "") == "ativa",
             "senha_em": _br(definida.get(cid), "%d/%m/%Y"),
@@ -187,7 +192,7 @@ def contas() -> dict:
                      "vencido" if h and h not in usados and expira else ""),
             "link_ate": _br(expira, "%d/%m %H:%M"), "criada_em": _br(_quando(l.get("criada_em")), "%d/%m/%Y"),
             "abre": bool(dados) or cofre is None})
-    out["contas"].sort(key=lambda c: (c["nome"] or c["email"]).lower())
+    out["contas"].sort(key=lambda c: (c["nome"] or c["usuario"]).lower())
     return out
 
 
@@ -207,16 +212,23 @@ def _novo_link(linha: dict) -> str:
     return f"{_url_painel()}/convite/{token}"
 
 
-def criar(nome: str, email: str, carteiras, papel: str, usuario) -> tuple[dict, str]:
-    """Cria a conta e já devolve o link de definir senha (aparece uma vez). Recusada: o texto diz por quê."""
+def _login_de(dados: dict) -> str:
+    return str(dados.get("usuario") or dados.get("email") or "").strip().lower()
+
+
+def criar(nome: str, login: str, carteiras, papel: str, usuario) -> tuple[dict, str]:
+    """Cria a conta e já devolve o link de definir senha (aparece uma vez). `login` = o usuário de entrar: um e-mail ou
+    um nome de usuário (o de hoje do cliente, 15/10/2026). Recusada: o texto diz por quê."""
     nome = " ".join(str(nome or "").split())
-    email = str(email or "").strip().lower()
+    login = str(login or "").strip().lower()
+    email = login if _EMAIL.match(login) else ""
     papel = papel if papel in PAPEIS else "cliente"
     carteiras = [c for c in CARTEIRAS if c in set(carteiras or [])]
     if not nome:
-        raise Recusada("Escreva o nome da pessoa")
-    if not _EMAIL.match(email):
-        raise Recusada("O e-mail não parece válido")
+        raise Recusada("Escreva o nome da pessoa (ou do acesso, como \"Thopen — acesso de hoje\")")
+    if not (email or _USUARIO.match(login)):
+        raise Recusada("O usuário precisa ser um e-mail ou ter de 3 a 60 letras, números, ponto, hífen ou sublinhado, "
+                       "sem espaço")
     if papel == "cliente" and not carteiras:
         raise Recusada("Marque ao menos uma carteira que a pessoa vai ver")
     publica = _publica()
@@ -225,22 +237,23 @@ def criar(nome: str, email: str, carteiras, papel: str, usuario) -> tuple[dict, 
         linhas = _ler()
         for l in linhas:
             try:
-                if json.loads(cofre.decifrar(l.get("dados_nexus") or "", ctx_nexus(l.get("conta_id")))).get("email") == email:
-                    raise Recusada("Já existe uma conta com este e-mail: gere um link novo para ela")
+                if _login_de(json.loads(cofre.decifrar(l.get("dados_nexus") or "", ctx_nexus(l.get("conta_id"))))) == login:
+                    raise Recusada("Já existe uma conta com este usuário: gere um link novo para ela")
             except Recusada:
                 raise
             except Exception:     # noqa: BLE001 — linha que não abre: não é a mesma pessoa que dá para saber
                 continue
         cid = uuid.uuid4().hex[:12]
         agora = _iso(_agora())
-        dados = json.dumps({"nome": nome, "email": email}, ensure_ascii=False)
+        # "usuario" é o de entrar; "email" só quando ele é um e-mail (a contestação usa como contato)
+        dados = json.dumps({"nome": nome, "email": email, "usuario": login}, ensure_ascii=False)
         nova = {"conta_id": cid, "carteiras": ";".join(CARTEIRAS if papel == "grid" else carteiras), "papel": papel,
                 "status": "ativa", "criada_em": agora, "alterada_em": agora, "alterada_por_hmac": _quem(usuario),
                 "dados_5080": selar(dados, ctx_5080(cid), publica), "dados_nexus": cofre.cifrar(dados, ctx_nexus(cid))}
         link = _novo_link(nova)
         _gravar(linhas + [nova])
     log.info("Acessos dos clientes: conta %s criada por %s", cid, nova["alterada_por_hmac"])
-    return {"conta_id": cid, "nome": nome, "email": email}, link
+    return {"conta_id": cid, "nome": nome, "email": email, "usuario": login}, link
 
 
 def _alterar(conta_id: str, usuario, mudar) -> dict:

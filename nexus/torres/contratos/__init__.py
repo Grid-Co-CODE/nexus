@@ -211,11 +211,11 @@ def acessos():
             form = {"nome": request.form.get("nome") or "", "email": request.form.get("email") or "",
                     "carteiras": request.form.getlist("carteira"), "papel": request.form.get("papel") or "cliente"}
             conta, link = AC.criar(form["nome"], form["email"], form["carteiras"], form["papel"], quem)
-            session[_AC_LINK] = {"link": link, "nome": conta["nome"], "email": conta["email"]}
+            session[_AC_LINK] = {"link": link, "nome": conta["nome"], "email": conta["usuario"]}
             session[_AC_AVISO] = f"Conta de {conta['nome']} criada."
         elif acao == "link":
             link = AC.gerar_link(cid, quem)
-            nome = next((c["nome"] or c["email"] for c in AC.contas()["contas"] if c["conta_id"] == cid), "")
+            nome = next((c["nome"] or c["usuario"] for c in AC.contas()["contas"] if c["conta_id"] == cid), "")
             session[_AC_LINK] = {"link": link, "nome": nome, "email": ""}
             session[_AC_AVISO] = "Link novo gerado; o anterior deixou de valer."
         elif acao in ("desativar", "reativar"):

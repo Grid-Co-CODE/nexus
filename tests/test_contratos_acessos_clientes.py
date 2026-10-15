@@ -86,10 +86,10 @@ def test_cria_a_conta_cifrada_e_o_link_de_uso_unico(banco):
     assert "ana souza" not in tudo and "ana@thopen.com.br" not in tudo and tk.lower() not in tudo
     cid = l["conta_id"]
     assert json.loads(_abrir(l["dados_5080"], f"nexus_acessos_clientes/{cid}/dados_5080", PRIV)) == \
-        {"nome": "Ana Souza", "email": "ana@thopen.com.br"}
+        {"nome": "Ana Souza", "email": "ana@thopen.com.br", "usuario": "ana@thopen.com.br"}
     assert json.loads(Cofre(CHAVE_CAD).decifrar(l["dados_nexus"], AC.ctx_nexus(cid)))["email"] == "ana@thopen.com.br"
     assert l["alterada_por_hmac"] and "levi" not in l["alterada_por_hmac"]
-    assert conta == {"conta_id": cid, "nome": "Ana Souza", "email": "ana@thopen.com.br"}
+    assert conta == {"conta_id": cid, "nome": "Ana Souza", "email": "ana@thopen.com.br", "usuario": "ana@thopen.com.br"}
 
 
 def test_selo_preso_a_conta(banco):
@@ -103,7 +103,8 @@ def test_recusas(banco, app):
     AC.criar("Ana", "ana@thopen.com.br", ["Thopen"], "cliente", None)
     for args, frase in ((("Ana 2", "ANA@thopen.com.br", ["Copel"], "cliente"), "Já existe"),
                         (("", "x@y.com", ["Thopen"], "cliente"), "nome"),
-                        (("Bia", "sem-arroba", ["Thopen"], "cliente"), "e-mail"),
+                        (("Bia", "com espaço", ["Thopen"], "cliente"), "usuário precisa"),
+                        (("Bia", "ab", ["Thopen"], "cliente"), "usuário precisa"),
                         (("Bia", "bia@y.com", [], "cliente"), "carteira")):
         with pytest.raises(AC.Recusada, match=frase):
             AC.criar(*args, None)
@@ -246,3 +247,18 @@ def test_teste_cruzado_com_o_codigo_do_5080():
         assert a._hash_token("tk") == hashlib.sha256(b"tk").hexdigest()
     finally:
         sys.path.remove(os.path.join(raiz, "thopen"))
+
+
+def test_conta_pelo_usuario_de_hoje_do_cliente(banco):
+    # Levi, 15/10/2026: o cliente segue com "o acesso atual que utilizam" (o login da T.I. pede Usuário e Senha): a conta
+    # pode ter um nome de usuário no lugar do e-mail, e o e-mail fica vazio (a contestação pede o contato)
+    conta, link = AC.criar("Thopen — acesso de hoje", "  Thopen.Operacao ", ["Thopen"], "cliente", None)
+    assert (conta["usuario"], conta["email"]) == ("thopen.operacao", "")
+    [l] = banco.linhas(AC.LIVRO, AC.ABA)
+    assert json.loads(_abrir(l["dados_5080"], AC.ctx_5080(l["conta_id"]), PRIV)) == {
+        "nome": "Thopen — acesso de hoje", "email": "", "usuario": "thopen.operacao"}
+    assert "thopen.operacao" not in json.dumps(l, ensure_ascii=False, default=str).lower()
+    with pytest.raises(AC.Recusada, match="Já existe"):
+        AC.criar("Outro", "THOPEN.OPERACAO", ["Copel"], "cliente", None)
+    (c,) = AC.contas()["contas"]
+    assert c["usuario"] == "thopen.operacao" and c["link"] == "pendente"
