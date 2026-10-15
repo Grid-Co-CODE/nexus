@@ -163,6 +163,8 @@ QUEM_GRAVA_ORIGEM = (
     ("igual", "Fracttal (API REST)", "Fracttal (o Nexus lê pela API REST, só leitura)"),
     # as contestações do cliente (13/10/2026): o 5080 grava a cada contestação (thopen/contestacao_banco.py)
     ("igual", "thopen_contestacoes", "Dashboard Thopen (5080)"),
+    # as senhas do login por pessoa (14/10/2026): o 5080 grava a cada senha definida (thopen/acessos.py)
+    ("igual", "thopen_acessos", "Dashboard Thopen (5080)"),
     ("prefixo", "nexus_", "Nexus"),                              # livro do Nexus fora do LIVROS: viola a regra 10
 )
 A_DECLARAR = "a declarar"

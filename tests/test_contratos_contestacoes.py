@@ -161,7 +161,9 @@ def test_pegar_para_mim_e_so_o_administrador_assume(trat, app):
     # a API do banco tem leitura aberta: nem o nome nem o e-mail em claro
     lin = trat.linhas(TR.LIVRO, TR.ABA)
     assert len(lin) == 2 and list(lin[0]) == list(TR.CAB)
-    assert "ana" not in json.dumps(lin, ensure_ascii=False, default=str).lower()
+    # o nome e o e-mail inteiros: um pedaço curto ("ana") aparece por acaso numa cifra em base64 (~1 em 150 rodadas)
+    claro = json.dumps(lin, ensure_ascii=False, default=str).lower()
+    assert "ana lima" not in claro and ANA["email"] not in claro and "beto souza" not in claro
 
 
 def test_so_o_responsavel_escreve_e_a_atualizacao_fica_com_a_hora(trat, app):

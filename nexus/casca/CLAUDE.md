@@ -194,11 +194,12 @@ recebe o formulário (POST, só administrador; o GET leva à aba). Código em `n
 conferida e gravada em `chaves.json` na pasta de dados (`NEXUS_DADOS`, fora do git), CIFRADA com AES-256-GCM
 numa chave derivada da `NEXUS_SECRET_KEY` (HKDF) e presa ao nome. Vale na hora (relida a cada 30 s e logo depois de
 gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valor; o log diz quem gravou qual, sem o valor.
-- **Só as chaves de `chaves.CHAVES`**, cada uma com a conferência dela: hoje a `NEXUS_CONTESTACAO_CHAVE_PRIVADA` (32 bytes
-  em base64 que viram X25519 e, havendo contestação no banco, abrem pelo menos uma; a de outro par é recusada). A tela não
-  edita o .env: nome fora da lista é recusado.
+- **Só as chaves de `chaves.CHAVES`**, cada uma com a conferência dela: a `NEXUS_CONTESTACAO_CHAVE_PRIVADA` (32 bytes
+  em base64 que viram X25519 e, havendo contestação no banco, abrem pelo menos uma; a de outro par é recusada) e, desde
+  14/10, a `NEXUS_ACESSOS_5080_PUBLICA` (a pública do Dashboard Thopen: 32 bytes que viram X25519; não há como conferir
+  contra o painel, a prova é a pessoa entrar). A tela não edita o .env: nome fora da lista é recusado.
 - **Quem lê usa `chaves.valor(nome)`** (a da tela e, sem ela, a do .env), nunca `config.get` direto: as Contestações
-  (`nexus/contratos/contestacoes.py`) já leem assim.
+  (`nexus/contratos/contestacoes.py`) e os Acessos dos clientes (`nexus/contratos/acessos_clientes.py`) leem assim.
 - **NEXUS_SECRET_KEY trocada:** a gravada não abre; vale a do .env (ou nenhuma), e a tela diz "não abre, cole de novo".
 - **Chave nova na tela:** uma entrada em `CHAVES` com o nome, o para quê, o arquivo de onde vem e a conferência, e quem
   lê passa a usar `chaves.valor`. Prova: `tests/test_chaves_nexus_14_10.py`.

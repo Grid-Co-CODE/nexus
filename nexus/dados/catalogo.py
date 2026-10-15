@@ -803,6 +803,14 @@ LIVROS = (
           "nexus/pcm/acompanhamento/curadoria.py", False,
           "registrado em 14/10/2026 antes de existir: nasce com a 1ª carga do arquivo do painel do PCM; o Acompanhamento "
           "lê com cache de 2 minutos, e a gravação relê o banco antes (troca o livro inteiro)"),
+    # o login por pessoa do Dashboard Thopen (14/10/2026): o Nexus é a fonte das contas; a senha, o 5080 grava no livro
+    # dele (thopen_acessos · senhas, em CONHECIDAS)
+    Livro("nexus_acessos_clientes", ("dim_conta_cliente",), "a cada ação na tela Acessos dos clientes",
+          "nexus/contratos/acessos_clientes.py, pela tela Contratos e clientes > Acessos dos clientes", False,
+          "registrado em 14/10/2026 antes de existir: nasce com a 1ª conta criada na tela. 1 linha = 1 conta (o estado "
+          "atual; o livro é trocado inteiro sob a trava, relido antes e conferido depois). Nome e e-mail só cifrados, "
+          "duas vezes: dados_5080 (selado para a pública do Dashboard Thopen, que lê a cada 2 min) e dados_nexus "
+          "(Cofre, a chave do cadastro); o link de definir senha só como sha256; quem mudou só como HMAC"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
@@ -896,6 +904,9 @@ CONHECIDAS = (
               "abas ocultas da planilha (cópia de segurança, falhas antigas, PVSyst, acumulado)"),
     Conhecida("os_creator", ("temas", "plataforma", "chamados_obs"), "apoio",
               "a configuração do OS Creator (temas, plataforma, observações dos chamados)"),
+    Conhecida("thopen_acessos", ("senhas",), "apoio",
+              "as senhas do login por pessoa do Dashboard Thopen (14/10/2026): o 5080 grava 1 linha a cada senha "
+              "definida pelo link (o hash scrypt, cifrado com a chave dele); o Nexus lê só quando cada conta definiu"),
     Conhecida("zz_teste_claude_apagar", ("*",), "teste",
               "livro de teste da API, criado para provar a gravação; nunca é dado (a API não apaga livro)"),
 )

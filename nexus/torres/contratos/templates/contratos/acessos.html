@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+{# Acessos dos clientes ao Dashboard Thopen (Levi, 14/10/2026: "É possível implementarmos uma visão de login e senha para
+   o dashboard thopen?" — por pessoa, ligada a um cliente, administrada aqui). As contas vêm do livro
+   nexus_acessos_clientes (nome e e-mail só cifrados); a senha, a pessoa define no painel pelo link de uso único que esta
+   tela gera. Regras em nexus/contratos/acessos_clientes.py e no CLAUDE.md desta pasta. #}
+<style>
+  .ac-tab td{vertical-align:middle}
+  .ac-tab td.ac-esq, .ac-tab th.ac-esq{text-align:left}
+  .ac-cart{display:flex;flex-wrap:wrap;gap:4px}
+  .ac-item{font:600 11px/18px var(--font-sans);padding:0 7px;border-radius:9px;background:var(--superficie-3);color:var(--tinta-2)}
+  .ac-acoes{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .ac-acoes form{margin:0}
+  .ac-nova{max-width:760px;margin:18px 0 6px;padding:14px 16px}
+  .ac-nova h2{margin:0 0 10px}
+  .ac-grade{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  .ac-grade .ac-larga{grid-column:1 / -1}
+  .ac-marcas{display:flex;gap:14px;flex-wrap:wrap;font-size:13.5px}
+  .ac-marcas label{display:inline-flex;align-items:center;gap:6px}
+  .ac-link{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .ac-link input{flex:1;min-width:260px;font-family:var(--font-mono, monospace);font-size:12.5px}
+  @media (max-width:700px){ .ac-grade{grid-template-columns:1fr} }
+</style>
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Dashboard Thopen<br><b>livro nexus_acessos_clientes</b></div>
+  </div>
+
+  {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Feito.</strong> {{ aviso }}</div></div>{% endif %}
+  {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
+  {% if link %}
+  <div class="cad-aviso cad-aviso--info" role="status"><i class="ph ph-link"></i><div>
+    <strong>O link de {{ link.nome or 'definir a senha' }}{% if link.email %} ({{ link.email }}){% endif %}.</strong>
+    Ele aparece só agora: copie e mande pelo Teams ou WhatsApp. Vale {{ horas }} horas e uma vez só; a pessoa escolhe a
+    senha e já entra.
+    <div class="ac-link"><input id="acLink" class="gc-campo" readonly value="{{ link.link }}" aria-label="Link de definir senha">
+      <button class="gc-btn gc-btn--ui gc-btn--primario" type="button" id="acCopiar"><i class="ph ph-copy"></i> Copiar</button></div>
+  </div></div>
+  {% endif %}
+  {% if d.erro %}<div class="cn-erro" role="alert"><b>{{ d.erro }}.</b> As contas não foram lidas; nada é gravado até a leitura voltar.</div>{% endif %}
+  {% if d.sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave pública do painel.</b>
+    Sem ela não dá para criar conta nem gerar link (o nome e o e-mail vão ao banco selados para o painel). Um
+    administrador cola a chave em <a href="{{ raiz }}/t/base/chaves-fontes?aba=nexus">Base → Chaves do Nexus</a>.</div>{% endif %}
+
+  <div class="cn-tab cn-tab--compacta ac-tab"><table>
+    <thead><tr><th class="ac-esq">Pessoa</th><th class="ac-esq">Carteiras</th><th>Papel</th><th>Situação</th><th>Senha</th>{% if admin %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for c in d.contas %}
+      <tr><td class="ac-esq">{% if c.abre %}<span class="ext-par"><span>{{ c.nome or '—' }}</span><span class="det">{{ c.email }}</span></span>{% else %}<span class="cn-t-critico" title="O nome e o e-mail desta conta não abrem com a chave do cadastro deste Nexus">não abre</span>{% endif %}</td>
+        <td class="ac-esq"><span class="ac-cart">{% if c.papel == 'grid' %}<span class="ac-item">todas</span>{% else %}{% for k in c.carteiras %}<span class="ac-item">{{ k }}</span>{% endfor %}{% endif %}</span></td>
+        <td>{{ papeis.get(c.papel, c.papel) }}</td>
+        <td>{% if c.ativa %}<span class="cn-t-ok">ativa</span>{% else %}<span class="cn-t-critico">desativada</span>{% endif %}</td>
+        <td>{% if c.link == 'pendente' %}<span class="ext-par"><span class="cn-t-alerta">link pendente</span><span class="det">até {{ c.link_ate }}</span></span>
+            {% elif c.senha_em %}<span class="ext-par"><span>definida</span><span class="det">{{ c.senha_em }}</span></span>
+            {% elif c.link == 'vencido' %}<span class="cn-t-critico" title="O link venceu sem a pessoa definir a senha">link vencido</span>
+            {% else %}<span class="mudo">sem senha</span>{% endif %}</td>
+        {% if admin %}<td><div class="ac-acoes">
+          {% if c.ativa %}
+          <form method="post" action="{{ '/t/contratos/acessos'|na_raiz }}"><input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="conta_id" value="{{ c.conta_id }}">
+            <button class="gc-btn gc-btn--ui gc-btn--contorno" name="acao" value="link" {% if d.sem_chave or d.erro %}disabled{% endif %} title="Senha nova ou esquecida: o link anterior deixa de valer"><i class="ph ph-link"></i> Gerar link</button></form>
+          <form method="post" action="{{ '/t/contratos/acessos'|na_raiz }}"><input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="conta_id" value="{{ c.conta_id }}">
+            <button class="gc-btn gc-btn--ui gc-btn--contorno" name="acao" value="desativar" {% if d.erro %}disabled{% endif %} title="Sai do painel em até 2 minutos"><i class="ph ph-prohibit"></i> Desativar</button></form>
+          {% else %}
+          <form method="post" action="{{ '/t/contratos/acessos'|na_raiz }}"><input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="conta_id" value="{{ c.conta_id }}">
+            <button class="gc-btn gc-btn--ui gc-btn--contorno" name="acao" value="reativar" {% if d.erro %}disabled{% endif %}><i class="ph ph-arrow-counter-clockwise"></i> Reativar</button></form>
+          {% endif %}
+        </div></td>{% endif %}</tr>
+    {% else %}<tr><td colspan="{{ 6 if admin else 5 }}" class="mudo">{{ 'Nenhuma conta ainda.' if not d.erro else '—' }}</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+
+  {% if admin %}
+  <section class="cad-secao ac-nova" aria-labelledby="acNovaT">
+    <h2 class="ui-kicker" id="acNovaT">Nova conta</h2>
+    <form method="post" action="{{ '/t/contratos/acessos'|na_raiz }}" autocomplete="off">
+      <input type="hidden" name="codigo" value="{{ codigo }}">
+      <div class="ac-grade">
+        <div><label class="gc-rotulo" for="acNome">Nome</label>
+          <input id="acNome" name="nome" class="gc-campo" required maxlength="120" value="{{ form.nome or '' }}"></div>
+        <div><label class="gc-rotulo" for="acEmail">E-mail</label>
+          <input id="acEmail" name="email" type="email" class="gc-campo" required maxlength="160" value="{{ form.email or '' }}"></div>
+        <div class="ac-larga"><span class="gc-rotulo">Carteiras que a pessoa vê</span>
+          <div class="ac-marcas">{% for k in carteiras %}<label><input type="checkbox" name="carteira" value="{{ k }}" {% if k in (form.carteiras or []) %}checked{% endif %}> {{ k }}</label>{% endfor %}</div></div>
+        <div><label class="gc-rotulo" for="acPapel">Papel</label>
+          <select id="acPapel" name="papel" class="gc-campo">{% for k, rot in papeis.items() %}<option value="{{ k }}" {% if (form.papel or 'cliente') == k %}selected{% endif %}>{{ rot }}{{ ' (vê todas as carteiras, grava os comentários)' if k == 'grid' else '' }}</option>{% endfor %}</select></div>
+      </div>
+      <div style="margin-top:12px"><button class="gc-btn gc-btn--ui gc-btn--primario" name="acao" value="criar" {% if d.sem_chave or d.erro %}disabled{% endif %}><i class="ph ph-user-plus"></i> Criar e gerar o link</button></div>
+    </form>
+  </section>
+  {% else %}
+  <p class="mudo" style="margin-top:12px">Só um administrador do Nexus cria contas, gera links e desativa.</p>
+  {% endif %}
+</div>
+<script>
+  (function(){
+    var b = document.getElementById('acCopiar'), i = document.getElementById('acLink');
+    if(!b || !i) return;
+    b.addEventListener('click', function(){
+      i.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject()).then(function(){ b.textContent = 'Copiado'; },
+        function(){ document.execCommand('copy'); b.textContent = 'Copiado'; });
+    });
+  })();
+</script>
+{% endblock %}

@@ -72,7 +72,11 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # Contratos e clientes → Contestações (13/10/2026): a chave PRIVADA (X25519, base64) que abre o nome, o
              # contato e a mensagem do cliente que o Dashboard Thopen grava cifrados com a pública. Sem ela, a tela lista
              # as contestações sem esses dados (nexus/contratos/contestacoes.py)
-             "NEXUS_CONTESTACAO_CHAVE_PRIVADA")
+             "NEXUS_CONTESTACAO_CHAVE_PRIVADA",
+             # Contratos e clientes → Acessos dos clientes (14/10/2026, nexus/contratos/acessos_clientes.py): a chave
+             # PÚBLICA do Dashboard Thopen (as contas vão seladas para ela; também pela tela Base → Chaves do Nexus) e o
+             # endereço do painel nos links de definir senha (padrão https://app.gridco.com.br/performance)
+             "NEXUS_ACESSOS_5080_PUBLICA", "NEXUS_THOPEN_URL")
 
 
 class ConfigErro(RuntimeError):

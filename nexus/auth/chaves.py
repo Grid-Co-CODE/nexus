@@ -86,6 +86,21 @@ def _conferir_contestacao(valor: str) -> str:
     return f"ela abre {abertas} de {len(linhas)} contestações gravadas no banco"
 
 
+def _conferir_acessos_publica(valor: str) -> str:
+    """A PÚBLICA do Dashboard Thopen (login por pessoa, 14/10/2026): 32 bytes em base64 que viram uma chave X25519. Não
+    há como conferir contra o painel (a privada só existe no servidor dele); a prova é a pessoa entrar."""
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
+    try:
+        bruto = _b64d(valor)
+        if len(bruto) != 32:
+            raise ValueError
+        X25519PublicKey.from_public_bytes(bruto)
+    except Exception:            # noqa: BLE001
+        raise Recusada("Isto não é a chave pública do Dashboard Thopen: cole a linha inteira do arquivo "
+                       "thopen_acessos_publica.txt.") from None
+    return "é uma chave pública válida; as contas criadas daqui em diante vão seladas para ela"
+
+
 # nome da variável → o que é, para que serve, e a conferência antes de gravar
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
@@ -93,6 +108,15 @@ CHAVES = {
         "para": "abrir o nome, o contato e a mensagem do cliente em Contratos e clientes → Contestações",
         "arquivo": "nexus_contestacao_privada.segredo",
         "conferir": _conferir_contestacao,
+    },
+    # o login por pessoa do Dashboard Thopen (14/10/2026): o nome e o e-mail de cada conta vão ao banco selados para o
+    # painel (nexus/contratos/acessos_clientes.py). Trocar o par = as contas de antes não abrem lá: gere o link de novo
+    "NEXUS_ACESSOS_5080_PUBLICA": {
+        "nome": "Acessos dos clientes ao Dashboard Thopen (chave pública do painel)",
+        "para": "criar as contas em Contratos e clientes → Acessos dos clientes (o painel abre o nome e o e-mail com a "
+                "privada dele)",
+        "arquivo": "thopen_acessos_publica.txt",
+        "conferir": _conferir_acessos_publica,
     },
 }
 
