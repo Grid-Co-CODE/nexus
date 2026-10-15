@@ -9,7 +9,12 @@ crie a view com a mesma rota (ela vence a genérica) em nexus/pcm/telas.py.
 Saíram do menu em 11/10/2026 (Levi: "tire essas seções: Chamados por etiqueta e disponibilidade"): eram placeholder;
 a Disponibilidade da Performance (porta única com a plataforma) continua lá. A Semana saiu em 12/10/2026 com o código
 dela (Levi: "pode excluir essa seção e o código dela"): o Quadro da semana mostra a semana por equipe e dia.
+
+O Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do PCM O&M: "Quero que libere na seção de
+PCM essa visão de acompanhamento. O design quero alá Nexus [...] mas as estruturas quero sim que mantenha!"): as abas
+MPA, MPS, Radar de Backlog, Mapa e One Page, com as fontes do Nexus (`nexus/pcm/acompanhamento`), do setor PCM.
 """
+from ...pcm import acompanhamento
 from ...pcm.telas import registrar_pcm
 from ..modelo import Tela, Torre
 
@@ -32,6 +37,10 @@ TORRE = Torre(
         Tela("gerar", "Gerar a semana",
              "A semana que o Nexus gera bate com a oficial do PCM?",
              "Motor do PCM rodando no Nexus, em sombra: nada é publicado"),
+        Tela("acompanhamento", "Acompanhamento PCM",
+             "Que MPA ou MPS está travada, que OS envelhece no backlog e onde está a carga de cada time?",
+             "Fracttal (pela Gestão PCM), programação semanal, Gerencial, cadastro e a curadoria do PCM",
+             do_setor="PCM"),
         Tela("gestao", "Gestão PCM",
              "Quanto do plano de manutenção está feito por usina, e que MPA ou MPS está envelhecendo?",
              "gestao_pcm.json do painel PCM (e a planilha da Gerencial, cifrada)"),
@@ -49,3 +58,5 @@ TORRE = Torre(
 
 bp = TORRE.criar_blueprint(__name__)
 registrar_pcm(bp)
+# o Acompanhamento do PCM (nexus/pcm/acompanhamento)
+acompanhamento.registrar(bp)

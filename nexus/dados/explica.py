@@ -38,6 +38,7 @@ RESUMO = {
     "decisao_setor": "O setor de cada pessoa do Fracttal, escolhido na tela",
     "decisao_tela_setor": "Que telas do Nexus cada setor vê, marcado na tela Acessos",
     "decisao_dono_relatorio": "O setor dono de cada relatório, escolhido na Central",
+    "decisao_curadoria_pcm": "O que a reunião de PCM decidiu sobre cada MPA e MPS acompanhada",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -117,6 +118,10 @@ PARA_QUE = {
                               "administrador na própria Central. O setor dono vê o relatório sem marcar nada em "
                               "Acessos e aparece no cartão; sem escolha, vale o setor padrão de cada relatório. Não "
                               "guarda nome nem e-mail de quem escolheu.",
+    "decisao_curadoria_pcm": "Guarda o que a reunião de PCM decide sobre cada MPA e MPS que ela acompanha: o grupo "
+                             "(Engenharia, auxílio da Manutenção, atrasada ou fora do ranking), o prazo do relatório da "
+                             "Engenharia, o que falta em campo e o bloqueio. É o que a tela Acompanhamento do PCM usa "
+                             "para montar as abas MPA e MPS; as pendências vêm do Fracttal. O conteúdo vai cifrado.",
     "decisao_tela_setor": "Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
                           "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Acompanhamento PCM{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm-acomp.css') }}">
+{# PCM → Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do PCM O&M: "Quero que libere na
+   seção de PCM essa visão de acompanhamento. O design quero alá Nexus, não quero que copie o design, mas as estruturas
+   quero sim que mantenha!"). As estruturas são as do painel (as cinco abas, os filtros laterais que se cruzam, os
+   cartões, os gráficos e as tabelas que filtram, o mapa e o One Page); o desenho é o do Nexus. A tela é desenhada pelo
+   static/pcm-acomp.js com o JSON de .../acompanhamento/dados.json (nexus/pcm/acompanhamento). #}
+<div class="pa" id="pa" data-dados="{{ ('/t/pcm/acompanhamento/dados.json')|na_raiz }}" data-rota="{{ ('/t/pcm/acompanhamento/rota')|na_raiz }}" data-aba="{{ aba }}">
+  <p class="gc-eyebrow">PCM · Acompanhamento</p>
+  <h1 class="titulo-pagina" id="pa-titulo">Acompanhamento PCM</h1>
+  <p class="pcm-fonte"><i class="ph ph-plug" aria-hidden="true"></i><span id="pa-fonte">Lendo o Fracttal, a programação, a Gerencial e a curadoria do PCM…</span></p>
+  <div class="pa-abas" role="tablist" aria-label="Painéis">
+    <button type="button" class="pa-aba" role="tab" data-tab="mpa" aria-selected="true">MPA · Preventiva anual</button>
+    <button type="button" class="pa-aba" role="tab" data-tab="mps" aria-selected="false" tabindex="-1">MPS · Preventiva semestral</button>
+    <button type="button" class="pa-aba" role="tab" data-tab="bkl" aria-selected="false" tabindex="-1">Radar de Backlog <span class="pa-selo">+25 dias</span></button>
+    <button type="button" class="pa-aba" role="tab" data-tab="map" aria-selected="false" tabindex="-1">Mapa</button>
+    <button type="button" class="pa-aba" role="tab" data-tab="op" aria-selected="false" tabindex="-1">One Page</button>
+  </div>
+  <div id="pa-avisos"></div>
+  <div class="pa-app">
+    <aside class="pa-lado" aria-label="Filtros">
+      <h2 class="gc-rotulo">Filtros</h2>
+      <div class="pa-busca">
+        <label class="gc-rotulo" for="pa-busca">Pesquisa geral</label>
+        <div class="pa-busca-campo"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+          <input class="gc-campo" id="pa-busca" type="search" placeholder="Usina, OS, cluster, pessoa, bloqueio…" autocomplete="off">
+          <button type="button" id="pa-busca-x" aria-label="Limpar pesquisa" hidden><i class="ph ph-x" aria-hidden="true"></i></button></div>
+        <span class="pa-dica">Busca em todos os campos da aba. Várias palavras: todas precisam aparecer.</span>
+      </div>
+      <div id="pa-filtros" class="pa-filtros"></div>
+      <button class="gc-btn gc-btn--contorno pa-limpar" id="pa-limpar" type="button"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i>Redefinir filtros</button>
+      <div class="pa-lado-nota">
+        <span id="pa-mostrando"></span>
+        <span>Os filtros se cruzam. Clique nos cartões, nas barras, nos pontos do gráfico e nos nomes sublinhados das tabelas para filtrar.</span>
+      </div>
+    </aside>
+    <main class="pa-main" id="pa-main"><p class="pa-carga" role="status">Montando o acompanhamento…</p></main>
+  </div>
+  <div class="pa-tip" id="pa-tip" role="tooltip" hidden></div>
+</div>
+<script src="{{ url_for('static', filename='pcm-acomp.js') }}"></script>
+{% endblock %}

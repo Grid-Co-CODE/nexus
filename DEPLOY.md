@@ -471,7 +471,8 @@ repositório público de lá). Para isso, **uma linha no `.env`** (o Levi passa 
 NEXUS_PCM_MPAS_SENHA=<a senha do login de administrador do painel do PCM>
 ```
 
-e reiniciar. A mesma linha liga a criticidade e a observação da Gerencial na Gestão PCM do Nexus. Sem ela tudo funciona,
+e reiniciar. A mesma linha liga a criticidade e a observação da Gerencial na Gestão PCM do Nexus e o espelho da Gerencial e o
+atraso das MPA/MPS no Acompanhamento do PCM (PCM → Acompanhamento PCM, 14/10/2026). Sem ela tudo funciona,
 e o relatório mostra "tarefas abertas há +30 dias" no lugar, como o painel do PCM sem a senha. Senha errada: a Gestão PCM
 avisa "a senha da Gerencial do .env não abriu o mpas.json". Regras: `nexus/pcm/relatorio_exec/CLAUDE.md`.
 

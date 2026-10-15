@@ -378,6 +378,22 @@ FATOS = (
                     "(relatorios/<tela>). O setor dono vê o relatório sem marca na matriz de Base > Acessos; sem "
                     "decisão vale o setor padrão do código, pelo nome. Nada de nome nem e-mail (regra 8): quem decidiu "
                     "vai em decidida_por_hmac e no log da máquina"),
+    # A curadoria do PCM no Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do PCM O&M: "Quero
+    # que libere na seção de PCM essa visão de acompanhamento"): o que a reunião de PCM decide sobre cada MPA e MPS
+    # acompanhada (grupo, prazo do relatório, o que falta); no painel era um arquivo num computador.
+    Fato("decisao_curadoria_pcm", "Curadoria das MPAs e MPSs do PCM", "pcm",
+         "nexus_pcm_curadoria · fato_decisao_curadoria",
+         "1 linha = 1 decisão da reunião de PCM sobre 1 MPA ou MPS acompanhada (item_id), ou sobre a regra do "
+         "responsável da Manutenção (item_id manutencao); ativo \"não\" tira o item do painel",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)")),
+         tipo="sem_medida", chave=("decidida_em", "item_id"),
+         fontes=("nexus_pcm_curadoria · fato_decisao_curadoria",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada item)",
+         observacao="o conteúdo (usina, OS, responsável, o que falta, observação) vai cifrado com a chave do cadastro em "
+                    "dados_cifrados (regra 8: a API tem leitura aberta e ali há nome de gente); em claro só o item, o "
+                    "tipo e o grupo. As pendências e o progresso não são da curadoria: o Acompanhamento recalcula pelo "
+                    "Fracttal (o gestao_pcm.json) a cada leitura. A 1ª carga veio do arquivo do painel do PCM de "
+                    "14/10/2026 (ferramentas/carregar_curadoria_pcm.py)"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -766,6 +782,11 @@ LIVROS = (
           "registrado em 14/10/2026 antes de existir: nasce com o 1º Salvar; livro próprio porque gravar troca o livro "
           "inteiro (no nexus_setor_telas uma gravação apagaria a outra aba); o portão e a Central leem com cache de 1 "
           "minuto, e a gravação relê o banco antes"),
+    Livro("nexus_pcm_curadoria", ("fato_decisao_curadoria",),
+          "a cada carga da curadoria do PCM (ferramentas/carregar_curadoria_pcm.py; a tela de edição vem depois)",
+          "nexus/pcm/acompanhamento/curadoria.py", False,
+          "registrado em 14/10/2026 antes de existir: nasce com a 1ª carga do arquivo do painel do PCM; o Acompanhamento "
+          "lê com cache de 2 minutos, e a gravação relê o banco antes (troca o livro inteiro)"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.

@@ -62,6 +62,10 @@
   --foto-veu:rgba(9,13,24,.92); --foto-etiqueta:rgba(9,13,24,.78); --foto-tinta:#fff; --foto-legenda:#e6e9f2;
   --foto-borda:rgba(255,255,255,.3); --foto-borda-hover:#a3d900;
   --papel:#fff; --papel-mudo:#5b6475; --papel-link:#3d5c00;
+  /* a folha de papel das telas (o One Page do Acompanhamento do PCM, 14/10/2026): tinta escura e o semáforo de impressão,
+     iguais nos dois temas (o papel é sempre branco) */
+  --papel-tinta:#1d2433; --papel-titulo:#1e2140; --papel-linha:#dfe4ea; --papel-fundo-2:#f5f6f9;
+  --papel-crit:#b42318; --papel-alerta:#8a5300; --papel-ok:#1f7a4d;
 }
 :root[data-tema="claro"]{
   /* superfícies e texto (o mudo e o fraco escurecidos até 4,5:1 também no #eceef2 de uma linha em hover) */
@@ -106,6 +110,10 @@
   --foto-veu:rgba(9,13,24,.92); --foto-etiqueta:rgba(9,13,24,.78); --foto-tinta:#fff; --foto-legenda:#e6e9f2;
   --foto-borda:rgba(255,255,255,.3); --foto-borda-hover:#a3d900;
   --papel:#fff; --papel-mudo:#5b6475; --papel-link:#3d5c00;
+  /* a folha de papel das telas (o One Page do Acompanhamento do PCM, 14/10/2026): tinta escura e o semáforo de impressão,
+     iguais nos dois temas (o papel é sempre branco) */
+  --papel-tinta:#1d2433; --papel-titulo:#1e2140; --papel-linha:#dfe4ea; --papel-fundo-2:#f5f6f9;
+  --papel-crit:#b42318; --papel-alerta:#8a5300; --papel-ok:#1f7a4d;
 }
 :root{
   --font-display:"Raleway","Poppins",system-ui,sans-serif;

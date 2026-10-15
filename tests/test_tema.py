@@ -65,6 +65,9 @@ ESCURO_DE_SEMPRE = {
     "--foto-etiqueta": "rgba(9,13,24,.78)", "--foto-tinta": "#fff", "--foto-legenda": "#e6e9f2",
     "--foto-borda": "rgba(255,255,255,.3)", "--foto-borda-hover": "#a3d900", "--papel": "#fff",
     "--papel-mudo": "#5b6475", "--papel-link": "#3d5c00",
+    # a folha de papel do One Page do Acompanhamento do PCM (14/10/2026): tokens novos, nenhum valor de antes mudou
+    "--papel-tinta": "#1d2433", "--papel-titulo": "#1e2140", "--papel-linha": "#dfe4ea", "--papel-fundo-2": "#f5f6f9",
+    "--papel-crit": "#b42318", "--papel-alerta": "#8a5300", "--papel-ok": "#1f7a4d",
     # as camadas de calor do Mapa de risco (09/10/2026): tokens novos, nenhum valor de antes mudou
     "--calor-risco-1": "#503f2b", "--calor-risco-2": "#724a26", "--calor-risco-3": "#985224", "--calor-risco-4": "#bf582b",
     "--calor-risco-5": "#e75b3c", "--calor-densidade-1": "#234950", "--calor-densidade-2": "#1e5e68",
@@ -350,6 +353,8 @@ def _contrastes_do_claro():
               ("--tinta", "--alerta-a16 sobre --superficie", fundo("--superficie", "--alerta-a16")),
               ("--mudo", "--barra", fundo("--barra")), ("--tinta-2", "--barra", fundo("--barra")),
               ("--papel-mudo", "--papel", fundo("--papel")), ("--papel-link", "--papel", fundo("--papel"))]
+    casos += [(t, "--papel", fundo("--papel")) for t in ("--papel-tinta", "--papel-titulo", "--papel-crit", "--papel-alerta",
+                                                          "--papel-ok")]
     for serie in ("--serie-sujidade", "--serie-vegetacao"):
         for s in ("--superficie", "--superficie-2"):
             casos.append((serie, s, fundo(s)))
