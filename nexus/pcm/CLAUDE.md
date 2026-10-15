@@ -25,7 +25,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `gestao.py` | as contas da Gestão PCM (Plano & Fila), transcritas do `js/preventivas.js` do painel |
 | `prova_gestao.py` + `.js` | a prova de que a Gestão PCM bate célula a célula com o painel (roda o JS dele no node) |
 | `semana.py` | as regras da semana que as telas Tarefas e OS, Quadro e Gerar usam: achar a semana, dia, situação, fora da jornada, filtros (a tela Semana saiu em 12/10/2026) |
-| `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal; `gerar_com_foto`, o mesmo com a FOTO do Fracttal e sem credencial (a prova) |
+| `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal; depois do motor, tira da planilha as tarefas do `sem:` das observações (`aplicar_sem`, 15/10/2026: o motor só o aplica nas OS de plano; seção do Quadro); `gerar_com_foto`, o mesmo com a FOTO do Fracttal e sem credencial (a prova) |
 | `insumos.py` | os insumos do motor guardados no Nexus, escritos na rodada no formato que o motor lê |
 | `historico_banco.py` | o histórico das programações que o motor lê, montado do `fato_programacao` do banco (desde 08/10/2026); o plano publicado da semana em andamento vem da reserva, do REPOSITÓRIO do PCM ou da pasta do PCM |
 | `comparar.py` | compara a semana do Nexus com a oficial (a do PCM), linha a linha; `conferir`: a conferência da semana gerada (dentro da semana, horas por equipe e dia, fora da jornada, repetidas, e `excede_hh_os`: a OS cuja corretiva o motor forçou além das horas do dia) |
@@ -197,11 +197,34 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   concentram das 8h às 17h). O painel corta na DATA da geração ou na sexta anterior, e contava a OS da sexta, que a
   geração da sexta já levou: W41 pelo painel 81/104/126/125/249 por dia, pelo sábado 46/84/112/111/180 (533).
 - **Reprogramar = linha de observação**, a do `rpLinha` do painel (contrato com o motor e com o robô do PCM):
-  `OS; não` (sempre a OS inteira), `OS; dia[; ; turno]` (a OS inteira), `OS; dia; SIGLA; turno; só: equipamento` (MPA,
-  MPS, MPT, MPM, MPQ e Handover: o nome do equipamento depois do último " - "), `OS; dia; nome da tarefa; turno` (as
-  outras: o nome até a 1ª vírgula). Só segunda a sexta: o motor e o robô não entendem sábado (o painel oferece, e a
-  linha volta "dia não reconhecido"). `static/pcm-quadro.js` monta a mesma linha para mostrar na fila; o teste roda as
-  duas (node) com os mesmos casos.
+  `OS; não` (sempre a OS inteira), `OS; sem: nome da tarefa` (só aquela tarefa sai da semana; abaixo),
+  `OS; dia[; ; turno]` (a OS inteira), `OS; dia; SIGLA; turno; só: equipamento` (MPA, MPS, MPT, MPM, MPQ e Handover: o
+  nome do equipamento depois do último " - "), `OS; dia; nome da tarefa; turno` (as outras: o nome até a 1ª vírgula).
+  Só segunda a sexta: o motor e o robô não entendem sábado (o painel oferece, e a linha volta "dia não reconhecido").
+  `static/pcm-quadro.js` monta a mesma linha para mostrar na fila; o teste roda as duas (node) com os mesmos casos.
+- **Tirar da semana = a TAREFA, não a OS** (Levi, 15/10/2026, urgente: "quando o PCM tenta tirar da semana uma tarefa
+  aparece uma notificação de tirar todas as tarefas da OS, isso não pode acontecer"). O botão gravava sempre
+  `OS; não`, copiado do painel do PCM (lá também só sai a OS inteira; "para tirar só uma parte usa-se sem:", que o
+  PCM nunca usou nos dois arquivos). Agora vale o que está no **"O que"** da janela: a tarefa (o padrão é a do cartão)
+  vira `OS; sem: nome da tarefa` (o nome até a 1ª vírgula: a vírgula separa palavras no `sem:`); "a OS inteira"
+  continua `OS; não`; a OS com uma tarefa só na semana também sai pelo `não`. A confirmação diz o que sai e o que fica.
+  **O `sem:` acha a tarefa pelo NOME** (contém a palavra, sem diferenciar maiúscula): tarefas de mesmo nome na OS saem
+  juntas, e são muitas (W42: 92 das 128 OS com mais de uma tarefa repetem nome; a OS 15067 tem "MPM - QGBT" nas linhas
+  do QGBT1, QGBT2 e QGBT3). A janela avisa ("está em 3 linhas da semana") e lista as de nome parecido que saem junto.
+  Separar por equipamento pediria mudar o robô e o motor do PCM.
+  Quem aplica: **semana em curso**, o robô (`atualizacao_semanal`, STEP A3) apaga as linhas da tarefa (agenda e
+  `_Pendentes`), em qualquer OS, e não reposiciona nada (a linha não tem dia nem turno). **Semana que o Nexus gera**, o
+  motor (`programacao_v7`) só aplica o `sem:` nas OS de plano (modo A: a tarefa nem é programada) e, como toda linha da
+  OS vira "pin", a OS entra na semana e o resto dela ganha prioridade na fila da usina; na OS comum (modo B) ele ignora
+  o `sem:` e programa a tarefa. Por isso a rodada roda o `geracao.aplicar_sem` depois do motor: a mesma exclusão do
+  robô na planilha gerada (na OS comum fica o horário vazio na agenda; falhar ali derruba a rodada, para não publicar
+  a semana com a tarefa que o PCM tirou). A tela Gerar mostra a linha em "OS com dia fixo", coluna "Tirar as tarefas
+  com". Prova de 15/10 com o código REAL do PCM (os parsers do robô e do motor tirados do repositório pelo `ast`) e a
+  `Programação Semana 42.xlsx` real numa cópia: `15067; sem: [Grid Co.] - MPM - QGBT, [Grid Co.] - MPM - Tracker` →
+  o robô tira as duas e não move nada; o motor (modo A) tira QGBT ×3 e Tracker ×1; o `aplicar_sem` apagou 4 linhas, só
+  da 15067 (1.986 → 1.982). Testes: `test_mescla_tirar_uma_tarefa`, `test_fila_tirar_uma_tarefa`,
+  `test_tela_quadro_tira_uma_tarefa_da_semana_em_curso` e, no `test_pcm_geracao.py`,
+  `test_sem_das_observacoes_tira_a_tarefa_da_planilha_gerada` e `test_rodada_aplica_o_sem_das_observacoes`.
 - **A fila** fica no navegador (localStorage, por semana), como no painel. Ao gravar, a página manda só {os, tarefa,
   dia, turno}; o servidor refaz a linha com a tarefa e o tipo da SEMANA (`linhas_da_fila`): OS ou tarefa que a semana
   não tem, dia ou turno inválido barram a gravação inteira (nenhum texto livre chega ao arquivo do motor).
@@ -211,8 +234,12 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   no Nexus (bloco 2 da tela Gerar), que valem na próxima geração; semana gerada no PC do PCM (a W42) -> só "Copiar
   tudo", para o painel do PCM; semana que acabou -> só ver.
 - **A mescla** (`mesclar`): a linha nova substitui a do MESMO alvo (OS, tarefas e "só:"); `OS; não` tira todas as
-  linhas da OS; a OS inteira num dia tira as linhas por tarefa dela; qualquer linha da OS tira o `não`. O resto do texto
-  fica igual e na mesma ordem.
+  linhas da OS; a OS inteira num dia tira as linhas por tarefa dela e o `sem:`; a linha por tarefa tira o `não` e, do
+  `sem:`, a tarefa que ela põe de volta num dia (pelo "só:" na OS de plano, pelo nome na comum). O `OS; sem:` não mexe
+  nas outras linhas da OS nem no `não`: junta as tarefas tiradas da OS numa linha só, a última da OS, levando o `sem:`
+  escrito à mão numa linha de dia (o motor guarda só o `sem:` da ÚLTIMA linha da OS que tem um; o robô soma todos).
+  A fila que volta da página já sai mesclada (`linhas_da_fila`), e na página a OS inteira apaga da fila o que havia
+  por tarefa dela. O resto do texto fica igual e na mesma ordem.
 - **O arquivo da semana em curso** vale para qualquer semana que estiver em curso: linha da semana passada se aplicaria
   à nova. O Nexus escreve a semana no cabeçalho (`# Semana 2026-W42: ...`); cabeçalho de outra semana = o que estava lá
   sai. Sem cabeçalho (gravado pelo painel do PCM): fica, a não ser que a pessoa marque para apagar. Em 09/10 ele tinha
@@ -232,7 +259,8 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
 - **Peso da página** (09/10, W41 real): 339 KB e ~160 ms com 200 cartões; as pendentes (1.697 na W41) vêm linha a linha
   só filtradas (até 150) ou a pedido (`pend=1`, 1,4 MB): os seletores de dia e turno saem de um `<template>` clonado pelo
   JS, e a lista de tarefas de cada OS vai uma vez em `oss` (antes, em cada cartão: 4,4 MB).
-- **Provar:** `tests/test_pcm_quadro.py` (26 testes; 24 mutações, todas pegas). Ver a tela: a cópia de conferência do
+- **Provar:** `tests/test_pcm_quadro.py` (35 testes; 24 mutações em 09/10 e mais 12 no tirar tarefa em 15/10, todas
+  pegas; o `aplicar_sem` está no `test_pcm_geracao.py`). Ver a tela: a cópia de conferência do
   Claude, com o armazém do PCM numa CÓPIA (`NEXUS_PCM_TRABALHO` no `app.config`: não é chave do `.env`, e sem isso ela
   lia o armazém real) e o GitHub que recusa gravar. Nunca testar clicando em Aplicar na semana em curso.
 

@@ -173,14 +173,23 @@ def linha(os_id, dia: str, turno_: str = "", tarefa: str = "", tipo: str = "") -
     """A linha que reprograma, a mesma do `rpLinha` do painel do PCM (e do `linha` de `static/pcm-quadro.js`):
 
         15269; não                                   a OS sai da semana (sempre a OS inteira)
+        15269; sem: [Grid Co.] - MPM - Trafo         só ESTA tarefa sai da semana (dia "sem"; 15/10/2026)
         15269; qua  /  15269; qua; ; tarde           a OS inteira no dia (e no turno)
         15269; qua; MPM; tarde; só: Transformador    preventiva por sigla: só a tarefa daquele equipamento
         15289; ter; Inhapi: vedação dos postes       as outras: o nome da tarefa (até a 1ª vírgula)
+
+    O "sem:" é o campo do motor e do robô do PCM que tira da semana as tarefas da OS cujo nome contém a palavra; aqui a
+    palavra é o nome da tarefa até a 1ª vírgula (a vírgula separa palavras no "sem:"). O painel do PCM só tirava a OS
+    inteira: Levi, 15/10/2026, "quando o PCM tenta tirar da semana uma tarefa aparece uma notificação de tirar todas
+    as tarefas da OS, isso não pode acontecer".
 
     None quando a tarefa não tem nome que o motor reconheça (a linha viraria a OS inteira)."""
     os_s = str(os_id).strip()
     if dia == "não":
         return f"{os_s}; não"
+    if dia == "sem":
+        nome = nome_da_tarefa(tarefa)
+        return f"{os_s}; sem: {nome}" if nome else None
     if not tarefa:
         return f"{os_s}; {dia}; ; {turno_}" if turno_ else f"{os_s}; {dia}"
     sig = sigla(tipo)
@@ -195,45 +204,94 @@ def linha(os_id, dia: str, turno_: str = "", tarefa: str = "", tipo: str = "") -
     return "; ".join(v for i, v in enumerate(partes) if i < 3 or v)
 
 
+def _so_sem(regra: dict) -> bool:
+    """A linha que só tira tarefas da semana ("OS; sem: ..."), sem dia, tarefa, turno nem "só:"."""
+    return (regra.get("tipo") == "fixar" and bool(regra.get("sem")) and not regra.get("dias")
+            and not regra.get("tarefas") and not regra.get("so") and not regra.get("turno"))
+
+
 def _alvo(regra: dict):
     if regra.get("tipo") == "fora":
         return (regra["os"], "fora")
+    if _so_sem(regra):
+        return (regra["os"], "sem")
     if regra.get("tipo") == "fixar":
         return (regra["os"], tuple(_norm(t) for t in regra.get("tarefas") or []),
                 tuple(_norm(s) for s in regra.get("so") or []))
     return None
 
 
+def _volta(palavra: str, regra: dict) -> bool:
+    """A tarefa que a linha por tarefa põe num dia é a que a palavra do "sem:" tirou? Na OS de plano a linha diz a
+    tarefa pelo "só:" (o campo de tarefas leva a sigla, que todas as tarefas do plano têm: sem "só:", a linha é "o
+    resto do plano", e o motor tira o "sem:" antes dela); na comum, pelo nome."""
+    p = _norm(palavra)
+    if regra.get("so"):
+        return any(_norm(s) in p for s in regra["so"])
+    return any(_norm(t) in p or p in _norm(t) for t in regra.get("tarefas") or [] if not sigla(t))
+
+
+def _unicas(palavras) -> list[str]:
+    vistas, out = set(), []
+    for p in palavras:
+        if _norm(p) not in vistas:
+            vistas.add(_norm(p))
+            out.append(p)
+    return out
+
+
 def mesclar(texto: str, novas: list[str]) -> tuple[str, dict]:
     """Junta as linhas novas ao texto das observações, sem duplicar ordem para a mesma OS:
     - a linha nova substitui a que já havia para o MESMO alvo (a OS, as tarefas e o "só:");
     - "OS; não" tira todas as linhas daquela OS (a OS sai inteira);
-    - a OS inteira num dia tira as linhas por tarefa dela e o "não" (mudou de ideia);
-    - uma linha por tarefa tira o "não" da OS.
+    - a OS inteira num dia tira as linhas por tarefa dela, o "não" e o "sem:" (mudou de ideia);
+    - uma linha por tarefa tira o "não" da OS e, do "sem:", a tarefa que ela põe de volta num dia;
+    - "OS; sem: ..." (tirar UMA tarefa, 15/10/2026) não mexe nas outras linhas da OS: junta as tarefas tiradas da OS
+      numa linha só, a última da OS (o motor guarda só o "sem:" da última linha da OS que tem um, e o robô do PCM soma
+      todos: assim os dois tiram as mesmas), levando também o "sem:" escrito à mão numa linha de dia.
     O resto (usinas, comentários, outras OS) fica igual e na mesma ordem. Devolve (texto, {novas, saem})."""
     linhas = (texto or "").replace("\r\n", "\n").split("\n")
     while linhas and not linhas[-1].strip():
         linhas.pop()
     originais = set(linhas)
     saem = []
+
+    def sai(l: str, nova: str) -> None:
+        if l in originais and l not in saem and l.strip() != nova.strip():
+            saem.append(l)
+
     for nova in novas:
         r = O.ler_linha(nova)
         alvo = _alvo(r)
         if alvo is None:
             raise QuadroErro(f"linha que o motor não entende: {nova}")
+        da_os = [O.ler_linha(l) for l in linhas]
+        if _so_sem(r):
+            palavras = [p for x in da_os if x.get("os") == r["os"] and x.get("tipo") == "fixar" for p in x.get("sem") or []]
+            nova = f"{r['os']}; sem: " + ", ".join(_unicas(palavras + list(r["sem"])))
+            fica = []
+            for l, x in zip(linhas, da_os):
+                if x.get("os") == r["os"] and _so_sem(x):
+                    sai(l, nova)
+                else:
+                    fica.append(l)
+            linhas = fica + [nova]
+            continue
         inteira = r["tipo"] == "fora" or not (r.get("tarefas") or r.get("so"))
-
-        def conflita(l: str) -> bool:
-            x = O.ler_linha(l)
-            if x.get("os") != r["os"] or x.get("tipo") not in ("fora", "fixar"):
-                return False
-            return inteira or x["tipo"] == "fora" or _alvo(x) == alvo
-
         fica = []
-        for l in linhas:
-            if conflita(l):
-                if l in originais and l not in saem and l.strip() != nova.strip():
-                    saem.append(l)
+        for l, x in zip(linhas, da_os):
+            if x.get("os") != r["os"] or x.get("tipo") not in ("fora", "fixar"):
+                fica.append(l)
+            elif inteira or x["tipo"] == "fora" or _alvo(x) == alvo:
+                sai(l, nova)
+            elif _so_sem(x):
+                resto = [p for p in x["sem"] if not _volta(p, r)]
+                if len(resto) == len(x["sem"]):
+                    fica.append(l)
+                    continue
+                sai(l, nova)
+                if resto:
+                    fica.append(f"{x['os']}; sem: " + ", ".join(resto))
             else:
                 fica.append(l)
         linhas = fica + [nova]
@@ -522,13 +580,17 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
     sems = [(s["week"], s.get("rows") or []) for s in publicadas if s.get("week") and s["week"] < week]
     sems.append((week, rows))
     indices = _indices(sems)
-    # as tarefas de cada OS na semana (agenda e pendentes): o "OS inteira (N tarefas)" da janela
+    # as tarefas de cada OS na semana (agenda e pendentes): o "OS inteira (N tarefas)" da janela. `n` = em quantas
+    # linhas o nome aparece (uma por equipamento ou bloco): tirar a tarefa pelo "sem:" tira todas, e a janela avisa
     por_os: dict[str, list[dict]] = {}
     for r, eh_pend in [(r, False) for r in rows] + [(p, True) for p in sem.get("pendentes") or []]:
         lst = por_os.setdefault(str(r.get("os_id") or ""), [])
         t = str(r.get("tarefa") or "")
-        if not any(x["t"] == t for x in lst):
-            lst.append({"t": t, "tp": str(r.get("tipo") or ""), "pend": eh_pend})
+        x = next((x for x in lst if x["t"] == t), None)
+        if x is None:
+            lst.append({"t": t, "tp": str(r.get("tipo") or ""), "pend": eh_pend, "n": 1})
+        else:
+            x["n"] += 1
 
     itens: list[dict] = []
     oss: dict[str, list[dict]] = {}
@@ -590,7 +652,8 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
 def linhas_da_fila(sem: dict, itens: list) -> tuple[list[str], list[str]]:
     """(linhas, problemas) dos itens da fila que a página mandou: {os, tarefa, dia, turno}. O tipo e a tarefa vêm da
     SEMANA, não da página: só entra OS e tarefa que a semana tem (agenda ou pendentes), e nenhum texto livre chega ao
-    arquivo que o motor e o robô do PCM leem."""
+    arquivo que o motor e o robô do PCM leem. Dia "sem" = tirar da semana só aquela tarefa (pede a tarefa). As linhas
+    saem já mescladas entre si (`mesclar`): as tarefas tiradas da mesma OS numa linha só."""
     tarefas: dict[str, dict[str, str]] = {}
     for r in (sem.get("rows") or []) + (sem.get("pendentes") or []):
         tarefas.setdefault(str(r.get("os_id") or "").strip(), {}).setdefault(str(r.get("tarefa") or ""),
@@ -606,16 +669,21 @@ def linhas_da_fila(sem: dict, itens: list) -> tuple[list[str], list[str]]:
         if not os_s.isdigit() or os_s not in tarefas:
             problemas.append(f"OS {os_s[:12] or '(vazia)'}: não está nesta semana")
             continue
-        if dia not in DIAS_REPROGRAMAR and dia != "não":
+        if dia not in DIAS_REPROGRAMAR and dia not in ("não", "sem"):
             problemas.append(f"OS {os_s}: dia inválido ({dia[:12] or 'vazio'}); use segunda a sexta")
             continue
+        if dia in ("não", "sem"):
+            tur = ""
         if tur and tur not in TURNOS:
             tur = {"manha": "manhã"}.get(tur, "")
             if not tur:
                 problemas.append(f"OS {os_s}: turno inválido")
                 continue
         if dia == "não":
-            tarefa, tur = "", ""
+            tarefa = ""
+        elif dia == "sem" and not tarefa:
+            problemas.append(f"OS {os_s}: para tirar uma tarefa, diga qual (a OS inteira sai pelo \"não\")")
+            continue
         elif tarefa and tarefa not in tarefas[os_s]:
             problemas.append(f"OS {os_s}: a tarefa não está nesta semana")
             continue
@@ -628,7 +696,7 @@ def linhas_da_fila(sem: dict, itens: list) -> tuple[list[str], list[str]]:
             linhas.remove(vistos[alvo])
         vistos[alvo] = l
         linhas.append(l)
-    return linhas, problemas
+    return (mesclar("", linhas)[0].splitlines() if linhas else []), problemas
 
 
 # ── gravar ──────────────────────────────────────────────────────────────────────────────────────────────────

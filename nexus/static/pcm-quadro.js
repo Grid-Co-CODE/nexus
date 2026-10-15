@@ -23,6 +23,8 @@
   function linha(os, dia, turno, tarefa, tipo) {
     os = String(os).trim(); turno = turno || "";
     if (dia === "não") return os + "; não";
+    // tirar só ESTA tarefa da semana (15/10/2026): o "sem:" do motor e do robô, com o nome até a 1ª vírgula
+    if (dia === "sem") { var n = nomeDaTarefa(tarefa); return n ? (os + "; sem: " + n) : null; }
     if (!tarefa) return turno ? (os + "; " + dia + "; ; " + turno) : (os + "; " + dia);
     var sig = sigla(tipo), partes;
     if (sig) {
@@ -36,7 +38,7 @@
     return partes.filter(function (v, i) { return i < 3 || v; }).join("; ");
   }
 
-  raiz.QuadroLinha = { linha: linha, sigla: sigla, chaveDaTarefa: chaveDaTarefa };
+  raiz.QuadroLinha = { linha: linha, sigla: sigla, chaveDaTarefa: chaveDaTarefa, nomeDaTarefa: nomeDaTarefa };
   if (typeof document === "undefined") return;          // no node (o teste), só a linha
 
   var no = document.getElementById("q-dados");
@@ -73,15 +75,18 @@
     clearTimeout(aviso._t); aviso._t = setTimeout(function () { a.hidden = true; }, 4000);
   }
 
-  // A mesma tarefa duas vezes na fila: vale a última. "OS; não" é a OS inteira (a gramática não filtra tarefa no "não").
+  // A mesma tarefa duas vezes na fila: vale a última. "OS; não" é a OS inteira (a gramática não filtra tarefa no "não");
+  // dia "sem" tira só a tarefa.
   function inserir(os, tarefa, dia, turno) {
     if (!dia) { aviso("Escolha o dia primeiro."); return null; }
     var r = { os: String(os), tarefa: dia === "não" ? "" : (tarefa || ""), tipo: "", dia: dia,
-              turno: dia === "não" ? "" : (turno || "") };
+              turno: (dia === "não" || dia === "sem") ? "" : (turno || "") };
     r.tipo = r.tarefa ? tipoDe(os, r.tarefa) : "";
     if (linhaDoItem(r) === null) { aviso("Esta tarefa não tem nome que o motor reconheça: reprograme a OS inteira."); return null; }
     var i = idx(r.os, r.tarefa);
     if (i >= 0) FILA.splice(i, 1);
+    // a OS inteira (fora ou num dia) apaga o que a fila tinha por tarefa dela, como a mescla do servidor (quadro.mesclar)
+    if (!r.tarefa) FILA = FILA.filter(function (x) { return !(x.os === r.os && x.tarefa); });
     FILA.push(r); salvar(); pintarFila(); marcar();
     return r;
   }
@@ -230,13 +235,36 @@
       txt.hidden = false;
       txt.innerHTML = "Linha: <code>" + esc(linhaDoItem(r)) + "</code>";
     });
+    // "Tirar da semana" vale para o que está no "O que": a tarefa (o padrão é a do cartão) ou a OS inteira. Levi,
+    // 15/10/2026: "quando o PCM tenta tirar da semana uma tarefa aparece uma notificação de tirar todas as tarefas da
+    // OS, isso não pode acontecer". A OS que só tem esta tarefa na semana sai pelo "não".
     var tir = c.querySelector("[data-rp-tirar]");
     if (tir) tir.addEventListener("click", function () {
-      var n = (OSS[t.os] || []).length || 1;
-      if (!confirm("Tirar a OS " + t.os + " da programação desta semana?" +
-                   (n > 1 ? "\n\nIsso tira as " + n + " tarefas dela." : ""))) return;
-      var r = inserir(t.os, "", "não", "");
-      if (r) { aviso("A OS " + t.os + " sai da semana · " + FILA.length + " na fila"); fechar(); }
+      var irmas = OSS[t.os] || [];
+      var sel = c.querySelector("[data-rp-alvo]");
+      var alvo = irmas.length > 1 ? (sel ? sel.value : t.t) : "";
+      var r;
+      if (!alvo) {
+        if (!confirm(irmas.length > 1
+            ? "Tirar a OS " + t.os + " INTEIRA da programação desta semana?\n\nSaem as " + irmas.length + " tarefas dela."
+            : "Tirar da programação desta semana a OS " + t.os + "?\n\nEla só tem esta tarefa na semana.")) return;
+        r = inserir(t.os, "", "não", "");
+        if (r) { aviso("A OS " + t.os + " sai da semana · " + FILA.length + " na fila"); fechar(); }
+        return;
+      }
+      // o robô e o motor acham a tarefa pelo NOME (contém a palavra): as de mesmo nome saem juntas, e o aviso diz quais
+      var chave = nomeDaTarefa(alvo).toLowerCase();
+      var esta = irmas.filter(function (x) { return x.t === alvo; })[0] || { n: 1 };
+      var junto = irmas.filter(function (x) { return x.t !== alvo && x.t.toLowerCase().indexOf(chave) >= 0; });
+      var fica = irmas.length - 1 - junto.length;
+      if (!confirm("Tirar da programação desta semana só a tarefa\n“" + alvo + "”\nda OS " + t.os + "?" +
+          ((esta.n || 1) > 1 ? "\n\nEla está em " + esta.n + " linhas da semana (uma por equipamento ou bloco): saem " +
+            "todas, porque o arquivo do PCM separa a tarefa só pelo nome." : "") +
+          (junto.length ? "\n\nSaem junto as de nome parecido: " + junto.map(function (x) { return "“" + x.t + "”"; }).join(", ") + "." : "") +
+          "\n\n" + (fica === 0 ? "Com isso, nenhuma tarefa da OS fica na semana." : fica === 1
+            ? "A outra tarefa da OS continua na semana." : "As outras " + fica + " tarefas da OS continuam na semana."))) return;
+      r = inserir(t.os, alvo, "sem", "");
+      if (r) { aviso("A tarefa sai da semana (OS " + t.os + ") · " + FILA.length + " na fila"); fechar(); }
     });
     pintarFila();
     dlg.showModal();

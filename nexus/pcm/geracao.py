@@ -44,6 +44,7 @@ from . import comparar
 from . import fonte
 from . import historico_banco as HB
 from . import insumos as I
+from . import observacoes as O
 
 AQUI = Path(__file__).resolve().parent
 RAIZ = AQUI.parents[1]
@@ -361,6 +362,9 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
                                stdout=f, stderr=subprocess.STDOUT, timeout=TEMPO_MAX_S)
         st["codigo"] = r.returncode
         if r.returncode == 0 and saida.exists():
+            # as tarefas tiradas da semana uma a uma (o "sem:"): falhar aqui derruba a rodada, porque publicar a semana
+            # com a tarefa que o PCM tirou seria pior que não ter a semana
+            st["sem"] = aplicar_sem(pasta / I.OBSERVACOES, saida)
             st["estado"] = "ok"
             st["resumo"] = comparar.resumo(saida)
             # o que olhar antes de publicar (blocos fora da semana, horas estouradas por equipe e dia e por OS...)
@@ -385,6 +389,48 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
     st["fim"] = datetime.now(_BRT).isoformat(timespec="seconds")
     st["duracao_s"] = int(time.monotonic() - t0)
     _gravar(pasta, st)
+
+
+def aplicar_sem(obs: Path, planilha: Path) -> dict:
+    """O "sem:" das observações na planilha que o motor gerou, como o robô do PCM o aplica na semana em curso
+    (`atualizacao_semanal`, STEP A3): em toda aba com "OSs ID" e "Tarefa" (as das equipes e a _Pendentes), apaga a
+    linha da OS cuja tarefa contém uma das palavras, sem diferenciar maiúscula. É o "Tirar da semana" de UMA tarefa do
+    Quadro (15/10/2026). O motor só aplica o "sem:" nas OS de plano (Handover e MPx, o modo A: lá a tarefa nem é
+    programada e aqui não sobra nada); na OS comum (modo B) ele programa a tarefa mesmo assim, e é aqui que ela sai, com
+    o horário dela vazio na agenda. Devolve {linhas apagadas, OS}; sem nada a apagar, a planilha nem é regravada."""
+    try:
+        texto = Path(obs).read_text(encoding="utf-8")
+    except OSError:
+        return {"linhas": 0, "os": []}
+    tirar: dict[int, list[str]] = {}
+    for r in O.ler(texto):
+        if r.get("tipo") == "fixar" and r.get("sem"):      # como o motor e o robô: vale mesmo com o dia errado
+            tirar.setdefault(int(r["os"]), []).extend(p.lower() for p in r["sem"])
+    if not tirar:
+        return {"linhas": 0, "os": []}
+    wb = openpyxl.load_workbook(planilha)
+    n, oss = 0, set()
+    for ws in wb.worksheets:
+        if ws.max_row < 2:
+            continue
+        cab = [c.value for c in ws[1]]
+        if "OSs ID" not in cab or "Tarefa" not in cab:
+            continue
+        col_os, col_t = cab.index("OSs ID") + 1, cab.index("Tarefa") + 1
+        for lin in range(ws.max_row, 1, -1):              # de baixo para cima: apagar não desloca o que falta ler
+            try:
+                os_ = int(ws.cell(row=lin, column=col_os).value)
+            except (TypeError, ValueError):
+                continue
+            palavras = tirar.get(os_)
+            if palavras and any(p in str(ws.cell(row=lin, column=col_t).value or "").lower() for p in palavras):
+                ws.delete_rows(lin, 1)
+                n += 1
+                oss.add(str(os_))
+    if n:
+        wb.save(planilha)
+    wb.close()
+    return {"linhas": n, "os": sorted(oss)}
 
 
 def _ambiente_foto(pasta: Path, saida: Path) -> dict:

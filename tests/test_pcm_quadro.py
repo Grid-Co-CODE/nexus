@@ -42,6 +42,12 @@ CASOS = [
      "15289; ter; Usina 1: vedação dos postes de CFTV; tarde"),
     (("15290", "seg", "", "Troca de fusível, string 3", "Corretiva"), "15290; seg; Troca de fusível"),
     (("15291", "seg", "", ", sem nome", "Corretiva"), None),
+    # tirar UMA tarefa da semana (15/10/2026): o "sem:" do motor e do robô, com o nome da tarefa até a 1ª vírgula
+    (("15067", "sem", "", "[Grid Co.] - MPM - QGBT", "MPM"), "15067; sem: [Grid Co.] - MPM - QGBT"),
+    (("15067", "sem", "tarde", "[Grid Co.] - MPM - QGBT", "MPM"), "15067; sem: [Grid Co.] - MPM - QGBT"),
+    (("15290", "sem", "", "Troca de fusível, string 3", "Corretiva"), "15290; sem: Troca de fusível"),
+    (("15291", "sem", "", ", sem nome", "Corretiva"), None),
+    (("15292", "sem", "", "", "Corretiva"), None),
 ]
 
 
@@ -95,6 +101,43 @@ def test_mescla_os_inteira_e_nao():
     assert novo == "42; não\n" and res["saem"] == []
     with pytest.raises(Q.QuadroErro):
         Q.mesclar(BASE, ["texto livre"])
+
+
+def test_mescla_tirar_uma_tarefa():
+    """Levi, 15/10/2026: "quando o PCM tenta tirar da semana uma tarefa aparece uma notificação de tirar todas as
+    tarefas da OS, isso não pode acontecer". Tirar uma tarefa é o "sem:" (o robô do PCM tira só as linhas da tarefa;
+    o motor, nas OS de plano): não mexe nas outras linhas da OS, e as tarefas tiradas da mesma OS ficam numa linha só
+    (o motor guarda só o "sem:" da última linha da OS que tem um; o robô soma)."""
+    novo, res = Q.mesclar(BASE, ["15269; sem: [Grid Co.] - MPM - Trafo"])
+    assert novo.splitlines() == BASE.splitlines() + ["15269; sem: [Grid Co.] - MPM - Trafo"] and res["saem"] == []
+    novo, res = Q.mesclar(novo, ["15269; sem: [Grid Co.] - MPM - SPDA", "15269; sem: [grid co.] - mpm - trafo"])
+    assert [l for l in novo.splitlines() if l.startswith("15269")] == [
+        "15269; seg", "15269; ter; MPM; só: Cabine", "15269; sem: [Grid Co.] - MPM - Trafo, [Grid Co.] - MPM - SPDA"]
+    assert res["saem"] == ["15269; sem: [Grid Co.] - MPM - Trafo"]
+    # a OS que já está fora inteira continua fora (o "sem:" não a devolve)
+    novo, _ = Q.mesclar(BASE, ["9000; sem: Troca de fusível"])
+    assert "9000; não" in novo.splitlines() and "9000; sem: Troca de fusível" in novo.splitlines()
+    # a OS inteira (fora ou num dia) apaga o que tinha sido tirado por tarefa
+    com_sem = "15269; sem: [Grid Co.] - MPM - Trafo\n"
+    assert Q.mesclar(com_sem, ["15269; não"])[0] == "15269; não\n"
+    novo, res = Q.mesclar(com_sem, ["15269; qua"])
+    assert novo == "15269; qua\n" and res["saem"] == ["15269; sem: [Grid Co.] - MPM - Trafo"]
+    # a tarefa tirada que volta num dia sai do "sem:" (pelo "só:" na OS de plano, pelo nome na OS comum)
+    dois = "15269; sem: [Grid Co.] - MPM - Trafo, [Grid Co.] - MPM - SPDA\n"
+    novo, _ = Q.mesclar(dois, ["15269; qua; MPM; só: Trafo"])
+    assert novo.splitlines() == ["15269; sem: [Grid Co.] - MPM - SPDA", "15269; qua; MPM; só: Trafo"]
+    novo, res = Q.mesclar("15290; sem: Troca de fusível\n", ["15290; seg; Troca de fusível"])
+    assert novo == "15290; seg; Troca de fusível\n" and res["saem"] == ["15290; sem: Troca de fusível"]
+    # a linha do resto do plano (a sigla sem "só:") não devolve a tarefa tirada: o motor tira o "sem:" antes dela
+    novo, _ = Q.mesclar("15269; sem: [Grid Co.] - MPM - Trafo\n", ["15269; qua; MPM"])
+    assert novo.splitlines() == ["15269; sem: [Grid Co.] - MPM - Trafo", "15269; qua; MPM"]
+    # o "sem:" escrito à mão numa linha de dia entra na linha nova, para o motor não perdê-lo, e a linha de dia fica
+    novo, _ = Q.mesclar("15269; qua; MPM; só: Cabine; sem: QGBT\n", ["15269; sem: Trafo"])
+    assert novo.splitlines() == ["15269; qua; MPM; só: Cabine; sem: QGBT", "15269; sem: QGBT, Trafo"]
+    novo, _ = Q.mesclar("15269; qua; sem: QGBT\n", ["15269; sem: Trafo"])
+    assert novo.splitlines() == ["15269; qua; sem: QGBT", "15269; sem: QGBT, Trafo"]
+    r = O.ler_linha("15269; sem: [Grid Co.] - MPM - Trafo, [Grid Co.] - MPM - SPDA")
+    assert r["problema"] is None and r["sem"] == ["[Grid Co.] - MPM - Trafo", "[Grid Co.] - MPM - SPDA"]
 
 
 # ── a semana do PCM ──────────────────────────────────────────────────────────────────────────────────────────
@@ -225,6 +268,23 @@ def test_fila_validada_contra_a_semana():
     assert len(problemas) == 4 and any("99" in p for p in problemas)
 
 
+def test_fila_tirar_uma_tarefa():
+    """Tirar da semana uma tarefa (15/10/2026): o item {os, tarefa, dia "sem"} vira o "sem:" com o nome da tarefa da
+    SEMANA; as tarefas tiradas da mesma OS saem numa linha só, e a mesma tarefa reprogramada depois volta."""
+    sem = _semana_teste()
+    itens = [{"os": "5", "tarefa": "[Grid Co.] - MPM - Trafo", "dia": "sem", "turno": "tarde"},
+             {"os": "6", "tarefa": "Troca de fusível", "dia": "sem"},
+             {"os": "5", "tarefa": "[Grid Co.] - MPM - SPDA", "dia": "sem"},             # pendente da OS 5
+             {"os": "5", "tarefa": "Tarefa inventada", "dia": "sem"},                     # a OS não tem
+             {"os": "1", "tarefa": "", "dia": "sem"}]                                     # sem tarefa: não é "tirar uma"
+    linhas, problemas = Q.linhas_da_fila(sem, itens)
+    assert linhas == ["6; sem: Troca de fusível", "5; sem: [Grid Co.] - MPM - Trafo, [Grid Co.] - MPM - SPDA"]
+    assert len(problemas) == 2 and "não está nesta semana" in problemas[0] and "diga qual" in problemas[1]
+    linhas, problemas = Q.linhas_da_fila(sem, [{"os": "5", "tarefa": "[Grid Co.] - MPM - Trafo", "dia": "sem"},
+                                               {"os": "5", "tarefa": "[Grid Co.] - MPM - Trafo", "dia": "sex"}])
+    assert linhas == ["5; sex; MPM; só: Trafo"] and not problemas
+
+
 # ── o arquivo da semana em curso ─────────────────────────────────────────────────────────────────────────────
 def test_arquivo_da_semana_em_curso_nao_carrega_outra_semana():
     cab41 = "# Semana 2026-W41: reprogramação da semana em curso, gravada pelo Nexus\n"
@@ -327,6 +387,21 @@ def test_tela_quadro_semana_em_curso_confirma_e_grava(app, logado, tmp_path, mon
     r = logado.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "itens": itens, "confirmo": "1",
                                                        "sha_visto": sha})
     assert r.status_code == 409 and len(gh.commits) == 1
+
+
+def test_tela_quadro_tira_uma_tarefa_da_semana_em_curso(app, logado, tmp_path, monkeypatch):
+    """O "Tirar da semana" de UMA tarefa grava o "sem:" (o robô do PCM tira só ela), e a janela da OS diz o que sai."""
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 7))
+    app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
+    gh = _com_github(app.config, GitHubFalso({"Observacoes_Semana_Atual.txt": b"15448; nao\n"}))
+    itens = json.dumps([{"os": "5", "tarefa": "[Grid Co.] - MPM - Trafo", "dia": "sem"}])
+    html = logado.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "itens": itens}).get_data(as_text=True)
+    assert "5; sem: [Grid Co.] - MPM - Trafo" in html and not gh.commits
+    sha = html.split('name="sha_visto" value="', 1)[1].split('"', 1)[0]
+    r = logado.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "itens": itens, "confirmo": "1",
+                                                       "sha_visto": sha})
+    assert r.status_code == 303 and gh.arquivos["Observacoes_Semana_Atual.txt"].decode("utf-8").splitlines()[1:] == [
+        "15448; nao", "5; sem: [Grid Co.] - MPM - Trafo"]
 
 
 def test_tela_quadro_rascunho_grava_nas_observacoes_do_nexus(app, logado, config, origem, monkeypatch):

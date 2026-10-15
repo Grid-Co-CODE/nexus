@@ -242,6 +242,53 @@ def test_diferenca_com_a_oficial_aparece_por_campo(config, origem):
     assert cmp["identicas"] is False and cmp["diferencas"].get("Hora Início") == 1
 
 
+def _linhas_da_planilha(p):
+    wb = openpyxl.load_workbook(p, read_only=True)
+    out = {}
+    for ws in wb.worksheets:
+        cab = list(next(ws.iter_rows(min_row=1, max_row=1, values_only=True)))
+        out[ws.title] = [(r[cab.index("OSs ID")], r[cab.index("Tarefa")]) for r in ws.iter_rows(min_row=2, values_only=True)]
+    wb.close()
+    return out
+
+
+def test_sem_das_observacoes_tira_a_tarefa_da_planilha_gerada(tmp_path, monkeypatch):
+    """Tirar uma tarefa da semana (15/10/2026) é o "sem:". O motor só o aplica nas OS de plano (modo A); na OS comum
+    ele programa a tarefa mesmo assim. Depois do motor, a rodada tira da planilha as linhas da tarefa como o robô do PCM
+    tira na semana em curso (atualizacao_semanal, STEP A3): em toda aba com "OSs ID" e "Tarefa", a da OS cuja tarefa
+    contém a palavra, sem diferenciar maiúscula."""
+    p = tmp_path / "sombra.xlsx"
+    outra = list(LINHAS[1])
+    outra[6] = "MPM trafo"
+    vizinha = list(LINHAS[1])
+    vizinha[2] = 15022
+    planilha(p, [LINHAS[0], LINHAS[1], outra, vizinha],
+             pendentes=[["SP Leste 02", 15021, "ALT1-CAB02", "MPM CABINE 2", "Sem capacidade"],
+                        ["SP Leste 02", "15020", "", "Outra", ""]])
+    obs = tmp_path / "Observacoes_Semana.txt"
+    obs.write_text("@usina Altair 1 = seg\n15021; sem: MPM cabine\n15020; não\n", encoding="utf-8")
+    assert G.aplicar_sem(obs, p) == {"linhas": 2, "os": ["15021"]}
+    assert _linhas_da_planilha(p) == {"SP Leste 02": [(15020, "Fusível queimado"), (15021, "MPM trafo"),
+                                                      (15022, "MPM cabine")],
+                                      "_Pendentes": [("15020", "Outra")]}
+    # sem "sem:" (ou sem linha a tirar), a planilha nem é regravada
+    antes = p.read_bytes()
+    obs.write_text("15020; não\n", encoding="utf-8")
+    assert G.aplicar_sem(obs, p) == {"linhas": 0, "os": []} and p.read_bytes() == antes
+    obs.write_text("15021; sem: tarefa que não existe\n", encoding="utf-8")
+    monkeypatch.setattr(openpyxl.Workbook, "save", lambda *a, **k: pytest.fail("regravou a planilha sem tirar nada"))
+    assert G.aplicar_sem(obs, p) == {"linhas": 0, "os": []} and p.read_bytes() == antes
+    obs.unlink()
+    assert G.aplicar_sem(obs, p) == {"linhas": 0, "os": []} and p.read_bytes() == antes
+
+
+def test_rodada_aplica_o_sem_das_observacoes(config):
+    I.salvar_observacoes(G.pasta_trabalho(config), "2026-W41", "15021; sem: MPM cabine\n", autor="teste")
+    st = G.aguardar(config, G.iniciar(config, "2026-W41")["id"], 60)
+    assert st["estado"] == "ok", st
+    assert st["sem"] == {"linhas": 1, "os": ["15021"]} and st["resumo"]["linhas"] == 1
+
+
 def test_motor_que_falha_vira_estado_falhou_com_o_motivo(config, tmp_path):
     cfg = dict(config, NEXUS_PCM_MOTOR=str(motor_falso(tmp_path, codigo_saida=1)))
     st = G.aguardar(cfg, G.iniciar(cfg, "2026-W41")["id"], 60)
