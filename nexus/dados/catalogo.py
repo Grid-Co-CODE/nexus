@@ -185,6 +185,18 @@ FATOS = (
     # Contratos e clientes → Contestações (Levi, 13/10/2026: "contestação ligada ao Nexus"; "ficaria na API do PG"). O
     # Dashboard Thopen (5080) é a FONTE: grava 1 linha por contestação × setor, a mesma divisão das mensagens do Teams.
     # Registrado antes da 1ª gravação. O que é do cliente vai só cifrado com a chave PÚBLICA (o 5080 não abre nada)
+    # o acompanhamento de cada contestação (Levi, 15/10/2026: "um botão 'Pegar para mim' (...) onde o responsável poderá
+    # inserir atualizações sobre a demanda com data e hora salva"). O Nexus é a FONTE; registrado antes da 1ª gravação
+    Fato("tratamento_contestacao", "Acompanhamento da contestação", "contratos",
+         "nexus_contestacoes_tratamento · fato_tratamento_contestacao",
+         "1 linha = 1 evento (responsável que pegou, ou atualização escrita) sobre 1 contestação × 1 setor",
+         _d(data=("id", "data_id (o dia de Brasília do evento)"),
+            pessoa=("cod", "pessoa_hmac (o código do e-mail de quem pegou ou escreveu)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_contestacoes_tratamento · fato_tratamento_contestacao",),
+         janela_origem="o Nexus é a fonte",
+         observacao="contestacao_linha_id liga à linha do thopen_contestacoes (o id dela, 1 contestação × 1 setor); "
+                    "evento = responsavel (o responsável de agora é o do último) ou atualizacao. Quem (nome e e-mail) e "
+                    "o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance ou "
          "Zeladoria)",
@@ -737,6 +749,10 @@ LIVROS = (
           "nexus/campo/ronda_avulsa.py + ferramentas/importar_avulsas_planilha.py --gravar", True,
           "criado em 08/10/2026 pela importação da validação por foto: 63 linhas (origem validacao_foto, usina_id "
           "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10"),
+    Livro("nexus_contestacoes_tratamento", ("fato_tratamento_contestacao",),
+          "a cada \"Pegar para mim\" e a cada atualização na tela Contestações",
+          "nexus/contratos/tratamento.py, pela tela Contratos e clientes > Contestações", False,
+          "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega"),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,
           "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável"),

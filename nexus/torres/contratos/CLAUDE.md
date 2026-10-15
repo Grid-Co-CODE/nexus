@@ -34,13 +34,34 @@ vive só na memória da tela. Sem a chave, a tela lista as contestações com "c
 **O par de 13/10/2026** está em `C:\GridcoAuto\entrega-ti\contestacoes-chaves-2026-10-13\` (a privada no
 `.segredo`, nunca impressa): perder a privada é perder o que já foi gravado; a cópia em cofre é item da virada.
 
-**A tela.** Uma aba por setor (Performance, Zeladoria) com a contagem; a mais nova em cima: quando chegou (Brasília), a
-usina, o dia contestado, o que contesta, o cliente e o contato, a mensagem, o que ele via na tela e se o Teams do setor
-recebeu ("não recebeu" = a contestação só está aqui). Tela nova nasce FECHADA para os setores (Base → Acessos): o
-administrador vê; marcar "Contestações" para Performance e Zeladoria.
+**A tela.** Uma aba por setor com a contagem; a mais nova em cima: quando chegou (Brasília), a usina, o dia contestado,
+o que contesta, o cliente e o contato, a mensagem, o que ele via na tela, se o Teams do setor recebeu ("não recebeu" = a
+contestação só está aqui) e o responsável. Tela nova nasce FECHADA para os setores (Base → Acessos): o administrador vê;
+marcar "Contestações" para Performance e Zeladoria.
 
-**Ainda não tem** (fica para quando o Levi pedir): marcar como respondida/quem respondeu (seria um livro do Nexus,
-`nexus_contestacoes_tratamento`, registrado antes de criar), filtro por usina ou cliente, outros dashboards.
+**Cada setor vê só a sua** (Levi, 15/10/2026: "O setor só vê a contestação do próprio setor, exceto administrador"):
+`_setores_visiveis` — administrador (a lista de agora; o Nexus recalcula `session["admin"]` a cada pedido), todas; quem
+tem setor, só a de mesmo nome (os setores do Nexus são "Performance" e "Zeladoria", como os das contestações); outro
+setor, nenhuma ("Nenhuma contestação para o seu setor"); portão por setor desligado (`NEXUS_ACESSO_POR_SETOR=0`,
+testes), todas. **O servidor barra**, não só a tela: o card e as ações de uma contestação de outro setor dão 404.
+
+**O acompanhamento** (Levi, 15/10/2026: "um botão 'Pegar para mim' ao clicar nesse botão o usuário se torna o
+responsável por aquela demanda. Ao clicar na linha, vai aparecer um card sobrepondo a tela com um blur de fundo onde o
+responsável poderá inserir atualizações sobre a demanda com data e hora salva"), em `nexus/contratos/tratamento.py`:
+- **Pegar para mim**: quem entrou com login de pessoa (Fracttal ou Microsoft; a senha de administrador não diz quem é)
+  vira o responsável. Com dono, só o administrador passa para si ("Assumir" na linha).
+- **O card** (o `<dialog class="cr-modal">` da Visão do responsável, fundo desfocado): a contestação, o cliente, o
+  responsável desde quando e as atualizações (a mais nova em cima, com data, hora e quem). Só o responsável de agora
+  escreve; o resto do setor lê. A atualização grava sem sair do card e a contagem da linha acompanha na hora (o evento
+  `close` do `<dialog>` não disparou no navegador do painel: nada depende dele).
+- **O dado**: livro `nexus_contestacoes_tratamento` · `fato_tratamento_contestacao` (fato `tratamento_contestacao` no
+  catálogo, registrado antes da 1ª gravação). 1 linha = 1 evento (`responsavel` ou `atualizacao`) sobre a linha do
+  `thopen_contestacoes` (`contestacao_linha_id`); só acrescenta, sob a trava, relido antes e conferido depois. O
+  responsável é o do último `responsavel` **pela ordem de gravação** (dois eventos no mesmo segundo ficavam na ordem do
+  id, ao acaso). Quem (nome e e-mail) e o texto só cifrados (Cofre, a chave do cadastro); a pessoa pelo `pessoa_hmac`.
+
+**Ainda não tem** (fica para quando o Levi pedir): status da demanda (concluída), soltar a demanda, filtro por usina ou
+cliente, outros dashboards.
 
 **Como provar.** `python -m pytest -q tests/test_contratos_contestacoes.py` (banco falso; com
 `PLATAFORMA_REPO=<clone da plataforma>` o teste cruzado cifra com o código do 5080 e abre aqui). Em 13/10/2026, ponta a

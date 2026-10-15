@@ -3,46 +3,150 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Contestações dos clientes (Levi, 13/10/2026: "em contratos e clientes no Nexus pode ter um lugar para essas
-   contestações separando setores!"). Uma aba por setor; a mais nova em cima. O que é do cliente (nome, contato,
-   mensagem, o que ele via) vem cifrado do banco e só abre com a chave privada deste Nexus (nexus/contratos/contestacoes.py). #}
+   contestações separando setores!"). Uma aba por setor que a sessão vê (15/10/2026: "O setor só vê a contestação do
+   próprio setor, exceto administrador"); a mais nova em cima. O que é do cliente (nome, contato, mensagem, o que ele via)
+   vem cifrado do banco e só abre com a chave privada deste Nexus (nexus/contratos/contestacoes.py).
+   O acompanhamento (15/10/2026: "um botão 'Pegar para mim' (...) Ao clicar na linha, vai aparecer um card sobrepondo a
+   tela com um blur de fundo onde o responsável poderá inserir atualizações"): nexus/contratos/tratamento.py. #}
 <style>
   .ct-tab td{vertical-align:top}
   .ct-tab td.ct-esq, .ct-tab th.ct-esq{text-align:left}
   .ct-tab .ct-usina{white-space:nowrap}
-  .ct-tab .ct-msg{max-width:360px;white-space:pre-wrap}
+  .ct-tab .ct-msg{max-width:320px;white-space:pre-wrap}
   .ct-tab .ct-tela{margin:0;padding:0;list-style:none;font-size:12px;color:var(--mudo)}
   .ct-tab .ct-tela b{color:var(--tinta-2);font-weight:600}
+  .ct-tab tbody tr[data-ct-card]{cursor:pointer}
+  .ct-tab tbody tr[data-ct-card]:hover td{background:var(--superficie-2)}
+  .ct-tab tbody tr[data-ct-card]:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
   .ct-itens{display:flex;flex-wrap:wrap;gap:4px}
   .ct-item{font:600 11px/18px var(--font-sans);padding:0 7px;border-radius:9px;background:var(--superficie-3);color:var(--tinta-2)}
+  .ct-resp{white-space:nowrap}
+  .ct-resp form{margin:4px 0 0}
+  .ct-pegar{padding:2px 10px;font-size:12px}
+  .ct-n{display:block;font-size:11.5px;color:var(--mudo)}
+  .ct-card h2{margin:4px 0 2px;font:800 21px/1.2 var(--font-display)}
+  .ct-card .ct-sub{margin:0 0 14px;color:var(--mudo);font-size:13px}
+  .ct-card .ct-bloco{margin:14px 0 0;padding:12px 14px;border:1px solid var(--linha);border-radius:var(--raio-md)}
+  .ct-card .ct-bloco h3{margin:0 0 8px;font:700 13px/1.3 var(--font-sans);color:var(--tinta-2)}
+  .ct-linha{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .ct-linha li{display:grid;grid-template-columns:150px minmax(0,1fr);gap:4px 14px}
+  .ct-linha .ct-q{font-size:12.5px;color:var(--mudo);font-variant-numeric:tabular-nums}
+  .ct-linha .ct-t{white-space:pre-wrap}
+  .ct-linha .ct-quem{display:block;font-size:12px;color:var(--mudo)}
+  .ct-form{display:grid;gap:8px;margin-top:10px}
+  .ct-form textarea{min-height:84px;resize:vertical}
+  @media (max-width:640px){ .ct-linha li{grid-template-columns:minmax(0,1fr)} }
 </style>
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Dashboard Thopen<br><b>livro thopen_contestacoes</b></div>
   </div>
+  {% if aviso %}<div class="cn-erro cn-aviso" role="status"><b>{{ aviso }}</b></div>{% endif %}
+  {% if erro %}<div class="cn-erro" role="alert"><b>Nada mudou.</b> {{ erro }}</div>{% endif %}
   {% if d.erro %}<div class="cn-erro" role="alert"><b>{{ d.erro }}.</b></div>{% endif %}
+  {% if trat_erro %}<div class="cn-erro" role="alert"><b>{{ trat_erro }}.</b> A lista aparece sem os responsáveis.</div>{% endif %}
   {% if d.sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave das contestações.</b>
     As contestações aparecem sem o nome, o contato e a mensagem do cliente, que vão cifrados no banco. Um administrador
     cola a chave em <a href="{{ raiz }}/t/base/chaves-nexus">Base → Chaves do Nexus</a>, sem a T.I.</div>{% endif %}
 
+  {% if not setores %}
+  <div class="cn-erro cn-aviso" role="status"><b>Nenhuma contestação para o seu setor.</b>
+    As contestações dos clientes vão para a Performance e para a Zeladoria{% if meu_setor %}; o seu setor é {{ meu_setor }}{% endif %}.</div>
+  {% else %}
   <nav class="cn-abas" aria-label="Setor">
     {% for s, rot in setores %}<a href="?setor={{ s }}"{% if s == setor %} aria-current="page"{% endif %}>{{ rot }}<i>{{ d.contagem.get(s, 0) }}</i></a>{% endfor %}
   </nav>
 
   <div class="cn-tab cn-tab--compacta ct-tab"><table>
-    <thead><tr><th>Recebida</th><th>Usina</th><th>Dia contestado</th><th>Contesta</th><th>Cliente</th><th class="ct-esq">Mensagem</th><th class="ct-esq">Na tela do cliente</th><th>Teams</th></tr></thead>
+    <thead><tr><th>Recebida</th><th>Usina</th><th>Dia contestado</th><th>Contesta</th><th>Cliente</th><th class="ct-esq">Mensagem</th><th class="ct-esq">Na tela do cliente</th><th>Teams</th><th>Responsável</th></tr></thead>
     <tbody>
-    {% for x in lista %}
-      <tr><td><span class="ext-par"><span class="m">{{ x.quando.strftime('%d/%m/%Y') if x.quando else '—' }}</span><span class="det">{{ x.quando.strftime('%H:%M') if x.quando else '' }}</span></span></td>
+    {% for x in lista %}{% set t = trat.get(x.id|string) or {} %}{% set r = t.get('responsavel') %}{% set meu_r = r and meu and r.hmac == meu %}
+      <tr data-ct-card="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/card')|na_raiz }}" tabindex="0" aria-label="Abrir o acompanhamento da contestação de {{ x.usina }}">
+        <td><span class="ext-par"><span class="m">{{ x.quando.strftime('%d/%m/%Y') if x.quando else '—' }}</span><span class="det">{{ x.quando.strftime('%H:%M') if x.quando else '' }}</span></span></td>
         <td class="ct-usina">{{ x.usina }}</td>
         <td class="m">{% if x.ini %}{{ x.ini.strftime('%d/%m/%Y') }}{% if x.fim and x.fim != x.ini %} a {{ x.fim.strftime('%d/%m') }}{% endif %}{% else %}—{% endif %}</td>
         <td><span class="ct-itens">{% for i in x.itens %}<span class="ct-item">{{ i }}</span>{% endfor %}</span></td>
         <td>{% if x.aberto %}<span class="ext-par"><span>{{ x.nome }}</span><span class="det">{{ x.contato }}</span></span>{% elif x.aberto is false %}<span class="cn-t-critico" title="A cifra desta linha não abre com a chave deste Nexus">não abre</span>{% else %}<span class="mudo">cifrado</span>{% endif %}</td>
         <td class="ct-msg ct-esq">{% if x.aberto %}{{ x.mensagem or '—' }}{% else %}<span class="mudo">—</span>{% endif %}</td>
         <td class="ct-esq">{% if x.tela %}<ul class="ct-tela">{% for rot, v in x.tela %}<li><b>{{ rot }}</b> {{ v }}</li>{% endfor %}</ul>{% else %}<span class="mudo">—</span>{% endif %}</td>
-        <td>{% if x.avisado %}<span class="cn-t-ok">recebeu</span>{% else %}<span class="cn-t-critico" title="O Teams recusou o aviso: a contestação só está aqui">não recebeu</span>{% endif %}</td></tr>
-    {% else %}<tr><td colspan="8" class="mudo">Nenhuma contestação para este setor.</td></tr>{% endfor %}
+        <td>{% if x.avisado %}<span class="cn-t-ok">recebeu</span>{% else %}<span class="cn-t-critico" title="O Teams recusou o aviso: a contestação só está aqui">não recebeu</span>{% endif %}</td>
+        <td class="ct-resp">{% if trat_erro %}<span class="mudo">—</span>
+          {% elif r %}<span>{{ r.nome or 'responsável' }}{% if meu_r %} (você){% endif %}</span>
+            <span class="ct-n">{{ t.atualizacoes|length }} atualizaç{{ 'ão' if t.atualizacoes|length == 1 else 'ões' }}</span>
+            {% if admin and not meu_r %}<form method="post" action="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/pegar')|na_raiz }}" data-ct-pegar>
+              <button class="gc-btn gc-btn--ui gc-btn--contorno ct-pegar" type="submit" title="Administrador: a demanda passa para você">Assumir</button></form>{% endif %}
+          {% else %}<form method="post" action="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/pegar')|na_raiz }}" data-ct-pegar>
+            <button class="gc-btn gc-btn--ui gc-btn--primario ct-pegar" type="submit">Pegar para mim</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="9" class="mudo">Nenhuma contestação para este setor.</td></tr>{% endfor %}
     </tbody>
   </table></div>
+  {% endif %}
+
+  {# o card por cima da lista, com o fundo desfocado (o mesmo <dialog> da Visão do responsável, campo.css .cr-modal): o
+     pedaço de página vem da rota `contestacao_card`; Esc, o Fechar e o clique fora fecham #}
+  <dialog class="cr-modal" id="ct-modal" aria-label="Acompanhamento da contestação">
+    <div class="cr-modal-barra"><button type="button" class="gc-btn gc-btn--contorno cr-modal-fechar">Fechar</button></div>
+    <div class="cr-modal-corpo"></div>
+  </dialog>
 </div>
+<script>
+(function () {
+  var dlg = document.getElementById('ct-modal');
+  if (!dlg) { return; }
+  var corpo = dlg.querySelector('.cr-modal-corpo');
+  var atual = null;                                     // o card aberto (o endereço dele, que é o data-ct-card da linha)
+  function abrir(url) {
+    atual = url;
+    corpo.innerHTML = '<p class="cr-jan-carregando">Carregando…</p>';
+    if (!dlg.open) { dlg.showModal(); }
+    fetch(url, {credentials: 'same-origin'}).then(function (r) {
+      if (r.redirected && /\/entrar/.test(r.url)) { location.reload(); return null; }     // a sessão do Nexus caiu
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.text();
+    }).then(function (html) { if (html !== null) { corpo.innerHTML = html; } }).catch(function (e) {
+      corpo.innerHTML = '<div class="cn-erro" role="alert"><b>Não consegui abrir agora (' + e.message + ').</b> Tente de novo.</div>';
+    });
+  }
+  // a linha abre o card; o "Pegar para mim" e o "Assumir" ficam na linha e não abrem o card
+  document.addEventListener('click', function (ev) {
+    if (ev.target.closest('[data-ct-pegar], a, button') || dlg.contains(ev.target)) { return; }
+    var tr = ev.target.closest('tr[data-ct-card]');
+    if (tr) { abrir(tr.getAttribute('data-ct-card')); }
+  });
+  document.addEventListener('keydown', function (ev) {
+    var tr = ev.target.closest && ev.target.closest('tr[data-ct-card]');
+    if (tr && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrir(tr.getAttribute('data-ct-card')); }
+  });
+  // a atualização grava sem sair do card: a resposta é o card de novo, com a nova ou com o motivo e o texto digitado.
+  // A contagem da linha acompanha na hora (sem reler a página: o evento "close" do <dialog> não é garantido)
+  function contar() {
+    var tr = atual && document.querySelector('tr[data-ct-card="' + atual + '"]');
+    var s = tr && tr.querySelector('.ct-n');
+    if (!s) { return; }
+    var n = corpo.querySelectorAll('.ct-linha li').length;
+    s.textContent = n + (n === 1 ? ' atualização' : ' atualizações');
+  }
+  dlg.addEventListener('submit', function (ev) {
+    var f = ev.target.closest('form[data-ct-atualizar]');
+    if (!f) { return; }
+    ev.preventDefault();
+    var bt = f.querySelector('button[type="submit"]');
+    if (bt) { bt.disabled = true; bt.textContent = 'Salvando…'; }
+    fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin'}).then(function (r) {
+      if (r.redirected && /\/entrar/.test(r.url)) { location.reload(); return null; }
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.text();
+    }).then(function (html) { if (html !== null) { corpo.innerHTML = html; contar(); } }).catch(function (e) {
+      if (bt) { bt.disabled = false; bt.textContent = 'Salvar atualização'; }
+      var p = f.querySelector('.ct-falha') || document.createElement('p');
+      p.className = 'ct-falha cn-t-critico';
+      p.textContent = 'Não consegui salvar agora (' + e.message + '). O texto continua aqui: tente de novo.';
+      f.appendChild(p);
+    });
+  });
+  dlg.addEventListener('click', function (ev) { if (ev.target === dlg) { dlg.close(); } });
+  dlg.querySelector('.cr-modal-fechar').addEventListener('click', function () { dlg.close(); });
+})();
+</script>
 {% endblock %}

@@ -121,3 +121,105 @@ def test_teste_cruzado_com_o_codigo_do_5080():
         assert CT.decifrar(c, CT.contexto("x1"), priv) == "Ana"
     finally:
         sys.path.remove(os.path.join(raiz, "thopen"))
+
+
+# ── O acompanhamento (Levi, 15/10/2026): "Pegar para mim", o card das atualizações e o setor que só vê o seu ──────────
+from nexus.cadastro.cifra import gerar_chave  # noqa: E402
+from nexus.contratos import tratamento as TR  # noqa: E402
+
+ANA = {"email": "ana.lima@gridco.com.br", "nome": "Ana Lima"}
+BETO = {"email": "beto.souza@gridco.com.br", "nome": "Beto Souza"}
+
+
+@pytest.fixture
+def trat(banco, app):
+    app.config.update(NEXUS_CHAVE_CADASTRO=gerar_chave(), NEXUS_PESSOA_HMAC="hmac-teste", GRIDCO_SQL_TOKEN="tk")
+    return banco
+
+
+def _como(cli, usuario, admin=False):
+    with cli.session_transaction() as s:
+        s["logado"], s["admin"], s["usuario"] = True, admin, usuario
+    return cli
+
+
+def test_pegar_para_mim_e_so_o_administrador_assume(trat, app):
+    TR.pegar("a1", "performance", ANA, admin=False)
+    r = TR.estado()["a1"]["responsavel"]
+    assert r["nome"] == "Ana Lima" and r["hmac"] == TR.codigo(ANA)
+    with pytest.raises(TR.Recusada, match="já é sua"):
+        TR.pegar("a1", "performance", ANA, admin=False)
+    with pytest.raises(TR.Recusada, match="já tem responsável"):
+        TR.pegar("a1", "performance", BETO, admin=False)
+    TR.pegar("a1", "performance", BETO, admin=True)                     # o administrador assume
+    assert TR.estado()["a1"]["responsavel"]["nome"] == "Beto Souza"
+    with pytest.raises(TR.Recusada, match="login"):                       # a senha de administrador não diz quem é
+        TR.pegar("b1", "performance", None, admin=True)
+    # a API do banco tem leitura aberta: nem o nome nem o e-mail em claro
+    lin = trat.linhas(TR.LIVRO, TR.ABA)
+    assert len(lin) == 2 and list(lin[0]) == list(TR.CAB)
+    assert "ana" not in json.dumps(lin, ensure_ascii=False, default=str).lower()
+
+
+def test_so_o_responsavel_escreve_e_a_atualizacao_fica_com_a_hora(trat, app):
+    with pytest.raises(TR.Recusada, match="Pegar para mim"):
+        TR.atualizar("a1", "performance", ANA, "Verificando com a equipe")
+    TR.pegar("a1", "performance", ANA, admin=False)
+    with pytest.raises(TR.Recusada, match="Escreva"):
+        TR.atualizar("a1", "performance", ANA, "   ")
+    TR.atualizar("a1", "performance", ANA, "Verificando   com a equipe\n\nOS aberta no Fracttal")
+    with pytest.raises(TR.Recusada, match="Só o responsável"):
+        TR.atualizar("a1", "performance", BETO, "outro")
+    (a,) = TR.estado()["a1"]["atualizacoes"]
+    assert a["texto"] == "Verificando com a equipe\n\nOS aberta no Fracttal" and a["nome"] == "Ana Lima"
+    assert a["quando"] is not None and "às" in a["quando_txt"]
+    assert "verificando" not in json.dumps(trat.linhas(TR.LIVRO, TR.ABA), default=str).lower()
+
+
+def test_o_setor_so_ve_a_contestacao_dele_e_o_administrador_ve_todas(trat, app, cliente, monkeypatch):
+    from nexus.auth import setor_telas as ST
+    setor = {"v": {"id": 3, "nome": "Zeladoria"}}
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": setor["v"], "erro": ""})
+    _como(cliente, ANA)
+    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    assert "Zeladoria<i>1</i>" in html and "Performance<i>" not in html and "Altair" not in html
+    # a de outro setor nem abre (o servidor barra, não só a tela)
+    assert cliente.get("/t/contratos/contestacoes?setor=performance").get_data(as_text=True).count("Altair") == 0
+    assert cliente.get("/t/contratos/contestacoes/a1/card").status_code == 404
+    assert cliente.post("/t/contratos/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 404
+    assert cliente.get("/t/contratos/contestacoes/a2/card").status_code == 200
+    setor["v"] = {"id": 1, "nome": "Engenharia"}                              # setor sem contestação: nenhuma
+    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    assert "Nenhuma contestação para o seu setor" in html and "o seu setor é Engenharia" in html
+    app.config["NEXUS_ADMINS"] = BETO["email"]                              # administrador (a lista de agora): todas
+    _como(cliente, BETO, admin=True)
+    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    assert "Performance<i>2</i>" in html and "Zeladoria<i>1</i>" in html
+
+
+def test_tela_pegar_abrir_o_card_e_escrever(trat, app, cliente):
+    _como(cliente, ANA)
+    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    assert html.count(">Pegar para mim</button>") == 2 and 'data-ct-card="/t/contratos/contestacoes/a1/card"' in html
+    r = cliente.post("/t/contratos/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"})
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/contratos/contestacoes?setor=performance")
+    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    assert "agora é sua" in html and "Ana Lima (você)" in html and "0 atualizações" in html
+    card = cliente.get("/t/contratos/contestacoes/a1/card").get_data(as_text=True)
+    assert "data-ct-atualizar" in card and "Nenhuma atualização ainda" in card and "Ana Souza" in card
+    r = cliente.post("/t/contratos/contestacoes/a1/atualizacao", data={"texto": "Liguei para o cliente"},
+                     headers={"Sec-Fetch-Site": "same-origin"})
+    card = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Atualização salva" in card and "Liguei para o cliente" in card
+    # outra pessoa do setor lê o card, mas não escreve; de outro site, nada grava
+    _como(cliente, BETO)
+    card = cliente.get("/t/contratos/contestacoes/a1/card").get_data(as_text=True)
+    assert "Liguei para o cliente" in card and "data-ct-atualizar" not in card and "Só Ana Lima escreve" in card
+    assert cliente.post("/t/contratos/contestacoes/b1/pegar", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+
+
+def test_catalogo_registra_o_acompanhamento():
+    from nexus.dados import catalogo
+    l = catalogo.LIVRO_POR_NOME[TR.LIVRO]
+    assert l.abas == (TR.ABA,) and catalogo.aba_segue_a_regra(TR.ABA)
+    assert catalogo.POR_ID["tratamento_contestacao"].fontes == (f"{TR.LIVRO} · {TR.ABA}",)

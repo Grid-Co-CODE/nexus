@@ -1,0 +1,50 @@
+{# O card de uma contestação (15/10/2026, Levi: "Ao clicar na linha, vai aparecer um card sobrepondo a tela com um blur de
+   fundo onde o responsável poderá inserir atualizações sobre a demanda com data e hora salva"). Pedaço de página: entra
+   no <dialog> da lista (contestacoes.html). Só o responsável de agora escreve; o resto do setor lê. #}
+<div class="ct-card">
+  <p class="gc-eyebrow">Contestação · {{ setor_rot }}</p>
+  <h2>{{ x.usina }}</h2>
+  <p class="ct-sub">Dia contestado {% if x.ini %}{{ x.ini.strftime('%d/%m/%Y') }}{% if x.fim and x.fim != x.ini %} a {{ x.fim.strftime('%d/%m/%Y') }}{% endif %}{% else %}—{% endif %}
+    · recebida {{ x.quando.strftime('%d/%m/%Y às %H:%M') if x.quando else '—' }}
+    {% if x.itens %}· {{ x.itens|join(', ') }}{% endif %}</p>
+
+  {% if aviso %}<div class="cn-erro cn-aviso" role="status"><b>{{ aviso }}.</b></div>{% endif %}
+  {% if erro %}<div class="cn-erro" role="alert"><b>Nada foi gravado.</b> {{ erro }}</div>{% endif %}
+  {% if lido %}<div class="cn-erro" role="alert"><b>{{ lido }}.</b></div>{% endif %}
+
+  <div class="ct-bloco">
+    <h3>O cliente</h3>
+    {% if x.aberto %}<p style="margin:0 0 6px"><b>{{ x.nome }}</b>{% if x.contato %} · {{ x.contato }}{% endif %}</p>
+      <p style="margin:0;white-space:pre-wrap">{{ x.mensagem or 'Sem mensagem.' }}</p>
+    {% else %}<p class="mudo" style="margin:0">O nome, o contato e a mensagem do cliente vão cifrados e não abrem neste Nexus.</p>{% endif %}
+  </div>
+
+  <div class="ct-bloco">
+    <h3>Responsável</h3>
+    {% if resp %}<p style="margin:0">{{ resp.nome or 'responsável' }}{% if sou_resp %} (você){% endif %} <span class="mudo">· desde {{ resp.quando_txt }}</span></p>
+    {% else %}<p class="mudo" style="margin:0">Ninguém pegou esta demanda ainda: use "Pegar para mim" na lista.</p>{% endif %}
+  </div>
+
+  <div class="ct-bloco">
+    <h3>Atualizações</h3>
+    {% if t.atualizacoes %}
+    <ul class="ct-linha">
+      {% for a in t.atualizacoes|reverse %}
+      <li><span class="ct-q">{{ a.quando_txt }}<span class="ct-quem">{{ a.nome }}</span></span><span class="ct-t">{{ a.texto or '—' }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="mudo" style="margin:0">Nenhuma atualização ainda.</p>{% endif %}
+
+    {% if sou_resp %}
+    <form class="ct-form" method="post" action="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/atualizacao')|na_raiz }}" data-ct-atualizar>
+      <label class="gc-rotulo" for="ct-texto">Nova atualização (fica com a data e a hora de agora)</label>
+      <textarea id="ct-texto" name="texto" class="gc-campo" maxlength="2000" required>{{ texto }}</textarea>
+      <div><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar atualização</button></div>
+    </form>
+    {% elif resp %}
+    <p class="mudo" style="margin:10px 0 0">Só {{ resp.nome or 'o responsável' }} escreve atualização{% if admin %}; para passar a demanda para você, use "Assumir" na lista{% endif %}.</p>
+    {% elif not com_login %}
+    <p class="mudo" style="margin:10px 0 0">Entre com o seu login (Fracttal ou Microsoft) para pegar e acompanhar a demanda.</p>
+    {% endif %}
+  </div>
+</div>
