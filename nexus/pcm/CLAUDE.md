@@ -349,7 +349,7 @@ vieram Tipo, Etiqueta, Estado, OS, Solicitação e Período.
 
 ## Armadilhas já vividas
 
-- **Endereço nunca a partir da raiz** (porta única, 09/10/2026): no servidor o Nexus mora em `/nexus`, e um
+- **Endereço nunca a partir da raiz** (porta única, 09/10/2026): debaixo do `/nexus` (o servidor até a fase 4; hoje na raiz, e o prefixo é a volta) um
   `/t/pcm/...` cru caía na plataforma de Performance. Os links e formulários de Gerar, Publicar, Quadro, Reprogramar e
   Semana saem com `{{ raiz }}`/`url_for`/`|na_raiz`; os redirecionamentos de `telas.py`, com `na_raiz` (só a parte do
   caminho: a consulta montada por `urlencode` vem depois).

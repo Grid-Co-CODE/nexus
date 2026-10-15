@@ -26,7 +26,9 @@ duas linhas quando o cliente marcou dos dois lados), `recebida_em` (UTC), `data_
 via na tela naquele dia (geração, irradiação, disponibilidade, trackers, strings, comentário, ronda) num JSON em
 `dados_cifrados`. Cifra **assimétrica** (X25519 + HKDF-SHA256 com a pública efêmera de sal + AES-256-GCM; prefixo
 `cx1:`): o 5080, público, tem só a chave PÚBLICA (`THOPEN_CONTESTACAO_CHAVE_PUBLICA`) e não abre nada, nem o que ele
-mesmo gravou; o Nexus abre com a PRIVADA (`NEXUS_CONTESTACAO_CHAVE_PRIVADA`, opcional no `config.py`). A cifra é presa à
+mesmo gravou; o Nexus abre com a PRIVADA (`NEXUS_CONTESTACAO_CHAVE_PRIVADA`, opcional no `config.py`): a que o administrador cola em Base → Chaves das fontes,
+aba Nexus (14/10/2026: cifrada na pasta de dados do servidor, sem a T.I. e sem reiniciar) e, sem ela, a do `.env`
+(`auth.chaves.valor`; regra em `nexus/casca/CLAUDE.md`, "Chaves do Nexus"). A tela sem chave leva a esse lugar. A cifra é presa à
 linha (contexto `thopen_contestacoes/<id>/dados` como dado associado): copiada para outra linha, "não abre". O decifrado
 vive só na memória da tela. Sem a chave, a tela lista as contestações com "cifrado" no lugar do cliente e diz por quê.
 **O par de 13/10/2026** está em `C:\GridcoAuto\entrega-ti\contestacoes-chaves-2026-10-13\` (a privada no

@@ -666,7 +666,7 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   o `voltar` devolve a ela. Levam a linha: o `decidir` sem login (o `codigo` do formulário), o "entre com o seu login do
   Fracttal" da tela (montado no servidor) e o da assinatura do técnico (`assinatura-tecnico?ativo=`, na tela e no
   detalhe da lista do HSEQ). Prova: `test_a_volta_do_login_do_fracttal_traz_a_mesma_linha_da_pt`.
-- **Debaixo do `/nexus`** (porta única, 10/10/2026; no servidor o Nexus mora em `/nexus`, e endereço cru cai na
+- **Debaixo do `/nexus`** (porta única, 10/10/2026; o servidor até a fase 4, hoje na raiz; com o prefixo, endereço cru cai na
   plataforma de Performance): o `volta` do formulário de decidir é o `request.full_path` da tela, SEM o prefixo;
   `assinatura._volta` confere sem ele (`sem_raiz`) e devolve com ele (`na_raiz`). O `next` do login do OS Creator
   (`_login`) vai sem o prefixo (é o caminho que o clone entende) e o endereço do login, com ele. A aprovação de OS chama

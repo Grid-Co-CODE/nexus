@@ -51,7 +51,7 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 
 - **Endereço nunca a partir da raiz** (porta única, 09/10/2026): as fichas, a lista, as Ligações, a Prévia, a
   Qualidade e a Visão saem com `{{ raiz }}`/`url_for`/`|na_raiz`, e os redirecionamentos de `telas.py` e
-  `telas_ligacoes.py`, com `na_raiz` (no servidor o Nexus mora em `/nexus`).
+  `telas_ligacoes.py`, com `na_raiz` (o Nexus pode rodar debaixo de um prefixo: `/nexus` no servidor até a fase 4, hoje na raiz).
   Regra completa em `nexus/casca/CLAUDE.md` (o prefixo `/nexus`); o esquecimento quebra `tests/test_prefixo.py`.
 - **Base · Chaves das fontes** (`chaves-fontes`, 09/10/2026) não é tela do cadastro: é o `/tokens` da Plataforma de
   Performance numa moldura, só para administrador do Nexus (`nexus/performance/CLAUDE.md`, seção "Porta única").

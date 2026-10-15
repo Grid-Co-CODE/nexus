@@ -89,12 +89,15 @@ para `dados/campo/identidades.json` por caminho relativo.
 
 ## 5. Endereço com HTTPS
 
-O Nexus está em **`https://app.gridco.com.br/nexus`**, ao lado da plataforma de Performance (na raiz do mesmo endereço).
+O Nexus está na **raiz de `https://app.gridco.com.br`** desde a fase 4 (seção 5b; conferido de fora em 14/10/2026),
+dividindo os caminhos com a plataforma de Performance; o `/nexus/...` antigo leva ao mesmo caminho na raiz (308).
 O cookie de sessão sai com `Secure`: o Nexus **precisa** de HTTPS na frente. O proxy tem de repassar `X-Forwarded-For`
 (o Caddy repassa por padrão): é por ele que o limite de tentativas de senha conta cada pessoa, e não o servidor inteiro
 como uma só.
 
-### 5a. O prefixo `/nexus` no próprio Nexus (`NEXUS_PREFIXO`, desde 09/10/2026)
+### 5a. O prefixo `/nexus` no próprio Nexus (`NEXUS_PREFIXO`, de 09/10/2026 até a fase 4)
+
+**Hoje sem uso no servidor** (o Nexus está na raiz, seção 5b). Fica aqui porque é a volta da fase 4.
 
 Até 09/10/2026 o Nexus não sabia que mora em `/nexus`: menu, Início, Sair e `fetch` saíam da raiz e caíam na plataforma,
 e quem consertava era uma reescrita das respostas no servidor (fora do repositório). Agora o Nexus põe o prefixo sozinho
@@ -142,7 +145,7 @@ app.gridco.com.br {
 só tirar a `NEXUS_PREFIXO` e mudar o Caddy (seção 5b). Num subdomínio próprio (`nexus.gridco.com.br`,
 `reverse_proxy 127.0.0.1:5070`), também sem ela.
 
-### 5b. Fase 4: o Nexus na raiz de `app.gridco.com.br` (quando o Levi e a T.I. decidirem)
+### 5b. Fase 4: o Nexus na raiz de `app.gridco.com.br` (no ar)
 
 Levi, 09/10/2026: "qnd tudo ficar pronto passar apenas para https://app.gridco.com.br". O Nexus passa a responder na
 raiz e a plataforma de Performance fica onde está: o Caddy divide **por caminho** (os caminhos dos dois foram medidos em
@@ -181,8 +184,8 @@ app.gridco.com.br {
 }
 ```
 
-Não foi validado com o próprio Caddy (o PC de desenvolvimento não tem): rode `caddy validate` antes do `caddy reload` e
-guarde o Caddyfile de antes, que é a volta.
+O Caddyfile em uso mora no servidor e é da T.I. (este trecho é o modelo; o PC de desenvolvimento não tem Caddy). Antes
+de mexer nele: `caddy validate` antes do `caddy reload`, e guarde o Caddyfile em uso, que é a volta.
 
 **Ordem:** (1) no `.env` do Nexus, **sem** `NEXUS_PREFIXO` (tire a linha, se houver) e reinicie; (2) troque o Caddy (a
 reescrita das respostas do Nexus, que existia para o `/nexus`, sai junto); (3) na plataforma, a fase 3 é
@@ -207,12 +210,17 @@ curl -s https://app.gridco.com.br/versao                                  # a pl
 ```
 E no navegador: entrar no Nexus, abrir as telas da Performance (moldura), o OS Creator e o Sair.
 
+**No ar: conferido de fora em 14/10/2026** (só leitura, GET): `/` leva a `/entrar?next=/`, `/nexus/` e
+`/nexus/t/cos/mesa` respondem 308 para a raiz, `/saude` dá o commit do `origin/main`, `/static/notif.js` e
+`/static/nexus.css` dão 200, e `/versao` e `/db_performace/health` seguem na plataforma e no banco. O HTML do Nexus
+já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não está no repositório.
+
 **Voltar:** o Caddyfile de antes, `NEXUS_PREFIXO=/nexus` no `.env` do Nexus e reiniciar (seção 5a); na plataforma, a
 `NEXUS_PORTA_PRINCIPAL` volta a `/nexus/` (ou sai).
 
 ## 6. Conferir depois de subir
 
-1. `https://app.gridco.com.br/nexus/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
+1. `https://app.gridco.com.br/saude` responde `{"ok": true, "commit": "..."}` com o commit do GitHub.
 2. Entrar com o login do Fracttal (e-mail e senha de quem vai usar; desde 06/10/2026). A senha de admin (a
    `NEXUS_SENHA_ADMIN` do `.env`; o Levi tem) segue em "Entrar com a senha de administrador" e é ela que abre o
    Cadastro, além dos e-mails em `NEXUS_ADMINS` (opcional, separados por vírgula) e dos que um administrador der na

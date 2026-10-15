@@ -185,7 +185,7 @@ ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) 
 `ferramentas/carregar_checklist_rondas_sem_os.py` num livro próprio (o `nexus_fatos` é regravado a cada hora). Ronda
 sem OS depois de 06/10 não entra ali.
 
-**Endereços das telas (porta única, 09/10/2026).** No servidor o Nexus mora em `/nexus`: a Governança de dados e
+**Endereços das telas (porta única, 09/10/2026).** O Nexus pode rodar debaixo de um prefixo (`/nexus` no servidor até a fase 4; hoje na raiz, e o prefixo é a volta): a Governança de dados e
 o organograma escrevem os endereços com `{{ raiz }}`/`url_for`/`|na_raiz`, nunca a partir da raiz (cairiam na
 plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento quebra `tests/test_prefixo.py`.
 

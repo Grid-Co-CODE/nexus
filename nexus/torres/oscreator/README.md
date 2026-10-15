@@ -763,8 +763,8 @@ chegado, então o catálogo de ativos não era a espera daquele clique.
 
 ## Debaixo do /nexus (porta única, 09/10/2026)
 
-Levi: "a partir de segunda quero o Nexus como link principal". No servidor o Nexus mora em `app.gridco.com.br/nexus`
-(`NEXUS_PREFIXO=/nexus`, `nexus/casca/CLAUDE.md`), e o clone escreve `/os/...` a partir da raiz em ~220 lugares
+Levi: "a partir de segunda quero o Nexus como link principal". O servidor serviu o Nexus em `app.gridco.com.br/nexus` até a
+fase 4 (hoje na raiz; `NEXUS_PREFIXO=/nexus` é a volta, `nexus/casca/CLAUDE.md`), e o clone escreve `/os/...` a partir da raiz em ~220 lugares
 (templates, `.js` e o JSON das rotas): ao pé da letra, levavam ao `/os/` da PLATAFORMA. O clone continua idêntico ao do
 oem (roda sozinho na raiz, no 5090); quem põe o prefixo é a ponte, na resposta, só quando há prefixo:
 

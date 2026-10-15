@@ -13,7 +13,10 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 | `campo/` | Visão do Nexus sobre o campo, sem Azure nem moldura: Atenção, PT, Rondas e Zeladoria são contas nossas (`nexus/campo/visao.py`); Aprovação e Triagem usam as regras copiadas do App; tudo pelos livros que o App grava no banco (Ordens, Imagens e Ranking saíram em 08/10/2026) | `campo/CLAUDE.md` |
 | `hseq/` | Extintores (09/10/2026): vencido, perto de vencer e sem conferência há mais de 30 dias, por usina e dia, por supervisor de campo e por gestor de contrato, com o relatório em PDF; EPI e EPC: as luvas isolantes pela ronda diária; APR e PT: as Permissões de trabalho (vieram do Campo em 09/10, o código continua lá), com a PT e a APR; as outras telas placeholder | `hseq/CLAUDE.md` (as contas moram em `nexus/hseq/`) |
 | `relatorios/` | a Central de emissão (13/10/2026): os relatórios do setor de quem entrou (todos, para o administrador), cada um uma tela que abre POR DENTRO dela (`Tela.dentro_de`: sem item no menu, acende a Central; quem tem um liberado vê a Central sem marcá-la). Hoje os três da Plataforma de Performance, na moldura: Criador de relatório, Relatório semanal (vieram da Performance) e Potência Ativa dos Inversores, os três DO setor Performance (`Tela.do_setor`: quem é da Performance os vê sem marcar; outro setor, pela marca em Base → Acessos) | docstring de `relatorios/__init__.py`; o mapa em `nexus/performance/CLAUDE.md` (seção "Porta única") Os quatro do PCM (14/10/2026: diário, tarde, fechamento e alerta) são NATIVOS do Nexus, do setor PCM: `nexus/pcm/relatorios` (`telas.registrar`); o Relatório executivo do PCM (Interno Grid, Cliente, Abertura da Semana) é cópia do JS do painel numa moldura, também do setor PCM: `nexus/pcm/relatorio_exec` (`registrar`). O setor dono de cada relatório se escolhe na própria Central, só pelo administrador (14/10/2026, `auth/dono_relatorio.py`). UMA estrutura em toda a Central (14/10/2026, Levi: "Use a mesma estrutura do print 1 para todos os relatórios de todos os setores"): à esquerda os blocos (`BLOCOS`/`lado` em `relatorios/__init__.py`, macro `relatorios/_lado.html`: "Relatórios Padrão PCM", "Relatório Gerencial PCM", "Relatórios Performance"), só com o que a pessoa vê; à direita a folha (PCM) ou a tela da plataforma (`relatorios/moldura.html`, a moldura de `performance/_porta.html` via `registrar_molduras(..., modelo=, extra=)`, sem título do Nexus em cima: o 2º cabeçalho saiu em 13/10/2026). Relatório novo entra num bloco (o teste reprova). |
-| as demais | só placeholder | — |
+| `engenharia/` | Confiabilidade dos ativos (pelas OS de falha do Fracttal) e o Quadro da equipe; Criticidade, FMEA e Laudos ainda placeholder | `engenharia/CLAUDE.md` |
+| `contratos/` | Contestações do cliente (13/10/2026, do Dashboard Thopen, por setor); Clientes, Onboarding, Comunicação e Portal ainda placeholder | `contratos/CLAUDE.md` |
+| `chamados/` | Fabricantes e Garantias são atalhos para telas do OS Creator Web (`ponte.ATALHOS`); Solicitações de clientes ainda placeholder | o docstring da torre e `oscreator/README.md` |
+| as demais (`comando/`) | só placeholder | — |
 
 ## Como funciona
 
@@ -25,7 +28,8 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
   redirecionamento (com `na_raiz`) para a tela que ficou no lugar, para quem tinha o endereço salvo. Caso: Base → Listas
   saiu em 11/10/2026 e o `/t/base/listas` leva à Governança de dados (`nexus/cadastro/CLAUDE.md`).
 - Templates em `nexus/torres/<torre>/templates/<torre>/`.
-- **Endereço nunca a partir da raiz** (09/10/2026): no servidor o Nexus mora em `/nexus` (`NEXUS_PREFIXO`), e um
+- **Endereço nunca a partir da raiz** (09/10/2026): o Nexus pode rodar debaixo de um prefixo (`NEXUS_PREFIXO`: `/nexus` no servidor até a fase 4; hoje na raiz, e o
+  prefixo é a volta), e aí um
   `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")` cru cai na plataforma de Performance. No template,
   `{{ raiz }}/t/...`, `url_for(...)` ou `{{ endereco|na_raiz }}` (o que vem montado do Python); no Python,
   `na_raiz("/t/...")` (`nexus/prefixo.py`); no JavaScript, `nexusRota("/t/...")`. Endereço relativo (`?filtro=...`) não

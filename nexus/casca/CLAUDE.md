@@ -29,8 +29,10 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 
 ## O prefixo `/nexus` e o cookie próprio (porta única, 09/10/2026)
 
-Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo". O servidor serve o Nexus em
-`app.gridco.com.br/nexus`, ao lado da plataforma de Performance na raiz (spec `docs/superpowers/specs/2026-10-09-performance-no-nexus-design.md`,
+Levi: "a partir de segunda quero o Nexus como link principal; o Nexus será o centro de tudo". O servidor serviu o Nexus em
+`app.gridco.com.br/nexus`, ao lado da plataforma de Performance na raiz, até a fase 4: **hoje ele está na raiz de
+`app.gridco.com.br`** (sem `NEXUS_PREFIXO`; o `/nexus/...` antigo devolve 308 para o mesmo caminho na raiz; conferido de
+fora em 14/10/2026, `DEPLOY.md` seção 5b). O prefixo segue no código porque é a volta (spec `docs/superpowers/specs/2026-10-09-performance-no-nexus-design.md`,
 seções 2 e 5.1). Até 09/10 o código não sabia do `/nexus`: o menu, o Início, o Sair e os `fetch` saíam da raiz e caíam
 na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho) se apagava a cada login.
 
@@ -40,7 +42,7 @@ na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho
   Debaixo do prefixo, o Sair e o Entrar apagam também um `nexus_sessao` de `Path=/` que tenha sobrado da janela entre
   publicar o código e pôr a variável (`auth._sem_a_sessao_velha_da_raiz`; revisão de 10/10/2026: ele seguia válido e a
   pessoa saía e continuava logada).
-- **Prefixo:** `NEXUS_PREFIXO` (`.env` ou ambiente; vazio = raiz, o PC e a fase 4, cujo Caddy está pronto no
+- **Prefixo:** `NEXUS_PREFIXO` (`.env` ou ambiente; vazio = raiz: o PC e o servidor desde a fase 4,
   `DEPLOY.md`, seção 5b). O `create_app` põe o middleware
   `Prefixo`: `SCRIPT_NAME` = prefixo, e o prefixo sai do `PATH_INFO` só quando vem (serve com o Caddy cortando o `/nexus`,
   `handle_path`, e sem cortar). O `X-Forwarded-Prefix` do pedido NUNCA é lido (o Caddy repassa o do cliente). Sem a
@@ -53,8 +55,8 @@ na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho
 - **A camada da T.I.:** o servidor tem, FORA do repositório, uma camada que reescreve a resposta (o `Location` e os
   caminhos do Nexus no HTML e no JavaScript ganham `/nexus`, e um calço põe `/nexus` em todo `fetch`). Ela não mexe no
   que já sai com `/nexus`, e o `nexusRota` não dobra o que ela reescreveu: com a variável ligada e a camada ainda ativa,
-  nada sai `/nexus/nexus` (`test_com_a_reescrita_do_servidor_ligada_nada_sai_com_o_prefixo_dobrado`). Depois de ligar a
-  variável a camada vira inútil e a T.I. pode tirá-la (`DEPLOY.md`, seção 5). Local: `ferramentas/porta_local.py
+  nada sai `/nexus/nexus` (`test_com_a_reescrita_do_servidor_ligada_nada_sai_com_o_prefixo_dobrado`). Na fase 4 ela
+  saiu junto (em 14/10/2026 o HTML do servidor já não trazia `/nexus/`). Local: `ferramentas/porta_local.py
   --reescrita-do-servidor` a imita. O `/saude` do servidor já respondeu um commit enquanto os estáticos eram de outro: lá ele
   não prova versão sozinho.
 - **O `nexus_tema` fica em `/`** (o botão grava pelo navegador; nome próprio, não colide).

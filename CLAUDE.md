@@ -42,20 +42,39 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 
 | Área | `.md` |
 |---|---|
-| Casca, login, quem é administrador (Base → Acessos), menu, tema (escuro e claro), servidor local, o prefixo `/nexus` e o cookie `nexus_sessao` | `nexus/casca/CLAUDE.md` |
-| Torres (como criar tela) | `nexus/torres/CLAUDE.md` |
+| Casca, login (Fracttal; a conta Microsoft da Grid, pronta em 14/10/2026 e desligada no servidor até a T.I. pôr as `NEXUS_MS_*`), quem é administrador (Base → Acessos), menu, tema (escuro e claro), servidor local, o endereço (raiz desde a fase 4; o prefixo `/nexus` é a volta), o cookie `nexus_sessao`, as Chaves do Nexus e o Raio-X | `nexus/casca/CLAUDE.md` |
+| Torres (como criar tela; a tabela de cada torre, inclusive Chamados, Pessoas e Comando, que ainda são atalho ou placeholder) | `nexus/torres/CLAUDE.md` |
+| Base (Registro mestre, Integração Fracttal, Equipamentos das usinas, Chaves das fontes; Acessos na casca, Governança nos dados) | `nexus/cadastro/CLAUDE.md` |
+| Relatórios (Central de emissão: os quatro do PCM, o executivo do PCM e os da Performance; o setor de cada relatório) | `nexus/pcm/relatorios/CLAUDE.md`, `nexus/pcm/relatorio_exec/CLAUDE.md` e `nexus/torres/CLAUDE.md` |
+| Contratos e clientes (Contestações do cliente, vindas do Dashboard Thopen) | `nexus/torres/contratos/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |
 | OS Creator embutido | `nexus/torres/oscreator/README.md` |
-| Performance (porta única: as telas da Plataforma de Performance numa moldura, com o passe `NEXUS_SSO_CHAVE`, o mapa das telas e a ponte de 04/10 como reserva do Tempo real; Clima e risco, alertas públicos por usina; Mapa de risco com camadas de calor e modo TV) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
-| PCM (programação semanal: gerar e, desde 09/10/2026, Publicar no App; Quadro da semana com a reprogramação de tarefas; Gestão PCM, o Plano & Fila das manutenções) | `nexus/pcm/CLAUDE.md` e `nexus/pcm/motor/README.md` |
+| Performance (porta única: as telas da Plataforma de Performance numa moldura, com o passe `NEXUS_SSO_CHAVE`, o mapa das telas e a ponte de 04/10 como reserva do Tempo real; Clima e risco, alertas públicos por usina em quatro níveis: Agir agora, Atenção, Acompanhar e Sem alerta; Mapa de risco com camadas de calor e modo TV) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
+| PCM (programação semanal: gerar e, desde 09/10/2026, Publicar no App; Quadro da semana com a reprogramação de tarefas; Gestão PCM, o Plano & Fila das manutenções; Acompanhamento PCM, desde 14/10/2026: MPA, MPS, Radar de Backlog, Mapa e One Page) | `nexus/pcm/CLAUDE.md`, `nexus/pcm/motor/README.md` e `nexus/pcm/acompanhamento/CLAUDE.md` |
 | Engenharia (Confiabilidade dos ativos, pelas OS de falha do Fracttal) | `nexus/torres/engenharia/CLAUDE.md` |
 | Segurança · HSEQ (Extintores: por usina e dia, por supervisor e o relatório em PDF; EPI e EPC: as luvas isolantes pela ronda diária; APR e PT: as Permissões de trabalho que vieram do Campo, com a PT e a APR) | `nexus/torres/hseq/CLAUDE.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |
 | Servidor da T.I. | `DEPLOY.md` |
 
-Desenho da fase atual: `docs/superpowers/specs/2026-09-29-casca-nexus-design.md`.
+Desenho da fase atual: `docs/superpowers/specs/2026-09-29-casca-nexus-design.md`; a porta única da Performance (o Nexus
+como porta, a plataforma como motor): `docs/superpowers/specs/2026-10-09-performance-no-nexus-design.md`.
+
+## Antes de começar: o estado de verdade (14/10/2026)
+
+O trabalho não acontece só nesta pasta. As sessões trabalham em worktrees (`C:/GridcoAuto/wt/*`,
+`C:/GridcoAuto/setores/<setor>/nexus`) e sobem direto à `main`; a pasta aberta pode estar dias atrás. Caso que criou a
+regra: em 14/10/2026 esta pasta estava 26 commits atrás do GitHub, e o Clima de 10 a 13/10 existia só no disco dela.
+- **Antes de dizer o que existe ou o que falta:** `git fetch`, e olhe `git log origin/main` (não o `main` local),
+  `git worktree list` e `git branch --no-merged origin/main` (o que está em andamento noutro ramo).
+- **Trabalho solto na pasta:** compare cada arquivo com o `origin/main` antes de commitar; o que outra sessão já subiu
+  vence o solto, e o solto que não existe em lugar nenhum é o que precisa de commit.
+- **O que está no ar:** `curl -s https://app.gridco.com.br/saude` dá o commit. Produção segue o `origin/main` sozinha: o
+  timer `deploy/nexus-atualizar.timer` roda o `deploy/atualizar.sh` a cada 2 min (busca, confere o boot fora da pasta do
+  serviço, anda e reinicia; `DEPLOY.md`, seção 8). Push na `main` = produção reiniciada em ~2 min.
+- **No Git Bash do Windows o `git` não lê `<(...)`** (substituição de processo): o `git diff --no-index <(...) arquivo`
+  sai vazio, e vazio parece "igual". Compare com `cmp`, arquivo temporário ou Python.
 
 ## Rodar
 
@@ -77,9 +96,9 @@ e a moldura diz "configurada em outra origem" (o caso que motivou: o Levi abriu 
 `python ferramentas/subir_copia_de_prova.py --porta 5170 --plataforma http://127.0.0.1:5150` (sem carga no banco, sem ler
 o Fracttal ao subir; nada sai para SunOp/API PV nem grava fora da máquina; entra-se pela senha de administrador). O que
 depende da MESMA origem do servidor (moldura da plataforma, cookies, `postMessage`) se prova com as duas cópias atrás de
-`python ferramentas/porta_local.py` (o papel do Caddy: Nexus em `/nexus`, plataforma na raiz; `--modo raiz` é a fase 4;
-`--reescrita-do-servidor` imita a camada que o servidor tem hoje, ver `nexus/casca/CLAUDE.md`; para o Nexus se ver
-debaixo do `/nexus` como no servidor, suba a cópia com `--prefixo /nexus`; para a moldura da Performance, com
+`python ferramentas/porta_local.py` (o papel do Caddy: `--modo raiz` é o servidor de hoje, a fase 4; o padrão,
+`--modo prefixo`, com a cópia subida com `--prefixo /nexus`, prova a volta, e `--reescrita-do-servidor` imita a camada
+que o servidor teve até a fase 4, ver `nexus/casca/CLAUDE.md`; para a moldura da Performance, com
 `--plataforma ""` e a mesma `NEXUS_SSO_CHAVE` pelo ambiente nas duas cópias, entrando por um nome `*.localhost` para os
 cookies não se misturarem com os da 5050 e da 5070). A cópia da plataforma é a `plataforma/subir_copia_de_prova.py` do
 PerformancePainel.
@@ -102,7 +121,8 @@ PerformancePainel.
 
 ## Regras
 
-- **Endereço do Nexus nunca a partir da raiz** (09/10/2026): no servidor ele mora em `/nexus` (`NEXUS_PREFIXO`). Template
+- **Endereço do Nexus nunca a partir da raiz** (09/10/2026): ele pode rodar debaixo de um prefixo (`NEXUS_PREFIXO`). No
+  servidor foi `/nexus` até a fase 4; hoje está na raiz de `app.gridco.com.br`, e o prefixo é a volta. Template
   `{{ raiz }}/...`, `url_for` ou `|na_raiz`; Python `na_raiz()`; JavaScript `nexusRota()` (`nexus/casca/CLAUDE.md`).
 - **Origem de dado:** nada de Excel nem OneDrive. Dado vem da API `db_performace` (PostgreSQL da T.I.).
   A API é compartilhada por vários sistemas: nada que identifique pessoa vai para ela em claro
@@ -119,7 +139,7 @@ PerformancePainel.
   anterior a 08/10/2026 ainda tem nomes (não se reescreve).
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.
-- Commit só quando pedido. Quando houver deploy automático, push na `main` vai para produção.
+- Commit só quando pedido. Há deploy automático: push na `main` vai para produção em ~2 min, com restart.
 - **Quem sobe o quê:** os administradores (Levi) commitam direto na `main`. O programador do COS entra por pull
   request, e a conferência `pasta-do-cos` só aprova o que mexe na área dele (`nexus/torres/cos/CLAUDE.md`, "Como
   entregar"). Quem obriga é a regra da `main` no GitHub (ruleset "main: pull request e pasta do COS"); mudar a área é
