@@ -1,8 +1,8 @@
 # Motor da programação semanal (cópia)
 
-Estes três arquivos são uma cópia do motor do PCM, tirada do repositório `fillipefigueiro-source/gridco-pcm-data`
-no commit `3ce6205` (09/10/2026 09:09; antes, `8ee58d9` de 30/09), **com as duas correções de 15/10/2026** (seção
-abaixo), que ainda esperam subir no repositório do PCM:
+Estes três arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
+`fillipefigueiro-source/gridco-pcm-data` no commit `fd39672` (15/10/2026 11:53; antes, `3ce6205` de 09/10 e `8ee58d9`
+de 30/09):
 
 | Arquivo | O que faz |
 |---|---|
@@ -14,8 +14,8 @@ Conferido pelo hash (SHA-256):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `2da686620987…` (no `3ce6205`: `af884da8319c…`) |
-| `fonte_bd_api.py` | `b81d2c394d67…` (no `3ce6205`: `d8fb8806b1e8…`) |
+| `programacao_v7.py` | `2da686620987…` |
+| `fonte_bd_api.py` | `b81d2c394d67…` |
 | `gerar_bd_via_api.py` | `6c580738ab5e…` |
 
 ## Por que uma cópia, e não um motor novo
@@ -24,10 +24,9 @@ O Nexus precisa gerar a **mesma** semana que o PCM gera, para a comparação lin
 substituir. Reescrever o motor tornaria a comparação inútil.
 
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
-sistemas rodarem juntos, as duas cópias precisam ser iguais. A exceção é a de 15/10/2026 (abaixo): o Nexus gera a
-semana desde a W43, e o conserto não podia esperar; a mesma mudança está pronta para o repositório do PCM.
+sistemas rodarem juntos, as duas cópias precisam ser iguais.
 
-## As correções de 15/10/2026 (aqui; no repositório do PCM, ainda não)
+## O que mudou em `fd39672` (15/10/2026)
 
 Levi, 15/10/2026: "as tarefas estão vindo com horas previstas para a mesma quantidade de horas da OS. Por exemplo, a
 OS 15596 de Elias Fausto, a OS toda tem 25 Horas, porém por tarefa está somando 25 horas por tarefa [...] O mesmo está
@@ -49,12 +48,11 @@ zeladoria, não só pelo nome".
 - **Prova** (`ferramentas/gerar_semana_foto.py`, W43, a mesma foto de 14/10 15:06 com o motor antes e depois): o maior
   dia de uma equipe caiu de 24,2 h para 10,3 h; a 14331 de 24 h (4 tarefas na segunda) para 6 h; zeladoria
   terceirizada de 31 para 18 linhas; agenda 1.622 h → 1.598 h. Testes: `tests/test_pcm_motor_regras.py`.
-- **Falta no repositório do PCM**, onde roda o robô (`atualizacao_semanal.py`, a cada 15 min): as duas mudanças acima
-  e duas do robô: OS nova com duração implausível (vazia ou acima de 8 h) usa a fixa da sigla, como a promoção de
-  pendentes já faz; e a mesma tarefa deslocada de novo só atualiza o motivo na `_Pendentes`, sem linha nova (na W42 a
-  15596 chegou a 660 pendentes, 480 do mesmo inversor, 15 mil horas: a linha deslocada fica na aba da equipe e volta a
-  ser deslocada a cada OS nova). Até subir lá, o robô ainda põe a duração da OS em cada tarefa de OS nova. Quando
-  subir, confira: sem o CR do Windows, os três arquivos daqui iguais aos de lá.
+- **No robô do PCM** (`atualizacao_semanal.py`, a cada 15 min, fora desta cópia), no mesmo `fd39672`: OS nova com
+  duração implausível (vazia ou acima de 8 h) usa a fixa da sigla, como a promoção de pendentes já fazia; e a mesma
+  tarefa deslocada de novo só atualiza o motivo na `_Pendentes`, sem linha nova (na W42 a 15596 chegou a 660
+  pendentes, 480 do mesmo inversor, 15 mil horas: a linha deslocada fica na aba da equipe e volta a ser deslocada a
+  cada OS nova). O Nexus subiu a cópia antes (`0032ee9`, 11:49); o repositório do PCM, às 11:54 (a pedido do Levi).
 
 ## Como o Nexus roda (`nexus/pcm/geracao.py`)
 
@@ -72,8 +70,8 @@ zeladoria, não só pelo nome".
   `.env` achado no caminho) e o `FRACTTAL_BASE_URL` aponta para uma porta fechada. O motor lê a foto; se tentar o
   Fracttal, falha.
 - **Saída:** a planilha fica em `saida/sombra.xlsx` e é comparada com a `Programação Semana NN.xlsx` oficial.
-- **Conferido em 09/10/2026:** sem o CR do Windows, os três arquivos são iguais aos do repositório do PCM no commit
-  `3ce6205` (09/10 09:09). O hash da tabela acima é o da cópia com CRLF.
+- **Conferido em 15/10/2026:** sem o CR do Windows, os três arquivos são iguais aos do repositório do PCM no commit
+  `fd39672` (15/10 11:53). O hash da tabela acima é o da cópia com CRLF.
 - **O que mudou em `3ce6205` (09/10/2026):** a W42 do PC do PCM quebrou na quinta (08/10 21:46, `ValueError: cannot
   convert float NaN to integer` no RPN dinâmico): a AUXILIAR atualizada naquele dia tinha 67 usinas sem MWp, e o motor
   guardava o vazio como NaN. O motor passou a ler o porte da coluna `POTÊNCIA CONTRATUAL (MWp)` (vazio e zero não
