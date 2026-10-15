@@ -47,8 +47,9 @@ def test_a_pagina_responde_com_nome_cliente_uf_e_o_nivel_da_usina(mundo_usina):
 
 def test_o_nivel_de_cada_usina_do_mundo(mundo_usina):
     c, _, _, _ = mundo_usina
-    esperado = {"1": ("agir", "Agir agora"), "2": ("atencao", "Atenção"), "3": ("atencao", "Atenção"), "4": ("sem", "Sem alerta"),
-                "6": ("atencao", "Atenção"), "7": ("sem", "Sem alerta")}
+    # 10/10/2026: aviso leve e risco de fogo sem fogo perto são a condição da região (Acompanhar)
+    esperado = {"1": ("agir", "Agir agora"), "2": ("regiao", "Acompanhar"), "3": ("regiao", "Acompanhar"), "4": ("sem", "Sem alerta"),
+                "6": ("regiao", "Acompanhar"), "7": ("sem", "Sem alerta")}
     for id_, (classe, rotulo) in esperado.items():
         assert re.search(rf'<span class="cl-pill cl-pill--{classe}"[^>]*>{rotulo}</span>', usina_pagina(c, id_)), id_
 

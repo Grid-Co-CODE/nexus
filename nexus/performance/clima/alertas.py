@@ -1,6 +1,6 @@
 """As regras de alerta por usina (06/10/2026), no mesmo corte do `gridco_meteo/alertas.py` e do `config.ALERTA` do pacote
 de referência: aviso do INMET cujo polígono contém a usina, foco de queimada a até 5 km, classe do risco de fogo do INPE.
-Os três níveis da usina (Agir agora, Atenção, Sem alerta) são de 07/10/2026.
+Os níveis da usina são de 07/10/2026 (Agir agora, Atenção, Sem alerta); o quarto, Acompanhar, de 10/10/2026.
 
 Funções puras: recebem coordenada e dado já lido, devolvem o que a tela mostra. Quem cruza com o cadastro e ordena por
 gravidade é o `visao.py`.
@@ -29,18 +29,26 @@ CONFIRMA_KM, CONFIRMA_MIN = 1.0, 60     # foco do INPE e foco da NASA a até 1 k
 FRP_MEDIO_MW, FRP_FORTE_MW = 5.0, 20.0  # a força do fogo: fraco < 5 MW <= médio < 20 MW <= forte (medido em 10/10/2026, na seca:
                                         # mediana de 6 MW, 90% abaixo de 25 MW)
 
-# ── os três níveis da usina (07/10/2026, Levi) ───────────────────────────────────────────────────────────────────────
+# ── os níveis da usina (07/10/2026; o quarto em 10/10/2026, Levi) ─────────────────────────────────────────────────────
 # O caso que os criou: em 06/10, no meio da seca, 145 das 154 usinas apareciam "com alerta" (aviso de baixa umidade e risco de
 # fogo alto cobrindo quase o Nordeste e o Centro-Oeste inteiros) e só 3 pediam alguma ação. Quando quase tudo é alerta, a lista
-# não deixa ver o que importa. Por isso a tela separa quem precisa de ação AGORA de quem só merece o olho:
-#   Agir agora  foco de queimada a até 5 km (é um evento, não uma previsão); OU aviso do INMET "Grande Perigo" de qualquer
-#               evento; OU aviso "Perigo" de um evento que estraga usina (EVENTOS_QUE_ESTRAGAM_USINA)
-#   Atenção     qualquer outro aviso do INMET, em vigor ou futuro (Perigo Potencial; Perigo de evento fora da lista, que
-#               nunca some, só não manda agir); OU risco de fogo alto ou crítico em algum dos quatro dias (hoje a D+3); OU
-#               fogo visto pela NASA a até 5 km nas últimas 24 h (10/10/2026)
+# não deixa ver o que importa. Por isso a tela separa quem precisa de ação AGORA de quem só merece o olho.
+# Em 10/10/2026 (Levi, olhando o mapa: "está tudo vermelho ou amarelo, tudo está em risco, quando tudo está em risco nada está em
+# risco") a Atenção ainda pegava 151 das 154: 53 por baixa umidade com risco de fogo, 48 por aviso de tempestade só em Perigo
+# Potencial (o nível mais leve do INMET), 31 só pelo risco de fogo. Era a REGIÃO inteira, não a usina. A Atenção passou a ser o que
+# acontece PERTO da usina (o fogo), e a condição da região virou um nível próprio, calmo (azul): Acompanhar. Com o dado de 10/10:
+# 3 agir, 27 atenção, 124 acompanhar.
+#   Agir agora  foco de queimada a até 5 km na última hora (é um evento, não uma previsão); OU aviso do INMET "Grande Perigo" de
+#               qualquer evento; OU aviso "Perigo" de um evento que estraga usina (EVENTOS_QUE_ESTRAGAM_USINA)
+#   Atenção     fogo visto pela NASA a até 5 km nas últimas 24 h; OU risco de fogo crítico hoje ou amanhã com fogo a até 10 km
+#               (da NASA nas últimas 24 h, ou do INPE na última hora)
+#   Acompanhar  a condição da região: qualquer outro aviso do INMET, em vigor ou futuro (Perigo Potencial de qualquer evento;
+#               Perigo de evento que não estraga usina, como baixa umidade e onda de calor), que nunca some, só não manda agir; OU
+#               risco de fogo alto ou crítico em algum dos quatro dias (hoje a D+3) sem fogo perto
 #   Sem alerta  nada disso, e só quando as fontes foram lidas (a regra do "não dá para dizer" mora no visao.py)
-AGIR, ATENCAO, SEM_ALERTA = "agir", "atencao", "sem"
-ROTULO_NIVEL = {AGIR: "Agir agora", ATENCAO: "Atenção", SEM_ALERTA: "Sem alerta"}
+AGIR, ATENCAO, REGIAO, SEM_ALERTA = "agir", "atencao", "regiao", "sem"
+ROTULO_NIVEL = {AGIR: "Agir agora", ATENCAO: "Atenção", REGIAO: "Acompanhar", SEM_ALERTA: "Sem alerta"}
+FOGO_REGIAO_KM = 10.0      # com risco de fogo crítico hoje ou amanhã, fogo a até 10 km já é atenção
 NIVEL_PERIGO, NIVEL_GRANDE_PERIGO = 2, 3        # os níveis do INMET: Perigo Potencial (1, amarelo), Perigo (2, laranja), Grande Perigo (3, vermelho)
 # Os eventos que estragam usina quando o INMET os põe em "Perigo". Comparados sem acento, sem caixa e sem espaço sobrando
 # (`chave_texto`), e por igualdade com o nome inteiro: evento que não está aqui, mesmo em Perigo, vai para Atenção em vez de
@@ -103,14 +111,23 @@ def aviso_manda_agir(aviso) -> bool:
     return aviso.nivel == NIVEL_PERIGO and evento_estraga_usina(aviso.evento)
 
 
-def nivel_da_usina(avisos, tem_foco: bool, risco_alto: bool, fogo_24h: bool = False) -> str:
-    """"agir", "atencao" ou "sem", pelos alertas que a usina TEM (os avisos já são os que a contêm, em vigor ou futuros). Se uma
-    fonte não foi lida, "sem" não quer dizer "sem alerta": quem monta a tela é quem sabe disso (`visao.montar`)."""
+def nivel_da_usina(avisos, tem_foco: bool, risco_alto: bool, fogo_24h: bool = False, fogo_com_risco: bool = False) -> str:
+    """"agir", "atencao", "regiao" ou "sem", pelos alertas que a usina TEM (os avisos já são os que a contêm, em vigor ou futuros).
+    `fogo_24h`: fogo da NASA a até 5 km nas últimas 24 h; `fogo_com_risco`: risco de fogo crítico hoje ou amanhã com fogo a até
+    10 km. Se uma fonte não foi lida, "sem" não quer dizer "sem alerta": quem monta a tela é quem sabe disso (`visao.montar`)."""
     if tem_foco or any(aviso_manda_agir(a) for a in avisos):
         return AGIR
-    if avisos or risco_alto or fogo_24h:
+    if fogo_24h or fogo_com_risco:
         return ATENCAO
+    if avisos or risco_alto:
+        return REGIAO
     return SEM_ALERTA
+
+
+def critico_hoje_ou_amanha(dias) -> bool:
+    """O risco de fogo é crítico hoje ou amanhã? `dias` são as células do `visao.celula_de_risco`: com o arquivo de ontem do INPE
+    (lido antes das ~06:30) o rótulo do T0 é "Ontem" e o de amanhã é "D+1", e é pelo rótulo que se acha o dia."""
+    return any(c.get("classe") == "crítico" and c.get("rotulo") in ("Hoje", "D+1") for c in dias or [])
 
 
 # ── focos de queimada ────────────────────────────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,39 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
+{# a matriz da Atenção e do Acompanhar (10/10/2026): usina, por quê, avisos, fogo perto e os quatro dias do risco de fogo #}
+{% macro matriz(linhas, regiao=false) %}
+    <div class="cl-matriz">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Usina</th>
+            <th scope="col">Por quê</th>
+            <th scope="col">Avisos do {{ fonte_nome.inmet }}</th>
+            <th scope="col">Fogo perto</th>
+            <th scope="col">Risco de fogo{% if v.dias_amigaveis %} · {{ v.dias_amigaveis|join(" · ") }}{% endif %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in linhas %}
+          <tr class="cl-lin{% if regiao %} cl-lin--regiao{% endif %}">
+            <th scope="row" class="cl-col-usina"><span class="cl-nome"><a class="cl-link" href="{{ url_for('torre_performance.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></span><span class="cl-onde">{{ c.onde }}</span></th>
+            <td class="cl-col-porque">{{ c.por_que }}</td>
+            {# uma pílula por evento, no nível mais alto, com a janela de todos os avisos dele; quando vale cada nível fica no balão
+               (09/10/2026: a mesma "Baixa umidade" em dois níveis eram duas pílulas iguais) #}
+            <td class="cl-col-aviso">{% for e in c.eventos %}<span class="cl-av" title="{{ e.detalhe }}"><span class="cl-pill cl-pill--n{{ e.nivel }}">{{ e.nome }}</span> <span class="cl-quando">{{ e.severidade }}{% if e.niveis|length > 1 %} (e outro nível){% endif %} · {{ e.quando }}</span></span>{% else %}{{ v.aviso_vazio }}{% endfor %}</td>
+            {# o fogo das últimas 24 h da NASA (10/10/2026): na Atenção não há foco da última hora (ele manda agir) #}
+            <td class="cl-col-foco">{% if c.fogo24 %}<span class="cl-fogo24 cl-fogo24--{{ c.fogo24.classe|replace('é', 'e') }}" title="{{ c.fogo24.detalhe }}">{{ c.fogo24.texto }}</span>{% else %}{{ v.foco_vazio }}{% endif %}</td>
+            {# a palavra do risco na célula; o número do INPE (0 a 1) e o dia ficam no balão #}
+            <td class="cl-col-risco">{% if c.dias %}<div class="cl-dias4">{% for d in c.dias %}<span class="cl-c cl-c-{{ d.cor }}" title="{{ d.dia }}: {{ d.valor }}{% if d.classe %} ({{ d.classe }}{% if d.nota %}, entorno de 2 km{% endif %}){% endif %}">{{ d.palavra }}{% if d.nota %}*{% endif %}</span>{% endfor %}</div>{% else %}<span class="cl-semleitura">sem leitura</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {# a nota do entorno, na tabela que tem o valor marcado (a do Acompanhar fica dentro do "Ver as N usinas") #}
+    {% set ns = namespace(entorno=false) %}{% for c in linhas %}{% for d in c.dias or [] %}{% if d.nota %}{% set ns.entorno = true %}{% endif %}{% endfor %}{% endfor %}
+    {% if ns.entorno %}<p class="cl-nota">* maior valor do entorno de 2 km: o {{ fonte_nome.inpe }} não calcula o pixel da usina onde não há vegetação.</p>{% endif %}
+{% endmacro %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
 {# Clima e risco (06/10/2026; leitura rápida em 07/10/2026): avisos do INMET, focos de queimada e risco de fogo do INPE por usina,
@@ -129,37 +163,27 @@
       {% endif %}
     </div>
     {% if v.atencao_linhas %}
-    <div class="cl-matriz">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Usina</th>
-            <th scope="col">Por quê</th>
-            <th scope="col">Avisos do {{ fonte_nome.inmet }}</th>
-            <th scope="col">Fogo a até 5 km</th>
-            <th scope="col">Risco de fogo{% if v.dias_amigaveis %} · {{ v.dias_amigaveis|join(" · ") }}{% endif %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for c in v.atencao_linhas %}
-          <tr class="cl-lin">
-            <th scope="row" class="cl-col-usina"><span class="cl-nome"><a class="cl-link" href="{{ url_for('torre_performance.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></span><span class="cl-onde">{{ c.onde }}</span></th>
-            <td class="cl-col-porque">{{ c.por_que }}</td>
-            {# uma pílula por evento, no nível mais alto, com a janela de todos os avisos dele; quando vale cada nível fica no balão
-               (09/10/2026: a mesma "Baixa umidade" em dois níveis eram duas pílulas iguais) #}
-            <td class="cl-col-aviso">{% for e in c.eventos %}<span class="cl-av" title="{{ e.detalhe }}"><span class="cl-pill cl-pill--n{{ e.nivel }}">{{ e.nome }}</span> <span class="cl-quando">{{ e.severidade }}{% if e.niveis|length > 1 %} (e outro nível){% endif %} · {{ e.quando }}</span></span>{% else %}{{ v.aviso_vazio }}{% endfor %}</td>
-            {# o fogo das últimas 24 h da NASA (10/10/2026): na Atenção não há foco da última hora (ele manda agir) #}
-            <td class="cl-col-foco">{% if c.fogo24 %}<span class="cl-fogo24 cl-fogo24--{{ c.fogo24.classe|replace('é', 'e') }}" title="{{ c.fogo24.detalhe }}">{{ c.fogo24.texto }}</span>{% else %}{{ v.foco_vazio }}{% endif %}</td>
-            {# a palavra do risco na célula; o número do INPE (0 a 1) e o dia ficam no balão #}
-            <td class="cl-col-risco">{% if c.dias %}<div class="cl-dias4">{% for d in c.dias %}<span class="cl-c cl-c-{{ d.cor }}" title="{{ d.dia }}: {{ d.valor }}{% if d.classe %} ({{ d.classe }}{% if d.nota %}, entorno de 2 km{% endif %}){% endif %}">{{ d.palavra }}{% if d.nota %}*{% endif %}</span>{% endfor %}</div>{% else %}<span class="cl-semleitura">sem leitura</span>{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% if v.matriz_tem_entorno %}<p class="cl-nota">* maior valor do entorno de 2 km: o {{ fonte_nome.inpe }} não calcula o pixel da usina onde não há vegetação.</p>{% endif %}
+    {{ matriz(v.atencao_linhas) }}
     {% else %}
     <p class="cl-nota">{{ v.vazio_atencao }}</p>
+    {% endif %}
+  </section>
+
+  {# Acompanhar (10/10/2026, Levi: "quando tudo está em risco nada está em risco"): a condição da região, que não pede nada além da
+     rotina; o resumo do que pesa e a lista inteira recolhida #}
+  <section class="cl-secao cl-secao--regiao" aria-labelledby="cl-regiao">
+    <div class="cl-secao-cab">
+      <h2 class="cl-h2" id="cl-regiao">Acompanhar{% if v.n_regiao %} <span class="cl-h2-sub">· {{ v.n_regiao }} {{ "usina" if v.n_regiao == 1 else "usinas" }}, condição da região: nada perto da usina pede ação</span>{% endif %}</h2>
+    </div>
+    {% if v.regiao %}
+    <p class="cl-regiao-resumo">{% for r in v.regiao_resumo %}<span class="cl-pill cl-pill--regiao">{{ r.nome }} · {{ r.n }}</span> {% endfor %}</p>
+    <p class="cl-nota">O que fazer: nada agora; manter a rotina de roçagem, aceiro e limpeza dos módulos.</p>
+    <details class="cl-mais-eventos cl-regiao-lista">
+      <summary>Ver as {{ v.n_regiao }} usinas</summary>
+      {{ matriz(v.regiao, true) }}
+    </details>
+    {% else %}
+    <p class="cl-nota">{{ v.vazio_regiao }}</p>
     {% endif %}
   </section>
 
@@ -251,7 +275,7 @@
       <li>Focos: {{ fonte_nome.inpe }}, Programa Queimadas, arquivos de 10 em 10 min com a detecção dos satélites. Um foco é um pixel com fogo detectado, não um incêndio confirmado; contam os que estão a até 5 km, nos arquivos da última hora.</li>
       <li>Risco de fogo: {{ fonte_nome.inpe }}, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1; alto a partir de 0,7, crítico acima de 0,95). Onde o INPE não calcula, por não haver vegetação, vale o maior valor do entorno de 2 km, marcado como entorno.</li>
       <li>Fogo das últimas 24 h: {{ fonte_nome.nasa_firms }}, focos dos satélites VIIRS (pixel de 375 m) e MODIS (1 km) das últimas passagens, com a força (FRP, em megawatts) e a confiança de cada um. Conta o que está a até 5 km da usina nas últimas 24 horas; o foco do {{ fonte_nome.inpe }} ganha a confirmação quando a NASA viu o mesmo fogo (a até 1 km e 1 hora). Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA.</li>
-      <li>Níveis: "Agir agora" é foco a até 5 km, aviso vermelho, ou aviso laranja de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo; "Atenção" é qualquer outro aviso em vigor ou futuro, risco de fogo alto ou crítico de hoje a D+3, ou fogo visto pela NASA a até 5 km nas últimas 24 h; "Sem alerta" só se diz com as quatro fontes lidas (sem a NASA, vira "sem alerta nas fontes lidas").</li>
+      <li>Níveis: "Agir agora" é foco a até 5 km na última hora, aviso vermelho, ou aviso laranja de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo; "Atenção" é fogo visto pela NASA a até 5 km nas últimas 24 h, ou a até 10 km com risco de fogo crítico hoje ou amanhã; "Acompanhar" é a condição da região (qualquer outro aviso em vigor ou futuro, ou risco de fogo alto ou crítico de hoje a D+3, sem fogo perto); "Sem alerta" só se diz com as quatro fontes lidas (sem a NASA, vira "sem alerta nas fontes lidas").</li>
     </ul>
   </footer>
 </div>

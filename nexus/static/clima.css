@@ -7,7 +7,9 @@
   --cl-critico-suave:var(--critico-suave);max-width:1280px;margin:0 auto;min-width:0;
   /* o fogo das últimas 24 h da NASA (10/10/2026): um rosa-avermelhado quente, que não se confunde com o laranja dos focos da última
      hora nem com o vermelho do "agir agora" */
-  --cl-nasa:var(--fogo-nasa)}
+  --cl-nasa:var(--fogo-nasa);
+  /* Acompanhar (10/10/2026): a condição da região, num azul de informação, calmo, que não se confunde com o amarelo da Atenção */
+  --cl-regiao:var(--info);--cl-regiao-suave:var(--info-suave)}
 .cl-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 16px}
 .cl-cab-txt{min-width:0}
 .cl-titulo{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}
@@ -21,12 +23,13 @@
 .cl-filtro select{min-width:0;max-width:100%}
 
 /* faixa do topo: quatro números, cada um com o nome do nível na cor dele */
-.cl-faixa{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:20px 0 0;background:var(--linha);
+.cl-faixa{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;margin:20px 0 0;background:var(--linha);
   border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden}
 .cl-cel{background:var(--superficie-2);padding:16px 20px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .cl-rotulo{display:block;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .cl-cel.cl-agir .cl-rotulo{color:var(--cl-critico)}
 .cl-cel.cl-atencao .cl-rotulo{color:var(--cl-atencao)}
+.cl-cel.cl-regiao .cl-rotulo{color:var(--cl-regiao)}
 .cl-cel.cl-sem .cl-rotulo{color:var(--cl-ok)}
 .cl-numero{display:flex;align-items:baseline;gap:8px;min-width:0}
 .cl-valor{font:600 34px/40px var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
@@ -122,6 +125,7 @@
 .cl-voltar a{color:var(--verde-texto)}
 .cl-pill--atencao{color:var(--cl-atencao);background:var(--cl-atencao-suave)}
 .cl-pill--sem{color:var(--cl-ok);background:var(--cl-ok-suave)}
+.cl-pill--regiao{color:var(--cl-regiao);background:var(--cl-regiao-suave)}
 .cl-pill--duvida{color:var(--cl-atencao);background:transparent;border:1px solid var(--alerta)}
 .cl-usina-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .cl-bloco{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:16px;min-width:0;
@@ -223,3 +227,9 @@
 /* o fogo das últimas 24 h da NASA na célula "Fogo a até 5 km" da Atenção (10/10/2026): a força na espessura do sublinhado */
 .cl-fogo24{white-space:nowrap;border-bottom:2px solid var(--cl-nasa);cursor:help}
 .cl-fogo24--forte{border-bottom-width:3px;font-weight:600}
+/* Acompanhar (10/10/2026): cinco números na faixa (quebra em três e depois em um), o resumo do que pesa na região e a borda do nível
+   no "Entenda os alertas" */
+@media (max-width:1100px){.cl-faixa{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.cl-faixa{grid-template-columns:minmax(0,1fr)}}
+.cl-regiao-resumo{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+.cl-entenda--regiao{border-color:var(--info-a42)}

@@ -164,8 +164,8 @@ def test_cada_usina_e_um_link_para_a_pagina_dela_com_o_nivel_na_classe(mundo):
     for nome, id_ in (("Usina Alfa", "1"), ("Usina Teta", "6")):
         assert usinas[nome].startswith(f'<a href="/t/performance/clima/usina/{id_}">')
     classe = {n: re.search(r'class="mp-ponto (mp-n-\w+)"', a).group(1) for n, a in usinas.items()}
-    assert classe == {"Usina Alfa": "mp-n-agir", "Usina Delta": "mp-n-agir", "Usina Beta": "mp-n-atencao", "Usina Gama": "mp-n-atencao",
-                      "Usina Epsilon": "mp-n-atencao", "Usina Teta": "mp-n-sem"}
+    assert classe == {"Usina Alfa": "mp-n-agir", "Usina Delta": "mp-n-agir", "Usina Beta": "mp-n-regiao", "Usina Gama": "mp-n-regiao",
+                      "Usina Epsilon": "mp-n-regiao", "Usina Teta": "mp-n-sem"}        # a condição da região: Acompanhar (10/10/2026)
 
 
 def test_o_titulo_da_usina_diz_nome_cliente_nivel_e_motivo(mundo):
@@ -265,7 +265,7 @@ def test_uma_usina_so_fora_do_recorte_diz_no_singular(tmp_path, monkeypatch, lei
 
 def test_a_legenda_conta_os_tres_niveis_e_diz_o_que_cada_um_quer_dizer(mundo):
     t = texto(pagina(mundo))
-    assert re.search(r"Agir agora 2\b", t) and re.search(r"Atenção 3\b", t) and re.search(r"Sem alerta 1\b", t)
+    assert re.search(r"Agir agora 2\b", t) and re.search(r"Atenção 0\b", t) and re.search(r"Acompanhar 3\b", t) and re.search(r"Sem alerta 1\b", t)
     assert "foco a até 5 km" in t and "Grande Perigo" in t
     for evento in A.EVENTOS_QUE_ESTRAGAM_USINA:                                             # a lista é a da regra, não uma cópia
         assert evento in t
@@ -284,7 +284,7 @@ def test_a_legenda_explica_as_camadas_com_o_que_ha_no_recorte(mundo):
 
 def test_a_legenda_do_recorte_conta_so_o_que_esta_nele(mundo):
     t = texto(pagina(mundo, regiao="nordeste"))
-    assert re.search(r"Agir agora 1\b", t) and re.search(r"Atenção 1\b", t) and re.search(r"Sem alerta 0\b", t)
+    assert re.search(r"Agir agora 1\b", t) and re.search(r"Atenção 0\b", t) and re.search(r"Acompanhar 1\b", t) and re.search(r"Sem alerta 0\b", t)
     assert "2 em vigor e 0 a começar neste recorte" in t and "1 foco na última hora neste recorte, 0 a até 5 km de uma usina" in t
 
 
@@ -637,8 +637,9 @@ def test_cadeia_real_o_json_o_csv_e_o_cog_viram_camadas_e_niveis(cadeia):
     html = pagina(c)
     s = svg(html)
     classe = {n: re.search(r'class="mp-ponto (mp-n-\w+)"', a).group(1) for n, a in usinas_do_svg(html).items()}
-    # A: Grande Perigo de Vendaval em cima e foco a 1,2 km (agir); B: nada (sem alerta); C: risco de fogo alto hoje (atenção)
-    assert classe == {"Usina A": "mp-n-agir", "Usina B": "mp-n-sem", "Usina C": "mp-n-atencao"}
+    # A: Grande Perigo de Vendaval em cima e foco a 1,2 km (agir); B: nada (sem alerta); C: risco de fogo alto hoje, sem fogo perto
+    # (acompanhar, desde 10/10/2026)
+    assert classe == {"Usina A": "mp-n-agir", "Usina B": "mp-n-sem", "Usina C": "mp-n-regiao"}
     assert s.count('class="mp-av mp-av-3"') == 1 and s.count("<circle class=\"mp-anel\"") == 1
     assert re.search(r'class="mp-focos" d="([^"]*)"', s).group(1).count("M") == 2
     t = texto(html)
@@ -686,17 +687,17 @@ def test_a_tabela_traz_cada_usina_com_o_risco_e_o_motivo_curto_e_quem_pede_acao_
     tab = trecho(html, 'class="mp-tabela"', "</table>")
     linhas = re.findall(r'<tr class="mp-tab-lin mp-tab--(\w+)">\s*<th scope="row"><a class="cl-link" href="([^"]+)">([^<]+)</a>'
                         r'.*?<td class="mp-tab-motivo">([^<]*)</td>', tab, flags=re.S)
-    # quem pede ação primeiro, depois a atenção, e a usina sem alerta por último (a ordem escrita aqui, não a da constante)
-    assert [n for n, *_ in linhas] == ["agir", "agir", "atencao", "atencao", "atencao", "sem"]
+    # quem pede ação primeiro, depois a atenção, o acompanhar, e a usina sem alerta por último (a ordem escrita aqui, não a da constante)
+    assert [n for n, *_ in linhas] == ["agir", "agir", "regiao", "regiao", "regiao", "sem"]
     assert len(linhas) == len(usinas_do_svg(html)) == 6                            # uma linha por usina desenhada no recorte
     por = {nome: (nivel, href, motivo) for nivel, href, nome, motivo in linhas}
     assert por["Usina Alfa"] == ("agir", "/t/performance/clima/usina/1", "Vendaval (Grande Perigo)")
     assert por["Usina Delta"][0] == "agir" and por["Usina Delta"][2] == "Fogo a 1,0 km"
-    assert por["Usina Beta"][0] == "atencao" and por["Usina Beta"][2] == "Baixa umidade (Perigo)"
+    assert por["Usina Beta"][0] == "regiao" and por["Usina Beta"][2] == "Baixa umidade (Perigo)"
     assert por["Usina Gama"][2] == "Onda de calor (Perigo Potencial, a partir de 08/10 15:00)"
     assert por["Usina Epsilon"][2] == "Risco de fogo alto hoje"
     assert por["Usina Teta"] == ("sem", "/t/performance/clima/usina/6", "Nada previsto")
-    assert ">Agir agora<" in tab and ">Atenção<" in tab and ">Sem alerta<" in tab        # o risco vai na palavra, não só na cor
+    assert ">Agir agora<" in tab and ">Acompanhar<" in tab and ">Sem alerta<" in tab     # o risco vai na palavra, não só na cor
 
 
 def test_a_tabela_segue_o_recorte_da_regiao(mundo):
@@ -706,7 +707,7 @@ def test_a_tabela_segue_o_recorte_da_regiao(mundo):
 
 
 def test_sem_leitura_completa_a_tabela_nao_diz_nada_previsto(mundo, leituras):
-    leituras(avisos=None, focos=lei_focos(), risco=lei_risco(risco_baixo()))         # avisos do INMET fora
+    leituras(avisos=None, focos=lei_focos(), risco=lei_risco(risco_baixo()))         # avisos do Instituto Nacional de Meteorologia (INMET) fora
     tab = trecho(pagina(mundo), 'class="mp-tabela"', "</table>")
     assert "Nada previsto" not in tab and "mp-tab--nx" in tab
     assert "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in tab

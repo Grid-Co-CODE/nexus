@@ -144,9 +144,9 @@ def lei_grade(valor, caixa=(-46.0, -24.0, -36.0, -4.0), passo=0.08, modificado=N
                      vence_em=vence_em, **kw)
 
 
-def tudo_instalado(leituras, avisos=None, focos=None, risco=None):
-    """O mundo completo: as três fontes lidas. O que não vem é "nada a avisar" (e não "fonte fora")."""
-    return leituras(avisos=avisos or lei_avisos(), focos=focos or lei_focos(), risco=risco or lei_risco(risco_baixo()))
+def tudo_instalado(leituras, avisos=None, focos=None, risco=None, firms=None):
+    """O mundo completo: as fontes lidas. O que não vem é "nada a avisar" (e não "fonte fora")."""
+    return leituras(avisos=avisos or lei_avisos(), focos=focos or lei_focos(), risco=risco or lei_risco(risco_baixo()), firms=firms)
 
 
 def por_nome(m):
@@ -159,7 +159,7 @@ def montar(**kw):
     return M.montar({}, **kw)
 
 
-def mundo_completo(leituras):
+def mundo_completo(leituras, firms=None):
     """O mundo de todos os testes de camada: Alfa em Grande Perigo e Beta em Perigo (Baixa Umidade) no Nordeste, Gama com um aviso
     que ainda vai começar, dois focos a menos de 5 km da Delta e dois longe de tudo, e risco de fogo alto hoje na Epsilon."""
     return tudo_instalado(
@@ -169,7 +169,7 @@ def mundo_completo(leituras):
                                 quando="futuro")),
         focos=lei_focos(foco_a(1.0, DELTA), foco_a(3.0, DELTA, "NOAA-21", dlon_km=1.0), foco_em(-3.0, -61.0),
                         foco_em(-9.0, -40.0)),
-        risco=lei_risco({**risco_baixo(), "5": dias(0.8, 0.1, 0.1, 0.1)}))
+        risco=lei_risco({**risco_baixo(), "5": dias(0.8, 0.1, 0.1, 0.1)}), firms=firms)
 
 
 def quebrar_contorno(monkeypatch, erro=None):

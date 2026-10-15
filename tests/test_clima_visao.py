@@ -81,7 +81,18 @@ def leituras(monkeypatch):
 
 
 def nomes(v):
-    return [c["nome"] for c in v["alertas"]]
+    """Os nomes na ordem da tela: agir, atenção e depois o Acompanhar (o quarto nível, 10/10/2026)."""
+    return [c["nome"] for c in v["alertas"] + v["regiao"]]
+
+
+def linhas(v):
+    """Todas as usinas com algo: os alertas (agir e atenção) e o Acompanhar."""
+    return v["alertas"] + v["regiao"]
+
+
+def fogo_nasa(lat, lon, horas=6.0, frp=8.0, confianca="nominal"):
+    """Um foco da NASA (FIRMS) no ponto, de `horas` antes de REF."""
+    return FocoNasa(lat, lon, "NOAA-20", (REF - timedelta(hours=horas)).astimezone(UTC), "VIIRS", confianca, frp, True)
 
 
 def faixa(v):
@@ -101,7 +112,7 @@ def so_a_usina(leituras, *, avisos=(), foco_km=None, risco=(0.1, 0.1, 0.1, 0.1))
 
 
 def nivel(v):
-    return (v["alertas"] or [{"nivel": "sem"}])[0]["nivel"]
+    return (v["alertas"] or v["regiao"] or [{"nivel": "sem"}])[0]["nivel"]
 
 
 def em_volta(lat, lon, meia=0.05):
@@ -109,7 +120,7 @@ def em_volta(lat, lon, meia=0.05):
                                                 [lon - meia, lat + meia], [lon - meia, lat - meia]]]}
 
 
-# ── os três níveis (07/10/2026): cada regra, uma de cada vez ─────────────────────────────────────────────────────────
+# ── os níveis (07/10/2026; o Acompanhar em 10/10/2026): cada regra, uma de cada vez ──────────────────────────────────
 
 def test_foco_a_ate_5_km_manda_agir_e_a_5_1_km_nao(leituras):
     v = so_a_usina(leituras, foco_km=4.9)
@@ -129,14 +140,15 @@ def test_perigo_de_evento_que_estraga_usina_manda_agir(leituras, evento):
 
 
 @pytest.mark.parametrize("evento", ["Onda de Calor", "Baixa Umidade", "Geada", "Evento Novo do INMET"])
-def test_perigo_de_evento_desconhecido_vai_para_atencao_e_nao_some(leituras, evento):
+def test_perigo_de_evento_que_nao_estraga_usina_vai_para_acompanhar_e_nao_some(leituras, evento):
     v = so_a_usina(leituras, avisos=[aviso(2, evento=evento)])
-    assert nivel(v) == "atencao" and v["alertas"][0]["avisos"][0]["evento"] == evento
+    assert nivel(v) == "regiao" and v["regiao"][0]["avisos"][0]["evento"] == evento
 
 
 @pytest.mark.parametrize("evento", ["Tempestade", "Vendaval", "Baixa Umidade"])
-def test_perigo_potencial_e_atencao_ate_de_tempestade(leituras, evento):
-    assert nivel(so_a_usina(leituras, avisos=[aviso(1, evento=evento)])) == "atencao"
+def test_perigo_potencial_e_acompanhar_ate_de_tempestade(leituras, evento):
+    # 10/10/2026: o Perigo Potencial cobre regiões inteiras (48 das 154 usinas num dia de tempestade possível): é a condição da região
+    assert nivel(so_a_usina(leituras, avisos=[aviso(1, evento=evento)])) == "regiao"
 
 
 def test_aviso_que_ainda_vai_comecar_conta_e_diz_quando_comeca(leituras):
@@ -145,7 +157,7 @@ def test_aviso_que_ainda_vai_comecar_conta_e_diz_quando_comeca(leituras):
     assert nivel(v) == "agir"
     assert v["alertas"][0]["motivos"][0]["prova"] == "Quando: a partir de 07/10 15:00, até 08/10 00:00"
     potencial = aviso(1, evento="Tempestade", inicio=REF + timedelta(hours=30), fim=REF + timedelta(hours=40))
-    assert nivel(so_a_usina(leituras, avisos=[potencial])) == "atencao"
+    assert nivel(so_a_usina(leituras, avisos=[potencial])) == "regiao"
 
 
 def test_aviso_vencido_nao_conta(leituras):
@@ -154,8 +166,8 @@ def test_aviso_vencido_nao_conta(leituras):
 
 
 @pytest.mark.parametrize("risco", [(0.8, 0.1, 0.1, 0.1), (0.1, 0.1, 0.1, 0.71), (0.1, 0.99, 0.1, 0.1)])
-def test_risco_alto_ou_critico_em_qualquer_dos_quatro_dias_e_atencao(leituras, risco):
-    assert nivel(so_a_usina(leituras, risco=risco)) == "atencao"
+def test_risco_alto_ou_critico_sem_fogo_perto_e_acompanhar(leituras, risco):
+    assert nivel(so_a_usina(leituras, risco=risco)) == "regiao"
 
 
 def test_risco_medio_nao_e_alerta(leituras):
@@ -192,13 +204,14 @@ def test_faltou_qualquer_fonte_o_sem_alerta_vira_traco(leituras, faltando):
 # ── ordem: o nível primeiro, e DENTRO de cada nível a gravidade que já existia ────────────────────────────────────────
 
 def test_agir_agora_vem_antes_de_atencao_mesmo_com_risco_critico_do_outro_lado(leituras):
-    # "A" só tem risco crítico (gravidade 3) e é atenção; "Z" tem Perigo de tempestade (gravidade 2) e é agir agora: Z primeiro
+    # "A" só tem risco crítico (gravidade 3) e é acompanhar; "Z" tem Perigo de tempestade (gravidade 2) e é agir agora: Z primeiro
     cad = cadastro(usina("1", "A Risco critico", -5.0, -45.0), usina("2", "Z Tempestade", -5.0, -50.0))
     tudo_lido(leituras, [aviso(2, evento="Tempestade", geo=em_volta(-5.0, -50.0))],
               risco=lei_risco({"1": dias(0.99, 0.99, 0.99, 0.99), "2": dias(0.1, 0.1, 0.1, 0.1)}))
     v = V.montar({}, cadastro=cad, ref=REF)
     assert nomes(v) == ["Z Tempestade", "A Risco critico"]
-    assert [c["nome"] for c in v["agir"]] == ["Z Tempestade"] and [c["nome"] for c in v["atencao"]] == ["A Risco critico"]
+    assert [c["nome"] for c in v["agir"]] == ["Z Tempestade"] and [c["nome"] for c in v["regiao"]] == ["A Risco critico"]
+    assert v["atencao"] == []
 
 
 def test_dentro_do_nivel_o_pior_alerta_de_cada_usina_vem_primeiro(leituras):
@@ -206,7 +219,7 @@ def test_dentro_do_nivel_o_pior_alerta_de_cada_usina_vem_primeiro(leituras):
     leituras(avisos=lei_avisos(aviso(1, geo={"type": "Polygon", "coordinates": [[[-46, -5.05], [-44, -5.05], [-44, -4.9], [-46, -4.9], [-46, -5.05]]]})),
              focos=lei_focos(), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1), "2": dias(0.8, 0.1, 0.1, 0.1), "3": dias(0.99, 0.1, 0.1, 0.1)}))
     v = V.montar({}, cadastro=cad, ref=REF)
-    assert [c["nivel"] for c in v["alertas"]] == ["atencao"] * 3 and nomes(v) == ["C Critico", "B Alto", "A Potencial"]
+    assert [c["nivel"] for c in v["regiao"]] == ["regiao"] * 3 and nomes(v) == ["C Critico", "B Alto", "A Potencial"]
 
 
 # Os desempates abaixo se provam um de cada vez: em cada cenário só UMA chave da ordem decide, e os nomes estão em ordem
@@ -231,13 +244,13 @@ def test_desempate_mais_tipos_de_alerta_primeiro(leituras):
 
 
 def test_desempate_o_aviso_mais_grave_primeiro(leituras):
-    # as duas são atenção (aviso fora da lista de eventos que estragam usina), gravidade 3 (risco crítico) e 2 tipos de alerta
+    # as duas são acompanhar (aviso fora da lista de eventos que estragam usina), gravidade 3 (risco crítico) e 2 tipos de alerta
     cad = cadastro(usina("1", "A Potencial", -5.0, -45.0), usina("2", "Z Perigo", -5.0, -50.0))
     leituras(avisos=lei_avisos(aviso(1, evento="Onda de Calor", geo=em_volta(-5.0, -45.0)),
                                aviso(2, evento="Onda de Calor", geo=em_volta(-5.0, -50.0))), focos=lei_focos(),
              risco=lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1), "2": dias(0.99, 0.1, 0.1, 0.1)}))
     v = V.montar({}, cadastro=cad, ref=REF)
-    assert [c["nivel"] for c in v["alertas"]] == ["atencao", "atencao"]
+    assert [c["nivel"] for c in v["regiao"]] == ["regiao", "regiao"]
     assert nomes(v) == ["Z Perigo", "A Potencial"]
 
 
@@ -253,28 +266,31 @@ def test_ultimo_desempate_e_o_nome_sem_acento_nem_caixa(leituras):
     assert nomes(V.montar({}, cadastro=cad, ref=REF)) == ["Árvore", "Mata", "zebra"]
 
 
-# ── a faixa do topo: Agir agora, Atenção, Sem alerta, Cobertura ──────────────────────────────────────────────────────
+# ── a faixa do topo: Agir agora, Atenção, Acompanhar, Sem alerta, Cobertura ──────────────────────────────────────────
 
 def test_faixa_conta_os_niveis_e_a_cobertura_e_a_soma_fecha(leituras):
-    cad = cadastro(usina("1", "A Agir", -5.0, -45.0), usina("2", "B Atencao", -5.0, -50.0), usina("3", "C Sem", -5.0, -55.0),
-                   usina("4", "D Sem", -5.0, -56.0), sem=[usina("5", "E Sem coordenada", None, None)])
-    tudo_lido(leituras, [aviso(3, geo=em_volta(-5.0, -45.0))],
-              risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1), "2": dias(0.9, 0.1, 0.1, 0.1), "3": dias(0.1, 0.1, 0.1, 0.1),
-                               "4": dias(0.1, 0.1, 0.1, 0.1)}))
+    cad = cadastro(usina("1", "A Agir", -5.0, -45.0), usina("2", "B Acompanhar", -5.0, -50.0), usina("3", "C Sem", -5.0, -55.0),
+                   usina("4", "D Sem", -5.0, -56.0), usina("6", "F Atencao", -5.0, -58.0),
+                   sem=[usina("5", "E Sem coordenada", None, None)])
+    leituras(avisos=lei_avisos(aviso(3, geo=em_volta(-5.0, -45.0))), focos=lei_focos(),
+             risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1), "2": dias(0.9, 0.1, 0.1, 0.1), "3": dias(0.1, 0.1, 0.1, 0.1),
+                              "4": dias(0.1, 0.1, 0.1, 0.1), "6": dias(0.1, 0.1, 0.1, 0.1)}),
+             firms=lei_firms(fogo_nasa(-5.0 + 3.0 / 111.195, -58.0)))                     # fogo da NASA a 3 km da F
     v = V.montar({}, cadastro=cad, ref=REF)
     f = faixa(v)
-    assert [x["id"] for x in v["faixa"]] == ["agir", "atencao", "sem", "cobertura"]
-    assert [x["rotulo"] for x in v["faixa"]] == ["Agir agora", "Atenção", "Sem alerta", "Cobertura"]
-    assert [f[i]["valor"] for i in ("agir", "atencao", "sem", "cobertura")] == ["1", "1", "2", "4"]
-    assert int(f["agir"]["valor"]) + int(f["atencao"]["valor"]) + int(f["sem"]["valor"]) == v["n_usinas"] == 4
+    assert [x["id"] for x in v["faixa"]] == ["agir", "atencao", "regiao", "sem", "cobertura"]
+    assert [x["rotulo"] for x in v["faixa"]] == ["Agir agora", "Atenção", "Acompanhar", "Sem alerta", "Cobertura"]
+    assert [f[i]["valor"] for i in ("agir", "atencao", "regiao", "sem", "cobertura")] == ["1", "1", "1", "2", "5"]
+    assert sum(int(f[i]["valor"]) for i in ("agir", "atencao", "regiao", "sem")) == v["n_usinas"] == 5
     assert f["cobertura"]["sub"] == "em operação com coordenada · 1 sem coordenada"
     assert f["agir"]["sub"] == "fogo a até 5 km ou aviso forte (tempestade, chuva forte, vento, granizo) do Instituto Nacional de Meteorologia (INMET)"
-    assert f["atencao"]["sub"] == ("outro aviso do Instituto Nacional de Meteorologia (INMET), risco de fogo alto nos próximos 4 dias ou "
-                                   "fogo a até 5 km nas últimas 24 h: acompanhar")
+    assert f["atencao"]["sub"] == "fogo a até 5 km nas últimas 24 h, ou a até 10 km com risco de fogo crítico: conferir na próxima ronda"
+    assert f["regiao"]["sub"] == ("condição da região: tempo seco, calor, risco de fogo ou aviso leve do Instituto Nacional de "
+                                  "Meteorologia (INMET); só a rotina")
     # "O que fazer" (09/10/2026) em cada nível que tem usina; a cobertura não tem
-    assert f["agir"]["fazer"].startswith("Avisar o supervisor") and f["atencao"]["fazer"].startswith("Acompanhar")
-    assert f["sem"]["fazer"] == "Nada." and f["cobertura"]["fazer"] == ""
-    assert (v["sem_alerta"], len(v["agir"]), len(v["atencao"])) == (2, 1, 1)
+    assert f["agir"]["fazer"].startswith("Avisar o supervisor") and f["atencao"]["fazer"].startswith("Na próxima ronda")
+    assert f["regiao"]["fazer"].startswith("Nada a fazer agora") and f["sem"]["fazer"] == "Nada." and f["cobertura"]["fazer"] == ""
+    assert (v["sem_alerta"], len(v["agir"]), len(v["atencao"]), v["n_regiao"]) == (2, 1, 1, 1)
 
 
 def test_faixa_cobertura_diz_quantas_estao_sem_dado_de_risco(leituras):
@@ -301,8 +317,9 @@ def test_fonte_sem_leitura_mostra_traco_e_as_outras_seguem(leituras):
     v = V.montar({}, cadastro=cad, ref=REF)
     f = faixa(v)
     assert (f["agir"]["valor"], f["agir"]["unidade"]) == ("—", "")             # o agir depende dos avisos e dos focos: nenhum lido
-    assert f["atencao"]["valor"] == "1"                                         # o risco foi lido, e o número vale
-    assert f["atencao"]["qual"] == ["sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)"]
+    assert f["regiao"]["valor"] == "1"                                          # o risco foi lido, e o número vale
+    assert f["regiao"]["qual"] == ["sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)"]
+    assert f["atencao"]["valor"] == "0" and f["atencao"]["qual"] == ["sem leitura de focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE)"]
     assert f["sem"]["valor"] == "—"
     assert [x["estado"] for x in v["fontes"]] == ["fora", "fora", "ok", "ok"]
     assert nomes(v) == ["U"]
@@ -317,15 +334,16 @@ def test_o_agir_so_vira_traco_quando_nem_os_avisos_nem_os_focos_foram_lidos(leit
     assert f["agir"]["valor"] == "0" and f["agir"]["qual"] == ["sem leitura de focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE)"] and "cl-na" in f["agir"]["classe"]
 
 
-def test_o_atencao_so_vira_traco_quando_nem_os_avisos_nem_o_risco_nem_a_nasa_foram_lidos(leituras):
-    leituras(focos=lei_focos(), firms=L.Leitura(None, None, erro="HTTP 503"))
+def test_o_atencao_so_vira_traco_quando_nem_os_focos_nem_o_risco_nem_a_nasa_foram_lidos(leituras):
+    # a Atenção (10/10/2026) é o fogo perto: vive dos focos do INPE, do risco de fogo e da NASA, e não dos avisos
+    leituras(avisos=lei_avisos(), firms=L.Leitura(None, None, erro="HTTP 503"))
     f = faixa(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))
     assert f["atencao"]["valor"] == "—" and f["agir"]["valor"] == "0"
-    # com a NASA lida o número vale (fogo das últimas 24 h é atenção), em âmbar e dizendo o que não foi lido (10/10/2026)
-    leituras(focos=lei_focos())
+    # com a NASA lida o número vale (fogo das últimas 24 h é atenção), em âmbar e dizendo o que não foi lido
+    leituras(avisos=lei_avisos())
     f = faixa(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))
     assert f["atencao"]["valor"] == "0" and "cl-na" in f["atencao"]["classe"]
-    assert f["atencao"]["qual"] == ["sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)",
+    assert f["atencao"]["qual"] == ["sem leitura de focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE)",
                                     "sem leitura de risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)"]
 
 
@@ -358,7 +376,8 @@ def test_fonte_lendo_diz_lendo(leituras):
 def test_fonte_lendo_diz_lendo_na_faixa_e_nao_sem_leitura(leituras):
     leituras(avisos=L.Leitura(None, None, erro=L.LENDO), focos=lei_focos(), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}))
     f = faixa(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))
-    assert f["agir"]["qual"] == ["lendo avisos do Instituto Nacional de Meteorologia (INMET)"] and f["atencao"]["qual"] == ["lendo avisos do Instituto Nacional de Meteorologia (INMET)"]
+    assert f["agir"]["qual"] == ["lendo avisos do Instituto Nacional de Meteorologia (INMET)"] and f["atencao"]["qual"] == []
+    assert f["regiao"]["qual"] == ["lendo avisos do Instituto Nacional de Meteorologia (INMET)"]
     assert f["sem"]["valor"] == "—" and f["sem"]["qual"] == ["lendo avisos do Instituto Nacional de Meteorologia (INMET)"]
 
 
@@ -598,9 +617,11 @@ def tiles(v):
 
 def test_a_grade_conta_usinas_com_alerta_por_estado_e_pega_a_cor_do_pior(leituras):
     usinas = usinas_em_ufs(("PA", "A"), ("PA", "B"), ("BA", "C"), ("BA", "D"), ("SP", "E"))      # lat -4,20 -4,25 -4,30 -4,35 -4,40
-    avisos = [aviso(2, evento="Vendaval", geo=em_volta(-4.2, -45.0, 0.03)),            # só a usina A (agir)
-              aviso(1, evento="Baixa Umidade", geo=em_volta(-4.30, -45.0, 0.08))]       # B, C e D (atenção); a E fica de fora
-    tudo_lido(leituras, avisos, risco=lei_risco({str(i): dias(0.1, 0.1, 0.1, 0.1) for i in range(1, 6)}))
+    avisos = [aviso(2, evento="Vendaval", geo=em_volta(-4.2, -45.0, 0.03))]            # só a usina A (agir)
+    # B, C e D em atenção pelo fogo da NASA a 1 km a leste de cada uma (o Acompanhar, a condição da região, não entra na grade)
+    fogos = [fogo_nasa(lat, -45.0 + 1.0 / 111.195) for lat in (-4.25, -4.30, -4.35)]
+    leituras(avisos=lei_avisos(*avisos), focos=lei_focos(), risco=lei_risco({str(i): dias(0.1, 0.1, 0.1, 0.1) for i in range(1, 6)}),
+             firms=lei_firms(*fogos))
     v = V.montar({}, cadastro=cadastro(*usinas), ref=REF)
     t = tiles(v)
     assert (t["PA"]["n"], t["PA"]["nivel"], t["PA"]["texto"]) == (2, "agir", "2")      # A agir, B atenção: o pior colore
@@ -623,14 +644,14 @@ def test_a_grade_no_singular_e_na_ordem_de_leitura(leituras):
 
 def test_uf_escrita_em_minuscula_ou_com_espaco_vale(leituras):
     usinas = [usina("1", "A", -4.2, -45.0, uf=" pa "), usina("2", "B", -4.3, -45.0, uf="Ba")]
-    tudo_lido(leituras, [aviso(1, geo=GRANDE)], risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1), "2": dias(0.1, 0.1, 0.1, 0.1)}))
+    tudo_lido(leituras, [aviso(3, geo=GRANDE)], risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1), "2": dias(0.1, 0.1, 0.1, 0.1)}))
     t = tiles(V.montar({}, cadastro=cadastro(*usinas), ref=REF))
     assert t["PA"]["n"] == 1 and t["BA"]["n"] == 1
 
 
 def test_usina_com_alerta_e_uf_invalida_nao_some_a_grade_diz_quantas(leituras):
     usinas = [usina("1", "A", -4.2, -45.0, uf=""), usina("2", "B", -4.3, -45.0, uf="Piauí"), usina("3", "C", -4.4, -45.0, uf="PI")]
-    tudo_lido(leituras, [aviso(1, geo=GRANDE)], risco=lei_risco({str(i): dias(0.1, 0.1, 0.1, 0.1) for i in (1, 2, 3)}))
+    tudo_lido(leituras, [aviso(3, geo=GRANDE)], risco=lei_risco({str(i): dias(0.1, 0.1, 0.1, 0.1) for i in (1, 2, 3)}))
     v = V.montar({}, cadastro=cadastro(*usinas), ref=REF)
     assert v["ufs_sem_uf"] == 2 and tiles(v)["PI"]["n"] == 1
     assert sum(t["n"] for t in v["ufs"]) == 1
@@ -638,7 +659,7 @@ def test_usina_com_alerta_e_uf_invalida_nao_some_a_grade_diz_quantas(leituras):
 
 def test_a_grade_segue_o_filtro_de_cliente(leituras):
     usinas = [usina("1", "A", -4.2, -45.0, "X", uf="PA"), usina("2", "B", -4.3, -45.0, "Y", uf="BA")]
-    tudo_lido(leituras, [aviso(1, geo=GRANDE)], risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1), "2": dias(0.1, 0.1, 0.1, 0.1)}))
+    tudo_lido(leituras, [aviso(3, geo=GRANDE)], risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1), "2": dias(0.1, 0.1, 0.1, 0.1)}))
     t = tiles(V.montar({}, cadastro=cadastro(*usinas), ref=REF, cliente="Y"))
     assert t["BA"]["n"] == 1 and t["PA"]["n"] == 0
 
@@ -656,24 +677,28 @@ def test_a_legenda_do_estado_sem_alerta_nao_afirma_o_que_nao_foi_lido(leituras):
 # ── "Atenção": as 20 primeiras e a lista inteira ─────────────────────────────────────────────────────────────────────
 
 def varias_em_atencao(n):
+    """`n` usinas em atenção: cada uma com um fogo da NASA a 1 km a leste dela (a Atenção, desde 10/10/2026, é o fogo perto)."""
     usinas = [usina(str(i), f"U{i:02d}", -4.2 - i * 0.01, -45.0) for i in range(1, n + 1)]
-    return usinas, lei_risco({u.id: dias(0.1, 0.1, 0.1, 0.1) for u in usinas})
+    fogos = lei_firms(*[fogo_nasa(u.lat, -45.0 + 1.0 / 111.195) for u in usinas])
+    return usinas, lei_risco({u.id: dias(0.1, 0.1, 0.1, 0.1) for u in usinas}), fogos
 
 
 @pytest.mark.parametrize("n,todas,mostradas,resumida", [(25, False, 20, True), (25, True, 25, False), (20, False, 20, False),
                                                        (21, False, 20, True), (3, False, 3, False)])
 def test_atencao_mostra_as_20_primeiras_e_todas_so_quando_pedido(leituras, n, todas, mostradas, resumida):
-    usinas, risco = varias_em_atencao(n)
-    tudo_lido(leituras, [aviso(1, geo=GRANDE)], risco=risco)
+    usinas, risco, fogos = varias_em_atencao(n)
+    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=risco, firms=fogos)
     v = V.montar({}, cadastro=cadastro(*usinas), ref=REF, todas=todas)
     assert (v["n_atencao"], len(v["atencao_linhas"]), v["atencao_resumida"]) == (n, mostradas, resumida)
-    assert len(v["atencao"]) == n and [c["nome"] for c in v["atencao_linhas"]] == [f"U{i:02d}" for i in range(1, mostradas + 1)]
+    # as primeiras da lista ORDENADA (a ordem, pelo fogo mais perto, é a dos testes de desempate)
+    assert len(v["atencao"]) == n and v["atencao_linhas"] == v["atencao"][:mostradas]
 
 
-def test_a_linha_da_atencao_traz_o_aviso_o_foco_e_os_quatro_dias(leituras):
+def test_a_linha_da_tabela_traz_o_aviso_o_foco_e_os_quatro_dias(leituras):
+    # aviso leve e risco sem fogo perto: a usina está em Acompanhar (10/10/2026), e a linha é a mesma da tabela da Atenção
     tudo_lido(leituras, [aviso(1, evento="Baixa Umidade"), aviso(2, evento="Onda de Calor")], risco=lei_risco({"1": dias(1.0, 0.82, 0.1, None)}))
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
-    c = v["atencao_linhas"][0]
+    c = v["regiao"][0]
     assert [(a["evento"], a["cor"]) for a in c["avisos"]] == [("Onda de Calor", "laranja"), ("Baixa Umidade", "amarelo")]
     assert [(d["rotulo"], d["curto"], d["cor"]) for d in c["dias"]] == [("Hoje", "1,00", "c"), ("D+1", "0,82", "a"),
                                                                        ("D+2", "0,10", "n"), ("D+3", "—", "n")]
@@ -700,7 +725,8 @@ def test_fonte_fora_e_sem_alerta_nao_diz_nenhuma_usina_para_agir_agora(leituras)
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     assert v["alertas"] == [] and v["faltando"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"] and v["lendo"] == []
     assert v["vazio_agir"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta"
-    assert v["vazio_atencao"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta"
+    assert v["vazio_atencao"] == "Nenhuma usina com fogo perto"                    # a Atenção não usa os avisos
+    assert v["vazio_regiao"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta"
     assert v["completa"] is False
 
 
@@ -717,13 +743,15 @@ def test_uma_fonte_fora_e_outra_lendo_aparecem_cada_uma_na_sua_lista(leituras):
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     assert v["lendo"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"] and v["faltando"] == ["focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE)"]
     assert v["vazio_agir"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET) e focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE): não dá para dizer que não há alerta"
-    assert v["vazio_atencao"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta"     # o atenção não usa os focos
+    assert v["vazio_atencao"] == "Sem leitura de focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE): não dá para dizer que não há alerta"     # a atenção usa os focos
+    assert v["vazio_regiao"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta"     # o acompanhar não
 
 
 def test_tudo_lido_e_sem_alerta_pode_dizer_que_nao_ha(leituras):
     leituras(avisos=lei_avisos(), focos=lei_focos(), risco=_baixo())
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
-    assert v["vazio_agir"] == "Nenhuma usina para agir agora" and v["vazio_atencao"] == "Nenhuma usina em atenção"
+    assert v["vazio_agir"] == "Nenhuma usina para agir agora" and v["vazio_atencao"] == "Nenhuma usina com fogo perto"
+    assert v["vazio_regiao"] == "Nenhuma usina com condição da região a acompanhar"
     assert v["completa"] is True and v["recarrega_em"] == 60 and v["lendo"] == []
 
 
@@ -732,7 +760,9 @@ def test_leitura_velha_sem_alerta_nao_diz_que_nao_ha_sem_ressalva(leituras):
     leituras(avisos=velha, focos=lei_focos(), risco=_baixo())
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     assert v["vazio_agir"] == "Nenhuma usina para agir agora nas leituras disponíveis (veja o estado das fontes)"
-    assert v["vazio_atencao"] == "Nenhuma usina em atenção nas leituras disponíveis (veja o estado das fontes)"
+    assert v["vazio_atencao"] == "Nenhuma usina com fogo perto"                    # a Atenção não usa os avisos
+    assert v["vazio_regiao"] == ("Nenhuma usina com condição da região a acompanhar nas leituras disponíveis (veja o estado das "
+                                 "fontes)")
     assert faixa(v)["sem"]["sub"] == "nas fontes lidas" and faixa(v)["sem"]["valor"] == "1"
 
 
@@ -743,7 +773,7 @@ def test_o_vazio_de_cada_secao_so_olha_as_fontes_que_ela_usa(leituras):
     leituras(avisos=lei_avisos(), focos=lei_focos(), risco=velha)
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     assert v["vazio_agir"] == "Nenhuma usina para agir agora"
-    assert v["vazio_atencao"] == "Nenhuma usina em atenção nas leituras disponíveis (veja o estado das fontes)"
+    assert v["vazio_atencao"] == "Nenhuma usina com fogo perto nas leituras disponíveis (veja o estado das fontes)"
     leituras(avisos=lei_avisos(), focos=lei_focos())                                 # o risco fora
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     assert v["vazio_agir"] == "Nenhuma usina para agir agora"
@@ -754,7 +784,8 @@ def test_com_usina_para_agir_o_vazio_nao_aparece_e_o_que_falta_continua_dito(lei
     leituras(focos=lei_focos(foco_a(1.0)), risco=lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}))
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     assert v["vazio_agir"] == "" and len(v["agir"]) == 1 and v["faltando"] == ["avisos do Instituto Nacional de Meteorologia (INMET)"]
-    assert v["vazio_atencao"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta"
+    assert v["vazio_atencao"] == "Nenhuma usina com fogo perto"
+    assert v["vazio_regiao"] == "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta"
 
 
 # ── I3: degradação parcial não fica "ok", e a faixa do topo diz ──────────────────────────────────────────────────────
@@ -765,7 +796,8 @@ def test_aviso_ignorado_deixa_o_inmet_em_atencao_e_a_faixa_parcial(leituras):
     f = v["fontes"][0]
     assert f["estado"] == "atencao" and f["qualifica"] == ["parcial"] and "1 aviso foi ignorado" in f["detalhe"]
     fx = faixa(v)
-    assert fx["agir"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"] and fx["atencao"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"] and fx["sem"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"]
+    assert fx["agir"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"] and fx["regiao"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"] and fx["sem"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"]
+    assert fx["atencao"]["qual"] == []                                                      # a atenção não usa os avisos
     assert fx["agir"]["valor"] == "1" and "cl-na" not in fx["agir"]["classe"]             # com alerta, a cor não vira "dúvida"
     assert fx["sem"]["sub"] == "nas fontes lidas"
 
@@ -775,14 +807,14 @@ def test_faixa_de_fonte_em_atencao_sem_alerta_nao_fica_verde(leituras):
     leituras(avisos=lei_avisos(ignorados=["aviso 7: sem polígono"]), focos=lei_focos(), risco=_baixo())
     fx = faixa(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))
     assert (fx["agir"]["valor"], fx["agir"]["qual"]) == ("0", ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"]) and "cl-na" in fx["agir"]["classe"]
-    assert (fx["atencao"]["valor"], fx["atencao"]["qual"]) == ("0", ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"]) and "cl-na" in fx["atencao"]["classe"]
+    assert (fx["regiao"]["valor"], fx["regiao"]["qual"]) == ("0", ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"]) and "cl-na" in fx["regiao"]["classe"]
     assert "cl-na" in fx["sem"]["classe"]
 
 
-def test_fonte_parcial_com_usina_em_atencao_nao_pinta_o_numero_de_ambar(leituras):
+def test_fonte_parcial_com_usina_em_acompanhar_nao_pinta_o_numero_de_ambar(leituras):
     leituras(avisos=lei_avisos(ignorados=["aviso 7: sem polígono"]), focos=lei_focos(), risco=lei_risco({"1": dias(0.9, 0.1, 0.1, 0.1)}))
     fx = faixa(V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF))
-    assert fx["atencao"]["valor"] == "1" and fx["atencao"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"] and "cl-na" not in fx["atencao"]["classe"]
+    assert fx["regiao"]["valor"] == "1" and fx["regiao"]["qual"] == ["avisos do Instituto Nacional de Meteorologia (INMET): parcial"] and "cl-na" not in fx["regiao"]["classe"]
 
 
 def test_leitura_velha_a_faixa_diz_de_que_hora_e_o_dado(leituras):
@@ -804,7 +836,8 @@ def test_arquivo_de_focos_que_falhou_deixa_os_focos_em_atencao_e_o_agir_parcial(
     assert f["estado"] == "atencao" and "1 de 2 arquivos indisponíveis" in f["detalhe"]
     fx = faixa(v)
     assert fx["agir"]["qual"] == ["focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE): parcial"] and "cl-na" in fx["agir"]["classe"]
-    assert fx["atencao"]["qual"] == [] and "cl-na" not in fx["atencao"]["classe"]          # o atenção não depende dos focos
+    assert fx["atencao"]["qual"] == ["focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE): parcial"]   # a atenção usa os focos
+    assert fx["regiao"]["qual"] == [] and "cl-na" not in fx["regiao"]["classe"]            # o acompanhar não depende dos focos
 
 
 def test_linhas_ilegiveis_nos_focos_deixam_em_atencao_e_dizem_quantas(leituras):
@@ -822,20 +855,20 @@ def test_focos_atrasados_a_faixa_diz_ate_que_hora_vai_o_dado(leituras):
     assert faixa(v)["agir"]["qual"] == ["focos de queimada do Instituto Nacional de Pesquisas Espaciais (INPE): arquivos até 14:10"] and "cl-na" in faixa(v)["agir"]["classe"]
 
 
-def test_dia_do_risco_sem_leitura_deixa_o_atencao_parcial_e_o_dia_aparece_na_fonte(leituras):
+def test_dia_do_risco_sem_leitura_deixa_o_acompanhar_parcial_e_o_dia_aparece_na_fonte(leituras):
     por = {"1": [Amostra(0.99, "ponto"), Amostra(0.99, "ponto"), Amostra(None, "indisponivel"), Amostra(0.99, "ponto")]}
     leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(por, erros={2: "HTTP 404"}))
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
-    assert faixa(v)["atencao"]["valor"] == "1" and faixa(v)["atencao"]["qual"] == ["risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE): parcial"]
+    assert faixa(v)["regiao"]["valor"] == "1" and faixa(v)["regiao"]["qual"] == ["risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE): parcial"]
     assert v["fontes"][2]["estado"] == "atencao" and v["fontes"][2]["detalhe"] == "D+2 indisponível (HTTP 404)"
-    assert [d["curto"] for d in v["alertas"][0]["dias"]] == ["0,99", "0,99", "—", "0,99"]
+    assert [d["curto"] for d in linhas(v)[0]["dias"]] == ["0,99", "0,99", "—", "0,99"]
 
 
 def test_fonte_inteira_nao_ganha_qualificador(leituras):
     leituras(avisos=lei_avisos(aviso(2)), focos=lei_focos(foco_a(1.0)), risco=lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1)}))
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
     assert [f["qualifica"] for f in v["fontes"]] == [[], [], [], []] and [f["estado"] for f in v["fontes"]] == ["ok"] * 4
-    assert all(faixa(v)[i]["qual"] == [] for i in ("agir", "atencao", "sem")) and v["completa"] is True
+    assert all(faixa(v)[i]["qual"] == [] for i in ("agir", "atencao", "regiao", "sem")) and v["completa"] is True
 
 
 # ── M3: sem a data do arquivo do INPE ────────────────────────────────────────────────────────────────────────────────
@@ -862,7 +895,7 @@ def test_com_o_arquivo_de_ontem_os_dias_da_usina_dizem_ontem_e_hoje(leituras):
     ontem = {0: datetime(2026, 10, 5, 9, 32, tzinfo=UTC)}
     leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco({"1": dias(0.8, 0.9, 0.1, 0.1)}, arquivos=ontem))
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
-    assert [d["rotulo"] for d in v["alertas"][0]["dias"]] == ["Ontem", "Hoje", "D+1", "D+2"]
+    assert [d["rotulo"] for d in linhas(v)[0]["dias"]] == ["Ontem", "Hoje", "D+1", "D+2"]
 
 
 def test_dia_que_falhou_leva_o_rotulo_do_calendario_no_detalhe(leituras):
@@ -896,6 +929,6 @@ def test_dias_misturados_nao_viram_uma_linha_so_e_nao_entram_na_lista_sem_risco(
     por = {"1": [Amostra(None, "sem_dado"), Amostra(0.9, "ponto"), Amostra(0.9, "ponto"), Amostra(0.9, "ponto")]}
     leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(por))
     v = V.montar({}, cadastro=cadastro(usina("1", "U")), ref=REF)
-    c = v["alertas"][0]
+    c = linhas(v)[0]
     assert c["risco_linha"] is None and [d["valor"] for d in c["dias"]][1:] == ["0,90"] * 3
     assert v["sem_risco"] == []

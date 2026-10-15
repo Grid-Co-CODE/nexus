@@ -55,7 +55,7 @@ def test_os_textos_nao_tem_emoji_nem_cor_como_nome_de_nivel():
     for t in textos:
         assert not re.search("[\U0001F300-\U0001FAFF☀-➿]", t), t
         assert not re.search(r"\b(amarelo|laranja|vermelho)\b", t), t
-    assert [c["id"] for c in EX.COMO_LER] == [A.AGIR, A.ATENCAO, A.SEM_ALERTA]
+    assert [c["id"] for c in EX.COMO_LER] == [A.AGIR, A.ATENCAO, A.REGIAO, A.SEM_ALERTA]
 
 
 def test_nome_amigavel_tira_a_maiuscula_do_meio():

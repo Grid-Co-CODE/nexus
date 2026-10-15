@@ -17,7 +17,8 @@ from nexus.performance.clima.fontes import Foco
 from nexus.performance.clima.usinas import Usina
 
 from clima_mapa_mundo import (ALFA, BETA, DELTA, EPSILON, GAMA, LIDO, REF, TETA, UM_GRAU, aviso, cadastro, dias, foco_a,
-                              foco_em, instalar_leituras, lei_avisos, lei_focos, lei_risco, montar, mundo_completo, mundo_de_usinas,
+                              foco_em, instalar_leituras, lei_avisos, lei_firms, lei_focos, lei_risco, montar, mundo_completo,
+                              mundo_de_usinas, nasa_a,
                               por_nome, quebrar_contorno, risco_baixo, tudo_instalado, usina)
 
 UTC = timezone.utc
@@ -64,12 +65,24 @@ CASOS = [
     ("foco a 4,9 km", dict(focos=lambda: lei_focos(foco_a(4.9, ALFA))), "agir"),
     ("aviso Grande Perigo", dict(avisos=lambda: lei_avisos(aviso(3, "Onda de Calor", ALFA))), "agir"),
     ("Perigo de evento que estraga usina", dict(avisos=lambda: lei_avisos(aviso(2, "Tempestade", ALFA))), "agir"),
-    ("Perigo de evento fora da lista", dict(avisos=lambda: lei_avisos(aviso(2, "Baixa Umidade", ALFA))), "atencao"),
-    ("Perigo Potencial, mesmo de evento que estraga", dict(avisos=lambda: lei_avisos(aviso(1, "Vendaval", ALFA))), "atencao"),
+    # a condição da região (10/10/2026): Acompanhar
+    ("Perigo de evento fora da lista", dict(avisos=lambda: lei_avisos(aviso(2, "Baixa Umidade", ALFA))), "regiao"),
+    ("Perigo Potencial, mesmo de evento que estraga", dict(avisos=lambda: lei_avisos(aviso(1, "Vendaval", ALFA))), "regiao"),
     ("aviso que ainda vai comecar", dict(avisos=lambda: lei_avisos(aviso(1, "Baixa Umidade", ALFA, inicio=REF + timedelta(hours=20),
-                                                                          quando="futuro"))), "atencao"),
-    ("risco de fogo alto em D+3", dict(risco=lambda: lei_risco({"1": dias(0.1, 0.1, 0.1, 0.8)})), "atencao"),
-    ("risco de fogo critico hoje", dict(risco=lambda: lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1)})), "atencao"),
+                                                                          quando="futuro"))), "regiao"),
+    ("risco de fogo alto em D+3", dict(risco=lambda: lei_risco({"1": dias(0.1, 0.1, 0.1, 0.8)})), "regiao"),
+    ("risco de fogo critico hoje", dict(risco=lambda: lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1)})), "regiao"),
+    # o fogo perto: Atenção
+    ("fogo da NASA a 3 km", dict(firms=lambda: lei_firms(nasa_a(3.0, ALFA))), "atencao"),
+    ("risco critico hoje com fogo da NASA a 8 km", dict(risco=lambda: lei_risco({"1": dias(0.99, 0.1, 0.1, 0.1)}),
+                                                        firms=lambda: lei_firms(nasa_a(8.0, ALFA))), "atencao"),
+    ("risco critico amanha com foco do INPE a 8 km", dict(risco=lambda: lei_risco({"1": dias(0.1, 0.99, 0.1, 0.1)}),
+                                                          focos=lambda: lei_focos(foco_a(8.0, ALFA))), "atencao"),
+    ("risco critico so em D+2 com fogo a 8 km", dict(risco=lambda: lei_risco({"1": dias(0.1, 0.1, 0.99, 0.1)}),
+                                                     firms=lambda: lei_firms(nasa_a(8.0, ALFA))), "regiao"),
+    ("risco alto com fogo a 8 km", dict(risco=lambda: lei_risco({"1": dias(0.9, 0.9, 0.1, 0.1)}),
+                                        firms=lambda: lei_firms(nasa_a(8.0, ALFA))), "regiao"),
+    ("fogo da NASA a 8 km sem risco", dict(firms=lambda: lei_firms(nasa_a(8.0, ALFA))), "sem"),
     ("risco de fogo medio", dict(risco=lambda: lei_risco({"1": dias(0.6, 0.6, 0.6, 0.6)})), "sem"),
     ("foco a 5,1 km", dict(focos=lambda: lei_focos(foco_a(5.1, ALFA))), "sem"),
     ("nada", dict(), "sem"),
@@ -77,10 +90,11 @@ CASOS = [
 
 
 @pytest.mark.parametrize("motivo,fontes,esperado", CASOS, ids=[c[0] for c in CASOS])
-def test_o_nivel_de_cada_usina_vem_da_regra_dos_tres_niveis(leituras, motivo, fontes, esperado):
+def test_o_nivel_de_cada_usina_vem_da_regra_dos_niveis(leituras, motivo, fontes, esperado):
     leituras(avisos=fontes["avisos"]() if "avisos" in fontes else lei_avisos(),
              focos=fontes["focos"]() if "focos" in fontes else lei_focos(),
-             risco=fontes["risco"]() if "risco" in fontes else lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}))
+             risco=fontes["risco"]() if "risco" in fontes else lei_risco({"1": dias(0.1, 0.1, 0.1, 0.1)}),
+             firms=fontes["firms"]() if "firms" in fontes else None)
     m = montar(cadastro=cadastro(usina("1", "Usina Alfa", ALFA)))
     assert [(u["nome"], u["nivel"]) for u in m["usinas"]] == [("Usina Alfa", esperado)], motivo
 
@@ -92,10 +106,10 @@ def test_a_contagem_por_nivel_e_a_do_que_esta_no_recorte(leituras):
                    focos=lei_focos(foco_a(1.0, DELTA)),
                    risco=lei_risco({**risco_baixo(), "5": dias(0.8, 0.1, 0.1, 0.1)}))
     m = montar()
-    assert m["contagem"] == {"agir": 2, "atencao": 3, "sem": 1, "nx": 0}
+    assert m["contagem"] == {"agir": 2, "atencao": 0, "regiao": 3, "sem": 1, "nx": 0}
     assert {u["nome"]: u["nivel"] for u in m["usinas"]} == {
-        "Usina Alfa": "agir", "Usina Beta": "atencao", "Usina Gama": "atencao", "Usina Delta": "agir",
-        "Usina Epsilon": "atencao", "Usina Teta": "sem"}
+        "Usina Alfa": "agir", "Usina Beta": "regiao", "Usina Gama": "regiao", "Usina Delta": "agir",
+        "Usina Epsilon": "regiao", "Usina Teta": "sem"}
     assert m["rotulo_sem"] == "Sem alerta"
 
 
@@ -119,7 +133,7 @@ def test_a_regiao_so_desenha_o_que_cai_nela(leituras):
     mundo_completo(leituras)
     ne = montar(regiao="nordeste")
     assert sorted(u["nome"] for u in ne["usinas"]) == ["Usina Alfa", "Usina Beta"]
-    assert ne["fora_do_recorte"] == 4 and ne["contagem"] == {"agir": 1, "atencao": 1, "sem": 0, "nx": 0}
+    assert ne["fora_do_recorte"] == 4 and ne["contagem"] == {"agir": 1, "atencao": 0, "regiao": 1, "sem": 0, "nx": 0}
     assert (ne["camada_avisos"]["n_vigor"], ne["camada_avisos"]["n_futuros"]) == (2, 0)
     assert ne["camada_focos"]["n"] == 1 and ne["camada_focos"]["n_perto"] == 0       # só o foco de -9, -40 está no Nordeste
     sul = montar(regiao="sul")
@@ -227,15 +241,15 @@ def test_usina_cai_onde_a_projecao_a_poe(leituras):
 def test_a_ordem_de_desenho_deixa_o_que_pede_acao_por_cima(leituras):
     mundo_completo(leituras)
     niveis = [u["nivel"] for u in montar()["usinas"]]
-    ordem = {"nx": 0, "sem": 1, "atencao": 2, "agir": 3}
+    ordem = {"nx": 0, "sem": 1, "regiao": 2, "atencao": 3, "agir": 4}
     assert niveis == sorted(niveis, key=ordem.get)
     assert niveis[0] == "sem" and niveis[-1] == "agir"
 
 
 def test_o_ponto_do_nivel_que_pede_acao_e_maior(leituras):
-    mundo_completo(leituras)
+    mundo_completo(leituras, firms=lei_firms(nasa_a(3.0, GAMA)))                     # a Gama com fogo perto: atenção
     r = {u["nivel"]: float(u["r"]) for u in montar()["usinas"]}
-    assert r["agir"] > r["atencao"] > r["sem"] > 0
+    assert r["agir"] > r["atencao"] > r["sem"] > 0 and r["regiao"] == r["sem"]       # a condição da região não cresce
 
 
 # ── o link e o título de cada usina ──────────────────────────────────────────────────────────────────────────────────
@@ -257,11 +271,11 @@ def test_o_titulo_diz_nome_cliente_nivel_e_o_motivo(leituras):
     assert t.splitlines()[3].startswith("Motivo: foco de queimada a 1,2 km; Vendaval")        # o que manda agir vem primeiro
 
 
-def test_o_motivo_de_atencao_lista_os_avisos_e_os_dias_do_risco(leituras):
+def test_o_motivo_de_acompanhar_lista_os_avisos_e_os_dias_do_risco(leituras):
     tudo_instalado(leituras, avisos=lei_avisos(aviso(2, "Baixa Umidade", ALFA), aviso(1, "Onda de Calor", ALFA)),
                    risco=lei_risco({"1": dias(0.8, 0.1, 0.99, 0.1)}))
     t = por_nome(montar(cadastro=cadastro(usina("1", "Usina Alfa", ALFA))))["Usina Alfa"]["titulo"]
-    assert "Nível: Atenção" in t
+    assert "Nível: Acompanhar" in t
     assert "Baixa Umidade (Perigo, em vigor, até 23:00)" in t and "Onda de Calor (Perigo Potencial" in t
     assert "risco de fogo crítico (Hoje, D+2)" in t
 
@@ -330,7 +344,7 @@ def test_sem_leitura_do_inmet_a_camada_some_e_quem_ficaria_sem_alerta_vira_sem_l
     leituras(avisos=L.Leitura(None, None, erro="HTTP 500"), focos=lei_focos(foco_a(1.0, DELTA)), risco=lei_risco(risco_baixo()))
     m = montar()
     assert m["camada_avisos"]["estado"] == "fora" and m["camada_avisos"]["grupos"] == []
-    assert m["contagem"] == {"agir": 1, "atencao": 0, "sem": 0, "nx": 5}
+    assert m["contagem"] == {"agir": 1, "atencao": 0, "regiao": 0, "sem": 0, "nx": 5}
     nx = por_nome(m)["Usina Teta"]
     assert nx["nivel"] == "nx" and "Nível: Sem leitura completa" in nx["titulo"]
     assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET); não dá para dizer que não há alerta" in nx["titulo"]
@@ -358,7 +372,7 @@ def test_sem_leitura_dos_focos_somem_os_pontos_e_os_aneis(leituras):
 def test_sem_leitura_do_risco_de_fogo_ninguem_fica_com_o_verde(leituras):
     leituras(avisos=lei_avisos(aviso(3, "Vendaval", ALFA)), focos=lei_focos(), risco=L.Leitura(None, None, erro="HTTP 503"))
     m = montar()
-    assert m["contagem"] == {"agir": 1, "atencao": 0, "sem": 0, "nx": 5} and m["sem_leitura_de"] == "risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)"
+    assert m["contagem"] == {"agir": 1, "atencao": 0, "regiao": 0, "sem": 0, "nx": 5} and m["sem_leitura_de"] == "risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE)"
     assert m["camada_avisos"]["estado"] == "ok" and m["camada_focos"]["estado"] == "ok"
 
 

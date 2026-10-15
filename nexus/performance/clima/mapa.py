@@ -276,13 +276,13 @@ def ufs_da_vista(v: Vista) -> tuple:
 URL_USINA = "/t/performance/clima/usina/{}"          # a página da usina (a tela principal a serve; o mapa só aponta para ela)
 NX = "nx"                                            # nível de quem ficaria "Sem alerta" mas teve fonte sem leitura
 ROTULO_NX = "Sem leitura completa"
-ORDEM_DE_DESENHO = {NX: 0, A.SEM_ALERTA: 1, A.ATENCAO: 2, A.AGIR: 3}     # o que pede ação por último: fica por cima
+ORDEM_DE_DESENHO = {NX: 0, A.SEM_ALERTA: 1, A.REGIAO: 2, A.ATENCAO: 3, A.AGIR: 4}     # o que pede ação por último: fica por cima
 # a ordem da tabela ao lado do mapa (09/10/2026): quem pede ação primeiro; quem não teve leitura completa antes de quem
 # está sem alerta (o cinza não é "tudo bem")
-ORDEM_DA_TABELA = {A.AGIR: 0, A.ATENCAO: 1, NX: 2, A.SEM_ALERTA: 3}
+ORDEM_DA_TABELA = {A.AGIR: 0, A.ATENCAO: 1, A.REGIAO: 2, NX: 3, A.SEM_ALERTA: 4}
 # Raios em unidades do SVG (o viewBox tem 1000 de largura): a usina que pede ação é maior que a que está bem, e o anel do foco
 # cobre o ponto da usina que está a até 5 km dele. No celular o CSS os multiplica (o SVG ali tem uns 340 px, não 700).
-R_USINA = {A.AGIR: 7.5, A.ATENCAO: 6.0, A.SEM_ALERTA: 5.0, NX: 5.0}
+R_USINA = {A.AGIR: 7.5, A.ATENCAO: 6.0, A.REGIAO: 5.0, A.SEM_ALERTA: 5.0, NX: 5.0}
 R_ALVO = 2.2                                         # o círculo invisível que aumenta a área de toque: R_ALVO vezes o raio
 R_ANEL = 12.0
 FOLGA_PONTO = 4.0                                    # foco um pouco fora do viewBox ainda desenha (o ponto tem espessura)
@@ -303,7 +303,7 @@ FUNDOS = {"avisos": "Avisos meteorológicos", "risco": "Risco de fogo", "densida
 FUNDO_PADRAO = "avisos"
 GIRO = ("avisos", "risco", "densidade")              # o que o modo TV alterna sozinho (`girar`)
 SOBRE = {"usinas": "Usinas", "focos": "Focos", "siglas": "Siglas dos estados"}
-NIVEIS = (A.AGIR, A.ATENCAO, A.SEM_ALERTA, NX)
+NIVEIS = (A.AGIR, A.ATENCAO, A.REGIAO, A.SEM_ALERTA, NX)
 GIRAR_MIN_S, GIRAR_MAX_S = 10, 600
 _SLUG = re.compile(r"^[a-z0-9-]{1,60}$")
 
@@ -628,7 +628,7 @@ def _camada_densidade(focos_l, v: Vista, aneis, qualifica: list, ref) -> dict:
 
 # ── a usina ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def _motivos(avisos: list, foco, dias: list, ref, fogo=None) -> str:
+def _motivos(avisos: list, foco, dias: list, ref, fogo=None, perto=None) -> str:
     """Por que a usina está no nível dela, em uma linha para o `<title>`: o foco, os avisos (os que mandam agir antes) e os dias
     de risco de fogo alto. Sem repetir e com no máximo MOTIVOS_NO_TITULO: lista de 8 avisos de baixa umidade não cabe num balão."""
     itens = []
@@ -636,6 +636,8 @@ def _motivos(avisos: list, foco, dias: list, ref, fogo=None) -> str:
         itens.append(f"foco de queimada a {V.numero(foco['km'], 1)} km")
     elif fogo:
         itens.append(f"fogo visto pela NASA a {V.numero(fogo['km'], 1)} km {V.idade(fogo['foco'].data, ref)}")
+    elif perto:
+        itens.append(f"fogo a {V.numero(perto['km'], 1)} km {perto['quando']}, com risco de fogo crítico")
     for a in sorted(avisos, key=lambda a: not A.aviso_manda_agir(a)):
         itens.append(f"{a.evento} ({a.severidade}, {V._validade(a, ref)})")
     com_risco = [c for c in dias if c["nivel"] > 0]
@@ -649,7 +651,7 @@ def _motivos(avisos: list, foco, dias: list, ref, fogo=None) -> str:
 
 
 def _fontes_que_pesaram(avisos, foco, dias, ref, sem_leitura_de: str, completa: bool, fogo=None, confirma=None,
-                        nasa_lida: bool = False) -> list:
+                        nasa_lida: bool = False, perto=None) -> list:
     """As fontes que pesaram no nível da usina, cada uma com o nome por extenso e o que ela trouxe (a dica do mapa, 09/10/2026:
     "dica ao passar o mouse na usina (nome, nível, o motivo, as fontes que pesaram)"). [[fonte, o que trouxe], ...]. Desde
     10/10/2026, o foco do INPE diz se a NASA o confirmou (e com que força), e o fogo das últimas 24 h da NASA tem a linha dele."""
@@ -666,6 +668,10 @@ def _fontes_que_pesaram(avisos, foco, dias, ref, sem_leitura_de: str, completa: 
         itens.append([F.extenso("inpe"), texto])
     if fogo and not confirma:
         itens.append([F.extenso("nasa_firms"), V.fogo_detalhe(fogo, ref)])
+    if perto:
+        itens.append([F.extenso("nasa_firms" if perto["fonte"] == "nasa" else "inpe"),
+                      f"fogo a {V.numero(perto['km'], 1)} km {perto['quando']} ({perto['texto_fonte']}), com risco de fogo crítico "
+                      "hoje ou amanhã"])
     com_numero = [c for c in dias if c.get("_num") is not None]
     if V.risco_curto(dias):
         maior = max(c["_num"] for c in dias if c["nivel"] > 0)
@@ -722,7 +728,8 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
          "regiao_nome": v.nome,
          "regioes": [{"id": BRASIL, "nome": "Brasil", "atual": v.id == BRASIL},
                      *({"id": r, "nome": n, "atual": v.id == r} for r, n in REGIOES.items())],
-         "viewbox": v.viewbox, "ufs": ufs, "usinas": [], "contagem": {A.AGIR: 0, A.ATENCAO: 0, A.SEM_ALERTA: 0, NX: 0},
+         "viewbox": v.viewbox, "ufs": ufs, "usinas": [],
+         "contagem": {A.AGIR: 0, A.ATENCAO: 0, A.REGIAO: 0, A.SEM_ALERTA: 0, NX: 0},
          "n_usinas": 0, "n_no_recorte": 0, "fora_do_recorte": 0, "sem_usinas": False, "rotulo_sem": "Sem alerta",
          "sem_leitura_de": "", "camada_avisos": None, "camada_focos": None, "camada_nasa": None, "fontes": [], "faltando": [],
          "lendo": [],
@@ -799,7 +806,8 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
         confirma = A.confirmacao(nasa, foco["foco"]) if foco and nasa is not None else None
         dias = ([V.celula_de_risco(i, a, rotulos, amigaveis) for i, a in enumerate(risco_l.dados["por_ponto"].get(u.id, []))]
                 if risco_l.dados else [])
-        nivel = A.nivel_da_usina(avisos, foco is not None, any(c["nivel"] > 0 for c in dias), fogo is not None)
+        perto = None if (foco or fogo) else V.fogo_com_risco(indice, nasa, u.lat, u.lon, dias, ref)
+        nivel = A.nivel_da_usina(avisos, foco is not None, any(c["nivel"] > 0 for c in dias), fogo is not None, perto is not None)
         if nivel == A.SEM_ALERTA:
             if ausentes:
                 nivel = NX
@@ -811,11 +819,11 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
                           ("" if m["completa"] else " nas fontes lidas"))
                 curto = "Nada previsto" + ("" if m["completa"] else " nas fontes lidas")
         else:
-            motivo = _motivos(avisos, foco, dias, ref, fogo)
-            curto = V.motivo_curto(avisos, foco, dias, ref, fogo)
+            motivo = _motivos(avisos, foco, dias, ref, fogo, perto)
+            curto = V.motivo_curto(avisos, foco, dias, ref, fogo, perto)
         m["contagem"][nivel] += 1
         gravidade = max([a.nivel for a in avisos] + [3 if foco else 0] + [c["nivel"] for c in dias] +
-                        [A.gravidade_do_fogo_24h(fogo) if fogo else 0])
+                        [A.gravidade_do_fogo_24h(fogo) if fogo else 2 if perto else 0])
         desenhadas.append({
             "id": u.id, "nome": u.nome, "nivel": nivel, "x": _n(x), "y": _n(y), "r": R_USINA[nivel],
             "r_alvo": round(R_USINA[nivel] * R_ALVO, 1), "href": URL_USINA.format(quote(str(u.id), safe="")),
@@ -831,7 +839,7 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
         # página (escapado pelo |tojson), lido pelo JavaScript; texto de terceiros entra no balão por textContent, nunca como HTML.
         dicas[u.id] = {"n": u.nome, "o": desenhadas[-1]["onde"], "v": nivel, "r": rotulo_do_nivel[nivel], "m": curto,
                        "f": _fontes_que_pesaram(avisos, foco, dias, ref, m["sem_leitura_de"] if nivel == NX else "",
-                                                m["completa"], fogo, confirma, nasa is not None)}
+                                                m["completa"], fogo, confirma, nasa is not None, perto)}
     m["tabela"] = sorted(desenhadas, key=lambda d: d["_ordem"])
     desenhadas.sort(key=lambda d: (ORDEM_DE_DESENHO[d["nivel"]], d["nome"].casefold()))
     m["usinas"] = desenhadas

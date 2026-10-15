@@ -180,10 +180,23 @@ def carga_de_25():
                  listas={"status_usina": ["OPERAÇÃO"], "uf": ["PI"]})
 
 
+def fogos_ao_norte(posicoes, km=1.0):
+    """Um foco da NASA (NOAA-20, 13:00 em Brasília, 8 MW) a `km` ao norte de cada pixel: a usina fica em Atenção (10/10/2026)."""
+    linhas = []
+    for pos in posicoes:
+        lat, lon = centro(*pos)
+        linhas.append(f"{lat + km / 111.195:.6f},{lon:.6f},335.0,0.39,0.36,2026-10-06,1600,N20,nominal,2.0NRT,296.0,8.00,D")
+    return firms(linhas_viirs=linhas)
+
+
 @pytest.fixture
 def mundo25(tmp_path, monkeypatch):
+    """As 25 usinas debaixo do aviso leve (a condição da região) e, desde 10/10/2026, com fogo da NASA a 1 km de cada uma: as 25
+    em Atenção, para a matriz mostrar as 20 primeiras."""
     sobre_todas = caixa_aviso(1, "leve", "Perigo Potencial", -45.0, -44.70, -5.30, -5.20, evento="Baixa Umidade")
-    yield _mundo(tmp_path, monkeypatch, carga_de_25(), arquivos_do_mundo(json.dumps({"hoje": [sobre_todas], "futuro": []}).encode()))
+    arquivos = arquivos_do_mundo(json.dumps({"hoje": [sobre_todas], "futuro": []}).encode(), nasa=False)
+    arquivos.update(fogos_ao_norte([(i - 1, 22) for i in range(1, 26)]))
+    yield _mundo(tmp_path, monkeypatch, carga_de_25(), arquivos)
     L.usar_sessao(None)
     L.usar_relogio(None)
     L.limpar_cache()

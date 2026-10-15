@@ -110,7 +110,7 @@ def test_o_nivel_da_usina_e_o_mesmo_da_tela_principal(leituras, nasa):
     v = pagina()
     assert (v["nivel"], v["rotulo"]) == ("agir", "Agir agora") and v["card"]["motivos"][0]["pill"] == "Fogo a 1,0 km"
     tudo_lido(leituras, avisos=[aviso(1, evento="Baixa Umidade")])
-    assert (pagina()["nivel"], pagina()["rotulo"]) == ("atencao", "Atenção")
+    assert (pagina()["nivel"], pagina()["rotulo"]) == ("regiao", "Acompanhar")            # condição da região (10/10/2026)
     tudo_lido(leituras)
     assert (pagina()["nivel"], pagina()["rotulo"]) == ("sem", "Sem alerta")
 

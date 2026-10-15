@@ -24,13 +24,25 @@ def cartoes(html):
 
 
 def linhas(html):
-    """{nome da usina: trecho da linha} da matriz de "Atenção", na ordem em que aparecem."""
-    achados = re.findall(r'<tr class="cl-lin".*?</tr>', html, flags=re.S)
+    """{nome da usina: trecho da linha} das tabelas da Atenção e do Acompanhar (10/10/2026), na ordem em que aparecem."""
+    achados = re.findall(r'<tr class="cl-lin[^"]*">.*?</tr>', html, flags=re.S)
+    return {re.search(r'<span class="cl-nome"><a [^>]*>([^<]+)</a></span>', a).group(1): a for a in achados}
+
+
+def linhas_atencao(html):
+    """{nome da usina: trecho da linha} só da matriz da Atenção (a do Acompanhar tem a classe cl-lin--regiao)."""
+    achados = re.findall(r'<tr class="cl-lin">.*?</tr>', html, flags=re.S)
+    return {re.search(r'<span class="cl-nome"><a [^>]*>([^<]+)</a></span>', a).group(1): a for a in achados}
+
+
+def linhas_regiao(html):
+    """{nome da usina: trecho da linha} da tabela do Acompanhar (10/10/2026), dentro do "Ver as N usinas"."""
+    achados = re.findall(r'<tr class="cl-lin cl-lin--regiao">.*?</tr>', html, flags=re.S)
     return {re.search(r'<span class="cl-nome"><a [^>]*>([^<]+)</a></span>', a).group(1): a for a in achados}
 
 
 def faixa(html):
-    """{id: trecho} das quatro células da faixa do topo."""
+    """{id: trecho} das cinco células da faixa do topo."""
     secao = re.search(r'<section class="cl-faixa".*?</section>', html, flags=re.S).group(0)
     return {m.group(1): m.group(0) for m in re.finditer(r'<div class="cl-cel[^"]*" data-id="(\w+)">.*?</div>', secao, flags=re.S)}
 
@@ -85,8 +97,9 @@ def test_faixa_do_topo_conta_agir_atencao_sem_alerta_e_cobertura(mundo):
     c, _, _ = mundo
     html = pagina(c)
     f = faixa(html)
-    # agir: Alfa; atenção: Gama (risco alto), Zeta (alto pelo entorno) e Beta (aviso Perigo Potencial); sem alerta: Delta e Eta
-    assert {i: valor(f[i]) for i in f} == {"agir": "1", "atencao": "3", "sem": "2", "cobertura": "6"}
+    # agir: Alfa; acompanhar (10/10/2026, a condição da região): Gama (risco alto), Zeta (alto pelo entorno) e Beta (aviso Perigo
+    # Potencial); atenção (fogo perto): nenhuma; sem alerta: Delta e Eta
+    assert {i: valor(f[i]) for i in f} == {"agir": "1", "atencao": "0", "regiao": "3", "sem": "2", "cobertura": "6"}
     t = texto(f["cobertura"])
     assert "em operação com coordenada · 1 sem dado de risco · 1 sem coordenada" in t
     assert "Agir agora" in texto(f["agir"]) and "fogo a até 5 km ou aviso forte (tempestade, chuva forte, vento, granizo) do Instituto Nacional de Meteorologia (INMET)" in texto(f["agir"])
@@ -98,7 +111,8 @@ def test_agir_agora_so_tem_a_usina_do_foco_e_do_perigo_de_tempestade(mundo):
     c, _, _ = mundo
     html = pagina(c)
     assert list(cartoes(html)) == ["Usina Alfa"]
-    assert list(linhas(html)) == ["Usina Gama", "Usina Zeta", "Usina Beta"]
+    # 10/10/2026: risco de fogo e aviso leve sem fogo perto são a condição da região (Acompanhar); a Atenção é o fogo perto
+    assert list(linhas_atencao(html)) == [] and list(linhas_regiao(html)) == ["Usina Gama", "Usina Zeta", "Usina Beta"]
     for fora in ("Usina Delta", "Usina Eta"):
         assert fora not in "".join(cartoes(html)) and fora not in "".join(linhas(html))
 
@@ -163,7 +177,7 @@ def test_a_linha_da_atencao_com_aviso_mostra_o_evento_e_a_coluna_do_foco_diz_que
 def test_pixel_mascarado_usa_o_entorno_e_marca_o_valor(mundo):
     c, _, _ = mundo
     html = pagina(c)
-    zeta, gama = linhas(html)["Usina Zeta"], linhas(html)["Usina Gama"]
+    zeta, gama = linhas_regiao(html)["Usina Zeta"], linhas_regiao(html)["Usina Gama"]
     assert re.findall(r'<span class="cl-c cl-c-a"[^>]*>([^<]+)</span>', zeta) == ["Alto*"] * 4
     assert "*" not in "".join(re.findall(r'<span class="cl-c[^>]*>([^<]+)</span>', gama))
     assert "hoje: 0,85 (alto, entorno de 2 km)" in zeta
@@ -207,7 +221,7 @@ def test_usina_sem_coordenada_aparece_numa_linha_e_a_coordenada_nunca_aparece(mu
 def test_filtro_por_cliente(mundo):
     c, _, _ = mundo
     html = pagina(c, cliente="Cliente Y")
-    assert list(cartoes(html)) == [] and list(linhas(html)) == ["Usina Gama", "Usina Zeta"]
+    assert list(cartoes(html)) == [] and list(linhas_regiao(html)) == ["Usina Gama", "Usina Zeta"]
     assert valor(faixa(html)["cobertura"]) == "3"
     assert 'value="Cliente Y" selected' in html
     assert "Usina Epsilon" not in html                         # a sem coordenada de outro cliente não aparece
@@ -254,7 +268,7 @@ def test_fonte_que_nunca_leu_diz_sem_leitura_boa_e_nao_mostra_zero(mundo):
     assert 'class="cl-fonte cl-fora"' in html
     f = faixa(html)
     assert valor(f["sem"]) == "—" and "não dá para dizer" in texto(f["sem"])           # traço, nunca "0" nem número solto
-    assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in texto(f["atencao"])
+    assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in texto(f["regiao"])        # a atenção não usa os avisos
     assert "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta" not in t     # há usinas nas duas listas: sem título de vazio
 
 
@@ -378,8 +392,9 @@ def test_a_grade_por_estado_tem_27_quadrados_o_numero_de_usinas_com_alerta_e_a_c
     q = quadrados(html)
     assert len(q) == 27 and set(q) == set(V.UFS_GRADE)
     pi = q["PI"]
-    assert "cl-uf--agir" in pi and re.search(r'<span class="cl-uf-n">4</span>', pi)             # Alfa, Gama, Zeta e Beta
-    assert "grid-column:4;grid-row:3" in pi and 'title="PI: 4 usinas com alerta, 1 para agir agora"' in pi
+    # só os alertas (agir e atenção) entram: a condição da região (Gama, Zeta e Beta, 10/10/2026) não pinta o estado
+    assert "cl-uf--agir" in pi and re.search(r'<span class="cl-uf-n">1</span>', pi)             # Alfa
+    assert "grid-column:4;grid-row:3" in pi and 'title="PI: 1 usina com alerta, 1 para agir agora"' in pi
     pa = q["PA"]
     assert "cl-uf--" not in pa and re.search(r'<span class="cl-uf-n">·</span>', pa)
     assert "cada quadrado é um estado (não é um mapa)" in texto(html)
@@ -405,7 +420,7 @@ def test_a_grade_nao_diz_sem_usina_com_alerta_quando_uma_fonte_nao_foi_lida(mund
 def test_matriz_com_25_usinas_mostra_as_20_primeiras_e_o_link_para_ver_todas(mundo25):
     c, _, _ = mundo25
     html = pagina(c)
-    assert len(linhas(html)) == 20 and list(linhas(html))[0] == "Usina 01" and list(linhas(html))[-1] == "Usina 20"
+    assert len(linhas_atencao(html)) == 20 and list(linhas_atencao(html))[0] == "Usina 01" and list(linhas_atencao(html))[-1] == "Usina 20"
     t = texto(html)
     assert "25 usinas, as 20 primeiras" in t and "Ver todas (25)" in t
     assert 'href="/t/performance/clima?todas=1#cl-atencao"' in html
@@ -414,7 +429,7 @@ def test_matriz_com_25_usinas_mostra_as_20_primeiras_e_o_link_para_ver_todas(mun
 def test_com_todas_a_matriz_mostra_as_25_e_oferece_voltar(mundo25):
     c, _, _ = mundo25
     html = pagina(c, todas="1")
-    assert len(linhas(html)) == 25 and list(linhas(html))[-1] == "Usina 25"
+    assert len(linhas_atencao(html)) == 25 and list(linhas_atencao(html))[-1] == "Usina 25"
     t = texto(html)
     assert "25 usinas" in t and "25 usinas, as 20 primeiras" not in t and "Ver todas" not in t and "Ver só as 20 primeiras" in t
     assert 'href="/t/performance/clima#cl-atencao"' in html
@@ -521,11 +536,13 @@ def test_sem_alerta_e_com_fonte_fora_a_tela_nao_diz_nenhuma_usina_para_agir_agor
     html = pagina(c)
     t = texto(html)
     assert "Sem leitura de avisos do Instituto Nacional de Meteorologia (INMET): não dá para dizer que não há alerta" in t
-    assert "Nenhuma usina para agir agora" not in t and "Nenhuma usina em atenção" not in t
+    assert "Nenhuma usina para agir agora" not in t
+    assert "Nenhuma usina com fogo perto" in t                                        # a atenção (o fogo perto) não usa os avisos
     f = faixa(html)
-    # o agir usa avisos e focos, o atenção usa avisos e risco: cada um perdeu o INMET e segue com o que leu, em âmbar e com a razão
-    assert (valor(f["agir"]), valor(f["atencao"]), valor(f["sem"])) == ("0", "0", "—")
-    assert "cl-na" in f["agir"] and "cl-na" in f["atencao"] and "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in texto(f["agir"])
+    # o agir usa avisos e focos, o acompanhar usa avisos e risco: cada um perdeu o INMET e segue com o que leu, em âmbar e com a razão
+    assert (valor(f["agir"]), valor(f["atencao"]), valor(f["regiao"]), valor(f["sem"])) == ("0", "0", "0", "—")
+    assert "cl-na" in f["agir"] and "cl-na" in f["regiao"] and "cl-na" not in f["atencao"]
+    assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET)" in texto(f["agir"])
     assert "Os números da faixa e as listas não incluem: avisos do Instituto Nacional de Meteorologia (INMET)." in t and "Lendo agora" not in t
     assert '<meta http-equiv="refresh" content="60">' in html
 
@@ -546,8 +563,9 @@ def test_tudo_lido_e_sem_alerta_a_tela_pode_dizer_que_nao_ha(mundo, monkeypatch)
     _instalar(monkeypatch, _leitura({"avisos": [], "ignorados": [], "lidos": 0}), _focos_vazio(), _risco())
     html = pagina(c)
     t = texto(html)
-    assert "Nenhuma usina para agir agora" in t and "Nenhuma usina em atenção" in t
-    assert {i: valor(x) for i, x in faixa(html).items()} == {"agir": "0", "atencao": "0", "sem": "6", "cobertura": "6"}
+    assert "Nenhuma usina para agir agora" in t and "Nenhuma usina com fogo perto" in t
+    assert "Nenhuma usina com condição da região a acompanhar" in t
+    assert {i: valor(x) for i, x in faixa(html).items()} == {"agir": "0", "atencao": "0", "regiao": "0", "sem": "6", "cobertura": "6"}
 
 
 def test_fonte_pela_metade_deixa_a_celula_ambar_e_diz_parcial(mundo, monkeypatch):
@@ -557,7 +575,8 @@ def test_fonte_pela_metade_deixa_a_celula_ambar_e_diz_parcial(mundo, monkeypatch
     html = pagina(c)
     f = faixa(html)
     assert 'class="cl-cel cl-agir cl-na"' in f["agir"] and "avisos do Instituto Nacional de Meteorologia (INMET): parcial" in texto(f["agir"])
-    assert 'class="cl-cel cl-atencao cl-na"' in f["atencao"] and "cl-na" in f["sem"] and "nas fontes lidas" in texto(f["sem"])
+    assert 'class="cl-cel cl-regiao cl-na"' in f["regiao"] and "cl-na" in f["sem"] and "nas fontes lidas" in texto(f["sem"])
+    assert 'class="cl-cel cl-atencao"' in f["atencao"]                                # a atenção não usa os avisos
     assert 'class="cl-fonte cl-atencao"' in html and "1 aviso foi ignorado" in texto(html)
 
 

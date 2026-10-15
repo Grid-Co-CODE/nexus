@@ -88,16 +88,21 @@ RISCO_FOGO = {"o_que_e": f"Previsão do {F.extenso('inpe')}, de 0 a 1, de quanto
               "na_usina": "Com risco alto ou crítico, qualquer faísca ou queimada vizinha pode virar incêndio perto dos módulos.",
               "conferir": "Roçagem e aceiro em dia e extintores no lugar."}
 
-# Os três níveis da USINA, na ordem da tela: o que quer dizer e o que fazer com ele.
+# Os quatro níveis da USINA, na ordem da tela: o que quer dizer e o que fazer com ele (o quarto, Acompanhar, de 10/10/2026: a
+# condição da região, que antes pintava de amarelo quase todas as usinas na seca).
 COMO_LER = (
     {"id": "agir", "rotulo": "Agir agora",
-     "quer_dizer": f"Fogo a até 5 km da usina, ou aviso forte do {F.extenso('inmet')}: Grande Perigo de qualquer tipo, ou "
+     "quer_dizer": f"Fogo a até 5 km da usina agora, ou aviso forte do {F.extenso('inmet')}: Grande Perigo de qualquer tipo, ou "
                    "Perigo de tempestade, chuva forte, vento ou granizo.",
      "fazer": "Avisar o supervisor da região e conferir a usina assim que der."},
     {"id": "atencao", "rotulo": "Atenção",
-     "quer_dizer": f"Algum outro aviso do {F.extenso('inmet')} (agora ou nos próximos dias), risco de fogo alto ou "
-                   "crítico em algum dos próximos quatro dias, ou fogo visto pelos satélites da NASA a até 5 km nas últimas 24 horas.",
-     "fazer": "Acompanhar; nada a fazer agora."},
+     "quer_dizer": "Fogo perto da usina: visto pelos satélites a até 5 km nas últimas 24 horas, ou a até 10 km com risco de fogo "
+                   "crítico hoje ou amanhã.",
+     "fazer": "Na próxima ronda, conferir o entorno: se o fogo chegou perto da cerca, o aceiro e a vegetação."},
+    {"id": "regiao", "rotulo": "Acompanhar",
+     "quer_dizer": f"Condição da região, nada perto da usina: tempo seco, calor, risco de fogo alto ou um aviso leve do "
+                   f"{F.extenso('inmet')} (Perigo Potencial, ou Perigo de baixa umidade e de calor).",
+     "fazer": "Nada a fazer agora; manter a rotina de roçagem, aceiro e limpeza."},
     {"id": "sem", "rotulo": "Sem alerta",
      "quer_dizer": "Nenhum aviso, nenhum fogo perto e risco de fogo abaixo de alto, com as quatro fontes lidas.",
      "fazer": "Nada."},

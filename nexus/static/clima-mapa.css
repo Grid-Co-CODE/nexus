@@ -56,6 +56,7 @@
 .mp-ponto.mp-n-agir{fill:var(--cl-critico)}
 .mp-ponto.mp-n-atencao{fill:var(--cl-atencao)}
 .mp-ponto.mp-n-sem{fill:var(--cl-ok)}
+.mp-ponto.mp-n-regiao{fill:var(--cl-regiao)}
 .mp-ponto.mp-n-nx{fill:var(--cl-mudo)}
 .mp-usinas a:hover .mp-ponto,.mp-usinas a:focus-visible .mp-ponto{stroke:var(--tinta);stroke-width:2.5px}
 
@@ -84,6 +85,7 @@
 .mp-chave.mp-n-agir{background:var(--cl-critico)}
 .mp-chave.mp-n-atencao{background:var(--cl-atencao)}
 .mp-chave.mp-n-sem{background:var(--cl-ok)}
+.mp-chave.mp-n-regiao{background:var(--cl-regiao)}
 .mp-chave.mp-n-nx{background:var(--cl-mudo)}
 .mp-chave--aviso{width:16px;height:12px;margin:3px 1px 0;border-radius:3px;border:1px solid currentColor;background:currentColor;opacity:.5}
 .mp-chave--futuro{background:transparent;border:1.5px dashed currentColor;opacity:1}
@@ -107,6 +109,7 @@
 .mp-risco--agir{color:var(--cl-critico)}
 .mp-risco--atencao{color:var(--cl-atencao)}
 .mp-risco--sem{color:var(--cl-ok)}
+.mp-risco--regiao{color:var(--cl-regiao)}
 .mp-risco--nx{color:var(--cl-mudo)}
 .mp-tab-motivo{min-width:130px;color:var(--tinta-2);overflow-wrap:break-word}
 
@@ -212,6 +215,7 @@
 .mp-oculta-agir .mp-usinas a:has(.mp-n-agir),.mp-oculta-agir .mp-tab--agir,
 .mp-oculta-atencao .mp-usinas a:has(.mp-n-atencao),.mp-oculta-atencao .mp-tab--atencao,
 .mp-oculta-sem .mp-usinas a:has(.mp-n-sem),.mp-oculta-sem .mp-tab--sem,
+.mp-oculta-regiao .mp-usinas a:has(.mp-n-regiao),.mp-oculta-regiao .mp-tab--regiao,
 .mp-oculta-nx .mp-usinas a:has(.mp-n-nx),.mp-oculta-nx .mp-tab--nx{display:none}
 /* a usina escolhida: um aro em volta dela no mapa e a linha marcada na tabela */
 .mp-sel{fill:none;stroke:var(--tinta);stroke-width:2.5px;vector-effect:non-scaling-stroke;pointer-events:none}

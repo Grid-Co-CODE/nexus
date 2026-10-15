@@ -230,12 +230,21 @@ def test_aviso_que_manda_agir_basta_e_vale_o_futuro():
     assert A.nivel_da_usina([futuro], False, False) == "agir"
 
 
-def test_outro_aviso_ou_risco_alto_e_atencao():
+def test_outro_aviso_ou_risco_alto_sem_fogo_perto_e_acompanhar():
+    # 10/10/2026: a condição da região (aviso leve, Perigo de evento que não estraga usina, risco alto) é Acompanhar
     potencial = aviso(nivel=1, severidade="Perigo Potencial", evento="Tempestade")
-    assert A.nivel_da_usina([potencial], False, False) == "atencao"
-    assert A.nivel_da_usina([aviso(nivel=2, evento="Onda de Calor")], False, False) == "atencao"
-    assert A.nivel_da_usina([], False, True) == "atencao"
-    assert A.nivel_da_usina([potencial], False, True) == "atencao"
+    assert A.nivel_da_usina([potencial], False, False) == "regiao"
+    assert A.nivel_da_usina([aviso(nivel=2, evento="Onda de Calor")], False, False) == "regiao"
+    assert A.nivel_da_usina([], False, True) == "regiao"
+    assert A.nivel_da_usina([potencial], False, True) == "regiao"
+
+
+def test_fogo_perto_e_atencao_e_vence_a_condicao_da_regiao():
+    potencial = aviso(nivel=1, severidade="Perigo Potencial", evento="Tempestade")
+    assert A.nivel_da_usina([], False, False, fogo_24h=True) == "atencao"                 # fogo da NASA a até 5 km em 24 h
+    assert A.nivel_da_usina([potencial], False, True, fogo_com_risco=True) == "atencao"   # crítico com fogo a até 10 km
+    assert A.nivel_da_usina([aviso(nivel=2, evento="Vendaval")], False, False, fogo_24h=True) == "agir"
+    assert A.ROTULO_NIVEL["regiao"] == "Acompanhar" and A.FOGO_REGIAO_KM == 10.0
 
 
 def test_agir_vence_atencao_quando_os_dois_aparecem():
@@ -249,4 +258,4 @@ def test_sem_nada_e_sem_alerta():
 
 
 def test_rotulos_dos_niveis():
-    assert A.ROTULO_NIVEL == {"agir": "Agir agora", "atencao": "Atenção", "sem": "Sem alerta"}
+    assert A.ROTULO_NIVEL == {"agir": "Agir agora", "atencao": "Atenção", "regiao": "Acompanhar", "sem": "Sem alerta"}

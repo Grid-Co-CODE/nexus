@@ -387,15 +387,27 @@ quer dizer, em linguagem de quem não é da meteorologia), `visao` (o que a tela
   crítico; o valor é arredondado a 9 casas antes de comparar (o 0,70 em double pode chegar 0,6999999999999). Valor ACIMA de 1
   derruba o dia: uma escala trocada (0 a 100) acenderia o "crítico" em toda usina.
 - **A borda do polígono conta como dentro** (o `contains` do shapely a exclui): um aviso que encosta na usina vale.
-- **Os três níveis da usina (07/10/2026), regra em `alertas.py`:** o caso que os criou foi 06/10, na seca: 145 das 154
-  usinas apareciam "com alerta" (baixa umidade e risco de fogo alto cobrindo o Nordeste e o Centro-Oeste) e só 3 pediam ação.
-  **Agir agora** = foco a até 5 km (é evento, não previsão); OU aviso do INMET "Grande Perigo" de qualquer evento; OU aviso
-  "Perigo" de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo (comparados sem acento,
-  sem caixa e pelo nome inteiro; evento fora da lista em Perigo vai para Atenção, nunca some). **Atenção** = qualquer outro
-  aviso, em vigor ou futuro; OU risco de fogo alto ou crítico em algum dos quatro dias. **Sem alerta** = nada disso, e só se
-  diz com as TRÊS fontes lidas. Aviso futuro conta (a tela diz quando começa). Dentro de cada nível, a ordem é a gravidade que já
-  existia (3 = Grande Perigo, foco ou risco crítico; 2 = Perigo ou risco alto; 1 = Perigo Potencial) e, no empate: tem foco,
-  mais tipos de alerta, foco mais perto, aviso mais grave, nome. Risco médio não é alerta. Com o arquivo de ontem do INPE (lido
+- **Os quatro níveis da usina, regra em `alertas.py`** (três em 07/10/2026; o quarto, Acompanhar, em 10/10/2026). Os casos que os
+  criaram: em 06/10, na seca, 145 das 154 usinas apareciam "com alerta" e só 3 pediam ação; em 10/10 (Levi, olhando o mapa: "está
+  tudo vermelho ou amarelo, tudo está em risco, quando tudo está em risco nada está em risco") a Atenção ainda pegava 151 das 154:
+  53 por baixa umidade com risco de fogo, 48 por tempestade só em Perigo Potencial, 31 só pelo risco. Era a REGIÃO, não a usina.
+  **Agir agora** (vermelho) = foco a até 5 km na última hora (é evento, não previsão); OU aviso do INMET "Grande Perigo" de
+  qualquer evento; OU aviso "Perigo" de tempestade, chuvas intensas, acumulado de chuva, vendaval, ventos costeiros ou granizo
+  (comparados sem acento, sem caixa e pelo nome inteiro). **Atenção** (amarelo) = o fogo PERTO: fogo visto pela NASA a até 5 km
+  nas últimas 24 h; OU risco de fogo crítico HOJE ou AMANHÃ (pelo rótulo do dia: com o arquivo de ontem, "Hoje" e "D+1") com fogo
+  a até 10 km (da NASA nas últimas 24 h, ou do INPE na última hora, "agora"). **Acompanhar** (azul, `--cl-regiao` = `--info`) = a
+  condição da região, nada perto da usina: qualquer outro aviso, em vigor ou futuro (Perigo Potencial de qualquer evento; Perigo
+  de evento fora da lista, como baixa umidade e onda de calor, que nunca some), OU risco de fogo alto ou crítico em algum dos
+  quatro dias sem fogo perto. **Sem alerta** = nada disso, com as fontes lidas. Com o dado de 10/10: 3 agir, 27 atenção, 124
+  acompanhar (o fogo a até 10 km com risco crítico pega 18 das 27; a 25 km seriam 62, o que voltaria a pintar tudo). De que fontes
+  cada número depende (`visao.FONTES_DO_NIVEL`): agir = avisos e focos; atenção = focos, risco e NASA (não os avisos); acompanhar
+  = avisos e risco; sem alerta = as quatro. A grade por estado conta só os alertas (agir e atenção): a condição da região não
+  pinta o estado. Na lista, o Acompanhar é uma seção própria: o resumo do que pesa (`visao.resumo_da_regiao`, uma pílula por
+  evento e nível e a do risco de fogo, com quantas usinas) e a tabela inteira recolhida em "Ver as N usinas" (a mesma macro
+  `matriz` da Atenção, com as linhas `cl-lin--regiao`). Aviso futuro conta (a tela diz quando começa). Dentro de cada nível, a
+  ordem é a gravidade que já existia (3 = Grande Perigo, foco, risco crítico ou fogo forte; 2 = Perigo, risco alto, fogo da NASA ou
+  fogo a 10 km com risco crítico; 1 = Perigo Potencial) e, no empate: tem foco, mais tipos de alerta, fogo mais perto, aviso mais
+  grave, nome. Risco médio não é alerta. Com o arquivo de ontem do INPE (lido
   antes das ~06:30) o dia "Ontem" ainda conta como um dos quatro (a fonte já está em atenção e o rótulo diz o dia certo).
 - **A tela não pode parecer "tudo bem" quando a fonte não foi lida inteira** (revisão de 06/10/2026). Fonte fora: a última
   leitura boa é servida com o erro e a hora ("INMET fora agora; última leitura boa às HH:MM"), nunca como fresca; sem leitura
