@@ -35,7 +35,37 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
-| `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá) |
+| `motor/` | **cópia** do motor do PCM: **não edite** (veja o `README.md` de lá); a exceção são as duas correções de 15/10/2026 (seção abaixo), que esperam subir no repositório do PCM |
+
+## Horas por tarefa e zeladoria no motor (15/10/2026)
+
+Levi: "as tarefas estão vindo com horas previstas para a mesma quantidade de horas da OS [...] a OS 15596 de Elias
+Fausto, a OS toda tem 25 Horas, porém por tarefa está somando 25 horas por tarefa, o que causa quase 750 hora de
+tarefas pendentes [...] O mesmo está acontecendo com a OS 14331" e "gostaria que o tipo zeladoria só puxasse quando o
+tipo de tarefa fosse de fato zeladoria, não só pelo nome, tem corretiva sendo reconhecida como zeladoria".
+
+- **A causa das horas:** a view `work_orders` do Fracttal devolve em `duration` a duração da OS repetida em cada
+  tarefa. O `fonte_bd_api.df_semanal` (o leitor do motor e do robô do PCM desde que a fonte trocou da planilha BD para a
+  API) não corrigia; o conserto antigo do PCM (`enriquecer_com_duracoes_subtarefas`) pede o JWT e não roda ali. A
+  duração da tarefa vem na mesma linha, em `tasks_duration` ("Total de Horas"). Conferido no retrato de 14/10: a
+  duração da OS é igual em todas as tarefas de 1.694 de 1.694 OS; a 15596 tem 25 h e as 43 tarefas somam 25 h; a 14331
+  tem 6 h = 4 × 1,5 h.
+- **De onde vinham os números da W42:** a 15596 com 25 h POR TAREFA (741 h na agenda, 660 pendentes, 15 mil horas)
+  foi o ROBÔ do PCM (`atualizacao_semanal`), que incorpora OS nova com a duração do leitor e empurra o que estiver no
+  caminho; e cada vez que uma OS nova cai no horário de uma linha já deslocada, ela vira mais uma pendente (480 do
+  mesmo inversor). A 14331 (4 × 6 h na mesma segunda) foi o MOTOR: fora das MPx, ele usa a duração do leitor.
+- **A regra agora:** nas OS de mais de uma tarefa, a duração é a da tarefa; sem ela, a da OS dividida pelas tarefas; OS
+  de uma tarefa não muda (`fonte_bd_api._duracao_da_tarefa`). Zeladoria é o "Tipo de tarefa" Zeladoria
+  (`programacao_v7.is_zeladoria`); pelo nome, "roça" sem acento casava com "troca" e "Sorocaba", e 150 das 186 tarefas
+  abertas marcadas não eram zeladoria (113 corretivas). As MPx do motor seguem com as horas fixas da calibração do PCM
+  (MPM 1,1 h, MPA 4 h por tarefa: a 15596 sai com 43 × 4 h no motor); trocar isso é decisão de regra do PCM.
+- **Onde está:** na cópia do motor do Nexus (vale para a semana que o Nexus gera, desde a W43). No repositório do PCM
+  NÃO subiu (o push foi barrado nesta sessão: é o sistema do PCM); o mesmo conserto, mais dois no robô (OS nova acima
+  de 8 h usa a duração fixa da sigla; a mesma tarefa não se repete na `_Pendentes`), está pronto e descrito no
+  `motor/README.md`. Até subir lá, o robô segue pondo a duração da OS em cada tarefa de OS nova, na semana em curso.
+- **Prova:** W43 com a mesma foto (`ferramentas/gerar_semana_foto.py`, 14/10 15:06), motor antes e depois: maior dia
+  de equipe 24,2 h → 10,3 h; 14331 24 h → 6 h; zeladoria terceirizada 31 → 18 linhas. Testes:
+  `tests/test_pcm_motor_regras.py` (4 mutações, todas pegas).
 
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
 
