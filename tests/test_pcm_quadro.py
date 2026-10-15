@@ -325,6 +325,43 @@ def test_aplicar_na_semana_em_curso_confere_e_registra(tmp_path):
     assert Q.gravadas(cfg2, "2026-W41") == []
 
 
+# ── o tipo de zeladoria que o Fracttal não confirma ─────────────────────────────────────────────────────────
+def _semana_com_zeladoria():
+    rows = [_r(15290, "Segunda-feira", "07:30", tarefa="Vargem Grande: troca de módulos danificados", tipo="Zeladoria",
+               paralelo="Sim"),
+            _r(16154, "Segunda-feira", "08:00", tarefa="Supressão Vegetal", tipo="Zeladoria", paralelo="Sim"),
+            _r(7, "Terça-feira", "09:00", tarefa="Limpeza que o Fracttal não tem", tipo="Zeladoria")]
+    pend = [{"os_id": "15291", "tarefa": "Troca de fusível", "tipo": "Zeladoria", "duracao": 1, "motivo": "",
+             "cluster": "SP Leste 02", "usina": "Cliente A - Usina 1 - SP"}]
+    return {"week": "2026-W42", "rows": rows, "pendentes": pend}
+
+
+FRACTTAL = [{"os": "15290", "tarefa": "Vargem Grande: troca de módulos danificados", "tipo": "Corretiva"},
+            {"os": "16154", "tarefa": "Supressão Vegetal", "tipo": "Zeladoria"},
+            {"os": "15291", "tarefa": "Troca de Fusível", "tipo": "Corretiva"}]
+
+
+def test_zeladoria_que_o_fracttal_nao_confirma_volta_ao_tipo_do_fracttal():
+    """Levi, 15/10/2026, com o cartão da OS 15290 ("Vargem Grande: troca de módulos danificados") marcado ZELADORIA:
+    "Zeladoria ainda está aparecendo em corretivas na parte de PCM do Nexus". A W42 foi gerada antes do motor corrigido
+    (zeladoria pelo nome; "roça" casava com "troca") e a planilha gravou o rótulo no tipo. O tipo do Fracttal (o
+    gestao_pcm.json da Gestão PCM) vale por cima, pela OS e pelo nome da tarefa; zeladoria de verdade e tarefa que o
+    Fracttal não tem ficam como estão."""
+    sem = _semana_com_zeladoria()
+    novo, n = Q.tipo_do_fracttal(sem, FRACTTAL)
+    assert n == 2 and [r["tipo"] for r in novo["rows"]] == ["Corretiva", "Zeladoria", "Zeladoria"]
+    assert novo["pendentes"][0]["tipo"] == "Corretiva"
+    assert sem["rows"][0]["tipo"] == "Zeladoria"                         # a semana que entrou não muda
+    q = Q.montar(novo, [], {})
+    cartao = next(c for col in q["colunas"] for c in col["cartoes"] if c["os"] == "15290")
+    assert cartao["tp"] == "Corretiva" and cartao["tc"] == "corretiva"
+    assert ("Zeladoria", 2) in q["opcoes"]["tipo"] and ("Corretiva", 1) in q["opcoes"]["tipo"]
+    # sem linha de zeladoria, nem precisa das tarefas do Fracttal
+    so_corretiva = {"week": "2026-W42", "rows": [_r(1, "Segunda-feira", "08:00")], "pendentes": []}
+    assert Q.tipo_do_fracttal(so_corretiva, None) == (so_corretiva, 0)
+    assert Q.tipo_do_fracttal(sem, None) == (sem, 0)
+
+
 # ── as telas ─────────────────────────────────────────────────────────────────────────────────────────────────
 def _banco(tmp_path) -> Path:
     s41 = _semana_teste()
@@ -342,6 +379,31 @@ def _nao_admin(app):
         s["logado"], s["admin"] = True, False
         s["usuario"] = {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa Teste", "perfil": "PCM"}
     return c
+
+
+def test_tela_quadro_mostra_o_tipo_do_fracttal(app, logado, tmp_path, monkeypatch):
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 13))
+    sem = _semana_com_zeladoria()
+    sem.update(label="Semana 42", dates={"seg": "12/10", "ter": "13/10", "qua": "14/10", "qui": "15/10", "sex": "16/10"})
+    banco = tmp_path / "banco_dados.json"
+    banco.write_text(json.dumps({"geradoEm": "2026-10-13T12:00:00Z", "semana_ativa": "2026-W42", "semanas": [sem]}),
+                     encoding="utf-8")
+    gestao = tmp_path / "gestao_pcm.json"
+    gestao.write_text(json.dumps({"geradoEm": "2026-10-13T12:00:00Z", "tarefas": FRACTTAL}), encoding="utf-8")
+    app.config.update(NEXUS_PCM_FONTE=str(banco), NEXUS_PCM_GESTAO_FONTE=str(gestao),
+                      NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
+    html = logado.get("/t/pcm/quadro").get_data(as_text=True)
+    dados = json.loads(html.split('id="q-dados">', 1)[1].split("</script>", 1)[0])
+    assert next(i for i in dados["itens"] if i["os"] == "15290")["tp"] == "Corretiva"
+    assert next(i for i in dados["itens"] if i["os"] == "16154")["tp"] == "Zeladoria"
+    # Tarefas e OS, da mesma semana: a linha e o filtro de tipo
+    html = logado.get("/t/pcm/tarefas?tipo=Zeladoria").get_data(as_text=True)
+    assert "Supressão Vegetal" in html and "troca de módulos danificados" not in html
+    assert '<option value="Corretiva"' in html and "Corretiva (1)" in html
+    # a Gestão PCM fora do ar: o quadro abre do mesmo jeito, com o tipo da planilha
+    app.config.update(NEXUS_PCM_GESTAO_FONTE=str(tmp_path / "nao_existe.json"))
+    html = logado.get("/t/pcm/quadro").get_data(as_text=True)
+    assert 'id="q-dados"' in html
 
 
 def test_tela_quadro_semana_em_curso(app, logado, tmp_path, monkeypatch):

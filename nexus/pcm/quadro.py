@@ -306,6 +306,47 @@ def _os(v) -> str:
         return str(v or "").strip()
 
 
+def _eh_zeladoria(tipo) -> bool:
+    return _norm(tipo).startswith("zeladoria")
+
+
+def tem_zeladoria(sem: dict) -> bool:
+    return any(_eh_zeladoria(r.get("tipo")) for r in (sem.get("rows") or []) + (sem.get("pendentes") or []))
+
+
+def tipo_do_fracttal(sem: dict, tarefas: list[dict] | None) -> tuple[dict, int]:
+    """O tipo "Zeladoria" que a planilha traz e o Fracttal não confirma volta a ser o tipo do Fracttal (15/10/2026).
+
+    Até a W42 o motor marcava zeladoria pelo NOME da tarefa ("roça" casava com "troca") e a planilha grava esse rótulo
+    no tipo. Levi, com o cartão da OS 15290 ("Vargem Grande: troca de módulos danificados", Corretiva no Fracttal):
+    "Zeladoria ainda está aparecendo em corretivas na parte de PCM do Nexus". O motor corrigido (zeladoria pelo tipo,
+    PCM `fd39672`) não grava mais isso; esta troca acerta as semanas já geradas. O tipo vem das tarefas do Fracttal da
+    Gestão PCM (`gestao_pcm.json`), pela OS e pelo nome da tarefa; a tarefa que o Fracttal não tem fica como veio.
+    Devolve (semana, quantas linhas mudaram); a semana que entrou não muda."""
+    if not tarefas or not tem_zeladoria(sem):
+        return sem, 0
+    tipo: dict[tuple[str, str], str] = {}
+    for t in tarefas:
+        if isinstance(t, dict):
+            tipo.setdefault((_os(t.get("os")), _norm(t.get("tarefa"))), str(t.get("tipo") or "").strip())
+    n = 0
+
+    def troca(lst):
+        nonlocal n
+        out = []
+        for r in lst:
+            if _eh_zeladoria(r.get("tipo")):
+                tp = tipo.get((_os(r.get("os_id")), _norm(r.get("tarefa"))))
+                if tp and not _eh_zeladoria(tp):
+                    r = dict(r, tipo=tp)
+                    n += 1
+            out.append(r)
+        return out
+
+    novo = dict(sem, rows=troca(sem.get("rows") or []), pendentes=troca(sem.get("pendentes") or []))
+    return novo, n
+
+
 def _hora(v) -> str:
     if v in (None, ""):
         return ""

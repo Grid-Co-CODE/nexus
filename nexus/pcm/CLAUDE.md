@@ -62,6 +62,14 @@ tipo de tarefa fosse de fato zeladoria, não só pelo nome, tem corretiva sendo 
   campo levar mais que o plano, o conserto é no plano do Fracttal. Zeladoria é o "Tipo de tarefa" Zeladoria
   (`programacao_v7.is_zeladoria`); pelo nome, "roça" sem acento casava com "troca" e "Sorocaba", e 150 das 186 tarefas
   abertas marcadas não eram zeladoria (113 corretivas).
+- **As semanas já geradas com a regra velha** gravaram "Zeladoria" no tipo (o motor escreve o rótulo dele na coluna
+  Tipo, e o tipo do Fracttal se perde). Levi, 15/10, com o cartão da OS 15290 ("troca de módulos danificados") na W42:
+  "Zeladoria ainda está aparecendo em corretivas na parte de PCM do Nexus". O Quadro e Tarefas e OS trocam esse
+  rótulo pelo tipo do Fracttal das tarefas da Gestão PCM (`gestao_pcm.json`), pela OS e pelo nome da tarefa, quando o
+  Fracttal diz outro tipo (`quadro.tipo_do_fracttal`, `telas._tipo_do_fracttal`; só lê a Gestão PCM quando a semana tem
+  zeladoria; fora do ar, fica o da planilha). Na W42 real: 26 linhas Zeladoria, 9 voltam ao tipo do Fracttal (8
+  corretivas e 1 administrativa); das 17 que ficam, 16 são Zeladoria no Fracttal e 1 não está mais no arquivo. Só o
+  rótulo muda: o "Em paralelo" da janela continua o que a planilha planejou, e o App de Campo segue com o arquivo dele.
 - **No robô do PCM:** OS nova acima de 8 h usa a duração fixa da sigla; a mesma tarefa não se repete na `_Pendentes`;
   e o passo A2 (incorporar OS nova) não reincorpora o que o `Observacoes_Semana_Atual.txt` tira (`não` e `sem:`). O A2
   roda ANTES do A3, que apaga: a cada rodada a OS tirada voltava, deslocava o que estivesse no horário dela e só então

@@ -260,6 +260,7 @@ def registrar_pcm(bp) -> None:
         sem = S.achar(leitura.dados, a.get("semana") or None)
         if sem is None:
             abort(404)
+        sem = _tipo_do_fracttal(current_app.config, sem)
         filtros = {"equipe": a.get("equipe") or None, "dia": a.get("dia") or None, "status": a.get("status") or None,
                    "tipo": a.get("tipo") or None, "busca": a.get("q") or None,
                    "horario": "fora" if a.get("horario") == "fora" else None}
@@ -559,6 +560,18 @@ def _gestor_da_sessao(sem) -> str:
     return ""
 
 
+def _tipo_do_fracttal(cfg, sem: dict) -> dict:
+    """O "Zeladoria" das semanas geradas antes do motor corrigido (pelo nome da tarefa) volta ao tipo do Fracttal
+    (`quadro.tipo_do_fracttal`), no Quadro e em Tarefas e OS. As tarefas da Gestão PCM só são lidas quando a semana tem
+    zeladoria; fora do ar, a tela abre com o tipo da planilha."""
+    if not Q.tem_zeladoria(sem):
+        return sem
+    try:
+        return Q.tipo_do_fracttal(sem, (fonte.ler_gestao(cfg).dados or {}).get("tarefas"))[0]
+    except Exception:      # noqa: BLE001 — a Gestão PCM fora do ar não derruba a tela
+        return sem
+
+
 def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
     pedida = (args.get("semana") or "").strip() or None
     base = _quadro_semana(cfg, pedida, (args.get("rodada") or "").strip() or None)
@@ -568,6 +581,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
         if pedida and base["leitura"].dados is not None:
             return None
         return dict(ctx, sem=None, chips=[], erro=erro, ok=None)
+    sem = _tipo_do_fracttal(cfg, sem)
     filtros = {k: str(args.get(k) or "").strip()[:160] for k in Q.FILTROS}
     filtro_gestor = False
     if not pedida and not any(filtros.values()) and not args.get("rodada"):
