@@ -37,11 +37,13 @@ vive só na memória da tela. Sem a chave, a tela lista as contestações com "c
 **A tela.** Uma aba por setor com a contagem; a mais nova em cima: quando chegou (Brasília), a usina, o dia contestado,
 o que contesta, o cliente e o contato, a mensagem, o que ele via na tela, se o Teams do setor recebeu ("não recebeu" = a
 contestação só está aqui) e o responsável. Tela nova nasce FECHADA para os setores (Base → Acessos): o administrador vê;
-marcar "Contestações" para Performance e Zeladoria.
+marcar "Contestações" para Performance, COS e Zeladoria. **Que setor recebe o quê** (o 5080 decide, `thopen/contestacao.py`):
+geração, string e tracker → Performance; disponibilidade e desligamento → COS (Levi, 15/10/2026: "Disponibilidade e
+desligamento vão para o setor de COS"); ronda → Zeladoria.
 
 **Cada setor vê só a sua** (Levi, 15/10/2026: "O setor só vê a contestação do próprio setor, exceto administrador"):
 `_setores_visiveis` — administrador (a lista de agora; o Nexus recalcula `session["admin"]` a cada pedido), todas; quem
-tem setor, só a de mesmo nome (os setores do Nexus são "Performance" e "Zeladoria", como os das contestações); outro
+tem setor, só a de mesmo nome (os setores do Nexus são "Performance", "COS" e "Zeladoria", como os das contestações); outro
 setor, nenhuma ("Nenhuma contestação para o seu setor"); portão por setor desligado (`NEXUS_ACESSO_POR_SETOR=0`,
 testes), todas. **O servidor barra**, não só a tela: o card e as ações de uma contestação de outro setor dão 404.
 

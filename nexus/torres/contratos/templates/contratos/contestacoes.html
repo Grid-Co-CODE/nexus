@@ -52,7 +52,7 @@
 
   {% if not setores %}
   <div class="cn-erro cn-aviso" role="status"><b>Nenhuma contestação para o seu setor.</b>
-    As contestações dos clientes vão para a Performance e para a Zeladoria{% if meu_setor %}; o seu setor é {{ meu_setor }}{% endif %}.</div>
+    As contestações dos clientes vão para a Performance, o COS e a Zeladoria{% if meu_setor %}; o seu setor é {{ meu_setor }}{% endif %}.</div>
   {% else %}
   <nav class="cn-abas" aria-label="Setor">
     {% for s, rot in setores %}<a href="?setor={{ s }}"{% if s == setor %} aria-current="page"{% endif %}>{{ rot }}<i>{{ d.contagem.get(s, 0) }}</i></a>{% endfor %}

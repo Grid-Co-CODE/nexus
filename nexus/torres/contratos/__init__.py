@@ -54,7 +54,7 @@ def _sem_acento(txt) -> str:
 def _setores_visiveis() -> tuple:
     """Os setores de contestação que a sessão vê (Levi, 15/10/2026: "O setor só vê a contestação do próprio setor, exceto
     administrador"). Administrador: todos. Quem tem setor: só o de mesmo nome (os setores do Nexus se chamam
-    Performance e Zeladoria, como os das contestações); outro setor, nenhum. Portão por setor desligado
+    Performance, COS e Zeladoria, como os das contestações); outro setor, nenhum. Portão por setor desligado
     (NEXUS_ACESSO_POR_SETOR=0, testes): todos, como antes."""
     if session.get("admin"):
         return tuple(s for s, _ in CT.SETORES)
@@ -79,7 +79,7 @@ def _achar(linha_id: str):
 
 @bp.route("/contestacoes")
 def contestacoes():
-    """Uma aba por setor que a sessão vê (Performance, Zeladoria), a contestação mais nova em cima: quando chegou, a
+    """Uma aba por setor que a sessão vê (Performance, COS, Zeladoria), a contestação mais nova em cima: quando chegou, a
     usina, o dia contestado, o que o cliente contestou, quem é e como responder, a mensagem e o que ele via na tela
     naquele dia, se o Teams do setor recebeu o aviso e quem é o responsável (ou o "Pegar para mim"). A linha abre o card
     das atualizações. Nome, contato e mensagem só com a chave privada deste Nexus."""

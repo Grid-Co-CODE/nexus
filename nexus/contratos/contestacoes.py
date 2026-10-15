@@ -3,7 +3,8 @@ um lugar para essas contestações separando setores!"; "ficaria na API do PG, p
 
 De onde vem: o Dashboard Thopen (5080) grava cada contestação no livro `thopen_contestacoes` · `contestacoes` (o 5080 é a
 FONTE; fato `contestacao_cliente` no catálogo, nexus/dados/catalogo.py). Grão: 1 linha = 1 contestação × 1 setor — as
-mesmas mensagens do Teams: ronda → Zeladoria; geração, disponibilidade, desligamento, string e tracker → Performance. O
+mesmas mensagens do Teams: ronda → Zeladoria; disponibilidade e desligamento → COS (15/10/2026); geração, string e
+tracker → Performance. O
 cliente que marca dos dois lados gera duas linhas com o mesmo `contestacao_id`.
 
 A API do banco tem LEITURA ABERTA (nexus/dados/CLAUDE.md, regra 8): nome, contato, mensagem e o que estava na tela do
@@ -24,7 +25,10 @@ LIVRO, ABA = "thopen_contestacoes", "contestacoes"
 PREFIXO = "cx1:"
 _INFO = b"thopen-contestacao/v1"
 CHAVE = "NEXUS_CONTESTACAO_CHAVE_PRIVADA"
-SETORES = (("performance", "Performance"), ("zeladoria", "Zeladoria"))
+# o setor de cada contestação é o do 5080 (thopen/contestacao.py, ITENS): geração, string e tracker → Performance;
+# disponibilidade e desligamento → COS (Levi, 15/10/2026: "Disponibilidade e desligamento vão para o setor de COS");
+# ronda → Zeladoria. O nome casa com o setor do Nexus (sem acento nem caixa): quem é do setor vê a aba dele
+SETORES = (("performance", "Performance"), ("cos", "COS"), ("zeladoria", "Zeladoria"))
 ITENS = {"geracao": "Geração", "disponibilidade": "Disponibilidade", "desligamento": "Desligamento",
          "string": "String", "tracker": "Tracker", "ronda": "Ronda"}
 # o que o cliente via naquele dia (o gráfico e as tabelas do Diário), na ordem do cartão do Teams

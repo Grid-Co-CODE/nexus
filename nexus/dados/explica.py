@@ -77,7 +77,7 @@ PARA_QUE = {
                     "de Ronda e conta na cobertura; a validação pela foto fica fora, porque não é uma ronda feita.",
     "contestacao_cliente": "Guarda cada contestação que o cliente fez no Dashboard Thopen (geração, disponibilidade, "
                            "desligamento, string, tracker ou ronda de um dia), separada pelo setor que responde: "
-                           "Performance ou Zeladoria. Quem é o cliente, o contato e a mensagem vão cifrados; só o Nexus "
+                           "Performance, COS ou Zeladoria. Quem é o cliente, o contato e a mensagem vão cifrados; só o Nexus "
                            "abre, na tela Contratos e clientes → Contestações.",
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "

@@ -198,8 +198,8 @@ FATOS = (
                     "evento = responsavel (o responsável de agora é o do último) ou atualizacao. Quem (nome e e-mail) e "
                     "o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
-         "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance ou "
-         "Zeladoria)",
+         "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
+         "ou Zeladoria)",
          _d(data=("cod", "data_id_recebida; data_id_contestada_ini e _fim (papéis)"),
             usina=("id", "usina_id (o de-para do 5080; vazio quando a usina tem dois ids, como Primavera); usina em "
                          "nome")),

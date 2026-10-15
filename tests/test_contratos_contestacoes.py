@@ -71,7 +71,7 @@ def banco(app):
 
 def test_separa_por_setor_e_abre_so_com_a_privada(banco, app):
     d = CT.contestacoes()
-    assert d["contagem"] == {"performance": 2, "zeladoria": 1} and d["erro"] is None and not d["sem_chave"]
+    assert d["contagem"] == {"performance": 2, "cos": 0, "zeladoria": 1} and d["erro"] is None and not d["sem_chave"]
     perf = d["por_setor"]["performance"]
     assert [x["id"] for x in perf] == ["b1", "a1"]                               # a mais nova em cima
     a1 = perf[1]
@@ -119,6 +119,9 @@ def test_teste_cruzado_com_o_codigo_do_5080():
         assert cb.LIVRO == CT.LIVRO and cb.ABA == CT.ABA and cb.PREFIXO == CT.PREFIXO
         c = cb.cifrar("Ana", cb.contexto("x1"), pub)
         assert CT.decifrar(c, CT.contexto("x1"), priv) == "Ana"
+        # os setores do 5080 (o canal de cada item) são os das abas daqui (15/10/2026: o COS entrou dos dois lados)
+        import contestacao as c5080
+        assert set(c5080.CANAL) == {s for s, _ in CT.SETORES} and set(c5080.ITENS.values()) <= set(c5080.CANAL)
     finally:
         sys.path.remove(os.path.join(raiz, "thopen"))
 
@@ -223,3 +226,17 @@ def test_catalogo_registra_o_acompanhamento():
     l = catalogo.LIVRO_POR_NOME[TR.LIVRO]
     assert l.abas == (TR.ABA,) and catalogo.aba_segue_a_regra(TR.ABA)
     assert catalogo.POR_ID["tratamento_contestacao"].fontes == (f"{TR.LIVRO} · {TR.ABA}",)
+
+
+def test_disponibilidade_e_desligamento_sao_do_cos(trat, app, cliente, monkeypatch):
+    # Levi, 15/10/2026: "Disponibilidade e desligamento vão para o setor de COS" — o 5080 grava a linha com setor "cos";
+    # quem é do setor COS vê só a aba dele
+    cab = list(banco_linha := _linha("c9", "cos", "disponibilidade;desligamento", "2026-10-15T12:00:00Z", usina="Mandaguaçu"))
+    trat._id(CT.LIVRO, CT.ABA)["linhas"].append({"headers": cab, "values": [banco_linha[c] for c in cab]})
+    d = CT.contestacoes()
+    assert d["contagem"]["cos"] == 1 and d["por_setor"]["cos"][0]["itens"] == ["Disponibilidade", "Desligamento"]
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 5, "nome": "COS"}, "erro": ""})
+    _como(cliente, ANA)
+    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    assert "COS<i>1</i>" in html and "Mandaguaçu" in html and "Performance<i>" not in html and "Zeladoria<i>" not in html
