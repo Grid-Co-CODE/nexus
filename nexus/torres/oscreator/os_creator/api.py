@@ -4557,7 +4557,8 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
     1 work_order_insert com as N → 1 OS multi-tarefa + responsável. Fase 3: etiquetas.
     'note' (se preenchido) sobrescreve a observação de TODAS as tarefas; senão usa a de cada uma.
     Data programada: cada tarefa pode trazer seu próprio 'event_date' (datetime); 'scheduled_date'
-    é o fallback p/ as que não tiverem (default de ambos = agora).
+    é o fallback p/ as que não tiverem (default de ambos = agora). 'prog_date' (datetime) separa a data PROGRAMADA da
+    do evento (a solicitação aprovada na Fila do PCM nasce programada na data sugerida, 15/10/2026).
     → {'ok','os':{id_work_order,wo_folio,id_tasks[,etiquetas]}|None,'erro','aviso','n_tarefas','n_criadas'}."""
     val = [t for t in (tarefas or []) if isinstance(t.get("asset"), dict) and t["asset"].get("id")]
     if not val:
@@ -4585,6 +4586,7 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
                                 tipo=_tipo or None,
                                 note=(note or t.get("notas") or ""),
                                 event_date=(t.get("event_date") or scheduled_date),
+                                prog_date=t.get("prog_date"),
                                 id_parent=id_parent, id_request=id_request)
             if os_.get("id_task"):
                 id_tasks.append(os_["id_task"])
@@ -4663,8 +4665,9 @@ def _tarefa_da_solicitacao(id_request):
 def aprovar_solicitacao(asset: dict, descricao: str, subtarefas: list, id_request,
                         id_responsible, responsible_name: str = "", note: str = "",
                         tipo: str = "Corretiva", etiqueta_ids: list = None,
-                        id_parent=None, classif=None) -> dict:
-    """Converte a solicitacao em OS NUMERADA. Mesmo envelope do `clonar_os`.
+                        id_parent=None, classif=None, prog_date: datetime = None) -> dict:
+    """Converte a solicitacao em OS NUMERADA. Mesmo envelope do `clonar_os`. `prog_date` = a data PROGRAMADA da OS (a
+    data sugerida da solicitacao, na Fila do PCM web, 15/10/2026); None = agora, como sempre.
 
     Aguenta ser chamada duas vezes: se a tentativa anterior parou no meio (tarefa criada, OS
     nao), retoma pela fase 2 em vez de tentar criar outra tarefa — o que so devolveria
@@ -4692,7 +4695,7 @@ def aprovar_solicitacao(asset: dict, descricao: str, subtarefas: list, id_reques
         # caminho da OS clonada — um lugar so decidindo o que vai no payload.
         return clonar_os([{"asset": asset, "tipo": tipo, "descricao": descricao,
                            "classif_1": c1, "classif_2": c2,
-                           "subtarefas": subtarefas or []}],
+                           "subtarefas": subtarefas or [], "prog_date": prog_date}],
                          id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
                          note=note, id_request=id_request, id_parent=id_parent)
     if not id_responsible:

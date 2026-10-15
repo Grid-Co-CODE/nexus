@@ -6,7 +6,9 @@
      edita, e o título escrito à mão não é trocado quando o tema muda (`_titulo_manual`);
    - a OBSERVAÇÃO mostra só o relato; o bloco [PCM] volta intacto ao gravar, o que acontece ao sair do campo e só se
      mudou (`_gravar_obs`);
-   - o TÉCNICO sugerido vem pré-escolhido pelo nome; a DATA é a pretendida pelo supervisor (não vai para a OS, como no app);
+   - o TÉCNICO sugerido vem pré-escolhido pelo nome; a DATA sugerida pelo supervisor é a data PROGRAMADA da OS (15/10/2026,
+     Levi: "No OS Creator em fila a OS programada do PCM tem que ser a data sugerida da solicitação!"; o servidor a lê da
+     própria solicitação; sem ela, a OS nasce programada agora, como antes);
    - as ETIQUETAS do tema entram marcadas "(tema)" e saem só nesta solicitação; tema sem a lista cai na regra antiga da
      PERFORMANCE — tracker, ETM e garantia (`_CardEtiquetas.aplicar_regra`);
    - CLASSIFICAÇÃO 1 = "Programada" e 2 = a disciplina do tema, só em campo vazio (`_sugerir_classif`);
@@ -342,8 +344,9 @@
     }
     if (pai.value.trim() && !paiSel) { SP.aviso('Escolha a OS pai na lista que aparece ao digitar o número — ou apague o campo.', true); return; }
     var subs = editor.itens(), t = (titulo.textContent || '').trim() || tituloDoTema(), n = subs.length || 3;
-    if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)?\n\nA API do Fracttal NÃO edita OS já criada — '
-                        + 'confira as subtarefas antes.')) return;
+    var quando = f.data_sug ? ', programada para ' + f.data_sug : ' (sem data sugerida: programada para agora)';
+    if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)' + quando + '?\n\nA API do Fracttal NÃO edita OS '
+                        + 'já criada — confira as subtarefas antes.')) return;
     ocupado(true, 'criando a OS…');
     SP.pedir('/os/api/solic/' + encodeURIComponent(f.id) + '/aprovar', {
       id_responsible: resp.value, responsavel: resp.options[resp.selectedIndex].text, titulo: t, subtarefas: subs,
@@ -352,7 +355,8 @@
     }, 'Criando a OS no Fracttal…').then(function (x) {
       ocupado(false, '');
       if (!x.ok) { SP.aviso(x.j.erro || 'Não consegui criar a OS.', true); return; }
-      SP.aviso('OS ' + x.j.folio + ' criada a partir da solicitação Nº ' + f.id + '.');
+      SP.aviso('OS ' + x.j.folio + ' criada a partir da solicitação Nº ' + f.id
+               + (x.j.programada ? ', programada para ' + x.j.programada : '') + '.');
       tirar(f);          // "Aprovar avança para a próxima": são várias na fila
     });
   });

@@ -371,6 +371,18 @@ def cartao(s: dict) -> dict:
             "busca": _busca(s)}
 
 
+# Brasília: a data sugerida que o supervisor escreve é a do relógio dele
+_BRT_SUG = dt.timezone(dt.timedelta(hours=-3))
+
+
+def data_sugerida_dt(texto):
+    """A data sugerida da solicitação ('15/10/2026 08:00', ou só o dia, que vira 08:00 como no app) como datetime de
+    Brasília, ou None. É a data em que a OS nasce PROGRAMADA quando o PCM aprova na Fila (15/10/2026, Levi: "No OS
+    Creator em fila a OS programada do PCM tem que ser a data sugerida da solicitação!")."""
+    iso = _data_sugerida_iso(texto)
+    return dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M").replace(tzinfo=_BRT_SUG) if iso else None
+
+
 def _data_sugerida_iso(texto) -> str:
     """'15/10/2026 08:00' ou só '15/10/2026' (as solicitações antigas: o dia vira 08:00, como no app) → o valor do
     <input type=datetime-local>. '' se não der para ler."""

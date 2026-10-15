@@ -419,12 +419,18 @@ def api_aprovar(id_code):
         id_parent = int(corpo.get("id_parent")) if corpo.get("id_parent") not in (None, "") else None
     except (TypeError, ValueError):
         return jsonify({"erro": "OS pai inválida: escolha a OS na lista que aparece ao digitar o número."}), 400
+    # a OS nasce PROGRAMADA na data sugerida da solicitação (15/10/2026, Levi: "No OS Creator em fila a OS programada do
+    # PCM tem que ser a data sugerida da solicitação!"); sem data sugerida legível, como antes (programada agora). Vem da
+    # própria solicitação (o bloco [PCM]), nunca da tela
+    prog = sw.data_sugerida_dt(s.get("_data_sug"))
     res = api.aprovar_solicitacao(
         asset, titulo, subs, s.get("id_code"), corpo.get("id_responsible"), corpo.get("responsavel") or "",
         tipo=corpo.get("tipo") or sw.TIPO_PADRAO, note=str(s.get("observacao") or ""),
         etiqueta_ids=corpo.get("etiquetas") or None, id_parent=id_parent,
-        classif=(corpo.get("classif1") or "", corpo.get("classif2") or ""))
+        classif=(corpo.get("classif1") or "", corpo.get("classif2") or ""), prog_date=prog)
     out = sw.mensagem_aprovacao(res, id_code)
+    if out.get("ok"):
+        out["programada"] = prog.strftime("%d/%m/%Y %H:%M") if prog else ""
     if out.get("ok") or (res or {}).get("ok"):
         _esquecer_lista()              # nasceu OS (ou a tarefa): a solicitação saiu da fila para todo mundo
     return (jsonify(out), 200) if out.get("ok") else (jsonify({"erro": out["mensagem"]}), 400)

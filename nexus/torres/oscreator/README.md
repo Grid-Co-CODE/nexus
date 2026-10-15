@@ -845,3 +845,16 @@ pedia de novo os planos e as subtarefas (o "GET /os/api/performance/contagens, 2
 - Levado ao oem pela `ferramentas/sincronizar_oscreator.py --aplicar` (sem commit lá: o oem é público).
 - Prova: `tests/test_oscreator_abre_sem_esperar_14_10.py` (a tela não pede nada ao Fracttal; o selo uma vez a cada 2 min;
   o Fracttal fora não fica guardado; a contagem uma vez em 6 h).
+
+## Fila do PCM: a OS nasce programada na data sugerida (15/10/2026)
+
+Levi, 15/10/2026: "No OS Creator em fila a OS programada do PCM tem que ser a data sugerida da solicitação!". Até então a
+data que o supervisor sugere (o bloco [PCM] da observação) só aparecia na ficha da Fila e a OS nascia programada na hora
+da aprovação, como no app de mesa.
+
+- Ao APROVAR, o servidor lê a data sugerida da própria solicitação (`solic_web.data_sugerida_dt`: com hora, ou só o dia,
+  que vira 08:00 como no app; horário de Brasília) e a manda como data PROGRAMADA da OS (`api.aprovar_solicitacao(...,
+  prog_date=)` → `clonar_os` → `create_os_rpc(prog_date=)`: `date_maintenance`, `initial_date` e o fim 20 min depois).
+  A data do evento segue sendo a da aprovação. Sem data sugerida legível, como antes: programada agora.
+- A confirmação e o aviso de "OS criada" dizem para quando ela ficou programada. A data vem da solicitação, nunca da tela.
+- O app de mesa (`steps/solic_pcm.py`) não mudou. Prova: `tests/test_oscreator_solic_pcm.py`.

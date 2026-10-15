@@ -302,6 +302,10 @@ def test_aprovar_leva_o_que_esta_na_ficha_com_o_anexo(cli):
     assert [(s["description"], s["attachments_required"]) for s in subs] == [("Medir isolação", True)]
     assert k["classif"] == ("Programada", "") and k["etiqueta_ids"] == [7] and k["id_parent"] == 880001
     assert k["tipo"] == "Corretiva" and k["note"] == OBS
+    # a OS nasce programada na data sugerida da solicitação (15/10/2026; o bloco diz só "15/10/2026": 08:00, como o app)
+    import datetime as _dt
+    assert k["prog_date"] == _dt.datetime(2026, 10, 15, 8, 0, tzinfo=_dt.timezone(_dt.timedelta(hours=-3)))
+    assert r.get_json()["programada"] == "15/10/2026 08:00"
     # a ficha que esvaziou a lista leva a BASE, como o app; sem a chave, as do tema
     cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, subtarefas=[]))
     assert len(cli.gravado[-1][3]) == len(sp.subtarefas_base())
@@ -609,3 +613,30 @@ def test_pela_ponte_quem_nao_e_do_pcm_recebe_o_aviso(app, cli, setor_de_mentira)
     assert r.status_code == 200 and 'id="fl_dados"' in r.get_data(as_text=True)
     r = c.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1, "titulo": "T", "subtarefas": []})
     assert r.status_code == 200 and cli.gravado[-1][0] == "aprovar"
+
+
+def test_a_data_sugerida_vira_a_data_programada_da_os(monkeypatch):
+    """15/10/2026, Levi: "No OS Creator em fila a OS programada do PCM tem que ser a data sugerida da solicitação!": a
+    leitura da data (com hora, só o dia = 08:00, ilegível = nenhuma) e o caminho até o Fracttal (clonar_os manda a data
+    PROGRAMADA ao create_os_rpc; o evento segue sendo agora)."""
+    import datetime as _dt
+    brt = _dt.timezone(_dt.timedelta(hours=-3))
+    assert sw.data_sugerida_dt("16/10/2026 14:30") == _dt.datetime(2026, 10, 16, 14, 30, tzinfo=brt)
+    assert sw.data_sugerida_dt("16/10/2026") == _dt.datetime(2026, 10, 16, 8, 0, tzinfo=brt)
+    assert sw.data_sugerida_dt("") is None and sw.data_sugerida_dt("amanhã") is None
+    chamadas = []
+
+    def criar(asset, desc, task_type, subs, **k):
+        chamadas.append(k)
+        return {"id_task": 501}
+    monkeypatch.setattr(api, "create_os_rpc", criar)
+    monkeypatch.setattr(api, "_classif_ids", lambda *a: {})
+    monkeypatch.setattr(api, "_solicitacao_row", lambda idc: {})
+    monkeypatch.setattr(api, "_tarefa_da_solicitacao", lambda idc: None)
+    monkeypatch.setattr(api, "_work_order_insert", lambda recs, idr, nome: {"id_work_order": 9, "wo_folio": 1234})
+    monkeypatch.setattr(api, "apply_labels", lambda *a: None)
+    quando = _dt.datetime(2026, 10, 16, 8, 0, tzinfo=brt)
+    api.aprovar_solicitacao({"id": 11, "code": "TST-INV11"}, "T", [], 5001, 1, "Ana", prog_date=quando)
+    assert chamadas[-1]["prog_date"] == quando and chamadas[-1]["event_date"] is None
+    api.aprovar_solicitacao({"id": 11, "code": "TST-INV11"}, "T", [], 5001, 1, "Ana")       # sem data: como antes
+    assert chamadas[-1]["prog_date"] is None
