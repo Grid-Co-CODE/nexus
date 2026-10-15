@@ -766,6 +766,18 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     CSV, `idade=30-` e `ver=Sem cadastro`): 2.235 OS, 6.134 tarefas (as 44 sem `final_date` a conta do App não conta),
     661 prontas, 505 pedem olho, 1.069 fora do App, 784 paradas há 30 dias. A velha com o teto de 6.000 mostrava 2.217
     OS, 5.956 tarefas e 766 paradas. O script ficou fora do repositório (ver o fim deste arquivo).
+- **15/10, App v269 (código `024648983354f613`, o mesmo do `/api/health` do App às 00:40; a pasta já tinha até a v274,
+  que não mexe no fecho):** o teste acusou `_foto_campo_descrita`, nome novo puxado pelo `_contar_fotos`. A v269
+  (14/10) mudou a régua da nota em quatro pontos: a foto de campo vale como descrita pela `nota` que o App novo manda à
+  parte (o "campo — nota" cortado em 80 caracteres levava a nota inteira em campo longo); `_v2_pede_foto` lê também o
+  `fotoReq`, que é como o celular manda (antes a foto pedida nunca disparava); o "não se aplica" não pede foto; e TODO
+  campo de texto preenchido conta como observação, não só os com "observ" ou "coment" no nome. Decisão: recópia
+  inteira, nada em `FORA` (nada de Azure). **As telas não mudam:** só `_qualidade_os` e `_qualidade_v2` alcançam o
+  que mudou, e no Nexus só o `nota_fracttal.py` (o coletor aposentado) as chama; o fecho das raízes da Aprovação e da
+  Triagem (74 nomes) é a mesma árvore de código na cópia velha e na nova. Elas mostram a nota que o App grava, e essa
+  segue a régua nova sozinha. No `nota_fracttal.py` o item ganhou o `fotoReq` do tipo 9: o `work_orders_subtasks` do
+  REST não traz o `attachments_required` (medido em 15/10, 1 GET fora do horário de campo), e a spec do fabricante
+  mora numa tabela do App (o porquê na docstring dele).
 - Trocados pelo Nexus no fim do arquivo gerado: `_tabela` e `tabela_qlog` (leem pela fonte do Nexus, `tabelas.py`),
   `tabela` (a dos tokens do Fracttal: só a partição `cadastro`; `tok` e `pt` recusadas), `fx` (Fracttal só GET,
   `fracttal.py`), `ident` (`pessoas.ident`) e `_varredura_carregar` (sempre `False`: sem blob do App).

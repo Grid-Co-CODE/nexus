@@ -120,6 +120,27 @@ def test_observacao_do_checklist_conta_quando_ha_falha():
     assert next(i for i in n["placar"]["itens"] if i["rot"] == "obs")["pts"] == 20 and n["obs_ok"]
 
 
+def test_qualquer_campo_de_texto_vale_como_observacao():
+    # App v269 (14/10/2026): todo campo de texto preenchido conta, não só os com "observ" ou "coment" no nome; o caso
+    # foi um "Descreva a atividade..." de 52 letras com uma Falha, que dava "NAO descreveu"
+    subs = _checklist_ok()
+    subs[0]["value"] = "3"                       # Falha
+    subs[3].update(description="Descreva a atividade realizada e/ou a pendência encontrada",
+                   value="Fusível da string 2 queimado, trocado e string religada")
+    obs = next(i for i in nf.nota(subs, [_foto("x" + GPS)])["placar"]["itens"] if i["rot"] == "obs")
+    assert obs["pts"] == 20 and obs["det"] == "houve achado; descreveu"
+
+
+def test_campo_de_tipo_9_pede_foto_e_o_nao_se_aplica_dispensa():
+    # App v269: o placar vê a foto pedida pelo `fotoReq` do formItemsParaChecklist (anexo, anexoApp ou tipo 9). Do
+    # REST do Fracttal só o tipo chega: o work_orders_subtasks não traz o attachments_required (medido em 15/10/2026)
+    subs = _checklist_ok() + [_sub(5, "Registro do quadro", 9, "true")]
+    foto = next(i for i in nf.nota(subs, [])["placar"]["itens"] if i["rot"] == "foto")
+    assert foto["det"] == "0 de 1 pedidas" and foto["pts"] == 0
+    subs[4]["value"] = "Não se aplica"           # v269: o "não se aplica" não pede foto
+    assert not any(i["rot"] == "foto" for i in nf.nota(subs, [])["placar"]["itens"])
+
+
 def test_foto_de_subtarefa_so_tem_descricao_quando_o_tecnico_escreveu():
     # a foto de campo nasce com o nome do campo; "campo — nota" é que é descrição do técnico (_contar_fotos do App)
     fotos = [_foto("Inspeção visual do inversor" + GPS), _foto("Inspeção visual do inversor — tampa trincada" + GPS)]

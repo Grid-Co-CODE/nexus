@@ -1,12 +1,12 @@
 """CÓPIA da lógica de regras do App de Campo (function_app.py). NÃO EDITE: rode ferramentas/extrair_regras_campo.py.
 
-Origem: function_app.py do App, codigo 92772066214dff23 (o número que o /api/health do App mostra quando é esta a
-versão no ar). Copiado em 09/10/2026 17:40. Sem comentários nem docstrings (o repositório é
+Origem: function_app.py do App, codigo 024648983354f613 (o número que o /api/health do App mostra quando é esta a
+versão no ar). Copiado em 15/10/2026 00:42. Sem comentários nem docstrings (o repositório é
 público); o porquê de cada regra está no código do App. Só o acesso a dado foi trocado (fim do arquivo).
 """
 # ruff: noqa
-CODIGO_APP = "92772066214dff23"
-COPIADAS = ('ApiError', 'CADASTRO_TTL_S', 'ESTOURO_EXEC_MIN', 'ESTOURO_EXEC_X', 'ESTOURO_PREV_TETO', 'ESTOURO_PREV_X', 'FILA_TTL_S', 'FxLimite', 'LIMIARES_PADRAO', 'STATUS_IN_REVIEW', 'SUP_CAP_BACKLOG', 'TRIAGEM_ESTOURO', 'TRIAGEM_NOTA_OK', 'V2_PESOS', 'V2_PISO', 'VARREDURA_ESPERA_S', '_CAD', '_CANON', '_CATOV', '_CL_USINA', '_FILA_CACHE', '_SUPCAN', '_VARR', '_agora_iso', '_area_ok', '_cadastro_tab', '_canon_cluster', '_casa_nome', '_catalogo_ov', '_cluster_da_usina', '_clusters_por_email', '_concentracao', '_contar_fotos', '_dias_entre', '_duracao_ronda', '_estouro', '_estouro_causa', '_fila_bruta', '_fila_do_app', '_fila_supervisao', '_filtro_pessoas', '_fora', '_fx_wo_paralelo', '_gestao_prioridades', '_hoje', '_int0', '_janela', '_janela_str', '_lim_cache', '_limiares', '_link_fracttal_os', '_no_escopo', '_norm', '_obs_do_fechamento', '_parse_iso', '_pessoa_por_nome', '_preenchido_item', '_qlog_por_os', '_qualidade_os', '_qualidade_v2', '_ronda_resumo', '_rondas_os_pares', '_rondas_os_por_folio', '_sup_canon', '_sup_canon_mapa', '_sup_norm', '_triagem', '_txt_tarefa', '_usinas_do_cluster', '_v2_achou_falha', '_v2_e_na', '_v2_pede_foto', '_veredito_os', '_veredito_ronda', '_veredito_usina', 'tabela_limiares', 'tabela_ronda', 'tabela_ronda_ativos', 'tabela_ronda_os')
+CODIGO_APP = "024648983354f613"
+COPIADAS = ('ApiError', 'CADASTRO_TTL_S', 'ESTOURO_EXEC_MIN', 'ESTOURO_EXEC_X', 'ESTOURO_PREV_TETO', 'ESTOURO_PREV_X', 'FILA_TTL_S', 'FxLimite', 'LIMIARES_PADRAO', 'STATUS_IN_REVIEW', 'SUP_CAP_BACKLOG', 'TRIAGEM_ESTOURO', 'TRIAGEM_NOTA_OK', 'V2_PESOS', 'V2_PISO', 'VARREDURA_ESPERA_S', '_CAD', '_CANON', '_CATOV', '_CL_USINA', '_FILA_CACHE', '_SUPCAN', '_VARR', '_agora_iso', '_area_ok', '_cadastro_tab', '_canon_cluster', '_casa_nome', '_catalogo_ov', '_cluster_da_usina', '_clusters_por_email', '_concentracao', '_contar_fotos', '_dias_entre', '_duracao_ronda', '_estouro', '_estouro_causa', '_fila_bruta', '_fila_do_app', '_fila_supervisao', '_filtro_pessoas', '_fora', '_foto_campo_descrita', '_fx_wo_paralelo', '_gestao_prioridades', '_hoje', '_int0', '_janela', '_janela_str', '_lim_cache', '_limiares', '_link_fracttal_os', '_no_escopo', '_norm', '_obs_do_fechamento', '_parse_iso', '_pessoa_por_nome', '_preenchido_item', '_qlog_por_os', '_qualidade_os', '_qualidade_v2', '_ronda_resumo', '_rondas_os_pares', '_rondas_os_por_folio', '_sup_canon', '_sup_canon_mapa', '_sup_norm', '_triagem', '_txt_tarefa', '_usinas_do_cluster', '_v2_achou_falha', '_v2_e_na', '_v2_pede_foto', '_veredito_os', '_veredito_ronda', '_veredito_usina', 'tabela_limiares', 'tabela_ronda', 'tabela_ronda_ativos', 'tabela_ronda_os')
 ASSINATURAS_TROCADAS = {'_tabela': '583740a7d68b3a65', '_varredura_carregar': '377c494f9c294aaf', 'fx': 'df3a6bba0b68da47', 'ident': 'a47f156debb43b7c', 'tabela': '666a04282aab3cbf', 'tabela_qlog': '95a72f1f98b561d4'}
 
 import base64
@@ -116,13 +116,17 @@ class FxLimite(ApiError):
     pass
 
 
+def _foto_campo_descrita(f):
+    return bool(str(f.get('nota') or '').strip()) or '—' in str(f.get('desc') or '')
+
+
 def _contar_fotos(d):
     fotos = d.get('fotos')
     if not isinstance(fotos, list) or (not fotos and (d.get('fotosResumo') or d.get('fotoItens'))):
         r = d.get('fotosResumo') or {}
         itens = [x for x in d.get('fotoItens') or [] if isinstance(x, dict)]
         n = _int0(r.get('total')) + len(itens)
-        nd = _int0(r.get('comDesc')) + sum((1 for x in itens if '—' in str(x.get('desc') or '')))
+        nd = _int0(r.get('comDesc')) + sum((1 for x in itens if _foto_campo_descrita(x)))
         return (n, nd)
     n = len(fotos)
     nd = 0
@@ -133,7 +137,7 @@ def _contar_fotos(d):
         if not desc:
             continue
         if f.get('campo'):
-            if '—' in desc:
+            if _foto_campo_descrita(f):
                 nd += 1
         else:
             nd += 1
@@ -165,7 +169,7 @@ V2_PESOS = {'sub': 30, 'foto': 25, 'obs': 20, 'desc': 15, 'assin': 10}
 
 
 def _v2_pede_foto(c):
-    return bool(c.get('anexo')) or bool(c.get('anexoApp'))
+    return bool(c.get('anexo')) or bool(c.get('anexoApp')) or bool(c.get('fotoReq'))
 
 
 def _v2_e_na(c, na):
@@ -182,8 +186,6 @@ def _obs_do_fechamento(d):
     chk = []
     for c in d.get('checklist') or []:
         if not isinstance(c, dict) or str(c.get('tipo') or '').strip().lower() != 'texto':
-            continue
-        if not re.search('observ|coment', _norm(c.get('desc') or '')):
             continue
         if c.get('fid') is not None and str(c.get('fid')) in intoc:
             continue
@@ -220,7 +222,7 @@ def _qualidade_v2(ev, gps_inicio=False, gps_ronda=False):
         ok = sum((1 for c in req if not _v2_e_na(c, na) and _preenchido_item(c, items.get(c.get('id')))))
         n_na = sum((1 for c in req if _v2_e_na(c, na)))
         partes.append(('sub', V2_PESOS['sub'], ok / float(len(req)), '%d de %d respondidas%s' % (ok, len(req), ', %d NA' % n_na if n_na else '')))
-    pedidas = sum((1 for c in checklist if _v2_pede_foto(c)))
+    pedidas = sum((1 for c in checklist if _v2_pede_foto(c) and (not _v2_e_na(c, na))))
     if pedidas:
         partes.append(('foto', V2_PESOS['foto'], min(1.0, n_fotos / float(pedidas)), '%d de %d pedidas' % (n_fotos, pedidas)))
     elif n_fotos:

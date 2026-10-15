@@ -17,13 +17,17 @@ Fracttal (medido em 04/10 no código do App v225 e na leitura do Fracttal):
 - assinatura: a leitura do Fracttal não a devolve, mas o App não deixa concluir sem ela (campo.html, travasSheet:
   "Assinar no fim da folha"). Todo fechamento pelo App tem assinatura, então ela entra como dada.
 
-O que a leitura do Fracttal NÃO tem, e por isso a nota daqui pode ficar ABAIXO da do App:
+O que a leitura do Fracttal NÃO tem, e por isso a nota daqui pode ficar ABAIXO ou ACIMA da do App:
 - a caixa "Registre observações" do App não vai ao Fracttal (o App guarda só no registro dele, `obs_app`): até 15
   pontos no painel quando o técnico escreveu só ali;
 - o GPS do fechamento não vai: vale o GPS das fotos, que vai dentro da descrição de cada uma (20 pontos no painel);
-- campo que já veio respondido do Fracttal e o técnico não tocou (`intocados` no App) conta como respondido.
-Foto pedida: o App também não a enxerga. O fechamento manda o checklist sem `anexo`/`anexoApp` (campo.html,
-formItemsParaChecklist), então `_v2_pede_foto` dá falso lá também: as duas notas tratam a foto do mesmo jeito.
+- campo que já veio respondido do Fracttal e o técnico não tocou (`intocados` no App) conta como respondido e, desde a
+  v269 do App (todo campo de texto preenchido vale como observação), o texto dele como observação;
+- a foto pedida (v269, 14/10/2026): o App a vê pelo `fotoReq` que o formItemsParaChecklist (campo.html) põe no item, o
+  `attachments_required` do Fracttal, a spec do fabricante nas OS de chamado ou o campo de tipo 9. O REST daqui só
+  mostra o tipo: o work_orders_subtasks não traz o `attachments_required` (medido em 15/10/2026 na OS 13061, nenhuma
+  das 17 colunas) e a spec mora numa tabela do App. Onde o App pede a foto pelos outros dois, o placar daqui diz
+  "nenhuma exigida" e qualquer foto vale os 25.
 """
 import re
 import urllib.parse
@@ -105,8 +109,9 @@ def evento(subtarefas, anexos, tarefa=None) -> dict:
         tipo = TIPO_DO_FRACTTAL.get(ftype, "texto")
         bruto, e_na = separar_nao_se_aplica(s.get("value"))
         iid = f"f{fid}"
+        # fotoReq: no App é anexo, anexoApp ou tipo 9 (formItemsParaChecklist); daqui só o tipo se vê (docstring)
         checklist.append({"id": iid, "fid": fid, "tipo": tipo, "ftype": ftype, "desc": s.get("description") or "",
-                          "req": bool(s.get("is_required"))})
+                          "req": bool(s.get("is_required")), "fotoReq": ftype == 9})
         items[iid] = valor_do_app(bruto, tipo)
         if e_na:
             na.append(str(fid))
