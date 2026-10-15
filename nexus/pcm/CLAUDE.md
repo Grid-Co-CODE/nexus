@@ -35,7 +35,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
-| `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá); hoje a do `fd39672` (15/10/2026, seção abaixo) |
+| `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá); hoje a do `bd4f673` (15/10/2026, seção abaixo) |
 
 ## Horas por tarefa e zeladoria no motor (15/10/2026)
 
@@ -55,25 +55,28 @@ tipo de tarefa fosse de fato zeladoria, não só pelo nome, tem corretiva sendo 
   caminho; e cada vez que uma OS nova cai no horário de uma linha já deslocada, ela vira mais uma pendente (480 do
   mesmo inversor). A 14331 (4 × 6 h na mesma segunda) foi o MOTOR: fora das MPx, ele usa a duração do leitor.
 - **A regra agora:** nas OS de mais de uma tarefa, a duração é a da tarefa; sem ela, a da OS dividida pelas tarefas; OS
-  de uma tarefa não muda (`fonte_bd_api._duracao_da_tarefa`). Zeladoria é o "Tipo de tarefa" Zeladoria
+  de uma tarefa não muda (`fonte_bd_api._duracao_da_tarefa`). No motor, a hora da tarefa vale para TODO tipo, também
+  nas MPx (Levi, sobre a 15596 com 43 × 4 h = 172 h: "Tem que ser de acordo com nova regra"): as horas fixas por sigla
+  da calibração de 31/07 (MPM 1,1 h, MPA 4 h...) só valem para a tarefa sem duração, e saiu o piso de 1 h das
+  preventivas (`programacao_v7.estimate_h` e `_estimate_h_sem_fracttal`). No Fracttal a MPM típica tem 10 min: se o
+  campo levar mais que o plano, o conserto é no plano do Fracttal. Zeladoria é o "Tipo de tarefa" Zeladoria
   (`programacao_v7.is_zeladoria`); pelo nome, "roça" sem acento casava com "troca" e "Sorocaba", e 150 das 186 tarefas
-  abertas marcadas não eram zeladoria (113 corretivas). As MPx do motor seguem com as horas fixas da calibração do PCM
-  (MPM 1,1 h, MPA 4 h por tarefa: a 15596 sai com 43 × 4 h no motor); trocar isso é decisão de regra do PCM.
-- **Onde está:** nos dois lados. Na cópia do motor do Nexus (`0032ee9`, a semana que o Nexus gera, desde a W43) e no
-  repositório do PCM (`fd39672`, 15/10 11:54, a pedido do Levi), que leva também duas no robô: OS nova acima de 8 h usa
-  a duração fixa da sigla, e a mesma tarefa não se repete na `_Pendentes`. As linhas que o robô já tinha gravado na
-  W42 (as 25 h da 15596 e as pendentes repetidas) ficam como estavam: ele não recalcula linha antiga.
-- **Prova:** W43 com a mesma foto (`ferramentas/gerar_semana_foto.py`, 14/10 15:06), motor antes e depois: maior dia
-  de equipe 24,2 h → 10,3 h; 14331 24 h → 6 h; zeladoria terceirizada 31 → 18 linhas. Testes:
-  `tests/test_pcm_motor_regras.py` (4 mutações, todas pegas). No robô, a 1ª rodada de verdade com o `fd39672` (15/10
-  12:24, Brasília) mudou a W42 do `banco_dados.json`: pendentes 2.222 linhas e 20.955 h → 1.246 e 1.516 h; linhas de 8 h
-  ou mais 695 → 15; pendentes repetidas 1.326 → 423 (as antigas; as duas funções do robô que gravam pendente passam
-  pela regra nova).
-- **Achado, ainda NÃO consertado (robô do PCM):** o passo A2 (incorporar OS nova) roda ANTES do A3 (aplicar o
-  `Observacoes_Semana_Atual.txt`) e não olha as exclusões: a cada rodada o robô reinclui a OS que o PCM tirou (`não`) e
-  a tarefa tirada (`sem:`), desloca o que estiver no horário dela e só então a apaga. Na rodada de 15/10 12:24, a 15596
-  (tirada pelo PCM às 09:42) deslocou 19 tarefas e mandou 9 para as pendentes. O conserto é o A2 pular o que o
-  arquivo da semana em curso tira; mexe no robô do PCM.
+  abertas marcadas não eram zeladoria (113 corretivas).
+- **No robô do PCM:** OS nova acima de 8 h usa a duração fixa da sigla; a mesma tarefa não se repete na `_Pendentes`;
+  e o passo A2 (incorporar OS nova) não reincorpora o que o `Observacoes_Semana_Atual.txt` tira (`não` e `sem:`). O A2
+  roda ANTES do A3, que apaga: a cada rodada a OS tirada voltava, deslocava o que estivesse no horário dela e só então
+  saía (15/10 12:24: a 15596, tirada pelo PCM às 09:42, deslocou 19 tarefas e mandou 9 para as pendentes).
+- **Onde está:** nos dois lados, com a cópia idêntica: repositório do PCM `fd39672` (11:54) e `bd4f673` (a pedido do
+  Levi) e a cópia do motor do Nexus (a semana que o Nexus gera, desde a W43). As linhas que o robô já tinha gravado na
+  W42 (as 25 h da 15596, as pendentes repetidas) ficam como estavam: ele não recalcula linha antiga (Levi: "As
+  antigas infelizmente já era").
+- **Prova:** W43 com a mesma foto (`ferramentas/gerar_semana_foto.py`, 14/10 15:06): duração por tarefa e zeladoria
+  pelo tipo: maior dia de equipe 24,2 h → 10,3 h; 14331 24 h → 6 h; zeladoria terceirizada 31 → 18 linhas. Com a hora
+  da tarefa também nas MPx: a 15596 cabe inteira (43 tarefas, 25 h; antes 10 na agenda e 33 pendentes); agenda 1.052
+  → 1.586 linhas e 1.598 → 1.133 h; pendentes 2.255 → 651 h. Testes: `tests/test_pcm_motor_regras.py` (7 mutações,
+  todas pegas). O A2 do robô, num caso montado (o "não" e o "sem:" ficam de fora, o resto entra). No robô, a 1ª rodada
+  de verdade com o `fd39672` (15/10 12:24, Brasília) mudou a W42 do `banco_dados.json`: pendentes 2.222 linhas e
+  20.955 h → 1.246 e 1.516 h; linhas de 8 h ou mais 695 → 15; pendentes repetidas 1.326 → 423 (as antigas).
 
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
 
@@ -251,9 +254,9 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   do QGBT1, QGBT2 e QGBT3). A janela avisa ("está em 3 linhas da semana") e lista as de nome parecido que saem junto.
   Separar por equipamento pediria mudar o robô e o motor do PCM.
   Quem aplica: **semana em curso**, o robô (`atualizacao_semanal`, STEP A3) apaga as linhas da tarefa (agenda e
-  `_Pendentes`), em qualquer OS, e não reposiciona nada (a linha não tem dia nem turno); mas o passo A2 dele reinclui a
-  tarefa (e a OS do `não`) a cada rodada antes de apagar, deslocando o que estiver no horário (achado de 15/10, na
-  seção "Horas por tarefa e zeladoria no motor"). **Semana que o Nexus gera**, o
+  `_Pendentes`), em qualquer OS, e não reposiciona nada (a linha não tem dia nem turno); e desde o `bd4f673` (15/10) o
+  passo A2 dele não reinclui a tarefa tirada (nem a OS do `não`) como OS nova (seção "Horas por tarefa e zeladoria no
+  motor"). **Semana que o Nexus gera**, o
   motor (`programacao_v7`) só aplica o `sem:` nas OS de plano (modo A: a tarefa nem é programada) e, como toda linha da
   OS vira "pin", a OS entra na semana e o resto dela ganha prioridade na fila da usina; na OS comum (modo B) ele ignora
   o `sem:` e programa a tarefa. Por isso a rodada roda o `geracao.aplicar_sem` depois do motor: a mesma exclusão do

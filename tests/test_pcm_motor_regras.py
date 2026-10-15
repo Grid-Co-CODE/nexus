@@ -72,6 +72,41 @@ def _regra_de_zeladoria():
     return texto, ns["is_zeladoria"]
 
 
+def _estimativa():
+    """O estimate_h do motor, tirado do arquivo pelo `ast` com as constantes de lá; a Média da Planilha Confiabilidade
+    (find_corretiva_mttr) é dublada."""
+    texto = (MOTOR / "programacao_v7.py").read_text(encoding="utf-8")
+    ns = {"re": re, "pd": pd, "find_corretiva_mttr": lambda tarefa: 2.5}
+    nomes = {"estimate_h", "_estimate_h_sem_fracttal", "parse_duration_to_hours", "MAX_TAREFA_H", "MIN_PREVENTIVA_H",
+             "_DUR_CAPADAS"}
+    for no in ast.parse(texto).body:
+        alvo = (no.name if isinstance(no, ast.FunctionDef) else
+                next((t.id for t in getattr(no, "targets", []) if isinstance(t, ast.Name)), None))
+        if alvo in nomes:
+            exec(compile(ast.Module([no], []), "programacao_v7", "exec"), ns)
+    return ns
+
+
+def test_hora_da_tarefa_vale_para_todo_tipo():
+    """Levi, 15/10/2026, sobre a 15596 (43 tarefas de MPA, 25 h na OS, 172 h com as fixas por sigla): "Tem que ser de
+    acordo com nova regra". A hora é a da tarefa no Fracttal também nas MPx, sem o piso de 1 h; as fixas da calibração
+    só valem para a tarefa sem duração; acima do teto, capa e lista."""
+    ns = _estimativa()
+    est = ns["estimate_h"]
+
+    def t(dur_h=None, cat=None, corretiva=False, fallback=None):
+        return {"OSs ID": 1, "Tarefa": "Tarefa", "mp_cat": cat, "corretiva": corretiva, "zeladoria": False,
+                "mttr_h_fallback": fallback, "Tarefa -> Duração estimada": None if dur_h is None else timedelta(hours=dur_h)}
+
+    assert est(t(0.25, "MPA")) == 0.25                       # o inversor da 15596, e não 4 h
+    assert round(est(t(10 / 60, "MPM")), 4) == round(10 / 60, 4)
+    assert est(t(0.5)) == 0.5                                  # sem o piso de 1 h
+    assert est(t(None, "MPA")) == 4.0 and est(t(None, "MPM")) == 1.10   # sem duração: a calibração
+    assert est(t(None, corretiva=True)) == 2.5                 # sem duração, corretiva: a Média da Confiabilidade
+    assert est(t(None, fallback=0.5)) == ns["MIN_PREVENTIVA_H"]          # sem duração, o piso de antes
+    assert est(t(20, "MPA")) == ns["MAX_TAREFA_H"] and ns["_DUR_CAPADAS"][-1][2] == 20
+
+
 def test_zeladoria_pelo_tipo_da_tarefa():
     texto, is_zeladoria = _regra_de_zeladoria()
     assert "df_tasks['zeladoria']   = df_tasks['Tipo de tarefa'].apply(is_zeladoria)" in texto
