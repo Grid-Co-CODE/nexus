@@ -7,7 +7,7 @@ import gzip
 import json
 import shutil
 import subprocess
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -20,6 +20,14 @@ from nexus.pcm.acompanhamento.mapa import Geo
 
 HOJE = date(2026, 10, 14)
 URL = "/t/pcm/acompanhamento"
+
+
+@pytest.fixture(autouse=True)
+def _tarde_de_hoje(monkeypatch):
+    """A Gestão PCM conta os dias do meio-dia da data (a regra do painel): antes do meio-dia sai um a menos. A hora dos
+    testes fica parada às 15h de HOJE, para o número não depender da hora em que o teste roda."""
+    from nexus.pcm import gestao
+    monkeypatch.setattr(gestao, "agora", lambda: datetime(2026, 10, 14, 15, 0, tzinfo=timezone(timedelta(hours=-3))))
 
 
 def _t(os_, tarefa, estado="Não Iniciada", st="Em processo", cri="2026-08-01", prog="2026-09-01", tipo="Corretiva",
@@ -101,6 +109,21 @@ def test_as_mpas_e_mpss_da_curadoria_com_a_gerencial_e_o_fracttal():
     assert (mps["pend"], mps["tot"]) == (5, 5) and mps["manut"] == "Pessoa NNE"   # manual trava os números; BA é Nordeste
     esp = D.espelho(linhas, painel, list(mpa.values()), [mps])
     assert [(e["linha"], e["g"]) for e in esp] == [(1, 2), (2, 3)]
+
+
+def test_sem_a_gerencial_o_atraso_vem_da_data_programada_do_fracttal():
+    """15/10/2026 ("A dispersão não está funcionando direito"): o servidor sem a senha da Gerencial deixava toda MPA sem
+    atraso, e o ponto ia para fora da escala. Sem a linha da Gerencial, vale a regra da Fila da Gestão PCM sem a planilha."""
+    tar = [_t("800", "[Grid Co.] - MPA - Inspeção", tipo="Preventiva", prog="2026-09-04"),
+           _t("800", "[Grid Co.] - MPA - Limpeza", tipo="Preventiva", prog="2026-10-20")]
+    cur = [{"grupo": 2, "os": "800", "usina": "Usina W", "tipo": "MPA", "tot": 2, "pend": 2},
+           {"grupo": 3, "os": "801", "usina": "Usina V", "tipo": "MPA", "tot": 2, "pend": 2}]      # OS sem tarefa: sem data
+    r = {x["os"]: x for x in D.mpa_mps(cur, [], D.totais(tar), HOJE, {}, "MPA", D.atraso_fracttal(tar, HOJE))}
+    assert r["800"]["atraso"] == 40 and r["800"]["atraso_fonte"] == "Fracttal"
+    assert "atraso" not in r["801"]                                 # fica fora do gráfico, e a tela diz quantas
+    linhas, _ = D.gerencial(MP, HOJE)                               # com a linha da Gerencial, vale a Data Prevista
+    x = D.mpa_mps(CURADORIA, linhas, D.totais(TAREFAS), HOJE, {}, "MPA", D.atraso_fracttal(TAREFAS, HOJE))[0]
+    assert x["atraso_fonte"] == "Gerencial" and x["atraso"] == 30
 
 
 def test_a_cadeia_de_os_soma_as_pendencias_das_duas():

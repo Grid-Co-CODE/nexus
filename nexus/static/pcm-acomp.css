@@ -118,7 +118,7 @@
 .pa-pt--g2{fill:var(--alerta);stroke:var(--superficie);stroke-width:2}
 .pa-pt--g3{fill:var(--critico);stroke:var(--superficie);stroke-width:2}
 .pa-pt:hover .pa-pt--g2,.pa-pt:hover .pa-pt--g3,.pa-pt:focus .pa-pt--g2,.pa-pt:focus .pa-pt--g3{stroke:var(--tinta)}
-.pa-graf .pa-pt-rot{fill:var(--tinta-2);font-weight:600}
+.pa-graf .pa-pt-rot{fill:var(--tinta-2);font-weight:600;pointer-events:none}
 .pa-barras{display:flex;flex-direction:column;gap:5px}
 .pa-barra{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr) 40px;gap:10px;align-items:center;background:transparent;
   border:0;padding:4px 6px;border-radius:6px;cursor:pointer;text-align:left;color:var(--tinta-2);font:400 12.5px/16px var(--font-sans)}

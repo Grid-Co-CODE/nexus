@@ -225,19 +225,33 @@
   function scatter(rows) {
     var W = 640, H = 340, m = {l: 46, r: 24, t: 14, b: 42};
     var maxX = Math.max.apply(null, [50].concat(rows.map(function (r) { return r.pend || 0; }))), maxY = Math.max.apply(null, [200].concat(rows.map(function (r) { return r.atraso || 0; })));
+    maxY = Math.ceil(maxY / 50) * 50;                               /* a escala fecha numa linha da grade */
     var xs = function (v) { return m.l + (v / maxX) * (W - m.l - m.r); }, ys = function (v) { return H - m.b - (v / maxY) * (H - m.t - m.b); };
     var s = '<rect x="' + xs(0) + '" y="' + m.t + '" width="' + (xs(10.5) - xs(0)) + '" height="' + (H - m.b - m.t) + '" class="pa-zona"/><text x="' + (xs(10.5) + 6) + '" y="' + (m.t + 13) + '" class="pa-zona-rot">≤ 10 pendências: Manutenção</text><g class="pa-eixo">';
     for (var v = 0; v <= maxY; v += 50) s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + ys(v) + '" y2="' + ys(v) + '"/><text x="' + (m.l - 8) + '" y="' + (ys(v) + 4) + '" text-anchor="end">' + v + "</text>";
     for (var u = 0; u <= maxX; u += 10) s += '<text x="' + xs(u) + '" y="' + (H - m.b + 17) + '" text-anchor="middle">' + u + "</text>";
     s += '</g><line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + ys(0) + '" y2="' + ys(0) + '" class="pa-base"/><text x="' + ((m.l + W - m.r) / 2) + '" y="' + (H - 5) + '" text-anchor="middle" class="pa-eixo-tit">PENDÊNCIAS NA OS</text><text x="12" y="' + ((m.t + H - m.b) / 2) + '" text-anchor="middle" class="pa-eixo-tit" transform="rotate(-90 12 ' + ((m.t + H - m.b) / 2) + ')">DIAS DE ATRASO</text>';
-    var top = new Set(rows.slice().sort(function (a, b) { return (b.atraso + b.pend * 2) - (a.atraso + a.pend * 2); }).slice(0, 6).map(function (r) { return r.os; }));
+    var top = rows.slice().sort(function (a, b) { return (b.atraso + b.pend * 2) - (a.atraso + a.pend * 2); }).slice(0, 6);
+    /* Rótulo dos 6 piores sem cobrir ponto nem outro rótulo: tenta direita, esquerda, acima e abaixo, nessa ordem. Em
+       15/10 o da Nova Xavantina 2 (47 pendências) ia para a esquerda e passava por cima do ponto das 40. */
+    var ocup = rows.map(function (r) { var x = xs(r.pend || 0), y = ys(r.atraso); return [x - 7, y - 7, x + 7, y + 7]; });
+    ocup.push([xs(10.5) + 6, m.t + 3, xs(10.5) + 6 + 26 * 6.6, m.t + 16]);   /* o rótulo da zona da Manutenção */
+    var livre = function (b) { return b[0] >= 0 && b[2] <= W && b[1] >= 0 && b[3] <= H - m.b && !ocup.some(function (o) { return b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]; }); };
+    var rotulos = top.map(function (r) {
+      var x = xs(r.pend || 0), y = ys(r.atraso), w = String(r.u).length * 6.6;
+      var op = [[x + 10, y + 4, "start", [x + 10, y - 7, x + 10 + w, y + 5]], [x - 10, y + 4, "end", [x - 10 - w, y - 7, x - 10, y + 5]],
+        [x, y - 12, "middle", [x - w / 2, y - 21, x + w / 2, y - 9]], [x, y + 21, "middle", [x - w / 2, y + 10, x + w / 2, y + 22]]];
+      var e = op.filter(function (o) { return livre(o[3]); })[0] || op[x < W - 150 ? 0 : 1];
+      ocup.push(e[3]);
+      return '<text x="' + e[0] + '" y="' + e[1] + '" text-anchor="' + e[2] + '" class="pa-pt-rot">' + esc(r.u) + "</text>";
+    });
     rows.forEach(function (r) {
-      var cx = xs(r.pend), cy = ys(r.atraso);
+      var cx = xs(r.pend || 0), cy = ys(r.atraso);
       var t = "<b>" + esc(r.u) + "</b> · OS " + esc(r.os) + "<br>" + r.pend + " pendência" + (r.pend > 1 ? "s" : "") + " · " + r.atraso + " dias de atraso<br>" + esc(r.cli) + " · " + esc(r.cluster) + '<br><span class="pa-tip-mudo">Clique para ir à linha da tabela</span>';
       s += '<g class="pa-pt" tabindex="0" data-goto="' + esc(r.os) + '" ' + tipAttr(t) + ' aria-label="' + esc(r.u) + ": " + r.pend + " pendências, " + r.atraso + ' dias"><circle cx="' + cx + '" cy="' + cy + '" r="13" class="pa-alvo"/>'
         + (r.g === 2 ? '<circle cx="' + cx + '" cy="' + cy + '" r="6" class="pa-pt--g2"/>' : '<rect x="' + (cx - 6) + '" y="' + (cy - 6) + '" width="12" height="12" rx="2" class="pa-pt--g3"/>') + "</g>";
-      if (top.has(r.os)) { var right = cx < W - 150; s += '<text x="' + (cx + (right ? 10 : -10)) + '" y="' + (cy + 4) + '" text-anchor="' + (right ? "start" : "end") + '" class="pa-pt-rot">' + esc(r.u) + "</text>"; }
     });
+    s += rotulos.join("");
     if (!rows.length) s += '<text x="' + (W / 2) + '" y="' + (H / 2) + '" text-anchor="middle" class="pa-eixo-tit">NENHUMA OS EM CAMPO NOS FILTROS</text>';
     return '<svg class="pa-graf" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Pendências por dias de atraso">' + s + "</svg>";
   }
@@ -264,9 +278,13 @@
       + cardG(2, "Auxílio da Manutenção", pend(2) + " pendências em aberto") + cardG(3, "Atrasadas e com mais pendências", pend(3) + " pendências em aberto")
       + cardG(0, "Fora do ranking", "OS recém-abertas, no prazo ou adiantadas") + "</div>";
     var field = rows.filter(function (r) { return r.g === 2 || r.g === 3; });
+    /* no gráfico só entra quem tem atraso medido: sem a Gerencial e sem data programada no Fracttal, o ponto não tem
+       onde ficar (15/10/2026: com o atraso vazio, os pontos iam para fora da escala, grudados no topo) */
+    var comData = field.filter(function (r) { return typeof r.atraso === "number" && isFinite(r.atraso); });
+    var semData = field.length - comData.length;
     var engOnly = G(1).filter(function (r) { return !oil(r) && r.parado != null; }).sort(function (a, b) { return b.parado - a.parado; });
     var withPrazo = G(1).filter(function (r) { return r.prazo; }).sort(function (a, b) { return a.prazo.localeCompare(b.prazo); });
-    var oldest = field.slice().sort(function (a, b) { return (b.atraso || 0) - (a.atraso || 0); })[0];
+    var oldest = comData.slice().sort(function (a, b) { return b.atraso - a.atraso; })[0];
     var eq = field.filter(function (r) { return (r.bl || []).indexOf("Equipamento") >= 0; }).length;
     var hl = [], nextP = withPrazo.filter(function (r) { return dd(r.prazo) >= 0; }), late = withPrazo.filter(function (r) { return dd(r.prazo) < 0; });
     if (late.length) hl.push([late.length + " vencido" + (late.length > 1 ? "s" : ""), "Relatórios da Engenharia com prazo vencido: " + late.map(function (r) { return esc(r.u); }).join(", ") + ".", "crit"]);
@@ -277,8 +295,9 @@
     if (field.length) hl.push([eq + " de " + field.length, K + "s em campo travadas por falta de equipamento.", "alerta"]);
     var hlHtml = hl.length ? '<div class="pa-destaques" aria-label="Destaques">' + hl.map(function (h) { return '<div class="pa-hl pa-hl--' + h[2] + '"><b>' + h[0] + "</b><span>" + h[1] + "</span></div>"; }).join("") + "</div>" : "";
     var causeItems = FIELD_CAUSES.map(function (c) { var v = field.filter(function (r) { return (r.bl || []).indexOf(c) >= 0; }).length; return {label: CAUSE_LBL[c], v: v, unit: K + (v > 1 ? "s" : "")}; }).filter(function (x) { return x.v; }).sort(function (a, b) { return b.v - a.v; });
-    var charts = field.length ? '<div class="pa-graficos"><div class="pa-painel"><h3>Pendências × dias de atraso</h3><p class="pa-pequeno">' + K + "s ainda em campo. Passe o mouse para o resumo; clique para ir à linha.</p>"
-      + '<div class="pa-legenda"><span><i class="pa-sw pa-sw--g2"></i>Auxílio da Manutenção</span><span><i class="pa-sw pa-sw--g3"></i>Atrasadas e com mais pendências</span></div>' + scatter(field) + "</div>"
+    var fonteAtraso = comData.some(function (r) { return r.atraso_fonte === "Fracttal"; }) ? (comData.every(function (r) { return r.atraso_fonte === "Fracttal"; }) ? " Atraso pela Data Programada no Fracttal (sem a Gerencial)." : " Atraso pela Gerencial e, sem ela, pela Data Programada no Fracttal.") : "";
+    var charts = field.length ? '<div class="pa-graficos"><div class="pa-painel"><h3>Pendências × dias de atraso</h3><p class="pa-pequeno">' + K + "s ainda em campo. Passe o mouse para o resumo; clique para ir à linha." + fonteAtraso + (semData ? " " + semData + " sem data de atraso ficam fora do gráfico." : "") + "</p>"
+      + '<div class="pa-legenda"><span><i class="pa-sw pa-sw--g2"></i>Auxílio da Manutenção</span><span><i class="pa-sw pa-sw--g3"></i>Atrasadas e com mais pendências</span></div>' + scatter(comData) + "</div>"
       + '<div class="pa-painel"><h3>O que trava as ' + K + 's em campo</h3><p class="pa-pequeno">Usinas por motivo; uma pode ter mais de um. Clique para filtrar.</p>' + bars(causeItems, "bl") + "</div></div>" : "";
     var osCell = function (r) { return '<span class="pa-os gc-num">' + esc(r.os) + "</span>"; };
     var c1 = [{k: "os", h: "OS", c: osCell}, {k: "u", h: "Usina", c: function (r) { return usinaCell(r, oil(r)); }}, {k: "resp", h: "Responsável da OS", c: respCell},
@@ -293,7 +312,7 @@
       {k: "resp", h: "Responsável da OS", c: respCell}, {k: "manut", h: "Resp. da Manutenção", c: manutCell}, {k: "prev", h: "Prevista", cls: "num", c: function (r) { return fmt(r.prev); }},
       {k: "bloq", h: "Bloqueios", c: function (r) { return blkCell(r); }}];
     var tip1 = function (r) { return "<b>" + esc(r.u) + "</b> · OS " + esc(r.os) + "<br>Execução terminou em " + fmt(r.fim) + (r.parado != null ? " (" + r.parado + " dias parada)" : "") + "<br>" + (r.prazo ? "Prazo do relatório: " + fmt(r.prazo) + (r.sem_oleo ? " (sem análise de óleo)" : "") : "Sem prazo combinado") + (oil(r) ? "<br>* Aguarda laudo de óleo, não a Engenharia" : ""); };
-    var tipF = function (r) { return "<b>" + esc(r.u) + "</b> · OS " + esc(r.os) + "<br>" + (r.tot ? r.pend + " de " + r.tot + " tarefas pendentes (" + Math.round(100 * r.pend / r.tot) + "%)" : (r.pend || 0) + " pendências em campo") + "<br>Atraso: " + (r.atraso || 0) + " dias · Prevista " + fmt(r.prev) + "<br>Bloqueio: " + (r.bl || []).map(function (b) { return CAUSE_LBL[b] || b; }).join(", "); };
+    var tipF = function (r) { return "<b>" + esc(r.u) + "</b> · OS " + esc(r.os) + "<br>" + (r.tot ? r.pend + " de " + r.tot + " tarefas pendentes (" + Math.round(100 * r.pend / r.tot) + "%)" : (r.pend || 0) + " pendências em campo") + "<br>Atraso: " + (r.atraso == null ? "sem data" : r.atraso + " dias" + (r.atraso_fonte === "Fracttal" ? " (pela Data Programada no Fracttal)" : "")) + " · Prevista " + fmt(r.prev) + "<br>Bloqueio: " + (r.bl || []).map(function (b) { return CAUSE_LBL[b] || b; }).join(", "); };
     var html = '<div class="pa-fchips" id="pa-fchips"></div><p class="pa-meta">' + (K === "MPA" ? "Manutenções preventivas anuais" : "Manutenções preventivas semestrais") + " acompanhadas pela reunião de PCM (a curadoria), com a linha da Gerencial e as pendências da OS no Fracttal (pela Gestão PCM).</p>" + cards + hlHtml + charts;
     var g1 = G(1), g2 = G(2), g3 = G(3), g0 = G(0), pl = function (n) { return n + " " + K + (n > 1 ? "s" : ""); };
     if (g1.length) html += section("t1", 1, "Pendente revisão ou relatório por parte da Engenharia", pl(g1.length), table("t1", c1, g1, {k: "prazo", dir: 1, then: {k: "fim", dir: 1}}, {tip: tip1}), g1.some(oil) ? '<p class="pa-pe"><sup class="pa-ast">*</sup> Não é pendência da Engenharia: o relatório depende do laudo de análise de óleo do transformador, emitido por laboratório externo.</p>' : "");
@@ -312,7 +331,7 @@
     var soon = function (r) { if (!r.prev || r.status === "Finalizado") return false; var n = dd(r.prev); return n >= 0 && n <= 30; };
     if (D.esp.length) html += section("te", "A", "Todas as " + K + "s · espelho da Gerencial", esp.length + " linha" + (esp.length !== 1 ? "s" : ""), table("te", ce, esp, {k: "prev", dir: 1}, {page: 40, rowCls: function (r) { return soon(r) ? "pa-logo" : ""; }, tip: function (r) { return "<b>" + esc(r.u) + "</b> (" + esc(r.cli) + ")<br>Ciclo " + (esc(r.ciclo) || "—") + " · Prevista " + fmt(r.prev) + "<br>Status: " + (esc(r.status) || "—") + (soon(r) ? "<br>Prevista para os próximos 30 dias" : ""); }}), '<p class="pa-pe">A barra azul na lateral marca as ' + K + "s previstas para os próximos 30 dias que ainda não foram finalizadas.</p>");
     else html += '<div class="pa-aviso-inline"><i class="ph ph-lock-simple" aria-hidden="true"></i><span>O espelho da Gerencial (todas as ' + K + "s da aba MPAS) aparece quando o Nexus abrir a planilha da Gerencial: " + esc(AV.gerencial === "sem_chave" ? "falta a senha dela no servidor (NEXUS_PCM_MPAS_SENHA)" : AV.gerencial) + ".</span></div>";
-    html += nota(["<b>Dias parado</b> conta da última execução registrada na OS até hoje. <b>Atraso</b> é o da Fila da Gestão PCM: da Data Prevista da Gerencial até hoje, para a MPA/MPS não concluída.",
+    html += nota(["<b>Dias parado</b> conta da última execução registrada na OS até hoje. <b>Atraso</b> é o da Fila da Gestão PCM: da Data Prevista da Gerencial até hoje, para a MPA/MPS não concluída; sem a Gerencial, da Data Programada mais antiga das tarefas da OS no Fracttal.",
       "<b>Progresso</b> é a parcela de tarefas já feitas na OS (ou na cadeia de OS) no Fracttal, recalculada a cada leitura; o grupo, o prazo e o que falta são da reunião de PCM.",
       "<b>Resp. da Manutenção</b> segue a regra da curadoria (um responsável para o Norte e Nordeste, outro para o resto); fica \"A definir\" sem ela."]);
     return html;

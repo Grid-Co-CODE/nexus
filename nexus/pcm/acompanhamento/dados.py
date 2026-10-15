@@ -295,10 +295,22 @@ def _pendencias(it: dict, tot_os: dict) -> dict:
     return x
 
 
+def atraso_fracttal(tarefas, hoje: date) -> dict:
+    """{OS: dias de atraso ou None} pela Fila da Gestão PCM SEM a Gerencial (`gestao.fila_fracttal`): da Data Programada
+    mais antiga das tarefas de MPA/MPS da OS até hoje, para a OS não concluída; None = no prazo, concluída ou sem data."""
+    return {x["os"]: x["atraso"] for x in G.fila_fracttal(tarefas or [], hoje)}
+
+
 def mpa_mps(curadoria: list[dict], linhas: list[dict], tot_os: dict, hoje: date, manutencao: dict,
-            tipo: str) -> list[dict]:
+            tipo: str, atraso_os: dict | None = None) -> list[dict]:
     """As linhas de uma aba (MPA ou MPS): a curadoria + a linha da Gerencial + as pendências do Fracttal. `manutencao` =
-    {"nne": nome, "outros": nome}: o responsável da Manutenção pela UF do cluster (decisão da curadoria)."""
+    {"nne": nome, "outros": nome}: o responsável da Manutenção pela UF do cluster (decisão da curadoria).
+
+    O atraso é o da Data Prevista da Gerencial. Sem a linha da Gerencial (ou sem a planilha: o servidor sem a senha dela),
+    ele sai do Fracttal, pela regra da Fila da Gestão PCM sem a planilha (`atraso_os`, de `atraso_fracttal`); numa cadeia de
+    OS, vale a mais atrasada. 15/10/2026, Levi, com o print da dispersão com todos os pontos grudados no topo: "A dispersão
+    não está funcionando direito" (sem a senha da Gerencial no servidor, nenhuma MPA tinha atraso, e o ponto sem atraso
+    ia parar fora da escala)."""
     out = []
     for it in curadoria:
         if it.get("tipo") != tipo:
@@ -322,6 +334,13 @@ def mpa_mps(curadoria: list[dict], linhas: list[dict], tot_os: dict, hoje: date,
             r["parado"] = dias(r["fim"], hoje)
         if r.get("prev") and g in (2, 3, 0):
             r["atraso"] = max(dias(r["prev"], hoje) or 0, 0)
+            r["atraso_fonte"] = "Gerencial"
+        elif g in (2, 3, 0) and atraso_os:
+            oss = re.findall(r"\d{3,5}", r.get("cadeia") or "") or [r["os"]]
+            achados = [atraso_os[o] for o in oss if o in atraso_os]
+            if achados:
+                r["atraso"] = max(v or 0 for v in achados)
+                r["atraso_fonte"] = "Fracttal"
         if r.get("tot") and r.get("pend") is not None:
             r["prog"] = round(100 * (r["tot"] - r["pend"]) / r["tot"])
         if r.get("flag"):
@@ -440,8 +459,9 @@ def montar(gestao: dict | None, bd: dict | None, mp: dict | None, curadoria: lis
     tot_os = totais(tarefas)
     linhas_ger, painel = gerencial(mp, hoje)
     cur = completar_pela_os(curadoria, tarefas)
-    mpa = mpa_mps(cur, linhas_ger, tot_os, hoje, manutencao, "MPA")
-    mps = mpa_mps(cur, linhas_ger, tot_os, hoje, manutencao, "MPS")
+    atr = atraso_fracttal(tarefas, hoje)
+    mpa = mpa_mps(cur, linhas_ger, tot_os, hoje, manutencao, "MPA", atr)
+    mps = mpa_mps(cur, linhas_ger, tot_os, hoje, manutencao, "MPS", atr)
     clsup = supervisores(bd, linhas_ger, sup_cadastro or {})
     atual = semana_atual(bd)
     data = {"hoje": hoje.isoformat(), "mpa": mpa, "mps": mps, "esp": espelho(linhas_ger, painel, mpa, mps),
