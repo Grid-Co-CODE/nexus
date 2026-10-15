@@ -556,10 +556,11 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
     95–99, 80–95, 50–80, abaixo de 50) e as OS que formaram o valor (`falhas_performance · disponibilidade_os`, publicada
     com o diário): OS, tipo, o que parou, início, fim, duração (do início ao fim), horas de sol (as que contam, da OS no
     mês: as mesmas em cada usina dela) e perda. **A perda é a da OS NESTA usina** (a régua do Gerencial: kWp afetado ×
-    horas de sol, sem a irradiação, fora o dia que a geração desmente; 0 quando todos foram desmentidos), e o total da
-    janela é a perda da usina no Gerencial. Até 13/10/2026 a plataforma repartia a perda da OS de duas usinas pela
-    potência, e o total errava quando a geração desmentia o dia numa usina só ou o teto de 100% pegava uma e não a outra
-    (setembro: 47.893 kWh na usina errada entre Rodrigues 1 e 2).
+    horas de sol, sem a irradiação), e o total da janela é a perda da usina no Gerencial. **Desde 15/10/2026 a
+    disponibilidade é só do Fracttal, isolada da geração** (Levi: "a geração não deve afetar a disponibilidade"): a OS
+    aberta conta, e a nota da janela diz isso; até ali a geração "desmentia" dias e a OS podia ficar com 0. Até 13/10/2026
+    a plataforma repartia a perda da OS de duas usinas pela potência (setembro: 47.893 kWh na usina errada entre
+    Rodrigues 1 e 2).
   - **PT**: a OS da PT no detalhe abre a PT por cima para aprovar sem sair da tela (Levi: "não tirar a pessoa da tela pois
     ela vai ter que voltar para ver mais usinas"): `/t/campo/responsaveis/pt/<numero>?ativo=&volta=`
     (`responsaveis_pt`, `_resp_pt.html`), a mesma linha e a mesma decisão da tela da PT, assinada com o login do

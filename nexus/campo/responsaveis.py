@@ -874,9 +874,9 @@ def os_disponibilidade(uid: int, mes: str, nomes: Nomes) -> dict:
     Gerencial): {oss: [{os, tipo, origem, escopo, inicio, fim, aberta, duracao_min, sol_min, perda_kwh}], totais,
     publicado}. Duração = do início ao fim da OS (o relógio); horas de sol = as de 06–18 h da OS dentro do mês (as que
     contam na conta), as mesmas em cada usina dela; perda = a da OS NESTA usina pela régua de lá (kWp afetado × horas de
-    sol, sem a irradiação, fora o dia que a geração desmente; 0 quando todos foram desmentidos), e por isso o total é a
-    perda da usina no Gerencial. Até 13/10/2026 a plataforma repartia a perda da OS de duas usinas pela potência, e o
-    total errava quando a geração desmentia o dia numa usina só (setembro: 47.893 kWh entre Rodrigues 1 e 2)."""
+    sol, sem a irradiação), e por isso o total é a perda da usina no Gerencial. Desde 15/10/2026 a disponibilidade é só
+    do Fracttal, isolada da geração (até ali a geração "desmentia" dias e a OS podia ficar com 0). Até 13/10/2026 a
+    plataforma repartia a perda da OS de duas usinas pela potência (setembro: 47.893 kWh entre Rodrigues 1 e 2)."""
     from datetime import datetime as _dt
     todas = visao._livro(LIVRO_DISP, ABA_DISP_OS)
     rs = _linhas_da_usina([r for r in todas if str(r.get("mes") or "") == mes], uid, nomes)

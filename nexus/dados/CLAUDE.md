@@ -73,7 +73,9 @@ ainda sem push). Coluna nova só no FIM (o BI e o Nexus leem por posição):
 - 09/10 (rodada 4 do Dashboard Thopen): aba `disponibilidade_dia` (fato `disponibilidade_dia`, 1 linha = usina do
   catálogo do Gerencial × dia fechado; `disp` e `h_perdidas` do índice do Gerencial › Disponibilidade, o 100 do dia sem
   OS escrito) e a coluna `disponibilidade_dia` no fim da `atualizacao`. Liga pelo nome do Gerencial e, sem ele, pelo
-  nome do Fracttal no `de_para` — nunca só pelo site: um site do Fracttal pode ser de duas usinas.
+  nome do Fracttal no `de_para` — nunca só pelo site: um site do Fracttal pode ser de duas usinas. Desde 15/10/2026
+  (Levi): de 10/2026 em diante só as OS do Fracttal, isolada da geração; setembro para trás, a "Disponibilidade Usina
+  (%)" do BD_Thopen, só a Thopen, e as abas de OS desse mês ficam sem linha.
 - Estado `origem`: nenhum deles tem `usina_id` ainda (pendência 10).
 
 **Janela (é condição, não data):** o workbook leva todos os meses publicados, mas o worker só remonta o mês corrente
@@ -156,9 +158,10 @@ fica de fora). Registrado antes de existir: nasce na 1ª volta do worker depois 
 `falhas_performance · disponibilidade_os` (`plataforma/falhas_publicar.py`, `_disp_os_linhas`): 1 linha = 1 OS × 1 usina
 do escopo, no mês, lido pela janela de Disponibilidade da Visão do responsável. **O `perda_kwh` é a perda da OS NAQUELA
 usina** (13/10/2026: o `kwh_usina` do índice da Disponibilidade da plataforma), pela régua do Gerencial (kWp afetado ×
-horas de sol, sem a irradiação, fora o dia que a geração desmente): as linhas de uma usina somam a perda dela no
-Gerencial, e a usina do escopo em que a OS não perdeu nada fica com 0. Antes era a perda da OS repartida pela potência,
-que errava quando a geração desmentia o dia numa usina só ou o teto de 100% pegava uma e não a outra (setembro: 47.893
+horas de sol, sem a irradiação; só o Fracttal, a geração não entra desde 15/10/2026): as linhas de uma usina somam a
+perda dela no Gerencial, e a usina do escopo em que a OS não perdeu nada fica com 0. Antes era a perda da OS repartida
+pela potência, que errava quando o teto de 100% pegava uma e não a outra (e, até 15/10, quando a geração desmentia o
+dia numa usina só) (setembro: 47.893
 kWh na usina errada entre Rodrigues 1 e 2; outubro: ~2,5 MWh na Boa Esperança do Sul 1 e 2 e ~5,2 MWh na Rodrigues). O
 índice publicado antes do campo ainda reparte pela potência. Mudou a regra lá, muda a `observacao` do catálogo junto.
 

@@ -526,7 +526,9 @@ FATOS = (
                     "muda até fechar (status; a quantidade escrita depois troca a origem)"),
     # Rodada 4 do Dashboard Thopen (Levi, 09/10/2026): a coluna Disp (%) da tabela do Diário "calculada pelo Fracttal, da
     # mesma forma que calculamos pelo gerencial da plataforma". A plataforma publica o diário do índice do Gerencial ›
-    # Disponibilidade (frac_disp_index.json), sem chamada nova ao Fracttal; o dia sem OS vem escrito (100 e 0 h)
+    # Disponibilidade (frac_disp_index.json), sem chamada nova ao Fracttal; o dia sem OS vem escrito (100 e 0 h). Desde
+    # 15/10/2026 (Levi): de 10/2026 em diante só as OS do Fracttal, isolada da geração; setembro para trás, a
+    # "Disponibilidade Usina (%)" do BD_Thopen, só as usinas da Thopen
     Fato("disponibilidade_dia", "Disponibilidade da usina por dia (Gerencial)", "performance",
          "falhas_performance · disponibilidade_dia",
          "1 linha = 1 usina do catálogo do Gerencial × 1 dia fechado do mês",
@@ -539,8 +541,9 @@ FATOS = (
          medidas=_m((("disp_pct", "%", "nao"), ("indisponibilidade_min", "min", "semi"))),
          janela_origem="o mês corrente e o anterior (o índice do Gerencial); mês que sai fica como foi publicado",
          observacao="disp = 100·(1 − h_perdidas/12); o 5080 calcula pelas horas (o disp de 1 casa desviava a média do "
-                    "mês). Um site do Fracttal pode ser de duas usinas (Aparecida do Taboado 1 e 2): ligar pelo nome "
-                    "primeiro"),
+                    "mês). De 10/2026 em diante só as OS do Fracttal (a geração não entra); setembro para trás, a "
+                    "Disponibilidade Usina (%) do BD_Thopen, só a Thopen. Um site do Fracttal pode ser de duas usinas "
+                    "(Aparecida do Taboado 1 e 2): ligar pelo nome primeiro"),
     Fato("parada_tracker", "Parada de tracker", "performance", "plataforma_series · trk_eventos",
          "1 linha = 1 parada", _d(data=("cod", "dia"), usina=("cod", "plant_id da fonte"),
                                   equipamento=("nome", "tracker")),
@@ -602,8 +605,8 @@ FATOS = (
     # O que formou a disponibilidade (12/10/2026, Levi: "Quero também que apareça todas as OSs listadas que formaram
     # aquele valor"): as OS da conta do Gerencial › Disponibilidade, publicadas com o diário pela plataforma. A perda de
     # cada linha é a da OS naquela usina desde 13/10/2026 (`kwh_usina` do índice da Disponibilidade): repartida pela
-    # potência, a OS de duas usinas punha a perda na usina errada quando a geração desmentia o dia numa só, ou o teto de
-    # 100% pegava uma e não a outra
+    # potência, a OS de duas usinas punha a perda na usina errada quando o teto de 100% pegava uma e não a outra (e, até
+    # 15/10/2026, quando a geração desmentia o dia numa só)
     Fato("disponibilidade_os", "OS que formaram a disponibilidade (Gerencial)", "performance",
          "falhas_performance · disponibilidade_os",
          "1 linha = 1 OS da conta da disponibilidade × 1 usina do escopo dela, no mês",
@@ -617,11 +620,12 @@ FATOS = (
          observacao="tipo = o tipo da tarefa (Religamento, Religamento Remoto, Corretiva Emergencial); origem = queda ou "
                     "equipamento; escopo = usina inteira, cabine N ou inversor N.M; duracao_sol_min = as horas de sol "
                     "(06–18 h) da OS dentro do mês, as mesmas em cada usina dela; perda_kwh = a perda da OS naquela "
-                    "usina pela régua do Gerencial (kWp afetado × horas de sol, sem a irradiação, fora o dia que a "
-                    "geração desmente): as linhas de uma usina somam a perda dela no Gerencial, e a usina do escopo em "
-                    "que a OS não perdeu nada (todo dia desmentido) fica com 0. Até 13/10/2026 era a perda da OS "
-                    "repartida pela potência (setembro: 47.893 kWh na usina errada entre Rodrigues 1 e 2). Sem a "
-                    "descrição nem quem criou (regra 8)"),
+                    "usina pela régua do Gerencial (kWp afetado × horas de sol, sem a irradiação; só o Fracttal, a "
+                    "geração não entra desde 15/10/2026): as linhas de uma usina somam a perda dela no Gerencial, e a "
+                    "usina do escopo em que a OS não tem hora de sol fica com 0. Até 13/10/2026 era a perda da OS "
+                    "repartida pela potência (setembro: 47.893 kWh na usina errada entre Rodrigues 1 e 2). Mês de "
+                    "setembro para trás vem do BD_Thopen, sem OS: a aba fica sem linha. Sem a descrição nem quem "
+                    "criou (regra 8)"),
     # A parcela de cada OS em cada dia (14/10/2026, Dashboard Thopen, Levi: "A partir de outubro quero os comentários 100%
     # OS Fracttal. Comentários e disponibilidade!"): sai da MESMA varredura da disponibilidade_dia (disponibilidade._varrer
     # da plataforma), por isso as linhas de uma usina num dia somam o h_perdidas dela. É o que o 5080 escreve no
@@ -642,8 +646,9 @@ FATOS = (
                     "horas de sol, 06–18 h), na mesma conta da disponibilidade_dia: somadas, as linhas de uma usina num "
                     "dia dão o h_perdidas dela, e a disponibilidade do dia é 100 × (1 − h ÷ 12). trechos = os horários "
                     "do dia em que a OS foi dona da perda (\"06:00-08:06; 10:55-12:05\"): a OS de cabine coberta por "
-                    "uma de usina inteira só conta fora dela, e o dia que a geração desmente não tem linha. tipo, "
-                    "origem, escopo e kWp são os da OS naquela usina. Sem a descrição nem quem criou (regra 8)"),
+                    "uma de usina inteira só conta fora dela (até 15/10/2026 o dia que a geração desmentia também não "
+                    "tinha linha; desde então a geração não entra). tipo, origem, escopo e kWp são os da OS naquela "
+                    "usina. Sem a descrição nem quem criou (regra 8)"),
     # ── Tickets ────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("ticket", "Ticket de performance", "chamados",
          "tickets_performance · Tickets de Performance, Trackers, Strings indisp", "1 linha = 1 ticket",
