@@ -65,7 +65,15 @@ tipo de tarefa fosse de fato zeladoria, não só pelo nome, tem corretiva sendo 
   W42 (as 25 h da 15596 e as pendentes repetidas) ficam como estavam: ele não recalcula linha antiga.
 - **Prova:** W43 com a mesma foto (`ferramentas/gerar_semana_foto.py`, 14/10 15:06), motor antes e depois: maior dia
   de equipe 24,2 h → 10,3 h; 14331 24 h → 6 h; zeladoria terceirizada 31 → 18 linhas. Testes:
-  `tests/test_pcm_motor_regras.py` (4 mutações, todas pegas).
+  `tests/test_pcm_motor_regras.py` (4 mutações, todas pegas). No robô, a 1ª rodada de verdade com o `fd39672` (15/10
+  12:24, Brasília) mudou a W42 do `banco_dados.json`: pendentes 2.222 linhas e 20.955 h → 1.246 e 1.516 h; linhas de 8 h
+  ou mais 695 → 15; pendentes repetidas 1.326 → 423 (as antigas; as duas funções do robô que gravam pendente passam
+  pela regra nova).
+- **Achado, ainda NÃO consertado (robô do PCM):** o passo A2 (incorporar OS nova) roda ANTES do A3 (aplicar o
+  `Observacoes_Semana_Atual.txt`) e não olha as exclusões: a cada rodada o robô reinclui a OS que o PCM tirou (`não`) e
+  a tarefa tirada (`sem:`), desloca o que estiver no horário dela e só então a apaga. Na rodada de 15/10 12:24, a 15596
+  (tirada pelo PCM às 09:42) deslocou 19 tarefas e mandou 9 para as pendentes. O conserto é o A2 pular o que o
+  arquivo da semana em curso tira; mexe no robô do PCM.
 
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
 
@@ -243,7 +251,9 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   do QGBT1, QGBT2 e QGBT3). A janela avisa ("está em 3 linhas da semana") e lista as de nome parecido que saem junto.
   Separar por equipamento pediria mudar o robô e o motor do PCM.
   Quem aplica: **semana em curso**, o robô (`atualizacao_semanal`, STEP A3) apaga as linhas da tarefa (agenda e
-  `_Pendentes`), em qualquer OS, e não reposiciona nada (a linha não tem dia nem turno). **Semana que o Nexus gera**, o
+  `_Pendentes`), em qualquer OS, e não reposiciona nada (a linha não tem dia nem turno); mas o passo A2 dele reinclui a
+  tarefa (e a OS do `não`) a cada rodada antes de apagar, deslocando o que estiver no horário (achado de 15/10, na
+  seção "Horas por tarefa e zeladoria no motor"). **Semana que o Nexus gera**, o
   motor (`programacao_v7`) só aplica o `sem:` nas OS de plano (modo A: a tarefa nem é programada) e, como toda linha da
   OS vira "pin", a OS entra na semana e o resto dela ganha prioridade na fila da usina; na OS comum (modo B) ele ignora
   o `sem:` e programa a tarefa. Por isso a rodada roda o `geracao.aplicar_sem` depois do motor: a mesma exclusão do
