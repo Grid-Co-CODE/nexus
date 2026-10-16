@@ -565,6 +565,12 @@ vieram Tipo, Etiqueta, Estado, OS, Solicitação e Período.
   anteriores; na reserva, `geracao.preparar_historico`).
 - **O arquivo de histórico do PC não é registro do que foi a campo:** guarda toda geração (a S41 de 02/10 08:26, que
   nunca foi ao campo, está lá), perdeu a W35 inteira e não se corrige sozinho. Daí o histórico vir do banco.
+- **Carga máxima do dia: 70% (16/10/2026, da W44 em diante; Levi: "70% HH por dia"):** o motor do PCM
+  (`CARGA_MAX_DIA`) programa até 6,15 h por equipe e dia (era 80%, 7 h); a noite segue em 80%. A conferência
+  (`comparar.CARGA_MAX_DIA`, `CAPACIDADE_H`, `DIA_DO_MOTOR_MIN`) usa a mesma conta, e o teste de contrato prende as duas.
+  Na W43 com a leitura das 12:23: de 1.232 para 1.220 blocos e 10 tarefas a mais na pendente (a maioria dos dias de
+  equipe já não enchia; 19 passam de 6,15 h pelas corretivas forçadas). Junto, o robô do PCM deixou de mudar a tarefa de
+  dia (rolagem desligada, cascata da OS nova só no mesmo dia): a tarefa de sexta fica no dia dela até o fechamento.
 - **Cota do Fracttal:** 200 pedidos por minuto para a **empresa inteira**, divididos com o App de Campo. O motor anda
   a 1 por segundo, e a tela pede confirmação no horário de campo (seg a sex, das 06h às 18h). Cada leitor do motor tem
   a sua variável de ritmo: o `gerar_bd_via_api` lê a `FRACTTAL_INTERVALO_S` e o `fonte_bd_api` (a leitura da semana,

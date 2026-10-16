@@ -413,9 +413,11 @@ def test_conferencia_da_semana_gerada(tmp_path):
     wb.save(tmp_path / "s.xlsx")
     c = C.conferir(tmp_path / "s.xlsx", "2026-W41")
     assert c["blocos"] == 8 and c["pendentes"] == 1 and c["fora_da_semana"] == 1     # o 12/10 é da semana seguinte
-    # segunda: 4 h + 3 h (a corretiva de MPA das 15:45 ficou na janela da noite); terça: 0,5 h + 6 h (zeladoria fora)
-    assert c["acima_da_capacidade"] == 0 and c["horas_dia_max"] == 7.0 and c["dias_de_equipe"] == 3
-    assert c["acima_da_capacidade_pelo_relogio"] == 0 and c["horas_dia_max_pelo_relogio"] == 7.0
+    # segunda: 4 h + 3 h (a corretiva de MPA das 15:45 ficou na janela da noite); terça: 0,5 h + 6 h (zeladoria fora).
+    # Com os 80% da W42 os dois dias cabiam nas 7 h; com a carga de 70% (16/10/2026, 6,15 h) passam
+    assert c["horas_dia_max"] == 7.0 and c["dias_de_equipe"] == 3 and c["capacidade_txt"] == "6,15"
+    assert c["acima_da_capacidade"] == 2 and [e["horas"] for e in c["acima_da_capacidade_exemplos"]] == [7.0, 6.5]
+    assert c["acima_da_capacidade_pelo_relogio"] == 2 and c["horas_dia_max_pelo_relogio"] == 7.0
     assert c["duracao_maior_que_o_horario"] == 1 and c["duracao_maior_que_o_horario_exemplos"][0]["os"] == "7"
     assert c["horas_noite_max"] == 8
     assert c["fora_da_jornada"] == 1                      # a forçada que começa às 03:15 do dia seguinte
@@ -469,6 +471,18 @@ def test_tela_gerar_sem_credencial_nao_roda(app, logado, config):
 def test_semana_invalida_nao_roda(app, logado, config):
     app.config.update({k: v for k, v in config.items() if k != "TESTING"})
     assert logado.post("/t/pcm/gerar", data={"semana": "41; rm -rf", "confirmo": "1"}).status_code == 400
+
+
+def test_a_conferencia_usa_a_carga_maxima_do_motor():
+    # 16/10/2026 (Levi): "carga máxima no programador de sexta de 70% HH por dia" (era 80%, 7 h). A conferência do Nexus
+    # conta os dias de equipe acima da carga com a MESMA conta do motor: carga nova no motor do PCM quebra este teste.
+    txt = G.MOTOR.read_text(encoding="utf-8")
+    m = re.search(r"^CARGA_MAX_DIA\s*=\s*([0-9.]+)", txt, re.M)
+    assert m and float(m.group(1)) == C.CARGA_MAX_DIA
+    assert re.search(r"^USEFUL_DAY_MIN\s*=.*\*\s*CARGA_MAX_DIA\)", txt, re.M)
+    assert re.search(r"^MPA_DAY_USEFUL_MIN\s*=.*\*\s*CARGA_MAX_DIA\)", txt, re.M)
+    assert re.search(r"^NIGHT_CAPACITY_MIN\s*=.*\*\s*0\.80\)", txt, re.M)      # a noite ficou nos 80%
+    assert (C.DIA_DO_MOTOR_MIN, C.CAPACIDADE_H, C.CAPACIDADE_TXT) == (369, 6.15, "6,15")
 
 
 def test_motor_le_o_fracttal_a_1_pedido_por_segundo_em_todos_os_leitores(monkeypatch, tmp_path):

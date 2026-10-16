@@ -57,8 +57,9 @@
   {% else %}
   <ul class="pcm-pub-lista">
     <li>{% if conf.fora_da_semana %}<strong class="pcm-pub-ruim">{{ conf.fora_da_semana }} blocos fora da semana</strong>{% else %}Todo bloco cai de segunda a sexta desta semana.{% endif %}</li>
-    <li>{% if conf.acima_da_capacidade %}{{ conf.acima_da_capacidade }} dias de equipe acima de 7 h pela coluna de duração
-      (o maior: {{ conf.horas_dia_max }} h){% else %}Nenhum dia de equipe acima de 7 h.{% endif %}</li>
+    {# a carga máxima do dia que valia na rodada (70% desde 16/10/2026: 6,15 h); a rodada de antes não traz: 7 h #}
+    <li>{% if conf.acima_da_capacidade %}{{ conf.acima_da_capacidade }} dias de equipe acima de {{ conf.capacidade_txt or '7' }} h pela coluna de duração
+      (o maior: {{ conf.horas_dia_max }} h){% else %}Nenhum dia de equipe acima de {{ conf.capacidade_txt or '7' }} h.{% endif %}</li>
     {% if conf.excede_hh_os %}
     <li><strong class="pcm-pub-ruim">Corretivas forçadas além das horas do dia:</strong>
       {% for e in conf.excede_hh_os %}OS {{ e.os }} ({{ e.tarefas }} {{ 'tarefa' if e.tarefas == 1 else 'tarefas' }}, {{ e.horas }} h, {{ e.equipe }}, {{ e.dia }}){{ ', ' if not loop.last }}{% endfor %}.
