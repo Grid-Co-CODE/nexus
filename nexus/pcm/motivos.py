@@ -388,7 +388,9 @@ def _gravar(cfg, mudar):
         resultado, mudou = mudar(cru)
         if mudou:
             _gravar_cru(cfg, cru)
-        _CACHE.pop(str(_arquivo_local(cfg) or "banco"), None)
+        # o que acabou de ser lido (e gravado) vale como a leitura de agora: a tela e o arquivo do robô não voltam ao
+        # banco logo em seguida (no 1º uso real do Justificar do App, cada marca lia o livro três vezes)
+        _CACHE[str(_arquivo_local(cfg) or "banco")] = dict(_estado(cru), erro="", lido_em=time.time())
         return resultado
 
 
@@ -645,6 +647,41 @@ def publicar_arquivo(cfg, est: dict | None = None) -> dict:
         if not lido or PB._sha256(lido["bytes"]) != PB._sha256(corpo):
             raise Recusada(f"o repositório não tem o arquivo enviado (commit {commit}); confira no GitHub")
     return {"commit": commit, "hash": dados["hash"], "igual": False}
+
+
+ATRASO_PUBLICAR_S = 3
+_PUB: dict = {"timer": None}
+_PUB_TRAVA = threading.Lock()
+
+
+def publicar_depois(cfg) -> None:
+    """Manda o arquivo ao repositório do PCM FORA do pedido (16/10/2026). No 1º uso real do Justificar do App (6 marcas
+    de um técnico em 4 min), 3 pedidos passaram de 20 s ou deram 502: cada marca esperava, além do banco, quatro chamadas
+    ao GitHub, e as marcas seguidas esperavam a vez. A marca já está no banco quando a resposta sai; o arquivo (o estado
+    inteiro) vai ATRASO_PUBLICAR_S depois, e as marcas que chegam nesse meio tempo vão juntas numa publicação só. Falhar
+    aqui não desfaz nada: o painel mostra o arquivo desatualizado e o botão de mandar de novo. Nos testes, na hora."""
+    if cfg.get("TESTING"):
+        _publicar_agora(cfg)
+        return
+    with _PUB_TRAVA:
+        if _PUB["timer"] is not None:
+            _PUB["timer"].cancel()
+        t = threading.Timer(ATRASO_PUBLICAR_S, _publicar_agora, args=(cfg,))
+        t.daemon = True
+        _PUB["timer"] = t
+        t.start()
+
+
+def _publicar_agora(cfg) -> None:
+    try:
+        r = publicar_arquivo(cfg)
+        log.info("Motivos do PCM: arquivo do robô %s.", "já estava em dia" if r["igual"]
+                 else f"publicado (commit {r['commit'][:7]})")
+    except Exception as ex:      # noqa: BLE001 — fora do pedido: o log e o painel dizem
+        log.error("Motivos do PCM: o arquivo do robô não foi publicado (%s: %s); o painel mostra e tem o botão de "
+                  "mandar de novo.", type(ex).__name__, str(ex)[:200])
+    finally:
+        esquecer_estado_no_repositorio()
 
 
 _ESTADO_REPO: dict = {}

@@ -480,7 +480,7 @@ def registrar_pcm(bp) -> None:
         linha = _tarefa_do_app(cfg, d)
         if linha is None:
             return jsonify(ok=False, erro="a tarefa não está na programação nem aberta na Gestão PCM"), 404
-        est = M.ler(cfg, forcar=True)
+        est = M.ler(cfg)
         if est.get("erro"):
             return jsonify(ok=False, erro=f"não consegui ler os motivos no banco ({est['erro']})"), 503
         atual = M.motivo_de(M.indice(M.vigentes(cfg, est)), linha["os"], linha["codigo"], linha["tarefa"])
@@ -493,8 +493,9 @@ def registrar_pcm(bp) -> None:
             return jsonify(ok=False, erro=str(ex)), 400
         arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
         marca = r["marca"]
+        # o arquivo do robô vai em instantes, fora do pedido (`arquivo_em_dia` fica por compatibilidade: null)
         return jsonify(ok=True, gravou=r["gravou"], marca=_marca_curta(marca) if marca else None,
-                       arquivo_em_dia=arq["ok"])
+                       arquivo="em instantes" if r["gravou"] else "sem mudança", arquivo_em_dia=None)
 
     @bp.route("/fora-da-programacao")
     def fora():
@@ -571,7 +572,7 @@ def registrar_pcm(bp) -> None:
         cfg = current_app.config
         if not pode_marcar() or _de_outro_site():
             abort(403)
-        arq = _publicar_arquivo(cfg)
+        arq = _publicar_arquivo(cfg, agora=True)
         session["pcm_motivos_aviso"] = ({"ok": arq["texto"] or "O arquivo do robô já estava em dia."} if arq["ok"]
                                         else {"erro": arq["texto"]})
         return redirect(na_raiz("/t/pcm/fora-da-programacao"), code=303)
@@ -1034,9 +1035,14 @@ def _efeito(marca: dict | None, destino: str | None, tirou: bool = False) -> str
     return "Sai da programação a partir da próxima geração da semana."
 
 
-def _publicar_arquivo(cfg) -> dict:
-    """Manda o estado novo ao repositório do PCM (o robô lê de lá). A marca já está no banco: falhar aqui não desfaz
+def _publicar_arquivo(cfg, agora: bool = False) -> dict:
+    """Manda o estado novo ao repositório do PCM (o robô lê de lá). Depois de uma marca, fora do pedido
+    (`motivos.publicar_depois`, 16/10/2026: com o GitHub dentro do pedido, o Justificar do App passava de 20 s); o botão
+    "Mandar o arquivo de novo" (`agora`) espera e diz o resultado. A marca já está no banco: falhar aqui não desfaz
     nada; a tela diz e o painel Fora da programação tem o botão de mandar de novo."""
+    if not agora:
+        M.publicar_depois(cfg)
+        return {"ok": True, "texto": ""}
     try:
         r = M.publicar_arquivo(cfg)
     except Exception as ex:      # noqa: BLE001 — sem token, GitHub fora: a tela diz

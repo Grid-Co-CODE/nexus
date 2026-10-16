@@ -133,7 +133,8 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   estar na programação publicada (comparada como o motor: sem acento, caixa e espaço a mais) ou aberta na Gestão PCM (a OS
   avulsa do App, com o código que o App mandou); senão 404. Grava com origem `app` e quem marcou pelo `tecnico_hmac` (o
   nome só cifrado; o painel e a janela mostram "(App)"), mexe na marca da OS quando é ela que vale (como a janela do
-  Quadro) e manda o arquivo do robô na hora. Respostas: 200 {ok, gravou, marca, arquivo_em_dia}; 400 pedido fora do
+  Quadro) e agenda o arquivo do robô (fora do pedido, abaixo). Respostas: 200 {ok, gravou, marca, arquivo ("em
+  instantes" ou "sem mudança"), arquivo_em_dia (null, por compatibilidade)}; 400 pedido fora do
   formato ou motivo que não existe; 401 assinatura ou hora; 404 tarefa; 503 sem a chave ou banco fora. Testes:
   `test_o_tecnico_marca_pelo_app` e `test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava`.
 - **O nome do motivo** segue a regra do Levi (16/10/2026, "Padronizar texto: sempre a primeira letra maiúscula o resto
@@ -185,9 +186,13 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   commit `3b3efae` no repositório do PCM). Vai (1) para
   a pasta de cada rodada (`motivos.materializar` no `geracao._preparar`; banco fora do ar = a última cópia boa da máquina, com aviso; sem
   cópia a rodada não sai) e (2) para a raiz do repositório do PCM a cada marca, cadastro e backoffice
-  (`publicar_arquivo`, o PUT do `publicar.py` com `NEXUS_PCM_GITHUB_TOKEN`; igual ao de lá = não grava). Falhar o GitHub
-  não desfaz a marca: a tela diz e o painel mostra "desatualizado" com o botão de mandar de novo. Não dispara o robô: ele
-  lê na rodada seguinte.
+  (`publicar_arquivo`, o PUT do `publicar.py` com `NEXUS_PCM_GITHUB_TOKEN`; igual ao de lá = não grava), **fora do
+  pedido** (`publicar_depois`: 3 s depois da marca, e as marcas seguidas vão juntas numa publicação só; o botão "Mandar o
+  arquivo de novo" espera e diz o resultado). Por quê: no 1º uso real do Justificar do App (16/10, 6 marcas de um
+  técnico em 4 min), 3 pedidos passaram de 20 s ou deram 502: cada marca lia o livro três vezes e esperava quatro
+  chamadas ao GitHub. Agora a gravação deixa a leitura guardada com o estado novo e a rota do App decide pela leitura
+  guardada (a gravação relê o banco). Falhar o GitHub não desfaz a marca: o log diz e o painel mostra "desatualizado"
+  com o botão de mandar de novo. Não dispara o robô: ele lê na rodada seguinte.
 - **No motor e no robô do PCM** (`fora_da_programacao.py`, cópia em `motor/`): o `programacao_v7` tira da lista antes de
   montar a semana (log `[FORA DA PROGRAMAÇÃO]`); o `atualizacao_semanal` pula no A2 e apaga no A3b; o
   `gerar_pcm_json` passou a mandar o `codigo` da pendente (o Quadro marca a pendente pelo ativo). Sem o arquivo, nada

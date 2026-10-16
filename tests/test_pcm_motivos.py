@@ -579,3 +579,18 @@ def test_sem_o_arquivo_no_repositorio_o_painel_manda(app, logado, tela):
     assert len(json.loads(tela.arquivos[M.ARQUIVO])["motivos"]) == 12
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
     assert "O arquivo está em dia" in html and "Mandar o arquivo de novo" not in html
+
+
+def test_o_arquivo_vai_fora_do_pedido_e_junta_as_marcas(monkeypatch):
+    """Fora dos testes, o arquivo do robô vai ATRASO_PUBLICAR_S depois da marca e as marcas seguidas viram UMA
+    publicação (16/10/2026: com o GitHub dentro do pedido, o Justificar do App passava de 20 s)."""
+    import time as _tempo
+    chamadas = []
+    monkeypatch.setattr(M, "publicar_arquivo", lambda cfg: chamadas.append(_tempo.time()) or {"igual": True, "commit": ""})
+    monkeypatch.setattr(M, "ATRASO_PUBLICAR_S", 0.2)
+    cfg = {"TESTING": False}
+    for _ in range(3):
+        M.publicar_depois(cfg)
+        assert not chamadas                       # a resposta sai antes: nada foi ao GitHub ainda
+    _tempo.sleep(0.6)
+    assert len(chamadas) == 1
