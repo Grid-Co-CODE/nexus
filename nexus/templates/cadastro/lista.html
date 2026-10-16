@@ -9,6 +9,10 @@
     <p class="cad-sub">Ensaio local: o BD_Operações continua sendo a fonte oficial até a virada.</p>
   </div>
   <div class="cad-acoes">
+    {% if ent.id == 'usinas' %}
+    {# o BD_Operações novo exporta CSV; a mesma regra servirá à fonte em tempo real (15/10/2026) #}
+    <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/base/registro-mestre/atualizar"><i class="ph ph-upload-simple"></i> Atualizar pelo CSV</a>
+    {% endif %}
     <a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ (url_nova)|na_raiz }}"><i class="ph ph-plus"></i> {{ texto_novo }}</a>
   </div>
 </div>

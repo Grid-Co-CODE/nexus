@@ -9,6 +9,8 @@ Regras de tela que valem para todas:
 - sem NEXUS_CHAVE_CADASTRO, a tela diz o que falta em vez de quebrar.
 """
 import os
+import secrets
+import time
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -18,11 +20,11 @@ from urllib.parse import urlencode
 from flask import abort, current_app, redirect, render_template, request, session
 from markupsafe import Markup
 
-from . import tipos
+from . import importar_csv, tipos
 from .armazem import ArmazemLocal
 from .calculos import CARGO_TECNICO, ERRO
 from .cifra import CifraErro, Cofre
-from .esquema import (CLIENTES, ENTIDADES, EQUIPES, PESSOAS, REGIOES_CAMPO, USINAS, VINCULO_CAMPO,
+from .esquema import (CLIENTES, ENTIDADES, EQUIPES, LISTAS, PESSOAS, REGIOES_CAMPO, USINAS, VINCULO_CAMPO,
                       VINCULO_COORDENADOR_CAMPO, VINCULO_GESTOR, VINCULO_SUPERVISOR_CAMPO, VINCULO_SUPERVISOR_LEGADO,
                       rotulo_lista)
 from .servico import Servico, chave_texto
@@ -631,6 +633,17 @@ def _extras_equipe(srv: Servico):
 
 # ── registro das rotas nas torres ──────────────────────────────────────────
 
+_CSV_PREVIAS = "nexus_cadastro_csv_previas"
+_CSV_FEITOS = "nexus_cadastro_csv_feitos"
+_CSV_TTL_S = 30 * 60
+_CSV_MAX = 5 * 1024 * 1024
+
+
+def _de_outro_site() -> bool:
+    from ..torres.moldura import _de_outro_site as regra
+    return regra()
+
+
 def registrar_base(bp):
     @_tela("Registro mestre")
     def usinas(srv):
@@ -711,6 +724,73 @@ def registrar_base(bp):
         importação do BD_Operações segue por comando (`importar.montar` → `srv.aplicar_carga`, nexus/cadastro/CLAUDE.md)."""
         return redirect(na_raiz("/t/base/registro-mestre"))
 
+    # ── Atualizar pelo CSV do BD_Operações novo (15/10/2026; regras em importar_csv.py) ──
+    # Levi: "Esse é o novo BD_Operações, conseguimos atualizar os dados do Nexus com esse CSV? daqui a duas semanas vamos
+    # ter acesso em tempo real a esses dados". Envia o arquivo, vê a prévia por coluna (antes e depois de cada usina),
+    # desmarca o que não quer e aplica: cada usina passa pela ficha (versão e auditoria). A prévia vive 30 min, na memória
+    # do processo, e vale uma vez; o resultado volta por 303 (F5 não aplica de novo).
+    def _csv_pagina(srv, status=200, **k):
+        k.setdefault("p", None)
+        k.setdefault("erro", None)
+        k.setdefault("feito", None)
+        return render_template("cadastro/atualizar_csv.html", LISTAS_ROTULO=LISTAS, **k), status
+
+    def _csv_guardar(chave, valor) -> str:
+        guardadas = current_app.extensions.setdefault(chave, {})
+        agora = time.time()
+        for t in [t for t, (_, quando) in guardadas.items() if agora - quando > _CSV_TTL_S]:
+            guardadas.pop(t, None)
+        token = secrets.token_urlsafe(16)
+        guardadas[token] = (valor, agora)
+        return token
+
+    @_tela("Atualizar pelo CSV")
+    def atualizar_csv(srv):
+        if request.method == "GET":
+            feito = current_app.extensions.get(_CSV_FEITOS, {}).get(request.args.get("feito", ""))
+            return _csv_pagina(srv, feito=feito[0] if feito else None)
+        if _de_outro_site():
+            return _csv_pagina(srv, 403, erro="Pedido de outro site: nada foi lido.")
+        f = request.files.get("arquivo")
+        nome = (f.filename if f else "") or ""
+        if not f or not nome.lower().endswith(".csv"):
+            return _csv_pagina(srv, 400, erro="Envie o CSV do BD_Operações (arquivo .csv).")
+        dados = f.read(_CSV_MAX + 1)
+        if len(dados) > _CSV_MAX:
+            return _csv_pagina(srv, 413, erro="Arquivo grande demais para o BD_Operações (mais de 5 MB).")
+        try:
+            cab, linhas = importar_csv.ler_csv(dados)
+        except Exception as e:                        # arquivo que não é CSV
+            return _csv_pagina(srv, 400, erro=f"Não consegui ler o arquivo: {str(e)[:160]}")
+        if importar_csv.ID not in cab:
+            return _csv_pagina(srv, 400, erro=f"O arquivo não tem a coluna “{importar_csv.ID}”: é mesmo o CSV do "
+                                              "BD_Operações?")
+        prop = importar_csv.proposta(linhas, srv, cab)
+        prop["arquivo"] = nome
+        return _csv_pagina(srv, p=prop, token=_csv_guardar(_CSV_PREVIAS, prop))
+
+    @_tela("Atualizar pelo CSV")
+    def atualizar_csv_aplicar(srv):
+        if _de_outro_site():
+            return _csv_pagina(srv, 403, erro="Pedido de outro site: nada foi gravado.")
+        previas = current_app.extensions.setdefault(_CSV_PREVIAS, {})
+        token = request.form.get("token", "")
+        item = previas.get(token)
+        if item is None or time.time() - item[1] > _CSV_TTL_S:
+            previas.pop(token, None)
+            return _csv_pagina(srv, 410, erro="A prévia venceu (30 min) ou já foi aplicada. Envie o arquivo de novo: "
+                                              "nada foi gravado.")
+        prop = item[0]
+        validos = {pc["campo"] for pc in prop.get("por_campo") or []}
+        campos = [c for c in request.form.getlist("campos") if c in validos]
+        if not campos:
+            return _csv_pagina(srv, 400, p=prop, token=token, erro="Marque ao menos uma coluna para aplicar.")
+        previas.pop(token, None)                       # vale uma vez: o segundo clique não grava de novo
+        res = importar_csv.aplicar(prop, srv, _quem(), campos)
+        res.update({"arquivo": prop.get("arquivo", ""), "colunas": len(campos), "de": len(validos)})
+        return redirect(na_raiz("/t/base/registro-mestre/atualizar?") + urlencode(
+            {"feito": _csv_guardar(_CSV_FEITOS, res)}), code=303)
+
     @_tela("Qualidade do cadastro")
     def qualidade(srv):
         pend = srv.pendencias()
@@ -745,6 +825,9 @@ def registrar_base(bp):
     bp.add_url_rule("/importar", "cad_importar", importar_saiu, methods=["GET", "POST"])
     bp.add_url_rule("/importar/aplicar", "cad_importar_aplicar", importar_saiu, methods=["GET", "POST"])
     bp.add_url_rule("/qualidade", "cad_qualidade", qualidade)
+    bp.add_url_rule("/registro-mestre/atualizar", "cad_atualizar_csv", atualizar_csv, methods=["GET", "POST"])
+    bp.add_url_rule("/registro-mestre/atualizar/aplicar", "cad_atualizar_csv_aplicar", atualizar_csv_aplicar,
+                    methods=["POST"])
 
 
 def registrar_pessoas(bp):

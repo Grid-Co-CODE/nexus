@@ -4,7 +4,8 @@ O registro mestre do Nexus: usinas, clientes, pessoas, equipes, regiões de camp
 BD_Operações (a região de campo vem da estrutura de O&M de 10/2026), mas editáveis numa tela. As telas ficam nas torres
 Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Regiões de campo, Qualidade do cadastro) e Pessoas
 (Colaboradores Operação). A tela Importar do Excel saiu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"):
-`/t/base/importar` leva ao Registro mestre, sem importar nada; a importação segue por comando (abaixo).
+`/t/base/importar` leva ao Registro mestre, sem importar nada; a importação segue por comando (abaixo). Desde 15/10/2026 o
+BD_Operações novo exporta CSV, e o Registro mestre tem **Atualizar pelo CSV** (`importar_csv.py`, seção própria abaixo).
 
 **A tela Listas saiu em 11/10/2026** (Levi: "pode tirar listas pois a governança faz mais sentido"): `/t/base/listas`
 responde um redirecionamento para Base → Governança de dados (quem tinha o endereço salvo não cai num 404; o POST de uma
@@ -28,6 +29,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `casamento.py` | casa o nome de uma base sem código (BD_Thopen) com a usina do cadastro |
 | `ligacoes.py` + `telas_ligacoes.py` | seção Ligações entre bases, no fim de Base → Governança de dados (até 11/10/2026 era a tela Base → Ligações): lê as bases, mostra os buracos, grava as decisões |
 | `importar.py` | importa o `BD_Operacoes.xlsx` (por comando desde 14/10/2026: a tela saiu) e monta a prévia do que muda antes de gravar |
+| `importar_csv.py` | Base → Registro mestre → Atualizar pelo CSV: o CSV do BD_Operações novo, usina a usina pela ficha, com prévia por coluna (15/10/2026) |
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Integração Fracttal: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
@@ -97,6 +99,57 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 - Importação de 07/10: o Gestor de Contrato foi preenchido em 159 usinas (coluna nova). Uma pessoa veio com "desistiu" na
   coluna Cluster e virou a equipe 146. O certo é Status = Desligado; quando a planilha for corrigida, a próxima
   importação marca essa equipe como excluída.
+
+## Atualizar pelo CSV do BD_Operações novo (`importar_csv.py`, `/t/base/registro-mestre/atualizar`; 15/10/2026)
+
+Levi, 15/10/2026, com o `operacao_usinas_2026-10-15.csv`: "Esse é o novo BD_Operações, conseguimos atualizar os dados do
+Nexus com esse CSV? daqui a duas semanas vamos ter acesso em tempo real a esses dados". O CSV tem 258 usinas, 73 colunas,
+`;` e decimal com vírgula. A tela (admin, botão "Atualizar pelo CSV" no Registro mestre) recebe o arquivo, mostra a
+prévia **por coluna** (cada coluna com caixa de marcar, a contagem e o antes/depois de cada usina; sensível mascarado) e
+aplica só as colunas marcadas. **A mesma regra (`proposta` + `aplicar`) é a que a fonte em tempo real vai usar**: troca a
+leitura do arquivo pelas linhas da fonte.
+
+Diferente da importação do `.xlsx` (que monta a carga inteira e marca como excluído o que não vem), aqui nada é criado
+nem excluído: grava **usina a usina pela ficha** (`Servico.salvar`, versão + auditoria), só o que mudou. Regras, com o
+caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia):
+
+- **Equipe = a do CSV** ("Trocar pela do CSV"), pelo nome sem maiúscula/acento; a que não existe é criada sem código nem
+  região. Em 15/10: 56 usinas mudam (as equipes por usina, "MGLGPRT02", "Pedra do Sal 1"..., viram as agrupadas que já
+  existiam sem usina, "Pedra do Sal 1 a 4"), 2 criadas (Barreiras, Máquinas 1 a 2). "0" = vazio, "N/A" = não tem.
+- **Célula vazia não apaga** ("Manter o do Nexus"): em 15/10, 50 latitudes, 36 modelos de tracker, 30 datas...
+- **Valor de lista novo entra na lista** ("Aplicar os novos"): os status AGUARDANDO LIBERAÇÃO e PRONTA PARA MOBILIZAR.
+  Só acento/maiúscula/hífen/espaço não é valor novo ("Centro Oeste" = "Centro-Oeste"); uma grafia só para todas as usinas.
+- **Arredondamento fica o do Nexus**: 7,049 no CSV × 7,0488 no Nexus (o CSV mostra 3 casas). O mesmo número não conta
+  como arredondado; texto com o mesmo número ("23.1" × "23,1", Tensão de linha) não muda.
+- **Campo automático** (receita mensal = preço por MWp × potência): o CSV com a mesma conta não congela o valor.
+- **"CÓDIGO" no código** (a Matões 100) não troca: é o código que liga ao Fracttal.
+- **Pessoa (Responsável O&M) pelo nome contido**: o CSV traz o nome completo ("Fulana Rodrigues Prado", "Ciclano
+  Araújo Rocha"; nomes fictícios, o repositório é público) e o cadastro o curto ("Fulana Prado", "Ciclano Araújo").
+  Casa pelo nome inteiro ou pelo nome do
+  cadastro contido no do CSV, na ordem, com o mesmo primeiro nome e ao menos dois nomes, quando **uma** pessoa serve
+  (duas que servem = não adivinha). Em 15/10: 158 usinas mudam de responsável; pelo nome inteiro, 203 ficariam sem par
+  (com a regra, 3). Quem não está no cadastro ("Beltrano Nunes", 3 usinas) fica como está e é listado. Cliente só casa
+  pelo nome exato.
+- **"O CSV resume"**: o valor do CSV contido no do Nexus, que diz mais do que unidade ("SUN2000-250KTL-H1 +
+  SUN2000-330KTL-H1" → "SUN2000-250KTL-H1"; "250 kW / 275 kVA" → "250"; "575 Wp" → "575" NÃO é resumo), é marcado na
+  prévia para a pessoa decidir a coluna. Em 15/10: 48 marcas (fabricante dos módulos 11, concessionária 10, modelo do
+  inversor 9...).
+- Link do mapa que não é endereço (11 usinas com coordenada em graus no lugar do link) fica de fora, listado.
+- As 20 colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, Pessoas a contratar, os kits...) ficam de
+  fora e a prévia as lista.
+
+**Onde grava:** no cadastro da máquina em que a tela abre (`NEXUS_ARMAZEM_LOCAL`: o do servidor em app.gridco.com.br; o do
+PC em `C:\GridcoAuto\nexus\cadastro_ensaio.json`). Os dois e a cópia no banco (`cadastro_nexus`) são donos
+separados: aplicar no servidor não muda o PC nem o banco (os "dois donos do ID": equipe criada num não existe no outro).
+
+**Tempo:** cada usina é uma gravação do arquivo inteiro: 251 usinas levaram 32 s no PC (a prévia, 0,2 s). A tela avisa
+e o botão trava depois do primeiro clique (a prévia vale uma vez; o segundo pedido diria "venceu" enquanto o primeiro
+grava). A prévia vive 30 min na memória do processo; o resultado volta por 303.
+
+**Prova:** `tests/test_cadastro_atualizar_csv_15_10.py` (cada regra, a tela, só admin, pedido de outro site, só as
+colunas marcadas, quem salvou a ficha depois da prévia ganha, a segunda prévia vazia). Com o arquivo real, numa CÓPIA
+do cadastro do PC (15/10): 258/258 casadas, 251 mudam em 22 colunas, aplicar 251 com 0 erro e 0 conflito, e a prévia
+de novo dá 0; pela tela (cópia), 20 de 22 colunas → 248 usinas.
 
 ## Estrutura de O&M de 10/2026: regiões de campo (`esquema.REGIOES_CAMPO`, `estrutura_campo.py`)
 
