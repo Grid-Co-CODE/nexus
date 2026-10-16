@@ -152,9 +152,12 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   escolha dele foi "geração e robô"). Não aparece no painel, e no App não tira nada. Em 16/10 a lista do Levi casava 286 tarefas
   abertas (208 de uma pessoa só); um dos 11 nomes não aparece como responsável de OS no Fracttal. Os nomes vão ao robô
   em claro, no arquivo do repositório do PCM ("precisa disso não, faz o simples").
-- **O painel Fora da programação** (`/t/pcm/fora-da-programacao`, `templates/pcm/fora.html`): só as tarefas com motivo
-  que tira; a FINALIZADA no Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico); o
-  único filtro é o Motivo (lista só os que existem); "Marcar pela OS" lista as tarefas da OS da Gestão PCM (a finalizada
+- **O painel Fora da programação** (`/t/pcm/fora-da-programacao`, `templates/pcm/fora.html`): as tarefas com motivo
+  que tira e TODA justificativa que veio do App (origem `app`), de qualquer motivo, com o texto do técnico, quem e desde
+  quando; a marca do PCM que não tira não aparece (16/10/2026: as 10 justificativas "Prioridade" de um técnico estavam
+  gravadas e o painel mostrava 0; o Levi escolheu listá-las aqui). A FINALIZADA no Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico); o
+  único filtro é o Motivo (lista só os que existem, inclusive os que não tiram, quando há justificativa do App com
+  eles); "Marcar pela OS" lista as tarefas da OS da Gestão PCM (a finalizada
   não se marca); "Editar" troca o motivo ou a observação e tira o motivo. Cadastro em `?ver=cadastro`
   (`motivos_cadastro.html`): tirar não apaga, marca `excluido` e o ID não volta, e as tarefas com ele perdem o motivo (a
   confirmação diz quantas).

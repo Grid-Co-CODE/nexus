@@ -1079,8 +1079,8 @@ def _num_arg(v) -> int | None:
 
 
 def _ctx_fora(cfg, args) -> dict:
-    """O painel Fora da programação: as tarefas com um motivo que tira da programação, menos as finalizadas no Fracttal;
-    o filtro é só o Motivo (Levi, 16/10/2026)."""
+    """O painel Fora da programação: as tarefas com um motivo que tira da programação e TODA justificativa que veio do
+    App, de qualquer motivo, menos as finalizadas no Fracttal; o filtro é só o Motivo (Levi, 16/10/2026)."""
     est = M.ler(cfg)
     vig = M.vigentes(cfg, est)
     ilegiveis = vig.pop("_ilegiveis", 0)
@@ -1089,7 +1089,9 @@ def _ctx_fora(cfg, args) -> dict:
     hoje = Q.hoje()
     linhas, finalizadas = [], 0
     for m in vig.values():
-        if not m["tira"]:
+        # a marca do PCM só aparece se tira; a do App, sempre (16/10/2026: as 10 justificativas "Prioridade" do técnico,
+        # que não tira, estavam gravadas e não apareciam em lugar nenhum; Levi escolheu mostrá-las aqui)
+        if not (m["tira"] or m["origem"] == "app"):
             continue
         estados = (g or {}).get("por_tarefa", {}).get((m["os"], M.norm(m["tarefa"])))
         if estados and all(_finalizada(e) for e in estados):
@@ -1106,11 +1108,12 @@ def _ctx_fora(cfg, args) -> dict:
     sel = _num_arg(args.get("motivo"))
     mostradas = sorted((l for l in linhas if not sel or l["motivo_id"] == sel),
                        key=lambda l: (l["desde"], int(l["os"]) if l["os"].isdigit() else 0, M.norm(l["tarefa"])))
-    opcoes = [(m, conta.get(m["id"], 0)) for m in motivos if m["tira"] and (conta.get(m["id"]) or m["id"] == sel)]
+    opcoes = [(m, conta.get(m["id"], 0)) for m in motivos if conta.get(m["id"]) or m["id"] == sel]
     os_txt = str(args.get("os") or "").strip()
     os_pedida = M.os_de(os_txt) if os_txt else ""
     aviso = session.pop("pcm_motivos_aviso", None) or {}
     return {"linhas": mostradas, "total": len(linhas), "motivos": motivos, "opcoes": opcoes, "sel": sel,
+            "n_tira": sum(1 for l in mostradas if l["tira"]),
             "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
             "gestao_ok": g is not None, "os_pedida": os_pedida,
             "da_os": _tarefas_da_os(g, os_pedida, vig) if os_pedida.isdigit() else None,

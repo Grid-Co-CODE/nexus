@@ -404,7 +404,7 @@ def test_painel_fora_da_programacao(app, logado, tela):
     filtro = html.split('id="f-motivo"', 1)[1].split("</select>", 1)[0]
     assert "Aguardando material (1)" in filtro and "Aguardando cliente" not in filtro    # o filtro lista o que existe
     html = " ".join(logado.get(f"/t/pcm/fora-da-programacao?motivo={ac}").get_data(as_text=True).split())
-    assert "Nenhuma tarefa fora da programação com esse motivo." in html
+    assert "Nenhuma tarefa com esse motivo." in html
     # marcar pela OS: as tarefas abertas da Gestão PCM (a mesma tarefa em dois ativos vira uma linha)
     html = " ".join(logado.get("/t/pcm/fora-da-programacao?os=7").get_data(as_text=True).split())
     assert "Limpeza do inversor" in html and "em 2 ativos" in html
@@ -534,6 +534,28 @@ def test_o_tecnico_marca_pelo_app(app, logado, tela):
     assert j["ok"] and j["gravou"]
     vig = {k: v for k, v in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if not k.startswith("_")}
     assert not [m for m in vig.values() if m["tarefa"].endswith("Trafo")]
+
+
+def test_o_painel_mostra_toda_justificativa_do_app(app, logado, tela):
+    """16/10/2026: o técnico justificava com "Prioridade", que não tira da programação, e o painel mostrava 0 tarefas. A
+    justificativa do App aparece com qualquer motivo (texto, quem e desde quando) e o filtro ganha o motivo dela; a marca
+    do PCM que não tira continua fora."""
+    cfg = app.config
+    pr, en = (next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == n) for n in ("Prioridade", "Engenharia"))
+    r = _pelo_app(app, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": pr,
+                        "obs": "o supervisor mandou atender a parada antes", "tecnico_hmac": TEC,
+                        "tecnico_nome": "Técnico Teste"})
+    assert r.status_code == 200 and r.get_json()["gravou"]
+    M.marcar(cfg, {"os": "8", "codigo": "", "tarefa": "Inspeção termográfica do trafo 9"}, en, "", PESSOA)
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert "o supervisor mandou atender a parada antes" in html and "UFV1-CAB01" in html
+    assert "Técnico Teste <span class=\"gc-ajuda\">(App)</span>" in html and "termográfica do trafo 9" not in html
+    assert "1</b> tarefa: 0 fora da programação, 1 só com justificativa do App" in html
+    assert "justificativas que os técnicos mandam pelo App" in html
+    filtro = html.split('id="f-motivo"', 1)[1].split("</select>", 1)[0]
+    assert "Prioridade (1)" in filtro and "Engenharia" not in filtro
+    html = " ".join(logado.get(f"/t/pcm/fora-da-programacao?motivo={pr}").get_data(as_text=True).split())
+    assert "o supervisor mandou atender a parada antes" in html
 
 
 def test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava(app, tela, monkeypatch):
