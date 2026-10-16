@@ -673,7 +673,7 @@ def estado_no_repositorio(cfg, est: dict | None = None) -> dict:
                 g["erro"] = f"não consegui ler o repositório do PCM ({type(ex).__name__})"
         _ESTADO_REPO["x"] = g
     return {"em_dia": bool(g["existe"]) and g["hash"] == dados["hash"], "existe": g["existe"],
-            "gerado_em": g["gerado_em"], "erro": g["erro"], "vazio": not dados["tarefas"] and not dados["backoffice"]}
+            "gerado_em": g["gerado_em"], "erro": g["erro"]}
 
 
 def esquecer_estado_no_repositorio() -> None:

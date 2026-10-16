@@ -28,10 +28,11 @@
   pelo número da OS) e ficam no banco. A geração da semana não programa a tarefa com motivo que tira da programação; na
   semana em curso, o robô do PCM a tira, pelo arquivo <span class="gc-dado">Fora_da_programacao.json</span> do repositório
   do PCM, que o App de Campo também lê. {% if repo.erro %}Não consegui conferir o arquivo: {{ repo.erro }}.{% elif repo.em_dia %}O
-  arquivo está em dia{% if repo.gerado_em %} (gravado em {{ repo.gerado_em[8:10] }}/{{ repo.gerado_em[5:7] }} às {{ repo.gerado_em[11:16] }}){% endif %}.{% elif not repo.existe and repo.vazio %}O
-  arquivo ainda não existe: nada foi marcado.{% else %}<strong>O arquivo do repositório está desatualizado</strong>: a última
+  arquivo está em dia{% if repo.gerado_em %} (gravado em {{ repo.gerado_em[8:10] }}/{{ repo.gerado_em[5:7] }} às {{ repo.gerado_em[11:16] }}){% endif %}.{% elif not repo.existe %}<strong>O
+  arquivo ainda não existe no repositório</strong>: sem ele o Justificar do App de Campo fica sem a lista de
+  motivos.{% else %}<strong>O arquivo do repositório está desatualizado</strong>: a última
   mudança não chegou ao robô.{% endif %}</span></p>
-{% if pode and not repo.em_dia and not (not repo.existe and repo.vazio) %}
+{% if pode and not repo.em_dia %}
 <form class="pcm-passo-pe" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/publicar">
   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-github-logo"></i> Mandar o arquivo de novo</button>
 </form>

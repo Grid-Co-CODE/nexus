@@ -148,7 +148,7 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   PRÓXIMA geração (o robô não a recoloca na semana em curso).
 - **Backoffice:** a OS cujo responsável no Fracttal (o `Responsável` da OS, o `user_assigned`) é um nome da lista (sem
   acento e sem caixa) não entra na geração, e o robô não a inclui como OS nova; a que já está na semana em curso fica (a
-  escolha dele foi "geração e robô"). Não aparece no painel nem no App. Em 16/10 a lista do Levi casava 286 tarefas
+  escolha dele foi "geração e robô"). Não aparece no painel, e no App não tira nada. Em 16/10 a lista do Levi casava 286 tarefas
   abertas (208 de uma pessoa só); um dos 11 nomes não aparece como responsável de OS no Fracttal. Os nomes vão ao robô
   em claro, no arquivo do repositório do PCM ("precisa disso não, faz o simples").
 - **O painel Fora da programação** (`/t/pcm/fora-da-programacao`, `templates/pcm/fora.html`): só as tarefas com motivo
@@ -175,10 +175,14 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   estava na agenda quando foi marcada; vazio na pendente e na marca pela OS) para o App agrupar; `motivo` = o id;
   `origem` = "app" (o técnico pelo App) ou "nexus" (Quadro e painel), sem pessoa, pedido do App para mostrar "marcado
   pelo PCM" ou "no App"; todo
-  motivo das tarefas está em `motivos` (`ativo` sempre verdadeiro: tirar do cadastro tira as marcas). O App tira das "OS
-  avulsas" do servidor dele o que estiver no arquivo (senão a tarefa apagada pelo robô voltava como avulsa). No App, a
-  tarefa que o técnico JÁ iniciou (em execução ou pausada) e recebe um motivo que tira continua visível para ele concluir
-  ou pausar (Levi, 16/10: "Continua visível"); a lista do backoffice em produção é o PCM quem preenche. Vai (1) para
+  motivo das tarefas está em `motivos` (`ativo` sempre verdadeiro: tirar do cadastro tira as marcas). **O App NÃO filtra
+  a programação** (Levi, 16/10: "se a programação semanal já estiver filtrada não tem necessidade de filtrar duas vezes
+  no app"; v281 no ar 16/10 17:27Z): quem tira a tarefa da semana é o robô (A3b), e até ele rodar o App mostra a tarefa
+  com o selo âmbar; o servidor do App tira das "OS avulsas" e dos religamentos (que o robô não alcança) a tarefa com
+  motivo que tira e ainda não iniciada; a lista do backoffice NÃO tira nada no App (só a geração e o robô). O Justificar
+  do App lê o cadastro do arquivo: **o arquivo tem de existir**, mesmo sem marca (o painel mostra "não existe" e o botão
+  de mandar). Em 16/10 ele nasceu com a lista do backoffice (os 11 nomes do Levi, gravados pelo Claude a pedido dele;
+  commit `3b3efae` no repositório do PCM). Vai (1) para
   a pasta de cada rodada (`motivos.materializar` no `geracao._preparar`; banco fora do ar = a última cópia boa da máquina, com aviso; sem
   cópia a rodada não sai) e (2) para a raiz do repositório do PCM a cada marca, cadastro e backoffice
   (`publicar_arquivo`, o PUT do `publicar.py` com `NEXUS_PCM_GITHUB_TOKEN`; igual ao de lá = não grava). Falhar o GitHub

@@ -567,3 +567,15 @@ def test_nome_do_motivo_na_regra_do_levi():
         "Aguardando concessionária", "Aguardando peça do fornecedor PCM", "Chamados (garantia)",
         "Aguardando fabricante/terceiro", "UFV parada"]
     assert all(m["nome"] == M.padronizar(m["nome"]) for m in M.cadastro_inicial())
+
+
+def test_sem_o_arquivo_no_repositorio_o_painel_manda(app, logado, tela):
+    """O Justificar do App lê o cadastro do arquivo: sem marca nenhuma, o arquivo que não existe ainda é "desatualizado"
+    e o painel mostra o botão de mandar (16/10/2026: o painel escondia e o App ficava sem a lista)."""
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert "O arquivo ainda não existe no repositório" in html and "Mandar o arquivo de novo" in html
+    r = logado.post("/t/pcm/fora-da-programacao/publicar")
+    assert r.status_code == 303 and len(tela.commits) == 1
+    assert len(json.loads(tela.arquivos[M.ARQUIVO])["motivos"]) == 12
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert "O arquivo está em dia" in html and "Mandar o arquivo de novo" not in html
