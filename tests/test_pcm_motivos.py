@@ -28,7 +28,7 @@ PESSOA = {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa Teste"}
 T1 = {"os": "15596", "codigo": "ELF1-INV02", "tarefa": "[Grid Co.] - MPA - Inversor", "usina": "Cliente A - Usina 1 - SP",
       "cliente": "Cliente A", "tipo": "MPA"}
 TIRAM = {"Aguardando cliente", "Aguardando concessionária", "Aguardando material", "Aguardando fabricante/terceiro",
-         "Condições climáticas adversas", "Pendente recurso"}
+         "Condições climáticas adversas", "Pendente recurso", "Vegetação alta impossibilitando ação"}
 
 
 @pytest.fixture
@@ -60,11 +60,11 @@ class Relogio:
 
 
 # ── o cadastro e a marca ──────────────────────────────────────────────────────────────────────────────────────
-def test_cadastro_inicial_sao_os_11_do_pedido(cfg):
+def test_cadastro_inicial_sao_os_12_do_pedido(cfg):
     est = M.ler(cfg)
     assert est["inicial"] and not est["erro"]
     assert [m["nome"] for m in est["motivos"]] == [n for n, _d, _t in M.CADASTRO_INICIAL]
-    assert [m["id"] for m in est["motivos"]] == list(range(1, 12))
+    assert [m["id"] for m in est["motivos"]] == list(range(1, 13))
     assert {m["nome"] for m in est["motivos"] if m["tira"]} == TIRAM
     # a 1ª gravação leva o cadastro inicial junto: depois dela, o cadastro vem do livro
     M.marcar(cfg, T1, _mid(cfg, "Engenharia"), "", PESSOA)
@@ -127,7 +127,7 @@ def test_cadastro_tirar_nao_reusa_o_id_e_a_marca_deixa_de_valer(cfg):
     assert _vig(cfg) == {} and "Pendente recurso" not in {m["nome"] for m in M.ativos(M.ler(cfg, forcar=True))}
     novo = M.cadastro(cfg, "criar", PESSOA, nome="aguardando LAUDO da COS", descricao="Laudo da engenharia", tira=True)
     assert novo["nome"] == "Aguardando laudo da COS"           # a regra do Levi: 1ª maiúscula, sigla fica (16/10/2026)
-    assert novo["motivo_id"] == 12                                # o 11 não volta
+    assert novo["motivo_id"] == 13                                # o 11 não volta
     for nome in ("AGUARDANDO LAUDO DA COS", "a", "x@y.com", "x" * (M.NOME_MAX + 1)):
         with pytest.raises(M.Recusada):
             M.cadastro(cfg, "criar", PESSOA, nome=nome)
@@ -184,7 +184,7 @@ def test_arquivo_do_robo_sem_observacao_nem_quem(cfg):
     M.backoffice_definir(cfg, "Beltrana Ramos", True, PESSOA)
     M.backoffice_definir(cfg, "Joana Teste", True, PESSOA)
     a = M.arquivo(cfg)
-    assert a["versao"] == 1 and len(a["motivos"]) == 11 and a["backoffice"] == ["Beltrana Ramos", "Joana Teste"]
+    assert a["versao"] == 1 and len(a["motivos"]) == 12 and a["backoffice"] == ["Beltrana Ramos", "Joana Teste"]
     assert [(t["os"], t["codigo"], t["tira_da_programacao"]) for t in a["tarefas"]] == [
         ("15020", "", False), ("15596", "ELF1-INV02", True)]
     assert set(a["tarefas"][1]) == {"os", "codigo", "tarefa", "usina", "cluster", "data_prog", "motivo", "origem",
@@ -333,7 +333,7 @@ def test_quem_marca_e_quem_mexe_no_cadastro(app, tela, monkeypatch):
 def test_janela_do_quadro_marca_a_tarefa_da_semana(app, logado, tela):
     html = logado.get("/t/pcm/quadro").get_data(as_text=True)
     d = _dados(html)
-    assert d["pode_marcar"] and len(d["motivos"]) == 11 and d["url_motivo"] == "/t/pcm/quadro/motivo"
+    assert d["pode_marcar"] and len(d["motivos"]) == 12 and d["url_motivo"] == "/t/pcm/quadro/motivo"
     assert '<span class="q-mp' not in html                       # nada marcado ainda: nenhum selo
     am = next(m[0] for m in d["motivos"] if m[1] == "Aguardando material")
     cab = {"semana": "2026-W41", "os": "5", "tarefa": "[Grid Co.] - MPM - Cabine", "codigo": "UFV1-CAB01"}

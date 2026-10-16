@@ -140,6 +140,7 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   minúscula conforme regra gramatical"), a MESMA do App: tudo minúsculo menos a sigla de 2 a 4 letras escrita em
   maiúsculas (PCM, COS, UFV), e a 1ª letra maiúscula (`motivos.padronizar`). O cadastro inicial já nasce assim
   ("Aguardando concessionária", "Condições climáticas adversas"); o que se cria ou edita na tela é padronizado ao gravar.
+  O 12º do cadastro inicial, "Vegetação alta impossibilitando ação", tira da programação (Levi, 16/10: "Sim, tira").
   O App escolhe a frase do técnico pelo id (Engenharia 1, Performance 3, Prioridade 9): renomear não quebra.
 - **Os que tiram da programação** (o cadastro inicial: os quatro Aguardando, Condições Climáticas Adversas e Pendente
   recurso; Prioridade não muda a geração): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as

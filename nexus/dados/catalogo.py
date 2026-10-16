@@ -847,7 +847,7 @@ LIVROS = (
           "a cada marca de motivo (Quadro da semana e Fora da programação), a cada mudança no cadastro dos motivos e na "
           "lista do backoffice (Gerar a semana)",
           "nexus/pcm/motivos.py, pelas telas do PCM", False,
-          "registrado em 16/10/2026 antes de existir: nasce com a 1ª gravação (o cadastro inicial, os 11 motivos do "
+          "registrado em 16/10/2026 antes de existir: nasce com a 1ª gravação (o cadastro inicial, os 12 motivos do "
           "pedido do Levi, entra junto). As telas leem com cache de 1 minuto e a gravação relê o banco antes (troca o "
           "livro inteiro, as três abas juntas)"),
     # o login por pessoa do Dashboard Thopen (14/10/2026): o Nexus é a fonte das contas; a senha, o 5080 grava no livro

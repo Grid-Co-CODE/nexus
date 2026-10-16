@@ -20,7 +20,7 @@ programação da semana". As decisões dele, uma a uma:
 O dado (livro `nexus_pcm_motivos`, registrado em `nexus/dados/catalogo.py`; regras em `nexus/dados/CLAUDE.md`):
 - `dim_motivo`: 1 linha = 1 motivo do cadastro (`motivo_id` 1, 2, 3...). Excluir marca `excluido = sim` e o ID nunca
   volta: as marcas antigas continuam apontando para ele, e deixam de valer. Antes da 1ª gravação vale o
-  CADASTRO_INICIAL (os 11 do pedido, na ordem dele), que entra no banco junto com a 1ª gravação.
+  CADASTRO_INICIAL (os 11 do pedido e o 12º do mesmo dia, na ordem dele), que entra no banco junto com a 1ª gravação.
 - `fato_decisao_motivo`: 1 linha = 1 decisão sobre o motivo de 1 tarefa: marcar (`motivo_id`) ou tirar (vazio). Só
   acrescenta; vale a última de cada tarefa (`item_id`).
 - `fato_decisao_backoffice`: 1 linha = 1 decisão de pôr ou tirar 1 nome da lista do backoffice; vale a última de cada
@@ -74,7 +74,7 @@ _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
 
-# Os 11 do pedido (Levi, 16/10/2026), na ordem e com o texto dele, os nomes na regra dele do mesmo dia ("Padronizar texto:
+# Os 11 do pedido (Levi, 16/10/2026) e o 12º do mesmo dia, na ordem e com o texto dele, os nomes na regra dele do mesmo dia ("Padronizar texto:
 # sempre a primeira letra maiúscula o resto minúscula conforme regra gramatical"; `padronizar`): (nome, descrição, tira
 # da programação). Os que tiram
 # são os que ele escolheu ("Aguardando e clima tiram da semana": os quatro Aguardando, Condições Climáticas e Pendente
@@ -94,6 +94,8 @@ CADASTRO_INICIAL = (
     ("Prioridade", "Prioridades a pedido do cliente.", False),
     ("Sinistro", "Casos de furto, incêndio, raios, vendaval ou outros casos anormais.", False),
     ("Pendente recurso", "Quando estiver pendente sobressalente, peça ou outro item, detalhes em observação.", True),
+    # o 12º, pedido pelo Levi no mesmo dia, com a lista do técnico no App ("Sim, tira", como as condições climáticas)
+    ("Vegetação alta impossibilitando ação", "", True),
 )
 
 
