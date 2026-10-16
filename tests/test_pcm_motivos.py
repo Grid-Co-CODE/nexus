@@ -465,13 +465,46 @@ def test_painel_sem_marcar_pela_os_e_a_tabela_da_2a_rodada(app, logado, tela):
     assert "Marcar pela OS" not in html and "Ver as tarefas" not in html and 'name="os"' not in html
     assert "Os motivos se marcam no Nexus" not in html and "<details>" not in html
     assert 'class="pcm-tabela fp-tab"' in html and '<th class="fp-esq">Tarefa</th>' in html
-    assert 'class="fp-tirar"' in html and "Tirar motivo" in html
+    assert 'class="fp-mais-b"' in html and "Retornar à programação" in html and 'class="fp-tirar"' not in html
     antes = len(M.vigentes(app.config, M.ler(app.config, forcar=True)))
     r = logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "7", "tarefa": "Limpeza do inversor",
                                                                  "motivo_id": am})
     assert r.status_code == 303
     assert "A tarefa não foi achada: atualize a página." in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
     assert len(M.vigentes(app.config, M.ler(app.config, forcar=True))) == antes and not tela.commits
+
+
+def test_painel_3a_rodada_usina_hora_os_e_tres_pontos(app, logado, tela, monkeypatch):
+    """Levi, 16/10/2026 (3ª rodada): "Em usina só o nome da usina, sem o nome do cliente no início"; "números de 5 a 6
+    dígitos ficará em verde grid, quando a pessoa clicar vai sobrepor na tela a mesma tela que aparece quando você clica
+    na OS no histórico de OS do OS Creator Web"; os três pontos com "retornar a programação"; "em desde quero data e
+    hora"; abaixo da tarefa "só MPA · no Fracttal: Não Iniciada"."""
+    from datetime import datetime as _dt, timezone as _tz
+    cfg = app.config
+    monkeypatch.setattr(M, "_agora", lambda: _dt(2026, 10, 7, 17, 32, tzinfo=_tz.utc))        # 14:32 de Brasília
+    am = next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == "Aguardando material")
+    M.marcar(cfg, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "tipo": "MPM",
+                   "usina": "Cliente A - Usina 1 - SP"}, am, "Realizado atividade da OS16290, ver OS 16291", PESSOA)
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    linha = html.split('<tbody>', 1)[1].split('</tr>', 1)[0]
+    assert '<td class="fp-usina" title="Cliente A - Usina 1 - SP">Usina 1</td>' in linha
+    assert '<td class="gc-dado">07/10/2026 14:32</td>' in linha
+    assert 'title="UFV1-CAB01">[Grid Co.] - MPM - Cabine<small>MPM · no Fracttal: Não iniciada</small>' in linha
+    # a OS e os números de 5 a 6 dígitos da observação: botões que abrem o card (pelo número, sem a OS na Gestão)
+    assert '<button type="button" class="fp-os-n" data-os="5" title="Abrir a OS 5">5</button>' in linha
+    assert ('Realizado atividade da OS<button type="button" class="fp-os-n" data-os="16290" title="Abrir a OS 16290">'
+            '16290</button>, ver OS <button type="button" class="fp-os-n" data-os="16291"') in linha
+    assert 'NexusOsCard.abrirFolio' in html and "card_os_abrir" not in html.split("<body", 1)[0]
+    # os três pontos: o menu com o Retornar à programação (tira o motivo)
+    assert 'class="fp-mais-b"' in linha and 'name="tirar" value="1"' in linha and "Retornar à programação" in linha
+    from nexus.pcm import telas as T
+    assert [T._nome_da_usina(x) for x in ("Thopen - Parelhas 1 - RN", "Thopen - Araçoiaba da Serra 1- SP",
+                                          "2C - Ipixuna do Pará 1 - PA", "Usina sem cliente", "")] == [
+        "Parelhas 1", "Araçoiaba da Serra 1", "Ipixuna do Pará 1", "Usina sem cliente", ""]
+    # o texto da observação é escapado antes: só o número vira botão
+    assert str(T._com_os("<b>OS 123456</b> e 1234567", None)) == (
+        '&lt;b&gt;OS <button type="button" class="fp-os-n" data-os="123456" title="Abrir a OS 123456">123456</button>'
+        '&lt;/b&gt; e 1234567')
 
 
 def test_motivo_do_tecnico_nao_se_troca_e_a_observacao_sim(app, logado, tela):

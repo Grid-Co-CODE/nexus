@@ -223,6 +223,20 @@ def test_sem_o_login_do_fracttal_o_card_diz_para_entrar(logado):
     assert 'href="/entrar?next=/"' in h
 
 
+def test_o_card_da_os_pelo_numero(app, logado):
+    """16/10/2026: a tela sem o id do Fracttal (o nº citado na observação do Fora da programação do PCM) abre o MESMO
+    card pelo número: o fragmento do "Buscar OS pelo nº" do clone (/os/os/folio/<nº>?parcial=1)."""
+    h = logado.get("/os/_nexus/card/folio/16290?de=/t/pcm/fora-da-programacao").get_data(as_text=True)
+    assert "Para abrir a OS, entre pelo Fracttal" in h and 'href="/entrar?next=/t/pcm/fora-da-programacao"' in h
+    _login_do_fracttal(app, logado)
+    r = logado.get("/os/_nexus/card/folio/16290?status=Em%20Processo&de=/t/pcm/fora-da-programacao")
+    h = r.get_data(as_text=True)
+    assert r.status_code == 200 and "carregar();" in h
+    assert 'data-fragmento="/os/os/folio/16290?parcial=1&amp;status=Em+Processo"' in h
+    assert 'data-pagina="/os/os/folio/16290?status=Em+Processo"' in h
+    assert logado.get("/os/_nexus/card/folio/abc").status_code == 404           # só número
+
+
 def test_link_do_card_abre_a_torre_os_creator_com_a_tela_numa_aba(logado):
     from nexus.torres.oscreator import ponte
     assert ponte.tela_do_endereco("/os/clonar?folio=15101") == "clonagem"

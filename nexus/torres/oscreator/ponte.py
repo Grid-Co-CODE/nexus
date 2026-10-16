@@ -582,8 +582,9 @@ def _tem_login_fracttal(alvo) -> bool:
     return bool(s.get("jwt"))
 
 
-@bp_raiz.route("/os/_nexus/card/<int:wid>")
-def card_os(wid: int):
+def _card(caminho: str, wid=None):
+    """A moldura do card (`card_os.html`) para uma página do clone (`/os/os/<id>` ou `/os/os/folio/<nº>`): o fragmento
+    dela (?parcial=1) vai para dentro da moldura, com o status que a tela mandou."""
     from urllib.parse import quote, urlencode
 
     from ...auth import next_seguro
@@ -596,9 +597,22 @@ def card_os(wid: int):
         estado = "fora"
     q = urlencode({"status": status}) if status else ""
     return render_template("oscreator/card_os.html", wid=wid, estado=estado,
-                           fragmento=f"/os/os/{wid}?" + urlencode({"parcial": 1, "status": status}),
-                           pagina=f"/os/os/{wid}" + ("?" + q if q else ""),
+                           fragmento=f"{caminho}?" + urlencode({"parcial": 1, "status": status}),
+                           pagina=caminho + ("?" + q if q else ""),
                            entrar=na_raiz("/entrar") + "?next=" + quote(de, safe="/"))
+
+
+@bp_raiz.route("/os/_nexus/card/<int:wid>")
+def card_os(wid: int):
+    return _card(f"/os/os/{wid}", wid)
+
+
+@bp_raiz.route("/os/_nexus/card/folio/<int:folio>")
+def card_os_folio(folio: int):
+    """O mesmo card pelo NÚMERO da OS, para a tela que não tem o id do Fracttal (16/10/2026: o nº citado na observação
+    do painel Fora da programação do PCM). Quem acha o id é o clone (`/os/os/folio/<nº>`, o "Buscar OS pelo nº" do
+    Histórico): um pedido a mais ao Fracttal, e "Não achei nenhuma OS com o nº" dentro da moldura quando não existe."""
+    return _card(f"/os/os/folio/{folio}")
 
 
 @bp_raiz.route("/os/_nexus/ir")

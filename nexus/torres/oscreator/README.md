@@ -470,6 +470,11 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
   `NexusOsCard.abrir(id_work_order, {status, folio, aoFechar(mudou)})`. O status vai como na linha do Histórico (o selo
   e a regra do "Editar" das notas saem dele). `mudou` diz se o card mudou a OS no Fracttal: a tela relê. Fecha pelo X,
   pelo escuro em volta, pelo Fechar do card ou pelo Esc (com um diálogo aberto, o Esc é do diálogo).
+- **Sem o id do Fracttal, pelo número da OS** (16/10/2026, o nº citado na observação do Fora da programação do PCM):
+  `NexusOsCard.abrirFolio(nº, {status, aoFechar})` → `/os/_nexus/card/folio/<nº>` (`ponte.card_os_folio`), a mesma
+  moldura com o fragmento `/os/os/folio/<nº>?parcial=1`: quem acha o id é o clone (o "Buscar OS pelo nº" do Histórico),
+  com um pedido a mais ao Fracttal, e o nº que não existe aparece como "Não achei nenhuma OS com o nº" dentro da moldura.
+  Tendo o id, prefira o `abrir` (sem o pedido a mais, e com a leitura antecipada do `prepararAoParar`).
 - **Sem o login do Fracttal** (entrou pela senha de admin), a moldura não busca a OS: diz "Para abrir a OS, entre pelo
   Fracttal", com o botão para `/entrar?next=<a tela>`. Se a sessão do Fracttal vencer no meio, a ponte manda o pedido
   do card para o login, e a moldura diz que venceu.

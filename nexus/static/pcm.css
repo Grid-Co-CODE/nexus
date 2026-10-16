@@ -646,12 +646,14 @@ html.pgp-aberto{overflow:hidden}
 @media (max-width:560px){.pgp-corpo{padding:16px}.pgp-estado{min-width:0}.pgp-tarefas li{flex-wrap:wrap}}
 
 /* ── Motivos das tarefas e Fora da programação (16/10/2026, nexus/pcm/motivos.py) ── */
-/* o selo do motivo: o que tira a tarefa da programação em âmbar (a tarefa sai da semana), os outros em azul */
+/* o selo do motivo (Levi, 16/10/2026: "troque as cores de azul e amarelo para vermelho e laranja — vermelho o que sai
+   da programação, laranja o que não sai"): o que tira a tarefa da programação em vermelho, os outros em laranja; as
+   duas cores têm a versão do tema claro (nexus.css) */
 .q-mp{display:inline-flex;align-items:center;gap:4px;max-width:100%;font:600 11px/16px var(--font-sans);padding:1px 8px;
-  border-radius:var(--raio-tag);color:var(--info);background:var(--info-suave);white-space:nowrap;overflow:hidden;
+  border-radius:var(--raio-tag);color:var(--laranja);background:var(--laranja-a16);white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;vertical-align:middle}
 .q-mp i{font-size:12px;flex:none}
-.q-mp--tira{color:var(--alerta);background:var(--alerta-a10)}
+.q-mp--tira{color:var(--critico);background:var(--critico-suave)}
 .q-c-mp{display:flex;min-width:0}
 .q-mp-atual{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0;font-size:13px;color:var(--tinta-2)}
 .q-mp-form{border-color:var(--linha);background:var(--superficie-2)}
@@ -666,19 +668,18 @@ html.pgp-aberto{overflow:hidden}
    troca na própria célula, a observação se edita na própria célula, e o "Tirar motivo" é um botão discreto no fim */
 .fp-tab th,.fp-tab td{text-align:center;vertical-align:middle}
 .fp-tab th.fp-esq,.fp-tab td.fp-esq{text-align:left}
-.fp-tab th,.fp-tab td{padding-left:10px;padding-right:10px}
+.fp-tab th,.fp-tab td{padding-left:8px;padding-right:8px}
 .fp-tab td{padding-top:12px;padding-bottom:12px}
 .fp-tab .gc-dado,.fp-tab .gc-num{white-space:nowrap}
 .fp-usina{min-width:120px;max-width:190px}
 .fp-tarefa{color:var(--tinta);font-weight:600;min-width:220px;overflow-wrap:anywhere}
 .fp-tarefa small{display:block;color:var(--mudo);font-size:11.5px;font-weight:400;margin-top:3px}
 .fp-motivo{white-space:nowrap}
-/* o motivo do PCM é o próprio selo, que abre a lista; o do técnico é o selo parado; o × ao lado tira o motivo */
-.fp-motivo-caixa{display:inline-flex;align-items:center;gap:4px;max-width:100%}
+/* o motivo do PCM é o próprio selo, que abre a lista; o do técnico é o selo parado */
 .fp-motivo form{display:inline-flex}
 .fp-mot-caixa{position:relative;display:inline-flex;align-items:center;max-width:240px;border-radius:var(--raio-tag);
-  color:var(--info);background:var(--info-suave)}
-.fp-mot-caixa--tira{color:var(--alerta);background:var(--alerta-a10)}
+  color:var(--laranja);background:var(--laranja-a16)}
+.fp-mot-caixa--tira{color:var(--critico);background:var(--critico-suave)}
 .fp-mot-caixa::after{content:"";position:absolute;right:8px;top:50%;margin-top:-2px;border-left:4px solid transparent;
   border-right:4px solid transparent;border-top:5px solid currentColor;pointer-events:none}
 /* do tamanho do motivo escolhido, não do mais comprido da lista (sem isso a coluna empurrava o "Tirar motivo" para
@@ -690,7 +691,7 @@ html.pgp-aberto{overflow:hidden}
 .fp-mot:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .fp-mot option{color:var(--tinta);background:var(--superficie)}
 /* a observação: o texto e o lápis; clicar abre o campo ali mesmo, sem mexer nas outras colunas */
-.fp-obs{min-width:160px;max-width:280px}
+.fp-obs{min-width:150px;max-width:280px}
 .fp-obs-ver{display:inline-flex;align-items:center;justify-content:center;gap:6px;max-width:100%}
 .fp-obs-txt{white-space:pre-wrap;overflow-wrap:anywhere;cursor:text}
 .fp-obs-txt.fp-vazio{color:var(--mudo)}
@@ -705,7 +706,7 @@ html.pgp-aberto{overflow:hidden}
 .fp-obs.editando .fp-obs-ver{display:none}
 .fp-obs-form textarea.gc-campo{width:100%;min-height:52px;resize:vertical;box-sizing:border-box;text-align:left}
 .fp-obs-botoes{display:flex;gap:6px;justify-content:center}
-.fp-quem{min-width:110px;max-width:160px}
+.fp-quem{min-width:100px;max-width:150px}
 /* a coluna Vezes e o histórico da tarefa, que abre logo abaixo da linha (16/10/2026) */
 .fp-vezes{min-width:30px;height:26px;padding:0 9px;border:1px solid var(--linha-forte);border-radius:999px;
   background:var(--superficie);color:var(--tinta);font:inherit;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer}
@@ -719,10 +720,26 @@ html.pgp-aberto{overflow:hidden}
 .fp-hist-obs{white-space:pre-wrap;overflow-wrap:anywhere}
 .fp-hist-obs.fp-vazio{color:var(--mudo)}
 @media (max-width:760px){.fp-hist-lista li{grid-template-columns:1fr;gap:2px}}
-.fp-tirar{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border:0;border-radius:50%;
-  background:transparent;color:var(--mudo);cursor:pointer}
-.fp-tirar i{font-size:13px}
-.fp-tirar:hover,.fp-tirar:focus-visible{color:var(--critico);background:var(--critico-suave);outline:none}
+/* a OS e o nº de 5 a 6 dígitos da observação: verde Grid, e o clique abre o card da OS do OS Creator (Levi, 16/10) */
+.fp-os-n{display:inline;border:0;padding:0;margin:0;background:none;font:inherit;font-weight:600;color:var(--verde-texto);
+  cursor:pointer;text-underline-offset:2px}
+.fp-os-n:hover{text-decoration:underline}
+.fp-os-n:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:3px}
+/* os três pontos do fim da linha e o menu deles, por cima da tabela (fixo: a rolagem da tabela não o corta) */
+.fp-mais{width:1%;white-space:nowrap}
+.fp-mais-b{display:inline-grid;place-items:center;width:28px;height:28px;border:0;border-radius:6px;background:transparent;
+  color:var(--mudo);cursor:pointer}
+.fp-mais-b i{font-size:20px}
+.fp-mais-b:hover,.fp-mais-b[aria-expanded="true"]{color:var(--tinta);background:var(--superficie-3)}
+.fp-mais-b:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+.fp-menu{position:fixed;z-index:50;min-width:220px;padding:6px;border:1px solid var(--linha);border-radius:var(--raio-md);
+  background:var(--superficie);box-shadow:0 10px 28px var(--sombra)}
+.fp-menu[hidden]{display:none}
+.fp-menu form{display:block}
+.fp-menu-i{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:6px;background:transparent;
+  color:var(--tinta);font:600 13px/18px var(--font-sans);padding:8px 10px;text-align:left;white-space:nowrap;cursor:pointer}
+.fp-menu-i i{font-size:16px;color:var(--verde-texto)}
+.fp-menu-i:hover,.fp-menu-i:focus-visible{background:var(--superficie-2);outline:none}
 .fp-acoes details{position:relative}
 .fp-acoes summary{cursor:pointer;color:var(--verde-texto);font-weight:600;list-style:none;white-space:nowrap}
 .fp-acoes summary::-webkit-details-marker{display:none}

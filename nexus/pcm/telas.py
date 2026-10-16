@@ -13,6 +13,8 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
+from markupsafe import Markup, escape
+
 from flask import abort, current_app, jsonify, redirect, render_template, request, session
 
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, motivos_app as MA
@@ -1036,6 +1038,36 @@ def _num_arg(v) -> int | None:
     return int(s) if s.isdigit() and int(s) > 0 else None
 
 
+_NUM_OS = re.compile(r"(?<!\d)(\d{5,6})(?!\d)")      # o nº de uma OS no texto: "OS16290", "OS 16290", "16290"
+
+
+def _nome_da_usina(nome) -> str:
+    """'Thopen - Parelhas 1 - RN' -> 'Parelhas 1' (Levi, 16/10/2026: "Em usina só o nome da usina, sem o nome do cliente
+    no início"): o meio do nome do Fracttal (cliente - usina - UF). Fora desse formato, como veio."""
+    t = str(nome or "").strip()
+    p = [x.strip() for x in re.split(r"\s+-\s*|\s*-\s+", t) if x.strip()]
+    return " - ".join(p[1:-1]) if len(p) >= 3 else t
+
+
+def _botao_os(n: str, g: dict | None) -> str:
+    """O nº da OS como botão que abre o card da OS do OS Creator por cima da tela (Levi, 16/10/2026: "quando a pessoa
+    clicar vai sobrepor na tela a mesma tela que aparece quando você clica na OS no histórico de OS do OS Creator Web").
+    Com a OS na Gestão PCM vão o id do Fracttal e o status do card (como a Gestão PCM abre); sem ela, só o número."""
+    ts = (g or {}).get("por_os", {}).get(n) or []
+    wid = next((str(t.get("idWO")) for t in ts if t.get("idWO")), "")
+    st = next((str(t.get("osStatus") or "") for t in ts if t.get("osStatus")), "")
+    st = G.STATUS_DO_CARD.get(G.sem_acento(st).strip(), st)
+    return (f'<button type="button" class="fp-os-n" data-os="{escape(n)}"'
+            + (f' data-wid="{escape(wid)}"' if wid else "") + (f' data-status="{escape(st)}"' if st else "")
+            + f' title="Abrir a OS {escape(n)}">{escape(n)}</button>')
+
+
+def _com_os(texto, g: dict | None) -> Markup:
+    """O texto (a observação) com cada número de 5 a 6 dígitos como botão da OS (`_botao_os`). O texto é escapado antes:
+    só o número vira botão."""
+    return Markup(_NUM_OS.sub(lambda x: _botao_os(x.group(1), g), str(escape(texto or ""))))
+
+
 def _ctx_fora(cfg, args) -> dict:
     """O painel Fora da programação: as tarefas com um motivo que tira da programação e TODA justificativa que veio do
     App, de qualquer motivo, menos as finalizadas no Fracttal; o filtro é só o Motivo (Levi, 16/10/2026). A justificativa
@@ -1061,9 +1093,11 @@ def _ctx_fora(cfg, args) -> dict:
         usina = m["usina"] or next((str(t.get("usina") or "") for t in (g or {}).get("por_os", {}).get(m["os"], [])), "")
         # quantas vezes a tarefa foi justificada (uma por dia e motivo), a do ativo e a da tarefa em todos os ativos da OS
         hist = [dict(h, quando_txt=M._brt(h["quando"]).strftime("%d/%m/%Y %H:%M") if M._brt(h["quando"]) else "",
-                     do_app=h["origem"] == "app")
+                     do_app=h["origem"] == "app", obs_html=_com_os(h["obs"], g))
                 for h in M.historico(cfg, est, {m["item_id"], M.item_id(m["os"], "", m["tarefa"])})]
-        linhas.append(dict(m, usina=usina, desde_txt=d.strftime("%d/%m/%Y") if d else "", vezes=len(hist), historico=hist,
+        linhas.append(dict(m, usina=usina, usina_nome=_nome_da_usina(usina), vezes=len(hist), historico=hist,
+                           desde_txt=d.strftime("%d/%m/%Y %H:%M") if d else "", os_html=Markup(_botao_os(m["os"], g)),
+                           obs_html=_com_os(m["obs"], g),
                            dias=max(0, (hoje - d.date()).days) if d else None, do_app=m["origem_motivo"] == "app",
                            quem_mostra=m["quem_motivo"] or m["quem"],
                            estado_fr=" · ".join(sorted({e for e in estados or [] if e})),
@@ -1077,7 +1111,8 @@ def _ctx_fora(cfg, args) -> dict:
     return {"linhas": mostradas, "total": len(linhas), "motivos": motivos, "opcoes": opcoes, "sel": sel,
             "n_tira": sum(1 for l in mostradas if l["tira"]),
             "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
-            "gestao_ok": g is not None, "pode": pode_marcar(), "pode_cadastro": pode_programar(), "repo": M.estado_no_repositorio(cfg, est),
+            "gestao_ok": g is not None, "pode": pode_marcar(), "pode_cadastro": pode_programar(),
+            "repo": M.estado_no_repositorio(cfg, est),
             "ok": aviso.get("ok"), "erro": aviso.get("erro")}
 
 

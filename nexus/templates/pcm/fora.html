@@ -7,8 +7,10 @@
    veio do App, de qualquer motivo (a do PCM que não tira não aparece), menos as finalizadas no Fracttal, que saem
    sozinhas; o único filtro é o Motivo. Marca-se no Quadro da semana e pelo App. Aqui (Levi, 16/10, 2ª rodada): o motivo
    do técnico não se troca ("se o técnico disse tá dito"), o do PCM se troca na própria célula, a observação se edita na
-   própria célula, "Tirar motivo" fica (o × ao lado do motivo); o "Marcar pela OS" saiu ("atrapalha mais que ajuda"); tudo centrado, menos a
-   Tarefa. O dado e as regras: nexus/pcm/motivos.py; as contas da tela: telas._ctx_fora. #}
+   própria célula; o "Marcar pela OS" saiu ("atrapalha mais que ajuda"); tudo centrado, menos a Tarefa. 3ª rodada (16/10):
+   a usina só com o nome, o "Desde" com a hora, a OS e o nº de 5 a 6 dígitos da observação em verde abrem o card da OS
+   do OS Creator (oscreator/card_os_abrir.html), a linha de baixo da tarefa sem o código do ativo (fica no title) e o
+   "Retornar à programação" no menu de três pontos do fim da linha. O dado e as regras: nexus/pcm/motivos.py; as contas da tela: telas._ctx_fora. #}
 {% macro selo(nome, tira) %}<span class="q-mp{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
 <p class="gc-eyebrow">PCM · Programação semanal</p>
 <div class="pcm-topo">
@@ -64,18 +66,18 @@
     <thead><tr>
       <th>Desde</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th>
       <th title="Quantas vezes a tarefa foi justificada: uma por dia e motivo">Vezes</th><th>Observação</th>
-      <th>Quem marcou</th>
+      <th>Quem marcou</th>{% if pode %}<th aria-label="Mais ações"></th>{% endif %}
     </tr></thead>
     <tbody>
     {% for l in linhas %}
       <tr>
         <td class="gc-dado">{{ l.desde_txt }}</td>
         <td class="gc-num">{{ l.dias if l.dias is not none else '' }}</td>
-        <td class="gc-dado">{{ l.os }}</td>
-        <td class="fp-usina">{{ l.usina }}</td>
-        <td class="fp-tarefa fp-esq">{{ l.tarefa }}<small>{% if l.codigo %}{{ l.codigo }}{% else %}todos os ativos da OS{% endif %}{% if l.tipo %} · {{ l.tipo }}{% endif %}{% if l.estado_fr %} · no Fracttal: {{ l.estado_fr }}{% elif l.fora_da_gestao %} · não está na Gestão PCM{% endif %}</small></td>
+        <td class="gc-dado">{{ l.os_html }}</td>
+        <td class="fp-usina"{% if l.usina != l.usina_nome %} title="{{ l.usina }}"{% endif %}>{{ l.usina_nome }}</td>
+        {% set sub = [l.tipo] if l.tipo else [] %}{% if l.estado_fr %}{% set sub = sub + ['no Fracttal: ' ~ l.estado_fr] %}{% elif l.fora_da_gestao %}{% set sub = sub + ['não está na Gestão PCM'] %}{% endif %}
+        <td class="fp-tarefa fp-esq" title="{% if l.codigo %}{{ l.codigo }}{% else %}todos os ativos da OS{% endif %}">{{ l.tarefa }}{% if sub %}<small>{{ sub|join(' · ') }}</small>{% endif %}</td>
         <td class="fp-motivo">
-          <div class="fp-motivo-caixa">
           {%- if pode and not l.do_app %}
           <form method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
             <input type="hidden" name="item" value="{{ l.item_id }}">{% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
@@ -85,18 +87,11 @@
             <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Trocar</button></noscript>
           </form>
           {%- else %}{{ selo(l.motivo, l.tira) }}{% endif -%}
-          {%- if pode %}
-          <form method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
-            <input type="hidden" name="item" value="{{ l.item_id }}"><input type="hidden" name="tirar" value="1">{% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
-            <button class="fp-tirar" type="submit" title="Tirar motivo" aria-label="Tirar o motivo da tarefa da OS {{ l.os }}" onclick="return confirm('Tirar o motivo da tarefa da OS {{ l.os }}?{% if l.tira %} Ela volta a ser programada na próxima geração da semana.{% endif %}')"><i class="ph ph-x"></i></button>
-          </form>
-          {%- endif %}
-          </div>
         </td>
         <td class="gc-num">{% if l.vezes %}<button type="button" class="fp-vezes" aria-expanded="false" aria-controls="fp-h-{{ loop.index }}"
             title="Ver as justificativas da tarefa" aria-label="{{ l.vezes }} {{ 'justificativa' if l.vezes == 1 else 'justificativas' }} da tarefa da OS {{ l.os }}: ver a lista">{{ l.vezes }}</button>{% else %}—{% endif %}</td>
         <td class="fp-obs">
-          <div class="fp-obs-ver"><span class="fp-obs-txt{% if not l.obs %} fp-vazio{% endif %}">{{ l.obs or '—' }}</span>{% if pode %}<button type="button" class="fp-lapis" title="Editar a observação" aria-label="Editar a observação da tarefa da OS {{ l.os }}"><i class="ph ph-pencil-simple"></i></button>{% endif %}</div>
+          <div class="fp-obs-ver"><span class="fp-obs-txt{% if not l.obs %} fp-vazio{% endif %}">{{ l.obs_html if l.obs else '—' }}</span>{% if pode %}<button type="button" class="fp-lapis" title="Editar a observação" aria-label="Editar a observação da tarefa da OS {{ l.os }}"><i class="ph ph-pencil-simple"></i></button>{% endif %}</div>
           {%- if pode %}
           <form class="fp-obs-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
             <input type="hidden" name="item" value="{{ l.item_id }}">{% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
@@ -106,14 +101,25 @@
           {%- endif %}
         </td>
         <td class="fp-quem">{{ l.quem_mostra }}{% if l.do_app %} <span class="gc-ajuda">(App)</span>{% endif %}</td>
+        {% if pode %}
+        <td class="fp-mais">
+          <button type="button" class="fp-mais-b" aria-haspopup="menu" aria-expanded="false" title="Mais ações" aria-label="Mais ações da tarefa da OS {{ l.os }}"><i class="ph ph-dots-three"></i></button>
+          <div class="fp-menu" role="menu" hidden>
+            <form method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
+              <input type="hidden" name="item" value="{{ l.item_id }}"><input type="hidden" name="tirar" value="1">{% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
+              <button type="submit" class="fp-menu-i" role="menuitem" onclick="return confirm('Retornar à programação a tarefa da OS {{ l.os }}? {% if l.tira %}O motivo sai e ela volta a ser programada na próxima geração da semana.{% else %}O motivo sai deste painel (a tarefa já estava na programação).{% endif %}')"><i class="ph ph-arrow-u-up-left"></i> Retornar à programação</button>
+            </form>
+          </div>
+        </td>
+        {% endif %}
       </tr>
       {% if l.vezes %}
       {# o histórico da tarefa (16/10/2026): cada justificativa, uma por dia e motivo, com quem justificou e o texto #}
       <tr class="fp-hist" id="fp-h-{{ loop.index }}" hidden>
-        <td colspan="9">
+        <td colspan="{{ 10 if pode else 9 }}">
           <ol class="fp-hist-lista">
           {% for h in l.historico %}
-            <li><span class="gc-dado">{{ h.quando_txt }}</span>{{ selo(h.motivo, h.tira) }}<span class="fp-hist-quem">{{ h.quem or '—' }}{% if h.do_app %} <span class="gc-ajuda">(App)</span>{% endif %}</span><span class="fp-hist-obs{% if not h.obs %} fp-vazio{% endif %}">{{ h.obs or '—' }}</span></li>
+            <li><span class="gc-dado">{{ h.quando_txt }}</span>{{ selo(h.motivo, h.tira) }}<span class="fp-hist-quem">{{ h.quem or '—' }}{% if h.do_app %} <span class="gc-ajuda">(App)</span>{% endif %}</span><span class="fp-hist-obs{% if not h.obs %} fp-vazio{% endif %}">{{ h.obs_html if h.obs else '—' }}</span></li>
           {% endfor %}
           </ol>
         </td>
@@ -123,8 +129,47 @@
     </tbody>
   </table>
 </div>
+{% include "oscreator/card_os_abrir.html" %}
 <script>
 (function () {
+  // a OS (e o nº de 5 a 6 dígitos da observação) abre o card da OS do OS Creator por cima da tela (Levi, 16/10/2026:
+  // "a mesma tela que aparece quando você clica na OS no histórico de OS do OS Creator Web"): pelo id do Fracttal quando a
+  // OS está na Gestão PCM (com a leitura antecipada quando o mouse para em cima), senão pelo número
+  document.querySelectorAll('.fp-tab .fp-os-n[data-wid]').forEach(function (b) {
+    if (window.NexusOsCard && NexusOsCard.prepararAoParar) NexusOsCard.prepararAoParar(b, b.getAttribute('data-wid'));
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('.fp-tab .fp-os-n');
+    if (!b || !window.NexusOsCard) return;
+    ev.preventDefault(); ev.stopPropagation();
+    var op = {folio: b.getAttribute('data-os'), status: b.getAttribute('data-status') || ''};
+    if (b.getAttribute('data-wid')) NexusOsCard.abrir(b.getAttribute('data-wid'), op);
+    else NexusOsCard.abrirFolio(op.folio, op);
+  }, true);
+  // os três pontos do fim da linha: o menu (hoje só "Retornar à programação") por cima da tabela, sem mexer nela
+  var aberto = null;
+  function fecharMenu() {
+    if (!aberto) return;
+    aberto.menu.hidden = true; aberto.botao.setAttribute('aria-expanded', 'false'); aberto = null;
+  }
+  document.querySelectorAll('.fp-tab .fp-mais-b').forEach(function (b) {
+    var menu = b.parentNode.querySelector('.fp-menu');
+    b.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      if (aberto && aberto.botao === b) { fecharMenu(); return; }
+      fecharMenu();
+      var r = b.getBoundingClientRect();
+      menu.hidden = false;
+      menu.style.top = Math.min(r.bottom + 4, window.innerHeight - menu.offsetHeight - 8) + 'px';
+      menu.style.left = Math.max(8, r.right - menu.offsetWidth) + 'px';
+      b.setAttribute('aria-expanded', 'true'); aberto = {botao: b, menu: menu};
+      var item = menu.querySelector('.fp-menu-i'); if (item) item.focus();
+    });
+  });
+  document.addEventListener('click', function (ev) { if (aberto && !aberto.menu.contains(ev.target)) fecharMenu(); });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') fecharMenu(); });
+  window.addEventListener('resize', fecharMenu);
+  window.addEventListener('scroll', fecharMenu, true);
   // a observação se edita na própria célula (Levi, 16/10/2026: "pq tem um campo de editar observação na coluna de
   // editar se já tem uma célula para observação na tabela?"); Esc e Cancelar voltam ao texto de antes
   document.querySelectorAll('.fp-tab td.fp-obs').forEach(function (td) {
@@ -134,7 +179,7 @@
     function abrir() { td.classList.add('editando'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
     function fechar() { ta.value = antes; td.classList.remove('editando'); }
     lapis.addEventListener('click', abrir);
-    td.querySelector('.fp-obs-txt').addEventListener('click', abrir);
+    td.querySelector('.fp-obs-txt').addEventListener('click', function (ev) { if (!ev.target.closest('.fp-os-n')) abrir(); });
     form.querySelector('.fp-obs-cancelar').addEventListener('click', fechar);
     ta.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') fechar(); });
   });

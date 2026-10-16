@@ -164,12 +164,19 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   observação não tira a justificativa daqui nem troca quem marcou (antes ela sumia e virava do PCM). A FINALIZADA no
   Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico); o único filtro é o Motivo
   (lista só os que existem, inclusive os que não tiram, quando há justificativa do App com eles). A tabela (Levi,
-  16/10, 2ª rodada), tudo centrado menos a Tarefa e sem a coluna Editar que abria a linha:
+  16/10, 2ª e 3ª rodadas), tudo centrado menos a Tarefa e sem a coluna Editar que abria a linha:
+  - a usina só com o nome ("Thopen - Parelhas 1 - RN" vira "Parelhas 1"; o nome inteiro no title); o "Desde" com a
+    hora; abaixo da tarefa só o tipo e a situação no Fracttal (o código do ativo, ou "todos os ativos da OS", no title:
+    é o que separa duas linhas iguais da mesma OS);
+  - a OS e todo nº de 5 a 6 dígitos da observação ("OS16290") em verde Grid abrem o card da OS do OS Creator por cima
+    da tela, o mesmo do Histórico (`oscreator/card_os_abrir.html`): pelo id do Fracttal quando a OS está na Gestão PCM
+    (`idWO`, com o status do card), senão pelo número (`NexusOsCard.abrirFolio`, `/os/_nexus/card/folio/<nº>`);
   - o motivo do técnico NÃO se troca ("se o técnico disse tá dito"; a rota recusa); o do PCM troca na própria célula
     (o selo é a lista; o que não tira pede confirmação, porque a tarefa sai do painel);
   - a observação se edita na própria célula (lápis ou clique no texto; o campo ocupa a largura da célula e não
     alarga a tabela: a 1366 px ela cabe inteira, editando ou não);
-  - o × ao lado do motivo tira o motivo (com confirmação);
+  - os três pontos do fim da linha abrem o menu com "Retornar à programação" (tira o motivo, com confirmação; o menu é
+    fixo na tela, para a rolagem da tabela não o cortar);
   - a coluna **Vezes** (16/10/2026, Levi: "é bom no nexus termos o histórico de quantas vezes uma OS teve um motivo
     diferente"; escolhas dele: "cada justificativa, 1 por dia", "por tarefa", no painel) conta as justificativas da
     tarefa (a do ativo e a da tarefa em todos os ativos da OS), uma por dia e motivo (`motivos.historico`): a mesma
@@ -183,7 +190,8 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   tarefas com ele perdem o motivo (a confirmação diz quantas).
 - **No Quadro** (a janela da OS, também das pendentes, que agora abrem a janela pelo nome): a seção Motivo mostra o de
   agora (desde quando, quem, a observação) e marca, troca ou tira por `POST /t/pcm/quadro/motivo` (JSON; a tarefa vem da
-  SEMANA, a página só diz qual). O cartão e a pendente ganham o selo (âmbar: tira; azul: não tira). Com a marca da OS
+  SEMANA, a página só diz qual). O cartão e a pendente ganham o selo (vermelho: tira; laranja: não tira — Levi, 16/10: "vermelho o que sai da
+  programação, laranja o que não sai"; o mesmo selo no painel e no cadastro). Com a marca da OS
   valendo na linha, trocar ou tirar mexe nela (em todos os ativos).
 - **O dado:** livro `nexus_pcm_motivos` (registrado no catálogo antes de existir; nasce com a 1ª gravação, que leva o
   cadastro inicial junto): `dim_motivo`, `fato_decisao_motivo` (só acrescenta, vale a última de cada tarefa) e
