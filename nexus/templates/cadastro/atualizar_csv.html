@@ -3,6 +3,7 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 <p class="gc-eyebrow"><a href="{{ raiz }}/t/base/registro-mestre">Registro mestre</a></p>
+<div class="csv-pagina">
 {% if not p %}
 <h1 class="titulo-pagina">Atualizar pelo CSV do BD_Operações</h1>
 <p class="lead">Envie o CSV exportado do BD_Operações. O Nexus casa cada linha pelo ID da usina (UFV-001) e mostra,
@@ -53,105 +54,124 @@
 {% if erro %}<div class="cad-aviso cad-aviso--critico"><i class="ph ph-warning"></i><div>{{ erro }}</div></div>{% endif %}
 
 {% set n_valores = p.novos_valores.values()|map('length')|sum %}
-<div class="cad-numeros">
+<div class="cad-numeros cad-numeros--visao csv-numeros">
   <div><div class="r">Usinas no CSV</div><div class="v">{{ p.total }}</div><div class="d">{{ p.total - p.sem_par|length }} casadas pelo ID</div></div>
   <div><div class="r">Usinas que mudam</div><div class="v">{{ p.mudancas|length }}</div><div class="d">em {{ p.por_campo|length }} coluna(s)</div></div>
   <div><div class="r">Equipes novas</div><div class="v">{{ p.equipes_novas|length }}</div><div class="d">{{ p.equipes_novas|join(', ') or 'nenhuma' }}</div></div>
   <div><div class="r">Valores novos nas listas</div><div class="v">{{ n_valores }}</div>
-    <div class="d">{% for lista, vals in p.novos_valores.items() %}{{ LISTAS_ROTULO.get(lista, lista) }}: {{ vals|join(', ') }}{% if not loop.last %} · {% endif %}{% else %}nenhum{% endfor %}</div></div>
+    <div class="d">{% for lista, vals in p.novos_valores.items() %}{{ vals|join(', ') }}{% if not loop.last %} · {% endif %}{% else %}nenhum{% endfor %}</div></div>
 </div>
 
-{% if p.por_campo %}
+{% if p.sem_pessoa or p.sem_cliente or p.sem_par %}
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Não casou com o cadastro (fica como está):</strong>
+  <ul class="csv-avisos">
+    {% for nome, n in p.sem_pessoa.items() %}<li>Responsável O&amp;M “{{ nome }}”, {{ n }} usina(s): não está em Colaboradores. Cadastre e envie o arquivo de novo.</li>{% endfor %}
+    {% for nome, n in p.sem_cliente.items() %}<li>Cliente “{{ nome }}”, {{ n }} usina(s): não está em Clientes.</li>{% endfor %}
+    {% for u in p.sem_par %}<li>{{ u.id_bd }} {{ u.nome }}: o ID não está no Registro mestre.</li>{% endfor %}
+  </ul></div></div>
+{% endif %}
+
+{% if grupos %}
 <form method="post" action="{{ raiz }}/t/base/registro-mestre/atualizar/aplicar" id="csv-aplicar">
   <input type="hidden" name="token" value="{{ token }}">
-  <div class="cad-bloco">
-    <h2>O que muda, por coluna</h2>
-    <p class="cad-sub">Desmarque a coluna que não quer trazer. <strong>O CSV resume</strong> = o valor do CSV está contido no do
-      Nexus, que tem mais detalhe (dois modelos de inversor viram um, “250 kW / 275 kVA” vira “250”). Campo sensível aparece mascarado.</p>
-    <div class="cad-rolagem">
-      <table class="cad-tabela">
-        <thead><tr><th>Aplicar</th><th>Coluna do CSV</th><th>Campo do Nexus</th><th class="num">Usinas</th><th class="num">O CSV resume</th></tr></thead>
-        <tbody>
-          {% for pc in p.por_campo %}
-          <tr>
-            <td><input type="checkbox" name="campos" value="{{ pc.campo }}" checked aria-label="Aplicar a coluna {{ pc.coluna }}"></td>
-            <td>{{ pc.coluna }}</td>
-            <td>{{ pc.rotulo }}{% if pc.oculto %} <span class="cad-chip cad-chip--info">sensível</span>{% endif %}</td>
-            <td class="num">{{ pc.linhas|length }}</td>
-            <td class="num">{% if pc.resumem %}<span class="cad-chip cad-chip--alerta">{{ pc.resumem }}</span>{% else %}0{% endif %}</td>
-          </tr>
-          <tr><td colspan="5" style="padding:0">
-            <details class="cad-dif"><summary>{{ 'Ver a mudança' if pc.linhas|length == 1 else 'Ver as %d mudanças'|format(pc.linhas|length) }} de {{ pc.coluna }}</summary>
-              <table class="cad-tabela">
-                <thead><tr><th>ID</th><th>Usina</th><th>No Nexus hoje</th><th>No CSV</th></tr></thead>
-                <tbody>{% for l in pc.linhas %}<tr><td class="id">{{ l.id_bd }}</td><td>{{ l.nome }}</td>
-                  <td>{% if pc.oculto %}{{ '•••' if l.antes else '(vazio)' }}{% else %}{{ l.antes or '(vazio)' }}{% endif %}</td>
-                  <td>{% if pc.oculto %}•••{% else %}{{ l.depois }}{% endif %}{% if l.resume %} <span class="cad-chip cad-chip--alerta">o CSV resume</span>{% endif %}</td></tr>{% endfor %}</tbody>
-              </table>
-            </details>
-          </td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="csv-cabeca">
+    <h2>O que muda</h2>
+    <div class="csv-marcar"><button type="button" data-marcar="1">Marcar todas</button> · <button type="button" data-marcar="0">Desmarcar todas</button></div>
+  </div>
+  <p class="cad-sub csv-legenda">Clique na coluna para ver usina a usina e desmarque a que não quiser trazer.
+    <span class="cad-chip cad-chip--alerta">resume</span> = o CSV resume o que o Nexus tem (“250 kW / 275 kVA” vira “250”).</p>
+  {% for nome_secao, itens in grupos %}
+  <section class="csv-grupo">
+    <h3 class="csv-secao">{{ nome_secao }}</h3>
+    {% for pc in itens %}{% set n = pc.linhas|length %}
+    <div class="csv-item">
+      <input type="checkbox" name="campos" value="{{ pc.campo }}" checked aria-label="Aplicar a coluna {{ pc.coluna }}">
+      <details>
+        <summary title="Campo do Nexus: {{ pc.rotulo }}">
+          <span class="csv-nome">{{ pc.coluna }}</span>
+          {% if pc.oculto %}<span class="cad-chip cad-chip--info">sensível</span>{% endif %}
+          {% if pc.resumem %}<span class="cad-chip cad-chip--alerta">{{ pc.resumem }} {{ 'resume' if pc.resumem == 1 else 'resumem' }}</span>{% endif %}
+          <span class="csv-conta">{{ n }} {{ 'usina' if n == 1 else 'usinas' }}</span>
+          <i class="ph ph-caret-down csv-seta" aria-hidden="true"></i>
+        </summary>
+        <div class="csv-detalhe">
+          <table class="cad-tabela csv-tabela">
+            <thead><tr><th>ID</th><th>Usina</th><th>Hoje no Nexus</th><th>No CSV</th></tr></thead>
+            <tbody>{% for l in pc.linhas %}<tr><td class="id">{{ l.id_bd }}</td><td>{{ l.nome }}</td>
+              <td class="csv-antes">{% if pc.oculto %}{{ '•••' if l.antes else '—' }}{% else %}{{ l.antes or '—' }}{% endif %}</td>
+              <td class="csv-depois">{% if pc.oculto %}•••{% else %}{{ l.depois }}{% endif %}{% if l.nota %} <span class="csv-nota">{{ l.nota }}</span>{% endif %}{% if l.resume %} <span class="cad-chip cad-chip--alerta">resume</span>{% endif %}</td></tr>{% endfor %}</tbody>
+          </table>
+        </div>
+      </details>
     </div>
-    <div class="cad-acoes" style="margin-top:14px">
-      <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/base/registro-mestre/atualizar">Cancelar</a>
-      <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" id="csv-aplicar-botao"><i class="ph ph-check"></i> Aplicar as colunas marcadas</button>
-    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+  <div class="csv-acoes">
     {# cada usina passa pela ficha: 250 usinas levaram 32 s no ensaio de 15/10/2026 #}
-    <p class="gc-ajuda" style="text-align:right">Leva cerca de meio minuto para 250 usinas: espere a tela voltar com o resultado.</p>
+    <span class="gc-ajuda">Leva cerca de meio minuto para 250 usinas: espere a tela voltar com o resultado.</span>
+    <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/base/registro-mestre/atualizar">Cancelar</a>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" id="csv-aplicar-botao"><i class="ph ph-check"></i> <span id="csv-aplicar-texto">Aplicar as colunas marcadas</span></button>
   </div>
 </form>
 <script>
-  // um clique só: o segundo pedido acharia a prévia já usada e mostraria "venceu" enquanto o primeiro ainda grava
-  document.getElementById("csv-aplicar").addEventListener("submit", function (ev) {
-    if (!this.querySelector('input[name="campos"]:checked')) return;
-    var b = document.getElementById("csv-aplicar-botao");
-    if (b.disabled) { ev.preventDefault(); return; }
-    b.disabled = true;
-    b.textContent = "Aplicando…";
-  });
+  (function () {
+    var f = document.getElementById("csv-aplicar");
+    var caixas = f.querySelectorAll('input[name="campos"]');
+    var botao = document.getElementById("csv-aplicar-botao");
+    var texto = document.getElementById("csv-aplicar-texto");
+    function contar() {
+      var n = f.querySelectorAll('input[name="campos"]:checked').length;
+      texto.textContent = n === 0 ? "Marque ao menos uma coluna"
+        : n === caixas.length ? "Aplicar as " + n + " colunas"
+        : "Aplicar " + n + (n === 1 ? " coluna" : " colunas") + " de " + caixas.length;
+      botao.disabled = n === 0;
+    }
+    f.addEventListener("change", contar);
+    f.querySelectorAll("[data-marcar]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var marcar = b.getAttribute("data-marcar") === "1";
+        caixas.forEach(function (c) { c.checked = marcar; });
+        contar();
+      });
+    });
+    // um clique só: o segundo pedido acharia a prévia já usada e mostraria "venceu" enquanto o primeiro ainda grava
+    f.addEventListener("submit", function (ev) {
+      if (botao.getAttribute("data-enviando")) { ev.preventDefault(); return; }
+      botao.setAttribute("data-enviando", "1");
+      botao.disabled = true;
+      texto.textContent = "Aplicando…";
+    });
+    contar();
+  })();
 </script>
 {% else %}
 <div class="cad-aviso cad-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>Nada a mudar:</strong> o Registro mestre já
   está como o CSV.</div></div>
 {% endif %}
 
-{% if p.vazios or p.arredondados or p.ignorados or p.ilegiveis %}
-<div class="cad-bloco">
-  <h2>O que fica como está</h2>
-  <div class="cad-rolagem">
-    <table class="cad-tabela">
-      <thead><tr><th>Por quê</th><th>Coluna do CSV</th><th class="num">Usinas</th></tr></thead>
-      <tbody>
-        {% for col, n in p.vazios.items() %}<tr><td>Vazio no CSV: fica o do Nexus</td><td>{{ col }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
-        {% for col, n in p.arredondados.items() %}<tr><td>O CSV só arredonda: fica o do Nexus, mais preciso</td><td>{{ col }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
-        {% for col, n in p.ignorados.items() %}<tr><td>Valor de mentira: não troca</td><td>{{ col }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
-        {% for g in p.ilegiveis|groupby('coluna') %}<tr><td>Não é do tipo do campo ({{ g.list[0].motivo }}):
-          {% for i in g.list %}{{ i.id_bd }}{% if not loop.last %}, {% endif %}{% endfor %}</td><td>{{ g.grouper }}</td><td class="num">{{ g.list|length }}</td></tr>{% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
-
-{% if p.sem_pessoa or p.sem_cliente or p.sem_par %}
-<div class="cad-bloco">
-  <h2>O que não casou</h2>
-  <div class="cad-painel"><ul>
-    {% for nome, n in p.sem_pessoa.items() %}<li>Responsável O&amp;M “{{ nome }}” ({{ n }} usina(s)): não está no cadastro de pessoas.
-      Fica o responsável de hoje; cadastre a pessoa em Colaboradores e envie o arquivo de novo.</li>{% endfor %}
-    {% for nome, n in p.sem_cliente.items() %}<li>Cliente “{{ nome }}” ({{ n }} usina(s)): não está em Clientes. Fica o cliente de hoje.</li>{% endfor %}
-    {% for u in p.sem_par %}<li>{{ u.id_bd }} {{ u.nome }}: o ID não está no Registro mestre. A linha fica de fora.</li>{% endfor %}
-  </ul></div>
-</div>
+{% if fica %}
+<details class="csv-extra">
+  <summary>Fica como está <span class="csv-conta">{{ fica }} {{ 'caso' if fica == 1 else 'casos' }}</span><i class="ph ph-caret-down csv-seta" aria-hidden="true"></i></summary>
+  <table class="cad-tabela csv-tabela">
+    <thead><tr><th>Por quê</th><th>Coluna do CSV</th><th class="num">Usinas</th></tr></thead>
+    <tbody>
+      {% for col, n in p.vazios.items() %}<tr><td>Vazio no CSV: fica o do Nexus</td><td>{{ col }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
+      {% for col, n in p.arredondados.items() %}<tr><td>O CSV só arredonda: fica o do Nexus, mais preciso</td><td>{{ col }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
+      {% for col, n in p.ignorados.items() %}<tr><td>Valor de mentira: não troca</td><td>{{ col }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
+      {% for g in p.ilegiveis|groupby('coluna') %}<tr><td>Não é do tipo do campo ({{ g.list[0].motivo }}):
+        {% for i in g.list %}{{ i.id_bd }}{% if not loop.last %}, {% endif %}{% endfor %}</td><td>{{ g.grouper }}</td><td class="num">{{ g.list|length }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</details>
 {% endif %}
 
 {% if p.sem_campo %}
-<div class="cad-bloco">
-  <h2>Colunas do CSV sem campo no Nexus</h2>
+<details class="csv-extra">
+  <summary>Colunas do CSV sem campo no Nexus <span class="csv-conta">{{ p.sem_campo|length }}</span><i class="ph ph-caret-down csv-seta" aria-hidden="true"></i></summary>
   <p class="cad-sub">Ficam de fora: {{ p.sem_campo|join(' · ') }}.</p>
+</details>
+{% endif %}
+{% endif %}
 </div>
-{% endif %}
-{% endif %}
 {% endblock %}

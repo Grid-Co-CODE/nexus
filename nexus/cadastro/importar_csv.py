@@ -177,18 +177,19 @@ def proposta(linhas: list, srv, cabecalho=None) -> dict:
                for r in srv.registros("pessoas")]
     colunas = {**COLUNAS, **REFS}
     por_campo = {cid: {"campo": cid, "coluna": col, "rotulo": campo[cid].rotulo, "oculto": bool(campo[cid].oculto),
-                       "linhas": [], "resumem": 0}
+                       "secao": campo[cid].secao, "linhas": [], "resumem": 0}
                  for col, cid in colunas.items() if cid in campo and campo[cid].editavel}
     mudancas, sem_par, vistos = [], [], set()
     vazios, arredondados = Counter(), Counter()
     ignorados, ilegiveis, sem_cliente, sem_pessoa = Counter(), [], Counter(), Counter()
     novos_valores, equipes_novas = {}, {}
 
-    def anotar(r, k, form, cid, valor, antes, depois):
+    def anotar(r, k, form, cid, valor, antes, depois, nota=""):
         form[cid] = valor
         resume = _resume(antes, depois)
         pc = por_campo[cid]
-        pc["linhas"].append({"id_bd": k, "nome": r.titulo, "antes": antes, "depois": depois, "resume": resume})
+        pc["linhas"].append({"id_bd": k, "nome": r.titulo, "antes": antes, "depois": depois, "nota": nota,
+                             "resume": resume})
         pc["resumem"] += int(resume)
 
     for ln in linhas:
@@ -246,7 +247,7 @@ def proposta(linhas: list, srv, cabecalho=None) -> dict:
             if not texto or texto == "0" or col not in ln:
                 continue                            # "0" é a célula vazia da fórmula do Excel, como na importação antiga
             c, atual = campo[cid], r.valores.get(cid)
-            depois = texto
+            depois, nota = texto, ""
             if tipos.marcador(texto):
                 alvo = tipos.marcador(texto)        # "N/A": a usina não tem (não é equipe nem pessoa chamada "N/A")
             elif cid == "cliente":
@@ -259,7 +260,7 @@ def proposta(linhas: list, srv, cabecalho=None) -> dict:
                 alvo = e.id if e else "nova:" + texto
                 if e is None:
                     equipes_novas[chave_texto(texto)] = texto
-                    depois = f"{texto} (equipe nova)"
+                    nota = "equipe nova"
             else:
                 alvo = _achar_pessoa(texto, pessoas)
                 if alvo is None:
@@ -267,10 +268,10 @@ def proposta(linhas: list, srv, cabecalho=None) -> dict:
                     continue
                 nome = srv.titulo_de("pessoas", alvo)
                 if chave_texto(nome) != chave_texto(texto):
-                    depois = f"{nome} (no CSV: {texto})"
+                    depois, nota = nome, f"no CSV: {texto}"
             if str(atual or "") == str(alvo):
                 continue
-            anotar(r, k, form, cid, alvo, srv.titulo_de(c.lista, atual) if atual else "", depois)
+            anotar(r, k, form, cid, alvo, srv.titulo_de(c.lista, atual) if atual else "", depois, nota)
         if form:
             mudancas.append({"usina_id": r.id, "id_bd": k, "nome": r.titulo, "versao": r.versao, "formulario": form})
     cab = list(cabecalho or (linhas[0].keys() if linhas else []))

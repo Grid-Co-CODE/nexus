@@ -494,3 +494,61 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
   .eq-lista{position:static;max-height:380px}
   .eq-kwp{align-items:flex-start;text-align:left}
 }
+
+/* Atualizar pelo CSV do BD_Operações (Registro mestre, 15/10/2026). Levi, 16/10, sobre a 1ª versão (uma tabela larga
+   e uma linha de "Ver as mudanças" embaixo de cada coluna): "ficou muito espaçado, confuso". Agora: uma linha por
+   coluna, agrupada pela seção da ficha; o usina a usina abre na própria linha; o Aplicar fica sempre à vista. */
+.csv-pagina{max-width:980px}
+.csv-pagina .cad-upload{max-width:none}
+.csv-pagina .cad-bloco{margin-top:24px}
+.csv-numeros{margin:0 0 14px}
+.csv-numeros .d{overflow-wrap:anywhere}
+.csv-avisos{margin:4px 0 0;padding-left:18px}
+.csv-cabeca{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:6px 0 2px}
+.csv-cabeca h2{font:700 15px/20px var(--font-sans);margin:0}
+.csv-marcar{font-size:12px;color:var(--mudo);white-space:nowrap}
+.csv-marcar button{background:none;border:0;padding:0;color:var(--tinta-2);font:inherit;cursor:pointer}
+.csv-marcar button:hover{color:var(--verde-texto)}
+.csv-legenda{margin:0 0 12px}
+.csv-legenda .cad-chip{font-size:10px;line-height:14px;padding:1px 6px}
+.csv-grupo{border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie);margin:0 0 12px;
+  overflow:hidden}
+.csv-secao{font:700 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);
+  margin:0;padding:9px 14px;background:var(--superficie-2)}
+.csv-item{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:start;border-top:1px solid var(--linha)}
+.csv-item>input{margin:11px 0 0 14px;width:15px;height:15px;accent-color:var(--verde);cursor:pointer}
+.csv-item summary{list-style:none;display:flex;align-items:center;gap:8px;padding:8px 14px 8px 4px;cursor:pointer;
+  font-size:13px;line-height:20px;color:var(--tinta)}
+.csv-item summary::-webkit-details-marker,details.csv-extra>summary::-webkit-details-marker{display:none}
+.csv-item summary:hover{color:var(--verde-texto)}
+.csv-nome{flex:1;min-width:0;font-weight:500}
+.csv-item summary .cad-chip{font-size:10px;line-height:14px;padding:1px 7px}
+.csv-conta{color:var(--mudo);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:78px;text-align:right}
+.csv-seta{color:var(--mudo);font-size:14px}
+details[open]>summary .csv-seta{transform:rotate(180deg)}
+.csv-item:has(>input:not(:checked)) .csv-nome{color:var(--mudo);text-decoration:line-through}
+.csv-detalhe{max-height:300px;overflow:auto;margin:0 14px 10px 4px;border:1px solid var(--linha);
+  border-radius:var(--raio-md)}
+.csv-tabela{font-size:12px}
+.csv-tabela th{padding:6px 10px}
+.csv-tabela td{padding:5px 10px}
+.csv-antes{color:var(--mudo)}
+.csv-depois{color:var(--tinta)}
+.csv-nota{color:var(--mudo);font-size:11px;margin-left:4px}
+.csv-acoes{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  padding:10px 14px;margin:4px 0 16px;background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);box-shadow:var(--sombra)}
+.csv-acoes .gc-ajuda{margin:0 auto 0 0}
+details.csv-extra{border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie);
+  margin:0 0 10px;overflow:hidden}
+details.csv-extra>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:9px 14px;
+  font-size:13px;color:var(--tinta-2)}
+details.csv-extra>summary:hover{color:var(--tinta)}
+details.csv-extra>summary .csv-conta{margin-left:auto}
+details.csv-extra>.cad-tabela{border-top:1px solid var(--linha)}
+details.csv-extra>.cad-sub{padding:0 14px 12px}
+@media (max-width:640px){
+  .csv-acoes{flex-wrap:wrap}
+  .csv-acoes .gc-ajuda{flex-basis:100%}
+  .csv-conta{min-width:0}
+}

@@ -105,8 +105,12 @@ Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanha
 Levi, 15/10/2026, com o `operacao_usinas_2026-10-15.csv`: "Esse é o novo BD_Operações, conseguimos atualizar os dados do
 Nexus com esse CSV? daqui a duas semanas vamos ter acesso em tempo real a esses dados". O CSV tem 258 usinas, 73 colunas,
 `;` e decimal com vírgula. A tela (admin, botão "Atualizar pelo CSV" no Registro mestre) recebe o arquivo, mostra a
-prévia **por coluna** (cada coluna com caixa de marcar, a contagem e o antes/depois de cada usina; sensível mascarado) e
-aplica só as colunas marcadas. **A mesma regra (`proposta` + `aplicar`) é a que a fonte em tempo real vai usar**: troca a
+prévia **por coluna** e aplica só as colunas marcadas. Desenho da prévia (Levi, 16/10, sobre a 1ª versão, uma tabela
+larga com uma linha "Ver as mudanças" embaixo de cada coluna: "muito espaçado, confuso"; o mockup aprovado: "Ficou bem
+melhor!"): uma linha por coluna com caixa de marcar, agrupada pela seção da ficha (`USINAS.secoes`), a contagem e as
+marcas "resume"/"sensível" à direita; clicar abre o usina a usina na própria linha (hoje → no CSV; a pessoa casada pelo
+nome contido aparece com o nome do CSV em cinza ao lado); o que não casou vira aviso no topo; "Fica como está" e as
+colunas sem campo ficam recolhidos; o botão Aplicar fica preso ao rodapé e diz quantas colunas vai aplicar. **A mesma regra (`proposta` + `aplicar`) é a que a fonte em tempo real vai usar**: troca a
 leitura do arquivo pelas linhas da fonte.
 
 Diferente da importação do `.xlsx` (que monta a carga inteira e marca como excluído o que não vem), aqui nada é criado

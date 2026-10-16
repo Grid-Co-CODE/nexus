@@ -733,6 +733,17 @@ def registrar_base(bp):
         k.setdefault("p", None)
         k.setdefault("erro", None)
         k.setdefault("feito", None)
+        p = k["p"]
+        if p:
+            # a prévia agrupada pelas seções da ficha da usina (Levi, 16/10: a 1ª versão, uma tabela larga com uma linha
+            # de "Ver as mudanças" embaixo de cada coluna, ficou "muito espaçada, confusa")
+            secoes = [(s.id, s.nome) for s in USINAS.secoes]
+            ids = {sid for sid, _ in secoes}
+            grupos = [(nome, [pc for pc in p["por_campo"] if pc.get("secao") == sid]) for sid, nome in secoes]
+            grupos.append(("Outros", [pc for pc in p["por_campo"] if pc.get("secao") not in ids]))
+            k["grupos"] = [g for g in grupos if g[1]]
+            k["fica"] = (sum(p["vazios"].values()) + sum(p["arredondados"].values()) + sum(p["ignorados"].values())
+                         + len(p["ilegiveis"]))
         return render_template("cadastro/atualizar_csv.html", LISTAS_ROTULO=LISTAS, **k), status
 
     def _csv_guardar(chave, valor) -> str:

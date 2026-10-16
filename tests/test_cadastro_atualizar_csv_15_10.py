@@ -107,9 +107,10 @@ def test_a_previa_segue_as_regras_e_nao_grava(srv):
     assert c["status"]["UFV-002"]["depois"] == "PRONTA PARA MOBILIZAR"
     assert c["cidade"]["UFV-002"]["antes"] == "" and c["cidade"]["UFV-002"]["depois"] == "Matões"
     assert c["modelo_inversores"]["UFV-001"]["resume"] is True            # dois modelos viram um: marcado
-    assert c["equipe"]["UFV-001"]["depois"] == "Brumado / Tanhaçu (equipe nova)"
+    assert c["equipe"]["UFV-001"]["depois"] == "Brumado / Tanhaçu" and c["equipe"]["UFV-001"]["nota"] == "equipe nova"
     assert c["equipe"]["UFV-002"]["depois"] == "sp leste 01"                # casou sem maiúscula: a SP Leste 01
-    assert c["responsavel_om"]["UFV-001"]["depois"] == "Fulana Prado (no CSV: Fulana Rodrigues Prado)"
+    assert c["responsavel_om"]["UFV-001"]["depois"] == "Fulana Prado"
+    assert c["responsavel_om"]["UFV-001"]["nota"] == "no CSV: Fulana Rodrigues Prado"
     # o que fica, e por quê
     # 7,049 × 7,0488 é arredondamento; a latitude igual e a receita igual à conta automática não contam
     assert p["arredondados"] == {"Potência real (MWp)": 1}
@@ -198,7 +199,7 @@ def test_a_tela_mostra_a_previa_e_aplica_uma_vez(cli):
                  content_type="multipart/form-data")
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and "Prévia da atualização" in html and "o CSV resume" in html
-    assert "Brumado / Tanhaçu (equipe nova)" in html and "Fulano Desconhecido" in html and "Mobilizado?" in html
+    assert '<span class="csv-nota">equipe nova</span>' in html and "Fulano Desconhecido" in html and "Mobilizado?" in html
     assert "UFV-999" in html and "PRONTA PARA MOBILIZAR" in html
     assert "Rua Teste 123" not in html and "•••" in html                     # sensível mascarado
     token = re.search(r'name="token" value="([^"]+)"', html).group(1)
