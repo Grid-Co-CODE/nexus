@@ -161,3 +161,59 @@ def test_as_chaves_moram_na_aba_nexus_das_chaves_das_fontes(app, admin, monkeypa
     assert '<a href="/t/base/chaves-fontes" aria-current="page">Fontes da Performance</a>' in h
     h = admin.get("/t/contratos/contestacoes").get_data(as_text=True)
     assert "Este Nexus não tem a chave das contestações." in h and "/t/base/chaves-nexus" in h
+
+
+# ── o token do GitHub do repositório do PCM (16/10/2026: o servidor não tinha; o Publicar no App parava) ───────────
+class _Resp:
+    def __init__(self, status, corpo=None, headers=None):
+        self.status_code, self._corpo, self.headers = status, corpo or {}, headers or {}
+
+    def json(self):
+        return self._corpo
+
+
+class _GitHub:
+    """O GitHub que só responde ao GET do repositório (a conferência da tela só lê)."""
+
+    def __init__(self, resp):
+        self.resp, self.pedidos = resp, []
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        self.pedidos.append(url)
+        return self.resp
+
+
+TOKEN = "ghp_" + "a1B2" * 9
+
+
+def _gravar_token(c, valor):
+    return c.post(URL, data={"codigo": _codigo(c), "chave": "NEXUS_PCM_GITHUB_TOKEN", "acao": "gravar", "valor": valor})
+
+
+def test_o_token_do_github_do_pcm_pela_tela(app, admin, tmp_path):
+    from nexus.pcm import publicar as PB
+    gh = _GitHub(_Resp(200, {"permissions": {"push": True}}, {"X-OAuth-Scopes": "repo, gist"}))
+    app.config["NEXUS_PCM_GITHUB_SESSAO"] = gh
+    assert PB.token(app.config) == ("", "")
+    r = _gravar_token(admin, TOKEN)
+    assert r.status_code == 303 and gh.pedidos == ["https://api.github.com/repos/fillipefigueiro-source/gridco-pcm-data"]
+    h = admin.get(PAGINA).get_data(as_text=True)
+    assert "GitHub do PCM" in h and "pode gravar nele" in h and TOKEN not in h
+    assert TOKEN not in (tmp_path / "dados" / K.ARQUIVO).read_text(encoding="utf-8")
+    with app.app_context():
+        assert PB.token(app.config) == (TOKEN, "Base → Chaves do Nexus")
+
+
+@pytest.mark.parametrize("valor, resp, pedaco", [
+    ("abc123", None, "não parece um token do GitHub"),
+    (TOKEN, _Resp(401), "recusou o token"),
+    (TOKEN, _Resp(404), "não enxerga o repositório"),
+    (TOKEN, _Resp(200, {"permissions": {"push": False}}), "só lê o repositório"),
+    (TOKEN, _Resp(200, {"permissions": {"push": True}}, {"X-OAuth-Scopes": "gist, read:org"}), "não tem o escopo repo"),
+])
+def test_token_do_github_que_nao_serve_nao_grava(app, admin, valor, resp, pedaco):
+    from nexus.pcm import publicar as PB
+    app.config["NEXUS_PCM_GITHUB_SESSAO"] = _GitHub(resp or _Resp(200, {"permissions": {"push": True}}))
+    r = _gravar_token(admin, valor)
+    assert r.status_code == 400 and pedaco in r.get_data(as_text=True)
+    assert PB.token(app.config) == ("", "") and "Chaves das fontes" in PB.SEM_TOKEN

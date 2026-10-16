@@ -22,6 +22,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import threading
 import time
@@ -101,6 +102,33 @@ def _conferir_acessos_publica(valor: str) -> str:
     return "é uma chave pública válida; as contas criadas daqui em diante vão seladas para ela"
 
 
+def _conferir_github_pcm(valor: str) -> str:
+    """O token do GitHub do repositório do PCM (16/10/2026): o servidor não tinha nenhum, e o Publicar no App, o "Aplicar
+    na semana em curso" do Quadro e o Fora_da_programacao.json do robô e do App paravam em "sem token do GitHub" (Levi,
+    com o print da tela de publicar a W43). Confere só lendo: o GitHub aceita o token, ele enxerga o repositório e a conta
+    pode gravar nele (o token clássico também precisa do escopo repo ou public_repo)."""
+    from ..pcm import publicar as PB
+    if not re.fullmatch(r"(ghp_|github_pat_)[A-Za-z0-9_]{20,250}", valor):
+        raise Recusada("Isto não parece um token do GitHub (ele começa com ghp_ ou github_pat_): nada foi gravado.")
+    repo, _ramo = PB.repositorio(current_app.config)
+    try:
+        r = PB._sessao(current_app.config).get(f"https://api.github.com/repos/{repo}", headers=PB._cab(valor), timeout=30)
+    except Exception as e:       # noqa: BLE001 — rede, GitHub fora: não grava sem conferir
+        raise Recusada(f"Não consegui falar com o GitHub ({type(e).__name__}): nada foi gravado; tente de novo.") from None
+    if r.status_code == 401:
+        raise Recusada("O GitHub recusou o token (vencido, apagado ou copiado pela metade): nada foi gravado.")
+    if r.status_code in (403, 404):
+        raise Recusada(f"Este token não enxerga o repositório {repo}: nada foi gravado.")
+    if r.status_code != 200:
+        raise Recusada(f"O GitHub respondeu {r.status_code}: nada foi gravado.")
+    escopos = (getattr(r, "headers", None) or {}).get("X-OAuth-Scopes")
+    if escopos is not None and not ({"repo", "public_repo"} & {e.strip() for e in escopos.split(",")}):
+        raise Recusada("Este token não tem o escopo repo (marque \"repo\" ao criar o token clássico): nada foi gravado.")
+    if not ((r.json() or {}).get("permissions") or {}).get("push"):
+        raise Recusada(f"Este token só lê o repositório {repo}; o Nexus precisa gravar nele: nada foi gravado.")
+    return f"o token abre o repositório {repo} e pode gravar nele"
+
+
 # nome da variável → o que é, para que serve, e a conferência antes de gravar
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
@@ -117,6 +145,15 @@ CHAVES = {
                 "privada dele)",
         "arquivo": "thopen_acessos_publica.txt",
         "conferir": _conferir_acessos_publica,
+    },
+    # o GitHub do repositório do PCM (16/10/2026): o servidor do Nexus não tinha token (nexus/pcm/publicar.token)
+    "NEXUS_PCM_GITHUB_TOKEN": {
+        "nome": "GitHub do PCM (token do repositório gridco-pcm-data)",
+        "para": "publicar a semana no App, gravar a reprogramação da semana em curso e mandar o arquivo Fora da "
+                "programação ao robô do PCM e ao App",
+        "arquivo": "",
+        "dica": "o token que o GitHub mostra uma vez só, ao criar (começa com ghp_ ou github_pat_)",
+        "conferir": _conferir_github_pcm,
     },
 }
 
@@ -212,7 +249,8 @@ def estado(config) -> list[dict]:
                 nao_abre = True
         env = bool(str(config.get(nome) or "").strip())
         origem = "tela" if item and not nao_abre else ("env" if env else None)
-        out.append({"id": nome, "nome": d["nome"], "para": d["para"], "arquivo": d["arquivo"], "origem": origem,
+        out.append({"id": nome, "nome": d["nome"], "para": d["para"], "arquivo": d["arquivo"], "dica": d.get("dica", ""),
+                    "origem": origem,
                     "quando": A.hora_br(item.get("quando")) if item else "", "por": (item or {}).get("por", ""),
                     "nao_abre": nao_abre, "env_tambem": env and bool(item)})
     return out

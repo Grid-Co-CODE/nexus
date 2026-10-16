@@ -56,8 +56,21 @@ def nome_planilha(semana: str) -> str:
 repositorio = fonte.repositorio
 
 
+# o aviso de quando falta o token: o servidor não tinha nenhum até 16/10/2026 (o Publicar no App mostrava "sem token do
+# GitHub" e ninguém sabia o que fazer); desde então o administrador cola em Base → Chaves das fontes, aba Nexus
+SEM_TOKEN = ("sem token do GitHub: um administrador cola o token do repositório do PCM em Base → Chaves das fontes, aba "
+             "Nexus (NEXUS_PCM_GITHUB_TOKEN)")
+
+
 def token(config) -> tuple[str, str]:
-    """(token, de onde veio), sem expor o valor. Nos testes, só o de teste."""
+    """(token, de onde veio), sem expor o valor. O colado em Base → Chaves do Nexus vence o resto, como as outras chaves
+    da tela (16/10/2026: o servidor não tinha nenhum); depois o ambiente, o .env do Nexus e, no PC, o login do `gh`. Nos
+    testes, o da tela ou o de teste."""
+    from ..auth import chaves as CH
+    if "NEXUS_PCM_GITHUB_TOKEN" in CH._ler(config):
+        t = CH.valor("NEXUS_PCM_GITHUB_TOKEN", config)
+        if t:
+            return t.strip(), "Base → Chaves do Nexus"
     if config.get("TESTING"):
         t = config.get("NEXUS_PCM_GITHUB_TOKEN") or ""
         return t, "teste" if t else ""
@@ -199,7 +212,7 @@ def estado_no_repositorio(config, semana: str) -> dict:
     out = {"repo": repo, "ramo": ramo, "token": de_onde, "planilha": nome_planilha(semana), "existe": False,
            "commit": None, "obs_atual": None, "erro": ""}
     if not tok:
-        out["erro"] = "sem token do GitHub (NEXUS_PCM_GITHUB_TOKEN)"
+        out["erro"] = SEM_TOKEN
         return out
     try:
         s = _sessao(config)
@@ -222,7 +235,7 @@ def publicar(config, rid: str, quem: str, agora: datetime | None = None) -> dict
             raise PublicacaoErro("; ".join(motivos))
         tok, de_onde = token(config)
         if not tok:
-            raise PublicacaoErro("sem token do GitHub: ponha NEXUS_PCM_GITHUB_TOKEN no .env do Nexus")
+            raise PublicacaoErro(SEM_TOKEN)
         repo, ramo = repositorio(config)
         st, arqs = arquivos_da_rodada(config, rid)
         s = _sessao(config)

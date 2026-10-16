@@ -197,7 +197,11 @@ gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valo
 - **Só as chaves de `chaves.CHAVES`**, cada uma com a conferência dela: a `NEXUS_CONTESTACAO_CHAVE_PRIVADA` (32 bytes
   em base64 que viram X25519 e, havendo contestação no banco, abrem pelo menos uma; a de outro par é recusada) e, desde
   14/10, a `NEXUS_ACESSOS_5080_PUBLICA` (a pública do Dashboard Thopen: 32 bytes que viram X25519; não há como conferir
-  contra o painel, a prova é a pessoa entrar). A tela não edita o .env: nome fora da lista é recusado.
+  contra o painel, a prova é a pessoa entrar) e, desde 16/10, o `NEXUS_PCM_GITHUB_TOKEN` (o token do repositório do
+  PCM: o servidor não tinha, e a tela de publicar a W43 dizia "sem token do GitHub"; a conferência só LÊ o GitHub: o token
+  tem a forma ghp_/github_pat_, o GitHub o aceita, ele enxerga o repositório, a conta pode gravar e, sendo clássico, tem o
+  escopo repo ou public_repo; `pcm/publicar.token` usa o da tela primeiro). A tela não edita o .env: nome fora da lista é
+  recusado.
 - **Quem lê usa `chaves.valor(nome)`** (a da tela e, sem ela, a do .env), nunca `config.get` direto: as Contestações
   (`nexus/contratos/contestacoes.py`) e os Acessos dos clientes (`nexus/contratos/acessos_clientes.py`) leem assim.
 - **NEXUS_SECRET_KEY trocada:** a gravada não abre; vale a do .env (ou nenhuma), e a tela diz "não abre, cole de novo".

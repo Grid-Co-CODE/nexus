@@ -31,7 +31,7 @@
     {% elif c.origem == 'env' %}<span class="gc-status gc-status--ok">Posta no .env do servidor</span>
     {% else %}<span class="gc-status gc-status--alerta">Não posta</span>{% endif %}
   </div>
-  <p class="chv-para">Para {{ c.para }}. Variável <span class="gc-dado">{{ c.id }}</span>; vem do arquivo <span class="gc-dado">{{ c.arquivo }}</span>.</p>
+  <p class="chv-para">Para {{ c.para }}. Variável <span class="gc-dado">{{ c.id }}</span>; {% if c.arquivo %}vem do arquivo <span class="gc-dado">{{ c.arquivo }}</span>{% else %}é {{ c.dica }}{% endif %}.</p>
   {% if c.origem == 'tela' %}<p class="chv-quando">Gravada em {{ c.quando }}{% if c.por %} por {{ c.por }}{% endif %}.{% if c.env_tambem %} O .env também tem uma; vale a da tela.{% endif %}</p>{% endif %}
   {% if c.nao_abre %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>A chave gravada pela tela não abre.</strong> A NEXUS_SECRET_KEY deste servidor mudou depois que ela foi gravada{% if c.origem == 'env' %}; vale a do .env{% endif %}. Cole a chave de novo.</div></div>{% endif %}
   <form method="post" action="{{ acao|na_raiz }}" class="chv-form" autocomplete="off">
@@ -39,7 +39,7 @@
     <input type="hidden" name="chave" value="{{ c.id }}">
     <label class="gc-rotulo" for="{{ c.id }}-v">{{ 'Trocar a chave' if c.origem else 'Colar a chave' }}</label>
     <input id="{{ c.id }}-v" name="valor" type="password" class="gc-campo" autocomplete="off" spellcheck="false"
-           placeholder="a linha inteira do arquivo {{ c.arquivo }}" {% if sem_pasta %}disabled{% endif %}>
+           placeholder="{% if c.arquivo %}a linha inteira do arquivo {{ c.arquivo }}{% else %}{{ c.dica }}{% endif %}" {% if sem_pasta %}disabled{% endif %}>
     <div class="chv-acoes">
       <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="gravar" {% if sem_pasta %}disabled{% endif %}><i class="ph ph-key"></i> Conferir e gravar</button>
       {% if c.origem == 'tela' or c.nao_abre %}<button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="apagar" formnovalidate><i class="ph ph-trash"></i> Apagar a da tela</button>{% endif %}

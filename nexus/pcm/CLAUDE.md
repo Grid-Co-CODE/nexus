@@ -324,8 +324,11 @@ escolhe a semana ativa pela data de hoje: a W43 publicada na quinta vira a do Ap
 - **Administrador ou setor PCM** (`telas.pode_programar`, desde 16/10/2026; antes só `session["admin"]`: a senha de
   admin ou um e-mail de `NEXUS_ADMINS`). O commit não leva o e-mail de quem publicou (o repositório é público); quem
   foi fica no `publicacao.json` da rodada.
-- **Token:** `NEXUS_PCM_GITHUB_TOKEN` (ambiente ou `.env` do Nexus; no servidor, um token só deste repositório, com
-  escrita de conteúdo). Sem ele, no PC, o login do `gh` da máquina (`gh auth token`). Nunca é impresso.
+- **Token:** `NEXUS_PCM_GITHUB_TOKEN`. Desde 16/10/2026 o administrador cola em Base → Chaves das fontes, aba Nexus
+  (`auth/chaves.py`; vence o ambiente e o `.env`, vale na hora, conferido no GitHub ao colar): o servidor não tinha
+  nenhum, e a tela de publicar a W43 mostrava "sem token do GitHub" (o aviso agora diz onde colar: `publicar.SEM_TOKEN`).
+  Depois, o ambiente e o `.env` do Nexus; no PC, o login do `gh` da máquina (`gh auth token`). Nunca é impresso. O
+  mesmo token serve ao Quadro (semana em curso) e ao arquivo dos motivos.
 - **Testar sem publicar:** a tela de confirmação lê o repositório de verdade (só GET). A cópia de conferência do
   Claude troca a sessão do GitHub por uma que recusa gravar. Testes: `tests/test_pcm_publicar.py` (GitHub falso).
 - **OS 14331 (W42, 09/10):** 4 corretivas "Teste de comando remoto" de 6 h cada (a duração estimada no Fracttal; o

@@ -610,7 +610,7 @@ def publicar_arquivo(cfg, est: dict | None = None) -> dict:
     with PB._trava:
         tok, _de_onde = PB.token(cfg)
         if not tok:
-            raise Recusada("sem token do GitHub (NEXUS_PCM_GITHUB_TOKEN): o robô do PCM não recebe o arquivo")
+            raise Recusada(PB.SEM_TOKEN)
         repo, ramo = PB.repositorio(cfg)
         s = PB._sessao(cfg)
         atual = PB._ler(s, tok, repo, ramo, ARQUIVO)
@@ -645,7 +645,7 @@ def estado_no_repositorio(cfg, est: dict | None = None) -> dict:
         g = {"t": time.time(), "hash": None, "gerado_em": "", "existe": False, "erro": ""}
         tok, _ = PB.token(cfg)
         if not tok:
-            g["erro"] = "sem token do GitHub (NEXUS_PCM_GITHUB_TOKEN)"
+            g["erro"] = PB.SEM_TOKEN
         else:
             try:
                 repo, ramo = PB.repositorio(cfg)

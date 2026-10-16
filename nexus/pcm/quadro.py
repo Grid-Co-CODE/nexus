@@ -814,7 +814,7 @@ def ler_atual(config) -> dict:
     out = {"repo": repo, "ramo": ramo, "token": de_onde, "texto": "", "sha": "", "existe": False, "semana": None,
            "erro": ""}
     if not tok:
-        out["erro"] = "sem token do GitHub (NEXUS_PCM_GITHUB_TOKEN)"
+        out["erro"] = PB.SEM_TOKEN
         return out
     try:
         lido = PB._ler(PB._sessao(config), tok, repo, ramo, PB.OBS_ATUAL)
@@ -837,7 +837,7 @@ def aplicar_na_semana_em_curso(config, semana: str, linhas: list[str], quem: str
     with PB._trava:
         tok, de_onde = PB.token(config)
         if not tok:
-            raise QuadroErro("sem token do GitHub: ponha NEXUS_PCM_GITHUB_TOKEN no .env do Nexus")
+            raise QuadroErro(PB.SEM_TOKEN)
         repo, ramo = PB.repositorio(config)
         s = PB._sessao(config)
         atual = PB._ler(s, tok, repo, ramo, PB.OBS_ATUAL)
