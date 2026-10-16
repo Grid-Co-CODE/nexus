@@ -141,6 +141,15 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
 **Onde grava:** no cadastro da máquina em que a tela abre (`NEXUS_ARMAZEM_LOCAL`: o do servidor em app.gridco.com.br; o do
 PC em `C:\GridcoAuto\nexus\cadastro_ensaio.json`). Os dois e a cópia no banco (`cadastro_nexus`) são donos
 separados: aplicar no servidor não muda o PC nem o banco (os "dois donos do ID": equipe criada num não existe no outro).
+**As telas de campo leem o BANCO** (`campo/visao.py`, chamados, Integração Fracttal: `cadastro_nexus`), não o arquivo:
+para o responsável novo chegar nelas, aplique no PC e publique (`ferramentas/publicar_cadastro.py --bases-guardadas`,
+com `--ensaio` e a comparação com o banco antes). Foi o caminho de 16/10/2026 (Levi: "mude logo pois precisamos da
+informação de responsáveis, técnicos, usinas"): o banco era igual ao PC (0 diferenças, publicado do PC em 12/10); depois
+do CSV, 2 inseridas, 320 atualizadas (251 usinas, 66 pessoas cujo supervisor calculado segue o responsável novo, 2
+de-para), 0 apagadas; conferido decifrando o sensível das 258. **Atualize os dois donos antes de publicar de qualquer
+um:** o "Publicar no banco" do servidor (Governança de dados) publica o arquivo DELE, e com o cadastro antigo lá o banco
+voltaria atrás. O CSV não traz técnico: o Técnico O&M sai da equipe de cada pessoa (Colaboradores); em 16/10, 55
+usinas sem técnico, 32 delas com "Pessoas da equipe" no CSV (coluna sem campo no Nexus).
 
 **Tempo:** cada usina é uma gravação do arquivo inteiro: 251 usinas levaram 32 s no PC (a prévia, 0,2 s). A tela avisa
 e o botão trava depois do primeiro clique (a prévia vale uma vez; o segundo pedido diria "venceu" enquanto o primeiro
