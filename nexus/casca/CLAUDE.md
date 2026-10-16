@@ -226,7 +226,9 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
   dentro de outra (`Tela.dentro_de`) não é item do menu, mas é marcada na matriz como qualquer tela; quem tem ela
   liberada vê a de fora sem marcá-la (`setor_telas.com_as_de_fora`, no `acesso`): o relatório liberado traz a Central.
 - **Tela do setor (13/10/2026).** `Tela.do_setor` = o setor dono, pelo nome (sem acento nem caixa): quem é dele vê a
-  tela SEM marca (`setor_telas.das_do_setor`, somada às marcas no `acesso`). Os três relatórios da plataforma na Central
+  tela SEM marca (`setor_telas.das_do_setor`, somada às marcas no `acesso`). Pode ser mais de um (uma tupla de nomes,
+  `setor_telas.donos_do_codigo`, 16/10/2026: o Gerar a semana e o Quadro da semana do PCM são do PCM e do Responsáveis
+  UFV, os supervisores); a Central, que mostra um dono por relatório, usa o primeiro. Os três relatórios da plataforma na Central
   são da Performance (Levi: "Potência ativa faz parte da performance!", "Esses dois são do setor performance") e os quatro
   do PCM, do PCM. Na matriz a caixa dela aparece marcada e presa, com "do setor", e o Salvar não grava decisão para ela;
   outro setor segue pela marca. **O dono de cada relatório se escolhe na Central** (14/10/2026, Levi: "adicione a opção

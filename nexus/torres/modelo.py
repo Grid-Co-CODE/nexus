@@ -27,8 +27,10 @@ class Tela:
     dentro_de: str = ""
     # o setor DONO da tela, pelo nome (o da tela Base → Integração Fracttal; sem acento nem caixa): quem é dele vê a tela
     # sem marcá-la em Base → Acessos (13/10/2026, Levi, sobre os relatórios da Central: "Potência ativa faz parte da
-    # performance!" e "Esses dois são do setor performance"). Vazio = só as marcas, como sempre
-    do_setor: str = ""
+    # performance!" e "Esses dois são do setor performance"). Vazio = só as marcas, como sempre. Pode ser mais de um
+    # (uma tupla de nomes, `setor_telas.donos_do_codigo`; 16/10/2026, o Gerar e o Quadro do PCM, que são também dos
+    # supervisores: Levi, "tanto PCM quanto supervisores! Vou criar um setor de Responsáveis UFV")
+    do_setor: str | tuple[str, ...] = ""
 
 
 @dataclass

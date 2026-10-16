@@ -232,6 +232,9 @@ def test_o_setor_pcm_gera_e_publica(app, config, origem, monkeypatch):
     assert "Publicar no App</a>" not in html and "administrador ou por quem é do setor PCM" in html
     assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 403
     assert c.post("/t/pcm/gerar/publicar", data={"rodada": rid, "confirmo": "1"}).status_code == 403 and not gh.commits
+    # os supervisores (Responsáveis UFV) abrem o Gerar e geram, mas publicar é do PCM e do administrador
+    _no_setor(monkeypatch, "Responsáveis UFV")
+    assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 403 and not gh.commits
     _no_setor(monkeypatch, "pcm")
     assert 'Publicar no App</a>' in c.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True)
     assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 200

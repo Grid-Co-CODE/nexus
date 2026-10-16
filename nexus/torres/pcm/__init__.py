@@ -25,13 +25,15 @@ TORRE = Torre(
     icone="calendar-check",
     descricao="Programação semanal, aderência ao plano e capacidade das equipes.",
     telas=[
-        # o Gerar e o Quadro são do setor PCM (16/10/2026, Levi: "mude as configurações para administradores e pessoas
-        # do setor de PCM conseguir gerar uma programação semanal!"): quem é dele os vê sem marcar em Base → Acessos, e
-        # publica e grava a reprogramação (`pcm.telas.pode_programar`)
+        # o Gerar e o Quadro são do setor PCM e dos supervisores, o setor Responsáveis UFV (16/10/2026, Levi: "mude as
+        # configurações para administradores e pessoas do setor de PCM conseguir gerar uma programação semanal!" e "tanto
+        # PCM quanto supervisores! Vou criar um setor de Responsáveis UFV"): quem é deles os vê sem marcar em Base →
+        # Acessos, gera e mexe nas observações; publicar e gravar a reprogramação é só do PCM e do administrador
+        # (`pcm.telas.pode_programar`)
         Tela("quadro", "Quadro da semana",
              "O que cada equipe faz em cada dia, e o que reprogramar?",
              "banco_dados.json do painel PCM e as gerações do Nexus",
-             do_setor="PCM"),
+             do_setor=("PCM", "Responsáveis UFV")),
         Tela("insights", "Insights do PCM",
              "Onde a aderência cai e que tarefa já rolou várias vezes?",
              "banco_dados.json do painel PCM"),
@@ -41,7 +43,7 @@ TORRE = Torre(
         Tela("gerar", "Gerar a semana",
              "Qual é a programação da próxima semana, e ela está pronta para ir ao App?",
              "Motor do PCM rodando no Nexus: a sombra é o rascunho, e a semana vai ao App pelo Publicar no App",
-             do_setor="PCM"),
+             do_setor=("PCM", "Responsáveis UFV")),
         Tela("acompanhamento", "Acompanhamento PCM",
              "Que MPA ou MPS está travada, que OS envelhece no backlog e onde está a carga de cada time?",
              "Fracttal (pela Gestão PCM), programação semanal, Gerencial, cadastro e a curadoria do PCM",

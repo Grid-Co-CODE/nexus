@@ -23,10 +23,12 @@ atropelam: na semana da troca, o PC do PCM não publica.
    (ele escolhe a semana ativa pela data). Na semana em curso, o robô roda a cada 15 a 30 min (OS nova, ajustes do
    `Observacoes_Semana_Atual.txt` que o Quadro grava, rolagem).
 **Quem pode (16/10/2026, Levi: "mude as configurações para administradores e pessoas do setor de PCM conseguir gerar uma
-programação semanal!"):** Gerar a semana e o Quadro da semana são telas do setor PCM (`do_setor`: quem é dele as vê
-sem marcar em Base → Acessos; os outros setores, só se marcadas); dentro delas, gerar e mexer nas observações é de quem
-abre a tela; publicar no App e gravar a reprogramação do Quadro é do administrador ou de quem é do setor PCM
-(`telas.pode_programar`, pelo setor da pessoa do login, sem acento nem caixa). Testes: `test_o_setor_pcm_gera_e_publica`
+programação semanal!" e, sobre gerar e as observações, "tanto PCM quanto supervisores! Vou criar um setor de
+Responsáveis UFV"):** Gerar a semana e o Quadro da semana são telas de DOIS setores, o PCM e o Responsáveis UFV
+(`do_setor=("PCM", "Responsáveis UFV")`, pelo nome, sem acento nem caixa: quem é deles as vê sem marcar em Base →
+Acessos; os outros setores, só se marcadas); dentro delas, gerar e mexer nas observações é de quem abre a tela;
+publicar no App e gravar a reprogramação do Quadro é do administrador ou de quem é do setor PCM (`telas.pode_programar`,
+pelo setor da pessoa do login): os supervisores montam a fila e copiam para o PCM. Testes: `test_o_setor_pcm_gera_e_publica`
 e `test_o_setor_pcm_grava_a_reprogramacao`.
 
 **A programação publicada também está no banco (08/10/2026):** o `banco_dados.json` vira o fato

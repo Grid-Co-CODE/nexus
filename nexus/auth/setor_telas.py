@@ -339,6 +339,13 @@ def _sem_acento(texto) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", str(texto or "")) if unicodedata.category(c) != "Mn").strip().lower()
 
 
+def donos_do_codigo(tela) -> tuple[str, ...]:
+    """Os nomes dos setores donos de uma tela no código (`Tela.do_setor`: um nome ou uma tupla deles; 16/10/2026, o
+    Gerar e o Quadro do PCM são do PCM e dos Responsáveis UFV)."""
+    d = tela.do_setor
+    return tuple(x for x in (d if isinstance(d, (tuple, list)) else (d,)) if x)
+
+
 def das_do_setor(setor) -> set[str]:
     """As telas que são DO setor: quem é dele as vê sem marcar (13/10/2026, Levi, sobre os relatórios da Central de
     emissão: "Potência ativa faz parte da performance!" e "Esses dois são do setor performance"). Setor de outro nome
@@ -367,7 +374,7 @@ def das_do_setor(setor) -> set[str]:
                 dono = escolhas[k]
                 if dono is not None and (dono == sid or (sid is None and _sem_acento(nomes.get(dono)) == alvo)):
                     out.add(k)
-            elif alvo and s.do_setor and _sem_acento(s.do_setor) == alvo:
+            elif alvo and any(_sem_acento(d) == alvo for d in donos_do_codigo(s)):
                 out.add(k)
     return out
 
@@ -380,9 +387,10 @@ def dono_de(torre_id: str, tela, escolhas: dict, setores: list[dict]) -> dict:
         sid = escolhas[k]
         nome = next((s["nome"] for s in setores if s["setor_id"] == sid), "setor excluído" if sid is not None else "")
         return {"setor_id": sid, "nome": nome, "escolhido": True}
-    alvo = _sem_acento(tela.do_setor)
+    primeiro = (donos_do_codigo(tela) or ("",))[0]          # a Central mostra um dono: o primeiro do código
+    alvo = _sem_acento(primeiro)
     s = next((s for s in setores if alvo and _sem_acento(s["nome"]) == alvo), None)
-    return {"setor_id": s["setor_id"] if s else None, "nome": s["nome"] if s else (tela.do_setor or ""),
+    return {"setor_id": s["setor_id"] if s else None, "nome": s["nome"] if s else primeiro,
             "escolhido": False}
 
 
