@@ -42,9 +42,11 @@ from ..prefixo import na_raiz, raiz
 bp = Blueprint("auth", __name__)
 log = logging.getLogger(__name__)
 
-# a foto do extintor que o App envia (Segurança · HSEQ, 09/10/2026) não tem sessão: a rota confere a assinatura HMAC
-# dela antes de gravar qualquer coisa (`nexus/hseq/fotos.receber`); só ela passa sem login, e só por POST
-ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber"}
+# a foto do extintor que o App envia (Segurança · HSEQ, 09/10/2026) e a marca de motivo do técnico pelo App (PCM,
+# 16/10/2026) não têm sessão: cada rota confere a assinatura HMAC antes de gravar qualquer coisa
+# (`nexus/hseq/fotos.receber`, `nexus/pcm/motivos_app.conferir`); só elas passam sem login, e só por POST
+ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber",
+                  "torre_pcm.motivo_do_app"}
 
 # Limite de tentativas do Entrar (auditoria A2 da porta única e revisão adversarial, 10/10/2026). Até a A2 era por IP: 5
 # erros de QUALQUER pessoa no mesmo IP trancavam o Entrar de todos por 15 min, inclusive a senha de administrador, e até o

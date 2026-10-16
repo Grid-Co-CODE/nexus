@@ -4,9 +4,10 @@ Levi, 16/10/2026, com a lista de 11 motivos (de "Engenharia - Tarefas originadas
 "Pendente recurso - Quando estiver pendente sobressalente, peça ou outro item, detalhes em observação") e, sobre o
 backoffice, "Quando a OS estiver atrelada como responsável para alguém do time de backoffice, desconsiderar para a
 programação da semana". As decisões dele, uma a uma:
-- o motivo se marca SÓ no Nexus (não vai ao Fracttal) e o App de Campo só mostra;
+- o motivo não vai ao Fracttal: mora no Nexus;
 - vale por TAREFA, e é UM por tarefa ("Um só por tarefa": marcar outro troca o anterior);
-- marcam e tiram o PCM, os supervisores (setor Responsáveis UFV) e o administrador; o cadastro dos motivos é do
+- marcam e tiram o PCM, os supervisores (setor Responsáveis UFV) e o administrador, no Nexus, e o técnico pelo App de
+  Campo, com qualquer motivo, valendo na hora ("Sim, e já vale"; `motivos_app.py`); o cadastro dos motivos é do
   administrador e do setor PCM;
 - os motivos de espera (os quatro "Aguardando", Condições Climáticas Adversas e Pendente recurso) TIRAM a tarefa da
   programação: a geração não a programa e, na semana em curso, o robô do PCM apaga as linhas dela e não a reinclui;
@@ -26,7 +27,8 @@ O dado (livro `nexus_pcm_motivos`, registrado em `nexus/dados/catalogo.py`; regr
   nome (`nome_hmac`).
 A tarefa, o nome, a usina, a observação e quem decidiu vão só CIFRADOS (o Cofre, a chave do cadastro): a API do banco
 tem leitura aberta (regra 8). Em claro: a OS, o código do ativo e o `equipamento_id`, o `tarefa_chave` (a mesma conta
-da programação e do fechamento) e o código de quem decidiu. Gravar troca o livro inteiro, sempre com as TRÊS abas
+da programação e do fechamento) e o código de quem decidiu (no Nexus, o do e-mail do login; pelo App, o do técnico:
+`motivos_app.py`). Gravar troca o livro inteiro, sempre com as TRÊS abas
 (gravar sem uma a apagaria), relido do banco antes (leitura que falha não grava), uma gravação por vez neste processo.
 
 A tarefa = OS + código do ativo + nome (`item_id`). A marca pelo número da OS (painel) vem da Gestão PCM, que não traz o
@@ -66,7 +68,7 @@ ARQUIVO = "Fora_da_programacao.json"
 VERSAO_ARQUIVO = 1
 NOME_MIN, NOME_MAX, DESCRICAO_MAX, OBS_MAX, PESSOA_MAX = 2, 60, 300, 500, 80
 TTL_S = 60
-ORIGENS = ("quadro", "painel")
+ORIGENS = ("quadro", "painel", "app")       # app: o técnico pelo App de Campo (motivos_app.py)
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
@@ -318,7 +320,8 @@ def vigentes(cfg, est: dict) -> dict:
                     "obs": D._txt(corpo.get("obs")), "quem": D._txt(corpo.get("quem")),
                     "motivo_id": mid, "motivo": m["nome"], "tira": m["tira"],
                     "desde": D._txt(inicio.get("decidida_em")), "quando": quando,
-                    "semana": D._txt(ult.get("semana")), "origem": D._txt(ult.get("origem"))}
+                    "semana": D._txt(ult.get("semana")), "origem": D._txt(ult.get("origem")),
+                    "quem_hmac": D._txt(ult.get("decidida_por_hmac"))}
     if ilegiveis:
         out["_ilegiveis"] = ilegiveis       # type: ignore[assignment]
     return out
@@ -385,10 +388,11 @@ def _gravar(cfg, mudar):
 
 
 def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana: str = "",
-           origem: str = "quadro") -> dict:
+           origem: str = "quadro", quem_hmac: str | None = None) -> dict:
     """Marca o motivo de uma tarefa (ou o tira: `motivo_id` None). `tarefa` = {os, codigo, tarefa, usina, cliente, tipo}
     tirada da SEMANA ou da Gestão PCM pelo servidor, nunca da página. Um motivo por tarefa: marcar outro troca. Marcar o
-    mesmo motivo com a mesma observação não grava. {"gravou", "marca"}."""
+    mesmo motivo com a mesma observação não grava. `quem_hmac`: o código de quem marcou quando ele chega pronto (o
+    técnico pelo App, que não tem e-mail no pedido). {"gravou", "marca"}."""
     os_s = os_de(tarefa.get("os"))
     # o texto EXATO da linha da programação (o App de Campo casa OS|ativo|nome como estão no banco_dados.json); a
     # identidade da tarefa (`item_id`) e a comparação do motor e do robô seguem normalizadas
@@ -404,6 +408,8 @@ def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana:
     mid = D._id(motivo_id) if motivo_id not in (None, "", 0, "0") else None
     cofre = _cofre(cfg)
     cod_quem, nome_quem = _quem(cfg, usuario)
+    if quem_hmac:
+        cod_quem = quem_hmac
     iid = item_id(os_s, codigo, nome_t)
 
     def mudar(cru):

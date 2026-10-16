@@ -121,9 +121,21 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   (painel) vem da Gestão PCM, que não traz o código, e vale para a tarefa em todos os ativos da OS; a do ativo vence a da
   OS (`motivo_de`). As comparações: OS como inteiro, código maiúsculo sem espaço, nome sem acento, sem caixa, espaço
   único (as mesmas no motor e no robô: o teste de contrato roda o módulo deles).
-- **Quem:** marcam e tiram o administrador, o setor PCM e o setor Responsáveis UFV (`telas.pode_marcar`); o cadastro dos
-  motivos (incluir, editar, dizer se tira, tirar) é do administrador e do setor PCM (`pode_programar`). A lista do
-  backoffice, de quem abre o Gerar a semana (como as observações).
+- **Quem:** marcam e tiram o administrador, o setor PCM e o setor Responsáveis UFV (`telas.pode_marcar`) e o TÉCNICO
+  pelo App de Campo, com qualquer motivo do cadastro, valendo na hora como a do PCM (Levi, 16/10/2026, depois da 1ª
+  versão: "Sim, e já vale" e "Todos do cadastro"); o cadastro dos motivos (incluir, editar, dizer se tira, tirar) é do
+  administrador e do setor PCM (`pode_programar`). A lista do backoffice, de quem abre o Gerar a semana (como as
+  observações).
+- **Pelo App** (`motivos_app.py`, a rota `POST /t/pcm/motivos/app`, pública só para quem assina, como a das fotos dos
+  extintores): corpo JSON {os, codigo, tarefa, motivo (id; null = tirar), obs, tecnico_hmac, tecnico_nome}; cabeçalhos
+  `X-Nexus-Ts` (epoch) e `X-Nexus-Assinatura` = HMAC-SHA256 de "<ts>." + o corpo cru, com a chave derivada da
+  `NEXUS_PESSOA_HMAC` (rótulo `nexus:pcm:motivos-app`; nenhuma configuração nova); janela de 15 min. A tarefa tem de
+  estar na programação publicada (comparada como o motor: sem acento, caixa e espaço a mais) ou aberta na Gestão PCM (a OS
+  avulsa do App, com o código que o App mandou); senão 404. Grava com origem `app` e quem marcou pelo `tecnico_hmac` (o
+  nome só cifrado; o painel e a janela mostram "(App)"), mexe na marca da OS quando é ela que vale (como a janela do
+  Quadro) e manda o arquivo do robô na hora. Respostas: 200 {ok, gravou, marca, arquivo_em_dia}; 400 pedido fora do
+  formato ou motivo que não existe; 401 assinatura ou hora; 404 tarefa; 503 sem a chave ou banco fora. Testes:
+  `test_o_tecnico_marca_pelo_app` e `test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava`.
 - **Os que tiram da programação** (o cadastro inicial: os quatro Aguardando, Condições Climáticas Adversas e Pendente
   recurso; Prioridade não muda a geração): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as
   linhas dela (agenda e `_Pendentes`, STEP A3b) e o STEP A2 não a inclui de novo. Tirar o motivo: a tarefa volta na

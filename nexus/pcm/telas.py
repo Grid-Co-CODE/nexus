@@ -15,7 +15,8 @@ from urllib.parse import urlencode
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, session
 
-from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, observacoes as O
+from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, motivos_app as MA
+from . import observacoes as O
 from . import publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
@@ -466,6 +467,35 @@ def registrar_pcm(bp) -> None:
                        efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq,
                        efeito=_efeito(efetiva, _destino_quadro(cfg, base)["id"], tirou=tirar and not efetiva))
 
+    @bp.route("/motivos/app", methods=["POST"])
+    def motivo_do_app():
+        """A marca do técnico pelo App de Campo (16/10/2026, Levi: "Sim, e já vale"; `motivos_app.py`). Sem sessão: vale
+        a assinatura (a rota está em `auth.ROTAS_PUBLICAS`). Com a marca da OS valendo na tarefa, trocar ou tirar mexe
+        nela, como na janela do Quadro."""
+        cfg = current_app.config
+        status, d = MA.conferir(cfg, request.headers.get("X-Nexus-Ts"), request.headers.get("X-Nexus-Assinatura"),
+                                request.get_data())
+        if status != 200:
+            return jsonify(ok=False, erro=d), status
+        linha = _tarefa_do_app(cfg, d)
+        if linha is None:
+            return jsonify(ok=False, erro="a tarefa não está na programação nem aberta na Gestão PCM"), 404
+        est = M.ler(cfg, forcar=True)
+        if est.get("erro"):
+            return jsonify(ok=False, erro=f"não consegui ler os motivos no banco ({est['erro']})"), 503
+        atual = M.motivo_de(M.indice(M.vigentes(cfg, est)), linha["os"], linha["codigo"], linha["tarefa"])
+        alvo = dict(linha, codigo="") if atual and not atual["codigo"] else linha
+        try:
+            r = M.marcar(cfg, alvo, d["motivo"], "" if d["motivo"] is None else d["obs"],
+                         {"nome": d["tecnico_nome"]}, semana=linha.get("semana") or "", origem="app",
+                         quem_hmac=d["tecnico_hmac"])
+        except M.Recusada as ex:
+            return jsonify(ok=False, erro=str(ex)), 400
+        arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
+        marca = r["marca"]
+        return jsonify(ok=True, gravou=r["gravou"], marca=_marca_curta(marca) if marca else None,
+                       arquivo_em_dia=arq["ok"])
+
     @bp.route("/fora-da-programacao")
     def fora():
         cfg = current_app.config
@@ -876,6 +906,32 @@ def _tarefa_da_semana(sem: dict, d: dict) -> dict | None:
     return None
 
 
+def _tarefa_do_app(cfg, d: dict) -> dict | None:
+    """A tarefa que o App apontou: a linha da programação publicada (a semana ativa primeiro; agenda ou pendentes), pela
+    OS, pelo nome e pelo código como o motor compara (sem acento, caixa e espaço a mais); senão, a tarefa ABERTA da
+    Gestão PCM com a OS e o nome (a OS avulsa do App), com o código que o App mandou. None se não existir."""
+    os_s, t, cod = d["os"], M.norm(d["tarefa"]), M.canon(d.get("codigo"))
+    dados = fonte.ler(cfg).dados or {}
+    semanas = sorted((s for s in dados.get("semanas") or [] if isinstance(s, dict)),
+                     key=lambda s: s.get("week") != dados.get("semana_ativa"))
+    for s in semanas:
+        for r in (s.get("rows") or []) + (s.get("pendentes") or []):
+            if M.os_de(r.get("os_id")) == os_s and M.norm(r.get("tarefa")) == t and M.canon(r.get("codigo")) == cod:
+                linha = _tarefa_da_semana(s, {"os": os_s, "tarefa": str(r.get("tarefa") or ""),
+                                              "codigo": str(r.get("codigo") or "")})
+                if linha:
+                    return dict(linha, semana=str(s.get("week") or ""))
+    g = _gestao_tarefas(cfg)
+    ts = [x for x in (g or {}).get("por_os", {}).get(os_s, [])
+          if M.norm(x.get("tarefa")) == t and not _finalizada(x.get("estado"))]
+    if not ts:
+        return None
+    x = ts[0]
+    return {"os": os_s, "codigo": str(d.get("codigo") or "").strip(), "tarefa": str(x.get("tarefa") or "").strip(),
+            "usina": str(x.get("usina") or "").strip(), "cliente": str(x.get("cliente") or "").strip(),
+            "tipo": str(x.get("tipo") or "").strip(), "cluster": str(x.get("cluster") or "").strip(), "data_prog": ""}
+
+
 _GT: dict = {}
 
 
@@ -960,7 +1016,8 @@ def _tarefas_da_os(g: dict | None, os_s: str, vig: dict) -> dict:
 def _marca_curta(m: dict) -> dict:
     d = M._brt(m["desde"])
     return {"item": m["item_id"], "id": m["motivo_id"], "n": m["motivo"], "tira": m["tira"],
-            "desde": d.strftime("%d/%m/%Y") if d else "", "quem": m["quem"], "obs": m["obs"], "geral": not m["codigo"]}
+            "desde": d.strftime("%d/%m/%Y") if d else "", "quem": m["quem"], "obs": m["obs"], "geral": not m["codigo"],
+            "app": m.get("origem") == "app"}
 
 
 def _efeito(marca: dict | None, destino: str | None, tirou: bool = False) -> str:

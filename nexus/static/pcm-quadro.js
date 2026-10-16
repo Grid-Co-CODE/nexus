@@ -210,7 +210,7 @@
     var h = "<h3>Motivo</h3>";
     if (mp) {
       h += "<p class=\"q-mp-atual\">" + selo(mp.n, mp.tira) + "<span>desde " + esc(mp.desde) +
-        (mp.quem ? " · " + esc(mp.quem) : "") + "</span></p>" +
+        (mp.quem ? " · " + esc(mp.quem) : "") + (mp.app ? " (App)" : "") + "</span></p>" +
         (mp.obs ? "<p class=\"q-rel\">" + esc(mp.obs) + "</p>" : "") +
         "<p class=\"q-nota\">" + (mp.tira ? "Este motivo tira a tarefa da programação." : "A tarefa continua na programação.") +
         (mp.geral ? " Marcado pelo número da OS: vale para esta tarefa em todos os ativos da OS." : "") + "</p>";

@@ -271,6 +271,8 @@ GESTAO = [
      "usina": "Cliente B - Usina 2 - RN", "cliente": "Cliente B"},
     {"os": "7", "tarefa": "Limpeza do inversor", "estado": "Não iniciada", "tipo": "Corretiva",
      "usina": "Cliente B - Usina 2 - RN", "cliente": "Cliente B"},
+    {"os": "9", "tarefa": "Troca de cabo", "estado": "Finalizada", "tipo": "Corretiva",       # só na Gestão, finalizada
+     "usina": "Cliente B - Usina 2 - RN", "cliente": "Cliente B"},
 ]
 
 
@@ -480,3 +482,75 @@ def test_o_motor_e_o_robo_leem_o_arquivo_do_nexus(cfg, tmp_path):
     (tmp_path / F.ARQUIVO).write_text("{quebrado", encoding="utf-8")
     quebrado = F.carregar(str(tmp_path))
     assert not quebrado["marcas"] and "ilegível" in quebrado["erro"]
+
+
+# ── a marca do técnico pelo App de Campo (nexus/pcm/motivos_app.py; Levi, 16/10/2026: "Sim, e já vale") ──────────
+TEC = "ab" * 12                         # o código do técnico (24 hexadecimais, como o "Técnico (HMAC)" das rondas)
+
+
+def _pelo_app(app, corpo: dict, ts=None, chave=None, assinar=True):
+    import time as _tempo
+    from nexus.pcm import motivos_app as MA
+    bruto = json.dumps(corpo, ensure_ascii=False).encode("utf-8")
+    ts = int(_tempo.time()) if ts is None else int(ts)
+    k = chave or MA.chave(app.config)
+    cab = {"X-Nexus-Ts": str(ts), "X-Nexus-Assinatura": MA.assinatura(k, ts, bruto) if assinar else "0" * 64,
+           "Content-Type": "application/json"}
+    return app.test_client().post("/t/pcm/motivos/app", data=bruto, headers=cab)       # sem sessão nenhuma
+
+
+def test_o_tecnico_marca_pelo_app(app, logado, tela):
+    """O App manda a marca assinada (chave derivada da NEXUS_PESSOA_HMAC, como as fotos dos extintores); vale na hora:
+    grava como a do PCM (origem app, quem marcou pelo código do técnico) e o arquivo do robô vai ao repositório."""
+    cfg = app.config
+    am, en = (next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == n) for n in ("Aguardando Material", "Engenharia"))
+    cab = {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": am,
+           "obs": "falta o disjuntor", "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
+    r = _pelo_app(app, cab)
+    j = r.get_json()
+    assert r.status_code == 200 and j["gravou"] and j["marca"]["n"] == "Aguardando Material" and j["marca"]["app"]
+    ultima = json.loads(open(cfg["NEXUS_PCM_MOTIVOS_ARQUIVO"], encoding="utf-8").read())[M.ABA_MARCA][-1]
+    assert ultima["origem"] == "app" and ultima["decidida_por_hmac"] == TEC and "Técnico Teste" not in json.dumps(ultima)
+    assert len(tela.commits) == 1 and json.loads(tela.arquivos[M.ARQUIVO])["tarefas"][0]["tarefa"] == cab["tarefa"]
+    assert not _pelo_app(app, cab).get_json()["gravou"] and len(tela.commits) == 1          # o mesmo envio de novo
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert "Técnico Teste <span class=\"gc-ajuda\">(App)</span>" in html and "falta o disjuntor" in html
+    # a OS avulsa do App (aberta na Gestão PCM, fora da programação): marca com o código que o App mandou
+    r = _pelo_app(app, {"os": "7", "codigo": "UFV2-INV03", "tarefa": "limpeza do  INVERSOR", "motivo": en,
+                        "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"})
+    assert r.status_code == 200 and r.get_json()["gravou"]
+    vig = {k: v for k, v in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if not k.startswith("_")}
+    assert ("7", "UFV2-INV03", "Limpeza do inversor") in {(m["os"], m["codigo"], m["tarefa"]) for m in vig.values()}
+    # tirar pelo App
+    j = _pelo_app(app, dict(cab, motivo=None)).get_json()
+    assert j["ok"] and j["gravou"] and j["marca"] is None
+    # a marca que vale na tarefa foi feita pela OS (painel): tirar pelo App mexe nela, como na janela do Quadro
+    M.marcar(cfg, {"os": "5", "codigo": "", "tarefa": "[Grid Co.] - MPM - Trafo"}, am, "", PESSOA, origem="painel")
+    j = _pelo_app(app, {"os": "5", "codigo": "UFV1-TR01", "tarefa": "[Grid Co.] - MPM - Trafo", "motivo": None,
+                        "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}).get_json()
+    assert j["ok"] and j["gravou"]
+    vig = {k: v for k, v in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if not k.startswith("_")}
+    assert not [m for m in vig.values() if m["tarefa"].endswith("Trafo")]
+
+
+def test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava(app, tela, monkeypatch):
+    cfg = app.config
+    am = next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == "Aguardando Material")
+    cab = {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": am,
+           "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
+    from nexus.pcm import motivos_app as MA
+    casos = [(_pelo_app(app, cab, assinar=False), 401), (_pelo_app(app, cab, ts=1_000_000_000), 401),
+             (_pelo_app(app, cab, chave=MA.hmac.new(b"outra", MA.ROTULO_CHAVE, MA.hashlib.sha256).digest()), 401),
+             (_pelo_app(app, dict(cab, os="999")), 404),                              # a tarefa não existe
+             (_pelo_app(app, dict(cab, os="9", codigo="", tarefa="Troca de cabo")), 404),   # finalizada, fora da semana
+             (_pelo_app(app, dict(cab, tecnico_hmac="fulano")), 400), (_pelo_app(app, dict(cab, motivo="x")), 400),
+             (_pelo_app(app, dict(cab, motivo=999)), 400), (_pelo_app(app, dict(cab, tarefa="")), 400)]
+    for r, esperado in casos:
+        assert r.status_code == esperado and not r.get_json()["ok"], (r.status_code, r.get_json())
+    assert not tela.commits and not M.vigentes(cfg, M.ler(cfg, forcar=True))
+    app.config["NEXUS_PESSOA_HMAC"] = ""
+    assert _pelo_app(app, cab, chave=b"x" * 32).status_code == 503
+    # só POST, e o portão deixa passar só esta rota do PCM sem login
+    from nexus.auth import ROTAS_PUBLICAS
+    assert "torre_pcm.motivo_do_app" in ROTAS_PUBLICAS
+    assert app.test_client().get("/t/pcm/motivos/app").status_code in (302, 405)

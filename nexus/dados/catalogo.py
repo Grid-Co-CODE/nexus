@@ -415,8 +415,8 @@ FATOS = (
          _d(data=("id", "data_id (o dia de Brasília da decisão)"),
             equipamento=("id", "equipamento_id (o código do ativo; vazio na marca feita pelo número da OS, que vale "
                                "para a tarefa em todos os ativos dela)"),
-            pessoa=("cod", "decidida_por_hmac (o código do e-mail de quem marcou; vazio com a senha de "
-                           "administrador)"),
+            pessoa=("cod", "decidida_por_hmac (o código do e-mail de quem marcou no Nexus, ou o código do técnico "
+                           "que marcou pelo App, origem app; vazio com a senha de administrador)"),
             os=("cod", "os")),
          tipo="sem_medida", chave=("decidida_em", "item_id"),
          fontes=("nexus_pcm_motivos · fato_decisao_motivo",),

@@ -72,7 +72,7 @@
         <td class="fp-tarefa">{{ l.tarefa }}<small>{% if l.codigo %}{{ l.codigo }}{% else %}todos os ativos da OS{% endif %}{% if l.tipo %} · {{ l.tipo }}{% endif %}{% if l.estado_fr %} · no Fracttal: {{ l.estado_fr }}{% elif l.fora_da_gestao %} · não está na Gestão PCM{% endif %}</small></td>
         <td>{{ selo(l.motivo, l.tira) }}</td>
         <td class="fp-obs">{{ l.obs }}</td>
-        <td>{{ l.quem }}</td>
+        <td>{{ l.quem }}{% if l.origem == 'app' %} <span class="gc-ajuda">(App)</span>{% endif %}</td>
         {% if pode %}
         <td class="fp-acoes">
           <details>
