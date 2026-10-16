@@ -1,8 +1,8 @@
 # Motor da programação semanal (cópia)
 
 Estes quatro arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
-`fillipefigueiro-source/gridco-pcm-data` no commit `fdad64e` (16/10/2026; antes, `bd4f673` e `fd39672` de 15/10, `3ce6205`
-de 09/10 e `8ee58d9` de 30/09):
+`fillipefigueiro-source/gridco-pcm-data` no commit `6215ceb` (16/10/2026, a carga de 70%; antes, `fdad64e` de 16/10,
+`bd4f673` e `fd39672` de 15/10, `3ce6205` de 09/10 e `8ee58d9` de 30/09):
 
 | Arquivo | O que faz |
 |---|---|
@@ -15,7 +15,7 @@ Conferido pelo hash (SHA-256 da cópia com CRLF):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `c9f17d0e1844…` |
+| `programacao_v7.py` | `8f8d807ffe3b…` |
 | `fonte_bd_api.py` | `b81d2c394d67…` |
 | `gerar_bd_via_api.py` | `6c580738ab5e…` |
 | `fora_da_programacao.py` | `91f9a81140c0…` |
@@ -27,6 +27,14 @@ substituir. Reescrever o motor tornaria a comparação inútil.
 
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
 sistemas rodarem juntos, as duas cópias precisam ser iguais.
+
+## O que mudou em 16/10/2026 (`6215ceb`): carga máxima do dia a 70%
+
+Levi, 16/10/2026: "carga máxima no programador de sexta de 70% HH por dia". `CARGA_MAX_DIA = 0.70` no
+`programacao_v7.py`: o dia útil (`USEFUL_DAY_MIN`) e o dia com MPA (`MPA_DAY_USEFUL_MIN`) passam de 80% para 70% das
+8,8 h líquidas (422 → 369 min, 7 → 6,15 h por equipe e dia), da W44 em diante; a janela da noite segue em 80%. A
+conferência do Nexus (`comparar.py`) usa a mesma conta, presa por teste. No mesmo commit, só no robô do PCM (que o
+Nexus não copia): a tarefa de sexta não muda mais de dia (rolagem desligada, cascata da OS nova só no mesmo dia).
 
 ## O que mudou em 16/10/2026 (`fdad64e`): fora da programação pelo Nexus
 
@@ -102,7 +110,7 @@ zeladoria, não só pelo nome".
   Fracttal, falha.
 - **Saída:** a planilha fica em `saida/sombra.xlsx` e é comparada com a `Programação Semana NN.xlsx` oficial.
 - **Conferido em 16/10/2026:** sem o CR do Windows, os quatro arquivos são iguais aos do repositório do PCM no commit
-  `fdad64e` (16/10). O hash da tabela acima é o da cópia com CRLF.
+  `6215ceb` (16/10). O hash da tabela acima é o da cópia com CRLF.
 - **O que mudou em `3ce6205` (09/10/2026):** a W42 do PC do PCM quebrou na quinta (08/10 21:46, `ValueError: cannot
   convert float NaN to integer` no RPN dinâmico): a AUXILIAR atualizada naquele dia tinha 67 usinas sem MWp, e o motor
   guardava o vazio como NaN. O motor passou a ler o porte da coluna `POTÊNCIA CONTRATUAL (MWp)` (vazio e zero não
