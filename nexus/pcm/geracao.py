@@ -63,7 +63,10 @@ INSUMOS = (  # (arquivo, obrigatório)
 )
 URL_API = "https://app.fracttal.com/api/"
 # 1 pedido por segundo. Fora do GitHub o motor anda a 0,15 s, rápido demais para os 200/min que robôs e App de Campo
-# dividem na EMPRESA inteira desde 24/09.
+# dividem na EMPRESA inteira desde 24/09. Cada leitor do motor tem a SUA variável: o gerar_bd_via_api lê a
+# FRACTTAL_INTERVALO_S e o fonte_bd_api (a leitura da semana, 5 páginas em paralelo) a PROG_API_INTERVALO_S, que sem
+# valor fica em 0,42 s (~143/min). Até 16/10/2026 só ia a primeira: a W43 de prova das 15:14 levou HTTP 429 em 9 s, no
+# horário de campo, com a cota da empresa já quase cheia. O teste confere toda variável *_INTERVALO_S dos leitores.
 INTERVALO_S = "1.0"
 TEMPO_MAX_S = 60 * 60
 SEMANA_RE = re.compile(r"^\d{4}-W\d{2}$")
@@ -223,7 +226,7 @@ def _ambiente(cred: Credencial, pasta: Path, saida: Path) -> dict:
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("NEXUS_", "FRACTTAL_")) and k not in fora}
     env.update({"FRACTTAL_CLIENT_ID": cred.client_id, "FRACTTAL_CLIENT_SECRET": cred.client_secret,
-                "FRACTTAL_BASE_URL": URL_API, "FRACTTAL_INTERVALO_S": INTERVALO_S,
+                "FRACTTAL_BASE_URL": URL_API, "FRACTTAL_INTERVALO_S": INTERVALO_S, "PROG_API_INTERVALO_S": INTERVALO_S,
                 "PCM_PROG_DIR": str(pasta), "PCM_OUTPUT": str(saida),
                 "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"})
     # No Linux o TZ põe o motor no horário de Brasília. No Windows o C runtime não entende "America/Sao_Paulo" e o

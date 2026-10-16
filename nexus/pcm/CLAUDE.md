@@ -563,6 +563,11 @@ vieram Tipo, Etiqueta, Estado, OS, Solicitação e Período.
 - **O arquivo de histórico do PC não é registro do que foi a campo:** guarda toda geração (a S41 de 02/10 08:26, que
   nunca foi ao campo, está lá), perdeu a W35 inteira e não se corrige sozinho. Daí o histórico vir do banco.
 - **Cota do Fracttal:** 200 pedidos por minuto para a **empresa inteira**, divididos com o App de Campo. O motor anda
-  a 1 por segundo, e a tela pede confirmação no horário de campo (seg a sex, das 06h às 18h).
+  a 1 por segundo, e a tela pede confirmação no horário de campo (seg a sex, das 06h às 18h). Cada leitor do motor tem
+  a sua variável de ritmo: o `gerar_bd_via_api` lê a `FRACTTAL_INTERVALO_S` e o `fonte_bd_api` (a leitura da semana,
+  5 páginas em paralelo) a `PROG_API_INTERVALO_S`, que sem valor fica em 0,42 s (~143/min). Até 16/10/2026 o Nexus só
+  mandava a primeira, e a W43 de prova das 15:14 levou HTTP 429 em 9 s, com a cota já quase cheia de outros: o
+  `_ambiente` manda as duas, e o teste confere toda variável `*_INTERVALO_S` que os leitores leem. Motor novo do PCM com
+  outra variável de ritmo quebra o teste.
 - **Dois Fracttal no mesmo processo se quebram:** o `FRACTTAL_BASE_URL` do motor tem `/api/` e o do OS Creator não.
   Por isso o motor roda em subprocesso, com ambiente próprio e sem as variáveis `NEXUS_*`.

@@ -4,6 +4,7 @@ com a semana oficial do PCM. Nada é publicado.
 Os testes usam um MOTOR FALSO (um script que escreve uma planilha no formato do gerador): nenhum teste vai ao Fracttal.
 """
 import json
+import re
 import sys
 import textwrap
 from datetime import date
@@ -468,6 +469,20 @@ def test_tela_gerar_sem_credencial_nao_roda(app, logado, config):
 def test_semana_invalida_nao_roda(app, logado, config):
     app.config.update({k: v for k, v in config.items() if k != "TESTING"})
     assert logado.post("/t/pcm/gerar", data={"semana": "41; rm -rf", "confirmo": "1"}).status_code == 400
+
+
+def test_motor_le_o_fracttal_a_1_pedido_por_segundo_em_todos_os_leitores(monkeypatch, tmp_path):
+    # W43 de prova, 16/10/2026 15:14: o Nexus só mandava a FRACTTAL_INTERVALO_S; a leitura da semana (fonte_bd_api,
+    # 5 páginas em paralelo) lê a PROG_API_INTERVALO_S e, sem ela, andou a 0,42 s e levou HTTP 429 em 9 s. Toda variável
+    # de ritmo que um leitor do motor lê tem de ir a 1 s, inclusive a que o ambiente do processo já tiver.
+    monkeypatch.setenv("PROG_API_INTERVALO_S", "0.1")
+    env = G._ambiente(G.Credencial(True, "teste", "id", "seg"), tmp_path, tmp_path / "s.xlsx")
+    lidas = set()
+    for leitor in (G.MOTOR.parent).glob("*.py"):
+        lidas |= set(re.findall(r'os\.environ\.get\(\s*"([A-Z_]*INTERVALO_S)"', leitor.read_text(encoding="utf-8")))
+    assert {"FRACTTAL_INTERVALO_S", "PROG_API_INTERVALO_S"} <= lidas
+    assert {v: env.get(v) for v in lidas} == {v: "1.0" for v in lidas}
+    assert G._ambiente_foto(tmp_path, tmp_path / "s.xlsx")["PROG_API_INTERVALO_S"] == "1.0"
 
 
 def test_fuso_do_motor_so_vai_pelo_tz_fora_do_windows(monkeypatch, tmp_path):
