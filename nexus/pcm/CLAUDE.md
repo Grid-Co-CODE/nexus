@@ -565,7 +565,8 @@ vieram Tipo, Etiqueta, Estado, OS, Solicitação e Período.
   anteriores; na reserva, `geracao.preparar_historico`).
 - **O arquivo de histórico do PC não é registro do que foi a campo:** guarda toda geração (a S41 de 02/10 08:26, que
   nunca foi ao campo, está lá), perdeu a W35 inteira e não se corrige sozinho. Daí o histórico vir do banco.
-- **Carga máxima do dia: 70% (16/10/2026, da W44 em diante; Levi: "70% HH por dia"):** o motor do PCM
+- **Carga máxima do dia: 70% (16/10/2026, já na W43, que o PCM regera pelo Nexus à noite; Levi: "70% HH por dia" e
+  "quero que funcione para o w43"):** o motor do PCM
   (`CARGA_MAX_DIA`) programa até 6,15 h por equipe e dia (era 80%, 7 h); a noite segue em 80%. A conferência
   (`comparar.CARGA_MAX_DIA`, `CAPACIDADE_H`, `DIA_DO_MOTOR_MIN`) usa a mesma conta, e o teste de contrato prende as duas.
   Na W43 com a leitura das 12:23: de 1.232 para 1.220 blocos e 10 tarefas a mais na pendente (a maioria dos dias de

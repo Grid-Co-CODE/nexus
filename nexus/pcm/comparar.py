@@ -86,7 +86,7 @@ def resumo(caminho) -> dict:
 
 # ── a conferência da semana gerada (antes de alguém publicar) ─────────────────────────────────────────────────
 # A capacidade e a jornada são as do gerador: a carga máxima do dia por equipe (CARGA_MAX_DIA, a mesma do
-# programacao_v7: 70% das 8,8 h líquidas desde 16/10/2026, para a W44 em diante; era 80%, 7 h), MPA na janela da noite
+# programacao_v7: 70% das 8,8 h líquidas desde 16/10/2026, já na W43; era 80%, 7 h), MPA na janela da noite
 # fora da conta, zeladoria terceirizada fora da conta e da jornada (a jornada é a mesma do fora_do_horario do semana.py).
 # O teste de contrato confere que a carga daqui é a do motor.
 CARGA_MAX_DIA = 0.70
