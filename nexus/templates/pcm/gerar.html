@@ -169,6 +169,39 @@
     </div>
     {% endfor %}
   </div>
+  {# A lista do backoffice (16/10/2026, Levi: "Quando a OS estiver atrelada como responsável para alguém do time de
+     backoffice, desconsiderar para a programação da semana"; a lista fica no Nexus, editável aqui). Vai ao motor na
+     rodada e ao robô do PCM no Fora_da_programacao.json (nexus/pcm/motivos.py). #}
+  <div class="pcm-bo" id="backoffice">
+    <h3 class="pcm-bo-tit">Backoffice: OS fora da programação</h3>
+    <p class="gc-ajuda">A OS cujo responsável no Fracttal é uma destas pessoas não entra na geração da semana, e o robô do
+      PCM não a inclui como OS nova no meio dela. Casa com o responsável da OS sem acento e sem diferenciar maiúsculas:
+      escreva o nome como está no Fracttal.</p>
+    {% if backoffice_erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div>Não consegui ler
+      a lista no banco ({{ backoffice_erro }}): nada se grava até a leitura voltar.</div></div>{% endif %}
+    <ul class="pcm-bo-lista">
+      {% for b in backoffice %}
+      <li>{{ b.nome }}
+        <form method="post" action="{{ raiz }}/t/pcm/gerar/backoffice"
+              onsubmit='return confirm({{ ("Tirar " ~ b.nome ~ " da lista do backoffice? As OS dessa pessoa voltam a ser programadas.")|tojson }})'>
+          <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+          <input type="hidden" name="nome" value="{{ b.nome }}">
+          <input type="hidden" name="acao" value="tirar">
+          <button type="submit" aria-label="Tirar {{ b.nome }} da lista"><i class="ph ph-x"></i></button>
+        </form>
+      </li>
+      {% else %}
+      <li class="gc-ajuda pcm-bo-vazio">Ninguém na lista: nenhuma OS sai pelo responsável.</li>
+      {% endfor %}
+    </ul>
+    <form class="pcm-bo-add" method="post" action="{{ raiz }}/t/pcm/gerar/backoffice">
+      <input type="hidden" name="semana" value="{{ semana_sugerida }}">
+      <input type="hidden" name="acao" value="por">
+      <label class="gc-rotulo" for="bo-nome">Incluir</label>
+      <input id="bo-nome" name="nome" class="gc-campo" maxlength="80" placeholder="Nome como no Fracttal" autocomplete="off" required>
+      <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-plus"></i> Incluir</button>
+    </form>
+  </div>
   <form class="pcm-passo-pe" method="post" action="{{ raiz }}/t/pcm/gerar/importar-repositorio">
     <input type="hidden" name="semana" value="{{ semana_sugerida }}">
     <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-github-logo"></i> Importar observações do repositório do PCM</button>

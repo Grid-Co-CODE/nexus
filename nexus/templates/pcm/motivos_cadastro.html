@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block titulo %}Cadastro de motivos{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# O cadastro dos motivos das tarefas (16/10/2026, Levi: "Também temos que ter um canto no PCM onde podemos controlar todos
+   esses motivos e adicionar ou tirar motivos!"; muda o cadastro o administrador e o setor PCM). Tirar não apaga: marca
+   excluido = sim e o ID não volta (nexus/pcm/motivos.py). #}
+<p class="gc-eyebrow">PCM · Fora da programação</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Cadastro de motivos</h1>
+    <p class="pcm-sub">Os motivos que o PCM e os supervisores marcam nas tarefas. "Tira da programação" = a tarefa com o
+      motivo não entra na geração da semana e, na semana em curso, o robô do PCM a tira.</p>
+  </div>
+  <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao"><i class="ph ph-arrow-left"></i> Fora da programação</a>
+</div>
+
+{% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}</div></div>{% endif %}
+{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
+{% if erro_banco %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler o
+  cadastro no banco.</strong> {{ erro_banco }}. A lista abaixo pode não ser a de agora; nada se grava até a leitura voltar.</div></div>
+{% elif inicial %}<p class="pcm-fonte"><i class="ph ph-info"></i><span>Este é o cadastro inicial, com os 11 motivos do pedido de
+  16/10/2026. Ele vai ao banco junto com a primeira marca ou a primeira mudança aqui.</span></p>{% endif %}
+
+<div class="pcm-rolagem">
+  <table class="pcm-tabela">
+    <thead><tr><th>Motivo</th><th>Descrição</th><th>Tira da programação</th><th class="num">Tarefas com ele</th>{% if pode %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for m in motivos %}
+      <tr>
+        <td><span class="q-mp{% if m.tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if m.tira else 'tag' }}"></i>{{ m.nome }}</span></td>
+        <td>{{ m.descricao or '—' }}</td>
+        <td>{{ 'Sim' if m.tira else 'Não' }}</td>
+        <td class="num">{{ m.n }}</td>
+        {% if pode %}
+        <td class="fp-acoes">
+          <details>
+            <summary>Editar</summary>
+            {% set volta = (m.n ~ (' tarefa com este motivo volta' if m.n == 1 else ' tarefas com este motivo voltam') ~ ' à programação. Salvar?') %}
+            {% set sai = (m.n ~ (' tarefa com este motivo sai' if m.n == 1 else ' tarefas com este motivo saem') ~ ' da programação. Salvar?') %}
+            <form class="fp-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/cadastro"
+                  {% if m.n %}onsubmit='return this.querySelector("[name=tira]").checked === {{ "true" if m.tira else "false" }} || confirm({{ (volta if m.tira else sai)|tojson }})'{% endif %}>
+              <input type="hidden" name="acao" value="editar">
+              <input type="hidden" name="motivo_id" value="{{ m.id }}">
+              <label class="gc-rotulo" for="n-{{ m.id }}">Nome</label>
+              <input id="n-{{ m.id }}" name="nome" class="gc-campo" value="{{ m.nome }}" maxlength="60" required>
+              <label class="gc-rotulo" for="d-{{ m.id }}">Descrição</label>
+              <textarea id="d-{{ m.id }}" name="descricao" class="gc-campo" maxlength="300">{{ m.descricao }}</textarea>
+              <label class="gc-rotulo"><input type="checkbox" name="tira" value="1"{% if m.tira %} checked{% endif %}> Tira da programação</label>
+              <div class="fp-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar</button></div>
+            </form>
+            {% set pergunta = 'Tirar o motivo ' ~ m.nome ~ ' do cadastro?' ~ ((' ' ~ m.n ~ (' tarefa está com ele e perde o motivo' if m.n == 1 else ' tarefas estão com ele e perdem o motivo') ~ (' (voltam à programação).' if m.tira else '.')) if m.n else '') %}
+            <form class="fp-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/cadastro"
+                  onsubmit='return confirm({{ pergunta|tojson }})'>
+              <input type="hidden" name="acao" value="excluir">
+              <input type="hidden" name="motivo_id" value="{{ m.id }}">
+              <div class="fp-botoes"><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-trash"></i> Tirar do cadastro</button></div>
+            </form>
+          </details>
+        </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pode %}
+<section class="pcm-passo">
+  <header class="pcm-passo-cab"><div class="pcm-passo-txt"><h2 class="pcm-passo-tit">Incluir motivo</h2></div></header>
+  <form class="fp-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/cadastro">
+    <input type="hidden" name="acao" value="criar">
+    <label class="gc-rotulo" for="novo-nome">Nome</label>
+    <input id="novo-nome" name="nome" class="gc-campo" maxlength="60" required>
+    <label class="gc-rotulo" for="novo-desc">Descrição (opcional)</label>
+    <textarea id="novo-desc" name="descricao" class="gc-campo" maxlength="300"></textarea>
+    <label class="gc-rotulo"><input type="checkbox" name="tira" value="1"> Tira da programação</label>
+    <div class="fp-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-plus"></i> Incluir</button></div>
+  </form>
+</section>
+{% else %}
+<p class="gc-ajuda"><i class="ph ph-lock-key"></i> Quem muda o cadastro é o administrador e o setor PCM.</p>
+{% endif %}
+{% endblock %}

@@ -27,6 +27,8 @@
 {% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}{% if ok_link %}
   <a class="pcm-link" href="{{ (ok_link)|na_raiz }}">Ver nas observações da semana</a>.{% endif %}</div></div>{% endif %}
 {% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
+{% if motivos_erro %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-tag"></i><div>Os motivos das tarefas não abriram
+  agora ({{ motivos_erro }}): o quadro sai sem eles e não dá para marcar até a leitura voltar.</div></div>{% endif %}
 
 {% if sem %}
 <form class="pcm-filtros q-filtros" method="get">
@@ -87,6 +89,7 @@
           <div class="q-c-tipo"><i class="q-ponto"></i>{{ k.tp or 'Sem tipo' }}</div>
           <div class="q-c-usina">{{ k.uc }}</div>
           <div class="q-c-tarefa">{{ k.t }}</div>
+          <div class="q-c-mp" data-mp-slot{% if not k.mp %} hidden{% endif %}>{% if k.mp %}<span class="q-mp{% if k.mpt %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if k.mpt else 'tag' }}"></i>{{ k.mp }}</span>{% endif %}</div>
           <div class="q-c-pe">
             {% if k.ini %}<span class="gc-dado">{{ k.ini }}</span>{% endif %}
             <span class="q-tur q-tur--{{ {'Manhã': 'manha', 'Tarde': 'tarde', 'Noite': 'noite'}.get(k.tur, 'sem') }}">{{ k.tur }}</span>
@@ -124,8 +127,9 @@
     </div>
     {% for p in g.itens %}
     <div class="q-pend-l" data-pend="{{ p.i }}" data-os="{{ p.os }}">
-      <div class="q-pend-t">{{ p.t }}
-        <small>OS {{ p.os }} · {{ p.tp or 'sem tipo' }} · {{ p.h }}{% if p.mot %} · <i>{{ p.mot }}</i>{% endif %}</small></div>
+      <div class="q-pend-t" data-abrir role="button" tabindex="0" aria-label="Abrir a OS {{ p.os }}: {{ p.t }}">{{ p.t }}
+        <small>OS {{ p.os }} · {{ p.tp or 'sem tipo' }} · {{ p.h }}{% if p.mot %} · <i>{{ p.mot }}</i>{% endif %}
+          <span data-mp-slot{% if not p.mp %} hidden{% endif %}>{% if p.mp %} · <span class="q-mp{% if p.mpt %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if p.mpt else 'tag' }}"></i>{{ p.mp }}</span>{% endif %}</span></small></div>
       {% if destino.id %}<div class="q-pend-ctr"></div>{% endif %}
     </div>
     {% endfor %}

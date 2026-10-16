@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block titulo %}Fora da programação{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# Fora da programação (16/10/2026, Levi: "temos que montar um painel de acompanhamento as OSs que saíram da programação
+   por esses motivos!"). As tarefas com um motivo que tira da programação (o cadastro diz quais), menos as finalizadas no
+   Fracttal, que saem sozinhas; o único filtro é o Motivo. Marca-se aqui pelo número da OS e no Quadro da semana. O dado e
+   as regras: nexus/pcm/motivos.py; as contas da tela: telas._ctx_fora. #}
+{% macro selo(nome, tira) %}<span class="q-mp{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
+<p class="gc-eyebrow">PCM · Programação semanal</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Fora da programação</h1>
+    <p class="pcm-sub">Tarefas tiradas da programação por um motivo de espera. Voltam quando o motivo sai, e somem daqui
+      quando são finalizadas no Fracttal.</p>
+  </div>
+  <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/pcm/fora-da-programacao?ver=cadastro"><i class="ph ph-list-checks"></i> Cadastro de motivos</a>
+</div>
+
+{% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}</div></div>{% endif %}
+{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
+{% if erro_banco %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler os
+  motivos no banco.</strong> {{ erro_banco }}. Enquanto isso, nada se marca.</div></div>{% endif %}
+{% if ilegiveis %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-lock-key"></i><div>{{ ilegiveis }}
+  {{ 'marca não abriu' if ilegiveis == 1 else 'marcas não abriram' }} com a chave deste Nexus e {{ 'ficou' if ilegiveis == 1 else 'ficaram' }} de fora.</div></div>{% endif %}
+
+<p class="pcm-fonte"><i class="ph ph-plug"></i><span>Os motivos se marcam no Nexus (na janela da OS do Quadro da semana e aqui,
+  pelo número da OS) e ficam no banco. A geração da semana não programa a tarefa com motivo que tira da programação; na
+  semana em curso, o robô do PCM a tira, pelo arquivo <span class="gc-dado">Fora_da_programacao.json</span> do repositório
+  do PCM, que o App de Campo também lê. {% if repo.erro %}Não consegui conferir o arquivo: {{ repo.erro }}.{% elif repo.em_dia %}O
+  arquivo está em dia{% if repo.gerado_em %} (gravado em {{ repo.gerado_em[8:10] }}/{{ repo.gerado_em[5:7] }} às {{ repo.gerado_em[11:16] }}){% endif %}.{% elif not repo.existe and repo.vazio %}O
+  arquivo ainda não existe: nada foi marcado.{% else %}<strong>O arquivo do repositório está desatualizado</strong>: a última
+  mudança não chegou ao robô.{% endif %}</span></p>
+{% if pode and not repo.em_dia and not (not repo.existe and repo.vazio) %}
+<form class="pcm-passo-pe" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/publicar">
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-github-logo"></i> Mandar o arquivo de novo</button>
+</form>
+{% endif %}
+
+<form class="fp-filtros" method="get">
+  <div class="campo">
+    <label class="gc-rotulo" for="f-motivo">Motivo</label>
+    <select id="f-motivo" name="motivo" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for m, n in opcoes %}<option value="{{ m.id }}"{% if m.id == sel %} selected{% endif %}>{{ m.nome }} ({{ n }})</option>{% endfor %}
+    </select>
+  </div>
+  {% if os_pedida %}<input type="hidden" name="os" value="{{ os_pedida }}">{% endif %}
+  <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
+  {% if sel %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao">Limpar</a>{% endif %}
+</form>
+
+<p class="pcm-conta"><b class="gc-num">{{ linhas|length }}</b>{% if linhas|length != total %} de {{ total }}{% endif %}
+  {{ 'tarefa fora' if total == 1 else 'tarefas fora' }} da programação{% if finalizadas %} · {{ finalizadas }}
+  {{ 'finalizada' if finalizadas == 1 else 'finalizadas' }} no Fracttal {{ 'saiu' if finalizadas == 1 else 'saíram' }} daqui{% endif %}{% if not gestao_ok %}
+  · a Gestão PCM não abriu agora: as finalizadas no Fracttal também aparecem{% endif %}</p>
+
+{% if linhas %}
+<div class="pcm-rolagem">
+  <table class="pcm-tabela">
+    <thead><tr>
+      <th>Desde</th><th class="num">Dias</th><th>OS</th><th>Usina</th><th>Tarefa</th><th>Motivo</th><th>Observação</th>
+      <th>Quem marcou</th>{% if pode %}<th></th>{% endif %}
+    </tr></thead>
+    <tbody>
+    {% for l in linhas %}
+      <tr>
+        <td class="gc-dado">{{ l.desde_txt }}</td>
+        <td class="num">{{ l.dias if l.dias is not none else '' }}</td>
+        <td class="gc-dado">{{ l.os }}</td>
+        <td>{{ l.usina }}</td>
+        <td class="fp-tarefa">{{ l.tarefa }}<small>{% if l.codigo %}{{ l.codigo }}{% else %}todos os ativos da OS{% endif %}{% if l.tipo %} · {{ l.tipo }}{% endif %}{% if l.estado_fr %} · no Fracttal: {{ l.estado_fr }}{% elif l.fora_da_gestao %} · não está na Gestão PCM{% endif %}</small></td>
+        <td>{{ selo(l.motivo, l.tira) }}</td>
+        <td class="fp-obs">{{ l.obs }}</td>
+        <td>{{ l.quem }}</td>
+        {% if pode %}
+        <td class="fp-acoes">
+          <details>
+            <summary>Editar</summary>
+            <form class="fp-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
+              <input type="hidden" name="item" value="{{ l.item_id }}">
+              {% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
+              <label class="gc-rotulo" for="mo-{{ loop.index }}">Motivo</label>
+              <select id="mo-{{ loop.index }}" name="motivo_id" class="gc-campo">
+                {% for m in motivos %}<option value="{{ m.id }}"{% if m.id == l.motivo_id %} selected{% endif %}>{{ m.nome }}{% if m.tira %} (tira da programação){% endif %}</option>{% endfor %}
+              </select>
+              <label class="gc-rotulo" for="ob-{{ loop.index }}">Observação</label>
+              <textarea id="ob-{{ loop.index }}" name="obs" class="gc-campo" maxlength="500">{{ l.obs }}</textarea>
+              <div class="fp-botoes">
+                <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar</button>
+                <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="tirar" value="1"
+                        onclick="return confirm('Tirar o motivo da tarefa da OS {{ l.os }}? Ela volta a ser programada na próxima geração da semana.')">Tirar o motivo</button>
+              </div>
+            </form>
+          </details>
+        </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="q-vazio">{% if sel %}Nenhuma tarefa fora da programação com esse motivo.{% else %}Nenhuma tarefa fora da programação por motivo.{% endif %}</p>
+{% endif %}
+
+<section class="pcm-passo" id="marcar-os">
+  <header class="pcm-passo-cab">
+    <div class="pcm-passo-txt">
+      <h2 class="pcm-passo-tit">Marcar pela OS</h2>
+      <p class="pcm-passo-sub">Para a tarefa que não está no Quadro da semana. As tarefas abertas vêm da Gestão PCM, que não
+        traz o código do ativo: a marca daqui vale para a tarefa em todos os ativos da OS. A marca feita no Quadro, num
+        ativo, vence a daqui naquele ativo.</p>
+    </div>
+  </header>
+  <form class="fp-os" method="get" action="{{ raiz }}/t/pcm/fora-da-programacao#marcar-os">
+    {% if sel %}<input type="hidden" name="motivo" value="{{ sel }}">{% endif %}
+    <div class="campo"><label class="gc-rotulo" for="f-os">OS</label>
+      <input id="f-os" name="os" class="gc-campo" inputmode="numeric" value="{{ os_pedida }}" placeholder="15596" autocomplete="off"></div>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Ver as tarefas</button>
+  </form>
+  {% if os_invalida %}<p class="gc-ajuda">Digite só o número da OS.</p>{% endif %}
+  {% if da_os %}
+    {% if da_os.erro %}
+    <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-info"></i><div>{{ da_os.erro }}</div></div>
+    {% else %}
+    <p class="pcm-conta">OS <b class="gc-num">{{ da_os.os }}</b> · {{ da_os.usina }}</p>
+    <div class="pcm-rolagem">
+      <table class="pcm-tabela">
+        <thead><tr><th>Tarefa</th><th>No Fracttal</th><th>Motivo de agora</th>{% if pode %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+        {% for t in da_os.tarefas %}
+          <tr>
+            <td class="fp-tarefa">{{ t.tarefa }}<small>{{ t.tipo }}{% if t.n > 1 %} · em {{ t.n }} ativos{% endif %}</small></td>
+            <td>{{ t.estados|unique|join(' · ') }}</td>
+            <td>{% if t.marca %}{{ selo(t.marca.motivo, t.marca.tira) }} <span class="gc-ajuda">desde {{ t.marca.desde_txt }}</span>{% else %}—{% endif %}
+              {% for m in t.por_ativo %}<small class="gc-ajuda fp-bloco">no ativo {{ m.codigo }}: {{ m.motivo }}</small>{% endfor %}</td>
+            {% if pode %}
+            <td class="fp-acoes">
+              {% if t.aberta %}
+              <details>
+                <summary>{{ 'Editar' if t.marca else 'Marcar' }}</summary>
+                <form class="fp-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
+                  {% if t.marca %}<input type="hidden" name="item" value="{{ t.marca.item_id }}">{% else %}
+                  <input type="hidden" name="os" value="{{ da_os.os }}"><input type="hidden" name="tarefa" value="{{ t.tarefa }}">{% endif %}
+                  <input type="hidden" name="v_os" value="{{ da_os.os }}">
+                  {% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
+                  <label class="gc-rotulo" for="tm-{{ loop.index }}">Motivo</label>
+                  <select id="tm-{{ loop.index }}" name="motivo_id" class="gc-campo">
+                    {% if not t.marca %}<option value="">escolha…</option>{% endif %}
+                    {% for m in motivos %}<option value="{{ m.id }}"{% if t.marca and m.id == t.marca.motivo_id %} selected{% endif %}>{{ m.nome }}{% if m.tira %} (tira da programação){% endif %}</option>{% endfor %}
+                  </select>
+                  <label class="gc-rotulo" for="to-{{ loop.index }}">Observação (opcional)</label>
+                  <textarea id="to-{{ loop.index }}" name="obs" class="gc-campo" maxlength="500">{{ t.marca.obs if t.marca else '' }}</textarea>
+                  <div class="fp-botoes">
+                    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">{{ 'Salvar' if t.marca else 'Marcar' }}</button>
+                    {% if t.marca %}<button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="tirar" value="1"
+                      onclick="return confirm('Tirar o motivo desta tarefa da OS {{ da_os.os }}?')">Tirar o motivo</button>{% endif %}
+                  </div>
+                </form>
+              </details>
+              {% else %}<span class="gc-ajuda">finalizada</span>{% endif %}
+            </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  {% endif %}
+  {% if not pode %}<p class="gc-ajuda"><i class="ph ph-lock-key"></i> Marcam o PCM, os supervisores (setor Responsáveis UFV) e o administrador.</p>{% endif %}
+</section>
+{% endblock %}

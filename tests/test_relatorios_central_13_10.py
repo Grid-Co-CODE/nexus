@@ -95,10 +95,12 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # e, desde 16/10/2026, o Gerar a semana e o Quadro da semana (Levi: "administradores e pessoas do setor de PCM
         # conseguir gerar uma programação semanal!", tests/test_pcm_publicar.py)
         assert ST.das_do_setor("PCM") == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
-                                          | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro"})
+                                          | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao"})
         # o Gerar e o Quadro têm dois donos: o PCM e os supervisores (Levi, 16/10/2026: "tanto PCM quanto supervisores!
         # Vou criar um setor de Responsáveis UFV"), pelo nome, sem acento nem caixa
-        assert ST.das_do_setor("Responsáveis UFV") == ST.das_do_setor("responsaveis ufv") == {"pcm/gerar", "pcm/quadro"}
+        # e, desde 16/10/2026, o Fora da programação (os motivos que tiram a tarefa da semana; tests/test_pcm_motivos.py)
+        assert ST.das_do_setor("Responsáveis UFV") == ST.das_do_setor("responsaveis ufv") == {
+            "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao"}
         assert ST.das_do_setor("") == set()
 
 

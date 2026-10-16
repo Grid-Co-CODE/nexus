@@ -198,6 +198,98 @@
       "gc-btn--contorno q-rp-tirar\" data-rp-tirar><i class=\"ph ph-x\"></i> Tirar da semana</button></div>" +
       "<p class=\"q-rp-st\" id=\"q-det-fila\"></p><p class=\"q-rp-linha-txt\" data-rp-txt hidden></p></div>";
   }
+  // ── o motivo da tarefa (16/10/2026, nexus/pcm/motivos.py): um por tarefa; o que "tira da programação" é âmbar ──
+  var MOTIVOS = D.motivos || [];          // [[id, nome, tira]] do cadastro
+  function selo(nome, tira) {
+    return "<span class=\"q-mp" + (tira ? " q-mp--tira" : "") + "\"><i class=\"ph ph-" + (tira ? "prohibit" : "tag") +
+      "\"></i>" + esc(nome) + "</span>";
+  }
+  function blocoMotivo(t) {
+    var mp = t.mp, pode = D.pode_marcar && MOTIVOS.length;
+    if (!mp && !pode) return "";
+    var h = "<h3>Motivo</h3>";
+    if (mp) {
+      h += "<p class=\"q-mp-atual\">" + selo(mp.n, mp.tira) + "<span>desde " + esc(mp.desde) +
+        (mp.quem ? " · " + esc(mp.quem) : "") + "</span></p>" +
+        (mp.obs ? "<p class=\"q-rel\">" + esc(mp.obs) + "</p>" : "") +
+        "<p class=\"q-nota\">" + (mp.tira ? "Este motivo tira a tarefa da programação." : "A tarefa continua na programação.") +
+        (mp.geral ? " Marcado pelo número da OS: vale para esta tarefa em todos os ativos da OS." : "") + "</p>";
+    } else {
+      h += "<p class=\"q-vazio\">Sem motivo.</p>";
+    }
+    if (!pode) return h;
+    return h + "<div class=\"q-rp q-mp-form\"><label class=\"q-campo\"><span>Motivo</span><select class=\"gc-campo\" " +
+      "data-mp-sel><option value=\"\">escolha…</option>" + MOTIVOS.map(function (m) {
+        return "<option value=\"" + m[0] + "\"" + (mp && mp.id === m[0] ? " selected" : "") + ">" + esc(m[1]) +
+          (m[2] ? " (tira da programação)" : "") + "</option>";
+      }).join("") + "</select></label><label class=\"q-campo\"><span>Observação (opcional)</span><textarea class=\"gc-campo\" " +
+      "data-mp-obs rows=\"2\" maxlength=\"500\">" + esc(mp ? mp.obs : "") + "</textarea></label><div class=\"q-rp-acoes\">" +
+      "<button type=\"button\" class=\"gc-btn gc-btn--ui gc-btn--primario\" data-mp-salvar><i class=\"ph ph-tag\"></i> " +
+      (mp ? "Salvar o motivo" : "Marcar o motivo") + "</button>" + (mp ? "<button type=\"button\" class=\"gc-btn gc-btn--ui " +
+      "gc-btn--contorno\" data-mp-tirar><i class=\"ph ph-x\"></i> Tirar o motivo</button>" : "") + "</div>" +
+      "<p class=\"q-nota\" data-mp-msg role=\"status\"" + (t._mpMsg ? "" : " hidden") + ">" + esc(t._mpMsg || "") + "</p></div>";
+  }
+  // a marca nova vale para as linhas da mesma tarefa: a da OS (sem código), em todos os ativos que não têm marca
+  // própria; a do ativo, só nas linhas daquele ativo (a resposta traz a que passou a valer para ele)
+  function aplicarMarca(t, j) {
+    ITENS.forEach(function (x) {
+      if (x.os !== t.os || x.t !== t.t) return;
+      if (j.geral) {
+        if (x.mp && !x.mp.geral) return;
+        if (j.marca) x.mp = j.marca; else delete x.mp;
+      } else if ((x.cod || "") === (t.cod || "")) {
+        if (j.efetiva) x.mp = j.efetiva; else delete x.mp;
+      }
+    });
+    pintarMotivos();
+  }
+  function pintarMotivos() {
+    document.querySelectorAll("[data-cartao],[data-pend]").forEach(function (el) {
+      var i = +(el.getAttribute("data-cartao") || el.getAttribute("data-pend"));
+      var slot = el.querySelector("[data-mp-slot]"), mp = ITENS[i] && ITENS[i].mp;
+      if (!slot) return;
+      slot.hidden = !mp;
+      slot.innerHTML = mp ? ((el.hasAttribute("data-pend") ? " · " : "") + selo(mp.n, mp.tira)) : "";
+    });
+  }
+  function enviarMotivo(i, t, c, tirar) {
+    var sel = c.querySelector("[data-mp-sel]"), obs = c.querySelector("[data-mp-obs]");
+    var msg = c.querySelector("[data-mp-msg]");
+    var escolhido = null;
+    MOTIVOS.forEach(function (m) { if (String(m[0]) === sel.value) escolhido = m; });
+    if (!tirar && !escolhido) { aviso("Escolha o motivo."); return; }
+    if (tirar && !confirm("Tirar o motivo “" + t.mp.n + "” desta tarefa?" + (t.mp.geral ? "\n\nEle foi marcado pelo " +
+        "número da OS: sai da tarefa em todos os ativos da OS." : "") + (t.mp.tira ? "\n\nA tarefa volta a ser programada " +
+        "na próxima geração da semana." : ""))) return;
+    if (!tirar && escolhido[2] && !(t.mp && t.mp.id === escolhido[0]) && !confirm("“" + escolhido[1] + "” tira a tarefa " +
+        "da programação.\n\n" + (D.destino === "atual" ? "Na semana em curso, o robô do PCM a tira na próxima rodada (até " +
+        "30 minutos)." : "A geração da semana não a programa enquanto o motivo valer.") + " Marcar?")) return;
+    c.querySelectorAll("[data-mp-salvar],[data-mp-tirar]").forEach(function (b) { b.disabled = true; });
+    msg.hidden = false; msg.textContent = "Gravando…";
+    fetch(D.url_motivo, {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({semana: D.semana, rodada: D.rodada, os: t.os, tarefa: t.t, codigo: t.cod || "",
+                            motivo_id: tirar ? "" : sel.value, obs: tirar ? "" : obs.value, tirar: !!tirar})})
+      .then(function (r) {
+        return r.json().then(function (j) { return {ok: r.ok, j: j}; },
+                             function () { return {ok: false, j: {erro: "O Nexus não respondeu (" + r.status + ")."}}; });
+      })
+      .then(function (x) {
+        if (!x.ok || !x.j.ok) {
+          msg.textContent = x.j.erro || "Não gravou.";
+          c.querySelectorAll("[data-mp-salvar],[data-mp-tirar]").forEach(function (b) { b.disabled = false; });
+          return;
+        }
+        aplicarMarca(t, x.j);
+        t._mpMsg = (x.j.gravou ? x.j.efeito : "Nada mudou.") + (x.j.arquivo && x.j.arquivo.texto ? " " + x.j.arquivo.texto : "");
+        abrir(i, abriu);
+        delete t._mpMsg;
+      })
+      .catch(function () {
+        msg.textContent = "O Nexus não respondeu: abra a janela de novo para conferir se gravou.";
+        c.querySelectorAll("[data-mp-salvar],[data-mp-tirar]").forEach(function (b) { b.disabled = false; });
+      });
+  }
+
   function abrir(i, origem) {
     var t = ITENS[i];
     if (!t || !dlg) return;
@@ -221,10 +313,14 @@
       "<h3>Quem</h3><dl>" + dl("Responsável O&M", t.resp) + dl("Responsável da OS", t.ros) + "</dl>" +
       "<h3>Situação da OS</h3><dl>" + dl("Status da OS", t.sp) + dl("Criticidade", t.cri) +
       dl("Em paralelo", sn(t.par)) + dl("Termografia", sn(t.termo)) + dl("Origem", t.nova) + dl("Etiqueta", t.etq) + "</dl>" +
+      blocoMotivo(t) +
       blocoReprogramar(t) +
       (t.pend ? "" : "<h3>Trajetória</h3>" + trajetoria(t)) +
       "<h3>Relatório de execução</h3>" + (t.rel ? "<p class=\"q-rel\">" + esc(t.rel) + "</p>"
         : "<p class=\"q-vazio\">Sem relatório registrado.</p>");
+    var mpSalvar = c.querySelector("[data-mp-salvar]"), mpTirar = c.querySelector("[data-mp-tirar]");
+    if (mpSalvar) mpSalvar.addEventListener("click", function () { enviarMotivo(i, t, c, false); });
+    if (mpTirar) mpTirar.addEventListener("click", function () { enviarMotivo(i, t, c, true); });
     var ins = c.querySelector("[data-rp-inserir]");
     if (ins) ins.addEventListener("click", function () {
       var alvo = c.querySelector("[data-rp-alvo]");
@@ -267,7 +363,7 @@
       if (r) { aviso("A tarefa sai da semana (OS " + t.os + ") · " + FILA.length + " na fila"); fechar(); }
     });
     pintarFila();
-    dlg.showModal();
+    if (!dlg.open) dlg.showModal();
     dlg.querySelector("[data-det-fechar]").focus();
   }
   function fechar() {
@@ -292,6 +388,13 @@
   var tplPend = document.getElementById("q-tpl-pend"), tplLote = document.getElementById("q-tpl-lote");
   document.querySelectorAll("[data-pend]").forEach(function (el) {
     var t = ITENS[+el.getAttribute("data-pend")];
+    // o nome da pendente abre a janela da OS (o motivo também se marca na pendente; 16/10/2026)
+    var nome = el.querySelector("[data-abrir]");
+    if (nome && t) {
+      var abreP = function () { abrir(+el.getAttribute("data-pend"), nome); };
+      nome.addEventListener("click", abreP);
+      nome.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abreP(); } });
+    }
     var ctr = el.querySelector(".q-pend-ctr");
     if (!t || !ctr || !tplPend) return;
     ctr.appendChild(tplPend.content.cloneNode(true));

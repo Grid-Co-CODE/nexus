@@ -34,6 +34,13 @@ TORRE = Torre(
              "O que cada equipe faz em cada dia, e o que reprogramar?",
              "banco_dados.json do painel PCM e as gerações do Nexus",
              do_setor=("PCM", "Responsáveis UFV")),
+        # as tarefas que saíram da programação por um motivo de espera e o cadastro dos motivos (16/10/2026, Levi:
+        # "temos que montar um painel de acompanhamento as OSs que saíram da programação por esses motivos!" e "Também
+        # temos que ter um canto no PCM onde podemos controlar todos esses motivos"); dos mesmos setores do Quadro
+        Tela("fora-da-programacao", "Fora da programação",
+             "Que tarefa saiu da programação por um motivo de espera, e desde quando?",
+             "Os motivos marcados no Nexus (Quadro da semana e esta tela) e a Gestão PCM",
+             do_setor=("PCM", "Responsáveis UFV")),
         Tela("insights", "Insights do PCM",
              "Onde a aderência cai e que tarefa já rolou várias vezes?",
              "banco_dados.json do painel PCM"),

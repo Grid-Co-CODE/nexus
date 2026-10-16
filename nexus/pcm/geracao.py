@@ -44,6 +44,7 @@ from . import comparar
 from . import fonte
 from . import historico_banco as HB
 from . import insumos as I
+from . import motivos as M
 from . import observacoes as O
 
 AQUI = Path(__file__).resolve().parent
@@ -312,9 +313,14 @@ def _preparar(config, semana: str, pasta: Path, trabalho: Path, origem: Path | N
                         "detalhe": f"do cadastro do Nexus: {aux['usinas']} usinas, "
                                    f"{aux['sem_responsavel']} sem responsável O&M"})
         insumos += I.materializar(trabalho, pasta, semana)
+        # o que fica fora da programação (16/10/2026): as tarefas com motivo de espera e os nomes do backoffice, no
+        # Fora_da_programacao.json que o motor lê da rodada (o mesmo arquivo que o robô do PCM lê do repositório)
+        insumos.append(M.materializar(config, pasta, trabalho))
     except A.SemCadastro as ex:
         raise NaoPronto(f"cadastro de usinas: {ex}") from ex
     except I.InsumoErro as ex:
+        raise NaoPronto(str(ex)) from ex
+    except M.Recusada as ex:
         raise NaoPronto(str(ex)) from ex
     insumos.append(_historico(config, pasta, semana, trabalho, origem, historico))
     return insumos

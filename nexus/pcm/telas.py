@@ -9,18 +9,22 @@ Quadro da semana (09/10/2026): o quadro da aba Semana do painel do PCM e a repro
 """
 import json
 import re
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, session
 
-from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, observacoes as O, publicar as PB
-from . import quadro as Q, semana as S
+from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, observacoes as O
+from . import publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
 
 POR_PAGINA = 150
 SETOR_PCM = "pcm"
+# quem marca e tira o motivo de uma tarefa (16/10/2026, Levi: "PCM no Nexus" e "Supervisores no Nexus"), pelo nome do
+# setor sem acento nem caixa; o administrador também
+SETORES_MARCAM = ("pcm", "responsaveis ufv")
 
 
 def pode_programar() -> bool:
@@ -37,6 +41,30 @@ def pode_programar() -> bool:
     except Exception:      # noqa: BLE001 — sem saber o setor, só o administrador
         return False
     return bool(setor) and ST._sem_acento(setor.get("nome")) == SETOR_PCM
+
+
+def pode_marcar() -> bool:
+    """Marcar e tirar o motivo de uma tarefa (16/10/2026): administrador, setor PCM e setor Responsáveis UFV (os
+    supervisores). O cadastro dos motivos é de quem `pode_programar` (Levi: "Administrador e setor PCM")."""
+    if session.get("admin"):
+        return True
+    if not session.get("logado"):
+        return False
+    try:
+        setor = ST.acesso().get("setor")
+    except Exception:      # noqa: BLE001 — sem saber o setor, só o administrador
+        return False
+    return bool(setor) and ST._sem_acento(setor.get("nome")) in SETORES_MARCAM
+
+
+def _usuario() -> dict | None:
+    u = session.get("usuario")
+    return u if isinstance(u, dict) else None
+
+
+def _de_outro_site() -> bool:
+    from ..torres.moldura import _de_outro_site as regra
+    return regra()
 
 
 def _quem() -> str:
@@ -91,6 +119,10 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     if sel and sel.get("publicacao"):
         leitura = fonte.ler(cfg)                    # a semana já chegou ao App? (o banco_dados.json que ele lê)
         app_sel = {"semana": PB.semana_no_app(leitura.dados, sel["semana"]), "erro": leitura.erro}
+    # a lista do backoffice (16/10/2026, Levi: "Lista fixa no Nexus", editável aqui) e o aviso do que se gravou nela
+    est_m = M.ler(cfg)
+    aviso_m = session.pop("pcm_motivos_aviso", None) or {}
+    ok, erro = ok or aviso_m.get("ok"), erro or aviso_m.get("erro")
     return {"conf": geracao.conferir(cfg, semana), "ultimas": geracao.ultimas(cfg), "sel": sel,
             "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,
             "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
@@ -105,6 +137,7 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
             "usinas_restritas": sum(1 for u in usinas if len(u["dias"]) < len(O.DIAS)),
             "fracttal_em": datetime.fromtimestamp(quando_fr, _BRT).strftime("%d/%m %H:%M") if quando_fr else "",
             "tem_origem": bool(origem and origem.is_dir()),
+            "backoffice": M.backoffice(cfg, est_m), "backoffice_erro": est_m.get("erro") or "",
             "campo": geracao.horario_de_campo(), "erro": erro, "ok": ok}
 
 
@@ -391,6 +424,149 @@ def registrar_pcm(bp) -> None:
         return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="aplicado", n=len(linhas),
                                                            commit=res.get("commit") or "")), code=303)
 
+    # ── os motivos das tarefas e o backoffice (16/10/2026, nexus/pcm/motivos.py) ──────────────────────────────────
+    @bp.route("/quadro/motivo", methods=["POST"])
+    def quadro_motivo():
+        """Marca, troca ou tira o motivo de uma tarefa pela janela da OS. JSON {semana, rodada, os, tarefa, codigo,
+        motivo_id, obs, tirar}. A tarefa vem da SEMANA (a página só diz qual): OS e tarefa que a semana não tem não
+        gravam. Com a marca feita pela OS (vale em todos os ativos dela), trocar ou tirar mexe nela."""
+        cfg = current_app.config
+        if not pode_marcar() or _de_outro_site():
+            abort(403)
+        d = request.get_json(silent=True) or {}
+        base = _quadro_semana(cfg, str(d.get("semana") or "").strip() or None, str(d.get("rodada") or "").strip() or None)
+        sem = base["sem"]
+        if sem is None:
+            return jsonify(ok=False, erro="A semana não foi achada: atualize a página."), 404
+        linha = _tarefa_da_semana(sem, d)
+        if linha is None:
+            return jsonify(ok=False, erro="Esta tarefa não está nesta semana: atualize a página."), 400
+        tirar = bool(d.get("tirar"))
+        if not tirar and not str(d.get("motivo_id") or "").strip():
+            return jsonify(ok=False, erro="Escolha o motivo."), 400
+        est = M.ler(cfg, forcar=True)
+        if est.get("erro"):
+            return jsonify(ok=False, erro=f"Não consegui ler os motivos no banco ({est['erro']}): nada foi gravado."), 503
+        antes = M.indice(M.vigentes(cfg, est))
+        atual = M.motivo_de(antes, linha["os"], linha["codigo"], linha["tarefa"])
+        # a marca que vale na linha é a da OS (sem código): trocar ou tirar mexe nela, em todos os ativos
+        alvo = dict(linha, codigo="") if atual and not atual["codigo"] else linha
+        try:
+            r = M.marcar(cfg, alvo, None if tirar else d.get("motivo_id"), "" if tirar else str(d.get("obs") or ""),
+                         _usuario(), semana=sem["week"], origem="quadro")
+        except M.Recusada as ex:
+            return jsonify(ok=False, erro=str(ex)), 400
+        arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
+        marca = r["marca"]
+        geral = not alvo["codigo"]
+        os_, t_ = linha["os"], M.norm(linha["tarefa"])
+        # a que passou a valer na linha: a do ativo vence a da OS
+        efetiva = ((antes.get((os_, M.canon(linha["codigo"]), t_)) if linha["codigo"] else None) or marca) if geral             else (marca or antes.get((os_, "", t_)))
+        return jsonify(ok=True, gravou=r["gravou"], geral=geral, marca=_marca_curta(marca) if marca else None,
+                       efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq,
+                       efeito=_efeito(efetiva, _destino_quadro(cfg, base)["id"], tirou=tirar and not efetiva))
+
+    @bp.route("/fora-da-programacao")
+    def fora():
+        cfg = current_app.config
+        if request.args.get("ver") == "cadastro":
+            return render_template("pcm/motivos_cadastro.html", **_ctx_cadastro(cfg))
+        return render_template("pcm/fora.html", **_ctx_fora(cfg, request.args))
+
+    @bp.route("/fora-da-programacao/marcar", methods=["POST"])
+    def fora_marcar():
+        """Do painel: troca ou tira o motivo de uma tarefa que já tem (`item`), ou marca uma tarefa aberta da OS
+        digitada (a tarefa vem da Gestão PCM, sem o código do ativo: vale em todos os ativos da OS)."""
+        cfg = current_app.config
+        if not pode_marcar() or _de_outro_site():
+            abort(403)
+        f = request.form
+        volta = {k: str(f.get("v_" + k))[:20] for k in ("motivo", "os") if f.get("v_" + k)}
+        tirar = f.get("tirar") == "1"
+        try:
+            if not tirar and not str(f.get("motivo_id") or "").strip():
+                raise M.Recusada("Escolha o motivo.")
+            est = M.ler(cfg, forcar=True)
+            if est.get("erro"):
+                raise M.Recusada(f"Não consegui ler os motivos no banco ({est['erro']}): nada foi gravado.")
+            iid = (f.get("item") or "").strip()
+            if iid:
+                m = M.vigentes(cfg, est).get(iid)
+                if not m or iid.startswith("_"):
+                    raise M.Recusada("Essa tarefa não tem mais motivo (alguém mudou agora): atualize a página.")
+                alvo = {k: m[k] for k in ("os", "codigo", "tarefa", "usina", "cliente", "tipo", "cluster", "data_prog")}
+                obs = f.get("obs") if f.get("obs") is not None else m["obs"]
+            else:
+                alvo = _tarefa_da_gestao(cfg, f.get("os"), f.get("tarefa"))
+                obs = f.get("obs") or ""
+            r = M.marcar(cfg, alvo, None if tirar else f.get("motivo_id"), "" if tirar else obs, _usuario(),
+                         origem="painel")
+        except M.Recusada as ex:
+            session["pcm_motivos_aviso"] = {"erro": str(ex)}
+        else:
+            arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
+            ok = ("Nada mudou." if not r["gravou"] else
+                  f"Motivo tirado da OS {alvo['os']}." if tirar else
+                  f"OS {alvo['os']}: {r['marca']['motivo']}." if r["marca"] else "Gravado.")
+            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
+                                            "erro": "" if arq["ok"] else arq["texto"]}
+        return redirect(na_raiz("/t/pcm/fora-da-programacao") + ("?" + urlencode(volta) if volta else ""), code=303)
+
+    @bp.route("/fora-da-programacao/cadastro", methods=["POST"])
+    def fora_cadastro():
+        """O cadastro dos motivos: incluir, editar (nome, descrição, se tira da programação) e tirar. Administrador e
+        setor PCM (Levi, 16/10/2026: "Administrador e setor PCM")."""
+        cfg = current_app.config
+        if not pode_programar() or _de_outro_site():
+            abort(403)
+        f = request.form
+        acao = f.get("acao") or ""
+        try:
+            r = M.cadastro(cfg, acao, _usuario(), motivo_id=f.get("motivo_id"), nome=f.get("nome"),
+                           descricao=f.get("descricao"), tira=f.get("tira") == "1")
+        except M.Recusada as ex:
+            session["pcm_motivos_aviso"] = {"erro": str(ex)}
+        else:
+            mudou = acao != "editar" or r.get("mudou")
+            arq = _publicar_arquivo(cfg) if mudou else {"ok": True, "texto": ""}
+            ok = {"criar": f"Motivo {r['nome']} incluído.", "excluir": f"Motivo {r['nome']} tirado do cadastro.",
+                  "editar": f"Motivo {r['nome']} salvo." if mudou else "Nada mudou."}.get(acao, "Salvo.")
+            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
+                                            "erro": "" if arq["ok"] else arq["texto"]}
+        return redirect(na_raiz("/t/pcm/fora-da-programacao?ver=cadastro"), code=303)
+
+    @bp.route("/fora-da-programacao/publicar", methods=["POST"])
+    def fora_publicar():
+        """Manda de novo o arquivo do robô (quando a última marca não chegou ao repositório do PCM)."""
+        cfg = current_app.config
+        if not pode_marcar() or _de_outro_site():
+            abort(403)
+        arq = _publicar_arquivo(cfg)
+        session["pcm_motivos_aviso"] = ({"ok": arq["texto"] or "O arquivo do robô já estava em dia."} if arq["ok"]
+                                        else {"erro": arq["texto"]})
+        return redirect(na_raiz("/t/pcm/fora-da-programacao"), code=303)
+
+    @bp.route("/gerar/backoffice", methods=["POST"])
+    def gerar_backoffice():
+        """A lista do backoffice (Gerar a semana, bloco 1): pôr ou tirar um nome. Quem abre a tela Gerar mexe nela,
+        como nas observações."""
+        cfg = current_app.config
+        if _de_outro_site():
+            abort(403)
+        semana = _semana_do_form() or ""
+        f = request.form
+        try:
+            r = M.backoffice_definir(cfg, f.get("nome"), f.get("acao") == "por", _usuario())
+        except M.Recusada as ex:
+            session["pcm_motivos_aviso"] = {"erro": str(ex)}
+        else:
+            arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
+            ok = (f"{r['nome']} {'entrou na' if f.get('acao') == 'por' else 'saiu da'} lista do backoffice."
+                  if r["gravou"] else "Nada mudou.")
+            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
+                                            "erro": "" if arq["ok"] else arq["texto"]}
+        return redirect(na_raiz("/t/pcm/gerar?") + urlencode({"semana": semana}) + "#backoffice", code=303)
+
 
 # ── Gestão PCM: o bloco "Manutenções — Plano & Fila" do painel (nexus/pcm/gestao.py) ──────────────────────────
 # As 28 mil tarefas do gestao_pcm.json não precisam ser revarridas a cada clique: o escopo e a base atômica ficam
@@ -615,6 +791,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
             filtros["resp"], filtro_gestor = g, True
     todos = args.get("todos") == "1"
     q = Q.montar(sem, base["publicadas"], filtros, todos=todos, mostrar_pendentes=True if args.get("pend") == "1" else None)
+    mot = _motivos_no_quadro(cfg, q)
     dest = _destino_quadro(cfg, base)
     pode = pode_programar()
     extra = {k: v for k, v in filtros.items() if v}
@@ -642,7 +819,10 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
     dados = {"semana": sem["week"], "rodada": base["rodada"] or "", "destino": dest["id"], "pode": pode,
              "dias": [[d, Q.NOMES_DIA[d]] for d in Q.DIAS_REPROGRAMAR], "turnos": list(Q.TURNOS), "itens": q["itens"],
              "oss": q["oss"],
-             "feito": feito in ("salvo", "aplicado")}
+             "feito": feito in ("salvo", "aplicado"),
+             # os motivos (16/10/2026): o cadastro para a janela e quem marca (PCM, Responsáveis UFV, administrador)
+             "motivos": mot["lista"], "pode_marcar": pode_marcar() and not mot["erro"],
+             "url_motivo": na_raiz("/t/pcm/quadro/motivo")}
     # para onde vai a reprogramação desta semana, dito com o nome do lugar (Levi, 09/10/2026, sobre a frase anterior,
     # "vira linha de observação, que só o PCM grava, e vale onde a fila diz": "Onde o PCM tem essa informação?")
     ctx["fonte_frase"] = {
@@ -663,7 +843,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
                 url_pendentes="?" + urlencode(dict(sel_qs, pend="1", **({"todos": "1"} if todos else {}))) + "#pendentes",
                 abrir_pendentes=args.get("pend") == "1" or (any(filtros.values()) and q["pend_sel"] <= 80),
                 dias_rp=[(d, Q.NOMES_DIA[d]) for d in Q.DIAS_REPROGRAMAR], turnos=Q.TURNOS,
-                gravadas=Q.gravadas(cfg, sem["week"]), ok=ok, erro=erro)
+                gravadas=Q.gravadas(cfg, sem["week"]), ok=ok, erro=erro, motivos_erro=mot["erro"])
 
 
 def _ctx_reprogramar(cfg, semana: str, linhas: list, problemas: list, itens_json: str, erro: str | None = None) -> dict:
@@ -673,3 +853,216 @@ def _ctx_reprogramar(cfg, semana: str, linhas: list, problemas: list, itens_json
         novo, res = Q.novo_texto_atual(atual["texto"], semana, linhas)
     return {"semana": semana, "linhas": linhas, "problemas": problemas, "itens_json": itens_json, "atual": atual,
             "novo": novo, "res": res, "erro": erro}
+
+
+# ── os motivos das tarefas e o backoffice (16/10/2026, nexus/pcm/motivos.py) ──────────────────────────────────────
+def _tarefa_da_semana(sem: dict, d: dict) -> dict | None:
+    """A tarefa que a página apontou, tirada da SEMANA: a linha (agenda ou pendentes) com a mesma OS, a mesma tarefa e
+    o mesmo código do ativo (a pendente do App ainda vem sem código). None se a semana não a tem."""
+    os_s = M.os_de(d.get("os"))
+    tarefa = str(d.get("tarefa") or "")
+    cod = M.canon(d.get("codigo"))
+    if not os_s.isdigit() or not tarefa:
+        return None
+    for r in (sem.get("rows") or []) + (sem.get("pendentes") or []):
+        if M.os_de(r.get("os_id")) != os_s or str(r.get("tarefa") or "") != tarefa or M.canon(r.get("codigo")) != cod:
+            continue
+        d = Q.dia_de(r.get("dia"))
+        data_prog = (HB.segunda(sem["week"]) + timedelta(days=Q.DIAS.index(d))).isoformat()             if d in Q.DIAS and sem.get("week") else ""
+        return {"os": os_s, "codigo": str(r.get("codigo") or "").strip(), "tarefa": tarefa,
+                "usina": str(r.get("usina") or "").strip(), "cliente": str(r.get("cliente") or "").strip(),
+                "tipo": str(r.get("tipo") or "").strip(), "cluster": str(r.get("cluster") or "").strip(),
+                "data_prog": data_prog}
+    return None
+
+
+_GT: dict = {}
+
+
+def _finalizada(estado) -> bool:
+    return M.norm(estado) == "finalizada"
+
+
+def _gestao_tarefas(cfg) -> dict | None:
+    """As tarefas da Gestão PCM (o gestao_pcm.json que o robô do PCM regrava) por OS e por (OS, nome): o painel tira a
+    tarefa FINALIZADA (Levi, 16/10/2026: "Sai do painel sozinha") e marca pelo número da OS. None quando a Gestão PCM não
+    abre: o painel mostra todas e diz."""
+    try:
+        d = fonte.ler_gestao(cfg).dados or {}
+    except Exception:      # noqa: BLE001 — fora do ar: o painel segue sem ela
+        return None
+    tarefas = d.get("tarefas")
+    if not isinstance(tarefas, list):
+        return None
+    chave = (str(d.get("dataHash") or ""), len(tarefas), id(tarefas))   # a cópia da fonte é trocada inteira
+    g = _GT.get("x")
+    if g and g["chave"] == chave:
+        return g
+    por_os: dict[str, list[dict]] = {}
+    por_tarefa: dict[tuple[str, str], list[str]] = {}
+    for t in tarefas:
+        if not isinstance(t, dict):
+            continue
+        o = M.os_de(t.get("os"))
+        por_os.setdefault(o, []).append(t)
+        por_tarefa.setdefault((o, M.norm(t.get("tarefa"))), []).append(str(t.get("estado") or ""))
+    g = {"chave": chave, "por_os": por_os, "por_tarefa": por_tarefa}
+    _GT["x"] = g
+    return g
+
+
+def _tarefa_da_gestao(cfg, os_, tarefa) -> dict:
+    """A tarefa aberta da OS digitada no painel, tirada da Gestão PCM (sem o código do ativo: a marca vale para a tarefa
+    em todos os ativos da OS)."""
+    g = _gestao_tarefas(cfg)
+    if g is None:
+        raise M.Recusada("A Gestão PCM não abriu agora: tente de novo em instantes.")
+    o, nome = M.os_de(os_), str(tarefa or "")
+    ts = [t for t in g["por_os"].get(o, []) if str(t.get("tarefa") or "") == nome]
+    if not o.isdigit() or not ts:
+        raise M.Recusada(f"A OS {o[:12]} não tem essa tarefa na Gestão PCM: atualize a página.")
+    if all(_finalizada(t.get("estado")) for t in ts):
+        raise M.Recusada("Essa tarefa já foi finalizada no Fracttal.")
+    t = ts[0]
+    return {"os": o, "codigo": "", "tarefa": nome, "usina": str(t.get("usina") or "").strip(),
+            "cliente": str(t.get("cliente") or "").strip(), "tipo": str(t.get("tipo") or "").strip(),
+            "cluster": str(t.get("cluster") or "").strip()}
+
+
+def _tarefas_da_os(g: dict | None, os_s: str, vig: dict) -> dict:
+    """As tarefas da OS digitada no painel (uma por nome), com a situação no Fracttal e o motivo de agora."""
+    if g is None:
+        return {"os": os_s, "erro": "A Gestão PCM não abriu agora: tente de novo em instantes.", "tarefas": []}
+    ts = g["por_os"].get(os_s) or []
+    if not ts:
+        return {"os": os_s, "tarefas": [],
+                "erro": f"A OS {os_s} não está na Gestão PCM (as tarefas do Fracttal desde 01/01, que o robô do PCM "
+                        "regrava a cada rodada)."}
+    idx = M.indice(vig)
+    por_nome: dict[str, dict] = {}
+    for t in ts:
+        nome = str(t.get("tarefa") or "")
+        x = por_nome.setdefault(nome, {"tarefa": nome, "tipo": str(t.get("tipo") or ""), "estados": []})
+        x["estados"].append(str(t.get("estado") or ""))
+    out = []
+    for x in por_nome.values():
+        n = M.norm(x["tarefa"])
+        geral = idx.get((os_s, "", n))
+        if geral:
+            d = M._brt(geral["desde"])
+            geral = dict(geral, desde_txt=d.strftime("%d/%m/%Y") if d else "")
+        out.append(dict(x, aberta=not all(_finalizada(e) for e in x["estados"]), n=len(x["estados"]), marca=geral,
+                        por_ativo=[m for m in vig.values() if m["os"] == os_s and m["codigo"] and M.norm(m["tarefa"]) == n]))
+    out.sort(key=lambda x: (not x["aberta"], M.norm(x["tarefa"])))
+    return {"os": os_s, "erro": "", "tarefas": out, "usina": str(ts[0].get("usina") or "")}
+
+
+def _marca_curta(m: dict) -> dict:
+    d = M._brt(m["desde"])
+    return {"item": m["item_id"], "id": m["motivo_id"], "n": m["motivo"], "tira": m["tira"],
+            "desde": d.strftime("%d/%m/%Y") if d else "", "quem": m["quem"], "obs": m["obs"], "geral": not m["codigo"]}
+
+
+def _efeito(marca: dict | None, destino: str | None, tirou: bool = False) -> str:
+    """O que a marca faz na programação, dito na hora (a janela e o aviso)."""
+    if tirou or not marca:
+        return "Sem motivo: a tarefa volta a ser programada na próxima geração da semana."
+    if not marca["tira"]:
+        return "A tarefa continua na programação; o motivo aparece no Quadro e no App de Campo."
+    if destino == "atual":
+        return ("Sai da programação: o robô do PCM tira a tarefa da semana em curso na próxima rodada (até 30 minutos) e "
+                "não a inclui de novo enquanto o motivo valer.")
+    if destino == "nexus":
+        return "Sai da programação: a próxima geração desta semana não a programa (gere de novo em Gerar a semana)."
+    return "Sai da programação a partir da próxima geração da semana."
+
+
+def _publicar_arquivo(cfg) -> dict:
+    """Manda o estado novo ao repositório do PCM (o robô lê de lá). A marca já está no banco: falhar aqui não desfaz
+    nada; a tela diz e o painel Fora da programação tem o botão de mandar de novo."""
+    try:
+        r = M.publicar_arquivo(cfg)
+    except Exception as ex:      # noqa: BLE001 — sem token, GitHub fora: a tela diz
+        msg = str(ex) if isinstance(ex, (M.Recusada, PB.PublicacaoErro)) else f"o GitHub não respondeu ({type(ex).__name__})"
+        return {"ok": False, "texto": f"Gravado no Nexus, mas o arquivo do robô do PCM não foi atualizado: {msg}. No "
+                                      "painel Fora da programação há o botão para mandar de novo."}
+    finally:
+        M.esquecer_estado_no_repositorio()
+    return {"ok": True, "texto": "" if r["igual"] else f"Arquivo do robô do PCM atualizado (commit {r['commit'][:7]})."}
+
+
+def _motivos_no_quadro(cfg, q: dict) -> dict:
+    """O motivo de cada tarefa do quadro (a janela da OS, o selo do cartão e da pendente) e o cadastro para marcar. O
+    banco fora do ar não derruba o quadro: sai sem os motivos, com o aviso."""
+    est = M.ler(cfg)
+    try:
+        idx = M.indice(M.vigentes(cfg, est))
+    except Exception:      # noqa: BLE001
+        idx = {}
+    for it in q["itens"]:
+        m = M.motivo_de(idx, it.get("os"), it.get("cod"), it.get("t"))
+        if m:
+            it["mp"] = _marca_curta(m)
+    for k in [k for c in q["colunas"] for k in c["cartoes"]] + [p for g in q["pendentes"] for p in g["itens"]]:
+        mp = q["itens"][k["i"]].get("mp")
+        if mp:
+            k["mp"], k["mpt"] = mp["n"], mp["tira"]
+    return {"lista": [[m["id"], m["nome"], m["tira"]] for m in M.ativos(est)], "erro": est.get("erro") or ""}
+
+
+def _num_arg(v) -> int | None:
+    s = str(v or "").strip()
+    return int(s) if s.isdigit() and int(s) > 0 else None
+
+
+def _ctx_fora(cfg, args) -> dict:
+    """O painel Fora da programação: as tarefas com um motivo que tira da programação, menos as finalizadas no Fracttal;
+    o filtro é só o Motivo (Levi, 16/10/2026)."""
+    est = M.ler(cfg)
+    vig = M.vigentes(cfg, est)
+    ilegiveis = vig.pop("_ilegiveis", 0)
+    motivos = M.ativos(est)
+    g = _gestao_tarefas(cfg)
+    hoje = Q.hoje()
+    linhas, finalizadas = [], 0
+    for m in vig.values():
+        if not m["tira"]:
+            continue
+        estados = (g or {}).get("por_tarefa", {}).get((m["os"], M.norm(m["tarefa"])))
+        if estados and all(_finalizada(e) for e in estados):
+            finalizadas += 1
+            continue
+        d = M._brt(m["desde"])
+        # a usina vem da linha marcada; sem ela (a pendente do App não traz), da Gestão PCM pela OS
+        usina = m["usina"] or next((str(t.get("usina") or "") for t in (g or {}).get("por_os", {}).get(m["os"], [])), "")
+        linhas.append(dict(m, usina=usina, desde_txt=d.strftime("%d/%m/%Y") if d else "",
+                           dias=max(0, (hoje - d.date()).days) if d else None,
+                           estado_fr=" · ".join(sorted({e for e in estados or [] if e})),
+                           fora_da_gestao=g is not None and not estados))
+    conta = Counter(l["motivo_id"] for l in linhas)
+    sel = _num_arg(args.get("motivo"))
+    mostradas = sorted((l for l in linhas if not sel or l["motivo_id"] == sel),
+                       key=lambda l: (l["desde"], int(l["os"]) if l["os"].isdigit() else 0, M.norm(l["tarefa"])))
+    opcoes = [(m, conta.get(m["id"], 0)) for m in motivos if m["tira"] and (conta.get(m["id"]) or m["id"] == sel)]
+    os_txt = str(args.get("os") or "").strip()
+    os_pedida = M.os_de(os_txt) if os_txt else ""
+    aviso = session.pop("pcm_motivos_aviso", None) or {}
+    return {"linhas": mostradas, "total": len(linhas), "motivos": motivos, "opcoes": opcoes, "sel": sel,
+            "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
+            "gestao_ok": g is not None, "os_pedida": os_pedida,
+            "da_os": _tarefas_da_os(g, os_pedida, vig) if os_pedida.isdigit() else None,
+            "os_invalida": bool(os_txt) and not os_pedida.isdigit(),
+            "pode": pode_marcar(), "pode_cadastro": pode_programar(), "repo": M.estado_no_repositorio(cfg, est),
+            "ok": aviso.get("ok"), "erro": aviso.get("erro")}
+
+
+def _ctx_cadastro(cfg) -> dict:
+    """O cadastro dos motivos, com quantas tarefas estão com cada um agora."""
+    est = M.ler(cfg)
+    vig = M.vigentes(cfg, est)
+    vig.pop("_ilegiveis", None)
+    conta = Counter(m["motivo_id"] for m in vig.values())
+    aviso = session.pop("pcm_motivos_aviso", None) or {}
+    return {"motivos": [dict(m, n=conta.get(m["id"], 0)) for m in M.ativos(est)], "inicial": est.get("inicial"),
+            "erro_banco": est.get("erro") or "", "pode": pode_programar(), "ok": aviso.get("ok"),
+            "erro": aviso.get("erro")}

@@ -40,6 +40,8 @@ RESUMO = {
     "decisao_tela_setor": "Que telas do Nexus cada setor vê, marcado na tela Acessos",
     "decisao_dono_relatorio": "O setor dono de cada relatório, escolhido na Central",
     "decisao_curadoria_pcm": "O que a reunião de PCM decidiu sobre cada MPA e MPS acompanhada",
+    "decisao_motivo_pcm": "O motivo de cada tarefa do PCM, e as que saíram da programação por ele",
+    "decisao_backoffice_pcm": "Quem é do backoffice: as OS dessas pessoas ficam fora da programação",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -126,7 +128,15 @@ PARA_QUE = {
                              "(Engenharia, auxílio da Manutenção, atrasada ou fora do ranking), o prazo do relatório da "
                              "Engenharia, o que falta em campo e o bloqueio. É o que a tela Acompanhamento do PCM usa "
                              "para montar as abas MPA e MPS; as pendências vêm do Fracttal. O conteúdo vai cifrado.",
-    "decisao_tela_setor": "Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
+    "decisao_motivo_pcm": "Guarda cada vez que o PCM ou um supervisor marca (ou tira) o motivo de uma tarefa no Nexus: "
+                          "Engenharia, Chamados, Aguardando Material, Sinistro e os outros do cadastro. Os motivos de "
+                          "espera tiram a tarefa da programação da semana até alguém tirar o motivo; é daqui que sai o "
+                          "painel Fora da programação e o arquivo que o robô do PCM e o App de Campo leem. A tarefa, a "
+                          "observação e quem marcou vão cifrados.",
+    "decisao_backoffice_pcm": "Guarda quem entra e quem sai da lista do backoffice, mantida no Gerar a semana: a OS "
+                              "cujo responsável no Fracttal é alguém da lista não entra na programação da semana. O "
+                              "nome vai cifrado.",
+    "decisao_tela_setor":"Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
                           "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "
                           "O Nexus "

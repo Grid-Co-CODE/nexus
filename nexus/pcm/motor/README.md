@@ -1,22 +1,24 @@
 # Motor da programação semanal (cópia)
 
-Estes três arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
-`fillipefigueiro-source/gridco-pcm-data` no commit `bd4f673` (15/10/2026; antes, `fd39672` do mesmo dia, `3ce6205` de
-09/10 e `8ee58d9` de 30/09):
+Estes quatro arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
+`fillipefigueiro-source/gridco-pcm-data` no commit `fdad64e` (16/10/2026; antes, `bd4f673` e `fd39672` de 15/10, `3ce6205`
+de 09/10 e `8ee58d9` de 30/09):
 
 | Arquivo | O que faz |
 |---|---|
 | `programacao_v7.py` | o gerador (motor v9): escolhe, ordena e distribui as tarefas da semana |
 | `fonte_bd_api.py` | lê as ordens e tarefas do Fracttal |
 | `gerar_bd_via_api.py` | lê as ordens e tarefas do Fracttal |
+| `fora_da_programacao.py` | lê o `Fora_da_programacao.json` do Nexus (16/10/2026): o que fica fora da programação |
 
-Conferido pelo hash (SHA-256):
+Conferido pelo hash (SHA-256 da cópia com CRLF):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `b877f9e28a67…` |
+| `programacao_v7.py` | `c9f17d0e1844…` |
 | `fonte_bd_api.py` | `b81d2c394d67…` |
 | `gerar_bd_via_api.py` | `6c580738ab5e…` |
+| `fora_da_programacao.py` | `91f9a81140c0…` |
 
 ## Por que uma cópia, e não um motor novo
 
@@ -25,6 +27,25 @@ substituir. Reescrever o motor tornaria a comparação inútil.
 
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
 sistemas rodarem juntos, as duas cópias precisam ser iguais.
+
+## O que mudou em 16/10/2026 (`fdad64e`): fora da programação pelo Nexus
+
+Levi, 16/10/2026: os motivos das tarefas (o que "tira da programação": Aguardando Material, Aguardando Cliente...) e
+"Quando a OS estiver atrelada como responsável para alguém do time de backoffice, desconsiderar para a programação da
+semana". O Nexus grava o `Fora_da_programacao.json` (`nexus/pcm/motivos.py`) na pasta da rodada e na raiz do repositório
+do PCM; o `fora_da_programacao.py` lê com a mesma regra do Nexus (OS, código do ativo e nome; a marca do ativo vence a da
+OS; o backoffice pelo nome sem acento e sem caixa: o teste de contrato do Nexus roda este arquivo).
+
+- **No motor** (`programacao_v7.py`, junto das OS "não" das observações): a tarefa com motivo que tira e a OS do
+  backoffice saem da lista antes de montar a semana, também as fixadas nas observações; o log diz quantas
+  (`[FORA DA PROGRAMAÇÃO]`). Sem o arquivo, nada muda.
+- **No robô** (`atualizacao_semanal.py`, fora desta cópia): o STEP A2 não inclui como OS nova; o STEP A3b apaga da
+  semana em curso (agenda e `_Pendentes`) a tarefa com motivo que tira; a OS do backoffice já na semana fica. O
+  `gerar_pcm_json.py` manda o `codigo` da pendente.
+- **Prova** (W43, a mesma foto): sem marcas, agenda e pendentes idênticas às do motor `bd4f673` (1.629 e 736, coluna a
+  coluna); com 3 marcas que tiram, 1 que não tira e os 11 nomes do backoffice, saíram as 3 tarefas e as 33 tarefas de 33
+  OS do backoffice, e a que não tira ficou. No robô, na planilha real da W42: o A3b tirou exatamente as 4 linhas
+  marcadas. Detalhe no `nexus/pcm/CLAUDE.md`, seção dos motivos.
 
 ## O que mudou em 15/10/2026 (`fd39672` e `bd4f673`)
 
@@ -67,7 +88,8 @@ zeladoria, não só pelo nome".
 
 - **Processo:** um subprocesso com o mesmo Python do Nexus.
 - **Pasta de trabalho:** uma por rodada, em `C:\GridcoAuto\nexus\pcm\geracoes\`, fora do OneDrive. Leva os insumos do
-  Nexus, a AUXILIAR do cadastro e o histórico de antes da semana, tirado do banco (`historico_banco.py`).
+  Nexus, a AUXILIAR do cadastro, o histórico de antes da semana, tirado do banco (`historico_banco.py`), e o
+  `Fora_da_programacao.json` (os motivos e o backoffice, do banco: `motivos.materializar`).
 - **Ambiente próprio:**
   - a credencial do Fracttal, a mesma do OS Creator, sem login;
   - `FRACTTAL_BASE_URL` com `/api/`;
@@ -79,8 +101,8 @@ zeladoria, não só pelo nome".
   `.env` achado no caminho) e o `FRACTTAL_BASE_URL` aponta para uma porta fechada. O motor lê a foto; se tentar o
   Fracttal, falha.
 - **Saída:** a planilha fica em `saida/sombra.xlsx` e é comparada com a `Programação Semana NN.xlsx` oficial.
-- **Conferido em 15/10/2026:** sem o CR do Windows, os três arquivos são iguais aos do repositório do PCM no commit
-  `bd4f673` (15/10). O hash da tabela acima é o da cópia com CRLF.
+- **Conferido em 16/10/2026:** sem o CR do Windows, os quatro arquivos são iguais aos do repositório do PCM no commit
+  `fdad64e` (16/10). O hash da tabela acima é o da cópia com CRLF.
 - **O que mudou em `3ce6205` (09/10/2026):** a W42 do PC do PCM quebrou na quinta (08/10 21:46, `ValueError: cannot
   convert float NaN to integer` no RPN dinâmico): a AUXILIAR atualizada naquele dia tinha 67 usinas sem MWp, e o motor
   guardava o vazio como NaN. O motor passou a ler o porte da coluna `POTÊNCIA CONTRATUAL (MWp)` (vazio e zero não

@@ -55,7 +55,8 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
-| `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá); hoje a do `bd4f673` (15/10/2026, seção abaixo) |
+| `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
+| `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá); hoje a do `bd4f673` + `fora_da_programacao.py` (16/10/2026, seção dos motivos) |
 
 ## Horas por tarefa e zeladoria no motor (15/10/2026)
 
@@ -106,10 +107,79 @@ tipo de tarefa fosse de fato zeladoria, não só pelo nome, tem corretiva sendo 
   de verdade com o `fd39672` (15/10 12:24, Brasília) mudou a W42 do `banco_dados.json`: pendentes 2.222 linhas e
   20.955 h → 1.246 e 1.516 h; linhas de 8 h ou mais 695 → 15; pendentes repetidas 1.326 → 423 (as antigas).
 
+## Motivos das tarefas, Fora da programação e o backoffice (`motivos.py`; 16/10/2026)
+
+Levi, 16/10/2026, com a lista de 11 motivos (Engenharia, Chamados (garantia), Performance, Aguardando Cliente, Aguardando
+Concessionária, Aguardando Material, Aguardando Fabricante/Terceiro, Condições Climáticas Adversas, Prioridade, Sinistro,
+Pendente recurso), "temos que montar um painel de acompanhamento as OSs que saíram da programação por esses motivos!",
+"Também temos que ter um canto no PCM onde podemos controlar todos esses motivos" e, à parte, "Quando a OS estiver
+atrelada como responsável para alguém do time de backoffice, desconsiderar para a programação da semana". Cada regra
+abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de botar qualquer filtro ou parâmetro"):
+
+- **O motivo se marca só no Nexus** (não vai ao Fracttal); o App de Campo só mostra. **Por TAREFA e UM por tarefa**
+  (marcar outro troca). A tarefa = OS + código do ativo + nome (`motivos.item_id`); a marca feita pelo número da OS
+  (painel) vem da Gestão PCM, que não traz o código, e vale para a tarefa em todos os ativos da OS; a do ativo vence a da
+  OS (`motivo_de`). As comparações: OS como inteiro, código maiúsculo sem espaço, nome sem acento, sem caixa, espaço
+  único (as mesmas no motor e no robô: o teste de contrato roda o módulo deles).
+- **Quem:** marcam e tiram o administrador, o setor PCM e o setor Responsáveis UFV (`telas.pode_marcar`); o cadastro dos
+  motivos (incluir, editar, dizer se tira, tirar) é do administrador e do setor PCM (`pode_programar`). A lista do
+  backoffice, de quem abre o Gerar a semana (como as observações).
+- **Os que tiram da programação** (o cadastro inicial: os quatro Aguardando, Condições Climáticas Adversas e Pendente
+  recurso; Prioridade não muda a geração): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as
+  linhas dela (agenda e `_Pendentes`, STEP A3b) e o STEP A2 não a inclui de novo. Tirar o motivo: a tarefa volta na
+  PRÓXIMA geração (o robô não a recoloca na semana em curso).
+- **Backoffice:** a OS cujo responsável no Fracttal (o `Responsável` da OS, o `user_assigned`) é um nome da lista (sem
+  acento e sem caixa) não entra na geração, e o robô não a inclui como OS nova; a que já está na semana em curso fica (a
+  escolha dele foi "geração e robô"). Não aparece no painel nem no App. Em 16/10 a lista do Levi casava 286 tarefas
+  abertas (208 de uma pessoa só); um dos 11 nomes não aparece como responsável de OS no Fracttal. Os nomes vão ao robô
+  em claro, no arquivo do repositório do PCM ("precisa disso não, faz o simples").
+- **O painel Fora da programação** (`/t/pcm/fora-da-programacao`, `templates/pcm/fora.html`): só as tarefas com motivo
+  que tira; a FINALIZADA no Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico); o
+  único filtro é o Motivo (lista só os que existem); "Marcar pela OS" lista as tarefas da OS da Gestão PCM (a finalizada
+  não se marca); "Editar" troca o motivo ou a observação e tira o motivo. Cadastro em `?ver=cadastro`
+  (`motivos_cadastro.html`): tirar não apaga, marca `excluido` e o ID não volta, e as tarefas com ele perdem o motivo (a
+  confirmação diz quantas).
+- **No Quadro** (a janela da OS, também das pendentes, que agora abrem a janela pelo nome): a seção Motivo mostra o de
+  agora (desde quando, quem, a observação) e marca, troca ou tira por `POST /t/pcm/quadro/motivo` (JSON; a tarefa vem da
+  SEMANA, a página só diz qual). O cartão e a pendente ganham o selo (âmbar: tira; azul: não tira). Com a marca da OS
+  valendo na linha, trocar ou tirar mexe nela (em todos os ativos).
+- **O dado:** livro `nexus_pcm_motivos` (registrado no catálogo antes de existir; nasce com a 1ª gravação, que leva o
+  cadastro inicial junto): `dim_motivo`, `fato_decisao_motivo` (só acrescenta, vale a última de cada tarefa) e
+  `fato_decisao_backoffice` (vale a última de cada nome). Tarefa, usina, observação, nome do backoffice e quem marcou só
+  cifrados (Cofre); em claro a OS, o código, o `equipamento_id`, o `tarefa_chave` e o código de quem decidiu. Gravar
+  troca o livro inteiro (as três abas), relido antes; leitura que falha não grava. Cópia de prova e testes:
+  `NEXUS_PCM_MOTIVOS_ARQUIVO` (o livro num arquivo).
+- **O arquivo `Fora_da_programacao.json`** (`motivos.arquivo`): o cadastro, as tarefas com motivo (sem observação e sem
+  quem marcou: o repositório é público) e os nomes do backoffice; `hash` = o do conteúdo. **Contrato com o App de Campo**
+  (o chat do App, 16/10): o servidor do App lê da mesma pasta do `banco_dados.json` (nome e pasta fixos); é o estado de
+  AGORA (a desmarcada sai); `os`, `codigo` e `tarefa` como nas linhas do `banco_dados.json` (o texto da marca é o da
+  linha, só sem espaço nas pontas; código vazio = todos os ativos da OS); `usina`, `cluster` e `data_prog` (o dia em que
+  estava na agenda quando foi marcada; vazio na pendente e na marca pela OS) para o App agrupar; `motivo` = o id; todo
+  motivo das tarefas está em `motivos` (`ativo` sempre verdadeiro: tirar do cadastro tira as marcas). O App tira das "OS
+  avulsas" do servidor dele o que estiver no arquivo (senão a tarefa apagada pelo robô voltava como avulsa). No App, a
+  tarefa que o técnico JÁ iniciou (em execução ou pausada) e recebe um motivo que tira continua visível para ele concluir
+  ou pausar (Levi, 16/10: "Continua visível"); a lista do backoffice em produção é o PCM quem preenche. Vai (1) para
+  a pasta de cada rodada (`motivos.materializar` no `geracao._preparar`; banco fora do ar = a última cópia boa da máquina, com aviso; sem
+  cópia a rodada não sai) e (2) para a raiz do repositório do PCM a cada marca, cadastro e backoffice
+  (`publicar_arquivo`, o PUT do `publicar.py` com `NEXUS_PCM_GITHUB_TOKEN`; igual ao de lá = não grava). Falhar o GitHub
+  não desfaz a marca: a tela diz e o painel mostra "desatualizado" com o botão de mandar de novo. Não dispara o robô: ele
+  lê na rodada seguinte.
+- **No motor e no robô do PCM** (`fora_da_programacao.py`, cópia em `motor/`): o `programacao_v7` tira da lista antes de
+  montar a semana (log `[FORA DA PROGRAMAÇÃO]`); o `atualizacao_semanal` pula no A2 e apaga no A3b; o
+  `gerar_pcm_json` passou a mandar o `codigo` da pendente (o Quadro marca a pendente pelo ativo). Sem o arquivo, nada
+  muda.
+- **Prova (16/10):** W43 com a mesma foto, motor sem marcas = o de antes (agenda 1.629 e pendentes 736, coluna a
+  coluna); com 3 marcas que tiram, 1 que não tira e os 11 nomes: saíram as 3 tarefas e as 33 tarefas de 33 OS do
+  backoffice que a semana teria, ficou a que não tira (agenda 1.629 → 1.606, pendentes 736 → 726). Robô, na planilha
+  real da W42: o A3b tirou exatamente as 4 linhas marcadas (o ativo com marca própria que não tira ficou), o A2 só deixou
+  entrar o que devia, e as 1.038 pendentes ganharam o código. Testes: `tests/test_pcm_motivos.py` (17; 19 mutações,
+  todas pegas).
+
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
 
-Quadro da semana, Insights do PCM, Tarefas e OS, Gerar a semana, Gestão PCM, PCM 52 Semanas, Torre de controle e Peças
-e sobressalentes (Insights, 52 Semanas, Torre de controle e Peças ainda são placeholder). **A Semana saiu em 12/10/2026
+Quadro da semana, Fora da programação (16/10/2026, dos mesmos setores do Quadro), Insights do PCM, Tarefas e OS, Gerar a
+semana, Gestão PCM, PCM 52 Semanas, Torre de controle e Peças e sobressalentes (Insights, 52 Semanas, Torre de controle e
+Peças ainda são placeholder). **A Semana saiu em 12/10/2026
 com o código dela** (Levi: "PCM > Semana -> pode excluir essa seção e o código dela!"): a rota, o `semana.html`, o
 `resumo` e o `por_equipe` do `semana.py` (aderência e horas por equipe e dia, contra as 7 h) e o CSS só dela; as regras
 que as outras telas usam ficaram no `semana.py`. O 1º item do PCM (e o cartão do PCM no Início) passou a ser o Quadro

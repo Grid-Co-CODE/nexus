@@ -406,6 +406,41 @@ FATOS = (
                     "tipo e o grupo. As pendências e o progresso não são da curadoria: o Acompanhamento recalcula pelo "
                     "Fracttal (o gestao_pcm.json) a cada leitura. A 1ª carga veio do arquivo do painel do PCM de "
                     "14/10/2026 (ferramentas/carregar_curadoria_pcm.py)"),
+    # Os motivos das tarefas do PCM e o backoffice (16/10/2026, Levi, com a lista dos 11 motivos e "Quando a OS estiver
+    # atrelada como responsável para alguém do time de backoffice, desconsiderar para a programação da semana"): o
+    # Nexus é a FONTE; o cadastro dos motivos (dim_motivo) mora no mesmo livro. Registrado antes da 1ª gravação.
+    Fato("decisao_motivo_pcm", "Motivo das tarefas do PCM", "pcm", "nexus_pcm_motivos · fato_decisao_motivo",
+         "1 linha = 1 decisão sobre o motivo de 1 tarefa (OS + código do ativo + nome; item_id): marcar um motivo "
+         "(motivo_id) ou tirá-lo (motivo_id vazio); um motivo por tarefa, vale a última decisão de cada tarefa",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)"),
+            equipamento=("id", "equipamento_id (o código do ativo; vazio na marca feita pelo número da OS, que vale "
+                               "para a tarefa em todos os ativos dela)"),
+            pessoa=("cod", "decidida_por_hmac (o código do e-mail de quem marcou; vazio com a senha de "
+                           "administrador)"),
+            os=("cod", "os")),
+         tipo="sem_medida", chave=("decidida_em", "item_id"),
+         fontes=("nexus_pcm_motivos · fato_decisao_motivo",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada tarefa)",
+         observacao="o motivo liga pelo motivo_id à dim_motivo do mesmo livro (o cadastro: excluir marca excluido = "
+                    "sim e o ID não volta; a marca de motivo excluído deixa de valer). tira_da_programacao = sim: a "
+                    "geração da semana não programa a tarefa e o robô do PCM a tira da semana em curso. A tarefa entra "
+                    "como tarefa_chave (a mesma conta da programação e do fechamento) e o texto, a usina, a observação "
+                    "e quem marcou vão só cifrados em dados_cifrados (regra 8). As três abas vão juntas a cada "
+                    "gravação. O Nexus publica o estado no Fora_da_programacao.json do repositório do PCM (o robô e o "
+                    "App leem)"),
+    Fato("decisao_backoffice_pcm", "Lista do backoffice do PCM", "pcm", "nexus_pcm_motivos · fato_decisao_backoffice",
+         "1 linha = 1 decisão de pôr ou tirar 1 nome da lista do backoffice (nome_hmac); vale a última decisão de "
+         "cada nome",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)"),
+            pessoa=("cod", "nome_hmac (o código do nome, como ele aparece no responsável da OS do Fracttal) e "
+                           "decidida_por_hmac (quem decidiu)")),
+         tipo="sem_medida", chave=("decidida_em", "nome_hmac"),
+         fontes=("nexus_pcm_motivos · fato_decisao_backoffice",),
+         janela_origem="o Nexus é a fonte (só acrescenta)",
+         observacao="a OS cujo responsável no Fracttal é um nome da lista (sem acento e sem caixa) fica fora da "
+                    "geração da semana e o robô do PCM não a inclui como OS nova. O nome vai só cifrado "
+                    "(dados_cifrados); o arquivo do robô, no repositório do PCM, leva os nomes em claro (decisão do "
+                    "Levi, 16/10/2026: \"faz o simples\")"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -808,6 +843,13 @@ LIVROS = (
           "nexus/pcm/acompanhamento/curadoria.py", False,
           "registrado em 14/10/2026 antes de existir: nasce com a 1ª carga do arquivo do painel do PCM; o Acompanhamento "
           "lê com cache de 2 minutos, e a gravação relê o banco antes (troca o livro inteiro)"),
+    Livro("nexus_pcm_motivos", ("dim_motivo", "fato_decisao_motivo", "fato_decisao_backoffice"),
+          "a cada marca de motivo (Quadro da semana e Fora da programação), a cada mudança no cadastro dos motivos e na "
+          "lista do backoffice (Gerar a semana)",
+          "nexus/pcm/motivos.py, pelas telas do PCM", False,
+          "registrado em 16/10/2026 antes de existir: nasce com a 1ª gravação (o cadastro inicial, os 11 motivos do "
+          "pedido do Levi, entra junto). As telas leem com cache de 1 minuto e a gravação relê o banco antes (troca o "
+          "livro inteiro, as três abas juntas)"),
     # o login por pessoa do Dashboard Thopen (14/10/2026): o Nexus é a fonte das contas; a senha, o 5080 grava no livro
     # dele (thopen_acessos · senhas, em CONHECIDAS)
     Livro("nexus_acessos_clientes", ("dim_conta_cliente",), "a cada ação na tela Acessos dos clientes",
