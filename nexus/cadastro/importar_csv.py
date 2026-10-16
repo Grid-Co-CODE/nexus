@@ -22,21 +22,24 @@ As regras (as decisões do Levi no mesmo dia, e o que o ensaio com o cadastro mo
   novos"); o que só difere em acento, maiúscula, hífen ou espaço ("Centro-Oeste" × "Centro Oeste") é o mesmo valor;
 - a equipe é a do CSV (Levi: "Trocar pela do CSV"): pelo nome; a que não existe é criada (sem código nem região, que a
   ficha da equipe completa). "0" é vazio e "N/A" é "a usina não tem", como na importação antiga;
-- o cliente e o Responsável O&M só casam com quem já está no cadastro. A pessoa casa pelo nome inteiro ou pelo nome do
-  cadastro contido no do CSV, na ordem e com o mesmo primeiro nome, quando só uma pessoa serve: o CSV de 15/10 traz o
+- o cliente só casa com quem já está no cadastro. A pessoa casa pelo nome inteiro, pelo nome padrão ou pelo nome do
+  cadastro contido no do CSV, na ordem e com o mesmo primeiro nome, quando só uma ficha serve: o CSV de 15/10 traz o
   nome completo ("Fulana Rodrigues Prado"; nomes fictícios, o repositório é público) e o cadastro o curto ("Fulana
-  Prado"): eram 203 usinas sem par pelo nome inteiro. O que não casa fica como está e é listado;
+  Prado"): eram 203 usinas sem par pelo nome inteiro. Nome que serve a duas fichas não liga nem cria (é avisado);
 - o valor do CSV contido no do Nexus, que tem mais detalhe ("SUN2000-250KTL-H1 + SUN2000-330KTL-H1" vira
   "SUN2000-250KTL-H1"), é marcado na prévia ("o CSV resume"), para a pessoa decidir a coluna;
 - as colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, os kits...) ficam de fora e são listadas;
-- "Pessoas da equipe" ("Nome (Cargo), Nome (Cargo · Desligado)"; Levi, 16/10: "procure esses 5 no fractall, faça a
-  relação e adicione no Nexus, não podemos ficar sem informação! Se adapte"): a pessoa casa também pelo NOME PADRÃO
-  calculado (o furo de 16/10: o CSV escreve "Bruno Samiel Anjos Albuquerque" e "Italo Vitor das Virgens Oliveira", a
-  ficha "Bruno Samuel..." e "Italo Vitor Dasvirgens...", e os padrões "Bruno Albuquerque" e "Italo Oliveira" estão
-  contidos no nome do CSV). Da ficha que casa, completa só o VAZIO (cargo, status, e-mail da conta do Fracttal, que é o
-  que liga a ficha ao Fracttal) e põe na equipe do CSV quando ele a dá numa equipe só (quem atende duas fica e é
-  listado). Quem não tem ficha e não está desligado ganha uma (Colaborador de campo, o cargo e a equipe do CSV, Ativo),
-  com o nome e o e-mail da conta do Fracttal quando ela existe (o Caio da Silva Cordeiro, 16/10).
+- AS PESSOAS DA USINA SÃO AS DO CSV (Levi, 16/10: "não quero que siga com os dados antigos, tem que aplicar no Nexus
+  também! Entenda... a regra ainda não é o Nexus, temos que nos adaptar as informações que vem"). O Responsável O&M e o
+  técnico, o eletricista e o mantenedor da usina (os da "Pessoas da equipe" DELA: "Nome (Cargo), Nome (Cargo ·
+  Desligado)", só a vírgula separa) vão para a própria usina; quem atende duas equipes aparece nas duas; o CSV que lista
+  a equipe sem um dos três deixa a usina sem ele ("-"), em vez de herdar o da equipe ou o do BD antigo; célula vazia
+  não mexe. Quem não tem ficha ganha uma (o responsável, Supervisor de Campo, como a importação antiga; o resto,
+  Colaborador de campo com o cargo e a equipe do CSV), com o nome e o e-mail da conta do Fracttal quando ela existe (é o
+  e-mail que liga a ficha ao Fracttal; o Caio da Silva Cordeiro e o Dallas Ferreira, 16/10). Da ficha que existe,
+  completa só o VAZIO (cargo, status, e-mail da conta do Fracttal) e a equipe quando o CSV dá uma só. A pessoa casa
+  também pelo NOME PADRÃO calculado (o furo de 16/10: o CSV escreve "Bruno Samiel..." e "Italo Vitor das Virgens...",
+  a ficha "Bruno Samuel..." e "Italo Vitor Dasvirgens...", e os padrões estão contidos no nome do CSV).
 """
 import csv
 import io
@@ -46,7 +49,7 @@ from collections import Counter
 
 from . import tipos
 from .calculos import ERRO
-from .esquema import ENTIDADES
+from .esquema import ENTIDADES, VINCULO_CAMPO, VINCULO_SUPERVISOR_CAMPO
 from .servico import chave_texto
 
 ID = "ID da usina"
@@ -73,8 +76,12 @@ COLUNAS = {
 }
 REFS = {"Cliente": "cliente", "Equipe": "equipe", "Responsável O&M": "responsavel_om"}
 COL_PESSOAS = "Pessoas da equipe"
-CAMPO_PESSOAS = "pessoas"                   # a "coluna" das pessoas na prévia (a caixa de marcar dela)
-VINCULO_NOVO = "Colaborador de campo"
+CAMPO_PESSOAS = "pessoas"                   # a "coluna" das fichas de pessoas na prévia (a caixa de marcar dela)
+NOVA_PESSOA = "nova-pessoa:"                # a ficha que nasce nesta aplicação (a usina aponta para ela)
+NENHUM = "-"                                # o marcador "não tem": a usina fica sem a pessoa, sem herdar a da equipe
+# técnico, eletricista e mantenedor da usina: os da "Pessoas da equipe" dela
+PAPEIS = (("tecnico_om", "Técnico O&M", "técnico"), ("eletricista_om", "Eletricista O&M", "eletricista"),
+          ("mantenedor_om", "Mantenedor O&M", "mantenedor"))
 # o cargo como o CSV escreve ("Técnico de O&M", "Eletricista", "Mantenedor", "Man") -> o da lista do cadastro
 _CARGOS = (("tecnic", "Técnico O&M"), ("eletric", "Eletricista O&M"), ("manten", "Mantenedor O&M"))
 _NUMERICOS = ("numero", "moeda", "coordenada")
@@ -198,23 +205,90 @@ def _indice_pessoas(srv) -> list:
     return out
 
 
-def _achar_pessoa(texto, pessoas: list):
-    """O id da pessoa do cadastro, ou None (ninguém, ou mais de uma que serve: não adivinha)."""
+def _casar_pessoa(texto, pessoas: list):
+    """(id, "") da ficha; (None, "nenhuma"), ou (None, "duas") quando o nome serve a mais de uma ficha (não adivinha nem
+    cria outra)."""
     alvo = _nomes(texto)
     if not alvo:
-        return None
+        return None, "nenhuma"
     exatos = {pid for pid, nomes in pessoas if alvo in nomes}
     if exatos:
-        return next(iter(exatos)) if len(exatos) == 1 else None
+        return (next(iter(exatos)), "") if len(exatos) == 1 else (None, "duas")
     parecidos = {pid for pid, nomes in pessoas if any(n and (_contido(n, alvo) or _contido(alvo, n)) for n in nomes)}
-    return next(iter(parecidos)) if len(parecidos) == 1 else None
+    if len(parecidos) == 1:
+        return next(iter(parecidos)), ""
+    return None, ("duas" if parecidos else "nenhuma")
+
+
+def _achar_pessoa(texto, pessoas: list):
+    """O id da pessoa do cadastro, ou None (ninguém, ou mais de uma que serve: não adivinha)."""
+    return _casar_pessoa(texto, pessoas)[0]
+
+
+class _Fichas:
+    """As fichas de pessoas que a atualização usa: acha a do cadastro (pelo nome, ou pela conta do Fracttal, que acha a
+    ficha de outro nome pelo e-mail) ou anota uma nova, com o nome e o e-mail da conta do Fracttal quando ela existe (é
+    o e-mail que liga a ficha ao Fracttal, o critério do login)."""
+
+    def __init__(self, srv, pessoas, fracttal):
+        self.srv, self.pessoas, self.fracttal = srv, pessoas, fracttal
+        self.contas = [(i, [_nomes(f.get("nome")), _nomes(_primeiro_e_ultimo(f.get("nome")))])
+                       for i, f in enumerate(fracttal) if f.get("email")]
+        self.por_email = {}
+        for r in srv.registros("pessoas"):
+            e = str(r.valores.get("email") or "").strip().lower()
+            if e:
+                self.por_email[e] = r
+        self.novas = {}          # chave -> {"chave", "nome", "formulario", "fracttal"}
+        self.duas = Counter()    # nome que serve a duas fichas: não liga nem cria
+
+    def conta(self, nome):
+        i = _achar_pessoa(nome, self.contas)
+        return self.fracttal[i] if i is not None else None
+
+    def ref(self, nome, vinculo, cargo=None, equipe=None):
+        """(ref, título, nota): o id da ficha, ou NOVA_PESSOA + chave da que vai nascer; ref None = nome de duas fichas."""
+        pid, motivo = _casar_pessoa(nome, self.pessoas)
+        if pid:
+            titulo = self.srv.titulo_de("pessoas", pid)
+            return pid, titulo, ("" if chave_texto(titulo) == chave_texto(nome) else f"no CSV: {nome}")
+        if motivo == "duas":
+            self.duas[nome] += 1
+            return None, "", ""
+        f = self.conta(nome)
+        email = str((f or {}).get("email") or "").strip().lower()
+        if email and email in self.por_email:                    # a conta do Fracttal acha a ficha de outro nome
+            r = self.por_email[email]
+            return r.id, r.titulo, f"no CSV: {nome}"
+        chave = chave_texto((f or {}).get("nome") or nome)
+        n = self.novas.get(chave)
+        if n is None:
+            form = {"nome": (f or {}).get("nome") or nome, "vinculo": vinculo, "status": "Ativo"}
+            if email:
+                form["email"] = email
+            n = self.novas[chave] = {"chave": chave, "nome": form["nome"], "formulario": form, "fracttal": bool(email)}
+        if cargo and "cargo" not in n["formulario"]:
+            n["formulario"]["cargo"] = cargo
+        if equipe and "equipe" not in n["formulario"]:
+            n["formulario"]["equipe"] = equipe
+        return NOVA_PESSOA + chave, n["nome"], "ficha nova"
+
+
+def _equipe_do_csv(ln, equipes):
+    """A equipe da linha: o id, "nova:" + nome (a que vai nascer) ou None."""
+    texto = _limpo(ln.get("Equipe"))
+    if not texto or texto == "0" or tipos.marcador(texto):
+        return None
+    e = equipes.get(chave_texto(texto))
+    return e.id if e else "nova:" + texto
 
 
 def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
     """O que a atualização faria, sem gravar nada: as usinas que mudam (campo a campo, antes e depois), por coluna, o que
-    fica como está e por quê, as equipes e os valores de lista novos, o que não casou e as pessoas das equipes.
-    `fracttal` = o pessoal do Fracttal (`fracttal_pessoal.ler_pessoal()["pessoas"]`: nome, email, conta_ativa); sem
-    ele, a ficha nova nasce sem e-mail."""
+    fica como está e por quê, as equipes e os valores de lista novos, o que não casou e as fichas de pessoas que nascem
+    ou se completam. `fracttal` = o pessoal do Fracttal (`fracttal_pessoal.ler_pessoal()["pessoas"]`: nome, email,
+    conta_ativa); sem ele, a ficha nova nasce sem e-mail."""
+    from .importar import eh_rotulo_de_regiao
     ent = ENTIDADES["usinas"]
     campo = {c.id: c for c in ent.campos}
     usinas = {}
@@ -225,11 +299,16 @@ def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
     listas = srv.listas()
     clientes = {chave_texto(r.valores.get("nome")): r.id for r in srv.registros("clientes")}
     equipes = {chave_texto(r.valores.get("nome")): r for r in srv.registros("equipes")}
+    regioes = [r.valores.get("nome") for r in srv.registros("regioes_campo")]
     pessoas = _indice_pessoas(srv)
+    fichas = _Fichas(srv, pessoas, fracttal or [])
     colunas = {**COLUNAS, **REFS}
     por_campo = {cid: {"campo": cid, "coluna": col, "rotulo": campo[cid].rotulo, "oculto": bool(campo[cid].oculto),
                        "secao": campo[cid].secao, "linhas": [], "resumem": 0}
                  for col, cid in colunas.items() if cid in campo and campo[cid].editavel}
+    for cid, _, papel in PAPEIS:
+        por_campo[cid] = {"campo": cid, "coluna": f"{campo[cid].rotulo} (Pessoas da equipe)", "rotulo": campo[cid].rotulo,
+                          "oculto": False, "secao": campo[cid].secao, "linhas": [], "resumem": 0}
     mudancas, sem_par, vistos = [], [], set()
     vazios, arredondados = Counter(), Counter()
     ignorados, ilegiveis, sem_cliente, sem_pessoa = Counter(), [], Counter(), Counter()
@@ -237,11 +316,14 @@ def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
 
     def anotar(r, k, form, cid, valor, antes, depois, nota=""):
         form[cid] = valor
-        resume = _resume(antes, depois)
+        resume = _resume(antes, depois) if cid in COLUNAS.values() else False
         pc = por_campo[cid]
         pc["linhas"].append({"id_bd": k, "nome": r.titulo, "antes": antes, "depois": depois, "nota": nota,
                              "resume": resume})
         pc["resumem"] += int(resume)
+
+    def pessoa_hoje(v):
+        return "" if v is None or v == "" or v is ERRO or tipos.marcador(v) else srv.titulo_de("pessoas", v)
 
     for ln in linhas:
         k = _limpo(ln.get(ID)).upper()
@@ -292,7 +374,8 @@ def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
                 if convertido == atual or _limpo(antes) == texto or _mesmo_numero(antes, texto):
                     continue
             anotar(r, k, form, cid, texto, antes, texto)
-        # as referências: o cliente e a pessoa só casam com quem existe; a equipe nova é criada
+        # as referências: o cliente só casa com quem existe; a equipe nova é criada; o Responsável O&M que não tem ficha
+        # ganha uma (Supervisor de Campo), como a importação antiga fazia: o CSV manda, a usina não segue com o antigo
         for col, cid in REFS.items():
             texto = _limpo(ln.get(col))
             if not texto or texto == "0" or col not in ln:
@@ -313,22 +396,51 @@ def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
                     equipes_novas[chave_texto(texto)] = texto
                     nota = "equipe nova"
             else:
-                alvo = _achar_pessoa(texto, pessoas)
-                if alvo is None:
-                    sem_pessoa[texto] += 1
+                if _casar_pessoa(texto, pessoas)[0] is None and eh_rotulo_de_regiao(texto, regioes):
+                    sem_pessoa[texto] += 1          # a região no lugar da pessoa (a vaga): não vira ficha
                     continue
-                nome = srv.titulo_de("pessoas", alvo)
-                if chave_texto(nome) != chave_texto(texto):
-                    depois, nota = nome, f"no CSV: {texto}"
+                alvo, depois, nota = fichas.ref(texto, VINCULO_SUPERVISOR_CAMPO)
+                if alvo is None:
+                    sem_pessoa[texto] += 1          # nome de duas fichas: não adivinha
+                    continue
             if str(atual or "") == str(alvo):
                 continue
             anotar(r, k, form, cid, alvo, srv.titulo_de(c.lista, atual) if atual else "", depois, nota)
+        # técnico, eletricista e mantenedor da usina: os da "Pessoas da equipe" DELA (Levi, 16/10: "não quero que siga
+        # com os dados antigos"); quem atende duas equipes aparece nas duas. O CSV que lista a equipe sem um dos três
+        # deixa a usina sem ele ("-"), em vez de herdar o da equipe ou o do BD antigo. Célula vazia não mexe
+        celula = _limpo(ln.get(COL_PESSOAS)) if COL_PESSOAS in ln else ""
+        if celula:
+            membros = pessoas_da_celula(celula)
+            eq = _equipe_do_csv(ln, equipes)
+            for cid, cargo, papel in PAPEIS:
+                atual = r.valor(cid)
+                atual = None if atual is ERRO or atual == "" else atual
+                quem = next((m for m in membros if m[1] == cargo and not m[2]), None)
+                if quem is None:
+                    if atual is None or tipos.marcador(atual):
+                        continue
+                    anotar(r, k, form, cid, NENHUM, pessoa_hoje(atual), "—", f"o CSV não traz {papel}")
+                    continue
+                alvo, nome, nota = fichas.ref(quem[0], VINCULO_CAMPO, cargo, eq)
+                if alvo is None or str(atual or "") == str(alvo):
+                    continue
+                anotar(r, k, form, cid, alvo, pessoa_hoje(atual), nome, nota)
         if form:
             mudancas.append({"usina_id": r.id, "id_bd": k, "nome": r.titulo, "versao": r.versao, "formulario": form})
     cab = list(cabecalho or (linhas[0].keys() if linhas else []))
     sem_campo = [c for c in cab if c and c != ID and c not in COLUNAS and c not in REFS and c != COL_PESSOAS]
-    pessoas_mudam, varias_equipes, desligadas_sem_ficha = _proposta_pessoas(linhas, srv, usinas, equipes, pessoas,
-                                                                             fracttal or [])
+    pessoas_mudam, desligadas = _proposta_pessoas(linhas, srv, usinas, equipes, fichas)
+    # os valores que as fichas usam (vínculo, cargo, status) e a lista ainda não tem entram com os outros valores novos
+    for m in pessoas_mudam:
+        for cid, lista in (("vinculo", "vinculo"), ("cargo", "cargos"), ("status", "status_contratacao")):
+            v = m["formulario"].get(cid)
+            if not v:
+                continue
+            existente = next((x for x in listas.get(lista, []) if _chave_lista(x) == _chave_lista(v)), None)
+            if existente is None:
+                existente = novos_valores.setdefault(lista, {}).setdefault(_chave_lista(v), v)
+            m["formulario"][cid] = existente
     return {"mudancas": mudancas, "sem_par": sem_par, "total": len(vistos),
             "por_campo": [pc for pc in por_campo.values() if pc["linhas"]],
             "vazios": dict(vazios.most_common()), "arredondados": dict(arredondados.most_common()),
@@ -336,74 +448,50 @@ def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
             "sem_pessoa": dict(sem_pessoa.most_common()),
             "novos_valores": {lista: sorted(v.values()) for lista, v in novos_valores.items()},
             "equipes_novas": sorted(equipes_novas.values(), key=chave_texto), "sem_campo": sem_campo,
-            "pessoas": pessoas_mudam, "pessoas_varias_equipes": varias_equipes,
-            "pessoas_desligadas_sem_ficha": desligadas_sem_ficha}
+            "pessoas": pessoas_mudam, "pessoas_desligadas_sem_ficha": desligadas,
+            "pessoas_ambiguas": dict(fichas.duas.most_common())}
 
 
-def _proposta_pessoas(linhas, srv, usinas, equipes, pessoas, fracttal):
-    """As fichas que a coluna "Pessoas da equipe" cria ou completa (ver o docstring do módulo)."""
+def _proposta_pessoas(linhas, srv, usinas, equipes, fichas):
+    """As fichas que nascem (toda pessoa da "Pessoas da equipe" e todo Responsável O&M sem ficha, menos o desligado) e
+    o que se completa nas que existem: só o vazio (cargo, status, e-mail da conta do Fracttal) e a equipe quando o CSV dá
+    uma só."""
     nome_eq = {r.id: r.valores.get("nome") for r in equipes.values()}
-    membros = {}
+    membros, desligadas = {}, []
     for ln in linhas:
         k = _limpo(ln.get(ID)).upper()
         if k not in usinas or COL_PESSOAS not in ln:
             continue
-        texto_eq = _limpo(ln.get("Equipe"))
-        alvo_eq = None
-        if texto_eq and texto_eq != "0" and not tipos.marcador(texto_eq):
-            e = equipes.get(chave_texto(texto_eq))
-            alvo_eq = e.id if e else "nova:" + texto_eq
+        eq = _equipe_do_csv(ln, equipes)
         for nome, cargo, desligado in pessoas_da_celula(ln.get(COL_PESSOAS)):
-            pid = _achar_pessoa(nome, pessoas)
-            m = membros.setdefault(pid or "novo:" + chave_texto(nome), {"pid": pid, "nome": nome, "equipes": set(),
-                                                                         "cargos": set(), "desligado": False})
-            if alvo_eq:
-                m["equipes"].add(alvo_eq)
+            if desligado:
+                pid = _achar_pessoa(nome, fichas.pessoas)
+                if pid is None:
+                    desligadas.append(nome)                  # desligado e sem ficha: não entra
+                    continue
+                ref = pid
+            else:
+                ref, _, _ = fichas.ref(nome, VINCULO_CAMPO, cargo, eq)
+                if ref is None or ref.startswith(NOVA_PESSOA):
+                    continue                                  # duas fichas, ou a nova (já leva cargo e equipe)
+            m = membros.setdefault(ref, {"nome": nome, "equipes": set(), "cargos": set(), "desligado": False})
+            if eq:
+                m["equipes"].add(eq)
             if cargo:
                 m["cargos"].add(cargo)
             m["desligado"] = m["desligado"] or desligado
-    contas = [(i, [_nomes(f.get("nome")), _nomes(_primeiro_e_ultimo(f.get("nome")))])
-              for i, f in enumerate(fracttal) if f.get("email")]
-    por_email = {}
-    for r in srv.registros("pessoas", incluir_excluidos=True):
-        e = str(r.valores.get("email") or "").strip().lower()
-        if e:
-            por_email[e] = r
-
-    def conta(nome):
-        i = _achar_pessoa(nome, contas)
-        return fracttal[i] if i is not None else None
 
     def titulo_eq(e):
         return e[5:] if str(e).startswith("nova:") else (nome_eq.get(e) or str(e or ""))
 
-    mudam, varias, desligadas = [], [], []
-    for chave, m in sorted(membros.items(), key=lambda kv: chave_texto(kv[1]["nome"])):
-        f = conta(m["nome"])
-        email = str((f or {}).get("email") or "").strip().lower()
-        r = srv.registro("pessoas", m["pid"]) if m["pid"] else por_email.get(email) if email else None
-        if r is not None and r.excluido:
-            r = None if m["pid"] is None else r
-        if len(m["equipes"]) > 1:
-            varias.append({"nome": r.titulo if r else m["nome"], "equipes": sorted(titulo_eq(e) for e in m["equipes"])})
-        equipe = next(iter(m["equipes"])) if len(m["equipes"]) == 1 else None
-        cargo = next(iter(m["cargos"])) if len(m["cargos"]) == 1 else None
+    mudam = []
+    for pid, m in sorted(membros.items(), key=lambda kv: chave_texto(kv[1]["nome"])):
+        r = srv.registro("pessoas", pid)
         if r is None:
-            if m["desligado"]:
-                desligadas.append(m["nome"])
-                continue
-            form = {"nome": (f or {}).get("nome") or m["nome"], "vinculo": VINCULO_NOVO, "status": "Ativo"}
-            if cargo:
-                form["cargo"] = cargo
-            if equipe:
-                form["equipe"] = equipe
-            if email:
-                form["email"] = email
-            mudam.append({"acao": "criar", "pessoa_id": None, "nome": form["nome"], "versao": None, "formulario": form,
-                          "campos": [("Ficha nova", " · ".join(x for x in (cargo or "", titulo_eq(equipe) if equipe else "",
-                                                                       "e-mail do Fracttal" if email else "") if x))]})
             continue
         v, form, campos = r.valores, {}, []
+        equipe = next(iter(m["equipes"])) if len(m["equipes"]) == 1 else None
+        cargo = next(iter(m["cargos"])) if len(m["cargos"]) == 1 else None
         if equipe and str(v.get("equipe") or "") != str(equipe):
             form["equipe"] = equipe
             campos.append(("Equipe", f"{titulo_eq(v.get('equipe')) or '—'} → {titulo_eq(equipe)}"))
@@ -413,24 +501,53 @@ def _proposta_pessoas(linhas, srv, usinas, equipes, pessoas, fracttal):
         if not v.get("status"):
             form["status"] = "Desligado" if m["desligado"] else "Ativo"
             campos.append(("Status", f"— → {form['status']}"))
-        if email and not v.get("email") and (email not in por_email or por_email[email].id == r.id):
+        f = fichas.conta(m["nome"])
+        email = str((f or {}).get("email") or "").strip().lower()
+        if email and not v.get("email") and (email not in fichas.por_email or fichas.por_email[email].id == r.id):
             form["email"] = email
             campos.append(("E-mail", "— → o da conta do Fracttal"))
         if form:
-            mudam.append({"acao": "completar", "pessoa_id": r.id, "nome": r.titulo, "versao": r.versao,
+            mudam.append({"acao": "completar", "pessoa_id": r.id, "chave": "", "nome": r.titulo, "versao": r.versao,
                           "formulario": form, "campos": campos})
-    return mudam, varias, desligadas
+    for n in sorted(fichas.novas.values(), key=lambda x: chave_texto(x["nome"])):
+        f = n["formulario"]
+        partes = [f.get("vinculo") if f.get("vinculo") != VINCULO_CAMPO else "", f.get("cargo") or "",
+                  titulo_eq(f["equipe"]) if f.get("equipe") else "", "e-mail do Fracttal" if f.get("email") else ""]
+        mudam.append({"acao": "criar", "pessoa_id": None, "chave": n["chave"], "nome": n["nome"], "versao": None,
+                      "formulario": f, "campos": [("Ficha nova", " · ".join(x for x in partes if x))]})
+    return mudam, desligadas
+
+
+def _resolver(form, criadas, novas_pessoas):
+    """Troca as referências ao que nasceu nesta aplicação (equipe "nova:", pessoa NOVA_PESSOA) pelo id; o que não nasceu
+    (a coluna desmarcada) sai do formulário."""
+    for cid in list(form):
+        v = str(form[cid] or "")
+        if v.startswith("nova:"):
+            nova = criadas.get(chave_texto(v[5:]))
+        elif v.startswith(NOVA_PESSOA):
+            nova = novas_pessoas.get(v[len(NOVA_PESSOA):])
+        else:
+            continue
+        if nova is None:
+            form.pop(cid)
+        else:
+            form[cid] = nova
+    return form
 
 
 def aplicar(prop: dict, srv, quem: str, campos=None) -> dict:
-    """Grava a proposta: os valores de lista novos, as equipes novas e, usina a usina, os campos que mudam (a versão é a
-    da leitura da prévia: quem salvou a ficha nesse meio tempo ganha, e a usina dela é listada). `campos` = só estes
-    campos (as colunas que ficaram marcadas na prévia); None = todos."""
+    """Grava a proposta: os valores de lista novos, as equipes novas, as fichas de pessoas (as novas primeiro, que as
+    usinas apontam para elas) e, usina a usina, os campos que mudam (a versão é a da leitura da prévia: quem salvou a
+    ficha nesse meio tempo ganha, e ela é listada). `campos` = só estes campos (as colunas marcadas na prévia, e
+    CAMPO_PESSOAS para as fichas); None = todos."""
     so = set(campos) if campos is not None else None
     usa = {}
     for c in ENTIDADES["usinas"].campos:
         if c.tipo == "lista":
             usa.setdefault(c.lista, set()).add(c.id)
+    for lista in ("vinculo", "cargos", "status_contratacao"):
+        usa.setdefault(lista, set()).add(CAMPO_PESSOAS)
     incluidos, criadas, conflitos, erros, atualizadas = [], {}, [], [], 0
     for lista, valores in (prop.get("novos_valores") or {}).items():
         if so is not None and not (usa.get(lista, set()) & so):
@@ -445,14 +562,27 @@ def aplicar(prop: dict, srv, quem: str, campos=None) -> dict:
                 criadas[chave_texto(nome)] = res.registro.id
             else:
                 erros.append({"id_bd": "", "nome": f"equipe {nome}", "erro": "; ".join((res.erros or {}).values())})
-    for m in prop.get("mudancas") or []:
-        form = {k: v for k, v in m["formulario"].items() if so is None or k in so}
-        if str(form.get("equipe") or "").startswith("nova:"):
-            nova = criadas.get(chave_texto(form["equipe"][5:]))
-            if nova is None:
-                form.pop("equipe")
+    novas_pessoas, pessoas_criadas, pessoas_completadas = {}, 0, 0
+    if so is None or CAMPO_PESSOAS in so:
+        for m in sorted(prop.get("pessoas") or [], key=lambda x: x["acao"] != "criar"):
+            form = _resolver(dict(m["formulario"]), criadas, novas_pessoas)
+            if m["acao"] == "criar":
+                res = srv.criar("pessoas", form, quem)
             else:
-                form["equipe"] = nova
+                res = srv.salvar("pessoas", m["pessoa_id"], form, m["versao"], quem)
+            if res.ok:
+                if m["acao"] == "criar":
+                    pessoas_criadas += 1
+                    novas_pessoas[m["chave"]] = res.registro.id
+                else:
+                    pessoas_completadas += 1
+            elif res.conflito is not None:
+                conflitos.append({"id_bd": "pessoa", "nome": m["nome"]})
+            else:
+                erros.append({"id_bd": "pessoa", "nome": m["nome"], "erro": "; ".join(
+                    f"{k}: {v}" for k, v in (res.erros or {}).items())})
+    for m in prop.get("mudancas") or []:
+        form = _resolver({k: v for k, v in m["formulario"].items() if so is None or k in so}, criadas, novas_pessoas)
         if not form:
             continue
         res = srv.salvar("usinas", m["usina_id"], form, m["versao"], quem)
@@ -463,30 +593,6 @@ def aplicar(prop: dict, srv, quem: str, campos=None) -> dict:
         else:
             erros.append({"id_bd": m["id_bd"], "nome": m["nome"], "erro": "; ".join(
                 f"{k}: {v}" for k, v in (res.erros or {}).items())})
-    pessoas_criadas = pessoas_completadas = 0
-    if so is None or CAMPO_PESSOAS in so:
-        for m in prop.get("pessoas") or []:
-            form = dict(m["formulario"])
-            if str(form.get("equipe") or "").startswith("nova:"):
-                nova = criadas.get(chave_texto(form["equipe"][5:]))
-                if nova is None:
-                    form.pop("equipe")
-                else:
-                    form["equipe"] = nova
-            if m["acao"] == "criar":
-                res = srv.criar("pessoas", form, quem)
-            else:
-                res = srv.salvar("pessoas", m["pessoa_id"], form, m["versao"], quem)
-            if res.ok:
-                if m["acao"] == "criar":
-                    pessoas_criadas += 1
-                else:
-                    pessoas_completadas += 1
-            elif res.conflito is not None:
-                conflitos.append({"id_bd": "pessoa", "nome": m["nome"]})
-            else:
-                erros.append({"id_bd": "pessoa", "nome": m["nome"], "erro": "; ".join(
-                    f"{k}: {v}" for k, v in (res.erros or {}).items())})
     srv.auditar(quem, "atualizou pelo CSV do BD_Operações", "usinas", str(prop.get("arquivo") or ""), [
         f"{atualizadas} usinas", f"{len(criadas)} equipes novas", f"{len(incluidos)} valores de lista novos",
         f"{pessoas_criadas} pessoas novas", f"{pessoas_completadas} pessoas completadas",

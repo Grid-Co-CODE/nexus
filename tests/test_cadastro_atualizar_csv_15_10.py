@@ -111,13 +111,19 @@ def test_a_previa_segue_as_regras_e_nao_grava(srv):
     assert c["equipe"]["UFV-002"]["depois"] == "sp leste 01"                # casou sem maiúscula: a SP Leste 01
     assert c["responsavel_om"]["UFV-001"]["depois"] == "Fulana Prado"
     assert c["responsavel_om"]["UFV-001"]["nota"] == "no CSV: Fulana Rodrigues Prado"
+    # o responsável que não tem ficha ganha uma (Levi, 16/10: "não quero que siga com os dados antigos")
+    assert c["responsavel_om"]["UFV-002"]["depois"] == "Fulano Desconhecido"
+    assert c["responsavel_om"]["UFV-002"]["nota"] == "ficha nova"
+    nova = next(m for m in p["pessoas"] if m["acao"] == "criar")
+    assert nova["formulario"] == {"nome": "Fulano Desconhecido", "vinculo": "Supervisor de Campo", "status": "Ativo"}
     # o que fica, e por quê
     # 7,049 × 7,0488 é arredondamento; a latitude igual e a receita igual à conta automática não contam
     assert p["arredondados"] == {"Potência real (MWp)": 1}
     assert p["vazios"] == {"Cidade": 1}
     assert p["ignorados"] == {'Código (o valor de mentira "CÓDIGO")': 1}
-    assert p["sem_pessoa"] == {"Fulano Desconhecido": 1} and p["sem_cliente"] == {"Cliente Novo": 1}
-    assert p["novos_valores"] == {"status_usina": ["PRONTA PARA MOBILIZAR"]}
+    assert p["sem_pessoa"] == {} and p["sem_cliente"] == {"Cliente Novo": 1}
+    assert p["novos_valores"] == {"status_usina": ["PRONTA PARA MOBILIZAR"], "vinculo": ["Supervisor de Campo"],
+                                  "status_contratacao": ["Ativo"]}
     assert p["equipes_novas"] == ["Brumado / Tanhaçu"] and p["sem_campo"] == ["Mobilizado?"]
     # região "Centro Oeste" × "Centro-Oeste", tensão "23,1" × "23.1" e a mesma latitude: nada muda
     assert "regiao" not in c and "tensao_linha" not in c and "latitude" not in c
@@ -128,7 +134,8 @@ def test_aplicar_grava_pela_ficha_e_a_segunda_previa_fica_vazia(srv):
     p = _prop(srv)
     res = ic.aplicar(p, srv, "teste")
     assert res["atualizadas"] == 2 and res["equipes_criadas"] == 1 and res["conflitos"] == [] and res["erros"] == []
-    assert res["valores_incluidos"] == ["PRONTA PARA MOBILIZAR"]
+    assert sorted(res["valores_incluidos"]) == ["Ativo", "PRONTA PARA MOBILIZAR", "Supervisor de Campo"]
+    assert res["pessoas_criadas"] == 1
     u1, u2 = srv.registro("usinas", "1").valores, srv.registro("usinas", "2").valores
     nova = next(r for r in srv.registros("equipes") if r.valores["nome"] == "Brumado / Tanhaçu")
     assert u1["equipe"] == nova.id and u1["responsavel_om"] == "1"
@@ -136,13 +143,14 @@ def test_aplicar_grava_pela_ficha_e_a_segunda_previa_fica_vazia(srv):
     assert u1["modelo_inversores"] == "SUN2000-250KTL-H1" and u1["tensao_linha"] == "23.1"
     assert u2["status"] == "PRONTA PARA MOBILIZAR" and u2["codigo"] == "MAB100" and u2["equipe"] == "1"
     assert u2["cidade"] == "Matões" and u2["cliente"] == "1" and u2["endereco"] == "Rua Teste 123"
+    assert srv.titulo_de("pessoas", u2["responsavel_om"]) == "Fulano Desconhecido"
     assert u2.get("receita_mensal") is None                                 # a conta igual não congela o automático
     assert "PRONTA PARA MOBILIZAR" in srv.listas()["status_usina"]
     assert srv.registro("usinas", "2").versao == 2                          # pela ficha: versão nova
     acoes = [a["acao"] for a in srv.auditoria(20)]
     assert "atualizou pelo CSV do BD_Operações" in acoes and "alterou" in acoes
     p2 = _prop(srv)
-    assert p2["mudancas"] == [] and p2["por_campo"] == [] and p2["equipes_novas"] == []
+    assert p2["mudancas"] == [] and p2["por_campo"] == [] and p2["equipes_novas"] == [] and p2["pessoas"] == []
 
 
 def test_so_as_colunas_marcadas_sao_gravadas(srv):
@@ -310,8 +318,16 @@ def test_a_previa_das_pessoas(srv_p):
     assert fulano["acao"] == "completar" and fulano["formulario"] == {"equipe": "1", "cargo": "Técnico O&M",
                                                                        "status": "Ativo"}
     assert "Otavio Ramos" not in por                # "das Neves" × "Dasneves": casou e não falta nada
-    assert p["pessoas_varias_equipes"] == [{"nome": "Marcelo Rios", "equipes": ["Equipe Nova Teste", "SP Leste 01"]}]
     assert p["pessoas_desligadas_sem_ficha"] == ["Silvio Prates Leme"]
+    # o técnico, o eletricista e o mantenedor vão para a usina; quem atende duas equipes aparece nas duas
+    c = _campos(p)
+    marcelo, renato_id = _por_nome(srv_p, "Marcelo Fonte Rios").id, _por_nome(srv_p, "Renato Samuel Lopes Andrade").id
+    assert c["tecnico_om"]["UFV-001"]["depois"] == c["tecnico_om"]["UFV-002"]["depois"] == "Marcelo Rios"
+    usina = {m["id_bd"]: m["formulario"] for m in p["mudancas"]}
+    assert usina["UFV-001"]["tecnico_om"] == usina["UFV-002"]["tecnico_om"] == marcelo
+    assert usina["UFV-001"]["mantenedor_om"] == renato_id
+    assert usina["UFV-001"]["eletricista_om"] == "nova-pessoa:teodoro mendes paiva"
+    assert usina["UFV-002"]["mantenedor_om"] == _por_nome(srv_p, "Otavio Vitor Dasneves Ramos").id
     assert "Pessoas da equipe" not in p["sem_campo"]
 
 
@@ -324,7 +340,10 @@ def test_aplicar_cria_e_completa_e_a_segunda_previa_fica_vazia(srv_p):
     assert teo["email"] == "teodoro.paiva@exemplo.test" and teo["equipe"] == nova.id and teo["cargo"] == "Eletricista O&M"
     renato = _por_nome(srv_p, "Renato Samuel Lopes Andrade").valores
     assert renato["equipe"] == nova.id and renato["cargo"] == "Mantenedor O&M" and renato["status"] == "Ativo"
-    assert _por_nome(srv_p, "Marcelo Fonte Rios").valores["equipe"] == "1"       # atende duas: fica
+    assert _por_nome(srv_p, "Marcelo Fonte Rios").valores["equipe"] == "1"       # atende duas: a ficha fica
+    u1 = next(r for r in srv_p.registros("usinas") if r.valores.get("id_bd") == "UFV-001")
+    assert u1.valores["eletricista_om"] == _por_nome(srv_p, "Teodoro Mendes Paiva").id   # a ficha nova, na usina
+    assert u1.valores["tecnico_om"] == _por_nome(srv_p, "Marcelo Fonte Rios").id
     assert not any(r.valores.get("nome") == "Silvio Prates Leme" for r in srv_p.registros("pessoas"))
     p2 = ic.proposta(linhas, srv_p, cab, FRACTTAL)
     assert p2["pessoas"] == []
@@ -345,12 +364,49 @@ def test_a_tela_mostra_e_aplica_as_pessoas(cli, srv_p, monkeypatch):
     r = cli.post("/t/base/registro-mestre/atualizar", data={"arquivo": (__import__("io").BytesIO(_csv(LINHAS_P, CAB_P)),
                                                                         "bd.csv")}, content_type="multipart/form-data")
     html = r.get_data(as_text=True)
-    assert "Pessoas das equipes" in html and "1 ficha nova" in html and "e-mail do Fracttal" in html
+    assert "Fichas das pessoas do CSV" in html and "1 ficha nova" in html and "e-mail do Fracttal" in html
+    assert "Técnico O&amp;M (Pessoas da equipe)" in html
     assert "teodoro.paiva@exemplo.test" not in html                  # o e-mail não aparece na prévia
-    assert "Marcelo Rios atende mais de uma equipe" in html and "Silvio Prates Leme" in html
+    assert "Silvio Prates Leme" in html
     token = re.search(r'name="token" value="([^"]+)"', html).group(1)
     campos = re.findall(r'name="campos" value="([^"]+)"', html)
     assert "pessoas" in campos
     r = cli.post("/t/base/registro-mestre/atualizar/aplicar", data={"token": token, "campos": campos})
     html = cli.get(r.headers["Location"]).get_data(as_text=True)
     assert "1 pessoa(s) nova(s) em Colaboradores" in html and "2 ficha(s)" in html
+
+
+def test_o_csv_sem_tecnico_deixa_a_usina_sem_tecnico(srv_p):
+    """A equipe do CSV sem técnico: a usina fica sem ("-"), não herda o técnico fixado no BD antigo nem o da equipe."""
+    u = next(r for r in srv_p.registros("usinas") if r.valores.get("id_bd") == "UFV-002")
+    assert srv_p.salvar("usinas", u.id, {"tecnico_om": _por_nome(srv_p, "Marcelo Fonte Rios").id}, u.versao, "t").ok
+    cab, linhas = ic.ler_csv(_csv(["UFV-002;Matões 100;sp leste 01;Otavio Vitor das Neves Ramos (Mantenedor)"], CAB_P))
+    p = ic.proposta(linhas, srv_p, cab, [])
+    c = _campos(p)
+    assert c["tecnico_om"]["UFV-002"]["antes"] == "Marcelo Rios" and c["tecnico_om"]["UFV-002"]["depois"] == "—"
+    ic.aplicar(p, srv_p, "teste")
+    u = srv_p.registro("usinas", u.id)
+    assert u.valores["tecnico_om"] == "-" and u.valor("tecnico_om") == "-"
+    assert ic.proposta(linhas, srv_p, cab, [])["mudancas"] == []           # de novo: nada
+
+
+def test_responsavel_sem_ficha_nasce_supervisor_com_o_email_do_fracttal(srv_p):
+    cab, linhas = ic.ler_csv(_csv(["UFV-002;Matões 100;Dalton Ferraz Neto"], "ID da usina;Nome;Responsável O&M"))
+    conta = [{"nome": "Dalton Ferraz Neto", "email": "dalton.neto@exemplo.test", "conta_ativa": True}]
+    p = ic.proposta(linhas, srv_p, cab, conta)
+    nova = next(m for m in p["pessoas"] if m["acao"] == "criar")
+    assert nova["formulario"] == {"nome": "Dalton Ferraz Neto", "vinculo": "Supervisor de Campo", "status": "Ativo",
+                                  "email": "dalton.neto@exemplo.test"}
+    ic.aplicar(p, srv_p, "teste")
+    u = next(r for r in srv_p.registros("usinas") if r.valores.get("id_bd") == "UFV-002")
+    assert srv_p.titulo_de("pessoas", u.valores["responsavel_om"]) == "Dalton Neto"
+
+
+def test_nome_de_duas_fichas_nao_liga_nem_cria(srv_p):
+    for nome in ("Beto Lins Costa", "Beto Ramos Costa"):          # os dois têm o nome padrão "Beto Costa"
+        assert srv_p.criar("pessoas", {"nome": nome, "vinculo": "Colaborador de campo"}, "t").ok
+    cab, linhas = ic.ler_csv(_csv(["UFV-002;Matões 100;sp leste 01;Beto Costa (Técnico de O&M)"], CAB_P))
+    p = ic.proposta(linhas, srv_p, cab, [])
+    assert p["pessoas_ambiguas"].get("Beto Costa")
+    assert not any(m["acao"] == "criar" for m in p["pessoas"])
+    assert "tecnico_om" not in {cid for m in p["mudancas"] for cid in m["formulario"]}

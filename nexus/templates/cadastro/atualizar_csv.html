@@ -64,13 +64,13 @@
     <div class="d">{% for lista, vals in p.novos_valores.items() %}{{ vals|join(', ') }}{% if not loop.last %} · {% endif %}{% else %}nenhum{% endfor %}</div></div>
 </div>
 
-{% if p.sem_pessoa or p.sem_cliente or p.sem_par or p.pessoas_varias_equipes or p.pessoas_desligadas_sem_ficha %}
+{% if p.sem_pessoa or p.sem_cliente or p.sem_par or p.pessoas_ambiguas or p.pessoas_desligadas_sem_ficha %}
 <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Para conferir (fica como está):</strong>
   <ul class="csv-avisos">
-    {% for nome, n in p.sem_pessoa.items() %}<li>Responsável O&amp;M “{{ nome }}”, {{ n }} usina(s): não está em Colaboradores. Cadastre e envie o arquivo de novo.</li>{% endfor %}
+    {% for nome, n in p.sem_pessoa.items() %}<li>Responsável O&amp;M “{{ nome }}”, {{ n }} usina(s): é região (vaga) ou serve a duas fichas.</li>{% endfor %}
     {% for nome, n in p.sem_cliente.items() %}<li>Cliente “{{ nome }}”, {{ n }} usina(s): não está em Clientes.</li>{% endfor %}
     {% for u in p.sem_par %}<li>{{ u.id_bd }} {{ u.nome }}: o ID não está no Registro mestre.</li>{% endfor %}
-    {% for x in p.pessoas_varias_equipes %}<li>{{ x.nome }} atende mais de uma equipe ({{ x.equipes|join(', ') }}): fica na equipe de hoje.</li>{% endfor %}
+    {% for nome, n in p.pessoas_ambiguas.items() %}<li>“{{ nome }}” serve a duas fichas em Colaboradores: não liga nem cria (confira as fichas).</li>{% endfor %}
     {% if p.pessoas_desligadas_sem_ficha %}<li>Desligado(s) no CSV e sem ficha (não entram): {{ p.pessoas_desligadas_sem_ficha|join(', ') }}.</li>{% endif %}
   </ul></div></div>
 {% endif %}
@@ -112,14 +112,14 @@
   </section>
   {% endfor %}
   {% if p.pessoas %}{% set n = p.pessoas|length %}{% set novas = p.pessoas|selectattr('acao', 'equalto', 'criar')|list|length %}
-  {# a coluna "Pessoas da equipe": completa o vazio das fichas e cria quem falta, com o e-mail do Fracttal (16/10/2026) #}
+  {# as fichas das pessoas que o CSV traz: cria quem falta (com o e-mail do Fracttal) e completa o vazio (16/10/2026) #}
   <section class="csv-grupo">
-    <h3 class="csv-secao">Pessoas das equipes</h3>
+    <h3 class="csv-secao">Colaboradores</h3>
     <div class="csv-item">
       <input type="checkbox" name="campos" value="pessoas" checked aria-label="Aplicar as pessoas das equipes">
       <details>
         <summary title="Colaboradores Operação">
-          <span class="csv-nome">Pessoas da equipe</span>
+          <span class="csv-nome">Fichas das pessoas do CSV</span>
           {% if novas %}<span class="cad-chip cad-chip--info">{{ novas }} {{ 'ficha nova' if novas == 1 else 'fichas novas' }}</span>{% endif %}
           <span class="csv-conta">{{ n }} {{ 'pessoa' if n == 1 else 'pessoas' }}</span>
           <i class="ph ph-caret-down csv-seta" aria-hidden="true"></i>
