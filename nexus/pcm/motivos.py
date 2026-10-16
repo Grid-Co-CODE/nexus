@@ -43,6 +43,7 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 import threading
 import time
 import unicodedata
@@ -73,7 +74,9 @@ _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
 
-# Os 11 do pedido (Levi, 16/10/2026), na ordem e com o texto dele: (nome, descrição, tira da programação). Os que tiram
+# Os 11 do pedido (Levi, 16/10/2026), na ordem e com o texto dele, os nomes na regra dele do mesmo dia ("Padronizar texto:
+# sempre a primeira letra maiúscula o resto minúscula conforme regra gramatical"; `padronizar`): (nome, descrição, tira
+# da programação). Os que tiram
 # são os que ele escolheu ("Aguardando e clima tiram da semana": os quatro Aguardando, Condições Climáticas e Pendente
 # recurso); Prioridade não muda a geração.
 CADASTRO_INICIAL = (
@@ -83,11 +86,11 @@ CADASTRO_INICIAL = (
                             "time de campo.", False),
     ("Performance", "Tarefas originadas com cunho que envolve a performance, para o time de backoffice ou para o time "
                     "de campo.", False),
-    ("Aguardando Cliente", "", True),
-    ("Aguardando Concessionária", "", True),
-    ("Aguardando Material", "", True),
-    ("Aguardando Fabricante/Terceiro", "", True),
-    ("Condições Climáticas Adversas", "", True),
+    ("Aguardando cliente", "", True),
+    ("Aguardando concessionária", "", True),
+    ("Aguardando material", "", True),
+    ("Aguardando fabricante/terceiro", "", True),
+    ("Condições climáticas adversas", "", True),
     ("Prioridade", "Prioridades a pedido do cliente.", False),
     ("Sinistro", "Casos de furto, incêndio, raios, vendaval ou outros casos anormais.", False),
     ("Pendente recurso", "Quando estiver pendente sobressalente, peça ou outro item, detalhes em observação.", True),
@@ -442,8 +445,19 @@ def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana:
     return r
 
 
-def _nome_motivo(nome) -> str:
+def padronizar(nome) -> str:
+    """A regra do Levi para o nome do motivo (16/10/2026, "sempre a primeira letra maiúscula o resto minúscula conforme
+    regra gramatical"), a MESMA do App de Campo: tudo minúsculo, menos a sigla de 2 a 4 letras escrita em maiúsculas (PCM,
+    COS, UFV), e a primeira letra maiúscula. "Aguardando Concessionária" -> "Aguardando concessionária"."""
     n = " ".join(str(nome or "").split())
+    n = re.sub(r"[^\W\d_]+", lambda m: m.group(0) if m.group(0).isupper() and 2 <= len(m.group(0)) <= 4
+               else m.group(0).lower(), n)
+    i = next((k for k, ch in enumerate(n) if ch.isalpha()), None)
+    return n if i is None else n[:i] + n[i].upper() + n[i + 1:]
+
+
+def _nome_motivo(nome) -> str:
+    n = padronizar(nome)
     if len(n) < NOME_MIN:
         raise Recusada("Escreva o nome do motivo.")
     if len(n) > NOME_MAX:

@@ -27,8 +27,8 @@ from test_pcm_quadro import _semana_teste
 PESSOA = {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa Teste"}
 T1 = {"os": "15596", "codigo": "ELF1-INV02", "tarefa": "[Grid Co.] - MPA - Inversor", "usina": "Cliente A - Usina 1 - SP",
       "cliente": "Cliente A", "tipo": "MPA"}
-TIRAM = {"Aguardando Cliente", "Aguardando Concessionária", "Aguardando Material", "Aguardando Fabricante/Terceiro",
-         "Condições Climáticas Adversas", "Pendente recurso"}
+TIRAM = {"Aguardando cliente", "Aguardando concessionária", "Aguardando material", "Aguardando fabricante/terceiro",
+         "Condições climáticas adversas", "Pendente recurso"}
 
 
 @pytest.fixture
@@ -76,9 +76,9 @@ def test_um_motivo_por_tarefa_e_o_desde(cfg, monkeypatch):
     """Levi: "Um só por tarefa". Marcar o mesmo motivo com a mesma observação não grava; trocar só a observação não
     reinicia o "desde"; trocar o motivo, sim; tirar e tirar de novo não grava."""
     rel = Relogio(monkeypatch)
-    am, si = _mid(cfg, "Aguardando Material"), _mid(cfg, "Sinistro")
+    am, si = _mid(cfg, "Aguardando material"), _mid(cfg, "Sinistro")
     r = M.marcar(cfg, T1, am, "falta o IGBT", PESSOA)
-    assert r["gravou"] and r["marca"]["motivo"] == "Aguardando Material" and r["marca"]["tira"]
+    assert r["gravou"] and r["marca"]["motivo"] == "Aguardando material" and r["marca"]["tira"]
     t0 = r["marca"]["desde"]
     assert not M.marcar(cfg, T1, am, "falta o IGBT", PESSOA)["gravou"]
     r = M.marcar(cfg, T1, am, "falta o IGBT; chega dia 20", PESSOA)
@@ -97,20 +97,20 @@ def test_um_motivo_por_tarefa_e_o_desde(cfg, monkeypatch):
 def test_marca_da_os_e_marca_do_ativo(cfg):
     """A marca pelo número da OS (o painel, pela Gestão PCM, sem código) vale para a tarefa em todos os ativos; a do
     ativo (o Quadro) vence a da OS naquele ativo; tirar a do ativo volta a valer a da OS."""
-    ac, am = _mid(cfg, "Aguardando Cliente"), _mid(cfg, "Aguardando Material")
+    ac, am = _mid(cfg, "Aguardando cliente"), _mid(cfg, "Aguardando material")
     M.marcar(cfg, dict(T1, codigo=""), ac, "", PESSOA, origem="painel")
     idx = M.indice(_vig(cfg))
-    assert M.motivo_de(idx, "15596", "ELF1-INV02", T1["tarefa"])["motivo"] == "Aguardando Cliente"
-    assert M.motivo_de(idx, "15596", "ELF1-INV03", T1["tarefa"])["motivo"] == "Aguardando Cliente"
+    assert M.motivo_de(idx, "15596", "ELF1-INV02", T1["tarefa"])["motivo"] == "Aguardando cliente"
+    assert M.motivo_de(idx, "15596", "ELF1-INV03", T1["tarefa"])["motivo"] == "Aguardando cliente"
     assert M.motivo_de(idx, "15596", "ELF1-INV02", "[Grid Co.] - MPA - Trafo") is None
     M.marcar(cfg, T1, am, "", PESSOA)
     idx = M.indice(_vig(cfg))
-    assert M.motivo_de(idx, "15596", "ELF1-INV02", T1["tarefa"])["motivo"] == "Aguardando Material"
-    assert M.motivo_de(idx, "15596", "ELF1-INV03", T1["tarefa"])["motivo"] == "Aguardando Cliente"
+    assert M.motivo_de(idx, "15596", "ELF1-INV02", T1["tarefa"])["motivo"] == "Aguardando material"
+    assert M.motivo_de(idx, "15596", "ELF1-INV03", T1["tarefa"])["motivo"] == "Aguardando cliente"
     # a OS, o código e o nome casam sem caixa, acento nem espaço a mais (como o robô compara)
-    assert M.motivo_de(idx, 15596.0, " elf1-inv02", "[grid co.]  -  mpa - inversor ")["motivo"] == "Aguardando Material"
+    assert M.motivo_de(idx, 15596.0, " elf1-inv02", "[grid co.]  -  mpa - inversor ")["motivo"] == "Aguardando material"
     M.marcar(cfg, T1, None, "", PESSOA)
-    assert M.motivo_de(M.indice(_vig(cfg)), "15596", "ELF1-INV02", T1["tarefa"])["motivo"] == "Aguardando Cliente"
+    assert M.motivo_de(M.indice(_vig(cfg)), "15596", "ELF1-INV02", T1["tarefa"])["motivo"] == "Aguardando cliente"
     with pytest.raises(M.Recusada):
         M.marcar(cfg, dict(T1, os="abc"), ac, "", PESSOA)
     with pytest.raises(M.Recusada):
@@ -125,9 +125,10 @@ def test_cadastro_tirar_nao_reusa_o_id_e_a_marca_deixa_de_valer(cfg):
     assert len(_vig(cfg)) == 1
     M.cadastro(cfg, "excluir", PESSOA, motivo_id=pr)
     assert _vig(cfg) == {} and "Pendente recurso" not in {m["nome"] for m in M.ativos(M.ler(cfg, forcar=True))}
-    novo = M.cadastro(cfg, "criar", PESSOA, nome="Aguardando Laudo", descricao="Laudo da engenharia", tira=True)
+    novo = M.cadastro(cfg, "criar", PESSOA, nome="aguardando LAUDO da COS", descricao="Laudo da engenharia", tira=True)
+    assert novo["nome"] == "Aguardando laudo da COS"           # a regra do Levi: 1ª maiúscula, sigla fica (16/10/2026)
     assert novo["motivo_id"] == 12                                # o 11 não volta
-    for nome in ("aguardando laudo", "a", "x@y.com", "x" * (M.NOME_MAX + 1)):
+    for nome in ("AGUARDANDO LAUDO DA COS", "a", "x@y.com", "x" * (M.NOME_MAX + 1)):
         with pytest.raises(M.Recusada):
             M.cadastro(cfg, "criar", PESSOA, nome=nome)
     pri = _mid(cfg, "Prioridade")
@@ -159,7 +160,7 @@ def test_backoffice_vale_a_ultima_decisao_de_cada_nome(cfg):
 def test_nada_em_claro_no_livro(cfg):
     """A API do banco tem leitura aberta (regra 8): a tarefa, a usina, a observação, o nome do backoffice e quem marcou
     vão só cifrados. Em claro: a OS, o código do ativo, o equipamento_id e o tarefa_chave."""
-    M.marcar(cfg, T1, _mid(cfg, "Aguardando Material"), "falta o IGBT, avisar Fulano de Tal", PESSOA)
+    M.marcar(cfg, T1, _mid(cfg, "Aguardando material"), "falta o IGBT, avisar Fulano de Tal", PESSOA)
     M.backoffice_definir(cfg, "Beltrana Ramos", True, PESSOA)
     cru = open(cfg["NEXUS_PCM_MOTIVOS_ARQUIVO"], encoding="utf-8").read()
     for texto in ("Fulano", "IGBT", "MPA - Inversor", "Usina 1", "Cliente A", "Beltrana", "pessoa.teste", "Pessoa Teste"):
@@ -177,7 +178,7 @@ def test_nada_em_claro_no_livro(cfg):
 
 # ── o arquivo do motor, do robô e do App ──────────────────────────────────────────────────────────────────────
 def test_arquivo_do_robo_sem_observacao_nem_quem(cfg):
-    M.marcar(cfg, T1, _mid(cfg, "Aguardando Material"), "obs que não sai", PESSOA)
+    M.marcar(cfg, T1, _mid(cfg, "Aguardando material"), "obs que não sai", PESSOA)
     M.marcar(cfg, {"os": 15020, "codigo": "", "tarefa": "Limpeza de módulos"}, _mid(cfg, "Engenharia"), "", PESSOA,
              origem="painel")
     M.backoffice_definir(cfg, "Beltrana Ramos", True, PESSOA)
@@ -192,7 +193,7 @@ def test_arquivo_do_robo_sem_observacao_nem_quem(cfg):
     assert all(m["ativo"] for m in a["motivos"])
     # o texto vai como está na linha da programação (o App de Campo casa sem normalizar); a tarefa é a mesma
     M.marcar(cfg, {"os": "15700", "codigo": "ELF1-INV09 ", "tarefa": " [Grid Co.]  -  MPA - Inversor"},
-             _mid(cfg, "Aguardando Material"), "", PESSOA)
+             _mid(cfg, "Aguardando material"), "", PESSOA)
     t = next(t for t in M.arquivo(cfg)["tarefas"] if t["os"] == "15700")
     assert (t["codigo"], t["tarefa"]) == ("ELF1-INV09", "[Grid Co.]  -  MPA - Inversor")
     assert M.motivo_de(M.indice(_vig(cfg)), "15700", "elf1-inv09", "[Grid Co.] - MPA - Inversor")
@@ -206,7 +207,7 @@ def test_arquivo_do_robo_sem_observacao_nem_quem(cfg):
 
 
 def test_a_rodada_escreve_o_arquivo_e_usa_a_copia_quando_o_banco_cai(cfg, tmp_path, monkeypatch):
-    M.marcar(cfg, T1, _mid(cfg, "Aguardando Material"), "", PESSOA)
+    M.marcar(cfg, T1, _mid(cfg, "Aguardando material"), "", PESSOA)
     M.backoffice_definir(cfg, "Beltrana Ramos", True, PESSOA)
     trab = tmp_path / "trab"
     (tmp_path / "r1").mkdir()
@@ -235,7 +236,7 @@ def test_a_geracao_leva_o_arquivo_para_o_motor(config, tmp_path):
     M.limpar()
     cfg = dict(config, NEXUS_PCM_MOTIVOS_ARQUIVO=str(tmp_path / "motivos.json"), NEXUS_CHAVE_CADASTRO=gerar_chave(),
                NEXUS_PESSOA_HMAC="chave-hmac-de-teste")
-    M.marcar(cfg, T1, _mid(cfg, "Aguardando Cliente"), "", PESSOA)
+    M.marcar(cfg, T1, _mid(cfg, "Aguardando cliente"), "", PESSOA)
     r = G.iniciar(cfg, "2026-W41")
     st = G.aguardar(cfg, r["id"], 60)
     assert st["estado"] == "ok", st
@@ -247,7 +248,7 @@ def test_a_geracao_leva_o_arquivo_para_o_motor(config, tmp_path):
 def test_github_so_grava_o_que_mudou(cfg):
     gh = GitHubFalso()
     cfg.update(NEXUS_PCM_GITHUB_TOKEN="tok-teste", NEXUS_PCM_GITHUB_SESSAO=gh)
-    M.marcar(cfg, T1, _mid(cfg, "Aguardando Material"), "", PESSOA)
+    M.marcar(cfg, T1, _mid(cfg, "Aguardando material"), "", PESSOA)
     r = M.publicar_arquivo(cfg)
     assert r["commit"] and not r["igual"] and len(gh.commits) == 1
     no_repo = json.loads(gh.arquivos[M.ARQUIVO].decode("utf-8"))
@@ -318,13 +319,13 @@ def test_quem_marca_e_quem_mexe_no_cadastro(app, tela, monkeypatch):
     assert not _dados(c.get("/t/pcm/quadro").get_data(as_text=True))["pode_marcar"]
     _no_setor(monkeypatch, "Responsáveis UFV")
     r = c.post("/t/pcm/quadro/motivo", json=marca)
-    assert r.status_code == 200 and r.get_json()["ok"] and r.get_json()["marca"]["n"] == "Aguardando Material"
+    assert r.status_code == 200 and r.get_json()["ok"] and r.get_json()["marca"]["n"] == "Aguardando material"
     assert c.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "criar", "nome": "Novo"}).status_code == 403
     _no_setor(monkeypatch, "pcm")
-    r = c.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "criar", "nome": "Aguardando Laudo", "tira": "1"})
+    r = c.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "criar", "nome": "Aguardando laudo", "tira": "1"})
     assert r.status_code == 303 and "ver=cadastro" in r.headers["Location"]
     html = c.get("/t/pcm/fora-da-programacao?ver=cadastro").get_data(as_text=True)
-    assert "Motivo Aguardando Laudo incluído." in html and "Aguardando Laudo" in html
+    assert "Motivo Aguardando laudo incluído." in html and "Aguardando laudo" in html
     # pedido de outro site não grava, nem para quem pode
     assert c.post("/t/pcm/quadro/motivo", json=marca, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
 
@@ -334,7 +335,7 @@ def test_janela_do_quadro_marca_a_tarefa_da_semana(app, logado, tela):
     d = _dados(html)
     assert d["pode_marcar"] and len(d["motivos"]) == 11 and d["url_motivo"] == "/t/pcm/quadro/motivo"
     assert '<span class="q-mp' not in html                       # nada marcado ainda: nenhum selo
-    am = next(m[0] for m in d["motivos"] if m[1] == "Aguardando Material")
+    am = next(m[0] for m in d["motivos"] if m[1] == "Aguardando material")
     cab = {"semana": "2026-W41", "os": "5", "tarefa": "[Grid Co.] - MPM - Cabine", "codigo": "UFV1-CAB01"}
     # a tarefa vem da semana: OS, nome ou código que a semana não tem não gravam
     for errado in (dict(cab, os="999"), dict(cab, tarefa="Outra"), dict(cab, codigo="UFV1-XX")):
@@ -342,7 +343,7 @@ def test_janela_do_quadro_marca_a_tarefa_da_semana(app, logado, tela):
         assert r.status_code == 400 and not r.get_json()["ok"]
     assert logado.post("/t/pcm/quadro/motivo", json=cab).status_code == 400            # sem motivo
     r = logado.post("/t/pcm/quadro/motivo", json=dict(cab, motivo_id=am, obs="falta o disjuntor")).get_json()
-    assert r["ok"] and r["gravou"] and not r["geral"] and r["efetiva"]["n"] == "Aguardando Material"
+    assert r["ok"] and r["gravou"] and not r["geral"] and r["efetiva"]["n"] == "Aguardando material"
     assert "robô do PCM tira a tarefa da semana em curso" in r["efeito"] and r["arquivo"]["ok"]
     assert len(tela.commits) == 1 and tela.commits[0]["caminho"] == M.ARQUIVO
     # o que o App de Campo recebe: a tarefa como na linha, com usina, cluster e o dia em que estava na agenda
@@ -355,7 +356,7 @@ def test_janela_do_quadro_marca_a_tarefa_da_semana(app, logado, tela):
     html = logado.get("/t/pcm/quadro").get_data(as_text=True)
     d = _dados(html)
     cabine = next(i for i in d["itens"] if i["t"].endswith("Cabine"))
-    assert cabine["mp"]["n"] == "Aguardando Material" and cabine["mp"]["obs"] == "falta o disjuntor"
+    assert cabine["mp"]["n"] == "Aguardando material" and cabine["mp"]["obs"] == "falta o disjuntor"
     assert "mp" not in next(i for i in d["itens"] if i["t"].endswith("Trafo"))
     assert html.count('q-mp q-mp--tira"') == 1
     # tirar
@@ -367,7 +368,7 @@ def test_janela_do_quadro_marca_a_tarefa_da_semana(app, logado, tela):
 
 def test_janela_do_quadro_mexe_na_marca_da_os(app, logado, tela):
     """A pendente sem código (a do App) marca pela OS; na janela, trocar a marca da OS mexe nela."""
-    ac = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando Cliente")
+    ac = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando cliente")
     fus = {"semana": "2026-W41", "os": "6", "tarefa": "Troca de fusível", "codigo": ""}
     r = logado.post("/t/pcm/quadro/motivo", json=dict(fus, motivo_id=ac)).get_json()
     assert r["ok"] and r["geral"] and r["marca"]["geral"]
@@ -375,14 +376,14 @@ def test_janela_do_quadro_mexe_na_marca_da_os(app, logado, tela):
     assert [(m["os"], m["codigo"]) for m in vig.values()] == [("6", "")]
     # a linha da agenda TEM código, mas a marca que vale nela foi feita pela OS (no painel): trocar e tirar na janela
     # mexem nessa marca (em todos os ativos), e não criam uma marca do ativo por cima
-    am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando Material")
+    am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando material")
     M.marcar(app.config, {"os": "5", "codigo": "", "tarefa": "[Grid Co.] - MPM - Cabine"}, ac, "", PESSOA, origem="painel")
     cab = {"semana": "2026-W41", "os": "5", "tarefa": "[Grid Co.] - MPM - Cabine", "codigo": "UFV1-CAB01"}
     r = logado.post("/t/pcm/quadro/motivo", json=dict(cab, motivo_id=am)).get_json()
-    assert r["ok"] and r["gravou"] and r["geral"] and r["efetiva"]["n"] == "Aguardando Material"
+    assert r["ok"] and r["gravou"] and r["geral"] and r["efetiva"]["n"] == "Aguardando material"
     vig = {k: v for k, v in M.vigentes(app.config, M.ler(app.config, forcar=True)).items() if not k.startswith("_")}
     assert sorted((m["os"], m["codigo"], m["motivo"]) for m in vig.values()) == [
-        ("5", "", "Aguardando Material"), ("6", "", "Aguardando Cliente")]
+        ("5", "", "Aguardando material"), ("6", "", "Aguardando cliente")]
     r = logado.post("/t/pcm/quadro/motivo", json=dict(cab, tirar=True)).get_json()
     assert r["ok"] and r["gravou"] and r["efetiva"] is None
     vig = {k: v for k, v in M.vigentes(app.config, M.ler(app.config, forcar=True)).items() if not k.startswith("_")}
@@ -392,7 +393,7 @@ def test_janela_do_quadro_mexe_na_marca_da_os(app, logado, tela):
 def test_painel_fora_da_programacao(app, logado, tela):
     cfg = app.config
     am, ac, en, conc = (next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == n) for n in (
-        "Aguardando Material", "Aguardando Cliente", "Engenharia", "Aguardando Concessionária"))
+        "Aguardando material", "Aguardando cliente", "Engenharia", "Aguardando concessionária"))
     M.marcar(cfg, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine",
                    "usina": "Cliente A - Usina 1 - SP"}, am, "falta o disjuntor", PESSOA)
     M.marcar(cfg, {"os": "6", "codigo": "", "tarefa": "Troca de fusível"}, ac, "", PESSOA)       # finalizada
@@ -401,7 +402,7 @@ def test_painel_fora_da_programacao(app, logado, tela):
     assert "falta o disjuntor" in html and "UFV1-CAB01" in html and "Troca de fusível" not in html
     assert "termográfica do trafo 9" not in html and "1 finalizada no Fracttal saiu daqui" in html
     filtro = html.split('id="f-motivo"', 1)[1].split("</select>", 1)[0]
-    assert "Aguardando Material (1)" in filtro and "Aguardando Cliente" not in filtro    # o filtro lista o que existe
+    assert "Aguardando material (1)" in filtro and "Aguardando cliente" not in filtro    # o filtro lista o que existe
     html = " ".join(logado.get(f"/t/pcm/fora-da-programacao?motivo={ac}").get_data(as_text=True).split())
     assert "Nenhuma tarefa fora da programação com esse motivo." in html
     # marcar pela OS: as tarefas abertas da Gestão PCM (a mesma tarefa em dois ativos vira uma linha)
@@ -411,7 +412,7 @@ def test_painel_fora_da_programacao(app, logado, tela):
                                                                  "motivo_id": conc, "v_os": "7"})
     assert r.status_code == 303 and "os=7" in r.headers["Location"]
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
-    assert "OS 7: Aguardando Concessionária." in html and "todos os ativos da OS" in html and "Limpeza do inversor" in html
+    assert "OS 7: Aguardando concessionária." in html and "todos os ativos da OS" in html and "Limpeza do inversor" in html
     # tirar pelo painel
     item = next(k for k, m in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if m["os"] == "7")
     logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": item, "tirar": "1"})
@@ -419,7 +420,7 @@ def test_painel_fora_da_programacao(app, logado, tela):
 
 
 def test_painel_recusa_finalizada_e_os_fora_da_gestao(app, logado, tela):
-    am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando Material")
+    am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando material")
     logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "6", "tarefa": "Troca de fusível", "motivo_id": am})
     assert "Essa tarefa já foi finalizada no Fracttal." in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
     logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "9", "tarefa": "Qualquer", "motivo_id": am})
@@ -459,7 +460,7 @@ def test_o_motor_e_o_robo_leem_o_arquivo_do_nexus(cfg, tmp_path):
     vence a da OS (também a que não tira), a OS como inteiro, o código sem espaço e sem caixa, o nome sem acento; o
     backoffice pelo nome sem acento. Mudou a regra num lado, este teste quebra."""
     F = _leitor_do_pcm()
-    am, en = _mid(cfg, "Aguardando Material"), _mid(cfg, "Engenharia")
+    am, en = _mid(cfg, "Aguardando material"), _mid(cfg, "Engenharia")
     M.marcar(cfg, T1, am, "", PESSOA)                                                   # do ativo, tira
     M.marcar(cfg, {"os": 15020, "codigo": "", "tarefa": "Limpeza de módulos"}, am, "", PESSOA, origem="painel")
     M.marcar(cfg, {"os": 15020, "codigo": "UFV2-INV01", "tarefa": "Limpeza de módulos"}, en, "", PESSOA)
@@ -468,10 +469,10 @@ def test_o_motor_e_o_robo_leem_o_arquivo_do_nexus(cfg, tmp_path):
     (tmp_path / F.ARQUIVO).write_bytes(M.bytes_do_arquivo(M.arquivo(cfg)))
     fora = F.carregar(str(tmp_path))
     assert not fora["erro"] and fora["n_tarefas"] == 2 and len(fora["marcas"]) == 4
-    assert F.motivo_que_tira(fora, 15596, "ELF1-INV02", T1["tarefa"]) == "Aguardando Material"
-    assert F.motivo_que_tira(fora, "15596.0", " elf1-inv02", "[grid co.]  -  MPA - inversor ") == "Aguardando Material"
+    assert F.motivo_que_tira(fora, 15596, "ELF1-INV02", T1["tarefa"]) == "Aguardando material"
+    assert F.motivo_que_tira(fora, "15596.0", " elf1-inv02", "[grid co.]  -  MPA - inversor ") == "Aguardando material"
     assert F.motivo_que_tira(fora, 15596, "ELF1-INV03", T1["tarefa"]) is None          # outro ativo, sem marca
-    assert F.motivo_que_tira(fora, 15020, "UFV2-INV02", "Limpeza de modulos") == "Aguardando Material"   # a da OS
+    assert F.motivo_que_tira(fora, 15020, "UFV2-INV02", "Limpeza de modulos") == "Aguardando material"   # a da OS
     assert F.motivo_que_tira(fora, 15020, "UFV2-INV01", "Limpeza de módulos") is None   # o ativo com marca própria
     assert F.motivo_que_tira(fora, 15030, "X1", "Inspeção") is None                     # marca que não tira
     assert F.do_backoffice(fora, "  rogerio  FICTICIO ") and not F.do_backoffice(fora, "Rógerio")
@@ -504,12 +505,12 @@ def test_o_tecnico_marca_pelo_app(app, logado, tela):
     """O App manda a marca assinada (chave derivada da NEXUS_PESSOA_HMAC, como as fotos dos extintores); vale na hora:
     grava como a do PCM (origem app, quem marcou pelo código do técnico) e o arquivo do robô vai ao repositório."""
     cfg = app.config
-    am, en = (next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == n) for n in ("Aguardando Material", "Engenharia"))
+    am, en = (next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == n) for n in ("Aguardando material", "Engenharia"))
     cab = {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": am,
            "obs": "falta o disjuntor", "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
     r = _pelo_app(app, cab)
     j = r.get_json()
-    assert r.status_code == 200 and j["gravou"] and j["marca"]["n"] == "Aguardando Material" and j["marca"]["app"]
+    assert r.status_code == 200 and j["gravou"] and j["marca"]["n"] == "Aguardando material" and j["marca"]["app"]
     ultima = json.loads(open(cfg["NEXUS_PCM_MOTIVOS_ARQUIVO"], encoding="utf-8").read())[M.ABA_MARCA][-1]
     assert ultima["origem"] == "app" and ultima["decidida_por_hmac"] == TEC and "Técnico Teste" not in json.dumps(ultima)
     no_repo = json.loads(tela.arquivos[M.ARQUIVO])["tarefas"][0]
@@ -537,7 +538,7 @@ def test_o_tecnico_marca_pelo_app(app, logado, tela):
 
 def test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava(app, tela, monkeypatch):
     cfg = app.config
-    am = next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == "Aguardando Material")
+    am = next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == "Aguardando material")
     cab = {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": am,
            "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
     from nexus.pcm import motivos_app as MA
@@ -556,3 +557,13 @@ def test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava(app, tela, 
     from nexus.auth import ROTAS_PUBLICAS
     assert "torre_pcm.motivo_do_app" in ROTAS_PUBLICAS
     assert app.test_client().get("/t/pcm/motivos/app").status_code in (302, 405)
+
+
+def test_nome_do_motivo_na_regra_do_levi():
+    """Levi, 16/10/2026: "Padronizar texto: sempre a primeira letra maiúscula o resto minúscula conforme regra gramatical"
+    — a mesma regra do App de Campo (a sigla de 2 a 4 letras em maiúsculas fica)."""
+    assert [M.padronizar(s) for s in ("Aguardando Concessionária", "  aguardando Peça do FORNECEDOR  PCM ",
+                                      "Chamados (garantia)", "Aguardando Fabricante/Terceiro", "UFV parada")] == [
+        "Aguardando concessionária", "Aguardando peça do fornecedor PCM", "Chamados (garantia)",
+        "Aguardando fabricante/terceiro", "UFV parada"]
+    assert all(m["nome"] == M.padronizar(m["nome"]) for m in M.cadastro_inicial())

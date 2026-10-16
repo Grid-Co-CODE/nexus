@@ -136,6 +136,11 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   Quadro) e manda o arquivo do robô na hora. Respostas: 200 {ok, gravou, marca, arquivo_em_dia}; 400 pedido fora do
   formato ou motivo que não existe; 401 assinatura ou hora; 404 tarefa; 503 sem a chave ou banco fora. Testes:
   `test_o_tecnico_marca_pelo_app` e `test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava`.
+- **O nome do motivo** segue a regra do Levi (16/10/2026, "Padronizar texto: sempre a primeira letra maiúscula o resto
+  minúscula conforme regra gramatical"), a MESMA do App: tudo minúsculo menos a sigla de 2 a 4 letras escrita em
+  maiúsculas (PCM, COS, UFV), e a 1ª letra maiúscula (`motivos.padronizar`). O cadastro inicial já nasce assim
+  ("Aguardando concessionária", "Condições climáticas adversas"); o que se cria ou edita na tela é padronizado ao gravar.
+  O App escolhe a frase do técnico pelo id (Engenharia 1, Performance 3, Prioridade 9): renomear não quebra.
 - **Os que tiram da programação** (o cadastro inicial: os quatro Aguardando, Condições Climáticas Adversas e Pendente
   recurso; Prioridade não muda a geração): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as
   linhas dela (agenda e `_Pendentes`, STEP A3b) e o STEP A2 não a inclui de novo. Tirar o motivo: a tarefa volta na
