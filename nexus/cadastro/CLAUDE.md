@@ -139,8 +139,24 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
   prévia para a pessoa decidir a coluna. Em 15/10: 48 marcas (fabricante dos módulos 11, concessionária 10, modelo do
   inversor 9...).
 - Link do mapa que não é endereço (11 usinas com coordenada em graus no lugar do link) fica de fora, listado.
-- As 20 colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, Pessoas a contratar, os kits...) ficam de
+- As 19 colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, Pessoas a contratar, os kits...) ficam de
   fora e a prévia as lista.
+- **"Pessoas da equipe"** ("Nome (Cargo), Nome (Cargo · Desligado)"; só a vírgula separa: "Manuel ... da Silva e Silva"
+  é um nome só). Levi, 16/10: "procure esses 5 no fractall, faça a relação e adicione no Nexus, não podemos ficar sem
+  informação! Se adapte". O furo daquele dia: a pessoa casava só pelo nome completo, e o CSV escreve "Bruno Samiel..." e
+  "Italo Vitor das Virgens..." onde a ficha tem "Bruno Samuel..." e "Italo Vitor Dasvirgens..."; agora casa também pelo
+  **nome padrão calculado** (`_indice_pessoas`: "Bruno Albuquerque" está contido no nome do CSV), e o Responsável O&M
+  ganha o mesmo índice. Da ficha que casa, completa **só o vazio**: cargo (o do CSV: "Técnico de O&M" → Técnico O&M,
+  "Eletricista", "Mantenedor"/"Man"), status (Ativo, ou Desligado quando o CSV marca) e o **e-mail da conta do
+  Fracttal** (é o e-mail que liga a ficha ao Fracttal, o critério do login; a conta casa pelo nome, uma só), e põe na
+  equipe do CSV quando ele dá UMA equipe (quem atende duas, como os 4 de 16/10, fica e é avisado). Quem não tem ficha e
+  não está desligado ganha uma (Colaborador de campo, cargo e equipe do CSV, Ativo), com o nome e o e-mail da conta do
+  Fracttal quando ela existe. A conta do Fracttal também acha a ficha de outro nome pelo e-mail (completa em vez de
+  criar). O pessoal do Fracttal vem de `fracttal_pessoal.ler_pessoal()` (1 hora; Fracttal fora = a ficha nasce sem
+  e-mail). Na prévia é o grupo "Pessoas das equipes", uma caixa de marcar só. **16/10, real:** no PC, o Caio da Silva
+  Cordeiro (conta ativa no Fracttal, sem ficha) foi criado e o Bruno Albuquerque completado à mão primeiro (ficha 135 e
+  100); a regra depois completou 29 fichas (24 mantenedores sem cargo e status, 5 e-mails do Fracttal conferidos nome a
+  nome). Italo e Manuel não têm conta no Fracttal (ficha certa, nada a relacionar).
 
 **Onde grava:** no cadastro da máquina em que a tela abre (`NEXUS_ARMAZEM_LOCAL`: o do servidor em app.gridco.com.br; o do
 PC em `C:\GridcoAuto\nexus\cadastro_ensaio.json`). Os dois e a cópia no banco (`cadastro_nexus`) são donos

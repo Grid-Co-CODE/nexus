@@ -28,7 +28,15 @@ As regras (as decisões do Levi no mesmo dia, e o que o ensaio com o cadastro mo
   Prado"): eram 203 usinas sem par pelo nome inteiro. O que não casa fica como está e é listado;
 - o valor do CSV contido no do Nexus, que tem mais detalhe ("SUN2000-250KTL-H1 + SUN2000-330KTL-H1" vira
   "SUN2000-250KTL-H1"), é marcado na prévia ("o CSV resume"), para a pessoa decidir a coluna;
-- as colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, os kits...) ficam de fora e são listadas.
+- as colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, os kits...) ficam de fora e são listadas;
+- "Pessoas da equipe" ("Nome (Cargo), Nome (Cargo · Desligado)"; Levi, 16/10: "procure esses 5 no fractall, faça a
+  relação e adicione no Nexus, não podemos ficar sem informação! Se adapte"): a pessoa casa também pelo NOME PADRÃO
+  calculado (o furo de 16/10: o CSV escreve "Bruno Samiel Anjos Albuquerque" e "Italo Vitor das Virgens Oliveira", a
+  ficha "Bruno Samuel..." e "Italo Vitor Dasvirgens...", e os padrões "Bruno Albuquerque" e "Italo Oliveira" estão
+  contidos no nome do CSV). Da ficha que casa, completa só o VAZIO (cargo, status, e-mail da conta do Fracttal, que é o
+  que liga a ficha ao Fracttal) e põe na equipe do CSV quando ele a dá numa equipe só (quem atende duas fica e é
+  listado). Quem não tem ficha e não está desligado ganha uma (Colaborador de campo, o cargo e a equipe do CSV, Ativo),
+  com o nome e o e-mail da conta do Fracttal quando ela existe (o Caio da Silva Cordeiro, 16/10).
 """
 import csv
 import io
@@ -64,6 +72,11 @@ COLUNAS = {
     "Acesso visualização": "acesso_visualizacao", "Databook": "databook",
 }
 REFS = {"Cliente": "cliente", "Equipe": "equipe", "Responsável O&M": "responsavel_om"}
+COL_PESSOAS = "Pessoas da equipe"
+CAMPO_PESSOAS = "pessoas"                   # a "coluna" das pessoas na prévia (a caixa de marcar dela)
+VINCULO_NOVO = "Colaborador de campo"
+# o cargo como o CSV escreve ("Técnico de O&M", "Eletricista", "Mantenedor", "Man") -> o da lista do cadastro
+_CARGOS = (("tecnic", "Técnico O&M"), ("eletric", "Eletricista O&M"), ("manten", "Mantenedor O&M"))
 _NUMERICOS = ("numero", "moeda", "coordenada")
 _PLACEHOLDER_CODIGO = {"codigo"}            # chave_texto("CÓDIGO")
 # o que sobra do valor do Nexus tirado o do CSV e que NÃO é detalhe: unidade e pontuação ("575 Wp" -> "575")
@@ -148,6 +161,43 @@ def _contido(curto: list, longo: list) -> bool:
     return all(t in resto for t in curto)
 
 
+def _cargo_do_csv(texto):
+    k = chave_texto(texto)
+    for prefixo, cargo in _CARGOS:
+        if k.startswith(prefixo):
+            return cargo
+    return "Mantenedor O&M" if k == "man" else None
+
+
+def pessoas_da_celula(texto) -> list[tuple]:
+    """'Fulana Prado (Técnico de O&M), Beltrano Nunes (Eletricista · Desligado)' -> [(nome, cargo, desligado)]. Só a
+    vírgula separa: "Manuel ... da Silva e Silva" é um nome só."""
+    out = []
+    for parte in str(texto or "").split(","):
+        m = re.match(r"^\s*(.*?)\s*(?:\(([^)]*)\))?\s*$", parte)
+        nome = _limpo(m.group(1)) if m else ""
+        if not nome:
+            continue
+        info = [x.strip() for x in re.split(r"[·•|]", (m.group(2) or "")) if x.strip()]
+        cargo = next((c for c in (_cargo_do_csv(x) for x in info) if c), None)
+        out.append((nome, cargo, any(chave_texto(x) == "desligado" for x in info)))
+    return out
+
+
+def _primeiro_e_ultimo(nome) -> str:
+    partes = str(nome or "").split()
+    return f"{partes[0]} {partes[-1]}" if len(partes) > 1 else " ".join(partes)
+
+
+def _indice_pessoas(srv) -> list:
+    """(id, [nome completo, nome padrão]) das fichas; o padrão é o CALCULADO quando a ficha não tem um digitado."""
+    out = []
+    for r in srv.registros("pessoas"):
+        padrao = r.valor("nome_padrao") if r.ent.tem("nome_padrao") else None
+        out.append((r.id, [_nomes(r.valores.get("nome")), _nomes("" if padrao is ERRO else padrao)]))
+    return out
+
+
 def _achar_pessoa(texto, pessoas: list):
     """O id da pessoa do cadastro, ou None (ninguém, ou mais de uma que serve: não adivinha)."""
     alvo = _nomes(texto)
@@ -160,9 +210,11 @@ def _achar_pessoa(texto, pessoas: list):
     return next(iter(parecidos)) if len(parecidos) == 1 else None
 
 
-def proposta(linhas: list, srv, cabecalho=None) -> dict:
+def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
     """O que a atualização faria, sem gravar nada: as usinas que mudam (campo a campo, antes e depois), por coluna, o que
-    fica como está e por quê, as equipes e os valores de lista novos, e o que não casou."""
+    fica como está e por quê, as equipes e os valores de lista novos, o que não casou e as pessoas das equipes.
+    `fracttal` = o pessoal do Fracttal (`fracttal_pessoal.ler_pessoal()["pessoas"]`: nome, email, conta_ativa); sem
+    ele, a ficha nova nasce sem e-mail."""
     ent = ENTIDADES["usinas"]
     campo = {c.id: c for c in ent.campos}
     usinas = {}
@@ -173,8 +225,7 @@ def proposta(linhas: list, srv, cabecalho=None) -> dict:
     listas = srv.listas()
     clientes = {chave_texto(r.valores.get("nome")): r.id for r in srv.registros("clientes")}
     equipes = {chave_texto(r.valores.get("nome")): r for r in srv.registros("equipes")}
-    pessoas = [(r.id, [_nomes(r.valores.get("nome")), _nomes(r.valores.get("nome_padrao"))])
-               for r in srv.registros("pessoas")]
+    pessoas = _indice_pessoas(srv)
     colunas = {**COLUNAS, **REFS}
     por_campo = {cid: {"campo": cid, "coluna": col, "rotulo": campo[cid].rotulo, "oculto": bool(campo[cid].oculto),
                        "secao": campo[cid].secao, "linhas": [], "resumem": 0}
@@ -275,14 +326,100 @@ def proposta(linhas: list, srv, cabecalho=None) -> dict:
         if form:
             mudancas.append({"usina_id": r.id, "id_bd": k, "nome": r.titulo, "versao": r.versao, "formulario": form})
     cab = list(cabecalho or (linhas[0].keys() if linhas else []))
-    sem_campo = [c for c in cab if c and c != ID and c not in COLUNAS and c not in REFS]
+    sem_campo = [c for c in cab if c and c != ID and c not in COLUNAS and c not in REFS and c != COL_PESSOAS]
+    pessoas_mudam, varias_equipes, desligadas_sem_ficha = _proposta_pessoas(linhas, srv, usinas, equipes, pessoas,
+                                                                             fracttal or [])
     return {"mudancas": mudancas, "sem_par": sem_par, "total": len(vistos),
             "por_campo": [pc for pc in por_campo.values() if pc["linhas"]],
             "vazios": dict(vazios.most_common()), "arredondados": dict(arredondados.most_common()),
             "ignorados": dict(ignorados), "ilegiveis": ilegiveis, "sem_cliente": dict(sem_cliente.most_common()),
             "sem_pessoa": dict(sem_pessoa.most_common()),
             "novos_valores": {lista: sorted(v.values()) for lista, v in novos_valores.items()},
-            "equipes_novas": sorted(equipes_novas.values(), key=chave_texto), "sem_campo": sem_campo}
+            "equipes_novas": sorted(equipes_novas.values(), key=chave_texto), "sem_campo": sem_campo,
+            "pessoas": pessoas_mudam, "pessoas_varias_equipes": varias_equipes,
+            "pessoas_desligadas_sem_ficha": desligadas_sem_ficha}
+
+
+def _proposta_pessoas(linhas, srv, usinas, equipes, pessoas, fracttal):
+    """As fichas que a coluna "Pessoas da equipe" cria ou completa (ver o docstring do módulo)."""
+    nome_eq = {r.id: r.valores.get("nome") for r in equipes.values()}
+    membros = {}
+    for ln in linhas:
+        k = _limpo(ln.get(ID)).upper()
+        if k not in usinas or COL_PESSOAS not in ln:
+            continue
+        texto_eq = _limpo(ln.get("Equipe"))
+        alvo_eq = None
+        if texto_eq and texto_eq != "0" and not tipos.marcador(texto_eq):
+            e = equipes.get(chave_texto(texto_eq))
+            alvo_eq = e.id if e else "nova:" + texto_eq
+        for nome, cargo, desligado in pessoas_da_celula(ln.get(COL_PESSOAS)):
+            pid = _achar_pessoa(nome, pessoas)
+            m = membros.setdefault(pid or "novo:" + chave_texto(nome), {"pid": pid, "nome": nome, "equipes": set(),
+                                                                         "cargos": set(), "desligado": False})
+            if alvo_eq:
+                m["equipes"].add(alvo_eq)
+            if cargo:
+                m["cargos"].add(cargo)
+            m["desligado"] = m["desligado"] or desligado
+    contas = [(i, [_nomes(f.get("nome")), _nomes(_primeiro_e_ultimo(f.get("nome")))])
+              for i, f in enumerate(fracttal) if f.get("email")]
+    por_email = {}
+    for r in srv.registros("pessoas", incluir_excluidos=True):
+        e = str(r.valores.get("email") or "").strip().lower()
+        if e:
+            por_email[e] = r
+
+    def conta(nome):
+        i = _achar_pessoa(nome, contas)
+        return fracttal[i] if i is not None else None
+
+    def titulo_eq(e):
+        return e[5:] if str(e).startswith("nova:") else (nome_eq.get(e) or str(e or ""))
+
+    mudam, varias, desligadas = [], [], []
+    for chave, m in sorted(membros.items(), key=lambda kv: chave_texto(kv[1]["nome"])):
+        f = conta(m["nome"])
+        email = str((f or {}).get("email") or "").strip().lower()
+        r = srv.registro("pessoas", m["pid"]) if m["pid"] else por_email.get(email) if email else None
+        if r is not None and r.excluido:
+            r = None if m["pid"] is None else r
+        if len(m["equipes"]) > 1:
+            varias.append({"nome": r.titulo if r else m["nome"], "equipes": sorted(titulo_eq(e) for e in m["equipes"])})
+        equipe = next(iter(m["equipes"])) if len(m["equipes"]) == 1 else None
+        cargo = next(iter(m["cargos"])) if len(m["cargos"]) == 1 else None
+        if r is None:
+            if m["desligado"]:
+                desligadas.append(m["nome"])
+                continue
+            form = {"nome": (f or {}).get("nome") or m["nome"], "vinculo": VINCULO_NOVO, "status": "Ativo"}
+            if cargo:
+                form["cargo"] = cargo
+            if equipe:
+                form["equipe"] = equipe
+            if email:
+                form["email"] = email
+            mudam.append({"acao": "criar", "pessoa_id": None, "nome": form["nome"], "versao": None, "formulario": form,
+                          "campos": [("Ficha nova", " · ".join(x for x in (cargo or "", titulo_eq(equipe) if equipe else "",
+                                                                       "e-mail do Fracttal" if email else "") if x))]})
+            continue
+        v, form, campos = r.valores, {}, []
+        if equipe and str(v.get("equipe") or "") != str(equipe):
+            form["equipe"] = equipe
+            campos.append(("Equipe", f"{titulo_eq(v.get('equipe')) or '—'} → {titulo_eq(equipe)}"))
+        if cargo and not v.get("cargo"):
+            form["cargo"] = cargo
+            campos.append(("Cargo", f"— → {cargo}"))
+        if not v.get("status"):
+            form["status"] = "Desligado" if m["desligado"] else "Ativo"
+            campos.append(("Status", f"— → {form['status']}"))
+        if email and not v.get("email") and (email not in por_email or por_email[email].id == r.id):
+            form["email"] = email
+            campos.append(("E-mail", "— → o da conta do Fracttal"))
+        if form:
+            mudam.append({"acao": "completar", "pessoa_id": r.id, "nome": r.titulo, "versao": r.versao,
+                          "formulario": form, "campos": campos})
+    return mudam, varias, desligadas
 
 
 def aplicar(prop: dict, srv, quem: str, campos=None) -> dict:
@@ -326,8 +463,34 @@ def aplicar(prop: dict, srv, quem: str, campos=None) -> dict:
         else:
             erros.append({"id_bd": m["id_bd"], "nome": m["nome"], "erro": "; ".join(
                 f"{k}: {v}" for k, v in (res.erros or {}).items())})
+    pessoas_criadas = pessoas_completadas = 0
+    if so is None or CAMPO_PESSOAS in so:
+        for m in prop.get("pessoas") or []:
+            form = dict(m["formulario"])
+            if str(form.get("equipe") or "").startswith("nova:"):
+                nova = criadas.get(chave_texto(form["equipe"][5:]))
+                if nova is None:
+                    form.pop("equipe")
+                else:
+                    form["equipe"] = nova
+            if m["acao"] == "criar":
+                res = srv.criar("pessoas", form, quem)
+            else:
+                res = srv.salvar("pessoas", m["pessoa_id"], form, m["versao"], quem)
+            if res.ok:
+                if m["acao"] == "criar":
+                    pessoas_criadas += 1
+                else:
+                    pessoas_completadas += 1
+            elif res.conflito is not None:
+                conflitos.append({"id_bd": "pessoa", "nome": m["nome"]})
+            else:
+                erros.append({"id_bd": "pessoa", "nome": m["nome"], "erro": "; ".join(
+                    f"{k}: {v}" for k, v in (res.erros or {}).items())})
     srv.auditar(quem, "atualizou pelo CSV do BD_Operações", "usinas", str(prop.get("arquivo") or ""), [
         f"{atualizadas} usinas", f"{len(criadas)} equipes novas", f"{len(incluidos)} valores de lista novos",
+        f"{pessoas_criadas} pessoas novas", f"{pessoas_completadas} pessoas completadas",
         f"{len(so) if so is not None else 'todas as'} colunas"])
     return {"atualizadas": atualizadas, "equipes_criadas": len(criadas), "valores_incluidos": incluidos,
+            "pessoas_criadas": pessoas_criadas, "pessoas_completadas": pessoas_completadas,
             "conflitos": conflitos, "erros": erros}

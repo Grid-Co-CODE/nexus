@@ -246,3 +246,111 @@ def test_so_admin_e_com_login(app_csv):
         s["admin"] = False
     assert c.get("/t/base/registro-mestre/atualizar").status_code == 403
     assert c.post("/t/base/registro-mestre/atualizar/aplicar", data={"token": "x"}).status_code == 403
+
+
+# ── "Pessoas da equipe" (16/10/2026, Levi: "procure esses 5 no fractall, faça a relação e adicione no Nexus, não podemos
+# ficar sem informação! Se adapte"): os casos reais com nomes fictícios. A grafia do CSV difere da ficha ("Samiel" ×
+# "Samuel", "das Neves" × "Dasneves") e o nome padrão calculado resolve; quem falta nasce com o e-mail da conta do
+# Fracttal; quem atende duas equipes fica; desligado sem ficha não entra; a conta do Fracttal acha a ficha de outro nome.
+CAB_P = "ID da usina;Nome;Equipe;Pessoas da equipe"
+LINHAS_P = [
+    "UFV-001;Brodowski;Equipe Nova Teste;Renato Samiel Lopes Andrade (Mantenedor), Teodoro Mendes Paiva (Eletricista), "
+    "Silvio Prates Leme (Eletricista · Desligado), Marcelo Fonte Rios (Técnico de O&M)",
+    "UFV-002;Matões 100;sp leste 01;Otavio Vitor das Neves Ramos (Mantenedor), Marcelo Fonte Rios (Técnico de O&M), "
+    "Fulano Real Silva (Técnico de O&M)",
+]
+FRACTTAL = [{"nome": "Teodoro Mendes Paiva", "email": "teodoro.paiva@exemplo.test", "conta_ativa": True},
+            {"nome": "Fulano Real Silva", "email": "fulano.real@exemplo.test", "conta_ativa": True},
+            {"nome": "Outra Pessoa", "email": "outra@exemplo.test", "conta_ativa": True}]
+
+
+@pytest.fixture
+def srv_p(app_csv):
+    from nexus.cadastro.telas import servico
+    with app_csv.app_context():
+        s = servico()
+        for lista, vals in (("cargos", ("Técnico O&M", "Eletricista O&M", "Mantenedor O&M")),
+                            ("status_contratacao", ("Ativo", "Desligado"))):
+            for v in vals:
+                assert s.adicionar_valor(lista, v, "teste").ok
+        for f in ({"nome": "Renato Samuel Lopes Andrade", "vinculo": "Colaborador de campo", "equipe": "2"},
+                  {"nome": "Otavio Vitor Dasneves Ramos", "vinculo": "Colaborador de campo", "cargo": "Mantenedor O&M",
+                   "status": "Ativo", "equipe": "1"},
+                  {"nome": "Marcelo Fonte Rios", "vinculo": "Colaborador de campo", "cargo": "Técnico O&M",
+                   "status": "Ativo", "equipe": "1"},
+                  {"nome": "Fulano de Tal", "vinculo": "Colaborador de campo", "email": "fulano.real@exemplo.test",
+                   "equipe": "2"}):
+            assert s.criar("pessoas", f, "teste").ok
+        yield s
+
+
+def _por_nome(srv, nome):
+    return next(r for r in srv.registros("pessoas") if r.valores.get("nome") == nome)
+
+
+def test_pessoas_da_celula_le_nome_cargo_e_desligado():
+    assert ic.pessoas_da_celula("Ana Lima (Técnico de O&M), Bia Souza (Eletricista · Desligado), "
+                                "Caio da Silva e Silva (Man), Duda Reis") == [
+        ("Ana Lima", "Técnico O&M", False), ("Bia Souza", "Eletricista O&M", True),
+        ("Caio da Silva e Silva", "Mantenedor O&M", False), ("Duda Reis", None, False)]
+
+
+def test_a_previa_das_pessoas(srv_p):
+    cab, linhas = ic.ler_csv(_csv(LINHAS_P, CAB_P))
+    p = ic.proposta(linhas, srv_p, cab, FRACTTAL)
+    por = {m["nome"]: m for m in p["pessoas"]}
+    renato = por["Renato Andrade"]                  # a ficha "Renato Samuel...": casou pelo nome padrão
+    assert renato["acao"] == "completar" and renato["formulario"] == {
+        "equipe": "nova:Equipe Nova Teste", "cargo": "Mantenedor O&M", "status": "Ativo"}
+    teo = por["Teodoro Mendes Paiva"]               # sem ficha: nasce com o e-mail da conta do Fracttal
+    assert teo["acao"] == "criar" and teo["formulario"] == {
+        "nome": "Teodoro Mendes Paiva", "vinculo": "Colaborador de campo", "status": "Ativo", "cargo": "Eletricista O&M",
+        "equipe": "nova:Equipe Nova Teste", "email": "teodoro.paiva@exemplo.test"}
+    fulano = por["Fulano Tal"]                      # o nome do CSV não casa; a conta do Fracttal acha a ficha pelo e-mail
+    assert fulano["acao"] == "completar" and fulano["formulario"] == {"equipe": "1", "cargo": "Técnico O&M",
+                                                                       "status": "Ativo"}
+    assert "Otavio Ramos" not in por                # "das Neves" × "Dasneves": casou e não falta nada
+    assert p["pessoas_varias_equipes"] == [{"nome": "Marcelo Rios", "equipes": ["Equipe Nova Teste", "SP Leste 01"]}]
+    assert p["pessoas_desligadas_sem_ficha"] == ["Silvio Prates Leme"]
+    assert "Pessoas da equipe" not in p["sem_campo"]
+
+
+def test_aplicar_cria_e_completa_e_a_segunda_previa_fica_vazia(srv_p):
+    cab, linhas = ic.ler_csv(_csv(LINHAS_P, CAB_P))
+    res = ic.aplicar(ic.proposta(linhas, srv_p, cab, FRACTTAL), srv_p, "teste")
+    assert res["pessoas_criadas"] == 1 and res["pessoas_completadas"] == 2 and res["erros"] == []
+    nova = next(r for r in srv_p.registros("equipes") if r.valores["nome"] == "Equipe Nova Teste")
+    teo = _por_nome(srv_p, "Teodoro Mendes Paiva").valores
+    assert teo["email"] == "teodoro.paiva@exemplo.test" and teo["equipe"] == nova.id and teo["cargo"] == "Eletricista O&M"
+    renato = _por_nome(srv_p, "Renato Samuel Lopes Andrade").valores
+    assert renato["equipe"] == nova.id and renato["cargo"] == "Mantenedor O&M" and renato["status"] == "Ativo"
+    assert _por_nome(srv_p, "Marcelo Fonte Rios").valores["equipe"] == "1"       # atende duas: fica
+    assert not any(r.valores.get("nome") == "Silvio Prates Leme" for r in srv_p.registros("pessoas"))
+    p2 = ic.proposta(linhas, srv_p, cab, FRACTTAL)
+    assert p2["pessoas"] == []
+
+
+def test_sem_o_fracttal_a_ficha_nasce_sem_email_e_desmarcar_pessoas_nao_grava(srv_p):
+    cab, linhas = ic.ler_csv(_csv(LINHAS_P, CAB_P))
+    p = ic.proposta(linhas, srv_p, cab, [])
+    assert "email" not in next(m for m in p["pessoas"] if m["acao"] == "criar")["formulario"]
+    res = ic.aplicar(p, srv_p, "teste", ["equipe"])
+    assert res["pessoas_criadas"] == 0 and res["pessoas_completadas"] == 0
+    assert not _por_nome(srv_p, "Renato Samuel Lopes Andrade").valores.get("cargo")
+
+
+def test_a_tela_mostra_e_aplica_as_pessoas(cli, srv_p, monkeypatch):
+    from nexus.cadastro import telas
+    monkeypatch.setattr(telas, "_pessoal_fracttal", lambda: FRACTTAL)
+    r = cli.post("/t/base/registro-mestre/atualizar", data={"arquivo": (__import__("io").BytesIO(_csv(LINHAS_P, CAB_P)),
+                                                                        "bd.csv")}, content_type="multipart/form-data")
+    html = r.get_data(as_text=True)
+    assert "Pessoas das equipes" in html and "1 ficha nova" in html and "e-mail do Fracttal" in html
+    assert "teodoro.paiva@exemplo.test" not in html                  # o e-mail não aparece na prévia
+    assert "Marcelo Rios atende mais de uma equipe" in html and "Silvio Prates Leme" in html
+    token = re.search(r'name="token" value="([^"]+)"', html).group(1)
+    campos = re.findall(r'name="campos" value="([^"]+)"', html)
+    assert "pessoas" in campos
+    r = cli.post("/t/base/registro-mestre/atualizar/aplicar", data={"token": token, "campos": campos})
+    html = cli.get(r.headers["Location"]).get_data(as_text=True)
+    assert "1 pessoa(s) nova(s) em Colaboradores" in html and "2 ficha(s)" in html

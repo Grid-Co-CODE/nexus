@@ -644,6 +644,16 @@ def _de_outro_site() -> bool:
     return regra()
 
 
+def _pessoal_fracttal() -> list:
+    """O pessoal do Fracttal (guardado por 1 hora, 2 pedidos) para a ficha nova da "Pessoas da equipe" nascer com o
+    e-mail da conta, que a liga ao Fracttal. Fracttal fora ou sem credencial: vazio, e a ficha nasce sem e-mail."""
+    try:
+        from .fracttal_pessoal import ler_pessoal
+        return ler_pessoal().get("pessoas") or []
+    except Exception:        # noqa: BLE001 — a prévia não para por causa do Fracttal
+        return []
+
+
 def registrar_base(bp):
     @_tela("Registro mestre")
     def usinas(srv):
@@ -776,7 +786,7 @@ def registrar_base(bp):
         if importar_csv.ID not in cab:
             return _csv_pagina(srv, 400, erro=f"O arquivo não tem a coluna “{importar_csv.ID}”: é mesmo o CSV do "
                                               "BD_Operações?")
-        prop = importar_csv.proposta(linhas, srv, cab)
+        prop = importar_csv.proposta(linhas, srv, cab, _pessoal_fracttal())
         prop["arquivo"] = nome
         return _csv_pagina(srv, p=prop, token=_csv_guardar(_CSV_PREVIAS, prop))
 
@@ -793,6 +803,8 @@ def registrar_base(bp):
                                               "nada foi gravado.")
         prop = item[0]
         validos = {pc["campo"] for pc in prop.get("por_campo") or []}
+        if prop.get("pessoas"):
+            validos.add(importar_csv.CAMPO_PESSOAS)
         campos = [c for c in request.form.getlist("campos") if c in validos]
         if not campos:
             return _csv_pagina(srv, 400, p=prop, token=token, erro="Marque ao menos uma coluna para aplicar.")

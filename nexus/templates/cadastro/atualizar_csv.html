@@ -14,7 +14,9 @@
 {% if feito %}
 <div class="cad-aviso cad-aviso--ok" style="margin-top:16px"><i class="ph ph-check-circle"></i><div>
   <strong>{{ feito.atualizadas }} usina(s) atualizada(s)</strong> pelo {{ feito.arquivo }}, em {{ feito.colunas }} de
-  {{ feito.de }} coluna(s){% if feito.equipes_criadas %}; {{ feito.equipes_criadas }} equipe(s) nova(s){% endif %}{% if feito.valores_incluidos %};
+  {{ feito.de }} coluna(s){% if feito.equipes_criadas %}; {{ feito.equipes_criadas }} equipe(s) nova(s){% endif %}{% if feito.pessoas_criadas %};
+  {{ feito.pessoas_criadas }} pessoa(s) nova(s) em Colaboradores{% endif %}{% if feito.pessoas_completadas %}; {{ feito.pessoas_completadas }} ficha(s)
+  de pessoa completada(s){% endif %}{% if feito.valores_incluidos %};
   valores novos nas listas: {{ feito.valores_incluidos|join(', ') }}{% endif %}.</div></div>
 {% if feito.conflitos %}
 <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div><strong>{{ feito.conflitos|length }} usina(s) ficaram como estavam</strong>
@@ -62,16 +64,18 @@
     <div class="d">{% for lista, vals in p.novos_valores.items() %}{{ vals|join(', ') }}{% if not loop.last %} · {% endif %}{% else %}nenhum{% endfor %}</div></div>
 </div>
 
-{% if p.sem_pessoa or p.sem_cliente or p.sem_par %}
-<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Não casou com o cadastro (fica como está):</strong>
+{% if p.sem_pessoa or p.sem_cliente or p.sem_par or p.pessoas_varias_equipes or p.pessoas_desligadas_sem_ficha %}
+<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Para conferir (fica como está):</strong>
   <ul class="csv-avisos">
     {% for nome, n in p.sem_pessoa.items() %}<li>Responsável O&amp;M “{{ nome }}”, {{ n }} usina(s): não está em Colaboradores. Cadastre e envie o arquivo de novo.</li>{% endfor %}
     {% for nome, n in p.sem_cliente.items() %}<li>Cliente “{{ nome }}”, {{ n }} usina(s): não está em Clientes.</li>{% endfor %}
     {% for u in p.sem_par %}<li>{{ u.id_bd }} {{ u.nome }}: o ID não está no Registro mestre.</li>{% endfor %}
+    {% for x in p.pessoas_varias_equipes %}<li>{{ x.nome }} atende mais de uma equipe ({{ x.equipes|join(', ') }}): fica na equipe de hoje.</li>{% endfor %}
+    {% if p.pessoas_desligadas_sem_ficha %}<li>Desligado(s) no CSV e sem ficha (não entram): {{ p.pessoas_desligadas_sem_ficha|join(', ') }}.</li>{% endif %}
   </ul></div></div>
 {% endif %}
 
-{% if grupos %}
+{% if grupos or p.pessoas %}
 <form method="post" action="{{ raiz }}/t/base/registro-mestre/atualizar/aplicar" id="csv-aplicar">
   <input type="hidden" name="token" value="{{ token }}">
   <div class="csv-cabeca">
@@ -107,6 +111,30 @@
     {% endfor %}
   </section>
   {% endfor %}
+  {% if p.pessoas %}{% set n = p.pessoas|length %}{% set novas = p.pessoas|selectattr('acao', 'equalto', 'criar')|list|length %}
+  {# a coluna "Pessoas da equipe": completa o vazio das fichas e cria quem falta, com o e-mail do Fracttal (16/10/2026) #}
+  <section class="csv-grupo">
+    <h3 class="csv-secao">Pessoas das equipes</h3>
+    <div class="csv-item">
+      <input type="checkbox" name="campos" value="pessoas" checked aria-label="Aplicar as pessoas das equipes">
+      <details>
+        <summary title="Colaboradores Operação">
+          <span class="csv-nome">Pessoas da equipe</span>
+          {% if novas %}<span class="cad-chip cad-chip--info">{{ novas }} {{ 'ficha nova' if novas == 1 else 'fichas novas' }}</span>{% endif %}
+          <span class="csv-conta">{{ n }} {{ 'pessoa' if n == 1 else 'pessoas' }}</span>
+          <i class="ph ph-caret-down csv-seta" aria-hidden="true"></i>
+        </summary>
+        <div class="csv-detalhe">
+          <table class="cad-tabela csv-tabela">
+            <thead><tr><th>Pessoa</th><th>O que muda</th></tr></thead>
+            <tbody>{% for m in p.pessoas %}<tr><td>{{ m.nome }}</td>
+              <td class="csv-depois">{% for rot, txt in m.campos %}{% if not loop.first %}<br>{% endif %}<span class="csv-antes">{{ rot }}:</span> {{ txt }}{% endfor %}</td></tr>{% endfor %}</tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </section>
+  {% endif %}
   <div class="csv-acoes">
     {# cada usina passa pela ficha: 250 usinas levaram 32 s no ensaio de 15/10/2026 #}
     <span class="gc-ajuda">Leva cerca de meio minuto para 250 usinas: espere a tela voltar com o resultado.</span>
