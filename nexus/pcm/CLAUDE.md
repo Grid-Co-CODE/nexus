@@ -166,7 +166,9 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   (o chat do App, 16/10): o servidor do App lê da mesma pasta do `banco_dados.json` (nome e pasta fixos); é o estado de
   AGORA (a desmarcada sai); `os`, `codigo` e `tarefa` como nas linhas do `banco_dados.json` (o texto da marca é o da
   linha, só sem espaço nas pontas; código vazio = todos os ativos da OS); `usina`, `cluster` e `data_prog` (o dia em que
-  estava na agenda quando foi marcada; vazio na pendente e na marca pela OS) para o App agrupar; `motivo` = o id; todo
+  estava na agenda quando foi marcada; vazio na pendente e na marca pela OS) para o App agrupar; `motivo` = o id;
+  `origem` = "app" (o técnico pelo App) ou "nexus" (Quadro e painel), sem pessoa, pedido do App para mostrar "marcado
+  pelo PCM" ou "no App"; todo
   motivo das tarefas está em `motivos` (`ativo` sempre verdadeiro: tirar do cadastro tira as marcas). O App tira das "OS
   avulsas" do servidor dele o que estiver no arquivo (senão a tarefa apagada pelo robô voltava como avulsa). No App, a
   tarefa que o técnico JÁ iniciou (em execução ou pausada) e recebe um motivo que tira continua visível para ele concluir

@@ -186,8 +186,9 @@ def test_arquivo_do_robo_sem_observacao_nem_quem(cfg):
     assert a["versao"] == 1 and len(a["motivos"]) == 11 and a["backoffice"] == ["Beltrana Ramos", "Joana Teste"]
     assert [(t["os"], t["codigo"], t["tira_da_programacao"]) for t in a["tarefas"]] == [
         ("15020", "", False), ("15596", "ELF1-INV02", True)]
-    assert set(a["tarefas"][1]) == {"os", "codigo", "tarefa", "usina", "cluster", "data_prog", "motivo",
+    assert set(a["tarefas"][1]) == {"os", "codigo", "tarefa", "usina", "cluster", "data_prog", "motivo", "origem",
                                     "tira_da_programacao", "desde"}
+    assert {t["origem"] for t in a["tarefas"]} == {"nexus"}
     assert all(m["ativo"] for m in a["motivos"])
     # o texto vai como está na linha da programação (o App de Campo casa sem normalizar); a tarefa é a mesma
     M.marcar(cfg, {"os": "15700", "codigo": "ELF1-INV09 ", "tarefa": " [Grid Co.]  -  MPA - Inversor"},
@@ -348,7 +349,7 @@ def test_janela_do_quadro_marca_a_tarefa_da_semana(app, logado, tela):
     no_repo = json.loads(tela.arquivos[M.ARQUIVO].decode("utf-8"))
     assert no_repo["tarefas"] == [{"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine",
                                    "usina": "Cliente A - Usina 1 - SP", "cluster": "SP Leste 02",
-                                   "data_prog": "2026-10-07", "motivo": am, "tira_da_programacao": True,
+                                   "data_prog": "2026-10-07", "motivo": am, "origem": "nexus", "tira_da_programacao": True,
                                    "desde": no_repo["tarefas"][0]["desde"]}]
     # o cartão da Cabine ganha o selo; o do Trafo (outro ativo, outra tarefa) não
     html = logado.get("/t/pcm/quadro").get_data(as_text=True)
@@ -511,7 +512,8 @@ def test_o_tecnico_marca_pelo_app(app, logado, tela):
     assert r.status_code == 200 and j["gravou"] and j["marca"]["n"] == "Aguardando Material" and j["marca"]["app"]
     ultima = json.loads(open(cfg["NEXUS_PCM_MOTIVOS_ARQUIVO"], encoding="utf-8").read())[M.ABA_MARCA][-1]
     assert ultima["origem"] == "app" and ultima["decidida_por_hmac"] == TEC and "Técnico Teste" not in json.dumps(ultima)
-    assert len(tela.commits) == 1 and json.loads(tela.arquivos[M.ARQUIVO])["tarefas"][0]["tarefa"] == cab["tarefa"]
+    no_repo = json.loads(tela.arquivos[M.ARQUIVO])["tarefas"][0]
+    assert len(tela.commits) == 1 and no_repo["tarefa"] == cab["tarefa"] and no_repo["origem"] == "app"
     assert not _pelo_app(app, cab).get_json()["gravou"] and len(tela.commits) == 1          # o mesmo envio de novo
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
     assert "Técnico Teste <span class=\"gc-ajuda\">(App)</span>" in html and "falta o disjuntor" in html

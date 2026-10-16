@@ -547,8 +547,9 @@ def arquivo(cfg, est: dict | None = None) -> dict:
     O contrato com o App de Campo (16/10/2026, o chat do App): o arquivo é o estado de AGORA (a tarefa desmarcada sai);
     os, codigo e tarefa como nas linhas do banco_dados.json (os em texto; código vazio = a tarefa em todos os ativos da
     OS); usina e cluster (já públicos no banco_dados.json) para o App agrupar; data_prog = o dia em que a tarefa estava na
-    agenda quando foi marcada (vazio na pendente e na marca pela OS); motivo = o id; desde e gerado_em em ISO. Motivo
-    tirado do cadastro tira as marcas dele: todo motivo das tarefas está em `motivos`."""
+    agenda quando foi marcada (vazio na pendente e na marca pela OS); motivo = o id; origem = "app" (o técnico pelo App)
+    ou "nexus" (Quadro e painel), sem pessoa; desde e gerado_em em ISO. Motivo tirado do cadastro tira as marcas dele:
+    todo motivo das tarefas está em `motivos`."""
     est = est or ler(cfg)
     vig = vigentes(cfg, est)
     motivos = [{"id": m["id"], "nome": m["nome"], "descricao": m["descricao"], "tira_da_programacao": m["tira"],
@@ -556,6 +557,7 @@ def arquivo(cfg, est: dict | None = None) -> dict:
                for m in ativos(est)]
     tarefas = sorted(({"os": m["os"], "codigo": m["codigo"], "tarefa": m["tarefa"], "usina": m["usina"],
                        "cluster": m["cluster"], "data_prog": m["data_prog"], "motivo": m["motivo_id"],
+                       "origem": "app" if m["origem"] == "app" else "nexus",
                        "tira_da_programacao": m["tira"], "desde": (_brt(m["desde"]) or _agora()).strftime("%Y-%m-%d")}
                       for k, m in vig.items() if not k.startswith("_")),
                      key=lambda t: (int(t["os"]) if t["os"].isdigit() else 0, norm(t["tarefa"]), canon(t["codigo"])))
