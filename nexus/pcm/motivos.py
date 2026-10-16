@@ -22,7 +22,9 @@ O dado (livro `nexus_pcm_motivos`, registrado em `nexus/dados/catalogo.py`; regr
   volta: as marcas antigas continuam apontando para ele, e deixam de valer. Antes da 1ª gravação vale o
   CADASTRO_INICIAL (os 11 do pedido e o 12º do mesmo dia, na ordem dele), que entra no banco junto com a 1ª gravação.
 - `fato_decisao_motivo`: 1 linha = 1 decisão sobre o motivo de 1 tarefa: marcar (`motivo_id`) ou tirar (vazio). Só
-  acrescenta; vale a última de cada tarefa (`item_id`).
+  acrescenta; vale a última de cada tarefa (`item_id`). A mesma justificativa (motivo e texto) repetida no MESMO dia não
+  grava; em outro dia, grava: cada dia conta no histórico (`historico`, Levi 16/10/2026: "cada justificativa, 1 por
+  dia").
 - `fato_decisao_backoffice`: 1 linha = 1 decisão de pôr ou tirar 1 nome da lista do backoffice; vale a última de cada
   nome (`nome_hmac`).
 A tarefa, o nome, a usina, a observação e quem decidiu vão só CIFRADOS (o Cofre, a chave do cadastro): a API do banco
@@ -150,6 +152,12 @@ def _brt(iso) -> datetime | None:
         return datetime.fromisoformat(str(iso or "").replace("Z", "+00:00")).astimezone(_BRT)
     except ValueError:
         return None
+
+
+def _mesmo_dia(iso, agora: datetime) -> bool:
+    """A decisão `iso` é do mesmo dia (no horário de Brasília) que `agora`?"""
+    d = _brt(iso)
+    return bool(d) and d.date() == agora.astimezone(_BRT).date()
 
 
 def _sim(v) -> bool:
@@ -344,6 +352,42 @@ def vigentes(cfg, est: dict) -> dict:
     return out
 
 
+def historico(cfg, est: dict, iids) -> list[dict]:
+    """As justificativas das tarefas `iids` (a do ativo e a da tarefa em todos os ativos da OS), da mais antiga à mais
+    nova: o histórico do painel (Levi, 16/10/2026: "é bom no nexus termos o histórico de quantas vezes uma OS teve um
+    motivo diferente"; conta "cada justificativa, 1 por dia", "por tarefa"). Uma por dia e motivo: repetir o motivo no
+    mesmo dia, ou só editar o texto, não conta de novo; no dia seguinte, conta; outro motivo no mesmo dia, também. Cada
+    uma: {quando, dia, motivo_id, motivo, tira, origem, quem, obs} — origem e quem da 1ª decisão do dia (quem
+    justificou: o PCM que edita o texto não vira o autor), o texto da última. Tirar o motivo não conta. A decisão que não
+    abre com a chave entra sem quem e texto."""
+    alvo = {i for i in iids if i}
+    nomes = {m["id"]: m for m in est.get("motivos") or []}
+    cofre = _cofre_ou_nada(cfg)
+    grupos: dict[tuple, dict] = {}
+    for x in sorted(est["marcas"], key=lambda x: D._txt(x.get("decidida_em"))):
+        iid = D._txt(x.get("item_id"))
+        mid = D._id(x.get("motivo_id"))
+        if iid not in alvo or not mid:
+            continue
+        quando = D._txt(x.get("decidida_em"))
+        b = _brt(quando)
+        dia = b.date().isoformat() if b else quando[:10]
+        try:
+            corpo = json.loads(cofre.decifrar(D._txt(x.get("dados_cifrados")), _ctx_marca(iid, quando)))
+        except Exception:        # noqa: BLE001 — sem a chave, cifra de outra chave ou linha mexida
+            corpo = {}
+        g = grupos.get((dia, mid))
+        if g is None:
+            m = nomes.get(mid) or {}
+            grupos[(dia, mid)] = {"quando": quando, "dia": dia, "motivo_id": mid,
+                                  "motivo": m.get("nome") or f"Motivo {mid}", "tira": bool(m.get("tira")),
+                                  "origem": D._txt(x.get("origem")), "quem": D._txt(corpo.get("quem")),
+                                  "obs": D._txt(corpo.get("obs"))}
+        else:
+            g["obs"] = D._txt(corpo.get("obs"))
+    return sorted(grupos.values(), key=lambda g: g["quando"])
+
+
 def indice(vig: dict) -> dict:
     """{(os, código canônico, nome normalizado): marca} para achar a marca de uma linha da semana."""
     return {(m["os"], canon(m["codigo"]), norm(m["tarefa"])): m for k, m in vig.items() if not k.startswith("_")}
@@ -410,8 +454,9 @@ def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana:
            origem: str = "quadro", quem_hmac: str | None = None) -> dict:
     """Marca o motivo de uma tarefa (ou o tira: `motivo_id` None). `tarefa` = {os, codigo, tarefa, usina, cliente, tipo}
     tirada da SEMANA ou da Gestão PCM pelo servidor, nunca da página. Um motivo por tarefa: marcar outro troca. Marcar o
-    mesmo motivo com a mesma observação não grava. `quem_hmac`: o código de quem marcou quando ele chega pronto (o
-    técnico pelo App, que não tem e-mail no pedido). {"gravou", "marca"}."""
+    mesmo motivo com a mesma observação no MESMO dia não grava; no dia seguinte, grava (a tarefa que segue atrasada é
+    cobrada de novo, e cada dia conta no histórico: Levi, 16/10/2026). `quem_hmac`: o código de quem marcou quando ele
+    chega pronto (o técnico pelo App, que não tem e-mail no pedido). {"gravou", "marca"}."""
     os_s = os_de(tarefa.get("os"))
     # o texto EXATO da linha da programação (o App de Campo casa OS|ativo|nome como estão no banco_dados.json); a
     # identidade da tarefa (`item_id`) e a comparação do motor e do robô seguem normalizadas
@@ -438,9 +483,10 @@ def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana:
         atual = vigentes(cfg, est).get(iid)
         if not mid and not atual:
             return {"gravou": False, "marca": None}, False
-        if mid and atual and atual["motivo_id"] == mid and atual["obs"] == obs:
-            return {"gravou": False, "marca": atual}, False
         agora = _agora()
+        if (mid and atual and atual["motivo_id"] == mid and atual["obs"] == obs
+                and _mesmo_dia(atual["quando"], agora)):
+            return {"gravou": False, "marca": atual}, False
         quando = _iso(agora)
         corpo = {"tarefa": nome_t, "codigo": codigo, "usina": str(tarefa.get("usina") or "").strip(),
                  "cluster": str(tarefa.get("cluster") or "").strip(),

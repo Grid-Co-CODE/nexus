@@ -94,6 +94,48 @@ def test_um_motivo_por_tarefa_e_o_desde(cfg, monkeypatch):
     assert {x["decidida_por_hmac"] for x in livro[M.ABA_MARCA]} == {codigo_da_pessoa("chave-hmac-de-teste", PESSOA["email"])}
 
 
+def test_cada_justificativa_conta_uma_vez_por_dia(cfg, monkeypatch):
+    """Levi, 16/10/2026: "Priorizei outras atividades" não tira a tarefa da programação e ela segue cobrada nos outros
+    dias; o histórico conta "cada justificativa, 1 por dia", "por tarefa". A mesma justificativa no mesmo dia não grava;
+    no dia seguinte, grava e conta; só editar o texto no mesmo dia não conta; outro motivo no mesmo dia conta; tirar não."""
+    rel = Relogio(monkeypatch)
+    pr, am = _mid(cfg, "Prioridade"), _mid(cfg, "Aguardando material")
+    assert not next(m for m in M.ativos(M.ler(cfg)) if m["id"] == pr)["tira"]
+    TEC_A = {"email": "tecnico.a@exemplo.com", "nome": "Técnico A"}
+    t0 = M.marcar(cfg, T1, pr, "fui para a parada da usina 2", TEC_A, origem="app")["marca"]["desde"]
+    assert not M.marcar(cfg, T1, pr, "fui para a parada da usina 2", TEC_A, origem="app")["gravou"]
+    assert M.marcar(cfg, T1, pr, "fui para a parada da usina 2; volto amanhã", PESSOA, origem="painel")["gravou"]
+    rel.t += timedelta(days=1)
+    r = M.marcar(cfg, T1, pr, "fui para a parada da usina 2; volto amanhã", TEC_A, origem="app")
+    assert r["gravou"] and r["marca"]["desde"] == t0                 # o motivo segue o mesmo: o "desde" não reinicia
+    assert M.marcar(cfg, T1, am, "falta o IGBT", PESSOA)["gravou"]    # outro motivo no mesmo dia: conta
+    assert M.marcar(cfg, T1, None, "", PESSOA)["gravou"]              # tirar: não conta
+    h = M.historico(cfg, M.ler(cfg, forcar=True), {M.item_id(T1["os"], T1["codigo"], T1["tarefa"])})
+    assert [(x["dia"], x["motivo"]) for x in h] == [("2026-10-16", "Prioridade"), ("2026-10-17", "Prioridade"),
+                                                    ("2026-10-17", "Aguardando material")]
+    assert h[0]["quem"] == "Técnico A" and h[0]["origem"] == "app"   # quem justificou, não o PCM que editou o texto
+    assert h[0]["obs"] == "fui para a parada da usina 2; volto amanhã"  # o texto mais novo do dia
+
+
+def test_o_painel_mostra_quantas_vezes_e_o_historico(app, logado, tela, monkeypatch):
+    """A coluna Vezes no painel (16/10/2026): o técnico justifica a mesma tarefa em dois dias e conta 2; o número abre
+    a lista com a data, o motivo, quem e o texto."""
+    cfg = app.config
+    rel = Relogio(monkeypatch)
+    pr = next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == "Prioridade")
+    cab = {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": pr,
+           "obs": "priorizei a corretiva do inversor 3", "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
+    assert _pelo_app(app, cab).get_json()["gravou"]
+    rel.t += timedelta(days=1)
+    assert _pelo_app(app, cab).get_json()["gravou"]                   # no dia seguinte, a mesma justificativa grava
+    assert not _pelo_app(app, cab).get_json()["gravou"]               # no mesmo dia, não
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert 'aria-controls="fp-h-1"' in html and ">2</button>" in html
+    lista = html.split('id="fp-h-1"', 1)[1].split("</ol>", 1)[0]
+    assert lista.count("<li>") == 2 and "16/10/2026" in lista and "17/10/2026" in lista
+    assert lista.count("priorizei a corretiva do inversor 3") == 2 and lista.count("Técnico Teste") == 2
+
+
 def test_marca_da_os_e_marca_do_ativo(cfg):
     """A marca pelo número da OS (o painel, pela Gestão PCM, sem código) vale para a tarefa em todos os ativos; a do
     ativo (o Quadro) vence a da OS naquele ativo; tirar a do ativo volta a valer a da OS."""

@@ -147,7 +147,8 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   apoio do setor engenharia" (era Engenharia), 3 "Preciso de apoio do setor performance" (era Performance), 9 "Priorizei
   outras atividades" (era Prioridade). O `CADASTRO_INICIAL` guarda os nomes do nascimento do livro (o banco manda).
 - **Os que tiram da programação** (o cadastro inicial: os quatro Aguardando, Condições Climáticas Adversas e Pendente
-  recurso; Prioridade não muda a geração): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as
+  recurso; os outros não mudam a geração: com "Priorizei outras atividades", o 9, a tarefa NÃO sai da programação e
+  continua sendo cobrada nos outros dias, Levi 16/10/2026): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as
   linhas dela (agenda e `_Pendentes`, STEP A3b) e o STEP A2 não a inclui de novo. Tirar o motivo: a tarefa volta na
   PRÓXIMA geração (o robô não a recoloca na semana em curso).
 - **Backoffice:** a OS cujo responsável no Fracttal (o `Responsável` da OS, o `user_assigned`) é um nome da lista (sem
@@ -169,6 +170,12 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   - a observação se edita na própria célula (lápis ou clique no texto; o campo ocupa a largura da célula e não
     alarga a tabela: a 1366 px ela cabe inteira, editando ou não);
   - o × ao lado do motivo tira o motivo (com confirmação);
+  - a coluna **Vezes** (16/10/2026, Levi: "é bom no nexus termos o histórico de quantas vezes uma OS teve um motivo
+    diferente"; escolhas dele: "cada justificativa, 1 por dia", "por tarefa", no painel) conta as justificativas da
+    tarefa (a do ativo e a da tarefa em todos os ativos da OS), uma por dia e motivo (`motivos.historico`): a mesma
+    justificativa no dia seguinte conta de novo, e por isso o `marcar` passou a GRAVAR a repetição em outro dia (no
+    mesmo dia, não grava); só editar o texto no mesmo dia não conta; tirar o motivo não conta. O número abre, logo abaixo
+    da linha, a lista com a data e hora, o motivo, quem justificou (da 1ª decisão do dia) e o texto (o mais novo);
   - saíram o "Marcar pela OS" ("atrapalha mais que ajuda": marca-se no Quadro e pelo App; a rota só aceita a tarefa
     que já tem motivo, `item`) e a nota de como o painel funciona; o aviso do arquivo do robô só aparece quando ele
     não está em dia.

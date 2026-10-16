@@ -62,7 +62,8 @@
 <div class="pcm-rolagem">
   <table class="pcm-tabela fp-tab">
     <thead><tr>
-      <th>Desde</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th><th>Observação</th>
+      <th>Desde</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th>
+      <th title="Quantas vezes a tarefa foi justificada: uma por dia e motivo">Vezes</th><th>Observação</th>
       <th>Quem marcou</th>
     </tr></thead>
     <tbody>
@@ -92,6 +93,8 @@
           {%- endif %}
           </div>
         </td>
+        <td class="gc-num">{% if l.vezes %}<button type="button" class="fp-vezes" aria-expanded="false" aria-controls="fp-h-{{ loop.index }}"
+            title="Ver as justificativas da tarefa" aria-label="{{ l.vezes }} {{ 'justificativa' if l.vezes == 1 else 'justificativas' }} da tarefa da OS {{ l.os }}: ver a lista">{{ l.vezes }}</button>{% else %}—{% endif %}</td>
         <td class="fp-obs">
           <div class="fp-obs-ver"><span class="fp-obs-txt{% if not l.obs %} fp-vazio{% endif %}">{{ l.obs or '—' }}</span>{% if pode %}<button type="button" class="fp-lapis" title="Editar a observação" aria-label="Editar a observação da tarefa da OS {{ l.os }}"><i class="ph ph-pencil-simple"></i></button>{% endif %}</div>
           {%- if pode %}
@@ -104,6 +107,18 @@
         </td>
         <td class="fp-quem">{{ l.quem_mostra }}{% if l.do_app %} <span class="gc-ajuda">(App)</span>{% endif %}</td>
       </tr>
+      {% if l.vezes %}
+      {# o histórico da tarefa (16/10/2026): cada justificativa, uma por dia e motivo, com quem justificou e o texto #}
+      <tr class="fp-hist" id="fp-h-{{ loop.index }}" hidden>
+        <td colspan="9">
+          <ol class="fp-hist-lista">
+          {% for h in l.historico %}
+            <li><span class="gc-dado">{{ h.quando_txt }}</span>{{ selo(h.motivo, h.tira) }}<span class="fp-hist-quem">{{ h.quem or '—' }}{% if h.do_app %} <span class="gc-ajuda">(App)</span>{% endif %}</span><span class="fp-hist-obs{% if not h.obs %} fp-vazio{% endif %}">{{ h.obs or '—' }}</span></li>
+          {% endfor %}
+          </ol>
+        </td>
+      </tr>
+      {% endif %}
     {% endfor %}
     </tbody>
   </table>
@@ -122,6 +137,19 @@
     td.querySelector('.fp-obs-txt').addEventListener('click', abrir);
     form.querySelector('.fp-obs-cancelar').addEventListener('click', fechar);
     ta.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') fechar(); });
+  });
+  // a coluna Vezes abre, logo abaixo da linha, as justificativas da tarefa (uma por dia e motivo)
+  document.querySelectorAll('.fp-tab .fp-vezes').forEach(function (b) {
+    var alvo = document.getElementById(b.getAttribute('aria-controls'));
+    if (!alvo) return;
+    b.addEventListener('click', function () {
+      var abrir = alvo.hidden;
+      alvo.hidden = !abrir;
+      b.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+      // em tela estreita a tabela rola para o lado: a lista começa na 1ª coluna, então volta para o começo
+      var rol = b.closest('.pcm-rolagem');
+      if (abrir && rol) rol.scrollLeft = 0;
+    });
   });
   // o motivo marcado pelo PCM troca na própria célula; o que não tira da programação tira a tarefa deste painel
   document.querySelectorAll('.fp-tab select.fp-mot').forEach(function (s) {

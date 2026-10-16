@@ -1059,7 +1059,11 @@ def _ctx_fora(cfg, args) -> dict:
         d = M._brt(m["desde"])
         # a usina vem da linha marcada; sem ela (a pendente do App não traz), da Gestão PCM pela OS
         usina = m["usina"] or next((str(t.get("usina") or "") for t in (g or {}).get("por_os", {}).get(m["os"], [])), "")
-        linhas.append(dict(m, usina=usina, desde_txt=d.strftime("%d/%m/%Y") if d else "",
+        # quantas vezes a tarefa foi justificada (uma por dia e motivo), a do ativo e a da tarefa em todos os ativos da OS
+        hist = [dict(h, quando_txt=M._brt(h["quando"]).strftime("%d/%m/%Y %H:%M") if M._brt(h["quando"]) else "",
+                     do_app=h["origem"] == "app")
+                for h in M.historico(cfg, est, {m["item_id"], M.item_id(m["os"], "", m["tarefa"])})]
+        linhas.append(dict(m, usina=usina, desde_txt=d.strftime("%d/%m/%Y") if d else "", vezes=len(hist), historico=hist,
                            dias=max(0, (hoje - d.date()).days) if d else None, do_app=m["origem_motivo"] == "app",
                            quem_mostra=m["quem_motivo"] or m["quem"],
                            estado_fr=" · ".join(sorted({e for e in estados or [] if e})),
