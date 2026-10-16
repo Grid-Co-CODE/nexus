@@ -661,18 +661,61 @@ html.pgp-aberto{overflow:hidden}
 .q-pend-t[data-abrir]:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .fp-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px}
 .fp-filtros .campo{display:flex;flex-direction:column;gap:5px}
-.fp-tarefa{color:var(--tinta);overflow-wrap:anywhere}
-.fp-tarefa small{display:block;color:var(--mudo);font-size:11.5px;margin-top:2px}
-.fp-bloco{display:block}
-.fp-obs{white-space:pre-wrap;overflow-wrap:anywhere;max-width:280px}
+/* a tabela do painel (Levi, 16/10/2026: "deixe essa tabela mais bonita, tá estranha demais!"; "centralizar cabeçalho e
+   todas as colunas exceto as do texto tarefa"). Sem a coluna Editar que abria a linha e a entortava: o motivo do PCM
+   troca na própria célula, a observação se edita na própria célula, e o "Tirar motivo" é um botão discreto no fim */
+.fp-tab th,.fp-tab td{text-align:center;vertical-align:middle}
+.fp-tab th.fp-esq,.fp-tab td.fp-esq{text-align:left}
+.fp-tab th,.fp-tab td{padding-left:10px;padding-right:10px}
+.fp-tab td{padding-top:12px;padding-bottom:12px}
+.fp-tab .gc-dado,.fp-tab .gc-num{white-space:nowrap}
+.fp-usina{min-width:120px;max-width:190px}
+.fp-tarefa{color:var(--tinta);font-weight:600;min-width:220px;overflow-wrap:anywhere}
+.fp-tarefa small{display:block;color:var(--mudo);font-size:11.5px;font-weight:400;margin-top:3px}
+.fp-motivo{white-space:nowrap}
+/* o motivo do PCM é o próprio selo, que abre a lista; o do técnico é o selo parado; o × ao lado tira o motivo */
+.fp-motivo-caixa{display:inline-flex;align-items:center;gap:4px;max-width:100%}
+.fp-motivo form{display:inline-flex}
+.fp-mot-caixa{position:relative;display:inline-flex;align-items:center;max-width:240px;border-radius:var(--raio-tag);
+  color:var(--info);background:var(--info-suave)}
+.fp-mot-caixa--tira{color:var(--alerta);background:var(--alerta-a10)}
+.fp-mot-caixa::after{content:"";position:absolute;right:8px;top:50%;margin-top:-2px;border-left:4px solid transparent;
+  border-right:4px solid transparent;border-top:5px solid currentColor;pointer-events:none}
+/* do tamanho do motivo escolhido, não do mais comprido da lista (sem isso a coluna empurrava o "Tirar motivo" para
+   fora da tela) */
+.fp-mot{appearance:none;-webkit-appearance:none;field-sizing:content;max-width:100%;border:1px solid transparent;border-radius:var(--raio-tag);
+  background:transparent;color:inherit;font:600 11px/16px var(--font-sans);padding:1px 22px 1px 8px;cursor:pointer;
+  text-overflow:ellipsis}
+.fp-mot:hover{border-color:currentColor}
+.fp-mot:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.fp-mot option{color:var(--tinta);background:var(--superficie)}
+/* a observação: o texto e o lápis; clicar abre o campo ali mesmo, sem mexer nas outras colunas */
+.fp-obs{min-width:160px;max-width:280px}
+.fp-obs-ver{display:inline-flex;align-items:center;justify-content:center;gap:6px;max-width:100%}
+.fp-obs-txt{white-space:pre-wrap;overflow-wrap:anywhere;cursor:text}
+.fp-obs-txt.fp-vazio{color:var(--mudo)}
+.fp-lapis{flex:none;display:inline-grid;place-items:center;width:24px;height:24px;border:0;border-radius:6px;
+  background:transparent;color:var(--mudo);cursor:pointer;opacity:.6}
+.fp-tab tr:hover .fp-lapis,.fp-lapis:focus-visible{opacity:1;color:var(--verde-texto)}
+.fp-lapis:hover{background:var(--superficie-3)}
+.fp-lapis:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+/* o campo ocupa a largura que a célula já tinha: abrir não alarga a tabela (a 1366 px ela vazava) */
+.fp-obs-form{display:none;gap:6px}
+.fp-obs.editando .fp-obs-form{display:grid}
+.fp-obs.editando .fp-obs-ver{display:none}
+.fp-obs-form textarea.gc-campo{width:100%;min-height:52px;resize:vertical;box-sizing:border-box;text-align:left}
+.fp-obs-botoes{display:flex;gap:6px;justify-content:center}
+.fp-quem{min-width:110px;max-width:160px}
+.fp-tirar{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border:0;border-radius:50%;
+  background:transparent;color:var(--mudo);cursor:pointer}
+.fp-tirar i{font-size:13px}
+.fp-tirar:hover,.fp-tirar:focus-visible{color:var(--critico);background:var(--critico-suave);outline:none}
 .fp-acoes details{position:relative}
 .fp-acoes summary{cursor:pointer;color:var(--verde-texto);font-weight:600;list-style:none;white-space:nowrap}
 .fp-acoes summary::-webkit-details-marker{display:none}
 .fp-form{display:grid;gap:8px;margin-top:8px;min-width:240px}
 .fp-form textarea.gc-campo{min-height:54px;resize:vertical}
 .fp-form .fp-botoes{display:flex;gap:8px;flex-wrap:wrap}
-.fp-os{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
-.fp-os .gc-campo{width:140px}
 .pcm-bo{margin-top:16px;padding-top:14px;border-top:1px solid var(--linha)}
 .pcm-bo-tit{font:700 14px/20px var(--font-sans);color:var(--tinta);margin:0 0 4px}
 .pcm-bo-lista{list-style:none;margin:10px 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
@@ -685,4 +728,4 @@ html.pgp-aberto{overflow:hidden}
 .pcm-bo-lista button:hover,.pcm-bo-lista button:focus-visible{color:var(--critico);background:var(--critico-suave);outline:none}
 .pcm-bo-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pcm-bo-add .gc-campo{width:min(320px,100%)}
-@media (max-width:640px){.fp-obs{max-width:none}.fp-form{min-width:0}}
+@media (max-width:640px){.fp-obs{max-width:none;min-width:140px}.fp-obs-form,.fp-form{min-width:0}.fp-tarefa{min-width:200px}}

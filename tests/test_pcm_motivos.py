@@ -398,34 +398,81 @@ def test_painel_fora_da_programacao(app, logado, tela):
                    "usina": "Cliente A - Usina 1 - SP"}, am, "falta o disjuntor", PESSOA)
     M.marcar(cfg, {"os": "6", "codigo": "", "tarefa": "Troca de fusível"}, ac, "", PESSOA)       # finalizada
     M.marcar(cfg, {"os": "8", "codigo": "", "tarefa": "Inspeção termográfica do trafo 9"}, en, "", PESSOA)             # não tira
+    M.marcar(cfg, {"os": "7", "codigo": "", "tarefa": "Limpeza do inversor"}, conc, "", PESSOA, origem="painel")
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
     assert "falta o disjuntor" in html and "UFV1-CAB01" in html and "Troca de fusível" not in html
     assert "termográfica do trafo 9" not in html and "1 finalizada no Fracttal saiu daqui" in html
+    assert "todos os ativos da OS" in html and "Limpeza do inversor" in html        # a marca da OS (de antes) aparece
     filtro = html.split('id="f-motivo"', 1)[1].split("</select>", 1)[0]
     assert "Aguardando material (1)" in filtro and "Aguardando cliente" not in filtro    # o filtro lista o que existe
     html = " ".join(logado.get(f"/t/pcm/fora-da-programacao?motivo={ac}").get_data(as_text=True).split())
     assert "Nenhuma tarefa com esse motivo." in html
-    # marcar pela OS: as tarefas abertas da Gestão PCM (a mesma tarefa em dois ativos vira uma linha)
-    html = " ".join(logado.get("/t/pcm/fora-da-programacao?os=7").get_data(as_text=True).split())
-    assert "Limpeza do inversor" in html and "em 2 ativos" in html
-    r = logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "7", "tarefa": "Limpeza do inversor",
-                                                                 "motivo_id": conc, "v_os": "7"})
-    assert r.status_code == 303 and "os=7" in r.headers["Location"]
-    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
-    assert "OS 7: Aguardando concessionária." in html and "todos os ativos da OS" in html and "Limpeza do inversor" in html
     # tirar pelo painel
     item = next(k for k, m in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if m["os"] == "7")
     logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": item, "tirar": "1"})
     assert "Limpeza do inversor" not in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
 
 
-def test_painel_recusa_finalizada_e_os_fora_da_gestao(app, logado, tela):
+def test_painel_sem_marcar_pela_os_e_a_tabela_da_2a_rodada(app, logado, tela):
+    """Levi, 16/10/2026 (2ª rodada): "tire esse 'Marcar pela OS' atrapalha mais que ajuda"; "Tire a observação 'Os
+    motivos se marcam no Nexus...'"; centrar tudo menos a Tarefa; sem a coluna Editar que abria a linha. O pedido pela
+    OS, sem a tarefa já marcada, não grava mais nada."""
     am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando material")
-    logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "6", "tarefa": "Troca de fusível", "motivo_id": am})
-    assert "Essa tarefa já foi finalizada no Fracttal." in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
-    logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "9", "tarefa": "Qualquer", "motivo_id": am})
-    assert "não tem essa tarefa na Gestão PCM" in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
-    assert not tela.commits
+    M.marcar(app.config, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine"}, am, "", PESSOA)
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao?os=7").get_data(as_text=True).split())
+    assert "Marcar pela OS" not in html and "Ver as tarefas" not in html and 'name="os"' not in html
+    assert "Os motivos se marcam no Nexus" not in html and "<details>" not in html
+    assert 'class="pcm-tabela fp-tab"' in html and '<th class="fp-esq">Tarefa</th>' in html
+    assert 'class="fp-tirar"' in html and "Tirar motivo" in html
+    antes = len(M.vigentes(app.config, M.ler(app.config, forcar=True)))
+    r = logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "7", "tarefa": "Limpeza do inversor",
+                                                                 "motivo_id": am})
+    assert r.status_code == 303
+    assert "A tarefa não foi achada: atualize a página." in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
+    assert len(M.vigentes(app.config, M.ler(app.config, forcar=True))) == antes and not tela.commits
+
+
+def test_motivo_do_tecnico_nao_se_troca_e_a_observacao_sim(app, logado, tela):
+    """Levi, 16/10/2026: "nem deveria poder trocar o motivo, se o técnico disse tá dito, observação Ok editar" e
+    "Motivo também deve ter como trocar pela coluna!" (o do PCM). A observação editada pelo PCM não tira a justificativa
+    do painel nem troca quem marcou (antes, a "Prioridade" do técnico sumia daqui e virava do PCM)."""
+    cfg = app.config
+    pr, am, conc, en = (next(m["id"] for m in M.ativos(M.ler(cfg)) if m["nome"] == n) for n in (
+        "Prioridade", "Aguardando material", "Aguardando concessionária", "Engenharia"))
+    assert _pelo_app(app, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": pr,
+                           "obs": "atendi a parada antes", "tecnico_hmac": TEC,
+                           "tecnico_nome": "Técnico Teste"}).get_json()["gravou"]
+    M.marcar(cfg, {"os": "5", "codigo": "UFV1-TR01", "tarefa": "[Grid Co.] - MPM - Trafo"}, am, "", PESSOA)
+    vig = M.vigentes(cfg, M.ler(cfg, forcar=True))
+    app_item = next(k for k, m in vig.items() if m["codigo"] == "UFV1-CAB01")
+    pcm_item = next(k for k, m in vig.items() if m["codigo"] == "UFV1-TR01")
+    html = logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
+    linha_app = html.split(app_item, 1)[0].rsplit("<tr>", 1)[1] + html.split(app_item, 1)[1].split("</tr>", 1)[0]
+    linha_pcm = html.split(pcm_item, 1)[0].rsplit("<tr>", 1)[1] + html.split(pcm_item, 1)[1].split("</tr>", 1)[0]
+    assert 'class="fp-mot"' not in linha_app and "q-mp" in linha_app       # o do técnico: o selo, sem a lista
+    assert 'class="fp-mot"' in linha_pcm and "fp-obs-form" in linha_app     # o do PCM troca na célula; a obs, nos dois
+    # o servidor também não troca o motivo do técnico
+    logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": app_item, "motivo_id": conc})
+    aviso = logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
+    assert "O motivo que o técnico mandou pelo App não se troca" in aviso
+    assert M.vigentes(cfg, M.ler(cfg, forcar=True))[app_item]["motivo_id"] == pr
+    # a observação do técnico se edita: a linha continua, com o técnico em "Quem marcou" e a origem App no arquivo
+    logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": app_item, "obs": "atendi a parada antes (PCM ciente)"})
+    m = M.vigentes(cfg, M.ler(cfg, forcar=True))[app_item]
+    assert m["obs"] == "atendi a parada antes (PCM ciente)" and m["origem"] == "painel"
+    assert (m["origem_motivo"], m["quem_motivo"], m["motivo_id"]) == ("app", "Técnico Teste", pr)
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert "OS 5: observação salva." in html and "atendi a parada antes (PCM ciente)" in html
+    assert "Técnico Teste <span class=\"gc-ajuda\">(App)</span>" in html
+    no_arquivo = {(t["codigo"], t["origem"]) for t in M.arquivo(cfg)["tarefas"]}
+    assert ("UFV1-CAB01", "app") in no_arquivo and ("UFV1-TR01", "nexus") in no_arquivo
+    # o motivo do PCM troca pela coluna (e o que não tira tira a tarefa do painel)
+    logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": pcm_item, "motivo_id": conc})
+    m = M.vigentes(cfg, M.ler(cfg, forcar=True))[pcm_item]
+    assert m["motivo_id"] == conc and m["origem_motivo"] == "painel"
+    assert "OS 5: Aguardando concessionária." in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
+    logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": pcm_item, "motivo_id": en})
+    assert "[Grid Co.] - MPM - Trafo" not in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
 
 
 def test_lista_do_backoffice_no_gerar(app, logado, config, tmp_path):
@@ -600,7 +647,8 @@ def test_sem_o_arquivo_no_repositorio_o_painel_manda(app, logado, tela):
     assert r.status_code == 303 and len(tela.commits) == 1
     assert len(json.loads(tela.arquivos[M.ARQUIVO])["motivos"]) == 12
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
-    assert "O arquivo está em dia" in html and "Mandar o arquivo de novo" not in html
+    assert "O arquivo ainda não existe" not in html and "desatualizado" not in html
+    assert "Mandar o arquivo de novo" not in html
 
 
 def test_o_arquivo_vai_fora_do_pedido_e_junta_as_marcas(monkeypatch):

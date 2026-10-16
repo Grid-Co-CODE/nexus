@@ -142,7 +142,10 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   maiúsculas (PCM, COS, UFV), e a 1ª letra maiúscula (`motivos.padronizar`). O cadastro inicial já nasce assim
   ("Aguardando concessionária", "Condições climáticas adversas"); o que se cria ou edita na tela é padronizado ao gravar.
   O 12º do cadastro inicial, "Vegetação alta impossibilitando ação", tira da programação (Levi, 16/10: "Sim, tira").
-  O App escolhe a frase do técnico pelo id (Engenharia 1, Performance 3, Prioridade 9): renomear não quebra.
+  O App escolhe a frase do técnico pelo id (1, 3 e 9): renomear não quebra. Em 16/10 os três foram renomeados no
+  cadastro de produção com as frases do App (Levi: "o motivo que aparecem devem ser os mesmos do app"): 1 "Preciso de
+  apoio do setor engenharia" (era Engenharia), 3 "Preciso de apoio do setor performance" (era Performance), 9 "Priorizei
+  outras atividades" (era Prioridade). O `CADASTRO_INICIAL` guarda os nomes do nascimento do livro (o banco manda).
 - **Os que tiram da programação** (o cadastro inicial: os quatro Aguardando, Condições Climáticas Adversas e Pendente
   recurso; Prioridade não muda a geração): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as
   linhas dela (agenda e `_Pendentes`, STEP A3b) e o STEP A2 não a inclui de novo. Tirar o motivo: a tarefa volta na
@@ -153,14 +156,24 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   abertas (208 de uma pessoa só); um dos 11 nomes não aparece como responsável de OS no Fracttal. Os nomes vão ao robô
   em claro, no arquivo do repositório do PCM ("precisa disso não, faz o simples").
 - **O painel Fora da programação** (`/t/pcm/fora-da-programacao`, `templates/pcm/fora.html`): as tarefas com motivo
-  que tira e TODA justificativa que veio do App (origem `app`), de qualquer motivo, com o texto do técnico, quem e desde
-  quando; a marca do PCM que não tira não aparece (16/10/2026: as 10 justificativas "Prioridade" de um técnico estavam
-  gravadas e o painel mostrava 0; o Levi escolheu listá-las aqui). A FINALIZADA no Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico); o
-  único filtro é o Motivo (lista só os que existem, inclusive os que não tiram, quando há justificativa do App com
-  eles); "Marcar pela OS" lista as tarefas da OS da Gestão PCM (a finalizada
-  não se marca); "Editar" troca o motivo ou a observação e tira o motivo. Cadastro em `?ver=cadastro`
-  (`motivos_cadastro.html`): tirar não apaga, marca `excluido` e o ID não volta, e as tarefas com ele perdem o motivo (a
-  confirmação diz quantas).
+  que tira e TODA justificativa que veio do App, de qualquer motivo, com o texto do técnico, quem e desde quando; a
+  marca do PCM que não tira não aparece (16/10/2026: as 10 justificativas "Prioridade" de um técnico estavam gravadas e
+  o painel mostrava 0; o Levi escolheu listá-las aqui). "Do App" é pelo MOTIVO (`origem_motivo`/`quem_motivo` de
+  `motivos.vigentes`: a 1ª decisão da sequência com o mesmo motivo), não pela última decisão: o PCM que edita a
+  observação não tira a justificativa daqui nem troca quem marcou (antes ela sumia e virava do PCM). A FINALIZADA no
+  Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico); o único filtro é o Motivo
+  (lista só os que existem, inclusive os que não tiram, quando há justificativa do App com eles). A tabela (Levi,
+  16/10, 2ª rodada), tudo centrado menos a Tarefa e sem a coluna Editar que abria a linha:
+  - o motivo do técnico NÃO se troca ("se o técnico disse tá dito"; a rota recusa); o do PCM troca na própria célula
+    (o selo é a lista; o que não tira pede confirmação, porque a tarefa sai do painel);
+  - a observação se edita na própria célula (lápis ou clique no texto; o campo ocupa a largura da célula e não
+    alarga a tabela: a 1366 px ela cabe inteira, editando ou não);
+  - o × ao lado do motivo tira o motivo (com confirmação);
+  - saíram o "Marcar pela OS" ("atrapalha mais que ajuda": marca-se no Quadro e pelo App; a rota só aceita a tarefa
+    que já tem motivo, `item`) e a nota de como o painel funciona; o aviso do arquivo do robô só aparece quando ele
+    não está em dia.
+  Cadastro em `?ver=cadastro` (`motivos_cadastro.html`): tirar não apaga, marca `excluido` e o ID não volta, e as
+  tarefas com ele perdem o motivo (a confirmação diz quantas).
 - **No Quadro** (a janela da OS, também das pendentes, que agora abrem a janela pelo nome): a seção Motivo mostra o de
   agora (desde quando, quem, a observação) e marca, troca ou tira por `POST /t/pcm/quadro/motivo` (JSON; a tarefa vem da
   SEMANA, a página só diz qual). O cartão e a pendente ganham o selo (âmbar: tira; azul: não tira). Com a marca da OS
@@ -177,7 +190,8 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   AGORA (a desmarcada sai); `os`, `codigo` e `tarefa` como nas linhas do `banco_dados.json` (o texto da marca é o da
   linha, só sem espaço nas pontas; código vazio = todos os ativos da OS); `usina`, `cluster` e `data_prog` (o dia em que
   estava na agenda quando foi marcada; vazio na pendente e na marca pela OS) para o App agrupar; `motivo` = o id;
-  `origem` = "app" (o técnico pelo App) ou "nexus" (Quadro e painel), sem pessoa, pedido do App para mostrar "marcado
+  `origem` = por onde o MOTIVO foi posto, "app" (o técnico pelo App) ou "nexus" (Quadro e painel; a observação editada
+  no painel não muda), sem pessoa, pedido do App para mostrar "marcado
   pelo PCM" ou "no App"; todo
   motivo das tarefas está em `motivos` (`ativo` sempre verdadeiro: tirar do cadastro tira as marcas). **O App NÃO filtra
   a programação** (Levi, 16/10: "se a programação semanal já estiver filtrada não tem necessidade de filtrar duas vezes

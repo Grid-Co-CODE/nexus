@@ -506,39 +506,43 @@ def registrar_pcm(bp) -> None:
 
     @bp.route("/fora-da-programacao/marcar", methods=["POST"])
     def fora_marcar():
-        """Do painel: troca ou tira o motivo de uma tarefa que já tem (`item`), ou marca uma tarefa aberta da OS
-        digitada (a tarefa vem da Gestão PCM, sem o código do ativo: vale em todos os ativos da OS)."""
+        """Do painel, numa tarefa que já tem motivo (`item`): troca o motivo marcado pelo PCM (na própria célula Motivo),
+        edita a observação (na própria célula Observação) ou tira o motivo. O motivo que o técnico mandou pelo App não
+        se troca aqui (Levi, 16/10/2026: "se o técnico disse tá dito"); a observação e o "Tirar motivo", sim. O
+        "Marcar pela OS" saiu ("atrapalha mais que ajuda"): marca-se no Quadro da semana e pelo App."""
         cfg = current_app.config
         if not pode_marcar() or _de_outro_site():
             abort(403)
         f = request.form
-        volta = {k: str(f.get("v_" + k))[:20] for k in ("motivo", "os") if f.get("v_" + k)}
+        volta = {"motivo": str(f.get("v_motivo"))[:20]} if f.get("v_motivo") else {}
         tirar = f.get("tirar") == "1"
         try:
-            if not tirar and not str(f.get("motivo_id") or "").strip():
-                raise M.Recusada("Escolha o motivo.")
+            iid = (f.get("item") or "").strip()
+            if not iid or iid.startswith("_"):
+                raise M.Recusada("A tarefa não foi achada: atualize a página.")
             est = M.ler(cfg, forcar=True)
             if est.get("erro"):
                 raise M.Recusada(f"Não consegui ler os motivos no banco ({est['erro']}): nada foi gravado.")
-            iid = (f.get("item") or "").strip()
-            if iid:
-                m = M.vigentes(cfg, est).get(iid)
-                if not m or iid.startswith("_"):
-                    raise M.Recusada("Essa tarefa não tem mais motivo (alguém mudou agora): atualize a página.")
-                alvo = {k: m[k] for k in ("os", "codigo", "tarefa", "usina", "cliente", "tipo", "cluster", "data_prog")}
-                obs = f.get("obs") if f.get("obs") is not None else m["obs"]
-            else:
-                alvo = _tarefa_da_gestao(cfg, f.get("os"), f.get("tarefa"))
-                obs = f.get("obs") or ""
-            r = M.marcar(cfg, alvo, None if tirar else f.get("motivo_id"), "" if tirar else obs, _usuario(),
-                         origem="painel")
+            m = M.vigentes(cfg, est).get(iid)
+            if not m:
+                raise M.Recusada("Essa tarefa não tem mais motivo (alguém mudou agora): atualize a página.")
+            alvo = {k: m[k] for k in ("os", "codigo", "tarefa", "usina", "cliente", "tipo", "cluster", "data_prog")}
+            pedido = str(f.get("motivo_id") or "").strip()
+            motivo_id = pedido or m["motivo_id"]
+            if not tirar and m["origem_motivo"] == "app" and str(motivo_id) != str(m["motivo_id"]):
+                raise M.Recusada("O motivo que o técnico mandou pelo App não se troca: dá para editar a observação ou "
+                                 "tirar o motivo.")
+            obs = f.get("obs") if f.get("obs") is not None else m["obs"]
+            r = M.marcar(cfg, alvo, None if tirar else motivo_id, "" if tirar else obs, _usuario(), origem="painel")
         except M.Recusada as ex:
             session["pcm_motivos_aviso"] = {"erro": str(ex)}
         else:
             arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
+            nova = r["marca"]
             ok = ("Nada mudou." if not r["gravou"] else
                   f"Motivo tirado da OS {alvo['os']}." if tirar else
-                  f"OS {alvo['os']}: {r['marca']['motivo']}." if r["marca"] else "Gravado.")
+                  f"OS {alvo['os']}: {nova['motivo']}." if nova and nova["motivo_id"] != m["motivo_id"] else
+                  f"OS {alvo['os']}: observação salva.")
             session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
                                             "erro": "" if arq["ok"] else arq["texto"]}
         return redirect(na_raiz("/t/pcm/fora-da-programacao") + ("?" + urlencode(volta) if volta else ""), code=303)
@@ -968,57 +972,11 @@ def _gestao_tarefas(cfg) -> dict | None:
     return g
 
 
-def _tarefa_da_gestao(cfg, os_, tarefa) -> dict:
-    """A tarefa aberta da OS digitada no painel, tirada da Gestão PCM (sem o código do ativo: a marca vale para a tarefa
-    em todos os ativos da OS)."""
-    g = _gestao_tarefas(cfg)
-    if g is None:
-        raise M.Recusada("A Gestão PCM não abriu agora: tente de novo em instantes.")
-    o, nome = M.os_de(os_), str(tarefa or "")
-    ts = [t for t in g["por_os"].get(o, []) if str(t.get("tarefa") or "") == nome]
-    if not o.isdigit() or not ts:
-        raise M.Recusada(f"A OS {o[:12]} não tem essa tarefa na Gestão PCM: atualize a página.")
-    if all(_finalizada(t.get("estado")) for t in ts):
-        raise M.Recusada("Essa tarefa já foi finalizada no Fracttal.")
-    t = ts[0]
-    return {"os": o, "codigo": "", "tarefa": nome, "usina": str(t.get("usina") or "").strip(),
-            "cliente": str(t.get("cliente") or "").strip(), "tipo": str(t.get("tipo") or "").strip(),
-            "cluster": str(t.get("cluster") or "").strip()}
-
-
-def _tarefas_da_os(g: dict | None, os_s: str, vig: dict) -> dict:
-    """As tarefas da OS digitada no painel (uma por nome), com a situação no Fracttal e o motivo de agora."""
-    if g is None:
-        return {"os": os_s, "erro": "A Gestão PCM não abriu agora: tente de novo em instantes.", "tarefas": []}
-    ts = g["por_os"].get(os_s) or []
-    if not ts:
-        return {"os": os_s, "tarefas": [],
-                "erro": f"A OS {os_s} não está na Gestão PCM (as tarefas do Fracttal desde 01/01, que o robô do PCM "
-                        "regrava a cada rodada)."}
-    idx = M.indice(vig)
-    por_nome: dict[str, dict] = {}
-    for t in ts:
-        nome = str(t.get("tarefa") or "")
-        x = por_nome.setdefault(nome, {"tarefa": nome, "tipo": str(t.get("tipo") or ""), "estados": []})
-        x["estados"].append(str(t.get("estado") or ""))
-    out = []
-    for x in por_nome.values():
-        n = M.norm(x["tarefa"])
-        geral = idx.get((os_s, "", n))
-        if geral:
-            d = M._brt(geral["desde"])
-            geral = dict(geral, desde_txt=d.strftime("%d/%m/%Y") if d else "")
-        out.append(dict(x, aberta=not all(_finalizada(e) for e in x["estados"]), n=len(x["estados"]), marca=geral,
-                        por_ativo=[m for m in vig.values() if m["os"] == os_s and m["codigo"] and M.norm(m["tarefa"]) == n]))
-    out.sort(key=lambda x: (not x["aberta"], M.norm(x["tarefa"])))
-    return {"os": os_s, "erro": "", "tarefas": out, "usina": str(ts[0].get("usina") or "")}
-
-
 def _marca_curta(m: dict) -> dict:
     d = M._brt(m["desde"])
     return {"item": m["item_id"], "id": m["motivo_id"], "n": m["motivo"], "tira": m["tira"],
-            "desde": d.strftime("%d/%m/%Y") if d else "", "quem": m["quem"], "obs": m["obs"], "geral": not m["codigo"],
-            "app": m.get("origem") == "app"}
+            "desde": d.strftime("%d/%m/%Y") if d else "", "quem": m.get("quem_motivo") or m["quem"], "obs": m["obs"],
+            "geral": not m["codigo"], "app": m.get("origem_motivo", m.get("origem")) == "app"}
 
 
 def _efeito(marca: dict | None, destino: str | None, tirou: bool = False) -> str:
@@ -1080,7 +1038,8 @@ def _num_arg(v) -> int | None:
 
 def _ctx_fora(cfg, args) -> dict:
     """O painel Fora da programação: as tarefas com um motivo que tira da programação e TODA justificativa que veio do
-    App, de qualquer motivo, menos as finalizadas no Fracttal; o filtro é só o Motivo (Levi, 16/10/2026)."""
+    App, de qualquer motivo, menos as finalizadas no Fracttal; o filtro é só o Motivo (Levi, 16/10/2026). A justificativa
+    é do App pelo motivo (`origem_motivo`): a observação editada pelo PCM não a tira daqui nem troca quem marcou."""
     est = M.ler(cfg)
     vig = M.vigentes(cfg, est)
     ilegiveis = vig.pop("_ilegiveis", 0)
@@ -1091,7 +1050,7 @@ def _ctx_fora(cfg, args) -> dict:
     for m in vig.values():
         # a marca do PCM só aparece se tira; a do App, sempre (16/10/2026: as 10 justificativas "Prioridade" do técnico,
         # que não tira, estavam gravadas e não apareciam em lugar nenhum; Levi escolheu mostrá-las aqui)
-        if not (m["tira"] or m["origem"] == "app"):
+        if not (m["tira"] or m["origem_motivo"] == "app"):
             continue
         estados = (g or {}).get("por_tarefa", {}).get((m["os"], M.norm(m["tarefa"])))
         if estados and all(_finalizada(e) for e in estados):
@@ -1101,7 +1060,8 @@ def _ctx_fora(cfg, args) -> dict:
         # a usina vem da linha marcada; sem ela (a pendente do App não traz), da Gestão PCM pela OS
         usina = m["usina"] or next((str(t.get("usina") or "") for t in (g or {}).get("por_os", {}).get(m["os"], [])), "")
         linhas.append(dict(m, usina=usina, desde_txt=d.strftime("%d/%m/%Y") if d else "",
-                           dias=max(0, (hoje - d.date()).days) if d else None,
+                           dias=max(0, (hoje - d.date()).days) if d else None, do_app=m["origem_motivo"] == "app",
+                           quem_mostra=m["quem_motivo"] or m["quem"],
                            estado_fr=" · ".join(sorted({e for e in estados or [] if e})),
                            fora_da_gestao=g is not None and not estados))
     conta = Counter(l["motivo_id"] for l in linhas)
@@ -1109,16 +1069,11 @@ def _ctx_fora(cfg, args) -> dict:
     mostradas = sorted((l for l in linhas if not sel or l["motivo_id"] == sel),
                        key=lambda l: (l["desde"], int(l["os"]) if l["os"].isdigit() else 0, M.norm(l["tarefa"])))
     opcoes = [(m, conta.get(m["id"], 0)) for m in motivos if conta.get(m["id"]) or m["id"] == sel]
-    os_txt = str(args.get("os") or "").strip()
-    os_pedida = M.os_de(os_txt) if os_txt else ""
     aviso = session.pop("pcm_motivos_aviso", None) or {}
     return {"linhas": mostradas, "total": len(linhas), "motivos": motivos, "opcoes": opcoes, "sel": sel,
             "n_tira": sum(1 for l in mostradas if l["tira"]),
             "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
-            "gestao_ok": g is not None, "os_pedida": os_pedida,
-            "da_os": _tarefas_da_os(g, os_pedida, vig) if os_pedida.isdigit() else None,
-            "os_invalida": bool(os_txt) and not os_pedida.isdigit(),
-            "pode": pode_marcar(), "pode_cadastro": pode_programar(), "repo": M.estado_no_repositorio(cfg, est),
+            "gestao_ok": g is not None, "pode": pode_marcar(), "pode_cadastro": pode_programar(), "repo": M.estado_no_repositorio(cfg, est),
             "ok": aviso.get("ok"), "erro": aviso.get("erro")}
 
 

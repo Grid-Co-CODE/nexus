@@ -294,7 +294,10 @@ def vigentes(cfg, est: dict) -> dict:
     """{item_id: marca}: a última decisão de cada tarefa, quando ela marca um motivo que vale (não excluído). A marca
     traz a OS, o código, a tarefa e o resto do que foi cifrado (usina, cliente, tipo, observação, quem), o motivo, desde
     quando a tarefa está com ele (a 1ª decisão da sequência com o mesmo motivo: trocar só a observação não reinicia) e a
-    hora da última decisão. Linha que não abre com a chave conta em `_ilegiveis` e não entra."""
+    hora da última decisão. `origem_motivo` e `quem_motivo`: por onde e por quem o motivo foi posto (a mesma 1ª decisão)
+    — o PCM que só edita a observação de uma justificativa do App não a torna dele (16/10/2026: no painel, a
+    justificativa "Prioridade" do técnico sumia e o nome dele virava o do PCM). Linha que não abre com a chave conta em
+    `_ilegiveis` e não entra."""
     validos = {m["id"]: m for m in ativos(est)}
     por_item: dict[str, list[dict]] = {}
     for x in sorted(est["marcas"], key=lambda x: D._txt(x.get("decidida_em"))):
@@ -318,6 +321,14 @@ def vigentes(cfg, est: dict) -> dict:
             ilegiveis += 1
             continue
         m = validos[mid]
+        quem_m, origem_m = D._txt(corpo.get("quem")), D._txt(ult.get("origem"))
+        if inicio is not ult:
+            try:
+                c0 = json.loads(cofre.decifrar(D._txt(inicio.get("dados_cifrados")),
+                                               _ctx_marca(iid, D._txt(inicio.get("decidida_em")))))
+                quem_m, origem_m = D._txt(c0.get("quem")), D._txt(inicio.get("origem"))
+            except Exception:    # noqa: BLE001 — a 1ª não abre: vale a última
+                pass
         out[iid] = {"item_id": iid, "os": os_de(ult.get("os")), "codigo": D._txt(corpo.get("codigo")),
                     "tarefa": D._txt(corpo.get("tarefa")), "usina": D._txt(corpo.get("usina")),
                     "cliente": D._txt(corpo.get("cliente")), "tipo": D._txt(corpo.get("tipo")),
@@ -326,7 +337,8 @@ def vigentes(cfg, est: dict) -> dict:
                     "motivo_id": mid, "motivo": m["nome"], "tira": m["tira"],
                     "desde": D._txt(inicio.get("decidida_em")), "quando": quando,
                     "semana": D._txt(ult.get("semana")), "origem": D._txt(ult.get("origem")),
-                    "quem_hmac": D._txt(ult.get("decidida_por_hmac"))}
+                    "quem_hmac": D._txt(ult.get("decidida_por_hmac")),
+                    "origem_motivo": origem_m, "quem_motivo": quem_m}
     if ilegiveis:
         out["_ilegiveis"] = ilegiveis       # type: ignore[assignment]
     return out
@@ -575,7 +587,7 @@ def arquivo(cfg, est: dict | None = None) -> dict:
                for m in ativos(est)]
     tarefas = sorted(({"os": m["os"], "codigo": m["codigo"], "tarefa": m["tarefa"], "usina": m["usina"],
                        "cluster": m["cluster"], "data_prog": m["data_prog"], "motivo": m["motivo_id"],
-                       "origem": "app" if m["origem"] == "app" else "nexus",
+                       "origem": "app" if m["origem_motivo"] == "app" else "nexus",
                        "tira_da_programacao": m["tira"], "desde": (_brt(m["desde"]) or _agora()).strftime("%Y-%m-%d")}
                       for k, m in vig.items() if not k.startswith("_")),
                      key=lambda t: (int(t["os"]) if t["os"].isdigit() else 0, norm(t["tarefa"]), canon(t["codigo"])))
