@@ -671,8 +671,11 @@ html.pgp-aberto{overflow:hidden}
 .fp-tab th,.fp-tab td{padding-left:8px;padding-right:8px}
 .fp-tab td{padding-top:12px;padding-bottom:12px}
 .fp-tab .gc-dado,.fp-tab .gc-num{white-space:nowrap}
-.fp-usina{min-width:120px;max-width:190px}
-.fp-tarefa{color:var(--tinta);font-weight:600;min-width:220px;overflow-wrap:anywhere}
+.fp-usina{min-width:90px;max-width:170px}
+/* o Desde com a hora embaixo (Levi, 16/10: "em desde quero data e hora"): numa linha só, a coluna Vezes empurrava os
+   três pontos para fora a 1366 px */
+.fp-desde small{display:block;color:var(--mudo);font-size:11.5px;margin-top:2px}
+.fp-tarefa{color:var(--tinta);font-weight:600;min-width:200px;overflow-wrap:anywhere}
 .fp-tarefa small{display:block;color:var(--mudo);font-size:11.5px;font-weight:400;margin-top:3px}
 .fp-motivo{white-space:nowrap}
 /* o motivo do PCM é o próprio selo, que abre a lista; o do técnico é o selo parado */

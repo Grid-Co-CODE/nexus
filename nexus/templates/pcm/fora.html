@@ -71,7 +71,7 @@
     <tbody>
     {% for l in linhas %}
       <tr>
-        <td class="gc-dado">{{ l.desde_txt }}</td>
+        <td class="gc-dado fp-desde">{{ l.desde_txt[:10] }}{% if l.desde_txt[11:] %}<small>{{ l.desde_txt[11:] }}</small>{% endif %}</td>
         <td class="gc-num">{{ l.dias if l.dias is not none else '' }}</td>
         <td class="gc-dado">{{ l.os_html }}</td>
         <td class="fp-usina"{% if l.usina != l.usina_nome %} title="{{ l.usina }}"{% endif %}>{{ l.usina_nome }}</td>

@@ -488,7 +488,7 @@ def test_painel_3a_rodada_usina_hora_os_e_tres_pontos(app, logado, tela, monkeyp
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
     linha = html.split('<tbody>', 1)[1].split('</tr>', 1)[0]
     assert '<td class="fp-usina" title="Cliente A - Usina 1 - SP">Usina 1</td>' in linha
-    assert '<td class="gc-dado">07/10/2026 14:32</td>' in linha
+    assert '<td class="gc-dado fp-desde">07/10/2026<small>14:32</small></td>' in linha
     assert 'title="UFV1-CAB01">[Grid Co.] - MPM - Cabine<small>MPM · no Fracttal: Não iniciada</small>' in linha
     # a OS e os números de 5 a 6 dígitos da observação: botões que abrem o card (pelo número, sem a OS na Gestão)
     assert '<button type="button" class="fp-os-n" data-os="5" title="Abrir a OS 5">5</button>' in linha
