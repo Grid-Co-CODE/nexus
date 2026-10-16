@@ -381,6 +381,27 @@ def _nao_admin(app):
     return c
 
 
+def test_o_setor_pcm_grava_a_reprogramacao(app, config, origem, monkeypatch):
+    """Levi, 16/10/2026: "administradores e pessoas do setor de PCM conseguir gerar uma programação semanal!". Quem é do
+    setor PCM grava a fila do Quadro (aqui, nas observações do rascunho do Nexus); o de outro setor monta e copia."""
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 2))
+    app.config.update({k: v for k, v in config.items() if k != "TESTING"})
+    rid = _rodada(app.config, origem)
+    c = _nao_admin(app)
+    itens = json.dumps([{"os": "15021", "tarefa": "MPM cabine", "dia": "sex", "turno": "tarde"}])
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 7, "nome": "Performance"},
+                                               "erro": ""})
+    assert "Quem grava é o PCM" in c.get("/t/pcm/quadro").get_data(as_text=True)
+    assert c.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "rodada": rid, "itens": itens}).status_code == 403
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 3, "nome": "PCM"}, "erro": ""})
+    assert "Gravar nas observações da 2026-W41" in c.get("/t/pcm/quadro").get_data(as_text=True)
+    r = c.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "rodada": rid, "itens": itens})
+    assert r.status_code == 303 and "feito=salvo" in r.headers["Location"]
+    assert "15021; sex; MPM cabine; tarde" in I.observacoes(G.pasta_trabalho(app.config), "2026-W41")
+    assert Q.gravadas(app.config, "2026-W41")[0]["quem"] == "pessoa.teste@exemplo.com"
+
+
 def test_tela_quadro_mostra_o_tipo_do_fracttal(app, logado, tmp_path, monkeypatch):
     monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 13))
     sem = _semana_com_zeladoria()

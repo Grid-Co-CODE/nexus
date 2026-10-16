@@ -194,13 +194,50 @@ def test_tela_publicar_so_administrador_e_com_confirmacao(app, logado, config, o
     assert "A semana 2026-W41 já começou" in html and 'name="ciente_comecou"' in html
     r = logado.post("/t/pcm/gerar/publicar", data={"rodada": rid, "repo_ja_tem": "1", "confirmo": "1", "substituir": "1"})
     assert r.status_code == 400 and len(gh.commits) == 2
-    # quem não é administrador não publica
+    # quem não é administrador nem do setor PCM não publica
     c = app.test_client()
     with c.session_transaction() as s:
         s["logado"], s["admin"] = True, False
         s["usuario"] = {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa Teste", "perfil": "PCM"}
     r = c.post("/t/pcm/gerar/publicar", data={"rodada": rid, "confirmo": "1", "substituir": "1"})
-    assert r.status_code == 403 and "Só administrador publica" in r.get_data(as_text=True) and len(gh.commits) == 2
+    assert r.status_code == 403 and "Só administrador ou o setor PCM publica" in r.get_data(as_text=True)
+    assert len(gh.commits) == 2
+
+
+def _no_setor(monkeypatch, nome):
+    """A pessoa do login no setor `nome` (o setor vem da Base → Integração Fracttal; aqui, dublado)."""
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 7, "nome": nome}, "erro": ""})
+
+
+def _pessoa(app):
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["logado"], s["admin"] = True, False
+        s["usuario"] = {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa Teste"}
+    return c
+
+
+def test_o_setor_pcm_gera_e_publica(app, config, origem, monkeypatch):
+    """Levi, 16/10/2026: "mude as configurações para administradores e pessoas do setor de PCM conseguir gerar uma
+    programação semanal!". Quem é do setor PCM (pelo nome, sem acento nem caixa) publica e vê o botão; o de outro setor,
+    não."""
+    monkeypatch.setattr(PB, "_agora", lambda: SABADO_ANTES)
+    app.config.update({k: v for k, v in config.items() if k != "TESTING"})
+    gh = _com_github(app.config, GitHubFalso({}))
+    rid = _rodada(app.config, origem)
+    c = _pessoa(app)
+    _no_setor(monkeypatch, "Performance")
+    html = c.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True)
+    assert "Publicar no App</a>" not in html and "administrador ou por quem é do setor PCM" in html
+    assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 403
+    assert c.post("/t/pcm/gerar/publicar", data={"rodada": rid, "confirmo": "1"}).status_code == 403 and not gh.commits
+    _no_setor(monkeypatch, "pcm")
+    assert 'Publicar no App</a>' in c.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True)
+    assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 200
+    r = c.post("/t/pcm/gerar/publicar", data={"rodada": rid, "confirmo": "1"})
+    assert r.status_code == 303 and "feito=publicada" in r.headers["Location"] and len(gh.commits) == 2
+    assert G.ler_status(app.config, rid)["publicacao"]["quem"] == "pessoa.teste@exemplo.com"
 
 
 # ── o plano publicado no histórico ───────────────────────────────────────────────────────────────────────────

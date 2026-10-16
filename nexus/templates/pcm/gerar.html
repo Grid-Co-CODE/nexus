@@ -11,7 +11,7 @@
   <div>
     <h1 class="titulo-pagina">Gerar a semana</h1>
     <p class="pcm-sub">O Nexus roda o motor do PCM e compara com a semana oficial. Gerar não muda nada no campo: a semana só
-      vai ao App pelo botão Publicar no App da rodada, com confirmação (só administrador).</p>
+      vai ao App pelo botão Publicar no App da rodada, com confirmação (administrador ou setor PCM).</p>
   </div>
   <form class="pcm-semana-sel" method="get" action="{{ raiz }}/t/pcm/gerar">
     <label class="gc-rotulo" for="ver-semana">Semana</label>
@@ -89,9 +89,9 @@
     depois da publicação.{% endif %}</div></div>
   {% elif pode_publicar %}
   <div class="pcm-pub-barra">
-    {% if admin %}<a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ raiz }}/t/pcm/gerar/publicar?rodada={{ sel.id }}"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</a>
+    {% if pode %}<a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ raiz }}/t/pcm/gerar/publicar?rodada={{ sel.id }}"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</a>
     <span class="gc-ajuda">Abre a conferência antes de mandar a semana para o campo.</span>
-    {% else %}<span class="gc-ajuda">Esta semana pode ser publicada no App por um administrador.</span>{% endif %}
+    {% else %}<span class="gc-ajuda">Esta semana pode ser publicada no App por um administrador ou por quem é do setor PCM.</span>{% endif %}
   </div>
   {% endif %}
   {% if sel.conferencia and sel.conferencia.excede_hh_os %}

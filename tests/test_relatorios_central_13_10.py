@@ -92,8 +92,10 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         assert ST.das_do_setor("performance") == ST.das_do_setor("Performance") == {f"relatorios/{t}" for t in RELATORIOS}
         # os do PCM (14/10/2026) são do setor PCM: os relatórios (nexus/pcm/relatorios, tests/test_relatorios_pcm.py) e o
         # Acompanhamento (nexus/pcm/acompanhamento, tests/test_pcm_acompanhamento.py)
+        # e, desde 16/10/2026, o Gerar a semana e o Quadro da semana (Levi: "administradores e pessoas do setor de PCM
+        # conseguir gerar uma programação semanal!", tests/test_pcm_publicar.py)
         assert ST.das_do_setor("PCM") == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
-                                          | {"pcm/acompanhamento"})
+                                          | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro"})
         assert ST.das_do_setor("") == set()
 
 

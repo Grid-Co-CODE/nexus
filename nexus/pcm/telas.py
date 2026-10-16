@@ -3,7 +3,8 @@
 Etapa 1: Semana e Tarefas e OS mostram a programação que está valendo (a mesma do App de Campo).
 Etapa 2: Gerar a semana roda o motor do PCM no Nexus, em sombra, e compara com a semana oficial do PCM.
 Etapa 3 (09/10/2026, Levi: "semana que vem já quero full nexus sem falta"): Publicar no App manda a semana gerada para o
-repositório do PCM, pelo mesmo caminho do PC do PCM (`publicar.py`): só administrador, com a tela de confirmação.
+repositório do PCM, pelo mesmo caminho do PC do PCM (`publicar.py`): administrador ou setor PCM (`pode_programar`,
+16/10/2026), com a tela de confirmação.
 Quadro da semana (09/10/2026): o quadro da aba Semana do painel do PCM e a reprogramação de tarefas (`quadro.py`).
 """
 import json
@@ -15,9 +16,31 @@ from flask import abort, current_app, jsonify, redirect, render_template, reques
 
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, observacoes as O, publicar as PB
 from . import quadro as Q, semana as S
+from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
 
 POR_PAGINA = 150
+SETOR_PCM = "pcm"
+
+
+def pode_programar() -> bool:
+    """Publicar a semana no App e gravar a reprogramação do Quadro: administrador ou pessoa do setor PCM (16/10/2026,
+    Levi: "mude as configurações para administradores e pessoas do setor de PCM conseguir gerar uma programação
+    semanal!"). O setor é o da pessoa do login (Base → Integração Fracttal, `setor_telas.acesso`), pelo nome, sem acento
+    nem caixa. Gerar e as observações já eram de quem abre a tela Gerar a semana, que agora é do setor PCM."""
+    if session.get("admin"):
+        return True
+    if not session.get("logado"):
+        return False
+    try:
+        setor = ST.acesso().get("setor")
+    except Exception:      # noqa: BLE001 — sem saber o setor, só o administrador
+        return False
+    return bool(setor) and ST._sem_acento(setor.get("nome")) == SETOR_PCM
+
+
+def _quem() -> str:
+    return (session.get("usuario") or {}).get("email") or "administrador (senha)"
 _BRT = timezone(timedelta(hours=-3))
 SITUACOES = [("feita", "Finalizada"), ("andamento", "Em andamento"), ("nao_iniciada", "Não iniciada")]
 
@@ -69,7 +92,7 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
         leitura = fonte.ler(cfg)                    # a semana já chegou ao App? (o banco_dados.json que ele lê)
         app_sel = {"semana": PB.semana_no_app(leitura.dados, sel["semana"]), "erro": leitura.erro}
     return {"conf": geracao.conferir(cfg, semana), "ultimas": geracao.ultimas(cfg), "sel": sel,
-            "admin": bool(session.get("admin")), "app_sel": app_sel,
+            "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,
             "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,
             "observacoes": texto_obs, "herdada_de": herdada_de,
@@ -181,13 +204,14 @@ def registrar_pcm(bp) -> None:
 
     @bp.route("/gerar/publicar", methods=["GET", "POST"])
     def gerar_publicar():
-        """Publicar no App: a confirmação (GET) e o envio (POST). Só administrador: muda a semana de todo o campo."""
+        """Publicar no App: a confirmação (GET) e o envio (POST). Administrador ou setor PCM (`pode_programar`): muda a
+        semana de todo o campo."""
         cfg = current_app.config
         rid = (request.values.get("rodada") or "").strip()
         st = geracao.ler_status(cfg, rid)
         if st is None:
             abort(404)
-        if not session.get("admin"):
+        if not pode_programar():
             return render_template("pcm/publicar.html", st=st, negado=True), 403
         motivos = PB.motivos_para_nao_publicar(cfg, rid)
         if request.method == "POST":
@@ -197,7 +221,7 @@ def registrar_pcm(bp) -> None:
                     or (comecou and not request.form.get("ciente_comecou"))):
                 return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
                                        erro="Marque a confirmação para publicar.")), 400
-            quem = (session.get("usuario") or {}).get("email") or "administrador (senha)"
+            quem = _quem()
             try:
                 PB.publicar(cfg, rid, quem)
             except PB.PublicacaoErro as ex:
@@ -216,7 +240,7 @@ def registrar_pcm(bp) -> None:
         semana = _semana_do_form()
         if not semana:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
-        I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, request.form.get("texto") or "", autor="admin")
+        I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, request.form.get("texto") or "", autor=_quem())
         return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=observacoes"), code=303)
 
     @bp.route("/gerar/observacoes/copiar", methods=["POST"])
@@ -236,7 +260,7 @@ def registrar_pcm(bp) -> None:
         if not texto.strip():
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
                                    erro=f"A semana {anterior} não tem observações para copiar.")), 400
-        I.salvar_observacoes(trab, semana, texto, autor="admin")
+        I.salvar_observacoes(trab, semana, texto, autor=_quem())
         return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=copiado"), code=303)
 
     @bp.route("/gerar/estado")
@@ -314,10 +338,11 @@ def registrar_pcm(bp) -> None:
 
     @bp.route("/quadro/reprogramar", methods=["POST"])
     def quadro_reprogramar():
-        """Grava a fila de reprogramação da página. Só administrador. Semana que o Nexus gera: nas observações dela no
-        Nexus, direto. Semana em curso: nos ajustes da semana em curso do repositório do PCM, depois da confirmação."""
+        """Grava a fila de reprogramação da página. Administrador ou setor PCM (`pode_programar`). Semana que o Nexus
+        gera: nas observações dela no Nexus, direto. Semana em curso: nos ajustes da semana em curso do repositório do
+        PCM, depois da confirmação."""
         cfg = current_app.config
-        if not session.get("admin"):
+        if not pode_programar():
             abort(403)
         f = request.form
         base = _quadro_semana(cfg, (f.get("semana") or "").strip() or None, (f.get("rodada") or "").strip() or None)
@@ -330,7 +355,7 @@ def registrar_pcm(bp) -> None:
             itens = []
         linhas, problemas = Q.linhas_da_fila(sem, itens)
         dest = _destino_quadro(cfg, base)
-        quem = (session.get("usuario") or {}).get("email") or "administrador (senha)"
+        quem = _quem()
         volta = {"semana": sem["week"]}
         if base["rodada"]:
             volta["rodada"] = base["rodada"]
@@ -591,7 +616,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
     todos = args.get("todos") == "1"
     q = Q.montar(sem, base["publicadas"], filtros, todos=todos, mostrar_pendentes=True if args.get("pend") == "1" else None)
     dest = _destino_quadro(cfg, base)
-    admin = bool(session.get("admin"))
+    pode = pode_programar()
     extra = {k: v for k, v in filtros.items() if v}
     sel_qs = dict(extra, **({"rodada": base["rodada"]} if base["rodada"] else {"semana": sem["week"]}))
     feito = args.get("feito") or ""
@@ -614,7 +639,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
     else:
         g = _quando(sem.get("geradaEm"))
         origem_txt = "publicada no App" + (f", gerada em {g}" if g else "")
-    dados = {"semana": sem["week"], "rodada": base["rodada"] or "", "destino": dest["id"], "admin": admin,
+    dados = {"semana": sem["week"], "rodada": base["rodada"] or "", "destino": dest["id"], "pode": pode,
              "dias": [[d, Q.NOMES_DIA[d]] for d in Q.DIAS_REPROGRAMAR], "turnos": list(Q.TURNOS), "itens": q["itens"],
              "oss": q["oss"],
              "feito": feito in ("salvo", "aplicado")}
@@ -630,7 +655,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
         "copiar": "Esta semana foi gerada no PC do PCM: a fila de reprogramação é para copiar e colar no painel do PCM.",
     }.get(dest["id"], "A semana já acabou: aqui é só para consulta.")
     ctx["ok_link"] = f"/t/pcm/gerar?semana={sem['week']}" if feito == "salvo" else ""
-    return dict(ctx, sem=sem, q=q, filtros=filtros, filtro_gestor=filtro_gestor, destino=dest, admin=admin,
+    return dict(ctx, sem=sem, q=q, filtros=filtros, filtro_gestor=filtro_gestor, destino=dest, pode=pode,
                 rodada=base["rodada"], chips=_chips_quadro(base, extra), origem_txt=origem_txt, dados=dados,
                 tem_filtro=any(filtros.values()),
                 url_limpar="?" + urlencode({k: v for k, v in sel_qs.items() if k in ("semana", "rodada")}),

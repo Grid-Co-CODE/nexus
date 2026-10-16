@@ -3,14 +3,15 @@
 {% block conteudo %}
 {# Publicar no App (09/10/2026, Levi: "semana que vem já quero full nexus sem falta"): a semana gerada no Nexus vai para o
    repositório do PCM, pelo mesmo caminho do PC do PCM, e o robô do PCM a leva ao banco_dados.json do App. Muda a semana de
-   todo o campo: só administrador, e tudo o que importa fica à vista antes do botão (`telas._ctx_publicar`). #}
+   todo o campo: administrador ou setor PCM (`telas.pode_programar`, 16/10/2026), e tudo o que importa fica à vista antes
+   do botão (`telas._ctx_publicar`). #}
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
 <p class="gc-eyebrow">PCM · Programação semanal</p>
 <h1 class="titulo-pagina">Publicar a semana {{ st.semana }} no App</h1>
 
 {% if negado %}
-<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-lock-key"></i><div><strong>Só administrador publica.</strong>
-  Publicar troca a semana de todo o campo no App. Entre com a senha de administrador ou peça a quem é.</div></div>
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-lock-key"></i><div><strong>Só administrador ou o setor PCM publica.</strong>
+  Publicar troca a semana de todo o campo no App. Peça a quem é do setor PCM ou a um administrador.</div></div>
 <p><a class="pcm-link" href="{{ raiz }}/t/pcm/gerar?rodada={{ st.id }}">Voltar à rodada</a></p>
 {% else %}
 

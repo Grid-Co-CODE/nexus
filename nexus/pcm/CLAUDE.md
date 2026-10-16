@@ -8,8 +8,26 @@ manutenções) tem seção própria abaixo.
 gerador no PC do programador do PCM, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
 **A troca (Levi, 09/10/2026: "semana que vem já quero full nexus sem falta"):** a partir da W43 o Nexus gera E publica.
 Gerar continua sendo sombra (não muda nada no campo); a semana só vai ao App pelo **Publicar no App** da rodada (seção
-abaixo), um passo à parte, só de administrador, com a tela de conferência. Duas publicações da mesma semana (o PC do PCM
-e o Nexus) se atropelam: na semana da troca, o PC do PCM não publica.
+abaixo), um passo à parte, com a tela de conferência. Duas publicações da mesma semana (o PC do PCM e o Nexus) se
+atropelam: na semana da troca, o PC do PCM não publica.
+
+**O fluxo da semana, do Gerar ao App** (o que responder a "após a sombra, o que acontece?", Levi, 16/10/2026):
+1. **Gerar a semana** (bloco 3): o Nexus roda o motor do PCM com os insumos e as observações da semana e grava uma
+   rodada (a "sombra": a planilha `saida/sombra.xlsx` e a conferência). Nada vai ao campo.
+2. **Revisar**: a rodada abre no Quadro da semana como "rascunho do Nexus"; o que mudar vira linha nas observações da
+   semana (pelo Quadro ou pelo bloco 2) e vale na PRÓXIMA geração: gera de novo. Cada geração é uma rodada nova, e o
+   Quadro mostra a mais recente.
+3. **Publicar no App** (o botão da rodada, com a tela de conferência): manda a `Programação Semana NN.xlsx` e o
+   `Observacoes_Semana.txt` ao repositório do PCM, relê e confere, e põe o plano na reserva do histórico.
+4. **O robô do PCM** roda com o push (5 a 10 min) e regrava o `banco_dados.json`; a semana vira a do App na segunda
+   (ele escolhe a semana ativa pela data). Na semana em curso, o robô roda a cada 15 a 30 min (OS nova, ajustes do
+   `Observacoes_Semana_Atual.txt` que o Quadro grava, rolagem).
+**Quem pode (16/10/2026, Levi: "mude as configurações para administradores e pessoas do setor de PCM conseguir gerar uma
+programação semanal!"):** Gerar a semana e o Quadro da semana são telas do setor PCM (`do_setor`: quem é dele as vê
+sem marcar em Base → Acessos; os outros setores, só se marcadas); dentro delas, gerar e mexer nas observações é de quem
+abre a tela; publicar no App e gravar a reprogramação do Quadro é do administrador ou de quem é do setor PCM
+(`telas.pode_programar`, pelo setor da pessoa do login, sem acento nem caixa). Testes: `test_o_setor_pcm_gera_e_publica`
+e `test_o_setor_pcm_grava_a_reprogramacao`.
 
 **A programação publicada também está no banco (08/10/2026):** o `banco_dados.json` vira o fato
 `nexus_programacao · fato_programacao` (1 linha = 1 bloco de agenda), que a carga de hora em hora mantém pela mescla por
@@ -217,8 +235,9 @@ escolhe a semana ativa pela data de hoje: a W43 publicada na quinta vira a do Ap
 - **Depois:** relê cada arquivo do repositório e compara o sha256 (conferir depois de gravar); grava `publicacao.json`
   na rodada e o `status.json`; põe o plano na reserva do histórico (`insumos.registrar_plano_publicado`: a semana
   publicada de novo troca o plano). A rodada mostra "Publicada no App" e se o `banco_dados.json` já tem a semana.
-- **Só administrador** (`session["admin"]`: a senha de admin ou um e-mail de `NEXUS_ADMINS`). O commit não leva o
-  e-mail de quem publicou (o repositório é público); quem foi fica no `publicacao.json` da rodada.
+- **Administrador ou setor PCM** (`telas.pode_programar`, desde 16/10/2026; antes só `session["admin"]`: a senha de
+  admin ou um e-mail de `NEXUS_ADMINS`). O commit não leva o e-mail de quem publicou (o repositório é público); quem
+  foi fica no `publicacao.json` da rodada.
 - **Token:** `NEXUS_PCM_GITHUB_TOKEN` (ambiente ou `.env` do Nexus; no servidor, um token só deste repositório, com
   escrita de conteúdo). Sem ele, no PC, o login do `gh` da máquina (`gh auth token`). Nunca é impresso.
 - **Testar sem publicar:** a tela de confirmação lê o repositório de verdade (só GET). A cópia de conferência do
@@ -295,7 +314,8 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   à nova. O Nexus escreve a semana no cabeçalho (`# Semana 2026-W42: ...`); cabeçalho de outra semana = o que estava lá
   sai. Sem cabeçalho (gravado pelo painel do PCM): fica, a não ser que a pessoa marque para apagar. Em 09/10 ele tinha
   3 linhas `OS; não` do painel, sem semana.
-- **Gravar é do PCM** (`session["admin"]`); os outros montam a fila e copiam para mandar ao PCM ("passa para o PCM").
+- **Gravar é do PCM** (`telas.pode_programar`: administrador ou quem é do setor PCM, desde 16/10/2026); os outros
+  montam a fila e copiam para mandar ao PCM ("passa para o PCM").
   A semana em curso passa por `reprogramar.html` (o que entra, o que o arquivo tem, como fica) e grava com o sha que a
   pessoa conferiu (mudou no meio: não grava, 409), relê e confere o sha256. O commit não leva e-mail (repositório
   público). Quem gravou o quê: `reprogramacoes.jsonl` na pasta de trabalho, e "Já gravadas para esta semana" na tela,

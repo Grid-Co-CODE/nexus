@@ -25,9 +25,13 @@ TORRE = Torre(
     icone="calendar-check",
     descricao="Programação semanal, aderência ao plano e capacidade das equipes.",
     telas=[
+        # o Gerar e o Quadro são do setor PCM (16/10/2026, Levi: "mude as configurações para administradores e pessoas
+        # do setor de PCM conseguir gerar uma programação semanal!"): quem é dele os vê sem marcar em Base → Acessos, e
+        # publica e grava a reprogramação (`pcm.telas.pode_programar`)
         Tela("quadro", "Quadro da semana",
              "O que cada equipe faz em cada dia, e o que reprogramar?",
-             "banco_dados.json do painel PCM e as gerações do Nexus"),
+             "banco_dados.json do painel PCM e as gerações do Nexus",
+             do_setor="PCM"),
         Tela("insights", "Insights do PCM",
              "Onde a aderência cai e que tarefa já rolou várias vezes?",
              "banco_dados.json do painel PCM"),
@@ -35,8 +39,9 @@ TORRE = Torre(
              "Qual é a lista consolidada de OS e tarefas da semana?",
              "banco_dados.json do painel PCM"),
         Tela("gerar", "Gerar a semana",
-             "A semana que o Nexus gera bate com a oficial do PCM?",
-             "Motor do PCM rodando no Nexus, em sombra: nada é publicado"),
+             "Qual é a programação da próxima semana, e ela está pronta para ir ao App?",
+             "Motor do PCM rodando no Nexus: a sombra é o rascunho, e a semana vai ao App pelo Publicar no App",
+             do_setor="PCM"),
         Tela("acompanhamento", "Acompanhamento PCM",
              "Que MPA ou MPS está travada, que OS envelhece no backlog e onde está a carga de cada time?",
              "Fracttal (pela Gestão PCM), programação semanal, Gerencial, cadastro e a curadoria do PCM",

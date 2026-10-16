@@ -156,7 +156,8 @@
 </details>
 {% endif %}
 
-{# A fila de reprogramação: aparece com o primeiro item. Grava só administrador; os outros copiam e mandam ao PCM. #}
+{# A fila de reprogramação: aparece com o primeiro item. Grava o administrador ou quem é do setor PCM (`pode`, 16/10/2026);
+   os outros copiam e mandam ao PCM. #}
 <aside class="q-fila" id="q-fila" hidden aria-label="Fila de reprogramação">
   <div class="q-fila-cab">
     <span class="q-fila-n" data-fila-n></span>
@@ -166,7 +167,7 @@
       <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fila-copiar><i class="ph ph-copy"></i> Copiar tudo</button>
       <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-fila-limpar>Limpar</button>
       {% if destino.id in ('atual', 'nexus') %}
-        {% if admin %}
+        {% if pode %}
         <form method="post" action="{{ raiz }}/t/pcm/quadro/reprogramar" class="q-fila-form">
           <input type="hidden" name="semana" value="{{ sem.week }}">
           {% if rodada %}<input type="hidden" name="rodada" value="{{ rodada }}">{% endif %}
@@ -176,7 +177,7 @@
             {% if destino.id == 'atual' %}Aplicar na semana em curso{% else %}Gravar nas observações da {{ sem.week }}{% endif %}</button>
         </form>
         {% else %}
-        <span class="q-fila-so"><i class="ph ph-lock-key"></i> Quem grava é o PCM (administrador): copie as linhas e mande ao PCM.</span>
+        <span class="q-fila-so"><i class="ph ph-lock-key"></i> Quem grava é o PCM (o setor PCM ou um administrador): copie as linhas e mande ao PCM.</span>
         {% endif %}
       {% endif %}
     </span>
