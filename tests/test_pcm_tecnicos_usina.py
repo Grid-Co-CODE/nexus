@@ -38,7 +38,7 @@ def _usina(uid, nome, equipe, status="OPERAÇÃO", **kw):
     return d
 
 
-USINAS = [_usina(1, "Usina Um", 10, tecnico_om_id=10), _usina(2, "Usina Dois", 10), _usina(3, "Usina Três", 20),
+USINAS = [_usina(1, "Usina Um", 10, tecnico_om_id=10), _usina(2, "Usina Dois", 10), _usina(3, "Usina Três", 20, cliente_id=2),
           _usina(4, "Usina Parada", 20, status="DESMOBILIZADA")]
 EQUIPES = [{"equipe_id": 10, "nome": "SP Norte 01", "regiao_campo_id": 1},
            {"equipe_id": 20, "nome": "SC Oeste 01", "regiao_campo_id": 2}]
@@ -73,7 +73,7 @@ def banco(app, tmp_path):
     api = ApiPGFalsa()
     _aba(api, "cadastro_nexus", "usinas", USINAS)
     _aba(api, "cadastro_nexus", "equipes", EQUIPES)
-    _aba(api, "cadastro_nexus", "clientes", [{"cliente_id": 1, "nome": "Cliente A"}])
+    _aba(api, "cadastro_nexus", "clientes", [{"cliente_id": 1, "nome": "Cliente A"}, {"cliente_id": 2, "nome": "Cliente B"}])
     _aba(api, "cadastro_nexus", "de_para", DE_PARA)
     _aba(api, "cadastro_nexus", "pessoas", _pessoas())
     _aba(api, "cadastro_nexus", "regioes_campo", REGIOES)
@@ -138,6 +138,7 @@ def test_linha_mostra_tecnicos_evidencia_e_avisos(app, banco):
     a3 = " | ".join(_linha(ctx, 3)["avisos"]).lower()
     assert "sem técnico" in a3 and "sem nome do fracttal" in a3
     assert l1["equipe"] == "SP Norte 01" and l1["regiao"] == "Sudeste 03" and l1["responsavel"] == "Responsável Noventa"
+    assert l1["cliente"] == "Cliente A" and _linha(ctx, 3)["cliente"] == "Cliente B"
     assert ctx["pessoas_json"] and all(set(p) == {"id", "nome", "equipe_id"} for p in ctx["pessoas_json"])
 
 
@@ -145,13 +146,16 @@ def test_filtros_em_cascata(app, banco):
     _por(app, 1, 10)
     assert {l["usina_id"] for l in _montar(app)["linhas"]} == {1, 2, 3}
     assert {l["usina_id"] for l in _montar(app, todas="1")["linhas"]} == {1, 2, 3, 4}
+    # o filtro de cliente no lugar do de região (Levi, 17/10: "troque o filtro de região e coloque o de cliente")
+    assert "regiao" not in T.FILTROS and "cliente" in T.FILTROS
     ctx = _montar(app, equipe="SP Norte 01")
     assert {l["usina_id"] for l in ctx["linhas"]} == {1, 2}
-    assert [v for v, _n in ctx["opcoes"]["regiao"]] == ["Sudeste 03"]
+    assert [v for v, _n in ctx["opcoes"]["cliente"]] == ["Cliente A"]
     assert {v for v, _n in ctx["opcoes"]["equipe"]} == {"SP Norte 01", "SC Oeste 01"}      # não restringe a si mesmo
-    vazio = _montar(app, equipe="SC Oeste 01", regiao="Sudeste 03")
-    assert vazio["linhas"] == [] and "SC Oeste 01" in {v for v, _n in vazio["opcoes"]["equipe"]}
-    assert "Sudeste 03" in {v for v, _n in vazio["opcoes"]["regiao"]}                     # a escolhida fica
+    vazio = _montar(app, equipe="SP Norte 01", cliente="Cliente B")
+    assert vazio["linhas"] == [] and "SP Norte 01" in {v for v, _n in vazio["opcoes"]["equipe"]}
+    assert "Cliente B" in {v for v, _n in vazio["opcoes"]["cliente"]}                     # a escolhida fica
+    assert {l["usina_id"] for l in _montar(app, cliente="Cliente B")["linhas"]} == {3}
     assert {l["usina_id"] for l in _montar(app, situacao="sem_tecnico")["linhas"]} == {2, 3}
     assert {l["usina_id"] for l in _montar(app, q="tecnico dez")["linhas"]} == {1}
     assert {l["usina_id"] for l in _montar(app, q="usina tres")["linhas"]} == {3}
@@ -166,6 +170,8 @@ def test_visao_por_tecnico(app, banco):
     assert por[12]["n_usinas"] == 0 and por[12]["rondas"] == 1
     assert 14 not in por and 90 not in por
     assert {t["pessoa_id"] for t in _montar(app, ver="tecnico", equipe="SC Oeste 01")["tecnicos"]} == {12}
+    # na visão por técnico, o cliente filtra quem tem usina dele
+    assert {t["pessoa_id"] for t in _montar(app, ver="tecnico", cliente="Cliente A")["tecnicos"]} == {10}
 
 
 def test_sem_chave_do_cadastro_a_tela_abre_e_avisa(app, banco):
@@ -254,3 +260,44 @@ def test_numeros_do_topo_chips_e_situacao(app, banco):
     assert por[10]["sit"] == ("ok", "Com usina") and por[12]["sit"] == ("critico", "Sem usina")
     assert por[13]["sit"] == ("critico", "Sem usina")
     assert ctx["lido"] and len(ctx["lido"]) == 5
+
+
+class _Contador(ApiPGFalsa):
+    """O banco falso que conta as listagens (/api/sheets) e as páginas lidas de cada aba."""
+
+    def __init__(self):
+        super().__init__()
+        self.listagens, self.paginas = 0, []
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        if url.endswith("/api/sheets"):
+            self.listagens += 1
+        elif "/rows" in url:
+            self.paginas.append((int(url.split("/api/sheets/")[1].split("/")[0]), int((params or {}).get("offset", 0))))
+        return super().get(url, params=params, headers=headers, timeout=timeout)
+
+
+def test_a_tela_fria_lista_o_banco_poucas_vezes_e_le_a_programacao_do_fim(app, banco):
+    """Levi, 17/10: "Quando clico em Todas e Por técnico não carrega, demora". Medido no banco real: 11,6 s na 1ª
+    abertura, porque cada livro pedia de novo a lista de todas as tabelas (~0,6 s cada) e a programação inteira (16,5 mil
+    linhas, 4,4 s) era lida para achar a semana em curso, que fica no fim (a carga põe as semanas do arquivo do robô
+    depois das antigas)."""
+    api = _Contador()
+    api.workbooks, api.abas = banco.workbooks, banco.abas
+    velhas = [{"data_id_semana": 20260928, "usina_id": 2, "pessoa_id_tecnico": 12}] * 2300
+    _aba(api, "nexus_programacao", "fato_programacao",
+         velhas + [{"data_id_semana": SEGUNDA, "usina_id": 1, "pessoa_id_tecnico": 10}] * 200)
+    app.extensions["nexus_dados_sessao"] = api
+    visao.limpar()
+    T.limpar()
+    ctx = _montar(app)
+    assert api.listagens <= 2, api.listagens
+    sid = api.abas[("nexus_programacao", "fato_programacao")]["id"]
+    assert (sid, 0) not in api.paginas                       # do fim para trás: as páginas velhas não são lidas
+    ev = {e["pessoa_id"]: e for e in _linha(ctx, 1)["evidencia"]}
+    assert ev[10]["na_programacao"]
+    # a semana velha (a pessoa 12 na usina 2) não conta como programação da semana
+    assert not any(e["na_programacao"] for e in _linha(ctx, 2)["evidencia"] if e["pessoa_id"] == 12)
+    antes = len(api.paginas)
+    _montar(app, ver="tecnico")
+    assert len(api.paginas) == antes                         # a 2ª aba não volta ao banco

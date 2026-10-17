@@ -39,7 +39,7 @@ class ApiPGFalsa:
             self.tokens.append((headers or {}).get("Authorization"))
             return Resposta(200, [{"key": k} for k in self.workbooks])
         if url.endswith("/api/sheets"):
-            return Resposta(200, [{"id": v["id"], "workbook_key": wb, "sheet_name": aba}
+            return Resposta(200, [{"id": v["id"], "workbook_key": wb, "sheet_name": aba, "row_count": len(v["linhas"])}
                                   for (wb, aba), v in self.abas.items()])
         m = re.search(r"/api/sheets/(\d+)/rows$", url)
         aba = next(v for v in self.abas.values() if v["id"] == int(m.group(1)))

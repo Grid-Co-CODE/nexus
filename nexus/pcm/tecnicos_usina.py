@@ -12,25 +12,36 @@ Campo (`campo.visao._Base` e `_livro`, guardados por 2 minutos):
 - a foto do App (`organizacao_app_campo · Atribuicoes`, o passo A1 do pacote do App): o que só o App tem, o que só o
   Nexus tem e as pendências para a troca (pessoa do App sem ficha que case, usina sem `de_para`).
 
-Os filtros (Levi, 17/10/2026, "desenvolva" sobre a proposta): equipe, região de campo, responsável, situação (sem
-técnico, com aviso) e busca, em cascata como as outras telas do PCM: cada um lista o que existe com os OUTROS aplicados,
+Os filtros (Levi, 17/10/2026: "desenvolva" sobre a proposta e, no mesmo dia, "troque o filtro de região e coloque o de
+cliente"): equipe, cliente, responsável, situação (com técnico, sem técnico, com aviso) e busca, em cascata como as
+outras telas do PCM: cada um lista o que existe com os OUTROS aplicados,
 e a opção escolhida fica na lista mesmo sem resultado.
 """
 import collections
 import json
+import time
 from datetime import date, datetime, timedelta
 
 from ..campo import visao
 from ..campo.ligacao_cadastro import SISTEMA_FRACTTAL, _norm, codigo_da_pessoa, mapas_de
 from ..dados import fatos as D
+from ..dados import livros
 from . import atribuicoes as A
 from .motivos import norm
 
-FILTROS = ("equipe", "regiao", "responsavel", "situacao", "q")
+FILTROS = ("equipe", "cliente", "responsavel", "situacao", "q")
 SITUACOES = (("com_tecnico", "Com técnico"), ("sem_tecnico", "Sem técnico"), ("com_aviso", "Com aviso"))
 EVIDENCIA_DIAS = 30
-SEM_EQUIPE, SEM_REGIAO, SEM_RESPONSAVEL = "Sem equipe", "Sem região", "Sem responsável"
+SEM_EQUIPE, SEM_REGIAO, SEM_RESPONSAVEL, SEM_CLIENTE = "Sem equipe", "Sem região", "Sem responsável", "Sem cliente"
 APP_LIVRO, APP_ABA = "organizacao_app_campo", "Atribuicoes"
+# o que a tela lê do banco numa listagem só (`visao.carregar`): o cadastro e a foto do App
+DO_BANCO = tuple(("cadastro_nexus", a) for a in ("usinas", "equipes", "de_para", "pessoas", "clientes", "regioes_campo"))     + ((APP_LIVRO, APP_ABA),)
+EVIDENCIA_S = 600            # a evidência de 30 dias não precisa ser mais fresca que 10 min
+_EV: dict = {}
+
+
+def limpar() -> None:
+    _EV.clear()
 
 
 class SemCadastro(Exception):
@@ -40,9 +51,13 @@ class SemCadastro(Exception):
         return f"Não consegui ler o cadastro no banco ({self.args[0] if self.args else 'erro'}): nada foi gravado."
 
 
-def ler_base():
-    """O cadastro do banco (`campo.visao._Base`), ou SemCadastro com o tipo do erro."""
+def ler_base(meta: dict | None = None):
+    """O cadastro do banco (`campo.visao._Base`), lido com uma listagem só (`visao.carregar`), ou SemCadastro com o
+    tipo do erro. `meta`, se vier, recebe o que a listagem disse de cada aba (a evidência a usa)."""
     try:
+        m = visao.carregar(DO_BANCO)
+        if meta is not None:
+            meta.update(m)
         return visao._Base()
     except Exception as ex:      # noqa: BLE001 — qualquer falha de leitura vira o aviso da tela
         raise SemCadastro(type(ex).__name__) from ex
@@ -156,25 +171,76 @@ def pedidos_da_reemissao(base, pessoas: dict, est: dict, usina_id: int, hoje: in
 
 
 # ── a evidência de campo ──────────────────────────────────────────────────────────────────────────────────────
-def _evidencia(hoje: int) -> tuple[dict, str]:
-    """({usina_id: {pessoa_id: {"rondas", "fechamentos", "na_programacao"}}}, erro). Livro fora do ar = sem evidência,
-    com o erro para a tela dizer."""
+def _programacao_do_fim(base, sessao, meta, segunda: int) -> list[dict]:
+    """As linhas da semana `segunda` no `fato_programacao`, lidas do FIM para trás. A carga põe as semanas do arquivo do
+    robô (as 4 mais novas) depois das antigas (`programacao.mesclar_semanas`), então a semana em curso está no fim: lê
+    página a página até passar dela (medido em 17/10/2026: 5 de 17 páginas, 4,4 s → ~1,4 s). Sem a contagem de linhas
+    na listagem, lê a aba inteira."""
+    if not meta or not meta[0]:
+        return []
+    sid, n = meta
+    if not n:
+        return [x for x in livros._linhas(base, sessao, sid) if D._id(x.get("data_id_semana")) == segunda]
+    out, viu, off = [], False, ((n - 1) // 1000) * 1000
+    while off >= 0:
+        r = sessao.get(f"{base}/api/sheets/{sid}/rows", params={"limit": 1000, "offset": off}, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+        rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
+        da_semana = [x for x in (dict(zip(y.get("headers") or [], y.get("values") or [])) for y in rows)
+                     if D._id(x.get("data_id_semana")) == segunda]
+        out += da_semana
+        if da_semana:
+            viu = True
+        elif viu:
+            break                # já passou da semana em curso
+        off -= 1000
+    return out
+
+
+def _evidencia(hoje: int, meta: dict | None = None) -> tuple[dict, str]:
+    """({usina_id: {pessoa_id: {"rondas", "fechamentos", "na_programacao"}}}, erro), guardada por EVIDENCIA_S. Livro
+    fora do ar = sem evidência, com o erro para a tela dizer. `meta`: a listagem que a tela já fez (senão, faz uma)."""
+    g = _EV.get(hoje)
+    if g and time.time() - g[0] < EVIDENCIA_S:
+        return g[1], ""
     corte = _id_dia(_dia(hoje) - timedelta(days=EVIDENCIA_DIAS))
     segunda = _id_dia(_dia(hoje) - timedelta(days=_dia(hoje).weekday()))
     ev: dict = collections.defaultdict(lambda: collections.defaultdict(
         lambda: {"rondas": 0, "fechamentos": 0, "na_programacao": False}))
     try:
-        for aba, campo in (("fato_ronda", "rondas"), ("fato_fechamento", "fechamentos")):
-            for x in visao._livro("nexus_fatos", aba):
+        base, sessao = visao._base(), visao._sessao()
+        if not meta:
+            r = sessao.get(f"{base}/api/sheets", timeout=60)
+            r.raise_for_status()
+            meta = {(x.get("workbook_key"), x.get("sheet_name")): (x.get("id"), int(x.get("row_count") or 0))
+                    for x in r.json()}
+        from concurrent.futures import ThreadPoolExecutor
+
+        def fato(aba):
+            sid = (meta.get(("nexus_fatos", aba)) or (None,))[0]
+            return livros._linhas(base, sessao, sid) if sid else []
+        # as três leituras são independentes: juntas (a espera é a rede)
+        with ThreadPoolExecutor(max_workers=3) as exe:
+            f_ronda, f_fech = exe.submit(fato, "fato_ronda"), exe.submit(fato, "fato_fechamento")
+            f_prog = exe.submit(_programacao_do_fim, base, sessao,
+                                meta.get(("nexus_programacao", "fato_programacao")), segunda)
+            lidas = {"rondas": f_ronda.result(), "fechamentos": f_fech.result()}
+            programacao = f_prog.result()
+        for campo, linhas in lidas.items():
+            for x in linhas:
                 uid, pid, dia = D._id(x.get("usina_id")), D._id(x.get("pessoa_id")), D._id(x.get("data_id"))
                 if uid and pid and dia and corte <= dia <= hoje:
                     ev[uid][pid][campo] += 1
-        for x in visao._livro("nexus_programacao", "fato_programacao"):
+        for x in programacao:
             uid, pid = D._id(x.get("usina_id")), D._id(x.get("pessoa_id_tecnico"))
-            if uid and pid and D._id(x.get("data_id_semana")) == segunda:
+            if uid and pid:
                 ev[uid][pid]["na_programacao"] = True
     except Exception as ex:      # noqa: BLE001 — o banco fora não derruba a tela: só tira a evidência
         return {}, f"{type(ex).__name__}"
+    ev = {u: dict(p) for u, p in ev.items()}
+    _EV.clear()
+    _EV[hoje] = (time.time(), ev)
     return ev, ""
 
 
@@ -228,7 +294,7 @@ def _pedido_dos_args(args) -> dict:
 
 
 def _passa(l: dict, pedido: dict, menos: str | None = None) -> bool:
-    for k in ("equipe", "regiao", "responsavel"):
+    for k in ("equipe", "cliente", "responsavel"):
         if k != menos and pedido[k] and l[k] != pedido[k]:
             return False
     if menos != "situacao" and pedido["situacao"]:
@@ -246,7 +312,7 @@ def _passa(l: dict, pedido: dict, menos: str | None = None) -> bool:
 def _opcoes(linhas: list[dict], pedido: dict) -> dict:
     """{filtro: [(valor, quantas)]}: cada filtro com os OUTROS aplicados; a escolha fica mesmo sem resultado."""
     out = {}
-    for k in ("equipe", "regiao", "responsavel", "situacao"):
+    for k in ("equipe", "cliente", "responsavel", "situacao"):
         c = collections.Counter()
         for l in linhas:
             if not _passa(l, pedido, menos=k):
@@ -273,8 +339,9 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     pedido = _pedido_dos_args(args)
     ver = args.get("ver") if args.get("ver") in ("tecnico", "app") else "usina"
     lido = datetime.now(A._BRT).strftime("%H:%M")
+    meta: dict = {}
     try:
-        base = ler_base()
+        base = ler_base(meta)
     except SemCadastro as ex:
         return {"ver": ver, "linhas": [], "tecnicos": [], "total_usinas": 0, "pedido": pedido, "lido": lido,
                 "resumo": {}, "chips": {},
@@ -286,7 +353,7 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     est = A.ler(cfg)
     atuais = A.atuais(est, hoje)
     fr = _fracttal(base)
-    ev, erro_ev = _evidencia(hoje)
+    ev, erro_ev = _evidencia(hoje, meta)
     todas = str(args.get("todas") or "") == "1"
     usinas = _usinas(base, todas=todas)
     ids = ({pid for (_u, pid, _p) in atuais} | {pid for e in ev.values() for pid in e}
@@ -346,6 +413,7 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
         nome = nome_usina(uid)
         sit = ("critico", "Sem técnico") if not tem else ("alerta", "Com aviso") if avisos else ("ok", "Com técnico")
         linhas.append({"sit": sit, "usina_id": uid, "nome": nome, "status": D._txt(u.get("status")), "equipe_id": eid,
+                       "cliente": base.nome_cliente.get(D._id(u.get("cliente_id"))) or SEM_CLIENTE,
                        "equipe": base.nome_equipe.get(eid) or SEM_EQUIPE, "regiao": reg.get("nome") or SEM_REGIAO,
                        "responsavel": nome_pessoa(resp) if resp else SEM_RESPONSAVEL,
                        "fracttal": nomes_fr[0] if nomes_fr else "", "fracttal_mudou": mudou_nome,
@@ -357,6 +425,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     tecnicos_v, todos_v = [], []
     # a aba Por técnico mostra a conta mesmo na aba Por usina, e o topo conta todas as pessoas de campo
     nome_eq = base.nome_equipe
+    cliente_de = {uid: base.nome_cliente.get(D._id(u.get("cliente_id"))) or SEM_CLIENTE
+                  for uid, u in base.por_id.items()}
     for pid, p in pessoas.items():
         eq = nome_eq.get(p["equipe_id"]) or SEM_EQUIPE
         reg = (base.regiao.get(base.regiao_da_equipe.get(p["equipe_id"])) or {}).get("nome") or SEM_REGIAO
@@ -370,7 +440,9 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
              "rondas": sum(e.get(pid, {}).get("rondas", 0) for e in ev.values()),
              "fechamentos": sum(e.get(pid, {}).get("fechamentos", 0) for e in ev.values())}
         todos_v.append(t)
-        if not ((pedido["equipe"] and eq != pedido["equipe"]) or (pedido["regiao"] and reg != pedido["regiao"])
+        # na visão por técnico, o cliente filtra quem tem usina dele
+        if not ((pedido["equipe"] and eq != pedido["equipe"])
+                or (pedido["cliente"] and not any(cliente_de.get(u["usina_id"]) == pedido["cliente"] for u in us))
                 or (pedido["q"] and norm(pedido["q"]) not in norm(p["nome"]))):
             tecnicos_v.append(t)
     tecnicos_v.sort(key=lambda t: norm(t["nome"]))

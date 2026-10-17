@@ -179,6 +179,32 @@ def _base() -> str:
     return (current_app.config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
+def carregar(pares) -> dict:
+    """Põe na cópia (2 min), com UMA listagem do banco, os livros pedidos que não estão nela, e devolve o que a listagem
+    disse de cada aba ({(livro, aba): (id, linhas)}; vazio quando nada faltava). Medido em 17/10/2026 (Técnicos por
+    usina, a 1ª abertura em 11,6 s): cada `livros.ler` pede de novo a lista de todas as tabelas do banco (~0,6 s, 95 KB),
+    e uma tela que lê 7 livros pagava 7 listagens."""
+    agora = time.time()
+    faltam = [p for p in pares if not (_LIVROS.get(p) and agora - _LIVROS[p][0] < LIVRO_S)]
+    if not faltam:
+        return {}
+    base, sessao = _base(), _sessao()
+    r = sessao.get(f"{base}/api/sheets", timeout=60)
+    r.raise_for_status()
+    meta = {(x.get("workbook_key"), x.get("sheet_name")): (x.get("id"), int(x.get("row_count") or 0)) for x in r.json()}
+    from concurrent.futures import ThreadPoolExecutor
+
+    def ler(p):
+        sid = (meta.get(p) or (None,))[0]
+        return livros._linhas(base, sessao, sid) if sid else []
+    # as abas são independentes: lidas juntas (a espera é a rede, não o processo)
+    with ThreadPoolExecutor(max_workers=min(6, len(faltam))) as ex:
+        lidas = list(ex.map(ler, faltam))
+    for p, linhas in zip(faltam, lidas):
+        _LIVROS[p] = (time.time(), linhas)
+    return meta
+
+
 def _livro(nome, aba=None) -> list[dict]:
     """Um livro do banco; o mesmo livro pedido por várias contas no mesmo ciclo é lido uma vez (2 min)."""
     chave = (nome, aba)

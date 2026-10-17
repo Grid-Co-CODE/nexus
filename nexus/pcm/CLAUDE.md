@@ -274,14 +274,22 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
 - **A tela** (PCM → Técnicos por usina), no estilo da tela de PT do Campo (Levi, 17/10: "quero que a tabela seja no
   mesmo estilo de PT e APR"; usa o `campo.css`): os números do topo (usinas, sem técnico, pessoas de campo, apoios,
   com aviso), as abas Por usina, Por técnico e, com a foto do App, Comparação com o App, os chips das situações (com
-  técnico, sem técnico, com aviso) e a linha que abre o detalhe com o histórico da usina. Veem os setores PCM e
+  técnico, sem técnico, com aviso) e a linha que abre o detalhe com o histórico e o "Pôr técnico" (Levi, 17/10, 2ª
+  rodada: a coluna Cliente antes da Usina, sem a Região de campo; os técnicos um embaixo do outro, sem borda; sem o
+  botão "Técnico" na célula). Veem os setores PCM e
   Responsáveis UFV; põe e tira quem `pode_programar`; a **carga inicial** (só administrador, só com o livro vazio) é a
   regra da equipe do App aplicada ao cadastro do Nexus, só nas usinas EM OPERAÇÃO (cada pessoa de campo recebe as
   usinas em operação com o mesmo `equipe_id`; medido em 17/10: a regra dava 53 de 227 usinas fora de operação). Ao lado de cada usina, sem gravar nada: quem rondou
   e fechou tarefa ali em 30 dias, quem é técnico na programação da semana e o técnico do cadastro. Avisos (não travam):
   sem técnico, sem nome do Fracttal, duas grafias, técnico sem e-mail (o App não o reconhece), quem esteve lá e não está
-  na lista, o nome ou o código que mudou ("Reenviar ao App"). Filtros (decididos pelo Levi): equipe, região de campo,
-  responsável, situação e busca, em cascata; `todas=1` mostra as usinas fora de operação. Visão por técnico. Sem o
+  na lista, o nome ou o código que mudou ("Reenviar ao App"). Filtros (decididos pelo Levi): equipe, cliente,
+  responsável, situação e busca, em cascata; `todas=1` mostra as usinas fora de operação. **O filtro de cliente
+  substituiu o de região de campo** (Levi, 17/10: "troque o filtro de região e coloque o de cliente"); na visão por
+  técnico, o cliente filtra quem tem usina dele. **Tempo** (medido no banco real, 17/10): a 1ª abertura levava 11,6 s
+  (cada livro pedia de novo a lista de todas as tabelas, ~0,6 s, e a programação inteira, 16,5 mil linhas, era lida
+  para achar a semana em curso); agora uma listagem só (`campo.visao.carregar`), as leituras em paralelo, a programação
+  lida do FIM (a semana em curso está entre as do arquivo do robô, no fim do fato) e a evidência guardada por 10 min:
+  3,3 s fria, 0,02 a 0,06 s quente. Visão por técnico. Sem o
   cadastro do banco, a tela abre com o aviso e nada grava.
 - **O App:** ainda não lê. O pacote está em `C:\GridcoBuild\app-campo-docs\_propostas\atribuicoes-nexus\LEIA.md` (A1:
   o App publica a foto `organizacao_app_campo · Atribuicoes`, que a tela compara NO IDIOMA DO APP — a grafia da usina e

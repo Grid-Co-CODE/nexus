@@ -145,6 +145,9 @@ decisões, 766 rondas, zeladoria vazia.
 ## As contas nossas (`nexus/campo/visao.py`)
 
 As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
+- **A cópia dos livros** (`_livro`, 2 min) e o **`carregar(pares)`** (17/10/2026): põe na cópia, com UMA listagem do
+  banco e as leituras em paralelo, os livros pedidos que faltam. Cada `livros.ler` pede de novo a lista de todas as
+  tabelas (~0,6 s): a tela que lê vários livros chama o `carregar` antes (Técnicos por usina do PCM: 11,6 s → 3,3 s).
 - **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou; refeita em 08/10 pelo pedido dele): sete
   indicadores do período (`painel_rondas`, depois dos filtros de região do Brasil, cliente, usina, Responsável O&M,
   equipe, região de campo e gestor de contrato) e seis abas:

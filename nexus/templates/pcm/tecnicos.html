@@ -77,7 +77,7 @@
     </div>
     {% if todas %}<input type="hidden" name="todas" value="1">{% endif %}
     {% endif %}
-    {% for chave, rotulo in (('equipe', 'Equipe'), ('regiao', 'Região de campo'), ('responsavel', 'Responsável')) %}
+    {% for chave, rotulo in (('equipe', 'Equipe'), ('cliente', 'Cliente'), ('responsavel', 'Responsável')) %}
     {% if not (ver == 'tecnico' and chave == 'responsavel') %}
     <label class="gc-rotulo" for="f-{{ chave }}">{{ rotulo }}</label>
     <select class="gc-campo" id="f-{{ chave }}" name="{{ chave }}" onchange="this.form.submit()">
@@ -89,7 +89,7 @@
     <input class="gc-campo" type="search" name="q" value="{{ pedido.q }}" aria-label="Buscar"
            placeholder="{{ 'técnico' if ver == 'tecnico' else 'usina ou técnico' }}">
     {% if pedido.situacao and ver == 'usina' %}<input type="hidden" name="situacao" value="{{ pedido.situacao }}">{% endif %}
-    {% if algum_filtro %}<a class="cn-filtro-ativo" href="{{ url(equipe='', regiao='', responsavel='', situacao='', q='') }}">Limpar filtros <span aria-hidden="true">×</span></a>{% endif %}
+    {% if algum_filtro %}<a class="cn-filtro-ativo" href="{{ url(equipe='', cliente='', responsavel='', situacao='', q='') }}">Limpar filtros <span aria-hidden="true">×</span></a>{% endif %}
   </form>
   {% endif %}
 
@@ -101,15 +101,15 @@
     {% endfor %}
   </div>
   <div class="cn-tab"><table class="cn-expande tu-tabela">
-    <thead><tr><th>Usina</th><th>Equipe</th><th>Região de campo</th><th>Responsável</th><th>Técnicos</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
+    <thead><tr><th>Cliente</th><th>Usina</th><th>Equipe</th><th>Responsável</th><th>Técnicos</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
     <tbody>
     {% for l in linhas %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false" data-usina="{{ l.usina_id }}" data-usina-nome="{{ l.nome }}"
           data-equipe="{{ l.equipe_id or '' }}" data-evid="{{ l.evidencia|map(attribute='pessoa_id')|join(',') }}">
+        <td class="tu-nw">{{ l.cliente }}</td>
         <td class="tu-usina"><span class="tu-nome">{{ l.nome }}</span>{% if todas and l.status != 'OPERAÇÃO' %}<span class="det">{{ l.status|lower or 'sem status' }}</span>{% endif %}</td>
-        <td class="tu-nw">{{ l.equipe }}</td><td class="tu-nw">{{ l.regiao }}</td><td>{{ l.responsavel }}</td>
-        <td><div class="tu-tecs">{% for t in l.tecnicos %}{{ selo(t, t.nome, l.usina_id, l.nome) }}{% else %}<span class="mudo">Ninguém</span>{% endfor %}
-          {% if pode %}<button type="button" class="tu-mais" data-por="{{ l.usina_id }}"><i class="ph ph-user-plus"></i> Técnico</button>{% endif %}</div></td>
+        <td class="tu-nw">{{ l.equipe }}</td><td>{{ l.responsavel }}</td>
+        <td><div class="tu-tecs">{% for t in l.tecnicos %}{{ selo(t, t.nome, l.usina_id, l.nome) }}{% else %}<span class="mudo">Ninguém</span>{% endfor %}</div></td>
         <td>{% for e in l.evidencia[:3] %}<span class="tu-ev-l">{{ e.nome }}<span class="m">{% if e.rondas %} · {{ e.rondas }} {{ 'ronda' if e.rondas == 1 else 'rondas' }}{% endif %}{% if e.fechamentos %} · {{ e.fechamentos }} {{ 'tarefa' if e.fechamentos == 1 else 'tarefas' }}{% endif %}{% if e.na_programacao %} · programado{% endif %}{% if e.do_cadastro and not (e.rondas or e.fechamentos or e.na_programacao) %} · do cadastro{% endif %}</span></span>{% else %}<span class="mudo">—</span>{% endfor %}
           {% if l.evidencia|length > 3 %}<span class="det">e mais {{ l.evidencia|length - 3 }}</span>{% endif %}</td>
         <td><span class="cn-st cn-t-{{ l.sit[0] }}">{{ l.sit[1] }}</span>{% if l.avisos %}<span class="det">{{ l.avisos|length }} aviso{{ 's' if l.avisos|length > 1 }}</span>{% endif %}</td>
@@ -139,15 +139,15 @@
 
   {% elif ver == 'tecnico' %}
   <div class="cn-tab"><table class="tu-tabela">
-    <thead><tr><th>Pessoa</th><th>Cargo</th><th>Equipe</th><th>Região de campo</th><th>Usinas</th><th>Nº</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
+    <thead><tr><th>Pessoa</th><th>Cargo</th><th>Equipe</th><th>Usinas</th><th>Nº</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
     <tbody>
     {% for t in tecnicos %}
-      <tr><td><span class="tu-nome">{{ t.nome }}</span></td><td>{{ t.cargo or '—' }}</td><td class="tu-nw">{{ t.equipe }}</td><td class="tu-nw">{{ t.regiao }}</td>
+      <tr><td><span class="tu-nome">{{ t.nome }}</span></td><td>{{ t.cargo or '—' }}</td><td class="tu-nw">{{ t.equipe }}</td>
         <td><div class="tu-tecs">{% for u in t.usinas %}{{ selo(u, u.nome, None, '') }}{% else %}<span class="mudo">Nenhuma</span>{% endfor %}</div></td>
         <td class="m">{{ t.n_usinas }}</td>
         <td>{% if t.rondas or t.fechamentos %}{{ t.rondas }} {{ 'ronda' if t.rondas == 1 else 'rondas' }}<span class="det">{{ t.fechamentos }} {{ 'tarefa fechada' if t.fechamentos == 1 else 'tarefas fechadas' }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
         <td><span class="cn-st cn-t-{{ t.sit[0] }}">{{ t.sit[1] }}</span>{% if t.sem_email and t.sit[0] != 'alerta' %}<span class="det">sem e-mail</span>{% endif %}</td></tr>
-    {% else %}<tr><td colspan="8" class="mudo">Nenhuma pessoa de campo com esses filtros.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="7" class="mudo">Nenhuma pessoa de campo com esses filtros.</td></tr>{% endfor %}
     </tbody></table></div>
 
   {% else %}

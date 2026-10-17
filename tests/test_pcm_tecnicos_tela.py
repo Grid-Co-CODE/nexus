@@ -127,3 +127,14 @@ def test_abas_no_estilo_da_pt_e_a_comparacao_com_o_app(app, banco, logado):
     visao.limpar()
     html = logado.get(ROTA + "?ver=app").get_data(as_text=True)
     assert "Comparação com o App" in html and "Pendências para a troca" in html and "Técnico Onze" in html
+
+
+def test_tabela_com_cliente_sem_regiao_e_sem_o_botao_tecnico_na_linha(app, banco, logado):
+    """Levi, 17/10: a coluna Cliente antes da Usina, sem a Região de campo; sem o botão "Técnico" na célula (o "Pôr
+    técnico" fica no detalhe da linha); os técnicos um em cima do outro, sem a borda verde."""
+    logado.post(ROTA + "/decidir", data={"usina_id": "1", "pessoa_id": "10", "acao": "por"})
+    html = logado.get(ROTA).get_data(as_text=True)
+    cab = html.split("<thead>", 1)[1].split("</thead>", 1)[0]
+    assert cab.index("Cliente") < cab.index("Usina") and "Região" not in cab
+    assert 'class="tu-mais"' not in html and "Pôr técnico" in html
+    assert 'id="f-cliente"' in html and 'id="f-regiao"' not in html
