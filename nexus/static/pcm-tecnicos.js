@@ -1,4 +1,5 @@
-/* Técnicos por usina (17/10/2026): a janela de pôr técnico, o histórico da usina e as confirmações.
+/* Técnicos por usina (17/10/2026): a linha que abre o detalhe (como a tela de PT), o histórico da usina buscado na
+   1ª abertura, a janela de pôr técnico e as confirmações.
    A lista de pessoas vem uma vez na página (#tu-dados: id, nome e equipe; nunca o e-mail); a janela de pôr técnico é UMA
    só, montada a cada clique: no alto quem esteve na usina (a evidência da linha), depois a mesma equipe, depois as outras.
    O servidor confere tudo de novo ao gravar (a pessoa de campo, a usina, o nome no Fracttal e o código saem do cadastro). */
@@ -46,9 +47,10 @@
     });
   }
 
-  function porTecnico(tr) {
+  function porTecnico(id) {
     var tpl = document.getElementById("tu-por");
-    if (!tpl) return;
+    var tr = document.querySelector('tr.cn-linha[data-usina="' + id + '"]');
+    if (!tpl || !tr) return;
     corpo.innerHTML = "";
     corpo.appendChild(tpl.content.cloneNode(true));
     corpo.querySelector("[data-por-usina]").textContent = tr.dataset.usinaNome;
@@ -75,19 +77,41 @@
     abrir();
   }
 
-  function historico(id) {
-    corpo.innerHTML = '<p class="pcm-sub">Carregando o histórico…</p>';
-    abrir();
-    fetch(rota + "/historico?usina=" + encodeURIComponent(id), {credentials: "same-origin"})
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
-      .then(function (html) { corpo.innerHTML = html; })
-      .catch(function (e) { corpo.innerHTML = '<p class="pcm-sub">Não consegui abrir o histórico (' + e.message + ").</p>"; });
+  function historico(caixa) {
+    if (!caixa || caixa.dataset.carregado) return;
+    caixa.dataset.carregado = "1";
+    fetch(rota + "/historico?usina=" + encodeURIComponent(caixa.dataset.historico), {credentials: "same-origin"})
+      .then(function (r) {
+        // a sessão vencida volta o login (redirecionado): não é o histórico
+        if (!r.ok || r.redirected) throw new Error(r.redirected ? "a sessão venceu: atualize a página" : "HTTP " + r.status);
+        return r.text();
+      })
+      .then(function (html) { caixa.innerHTML = html; })
+      .catch(function (e) {
+        delete caixa.dataset.carregado;
+        caixa.textContent = "Não consegui abrir o histórico (" + e.message + ").";
+      });
   }
+
+  // clicar na linha abre o detalhe logo abaixo (como na tela de PT); os botões e o × dentro dela fazem só o deles
+  document.querySelectorAll("table.cn-expande tr.cn-linha").forEach(function (tr) {
+    function alterna(ev) {
+      if (ev.target.closest("a, button, form, input, label")) return;
+      var det = tr.nextElementSibling;
+      if (!det || !det.classList.contains("cn-detalhe")) return;
+      det.hidden = !det.hidden;
+      tr.setAttribute("aria-expanded", String(!det.hidden));
+      if (!det.hidden) historico(det.querySelector("[data-historico]"));
+    }
+    tr.addEventListener("click", alterna);
+    tr.addEventListener("keydown", function (ev) {
+      if (ev.target !== tr) return;
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); alterna(ev); }
+    });
+  });
 
   document.addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-por]");
-    if (b) { porTecnico(b.closest("tr")); return; }
-    var h = ev.target.closest("[data-historico]");
-    if (h) historico(h.dataset.historico);
+    if (b) porTecnico(b.dataset.por);
   });
 })();

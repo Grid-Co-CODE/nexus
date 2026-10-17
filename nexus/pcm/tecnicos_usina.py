@@ -27,7 +27,7 @@ from . import atribuicoes as A
 from .motivos import norm
 
 FILTROS = ("equipe", "regiao", "responsavel", "situacao", "q")
-SITUACOES = (("sem_tecnico", "Sem técnico"), ("com_aviso", "Com aviso"))
+SITUACOES = (("com_tecnico", "Com técnico"), ("sem_tecnico", "Sem técnico"), ("com_aviso", "Com aviso"))
 EVIDENCIA_DIAS = 30
 SEM_EQUIPE, SEM_REGIAO, SEM_RESPONSAVEL = "Sem equipe", "Sem região", "Sem responsável"
 APP_LIVRO, APP_ABA = "organizacao_app_campo", "Atribuicoes"
@@ -124,11 +124,13 @@ def _pedido(uid, fracttal, pid, pessoas, de=None, ate=None) -> dict:
 
 
 def pedidos_da_carga_inicial(base, pessoas: dict) -> list[dict]:
-    """A regra da equipe, a mesma do App (o `espelhar_bd_operacoes.py`): cada pessoa de campo recebe as usinas do
-    cadastro (não excluídas) com o mesmo `equipe_id`. Assim a lista nasce perto do que o campo vê hoje."""
+    """A regra da equipe, a mesma do App (o `espelhar_bd_operacoes.py`): cada pessoa de campo recebe as usinas EM
+    OPERAÇÃO do cadastro com o mesmo `equipe_id` (Levi, 17/10/2026: "preenche os técnicos!!"; medido no banco no mesmo
+    dia: 53 das 227 usinas da regra estavam fora de operação, e a tela abre só nas em operação). A lista nasce perto do
+    que o campo vê hoje, e o PCM põe à mão a de fora de operação que precisar."""
     fr = _fracttal(base)
     out = []
-    for uid, u in sorted(_usinas(base).items()):
+    for uid, u in sorted(_usinas(base, todas=False).items()):
         eid = D._id(u.get("equipe_id"))
         for pid, p in sorted(pessoas.items()):
             if eid and p["equipe_id"] == eid:
@@ -230,6 +232,8 @@ def _passa(l: dict, pedido: dict, menos: str | None = None) -> bool:
         if k != menos and pedido[k] and l[k] != pedido[k]:
             return False
     if menos != "situacao" and pedido["situacao"]:
+        if pedido["situacao"] == "com_tecnico" and not l["tem_tecnico"]:
+            return False
         if pedido["situacao"] == "sem_tecnico" and l["tem_tecnico"]:
             return False
         if pedido["situacao"] == "com_aviso" and not l["avisos"]:
@@ -248,6 +252,7 @@ def _opcoes(linhas: list[dict], pedido: dict) -> dict:
             if not _passa(l, pedido, menos=k):
                 continue
             if k == "situacao":
+                c["com_tecnico"] += l["tem_tecnico"]
                 c["sem_tecnico"] += not l["tem_tecnico"]
                 c["com_aviso"] += bool(l["avisos"])
             else:
@@ -262,14 +267,17 @@ def _opcoes(linhas: list[dict], pedido: dict) -> dict:
 
 
 def montar(cfg, args, hoje: int | None = None) -> dict:
-    """O contexto da tela (`pcm/tecnicos.html`). `args`: os filtros, `ver` (usina | tecnico) e `todas` (as usinas fora
-    de operação também)."""
+    """O contexto da tela (`pcm/tecnicos.html`, no estilo da tela de PT do Campo). `args`: os filtros, `ver` (a aba:
+    usina | tecnico | app) e `todas` (as usinas fora de operação também)."""
     hoje = hoje or A.hoje_id()
-    pedido, ver = _pedido_dos_args(args), ("tecnico" if args.get("ver") == "tecnico" else "usina")
+    pedido = _pedido_dos_args(args)
+    ver = args.get("ver") if args.get("ver") in ("tecnico", "app") else "usina"
+    lido = datetime.now(A._BRT).strftime("%H:%M")
     try:
         base = ler_base()
     except SemCadastro as ex:
-        return {"ver": ver, "linhas": [], "tecnicos": [], "total_usinas": 0, "pedido": pedido,
+        return {"ver": ver, "linhas": [], "tecnicos": [], "total_usinas": 0, "pedido": pedido, "lido": lido,
+                "resumo": {}, "chips": {},
                 "opcoes": {k: [] for k in FILTROS if k != "q"}, "todas": str(args.get("todas") or "") == "1",
                 "situacoes": dict(SITUACOES), "hoje": hoje, "pessoas_json": [],
                 "app": {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": []}, "livro_vazio": False,
@@ -336,7 +344,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
             if e["pessoa_id"] not in na_lista and (e["rondas"] or e["fechamentos"]):
                 avisos.append(f"{e['nome']} {'rondou' if e['rondas'] else 'fechou tarefa'} aqui e não está na lista")
         nome = nome_usina(uid)
-        linhas.append({"usina_id": uid, "nome": nome, "status": D._txt(u.get("status")), "equipe_id": eid,
+        sit = ("critico", "Sem técnico") if not tem else ("alerta", "Com aviso") if avisos else ("ok", "Com técnico")
+        linhas.append({"sit": sit, "usina_id": uid, "nome": nome, "status": D._txt(u.get("status")), "equipe_id": eid,
                        "equipe": base.nome_equipe.get(eid) or SEM_EQUIPE, "regiao": reg.get("nome") or SEM_REGIAO,
                        "responsavel": nome_pessoa(resp) if resp else SEM_RESPONSAVEL,
                        "fracttal": nomes_fr[0] if nomes_fr else "", "fracttal_mudou": mudou_nome,
@@ -345,23 +354,26 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                        "_busca": norm(" ".join([nome] + [t["nome"] for t in tecnicos]))})
     linhas.sort(key=lambda l: norm(l["nome"]))
 
-    tecnicos_v = []
-    if ver == "tecnico":
-        nome_eq = base.nome_equipe
-        for pid, p in pessoas.items():
-            eq = nome_eq.get(p["equipe_id"]) or SEM_EQUIPE
-            reg = (base.regiao.get(base.regiao_da_equipe.get(p["equipe_id"])) or {}).get("nome") or SEM_REGIAO
-            if ((pedido["equipe"] and eq != pedido["equipe"]) or (pedido["regiao"] and reg != pedido["regiao"])
-                    or (pedido["q"] and norm(pedido["q"]) not in norm(p["nome"]))):
-                continue
-            us = sorted(({"usina_id": uid, "nome": nome_usina(uid), "status": x["status"],
-                          "ate": _dm(D._id(x.get("ate_data_id")))}
-                         for (uid, pp, _papel), x in atuais.items() if pp == pid), key=lambda u: norm(u["nome"]))
-            tecnicos_v.append({"pessoa_id": pid, "nome": p["nome"], "equipe": eq, "regiao": reg, "usinas": us,
-                               "n_usinas": len(us), "sem_email": not p["hmac"],
-                               "rondas": sum(e.get(pid, {}).get("rondas", 0) for e in ev.values()),
-                               "fechamentos": sum(e.get(pid, {}).get("fechamentos", 0) for e in ev.values())})
-        tecnicos_v.sort(key=lambda t: norm(t["nome"]))
+    tecnicos_v, todos_v = [], []
+    # a aba Por técnico mostra a conta mesmo na aba Por usina, e o topo conta todas as pessoas de campo
+    nome_eq = base.nome_equipe
+    for pid, p in pessoas.items():
+        eq = nome_eq.get(p["equipe_id"]) or SEM_EQUIPE
+        reg = (base.regiao.get(base.regiao_da_equipe.get(p["equipe_id"])) or {}).get("nome") or SEM_REGIAO
+        us = sorted(({"usina_id": uid, "nome": nome_usina(uid), "status": x["status"],
+                      "ate": _dm(D._id(x.get("ate_data_id")))}
+                     for (uid, pp, _papel), x in atuais.items() if pp == pid), key=lambda u: norm(u["nome"]))
+        sit = (("critico", "Sem usina") if not us else ("alerta", "Sem e-mail") if not p["hmac"]
+               else ("ok", "Com usina"))
+        t = {"pessoa_id": pid, "nome": p["nome"], "cargo": p["cargo"], "equipe": eq, "regiao": reg, "usinas": us,
+             "sit": sit, "n_usinas": len(us), "sem_email": not p["hmac"],
+             "rondas": sum(e.get(pid, {}).get("rondas", 0) for e in ev.values()),
+             "fechamentos": sum(e.get(pid, {}).get("fechamentos", 0) for e in ev.values())}
+        todos_v.append(t)
+        if not ((pedido["equipe"] and eq != pedido["equipe"]) or (pedido["regiao"] and reg != pedido["regiao"])
+                or (pedido["q"] and norm(pedido["q"]) not in norm(p["nome"]))):
+            tecnicos_v.append(t)
+    tecnicos_v.sort(key=lambda t: norm(t["nome"]))
 
     vale = {(u, p): x for (u, p, _papel), x in atuais.items() if x["status"] == "vale"}
     avisos_gerais = []
@@ -374,8 +386,16 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     if erro_ev:
         avisos_gerais.append(f"A evidência de campo não foi lida agora ({erro_ev}): a lista e os avisos de técnico "
                              "seguem valendo.")
-    return {"ver": ver, "linhas": [l for l in linhas if _passa(l, pedido)], "tecnicos": tecnicos_v,
-            "total_usinas": len(linhas), "pedido": pedido, "opcoes": _opcoes(linhas, pedido), "todas": todas,
+    # o topo, como o da tela de PT: o universo da tela (as usinas da lista e as pessoas de campo), sem os filtros
+    resumo = {"usinas": len(linhas), "com_tecnico": sum(l["tem_tecnico"] for l in linhas),
+              "sem_tecnico": sum(not l["tem_tecnico"] for l in linhas), "com_aviso": sum(bool(l["avisos"]) for l in linhas),
+              "pessoas": len(todos_v), "com_usina": sum(bool(t["usinas"]) for t in todos_v),
+              "apoios": sum(1 for x in atuais.values() if D._txt(x.get("ate_data_id")) or x["status"] == "agendado")}
+    opcoes = _opcoes(linhas, pedido)
+    chips = dict(opcoes["situacao"], todas=sum(1 for l in linhas if _passa(l, pedido, menos="situacao")))
+    return {"ver": ver, "linhas": [l for l in linhas if _passa(l, pedido)], "tecnicos": tecnicos_v, "lido": lido,
+            "resumo": resumo, "chips": chips,
+            "total_usinas": len(linhas), "pedido": pedido, "opcoes": opcoes, "todas": todas,
             "situacoes": dict(SITUACOES), "hoje": hoje,
             "pessoas_json": sorted(({"id": pid, "nome": p["nome"], "equipe_id": p["equipe_id"]}
                                     for pid, p in pessoas.items()), key=lambda p: norm(p["nome"])),

@@ -271,9 +271,13 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   mudança (a reemissão), mas a reemissão nunca troca um código bom por vazio (sem o código de hoje vai o gravado). O
   tirar leva o nome e o código da linha que pôs (é por eles que o App acha o que tirar). Sem a `NEXUS_PESSOA_HMAC` nada
   se grava (a linha iria sem assinatura e o App a descartaria).
-- **A tela** (PCM → Técnicos por usina): veem os setores PCM e Responsáveis UFV; põe e tira quem `pode_programar`; a
-  **carga inicial** (só administrador, só com o livro vazio) é a regra da equipe do App aplicada ao cadastro do Nexus
-  (cada pessoa de campo recebe as usinas com o mesmo `equipe_id`). Ao lado de cada usina, sem gravar nada: quem rondou
+- **A tela** (PCM → Técnicos por usina), no estilo da tela de PT do Campo (Levi, 17/10: "quero que a tabela seja no
+  mesmo estilo de PT e APR"; usa o `campo.css`): os números do topo (usinas, sem técnico, pessoas de campo, apoios,
+  com aviso), as abas Por usina, Por técnico e, com a foto do App, Comparação com o App, os chips das situações (com
+  técnico, sem técnico, com aviso) e a linha que abre o detalhe com o histórico da usina. Veem os setores PCM e
+  Responsáveis UFV; põe e tira quem `pode_programar`; a **carga inicial** (só administrador, só com o livro vazio) é a
+  regra da equipe do App aplicada ao cadastro do Nexus, só nas usinas EM OPERAÇÃO (cada pessoa de campo recebe as
+  usinas em operação com o mesmo `equipe_id`; medido em 17/10: a regra dava 53 de 227 usinas fora de operação). Ao lado de cada usina, sem gravar nada: quem rondou
   e fechou tarefa ali em 30 dias, quem é técnico na programação da semana e o técnico do cadastro. Avisos (não travam):
   sem técnico, sem nome do Fracttal, duas grafias, técnico sem e-mail (o App não o reconhece), quem esteve lá e não está
   na lista, o nome ou o código que mudou ("Reenviar ao App"). Filtros (decididos pelo Levi): equipe, região de campo,

@@ -59,11 +59,11 @@ def test_carga_inicial_so_com_livro_vazio(app, banco, logado):
     assert "Carga inicial pela equipe" in logado.get(ROTA).get_data(as_text=True)
     assert logado.post(ROTA + "/carga-inicial").status_code == 303
     dec = _decisoes(app)
-    assert len(dec) == 6 and {d["origem"] for d in dec} == {"carga_inicial"}
+    assert len(dec) == 5 and {d["origem"] for d in dec} == {"carga_inicial"}
     html = logado.get(ROTA).get_data(as_text=True)
-    assert "6 ligações" in html and "Carga inicial pela equipe" not in html
+    assert "5 ligações" in html and "Carga inicial pela equipe" not in html
     logado.post(ROTA + "/carga-inicial")
-    assert len(_decisoes(app)) == 6
+    assert len(_decisoes(app)) == 5
     assert "o livro já tem decisões" in logado.get(ROTA).get_data(as_text=True)
 
 
@@ -113,3 +113,17 @@ def test_tirar_leva_o_nome_e_o_codigo_que_o_app_tem(app, banco, logado):
     logado.post(ROTA + "/decidir", data={"usina_id": "1", "pessoa_id": "10", "acao": "tirar"})
     ult = _decisoes(app)[-1]
     assert ult["na_usina"] == "nao" and ult["usina_fracttal"] == "Nome Antigo" and ult["pessoa_hmac"] == "c" * 24
+
+
+def test_abas_no_estilo_da_pt_e_a_comparacao_com_o_app(app, banco, logado):
+    """As abas Por usina, Por técnico e, com a foto do App, Comparação com o App; os chips das situações."""
+    html = logado.get(ROTA).get_data(as_text=True)
+    assert 'class="campo-nativa"' in html and 'class="cn-numeros"' in html and "Sem técnico" in html
+    assert "Por técnico" in html and "Comparação com o App" not in html
+    from test_pcm_tecnicos_usina import _aba
+    _aba(banco, "organizacao_app_campo", "Atribuicoes", [{"Usina": F1, "Pessoa (HMAC)": _h("t11@exemplo.test"),
+                                                           "Papel": "executa"}])
+    from nexus.campo import visao
+    visao.limpar()
+    html = logado.get(ROTA + "?ver=app").get_data(as_text=True)
+    assert "Comparação com o App" in html and "Pendências para a troca" in html and "Técnico Onze" in html

@@ -114,7 +114,8 @@ def test_carga_inicial_e_a_regra_da_equipe(app, banco):
         base = visao._Base()
         pessoas = T.pessoas_de_campo(base, app.config)
         peds = T.pedidos_da_carga_inicial(base, pessoas)
-    assert {(p["usina_id"], p["pessoa_id"]) for p in peds} == {(1, 10), (1, 11), (2, 10), (2, 11), (3, 12), (4, 12)}
+    # só as usinas em operação (Levi, 17/10: "preenche os técnicos!!"; a desmobilizada 4 fica de fora)
+    assert {(p["usina_id"], p["pessoa_id"]) for p in peds} == {(1, 10), (1, 11), (2, 10), (2, 11), (3, 12)}
     p1 = next(p for p in peds if (p["usina_id"], p["pessoa_id"]) == (1, 10))
     assert p1["usina_fracttal"] == F1 and p1["pessoa_hmac"] == _h("t10@exemplo.test") and p1["na_usina"] is True
     assert next(p for p in peds if p["usina_id"] == 3)["usina_fracttal"] == ""
@@ -235,3 +236,21 @@ def test_comparacao_fala_a_lingua_do_app(app, banco):
         (1, 10, "Cliente A - Usina Um - SP")]
     assert [(x["usina_id"], x["pessoa_id"], x["grafia"]) for x in app_["so_no_nexus"]] == [(1, 10, F1)]
     assert any("sem o código" in p for p in app_["pendencias"])
+
+
+def test_numeros_do_topo_chips_e_situacao(app, banco):
+    """O topo e os chips no estilo da tela de PT (Levi, 17/10: "quero que a tabela seja no mesmo estilo de PT e APR"):
+    usinas em operação, sem técnico, pessoas de campo, apoios e com aviso; os chips contam cada situação."""
+    _por(app, 1, 10)
+    _por(app, 1, 11, ate="2026-10-31")
+    ctx = _montar(app)
+    r = ctx["resumo"]
+    assert (r["usinas"], r["com_tecnico"], r["sem_tecnico"], r["pessoas"], r["com_usina"], r["apoios"]) ==         (3, 1, 2, 4, 2, 1)
+    assert r["com_aviso"] == sum(1 for l in ctx["linhas"] if l["avisos"])
+    assert ctx["chips"]["todas"] == 3 and ctx["chips"]["com_tecnico"] == 1 and ctx["chips"]["sem_tecnico"] == 2
+    assert {l["usina_id"] for l in _montar(app, situacao="com_tecnico")["linhas"]} == {1}
+    assert _linha(ctx, 3)["sit"] == ("critico", "Sem técnico")
+    por = {t["pessoa_id"]: t for t in ctx["tecnicos"]}
+    assert por[10]["sit"] == ("ok", "Com usina") and por[12]["sit"] == ("critico", "Sem usina")
+    assert por[13]["sit"] == ("critico", "Sem usina")
+    assert ctx["lido"] and len(ctx["lido"]) == 5
