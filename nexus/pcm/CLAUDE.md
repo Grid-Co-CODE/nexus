@@ -56,6 +56,8 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
+| `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
+| `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá); hoje a do `bd4f673` + `fora_da_programacao.py` (16/10/2026, seção dos motivos) |
 
 ## Horas por tarefa e zeladoria no motor (15/10/2026)
@@ -251,9 +253,46 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   entrar o que devia, e as 1.038 pendentes ganharam o código. Testes: `tests/test_pcm_motivos.py` (17; 19 mutações,
   todas pegas).
 
+## Técnicos por usina (`atribuicoes.py`, `tecnicos_usina.py`, `templates/pcm/tecnicos.html`; 17/10/2026)
+
+Levi, 17/10/2026: "cria uma estrutura que liga usina e técnico e o PCM pode editar a vontade"; "é normal usinas terem
+dois técnicos e receberem de vez em quando mais técnicos"; "quero tirar do site de gestão"; "vamos deixar redondo,
+depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-10-17-tecnicos-por-usina-design.md`.
+
+- **O que a lista quer dizer:** quem VÊ e pode rondar a usina no App de Campo. No App é o papel `executa` da tabela
+  `atribuicoes` (modelo de escopo "novo", ligado em produção), que decide as usinas da aba Ronda; hoje ele vem da tela
+  Organização do site de gestão e do `espelhar_bd_operacoes.py` (a regra da equipe). Não é "o designado": o
+  `tecnico_om_id` do cadastro (um por usina) continua como está.
+- **O dado:** livro `nexus_pcm_atribuicoes · fato_decisao_atribuicao` (catálogo: `decisao_atribuicao_pcm`). 1 linha = 1
+  decisão de pôr ou tirar 1 pessoa de 1 usina num papel; só acrescenta; vale a última de cada (`usina_id`, `pessoa_id`,
+  `papel`). Fixo = sem datas; apoio = `ate_data_id` (vale até o último dia, sai sozinho); agendado = `de_data_id` no
+  futuro. Em claro os IDs, o `usina_fracttal` (o nome que o App usa para achar a usina) e os códigos HMAC; a observação
+  só cifrada. A mesma decisão não grava de novo; o nome do Fracttal ou o código da pessoa diferentes contam como
+  mudança (a reemissão). O tirar leva o nome e o código da linha que pôs (é por eles que o App acha o que tirar).
+- **A tela** (PCM → Técnicos por usina): veem os setores PCM e Responsáveis UFV; põe e tira quem `pode_programar`; a
+  **carga inicial** (só administrador, só com o livro vazio) é a regra da equipe do App aplicada ao cadastro do Nexus
+  (cada pessoa de campo recebe as usinas com o mesmo `equipe_id`). Ao lado de cada usina, sem gravar nada: quem rondou
+  e fechou tarefa ali em 30 dias, quem é técnico na programação da semana e o técnico do cadastro. Avisos (não travam):
+  sem técnico, sem nome do Fracttal, duas grafias, técnico sem e-mail (o App não o reconhece), quem esteve lá e não está
+  na lista, o nome ou o código que mudou ("Reenviar ao App"). Filtros (decididos pelo Levi): equipe, região de campo,
+  responsável, situação e busca, em cascata; `todas=1` mostra as usinas fora de operação. Visão por técnico. Sem o
+  cadastro do banco, a tela abre com o aviso e nada grava.
+- **O App:** ainda não lê. O pacote está em `C:\GridcoBuild\app-campo-docs\_propostas\atribuicoes-nexus\LEIA.md` (A1:
+  o App publica a foto `organizacao_app_campo · Atribuicoes`, que a tela compara e de onde saem as pendências para a
+  troca; A2: o App lê este livro, confere a assinatura e substitui o `executa`, com o interruptor `NEXUS_ATRIBUICOES`;
+  A3: a Organização e o espelho deixam de editar o `executa`). A assinatura é HMAC com a chave derivada da
+  `NEXUS_PESSOA_HMAC` (rótulo `nexus:pcm:atribuicoes`); o vetor de teste está nos dois lados.
+- **Fases:** agora o Nexus (nada muda no campo); depois o A1 → o PCM zera as pendências → A2 e A3 → o Levi liga; por
+  fim o responsável da usina e a hierarquia (papel `responsavel`) e o site de gestão sai 100% da organização de campo.
+- **Provar:** `tests/test_pcm_atribuicoes.py` (o livro: vigência, dia de Brasília, mesma decisão, assinatura),
+  `tests/test_pcm_tecnicos_usina.py` (a visão: regra da equipe, evidência, avisos, cascata, foto do App) e
+  `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar, tirar, banco fora); 11 mutações, todas
+  pegas. A tela: renderizar com o banco de mentira dos testes e servir a pasta (1366 e 375 px, escuro e claro).
+
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
 
-Quadro da semana, Fora da programação (16/10/2026, dos mesmos setores do Quadro), Insights do PCM, Tarefas e OS, Gerar a
+Quadro da semana, Fora da programação (16/10/2026, dos mesmos setores do Quadro), Técnicos por usina (17/10/2026, dos
+mesmos setores; edita o PCM), Insights do PCM, Tarefas e OS, Gerar a
 semana, Gestão PCM, PCM 52 Semanas, Torre de controle e Peças e sobressalentes (Insights, 52 Semanas, Torre de controle e
 Peças ainda são placeholder). **A Semana saiu em 12/10/2026
 com o código dela** (Levi: "PCM > Semana -> pode excluir essa seção e o código dela!"): a rota, o `semana.html`, o
