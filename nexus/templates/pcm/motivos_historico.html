@@ -21,18 +21,7 @@
 {% if erro_banco %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler os
   motivos no banco.</strong> {{ erro_banco }}.</div></div>{% endif %}
 
-<form class="fp-filtros" method="get">
-  <input type="hidden" name="ver" value="historico">
-  <div class="campo">
-    <label class="gc-rotulo" for="f-motivo">Motivo</label>
-    <select id="f-motivo" name="motivo" class="gc-campo" onchange="this.form.submit()">
-      <option value="">Todos</option>
-      {% for i, n, q in opcoes %}<option value="{{ i }}"{% if i == sel %} selected{% endif %}>{{ n }} ({{ q }})</option>{% endfor %}
-    </select>
-  </div>
-  <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
-  {% if sel %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao?ver=historico">Limpar</a>{% endif %}
-</form>
+{% with ver="historico" %}{% include "pcm/_fora_filtros.html" %}{% endwith %}
 
 <p class="pcm-conta"><b class="gc-num">{{ linhas|length }}</b>{% if linhas|length != total %} de {{ total }}{% endif %}
   {{ 'período' if total == 1 else 'períodos' }} de motivo{% if abertos %} · {{ abertos }} ainda no painel{% endif %}{% if not gestao_ok %}
@@ -80,6 +69,6 @@
 })();
 </script>
 {% else %}
-<p class="q-vazio">{% if sel %}Nenhum período com esse motivo.{% else %}Nenhuma tarefa teve motivo ainda.{% endif %}</p>
+<p class="q-vazio">{% if algum_filtro %}Nenhum período com esses filtros.{% else %}Nenhuma tarefa teve motivo ainda.{% endif %}</p>
 {% endif %}
 {% endblock %}

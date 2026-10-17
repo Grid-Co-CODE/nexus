@@ -448,7 +448,7 @@ def test_painel_fora_da_programacao(app, logado, tela):
     filtro = html.split('id="f-motivo"', 1)[1].split("</select>", 1)[0]
     assert "Aguardando material (1)" in filtro and "Aguardando cliente" not in filtro    # o filtro lista o que existe
     html = " ".join(logado.get(f"/t/pcm/fora-da-programacao?motivo={ac}").get_data(as_text=True).split())
-    assert "Nenhuma tarefa com esse motivo." in html
+    assert "Nenhuma tarefa com esses filtros." in html
     # tirar pelo painel
     item = next(k for k, m in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if m["os"] == "7")
     logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": item, "tirar": "1"})
@@ -461,8 +461,10 @@ def test_painel_sem_marcar_pela_os_e_a_tabela_da_2a_rodada(app, logado, tela):
     OS, sem a tarefa já marcada, não grava mais nada."""
     am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando material")
     M.marcar(app.config, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine"}, am, "", PESSOA)
-    html = " ".join(logado.get("/t/pcm/fora-da-programacao?os=7").get_data(as_text=True).split())
-    assert "Marcar pela OS" not in html and "Ver as tarefas" not in html and 'name="os"' not in html
+    # (o ?os= de antes, do "Marcar pela OS", virou o filtro da OS: 16/10, "aumente a quantidade de filtros")
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert "Marcar pela OS" not in html and "Ver as tarefas" not in html
+    assert html.count('name="os"') == 1 and 'id="f-os"' in html                  # o único "os" é o filtro da OS
     assert "Os motivos se marcam no Nexus" not in html and "<details>" not in html
     assert 'class="pcm-tabela fp-tab"' in html and '<th class="fp-esq">Tarefa</th>' in html
     assert 'class="fp-mais-b"' in html and "Retornar à programação" in html and 'class="fp-tirar"' not in html
@@ -797,4 +799,58 @@ def test_historico_guarda_cada_periodo_de_motivo_e_como_saiu(app, logado, tela, 
     logado.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "excluir", "motivo_id": ids["Aguardando cliente"]})
     html = " ".join(logado.get("/t/pcm/fora-da-programacao?ver=historico").get_data(as_text=True).split())
     assert "Motivo tirado do cadastro" in html and "Ainda no painel" not in html
+
+
+def test_filtros_tecnico_equipe_os_usina_responsavel_no_painel_e_no_historico(app, logado, tela):
+    """Levi, 16/10/2026: "aumente a quantidade de filtros — Técnico, equipe, OS, Usina, Responsável" (as definições foram
+    escolha dele: Técnico = quem justificou; Equipe = a equipe da tarefa, a mesma da usina; OS digitada; Usina; Responsável
+    = o responsável da OS no Fracttal, pela Gestão PCM), nas duas telas. As listas mostram só o que existe e somam."""
+    import json as _json
+    cfg = app.config
+    gestao = [dict(t) for t in GESTAO]
+    for t in gestao:
+        if t["os"] == "5":
+            t.update(responsavel="Gestora Um", cluster="Equipe Norte")
+        if t["os"] == "7":
+            t.update(responsavel="Gestor Dois", cluster="Equipe Sul")
+    open(cfg["NEXUS_PCM_GESTAO_FONTE"], "w", encoding="utf-8").write(_json.dumps(
+        {"geradoEm": "2026-10-07T12:00:00Z", "dataHash": "filtros", "tarefas": gestao}))
+    ids = {m["nome"]: m["id"] for m in M.ativos(M.ler(cfg))}
+    assert _pelo_app(app, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine",
+                           "motivo": ids["Prioridade"], "obs": "atendi a parada antes", "tecnico_hmac": TEC,
+                           "tecnico_nome": "Técnico Teste"}).get_json()["gravou"]
+    M.marcar(cfg, {"os": "7", "codigo": "", "tarefa": "Limpeza do inversor", "usina": "Cliente B - Usina 2 - RN"},
+             ids["Aguardando material"], "", PESSOA, origem="painel")
+
+    def linhas(url):
+        h = logado.get(url).get_data(as_text=True)
+        return h, sorted(set(__import__("re").findall(r'data-os="(\d+)" title="Abrir a OS \d+">\d+</button></td>', h)))
+    html, todas = linhas("/t/pcm/fora-da-programacao")
+    assert todas == ["5", "7"]
+    for chave, rotulo in (("f-tecnico", "Técnico"), ("f-equipe", "Equipe"), ("f-usina", "Usina"),
+                          ("f-responsavel", "Responsável")):
+        assert f'<label class="gc-rotulo" for="{chave}">{rotulo}</label>' in html
+    lista = html.split('id="f-equipe"', 1)[1].split("</select>", 1)[0]
+    # só o que existe, com a contagem; a equipe da linha da programação (a OS 5 está na SP Leste 02) vale antes da Gestão
+    assert "SP Leste 02 (1)" in lista and "Equipe Sul (1)" in lista and "Equipe Norte" not in lista
+    for q, esperado in (("tecnico=Técnico Teste", ["5"]), ("equipe=Equipe Sul", ["7"]), ("usina=Usina 2", ["7"]),
+                        ("responsavel=Gestora Um", ["5"]), ("os=7", ["7"]), ("os=OS 5", ["5"]),
+                        ("tecnico=Técnico Teste&equipe=Equipe Sul", [])):
+        h, os_ = linhas("/t/pcm/fora-da-programacao?" + q)
+        assert os_ == esperado, (q, os_)
+        assert ">Limpar</a>" in h
+    h, _ = linhas("/t/pcm/fora-da-programacao?tecnico=Técnico Teste&equipe=Equipe Sul")
+    assert "Nenhuma tarefa com esses filtros." in h
+    # depois de salvar, a tela volta com os mesmos filtros
+    item = next(k for k, m in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if m["os"] == "7")
+    r = logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": item, "obs": "falta o disjuntor",
+                                                                 "v_equipe": "Equipe Sul", "v_os": "7"})
+    assert r.status_code == 303 and "equipe=Equipe+Sul" in r.headers["Location"] and "os=7" in r.headers["Location"]
+    h, _ = linhas("/t/pcm/fora-da-programacao?equipe=Equipe Sul")
+    assert 'name="v_equipe" value="Equipe Sul"' in h                                  # cada formulário leva o filtro
+    # o Histórico tem os mesmos
+    h, os_ = linhas("/t/pcm/fora-da-programacao?ver=historico&usina=Usina 2")
+    assert os_ == ["7"] and 'name="ver" value="historico"' in h and 'id="f-responsavel"' in h
+    h, os_ = linhas("/t/pcm/fora-da-programacao?ver=historico&responsavel=Gestora Um")
+    assert os_ == ["5"]
 

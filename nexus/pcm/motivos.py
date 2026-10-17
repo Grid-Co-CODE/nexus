@@ -424,6 +424,7 @@ def episodios(cfg, est: dict) -> list[dict]:
                 m = todos.get(mid) or {}
                 atual = {"item_id": iid, "os": os_de(x.get("os")), "codigo": D._txt(corpo.get("codigo")),
                          "tarefa": D._txt(corpo.get("tarefa")), "usina": D._txt(corpo.get("usina")),
+                         "cluster": D._txt(corpo.get("cluster")),
                          "tipo": D._txt(corpo.get("tipo")), "motivo_id": mid,
                          "motivo": m.get("nome") or f"Motivo {mid}", "tira": bool(m.get("tira")),
                          "excluido": bool(m.get("excluido")), "origem": D._txt(x.get("origem")),

@@ -45,17 +45,9 @@
 </form>
 {% endif %}
 
-<form class="fp-filtros" method="get">
-  <div class="campo">
-    <label class="gc-rotulo" for="f-motivo">Motivo</label>
-    <select id="f-motivo" name="motivo" class="gc-campo" onchange="this.form.submit()">
-      <option value="">Todos</option>
-      {% for m, n in opcoes %}<option value="{{ m.id }}"{% if m.id == sel %} selected{% endif %}>{{ m.nome }} ({{ n }})</option>{% endfor %}
-    </select>
-  </div>
-  <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
-  {% if sel %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao">Limpar</a>{% endif %}
-</form>
+{% with ver="" %}{% include "pcm/_fora_filtros.html" %}{% endwith %}
+{# os filtros que estão valendo vão junto em cada formulário da tabela: depois de salvar, a tela volta filtrada #}
+{% macro manter() %}{% for k, v in pedido.items() if v %}<input type="hidden" name="v_{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
 
 <p class="pcm-conta"><b class="gc-num">{{ linhas|length }}</b>{% if linhas|length != total %} de {{ total }}{% endif %}
   {{ 'tarefa' if total == 1 else 'tarefas' }}: {{ n_tira }} fora da programação{% if linhas|length > n_tira %},
@@ -83,7 +75,7 @@
         <td class="fp-motivo">
           {%- if pode and not l.do_app %}
           <form method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
-            <input type="hidden" name="item" value="{{ l.item_id }}">{% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
+            <input type="hidden" name="item" value="{{ l.item_id }}">{{ manter() }}
             <span class="fp-mot-caixa{% if l.tira %} fp-mot-caixa--tira{% endif %}"><select name="motivo_id" class="fp-mot" aria-label="Motivo da tarefa da OS {{ l.os }}">
               {% for m in motivos %}<option value="{{ m.id }}" data-tira="{{ 1 if m.tira else 0 }}"{% if m.id == l.motivo_id %} selected{% endif %}>{{ m.nome }}</option>{% endfor %}
             </select></span>
@@ -97,7 +89,7 @@
           <div class="fp-obs-ver"><span class="fp-obs-txt{% if not l.obs %} fp-vazio{% endif %}">{{ l.obs_html if l.obs else '—' }}</span>{% if pode %}<button type="button" class="fp-lapis" title="Editar a observação" aria-label="Editar a observação da tarefa da OS {{ l.os }}"><i class="ph ph-pencil-simple"></i></button>{% endif %}</div>
           {%- if pode %}
           <form class="fp-obs-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
-            <input type="hidden" name="item" value="{{ l.item_id }}">{% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
+            <input type="hidden" name="item" value="{{ l.item_id }}">{{ manter() }}
             <textarea name="obs" class="gc-campo" maxlength="500" rows="2" aria-label="Observação da tarefa da OS {{ l.os }}">{{ l.obs }}</textarea>
             <div class="fp-obs-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar</button><button class="gc-btn gc-btn--ui gc-btn--fantasma fp-obs-cancelar" type="button">Cancelar</button></div>
           </form>
@@ -109,7 +101,7 @@
           <button type="button" class="fp-mais-b" aria-haspopup="menu" aria-expanded="false" title="Mais ações" aria-label="Mais ações da tarefa da OS {{ l.os }}"><i class="ph ph-dots-three"></i></button>
           <div class="fp-menu" role="menu" hidden>
             <form method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/marcar">
-              <input type="hidden" name="item" value="{{ l.item_id }}"><input type="hidden" name="tirar" value="1">{% if sel %}<input type="hidden" name="v_motivo" value="{{ sel }}">{% endif %}
+              <input type="hidden" name="item" value="{{ l.item_id }}"><input type="hidden" name="tirar" value="1">{{ manter() }}
               <button type="submit" class="fp-menu-i" role="menuitem" onclick="return confirm('Retornar à programação a tarefa da OS {{ l.os }}? {% if l.tira %}O motivo sai e ela volta a ser programada na próxima geração da semana.{% else %}O motivo sai deste painel (a tarefa já estava na programação).{% endif %}')"><i class="ph ph-arrow-u-up-left"></i> Retornar à programação</button>
             </form>
           </div>
@@ -212,7 +204,7 @@
 })();
 </script>
 {% else %}
-<p class="q-vazio">{% if sel %}Nenhuma tarefa com esse motivo.{% else %}Nenhuma tarefa fora da programação nem justificativa do App.{% endif %}</p>
+<p class="q-vazio">{% if algum_filtro %}Nenhuma tarefa com esses filtros.{% else %}Nenhuma tarefa fora da programação nem justificativa do App.{% endif %}</p>
 {% endif %}
 {% if not pode %}<p class="gc-ajuda"><i class="ph ph-lock-key"></i> Mexem nos motivos o PCM, os supervisores (setor Responsáveis UFV) e o administrador.</p>{% endif %}
 {% endblock %}

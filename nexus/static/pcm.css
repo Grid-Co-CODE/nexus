@@ -676,6 +676,9 @@ html.pgp-aberto{overflow:hidden}
 .fp-saida--alerta{color:var(--alerta)}
 .fp-saida--neutro{color:var(--tinta-2)}
 .fp-filtros .campo{display:flex;flex-direction:column;gap:5px}
+/* seis filtros e o Limpar numa linha a 1366 px (Levi, 16/10: "aumente a quantidade de filtros") */
+.fp-filtros select.gc-campo{min-width:140px;max-width:200px}
+.fp-filtros .fp-f-os{width:110px}
 /* a tabela do painel (Levi, 16/10/2026: "deixe essa tabela mais bonita, tá estranha demais!"; "centralizar cabeçalho e
    todas as colunas exceto as do texto tarefa"). Sem a coluna Editar que abria a linha e a entortava: o motivo do PCM
    troca na própria célula, a observação se edita na própria célula, e o "Tirar motivo" é um botão discreto no fim */

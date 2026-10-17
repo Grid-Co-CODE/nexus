@@ -162,8 +162,15 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   o painel mostrava 0; o Levi escolheu listá-las aqui). "Do App" é pelo MOTIVO (`origem_motivo`/`quem_motivo` de
   `motivos.vigentes`: a 1ª decisão da sequência com o mesmo motivo), não pela última decisão: o PCM que edita a
   observação não tira a justificativa daqui nem troca quem marcou (antes ela sumia e virava do PCM). A FINALIZADA no
-  Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico); o único filtro é o Motivo
-  (lista só os que existem, inclusive os que não tiram, quando há justificativa do App com eles). A tabela (Levi,
+  Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico). **Filtros** (Levi, 16/10:
+  "aumente a quantidade de filtros — Técnico, equipe, OS, Usina, Responsável"; as definições foram escolha dele, com o
+  dado do dia, e valem também no Histórico; `telas.FILTROS_FORA`, `_campos_de_filtro`, `_filtrar`, o pedaço
+  `pcm/_fora_filtros.html`): Motivo; Técnico = quem justificou (quem pôs o motivo); Equipe = a equipe da tarefa na
+  programação (o `cluster` da linha da semana, gravado na marca) ou, sem ela, na Gestão PCM: é a mesma da usina no
+  cadastro do Nexus (14 de 14 em 16/10); Usina (o nome); Responsável = o responsável da OS no Fracttal (a Gestão PCM; em
+  16/10, os gestores de contrato Camila Viana e Danuth Fernandes); OS = o número digitado (só os dígitos, igual). As
+  listas mostram só o que existe, com quantas linhas têm cada um; os filtros somam; cada formulário da tabela leva os
+  que valem (`v_<filtro>`), e a tela volta filtrada depois de salvar. Seis filtros e o Limpar cabem numa linha a 1366 px. A tabela (Levi,
   16/10, 2ª e 3ª rodadas), tudo centrado menos a Tarefa e sem a coluna Editar que abria a linha:
   - a usina só com o nome ("Thopen - Parelhas 1 - RN" vira "Parelhas 1"; o nome inteiro no title); o "Desde" com a
     hora; abaixo da tarefa só o tipo e a situação no Fracttal (o código do ativo, ou "todos os ativos da OS", no title:
@@ -192,8 +199,8 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   do `historico`, da coluna Vezes), do mais novo ao mais antigo, com de quando até quando, os dias, quem pôs o motivo e
   como saiu: "Retornou à programação" (com quem tirou; "(App)" quando foi o técnico), "Trocou para <motivo>", "Finalizada
   no Fracttal", "Motivo tirado do cadastro" ou "Ainda no painel". Nada se apaga (o livro só acrescenta decisões); o
-  mesmo recorte do painel (o motivo que tira e a justificativa do App, pela origem de quem pôs o motivo) e o mesmo único
-  filtro, o Motivo. O botão "Histórico" fica ao lado do "Cadastro de motivos". Cabe a 1366 px.
+  mesmo recorte do painel (o motivo que tira e a justificativa do App, pela origem de quem pôs o motivo) e os mesmos
+  filtros do painel. O botão "Histórico" fica ao lado do "Cadastro de motivos". Cabe a 1366 px.
   Cadastro em `?ver=cadastro` (`motivos_cadastro.html`): tirar não apaga, marca `excluido` e o ID não volta, e as
   tarefas com ele perdem o motivo (a confirmação diz quantas).
 - **No Quadro** (a janela da OS, também das pendentes, que agora abrem a janela pelo nome): a seção Motivo mostra o de

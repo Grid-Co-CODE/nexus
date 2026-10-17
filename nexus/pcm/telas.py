@@ -518,7 +518,7 @@ def registrar_pcm(bp) -> None:
         if not pode_marcar() or _de_outro_site():
             abort(403)
         f = request.form
-        volta = {"motivo": str(f.get("v_motivo"))[:20]} if f.get("v_motivo") else {}
+        volta = {k: str(f.get("v_" + k))[:80] for k in FILTROS_FORA if f.get("v_" + k)}
         tirar = f.get("tirar") == "1"
         try:
             iid = (f.get("item") or "").strip()
@@ -1040,6 +1040,47 @@ def _num_arg(v) -> int | None:
     return int(s) if s.isdigit() and int(s) > 0 else None
 
 
+# os filtros do Fora da programação e do Histórico (Levi, 16/10/2026: "aumente a quantidade de filtros — Técnico, equipe,
+# OS, Usina, Responsável"; definições aprovadas por ele, nas duas telas): Técnico = quem justificou (quem pôs o motivo);
+# Equipe = a equipe da tarefa na programação e na Gestão PCM (o "cluster" dela, a mesma da usina no cadastro do Nexus:
+# 14 de 14 em 16/10); OS = o número digitado; Usina = o nome; Responsável = o responsável da OS no Fracttal (a Gestão
+# PCM; em 16/10, os gestores de contrato). Mais o Motivo de antes. As listas mostram só o que existe, e os filtros somam.
+FILTROS_FORA = ("motivo", "tecnico", "equipe", "os", "usina", "responsavel")
+
+
+def _campos_de_filtro(l: dict, g: dict | None) -> dict:
+    """O que cada filtro olha numa linha (`tecnico` já posto por quem chama): a equipe, a usina e os responsáveis da OS no
+    Fracttal (as tarefas da Gestão PCM com o mesmo número e nome: a mesma tarefa em vários ativos)."""
+    n = M.norm(l["tarefa"])
+    ts = [t for t in (g or {}).get("por_os", {}).get(l["os"], []) if M.norm(t.get("tarefa")) == n]
+    equipe = (str(l.get("cluster") or "").strip()
+              or next((str(t.get("cluster") or "").strip() for t in ts if str(t.get("cluster") or "").strip()), ""))
+    return {"f_tecnico": l.get("tecnico") or "", "f_equipe": equipe, "f_usina": l.get("usina_nome") or "",
+            "f_responsavel": sorted({" ".join(str(t.get("responsavel") or "").split()) for t in ts
+                                     if str(t.get("responsavel") or "").strip()})}
+
+
+def _filtrar(linhas: list[dict], args) -> tuple[list[dict], dict, dict]:
+    """(as linhas que passam em todos os filtros, o que foi pedido, as opções de cada lista com a contagem)."""
+    pedido = {k: " ".join(str(args.get(k) or "").split())[:80] for k in FILTROS_FORA}
+    pedido["motivo"] = _num_arg(args.get("motivo"))
+    pedido["os"] = re.sub(r"\D", "", pedido["os"])[:12]
+
+    def passa(l):
+        return ((not pedido["motivo"] or l["motivo_id"] == pedido["motivo"])
+                and (not pedido["tecnico"] or l["f_tecnico"] == pedido["tecnico"])
+                and (not pedido["equipe"] or l["f_equipe"] == pedido["equipe"])
+                and (not pedido["usina"] or l["f_usina"] == pedido["usina"])
+                and (not pedido["responsavel"] or pedido["responsavel"] in l["f_responsavel"])
+                and (not pedido["os"] or l["os"] == pedido["os"]))
+
+    def lista(chave):
+        c = Counter(v for l in linhas for v in (l[chave] if isinstance(l[chave], list) else [l[chave]]) if v)
+        return sorted(c.items(), key=lambda x: M.norm(x[0]))
+    opcoes = {k: lista("f_" + k) for k in ("tecnico", "equipe", "usina", "responsavel")}
+    return [l for l in linhas if passa(l)], pedido, opcoes
+
+
 _NUM_OS = re.compile(r"(?<!\d)(\d{5,6})(?!\d)")      # o nº de uma OS no texto: "OS16290", "OS 16290", "16290"
 
 
@@ -1101,16 +1142,20 @@ def _ctx_fora(cfg, args) -> dict:
                            desde_txt=d.strftime("%d/%m/%Y %H:%M") if d else "", os_html=Markup(_botao_os(m["os"], g)),
                            obs_html=_com_os(m["obs"], g),
                            dias=max(0, (hoje - d.date()).days) if d else None, do_app=m["origem_motivo"] == "app",
-                           quem_mostra=m["quem_motivo"] or m["quem"],
+                           quem_mostra=m["quem_motivo"] or m["quem"], tecnico=m["quem_motivo"] or m["quem"],
                            estado_fr=" · ".join(sorted({e for e in estados or [] if e})),
                            fora_da_gestao=g is not None and not estados))
+    for l in linhas:
+        l.update(_campos_de_filtro(l, g))
+    passam, pedido, opcoes_f = _filtrar(linhas, args)
     conta = Counter(l["motivo_id"] for l in linhas)
-    sel = _num_arg(args.get("motivo"))
-    mostradas = sorted((l for l in linhas if not sel or l["motivo_id"] == sel),
-                       key=lambda l: (l["desde"], int(l["os"]) if l["os"].isdigit() else 0, M.norm(l["tarefa"])))
-    opcoes = [(m, conta.get(m["id"], 0)) for m in motivos if conta.get(m["id"]) or m["id"] == sel]
+    sel = pedido["motivo"]
+    mostradas = sorted(passam, key=lambda l: (l["desde"], int(l["os"]) if l["os"].isdigit() else 0,
+                                              M.norm(l["tarefa"])))
+    opcoes = [(m["id"], m["nome"], conta.get(m["id"], 0)) for m in motivos if conta.get(m["id"]) or m["id"] == sel]
     aviso = session.pop("pcm_motivos_aviso", None) or {}
     return {"linhas": mostradas, "total": len(linhas), "motivos": motivos, "opcoes": opcoes, "sel": sel,
+            "pedido": pedido, "opcoes_f": opcoes_f, "algum_filtro": any(pedido.values()),
             "n_tira": sum(1 for l in mostradas if l["tira"]),
             "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
             "gestao_ok": g is not None, "pode": pode_marcar(), "pode_cadastro": pode_programar(),
@@ -1150,11 +1195,15 @@ def _ctx_historico(cfg, args) -> dict:
                            ate_txt=a.strftime("%d/%m/%Y %H:%M") if a else "",
                            dias=max(0, ((a.date() if a else hoje) - d.date()).days) if d else None,
                            do_app=e["origem"] == "app", saida_txt=saida, saida_tom=tom,
-                           saiu_pelo_app=e["origem_saida"] == "app"))
+                           saiu_pelo_app=e["origem_saida"] == "app", tecnico=e["quem"]))
+    for l in linhas:
+        l.update(_campos_de_filtro(l, g))
+    passam, pedido, opcoes_f = _filtrar(linhas, args)
     conta = Counter(l["motivo_id"] for l in linhas)
     nomes = {l["motivo_id"]: l["motivo"] for l in linhas}
-    sel = _num_arg(args.get("motivo"))
-    return {"linhas": [l for l in linhas if not sel or l["motivo_id"] == sel], "total": len(linhas), "sel": sel,
+    sel = pedido["motivo"]
+    return {"linhas": passam, "total": len(linhas), "sel": sel, "pedido": pedido, "opcoes_f": opcoes_f,
+            "algum_filtro": any(pedido.values()),
             "opcoes": sorted(((i, n, conta[i]) for i, n in nomes.items()), key=lambda o: M.norm(o[1])),
             "abertos": sum(1 for l in linhas if l["saida_tom"] == "alerta"), "erro_banco": est.get("erro") or "",
             "gestao_ok": g is not None}
