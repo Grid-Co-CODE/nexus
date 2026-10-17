@@ -662,6 +662,19 @@ html.pgp-aberto{overflow:hidden}
 .q-pend-t[data-abrir]:hover{color:var(--tinta)}
 .q-pend-t[data-abrir]:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .fp-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px}
+.fp-topo-bts{display:flex;gap:8px;flex-wrap:wrap}
+/* o Histórico (16/10/2026): como o período acabou, com quem tirou embaixo */
+.fp-saida{min-width:110px;max-width:150px}
+/* a tabela do Histórico tem uma coluna a mais (Como saiu) e nenhuma edição: a Tarefa e a Observação mais estreitas, e o
+   "até" do período na letra do texto, para caber a 1366 px */
+.fp-tab--hist .fp-tarefa{min-width:170px}
+.fp-tab--hist .fp-obs{min-width:120px;max-width:220px}
+.fp-tab--hist .fp-desde small{font-family:var(--font-sans)}
+.fp-saida small{display:block;color:var(--mudo);font-size:11.5px;margin-top:2px}
+.fp-saida-t{font-weight:600}
+.fp-saida--ok{color:var(--ok)}
+.fp-saida--alerta{color:var(--alerta)}
+.fp-saida--neutro{color:var(--tinta-2)}
 .fp-filtros .campo{display:flex;flex-direction:column;gap:5px}
 /* a tabela do painel (Levi, 16/10/2026: "deixe essa tabela mais bonita, tá estranha demais!"; "centralizar cabeçalho e
    todas as colunas exceto as do texto tarefa"). Sem a coluna Editar que abria a linha e a entortava: o motivo do PCM

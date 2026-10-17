@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block titulo %}Histórico de motivos{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# Fora da programação > Histórico (16/10/2026, Levi: "mas salva um histórico de motivos no fora da programação >
+   histórico"). Cada período de motivo de cada tarefa, do mais novo ao mais antigo, e como acabou: o livro dos motivos só
+   acrescenta decisões, então o que sai do painel (retornou à programação, trocou, foi finalizado) fica aqui. O mesmo
+   recorte e o mesmo filtro do painel; a OS e o nº de 5 a 6 dígitos da observação abrem o card da OS. As contas:
+   motivos.episodios e telas._ctx_historico. #}
+{% macro selo(nome, tira) %}<span class="q-mp{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
+<p class="gc-eyebrow">PCM · Fora da programação</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Histórico de motivos</h1>
+    <p class="pcm-sub">Cada vez que uma tarefa ficou com um motivo, de quando a quando e como saiu. Nada se apaga: o que
+      retorna à programação, troca de motivo ou é finalizado no Fracttal sai do painel e fica aqui.</p>
+  </div>
+  <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao"><i class="ph ph-arrow-left"></i> Fora da programação</a>
+</div>
+
+{% if erro_banco %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler os
+  motivos no banco.</strong> {{ erro_banco }}.</div></div>{% endif %}
+
+<form class="fp-filtros" method="get">
+  <input type="hidden" name="ver" value="historico">
+  <div class="campo">
+    <label class="gc-rotulo" for="f-motivo">Motivo</label>
+    <select id="f-motivo" name="motivo" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for i, n, q in opcoes %}<option value="{{ i }}"{% if i == sel %} selected{% endif %}>{{ n }} ({{ q }})</option>{% endfor %}
+    </select>
+  </div>
+  <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
+  {% if sel %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao?ver=historico">Limpar</a>{% endif %}
+</form>
+
+<p class="pcm-conta"><b class="gc-num">{{ linhas|length }}</b>{% if linhas|length != total %} de {{ total }}{% endif %}
+  {{ 'período' if total == 1 else 'períodos' }} de motivo{% if abertos %} · {{ abertos }} ainda no painel{% endif %}{% if not gestao_ok %}
+  · a Gestão PCM não abriu agora: a finalizada no Fracttal aparece como "ainda no painel"{% endif %}</p>
+
+{% if linhas %}
+<div class="pcm-rolagem">
+  <table class="pcm-tabela fp-tab fp-tab--hist">
+    <thead><tr>
+      <th>Período</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th><th>Observação</th>
+      <th>Quem marcou</th><th>Como saiu</th>
+    </tr></thead>
+    <tbody>
+    {% for l in linhas %}
+      <tr>
+        <td class="gc-dado fp-desde">{{ l.desde_txt }}<small>{% if l.ate_txt %}até {{ l.ate_txt }}{% else %}até agora{% endif %}</small></td>
+        <td class="gc-num">{{ l.dias if l.dias is not none else '' }}</td>
+        <td class="gc-dado">{{ l.os_html }}</td>
+        <td class="fp-usina"{% if l.usina != l.usina_nome %} title="{{ l.usina }}"{% endif %}>{{ l.usina_nome }}</td>
+        <td class="fp-tarefa fp-esq" title="{% if l.codigo %}{{ l.codigo }}{% else %}todos os ativos da OS{% endif %}">{{ l.tarefa }}{% if l.tipo %}<small>{{ l.tipo }}</small>{% endif %}</td>
+        <td class="fp-motivo">{{ selo(l.motivo, l.tira) }}</td>
+        <td class="fp-obs"><span class="fp-obs-txt{% if not l.obs %} fp-vazio{% endif %}">{{ l.obs_html if l.obs else '—' }}</span></td>
+        <td class="fp-quem">{{ l.quem or '—' }}{% if l.do_app %} <span class="gc-ajuda">(App)</span>{% endif %}</td>
+        <td class="fp-saida"><span class="fp-saida-t fp-saida--{{ l.saida_tom }}">{{ l.saida_txt }}</span>{% if l.quem_saiu %}<small>por {{ l.quem_saiu }}{% if l.saiu_pelo_app %} (App){% endif %}</small>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "oscreator/card_os_abrir.html" %}
+<script>
+(function () {
+  // a OS e o nº de 5 a 6 dígitos da observação abrem o card da OS do OS Creator, como no painel
+  document.querySelectorAll('.fp-tab .fp-os-n[data-wid]').forEach(function (b) {
+    if (window.NexusOsCard && NexusOsCard.prepararAoParar) NexusOsCard.prepararAoParar(b, b.getAttribute('data-wid'));
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('.fp-tab .fp-os-n');
+    if (!b || !window.NexusOsCard) return;
+    ev.preventDefault();
+    var op = {folio: b.getAttribute('data-os'), status: b.getAttribute('data-status') || ''};
+    if (b.getAttribute('data-wid')) NexusOsCard.abrir(b.getAttribute('data-wid'), op);
+    else NexusOsCard.abrirFolio(op.folio, op);
+  }, true);
+})();
+</script>
+{% else %}
+<p class="q-vazio">{% if sel %}Nenhum período com esse motivo.{% else %}Nenhuma tarefa teve motivo ainda.{% endif %}</p>
+{% endif %}
+{% endblock %}

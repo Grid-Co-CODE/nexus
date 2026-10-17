@@ -388,6 +388,52 @@ def historico(cfg, est: dict, iids) -> list[dict]:
     return sorted(grupos.values(), key=lambda g: g["quando"])
 
 
+def episodios(cfg, est: dict) -> list[dict]:
+    """Cada período de motivo de cada tarefa, do mais novo ao mais antigo: o Histórico do painel (Levi, 16/10/2026: "mas
+    salva um histórico de motivos no fora da programação > histórico"). Período = as decisões seguidas da tarefa com o
+    mesmo motivo (editar o texto ou repetir a justificativa não abre outro; a contagem por dia é a do `historico`, da
+    coluna Vezes, que não muda); acaba quando a tarefa troca de motivo ou o motivo sai. Nada se perde: o livro só
+    acrescenta decisões. Cada um: {item_id, os, codigo, tarefa, usina, tipo, motivo_id, motivo, tira, excluido, origem e
+    quem (de quem pôs o motivo), obs (o texto mais novo), desde, ate ("" = ainda vale), saida ("" | "troca" | "tirado"),
+    para (o motivo novo, na troca), quem_saiu, origem_saida}. A decisão que não abre com a chave entra sem os textos."""
+    todos = {m["id"]: m for m in est.get("motivos") or []}
+    cofre = _cofre_ou_nada(cfg)
+    por_item: dict[str, list[dict]] = {}
+    for x in sorted(est["marcas"], key=lambda x: D._txt(x.get("decidida_em"))):
+        por_item.setdefault(D._txt(x.get("item_id")), []).append(x)
+    out = []
+    for iid, lst in por_item.items():
+        atual = None
+        for x in lst:
+            quando = D._txt(x.get("decidida_em"))
+            try:
+                corpo = json.loads(cofre.decifrar(D._txt(x.get("dados_cifrados")), _ctx_marca(iid, quando)))
+            except Exception:        # noqa: BLE001 — sem a chave, cifra de outra chave ou linha mexida
+                corpo = {}
+            mid = D._id(x.get("motivo_id"))
+            if atual and mid == atual["motivo_id"]:
+                atual["obs"] = D._txt(corpo.get("obs"))
+                continue
+            if atual:
+                atual.update(ate=quando, saida="troca" if mid else "tirado",
+                             para=((todos.get(mid) or {}).get("nome") or f"Motivo {mid}") if mid else "",
+                             quem_saiu=D._txt(corpo.get("quem")), origem_saida=D._txt(x.get("origem")))
+                out.append(atual)
+                atual = None
+            if mid:
+                m = todos.get(mid) or {}
+                atual = {"item_id": iid, "os": os_de(x.get("os")), "codigo": D._txt(corpo.get("codigo")),
+                         "tarefa": D._txt(corpo.get("tarefa")), "usina": D._txt(corpo.get("usina")),
+                         "tipo": D._txt(corpo.get("tipo")), "motivo_id": mid,
+                         "motivo": m.get("nome") or f"Motivo {mid}", "tira": bool(m.get("tira")),
+                         "excluido": bool(m.get("excluido")), "origem": D._txt(x.get("origem")),
+                         "quem": D._txt(corpo.get("quem")), "obs": D._txt(corpo.get("obs")), "desde": quando,
+                         "ate": "", "saida": "", "para": "", "quem_saiu": "", "origem_saida": ""}
+        if atual:
+            out.append(atual)
+    return sorted(out, key=lambda e: (e["desde"], e["item_id"]), reverse=True)
+
+
 def indice(vig: dict) -> dict:
     """{(os, código canônico, nome normalizado): marca} para achar a marca de uma linha da semana."""
     return {(m["os"], canon(m["codigo"]), norm(m["tarefa"])): m for k, m in vig.items() if not k.startswith("_")}

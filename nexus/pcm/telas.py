@@ -504,6 +504,8 @@ def registrar_pcm(bp) -> None:
         cfg = current_app.config
         if request.args.get("ver") == "cadastro":
             return render_template("pcm/motivos_cadastro.html", **_ctx_cadastro(cfg))
+        if request.args.get("ver") == "historico":
+            return render_template("pcm/motivos_historico.html", **_ctx_historico(cfg, request.args))
         return render_template("pcm/fora.html", **_ctx_fora(cfg, request.args))
 
     @bp.route("/fora-da-programacao/marcar", methods=["POST"])
@@ -1114,6 +1116,48 @@ def _ctx_fora(cfg, args) -> dict:
             "gestao_ok": g is not None, "pode": pode_marcar(), "pode_cadastro": pode_programar(),
             "repo": M.estado_no_repositorio(cfg, est),
             "ok": aviso.get("ok"), "erro": aviso.get("erro")}
+
+
+# como o período acabou, no Histórico: o texto e o tom (o resolvido em verde, o que segue no painel em âmbar)
+_SAIDA = {"tirado": ("Retornou à programação", "ok"), "finalizada": ("Finalizada no Fracttal", "ok"),
+          "excluido": ("Motivo tirado do cadastro", "neutro"), "painel": ("Ainda no painel", "alerta")}
+
+
+def _ctx_historico(cfg, args) -> dict:
+    """Fora da programação > Histórico (Levi, 16/10/2026: "mas salva um histórico de motivos no fora da programação >
+    histórico"): cada período de motivo de cada tarefa (`motivos.episodios`), do mais novo ao mais antigo, com quando
+    acabou e como (retornou à programação, trocou de motivo, foi finalizada no Fracttal ou segue no painel). O mesmo
+    recorte do painel (o motivo que tira e a justificativa do App, pela origem de quem pôs o motivo; a marca do PCM que
+    não tira nunca esteve lá) e o mesmo único filtro, o Motivo."""
+    est = M.ler(cfg)
+    g = _gestao_tarefas(cfg)
+    hoje = Q.hoje()
+    linhas = []
+    for e in M.episodios(cfg, est):
+        if not (e["tira"] or e["origem"] == "app"):
+            continue
+        d, a = M._brt(e["desde"]), M._brt(e["ate"]) if e["ate"] else None
+        estados = (g or {}).get("por_tarefa", {}).get((e["os"], M.norm(e["tarefa"])))
+        finalizada = bool(estados) and all(_finalizada(x) for x in estados)
+        if e["saida"] == "troca":
+            saida, tom = f"Trocou para {e['para']}", "neutro"
+        else:
+            saida, tom = _SAIDA[e["saida"] or ("excluido" if e["excluido"] else
+                                                "finalizada" if finalizada else "painel")]
+        usina = e["usina"] or next((str(t.get("usina") or "") for t in (g or {}).get("por_os", {}).get(e["os"], [])), "")
+        linhas.append(dict(e, usina=usina, usina_nome=_nome_da_usina(usina), os_html=Markup(_botao_os(e["os"], g)),
+                           obs_html=_com_os(e["obs"], g), desde_txt=d.strftime("%d/%m/%Y %H:%M") if d else "",
+                           ate_txt=a.strftime("%d/%m/%Y %H:%M") if a else "",
+                           dias=max(0, ((a.date() if a else hoje) - d.date()).days) if d else None,
+                           do_app=e["origem"] == "app", saida_txt=saida, saida_tom=tom,
+                           saiu_pelo_app=e["origem_saida"] == "app"))
+    conta = Counter(l["motivo_id"] for l in linhas)
+    nomes = {l["motivo_id"]: l["motivo"] for l in linhas}
+    sel = _num_arg(args.get("motivo"))
+    return {"linhas": [l for l in linhas if not sel or l["motivo_id"] == sel], "total": len(linhas), "sel": sel,
+            "opcoes": sorted(((i, n, conta[i]) for i, n in nomes.items()), key=lambda o: M.norm(o[1])),
+            "abertos": sum(1 for l in linhas if l["saida_tom"] == "alerta"), "erro_banco": est.get("erro") or "",
+            "gestao_ok": g is not None}
 
 
 def _ctx_cadastro(cfg) -> dict:

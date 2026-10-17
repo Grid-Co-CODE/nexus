@@ -186,6 +186,14 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   - saíram o "Marcar pela OS" ("atrapalha mais que ajuda": marca-se no Quadro e pelo App; a rota só aceita a tarefa
     que já tem motivo, `item`) e a nota de como o painel funciona; o aviso do arquivo do robô só aparece quando ele
     não está em dia.
+  **Histórico** em `?ver=historico` (`motivos_historico.html`; Levi, 16/10/2026: "mas salva um histórico de motivos
+  no fora da programação > histórico"): cada PERÍODO de motivo de cada tarefa (`motivos.episodios`: as decisões
+  seguidas com o mesmo motivo; editar o texto ou repetir a justificativa não abre outro, e a contagem por dia continua a
+  do `historico`, da coluna Vezes), do mais novo ao mais antigo, com de quando até quando, os dias, quem pôs o motivo e
+  como saiu: "Retornou à programação" (com quem tirou; "(App)" quando foi o técnico), "Trocou para <motivo>", "Finalizada
+  no Fracttal", "Motivo tirado do cadastro" ou "Ainda no painel". Nada se apaga (o livro só acrescenta decisões); o
+  mesmo recorte do painel (o motivo que tira e a justificativa do App, pela origem de quem pôs o motivo) e o mesmo único
+  filtro, o Motivo. O botão "Histórico" fica ao lado do "Cadastro de motivos". Cabe a 1366 px.
   Cadastro em `?ver=cadastro` (`motivos_cadastro.html`): tirar não apaga, marca `excluido` e o ID não volta, e as
   tarefas com ele perdem o motivo (a confirmação diz quantas).
 - **No Quadro** (a janela da OS, também das pendentes, que agora abrem a janela pelo nome): a seção Motivo mostra o de

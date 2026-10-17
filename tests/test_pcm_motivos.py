@@ -739,3 +739,62 @@ def test_o_arquivo_vai_fora_do_pedido_e_junta_as_marcas(monkeypatch):
         assert not chamadas                       # a resposta sai antes: nada foi ao GitHub ainda
     _tempo.sleep(0.6)
     assert len(chamadas) == 1
+
+
+# ── Fora da programação > Histórico (Levi, 16/10/2026: "mas salva um histórico de motivos no fora da programação >
+#    histórico") ──
+def test_historico_guarda_cada_periodo_de_motivo_e_como_saiu(app, logado, tela, monkeypatch):
+    """Cada período de motivo de cada tarefa, do mais novo ao mais antigo: o que retornou à programação, o que trocou de
+    motivo e o que segue no painel. Editar só o texto não abre outro período (fica o texto mais novo), e quem pôs o
+    motivo é o autor; quem tirou vem embaixo. A marca do PCM que não tira nunca esteve no painel e não entra."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    cfg = app.config
+    hora = [_dt(2026, 10, 6, 11, 0, tzinfo=_tz.utc)]
+
+    def passo(h=1):
+        hora[0] += _td(hours=h)
+    monkeypatch.setattr(M, "_agora", lambda: hora[0])
+    ids = {m["nome"]: m["id"] for m in M.ativos(M.ler(cfg))}
+    cab = {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": ids["Prioridade"],
+           "obs": "atendi a parada antes", "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
+    assert _pelo_app(app, cab).get_json()["gravou"]                                         # 1) o técnico justifica
+    passo()
+    item = next(k for k, m in M.vigentes(cfg, M.ler(cfg, forcar=True)).items() if m["codigo"] == "UFV1-CAB01")
+    logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": item, "obs": "atendi a parada antes (OS 16290)"})
+    passo()
+    logado.post("/t/pcm/fora-da-programacao/marcar", data={"item": item, "tirar": "1"})      # 2) retornou à programação
+    passo(30)
+    trafo = {"os": "5", "codigo": "UFV1-TR01", "tarefa": "[Grid Co.] - MPM - Trafo", "tipo": "MPM",
+             "usina": "Cliente A - Usina 1 - SP"}
+    M.marcar(cfg, trafo, ids["Aguardando material"], "falta o disjuntor", PESSOA)           # 3) o PCM tira da semana
+    passo()
+    M.marcar(cfg, trafo, ids["Aguardando cliente"], "o cliente pediu para esperar", PESSOA)  # 4) troca de motivo
+    passo()
+    M.marcar(cfg, {"os": "8", "codigo": "", "tarefa": "Inspeção termográfica do trafo 9"}, ids["Engenharia"], "",
+             PESSOA)                                                                         # o PCM que não tira: fora
+    eps = M.episodios(cfg, M.ler(cfg, forcar=True))
+    assert [(e["motivo"], e["saida"], e["para"]) for e in eps] == [
+        ("Engenharia", "", ""), ("Aguardando cliente", "", ""), ("Aguardando material", "troca", "Aguardando cliente"),
+        ("Prioridade", "tirado", "")]
+    pri = eps[-1]
+    assert (pri["quem"], pri["origem"], pri["obs"]) == ("Técnico Teste", "app", "atendi a parada antes (OS 16290)")
+    assert pri["quem_saiu"] and pri["origem_saida"] == "painel" and pri["ate"] > pri["desde"]
+    # a tela: o mesmo recorte do painel, do mais novo ao mais antigo, e como cada período saiu
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao?ver=historico").get_data(as_text=True).split())
+    assert "Histórico de motivos" in html and "3</b> períodos de motivo · 1 ainda no painel" in html
+    assert "termográfica do trafo 9" not in html
+    corpo = html.split("<tbody>", 1)[1]
+    assert corpo.index("Aguardando cliente") < corpo.index("Trocou para Aguardando cliente") < corpo.index(
+        "Retornou à programação")
+    assert "Ainda no painel" in corpo and "até agora" in corpo and "Técnico Teste <span class=\"gc-ajuda\">(App)</span>" in corpo
+    assert '<button type="button" class="fp-os-n" data-os="16290"' in corpo and "Usina 1" in corpo
+    # o filtro é o Motivo, como no painel, e o painel tem o botão do Histórico
+    so = " ".join(logado.get(f"/t/pcm/fora-da-programacao?ver=historico&motivo={ids['Prioridade']}").get_data(
+        as_text=True).split())
+    assert "Retornou à programação" in so and "Trocou para" not in so and 'name="ver" value="historico"' in so
+    assert "?ver=historico" in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
+    # o motivo tirado do cadastro encerra o período
+    logado.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "excluir", "motivo_id": ids["Aguardando cliente"]})
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao?ver=historico").get_data(as_text=True).split())
+    assert "Motivo tirado do cadastro" in html and "Ainda no painel" not in html
+
