@@ -91,6 +91,7 @@ def banco(app, tmp_path):
     A.limpar()
     yield api
     app.extensions.pop("nexus_dados_sessao", None)
+    visao.limpar()          # o cadastro de mentira não fica no cache das telas do Campo para o teste seguinte
 
 
 def _por(app, uid, pid, fracttal=None, hmac=None, **kw):

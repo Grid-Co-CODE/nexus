@@ -778,3 +778,64 @@ html.pgp-aberto{overflow:hidden}
 .pcm-bo-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pcm-bo-add .gc-campo{width:min(320px,100%)}
 @media (max-width:640px){.fp-obs{max-width:none;min-width:140px}.fp-obs-form,.fp-form{min-width:0}.fp-tarefa{min-width:200px}}
+
+/* ── Técnicos por usina (17/10/2026; templates/pcm/tecnicos.html) ─────────────────────────────────────────────── */
+.tu-tab td{vertical-align:top}
+.tu-usina{min-width:180px}
+.tu-sub{display:block;margin-top:2px;font-size:11.5px;line-height:16px;color:var(--mudo)}
+.tu-sub--aviso{color:var(--alerta)}
+.tu-tecs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:200px}
+.tu-tec{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 10px;border-radius:999px;
+  background:var(--verde-suave);color:var(--tinta);font:600 12px/20px var(--font-sans);white-space:nowrap}
+.tu-tec small{font-weight:500;color:var(--tinta-2)}
+.tu-tec--apoio{background:var(--superficie-2);border:1px dashed var(--linha-forte)}
+.tu-tec--agendado{background:var(--info-suave)}
+.tu-tec form{display:inline;margin:0}
+.tu-tec button{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;
+  border-radius:50%;background:transparent;color:var(--mudo);cursor:pointer}
+.tu-tec button:hover{color:var(--critico);background:var(--critico-suave)}
+.tu-mais{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border:1px dashed var(--linha-forte);border-radius:999px;
+  background:transparent;color:var(--tinta-2);font:600 12px/20px var(--font-sans);cursor:pointer}
+.tu-mais:hover{border-color:var(--verde);color:var(--verde-texto)}
+.tu-vazio{color:var(--mudo);font-size:12px}
+.tu-ev,.tu-avisos{margin:0;padding:0;list-style:none;font-size:12px;line-height:17px}
+.tu-ev{color:var(--tinta-2);min-width:180px}
+.tu-ev li+li,.tu-avisos li+li{margin-top:3px}
+.tu-avisos{color:var(--alerta);min-width:160px}
+.tu-acoes>div{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.tu-acoes form{margin:0}
+.tu-acoes .gc-btn{white-space:nowrap}
+.tu-app{margin-top:22px;padding:14px 16px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+.tu-app details{margin-top:8px}
+.tu-app summary{cursor:pointer;color:var(--tinta)}
+.tu-app ul{margin-top:6px}
+.tu-por-form{display:flex;flex-direction:column;gap:8px}
+.tu-lista-pessoas{max-height:44vh;overflow-y:auto;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.tu-grupo{padding:6px 10px;background:var(--superficie-2);font:700 11px/14px var(--font-sans);letter-spacing:.05em;
+  text-transform:uppercase;color:var(--mudo)}
+.tu-pessoa{display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--linha);font-size:13px;
+  color:var(--tinta);cursor:pointer}
+.tu-pessoa:hover{background:var(--superficie-2)}
+.tu-datas{display:flex;gap:10px;flex-wrap:wrap}
+.tu-datas .campo{display:flex;flex-direction:column;gap:5px;flex:1 1 140px}
+.tu-por-form textarea.gc-campo{width:100%;box-sizing:border-box;resize:vertical}
+.tu-por-pe{display:flex;justify-content:flex-end;margin-top:4px}
+.tu-hist{margin:0;padding:0;list-style:none}
+.tu-hist li{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--linha);font-size:13px;color:var(--tinta-2)}
+.tu-hist li:first-child{border-top:0}
+.tu-hist-quando{font:600 11.5px/16px var(--font-sans);color:var(--mudo)}
+/* no celular, cada usina vira um cartão: a tabela de 5 colunas não cabe em 375 px */
+@media (max-width:640px){
+  .pcm-rolagem:has(.tu-tab){overflow-x:visible;border:0}
+  .tu-tab,.tu-tab tbody,.tu-tab tr,.tu-tab td{display:block;width:auto}
+  .tu-tab thead{display:none}
+  .tu-tab tr{border:1px solid var(--linha);border-radius:var(--raio-md);margin-bottom:10px;background:var(--superficie)}
+  .tu-tab tbody tr:first-child td,.tu-tab td{border-top:0}
+  .tu-tab td{padding:6px 12px}
+  .tu-tab td[data-rotulo]::before{content:attr(data-rotulo);display:block;margin-bottom:3px;font:700 10.5px/14px var(--font-sans);
+    letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+  .tu-tab td.tu-sem{display:none}
+  .tu-tab .num{text-align:left}
+  .tu-usina,.tu-tecs,.tu-ev,.tu-avisos{min-width:0}
+  .tu-acoes>div{flex-direction:row;flex-wrap:wrap}
+}

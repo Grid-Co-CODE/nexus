@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block titulo %}Técnicos por usina{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# Técnicos por usina (17/10/2026, Levi: "cria uma estrutura que liga usina e técnico e o PCM pode editar a vontade" e
+   "é normal usinas terem dois técnicos e receberem de vez em quando mais técnicos"). A lista de uma usina é quem VÊ e
+   pode rondar aquela usina no App de Campo (o papel executa do App). Ao lado, o que ajuda a decidir: quem rondou e
+   fechou tarefa ali em 30 dias, quem está na programação da semana e o técnico do cadastro. O dado:
+   nexus/pcm/atribuicoes.py; as contas da tela: nexus/pcm/tecnicos_usina.py. #}
+{% macro manter() %}{% for k, v in pedido.items() if v %}<input type="hidden" name="v_{{ k }}" value="{{ v }}">{% endfor %}{% if ver == 'tecnico' %}<input type="hidden" name="v_ver" value="tecnico">{% endif %}{% if todas %}<input type="hidden" name="v_todas" value="1">{% endif %}{% endmacro %}
+{% macro url() -%}
+{%- set q = {} -%}{%- for k, v in pedido.items() if v %}{% set _ = q.update({k: v}) %}{% endfor -%}
+{%- if ver == 'tecnico' %}{% set _ = q.update({'ver': 'tecnico'}) %}{% endif -%}{%- if todas %}{% set _ = q.update({'todas': '1'}) %}{% endif -%}
+{%- for k, v in kwargs.items() %}{% if v %}{% set _ = q.update({k: v}) %}{% else %}{% set _ = q.pop(k, None) %}{% endif %}{% endfor -%}
+{{ raiz }}/t/pcm/tecnicos-por-usina{% if q %}?{{ q|urlencode }}{% endif %}
+{%- endmacro %}
+
+<p class="gc-eyebrow">PCM · Campo</p>
+<div class="pcm-topo">
+  <div>
+    <h1 class="titulo-pagina">Técnicos por usina</h1>
+    <p class="pcm-sub">Quem vê e pode rondar cada usina no App de Campo. Ao lado, quem esteve lá nos últimos 30 dias,
+      para ajudar a decidir.</p>
+  </div>
+  <div class="fp-topo-bts">
+    <a class="gc-btn gc-btn--ui {{ 'gc-btn--primario' if ver == 'usina' else 'gc-btn--contorno' }}" href="{{ url(ver='') }}"><i class="ph ph-solar-panel"></i> Por usina</a>
+    <a class="gc-btn gc-btn--ui {{ 'gc-btn--primario' if ver == 'tecnico' else 'gc-btn--contorno' }}" href="{{ url(ver='tecnico') }}"><i class="ph ph-users-three"></i> Por técnico</a>
+  </div>
+</div>
+
+{% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}</div></div>{% endif %}
+{% if erro_acao %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro_acao }}</strong></div></div>{% endif %}
+{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler os
+  técnicos por usina no banco.</strong> {{ erro }}. Enquanto isso, nada se grava.</div></div>{% endif %}
+{% if erro_cadastro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div>
+  <strong>Não consegui ler o cadastro no banco</strong> ({{ erro_cadastro }}). Sem ele a tela não sabe as usinas nem as pessoas, e nada
+  se grava. Tente de novo em instantes.</div></div>{% endif %}
+{% for a in avisos_gerais %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div>{{ a }}</div></div>{% endfor %}
+<div class="pcm-aviso"><i class="ph ph-info"></i><div>O App de Campo ainda não lê esta lista: hoje a aba Ronda segue a
+  tela Organização do site de gestão. A troca é ligada quando as pendências da comparação com o App chegarem a zero.</div></div>
+
+{% if admin and livro_vazio and not erro and not erro_cadastro %}
+<form class="pcm-passo-pe" method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/carga-inicial"
+      data-confirmar="Cada pessoa de campo recebe as usinas da equipe dela, a mesma regra que o App usa hoje. É uma vez só. Seguir?">
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-users-four"></i> Carga inicial pela equipe</button>
+</form>
+{% endif %}
+
+<form class="fp-filtros" method="get">
+  {% if ver == 'tecnico' %}<input type="hidden" name="ver" value="tecnico">{% endif %}
+  {% if todas %}<input type="hidden" name="todas" value="1">{% endif %}
+  {% for chave, rotulo in (('equipe', 'Equipe'), ('regiao', 'Região de campo'), ('responsavel', 'Responsável'), ('situacao', 'Situação')) %}
+  {% if not (ver == 'tecnico' and chave in ('responsavel', 'situacao')) %}
+  <div class="campo">
+    <label class="gc-rotulo" for="f-{{ chave }}">{{ rotulo }}</label>
+    <select id="f-{{ chave }}" name="{{ chave }}" class="gc-campo" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for v, q in opcoes[chave] %}<option value="{{ v }}"{% if v == pedido[chave] %} selected{% endif %}>{{ situacoes.get(v, v) if chave == 'situacao' else v }} ({{ q }})</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% endfor %}
+  <div class="campo">
+    <label class="gc-rotulo" for="f-q">Busca</label>
+    <input id="f-q" name="q" class="gc-campo" value="{{ pedido.q }}" placeholder="{{ 'técnico' if ver == 'tecnico' else 'usina ou técnico' }}"
+           autocomplete="off" onchange="this.form.submit()">
+  </div>
+  <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
+  {% if algum_filtro %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/tecnicos-por-usina{% if ver == 'tecnico' %}?ver=tecnico{% endif %}">Limpar</a>{% endif %}
+</form>
+
+{% if ver == 'usina' %}
+<p class="pcm-conta"><b class="gc-num">{{ linhas|length }}</b>{% if linhas|length != total_usinas %} de {{ total_usinas }}{% endif %}
+  {{ 'usina' if total_usinas == 1 else 'usinas' }} {{ 'do cadastro' if todas else 'em operação' }} ·
+  <a href="{{ url(todas='' if todas else '1') }}">{{ 'só as em operação' if todas else 'incluir as fora de operação' }}</a></p>
+{% if linhas %}
+<div class="pcm-rolagem">
+  <table class="pcm-tabela tu-tab">
+    <thead><tr><th>Usina</th><th>Técnicos</th><th>Em campo (30 dias)</th><th>Avisos</th><th></th></tr></thead>
+    <tbody>
+    {% for l in linhas %}
+      <tr data-usina="{{ l.usina_id }}" data-usina-nome="{{ l.nome }}" data-equipe="{{ l.equipe_id or '' }}"
+          data-evid="{{ l.evidencia|map(attribute='pessoa_id')|join(',') }}">
+        <td class="tu-usina"><strong>{{ l.nome }}</strong>
+          <span class="tu-sub">{{ l.equipe }} · {{ l.regiao }}</span>
+          <span class="tu-sub">Responsável: {{ l.responsavel }}</span></td>
+        <td data-rotulo="Técnicos">
+          <div class="tu-tecs">
+          {% for t in l.tecnicos %}
+            <span class="tu-tec{% if t.status == 'agendado' %} tu-tec--agendado{% elif t.ate %} tu-tec--apoio{% endif %}"
+                  title="{% if t.sem_email %}Sem e-mail no cadastro: o App não o reconhece{% endif %}">
+              {{ t.nome }}{% if t.status == 'agendado' %} <small>a partir de {{ t.de }}</small>{% endif %}{% if t.ate %} <small>até {{ t.ate }}</small>{% endif %}
+              {% if pode %}<form method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/decidir" data-confirmar="Tirar {{ t.nome }} de {{ l.nome }}? A pessoa deixa de ver a usina no App quando a troca estiver ligada.">
+                <input type="hidden" name="usina_id" value="{{ l.usina_id }}"><input type="hidden" name="pessoa_id" value="{{ t.pessoa_id }}">
+                <input type="hidden" name="acao" value="tirar">{{ manter() }}
+                <button type="submit" aria-label="Tirar {{ t.nome }}"><i class="ph ph-x"></i></button></form>{% endif %}
+            </span>
+          {% else %}<span class="tu-vazio">Ninguém</span>{% endfor %}
+          {% if pode %}<button type="button" class="tu-mais" data-por="{{ l.usina_id }}"><i class="ph ph-user-plus"></i> Técnico</button>{% endif %}
+          </div>
+        </td>
+        <td data-rotulo="Em campo (30 dias)">
+          {% if l.evidencia %}<ul class="tu-ev">
+          {% for e in l.evidencia %}<li><b>{{ e.nome }}</b>{% if e.rondas %} · {{ e.rondas }} {{ 'ronda' if e.rondas == 1 else 'rondas' }}{% endif %}{% if e.fechamentos %} · {{ e.fechamentos }} {{ 'tarefa fechada' if e.fechamentos == 1 else 'tarefas fechadas' }}{% endif %}{% if e.na_programacao %} · na programação{% endif %}{% if e.do_cadastro %} · técnico do cadastro{% endif %}</li>{% endfor %}
+          </ul>{% else %}<span class="tu-vazio">Ninguém registrado</span>{% endif %}
+        </td>
+        <td data-rotulo="Avisos"{% if not l.avisos %} class="tu-sem"{% endif %}>{% if l.avisos %}<ul class="tu-avisos">{% for a in l.avisos %}<li>{{ a }}</li>{% endfor %}</ul>{% endif %}</td>
+        <td class="tu-acoes"><div>
+          <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-historico="{{ l.usina_id }}"><i class="ph ph-clock-counter-clockwise"></i> Histórico</button>
+          {% if pode and l.reenviar %}<form method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/decidir">
+            <input type="hidden" name="usina_id" value="{{ l.usina_id }}"><input type="hidden" name="acao" value="reemitir">{{ manter() }}
+            <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-arrows-clockwise"></i> Reenviar ao App</button></form>{% endif %}
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}<p class="pcm-conta">Nenhuma usina com esses filtros.</p>{% endif %}
+
+{% else %}
+<p class="pcm-conta"><b class="gc-num">{{ tecnicos|length }}</b> {{ 'pessoa' if tecnicos|length == 1 else 'pessoas' }} de campo</p>
+{% if tecnicos %}
+<div class="pcm-rolagem">
+  <table class="pcm-tabela tu-tab">
+    <thead><tr><th>Pessoa</th><th>Usinas</th><th class="num">Usinas</th><th>Em campo (30 dias)</th></tr></thead>
+    <tbody>
+    {% for t in tecnicos %}
+      <tr>
+        <td><strong>{{ t.nome }}</strong><span class="tu-sub">{{ t.equipe }} · {{ t.regiao }}</span>
+          {% if t.sem_email %}<span class="tu-sub tu-sub--aviso">Sem e-mail no cadastro: o App não o reconhece</span>{% endif %}</td>
+        <td data-rotulo="Usinas"><div class="tu-tecs">{% for u in t.usinas %}<span class="tu-tec{% if u.status == 'agendado' %} tu-tec--agendado{% elif u.ate %} tu-tec--apoio{% endif %}">{{ u.nome }}{% if u.ate %} <small>até {{ u.ate }}</small>{% endif %}</span>{% else %}<span class="tu-vazio">Nenhuma</span>{% endfor %}</div></td>
+        <td class="num" data-rotulo="Nº de usinas">{{ t.n_usinas }}</td>
+        <td data-rotulo="Em campo (30 dias)">{% if t.rondas or t.fechamentos %}{{ t.rondas }} {{ 'ronda' if t.rondas == 1 else 'rondas' }} · {{ t.fechamentos }} {{ 'tarefa fechada' if t.fechamentos == 1 else 'tarefas fechadas' }}{% else %}<span class="tu-vazio">Nada registrado</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}<p class="pcm-conta">Nenhuma pessoa de campo com esses filtros.</p>{% endif %}
+{% endif %}
+
+{% if app.existe %}
+<section class="tu-app">
+  <h2 class="gc-h3">Comparação com o App</h2>
+  <p class="pcm-sub">O que o App usa hoje na aba Ronda, contra o que vale aqui. A troca só é ligada com as pendências em zero.</p>
+  <details{% if app.pendencias %} open{% endif %}><summary><b class="gc-num">{{ app.pendencias|length }}</b> {{ 'pendência' if app.pendencias|length == 1 else 'pendências' }} para a troca</summary>
+    {% if app.pendencias %}<ul class="tu-avisos">{% for p in app.pendencias %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}</details>
+  <details><summary><b class="gc-num">{{ app.so_no_app|length }}</b> só no App</summary>
+    <ul class="tu-ev">{% for x in app.so_no_app %}<li>{{ x.usina }} · {{ x.nome }}</li>{% endfor %}</ul></details>
+  <details><summary><b class="gc-num">{{ app.so_no_nexus|length }}</b> só no Nexus</summary>
+    <ul class="tu-ev">{% for x in app.so_no_nexus %}<li>{{ x.usina }} · {{ x.nome }}</li>{% endfor %}</ul></details>
+</section>
+{% endif %}
+
+<dialog class="q-det" id="tu-det" aria-label="Técnicos por usina" data-rota="{{ raiz }}/t/pcm/tecnicos-por-usina">
+  <div class="q-det-corpo">
+    <div class="q-det-acoes"><button type="button" data-det-fechar aria-label="Fechar"><i class="ph ph-x"></i></button></div>
+    <div data-det-corpo></div>
+  </div>
+</dialog>
+{% if pode %}
+<template id="tu-por">
+  <p class="gc-eyebrow">Pôr técnico</p>
+  <h2 class="q-det-titulo" data-por-usina></h2>
+  <form method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/decidir" class="tu-por-form">
+    <input type="hidden" name="acao" value="por"><input type="hidden" name="usina_id" value="">{{ manter() }}
+    <label class="gc-rotulo" for="tu-busca">Pessoa</label>
+    <input id="tu-busca" class="gc-campo" placeholder="buscar pelo nome" autocomplete="off" data-por-busca>
+    <div class="tu-lista-pessoas" data-por-lista></div>
+    <div class="tu-datas">
+      <div class="campo"><label class="gc-rotulo" for="tu-de">A partir de</label><input id="tu-de" type="date" name="de" class="gc-campo"></div>
+      <div class="campo"><label class="gc-rotulo" for="tu-ate">Até (apoio)</label><input id="tu-ate" type="date" name="ate" class="gc-campo"></div>
+    </div>
+    <p class="tu-sub">Sem datas, a pessoa fica fixa na usina. Com a data final, é apoio: sai sozinha depois desse dia.</p>
+    <label class="gc-rotulo" for="tu-obs">Observação (opcional)</label>
+    <textarea id="tu-obs" name="obs" class="gc-campo" maxlength="300" rows="2" placeholder="ex.: apoio nas férias do titular"></textarea>
+    <div class="tu-por-pe"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" disabled data-por-enviar><i class="ph ph-user-plus"></i> Pôr na usina</button></div>
+  </form>
+</template>
+{% endif %}
+<script type="application/json" id="tu-dados">{{ {"pessoas": pessoas_json}|tojson }}</script>
+<script src="{{ url_for('static', filename='pcm-tecnicos.js') }}"></script>
+{% endblock %}

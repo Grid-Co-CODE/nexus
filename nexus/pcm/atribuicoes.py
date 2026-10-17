@@ -215,7 +215,10 @@ def historico(cfg, est: dict, usina_id: int) -> list[dict]:
     origem, quem_hmac, obs}. A observação sai decifrada; sem a chave do cadastro, vazia."""
     cofre = _cofre(cfg)
     out = []
-    for x in sorted(est.get("decisoes") or [], key=lambda x: D._txt(x.get("decidida_em")), reverse=True):
+    # a mais nova primeiro; duas no mesmo segundo, a gravada depois primeiro (a ordem do livro desempata)
+    ordem = sorted(enumerate(est.get("decisoes") or []), key=lambda t: (D._txt(t[1].get("decidida_em")), t[0]),
+                   reverse=True)
+    for _i, x in ordem:
         if _int_ou_none(x.get("usina_id")) != usina_id:
             continue
         quando, pid = D._txt(x.get("decidida_em")), _int_ou_none(x.get("pessoa_id"))

@@ -33,6 +33,21 @@ SEM_EQUIPE, SEM_REGIAO, SEM_RESPONSAVEL = "Sem equipe", "Sem região", "Sem resp
 APP_LIVRO, APP_ABA = "organizacao_app_campo", "Atribuicoes"
 
 
+class SemCadastro(Exception):
+    """O cadastro do banco não foi lido (a API fora do ar, ou o teste sem banco): a tela abre com o aviso e nada grava."""
+
+    def __str__(self):
+        return f"Não consegui ler o cadastro no banco ({self.args[0] if self.args else 'erro'}): nada foi gravado."
+
+
+def ler_base():
+    """O cadastro do banco (`campo.visao._Base`), ou SemCadastro com o tipo do erro."""
+    try:
+        return visao._Base()
+    except Exception as ex:      # noqa: BLE001 — qualquer falha de leitura vira o aviso da tela
+        raise SemCadastro(type(ex).__name__) from ex
+
+
 def _dia(d: int) -> date:
     return datetime.strptime(str(d), "%Y%m%d").date()
 
@@ -95,6 +110,11 @@ def _fracttal(base) -> dict:
         if uid and D._txt(d.get("sistema")) == SISTEMA_FRACTTAL and D._txt(d.get("chave_externa")):
             out.setdefault(uid, []).append(" ".join(D._txt(d.get("chave_externa")).split()))
     return {k: sorted(set(v)) for k, v in out.items()}
+
+
+def nome_no_fracttal(base, usina_id: int) -> str:
+    """O nome da usina no Fracttal que vai ao App (o 1º do `de_para`, em ordem alfabética); vazio = sem `de_para`."""
+    return (_fracttal(base).get(usina_id) or [""])[0]
 
 
 def _pedido(uid, fracttal, pid, pessoas, de=None, ate=None) -> dict:
@@ -224,7 +244,15 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     """O contexto da tela (`pcm/tecnicos.html`). `args`: os filtros, `ver` (usina | tecnico) e `todas` (as usinas fora
     de operação também)."""
     hoje = hoje or A.hoje_id()
-    base = visao._Base()
+    pedido, ver = _pedido_dos_args(args), ("tecnico" if args.get("ver") == "tecnico" else "usina")
+    try:
+        base = ler_base()
+    except SemCadastro as ex:
+        return {"ver": ver, "linhas": [], "tecnicos": [], "total_usinas": 0, "pedido": pedido,
+                "opcoes": {k: [] for k in FILTROS if k != "q"}, "todas": str(args.get("todas") or "") == "1",
+                "situacoes": dict(SITUACOES), "hoje": hoje, "pessoas_json": [],
+                "app": {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": []}, "livro_vazio": False,
+                "erro": "", "erro_cadastro": ex.args[0] if ex.args else "erro", "avisos_gerais": []}
     pessoas = pessoas_de_campo(base, cfg)
     est = A.ler(cfg)
     atuais = A.atuais(est, hoje)
@@ -286,7 +314,7 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
             if e["pessoa_id"] not in na_lista and (e["rondas"] or e["fechamentos"]):
                 avisos.append(f"{e['nome']} {'rondou' if e['rondas'] else 'fechou tarefa'} aqui e não está na lista")
         nome = nome_usina(uid)
-        linhas.append({"usina_id": uid, "nome": nome, "status": D._txt(u.get("status")),
+        linhas.append({"usina_id": uid, "nome": nome, "status": D._txt(u.get("status")), "equipe_id": eid,
                        "equipe": base.nome_equipe.get(eid) or SEM_EQUIPE, "regiao": reg.get("nome") or SEM_REGIAO,
                        "responsavel": nome_pessoa(resp) if resp else SEM_RESPONSAVEL,
                        "fracttal": nomes_fr[0] if nomes_fr else "", "fracttal_mudou": mudou_nome,
@@ -294,8 +322,6 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                        "evidencia": evidencia, "avisos": avisos,
                        "_busca": norm(" ".join([nome] + [t["nome"] for t in tecnicos]))})
     linhas.sort(key=lambda l: norm(l["nome"]))
-    pedido = _pedido_dos_args(args)
-    ver = "tecnico" if args.get("ver") == "tecnico" else "usina"
 
     tecnicos_v = []
     if ver == "tecnico":
@@ -332,7 +358,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
             "pessoas_json": sorted(({"id": pid, "nome": p["nome"], "equipe_id": p["equipe_id"]}
                                     for pid, p in pessoas.items()), key=lambda p: norm(p["nome"])),
             "app": _comparar_app(cfg, base, nome_usina, nome_pessoa, vale),
-            "livro_vazio": not est.get("decisoes"), "erro": est.get("erro") or "", "avisos_gerais": avisos_gerais}
+            "livro_vazio": not est.get("decisoes"), "erro": est.get("erro") or "", "erro_cadastro": "",
+            "avisos_gerais": avisos_gerais}
 
 
 def historico_da_usina(cfg, base, pessoas: dict, usina_id: int) -> list[dict]:

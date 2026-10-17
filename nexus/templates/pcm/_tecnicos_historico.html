@@ -1,0 +1,15 @@
+{# O histórico de uma usina na tela Técnicos por usina (a página pede por fetch e põe na janela ao lado): cada decisão,
+   da mais nova à mais antiga. hist: tecnicos_usina.historico_da_usina. #}
+<p class="gc-eyebrow">Histórico</p>
+<h2 class="q-det-titulo">{{ usina }}</h2>
+{% if hist %}
+<ol class="tu-hist">
+{% for h in hist %}
+  <li>
+    <span class="tu-hist-quando">{{ h.quando_txt }}</span>
+    <span><b>{{ h.quem }}</b> {{ h.acao }} <b>{{ h.nome }}</b>{% if h.de %} a partir de {{ h.de }}{% endif %}{% if h.ate %} até {{ h.ate }}{% endif %}{% if h.origem == 'carga_inicial' %} (carga inicial pela equipe){% elif h.origem == 'reemissao' %} (reenviado ao App){% endif %}</span>
+    {% if h.obs %}<span class="tu-sub">{{ h.obs }}</span>{% endif %}
+  </li>
+{% endfor %}
+</ol>
+{% else %}<p class="pcm-sub">Nenhuma decisão ainda para esta usina.</p>{% endif %}

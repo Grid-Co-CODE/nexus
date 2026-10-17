@@ -19,6 +19,7 @@ from flask import abort, current_app, jsonify, redirect, render_template, reques
 
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, motivos_app as MA
 from . import observacoes as O
+from . import atribuicoes as AT, tecnicos_usina as TU
 from . import publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
@@ -605,6 +606,108 @@ def registrar_pcm(bp) -> None:
             session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
                                             "erro": "" if arq["ok"] else arq["texto"]}
         return redirect(na_raiz("/t/pcm/gerar?") + urlencode({"semana": semana}) + "#backoffice", code=303)
+
+    # ── Técnicos por usina (17/10/2026; nexus/pcm/atribuicoes.py e tecnicos_usina.py) ──────────────────────────────
+    @bp.route("/tecnicos-por-usina")
+    def tecnicos():
+        """Quem vê e pode rondar cada usina no App de Campo (Levi, 17/10/2026: "cria uma estrutura que liga usina e
+        técnico e o PCM pode editar a vontade"). Veem os setores PCM e Responsáveis UFV; edita quem `pode_programar`."""
+        cfg = current_app.config
+        ctx = TU.montar(cfg, request.args)
+        aviso = session.pop("pcm_tecnicos_aviso", None) or {}
+        return render_template("pcm/tecnicos.html", **ctx, pode=pode_programar() and not ctx["erro_cadastro"],
+                               admin=bool(session.get("admin")),
+                               ok=aviso.get("ok", ""), erro_acao=aviso.get("erro", ""),
+                               algum_filtro=any(ctx["pedido"].values()))
+
+    @bp.route("/tecnicos-por-usina/decidir", methods=["POST"])
+    def tecnicos_decidir():
+        """Pôr (fixo, ou apoio com datas) ou tirar um técnico de uma usina, e reenviar ao App as ligações de uma usina
+        cujo nome no Fracttal (ou o e-mail de um técnico) mudou. O nome da usina e o código da pessoa saem do cadastro,
+        nunca da página."""
+        cfg = current_app.config
+        if not pode_programar() or _de_outro_site():
+            abort(403)
+        f = request.form
+        volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
+        try:
+            session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_decidir(cfg, f)}
+        except (AT.Recusada, TU.SemCadastro) as ex:
+            session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+        return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
+
+    @bp.route("/tecnicos-por-usina/carga-inicial", methods=["POST"])
+    def tecnicos_carga_inicial():
+        """A regra da equipe (cada pessoa de campo recebe as usinas da equipe dela), uma vez, com o livro vazio: a lista
+        nasce perto do que o App mostra hoje. Só administrador."""
+        cfg = current_app.config
+        if not session.get("admin") or _de_outro_site():
+            abort(403)
+        try:
+            est = AT.ler(cfg, forcar=True)
+            if est.get("erro"):
+                raise AT.Recusada(f"Não consegui ler os técnicos por usina no banco ({est['erro']}): nada foi gravado.")
+            if est["decisoes"]:
+                raise AT.Recusada("A carga inicial é só para o começo: o livro já tem decisões, e nada foi gravado.")
+            base = TU.ler_base()
+            n = AT.decidir_varias(cfg, TU.pedidos_da_carga_inicial(base, TU.pessoas_de_campo(base, cfg)), _usuario(),
+                                  "carga_inicial")
+            session["pcm_tecnicos_aviso"] = {"ok": f"Carga inicial feita: {n} ligações pela regra da equipe."}
+        except (AT.Recusada, TU.SemCadastro) as ex:
+            session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+        return redirect(na_raiz("/t/pcm/tecnicos-por-usina"), code=303)
+
+    @bp.route("/tecnicos-por-usina/historico")
+    def tecnicos_historico():
+        """O histórico de uma usina (a tela pede por fetch e põe na janela ao lado)."""
+        cfg = current_app.config
+        uid = _num_arg(request.args.get("usina"))
+        try:
+            base = TU.ler_base()
+        except TU.SemCadastro:
+            abort(503)
+        if not uid or uid not in base.por_id:
+            abort(404)
+        hist = TU.historico_da_usina(cfg, base, TU.pessoas_de_campo(base, cfg), uid)
+        return render_template("pcm/_tecnicos_historico.html", hist=hist,
+                               usina=str(base.por_id[uid].get("nome") or f"Usina {uid}"))
+
+
+def _tecnicos_decidir(cfg, f) -> str:
+    """A decisão de um formulário da tela Técnicos por usina; devolve o texto do aviso ou levanta `AT.Recusada` (ou
+    `TU.SemCadastro`, sem o cadastro do banco)."""
+    acao = f.get("acao")
+    uid = _num_arg(f.get("usina_id"))
+    est = AT.ler(cfg, forcar=True)
+    if est.get("erro"):
+        raise AT.Recusada(f"Não consegui ler os técnicos por usina no banco ({est['erro']}): nada foi gravado.")
+    base = TU.ler_base()
+    u = base.por_id.get(uid) if uid else None
+    if not u or str(u.get("excluido") or "").strip().lower() == "sim":
+        raise AT.Recusada("A usina não foi achada no cadastro: atualize a página.")
+    pessoas = TU.pessoas_de_campo(base, cfg)
+    if acao == "reemitir":
+        n = AT.decidir_varias(cfg, TU.pedidos_da_reemissao(base, pessoas, est, uid, AT.hoje_id()), _usuario(),
+                              "reemissao")
+        return (f"{n} {'ligação reenviada' if n == 1 else 'ligações reenviadas'} ao App." if n
+                else "Nada a reenviar: o App já tem o nome e os códigos de hoje.")
+    pid = _num_arg(f.get("pessoa_id"))
+    if not pid:
+        raise AT.Recusada("Escolha a pessoa.")
+    if acao == "por":
+        if pid not in pessoas:
+            raise AT.Recusada("Essa pessoa não é de campo ativa no cadastro: confira a ficha dela.")
+        r = AT.decidir(cfg, usina_id=uid, usina_fracttal=TU.nome_no_fracttal(base, uid), pessoa_id=pid,
+                       pessoa_hmac=pessoas[pid]["hmac"], na_usina=True, usuario=_usuario(), de=f.get("de") or "",
+                       ate=f.get("ate") or "", obs=f.get("obs") or "")
+    elif acao == "tirar":
+        # o tirar leva o nome e o código da linha que pôs: é por eles que o App acha a ligação a tirar
+        x = AT.atuais(est, AT.hoje_id()).get((uid, pid, "executa")) or {}
+        r = AT.decidir(cfg, usina_id=uid, usina_fracttal=str(x.get("usina_fracttal") or ""), pessoa_id=pid,
+                       pessoa_hmac=str(x.get("pessoa_hmac") or ""), na_usina=False, usuario=_usuario())
+    else:
+        abort(400)
+    return r["texto"]
 
 
 # ── Gestão PCM: o bloco "Manutenções — Plano & Fila" do painel (nexus/pcm/gestao.py) ──────────────────────────

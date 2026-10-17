@@ -41,6 +41,12 @@ TORRE = Torre(
              "Que tarefa saiu da programação por um motivo de espera, e desde quando?",
              "Os motivos marcados no Nexus (Quadro da semana e esta tela) e a Gestão PCM",
              do_setor=("PCM", "Responsáveis UFV")),
+        # quem vê e pode rondar cada usina no App de Campo (17/10/2026, Levi: "cria uma estrutura que liga usina e
+        # técnico e o PCM pode editar a vontade"); dos mesmos setores do Quadro, edita o PCM (`pcm.telas.pode_programar`)
+        Tela("tecnicos-por-usina", "Técnicos por usina",
+             "Quem cobre cada usina, e quem pode rondar ali no App?",
+             "O cadastro do Nexus, as rondas e a programação; as decisões do PCM nesta tela",
+             do_setor=("PCM", "Responsáveis UFV")),
         Tela("insights", "Insights do PCM",
              "Onde a aderência cai e que tarefa já rolou várias vezes?",
              "banco_dados.json do painel PCM"),
