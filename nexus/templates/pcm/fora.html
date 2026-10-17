@@ -37,10 +37,10 @@
 
 {% set r = resumo %}
 <div class="cn-numeros">
-  <span><span class="gc-rotulo">Fora da programação</span><span class="v{% if r.fora %} ruim{% endif %}">{{ r.fora }}</span><span class="d">tarefas tiradas por um motivo de espera</span></span>
-  <span><span class="gc-rotulo">Só justificativa do App</span><span class="v">{{ r.so_app }}</span><span class="d">seguem programadas</span></span>
-  <span><span class="gc-rotulo">Mais antiga</span><span class="v">{{ '—' if r.mais_antiga is none else (r.mais_antiga ~ (' dia' if r.mais_antiga == 1 else ' dias')) }}</span><span class="d">com o motivo</span></span>
-  <span><span class="gc-rotulo">Justificativas</span><span class="v">{{ r.justificativas }}</span><span class="d">uma por dia e motivo</span></span>
+  <span><span class="gc-rotulo">Fora da programação</span><span class="v{% if r.fora %} ruim{% endif %}" data-fp-n="fora">{{ r.fora }}</span><span class="d">tarefas tiradas por um motivo de espera</span></span>
+  <span><span class="gc-rotulo">Só justificativa do App</span><span class="v" data-fp-n="so_app">{{ r.so_app }}</span><span class="d">seguem programadas</span></span>
+  <span><span class="gc-rotulo">Mais antiga</span><span class="v" data-fp-n="mais_antiga">{{ '—' if r.mais_antiga is none else (r.mais_antiga ~ (' dia' if r.mais_antiga == 1 else ' dias')) }}</span><span class="d">com o motivo</span></span>
+  <span><span class="gc-rotulo">Justificativas</span><span class="v" data-fp-n="justificativas">{{ r.justificativas }}</span><span class="d">uma por dia e motivo</span></span>
   <span><span class="gc-rotulo">Finalizadas</span><span class="v">{{ r.finalizadas }}</span><span class="d">saíram daqui pelo Fracttal</span></span>
 </div>
 {% with parte="abas", aba="painel", n=linhas|length %}{% include "pcm/_fora_topo.html" %}{% endwith %}
@@ -52,22 +52,24 @@
 {# os filtros que estão valendo vão junto em cada formulário da tabela: depois de salvar, a tela volta filtrada #}
 {% macro manter() %}{% for k, v in pedido.items() if v %}<input type="hidden" name="v_{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
 
-<p class="pcm-conta"><b class="gc-num">{{ linhas|length }}</b>{% if linhas|length != total %} de {{ total }}{% endif %}
-  {{ 'tarefa' if total == 1 else 'tarefas' }}: {{ n_tira }} fora da programação{% if linhas|length > n_tira %},
-  {{ linhas|length - n_tira }} só com justificativa do App{% endif %}{% if finalizadas %} · {{ finalizadas }}
+<p class="pcm-conta"><b class="gc-num" data-fl-conta="fora">{{ linhas|length }}</b> de {{ total }}
+  {{ 'tarefa' if total == 1 else 'tarefas' }}: <span data-fp-n="fora">{{ n_tira }}</span> fora da programação,
+  <span data-fp-n="so_app">{{ linhas|length - n_tira }}</span> só com justificativa do App{% if finalizadas %} · {{ finalizadas }}
   {{ 'finalizada' if finalizadas == 1 else 'finalizadas' }} no Fracttal {{ 'saiu' if finalizadas == 1 else 'saíram' }} daqui{% endif %}{% if not gestao_ok %}
   · a Gestão PCM não abriu agora: as finalizadas no Fracttal também aparecem{% endif %}</p>
 
-{% if linhas %}
-<div class="cn-tab"><table class="fp-tab">
+{% if todas_linhas %}
+<div class="cn-tab"><table class="fp-tab" data-fl-grupo="fp-f" data-fl-nome="fora">
     <thead><tr>
       <th>Desde</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th>
       <th title="Quantas vezes a tarefa foi justificada: uma por dia e motivo">Vezes</th><th>Observação</th>
       <th>Quem marcou</th>{% if pode %}<th aria-label="Mais ações"></th>{% endif %}
     </tr></thead>
     <tbody>
-    {% for l in linhas %}
-      <tr>
+    {% for l in todas_linhas %}
+      <tr data-fl-linha data-f-motivo="{{ l.motivo_id }}" data-f-tecnico="{{ l.f_tecnico }}" data-f-equipe="{{ l.f_equipe }}"
+          data-f-usina="{{ l.f_usina }}" data-f-responsavel="{{ l.f_responsavel|join('|') }}" data-f-os="{{ l.os }}"
+          data-tira="{{ 1 if l.tira else 0 }}" data-dias="{{ l.dias if l.dias is not none else '' }}" data-vezes="{{ l.vezes or 0 }}"{% if not l._visivel %} hidden{% endif %}>
         <td class="gc-dado fp-desde">{{ l.desde_txt[:10] }}{% if l.desde_txt[11:] %}<small>{{ l.desde_txt[11:] }}</small>{% endif %}</td>
         <td class="gc-num">{{ l.dias if l.dias is not none else '' }}</td>
         <td class="gc-dado">{{ l.os_html }}</td>
@@ -123,6 +125,7 @@
       </tr>
       {% endif %}
     {% endfor %}
+    <tr data-fl-vazio="fora"{% if linhas %} hidden{% endif %}><td colspan="{{ 10 if pode else 9 }}" class="mudo">Nenhuma tarefa com esses filtros.</td></tr>
     </tbody>
   </table></div>
 {% include "oscreator/card_os_abrir.html" %}
@@ -192,6 +195,20 @@
       if (abrir && rol) rol.scrollLeft = 0;
     });
   });
+  // os números do topo e a conta acompanham o filtro na página: o que está na tabela agora
+  document.addEventListener('filtro-local', function () {
+    var vis = Array.prototype.filter.call(document.querySelectorAll('.fp-tab tr[data-fl-linha]'), function (t) { return !t.hidden; });
+    var fora = vis.filter(function (t) { return t.getAttribute('data-tira') === '1'; }).length;
+    var dias = vis.map(function (t) { return t.getAttribute('data-dias'); }).filter(function (d) { return d !== ''; }).map(Number);
+    var just = vis.reduce(function (s, t) { return s + Number(t.getAttribute('data-vezes') || 0); }, 0);
+    var mais = dias.length ? Math.max.apply(null, dias) : null;
+    var por = {fora: fora, so_app: vis.length - fora, justificativas: just,
+               mais_antiga: mais === null ? '—' : mais + (mais === 1 ? ' dia' : ' dias')};
+    Object.keys(por).forEach(function (k) {
+      document.querySelectorAll('[data-fp-n="' + k + '"]').forEach(function (e) { e.textContent = por[k]; });
+    });
+    document.querySelectorAll('[data-fp-n="fora"].v').forEach(function (e) { e.classList.toggle('ruim', fora > 0); });
+  });
   // o motivo marcado pelo PCM troca na própria célula; o que não tira da programação tira a tarefa deste painel
   document.querySelectorAll('.fp-tab select.fp-mot').forEach(function (s) {
     var antes = s.value;
@@ -209,4 +226,5 @@
 {% endif %}
 {% if not pode %}<p class="gc-ajuda"><i class="ph ph-lock-key"></i> Mexem nos motivos o PCM, os supervisores (setor Responsáveis UFV) e o administrador.</p>{% endif %}
 </div>
+<script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
 {% endblock %}

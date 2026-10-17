@@ -114,4 +114,41 @@
     var b = ev.target.closest("[data-por]");
     if (b) porTecnico(b.dataset.por);
   });
+
+  // as abas Por usina e Por técnico trocam na própria página (17/10/2026: o filtro não recarrega, a aba também não)
+  var abaAgora = (new URL(location.href)).searchParams.get("ver") === "tecnico" ? "tecnico" : "usina";
+  document.querySelectorAll(".cn-abas a[data-aba]").forEach(function (a) {
+    a.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      abaAgora = a.getAttribute("data-aba");
+      document.querySelectorAll(".cn-abas a[data-aba]").forEach(function (o) {
+        if (o === a) o.setAttribute("aria-current", "page"); else o.removeAttribute("aria-current");
+      });
+      document.querySelectorAll("[data-aba-secao]").forEach(function (s) { s.hidden = s.getAttribute("data-aba-secao") !== abaAgora; });
+      document.querySelectorAll("[data-so-aba]").forEach(function (e) { e.hidden = e.getAttribute("data-so-aba") !== abaAgora; });
+      var u = new URL(location.href);
+      if (abaAgora === "usina") u.searchParams.delete("ver"); else u.searchParams.set("ver", abaAgora);
+      history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+      if (window.FiltroLocal && window.FiltroLocal["tu-f"]) window.FiltroLocal["tu-f"].aplicar();
+    });
+  });
+  // gravar volta para a aba de agora
+  document.addEventListener("submit", function (ev) {
+    var f = ev.target;
+    if (f.id === "tu-f" || f.method.toLowerCase() !== "post") return;
+    f.querySelectorAll('input[name="v_ver"]').forEach(function (i) { i.remove(); });
+    if (abaAgora !== "usina") {
+      var i = document.createElement("input");
+      i.type = "hidden"; i.name = "v_ver"; i.value = abaAgora;
+      f.appendChild(i);
+    }
+  });
+  // os números do topo: "Todas" troca as contas de em operação pelas do cadastro inteiro
+  document.addEventListener("filtro-local", function (ev) {
+    var st = window.FiltroLocal && window.FiltroLocal["tu-f"] && window.FiltroLocal["tu-f"].estado;
+    if (!st) return;
+    document.querySelectorAll("[data-tu-numeros] [data-op][data-todas]").forEach(function (e) {
+      e.textContent = e.getAttribute(st.todas ? "data-todas" : "data-op");
+    });
+  });
 })();

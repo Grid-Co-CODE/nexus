@@ -1253,8 +1253,13 @@ def _ctx_fora(cfg, args) -> dict:
     passam, pedido, opcoes_f = _filtrar(linhas, args)
     conta = Counter(l["motivo_id"] for l in linhas)
     sel = pedido["motivo"]
-    mostradas = sorted(passam, key=lambda l: (l["desde"], int(l["os"]) if l["os"].isdigit() else 0,
-                                              M.norm(l["tarefa"])))
+    def ordem(l):
+        return l["desde"], int(l["os"]) if l["os"].isdigit() else 0, M.norm(l["tarefa"])
+    mostradas = sorted(passam, key=ordem)
+    # o filtro é na página (17/10/2026): todas as linhas vão, e as que não passam chegam escondidas
+    passa_ids = {id(l) for l in passam}
+    for l in linhas:
+        l["_visivel"] = id(l) in passa_ids
     opcoes = [(m["id"], m["nome"], conta.get(m["id"], 0)) for m in motivos if conta.get(m["id"]) or m["id"] == sel]
     aviso = session.pop("pcm_motivos_aviso", None) or {}
     n_tira = sum(1 for l in mostradas if l["tira"])
@@ -1264,7 +1269,7 @@ def _ctx_fora(cfg, args) -> dict:
     resumo = {"fora": n_tira, "so_app": len(mostradas) - n_tira, "mais_antiga": max(dias) if dias else None,
               "justificativas": sum(l.get("vezes") or 0 for l in mostradas), "finalizadas": finalizadas}
     return {"linhas": mostradas, "total": len(linhas), "motivos": motivos, "opcoes": opcoes, "sel": sel,
-            "resumo": resumo, "lido": datetime.now(_BRT).strftime("%H:%M"),
+            "resumo": resumo, "lido": datetime.now(_BRT).strftime("%H:%M"), "todas_linhas": sorted(linhas, key=ordem),
             "pedido": pedido, "opcoes_f": opcoes_f, "algum_filtro": any(pedido.values()),
             "n_tira": n_tira,
             "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
@@ -1309,10 +1314,14 @@ def _ctx_historico(cfg, args) -> dict:
     for l in linhas:
         l.update(_campos_de_filtro(l, g))
     passam, pedido, opcoes_f = _filtrar(linhas, args)
+    passa_ids = {id(l) for l in passam}
+    for l in linhas:
+        l["_visivel"] = id(l) in passa_ids
     conta = Counter(l["motivo_id"] for l in linhas)
     nomes = {l["motivo_id"]: l["motivo"] for l in linhas}
     sel = pedido["motivo"]
-    return {"linhas": passam, "total": len(linhas), "sel": sel, "pedido": pedido, "opcoes_f": opcoes_f,
+    return {"linhas": passam, "todas_linhas": linhas, "total": len(linhas), "sel": sel, "pedido": pedido,
+            "opcoes_f": opcoes_f,
             "algum_filtro": any(pedido.values()),
             "opcoes": sorted(((i, n, conta[i]) for i, n in nomes.items()), key=lambda o: M.norm(o[1])),
             "abertos": sum(1 for l in linhas if l["saida_tom"] == "alerta"), "erro_banco": est.get("erro") or "",

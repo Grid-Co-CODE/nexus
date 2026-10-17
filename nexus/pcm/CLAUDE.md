@@ -328,6 +328,15 @@ montar essa torre agora, vou falar com o time de PCM"): a tela segue placeholder
 
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
+**O filtro na própria página** (Levi, 17/10/2026: "sempre que vou puxar um filtro ele carrega o site de novo, deveria só
+filtrar os dados direto"): no Técnicos por usina e no Fora da programação (painel e histórico) as linhas vão TODAS à
+página, cada uma com o que cada filtro olha (`data-f-<chave>`), e o `static/filtro-local.js` só mostra e esconde,
+refaz as contas das listas em cascata (cada lista com os OUTROS filtros, a mesma regra do servidor) e troca o endereço
+(`history.replaceState`), sem ir ao servidor; as abas Por usina e Por técnico e o "Todas" do Técnicos por usina também.
+O servidor continua entendendo o endereço: a página aberta já filtrada chega com as linhas certas escondidas, e os
+formulários de gravar levam os filtros de agora (`v_<chave>`), para a tela voltar como estava. Tela nova com filtro usa
+o mesmo script (o formulário `data-filtro-local`, as linhas `data-fl-linha`; o cabeçalho do arquivo diz o resto).
+
 Levi: "Os filtros tem que se auto filtrar também, pelo o que vi nenhum tem relação alguma com outro, está só buscando
 uma string". Cada filtro lista só o que existe com os OUTROS filtros aplicados (escolhida a equipe, o Responsável e o
 Cliente só listam os dela); o filtro não restringe a si mesmo (dá para trocar de equipe sem limpar o resto); a opção

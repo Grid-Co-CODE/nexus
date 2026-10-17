@@ -20,19 +20,20 @@
 
 {% with ver="historico" %}{% include "pcm/_fora_filtros.html" %}{% endwith %}
 
-<p class="pcm-conta"><b class="gc-num">{{ linhas|length }}</b>{% if linhas|length != total %} de {{ total }}{% endif %}
+<p class="pcm-conta"><b class="gc-num" data-fl-conta="hist">{{ linhas|length }}</b> de {{ total }}
   {{ 'período' if total == 1 else 'períodos' }} de motivo{% if abertos %} · {{ abertos }} ainda no painel{% endif %}{% if not gestao_ok %}
   · a Gestão PCM não abriu agora: a finalizada no Fracttal aparece como "ainda no painel"{% endif %}</p>
 
-{% if linhas %}
-<div class="cn-tab"><table class="fp-tab fp-tab--hist">
+{% if todas_linhas %}
+<div class="cn-tab"><table class="fp-tab fp-tab--hist" data-fl-grupo="fp-f" data-fl-nome="hist">
     <thead><tr>
       <th>Período</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th><th>Observação</th>
       <th>Quem marcou</th><th>Como saiu</th>
     </tr></thead>
     <tbody>
-    {% for l in linhas %}
-      <tr>
+    {% for l in todas_linhas %}
+      <tr data-fl-linha data-f-motivo="{{ l.motivo_id }}" data-f-tecnico="{{ l.f_tecnico }}" data-f-equipe="{{ l.f_equipe }}"
+          data-f-usina="{{ l.f_usina }}" data-f-responsavel="{{ l.f_responsavel|join('|') }}" data-f-os="{{ l.os }}"{% if not l._visivel %} hidden{% endif %}>
         <td class="gc-dado fp-desde">{{ l.desde_txt }}<small>{% if l.ate_txt %}até {{ l.ate_txt }}{% else %}até agora{% endif %}</small></td>
         <td class="gc-num">{{ l.dias if l.dias is not none else '' }}</td>
         <td class="gc-dado">{{ l.os_html }}</td>
@@ -44,6 +45,7 @@
         <td class="fp-saida"><span class="fp-saida-t fp-saida--{{ l.saida_tom }}">{{ l.saida_txt }}</span>{% if l.quem_saiu %}<small>por {{ l.quem_saiu }}{% if l.saiu_pelo_app %} (App){% endif %}</small>{% endif %}</td>
       </tr>
     {% endfor %}
+    <tr data-fl-vazio="hist"{% if linhas %} hidden{% endif %}><td colspan="9" class="mudo">Nenhum período com esses filtros.</td></tr>
     </tbody>
   </table></div>
 {% include "oscreator/card_os_abrir.html" %}
@@ -67,4 +69,5 @@
 <p class="q-vazio">{% if algum_filtro %}Nenhum período com esses filtros.{% else %}Nenhuma tarefa teve motivo ainda.{% endif %}</p>
 {% endif %}
 </div>
+<script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
 {% endblock %}

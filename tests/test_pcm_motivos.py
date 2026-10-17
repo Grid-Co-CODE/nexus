@@ -466,7 +466,7 @@ def test_painel_sem_marcar_pela_os_e_a_tabela_da_2a_rodada(app, logado, tela):
     assert "Marcar pela OS" not in html and "Ver as tarefas" not in html
     assert html.count('name="os"') == 1 and 'id="f-os"' in html                  # o único "os" é o filtro da OS
     assert "Os motivos se marcam no Nexus" not in html and "<details>" not in html
-    assert '<div class="cn-tab"><table class="fp-tab">' in html and '<th class="fp-esq">Tarefa</th>' in html
+    assert '<div class="cn-tab"><table class="fp-tab" data-fl-grupo="fp-f"' in html and '<th class="fp-esq">Tarefa</th>' in html
     assert 'class="fp-mais-b"' in html and "Retornar à programação" in html and 'class="fp-tirar"' not in html
     antes = len(M.vigentes(app.config, M.ler(app.config, forcar=True)))
     r = logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "7", "tarefa": "Limpeza do inversor",
@@ -674,7 +674,8 @@ def test_o_painel_mostra_toda_justificativa_do_app(app, logado, tela):
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
     assert "o supervisor mandou atender a parada antes" in html and "UFV1-CAB01" in html
     assert "Técnico Teste <span class=\"gc-ajuda\">(App)</span>" in html and "termográfica do trafo 9" not in html
-    assert "1</b> tarefa: 0 fora da programação, 1 só com justificativa do App" in html
+    assert ('1</b> de 1 tarefa: <span data-fp-n="fora">0</span> fora da programação, <span data-fp-n="so_app">1</span> só '
+            'com justificativa do App') in html
     assert "justificativas que os técnicos mandam pelo App" in html
     filtro = html.split('id="f-motivo"', 1)[1].split("</select>", 1)[0]
     assert "Prioridade (1)" in filtro and "Engenharia" not in filtro
@@ -783,7 +784,7 @@ def test_historico_guarda_cada_periodo_de_motivo_e_como_saiu(app, logado, tela, 
     assert pri["quem_saiu"] and pri["origem_saida"] == "painel" and pri["ate"] > pri["desde"]
     # a tela: o mesmo recorte do painel, do mais novo ao mais antigo, e como cada período saiu
     html = " ".join(logado.get("/t/pcm/fora-da-programacao?ver=historico").get_data(as_text=True).split())
-    assert "Histórico de motivos" in html and "3</b> períodos de motivo · 1 ainda no painel" in html
+    assert "Histórico de motivos" in html and "3</b> de 3 períodos de motivo · 1 ainda no painel" in html
     assert "termográfica do trafo 9" not in html
     corpo = html.split("<tbody>", 1)[1]
     assert corpo.index("Aguardando cliente") < corpo.index("Trocou para Aguardando cliente") < corpo.index(
@@ -793,7 +794,9 @@ def test_historico_guarda_cada_periodo_de_motivo_e_como_saiu(app, logado, tela, 
     # o filtro é o Motivo, como no painel, e o painel tem o botão do Histórico
     so = " ".join(logado.get(f"/t/pcm/fora-da-programacao?ver=historico&motivo={ids['Prioridade']}").get_data(
         as_text=True).split())
-    assert "Retornou à programação" in so and "Trocou para" not in so and 'name="ver" value="historico"' in so
+    # o filtro é na página (17/10/2026): todas as linhas vão, e as que não passam chegam escondidas
+    vis = "".join(t for t in so.split("<tr data-fl-linha")[1:] if " hidden>" not in t.split(">", 1)[0] + ">")
+    assert "Retornou à programação" in vis and "Trocou para" not in vis and 'name="ver" value="historico"' in so
     assert "?ver=historico" in logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True)
     # o motivo tirado do cadastro encerra o período
     logado.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "excluir", "motivo_id": ids["Aguardando cliente"]})
@@ -824,7 +827,10 @@ def test_filtros_tecnico_equipe_os_usina_responsavel_no_painel_e_no_historico(ap
 
     def linhas(url):
         h = logado.get(url).get_data(as_text=True)
-        return h, sorted(set(__import__("re").findall(r'data-os="(\d+)" title="Abrir a OS \d+">\d+</button></td>', h)))
+        # o filtro é na página (17/10/2026): todas as linhas vão, e as que não passam chegam escondidas
+        vis = [t for t in h.split("<tr data-fl-linha")[1:] if " hidden>" not in t.split(">", 1)[0] + ">"]
+        return h, sorted(set(__import__("re").findall(r'data-os="(\d+)" title="Abrir a OS \d+">\d+</button></td>',
+                                                      "".join(vis))))
     html, todas = linhas("/t/pcm/fora-da-programacao")
     assert todas == ["5", "7"]
     for chave, rotulo in (("f-tecnico", "Técnico"), ("f-equipe", "Equipe"), ("f-usina", "Usina"),

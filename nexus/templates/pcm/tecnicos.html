@@ -41,14 +41,15 @@
     isso, nada se grava.</span></div>{% endif %}
   {% for a in avisos_gerais %}<div class="cn-erro cn-aviso" role="status"><span>{{ a }}</span></div>{% endfor %}
 
-  {% set r = resumo %}
+  {% set r, ro, rt = resumo, resumo_op, resumo_todas %}
+  {% macro kpi(chave) %}<span class="v{% if chave == 'sem_tecnico' and r[chave] %} ruim{% endif %}" data-op="{{ ro[chave] }}" data-todas="{{ rt[chave] }}">{{ r[chave] }}</span>{% endmacro %}
   {% if r %}
-  <div class="cn-numeros">
-    <span><span class="gc-rotulo">Usinas {{ 'no cadastro' if todas else 'em operação' }}</span><span class="v">{{ r.usinas }}</span><span class="d">{{ r.com_tecnico }} com técnico</span></span>
-    <span><span class="gc-rotulo">Sem técnico</span><span class="v{% if r.sem_tecnico %} ruim{% endif %}">{{ r.sem_tecnico }}</span><span class="d">ninguém vê a usina no App</span></span>
+  <div class="cn-numeros" data-tu-numeros>
+    <span><span class="gc-rotulo" data-op="Usinas em operação" data-todas="Usinas no cadastro">Usinas {{ 'no cadastro' if todas else 'em operação' }}</span>{{ kpi('usinas') }}<span class="d"><span data-op="{{ ro.com_tecnico }}" data-todas="{{ rt.com_tecnico }}">{{ r.com_tecnico }}</span> com técnico</span></span>
+    <span><span class="gc-rotulo">Sem técnico</span>{{ kpi('sem_tecnico') }}<span class="d">ninguém vê a usina no App</span></span>
     <span><span class="gc-rotulo">Pessoas de campo</span><span class="v">{{ r.pessoas }}</span><span class="d">{{ r.com_usina }} com usina</span></span>
     <span><span class="gc-rotulo">Apoios</span><span class="v">{{ r.apoios }}</span><span class="d">com data para acabar ou começar</span></span>
-    <span><span class="gc-rotulo">Com aviso</span><span class="v">{{ r.com_aviso }}</span><span class="d">usinas para o PCM olhar</span></span>
+    <span><span class="gc-rotulo">Com aviso</span>{{ kpi('com_aviso') }}<span class="d">usinas para o PCM olhar</span></span>
   </div>
   {% endif %}
 
@@ -61,51 +62,51 @@
   </form>
   {% endif %}
 
+  {# as abas Por usina e Por técnico trocam na própria página (pcm-tecnicos.js); a Comparação com o App é outra página #}
   <nav class="cn-abas" aria-label="Abas">
-    <a href="{{ url(ver='') }}"{% if ver == 'usina' %} aria-current="page"{% endif %}>Por usina<i>{{ chips.get('todas', 0) }}</i></a>
-    <a href="{{ url(ver='tecnico') }}"{% if ver == 'tecnico' %} aria-current="page"{% endif %}>Por técnico<i>{{ tecnicos|length }}</i></a>
+    <a href="{{ url(ver='') }}" data-aba="usina"{% if ver == 'usina' %} aria-current="page"{% endif %}>Por usina<i data-fl-conta="usina">{{ chips.get('todas', 0) }}</i></a>
+    <a href="{{ url(ver='tecnico') }}" data-aba="tecnico"{% if ver == 'tecnico' %} aria-current="page"{% endif %}>Por técnico<i data-fl-conta="tecnico">{{ tecnicos|length }}</i></a>
     {% if app.existe %}<a href="{{ url(ver='app') }}"{% if ver == 'app' %} aria-current="page"{% endif %}>Comparação com o App<i>{{ app.pendencias|length }}</i></a>{% endif %}
   </nav>
 
   {% if ver != 'app' %}
-  <form class="cn-filtros" method="get">
-    {% if ver == 'tecnico' %}<input type="hidden" name="ver" value="tecnico">{% endif %}
-    {% if ver == 'usina' %}
-    <div class="cn-seg" aria-label="Usinas">
-      <a href="{{ url(todas='') }}"{% if not todas %} aria-current="page"{% endif %}>Em operação</a>
-      <a href="{{ url(todas='1') }}"{% if todas %} aria-current="page"{% endif %}>Todas</a>
+  {# o filtro é na própria página (filtro-local.js, 17/10/2026): escolher não recarrega a tela #}
+  <form class="cn-filtros" method="get" id="tu-f" data-filtro-local>
+    <div class="cn-seg" aria-label="Usinas" data-fl-seg="tu-f" data-so-aba="usina"{% if ver != 'usina' %} hidden{% endif %}>
+      <a href="{{ url(todas='') }}" data-fl-todas="0"{% if not todas %} aria-current="page"{% endif %}>Em operação</a>
+      <a href="{{ url(todas='1') }}" data-fl-todas="1"{% if todas %} aria-current="page"{% endif %}>Todas</a>
     </div>
-    {% if todas %}<input type="hidden" name="todas" value="1">{% endif %}
-    {% endif %}
     {% for chave, rotulo in (('equipe', 'Equipe'), ('cliente', 'Cliente'), ('responsavel', 'Responsável')) %}
-    {% if not (ver == 'tecnico' and chave == 'responsavel') %}
+    <span class="tu-filtro"{% if chave == 'responsavel' %} data-so-aba="usina"{% if ver != 'usina' %} hidden{% endif %}{% endif %}>
     <label class="gc-rotulo" for="f-{{ chave }}">{{ rotulo }}</label>
-    <select class="gc-campo" id="f-{{ chave }}" name="{{ chave }}" onchange="this.form.submit()">
+    <select class="gc-campo" id="f-{{ chave }}" name="{{ chave }}" data-fl>
       <option value="">{{ 'Todos' if chave == 'responsavel' else 'Todas' }}</option>
-      {% for v, q in opcoes.get(chave, []) %}<option value="{{ v }}"{% if v == pedido[chave] %} selected{% endif %}>{{ v }}</option>{% endfor %}
+      {% set conta = dict(opcoes.get(chave, [])) %}
+      {% for v in opcoes_todas.get(chave, []) %}<option value="{{ v }}" data-rotulo="{{ v }}"{% if v == pedido[chave] %} selected{% endif %}>{{ v }} ({{ conta.get(v, 0) }})</option>{% endfor %}
     </select>
-    {% endif %}
+    </span>
     {% endfor %}
-    <input class="gc-campo" type="search" name="q" value="{{ pedido.q }}" aria-label="Buscar"
-           placeholder="{{ 'técnico' if ver == 'tecnico' else 'usina ou técnico' }}">
-    {% if pedido.situacao and ver == 'usina' %}<input type="hidden" name="situacao" value="{{ pedido.situacao }}">{% endif %}
-    {% if algum_filtro %}<a class="cn-filtro-ativo" href="{{ url(equipe='', cliente='', responsavel='', situacao='', q='') }}">Limpar filtros <span aria-hidden="true">×</span></a>{% endif %}
+    <input class="gc-campo" type="search" name="q" value="{{ pedido.q }}" aria-label="Buscar" data-fl-texto="contem"
+           placeholder="usina ou técnico" autocomplete="off">
+    <a class="cn-filtro-ativo" href="{{ raiz }}/t/pcm/tecnicos-por-usina" data-fl-limpar{% if not algum_filtro %} hidden{% endif %}>Limpar filtros <span aria-hidden="true">×</span></a>
   </form>
-  {% endif %}
 
-  {% if ver == 'usina' %}
-  <div class="cn-chips">
-    <a href="{{ url(situacao='') }}"{% if not pedido.situacao %} aria-current="page"{% endif %}>Todas <b>{{ chips.get('todas', 0) }}</b></a>
+  <section data-aba-secao="usina"{% if ver != 'usina' %} hidden{% endif %}>
+  <div class="cn-chips" data-fl-chips="tu-f" data-fl-chave="situacao">
+    <a href="{{ url(situacao='') }}" data-fl-chip=""{% if not pedido.situacao %} aria-current="page"{% endif %}>Todas <b>{{ chips.get('todas', 0) }}</b></a>
     {% for s, cor in (('com_tecnico', 'ok'), ('sem_tecnico', 'critico'), ('com_aviso', 'alerta')) %}
-    <a href="{{ url(situacao=s) }}"{% if pedido.situacao == s %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ situacoes[s] }}</span> <b>{{ chips.get(s, 0) }}</b></a>
+    <a href="{{ url(situacao=s) }}" data-fl-chip="{{ s }}"{% if pedido.situacao == s %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ situacoes[s] }}</span> <b>{{ chips.get(s, 0) }}</b></a>
     {% endfor %}
   </div>
-  <div class="cn-tab"><table class="cn-expande tu-tabela">
+  <div class="cn-tab"><table class="cn-expande tu-tabela" data-fl-grupo="tu-f" data-fl-nome="usina">
     <thead><tr><th>Cliente</th><th>Usina</th><th>Equipe</th><th>Responsável</th><th>Técnicos</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
     <tbody>
-    {% for l in linhas %}
+    {% for l in todas_linhas %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false" data-usina="{{ l.usina_id }}" data-usina-nome="{{ l.nome }}"
-          data-equipe="{{ l.equipe_id or '' }}" data-evid="{{ l.evidencia|map(attribute='pessoa_id')|join(',') }}">
+          data-equipe="{{ l.equipe_id or '' }}" data-evid="{{ l.evidencia|map(attribute='pessoa_id')|join(',') }}"
+          data-fl-linha{% if not l.op %} data-fl-fora="1"{% endif %} data-f-equipe="{{ l.equipe }}" data-f-cliente="{{ l.cliente }}"
+          data-f-responsavel="{{ l.responsavel }}" data-f-situacao="{{ 'com_tecnico' if l.tem_tecnico else 'sem_tecnico' }}{% if l.avisos %}|com_aviso{% endif %}"
+          data-f-busca="{{ l._busca }}"{% if not l._visivel %} hidden{% endif %}>
         <td class="tu-nw">{{ l.cliente }}</td>
         <td class="tu-usina"><span class="tu-nome">{{ l.nome }}</span>{% if todas and l.status != 'OPERAÇÃO' %}<span class="det">{{ l.status|lower or 'sem status' }}</span>{% endif %}</td>
         <td class="tu-nw">{{ l.equipe }}</td><td>{{ l.responsavel }}</td>
@@ -134,21 +135,26 @@
           <div><h3>Histórico</h3><div class="tu-hist-caixa" data-historico="{{ l.usina_id }}"><p class="mudo">Carregando…</p></div></div>
         </div>
       </td></tr>
-    {% else %}<tr><td colspan="7" class="mudo">Nenhuma usina com esses filtros.</td></tr>{% endfor %}
+    {% endfor %}
+    <tr data-fl-vazio="usina"{% if linhas %} hidden{% endif %}><td colspan="7" class="mudo">Nenhuma usina com esses filtros.</td></tr>
     </tbody></table></div>
+  </section>
 
-  {% elif ver == 'tecnico' %}
-  <div class="cn-tab"><table class="tu-tabela">
+  <section data-aba-secao="tecnico"{% if ver != 'tecnico' %} hidden{% endif %}>
+  <div class="cn-tab"><table class="tu-tabela" data-fl-grupo="tu-f" data-fl-nome="tecnico">
     <thead><tr><th>Pessoa</th><th>Cargo</th><th>Equipe</th><th>Usinas</th><th>Nº</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
     <tbody>
-    {% for t in tecnicos %}
-      <tr><td><span class="tu-nome">{{ t.nome }}</span></td><td>{{ t.cargo or '—' }}</td><td class="tu-nw">{{ t.equipe }}</td>
+    {% for t in todos_tecnicos %}
+      <tr data-fl-linha data-f-equipe="{{ t.equipe }}" data-f-cliente="{{ t.clientes|join('|') }}" data-f-busca="{{ t._busca }}"{% if not t._visivel %} hidden{% endif %}>
+        <td><span class="tu-nome">{{ t.nome }}</span></td><td>{{ t.cargo or '—' }}</td><td class="tu-nw">{{ t.equipe }}</td>
         <td><div class="tu-tecs">{% for u in t.usinas %}{{ selo(u, u.nome, None, '') }}{% else %}<span class="mudo">Nenhuma</span>{% endfor %}</div></td>
         <td class="m">{{ t.n_usinas }}</td>
         <td>{% if t.rondas or t.fechamentos %}{{ t.rondas }} {{ 'ronda' if t.rondas == 1 else 'rondas' }}<span class="det">{{ t.fechamentos }} {{ 'tarefa fechada' if t.fechamentos == 1 else 'tarefas fechadas' }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
         <td><span class="cn-st cn-t-{{ t.sit[0] }}">{{ t.sit[1] }}</span>{% if t.sem_email and t.sit[0] != 'alerta' %}<span class="det">sem e-mail</span>{% endif %}</td></tr>
-    {% else %}<tr><td colspan="7" class="mudo">Nenhuma pessoa de campo com esses filtros.</td></tr>{% endfor %}
+    {% endfor %}
+    <tr data-fl-vazio="tecnico"{% if tecnicos %} hidden{% endif %}><td colspan="7" class="mudo">Nenhuma pessoa de campo com esses filtros.</td></tr>
     </tbody></table></div>
+  </section>
 
   {% else %}
   <div class="cn-lista-cab"><h2>Pendências para a troca</h2><span class="mudo">o que o App tem e o Nexus não consegue dizer; o conserto é no cadastro do Nexus</span></div>
@@ -197,5 +203,6 @@
 </template>
 {% endif %}
 <script type="application/json" id="tu-dados">{{ {"pessoas": pessoas_json}|tojson }}</script>
+<script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
 <script src="{{ url_for('static', filename='pcm-tecnicos.js') }}"></script>
 {% endblock %}

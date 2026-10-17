@@ -138,3 +138,19 @@ def test_tabela_com_cliente_sem_regiao_e_sem_o_botao_tecnico_na_linha(app, banco
     assert cab.index("Cliente") < cab.index("Usina") and "Região" not in cab
     assert 'class="tu-mais"' not in html and "Pôr técnico" in html
     assert 'id="f-cliente"' in html and 'id="f-regiao"' not in html
+
+
+def test_o_filtro_e_na_pagina(app, banco, logado):
+    """Levi, 17/10: "sempre que vou puxar um filtro ele carrega o site de novo, deveria só filtrar os dados direto". As
+    linhas vão todas à página (as que não passam, escondidas), com o que cada filtro olha; as listas não mandam o
+    formulário; as duas abas estão na página."""
+    import re
+    html = logado.get(ROTA + "?equipe=SP+Norte+01").get_data(as_text=True)
+    assert "data-filtro-local" in html and "filtro-local.js" in html and "this.form.submit()" not in html
+    linhas = re.findall(r'<tr class="cn-linha"[^>]*>', html)
+    assert len(linhas) == 4                                           # as 4 usinas, a desmobilizada também
+    escondidas = [l for l in linhas if l.rstrip(">").endswith(" hidden")]
+    assert len(escondidas) == 2                                       # a da SC Oeste 01 e a fora de operação
+    assert all('data-f-equipe="' in l and 'data-f-situacao="' in l and 'data-f-busca="' in l for l in linhas)
+    assert sum('data-fl-fora="1"' in l for l in linhas) == 1
+    assert 'data-aba-secao="usina"' in html and 'data-aba-secao="tecnico"' in html

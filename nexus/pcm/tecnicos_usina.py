@@ -344,7 +344,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
         base = ler_base(meta)
     except SemCadastro as ex:
         return {"ver": ver, "linhas": [], "tecnicos": [], "total_usinas": 0, "pedido": pedido, "lido": lido,
-                "resumo": {}, "chips": {},
+                "resumo": {}, "resumo_op": {}, "resumo_todas": {}, "chips": {}, "todas_linhas": [],
+                "todos_tecnicos": [], "opcoes_todas": {k: [] for k in ("equipe", "cliente", "responsavel")},
                 "opcoes": {k: [] for k in FILTROS if k != "q"}, "todas": str(args.get("todas") or "") == "1",
                 "situacoes": dict(SITUACOES), "hoje": hoje, "pessoas_json": [],
                 "app": {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": []}, "livro_vazio": False,
@@ -355,7 +356,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     fr = _fracttal(base)
     ev, erro_ev = _evidencia(hoje, meta)
     todas = str(args.get("todas") or "") == "1"
-    usinas = _usinas(base, todas=todas)
+    # todas as usinas vão à página (as fora de operação escondidas): o filtro "Todas" é na própria página (17/10/2026)
+    usinas = _usinas(base, todas=True)
     ids = ({pid for (_u, pid, _p) in atuais} | {pid for e in ev.values() for pid in e}
            | {D._id(u.get(c)) for u in usinas.values() for c in ("tecnico_om_id", "responsavel_om_id")})
     nomes = base.nomes({i for i in ids if i})
@@ -412,7 +414,7 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                 avisos.append(f"{e['nome']} {'rondou' if e['rondas'] else 'fechou tarefa'} aqui e não está na lista")
         nome = nome_usina(uid)
         sit = ("critico", "Sem técnico") if not tem else ("alerta", "Com aviso") if avisos else ("ok", "Com técnico")
-        linhas.append({"sit": sit, "usina_id": uid, "nome": nome, "status": D._txt(u.get("status")), "equipe_id": eid,
+        linhas.append({"sit": sit, "op": D._txt(u.get("status")).upper() == visao.STATUS_OPERACAO, "usina_id": uid, "nome": nome, "status": D._txt(u.get("status")), "equipe_id": eid,
                        "cliente": base.nome_cliente.get(D._id(u.get("cliente_id"))) or SEM_CLIENTE,
                        "equipe": base.nome_equipe.get(eid) or SEM_EQUIPE, "regiao": reg.get("nome") or SEM_REGIAO,
                        "responsavel": nome_pessoa(resp) if resp else SEM_RESPONSAVEL,
@@ -421,6 +423,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                        "evidencia": evidencia, "avisos": avisos,
                        "_busca": norm(" ".join([nome] + [t["nome"] for t in tecnicos]))})
     linhas.sort(key=lambda l: norm(l["nome"]))
+    todas_linhas = linhas
+    linhas = [l for l in todas_linhas if todas or l["op"]]          # o escopo: em operação, ou todas
 
     tecnicos_v, todos_v = [], []
     # a aba Por técnico mostra a conta mesmo na aba Por usina, e o topo conta todas as pessoas de campo
@@ -439,6 +443,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
              "sit": sit, "n_usinas": len(us), "sem_email": not p["hmac"],
              "rondas": sum(e.get(pid, {}).get("rondas", 0) for e in ev.values()),
              "fechamentos": sum(e.get(pid, {}).get("fechamentos", 0) for e in ev.values())}
+        t["clientes"] = sorted({cliente_de.get(u["usina_id"]) or SEM_CLIENTE for u in us}, key=norm)
+        t["_busca"] = norm(p["nome"])
         todos_v.append(t)
         # na visão por técnico, o cliente filtra quem tem usina dele
         if not ((pedido["equipe"] and eq != pedido["equipe"])
@@ -458,15 +464,32 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     if erro_ev:
         avisos_gerais.append(f"A evidência de campo não foi lida agora ({erro_ev}): a lista e os avisos de técnico "
                              "seguem valendo.")
-    # o topo, como o da tela de PT: o universo da tela (as usinas da lista e as pessoas de campo), sem os filtros
-    resumo = {"usinas": len(linhas), "com_tecnico": sum(l["tem_tecnico"] for l in linhas),
-              "sem_tecnico": sum(not l["tem_tecnico"] for l in linhas), "com_aviso": sum(bool(l["avisos"]) for l in linhas),
-              "pessoas": len(todos_v), "com_usina": sum(bool(t["usinas"]) for t in todos_v),
-              "apoios": sum(1 for x in atuais.values() if D._txt(x.get("ate_data_id")) or x["status"] == "agendado")}
+    # o topo, como o da tela de PT: o universo da tela (as usinas da lista e as pessoas de campo), sem os filtros; as duas
+    # contas (em operação e todas) vão à página, que troca ao clicar em "Todas"
+    def _resumo(ls):
+        return {"usinas": len(ls), "com_tecnico": sum(l["tem_tecnico"] for l in ls),
+                "sem_tecnico": sum(not l["tem_tecnico"] for l in ls), "com_aviso": sum(bool(l["avisos"]) for l in ls),
+                "pessoas": len(todos_v), "com_usina": sum(bool(t["usinas"]) for t in todos_v),
+                "apoios": sum(1 for x in atuais.values() if D._txt(x.get("ate_data_id")) or x["status"] == "agendado")}
+    resumo_op, resumo_todas = _resumo([l for l in todas_linhas if l["op"]]), _resumo(todas_linhas)
+    resumo = resumo_todas if todas else resumo_op
     opcoes = _opcoes(linhas, pedido)
+    visiveis = {id(l) for l in linhas if _passa(l, pedido)}
+    for l in todas_linhas:
+        l["_visivel"] = id(l) in visiveis
+    vis_t = {id(t) for t in tecnicos_v}
+    for t in todos_v:
+        t["_visivel"] = id(t) in vis_t
+    # as listas dos filtros: todo valor de toda usina (a escolha de "Todas" é na página); as contas, a página refaz
+    opcoes_todas = {k: sorted({l[k] for l in todas_linhas} | ({pedido[k]} if pedido[k] else set()), key=norm)
+                    for k in ("equipe", "cliente", "responsavel")}
+    opcoes_todas["cliente"] = sorted(set(opcoes_todas["cliente"]) | {c for t in todos_v for c in t["clientes"]}, key=norm)
+    opcoes_todas["equipe"] = sorted(set(opcoes_todas["equipe"]) | {t["equipe"] for t in todos_v}, key=norm)
     chips = dict(opcoes["situacao"], todas=sum(1 for l in linhas if _passa(l, pedido, menos="situacao")))
     return {"ver": ver, "linhas": [l for l in linhas if _passa(l, pedido)], "tecnicos": tecnicos_v, "lido": lido,
-            "resumo": resumo, "chips": chips,
+            "resumo": resumo, "resumo_op": resumo_op, "resumo_todas": resumo_todas, "chips": chips,
+            "todas_linhas": todas_linhas, "todos_tecnicos": sorted(todos_v, key=lambda t: norm(t["nome"])),
+            "opcoes_todas": opcoes_todas,
             "total_usinas": len(linhas), "pedido": pedido, "opcoes": opcoes, "todas": todas,
             "situacoes": dict(SITUACOES), "hoje": hoje,
             "pessoas_json": sorted(({"id": pid, "nome": p["nome"], "equipe_id": p["equipe_id"]}
