@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Histórico de motivos{% endblock %}
 {% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
 {# Fora da programação > Histórico (16/10/2026, Levi: "mas salva um histórico de motivos no fora da programação >
    histórico"). Cada período de motivo de cada tarefa, do mais novo ao mais antigo, e como acabou: o livro dos motivos só
@@ -8,18 +9,14 @@
    recorte e o mesmo filtro do painel; a OS e o nº de 5 a 6 dígitos da observação abrem o card da OS. As contas:
    motivos.episodios e telas._ctx_historico. #}
 {% macro selo(nome, tira) %}<span class="q-mp{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
-<p class="gc-eyebrow">PCM · Fora da programação</p>
-<div class="pcm-topo">
-  <div>
-    <h1 class="titulo-pagina">Histórico de motivos</h1>
-    <p class="pcm-sub">Cada vez que uma tarefa ficou com um motivo, de quando a quando e como saiu. Nada se apaga: o que
-      retorna à programação, troca de motivo ou é finalizado no Fracttal sai do painel e fica aqui.</p>
-  </div>
-  <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao"><i class="ph ph-arrow-left"></i> Fora da programação</a>
-</div>
+<div class="campo-nativa">
+{% with parte="cab", aba="historico", n=None %}{% include "pcm/_fora_topo.html" %}{% endwith %}
+{% with parte="abas", aba="historico", n=linhas|length %}{% include "pcm/_fora_topo.html" %}{% endwith %}
+<p class="pcm-sub fp-sub">Cada vez que uma tarefa ficou com um motivo, de quando a quando e como saiu. Nada se apaga: o que
+  retorna à programação, troca de motivo ou é finalizado no Fracttal sai do painel e fica aqui.</p>
 
-{% if erro_banco %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler os
-  motivos no banco.</strong> {{ erro_banco }}.</div></div>{% endif %}
+{% if erro_banco %}<div class="cn-erro" role="alert"><span><b>Não consegui ler os
+  motivos no banco.</b> {{ erro_banco }}.</span></div>{% endif %}
 
 {% with ver="historico" %}{% include "pcm/_fora_filtros.html" %}{% endwith %}
 
@@ -28,8 +25,7 @@
   · a Gestão PCM não abriu agora: a finalizada no Fracttal aparece como "ainda no painel"{% endif %}</p>
 
 {% if linhas %}
-<div class="pcm-rolagem">
-  <table class="pcm-tabela fp-tab fp-tab--hist">
+<div class="cn-tab"><table class="fp-tab fp-tab--hist">
     <thead><tr>
       <th>Período</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th><th>Observação</th>
       <th>Quem marcou</th><th>Como saiu</th>
@@ -49,8 +45,7 @@
       </tr>
     {% endfor %}
     </tbody>
-  </table>
-</div>
+  </table></div>
 {% include "oscreator/card_os_abrir.html" %}
 <script>
 (function () {
@@ -71,4 +66,5 @@
 {% else %}
 <p class="q-vazio">{% if algum_filtro %}Nenhum período com esses filtros.{% else %}Nenhuma tarefa teve motivo ainda.{% endif %}</p>
 {% endif %}
+</div>
 {% endblock %}

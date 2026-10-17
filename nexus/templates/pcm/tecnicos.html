@@ -33,13 +33,13 @@
       <p class="cn-pergunta">Quem vê e pode rondar cada usina no App? Quem esteve lá nos últimos 30 dias?</p></div>
     <div class="cn-frescor">cadastro, rondas e decisões do banco<br><b>lido às {{ lido }}</b></div>
   </div>
-  {% if ok %}<div class="cn-certo" role="status"><b>{{ ok }}</b></div>{% endif %}
-  {% if erro_acao %}<div class="cn-erro" role="alert"><b>{{ erro_acao }}</b></div>{% endif %}
-  {% if erro_cadastro %}<div class="cn-erro" role="alert"><b>Não consegui ler o cadastro no banco</b> ({{ erro_cadastro }}).
-    Sem ele a tela não sabe as usinas nem as pessoas, e nada se grava. Tente de novo em instantes.</div>{% endif %}
-  {% if erro %}<div class="cn-erro" role="alert"><b>Não consegui ler os técnicos por usina no banco.</b> {{ erro }}. Enquanto
-    isso, nada se grava.</div>{% endif %}
-  {% for a in avisos_gerais %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
+  {% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
+  {% if erro_acao %}<div class="cn-erro" role="alert"><span><b>{{ erro_acao }}</b></span></div>{% endif %}
+  {% if erro_cadastro %}<div class="cn-erro" role="alert"><span><b>Não consegui ler o cadastro no banco</b> ({{ erro_cadastro }}).
+    Sem ele a tela não sabe as usinas nem as pessoas, e nada se grava. Tente de novo em instantes.</span></div>{% endif %}
+  {% if erro %}<div class="cn-erro" role="alert"><span><b>Não consegui ler os técnicos por usina no banco.</b> {{ erro }}. Enquanto
+    isso, nada se grava.</span></div>{% endif %}
+  {% for a in avisos_gerais %}<div class="cn-erro cn-aviso" role="status"><span>{{ a }}</span></div>{% endfor %}
 
   {% set r = resumo %}
   {% if r %}

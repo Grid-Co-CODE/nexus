@@ -1257,9 +1257,16 @@ def _ctx_fora(cfg, args) -> dict:
                                               M.norm(l["tarefa"])))
     opcoes = [(m["id"], m["nome"], conta.get(m["id"], 0)) for m in motivos if conta.get(m["id"]) or m["id"] == sel]
     aviso = session.pop("pcm_motivos_aviso", None) or {}
+    n_tira = sum(1 for l in mostradas if l["tira"])
+    # os números do topo, no estilo da tela de PT (Levi, 17/10/2026: "Quero mesmo estilo de tabela em Fora da
+    # programação"): o que está na tabela agora (com os filtros)
+    dias = [l["dias"] for l in mostradas if l.get("dias") is not None]
+    resumo = {"fora": n_tira, "so_app": len(mostradas) - n_tira, "mais_antiga": max(dias) if dias else None,
+              "justificativas": sum(l.get("vezes") or 0 for l in mostradas), "finalizadas": finalizadas}
     return {"linhas": mostradas, "total": len(linhas), "motivos": motivos, "opcoes": opcoes, "sel": sel,
+            "resumo": resumo, "lido": datetime.now(_BRT).strftime("%H:%M"),
             "pedido": pedido, "opcoes_f": opcoes_f, "algum_filtro": any(pedido.values()),
-            "n_tira": sum(1 for l in mostradas if l["tira"]),
+            "n_tira": n_tira,
             "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
             "gestao_ok": g is not None, "pode": pode_marcar(), "pode_cadastro": pode_programar(),
             "repo": M.estado_no_repositorio(cfg, est),
@@ -1309,7 +1316,7 @@ def _ctx_historico(cfg, args) -> dict:
             "algum_filtro": any(pedido.values()),
             "opcoes": sorted(((i, n, conta[i]) for i, n in nomes.items()), key=lambda o: M.norm(o[1])),
             "abertos": sum(1 for l in linhas if l["saida_tom"] == "alerta"), "erro_banco": est.get("erro") or "",
-            "gestao_ok": g is not None}
+            "gestao_ok": g is not None, "lido": datetime.now(_BRT).strftime("%H:%M")}
 
 
 def _ctx_cadastro(cfg) -> dict:
@@ -1321,4 +1328,4 @@ def _ctx_cadastro(cfg) -> dict:
     aviso = session.pop("pcm_motivos_aviso", None) or {}
     return {"motivos": [dict(m, n=conta.get(m["id"], 0)) for m in M.ativos(est)], "inicial": est.get("inicial"),
             "erro_banco": est.get("erro") or "", "pode": pode_programar(), "ok": aviso.get("ok"),
-            "erro": aviso.get("erro")}
+            "erro": aviso.get("erro"), "lido": datetime.now(_BRT).strftime("%H:%M")}

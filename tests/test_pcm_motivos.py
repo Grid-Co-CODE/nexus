@@ -466,7 +466,7 @@ def test_painel_sem_marcar_pela_os_e_a_tabela_da_2a_rodada(app, logado, tela):
     assert "Marcar pela OS" not in html and "Ver as tarefas" not in html
     assert html.count('name="os"') == 1 and 'id="f-os"' in html                  # o único "os" é o filtro da OS
     assert "Os motivos se marcam no Nexus" not in html and "<details>" not in html
-    assert 'class="pcm-tabela fp-tab"' in html and '<th class="fp-esq">Tarefa</th>' in html
+    assert '<div class="cn-tab"><table class="fp-tab">' in html and '<th class="fp-esq">Tarefa</th>' in html
     assert 'class="fp-mais-b"' in html and "Retornar à programação" in html and 'class="fp-tirar"' not in html
     antes = len(M.vigentes(app.config, M.ler(app.config, forcar=True)))
     r = logado.post("/t/pcm/fora-da-programacao/marcar", data={"os": "7", "tarefa": "Limpeza do inversor",
@@ -854,3 +854,25 @@ def test_filtros_tecnico_equipe_os_usina_responsavel_no_painel_e_no_historico(ap
     h, os_ = linhas("/t/pcm/fora-da-programacao?ver=historico&responsavel=Gestora Um")
     assert os_ == ["5"]
 
+
+
+def test_fora_no_estilo_da_tela_de_pt(app, logado, tela):
+    """Levi, 17/10/2026: "Quero mesmo estilo de tabela em Fora da programação" (o da tela de PT e APR, como o Técnicos
+    por usina): o cabeçalho, os números do topo, as abas Painel, Histórico e Cadastro de motivos e a tabela do Campo."""
+    am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando material")
+    M.marcar(app.config, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine",
+                          "usina": "Cliente A - Usina 1 - SP"}, am, "", PESSOA)
+    html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    assert 'class="campo-nativa"' in html and 'class="cn-numeros"' in html and 'class="cn-filtros fp-filtros"' in html
+    abas = html.split('class="cn-abas"', 1)[1].split("</nav>", 1)[0]
+    assert abas.index("Painel") < abas.index("Histórico") < abas.index("Cadastro de motivos")
+    assert 'aria-current="page">Painel' in abas
+    ctx = None
+    with app.test_request_context():
+        from nexus.pcm import telas as TL
+        ctx = TL._ctx_fora(app.config, {})
+    assert ctx["resumo"]["fora"] == 1 and ctx["resumo"]["so_app"] == 0 and ctx["resumo"]["justificativas"] == 1
+    for ver, aba in (("historico", "Histórico"), ("cadastro", "Cadastro de motivos")):
+        h = " ".join(logado.get(f"/t/pcm/fora-da-programacao?ver={ver}").get_data(as_text=True).split())
+        assert 'class="campo-nativa"' in h and f'aria-current="page">{aba}' in h, ver
+        assert 'class="cn-tab"' in h, ver

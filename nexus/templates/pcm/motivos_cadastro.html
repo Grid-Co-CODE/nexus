@@ -1,37 +1,33 @@
 {% extends "base.html" %}
 {% block titulo %}Cadastro de motivos{% endblock %}
 {% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
 {# O cadastro dos motivos das tarefas (16/10/2026, Levi: "Também temos que ter um canto no PCM onde podemos controlar todos
    esses motivos e adicionar ou tirar motivos!"; muda o cadastro o administrador e o setor PCM). Tirar não apaga: marca
    excluido = sim e o ID não volta (nexus/pcm/motivos.py). #}
-<p class="gc-eyebrow">PCM · Fora da programação</p>
-<div class="pcm-topo">
-  <div>
-    <h1 class="titulo-pagina">Cadastro de motivos</h1>
-    <p class="pcm-sub">Os motivos que o PCM e os supervisores marcam nas tarefas. "Tira da programação" = a tarefa com o
-      motivo não entra na geração da semana e, na semana em curso, o robô do PCM a tira.</p>
-  </div>
-  <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/pcm/fora-da-programacao"><i class="ph ph-arrow-left"></i> Fora da programação</a>
-</div>
+<div class="campo-nativa">
+{% with parte="cab", aba="cadastro", n=None %}{% include "pcm/_fora_topo.html" %}{% endwith %}
+{% with parte="abas", aba="cadastro", n=motivos|length %}{% include "pcm/_fora_topo.html" %}{% endwith %}
+<p class="pcm-sub fp-sub">Os motivos que o PCM e os supervisores marcam nas tarefas. "Tira da programação" = a tarefa com o
+  motivo não entra na geração da semana e, na semana em curso, o robô do PCM a tira.</p>
 
-{% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}</div></div>{% endif %}
-{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
-{% if erro_banco %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler o
-  cadastro no banco.</strong> {{ erro_banco }}. A lista abaixo pode não ser a de agora; nada se grava até a leitura voltar.</div></div>
+{% if ok %}<div class="cn-certo" role="status"><span>{{ ok }}</span></div>{% endif %}
+{% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
+{% if erro_banco %}<div class="cn-erro" role="alert"><span><b>Não consegui ler o
+  cadastro no banco.</b> {{ erro_banco }}. A lista abaixo pode não ser a de agora; nada se grava até a leitura voltar.</span></div>
 {% elif inicial %}<p class="pcm-fonte"><i class="ph ph-info"></i><span>Este é o cadastro inicial, com os 12 motivos pedidos em
   16/10/2026. Ele vai ao banco junto com a primeira marca ou a primeira mudança aqui.</span></p>{% endif %}
 
-<div class="pcm-rolagem">
-  <table class="pcm-tabela">
-    <thead><tr><th>Motivo</th><th>Descrição</th><th>Tira da programação</th><th class="num">Tarefas com ele</th>{% if pode %}<th></th>{% endif %}</tr></thead>
+<div class="cn-tab"><table class="fp-cad">
+    <thead><tr><th>Motivo</th><th class="fp-esq">Descrição</th><th>Tira da programação</th><th>Tarefas com ele</th>{% if pode %}<th></th>{% endif %}</tr></thead>
     <tbody>
     {% for m in motivos %}
       <tr>
         <td><span class="q-mp{% if m.tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if m.tira else 'tag' }}"></i>{{ m.nome }}</span></td>
-        <td>{{ m.descricao or '—' }}</td>
-        <td>{{ 'Sim' if m.tira else 'Não' }}</td>
-        <td class="num">{{ m.n }}</td>
+        <td class="fp-esq">{{ m.descricao or '—' }}</td>
+        <td>{% if m.tira %}<span class="cn-st cn-t-critico">Sim</span>{% else %}<span class="cn-st cn-t-neutro">Não</span>{% endif %}</td>
+        <td class="m">{{ m.n }}</td>
         {% if pode %}
         <td class="fp-acoes">
           <details>
@@ -62,8 +58,7 @@
       </tr>
     {% endfor %}
     </tbody>
-  </table>
-</div>
+  </table></div>
 
 {% if pode %}
 <section class="pcm-passo">
@@ -81,4 +76,5 @@
 {% else %}
 <p class="gc-ajuda"><i class="ph ph-lock-key"></i> Quem muda o cadastro é o administrador e o setor PCM.</p>
 {% endif %}
+</div>
 {% endblock %}

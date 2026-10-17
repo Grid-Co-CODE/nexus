@@ -173,7 +173,11 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   16/10, os gestores de contrato Camila Viana e Danuth Fernandes); OS = o número digitado (só os dígitos, igual). As
   listas mostram só o que existe, com quantas linhas têm cada um; os filtros somam; cada formulário da tabela leva os
   que valem (`v_<filtro>`), e a tela volta filtrada depois de salvar. Seis filtros e o Limpar cabem numa linha a 1366 px. A tabela (Levi,
-  16/10, 2ª e 3ª rodadas), tudo centrado menos a Tarefa e sem a coluna Editar que abria a linha:
+  16/10, 2ª e 3ª rodadas), tudo centrado menos a Tarefa e sem a coluna Editar que abria a linha. **No estilo da tela de
+  PT do Campo** (Levi, 17/10/2026: "Quero mesmo estilo de tabela em Fora da programação"; o `campo.css`, como o Técnicos
+  por usina): o cabeçalho com a hora da leitura, os números do topo (fora da programação, só justificativa do App, a mais
+  antiga, justificativas, finalizadas; o que está na tabela, com os filtros), as abas Painel, Histórico e Cadastro de
+  motivos (`_fora_topo.html`, no lugar dos botões de cada visão) e os filtros e a tabela do Campo:
   - a usina só com o nome ("Thopen - Parelhas 1 - RN" vira "Parelhas 1"; o nome inteiro no title); o "Desde" com a
     hora; abaixo da tarefa só o tipo e a situação no Fracttal (o código do ativo, ou "todos os ativos da OS", no title:
     é o que separa duas linhas iguais da mesma OS);

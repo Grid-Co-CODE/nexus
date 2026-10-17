@@ -1,0 +1,18 @@
+{# O cabeçalho do Fora da programação, no estilo da tela de PT do Campo (Levi, 17/10/2026: "Quero mesmo estilo de tabela
+   em Fora da programação"): o título, a hora da leitura e as abas Painel, Histórico e Cadastro de motivos (antes eram
+   botões no alto de cada visão). Em duas partes, como na tela de PT (o título, os avisos e os números, depois as abas):
+   parte ("cab" | "abas"); aba ("painel" | "historico" | "cadastro"), n (a conta da aba aberta) e lido. #}
+{% if parte == 'cab' %}
+<div class="cn-cab">
+  <div><p class="gc-eyebrow">PCM · Programação semanal</p><h1 class="cn-titulo">Fora da programação</h1>
+    <p class="cn-pergunta">Que tarefa saiu da programação por um motivo de espera, e desde quando? O que os técnicos
+      justificaram pelo App?</p></div>
+  <div class="cn-frescor">motivos do banco<br><b>lido às {{ lido }}</b></div>
+</div>
+{% else %}
+<nav class="cn-abas" aria-label="Abas">
+  {% for chave, rotulo, sufixo in (('painel', 'Painel', ''), ('historico', 'Histórico', '?ver=historico'), ('cadastro', 'Cadastro de motivos', '?ver=cadastro')) %}
+  <a href="{{ raiz }}/t/pcm/fora-da-programacao{{ sufixo }}"{% if aba == chave %} aria-current="page"{% endif %}>{{ rotulo }}{% if aba == chave and n is not none %}<i>{{ n }}</i>{% endif %}</a>
+  {% endfor %}
+</nav>
+{% endif %}

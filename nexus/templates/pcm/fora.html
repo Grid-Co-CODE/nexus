@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Fora da programação{% endblock %}
 {% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
 {# Fora da programação (16/10/2026, Levi: "temos que montar um painel de acompanhamento as OSs que saíram da programação
    por esses motivos!"). As tarefas com um motivo que tira da programação (o cadastro diz quais) e toda justificativa que
@@ -12,38 +13,40 @@
    do OS Creator (oscreator/card_os_abrir.html), a linha de baixo da tarefa sem o código do ativo (fica no title) e o
    "Retornar à programação" no menu de três pontos do fim da linha. O dado e as regras: nexus/pcm/motivos.py; as contas da tela: telas._ctx_fora. #}
 {% macro selo(nome, tira) %}<span class="q-mp{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
-<p class="gc-eyebrow">PCM · Programação semanal</p>
-<div class="pcm-topo">
-  <div>
-    <h1 class="titulo-pagina">Fora da programação</h1>
-    <p class="pcm-sub">Tarefas tiradas da programação por um motivo de espera e as justificativas que os técnicos mandam
-      pelo App, de qualquer motivo. A tirada volta à programação quando o motivo sai; todas somem daqui quando são
-      finalizadas no Fracttal.</p>
-  </div>
-  <div class="fp-topo-bts">
-    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/pcm/fora-da-programacao?ver=historico"><i class="ph ph-clock-counter-clockwise"></i> Histórico</a>
-    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/pcm/fora-da-programacao?ver=cadastro"><i class="ph ph-list-checks"></i> Cadastro de motivos</a>
-  </div>
-</div>
+<div class="campo-nativa">
+{% with parte="cab", aba="painel", n=None %}{% include "pcm/_fora_topo.html" %}{% endwith %}
 
-{% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}</div></div>{% endif %}
-{% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
-{% if erro_banco %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler os
-  motivos no banco.</strong> {{ erro_banco }}. Enquanto isso, nada se marca.</div></div>{% endif %}
-{% if ilegiveis %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-lock-key"></i><div>{{ ilegiveis }}
-  {{ 'marca não abriu' if ilegiveis == 1 else 'marcas não abriram' }} com a chave deste Nexus e {{ 'ficou' if ilegiveis == 1 else 'ficaram' }} de fora.</div></div>{% endif %}
+{% if ok %}<div class="cn-certo" role="status"><span>{{ ok }}</span></div>{% endif %}
+{% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
+{% if erro_banco %}<div class="cn-erro" role="alert"><span><b>Não consegui ler os
+  motivos no banco.</b> {{ erro_banco }}. Enquanto isso, nada se marca.</span></div>{% endif %}
+{% if ilegiveis %}<div class="cn-erro cn-aviso" role="status"><span>{{ ilegiveis }}
+  {{ 'marca não abriu' if ilegiveis == 1 else 'marcas não abriram' }} com a chave deste Nexus e {{ 'ficou' if ilegiveis == 1 else 'ficaram' }} de fora.</span></div>{% endif %}
 
-{% if repo.erro %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div>Não consegui conferir o arquivo do
-  robô do PCM: {{ repo.erro }}.</div></div>
-{% elif not repo.existe %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>O arquivo
-  ainda não existe no repositório</strong>: sem ele o Justificar do App de Campo fica sem a lista de motivos.</div></div>
-{% elif not repo.em_dia %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>O arquivo do
-  repositório está desatualizado</strong>: a última mudança não chegou ao robô do PCM.</div></div>{% endif %}
+{% if repo.erro %}<div class="cn-erro cn-aviso" role="status"><span>Não consegui conferir o arquivo do
+  robô do PCM: {{ repo.erro }}.</span></div>
+{% elif not repo.existe %}<div class="cn-erro" role="alert"><span><b>O arquivo
+  ainda não existe no repositório</b>: sem ele o Justificar do App de Campo fica sem a lista de motivos.</span></div>
+{% elif not repo.em_dia %}<div class="cn-erro cn-aviso" role="status"><span><b>O arquivo do
+  repositório está desatualizado</b>: a última mudança não chegou ao robô do PCM.</span></div>{% endif %}
 {% if pode and not repo.em_dia %}
 <form class="pcm-passo-pe" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/publicar">
   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-github-logo"></i> Mandar o arquivo de novo</button>
 </form>
 {% endif %}
+
+{% set r = resumo %}
+<div class="cn-numeros">
+  <span><span class="gc-rotulo">Fora da programação</span><span class="v{% if r.fora %} ruim{% endif %}">{{ r.fora }}</span><span class="d">tarefas tiradas por um motivo de espera</span></span>
+  <span><span class="gc-rotulo">Só justificativa do App</span><span class="v">{{ r.so_app }}</span><span class="d">seguem programadas</span></span>
+  <span><span class="gc-rotulo">Mais antiga</span><span class="v">{{ '—' if r.mais_antiga is none else (r.mais_antiga ~ (' dia' if r.mais_antiga == 1 else ' dias')) }}</span><span class="d">com o motivo</span></span>
+  <span><span class="gc-rotulo">Justificativas</span><span class="v">{{ r.justificativas }}</span><span class="d">uma por dia e motivo</span></span>
+  <span><span class="gc-rotulo">Finalizadas</span><span class="v">{{ r.finalizadas }}</span><span class="d">saíram daqui pelo Fracttal</span></span>
+</div>
+{% with parte="abas", aba="painel", n=linhas|length %}{% include "pcm/_fora_topo.html" %}{% endwith %}
+<p class="pcm-sub fp-sub">Tarefas tiradas da programação por um motivo de espera e as justificativas que os técnicos mandam
+  pelo App, de qualquer motivo. A tirada volta à programação quando o motivo sai; todas somem daqui quando são
+  finalizadas no Fracttal.</p>
 
 {% with ver="" %}{% include "pcm/_fora_filtros.html" %}{% endwith %}
 {# os filtros que estão valendo vão junto em cada formulário da tabela: depois de salvar, a tela volta filtrada #}
@@ -56,8 +59,7 @@
   · a Gestão PCM não abriu agora: as finalizadas no Fracttal também aparecem{% endif %}</p>
 
 {% if linhas %}
-<div class="pcm-rolagem">
-  <table class="pcm-tabela fp-tab">
+<div class="cn-tab"><table class="fp-tab">
     <thead><tr>
       <th>Desde</th><th>Dias</th><th>OS</th><th>Usina</th><th class="fp-esq">Tarefa</th><th>Motivo</th>
       <th title="Quantas vezes a tarefa foi justificada: uma por dia e motivo">Vezes</th><th>Observação</th>
@@ -122,8 +124,7 @@
       {% endif %}
     {% endfor %}
     </tbody>
-  </table>
-</div>
+  </table></div>
 {% include "oscreator/card_os_abrir.html" %}
 <script>
 (function () {
@@ -187,7 +188,7 @@
       alvo.hidden = !abrir;
       b.setAttribute('aria-expanded', abrir ? 'true' : 'false');
       // em tela estreita a tabela rola para o lado: a lista começa na 1ª coluna, então volta para o começo
-      var rol = b.closest('.pcm-rolagem');
+      var rol = b.closest('.cn-tab');
       if (abrir && rol) rol.scrollLeft = 0;
     });
   });
@@ -207,4 +208,5 @@
 <p class="q-vazio">{% if algum_filtro %}Nenhuma tarefa com esses filtros.{% else %}Nenhuma tarefa fora da programação nem justificativa do App.{% endif %}</p>
 {% endif %}
 {% if not pode %}<p class="gc-ajuda"><i class="ph ph-lock-key"></i> Mexem nos motivos o PCM, os supervisores (setor Responsáveis UFV) e o administrador.</p>{% endif %}
+</div>
 {% endblock %}

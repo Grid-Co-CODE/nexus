@@ -661,7 +661,11 @@ html.pgp-aberto{overflow:hidden}
 .q-pend-t[data-abrir]{cursor:pointer}
 .q-pend-t[data-abrir]:hover{color:var(--tinta)}
 .q-pend-t[data-abrir]:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
-.fp-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px}
+/* os filtros na linha da tela de PT do Campo (cn-filtros, 17/10/2026); a lista estreita para caber a 1366 px */
+.fp-filtros{margin-bottom:12px}
+.fp-sub{margin-top:14px}
+.cn-tab table.fp-cad{min-width:760px}
+.fp-cad td.fp-esq,.fp-cad th.fp-esq{text-align:left}
 .fp-topo-bts{display:flex;gap:8px;flex-wrap:wrap}
 /* o Histórico (16/10/2026): como o período acabou, com quem tirou embaixo */
 .fp-saida{min-width:110px;max-width:150px}
