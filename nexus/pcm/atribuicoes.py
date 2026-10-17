@@ -254,9 +254,13 @@ def _linha(cfg, p: dict, quem_hmac: str, origem: str, agora: datetime, hoje: int
     vale_agora = bool(ult) and (uid, pid, papel) in atuais({"decisoes": [ult]}, hoje)
     if not na and not vale_agora:
         raise Recusada("Essa pessoa já não está nesta usina (alguém mudou agora): atualize a página.")
+    # a mesma decisão não grava de novo; o nome da usina no Fracttal e o código da pessoa contam (é o que o App lê:
+    # a reemissão depois de a usina mudar de nome no Fracttal precisa gravar)
     if ult is not None and _sim(ult.get("na_usina")) == na and (
             not na or (vale_agora and _int_ou_none(ult.get("de_data_id")) == de
-                       and _int_ou_none(ult.get("ate_data_id")) == ate)):
+                       and _int_ou_none(ult.get("ate_data_id")) == ate
+                       and D._txt(ult.get("usina_fracttal")) == D._txt(p.get("usina_fracttal"))
+                       and D._txt(ult.get("pessoa_hmac")) == D._txt(p.get("pessoa_hmac")))):
         return None
     quando = _iso(agora)
     nova = {"decidida_em": quando, "data_id": _data_id(agora), "usina_id": uid,

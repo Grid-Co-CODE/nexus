@@ -159,3 +159,16 @@ def test_decidir_varias_grava_uma_vez(cfg, monkeypatch):
     assert len(chamadas) == 1
     dec = A.ler(cfg, forcar=True)["decisoes"]
     assert len(dec) == 3 and {d["origem"] for d in dec} == {"carga_inicial"}
+
+
+def test_novo_nome_no_fracttal_ou_novo_codigo_grava_de_novo(cfg, monkeypatch):
+    """A reemissão (a usina mudou de nome no Fracttal) e o e-mail corrigido no cadastro mudam o que o App lê: não é a
+    "mesma decisão"."""
+    Relogio(monkeypatch)
+    _por(cfg, 10)
+    r = A.decidir(cfg, usina_id=1, usina_fracttal="Cliente A - Usina 1 - SP (novo)", pessoa_id=10,
+                  pessoa_hmac=f"{10:024d}", na_usina=True, usuario=PESSOA, origem="reemissao")
+    assert r["gravou"] is True
+    assert A.decidir(cfg, usina_id=1, usina_fracttal="Cliente A - Usina 1 - SP (novo)", pessoa_id=10,
+                     pessoa_hmac="f" * 24, na_usina=True, usuario=PESSOA)["gravou"] is True
+    assert _atuais(cfg)[(1, 10, "executa")]["usina_fracttal"] == "Cliente A - Usina 1 - SP (novo)"
