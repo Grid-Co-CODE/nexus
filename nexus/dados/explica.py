@@ -42,6 +42,7 @@ RESUMO = {
     "decisao_curadoria_pcm": "O que a reunião de PCM decidiu sobre cada MPA e MPS acompanhada",
     "decisao_motivo_pcm": "O motivo de cada tarefa do PCM, e as que saíram da programação por ele",
     "decisao_backoffice_pcm": "Quem é do backoffice: as OS dessas pessoas ficam fora da programação",
+    "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -136,6 +137,9 @@ PARA_QUE = {
     "decisao_backoffice_pcm": "Guarda quem entra e quem sai da lista do backoffice, mantida no Gerar a semana: a OS "
                               "cujo responsável no Fracttal é alguém da lista não entra na programação da semana. O "
                               "nome vai cifrado.",
+    "decisao_atribuicao_pcm": "Guarda cada vez que o PCM põe ou tira um técnico de uma usina na tela Técnicos por "
+                              "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
+                              "App de Campo: o App lê daqui. A observação vai cifrada.",
     "decisao_tela_setor":"Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
                           "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "

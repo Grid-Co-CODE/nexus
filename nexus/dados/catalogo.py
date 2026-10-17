@@ -441,6 +441,26 @@ FATOS = (
                     "geração da semana e o robô do PCM não a inclui como OS nova. O nome vai só cifrado "
                     "(dados_cifrados); o arquivo do robô, no repositório do PCM, leva os nomes em claro (decisão do "
                     "Levi, 16/10/2026: \"faz o simples\")"),
+    # Os técnicos por usina (17/10/2026, Levi: "cria uma estrutura que liga usina e técnico e o PCM pode editar a
+    # vontade" e "quero tirar do site de gestão"): o Nexus é a FONTE de quem cobre cada usina; o App de Campo lê daqui o
+    # papel executa (as usinas da aba Ronda). Registrado antes da 1ª gravação.
+    Fato("decisao_atribuicao_pcm", "Técnicos por usina", "pcm", "nexus_pcm_atribuicoes · fato_decisao_atribuicao",
+         "1 linha = 1 decisão de pôr ou tirar 1 pessoa de 1 usina num papel (executa); vale a última decisão de cada "
+         "usina, pessoa e papel",
+         _d(data=("id", "data_id (o dia de Brasília da decisão; de_data_id e ate_data_id, o período do apoio)"),
+            usina=("id", "usina_id (+ usina_fracttal, o nome da usina no Fracttal, por onde o App a acha)"),
+            pessoa=("id", "pessoa_id + pessoa_hmac (o código do e-mail, por onde o App acha a pessoa) e "
+                          "decidida_por_hmac (quem decidiu)")),
+         tipo="sem_medida", chave=("decidida_em", "usina_id", "pessoa_id", "papel"),
+         fontes=("nexus_pcm_atribuicoes · fato_decisao_atribuicao",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada usina, pessoa e papel)",
+         observacao="executa = quem vê e pode rondar a usina no App de Campo (a aba Ronda). O apoio é a mesma ligação "
+                    "com de_data_id e ate_data_id: vale do 1º ao último dia, sem ninguém precisar tirar. Cada linha "
+                    "vai assinada (assinatura, HMAC com a chave derivada da NEXUS_PESSOA_HMAC): o App lê o livro pela "
+                    "leitura aberta da API e só aplica a linha assinada, quando o interruptor dele "
+                    "(NEXUS_ATRIBUICOES) estiver ligado. A observação do PCM vai só cifrada (dados_cifrados, regra 8). "
+                    "A carga inicial (origem carga_inicial) é a regra da equipe do cadastro: cada pessoa de campo "
+                    "recebe as usinas da equipe dela"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -858,6 +878,11 @@ LIVROS = (
           "atual; o livro é trocado inteiro sob a trava, relido antes e conferido depois). Nome e e-mail só cifrados, "
           "duas vezes: dados_5080 (selado para a pública do Dashboard Thopen, que lê a cada 2 min) e dados_nexus "
           "(Cofre, a chave do cadastro); o link de definir senha só como sha256; quem mudou só como HMAC"),
+    # os técnicos por usina (17/10/2026): o PCM põe e tira técnicos de cada usina; o App de Campo lê o executa daqui
+    Livro("nexus_pcm_atribuicoes", ("fato_decisao_atribuicao",), "a cada decisão na tela Técnicos por usina",
+          "nexus/pcm/atribuicoes.py, pela tela Técnicos por usina do PCM", False,
+          "registrado em 17/10/2026 antes de existir: nasce com a 1ª decisão ou com a carga inicial (a regra da equipe "
+          "do cadastro). A tela lê com cache de 1 minuto e a gravação relê o banco antes (troca o livro inteiro)"),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
@@ -954,6 +979,10 @@ CONHECIDAS = (
     Conhecida("thopen_acessos", ("senhas",), "apoio",
               "as senhas do login por pessoa do Dashboard Thopen (14/10/2026): o 5080 grava 1 linha a cada senha "
               "definida pelo link (o hash scrypt, cifrado com a chave dele); o Nexus lê só quando cada conta definiu"),
+    Conhecida("organizacao_app_campo", ("Atribuicoes",), "apoio",
+              "a foto das atribuições do App de Campo (usina × pessoa em HMAC × papel), publicada pelo App para o PCM "
+              "comparar na tela Técnicos por usina antes de o App passar a ler o nexus_pcm_atribuicoes (17/10/2026); "
+              "sai quando a troca estiver feita"),
     Conhecida("zz_teste_claude_apagar", ("*",), "teste",
               "livro de teste da API, criado para provar a gravação; nunca é dado (a API não apaga livro)"),
 )
