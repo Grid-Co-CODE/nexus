@@ -204,3 +204,34 @@ def test_comparacao_com_a_foto_do_app(app, banco):
     assert [(x["usina_id"], x["pessoa_id"]) for x in app_["so_no_app"]] == [(1, 11)]
     assert [(x["usina_id"], x["pessoa_id"]) for x in app_["so_no_nexus"]] == [(2, 11)]
     assert len(app_["pendencias"]) == 2
+
+
+def test_reenviar_nao_apaga_o_codigo_que_o_app_tem(app, banco):
+    """Sem o código de hoje (o Nexus sem a chave do cadastro, ou o técnico promovido, que sai das pessoas de campo), a
+    reemissão leva o código gravado, e a linha não diz "sem e-mail" (o App reconhece o código gravado)."""
+    _por(app, 1, 10, fracttal="Nome Antigo")
+    app.config.pop("NEXUS_CHAVE_CADASTRO")
+    with app.test_request_context():
+        base = visao._Base()
+        peds = T.pedidos_da_reemissao(base, T.pessoas_de_campo(base, app.config), A.ler(app.config, forcar=True), 1,
+                                      HOJE)
+    assert [(p["pessoa_id"], p["pessoa_hmac"]) for p in peds] == [(10, _h("t10@exemplo.test"))]
+    assert _linha(_montar(app), 1)["tecnicos"][0]["sem_email"] is False
+
+
+def test_comparacao_fala_a_lingua_do_app(app, banco):
+    """O App acha a usina pela grafia e a pessoa pelo código que VÃO na linha: outra grafia da mesma usina no App, ou a
+    linha sem código, não podem sair "iguais" (o portão da troca; revisão de 17/10)."""
+    _aba(banco, "cadastro_nexus", "de_para", DE_PARA + [
+        {"usina_id": 1, "sistema": "Fracttal · Classificação 1", "chave_externa": "Cliente A - Usina Um - SP"}])
+    visao.limpar()
+    _por(app, 1, 10)                                  # vai ao App como F1 (a 1ª em ordem alfabética)
+    _por(app, 2, 13, hmac="")                         # vai sem código: o App não aplica
+    _aba(banco, "organizacao_app_campo", "Atribuicoes", [
+        {"Usina": "Cliente A - Usina Um - SP", "Pessoa (HMAC)": _h("t10@exemplo.test"), "Papel": "executa"}])
+    visao.limpar()
+    app_ = _montar(app)["app"]
+    assert [(x["usina_id"], x["pessoa_id"], x["grafia"]) for x in app_["so_no_app"]] == [
+        (1, 10, "Cliente A - Usina Um - SP")]
+    assert [(x["usina_id"], x["pessoa_id"], x["grafia"]) for x in app_["so_no_nexus"]] == [(1, 10, F1)]
+    assert any("sem o código" in p for p in app_["pendencias"])

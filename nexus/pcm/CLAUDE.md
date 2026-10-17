@@ -268,7 +268,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   `papel`). Fixo = sem datas; apoio = `ate_data_id` (vale até o último dia, sai sozinho); agendado = `de_data_id` no
   futuro. Em claro os IDs, o `usina_fracttal` (o nome que o App usa para achar a usina) e os códigos HMAC; a observação
   só cifrada. A mesma decisão não grava de novo; o nome do Fracttal ou o código da pessoa diferentes contam como
-  mudança (a reemissão). O tirar leva o nome e o código da linha que pôs (é por eles que o App acha o que tirar).
+  mudança (a reemissão), mas a reemissão nunca troca um código bom por vazio (sem o código de hoje vai o gravado). O
+  tirar leva o nome e o código da linha que pôs (é por eles que o App acha o que tirar). Sem a `NEXUS_PESSOA_HMAC` nada
+  se grava (a linha iria sem assinatura e o App a descartaria).
 - **A tela** (PCM → Técnicos por usina): veem os setores PCM e Responsáveis UFV; põe e tira quem `pode_programar`; a
   **carga inicial** (só administrador, só com o livro vazio) é a regra da equipe do App aplicada ao cadastro do Nexus
   (cada pessoa de campo recebe as usinas com o mesmo `equipe_id`). Ao lado de cada usina, sem gravar nada: quem rondou
@@ -278,8 +280,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   responsável, situação e busca, em cascata; `todas=1` mostra as usinas fora de operação. Visão por técnico. Sem o
   cadastro do banco, a tela abre com o aviso e nada grava.
 - **O App:** ainda não lê. O pacote está em `C:\GridcoBuild\app-campo-docs\_propostas\atribuicoes-nexus\LEIA.md` (A1:
-  o App publica a foto `organizacao_app_campo · Atribuicoes`, que a tela compara e de onde saem as pendências para a
-  troca; A2: o App lê este livro, confere a assinatura e substitui o `executa`, com o interruptor `NEXUS_ATRIBUICOES`;
+  o App publica a foto `organizacao_app_campo · Atribuicoes`, que a tela compara NO IDIOMA DO APP — a grafia da usina e
+  o código que vão na linha, não os IDs do Nexus — e de onde saem as pendências para a troca (inclusive a linha que vai
+  sem nome do Fracttal ou sem código); A2: o App lê este livro, confere a assinatura e substitui o `executa`, com o interruptor `NEXUS_ATRIBUICOES`;
   A3: a Organização e o espelho deixam de editar o `executa`). A assinatura é HMAC com a chave derivada da
   `NEXUS_PESSOA_HMAC` (rótulo `nexus:pcm:atribuicoes`); o vetor de teste está nos dois lados.
 - **Fases:** agora o Nexus (nada muda no campo); depois o A1 → o PCM zera as pendências → A2 e A3 → o Levi liga; por

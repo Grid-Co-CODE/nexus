@@ -147,9 +147,9 @@
   <details{% if app.pendencias %} open{% endif %}><summary><b class="gc-num">{{ app.pendencias|length }}</b> {{ 'pendência' if app.pendencias|length == 1 else 'pendências' }} para a troca</summary>
     {% if app.pendencias %}<ul class="tu-avisos">{% for p in app.pendencias %}<li>{{ p }}</li>{% endfor %}</ul>{% endif %}</details>
   <details><summary><b class="gc-num">{{ app.so_no_app|length }}</b> só no App</summary>
-    <ul class="tu-ev">{% for x in app.so_no_app %}<li>{{ x.usina }} · {{ x.nome }}</li>{% endfor %}</ul></details>
+    <ul class="tu-ev">{% for x in app.so_no_app %}<li>{{ x.usina }} · {{ x.nome }} <small>como "{{ x.grafia }}"</small></li>{% endfor %}</ul></details>
   <details><summary><b class="gc-num">{{ app.so_no_nexus|length }}</b> só no Nexus</summary>
-    <ul class="tu-ev">{% for x in app.so_no_nexus %}<li>{{ x.usina }} · {{ x.nome }}</li>{% endfor %}</ul></details>
+    <ul class="tu-ev">{% for x in app.so_no_nexus %}<li>{{ x.usina }} · {{ x.nome }} <small>como "{{ x.grafia }}"</small></li>{% endfor %}</ul></details>
 </section>
 {% endif %}
 

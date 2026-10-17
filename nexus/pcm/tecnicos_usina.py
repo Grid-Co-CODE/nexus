@@ -140,8 +140,17 @@ def pedidos_da_reemissao(base, pessoas: dict, est: dict, usina_id: int, hoje: in
     """As ligações atuais da usina (valendo e agendadas) com o nome do Fracttal e o código de hoje: o que o App lê
     mudou (a usina foi renomeada no Fracttal, o e-mail foi corrigido no cadastro) e a linha precisa ir de novo."""
     fr = _fracttal(base)
-    return [_pedido(usina_id, fr, pid, pessoas, D._id(x.get("de_data_id")), D._id(x.get("ate_data_id")))
-            for (uid, pid, _papel), x in sorted(A.atuais(est, hoje).items()) if uid == usina_id]
+    out = []
+    for (uid, pid, _papel), x in sorted(A.atuais(est, hoje).items()):
+        if uid != usina_id:
+            continue
+        p = _pedido(usina_id, fr, pid, pessoas, D._id(x.get("de_data_id")), D._id(x.get("ate_data_id")))
+        # sem o código de hoje (o Nexus sem a chave do cadastro, o técnico promovido, a ficha sem e-mail), vai o gravado:
+        # trocar o código bom por vazio tiraria a usina da pessoa no App sem o PCM decidir (revisão de 17/10)
+        p["pessoa_hmac"] = p["pessoa_hmac"] or D._txt(x.get("pessoa_hmac"))
+        p["usina_fracttal"] = p["usina_fracttal"] or D._txt(x.get("usina_fracttal"))
+        out.append(p)
+    return out
 
 
 # ── a evidência de campo ──────────────────────────────────────────────────────────────────────────────────────
@@ -168,8 +177,11 @@ def _evidencia(hoje: int) -> tuple[dict, str]:
 
 
 # ── a foto do App ─────────────────────────────────────────────────────────────────────────────────────────────
-def _comparar_app(cfg, base, nome_usina, nome_pessoa, vale: set) -> dict:
-    """{"existe", "so_no_app", "so_no_nexus", "pendencias"}: o `executa` do App contra o que vale no Nexus."""
+def _comparar_app(cfg, base, nome_usina, nome_pessoa, vale: dict) -> dict:
+    """{"existe", "so_no_app", "so_no_nexus", "pendencias"}: o `executa` do App contra o que vale no Nexus, no IDIOMA
+    DO APP — a grafia da usina e o código da pessoa que vão na linha (revisão de 17/10: comparar pelos IDs do Nexus
+    dava "igual" quando o App usa outra grafia da mesma usina, ou quando a linha vai sem código). `vale`:
+    {(usina_id, pessoa_id): a linha vigente}."""
     try:
         linhas = visao._livro(APP_LIVRO, APP_ABA)
     except Exception:            # noqa: BLE001
@@ -177,25 +189,34 @@ def _comparar_app(cfg, base, nome_usina, nome_pessoa, vale: set) -> dict:
     if not linhas:
         return {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": []}
     m = mapas_de(cfg, base.de_para, base.pessoas)
-    pares, pend = set(), {}
+    pend, nexus, app_ = {}, {}, {}
+    for (uid, pid), x in vale.items():
+        fr, cod = " ".join(D._txt(x.get("usina_fracttal")).split()), D._txt(x.get("pessoa_hmac"))
+        if not fr:
+            pend[("nx-usina", uid)] = f"{nome_usina(uid)}: vai ao App sem o nome do Fracttal (o App não acha a usina)"
+        elif not cod:
+            pend[("nx-pessoa", uid, pid)] = (f"{nome_usina(uid)} · {nome_pessoa(pid)}: vai ao App sem o código (sem "
+                                             "e-mail no cadastro), e o App não a aplica")
+        else:
+            nexus[(_norm(fr), cod)] = (uid, pid, fr)
     for x in linhas:
         if D._txt(x.get("Papel")).lower() != "executa":
             continue
         usina, cod = " ".join(D._txt(x.get("Usina")).split()), D._txt(x.get("Pessoa (HMAC)"))
-        uid = m["usina"].get(_norm(usina))
-        pid = m["hmac"].get(cod)
+        uid, pid = m["usina"].get(_norm(usina)), m["hmac"].get(cod)
         if not uid:
             pend[("usina", usina)] = f"{usina}: usina do App sem o nome do Fracttal no de-para do cadastro"
         elif not pid:
-            pend[("pessoa", uid, cod)] = (f"{nome_usina(uid)}: uma pessoa do App sem ficha que case (sem e-mail no "
-                                          "cadastro, ou com outro e-mail)")
+            pend[("pessoa", uid, cod)] = (f"{nome_usina(uid)}: a pessoa de código {cod[:8]}… do App sem ficha que "
+                                          "case (sem e-mail no cadastro, ou com outro e-mail)")
         else:
-            pares.add((uid, pid))
+            app_[(_norm(usina), cod)] = (uid, pid, usina)
 
-    def itens(ps):
-        return [{"usina_id": u, "usina": nome_usina(u), "pessoa_id": p, "nome": nome_pessoa(p)}
-                for u, p in sorted(ps, key=lambda t: (norm(nome_usina(t[0])), norm(nome_pessoa(t[1]))))]
-    return {"existe": True, "so_no_app": itens(pares - vale), "so_no_nexus": itens(vale - pares),
+    def itens(lado: dict, outro: dict):
+        return sorted(({"usina_id": u, "usina": nome_usina(u), "pessoa_id": p, "nome": nome_pessoa(p), "grafia": g}
+                       for k, (u, p, g) in lado.items() if k not in outro),
+                      key=lambda i: (norm(i["usina"]), norm(i["nome"]), i["grafia"]))
+    return {"existe": True, "so_no_app": itens(app_, nexus), "so_no_nexus": itens(nexus, app_),
             "pendencias": [pend[k] for k in sorted(pend, key=str)]}
 
 
@@ -283,11 +304,12 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
         mudou_nome = mudou_codigo = False
         for pid, x in sorted(por_usina.get(uid, []), key=lambda t: norm(nome_pessoa(t[0]))):
             hm = (pessoas.get(pid) or {}).get("hmac") or ""
+            gravado = D._txt(x.get("pessoa_hmac"))
             tecnicos.append({"pessoa_id": pid, "nome": nome_pessoa(pid), "status": x["status"],
                              "de": _dm(D._id(x.get("de_data_id"))), "ate": _dm(D._id(x.get("ate_data_id"))),
-                             "sem_email": not hm})
+                             "sem_email": not gravado})
             mudou_nome |= bool(nomes_fr) and D._txt(x.get("usina_fracttal")) != nomes_fr[0]
-            mudou_codigo |= bool(hm) and D._txt(x.get("pessoa_hmac")) != hm
+            mudou_codigo |= bool(hm) and gravado != hm
         na_lista = {t["pessoa_id"] for t in tecnicos}
         do_cad = D._id(u.get("tecnico_om_id"))
         evid = {pid: dict(e) for pid, e in (ev.get(uid) or {}).items()}
@@ -341,14 +363,14 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                                "fechamentos": sum(e.get(pid, {}).get("fechamentos", 0) for e in ev.values())})
         tecnicos_v.sort(key=lambda t: norm(t["nome"]))
 
-    vale = {(u, p) for (u, p, _papel), x in atuais.items() if x["status"] == "vale"}
+    vale = {(u, p): x for (u, p, _papel), x in atuais.items() if x["status"] == "vale"}
     avisos_gerais = []
     if not cfg.get("NEXUS_CHAVE_CADASTRO"):
         avisos_gerais.append("Este Nexus não tem a chave do cadastro: os nomes aparecem pelo número e o e-mail (o "
                              "código que o App usa) não é lido.")
     if not cfg.get("NEXUS_PESSOA_HMAC"):
-        avisos_gerais.append("Este Nexus não tem a NEXUS_PESSOA_HMAC: as linhas vão sem o código e sem a assinatura, e "
-                             "o App não as aplica.")
+        avisos_gerais.append("Este Nexus não tem a NEXUS_PESSOA_HMAC: sem ela a linha iria sem assinatura e o App não a "
+                             "aplicaria, então nada se grava.")
     if erro_ev:
         avisos_gerais.append(f"A evidência de campo não foi lida agora ({erro_ev}): a lista e os avisos de técnico "
                              "seguem valendo.")

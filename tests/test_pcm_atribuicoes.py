@@ -172,3 +172,13 @@ def test_novo_nome_no_fracttal_ou_novo_codigo_grava_de_novo(cfg, monkeypatch):
     assert A.decidir(cfg, usina_id=1, usina_fracttal="Cliente A - Usina 1 - SP (novo)", pessoa_id=10,
                      pessoa_hmac="f" * 24, na_usina=True, usuario=PESSOA)["gravou"] is True
     assert _atuais(cfg)[(1, 10, "executa")]["usina_fracttal"] == "Cliente A - Usina 1 - SP (novo)"
+
+
+def test_sem_a_chave_hmac_nada_grava(cfg, monkeypatch):
+    """Sem a NEXUS_PESSOA_HMAC a linha iria sem assinatura e o App a descartaria: o Nexus diria uma coisa e o App faria
+    outra (revisão de 17/10). Nada se grava."""
+    Relogio(monkeypatch)
+    cfg.pop("NEXUS_PESSOA_HMAC")
+    with pytest.raises(A.Recusada):
+        _por(cfg, 10)
+    assert A.ler(cfg, forcar=True)["decisoes"] == []

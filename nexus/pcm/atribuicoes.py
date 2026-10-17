@@ -285,6 +285,10 @@ def decidir_varias(cfg, pedidos: list[dict], usuario: dict | None, origem: str) 
     """Várias decisões numa gravação só (a carga inicial, a reemissão). Cada pedido tem as chaves de `decidir`. Devolve
     quantas linhas entraram; o pedido que não muda nada não entra, e um pedido recusado recusa todos."""
     from .motivos import _quem
+    if not str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip():
+        # sem a chave a linha iria sem assinatura e o App a descartaria: o Nexus diria uma coisa e o App faria outra
+        raise Recusada("Este Nexus não tem a NEXUS_PESSOA_HMAC: a linha iria sem assinatura e o App não a aplicaria. "
+                       "Nada foi gravado.")
     quem_hmac = _quem(cfg, usuario)[0]
     with _TRAVA:
         try:
