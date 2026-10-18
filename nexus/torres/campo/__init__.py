@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import Response, abort, redirect, render_template, request, session
+from flask import Response, abort, current_app, make_response, redirect, render_template, request, session
 from markupsafe import Markup, escape
 
 import logging as _logging
@@ -28,7 +28,7 @@ from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
-from ...prefixo import na_raiz
+from ...prefixo import na_raiz, raiz
 from .aprovar_os import bp_aprovar_os, papel_da_sessao, pode_na_tela
 from .assinatura import _login as _login_da_pt, _tela as _tela_da_pt, bp_assinatura
 
@@ -324,9 +324,18 @@ def atencao():
 # o link de cada área leva à tela dona do número
 TELA_DONA = {"meta": "torre_performance.moldura_gerencial", "disp": "torre_performance.moldura_disponibilidade",
              "ativos": "torre_engenharia.confiabilidade", "pt": "torre_hseq.apr_pt",
-             "chamados": "torre_chamados.abrir_garantias", "extintores": "torre_hseq.extintores"}
+             "chamados": "torre_chamados.abrir_garantias", "extintores": "torre_hseq.extintores",
+             # o bloco Manutenção (18/10/2026): as telas do PCM e a Aprovação de OS
+             "gestao": "torre_pcm.gestao", "fora": "torre_pcm.fora", "quadro": "torre_pcm.quadro",
+             "aprovacao": "torre_campo.aprovacao"}
 LINKS_DO_BLOCO = {"perf": (("Visão gerencial", "meta"), ("Disponibilidade", "disp"), ("Confiabilidade", "ativos")),
-                  "acomp": (("APR e PT", "pt"), ("Acompanhamento de chamados", "chamados"), ("Extintores", "extintores"))}
+                  "acomp": (("APR e PT", "pt"), ("Acompanhamento de chamados", "chamados"), ("Extintores", "extintores")),
+                  "manut": (("Gestão PCM", "gestao"), ("Fora da programação", "fora"), ("Quadro da semana", "quadro"),
+                            ("Aprovação de OS", "aprovacao"))}
+# o limite das atrasadas de quem olha (Levi, 18/10/2026: "o supervisor decide, começa com 30 dias mas pode alterar";
+# "no navegador dele"): um cookie de preferência de tela, não dado de negócio, então não vai ao banco
+COOKIE_LIMITE = "nexus_resp_limite"
+FAIXA_MAX = 6
 CAMPOS_DA_BUSCA = ("usina", "cidade", "equipe", "cliente", "uf", "responsavel", "gestor")
 
 
@@ -358,7 +367,11 @@ def responsaveis():
     Filtros de responsável, cliente e busca; "Todos" vai como "*"."""
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados
-    todas = d.get("usinas") or []
+    # o bloco Manutenção no limite de quem olha: o parâmetro (o campo do bloco) vence o cookie; sem os dois, 30
+    pedido_limite = request.args.get("limite")
+    limite = campo_resp.limite_do_pedido(pedido_limite if pedido_limite is not None
+                                         else request.cookies.get(COOKIE_LIMITE))
+    todas = campo_resp.com_manutencao(d.get("usinas") or [], limite)
     # o responsável que entrou pelo Fracttal vai direto para Onde focar, nas usinas dele, e não vê os cartões (Levi,
     # 12/10/2026: "caso a pessoa que logue seja algum desses responsáveis não vai aparecer por responsável, já vai direto
     # para Onde Focar!"); o filtro continua, para olhar as usinas de quem ele estiver cobrindo
@@ -383,9 +396,14 @@ def responsaveis():
         modo = "foco" if responsavel else "cartoes"
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
-    return render_template("campo/responsaveis.html", **_comum(
+    # a faixa "Parada agora" (18/10/2026): as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro
+    faixa = sorted(((u, p) for u in usinas for p in u.get("paradas_abertas") or ()),
+                   key=lambda up: (up[1]["_ini"], up[0]["usina"]))
+    from ...campo import tarefas_os
+    html = render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
-        responsavel_logado=logado,
+        responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
+        foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
         opcoes_responsavel=nomes, opcoes_cliente=sorted({u.get("cliente") for u in todas if u.get("cliente")}),
@@ -394,6 +412,11 @@ def responsaveis():
         mes_id=d.get("mes_id"),
         limites={"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,
                  "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO}))
+    resp = make_response(html)
+    if pedido_limite is not None:
+        resp.set_cookie(COOKIE_LIMITE, str(limite), max_age=365 * 24 * 3600, path=raiz() or "/", samesite="Lax",
+                        secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    return resp
 
 
 # As janelas por cima da Visão do responsável (Levi, 12/10/2026: "precisamos mostrar para o supervisor de onde está

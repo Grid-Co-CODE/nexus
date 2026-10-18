@@ -186,6 +186,38 @@ máquina por vez (a última gravação do livro tem de ter mais de 50 min); `NEX
 traz a subtarefa do ticket: "aguardando ticket" × "com o fabricante" fica só no quadro. A Visão do responsável lê daqui
 (até 12/10 contava pela planilha de tickets).
 
+**As tarefas das OS do Fracttal (18/10/2026):** Levi: "pegando tudo do Fracttal ou Nexus, sem fontes externas!". As
+telas do PCM leem as tarefas do `gestao_pcm.json` que o robô do PCM regrava no GitHub dele; para a Visão do responsável
+(bloco Manutenção) o Nexus lê o Fracttal ele mesmo, no livro `nexus_os · fato_tarefa_os` (`fato_tarefa_os.py`,
+conformado, foto periódica, chave `fracttal_tarefa_id`): 1 linha = 1 tarefa de OS em processo ou em verificação, e a
+zeladoria finalizada nos últimos 90 dias, com `data_id_criacao`/`_programada`/`_fim`, `usina_id` (de-para do Fracttal pelo
+site; código do ativo), `equipamento_id`, o tipo, o status da OS, o estado da tarefa, `tarefa_chave` (a mesma conta da
+programação e dos motivos) e `do_backoffice` (1/0: o HMAC do responsável da OS contra a lista do PCM; o nome nunca vai).
+Quem grava é `nexus/campo/tarefas_os.py`, fora da carga de hora em hora: cada máquina no :10 mais um atraso sorteado
+de até 10 min, uma por vez (mais de 50 min desde a última, conferido também logo antes de gravar: a leitura leva ~2 min),
+`NEXUS_OS_PUBLICAR=0` desliga; lê o banco ANTES do Fracttal (se o banco cai, a cota não se gasta). Leitura incompleta
+não grava: página recusada 3 vezes, mais de 150 páginas, resposta sem a lista ou com `success: false`, página repetida
+ou a leitura abaixo do total que o REST informa (`limit=1`; a sonda de 18/10 mostrou que a página depois da última vem
+com `data: None`, e é o total que separa o fim do corte). Até 1% do total pode faltar (a OS que muda de status durante a
+leitura pula as linhas dela numa borda de página): fica no `faltaram` da qualidade. E não grava o que sairia chutado
+(`recusou`): sem a `NEXUS_PESSOA_HMAC` ou a lista do backoffice (o `do_backoffice` iria 0 para todas), com a usina ou o
+de-para do cadastro vazios, ou com menos de 90% das tarefas ligadas a uma usina. Grava também a `qualidade` do livro
+(`linha_qualidade`), que a Governança lê.
+**1º ensaio (18/10/2026, ~02:50, só GET, `ferramentas/ensaio_tarefas_os.py`):** 89 páginas em 118 s (status 1: 29;
+status 2: 59; zeladoria finalizada: 1); 8.737 tarefas, nenhuma repetida, nenhuma fora do domínio; usina ligada 98,6%
+(de-para 8.367, código 251), equipamento e data programada 100%; 65 do backoffice. Os tipos no REST: Preventiva 4.180,
+Handover 1.125, Corretiva 898, Religamento 856, Inspeção 729, Administrativa 464, Corretiva Emergencial 302, Religamento
+Remoto 121, Zeladoria 62 (a grafia "Zeladoria" do filtro confere). Sites sem usina (consertar no de-para do cadastro):
+Apolo Rio do Peixe 1 e 2 (48), Apolo Gravatá 2 (29), Apolo Ibipeba (21), Solier Cascavel (9), Apolo Iramaia 2 (8),
+"Grid Co." (2). Contra o `gestao_pcm.json` das 01:42 (sem exclusão dos dois lados, Data Programada desde 01/01):
+abertas 2.236 × 2.218 e atrasadas (mais de 10 dias) 1.073 × 1.071. As diferenças: Colíder 1 e 2 (22 abertas) caem em
+"sem usina" do lado do PCM (o arquivo dele dá a usina pelo nome atual do ativo, e o nome não liga pelo de-para);
+Brodowski, 42 × 26 abertas com as atrasadas iguais (3 × 3): provavelmente OS nova depois do arquivo do PCM (o ensaio
+é de uma hora depois e nenhuma das 16 a mais está atrasada); não conferido OS a OS. Das 2.236 abertas, a Visão tira 56 do backoffice, 19 com motivo, 23 de chamado e 17 de zeladoria; Teste, 0.
+**No banco desde 18/10/2026 (~10:45):** a 1ª gravação, à mão (`--gravar`, com o OK do Levi), já com a leitura
+conferida contra o total do REST: 92 pedidos ao Fracttal (3 totais e 89 páginas), 8.746 tarefas gravadas e as mesmas
+8.746 relidas por GET depois de gravar, nenhuma faltando, 119 sem usina (98,6% ligadas).
+
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da
 ronda no App, exportadas UMA vez (pela conta do Levi; o Nexus não lê o Azure) e gravadas por

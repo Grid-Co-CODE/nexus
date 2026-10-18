@@ -54,8 +54,11 @@ META_NA_META = 97        # Visão gerencial (atgTag): 97% ou mais = "Na meta"
 META_ATENCAO = 90        # de 90% a 97% = "Atenção"; abaixo de 90% = "Abaixo"
 DISP_OK = 99             # Disponibilidade (classePill): 99% ou mais = verde
 DISP_CRITICO = 80        # abaixo de 80% = vermelho; entre os dois, âmbar
+# o 3º bloco, embaixo dos dois na largura toda (18/10/2026, o modelo A escolhido pelo Levi): o que um supervisor tinha
+# no painel próprio (OS abertas e atrasadas, tarefas paradas, semana, zeladoria), "pegando tudo do Fracttal ou Nexus"
 BLOCOS = (("perf", "Performance", "Meta, PR e disponibilidade do mês"),
-          ("acomp", "Acompanhamento", "Rondas, PT, chamados e extintores"))
+          ("acomp", "Acompanhamento", "Rondas, limpeza, PT, chamados e extintores"),
+          ("manut", "Manutenção", "OS, tarefas paradas, semana e zeladoria"))
 REGUAS = (
     ("perf", "meta", "Meta do mês", "Visão gerencial da plataforma: atingimento abaixo de 90% é crítico (Abaixo), de 90% "
                                     "a 97% é atenção, 97% ou mais está na meta. PR abaixo do PR previsto é atenção."),
@@ -66,12 +69,28 @@ REGUAS = (
                                           "pode esperar."),
     ("acomp", "ronda", "Rondas", "Central de atenção: nunca teve ronda, ou sem ronda há 7 dias ou mais, é crítico; ronda "
                                  "longa pendente é atenção."),
+    ("acomp", "limpeza", "Limpeza", "Rondas › Sujidade e vegetação, a última leitura da usina: nível 5 ou vala obstruída "
+                                    "é crítico; nível 4, vala parcial ou sensor sujo é atenção."),
     ("acomp", "pt", "PT", "APR e PT: PT esperando o De acordo há mais de 2 h é crítico; se é de hoje, vai para o "
                                 "topo (técnico parado no campo agora). Esperando há menos de 2 h, atenção."),
     ("acomp", "chamados", "Chamados", "Acompanhamento de chamados: chamado de garantia em aberto com o fabricante é "
                                       "atenção (o mesmo dado do quadro, publicado no banco de hora em hora)."),
     ("acomp", "extintores", "Extintores", "Segurança · HSEQ › Extintores: recarga ou teste hidrostático vencido é "
                                           "crítico; vence em até 30 dias ou sem conferência há mais de 30 dias é atenção."),
+    ("manut", "parada", "Parada agora", "As OS de parada ainda abertas no mês (a disponibilidade do Gerencial, que vem "
+                                        "do Fracttal): qualquer uma, da usina inteira ou de um equipamento, é crítico e "
+                                        "vai para a faixa do topo."),
+    ("manut", "atrasadas", "OS atrasadas", "A régua do PCM (Gestão PCM e relatórios): tarefa aberta com a Data "
+                                           "Programada há mais de 10 dias é atenção; há mais do limite que você escolhe "
+                                           "no bloco (30 dias, se ninguém mudou) é crítico. Ficam de fora o backoffice, "
+                                           "a tarefa parada por motivo, a OS de chamado, a zeladoria e o Teste."),
+    ("manut", "paradas", "Tarefas paradas", "Fora da programação do PCM: tarefa tirada da programação por um motivo, ou "
+                                            "justificada pelo técnico no App, é atenção."),
+    ("manut", "semana", "Semana passada", "Fechamento da semana do PCM: linhas do plano finalizadas ÷ linhas do plano; "
+                                          "abaixo da meta de 85% é atenção. A semana vem do arquivo do PCM, copiado "
+                                          "para o banco de hora em hora."),
+    ("manut", "zeladoria", "Zeladoria", "As tarefas do tipo Zeladoria no Fracttal: com a data programada vencida e não "
+                                        "feita, é atenção."),
 )
 ROTULO_AREA = {a: r for _b, a, r, _t in REGUAS}
 BLOCO_DA_AREA = {a: b for b, a, _r, _t in REGUAS}
@@ -227,6 +246,131 @@ def disponibilidade(nomes: Nomes, mes: str) -> tuple[dict, dict]:
                     "dias": max(len(x["dias"]) for x in xs), "pot_kwp": sum(x["pot"] or 0 for x in xs) or None}
     ate = max((str(r.get("dia") or "") for r in linhas), default="")
     return out, {"publicado": bool(linhas), "ate": ate, "usinas": len(por_nome), "sem_usina": sorted(sem)}
+
+
+def paradas_abertas(nomes: Nomes, mes: str) -> tuple[dict, dict]:
+    """{usina_id: [OS de parada AINDA aberta]} para a faixa "Parada agora" (18/10/2026; o painel próprio de um
+    supervisor tinha a faixa "Usinas desligadas"). Fonte: as OS que formaram a disponibilidade do mês
+    (`falhas_performance · disponibilidade_os`, a plataforma publica do Fracttal), as com `aberta`; a mesma ligação pelo
+    nome da `disponibilidade` (cada nome uma vez). A mais antiga primeiro."""
+    linhas = [r for r in visao._livro(LIVRO_DISP, ABA_DISP_OS) if str(r.get("mes") or "") == mes]
+    abertas = [r for r in linhas if str(r.get("aberta") or "").strip().lower() in ("sim", "true", "1")]
+    uid_de, out = {}, collections.defaultdict(list)
+    for r in abertas:
+        n, f = str(r.get("usina") or "").strip(), str(r.get("usina_fracttal") or "")
+        if (n, f) not in uid_de:
+            uid_de[(n, f)] = nomes.usina(n, fracttal=f)[0]
+        uid = uid_de[(n, f)]
+        if uid:
+            ini = str(r.get("inicio") or "")
+            out[uid].append({"os": str(r.get("os") or ""), "tipo": str(r.get("tipo") or "—"),
+                             "escopo": str(r.get("escopo") or "—"), "codigo": str(r.get("codigo_ativo") or ""),
+                             "inicio": _hora(ini), "_ini": ini})
+    for lst in out.values():
+        lst.sort(key=lambda o: (o["_ini"], o["os"]))
+    return dict(out), {"publicado": bool(linhas), "abertas": len(abertas),
+                       "sem_usina": sorted({n for (n, _f), u in uid_de.items() if not u})}
+
+
+def _programacao_recente(segundas: set) -> list[dict]:
+    """As linhas do `fato_programacao` das semanas pedidas (a passada e a corrente), lidas do FIM para trás, como a tela
+    Técnicos por usina (`pcm.tecnicos_usina._programacao_do_fim`): a carga põe as 4 semanas do arquivo do PCM no fim
+    (`programacao.mesclar_semanas`), e a aba inteira (16.540 linhas em 18/10/2026) levava 4,4 s a cada conta da Visão.
+    Para depois de passar das semanas pedidas. Sem a listagem das abas, a aba inteira."""
+    from ..dados import programacao as PG
+    base, s = visao._base(), visao._sessao()
+    try:
+        r = s.get(f"{base}/api/sheets", timeout=60)
+        r.raise_for_status()
+        meta = next(((x.get("id"), int(x.get("row_count") or 0)) for x in r.json()
+                     if x.get("workbook_key") == PG.LIVRO and x.get("sheet_name") == PG.ABA), None)
+    except Exception:       # noqa: BLE001 — sem a listagem: a aba inteira, pela cópia de sempre
+        meta = None
+    if not meta or not meta[0]:
+        return visao._livro(PG.LIVRO, PG.ABA)
+    sid, n = meta
+    out, viu, off = [], False, ((max(n, 1) - 1) // 1000) * 1000
+    while off >= 0:
+        r = s.get(f"{base}/api/sheets/{sid}/rows", params={"limit": 1000, "offset": off}, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+        rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
+        achadas = [x for x in (dict(zip(y.get("headers") or [], y.get("values") or [])) for y in rows)
+                   if visao.D._id(x.get("data_id_semana")) in segundas]
+        out += achadas
+        if achadas:
+            viu = True
+        elif viu:
+            break           # já passou das semanas pedidas
+        off -= 1000
+    return out
+
+
+def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
+    """{usina_id: o dado cru do bloco Manutenção} (18/10/2026; a conta é `nexus/campo/manutencao.py`): as tarefas das OS
+    do Fracttal (`nexus_os`), os motivos do Fora da programação (decifrados aqui: a marca guarda a usina e a tarefa
+    cifradas), as OS de chamado e a programação. O nível NÃO sai daqui: depende do limite de quem olha
+    (`com_manutencao`, no pedido). Sem o `nexus_os` no banco, só as paradas por marca e a semana."""
+    from flask import current_app
+    from ..dados import fato_tarefa_os as FT
+    from ..dados.calendario import data_id
+    from . import manutencao as M
+    cfg = current_app.config
+    tarefas = visao._livro(FT.LIVRO, FT.ABA)
+    q = next(iter(visao._livro(FT.LIVRO, "qualidade")), {})
+    # sem os motivos, a tarefa parada por motivo conta como atrasada: a tela avisa (revisão de 18/10/2026: passava calado).
+    # A leitura que falha com uma cópia boa na memória (`velha`) segue com as marcas dela, sem aviso
+    marcas, erro_motivos, ilegiveis = [], "", 0
+    try:
+        from ..pcm import motivos
+        est = motivos.ler(cfg)
+        if est.get("erro") and not est.get("lido_em"):
+            erro_motivos = est["erro"]
+        vig = motivos.vigentes(cfg, est)
+        ilegiveis = visao.D._int(vig.pop("_ilegiveis", 0)) or 0
+        marcas = M.marcas_paradas(vig, lambda m: b.lig.usina(m.get("usina"), m.get("codigo"))[0])
+    except Exception as e:      # noqa: BLE001 — sem os motivos, o resto do bloco vale
+        erro_motivos = f"{type(e).__name__}: {str(e)[:120]}"
+    chamados_os = {visao.D._id(r.get("os")) for r in visao._livro(LIVRO_CHAMADOS, ABA_CHAMADOS)} - {None}
+    t = M.tarefas_por_usina(tarefas if tarefas else None, marcas, chamados_os, hoje)
+    passada = hoje - timedelta(days=hoje.weekday() + 7)
+    prog = _programacao_recente({data_id(passada), data_id(passada + timedelta(days=7))})
+    s = M.semana_por_usina(prog, hoje, agora.strftime("%H:%M"))
+    ano, sem, _ = passada.isocalendar()
+    por = {uid: {**t.get(uid, {}), **s.get(uid, {})} for uid in set(t) | set(s)}
+    return por, {"publicado": bool(tarefas), "gerado_em": str(q.get("gerado_em") or ""), "erro_motivos": erro_motivos,
+                 "ilegiveis": ilegiveis, "semana_passada": f"{ano}-W{sem:02d}"}
+
+
+FOTO_VELHA_H = 2        # o laço grava de hora em hora (do :10 ao :20): passou de 2 h, ao menos uma volta não gravou
+
+
+def foto_das_os(gerado_em, agora) -> dict:
+    """De quando é a foto das OS no banco (o `gerado_em` da qualidade do `nexus_os`, gravado por qualquer máquina) e se
+    está velha, no relógio do pedido. A tela dizia só a hora ("às 09:10"), e a foto de ontem passava por de hoje (revisão
+    de 18/10/2026). `quando`: "das 09:10" hoje, "de 17/10 às 09:10" noutro dia."""
+    d = visao._dt(gerado_em)
+    if not d:
+        return {"quando": "", "horas": None, "velha": False}
+    d, agora = d.astimezone(_BRT), agora.astimezone(_BRT)
+    horas = (agora - d).total_seconds() / 3600
+    quando = f"das {d:%H:%M}" if d.date() == agora.date() else f"de {d:%d/%m} às {d:%H:%M}"
+    return {"quando": quando, "horas": int(horas), "velha": horas > FOTO_VELHA_H}
+
+
+def limpeza() -> tuple[dict, dict]:
+    """{usina_id: a última leitura de sujidade e vegetação} (18/10/2026): a conta das Rondas (`visao.sujidade_vegetacao`,
+    a régua `visao.criticidade`), com o checklist do fato de ronda e as respostas das OS de ronda que o processo já tem
+    (sem pedir releitura ao Fracttal: a tela Rondas é quem pede). 90 dias: a última leitura, de quando for."""
+    from . import ronda_checklist
+    lei = visao.rondas()
+    if lei.erro:
+        raise visao.SemBanco(lei.erro)
+    d = lei.dados or {}
+    suj = visao.sujidade_vegetacao(d.get("todas") or [], d.get("cobertura") or [], ronda_checklist.respostas(), 90,
+                                   d.get("hoje") or visao._agora().date().isoformat(), d.get("validacoes") or [])
+    por = {x["usina_id"]: x for x in suj.get("linhas") or [] if x.get("usina_id")}
+    return por, {"com_leitura": len(por)}
 
 
 # ── Ativos falhando (Engenharia › Confiabilidade) ───────────────────────────────────────────────────────────────
@@ -467,6 +611,10 @@ def alertas_acompanhamento(u: dict) -> tuple[list[dict], list[str]]:
         al.append({"area": "ronda", "nivel": "atencao", "titulo": "Ronda longa pendente"})
     elif r.get("dias") is not None and r["dias"] < 999:
         bem.append("ronda " + ("hoje" if r["dias"] == 0 else ("ontem" if r["dias"] == 1 else f"há {r['dias']} dias")))
+    # a limpeza da última ronda, na régua das Rondas (`visao.criticidade`: o "status" dela, o mais grave primeiro)
+    for texto, cor in (u.get("limpeza") or {}).get("status") or ():
+        if cor in ("critico", "alerta"):
+            al.append({"area": "limpeza", "nivel": "critico" if cor == "critico" else "atencao", "titulo": texto})
     p = u.get("pt") or {}
     grupos_pt = (("agora", lambda x: x["hoje"] and x["parada"]), ("critico", lambda x: not x["hoje"] and x["parada"]),
                  ("atencao", lambda x: not x["parada"]))
@@ -544,9 +692,28 @@ def linha_performance(u: dict) -> dict:
     return {"valores": valores, "tag": tag, "det": det}
 
 
+def _limpeza(x) -> tuple[dict, str]:
+    """A coluna Limpeza ("S2 V5", na cor do achado mais grave da régua das Rondas) e o texto do detalhe."""
+    if not x:
+        return _v("—", "neutro"), ""
+    s, v = x.get("sujidade"), x.get("vegetacao")
+    cores = {c for _t, c in x.get("status") or ()}
+    cls = "critico" if "critico" in cores else ("alerta" if "alerta" in cores else "ok")
+    partes = [f"Sujidade {s}" if s else "", f"Vegetação {v}" if v else ""]
+    vala = str(x.get("vala") or "").strip()
+    if vala and vala.lower() != "limpa":
+        partes.append(f"vala {vala.lower()}")
+    if x.get("sensores_sujos"):
+        partes.append("sensor sujo (" + ", ".join(x["sensores_sujos"]) + ")")
+    partes.append(f"ronda de {_dm(x.get('data'))}")
+    txt = " ".join(p for p in (f"S{s}" if s else "", f"V{v}" if v else "") if p) or "—"
+    return _v(txt, cls), " · ".join(p for p in partes if p)
+
+
 def linha_acompanhamento(u: dict) -> dict:
-    """Os valores da linha (ronda, PT, chamados, extintores) e o detalhe."""
+    """Os valores da linha (ronda, limpeza, PT, chamados, extintores) e o detalhe."""
     r, p, c, e = u.get("ronda") or {}, u.get("pt") or {}, u.get("chamados") or {}, u.get("extintores") or {}
+    lim, lim_txt = _limpeza(u.get("limpeza"))
     if r.get("tipo") == "nunca":
         ronda, ronda_txt = _v("nunca", "critico"), "Nunca teve ronda pelo App desde a mobilização"
     elif r.get("tipo") == "sem_ronda":
@@ -585,6 +752,8 @@ def linha_acompanhamento(u: dict) -> dict:
     det = []
     if ronda_txt:
         det.append({"rot": "Ronda", "forte": "", "resto": ronda_txt, "itens": []})
+    if lim_txt:
+        det.append({"rot": "Limpeza", "forte": "", "resto": lim_txt, "itens": []})
     if p.get("aguardando"):
         det.append({"rot": "PT", "forte": "", "resto": f"{p['aguardando']} esperando o De acordo",
                     "itens": [{"forte": f"OS {x['os'] or x['numero']}", "txt": f"há {_duracao(x['idade_min'])}",
@@ -607,7 +776,8 @@ def linha_acompanhamento(u: dict) -> dict:
                     "itens": [{"forte": f"Extintor {x['ext']}", "txt": (f"({x['onde']}) " if x["onde"] else "") + x["txt"]}
                               for x in e["lista"][:3]],
                     "mais": max(0, len(e["lista"]) - 3)})
-    return {"valores": {"ronda": ronda, "pt": pt, "chamados": ch, "extintores": ext}, "tag": None, "det": det}
+    return {"valores": {"ronda": ronda, "limpeza": lim, "pt": pt, "chamados": ch, "extintores": ext}, "tag": None,
+            "det": det}
 
 
 def _pt_vazia() -> dict:
@@ -646,7 +816,12 @@ def montar(b, usinas_ronda, pendentes, pts, fontes, hoje) -> list[dict]:
                                                   "gestor", "responsavel", "cluster")},
              "meta": fontes["metas"].get(uid), "disp": fontes["disp"].get(uid), "ativos": fontes["ativos"].get(uid),
              "chamados": fontes["chamados"].get(uid), "extintores": fontes["extintores"].get(uid), "ronda": r,
-             "pt": pt.get(uid) or _pt_vazia()}
+             "pt": pt.get(uid) or _pt_vazia(),
+             # 18/10/2026: a limpeza da última ronda e as paradas abertas (fontes novas: por `.get`, a fonte que não
+             # veio não quebra a conta)
+             "limpeza": (fontes.get("limpeza") or {}).get(uid),
+             "paradas_abertas": (fontes.get("paradas") or {}).get(uid) or [],
+             "manutencao": (fontes.get("manut") or {}).get(uid) or {}}
         for bloco, alertas, linha in (("perf", alertas_performance, linha_performance),
                                       ("acomp", alertas_acompanhamento, linha_acompanhamento)):
             al, bem = alertas(u)
@@ -656,6 +831,154 @@ def montar(b, usinas_ronda, pendentes, pts, fontes, hoje) -> list[dict]:
         u["nivel"] = min((u["perf"]["nivel"], u["acomp"]["nivel"]), key=NIVEIS.index)
         u["foco"] = u["perf"]["peso"] + u["acomp"]["peso"]
         out.append(u)
+    out.sort(key=ordem_do_foco)
+    return out
+
+
+# ── O bloco Manutenção (18/10/2026): o nível depende do limite de quem olha, então sai no pedido ──────────────────
+def limite_do_pedido(valor) -> int:
+    """O limite das atrasadas (Levi, 18/10/2026: "o supervisor decide, começa com 30 dias mas pode alterar"): número
+    fora de 10 a 365 vai ao mais perto (atrasada já é mais de 10 dias); texto ou vazio vale 30. Nunca um erro."""
+    from .manutencao import LIMITE_MAX, LIMITE_MIN, LIMITE_PADRAO
+    try:
+        n = int(str(valor).strip())
+    except (TypeError, ValueError):
+        return LIMITE_PADRAO
+    return max(LIMITE_MIN, min(LIMITE_MAX, n))
+
+
+def _plural(n, um, varios) -> str:
+    return f"{n} {um if n == 1 else varios}"
+
+
+def alertas_manutencao(u: dict, limite: int) -> tuple[list[dict], list[str]]:
+    """Os alertas do bloco Manutenção e o que está bem, na régua das telas donas (ver `REGUAS`, bloco manut) e com o
+    limite das atrasadas de quem olha."""
+    from .manutencao import META_SEMANA
+    m, al, bem = u.get("manutencao") or {}, [], []
+    pa = u.get("paradas_abertas") or []
+    if pa:
+        al.append({"area": "parada", "nivel": "critico", "titulo": _plural(len(pa), "OS de parada aberta",
+                                                                           "OS de parada abertas")})
+    if m.get("atrasadas"):
+        maior = m.get("maior_atraso") or 0
+        al.append({"area": "atrasadas", "nivel": "critico" if maior > limite else "atencao",
+                   "titulo": f"{_plural(m['atrasadas'], 'tarefa atrasada', 'tarefas atrasadas')}, a mais antiga há "
+                             f"{maior} dias"})
+    elif m.get("os_abertas"):
+        bem.append("nenhuma tarefa atrasada")
+    if m.get("paradas"):
+        al.append({"area": "paradas", "nivel": "atencao",
+                   "titulo": _plural(m["paradas"], "tarefa fora da programação", "tarefas fora da programação")})
+    pct = m.get("passada_pct")
+    if pct is not None and pct < META_SEMANA:
+        al.append({"area": "semana", "nivel": "atencao", "titulo": f"semana passada com {_virgula(pct)}% do plano feito"})
+    elif pct is not None:
+        bem.append(f"semana passada com {_virgula(pct)}% do plano feito")
+    if m.get("zeladoria_vencida"):
+        al.append({"area": "zeladoria", "nivel": "atencao", "titulo": f"zeladoria vencida desde {_dm(m['zeladoria_vencida'])}"})
+    return al, bem
+
+
+def _curto(txt, n=16) -> str:
+    t = str(txt or "")
+    t = t[len("Aguardando "):] if t.startswith("Aguardando ") else t
+    return t if len(t) <= n else t[:n - 1] + "…"
+
+
+def linha_manutencao(u: dict, limite: int) -> dict:
+    """Os valores da linha (OS abertas, atrasadas, vencem, paradas, semana, zeladoria) e o detalhe. O item de OS do
+    detalhe leva `os_card` (o card da OS do Nexus), nunca `numero`: no template, `numero` vira o botão da PT."""
+    m, pa = u.get("manutencao") or {}, u.get("paradas_abertas") or []
+    abertas, atr, maior = m.get("os_abertas") or 0, m.get("atrasadas") or 0, m.get("maior_atraso") or 0
+    v_os = _v(str(abertas), "neutro") if abertas else _v("—", "neutro")
+    if atr:
+        v_atr = _v(str(atr), "critico" if maior > limite else "alerta", f"{maior} d")
+    else:
+        v_atr = _v("0", "ok") if abertas else _v("—", "neutro")
+    v_ven = _v(str(m["vencem"]), "neutro") if m.get("vencem") else _v("—", "neutro")
+    v_par = _v(str(m["paradas"]), "alerta", _curto(m.get("motivo_comum"))) if m.get("paradas") else _v("—", "neutro")
+    pct = m.get("passada_pct")
+    from .manutencao import META_SEMANA
+    v_sem = _v("—", "neutro") if pct is None else _v(f"{_virgula(pct, 0)}%", "ok" if pct >= META_SEMANA else "alerta")
+    if m.get("zeladoria_vencida"):
+        v_zel = _v(f"venc. {_dm(m['zeladoria_vencida'])}", "alerta")
+    elif m.get("zeladoria_proxima"):
+        v_zel = _v(f"próx. {_dm(m['zeladoria_proxima'])}", "neutro")
+    else:
+        v_zel = _v("—", "neutro")
+    det = []
+    if pa:
+        det.append({"rot": "Parada agora", "forte": "", "resto": _plural(len(pa), "OS de parada aberta",
+                                                                          "OS de parada abertas"),
+                    "itens": [{"forte": f"OS {p['os']}", "txt": f"{p['escopo']} · {p['tipo']} · desde {p['inicio']}",
+                               "os_card": {"wid": None, "folio": p["os"]}} for p in pa[:3]],
+                    "mais": max(0, len(pa) - 3)})
+    if abertas:
+        det.append({"rot": "OS abertas", "forte": "", "resto": _plural(abertas, "OS aberta", "OS abertas")
+                    + (f" · {m['em_verificacao']} esperando a aprovação" if m.get("em_verificacao") else ""),
+                    "itens": []})
+    if atr:
+        det.append({"rot": "Atrasadas", "forte": "",
+                    "resto": f"{_plural(atr, 'tarefa', 'tarefas')} em {_plural(m.get('atrasadas_os') or 0, 'OS', 'OS')}, "
+                             f"a mais antiga há {maior} dias (programada há mais de 10 dias)",
+                    "itens": [{"forte": f"OS {x['os']}", "txt": " · ".join(t for t in (
+                        f"há {x['dias']} d", (x.get("tipo") or "").replace("_", " ")) if t),
+                               "os_card": {"wid": x.get("wid"), "folio": x["os"]}}
+                              for x in m.get("lista_atrasadas") or []],
+                    "mais": max(0, (m.get("atrasadas_os") or 0) - len(m.get("lista_atrasadas") or []))})
+    if m.get("vencem"):
+        det.append({"rot": "Vencem até amanhã", "forte": "", "itens": [],
+                    "resto": _plural(m["vencem"], "tarefa programada para hoje ou amanhã",
+                                     "tarefas programadas para hoje ou amanhã")})
+    if m.get("paradas"):
+        det.append({"rot": "Paradas", "forte": "",
+                    "resto": _plural(m["paradas"], "tarefa fora da programação", "tarefas fora da programação"),
+                    "itens": [{"forte": f"OS {x['os']}", "txt": " · ".join(t for t in (
+                        x.get("motivo"), f"desde {_dm(x['desde'])}" if x.get("desde") else "", x.get("quem")) if t),
+                               "os_card": {"wid": x.get("wid"), "folio": x["os"]}}
+                              for x in m.get("lista_paradas") or []],
+                    "mais": 0})
+    if pct is not None or m.get("hoje_devidas"):
+        partes = []
+        if pct is not None:
+            partes.append(f"semana passada ({m.get('passada')}): {m['passada_feitas']} de {m['passada_prog']} linhas do "
+                          f"plano feitas ({_virgula(pct)}%)")
+        if m.get("hoje_devidas"):
+            partes.append(f"hoje até agora: {m['hoje_feitas']} de {m['hoje_devidas']}")
+        det.append({"rot": "Semana", "forte": "", "resto": " · ".join(partes), "itens": []})
+    if m.get("zeladoria_proxima") or m.get("zeladoria_vencida") or m.get("zeladoria_ultima"):
+        det.append({"rot": "Zeladoria", "forte": "", "itens": [], "resto": " · ".join(t for t in (
+            f"vencida desde {_dm(m['zeladoria_vencida'])}" if m.get("zeladoria_vencida") else "",
+            f"próxima {_dm(m['zeladoria_proxima'])}" if m.get("zeladoria_proxima") else "",
+            f"última feita {_dm(m['zeladoria_ultima'])}" if m.get("zeladoria_ultima") else "") if t)})
+    return {"valores": {"os": v_os, "atrasadas": v_atr, "vencem": v_ven, "paradas": v_par, "semana": v_sem,
+                        "zeladoria": v_zel},
+            "tag": ("critico", "parada") if pa else None, "det": det}
+
+
+def ordem_da_manutencao(u: dict):
+    """A Manutenção pelo nível; dentro dele, parada primeiro, depois mais tarefas atrasadas, mais tarefas paradas e a
+    semana mais baixa (decisão do Levi, 18/10/2026); no empate, o nome."""
+    m = u.get("manutencao") or {}
+    pct = m.get("passada_pct")
+    return (NIVEIS.index(u["manut"]["nivel"]), -len(u.get("paradas_abertas") or []), -(m.get("atrasadas") or 0),
+            -(m.get("paradas") or 0), pct if pct is not None else 999, u["usina"])
+
+
+def com_manutencao(usinas: list[dict], limite: int) -> list[dict]:
+    """As usinas com o bloco Manutenção no limite de quem olha: cópias rasas (a cópia guardada de 5 min, comum a todos,
+    nunca muda) com `manut` e o nível e o foco refeitos com os três blocos."""
+    out = []
+    for u in usinas:
+        v = dict(u)
+        al, bem = alertas_manutencao(v, limite)
+        al.sort(key=lambda a: -PESO[a["nivel"]])
+        v["manut"] = {"alertas": al, "bem": bem, "nivel": _nivel(al), "peso": sum(PESO[a["nivel"]] for a in al),
+                      **linha_manutencao(v, limite)}
+        v["nivel"] = min((v["perf"]["nivel"], v["acomp"]["nivel"], v["manut"]["nivel"]), key=NIVEIS.index)
+        v["foco"] = v["perf"]["peso"] + v["acomp"]["peso"] + v["manut"]["peso"]
+        out.append(v)
     out.sort(key=ordem_do_foco)
     return out
 
@@ -672,7 +995,7 @@ def bloco(usinas: list[dict], qual: str) -> dict:
     na ordem do bloco ("ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a
     Performance pela meta do mês, da pior para a melhor (sem meta no fim); o Acompanhamento pela ronda (`ordem_da_ronda`).
     A cor de cada linha continua a do nível dela."""
-    chave = ordem_da_meta if qual == "perf" else ordem_da_ronda
+    chave = {"perf": ordem_da_meta, "manut": ordem_da_manutencao}.get(qual, ordem_da_ronda)
     tri = collections.Counter(u[qual]["nivel"] for u in usinas)
     return {"linhas": sorted(usinas, key=chave), "tri": {n: tri.get(n, 0) for n in NIVEIS}}
 
@@ -703,8 +1026,12 @@ def soma(nome: str, usinas: list[dict]) -> dict:
     cliente de lá); no Acompanhamento, as rondas pendentes, as PT esperando (paradas e paradas de hoje), os chamados em
     aberto e os extintores vencidos. E os ativos em crítico e as 3 usinas que mais pedem."""
     s = {"responsavel": nome, "usinas": len(usinas), "pts": 0, "paradas": 0, "agora": 0, "rondas": 0, "chamados": 0,
-         "ext_vencidos": 0, "ativos_criticos": 0, "abaixo_meta": 0, "pr_abaixo": 0}
+         "ext_vencidos": 0, "ativos_criticos": 0, "abaixo_meta": 0, "pr_abaixo": 0,
+         # a Manutenção (18/10/2026): OS abertas, tarefas atrasadas, tarefas paradas, OS de parada aberta e a semana
+         # passada do grupo (linhas do plano feitas ÷ linhas do plano, a conta do Fechamento)
+         "os_abertas": 0, "atrasadas": 0, "tarefas_paradas": 0, "paradas_abertas": 0}
     prod = meta = disp_p = pot = 0.0
+    sem_prog = sem_feitas = 0
     for u in usinas:
         m = u.get("meta") or {}
         if m.get("prod_kwh") is not None and m.get("meta_kwh"):
@@ -726,14 +1053,23 @@ def soma(nome: str, usinas: list[dict]) -> dict:
         s["chamados"] += (u.get("chamados") or {}).get("abertos", 0)
         s["ext_vencidos"] += (u.get("extintores") or {}).get("vencidos", 0)
         s["ativos_criticos"] += (u.get("ativos") or {}).get("critico", 0)
-    for qual in ("perf", "acomp"):
-        tri = collections.Counter(u[qual]["nivel"] for u in usinas)
+        m = u.get("manutencao") or {}
+        s["os_abertas"] += m.get("os_abertas") or 0
+        s["atrasadas"] += m.get("atrasadas") or 0
+        s["tarefas_paradas"] += m.get("paradas") or 0
+        s["paradas_abertas"] += len(u.get("paradas_abertas") or [])
+        sem_prog += m.get("passada_prog") or 0
+        sem_feitas += m.get("passada_feitas") or 0
+    # o bloco Manutenção só existe depois do limite de quem olha (`com_manutencao`); sem ele, a triagem dele é zero
+    for qual in ("perf", "acomp", "manut"):
+        tri = collections.Counter(u[qual]["nivel"] for u in usinas if qual in u)
         s[qual] = {n: tri.get(n, 0) for n in NIVEIS}
     s["meta_pct"] = round(100 * prod / meta, 1) if meta else None
     s["disp"] = round(disp_p / pot, 1) if pot else None
+    s["semana_pct"] = round(100 * sem_feitas / sem_prog, 1) if sem_prog else None
     s["pior"] = [u["usina"] for u in sorted((u for u in usinas if u["nivel"] == "critico"), key=ordem_do_foco)[:3]]
     s["nivel"] = min(("critico" if s[q]["critico"] else ("atencao" if s[q]["atencao"] else "ok")
-                      for q in ("perf", "acomp")), key=NIVEIS.index)
+                      for q in ("perf", "acomp", "manut")), key=NIVEIS.index)
     return s
 
 
@@ -744,8 +1080,9 @@ def por_responsavel(usinas: list[dict]) -> list[dict]:
     for u in usinas:
         g[u.get("responsavel") or visao.SEM_RESPONSAVEL].append(u)
     out = [soma(nome, us) for nome, us in g.items()]
-    out.sort(key=lambda s: (s["responsavel"] == visao.SEM_RESPONSAVEL, -(s["perf"]["critico"] + s["acomp"]["critico"]),
-                            -(s["perf"]["atencao"] + s["acomp"]["atencao"]), s["responsavel"]))
+    out.sort(key=lambda s: (s["responsavel"] == visao.SEM_RESPONSAVEL,
+                            -(s["perf"]["critico"] + s["acomp"]["critico"] + s["manut"]["critico"]),
+                            -(s["perf"]["atencao"] + s["acomp"]["atencao"] + s["manut"]["atencao"]), s["responsavel"]))
     return out
 
 
@@ -927,9 +1264,13 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
         atv, atv_i = _ler_fonte("ativos", ativos, erros)
         cha, cha_i = _ler_fonte("chamados", lambda: chamados(hoje), erros)
         ext, ext_i = _ler_fonte("extintores", extintores, erros)
+        lim, lim_i = _ler_fonte("limpeza", limpeza, erros)
+        par, par_i = _ler_fonte("paradas", lambda: paradas_abertas(nomes, mes), erros)
+        man, man_i = _ler_fonte("manut", lambda: manutencao_fonte(b, hoje, agora), erros)
         if pts.erro:
             erros["pt"] = pts.erro
-        fontes = {"metas": met, "disp": dsp, "ativos": atv, "chamados": cha, "extintores": ext}
+        fontes = {"metas": met, "disp": dsp, "ativos": atv, "chamados": cha, "extintores": ext, "limpeza": lim,
+                  "paradas": par, "manut": man}
         usinas = montar(b, at.dados.get("usinas") or [], at.dados.get("pendentes") or [],
                         (pts.dados or {}).get("aguardando") or [], fontes, hoje)
         responsaveis_por_pessoa = {}
@@ -938,7 +1279,8 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
             if pid:
                 responsaveis_por_pessoa[pid] = b.responsavel_da_usina(uid)
         return {"usinas": usinas, "mes_id": mes_id, "hoje": hoje.isoformat(), "erros": erros,
-                "info": {"metas": met_i, "disp": dsp_i, "ativos": atv_i, "chamados": cha_i, "extintores": ext_i},
+                "info": {"metas": met_i, "disp": dsp_i, "ativos": atv_i, "chamados": cha_i, "extintores": ext_i,
+                         "limpeza": lim_i, "paradas": par_i, "manut": man_i},
                 "responsaveis_por_pessoa": responsaveis_por_pessoa, "sem_mobilizacao": b.sem_mobilizacao,
                 "fatos": at.dados.get("fatos") or {}, **visao._estrutura(b)}
     return visao._ler(("visao_responsaveis",), calcular)

@@ -32,6 +32,10 @@ def instalar(app):
     # `nexus_chamados · fato_chamado`, de hora em hora, uma máquina por vez (NEXUS_CHAMADOS_PUBLICAR=0 desliga)
     from . import chamados_acompanhamento
     chamados_acompanhamento.ligar(app)
+    # as tarefas das OS do Fracttal no banco (18/10/2026): `nexus_os · fato_tarefa_os`, de hora em hora (:10), uma
+    # máquina por vez (NEXUS_OS_PUBLICAR=0 desliga). É a fonte do bloco Manutenção da Visão do responsável
+    from . import tarefas_os
+    tarefas_os.ligar(app)
     # a última fila boa da Aprovação, do disco, já no boot e em toda máquina: não vai ao Fracttal (13/10/2026)
     threading.Thread(target=lambda: aprovacao.carregar_do_disco(app), daemon=True, name="nexus-fila-disco").start()
     # NEXUS_CAMPO_AQUECER=0 desliga só o que vai ao Fracttal ao subir (a cota é de 200/min para a empresa inteira)
