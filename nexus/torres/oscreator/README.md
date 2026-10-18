@@ -475,9 +475,12 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
   moldura com o fragmento `/os/os/folio/<nº>?parcial=1`: quem acha o id é o clone (o "Buscar OS pelo nº" do Histórico),
   com um pedido a mais ao Fracttal, e o nº que não existe aparece como "Não achei nenhuma OS com o nº" dentro da moldura.
   Tendo o id, prefira o `abrir` (sem o pedido a mais, e com a leitura antecipada do `prepararAoParar`).
-- **Sem o login do Fracttal** (entrou pela senha de admin), a moldura não busca a OS: diz "Para abrir a OS, entre pelo
-  Fracttal", com o botão para `/entrar?next=<a tela>`. Se a sessão do Fracttal vencer no meio, a ponte manda o pedido
-  do card para o login, e a moldura diz que venceu.
+- **Sem o login do Fracttal** (entrou pela conta Microsoft ou pela senha de admin), a moldura não busca a OS: diz
+  "Para abrir a OS, entre pelo Fracttal", com o botão para o login do PRÓPRIO OS Creator (`/os/login`), que volta à
+  tela de onde se veio por `/os/_nexus/card/voltar?de=<a tela>` (o clone só devolve para `/os/...`; o `/os/_nexus/voltar`
+  é o da assinatura da PT, só do Campo). Até 18/10/2026 o botão ia ao `/entrar` do Nexus, que com a conta Microsoft
+  ligada é a porta dela: o Levi clicava em "Entrar com o Fracttal" e caía na Microsoft. Se a sessão do Fracttal vencer
+  no meio, a ponte manda o pedido do card para o login, e a moldura diz que venceu.
 - **Links do card** para outras telas do OS Creator ("Clonar esta OS", "Abrir chamado") passam por `/os/_nexus/ir`,
   que abre a torre OS Creator do Nexus com a tela numa aba (`tela_do_endereco`). Com Ctrl, numa aba nova.
 - **O X do card** ficava escondido atrás do cabeçalho fixo dele, também no Histórico (`.os-modal-x` com z-index 2, o

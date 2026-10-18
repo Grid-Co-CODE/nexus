@@ -596,10 +596,24 @@ def _card(caminho: str, wid=None):
         logging.exception("OS Creator: o clone não subiu (card da OS)")
         estado = "fora"
     q = urlencode({"status": status}) if status else ""
+    # sem o login do Fracttal, o do PRÓPRIO OS Creator (/os/login), e a volta à tela de onde a pessoa saiu pelo
+    # /os/_nexus/card/voltar (o clone só devolve para /os/...). Até 18/10/2026 era o /entrar do Nexus, que com a conta
+    # Microsoft ligada é a porta DELA: o Levi clicava em "Entrar com o Fracttal" e caía na Microsoft
+    volta = "/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/")
     return render_template("oscreator/card_os.html", wid=wid, estado=estado,
                            fragmento=f"{caminho}?" + urlencode({"parcial": 1, "status": status}),
                            pagina=caminho + ("?" + q if q else ""),
-                           entrar=na_raiz("/entrar") + "?next=" + quote(de, safe="/"))
+                           entrar=na_raiz("/os/login") + "?next=" + quote(volta, safe=""))
+
+
+@bp_raiz.route("/os/_nexus/card/voltar")
+def card_voltar():
+    """A volta do login do Fracttal do OS Creator (o "Entrar com o Fracttal" do card da OS): à tela do Nexus `de`, e só
+    a uma do próprio site (`destino_seguro`). O /os/_nexus/voltar é o da assinatura da PT (só telas do Campo)."""
+    from flask import redirect
+
+    from ...auth import destino_seguro
+    return redirect(destino_seguro(request.args.get("de")))
 
 
 @bp_raiz.route("/os/_nexus/card/<int:wid>")

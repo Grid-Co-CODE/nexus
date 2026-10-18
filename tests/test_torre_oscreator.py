@@ -214,20 +214,37 @@ def test_o_card_da_os_e_o_do_historico_numa_moldura(app, logado):
 
 
 def test_sem_o_login_do_fracttal_o_card_diz_para_entrar(logado):
-    """Quem entrou pela senha de admin não tem o JWT do Fracttal: a moldura não busca a OS e diz como entrar."""
+    """Quem entrou pela senha de admin (ou pela conta Microsoft) não tem o JWT do Fracttal: a moldura não busca a OS e
+    manda ao login do Fracttal do PRÓPRIO OS Creator (/os/login), que volta, pelo /os/_nexus/card/voltar, à tela de onde a
+    pessoa saiu. Levi, 18/10/2026: o botão ia ao /entrar do Nexus, que com a Microsoft ligada é a porta dela ("redireciona
+    para logar pela microsoft, não loga pelo fractal")."""
     h = logado.get("/os/_nexus/card/9001?status=Em%20Processo&de=/t/engenharia/equipe").get_data(as_text=True)
     assert "Para abrir a OS, entre pelo Fracttal" in h and "carregar();" not in h
-    assert 'href="/entrar?next=/t/engenharia/equipe" target="_top"' in h
+    assert 'href="/os/login?next=%2Fos%2F_nexus%2Fcard%2Fvoltar%3Fde%3D%2Ft%2Fengenharia%2Fequipe" target="_top"' in h
+    assert 'href="/entrar' not in h
     # de fora do Nexus não vira destino
     h = logado.get("/os/_nexus/card/9001?de=//exemplo.invalid/x").get_data(as_text=True)
-    assert 'href="/entrar?next=/"' in h
+    assert 'href="/os/login?next=%2Fos%2F_nexus%2Fcard%2Fvoltar%3Fde%3D%2F"' in h
+
+
+def test_a_volta_do_login_do_fracttal_cai_na_tela_de_origem(app, logado):
+    """O /os/_nexus/card/voltar leva à tela do Nexus (`de`), e só a uma do próprio site. O login do clone o aceita como
+    destino (começa com /os), então quem entra pelo Fracttal no card volta à tela de onde clicou na OS."""
+    r = logado.get("/os/_nexus/card/voltar?de=/t/pcm/gestao%3Fmodo%3Dplano")
+    assert r.status_code == 302 and r.headers["Location"] == "/t/pcm/gestao?modo=plano"
+    assert logado.get("/os/_nexus/card/voltar?de=//exemplo.invalid/x").headers["Location"] == "/"
+    from nexus.torres.oscreator import ponte
+    from nexus.torres.oscreator.os_creator.os_web import rotas
+    with ponte.clone(app).test_request_context():
+        assert rotas._destino_local("/os/_nexus/card/voltar?de=/t/pcm/gestao") == "/os/_nexus/card/voltar?de=/t/pcm/gestao"
 
 
 def test_o_card_da_os_pelo_numero(app, logado):
     """16/10/2026: a tela sem o id do Fracttal (o nº citado na observação do Fora da programação do PCM) abre o MESMO
     card pelo número: o fragmento do "Buscar OS pelo nº" do clone (/os/os/folio/<nº>?parcial=1)."""
     h = logado.get("/os/_nexus/card/folio/16290?de=/t/pcm/fora-da-programacao").get_data(as_text=True)
-    assert "Para abrir a OS, entre pelo Fracttal" in h and 'href="/entrar?next=/t/pcm/fora-da-programacao"' in h
+    assert "Para abrir a OS, entre pelo Fracttal" in h
+    assert 'href="/os/login?next=%2Fos%2F_nexus%2Fcard%2Fvoltar%3Fde%3D%2Ft%2Fpcm%2Ffora-da-programacao"' in h
     _login_do_fracttal(app, logado)
     r = logado.get("/os/_nexus/card/folio/16290?status=Em%20Processo&de=/t/pcm/fora-da-programacao")
     h = r.get_data(as_text=True)
