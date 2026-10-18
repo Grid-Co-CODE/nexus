@@ -35,10 +35,16 @@
   <div class="cn-cab eg-mesa-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa do engenheiro</p>
       <h1 class="cn-titulo">{% if alvo and alvo != meu %}A mesa de {{ nome_alvo or 'outra pessoa' }}{% else %}A sua mesa{% endif %}</h1>
-      <p class="cn-pergunta">O que está com {{ 'você' if not alvo or alvo == meu else 'a pessoa' }} na Confiabilidade e o que precisa de dono.</p></div>
-    {% if admin %}<form class="eg-mesa-quem" method="get"><label><span class="gc-rotulo">Ver a mesa de</span>
-      <select class="gc-campo" name="pessoa" onchange="this.form.submit()">{% if not alvo %}<option value="">Escolha a pessoa</option>{% endif %}{% for p in pessoas %}<option value="{{ p.hmac }}"{% if p.hmac == alvo %} selected{% endif %}>{{ p.nome }}{% if meu and p.hmac == meu %} (você){% endif %}</option>{% endfor %}</select></label></form>{% endif %}
+      <p class="cn-pergunta">O que está com {{ quem }} na Confiabilidade e o que precisa de dono.</p></div>
+    {# o administrador fora da Engenharia (o da Performance) não está na lista: a 1ª opção é a mesa dele, escolhida
+       quando ninguém da lista está, e a volta a ela depois de ver a de alguém (revisão final, 18/10/2026) #}
+    {% if admin %}{% set hmacs = pessoas|map(attribute='hmac')|list %}<form class="eg-mesa-quem" method="get"><label><span class="gc-rotulo">Ver a mesa de</span>
+      <select class="gc-campo" name="pessoa" onchange="this.form.submit()">{% if not alvo or alvo not in hmacs %}<option value="" selected>{{ 'A sua mesa' if meu else 'Escolha a pessoa' }}</option>{% elif meu and meu not in hmacs %}<option value="">A sua mesa</option>{% endif %}{% for p in pessoas %}<option value="{{ p.hmac }}"{% if p.hmac == alvo %} selected{% endif %}>{{ p.nome }}{% if meu and p.hmac == meu %} (você){% endif %}</option>{% endfor %}</select></label></form>{% endif %}
   </div>
+  {% if sem_cadastro %}<p class="cn-erro cn-aviso" role="status"><b>O cadastro do Nexus não respondeu.</b> Usina e cliente estão como o Fracttal escreve.</p>{% endif %}
+  {% if est.lendo and not est.completa %}<p class="cn-erro cn-aviso" role="status"><b>Lendo as OS de falha no Fracttal pela primeira vez.</b> {{ est.n }} já lidas; recarregue em 2 a 3 minutos.</p>
+  {% elif est.erro %}<p class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou parte da leitura ({{ est.erro }}).</b> Mostrando as {{ est.n }} OS já lidas; nova tentativa em 5 minutos.</p>
+  {% elif not est.completa %}<p class="cn-erro cn-aviso" role="status"><b>A leitura das OS de falha ainda não terminou.</b> Os números podem mudar; recarregue em alguns minutos.</p>{% endif %}
   {% if velha_em %}<p class="cn-erro cn-aviso" role="status"><b>Mostrando a última leitura boa dos acompanhamentos ({{ velha_em }}).</b> O banco não respondeu agora; recarregue em instantes.</p>{% endif %}
   {% if erro_acomp %}<p class="cn-erro cn-aviso" role="status"><b>Não consegui ler os acompanhamentos ({{ erro_acomp }}).</b> Recarregue em instantes.</p>{% endif %}
   {% if not alvo %}<p class="cn-erro cn-aviso" role="status"><b>Escolha de quem ver a mesa.</b> A senha de administrador não diz quem é a pessoa.</p>{% endif %}
@@ -56,14 +62,14 @@
     <div class="eg-mesa-col">
       {% if alvo %}
       <section class="eg-painel eg-mesa-caixa">
-        <div class="eg-painel-cab"><h2>Encaminhados para você</h2><span>até você comentar ou salvar algo · clique abre a gaveta</span></div>
+        <div class="eg-painel-cab"><h2>Encaminhados para {{ quem }}</h2><span>até {{ quem }} comentar ou salvar algo · clique abre a gaveta</span></div>
         {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos.</p>
-        {% else %}<div class="eg-itens">{% for x in caixa %}{{ cartao(x, true) }}{% else %}<p class="mudo eg-vazio">Nada encaminhado esperando você.</p>{% endfor %}</div>{% endif %}
+        {% else %}<div class="eg-itens">{% for x in caixa %}{{ cartao(x, true) }}{% else %}<p class="mudo eg-vazio">Nada encaminhado esperando {{ quem }}.</p>{% endfor %}</div>{% endif %}
       </section>
       <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>Com você</h2><span>falha nova primeiro, depois o nível</span></div>
+        <div class="eg-painel-cab"><h2>Com {{ quem }}</h2><span>falha nova primeiro, depois o nível</span></div>
         {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos.</p>
-        {% else %}<div class="eg-itens">{% for x in comigo %}{{ cartao(x) }}{% else %}<p class="mudo eg-vazio">{{ 'Nenhum outro ativo com você.' if caixa else 'Nenhum ativo com você agora.' }}</p>{% endfor %}</div>{% endif %}
+        {% else %}<div class="eg-itens">{% for x in comigo %}{{ cartao(x) }}{% else %}<p class="mudo eg-vazio">{{ ('Nenhum outro ativo com ' ~ quem ~ '.') if caixa else ('Nenhum ativo com ' ~ quem ~ ' agora.') }}</p>{% endfor %}</div>{% endif %}
       </section>
       {% endif %}
     </div>
@@ -86,7 +92,7 @@
         {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ s.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
           <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-gaveta="{{ s.gid }}" data-eg-abrir-encaminhar>Encaminhar</button></div>{% endif %}
         </article>
-      {% else %}<p class="mudo eg-vazio">Todo crítico tem dono.</p>{% endfor %}</div>{% endif %}
+      {% else %}<p class="mudo eg-vazio">{{ 'Todo crítico tem dono.' if est.completa else 'Nenhum crítico sem dono nas OS lidas até agora.' }}</p>{% endfor %}</div>{% endif %}
     </section>
   </div>
 

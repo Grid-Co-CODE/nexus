@@ -11,6 +11,9 @@ releu recebeu vazio e a troca apagaria o histórico), a aba que sumiria (o banco
 aba que encolheria (menos linhas que o banco tem agora). Medido no banco real em 18/10/2026: o `row_count` da listagem é
 o número de linhas que a leitura devolve, e o `sheet_count` do livro diz quantas abas ele tem. O livro da carga de hora
 em hora não é desses: ele encolhe de propósito, pela janela de cada fonte.
+A trava não fica cega quando a listagem de livros falha (revisão final, 18/10/2026): o livro que só cresce e não veio no
+/api/workbooks, mas tem abas listadas, é recusado (antes ele era "criado" e trocado sem conferência); e, sem o
+`sheet_count` e sem nenhuma aba listada, também (só o 0 dito pelo banco, o livro criado e nunca gravado, segue).
 """
 from ..cadastro.banco import MIME_XLSX, xlsx_bytes
 
@@ -49,6 +52,9 @@ def _conferir_antes(livro: str, w: dict, tabelas: dict, base: str, sessao, so: t
     r.raise_for_status()
     listadas = {x["sheet_name"]: x for x in r.json() if x.get("workbook_key") == livro}
     n = _int(w.get("sheet_count"))
+    if not listadas and n is None:
+        raise GravacaoRecusada(f"{livro}: o banco não disse quantas abas o livro tem e a listagem não trouxe nenhuma; "
+                               "não gravo por cima (tente de novo em instantes)")
     if n and len(listadas) < n:
         raise GravacaoRecusada(f"{livro}: o banco diz que o livro tem {n} abas e a listagem trouxe {len(listadas)}; "
                                "não gravo por cima de uma leitura incompleta (tente de novo em instantes)")
@@ -63,6 +69,17 @@ def _conferir_antes(livro: str, w: dict, tabelas: dict, base: str, sessao, so: t
         if tem is not None and vai is not None and vai < tem:
             raise GravacaoRecusada(f"{livro}.{aba}: o banco tem {tem} linhas e a gravação levaria {vai}; livro que só "
                                    "cresce não encolhe")
+
+
+def _conferir_livro_novo(livro: str, base: str, sessao) -> None:
+    """O livro que só cresce e não veio na listagem de livros: se a de abas traz abas dele, ele existe e a listagem de
+    livros falhou; criar e trocar apagaria o histórico."""
+    r = sessao.get(f"{base}/api/sheets", timeout=60)
+    r.raise_for_status()
+    n = sum(1 for x in r.json() if x.get("workbook_key") == livro)
+    if n:
+        raise GravacaoRecusada(f"{livro}: a listagem de livros não trouxe o livro, mas a de abas traz {n}; não gravo por "
+                               "cima (tente de novo em instantes)")
 
 
 def abas(base: str, sessao, livro: str) -> dict:
@@ -119,6 +136,8 @@ def publicar(livro: str, nome: str, tabelas: dict, *, base: str, token: str, ses
     w = next((x for x in r.json() if x.get("key") == livro), None)
     so = _so_cresce(livro)
     if w is None:
+        if so:
+            _conferir_livro_novo(livro, base, sessao)
         sessao.post(f"{base}/api/workbooks", headers=h, json={"key": livro, "display_name": nome},
                     timeout=60).raise_for_status()
     elif so:

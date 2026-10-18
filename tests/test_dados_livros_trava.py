@@ -144,3 +144,54 @@ def test_aba_que_o_catalogo_nao_declara_pode_sair():
     api = ApiPGFalsa()
     _livro(api, "nexus_pt_decisoes", {"decisoes": 2, "fato_decisao_pt": 3})
     assert _pub(api, "nexus_pt_decisoes", _tab(fato_decisao_pt=4)) == {"fato_decisao_pt": 4}
+
+
+class _Listagens:
+    """O banco falso com /api/workbooks mexido (revisão final, 18/10/2026: a trava não pode ficar cega quando a listagem
+    de livros falha ou deixa de trazer o sheet_count)."""
+
+    def __init__(self, api, livros_sem=(), sem_sheet_count=False):
+        self.api, self.livros_sem, self.sem_sheet_count = api, set(livros_sem), sem_sheet_count
+
+    def get(self, url, *a, **k):
+        r = self.api.get(url, *a, **k)
+        if url.endswith("/api/workbooks"):
+            from pg_falso import Resposta
+            ws = [dict(w) for w in r.json() if w["key"] not in self.livros_sem]
+            for w in ws:
+                if self.sem_sheet_count:
+                    w.pop("sheet_count", None)
+            r = Resposta(200, ws)
+        return r
+
+    def post(self, *a, **k):
+        return self.api.post(*a, **k)
+
+
+def test_livro_fora_da_listagem_de_livros_mas_com_abas_recusa():
+    # /api/workbooks sem o livro: o publicar o "criava" e trocava sem conferir nada; as abas dele seguem listadas
+    api = ApiPGFalsa()
+    _livro(api, "nexus_setores", {"dim_setor": 10, "fato_decisao_setor": 37})
+    with pytest.raises(livros.GravacaoRecusada, match="listagem"):
+        livros.publicar("nexus_setores", "x", _tab(dim_setor=1, fato_decisao_setor=1), base=B, token="tk",
+                        sessao=_Listagens(api, livros_sem={"nexus_setores"}))
+    assert api.syncs == 0 and len(api.linhas("nexus_setores", "fato_decisao_setor")) == 37
+
+
+def test_sem_sheet_count_e_sem_abas_listadas_recusa():
+    # a API deixou de mandar o sheet_count e a listagem de abas veio vazia: sem as duas, a trava não via nada
+    api = ApiPGFalsa()
+    _livro(api, "nexus_setores", {"dim_setor": 10, "fato_decisao_setor": 37})
+    api.omitir.add("nexus_setores")
+    with pytest.raises(livros.GravacaoRecusada, match="abas"):
+        livros.publicar("nexus_setores", "x", _tab(dim_setor=1, fato_decisao_setor=1), base=B, token="tk",
+                        sessao=_Listagens(api, sem_sheet_count=True))
+    assert api.syncs == 0
+
+
+def test_livro_criado_e_nunca_gravado_grava():
+    # sheet_count 0 dito pelo banco (o livro foi criado e a 1ª troca falhou): sem abas listadas, grava
+    api = ApiPGFalsa()
+    api.workbooks["nexus_setores"] = {"key": "nexus_setores"}
+    assert _pub(api, "nexus_setores", _tab(dim_setor=1, fato_decisao_setor=1)) == {"dim_setor": 1,
+                                                                                   "fato_decisao_setor": 1}

@@ -11,6 +11,7 @@ from test_engenharia_acompanhamento import (ANA, ATIVO, BETO, PESSOAS, _a, _aid,
 from nexus.engenharia import acompanhamento as A
 
 URL = "/t/engenharia/mesa"
+CAIO = {"email": "caio.prado@gridco.com.br", "nome": "Caio Prado"}      # administrador fora da Engenharia
 INV02 = {"cod": "IBI200-INV02", "usina_id": 1, "usina_ligada_por": "de-para do Fracttal", "nivel": "atencao",
          "nFalha": 2, "n7": 1}
 
@@ -91,7 +92,7 @@ def test_os_numeros_do_topo(mesa, cliente):
     rotulos = re.findall(r'<span class="kb-kpi-rot">([^<]+)</span>', faixa)
     valores = re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', faixa)
     assert rotulos == ["Encaminhados para você", "Com você", "Críticos sem dono"]
-    assert valores == ["1", "2", "1"]                       # INV02; INVR1.3 e INV02; INV05
+    assert valores == ["1", "1", "1"]                       # INV02; INVR1.3 (o da lista Com você); INV05
     assert 'kb-kpi-v--alerta">1<' in faixa and 'kb-kpi-v--critico">1<' in faixa
     assert "chegou <b>hoje</b>" in faixa and "há 0 dias" not in faixa                # encaminhado agora
 
@@ -99,7 +100,7 @@ def test_os_numeros_do_topo(mesa, cliente):
 def test_administrador_escolhe_de_quem_ver(mesa, cliente, app):
     app.config["NEXUS_ADMINS"] = BETO["email"]                       # administrador é o da lista de agora
     html = _como(cliente, BETO, admin=True).get(URL + "?pessoa=" + A.codigo(ANA)).get_data(as_text=True)
-    assert 'name="pessoa"' in html and "IBI200-INVR1.3" in _secao(html, "Com você")
+    assert 'name="pessoa"' in html and "IBI200-INVR1.3" in _secao(html, "Com Ana Lima")
     assert "A mesa de Ana Lima" in html
     # a senha de administrador não diz quem é: a Mesa pede para escolher a pessoa
     html = _como(cliente, None, admin=True).get(URL).get_data(as_text=True)
@@ -119,3 +120,68 @@ def test_comentario_com_html_sai_escapado_na_mesa(mesa, cliente):
     A.comentar(_aid_de("IBI200-INVR1.3"), "<script>alert(1)</script>", ANA, True)
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     assert "&lt;script&gt;alert(1)" in html and "<script>alert(1)" not in html
+
+
+def _escolhidas(html):
+    sel = html.split('name="pessoa"', 1)[1].split("</select>", 1)[0]
+    return sel, re.findall(r"<option[^>]*selected[^>]*>([^<]*)<", sel)
+
+
+def test_administrador_fora_da_engenharia_escolhe_e_volta_para_a_sua_mesa(mesa, cliente, app, monkeypatch):
+    # revisão final: o administrador da Performance não está na lista da Engenharia; o seletor marcava a 1ª pessoa
+    # como escolhida (a mesa dela não abria pelo seletor) e não havia como voltar à sua
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+                                               "erro": ""})
+    app.config["NEXUS_ADMINS"] = CAIO["email"]
+    html = _como(cliente, CAIO, admin=True).get(URL).get_data(as_text=True)
+    assert "A sua mesa" in html and _escolhidas(html)[1] == ["A sua mesa"]
+    html = cliente.get(URL + "?pessoa=" + A.codigo(ANA)).get_data(as_text=True)
+    sel, escolhidas = _escolhidas(html)
+    assert escolhidas == ["Ana Lima"] and '<option value="">A sua mesa</option>' in sel
+    # a mesa de outra pessoa diz de quem é, nos títulos e nos números
+    assert "IBI200-INVR1.3" in _secao(html, "Com Ana Lima") and _secao(html, "Com você") == ""
+    assert ">Encaminhados para Ana Lima</h2>" in html and ">Encaminhados para você</h2>" not in html
+    faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
+    assert re.findall(r'<span class="kb-kpi-rot">([^<]+)</span>', faixa) == [
+        "Encaminhados para Ana Lima", "Com Ana Lima", "Críticos sem dono"]
+
+
+def test_sem_pessoa_escolhida_os_numeros_dela_sao_traco(mesa, cliente, app):
+    # a senha de administrador não diz quem é: "0 · nada esperando você" era um número de ninguém
+    app.config["NEXUS_ADMINS"] = BETO["email"]
+    html = _como(cliente, None, admin=True).get(URL).get_data(as_text=True)
+    faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
+    assert re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', faixa) == ["—", "—", "1"]
+    assert _escolhidas(html)[1] == ["Escolha a pessoa"]
+
+
+def test_leitura_das_os_pela_metade_nao_vira_numero(mesa, cliente, monkeypatch):
+    # revisão final: na 1ª leitura das OS a Mesa dizia "todo crítico tem dono" com 0 no número (a Confiabilidade avisa)
+    from nexus.engenharia import os_falhas
+    monkeypatch.setattr(os_falhas, "estado", lambda: {"lendo": True, "erro": "", "completa": False, "n": 3,
+                                                       "vivas_em": None})
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    assert "Lendo as OS de falha no Fracttal pela primeira vez" in html
+    faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
+    assert re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', faixa)[2] == "—"
+
+
+def test_numeros_da_mesa_empilham_sem_recuo_no_celular():
+    # revisão final: a 900 px a faixa vira uma coluna, mas o .kb-kpi:nth-child(even) ainda recuava o 2º número
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    regra = re.search(r"@media \(max-width:900px\)\{\.eg-mesa-kpis\{[^}]*\}(.*?)\}\s*$", css, re.M | re.S)
+    assert regra and ".eg-mesa-kpis .kb-kpi{padding:0;border-left:0}" in regra.group(1)
+
+
+def test_a_engenharia_age_pela_mesa_sem_marcar_a_confiabilidade(app, monkeypatch):
+    # revisão final: a Mesa é do setor Engenharia, mas as ações da gaveta vão para as rotas da Confiabilidade, e o portão
+    # do setor pede a marca dela; sem a marca, o Pegar da Mesa voltava "O Nexus não gravou (HTTP 403)"
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "escolhas_de_dono", lambda: {})          # sem escolha na Central: vale o do código
+    with app.app_context():
+        telas = ST.das_do_setor({"id": 1, "nome": "Engenharia"})
+        assert ST.pode("/t/engenharia/mesa", telas)
+        for acao in ("pegar", "encaminhar", "a1b2c3/salvar", "a1b2c3/comentar"):
+            assert ST.pode(f"/t/engenharia/confiabilidade/acompanhamento/{acao}", telas)

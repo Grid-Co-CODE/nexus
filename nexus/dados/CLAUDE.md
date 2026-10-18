@@ -265,7 +265,9 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
    de trocar um livro que só cresce (`Livro.so_cresce` no catálogo: as abas que nunca encolhem; `True` = todas), ele
    recusa (`GravacaoRecusada`, nada gravado) a listagem incompleta, a aba declarada no catálogo que sumiria (a
    desconhecida, como a antiga `decisoes` das decisões de PT, sai como sempre saiu) e a aba que encolheria (Levi,
-   18/10/2026: "Proteger os livros do Nexus de gravar sobre leitura vazia"). O caso que motivou: a gravação troca o livro
+   18/10/2026: "Proteger os livros do Nexus de gravar sobre leitura vazia"). Sem ficar cega: o livro que não veio na
+   listagem de livros mas tem abas listadas é recusado (antes era "criado" e trocado), e sem o `sheet_count` e sem
+   nenhuma aba listada também (o 0 dito pelo banco, livro criado e nunca gravado, segue). O caso que motivou: a gravação troca o livro
    inteiro; se a listagem do banco omitir as abas por um instante, quem relê recebe vazio e a troca apagaria o histórico
    para sempre. A conta usa o `sheet_count` do livro e o `row_count` de cada aba (medido em 18/10: o `row_count` é o que
    a leitura devolve). Ligado nos 13 livros dos módulos que só acrescentam (setores, telas por setor, dono dos

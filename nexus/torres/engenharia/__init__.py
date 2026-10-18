@@ -29,9 +29,13 @@ TORRE = Torre(
              "O que está comigo, o que me encaminharam e o que precisa de dono?",
              "Acompanhamento dos ativos da Engenharia (banco) e as OS de falha do Fracttal",
              do_setor="Engenharia"),
+        # do setor Engenharia também (revisão final, 18/10/2026): as ações da gaveta da Mesa vão para as rotas daqui, e o
+        # portão do setor pede a marca desta tela; sem ela, o Pegar da Mesa voltava HTTP 403. A marca em Base → Acessos
+        # segue valendo para os outros setores
         Tela("confiabilidade", "Confiabilidade",
              "Quais ativos falham mais e demoram mais a voltar?",
-             "OS de falha do Fracttal, lidas pelo Nexus"),
+             "OS de falha do Fracttal, lidas pelo Nexus",
+             do_setor="Engenharia"),
         Tela("equipe", "Quadro da equipe",
              "Quem da engenharia está com o quê, o que atrasou e o que vem por aí?",
              "OS do Fracttal dos responsáveis da engenharia"),
@@ -303,23 +307,25 @@ def _ativo_do(x: dict, base: dict) -> dict:
         "cod": x["acomp"]["cod"], "nome": x["acomp"]["cod"], "usina": "", "cliente": "", "fam": "", "crit": ""}
 
 
-def _faixa_da_mesa(caixa: list, comigo: list, sem_dono: list, erro: str) -> list[dict]:
+def _faixa_da_mesa(caixa: list, comigo: list, sem_dono: list, erro: str, *, quem: str = "você",
+                   sem_pessoa: bool = False, os_pela_metade: bool = False) -> list[dict]:
     """Os três números do topo, no modelo do Acompanhamento de chamados (o rótulo, o número pela gravidade, o detalhe).
-    Sem ler o livro, os números são "—", nunca 0."""
+    Cada número é o da lista de mesmo nome (o encaminhado conta só na caixa). Sem ler o livro, os números são "—", nunca
+    0; sem pessoa escolhida (a senha de administrador), os dois dela também; com as OS lidas pela metade, o dos críticos
+    (revisão final, 18/10/2026: a Mesa dizia "todo crítico tem dono" com 0 na 1ª leitura das OS)."""
     from ...engenharia import confiabilidade as C
-    rotulos = ("Encaminhados para você", "Com você", "Críticos sem dono")
+    rotulos = (f"Encaminhados para {quem}", f"Com {quem}", "Críticos sem dono")
     if erro:
         return [{"rotulo": r, "valor": "—", "grav": "", "nota": [("não consegui ler os acompanhamentos", False)]}
                 for r in rotulos]
     agora = datetime.now(BRT)
     if caixa:
         dias = max(0, (agora - min(x["acomp"]["com_desde"] or agora for x in caixa)).days)
-        n1 = ([("o mais antigo chegou ", False), ("hoje", True), (", sem nada seu", False)] if dias == 0 else
-              [("o mais antigo há ", False), (_dias(dias), True), (", sem nada seu", False)])
+        n1 = ([("o mais antigo chegou ", False), ("hoje", True), (", sem resposta", False)] if dias == 0 else
+              [("o mais antigo há ", False), (_dias(dias), True), (", sem resposta", False)])
     else:
-        n1 = [("nada esperando você", False)]
-    comigo_todos = caixa + comigo
-    novas = sum(1 for x in comigo_todos if x["novas"])
+        n1 = [(f"nada esperando {quem}", False)]
+    novas = sum(1 for x in comigo if x["novas"])
     n2 = ([(str(novas), True), (" com falha nova desde que entrou" if novas == 1 else
                                 " com falha nova desde que entraram", False)] if novas else
           [("nenhum com falha nova", False)])
@@ -328,9 +334,15 @@ def _faixa_da_mesa(caixa: list, comigo: list, sem_dono: list, erro: str) -> list
         n3 = [("o pior: ", False), (f"{pior.get('nFalha')} falhas em {C.JANELA_DIAS} dias", True)]
     else:
         n3 = [("todo crítico tem dono", False)]
-    return [{"rotulo": rotulos[0], "valor": len(caixa), "grav": "alerta" if caixa else "", "nota": n1},
-            {"rotulo": rotulos[1], "valor": len(comigo_todos), "grav": "", "nota": n2},
-            {"rotulo": rotulos[2], "valor": len(sem_dono), "grav": "critico" if sem_dono else "", "nota": n3}]
+    faixa = [{"rotulo": rotulos[0], "valor": len(caixa), "grav": "alerta" if caixa else "", "nota": n1},
+             {"rotulo": rotulos[1], "valor": len(comigo), "grav": "", "nota": n2},
+             {"rotulo": rotulos[2], "valor": len(sem_dono), "grav": "critico" if sem_dono else "", "nota": n3}]
+    if sem_pessoa:
+        for k in faixa[:2]:
+            k.update(valor="—", grav="", nota=[("escolha de quem ver a mesa", False)])
+    if os_pela_metade:
+        faixa[2].update(valor="—", grav="", nota=[("a leitura das OS de falha ainda não terminou", False)])
+    return faixa
 
 
 @bp.route("/mesa")
@@ -349,6 +361,8 @@ def mesa():
     if admin and pedida and any(p["hmac"] == pedida for p in pessoas):
         alvo = pedida
     nome_alvo = next((p["nome"] for p in pessoas if p["hmac"] == alvo), "")
+    # a mesa de outra pessoa diz de quem é nos títulos e nos números (o administrador vendo a mesa de alguém)
+    quem = "você" if not alvo or alvo == meu else (nome_alvo or "a pessoa")
     lido = AC.ler()
     erro = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
     acomps = AC.estado(lido["eventos"])
@@ -379,14 +393,17 @@ def mesa():
     comigo = [dict(x, gid=gaveta(x["a"], x["acomp"], x["novas"])) for x in comigo]
     sem_dono = [dict(s, gid=gaveta(s, None, [])) for s in sem_dono]
     diags = AC.diagnosticos(lido["diagnosticos"])
+    est = os_falhas.estado()
     return render_template(
         "engenharia/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"), alvo=alvo, meu=meu, admin=admin,
-        nome_alvo=nome_alvo, pessoas=pessoas, caixa=caixa, comigo=comigo, sem_dono=sem_dono, gavetas=gavetas,
-        kpis=_faixa_da_mesa(caixa, comigo, sem_dono, erro), erro_acomp=erro, erro_leitura=bool(erro),
+        nome_alvo=nome_alvo, quem=quem, pessoas=pessoas, caixa=caixa, comigo=comigo, sem_dono=sem_dono,
+        gavetas=gavetas, erro_acomp=erro, erro_leitura=bool(erro),
+        kpis=_faixa_da_mesa(caixa, comigo, sem_dono, erro, quem=quem, sem_pessoa=not alvo,
+                            os_pela_metade=not est.get("completa")),
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
         pode=pode, diags_ativos=[x for x in diags if not x["excluido"]], diag_nome={x["id"]: x["nome"] for x in diags},
         niveis=C.NIVEIS, meta=C.META_DISP, janela=C.JANELA_DIAS, h=_h, pct=_pct,
-        hoje=datetime.now(BRT).date().isoformat(), piso=AC.PISO.isoformat(), est=os_falhas.estado(),
+        hoje=datetime.now(BRT).date().isoformat(), piso=AC.PISO.isoformat(), est=est,
         sem_cadastro=g.get("sem_cadastro"), lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"))
 
 

@@ -12,7 +12,10 @@ Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusR
 
 O Levi escolheu, no rascunho aprovado, a primeira tela da Engenharia ("Sim, a primeira"), do setor Engenharia
 (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos). Cada um vê a sua mesa ("Cada um vê a sua"), e só o
-administrador escolhe de quem ver (`?pessoa=<código>`; para os demais o parâmetro é ignorado). A rota é `/t/engenharia/mesa`
+administrador escolhe de quem ver (`?pessoa=<código>`; para os demais o parâmetro é ignorado). O administrador fora da
+Engenharia (o da Performance) não está na lista: a 1ª opção do seletor é "A sua mesa", escolhida quando ninguém da lista
+está, e a volta a ela; a mesa de outra pessoa diz o nome dela nos títulos e nos números ("Com <nome da pessoa>"), e sem pessoa
+escolhida (a senha de administrador) os dois números dela são "—". A rota é `/t/engenharia/mesa`
 (`mesa()` em `__init__.py`), o template é `templates/engenharia/mesa.html` e as classes são as `eg-mesa-*` em
 `engenharia.css`. Ela entra na `FORA` da pré-carga, porque lê as OS de falha ao abrir.
 - **Encaminhados para você:** o que outra pessoa passou e quem recebeu ainda não mexeu (Levi: "Até eu mexer nele"). Sai
@@ -20,11 +23,13 @@ administrador escolhe de quem ver (`?pessoa=<código>`; para os demais o parâme
   não aparecem de novo em "Com você".
 - **Com você:** os outros acompanhamentos abertos da pessoa, com falha nova primeiro, depois o nível.
 - **Críticos sem dono:** os da lista Ativos com sinal com nível crítico, com o Pegar e o Encaminhar ali mesmo.
-- **A faixa:** Encaminhados para você (âmbar quando há), Com você (todos, inclusive os encaminhados) e Críticos sem dono
-  (vermelho quando há), no modelo do Acompanhamento de chamados (`kb-kpis`). Sem ler o livro, os números dizem "—" e as
-  listas dizem que não leram.
+- **A faixa:** Encaminhados para você (âmbar quando há), Com você e Críticos sem dono (vermelho quando há), no modelo do
+  Acompanhamento de chamados (`kb-kpis`). Cada número é o da lista de mesmo nome (o encaminhado conta só na caixa: o
+  número diferente da lista é antiobjetivo do desenho). Sem ler o livro, os números dizem "—" e as listas dizem que não
+  leram; com as OS de falha lidas pela metade, os avisos são os da Confiabilidade e o número dos críticos é "—".
 - **O clique:** abre a mesma gaveta da Confiabilidade (`_gaveta.html`), com as mesmas ações e rotas. O JS da gaveta
-  mora em `static/engenharia-gaveta.js` (`egGaveta.ligar()`), e as duas telas o usam.
+  mora em `static/engenharia-gaveta.js` (`egGaveta.ligar()`), e as duas telas o usam. Por isso a Confiabilidade também é
+  do setor Engenharia: o portão do setor pede a marca da tela dona da rota, e sem ela o Pegar da Mesa voltava HTTP 403.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_mesa.py`.
 
 ## Acompanhamento dos ativos com sinal (18/10/2026)
