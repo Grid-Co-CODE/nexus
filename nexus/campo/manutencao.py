@@ -89,6 +89,12 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
                 if fim and (r["zeladoria_ultima"] is None or fim > r["zeladoria_ultima"]):
                     r["zeladoria_ultima"] = fim
             continue
+        fora = D._int(t.get("do_backoffice")) == 1 or tipo == "teste" or os_ in os_de_chamado
+        # a OS em verificação tem as tarefas feitas e espera o supervisor (a fila da Aprovação): conta como aberta e
+        # esperando a aprovação qualquer que seja o estado da tarefa (revisão de 18/10/2026: só contava a tarefa viva)
+        if D._txt(t.get("status_os")) == "em_verificacao" and not fora:
+            abertas.setdefault(uid, set()).add(os_)
+            verif.setdefault(uid, set()).add(os_)
         if not viva:
             continue
         ch = D._txt(t.get("tarefa_chave"))
@@ -96,11 +102,9 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
         if m:
             paradas.setdefault(uid, []).append(m)
             continue
-        if D._int(t.get("do_backoffice")) == 1 or tipo == "teste" or os_ in os_de_chamado:
+        if fora:
             continue
         abertas.setdefault(uid, set()).add(os_)
-        if D._txt(t.get("status_os")) == "em_verificacao":
-            verif.setdefault(uid, set()).add(os_)
         if prog:
             dias = (hoje - prog).days
             if dias > DIAS_ATRASO:

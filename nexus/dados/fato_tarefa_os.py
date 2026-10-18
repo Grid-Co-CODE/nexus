@@ -120,7 +120,8 @@ def linha_qualidade(linhas: list[list], rel: dict, origem_em: str, agora: str) -
     com = {c: sum(1 for l in linhas if l[i[c]] is not None) for c in ("data_id_programada", "usina_id",
                                                                       "equipamento_id")}
     como = Counter(l[i["usina_ligada_por"]] for l in linhas)
-    extra = {k: rel.get(k) for k in ("lidas", "repetidas", "sem_chave", "fora_do_dominio", "backoffice", "paginas")}
+    extra = {k: rel.get(k) for k in ("lidas", "repetidas", "sem_chave", "fora_do_dominio", "backoffice", "paginas",
+                                     "faltaram")}
     valores = {"fato": "tarefa_os", "livro_origem": "Fracttal (API REST) · work_orders", "linhas": n,
                "com_data": com["data_id_programada"], "com_usina": com["usina_id"],
                "com_equipamento": com["equipamento_id"], "pct_data": _pct(com["data_id_programada"], n),

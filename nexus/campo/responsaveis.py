@@ -318,13 +318,16 @@ def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
     cfg = current_app.config
     tarefas = visao._livro(FT.LIVRO, FT.ABA)
     q = next(iter(visao._livro(FT.LIVRO, "qualidade")), {})
-    marcas, erro_motivos = [], ""
+    # sem os motivos, a tarefa parada por motivo conta como atrasada: a tela avisa (revisão de 18/10/2026: passava calado).
+    # A leitura que falha com uma cópia boa na memória (`velha`) segue com as marcas dela, sem aviso
+    marcas, erro_motivos, ilegiveis = [], "", 0
     try:
         from ..pcm import motivos
         est = motivos.ler(cfg)
-        erro_motivos = est.get("erro") or ""
+        if est.get("erro") and not est.get("lido_em"):
+            erro_motivos = est["erro"]
         vig = motivos.vigentes(cfg, est)
-        vig.pop("_ilegiveis", None)
+        ilegiveis = visao.D._int(vig.pop("_ilegiveis", 0)) or 0
         marcas = M.marcas_paradas(vig, lambda m: b.lig.usina(m.get("usina"), m.get("codigo"))[0])
     except Exception as e:      # noqa: BLE001 — sem os motivos, o resto do bloco vale
         erro_motivos = f"{type(e).__name__}: {str(e)[:120]}"
@@ -336,7 +339,23 @@ def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
     ano, sem, _ = passada.isocalendar()
     por = {uid: {**t.get(uid, {}), **s.get(uid, {})} for uid in set(t) | set(s)}
     return por, {"publicado": bool(tarefas), "gerado_em": str(q.get("gerado_em") or ""), "erro_motivos": erro_motivos,
-                 "semana_passada": f"{ano}-W{sem:02d}"}
+                 "ilegiveis": ilegiveis, "semana_passada": f"{ano}-W{sem:02d}"}
+
+
+FOTO_VELHA_H = 2        # o laço grava de hora em hora (do :10 ao :20): passou de 2 h, ao menos uma volta não gravou
+
+
+def foto_das_os(gerado_em, agora) -> dict:
+    """De quando é a foto das OS no banco (o `gerado_em` da qualidade do `nexus_os`, gravado por qualquer máquina) e se
+    está velha, no relógio do pedido. A tela dizia só a hora ("às 09:10"), e a foto de ontem passava por de hoje (revisão
+    de 18/10/2026). `quando`: "das 09:10" hoje, "de 17/10 às 09:10" noutro dia."""
+    d = visao._dt(gerado_em)
+    if not d:
+        return {"quando": "", "horas": None, "velha": False}
+    d, agora = d.astimezone(_BRT), agora.astimezone(_BRT)
+    horas = (agora - d).total_seconds() / 3600
+    quando = f"das {d:%H:%M}" if d.date() == agora.date() else f"de {d:%d/%m} às {d:%H:%M}"
+    return {"quando": quando, "horas": int(horas), "velha": horas > FOTO_VELHA_H}
 
 
 def limpeza() -> tuple[dict, dict]:

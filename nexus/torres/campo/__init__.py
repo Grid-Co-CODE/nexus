@@ -403,6 +403,7 @@ def responsaveis():
     html = render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
+        foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
         opcoes_responsavel=nomes, opcoes_cliente=sorted({u.get("cliente") for u in todas if u.get("cliente")}),

@@ -193,9 +193,15 @@ conformado, foto periódica, chave `fracttal_tarefa_id`): 1 linha = 1 tarefa de 
 zeladoria finalizada nos últimos 90 dias, com `data_id_criacao`/`_programada`/`_fim`, `usina_id` (de-para do Fracttal pelo
 site; código do ativo), `equipamento_id`, o tipo, o status da OS, o estado da tarefa, `tarefa_chave` (a mesma conta da
 programação e dos motivos) e `do_backoffice` (1/0: o HMAC do responsável da OS contra a lista do PCM; o nome nunca vai).
-Quem grava é `nexus/campo/tarefas_os.py`, fora da carga de hora em hora: aos :10, uma máquina por vez (mais de 50 min
-desde a última), `NEXUS_OS_PUBLICAR=0` desliga; lê o banco ANTES do Fracttal (se o banco cai, a cota não se gasta) e
-leitura incompleta não grava (página recusada 3 vezes ou mais de 150 páginas). Grava também a `qualidade` do livro
+Quem grava é `nexus/campo/tarefas_os.py`, fora da carga de hora em hora: cada máquina no :10 mais um atraso sorteado
+de até 10 min, uma por vez (mais de 50 min desde a última, conferido também logo antes de gravar: a leitura leva ~2 min),
+`NEXUS_OS_PUBLICAR=0` desliga; lê o banco ANTES do Fracttal (se o banco cai, a cota não se gasta). Leitura incompleta
+não grava: página recusada 3 vezes, mais de 150 páginas, resposta sem a lista ou com `success: false`, página repetida
+ou a leitura abaixo do total que o REST informa (`limit=1`; a sonda de 18/10 mostrou que a página depois da última vem
+com `data: None`, e é o total que separa o fim do corte). Até 1% do total pode faltar (a OS que muda de status durante a
+leitura pula as linhas dela numa borda de página): fica no `faltaram` da qualidade. E não grava o que sairia chutado
+(`recusou`): sem a `NEXUS_PESSOA_HMAC` ou a lista do backoffice (o `do_backoffice` iria 0 para todas), com a usina ou o
+de-para do cadastro vazios, ou com menos de 90% das tarefas ligadas a uma usina. Grava também a `qualidade` do livro
 (`linha_qualidade`), que a Governança lê.
 **1º ensaio (18/10/2026, ~02:50, só GET, `ferramentas/ensaio_tarefas_os.py`):** 89 páginas em 118 s (status 1: 29;
 status 2: 59; zeladoria finalizada: 1); 8.737 tarefas, nenhuma repetida, nenhuma fora do domínio; usina ligada 98,6%

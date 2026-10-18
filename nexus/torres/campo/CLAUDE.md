@@ -620,8 +620,9 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   PCM no fim, `_programacao_recente`), as OS de parada abertas (`falhas_performance · disponibilidade_os`) e a limpeza
   das Rondas (`visao.sujidade_vegetacao`, a última leitura em 90 dias, sem pedir releitura ao Fracttal). A única fonte
   externa é a programação (cópia do `banco_dados.json` do PCM), e o bloco diz isso.
-- **O que conta (`nexus/campo/manutencao.py`, puro):** OS abertas = OS não finalizadas, em processo e em verificação
-  (no detalhe, as que esperam a aprovação). **Atrasada é a régua do PCM** (Levi: "Régua do PCM: +10 dias"; o
+- **O que conta (`nexus/campo/manutencao.py`, puro):** OS abertas = OS não finalizadas, em processo e em verificação;
+  no detalhe, as que esperam a aprovação: TODA OS em verificação, com as tarefas feitas ou não (é a fila da Aprovação;
+  a revisão de 18/10/2026 achou que só a tarefa ainda aberta contava, e a OS que o técnico terminou sumia). **Atrasada é a régua do PCM** (Levi: "Régua do PCM: +10 dias"; o
   `DIAS_ALERTA` do robô da Gestão PCM): tarefa aberta com a Data Programada há MAIS de 10 dias, contada por tarefa, como
   o PCM conta. Ficam fora de OS abertas e atrasadas, para nada contar duas vezes: o backoffice (decisão do Levi: o
   supervisor não age sobre elas), a tarefa com motivo do recorte do painel (motivo que tira ou justificativa do App:
@@ -643,8 +644,14 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   crítico; nível 4, vala parcial ou sensor sujo é atenção); no detalhe, sujidade, vegetação, vala, sensores e o dia da
   ronda. A **faixa Parada agora**: as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro, 6 e "e mais N".
 - **Avisos:** sem o `nexus_os` no banco, "As OS do Fracttal ainda não chegaram ao banco" e o bloco não cobra por elas;
-  a última leitura do Fracttal que falhou (`tarefas_os.estado()`, lido no pedido) aparece no topo com a hora das OS
-  que valem.
+  a última leitura do Fracttal desta máquina que falhou ou se recusou a gravar (`tarefas_os.estado()`, lido no pedido)
+  aparece no topo, com o motivo e de quando são as OS que valem. A foto das OS diz o dia quando não é de hoje
+  (`foto_das_os`, pelo `gerado_em` da qualidade, gravado por qualquer máquina) e, passada de 2 h, avisa ("As OS da tela
+  são da leitura de 17/10 às 09:10"): a tela dizia só a hora, e a foto de ontem passava por de hoje. Sem os motivos do
+  PCM (nenhuma cópia boa) ou com marca que não abre com a chave desta máquina, a tela avisa: essas tarefas contam como
+  atrasadas, não como paradas. **Provado em 18/10/2026:** a semana passada (W41) da Visão, pela cópia do banco, bate com
+  o "Por cliente" do Fechamento do PCM, cliente a cliente (958 linhas do plano, 958 com usina; só a grafia do nome do
+  cliente difere entre o arquivo do PCM e o cadastro).
 - **O card da OS:** o item de OS do detalhe usa a chave `os_card` (`{"wid", "folio"}`) e abre o card do OS Creator
   (`oscreator/card_os_abrir.html`; sem o id, pelo número). **Nunca `numero`**: no template, `numero` vira o botão da PT.
 - **Prova:** `tests/test_campo_manutencao.py` (as regras num dia fixo) e os testes do bloco em

@@ -616,6 +616,54 @@ def test_a_tela_diz_que_a_leitura_falhou(manut, logado, monkeypatch):
     assert "A última leitura do Fracttal falhou" in html and "09:10" in html
 
 
+def test_a_tela_diz_que_a_leitura_nao_gravou(manut, logado, monkeypatch):
+    """Revisão de 18/10/2026: a volta que lê e se recusa a gravar (`recusou`: o backoffice não abriu, o cadastro veio
+    vazio...) não aparecia na tela, só a que falhava."""
+    from nexus.campo import tarefas_os
+    monkeypatch.setattr(tarefas_os, "estado", lambda: {
+        "ultimo": {"recusou": "a lista do backoffice do PCM não abriu: o do_backoffice sairia chutado"},
+        "quando": f"{HOJE.isoformat()}T10:10-03:00"})
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert "A última leitura do Fracttal não gravou" in html and "backoffice do PCM não abriu" in html
+
+
+def test_a_foto_velha_das_os_avisa_com_o_dia(manut, logado):
+    """Revisão de 18/10/2026: a tela dizia só a hora da leitura ("às 09:10"), e a foto de ontem passava por de hoje."""
+    ontem = HOJE - timedelta(days=1)
+    _aba(manut, "nexus_os", "qualidade", [{"fato": "tarefa_os", "gerado_em": f"{ontem.isoformat()}T09:10:00-03:00"}])
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert f"As OS da tela são da leitura de {ontem.strftime('%d/%m')} às 09:10" in html
+
+
+def test_a_foto_recente_das_os_nao_avisa(manut, logado):
+    agora = datetime.now(BRT) - timedelta(minutes=30)
+    _aba(manut, "nexus_os", "qualidade", [{"fato": "tarefa_os", "gerado_em": agora.isoformat(timespec="seconds")}])
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert "As OS da tela são da leitura" not in html
+    assert R.foto_das_os(agora.isoformat(), datetime.now(BRT))["velha"] is False
+
+
+def test_sem_os_motivos_a_tela_avisa(manut, logado, monkeypatch):
+    """Revisão de 18/10/2026: sem os motivos do PCM, as tarefas paradas por motivo passavam calado para as atrasadas."""
+    from nexus.pcm import motivos
+    monkeypatch.setattr(motivos, "ler", lambda cfg, **k: {"motivos": [], "inicial": [], "marcas": [], "backoffice": [],
+                                                           "erro": "ConnectionError: o banco não respondeu",
+                                                           "lido_em": None})
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert "Os motivos do Fora da programação não abriram" in html
+
+
+def test_marca_que_nao_abre_com_a_chave_avisa(manut, logado, monkeypatch):
+    from nexus.pcm import motivos
+    monkeypatch.setattr(motivos, "vigentes", lambda cfg, est: {"_ilegiveis": 2})
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert "2 marcas do Fora da programação não abriram com a chave" in html
+
+
 def test_os_do_detalhe_abre_o_card_e_nao_a_pt(manut, logado):
     bloco = _bloco_manut(logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True))
     assert 'data-wid="50901"' in bloco and "cr-os" in bloco
@@ -636,6 +684,49 @@ def test_tarefa_com_motivo_sai_das_atrasadas_e_vai_para_paradas(manut, tmp_path)
     m = _com_manut()["Brodowski 1"]["manutencao"]
     assert (m["atrasadas"], m["paradas"], m["motivo_comum"]) == (0, 1, "Aguardando material")
     M.limpar()
+
+
+def test_a_fronteira_do_limite_das_atrasadas():
+    """Revisão de 18/10/2026 (I7): no limite (30 dias) é Acompanhar; um dia acima, Focar. "Acima do limite" é maior
+    que, não maior ou igual."""
+    for maior, nivel, cls in ((30, "atencao", "alerta"), (31, "critico", "critico")):
+        u = {"manutencao": {"atrasadas": 2, "maior_atraso": maior, "os_abertas": 1}}
+        al, _ = R.alertas_manutencao(u, 30)
+        assert [a["nivel"] for a in al] == [nivel], maior
+        assert R.linha_manutencao(u, 30)["valores"]["atrasadas"]["cls"] == cls, maior
+
+
+def test_a_fronteira_da_meta_da_semana():
+    """A régua do Fechamento do PCM: 85% é a meta (cumprida); 84,9%, Acompanhar."""
+    for pct, cobra, cls in ((84.9, True, "alerta"), (85.0, False, "ok")):
+        u = {"manutencao": {"passada_pct": pct, "passada": "2026-W41", "passada_prog": 10, "passada_feitas": 8}}
+        al, bem = R.alertas_manutencao(u, 30)
+        assert any(a["area"] == "semana" for a in al) is cobra, pct
+        assert R.linha_manutencao(u, 30)["valores"]["semana"]["cls"] == cls, pct
+
+
+def test_a_zeladoria_vencida_e_acompanhar_e_a_proxima_nao_cobra():
+    base = {"perf": {"nivel": "ok", "peso": 0}, "acomp": {"nivel": "ok", "peso": 0}, "meta": {}}
+    us = [dict(base, usina="A", manutencao={"zeladoria_vencida": date(2026, 10, 1)}),
+          dict(base, usina="B", manutencao={"zeladoria_proxima": date(2026, 10, 30)}),
+          dict(base, usina="C", manutencao={})]
+    u = {x["usina"]: x for x in R.com_manutencao(us, 30)}
+    assert [u[n]["manut"]["nivel"] for n in "ABC"] == ["atencao", "ok", "ok"]
+    assert u["A"]["nivel"] == "atencao" and u["A"]["manut"]["valores"]["zeladoria"]["txt"] == "venc. 01/10"
+    assert u["B"]["manut"]["valores"]["zeladoria"]["txt"] == "próx. 30/10"
+
+
+def test_a_ordem_do_bloco_manutencao():
+    """Decisão do Levi (18/10/2026): o nível; dentro dele, a parada primeiro, depois mais atrasadas, mais paradas e a
+    semana mais baixa; no empate, o nome."""
+    def u(nome, nivel, pa=0, atr=0, par=0, pct=None):
+        return {"usina": nome, "manut": {"nivel": nivel}, "paradas_abertas": [{}] * pa,
+                "manutencao": {"atrasadas": atr, "paradas": par, "passada_pct": pct}}
+    us = [u("H", "ok"), u("G", "atencao", pct=70.0), u("F", "atencao", pct=60.0), u("E", "atencao", par=2),
+          u("D", "atencao", atr=3), u("C", "critico", atr=1), u("B", "critico", atr=5), u("A", "critico", pa=1),
+          u("I", "atencao", pct=60.0), u("J", "atencao", atr=3, par=1)]
+    assert [x["usina"] for x in sorted(us, key=R.ordem_da_manutencao)] == [
+        "A", "B", "C", "J", "D", "E", "F", "I", "G", "H"]
 
 
 def test_cartoes_com_os_tres_blocos(manut, logado):

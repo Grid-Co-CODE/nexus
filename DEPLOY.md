@@ -402,7 +402,7 @@ e porquês em `nexus/casca/CLAUDE.md`, seções "Telas por setor" e "Pré-carga"
 - **Variáveis (opcionais, padrão ligado: NÃO pôr no servidor)**: `NEXUS_ACESSO_POR_SETOR` (`0` = todos veem tudo, como
   antes), `NEXUS_PRE_CARGA` (`0` = sem pré-carga), `NEXUS_CHAMADOS_PUBLICAR` (`0` = esta máquina não publica os
   chamados de garantia no banco aos :50) e `NEXUS_OS_PUBLICAR` (`0` = esta máquina não publica as tarefas das OS do
-  Fracttal, o `nexus_os`, aos :10; 18/10/2026). Só com `0`, e só se o Levi pedir; depois, `sudo systemctl restart
+  Fracttal, o `nexus_os`, entre :10 e :20; 18/10/2026). Só com `0`, e só se o Levi pedir; depois, `sudo systemctl restart
   nexus`.
 - **Conferir:** Base → Acessos mostra a seção "Telas por setor" com os setores e, depois que alguém com setor entrar, a
   linha "Pré-carga: última volta em ...".

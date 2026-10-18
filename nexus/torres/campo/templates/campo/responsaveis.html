@@ -40,8 +40,18 @@
   {% if not leitura.erro and 'manut' not in erros and not manut_i.get('publicado') %}
   <div class="cn-erro cn-aviso" role="status"><b>As OS do Fracttal ainda não chegaram ao banco.</b> O Nexus lê as tarefas das OS do Fracttal de hora em hora (livro nexus_os); até lá, as colunas de OS e de zeladoria ficam vazias e nenhuma usina é cobrada por elas.</div>
   {% endif %}
-  {% if ((estado_os or {}).get('ultimo') or {}).get('erro') %}
-  <div class="cn-erro cn-aviso" role="status"><b>A última leitura do Fracttal falhou{% if estado_os.quando %} às {{ estado_os.quando[11:16] }}{% endif %}</b> ({{ estado_os.ultimo.erro[:90] }}): nada foi gravado, e as OS da tela são as da leitura de {{ manut_i.get('gerado_em', '')[11:16] or 'antes' }}.</div>
+  {# a volta que falhou ou que se recusou a gravar (o dado sairia chutado), e a foto velha: o que a tela mostra é a
+     última foto boa, e ela diz de quando é (revisão de 18/10/2026) #}
+  {% set ult_os = (estado_os or {}).get('ultimo') or {} %}
+  {% if ult_os.get('erro') or ult_os.get('recusou') %}
+  <div class="cn-erro cn-aviso" role="status"><b>A última leitura do Fracttal {{ 'falhou' if ult_os.get('erro') else 'não gravou' }}{% if estado_os.quando %} às {{ estado_os.quando[11:16] }}{% endif %}</b> ({{ (ult_os.get('erro') or ult_os.get('recusou'))[:120] }}): nada foi gravado, e as OS da tela são as da leitura {{ foto_os.quando or 'anterior' }}.</div>
+  {% elif foto_os.velha %}
+  <div class="cn-erro cn-aviso" role="status"><b>As OS da tela são da leitura {{ foto_os.quando }}</b> (há {{ foto_os.horas }} h): o Nexus lê o Fracttal de hora em hora, e as leituras seguintes não chegaram ao banco.</div>
+  {% endif %}
+  {% if manut_i.get('erro_motivos') %}
+  <div class="cn-erro cn-aviso" role="status"><b>Os motivos do Fora da programação não abriram</b> ({{ manut_i.erro_motivos[:90] }}): a coluna Paradas fica vazia, e as tarefas com motivo contam como atrasadas até eles voltarem.</div>
+  {% elif manut_i.get('ilegiveis') %}
+  <div class="cn-erro cn-aviso" role="status"><b>{{ manut_i.ilegiveis }} marca{{ 's' if manut_i.ilegiveis > 1 }} do Fora da programação não {{ 'abriram' if manut_i.ilegiveis > 1 else 'abriu' }} com a chave desta máquina:</b> {{ 'essas tarefas contam' if manut_i.ilegiveis > 1 else 'essa tarefa conta' }} como atrasada{{ 's' if manut_i.ilegiveis > 1 }}, não como parada{{ 's' if manut_i.ilegiveis > 1 }}.</div>
   {% endif %}
 
   <form class="cn-filtros" method="get">
@@ -139,7 +149,7 @@
           <span>dias</span>
           <button class="gc-btn gc-btn--contorno" type="submit">Aplicar</button>
         </form>
-        <p class="cr-nota-bloco">A semana vem do arquivo do PCM, copiado para o banco de hora em hora{% if manut_i.get('semana_passada') %} (semana passada: {{ manut_i.semana_passada }}){% endif %}. As OS são lidas do Fracttal pelo Nexus{% if manut_i.get('gerado_em') %}, a última vez às {{ manut_i.gerado_em[11:16] }}{% endif %}.</p>
+        <p class="cr-nota-bloco">A semana vem do arquivo do PCM, copiado para o banco de hora em hora{% if manut_i.get('semana_passada') %} (semana passada: {{ manut_i.semana_passada }}){% endif %}. As OS são lidas do Fracttal pelo Nexus{% if foto_os.quando %}; a leitura no banco é {{ foto_os.quando }}{% endif %}.</p>
         {% endif %}
         <div class="cr-resumo">
           {% if b == 'perf' %}

@@ -51,6 +51,16 @@ def test_as_exclusoes():
     assert {x["os"] for x in r["lista_atrasadas"]} == {205, 206}
 
 
+def test_a_os_esperando_aprovacao_conta_com_as_tarefas_feitas():
+    """Revisão de 18/10/2026: a OS em verificação tem as tarefas feitas (o técnico terminou; falta o supervisor
+    aprovar) e não entrava em "esperando a aprovação" nem nas abertas. A fila da Aprovação é a das OS em verificação."""
+    r = _usina([_t(1, 400, status="em_verificacao", estado="finalizada"),
+                _t(2, 400, status="em_verificacao", estado="finalizada"),
+                _t(3, 401, status="em_verificacao", estado="finalizada", bo=1),     # do backoffice: fica fora
+                _t(4, 402, prog=20261020)])
+    assert (r["os_abertas"], r["em_verificacao"], r["atrasadas"]) == (2, 1, 0)
+
+
 def test_marca_sem_codigo_tira_todos_os_ativos_e_casa_sem_acento():
     visual = D.tarefa_chave("inspecao visual")
     tarefas = [_t(1, 300, codigo="THPN-ALT100-INVR1", chave=visual), _t(2, 300, codigo="THPN-ALT100-INVR2", chave=visual)]
