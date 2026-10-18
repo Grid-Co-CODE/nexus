@@ -166,11 +166,13 @@ def usinas_por_dia(regras: list[dict], usinas_fracttal: list[str]) -> list[dict]
     for i, r in enumerate(regras):
         if r["tipo"] == "usina" and r.get("usina") and r.get("dias"):    # o motor descarta nome vazio e regra sem dia
             valendo[norm_usina(r["usina"])] = i
-    saida = []
+    from . import clientes
+    m, saida = clientes.mapa(), []
     for f in usinas_fracttal:
         info = separar_nome(f)
         if not info:
             continue
+        info["cliente"] = clientes.nome(info["cliente"], m)      # o nome do cadastro (Levi, 18/10/2026)
         regra = next((i for chave, i in valendo.items() if casa(f, chave)), None)
         info["regra"] = regra
         info["dias"] = list(regras[regra]["dias"]) if regra is not None else list(DIAS)
