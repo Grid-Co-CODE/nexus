@@ -235,12 +235,13 @@ def test_tela_dos_cartoes_e_a_dos_dois_blocos(tela, logado):
     html = logado.get("/t/campo/responsaveis").get_data(as_text=True)
     assert "Visão do responsável" in html and "Ciclano Chefe" in html and "Beltrano Supervisor" in html
     assert "responsavel=Ciclano+Chefe" in html and "Extintores vencidos" in html   # o cartão abre as usinas dele
+    # escolhido o responsável, a Visão geral (Levi, 18/10/2026: "pode tirar o Onde focar")
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
-    perf = html[html.index('id="cr-perf"'):html.index('id="cr-acomp"')]
-    acomp = html[html.index('id="cr-acomp"'):html.index('class="cn-nota"')]
-    assert "Altair" in perf and "85%" in perf and "1 ativo crítico" in perf and "Meta do mês em" not in perf
-    assert "Brodowski 1" in perf and "usina em dia</b>" not in perf          # em dia vira linha (13/10/2026)
-    assert "1 vencido" in acomp and "Tracker 1 STI" in acomp and "aberto há 26 d" in acomp
+    assert 'aria-current="page">Visão geral' in html
+    lista = _bloco_manut(html)
+    assert "Altair" in lista and "85%" in lista and "1 ativo crítico" in lista
+    assert "Brodowski 1" in lista and "usina em dia</b>" not in lista        # em dia vira linha (13/10/2026)
+    assert "1 vencido" in lista and "Tracker 1 STI" in lista and "aberto há 26 d" in lista
     assert "Coração 1" not in html                                         # é do outro responsável
     assert "Tempo do COS" not in html and "Visão gerencial da plataforma" in html
 
@@ -251,12 +252,12 @@ def test_quem_entra_pelo_fracttal_cai_nas_usinas_dele(tela, cliente):
     with cliente.session_transaction() as s:
         s["usuario"] = {"email": "beltrano@exemplo.test", "nome": "Beltrano Supervisor", "perfil": ""}
     html = cliente.get("/t/campo/responsaveis").get_data(as_text=True)
-    assert '<option value="Beltrano Supervisor" selected>' in html and 'id="cr-perf"' in html
+    assert '<option value="Beltrano Supervisor" selected>' in html and 'class="cr-gr"' in html
     # o responsável logado não vê os cartões (Levi, 12/10/2026: "não vai aparecer por responsável, já vai direto para
     # Onde Focar!"): nem pelo endereço; "Todos" mostra as usinas de todos, ainda nos dois blocos
     assert ">Por responsável</a>" not in html
     html = cliente.get("/t/campo/responsaveis?responsavel=*&modo=cartoes").get_data(as_text=True)
-    assert 'id="cr-perf"' in html and 'class="cn-equipes"' not in html and "Ciclano Chefe" in html
+    assert 'class="cr-gr"' in html and 'class="cn-equipes"' not in html and "Ciclano Chefe" in html
 
 
 def test_sem_a_meta_e_sem_os_chamados_no_banco_a_tela_avisa_e_nao_cobra(tela, logado):
@@ -547,13 +548,16 @@ def manut(tela):
 
 
 def _bloco_manut(html):
-    return html[html.index('id="cr-manut"'):html.index('class="cn-nota"')]
+    """A lista da Visão geral (desde 18/10/2026 no lugar dos três blocos de Onde focar)."""
+    return html[html.index('class="cr-gr-lista"'):html.index('class="cn-nota"')]
 
 
-def _nivel_da_linha(trecho, usina):
-    i = trecho.index(usina)
-    ini = trecho.rindex('<details class="cr-lin cr-lin--', 0, i) + len('<details class="cr-lin cr-lin--')
-    return trecho[ini:trecho.index('"', ini)]
+def _nivel_da_linha(trecho, usina, bloco="manut"):
+    """O nível do bloco na linha da usina (o `data-<bloco>` da linha da Visão geral)."""
+    i = trecho.index(f"<b>{usina}")
+    linha = trecho[trecho.rindex('<details class="cr-gr-lin', 0, i):i]
+    ini = linha.index(f'data-{bloco}="') + len(f'data-{bloco}="')
+    return linha[ini:linha.index('"', ini)]
 
 
 def _com_manut(limite=30):
@@ -561,12 +565,13 @@ def _com_manut(limite=30):
 
 
 def test_o_bloco_manutencao_na_tela(manut, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
-    assert html.index('id="cr-acomp"') < html.index('id="cr-manut"')
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    # Levi, 18/10/2026: "A ordem é essa mesmo: Performance, manutenção e acompanhamento"
+    assert html.index('id="cr-gr-perf"') < html.index('id="cr-gr-manut"') < html.index('id="cr-gr-acomp"')
     bloco = _bloco_manut(html)
-    for rot in ("OS abertas", "Atrasadas", "Vencem até amanhã", "Paradas", "Semana passada", "Zeladoria"):
+    for rot in ("OS abertas", "Atrasadas", "Pausadas", "Semana passada"):
         assert rot in bloco, rot
-    assert "A semana vem do arquivo do PCM" in bloco
+    assert "A semana vem do arquivo do PCM" in html
     assert _nivel_da_linha(bloco, "Brodowski 1") == "critico" and _nivel_da_linha(bloco, "Coração 1") == "atencao"
     u = _com_manut()
     assert u["Brodowski 1"]["manut"]["valores"]["atrasadas"]["cls"] == "critico"
@@ -574,11 +579,11 @@ def test_o_bloco_manutencao_na_tela(manut, logado):
 
 
 def test_o_limite_muda_o_nivel_e_fica_no_cookie(manut, logado):
-    r = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&limite=45")
+    r = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&limite=45")
     assert "nexus_resp_limite=45" in r.headers.get("Set-Cookie", "")
     assert _nivel_da_linha(_bloco_manut(r.get_data(as_text=True)), "Brodowski 1") == "atencao"
     # o pedido seguinte, sem o parâmetro, segue com o limite do cookie
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert 'name="limite"' in html and 'value="45"' in html
     assert _nivel_da_linha(_bloco_manut(html), "Brodowski 1") == "atencao"
 
@@ -587,24 +592,24 @@ def test_limite_do_cookie_com_lixo(manut, logado):
     assert [R.limite_do_pedido(v) for v in ("abc", "", None, "0", "-5", "9999", "45", " 60 ")] == [
         30, 30, 30, 10, 10, 365, 45, 60]
     logado.set_cookie("nexus_resp_limite", "abc")
-    r = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco")
+    r = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral")
     assert r.status_code == 200 and 'value="30"' in r.get_data(as_text=True)
 
 
 def test_parada_aberta_poe_em_focar_e_na_faixa_respeitando_o_filtro(manut, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     faixa = html[html.index('class="cr-parada"'):]
     faixa = faixa[:faixa.index("</div>")]
     assert "Altair" in faixa and "13002" in faixa and "Inversor 1" in faixa
     altair = _com_manut()["Altair"]["manut"]
     assert altair["nivel"] == "critico" and altair["tag"] == ("critico", "parada")
     # o filtro de outro responsável: a faixa não mostra a Altair
-    html = logado.get("/t/campo/responsaveis?responsavel=Beltrano+Supervisor&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=Beltrano+Supervisor&modo=geral").get_data(as_text=True)
     assert 'class="cr-parada"' not in html
 
 
 def test_sem_o_fato_a_tela_avisa_e_nao_cobra(tela, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert "As OS do Fracttal ainda não chegaram ao banco" in html
     u = _com_manut()
     assert u["Brodowski 1"]["manut"]["nivel"] == u["Coração 1"]["manut"]["nivel"] == "ok"
@@ -614,7 +619,7 @@ def test_a_tela_diz_que_a_leitura_falhou(manut, logado, monkeypatch):
     from nexus.campo import tarefas_os
     monkeypatch.setattr(tarefas_os, "estado", lambda: {"ultimo": {"erro": "LeituraIncompleta: o Fracttal recusou"},
                                                        "quando": f"{HOJE.isoformat()}T10:10-03:00"})
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert "A última leitura do Fracttal falhou" in html and "09:10" in html
 
 
@@ -625,7 +630,7 @@ def test_a_tela_diz_que_a_leitura_nao_gravou(manut, logado, monkeypatch):
     monkeypatch.setattr(tarefas_os, "estado", lambda: {
         "ultimo": {"recusou": "a lista do backoffice do PCM não abriu: o do_backoffice sairia chutado"},
         "quando": f"{HOJE.isoformat()}T10:10-03:00"})
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert "A última leitura do Fracttal não gravou" in html and "backoffice do PCM não abriu" in html
 
 
@@ -634,7 +639,7 @@ def test_a_foto_velha_das_os_avisa_com_o_dia(manut, logado):
     ontem = HOJE - timedelta(days=1)
     _aba(manut, "nexus_os", "qualidade", [{"fato": "tarefa_os", "gerado_em": f"{ontem.isoformat()}T09:10:00-03:00"}])
     visao.limpar()
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert f"As OS da tela são da leitura de {ontem.strftime('%d/%m')} às 09:10" in html
 
 
@@ -642,7 +647,7 @@ def test_a_foto_recente_das_os_nao_avisa(manut, logado):
     agora = datetime.now(BRT) - timedelta(minutes=30)
     _aba(manut, "nexus_os", "qualidade", [{"fato": "tarefa_os", "gerado_em": agora.isoformat(timespec="seconds")}])
     visao.limpar()
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert "As OS da tela são da leitura" not in html
     assert R.foto_das_os(agora.isoformat(), datetime.now(BRT))["velha"] is False
 
@@ -654,7 +659,7 @@ def test_sem_os_motivos_a_tela_avisa(manut, logado, monkeypatch):
                                                            "erro": "ConnectionError: o banco não respondeu",
                                                            "lido_em": None})
     visao.limpar()
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert "Os motivos do Fora da programação não abriram" in html
 
 
@@ -662,14 +667,13 @@ def test_marca_que_nao_abre_com_a_chave_avisa(manut, logado, monkeypatch):
     from nexus.pcm import motivos
     monkeypatch.setattr(motivos, "vigentes", lambda cfg, est: {"_ilegiveis": 2})
     visao.limpar()
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert "2 marcas do Fora da programação não abriram com a chave" in html
 
 
 def test_os_do_detalhe_abre_o_card_e_nao_a_pt(manut, logado):
-    bloco = _bloco_manut(logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True))
-    assert 'data-wid="50901"' in bloco and "cr-os" in bloco
-    assert "/t/campo/responsaveis/pt/" not in bloco
+    bloco = _bloco_manut(logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True))
+    assert re.search(r'<button type="button" class="cn-link cr-os cr-link-botao" data-wid="50901"', bloco)
 
 
 def test_tarefa_com_motivo_sai_das_atrasadas_e_vai_para_paradas(manut, tmp_path):
@@ -770,7 +774,7 @@ def test_a_aba_ranking_das_equipes(tela, logado):
     grade = html[html.index('class="cn-equipes cr-rk"'):]                    # os números de cima citam a melhor equipe
     assert grade.index("SC Oeste 01") < grade.index("SP Norte 01")           # sem nota antes da ranqueada
     assert "1º" in html and "de 1" in html and ">93<" in html and "sem nota do App" in html
-    assert "60% qualidade" in html and "equipe=SP+Norte+01" in html and "modo=foco" in html
+    assert "60% qualidade" in html and "equipe=SP+Norte+01" in html and "modo=geral" in html
 
 
 def test_o_responsavel_logado_ve_o_ranking_das_equipes_dele(tela, cliente):
@@ -778,14 +782,14 @@ def test_o_responsavel_logado_ve_o_ranking_das_equipes_dele(tela, cliente):
     assert ">Ranking das equipes</a>" in html and ">Por responsável</a>" not in html
     assert "SC Oeste 01" in html and "SP Norte 01" not in html                # Beltrano é o responsável da Coração 1
     html = cliente.get("/t/campo/responsaveis?modo=cartoes").get_data(as_text=True)
-    assert 'id="cr-perf"' in html and 'class="cn-equipes"' not in html       # nunca os cartões dos outros
+    assert 'class="cr-gr"' in html and 'class="cn-equipes"' not in html      # nunca os cartões dos outros
 
 
-def test_o_filtro_de_equipe_em_onde_focar(tela, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&equipe=SP+Norte+01").get_data(as_text=True)
+def test_o_filtro_de_equipe_na_visao_geral(tela, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&equipe=SP+Norte+01").get_data(as_text=True)
     assert "Altair" in html and "Brodowski 1" in html and "Coração 1" not in html
-    assert "Equipe SP Norte 01" in html and 'href="?responsavel=%2A&amp;modo=foco"' in html   # o "×" tira só a equipe
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&equipe=SP+Norte").get_data(as_text=True)
+    assert "Equipe SP Norte 01" in html and 'href="?responsavel=%2A&amp;modo=geral"' in html  # o "×" tira só a equipe
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&equipe=SP+Norte").get_data(as_text=True)
     assert "Altair" not in html                                               # o nome exato, nunca um pedaço
 
 
@@ -794,16 +798,15 @@ def test_sem_as_notas_do_app_o_ranking_avisa(tela, logado, monkeypatch):
     visao.limpar()
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
     assert "Não consegui ler as notas do App" in html and 'class="cn-equipes cr-rk"' not in html
-    assert 'id="cr-perf"' in logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert 'class="cr-gr"' in logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
 
 
-def test_o_filtro_de_equipe_nao_vaza_para_os_cartoes(tela, logado):
-    # achado 2 da revisão: de Onde focar com a equipe, o "Todos os responsáveis ×" levava aos cartões com o `equipe=`
-    # escondido, e os números do responsável saíam recortados sem nenhum aviso
-    import re as _re
-    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=foco&equipe=SP+Norte+01").get_data(as_text=True)
-    todos = _re.search(r'href="([^"]*)" title="Voltar aos cartões dos responsáveis"', html).group(1)
-    assert "modo=cartoes" in todos and "equipe=" not in todos
+def test_o_filtro_de_equipe_nao_fica_escondido(tela, logado):
+    # achado 2 da revisão do ranking: o "Todos os responsáveis ×" levava aos cartões com o `equipe=` escondido, e os
+    # números saíam recortados sem aviso. Na Visão geral o × fica na Visão geral, e a equipe segue à vista, com o × dela
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=geral&equipe=SP+Norte+01").get_data(as_text=True)
+    todos = re.search(r'href="([^"]*)" title="As usinas de todos os responsáveis"', html).group(1)
+    assert "modo=geral" in todos and "Equipe SP Norte 01" in html
 
 
 def test_a_regua_do_ranking_diz_o_desempate_e_a_legenda_do_semaforo(tela, logado):
@@ -909,9 +912,9 @@ def test_o_ranking_diz_o_periodo_e_de_onde_vieram_as_notas(tela, logado):
     assert "fato_fechamento calculado na hora" in html          # o banco falso não tem o fato: a conta é feita na hora
 
 
-def test_a_faixa_de_onde_focar_diz_que_a_equipe_e_filtro(tela, logado):
+def test_a_faixa_da_visao_geral_diz_que_a_equipe_e_filtro(tela, logado):
     # pendência da revisão (achado 10): com a equipe escolhida, a faixa não dizia "com os filtros"
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&equipe=SP+Norte+01").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&equipe=SP+Norte+01").get_data(as_text=True)
     assert "mobilizadas, com os filtros" in html
 
 
@@ -954,12 +957,142 @@ def test_a_visao_geral_diz_com_os_filtros_com_a_equipe(manut, logado):
     assert "com os filtros" in faixa
 
 
-def test_a_lista_unica_vira_cartoes_ate_1280_px():
-    """Revisão de 18/10/2026: entre 761 e 1260 px as 10 colunas não cabiam (a Usina zerava e Semana sumia, cortada sem
-    rolagem): até 1280 px a lista vira os cartões com as etiquetas P, A e M (a 1281 px a Usina fica com ~150 px)."""
+def test_a_lista_unica_vira_cartoes_ate_1180_px():
+    """Revisão de 18/10/2026: entre 761 e 1260 px as colunas não cabiam (a Usina zerava e Semana sumia, cortada sem
+    rolagem). Até 1180 px a lista vira os cartões (etiquetas P, M e A); de 1181 a 1366, as colunas principais."""
     css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
-    bloco = re.search(r'@media \(max-width:1280px\)\{\n  \.cr-gr-grupos(.*?)\n\}', css, re.S).group(1)
+    bloco = re.search(r'@media \(max-width:1180px\)\{\n  \.cr-gr-grupos(.*?)\n\}', css, re.S).group(1)
     assert '.cr-gr-g > [class*="cr-col-"]{display:none}' in bloco and ".cr-gr-pills{display:flex" in bloco
+
+
+# ── A Visão geral no lugar de Onde focar (Levi, 18/10/2026: "A IDEIA É QUE A VISÃO GERAL SEJA UMA MELHORIA DO ONDE
+# FOCAR, ENTÃO PODE TIRAR O ONDE FOCAR"; as colunas na ordem Performance, Manutenção e Acompanhamento; "AO CLICAR NO
+# BLOCO EM VISÃO GERAL DESTAQUE AS COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO") ──────────────────────
+def test_onde_focar_saiu_e_a_visao_geral_e_o_padrao(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    assert 'aria-current="page">Visão geral' in html and ">Onde focar</a>" not in html
+    # o endereço antigo (o link guardado, o cartão do ranking de antes) abre a Visão geral
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert 'aria-current="page">Visão geral' in html and 'class="cr-gr"' in html
+
+
+def test_as_colunas_da_visao_geral_na_ordem_do_levi(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    lista = _bloco_manut(html)
+    cab = lista[lista.index('class="cr-cols'):]
+    cab = re.findall(r"<span[^>]*>([^<]*)</span>", cab[:cab.index("</div>")])
+    assert cab == ["Usina", "Meta", "PR / prev.", "Disp.", "OS abertas", "Atrasadas", "Pausadas", "Semana passada",
+                   "Ronda", "Limpeza", "PT", "Chamados", "Extintores", ""]
+    grupos = lista[lista.index('cr-gr-grupos'):]
+    assert re.findall(r'>(Performance|Manutenção|Acompanhamento)<', grupos[:grupos.index("</div>")]) == [
+        "Performance", "Manutenção", "Acompanhamento"]
+
+
+def test_a_lista_geral_na_ordem_do_bloco():
+    us = [{"usina": n, "meta": {"atingimento": a}, "ronda": {"tipo": t}, "manut": {"nivel": "ok"},
+           "perf": {"nivel": "ok"}, "acomp": {"nivel": "ok"}, "manutencao": {}}
+          for n, a, t in (("A", 99, "nunca"), ("B", 70, None), ("C", 85, "sem_ronda"))]
+    assert [u["usina"] for u in R.lista_geral(us, None, "perf")] == ["B", "C", "A"]      # a pior meta primeiro
+    assert [u["usina"] for u in R.lista_geral(us, None, "acomp")] == ["A", "C", "B"]     # a pior ronda primeiro
+    assert [u["usina"] for u in R.lista_geral(us, None, None)] == ["A", "B", "C"]        # sem bloco, a ordem que veio
+    assert [R.bloco_geral(v, f) for v, f in (("manut", None), (None, "perf.abaixo_meta"), ("xx", None), (None, None),
+                                             ("acomp", "manut.atrasadas"))] == ["manut", "perf", None, None, "acomp"]
+
+
+def test_o_clique_no_bloco_ordena_e_destaca(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&bloco=perf").get_data(as_text=True)
+    lista = _bloco_manut(html)
+    nomes = re.findall(r'<details class="cr-gr-lin[^>]*>\s*<summary[^>]*>\s*<span class="cr-u"><i[^>]*></i><span><b>([^<]+)', lista)
+    esperado = [u["usina"] for u in R.bloco(list(_com_manut().values()), "perf")["linhas"]]
+    assert nomes == esperado
+    cab = lista[lista.index('class="cr-cols'):]
+    cab = cab[:cab.index("</div>")]
+    assert re.findall(r'<span class="cr-col-(\w+) cr-gr-csel">', cab) == ["meta", "pr", "disp"]
+    assert 'class="cr-gr-gp cr-gr-gp--perf cr-gr-gp--sel"' in lista and 'id="cr-gr-perf"' in html
+    assert "Ordenado por Performance" in html and 'class="cr-gr-limpar"' in html
+
+
+def test_a_largura_das_colunas_se_adapta():
+    """Levi, 18/10/2026: "em visão geral tem um espaço grande para as colunas, deixe mais adaptável": as colunas
+    dividem a largura (fr), em vez de px fixos com a Usina levando todo o resto."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    trilhas = re.search(r"\.cr-gr-g\{grid-template-columns:([^;}]*)", css).group(1)
+    assert trilhas.startswith("minmax(160px,2fr)") and trilhas.count("fr)") == 13 and "px " not in trilhas.replace("160px", "")
+
+
+
+# ── A revisão da Visão geral nova (18/10/2026) ───────────────────────────────────────────────────────────────────
+def _nomes_da_lista(html):
+    return re.findall(r'<details class="cr-gr-lin[^>]*>\s*<summary[^>]*>\s*<span class="cr-u"><i[^>]*></i><span><b>([^<]+)',
+                      _bloco_manut(html))
+
+
+def test_o_filtro_destaca_mas_mantem_a_ordem_do_foco(manut, logado):
+    """Só o clique no nome do bloco ordena pela régua dele; o número filtra e destaca, e a lista segue na ordem do foco
+    (revisão: "PT esperando" ordenado pela ronda jogava a PT parada hoje para o fim, contra a regra da tela)."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=manut.atrasadas").get_data(as_text=True)
+    foco = [n for n, u in _com_manut().items() if (u.get("manutencao") or {}).get("atrasadas")]
+    assert _nomes_da_lista(html) == foco
+    cab = _bloco_manut(html)[_bloco_manut(html).index('class="cr-cols'):]
+    assert re.findall(r'<span class="cr-col-(\w+) cr-gr-csel">', cab[:cab.index("</div>")]) == [
+        "os", "atrasadas", "paradas", "semana"]
+    us = list(_com_manut().values())
+    assert R.lista_geral(us, "acomp.pts", None) == R.filtrar_geral(us, "acomp.pts")
+
+
+def test_de_1181_a_1366_px_ficam_as_colunas_principais():
+    """Revisão: a 1366 px (notebook comum) a tela padrão só mostrava as etiquetas, sem número. Ficam Meta, Disp.,
+    Atrasadas, Pausadas, Semana passada, Ronda e PT; o resto vai ao detalhe."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    meio = re.search(r"@media \(min-width:1181px\) and \(max-width:1366px\)\{(.*?)\n\}", css, re.S).group(1)
+    for col in ("pr", "os", "limpeza", "chamados", "extintores"):
+        assert f".cr-gr-lista .cr-col-{col}" in meio, col
+    assert ".cr-gr-gp--perf{grid-column:span 2}" in meio and ".cr-gr-gp--acomp{grid-column:span 2}" in meio
+
+
+def test_o_bloco_escolhido_marca_a_etiqueta_no_cartao(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&bloco=manut").get_data(as_text=True)
+    lista = _bloco_manut(html)
+    assert lista.count("cr-gr-pill--sel") == lista.count('class="cr-gr-lin') > 0
+    assert re.search(r'cr-gr-pill cr-gr-pill--sel" title="Manutenção"', lista)
+
+
+def test_pausadas_em_toda_a_tela(manut, logado, monkeypatch):
+    html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*").get_data(as_text=True)
+    assert "Tarefas pausadas" in html and "Tarefas paradas" not in html
+    assert "a tarefa parada por motivo" not in html
+    from nexus.pcm import motivos
+    monkeypatch.setattr(motivos, "ler", lambda cfg, **k: {"motivos": [], "inicial": [], "marcas": [], "backoffice": [],
+                                                           "erro": "ConnectionError", "lido_em": None})
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert "a coluna Pausadas fica vazia" in html
+
+
+def test_todos_os_responsaveis_fica_na_visao_geral(manut, logado):
+    """Revisão: quem veio do cartão (sem `modo` no endereço) caía nos cartões ao clicar em "Todos os responsáveis ×"."""
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    todos = re.search(r'href="([^"]*)" title="As usinas de todos os responsáveis"', html).group(1)
+    assert "modo=geral" in todos
+    html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*&filtro=manut.atrasadas&bloco=perf").get_data(as_text=True)
+    cartoes = re.findall(r'class="cn-equipe[^"]*cn-sup[^"]*" href="([^"]*)"', html)
+    assert cartoes and all("filtro=" not in h and "bloco=" not in h for h in cartoes)
+
+
+def test_a_zeladoria_vencida_aparece_no_nome(manut, logado):
+    """Revisão: a zeladoria saiu das colunas (vai ao detalhe), e a usina ficava amarela sem motivo à vista."""
+    _aba(manut, "nexus_os", "fato_tarefa_os", [_tarefa(1, 901, 2, 31), _tarefa(2, 902, 3, 12),
+                                               _tarefa(3, 903, 3, 5, tipo="zeladoria")])
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    lista = _bloco_manut(html)
+    i = lista.index("<b>Coração 1")
+    assert "zeladoria vencida" in lista[i:lista.index("</b>", i)]
+
+
+def test_o_realce_nao_apaga_o_verde_das_celulas():
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert re.search(r"\.cr-gr-csel\{[^}]*background:var\(--superficie-3\)", css)
 
 
 # ── O número anômalo (Levi, 18/10/2026: "apenas sinalize que o número está anômalo e o dado pode estar errado, temos

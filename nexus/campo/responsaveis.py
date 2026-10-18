@@ -84,8 +84,8 @@ REGUAS = (
     ("manut", "atrasadas", "OS atrasadas", "A régua do PCM (Gestão PCM e relatórios): tarefa aberta com a Data "
                                            "Programada há mais de 10 dias é atenção; há mais do limite que você escolhe "
                                            "no bloco (30 dias, se ninguém mudou) é crítico. Ficam de fora o backoffice, "
-                                           "a tarefa parada por motivo, a OS de chamado, a zeladoria e o Teste."),
-    ("manut", "paradas", "Tarefas paradas", "Fora da programação do PCM: tarefa tirada da programação por um motivo, ou "
+                                           "a tarefa pausada por motivo, a OS de chamado, a zeladoria e o Teste."),
+    ("manut", "paradas", "Tarefas pausadas", "Fora da programação do PCM: tarefa tirada da programação por um motivo, ou "
                                             "justificada pelo técnico no App, é atenção."),
     ("manut", "semana", "Semana passada", "Fechamento da semana do PCM: linhas do plano finalizadas ÷ linhas do plano; "
                                           "abaixo da meta de 85% é atenção. A semana vem do arquivo do PCM, copiado "
@@ -963,7 +963,7 @@ def linha_manutencao(u: dict, limite: int) -> dict:
                     "resto": _plural(m["vencem"], "tarefa programada para hoje ou amanhã",
                                      "tarefas programadas para hoje ou amanhã")})
     if m.get("paradas"):
-        det.append({"rot": "Paradas", "forte": "",
+        det.append({"rot": "Pausadas", "forte": "",
                     "resto": _plural(m["paradas"], "tarefa fora da programação", "tarefas fora da programação"),
                     "itens": [{"forte": f"OS {x['os']}", "txt": " · ".join(t for t in (
                         x.get("motivo"), f"desde {_dm(x['desde'])}" if x.get("desde") else "", x.get("quem")) if t),
@@ -1095,7 +1095,7 @@ FILTROS_GERAL = {
     "acomp.chamados": ("acomp", "Chamados", lambda u: bool((u.get("chamados") or {}).get("abertos"))),
     "acomp.ext": ("acomp", "Extintores vencidos", lambda u: bool((u.get("extintores") or {}).get("vencidos"))),
     "manut.atrasadas": ("manut", "Tarefas atrasadas", lambda u: bool(_manut(u).get("atrasadas"))),
-    "manut.paradas": ("manut", "Tarefas paradas", lambda u: bool(_manut(u).get("paradas"))),
+    "manut.paradas": ("manut", "Tarefas pausadas", lambda u: bool(_manut(u).get("paradas"))),
     "manut.semana": ("manut", "Semana passada abaixo de 85%", _semana_abaixo),
 }
 for _b, _nome, _txt in BLOCOS:
@@ -1108,6 +1108,26 @@ def filtro_geral(valor) -> str | None:
     """A chave do filtro da Visão geral, ou None (vazio, lixo ou chave que não existe: a aba abre sem filtro)."""
     v = str(valor or "").strip()
     return v if v in FILTROS_GERAL else None
+
+
+# a ordem dos blocos na Visão geral (Levi, 18/10/2026: "A ordem é essa mesmo: Performance, manutenção e acompanhamento")
+BLOCOS_GERAL = ("perf", "manut", "acomp")
+
+
+def bloco_geral(valor, filtro: str | None) -> str | None:
+    """O bloco que ordena e destaca a lista (Levi: "ao clicar no bloco em Visão geral destaque as colunas daquele bloco
+    e ordene de acordo com aquele bloco"): o `bloco` do endereço; sem ele, o bloco do filtro; sem os dois, nenhum."""
+    v = str(valor or "").strip()
+    if v in BLOCOS_GERAL:
+        return v
+    return FILTROS_GERAL[filtro][0] if filtro in FILTROS_GERAL else None
+
+
+def lista_geral(usinas: list[dict], filtro: str | None, qual: str | None) -> list[dict]:
+    """As usinas do filtro, na ordem do bloco escolhido (a mesma régua de ordem do bloco: a pior meta, a pior ronda,
+    a Manutenção pelo nível e pelas atrasadas); sem bloco, na ordem que vieram (a do foco, `ordem_do_foco`)."""
+    lista = filtrar_geral(usinas, filtro)
+    return bloco(lista, qual)["linhas"] if qual in BLOCOS_GERAL else lista
 
 
 def filtrar_geral(usinas: list[dict], chave: str | None) -> list[dict]:
