@@ -55,7 +55,9 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   Encerrados. Nenhum filtro entra sem o Levi pedir (o de diagnóstico ele não quis).
 - **Quem age** (pega, encaminha, salva, comenta, mexe no cadastro): o setor Engenharia (Base → Integração Fracttal; o
   nome do setor, sem acento nem caixa) e o administrador, com login de pessoa: a senha de administrador não diz quem é, e
-  a ação é recusada. Quem só vê a tela lê tudo, sem botões. Encaminhar é só para pessoas do setor Engenharia (o nome vem
+  a ação é recusada. Quem só vê a tela lê tudo, sem botões. Na lista Ativos com sinal o cartão só abre a gaveta, e o
+  Pegar e o Encaminhar ficam nela (Levi, 18/10/2026: "tire esses botões ... da tela inicial, deixe apenas quando clica no
+  ativo com sinal!"). Encaminhar é só para pessoas do setor Engenharia (o nome vem
   do pessoal do Fracttal). Qualquer um da Engenharia comenta e muda datas e diagnóstico (o Levi não quis "só quem
   acompanha escreve"). Não há "soltar": quem pegou por engano encaminha ou encerra.
 - **Datas:** o início começa no dia do Pegar e pode mudar; o **fim é o dia em que a análise terminou**: preenchê-lo, com o
@@ -72,8 +74,8 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
 - **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
   com o aviso ou o erro (`_gaveta.html`, a mesma peça da página); ao fechar depois de gravar, a página recarrega. O Pegar
-  do cartão também responde na gaveta. O ativo é casado pelo código canônico (`equipamento.canon`): o Fracttal e o livro
-  escrevem o mesmo ativo de jeitos diferentes. Da revisão final (18/10/2026), no molde do card das Contestações:
+  do cartão da Mesa (Críticos sem dono) também responde na gaveta. O ativo é casado pelo código canônico
+  (`equipamento.canon`): o Fracttal e o livro escrevem o mesmo ativo de jeitos diferentes. Da revisão final (18/10/2026), no molde do card das Contestações:
   - a resposta passa por `static/engenharia-gaveta.js`: sessão vencida (o 302 do portão até o Entrar, ou o 401 do fim
     da sessão do Fracttal) recarrega a página; HTTP de erro mostra a falha sem trocar a gaveta (o texto fica);
   - a recusa e o banco fora devolvem o que foi digitado (o comentário, as datas e o diagnóstico escolhidos);
