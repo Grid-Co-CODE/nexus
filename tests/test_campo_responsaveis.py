@@ -828,3 +828,27 @@ def test_o_filtro_de_cliente_muda_o_ranking(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking&cliente=Thopen").get_data(as_text=True)
     grade = html[html.index('class="cn-equipes cr-rk"'):]
     assert "SP Norte 01" in grade and "SC Oeste 01" not in grade              # a Coração 1 é de outro cliente
+
+
+# ── A Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que
+# filtram as usinas em atenção daquele bloco ao clicar) ───────────────────────────────────────────────────────────
+def test_os_filtros_da_visao_geral_contam_como_o_resumo(manut):
+    """Cada filtro da Visão geral usa a condição que conta o número no resumo (`soma`): nenhuma régua nova."""
+    lista = list(_com_manut().values())
+    s = R.soma("Todos", lista)
+
+    def n(k):
+        return len(R.filtrar_geral(lista, k))
+    assert n("perf.abaixo_meta") == s["abaixo_meta"] and n("perf.pr_abaixo") == s["pr_abaixo"]
+    assert n("acomp.rondas") == s["rondas"]
+    assert n("acomp.pts") == sum(1 for u in lista if u["pt"]["aguardando"])
+    assert n("manut.atrasadas") == sum(1 for u in lista if (u.get("manutencao") or {}).get("atrasadas")) == 2
+    for b in ("perf", "acomp", "manut"):
+        assert n(b) == s[b]["critico"] + s[b]["atencao"]
+        assert n(f"{b}.critico") == s[b]["critico"] and n(f"{b}.atencao") == s[b]["atencao"]
+
+
+def test_filtro_da_visao_geral_com_lixo_e_ignorado():
+    assert [R.filtro_geral(v) for v in ("manut.atrasadas", "", None, "manut.", "x" * 500, "perf.critico")] == [
+        "manut.atrasadas", None, None, None, None, "perf.critico"]
+    assert R.filtrar_geral([{"usina": "A"}], None) == [{"usina": "A"}]

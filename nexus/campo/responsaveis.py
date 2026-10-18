@@ -1034,6 +1034,74 @@ def ordem_da_ronda(u: dict):
     return (grupo, -(dias or 0), u["usina"])
 
 
+# ── A Visão geral (18/10/2026) ────────────────────────────────────────────────────────────────────────────────────
+# Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que, ao clicar, "já filtra as usinas em
+# atenção daquele bloco". Cada chave é (bloco, rótulo, a condição): o número usa a MESMA condição que o conta no `soma`
+# (nenhuma régua nova); a chave do bloco são as usinas que pedem atenção nele (focar ou acompanhar), e
+# `<bloco>.<nível>`, só aquele nível. Vai no endereço (`?modo=geral&filtro=manut.atrasadas`); chave que não existe é
+# ignorada.
+def _meta(u) -> dict:
+    return u.get("meta") or {}
+
+
+def _manut(u) -> dict:
+    return u.get("manutencao") or {}
+
+
+def _abaixo_da_meta(u) -> bool:
+    a = _meta(u).get("atingimento")
+    return a is not None and a < META_NA_META
+
+
+def _pr_abaixo(u) -> bool:
+    m = _meta(u)
+    return m.get("pr") is not None and m.get("pr_meta") is not None and m["pr"] < m["pr_meta"]
+
+
+def _disp_abaixo(u) -> bool:
+    d = (u.get("disp") or {}).get("disp")
+    return d is not None and d < DISP_OK
+
+
+def _semana_abaixo(u) -> bool:
+    from .manutencao import META_SEMANA
+    p = _manut(u).get("passada_pct")
+    return p is not None and p < META_SEMANA
+
+
+FILTROS_GERAL = {
+    "perf.abaixo_meta": ("perf", "Abaixo da meta", _abaixo_da_meta),
+    "perf.pr_abaixo": ("perf", "PR abaixo", _pr_abaixo),
+    "perf.disp": ("perf", "Disponibilidade abaixo de 99%", _disp_abaixo),
+    "acomp.rondas": ("acomp", "Rondas pendentes",
+                     lambda u: (u.get("ronda") or {}).get("tipo") in ("nunca", "sem_ronda", "longa_pendente")),
+    "acomp.pts": ("acomp", "PT esperando", lambda u: bool((u.get("pt") or {}).get("aguardando"))),
+    "acomp.chamados": ("acomp", "Chamados", lambda u: bool((u.get("chamados") or {}).get("abertos"))),
+    "acomp.ext": ("acomp", "Extintores vencidos", lambda u: bool((u.get("extintores") or {}).get("vencidos"))),
+    "manut.atrasadas": ("manut", "Tarefas atrasadas", lambda u: bool(_manut(u).get("atrasadas"))),
+    "manut.paradas": ("manut", "Tarefas paradas", lambda u: bool(_manut(u).get("paradas"))),
+    "manut.semana": ("manut", "Semana passada abaixo de 85%", _semana_abaixo),
+}
+for _b, _nome, _txt in BLOCOS:
+    FILTROS_GERAL[_b] = (_b, "pedem atenção", lambda u, b=_b: (u.get(b) or {}).get("nivel", "ok") != "ok")
+    FILTROS_GERAL[f"{_b}.critico"] = (_b, "focar", lambda u, b=_b: (u.get(b) or {}).get("nivel") == "critico")
+    FILTROS_GERAL[f"{_b}.atencao"] = (_b, "acompanhar", lambda u, b=_b: (u.get(b) or {}).get("nivel") == "atencao")
+
+
+def filtro_geral(valor) -> str | None:
+    """A chave do filtro da Visão geral, ou None (vazio, lixo ou chave que não existe: a aba abre sem filtro)."""
+    v = str(valor or "").strip()
+    return v if v in FILTROS_GERAL else None
+
+
+def filtrar_geral(usinas: list[dict], chave: str | None) -> list[dict]:
+    """As usinas que entram no filtro `chave`; sem chave válida, todas."""
+    if chave not in FILTROS_GERAL:
+        return list(usinas)
+    cond = FILTROS_GERAL[chave][2]
+    return [u for u in usinas if cond(u)]
+
+
 def soma(nome: str, usinas: list[dict]) -> dict:
     """O resumo de um grupo de usinas (um responsável, ou o filtro da tela), por bloco: a triagem (focar, acompanhar,
     pode esperar); na Performance, a meta do grupo (produção ÷ meta das usinas com meta, a conta do Gerencial), as
