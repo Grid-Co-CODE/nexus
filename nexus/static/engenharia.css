@@ -359,3 +359,5 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
   color:var(--sobre-verde);background:var(--verde);border-radius:5px;padding:1px 6px;margin-left:4px;vertical-align:middle}
 @media (max-width:1100px){.eg-mesa-grade{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:900px){.eg-mesa-kpis{grid-template-columns:minmax(0,1fr)}}
+/* a gaveta no celular: os quatro números do ativo em duas colunas (em uma linha, "Disponibilidade" cortava a 375 px) */
+@media (max-width:480px){.eg-gav-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
