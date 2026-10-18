@@ -205,3 +205,41 @@ def test_comentario_cifrado_com_hora_quem_e_limites(banco):
     with pytest.raises(A.Recusada, match="Engenharia"):
         A.comentar(_aid(), "sem poder", ANA, False)
     assert "datalogger" not in json.dumps(banco.linhas(A.LIVRO, A.ABA_EVENTO), default=str).lower()
+
+
+# ── Task 3: o cadastro dos diagnósticos e as pessoas da Engenharia ───────────────────────────────────────────────────
+def test_cadastro_cria_renomeia_e_exclui_sem_reaproveitar_id(banco):
+    A.pegar(ATIVO, ANA, pode=True)
+    A.criar_diagnostico("Proteção", "", ANA, True)
+    A.mudar_diagnostico(3, "Proteção (relé)", "Relé de proteção atuando", BETO, True)
+    A.excluir_diagnostico(3, ANA, True)
+    A.criar_diagnostico("Inversor", "", ANA, True)
+    ds = A.diagnosticos(A.ler(forcar=True)["diagnosticos"])
+    assert [(d["id"], d["nome"], d["excluido"]) for d in ds] == [
+        (1, "Comunicação", False), (2, "Disjuntor", False), (3, "Proteção (relé)", True), (4, "Inversor", False)]
+    assert ds[2]["descricao"] == "Relé de proteção atuando"
+    with pytest.raises(A.Recusada, match="já existe"):
+        A.criar_diagnostico("comunicacao", "", ANA, True)               # sem acento nem caixa, o mesmo nome
+    with pytest.raises(A.Recusada, match="caracteres"):
+        A.criar_diagnostico("A", "", ANA, True)
+    with pytest.raises(A.Recusada, match="Engenharia"):
+        A.criar_diagnostico("Outro", "", ANA, False)
+    with pytest.raises(A.Recusada, match="excluído"):
+        A.excluir_diagnostico(3, ANA, True)
+    assert len(banco.linhas(A.LIVRO, A.ABA_EVENTO)) == 1                # o cadastro grava sem tocar nos eventos
+
+
+def test_pessoas_da_engenharia_pelo_setor_e_o_nome_do_fracttal(banco, monkeypatch):
+    from nexus.cadastro import fracttal_pessoal as FP
+    from nexus.cadastro import setores as S
+    setores = [{"setor_id": 1, "nome": "Engenharia", "excluido": False},
+               {"setor_id": 2, "nome": "Performance", "excluido": False}]
+    decisoes = [_dec(10, 1, "h10", "2026-10-12T10:00:00Z"), _dec(11, 2, "h11", "2026-10-12T10:00:00Z"),
+                _dec(12, 1, "h12", "2026-10-12T10:00:00Z"), _dec(12, None, "h12", "2026-10-13T10:00:00Z"),
+                _dec(13, 1, "h13", "2026-10-12T10:00:00Z")]
+    monkeypatch.setattr(S, "ler", lambda *a, **k: {"setores": setores, "decisoes": decisoes, "lido_em": 1, "erro": ""})
+    monkeypatch.setattr(FP, "ler_pessoal", lambda *a, **k: {
+        "pessoas": [{"id": 10, "nome": "Ana Lima"}, {"id": 11, "nome": "Beto Souza"}], "erro": ""})
+    # 11 é da Performance; 12 saiu do setor no dia seguinte; 13 é da Engenharia sem nome no Fracttal
+    assert A.pessoas_da_engenharia() == [{"hmac": "h10", "nome": "Ana Lima"},
+                                         {"hmac": "h13", "nome": "(sem nome no Fracttal)"}]     # sem nome no fim

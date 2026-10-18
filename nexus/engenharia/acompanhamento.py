@@ -415,3 +415,102 @@ def comentar(acompanhamento_id: str, texto: str, usuario, pode: bool) -> dict:
         nova = _evento(cofre, "comentario", quem, a["id"], _ativo_de(a), texto=texto)
         _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
     return nova
+
+
+# ── o cadastro dos diagnósticos (como o Cadastro de motivos do PCM) ───────────────────────────────────────────────────
+NOME_MIN, NOME_MAX, DESCRICAO_MAX = 2, 60, 300
+SEM_NOME = "(sem nome no Fracttal)"
+
+
+def _nome_diag(nome) -> str:
+    n = " ".join(str(nome or "").split())
+    if not NOME_MIN <= len(n) <= NOME_MAX:
+        raise Recusada(f"O nome do diagnóstico tem de ter de {NOME_MIN} a {NOME_MAX} caracteres")
+    return n
+
+
+def _descricao(descricao) -> str:
+    d = " ".join(str(descricao or "").split())
+    if len(d) > DESCRICAO_MAX:
+        raise Recusada(f"A descrição passou de {DESCRICAO_MAX} caracteres")
+    return d
+
+
+def _repetido(linhas: list[dict], nome: str, fora=None) -> None:
+    if any(_norm(l.get("nome")) == _norm(nome) and not _sim(l.get("excluido")) and _int(l.get("diagnostico_id")) != fora
+           for l in linhas):
+        raise Recusada(f"O diagnóstico {nome} já existe")
+
+
+def _linha_do_cadastro(linhas: list[dict], diagnostico_id) -> dict:
+    l = next((l for l in linhas if _int(l.get("diagnostico_id")) == _int(diagnostico_id)), None)
+    if not l:
+        raise Recusada("Não achei este diagnóstico: recarregue a página")
+    if _sim(l.get("excluido")):
+        raise Recusada("Este diagnóstico foi excluído")
+    return l
+
+
+def _gravar_cadastro(mudar, usuario, pode: bool) -> dict:
+    """Relê o livro, muda a aba do cadastro e grava as duas abas (os eventos como estavam)."""
+    quem = _quem(usuario, pode, "mexe no cadastro dos diagnósticos")
+    with _TRAVA:
+        lido = _reler()
+        linhas = [dict(l) for l in _linhas_do_cadastro(lido["diagnosticos"])]
+        agora = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        alvo = mudar(linhas)
+        alvo.update(alterado_em=agora, alterado_por_hmac=quem["hmac"])
+        alvo.setdefault("criado_em", agora)
+        _publicar(lido["eventos"], linhas)
+    return alvo
+
+
+def criar_diagnostico(nome: str, descricao: str, usuario, pode: bool) -> dict:
+    n, d = _nome_diag(nome), _descricao(descricao)
+
+    def mudar(linhas):
+        _repetido(linhas, n)
+        # o ID é o maior + 1, contando os excluídos: um ID nunca volta (os acompanhamentos antigos apontam para ele)
+        nova = {"diagnostico_id": max((_int(l.get("diagnostico_id")) or 0 for l in linhas), default=0) + 1,
+                "nome": n, "descricao": d or None, "excluido": None}
+        linhas.append(nova)
+        return nova
+    return _gravar_cadastro(mudar, usuario, pode)
+
+
+def mudar_diagnostico(diagnostico_id: int, nome: str, descricao: str, usuario, pode: bool) -> dict:
+    n, d = _nome_diag(nome), _descricao(descricao)
+
+    def mudar(linhas):
+        l = _linha_do_cadastro(linhas, diagnostico_id)
+        _repetido(linhas, n, fora=_int(diagnostico_id))
+        l.update(nome=n, descricao=d or None)
+        return l
+    return _gravar_cadastro(mudar, usuario, pode)
+
+
+def excluir_diagnostico(diagnostico_id: int, usuario, pode: bool) -> dict:
+    def mudar(linhas):
+        l = _linha_do_cadastro(linhas, diagnostico_id)
+        l["excluido"] = "sim"
+        return l
+    return _gravar_cadastro(mudar, usuario, pode)
+
+
+def pessoas_da_engenharia() -> list[dict]:
+    """[{"hmac", "nome"}]: quem é do setor Engenharia hoje (a última decisão de cada pessoa do Fracttal, livro
+    `nexus_setores`), com o código do e-mail; o nome vem do pessoal do Fracttal (guardado 1 h, só na memória e na tela).
+    Os nomes primeiro, em ordem; quem está sem nome no Fracttal, no fim."""
+    from ..cadastro import fracttal_pessoal as FP
+    from ..cadastro import setores as S
+    st = S.ler(*_banco())
+    sid = next((s["setor_id"] for s in S.ativos(st.get("setores") or []) if _norm(s["nome"]) == SETOR), None)
+    if sid is None:
+        return []
+    ultima = {}
+    for d in sorted(st.get("decisoes") or [], key=lambda x: str(x.get("decidida_em") or "")):
+        ultima[str(d.get("fracttal_id"))] = d
+    nomes = {str(p.get("id")): p.get("nome") for p in (FP.ler_pessoal().get("pessoas") or [])}
+    out = [{"hmac": d["pessoa_hmac"], "nome": nomes.get(fid) or SEM_NOME} for fid, d in ultima.items()
+           if d.get("setor_id") == sid and d.get("pessoa_hmac")]
+    return sorted(out, key=lambda p: (p["nome"] == SEM_NOME, _norm(p["nome"])))
