@@ -135,3 +135,108 @@ def seta(atual, antes) -> dict:
         return {"tipo": "sem", "n": 0}
     d = antes - atual
     return {"tipo": "sobe" if d > 0 else ("desce" if d < 0 else "igual"), "n": abs(d)}
+
+
+# ── Os cartões: a posição é só a nota do App; o resto da Visão diz em quê cobrar ─────────────────────────────────────
+MAX_ETIQUETAS = 4       # o cartão v2 aprovado: até 4 etiquetas e "e mais N"
+
+
+def _pl(n, um, varios) -> str:
+    return f"{n} {um if n == 1 else varios}"
+
+
+def etiquetas(s: dict, usinas: list[dict], limite: int) -> list[dict]:
+    """Em quê cobrar a equipe: os números da Visão (`responsaveis.soma` do grupo e as linhas das usinas), cada um na régua
+    da tela dona (a mesma do bloco em que ele aparece na Visão), o crítico primeiro e, dentro do nível, a ordem fixa:
+    parada aberta, atrasadas, PT, ronda, limpeza, extintores, meta, disponibilidade, zeladoria, semana, chamados, tarefas
+    paradas. Eles NÃO mudam a posição (decisão do Levi, 18/10/2026: "só aparecem ao lado"). Na meta conta usinas abaixo de
+    97%, e não a meta somada do grupo: medido em 18/10/2026, uma usina com produção de 10,7 GWh contra meta de 149 MWh no
+    Gerencial punha a equipe em 2.207%."""
+    from .manutencao import META_SEMANA
+    from .responsaveis import DISP_CRITICO, DISP_OK, META_ATENCAO, META_NA_META, _virgula
+    us, out = usinas or [], []
+
+    def add(cls, txt):
+        out.append({"cls": cls, "txt": txt})
+    if s.get("paradas_abertas"):
+        add("critico", _pl(s["paradas_abertas"], "OS de parada aberta", "OS de parada abertas"))
+    if s.get("atrasadas"):
+        n = s["atrasadas"]
+        maior = max(((u.get("manutencao") or {}).get("maior_atraso") or 0 for u in us), default=0)
+        add("critico" if maior > limite else "alerta",
+            f"{n} tarefas atrasadas, a mais antiga há {maior} d" if n > 1 else f"1 tarefa atrasada, há {maior} d")
+    if s.get("paradas"):
+        add("critico", _pl(s["paradas"], "PT parada", "PT paradas"))
+    pedem = [t for t in ((u.get("ronda") or {}).get("tipo") for u in us) if t in ("nunca", "sem_ronda", "longa_pendente")]
+    if pedem:
+        add("critico" if any(t != "longa_pendente" for t in pedem) else "alerta",
+            f"{len(pedem)} usinas pedem ronda" if len(pedem) > 1 else "1 usina pede ronda")
+    limpeza = [(((u.get("acomp") or {}).get("valores") or {}).get("limpeza") or {}).get("cls") for u in us]
+    if "critico" in limpeza:
+        add("critico", f"limpeza crítica em {_pl(limpeza.count('critico'), 'usina', 'usinas')}")
+    elif "alerta" in limpeza:
+        add("alerta", f"limpeza em atenção em {_pl(limpeza.count('alerta'), 'usina', 'usinas')}")
+    if s.get("ext_vencidos"):
+        add("critico", _pl(s["ext_vencidos"], "extintor vencido", "extintores vencidos"))
+    abaixo = [a for a in ((u.get("meta") or {}).get("atingimento") for u in us) if a is not None and a < META_NA_META]
+    if abaixo:
+        add("critico" if any(a < META_ATENCAO for a in abaixo) else "alerta",
+            _pl(len(abaixo), "usina abaixo da meta", "usinas abaixo da meta"))
+    disp = s.get("disp")
+    if disp is not None and disp < DISP_OK:
+        add("critico" if disp < DISP_CRITICO else "alerta", f"disp. {_virgula(disp)}%")
+    zel = sum(1 for u in us if (u.get("manutencao") or {}).get("zeladoria_vencida"))
+    if zel:
+        add("alerta", f"zeladoria vencida em {_pl(zel, 'usina', 'usinas')}")
+    pct = s.get("semana_pct")
+    if pct is not None and pct < META_SEMANA:
+        add("alerta", f"semana passada {_virgula(pct, 0)}%")
+    if s.get("chamados"):
+        add("alerta", _pl(s["chamados"], "chamado com o fabricante", "chamados com o fabricante"))
+    if s.get("tarefas_paradas"):
+        add("alerta", _pl(s["tarefas_paradas"], "tarefa fora da programação", "tarefas fora da programação"))
+    out.sort(key=lambda e: e["cls"] != "critico")       # estável: o crítico primeiro, a ordem fixa dentro do nível
+    return out
+
+
+def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict, limite: int) -> dict:
+    """Um cartão por equipe das usinas que passaram pelos filtros da tela (as usinas já com o bloco Manutenção no limite
+    de quem olha): a nota e a posição pela régua do App (refeitas só sobre essas usinas), a posição de antes (a MESMA
+    lista de equipes no período anterior) e a seta, o semáforo dos três blocos (`responsaveis.soma`) e as etiquetas.
+    A ordem é a de quem cobra: as sem nota primeiro (sem OS nem ronda do App no período: o App as deixa fora, mas é o
+    pior caso para quem cobra), depois as ranqueadas da última posição para a 1ª, e a "Sem equipe" no fim, sem posição
+    (o conserto é no cadastro)."""
+    from .responsaveis import soma
+    grupos: dict[str, list] = {}
+    for u in usinas:
+        grupos.setdefault(u.get("equipe") or visao.SEM_EQUIPE, []).append(u)
+
+    def nota(us, per):
+        return nota_da_equipe([(por_usina.get(u.get("usina_id")) or {}).get(per) or _vazio() for u in us])
+    atual = {e: nota(us, "atual") for e, us in grupos.items()}
+    antes = {e: nota(us, "anterior") for e, us in grupos.items()}
+    reais = [e for e in grupos if e != visao.SEM_EQUIPE]
+    pos = posicoes({e: atual[e] for e in reais})
+    pos_antes = posicoes({e: antes[e] for e in reais})
+    out = []
+    for e, us in grupos.items():
+        n, s, sem = atual[e], soma(e, us), e == visao.SEM_EQUIPE
+        etq = etiquetas(s, us, limite)
+        p, pa = pos.get(e), pos_antes.get(e)
+        out.append({"equipe": e, "sem_equipe": sem, "usinas": len(us), "tecnicos": tecnicos.get(e, 0),
+                    "regiao_campo": next((u["regiao_campo"] for u in us if u.get("regiao_campo")), ""),
+                    "base_pequena": len(us) < visao.BASE_PEQUENA, "posicao": p, "nota": n["nota"],
+                    "qualidade": n["qualidade"], "cobertura": n["cobertura"], "n_os": n["n_os"], "n_ronda": n["n_ronda"],
+                    "cor": "neutro" if sem else cor(n["nota"]), "antes": {"nota": antes[e]["nota"], "posicao": pa},
+                    "seta": seta(p, pa), "tri": {q: s[q] for q in ("perf", "acomp", "manut")},
+                    "etiquetas": etq[:MAX_ETIQUETAS], "mais": max(0, len(etq) - MAX_ETIQUETAS)})
+    out.sort(key=lambda c: (2 if c["sem_equipe"] else (0 if c["posicao"] is None else 1), -(c["posicao"] or 0),
+                            c["equipe"]))
+    equipes = [c for c in out if not c["sem_equipe"]]
+    rk = sorted((c for c in equipes if c["posicao"] is not None), key=lambda c: c["posicao"])
+    melhor, menor = (rk[0], rk[-1]) if rk else (None, None)
+    return {"cartoes": out, "total": len(rk),
+            "kpis": {"equipes": len(equipes), "tecnicos": sum(c["tecnicos"] for c in equipes),
+                     "melhor": {"nota": melhor["nota"], "equipe": melhor["equipe"]} if melhor else None,
+                     "menor": {"nota": menor["nota"], "equipe": menor["equipe"]} if menor else None,
+                     "amplitude": melhor["nota"] - menor["nota"] if rk else None}}
