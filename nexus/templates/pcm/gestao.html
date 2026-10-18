@@ -132,16 +132,18 @@
 {%- if c.p is defined and o.val == 'pct' %}<b class="pg-pct">{{ c.p }}%</b><span class="pg-fr">({{ c.f }}/{{ c.t }})</span>
 {%- else %}{{ c.txt }}{% endif -%}
 {%- endmacro %}
-{# na linha da usina, a célula com o que falta abre o painel das tarefas pendentes (12/10/2026, Levi: "Na versão antiga
-   ao clicar em cima do % do que tem pendente aparecia as tarefas pendentes"); MPA e MPS seguem abrindo a Fila, como no
-   painel. O endereço do painel é o desta tela com pu (a usina) e pc (a coluna; "*" = a coluna Pendentes) #}
+{# na linha da usina, toda célula com tarefa abre o painel lateral das tarefas dela, as pendentes e as finalizadas
+   (12/10/2026, Levi: "Na versão antiga ao clicar em cima do % do que tem pendente aparecia as tarefas pendentes";
+   18/10/2026: a de 100% também, "uma barra lateral com uma informação mais fácil de ler"). MPA e MPS iam direto à Fila,
+   e agora a Fila é um link no painel (`data-fila`). O endereço do painel é o desta tela com pu (a usina) e pc (a
+   coluna; "*" = o Geral e a coluna Pendentes) #}
 {% macro td(c, usina=none, sig='') -%}
-<td>{% if c.drill %}<a class="pg-cel pg-tom--{{ c.tom }} pg-frac" href="{{ url(modo='fila', drill=usina, dt=sig, pend=None) }}" title="{{ c.os }}">{{ valor(c) }}</a>
-{%- elif usina and c.t is defined and c.t > c.f %}<button type="button" class="pg-cel pg-tom--{{ c.tom }} pg-cel--pend" data-pend="{{ url(pu=usina, pc=sig) }}" aria-haspopup="dialog" title="{{ (c.os ~ ' · ') if c.os }}clique para ver {{ 'a tarefa pendente' if c.t - c.f == 1 else 'as ' ~ (c.t - c.f) ~ ' tarefas pendentes' }}">{{ valor(c) }}</button>
+<td>{% if usina and c.t is defined and c.t > 0 %}<button type="button" class="pg-cel pg-tom--{{ c.tom }} pg-cel--pend" data-pend="{{ url(pu=usina, pc=sig) }}"{% if c.drill %} data-fila="{{ url(modo='fila', drill=usina, dt=sig, pend=None) }}"{% endif %} aria-haspopup="dialog" title="{{ (c.os ~ ' · ') if c.os }}clique para ver {{ ('as tarefas: ' ~ (c.t - c.f) ~ (' pendente' if c.t - c.f == 1 else ' pendentes') ~ ' e ' ~ c.f ~ (' finalizada' if c.f == 1 else ' finalizadas')) if c.t > c.f else ('a tarefa finalizada' if c.t == 1 else 'as ' ~ c.t ~ ' tarefas, todas finalizadas') }}">{{ valor(c) }}</button>
 {%- else %}<span class="pg-cel pg-tom--{{ c.tom if c.tom is defined else 'nulo' }}"{% if c.os %} title="{{ c.os }}"{% endif %}>{{ valor(c) }}</span>{% endif %}</td>
 {%- endmacro %}
 {% macro fim(geral, tudo, mal=true, usina=none) -%}
-<td><span class="pg-cel pg-tom--{{ tom(geral) }}">{% if geral is none %}—{% else %}<b class="pg-pct">{{ geral }}%</b><span class="pg-fr">({{ tudo.f }}/{{ tudo.t }})</span>{% endif %}</span></td><td class="pg-pend{{ ' pg-pend--mal' if mal and tudo.t - tudo.f > 0 }}">
+<td>{% if usina and tudo.t %}<button type="button" class="pg-cel pg-tom--{{ tom(geral) }} pg-cel--pend" data-pend="{{ url(pu=usina, pc='*') }}" aria-haspopup="dialog" title="clique para ver as tarefas do Geral"><b class="pg-pct">{{ geral }}%</b><span class="pg-fr">({{ tudo.f }}/{{ tudo.t }})</span></button>
+{%- else %}<span class="pg-cel pg-tom--{{ tom(geral) }}">{% if geral is none %}—{% else %}<b class="pg-pct">{{ geral }}%</b><span class="pg-fr">({{ tudo.f }}/{{ tudo.t }})</span>{% endif %}</span>{% endif %}</td><td class="pg-pend{{ ' pg-pend--mal' if mal and tudo.t - tudo.f > 0 }}">
 {%- if usina and tudo.t - tudo.f > 0 %}<button type="button" class="pg-pend-bt" data-pend="{{ url(pu=usina, pc='*') }}" aria-haspopup="dialog" title="Ver as {{ tudo.t - tudo.f }} tarefas pendentes do Geral">{{ tudo.t - tudo.f }}</button>
 {%- else %}{{ tudo.t - tudo.f }}{% endif %}</td>
 {%- endmacro %}
@@ -172,7 +174,7 @@
   <span><i class="pg-amostra pg-tom--crit"></i>abaixo de 50%</span><span><i class="pg-amostra pg-tom--nulo"></i>sem preventiva no período</span>
   <span>ao lado do %, feitas/total</span>
   {% if tem_ger %}<span><b>Criticidade · observação</b>: da Gerencial (aba MPAS), a última entrada datada do log</span>{% endif %}
-  <span class="pg-fim">clique no grupo para abrir as usinas · na célula da usina para ver as tarefas pendentes · na fração de MPA e MPS para abrir a Fila</span></p>
+  <span class="pg-fim">clique no grupo para abrir as usinas · na célula da usina para ver as tarefas dela, pendentes e finalizadas (a de MPA e MPS leva também à Fila)</span></p>
 {# o painel das tarefas pendentes (12/10/2026: "Faça maior e mais bonito"): lateral, largo, com a lista por OS; a OS abre
    o card dela no Nexus (oscreator/card_os_abrir.html, o NexusOsCard das outras torres) #}
 <div class="pgp-veu" id="pgp-veu" hidden></div>
@@ -203,6 +205,14 @@
           if (meu !== pedido) return;
           corpo.innerHTML = r.ok || r.t.indexOf('pgp-cab') >= 0 ? r.t : '<p class="pgp-carga">Não consegui ler as tarefas (' + r.t.length + ').</p>';
           var x = corpo.querySelector('[data-fechar]'); if (x) x.focus();
+          // MPA e MPS: a Fila daquela usina, que era o clique da fração, fica num link do painel
+          var cab = corpo.querySelector('.pgp-cab-txt');
+          if (bt.dataset.fila && cab) {
+            var a = document.createElement('a');
+            a.className = 'pgp-fila'; a.href = bt.dataset.fila;
+            a.innerHTML = 'Ver na Fila <i class="ph ph-arrow-right" aria-hidden="true"></i>';
+            cab.appendChild(a);
+          }
           corpo.querySelectorAll('.pgp-os-n[data-wid]').forEach(function (b) {
             if (window.NexusOsCard && NexusOsCard.prepararAoParar) NexusOsCard.prepararAoParar(b, b.dataset.wid);
           });

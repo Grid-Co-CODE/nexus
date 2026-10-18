@@ -662,6 +662,20 @@ html.pgp-aberto{overflow:hidden}
 .pgp-estado--nulo{background:var(--superficie-3);color:var(--tinta-2)}
 .pgp-nota{margin:8px 0 0;font-size:12px;color:var(--tinta-2)}
 .pgp-vazio,.pgp-carga{color:var(--mudo);font-size:13px}
+/* as pendentes e as finalizadas da célula (18/10/2026) */
+.pgp-t--ok{color:var(--ok) !important}
+.pgp-sec{margin:18px 0 8px;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.pgp-estado--ok{background:var(--ok-suave);color:var(--ok)}
+.pgp-tudo{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ok)}
+.pgp-tudo i{font-size:18px}
+.pgp-feitas summary{cursor:pointer;list-style:none}
+.pgp-feitas summary::-webkit-details-marker{display:none}
+.pgp-feitas summary .pgp-sec{display:inline-flex;align-items:center;gap:6px}
+.pgp-feitas summary .pgp-sec::before{content:"▸";font-size:11px;transition:transform .12s}
+.pgp-feitas[open] summary .pgp-sec::before{transform:rotate(90deg)}
+.pgp-feitas summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.pgp-fila{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;font-weight:600;color:var(--verde-texto);text-decoration:none}
+.pgp-fila:hover{text-decoration:underline}
 @media (max-width:560px){.pgp-corpo{padding:16px}.pgp-estado{min-width:0}.pgp-tarefas li{flex-wrap:wrap}}
 
 /* ── Motivos das tarefas e Fora da programação (16/10/2026, nexus/pcm/motivos.py) ── */

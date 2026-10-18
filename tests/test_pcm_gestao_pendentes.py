@@ -5,7 +5,7 @@ abrindo a Fila, como no painel. O número de tarefas da lista é o da célula. N
 no formato do gestao_pcm.json (os mesmos dados do test_pcm_gestao)."""
 import json
 
-from test_pcm_gestao import ALTAIR, M, com_fonte, t, tarefas  # noqa: F401  (com_fonte é fixture)
+from test_pcm_gestao import ALTAIR, TUCANO, M, com_fonte, t, tarefas  # noqa: F401  (com_fonte é fixture)
 
 from nexus.pcm import gestao as G
 
@@ -62,12 +62,15 @@ def test_painel_pela_tela(logado, com_fonte):
     frag = logado.get("/t/pcm/gestao", query_string={"pu": ALTAIR, "pc": "MPM"})
     h = frag.get_data(as_text=True)
     assert frag.status_code == 200 and 'class="pgp-cab"' in h and ALTAIR in h
-    assert "MPM inversores" in h and "MPM das cabines" not in h          # só a que falta
+    pend, feitas = h.split('class="pgp-feitas"', 1)
+    assert "MPM inversores" in pend and "MPM das cabines" not in pend     # nas pendentes, só a que falta
+    assert "MPM das cabines" in feitas and "MPM inversores" not in feitas # a finalizada vai embaixo (18/10/2026)
     assert "<b>1</b> de <b>2</b> finalizadas" in h and "OS 101" in h
     tudo = logado.get("/t/pcm/gestao", query_string={"pu": ALTAIR, "pc": "*"}).get_data(as_text=True)
     assert "MPM inversores" in tudo and "MPA trackers" in tudo and "Disjuntor" not in tudo   # a corretiva fica fora
     corr = logado.get("/t/pcm/gestao", query_string={"pu": ALTAIR, "pc": "CORR"}).get_data(as_text=True)
-    assert "Disjuntor" in corr and "Fusível" not in corr
+    pend, feitas = corr.split('class="pgp-feitas"', 1)
+    assert "Disjuntor" in pend and "Fusível" not in pend and "Fusível" in feitas
     # coluna que a matriz não tem: 404 (nada de lista inventada)
     assert logado.get("/t/pcm/gestao", query_string={"pu": ALTAIR, "pc": "XYZ"}).status_code == 404
 
@@ -80,3 +83,31 @@ def test_painel_obedece_os_filtros_de_cima_e_o_mes(logado, com_fonte):
     assert "MPM inversores" in h and "MPM do outro mês" not in h
     h = logado.get("/t/pcm/gestao", query_string={"pu": ALTAIR, "pc": "MPM", "responsavel": "Outro"}).get_data(as_text=True)
     assert "MPM do outro mês" in h and "MPM inversores" not in h
+
+
+def test_a_celula_cheia_e_a_fracao_de_mpa_abrem_o_painel_com_as_finalizadas(logado, com_fonte):
+    """Levi, 18/10/2026: "Quando clico em uma célula que está 100% vai para essa tela confusa, conseguiria abrir uma
+    barra lateral com uma informação mais fácil de ler que nem as células com % abaixo de 100". Toda célula da usina com
+    tarefa abre o painel: a de 100% também, e a fração de MPA e MPS, que ia direto à Fila (a Fila fica num link do
+    painel). O painel separa as pendentes das finalizadas, com a data em que cada OS terminou."""
+    import re
+    ts = tarefas()
+    ts[6]["dataFinal"] = f"{M[1]}-12"                                   # a MPT do Tucano, a célula de 100%
+    (com_fonte / "gestao_pcm.json").write_text(json.dumps({"geradoEm": "x", "dataHash": "feitas", "tarefas": ts}),
+                                               encoding="utf-8")
+    html = logado.get("/t/pcm/gestao?mes=todos").get_data(as_text=True)
+    corpo = html.split("<tbody>")[1].split("</tbody>")[0]
+    assert 'class="pg-cel' in corpo and "pg-frac" not in corpo           # nenhuma célula da usina leva direto à Fila
+    cheia = re.search(r'<button type="button" class="pg-cel pg-tom--ok pg-cel--pend" data-pend="([^"]*pc=MPT[^"]*)"',
+                      corpo)
+    assert cheia and "Tucano" in cheia.group(1)
+    mpa = re.search(r'<button type="button" class="pg-cel [^"]*" data-pend="[^"]*pc=MPA[^"]*" data-fila="([^"]*)"', corpo)
+    assert mpa and "modo=fila" in mpa.group(1) and "dt=MPA" in mpa.group(1)
+    h = logado.get("/t/pcm/gestao", query_string={"pu": TUCANO, "pc": "MPT", "mes": "todos"}).get_data(as_text=True)
+    assert "Tarefas · MPT" in h and "<b>1</b> de <b>1</b> finalizadas" in h and "Todas as tarefas desta célula" in h
+    assert '<details class="pgp-feitas" open>' in h                    # sem pendente, as finalizadas abertas
+    feitas = h.split('class="pgp-feitas"', 1)[1]
+    assert "MPT da usina" in feitas and "OS 201" in feitas and "Finalizada em " + G.data_curta(f"{M[1]}-12") in feitas
+    js = html.split("pgp-veu", 1)[1]
+    assert "dataset.fila" in js and "Ver na Fila" in js
+

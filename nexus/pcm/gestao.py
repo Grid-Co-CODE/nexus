@@ -425,10 +425,12 @@ def curto(tarefa) -> str:
 
 
 def pendentes(tarefas, o: Opcoes, meses_, usina: str, col: str) -> dict:
-    """As tarefas que faltam numa célula do Plano: a usina × a coluna (a sigla, a "CORR" ou o mês; "*" = as colunas do
-    Geral, a conta da coluna Pendentes), com os mesmos recortes da matriz (tipo, mês e busca; os filtros de cima já vêm
-    aplicados em `tarefas`). Pendente = tarefa que não está Finalizada (a regra de ouro do painel), então o número bate
-    com o da célula. Agrupadas por OS: as atrasadas primeiro, depois pela Data Programada mais antiga."""
+    """As tarefas de uma célula do Plano: a usina × a coluna (a sigla, a "CORR" ou o mês; "*" = as colunas do Geral, a
+    conta da coluna Pendentes), com os mesmos recortes da matriz (tipo, mês e busca; os filtros de cima já vêm aplicados
+    em `tarefas`). Pendente = tarefa que não está Finalizada (a regra de ouro do painel), então o número bate com o da
+    célula. `oss`: as pendentes por OS, as atrasadas primeiro, depois pela Data Programada mais antiga. `feitas_oss`
+    (18/10/2026, Levi: a célula de 100% "conseguiria abrir uma barra lateral com uma informação mais fácil de ler"): as
+    finalizadas por OS, da que terminou por último para a mais antiga (a `dataFinal` mais nova de cada OS)."""
     cs = colunas(o, meses_)
     alvo = {c for c in cs if c != "CORR"} if col == "*" else {col}
     fs = [*SIGLAS, "corr", "emerg"] if o.tipo == "todos" else (list(SIGLAS) if o.tipo == "prev" else [o.tipo])
@@ -436,6 +438,7 @@ def pendentes(tarefas, o: Opcoes, meses_, usina: str, col: str) -> dict:
     q = sem_acento(o.busca) if o.busca else ""
     feitas = total = 0
     oss: dict[str, dict] = {}
+    feitas_oss: dict[str, dict] = {}
     for t in tarefas:
         if str(t.get("usina") or "") != usina:
             continue
@@ -449,11 +452,19 @@ def pendentes(tarefas, o: Opcoes, meses_, usina: str, col: str) -> dict:
         if k not in alvo:
             continue
         total += 1
-        if str(t.get("estado") or "") == "Finalizada":
-            feitas += 1
-            continue
         n = str(t.get("os") or "—")
         st = STATUS_DO_CARD.get(sem_acento(t.get("osStatus")).strip(), str(t.get("osStatus") or ""))
+        if str(t.get("estado") or "") == "Finalizada":
+            feitas += 1
+            g = feitas_oss.setdefault(n, {"os": n, "wid": t.get("idWO"), "status": st,
+                                          "status_cls": _STATUS_CLS.get(st, "nulo"), "url": str(t.get("url") or ""),
+                                          "fim": "", "tarefas": []})
+            fim = str(t.get("dataFinal") or "")[:10]
+            if fim > g["fim"]:
+                g["fim"] = fim
+            g["tarefas"].append({"tarefa": str(t.get("tarefa") or ""), "curto": curto(t.get("tarefa")),
+                                 "sig": sm[0].upper() if sm[0] in SIGLAS else ROT_TIPO.get(sm[0], "")})
+            continue
         g = oss.setdefault(n, {"os": n, "wid": t.get("idWO"), "status": st, "status_cls": _STATUS_CLS.get(st, "nulo"),
                                "url": str(t.get("url") or ""), "programada": "", "atrasada": False, "tarefas": []})
         prog = str(t.get("dataProg") or "")[:10]
@@ -476,8 +487,16 @@ def pendentes(tarefas, o: Opcoes, meses_, usina: str, col: str) -> dict:
         g["tarefas"] = sorted(juntas.values(), key=lambda x: (ordem_estado.get(x["cls"], 3), sem_acento(x["curto"])))
         g["fechada"] = g["status"] == "Concluída"
     lista = sorted(oss.values(), key=lambda g: (not g["atrasada"], g["programada"] or "9999", g["os"]))
+    for g in feitas_oss.values():
+        juntas = {}
+        for x in g["tarefas"]:
+            j = juntas.setdefault((x["curto"], x["sig"]), dict(x, n=0))
+            j["n"] += 1
+        g["tarefas"] = sorted(juntas.values(), key=lambda x: sem_acento(x["curto"]))
+    feitas_lista = sorted(feitas_oss.values(), key=lambda g: (g["fim"] or "0000", g["os"]), reverse=True)
     tarefas_p = [x for g in lista for x in g["tarefas"] for _ in range(x["n"])]
     return {"usina": usina, "col": col, "oss": lista, "n_os": len(lista), "n_tarefas": len(tarefas_p),
+            "feitas_oss": feitas_lista,
             "feitas": feitas, "total": total, "pct": _round(100 * feitas / total) if total else None,
             "atrasadas": sum(1 for g in lista if g["atrasada"]),
             # (estado, quantas, classe da cor), na ordem do andamento: em progresso, pausada, não iniciada

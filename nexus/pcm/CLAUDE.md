@@ -644,16 +644,18 @@ lê: nada vai ao banco nem ao Fracttal. Os controles vão pela URL (`modo`, `tip
   grava o `geradoEm` em UTC sem fuso e o painel o mostra como hora local: 12:42 lá é 09:42 aqui). Dois defeitos do
   painel que o Nexus não copia (revisão de 08/10): a dica "sem preventiva no período" nas células de grupo e do TOTAL,
   que têm tarefa (aqui ficam sem dica), e o cabeçalho Tipo da Fila, que lá não ordena nada (aqui ordena pelo tipo).
-- **As tarefas pendentes da célula** (Levi, 12/10/2026: "Na versão antiga ao clicar em cima do % do que tem pendente
-  aparecia as tarefas pendentes, resolva isso por gentileza no Nexus! Faça maior e mais bonito"): na linha da usina, a
-  célula com o que falta (MPM, MPT, Corretivas, os meses) e o número da coluna Pendentes abrem um **painel lateral**
-  (640 px; no celular, a tela toda) com as tarefas que não estão Finalizadas, por OS: as atrasadas primeiro, depois pela
-  Data Programada; o status da OS (na grafia do card do OS Creator: "Em processo" → Em Processo, "Verificação" → Em
+- **As tarefas da célula** (Levi, 12/10/2026: "Na versão antiga ao clicar em cima do % do que tem pendente aparecia
+  as tarefas pendentes, resolva isso por gentileza no Nexus! Faça maior e mais bonito"; 18/10/2026: a de 100% "ia para
+  essa tela confusa", que pedia "uma barra lateral com uma informação mais fácil de ler"): na linha da usina, TODA célula
+  com tarefa (a de 100% também; MPA e MPS inclusive; o Geral) e o número da coluna Pendentes abrem um **painel lateral**
+  (640 px; no celular, a tela toda). Em cima, as que não estão Finalizadas, por OS: as atrasadas primeiro, depois pela
+  Data Programada; embaixo, as **Finalizadas** por OS, da que terminou por último (a `dataFinal`), recolhidas quando há
+  pendente e abertas quando a célula está em 100%; o status da OS (na grafia do card do OS Creator: "Em processo" → Em Processo, "Verificação" → Em
   Verificação, "Finalizados" → Concluída, com o aviso "OS finalizada no Fracttal com a tarefa em aberto"), Atrasada,
   a programada e o Fracttal no ícone; a OS abre o **card dela no Nexus** (`oscreator/card_os_abrir.html`). O nome da
   tarefa sem o "[Grid Co.] - MPM - " (o inteiro no title); a mesma atividade repetida na OS (uma por ativo: o arquivo
-  não traz o ativo) vira uma linha com "×4". **MPA e MPS seguem abrindo a Fila** (como no painel), e grupo e TOTAL não
-  abrem lista. A conta é `gestao.pendentes` (a regra `classificar`, a mesma da `base`, e os mesmos recortes da matriz:
+  não traz o ativo) vira uma linha com "×4". **MPA e MPS abrem o painel, e a Fila daquela usina é o link "Ver na
+  Fila" dele** (o `data-fila` da célula; antes a fração ia direto à Fila), e grupo e TOTAL não abrem lista. A conta é `gestao.pendentes` (a regra `classificar`, a mesma da `base`, e os mesmos recortes da matriz:
   tipo, mês, busca e os filtros de cima): o número da lista é o da célula, conferido em toda célula de usina pelo teste.
   Endereço: o da própria tela com `pu` (usina) e `pc` (coluna; `*` = Pendentes), pedido por fetch; coluna que a matriz
   não tem = 404. A `classificar` saiu da `base` sem mudar conta: a prova de 12/10 (356 casos, 434.725 valores) bateu
