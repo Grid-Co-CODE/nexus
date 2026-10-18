@@ -24,8 +24,8 @@ RAMO_PADRAO = "main"
 TTL_S = 300
 TIMEOUT_S = 30
 
-# fonte -> (monotonic da última conferência, dados, epoch do download, ETag do GitHub)
-_cache: dict[str, tuple[float, dict, float, str | None]] = {}
+# fonte -> (monotonic da última conferência, dados, epoch do download, ETag do GitHub, versão do mapa de clientes aplicado)
+_cache: dict[str, tuple[float, dict, float, str | None, int]] = {}
 _trava = threading.Lock()
 
 
@@ -155,15 +155,30 @@ def ler_confiabilidade(config) -> Leitura:
     return _ler(config, "NEXUS_PCM_CONFIABILIDADE_FONTE", URL_CONFIABILIDADE, _validar_dict)
 
 
+def _com_nomes_do_nexus(fonte: str, entrada, m: dict):
+    """A cópia em memória com o cliente pelo nome do cadastro (`nexus/pcm/clientes.py`; Levi, 18/10/2026: "Use o nome
+    do cliente no Nexus como principal"). Troca de novo só quando o mapa mudou (a troca é idempotente)."""
+    from . import clientes
+    v = clientes.versao(m)
+    if entrada[4] != v:
+        clientes.aplicar(entrada[1], m)
+        entrada = entrada[:4] + (v,)
+        _cache[fonte] = entrada
+    return entrada
+
+
 def _ler(config, chave: str, padrao: str, validar) -> Leitura:
     fonte = str(config.get(chave) or os.environ.get(chave) or padrao)
     if config.get("TESTING") and not (config.get(chave) or os.environ.get(chave)):
         return Leitura(None, fonte, erro="sem fonte configurada nos testes")
+    from . import clientes
+    m = clientes.mapa()                  # fora da trava: a 1ª leitura do cadastro em 10 min vai ao banco
     local = not fonte.startswith(("http://", "https://"))
     agora = time.monotonic()
     with _trava:
         em_cache = _cache.get(fonte)
         if em_cache and not local and agora - em_cache[0] < TTL_S:
+            em_cache = _com_nomes_do_nexus(fonte, em_cache, m)
             return Leitura(em_cache[1], fonte, baixado_em=em_cache[2])
         try:
             dados, etag = _baixar(fonte, validar, em_cache[3] if em_cache and not local else None)
@@ -173,10 +188,10 @@ def _ler(config, chave: str, padrao: str, validar) -> Leitura:
             erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         else:
             if dados is None:        # 304: o arquivo não mudou, a cópia em memória vale mais 5 min
-                _cache[fonte] = (agora, em_cache[1], em_cache[2], etag)
-                return Leitura(em_cache[1], fonte, baixado_em=em_cache[2])
-            _cache[fonte] = (agora, dados, time.time(), etag)
-            return Leitura(dados, fonte, baixado_em=time.time())
+                e = _com_nomes_do_nexus(fonte, (agora, em_cache[1], em_cache[2], etag, em_cache[4]), m)
+                return Leitura(e[1], fonte, baixado_em=e[2])
+            e = _com_nomes_do_nexus(fonte, (agora, dados, time.time(), etag, None), m)
+            return Leitura(e[1], fonte, baixado_em=e[2])
         if em_cache:
             return Leitura(em_cache[1], fonte, baixado_em=em_cache[2], erro=erro, velha=True)
         return Leitura(None, fonte, erro=erro)

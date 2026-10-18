@@ -311,6 +311,8 @@ def vigentes(cfg, est: dict) -> dict:
     for x in sorted(est["marcas"], key=lambda x: D._txt(x.get("decidida_em"))):
         por_item.setdefault(D._txt(x.get("item_id")), []).append(x)
     cofre = _cofre_ou_nada(cfg)
+    from . import clientes
+    m_cli = clientes.mapa()
     out, ilegiveis = {}, 0
     for iid, lst in por_item.items():
         ult = lst[-1]
@@ -339,7 +341,8 @@ def vigentes(cfg, est: dict) -> dict:
                 pass
         out[iid] = {"item_id": iid, "os": os_de(ult.get("os")), "codigo": D._txt(corpo.get("codigo")),
                     "tarefa": D._txt(corpo.get("tarefa")), "usina": D._txt(corpo.get("usina")),
-                    "cliente": D._txt(corpo.get("cliente")), "tipo": D._txt(corpo.get("tipo")),
+                    # o nome do cadastro (Levi, 18/10/2026): a marca de antes guarda a grafia do arquivo do PCM
+                    "cliente": clientes.nome(D._txt(corpo.get("cliente")), m_cli), "tipo": D._txt(corpo.get("tipo")),
                     "cluster": D._txt(corpo.get("cluster")), "data_prog": D._txt(corpo.get("data_prog")),
                     "obs": D._txt(corpo.get("obs")), "quem": D._txt(corpo.get("quem")),
                     "motivo_id": mid, "motivo": m["nome"], "tira": m["tira"],

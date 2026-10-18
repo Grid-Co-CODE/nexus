@@ -370,9 +370,11 @@ def semana_do_rascunho(caminho: Path, semana: str) -> dict:
     """A `saida/sombra.xlsx` de uma rodada como semana do quadro, nas chaves do `banco_dados.json` (as do
     `gerar_pcm_json.py` do robô). A planilha não traz o que o robô busca no Fracttal depois (criação, relatório,
     status da OS): o cartão sai sem isso. Guardada pela data do arquivo (ler ~1 MB leva ~1 s)."""
+    from . import clientes
     chave = (str(caminho), caminho.stat().st_mtime_ns)
     feito = _CACHE_RASCUNHO.get(chave)
     if feito is not None:
+        clientes.aplicar(feito, clientes.mapa())     # o cliente pelo nome do cadastro (nexus/pcm/clientes.py)
         return feito
     blocos, pend = C.linhas_da_planilha(caminho)
     rows = [{"cliente": _cliente(b.get("Ativo (Usina)")), "usina": str(b.get("Ativo (Usina)") or "").strip(),
@@ -397,6 +399,7 @@ def semana_do_rascunho(caminho: Path, semana: str) -> dict:
     if len(_CACHE_RASCUNHO) > 8:
         _CACHE_RASCUNHO.clear()
     _CACHE_RASCUNHO[chave] = out
+    clientes.aplicar(out, clientes.mapa())
     return out
 
 

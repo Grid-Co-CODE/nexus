@@ -10,7 +10,8 @@
 {% set cor = {'agora': 'critico', 'critico': 'critico', 'atencao': 'alerta', 'ok': 'ok'} %}
 {% set fonte_nome = {'metas': 'a meta do mês', 'disp': 'a disponibilidade', 'ativos': 'os ativos da Confiabilidade',
                      'chamados': 'os chamados', 'extintores': 'os extintores', 'pt': 'as PT',
-                     'limpeza': 'a limpeza das rondas', 'paradas': 'as paradas abertas', 'manut': 'a manutenção'} %}
+                     'limpeza': 'a limpeza das rondas', 'paradas': 'as paradas abertas', 'manut': 'a manutenção',
+                     'ranking': 'as notas do App (o Ranking das equipes)'} %}
 {# 18/10/2026: a Limpeza no Acompanhamento e o 3º bloco, Manutenção (o modelo A: embaixo dos dois, na largura toda) #}
 {% set colunas = {'perf': (('meta', 'Meta'), ('pr', 'PR / prev.'), ('disp', 'Disp.')),
                   'acomp': (('ronda', 'Ronda'), ('limpeza', 'Limpeza'), ('pt', 'PT'), ('chamados', 'Chamados'),
@@ -55,11 +56,13 @@
   {% endif %}
 
   <form class="cn-filtros" method="get">
-    {# o responsável que entrou pelo Fracttal não vê os cartões dos outros: vai direto para Onde focar #}
-    {% if not responsavel_logado %}<div class="cn-seg" aria-label="Visão">
-      <a href="{{ url(modo='cartoes', responsavel='*') }}"{% if modo == 'cartoes' %} aria-current="page"{% endif %}>Por responsável</a>
+    {# o responsável que entrou pelo Fracttal não vê os cartões dos outros: vai direto para Onde focar; o Ranking das
+       equipes (18/10/2026) é para todos, com as equipes do filtro #}
+    <div class="cn-seg" aria-label="Visão">
+      {% if not responsavel_logado %}<a href="{{ url(modo='cartoes', responsavel='*', equipe=None) }}"{% if modo == 'cartoes' %} aria-current="page"{% endif %}>Por responsável</a>{% endif %}
       <a href="{{ url(modo='foco', responsavel=responsavel or '*') }}"{% if modo == 'foco' %} aria-current="page"{% endif %}>Onde focar</a>
-    </div>{% endif %}
+      <a href="{{ url(modo='ranking', equipe=None) }}"{% if modo == 'ranking' %} aria-current="page"{% endif %}>Ranking das equipes</a>
+    </div>
     <label class="gc-rotulo" for="cr-responsavel">Responsável O&amp;M</label>
     <select class="gc-campo" id="cr-responsavel" name="responsavel" onchange="this.form.submit()">
       <option value="*"{% if not responsavel %} selected{% endif %}>Todos</option>{% for r in opcoes_responsavel %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
@@ -70,6 +73,7 @@
     </select>
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, cidade ou equipe" aria-label="Buscar">
     {% if request.args.get('modo') %}<input type="hidden" name="modo" value="{{ request.args.get('modo') }}">{% endif %}
+    {% if equipe %}<input type="hidden" name="equipe" value="{{ equipe }}">{% endif %}
   </form>
 
   {# a faixa "Parada agora" (18/10/2026; o painel próprio de um supervisor tinha a de "Usinas desligadas"): as OS de
@@ -126,12 +130,69 @@
     <p class="mudo">Nenhum responsável com esses filtros.</p>
     {% endfor %}
   </div>
+  {% elif modo == 'ranking' %}
+  {# o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"; a posição "de acordo com as regras do ranking do app de
+     campo"): a conta é nexus/campo/ranking_equipes.py. Os quatro números do painel do App, a régua numa frase e um cartão
+     por equipe, da pior para a melhor (o cartão v2 do protótipo aprovado). Sem as notas do App, nenhum cartão: todas as
+     equipes sairiam "sem nota", e isso é falta de dado, não da equipe #}
+  {% if 'ranking' in erros %}
+  <p class="mudo cr-vazio">Sem as notas do App agora, o ranking não sai: as outras abas continuam valendo.</p>
+  {% else %}
+  {% set k = ranking.kpis %}
+  <div class="cr-rk-kpis">
+    <div class="cr-rk-kpi"><span>Equipes</span><b>{{ k.equipes }}</b><small>{{ k.tecnicos }} técnico{{ 's' if k.tecnicos != 1 }}</small></div>
+    <div class="cr-rk-kpi"><span>Melhor nota</span><b{% if k.melhor %} class="cn-t-{{ ranking_cor(k.melhor.nota) }}"{% endif %}>{{ k.melhor.nota if k.melhor else '—' }}</b><small>{{ k.melhor.equipe if k.melhor else 'nenhuma equipe com nota' }}</small></div>
+    <div class="cr-rk-kpi"><span>Menor nota</span><b{% if k.menor %} class="cn-t-{{ ranking_cor(k.menor.nota) }}"{% endif %}>{{ k.menor.nota if k.menor else '—' }}</b><small>{{ k.menor.equipe if k.menor else 'nenhuma equipe com nota' }}</small></div>
+    <div class="cr-rk-kpi"><span>Amplitude</span><b>{{ '—' if k.amplitude is none else k.amplitude ~ ' pts' }}</b><small>entre a 1ª e a última</small></div>
+  </div>
+  <p class="cr-rk-regua"><b>A régua do App (Ranking por região):</b> nota = 60% qualidade (a nota média das tarefas e das
+    rondas feitas pelo App) + 40% cobertura (usinas da equipe com ronda nos últimos 30 dias). A posição é só essa nota.
+    No empate, vence a maior qualidade, depois a maior cobertura, mais notas e o nome. "Em quê cobrar" traz os alertas da
+    Visão, na régua de cada tela, e não muda a posição. A cor é a do painel do App (85
+    ou mais verde, 70 ou mais âmbar). A seta compara com os 30 dias anteriores. Diferenças contra o painel do App: a
+    equipe da usina é a do cadastro do Nexus (no App, a do catálogo e da programação dele), a base da cobertura são as
+    usinas mobilizadas, o dia é o de Brasília e a ronda avulsa do Nexus conta na cobertura.</p>
+  {# a legenda do semáforo (revisão de 18/10/2026: os três números só se distinguiam pela cor; a regra da casa é cor E
+     palavra, e a dica do mouse não existe no toque) #}
+  <p class="cr-rk-leg">Nos três blocos de cada cartão, as usinas da equipe: <b class="cn-t-critico">focar</b> · <b class="cn-t-alerta">acompanhar</b> · <b class="cn-t-ok">em dia</b></p>
+  {% set seta_txt = {'sobe': 'sobe ', 'desce': 'desce ', 'igual': 'mesma posição', 'sem': 'sem nota antes'} %}
+  <div class="cn-equipes cr-rk">
+    {% for c in ranking.cartoes %}
+    <a class="cn-equipe{% if c.cor != 'neutro' %} cn-equipe--{{ c.cor }}{% endif %} cr-rk-cartao" href="{{ url(modo='foco', equipe=c.equipe, responsavel=responsavel or '*') }}">
+      <div class="cr-rk-topo">
+        <div class="cr-rk-pos">{% if c.posicao %}{{ c.posicao }}º<small> de {{ ranking.total }}</small>
+          <span class="cr-rk-seta cr-rk-seta--{{ c.seta.tipo }}">{{ seta_txt[c.seta.tipo] }}{{ c.seta.n if c.seta.tipo in ('sobe', 'desce') }}</span>{% else %}—{% endif %}</div>
+        <div class="cr-rk-nota cn-t-{{ c.cor }}">{{ c.nota if c.nota is not none and not c.sem_equipe else '—' }}<small>nota do App</small></div>
+      </div>
+      <div class="cn-eq-cab">
+        <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>{% if c.base_pequena and not c.sem_equipe %}<i class="cr-tag cr-tag--neutro" title="Menos de 3 usinas: uma usina a mais ou a menos muda muito a nota">base pequena</i>{% endif %}</div>
+        <span>{{ c.usinas }} usina{{ 's' if c.usinas != 1 }} · {{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }}{% if c.regiao_campo and c.regiao_campo != sem_regiao %} · {{ c.regiao_campo }}{% endif %}</span>
+      </div>
+      <p class="cr-rk-comp">{% if c.sem_equipe %}usinas sem equipe no cadastro: o conserto é no cadastro{% elif c.nota is none %}{% if c.n_ronda %}sem nota do App: {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }} em 30 dias, nenhuma com nota{% else %}sem nota do App: nenhuma OS nem ronda pelo App em 30 dias{% endif %}{% else %}qualidade <b>{{ c.qualidade }}</b> · cobertura <b>{{ c.cobertura }}%</b> · {{ c.n_os }} tarefa{{ 's' if c.n_os != 1 }} e {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }}{% if c.antes.nota is not none %} · antes {{ c.antes.nota }}{% if c.antes.posicao %} ({{ c.antes.posicao }}º){% endif %}{% endif %}{% endif %}</p>
+      <div class="cr-rk-mini">
+        {# "Acompanh.": a palavra inteira cortava a 1440 e a 375 px; a dica leva o nome inteiro #}
+        {% for b, nome, curto in (('perf', 'Performance', 'Performance'), ('acomp', 'Acompanhamento', 'Acompanh.'), ('manut', 'Manutenção', 'Manutenção')) %}{% set t = c.tri[b] %}
+        <div title="{{ nome }}: {{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} em dia"><span>{{ curto }}</span><b><i class="cn-t-critico">{{ t.critico }}</i> · <i class="cn-t-alerta">{{ t.atencao }}</i> · <i class="cn-t-ok">{{ t.ok }}</i></b></div>
+        {% endfor %}
+      </div>
+      <div class="cr-rk-etqs"><span class="cr-rk-rot">Em quê cobrar</span>
+        {% for e in c.etiquetas %}<span class="cr-tag cr-tag--{{ e.cls }}">{{ e.txt }}</span>{% else %}<span class="cr-tag cr-tag--ok">nada a cobrar nos três blocos</span>{% endfor %}
+        {% if c.mais %}<span class="cr-tag cr-tag--neutro">e mais {{ c.mais }}</span>{% endif %}
+      </div>
+      <span class="cr-rk-ir">Ver as usinas da equipe em Onde focar</span>
+    </a>
+    {% else %}
+    <p class="mudo">Nenhuma equipe com esses filtros.</p>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% else %}
   <div class="cn-faixa-equipe">
     <b>{{ responsavel or 'Todos os responsáveis' }}</b>
     <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q %}, com os filtros{% endif %}</span>
     {% if responsavel and responsavel_logado %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*') }}" title="As usinas de todos os responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>
-    {% elif responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='cartoes') }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
+    {% elif responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='cartoes', equipe=None) }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
+    {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="As usinas de todas as equipes">Equipe {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
   </div>
 
   <div class="cr-blocos">
