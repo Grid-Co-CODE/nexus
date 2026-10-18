@@ -991,7 +991,10 @@ def test_o_dominio_da_anomalia_e_a_regua_unica_da_plataforma():
     # o Levi escolheu UMA régua (18/10/2026, na plataforma): a meta do mês fora de 2 a 8 kWh por kWp por dia; recusou as
     # outras (PR do mês acima de 130%, geração acima de 8 kWh/kWp/dia, atingimento acima de 200%)
     from nexus.dados import dominios as DOM
-    assert set(DOM.ANOMALIA_META) == {"meta_baixa", "meta_alta"}
+    # e o dia que o filtro da plataforma tirou da conta (geração acima da potência × 12 h: a Ibirapuã II em 10/2026, o
+    # filtro que o Levi pediu "especificamente para essa usina")
+    assert set(DOM.ANOMALIA_META) == {"meta_baixa", "meta_alta", "geracao_impossivel"}
+    assert "geração acima da potência × 12 h" in DOM.ANOMALIA_META["geracao_impossivel"]
     assert "abaixo de 2 kWh por kWp por dia" in DOM.ANOMALIA_META["meta_baixa"]
     assert "acima de 8 kWh por kWp por dia" in DOM.ANOMALIA_META["meta_alta"]
     # a frase que a plataforma tinha montado não é código: vira o sinal genérico, nunca some
