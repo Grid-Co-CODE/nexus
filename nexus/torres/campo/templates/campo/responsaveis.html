@@ -24,6 +24,22 @@
 {% macro c_disp(x) %}{{ 'cn-t-neutro' if x is none else ('cn-t-ok' if x >= limites.disp_ok else ('cn-t-alerta' if x >= limites.disp_critico else 'cn-t-critico')) }}{% endmacro %}
 {% macro triagem(t) %}<div class="cr-triagem" role="img" aria-label="{{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} que podem esperar">{% if t.critico %}<span class="c" style="flex: {{ t.critico }}"></span>{% endif %}{% if t.atencao %}<span class="a" style="flex: {{ t.atencao }}"></span>{% endif %}{% if t.ok %}<span class="o" style="flex: {{ t.ok }}"></span>{% endif %}</div>{% endmacro %}
 {% macro triagem_leg(t) %}<div class="cr-tri-leg"><span><b class="cn-t-critico">{{ t.critico }}</b>focar</span><span><b class="cn-t-alerta">{{ t.atencao }}</b>acompanhar</span><span><b class="cn-t-ok">{{ t.ok }}</b>em dia</span></div>{% endmacro %}
+{# o detalhe de um bloco de uma usina: o mesmo nos blocos de Onde focar e na Visão geral (18/10/2026) #}
+{% macro det_bloco(u, b) %}{% set x = u[b] %}
+          <dl class="cr-dl">
+            {% for i in x.det %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp', 'Ativos falhando': 'ativos'}.get(i.rot) if b == 'perf' else none %}
+              <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
+              {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">{{ 'ver os ativos' if jan == 'ativos' else 'dia a dia' }}</button>{% endif %}
+              {# a OS da PT abre a PT por cima, para aprovar sem sair da tela (Levi, 12/10/2026) #}
+              {# a OS da Manutenção abre o card dela no Nexus (o do OS Creator), como a Gestão PCM: `os_card` #}
+              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% elif it.get('os_card') %}<button type="button" class="cn-link cr-os cr-link-botao" data-wid="{{ it.os_card.wid or '' }}" data-folio="{{ it.os_card.folio }}" title="Abrir o card da OS">{{ it.forte }}</button>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
+              {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
+          </dl>
+          <div class="cr-links">
+            {% if b == 'acomp' %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}">Rondas da usina</a>{% endif %}
+            {% for rot, area in links_do_bloco[b] %}<a class="cn-link" href="{{ url_for(tela_dona[area]) }}">{{ rot }}</a>{% endfor %}
+          </div>
+{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
@@ -62,6 +78,7 @@
       {% if not responsavel_logado %}<a href="{{ url(modo='cartoes', responsavel='*', equipe=None) }}"{% if modo == 'cartoes' %} aria-current="page"{% endif %}>Por responsável</a>{% endif %}
       <a href="{{ url(modo='foco', responsavel=responsavel or '*') }}"{% if modo == 'foco' %} aria-current="page"{% endif %}>Onde focar</a>
       <a href="{{ url(modo='ranking', equipe=None) }}"{% if modo == 'ranking' %} aria-current="page"{% endif %}>Ranking das equipes</a>
+      <a href="{{ url(modo='geral', filtro=None) }}"{% if modo == 'geral' %} aria-current="page"{% endif %}>Visão geral</a>
     </div>
     <label class="gc-rotulo" for="cr-responsavel">Responsável O&amp;M</label>
     <select class="gc-campo" id="cr-responsavel" name="responsavel" onchange="this.form.submit()">
@@ -186,6 +203,89 @@
     {% endfor %}
   </div>
   {% endif %}
+  {% elif modo == 'geral' %}
+  {# a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que filtram
+     as usinas em atenção daquele bloco ao clicar; protótipo aprovado): os três blocos em cima, com os números do resumo
+     (`soma`), e as usinas do filtro numa lista só. O filtro vai no endereço (`filtro`; FILTROS_GERAL em
+     nexus/campo/responsaveis.py: a condição de cada número do resumo). Número zero não é link #}
+  {% set fg = filtros_geral.get(filtro) if filtro else none %}
+  {% set nome_bloco = {'perf': 'Performance', 'acomp': 'Acompanhamento', 'manut': 'Manutenção'} %}
+  {% macro kpi(chave, rot, valor, cls, sub) %}{% set n = contagem_geral.get(chave, 0) if chave else 0 %}{% if n %}<a class="cr-gr-kpi{% if filtro == chave %} cr-gr-sel{% endif %}" href="{{ url(filtro=None if filtro == chave else chave) }}" title="Ver as {{ n }} usina{{ 's' if n != 1 }}">{% else %}<div class="cr-gr-kpi">{% endif %}<span class="r">{{ rot }}</span><b class="{{ cls }}">{{ valor }}</b><small>{{ sub }}</small>{% if n %}</a>{% else %}</div>{% endif %}{% endmacro %}
+  {% macro chip(chave, n, cls, rot) %}{% if n %}<a class="cr-gr-chip{% if filtro == chave %} cr-gr-sel{% endif %}" href="{{ url(filtro=None if filtro == chave else chave) }}"><b class="{{ cls }}">{{ n }}</b> {{ rot }}</a>{% else %}<span class="cr-gr-chip"><b class="{{ cls }}">0</b> {{ rot }}</span>{% endif %}{% endmacro %}
+  <div class="cr-gr">
+  <div class="cn-faixa-equipe">
+    <b>{{ responsavel or 'Todos os responsáveis' }}</b>
+    <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q %}, com os filtros{% endif %}</span>
+    {% if responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*') }}" title="As usinas de todos os responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
+    {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="As usinas de todas as equipes">Equipe {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
+  </div>
+  <div class="cr-gr-blocos">
+    {% for b, nome, txt, bl in blocos %}{% set t = bl.tri %}{% set atn = t.critico + t.atencao %}
+    <section class="cr-gr-bloco{% if fg and fg[0] == b %} cr-gr-bloco--sel{% endif %}" aria-labelledby="cr-gr-{{ b }}">
+      <header class="cr-gr-cab">
+        <h2 id="cr-gr-{{ b }}"><i class="ph ph-{{ icone[b] }}" aria-hidden="true"></i>{{ nome }}</h2>
+        {% if atn %}<a class="cr-gr-atn{% if filtro == b %} cr-gr-sel{% endif %}" href="{{ url(filtro=None if filtro == b else b) }}" title="Ver as usinas para focar ou acompanhar em {{ nome }}">{{ atn }} pede{{ 'm' if atn != 1 }} atenção</a>{% else %}<span class="cr-gr-atn">tudo em dia</span>{% endif %}
+      </header>
+      <div class="cr-gr-kpis">
+        {% if b == 'perf' %}
+        {{ kpi('perf.abaixo_meta', 'Meta do mês', pct(resumo.meta_pct, 1), c_meta(resumo.meta_pct), 'produção ÷ meta do grupo') }}
+        {{ kpi('perf.abaixo_meta', 'Abaixo da meta', resumo.abaixo_meta, 'cn-t-alerta' if resumo.abaixo_meta else '', 'usinas com menos de 97%') }}
+        {{ kpi('perf.pr_abaixo', 'PR abaixo', resumo.pr_abaixo, 'cn-t-alerta' if resumo.pr_abaixo else '', 'usinas abaixo do previsto') }}
+        {{ kpi('perf.disp', 'Disponibilidade', pct(resumo.disp, 1), c_disp(resumo.disp), 'média do mês, pela potência') }}
+        {% elif b == 'manut' %}
+        {{ kpi(none, 'OS abertas', resumo.os_abertas, '', 'em processo e em verificação') }}
+        {{ kpi('manut.atrasadas', 'Tarefas atrasadas', resumo.atrasadas, 'cn-t-alerta' if resumo.atrasadas else '', 'programadas há mais de 10 dias') }}
+        {{ kpi('manut.paradas', 'Tarefas paradas', resumo.tarefas_paradas, 'cn-t-alerta' if resumo.tarefas_paradas else '', 'fora da programação') }}
+        {{ kpi('manut.semana', 'Semana passada', pct(resumo.semana_pct, 0), '', 'do plano feito (meta de 85%)') }}
+        {% else %}
+        {{ kpi('acomp.rondas', 'Rondas pendentes', resumo.rondas, 'cn-t-alerta' if resumo.rondas else '', 'nunca, 7 dias ou mais, ou a longa') }}
+        {{ kpi('acomp.pts', 'PT esperando', resumo.pts, 'cn-t-critico' if resumo.agora else '', resumo.agora ~ ' parada' ~ ('s' if resumo.agora != 1 else '') ~ ' hoje') }}
+        {{ kpi('acomp.chamados', 'Chamados', resumo.chamados, '', 'em aberto com o fabricante') }}
+        {{ kpi('acomp.ext', 'Extintores', resumo.ext_vencidos, 'cn-t-critico' if resumo.ext_vencidos else '', 'vencidos (recarga ou hidrostático)') }}
+        {% endif %}
+      </div>
+      {{ triagem(t) }}
+      <div class="cr-gr-tri">{{ chip(b ~ '.critico', t.critico, 'cn-t-critico', 'focar') }}{{ chip(b ~ '.atencao', t.atencao, 'cn-t-alerta', 'acompanhar') }}<span class="cr-gr-chip"><b class="cn-t-ok">{{ t.ok }}</b> em dia</span></div>
+      {% if b == 'manut' %}
+      <form class="cr-limite cr-gr-limite" method="get">
+        {% for k, v in request.args.items() if k != 'limite' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <label for="cr-gr-limite">Focar atrasada há mais de</label>
+        <input class="gc-campo" id="cr-gr-limite" type="number" name="limite" min="10" max="365" value="{{ limite }}">
+        <span>dias</span>
+        <button class="gc-btn gc-btn--contorno" type="submit">Aplicar</button>
+      </form>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  <div class="cr-gr-estado">
+    <b>{{ lista_geral|length }} de {{ usinas|length }} usina{{ 's' if usinas|length != 1 }}</b>
+    {% if fg %}<span class="cr-gr-filtro">{{ nome_bloco[fg[0]] }} · {{ fg[1] }}<a class="cr-gr-limpar" href="{{ url(filtro=None) }}" title="Tirar o filtro" aria-label="Tirar o filtro">×</a></span>
+    {% else %}<span class="mudo">Clique num bloco ou num número para ver só as usinas que pedem atenção nele.</span>{% endif %}
+  </div>
+  {% set cols = (('perf', 'meta', 'Meta'), ('perf', 'disp', 'Disp.'), ('acomp', 'ronda', 'Ronda'), ('acomp', 'limpeza', 'Limpeza'),
+                 ('acomp', 'pt', 'PT'), ('manut', 'atrasadas', 'Atrasadas'), ('manut', 'paradas', 'Paradas'), ('manut', 'semana', 'Semana')) %}
+  <div class="cr-gr-lista">
+    <div class="cr-gr-grupos cr-gr-g"><span></span>{% for b, n in (('perf', 2), ('acomp', 3), ('manut', 3)) %}<span class="cr-gr-gp{% if fg and fg[0] == b %} cr-gr-gp--sel{% endif %}" style="grid-column: span {{ n }}">{{ nome_bloco[b] }}</span>{% endfor %}<span></span></div>
+    <div class="cr-cols cr-g cr-gr-g"><span>Usina</span>{% for b, k, rot in cols %}<span class="cr-col-{{ k }}{% if fg and fg[0] == b %} cr-gr-csel{% endif %}">{{ rot }}</span>{% endfor %}<span></span></div>
+    {% for u in lista_geral %}
+    <details class="cr-gr-lin cr-lin cr-lin--{{ u.nivel }}">
+      <summary class="cr-g cr-gr-g">
+        <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
+        {% for b, k, rot in cols %}{% set v = u[b].valores[k] %}<span class="cr-col-{{ k }}{% if fg and fg[0] == b %} cr-gr-csel{% endif %}"><span class="cr-v cr-v--{{ v.cls }}">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</span></span>{% endfor %}
+        {# no celular (até 760 px) as colunas saem e ficam as três etiquetas, na cor do nível de cada bloco, com o alerta principal #}
+        <span class="cr-gr-pills">{% for b, letra in (('perf', 'P'), ('acomp', 'A'), ('manut', 'M')) %}{% set al = u[b].alertas %}<span class="cr-tag cr-tag--{{ cor[u[b].nivel] }} cr-gr-pill"><em>{{ letra }}</em>{{ al[0].titulo if al else 'em dia' }}</span>{% endfor %}</span>
+        <i class="ph ph-caret-down cr-seta" aria-hidden="true"></i>
+      </summary>
+      <div class="cr-gr-det">
+        {% for b, nome, txt, bl in blocos %}<div class="cr-det"><h3>{{ nome }}</h3>{% if u[b].det %}{{ det_bloco(u, b) }}{% else %}<p class="mudo">em dia</p>{% endif %}</div>{% endfor %}
+      </div>
+    </details>
+    {% else %}
+    <p class="mudo cr-vazio">Nenhuma usina com esse filtro.</p>
+    {% endfor %}
+  </div>
+  </div>
   {% else %}
   <div class="cn-faixa-equipe">
     <b>{{ responsavel or 'Todos os responsáveis' }}</b>
@@ -244,19 +344,7 @@
           <i class="ph ph-caret-down cr-seta" aria-hidden="true"></i>
         </summary>
         <div class="cr-det">
-          <dl class="cr-dl">
-            {% for i in x.det %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp', 'Ativos falhando': 'ativos'}.get(i.rot) if b == 'perf' else none %}
-              <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
-              {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">{{ 'ver os ativos' if jan == 'ativos' else 'dia a dia' }}</button>{% endif %}
-              {# a OS da PT abre a PT por cima, para aprovar sem sair da tela (Levi, 12/10/2026) #}
-              {# a OS da Manutenção abre o card dela no Nexus (o do OS Creator), como a Gestão PCM: `os_card` #}
-              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% elif it.get('os_card') %}<button type="button" class="cn-link cr-os cr-link-botao" data-wid="{{ it.os_card.wid or '' }}" data-folio="{{ it.os_card.folio }}" title="Abrir o card da OS">{{ it.forte }}</button>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
-              {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
-          </dl>
-          <div class="cr-links">
-            {% if b == 'acomp' %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}">Rondas da usina</a>{% endif %}
-            {% for rot, area in links_do_bloco[b] %}<a class="cn-link" href="{{ url_for(tela_dona[area]) }}">{{ rot }}</a>{% endfor %}
-          </div>
+          {{ det_bloco(u, b) }}
         </div>
       </details>
       {% else %}

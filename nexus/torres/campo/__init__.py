@@ -396,10 +396,17 @@ def responsaveis():
     usinas = [u for u in base if not responsavel or (u.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel]
     modo = request.args.get("modo")
     if logado:
-        # o responsável logado nunca vê os cartões dos outros responsáveis; o Ranking das equipes dele, sim (18/10/2026)
-        modo = "ranking" if modo == "ranking" else "foco"
-    elif modo not in ("cartoes", "foco", "ranking"):
+        # o responsável logado nunca vê os cartões dos outros responsáveis; o Ranking das equipes e a Visão geral das
+        # usinas dele, sim (18/10/2026)
+        modo = modo if modo in ("ranking", "geral") else "foco"
+    elif modo not in ("cartoes", "foco", "ranking", "geral"):
         modo = "foco" if responsavel else "cartoes"
+    # a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"): todas as usinas do filtro numa lista
+    # só, e o clique num bloco, nível ou número do resumo filtra (`filtro`, a condição daquele número no `soma`)
+    filtro = campo_resp.filtro_geral(request.args.get("filtro")) if modo == "geral" else None
+    lista_geral = campo_resp.filtrar_geral(usinas, filtro) if modo == "geral" else []
+    contagem_geral = ({k: len(campo_resp.filtrar_geral(usinas, k)) for k in campo_resp.FILTROS_GERAL}
+                      if modo == "geral" else {})
     # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre as
     # usinas que passaram pelos filtros, no limite das atrasadas de quem olha (nexus/campo/ranking_equipes.py)
     ranking = (campo_ranking.cartoes(usinas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {})
@@ -413,6 +420,7 @@ def responsaveis():
     html = render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
+        filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),

@@ -4,7 +4,9 @@ Acompanhamento, linha que abre o detalhe, extintores no acompanhamento e "só ti
 Banco falso do test_campo_visao: a Altair e a Brodowski 1 são do responsável 91 (Ciclano Chefe) e a Coração 1 do 90
 (Beltrano Supervisor). Por cima: a meta do mês (Gerencial publicado), o diário da disponibilidade, os chamados no banco
 (`nexus_chamados`), os extintores do App e os sinais da Confiabilidade (dublados: nada vai ao Fracttal)."""
+import re
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from test_campo_visao import USINAS, _aba, _dia, _ronda, banco  # noqa: F401  (banco é fixture)
@@ -852,3 +854,47 @@ def test_filtro_da_visao_geral_com_lixo_e_ignorado():
     assert [R.filtro_geral(v) for v in ("manut.atrasadas", "", None, "manut.", "x" * 500, "perf.critico")] == [
         "manut.atrasadas", None, None, None, None, "perf.critico"]
     assert R.filtrar_geral([{"usina": "A"}], None) == [{"usina": "A"}]
+
+
+def test_a_visao_geral_mostra_os_tres_blocos_e_a_lista_unica(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert 'aria-current="page">Visão geral' in html
+    geral = html[html.index('class="cr-gr"'):]
+    for b in ("Performance", "Acompanhamento", "Manutenção"):
+        assert b in geral
+    assert geral.count('class="cr-gr-lin') == len(_com_manut())          # todas as usinas, uma linha cada
+    assert re.search(r'filtro=manut\.atrasadas(&|")', geral)              # o número vira link
+
+
+def test_o_clique_no_numero_filtra_a_lista(manut, logado):
+    total = len(_com_manut())
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=manut.atrasadas").get_data(as_text=True)
+    geral = html[html.index('class="cr-gr"'):]
+    assert geral.count('class="cr-gr-lin') == 2                          # as duas usinas com tarefa atrasada
+    estado = geral[geral.index('class="cr-gr-estado"'):][:600]
+    assert f"2 de {total} usinas" in estado and "Tarefas atrasadas" in estado
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=nada").get_data(as_text=True)
+    assert html.count('class="cr-gr-lin') == total                       # filtro que não existe: sem filtro
+
+
+def test_filtro_sem_usina_diz_e_deixa_limpar(manut, logado):
+    # nenhuma tarefa com motivo no fixture: Tarefas paradas é zero
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=manut.paradas").get_data(as_text=True)
+    assert "Nenhuma usina com esse filtro" in html and 'class="cr-gr-limpar"' in html
+    blocos = html.split('class="cr-gr-blocos"')[1].split('class="cr-gr-estado"')[0]
+    assert not re.search(r'filtro=manut\.paradas(&|")', blocos)          # número zero não é link
+
+
+def test_quem_entra_pelo_fracttal_ve_so_as_usinas_dele_na_visao_geral(manut, cliente):
+    """Como em Onde focar: o responsável que entrou pelo Fracttal vê as usinas dele."""
+    _responsavel(cliente)
+    html = cliente.get("/t/campo/responsaveis?modo=geral").get_data(as_text=True)
+    dele = [u for u in _com_manut().values() if u.get("responsavel") == "Beltrano Supervisor"]
+    assert 'aria-current="page">Visão geral' in html
+    assert html.count('class="cr-gr-lin') == len(dele) > 0
+
+
+def test_o_cabecalho_e_as_colunas_ficam_no_centro():
+    """Levi, 18/10/2026: "centralize o cabeçalho e todas as colunas exceto Usina" (os blocos e a Visão geral)."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert re.search(r'\.cr-g > \[class\*="cr-col-"\]\{[^}]*justify-self:center', css)
