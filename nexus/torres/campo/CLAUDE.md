@@ -679,6 +679,8 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
   antes das ranqueadas; "Sem equipe" no fim. A seta compara com os 30 dias anteriores (a mesma lista de equipes); a usina
   mobilizada depois do fim do período anterior fica fora dele (revisão de 18/10/2026: contava como "sem ronda" de antes,
   e a seta "subia" sem a equipe ter melhorado).
+  A régua da tela diz as datas dos dois períodos e, quando o fato de fechamento saiu na hora (o banco sem a carga desta
+  versão do livro do App), diz isso; a dica do "base pequena" usa o `visao.BASE_PEQUENA`.
 - **Diferenças contra o painel do App** (a tela diz): a equipe da usina é a do cadastro do Nexus (no App, a OS vai ao
   cluster da tarefa na programação do PCM ou da usina no catálogo dele); a base da cobertura são as usinas mobilizadas; o
   dia é o de Brasília; a ronda avulsa do Nexus conta na cobertura.

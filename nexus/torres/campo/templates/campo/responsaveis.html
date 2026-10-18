@@ -151,7 +151,11 @@
     Visão, na régua de cada tela, e não muda a posição. A cor é a do painel do App (85
     ou mais verde, 70 ou mais âmbar). A seta compara com os 30 dias anteriores. Diferenças contra o painel do App: a
     equipe da usina é a do cadastro do Nexus (no App, a do catálogo e da programação dele), a base da cobertura são as
-    usinas mobilizadas, o dia é o de Brasília e a ronda avulsa do Nexus conta na cobertura.</p>
+    usinas mobilizadas, o dia é o de Brasília e a ronda avulsa do Nexus conta na cobertura.
+    {# o período e de onde vieram as notas (revisão de 18/10/2026): o fato de fechamento pode sair na hora quando o banco
+       ainda não tem a carga desta versão do livro do App (`visao._fato`) #}
+    {% set rk_i = info.get('ranking') or {} %}{% if rk_i.get('atual') %}Período: de {{ dia_curto(rk_i.atual[0]) }} a {{ dia_curto(rk_i.atual[1]) }} (o anterior: de {{ dia_curto(rk_i.anterior[0]) }} a {{ dia_curto(rk_i.anterior[1]) }}).{% endif %}
+    {% if rk_i.get('aviso') %}<span class="mudo">As notas das tarefas: {{ rk_i.aviso }}.</span>{% endif %}</p>
   {# a legenda do semáforo (revisão de 18/10/2026: os três números só se distinguiam pela cor; a regra da casa é cor E
      palavra, e a dica do mouse não existe no toque) #}
   <p class="cr-rk-leg">Nos três blocos de cada cartão, as usinas da equipe: <b class="cn-t-critico">focar</b> · <b class="cn-t-alerta">acompanhar</b> · <b class="cn-t-ok">em dia</b></p>
@@ -165,7 +169,7 @@
         <div class="cr-rk-nota cn-t-{{ c.cor }}">{{ c.nota if c.nota is not none and not c.sem_equipe else '—' }}<small>nota do App</small></div>
       </div>
       <div class="cn-eq-cab">
-        <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>{% if c.base_pequena and not c.sem_equipe %}<i class="cr-tag cr-tag--neutro" title="Menos de 3 usinas: uma usina a mais ou a menos muda muito a nota">base pequena</i>{% endif %}</div>
+        <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>{% if c.base_pequena and not c.sem_equipe %}<i class="cr-tag cr-tag--neutro" title="Menos de {{ base_pequena }} usinas: uma usina a mais ou a menos muda muito a nota">base pequena</i>{% endif %}</div>
         <span>{{ c.usinas }} usina{{ 's' if c.usinas != 1 }} · {{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }}{% if c.regiao_campo and c.regiao_campo != sem_regiao %} · {{ c.regiao_campo }}{% endif %}</span>
       </div>
       <p class="cr-rk-comp">{% if c.sem_equipe %}usinas sem equipe no cadastro: o conserto é no cadastro{% elif c.nota is none %}{% if c.n_ronda %}sem nota do App: {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }} em 30 dias, nenhuma com nota{% else %}sem nota do App: nenhuma OS nem ronda pelo App em 30 dias{% endif %}{% else %}qualidade <b>{{ c.qualidade }}</b> · cobertura <b>{{ c.cobertura }}%</b> · {{ c.n_os }} tarefa{{ 's' if c.n_os != 1 }} e {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }}{% if c.antes.nota is not none %} · antes {{ c.antes.nota }}{% if c.antes.posicao %} ({{ c.antes.posicao }}º){% endif %}{% endif %}{% endif %}</p>
@@ -189,7 +193,7 @@
   {% else %}
   <div class="cn-faixa-equipe">
     <b>{{ responsavel or 'Todos os responsáveis' }}</b>
-    <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q %}, com os filtros{% endif %}</span>
+    <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q or equipe %}, com os filtros{% endif %}</span>
     {% if responsavel and responsavel_logado %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*') }}" title="As usinas de todos os responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>
     {% elif responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='cartoes', equipe=None) }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="As usinas de todas as equipes">Equipe {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
