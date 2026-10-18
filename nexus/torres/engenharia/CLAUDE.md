@@ -55,7 +55,9 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   Encerrados. Nenhum filtro entra sem o Levi pedir (o de diagnóstico ele não quis).
 - **Quem age** (pega, encaminha, salva, comenta, mexe no cadastro): o setor Engenharia (Base → Integração Fracttal; o
   nome do setor, sem acento nem caixa) e o administrador, com login de pessoa: a senha de administrador não diz quem é, e
-  a ação é recusada. Quem só vê a tela lê tudo, sem botões. Encaminhar é só para pessoas do setor Engenharia (o nome vem
+  a ação é recusada. Quem só vê a tela lê tudo, sem botões. Na lista Ativos com sinal o cartão só abre a gaveta, e o
+  Pegar e o Encaminhar ficam nela (Levi, 18/10/2026: "tire esses botões ... da tela inicial, deixe apenas quando clica no
+  ativo com sinal!"). Encaminhar é só para pessoas do setor Engenharia (o nome vem
   do pessoal do Fracttal). Qualquer um da Engenharia comenta e muda datas e diagnóstico (o Levi não quis "só quem
   acompanha escreve"). Não há "soltar": quem pegou por engano encaminha ou encerra.
 - **Datas:** o início começa no dia do Pegar e pode mudar; o **fim é o dia em que a análise terminou**: preenchê-lo, com o
@@ -72,8 +74,8 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
 - **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
   com o aviso ou o erro (`_gaveta.html`, a mesma peça da página); ao fechar depois de gravar, a página recarrega. O Pegar
-  do cartão também responde na gaveta. O ativo é casado pelo código canônico (`equipamento.canon`): o Fracttal e o livro
-  escrevem o mesmo ativo de jeitos diferentes. Da revisão final (18/10/2026), no molde do card das Contestações:
+  do cartão da Mesa (Críticos sem dono) também responde na gaveta. O ativo é casado pelo código canônico
+  (`equipamento.canon`): o Fracttal e o livro escrevem o mesmo ativo de jeitos diferentes. Da revisão final (18/10/2026), no molde do card das Contestações:
   - a resposta passa por `static/engenharia-gaveta.js`: sessão vencida (o 302 do portão até o Entrar, ou o 401 do fim
     da sessão do Fracttal) recarrega a página; HTTP de erro mostra a falha sem trocar a gaveta (o texto fica);
   - a recusa e o banco fora devolvem o que foi digitado (o comentário, as datas e o diagnóstico escolhidos);
@@ -108,9 +110,12 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
 - **Quem é da equipe:** os mesmos nomes da Nova solicitação | Engenharia do OS Creator (`OS_WEB_ENGENHARIA_RESPONSAVEIS`
   no .env do OS Creator; `NEXUS_ENGENHARIA_RESPONSAVEIS` no .env do Nexus vale por cima). Nomes nunca no código
   (repositório público). No servidor, a linha tem de estar no .env do OS Creator de lá.
-- **Leitura (medido em 06/10):** o REST filtra pelo nome do responsável (`personnel_description`, por trecho) e
-  IGNORA `id_personnel`. O nome vira a pessoa pela lista `personnel` (só se for UMA; guardada 24 h) e as OS vindas
-  pelo nome são conferidas pelo `id_personnel` (homônimo fora). Eram 55 linhas para os 6 (~8 pedidos), guardadas
+- **Leitura (medido em 06/10):** o REST filtra pelo nome do responsável (`personnel_description`, por trecho e
+  literal: um espaço a mais já não casa) e IGNORA `id_personnel`. O nome vira a pessoa pela lista `personnel` (só se for
+  UMA; guardada 24 h), as OS são pedidas pelo nome do .env e pelo nome como o Fracttal escreve hoje (`grafias`, sem o
+  que um trecho mais curto já cobre) e conferidas pelo `id_personnel` (homônimo fora). Caso que criou a regra
+  (18/10/2026): o Fracttal passou a escrever o nome de um engenheiro com dois espaços, e o quadro só achava as duas OS
+  antigas dele (de quando era escrito com um); faltavam 20, entre elas as duas abertas na semana. Eram 55 linhas para os 6 (~8 pedidos), guardadas
   5 min; a cópia vencida abre na hora e é relida por trás. Linha do REST é por tarefa; o cartão é por OS.
 - **Pronto antes de abrir** (Levi, 09/10/2026: "talvez um carregamento periódico que carregue em segundo plano e deixe
   todos prontos"; `os_equipe.manter_quente`, `_tique`, `marcar_uso`): a cada minuto, se alguém abriu a tela nas últimas

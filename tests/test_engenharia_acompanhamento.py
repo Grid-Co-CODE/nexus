@@ -680,3 +680,14 @@ def test_cadastro_que_nao_veio_na_leitura_nao_volta_ao_inicial(banco):
     with pytest.raises(livros.GravacaoRecusada, match="cadastro"):
         A.comentar(aid, "Trocar cabo", ANA, True)
     assert falhou and banco.linhas(A.LIVRO, A.ABA_DIAG) == antes
+
+
+def test_lista_dos_ativos_com_sinal_sem_os_botoes(tela, cliente):
+    # Levi, 18/10/2026: "tire esses botões de pegar para acompanhar e encaminhar da tela inicial, deixe apenas quando
+    # clica no ativo com sinal!" - o cartão só abre a gaveta; o Pegar e o Encaminhar ficam nela
+    html = _como(cliente, ANA).get("/t/engenharia/confiabilidade").get_data(as_text=True)
+    lista = _lista(html)
+    assert "IBI200-INV02" in lista and 'data-gaveta="g0"' in lista
+    assert "Pegar para acompanhar" not in lista and "Encaminhar" not in lista and "eg-item-acoes" not in lista
+    gaveta = html.split('<template id="g0">', 1)[1].split("</template>", 1)[0]
+    assert "IBI200-INV02" in gaveta and "Pegar para acompanhar" in gaveta and "Encaminhar" in gaveta

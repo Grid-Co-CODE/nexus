@@ -102,8 +102,8 @@
           </span>
           <span class="eg-item-n"><b>{{ a.nFalha }}</b><span>falha{{ 's' if a.nFalha != 1 }} · {{ a.n30 }} OS</span></span>
         </button>
-        {% if pode and not erro_acomp %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ a.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
-          <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-gaveta="g{{ loop.index0 }}" data-eg-abrir-encaminhar>Encaminhar</button></div>{% endif %}
+        {# sem botões no cartão (Levi, 18/10/2026: "deixe apenas quando clica no ativo com sinal!"): o Pegar e o
+           Encaminhar ficam na gaveta #}
         </article>
       {% else %}<p class="mudo eg-vazio">Nenhum ativo com sinal com esses filtros.</p>{% endfor %}
       </div>
