@@ -190,13 +190,13 @@ def codigo(v):
 # ── O número anômalo da Performance (18/10/2026) ──────────────────────────────────────────────────────────────────
 # Levi: "apenas sinalize que o número está anômalo e o dado pode estar errado, temos que sinalizar pela plataforma e não
 # ficar travando a construção!". A plataforma marca, na coluna `anomalia` do `nexus_performance · fato_meta_usina_mes`
-# (no fim do fato), um ou mais CÓDIGOS desta lista separados por vírgula (a regra de cada um é dela); a frase é daqui. O
-# número não muda: a Visão do responsável mostra a etiqueta "anômalo" e a frase. Caso que criou: em 10/2026, Santo
-# Anastácio e Álvares Machado com 217% e 331% da meta (a meta de outubro baixa demais no BD_Thopen).
-ANOMALIA_META = {"meta_baixa": "a meta do mês está baixa demais para a potência",
-                 "meta_alta": "a meta do mês está alta demais para a potência",
-                 "geracao_impossivel": "há dia com geração acima do possível (potência × 12 h)",
-                 "pr_alto": "há dia com PR acima do possível"}
+# (no fim do fato), um ou mais CÓDIGOS desta lista separados por vírgula; a frase é daqui (regra 8: no fato, nada de
+# texto). O número não muda: a Visão do responsável mostra a etiqueta "anômalo" e a frase. A régua é a da plataforma, e
+# o Levi escolheu UMA só (18/10/2026): a meta do mês fora de 2 a 8 kWh por kWp por dia (recusou PR do mês acima de
+# 130%, geração acima de 8 kWh/kWp/dia e atingimento acima de 200%). Caso que criou: em 10/2026, Santo Anastácio e
+# Álvares Machado com 217% e 331% da meta (a meta de outubro de 1,3 e 0,9 kWh/kWp/dia no BD_Thopen).
+ANOMALIA_META = {"meta_baixa": "a meta do mês está abaixo de 2 kWh por kWp por dia (o normal é de 2 a 8)",
+                 "meta_alta": "a meta do mês está acima de 8 kWh por kWp por dia (o normal é de 2 a 8)"}
 # código que a plataforma criou e o Nexus ainda não conhece: o sinal aparece assim, nunca some
 ANOMALIA_DESCONHECIDA = "número anômalo (a plataforma sinalizou)"
 
