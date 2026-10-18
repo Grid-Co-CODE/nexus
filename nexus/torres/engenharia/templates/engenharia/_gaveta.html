@@ -7,7 +7,7 @@
 {% set a = gv.a %}{% set ac = gv.acomp %}
 {% macro encaminhar(cod, atual) %}<details class="eg-encaminhar" data-eg-encaminhar>
   <summary class="gc-btn gc-btn--contorno">Encaminhar</summary>
-  {% if pessoas %}<form class="eg-encaminhar-form" data-eg-form="encaminhar" method="post">
+  {% if pessoas %}<form class="eg-encaminhar-form" data-eg-form="encaminhar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_encaminhar') }}">
     <input type="hidden" name="cod" value="{{ cod }}">
     <select name="para" class="gc-campo" required aria-label="Para quem da Engenharia"><option value="">Escolha a pessoa</option>{% for p in pessoas if p.hmac != atual %}<option value="{{ p.hmac }}">{{ p.nome }}{% if meu and p.hmac == meu %} (você){% endif %}</option>{% endfor %}</select>
     <button type="submit" class="gc-btn gc-btn--primario">Encaminhar</button>
@@ -31,7 +31,7 @@
     {% if pode %}{{ encaminhar(ac.cod, ac.responsavel.hmac) }}{% endif %}</div>
   {% if gv.novas %}<div class="eg-acomp-aviso"><b>{{ gv.novas|length }} {{ 'falha nova' if gv.novas|length == 1 else 'falhas novas' }} desde que entrou:</b> {% for x in gv.novas %}OS {{ x.os }}, {{ x.tipo|lower }}, {{ x.dia }}{{ '; ' if not loop.last }}{% endfor %}.</div>{% endif %}
   {% if pode %}
-  <form class="eg-acomp-campos" data-eg-form="salvar" data-falhas="{{ gv.falhas_dias|join(',') }}" method="post">
+  <form class="eg-acomp-campos" data-eg-form="salvar" data-falhas="{{ gv.falhas_dias|join(',') }}" method="post" action="{{ url_for('torre_engenharia.acompanhamento_salvar', aid=ac.id) }}">
     <label><span class="gc-rotulo">Início da análise</span><input class="gc-campo" type="date" name="inicio" required value="{{ ac.inicio.isoformat() if ac.inicio else '' }}" max="{{ hoje }}"></label>
     <label><span class="gc-rotulo">Fim da análise</span><input class="gc-campo" type="date" name="fim" max="{{ hoje }}"></label>
     <label><span class="gc-rotulo">Diagnóstico</span><select class="gc-campo" name="diagnostico"><option value="">A definir</option>{% for x in diags_ativos %}<option value="{{ x.id }}"{% if x.id == ac.diagnostico_id %} selected{% endif %}>{{ x.nome }}</option>{% endfor %}{% if ac.diagnostico_id and ac.diagnostico_id not in diags_ativos|map(attribute='id')|list %}<option value="{{ ac.diagnostico_id }}" selected>{{ diag_nome.get(ac.diagnostico_id, '—') }} (excluído)</option>{% endif %}</select></label>
@@ -44,7 +44,7 @@
     <dt>Diagnóstico</dt><dd>{{ diag_nome.get(ac.diagnostico_id, 'a definir') }}</dd></dl>
   {% endif %}
   <h4 class="eg-acomp-sub">Comentários</h4>
-  {% if pode %}<form class="eg-acomp-coment" data-eg-form="comentar" method="post">
+  {% if pode %}<form class="eg-acomp-coment" data-eg-form="comentar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_comentar', aid=ac.id) }}">
     <textarea class="gc-campo" name="texto" rows="3" maxlength="2000" aria-label="Comentário" placeholder="Escreva o que viu, o que fez ou o que falta…"></textarea>
     <button type="submit" class="gc-btn gc-btn--primario">Salvar comentário</button>
   </form>{% endif %}
@@ -59,7 +59,7 @@
 </section>
 {% else %}
 <div class="eg-acomp-sem"><span>Ninguém acompanha este ativo.</span>
-  {% if pode %}<span class="eg-acomp-acoes"><form data-eg-form="pegar" method="post"><input type="hidden" name="cod" value="{{ a.get('cod') }}"><button type="submit" class="gc-btn gc-btn--primario">Pegar para acompanhar</button></form>{{ encaminhar(a.get('cod'), '') }}</span>{% endif %}
+  {% if pode %}<span class="eg-acomp-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ a.get('cod') }}"><button type="submit" class="gc-btn gc-btn--primario">Pegar para acompanhar</button></form>{{ encaminhar(a.get('cod'), '') }}</span>{% endif %}
 </div>
 {% endif %}
 

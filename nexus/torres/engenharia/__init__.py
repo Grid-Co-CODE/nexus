@@ -10,7 +10,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import render_template, request, session
+from flask import abort, redirect, render_template, request, session
 
 from ..modelo import Tela, Torre
 
@@ -162,10 +162,9 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
 
     def gaveta(i, a, acomp, novas):
         c = canon(a.get("cod") or (acomp or {}).get("cod"))
-        novas = [dict(x, dia=x["quando"].astimezone(BRT).strftime("%d/%m")) for x in novas]
-        return {"id": f"g{i}", "a": a, "acomp": acomp, "novas": novas,
-                "anteriores": [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
-                "falhas_dias": sorted({x["quando"].astimezone(BRT).strftime("%Y-%m-%d") for x in falhas_em.get(c, [])})}
+        return _montar_gaveta(f"g{i}", a, acomp, novas,
+                              [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
+                              falhas_em.get(c, []))
     if aba == "ativos":
         gavetas = [gaveta(i, s, None, []) for i, s in enumerate(sinais)]
     elif aba == "acompanhamento":
@@ -182,6 +181,16 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
             "quem_opcoes": quem_opcoes, "erro_acomp": "" if lido.get("lido_em") else lido.get("erro", ""),
             "uso": collections.Counter(a["diagnostico_id"] for a in acomps.values() if a["diagnostico_id"]),
             "contas": {"ativos": len(sinais), "acompanhamento": len(abertos), "encerrados": len(encerrados)}}
+
+
+def _montar_gaveta(gid: str, a: dict, acomp: dict | None, novas: list, anteriores: list, falhas: list) -> dict:
+    """O que a gaveta de um ativo mostra (engenharia/_gaveta.html), na página e na resposta das ações: o ativo, o
+    acompanhamento, as falhas novas com o dia, os encerrados anteriores e o dia de cada falha do ativo (o aviso de que o
+    fim escolhido faz o ativo voltar para Ativos com sinal)."""
+    return {"id": gid, "a": a, "acomp": acomp,
+            "novas": [dict(x, dia=x["quando"].astimezone(BRT).strftime("%d/%m")) for x in novas],
+            "anteriores": anteriores,
+            "falhas_dias": sorted({x["quando"].astimezone(BRT).strftime("%Y-%m-%d") for x in falhas})}
 
 
 def _quem_pode() -> tuple[bool, str | None]:
@@ -249,7 +258,203 @@ def confiabilidade():
         lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"), pode=pode, meu=meu,
         pessoas=_pessoas(pode) if aba in ("ativos", "acompanhamento") else [],
         hoje=datetime.now(BRT).date().isoformat(),
+        aviso_dg=session.pop(_AVISO_DG, None), erro_dg=session.pop(_ERRO_DG, None),
         periodo=f"{d['periodo']['de'].astimezone(BRT):%d/%m} a {d['periodo']['ate'].astimezone(BRT):%d/%m/%Y}", **ac)
+
+
+# ── as ações do acompanhamento (18/10/2026) ─────────────────────────────────────────────────────────────────────────
+# Toda ação é POST, só da própria página (`_de_outro_site`), e responde a gaveta do ativo relida do banco, com o aviso
+# ou o erro: a gaveta grava sem sair dela, como o card das Contestações. O cadastro dos diagnósticos é a aba dele,
+# com o vai-e-volta de sempre (303 e o aviso na sessão).
+_AVISO_DG, _ERRO_DG = "engenharia_diag_aviso", "engenharia_diag_erro"
+FALHOU_BANCO = "Não consegui gravar no banco ({}). Nada mudou; tente de novo em instantes."
+
+
+def _para_gravar(s: dict) -> dict:
+    """O item de sinais da Confiabilidade no formato do livro (a ligação da usina vem como `ligada_por`)."""
+    return {"cod": s["cod"], "usina_id": s.get("usina_id"), "usina_ligada_por": s.get("ligada_por"),
+            "nivel": s.get("nivel"), "nFalha": s.get("nFalha"), "n7": s.get("n7")}
+
+
+def _agora_do_livro():
+    """A Confiabilidade, os acompanhamentos relidos agora e a separação das abas: a base de cada ação."""
+    from ...engenharia import acompanhamento as AC
+    d = _dados()["dados"]
+    lido = AC.ler(forcar=True)
+    acomps = AC.estado(lido["eventos"])
+    return d, lido, acomps, AC.separar(d["sinais"], acomps, d.get("falhasEm") or {})
+
+
+def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str = "", status: int = 200):
+    """A gaveta do ativo como está no banco agora: o acompanhamento `acomp_id` (o que acabou de ser encerrado) ou o
+    aberto, e os encerrados dele embaixo."""
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import confiabilidade as C
+    d, lido, acomps, sep = _agora_do_livro()
+    c = canon(cod)
+    pode, meu = _quem_pode()
+    aberto = next((x for x in sep["aberto"] if canon(x["acomp"]["cod"]) == c), None)
+    acomp = acomps.get(acomp_id) if acomp_id else (aberto or {}).get("acomp")
+    base = {canon(a["cod"]): a for a in d["ativos"]}
+    base.update({canon(s["cod"]): s for s in d["sinais"]})
+    a = base.get(c) or {"cod": cod, "nome": cod, "usina": "", "cliente": "", "fam": "", "crit": ""}
+    novas = aberto["novas"] if aberto and acomp is aberto["acomp"] else []
+    anteriores = [x["acomp"] for x in sep["encerrado"] if canon(x["acomp"]["cod"]) == c
+                  and (not acomp or x["acomp"]["id"] != acomp["id"])]
+    gv = _montar_gaveta("g", a, acomp, novas, anteriores, (d.get("falhasEm") or {}).get(c, []))
+    diags = AC.diagnosticos(lido["diagnosticos"])
+    if lido.get("erro") and not lido.get("lido_em") and not erro:
+        erro = f"Não consegui ler os acompanhamentos ({lido['erro'].split(':')[0]}). Recarregue em instantes."
+    return render_template("engenharia/_gaveta.html", gv=gv, niveis=C.NIVEIS, pode=pode, meu=meu,
+                           pessoas=_pessoas(pode), diags_ativos=[x for x in diags if not x["excluido"]],
+                           diag_nome={x["id"]: x["nome"] for x in diags}, meta=C.META_DISP, janela=C.JANELA_DIAS,
+                           h=_h, pct=_pct, hoje=datetime.now(BRT).date().isoformat(), aviso=aviso, erro=erro), status
+
+
+def _acao(cod: str, fazer, aviso: str = "", acomp_id=None):
+    """Roda a ação e responde a gaveta. `fazer()` devolve o aviso (ou None para o de `aviso`) e pode trocar o
+    acompanhamento mostrado (o encerrado) devolvendo (aviso, acomp_id)."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    from ...engenharia import acompanhamento as AC
+    try:
+        r = fazer()
+    except AC.Recusada as e:
+        return _gaveta_de(cod, erro=str(e))
+    except Exception as e:      # noqa: BLE001 — banco fora: a gaveta diz, nada mudou
+        import logging
+        logging.exception("confiabilidade: a ação do acompanhamento em %s não gravou", cod)
+        return _gaveta_de(cod, erro=FALHOU_BANCO.format(type(e).__name__))
+    if isinstance(r, tuple):
+        aviso, acomp_id = r
+    elif r:
+        aviso = r
+    return _gaveta_de(cod, acomp_id=acomp_id, aviso=aviso)
+
+
+@bp.route("/confiabilidade/acompanhamento/pegar", methods=["POST"])
+def acompanhamento_pegar():
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    cod = request.form.get("cod", "")
+
+    def fazer():
+        pode, _ = _quem_pode()
+        _d, _l, _a, sep = _agora_do_livro()
+        s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
+        if not s:
+            if not pode:          # a recusa de quem não pode vale antes da de "não está na lista"
+                AC.pegar({"cod": cod}, session.get("usuario"), pode)
+            raise AC.Recusada("Este ativo não está em Ativos com sinal agora: recarregue a página")
+        AC.pegar(_para_gravar(s), session.get("usuario"), pode)
+    return _acao(cod, fazer, "Agora este ativo está com você: ele saiu de Ativos com sinal e foi para Em acompanhamento.")
+
+
+@bp.route("/confiabilidade/acompanhamento/encaminhar", methods=["POST"])
+def acompanhamento_encaminhar():
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    cod, para = request.form.get("cod", ""), request.form.get("para", "")
+
+    def fazer():
+        pode, _ = _quem_pode()
+        pessoas = _pessoas(pode)
+        _d, _l, _a, sep = _agora_do_livro()
+        s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
+        aberto = any(canon(x["acomp"]["cod"]) == canon(cod) for x in sep["aberto"])
+        if not s and not aberto:
+            if not pode:
+                AC.encaminhar({"cod": cod}, para, session.get("usuario"), pode, pessoas)
+            raise AC.Recusada("Este ativo não está em Ativos com sinal nem em acompanhamento: recarregue a página")
+        AC.encaminhar(_para_gravar(s) if s and not aberto else {"cod": cod}, para, session.get("usuario"), pode,
+                      pessoas)
+        nome = next((p["nome"] for p in pessoas if p["hmac"] == para), "")
+        return f"Encaminhado para {nome}." if nome else "Encaminhado."
+    return _acao(cod, fazer)
+
+
+def _cod_do(acompanhamento_id: str) -> str:
+    from ...engenharia import acompanhamento as AC
+    a = AC.estado(AC.ler(forcar=True)["eventos"]).get(acompanhamento_id)
+    return a["cod"] if a else ""
+
+
+@bp.route("/confiabilidade/acompanhamento/<aid>/salvar", methods=["POST"])
+def acompanhamento_salvar(aid):
+    from ...engenharia import acompanhamento as AC
+    cod = _cod_do(aid)
+    fim = request.form.get("fim", "")
+
+    def fazer():
+        pode, _ = _quem_pode()
+        ev = AC.salvar(aid, request.form.get("inicio", ""), fim, request.form.get("diagnostico", ""),
+                       session.get("usuario"), pode)
+        if ev["evento"] != "encerrou":
+            return "Salvo."
+        # encerrar com falha depois do fim faz o ativo voltar para Ativos com sinal (a regra do Levi, 18/10/2026)
+        from ...dados.equipamento import canon
+        d = _dados()["dados"]
+        marco = AC._depois_do_fim(AC._dia(ev["data_id_fim_analise"]))
+        volta = any(x["quando"] >= marco for x in (d.get("falhasEm") or {}).get(canon(cod), []))
+        return ("Encerrado." + (" O ativo volta para Ativos com sinal: teve falha depois do fim." if volta else ""),
+                aid)
+    return _acao(cod, fazer)
+
+
+@bp.route("/confiabilidade/acompanhamento/<aid>/comentar", methods=["POST"])
+def acompanhamento_comentar(aid):
+    from ...engenharia import acompanhamento as AC
+    cod = _cod_do(aid)
+
+    def fazer():
+        pode, _ = _quem_pode()
+        AC.comentar(aid, request.form.get("texto", ""), session.get("usuario"), pode)
+    return _acao(cod, fazer, "Comentário salvo.")
+
+
+def _cadastro(fazer, aviso: str):
+    """As ações da aba Diagnósticos: grava, guarda o aviso (ou o erro) na sessão e volta à aba."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    from ...engenharia import acompanhamento as AC
+    from ...prefixo import na_raiz
+    try:
+        pode, _ = _quem_pode()
+        fazer(pode)
+        session[_AVISO_DG] = aviso
+    except AC.Recusada as e:
+        session[_ERRO_DG] = str(e)
+    except Exception as e:      # noqa: BLE001 — banco fora: a aba diz, nada mudou
+        import logging
+        logging.exception("confiabilidade: o cadastro dos diagnósticos não gravou")
+        session[_ERRO_DG] = FALHOU_BANCO.format(type(e).__name__)
+    return redirect(na_raiz("/t/engenharia/confiabilidade?aba=diagnosticos"), code=303)
+
+
+@bp.route("/confiabilidade/diagnosticos/criar", methods=["POST"])
+def diagnostico_criar():
+    from ...engenharia import acompanhamento as AC
+    nome = " ".join(request.form.get("nome", "").split())
+    return _cadastro(lambda pode: AC.criar_diagnostico(nome, request.form.get("descricao", ""),
+                                                       session.get("usuario"), pode), f"Diagnóstico {nome} criado.")
+
+
+@bp.route("/confiabilidade/diagnosticos/<int:did>/salvar", methods=["POST"])
+def diagnostico_salvar(did):
+    from ...engenharia import acompanhamento as AC
+    nome = " ".join(request.form.get("nome", "").split())
+    return _cadastro(lambda pode: AC.mudar_diagnostico(did, nome, request.form.get("descricao", ""),
+                                                       session.get("usuario"), pode), f"Diagnóstico {nome} salvo.")
+
+
+@bp.route("/confiabilidade/diagnosticos/<int:did>/excluir", methods=["POST"])
+def diagnostico_excluir(did):
+    from ...engenharia import acompanhamento as AC
+    return _cadastro(lambda pode: AC.excluir_diagnostico(did, session.get("usuario"), pode),
+                     "Diagnóstico excluído: saiu da escolha; os acompanhamentos que já o usam continuam com ele.")
 
 
 # ── Quadro da equipe (06/10/2026) ───────────────────────────────────────────────────────────────────────────────────

@@ -101,7 +101,7 @@
           </span>
           <span class="eg-item-n"><b>{{ a.nFalha }}</b><span>falha{{ 's' if a.nFalha != 1 }} · {{ a.n30 }} OS</span></span>
         </button>
-        {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post"><input type="hidden" name="cod" value="{{ a.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
+        {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ a.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
           <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-gaveta="g{{ loop.index0 }}" data-eg-abrir-encaminhar>Encaminhar</button></div>{% endif %}
         </article>
       {% else %}<p class="mudo eg-vazio">Nenhum ativo com sinal com esses filtros.</p>{% endfor %}
@@ -170,10 +170,22 @@
   {% elif aba == 'diagnosticos' %}
   <section class="eg-painel">
     <div class="eg-painel-cab"><h2>Diagnósticos</h2><span>a lista do Diagnóstico do acompanhamento · o excluído sai da escolha e o número dele não volta</span></div>
+    {% if aviso_dg %}<p class="eg-acomp-msg eg-acomp-msg--ok eg-aviso-lista" role="status">{{ aviso_dg }}</p>{% endif %}
+    {% if erro_dg %}<p class="eg-acomp-msg eg-acomp-msg--erro eg-aviso-lista" role="alert">{{ erro_dg }}</p>{% endif %}
+    <form class="eg-diag-novo" method="post" action="{{ url_for('torre_engenharia.diagnostico_criar') }}">
+      <label><span class="gc-rotulo">Novo diagnóstico</span><input class="gc-campo" name="nome" required minlength="2" maxlength="60" placeholder="Ex.: Proteção"></label>
+      <label><span class="gc-rotulo">Descrição (opcional)</span><input class="gc-campo" name="descricao" maxlength="300"></label>
+      <button type="submit" class="gc-btn gc-btn--primario">Criar</button>
+    </form>
     <div class="eg-est-rolo"><table class="eg-est eg-diag">
-      <thead><tr><th>Nome</th><th>Descrição</th><th class="eg-num">Em uso</th></tr></thead>
-      <tbody>{% for x in diags if not x.excluido %}<tr><td><b>{{ x.nome }}</b></td><td>{{ x.descricao or '—' }}</td><td class="eg-num">{{ uso.get(x.id, 0) }}</td></tr>
-      {% else %}<tr><td colspan="3" class="mudo">Nenhum diagnóstico no cadastro.</td></tr>{% endfor %}</tbody></table></div>
+      <thead><tr><th>Nome</th><th>Descrição</th><th class="eg-num">Em uso</th><th aria-label="Ações"></th></tr></thead>
+      <tbody>{% for x in diags if not x.excluido %}<tr>
+        <td><input class="gc-campo" name="nome" form="dg{{ x.id }}" value="{{ x.nome }}" required minlength="2" maxlength="60" aria-label="Nome do diagnóstico"></td>
+        <td><input class="gc-campo" name="descricao" form="dg{{ x.id }}" value="{{ x.descricao }}" maxlength="300" aria-label="Descrição"></td>
+        <td class="eg-num">{{ uso.get(x.id, 0) }}</td>
+        <td><span class="eg-diag-acoes"><form id="dg{{ x.id }}" method="post" action="{{ url_for('torre_engenharia.diagnostico_salvar', did=x.id) }}"><button type="submit" class="gc-btn gc-btn--contorno eg-btn-peq">Salvar</button></form>
+          <form method="post" action="{{ url_for('torre_engenharia.diagnostico_excluir', did=x.id) }}" data-eg-confirmar="Excluir o diagnóstico {{ x.nome }}? Ele sai da escolha; os acompanhamentos que já o usam continuam com ele."><button type="submit" class="gc-btn gc-btn--fantasma eg-btn-peq">Excluir</button></form></span></td>
+      </tr>{% else %}<tr><td colspan="4" class="mudo">Nenhum diagnóstico no cadastro.</td></tr>{% endfor %}</tbody></table></div>
   </section>
   {% else %}
   {% set cols = [('usinas', 'Usinas'), ('eventos', 'Eventos (hist.)'), ('sinais', 'Ativos c/ sinal'), ('criticos', 'Críticos'),
@@ -214,24 +226,84 @@
 </div>
 <script>
   (function () {
-    // a gaveta do ativo: o clique no cartão copia o detalhe dele para a gaveta lateral (sem animação)
+    // a gaveta do ativo: o clique no cartão copia o detalhe dele para a gaveta lateral (sem animação). Desde 18/10/2026
+    // ela traz o acompanhamento: os formulários gravam sem sair dela (a resposta é a gaveta de novo) e, ao fechar
+    // depois de gravar, a página recarrega (as listas e os números das abas mudaram)
     var gav = document.querySelector('.eg-gaveta'), veu = document.querySelector('.eg-veu');
     if (gav) {
-      var corpo = gav.querySelector('.eg-gav-corpo'), ativo = null;
-      function fecha() { gav.hidden = true; veu.hidden = true; if (ativo) { ativo.classList.remove('eg-item--on'); ativo.focus(); } ativo = null; }
+      var corpo = gav.querySelector('.eg-gav-corpo'), ativo = null, mudou = false;
+      function mostra() { gav.hidden = false; veu.hidden = false; gav.querySelector('.eg-gav-fechar').focus(); }
+      function fecha() {
+        if (mudou) { location.reload(); return; }
+        gav.hidden = true; veu.hidden = true; if (ativo) { ativo.classList.remove('eg-item--on'); ativo.focus(); } ativo = null;
+      }
+      function marca(cartao) {
+        if (ativo) ativo.classList.remove('eg-item--on');
+        ativo = cartao; if (cartao) cartao.classList.add('eg-item--on');
+      }
+      function abre(id, cartao) {
+        var t = document.getElementById(id);
+        if (!t) return;
+        corpo.replaceChildren(t.content.cloneNode(true));
+        marca(cartao);
+        mostra();
+      }
       document.querySelectorAll('.eg-item').forEach(function (b) {
+        b.addEventListener('click', function () { abre(b.dataset.gaveta, b); });
+      });
+      // o Encaminhar do cartão abre a gaveta já na escolha da pessoa
+      document.querySelectorAll('[data-eg-abrir-encaminhar]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var t = document.getElementById(b.dataset.gaveta);
-          corpo.replaceChildren(t.content.cloneNode(true));
-          if (ativo) ativo.classList.remove('eg-item--on');
-          ativo = b; b.classList.add('eg-item--on');
-          gav.hidden = false; veu.hidden = false; gav.querySelector('.eg-gav-fechar').focus();
+          abre(b.dataset.gaveta, b.closest('.eg-cartao').querySelector('.eg-item'));
+          var d = corpo.querySelector('[data-eg-encaminhar]');
+          if (d) { d.open = true; var s = d.querySelector('select'); if (s) s.focus(); }
         });
+      });
+      // os formulários do acompanhamento (os da gaveta e o Pegar do cartão): POST por fetch; a resposta, com o aviso
+      // ou o erro, vira o conteúdo da gaveta (aberta, se o clique foi no cartão)
+      document.addEventListener('submit', function (ev) {
+        var f = ev.target.closest('form[data-eg-form]');
+        if (!f) return;
+        ev.preventDefault();
+        var b = f.querySelector('[type="submit"]'), cartao = f.closest('.eg-cartao');
+        if (b) b.disabled = true;
+        fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin'})
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            corpo.innerHTML = html;
+            mudou = true;
+            if (cartao) marca(cartao.querySelector('.eg-item'));
+            if (gav.hidden) mostra();
+          })
+          .catch(function () {
+            if (b) b.disabled = false;
+            if (cartao && gav.hidden) abre(cartao.querySelector('.eg-item').dataset.gaveta, cartao.querySelector('.eg-item'));
+            var p = document.createElement('p');
+            p.className = 'eg-acomp-msg eg-acomp-msg--erro';
+            p.setAttribute('role', 'alert');
+            p.textContent = 'Não consegui falar com o Nexus agora. Nada mudou; tente de novo em instantes.';
+            corpo.prepend(p);
+          });
+      });
+      // o fim da análise antes de uma falha faz o ativo voltar para Ativos com sinal (a regra do Levi): avisa na hora
+      document.addEventListener('input', function (ev) {
+        var f = ev.target.closest('form[data-eg-form="salvar"]');
+        if (!f || ev.target.name !== 'fim') return;
+        var fimDia = ev.target.value, dias = (f.dataset.falhas || '').split(',').filter(Boolean);
+        var n = fimDia ? dias.filter(function (d) { return d > fimDia; }).length : 0;
+        var aviso = f.querySelector('[data-eg-volta]');
+        aviso.hidden = !n;
+        aviso.textContent = n ? 'Há ' + n + (n === 1 ? ' falha' : ' falhas') + ' depois desta data de fim: o ativo volta para Ativos com sinal ao encerrar.' : '';
       });
       gav.querySelector('.eg-gav-fechar').addEventListener('click', fecha);
       veu.addEventListener('click', fecha);
       document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !gav.hidden) fecha(); });
     }
+    // o cadastro dos diagnósticos: excluir pede confirmação (o diagnóstico sai da escolha)
+    document.addEventListener('submit', function (ev) {
+      var f = ev.target.closest('form[data-eg-confirmar]');
+      if (f && !confirm(f.dataset.egConfirmar)) ev.preventDefault();
+    });
     // estatísticas: ordenar pelo cabeçalho e filtrar pelo nome
     var est = document.querySelector('.eg-est');
     if (est) {

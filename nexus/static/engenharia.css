@@ -337,3 +337,11 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
   .eg-acomp-campos{grid-template-columns:minmax(0,1fr)}
   .eg-item-acoes{justify-content:flex-start}
 }
+/* a aba Diagnósticos: criar em cima, editar e excluir na própria linha (como o Cadastro de motivos do PCM) */
+.eg-diag-novo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto;gap:10px;align-items:end;padding:14px 18px;
+  border-bottom:1px solid var(--linha)}
+.eg-diag-novo label{display:grid;gap:4px;min-width:0}
+.eg-diag .gc-campo{width:100%;min-width:0}
+.eg-diag-acoes{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.eg-diag-acoes form{margin:0}
+@media (max-width:640px){.eg-diag-novo{grid-template-columns:minmax(0,1fr)}}

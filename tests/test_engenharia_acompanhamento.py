@@ -3,6 +3,7 @@ administradores pegar aqueles ativos com sinal para acompanhar ou alguém da eng
 ver!"). Desenho em docs/superpowers/specs/2026-10-18-engenharia-acompanhamento-design.md. Banco falso
 (tests/pg_falso.py); os nomes são fictícios."""
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -403,3 +404,86 @@ def test_banco_fora_a_tela_abre_e_avisa(tela, cliente, monkeypatch):
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and "Não consegui ler os acompanhamentos" in html
     assert "Nenhum ativo em acompanhamento" not in html
+
+
+# ── Task 6: as ações na tela (a gaveta grava e responde a gaveta de novo) ────────────────────────────────────────────
+SAME = {"Sec-Fetch-Site": "same-origin"}
+URL = "/t/engenharia/confiabilidade"
+
+
+def test_pegar_pela_gaveta_e_comentar(tela, cliente):
+    _como(cliente, BETO)
+    r = cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"}, headers=SAME)
+    g = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Com <b>Beto Souza</b> (você)" in g and "Salvar comentário" in g
+    assert "Em acompanhamento" in g                                          # o aviso diz para onde o ativo foi
+    aid = _aid_de("IBI200-INV02")
+    r = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar cabo"}, headers=SAME)
+    g = r.get_data(as_text=True)
+    assert "Comentário salvo" in g and "Trocar cabo" in g
+    # e a página já mostra o ativo na outra aba
+    assert "IBI200-INV02" not in _lista(cliente.get(URL).get_data(as_text=True))
+    assert "IBI200-INV02" in _lista(cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True))
+
+
+def test_encaminhar_lista_so_a_engenharia(tela, cliente):
+    g = _como(cliente, ANA).post(URL + "/acompanhamento/encaminhar", data={"cod": "IBI200-INV02", "para": A.codigo(BETO)},
+                                 headers=SAME).get_data(as_text=True)
+    sel = re.search(r'<select name="para".*?</select>', g, re.S).group(0)
+    assert "Com <b>Beto Souza</b>" in g and "Encaminhado para Beto Souza" in g
+    assert sel.count("<option") == len(PESSOAS())          # o "Escolha" e quem não está com o ativo agora (Ana)
+    g = cliente.post(URL + "/acompanhamento/encaminhar", data={"cod": "IBI200-INV02", "para": "hmac-de-fora"},
+                     headers=SAME).get_data(as_text=True)
+    assert "Escolha uma pessoa da Engenharia" in g and "Com <b>Beto Souza</b>" in g
+
+
+def test_salvar_encerra_e_avisa_quando_volta(tela, cliente):
+    # INVR1.3 teve falha em 05/10 (1 dia antes de AGORA): encerrar com fim 04/10 faz o ativo voltar
+    html = _como(cliente, ANA).get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    assert re.search(r'data-falhas="[^"]*2026-10-05', html)
+    g = cliente.post(f"{URL}/acompanhamento/{_aid_de('IBI200-INVR1.3')}/salvar",
+                     data={"inicio": "2026-10-01", "fim": "2026-10-04", "diagnostico": "1"}, headers=SAME).get_data(as_text=True)
+    assert "Encerrado." in g and "volta para Ativos com sinal" in g and "Salvar comentário" not in g
+    lista = _lista(cliente.get(URL).get_data(as_text=True))
+    assert "IBI200-INVR1.3" in lista and "já acompanhado · Comunicação em 04/10" in lista
+
+
+def test_salvar_recusado_responde_a_gaveta_com_o_erro(tela, cliente):
+    g = _como(cliente, ANA).post(f"{URL}/acompanhamento/{_aid_de('IBI200-INVR1.3')}/salvar",
+                                 data={"inicio": "2026-10-01", "fim": "2026-10-04", "diagnostico": ""},
+                                 headers=SAME).get_data(as_text=True)
+    assert "Para encerrar, escolha o diagnóstico" in g and "Salvar comentário" in g      # nada mudou: segue aberto
+
+
+def test_acao_de_outro_site_ou_sem_poder_nao_grava(tela, cliente, monkeypatch):
+    from nexus.auth import setor_telas as ST
+    _como(cliente, ANA)
+    assert cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"},
+                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+                                               "erro": ""})
+    g = cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"}, headers=SAME).get_data(as_text=True)
+    assert "Só quem é da Engenharia" in g and _aid_de("IBI200-INV02") is None
+    r = cliente.post(URL + "/diagnosticos/criar", data={"nome": "Proteção"}, headers=SAME)
+    assert r.status_code == 303 and "Proteção" not in [d["nome"] for d in A.diagnosticos(A.ler(forcar=True)["diagnosticos"])]
+
+
+def test_pegar_ativo_que_nao_esta_na_lista_recusa(tela, cliente):
+    # TRK07 foi encerrado e não falhou depois do fim: não está em Ativos com sinal, não se pega de uma página velha
+    g = _como(cliente, ANA).post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-TRK07"}, headers=SAME).get_data(as_text=True)
+    assert "não está em Ativos com sinal" in g and _aid_de("IBI200-TRK07") is None
+
+
+def test_cadastro_pela_aba_diagnosticos(tela, cliente):
+    r = _como(cliente, ANA).post(URL + "/diagnosticos/criar", data={"nome": "Proteção", "descricao": "Relé atuando"},
+                                 headers=SAME)
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/engenharia/confiabilidade?aba=diagnosticos")
+    dg = cliente.get(URL + "?aba=diagnosticos").get_data(as_text=True)
+    assert 'value="Proteção"' in dg and "Diagnóstico Proteção criado" in dg
+    r = cliente.post(URL + "/diagnosticos/3/salvar", data={"nome": "Proteção (relé)", "descricao": ""}, headers=SAME)
+    assert r.status_code == 303 and 'value="Proteção (relé)"' in cliente.get(URL + "?aba=diagnosticos").get_data(as_text=True)
+    cliente.post(URL + "/diagnosticos/3/excluir", headers=SAME)
+    ac = cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    assert "Proteção (relé)</option>" not in ac                              # o excluído sai da escolha
+    r = cliente.post(URL + "/diagnosticos/criar", data={"nome": "comunicacao"}, headers=SAME)
+    assert "já existe" in cliente.get(URL + "?aba=diagnosticos").get_data(as_text=True)
