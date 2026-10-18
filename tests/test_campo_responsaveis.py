@@ -642,3 +642,29 @@ def test_cartoes_com_os_tres_blocos(manut, logado):
     html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*").get_data(as_text=True)
     cartoes = html[html.index('class="cn-equipes"'):html.index('class="cn-nota"')]
     assert cartoes.count("<span>Manutenção</span>") == 2
+
+
+def test_a_programacao_e_lida_do_fim(tela, monkeypatch):
+    """A semana vem do `fato_programacao`, que guarda as semanas desde a W21 (16.540 linhas em 18/10/2026: 4,4 s a aba
+    inteira a cada conta). A carga põe as 4 semanas do arquivo do PCM no fim: lê-se do fim para trás e para depois de
+    passar da semana passada, como a tela Técnicos por usina."""
+    seg = HOJE - timedelta(days=HOJE.weekday())
+
+    def linha(semana, status):
+        return {"usina_id": 2, "data_id_semana": _did(semana), "data_id_programada": _did(semana),
+                "hora_inicio": "08:00", "status_execucao": status}
+    _aba(tela, "nexus_programacao", "fato_programacao",
+         [linha(seg - timedelta(days=35), "finalizada")] * 2500
+         + [linha(seg - timedelta(days=7), "finalizada")] * 17 + [linha(seg - timedelta(days=7), "nao_iniciada")] * 3)
+    sid = tela.abas[("nexus_programacao", "fato_programacao")]["id"]
+    offsets, get = [], tela.get
+
+    def contando(url, params=None, **k):
+        if url.endswith(f"/api/sheets/{sid}/rows"):
+            offsets.append(int((params or {}).get("offset", 0)))
+        return get(url, params=params, **k)
+    monkeypatch.setattr(tela, "get", contando)
+    visao.limpar()
+    m = _com_manut()["Brodowski 1"]["manutencao"]
+    assert (m["passada_prog"], m["passada_feitas"], m["passada_pct"]) == (20, 17, 85.0)
+    assert offsets and 0 not in offsets                 # a 1ª página (as semanas antigas) nunca é lida

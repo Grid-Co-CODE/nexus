@@ -272,6 +272,40 @@ def paradas_abertas(nomes: Nomes, mes: str) -> tuple[dict, dict]:
                        "sem_usina": sorted({n for (n, _f), u in uid_de.items() if not u})}
 
 
+def _programacao_recente(segundas: set) -> list[dict]:
+    """As linhas do `fato_programacao` das semanas pedidas (a passada e a corrente), lidas do FIM para trás, como a tela
+    Técnicos por usina (`pcm.tecnicos_usina._programacao_do_fim`): a carga põe as 4 semanas do arquivo do PCM no fim
+    (`programacao.mesclar_semanas`), e a aba inteira (16.540 linhas em 18/10/2026) levava 4,4 s a cada conta da Visão.
+    Para depois de passar das semanas pedidas. Sem a listagem das abas, a aba inteira."""
+    from ..dados import programacao as PG
+    base, s = visao._base(), visao._sessao()
+    try:
+        r = s.get(f"{base}/api/sheets", timeout=60)
+        r.raise_for_status()
+        meta = next(((x.get("id"), int(x.get("row_count") or 0)) for x in r.json()
+                     if x.get("workbook_key") == PG.LIVRO and x.get("sheet_name") == PG.ABA), None)
+    except Exception:       # noqa: BLE001 — sem a listagem: a aba inteira, pela cópia de sempre
+        meta = None
+    if not meta or not meta[0]:
+        return visao._livro(PG.LIVRO, PG.ABA)
+    sid, n = meta
+    out, viu, off = [], False, ((max(n, 1) - 1) // 1000) * 1000
+    while off >= 0:
+        r = s.get(f"{base}/api/sheets/{sid}/rows", params={"limit": 1000, "offset": off}, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+        rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
+        achadas = [x for x in (dict(zip(y.get("headers") or [], y.get("values") or [])) for y in rows)
+                   if visao.D._id(x.get("data_id_semana")) in segundas]
+        out += achadas
+        if achadas:
+            viu = True
+        elif viu:
+            break           # já passou das semanas pedidas
+        off -= 1000
+    return out
+
+
 def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
     """{usina_id: o dado cru do bloco Manutenção} (18/10/2026; a conta é `nexus/campo/manutencao.py`): as tarefas das OS
     do Fracttal (`nexus_os`), os motivos do Fora da programação (decifrados aqui: a marca guarda a usina e a tarefa
@@ -279,7 +313,7 @@ def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
     (`com_manutencao`, no pedido). Sem o `nexus_os` no banco, só as paradas por marca e a semana."""
     from flask import current_app
     from ..dados import fato_tarefa_os as FT
-    from ..dados import programacao as PG
+    from ..dados.calendario import data_id
     from . import manutencao as M
     cfg = current_app.config
     tarefas = visao._livro(FT.LIVRO, FT.ABA)
@@ -296,8 +330,9 @@ def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
         erro_motivos = f"{type(e).__name__}: {str(e)[:120]}"
     chamados_os = {visao.D._id(r.get("os")) for r in visao._livro(LIVRO_CHAMADOS, ABA_CHAMADOS)} - {None}
     t = M.tarefas_por_usina(tarefas if tarefas else None, marcas, chamados_os, hoje)
-    s = M.semana_por_usina(visao._livro(PG.LIVRO, PG.ABA), hoje, agora.strftime("%H:%M"))
     passada = hoje - timedelta(days=hoje.weekday() + 7)
+    prog = _programacao_recente({data_id(passada), data_id(passada + timedelta(days=7))})
+    s = M.semana_por_usina(prog, hoje, agora.strftime("%H:%M"))
     ano, sem, _ = passada.isocalendar()
     por = {uid: {**t.get(uid, {}), **s.get(uid, {})} for uid in set(t) | set(s)}
     return por, {"publicado": bool(tarefas), "gerado_em": str(q.get("gerado_em") or ""), "erro_motivos": erro_motivos,
