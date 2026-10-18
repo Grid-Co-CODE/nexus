@@ -12,7 +12,7 @@
    a usina só com o nome, o "Desde" com a hora, a OS e o nº de 5 a 6 dígitos da observação em verde abrem o card da OS
    do OS Creator (oscreator/card_os_abrir.html), a linha de baixo da tarefa sem o código do ativo (fica no title) e o
    "Retornar à programação" no menu de três pontos do fim da linha. O dado e as regras: nexus/pcm/motivos.py; as contas da tela: telas._ctx_fora. #}
-{% macro selo(nome, tira) %}<span class="q-mp{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
+{% macro selo(nome, tira) %}<span class="q-mp q-mp--texto{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
 <div class="campo-nativa">
 {% with parte="cab", aba="painel", n=None %}{% include "pcm/_fora_topo.html" %}{% endwith %}
 

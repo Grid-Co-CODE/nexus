@@ -12,6 +12,7 @@ os que tiram, sem a finalizada, o filtro Motivo, marcar pela OS) e a lista no Ge
 GitHub: o livro é um arquivo (`NEXUS_PCM_MOTIVOS_ARQUIVO`) e o GitHub é o falso dos testes da publicação."""
 import json
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -882,3 +883,45 @@ def test_fora_no_estilo_da_tela_de_pt(app, logado, tela):
         h = " ".join(logado.get(f"/t/pcm/fora-da-programacao?ver={ver}").get_data(as_text=True).split())
         assert 'class="campo-nativa"' in h and f'aria-current="page">{aba}' in h, ver
         assert 'class="cn-tab"' in h, ver
+
+
+def test_cadastro_edita_na_propria_linha_e_o_selo_so_com_a_cor(app, logado, tela):
+    """Levi, 18/10/2026, no Cadastro de motivos: "Tem que dar para mudar a opção tira da programação"; o Editar "abre um
+    card nada a ver abaixo [...] que poderia facilmente estar destacado na coluna de descrição"; "o nome também poderia
+    ser mudado no motivo"; "Tire as bordas vermelhas e laranjas, deixe só as fontes!". O nome, a descrição e o "tira"
+    se editam na própria linha (um formulário por linha, ligado aos campos pelo atributo `form`), e o selo do motivo,
+    nas telas do Fora da programação, é só a letra na cor (vermelho tira, laranja não tira)."""
+    clima = next(m for m in M.ativos(M.ler(app.config, forcar=True)) if m["nome"] == "Condições climáticas adversas")
+    f = f"f-motivo-{clima['id']}"
+    html = logado.get("/t/pcm/fora-da-programacao?ver=cadastro").get_data(as_text=True)
+    tab = html.split('<table class="fp-cad"', 1)[1].split("</table>", 1)[0]
+    assert "<details" not in tab and "Editar</summary>" not in tab
+    linha = tab.split(f'data-motivo="{clima["id"]}"', 1)[1].split("</tr>", 1)[0]
+    assert f'<form id="{f}"' in linha and 'name="acao" value="editar"' in linha
+    for campo in ('name="nome"', 'name="descricao"', 'name="tira"'):
+        pedaco = linha.split(campo, 1)
+        assert len(pedaco) == 2 and f'form="{f}"' in pedaco[1].split(">", 1)[0], campo
+    nome = linha.split('name="nome"', 1)[1].split(">", 1)[0]
+    assert 'value="Condições climáticas adversas"' in nome
+    assert "fp-cad-nome--tira" in linha.split('name="nome"', 1)[0].rsplit("<input", 1)[1]
+    assert " checked" in linha.split('name="tira"', 1)[1].split(">", 1)[0]
+    # o que os campos da linha mandam (sem o "tira" marcado) muda o motivo
+    r = logado.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "editar", "motivo_id": str(clima["id"]),
+                                                                  "nome": "Condições climáticas adversas",
+                                                                  "descricao": "Chuva forte ou raio na usina."})
+    assert r.status_code == 303
+    novo = next(m for m in M.ativos(M.ler(app.config, forcar=True)) if m["id"] == clima["id"])
+    assert novo["tira"] is False and novo["descricao"] == "Chuva forte ou raio na usina."
+    linha = logado.get("/t/pcm/fora-da-programacao?ver=cadastro").get_data(as_text=True).split(
+        f'data-motivo="{clima["id"]}"', 1)[1].split("</tr>", 1)[0]
+    assert "fp-cad-nome--tira" not in linha and " checked" not in linha.split('name="tira"', 1)[1].split(">", 1)[0]
+    # o selo só com a cor da letra: no painel, no histórico e na folha de estilo
+    am = next(m["id"] for m in M.ativos(M.ler(app.config)) if m["nome"] == "Aguardando material")
+    M.marcar(app.config, {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine",
+                          "usina": "Cliente A - Usina 1 - SP"}, am, "", PESSOA)
+    for url in ("/t/pcm/fora-da-programacao", "/t/pcm/fora-da-programacao?ver=historico"):
+        h = logado.get(url).get_data(as_text=True)
+        assert '<span class="q-mp q-mp--texto q-mp--tira">' in h, url
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
+    regra = css.split(".q-mp--texto{", 1)[1].split("}", 1)[0]
+    assert "background:none" in regra and "padding:0" in regra

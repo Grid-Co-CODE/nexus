@@ -126,8 +126,11 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
 - **Quem:** marcam e tiram o administrador, o setor PCM e o setor Responsáveis UFV (`telas.pode_marcar`) e o TÉCNICO
   pelo App de Campo, com qualquer motivo do cadastro, valendo na hora como a do PCM (Levi, 16/10/2026, depois da 1ª
   versão: "Sim, e já vale" e "Todos do cadastro"); o cadastro dos motivos (incluir, editar, dizer se tira, tirar) é do
-  administrador e do setor PCM (`pode_programar`). A lista do backoffice, de quem abre o Gerar a semana (como as
-  observações).
+  administrador e do setor PCM (`pode_programar`). **O Cadastro de motivos edita na própria linha** (Levi, 18/10/2026:
+  o Editar abria "um card nada a ver abaixo"; o nome, a descrição e o "tira" se mudam na coluna deles): o `<form>` de
+  cada linha fica na célula das ações e os campos se ligam a ele pelo atributo `form`; o Salvar só aparece na linha que
+  mudou, e mudar o "tira" de motivo com tarefas pede confirmação. A lista do backoffice, de quem abre o Gerar a semana
+  (como as observações).
 - **Pelo App** (`motivos_app.py`, a rota `POST /t/pcm/motivos/app`, pública só para quem assina, como a das fotos dos
   extintores): corpo JSON {os, codigo, tarefa, motivo (id; null = tirar), obs, tecnico_hmac, tecnico_nome}; cabeçalhos
   `X-Nexus-Ts` (epoch) e `X-Nexus-Assinatura` = HMAC-SHA256 de "<ts>." + o corpo cru, com a chave derivada da
@@ -212,7 +215,9 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
 - **No Quadro** (a janela da OS, também das pendentes, que agora abrem a janela pelo nome): a seção Motivo mostra o de
   agora (desde quando, quem, a observação) e marca, troca ou tira por `POST /t/pcm/quadro/motivo` (JSON; a tarefa vem da
   SEMANA, a página só diz qual). O cartão e a pendente ganham o selo (vermelho: tira; laranja: não tira — Levi, 16/10: "vermelho o que sai da
-  programação, laranja o que não sai"; o mesmo selo no painel e no cadastro). Com a marca da OS
+  programação, laranja o que não sai"). Nas telas do Fora da programação (painel, histórico, cadastro) o selo é só a
+  letra na cor, sem o fundo (Levi, 18/10: "Tire as bordas vermelhas e laranjas, deixe só as fontes!", `q-mp--texto`);
+  no Quadro segue com o fundo. Com a marca da OS
   valendo na linha, trocar ou tirar mexe nela (em todos os ativos).
 - **O dado:** livro `nexus_pcm_motivos` (registrado no catálogo antes de existir; nasce com a 1ª gravação, que leva o
   cadastro inicial junto): `dim_motivo`, `fato_decisao_motivo` (só acrescenta, vale a última de cada tarefa) e

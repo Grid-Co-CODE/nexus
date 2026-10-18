@@ -654,6 +654,9 @@ html.pgp-aberto{overflow:hidden}
   text-overflow:ellipsis;vertical-align:middle}
 .q-mp i{font-size:12px;flex:none}
 .q-mp--tira{color:var(--critico);background:var(--critico-suave)}
+/* nas telas do Fora da programação o selo é só a letra na cor (Levi, 18/10/2026: "Tire as bordas vermelhas e laranjas,
+   deixe só as fontes!"); o Quadro da semana segue com o fundo */
+.q-mp.q-mp--texto{background:none;padding:0;border-radius:0}
 .q-c-mp{display:flex;min-width:0}
 .q-mp-atual{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0;font-size:13px;color:var(--tinta-2)}
 .q-mp-form{border-color:var(--linha);background:var(--superficie-2)}
@@ -769,6 +772,21 @@ html.pgp-aberto{overflow:hidden}
 .fp-form{display:grid;gap:8px;margin-top:8px;min-width:240px}
 .fp-form textarea.gc-campo{min-height:54px;resize:vertical}
 .fp-form .fp-botoes{display:flex;gap:8px;flex-wrap:wrap}
+/* o Cadastro de motivos edita na própria linha (18/10/2026): o nome na cor do selo, a descrição e o "tira" na coluna dele */
+/* os campos têm cara de texto (só a cor da letra, como o selo): a borda aparece ao passar o mouse na linha e ao editar */
+.fp-cad .gc-campo{width:100%;box-sizing:border-box;border-color:transparent;background:transparent}
+.fp-cad tr:hover .gc-campo{border-color:var(--linha)}
+.fp-cad .gc-campo:focus{border-color:var(--foco);background:var(--superficie)}
+.fp-cad-nome{min-width:280px;font-weight:600;color:var(--laranja)}
+.fp-cad-nome--tira{color:var(--critico)}
+.fp-cad-desc{min-width:300px;min-height:0;resize:none;overflow:hidden;color:var(--tinta-2)}
+.fp-cad-tira{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:var(--mudo);white-space:nowrap}
+.fp-cad-tira:has(input:checked){color:var(--critico)}
+.fp-cad td.fp-acoes{white-space:nowrap}
+.fp-cad td.fp-acoes form{display:inline-flex;vertical-align:middle;margin:0 2px}
+.fp-cad-tirar{border:0;background:transparent;color:var(--mudo);cursor:pointer;width:32px;height:32px;border-radius:50%;
+  display:inline-grid;place-items:center;font-size:16px}
+.fp-cad-tirar:hover,.fp-cad-tirar:focus-visible{color:var(--critico);background:var(--critico-suave);outline:none}
 .pcm-bo{margin-top:16px;padding-top:14px;border-top:1px solid var(--linha)}
 .pcm-bo-tit{font:700 14px/20px var(--font-sans);color:var(--tinta);margin:0 0 4px}
 .pcm-bo-lista{list-style:none;margin:10px 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}

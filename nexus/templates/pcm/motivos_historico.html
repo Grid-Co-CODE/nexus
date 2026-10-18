@@ -8,7 +8,7 @@
    acrescenta decisões, então o que sai do painel (retornou à programação, trocou, foi finalizado) fica aqui. O mesmo
    recorte e o mesmo filtro do painel; a OS e o nº de 5 a 6 dígitos da observação abrem o card da OS. As contas:
    motivos.episodios e telas._ctx_historico. #}
-{% macro selo(nome, tira) %}<span class="q-mp{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
+{% macro selo(nome, tira) %}<span class="q-mp q-mp--texto{% if tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if tira else 'tag' }}"></i>{{ nome }}</span>{% endmacro %}
 <div class="campo-nativa">
 {% with parte="cab", aba="historico", n=None %}{% include "pcm/_fora_topo.html" %}{% endwith %}
 {% with parte="abas", aba="historico", n=linhas|length %}{% include "pcm/_fora_topo.html" %}{% endwith %}

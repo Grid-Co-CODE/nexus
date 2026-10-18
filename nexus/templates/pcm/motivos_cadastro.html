@@ -22,39 +22,41 @@
 <div class="cn-tab"><table class="fp-cad">
     <thead><tr><th>Motivo</th><th class="fp-esq">Descrição</th><th>Tira da programação</th><th>Tarefas com ele</th>{% if pode %}<th></th>{% endif %}</tr></thead>
     <tbody>
+    {# a linha é o formulário (Levi, 18/10/2026: o Editar abria "um card nada a ver abaixo"; o nome, a descrição e o
+       "tira" se mudam na própria coluna). O <form> fica na célula das ações e os campos se ligam a ele pelo `form`. #}
     {% for m in motivos %}
-      <tr>
-        <td><span class="q-mp{% if m.tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if m.tira else 'tag' }}"></i>{{ m.nome }}</span></td>
+      {% set f = 'f-motivo-' ~ m.id %}
+      <tr data-motivo="{{ m.id }}">
+      {% if pode %}
+        <td><input class="gc-campo fp-cad-nome{% if m.tira %} fp-cad-nome--tira{% endif %}" name="nome" form="{{ f }}" value="{{ m.nome }}"
+                   maxlength="60" required aria-label="Nome do motivo"></td>
+        <td class="fp-esq"><textarea class="gc-campo fp-cad-desc" name="descricao" form="{{ f }}" maxlength="300" rows="2"
+                   placeholder="Sem descrição" aria-label="Descrição do motivo {{ m.nome }}">{{ m.descricao }}</textarea></td>
+        <td><label class="fp-cad-tira"><input type="checkbox" name="tira" value="1" form="{{ f }}"{% if m.tira %} checked{% endif %}>
+          <span data-sim-nao>{{ 'Sim' if m.tira else 'Não' }}</span></label></td>
+        <td class="m">{{ m.n }}</td>
+        <td class="fp-acoes">
+          {% set volta = (m.n ~ (' tarefa com este motivo volta' if m.n == 1 else ' tarefas com este motivo voltam') ~ ' à programação. Salvar?') %}
+          {% set sai = (m.n ~ (' tarefa com este motivo sai' if m.n == 1 else ' tarefas com este motivo saem') ~ ' da programação. Salvar?') %}
+          <form id="{{ f }}" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/cadastro"
+                {% if m.n %}onsubmit='return this.elements.tira.checked === {{ "true" if m.tira else "false" }} || confirm({{ (volta if m.tira else sai)|tojson }})'{% endif %}>
+            <input type="hidden" name="acao" value="editar">
+            <input type="hidden" name="motivo_id" value="{{ m.id }}">
+            <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" data-salvar hidden>Salvar</button>
+          </form>
+          {% set pergunta = 'Tirar o motivo ' ~ m.nome ~ ' do cadastro?' ~ ((' ' ~ m.n ~ (' tarefa está com ele e perde o motivo' if m.n == 1 else ' tarefas estão com ele e perdem o motivo') ~ (' (voltam à programação).' if m.tira else '.')) if m.n else '') %}
+          <form method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/cadastro" onsubmit='return confirm({{ pergunta|tojson }})'>
+            <input type="hidden" name="acao" value="excluir">
+            <input type="hidden" name="motivo_id" value="{{ m.id }}">
+            <button class="fp-cad-tirar" type="submit" title="Tirar do cadastro" aria-label="Tirar o motivo {{ m.nome }} do cadastro"><i class="ph ph-trash"></i></button>
+          </form>
+        </td>
+      {% else %}
+        <td><span class="q-mp q-mp--texto{% if m.tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if m.tira else 'tag' }}"></i>{{ m.nome }}</span></td>
         <td class="fp-esq">{{ m.descricao or '—' }}</td>
         <td>{% if m.tira %}<span class="cn-st cn-t-critico">Sim</span>{% else %}<span class="cn-st cn-t-neutro">Não</span>{% endif %}</td>
         <td class="m">{{ m.n }}</td>
-        {% if pode %}
-        <td class="fp-acoes">
-          <details>
-            <summary>Editar</summary>
-            {% set volta = (m.n ~ (' tarefa com este motivo volta' if m.n == 1 else ' tarefas com este motivo voltam') ~ ' à programação. Salvar?') %}
-            {% set sai = (m.n ~ (' tarefa com este motivo sai' if m.n == 1 else ' tarefas com este motivo saem') ~ ' da programação. Salvar?') %}
-            <form class="fp-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/cadastro"
-                  {% if m.n %}onsubmit='return this.querySelector("[name=tira]").checked === {{ "true" if m.tira else "false" }} || confirm({{ (volta if m.tira else sai)|tojson }})'{% endif %}>
-              <input type="hidden" name="acao" value="editar">
-              <input type="hidden" name="motivo_id" value="{{ m.id }}">
-              <label class="gc-rotulo" for="n-{{ m.id }}">Nome</label>
-              <input id="n-{{ m.id }}" name="nome" class="gc-campo" value="{{ m.nome }}" maxlength="60" required>
-              <label class="gc-rotulo" for="d-{{ m.id }}">Descrição</label>
-              <textarea id="d-{{ m.id }}" name="descricao" class="gc-campo" maxlength="300">{{ m.descricao }}</textarea>
-              <label class="gc-rotulo"><input type="checkbox" name="tira" value="1"{% if m.tira %} checked{% endif %}> Tira da programação</label>
-              <div class="fp-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar</button></div>
-            </form>
-            {% set pergunta = 'Tirar o motivo ' ~ m.nome ~ ' do cadastro?' ~ ((' ' ~ m.n ~ (' tarefa está com ele e perde o motivo' if m.n == 1 else ' tarefas estão com ele e perdem o motivo') ~ (' (voltam à programação).' if m.tira else '.')) if m.n else '') %}
-            <form class="fp-form" method="post" action="{{ raiz }}/t/pcm/fora-da-programacao/cadastro"
-                  onsubmit='return confirm({{ pergunta|tojson }})'>
-              <input type="hidden" name="acao" value="excluir">
-              <input type="hidden" name="motivo_id" value="{{ m.id }}">
-              <div class="fp-botoes"><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-trash"></i> Tirar do cadastro</button></div>
-            </form>
-          </details>
-        </td>
-        {% endif %}
+      {% endif %}
       </tr>
     {% endfor %}
     </tbody>
@@ -77,4 +79,30 @@
 <p class="gc-ajuda"><i class="ph ph-lock-key"></i> Quem muda o cadastro é o administrador e o setor PCM.</p>
 {% endif %}
 </div>
+{% if pode %}
+<script>
+  // o Salvar aparece na linha que mudou; o "tira" troca na hora o Sim/Não e a cor do nome; a descrição tem a altura do texto
+  function altura(t) { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
+  document.querySelectorAll("tr[data-motivo]").forEach(function (tr) {
+    var salvar = tr.querySelector("[data-salvar]"), tira = tr.querySelector("input[name=tira]");
+    var nome = tr.querySelector("input[name=nome]"), simNao = tr.querySelector("[data-sim-nao]");
+    var desc = tr.querySelector("textarea[name=descricao]");
+    if (!salvar) return;
+    altura(desc);
+    desc.addEventListener("input", function () { altura(desc); });
+    function mudou() {
+      salvar.hidden = false;
+      nome.classList.toggle("fp-cad-nome--tira", tira.checked);
+      simNao.textContent = tira.checked ? "Sim" : "Não";
+    }
+    tr.addEventListener("input", mudou);
+    tr.addEventListener("change", mudou);
+  });
+  // a medida certa só sai com a fonte carregada e a largura final da coluna
+  function medir() { document.querySelectorAll("table.fp-cad textarea[name=descricao]").forEach(altura); }
+  window.addEventListener("load", medir);
+  window.addEventListener("resize", medir);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(medir);
+</script>
+{% endif %}
 {% endblock %}
