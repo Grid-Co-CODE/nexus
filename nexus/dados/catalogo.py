@@ -33,7 +33,7 @@ Estados de cada fato (`ESTADOS_FATO`):
 import re
 from dataclasses import dataclass
 
-from . import fato_chamado, fato_pt, fato_ronda, fatos, geracao, programacao
+from . import fato_chamado, fato_pt, fato_ronda, fato_tarefa_os, fatos, geracao, programacao
 
 ESTADOS = {"id": "ID", "cod": "código", "hmac": "código da pessoa", "nome": "nome", "largo": "em colunas",
            "prop": "cadastro próprio", "nao": "—"}
@@ -750,6 +750,22 @@ FATOS = (
                     "não grava com a leitura do banco vazia ou que falha; as semanas desde a W21 vieram do git do PCM "
                     "(carga única, ferramentas/carregar_programacao_historica.py). Usina e equipe são as ATUAIS do "
                     "ativo (o robô reescreve): a da época sai do usinas_historico"),
+    # As tarefas das OS do Fracttal lidas pelo próprio Nexus (18/10/2026, Levi: "pegando tudo do Fracttal ou Nexus, sem
+    # fontes externas!"): o que o gestao_pcm.json do robô do PCM dava às telas, agora no banco, de hora em hora
+    # (nexus/campo/tarefas_os.py). Registrado antes de existir: o livro nasce na 1ª gravação, depois do ensaio
+    Fato("tarefa_os", "Tarefa de OS do Fracttal", "pcm",
+         "fora do banco: API REST do Fracttal (work_orders, uma linha por tarefa)", fato_tarefa_os.GRAO,
+         _d(data=("id", "data_id_criacao, data_id_programada, data_id_fim (dia de Brasília)"),
+            usina=("id", "usina_id (de-para do Fracttal pelo site da OS; código do ativo)"),
+            equipamento=("id", "equipamento_id (o código do ativo na dimensão de equipamento)"),
+            os=("cod", "os (o nº da OS) e fracttal_os_id (o id da OS no Fracttal, para abrir o card)")),
+         tipo=fato_tarefa_os.TIPO, chave=fato_tarefa_os.CHAVE, medidas=_m(fato_tarefa_os.MEDIDAS),
+         fontes=_fontes(fato_tarefa_os.FONTES), janela_origem=fato_tarefa_os.JANELA_ORIGEM,
+         estado="conformado", conformado_em="nexus_os · fato_tarefa_os",
+         observacao="foto de hora em hora do que está aberto (status 1 e 2) e da zeladoria feita em 90 dias; "
+                    "cancelada fica fora. O nome da tarefa vira tarefa_chave (a mesma conta da programação e dos "
+                    "motivos); o responsável da OS só vira do_backoffice (1/0, pelo HMAC do nome contra a lista do "
+                    "PCM), nunca o nome (regra 8). Leitura do Fracttal incompleta não grava"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -835,6 +851,11 @@ LIVROS = (
           "nexus/campo/chamados_acompanhamento.py (laço do Campo; NEXUS_CHAMADOS_PUBLICAR=0 desliga numa máquina)", True,
           "no banco desde 12/10/2026 (1ª gravação pelo Nexus do PC, conferida por GET: 18 linhas, 17 abertas e 1 em "
           "verificação, todas com usina); grava se a última gravação tiver mais de 50 min"),
+    Livro("nexus_os", ("fato_tarefa_os", "qualidade"), "de hora em hora (:10), uma máquina por vez",
+          "nexus/campo/tarefas_os.py (laço do Campo; NEXUS_OS_PUBLICAR=0 desliga numa máquina)", False,
+          "registrado em 18/10/2026 antes de existir: nasce na 1ª gravação, feita à mão depois do ensaio "
+          "(ferramentas/ensaio_tarefas_os.py --gravar); grava só a leitura inteira do Fracttal e se a última "
+          "gravação tiver mais de 50 min"),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "

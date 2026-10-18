@@ -63,6 +63,7 @@ RESUMO = {
     "chamado": "Cada chamado de garantia aberto com o fabricante e em que pé está",
     # ── PCM ──
     "programacao": "A agenda semanal de manutenção montada pelo PCM",
+    "tarefa_os": "Cada tarefa das OS abertas no Fracttal e a zeladoria feita",
 }
 
 PARA_QUE = {
@@ -207,4 +208,8 @@ PARA_QUE = {
     "programacao": "A agenda semanal de manutenção que o PCM monta: que tarefa, em que usina, com qual equipe e em "
                    "que dia e hora. Serve para comparar o planejado com o que o campo fez e ver a carga de cada "
                    "equipe. O Nexus guarda as semanas desde a W21 de 2026, além das 4 que o arquivo do PCM guarda.",
+    "tarefa_os": "Guarda cada tarefa das OS abertas no Fracttal (em processo e em verificação) e a zeladoria feita nos "
+                 "últimos 90 dias, lidas pelo próprio Nexus de hora em hora: a usina, o equipamento, o tipo, a data "
+                 "programada e em que pé está. É de onde a Visão do responsável conta as OS abertas e atrasadas e a "
+                 "zeladoria de cada usina.",
 }
