@@ -3,7 +3,7 @@ administradores pegar aqueles ativos com sinal para acompanhar ou alguém da eng
 ver!"). Desenho em docs/superpowers/specs/2026-10-18-engenharia-acompanhamento-design.md. Banco falso
 (tests/pg_falso.py); os nomes são fictícios."""
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 import requests
@@ -131,3 +131,77 @@ def test_banco_fora_nao_grava_e_a_leitura_diz(banco, monkeypatch):
     with pytest.raises(requests.ConnectionError):
         A.pegar(ATIVO, ANA, pode=True)
     assert banco.syncs == 0
+
+
+# ── Task 2: encaminhar, salvar (dados e encerrar) e comentar ─────────────────────────────────────────────────────────
+def PESSOAS():
+    """As pessoas do setor Engenharia, como a tela recebe de `pessoas_da_engenharia` (Task 3)."""
+    return [{"hmac": A.codigo(ANA), "nome": "Ana Lima"}, {"hmac": A.codigo(BETO), "nome": "Beto Souza"}]
+
+
+def test_encaminhar_so_para_a_engenharia_e_troca_quem_acompanha(banco):
+    A.encaminhar(ATIVO, A.codigo(BETO), ANA, True, PESSOAS())
+    a = _a()
+    assert a["responsavel"]["nome"] == "Beto Souza" and a["encaminhado_por"] == "Ana Lima" and a["aberto"]
+    assert a["inicio"] == datetime.now(BRT).date() and a["falhas30_entrada"] == 5     # encaminhar também começa
+    with pytest.raises(A.Recusada, match="Engenharia"):
+        A.encaminhar(ATIVO, "hmac-de-fora", ANA, True, PESSOAS())
+    with pytest.raises(A.Recusada, match="já está com Beto Souza"):
+        A.encaminhar(ATIVO, A.codigo(BETO), ANA, True, PESSOAS())
+    A.encaminhar(ATIVO, A.codigo(ANA), ANA, True, PESSOAS())          # assumir = encaminhar para si mesmo
+    a = _a()                                                         # o mesmo acompanhamento, com outra pessoa
+    assert a["responsavel"]["nome"] == "Ana Lima" and a["encaminhado_por"] == ""
+    with pytest.raises(A.Recusada, match="Engenharia"):
+        A.encaminhar(ATIVO, A.codigo(BETO), ANA, False, PESSOAS())
+
+
+def test_salvar_muda_e_encerra_so_com_fim_e_diagnostico(banco):
+    A.pegar(ATIVO, ANA, pode=True)
+    aid, hoje = _aid(), date(2026, 10, 18)
+    A.salvar(aid, "2026-10-15", "", "1", BETO, True, hoje)            # qualquer um da Engenharia muda
+    a = _a()
+    assert a["inicio"] == date(2026, 10, 15) and a["diagnostico_id"] == 1 and a["aberto"]
+    with pytest.raises(A.Recusada, match="Nada mudou"):
+        A.salvar(aid, "2026-10-15", "", "1", ANA, True, hoje)
+    for ini, fim, diag, erro in (("2026-10-15", "2026-10-17", "", "diagnóstico"),
+                                 ("2026-10-15", "2026-10-14", "1", "antes do início"),
+                                 ("2026-10-15", "2026-10-19", "1", "depois de hoje"),
+                                 ("2026-10-19", "", "1", "depois de hoje"),
+                                 ("2026-10-15", "", "9", "não existe")):
+        with pytest.raises(A.Recusada, match=erro):
+            A.salvar(aid, ini, fim, diag, ANA, True, hoje)
+    A.salvar(aid, "2026-10-15", "2026-10-17", "2", ANA, True, hoje)
+    a = _a()
+    assert not a["aberto"] and a["fim"] == date(2026, 10, 17) and a["diagnostico_id"] == 2 and a["encerrado_em"]
+    with pytest.raises(A.Recusada, match="encerrado"):
+        A.comentar(aid, "depois", ANA, True)
+    with pytest.raises(A.Recusada, match="encerrado"):
+        A.salvar(aid, "2026-10-15", "2026-10-18", "2", ANA, True, hoje)
+
+
+def test_data_invalida_recusa_e_nao_grava(banco):
+    # Review Focus 5: o campo de data manda AAAA-MM-DD; o resto (dia que não existe, outro formato, vazio) não grava
+    A.pegar(ATIVO, ANA, pode=True)
+    n = len(banco.linhas(A.LIVRO, A.ABA_EVENTO))
+    for ini in ("2026-02-31", "18/10/2026", ""):
+        with pytest.raises(A.Recusada, match="início"):
+            A.salvar(_aid(), ini, "", "1", ANA, True, date(2026, 10, 18))
+    with pytest.raises(A.Recusada, match="fim"):
+        A.salvar(_aid(), "2026-10-15", "31/10/2026", "1", ANA, True, date(2026, 10, 18))
+    assert len(banco.linhas(A.LIVRO, A.ABA_EVENTO)) == n
+
+
+def test_comentario_cifrado_com_hora_quem_e_limites(banco):
+    A.pegar(ATIVO, ANA, pode=True)
+    A.comentar(_aid(), "  Datalogger   perde o link\n\nTrocar cabo ", BETO, True)   # não só quem acompanha
+    A.comentar(_aid(), "Cabo trocado", ANA, True)
+    novo, velho = _a()["comentarios"]                                                 # o mais novo primeiro
+    assert velho["texto"] == "Datalogger perde o link\n\nTrocar cabo" and velho["nome"] == "Beto Souza"
+    assert novo["texto"] == "Cabo trocado" and " às " in novo["quando_txt"]
+    with pytest.raises(A.Recusada, match="Escreva"):
+        A.comentar(_aid(), "   ", ANA, True)
+    with pytest.raises(A.Recusada, match="2000"):
+        A.comentar(_aid(), "x" * 2001, ANA, True)
+    with pytest.raises(A.Recusada, match="Engenharia"):
+        A.comentar(_aid(), "sem poder", ANA, False)
+    assert "datalogger" not in json.dumps(banco.linhas(A.LIVRO, A.ABA_EVENTO), default=str).lower()

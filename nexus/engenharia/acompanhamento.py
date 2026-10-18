@@ -312,3 +312,106 @@ def pegar(ativo: dict, usuario, pode: bool) -> dict:
                        inicio=datetime.now(_BRT).date(), entrada=ativo)
         _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
     return nova
+
+
+def _ativo_de(a: dict) -> dict:
+    return {"cod": a["cod"], "usina_id": a["usina_id"], "usina_ligada_por": a.get("usina_ligada_por")}
+
+
+def _do_livro(lido: dict, acompanhamento_id) -> dict:
+    """O acompanhamento aberto, ou a recusa: não achado, ou encerrado (encerrado fica só para ler)."""
+    a = estado(lido["eventos"]).get(_txt(acompanhamento_id))
+    if not a:
+        raise Recusada("Não achei este acompanhamento: recarregue a página")
+    if not a["aberto"]:
+        raise Recusada("Este acompanhamento já foi encerrado: fica só para ler")
+    return a
+
+
+def encaminhar(ativo: dict, para_hmac: str, usuario, pode: bool, pessoas: list[dict]) -> dict:
+    """Passa o ativo para uma pessoa da Engenharia (`pessoas`, de `pessoas_da_engenharia`). Ativo livre: começa o
+    acompanhamento com quem recebeu, o início em hoje. Ativo acompanhado: troca quem acompanha (para si mesmo = assumir)."""
+    quem = _quem(usuario, pode, "encaminha um ativo")
+    para = next((p for p in pessoas or [] if p.get("hmac") and p["hmac"] == _txt(para_hmac)), None)
+    if not para:
+        raise Recusada("Escolha uma pessoa da Engenharia para encaminhar")
+    cofre = _cofre()
+    if not canon(ativo.get("cod")):
+        raise Recusada("Ativo sem código")
+    resp = {"hmac": para["hmac"], "nome": para.get("nome") or ""}
+    with _TRAVA:
+        lido = _reler()
+        ab = aberto_de(estado(lido["eventos"]), ativo.get("cod"))
+        if ab and ab["responsavel"]["hmac"] == resp["hmac"]:
+            raise Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or resp['nome']}")
+        if ab:
+            nova = _evento(cofre, "encaminhou", quem, ab["id"], _ativo_de(ab), responsavel=resp)
+        else:
+            nova = _evento(cofre, "encaminhou", quem, uuid.uuid4().hex[:12], ativo, responsavel=resp,
+                           inicio=datetime.now(_BRT).date(), entrada=ativo)
+        _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
+    return nova
+
+
+def _data(v, campo: str) -> date | None:
+    """A data do <input type="date"> (AAAA-MM-DD); vazio = None; o resto é recusado."""
+    t = _txt(v)
+    if not t:
+        return None
+    try:
+        return datetime.strptime(t, "%Y-%m-%d").date()
+    except ValueError:
+        raise Recusada(f"Data inválida no {campo}: escolha no calendário do campo") from None
+
+
+def salvar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, usuario, pode: bool,
+           hoje: date | None = None) -> dict:
+    """Muda o início e o diagnóstico (evento `dados`) ou, com o fim, encerra (evento `encerrou`, que exige o
+    diagnóstico: o fim da análise é o dia em que ela terminou, decisão do Levi de 18/10/2026)."""
+    quem = _quem(usuario, pode, "muda um acompanhamento")
+    hoje = hoje or datetime.now(_BRT).date()
+    ini = _data(inicio, "início da análise")
+    if not ini:
+        raise Recusada("Escolha o início da análise")
+    f = _data(fim, "fim da análise")
+    diag = _int(diagnostico_id)
+    if ini > hoje:
+        raise Recusada("O início da análise não pode ser depois de hoje")
+    if f and f > hoje:
+        raise Recusada("O fim da análise não pode ser depois de hoje")
+    if f and f < ini:
+        raise Recusada("O fim da análise não pode ser antes do início")
+    if f and not diag:
+        raise Recusada("Para encerrar, escolha o diagnóstico")
+    cofre = _cofre()
+    with _TRAVA:
+        lido = _reler()
+        a = _do_livro(lido, acompanhamento_id)
+        diag = diag or a["diagnostico_id"]
+        if diag and diag != a["diagnostico_id"] and not any(
+                d["id"] == diag and not d["excluido"] for d in diagnosticos(lido["diagnosticos"])):
+            raise Recusada("Este diagnóstico não existe no cadastro (ou foi excluído): escolha outro")
+        if not f and ini == a["inicio"] and diag == a["diagnostico_id"]:
+            raise Recusada("Nada mudou")
+        nova = _evento(cofre, "encerrou" if f else "dados", quem, a["id"], _ativo_de(a), inicio=ini, fim=f,
+                       diagnostico_id=diag)
+        _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
+    return nova
+
+
+def comentar(acompanhamento_id: str, texto: str, usuario, pode: bool) -> dict:
+    """Um comentário, com a data e a hora de agora e quem escreveu. Qualquer um da Engenharia escreve (o Levi não quis
+    "só quem acompanha escreve", 18/10/2026); nunca se edita nem se apaga."""
+    quem = _quem(usuario, pode, "comenta um acompanhamento")
+    texto = "\n".join(" ".join(l.split()) for l in str(texto or "").strip().splitlines()).strip()
+    if not texto:
+        raise Recusada("Escreva o comentário antes de salvar")
+    if len(texto) > TEXTO_MAX:
+        raise Recusada(f"O comentário passou de {TEXTO_MAX} caracteres")
+    cofre = _cofre()
+    with _TRAVA:
+        lido = _reler()
+        a = _do_livro(lido, acompanhamento_id)
+        nova = _evento(cofre, "comentario", quem, a["id"], _ativo_de(a), texto=texto)
+        _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
+    return nova
