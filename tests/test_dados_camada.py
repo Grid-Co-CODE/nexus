@@ -122,6 +122,8 @@ def test_livros_do_nexus_registrados_antes_de_existir_e_na_regra_10():
     for nome in ("nexus_equipamentos", "nexus_ativos_fracttal", "nexus_tempo_real", "nexus_depara"):
         assert catalogo.LIVRO_POR_NOME[nome].no_banco, nome
     assert not catalogo.LIVRO_POR_NOME[decisao_pt.LIVRO].no_banco
+    # o nexus_os nasceu na 1ª gravação, conferida por GET depois de gravar (18/10/2026: 8.746 tarefas)
+    assert catalogo.LIVRO_POR_NOME[fato_tarefa_os.LIVRO].no_banco
 
 
 def test_decisao_da_pt_no_catalogo_e_o_contrato_com_o_app():

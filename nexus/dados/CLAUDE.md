@@ -214,6 +214,9 @@ abertas 2.236 × 2.218 e atrasadas (mais de 10 dias) 1.073 × 1.071. As diferen�
 "sem usina" do lado do PCM (o arquivo dele dá a usina pelo nome atual do ativo, e o nome não liga pelo de-para);
 Brodowski, 42 × 26 abertas com as atrasadas iguais (3 × 3): provavelmente OS nova depois do arquivo do PCM (o ensaio
 é de uma hora depois e nenhuma das 16 a mais está atrasada); não conferido OS a OS. Das 2.236 abertas, a Visão tira 56 do backoffice, 19 com motivo, 23 de chamado e 17 de zeladoria; Teste, 0.
+**No banco desde 18/10/2026 (~10:45):** a 1ª gravação, à mão (`--gravar`, com o OK do Levi), já com a leitura
+conferida contra o total do REST: 92 pedidos ao Fracttal (3 totais e 89 páginas), 8.746 tarefas gravadas e as mesmas
+8.746 relidas por GET depois de gravar, nenhuma faltando, 119 sem usina (98,6% ligadas).
 
 **Carga única do checklist das rondas sem OS (06/10/2026).** Levi: "Atualize o banco de dados com essas rondas passadas
 sem OS, mas não será rotina". A ronda sem OS não tem o texto da OS no Fracttal; as respostas só existiam no registro da

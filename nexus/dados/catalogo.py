@@ -851,11 +851,11 @@ LIVROS = (
           "nexus/campo/chamados_acompanhamento.py (laço do Campo; NEXUS_CHAMADOS_PUBLICAR=0 desliga numa máquina)", True,
           "no banco desde 12/10/2026 (1ª gravação pelo Nexus do PC, conferida por GET: 18 linhas, 17 abertas e 1 em "
           "verificação, todas com usina); grava se a última gravação tiver mais de 50 min"),
-    Livro("nexus_os", ("fato_tarefa_os", "qualidade"), "de hora em hora (:10), uma máquina por vez",
-          "nexus/campo/tarefas_os.py (laço do Campo; NEXUS_OS_PUBLICAR=0 desliga numa máquina)", False,
-          "registrado em 18/10/2026 antes de existir: nasce na 1ª gravação, feita à mão depois do ensaio "
-          "(ferramentas/ensaio_tarefas_os.py --gravar); grava só a leitura inteira do Fracttal e se a última "
-          "gravação tiver mais de 50 min"),
+    Livro("nexus_os", ("fato_tarefa_os", "qualidade"), "de hora em hora (entre :10 e :20), uma máquina por vez",
+          "nexus/campo/tarefas_os.py (laço do Campo; NEXUS_OS_PUBLICAR=0 desliga numa máquina)", True,
+          "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "
+          "8.746 tarefas, conferidas por GET depois de gravar); grava só a leitura inteira do Fracttal e se a "
+          "última gravação tiver mais de 50 min"),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
