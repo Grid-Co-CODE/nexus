@@ -166,8 +166,9 @@
       </div>
       <p class="cr-rk-comp">{% if c.sem_equipe %}usinas sem equipe no cadastro: o conserto é no cadastro{% elif c.nota is none %}sem nota do App: nenhuma OS nem ronda pelo App em 30 dias{% else %}qualidade <b>{{ c.qualidade }}</b> · cobertura <b>{{ c.cobertura }}%</b> · {{ c.n_os }} tarefa{{ 's' if c.n_os != 1 }} e {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }}{% if c.antes.nota is not none %} · antes {{ c.antes.nota }}{% if c.antes.posicao %} ({{ c.antes.posicao }}º){% endif %}{% endif %}{% endif %}</p>
       <div class="cr-rk-mini">
-        {% for b, nome in (('perf', 'Performance'), ('acomp', 'Acompanhamento'), ('manut', 'Manutenção')) %}{% set t = c.tri[b] %}
-        <div title="{{ nome }}: {{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} em dia"><span>{{ nome }}</span><b><i class="cn-t-critico">{{ t.critico }}</i> · <i class="cn-t-alerta">{{ t.atencao }}</i> · <i class="cn-t-ok">{{ t.ok }}</i></b></div>
+        {# "Acompanh.": a palavra inteira cortava a 1440 e a 375 px; a dica leva o nome inteiro #}
+        {% for b, nome, curto in (('perf', 'Performance', 'Performance'), ('acomp', 'Acompanhamento', 'Acompanh.'), ('manut', 'Manutenção', 'Manutenção')) %}{% set t = c.tri[b] %}
+        <div title="{{ nome }}: {{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} em dia"><span>{{ curto }}</span><b><i class="cn-t-critico">{{ t.critico }}</i> · <i class="cn-t-alerta">{{ t.atencao }}</i> · <i class="cn-t-ok">{{ t.ok }}</i></b></div>
         {% endfor %}
       </div>
       <div class="cr-rk-etqs"><span class="cr-rk-rot">Em quê cobrar</span>

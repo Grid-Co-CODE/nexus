@@ -688,7 +688,11 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
   limite das atrasadas são de quem olha. Nada novo no banco. Sem as notas, a aba diz e não mostra cartão.
 - **O filtro `equipe=`**: o cartão abre Onde focar só com as usinas da equipe (o nome exato do cadastro), com o "×".
 - **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta;
-  mutações pegas) e os testes da aba em `tests/test_campo_responsaveis.py`.
+  mutações pegas) e os testes da aba em `tests/test_campo_responsaveis.py`. Com o banco real (18/10/2026, só GET, o
+  `test_client` com a sessão de administrador e o HTML servido local): em "Todos", 55 cartões (52 ranqueadas, notas de 41
+  a 98; 2 sem nota; 1 "Sem equipe"); o responsável com mais equipes vê 12. O agrupamento no pedido leva 7 a 8 ms para as
+  55; a conta fria da Visão ficou em 22 a 24 s, como antes (as leituras do ranking já estão no ciclo). A 1440 e a 375 px,
+  escuro e claro, sem rolagem lateral; o "Acompanhamento" do mini-bloco vira "Acompanh." (a palavra inteira cortava).
 
 ### Os chamados de garantia no banco (`nexus_chamados · fato_chamado`, 12/10/2026)
 
