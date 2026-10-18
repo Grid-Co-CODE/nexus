@@ -192,3 +192,34 @@ def test_a_faixa_da_tela_tem_rotulo_numero_e_explicacao(logado, monkeypatch):
         assert rotulo and numero.isdigit() and nota, b
     assert '<b class="kb-kpi-v kb-kpi-v--critico">2</b>' in faixa and "a mais atrasada: <b>OS 2</b>, 5 dias" in faixa
     assert "kb-resumo" not in html                                     # a faixa de antes (número em cima, rótulo embaixo) saiu
+
+
+def test_le_as_os_pelo_nome_como_o_fracttal_escreve(app, monkeypatch):
+    # 18/10/2026: o Fracttal passou a escrever o nome de um engenheiro com dois espaços. O filtro do REST
+    # (personnel_description) é por trecho e literal, e o nome do .env (um espaço) só achava as OS antigas, de quando o
+    # Fracttal o escrevia com um espaço: as OS abertas para ele na semana não apareciam no quadro
+    from urllib.parse import unquote
+    linhas = [_w("100", 3, task="DONE", prog_dias=-120, fim=(AGORA - timedelta(days=100)).isoformat(),
+                 personnel_description="Ana Teste "),
+              _w("200", 1, personnel_description="Ana  Teste")]
+
+    def rest(path):
+        if path.startswith("personnel?"):
+            return {"data": PESSOAS}
+        trecho = unquote(path.split("personnel_description=", 1)[1].split("&", 1)[0])
+        return {"data": [w for w in linhas if trecho in w["personnel_description"]]}
+    monkeypatch.setattr(E, "_ler_fracttal", rest)
+    monkeypatch.setattr(E.time, "sleep", lambda s: None)
+    app.config["NEXUS_ENGENHARIA_RESPONSAVEIS"] = "Ana Teste"
+    E.limpar()
+    E._reler(app)
+    assert sorted(o["os"] for o in E._EST["os"]) == ["100", "200"]                  # sem repetir a mesma linha
+    assert next(o for o in E._EST["os"] if o["os"] == "200")["coluna"] == "fazer"
+    E.limpar()
+
+
+def test_grafias_pede_o_mais_curto_que_ja_cobre_os_outros():
+    # o trecho mais curto já traz as linhas do mais comprido: "Ana" cobre "Ana  Teste"; um espaço a mais não cobre
+    assert E.grafias("Ana", PESSOAS[0]) == ["Ana"]
+    assert E.grafias("Ana Teste", PESSOAS[0]) == ["Ana Teste", "Ana  Teste"]
+    assert E.grafias("Bruno Exemplo", {"name": "Bruno Exemplo ", "full_name": None}) == ["Bruno Exemplo"]

@@ -7,7 +7,7 @@ Quem é da equipe: os mesmos nomes da Nova solicitação | Engenharia do OS Crea
 RESPONSAVEIS` no .env do Nexus vale por cima, se existir.
 
 Leitura (medido em 06/10): o REST filtra OS pelo nome do responsável (`personnel_description`, por trecho: "Fulano" acha
-"Fulano de Tal"), mas IGNORA `id_personnel`. Então: cada nome vira a pessoa do Fracttal pela lista `personnel` (150
+"Fulano de Tal"; e literal: um espaço a mais já não casa), mas IGNORA `id_personnel`. Então: cada nome vira a pessoa do Fracttal pela lista `personnel` (150
 pessoas, guardada 24 h; nome igual ou começando pelo nome do .env, só se for UMA), e as OS vêm pelo nome e são
 conferidas pelo `id_personnel` dela (um homônimo não entra). Os 6 somavam 55 linhas: ~8 pedidos por leitura, guardada
 5 min. Nada vai para o banco.
@@ -17,6 +17,7 @@ As linhas do REST são por TAREFA; o quadro é por OS (o número), com as tarefa
 - status 1: Em execução se alguma tarefa já começou e não terminou; senão A fazer (a data programada diz se atrasou,
   se vence logo ou se ainda vai abrir: "que serão abertas").
 """
+import json
 import os
 import threading
 import time
@@ -72,6 +73,24 @@ def casar(nome: str, pessoas: list[dict]) -> dict | None:
     iguais = [p for p in pessoas if alvo in (_norm(p.get("name")), _norm(p.get("full_name")))]
     achados = iguais or [p for p in pessoas if _norm(p.get("name")).startswith(alvo) or _norm(p.get("full_name")).startswith(alvo)]
     return achados[0] if len(achados) == 1 else None
+
+
+def grafias(nome: str, p: dict) -> list[str]:
+    """Os trechos que vão ao filtro do REST: o nome do .env e o nome como o Fracttal escreve hoje (`name`/`full_name`,
+    com os espaços dele), sem o que um trecho mais curto já cobre. Caso real (18/10/2026): o Fracttal passou a escrever o
+    nome de um engenheiro com dois espaços, e o nome do .env (um espaço) só achava as OS antigas, de quando ele era
+    escrito com um; as OS abertas para ele na semana não apareciam no quadro. As linhas seguem conferidas pelo
+    `id_personnel` (em `montar`)."""
+    candidatos = []
+    for g in (nome, p.get("name"), p.get("full_name")):
+        g = str(g or "").strip()
+        if g and g not in candidatos:
+            candidatos.append(g)
+    out = []
+    for g in sorted(candidatos, key=len):
+        if not any(o in g for o in out):
+            out.append(g)
+    return out
 
 
 def _paginas(path):
@@ -177,8 +196,15 @@ def _reler(app):
                 pessoa = {"id": p.get("id_personnel"), "nome": n,
                           "nome_fracttal": " ".join(str(p.get("name") or p.get("full_name") or n).split())}
                 equipe.append(pessoa)
-                todas += montar(_paginas(f"work_orders?personnel_description={quote(n)}"), pessoa, agora)
-                time.sleep(0.3)
+                linhas, vistas = [], set()
+                for g in grafias(n, p):
+                    for w in _paginas(f"work_orders?personnel_description={quote(g)}"):
+                        chave = json.dumps(w, sort_keys=True, default=str)   # a mesma linha por dois trechos entra uma vez
+                        if chave not in vistas:
+                            vistas.add(chave)
+                            linhas.append(w)
+                    time.sleep(0.3)
+                todas += montar(linhas, pessoa, agora)
             a.update(os=todas, equipe=equipe, faltam=faltam, ts=time.time(), erro="", erro_em=0.0)
     except Exception as e:      # noqa: BLE001 — 429 ou rede: fica a leitura anterior
         a.update(erro=str(e)[:160], erro_em=time.time())
