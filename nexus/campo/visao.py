@@ -46,7 +46,9 @@ STATUS_OPERACAO = "OPERAÇÃO"
 DIAS_SEM_RONDA_ALERTA = 7        # usina mobilizada sem ronda há 7 dias ou mais = ronda pendente
 DIAS_COBERTURA = 14              # janela da cobertura de ronda (a mesma do ranking por região)
 PT_PARADA_MIN = DOM.PT_PARADA_MIN  # PT esperando o De acordo há mais de 2 h = parada (o mesmo limite do fato_pt)
-PESO_QUALIDADE, PESO_COBERTURA = 0.6, 0.4     # ranking por região, a mesma régua do painel do App
+# os pesos do ranking por região do painel do App (`_ranking_regioes`): o Índice das rondas do Painel (só as rondas) e o
+# Ranking das equipes da Visão do responsável (as rondas e as tarefas fechadas pelo App, `ranking_equipes`)
+PESO_QUALIDADE, PESO_COBERTURA = 0.6, 0.4
 _DATA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}")
 # Região do Brasil pela UF do cadastro (Levi, 05/10: "Adicione uma coluna de região do Brasil"). Pela UF, e não pela
 # coluna `regiao` do cadastro: medido em 05/10, ela tem "Centro Oeste" e "Centro-Oeste" e 2 usinas vazias.
@@ -1091,9 +1093,11 @@ def comparativos(periodo, cobertura, lim=None) -> dict:
     de contrato, todos do cadastro, pela usina (a região de campo pela equipe dela). Na região de campo, `sub` diz quem é
     o Supervisor de Campo (ou que a vaga está aberta). Cobertura = usinas mobilizadas do grupo com ronda no período ÷ usinas do grupo (a conta do
     indicador "Cobertura de usinas"); qualidade = a nota média das rondas do grupo; duração média = a média de fim −
-    início; pendentes = a regra da Central. Índice = 60% qualidade + 40% cobertura, a régua do ranking por região do
-    painel do App; grupo sem uma das duas não ganha índice, para não ganhar 100 pela outra metade. Melhor índice
-    primeiro. `base_pequena` marca o grupo com menos de `BASE_PEQUENA` usinas (o número dele oscila muito)."""
+    início; pendentes = a regra da Central. Índice das rondas = 60% qualidade + 40% cobertura: a fórmula do ranking por
+    região do painel do App, só com as rondas (o App soma também as tarefas, como o Ranking das equipes da Visão do
+    responsável; o nome mudou em 18/10/2026 para os dois números não se confundirem); grupo sem uma das duas não ganha
+    índice, para não ganhar 100 pela outra metade. Melhor índice primeiro. `base_pequena` marca o grupo com menos de
+    `BASE_PEQUENA` usinas (o número dele oscila muito)."""
     lim = lim or _limites()
     com_ronda = {r["usina_id"] for r in periodo if r["usina_id"]}
     out = {}

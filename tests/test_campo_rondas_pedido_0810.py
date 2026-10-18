@@ -251,7 +251,13 @@ def test_destaque_do_painel_com_base_pequena_e_titulo_dos_blocos(banco, logado):
     # mas só de base pequena
     html = logado.get("/t/campo/rondas?aba=painel").get_data(as_text=True)
     destaques = html.split('<div class="cn-rank-destaques">', 1)[1].split('<div class="cn-rank-grade">', 1)[0]
-    assert destaques.count("só grupos de base pequena (menos de 3 usinas)") == 5 and "sem índice no período" not in destaques
+    assert destaques.count("só grupos de base pequena (menos de 3 usinas)") == 5
+    assert "sem índice das rondas no período" not in destaques
+    # o Índice das rondas (18/10/2026): a fórmula do ranking por região do App só com as rondas; o Ranking das equipes da
+    # Visão do responsável usa também as tarefas fechadas pelo App, e dois números com o mesmo nome confundiam
+    assert 'aria-sort="descending">Índice das rondas</th>' in html
+    assert "Índice das rondas = 60% da nota média das rondas + 40% cobertura" in html
+    assert "(a régua do ranking do App)" not in html
     blocos = logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
     assert 'title="1 técnico rondou neste cluster no período"' in blocos
     assert 'title="0 técnicos rondaram neste cluster no período"' in blocos

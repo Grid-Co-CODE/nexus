@@ -196,9 +196,12 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     coberturas, quais equipes tem melhor qualidade e cobertura, qual cliente, qual supervisor!"; `visao.comparativos`):
     respeitando o período e os filtros, uma tabela por região do Brasil (UF), equipe, cliente, região de campo (com o
     Supervisor de Campo embaixo do nome) e gestor de contrato (do cadastro: a região pela equipe da usina, o gestor pela
-    usina; a de "supervisor" saiu com a estrutura de O&M de 10/2026) com Índice, Cobertura (barra), Qualidade (barra), Rondas e Duração média, melhor índice primeiro; em
-    cima, o melhor e o que pede atenção de cada uma (sem os de base pequena). Índice = 60% qualidade + 40% cobertura (a
-    régua do ranking do App); grupo sem uma das duas fica sem índice. **Base pequena** = menos de 3 usinas
+    usina; a de "supervisor" saiu com a estrutura de O&M de 10/2026) com Índice das rondas, Cobertura (barra), Qualidade
+    (barra), Rondas e Duração média, melhor índice primeiro; em cima, o melhor e o que pede atenção de cada uma (sem os de
+    base pequena). **Índice das rondas** = 60% da nota média das rondas + 40% cobertura: a fórmula do ranking por região
+    do App, só com as rondas (até 18/10/2026 chamava "Índice", "a régua do ranking do App"; mudou porque o Ranking das
+    equipes da Visão do responsável usa a régua inteira, com as tarefas fechadas pelo App, e a mesma equipe tinha duas
+    "notas do App" diferentes na mesma torre); grupo sem uma das duas fica sem índice. **Base pequena** = menos de 3 usinas
     (`BASE_PEQUENA`). Clicar no nome leva aos Registros filtrados (`regiao=`, `equipe=`, `cliente=`, `regiao_campo=`,
     `gestor=`; a
     equipe virou filtro da tela, com o ×). Barras em CSS feitas no servidor, sem biblioteca. As tabelas ficam lado a
