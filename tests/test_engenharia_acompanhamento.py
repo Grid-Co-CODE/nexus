@@ -243,3 +243,60 @@ def test_pessoas_da_engenharia_pelo_setor_e_o_nome_do_fracttal(banco, monkeypatc
     # 11 é da Performance; 12 saiu do setor no dia seguinte; 13 é da Engenharia sem nome no Fracttal
     assert A.pessoas_da_engenharia() == [{"hmac": "h10", "nome": "Ana Lima"},
                                          {"hmac": "h13", "nome": "(sem nome no Fracttal)"}]     # sem nome no fim
+
+
+# ── Task 4: a separação das abas (acompanhamentos montados à mão, sem banco) ─────────────────────────────────────────
+def _ac(cod, desde, inicio, fim=None, diag=None):
+    return {"id": cod, "cod": cod, "desde": desde, "inicio": inicio, "fim": fim, "diagnostico_id": diag,
+            "aberto": fim is None, "encerrado_em": desde if fim else None,
+            "responsavel": {"hmac": "h-ana", "nome": "Ana Lima"}, "nivel_entrada": "critico"}
+
+
+def _f(quando):
+    return {"quando": quando, "os": "1", "tipo": "Corretiva"}
+
+
+def D(d, h=8, m=0):
+    return datetime(2026, 10, d, h, m, tzinfo=BRT)
+
+
+def test_separar_tira_o_acompanhado_e_o_encerrado_sem_falha_nova():
+    sinais = [{"cod": c, "nivel": "atencao"} for c in ("IBI200-INVR1.3", "IBI200-TRK07", "IBI200-INV02")]
+    acomps = {"a1": _ac("IBI200-INVR1.3", D(16), date(2026, 10, 16)),
+              "a2": _ac("IBI200-TRK07", D(1), date(2026, 10, 1), fim=date(2026, 10, 10), diag=2)}
+    s = A.separar(sinais, acomps, {"IBI200-TRK07": [_f(D(9))]})
+    assert [x["cod"] for x in s["sinal"]] == ["IBI200-INV02"] and s["sinal"][0]["ja"] is None
+    assert [x["acomp"]["cod"] for x in s["aberto"]] == ["IBI200-INVR1.3"]
+    assert [(x["acomp"]["cod"], x["voltou"]) for x in s["encerrado"]] == [("IBI200-TRK07", None)]
+
+
+def test_encerrado_volta_so_com_falha_do_dia_seguinte_ao_fim():
+    sinais = [{"cod": "IBI200-TRK07", "nivel": "atencao"}]
+    acomps = {"a2": _ac("IBI200-TRK07", D(1), date(2026, 10, 1), fim=date(2026, 10, 10), diag=2)}
+    assert A.separar(sinais, acomps, {"IBI200-TRK07": [_f(D(10, 23))]})["sinal"] == []    # o dia do fim é analisado
+    s = A.separar(sinais, acomps, {"IBI200-TRK07": [_f(D(10, 23)), _f(D(11, 0, 30))]})
+    assert s["sinal"][0]["ja"] == {"diagnostico_id": 2, "fim": date(2026, 10, 10)}
+    assert s["encerrado"][0]["voltou"] == D(11, 0, 30)
+
+
+def test_falha_nova_conta_da_gravacao_do_inicio_do_acompanhamento():
+    acomps = {"a1": _ac("IBI200-INVR1.3", D(16, 14, 20), date(2026, 10, 10))}     # o início é anterior à gravação
+    (x,) = A.separar([{"cod": "IBI200-INVR1.3", "nivel": "critico"}], acomps,
+                     {"IBI200-INVR1.3": [_f(D(12)), _f(D(17))]})["aberto"]
+    assert [f["quando"] for f in x["novas"]] == [D(17)]
+
+
+def test_aberto_com_falha_nova_vem_primeiro_e_depois_o_nivel():
+    sinais = [{"cod": "A1", "nivel": "atencao"}, {"cod": "B2", "nivel": "critico"}, {"cod": "C3", "nivel": "atencao"}]
+    acomps = {"a": _ac("A1", D(10), date(2026, 10, 10)), "b": _ac("B2", D(10), date(2026, 10, 10)),
+              "c": _ac("C3", D(10), date(2026, 10, 10)), "d": _ac("D4", D(9), date(2026, 10, 9))}    # D4 sem sinal agora
+    s = A.separar(sinais, acomps, {"C3": [_f(D(12))]})
+    assert [x["acomp"]["cod"] for x in s["aberto"]] == ["C3", "B2", "A1", "D4"]
+    assert s["aberto"][3]["ativo"] is None
+
+
+def test_codigo_casa_sem_caixa_nem_espaco():
+    # Review Focus 2: o mesmo ativo escrito de outro jeito no Fracttal e no livro
+    s = A.separar([{"cod": " ibi200-invr1.3", "nivel": "critico"}],
+                  {"a1": _ac("IBI200-INVR1.3", D(16), date(2026, 10, 16))}, {})
+    assert s["sinal"] == [] and s["aberto"][0]["ativo"]["cod"] == " ibi200-invr1.3"

@@ -20,6 +20,7 @@ Gravar troca o livro inteiro, relido do banco antes (leitura que falha não grav
 gravação por vez neste processo (`_TRAVA`); `livros.publicar` confere a contagem depois. Duas máquinas gravando no mesmo
 segundo ainda podem perder um evento: o mesmo risco aceito nos setores e nas Contestações.
 """
+import collections
 import json
 import threading
 import time
@@ -514,3 +515,58 @@ def pessoas_da_engenharia() -> list[dict]:
     out = [{"hmac": d["pessoa_hmac"], "nome": nomes.get(fid) or SEM_NOME} for fid, d in ultima.items()
            if d.get("setor_id") == sid and d.get("pessoa_hmac")]
     return sorted(out, key=lambda p: (p["nome"] == SEM_NOME, _norm(p["nome"])))
+
+
+# ── a separação das abas da Confiabilidade ───────────────────────────────────────────────────────────────────────────
+NIVEL_ORDEM = {"critico": 0, "atencao": 1, "monitorar": 2}
+
+
+def _depois_do_fim(fim: date) -> datetime:
+    """00:00 de Brasília do dia seguinte ao fim: o dia do fim conta como analisado."""
+    return datetime.combine(fim + timedelta(days=1), datetime.min.time(), tzinfo=_BRT)
+
+
+def separar(sinais: list[dict], acomps: dict[str, dict], falhas_em: dict[str, list[dict]]) -> dict:
+    """As três listas das abas, casando pelo código canônico (o Fracttal e o livro escrevem o mesmo ativo de jeitos
+    diferentes):
+    - "sinal": os ativos com sinal sem acompanhamento aberto; o que tem acompanhamento encerrado só fica se falhou depois
+      do fim do último (decisão do Levi: "só volta se falhar depois do fim"), e leva `ja` (o diagnóstico e o fim);
+    - "aberto": [{"acomp", "ativo" (o sinal de agora ou None: o acompanhamento não depende do sinal), "novas" (as falhas
+      depois da gravação do começo)}], quem tem falha nova primeiro, depois o nível e o mais antigo;
+    - "encerrado": [{"acomp", "ativo", "voltou" (a 1ª falha depois do fim, ou None)}], o encerrado mais novo primeiro."""
+    nunca = datetime.min.replace(tzinfo=_BRT)
+    abertos, encerrados = {}, collections.defaultdict(list)
+    for a in acomps.values():
+        if a["aberto"]:
+            abertos[canon(a["cod"])] = a
+        else:
+            encerrados[canon(a["cod"])].append(a)
+    sinal_de = {canon(s["cod"]): s for s in sinais}
+
+    def voltou(a):
+        if not a.get("fim"):
+            return None
+        marco = _depois_do_fim(a["fim"])
+        return next((f["quando"] for f in falhas_em.get(canon(a["cod"]), []) if f["quando"] >= marco), None)
+
+    sinal = []
+    for s in sinais:
+        c = canon(s["cod"])
+        if c in abertos:
+            continue
+        if encerrados.get(c):
+            ultimo = max(encerrados[c], key=lambda a: a.get("encerrado_em") or nunca)
+            if voltou(ultimo) is None:
+                continue
+            sinal.append(dict(s, ja={"diagnostico_id": ultimo["diagnostico_id"], "fim": ultimo["fim"]}))
+        else:
+            sinal.append(dict(s, ja=None))
+    aberto = [{"acomp": a, "ativo": sinal_de.get(c),
+               "novas": [f for f in falhas_em.get(c, []) if a.get("desde") and f["quando"] > a["desde"]]}
+              for c, a in abertos.items()]
+    aberto.sort(key=lambda x: (-len(x["novas"]), NIVEL_ORDEM.get((x["ativo"] or {}).get("nivel"), 3),
+                               x["acomp"].get("desde") or nunca))
+    encerrado = [{"acomp": a, "ativo": sinal_de.get(c), "voltou": voltou(a)} for c, lista in encerrados.items()
+                 for a in lista]
+    encerrado.sort(key=lambda x: x["acomp"].get("encerrado_em") or nunca, reverse=True)
+    return {"sinal": sinal, "aberto": aberto, "encerrado": encerrado}
