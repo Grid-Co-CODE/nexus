@@ -7,10 +7,10 @@ Banco falso do test_campo_visao: a Altair e a Brodowski 1 são do responsável 9
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
-from test_campo_visao import USINAS, _aba, banco  # noqa: F401  (banco é fixture)
+from test_campo_visao import USINAS, _aba, _dia, _ronda, banco  # noqa: F401  (banco é fixture)
 
 from nexus.campo import responsaveis as R
-from nexus.campo import visao
+from nexus.campo import ronda_checklist, visao
 from nexus.dados import fato_chamado as F
 
 BRT = timezone(timedelta(hours=-3))
@@ -103,6 +103,9 @@ def tela(banco, monkeypatch):
          "tipo": "Corretiva Emergencial", "origem": "equipamento", "codigo_ativo": "THPN-ALT100-INVR1", "escopo": "Inversor 1",
          "kwp": 250, "inicio": f"{MES}-02T08:00:00", "fim": None, "aberta": "sim", "duracao_sol_min": 120, "perda_kwh": 500}])
     monkeypatch.setattr(R, "_engenharia", lambda: {"dados": {"sinais": SINAIS}, "sem_cadastro": False})
+    # a Limpeza (18/10/2026) lê também as respostas das OS de ronda que o processo guardou na memória (a fila da
+    # Aprovação, as aprovadas): outro teste pode ter deixado alguma, e a sujidade de lá viraria alerta aqui
+    monkeypatch.setattr(ronda_checklist, "respostas", lambda: {})
     visao.limpar()
     return banco
 
@@ -478,3 +481,37 @@ def test_observacao_vazia_ou_comprida_e_recusada_e_o_texto_fica(tela, cliente, b
     longo = "x" * (O.TEXTO_MAX + 1)
     html = c.post("/t/campo/responsaveis/usina/3/observacao", data={"texto": longo}).get_data(as_text=True)
     assert "passou de 2000 caracteres" in html and longo in html and O.ler_todas() == []
+
+
+# ── A Limpeza e as paradas abertas (18/10/2026: o que um supervisor tinha no painel próprio) ────────────────────────
+SUJ, VEG = "Sujidade dos módulos (1 a 5)", "Altura da vegetação (1 a 5)"
+
+
+def test_limpeza_na_regua_das_rondas(tela):
+    """A última sujidade e vegetação da usina (o checklist que o App manda no livro de rondas), na régua das Rondas
+    (`visao.criticidade`): nível 5 é crítico, nível 4 é atenção; sem leitura, nada."""
+    _aba(tela, "rondas_app_campo", "OS de ronda", [
+        _ronda(_dia(1), **{SUJ: 2, VEG: 5}),
+        _ronda(_dia(2), usina="Thopen - Brodowski 1 - SP", ativo="THPN-BWK100", OS="501", **{SUJ: 4, VEG: 1})])
+    visao.limpar()
+    u = _por_usina()
+    alt, bwk, cor = u["Altair"], u["Brodowski 1"], u["Coração 1"]
+    assert alt["acomp"]["valores"]["limpeza"] == {"txt": "S2 V5", "cls": "critico", "sub": ""}
+    assert {"area": "limpeza", "nivel": "critico", "titulo": "Vegetação muito alta"} in alt["acomp"]["alertas"]
+    assert alt["acomp"]["nivel"] == "critico"
+    det = next(i for i in alt["acomp"]["det"] if i["rot"] == "Limpeza")
+    assert "Sujidade 2" in det["resto"] and "Vegetação 5" in det["resto"] and _dia(1)[8:10] in det["resto"]
+    assert bwk["acomp"]["valores"]["limpeza"]["cls"] == "alerta"
+    assert {"area": "limpeza", "nivel": "atencao", "titulo": "Sujidade alta"} in bwk["acomp"]["alertas"]
+    assert cor["acomp"]["valores"]["limpeza"] == {"txt": "—", "cls": "neutro", "sub": ""}
+    assert "Limpeza" not in [i["rot"] for i in cor["acomp"]["det"]]
+
+
+def test_paradas_abertas_de_todas_as_usinas(tela):
+    """A OS de parada aberta do mês (as OS que formaram a disponibilidade, publicadas pela plataforma) vira a lista da
+    usina para a faixa "Parada agora"; a OS já fechada não."""
+    u = _por_usina()
+    assert u["Altair"]["paradas_abertas"] == [{"os": "13002", "tipo": "Corretiva Emergencial", "escopo": "Inversor 1",
+                                               "codigo": "THPN-ALT100-INVR1", "inicio": f"02/{MES[5:7]} 08:00",
+                                               "_ini": f"{MES}-02T08:00:00"}]
+    assert u["Brodowski 1"]["paradas_abertas"] == [] and u["Coração 1"]["paradas_abertas"] == []
