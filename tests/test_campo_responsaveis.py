@@ -759,3 +759,37 @@ def test_a_programacao_e_lida_do_fim(tela, monkeypatch):
     m = _com_manut()["Brodowski 1"]["manutencao"]
     assert (m["passada_prog"], m["passada_feitas"], m["passada_pct"]) == (20, 17, 85.0)
     assert offsets and 0 not in offsets                 # a 1ª página (as semanas antigas) nunca é lida
+
+
+# ── O Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar", a posição pela régua do ranking por região do App) ──
+def test_a_aba_ranking_das_equipes(tela, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
+    assert 'aria-current="page">Ranking das equipes</a>' in html and 'class="cn-equipes cr-rk"' in html
+    grade = html[html.index('class="cn-equipes cr-rk"'):]                    # os números de cima citam a melhor equipe
+    assert grade.index("SC Oeste 01") < grade.index("SP Norte 01")           # sem nota antes da ranqueada
+    assert "1º" in html and "de 1" in html and ">93<" in html and "sem nota do App" in html
+    assert "60% qualidade" in html and "equipe=SP+Norte+01" in html and "modo=foco" in html
+
+
+def test_o_responsavel_logado_ve_o_ranking_das_equipes_dele(tela, cliente):
+    html = _responsavel(cliente).get("/t/campo/responsaveis?modo=ranking").get_data(as_text=True)
+    assert ">Ranking das equipes</a>" in html and ">Por responsável</a>" not in html
+    assert "SC Oeste 01" in html and "SP Norte 01" not in html                # Beltrano é o responsável da Coração 1
+    html = cliente.get("/t/campo/responsaveis?modo=cartoes").get_data(as_text=True)
+    assert 'id="cr-perf"' in html and 'class="cn-equipes"' not in html       # nunca os cartões dos outros
+
+
+def test_o_filtro_de_equipe_em_onde_focar(tela, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&equipe=SP+Norte+01").get_data(as_text=True)
+    assert "Altair" in html and "Brodowski 1" in html and "Coração 1" not in html
+    assert "Equipe SP Norte 01" in html and 'href="?responsavel=%2A&amp;modo=foco"' in html   # o "×" tira só a equipe
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&equipe=SP+Norte").get_data(as_text=True)
+    assert "Altair" not in html                                               # o nome exato, nunca um pedaço
+
+
+def test_sem_as_notas_do_app_o_ranking_avisa(tela, logado, monkeypatch):
+    monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("fato fora")))
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
+    assert "Não consegui ler as notas do App" in html and 'class="cn-equipes cr-rk"' not in html
+    assert 'id="cr-perf"' in logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)

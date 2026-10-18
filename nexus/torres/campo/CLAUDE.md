@@ -19,7 +19,7 @@ usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação d
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
-| **Visão do responsável** (12/10/2026, a 1ª do Campo) | três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação) | `campo/responsaveis.py` (junta; cada número é da tela dona) e `campo/manutencao.py` (a conta do bloco Manutenção) |
+| **Visão do responsável** (12/10/2026, a 1ª do Campo) | três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App; Aprovar pelo portão `/os/_nexus/aprovacao/<id>/aprovar` | regras copiadas do App |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
@@ -529,7 +529,7 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
 - **O responsável que entra pelo Fracttal vai direto para Onde focar** (Levi, 12/10/2026: "caso a pessoa que logue seja
   algum desses responsáveis não vai aparecer por responsável, já vai direto para Onde Focar!"): `_responsavel_do_login`
   (guardado em `session["responsavel_padrao"]`) marca o filtro nele, a aba "Por responsável" some e o `modo=cartoes` do
-  endereço não vale para ele; o filtro continua (para olhar as usinas de quem ele estiver cobrindo; "Todos" mostra as
+  endereço não vale para ele (o Ranking das equipes, desde 18/10/2026, ele vê, com as equipes dele); o filtro continua (para olhar as usinas de quem ele estiver cobrindo; "Todos" mostra as
   de todos, ainda nos dois blocos). Quem não é responsável (admin, coordenador) segue com os cartões.
 - **Esperando o De acordo é só PT** (Levi, 12/10: "na verdade esperando de acordo é só PT então mostra só PT"): o rótulo
   é "PT".
@@ -660,6 +660,32 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   programação lida do fim). Na tela, com o dado real (18/10/2026, só GET): 8.737 tarefas, 334 OS abertas, 1.023 tarefas
   atrasadas, 19 paradas, a semana passada (W41) em 52%, 31 OS de parada abertas; 60 usinas em Focar, 35 em Acompanhar e
   36 em dia com o limite de 30; a 1920, 1536, 1440, 1366, 1024 e 375 px, escuro e claro, sem rolagem lateral.
+
+### O Ranking das equipes (18/10/2026)
+
+A peça 2 da Visão (Levi: os responsáveis largarem os painéis próprios). Responde "qual equipe cobrar": a aba `modo=ranking`
+mostra um cartão por equipe das usinas do filtro (o responsável logado vê as dele; quem não é responsável, todas), da pior
+para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md`.
+
+- **A posição é a régua do App** ("de acordo com as regras do ranking do app de campo"): o Ranking por região do painel
+  do App (`_ranking_regioes`), a única conta por equipe que o App tem (o placar do ciclo é só por técnico). Nota = 60%
+  qualidade + 40% cobertura, nos últimos 30 dias (hoje − 29 a hoje; o App não tem janela oficial). Qualidade = a média
+  simples das notas das tarefas fechadas pelo App (`fato_fechamento.nota_pts`) e das rondas do App (`fato_ronda.nota_pts`);
+  cobertura = usinas da equipe com ronda ÷ usinas. A cor é a escala do painel do App (85 verde, 70 âmbar), não régua da
+  nota. Empate: qualidade, cobertura, volume, nome. Sem nota (nenhuma OS nem ronda do App): sem posição, antes das
+  ranqueadas; "Sem equipe" no fim. A seta compara com os 30 dias anteriores (a mesma lista de equipes).
+- **Diferenças contra o painel do App** (a tela diz): a equipe da usina é a do cadastro do Nexus (no App, a OS vai ao
+  cluster da tarefa na programação do PCM ou da usina no catálogo dele); a base da cobertura são as usinas mobilizadas; o
+  dia é o de Brasília; a ronda avulsa do Nexus conta na cobertura.
+- **Em quê cobrar** (`ranking_equipes.etiquetas`): os números da Visão por equipe, na régua de cada tela dona, o crítico
+  primeiro, até 4 no cartão; **não mudam a posição** (decisão do Levi). A meta conta usinas abaixo de 97%, nunca a meta
+  somada do grupo (uma usina com a meta errada no Gerencial punha a equipe em 2.207%).
+- **De onde vem:** `responsaveis.ranking_fonte` agrega por usina, nos dois períodos, na cópia de 5 min da Visão (as duas
+  leituras já estão no ciclo quando a Visão é feita); `ranking_equipes.cartoes` agrupa no pedido, porque os filtros e o
+  limite das atrasadas são de quem olha. Nada novo no banco. Sem as notas, a aba diz e não mostra cartão.
+- **O filtro `equipe=`**: o cartão abre Onde focar só com as usinas da equipe (o nome exato do cadastro), com o "×".
+- **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta;
+  mutações pegas) e os testes da aba em `tests/test_campo_responsaveis.py`.
 
 ### Os chamados de garantia no banco (`nexus_chamados · fato_chamado`, 12/10/2026)
 

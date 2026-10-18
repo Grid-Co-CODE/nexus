@@ -22,6 +22,7 @@ from werkzeug.datastructures import ImmutableMultiDict
 from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
 from ...campo import responsaveis as campo_resp
+from ...campo import ranking_equipes as campo_ranking
 from ...campo import observacao_responsavel as campo_obs
 from ...campo import responsaveis_graficos as campo_graficos
 from ...campo import triagem as campo_triagem
@@ -382,18 +383,27 @@ def responsaveis():
     else:
         responsavel = "" if pedido == TODOS else pedido
     cliente = request.args.get("cliente", "")
+    # a equipe (18/10/2026): o cartão do Ranking das equipes abre Onde focar só com as usinas dela; o nome exato do
+    # cadastro, nunca um pedaço (a busca continua para isso)
+    equipe = request.args.get("equipe", "")
     q = request.args.get("q", "").strip().lower()
 
     def passa(u):
         return ((not cliente or u.get("cliente") == cliente)
+                and (not equipe or u.get("equipe") == equipe)
                 and (not q or q in " ".join(str(u.get(c) or "") for c in CAMPOS_DA_BUSCA).lower()))
     base = [u for u in todas if passa(u)]
     usinas = [u for u in base if not responsavel or (u.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel]
     modo = request.args.get("modo")
     if logado:
-        modo = "foco"
-    elif modo not in ("cartoes", "foco"):
+        # o responsável logado nunca vê os cartões dos outros responsáveis; o Ranking das equipes dele, sim (18/10/2026)
+        modo = "ranking" if modo == "ranking" else "foco"
+    elif modo not in ("cartoes", "foco", "ranking"):
         modo = "foco" if responsavel else "cartoes"
+    # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre as
+    # usinas que passaram pelos filtros, no limite das atrasadas de quem olha (nexus/campo/ranking_equipes.py)
+    ranking = (campo_ranking.cartoes(usinas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {}, limite)
+               if modo == "ranking" else None)
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
     # a faixa "Parada agora" (18/10/2026): as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro
@@ -402,6 +412,7 @@ def responsaveis():
     from ...campo import tarefas_os
     html = render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
+        equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
