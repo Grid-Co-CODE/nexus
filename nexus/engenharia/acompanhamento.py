@@ -298,8 +298,17 @@ def _evento(cofre, evento: str, quem: dict, aid: str, ativo: dict, *, responsave
 
 
 def _reler() -> dict:
-    """O livro relido do banco agora, sem a cópia: gravar sobre uma leitura velha apagaria o que outra pessoa gravou."""
-    return _ler_banco(*_banco())
+    """O livro relido do banco agora, sem a cópia: gravar sobre uma leitura velha apagaria o que outra pessoa gravou.
+    O cadastro vazio só vale no livro que ainda não existe (a 1ª gravação leva o CADASTRO_INICIAL). Com o livro no
+    banco, a aba que não veio é leitura incompleta: o inicial tem as mesmas 2 linhas, passava pela contagem da trava e
+    desfazia o diagnóstico já mexido (auditoria da trava, 18/10/2026)."""
+    base, sessao = _banco()
+    lido = _ler_banco(base, sessao)
+    if not lido["diagnosticos"] and livros.existe(LIVRO, base=base, token=current_app.config["GRIDCO_SQL_TOKEN"],
+                                                  sessao=sessao):
+        raise livros.GravacaoRecusada(f"{LIVRO}: o cadastro dos diagnósticos não veio na leitura do banco; não gravo "
+                                      "por cima (tente de novo em instantes)")
+    return lido
 
 
 def _publicar(eventos: list[dict], diags: list[dict]) -> None:

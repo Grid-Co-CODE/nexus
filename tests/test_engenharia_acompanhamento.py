@@ -657,3 +657,26 @@ def test_diagnostico_nao_aceita_email(banco):
         A.criar_diagnostico("ana.lima@gridco.com.br", "", ANA, True)
     with pytest.raises(A.Recusada, match="e-mail"):
         A.criar_diagnostico("Proteção", "falar com ana.lima@gridco.com.br", ANA, True)
+
+
+def test_cadastro_que_nao_veio_na_leitura_nao_volta_ao_inicial(banco):
+    # auditoria da trava (18/10/2026): a listagem do módulo veio sem a aba do cadastro e a da trava, um instante depois,
+    # veio inteira; o cadastro inicial (2 linhas) passava pela contagem e desfazia o diagnóstico já mexido
+    from pg_falso import Resposta
+
+    from nexus.dados import livros
+    A.pegar(ATIVO, ANA, True)
+    A.mudar_diagnostico(1, "Comunicação", "Perda de sinal do inversor", ANA, True)
+    antes, aid = banco.linhas(A.LIVRO, A.ABA_DIAG), _aid()
+    get, falhou = banco.get, []
+
+    def get_uma_vez_sem_o_cadastro(url, *a, **k):
+        r = get(url, *a, **k)
+        if url.endswith("/api/sheets") and not falhou:
+            falhou.append(url)
+            r = Resposta(200, [x for x in r.json() if x["sheet_name"] != A.ABA_DIAG])
+        return r
+    banco.get = get_uma_vez_sem_o_cadastro
+    with pytest.raises(livros.GravacaoRecusada, match="cadastro"):
+        A.comentar(aid, "Trocar cabo", ANA, True)
+    assert falhou and banco.linhas(A.LIVRO, A.ABA_DIAG) == antes

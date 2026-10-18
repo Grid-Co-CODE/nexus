@@ -103,6 +103,13 @@ def atualizado_em(base: str, sessao, livro: str) -> str | None:
     return None
 
 
+def existe(livro: str, *, base: str, token: str, sessao) -> bool:
+    """O livro está na listagem do banco (/api/workbooks, a mesma que o `publicar` consulta para criá-lo)."""
+    r = sessao.get(f"{base}/api/workbooks", headers={"Authorization": f"Bearer {token}"}, timeout=60)
+    r.raise_for_status()
+    return any(w.get("key") == livro for w in r.json())
+
+
 def publicar(livro: str, nome: str, tabelas: dict, *, base: str, token: str, sessao) -> dict:
     """Grava o livro inteiro e confere aba a aba. {aba: linhas}. Erro de gravação ou contagem diferente sobe; o livro
     que só cresce é conferido antes (`GravacaoRecusada`, nada gravado)."""

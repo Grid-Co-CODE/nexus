@@ -83,6 +83,9 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
 - **O dado:** livro `nexus_engenharia_acompanhamento` (`dim_diagnostico` e `fato_acompanhamento_ativo`, 1 linha = 1
   evento), registrado no catálogo antes da 1ª gravação; regra em `nexus/dados/CLAUDE.md`. Nasce na 1ª gravação depois
   do deploy (o 1º Pegar ou a 1ª mudança no cadastro dos diagnósticos), com o cadastro inicial (Comunicação, Disjuntor).
+  Com o livro no banco, o cadastro que não vem na releitura é leitura incompleta e a gravação é recusada
+  (`livros.existe`): o inicial tem as mesmas 2 linhas, passaria pela trava e desfaria o diagnóstico mexido (auditoria
+  da trava, 18/10/2026).
   Quem, o nome de quem acompanha e o comentário só cifrados.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py tests/test_engenharia_gaveta_js.py`
   (o livro, as regras, a separação das abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como

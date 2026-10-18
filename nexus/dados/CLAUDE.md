@@ -271,8 +271,10 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
    a leitura devolve). Ligado nos 13 livros dos módulos que só acrescentam (setores, telas por setor, dono dos
    relatórios, estrutura das usinas sem a `aba_equipamentos`, que é visão, decisão da PT, observação do responsável,
    ronda avulsa, contas dos clientes, Contestações, curadoria, técnicos por usina, motivos do PCM e o acompanhamento da
-   Engenharia). A carga de hora em
-   hora fica sem trava: encolhe de propósito, pela janela da fonte. Prova: `tests/test_dados_livros_trava.py`.
+   Engenharia). A carga de hora em hora fica sem trava: encolhe de propósito, pela janela da fonte. A trava não vê a
+   troca com a mesma contagem: o módulo que põe uma lista de partida no lugar da aba que veio vazia confere antes com
+   `livros.existe` que o livro ainda não existe (o acompanhamento da Engenharia confere; os motivos do PCM, com o
+   `dim_motivo` de 12 linhas, ainda não, 18/10/2026). Prova: `tests/test_dados_livros_trava.py`.
 10. **Livro no banco é para sempre** (a API não apaga): nome `nexus_<assunto>`, abas `fato_<processo>`,
     `dim_<assunto>`, `<dimensão>_historico`, `qualidade`, `atualizacao`; exceção só com motivo em
     `catalogo.ABAS_FORA_DA_REGRA`. **Registre em `catalogo.LIVROS` antes de criar** (o teste cobra).
