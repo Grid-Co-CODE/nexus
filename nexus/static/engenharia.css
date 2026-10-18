@@ -345,3 +345,17 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 .eg-diag-acoes{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .eg-diag-acoes form{margin:0}
 @media (max-width:640px){.eg-diag-novo{grid-template-columns:minmax(0,1fr)}}
+
+/* a Mesa do engenheiro (18/10/2026): a faixa com três números, a caixa "Encaminhados para você" em destaque à esquerda
+   e "Críticos sem dono" à direita; os cartões e a gaveta são os da Confiabilidade */
+.eg-mesa-cab{align-items:flex-end}
+.eg-mesa-quem label{display:grid;gap:4px}
+.eg-mesa-quem .gc-campo{min-width:220px}
+.eg-mesa-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+.eg-mesa-grade{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:16px;align-items:start}
+.eg-mesa-grade>.eg-painel,.eg-mesa-col>.eg-painel:first-child{margin-top:16px}
+.eg-mesa-caixa{border-color:var(--verde-a40)}
+.eg-novo{display:inline-block;font:800 10px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--sobre-verde);background:var(--verde);border-radius:5px;padding:1px 6px;margin-left:4px;vertical-align:middle}
+@media (max-width:1100px){.eg-mesa-grade{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.eg-mesa-kpis{grid-template-columns:minmax(0,1fr)}}

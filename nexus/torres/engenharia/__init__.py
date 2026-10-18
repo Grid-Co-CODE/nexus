@@ -23,6 +23,12 @@ TORRE = Torre(
     icone="gear-six",
     descricao="Confiabilidade dos ativos, criticidade e causa raiz.",
     telas=[
+        # a primeira tela da Engenharia (Levi, 18/10/2026: "Sim, a primeira"), do setor Engenharia: quem é dele a vê
+        # sem marcá-la em Base → Acessos
+        Tela("mesa", "Mesa do engenheiro",
+             "O que está comigo, o que me encaminharam e o que precisa de dono?",
+             "Acompanhamento dos ativos da Engenharia (banco) e as OS de falha do Fracttal",
+             do_setor="Engenharia"),
         Tela("confiabilidade", "Confiabilidade",
              "Quais ativos falham mais e demoram mais a voltar?",
              "OS de falha do Fracttal, lidas pelo Nexus"),
@@ -276,6 +282,112 @@ def confiabilidade():
 # com o vai-e-volta de sempre (303 e o aviso na sessão).
 _AVISO_DG, _ERRO_DG = "engenharia_diag_aviso", "engenharia_diag_erro"
 FALHOU_BANCO = "Não consegui gravar no banco ({}). Nada mudou; tente de novo em instantes."
+
+
+# ── a Mesa do engenheiro (18/10/2026) ───────────────────────────────────────────────────────────────────────────────
+# Levi: a primeira tela da Engenharia; cada um vê a sua mesa (o administrador escolhe de quem ver), com "Encaminhados
+# para você" (até a pessoa mexer no ativo), "Com você" e "Críticos sem dono", e a faixa com os três números no modelo do
+# Acompanhamento de chamados. O clique abre a mesma gaveta da Confiabilidade (_gaveta.html), com as mesmas ações.
+def _ativos_por_codigo(d: dict) -> dict:
+    """O ativo de cada código canônico: o item de sinais (com o nível) ou, sem sinal agora, o da disponibilidade."""
+    from ...dados.equipamento import canon
+    base = {canon(a["cod"]): a for a in d["ativos"]}
+    base.update({canon(s["cod"]): s for s in d["sinais"]})
+    return base
+
+
+def _ativo_do(x: dict, base: dict) -> dict:
+    """O ativo de um acompanhamento: o de agora, ou só o que o livro guardou (o código)."""
+    from ...dados.equipamento import canon
+    return x["ativo"] or base.get(canon(x["acomp"]["cod"])) or {
+        "cod": x["acomp"]["cod"], "nome": x["acomp"]["cod"], "usina": "", "cliente": "", "fam": "", "crit": ""}
+
+
+def _faixa_da_mesa(caixa: list, comigo: list, sem_dono: list, erro: str) -> list[dict]:
+    """Os três números do topo, no modelo do Acompanhamento de chamados (o rótulo, o número pela gravidade, o detalhe).
+    Sem ler o livro, os números são "—", nunca 0."""
+    from ...engenharia import confiabilidade as C
+    rotulos = ("Encaminhados para você", "Com você", "Críticos sem dono")
+    if erro:
+        return [{"rotulo": r, "valor": "—", "grav": "", "nota": [("não consegui ler os acompanhamentos", False)]}
+                for r in rotulos]
+    agora = datetime.now(BRT)
+    if caixa:
+        dias = max(0, (agora - min(x["acomp"]["com_desde"] or agora for x in caixa)).days)
+        n1 = ([("o mais antigo chegou ", False), ("hoje", True), (", sem nada seu", False)] if dias == 0 else
+              [("o mais antigo há ", False), (_dias(dias), True), (", sem nada seu", False)])
+    else:
+        n1 = [("nada esperando você", False)]
+    comigo_todos = caixa + comigo
+    novas = sum(1 for x in comigo_todos if x["novas"])
+    n2 = ([(str(novas), True), (" com falha nova desde que entrou" if novas == 1 else
+                                " com falha nova desde que entraram", False)] if novas else
+          [("nenhum com falha nova", False)])
+    if sem_dono:
+        pior = max(sem_dono, key=lambda s: s.get("nFalha") or 0)
+        n3 = [("o pior: ", False), (f"{pior.get('nFalha')} falhas em {C.JANELA_DIAS} dias", True)]
+    else:
+        n3 = [("todo crítico tem dono", False)]
+    return [{"rotulo": rotulos[0], "valor": len(caixa), "grav": "alerta" if caixa else "", "nota": n1},
+            {"rotulo": rotulos[1], "valor": len(comigo_todos), "grav": "", "nota": n2},
+            {"rotulo": rotulos[2], "valor": len(sem_dono), "grav": "critico" if sem_dono else "", "nota": n3}]
+
+
+@bp.route("/mesa")
+def mesa():
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import confiabilidade as C
+    from ...engenharia import os_falhas
+    g = _dados()
+    d = g["dados"]
+    pode, meu = _quem_pode()
+    admin = bool(session.get("admin"))
+    pessoas = _pessoas(pode)
+    # cada um vê a sua; só o administrador escolhe de quem ver (o `pessoa` de outra pessoa é ignorado para os demais)
+    alvo, pedida = meu, request.args.get("pessoa", "")
+    if admin and pedida and any(p["hmac"] == pedida for p in pessoas):
+        alvo = pedida
+    nome_alvo = next((p["nome"] for p in pessoas if p["hmac"] == alvo), "")
+    lido = AC.ler()
+    erro = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
+    acomps = AC.estado(lido["eventos"])
+    falhas_em = d.get("falhasEm") or {}
+    sep = AC.separar(d["sinais"], acomps, falhas_em)
+    base = _ativos_por_codigo(d)
+    nunca = datetime.min.replace(tzinfo=BRT)
+    meus = [dict(x, a=_ativo_do(x, base)) for x in sep["aberto"] if alvo and x["acomp"]["responsavel"]["hmac"] == alvo]
+    # a caixa: o que outra pessoa passou e quem recebeu ainda não mexeu (Levi: "Até eu mexer nele"), o mais antigo antes
+    caixa = sorted((x for x in meus if x["acomp"]["encaminhado_por"] and not x["acomp"]["respondeu"]),
+                   key=lambda x: x["acomp"]["com_desde"] or nunca)
+    na_caixa = {x["acomp"]["id"] for x in caixa}
+    comigo = [x for x in meus if x["acomp"]["id"] not in na_caixa]
+    sem_dono = [s for s in sep["sinal"] if s.get("nivel") == "critico"] if not erro else []
+    anteriores = {}
+    for x in sep["encerrado"]:
+        anteriores.setdefault(canon(x["acomp"]["cod"]), []).append(x["acomp"])
+    gavetas = []
+
+    def gaveta(a, acomp, novas) -> str:
+        c = canon(a.get("cod") or (acomp or {}).get("cod"))
+        gv = _montar_gaveta(f"g{len(gavetas)}", a, acomp, novas,
+                            [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
+                            falhas_em.get(c, []) if a.get("nivel") else [])
+        gavetas.append(gv)
+        return gv["id"]
+    caixa = [dict(x, gid=gaveta(x["a"], x["acomp"], x["novas"])) for x in caixa]
+    comigo = [dict(x, gid=gaveta(x["a"], x["acomp"], x["novas"])) for x in comigo]
+    sem_dono = [dict(s, gid=gaveta(s, None, [])) for s in sem_dono]
+    diags = AC.diagnosticos(lido["diagnosticos"])
+    return render_template(
+        "engenharia/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"), alvo=alvo, meu=meu, admin=admin,
+        nome_alvo=nome_alvo, pessoas=pessoas, caixa=caixa, comigo=comigo, sem_dono=sem_dono, gavetas=gavetas,
+        kpis=_faixa_da_mesa(caixa, comigo, sem_dono, erro), erro_acomp=erro, erro_leitura=bool(erro),
+        velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
+        pode=pode, diags_ativos=[x for x in diags if not x["excluido"]], diag_nome={x["id"]: x["nome"] for x in diags},
+        niveis=C.NIVEIS, meta=C.META_DISP, janela=C.JANELA_DIAS, h=_h, pct=_pct,
+        hoje=datetime.now(BRT).date().isoformat(), piso=AC.PISO.isoformat(), est=os_falhas.estado(),
+        sem_cadastro=g.get("sem_cadastro"), lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"))
 
 
 def _para_gravar(s: dict) -> dict:

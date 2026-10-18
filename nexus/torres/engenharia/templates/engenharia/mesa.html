@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+{# A Mesa do engenheiro (Levi, 18/10/2026): a primeira tela da Engenharia, a mesa de quem entrou (o administrador escolhe
+   de quem ver), com "Encaminhados para você" (até a pessoa mexer no ativo), "Com você" e "Críticos sem dono", e a faixa
+   com os três números no modelo do Acompanhamento de chamados. O cartão e a gaveta são os da Confiabilidade
+   (_gaveta.html e o engenharia-gaveta.js), com as mesmas ações. #}
+{% macro pill(n) %}{% for k, rot, cor in niveis if k == n %}<span class="eg-pill eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}{% endmacro %}
+{% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
+{% macro cartao(x, na_caixa=false) %}{% set ac = x.acomp %}{% set a = x.a %}
+  <article class="eg-cartao">
+  <button type="button" class="eg-item" data-gaveta="{{ x.gid }}">
+    {% if x.ativo %}{{ pill(x.ativo.nivel) }}{% else %}<span class="eg-pill eg-pill--neutro">Sem sinal agora</span>{% endif %}
+    <span class="eg-item-corpo">
+      <span class="eg-item-tit"><b>{{ a.nome }}</b> <code>{{ ac.cod }}</code> <span class="eg-onde">{{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %}</span>{% if na_caixa %} <span class="eg-novo">novo</span>{% endif %}</span>
+      {% if na_caixa %}
+      <span class="eg-acomp-quem">Encaminhado por {{ ac.encaminhado_por }} em {{ ac.com_desde.strftime('%d/%m') if ac.com_desde else '—' }} · análise desde {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }}</span>
+      {% else %}
+      <span class="eg-acomp-quem">Com {{ 'você' if meu and ac.responsavel.hmac == meu else (ac.responsavel.nome or 'alguém') }} desde {{ ac.com_desde.strftime('%d/%m') if ac.com_desde else '—' }} · análise desde {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }}</span>
+      {% endif %}
+      <span class="eg-item-tags">
+        {% if ac.diagnostico_id %}{{ tag('Diagnóstico: ' ~ diag_nome.get(ac.diagnostico_id, '—'), 'info') }}{% else %}{{ tag('Diagnóstico a definir', 'neutro') }}{% endif %}
+        {{ tag(ac.comentarios|length ~ (' comentário' if ac.comentarios|length == 1 else ' comentários'), 'neutro') }}
+        {% if x.novas %}{{ tag(x.novas|length ~ (' falha nova' if x.novas|length == 1 else ' falhas novas') ~ ' desde que entrou', 'critico') }}{% endif %}
+      </span>
+      {% if ac.comentarios %}{% set c = ac.comentarios[0] %}<span class="eg-acomp-ultimo">"{{ c.texto|truncate(140) }}" <i>· {{ c.nome }}, {{ c.quando_txt }}</i></span>{% endif %}
+    </span>
+    <span class="eg-item-n"><b>{{ ac.falhas30_entrada if ac.falhas30_entrada is not none else '—' }}</b><span>falhas quando entrou</span></span>
+  </button>
+  </article>
+{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab eg-mesa-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa do engenheiro</p>
+      <h1 class="cn-titulo">{% if alvo and alvo != meu %}A mesa de {{ nome_alvo or 'outra pessoa' }}{% else %}A sua mesa{% endif %}</h1>
+      <p class="cn-pergunta">O que está com {{ 'você' if not alvo or alvo == meu else 'a pessoa' }} na Confiabilidade e o que precisa de dono.</p></div>
+    {% if admin %}<form class="eg-mesa-quem" method="get"><label><span class="gc-rotulo">Ver a mesa de</span>
+      <select class="gc-campo" name="pessoa" onchange="this.form.submit()">{% if not alvo %}<option value="">Escolha a pessoa</option>{% endif %}{% for p in pessoas %}<option value="{{ p.hmac }}"{% if p.hmac == alvo %} selected{% endif %}>{{ p.nome }}{% if meu and p.hmac == meu %} (você){% endif %}</option>{% endfor %}</select></label></form>{% endif %}
+  </div>
+  {% if velha_em %}<p class="cn-erro cn-aviso" role="status"><b>Mostrando a última leitura boa dos acompanhamentos ({{ velha_em }}).</b> O banco não respondeu agora; recarregue em instantes.</p>{% endif %}
+  {% if erro_acomp %}<p class="cn-erro cn-aviso" role="status"><b>Não consegui ler os acompanhamentos ({{ erro_acomp }}).</b> Recarregue em instantes.</p>{% endif %}
+  {% if not alvo %}<p class="cn-erro cn-aviso" role="status"><b>Escolha de quem ver a mesa.</b> A senha de administrador não diz quem é a pessoa.</p>{% endif %}
+
+  <section class="kb-kpis eg-mesa-kpis" aria-label="A mesa agora">
+    {% for k in kpis %}<div class="kb-kpi">
+      <span class="kb-kpi-rot">{{ k.rotulo }}</span>
+      <span class="kb-kpi-linha"><b class="kb-kpi-v{{ ' kb-kpi-v--' ~ k.grav if k.grav }}">{{ k.valor }}</b><span class="kb-kpi-nota">
+        {%- for texto, negrito in k.nota %}{% if negrito %}<b>{{ texto }}</b>{% else %}{{ texto }}{% endif %}{% endfor -%}
+      </span></span>
+    </div>{% endfor %}
+  </section>
+
+  <div class="eg-mesa-grade">
+    <div class="eg-mesa-col">
+      {% if alvo %}
+      <section class="eg-painel eg-mesa-caixa">
+        <div class="eg-painel-cab"><h2>Encaminhados para você</h2><span>até você comentar ou salvar algo · clique abre a gaveta</span></div>
+        {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos.</p>
+        {% else %}<div class="eg-itens">{% for x in caixa %}{{ cartao(x, true) }}{% else %}<p class="mudo eg-vazio">Nada encaminhado esperando você.</p>{% endfor %}</div>{% endif %}
+      </section>
+      <section class="eg-painel">
+        <div class="eg-painel-cab"><h2>Com você</h2><span>falha nova primeiro, depois o nível</span></div>
+        {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos.</p>
+        {% else %}<div class="eg-itens">{% for x in comigo %}{{ cartao(x) }}{% else %}<p class="mudo eg-vazio">{{ 'Nenhum outro ativo com você.' if caixa else 'Nenhum ativo com você agora.' }}</p>{% endfor %}</div>{% endif %}
+      </section>
+      {% endif %}
+    </div>
+    <section class="eg-painel">
+      <div class="eg-painel-cab"><h2>Críticos sem dono</h2><span>da Confiabilidade · ninguém pegou</span></div>
+      {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos: não sei quem tem dono.</p>
+      {% else %}<div class="eg-itens">{% for s in sem_dono %}
+        <article class="eg-cartao">
+        <button type="button" class="eg-item" data-gaveta="{{ s.gid }}">
+          {{ pill(s.nivel) }}
+          <span class="eg-item-corpo">
+            <span class="eg-item-tit"><b>{{ s.nome }}</b> <code>{{ s.cod }}</code> <span class="eg-onde">{{ s.usina }}{% if s.uf %} - {{ s.uf }}{% endif %}</span></span>
+            <span class="eg-item-tags"><span class="eg-crit">Crit. {{ s.crit }}</span>
+              {% if s.nFalha >= 3 %}{{ tag('A · ' ~ s.nFalha ~ ' falhas em ' ~ janela ~ 'd', 'critico' if s.nFalha >= 4 else 'alerta') }}{% endif %}
+              {% if s.n7 >= 1 %}{{ tag('B · ' ~ s.n7 ~ ' em 7d', 'critico' if s.n7 >= 3 else ('alerta' if s.n7 >= 2 else 'neutro')) }}{% endif %}
+              {% if s.ja %}{{ tag('já acompanhado · ' ~ diag_nome.get(s.ja.diagnostico_id, 'sem diagnóstico') ~ ' em ' ~ s.ja.fim.strftime('%d/%m'), 'neutro') }}{% endif %}</span>
+          </span>
+          <span class="eg-item-n"><b>{{ s.nFalha }}</b><span>falha{{ 's' if s.nFalha != 1 }} · {{ s.n30 }} OS</span></span>
+        </button>
+        {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ s.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
+          <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-gaveta="{{ s.gid }}" data-eg-abrir-encaminhar>Encaminhar</button></div>{% endif %}
+        </article>
+      {% else %}<p class="mudo eg-vazio">Todo crítico tem dono.</p>{% endfor %}</div>{% endif %}
+    </section>
+  </div>
+
+  {# a gaveta de cada cartão (a mesma da Confiabilidade) #}
+  {% for gv in gavetas %}<template id="{{ gv.id }}">{% include "engenharia/_gaveta.html" %}</template>{% endfor %}
+  <div class="eg-veu" hidden></div>
+  <aside class="eg-gaveta" role="dialog" aria-modal="true" aria-label="Ativo" hidden>
+    <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
+    <div class="eg-gav-corpo"></div>
+  </aside>
+  <div class="cn-nota"><b>De onde vem.</b> Os acompanhamentos do livro da Engenharia (o banco do Nexus) e os sinais da
+    Confiabilidade, pelas OS de falha do Fracttal ({{ est.n }} OS na conta das {{ lido }}).</div>
+</div>
+<script src="{{ url_for('static', filename='engenharia-gaveta.js') }}"></script>
+<script>egGaveta.ligar();</script>
+{% endblock %}

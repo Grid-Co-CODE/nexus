@@ -38,7 +38,7 @@ LEMBRAR_S = 60
 PAUSA_S = 0.3
 # as telas que leem o Fracttal ao abrir: medido em 12/10/2026 abrindo as 85 telas com o Fracttal bloqueado, só estas
 # tentaram. Tela nova que lê o Fracttal ao abrir entra aqui (nexus/torres/CLAUDE.md).
-FORA = frozenset({"engenharia/confiabilidade", "engenharia/equipe", "campo/aprovacao", "base/fracttal"})
+FORA = frozenset({"engenharia/mesa", "engenharia/confiabilidade", "engenharia/equipe", "campo/aprovacao", "base/fracttal"})
 CABECALHO = "X-Nexus-Pre-Carga"
 
 

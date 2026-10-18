@@ -208,6 +208,7 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
                 "id": aid, "cod": _txt(l.get("codigo_ativo")), "equipamento_id": _int(l.get("equipamento_id")),
                 "usina_id": _int(l.get("usina_id")), "usina_ligada_por": _txt(l.get("usina_ligada_por")),
                 "responsavel": {"hmac": "", "nome": ""}, "encaminhado_por": "", "desde": q, "com_desde": q,
+                "respondeu": False,
                 "inicio": None,
                 "fim": None, "diagnostico_id": None, "comentarios": [], "aberto": True, "encerrado_em": None,
                 "nivel_entrada": _txt(l.get("nivel_na_entrada")), "falhas30_entrada": _int(l.get("falhas_30d_qtd")),
@@ -217,8 +218,13 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
             a["responsavel"] = {"hmac": resp, "nome": dados.get("responsavel") or ""}
             # desde quando ESTA pessoa acompanha (o "Com <pessoa> desde"); o `desde` é o começo do acompanhamento
             a["com_desde"] = q
+            # quem pega já está mexendo; quem recebe de outra pessoa ainda não (a caixa "Encaminhados para você" da
+            # Mesa do engenheiro, até a pessoa mexer no ativo: Levi, 18/10/2026)
+            a["respondeu"] = _txt(l.get("pessoa_hmac")) == resp
             # encaminhar para si mesmo é assumir: não há "encaminhado por" você mesmo
             a["encaminhado_por"] = (quem.get("nome") or "") if ev == "encaminhou" and _txt(l.get("pessoa_hmac")) != resp else ""
+        elif _txt(l.get("pessoa_hmac")) == a["responsavel"]["hmac"]:
+            a["respondeu"] = True
         if _dia(l.get("data_id_inicio_analise")):
             a["inicio"] = _dia(l.get("data_id_inicio_analise"))
         if _txt(l.get("diagnostico_id")):

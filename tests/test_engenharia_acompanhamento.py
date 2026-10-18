@@ -600,11 +600,11 @@ def test_aba_diagnosticos_sem_erro_de_js(tela, cliente):
     if not shutil.which("node"):
         pytest.skip("sem node nesta máquina")
     html = _como(cliente, ANA).get(URL + "?aba=diagnosticos").get_data(as_text=True)
-    js = next(s.split("</script>", 1)[0] for s in html.split("<script>")[1:] if "a gaveta do ativo" in s)
+    js = next(s.split("</script>", 1)[0] for s in html.split("<script>")[1:] if "egGaveta.ligar()" in s)
     pagina = ("const tabela = {tBodies: [{rows: []}], querySelectorAll: () => []};\n"
               "globalThis.document = {querySelector: s => s === '.eg-est' ? tabela : null, querySelectorAll: () => [],\n"
               "                       addEventListener: () => {}};\n"
-              "globalThis.window = globalThis;\n" + js)
+              "globalThis.window = globalThis;\nglobalThis.egGaveta = {ligar: () => {}};\n" + js)
     r = subprocess.run(["node", "-e", pagina], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
 
