@@ -970,7 +970,7 @@ def test_a_meta_anomala_da_plataforma_e_sinalizada_e_o_numero_fica(tela, logado)
     # só mostra: o número e a cor continuam os do Gerencial, com a etiqueta e o porquê
     from nexus.dados import dominios as DOM
     linhas = [dict(_meta("Altair", 850000, 1000000, 85.0), anomalia="meta_baixa"),
-              dict(_meta("Brodowski 1 A", 600000, 500000, 120.0, pr=82, pr_meta=80), anomalia="geracao_impossivel, novo_x"),
+              dict(_meta("Brodowski 1 A", 600000, 500000, 120.0, pr=82, pr_meta=80), anomalia="meta_alta, novo_x"),
               _meta("Brodowski 1 B", 400000, 500000, 80.0, pr=78, pr_meta=80), _meta("Coração 1", 990000, 1000000, 99.0)]
     _aba(tela, "nexus_performance", "fato_meta_usina_mes", linhas)
     visao.limpar()
@@ -978,10 +978,21 @@ def test_a_meta_anomala_da_plataforma_e_sinalizada_e_o_numero_fica(tela, logado)
     baixa = DOM.ANOMALIA_META["meta_baixa"]
     assert u["Altair"]["meta"]["anomalia"] == baixa and u["Altair"]["meta"]["atingimento"] == 85.0
     # duas linhas do Gerencial na mesma usina: as frases das duas; o código que o Nexus não conhece não some
-    assert u["Brodowski 1"]["meta"]["anomalia"] == f"{DOM.ANOMALIA_META['geracao_impossivel']} · {DOM.ANOMALIA_DESCONHECIDA}"
+    assert u["Brodowski 1"]["meta"]["anomalia"] == f"{DOM.ANOMALIA_META['meta_alta']} · {DOM.ANOMALIA_DESCONHECIDA}"
     assert not u["Coração 1"]["meta"]["anomalia"]
     v = u["Altair"]["perf"]["valores"]["meta"]
     assert (v["txt"], v["sub"]) == ("85%", "anômalo") and baixa in v["dica"] and "O dado pode estar errado" in v["dica"]
     assert any(baixa in (d.get("alerta") or "") for d in u["Altair"]["perf"]["det"])
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
     assert html.count("<small>anômalo</small>") == 2 and f"dado anômalo: {baixa}. O dado pode estar errado" in html
+
+
+def test_o_dominio_da_anomalia_e_a_regua_unica_da_plataforma():
+    # o Levi escolheu UMA régua (18/10/2026, na plataforma): a meta do mês fora de 2 a 8 kWh por kWp por dia; recusou as
+    # outras (PR do mês acima de 130%, geração acima de 8 kWh/kWp/dia, atingimento acima de 200%)
+    from nexus.dados import dominios as DOM
+    assert set(DOM.ANOMALIA_META) == {"meta_baixa", "meta_alta"}
+    assert "abaixo de 2 kWh por kWp por dia" in DOM.ANOMALIA_META["meta_baixa"]
+    assert "acima de 8 kWh por kWp por dia" in DOM.ANOMALIA_META["meta_alta"]
+    # a frase que a plataforma tinha montado não é código: vira o sinal genérico, nunca some
+    assert DOM.anomalias("meta do mês de 0,9 kWh por kWp por dia (o normal é de 2 a 8)") == [DOM.ANOMALIA_DESCONHECIDA]
