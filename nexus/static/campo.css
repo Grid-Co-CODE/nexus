@@ -941,7 +941,7 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-gr-limpar{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:999px;background:var(--verde);
   color:var(--sobre-verde);font-weight:700;text-decoration:none}
 .cr-gr-lista{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden}
-.cr-gr-g{grid-template-columns:minmax(0,1fr) 84px 84px 92px 76px 104px 112px 80px 80px 14px}
+.cr-gr-g{grid-template-columns:minmax(0,1fr) 72px 72px 92px 76px 92px 92px 128px 72px 14px}
 .cr-gr-grupos{padding:10px 16px 0;font:700 11px/14px var(--font-sans);color:var(--tinta)}
 .cr-gr-gp{text-align:center;padding-bottom:6px;border-bottom:2px solid var(--linha)}
 .cr-gr-gp--sel{border-bottom-color:var(--verde)}
@@ -960,10 +960,14 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
   .cr-gr-det{grid-template-columns:minmax(0,1fr)}
   .cr-gr-det > .cr-det{border-right:0;border-bottom:1px solid var(--linha)}
 }
-@media (max-width:760px){
-  .cr-gr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* a lista em cartões até 1280 px (revisão de 18/10/2026: de 761 a 1260 px as dez colunas não cabiam, a Usina zerava e
+   a Semana sumia cortada, sem rolagem): a usina, as etiquetas P, A e M e o detalhe ao abrir */
+@media (max-width:1280px){
   .cr-gr-grupos,.cr-gr-lista > .cr-cols{display:none}
   .cr-gr-g{grid-template-columns:minmax(0,1fr) 14px}
   .cr-gr-g > [class*="cr-col-"]{display:none}
   .cr-gr-pills{display:flex;flex-wrap:wrap;gap:6px;grid-column:1 / -1;grid-row:2}
+}
+@media (max-width:760px){
+  .cr-gr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 }

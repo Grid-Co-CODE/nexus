@@ -219,7 +219,7 @@
   <div class="cr-gr">
   <div class="cn-faixa-equipe">
     <b>{{ responsavel or 'Todos os responsáveis' }}</b>
-    <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q %}, com os filtros{% endif %}</span>
+    <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q or equipe %}, com os filtros{% endif %}</span>
     {% if responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*') }}" title="As usinas de todos os responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="As usinas de todas as equipes">Equipe {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
   </div>
@@ -275,14 +275,16 @@
     {% for u in lista_geral %}
     <details class="cr-gr-lin cr-lin cr-lin--{{ u.nivel }}">
       <summary class="cr-g cr-gr-g">
-        <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
+        {# a etiqueta no nome, a mesma de Onde focar (revisão de 18/10/2026: a usina parada saía sem ela, com a
+           Manutenção em "—", e o supervisor a lia como em dia) #}
+        <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}{% for b in ('perf', 'acomp', 'manut') %}{% set x = u[b] %}{% if x.tag %}{% if b == 'perf' %}<button type="button" class="cr-tag cr-tag--{{ x.tag[0] }} cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='ativos') }}" title="Ver os ativos falhando">{{ x.tag[1] }}</button>{% else %}<em class="cr-tag cr-tag--{{ x.tag[0] }}">{{ x.tag[1] }}</em>{% endif %}{% endif %}{% endfor %}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
         {% for b, k, rot in cols %}{% set v = u[b].valores[k] %}<span class="cr-col-{{ k }}{% if fg and fg[0] == b %} cr-gr-csel{% endif %}"><span class="cr-v cr-v--{{ v.cls }}">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</span></span>{% endfor %}
         {# no celular (até 760 px) as colunas saem e ficam as três etiquetas, na cor do nível de cada bloco, com o alerta principal #}
         <span class="cr-gr-pills">{% for b, letra in (('perf', 'P'), ('acomp', 'A'), ('manut', 'M')) %}{% set al = u[b].alertas %}<span class="cr-tag cr-tag--{{ cor[u[b].nivel] }} cr-gr-pill"><em>{{ letra }}</em>{{ al[0].titulo if al else 'em dia' }}</span>{% endfor %}</span>
         <i class="ph ph-caret-down cr-seta" aria-hidden="true"></i>
       </summary>
       <div class="cr-gr-det">
-        {% for b, nome, txt, bl in blocos %}<div class="cr-det"><h3>{{ nome }}</h3>{% if u[b].det %}{{ det_bloco(u, b) }}{% else %}<p class="mudo">em dia</p>{% endif %}</div>{% endfor %}
+        {% for b, nome, txt, bl in blocos %}<div class="cr-det"><h3>{{ nome }}</h3>{% if not u[b].det %}<p class="mudo">Nada a mostrar neste bloco.</p>{% endif %}{{ det_bloco(u, b) }}</div>{% endfor %}
       </div>
     </details>
     {% else %}

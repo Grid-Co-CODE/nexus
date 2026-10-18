@@ -920,3 +920,43 @@ def test_a_dica_da_base_pequena_usa_a_constante(tela, logado, monkeypatch):
     monkeypatch.setattr(visao, "BASE_PEQUENA", 4)
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
     assert 'title="Menos de 4 usinas' in html
+
+
+def _linha_geral(html, usina):
+    """O resumo (`summary`) da linha da usina na lista da Visão geral."""
+    i = html.index(f"<b>{usina}", html.index('class="cr-gr-lista"'))
+    return html[html.rindex('<details class="cr-gr-lin', 0, i):html.index("</summary>", i)]
+
+
+def test_a_usina_parada_tem_a_etiqueta_na_lista_geral(manut, logado):
+    """Revisão de 18/10/2026: na lista da Visão geral a usina parada não mostrava a etiqueta "parada" que Onde focar
+    mostra no nome (e as células da Manutenção vinham "—"): o supervisor lia a usina como em dia."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    altair = _linha_geral(html, "Altair")
+    assert "cr-tag--critico" in altair and ">parada<" in altair
+
+
+def test_o_bloco_sem_detalhe_nao_diz_em_dia(manut, logado, monkeypatch):
+    """Revisão de 18/10/2026: o bloco sem nenhuma linha de detalhe é, quase sempre, falta de dado; "em dia" contradizia a
+    regra da tela (falta de dado não é em dia) e tirava os links do bloco. Aqui, a Manutenção sem detalhe."""
+    original = R.linha_manutencao
+    monkeypatch.setattr(R, "linha_manutencao", lambda u, limite: {**original(u, limite), "det": []})
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    lista = html[html.index('class="cr-gr-lista"'):]
+    assert "em dia</p>" not in lista and "Nada a mostrar neste bloco" in lista
+    assert "Gestão PCM" in lista.split("Nada a mostrar neste bloco")[1][:600]          # os links do bloco ficam
+
+
+def test_a_visao_geral_diz_com_os_filtros_com_a_equipe(manut, logado):
+    equipe = next(u["equipe"] for u in _com_manut().values() if u.get("equipe"))
+    html = logado.get(f"/t/campo/responsaveis?responsavel=*&modo=geral&equipe={equipe}").get_data(as_text=True)
+    faixa = html[html.index('class="cr-gr"'):html.index('class="cr-gr-blocos"')]
+    assert "com os filtros" in faixa
+
+
+def test_a_lista_unica_vira_cartoes_ate_1280_px():
+    """Revisão de 18/10/2026: entre 761 e 1260 px as 10 colunas não cabiam (a Usina zerava e Semana sumia, cortada sem
+    rolagem): até 1280 px a lista vira os cartões com as etiquetas P, A e M (a 1281 px a Usina fica com ~150 px)."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    bloco = re.search(r'@media \(max-width:1280px\)\{\n  \.cr-gr-grupos(.*?)\n\}', css, re.S).group(1)
+    assert '.cr-gr-g > [class*="cr-col-"]{display:none}' in bloco and ".cr-gr-pills{display:flex" in bloco
