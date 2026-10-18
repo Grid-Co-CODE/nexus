@@ -35,7 +35,9 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   do pessoal do Fracttal). Qualquer um da Engenharia comenta e muda datas e diagnóstico (o Levi não quis "só quem
   acompanha escreve"). Não há "soltar": quem pegou por engano encaminha ou encerra.
 - **Datas:** o início começa no dia do Pegar e pode mudar; o **fim é o dia em que a análise terminou**: preenchê-lo, com o
-  diagnóstico, encerra (não há outro botão). Fim antes do início ou depois de hoje, ou data fora do calendário, é recusado.
+  diagnóstico, encerra (não há outro botão). Fim antes do início ou depois de hoje, data fora do calendário ou antes de
+  20/10/2025 (`acompanhamento.PISO`, o começo das contas; revisão final: "0202-10-15" virava um data_id de 7 dígitos,
+  para sempre no livro) é recusado.
   Encerrado fica só para ler e não reabre. Se o fim escolhido é anterior a uma falha, a gaveta avisa na hora (pelo
   `data-falhas`) que o ativo volta para Ativos com sinal.
 - **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
@@ -43,13 +45,22 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
 - **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
   com o aviso ou o erro (`_gaveta.html`, a mesma peça da página); ao fechar depois de gravar, a página recarrega. O Pegar
   do cartão também responde na gaveta. O ativo é casado pelo código canônico (`equipamento.canon`): o Fracttal e o livro
-  escrevem o mesmo ativo de jeitos diferentes.
+  escrevem o mesmo ativo de jeitos diferentes. Da revisão final (18/10/2026), no molde do card das Contestações:
+  - a resposta passa por `static/engenharia-gaveta.js`: sessão vencida (o 302 do portão até o Entrar, ou o 401 do fim
+    da sessão do Fracttal) recarrega a página; HTTP de erro mostra a falha sem trocar a gaveta (o texto fica);
+  - a recusa e o banco fora devolvem o que foi digitado (o comentário, as datas e o diagnóstico escolhidos);
+  - página velha: o Pegar diz com quem o ativo já está (a regra 1), e o Encaminhar da gaveta que viu o ativo livre
+    (`livre=1`) não passa adiante o acompanhamento que outra pessoa abriu depois;
+  - livro ilegível: as abas Em acompanhamento e Encerrados dizem "—" (não 0), a gaveta não diz "Ninguém acompanha" nem
+    oferece o Pegar, a aba Diagnósticos não mostra o cadastro inicial; a cópia velha diz a hora da última leitura boa;
+  - "Com <pessoa> desde" é quando a pessoa recebeu o ativo (`com_desde`), não o começo do acompanhamento (`desde`).
 - **O dado:** livro `nexus_engenharia_acompanhamento` (`dim_diagnostico` e `fato_acompanhamento_ativo`, 1 linha = 1
   evento), registrado no catálogo antes da 1ª gravação; regra em `nexus/dados/CLAUDE.md`. Nasce no 1º Pegar depois do
   deploy, com o cadastro inicial (Comunicação, Disjuntor). Quem, o nome de quem acompanha e o comentário só cifrados.
-- **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py` (o livro, as regras, a separação das
-  abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como texto, o código com caixa e espaço, o
-  comentário com HTML e o banco fora). A prova não grava no banco de verdade: o livro é para sempre.
+- **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py tests/test_engenharia_gaveta_js.py`
+  (o livro, as regras, a separação das abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como
+  texto, o código com caixa e espaço, o comentário com HTML, o banco fora e cada achado da revisão final; o JS da
+  resposta, no node). A prova não grava no banco de verdade: o livro é para sempre.
 
 ## Quadro da equipe (06/10/2026)
 

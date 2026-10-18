@@ -133,6 +133,7 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
     from ...dados.equipamento import canon
     from ...engenharia import acompanhamento as AC
     lido = AC.ler()
+    erro_acomp = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
     acomps = AC.estado(lido["eventos"])
     diags = AC.diagnosticos(lido["diagnosticos"])
     falhas_em = d.get("falhasEm") or {}
@@ -180,9 +181,13 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
                           for x in fonte_quem if x["acomp"]["responsavel"]["hmac"]}.items(), key=lambda kv: kv[1].lower())
     return {"sinais": sinais, "abertos": abertos, "encerrados": encerrados, "gavetas": gavetas, "diags": diags,
             "diags_ativos": [x for x in diags if not x["excluido"]], "diag_nome": {x["id"]: x["nome"] for x in diags},
-            "quem_opcoes": quem_opcoes, "erro_acomp": "" if lido.get("lido_em") else lido.get("erro", ""),
+            "quem_opcoes": quem_opcoes, "erro_acomp": erro_acomp, "erro_leitura": bool(erro_acomp),
+            "velha_em": datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
+            "piso": AC.PISO.isoformat(),
             "uso": collections.Counter(a["diagnostico_id"] for a in acomps.values() if a["diagnostico_id"]),
-            "contas": {"ativos": len(sinais), "acompanhamento": len(abertos), "encerrados": len(encerrados)}}
+            # sem ler o livro, os números de Em acompanhamento e Encerrados não são 0: são desconhecidos (revisão final)
+            "contas": {"ativos": len(sinais), "acompanhamento": "—" if erro_acomp else len(abertos),
+                       "encerrados": "—" if erro_acomp else len(encerrados)}}
 
 
 def _montar_gaveta(gid: str, a: dict, acomp: dict | None, novas: list, anteriores: list, falhas: list) -> dict:
@@ -287,7 +292,8 @@ def _agora_do_livro():
     return d, lido, acomps, AC.separar(d["sinais"], acomps, d.get("falhasEm") or {})
 
 
-def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str = "", status: int = 200):
+def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str = "", status: int = 200,
+               digitado: dict | None = None):
     """A gaveta do ativo como está no banco agora: o acompanhamento `acomp_id` (o que acabou de ser encerrado) ou o
     aberto, e os encerrados dele embaixo."""
     from ...dados.equipamento import canon
@@ -306,29 +312,33 @@ def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str
                   and (not acomp or x["acomp"]["id"] != acomp["id"])]
     gv = _montar_gaveta("g", a, acomp, novas, anteriores, (d.get("falhasEm") or {}).get(c, []))
     diags = AC.diagnosticos(lido["diagnosticos"])
-    if lido.get("erro") and not lido.get("lido_em") and not erro:
+    erro_leitura = bool(lido.get("erro") and not lido.get("lido_em"))
+    if erro_leitura and not erro:
         erro = f"Não consegui ler os acompanhamentos ({lido['erro'].split(':')[0]}). Recarregue em instantes."
     return render_template("engenharia/_gaveta.html", gv=gv, niveis=C.NIVEIS, pode=pode, meu=meu,
                            pessoas=_pessoas(pode), diags_ativos=[x for x in diags if not x["excluido"]],
                            diag_nome={x["id"]: x["nome"] for x in diags}, meta=C.META_DISP, janela=C.JANELA_DIAS,
-                           h=_h, pct=_pct, hoje=datetime.now(BRT).date().isoformat(), aviso=aviso, erro=erro), status
+                           h=_h, pct=_pct, hoje=datetime.now(BRT).date().isoformat(), piso=AC.PISO.isoformat(),
+                           aviso=aviso, erro=erro, erro_leitura=erro_leitura, digitado=digitado or {}), status
 
 
-def _acao(cod: str, fazer, aviso: str = "", acomp_id=None):
+def _acao(cod: str, fazer, aviso: str = "", acomp_id=None, form: str = ""):
     """Roda a ação e responde a gaveta. `fazer()` devolve o aviso (ou None para o de `aviso`) e pode trocar o
-    acompanhamento mostrado (o encerrado) devolvendo (aviso, acomp_id)."""
+    acompanhamento mostrado (o encerrado) devolvendo (aviso, acomp_id). Na recusa e no banco fora, o que foi digitado
+    no formulário `form` volta preenchido (revisão final: o comentário de até 2.000 letras se perdia)."""
     from ..moldura import _de_outro_site
     if _de_outro_site():
         abort(403)
     from ...engenharia import acompanhamento as AC
+    digitado = dict(request.form.items(), form=form)
     try:
         r = fazer()
     except AC.Recusada as e:
-        return _gaveta_de(cod, erro=str(e))
+        return _gaveta_de(cod, erro=str(e), digitado=digitado)
     except Exception as e:      # noqa: BLE001 — banco fora: a gaveta diz, nada mudou
         import logging
         logging.exception("confiabilidade: a ação do acompanhamento em %s não gravou", cod)
-        return _gaveta_de(cod, erro=FALHOU_BANCO.format(type(e).__name__))
+        return _gaveta_de(cod, erro=FALHOU_BANCO.format(type(e).__name__), digitado=digitado)
     if isinstance(r, tuple):
         aviso, acomp_id = r
     elif r:
@@ -344,14 +354,18 @@ def acompanhamento_pegar():
 
     def fazer():
         pode, _ = _quem_pode()
-        _d, _l, _a, sep = _agora_do_livro()
+        if not pode:              # a recusa de quem não pode vale antes de todas
+            AC.pegar({"cod": cod}, session.get("usuario"), pode)
+        _d, _l, acomps, sep = _agora_do_livro()
+        ab = AC.aberto_de(acomps, cod)
+        if ab:                    # quem chegou depois sabe com quem está (a regra 1 do desenho), mesmo de página velha
+            raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}: recarregue a página")
         s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
         if not s:
-            if not pode:          # a recusa de quem não pode vale antes da de "não está na lista"
-                AC.pegar({"cod": cod}, session.get("usuario"), pode)
             raise AC.Recusada("Este ativo não está em Ativos com sinal agora: recarregue a página")
         AC.pegar(_para_gravar(s), session.get("usuario"), pode)
-    return _acao(cod, fazer, "Agora este ativo está com você: ele saiu de Ativos com sinal e foi para Em acompanhamento.")
+    return _acao(cod, fazer, "Agora este ativo está com você: ele saiu de Ativos com sinal e foi para Em acompanhamento.",
+                 form="pegar")
 
 
 @bp.route("/confiabilidade/acompanhamento/encaminhar", methods=["POST"])
@@ -359,22 +373,27 @@ def acompanhamento_encaminhar():
     from ...dados.equipamento import canon
     from ...engenharia import acompanhamento as AC
     cod, para = request.form.get("cod", ""), request.form.get("para", "")
+    viu_livre = request.form.get("livre") == "1"
 
     def fazer():
         pode, _ = _quem_pode()
         pessoas = _pessoas(pode)
         _d, _l, _a, sep = _agora_do_livro()
         s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
-        aberto = any(canon(x["acomp"]["cod"]) == canon(cod) for x in sep["aberto"])
+        ab = next((x["acomp"] for x in sep["aberto"] if canon(x["acomp"]["cod"]) == canon(cod)), None)
+        aberto = ab is not None
+        if not pode:
+            AC.encaminhar({"cod": cod}, para, session.get("usuario"), pode, pessoas)
+        if viu_livre and ab:      # a gaveta viu o ativo livre e alguém o pegou depois (revisão final)
+            raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}: recarregue a "
+                              "página para encaminhar")
         if not s and not aberto:
-            if not pode:
-                AC.encaminhar({"cod": cod}, para, session.get("usuario"), pode, pessoas)
             raise AC.Recusada("Este ativo não está em Ativos com sinal nem em acompanhamento: recarregue a página")
         AC.encaminhar(_para_gravar(s) if s and not aberto else {"cod": cod}, para, session.get("usuario"), pode,
                       pessoas)
         nome = next((p["nome"] for p in pessoas if p["hmac"] == para), "")
         return f"Encaminhado para {nome}." if nome else "Encaminhado."
-    return _acao(cod, fazer)
+    return _acao(cod, fazer, form="encaminhar")
 
 
 def _cod_do(acompanhamento_id: str) -> str:
@@ -402,7 +421,7 @@ def acompanhamento_salvar(aid):
         volta = any(x["quando"] >= marco for x in (d.get("falhasEm") or {}).get(canon(cod), []))
         return ("Encerrado." + (" O ativo volta para Ativos com sinal: teve falha depois do fim." if volta else ""),
                 aid)
-    return _acao(cod, fazer)
+    return _acao(cod, fazer, form="salvar")
 
 
 @bp.route("/confiabilidade/acompanhamento/<aid>/comentar", methods=["POST"])
@@ -413,7 +432,7 @@ def acompanhamento_comentar(aid):
     def fazer():
         pode, _ = _quem_pode()
         AC.comentar(aid, request.form.get("texto", ""), session.get("usuario"), pode)
-    return _acao(cod, fazer, "Comentário salvo.")
+    return _acao(cod, fazer, "Comentário salvo.", form="comentar")
 
 
 def _cadastro(fazer, aviso: str):

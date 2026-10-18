@@ -487,3 +487,87 @@ def test_cadastro_pela_aba_diagnosticos(tela, cliente):
     assert "Proteção (relé)</option>" not in ac                              # o excluído sai da escolha
     r = cliente.post(URL + "/diagnosticos/criar", data={"nome": "comunicacao"}, headers=SAME)
     assert "já existe" in cliente.get(URL + "?aba=diagnosticos").get_data(as_text=True)
+
+
+# ── a revisão final (18/10/2026): cada achado com o teste que o reproduz ─────────────────────────────────────────────
+def test_data_antes_do_inicio_do_metodo_recusa(banco):
+    # "0202-10-15" (o ano com um dígito a menos) gravava um data_id de 7 dígitos, para sempre no livro, e voltava
+    # lido como outra data
+    A.pegar(ATIVO, ANA, pode=True)
+    n = len(banco.linhas(A.LIVRO, A.ABA_EVENTO))
+    for ini, fim in (("0202-10-15", ""), ("1900-01-01", ""), ("2025-10-19", ""), ("2026-10-15", "0202-10-16")):
+        with pytest.raises(A.Recusada, match="Data inválida"):
+            A.salvar(_aid(), ini, fim, "1", ANA, True, date(2026, 10, 18))
+    assert len(banco.linhas(A.LIVRO, A.ABA_EVENTO)) == n
+    A.salvar(_aid(), "2025-10-20", "", "1", ANA, True, date(2026, 10, 18))       # o piso vale
+    assert _a()["inicio"] == date(2025, 10, 20)
+
+
+def test_banco_fora_nao_diz_zero_nem_ninguem(tela, cliente, monkeypatch):
+    # com o livro ilegível, os números das abas diziam 0, a gaveta "Ninguém acompanha" com o Pegar, e a aba Diagnósticos
+    # mostrava o cadastro inicial como se fosse o do banco
+    monkeypatch.setattr(tela, "get", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("fora")))
+    A.limpar()
+    _como(cliente, ANA)
+    html = cliente.get(URL).get_data(as_text=True)
+    assert "Em acompanhamento <i>—</i>" in html and "Encerrados <i>—</i>" in html
+    assert "Ninguém acompanha este ativo" not in html and "Pegar para acompanhar" not in html
+    assert "Não consegui ler os acompanhamentos" in html
+    dg = cliente.get(URL + "?aba=diagnosticos").get_data(as_text=True)
+    assert "Não consegui ler os acompanhamentos" in dg and 'value="Comunicação"' not in dg
+
+
+def test_copia_velha_avisa_a_hora(tela, cliente, monkeypatch):
+    # a leitura que falha depois de uma boa devolve a cópia velha, e a tela não dizia
+    _como(cliente, ANA)
+    assert "IBI200-INVR1.3" in _lista(cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True))
+    A._CACHE["livro"]["lido_em"] -= 3600                                          # a cópia venceu
+    monkeypatch.setattr(tela, "get", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("fora")))
+    html = cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    assert "IBI200-INVR1.3" in _lista(html) and "última leitura boa" in html
+
+
+def test_texto_digitado_nao_se_perde(tela, cliente, monkeypatch):
+    # a recusa e o banco fora respondiam a gaveta sem o que a pessoa tinha digitado (o comentário de até 2.000 letras)
+    from nexus.dados import livros
+    _como(cliente, ANA)
+    aid = _aid_de("IBI200-INVR1.3")
+    g = cliente.post(f"{URL}/acompanhamento/{aid}/salvar", data={"inicio": "2026-10-01", "fim": "2026-10-04",
+                                                                  "diagnostico": ""}, headers=SAME).get_data(as_text=True)
+    assert "Para encerrar, escolha o diagnóstico" in g and 'value="2026-10-04"' in g and 'value="2026-10-01"' in g
+    monkeypatch.setattr(livros, "publicar", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("fora")))
+    g = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar o cabo de rede"},
+                     headers=SAME).get_data(as_text=True)
+    assert "Não consegui gravar no banco" in g and ">Trocar o cabo de rede</textarea>" in g
+
+
+def test_pegar_de_pagina_velha_diz_com_quem_esta(tela, cliente):
+    # a regra 1 do desenho ("o segundo recebe 'já está com <pessoa>'") valia no módulo, mas a rota respondia antes que o
+    # ativo não estava na lista
+    g = _como(cliente, BETO).post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INVR1.3"},
+                                  headers=SAME).get_data(as_text=True)
+    assert "já está com Ana Lima" in g
+
+
+def test_encaminhar_de_pagina_velha_nao_toma_o_acompanhamento_de_outro(tela, cliente):
+    # o ativo estava livre quando a página abriu e outra pessoa o pegou depois: o Encaminhar da gaveta velha passava o
+    # acompanhamento dela adiante sem ninguém pedir
+    html = _como(cliente, BETO).get(URL).get_data(as_text=True)
+    assert 'name="livre" value="1"' in html                       # a gaveta do ativo livre diz que o viu livre
+    g = cliente.post(URL + "/acompanhamento/encaminhar", data={"cod": "IBI200-INVR1.3", "para": A.codigo(BETO),
+                                                               "livre": "1"}, headers=SAME).get_data(as_text=True)
+    assert "já está com Ana Lima" in g
+    a = next(x for x in A.estado(A.ler(forcar=True)["eventos"]).values() if x["cod"] == "IBI200-INVR1.3")
+    assert a["responsavel"]["nome"] == "Ana Lima"
+
+
+def test_com_quem_desde_conta_do_encaminhamento(tela, cliente):
+    # "Com <pessoa> desde" mostrava o começo do acompanhamento, não quando a pessoa o recebeu
+    linhas = tela.abas[(A.LIVRO, A.ABA_EVENTO)]["linhas"]
+    linhas[0]["values"][linhas[0]["headers"].index("registrado_em")] = "2026-10-10T12:00:00Z"   # o Pegar de INVR1.3
+    A.limpar()
+    A.encaminhar({"cod": "IBI200-INVR1.3"}, A.codigo(BETO), ANA, True, PESSOAS())
+    a = next(x for x in A.estado(A.ler(forcar=True)["eventos"]).values() if x["cod"] == "IBI200-INVR1.3")
+    assert a["desde"].strftime("%d/%m") == "10/10" and a["com_desde"].date() == datetime.now(BRT).date()
+    ac = _como(cliente, ANA).get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    assert "Com Beto Souza desde " + datetime.now(BRT).strftime("%d/%m") in _lista(ac)

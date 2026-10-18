@@ -66,6 +66,7 @@
       <a class="eg-alterna{% if esconder %} eg-alterna--on{% endif %}" href="{{ url(servico=None if esconder else '0') }}">{{ 'Mostrar' if esconder else 'Esconder' }} serviço registrado como corretiva</a></p>
   </section>
 
+  {% if velha_em %}<p class="cn-erro cn-aviso" role="status"><b>Mostrando a última leitura boa dos acompanhamentos ({{ velha_em }}).</b> O banco não respondeu agora; recarregue em instantes.</p>{% endif %}
   <nav class="eg-abas" aria-label="Abas">
     {% for a, nome in abas %}<a href="{{ url(aba=None if a == 'ativos' else a) }}"{% if a == aba %} aria-current="page"{% endif %}>{{ nome }}{% if a in contas %} <i>{{ contas[a] }}</i>{% endif %}</a>{% endfor %}
   </nav>
@@ -101,7 +102,7 @@
           </span>
           <span class="eg-item-n"><b>{{ a.nFalha }}</b><span>falha{{ 's' if a.nFalha != 1 }} · {{ a.n30 }} OS</span></span>
         </button>
-        {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ a.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
+        {% if pode and not erro_acomp %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ a.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
           <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-gaveta="g{{ loop.index0 }}" data-eg-abrir-encaminhar>Encaminhar</button></div>{% endif %}
         </article>
       {% else %}<p class="mudo eg-vazio">Nenhum ativo com sinal com esses filtros.</p>{% endfor %}
@@ -148,7 +149,7 @@
         <span class="eg-item-corpo">
           <span class="eg-item-tit"><b>{{ a.nome }}</b> <code>{{ ac.cod }}</code> <span class="eg-onde">{{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %}</span></span>
           {% if aba == 'acompanhamento' %}
-          <span class="eg-acomp-quem">Com {{ ac.responsavel.nome or 'alguém' }}{% if meu and ac.responsavel.hmac == meu %} (você){% endif %} desde {{ ac.desde.strftime('%d/%m') if ac.desde else '—' }}{% if ac.encaminhado_por %} · encaminhado por {{ ac.encaminhado_por }}{% endif %} · análise desde {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }}</span>
+          <span class="eg-acomp-quem">Com {{ ac.responsavel.nome or 'alguém' }}{% if meu and ac.responsavel.hmac == meu %} (você){% endif %} desde {{ ac.com_desde.strftime('%d/%m') if ac.com_desde else '—' }}{% if ac.encaminhado_por %} · encaminhado por {{ ac.encaminhado_por }}{% endif %} · análise desde {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }}</span>
           {% else %}
           <span class="eg-acomp-quem">{{ ac.responsavel.nome or '—' }} · análise {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }} → {{ ac.fim.strftime('%d/%m/%Y') if ac.fim else '—' }}</span>
           {% endif %}
@@ -170,6 +171,8 @@
   {% elif aba == 'diagnosticos' %}
   <section class="eg-painel">
     <div class="eg-painel-cab"><h2>Diagnósticos</h2><span>a lista do Diagnóstico do acompanhamento · o excluído sai da escolha e o número dele não volta</span></div>
+    {% if erro_acomp %}<p class="cn-erro cn-aviso eg-aviso-lista" role="status"><b>Não consegui ler os acompanhamentos ({{ erro_acomp }}).</b> O cadastro dos diagnósticos mora no mesmo livro; recarregue em instantes.</p>
+    {% else %}
     {% if aviso_dg %}<p class="eg-acomp-msg eg-acomp-msg--ok eg-aviso-lista" role="status">{{ aviso_dg }}</p>{% endif %}
     {% if erro_dg %}<p class="eg-acomp-msg eg-acomp-msg--erro eg-aviso-lista" role="alert">{{ erro_dg }}</p>{% endif %}
     <form class="eg-diag-novo" method="post" action="{{ url_for('torre_engenharia.diagnostico_criar') }}">
@@ -186,6 +189,7 @@
         <td><span class="eg-diag-acoes"><form id="dg{{ x.id }}" method="post" action="{{ url_for('torre_engenharia.diagnostico_salvar', did=x.id) }}"><button type="submit" class="gc-btn gc-btn--contorno eg-btn-peq">Salvar</button></form>
           <form method="post" action="{{ url_for('torre_engenharia.diagnostico_excluir', did=x.id) }}" data-eg-confirmar="Excluir o diagnóstico {{ x.nome }}? Ele sai da escolha; os acompanhamentos que já o usam continuam com ele."><button type="submit" class="gc-btn gc-btn--fantasma eg-btn-peq">Excluir</button></form></span></td>
       </tr>{% else %}<tr><td colspan="4" class="mudo">Nenhum diagnóstico no cadastro.</td></tr>{% endfor %}</tbody></table></div>
+    {% endif %}
   </section>
   {% else %}
   {% set cols = [('usinas', 'Usinas'), ('eventos', 'Eventos (hist.)'), ('sinais', 'Ativos c/ sinal'), ('criticos', 'Críticos'),
@@ -224,6 +228,7 @@
     lidas pelo Nexus no Fracttal: as abertas a cada leitura, as concluídas desde 20/10/2025 guardadas e atualizadas pelo
     que fechou depois; as canceladas ficam fora. {{ est.n }} OS na conta de agora.</div>
 </div>
+<script src="{{ url_for('static', filename='engenharia-gaveta.js') }}"></script>
 <script>
   (function () {
     // a gaveta do ativo: o clique no cartão copia o detalhe dele para a gaveta lateral (sem animação). Desde 18/10/2026
@@ -267,23 +272,31 @@
         ev.preventDefault();
         var b = f.querySelector('[type="submit"]'), cartao = f.closest('.eg-cartao');
         if (b) b.disabled = true;
+        // a falha não troca a gaveta: o formulário, com o que foi digitado, continua (o molde das Contestações)
+        function falha(msg) {
+          if (b) b.disabled = false;
+          var alvo = f;
+          if (cartao) {
+            if (gav.hidden) abre(cartao.querySelector('.eg-item').dataset.gaveta, cartao.querySelector('.eg-item'));
+            alvo = null;
+          }
+          var p = (alvo && alvo.querySelector('.eg-acomp-msg--erro')) || document.createElement('p');
+          p.className = 'eg-acomp-msg eg-acomp-msg--erro';
+          p.setAttribute('role', 'alert');
+          p.textContent = msg;
+          if (alvo) alvo.appendChild(p); else corpo.prepend(p);
+        }
         fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin'})
-          .then(function (r) { return r.text(); })
-          .then(function (html) {
-            corpo.innerHTML = html;
+          .then(egGaveta.resposta)
+          .then(function (x) {
+            if (x.acao === 'login') { location.reload(); return; }
+            if (x.acao === 'falha') { falha(x.msg); return; }
+            corpo.innerHTML = x.html;
             mudou = true;
             if (cartao) marca(cartao.querySelector('.eg-item'));
             if (gav.hidden) mostra();
           })
-          .catch(function () {
-            if (b) b.disabled = false;
-            if (cartao && gav.hidden) abre(cartao.querySelector('.eg-item').dataset.gaveta, cartao.querySelector('.eg-item'));
-            var p = document.createElement('p');
-            p.className = 'eg-acomp-msg eg-acomp-msg--erro';
-            p.setAttribute('role', 'alert');
-            p.textContent = 'Não consegui falar com o Nexus agora. Nada mudou; tente de novo em instantes.';
-            corpo.prepend(p);
-          });
+          .catch(function () { falha('Não consegui falar com o Nexus agora. Nada mudou; tente de novo em instantes.'); });
       });
       // o fim da análise antes de uma falha faz o ativo voltar para Ativos com sinal (a regra do Levi): avisa na hora
       document.addEventListener('input', function (ev) {
