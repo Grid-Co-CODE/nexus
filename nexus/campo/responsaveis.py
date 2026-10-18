@@ -373,6 +373,20 @@ def limpeza() -> tuple[dict, dict]:
     return por, {"com_leitura": len(por)}
 
 
+# ── O Ranking das equipes (18/10/2026): a régua do ranking por região do App, por usina, nos dois períodos ──────────
+def ranking_fonte(b, hoje) -> tuple[dict, dict]:
+    """{usina_id: {"atual", "anterior"}} com as notas do App (as tarefas fechadas e as rondas) e a ronda de cada usina
+    mobilizada (`ranking_equipes.agregar`). O agrupamento por equipe sai no pedido, porque os filtros são de quem olha.
+    As duas leituras já estão na cópia do ciclo quando a Visão é feita (medido no banco real em 18/10/2026: as rondas em
+    0,03 s e o fato de fechamento em 0,00 s depois da conta da Visão, que lê os dois para a Central)."""
+    from . import ranking_equipes
+    fech = visao._fato("fechamento", b)
+    per = ranking_equipes.periodos(hoje)
+    return (ranking_equipes.agregar(fech["linhas"], visao._rondas_ligadas(b), b.mobilizadas, hoje),
+            {"de": fech["de"], "aviso": fech["aviso"],
+             **{p: (ini.isoformat(), fim.isoformat()) for p, (ini, fim) in per.items()}})
+
+
 # ── Ativos falhando (Engenharia › Confiabilidade) ───────────────────────────────────────────────────────────────
 def _engenharia() -> dict:
     """Os dados da Confiabilidade, com a cópia dela (as OS de falha do Fracttal lidas em segundo plano)."""
@@ -1267,6 +1281,7 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
         lim, lim_i = _ler_fonte("limpeza", limpeza, erros)
         par, par_i = _ler_fonte("paradas", lambda: paradas_abertas(nomes, mes), erros)
         man, man_i = _ler_fonte("manut", lambda: manutencao_fonte(b, hoje, agora), erros)
+        rk, rk_i = _ler_fonte("ranking", lambda: ranking_fonte(b, hoje), erros)
         if pts.erro:
             erros["pt"] = pts.erro
         fontes = {"metas": met, "disp": dsp, "ativos": atv, "chamados": cha, "extintores": ext, "limpeza": lim,
@@ -1280,7 +1295,10 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
                 responsaveis_por_pessoa[pid] = b.responsavel_da_usina(uid)
         return {"usinas": usinas, "mes_id": mes_id, "hoje": hoje.isoformat(), "erros": erros,
                 "info": {"metas": met_i, "disp": dsp_i, "ativos": atv_i, "chamados": cha_i, "extintores": ext_i,
-                         "limpeza": lim_i, "paradas": par_i, "manut": man_i},
+                         "limpeza": lim_i, "paradas": par_i, "manut": man_i, "ranking": rk_i},
+                # o Ranking das equipes (18/10/2026): as notas do App por usina e quantos técnicos cada equipe tem
+                "ranking_por_usina": rk,
+                "tecnicos_por_equipe": {nome: t.get("tecnicos", 0) for nome, t in b.times().items()},
                 "responsaveis_por_pessoa": responsaveis_por_pessoa, "sem_mobilizacao": b.sem_mobilizacao,
                 "fatos": at.dados.get("fatos") or {}, **visao._estrutura(b)}
     return visao._ler(("visao_responsaveis",), calcular)

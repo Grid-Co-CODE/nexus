@@ -4,7 +4,12 @@ no function_app.py: 60% qualidade + 40% cobertura, por cluster, a única conta p
 Nexus. Desenho: docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md."""
 from datetime import date
 
+from test_campo_responsaveis import tela  # noqa: F401  (fixture: o banco falso com a meta, os chamados e os extintores)
+from test_campo_visao import banco  # noqa: F401  (fixture de que a `tela` depende)
+
 from nexus.campo import ranking_equipes as RE
+from nexus.campo import responsaveis as R
+from nexus.campo import visao
 
 HOJE = date(2026, 10, 18)
 
@@ -73,3 +78,21 @@ def test_seta():
     assert RE.seta(3, 5) == {"tipo": "sobe", "n": 2} and RE.seta(4, 2) == {"tipo": "desce", "n": 2}
     assert RE.seta(2, 2) == {"tipo": "igual", "n": 0}
     assert RE.seta(2, None) == RE.seta(None, 1) == {"tipo": "sem", "n": 0}
+
+
+# ── As notas na cópia de 5 min da Visão (o banco falso: Altair e Brodowski 1 na SP Norte 01, Coração 1 na SC Oeste 01) ──
+def test_as_notas_do_app_chegam_a_usina_do_cadastro(tela):  # noqa: F811
+    d = R.visao_responsaveis().dados
+    a = d["ranking_por_usina"]
+    # Altair: 2 rondas (90) + 3 tarefas fechadas pelo App (90, 70, 100); Brodowski 1: 1 ronda (90); Coração 1: nada
+    assert a[1]["atual"] == {"q_soma": 440, "q_n": 5, "n_os": 3, "n_ronda": 2, "rondada": True}
+    assert a[2]["atual"] == {"q_soma": 90, "q_n": 1, "n_os": 0, "n_ronda": 1, "rondada": True}
+    assert a[3]["atual"]["rondada"] is False and a[3]["atual"]["q_n"] == 0
+    assert d["tecnicos_por_equipe"]["SP Norte 01"] == 2 and d["tecnicos_por_equipe"]["SC Oeste 01"] == 1
+
+
+def test_a_fonte_das_notas_que_falha_nao_derruba_a_visao(tela, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("fato fora")))
+    visao.limpar()
+    d = R.visao_responsaveis().dados
+    assert "fato fora" in d["erros"]["ranking"] and len(d["usinas"]) == 3 and d["ranking_por_usina"] == {}
