@@ -277,7 +277,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   se grava (a linha iria sem assinatura e o App a descartaria).
 - **A tela** (PCM → Técnicos por usina), no estilo da tela de PT do Campo (Levi, 17/10: "quero que a tabela seja no
   mesmo estilo de PT e APR"; usa o `campo.css`): os números do topo (usinas, sem técnico, pessoas de campo, apoios,
-  com aviso), as abas Por usina, Por técnico e, com a foto do App, Comparação com o App, os chips das situações (com
+  com aviso), as abas Por usina, Por técnico e, com a foto do App, Comparação com o App (outra página: as duas
+  primeiras trocam na própria página só onde a seção delas está; na Comparação o link navega, 18/10/2026, o Levi
+  clicava em Por usina ali e a tela não voltava; `tests/test_pcm_tecnicos_js.py`), os chips das situações (com
   técnico, sem técnico, com aviso) e a linha que abre o detalhe com o histórico e o "Pôr técnico" (Levi, 17/10, 2ª
   rodada: a coluna Cliente antes da Usina, sem a Região de campo; os técnicos um embaixo do outro, sem borda; sem o
   botão "Técnico" na célula). Veem os setores PCM e

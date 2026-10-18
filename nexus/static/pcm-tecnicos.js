@@ -119,8 +119,14 @@
   var abaAgora = (new URL(location.href)).searchParams.get("ver") === "tecnico" ? "tecnico" : "usina";
   document.querySelectorAll(".cn-abas a[data-aba]").forEach(function (a) {
     a.addEventListener("click", function (ev) {
+      // a Comparação com o App é outra página, sem as duas seções: ali o link navega (18/10/2026, o Levi clicava em
+      // Por usina na Comparação e a tela não voltava, porque o clique era cancelado e não havia seção para mostrar)
+      var aba = a.getAttribute("data-aba");
+      var tem = false;
+      document.querySelectorAll("[data-aba-secao]").forEach(function (s) { tem = tem || s.getAttribute("data-aba-secao") === aba; });
+      if (!tem) return;
       ev.preventDefault();
-      abaAgora = a.getAttribute("data-aba");
+      abaAgora = aba;
       document.querySelectorAll(".cn-abas a[data-aba]").forEach(function (o) {
         if (o === a) o.setAttribute("aria-current", "page"); else o.removeAttribute("aria-current");
       });
