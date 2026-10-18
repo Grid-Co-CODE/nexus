@@ -15,10 +15,29 @@
       atividades por usina, de {{ rot_mes(meses[0]) }} a {{ rot_mes(meses[2]) }}.{% else %}O que está velho e por quê:
       o envelhecimento das MPA e MPS, da mais antiga para a mais nova.{% endif %}</p>{% endif %}
   </div>
-  {% if dados %}<nav class="pg-seg pg-modo" aria-label="Modo">
+  {% if dados %}<div class="pg-topo-dir">
+  <nav class="pg-seg pg-modo" aria-label="Modo">
     <a href="{{ url(modo='plano') }}"{% if o.modo == 'plano' %} aria-current="page"{% endif %}><i class="ph ph-table" aria-hidden="true"></i>Plano</a>
     <a href="{{ url(modo='fila') }}"{% if o.modo == 'fila' %} aria-current="page"{% endif %}><i class="ph ph-hourglass-medium" aria-hidden="true"></i>Fila</a>
-  </nav>{% endif %}
+  </nav>
+  {# de onde vêm os dados, num ícone à direita (Levi, 18/10/2026: "podem muito bem estar em um ícone do lado direito
+     da tela para quando a pessoa clicar na exclamação aparecer esse disclaimer"); o que é falha de verdade (a última
+     leitura boa, a chave da Gerencial que não abriu) segue à vista, em amarelo #}
+  {% set nota_ger = not tem_ger and ger_erro == 'sem_chave' %}
+  {% if not fonte_velha or nota_ger %}
+  <details class="pg-info">
+    <summary aria-label="De onde vêm os dados desta tela" title="De onde vêm os dados desta tela"><i class="ph ph-warning-circle" aria-hidden="true"></i></summary>
+    <div class="pg-info-txt" role="note">
+      {% if not fonte_velha %}<p>Lê o gestao_pcm.json do painel do PCM (as tarefas do Fracttal{% if corte %} desde
+        {{ data_curta(corte) }}{% endif %}){% if fonte_gerada %}, atualizado em {{ fonte_gerada }}{% endif %}. Concluída é o
+        estado da TAREFA (Finalizada), nunca o status da OS.</p>{% endif %}
+      {% if nota_ger %}<p>Prevista, criticidade e observação de cada MPA e MPS vêm da planilha da Gerencial, que o painel
+        guarda cifrada. Enquanto este Nexus não tem a chave dela, a Fila mostra o lado do Fracttal: uma linha por OS,
+        atraso pela Data Programada.</p>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+  </div>{% endif %}
 </div>
 
 {% if not dados %}
@@ -26,10 +45,7 @@
   Motivo: {{ fonte_erro }}. O painel do PCM segue no ar; esta tela volta quando a leitura voltar.</div></div>
 {% else %}
 {% if fonte_velha %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-clock-counter-clockwise"></i><div><strong>Mostrando a última leitura boa.</strong>
-  A tentativa de agora falhou ({{ fonte_erro }}).</div></div>
-{% else %}<p class="pcm-fonte"><i class="ph ph-plug"></i><span>Lê o gestao_pcm.json do painel do PCM (as tarefas do Fracttal{% if corte %}
-  desde {{ data_curta(corte) }}{% endif %}){% if fonte_gerada %}, atualizado em {{ fonte_gerada }}{% endif %}. Concluída é o
-  estado da TAREFA (Finalizada), nunca o status da OS.</span></p>{% endif %}
+  A tentativa de agora falhou ({{ fonte_erro }}).</div></div>{% endif %}
 
 {# o PAR de números do topo, nunca uma média única (regra do painel) #}
 {% set rp = par.rotina %}
@@ -51,14 +67,11 @@
     <div class="d">todas as tarefas da OS finalizadas</div></div>
   {% endif %}
 </div>
-{% if not tem_ger %}
-{# Sem a chave da Gerencial não é falha: a Fila funciona com o Fracttal (pedido de 08/10: dizer isso sem parecer erro).
-   Falha de verdade (chave configurada que não abriu, arquivo fora do ar) vai em amarelo. #}
-{% if ger_erro == 'sem_chave' %}<p class="pcm-fonte pg-nota"><i class="ph ph-info"></i><span>Prevista, criticidade e
-  observação de cada MPA e MPS vêm da planilha da Gerencial, que o painel guarda cifrada. Enquanto este Nexus não tem a chave
-  dela, a Fila mostra o lado do Fracttal: uma linha por OS, atraso pela Data Programada.</span></p>
-{% else %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-lock-simple"></i><div><strong>Sem a planilha da Gerencial agora:</strong>
-  {{ ger_erro }}. A Fila segue com o lado do Fracttal.</div></div>{% endif %}
+{% if not tem_ger and ger_erro != 'sem_chave' %}
+{# Sem a chave da Gerencial não é falha: a Fila funciona com o Fracttal (pedido de 08/10: dizer isso sem parecer erro),
+   e a nota mora no ícone do topo. Falha de verdade (chave configurada que não abriu, arquivo fora do ar) vai em amarelo. #}
+<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-lock-simple"></i><div><strong>Sem a planilha da Gerencial agora:</strong>
+  {{ ger_erro }}. A Fila segue com o lado do Fracttal.</div></div>
 {% endif %}
 
 {# os filtros de cima da aba Gestão PCM do painel; valem nos dois modos #}
@@ -296,4 +309,13 @@
 {% endif %}
 {% endif %}
 </div>
+<script>
+  // o aviso do ícone fecha com o clique fora dele e com o Esc
+  document.addEventListener("click", function (ev) {
+    document.querySelectorAll("details.pg-info[open]").forEach(function (d) { if (!d.contains(ev.target)) d.open = false; });
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") document.querySelectorAll("details.pg-info[open]").forEach(function (d) { d.open = false; });
+  });
+</script>
 {% endblock %}

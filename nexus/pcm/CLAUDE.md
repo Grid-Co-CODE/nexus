@@ -490,6 +490,12 @@ situação, turno e busca, em cascata (seção acima). O gestor de contrato que 
 (quando o nome casa com a coluna Responsável). Semanas: as do `banco_dados.json` e os rascunhos do Nexus (a rodada mais recente de cada semana que
 ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também as de prova).
 
+- **A janela da OS** (Levi, 18/10/2026; `tests/test_pcm_quadro_janela_js.py` a abre no node): os cartões do topo são
+  Tipo, Situação, Criticidade, Semanas na fila e Reprogramada (a seção "Situação da OS" de baixo saiu, e com ela o
+  Status da OS, Em paralelo, Termografia, Origem e Etiqueta); Onde e Quem lado a lado e o Quando embaixo (o dia da
+  semana com a data entre parênteses: "Terça (13/10)"); o motivo tem o título "Técnico não consegue fazer?", sem o
+  "Sem motivo.", e o botão "Salvar motivo".
+
 - **A semana do PCM vai do sábado 00:00 à sexta** (o processo, Levi com o programador do PCM: a programação nasce na quinta;
   supervisor e gestor de contrato olham e passam ao PCM; o PCM altera; no fim da sexta ela é gerada de novo e substitui;
   "o ideal é que inicie da meia-noite de sábado e finalize na sexta"). **Criadas após o plano** = OS com `dataCriacao`
@@ -599,6 +605,11 @@ cascata desde 09/10/2026). Só
 lê: nada vai ao banco nem ao Fracttal. Os controles vão pela URL (`modo`, `tipo`, `dim`, `col`, `val`, `mes`, `q`,
 `ordem`/`desc`, `pend`, `ordemf`/`descf`; o drill da fração é `drill` + `dt`, porque `usina` é o filtro de cima).
 
+- **O aviso de onde vêm os dados** (o `gestao_pcm.json` e, sem a chave, a nota da Gerencial) mora num ícone à direita
+  do topo e abre ao clicar (Levi, 18/10/2026); o que é falha de verdade (a última leitura boa, a chave que não abriu)
+  segue à vista, em amarelo.
+- **A célula tem altura fixa** (18/10/2026): o `<button>` da pendente na linha da usina herdava o `font` e perdia o
+  `line-height`, e o fundo no tom ficava com 19 px no meio da célula de 34 ("parece que aparece só no meio").
 - **De onde vem:** o `gestao_pcm.json` (as tarefas do Fracttal desde 01/01, que o robô do repositório do PCM regrava;
   14,7 MB e 28,6 mil tarefas em 08/10) e a planilha da Gerencial, o `mpas.json` do mesmo repositório, **cifrado**
   (AES-GCM + PBKDF2; o repositório é público). A Gerencial abre com `NEXUS_PCM_MPAS_SENHA` (a mesma senha que o painel

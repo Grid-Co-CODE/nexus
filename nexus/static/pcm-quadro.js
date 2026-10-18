@@ -146,10 +146,6 @@
     return (val === null || val === undefined || val === "" || val === 0) ? "" :
       "<div class=\"q-dl\"><dt>" + esc(rot) + "</dt><dd>" + esc(val) + "</dd></div>";
   }
-  function sn(v) {
-    var x = String(v || "").trim().toLowerCase();
-    return x === "sim" ? "Sim" : (x === "não" || x === "nao") ? "Não" : (v || "");
-  }
   function chipEstado(st) {
     var c = { "Finalizada": "feita", "Em progresso": "andamento", "Pausada": "pausada" }[st] || "nao";
     return "<span class=\"q-st q-st--" + c + "\">" + esc(st) + "</span>";
@@ -207,17 +203,16 @@
   function blocoMotivo(t) {
     var mp = t.mp, pode = D.pode_marcar && MOTIVOS.length;
     if (!mp && !pode) return "";
-    var h = "<h3>Motivo</h3>";
+    // Levi, 18/10/2026: o título é a pergunta que o motivo responde, e a tarefa sem motivo não diz "Sem motivo."
+    var h = "<h3>Técnico não consegue fazer?</h3>";
     if (mp) {
       h += "<p class=\"q-mp-atual\">" + selo(mp.n, mp.tira) + "<span>desde " + esc(mp.desde) +
         (mp.quem ? " · " + esc(mp.quem) : "") + (mp.app ? " (App)" : "") + "</span></p>" +
         (mp.obs ? "<p class=\"q-rel\">" + esc(mp.obs) + "</p>" : "") +
         "<p class=\"q-nota\">" + (mp.tira ? "Este motivo tira a tarefa da programação." : "A tarefa continua na programação.") +
         (mp.geral ? " Marcado pelo número da OS: vale para esta tarefa em todos os ativos da OS." : "") + "</p>";
-    } else {
-      h += "<p class=\"q-vazio\">Sem motivo.</p>";
     }
-    if (!pode) return h;
+    if (!pode) return mp ? h : "";
     return h + "<div class=\"q-rp q-mp-form\"><label class=\"q-campo\"><span>Motivo</span><select class=\"gc-campo\" " +
       "data-mp-sel><option value=\"\">escolha…</option>" + MOTIVOS.map(function (m) {
         return "<option value=\"" + m[0] + "\"" + (mp && mp.id === m[0] ? " selected" : "") + ">" + esc(m[1]) +
@@ -225,7 +220,7 @@
       }).join("") + "</select></label><label class=\"q-campo\"><span>Observação (opcional)</span><textarea class=\"gc-campo\" " +
       "data-mp-obs rows=\"2\" maxlength=\"500\">" + esc(mp ? mp.obs : "") + "</textarea></label><div class=\"q-rp-acoes\">" +
       "<button type=\"button\" class=\"gc-btn gc-btn--ui gc-btn--primario\" data-mp-salvar><i class=\"ph ph-tag\"></i> " +
-      (mp ? "Salvar o motivo" : "Marcar o motivo") + "</button>" + (mp ? "<button type=\"button\" class=\"gc-btn gc-btn--ui " +
+      "Salvar motivo</button>" + (mp ? "<button type=\"button\" class=\"gc-btn gc-btn--ui " +
       "gc-btn--contorno\" data-mp-tirar><i class=\"ph ph-x\"></i> Tirar o motivo</button>" : "") + "</div>" +
       "<p class=\"q-nota\" data-mp-msg role=\"status\"" + (t._mpMsg ? "" : " hidden") + ">" + esc(t._mpMsg || "") + "</p></div>";
   }
@@ -301,18 +296,17 @@
       "<div class=\"q-fatos\">" +
       "<div><span>Tipo</span><b><i class=\"q-ponto q-t--" + esc(t.tc) + "\"></i>" + esc(t.tp || "—") + "</b></div>" +
       "<div><span>Situação</span><b>" + (t.pend ? "<span class=\"q-st q-st--nao\">Pendente</span>" : chipEstado(t.st)) + "</b></div>" +
+      "<div><span>Criticidade</span><b>" + esc(t.cri || "—") + "</b></div>" +
       "<div><span>Semanas na fila</span><b class=\"" + (t.rol >= 3 ? "q-mal" : "") + "\">" + (t.rol || 1) + "ª semana</b></div>" +
       "<div><span>Reprogramada</span><b class=\"" + (t.rep ? "q-mal" : "") + "\">" + (t.rep ? "Sim" : "Não") + "</b></div></div>" +
       (t.pend && t.mot ? "<p class=\"q-nota\">Não coube na semana: " + esc(t.mot) + "</p>" : "") +
-      "<h3>Onde</h3><dl>" + dl("Usina", t.uc) + dl("Cliente", t.cli) + dl("Equipe cluster", t.cl) +
-      dl("Código do ativo", t.cod) + "</dl>" +
-      "<h3>Quando</h3><dl>" + dl("Criada em", t.dcri) + dl("Dia nesta semana", t.d ? (t.d + (t.data ? " " + t.data : "")) : "") +
+      "<div class=\"q-lado\"><section><h3>Onde</h3><dl>" + dl("Usina", t.uc) + dl("Cliente", t.cli) +
+      dl("Equipe cluster", t.cl) + dl("Código do ativo", t.cod) + "</dl></section>" +
+      "<section><h3>Quem</h3><dl>" + dl("Responsável O&M", t.resp) + dl("Responsável da OS", t.ros) + "</dl></section></div>" +
+      "<h3>Quando</h3><dl>" + dl("Criada em", t.dcri) + dl("Dia nesta semana", t.d ? (t.d + (t.data ? " (" + t.data + ")" : "")) : "") +
       dl("Data no Fracttal", t.dprog) + dl("Janela", t.ini && t.fim ? t.ini + " – " + t.fim : t.ini) +
       dl("Duração prevista", t.h) + dl("Deslocamento", t.desl ? String(t.desl).replace(".", ",") + " h" : "") +
       dl("Finalizada em", t.dfim) + dl("Rolagem", t.rol_txt) + "</dl>" +
-      "<h3>Quem</h3><dl>" + dl("Responsável O&M", t.resp) + dl("Responsável da OS", t.ros) + "</dl>" +
-      "<h3>Situação da OS</h3><dl>" + dl("Status da OS", t.sp) + dl("Criticidade", t.cri) +
-      dl("Em paralelo", sn(t.par)) + dl("Termografia", sn(t.termo)) + dl("Origem", t.nova) + dl("Etiqueta", t.etq) + "</dl>" +
       blocoMotivo(t) +
       blocoReprogramar(t) +
       (t.pend ? "" : "<h3>Trajetória</h3>" + trajetoria(t)) +

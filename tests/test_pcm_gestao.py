@@ -368,3 +368,27 @@ def test_filtros_de_cima_em_cascata():
     e = G.escolhas_topo(ts, {"cliente": "Thopen", "usina": TUCANO, "cluster": "", "responsavel": ""})
     assert TUCANO in e["usina"] and e["cluster"] == []
     assert G.escolhas_topo(ts) == G.escolhas_topo(ts, {})          # sem filtro, tudo como antes
+
+
+def test_a_celula_colorida_enche_a_altura_da_linha():
+    """Levi, 18/10/2026 (Plano & Fila, a linha da usina aberta): o preenchimento "não é completo nas células, parece que
+    aparece só no meio". A célula pendente da usina é um <button>, e o `font: inherit` dele zerava o line-height de 32 px:
+    o fundo ficava com 19 px no meio da célula de 34. O bloco da célula tem altura fixa (flex), seja span, link ou botão."""
+    from pathlib import Path
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
+    regra = css.split("\n.pg-cel{", 1)[1].split("}", 1)[0]
+    assert "display:flex" in regra and "height:32px" in regra and "box-sizing:border-box" in regra
+    botao = css.split("\nbutton.pg-cel{", 1)[1].split("}", 1)[0]
+    assert "height:32px" in botao.split("font:inherit", 1)[1] or "font:inherit" not in botao
+
+
+def test_de_onde_vem_os_dados_num_icone_a_direita(logado, com_fonte):
+    """Levi, 18/10/2026: os textos "Lê o gestao_pcm.json..." e "Prevista, criticidade e observação..." moram num ícone
+    do lado direito do topo, e aparecem ao clicar nele; a falha de verdade segue à vista."""
+    html = logado.get("/t/pcm/gestao?modo=fila").get_data(as_text=True)
+    topo = html.split('<div class="pcm-topo">', 1)[1].split("{# o PAR", 1)[0]
+    info = topo.split('<details class="pg-info">', 1)[1].split("</details>", 1)[0]
+    assert "Lê o gestao_pcm.json" in info and "Enquanto este Nexus não tem a chave" in info
+    assert "ph-warning-circle" in info and 'aria-label="De onde vêm os dados desta tela"' in info
+    assert html.count("Lê o gestao_pcm.json") == 1 and html.count("Enquanto este Nexus não tem a chave") == 1
+    assert 'class="pcm-fonte' not in html.split('<div class="pcm-topo">', 1)[1].split('<form class="pg-filtros"', 1)[0]
