@@ -19,6 +19,7 @@ RESUMO = {
     "ronda_avulsa": "Ronda lançada à mão no Nexus e o nível validado pela foto",
     "observacao_responsavel": "A observação do Responsável O&M sobre a usina, com dia e hora",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
+    "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
@@ -89,6 +90,12 @@ PARA_QUE = {
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
+    "acompanhamento_ativo": "Guarda o acompanhamento dos ativos que acenderam na Confiabilidade: quem da Engenharia "
+                            "pegou cada ativo (ou para quem foi encaminhado), o início e o fim da análise, o "
+                            "diagnóstico e cada comentário, com o dia e a hora. Serve para saber quem está olhando "
+                            "cada ativo e, com o tempo, quais diagnósticos se repetem por família, usina e cliente, "
+                            "quanto leva uma análise e se o ativo voltou a falhar depois dela. Quem e o texto vão "
+                            "cifrados; a tela Engenharia → Confiabilidade mostra.",
     "decisao": "Registra as decisões tomadas no painel do App de Campo: a aprovação de uma tarefa, o tratamento de um "
                "alerta da Central de atenção e a devolução de uma tarefa ao técnico. Serve para saber quem decidiu o "
                "quê, quando e sobre qual OS.",

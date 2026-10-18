@@ -132,3 +132,14 @@ def test_tela_de_confiabilidade(app, logado, monkeypatch):
         assert "Estatísticas" in ind and "Thopen" in ind and "Eventos (hist.)" in ind and 'class="eg-disp"' in ind
     finally:
         torre._CACHE.clear()
+
+
+def test_falhas_em_tem_so_as_que_contam_no_sinal_e_todo_o_periodo():
+    # o acompanhamento (18/10/2026) conta a falha nova pela MESMA regra do sinal: corretiva e corretiva emergencial,
+    # sem o serviço registrado como corretiva; e de todo o período lido, não só dos 30 dias (um acompanhamento dura mais)
+    linhas = [_os("IBI200-INVR1.3", 40), _os("IBI200-INVR1.3", 2, tipo="Religamento"),
+              _os("IBI200-INVR1.3", 3, tarefa="Limpeza do inversor"), _os("IBI200-INVR1.3", 1),
+              _os("IBI200-INVR1.3", 5, tipo="Corretiva Emergencial")]
+    f = C.calcular(linhas, _onde, AGORA)["falhasEm"]["IBI200-INVR1.3"]
+    assert [(AGORA - x["quando"]).days for x in f] == [40, 5, 1]
+    assert f[0]["tipo"] == "Corretiva" and f[1]["tipo"] == "Corretiva Emergencial" and f[2]["os"] == "IBI200-INVR1.3-1"

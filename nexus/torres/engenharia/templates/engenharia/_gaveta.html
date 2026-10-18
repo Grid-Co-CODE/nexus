@@ -1,0 +1,90 @@
+{# A gaveta de um ativo da Confiabilidade. Desde 18/10/2026 traz o acompanhamento (quem acompanha, início e fim da
+   análise, diagnóstico, comentários, o aviso de falha nova e os acompanhamentos anteriores; desenho em
+   docs/superpowers/specs/2026-10-18-engenharia-acompanhamento-design.md). A MESMA peça vai na página (um <template> por
+   cartão) e na resposta de cada ação, para a gaveta gravar sem sair dela.
+   Variáveis: gv ({a, acomp, novas, anteriores, falhas_dias}), niveis, pode, meu, pessoas, diags_ativos, diag_nome,
+   meta, janela, h, pct, hoje, piso, erro_leitura; aviso, erro e digitado (o que a pessoa tinha digitado, que volta
+   preenchido na recusa e no banco fora) só na resposta de uma ação. Sem macro da página: a resposta não a tem. #}
+{% set a = gv.a %}{% set ac = gv.acomp %}{% set dg = digitado or {} %}{% set em_salvar = dg.get('form') == 'salvar' %}
+{% macro encaminhar(cod, atual, livre=false) %}<details class="eg-encaminhar" data-eg-encaminhar>
+  <summary class="gc-btn gc-btn--contorno">Encaminhar</summary>
+  {% if pessoas %}<form class="eg-encaminhar-form" data-eg-form="encaminhar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_encaminhar') }}">
+    <input type="hidden" name="cod" value="{{ cod }}">{% if livre %}<input type="hidden" name="livre" value="1">{% endif %}
+    <select name="para" class="gc-campo" required aria-label="Para quem da Engenharia"><option value="">Escolha a pessoa</option>{% for p in pessoas if p.hmac != atual %}<option value="{{ p.hmac }}">{{ p.nome }}{% if meu and p.hmac == meu %} (você){% endif %}</option>{% endfor %}</select>
+    <button type="submit" class="gc-btn gc-btn--primario">Encaminhar</button>
+  </form>{% else %}<p class="mudo eg-encaminhar-vazio">Ninguém do setor Engenharia para receber agora (o setor de cada pessoa fica em Base → Integração Fracttal).</p>{% endif %}
+</details>{% endmacro %}
+{% macro comentarios(lista) %}<ol class="eg-acomp-tl">{% for c in lista %}<li><span class="q">{{ c.quando_txt }} · {{ c.nome or '—' }}</span>{{ c.texto }}</li>{% else %}<li class="mudo">Nenhum comentário ainda.</li>{% endfor %}</ol>{% endmacro %}
+<div class="eg-gav-cab">{% for k, rot, cor in niveis if k == a.get('nivel') %}<span class="eg-pill eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}<div><h2>{{ a.get('nome') or a.get('cod') }}</h2><p><code>{{ a.get('cod') }}</code>{% if a.get('usina') %} · {{ a.usina }}{% if a.get('uf') %} - {{ a.uf }}{% endif %}{% endif %}{% if a.get('cliente') %} · {{ a.cliente }}{% endif %}</p></div></div>
+{% if aviso %}<p class="eg-acomp-msg eg-acomp-msg--ok" role="status">{{ aviso }}</p>{% endif %}
+{% if erro %}<p class="eg-acomp-msg eg-acomp-msg--erro" role="alert">{{ erro }}</p>{% endif %}
+<div class="eg-gav-kpis">
+  <div><span class="v">{{ h(a.get('mtbf')) }}</span><span class="n">MTBF</span></div>
+  <div><span class="v">{{ h(a.get('mttr')) }}</span><span class="n">MTTR</span></div>
+  <div><span class="v cn-t-{{ 'ok' if (a.get('disp') or 0) >= meta else 'critico' }}">{{ pct(a.get('disp')) }}</span><span class="n">Disponibilidade</span></div>
+  <div><span class="v">{{ a.get('n') if a.get('n') is not none else '—' }}</span><span class="n">falhas desde 20/10/2025</span></div>
+</div>
+
+{% if ac and ac.aberto %}
+<section class="eg-acomp" data-eg-acomp="{{ ac.id }}">
+  <h3 class="eg-acomp-tit">Acompanhamento <span class="eg-pill eg-pill--info">em andamento</span></h3>
+  <div class="eg-acomp-dono"><span>Com <b>{{ ac.responsavel.nome or 'alguém' }}</b>{% if meu and ac.responsavel.hmac == meu %} (você){% endif %} desde {{ ac.com_desde.strftime('%d/%m/%Y %H:%M') if ac.com_desde else '—' }}{% if ac.encaminhado_por %} · encaminhado por {{ ac.encaminhado_por }}{% endif %}</span>
+    {% if pode %}{{ encaminhar(ac.cod, ac.responsavel.hmac) }}{% endif %}</div>
+  {% if gv.novas %}<div class="eg-acomp-aviso"><b>{{ gv.novas|length }} {{ 'falha nova' if gv.novas|length == 1 else 'falhas novas' }} desde que entrou:</b> {% for x in gv.novas %}OS {{ x.os }}, {{ x.tipo|lower }}, {{ x.dia }}{{ '; ' if not loop.last }}{% endfor %}.</div>{% endif %}
+  {% if pode %}
+  <form class="eg-acomp-campos" data-eg-form="salvar" data-falhas="{{ gv.falhas_dias|join(',') }}" method="post" action="{{ url_for('torre_engenharia.acompanhamento_salvar', aid=ac.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}">
+    <label><span class="gc-rotulo">Início da análise</span><input class="gc-campo" type="date" name="inicio" required value="{{ dg.get('inicio', '') if em_salvar else (ac.inicio.isoformat() if ac.inicio else '') }}" min="{{ piso }}" max="{{ hoje }}"></label>
+    <label><span class="gc-rotulo">Fim da análise</span><input class="gc-campo" type="date" name="fim" value="{{ dg.get('fim', '') if em_salvar else '' }}" min="{{ piso }}" max="{{ hoje }}"></label>
+    <label><span class="gc-rotulo">Diagnóstico</span>{% set diag_escolhido = (dg.get('diagnostico')|int(0)) if em_salvar else ac.diagnostico_id %}<select class="gc-campo" name="diagnostico"><option value="0"{% if not diag_escolhido %} selected{% endif %}>A definir</option>{% for x in diags_ativos %}<option value="{{ x.id }}"{% if x.id == diag_escolhido %} selected{% endif %}>{{ x.nome }}</option>{% endfor %}{% if ac.diagnostico_id and ac.diagnostico_id not in diags_ativos|map(attribute='id')|list %}<option value="{{ ac.diagnostico_id }}" selected>{{ diag_nome.get(ac.diagnostico_id, '—') }} (excluído)</option>{% endif %}</select></label>
+    <p class="eg-acomp-dica">Preencher o fim (com o diagnóstico) encerra o acompanhamento: o ativo vai para Encerrados.</p>
+    <p class="eg-acomp-volta" data-eg-volta hidden></p>
+    <button type="submit" class="gc-btn gc-btn--primario">Salvar</button>
+  </form>
+  {% else %}
+  <dl class="cn-dados eg-acomp-dados"><dt>Início da análise</dt><dd>{{ ac.inicio.strftime('%d/%m/%Y') if ac.inicio else '—' }}</dd>
+    <dt>Diagnóstico</dt><dd>{{ diag_nome.get(ac.diagnostico_id, 'a definir') }}</dd></dl>
+  {% endif %}
+  <h4 class="eg-acomp-sub">Comentários</h4>
+  {% if pode %}<form class="eg-acomp-coment" data-eg-form="comentar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_comentar', aid=ac.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}">
+    <textarea class="gc-campo" name="texto" rows="3" maxlength="2000" aria-label="Comentário" placeholder="Escreva o que viu, o que fez ou o que falta…">{{ dg.get('texto', '') if dg.get('form') == 'comentar' else '' }}</textarea>
+    <button type="submit" class="gc-btn gc-btn--primario">Salvar comentário</button>
+  </form>{% endif %}
+  {{ comentarios(ac.comentarios) }}
+</section>
+{% elif ac %}
+<section class="eg-acomp eg-acomp--fechado">
+  <h3 class="eg-acomp-tit">Acompanhamento <span class="eg-pill eg-pill--ok">Encerrado</span></h3>
+  <div class="eg-acomp-dono"><span><b>{{ ac.responsavel.nome or '—' }}</b> · análise {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }} → {{ ac.fim.strftime('%d/%m/%Y') if ac.fim else '—' }} · {{ diag_nome.get(ac.diagnostico_id, 'sem diagnóstico') }}</span></div>
+  <h4 class="eg-acomp-sub">Comentários</h4>
+  {{ comentarios(ac.comentarios) }}
+</section>
+{% elif erro_leitura %}
+{# sem ler o livro não se sabe se alguém acompanha: nada de "ninguém" nem de Pegar (revisão final) #}
+<div class="eg-acomp-sem"><span>Não consegui ler os acompanhamentos: não sei se alguém acompanha este ativo. Recarregue em instantes.</span></div>
+{% else %}
+<div class="eg-acomp-sem"><span>Ninguém acompanha este ativo.</span>
+  {% if pode %}<span class="eg-acomp-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ a.get('cod') }}"><button type="submit" class="gc-btn gc-btn--primario">Pegar para acompanhar</button></form>{{ encaminhar(a.get('cod'), '', true) }}</span>{% endif %}
+</div>
+{% endif %}
+
+{% if gv.anteriores %}
+<h3>Acompanhamentos anteriores</h3>
+<ul class="eg-ant">{% for x in gv.anteriores %}<li><details><summary><b>{{ x.inicio.strftime('%d/%m') if x.inicio else '—' }} → {{ x.fim.strftime('%d/%m/%Y') if x.fim else '—' }}</b> · {{ diag_nome.get(x.diagnostico_id, 'sem diagnóstico') }} · {{ x.responsavel.nome or '—' }} · {{ x.comentarios|length }} {{ 'comentário' if x.comentarios|length == 1 else 'comentários' }}</summary>{{ comentarios(x.comentarios) }}</details></li>{% endfor %}</ul>
+{% endif %}
+
+<h3>Por que acendeu</h3>
+{% if a.get('porQue') is not none %}<ul class="eg-porque">{% for p in a.porQue %}<li>{{ p }}</li>{% else %}<li>2 falhas em {{ janela }} dias</li>{% endfor %}</ul>
+{% else %}<p class="mudo">Sem sinal nos últimos {{ janela }} dias.</p>{% endif %}
+{% if a.get('fam') %}<dl class="cn-dados eg-gav-dados">
+  <dt>Família</dt><dd>{{ a.fam }} · criticidade {{ a.get('crit') }}{% if a.get('critVal') %} ({{ a.critVal }}){% endif %}</dd>
+  {% if a.get('cluster') %}<dt>Cluster</dt><dd>{{ a.cluster }}{% if a.get('equipe') %} · {{ a.equipe }}{% endif %}</dd>{% endif %}
+  {% if a.get('circuito') %}<dt>Circuito</dt><dd>{{ a.circuito }}</dd>{% endif %}
+  {% if a.get('mtbf') %}<dt>λ</dt><dd>{{ '%.1e'|format(1 / a.mtbf) }} falhas/h</dd>{% endif %}
+</dl>{% endif %}
+{% if a.get('os') %}<h3>As últimas OS ({{ a.os|length }} de {{ a.get('n30') }} em {{ janela }} dias)</h3>
+<ol class="eg-oss">{% for o in a.os %}
+  <li class="{{ 'eg-os-servico' if o.servico }}"><span class="eg-os-cab"><span class="m">{{ o.d }}</span>
+    {% if o.url %}<a class="cn-link m" href="{{ (o.url)|na_raiz }}" target="_blank" rel="noopener">OS {{ o.os }}</a>{% else %}<span class="m">OS {{ o.os }}</span>{% endif %}
+    <span>{{ o.tipo }}</span>{% if o.servico %}<span class="eg-tag eg-tag--info">serviço</span>{% endif %}<span class="mudo">{{ o.st }}</span></span>
+    <b>{{ o.t }}</b>{% if o.nota %}<span class="mudo">{{ o.nota }}</span>{% endif %}{% if o.quem %}<span class="eg-quem">{{ o.quem }}</span>{% endif %}</li>
+{% endfor %}</ol>{% endif %}

@@ -28,6 +28,9 @@ class ApiPGFalsa:
         self.criacoes = self.syncs = 0
         self.como_texto, self.perder = como_texto, perder
         self.tokens = []
+        # livros cujas abas a listagem (/api/sheets) deixa de fora, como se a API falhasse por um instante; o
+        # /api/workbooks continua dizendo quantas abas o livro tem (sheet_count, como a API real)
+        self.omitir = set()
 
     def _id(self, wb, aba):
         if (wb, aba) not in self.abas:
@@ -37,10 +40,11 @@ class ApiPGFalsa:
     def get(self, url, params=None, headers=None, timeout=None):
         if url.endswith("/api/workbooks"):
             self.tokens.append((headers or {}).get("Authorization"))
-            return Resposta(200, [{"key": k} for k in self.workbooks])
+            return Resposta(200, [{"key": k, "sheet_count": sum(1 for (wb, _a) in self.abas if wb == k)}
+                                  for k in self.workbooks])
         if url.endswith("/api/sheets"):
             return Resposta(200, [{"id": v["id"], "workbook_key": wb, "sheet_name": aba, "row_count": len(v["linhas"])}
-                                  for (wb, aba), v in self.abas.items()])
+                                  for (wb, aba), v in self.abas.items() if wb not in self.omitir])
         m = re.search(r"/api/sheets/(\d+)/rows$", url)
         aba = next(v for v in self.abas.values() if v["id"] == int(m.group(1)))
         ini, lim = int((params or {}).get("offset", 0)), int((params or {}).get("limit", 1000))

@@ -24,6 +24,8 @@ import re
 import statistics
 from datetime import datetime, timedelta, timezone
 
+from ..dados.equipamento import canon
+
 JANELA_DIAS = 30
 META_DISP = 0.85
 TIPOS_SINAL = {"corretiva", "corretiva emergencial"}
@@ -132,7 +134,17 @@ def calcular(linhas: list[dict], onde, agora: datetime | None = None) -> dict:
         por[cod].append(r)
 
     ativos = {}
+    # as falhas de cada ativo em todo o período lido, pela MESMA regra do sinal (corretiva e corretiva emergencial, sem
+    # o serviço registrado como corretiva): o acompanhamento da Engenharia (18/10/2026) conta a falha nova desde que o
+    # ativo entrou e depois do fim da análise, e um acompanhamento dura mais que os 30 dias. Chave: o código canônico
+    falhas_em = collections.defaultdict(list)
     for cod, rs in por.items():
+        for r in rs:
+            cr = _dt(r.get("creation_date"))
+            tipo = str(r.get("tasks_log_task_type_main") or "").strip()
+            if cr and tipo.lower() in TIPOS_SINAL and not RX_SERVICO.search(
+                    f"{r.get('description') or ''} {r.get('task_note') or ''}"):
+                falhas_em[canon(cod)].append({"quando": cr, "os": str(r.get("wo_folio") or ""), "tipo": tipo})
         r0 = max(rs, key=lambda r: str(r.get("creation_date") or ""))
         # sem o código e sem a marca ou o endereço que vêm depois de 2+ espaços (o limpa_ativo do PCM)
         nome = re.split(r"\s{2,}", RX_COD.sub("", str(r0.get("items_log_description") or "")).strip())[0] or cod
@@ -225,7 +237,8 @@ def calcular(linhas: list[dict], onde, agora: datetime | None = None) -> dict:
     familias = sorted(({"fam": f, **v, "p90": p90.get(f, 2)} for f, v in fams.items()), key=lambda x: -x["falhas"])
     return {"kpi": kpi, "p90": p90, "critDist": dict(crit_dist), "sinais": sinais, "familias": familias,
             "ativos": [{k: v for k, v in a.items() if k != "janela"} for a in confi], "semCodigo": sem_codigo,
-            "periodo": {"de": inicio_janela, "ate": agora}}
+            "periodo": {"de": inicio_janela, "ate": agora},
+            "falhasEm": {c: sorted(fs, key=lambda f: f["quando"]) for c, fs in falhas_em.items()}}
 
 
 def indicadores(ativos: list[dict], sinais: list[dict], por: str) -> list[dict]:

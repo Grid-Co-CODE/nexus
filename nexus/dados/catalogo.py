@@ -197,6 +197,25 @@ FATOS = (
          observacao="contestacao_linha_id liga à linha do thopen_contestacoes (o id dela, 1 contestação × 1 setor); "
                     "evento = responsavel (o responsável de agora é o do último) ou atualizacao. Quem (nome e e-mail) e "
                     "o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+    # o acompanhamento dos ativos com sinal da Confiabilidade (Levi, 18/10/2026: "os membros de engenharia ou
+    # administradores pegar aqueles ativos com sinal para acompanhar ou alguém da engenharia poder encaminhar para a
+    # pessoa ver!"). O Nexus é a FONTE; registrado antes da 1ª gravação
+    Fato("acompanhamento_ativo", "Acompanhamento dos ativos da Engenharia", "engenharia",
+         "nexus_engenharia_acompanhamento · fato_acompanhamento_ativo",
+         "1 linha = 1 evento (pegou, encaminhou, dados, comentario, encerrou) sobre 1 acompanhamento de 1 ativo",
+         _d(data=("id", "data_id (o dia de Brasília do evento); papéis data_id_inicio_analise e data_id_fim_analise"),
+            usina=("id", "usina_id (a ligação da Confiabilidade com o cadastro; usina_ligada_por)"),
+            equipamento=("id", "equipamento_id (o código do ativo)"),
+            pessoa=("cod", "pessoa_hmac (quem fez) e responsavel_hmac (quem acompanha)")),
+         tipo="transacao", chave=("id",),
+         medidas=_m((("falhas_30d_qtd", "qtd", "semi"), ("falhas_7d_qtd", "qtd", "semi"))),
+         fontes=("nexus_engenharia_acompanhamento · fato_acompanhamento_ativo",),
+         janela_origem="o Nexus é a fonte",
+         observacao="acompanhamento_id junta os eventos de um acompanhamento; quem acompanha é o do último pegou ou "
+                    "encaminhou; encerrou leva o fim e o diagnóstico (diagnostico_id aponta a aba dim_diagnostico do "
+                    "mesmo livro). As medidas são a foto do sinal na entrada, só no evento que começa (somam entre "
+                    "acompanhamentos, não no tempo de um ativo). Quem, o nome de quem acompanha e o texto só "
+                    "cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
          "ou Zeladoria)",
@@ -778,6 +797,14 @@ class Livro:
     quem_grava: str
     no_banco: bool             # já existe no banco (False = registrado antes de existir: regra 10)
     observacao: str = ""
+    # as abas que só crescem (18/10/2026): o livros.publicar recusa gravar se a listagem vier incompleta, se uma aba do
+    # banco ficar de fora ou se uma destas encolher. Vazio = livro sem trava (a carga, que encolhe pela janela da fonte);
+    # True = todas as abas do livro
+    so_cresce: tuple = ()
+
+    def __post_init__(self):
+        if self.so_cresce is True:
+            object.__setattr__(self, "so_cresce", tuple(self.abas))
 
 
 # Os livros que o NEXUS grava (regra 10: nome `nexus_<assunto>`, para sempre; registrar AQUI antes de criar).
@@ -824,17 +851,29 @@ LIVROS = (
           "a cada lançamento no Nexus; importação da validação por foto (só a pedido)",
           "nexus/campo/ronda_avulsa.py + ferramentas/importar_avulsas_planilha.py --gravar", True,
           "criado em 08/10/2026 pela importação da validação por foto: 63 linhas (origem validacao_foto, usina_id "
-          "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10"),
+          "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10",
+          so_cresce=True),
     Livro("nexus_contestacoes_tratamento", ("fato_tratamento_contestacao",),
           "a cada \"Pegar para mim\" e a cada atualização na tela Contestações",
           "nexus/contratos/tratamento.py, pela tela Contratos e clientes > Contestações", False,
-          "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega"),
+          "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega",
+          so_cresce=True),
+    Livro("nexus_engenharia_acompanhamento", ("dim_diagnostico", "fato_acompanhamento_ativo"),
+          "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
+          "Confiabilidade)",
+          "nexus/engenharia/acompanhamento.py, pela tela Engenharia > Confiabilidade", False,
+          "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª gravação (o 1º Pegar ou a 1ª "
+          "mudança no cadastro dos diagnósticos), com o cadastro inicial (Comunicação, Disjuntor). As duas abas "
+          "vão juntas a cada gravação, sobre o livro relido do banco",
+          so_cresce=True),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,
-          "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável"),
+          "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável",
+          so_cresce=True),
     Livro("nexus_pt_decisoes", ("fato_decisao_pt",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "o livro não existe no banco (GET em 11/10/2026): nenhuma decisão gravada. A aba era 'decisoes' até a "
-          "decisão 4 (11/10/2026), nunca gravada; o App lê a fato_decisao_pt"),
+          "decisão 4 (11/10/2026), nunca gravada; o App lê a fato_decisao_pt",
+          so_cresce=True),
     Livro("nexus_tempo_real", ("fato_decisao_cobertura",), "a cada decisão na tela Fontes do tempo real",
           "plataforma/cobertura.py (PerformancePainel), pela tela /admin/tempo-real da plataforma", True,
           "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
@@ -859,7 +898,8 @@ LIVROS = (
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
           "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
-          "1 minuto e relê o banco antes de cada gravação"),
+          "1 minuto e relê o banco antes de cada gravação",
+          so_cresce=True),
     Livro("nexus_estrutura_usina", ("dim_supervisorio", "dim_cabine", "dim_inversor", "aba_equipamentos"),
           "a cada ligação de chave e a cada Salvar da tela Equipamentos das usinas",
           "nexus/cadastro/estrutura_usina.py, pela tela Base > Equipamentos das usinas", False,
@@ -868,29 +908,34 @@ LIVROS = (
           "1 minuto e relê o banco antes de cada gravação. Quem mudou, só como HMAC (alterado_por_hmac). A aba "
           "aba_equipamentos é a VISÃO no formato da aba Equipamentos das chaves marcadas \"no lugar da aba\", refeita a "
           "cada gravação: a plataforma, o gêmeo, as Ligações e o coletor (quando ligado nele) trocam as linhas dessas "
-          "chaves por ela"),
+          "chaves por ela",
+          so_cresce=("dim_supervisorio", "dim_cabine", "dim_inversor")),
     Livro("nexus_setor_telas", ("fato_decisao_tela_setor",), "a cada Salvar da seção Telas por setor (Base > Acessos)",
           "nexus/auth/setor_telas.py, pela tela Base > Acessos", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º Salvar na tela; o portão de cada pedido e a "
-          "tela leem com cache de 1 minuto, e a gravação relê o banco antes"),
+          "tela leem com cache de 1 minuto, e a gravação relê o banco antes",
+          so_cresce=True),
     Livro("nexus_relatorio_setor", ("fato_decisao_dono_relatorio",),
           "a cada Salvar da seção Setor de cada relatório (Relatórios > Central de emissão)",
           "nexus/auth/dono_relatorio.py, pela Central de emissão", False,
           "registrado em 14/10/2026 antes de existir: nasce com o 1º Salvar; livro próprio porque gravar troca o livro "
           "inteiro (no nexus_setor_telas uma gravação apagaria a outra aba); o portão e a Central leem com cache de 1 "
-          "minuto, e a gravação relê o banco antes"),
+          "minuto, e a gravação relê o banco antes",
+          so_cresce=True),
     Livro("nexus_pcm_curadoria", ("fato_decisao_curadoria",),
           "a cada carga da curadoria do PCM (ferramentas/carregar_curadoria_pcm.py; a tela de edição vem depois)",
           "nexus/pcm/acompanhamento/curadoria.py", False,
           "registrado em 14/10/2026 antes de existir: nasce com a 1ª carga do arquivo do painel do PCM; o Acompanhamento "
-          "lê com cache de 2 minutos, e a gravação relê o banco antes (troca o livro inteiro)"),
+          "lê com cache de 2 minutos, e a gravação relê o banco antes (troca o livro inteiro)",
+          so_cresce=True),
     Livro("nexus_pcm_motivos", ("dim_motivo", "fato_decisao_motivo", "fato_decisao_backoffice"),
           "a cada marca de motivo (Quadro da semana e Fora da programação), a cada mudança no cadastro dos motivos e na "
           "lista do backoffice (Gerar a semana)",
           "nexus/pcm/motivos.py, pelas telas do PCM", False,
           "registrado em 16/10/2026 antes de existir: nasce com a 1ª gravação (o cadastro inicial, os 12 motivos do "
           "pedido do Levi, entra junto). As telas leem com cache de 1 minuto e a gravação relê o banco antes (troca o "
-          "livro inteiro, as três abas juntas)"),
+          "livro inteiro, as três abas juntas)",
+          so_cresce=True),
     # o login por pessoa do Dashboard Thopen (14/10/2026): o Nexus é a fonte das contas; a senha, o 5080 grava no livro
     # dele (thopen_acessos · senhas, em CONHECIDAS)
     Livro("nexus_acessos_clientes", ("dim_conta_cliente",), "a cada ação na tela Acessos dos clientes",
@@ -898,12 +943,14 @@ LIVROS = (
           "registrado em 14/10/2026 antes de existir: nasce com a 1ª conta criada na tela. 1 linha = 1 conta (o estado "
           "atual; o livro é trocado inteiro sob a trava, relido antes e conferido depois). Nome e e-mail só cifrados, "
           "duas vezes: dados_5080 (selado para a pública do Dashboard Thopen, que lê a cada 2 min) e dados_nexus "
-          "(Cofre, a chave do cadastro); o link de definir senha só como sha256; quem mudou só como HMAC"),
+          "(Cofre, a chave do cadastro); o link de definir senha só como sha256; quem mudou só como HMAC",
+          so_cresce=True),
     # os técnicos por usina (17/10/2026): o PCM põe e tira técnicos de cada usina; o App de Campo lê o executa daqui
     Livro("nexus_pcm_atribuicoes", ("fato_decisao_atribuicao",), "a cada decisão na tela Técnicos por usina",
           "nexus/pcm/atribuicoes.py, pela tela Técnicos por usina do PCM", False,
           "registrado em 17/10/2026 antes de existir: nasce com a 1ª decisão ou com a carga inicial (a regra da equipe "
-          "do cadastro). A tela lê com cache de 1 minuto e a gravação relê o banco antes (troca o livro inteiro)"),
+          "do cadastro). A tela lê com cache de 1 minuto e a gravação relê o banco antes (troca o livro inteiro)",
+          so_cresce=True),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.

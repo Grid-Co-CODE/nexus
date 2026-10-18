@@ -1,11 +1,101 @@
 # CLAUDE.md — torre Engenharia
 
-Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje só a
-**Confiabilidade** é tela de verdade; as outras caem no placeholder da casca.
+Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje são telas de verdade
+a **Mesa do engenheiro** (a primeira da torre, 18/10/2026), a **Confiabilidade** (com o **acompanhamento** dos ativos
+com sinal desde 18/10/2026) e o **Quadro da equipe**; as outras caem no placeholder da casca.
 
 Endereços nunca a partir da raiz (porta única, 09/10/2026: o Nexus pode rodar debaixo de `/nexus`, como no servidor até a fase 4): o link da OS na
 Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusRota` (regra das torres em
 `nexus/torres/CLAUDE.md`; o esquecimento quebra `tests/test_prefixo.py`).
+
+## Mesa do engenheiro (18/10/2026)
+
+O Levi escolheu, no rascunho aprovado, a primeira tela da Engenharia ("Sim, a primeira"), do setor Engenharia
+(`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos). Cada um vê a sua mesa ("Cada um vê a sua"), e só o
+administrador escolhe de quem ver (`?pessoa=<código>`; para os demais o parâmetro é ignorado). O administrador fora da
+Engenharia (o da Performance) não está na lista: a 1ª opção do seletor é "A sua mesa", escolhida quando ninguém da lista
+está, e a volta a ela; a mesa de outra pessoa diz o nome dela nos títulos e nos números ("Com <nome da pessoa>"), e sem pessoa
+escolhida (a senha de administrador) os dois números dela são "—". A rota é `/t/engenharia/mesa`
+(`mesa()` em `__init__.py`), o template é `templates/engenharia/mesa.html` e as classes são as `eg-mesa-*` em
+`engenharia.css`. Ela entra na `FORA` da pré-carga, porque lê as OS de falha ao abrir.
+- **Encaminhados para você:** o que outra pessoa passou e quem recebeu ainda não mexeu (Levi: "Até eu mexer nele"). Sai
+  quando a pessoa comenta ou salva (`respondeu` no `acompanhamento.estado`), e o mais antigo vem primeiro. Esses ativos
+  não aparecem de novo em "Com você".
+- **Com você:** os outros acompanhamentos abertos da pessoa, com falha nova primeiro, depois o nível.
+- **Críticos sem dono:** os da lista Ativos com sinal com nível crítico, com o Pegar e o Encaminhar ali mesmo.
+- **A faixa:** Encaminhados para você (âmbar quando há), Com você e Críticos sem dono (vermelho quando há), no modelo do
+  Acompanhamento de chamados (`kb-kpis`). Cada número é o da lista de mesmo nome (o encaminhado conta só na caixa: o
+  número diferente da lista é antiobjetivo do desenho). Sem ler o livro, os números dizem "—" e as listas dizem que não
+  leram; com as OS de falha lidas pela metade, os avisos são os da Confiabilidade e o número dos críticos é "—".
+- **O clique:** abre a mesma gaveta da Confiabilidade (`_gaveta.html`), com as mesmas ações e rotas. O JS da gaveta
+  mora em `static/engenharia-gaveta.js` (`egGaveta.ligar()`), e as duas telas o usam. Por isso a Confiabilidade também é
+  do setor Engenharia: o portão do setor pede a marca da tela dona da rota, e sem ela o Pegar da Mesa voltava HTTP 403.
+- **Como provar:** `python -m pytest -q tests/test_engenharia_mesa.py`.
+
+## Acompanhamento dos ativos com sinal (18/10/2026)
+
+Levi: "os membros de engenharia ou administradores pegar aqueles ativos com sinal para acompanhar ou alguém da
+engenharia poder encaminhar para a pessoa ver!" e "o que está sendo acompanhado sai de ativos com sinal e passam para em
+acompanhamento". É o começo de um ecossistema da Engenharia que depois vai aos outros setores ("vamos começar pelo setor
+de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho aprovado:
+`docs/superpowers/specs/2026-10-18-engenharia-acompanhamento-design.md` e `docs/mockups/engenharia-acompanhamento.html`.
+
+| Peça | Onde |
+|---|---|
+| Regras e o livro | `nexus/engenharia/acompanhamento.py` (o molde é o "Pegar para mim" das Contestações e o cadastro dos motivos do PCM) |
+| As falhas de cada ativo | `confiabilidade.calcular(...)["falhasEm"]` (pelo código canônico, todo o período, a regra do sinal) |
+| Tela e ações | `__init__.py` (`_gavetas_e_listas`, `_gaveta_de` e as rotas `confiabilidade/acompanhamento/*` e `confiabilidade/diagnosticos/*`), `templates/engenharia/confiabilidade.html` e `_gaveta.html`, classes `eg-acomp*`, `eg-cartao`, `eg-diag*` em `engenharia.css` |
+
+- **Abas:** Ativos com sinal · Em acompanhamento · Encerrados · Indicadores · Diagnósticos (esta só para quem age). O
+  ativo com acompanhamento aberto sai de Ativos com sinal; o encerrado também, e **só volta com falha nova** depois do
+  fim da análise (a partir do dia seguinte ao fim, no dia de Brasília), com a etiqueta "já acompanhado · <diagnóstico>
+  em <fim>". O painel ao lado e a faixa de números continuam sobre todos os ativos com sinal (descrevem a frota).
+- **Filtros:** os de hoje valem nas três listas; "Quem acompanha" (Em acompanhamento) e "Quem acompanhava" (Encerrados),
+  o parâmetro `quem` (o código da pessoa, nunca o nome). O nível é o de agora em Em acompanhamento e o da entrada em
+  Encerrados. Nenhum filtro entra sem o Levi pedir (o de diagnóstico ele não quis).
+- **Quem age** (pega, encaminha, salva, comenta, mexe no cadastro): o setor Engenharia (Base → Integração Fracttal; o
+  nome do setor, sem acento nem caixa) e o administrador, com login de pessoa: a senha de administrador não diz quem é, e
+  a ação é recusada. Quem só vê a tela lê tudo, sem botões. Encaminhar é só para pessoas do setor Engenharia (o nome vem
+  do pessoal do Fracttal). Qualquer um da Engenharia comenta e muda datas e diagnóstico (o Levi não quis "só quem
+  acompanha escreve"). Não há "soltar": quem pegou por engano encaminha ou encerra.
+- **Datas:** o início começa no dia do Pegar e pode mudar; o **fim é o dia em que a análise terminou**: preenchê-lo, com o
+  diagnóstico, encerra (não há outro botão). Fim antes do início ou depois de hoje, data fora do calendário ou antes de
+  20/10/2025 (`acompanhamento.PISO`, o começo das contas; revisão final: "0202-10-15" virava um data_id de 7 dígitos,
+  para sempre no livro) é recusado.
+  Encerrado fica só para ler e não reabre. Se o fim escolhido é anterior a uma falha, a gaveta avisa na hora (pelo
+  `data-falhas`) que o ativo volta para Ativos com sinal, só quando ele ainda tem o sinal de 30 dias (sem sinal, não
+  volta, e o aviso não vale).
+- **Diagnóstico:** o "A definir" da gaveta manda 0 e limpa o diagnóstico (o Levi, 18/10/2026; o histórico guarda a
+  troca); o vazio, que só a API manda, quer dizer "manter". Encerrar exige um diagnóstico escolhido. O nome e a descrição
+  do cadastro vão em claro e recusam e-mail ("@"), como o nome do setor.
+- **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
+  entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
+- **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
+  com o aviso ou o erro (`_gaveta.html`, a mesma peça da página); ao fechar depois de gravar, a página recarrega. O Pegar
+  do cartão também responde na gaveta. O ativo é casado pelo código canônico (`equipamento.canon`): o Fracttal e o livro
+  escrevem o mesmo ativo de jeitos diferentes. Da revisão final (18/10/2026), no molde do card das Contestações:
+  - a resposta passa por `static/engenharia-gaveta.js`: sessão vencida (o 302 do portão até o Entrar, ou o 401 do fim
+    da sessão do Fracttal) recarrega a página; HTTP de erro mostra a falha sem trocar a gaveta (o texto fica);
+  - a recusa e o banco fora devolvem o que foi digitado (o comentário, as datas e o diagnóstico escolhidos);
+  - página velha: o Pegar diz com quem o ativo já está (a regra 1), e o Encaminhar da gaveta que viu o ativo livre
+    (`livre=1`) não passa adiante o acompanhamento que outra pessoa abriu depois;
+  - livro ilegível: as abas Em acompanhamento e Encerrados dizem "—" (não 0), a gaveta não diz "Ninguém acompanha" nem
+    oferece o Pegar, a aba Diagnósticos não mostra o cadastro inicial; a cópia velha diz a hora da última leitura boa;
+  - "Com <pessoa> desde" é quando a pessoa recebeu o ativo (`com_desde`), não o começo do acompanhamento (`desde`);
+  - salvar e comentar conferem a origem antes de qualquer leitura do banco, e o código do ativo vem da própria gaveta;
+  - a conferência que falha DEPOIS da troca (`GravacaoErro`) não diz "Nada mudou": a troca já foi feita, e a gaveta pede
+    para conferir a lista antes de repetir.
+- **O dado:** livro `nexus_engenharia_acompanhamento` (`dim_diagnostico` e `fato_acompanhamento_ativo`, 1 linha = 1
+  evento), registrado no catálogo antes da 1ª gravação; regra em `nexus/dados/CLAUDE.md`. Nasce na 1ª gravação depois
+  do deploy (o 1º Pegar ou a 1ª mudança no cadastro dos diagnósticos), com o cadastro inicial (Comunicação, Disjuntor).
+  Com o livro no banco, o cadastro que não vem na releitura é leitura incompleta e a gravação é recusada
+  (`livros.existe`): o inicial tem as mesmas 2 linhas, passaria pela trava e desfaria o diagnóstico mexido (auditoria
+  da trava, 18/10/2026).
+  Quem, o nome de quem acompanha e o comentário só cifrados.
+- **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py tests/test_engenharia_gaveta_js.py`
+  (o livro, as regras, a separação das abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como
+  texto, o código com caixa e espaço, o comentário com HTML, o banco fora e cada achado da revisão final; o JS da
+  resposta, no node). A prova não grava no banco de verdade: o livro é para sempre.
 
 ## Quadro da equipe (06/10/2026)
 

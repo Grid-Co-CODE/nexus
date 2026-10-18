@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acompanhamento da Engenharia · rascunho 2 · Nexus</title>
+<!-- O rascunho 2 aprovado pelo Levi em 18/10/2026 (desenho: docs/superpowers/specs/2026-10-18-engenharia-acompanhamento-design.md). Dados de mentira. -->
+<style>body{margin:0;padding:16px;background:#0b1020;color:#e9eef6;font:400 14px/1.5 system-ui,"Segoe UI",sans-serif}h2{margin:8px 0 4px}h3{margin:22px 0 6px;font-size:15px}.subtitle{margin:0 0 8px;color:#96a0b4}</style>
+</head>
+<body>
+<style>
+.nx{--fundo:#090d18;--sup:#161d30;--sup2:#1c2640;--sup3:#243154;--tinta:#e9eef6;--tinta2:#c3cad7;--mudo:#96a0b4;
+  --linha:rgba(255,255,255,.09);--linhaf:rgba(255,255,255,.16);--verde:#a3d900;--sobre-verde:#191528;
+  --critico:#ff5b6e;--critico-s:rgba(255,91,110,.14);--alerta:#ffd83d;--alerta-s:rgba(255,216,61,.14);
+  --info:#7fb8ff;--info-s:rgba(91,157,255,.14);--ok:#4ade80;--ok-s:rgba(74,222,128,.14);
+  background:var(--fundo);color:var(--tinta);font:400 14px/1.5 Poppins,system-ui,"Segoe UI",sans-serif;
+  padding:18px;border-radius:14px;margin:8px 0 28px}
+.nx *{box-sizing:border-box}
+.nx-eyebrow{margin:0;font:700 11px/14px system-ui;letter-spacing:.08em;text-transform:uppercase;color:var(--verde)}
+.nx-h1{margin:2px 0 0;font:700 22px/1.3 system-ui}
+.nx-filtros{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.nx-f{display:grid;gap:3px;font:700 10px/13px system-ui;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta2)}
+.nx-f span{font:400 13px/18px system-ui;letter-spacing:0;text-transform:none;color:var(--tinta);background:var(--sup2);border:1px solid var(--linhaf);border-radius:8px;padding:6px 10px;min-width:96px}
+.nx-f.novo span{border:1px dashed var(--verde)}
+.nx-abas{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.nx-abas span{font:600 13.5px/18px system-ui;color:var(--tinta2);padding:8px 16px;border-radius:999px;border:1px solid var(--linhaf)}
+.nx-abas span.on{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.nx-abas i{font-style:normal;font-size:11.5px;padding:1px 7px;border-radius:999px;margin-left:4px;background:rgba(0,0,0,.18)}
+.nx-abas span.novo{border-style:dashed;border-color:var(--verde);color:var(--tinta)}
+.nx-painel{background:var(--sup);border:1px solid var(--linha);border-radius:14px;margin-top:14px;overflow:hidden}
+.nx-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--linha)}
+.nx-cab h2{margin:0;font:700 15px/1.3 system-ui}
+.nx-cab span{font-size:12px;color:var(--mudo)}
+.nx-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:6px 14px;padding:14px 16px;border-bottom:1px solid var(--linha)}
+.nx-item:last-child{border-bottom:0}
+.nx-item.on{background:var(--sup2);box-shadow:inset 3px 0 0 var(--verde)}
+.nx-pill{justify-self:start;align-self:start;display:inline-block;font:800 10.5px/16px system-ui;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.nx-pill.c{color:var(--critico);background:var(--critico-s);box-shadow:inset 0 0 0 1px var(--critico)}
+.nx-pill.a{color:var(--alerta);background:var(--alerta-s);box-shadow:inset 0 0 0 1px var(--alerta)}
+.nx-pill.i{color:var(--info);background:var(--info-s);box-shadow:inset 0 0 0 1px var(--info)}
+.nx-pill.ok{color:var(--ok);background:var(--ok-s);box-shadow:inset 0 0 0 1px var(--ok)}
+.nx-corpo{display:grid;gap:7px;min-width:0}
+.nx-tit{font-size:14.5px;line-height:1.35}
+.nx-tit b{font-weight:700}
+.nx-tit code{font:600 11.5px Consolas,monospace;color:var(--mudo);margin:0 4px}
+.nx-onde{font-size:13px;color:var(--tinta2)}
+.nx-tags{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.nx-tag{display:inline-block;font:600 11.5px/16px system-ui;padding:2px 8px;border-radius:6px;border:1px solid currentColor;white-space:nowrap}
+.nx-tag.c{color:var(--critico);background:var(--critico-s)}
+.nx-tag.a{color:var(--alerta);background:var(--alerta-s)}
+.nx-tag.i{color:var(--info);background:var(--info-s)}
+.nx-tag.n{color:var(--tinta2);border-color:var(--linhaf);background:var(--sup2)}
+.nx-tag.ok{color:var(--ok);background:var(--ok-s)}
+.nx-crit{font-weight:600;margin-right:4px}
+.nx-dir{display:grid;justify-items:end;gap:8px}
+.nx-n{display:grid;justify-items:end;gap:2px;white-space:nowrap}
+.nx-n b{font:800 26px/1 system-ui}
+.nx-n span{font-size:11.5px;color:var(--mudo)}
+.nx-acoes{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.nx-btn{display:inline-flex;align-items:center;font:600 12.5px/16px system-ui;padding:7px 12px;border-radius:8px;border:1px solid transparent;white-space:nowrap}
+.nx-btn.p{background:var(--verde);color:var(--sobre-verde)}
+.nx-btn.o{border-color:var(--linhaf);color:var(--tinta)}
+.nx-quem{font-size:12.5px;color:var(--tinta2)}
+.nx-quem b{color:var(--tinta)}
+.nx-ultimo{font-size:13px;color:var(--tinta2);border-left:3px solid var(--linhaf);padding-left:10px}
+.nx-ultimo span{color:var(--mudo);font-size:12px}
+.nx-nota{margin:10px 0 0;font-size:12.5px;color:var(--mudo)}
+/* a gaveta */
+.nx-cena{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,560px);gap:0;border-radius:14px;overflow:hidden;border:1px solid var(--linha)}
+.nx-atras{background:rgba(9,13,24,.55);padding:14px;opacity:.55}
+.nx-gav{background:var(--sup);border-left:1px solid var(--linhaf);padding:18px}
+.nx-gcab{display:flex;gap:12px;align-items:flex-start}
+.nx-gcab h2{margin:0;font:700 18px/1.3 system-ui}
+.nx-gcab p{margin:3px 0 0;font-size:13px;color:var(--tinta2)}
+.nx-gkpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--linha);border-radius:10px;overflow:hidden;margin-top:14px}
+.nx-gkpis div{background:var(--sup2);padding:10px 12px;display:grid;gap:2px}
+.nx-gkpis b{font:800 18px/1.1 system-ui}
+.nx-gkpis span{font:700 10px/13px system-ui;letter-spacing:.05em;text-transform:uppercase;color:var(--tinta2)}
+.nx-acomp{margin-top:16px;border:1px solid var(--verde);border-radius:12px;padding:14px;background:rgba(163,217,0,.05)}
+.nx-acomp h3{margin:0 0 10px;font:700 14px/1.3 system-ui;color:var(--tinta);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.nx-dono{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;background:var(--sup2);border-radius:10px;font-size:13px}
+.nx-aviso{margin-top:10px;padding:9px 12px;border-radius:10px;background:var(--critico-s);border:1px solid var(--critico);color:var(--tinta);font-size:13px}
+.nx-aviso b{color:var(--critico)}
+.nx-campos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.nx-campo{display:grid;gap:4px}
+.nx-rot{font:700 10.5px/14px system-ui;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta2)}
+.nx-in{background:var(--sup2);border:1px solid var(--linhaf);border-radius:8px;padding:8px 10px;font-size:13.5px;color:var(--tinta);min-height:36px}
+.nx-in.vazio{color:var(--mudo)}
+.nx-dica{margin:6px 0 0;font-size:12px;color:var(--mudo)}
+.nx-h3{margin:16px 0 8px;font:700 13px/1.3 system-ui;color:var(--tinta)}
+.nx-area{background:var(--sup2);border:1px solid var(--linhaf);border-radius:8px;padding:10px;font-size:13px;color:var(--mudo);min-height:56px}
+.nx-tl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.nx-tl li{display:grid;gap:2px;padding:9px 12px;background:var(--sup2);border-radius:10px;font-size:13px}
+.nx-tl .q{font-size:11.5px;color:var(--mudo)}
+.nx-ant{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.nx-ant li{padding:9px 12px;border:1px solid var(--linha);border-radius:10px;font-size:13px;color:var(--tinta2)}
+.nx-ant b{color:var(--tinta)}
+.nx-porque{margin:0;padding-left:18px;font-size:13px;color:var(--tinta2)}
+.nx-sem{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding:12px 14px;border:1px dashed var(--linhaf);border-radius:12px;font-size:13px;color:var(--tinta2)}
+@media (max-width:760px){
+  .nx-cena{grid-template-columns:minmax(0,1fr)}
+  .nx-atras{display:none}
+  .nx-gav{border-left:0}
+}
+@media (max-width:640px){
+  .nx-item{grid-template-columns:minmax(0,1fr)}
+  .nx-dir,.nx-n{justify-items:start}
+  .nx-acoes{justify-content:flex-start}
+  .nx-campos{grid-template-columns:minmax(0,1fr)}
+  .nx-gkpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+
+<h2>Rascunho 2 · o acompanhamento na gaveta do ativo</h2>
+<p class="subtitle">Com as suas respostas. Dados de mentira; as pessoas são "você", "Eng. B" e "Eng. C".</p>
+
+<h3>1 · As abas e os filtros</h3>
+<div class="nx">
+  <p class="nx-eyebrow">Engenharia · Confiabilidade</p>
+  <h1 class="nx-h1">Confiabilidade dos ativos</h1>
+  <div class="nx-filtros">
+    <label class="nx-f">Cliente<span>Todos</span></label>
+    <label class="nx-f">Usina<span>Todas</span></label>
+    <label class="nx-f">Família<span>Todas</span></label>
+    <label class="nx-f">Criticidade<span>Todas</span></label>
+    <label class="nx-f">Nível<span>Todos</span></label>
+    <label class="nx-f">Buscar<span>ativo, código, usina</span></label>
+    <label class="nx-f novo">Quem acompanha<span>Todos ▾</span></label>
+  </div>
+  <div class="nx-abas">
+    <span>Ativos com sinal <i>21</i></span>
+    <span class="on">Em acompanhamento <i>2</i></span>
+    <span class="novo">Encerrados <i>5</i></span>
+    <span>Indicadores</span>
+  </div>
+  <section class="nx-painel">
+    <div class="nx-cab"><h2>Em acompanhamento</h2><span>clique abre a gaveta do ativo</span></div>
+    <div class="nx-item on">
+      <span class="nx-pill c">Crítico</span>
+      <span class="nx-corpo">
+        <span class="nx-tit"><b>Inversor 1.3</b> <code>DEL400-INVR1.3</code> <span class="nx-onde">Usina Delta - GO</span></span>
+        <span class="nx-quem">Com <b>Eng. C</b> desde 16/10 · encaminhado por Eng. B · análise desde 16/10</span>
+        <span class="nx-tags"><span class="nx-tag i">Diagnóstico: Comunicação</span><span class="nx-tag n">3 comentários</span><span class="nx-tag c">1 falha nova desde que entrou</span></span>
+        <span class="nx-ultimo">"Datalogger perde o link à noite; trocar o cabo de rede na próxima visita." <span>· Eng. C, 17/10 09:12</span></span>
+      </span>
+      <span class="nx-dir"><span class="nx-n"><b>5</b><span>falhas quando entrou</span></span></span>
+    </div>
+    <div class="nx-item">
+      <span class="nx-pill a">Atenção</span>
+      <span class="nx-corpo">
+        <span class="nx-tit"><b>Tracker 7</b> <code>EPS500-TRK07</code> <span class="nx-onde">Usina Épsilon - SP</span></span>
+        <span class="nx-quem">Com <b>você</b> desde 17/10 · análise desde 17/10</span>
+        <span class="nx-tags"><span class="nx-tag n">Diagnóstico a definir</span><span class="nx-tag n">nenhum comentário</span></span>
+      </span>
+      <span class="nx-dir"><span class="nx-n"><b>3</b><span>falhas quando entrou</span></span></span>
+    </div>
+  </section>
+  <p class="nx-nota">"Quem acompanha" só nesta aba. Em <b>Ativos com sinal</b>, o ativo que voltou com falha nova depois de um acompanhamento traz a marca <span class="nx-tag n">já acompanhado · Disjuntor em 10/09</span>.</p>
+</div>
+
+<h3>2 · A gaveta de um ativo em acompanhamento</h3>
+<div class="nx">
+  <div class="nx-cena">
+    <div class="nx-atras"><p class="nx-nota">a lista fica atrás, esmaecida</p></div>
+    <div class="nx-gav">
+      <div class="nx-gcab"><span class="nx-pill c">Crítico</span><div><h2>Inversor 1.3</h2><p><code>DEL400-INVR1.3</code> · Usina Delta - GO · Cliente X</p></div></div>
+      <div class="nx-gkpis">
+        <div><b>466 h</b><span>MTBF</span></div><div><b>9,8 h</b><span>MTTR</span></div>
+        <div><b style="color:var(--critico)">71,2%</b><span>Disponibilidade</span></div><div><b>12</b><span>falhas desde 20/10/2025</span></div>
+      </div>
+
+      <div class="nx-acomp">
+        <h3>Acompanhamento <span class="nx-pill i">em andamento</span></h3>
+        <div class="nx-dono"><span>Com <b>Eng. C</b> desde 16/10/2026 14:20 · encaminhado por Eng. B</span><span class="nx-btn o">Encaminhar</span></div>
+        <div class="nx-aviso"><b>1 falha nova desde que entrou:</b> OS 41872, corretiva, 17/10.</div>
+        <div class="nx-campos">
+          <label class="nx-campo"><span class="nx-rot">Início da análise</span><span class="nx-in">16/10/2026</span></label>
+          <label class="nx-campo"><span class="nx-rot">Fim da análise</span><span class="nx-in vazio">dd/mm/aaaa</span></label>
+          <label class="nx-campo"><span class="nx-rot">Diagnóstico</span><span class="nx-in">Comunicação ▾</span></label>
+        </div>
+        <p class="nx-dica">Preencher o fim (com o diagnóstico) encerra o acompanhamento: o ativo vai para Encerrados.</p>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="nx-btn p">Salvar</span></div>
+        <h4 class="nx-h3">Comentários</h4>
+        <div class="nx-area">Escreva o que viu, o que fez ou o que falta…</div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="nx-btn p">Salvar comentário</span></div>
+        <ol class="nx-tl">
+          <li><span class="q">17/10/2026 09:12 · Eng. C</span>Datalogger perde o link à noite; trocar o cabo de rede na próxima visita.</li>
+          <li><span class="q">16/10/2026 18:03 · você</span>Vi o mesmo padrão na usina vizinha em setembro.</li>
+          <li><span class="q">16/10/2026 16:40 · Eng. C</span>As 5 OS são de inversor sem comunicação, todas com religamento remoto.</li>
+        </ol>
+      </div>
+
+      <h4 class="nx-h3">Acompanhamentos anteriores</h4>
+      <ul class="nx-ant"><li><b>02/09 → 10/09/2026</b> · Disjuntor · Eng. B · 2 comentários</li></ul>
+      <h4 class="nx-h3">Por que acendeu</h4>
+      <ul class="nx-porque"><li>5 falhas em 30 dias (crítico a partir de 4)</li><li>3 falhas em 7 dias</li></ul>
+      <h4 class="nx-h3">As últimas OS</h4>
+      <p class="nx-nota" style="margin-top:0">(a lista de hoje, sem mudança)</p>
+    </div>
+  </div>
+</div>
+
+<h3>3 · A gaveta de um ativo com sinal que ninguém pegou</h3>
+<div class="nx">
+  <div class="nx-gav" style="border:1px solid var(--linha);border-radius:14px">
+    <div class="nx-gcab"><span class="nx-pill c">Crítico</span><div><h2>Inversor 2.1</h2><p><code>ALF100-INVR2.1</code> · Usina Alfa - MG · Cliente Y</p></div></div>
+    <div class="nx-sem"><span>Ninguém acompanha este ativo.</span><span class="nx-acoes"><span class="nx-btn p">Pegar para acompanhar</span><span class="nx-btn o">Encaminhar</span></span></div>
+    <p class="nx-nota">Os mesmos dois botões ficam no cartão da lista. Pegar começa o acompanhamento com você e o início da análise em hoje; Encaminhar abre a lista das pessoas da Engenharia.</p>
+  </div>
+</div>
+
+<h3>4 · A aba Encerrados</h3>
+<div class="nx">
+  <section class="nx-painel" style="margin-top:0">
+    <div class="nx-cab"><h2>Encerrados</h2><span>o mais recente em cima · clique abre a gaveta</span></div>
+    <div class="nx-item">
+      <span class="nx-pill ok">Encerrado</span>
+      <span class="nx-corpo">
+        <span class="nx-tit"><b>QGBT</b> <code>GAM300-QGBT1</code> <span class="nx-onde">Usina Gama - BA</span></span>
+        <span class="nx-quem"><b>Eng. B</b> · análise 01/10 → 09/10/2026 · 4 comentários</span>
+        <span class="nx-tags"><span class="nx-tag i">Diagnóstico: Disjuntor</span><span class="nx-tag ok">sem falha nova desde o fim</span></span>
+      </span>
+      <span class="nx-dir"><span class="nx-n"><b>3</b><span>falhas quando entrou</span></span></span>
+    </div>
+    <div class="nx-item">
+      <span class="nx-pill ok">Encerrado</span>
+      <span class="nx-corpo">
+        <span class="nx-tit"><b>Inversor 2.1</b> <code>ALF100-INVR2.1</code> <span class="nx-onde">Usina Alfa - MG</span></span>
+        <span class="nx-quem"><b>você</b> · análise 20/09 → 28/09/2026 · 2 comentários</span>
+        <span class="nx-tags"><span class="nx-tag i">Diagnóstico: Comunicação</span><span class="nx-tag c">voltou com falha nova em 12/10</span></span>
+      </span>
+      <span class="nx-dir"><span class="nx-n"><b>4</b><span>falhas quando entrou</span></span></span>
+    </div>
+  </section>
+</div>
+</body>
+</html>
