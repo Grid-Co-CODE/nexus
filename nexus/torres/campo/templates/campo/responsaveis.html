@@ -9,9 +9,15 @@
    blocos (Performance e Acompanhamento), cada usina numa linha que abre o detalhe (<details>, sem script). #}
 {% set cor = {'agora': 'critico', 'critico': 'critico', 'atencao': 'alerta', 'ok': 'ok'} %}
 {% set fonte_nome = {'metas': 'a meta do mês', 'disp': 'a disponibilidade', 'ativos': 'os ativos da Confiabilidade',
-                     'chamados': 'os chamados', 'extintores': 'os extintores', 'pt': 'as PT'} %}
+                     'chamados': 'os chamados', 'extintores': 'os extintores', 'pt': 'as PT',
+                     'limpeza': 'a limpeza das rondas', 'paradas': 'as paradas abertas', 'manut': 'a manutenção'} %}
+{# 18/10/2026: a Limpeza no Acompanhamento e o 3º bloco, Manutenção (o modelo A: embaixo dos dois, na largura toda) #}
 {% set colunas = {'perf': (('meta', 'Meta'), ('pr', 'PR / prev.'), ('disp', 'Disp.')),
-                  'acomp': (('ronda', 'Ronda'), ('pt', 'PT'), ('chamados', 'Chamados'), ('extintores', 'Extintores'))} %}
+                  'acomp': (('ronda', 'Ronda'), ('limpeza', 'Limpeza'), ('pt', 'PT'), ('chamados', 'Chamados'),
+                            ('extintores', 'Extintores')),
+                  'manut': (('os', 'OS abertas'), ('atrasadas', 'Atrasadas'), ('vencem', 'Vencem até amanhã'),
+                            ('paradas', 'Paradas'), ('semana', 'Semana passada'), ('zeladoria', 'Zeladoria'))} %}
+{% set icone = {'perf': 'chart-line-up', 'acomp': 'clipboard-text', 'manut': 'wrench'} %}
 {% macro pct(x, casas=0) %}{{ '—' if x is none else ('%.*f'|format(casas, x))|replace('.', ',') ~ '%' }}{% endmacro %}
 {% macro c_meta(a) %}{{ 'cn-t-neutro' if a is none else ('cn-t-ok' if a >= limites.meta_ok else ('cn-t-alerta' if a >= limites.meta_atencao else 'cn-t-critico')) }}{% endmacro %}
 {% macro c_disp(x) %}{{ 'cn-t-neutro' if x is none else ('cn-t-ok' if x >= limites.disp_ok else ('cn-t-alerta' if x >= limites.disp_critico else 'cn-t-critico')) }}{% endmacro %}
@@ -29,6 +35,13 @@
   {% endif %}
   {% if not leitura.erro and 'chamados' not in erros and not (info.get('chamados') or {}).get('publicado') %}
   <div class="cn-erro cn-aviso" role="status"><b>Os chamados ainda não chegaram ao banco.</b> O Nexus publica as OS de acompanhamento de chamado de hora em hora (livro nexus_chamados); até lá, a coluna Chamados fica vazia.</div>
+  {% endif %}
+  {% set manut_i = info.get('manut') or {} %}
+  {% if not leitura.erro and 'manut' not in erros and not manut_i.get('publicado') %}
+  <div class="cn-erro cn-aviso" role="status"><b>As OS do Fracttal ainda não chegaram ao banco.</b> O Nexus lê as tarefas das OS do Fracttal de hora em hora (livro nexus_os); até lá, as colunas de OS e de zeladoria ficam vazias e nenhuma usina é cobrada por elas.</div>
+  {% endif %}
+  {% if ((estado_os or {}).get('ultimo') or {}).get('erro') %}
+  <div class="cn-erro cn-aviso" role="status"><b>A última leitura do Fracttal falhou{% if estado_os.quando %} às {{ estado_os.quando[11:16] }}{% endif %}</b> ({{ estado_os.ultimo.erro[:90] }}): nada foi gravado, e as OS da tela são as da leitura de {{ manut_i.get('gerado_em', '')[11:16] or 'antes' }}.</div>
   {% endif %}
 
   <form class="cn-filtros" method="get">
@@ -48,6 +61,16 @@
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, cidade ou equipe" aria-label="Buscar">
     {% if request.args.get('modo') %}<input type="hidden" name="modo" value="{{ request.args.get('modo') }}">{% endif %}
   </form>
+
+  {# a faixa "Parada agora" (18/10/2026; o painel próprio de um supervisor tinha a de "Usinas desligadas"): as OS de
+     parada ainda abertas nas usinas do filtro, a mais antiga primeiro (a disponibilidade do Gerencial, do Fracttal) #}
+  {% if faixa %}
+  <div class="cr-parada" role="status">
+    <b>Parada agora</b>
+    {% for u, p in faixa[:faixa_max] %}<span>{{ u.usina }} · {{ p.escopo }} · OS {{ p.os }} · desde {{ p.inicio }}</span>{% endfor %}
+    {% if faixa|length > faixa_max %}<span class="mudo">e mais {{ faixa|length - faixa_max }}</span>{% endif %}
+  </div>
+  {% endif %}
 
   {% if modo == 'cartoes' %}
   {# um cartão por Responsável O&M, com os dois blocos: quantas usinas pedem foco, acompanhamento ou podem esperar em
@@ -78,6 +101,15 @@
           <div><dt>Extintores vencidos</dt><dd{% if c.ext_vencidos %} class="cn-t-critico"{% endif %}>{{ c.ext_vencidos }}</dd></div>
         </dl>
       </div>
+      <div class="cr-card-bloco">
+        <div class="cr-card-tit"><span>Manutenção</span>{{ triagem_leg(c.manut) }}</div>
+        {{ triagem(c.manut) }}
+        <dl class="cr-mini">
+          <div><dt>Tarefas atrasadas</dt><dd>{{ c.atrasadas }}</dd></div>
+          <div><dt>Tarefas paradas</dt><dd>{{ c.tarefas_paradas }}</dd></div>
+          <div><dt>Semana passada</dt><dd>{{ pct(c.semana_pct, 0) }}</dd></div>
+        </dl>
+      </div>
       {% if c.pior %}<span class="cr-pior">Primeiro: {{ c.pior|join(', ') }}</span>{% endif %}
     </a>
     {% else %}
@@ -96,13 +128,30 @@
     {% for b, nome, txt, bl in blocos %}
     <section class="cr-bloco cr-bloco--{{ b }}" aria-labelledby="cr-{{ b }}">
       <header class="cr-cab">
-        <div class="cr-tit"><i class="ph ph-{{ 'chart-line-up' if b == 'perf' else 'clipboard-text' }}" aria-hidden="true"></i><h2 id="cr-{{ b }}">{{ nome }}</h2><p>{{ txt }}</p></div>
+        <div class="cr-tit"><i class="ph ph-{{ icone[b] }}" aria-hidden="true"></i><h2 id="cr-{{ b }}">{{ nome }}</h2><p>{{ txt }}</p></div>
+        {% if b == 'manut' %}
+        {# o limite das atrasadas é de quem olha (Levi, 18/10/2026: "o supervisor decide, começa com 30 dias mas pode
+           alterar"), guardado no navegador dele; os filtros da tela vão junto #}
+        <form class="cr-limite" method="get">
+          {% for k, v in request.args.items() if k != 'limite' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+          <label for="cr-limite">Focar tarefa atrasada há mais de</label>
+          <input class="gc-campo" id="cr-limite" type="number" name="limite" min="10" max="365" value="{{ limite }}">
+          <span>dias</span>
+          <button class="gc-btn gc-btn--contorno" type="submit">Aplicar</button>
+        </form>
+        <p class="cr-nota-bloco">A semana vem do arquivo do PCM, copiado para o banco de hora em hora{% if manut_i.get('semana_passada') %} (semana passada: {{ manut_i.semana_passada }}){% endif %}. As OS são lidas do Fracttal pelo Nexus{% if manut_i.get('gerado_em') %}, a última vez às {{ manut_i.gerado_em[11:16] }}{% endif %}.</p>
+        {% endif %}
         <div class="cr-resumo">
           {% if b == 'perf' %}
           <div><span class="r">Meta do mês</span><b class="{{ c_meta(resumo.meta_pct) }}">{{ pct(resumo.meta_pct, 1) }}</b><small>produção ÷ meta do grupo</small></div>
           <div><span class="r">Abaixo da meta</span><b>{{ resumo.abaixo_meta }}</b><small>usinas com menos de 97%</small></div>
           <div><span class="r">PR abaixo</span><b>{{ resumo.pr_abaixo }}</b><small>usinas abaixo do previsto</small></div>
           <div><span class="r">Disponibilidade</span><b class="{{ c_disp(resumo.disp) }}">{{ pct(resumo.disp, 1) }}</b><small>média do mês, pela potência</small></div>
+          {% elif b == 'manut' %}
+          <div><span class="r">OS abertas</span><b>{{ resumo.os_abertas }}</b><small>em processo e em verificação</small></div>
+          <div><span class="r">Tarefas atrasadas</span><b{% if resumo.atrasadas %} class="cn-t-alerta"{% endif %}>{{ resumo.atrasadas }}</b><small>programadas há mais de 10 dias</small></div>
+          <div><span class="r">Tarefas paradas</span><b>{{ resumo.tarefas_paradas }}</b><small>fora da programação</small></div>
+          <div><span class="r">Semana passada</span><b>{{ pct(resumo.semana_pct, 0) }}</b><small>do plano feito (meta de 85%)</small></div>
           {% else %}
           <div><span class="r">Rondas pendentes</span><b>{{ resumo.rondas }}</b><small>nunca, 7 dias ou mais, ou a longa</small></div>
           <div><span class="r">PT esperando</span><b{% if resumo.agora %} class="cn-t-critico"{% endif %}>{{ resumo.pts }}</b><small>{{ resumo.agora }} parada{{ 's' if resumo.agora != 1 }} hoje</small></div>
@@ -129,7 +178,8 @@
               <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
               {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">{{ 'ver os ativos' if jan == 'ativos' else 'dia a dia' }}</button>{% endif %}
               {# a OS da PT abre a PT por cima, para aprovar sem sair da tela (Levi, 12/10/2026) #}
-              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
+              {# a OS da Manutenção abre o card dela no Nexus (o do OS Creator), como a Gestão PCM: `os_card` #}
+              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% elif it.get('os_card') %}<button type="button" class="cn-link cr-os cr-link-botao" data-wid="{{ it.os_card.wid or '' }}" data-folio="{{ it.os_card.folio }}" title="Abrir o card da OS">{{ it.forte }}</button>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
               {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
           </dl>
           <div class="cr-links">
@@ -149,7 +199,7 @@
   <div class="cn-nota">
     <b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
     dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.
-    {% for b, nome in (('perf', 'Performance'), ('acomp', 'Acompanhamento')) %}
+    {% for b, nome, _txt, _bl in blocos %}
     <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
     {% endfor %}
     Responsável O&amp;M é o da ficha da usina no cadastro (o mesmo da Central de atenção); só usina mobilizada. Fonte sem
@@ -169,7 +219,17 @@
     <div class="cr-modal-corpo"></div>
   </dialog>
 </div>
+{% include "oscreator/card_os_abrir.html" %}
 <script>
+// a OS do bloco Manutenção abre o card dela por cima (18/10/2026), sem sair da Visão: pelo id do Fracttal quando o fato
+// tem, senão pelo número (o clone acha o id)
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest('.cr-os');
+  if (!b || !window.NexusOsCard) { return; }
+  ev.preventDefault(); ev.stopPropagation();
+  var wid = b.getAttribute('data-wid'), folio = b.getAttribute('data-folio');
+  if (wid) { NexusOsCard.abrir(wid, {status: '', folio: folio}); } else { NexusOsCard.abrirFolio(folio, {status: ''}); }
+});
 (function () {
   var dlg = document.getElementById('cr-modal');
   if (!dlg) { return; }

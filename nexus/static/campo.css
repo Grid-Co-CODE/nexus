@@ -651,7 +651,20 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 .cr-cab .cr-tri-leg{margin-top:-4px}
 .cr-g{display:grid;align-items:center;gap:10px}
 .cr-bloco--perf .cr-g{grid-template-columns:minmax(0,1fr) 62px 104px 72px 14px}
-.cr-bloco--acomp .cr-g{grid-template-columns:minmax(0,1fr) 96px 100px 76px 98px 14px}
+/* 18/10/2026: a Limpeza entra no Acompanhamento (as colunas apertam um pouco para o nome da usina caber a 1366 px) */
+.cr-bloco--acomp .cr-g{grid-template-columns:minmax(0,1fr) 84px 60px 92px 76px 92px 14px}
+/* o 3º bloco, Manutenção (o modelo A do Levi, 18/10/2026): embaixo dos dois, na largura toda */
+.cr-bloco--manut{grid-column:1 / -1}
+.cr-bloco--manut .cr-g{grid-template-columns:minmax(0,1fr) 84px 104px 112px 150px 104px 112px 14px}
+@media (max-width:1180px){.cr-bloco--manut .cr-g{grid-template-columns:minmax(0,1fr) 70px 90px 90px 120px 90px 100px 14px}}
+.cr-limite{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:12.5px;color:var(--mudo)}
+.cr-limite input{width:72px}
+.cr-nota-bloco{margin:0;font-size:12px;color:var(--mudo)}
+/* a faixa "Parada agora": as OS de parada abertas nas usinas do filtro, acima dos blocos */
+.cr-parada{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-top:16px;padding:10px 16px;font-size:13px;
+  border:1px solid var(--critico-a35);border-left:4px solid var(--critico);border-radius:var(--raio-md);
+  background:var(--critico-suave)}
+.cr-parada b{color:var(--critico);font-weight:700}
 .cr-cols{padding:9px 16px;font:700 10px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);
   border-bottom:1px solid var(--linha)}
 .cr-lin{border-bottom:1px solid var(--linha)}
@@ -700,7 +713,11 @@ button.cr-v--neutro{background:transparent}
   .cr-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
   .cr-bloco--perf .cr-g{grid-template-columns:minmax(0,1fr) 52px 60px 62px 12px}
   .cr-bloco--acomp .cr-g{grid-template-columns:minmax(0,1fr) 70px 70px 12px}
-  .cr-bloco--acomp .cr-col-chamados,.cr-bloco--acomp .cr-col-extintores{display:none}
+  .cr-bloco--acomp .cr-col-limpeza,.cr-bloco--acomp .cr-col-chamados,.cr-bloco--acomp .cr-col-extintores{display:none}
+  /* no celular a Manutenção fica com as atrasadas e as paradas; o resto está no detalhe da linha */
+  .cr-bloco--manut .cr-g{grid-template-columns:minmax(0,1fr) 70px 70px 12px}
+  .cr-bloco--manut .cr-col-os,.cr-bloco--manut .cr-col-vencem,.cr-bloco--manut .cr-col-semana,
+  .cr-bloco--manut .cr-col-zeladoria{display:none}
   .cr-v small,.cr-u small{display:none}
   .cr-dl,.cr-reguas{grid-template-columns:minmax(0,1fr)}
   .cr-det{padding-left:16px}

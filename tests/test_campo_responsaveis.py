@@ -515,3 +515,130 @@ def test_paradas_abertas_de_todas_as_usinas(tela):
                                                "codigo": "THPN-ALT100-INVR1", "inicio": f"02/{MES[5:7]} 08:00",
                                                "_ini": f"{MES}-02T08:00:00"}]
     assert u["Brodowski 1"]["paradas_abertas"] == [] and u["Coração 1"]["paradas_abertas"] == []
+
+
+# ── O bloco Manutenção (18/10/2026, Levi: o que o supervisor tinha no painel próprio, "pegando tudo do Fracttal ou
+# Nexus"): as tarefas das OS (`nexus_os`), as paradas abertas, o limite das atrasadas de quem olha (cookie) ───────────
+def _did(d):
+    return d.year * 10000 + d.month * 100 + d.day
+
+
+def _tarefa(tid, os_, usina, dias_atras, tipo="corretiva", status="em_processo", estado="nao_iniciada"):
+    """Uma linha do fato `nexus_os · fato_tarefa_os`, como o laço do Campo grava."""
+    from nexus.dados import fatos as D
+    return {"fracttal_tarefa_id": tid, "os": os_, "fracttal_os_id": 50000 + os_,
+            "tarefa_chave": D.tarefa_chave("troca de fusivel"), "codigo_ativo": "THPN-ALT100-INVR1",
+            "equipamento_id": None, "equipamento_ligado_por": None, "usina_id": usina,
+            "usina_ligada_por": "de-para do Fracttal", "site_fracttal": "Thopen - X - SP", "data_id_criacao": None,
+            "data_id_programada": _did(HOJE - timedelta(days=dias_atras)), "data_id_fim": None, "tipo_tarefa": tipo,
+            "status_os": status, "estado_tarefa": estado, "do_backoffice": 0, "duracao_min": None}
+
+
+@pytest.fixture
+def manut(tela):
+    _aba(tela, "nexus_os", "fato_tarefa_os", [
+        _tarefa(1, 901, 2, 31),             # Brodowski 1: atrasada há 31 dias, acima do limite padrão (30)
+        _tarefa(2, 902, 3, 12)])            # Coração 1: atrasada há 12 dias, abaixo do limite
+    _aba(tela, "nexus_os", "qualidade", [{"fato": "tarefa_os", "gerado_em": f"{HOJE.isoformat()}T09:10:00-03:00"}])
+    visao.limpar()
+    return tela
+
+
+def _bloco_manut(html):
+    return html[html.index('id="cr-manut"'):html.index('class="cn-nota"')]
+
+
+def _nivel_da_linha(trecho, usina):
+    i = trecho.index(usina)
+    ini = trecho.rindex('<details class="cr-lin cr-lin--', 0, i) + len('<details class="cr-lin cr-lin--')
+    return trecho[ini:trecho.index('"', ini)]
+
+
+def _com_manut(limite=30):
+    return {u["usina"]: u for u in R.com_manutencao(R.visao_responsaveis().dados["usinas"], limite)}
+
+
+def test_o_bloco_manutencao_na_tela(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert html.index('id="cr-acomp"') < html.index('id="cr-manut"')
+    bloco = _bloco_manut(html)
+    for rot in ("OS abertas", "Atrasadas", "Vencem até amanhã", "Paradas", "Semana passada", "Zeladoria"):
+        assert rot in bloco, rot
+    assert "A semana vem do arquivo do PCM" in bloco
+    assert _nivel_da_linha(bloco, "Brodowski 1") == "critico" and _nivel_da_linha(bloco, "Coração 1") == "atencao"
+    u = _com_manut()
+    assert u["Brodowski 1"]["manut"]["valores"]["atrasadas"]["cls"] == "critico"
+    assert u["Coração 1"]["manut"]["valores"]["atrasadas"]["cls"] == "alerta"
+
+
+def test_o_limite_muda_o_nivel_e_fica_no_cookie(manut, logado):
+    r = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&limite=45")
+    assert "nexus_resp_limite=45" in r.headers.get("Set-Cookie", "")
+    assert _nivel_da_linha(_bloco_manut(r.get_data(as_text=True)), "Brodowski 1") == "atencao"
+    # o pedido seguinte, sem o parâmetro, segue com o limite do cookie
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert 'name="limite"' in html and 'value="45"' in html
+    assert _nivel_da_linha(_bloco_manut(html), "Brodowski 1") == "atencao"
+
+
+def test_limite_do_cookie_com_lixo(manut, logado):
+    assert [R.limite_do_pedido(v) for v in ("abc", "", None, "0", "-5", "9999", "45", " 60 ")] == [
+        30, 30, 30, 10, 10, 365, 45, 60]
+    logado.set_cookie("nexus_resp_limite", "abc")
+    r = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco")
+    assert r.status_code == 200 and 'value="30"' in r.get_data(as_text=True)
+
+
+def test_parada_aberta_poe_em_focar_e_na_faixa_respeitando_o_filtro(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    faixa = html[html.index('class="cr-parada"'):]
+    faixa = faixa[:faixa.index("</div>")]
+    assert "Altair" in faixa and "13002" in faixa and "Inversor 1" in faixa
+    altair = _com_manut()["Altair"]["manut"]
+    assert altair["nivel"] == "critico" and altair["tag"] == ("critico", "parada")
+    # o filtro de outro responsável: a faixa não mostra a Altair
+    html = logado.get("/t/campo/responsaveis?responsavel=Beltrano+Supervisor&modo=foco").get_data(as_text=True)
+    assert 'class="cr-parada"' not in html
+
+
+def test_sem_o_fato_a_tela_avisa_e_nao_cobra(tela, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert "As OS do Fracttal ainda não chegaram ao banco" in html
+    u = _com_manut()
+    assert u["Brodowski 1"]["manut"]["nivel"] == u["Coração 1"]["manut"]["nivel"] == "ok"
+
+
+def test_a_tela_diz_que_a_leitura_falhou(manut, logado, monkeypatch):
+    from nexus.campo import tarefas_os
+    monkeypatch.setattr(tarefas_os, "estado", lambda: {"ultimo": {"erro": "LeituraIncompleta: o Fracttal recusou"},
+                                                       "quando": f"{HOJE.isoformat()}T10:10-03:00"})
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+    assert "A última leitura do Fracttal falhou" in html and "09:10" in html
+
+
+def test_os_do_detalhe_abre_o_card_e_nao_a_pt(manut, logado):
+    bloco = _bloco_manut(logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True))
+    assert 'data-wid="50901"' in bloco and "cr-os" in bloco
+    assert "/t/campo/responsaveis/pt/" not in bloco
+
+
+def test_tarefa_com_motivo_sai_das_atrasadas_e_vai_para_paradas(manut, tmp_path):
+    from flask import current_app
+    from nexus.pcm import motivos as M
+    cfg = current_app.config
+    cfg["NEXUS_PCM_MOTIVOS_ARQUIVO"] = str(tmp_path / "motivos.json")
+    M.limpar()
+    mid = next(m["id"] for m in M.ativos(M.ler(cfg, forcar=True)) if m["nome"] == "Aguardando material")
+    M.marcar(cfg, {"os": "901", "codigo": "THPN-ALT100-INVR1", "tarefa": "Troca de fusível",
+                   "usina": "Thopen - Brodowski 1 - SP", "cliente": "Thopen", "tipo": "Corretiva"}, mid, "",
+             {"email": "pessoa@exemplo.test", "nome": "Pessoa Fictícia"})
+    visao.limpar()
+    m = _com_manut()["Brodowski 1"]["manutencao"]
+    assert (m["atrasadas"], m["paradas"], m["motivo_comum"]) == (0, 1, "Aguardando material")
+    M.limpar()
+
+
+def test_cartoes_com_os_tres_blocos(manut, logado):
+    html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*").get_data(as_text=True)
+    cartoes = html[html.index('class="cn-equipes"'):html.index('class="cn-nota"')]
+    assert cartoes.count("<span>Manutenção</span>") == 2
