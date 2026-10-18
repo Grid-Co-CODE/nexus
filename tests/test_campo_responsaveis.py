@@ -4,7 +4,9 @@ Acompanhamento, linha que abre o detalhe, extintores no acompanhamento e "só ti
 Banco falso do test_campo_visao: a Altair e a Brodowski 1 são do responsável 91 (Ciclano Chefe) e a Coração 1 do 90
 (Beltrano Supervisor). Por cima: a meta do mês (Gerencial publicado), o diário da disponibilidade, os chamados no banco
 (`nexus_chamados`), os extintores do App e os sinais da Confiabilidade (dublados: nada vai ao Fracttal)."""
+import re
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from test_campo_visao import USINAS, _aba, _dia, _ronda, banco  # noqa: F401  (banco é fixture)
@@ -830,6 +832,74 @@ def test_o_filtro_de_cliente_muda_o_ranking(tela, logado):
     assert "SP Norte 01" in grade and "SC Oeste 01" not in grade              # a Coração 1 é de outro cliente
 
 
+# ── A Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que
+# filtram as usinas em atenção daquele bloco ao clicar) ───────────────────────────────────────────────────────────
+def test_os_filtros_da_visao_geral_contam_como_o_resumo(manut):
+    """Cada filtro da Visão geral usa a condição que conta o número no resumo (`soma`): nenhuma régua nova."""
+    lista = list(_com_manut().values())
+    s = R.soma("Todos", lista)
+
+    def n(k):
+        return len(R.filtrar_geral(lista, k))
+    assert n("perf.abaixo_meta") == s["abaixo_meta"] and n("perf.pr_abaixo") == s["pr_abaixo"]
+    assert n("acomp.rondas") == s["rondas"]
+    assert n("acomp.pts") == sum(1 for u in lista if u["pt"]["aguardando"])
+    assert n("manut.atrasadas") == sum(1 for u in lista if (u.get("manutencao") or {}).get("atrasadas")) == 2
+    for b in ("perf", "acomp", "manut"):
+        assert n(b) == s[b]["critico"] + s[b]["atencao"]
+        assert n(f"{b}.critico") == s[b]["critico"] and n(f"{b}.atencao") == s[b]["atencao"]
+
+
+def test_filtro_da_visao_geral_com_lixo_e_ignorado():
+    assert [R.filtro_geral(v) for v in ("manut.atrasadas", "", None, "manut.", "x" * 500, "perf.critico")] == [
+        "manut.atrasadas", None, None, None, None, "perf.critico"]
+    assert R.filtrar_geral([{"usina": "A"}], None) == [{"usina": "A"}]
+
+
+def test_a_visao_geral_mostra_os_tres_blocos_e_a_lista_unica(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert 'aria-current="page">Visão geral' in html
+    geral = html[html.index('class="cr-gr"'):]
+    for b in ("Performance", "Acompanhamento", "Manutenção"):
+        assert b in geral
+    assert geral.count('class="cr-gr-lin') == len(_com_manut())          # todas as usinas, uma linha cada
+    assert re.search(r'filtro=manut\.atrasadas(&|")', geral)              # o número vira link
+
+
+def test_o_clique_no_numero_filtra_a_lista(manut, logado):
+    total = len(_com_manut())
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=manut.atrasadas").get_data(as_text=True)
+    geral = html[html.index('class="cr-gr"'):]
+    assert geral.count('class="cr-gr-lin') == 2                          # as duas usinas com tarefa atrasada
+    estado = geral[geral.index('class="cr-gr-estado"'):][:600]
+    assert f"2 de {total} usinas" in estado and "Tarefas atrasadas" in estado
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=nada").get_data(as_text=True)
+    assert html.count('class="cr-gr-lin') == total                       # filtro que não existe: sem filtro
+
+
+def test_filtro_sem_usina_diz_e_deixa_limpar(manut, logado):
+    # nenhuma tarefa com motivo no fixture: Tarefas paradas é zero
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=manut.paradas").get_data(as_text=True)
+    assert "Nenhuma usina com esse filtro" in html and 'class="cr-gr-limpar"' in html
+    blocos = html.split('class="cr-gr-blocos"')[1].split('class="cr-gr-estado"')[0]
+    assert not re.search(r'filtro=manut\.paradas(&|")', blocos)          # número zero não é link
+
+
+def test_quem_entra_pelo_fracttal_ve_so_as_usinas_dele_na_visao_geral(manut, cliente):
+    """Como em Onde focar: o responsável que entrou pelo Fracttal vê as usinas dele."""
+    _responsavel(cliente)
+    html = cliente.get("/t/campo/responsaveis?modo=geral").get_data(as_text=True)
+    dele = [u for u in _com_manut().values() if u.get("responsavel") == "Beltrano Supervisor"]
+    assert 'aria-current="page">Visão geral' in html
+    assert html.count('class="cr-gr-lin') == len(dele) > 0
+
+
+def test_o_cabecalho_e_as_colunas_ficam_no_centro():
+    """Levi, 18/10/2026: "centralize o cabeçalho e todas as colunas exceto Usina" (os blocos e a Visão geral)."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert re.search(r'\.cr-g > \[class\*="cr-col-"\]\{[^}]*justify-self:center', css)
+
+
 def test_o_ranking_diz_o_periodo_e_de_onde_vieram_as_notas(tela, logado):
     # pendência da revisão (achado 8): a aba não dizia as datas dos dois períodos nem que as notas saíram na hora
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
@@ -850,3 +920,43 @@ def test_a_dica_da_base_pequena_usa_a_constante(tela, logado, monkeypatch):
     monkeypatch.setattr(visao, "BASE_PEQUENA", 4)
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
     assert 'title="Menos de 4 usinas' in html
+
+
+def _linha_geral(html, usina):
+    """O resumo (`summary`) da linha da usina na lista da Visão geral."""
+    i = html.index(f"<b>{usina}", html.index('class="cr-gr-lista"'))
+    return html[html.rindex('<details class="cr-gr-lin', 0, i):html.index("</summary>", i)]
+
+
+def test_a_usina_parada_tem_a_etiqueta_na_lista_geral(manut, logado):
+    """Revisão de 18/10/2026: na lista da Visão geral a usina parada não mostrava a etiqueta "parada" que Onde focar
+    mostra no nome (e as células da Manutenção vinham "—"): o supervisor lia a usina como em dia."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    altair = _linha_geral(html, "Altair")
+    assert "cr-tag--critico" in altair and ">parada<" in altair
+
+
+def test_o_bloco_sem_detalhe_nao_diz_em_dia(manut, logado, monkeypatch):
+    """Revisão de 18/10/2026: o bloco sem nenhuma linha de detalhe é, quase sempre, falta de dado; "em dia" contradizia a
+    regra da tela (falta de dado não é em dia) e tirava os links do bloco. Aqui, a Manutenção sem detalhe."""
+    original = R.linha_manutencao
+    monkeypatch.setattr(R, "linha_manutencao", lambda u, limite: {**original(u, limite), "det": []})
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    lista = html[html.index('class="cr-gr-lista"'):]
+    assert "em dia</p>" not in lista and "Nada a mostrar neste bloco" in lista
+    assert "Gestão PCM" in lista.split("Nada a mostrar neste bloco")[1][:600]          # os links do bloco ficam
+
+
+def test_a_visao_geral_diz_com_os_filtros_com_a_equipe(manut, logado):
+    equipe = next(u["equipe"] for u in _com_manut().values() if u.get("equipe"))
+    html = logado.get(f"/t/campo/responsaveis?responsavel=*&modo=geral&equipe={equipe}").get_data(as_text=True)
+    faixa = html[html.index('class="cr-gr"'):html.index('class="cr-gr-blocos"')]
+    assert "com os filtros" in faixa
+
+
+def test_a_lista_unica_vira_cartoes_ate_1280_px():
+    """Revisão de 18/10/2026: entre 761 e 1260 px as 10 colunas não cabiam (a Usina zerava e Semana sumia, cortada sem
+    rolagem): até 1280 px a lista vira os cartões com as etiquetas P, A e M (a 1281 px a Usina fica com ~150 px)."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    bloco = re.search(r'@media \(max-width:1280px\)\{\n  \.cr-gr-grupos(.*?)\n\}', css, re.S).group(1)
+    assert '.cr-gr-g > [class*="cr-col-"]{display:none}' in bloco and ".cr-gr-pills{display:flex" in bloco
