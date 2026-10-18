@@ -99,36 +99,37 @@ def test_a_fonte_das_notas_que_falha_nao_derruba_a_visao(tela, monkeypatch):  # 
 
 
 # ── Os cartões e o que cobrar ────────────────────────────────────────────────────────────────────────────────────
-def _u(**kw):
-    """Uma usina mínima para as etiquetas (só o que `etiquetas` lê)."""
-    base = {"ronda": {}, "acomp": {"valores": {"limpeza": {"cls": "neutro"}}}, "meta": {}, "manutencao": {}}
-    return {**base, **kw}
-
-
 def test_etiquetas_na_regua_de_cada_tela():
-    s = {"paradas_abertas": 1, "atrasadas": 17, "paradas": 2, "ext_vencidos": 14, "disp": 95.1, "semana_pct": 48.1,
-         "chamados": 1, "tarefas_paradas": 3}
-    us = [_u(ronda={"tipo": "sem_ronda"}, acomp={"valores": {"limpeza": {"cls": "critico"}}}, meta={"atingimento": 88.0},
-             manutencao={"maior_atraso": 132, "zeladoria_vencida": "2026-10-01"}),
-          _u(ronda={"tipo": "longa_pendente"}, meta={"atingimento": 99.0}, manutencao={"maior_atraso": 20})]
-    assert [(e["cls"], e["txt"]) for e in RE.etiquetas(s, us, 30)] == [
+    s = {"paradas_abertas": 1, "atrasadas": 17, "paradas": 2, "pts": 3, "ext_vencidos": 14, "disp": 95.1,
+         "semana_pct": 48.1, "chamados": 1, "tarefas_paradas": 3}
+    us = [_ua(1, perf=[("meta", "critico"), ("disp", "atencao"), ("ativos", "critico")],
+              acomp=[("ronda", "critico"), ("limpeza", "critico"), ("pt", "critico"), ("extintores", "critico"),
+                     ("chamados", "atencao")],
+              manut=[("parada", "critico"), ("atrasadas", "critico"), ("zeladoria", "atencao"), ("semana", "atencao")],
+              meta={"atingimento": 88.0}, ativos={"lista": [{"nivel": "critico"}]}, manutencao={"maior_atraso": 132}),
+          _ua(2, acomp=[("ronda", "atencao")], manut=[("atrasadas", "atencao"), ("paradas", "atencao")],
+              meta={"atingimento": 99.0}, manutencao={"maior_atraso": 20})]
+    assert [(e["cls"], e["txt"]) for e in RE.etiquetas(s, us)] == [
         ("critico", "1 OS de parada aberta"), ("critico", "17 tarefas atrasadas, a mais antiga há 132 d"),
         ("critico", "2 PT paradas"), ("critico", "2 usinas pedem ronda"), ("critico", "limpeza crítica em 1 usina"),
-        ("critico", "14 extintores vencidos"), ("critico", "1 usina abaixo da meta"), ("alerta", "disp. 95,1%"),
-        ("alerta", "zeladoria vencida em 1 usina"), ("alerta", "semana passada 48%"),
-        ("alerta", "1 chamado com o fabricante"), ("alerta", "3 tarefas fora da programação")]
-    # o limite de quem olha: a mais antiga há 132 d com o limite 200 é atenção, e vai para depois dos seis críticos
-    assert [(e["cls"], e["txt"]) for e in RE.etiquetas(s, us, 200)][6] == (
+        ("critico", "14 extintores vencidos"), ("critico", "1 ativo em crítico"), ("critico", "1 usina abaixo da meta"),
+        ("alerta", "disp. abaixo de 99% em 1 usina"), ("alerta", "zeladoria vencida em 1 usina"),
+        ("alerta", "semana passada 48%"), ("alerta", "1 chamado com o fabricante"),
+        ("alerta", "3 tarefas fora da programação")]
+    # o limite de quem olha já está no nível do alerta (`com_manutencao`): com as atrasadas em atenção, a etiqueta é de
+    # atenção e vai para depois dos sete críticos
+    us[0]["manut"]["alertas"][1]["nivel"] = "atencao"
+    assert [(e["cls"], e["txt"]) for e in RE.etiquetas(s, us)][7] == (
         "alerta", "17 tarefas atrasadas, a mais antiga há 132 d")
 
 
 def test_sem_nada_a_cobrar_nao_ha_etiqueta():
-    assert RE.etiquetas({"disp": 99.5, "semana_pct": 90}, [_u(meta={"atingimento": 98})], 30) == []
+    assert RE.etiquetas({"disp": 99.5, "semana_pct": 90}, [_ua(1, meta={"atingimento": 98})]) == []
 
 
 def test_cartoes_da_pior_para_a_melhor(tela):  # noqa: F811
     d = R.visao_responsaveis().dados
-    r = RE.cartoes(R.com_manutencao(d["usinas"], 30), d["ranking_por_usina"], d["tecnicos_por_equipe"], 30)
+    r = RE.cartoes(R.com_manutencao(d["usinas"], 30), d["ranking_por_usina"], d["tecnicos_por_equipe"])
     assert [c["equipe"] for c in r["cartoes"]] == ["SC Oeste 01", "SP Norte 01"]     # sem nota antes das ranqueadas
     sc, sp = r["cartoes"]
     assert (sc["posicao"], sc["nota"], sc["cor"]) == (None, None, "neutro")
@@ -143,7 +144,7 @@ def test_cartoes_da_pior_para_a_melhor(tela):  # noqa: F811
 def test_a_nota_e_refeita_sobre_as_usinas_do_filtro(tela):  # noqa: F811
     d = R.visao_responsaveis().dados
     so_brodowski = [u for u in R.com_manutencao(d["usinas"], 30) if u["usina"] == "Brodowski 1"]
-    c = RE.cartoes(so_brodowski, d["ranking_por_usina"], d["tecnicos_por_equipe"], 30)["cartoes"][0]
+    c = RE.cartoes(so_brodowski, d["ranking_por_usina"], d["tecnicos_por_equipe"])["cartoes"][0]
     assert (c["usinas"], c["qualidade"], c["cobertura"], c["nota"]) == (1, 90, 100, 94)
 
 
@@ -151,7 +152,7 @@ def test_sem_equipe_vai_para_o_fim_sem_posicao(tela):  # noqa: F811
     d = R.visao_responsaveis().dados
     # a Brodowski 1 (nota 90, a melhor da tela) sem equipe no cadastro: nem com nota ela ganha posição
     us = [dict(u, equipe=visao.SEM_EQUIPE) if u["usina"] == "Brodowski 1" else u for u in R.com_manutencao(d["usinas"], 30)]
-    r = RE.cartoes(us, d["ranking_por_usina"], d["tecnicos_por_equipe"], 30)
+    r = RE.cartoes(us, d["ranking_por_usina"], d["tecnicos_por_equipe"])
     assert [c["equipe"] for c in r["cartoes"]] == ["SC Oeste 01", "SP Norte 01", visao.SEM_EQUIPE]
     assert r["cartoes"][-1]["sem_equipe"] and r["cartoes"][-1]["posicao"] is None and r["cartoes"][-1]["cor"] == "neutro"
     assert r["total"] == 1 and r["kpis"]["equipes"] == 2 and r["cartoes"][1]["posicao"] == 1
@@ -164,6 +165,57 @@ def test_a_seta_contra_o_periodo_anterior(tela):  # noqa: F811
         return {"q_soma": s, "q_n": n, "n_os": n, "n_ronda": 0, "rondada": True}
     por = {1: {"atual": agg(450, 5), "anterior": agg(350, 5)}, 2: {"atual": agg(90, 1), "anterior": agg(70, 1)},
            3: {"atual": agg(80, 1), "anterior": agg(100, 1)}}
-    r = {c["equipe"]: c for c in RE.cartoes(R.com_manutencao(d["usinas"], 30), por, d["tecnicos_por_equipe"], 30)["cartoes"]}
+    r = {c["equipe"]: c for c in RE.cartoes(R.com_manutencao(d["usinas"], 30), por, d["tecnicos_por_equipe"])["cartoes"]}
     assert (r["SP Norte 01"]["posicao"], r["SP Norte 01"]["antes"]["posicao"]) == (1, 2)
     assert r["SP Norte 01"]["seta"] == {"tipo": "sobe", "n": 1} and r["SC Oeste 01"]["seta"] == {"tipo": "desce", "n": 1}
+
+
+# ── A revisão do ramo (18/10/2026) ───────────────────────────────────────────────────────────────────────────────
+def _ua(uid, perf=(), acomp=(), manut=(), **kw):
+    """Uma usina com os alertas dos três blocos (área, nível), como `responsaveis.montar`/`com_manutencao` deixam."""
+    def bloco(xs):
+        return {"alertas": [{"area": a, "nivel": n, "titulo": ""} for a, n in xs]}
+    return {"usina_id": uid, "perf": bloco(perf), "acomp": bloco(acomp), "manut": bloco(manut), "meta": {},
+            "manutencao": {}, "ativos": {}, **kw}
+
+
+def test_toda_area_com_alerta_vira_etiqueta():
+    # achado 1 da revisão: o semáforo do cartão conta TODOS os alertas da Visão, e a etiqueta só olhava 12 números; uma
+    # equipe só com um ativo em crítico mostrava "Performance 1 · 0 · 0" e, embaixo, "nada a cobrar nos três blocos"
+    ativo = _ua(1, perf=[("ativos", "critico")], ativos={"lista": [{"nivel": "critico"}]})
+    assert [(e["cls"], e["txt"]) for e in RE.etiquetas({}, [ativo])] == [("critico", "1 ativo em crítico")]
+    ext = _ua(2, acomp=[("extintores", "atencao")])
+    assert [(e["cls"], e["txt"]) for e in RE.etiquetas({}, [ext])] == [
+        ("alerta", "extintores a vencer ou sem conferência em 1 usina")]
+    pt = _ua(3, acomp=[("pt", "atencao")])
+    assert [(e["cls"], e["txt"]) for e in RE.etiquetas({"pts": 1}, [pt])] == [("alerta", "1 PT esperando o De acordo")]
+    # a disponibilidade da usina, não a média do grupo pela potência (que escondia uma usina abaixo de 80%)
+    disp = _ua(4, perf=[("disp", "critico")])
+    assert [(e["cls"], e["txt"]) for e in RE.etiquetas({"disp": 99.2}, [disp])] == [
+        ("critico", "disp. abaixo de 80% em 1 usina")]
+    pr = _ua(5, perf=[("meta", "atencao")], meta={"atingimento": 99.0})
+    assert [(e["cls"], e["txt"]) for e in RE.etiquetas({}, [pr])] == [("alerta", "1 usina com PR abaixo do previsto")]
+
+
+def test_nada_a_cobrar_so_quando_o_semaforo_esta_todo_em_dia(tela):  # noqa: F811
+    d = R.visao_responsaveis().dados
+    for c in RE.cartoes(R.com_manutencao(d["usinas"], 30), d["ranking_por_usina"], d["tecnicos_por_equipe"])["cartoes"]:
+        pede = any(c["tri"][b]["critico"] or c["tri"][b]["atencao"] for b in ("perf", "acomp", "manut"))
+        assert bool(c["etiquetas"]) == pede, c["equipe"]
+
+
+def test_usina_mobilizada_depois_do_periodo_anterior_fica_fora_dele(tela):  # noqa: F811
+    # achado 3 da revisão: a usina mobilizada há 10 dias contava como "sem ronda" no período anterior, quando ainda não
+    # era da operação: a cobertura de antes caía e a seta "subia" sem a equipe ter melhorado
+    a = RE.agregar([], [{"data": "2026-09-01", "usina_id": 2, "nota": 90}], {1, 2}, HOJE,
+                   desde={1: "2026-10-10", 2: "2026-09-01"})
+    assert a[1]["anterior"] is None and a[1]["atual"] is not None
+    assert a[2]["anterior"]["rondada"] is True
+    d = R.visao_responsaveis().dados
+
+    def agg(s, n):
+        return {"q_soma": s, "q_n": n, "n_os": n, "n_ronda": 0, "rondada": True}
+    por = {1: {"atual": agg(450, 5), "anterior": agg(350, 5)}, 2: {"atual": agg(90, 1), "anterior": None},
+           3: {"atual": agg(80, 1), "anterior": agg(100, 1)}}
+    r = {c["equipe"]: c for c in RE.cartoes(R.com_manutencao(d["usinas"], 30), por, d["tecnicos_por_equipe"])["cartoes"]}
+    assert r["SP Norte 01"]["antes"]["nota"] == 82          # só a Altair: 0,6 × 70 + 0,4 × 100 (antes: 62, com 50%)

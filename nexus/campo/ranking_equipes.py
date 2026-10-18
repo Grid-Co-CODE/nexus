@@ -62,17 +62,23 @@ def _periodo_do_dia(per: dict, dia: date | None) -> str | None:
     return None
 
 
-def agregar(fechamentos: list[dict], rondas: list[dict], mobilizadas, hoje: date) -> dict:
-    """{usina_id: {"atual": AGG, "anterior": AGG}} de toda usina mobilizada, AGG = {"q_soma", "q_n", "n_os", "n_ronda",
-    "rondada"}. A tarefa fechada pelo App conta com a nota dela (sem nota, não conta em nada); a ronda do App conta como
-    ronda e, com nota, na qualidade; a avulsa do Nexus só deixa a usina com ronda (cobertura). Linha de usina que não é
-    mobilizada, ou de fora dos dois períodos, fica de fora. A API pode devolver tudo como texto: passa por `D._id`/`D._int`."""
+def agregar(fechamentos: list[dict], rondas: list[dict], mobilizadas, hoje: date, desde: dict | None = None) -> dict:
+    """{usina_id: {"atual": AGG, "anterior": AGG | None}} de toda usina mobilizada, AGG = {"q_soma", "q_n", "n_os",
+    "n_ronda", "rondada"}. A tarefa fechada pelo App conta com a nota dela (sem nota, não conta em nada); a ronda do App
+    conta como ronda e, com nota, na qualidade; a avulsa do Nexus só deixa a usina com ronda (cobertura). Linha de usina
+    que não é mobilizada, ou de fora dos dois períodos, fica de fora. A API pode devolver tudo como texto: passa por
+    `D._id`/`D._int`. `desde` = {usina_id: "AAAA-MM-DD" da mobilização}: a usina mobilizada depois do fim do período
+    anterior não era da operação nele, e fica fora dele (`anterior` = None). Revisão de 18/10/2026: ela contava como "sem
+    ronda" de antes, a cobertura de antes caía e a seta "subia" sem a equipe ter melhorado."""
     per = periodos(hoje)
-    out = {uid: {"atual": _vazio(), "anterior": _vazio()} for uid in mobilizadas}
+    fim_anterior = per["anterior"][1].isoformat()
+    out = {uid: {"atual": _vazio(),
+                 "anterior": None if str((desde or {}).get(uid) or "")[:10] > fim_anterior else _vazio()}
+           for uid in mobilizadas}
     for x in fechamentos:
         uid, nota = D._id(x.get("usina_id")), D._int(x.get("nota_pts"))
         p = _periodo_do_dia(per, _dia_do_id(x.get("data_id")))
-        if uid not in out or nota is None or not p:
+        if uid not in out or nota is None or not p or out[uid][p] is None:
             continue
         a = out[uid][p]
         a["q_soma"] += nota
@@ -81,7 +87,7 @@ def agregar(fechamentos: list[dict], rondas: list[dict], mobilizadas, hoje: date
     for r in rondas:
         uid = D._id(r.get("usina_id"))
         p = _periodo_do_dia(per, _dia_iso(r.get("data")))
-        if uid not in out or not p:
+        if uid not in out or not p or out[uid][p] is None:
             continue
         a = out[uid][p]
         a["rondada"] = True
@@ -145,63 +151,94 @@ def _pl(n, um, varios) -> str:
     return f"{n} {um if n == 1 else varios}"
 
 
-def etiquetas(s: dict, usinas: list[dict], limite: int) -> list[dict]:
-    """Em quê cobrar a equipe: os números da Visão (`responsaveis.soma` do grupo e as linhas das usinas), cada um na régua
-    da tela dona (a mesma do bloco em que ele aparece na Visão), o crítico primeiro e, dentro do nível, a ordem fixa:
-    parada aberta, atrasadas, PT, ronda, limpeza, extintores, meta, disponibilidade, zeladoria, semana, chamados, tarefas
-    paradas. Eles NÃO mudam a posição (decisão do Levi, 18/10/2026: "só aparecem ao lado"). Na meta conta usinas abaixo de
-    97%, e não a meta somada do grupo: medido em 18/10/2026, uma usina com produção de 10,7 GWh contra meta de 149 MWh no
-    Gerencial punha a equipe em 2.207%."""
-    from .manutencao import META_SEMANA
-    from .responsaveis import DISP_CRITICO, DISP_OK, META_ATENCAO, META_NA_META, _virgula
-    us, out = usinas or [], []
+# a ordem fixa das áreas dentro do mesmo nível (as áreas das `REGUAS` da Visão)
+ORDEM_DAS_AREAS = ("parada", "atrasadas", "pt", "ronda", "limpeza", "extintores", "ativos", "meta", "disp", "zeladoria",
+                   "semana", "chamados", "paradas")
 
-    def add(cls, txt):
-        out.append({"cls": cls, "txt": txt})
-    if s.get("paradas_abertas"):
-        add("critico", _pl(s["paradas_abertas"], "OS de parada aberta", "OS de parada abertas"))
-    if s.get("atrasadas"):
-        n = s["atrasadas"]
+
+def _texto(area: str, s: dict, us: list[dict], crit: int, todas: int) -> str:
+    """O texto da etiqueta de uma área: o número do grupo quando a Visão tem (`responsaveis.soma`), senão quantas usinas.
+    `crit` = usinas com o alerta da área em crítico; `todas` = usinas com o alerta da área."""
+    from .manutencao import META_SEMANA
+    from .responsaveis import META_NA_META, _virgula
+
+    def usinas(n):
+        return _pl(n, "usina", "usinas")
+    if area == "parada":
+        return _pl(s.get("paradas_abertas") or todas, "OS de parada aberta", "OS de parada abertas")
+    if area == "atrasadas":
+        n = s.get("atrasadas") or 0
         maior = max(((u.get("manutencao") or {}).get("maior_atraso") or 0 for u in us), default=0)
-        add("critico" if maior > limite else "alerta",
-            f"{n} tarefas atrasadas, a mais antiga há {maior} d" if n > 1 else f"1 tarefa atrasada, há {maior} d")
-    if s.get("paradas"):
-        add("critico", _pl(s["paradas"], "PT parada", "PT paradas"))
-    pedem = [t for t in ((u.get("ronda") or {}).get("tipo") for u in us) if t in ("nunca", "sem_ronda", "longa_pendente")]
-    if pedem:
-        add("critico" if any(t != "longa_pendente" for t in pedem) else "alerta",
-            f"{len(pedem)} usinas pedem ronda" if len(pedem) > 1 else "1 usina pede ronda")
-    limpeza = [(((u.get("acomp") or {}).get("valores") or {}).get("limpeza") or {}).get("cls") for u in us]
-    if "critico" in limpeza:
-        add("critico", f"limpeza crítica em {_pl(limpeza.count('critico'), 'usina', 'usinas')}")
-    elif "alerta" in limpeza:
-        add("alerta", f"limpeza em atenção em {_pl(limpeza.count('alerta'), 'usina', 'usinas')}")
-    if s.get("ext_vencidos"):
-        add("critico", _pl(s["ext_vencidos"], "extintor vencido", "extintores vencidos"))
-    abaixo = [a for a in ((u.get("meta") or {}).get("atingimento") for u in us) if a is not None and a < META_NA_META]
-    if abaixo:
-        add("critico" if any(a < META_ATENCAO for a in abaixo) else "alerta",
-            _pl(len(abaixo), "usina abaixo da meta", "usinas abaixo da meta"))
-    disp = s.get("disp")
-    if disp is not None and disp < DISP_OK:
-        add("critico" if disp < DISP_CRITICO else "alerta", f"disp. {_virgula(disp)}%")
-    zel = sum(1 for u in us if (u.get("manutencao") or {}).get("zeladoria_vencida"))
-    if zel:
-        add("alerta", f"zeladoria vencida em {_pl(zel, 'usina', 'usinas')}")
-    pct = s.get("semana_pct")
-    if pct is not None and pct < META_SEMANA:
-        add("alerta", f"semana passada {_virgula(pct, 0)}%")
-    if s.get("chamados"):
-        add("alerta", _pl(s["chamados"], "chamado com o fabricante", "chamados com o fabricante"))
-    if s.get("tarefas_paradas"):
-        add("alerta", _pl(s["tarefas_paradas"], "tarefa fora da programação", "tarefas fora da programação"))
+        return f"{n} tarefas atrasadas, a mais antiga há {maior} d" if n > 1 else f"1 tarefa atrasada, há {maior} d"
+    if area == "pt":
+        if crit and s.get("paradas"):
+            return _pl(s["paradas"], "PT parada", "PT paradas")
+        return _pl(s.get("pts") or todas, "PT esperando o De acordo", "PT esperando o De acordo")
+    if area == "ronda":
+        return f"{todas} usinas pedem ronda" if todas > 1 else "1 usina pede ronda"
+    if area == "limpeza":
+        return f"limpeza crítica em {usinas(crit)}" if crit else f"limpeza em atenção em {usinas(todas)}"
+    if area == "extintores":
+        if crit and s.get("ext_vencidos"):
+            return _pl(s["ext_vencidos"], "extintor vencido", "extintores vencidos")
+        return f"extintores a vencer ou sem conferência em {usinas(todas)}"
+    if area == "ativos":
+        nivel = "critico" if crit else "atencao"
+        n = sum(1 for u in us for x in ((u.get("ativos") or {}).get("lista") or ()) if x.get("nivel") == nivel) or todas
+        return _pl(n, "ativo em crítico", "ativos em crítico") if crit else _pl(n, "ativo pedindo atenção",
+                                                                             "ativos pedindo atenção")
+    if area == "meta":
+        abaixo = sum(1 for u in us if ((u.get("meta") or {}).get("atingimento") is not None
+                                       and u["meta"]["atingimento"] < META_NA_META))
+        if abaixo:
+            return _pl(abaixo, "usina abaixo da meta", "usinas abaixo da meta")
+        return _pl(todas, "usina com PR abaixo do previsto", "usinas com PR abaixo do previsto")
+    if area == "disp":
+        return f"disp. abaixo de 80% em {usinas(crit)}" if crit else f"disp. abaixo de 99% em {usinas(todas)}"
+    if area == "zeladoria":
+        return f"zeladoria vencida em {usinas(todas)}"
+    if area == "semana":
+        pct = s.get("semana_pct")
+        if pct is not None and pct < META_SEMANA:
+            return f"semana passada {_virgula(pct, 0)}%"
+        return f"semana passada abaixo de 85% em {usinas(todas)}"
+    if area == "chamados":
+        return _pl(s.get("chamados") or todas, "chamado com o fabricante", "chamados com o fabricante")
+    if area == "paradas":
+        return _pl(s.get("tarefas_paradas") or todas, "tarefa fora da programação", "tarefas fora da programação")
+    from .responsaveis import ROTULO_AREA
+    return f"{ROTULO_AREA.get(area, area)} em {usinas(todas)}"
+
+
+def etiquetas(s: dict, usinas: list[dict]) -> list[dict]:
+    """Em quê cobrar a equipe. Cada etiqueta é uma ÁREA com alerta em alguma usina da equipe, no nível do pior alerta dela,
+    tirada dos MESMOS alertas que fazem o semáforo do cartão (`perf`, `acomp` e `manut` de cada usina, as réguas das
+    telas donas e o limite das atrasadas de quem olha, `com_manutencao`): nada a cobrar só quando o semáforo está todo em
+    dia. Revisão de 18/10/2026: as etiquetas saíam de 12 números à parte, e uma equipe só com um ativo em crítico
+    mostrava "Performance 1 · 0 · 0" e, embaixo, "nada a cobrar nos três blocos". O crítico primeiro e, no mesmo nível, a
+    ordem de `ORDEM_DAS_AREAS`. Elas NÃO mudam a posição (decisão do Levi, 18/10/2026: "só aparecem ao lado"). Na meta
+    conta usinas abaixo de 97%, e não a meta somada do grupo: medido em 18/10/2026, uma usina com produção de 10,7 GWh
+    contra meta de 149 MWh no Gerencial punha a equipe em 2.207%; na disponibilidade, as usinas, e não a média do grupo
+    pela potência, que escondia uma usina abaixo de 80%."""
+    us = usinas or []
+    areas: dict[str, dict] = {}
+    for u in us:
+        for b in ("perf", "acomp", "manut"):
+            for a in (u.get(b) or {}).get("alertas") or ():
+                x = areas.setdefault(a["area"], {"crit": set(), "todas": set()})
+                x["todas"].add(u.get("usina_id"))
+                if a["nivel"] in ("agora", "critico"):
+                    x["crit"].add(u.get("usina_id"))
+    ordem = [a for a in ORDEM_DAS_AREAS if a in areas] + sorted(a for a in areas if a not in ORDEM_DAS_AREAS)
+    out = [{"cls": "critico" if areas[a]["crit"] else "alerta",
+            "txt": _texto(a, s, us, len(areas[a]["crit"]), len(areas[a]["todas"]))} for a in ordem]
     out.sort(key=lambda e: e["cls"] != "critico")       # estável: o crítico primeiro, a ordem fixa dentro do nível
     return out
 
 
-def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict, limite: int) -> dict:
+def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict) -> dict:
     """Um cartão por equipe das usinas que passaram pelos filtros da tela (as usinas já com o bloco Manutenção no limite
-    de quem olha): a nota e a posição pela régua do App (refeitas só sobre essas usinas), a posição de antes (a MESMA
+    de quem olha, `com_manutencao`: o limite está nos alertas, e daí no semáforo e nas etiquetas): a nota e a posição pela régua do App (refeitas só sobre essas usinas), a posição de antes (a MESMA
     lista de equipes no período anterior) e a seta, o semáforo dos três blocos (`responsaveis.soma`) e as etiquetas.
     A ordem é a de quem cobra: as sem nota primeiro (sem OS nem ronda do App no período: o App as deixa fora, mas é o
     pior caso para quem cobra), depois as ranqueadas da última posição para a 1ª, e a "Sem equipe" no fim, sem posição
@@ -212,7 +249,14 @@ def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict, limite: int) ->
         grupos.setdefault(u.get("equipe") or visao.SEM_EQUIPE, []).append(u)
 
     def nota(us, per):
-        return nota_da_equipe([(por_usina.get(u.get("usina_id")) or {}).get(per) or _vazio() for u in us])
+        # a usina fora do período (mobilizada depois dele: `anterior` = None) não entra na conta dele
+        aggs = []
+        for u in us:
+            p = por_usina.get(u.get("usina_id"))
+            a = _vazio() if p is None else p.get(per)
+            if a is not None:
+                aggs.append(a)
+        return nota_da_equipe(aggs)
     atual = {e: nota(us, "atual") for e, us in grupos.items()}
     antes = {e: nota(us, "anterior") for e, us in grupos.items()}
     reais = [e for e in grupos if e != visao.SEM_EQUIPE]
@@ -221,7 +265,7 @@ def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict, limite: int) ->
     out = []
     for e, us in grupos.items():
         n, s, sem = atual[e], soma(e, us), e == visao.SEM_EQUIPE
-        etq = etiquetas(s, us, limite)
+        etq = etiquetas(s, us)
         p, pa = pos.get(e), pos_antes.get(e)
         out.append({"equipe": e, "sem_equipe": sem, "usinas": len(us), "tecnicos": tecnicos.get(e, 0),
                     "regiao_campo": next((u["regiao_campo"] for u in us if u.get("regiao_campo")), ""),

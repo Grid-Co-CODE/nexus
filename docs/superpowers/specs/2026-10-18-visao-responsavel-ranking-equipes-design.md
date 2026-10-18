@@ -90,9 +90,11 @@ Para cada equipe, sobre as usinas **mobilizadas** dela que passam pelos filtros 
 - **A ordem** do App é só a nota, da maior para a menor. Empate (medido: 41 das 52 equipes com nota dividem 10 notas):
   maior qualidade, maior cobertura, mais notas no período (o ciclo do App desempata pelo volume, as tarefas contadas), o
   nome (escolha do Claude: o ranking por região do App não desempata, e a ordem dele no empate é a da leitura das
-  tabelas). A posição 1 é a melhor, como no App; a tela mostra da última para a 1ª.
+  tabelas). A posição 1 é a melhor, como no App; a tela mostra da última para a 1ª e diz o desempate.
 - **Período P** (decisão do Levi): os últimos 30 dias, de hoje − 29 a hoje, pelo dia de Brasília do fato (`data_id`),
-  como o "Últimos 30 dias" do painel do App. **Anterior**: de hoje − 59 a hoje − 30. A janela fica numa constante.
+  como o "Últimos 30 dias" do painel do App. **Anterior**: de hoje − 59 a hoje − 30; a usina mobilizada depois do fim
+  dele fica fora da conta dele (revisão do ramo: ela contava como "sem ronda" e a seta subia sozinha). A janela fica
+  numa constante.
 - **A ronda avulsa** (lançada à mão no Nexus) conta na cobertura (decisão do Levi de 07/10/2026 para a cobertura das
   Rondas) e não tem nota. A validação por foto não é ronda (fica fora, como em todo o Campo).
 
@@ -131,13 +133,15 @@ seta compara, que a cor é a do painel do App, e as diferenças contra o painel 
 - A **composição**: qualidade, cobertura, quantas OS e rondas entraram, e a nota e a posição de antes.
 - O **semáforo dos três blocos** (Performance, Acompanhamento, Manutenção): quantas usinas em Focar, Acompanhar e em dia,
   o mesmo `soma` dos cartões por responsável, com o limite das atrasadas de quem olha.
-- **Em quê cobrar**: as etiquetas da Visão, na régua de cada tela dona, o crítico primeiro, até 4 e "e mais N"; sem
-  nenhuma, "nada a cobrar nos três blocos". As etiquetas: OS de parada aberta; tarefas atrasadas (quantas e a mais
-  antiga; crítico acima do limite de quem olha); semana passada abaixo de 85%; usinas que pedem ronda (nunca, 7 dias ou
-  mais, longa pendente); limpeza crítica ou em atenção; PT parada; extintores vencidos; usinas abaixo da meta;
-  disponibilidade abaixo de 99%; zeladoria vencida; chamados em aberto; tarefas paradas. Para a meta, conta **usinas
-  abaixo de 97%** e não a meta somada do grupo (escolha do Claude: medido em 18/10, uma usina com produção de 10,7 GWh
-  contra meta de 149 MWh põe a equipe em 2.207%).
+- **Em quê cobrar**: uma etiqueta por área com alerta nas usinas da equipe, tirada dos MESMOS alertas que fazem o
+  semáforo do cartão (os três blocos, nas réguas das telas donas e no limite das atrasadas de quem olha), no nível do
+  pior alerta da área; o crítico primeiro, até 4 e "e mais N"; "nada a cobrar nos três blocos" só com o semáforo todo em
+  dia. Correção da revisão do ramo (18/10/2026): no 1º desenho eram 12 números à parte, e uma equipe só com um ativo em
+  crítico mostrava "nada a cobrar". O texto usa o número do grupo quando a Visão tem (tarefas atrasadas e a mais antiga,
+  PT paradas, extintores vencidos, chamados, tarefas paradas, a semana do grupo) e, senão, quantas usinas. Para a meta,
+  conta **usinas abaixo de 97%** e não a meta somada do grupo (escolha do Claude: medido em 18/10, uma usina com produção
+  de 10,7 GWh contra meta de 149 MWh põe a equipe em 2.207%); na disponibilidade, as usinas abaixo de 99% (ou de 80%), e
+  não a média do grupo pela potência. Uma legenda diz o que são os três números do semáforo (cor e palavra).
 - **Clicar** abre Onde focar só com as usinas da equipe: filtro novo `equipe=` na Visão (o nome exato da equipe do
   cadastro), com o "×" para tirar, como os outros filtros. A busca continua.
 

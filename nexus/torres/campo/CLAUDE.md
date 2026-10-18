@@ -675,18 +675,25 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
   qualidade + 40% cobertura, nos últimos 30 dias (hoje − 29 a hoje; o App não tem janela oficial). Qualidade = a média
   simples das notas das tarefas fechadas pelo App (`fato_fechamento.nota_pts`) e das rondas do App (`fato_ronda.nota_pts`);
   cobertura = usinas da equipe com ronda ÷ usinas. A cor é a escala do painel do App (85 verde, 70 âmbar), não régua da
-  nota. Empate: qualidade, cobertura, volume, nome. Sem nota (nenhuma OS nem ronda do App): sem posição, antes das
-  ranqueadas; "Sem equipe" no fim. A seta compara com os 30 dias anteriores (a mesma lista de equipes).
+  nota. Empate: qualidade, cobertura, volume, nome (a tela diz). Sem nota (nenhuma OS nem ronda do App): sem posição,
+  antes das ranqueadas; "Sem equipe" no fim. A seta compara com os 30 dias anteriores (a mesma lista de equipes); a usina
+  mobilizada depois do fim do período anterior fica fora dele (revisão de 18/10/2026: contava como "sem ronda" de antes,
+  e a seta "subia" sem a equipe ter melhorado).
 - **Diferenças contra o painel do App** (a tela diz): a equipe da usina é a do cadastro do Nexus (no App, a OS vai ao
   cluster da tarefa na programação do PCM ou da usina no catálogo dele); a base da cobertura são as usinas mobilizadas; o
   dia é o de Brasília; a ronda avulsa do Nexus conta na cobertura.
-- **Em quê cobrar** (`ranking_equipes.etiquetas`): os números da Visão por equipe, na régua de cada tela dona, o crítico
-  primeiro, até 4 no cartão; **não mudam a posição** (decisão do Levi). A meta conta usinas abaixo de 97%, nunca a meta
-  somada do grupo (uma usina com a meta errada no Gerencial punha a equipe em 2.207%).
+- **Em quê cobrar** (`ranking_equipes.etiquetas`): uma etiqueta por área com alerta nas usinas da equipe, tirada dos
+  MESMOS alertas que fazem o semáforo do cartão (os três blocos, no limite de quem olha), no nível do pior: "nada a
+  cobrar" só com o semáforo todo em dia (revisão de 18/10/2026: saíam de 12 números à parte, e uma equipe só com um ativo
+  em crítico mostrava "nada a cobrar"). O crítico primeiro, até 4 no cartão; **não mudam a posição** (decisão do Levi). A
+  meta conta usinas abaixo de 97%, nunca a meta somada do grupo (uma usina com a meta errada no Gerencial punha a equipe
+  em 2.207%); a disponibilidade conta usinas, não a média do grupo. Uma legenda diz o que são os três números do
+  semáforo (cor e palavra).
 - **De onde vem:** `responsaveis.ranking_fonte` agrega por usina, nos dois períodos, na cópia de 5 min da Visão (as duas
   leituras já estão no ciclo quando a Visão é feita); `ranking_equipes.cartoes` agrupa no pedido, porque os filtros e o
   limite das atrasadas são de quem olha. Nada novo no banco. Sem as notas, a aba diz e não mostra cartão.
-- **O filtro `equipe=`**: o cartão abre Onde focar só com as usinas da equipe (o nome exato do cadastro), com o "×".
+- **O filtro `equipe=`**: o cartão abre Onde focar só com as usinas da equipe (o nome exato do cadastro), com o "×";
+  a volta aos cartões dos responsáveis tira o filtro (revisão de 18/10/2026: ele vazava escondido para lá).
 - **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta;
   mutações pegas) e os testes da aba em `tests/test_campo_responsaveis.py`. Com o banco real (18/10/2026, só GET, o
   `test_client` com a sessão de administrador e o HTML servido local): em "Todos", 55 cartões (52 ranqueadas, notas de 41

@@ -793,3 +793,38 @@ def test_sem_as_notas_do_app_o_ranking_avisa(tela, logado, monkeypatch):
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
     assert "Não consegui ler as notas do App" in html and 'class="cn-equipes cr-rk"' not in html
     assert 'id="cr-perf"' in logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
+
+
+def test_o_filtro_de_equipe_nao_vaza_para_os_cartoes(tela, logado):
+    # achado 2 da revisão: de Onde focar com a equipe, o "Todos os responsáveis ×" levava aos cartões com o `equipe=`
+    # escondido, e os números do responsável saíam recortados sem nenhum aviso
+    import re as _re
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=foco&equipe=SP+Norte+01").get_data(as_text=True)
+    todos = _re.search(r'href="([^"]*)" title="Voltar aos cartões dos responsáveis"', html).group(1)
+    assert "modo=cartoes" in todos and "equipe=" not in todos
+
+
+def test_a_regua_do_ranking_diz_o_desempate_e_a_legenda_do_semaforo(tela, logado):
+    # achados 4 e 6 da revisão: com 41 de 52 equipes empatadas, a posição saía do desempate sem a tela dizer; e os três
+    # números do semáforo só se distinguiam pela cor (a regra da casa: severidade por cor E palavra)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
+    assert "No empate, vence a maior qualidade, depois a maior cobertura, mais notas e o nome" in html
+    assert 'class="cr-rk-leg"' in html and ">focar</b>" in html and ">acompanhar</b>" in html and ">em dia</b>" in html
+
+
+def test_equipe_com_ronda_sem_nota_nao_e_chamada_de_sem_ronda(tela, logado, monkeypatch):
+    # achado 5 da revisão: "nenhuma OS nem ronda pelo App" saía também quando havia ronda do App sem nota
+    vazio = {"q_soma": 0, "q_n": 0, "n_os": 0, "n_ronda": 0, "rondada": False}
+    por = {1: {"atual": dict(vazio), "anterior": dict(vazio)}, 2: {"atual": dict(vazio), "anterior": dict(vazio)},
+           3: {"atual": dict(vazio, n_ronda=1, rondada=True), "anterior": dict(vazio)}}
+    monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (por, {}))
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
+    assert "sem nota do App: 1 ronda em 30 dias, nenhuma com nota" in html
+    assert "sem nota do App: nenhuma OS nem ronda pelo App em 30 dias" in html      # a SP Norte 01, sem nada
+
+
+def test_o_filtro_de_cliente_muda_o_ranking(tela, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking&cliente=Thopen").get_data(as_text=True)
+    grade = html[html.index('class="cn-equipes cr-rk"'):]
+    assert "SP Norte 01" in grade and "SC Oeste 01" not in grade              # a Coração 1 é de outro cliente

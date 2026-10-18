@@ -382,7 +382,8 @@ def ranking_fonte(b, hoje) -> tuple[dict, dict]:
     from . import ranking_equipes
     fech = visao._fato("fechamento", b)
     per = ranking_equipes.periodos(hoje)
-    return (ranking_equipes.agregar(fech["linhas"], visao._rondas_ligadas(b), b.mobilizadas, hoje),
+    desde = {uid: str(u.get("data_mobilizacao") or "")[:10] for uid, u in b.mobilizadas.items()}
+    return (ranking_equipes.agregar(fech["linhas"], visao._rondas_ligadas(b), b.mobilizadas, hoje, desde),
             {"de": fech["de"], "aviso": fech["aviso"],
              **{p: (ini.isoformat(), fim.isoformat()) for p, (ini, fim) in per.items()}})
 

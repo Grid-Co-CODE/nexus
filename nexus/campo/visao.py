@@ -44,7 +44,8 @@ from . import apr_dia, leitura, livros_app
 _BRT = timezone(timedelta(hours=-3))
 STATUS_OPERACAO = "OPERAÇÃO"
 DIAS_SEM_RONDA_ALERTA = 7        # usina mobilizada sem ronda há 7 dias ou mais = ronda pendente
-DIAS_COBERTURA = 14              # janela da cobertura de ronda (a mesma do ranking por região)
+DIAS_COBERTURA = 14              # janela da cobertura de ronda da Central e da Visão (o ranking por região do App usa
+                                 # 30 dias: o Ranking das equipes, `ranking_equipes.JANELA_DIAS`)
 PT_PARADA_MIN = DOM.PT_PARADA_MIN  # PT esperando o De acordo há mais de 2 h = parada (o mesmo limite do fato_pt)
 # os pesos do ranking por região do painel do App (`_ranking_regioes`): o Índice das rondas do Painel (só as rondas) e o
 # Ranking das equipes da Visão do responsável (as rondas e as tarefas fechadas pelo App, `ranking_equipes`)
