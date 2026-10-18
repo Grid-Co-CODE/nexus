@@ -147,10 +147,12 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   maiúsculas (PCM, COS, UFV), e a 1ª letra maiúscula (`motivos.padronizar`). O cadastro inicial já nasce assim
   ("Aguardando concessionária", "Condições climáticas adversas"); o que se cria ou edita na tela é padronizado ao gravar.
   O 12º do cadastro inicial, "Vegetação alta impossibilitando ação", tira da programação (Levi, 16/10: "Sim, tira").
-  O App escolhe a frase do técnico pelo id (1, 3 e 9): renomear não quebra. Em 16/10 os três foram renomeados no
-  cadastro de produção com as frases do App (Levi: "o motivo que aparecem devem ser os mesmos do app"): 1 "Preciso de
-  apoio do setor engenharia" (era Engenharia), 3 "Preciso de apoio do setor performance" (era Performance), 9 "Priorizei
-  outras atividades" (era Prioridade). O `CADASTRO_INICIAL` guarda os nomes do nascimento do livro (o banco manda).
+  O App escolhe a frase do técnico pelo id (1, 3 e 9; o `FORA_FRASE` do campo.html): renomear aqui não muda o
+  Justificar. **No Nexus os três são Engenharia, Performance e Prioridade; no App, as frases do técnico** (Levi,
+  18/10/2026, que desfez a troca de 16/10, quando o cadastro de produção tinha ganhado as frases "Preciso de apoio do
+  setor engenharia", "Preciso de apoio do setor performance" e "Priorizei outras atividades"). Renomeados no banco em
+  18/10, 03:47Z, pelo `motivos.cadastro`; o selo das marcas de outros no App lê o nome do arquivo do robô, que o servidor
+  manda de novo na próxima marca. O `CADASTRO_INICIAL` guarda os nomes do nascimento do livro (o banco manda).
 - **Os que tiram da programação** (o cadastro inicial: os quatro Aguardando, Condições Climáticas Adversas e Pendente
   recurso; os outros não mudam a geração: com "Priorizei outras atividades", o 9, a tarefa NÃO sai da programação e
   continua sendo cobrada nos outros dias, Levi 16/10/2026): a geração não programa a tarefa e, na semana em curso, o robô do PCM apaga as
