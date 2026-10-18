@@ -19,7 +19,7 @@ usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação d
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
-| **Visão do responsável** (12/10/2026, a 1ª do Campo) | dois blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade) e Acompanhamento (Central e PT, chamados de `nexus_chamados`, extintores do HSEQ) | `campo/responsaveis.py` (junta; cada número é da tela dona) |
+| **Visão do responsável** (12/10/2026, a 1ª do Campo) | três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação) | `campo/responsaveis.py` (junta; cada número é da tela dona) e `campo/manutencao.py` (a conta do bloco Manutenção) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App; Aprovar pelo portão `/os/_nexus/aprovacao/<id>/aprovar` | regras copiadas do App |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
@@ -488,8 +488,11 @@ Seria interessante também incluir os extintores", aprovado no protótipo com "s
 nexus é um ambiente centralizado e precisamos ter os dados se conversando!". `/t/campo/responsaveis`, a 1ª tela do
 Campo. Conta em `nexus/campo/responsaveis.py`.
 
-- **Dois blocos lado a lado** (empilham abaixo de 1180 px): **Performance** (meta, PR, disponibilidade; os ativos
-  falhando como etiqueta na linha e no detalhe) e **Acompanhamento** (rondas, PT, chamados, extintores). Cada usina é
+- **Três blocos** (desde 18/10/2026): **Performance** (meta, PR, disponibilidade; os ativos falhando como etiqueta na
+  linha e no detalhe) e **Acompanhamento** (rondas, limpeza, PT, chamados, extintores) lado a lado, e **Manutenção**
+  (seção própria abaixo) embaixo, na largura toda. Os dois de cima empilham abaixo de 1500 px (até 18/10 era 1180: com
+  a coluna Limpeza, lado a lado, o nome da usina no Acompanhamento ficava com 74 px a 1366 px e 109 px a 1440 px; a
+  1536 px, o 1920 com zoom de 125%, tem ~170 px). Acima dos blocos, a faixa **Parada agora**. Cada usina é
   uma linha compacta com os valores coloridos pela régua; clicar abre o detalhe e os links das telas donas (`<details>`,
   sem script). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só atenção; em dia) e
   **todas as usinas viram linha, inclusive as em dia** (Levi, 13/10/2026: "Tem que aparecer todas as usinas do
@@ -592,11 +595,64 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   - Sem o dado no banco (a série ou as OS antes da 1ª publicação; a usina sem aba no BD), a janela diz por quê.
 - **Isolamento** (regra 13): cada fonte em `_ler_fonte`; a que falha volta vazia e a tela diz qual. Sem o livro da meta
   ou o dos chamados (antes da 1ª publicação), a tela avisa e não cobra por eles.
-- Custo: ~12 s fria, cópia de 5 min por `visao._ler`. NÃO entra no aquecimento do `manter_quente` (a conta chama a
-  Confiabilidade, que pede a releitura das OS de falha ao Fracttal, e o PC sobe com `NEXUS_CAMPO_AQUECER=0`).
-- Prova: `tests/test_campo_responsaveis.py`. Protótipo e ensaio com o banco real: `create_app()` + `app_context()`,
-  `os_falhas.pedir_releitura` desligado e `responsaveis.visao_responsaveis()` (fora do repositório: o resultado tem nome
-  de responsável).
+- Custo: cópia de 5 min por `visao._ler`, refeita em segundo plano. Fria, medida no banco real em 18/10/2026 (PC, com
+  as fontes novas da Manutenção e da Limpeza): ~24 s antes de ler a programação do fim; as partes: cadastro 3,2 s,
+  Central 4,0 s, Rondas (a Limpeza) 4,6 s, chamados 4,7 s, a programação inteira 4,4 s (agora 1,3 s, do fim), a conta da
+  Manutenção 3,1 s. NÃO entra no aquecimento do `manter_quente` (a conta chama a Confiabilidade, que pede a releitura das
+  OS de falha ao Fracttal, e o PC sobe com `NEXUS_CAMPO_AQUECER=0`).
+- Prova: `tests/test_campo_responsaveis.py` e `tests/test_campo_manutencao.py`. Protótipo e ensaio com o banco real:
+  `create_app()` + `app_context()`, `os_falhas.pedir_releitura` desligado e `responsaveis.visao_responsaveis()` (fora do
+  repositório: o resultado tem nome de responsável). A tela inteira sem senha no navegador: o `test_client` com
+  `session_transaction` (`logado` e `admin`), a trava da cópia de prova (`subir_copia_de_prova.instalar_trava`: nada
+  que não seja GET sai) e o HTML salvo com o `static` ao lado, servido por `python -m http.server` (18/10/2026).
+
+### O bloco Manutenção, a Limpeza e a faixa "Parada agora" (18/10/2026)
+
+Um supervisor montou um painel próprio (planilha, robô do Fracttal, WhatsApp) porque a Visão não mostrava a manutenção
+das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os painéis próprios e usarem só o Nexus,
+"pegando tudo do Fracttal ou Nexus, sem fontes externas!". Desenho e decisões:
+`docs/superpowers/specs/2026-10-18-visao-responsavel-manutencao-design.md`.
+
+- **De onde vem:** as tarefas das OS do Fracttal no banco (`nexus_os · fato_tarefa_os`, lidas pelo próprio Nexus de
+  hora em hora: `nexus/campo/tarefas_os.py` e `nexus/dados/CLAUDE.md`), os motivos do Fora da programação do PCM
+  (`motivos.vigentes`, decifrados na conta: a marca guarda a usina e a tarefa cifradas), as OS de chamado
+  (`nexus_chamados`), a programação (`nexus_programacao`, lida do FIM para trás: a carga põe as 4 semanas do arquivo do
+  PCM no fim, `_programacao_recente`), as OS de parada abertas (`falhas_performance · disponibilidade_os`) e a limpeza
+  das Rondas (`visao.sujidade_vegetacao`, a última leitura em 90 dias, sem pedir releitura ao Fracttal). A única fonte
+  externa é a programação (cópia do `banco_dados.json` do PCM), e o bloco diz isso.
+- **O que conta (`nexus/campo/manutencao.py`, puro):** OS abertas = OS não finalizadas, em processo e em verificação
+  (no detalhe, as que esperam a aprovação). **Atrasada é a régua do PCM** (Levi: "Régua do PCM: +10 dias"; o
+  `DIAS_ALERTA` do robô da Gestão PCM): tarefa aberta com a Data Programada há MAIS de 10 dias, contada por tarefa, como
+  o PCM conta. Ficam fora de OS abertas e atrasadas, para nada contar duas vezes: o backoffice (decisão do Levi: o
+  supervisor não age sobre elas), a tarefa com motivo do recorte do painel (motivo que tira ou justificativa do App:
+  conta em Paradas), a OS do `fato_chamado` (conta em Chamados), a Zeladoria (coluna própria) e o Teste. Vencem até
+  amanhã só informa. A marca casa com a tarefa pela OS, o código canônico (código vazio = todos os ativos da OS) e a
+  `tarefa_chave`. **Semana** = a semana passada, FECHADA, pela conta do Fechamento do PCM (linhas do plano finalizadas
+  ÷ linhas do plano): na semana corrente a rolagem da noite tira da agenda o que não foi feito (vai às pendentes, fora
+  do fato) e o "até hoje" saía inflado; o dia de hoje até agora (as linhas cujo `hora_inicio` passou) só informa.
+  Zeladoria: a próxima programada, a vencida e a última feita (tipo de tarefa Zeladoria no Fracttal).
+- **As réguas** (`REGUAS`, bloco manut, e as decisões do Levi de 18/10): qualquer OS de parada aberta (usina inteira
+  ou equipamento) é crítico e vai para a faixa; tarefa atrasada é atenção, e crítico quando a mais antiga passa do
+  **limite de quem olha**; tarefa parada, semana passada abaixo de 85% e zeladoria vencida são atenção. A ordem do
+  bloco: o nível; dentro dele, parada, mais tarefas atrasadas, mais paradas, a semana mais baixa.
+- **O limite** (Levi: "o supervisor decide, começa com 30 dias mas pode alterar"; "no navegador dele"): o campo do
+  bloco manda `?limite=`, e a rota grava o cookie `nexus_resp_limite` (1 ano, no caminho do prefixo); sem o parâmetro
+  vale o cookie; sem os dois, 30. Número fora de 10 a 365 vai ao mais perto; texto vale 30 (`limite_do_pedido`). Como o
+  nível depende de quem olha, ele sai NO PEDIDO (`com_manutencao`, cópias rasas: a cópia de 5 min é comum a todos).
+- **A Limpeza** (Acompanhamento): "S2 V5" na cor do achado mais grave da régua das Rondas (nível 5 ou vala obstruída é
+  crítico; nível 4, vala parcial ou sensor sujo é atenção); no detalhe, sujidade, vegetação, vala, sensores e o dia da
+  ronda. A **faixa Parada agora**: as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro, 6 e "e mais N".
+- **Avisos:** sem o `nexus_os` no banco, "As OS do Fracttal ainda não chegaram ao banco" e o bloco não cobra por elas;
+  a última leitura do Fracttal que falhou (`tarefas_os.estado()`, lido no pedido) aparece no topo com a hora das OS
+  que valem.
+- **O card da OS:** o item de OS do detalhe usa a chave `os_card` (`{"wid", "folio"}`) e abre o card do OS Creator
+  (`oscreator/card_os_abrir.html`; sem o id, pelo número). **Nunca `numero`**: no template, `numero` vira o botão da PT.
+- **Prova:** `tests/test_campo_manutencao.py` (as regras num dia fixo) e os testes do bloco em
+  `tests/test_campo_responsaveis.py` (a tela, o limite e o cookie, o cookie com lixo, a faixa com o filtro, o aviso sem
+  o fato, a leitura que falhou, o card da OS, o motivo que tira das atrasadas, os cartões com os três blocos, a
+  programação lida do fim). Na tela, com o dado real (18/10/2026, só GET): 8.737 tarefas, 334 OS abertas, 1.023 tarefas
+  atrasadas, 19 paradas, a semana passada (W41) em 52%, 31 OS de parada abertas; 60 usinas em Focar, 35 em Acompanhar e
+  36 em dia com o limite de 30; a 1920, 1536, 1440, 1366, 1024 e 375 px, escuro e claro, sem rolagem lateral.
 
 ### Os chamados de garantia no banco (`nexus_chamados · fato_chamado`, 12/10/2026)
 
@@ -888,7 +944,10 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   a validação por foto (`validacoes_por_foto`). `decisao_pt.py`: a decisão da PT no banco (acima).
 - `responsaveis.py`: a Visão do responsável (acima): `Nomes`, um leitor por fonte, os alertas e a linha de cada bloco,
   `montar`, `bloco`, `soma`, e os leitores das janelas (`serie_diaria`, `tabela_meta`, `disp_diaria`,
-  `os_disponibilidade`). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
+  `os_disponibilidade`); desde 18/10/2026, a Limpeza (`limpeza`), as paradas abertas (`paradas_abertas`) e o bloco
+  Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
+  `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
+  grava o `nexus_os` (acima). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
   `chamados_acompanhamento.py`: os chamados de garantia no banco (acima).
 - `livros_app.py`, `fonte_pg.py`, `tabelas.py`: os livros do App no formato que as regras copiadas consultam
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
