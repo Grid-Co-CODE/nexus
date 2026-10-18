@@ -185,3 +185,12 @@ def test_a_engenharia_age_pela_mesa_sem_marcar_a_confiabilidade(app, monkeypatch
         assert ST.pode("/t/engenharia/mesa", telas)
         for acao in ("pegar", "encaminhar", "a1b2c3/salvar", "a1b2c3/comentar"):
             assert ST.pode(f"/t/engenharia/confiabilidade/acompanhamento/{acao}", telas)
+
+
+def test_etiqueta_longa_quebra_dentro_do_cartao_no_celular():
+    # prova a 375 px (18/10/2026): "já acompanhado · Comunicação em 14/10" (sem quebra) alargava a coluna do corpo do
+    # cartão e passava da borda; a coluna encolhe e, no celular, a etiqueta quebra a linha
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r"\.eg-item-corpo\{[^}]*grid-template-columns:minmax\(0,1fr\)", css)
+    assert re.search(r"@media \(max-width:480px\)\{[^@]*\.eg-item-tags \.eg-tag\{white-space:normal\}", css)
