@@ -135,7 +135,9 @@ PerformancePainel.
 - **Nome de colega não entra em arquivo versionado** (o repositório é público; nome de técnico ou supervisor ao lado de
   nota, ronda ou pendência é dado pessoal ligado a desempenho): cite pelo papel ("um técnico", "o supervisor da equipe
   X", "o programador do PCM"); fixture de teste com nome fictício. `tests/test_sem_nomes_no_repositorio.py` monta a
-  lista de nomes só na memória (cadastro, App, livro de rondas) e falha com `caminho:linha`. O histórico do git
+  lista de nomes só na memória (cadastro, App, livro de rondas) e falha com `caminho:linha`. **Ele só roda com o
+  `.env`** (sem ele, pula): numa worktree, copie o `.env` antes da suíte (em 18/10/2026 três arquivos com nome passaram
+  assim, pelas worktrees sem `.env`). O histórico do git
   anterior a 08/10/2026 ainda tem nomes (não se reescreve).
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.

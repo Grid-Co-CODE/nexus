@@ -173,7 +173,7 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   `pcm/_fora_filtros.html`): Motivo; Técnico = quem justificou (quem pôs o motivo); Equipe = a equipe da tarefa na
   programação (o `cluster` da linha da semana, gravado na marca) ou, sem ela, na Gestão PCM: é a mesma da usina no
   cadastro do Nexus (14 de 14 em 16/10); Usina (o nome); Responsável = o responsável da OS no Fracttal (a Gestão PCM; em
-  16/10, os gestores de contrato Camila Viana e Danuth Fernandes); OS = o número digitado (só os dígitos, igual). As
+  16/10, dois gestores de contrato); OS = o número digitado (só os dígitos, igual). As
   listas mostram só o que existe, com quantas linhas têm cada um; os filtros somam; cada formulário da tabela leva os
   que valem (`v_<filtro>`), e a tela volta filtrada depois de salvar. Seis filtros e o Limpar cabem numa linha a 1366 px. A tabela (Levi,
   16/10, 2ª e 3ª rodadas), tudo centrado menos a Tarefa e sem a coluna Editar que abria a linha. **No estilo da tela de

@@ -36,10 +36,10 @@ As regras (as decisões do Levi no mesmo dia, e o que o ensaio com o cadastro mo
   a equipe sem um dos três deixa a usina sem ele ("-"), em vez de herdar o da equipe ou o do BD antigo; célula vazia
   não mexe. Quem não tem ficha ganha uma (o responsável, Supervisor de Campo, como a importação antiga; o resto,
   Colaborador de campo com o cargo e a equipe do CSV), com o nome e o e-mail da conta do Fracttal quando ela existe (é o
-  e-mail que liga a ficha ao Fracttal; o Caio da Silva Cordeiro e o Dallas Ferreira, 16/10). Da ficha que existe,
+  e-mail que liga a ficha ao Fracttal; duas pessoas em 16/10). Da ficha que existe,
   completa só o VAZIO (cargo, status, e-mail da conta do Fracttal) e a equipe quando o CSV dá uma só. A pessoa casa
-  também pelo NOME PADRÃO calculado (o furo de 16/10: o CSV escreve "Bruno Samiel..." e "Italo Vitor das Virgens...",
-  a ficha "Bruno Samuel..." e "Italo Vitor Dasvirgens...", e os padrões estão contidos no nome do CSV).
+  também pelo NOME PADRÃO calculado (o furo de 16/10: o CSV escrevia o nome com uma letra trocada ou com a partícula do
+  sobrenome separada, e o nome padrão da ficha está contido no nome do CSV).
 """
 import csv
 import io

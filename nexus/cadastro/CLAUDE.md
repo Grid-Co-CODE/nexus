@@ -150,7 +150,7 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
   vazio e não deixa o Nexus deduzir pela equipe), em vez de herdar o técnico fixado no BD antigo; célula vazia não mexe.
   Na prévia são as colunas "Técnico O&M (Pessoas da equipe)" e afins, na seção Equipe e contatos. **16/10, real:** o
   técnico mudou em 62 usinas (7 ganharam; 55 ficaram sem, porque o Nexus mostrava como técnico quem o CSV diz ser
-  mantenedor ou eletricista, como o Israel Rocha na Brumado / Tanhaçu): usinas com técnico 203 → 150.
+  mantenedor ou eletricista, como um mantenedor de duas usinas da mesma equipe na BA): usinas com técnico 203 → 150.
 - **Quem não tem ficha ganha uma** (Levi, 16/10: "procure esses 5 no fractall, faça a relação e adicione no Nexus, não
   podemos ficar sem informação! Se adapte"): o Responsável O&M como Supervisor de Campo (como a importação antiga), o
   resto como Colaborador de campo com o cargo ("Técnico de O&M" → Técnico O&M, "Eletricista", "Mantenedor"/"Man") e a
@@ -159,11 +159,12 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
   e-mail). Desligado sem ficha não entra; nome que serve a duas fichas não liga nem cria (aviso). A conta do Fracttal
   acha a ficha de outro nome pelo e-mail. Da ficha que existe, completa só o VAZIO (cargo, status, e-mail) e a equipe
   quando o CSV dá uma só. Os valores de vínculo, cargo e status que a lista não tem entram com os valores novos.
-  Em 16/10: Caio da Silva Cordeiro e Dallas Ferreira (contas ativas, sem ficha) nasceram; 29 fichas completadas (24
+  Em 16/10: duas pessoas com conta ativa e sem ficha nasceram; 29 fichas completadas (24
   mantenedores sem cargo e status, 5 e-mails conferidos nome a nome). Na prévia, o grupo "Colaboradores".
 - **A pessoa casa também pelo NOME PADRÃO calculado** (`_indice_pessoas`): o furo de 16/10 era casar só pelo nome
-  completo, e o CSV escreve "Bruno Samiel..." e "Italo Vitor das Virgens..." onde a ficha tem "Bruno Samuel..." e "Italo
-  Vitor Dasvirgens..."; os padrões "Bruno Albuquerque" e "Italo Oliveira" estão contidos no nome do CSV. Italo e Manuel
+  completo, e o CSV escrevia o nome com uma letra trocada ou com a partícula do sobrenome separada, onde a ficha a tem
+  junta; o nome padrão da ficha (o primeiro e o último nome) está contido no nome do CSV. Duas dessas pessoas não têm
+  conta no Fracttal (ficha certa, nada a relacionar).
   não têm conta no Fracttal (ficha certa, nada a relacionar).
 
 **Onde grava:** no cadastro da máquina em que a tela abre (`NEXUS_ARMAZEM_LOCAL`: o do servidor em app.gridco.com.br; o do
