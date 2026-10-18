@@ -9,7 +9,7 @@ anotados, e as funções que eles chamariam, trocadas por marcadores.
 import pytest
 
 import nexus.campo as campo
-from nexus.campo import aprovacao, chamados_acompanhamento, ronda_checklist, ronda_fotos, tabelas, visao
+from nexus.campo import aprovacao, chamados_acompanhamento, ronda_checklist, ronda_fotos, tabelas, tarefas_os, visao
 
 
 class _App:
@@ -29,6 +29,8 @@ def chamadas(monkeypatch):
     # rodada e ia ao Fracttal e ao banco com a config deste teste (13/10/2026: só não foi porque o app falso não tem
     # app_context)
     monkeypatch.setattr(chamados_acompanhamento, "ligar", lambda app: feitas.append("Fracttal: chamados no banco"))
+    # o laço das tarefas das OS (18/10/2026) é outra thread do mesmo jeito: marcador, nunca a rede
+    monkeypatch.setattr(tarefas_os, "ligar", lambda app: feitas.append("Fracttal: tarefas das OS no banco"))
     # a cópia em disco das fotos da ronda: o app falso não tem TESTING e apontava a pasta para a dados/ de verdade do
     # PC, onde os testes seguintes gravavam as fotos falsas (13/10/2026)
     monkeypatch.setattr(ronda_fotos, "configurar", lambda pasta: None)
@@ -54,12 +56,13 @@ def chamadas(monkeypatch):
 
 def test_sem_a_chave_liga_tudo(chamadas):
     """O servidor: a T.I. não põe nada no .env e sobe com a pré-carga pelo banco e as leituras do Fracttal."""
-    assert chamadas({}) == ["banco: telas do Campo", "Fracttal: chamados no banco", "Fracttal: fila da Aprovação",
-                            "Fracttal: rondas aprovadas"]
+    assert chamadas({}) == ["banco: telas do Campo", "Fracttal: chamados no banco", "Fracttal: tarefas das OS no banco",
+                            "Fracttal: fila da Aprovação", "Fracttal: rondas aprovadas"]
 
 
 def test_chave_em_zero_desliga_so_o_fracttal(chamadas):
     """O PC (NEXUS_CAMPO_AQUECER=0): sem leitura do Fracttal ao subir, mas as telas do Campo saem prontas do banco. Os
     chamados de garantia têm a chave deles (NEXUS_CHAMADOS_PUBLICAR, ver test_campo_chamados_acompanhamento): uma
     máquina grava por vez, pela trava de 50 min do banco."""
-    assert chamadas({"NEXUS_CAMPO_AQUECER": "0"}) == ["banco: telas do Campo", "Fracttal: chamados no banco"]
+    assert chamadas({"NEXUS_CAMPO_AQUECER": "0"}) == ["banco: telas do Campo", "Fracttal: chamados no banco",
+                                                      "Fracttal: tarefas das OS no banco"]

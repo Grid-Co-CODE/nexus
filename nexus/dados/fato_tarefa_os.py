@@ -108,6 +108,30 @@ def linhas(rows, lig, equip_idx, backoffice_hmac, chave_hmac) -> tuple[list[list
     return out, rel
 
 
+def linha_qualidade(linhas: list[list], rel: dict, origem_em: str, agora: str) -> list:
+    """A linha da aba `qualidade` (`fatos.CAB_QUALIDADE`), preenchida pelo nome da coluna como a da programação: quanto
+    liga a data programada, a usina e o equipamento, por onde a usina ligou, os sites que não ligaram (para consertar no
+    cadastro) e, no `extra`, o relatório da leitura (repetidas, fora do domínio, backoffice, páginas)."""
+    import json
+    from .fatos import CAB_QUALIDADE, _exemplos, _pct
+    i = {c: CAB_TAREFA_OS.index(c) for c in ("data_id_programada", "usina_id", "usina_ligada_por",
+                                              "equipamento_id", "site_fracttal")}
+    n = len(linhas)
+    com = {c: sum(1 for l in linhas if l[i[c]] is not None) for c in ("data_id_programada", "usina_id",
+                                                                      "equipamento_id")}
+    como = Counter(l[i["usina_ligada_por"]] for l in linhas)
+    extra = {k: rel.get(k) for k in ("lidas", "repetidas", "sem_chave", "fora_do_dominio", "backoffice", "paginas")}
+    valores = {"fato": "tarefa_os", "livro_origem": "Fracttal (API REST) · work_orders", "linhas": n,
+               "com_data": com["data_id_programada"], "com_usina": com["usina_id"],
+               "com_equipamento": com["equipamento_id"], "pct_data": _pct(com["data_id_programada"], n),
+               "pct_usina": _pct(com["usina_id"], n), "pct_equipamento": _pct(com["equipamento_id"], n),
+               "usina_por_de_para": como.get("de-para do Fracttal", 0), "usina_por_codigo": como.get("código do ativo", 0),
+               "sem_usina_exemplos": _exemplos(Counter(l[i["site_fracttal"]] for l in linhas if l[i["usina_id"]] is None)),
+               "origem_atualizada_em": origem_em, "gerado_em": agora,
+               "extra": json.dumps(extra, ensure_ascii=False, sort_keys=True)}
+    return [valores.get(c) for c in CAB_QUALIDADE]
+
+
 def conferir_grao(linhas: list[list]) -> None:
     """Sobe `GraoDuplicado` se o id da tarefa repete ou vem vazio: o fato não grava contando em dobro."""
     _conferir_grao(linhas, CAB_TAREFA_OS, "fracttal_tarefa_id")

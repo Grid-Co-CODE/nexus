@@ -39,6 +39,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_CARGA_DADOS",
              # os chamados de garantia no banco (12/10/2026, nexus/campo/chamados_acompanhamento.py): "0" desliga numa máquina
              "NEXUS_CHAMADOS_PUBLICAR",
+             # as tarefas das OS do Fracttal no banco (18/10/2026, nexus/campo/tarefas_os.py): "0" desliga numa máquina
+             "NEXUS_OS_PUBLICAR",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
              "NEXUS_ADMINS",
              # Entrar com a Microsoft da Grid Co. (14/10/2026, nexus/auth/microsoft.py): as QUATRO primeiras ligam a porta
