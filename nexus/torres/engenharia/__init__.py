@@ -5,11 +5,12 @@ diretamente esse caminho mas construindo algo nosso!"): o Nexus lê as OS de fal
 os_falhas.py`) e faz as contas (`nexus/engenharia/confiabilidade.py`). As outras telas seguem no placeholder da casca.
 Leia o CLAUDE.md desta pasta antes de mexer.
 """
+import collections
 import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import render_template, request
+from flask import render_template, request, session
 
 from ..modelo import Tela, Torre
 
@@ -43,7 +44,10 @@ bp = TORRE.criar_blueprint(__name__)
 BRT = timezone(timedelta(hours=-3))
 CACHE_S = 300
 _CACHE: dict = {}
-ABAS = (("ativos", "Ativos"), ("indicadores", "Indicadores"))
+# as abas do acompanhamento (18/10/2026): o ativo pego sai de Ativos com sinal e vai para Em acompanhamento; o encerrado,
+# para Encerrados; o cadastro dos diagnósticos só para quem pode mexer nele
+ABAS = (("ativos", "Ativos com sinal"), ("acompanhamento", "Em acompanhamento"), ("encerrados", "Encerrados"),
+        ("indicadores", "Indicadores"), ("diagnosticos", "Diagnósticos"))
 
 
 def _url(**mudar) -> str:
@@ -121,15 +125,98 @@ def _pct(x) -> str:
     return "—" if x is None else f"{100 * x:.1f}".replace(".", ",") + "%"
 
 
+def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
+    """O acompanhamento na Confiabilidade (18/10/2026; desenho em docs/superpowers/specs/2026-10-18-engenharia-
+    acompanhamento-design.md): as três listas das abas, com os filtros, e a gaveta de cada cartão da aba aberta."""
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    lido = AC.ler()
+    acomps = AC.estado(lido["eventos"])
+    diags = AC.diagnosticos(lido["diagnosticos"])
+    falhas_em = d.get("falhasEm") or {}
+    sep = AC.separar(d["sinais"], acomps, falhas_em)
+    # o ativo de um acompanhamento sem sinal agora: o da conta de disponibilidade, ou só o que o livro guardou
+    base = {canon(a["cod"]): a for a in d["ativos"]}
+    base.update({canon(s["cod"]): s for s in d["sinais"]})
+
+    def ativo_de(x):
+        return x["ativo"] or base.get(canon(x["acomp"]["cod"])) or {
+            "cod": x["acomp"]["cod"], "nome": x["acomp"]["cod"], "usina": "", "cliente": "", "fam": "", "crit": ""}
+    q = f["q"].strip().lower()
+
+    def passa(a, nivel, quem=None):
+        return ((not f["cliente"] or a.get("cliente") == f["cliente"]) and (not f["usina"] or a.get("usina") == f["usina"])
+                and (not f["fam"] or a.get("fam") == f["fam"]) and (not f["crit"] or a.get("crit") == f["crit"])
+                and (not f["nivel"] or nivel == f["nivel"]) and (quem is None or not f["quem"] or quem == f["quem"])
+                and (not q or q in f"{a.get('cod')} {a.get('nome')} {a.get('usina')} {a.get('cliente')}".lower()))
+    sinais = [s for s in sep["sinal"] if passa(s, s.get("nivel")) and not (esconder and s["soServico"])]
+    # em acompanhamento vale o nível de agora; no encerrado, o da entrada (encerrado quase nunca tem sinal agora)
+    abertos = [dict(x, a=ativo_de(x)) for x in sep["aberto"]
+               if passa(ativo_de(x), (x["ativo"] or {}).get("nivel"), x["acomp"]["responsavel"]["hmac"])]
+    encerrados = [dict(x, a=ativo_de(x), voltou_dia=x["voltou"].astimezone(BRT).strftime("%d/%m") if x["voltou"] else "")
+                  for x in sep["encerrado"]
+                  if passa(ativo_de(x), x["acomp"]["nivel_entrada"], x["acomp"]["responsavel"]["hmac"])]
+    anteriores = {}
+    for x in sep["encerrado"]:
+        anteriores.setdefault(canon(x["acomp"]["cod"]), []).append(x["acomp"])
+
+    def gaveta(i, a, acomp, novas):
+        c = canon(a.get("cod") or (acomp or {}).get("cod"))
+        novas = [dict(x, dia=x["quando"].astimezone(BRT).strftime("%d/%m")) for x in novas]
+        return {"id": f"g{i}", "a": a, "acomp": acomp, "novas": novas,
+                "anteriores": [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
+                "falhas_dias": sorted({x["quando"].astimezone(BRT).strftime("%Y-%m-%d") for x in falhas_em.get(c, [])})}
+    if aba == "ativos":
+        gavetas = [gaveta(i, s, None, []) for i, s in enumerate(sinais)]
+    elif aba == "acompanhamento":
+        gavetas = [gaveta(i, x["a"], x["acomp"], x["novas"]) for i, x in enumerate(abertos)]
+    elif aba == "encerrados":
+        gavetas = [gaveta(i, x["a"], x["acomp"], []) for i, x in enumerate(encerrados)]
+    else:
+        gavetas = []
+    fonte_quem = sep["aberto"] if aba == "acompanhamento" else sep["encerrado"]
+    quem_opcoes = sorted({x["acomp"]["responsavel"]["hmac"]: x["acomp"]["responsavel"]["nome"] or "(sem nome)"
+                          for x in fonte_quem if x["acomp"]["responsavel"]["hmac"]}.items(), key=lambda kv: kv[1].lower())
+    return {"sinais": sinais, "abertos": abertos, "encerrados": encerrados, "gavetas": gavetas, "diags": diags,
+            "diags_ativos": [x for x in diags if not x["excluido"]], "diag_nome": {x["id"]: x["nome"] for x in diags},
+            "quem_opcoes": quem_opcoes, "erro_acomp": "" if lido.get("lido_em") else lido.get("erro", ""),
+            "uso": collections.Counter(a["diagnostico_id"] for a in acomps.values() if a["diagnostico_id"]),
+            "contas": {"ativos": len(sinais), "acompanhamento": len(abertos), "encerrados": len(encerrados)}}
+
+
+def _quem_pode() -> tuple[bool, str | None]:
+    """(pode agir no acompanhamento, o código da pessoa do login): o administrador e quem é do setor Engenharia."""
+    from ...auth import setor_telas as ST
+    from ...engenharia import acompanhamento as AC
+    setor = (ST.acesso() or {}).get("setor")
+    return AC.pode_agir(setor, bool(session.get("admin"))), AC.codigo(session.get("usuario"))
+
+
+def _pessoas(pode: bool) -> list[dict]:
+    """As pessoas da Engenharia para o Encaminhar (o setor no banco e o nome no Fracttal); sem elas, a lista fica vazia
+    e a gaveta diz por quê."""
+    if not pode:
+        return []
+    from ...engenharia import acompanhamento as AC
+    try:
+        return AC.pessoas_da_engenharia()
+    except Exception as e:      # noqa: BLE001 — setor ou Fracttal fora: o Encaminhar diz que não há a quem
+        import logging
+        logging.warning("confiabilidade: as pessoas da Engenharia não vieram (%s: %s)", type(e).__name__, str(e)[:160])
+        return []
+
+
 @bp.route("/confiabilidade")
 def confiabilidade():
     from ...engenharia import confiabilidade as C
     from ...engenharia import os_falhas
     g = _dados()
     d = g["dados"]
-    f = {k: request.args.get(k, "") for k in ("cliente", "usina", "fam", "crit", "nivel", "q")}
+    pode, meu = _quem_pode()
+    abas = tuple(x for x in ABAS if x[0] != "diagnosticos" or pode)
+    f = {k: request.args.get(k, "") for k in ("cliente", "usina", "fam", "crit", "nivel", "q", "quem")}
     esconder = request.args.get("servico") == "0"
-    aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS) else "ativos"
+    aba = request.args.get("aba") if request.args.get("aba") in dict(abas) else "ativos"
     q = f["q"].strip().lower()
 
     def passa(a, com_nivel=True):
@@ -137,7 +224,8 @@ def confiabilidade():
                 and (not f["fam"] or a["fam"] == f["fam"]) and (not f["crit"] or a["crit"] == f["crit"])
                 and (not com_nivel or not f["nivel"] or a.get("nivel") == f["nivel"])
                 and (not q or q in f"{a['cod']} {a['nome']} {a.get('usina')} {a.get('cliente')}".lower()))
-    sinais = [a for a in d["sinais"] if passa(a) and not (esconder and a["soServico"])]
+    # todos os ativos com sinal (acompanhados ou não): o painel ao lado e a faixa descrevem a frota (escolha de 18/10)
+    todos = [a for a in d["sinais"] if passa(a) and not (esconder and a["soServico"])]
     ativos = [a for a in d["ativos"] if passa(a, com_nivel=False)]
     por = request.args.get("por") if request.args.get("por") in ("cliente", "usina") else "cliente"
     clientes = sorted({a.get("cliente") for a in d["ativos"] + d["sinais"] if a.get("cliente")})
@@ -145,20 +233,23 @@ def confiabilidade():
                      and (not f["cliente"] or a.get("cliente") == f["cliente"])})
     # o painel ao lado: os clientes com mais ativos com sinal (com os filtros de agora)
     por_cliente = {}
-    for a in sinais:
+    for a in todos:
         x = por_cliente.setdefault(a.get("cliente") or "—", {"nome": a.get("cliente") or "—", "sinais": 0, "criticos": 0})
         x["sinais"] += 1
         x["criticos"] += a["nivel"] == "critico"
     top_clientes = sorted(por_cliente.values(), key=lambda x: (-x["sinais"], -x["criticos"], x["nome"]))[:6]
+    ac = _gavetas_e_listas(d, f, esconder, aba)
     return render_template(
         "engenharia/confiabilidade.html", fams=d.get("familias") or [], crit_dist=d.get("critDist") or {},
         top_clientes=top_clientes, torre=TORRE, tela=TORRE.tela("confiabilidade"), d=d, k=d["kpi"],
-        sinais=sinais, total_sinais=len(d["sinais"]), ativos=ativos, f=f, esconder=esconder, aba=aba, abas=ABAS,
-        por=por, indicadores=C.indicadores(ativos, sinais, por) if aba == "indicadores" else [],
+        todos=todos, total_sinais=len(d["sinais"]), ativos=ativos, f=f, esconder=esconder, aba=aba, abas=abas,
+        por=por, indicadores=C.indicadores(ativos, todos, por) if aba == "indicadores" else [],
         clientes=clientes, usinas=usinas, familias=C.FAMILIAS, niveis=C.NIVEIS, meta=C.META_DISP,
         janela=C.JANELA_DIAS, url=_url, h=_h, pct=_pct, est=os_falhas.estado(), sem_cadastro=g.get("sem_cadastro"),
-        lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"),
-        periodo=f"{d['periodo']['de'].astimezone(BRT):%d/%m} a {d['periodo']['ate'].astimezone(BRT):%d/%m/%Y}")
+        lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"), pode=pode, meu=meu,
+        pessoas=_pessoas(pode) if aba in ("ativos", "acompanhamento") else [],
+        hoje=datetime.now(BRT).date().isoformat(),
+        periodo=f"{d['periodo']['de'].astimezone(BRT):%d/%m} a {d['periodo']['ate'].astimezone(BRT):%d/%m/%Y}", **ac)
 
 
 # ── Quadro da equipe (06/10/2026) ───────────────────────────────────────────────────────────────────────────────────

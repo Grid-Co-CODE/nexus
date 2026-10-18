@@ -271,3 +271,69 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 .kb-raia{display:grid;gap:10px}
 .kb-raia-tit{display:flex;align-items:center;gap:10px;margin:0;font:700 15px var(--font-sans);color:var(--tinta)}
 .kb-rodape{font-size:12.5px;margin-top:14px}
+
+/* ── o acompanhamento dos ativos (18/10/2026): o cartão com os botões, as abas Em acompanhamento e Encerrados, o bloco
+   da gaveta e o cadastro dos diagnósticos. O cartão virou <article> com o botão que abre a gaveta e, ao lado, os
+   botões de agir (botão dentro de botão não vale) ── */
+.eg-cartao{border-bottom:1px solid var(--linha)}
+.eg-cartao:last-child{border-bottom:0}
+.eg-cartao>.eg-item{border-bottom:0}
+.eg-item-acoes{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;padding:0 18px 12px}
+.eg-item-acoes form{margin:0}
+.eg-btn-peq{padding:6px 12px;font-size:12.5px}
+.eg-pill--ok{color:var(--ok);background:var(--ok-suave);box-shadow:inset 0 0 0 1px var(--ok)}
+.eg-pill--neutro{color:var(--tinta-2);background:var(--superficie-2);box-shadow:inset 0 0 0 1px var(--linha-forte)}
+.eg-tag--ok{color:var(--ok);background:var(--ok-suave)}
+.eg-acomp-quem{font-size:12.5px;color:var(--tinta-2)}
+.eg-acomp-ultimo{font-size:13px;color:var(--tinta-2);border-left:3px solid var(--linha-forte);padding-left:10px;
+  overflow-wrap:anywhere}
+.eg-acomp-ultimo i{font-style:normal;font-size:12px;color:var(--mudo)}
+.eg-aviso-lista{margin:12px 18px}
+.eg-acomp{margin-top:18px;padding:14px;border:1px solid var(--verde-a40);border-radius:12px;background:var(--verde-suave)}
+.eg-acomp--fechado{border-color:var(--linha-forte);background:var(--superficie-2)}
+.eg-gaveta .eg-acomp-tit{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px;
+  font:700 14px/1.3 var(--font-sans);letter-spacing:0;text-transform:none;color:var(--tinta)}
+.eg-acomp-dono{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 10px;padding:9px 12px;
+  border-radius:10px;background:var(--superficie-2);font-size:13px;color:var(--tinta-2)}
+.eg-acomp--fechado .eg-acomp-dono{background:var(--superficie)}
+.eg-acomp-dono b{color:var(--tinta)}
+.eg-acomp-aviso{margin-top:10px;padding:9px 12px;border-radius:10px;border:1px solid var(--critico);
+  background:var(--critico-suave);font-size:13px;color:var(--tinta)}
+.eg-acomp-aviso b{color:var(--critico)}
+.eg-acomp-msg{margin:12px 0 0;padding:9px 12px;border-radius:10px;font-size:13px}
+.eg-acomp-msg--ok{border:1px solid var(--ok);background:var(--ok-suave);color:var(--tinta)}
+.eg-acomp-msg--erro{border:1px solid var(--critico);background:var(--critico-suave);color:var(--tinta)}
+.eg-acomp-campos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.eg-acomp-campos label{display:grid;gap:4px;min-width:0}
+.eg-acomp-campos .gc-campo,.eg-acomp-coment .gc-campo,.eg-encaminhar .gc-campo{width:100%;min-width:0}
+.eg-acomp-dica,.eg-acomp-volta{grid-column:1/-1;margin:0;font-size:12px;color:var(--mudo)}
+.eg-acomp-volta{color:var(--alerta)}
+.eg-acomp-campos>.gc-btn,.eg-acomp-coment>.gc-btn{grid-column:1/-1;justify-self:end}
+.eg-acomp-dados{margin-top:12px}
+.eg-gaveta .eg-acomp-sub{margin:16px 0 8px;font:700 13px/1.3 var(--font-sans);color:var(--tinta)}
+.eg-acomp-coment{display:grid;gap:8px}
+.eg-acomp-coment textarea{min-height:64px;resize:vertical;font:inherit}
+.eg-acomp-tl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.eg-acomp-tl li{display:grid;gap:2px;padding:9px 12px;border-radius:10px;background:var(--superficie-2);font-size:13px;
+  color:var(--tinta);white-space:pre-line;overflow-wrap:anywhere}
+.eg-acomp--fechado .eg-acomp-tl li{background:var(--superficie)}
+.eg-acomp-tl .q{white-space:normal;font-size:11.5px;color:var(--mudo)}
+.eg-acomp-sem{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-top:18px;
+  padding:12px 14px;border:1px dashed var(--linha-forte);border-radius:12px;font-size:13px;color:var(--tinta-2)}
+.eg-acomp-acoes{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
+.eg-acomp-acoes form{margin:0}
+.eg-encaminhar summary{list-style:none;cursor:pointer}
+.eg-encaminhar summary::-webkit-details-marker{display:none}
+.eg-encaminhar[open] summary{border-color:var(--verde)}
+.eg-encaminhar-form{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.eg-encaminhar-form select{flex:1 1 180px}
+.eg-encaminhar-vazio{margin:8px 0 0;font-size:12.5px}
+.eg-ant{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.eg-ant>li{padding:9px 12px;border:1px solid var(--linha);border-radius:10px;font-size:13px;color:var(--tinta-2)}
+.eg-ant summary{cursor:pointer}
+.eg-ant b{color:var(--tinta)}
+.eg-diag td{vertical-align:top}
+@media (max-width:640px){
+  .eg-acomp-campos{grid-template-columns:minmax(0,1fr)}
+  .eg-item-acoes{justify-content:flex-start}
+}

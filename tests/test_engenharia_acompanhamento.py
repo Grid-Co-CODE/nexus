@@ -300,3 +300,106 @@ def test_codigo_casa_sem_caixa_nem_espaco():
     s = A.separar([{"cod": " ibi200-invr1.3", "nivel": "critico"}],
                   {"a1": _ac("IBI200-INVR1.3", D(16), date(2026, 10, 16))}, {})
     assert s["sinal"] == [] and s["aberto"][0]["ativo"]["cod"] == " ibi200-invr1.3"
+
+
+# ── Task 5: a tela (abas, filtros, listas e a gaveta) ────────────────────────────────────────────────────────────────
+TRK07 = {"cod": "IBI200-TRK07", "usina_id": 1, "usina_ligada_por": "de-para do Fracttal", "nivel": "monitorar",
+         "nFalha": 2, "n7": 1}
+
+
+@pytest.fixture
+def tela(banco, app, monkeypatch):
+    """A Confiabilidade com o relógio em 06/10/2026 (as OS de test_engenharia_confiabilidade): sinal em IBI200-INVR1.3
+    (crítico), IBI200-TRK07 e IBI200-INV02; no livro, INVR1.3 aberto com Ana Lima e TRK07 encerrado hoje, sem falha
+    depois do fim; INV02 livre. Quem entra é do setor Engenharia."""
+    from test_engenharia_confiabilidade import AGORA, _onde, _os
+
+    from nexus.auth import setor_telas as ST
+    from nexus.engenharia import confiabilidade as C
+    from nexus.engenharia import os_falhas
+    from nexus.torres import engenharia as torre
+
+    class Relogio(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return AGORA.astimezone(tz)
+    monkeypatch.setattr(C, "datetime", Relogio)
+    linhas = ([_os("IBI200-INVR1.3", d) for d in (1, 2, 3, 10)] + [_os("IBI200-TRK07", d) for d in (5, 20)]
+              + [_os("IBI200-INV02", d) for d in (1, 4)])
+    monkeypatch.setattr(os_falhas, "pedir_releitura", lambda app=None: None)
+    monkeypatch.setattr(os_falhas, "linhas", lambda: linhas)
+    monkeypatch.setattr(os_falhas, "estado", lambda: {"lendo": False, "erro": "", "completa": True, "n": len(linhas),
+                                                       "vivas_em": 1})
+    monkeypatch.setattr(torre, "_onde_do_cadastro", lambda: _onde)
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+                                               "erro": ""})
+    monkeypatch.setattr(A, "pessoas_da_engenharia", PESSOAS)
+    A.pegar(dict(ATIVO, nFalha=4), ANA, pode=True)
+    A.pegar(TRK07, ANA, pode=True)
+    hoje = datetime.now(BRT).date().isoformat()
+    A.salvar(_aid_de("IBI200-TRK07"), hoje, hoje, "2", ANA, True)
+    torre._CACHE.clear()
+    yield banco
+    torre._CACHE.clear()
+
+
+def test_tela_tem_as_abas_e_os_numeros(tela, cliente):
+    html = _como(cliente, ANA).get("/t/engenharia/confiabilidade").get_data(as_text=True)
+    assert "Em acompanhamento <i>1</i>" in html and "Encerrados <i>1</i>" in html and ">Diagnósticos<" in html
+    assert "Ativos com sinal <i>1</i>" in html and "Pegar para acompanhar" in html
+    assert "IBI200-INV02" in _lista(html) and "IBI200-TRK07" not in _lista(html) and "IBI200-INVR1.3" not in _lista(html)
+    assert 'name="quem"' not in html
+    ac = cliente.get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
+    assert "IBI200-INVR1.3" in _lista(ac) and "Com Ana Lima (você) desde" in ac and 'name="quem"' in ac
+    assert "Quem acompanha" in ac and "4" in _lista(ac)                         # as falhas quando entrou
+    enc = cliente.get("/t/engenharia/confiabilidade?aba=encerrados").get_data(as_text=True)
+    assert "IBI200-TRK07" in _lista(enc) and "Quem acompanhava" in enc and "Disjuntor" in _lista(enc)
+    assert "sem falha nova desde o fim" in _lista(enc)
+    dg = cliente.get("/t/engenharia/confiabilidade?aba=diagnosticos").get_data(as_text=True)
+    assert "Comunicação" in dg and "Disjuntor" in dg
+
+
+def test_filtro_quem_acompanha(tela, cliente):
+    _como(cliente, ANA)
+    url = "/t/engenharia/confiabilidade?aba=acompanhamento&quem="
+    assert "IBI200-INVR1.3" in _lista(cliente.get(url + A.codigo(ANA)).get_data(as_text=True))
+    assert "IBI200-INVR1.3" not in _lista(cliente.get(url + A.codigo(BETO)).get_data(as_text=True))
+    # os filtros de hoje valem também nesta aba; o nível é o de agora
+    assert "IBI200-INVR1.3" not in _lista(cliente.get(
+        "/t/engenharia/confiabilidade?aba=acompanhamento&nivel=atencao").get_data(as_text=True))
+
+
+def test_quem_nao_e_da_engenharia_le_sem_botoes(tela, cliente, monkeypatch):
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+                                               "erro": ""})
+    html = _como(cliente, BETO).get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
+    assert "IBI200-INVR1.3" in _lista(html) and "Com Ana Lima desde" in html
+    assert "Pegar para acompanhar" not in html and "Salvar comentário" not in html and ">Diagnósticos<" not in html
+    assert ">Diagnósticos<" not in cliente.get("/t/engenharia/confiabilidade?aba=diagnosticos").get_data(as_text=True)
+
+
+def test_gaveta_mostra_o_acompanhamento_e_os_anteriores(tela, cliente):
+    A.comentar(_aid_de("IBI200-INVR1.3"), "Datalogger perde o link", BETO, True)
+    html = _como(cliente, ANA).get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
+    assert "Acompanhamento" in html and "Datalogger perde o link" in html and "Salvar comentário" in html
+    assert "Início da análise" in html and "Fim da análise" in html and "Beto Souza" in html
+    enc = cliente.get("/t/engenharia/confiabilidade?aba=encerrados").get_data(as_text=True)
+    assert "Encerrado" in enc and "Salvar comentário" not in enc                     # encerrado fica só para ler
+
+
+def test_comentario_com_html_sai_escapado(tela, cliente):
+    # Review Focus 3
+    A.comentar(_aid_de("IBI200-INVR1.3"), "<script>alert(1)</script>", ANA, True)
+    html = _como(cliente, ANA).get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html and "<script>alert(1)" not in html
+
+
+def test_banco_fora_a_tela_abre_e_avisa(tela, cliente, monkeypatch):
+    # Review Focus 4: sem ler o livro, a aba diz que não leu (nunca "nenhum") e a tela abre
+    monkeypatch.setattr(tela, "get", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("fora")))
+    A.limpar()
+    r = _como(cliente, ANA).get("/t/engenharia/confiabilidade?aba=acompanhamento")
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Não consegui ler os acompanhamentos" in html
+    assert "Nenhum ativo em acompanhamento" not in html

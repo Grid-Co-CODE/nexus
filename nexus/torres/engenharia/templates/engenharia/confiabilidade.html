@@ -5,7 +5,9 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
 {# Confiabilidade, nossa (06/10/2026): as OS de falha do Fracttal lidas pelo Nexus (nexus/engenharia/os_falhas.py) e as
    contas em nexus/engenharia/confiabilidade.py. Visual (Levi, 06/10: "acho essa estética bem mais atrativa, o nosso está
-   pouco criativo"): lista em cartões com a gaveta lateral, painel "onde está o problema" e estatísticas com barras. #}
+   pouco criativo"): lista em cartões com a gaveta lateral, painel "onde está o problema" e estatísticas com barras.
+   O acompanhamento (18/10/2026): o ativo pego sai de Ativos com sinal e vai para Em acompanhamento; o encerrado, para
+   Encerrados; a gaveta (engenharia/_gaveta.html, a mesma da resposta das ações) traz o acompanhamento. #}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
 {% macro pill(n) %}{% for k, rot, cor in niveis if k == n %}<span class="eg-pill eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}{% endmacro %}
 {% macro barra(v, maximo) %}<span class="eg-mini" style="width:{{ (100 * (v or 0) / (maximo or 1))|round(0) }}%"></span>{% endmacro %}
@@ -54,14 +56,18 @@
         <select class="gc-campo" name="nivel" onchange="this.form.submit()"><option value="">Todos</option>{% for x, rot, _c in niveis %}<option value="{{ x }}"{% if x == f.nivel %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
       <label><span class="gc-rotulo">Buscar</span>
         <input class="gc-campo" type="search" name="q" value="{{ f.q }}" placeholder="ativo, código, usina"></label>
+      {% if aba in ('acompanhamento', 'encerrados') %}
+      <label><span class="gc-rotulo">{{ 'Quem acompanha' if aba == 'acompanhamento' else 'Quem acompanhava' }}</span>
+        <select class="gc-campo" name="quem" onchange="this.form.submit()"><option value="">Todos</option>{% for hm, nome in quem_opcoes %}<option value="{{ hm }}"{% if hm == f.quem %} selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
+      {% endif %}
       {% for x in ('aba', 'por', 'servico') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     </form>
-    <p class="eg-conta"><b>{{ sinais|length }}</b> ativos com sinal, de <b>{{ k.ativosCorretiva }}</b> com corretiva em {{ janela }} dias
+    <p class="eg-conta"><b>{{ todos|length }}</b> ativos com sinal, de <b>{{ k.ativosCorretiva }}</b> com corretiva em {{ janela }} dias{% if contas.acompanhamento %} · <b>{{ contas.acompanhamento }}</b> em acompanhamento{% endif %}
       <a class="eg-alterna{% if esconder %} eg-alterna--on{% endif %}" href="{{ url(servico=None if esconder else '0') }}">{{ 'Mostrar' if esconder else 'Esconder' }} serviço registrado como corretiva</a></p>
   </section>
 
   <nav class="eg-abas" aria-label="Abas">
-    {% for a, nome in abas %}<a href="{{ url(aba=None if a == 'ativos' else a) }}"{% if a == aba %} aria-current="page"{% endif %}>{{ nome }}{% if a == 'ativos' %} <i>{{ sinais|length }}</i>{% endif %}</a>{% endfor %}
+    {% for a, nome in abas %}<a href="{{ url(aba=None if a == 'ativos' else a) }}"{% if a == aba %} aria-current="page"{% endif %}>{{ nome }}{% if a in contas %} <i>{{ contas[a] }}</i>{% endif %}</a>{% endfor %}
   </nav>
 
   <section class="eg-painel eg-kpis">
@@ -76,9 +82,11 @@
   {% if aba == 'ativos' %}
   <div class="eg-grade">
     <section class="eg-painel">
-      <div class="eg-painel-cab"><h2>Ativos com sinal</h2><span>por gravidade · clique abre a gaveta</span></div>
+      <div class="eg-painel-cab"><h2>Ativos com sinal</h2><span>por gravidade · quem está em acompanhamento sai daqui · clique abre a gaveta</span></div>
+      {% if erro_acomp %}<p class="cn-erro cn-aviso eg-aviso-lista" role="status"><b>Não consegui ler os acompanhamentos ({{ erro_acomp }}).</b> A lista pode trazer ativos que já estão em acompanhamento; recarregue em instantes.</p>{% endif %}
       <div class="eg-itens">
       {% for a in sinais %}
+        <article class="eg-cartao">
         <button type="button" class="eg-item" data-gaveta="g{{ loop.index0 }}">
           {{ pill(a.nivel) }}
           <span class="eg-item-corpo">
@@ -88,34 +96,14 @@
               {% if a.nFalha >= 3 %}{{ tag('A · ' ~ a.nFalha ~ ' falhas em ' ~ janela ~ 'd', 'critico' if a.nFalha >= 4 else 'alerta') }}{% endif %}
               {% if a.n7 >= 1 %}{{ tag('B · ' ~ a.n7 ~ ' em 7d', 'critico' if a.n7 >= 3 else ('alerta' if a.n7 >= 2 else 'neutro')) }}{% endif %}
               {% if a.nFalha > a.p90 %}{{ tag('D · P90 ' ~ a.fam ~ ' = ' ~ a.p90, 'alerta') }}{% endif %}
-              {% if a.disp is not none %}{{ tag('Disp ' ~ pct(a.disp), 'alerta' if a.disp < meta else 'neutro') }}{% endif %}</span>
+              {% if a.disp is not none %}{{ tag('Disp ' ~ pct(a.disp), 'alerta' if a.disp < meta else 'neutro') }}{% endif %}
+              {% if a.ja %}{{ tag('já acompanhado · ' ~ diag_nome.get(a.ja.diagnostico_id, 'sem diagnóstico') ~ ' em ' ~ a.ja.fim.strftime('%d/%m'), 'neutro') }}{% endif %}</span>
           </span>
           <span class="eg-item-n"><b>{{ a.nFalha }}</b><span>falha{{ 's' if a.nFalha != 1 }} · {{ a.n30 }} OS</span></span>
         </button>
-        <template id="g{{ loop.index0 }}">
-          <div class="eg-gav-cab">{{ pill(a.nivel) }}<div><h2>{{ a.nome }}</h2><p><code>{{ a.cod }}</code> · {{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %} · {{ a.cliente }}</p></div></div>
-          <div class="eg-gav-kpis">
-            <div><span class="v">{{ h(a.mtbf) }}</span><span class="n">MTBF</span></div>
-            <div><span class="v">{{ h(a.mttr) }}</span><span class="n">MTTR</span></div>
-            <div><span class="v cn-t-{{ 'ok' if (a.disp or 0) >= meta else 'critico' }}">{{ pct(a.disp) }}</span><span class="n">Disponibilidade</span></div>
-            <div><span class="v">{{ a.n }}</span><span class="n">falhas desde 20/10/2025</span></div>
-          </div>
-          <h3>Por que acendeu</h3>
-          <ul class="eg-porque">{% for p in a.porQue %}<li>{{ p }}</li>{% else %}<li>2 falhas em {{ janela }} dias</li>{% endfor %}</ul>
-          <dl class="cn-dados eg-gav-dados">
-            <dt>Família</dt><dd>{{ a.fam }} · criticidade {{ a.crit }} ({{ a.critVal }})</dd>
-            {% if a.cluster %}<dt>Cluster</dt><dd>{{ a.cluster }}{% if a.equipe %} · {{ a.equipe }}{% endif %}</dd>{% endif %}
-            {% if a.circuito %}<dt>Circuito</dt><dd>{{ a.circuito }}</dd>{% endif %}
-            {% if a.mtbf %}<dt>λ</dt><dd>{{ '%.1e'|format(1 / a.mtbf) }} falhas/h</dd>{% endif %}
-          </dl>
-          <h3>As últimas OS ({{ a.os|length }} de {{ a.n30 }} em {{ janela }} dias)</h3>
-          <ol class="eg-oss">{% for o in a.os %}
-            <li class="{{ 'eg-os-servico' if o.servico }}"><span class="eg-os-cab"><span class="m">{{ o.d }}</span>
-              {% if o.url %}<a class="cn-link m" href="{{ (o.url)|na_raiz }}" target="_blank" rel="noopener">OS {{ o.os }}</a>{% else %}<span class="m">OS {{ o.os }}</span>{% endif %}
-              <span>{{ o.tipo }}</span>{% if o.servico %}{{ tag('serviço', 'info') }}{% endif %}<span class="mudo">{{ o.st }}</span></span>
-              <b>{{ o.t }}</b>{% if o.nota %}<span class="mudo">{{ o.nota }}</span>{% endif %}{% if o.quem %}<span class="eg-quem">{{ o.quem }}</span>{% endif %}</li>
-          {% endfor %}</ol>
-        </template>
+        {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post"><input type="hidden" name="cod" value="{{ a.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
+          <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-gaveta="g{{ loop.index0 }}" data-eg-abrir-encaminhar>Encaminhar</button></div>{% endif %}
+        </article>
       {% else %}<p class="mudo eg-vazio">Nenhum ativo com sinal com esses filtros.</p>{% endfor %}
       </div>
     </section>
@@ -146,11 +134,47 @@
       </section>
     </aside>
   </div>
-  <div class="eg-veu" hidden></div>
-  <aside class="eg-gaveta" role="dialog" aria-modal="true" aria-label="Ativo" hidden>
-    <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
-    <div class="eg-gav-corpo"></div>
-  </aside>
+  {% elif aba in ('acompanhamento', 'encerrados') %}
+  {% set lista = abertos if aba == 'acompanhamento' else encerrados %}
+  <section class="eg-painel">
+    <div class="eg-painel-cab"><h2>{{ 'Em acompanhamento' if aba == 'acompanhamento' else 'Encerrados' }}</h2><span>{{ 'quem tem falha nova primeiro, depois o nível' if aba == 'acompanhamento' else 'o encerrado mais recente em cima' }} · clique abre a gaveta</span></div>
+    {% if erro_acomp %}<p class="cn-erro cn-aviso eg-aviso-lista" role="status"><b>Não consegui ler os acompanhamentos ({{ erro_acomp }}).</b> Recarregue em instantes.</p>
+    {% else %}
+    <div class="eg-itens">
+    {% for x in lista %}{% set ac = x.acomp %}{% set a = x.a %}
+      <article class="eg-cartao">
+      <button type="button" class="eg-item" data-gaveta="g{{ loop.index0 }}">
+        {% if aba == 'encerrados' %}<span class="eg-pill eg-pill--ok">Encerrado</span>{% elif x.ativo %}{{ pill(x.ativo.nivel) }}{% else %}<span class="eg-pill eg-pill--neutro">Sem sinal agora</span>{% endif %}
+        <span class="eg-item-corpo">
+          <span class="eg-item-tit"><b>{{ a.nome }}</b> <code>{{ ac.cod }}</code> <span class="eg-onde">{{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %}</span></span>
+          {% if aba == 'acompanhamento' %}
+          <span class="eg-acomp-quem">Com {{ ac.responsavel.nome or 'alguém' }}{% if meu and ac.responsavel.hmac == meu %} (você){% endif %} desde {{ ac.desde.strftime('%d/%m') if ac.desde else '—' }}{% if ac.encaminhado_por %} · encaminhado por {{ ac.encaminhado_por }}{% endif %} · análise desde {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }}</span>
+          {% else %}
+          <span class="eg-acomp-quem">{{ ac.responsavel.nome or '—' }} · análise {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }} → {{ ac.fim.strftime('%d/%m/%Y') if ac.fim else '—' }}</span>
+          {% endif %}
+          <span class="eg-item-tags">
+            {% if ac.diagnostico_id %}{{ tag('Diagnóstico: ' ~ diag_nome.get(ac.diagnostico_id, '—'), 'info') }}{% else %}{{ tag('Diagnóstico a definir', 'neutro') }}{% endif %}
+            {{ tag(ac.comentarios|length ~ (' comentário' if ac.comentarios|length == 1 else ' comentários'), 'neutro') }}
+            {% if aba == 'acompanhamento' and x.novas %}{{ tag(x.novas|length ~ (' falha nova' if x.novas|length == 1 else ' falhas novas') ~ ' desde que entrou', 'critico') }}{% endif %}
+            {% if aba == 'encerrados' %}{% if x.voltou %}{{ tag('voltou com falha nova em ' ~ x.voltou_dia, 'critico') }}{% else %}{{ tag('sem falha nova desde o fim', 'ok') }}{% endif %}{% endif %}
+          </span>
+          {% if aba == 'acompanhamento' and ac.comentarios %}{% set c = ac.comentarios[0] %}<span class="eg-acomp-ultimo">"{{ c.texto|truncate(140) }}" <i>· {{ c.nome }}, {{ c.quando_txt }}</i></span>{% endif %}
+        </span>
+        <span class="eg-item-n"><b>{{ ac.falhas30_entrada if ac.falhas30_entrada is not none else '—' }}</b><span>falhas quando entrou</span></span>
+      </button>
+      </article>
+    {% else %}<p class="mudo eg-vazio">{{ 'Nenhum ativo em acompanhamento com esses filtros.' if aba == 'acompanhamento' else 'Nenhum acompanhamento encerrado com esses filtros.' }}</p>{% endfor %}
+    </div>
+    {% endif %}
+  </section>
+  {% elif aba == 'diagnosticos' %}
+  <section class="eg-painel">
+    <div class="eg-painel-cab"><h2>Diagnósticos</h2><span>a lista do Diagnóstico do acompanhamento · o excluído sai da escolha e o número dele não volta</span></div>
+    <div class="eg-est-rolo"><table class="eg-est eg-diag">
+      <thead><tr><th>Nome</th><th>Descrição</th><th class="eg-num">Em uso</th></tr></thead>
+      <tbody>{% for x in diags if not x.excluido %}<tr><td><b>{{ x.nome }}</b></td><td>{{ x.descricao or '—' }}</td><td class="eg-num">{{ uso.get(x.id, 0) }}</td></tr>
+      {% else %}<tr><td colspan="3" class="mudo">Nenhum diagnóstico no cadastro.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
   {% else %}
   {% set cols = [('usinas', 'Usinas'), ('eventos', 'Eventos (hist.)'), ('sinais', 'Ativos c/ sinal'), ('criticos', 'Críticos'),
                  ('falhas30', 'Falhas ' ~ janela ~ 'd'), ('abaixo', 'Abaixo da meta'), ('mtbf', 'MTBF (h)'), ('mttr', 'MTTR (h)')] %}
@@ -177,6 +201,13 @@
       como está um ativo típico do cliente. "Eventos" são as falhas desde 20/10/2025.</p>
   </section>
   {% endif %}
+  {# a gaveta de cada cartão da aba aberta (o acompanhamento entra nela; 18/10/2026) #}
+  {% for gv in gavetas %}<template id="{{ gv.id }}">{% include "engenharia/_gaveta.html" %}</template>{% endfor %}
+  <div class="eg-veu" hidden></div>
+  <aside class="eg-gaveta" role="dialog" aria-modal="true" aria-label="Ativo" hidden>
+    <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
+    <div class="eg-gav-corpo"></div>
+  </aside>
   <div class="cn-nota"><b>De onde vem.</b> As OS de falha (corretiva, corretiva emergencial, religamento e religamento remoto)
     lidas pelo Nexus no Fracttal: as abertas a cada leitura, as concluídas desde 20/10/2025 guardadas e atualizadas pelo
     que fechou depois; as canceladas ficam fora. {{ est.n }} OS na conta de agora.</div>
