@@ -373,7 +373,7 @@ def responsaveis():
     limite = campo_resp.limite_do_pedido(pedido_limite if pedido_limite is not None
                                          else request.cookies.get(COOKIE_LIMITE))
     todas = campo_resp.com_manutencao(d.get("usinas") or [], limite)
-    # o responsável que entrou pelo Fracttal vai direto para Onde focar, nas usinas dele, e não vê os cartões (Levi,
+    # o responsável que entrou pelo Fracttal vai direto para a Visão geral, nas usinas dele, e não vê os cartões (Levi,
     # 12/10/2026: "caso a pessoa que logue seja algum desses responsáveis não vai aparecer por responsável, já vai direto
     # para Onde Focar!"); o filtro continua, para olhar as usinas de quem ele estiver cobrindo
     logado = "" if leitura.erro else _responsavel_do_login(d)
@@ -383,7 +383,7 @@ def responsaveis():
     else:
         responsavel = "" if pedido == TODOS else pedido
     cliente = request.args.get("cliente", "")
-    # a equipe (18/10/2026): o cartão do Ranking das equipes abre Onde focar só com as usinas dela; o nome exato do
+    # a equipe (18/10/2026): o cartão do Ranking das equipes abre a Visão geral só com as usinas dela; o nome exato do
     # cadastro, nunca um pedaço (a busca continua para isso)
     equipe = request.args.get("equipe", "")
     q = request.args.get("q", "").strip().lower()
@@ -395,16 +395,22 @@ def responsaveis():
     base = [u for u in todas if passa(u)]
     usinas = [u for u in base if not responsavel or (u.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel]
     modo = request.args.get("modo")
+    # Onde focar virou a Visão geral (Levi, 18/10/2026: "A IDEIA É QUE A VISÃO GERAL SEJA UMA MELHORIA DO ONDE FOCAR,
+    # ENTÃO PODE TIRAR O ONDE FOCAR"): o endereço antigo (`modo=foco`, link guardado) abre a Visão geral
+    if modo == "foco":
+        modo = "geral"
     if logado:
         # o responsável logado nunca vê os cartões dos outros responsáveis; o Ranking das equipes e a Visão geral das
         # usinas dele, sim (18/10/2026)
-        modo = modo if modo in ("ranking", "geral") else "foco"
-    elif modo not in ("cartoes", "foco", "ranking", "geral"):
-        modo = "foco" if responsavel else "cartoes"
+        modo = modo if modo in ("ranking", "geral") else "geral"
+    elif modo not in ("cartoes", "ranking", "geral"):
+        modo = "geral" if responsavel else "cartoes"
     # a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"): todas as usinas do filtro numa lista
     # só, e o clique num bloco, nível ou número do resumo filtra (`filtro`, a condição daquele número no `soma`)
     filtro = campo_resp.filtro_geral(request.args.get("filtro")) if modo == "geral" else None
-    lista_geral = campo_resp.filtrar_geral(usinas, filtro) if modo == "geral" else []
+    # o bloco do clique ordena a lista pela régua dele e destaca as colunas dele (o `bloco` do endereço, ou o do filtro)
+    bloco_sel = campo_resp.bloco_geral(request.args.get("bloco"), filtro) if modo == "geral" else None
+    lista_geral = campo_resp.lista_geral(usinas, filtro, bloco_sel) if modo == "geral" else []
     contagem_geral = ({k: len(campo_resp.filtrar_geral(usinas, k)) for k in campo_resp.FILTROS_GERAL}
                       if modo == "geral" else {})
     # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre as
@@ -421,6 +427,8 @@ def responsaveis():
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
+        bloco_sel=bloco_sel, blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
+                                           for bb, nome, txt in campo_resp.BLOCOS if bb == b],
         base_pequena=visao.BASE_PEQUENA,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
