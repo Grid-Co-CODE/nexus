@@ -496,7 +496,10 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   Tipo, Situação, Criticidade, Semanas na fila e Reprogramada (a seção "Situação da OS" de baixo saiu, e com ela o
   Status da OS, Em paralelo, Termografia, Origem e Etiqueta); Onde e Quem lado a lado e o Quando embaixo (o dia da
   semana com a data entre parênteses: "Terça (13/10)"); o motivo tem o título "Técnico não consegue fazer?", sem o
-  "Sem motivo.", e o botão "Salvar motivo".
+  "Sem motivo.", e o botão "Salvar motivo". A lista de motivos é como a do Fora da programação: só o nome (saiu o
+  "(tira da programação)" do lado), o campo na cor do escolhido (vermelho tira, laranja não) e, quando tira, a linha
+  "Tira a tarefa da programação." embaixo. As colunas dos cartões seguem o conteúdo (`repeat(5,auto)`): com cinco
+  iguais, REPROGRAMADA passava da borda na janela de 580 px.
 
 - **A semana do PCM vai do sábado 00:00 à sexta** (o processo, Levi com o programador do PCM: a programação nasce na quinta;
   supervisor e gestor de contrato olham e passam ao PCM; o PCM altera; no fim da sexta ela é gerada de novo e substitui;

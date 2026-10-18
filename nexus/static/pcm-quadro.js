@@ -215,9 +215,11 @@
     if (!pode) return mp ? h : "";
     return h + "<div class=\"q-rp q-mp-form\"><label class=\"q-campo\"><span>Motivo</span><select class=\"gc-campo\" " +
       "data-mp-sel><option value=\"\">escolha…</option>" + MOTIVOS.map(function (m) {
-        return "<option value=\"" + m[0] + "\"" + (mp && mp.id === m[0] ? " selected" : "") + ">" + esc(m[1]) +
-          (m[2] ? " (tira da programação)" : "") + "</option>";
-      }).join("") + "</select></label><label class=\"q-campo\"><span>Observação (opcional)</span><textarea class=\"gc-campo\" " +
+        // só o nome, como no Fora da programação (18/10/2026): a cor do campo e a linha de baixo dizem se tira
+        return "<option value=\"" + m[0] + "\" data-tira=\"" + (m[2] ? 1 : 0) + "\"" +
+          (mp && mp.id === m[0] ? " selected" : "") + ">" + esc(m[1]) + "</option>";
+      }).join("") + "</select></label><p class=\"q-mp-dica\" data-mp-tira hidden>Tira a tarefa da programação.</p>" +
+      "<label class=\"q-campo\"><span>Observação (opcional)</span><textarea class=\"gc-campo\" " +
       "data-mp-obs rows=\"2\" maxlength=\"500\">" + esc(mp ? mp.obs : "") + "</textarea></label><div class=\"q-rp-acoes\">" +
       "<button type=\"button\" class=\"gc-btn gc-btn--ui gc-btn--primario\" data-mp-salvar><i class=\"ph ph-tag\"></i> " +
       "Salvar motivo</button>" + (mp ? "<button type=\"button\" class=\"gc-btn gc-btn--ui " +
@@ -313,6 +315,18 @@
       "<h3>Relatório de execução</h3>" + (t.rel ? "<p class=\"q-rel\">" + esc(t.rel) + "</p>"
         : "<p class=\"q-vazio\">Sem relatório registrado.</p>");
     var mpSalvar = c.querySelector("[data-mp-salvar]"), mpTirar = c.querySelector("[data-mp-tirar]");
+    var mpSel = c.querySelector("[data-mp-sel]"), mpDica = c.querySelector("[data-mp-tira]");
+    if (mpSel) {
+      // a cor do motivo escolhido, a mesma do selo: vermelho tira da programação, laranja não tira
+      var pintar = function () {
+        var op = mpSel.options[mpSel.selectedIndex], tira = op && op.getAttribute("data-tira");
+        mpSel.classList.toggle("q-mp-sel--tira", tira === "1");
+        mpSel.classList.toggle("q-mp-sel--nao", tira === "0");
+        if (mpDica) mpDica.hidden = tira !== "1";
+      };
+      pintar();
+      mpSel.addEventListener("change", pintar);
+    }
     if (mpSalvar) mpSalvar.addEventListener("click", function () { enviarMotivo(i, t, c, false); });
     if (mpTirar) mpTirar.addEventListener("click", function () { enviarMotivo(i, t, c, true); });
     var ins = c.querySelector("[data-rp-inserir]");

@@ -85,3 +85,25 @@ def test_os_cartoes_do_topo_com_a_criticidade_e_sem_a_situacao_da_os_embaixo():
     assert "Situação da OS" not in h and "Status da OS" not in h
     sem = janela(dict(ITEM, cri=""))
     assert ">—</b>" in sem.split('<div class="q-fatos">', 1)[1].split("<h3>", 1)[0]
+
+
+def test_a_lista_de_motivos_como_no_fora_da_programacao():
+    """Levi, 18/10/2026 (2ª rodada): os motivos da janela "tem que estar de acordo com os motivos de fora da
+    programação": só o nome, sem o "(tira da programação)" do lado; a cor do campo diz se o escolhido tira (vermelho)
+    ou não (laranja), e uma linha embaixo diz quando tira."""
+    h = janela(ITEM, motivos=[[1, "Engenharia", False], [4, "Aguardando cliente", True]])
+    sel = h.split("data-mp-sel", 1)[1].split("</select>", 1)[0]
+    assert "(tira da programação)" not in sel
+    assert '<option value="1" data-tira="0">Engenharia</option>' in sel
+    assert '<option value="4" data-tira="1">Aguardando cliente</option>' in sel
+    assert "data-mp-tira" in h and "Tira a tarefa da programação" in h
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
+    assert ".q-mp-sel--tira{color:var(--critico)}" in css and ".q-mp-sel--nao{color:var(--laranja)}" in css
+
+
+def test_os_rotulos_dos_cartoes_cabem():
+    """Levi, 18/10/2026: "reprogramada está ultrapassando linha do card". As cinco colunas seguem o conteúdo (auto), com
+    menos respiro, para o rótulo mais longo de uma palavra (REPROGRAMADA) caber na janela de 580 px."""
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
+    regra = css.split("\n.q-fatos{", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns:repeat(5,auto)" in regra
