@@ -295,14 +295,21 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   lida do FIM (a semana em curso está entre as do arquivo do robô, no fim do fato) e a evidência guardada por 10 min:
   3,3 s fria, 0,02 a 0,06 s quente. Visão por técnico. Sem o
   cadastro do banco, a tela abre com o aviso e nada grava.
-- **O App:** ainda não lê. O pacote está em `C:\GridcoBuild\app-campo-docs\_propostas\atribuicoes-nexus\LEIA.md` (A1:
-  o App publica a foto `organizacao_app_campo · Atribuicoes`, que a tela compara NO IDIOMA DO APP — a grafia da usina e
-  o código que vão na linha, não os IDs do Nexus — e de onde saem as pendências para a troca (inclusive a linha que vai
-  sem nome do Fracttal ou sem código); A2: o App lê este livro, confere a assinatura e substitui o `executa`, com o interruptor `NEXUS_ATRIBUICOES`;
-  A3: a Organização e o espelho deixam de editar o `executa`). A assinatura é HMAC com a chave derivada da
-  `NEXUS_PESSOA_HMAC` (rótulo `nexus:pcm:atribuicoes`); o vetor de teste está nos dois lados.
-- **Fases:** agora o Nexus (nada muda no campo); depois o A1 → o PCM zera as pendências → A2 e A3 → o Levi liga; por
-  fim o responsável da usina e a hierarquia (papel `responsavel`) e o site de gestão sai 100% da organização de campo.
+- **O App: A1–A3 no ar na v283 (17/10/2026), com o interruptor `NEXUS_ATRIBUICOES` AUSENTE** (a aba Ronda ainda
+  segue a Organização do site de gestão). O contrato: `C:\GridcoBuild\app-campo-docs\_propostas\atribuicoes-nexus\LEIA.md`.
+  A1: o App publica a foto `organizacao_app_campo · Atribuicoes` aos :25, que a tela compara NO IDIOMA DO APP — a grafia
+  da usina e o código que vão na linha, não os IDs do Nexus — e de onde saem as pendências para a troca (inclusive a
+  linha que vai sem nome do Fracttal ou sem código). A2: de 5 em 5 min o App lê este livro, confere a assinatura e, com
+  `NEXUS_ATRIBUICOES=ligado`, substitui o `executa` (`simular` só conta no `/health` → `nexusAtribuicoes`: `a_por`,
+  `a_tirar`). A3: ligado, a Organização recusa o "Marcar que executa" e o espelho do BD deixa o `executa` em paz. A
+  assinatura é HMAC com a chave derivada da `NEXUS_PESSOA_HMAC` (rótulo `nexus:pcm:atribuicoes`); o vetor de teste está
+  nos dois lados. **Do lado do App, a usina casa EXATO pelo nome do Fracttal** (não por "contém"), a linha vigente que
+  não é a última do seu par assinado (usina_fracttal, pessoa_hmac) não vale (os IDs não são assinados), e **com
+  qualquer pendência (sem código, sem usina) o App não tira ninguém** de usina, só põe: por isso se liga com as
+  pendências em zero. A reemissão daqui (mesmos IDs, código novo) é a forma certa de corrigir uma linha.
+- **Fases:** o Nexus e o App prontos (nada muda no campo); o PCM zera as pendências → o Levi confere o `simular` e liga;
+  por fim o responsável da usina e a hierarquia (papel `responsavel`) e o site de gestão sai 100% da organização de
+  campo.
 - **Provar:** `tests/test_pcm_atribuicoes.py` (o livro: vigência, dia de Brasília, mesma decisão, assinatura),
   `tests/test_pcm_tecnicos_usina.py` (a visão: regra da equipe, evidência, avisos, cascata, foto do App) e
   `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar, tirar, banco fora); 11 mutações, todas
