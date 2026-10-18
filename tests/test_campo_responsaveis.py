@@ -957,11 +957,11 @@ def test_a_visao_geral_diz_com_os_filtros_com_a_equipe(manut, logado):
     assert "com os filtros" in faixa
 
 
-def test_a_lista_unica_vira_cartoes_ate_1366_px():
+def test_a_lista_unica_vira_cartoes_ate_1180_px():
     """Revisão de 18/10/2026: entre 761 e 1260 px as colunas não cabiam (a Usina zerava e Semana sumia, cortada sem
-    rolagem). Com as 12 colunas que o Levi pediu, a lista vira os cartões (etiquetas P, M e A) até 1366 px."""
+    rolagem). Até 1180 px a lista vira os cartões (etiquetas P, M e A); de 1181 a 1366, as colunas principais."""
     css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
-    bloco = re.search(r'@media \(max-width:1366px\)\{\n  \.cr-gr-grupos(.*?)\n\}', css, re.S).group(1)
+    bloco = re.search(r'@media \(max-width:1180px\)\{\n  \.cr-gr-grupos(.*?)\n\}', css, re.S).group(1)
     assert '.cr-gr-g > [class*="cr-col-"]{display:none}' in bloco and ".cr-gr-pills{display:flex" in bloco
 
 
@@ -1008,7 +1008,7 @@ def test_o_clique_no_bloco_ordena_e_destaca(manut, logado):
     cab = lista[lista.index('class="cr-cols'):]
     cab = cab[:cab.index("</div>")]
     assert re.findall(r'<span class="cr-col-(\w+) cr-gr-csel">', cab) == ["meta", "pr", "disp"]
-    assert 'class="cr-gr-gp cr-gr-gp--sel"' in lista and 'id="cr-gr-perf"' in html
+    assert 'class="cr-gr-gp cr-gr-gp--perf cr-gr-gp--sel"' in lista and 'id="cr-gr-perf"' in html
     assert "Ordenado por Performance" in html and 'class="cr-gr-limpar"' in html
 
 
@@ -1018,3 +1018,78 @@ def test_a_largura_das_colunas_se_adapta():
     css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
     trilhas = re.search(r"\.cr-gr-g\{grid-template-columns:([^;}]*)", css).group(1)
     assert trilhas.startswith("minmax(160px,2fr)") and trilhas.count("fr)") == 13 and "px " not in trilhas.replace("160px", "")
+
+
+
+# ── A revisão da Visão geral nova (18/10/2026) ───────────────────────────────────────────────────────────────────
+def _nomes_da_lista(html):
+    return re.findall(r'<details class="cr-gr-lin[^>]*>\s*<summary[^>]*>\s*<span class="cr-u"><i[^>]*></i><span><b>([^<]+)',
+                      _bloco_manut(html))
+
+
+def test_o_filtro_destaca_mas_mantem_a_ordem_do_foco(manut, logado):
+    """Só o clique no nome do bloco ordena pela régua dele; o número filtra e destaca, e a lista segue na ordem do foco
+    (revisão: "PT esperando" ordenado pela ronda jogava a PT parada hoje para o fim, contra a regra da tela)."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=manut.atrasadas").get_data(as_text=True)
+    foco = [n for n, u in _com_manut().items() if (u.get("manutencao") or {}).get("atrasadas")]
+    assert _nomes_da_lista(html) == foco
+    cab = _bloco_manut(html)[_bloco_manut(html).index('class="cr-cols'):]
+    assert re.findall(r'<span class="cr-col-(\w+) cr-gr-csel">', cab[:cab.index("</div>")]) == [
+        "os", "atrasadas", "paradas", "semana"]
+    us = list(_com_manut().values())
+    assert R.lista_geral(us, "acomp.pts", None) == R.filtrar_geral(us, "acomp.pts")
+
+
+def test_de_1181_a_1366_px_ficam_as_colunas_principais():
+    """Revisão: a 1366 px (notebook comum) a tela padrão só mostrava as etiquetas, sem número. Ficam Meta, Disp.,
+    Atrasadas, Pausadas, Semana passada, Ronda e PT; o resto vai ao detalhe."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    meio = re.search(r"@media \(min-width:1181px\) and \(max-width:1366px\)\{(.*?)\n\}", css, re.S).group(1)
+    for col in ("pr", "os", "limpeza", "chamados", "extintores"):
+        assert f".cr-gr-lista .cr-col-{col}" in meio, col
+    assert ".cr-gr-gp--perf{grid-column:span 2}" in meio and ".cr-gr-gp--acomp{grid-column:span 2}" in meio
+
+
+def test_o_bloco_escolhido_marca_a_etiqueta_no_cartao(manut, logado):
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&bloco=manut").get_data(as_text=True)
+    lista = _bloco_manut(html)
+    assert lista.count("cr-gr-pill--sel") == lista.count('class="cr-gr-lin') > 0
+    assert re.search(r'cr-gr-pill cr-gr-pill--sel" title="Manutenção"', lista)
+
+
+def test_pausadas_em_toda_a_tela(manut, logado, monkeypatch):
+    html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*").get_data(as_text=True)
+    assert "Tarefas pausadas" in html and "Tarefas paradas" not in html
+    assert "a tarefa parada por motivo" not in html
+    from nexus.pcm import motivos
+    monkeypatch.setattr(motivos, "ler", lambda cfg, **k: {"motivos": [], "inicial": [], "marcas": [], "backoffice": [],
+                                                           "erro": "ConnectionError", "lido_em": None})
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert "a coluna Pausadas fica vazia" in html
+
+
+def test_todos_os_responsaveis_fica_na_visao_geral(manut, logado):
+    """Revisão: quem veio do cartão (sem `modo` no endereço) caía nos cartões ao clicar em "Todos os responsáveis ×"."""
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    todos = re.search(r'href="([^"]*)" title="As usinas de todos os responsáveis"', html).group(1)
+    assert "modo=geral" in todos
+    html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*&filtro=manut.atrasadas&bloco=perf").get_data(as_text=True)
+    cartoes = re.findall(r'class="cn-equipe[^"]*cn-sup[^"]*" href="([^"]*)"', html)
+    assert cartoes and all("filtro=" not in h and "bloco=" not in h for h in cartoes)
+
+
+def test_a_zeladoria_vencida_aparece_no_nome(manut, logado):
+    """Revisão: a zeladoria saiu das colunas (vai ao detalhe), e a usina ficava amarela sem motivo à vista."""
+    _aba(manut, "nexus_os", "fato_tarefa_os", [_tarefa(1, 901, 2, 31), _tarefa(2, 902, 3, 12),
+                                               _tarefa(3, 903, 3, 5, tipo="zeladoria")])
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    lista = _bloco_manut(html)
+    i = lista.index("<b>Coração 1")
+    assert "zeladoria vencida" in lista[i:lista.index("</b>", i)]
+
+
+def test_o_realce_nao_apaga_o_verde_das_celulas():
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert re.search(r"\.cr-gr-csel\{[^}]*background:var\(--superficie-3\)", css)

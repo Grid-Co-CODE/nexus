@@ -408,9 +408,11 @@ def responsaveis():
     # a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"): todas as usinas do filtro numa lista
     # só, e o clique num bloco, nível ou número do resumo filtra (`filtro`, a condição daquele número no `soma`)
     filtro = campo_resp.filtro_geral(request.args.get("filtro")) if modo == "geral" else None
-    # o bloco do clique ordena a lista pela régua dele e destaca as colunas dele (o `bloco` do endereço, ou o do filtro)
+    # o clique no nome do bloco ORDENA a lista pela régua dele (`bloco`); o filtro só destaca o bloco dele e mantém a
+    # ordem do foco (revisão de 18/10/2026: "PT esperando" ordenado pela ronda jogava a PT parada hoje para o fim)
+    bloco_ordem = campo_resp.bloco_geral(request.args.get("bloco"), None) if modo == "geral" else None
     bloco_sel = campo_resp.bloco_geral(request.args.get("bloco"), filtro) if modo == "geral" else None
-    lista_geral = campo_resp.lista_geral(usinas, filtro, bloco_sel) if modo == "geral" else []
+    lista_geral = campo_resp.lista_geral(usinas, filtro, bloco_ordem) if modo == "geral" else []
     contagem_geral = ({k: len(campo_resp.filtrar_geral(usinas, k)) for k in campo_resp.FILTROS_GERAL}
                       if modo == "geral" else {})
     # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre as
@@ -427,7 +429,7 @@ def responsaveis():
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
-        bloco_sel=bloco_sel, blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
+        bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
         base_pequena=visao.BASE_PEQUENA,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),

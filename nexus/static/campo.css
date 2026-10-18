@@ -954,7 +954,12 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-gr-grupos{padding:10px 16px 0;font:700 11px/14px var(--font-sans);color:var(--tinta)}
 .cr-gr-gp{text-align:center;padding-bottom:6px;border-bottom:2px solid var(--linha)}
 .cr-gr-gp--sel{border-bottom-color:var(--verde)}
-.cr-gr-csel{border-radius:var(--raio-tag);background:var(--verde-suave)}
+/* o realce das colunas do bloco escolhido: um cinza da superfície (o verde-suave apagava as células verdes) */
+.cr-gr-csel{border-radius:var(--raio-tag);background:var(--superficie-3)}
+.cr-gr-gp--perf{grid-column:span 3}
+.cr-gr-gp--manut{grid-column:span 4}
+.cr-gr-gp--acomp{grid-column:span 5}
+.cr-gr-pill--sel{outline:2px solid var(--verde);outline-offset:1px}
 .cr-gr-pills{display:none}
 .cr-gr-pill{margin-left:0}
 .cr-gr-pill em{font-style:normal;opacity:.75;margin-right:5px}
@@ -969,9 +974,20 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
   .cr-gr-det{grid-template-columns:minmax(0,1fr)}
   .cr-gr-det > .cr-det{border-right:0;border-bottom:1px solid var(--linha)}
 }
-/* a lista em cartões até 1366 px (revisão de 18/10/2026: de 761 a 1260 px as colunas não cabiam, a Usina zerava e a
-   Semana sumia cortada, sem rolagem; com as 12 colunas do Levi, até 1366): a usina, as etiquetas P, M e A e o detalhe */
-@media (max-width:1366px){
+/* de 1181 a 1366 px (o notebook comum) ficam as colunas principais: Meta e Disp.; Atrasadas, Pausadas e Semana
+   passada; Ronda e PT. PR, OS abertas, Limpeza, Chamados e Extintores vão ao detalhe (revisão de 18/10/2026: com os
+   cartões até 1366, a tela padrão desse notebook não mostrava nenhum número) */
+@media (min-width:1181px) and (max-width:1366px){
+  .cr-gr-g{grid-template-columns:minmax(160px,2fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1.1fr) 14px}
+  .cr-gr-lista .cr-col-pr,.cr-gr-lista .cr-col-os,.cr-gr-lista .cr-col-limpeza,.cr-gr-lista .cr-col-chamados,
+  .cr-gr-lista .cr-col-extintores{display:none}
+  .cr-gr-gp--perf{grid-column:span 2}
+  .cr-gr-gp--manut{grid-column:span 3}
+  .cr-gr-gp--acomp{grid-column:span 2}
+}
+/* a lista em cartões até 1180 px (revisão de 18/10/2026: de 761 a 1260 px as colunas não cabiam, a Usina zerava e a
+   Semana sumia cortada, sem rolagem): a usina, as etiquetas P, M e A e o detalhe */
+@media (max-width:1180px){
   .cr-gr-grupos,.cr-gr-lista > .cr-cols{display:none}
   .cr-gr-g{grid-template-columns:minmax(0,1fr) 14px}
   .cr-gr-g > [class*="cr-col-"]{display:none}

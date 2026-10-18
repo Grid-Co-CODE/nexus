@@ -83,7 +83,7 @@ REGUAS = (
     ("manut", "atrasadas", "OS atrasadas", "A régua do PCM (Gestão PCM e relatórios): tarefa aberta com a Data "
                                            "Programada há mais de 10 dias é atenção; há mais do limite que você escolhe "
                                            "no bloco (30 dias, se ninguém mudou) é crítico. Ficam de fora o backoffice, "
-                                           "a tarefa parada por motivo, a OS de chamado, a zeladoria e o Teste."),
+                                           "a tarefa pausada por motivo, a OS de chamado, a zeladoria e o Teste."),
     ("manut", "paradas", "Tarefas pausadas", "Fora da programação do PCM: tarefa tirada da programação por um motivo, ou "
                                             "justificada pelo técnico no App, é atenção."),
     ("manut", "semana", "Semana passada", "Fechamento da semana do PCM: linhas do plano finalizadas ÷ linhas do plano; "

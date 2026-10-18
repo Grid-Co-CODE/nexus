@@ -491,19 +491,17 @@ Seria interessante também incluir os extintores", aprovado no protótipo com "s
 nexus é um ambiente centralizado e precisamos ter os dados se conversando!". `/t/campo/responsaveis`, a 1ª tela do
 Campo. Conta em `nexus/campo/responsaveis.py`.
 
-- **Três blocos** (desde 18/10/2026): **Performance** (meta, PR, disponibilidade; os ativos falhando como etiqueta na
-  linha e no detalhe) e **Acompanhamento** (rondas, limpeza, PT, chamados, extintores) lado a lado, e **Manutenção**
-  (seção própria abaixo) embaixo, na largura toda. Os dois de cima empilham abaixo de 1500 px (até 18/10 era 1180: com
-  a coluna Limpeza, lado a lado, o nome da usina no Acompanhamento ficava com 74 px a 1366 px e 109 px a 1440 px; a
-  1536 px, o 1920 com zoom de 125%, tem ~170 px). Acima dos blocos, a faixa **Parada agora**. Cada usina é
-  uma linha compacta com os valores coloridos pela régua; clicar abre o detalhe e os links das telas donas (`<details>`,
-  sem script). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só atenção; em dia) e
-  **todas as usinas viram linha, inclusive as em dia** (Levi, 13/10/2026: "Tem que aparecer todas as usinas do
-  responsável inclusive as que estão em dia"; até ali as em dia ficavam recolhidas no fim do bloco). **A ordem de cada
-  bloco** ("Ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a Performance
-  pela meta do mês, da pior para a melhor, sem meta no fim (`ordem_da_meta`); o Acompanhamento pela ronda, a pior em
-  cima (`ordem_da_ronda`: nunca teve; sem ronda há 7 dias ou mais, mais dias primeiro; longa pendente; em dia, a mais
-  antiga primeiro; sem dado). A cor da linha continua a do nível dela.
+- **Três blocos, uma lista** (desde 18/10/2026 na Visão geral, que tirou Onde focar; seção própria abaixo):
+  **Performance** (meta, PR, disponibilidade; os ativos falhando como etiqueta no nome), **Manutenção** (seção própria
+  abaixo) e **Acompanhamento** (rondas, limpeza, PT, chamados, extintores). Acima, a faixa **Parada agora**. Cada usina
+  é uma linha compacta com os valores coloridos pela régua; clicar abre o detalhe dos três blocos e os links das telas
+  donas (`<details>`, sem script). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só
+  atenção; em dia) e **todas as usinas viram linha, inclusive as em dia** (Levi, 13/10/2026: "Tem que aparecer todas as
+  usinas do responsável inclusive as que estão em dia"). **A ordem de cada bloco** (o clique no nome do bloco ordena por
+  ela; "Ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a Performance pela
+  meta do mês, da pior para a melhor, sem meta no fim (`ordem_da_meta`); a Manutenção pelo nível e pelas atrasadas
+  (`ordem_da_manutencao`); o Acompanhamento pela ronda, a pior em cima (`ordem_da_ronda`: nunca teve; sem ronda há 7
+  dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado).
 - **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
@@ -534,7 +532,7 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   Visão geral em 18/10/2026): `_responsavel_do_login`
   (guardado em `session["responsavel_padrao"]`) marca o filtro nele, a aba "Por responsável" some e o `modo=cartoes` do
   endereço não vale para ele (o Ranking das equipes, desde 18/10/2026, ele vê, com as equipes dele); o filtro continua (para olhar as usinas de quem ele estiver cobrindo; "Todos" mostra as
-  de todos, ainda nos dois blocos). Quem não é responsável (admin, coordenador) segue com os cartões.
+  de todos, ainda na Visão geral). Quem não é responsável (admin, coordenador) segue com os cartões.
 - **Esperando o De acordo é só PT** (Levi, 12/10: "na verdade esperando de acordo é só PT então mostra só PT"): o rótulo
   é "PT".
 - **As janelas por cima da tela** (Levi, 12/10/2026: "precisamos mostrar para o supervisor de onde está vindo!"; "ao
@@ -630,7 +628,7 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   `DIAS_ALERTA` do robô da Gestão PCM): tarefa aberta com a Data Programada há MAIS de 10 dias, contada por tarefa, como
   o PCM conta. Ficam fora de OS abertas e atrasadas, para nada contar duas vezes: o backoffice (decisão do Levi: o
   supervisor não age sobre elas), a tarefa com motivo do recorte do painel (motivo que tira ou justificativa do App:
-  conta em Paradas), a OS do `fato_chamado` (conta em Chamados), a Zeladoria (coluna própria) e o Teste. Vencem até
+  conta em Pausadas), a OS do `fato_chamado` (conta em Chamados), a Zeladoria (no detalhe, e a etiqueta "zeladoria vencida" no nome) e o Teste. Vencem até
   amanhã só informa. A marca casa com a tarefa pela OS, o código canônico (código vazio = todos os ativos da OS) e a
   `tarefa_chave`. **Semana** = a semana passada, FECHADA, pela conta do Fechamento do PCM (linhas do plano finalizadas
   ÷ linhas do plano): na semana corrente a rolagem da noite tira da agenda o que não foi feito (vai às pendentes, fora
@@ -743,17 +741,21 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
 - **O clique:** o nome do bloco ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta; `manut`:
   `ordem_da_manutencao`; `acomp`: a pior ronda) e destaca as colunas dele (`lista_geral`, `bloco_geral`); clicar de novo
   volta à ordem geral (a do foco). O "pedem atenção", "focar", "acompanhar" e cada número FILTRAM (`filtro=`;
-  `FILTROS_GERAL` guarda a condição de cada um, a MESMA que conta o número no `soma`, nenhuma régua nova) e também
-  ordenam e destacam pelo bloco deles. Chave que não existe é ignorada; número zero não é link; OS abertas não filtra; o
-  × limpa. O filtro e o bloco seguem quando se troca o responsável, o cliente ou a busca. A bolinha da linha é o nível
-  do bloco escolhido (sem bloco, o da usina).
+  `FILTROS_GERAL` guarda a condição de cada um, a MESMA que conta o número no `soma`, nenhuma régua nova) e destacam o
+  bloco deles, MAS a lista segue na ordem do foco (revisão de 18/10/2026: "PT esperando" ordenado pela ronda jogava a PT
+  parada hoje para o fim, contra a regra da tela). Chave que não existe é ignorada; número zero não é link; OS abertas
+  não filtra; o × limpa. O filtro e o bloco seguem quando se troca o responsável, o cliente ou a busca; o "Todos os
+  responsáveis ×" fica na Visão geral, e o cartão de um responsável abre sem filtro. A bolinha da linha é o nível do
+  bloco destacado (sem bloco, o da usina); a zeladoria vencida (fora das colunas) vai como etiqueta no nome.
 - **A largura:** as colunas dividem a largura em frações (a Usina com 160 px no mínimo e duas partes), e o valor quebra
-  a linha se precisar; até 1366 px a lista vira cartões, com as etiquetas P, M e A na cor do nível de cada bloco e o
-  alerta principal (revisão de 18/10: de 761 a 1260 px as colunas fixas não cabiam).
+  a linha se precisar. De 1181 a 1366 px (o notebook comum) ficam as colunas principais: Meta, Disp., Atrasadas,
+  Pausadas, Semana passada, Ronda e PT (o resto no detalhe). Até 1180 px a lista vira cartões, com as etiquetas P, M e A
+  na cor do nível de cada bloco e o alerta principal (a do bloco destacado, com contorno). O realce das colunas é o
+  cinza `--superficie-3` (o verde-suave apagava as células verdes).
 - **O centro das colunas:** o cabeçalho e as células `cr-col-*` ficam no centro (`.cr-g > [class*="cr-col-"]`); a Usina,
   à esquerda.
 - **Prova (18/10/2026, o banco real só lido):** 131 usinas; o clique em Manutenção pôs as críticas da Manutenção em cima,
-  com as quatro colunas realçadas; a 1920, 1440 e 375 px, nos dois temas, sem rolagem de lado.
+  com as colunas realçadas; a 1920, 1440, 1300 e 375 px, nos dois temas, sem rolagem de lado.
 
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 

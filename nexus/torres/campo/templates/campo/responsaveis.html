@@ -12,12 +12,6 @@
                      'chamados': 'os chamados', 'extintores': 'os extintores', 'pt': 'as PT',
                      'limpeza': 'a limpeza das rondas', 'paradas': 'as paradas abertas', 'manut': 'a manutenção',
                      'ranking': 'as notas do App (o Ranking das equipes)'} %}
-{# 18/10/2026: a Limpeza no Acompanhamento e o 3º bloco, Manutenção (o modelo A: embaixo dos dois, na largura toda) #}
-{% set colunas = {'perf': (('meta', 'Meta'), ('pr', 'PR / prev.'), ('disp', 'Disp.')),
-                  'acomp': (('ronda', 'Ronda'), ('limpeza', 'Limpeza'), ('pt', 'PT'), ('chamados', 'Chamados'),
-                            ('extintores', 'Extintores')),
-                  'manut': (('os', 'OS abertas'), ('atrasadas', 'Atrasadas'), ('vencem', 'Vencem até amanhã'),
-                            ('paradas', 'Paradas'), ('semana', 'Semana passada'), ('zeladoria', 'Zeladoria'))} %}
 {% set icone = {'perf': 'chart-line-up', 'acomp': 'clipboard-text', 'manut': 'wrench'} %}
 {% macro pct(x, casas=0) %}{{ '—' if x is none else ('%.*f'|format(casas, x))|replace('.', ',') ~ '%' }}{% endmacro %}
 {% macro c_meta(a) %}{{ 'cn-t-neutro' if a is none else ('cn-t-ok' if a >= limites.meta_ok else ('cn-t-alerta' if a >= limites.meta_atencao else 'cn-t-critico')) }}{% endmacro %}
@@ -66,9 +60,9 @@
   <div class="cn-erro cn-aviso" role="status"><b>As OS da tela são da leitura {{ foto_os.quando }}</b> (há {{ foto_os.horas }} h): o Nexus lê o Fracttal de hora em hora, e as leituras seguintes não chegaram ao banco.</div>
   {% endif %}
   {% if manut_i.get('erro_motivos') %}
-  <div class="cn-erro cn-aviso" role="status"><b>Os motivos do Fora da programação não abriram</b> ({{ manut_i.erro_motivos[:90] }}): a coluna Paradas fica vazia, e as tarefas com motivo contam como atrasadas até eles voltarem.</div>
+  <div class="cn-erro cn-aviso" role="status"><b>Os motivos do Fora da programação não abriram</b> ({{ manut_i.erro_motivos[:90] }}): a coluna Pausadas fica vazia, e as tarefas com motivo contam como atrasadas até eles voltarem.</div>
   {% elif manut_i.get('ilegiveis') %}
-  <div class="cn-erro cn-aviso" role="status"><b>{{ manut_i.ilegiveis }} marca{{ 's' if manut_i.ilegiveis > 1 }} do Fora da programação não {{ 'abriram' if manut_i.ilegiveis > 1 else 'abriu' }} com a chave desta máquina:</b> {{ 'essas tarefas contam' if manut_i.ilegiveis > 1 else 'essa tarefa conta' }} como atrasada{{ 's' if manut_i.ilegiveis > 1 }}, não como parada{{ 's' if manut_i.ilegiveis > 1 }}.</div>
+  <div class="cn-erro cn-aviso" role="status"><b>{{ manut_i.ilegiveis }} marca{{ 's' if manut_i.ilegiveis > 1 }} do Fora da programação não {{ 'abriram' if manut_i.ilegiveis > 1 else 'abriu' }} com a chave desta máquina:</b> {{ 'essas tarefas contam' if manut_i.ilegiveis > 1 else 'essa tarefa conta' }} como atrasada{{ 's' if manut_i.ilegiveis > 1 }}, não como pausada{{ 's' if manut_i.ilegiveis > 1 }}.</div>
   {% endif %}
 
   <form class="cn-filtros" method="get">
@@ -91,7 +85,7 @@
     {% if request.args.get('modo') %}<input type="hidden" name="modo" value="{{ request.args.get('modo') }}">{% endif %}
     {% if equipe %}<input type="hidden" name="equipe" value="{{ equipe }}">{% endif %}
     {% if filtro %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
-    {% if bloco_sel and not filtro %}<input type="hidden" name="bloco" value="{{ bloco_sel }}">{% endif %}
+    {% if bloco_ordem %}<input type="hidden" name="bloco" value="{{ bloco_ordem }}">{% endif %}
   </form>
 
   {# a faixa "Parada agora" (18/10/2026; o painel próprio de um supervisor tinha a de "Usinas desligadas"): as OS de
@@ -109,7 +103,7 @@
      cada um e os números do grupo; o cartão abre as usinas dele #}
   <div class="cn-equipes">
     {% for c in cartoes %}
-    <a class="cn-equipe cn-equipe--{{ cor[c.nivel] }} cn-sup{% if c.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=c.responsavel, modo=None) }}">
+    <a class="cn-equipe cn-equipe--{{ cor[c.nivel] }} cn-sup{% if c.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=c.responsavel, modo=None, filtro=None, bloco=None) }}">
       <div class="cn-eq-cab">
         <div class="cn-eq-titulo"><b>{{ c.responsavel }}</b></div>
         <span>{{ 'usinas sem responsável O&M no cadastro' if c.responsavel == sem_responsavel else 'Responsável O&M' }} · {{ c.usinas }} usina{{ 's' if c.usinas != 1 }} mobilizada{{ 's' if c.usinas != 1 }}</span>
@@ -138,7 +132,7 @@
         {{ triagem(c.manut) }}
         <dl class="cr-mini">
           <div><dt>Tarefas atrasadas</dt><dd>{{ c.atrasadas }}</dd></div>
-          <div><dt>Tarefas paradas</dt><dd>{{ c.tarefas_paradas }}</dd></div>
+          <div><dt>Tarefas pausadas</dt><dd>{{ c.tarefas_paradas }}</dd></div>
           <div><dt>Semana passada</dt><dd>{{ pct(c.semana_pct, 0) }}</dd></div>
         </dl>
       </div>
@@ -224,11 +218,11 @@
   <div class="cn-faixa-equipe">
     <b>{{ responsavel or 'Todos os responsáveis' }}</b>
     <span>{{ resumo.usinas }} usina{{ 's' if resumo.usinas != 1 }} mobilizada{{ 's' if resumo.usinas != 1 }}{% if cliente or q or equipe %}, com os filtros{% endif %}</span>
-    {% if responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*') }}" title="As usinas de todos os responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
+    {% if responsavel %}<a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='geral') }}" title="As usinas de todos os responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>{% endif %}
     {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="As usinas de todas as equipes">Equipe {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
   </div>
   <div class="cr-gr-blocos">
-    {% for b, nome, txt, bl in blocos_geral %}{% set t = bl.tri %}{% set atn = t.critico + t.atencao %}{% set so_ordem = bloco_sel == b and not filtro %}
+    {% for b, nome, txt, bl in blocos_geral %}{% set t = bl.tri %}{% set atn = t.critico + t.atencao %}{% set so_ordem = bloco_ordem == b %}
     <section class="cr-gr-bloco{% if bloco_sel == b %} cr-gr-bloco--sel{% endif %}" id="cr-gr-{{ b }}" aria-labelledby="cr-gr-tit-{{ b }}">
       <header class="cr-gr-cab">
         <h2 id="cr-gr-tit-{{ b }}"><a class="cr-gr-tit" href="{{ url(bloco=None if so_ordem else b, filtro=None) }}" title="{{ 'Voltar à ordem geral' if so_ordem else 'Ordenar as usinas por ' ~ nome }}"{% if bloco_sel == b %} aria-current="true"{% endif %}><i class="ph ph-{{ icone[b] }}" aria-hidden="true"></i>{{ nome }}</a></h2>
@@ -272,7 +266,7 @@
   <div class="cr-gr-estado">
     <b>{{ lista_geral|length }} de {{ usinas|length }} usina{{ 's' if usinas|length != 1 }}</b>
     {% if fg %}<span class="cr-gr-filtro">{{ nome_bloco[fg[0]] }} · {{ fg[1] }}<a class="cr-gr-limpar" href="{{ url(filtro=None, bloco=None) }}" title="Tirar o filtro" aria-label="Tirar o filtro">×</a></span>
-    {% elif bloco_sel %}<span class="cr-gr-filtro">Ordenado por {{ nome_bloco[bloco_sel] }}<a class="cr-gr-limpar" href="{{ url(bloco=None) }}" title="Voltar à ordem geral" aria-label="Voltar à ordem geral">×</a></span>
+    {% elif bloco_ordem %}<span class="cr-gr-filtro">Ordenado por {{ nome_bloco[bloco_ordem] }}<a class="cr-gr-limpar" href="{{ url(bloco=None) }}" title="Voltar à ordem geral" aria-label="Voltar à ordem geral">×</a></span>
     {% else %}<span class="mudo">Clique no nome de um bloco para ordenar as usinas por ele; num número, para ver só as que pedem atenção nele.</span>{% endif %}
   </div>
   {# as colunas na ordem do Levi (18/10/2026): Performance (Meta, PR / prev., Disp.), Manutenção (OS abertas, Atrasadas,
@@ -282,7 +276,7 @@
                  ('manut', 'semana', 'Semana passada'), ('acomp', 'ronda', 'Ronda'), ('acomp', 'limpeza', 'Limpeza'),
                  ('acomp', 'pt', 'PT'), ('acomp', 'chamados', 'Chamados'), ('acomp', 'extintores', 'Extintores')) %}
   <div class="cr-gr-lista">
-    <div class="cr-g cr-gr-grupos cr-gr-g"><span></span>{% for b, n in (('perf', 3), ('manut', 4), ('acomp', 5)) %}<span class="cr-gr-gp{% if bloco_sel == b %} cr-gr-gp--sel{% endif %}" style="grid-column: span {{ n }}">{{ nome_bloco[b] }}</span>{% endfor %}<span></span></div>
+    <div class="cr-g cr-gr-grupos cr-gr-g"><span></span>{% for b in ('perf', 'manut', 'acomp') %}<span class="cr-gr-gp cr-gr-gp--{{ b }}{% if bloco_sel == b %} cr-gr-gp--sel{% endif %}">{{ nome_bloco[b] }}</span>{% endfor %}<span></span></div>
     <div class="cr-cols cr-g cr-gr-g"><span>Usina</span>{% for b, k, rot in cols %}<span class="cr-col-{{ k }}{% if bloco_sel == b %} cr-gr-csel{% endif %}">{{ rot }}</span>{% endfor %}<span></span></div>
     {% for u in lista_geral %}{% set nv = u[bloco_sel].nivel if bloco_sel else u.nivel %}
     {# a cor da bolinha: o nível do bloco escolhido (a lista está na ordem dele); sem bloco, o nível da usina #}
@@ -290,12 +284,12 @@
       <summary class="cr-g cr-gr-g">
         {# a etiqueta no nome, a de cada bloco (revisão de 18/10/2026: a usina parada saía sem ela, com a Manutenção em
            "—", e o supervisor a lia como em dia) #}
-        <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}{% for b in ('perf', 'manut', 'acomp') %}{% set x = u[b] %}{% if x.tag %}{% if b == 'perf' %}<button type="button" class="cr-tag cr-tag--{{ x.tag[0] }} cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='ativos') }}" title="Ver os ativos falhando">{{ x.tag[1] }}</button>{% else %}<em class="cr-tag cr-tag--{{ x.tag[0] }}">{{ x.tag[1] }}</em>{% endif %}{% endif %}{% endfor %}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
+        <span class="cr-u"><i class="cr-dot" aria-hidden="true"></i><span><b>{{ u.usina }}{% for b in ('perf', 'manut', 'acomp') %}{% set x = u[b] %}{% if x.tag %}{% if b == 'perf' %}<button type="button" class="cr-tag cr-tag--{{ x.tag[0] }} cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='ativos') }}" title="Ver os ativos falhando">{{ x.tag[1] }}</button>{% else %}<em class="cr-tag cr-tag--{{ x.tag[0] }}">{{ x.tag[1] }}</em>{% endif %}{% endif %}{% endfor %}{% if (u.manutencao or {}).get('zeladoria_vencida') %}<em class="cr-tag cr-tag--alerta">zeladoria vencida</em>{% endif %}</b><small>{{ u.cliente or '—' }} · {{ u.equipe or '—' }}{% if not responsavel %} · {{ u.responsavel or sem_responsavel }}{% endif %}</small></span></span>
         {# na Performance, o valor abre a janela do dia a dia (Levi, 12/10/2026: "precisamos mostrar para o supervisor de
            onde está vindo!"), como fazia o bloco de Onde focar #}
         {% for b, k, rot in cols %}{% set v = u[b].valores[k] %}<span class="cr-col-{{ k }}{% if bloco_sel == b %} cr-gr-csel{% endif %}">{% if b == 'perf' %}<button type="button" class="cr-v cr-v--{{ v.cls }} cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=k) }}" title="{{ rot }}: ver o dia a dia">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</button>{% else %}<span class="cr-v cr-v--{{ v.cls }}">{{ v.txt }}{% if v.sub %} <small>{{ v.sub }}</small>{% endif %}</span>{% endif %}</span>{% endfor %}
         {# no celular e até 1366 px as colunas saem e ficam as três etiquetas, na cor do nível de cada bloco #}
-        <span class="cr-gr-pills">{% for b, letra in (('perf', 'P'), ('manut', 'M'), ('acomp', 'A')) %}{% set al = u[b].alertas %}<span class="cr-tag cr-tag--{{ cor[u[b].nivel] }} cr-gr-pill" title="{{ nome_bloco[b] }}"><em>{{ letra }}</em>{{ al[0].titulo if al else 'em dia' }}</span>{% endfor %}</span>
+        <span class="cr-gr-pills">{% for b, letra in (('perf', 'P'), ('manut', 'M'), ('acomp', 'A')) %}{% set al = u[b].alertas %}<span class="cr-tag cr-tag--{{ cor[u[b].nivel] }} cr-gr-pill{% if bloco_sel == b %} cr-gr-pill--sel{% endif %}" title="{{ nome_bloco[b] }}"><em>{{ letra }}</em>{{ al[0].titulo if al else 'em dia' }}</span>{% endfor %}</span>
         <i class="ph ph-caret-down cr-seta" aria-hidden="true"></i>
       </summary>
       <div class="cr-gr-det">
@@ -312,7 +306,7 @@
   <div class="cn-nota">
     <b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
     dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.
-    {% for b, nome, _txt, _bl in blocos %}
+    {% for b, nome, _txt, _bl in blocos_geral %}
     <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
     {% endfor %}
     Responsável O&amp;M é o da ficha da usina no cadastro (o mesmo da Central de atenção); só usina mobilizada. Fonte sem
