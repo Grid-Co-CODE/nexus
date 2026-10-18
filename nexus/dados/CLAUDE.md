@@ -262,7 +262,8 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
    Sensível do cadastro, só cifrado (`sensivel_cifrado`).
 9. **Conferir antes e depois de gravar:** `livros.publicar` relê cada aba e compara a contagem; diferença é erro. ANTES
    de trocar um livro que só cresce (`Livro.so_cresce` no catálogo: as abas que nunca encolhem; `True` = todas), ele
-   recusa (`GravacaoRecusada`, nada gravado) a listagem incompleta, a aba que sumiria e a aba que encolheria (Levi,
+   recusa (`GravacaoRecusada`, nada gravado) a listagem incompleta, a aba declarada no catálogo que sumiria (a
+   desconhecida, como a antiga `decisoes` das decisões de PT, sai como sempre saiu) e a aba que encolheria (Levi,
    18/10/2026: "Proteger os livros do Nexus de gravar sobre leitura vazia"). O caso que motivou: a gravação troca o livro
    inteiro; se a listagem do banco omitir as abas por um instante, quem relê recebe vazio e a troca apagaria o histórico
    para sempre. A conta usa o `sheet_count` do livro e o `row_count` de cada aba (medido em 18/10: o `row_count` é o que

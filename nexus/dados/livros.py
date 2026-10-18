@@ -32,13 +32,19 @@ def _int(v) -> int | None:
 
 def _so_cresce(livro: str) -> tuple:
     """As abas que nunca encolhem, pelo catálogo (vazio = livro sem trava)."""
-    from . import catalogo        # aqui dentro: o catálogo importa os fatos, e eles importam este módulo
-    l = catalogo.LIVRO_POR_NOME.get(livro)
+    l = _do_catalogo(livro)
     return tuple(l.so_cresce) if l else ()
 
 
+def _do_catalogo(livro: str):
+    from . import catalogo        # aqui dentro: o catálogo importa os fatos, e eles importam este módulo
+    return catalogo.LIVRO_POR_NOME.get(livro)
+
+
 def _conferir_antes(livro: str, w: dict, tabelas: dict, base: str, sessao, so: tuple) -> None:
-    """A trava do livro que só cresce, antes da troca (ver o docstring do módulo)."""
+    """A trava do livro que só cresce, antes da troca (ver o docstring do módulo). A aba que sumiria só conta se o
+    catálogo a declara: a desconhecida não é dado do livro (a antiga `decisoes` das decisões de PT, que um Nexus velho
+    gravava e não vale mais, sai na troca como sempre saiu; o radar da Governança mostra a aba que ninguém declarou)."""
     r = sessao.get(f"{base}/api/sheets", timeout=60)
     r.raise_for_status()
     listadas = {x["sheet_name"]: x for x in r.json() if x.get("workbook_key") == livro}
@@ -46,7 +52,9 @@ def _conferir_antes(livro: str, w: dict, tabelas: dict, base: str, sessao, so: t
     if n and len(listadas) < n:
         raise GravacaoRecusada(f"{livro}: o banco diz que o livro tem {n} abas e a listagem trouxe {len(listadas)}; "
                                "não gravo por cima de uma leitura incompleta (tente de novo em instantes)")
-    faltam = sorted(set(listadas) - set(tabelas))
+    l = _do_catalogo(livro)
+    declaradas = set(l.abas) if l else set(so)
+    faltam = sorted((set(listadas) & declaradas) - set(tabelas))
     if faltam:
         raise GravacaoRecusada(f"{livro}: gravar sem a aba {', '.join(faltam)} a apagaria")
     for aba in so:

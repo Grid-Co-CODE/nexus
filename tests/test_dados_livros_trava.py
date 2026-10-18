@@ -135,3 +135,11 @@ def test_contestacao_pega_com_a_listagem_vazia_nao_apaga_o_historico(app):
             assert "ana lima" not in json.dumps(api.linhas(TR.LIVRO, TR.ABA), default=str).lower()
     finally:
         app.extensions.pop("nexus_dados_sessao", None)
+
+
+def test_aba_que_o_catalogo_nao_declara_pode_sair():
+    # a aba antiga "decisoes" do livro de decisões de PT não vale mais (um Nexus velho a gravava): a troca a tira, como
+    # antes. A trava protege as abas que o catálogo declara; a desconhecida não é dado do livro (o radar a mostra)
+    api = ApiPGFalsa()
+    _livro(api, "nexus_pt_decisoes", {"decisoes": 2, "fato_decisao_pt": 3})
+    assert _pub(api, "nexus_pt_decisoes", _tab(fato_decisao_pt=4)) == {"fato_decisao_pt": 4}
