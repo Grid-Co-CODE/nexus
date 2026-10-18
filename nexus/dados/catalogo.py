@@ -197,6 +197,25 @@ FATOS = (
          observacao="contestacao_linha_id liga à linha do thopen_contestacoes (o id dela, 1 contestação × 1 setor); "
                     "evento = responsavel (o responsável de agora é o do último) ou atualizacao. Quem (nome e e-mail) e "
                     "o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+    # o acompanhamento dos ativos com sinal da Confiabilidade (Levi, 18/10/2026: "os membros de engenharia ou
+    # administradores pegar aqueles ativos com sinal para acompanhar ou alguém da engenharia poder encaminhar para a
+    # pessoa ver!"). O Nexus é a FONTE; registrado antes da 1ª gravação
+    Fato("acompanhamento_ativo", "Acompanhamento dos ativos da Engenharia", "engenharia",
+         "nexus_engenharia_acompanhamento · fato_acompanhamento_ativo",
+         "1 linha = 1 evento (pegou, encaminhou, dados, comentario, encerrou) sobre 1 acompanhamento de 1 ativo",
+         _d(data=("id", "data_id (o dia de Brasília do evento); papéis data_id_inicio_analise e data_id_fim_analise"),
+            usina=("id", "usina_id (a ligação da Confiabilidade com o cadastro; usina_ligada_por)"),
+            equipamento=("id", "equipamento_id (o código do ativo)"),
+            pessoa=("cod", "pessoa_hmac (quem fez) e responsavel_hmac (quem acompanha)")),
+         tipo="transacao", chave=("id",),
+         medidas=_m((("falhas_30d_qtd", "qtd", "semi"), ("falhas_7d_qtd", "qtd", "semi"))),
+         fontes=("nexus_engenharia_acompanhamento · fato_acompanhamento_ativo",),
+         janela_origem="o Nexus é a fonte",
+         observacao="acompanhamento_id junta os eventos de um acompanhamento; quem acompanha é o do último pegou ou "
+                    "encaminhou; encerrou leva o fim e o diagnóstico (diagnostico_id aponta a aba dim_diagnostico do "
+                    "mesmo livro). As medidas são a foto do sinal na entrada, só no evento que começa (somam entre "
+                    "acompanhamentos, não no tempo de um ativo). Quem, o nome de quem acompanha e o texto só "
+                    "cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
          "ou Zeladoria)",
@@ -829,6 +848,12 @@ LIVROS = (
           "a cada \"Pegar para mim\" e a cada atualização na tela Contestações",
           "nexus/contratos/tratamento.py, pela tela Contratos e clientes > Contestações", False,
           "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega"),
+    Livro("nexus_engenharia_acompanhamento", ("dim_diagnostico", "fato_acompanhamento_ativo"),
+          "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
+          "Confiabilidade)",
+          "nexus/engenharia/acompanhamento.py, pela tela Engenharia > Confiabilidade", False,
+          "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce no 1º Pegar, com o cadastro inicial "
+          "(Comunicação, Disjuntor). As duas abas vão juntas a cada gravação, sobre o livro relido do banco"),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,
           "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável"),
