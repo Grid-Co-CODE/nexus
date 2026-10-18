@@ -34,6 +34,7 @@ import re
 import unicodedata
 from datetime import date, timedelta, timezone
 
+from ..dados import dominios as DOM
 from . import visao
 
 LIVRO_META, ABA_META = "nexus_performance", "fato_meta_usina_mes"
@@ -204,7 +205,15 @@ def metas(nomes: Nomes, mes_id: int) -> tuple[dict, dict]:
         prod = [_num(r.get("prod_kwh")) for r in rs if _num(r.get("prod_kwh")) is not None]
         meta = [_num(r.get("meta_kwh")) for r in rs if _num(r.get("meta_kwh")) is not None]
         cob = [_int(r.get("dias_cobertos_qtd")) for r in rs if _int(r.get("dias_cobertos_qtd")) is not None]
+        # o número anômalo (Levi, 18/10/2026: "apenas sinalize que o número está anômalo e o dado pode estar errado,
+        # temos que sinalizar pela plataforma"): os códigos que a plataforma publica na coluna `anomalia` (no fim do
+        # fato), com a frase de `dominios.ANOMALIA_META`; o Nexus não decide o que é anômalo nem mexe no número
+        frases = []
+        for r in rs:
+            frases += [f for f in DOM.anomalias(r.get("anomalia")) if f not in frases]
+        anomalia = " · ".join(frases)
         out[uid] = {"prod_kwh": sum(prod) if prod else None, "meta_kwh": sum(meta) if meta else None,
+                    "anomalia": anomalia,
                     "atingimento": ating, "pr": pr, "pr_meta": prm, "dias_cob": min(cob) if cob else None,
                     "dias_mes": _int(rs[0].get("dias_mes_qtd")), "full_om": any(_int(r.get("full_om")) == 1 for r in rs),
                     "linhas": [str(r.get("usina") or "") for r in rs]}
@@ -677,7 +686,12 @@ def linha_performance(u: dict) -> dict:
     rótulo, o principal em destaque, o resto e os itens)."""
     m, d, at = u.get("meta") or {}, u.get("disp") or {}, u.get("ativos") or {}
     pr, prm = m.get("pr"), m.get("pr_meta")
-    valores = {"meta": _v(_pct(m.get("atingimento")), cls_meta(m.get("atingimento"))),
+    v_meta = _v(_pct(m.get("atingimento")), cls_meta(m.get("atingimento")))
+    if m.get("anomalia"):
+        # o número e a cor continuam os do Gerencial; a etiqueta e a dica dizem que o dado pode estar errado
+        v_meta.update(sub="anômalo", dica=f"Meta: dado anômalo: {m['anomalia']}. O dado pode estar errado (a plataforma "
+                                          "sinaliza; o número é o que o Gerencial publica). Clique para ver o dia a dia.")
+    valores = {"meta": v_meta,
                "pr": (_v(_virgula(pr), "alerta" if pr < prm else "ok", f"/ {_virgula(prm)}") if pr is not None and prm is not None
                       else _v(_virgula(pr), "neutro") if pr is not None else _v("—", "neutro")),
                "disp": _v(_pct(d.get("disp"), 1), cls_disp(d.get("disp")))}
@@ -689,7 +703,9 @@ def linha_performance(u: dict) -> dict:
     det = []
     if m.get("meta_kwh"):
         det.append({"rot": "Meta do mês", "forte": f"{_mwh(m.get('prod_kwh'))} de {_mwh(m['meta_kwh'])} MWh",
-                    "resto": f"{_pct(m.get('atingimento'))} · meta até {m.get('dias_cob') or '—'} dias cobertos", "itens": []})
+                    "resto": f"{_pct(m.get('atingimento'))} · meta até {m.get('dias_cob') or '—'} dias cobertos",
+                    "alerta": f"número anômalo, o dado pode estar errado: {m['anomalia']}" if m.get("anomalia") else "",
+                    "itens": []})
     else:
         det.append({"rot": "Meta do mês", "forte": "", "resto": "sem meta publicada para esta usina", "itens": []})
     if pr is not None:

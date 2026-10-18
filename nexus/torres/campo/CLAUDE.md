@@ -508,7 +508,12 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
     do servidor (`plataforma/gerencial_publicar.py`). < 90% crítico, < 97% atenção (o `atgTag` da Visão gerencial); PR
-    abaixo do previsto, atenção. Usina com duas linhas no Gerencial (Santarém 1 e 2): produção e meta somam,
+    abaixo do previsto, atenção. **O número anômalo** (Levi, 18/10/2026: "apenas sinalize que o número está anômalo e o
+    dado pode estar errado, temos que sinalizar pela plataforma e não ficar travando a construção!"): a plataforma marca
+    a coluna `anomalia` do fato com códigos de `dominios.ANOMALIA_META` (meta baixa ou alta para a potência, dia com
+    geração ou PR acima do possível; a regra é dela); a Visão mantém o número e a cor e põe "anômalo" ao lado, com a
+    frase na dica e no detalhe. Código desconhecido aparece como "número anômalo (a plataforma sinalizou)", nunca some.
+    Caso que criou: Santo Anastácio e Álvares Machado com 217% e 331% em 10/2026 (a meta de outubro baixa no BD_Thopen). Usina com duas linhas no Gerencial (Santarém 1 e 2): produção e meta somam,
     atingimento refeito sobre a soma, PR pesado pela meta.
   - Disponibilidade: `falhas_performance · disponibilidade_dia`; o mês é a média dos dias fechados (a régua de lá é
     `12 h × dias`); duas usinas do Gerencial na mesma do cadastro, pesadas pela potência. < 80% crítico, < 99% atenção.

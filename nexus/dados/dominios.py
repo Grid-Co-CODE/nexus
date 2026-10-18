@@ -185,3 +185,29 @@ def codigo(v):
     de código (frase, texto livre) = vazio, porque texto livre não entra no fato (regra 8)."""
     n = norm(v).replace(" ", "_")
     return n if _CODIGO.match(n) else None
+
+
+# ── O número anômalo da Performance (18/10/2026) ──────────────────────────────────────────────────────────────────
+# Levi: "apenas sinalize que o número está anômalo e o dado pode estar errado, temos que sinalizar pela plataforma e não
+# ficar travando a construção!". A plataforma marca, na coluna `anomalia` do `nexus_performance · fato_meta_usina_mes`
+# (no fim do fato), um ou mais CÓDIGOS desta lista separados por vírgula (a regra de cada um é dela); a frase é daqui. O
+# número não muda: a Visão do responsável mostra a etiqueta "anômalo" e a frase. Caso que criou: em 10/2026, Santo
+# Anastácio e Álvares Machado com 217% e 331% da meta (a meta de outubro baixa demais no BD_Thopen).
+ANOMALIA_META = {"meta_baixa": "a meta do mês está baixa demais para a potência",
+                 "meta_alta": "a meta do mês está alta demais para a potência",
+                 "geracao_impossivel": "há dia com geração acima do possível (potência × 12 h)",
+                 "pr_alto": "há dia com PR acima do possível"}
+# código que a plataforma criou e o Nexus ainda não conhece: o sinal aparece assim, nunca some
+ANOMALIA_DESCONHECIDA = "número anômalo (a plataforma sinalizou)"
+
+
+def anomalias(v) -> list[str]:
+    """As frases dos códigos da coluna `anomalia` (separados por vírgula), sem repetir; vazio = nenhuma."""
+    out = []
+    for parte in str(v or "").split(","):
+        if not parte.strip():
+            continue
+        frase = ANOMALIA_META.get(codigo(parte)) or ANOMALIA_DESCONHECIDA
+        if frase not in out:
+            out.append(frase)
+    return out

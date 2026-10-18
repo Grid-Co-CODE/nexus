@@ -655,7 +655,9 @@ FATOS = (
                     "fonte = de onde veio a produção (pg = banco da Thopen, bd = BD_Performance); meta_fonte = de onde "
                     "veio a meta (BD_Thopen, Info Mensal ou o P50 anual ÷ 12). A energia vai em kWh (o Gerencial mostra "
                     "MWh com 1 casa). O motivo do PR sem confiança (texto) fica de fora (regra 8). Grava só o worker do "
-                    "servidor (Linux); GER_PUBLICAR=1 força numa máquina"),
+                    "servidor (Linux); GER_PUBLICAR=1 força numa máquina. Desde 18/10/2026 a coluna `anomalia` (no fim): "
+                    "códigos da lista `dominios.ANOMALIA_META`, separados por vírgula, quando a plataforma vê o número "
+                    "anômalo (o número não muda; a Visão do responsável sinaliza que o dado pode estar errado)"),
     # As janelas da Visão do responsável (12/10/2026, Levi: "PR ao clicar aparece um card (...) essa mesma visão do PAINEL
     # NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO"; a meta "com uma tabelinha de dia do mês, geração meta, geração real"):
     # o dia a dia do Gerencial (a geração que fecha no atingimento, 13/10/2026) com o POA e o PR do PR diário do Painel
