@@ -41,7 +41,8 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 
 | Arquivo | O que faz |
 |---|---|
-| `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo) |
+| `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo); na cópia em memória, o `cliente` já vem pelo nome do cadastro (`clientes.py`) |
+| `clientes.py` | **o nome do cliente é o do cadastro do Nexus** (18/10/2026, seção abaixo) |
 | `gestao.py` | as contas da Gestão PCM (Plano & Fila), transcritas do `js/preventivas.js` do painel |
 | `prova_gestao.py` + `.js` | a prova de que a Gestão PCM bate célula a célula com o painel (roda o JS dele no node) |
 | `semana.py` | as regras da semana que as telas Tarefas e OS, Quadro e Gerar usam: achar a semana, dia, situação, fora da jornada, filtros (a tela Semana saiu em 12/10/2026) |
@@ -59,6 +60,26 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (veja o `README.md` de lá); hoje a do `bd4f673` + `fora_da_programacao.py` (16/10/2026, seção dos motivos) |
+
+## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
+
+Levi: "Use o nome do cliente no Nexus como principal". Os arquivos do PCM tiram o cliente do nome do site no Fracttal
+("Cliente - Usina - UF"), e a grafia de lá não é a do cadastro: "Utragaz", "RenoGrid", "Greenyellow" e "Semp" (no
+cadastro, Ultragaz, Renogrid, GreenYellow e SEMP). Achado ao provar a semana da Visão do responsável contra o Fechamento
+do PCM: os números batiam cliente a cliente, o nome não.
+- **Como troca:** o mesmo nome do cadastro sem diferenciar maiúscula, acento e espaço; e o erro de grafia pelo de-para
+  do Fracttal no cadastro (o site liga à usina, e a ficha da usina tem o cliente), só quando todas as usinas com aquele
+  começo de site são do mesmo cliente. O que não casa fica como veio (o nome composto da planilha de operações,
+  "Thopen;#Renogrid", e os clientes que não estão no cadastro). Por ID, não por palpite.
+- **Onde:** o `fonte` troca o campo `cliente` na cópia em memória de todos os arquivos (Gestão PCM, Fora da
+  programação, relatórios, Acompanhamento, relatório executivo); o Quadro da semana na semana da rodada; as Observações
+  da semana; e a marca antiga do Fora da programação, que guarda o cliente de quando foi feita.
+- **Só o que o Nexus mostra:** o arquivo do PCM e o que o Nexus manda ao App e ao PCM (a planilha da rodada, o
+  `Fora_da_programacao.json`) não passam por aqui. O filtro de cliente que alguém guardou com a grafia antiga ("Utragaz")
+  deixa de achar a usina.
+- **Sem o banco** (teste sem o banco falso, falha de rede): os nomes ficam como vieram; o banco que falhou é tentado de
+  novo em 5 min. O mapa fica 10 min em memória por app. **Medido em 18/10:** 17 nomes em 1,6 s; a única troca pelo site
+  é "Utragaz"; os arquivos lidos já saem só com os nomes do cadastro.
 
 ## Horas por tarefa e zeladoria no motor (15/10/2026)
 
