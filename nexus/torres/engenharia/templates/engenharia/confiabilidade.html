@@ -334,8 +334,9 @@
           est.querySelectorAll('th.eg-ord').forEach(function (o) { o.classList.toggle('eg-ord--on', o === th); });
         });
       });
+      // a aba Diagnósticos também tem uma tabela .eg-est, sem o filtro (só a de Indicadores o tem)
       var filtro = document.querySelector('.eg-filtrar');
-      filtro.addEventListener('input', function () {
+      if (filtro) filtro.addEventListener('input', function () {
         var q = filtro.value.trim().toLowerCase();
         Array.prototype.forEach.call(corpoT.rows, function (r) {
           r.hidden = q && r.cells.length > 1 && r.cells[0].dataset.v.toLowerCase().indexOf(q) < 0;

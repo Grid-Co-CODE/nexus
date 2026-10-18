@@ -32,10 +32,10 @@
     {% if pode %}{{ encaminhar(ac.cod, ac.responsavel.hmac) }}{% endif %}</div>
   {% if gv.novas %}<div class="eg-acomp-aviso"><b>{{ gv.novas|length }} {{ 'falha nova' if gv.novas|length == 1 else 'falhas novas' }} desde que entrou:</b> {% for x in gv.novas %}OS {{ x.os }}, {{ x.tipo|lower }}, {{ x.dia }}{{ '; ' if not loop.last }}{% endfor %}.</div>{% endif %}
   {% if pode %}
-  <form class="eg-acomp-campos" data-eg-form="salvar" data-falhas="{{ gv.falhas_dias|join(',') }}" method="post" action="{{ url_for('torre_engenharia.acompanhamento_salvar', aid=ac.id) }}">
+  <form class="eg-acomp-campos" data-eg-form="salvar" data-falhas="{{ gv.falhas_dias|join(',') }}" method="post" action="{{ url_for('torre_engenharia.acompanhamento_salvar', aid=ac.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}">
     <label><span class="gc-rotulo">Início da análise</span><input class="gc-campo" type="date" name="inicio" required value="{{ dg.get('inicio', '') if em_salvar else (ac.inicio.isoformat() if ac.inicio else '') }}" min="{{ piso }}" max="{{ hoje }}"></label>
     <label><span class="gc-rotulo">Fim da análise</span><input class="gc-campo" type="date" name="fim" value="{{ dg.get('fim', '') if em_salvar else '' }}" min="{{ piso }}" max="{{ hoje }}"></label>
-    <label><span class="gc-rotulo">Diagnóstico</span>{% set diag_escolhido = (dg.get('diagnostico')|int(0)) if em_salvar else ac.diagnostico_id %}<select class="gc-campo" name="diagnostico"><option value=""{% if not diag_escolhido %} selected{% endif %}>A definir</option>{% for x in diags_ativos %}<option value="{{ x.id }}"{% if x.id == diag_escolhido %} selected{% endif %}>{{ x.nome }}</option>{% endfor %}{% if ac.diagnostico_id and ac.diagnostico_id not in diags_ativos|map(attribute='id')|list %}<option value="{{ ac.diagnostico_id }}" selected>{{ diag_nome.get(ac.diagnostico_id, '—') }} (excluído)</option>{% endif %}</select></label>
+    <label><span class="gc-rotulo">Diagnóstico</span>{% set diag_escolhido = (dg.get('diagnostico')|int(0)) if em_salvar else ac.diagnostico_id %}<select class="gc-campo" name="diagnostico"><option value="0"{% if not diag_escolhido %} selected{% endif %}>A definir</option>{% for x in diags_ativos %}<option value="{{ x.id }}"{% if x.id == diag_escolhido %} selected{% endif %}>{{ x.nome }}</option>{% endfor %}{% if ac.diagnostico_id and ac.diagnostico_id not in diags_ativos|map(attribute='id')|list %}<option value="{{ ac.diagnostico_id }}" selected>{{ diag_nome.get(ac.diagnostico_id, '—') }} (excluído)</option>{% endif %}</select></label>
     <p class="eg-acomp-dica">Preencher o fim (com o diagnóstico) encerra o acompanhamento: o ativo vai para Encerrados.</p>
     <p class="eg-acomp-volta" data-eg-volta hidden></p>
     <button type="submit" class="gc-btn gc-btn--primario">Salvar</button>
@@ -45,7 +45,7 @@
     <dt>Diagnóstico</dt><dd>{{ diag_nome.get(ac.diagnostico_id, 'a definir') }}</dd></dl>
   {% endif %}
   <h4 class="eg-acomp-sub">Comentários</h4>
-  {% if pode %}<form class="eg-acomp-coment" data-eg-form="comentar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_comentar', aid=ac.id) }}">
+  {% if pode %}<form class="eg-acomp-coment" data-eg-form="comentar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_comentar', aid=ac.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}">
     <textarea class="gc-campo" name="texto" rows="3" maxlength="2000" aria-label="Comentário" placeholder="Escreva o que viu, o que fez ou o que falta…">{{ dg.get('texto', '') if dg.get('form') == 'comentar' else '' }}</textarea>
     <button type="submit" class="gc-btn gc-btn--primario">Salvar comentário</button>
   </form>{% endif %}

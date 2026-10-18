@@ -167,7 +167,7 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
         c = canon(a.get("cod") or (acomp or {}).get("cod"))
         return _montar_gaveta(f"g{i}", a, acomp, novas,
                               [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
-                              falhas_em.get(c, []))
+                              falhas_em.get(c, []) if a.get("nivel") else [])
     if aba == "ativos":
         gavetas = [gaveta(i, s, None, []) for i, s in enumerate(sinais)]
     elif aba == "acompanhamento":
@@ -193,7 +193,8 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
 def _montar_gaveta(gid: str, a: dict, acomp: dict | None, novas: list, anteriores: list, falhas: list) -> dict:
     """O que a gaveta de um ativo mostra (engenharia/_gaveta.html), na página e na resposta das ações: o ativo, o
     acompanhamento, as falhas novas com o dia, os encerrados anteriores e o dia de cada falha do ativo (o aviso de que o
-    fim escolhido faz o ativo voltar para Ativos com sinal)."""
+    fim escolhido faz o ativo voltar para Ativos com sinal). `falhas` vazio para o ativo sem o sinal de 30 dias: ele
+    não volta para a lista, e o aviso não vale (acabamento da revisão final)."""
     return {"id": gid, "a": a, "acomp": acomp,
             "novas": [dict(x, dia=x["quando"].astimezone(BRT).strftime("%d/%m")) for x in novas],
             "anteriores": anteriores,
@@ -310,7 +311,8 @@ def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str
     novas = aberto["novas"] if aberto and acomp is aberto["acomp"] else []
     anteriores = [x["acomp"] for x in sep["encerrado"] if canon(x["acomp"]["cod"]) == c
                   and (not acomp or x["acomp"]["id"] != acomp["id"])]
-    gv = _montar_gaveta("g", a, acomp, novas, anteriores, (d.get("falhasEm") or {}).get(c, []))
+    gv = _montar_gaveta("g", a, acomp, novas, anteriores,
+                        (d.get("falhasEm") or {}).get(c, []) if a.get("nivel") else [])
     diags = AC.diagnosticos(lido["diagnosticos"])
     erro_leitura = bool(lido.get("erro") and not lido.get("lido_em"))
     if erro_leitura and not erro:
@@ -335,10 +337,20 @@ def _acao(cod: str, fazer, aviso: str = "", acomp_id=None, form: str = ""):
         r = fazer()
     except AC.Recusada as e:
         return _gaveta_de(cod, erro=str(e), digitado=digitado)
-    except Exception as e:      # noqa: BLE001 — banco fora: a gaveta diz, nada mudou
+    except Exception as e:      # noqa: BLE001 — banco fora: a gaveta diz o que aconteceu
         import logging
+
+        from ...dados import livros
         logging.exception("confiabilidade: a ação do acompanhamento em %s não gravou", cod)
-        return _gaveta_de(cod, erro=FALHOU_BANCO.format(type(e).__name__), digitado=digitado)
+        # a GravacaoErro vem da conferência DEPOIS da troca: a troca já foi feita, e repetir pode gravar duas vezes. A
+        # GravacaoRecusada (a trava dos livros que só crescem, quando existir) é antes: aí nada mudou mesmo
+        recusada = getattr(livros, "GravacaoRecusada", None)
+        if isinstance(e, livros.GravacaoErro) and not (recusada and isinstance(e, recusada)):
+            erro = ("Gravei, mas a conferência do banco não bateu: confira a lista (recarregue a página) antes de repetir, "
+                    "para não gravar duas vezes.")
+        else:
+            erro = FALHOU_BANCO.format(type(e).__name__)
+        return _gaveta_de(cod, erro=erro, digitado=digitado)
     if isinstance(r, tuple):
         aviso, acomp_id = r
     elif r:
@@ -405,7 +417,10 @@ def _cod_do(acompanhamento_id: str) -> str:
 @bp.route("/confiabilidade/acompanhamento/<aid>/salvar", methods=["POST"])
 def acompanhamento_salvar(aid):
     from ...engenharia import acompanhamento as AC
-    cod = _cod_do(aid)
+    from ..moldura import _de_outro_site
+    if _de_outro_site():          # antes de qualquer leitura do banco (acabamento da revisão final)
+        abort(403)
+    cod = request.form.get("cod") or _cod_do(aid)
     fim = request.form.get("fim", "")
 
     def fazer():
@@ -414,11 +429,13 @@ def acompanhamento_salvar(aid):
                        session.get("usuario"), pode)
         if ev["evento"] != "encerrou":
             return "Salvo."
-        # encerrar com falha depois do fim faz o ativo voltar para Ativos com sinal (a regra do Levi, 18/10/2026)
+        # encerrar com falha depois do fim faz o ativo voltar para Ativos com sinal (a regra do Levi, 18/10/2026): só
+        # se ele ainda tem o sinal de 30 dias (acabamento da revisão final)
         from ...dados.equipamento import canon
         d = _dados()["dados"]
         marco = AC._depois_do_fim(AC._dia(ev["data_id_fim_analise"]))
-        volta = any(x["quando"] >= marco for x in (d.get("falhasEm") or {}).get(canon(cod), []))
+        tem_sinal = any(canon(s["cod"]) == canon(cod) for s in d["sinais"])
+        volta = tem_sinal and any(x["quando"] >= marco for x in (d.get("falhasEm") or {}).get(canon(cod), []))
         return ("Encerrado." + (" O ativo volta para Ativos com sinal: teve falha depois do fim." if volta else ""),
                 aid)
     return _acao(cod, fazer, form="salvar")
@@ -427,7 +444,10 @@ def acompanhamento_salvar(aid):
 @bp.route("/confiabilidade/acompanhamento/<aid>/comentar", methods=["POST"])
 def acompanhamento_comentar(aid):
     from ...engenharia import acompanhamento as AC
-    cod = _cod_do(aid)
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    cod = request.form.get("cod") or _cod_do(aid)
 
     def fazer():
         pode, _ = _quem_pode()

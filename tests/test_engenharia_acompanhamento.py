@@ -352,7 +352,7 @@ def test_tela_tem_as_abas_e_os_numeros(tela, cliente):
     assert 'name="quem"' not in html
     ac = cliente.get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
     assert "IBI200-INVR1.3" in _lista(ac) and "Com Ana Lima (você) desde" in ac and 'name="quem"' in ac
-    assert "Quem acompanha" in ac and "4" in _lista(ac)                         # as falhas quando entrou
+    assert "Quem acompanha" in ac and "<b>4</b><span>falhas quando entrou</span>" in _lista(ac)
     enc = cliente.get("/t/engenharia/confiabilidade?aba=encerrados").get_data(as_text=True)
     assert "IBI200-TRK07" in _lista(enc) and "Quem acompanhava" in enc and "Disjuntor" in _lista(enc)
     assert "sem falha nova desde o fim" in _lista(enc)
@@ -571,3 +571,89 @@ def test_com_quem_desde_conta_do_encaminhamento(tela, cliente):
     assert a["desde"].strftime("%d/%m") == "10/10" and a["com_desde"].date() == datetime.now(BRT).date()
     ac = _como(cliente, ANA).get(URL + "?aba=acompanhamento").get_data(as_text=True)
     assert "Com Beto Souza desde " + datetime.now(BRT).strftime("%d/%m") in _lista(ac)
+
+
+# ── os acabamentos da revisão final (18/10/2026, pedidos pelo Levi) ──────────────────────────────────────────────────
+def test_a_definir_limpa_o_diagnostico(banco):
+    # o Levi: o "A definir" limpa o diagnóstico (o histórico guarda a troca); o vazio, que a API manda, segue "manter"
+    A.pegar(ATIVO, ANA, pode=True)
+    hoje = date(2026, 10, 18)
+    A.salvar(_aid(), "2026-10-15", "", "1", ANA, True, hoje)
+    assert _a()["diagnostico_id"] == 1
+    A.salvar(_aid(), "2026-10-15", "", "0", ANA, True, hoje)
+    assert _a()["diagnostico_id"] is None
+    with pytest.raises(A.Recusada, match="Nada mudou"):
+        A.salvar(_aid(), "2026-10-15", "", "0", ANA, True, hoje)
+    with pytest.raises(A.Recusada, match="diagnóstico"):
+        A.salvar(_aid(), "2026-10-15", "2026-10-17", "0", ANA, True, hoje)
+
+
+def test_a_definir_da_gaveta_manda_zero(tela, cliente):
+    html = _como(cliente, ANA).get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    assert re.search(r'<option value="0"[^>]*>A definir</option>', html)
+
+
+def test_aba_diagnosticos_sem_erro_de_js(tela, cliente):
+    # o script da página procurava o filtro da tabela de Indicadores em toda tabela .eg-est, e a aba Diagnósticos tem uma
+    import shutil
+    import subprocess
+    if not shutil.which("node"):
+        pytest.skip("sem node nesta máquina")
+    html = _como(cliente, ANA).get(URL + "?aba=diagnosticos").get_data(as_text=True)
+    js = next(s.split("</script>", 1)[0] for s in html.split("<script>")[1:] if "a gaveta do ativo" in s)
+    pagina = ("const tabela = {tBodies: [{rows: []}], querySelectorAll: () => []};\n"
+              "globalThis.document = {querySelector: s => s === '.eg-est' ? tabela : null, querySelectorAll: () => [],\n"
+              "                       addEventListener: () => {}};\n"
+              "globalThis.window = globalThis;\n" + js)
+    r = subprocess.run(["node", "-e", pagina], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+
+
+def test_aviso_de_volta_so_com_sinal(tela, cliente, monkeypatch):
+    # o "volta para Ativos com sinal" só vale para o ativo que ainda tem o sinal de 30 dias
+    from test_engenharia_confiabilidade import _os
+
+    from nexus.engenharia import os_falhas
+    from nexus.torres import engenharia as torre
+    linhas = ([_os("IBI200-INVR1.3", d) for d in (1, 2, 3, 10)] + [_os("IBI200-TRK07", d) for d in (5, 20)]
+              + [_os("IBI200-INV02", d) for d in (1, 4)] + [_os("IBI200-INV09", 40)])        # INV09: sem sinal agora
+    monkeypatch.setattr(os_falhas, "linhas", lambda: linhas)
+    torre._CACHE.clear()
+    A.pegar({"cod": "IBI200-INV09", "usina_id": 1, "usina_ligada_por": "de-para do Fracttal"}, ANA, pode=True)
+    html = _como(cliente, ANA).get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    gaveta = next(t for t in html.split('<template id="')[1:] if "IBI200-INV09" in t)
+    assert 'data-falhas=""' in gaveta
+    g = cliente.post(f"{URL}/acompanhamento/{_aid_de('IBI200-INV09')}/salvar",
+                     data={"inicio": "2026-08-01", "fim": "2026-08-20", "diagnostico": "1", "cod": "IBI200-INV09"},
+                     headers=SAME).get_data(as_text=True)
+    assert "Encerrado." in g and "volta para Ativos com sinal" not in g
+
+
+def test_acao_de_outro_site_nao_le_o_livro(tela, cliente, monkeypatch):
+    # a conferência de origem vem antes de qualquer leitura do banco
+    _como(cliente, ANA)
+    aid = _aid_de("IBI200-INVR1.3")
+    monkeypatch.setattr(A, "ler", lambda *a, **k: (_ for _ in ()).throw(AssertionError("leu o livro")))
+    for acao, dados in (("salvar", {"inicio": "2026-10-01"}), ("comentar", {"texto": "x"})):
+        r = cliente.post(f"{URL}/acompanhamento/{aid}/{acao}", data=dados, headers={"Sec-Fetch-Site": "cross-site"})
+        assert r.status_code == 403
+
+
+def test_conferencia_que_falha_depois_de_gravar_nao_diz_nada_mudou(tela, cliente, monkeypatch):
+    # quando a contagem não bate depois da troca, a troca já foi feita: repetir pode duplicar o comentário
+    from nexus.dados import livros
+    _como(cliente, ANA)
+    aid = _aid_de("IBI200-INVR1.3")
+    monkeypatch.setattr(livros, "publicar",
+                        lambda *a, **k: (_ for _ in ()).throw(livros.GravacaoErro("enviei 3 linhas e o banco tem 2")))
+    g = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar cabo", "cod": "IBI200-INVR1.3"},
+                     headers=SAME).get_data(as_text=True)
+    assert "Nada mudou" not in g and "confira" in g.lower() and ">Trocar cabo</textarea>" in g
+
+
+def test_diagnostico_nao_aceita_email(banco):
+    # o nome e a descrição vão em claro (a API tem leitura aberta): e-mail não entra, como no cadastro de setores
+    with pytest.raises(A.Recusada, match="e-mail"):
+        A.criar_diagnostico("ana.lima@gridco.com.br", "", ANA, True)
+    with pytest.raises(A.Recusada, match="e-mail"):
+        A.criar_diagnostico("Proteção", "falar com ana.lima@gridco.com.br", ANA, True)

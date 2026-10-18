@@ -852,8 +852,8 @@ LIVROS = (
           "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
           "Confiabilidade)",
           "nexus/engenharia/acompanhamento.py, pela tela Engenharia > Confiabilidade", False,
-          "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce no 1º Pegar, com o cadastro inicial "
-          "(Comunicação, Disjuntor). As duas abas vão juntas a cada gravação, sobre o livro relido do banco"),
+          "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª gravação (o 1º Pegar ou a 1ª "
+          "mudança no cadastro dos diagnósticos), com o cadastro inicial (Comunicação, Disjuntor). As duas abas vão juntas a cada gravação, sobre o livro relido do banco"),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,
           "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável"),

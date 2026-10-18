@@ -221,8 +221,9 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
             a["encaminhado_por"] = (quem.get("nome") or "") if ev == "encaminhou" and _txt(l.get("pessoa_hmac")) != resp else ""
         if _dia(l.get("data_id_inicio_analise")):
             a["inicio"] = _dia(l.get("data_id_inicio_analise"))
-        if _int(l.get("diagnostico_id")):
-            a["diagnostico_id"] = _int(l.get("diagnostico_id"))
+        if _txt(l.get("diagnostico_id")):
+            # 0 = o "A definir" da tela: limpa o diagnóstico (o Levi, 18/10/2026); vazio = o evento não mexeu nele
+            a["diagnostico_id"] = _int(l.get("diagnostico_id")) or None
         if ev == "comentario":
             a["comentarios"].insert(0, {"quando": q, "quando_txt": q.strftime("%d/%m/%Y às %H:%M") if q else "—",
                                         "nome": quem.get("nome") or quem.get("email") or "",
@@ -385,7 +386,7 @@ def salvar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, u
     if not ini:
         raise Recusada("Escolha o início da análise")
     f = _data(fim, "fim da análise")
-    diag = _int(diagnostico_id)
+    diag = _int(diagnostico_id)          # None (vazio) = manter; 0 = o "A definir" (limpa); n = o diagnóstico
     if ini > hoje:
         raise Recusada("O início da análise não pode ser depois de hoje")
     if f and f > hoje:
@@ -398,14 +399,15 @@ def salvar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, u
     with _TRAVA:
         lido = _reler()
         a = _do_livro(lido, acompanhamento_id)
-        diag = diag or a["diagnostico_id"]
+        limpa = diag == 0
+        novo = None if limpa else (diag or a["diagnostico_id"])
         if diag and diag != a["diagnostico_id"] and not any(
                 d["id"] == diag and not d["excluido"] for d in diagnosticos(lido["diagnosticos"])):
             raise Recusada("Este diagnóstico não existe no cadastro (ou foi excluído): escolha outro")
-        if not f and ini == a["inicio"] and diag == a["diagnostico_id"]:
+        if not f and ini == a["inicio"] and novo == a["diagnostico_id"]:
             raise Recusada("Nada mudou")
         nova = _evento(cofre, "encerrou" if f else "dados", quem, a["id"], _ativo_de(a), inicio=ini, fim=f,
-                       diagnostico_id=diag)
+                       diagnostico_id=0 if limpa else novo)
         _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
     return nova
 
@@ -437,6 +439,8 @@ def _nome_diag(nome) -> str:
     n = " ".join(str(nome or "").split())
     if not NOME_MIN <= len(n) <= NOME_MAX:
         raise Recusada(f"O nome do diagnóstico tem de ter de {NOME_MIN} a {NOME_MAX} caracteres")
+    if "@" in n:              # vai em claro, e a API do banco tem leitura aberta (como o nome do setor)
+        raise Recusada("O nome do diagnóstico não pode ter e-mail: o banco tem leitura aberta")
     return n
 
 
@@ -444,6 +448,8 @@ def _descricao(descricao) -> str:
     d = " ".join(str(descricao or "").split())
     if len(d) > DESCRICAO_MAX:
         raise Recusada(f"A descrição passou de {DESCRICAO_MAX} caracteres")
+    if "@" in d:
+        raise Recusada("A descrição do diagnóstico não pode ter e-mail: o banco tem leitura aberta")
     return d
 
 

@@ -39,7 +39,11 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   20/10/2025 (`acompanhamento.PISO`, o começo das contas; revisão final: "0202-10-15" virava um data_id de 7 dígitos,
   para sempre no livro) é recusado.
   Encerrado fica só para ler e não reabre. Se o fim escolhido é anterior a uma falha, a gaveta avisa na hora (pelo
-  `data-falhas`) que o ativo volta para Ativos com sinal.
+  `data-falhas`) que o ativo volta para Ativos com sinal, só quando ele ainda tem o sinal de 30 dias (sem sinal, não
+  volta, e o aviso não vale).
+- **Diagnóstico:** o "A definir" da gaveta manda 0 e limpa o diagnóstico (o Levi, 18/10/2026; o histórico guarda a
+  troca); o vazio, que só a API manda, quer dizer "manter". Encerrar exige um diagnóstico escolhido. O nome e a descrição
+  do cadastro vão em claro e recusam e-mail ("@"), como o nome do setor.
 - **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
 - **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
@@ -53,10 +57,14 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
     (`livre=1`) não passa adiante o acompanhamento que outra pessoa abriu depois;
   - livro ilegível: as abas Em acompanhamento e Encerrados dizem "—" (não 0), a gaveta não diz "Ninguém acompanha" nem
     oferece o Pegar, a aba Diagnósticos não mostra o cadastro inicial; a cópia velha diz a hora da última leitura boa;
-  - "Com <pessoa> desde" é quando a pessoa recebeu o ativo (`com_desde`), não o começo do acompanhamento (`desde`).
+  - "Com <pessoa> desde" é quando a pessoa recebeu o ativo (`com_desde`), não o começo do acompanhamento (`desde`);
+  - salvar e comentar conferem a origem antes de qualquer leitura do banco, e o código do ativo vem da própria gaveta;
+  - a conferência que falha DEPOIS da troca (`GravacaoErro`) não diz "Nada mudou": a troca já foi feita, e a gaveta pede
+    para conferir a lista antes de repetir.
 - **O dado:** livro `nexus_engenharia_acompanhamento` (`dim_diagnostico` e `fato_acompanhamento_ativo`, 1 linha = 1
-  evento), registrado no catálogo antes da 1ª gravação; regra em `nexus/dados/CLAUDE.md`. Nasce no 1º Pegar depois do
-  deploy, com o cadastro inicial (Comunicação, Disjuntor). Quem, o nome de quem acompanha e o comentário só cifrados.
+  evento), registrado no catálogo antes da 1ª gravação; regra em `nexus/dados/CLAUDE.md`. Nasce na 1ª gravação depois
+  do deploy (o 1º Pegar ou a 1ª mudança no cadastro dos diagnósticos), com o cadastro inicial (Comunicação, Disjuntor).
+  Quem, o nome de quem acompanha e o comentário só cifrados.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py tests/test_engenharia_gaveta_js.py`
   (o livro, as regras, a separação das abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como
   texto, o código com caixa e espaço, o comentário com HTML, o banco fora e cada achado da revisão final; o JS da
