@@ -332,7 +332,7 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 .eg-ant>li{padding:9px 12px;border:1px solid var(--linha);border-radius:10px;font-size:13px;color:var(--tinta-2)}
 .eg-ant summary{cursor:pointer}
 .eg-ant b{color:var(--tinta)}
-.eg-diag td{vertical-align:top}
+.eg-diag td{vertical-align:middle}
 @media (max-width:640px){
   .eg-acomp-campos{grid-template-columns:minmax(0,1fr)}
   .eg-item-acoes{justify-content:flex-start}

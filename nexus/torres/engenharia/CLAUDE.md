@@ -1,11 +1,55 @@
 # CLAUDE.md — torre Engenharia
 
-Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje só a
-**Confiabilidade** é tela de verdade; as outras caem no placeholder da casca.
+Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje são telas de verdade
+a **Confiabilidade** (com o **acompanhamento** dos ativos com sinal desde 18/10/2026) e o **Quadro da equipe**; as
+outras caem no placeholder da casca.
 
 Endereços nunca a partir da raiz (porta única, 09/10/2026: o Nexus pode rodar debaixo de `/nexus`, como no servidor até a fase 4): o link da OS na
 Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusRota` (regra das torres em
 `nexus/torres/CLAUDE.md`; o esquecimento quebra `tests/test_prefixo.py`).
+
+## Acompanhamento dos ativos com sinal (18/10/2026)
+
+Levi: "os membros de engenharia ou administradores pegar aqueles ativos com sinal para acompanhar ou alguém da
+engenharia poder encaminhar para a pessoa ver!" e "o que está sendo acompanhado sai de ativos com sinal e passam para em
+acompanhamento". É o começo de um ecossistema da Engenharia que depois vai aos outros setores ("vamos começar pelo setor
+de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho aprovado:
+`docs/superpowers/specs/2026-10-18-engenharia-acompanhamento-design.md` e `docs/mockups/engenharia-acompanhamento.html`.
+
+| Peça | Onde |
+|---|---|
+| Regras e o livro | `nexus/engenharia/acompanhamento.py` (o molde é o "Pegar para mim" das Contestações e o cadastro dos motivos do PCM) |
+| As falhas de cada ativo | `confiabilidade.calcular(...)["falhasEm"]` (pelo código canônico, todo o período, a regra do sinal) |
+| Tela e ações | `__init__.py` (`_gavetas_e_listas`, `_gaveta_de` e as rotas `confiabilidade/acompanhamento/*` e `confiabilidade/diagnosticos/*`), `templates/engenharia/confiabilidade.html` e `_gaveta.html`, classes `eg-acomp*`, `eg-cartao`, `eg-diag*` em `engenharia.css` |
+
+- **Abas:** Ativos com sinal · Em acompanhamento · Encerrados · Indicadores · Diagnósticos (esta só para quem age). O
+  ativo com acompanhamento aberto sai de Ativos com sinal; o encerrado também, e **só volta com falha nova** depois do
+  fim da análise (a partir do dia seguinte ao fim, no dia de Brasília), com a etiqueta "já acompanhado · <diagnóstico>
+  em <fim>". O painel ao lado e a faixa de números continuam sobre todos os ativos com sinal (descrevem a frota).
+- **Filtros:** os de hoje valem nas três listas; "Quem acompanha" (Em acompanhamento) e "Quem acompanhava" (Encerrados),
+  o parâmetro `quem` (o código da pessoa, nunca o nome). O nível é o de agora em Em acompanhamento e o da entrada em
+  Encerrados. Nenhum filtro entra sem o Levi pedir (o de diagnóstico ele não quis).
+- **Quem age** (pega, encaminha, salva, comenta, mexe no cadastro): o setor Engenharia (Base → Integração Fracttal; o
+  nome do setor, sem acento nem caixa) e o administrador, com login de pessoa: a senha de administrador não diz quem é, e
+  a ação é recusada. Quem só vê a tela lê tudo, sem botões. Encaminhar é só para pessoas do setor Engenharia (o nome vem
+  do pessoal do Fracttal). Qualquer um da Engenharia comenta e muda datas e diagnóstico (o Levi não quis "só quem
+  acompanha escreve"). Não há "soltar": quem pegou por engano encaminha ou encerra.
+- **Datas:** o início começa no dia do Pegar e pode mudar; o **fim é o dia em que a análise terminou**: preenchê-lo, com o
+  diagnóstico, encerra (não há outro botão). Fim antes do início ou depois de hoje, ou data fora do calendário, é recusado.
+  Encerrado fica só para ler e não reabre. Se o fim escolhido é anterior a uma falha, a gaveta avisa na hora (pelo
+  `data-falhas`) que o ativo volta para Ativos com sinal.
+- **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
+  entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
+- **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
+  com o aviso ou o erro (`_gaveta.html`, a mesma peça da página); ao fechar depois de gravar, a página recarrega. O Pegar
+  do cartão também responde na gaveta. O ativo é casado pelo código canônico (`equipamento.canon`): o Fracttal e o livro
+  escrevem o mesmo ativo de jeitos diferentes.
+- **O dado:** livro `nexus_engenharia_acompanhamento` (`dim_diagnostico` e `fato_acompanhamento_ativo`, 1 linha = 1
+  evento), registrado no catálogo antes da 1ª gravação; regra em `nexus/dados/CLAUDE.md`. Nasce no 1º Pegar depois do
+  deploy, com o cadastro inicial (Comunicação, Disjuntor). Quem, o nome de quem acompanha e o comentário só cifrados.
+- **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py` (o livro, as regras, a separação das
+  abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como texto, o código com caixa e espaço, o
+  comentário com HTML e o banco fora). A prova não grava no banco de verdade: o livro é para sempre.
 
 ## Quadro da equipe (06/10/2026)
 

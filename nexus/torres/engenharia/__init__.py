@@ -2,7 +2,9 @@
 
 A Confiabilidade é nossa desde 06/10/2026 (Levi: "traga a aba Confiabilidade do pcm.gridco.com.br, não referenciando
 diretamente esse caminho mas construindo algo nosso!"): o Nexus lê as OS de falha do Fracttal (`nexus/engenharia/
-os_falhas.py`) e faz as contas (`nexus/engenharia/confiabilidade.py`). As outras telas seguem no placeholder da casca.
+os_falhas.py`) e faz as contas (`nexus/engenharia/confiabilidade.py`). Desde 18/10/2026 a Confiabilidade tem o
+acompanhamento dos ativos com sinal (pegar, encaminhar, diagnóstico, comentários; `nexus/engenharia/acompanhamento.py`).
+O Quadro da equipe também é nosso; as outras telas seguem no placeholder da casca.
 Leia o CLAUDE.md desta pasta antes de mexer.
 """
 import collections

@@ -52,7 +52,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | OS Creator embutido | `nexus/torres/oscreator/README.md` |
 | Performance (porta única: as telas da Plataforma de Performance numa moldura, com o passe `NEXUS_SSO_CHAVE`, o mapa das telas e a ponte de 04/10 como reserva do Tempo real; Clima e risco, alertas públicos por usina em quatro níveis: Agir agora, Atenção, Acompanhar e Sem alerta; Mapa de risco com camadas de calor e modo TV) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
 | PCM (programação semanal: gerar e, desde 09/10/2026, Publicar no App; Quadro da semana com a reprogramação de tarefas; Gestão PCM, o Plano & Fila das manutenções; Acompanhamento PCM, desde 14/10/2026: MPA, MPS, Radar de Backlog, Mapa e One Page; Técnicos por usina, desde 17/10/2026: quem vê e pode rondar cada usina no App, editado pelo PCM) | `nexus/pcm/CLAUDE.md`, `nexus/pcm/motor/README.md` e `nexus/pcm/acompanhamento/CLAUDE.md` |
-| Engenharia (Confiabilidade dos ativos, pelas OS de falha do Fracttal) | `nexus/torres/engenharia/CLAUDE.md` |
+| Engenharia (Confiabilidade dos ativos, pelas OS de falha do Fracttal; desde 18/10/2026 o acompanhamento dos ativos com sinal: pegar, encaminhar, diagnóstico, comentários e os encerrados) | `nexus/torres/engenharia/CLAUDE.md` |
 | Segurança · HSEQ (Extintores: por usina e dia, por supervisor e o relatório em PDF; EPI e EPC: as luvas isolantes pela ronda diária; APR e PT: as Permissões de trabalho que vieram do Campo, com a PT e a APR) | `nexus/torres/hseq/CLAUDE.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |
