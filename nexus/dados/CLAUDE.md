@@ -260,7 +260,16 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
    observação do App, o motivo da PT, a tarefa do PCM ficaram fora). Pessoa só como `pessoa_id`; vinda de fora, como
    HMAC do e-mail (`NEXUS_PESSOA_HMAC`). O nome em claro de uma fonte (as rondas, hoje) só serve para ligar, na memória.
    Sensível do cadastro, só cifrado (`sensivel_cifrado`).
-9. **Conferir depois de gravar:** `livros.publicar` relê cada aba e compara a contagem; diferença é erro.
+9. **Conferir antes e depois de gravar:** `livros.publicar` relê cada aba e compara a contagem; diferença é erro. ANTES
+   de trocar um livro que só cresce (`Livro.so_cresce` no catálogo: as abas que nunca encolhem; `True` = todas), ele
+   recusa (`GravacaoRecusada`, nada gravado) a listagem incompleta, a aba que sumiria e a aba que encolheria (Levi,
+   18/10/2026: "Proteger os livros do Nexus de gravar sobre leitura vazia"). O caso que motivou: a gravação troca o livro
+   inteiro; se a listagem do banco omitir as abas por um instante, quem relê recebe vazio e a troca apagaria o histórico
+   para sempre. A conta usa o `sheet_count` do livro e o `row_count` de cada aba (medido em 18/10: o `row_count` é o que
+   a leitura devolve). Ligado nos 12 livros dos módulos que só acrescentam (setores, telas por setor, dono dos
+   relatórios, estrutura das usinas sem a `aba_equipamentos`, que é visão, decisão da PT, observação do responsável,
+   ronda avulsa, contas dos clientes, Contestações, curadoria, técnicos por usina e motivos do PCM). A carga de hora em
+   hora fica sem trava: encolhe de propósito, pela janela da fonte. Prova: `tests/test_dados_livros_trava.py`.
 10. **Livro no banco é para sempre** (a API não apaga): nome `nexus_<assunto>`, abas `fato_<processo>`,
     `dim_<assunto>`, `<dimensão>_historico`, `qualidade`, `atualizacao`; exceção só com motivo em
     `catalogo.ABAS_FORA_DA_REGRA`. **Registre em `catalogo.LIVROS` antes de criar** (o teste cobra).
@@ -288,7 +297,8 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
    uma e por onde vai ligar. Sistema novo chamando usina de outro jeito = entra no `de_para` do cadastro (tela Base →
    Ligações), não num mapa escondido no código. Equipamento novo de outra fonte = apelido em `equipamento_apelido`.
 4. **Registrar no `catalogo.py`** (`Fato`, estado `origem`, com `tipo`, `chave`, `medidas`, `fontes`,
-   `janela_origem`) e, se for livro novo, em `LIVROS`; e o "para que serve" em `explica.py` (`RESUMO` e `PARA_QUE`; o
+   `janela_origem`) e, se for livro novo, em `LIVROS` (com `so_cresce` quando o módulo só acrescenta: regra 9); e o
+   "para que serve" em `explica.py` (`RESUMO` e `PARA_QUE`; o
    teste cobra). A tela já passa a mostrar a lacuna. Tabela que não é fato (cadastro, controle, apoio de outro sistema)
    entra em `CONHECIDAS`, com o porquê. Sem isso, a tabela aparece como **nova** no radar da Governança.
 5. **Pessoa?** Confirmar que nada pessoal vai em claro (regra 8).
