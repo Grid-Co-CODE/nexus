@@ -132,6 +132,20 @@ def test_sem_a_lista_do_backoffice_grava_e_diz(app, banco, monkeypatch):
     assert json.loads(banco.linhas(F.LIVRO, "qualidade")[0]["extra"])["backoffice"] is None
 
 
+def test_o_banco_que_falha_nao_gasta_o_fracttal(app, banco, monkeypatch):
+    """O ensaio de 18/10/2026 leu 89 páginas do Fracttal (2 min da cota da empresa) e caiu depois, lendo o cadastro do
+    banco (tempo esgotado): o banco vai antes, e o Fracttal só é lido quando o resto da volta pode terminar."""
+    from nexus.dados import livros
+    ler = _tres()
+
+    def banco_fora(*a, **k):
+        raise ConnectionError("o banco não respondeu")
+    monkeypatch.setattr(livros, "ler", banco_fora)
+    with app.app_context(), pytest.raises(ConnectionError):
+        P.publicar(app.config, banco, ler=ler, agora=AGORA)
+    assert ler.pedidos == [] and banco.syncs == 0
+
+
 def test_outra_maquina_gravou_ha_menos_de_50_min_pula(app, banco, monkeypatch):
     monkeypatch.setattr(P, "_ultima", lambda base, s: AGORA - timedelta(minutes=20))
     with app.app_context():

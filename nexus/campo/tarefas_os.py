@@ -125,6 +125,12 @@ def publicar(config, sessao=None, *, ler=None, agora=None, forcar=False) -> dict
             return {"pulou": f"a última gravação é de {u.astimezone(_BRT).isoformat(timespec='minutes')}"}
     if not config.get("GRIDCO_SQL_TOKEN"):
         return {"erro": "sem GRIDCO_SQL_TOKEN: não grava"}
+    # o banco ANTES do Fracttal (ensaio de 18/10/2026: 89 páginas lidas, 2 min da cota da empresa, e a volta caiu no
+    # cadastro com o tempo esgotado): o Fracttal só é lido quando o resto da volta pode terminar
+    cad = {aba: livros.ler(base, s, "cadastro_nexus", aba) for aba in ("usinas", "de_para", "equipes")}
+    lig = D.Ligador(cad["usinas"], cad["de_para"], cad["equipes"], {})
+    idx = E.indice(livros.ler(base, s, "nexus_equipamentos", "dim_equipamento"))
+    bo = _backoffice_hmac(config)
     ler = ler or fracttal.ler
     paginas = [0]
 
@@ -136,10 +142,6 @@ def publicar(config, sessao=None, *, ler=None, agora=None, forcar=False) -> dict
     except LeituraIncompleta as e:
         return {"erro": f"LeituraIncompleta: {e}"[:300], "paginas": paginas[0]}
     lido_em = datetime.now(_BRT).isoformat(timespec="seconds")
-    cad = {aba: livros.ler(base, s, "cadastro_nexus", aba) for aba in ("usinas", "de_para", "equipes")}
-    lig = D.Ligador(cad["usinas"], cad["de_para"], cad["equipes"], {})
-    idx = E.indice(livros.ler(base, s, "nexus_equipamentos", "dim_equipamento"))
-    bo = _backoffice_hmac(config)
     lin, rf = F.linhas(rows, lig, idx, bo or set(), config.get("NEXUS_PESSOA_HMAC") if bo is not None else None)
     F.conferir_grao(lin)
     i_st = F.CAB_TAREFA_OS.index("status_os")
