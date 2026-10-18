@@ -871,3 +871,40 @@ button.cr-tag:hover{filter:brightness(1.1)}
 .cn-tab td.rk-tec{text-align:left;font-weight:500;white-space:nowrap}
 .cn-tab td.rk-motivo{text-align:left;color:var(--tinta-2)}
 @media (max-width:700px){.rk-podio{grid-template-columns:1fr}}
+
+/* ── O Ranking das equipes na Visão do responsável (18/10/2026): os quatro números do painel do App, a régua numa frase
+   e um cartão por equipe (o cartão v2 do protótipo aprovado pelo Levi), por cima do `cn-equipe` dos cartões ── */
+.cr-rk-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}
+.cr-rk-kpi{display:grid;gap:2px;align-content:start;padding:10px 12px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);min-width:0}
+.cr-rk-kpi > span{font-size:11.5px;color:var(--mudo)}
+.cr-rk-kpi b{font:700 20px/26px var(--font-sans);font-variant-numeric:tabular-nums}
+.cr-rk-kpi small{font-size:12px;color:var(--mudo);overflow-wrap:anywhere}
+.cr-rk-regua{margin:12px 0 0;font-size:12.5px;line-height:1.5;color:var(--mudo)}
+.cr-rk-regua b{color:var(--tinta-2)}
+.cr-rk-leg{margin:8px 0 0;font-size:12.5px;color:var(--mudo)}
+.cr-rk-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cr-rk-pos{font:700 26px/1 var(--font-sans);font-variant-numeric:tabular-nums}
+.cr-rk-pos small{font:500 12px/1 var(--font-sans);color:var(--mudo)}
+.cr-rk-seta{display:block;margin-top:6px;font:600 11.5px/16px var(--font-sans)}
+.cr-rk-seta--sobe{color:var(--ok)}
+.cr-rk-seta--desce{color:var(--critico)}
+.cr-rk-seta--igual,.cr-rk-seta--sem{color:var(--mudo)}
+.cr-rk-nota{font:700 26px/1 var(--font-sans);text-align:right;font-variant-numeric:tabular-nums}
+.cr-rk-nota small{display:block;margin-top:6px;font:500 11px/14px var(--font-sans);color:var(--mudo)}
+.cr-rk-comp{margin:0;font-size:12px;color:var(--mudo)}
+.cr-rk-comp b{color:var(--tinta-2)}
+.cr-rk-mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cr-rk-mini > div{display:grid;gap:2px;padding:6px 4px;text-align:center;font-size:11px;color:var(--mudo);
+  background:var(--superficie-2);border-radius:8px;min-width:0}
+.cr-rk-mini > div > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr-rk-mini b{font:600 13px/18px var(--font-sans);font-variant-numeric:tabular-nums}
+.cr-rk-mini i{font-style:normal}
+.cr-rk-etqs{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.cr-rk-etqs .cr-tag{margin-left:0;white-space:normal}
+.cr-rk-rot{flex-basis:100%;font:700 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+/* o positivo como a pílula positiva da Visão (`cr-v--ok`): texto verde Grid no escuro, o musgo no claro */
+.cr-tag--ok{color:var(--verde);background:var(--verde-suave)}
+:root[data-tema="claro"] .cr-tag--ok{color:var(--verde-texto)}
+.cr-rk-ir{font-size:12.5px;font-weight:600;color:var(--verde-texto)}
+@media (max-width:640px){.cr-rk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}

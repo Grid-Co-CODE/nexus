@@ -36,8 +36,10 @@
         trackers apontados sem resposta = Sem devolutiva; nota 95% sem pendência = Muito bom; abaixo de 85% ou com
         pendência = Atenção.</li>
       <li><b>Painel:</b> os mesmos números por região do Brasil, equipe, cliente, região de campo (com o Supervisor de
-        Campo) e gestor de contrato (Supervisor PM). Índice = 60% qualidade + 40%
-        cobertura (a régua do ranking do App); quem não tem uma das duas fica sem índice. "Base pequena" = menos de
+        Campo) e gestor de contrato (Supervisor PM).
+        Índice das rondas = 60% da nota média das rondas + 40% cobertura (a fórmula do ranking por região do App, só
+        com as rondas: o Ranking das equipes da Visão do responsável usa também as tarefas fechadas pelo App); quem não
+        tem uma das duas fica sem índice. "Base pequena" = menos de
         {{ base_pequena }} usinas: o número oscila muito.</li>
       <li><b>Sujidade e vegetação:</b> o mais crítico primeiro. Nota de criticidade: nível 5 vale 5, nível 4 vale 3,
         nível 3 vale 1 (sujidade e vegetação); vala obstruída 4, parcial 2; cada sensor sujo 2. O Status diz o porquê.</li>
@@ -189,7 +191,7 @@
        coberturas, quais equipes tem melhor qualidade e cobertura, qual cliente, qual supervisor!"; com a estrutura de
        O&M de 10/2026 o "supervisor" virou a região de campo (com o Supervisor de Campo) e o gestor de contrato #}
     <div class="cn-lista-cab"><h2>Quem está melhor nos últimos {{ dias }} dias</h2>
-      <span class="mudo">com os filtros acima · índice = 60% qualidade + 40% cobertura · melhor primeiro · clique no cabeçalho para ordenar, no nome para ver as rondas</span></div>
+      <span class="mudo">com os filtros acima · índice das rondas = 60% da nota das rondas + 40% cobertura · melhor primeiro · clique no cabeçalho para ordenar, no nome para ver as rondas</span></div>
     {% macro barra(p, cor) %}<span class="cn-rank-barra" aria-hidden="true"><i class="cn-b-{{ cor }}" style="width: {{ p }}%"></i></span>{% endmacro %}
     <div class="cn-rank-destaques">
       {% for chave, titulo in dimensoes %}{% set ok = comparativos[chave]|selectattr('indice', 'ne', none)|rejectattr('base_pequena')|list %}
@@ -197,7 +199,7 @@
         {% if ok %}<span><span class="mudo">melhor</span> <b class="cn-t-ok">{{ ok[0].nome }}</b> <span class="m">{{ ok[0].indice }}</span></span>
         {% if ok|length > 1 %}<span><span class="mudo">pede atenção</span> <b class="cn-t-{{ cor_pct(ok[-1].indice, 85, 70) }}">{{ ok[-1].nome }}</b> <span class="m">{{ ok[-1].indice }}</span></span>{% endif %}
         {% elif comparativos[chave]|selectattr('indice', 'ne', none)|list %}<span class="mudo">só grupos de base pequena (menos de {{ base_pequena }} usinas): veja a tabela</span>
-        {% else %}<span class="mudo">sem índice no período</span>{% endif %}</div>
+        {% else %}<span class="mudo">sem índice das rondas no período</span>{% endif %}</div>
       {% endfor %}
     </div>
     <div class="cn-rank-grade">
@@ -205,7 +207,7 @@
       <section class="cn-rank" aria-label="{{ titulo }}">
         <h3>Por {{ titulo|lower if chave != 'regiao_br' else 'região do Brasil' }} <span class="mudo">{{ lista|length }}</span></h3>
         <div class="cn-tab cn-rank-tab"><table class="cn-ordenavel">
-          <thead><tr><th>{{ titulo }}</th><th data-primeiro="desc" aria-sort="descending">Índice</th><th data-primeiro="desc">Cobertura</th><th data-primeiro="desc">Qualidade</th><th data-primeiro="desc">Rondas</th><th data-primeiro="desc">Duração média</th></tr></thead>
+          <thead><tr><th>{{ titulo }}</th><th data-primeiro="desc" aria-sort="descending">Índice das rondas</th><th data-primeiro="desc">Cobertura</th><th data-primeiro="desc">Qualidade</th><th data-primeiro="desc">Rondas</th><th data-primeiro="desc">Duração média</th></tr></thead>
           <tbody>
           {% for a in lista %}
             <tr><td class="cn-rank-nome">{% if a.nome != '—' %}<a class="cn-link" href="{{ url(aba=None, cob=None, cluster=None, **{filtro: a.nome}) }}">{{ a.nome }}</a>{% else %}<span class="mudo">sem {{ titulo|lower }} no cadastro</span>{% endif %}
