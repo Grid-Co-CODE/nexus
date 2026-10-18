@@ -195,8 +195,11 @@ def codigo(v):
 # o Levi escolheu UMA só (18/10/2026): a meta do mês fora de 2 a 8 kWh por kWp por dia (recusou PR do mês acima de
 # 130%, geração acima de 8 kWh/kWp/dia e atingimento acima de 200%). Caso que criou: em 10/2026, Santo Anastácio e
 # Álvares Machado com 217% e 331% da meta (a meta de outubro de 1,3 e 0,9 kWh/kWp/dia no BD_Thopen).
+# `geracao_impossivel`: a usina tem dia tirado da conta pelo filtro da plataforma (geração acima da potência × 12 h), o
+# que o Levi pediu "especificamente para essa usina" (a Ibirapuã II: os contadores acumulados digitados como geração)
 ANOMALIA_META = {"meta_baixa": "a meta do mês está abaixo de 2 kWh por kWp por dia (o normal é de 2 a 8)",
-                 "meta_alta": "a meta do mês está acima de 8 kWh por kWp por dia (o normal é de 2 a 8)"}
+                 "meta_alta": "a meta do mês está acima de 8 kWh por kWp por dia (o normal é de 2 a 8)",
+                 "geracao_impossivel": "há dia com geração acima da potência × 12 h, que ficou fora da conta"}
 # código que a plataforma criou e o Nexus ainda não conhece: o sinal aparece assim, nunca some
 ANOMALIA_DESCONHECIDA = "número anômalo (a plataforma sinalizou)"
 

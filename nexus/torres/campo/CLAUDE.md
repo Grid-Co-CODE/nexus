@@ -508,8 +508,9 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
     do servidor (`plataforma/gerencial_publicar.py`). < 90% crítico, < 97% atenção (o `atgTag` da Visão gerencial); PR
     abaixo do previsto, atenção. **O número anômalo** (Levi, 18/10/2026: "apenas sinalize que o número está anômalo e o
     dado pode estar errado, temos que sinalizar pela plataforma e não ficar travando a construção!"): a plataforma marca
-    a coluna `anomalia` do fato com o código de `dominios.ANOMALIA_META` (`meta_baixa`, `meta_alta`: a régua única que o
-    Levi escolheu na plataforma, a meta do mês fora de 2 a 8 kWh por kWp por dia); a Visão mantém o número e a cor e põe
+    a coluna `anomalia` do fato com códigos de `dominios.ANOMALIA_META` (`meta_baixa`, `meta_alta`: a régua única que o
+    Levi escolheu na plataforma, a meta do mês fora de 2 a 8 kWh por kWp por dia; `geracao_impossivel`: dia tirado da
+    conta pelo filtro de geração acima da potência × 12 h, o da Ibirapuã II); a Visão mantém o número e a cor e põe
     "anômalo" ao lado, com a frase na dica e no detalhe. Código desconhecido aparece como "número anômalo (a plataforma sinalizou)", nunca some.
     Caso que criou: Santo Anastácio e Álvares Machado com 217% e 331% em 10/2026 (a meta de outubro baixa no BD_Thopen). Usina com duas linhas no Gerencial (Santarém 1 e 2): produção e meta somam,
     atingimento refeito sobre a soma, PR pesado pela meta.
