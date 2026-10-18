@@ -720,6 +720,28 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
 - Sem pessoa e sem a nota (regra 8): o fabricante e o componente saem da marca (categorias).
 - Prova: `tests/test_campo_chamados_acompanhamento.py`.
 
+### A Visão geral e o centro das colunas (18/10/2026)
+
+Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que, ao clicar, "já filtra as usinas em
+atenção daquele bloco" (protótipo aprovado); e "centralize o cabeçalho e todas as colunas exceto Usina". Desenho:
+`docs/superpowers/specs/2026-10-18-visao-responsavel-visao-geral-design.md`.
+- **A aba `modo=geral`:** em cima, os três blocos com os MESMOS números do resumo (`soma`) e a triagem de cada um; embaixo,
+  as usinas do filtro da tela (responsável, cliente, busca, equipe) numa lista só, na ordem de Onde focar, com Meta,
+  Disp., Ronda, Limpeza, PT, Atrasadas, Paradas e Semana (as células são os `valores` de cada bloco, com a mesma cor) e,
+  ao abrir, o detalhe dos três blocos (o macro `det_bloco` do template, o mesmo dos blocos de Onde focar). O responsável
+  logado vê as usinas dele, como em Onde focar.
+- **O filtro pelo clique vai no endereço** (`filtro=manut.atrasadas`): o nome do bloco = as usinas em focar ou acompanhar
+  nele; "focar" e "acompanhar" = só aquele nível; cada número = as usinas que entram nele. `FILTROS_GERAL`
+  (`nexus/campo/responsaveis.py`) guarda a condição de cada um, a MESMA que conta o número no `soma` (nenhuma régua
+  nova); chave que não existe é ignorada; número zero não é link; OS abertas não filtra (quase toda usina tem). Clicar
+  de novo, ou no ×, tira o filtro. O número conta o que conta hoje (tarefas, PT); o filtro diz quantas usinas.
+- **No celular** (até 760 px) as colunas saem e cada usina mostra três etiquetas (P, A e M) na cor do nível do bloco, com
+  o alerta principal; o detalhe abre ao tocar.
+- **O centro das colunas:** o cabeçalho e as células `cr-col-*` ficam no centro (a regra `.cr-g > [class*="cr-col-"]` do
+  `campo.css`), nos blocos de Onde focar e na Visão geral; a Usina fica à esquerda.
+- **Prova (18/10/2026, o banco real só lido):** 131 usinas na lista; o filtro de Tarefas atrasadas deixou 76, com as
+  colunas da Manutenção realçadas; a 1440 e a 375 px, nos dois temas, sem rolagem de lado.
+
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
 Levi, 08/10, sobre a "Nova Estrutura O&M Equipe": "pode adaptar, deixa as vagas preparadas". O antigo "Supervisor de

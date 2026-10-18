@@ -266,7 +266,7 @@
   {% set cols = (('perf', 'meta', 'Meta'), ('perf', 'disp', 'Disp.'), ('acomp', 'ronda', 'Ronda'), ('acomp', 'limpeza', 'Limpeza'),
                  ('acomp', 'pt', 'PT'), ('manut', 'atrasadas', 'Atrasadas'), ('manut', 'paradas', 'Paradas'), ('manut', 'semana', 'Semana')) %}
   <div class="cr-gr-lista">
-    <div class="cr-gr-grupos cr-gr-g"><span></span>{% for b, n in (('perf', 2), ('acomp', 3), ('manut', 3)) %}<span class="cr-gr-gp{% if fg and fg[0] == b %} cr-gr-gp--sel{% endif %}" style="grid-column: span {{ n }}">{{ nome_bloco[b] }}</span>{% endfor %}<span></span></div>
+    <div class="cr-g cr-gr-grupos cr-gr-g"><span></span>{% for b, n in (('perf', 2), ('acomp', 3), ('manut', 3)) %}<span class="cr-gr-gp{% if fg and fg[0] == b %} cr-gr-gp--sel{% endif %}" style="grid-column: span {{ n }}">{{ nome_bloco[b] }}</span>{% endfor %}<span></span></div>
     <div class="cr-cols cr-g cr-gr-g"><span>Usina</span>{% for b, k, rot in cols %}<span class="cr-col-{{ k }}{% if fg and fg[0] == b %} cr-gr-csel{% endif %}">{{ rot }}</span>{% endfor %}<span></span></div>
     {% for u in lista_geral %}
     <details class="cr-gr-lin cr-lin cr-lin--{{ u.nivel }}">
