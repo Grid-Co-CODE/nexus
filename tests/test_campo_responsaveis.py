@@ -828,3 +828,25 @@ def test_o_filtro_de_cliente_muda_o_ranking(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking&cliente=Thopen").get_data(as_text=True)
     grade = html[html.index('class="cn-equipes cr-rk"'):]
     assert "SP Norte 01" in grade and "SC Oeste 01" not in grade              # a Coração 1 é de outro cliente
+
+
+def test_o_ranking_diz_o_periodo_e_de_onde_vieram_as_notas(tela, logado):
+    # pendência da revisão (achado 8): a aba não dizia as datas dos dois períodos nem que as notas saíram na hora
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
+    atual = f"de {(HOJE - timedelta(days=29)):%d/%m} a {HOJE:%d/%m}"
+    anterior = f"de {(HOJE - timedelta(days=59)):%d/%m} a {(HOJE - timedelta(days=30)):%d/%m}"
+    assert f"Período: {atual} (o anterior: {anterior})" in html
+    assert "fato_fechamento calculado na hora" in html          # o banco falso não tem o fato: a conta é feita na hora
+
+
+def test_a_faixa_de_onde_focar_diz_que_a_equipe_e_filtro(tela, logado):
+    # pendência da revisão (achado 10): com a equipe escolhida, a faixa não dizia "com os filtros"
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco&equipe=SP+Norte+01").get_data(as_text=True)
+    assert "mobilizadas, com os filtros" in html
+
+
+def test_a_dica_da_base_pequena_usa_a_constante(tela, logado, monkeypatch):
+    # pendência da revisão (achado 11): o 3 estava escrito na dica; a régua é `visao.BASE_PEQUENA`, a do Painel das Rondas
+    monkeypatch.setattr(visao, "BASE_PEQUENA", 4)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
+    assert 'title="Menos de 4 usinas' in html
