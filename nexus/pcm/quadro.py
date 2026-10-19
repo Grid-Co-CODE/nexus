@@ -860,3 +860,160 @@ def aplicar_na_semana_em_curso(config, semana: str, linhas: list[str], quem: str
                        "destino": "atual", "linhas": linhas, "saem": res["saem"],
                        "saem_outra_semana": res["saem_outra_semana"], "commit": commit, "token": de_onde})
     return dict(res, commit=commit, texto=novo)
+
+
+# ── a tela de reprogramações da semana em curso (19/10/2026) ────────────────────────────────────────────────
+# O programador do PCM, sobre a reprogramação gravada pelo Quadro: "ainda tá meio que fantasma pra mim, sem poder editar".
+# A fila do Quadro só ACRESCENTA linhas; a tela /t/pcm/quadro/reprogramacoes mostra o arquivo inteiro, cada linha editável
+# e removível, e grava o arquivo como a pessoa deixou (só o PCM e o administrador, `telas.pode_programar`).
+LINHA_MAX = 300
+LINHAS_MAX = 400
+_TURNO_FRASE = {"MANHA": "de manhã", "TARDE": "à tarde", "NOITE": "à noite"}
+
+
+def linhas_do_atual(texto: str) -> list[str]:
+    """As linhas do `Observacoes_Semana_Atual.txt` sem o cabeçalho do Nexus e sem as vazias, na ordem."""
+    corpo = [l.strip() for l in (texto or "").replace("\r\n", "\n").split("\n") if l.strip()]
+    return corpo[1:] if corpo and semana_do_cabecalho(texto) else corpo
+
+
+def _problema(l: str) -> str | None:
+    """O que impede a linha de ir ao arquivo que o robô do PCM aplica na semana em curso (None = vai)."""
+    if len(l) > LINHA_MAX:
+        return f"linha longa demais (até {LINHA_MAX} caracteres)"
+    if any(ord(c) < 32 for c in l):
+        return "linha com caractere de controle"
+    r = O.ler_linha(l)
+    if r["problema"]:
+        return r["problema"]
+    if r["tipo"] == "comentario":
+        return None
+    if r["tipo"] not in ("fora", "fixar"):
+        # texto livre e "@usina" (regra da geração da semana): o robô da semana em curso só aplica linha de OS
+        return "o robô da semana em curso só lê linha de OS (comece pelo número: 15269; qua) ou comentário com #"
+    if r["tipo"] == "fixar" and not r["dias"] and not r["sem"]:
+        return 'falta o dia (seg a sex), o "não" ou o "sem: tarefa"'
+    return None
+
+
+def _anula(antes: str, depois: str) -> bool:
+    """A linha `depois` (mais abaixo, da mesma OS) anula ou corta a `antes`? A regra da mescla do Quadro (`mesclar`)."""
+    try:
+        return antes in mesclar(antes, [depois])[1]["saem"]
+    except QuadroErro:
+        return False
+
+
+def problemas_das_linhas(linhas: list[str]) -> dict[int, str]:
+    """{índice: o problema} das linhas como a pessoa deixou na tela. Além da linha que o robô não entende: a repetida e
+    a que outra linha da mesma OS, mais abaixo, anula. A fila do Quadro mescla e nunca grava as duas; editadas à mão,
+    o motor e o robô do PCM leriam cada um de um jeito (o motor fica com o "sem:" da ÚLTIMA linha da OS, o robô soma
+    todos)."""
+    linhas = [str(l or "").strip() for l in linhas]
+    out: dict[int, str] = {}
+    lidas = []
+    for i, l in enumerate(linhas):
+        p = _problema(l)
+        if p:
+            out[i] = p
+        lidas.append(None if p else O.ler_linha(l))
+    vistas: dict[str, int] = {}
+    for i, l in enumerate(linhas):
+        chave = " ".join(l.split()).casefold()
+        if i not in out and chave in vistas:
+            out[i] = f"linha repetida (igual à {vistas[chave] + 1})"
+        vistas.setdefault(chave, i)
+    for i, r in enumerate(lidas):
+        if i in out or not r or r["tipo"] == "comentario":
+            continue
+        for j in range(i + 1, len(linhas)):
+            x = lidas[j]
+            if j in out or not x or x.get("os") != r["os"]:
+                continue
+            if _so_sem(r) and _so_sem(x):
+                out[i] = (f"as tarefas tiradas da OS {r['os']} vão numa linha só ({r['os']}; sem: "
+                          + ", ".join(_unicas(list(r["sem"]) + list(x["sem"]))) + "): o motor só lê a última")
+                break
+            if _anula(linhas[i], linhas[j]):
+                out[i] = f"a linha {j + 1} (OS {r['os']}) anula esta: deixe uma das duas"
+                break
+    return out
+
+
+def descrever(l: str, sem: dict | None) -> dict:
+    """A linha em palavras para a tela: {tipo, os, o_que, usina, aviso}. A usina e o aviso vêm da SEMANA em curso
+    (agenda e pendentes): a OS que a semana não tem, o robô não tem o que mover."""
+    r = O.ler_linha(l)
+    out = {"tipo": r["tipo"], "os": "", "o_que": "", "usina": "", "aviso": ""}
+    if r["tipo"] == "comentario":
+        out["o_que"] = "Comentário: o robô não aplica"
+        return out
+    if r["tipo"] not in ("fora", "fixar"):
+        return out
+    os_s = str(r["os"])
+    out["os"] = os_s
+    if r["tipo"] == "fora":
+        out["o_que"] = "Tira da semana a OS inteira"
+    elif _so_sem(r):
+        out["o_que"] = "Tira da semana só: " + "; ".join(r["sem"])
+    elif r["dias"]:
+        nomes = [O.NOMES_DIA[d].lower() for d in r["dias"]]
+        quando = "na " + (", ".join(nomes[:-1]) + " e " + nomes[-1] if len(nomes) > 1 else nomes[0])
+        tur = _TURNO_FRASE.get(O._sem_acento(r.get("turno") or "").upper())
+        if r["so"]:
+            alvo = ", ".join(r["so"]) + (f" ({', '.join(r['tarefas'])})" if r["tarefas"] else "")
+        else:
+            alvo = ", ".join(r["tarefas"]) or "A OS inteira"
+        out["o_que"] = f"{alvo} {quando}" + (f", {tur}" if tur else "")
+        if r["sem"]:
+            out["o_que"] += "; tira da semana: " + "; ".join(r["sem"])
+    if sem:
+        r0 = next((x for x in (sem.get("rows") or []) + (sem.get("pendentes") or [])
+                   if str(x.get("os_id") or "").strip() == os_s), None)
+        if r0:
+            out["usina"] = str(r0.get("usina") or "").strip()
+        else:
+            n = str(sem.get("week") or "").rpartition("W")[2].lstrip("0")
+            out["aviso"] = f"esta OS não está na semana {n} (nem nas pendentes): o robô não tem o que mover"
+    return out
+
+
+def regravar_semana_em_curso(config, semana: str, linhas: list[str], quem: str, sha_visto: str) -> dict:
+    """Grava o `Observacoes_Semana_Atual.txt` INTEIRO como a pessoa deixou na tela de reprogramações (linhas editadas,
+    tiradas e novas), com o cabeçalho da semana em curso. A mesma conferência do `aplicar_na_semana_em_curso`: o sha
+    que a pessoa viu (mudou no meio: não grava), relê e confere o sha256. Linha com problema (`problemas_das_linhas`):
+    nada vai. Igual ao que está lá: nenhum commit. Devolve {mudou, commit, entram, saem, texto}."""
+    linhas = [str(l or "").strip() for l in linhas if str(l or "").strip()]
+    if len(linhas) > LINHAS_MAX:
+        raise QuadroErro(f"linhas demais (até {LINHAS_MAX})")
+    ruins = problemas_das_linhas(linhas)
+    if ruins:
+        raise QuadroErro("; ".join(f"linha {i + 1}: {p}" for i, p in sorted(ruins.items())))
+    novo = CAB_ATUAL.format(semana=semana) + "\n" + "".join(l + "\n" for l in linhas)
+    with PB._trava:
+        tok, de_onde = PB.token(config)
+        if not tok:
+            raise QuadroErro(PB.SEM_TOKEN)
+        repo, ramo = PB.repositorio(config)
+        s = PB._sessao(config)
+        atual = PB._ler(s, tok, repo, ramo, PB.OBS_ATUAL)
+        if ((atual or {}).get("sha") or "") != (sha_visto or ""):
+            raise QuadroErro("o arquivo de ajustes da semana em curso mudou desde que você abriu a tela; abra de novo e "
+                             "confira")
+        texto = atual["bytes"].decode("utf-8", errors="replace") if atual else ""
+        antes = linhas_do_atual(texto)
+        if texto.replace("\r\n", "\n") == novo:
+            return {"mudou": False, "commit": "", "entram": [], "saem": [], "texto": novo}
+        dados = novo.encode("utf-8")
+        commit = PB._gravar(s, tok, repo, ramo, PB.OBS_ATUAL, dados,
+                            f"chore: Nexus edita a reprogramação da semana em curso ({semana}, {len(linhas)} "
+                            f"{'linha' if len(linhas) == 1 else 'linhas'})")
+        lido = PB._ler(s, tok, repo, ramo, PB.OBS_ATUAL)
+        if not lido or PB._sha256(lido["bytes"]) != PB._sha256(dados):
+            raise QuadroErro(f"o repositório não tem o arquivo enviado (commit {commit}); confira no GitHub")
+    entram = [l for l in linhas if l not in antes]
+    saem = [l for l in antes if l not in linhas]
+    registrar(config, {"quando": datetime.now(_BRT).isoformat(timespec="seconds"), "quem": quem, "semana": semana,
+                       "destino": "atual", "acao": "edicao", "linhas": entram, "saem": saem, "commit": commit,
+                       "token": de_onde})
+    return {"mudou": True, "commit": commit, "entram": entram, "saem": saem, "texto": novo}

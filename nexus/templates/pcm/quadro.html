@@ -16,6 +16,9 @@
     {% for c in chips %}<a href="{{ (c.href)|na_raiz }}"{% if c.atual %} aria-current="page"{% endif %}>{{ c.rotulo }}</a>{% endfor %}
   </nav>
   {% endif %}
+  {# 19/10/2026: o programador do PCM "não achou a reprogramação"; o botão leva ao bloco do fim da página #}
+  {% if rp_url %}<a class="gc-btn gc-btn--ui gc-btn--contorno q-rp-link" href="#reprogramacoes" data-rp-abrir><i class="ph ph-list-checks"></i>
+    Reprogramações da semana em curso</a>{% endif %}
 </div>
 
 {% if rodada %}
@@ -144,7 +147,18 @@
 </details>
 {% endif %}
 
-{% if gravadas %}
+{% if rp_url %}
+{# As reprogramações da semana em curso (19/10/2026), no lugar de "Já gravadas" (Levi escolheu "Dentro do Quadro"): o
+   Observacoes_Semana_Atual.txt inteiro, cada linha editável e removível. Aberto e carregado pelo pcm-reprogramacoes.js
+   depois da página (ler o GitHub não atrasa o Quadro); na gravação barrada, já vem montado com o que a pessoa escreveu. #}
+<details class="q-gravadas q-rp" id="reprogramacoes" data-rp-url="{{ rp_url }}" open{% if rp %} data-rp-carregado="1" data-rp-ir="1"{% endif %}>
+  <summary><i class="ph ph-caret-right q-seta"></i> Reprogramações da semana em curso</summary>
+  {# o "gravado" fica aqui, onde a pessoa está depois de gravar (a página volta rolada até o bloco) #}
+  {% if rp_ok %}<div class="pcm-aviso pcm-aviso--ok q-rp-ok" role="status"><i class="ph ph-check-circle"></i><div>{{ rp_ok }}</div></div>{% endif %}
+  <div class="q-rp-corpo" data-rp-bloco>{% if rp %}{% include "pcm/_reprogramacoes.html" %}{% else %}<p class="gc-ajuda">Abrindo o
+    arquivo da semana em curso no repositório do PCM…</p>{% endif %}</div>
+</details>
+{% elif gravadas %}
 {# o que o PCM já gravou para esta semana, à vista de todos (gravar continua sendo só do PCM) #}
 <details class="q-gravadas">
   <summary><i class="ph ph-caret-right q-seta"></i> Já gravadas para esta semana <b class="gc-num">{{ gravadas|length }}</b></summary>
@@ -198,5 +212,6 @@
 <div class="q-aviso" id="q-aviso" role="status" hidden></div>
 <script type="application/json" id="q-dados">{{ dados|tojson }}</script>
 <script src="{{ url_for('static', filename='pcm-quadro.js') }}"></script>
+<script src="{{ url_for('static', filename='pcm-reprogramacoes.js') }}"></script>
 {% endif %}
 {% endblock %}

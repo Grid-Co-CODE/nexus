@@ -446,6 +446,49 @@ def registrar_pcm(bp) -> None:
         return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="aplicado", n=len(linhas),
                                                            commit=res.get("commit") or "")), code=303)
 
+    @bp.route("/quadro/reprogramacoes", methods=["GET", "POST"])
+    def quadro_reprogramacoes():
+        """As reprogramações da semana em curso (19/10/2026; o programador do PCM: "eu não achei isso da reprogramação",
+        "ainda tá meio que fantasma pra mim, sem poder editar"): o Observacoes_Semana_Atual.txt inteiro, cada linha
+        editável e removível, num bloco no fim do Quadro (Levi escolheu "Dentro do Quadro"). GET ?parte=1 = o bloco, que
+        o pcm-reprogramacoes.js busca (ler o GitHub não atrasa o Quadro). Ver é de quem vê o Quadro; gravar, do PCM e
+        do administrador (`pode_programar`), na semana em curso, com o sha que a pessoa viu."""
+        cfg = current_app.config
+        if request.method == "GET":
+            if request.args.get("parte") != "1":
+                return redirect(na_raiz("/t/pcm/quadro#reprogramacoes"), code=303)
+            return render_template("pcm/_reprogramacoes.html", rp=_ctx_reprogramacoes(cfg))
+        if not pode_programar() or _de_outro_site():
+            abort(403)
+        f = request.form
+        tela = _linhas_do_form(f)
+        sha = f.get("sha_visto") or ""
+        sem, _ = _semana_em_curso(cfg)
+        if sem is None or sem["week"] != (f.get("semana") or ""):
+            return _quadro_com_reprogramacoes(cfg, f.get("semana"), 409, _ctx_reprogramacoes(
+                cfg, erro="Não gravei: a semana em curso não é mais a que você abriu. Confira o arquivo de novo.",
+                tentativa=[t for t, x in tela if not x]))
+        if not f.get("confirmo"):
+            return _quadro_com_reprogramacoes(cfg, sem["week"], 400, _ctx_reprogramacoes(
+                cfg, tela=tela, sha=sha, erro="Nada foi gravado: marque o \"Confirmo\" antes de gravar."))
+        ficam = [t for t, x in tela if not x]
+        if Q.problemas_das_linhas(ficam):
+            return _quadro_com_reprogramacoes(cfg, sem["week"], 400, _ctx_reprogramacoes(
+                cfg, tela=tela, sha=sha, erro="Nada foi gravado: arrume ou tire as linhas marcadas em vermelho."))
+        try:
+            res = Q.regravar_semana_em_curso(cfg, sem["week"], ficam, _quem(), sha)
+        except (Q.QuadroErro, PB.PublicacaoErro) as ex:
+            return _quadro_com_reprogramacoes(cfg, sem["week"], 409, _ctx_reprogramacoes(
+                cfg, erro=f"Não gravei: {ex}.", tentativa=ficam))
+        except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda
+            return _quadro_com_reprogramacoes(cfg, sem["week"], 502, _ctx_reprogramacoes(
+                cfg, erro=f"O GitHub não respondeu ({type(ex).__name__}): confira o repositório antes de tentar de novo.",
+                tentativa=ficam))
+        volta = {"semana": sem["week"], "rp": "gravado" if res["mudou"] else "igual"}
+        if res["mudou"]:
+            volta.update(commit=res["commit"] or "", entram=len(res["entram"]), saem=len(res["saem"]))
+        return redirect(na_raiz("/t/pcm/quadro?") + urlencode(volta) + "#reprogramacoes", code=303)
+
     # ── os motivos das tarefas e o backoffice (16/10/2026, nexus/pcm/motivos.py) ──────────────────────────────────
     @bp.route("/quadro/motivo", methods=["POST"])
     def quadro_motivo():
@@ -987,8 +1030,8 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
     # "vira linha de observação, que só o PCM grava, e vale onde a fila diz": "Onde o PCM tem essa informação?")
     ctx["fonte_frase"] = {
         "atual": "Reprogramar não muda o quadro na hora: o PCM grava a fila nos ajustes da semana em curso (o "
-                 "Observacoes_Semana_Atual.txt do repositório do PCM) e o robô do PCM aplica na rodada seguinte. O que já "
-                 "foi gravado fica em \"Já gravadas para esta semana\", no fim da página.",
+                 "Observacoes_Semana_Atual.txt do repositório do PCM) e o robô do PCM aplica na rodada seguinte. O arquivo "
+                 "inteiro fica em \"Reprogramações da semana em curso\", no fim da página, para editar e tirar linhas.",
         "nexus": "Reprogramar não muda o quadro na hora: o PCM grava a fila nas observações desta semana no Nexus (Gerar "
                  "a semana, bloco 2), que valem na próxima geração. O que já foi gravado fica em \"Já gravadas para esta "
                  "semana\", no fim da página.",
@@ -1003,7 +1046,10 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
                 url_pendentes="?" + urlencode(dict(sel_qs, pend="1", **({"todos": "1"} if todos else {}))) + "#pendentes",
                 abrir_pendentes=args.get("pend") == "1" or (any(filtros.values()) and q["pend_sel"] <= 80),
                 dias_rp=[(d, Q.NOMES_DIA[d]) for d in Q.DIAS_REPROGRAMAR], turnos=Q.TURNOS,
-                gravadas=Q.gravadas(cfg, sem["week"]), ok=ok, erro=erro, motivos_erro=mot["erro"])
+                gravadas=Q.gravadas(cfg, sem["week"]), ok=ok, erro=erro, motivos_erro=mot["erro"],
+                # o bloco das reprogramações da semana em curso (19/10/2026): só na semana em curso, carregado depois
+                rp_url=na_raiz("/t/pcm/quadro/reprogramacoes?parte=1") if dest["id"] == "atual" else "", rp=None,
+                rp_ok=_ok_reprogramacoes(args) if dest["id"] == "atual" else None)
 
 
 def _ctx_reprogramar(cfg, semana: str, linhas: list, problemas: list, itens_json: str, erro: str | None = None) -> dict:
@@ -1013,6 +1059,78 @@ def _ctx_reprogramar(cfg, semana: str, linhas: list, problemas: list, itens_json
         novo, res = Q.novo_texto_atual(atual["texto"], semana, linhas)
     return {"semana": semana, "linhas": linhas, "problemas": problemas, "itens_json": itens_json, "atual": atual,
             "novo": novo, "res": res, "erro": erro}
+
+
+# ── as reprogramações da semana em curso (19/10/2026, `quadro_reprogramacoes`) ─────────────────────────────────────
+def _semana_em_curso(cfg):
+    """(semana, leitura): a semana publicada no App que está em curso hoje, de segunda a sexta dela (a mesma regra do
+    `Q.destino`), a única que o arquivo de ajustes alcança; None fora disso (fim de semana, semana não publicada)."""
+    leitura = fonte.ler(cfg)
+    dia = Q.hoje()
+    for s in (leitura.dados or {}).get("semanas") or []:
+        if not isinstance(s, dict) or not s.get("week"):
+            continue
+        try:
+            seg = HB.segunda(s["week"])
+        except (TypeError, ValueError):
+            continue
+        if seg <= dia <= seg + timedelta(days=4):
+            return s, leitura
+    return None, leitura
+
+
+def _linhas_do_form(f) -> list[tuple[str, bool]]:
+    """[(texto, tirada)] na ordem da tela: os campos l0, l1... (as novas vêm em seguida) e a marca x<i> de tirar. A
+    linha nova deixada em branco não conta."""
+    n = min(int(f.get("n")) if str(f.get("n") or "").isdigit() else 0, Q.LINHAS_MAX + 100)
+    out = []
+    for i in range(n):
+        t = f.get(f"l{i}")
+        if t is not None and str(t).strip():
+            out.append((str(t).strip()[:1000], f.get(f"x{i}") == "1"))
+    return out
+
+
+def _ctx_reprogramacoes(cfg, tela=None, sha=None, erro=None, tentativa=None) -> dict:
+    """O bloco das reprogramações. `tela` = as linhas como a pessoa mandou (a gravação barrada volta com o que ela
+    escreveu e o problema de cada uma); sem ela, as do arquivo agora. `tentativa` = o que ela tinha deixado quando o
+    arquivo mudou no meio (para copiar)."""
+    sem, _ = _semana_em_curso(cfg)
+    atual = Q.ler_atual(cfg)
+    if tela is None:
+        tela = [(l, False) for l in Q.linhas_do_atual(atual["texto"])]
+    ficam = [k for k, (t, x) in enumerate(tela) if not x]
+    probs = Q.problemas_das_linhas([tela[k][0] for k in ficam])
+    linhas = [{"i": k, "texto": t, "tirada": x, "desc": Q.descrever(t, sem),
+               "problema": probs.get(ficam.index(k)) if k in ficam else None}
+              for k, (t, x) in enumerate(tela)]
+    w = sem["week"] if sem else ""
+    return {"sem": sem, "semana": w, "num": _num_semana(w) if w else None, "atual": atual, "linhas": linhas,
+            "sha": atual["sha"] if sha is None else sha, "pode_programar": pode_programar(),
+            "pode": pode_programar() and sem is not None and not atual["erro"], "erro": erro, "tentativa": tentativa,
+            "lido": datetime.now(_BRT).strftime("%H:%M"), "linha_max": Q.LINHA_MAX,
+            "gravadas": [g for g in Q.gravadas(cfg, w) if g.get("destino") == "atual"] if w else []}
+
+
+def _quadro_com_reprogramacoes(cfg, semana, status: int, rp: dict):
+    """A gravação barrada volta ao Quadro com o bloco já aberto, com o que a pessoa escreveu e o porquê."""
+    ctx = _ctx_quadro(cfg, {"semana": semana} if semana else {}) or _ctx_quadro(cfg, {})
+    ctx["rp"] = rp
+    return render_template("pcm/quadro.html", **ctx), status
+
+
+def _ok_reprogramacoes(args) -> str | None:
+    rp = args.get("rp") or ""
+    if rp == "igual":
+        return "Nada mudou: o arquivo da semana em curso já estava assim."
+    if rp != "gravado":
+        return None
+    commit = args.get("commit") if re.fullmatch(r"[0-9a-f]{4,40}", str(args.get("commit") or "")) else ""
+    ent = int(args.get("entram")) if str(args.get("entram") or "").isdigit() else 0
+    sai = int(args.get("saem")) if str(args.get("saem") or "").isdigit() else 0
+    return (f"Arquivo da semana em curso gravado{f' (commit {commit})' if commit else ''}: {ent} "
+            f"{'linha entrou ou mudou' if ent == 1 else 'linhas entraram ou mudaram'}, {sai} "
+            f"{'saiu' if sai == 1 else 'saíram'}. O robô do PCM aplica na rodada seguinte (até 15 minutos).")
 
 
 # ── os motivos das tarefas e o backoffice (16/10/2026, nexus/pcm/motivos.py) ──────────────────────────────────────

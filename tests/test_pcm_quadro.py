@@ -465,7 +465,7 @@ def test_tela_quadro_semana_em_curso_confirma_e_grava(app, logado, tmp_path, mon
     assert gh.arquivos["Observacoes_Semana_Atual.txt"].decode("utf-8").splitlines()[1:] == [
         "15448; nao", "6; qui; Troca de fusível; manhã"]
     html = logado.get(r.headers["Location"]).get_data(as_text=True)
-    assert "1 linha gravada nos ajustes da semana em curso" in html and "Já gravadas para esta semana" in html
+    assert "1 linha gravada nos ajustes da semana em curso" in html and 'id="reprogramacoes"' in html
     # com o sha velho (o arquivo mudou depois da confirmação), não grava de novo
     r = logado.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "itens": itens, "confirmo": "1",
                                                        "sha_visto": sha})
@@ -528,3 +528,212 @@ def test_filtros_do_quadro_em_cascata():
     # a opção escolhida fica na lista mesmo quando a combinação não tem nada (a tela não esconde o filtro valendo)
     op = Q.montar(sem, [], {"equipe": "RN Sul 01", "tipo": "MPM"})["opcoes"]
     assert ("MPM", 0) in op["tipo"] and ("RN Sul 01", 0) in op["equipe"]
+
+
+# ── a tela de reprogramações da semana em curso (19/10/2026) ────────────────────────────────────────────────
+# O programador do PCM "não achou a reprogramação": "ainda tá meio que fantasma pra mim, sem poder editar". A tela mostra
+# tudo o que está no Observacoes_Semana_Atual.txt, cada linha editável e removível, e grava só com o PCM ou o administrador.
+ATUAL_W41 = ("# Semana 2026-W41: reprogramação da semana em curso, gravada pelo Nexus\n"
+             "15448; nao\n\n5; sem: [Grid Co.] - MPM - Trafo\n# conferir com o supervisor\n6; qui; Troca de fusível; manhã\n")
+
+
+def test_linhas_do_arquivo_da_semana_em_curso():
+    assert Q.linhas_do_atual(ATUAL_W41) == ["15448; nao", "5; sem: [Grid Co.] - MPM - Trafo", "# conferir com o supervisor",
+                                            "6; qui; Troca de fusível; manhã"]
+    assert Q.linhas_do_atual("15448; nao\r\n\r\n15001; ter\r\n") == ["15448; nao", "15001; ter"]   # do painel, sem cabeçalho
+    assert Q.linhas_do_atual("") == []
+
+
+@pytest.mark.parametrize("linha,ruim", [
+    ("15001; ter", False), ("15001; não", False), ("15001; qua; MPM; tarde; só: Trafo", False),
+    ("15001; sem: Troca de fusível", False), ("# um comentário", False),
+    ("15001; sab", True),                  # o robô não entende sábado
+    ("15001; qua; ; madrugada", True),     # turno que não existe
+    ("15001", True),                       # sem dia, "não" nem "sem:": o robô não tem o que fazer
+    ("15001; ; MPM", True),
+    ("OS 15001; ter", True),               # com prefixo
+    ("trocar a OS da usina", True),        # texto livre: o robô só lê linha de OS
+    ("@usina Usina 1 = seg", True),        # regra de usina é da geração, não da semana em curso
+    ("15001; ter" + " " * 400, False),     # espaço no fim não conta
+    ("15001; ter; " + "x" * 400, True),    # longa demais
+], ids=lambda v: str(v).strip()[:24] if isinstance(v, str) else None)
+def test_problema_da_linha_da_semana_em_curso(linha, ruim):
+    assert bool(Q.problemas_das_linhas([linha])) is ruim
+
+
+def test_problemas_das_linhas_repetidas_ou_que_se_anulam():
+    # a mesma linha duas vezes e o "não" que uma linha de dia da mesma OS, mais abaixo, anula
+    p = Q.problemas_das_linhas(["15001; ter", "15448; não", "15001; ter", "15448; qua"])
+    assert set(p) == {1, 2} and "repetida" in p[2] and "15448" in p[1]
+    # duas linhas de "sem:" na mesma OS: o motor só lê a última, o robô soma as duas
+    p = Q.problemas_das_linhas(["5; sem: Trafo", "5; sem: Cabine"])
+    assert set(p) == {0} and "linha só" in p[0]
+    # tarefas diferentes da mesma OS em dias diferentes convivem
+    assert Q.problemas_das_linhas(["5; qua; MPM; só: Trafo", "5; qui; MPM; só: Cabine", "5; sem: SPDA"]) == {}
+
+
+def test_descrever_a_linha_em_palavras():
+    sem = _semana_teste()
+    d = Q.descrever("5; qua; MPM; tarde; só: Trafo", sem)
+    assert d["os"] == "5" and d["usina"] == "Cliente A - Usina 1 - SP" and "na quarta" in d["o_que"] and "tarde" in d["o_que"]
+    assert "Trafo" in d["o_que"] and not d["aviso"]
+    assert "inteira" in Q.descrever("6; não", sem)["o_que"] and "Cliente B" in Q.descrever("6; não", sem)["usina"]
+    assert "Trafo" in Q.descrever("5; sem: [Grid Co.] - MPM - Trafo", sem)["o_que"]
+    assert Q.descrever("# lembrete", sem)["tipo"] == "comentario"
+    assert "não está na semana" in Q.descrever("99999; ter", sem)["aviso"]
+
+
+def test_regravar_a_semana_em_curso_confere_e_registra(tmp_path):
+    cfg = {"TESTING": True, "NEXUS_PCM_TRABALHO": str(tmp_path / "trab")}
+    gh = _com_github(cfg, GitHubFalso({"Observacoes_Semana_Atual.txt": ATUAL_W41.encode("utf-8")}))
+    sha = Q.ler_atual(cfg)["sha"]
+    novas = ["15448; qua", "# conferir com o supervisor", "6; sex; Troca de fusível; tarde", "7; não"]
+    # o arquivo mudou depois que a pessoa abriu a tela: não grava
+    with pytest.raises(Q.QuadroErro):
+        Q.regravar_semana_em_curso(cfg, "2026-W41", novas, "pessoa.teste@exemplo.com", "sha-velho")
+    # linha que o robô não entende: não grava nada
+    with pytest.raises(Q.QuadroErro) as ex:
+        Q.regravar_semana_em_curso(cfg, "2026-W41", novas + ["15001; sab"], "pessoa.teste@exemplo.com", sha)
+    assert "linha 5" in str(ex.value) and not gh.commits
+    res = Q.regravar_semana_em_curso(cfg, "2026-W41", novas, "pessoa.teste@exemplo.com", sha)
+    assert gh.arquivos["Observacoes_Semana_Atual.txt"].decode("utf-8") == (
+        "# Semana 2026-W41: reprogramação da semana em curso, gravada pelo Nexus\n" + "".join(l + "\n" for l in novas))
+    assert len(gh.commits) == 1 and "@" not in gh.commits[0]["mensagem"] and res["commit"] and res["mudou"]
+    assert res["entram"] == ["15448; qua", "6; sex; Troca de fusível; tarde", "7; não"]
+    assert res["saem"] == ["15448; nao", "5; sem: [Grid Co.] - MPM - Trafo", "6; qui; Troca de fusível; manhã"]
+    reg = Q.gravadas(cfg, "2026-W41")[0]
+    assert reg["acao"] == "edicao" and reg["destino"] == "atual" and reg["saem"] == res["saem"] and reg["commit"]
+    # gravar igual não faz commit
+    res = Q.regravar_semana_em_curso(cfg, "2026-W41", novas, "pessoa.teste@exemplo.com", Q.ler_atual(cfg)["sha"])
+    assert not res["mudou"] and len(gh.commits) == 1
+    # tirar tudo deixa só o cabeçalho
+    Q.regravar_semana_em_curso(cfg, "2026-W41", [], "pessoa.teste@exemplo.com", Q.ler_atual(cfg)["sha"])
+    assert gh.arquivos["Observacoes_Semana_Atual.txt"].decode("utf-8").splitlines() == [
+        "# Semana 2026-W41: reprogramação da semana em curso, gravada pelo Nexus"]
+    # o repositório não devolve o que foi gravado: erro, e nada vai para o registro
+    cfg2 = {"TESTING": True, "NEXUS_PCM_TRABALHO": str(tmp_path / "trab2")}
+    _com_github(cfg2, GitHubFalso({"Observacoes_Semana_Atual.txt": b"15448; nao\n"}, estragar_leitura=True))
+    with pytest.raises(Q.QuadroErro):
+        Q.regravar_semana_em_curso(cfg2, "2026-W41", ["15001; ter"], "pessoa.teste@exemplo.com", Q.ler_atual(cfg2)["sha"])
+    assert Q.gravadas(cfg2, "2026-W41") == []
+
+
+def _form_reprogramacoes(html, mudar=None, tirar=(), novas=(), confirmo=True):
+    """O formulário do bloco como o navegador manda: as linhas da página (l0, l1...), as tiradas (x<i>) e as novas."""
+    import html as H
+    import re
+    linhas = re.findall(r'name="l(\d+)" value="([^"]*)"', html)
+    dados = {f"l{i}": H.unescape(v) for i, v in linhas}
+    dados.update({f"l{i}": v for i, v in (mudar or {}).items()})
+    dados.update({f"x{i}": "1" for i in tirar})
+    dados.update({f"l{len(linhas) + j}": v for j, v in enumerate(novas)})
+    dados["n"] = str(len(linhas) + len(novas))
+    form = html.split("data-rp-form", 1)[1]
+    dados["semana"] = form.split('name="semana" value="', 1)[1].split('"', 1)[0]
+    dados["sha_visto"] = form.split('name="sha_visto" value="', 1)[1].split('"', 1)[0]
+    if confirmo:
+        dados["confirmo"] = "1"
+    return dados
+
+
+def _bloco(c):
+    r = c.get("/t/pcm/quadro/reprogramacoes?parte=1")
+    assert r.status_code == 200
+    return r.get_data(as_text=True)
+
+
+def test_tela_reprogramacoes_da_semana_em_curso(app, logado, tmp_path, monkeypatch):
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 7))
+    app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
+    gh = _com_github(app.config, GitHubFalso({"Observacoes_Semana_Atual.txt": ATUAL_W41.encode("utf-8")}))
+    # no Quadro da semana em curso: o botão do topo e o bloco no fim, que o JS carrega (o Quadro não lê o GitHub)
+    html = logado.get("/t/pcm/quadro").get_data(as_text=True)
+    assert 'href="#reprogramacoes" data-rp-abrir' in html and 'id="reprogramacoes"' in html
+    assert 'data-rp-url="/t/pcm/quadro/reprogramacoes?parte=1"' in html and "15448; nao" not in html
+    assert "pcm-reprogramacoes.js" in html
+    # o endereço sem ?parte=1 leva ao bloco no Quadro
+    r = logado.get("/t/pcm/quadro/reprogramacoes")
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/pcm/quadro#reprogramacoes")
+    html = _bloco(logado)
+    assert "Semana 41" in html and "<html" not in html
+    for l in ("15448; nao", "5; sem: [Grid Co.] - MPM - Trafo", "# conferir com o supervisor"):
+        assert f'value="{l}"' in html                                          # cada linha num campo editável
+    assert html.count('name="x') == 4 and "Gravar o arquivo" in html          # e cada uma com o tirar
+    assert "Cliente B - Usina 2 - RN" in html and "não está na semana" in html  # a usina da OS 6; a 15448 não é da W41
+    # editar uma, tirar outra e incluir uma nova
+    dados = _form_reprogramacoes(html, mudar={3: "6; sex; Troca de fusível; tarde"}, tirar=[0], novas=["5; qua; MPM; só: Cabine"])
+    r = logado.post("/t/pcm/quadro/reprogramacoes", data=dados)
+    loc = r.headers.get("Location", "")
+    assert r.status_code == 303 and "rp=gravado" in loc and loc.endswith("#reprogramacoes") and len(gh.commits) == 1
+    assert gh.arquivos["Observacoes_Semana_Atual.txt"].decode("utf-8").splitlines() == [
+        "# Semana 2026-W41: reprogramação da semana em curso, gravada pelo Nexus", "5; sem: [Grid Co.] - MPM - Trafo",
+        "# conferir com o supervisor", "6; sex; Troca de fusível; tarde", "5; qua; MPM; só: Cabine"]
+    assert "Arquivo da semana em curso gravado" in logado.get(loc.split("#")[0]).get_data(as_text=True)
+    html = _bloco(logado)
+    assert 'value="6; sex; Troca de fusível; tarde"' in html and "15448; nao" in html.split("Saíram", 1)[1]
+    # linha que o robô não entende: não grava, e o Quadro volta com o bloco aberto, o que a pessoa escreveu e o porquê
+    r = logado.post("/t/pcm/quadro/reprogramacoes", data=_form_reprogramacoes(html, mudar={0: "5; sab"}))
+    html = r.get_data(as_text=True)
+    assert r.status_code == 400 and len(gh.commits) == 1 and "Quadro da semana" in html
+    assert 'value="5; sab"' in html and "dia não reconhecido" in html and 'data-rp-carregado="1" data-rp-ir="1"' in html
+    # a linha volta como a pessoa escreveu, sem a marca de "editada" (que esconderia o problema)
+    assert 'value="5; sab" data-original="5; sab"' in html
+    # sem o "confirmo": não grava
+    r = logado.post("/t/pcm/quadro/reprogramacoes", data=_form_reprogramacoes(html, mudar={0: "5; qua"}, confirmo=False))
+    assert r.status_code == 400 and len(gh.commits) == 1
+    # o arquivo mudou depois que a pessoa abriu o bloco: não grava por cima
+    dados = _form_reprogramacoes(_bloco(logado), tirar=[0])
+    gh.arquivos["Observacoes_Semana_Atual.txt"] += b"15999; nao\n"
+    r = logado.post("/t/pcm/quadro/reprogramacoes", data=dados)
+    assert r.status_code == 409 and len(gh.commits) == 1 and "mudou" in r.get_data(as_text=True)
+
+
+def test_tela_reprogramacoes_quem_nao_e_do_pcm_so_ve(app, tmp_path, monkeypatch):
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 7))
+    app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
+    gh = _com_github(app.config, GitHubFalso({"Observacoes_Semana_Atual.txt": ATUAL_W41.encode("utf-8")}))
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 7, "nome": "Performance"},
+                                               "erro": ""})
+    c = _nao_admin(app)
+    html = _bloco(c)
+    assert "15448; nao" in html and "Gravar o arquivo" not in html and 'name="l0"' not in html
+    assert "Quem grava é o PCM" in html
+    assert c.post("/t/pcm/quadro/reprogramacoes", data={"semana": "2026-W41", "n": "1", "l0": "5; qua"}).status_code == 403
+    assert not gh.commits
+    # o setor PCM grava
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 3, "nome": "PCM"}, "erro": ""})
+    html = _bloco(c)
+    assert "Gravar o arquivo" in html
+    assert c.post("/t/pcm/quadro/reprogramacoes", data=_form_reprogramacoes(html, tirar=[0])).status_code == 303
+    assert len(gh.commits) == 1
+    # pedido de outro site: não grava
+    r = c.post("/t/pcm/quadro/reprogramacoes", data=_form_reprogramacoes(_bloco(c), tirar=[0]),
+               headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403 and len(gh.commits) == 1
+
+
+def test_tela_reprogramacoes_fora_da_semana_em_curso(app, logado, tmp_path, monkeypatch):
+    """No sábado a W41 acabou e a W42 ainda não começou: o Quadro não traz o bloco, e ele não grava."""
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 10))
+    app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
+    gh = _com_github(app.config, GitHubFalso({"Observacoes_Semana_Atual.txt": ATUAL_W41.encode("utf-8")}))
+    assert 'id="reprogramacoes"' not in logado.get("/t/pcm/quadro").get_data(as_text=True)
+    html = _bloco(logado)
+    assert "15448; nao" in html and "Nenhuma semana em curso" in html and "Gravar o arquivo" not in html
+    r = logado.post("/t/pcm/quadro/reprogramacoes", data={"semana": "2026-W41", "n": "1", "l0": "5; qua", "confirmo": "1",
+                                                         "sha_visto": Q.ler_atual(app.config)["sha"]})
+    assert r.status_code == 409 and not gh.commits
+
+
+def test_tela_reprogramacoes_cabecalho_de_outra_semana(app, logado, tmp_path, monkeypatch):
+    """O arquivo vale para qualquer semana em curso: linha que ficou da semana passada, o robô aplica nesta. O bloco
+    avisa, e gravar põe a semana em curso no cabeçalho (a pessoa conferiu o que fica)."""
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 7))
+    app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
+    gh = _com_github(app.config, GitHubFalso({"Observacoes_Semana_Atual.txt": ATUAL_W41.replace("W41", "W40").encode()}))
+    html = _bloco(logado)
+    assert "semana\n  2026-W40" in html or "semana 2026-W40" in " ".join(html.split())
+    assert "aplica nesta" in html
+    assert logado.post("/t/pcm/quadro/reprogramacoes", data=_form_reprogramacoes(html)).status_code == 303
+    assert Q.semana_do_cabecalho(gh.arquivos["Observacoes_Semana_Atual.txt"].decode()) == "2026-W41"

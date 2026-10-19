@@ -593,8 +593,26 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   montam a fila e copiam para mandar ao PCM ("passa para o PCM").
   A semana em curso passa por `reprogramar.html` (o que entra, o que o arquivo tem, como fica) e grava com o sha que a
   pessoa conferiu (mudou no meio: não grava, 409), relê e confere o sha256. O commit não leva e-mail (repositório
-  público). Quem gravou o quê: `reprogramacoes.jsonl` na pasta de trabalho, e "Já gravadas para esta semana" na tela,
-  À VISTA DE TODOS (só gravar é do PCM), cada uma com o lugar onde foi parar.
+  público). Quem gravou o quê: `reprogramacoes.jsonl` na pasta de trabalho, À VISTA DE TODOS (só gravar é do PCM):
+  na semana em curso, em "Quem gravou nesta semana", dentro do bloco abaixo; nas outras, em "Já gravadas para esta
+  semana", cada uma com o lugar onde foi parar.
+- **Reprogramações da semana em curso** (19/10/2026; o programador do PCM: "eu não achei isso da reprogramação", "ainda
+  tá meio que fantasma pra mim, sem poder editar"). A fila só ACRESCENTA linhas; o bloco `#reprogramacoes`, no fim do
+  Quadro da semana em curso (no lugar de "Já gravadas"; Levi escolheu "Dentro do Quadro" entre página própria, bloco e
+  item de menu), mostra o `Observacoes_Semana_Atual.txt` INTEIRO, cada linha editável e removível, e o botão
+  "Reprogramações da semana em curso" no topo do Quadro leva a ele. O bloco vem depois da página
+  (`/t/pcm/quadro/reprogramacoes?parte=1`, `static/pcm-reprogramacoes.js`): ler o GitHub (até 60 s) não atrasa o
+  Quadro. Cada linha mostra o que faz em palavras e a usina, pela semana (`quadro.descrever`), e avisa a OS que a semana
+  não tem. Gravar (`quadro.regravar_semana_em_curso`, POST no mesmo endereço) é de `pode_programar`, só de segunda a
+  sexta da semana publicada no App (`telas._semana_em_curso`, a regra do `destino`), com o "Confirmo", o sha que a
+  pessoa viu (mudou: 409), relê e confere o sha256; grava o arquivo como ficou na tela, com o cabeçalho da semana em
+  curso (cabeçalho de outra semana ou sem cabeçalho: o bloco avisa antes). Barra a gravação inteira
+  (`quadro.problemas_das_linhas`): a linha que o robô não entende (texto livre, `@usina`, sábado, turno errado, sem dia
+  nem "não" nem "sem:", mais de 300 caracteres), a repetida e a que outra da mesma OS, mais abaixo, anula pela regra do
+  `mesclar` (o motor e o robô leriam cada um de um jeito); duas `sem:` da mesma OS vão numa linha só. Barrada, o Quadro
+  volta com o bloco aberto, o que a pessoa escreveu e o problema de cada linha. **Tirar uma linha não desfaz o que o
+  robô já aplicou** (ele apaga as linhas da planilha): o bloco diz isso e ensina a linha que põe a OS de volta. No
+  registro, `acao: "edicao"` com o que entrou ou mudou e o que saiu.
 - **Onde o PCM vê a reprogramação** (Levi, 09/10: "Onde o PCM tem essa informação?", sobre a frase "vira linha de
   observação, que só o PCM grava"): a frase da fonte do quadro diz o lugar pelo nome, conforme a semana. Semana em
   curso: o `Observacoes_Semana_Atual.txt` do repositório do PCM (o robô aplica). Semana que o Nexus gera: as
@@ -605,7 +623,7 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
 - **Peso da página** (09/10, W41 real): 339 KB e ~160 ms com 200 cartões; as pendentes (1.697 na W41) vêm linha a linha
   só filtradas (até 150) ou a pedido (`pend=1`, 1,4 MB): os seletores de dia e turno saem de um `<template>` clonado pelo
   JS, e a lista de tarefas de cada OS vai uma vez em `oss` (antes, em cada cartão: 4,4 MB).
-- **Provar:** `tests/test_pcm_quadro.py` (35 testes; 24 mutações em 09/10 e mais 12 no tirar tarefa em 15/10, todas
+- **Provar:** `tests/test_pcm_quadro.py` (60 testes; 24 mutações em 09/10 e mais 12 no tirar tarefa em 15/10, todas
   pegas; o `aplicar_sem` está no `test_pcm_geracao.py`). Ver a tela: a cópia de conferência do
   Claude, com o armazém do PCM numa CÓPIA (`NEXUS_PCM_TRABALHO` no `app.config`: não é chave do `.env`, e sem isso ela
   lia o armazém real) e o GitHub que recusa gravar. Nunca testar clicando em Aplicar na semana em curso.

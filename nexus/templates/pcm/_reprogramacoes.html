@@ -1,0 +1,120 @@
+{# As reprogramações da semana em curso (19/10/2026), o bloco do fim do Quadro (quadro.html, #reprogramacoes): o
+   Observacoes_Semana_Atual.txt inteiro, cada linha editável e removível; grava o PCM e o administrador
+   (nexus/pcm/quadro.py, `regravar_semana_em_curso`). `rp` sai de `telas._ctx_reprogramacoes`. Vem pelo fetch do
+   pcm-reprogramacoes.js (?parte=1) ou, na gravação barrada, já incluído no Quadro. #}
+{% macro o_que(l) %}
+  {% if l.problema %}<span class="rp-problema">{{ l.problema }}</span>{% endif %}
+  <span class="rp-desc">{{ l.desc.o_que or '—' }}</span>
+  {% if l.desc.aviso and not l.problema %}<span class="rp-aviso">{{ l.desc.aviso }}</span>{% endif %}
+  <span class="rp-tag">editada: o Nexus confere ao gravar</span>
+{% endmacro %}
+<div class="rp" data-rp>
+{% if rp.erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ rp.erro }}</strong>
+  {% if rp.tentativa %}<p class="gc-ajuda">O que você tinha deixado (copie se precisar):</p>
+  <pre class="pcm-pre q-pre">{{ rp.tentativa|join('\n') }}</pre>{% endif %}</div></div>{% endif %}
+
+<p class="rp-sub">Tudo o que está no <span class="gc-dado">Observacoes_Semana_Atual.txt</span> do repositório do PCM, lido às
+  {{ rp.lido }}: as linhas que a fila do Quadro gravou e as que vieram do painel do PCM. O robô do PCM lê o arquivo inteiro a
+  cada rodada (15 a 30 minutos) e aplica na programação {% if rp.num %}da Semana {{ rp.num }}{% else %}da semana em curso{% endif %}.</p>
+
+{% if rp.atual.erro %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-plugs"></i><div><strong>Não consegui ler o repositório do PCM:</strong>
+  {{ rp.atual.erro }}. Nada se grava até a leitura voltar.</div></div>
+{% else %}
+  {% if not rp.sem %}
+<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-calendar-x"></i><div><strong>Nenhuma semana em curso agora.</strong>
+  O arquivo vale de segunda a sexta da semana publicada no App: aqui é só para ver.</div></div>
+  {% elif rp.atual.semana and rp.atual.semana != rp.semana %}
+<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-calendar-x"></i><div><strong>Estas linhas foram gravadas para a semana
+  {{ rp.atual.semana }}.</strong> O arquivo vale para qualquer semana em curso: o robô do PCM aplica nesta o que ficar aqui.
+  Tire o que não vale mais; ao gravar, o cabeçalho passa a ser da {{ rp.semana }}.</div></div>
+  {% elif not rp.atual.semana and rp.linhas %}
+<p class="pcm-fonte"><i class="ph ph-info"></i><span>Sem a semana no cabeçalho: estas linhas vieram do painel do PCM. O robô
+  aplica nesta semana o que ficar aqui; ao gravar, o cabeçalho passa a ser da {{ rp.semana }}.</span></p>
+  {% endif %}
+
+  {% if rp.pode %}
+<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Tirar uma linha não desfaz o que o robô já
+  aplicou.</strong> A OS que ele tirou da semana não volta sozinha: para pôr de volta, escreva a linha que a põe num dia (por
+  exemplo, <span class="gc-dado">15269; qua</span>).</div></div>
+<form class="rp-form" method="post" action="{{ raiz }}/t/pcm/quadro/reprogramacoes" data-rp-form>
+  <input type="hidden" name="semana" value="{{ rp.semana }}">
+  <input type="hidden" name="sha_visto" value="{{ rp.sha }}">
+  <input type="hidden" name="n" value="{{ rp.linhas|length }}" data-rp-n>
+  <div class="rp-tabela"><table class="rp-tab">
+    <thead><tr><th>#</th><th class="rp-esq">Linha (o que o robô lê)</th><th class="rp-esq">O que faz</th><th class="rp-esq">Usina</th><th>Tirar</th></tr></thead>
+    <tbody data-rp-corpo>
+    {% for l in rp.linhas %}
+      <tr data-rp-linha class="{{ 'rp-tirada' if l.tirada }}{{ ' rp-ruim' if l.problema }}">
+        <td class="rp-n">{{ loop.index }}</td>
+        <td class="rp-esq"><input class="gc-campo rp-campo" name="l{{ l.i }}" value="{{ l.texto }}" data-original="{{ l.texto }}"
+               maxlength="{{ rp.linha_max }}" spellcheck="false" autocomplete="off" aria-label="Linha {{ loop.index }}"></td>
+        <td class="rp-esq rp-oque">{{ o_que(l) }}</td>
+        <td class="rp-esq rp-usina">{{ l.desc.usina or '—' }}</td>
+        <td><label class="rp-tirar" title="Tirar a linha"><input type="checkbox" name="x{{ l.i }}" value="1"{% if l.tirada %} checked{% endif %}
+               aria-label="Tirar a linha {{ loop.index }}"><i class="ph ph-trash"></i></label></td>
+      </tr>
+    {% else %}
+      <tr class="rp-vazio" data-rp-vazio><td colspan="5">O arquivo está vazio: nada reprogramado nesta semana.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <template data-rp-modelo><tr data-rp-linha class="rp-nova"><td class="rp-n">+</td><td class="rp-esq"><input class="gc-campo rp-campo"
+    maxlength="{{ rp.linha_max }}" spellcheck="false" autocomplete="off" placeholder="15269; qua; MPM; tarde; só: Transformador"
+    aria-label="Linha nova"></td><td class="rp-esq rp-oque"><span class="rp-desc">Linha nova: o Nexus confere ao gravar</span></td>
+    <td class="rp-esq rp-usina">—</td><td><button type="button" class="rp-tirar" data-rp-desfaz aria-label="Tirar a linha nova"><i
+    class="ph ph-x"></i></button></td></tr></template>
+  <div class="rp-barra">
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rp-incluir><i class="ph ph-plus"></i> Incluir linha</button>
+    <span class="rp-resumo" data-rp-resumo aria-live="polite"></span>
+  </div>
+  <details class="rp-ajuda">
+    <summary><i class="ph ph-caret-right q-seta"></i> Como escrever cada linha</summary>
+    <dl>
+      <dt><span class="gc-dado">15269; não</span></dt><dd>a OS inteira sai da semana</dd>
+      <dt><span class="gc-dado">15269; sem: [Grid Co.] - MPM - QGBT</span></dt><dd>só essa tarefa sai da semana, pelo nome (várias, separadas por vírgula, numa linha só)</dd>
+      <dt><span class="gc-dado">15269; qua</span> · <span class="gc-dado">15269; qua; ; tarde</span></dt><dd>a OS inteira no dia (e no turno)</dd>
+      <dt><span class="gc-dado">15269; qua; MPM; tarde; só: Transformador</span></dt><dd>preventiva por sigla (MPA, MPS, MPT, MPM, MPQ, Handover): só a tarefa daquele equipamento</dd>
+      <dt><span class="gc-dado">15289; ter; Troca de fusível; manhã</span></dt><dd>as outras: o nome da tarefa até a 1ª vírgula</dd>
+      <dt><span class="gc-dado"># texto</span></dt><dd>comentário: o robô não aplica</dd>
+    </dl>
+    <p class="gc-ajuda">Dias: seg, ter, qua, qui e sex (o robô não entende sábado). Turnos: manhã, tarde e noite.</p>
+  </details>
+  <label class="pcm-confirma"><input type="checkbox" name="confirmo" value="1" required> Confirmo: o arquivo fica como está nesta
+    tela e muda a programação da Semana {{ rp.num }}, que o campo está seguindo.</label>
+  <div class="pcm-pub-acoes">
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-floppy-disk"></i> Gravar o arquivo</button>
+  </div>
+</form>
+  {% else %}
+<div class="rp-tabela"><table class="rp-tab">
+  <thead><tr><th>#</th><th class="rp-esq">Linha (o que o robô lê)</th><th class="rp-esq">O que faz</th><th class="rp-esq">Usina</th></tr></thead>
+  <tbody>
+  {% for l in rp.linhas %}
+    <tr class="{{ 'rp-ruim' if l.problema }}"><td class="rp-n">{{ loop.index }}</td><td class="rp-esq"><span class="gc-dado rp-texto">{{ l.texto }}</span></td>
+      <td class="rp-esq rp-oque">{{ o_que(l) }}</td><td class="rp-esq rp-usina">{{ l.desc.usina or '—' }}</td></tr>
+  {% else %}
+    <tr class="rp-vazio"><td colspan="4">O arquivo está vazio: nada reprogramado nesta semana.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+    {% if not rp.pode_programar %}<p class="gc-ajuda">Quem grava é o PCM ou o administrador: copie a linha e mande ao PCM.</p>{% endif %}
+  {% endif %}
+{% endif %}
+
+{% if rp.gravadas %}
+<details class="rp-ajuda rp-hist">
+  <summary><i class="ph ph-caret-right q-seta"></i> Quem gravou nesta semana <b class="gc-num">{{ rp.gravadas|length }}</b></summary>
+  <ul>
+  {% for g in rp.gravadas %}
+    <li><span class="q-grav-quando">{{ g.quando[8:10] }}/{{ g.quando[5:7] }} {{ g.quando[11:16] }}</span> · {{ g.quem }} ·
+      {{ 'editou o arquivo' if g.acao == 'edicao' else 'pela fila do Quadro' }}{% if g.commit %}, commit {{ g.commit }}{% endif %}
+      {% if g.linhas %}<span class="q-grav-rot">{{ 'Entraram ou mudaram' if g.acao == 'edicao' else 'Entraram' }}</span>
+      <pre class="pcm-pre q-pre">{{ g.linhas|join('\n') }}</pre>{% endif %}
+      {% if g.saem %}<span class="q-grav-rot">Saíram</span>
+      <pre class="pcm-pre q-pre">{{ g.saem|join('\n') }}</pre>{% endif %}</li>
+  {% endfor %}
+  </ul>
+</details>
+{% endif %}
+</div>
