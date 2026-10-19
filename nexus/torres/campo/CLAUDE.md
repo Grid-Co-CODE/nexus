@@ -763,6 +763,22 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
 - **Prova (18/10/2026, o banco real só lido):** 131 usinas; o clique em Manutenção pôs as críticas da Manutenção em cima,
   com as colunas realçadas; a 1920, 1440, 1300 e 375 px, nos dois temas, sem rolagem de lado.
 
+### O mapa das usinas na Visão geral (18/10/2026)
+
+Levi: "Para o mapa podemos usar o IBGE como a performance faz". Desenho e decisões dele (Lista | Mapa na Visão geral, a cor
+pelo bloco clicado, o resumo ao lado, só as usinas): `docs/superpowers/specs/2026-10-18-visao-responsavel-mapa-design.md`.
+- **`?ver=mapa`** troca a lista pelo mapa, com as MESMAS usinas (os filtros e o clique dos blocos valem); o filtro do
+  topo leva o `ver` junto. O ponto é um link (`usina=<id>`) que abre ao lado o resumo da usina (os alertas dos três
+  blocos, ou o que está bem) e o "Ver na lista" (`#u-<id>`, a linha da lista tem esse `id`).
+- **O desenho** é o do Mapa de risco (`performance/clima/mapa.py`: o contorno do IBGE, a projeção, `ufs_da_vista`),
+  feito no servidor (`nexus/campo/mapa_responsaveis.py`). O recorte são os estados com usina na lista, no mínimo 3
+  graus; o ponto crítico é desenhado por último (fica por cima). A cor: o nível do bloco destacado, ou o da usina.
+- **A coordenada nunca vira texto:** abre só no servidor (`performance/clima/usinas.do_app`, cópia de 5 min por app) e o
+  navegador recebe o x e o y do desenho. Sem endereço nem "como chegar". Usina sem coordenada vai para a lista "Sem
+  coordenada no cadastro"; sem o cadastro na máquina (teste, PC sem o armazém), o mapa diz por quê.
+- **Prova (18/10/2026, o cadastro e o banco reais, só lidos):** 127 usinas no mapa e 4 sem coordenada; o resumo da usina
+  clicada; o mapa recolorido pela Manutenção; a 1440 e a 375 px, nos dois temas, sem rolagem de lado.
+
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
 Levi, 08/10, sobre a "Nova Estrutura O&M Equipe": "pode adaptar, deixa as vagas preparadas". O antigo "Supervisor de

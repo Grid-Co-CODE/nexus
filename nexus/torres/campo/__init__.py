@@ -420,6 +420,17 @@ def responsaveis():
     lista_geral = campo_resp.lista_geral(usinas, filtro, bloco_ordem) if modo == "geral" else []
     contagem_geral = ({k: len(campo_resp.filtrar_geral(usinas, k)) for k in campo_resp.FILTROS_GERAL}
                       if modo == "geral" else {})
+    # o mapa das usinas (18/10/2026, Levi: "Para o mapa podemos usar o IBGE como a performance faz"): Lista | Mapa na
+    # Visão geral, as MESMAS usinas da lista (filtro e ordem), a cor pelo bloco destacado; o ponto clicado (`usina`) abre
+    # o resumo ao lado. A coordenada fica no servidor (nexus/campo/mapa_responsaveis.py)
+    ver = "mapa" if modo == "geral" and request.args.get("ver") == "mapa" else "lista"
+    mapa, usina_sel, erro_mapa = None, None, ""
+    if ver == "mapa":
+        from ...campo import mapa_responsaveis as campo_mapa
+        coords, erro_mapa = campo_mapa.coordenadas()
+        mapa = campo_mapa.desenho(lista_geral, coords, bloco_sel)
+        pedida = str(request.args.get("usina") or "")
+        usina_sel = next((u for u in lista_geral if str(u.get("usina_id")) == pedida), None) if pedida else None
     # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre as
     # usinas que passaram pelos filtros, no limite das atrasadas de quem olha (nexus/campo/ranking_equipes.py)
     ranking = (campo_ranking.cartoes(usinas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {})
@@ -434,7 +445,8 @@ def responsaveis():
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
-        bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
+        bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, ver=ver, mapa=mapa, usina_sel=usina_sel, erro_mapa=erro_mapa,
+        blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
         base_pequena=visao.BASE_PEQUENA,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
