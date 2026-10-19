@@ -115,3 +115,11 @@ def test_o_csv_e_do_responsavel(fila_resp, logado):
     assert cab.startswith("OS;Dias esperando;Criação da OS;Data fim;Responsável O&M;Usina;Cliente;Técnicos")
     assert "Região de campo" not in cab and "Gestor de contrato" not in cab and "Quem aprova" not in cab
     assert "15088;8;31/08/26;" in texto and ";Ciclano Chefe;Usina A;Thopen;" in texto and "16001" not in texto
+
+
+def test_a_rota_antiga_do_aprovar_saiu(fila_resp, logado):
+    """Levi, 18/10/2026: "pode tirar a rota antiga!". Aprovar é o Concluir do card do OS Creator; o portão do Aprovar
+    do Nexus (`/os/_nexus/aprovacao/<id>/aprovar`), sem botão desde a lista por usina, saiu do servidor."""
+    logado.get("/t/campo/aprovacao")
+    assert logado.post("/os/_nexus/aprovacao/15088/aprovar", json={}).status_code == 404
+    assert aprovacao.os_na_fila(15088)                        # nada foi aprovado nem tirado da fila

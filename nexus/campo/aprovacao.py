@@ -3,8 +3,8 @@
 Quem calcula é a cópia das regras do App (regras_app.py): o mesmo `_fila_supervisao` da rota gestao/supervisao/fila,
 com os mesmos grupos ("Evidência completa", "Precisa do seu olho", "Fechadas fora do App") e os mesmos números. A fila
 crua vem do Fracttal (OS em revisão), lida pelo Nexus só com GET (fracttal.py); a nota do registro é a do livro que o
-App grava no banco (fonte_pg.py). Aprovar uma OS é o Concluir do OS Creator, só para o supervisor da OS ou um
-administrador (o portão no servidor é `nexus/torres/campo/aprovar_os.py`); aprovar em lote e devolver seguem no App.
+App grava no banco (fonte_pg.py). Aprovar uma OS é o Concluir do card do OS Creator, que a OS abre na tela (desde
+18/10/2026; o portão do Aprovar do Nexus saiu no mesmo dia); aprovar em lote e devolver seguem no App.
 
 **A tela nunca espera o Fracttal** (Levi, 05/10/2026: "Quando clico no botão 'Aprovação de OS' fica carregando
 infinito"). Medido no log: a fila tem 55 páginas (5.495 tarefas), lida uma página por vez leva 1 min ou mais, e à

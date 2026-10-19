@@ -19,7 +19,7 @@ As regras:
 - O portão vale para as páginas e os dados de cada torre (`/t/<torre>/...`): o endereço que é de uma tela segue a marca
   dela; o resto da torre (os dados e as sub-rotas) abre para quem tem ao menos uma tela da torre. O OS Creator servido
   em `/os/` é o conteúdo da torre OS (as telas `/t/os/*` abrem nele): abre para quem tem ao menos uma tela dela. As ações
-  do Nexus em `/os/_nexus/` (aprovar OS, decidir PT, o cartão da OS) são das telas do Campo e do HSEQ e seguem a régua de
+  do Nexus em `/os/_nexus/` (decidir PT, o cartão da OS) são das telas do Campo e do HSEQ e seguem a régua de
   cada uma. As telas da plataforma dentro da moldura seguem o login de lá: o que fecha aqui é a tela do Nexus que as abre.
 
 O dado: livro `nexus_setor_telas · fato_decisao_tela_setor`, no catálogo (`nexus/dados/catalogo.py`, fato

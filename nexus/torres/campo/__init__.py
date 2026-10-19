@@ -31,7 +31,7 @@ from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
 from ...prefixo import na_raiz, raiz
-from .aprovar_os import bp_aprovar_os, papel_da_sessao
+from .papel import papel_da_sessao
 from .assinatura import _login as _login_da_pt, _tela as _tela_da_pt, bp_assinatura
 
 FONTE_APP = "Livros que o App de Campo grava no banco do Nexus + cadastro do Nexus"
@@ -80,9 +80,6 @@ TORRE = Torre(
 bp = TORRE.criar_blueprint(__name__)
 # as rotas de quem assina a PT moram em /os/_nexus (o cookie do login do Fracttal do OS Creator só vale em /os)
 bp.record_once(lambda estado: estado.app.register_blueprint(bp_assinatura))
-# e o portão de quem aprova a OS também (Levi, 08/10/2026: "só o supervisor ou ADM consegue aprovar a OS logando pelo
-# Fracttal"), pelo mesmo motivo: é ali que o servidor sabe quem entrou no Fracttal
-bp.record_once(lambda estado: estado.app.register_blueprint(bp_aprovar_os))
 
 # Ordens de serviço, Ranking e Imagens da ronda saíram do menu em 08/10/2026: quem guardou o endereço cai na Central. O
 # /ranking voltou em 13/10/2026 com outra tela, o Ranking de pontos (o placar do ciclo do App)
@@ -1238,11 +1235,6 @@ def _por_os(linhas) -> list[dict]:
                   "responsavel_cad", "cliente_cad"):
             o[c] = primeira.get(c) or ""
         o["cadastrada"] = bool(primeira.get("cadastrada"))
-        # quem aprova a OS: o das usinas das tarefas (OS em duas regiões, rara, é das duas)
-        o["aprovadores"] = []
-        for t in ts:
-            if t.get("aprovador") and t["aprovador"] not in o["aprovadores"]:
-                o["aprovadores"].append(t["aprovador"])
         notas = [int(t["qualidade"]) for t in ts if t.get("pelo_app") and t.get("qualidade") is not None]
         o["nota"] = min(notas) if notas else None                            # a pior tarefa
         o["pelo_app"] = all(t.get("pelo_app") for t in ts)

@@ -1,17 +1,15 @@
-"""Aprovação de OS, pedido do Levi de 08/10/2026: a fila inteira (sem "OS fechadas nos X dias"), os cartões que abrem a
-tabela das OS com as colunas pedidas, e o Aprovar com a regra no servidor. Com a estrutura de O&M de 10/2026 (Levi,
+"""Aprovação de OS, pedido do Levi de 08/10/2026: a fila inteira (sem "OS fechadas nos X dias") e a tabela das OS com as
+colunas pedidas (desde 18/10/2026 na lista por usina, `test_campo_aprovacao_responsavel.py`). O Aprovar com a regra no
+servidor saiu em 18/10/2026 (Levi: "pode tirar a rota antiga!"): aprovar é o Concluir do card do OS Creator. Com a estrutura de O&M de 10/2026 (Levi,
 08/10: "pode adaptar, deixa as vagas preparadas"; o Supervisor de Campo "aprova e fecha as OS"): os cartões são por
 região de campo (com a alternância para gestor de contrato) e QUEM APROVA é o Supervisor de Campo da região da usina; com
 a vaga aberta, o Coordenador de Campo; sem os dois, só um administrador. O Gestor de contrato não aprova.
 
 Fracttal FALSO do começo ao fim: nenhuma OS de verdade é aprovada, e o Concluir do OS Creator é trocado por um
 gravador (o portão é provado até a porta do clone, com o caminho, o método e o cookie que ele levaria)."""
-import base64
-import json
 import re
 import shutil
 import subprocess
-import time
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -21,12 +19,9 @@ from test_campo_regras_app import TabelaFalsa
 from test_campo_visao import CHAVE_CADASTRO, EQUIPES, REGIOES, _aba, _pessoas
 
 from nexus.campo import aprovacao, fracttal, leitura, regras_app, tabelas, visao
-from nexus.torres.campo import aprovar_os
 
 BRT = timezone(timedelta(hours=-3))
 CRIADA_15088 = "2026-09-01T01:30:00.123+00:00"      # 31/08 às 22:30 em Brasília: a data certa é 31/08
-SUPERVISORA = {"pessoa_id": 92, "nome": "Supervisora Campo", "papel": "supervisor_campo", "regioes": ["Sudeste 03"]}
-COORDENADOR = {"pessoa_id": 93, "nome": "Coordenador Campo", "papel": "coordenador", "regioes": ["Sudeste 03", "Sul 01"]}
 
 
 def _quando(atras_dias):
@@ -183,21 +178,7 @@ def test_csv_tem_as_colunas_da_tabela(fila, logado):
     assert "15088;8;31/08/26;" in texto and "\n16001;" in texto
 
 
-# ── 4. quem aprova: o supervisor de campo da região; com a vaga aberta, o coordenador; senão, admin ──────────────
-def _jwt(email):
-    corpo = base64.urlsafe_b64encode(json.dumps({"email": email, "exp": time.time() + 3600}).encode())
-    return "x." + corpo.decode().rstrip("=") + ".y"
-
-
-def _fracttal_de(app, cliente, email, nome):
-    """O cookie do OS Creator, como o login do Fracttal grava (o portão lê quem entrou por ele)."""
-    from nexus.torres.oscreator import ponte
-    clone = ponte.clone(app)
-    valor = clone.session_interface.get_signing_serializer(clone).dumps(
-        {"jwt": _jwt(email), "conta": {"email": email, "nome": nome}})
-    cliente.set_cookie("os_sessao", valor, path="/os")
-
-
+# ── 3. quem entrou pelo Fracttal (as telas que vêm já filtradas usam) ─────────────────────────────────────────
 def _sessao_nexus(cliente, papel=None, admin=False):
     """Quem entrou no Nexus pelo Fracttal (não admin), com o papel que o login grava (`supervisor_padrao`).
 
@@ -214,143 +195,8 @@ def _sessao_nexus(cliente, papel=None, admin=False):
             s["supervisor_padrao"] = papel
 
 
-@pytest.fixture
-def concluir(monkeypatch):
-    """O Concluir do OS Creator trocado por um gravador: guarda o pedido que chegaria ao clone e responde como ele."""
-    pedidos = []
-
-    def clone_falso(environ, start_response):
-        pedidos.append({"caminho": environ["PATH_INFO"], "metodo": environ["REQUEST_METHOD"],
-                        "corpo": json.loads(environ["wsgi.input"].read(int(environ.get("CONTENT_LENGTH") or 0)) or b"{}"),
-                        "cookie": environ.get("HTTP_COOKIE", "")})
-        start_response("200 OK", [("Content-Type", "application/json")])
-        return [json.dumps({"ok": True, "mensagem": "OS concluída."}).encode()]
-    monkeypatch.setattr(aprovar_os, "_clone", lambda: clone_falso)
-    return pedidos
-
-
 def _ler_fila(cliente):
     cliente.get("/t/campo/aprovacao?regiao_campo=*")      # nos testes a releitura roda na hora
-
-
-def test_supervisor_de_campo_aprova_a_os_da_regiao_dele(app, fila, cliente, concluir):
-    _sessao_nexus(cliente, papel=SUPERVISORA)
-    _ler_fila(cliente)
-    # no servidor: quem entrou no Fracttal é a supervisora (pelo e-mail da ficha), e a 15088 é da região dela
-    _fracttal_de(app, cliente, "supervisora@exemplo.test", "Supervisora C.")
-    r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={"folio": "99999"})
-    assert r.status_code == 200 and r.get_json()["ok"] and r.get_json()["tarefas_tiradas"] == 2
-    assert concluir == [{"caminho": "/os/api/os/15088/concluir", "metodo": "POST", "corpo": {"folio": "15088"},
-                         "cookie": concluir[0]["cookie"]}]
-    assert "os_sessao=" in concluir[0]["cookie"]                  # o login do Fracttal de quem clicou vai junto
-    assert aprovacao.os_na_fila(15088) is None                    # saiu da fila guardada na hora
-    # e a da Sul 01 (vaga aberta: é do coordenador) ela não aprova
-    r = cliente.post("/os/_nexus/aprovacao/16001/aprovar", json={})
-    assert r.status_code == 403 and "aprova o coordenador de campo (Coordenador Campo)" in r.get_json()["erro"]
-
-
-def test_coordenador_aprova_so_onde_a_vaga_esta_aberta(app, fila, cliente, concluir):
-    _sessao_nexus(cliente, papel=COORDENADOR)
-    _ler_fila(cliente)
-    _fracttal_de(app, cliente, "coordenador@exemplo.test", "Coordenador C.")
-    assert cliente.post("/os/_nexus/aprovacao/16001/aprovar", json={}).status_code == 200
-    r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={})
-    assert r.status_code == 403 and r.get_json()["erro"] == (
-        "Quem aprova é o supervisor de campo da região Sudeste 03 (Supervisora Campo) ou um administrador.")
-    assert [p["caminho"] for p in concluir] == ["/os/api/os/16001/concluir"]
-
-
-def test_gestor_de_contrato_e_quem_nao_tem_papel_levam_403_mesmo_forjando(app, fila, cliente, concluir):
-    # o gestor de contrato (o "supervisor" de antes) não aprova: o PDF põe a aprovação no Supervisor de Campo
-    _sessao_nexus(cliente, papel={"pessoa_id": 90, "nome": "Beltrano Supervisor", "papel": "gestor",
-                                  "gestor": "Beltrano Supervisor"})
-    _ler_fila(cliente)
-    _fracttal_de(app, cliente, "beltrano@exemplo.test", "Beltrano S.")
-    r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={})
-    assert r.status_code == 403 and "supervisor de campo da região Sudeste 03" in r.get_json()["erro"]
-    assert concluir == [] and aprovacao.os_na_fila(15088)        # nada foi ao clone; a OS segue na fila
-    # o mesmo login do Fracttal, com a sessão do Nexus dizendo "supervisora": vale quem entrou no Fracttal
-    _sessao_nexus(cliente, papel=SUPERVISORA)
-    assert cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={}).status_code == 403
-    # técnico (sem papel nenhum): 403
-    _fracttal_de(app, cliente, "tecnico@exemplo.test", "Fulano de Tal")
-    assert cliente.post("/os/_nexus/aprovacao/16001/aprovar", json={}).status_code == 403
-    assert concluir == []
-
-
-def test_regiao_sem_supervisor_e_sem_coordenador_so_admin_aprova(app, fila, cliente, logado, concluir):
-    sem_ninguem = [dict(REGIOES[0]), dict(REGIOES[1], coordenador_campo_id=None, coordenador_campo_vaga="sim")]
-    _aba(fila.api, "cadastro_nexus", "regioes_campo", sem_ninguem)
-    visao.limpar()
-    _ler_fila(logado)
-    # (o `logado` e o `cliente` são o mesmo navegador: a sessão é trocada aqui)
-    _sessao_nexus(cliente, papel=COORDENADOR)
-    _fracttal_de(app, cliente, "coordenador@exemplo.test", "Coordenador C.")
-    r = cliente.post("/os/_nexus/aprovacao/16001/aprovar", json={})
-    assert r.status_code == 403 and r.get_json()["erro"].startswith("Só um administrador aprova: a região Sul 01")
-    _sessao_nexus(cliente, admin=True)
-    _fracttal_de(app, cliente, "tecnico@exemplo.test", "Fulano de Tal")
-    assert cliente.post("/os/_nexus/aprovacao/16001/aprovar", json={}).status_code == 200      # o admin aprova
-
-
-def test_estrutura_nao_publicada_so_admin_aprova(app, fila, cliente, concluir):
-    """Sem a aba `regioes_campo` no banco (antes da 1ª publicação), ninguém é supervisor de campo de nada: só um
-    administrador aprova pelo portão, e ele diz por quê."""
-    _aba(fila.api, "cadastro_nexus", "regioes_campo", [])
-    visao.limpar()
-    _sessao_nexus(cliente, papel=SUPERVISORA)
-    _ler_fila(cliente)
-    _fracttal_de(app, cliente, "supervisora@exemplo.test", "Supervisora C.")
-    r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={})
-    assert r.status_code == 403 and "a estrutura de campo (regiões e supervisores de campo) ainda não foi publicada" in r.get_json()["erro"]
-
-
-def test_administrador_aprova_qualquer_os(app, fila, logado, cliente, concluir):
-    # logado = senha de admin do Nexus; o login do Fracttal pode ser de quem não tem papel nenhum
-    _ler_fila(logado)
-    _fracttal_de(app, logado, "tecnico@exemplo.test", "Fulano de Tal")
-    assert logado.post("/os/_nexus/aprovacao/16001/aprovar", json={}).status_code == 200
-    assert [p["caminho"] for p in concluir] == ["/os/api/os/16001/concluir"]
-
-
-def test_email_do_fracttal_em_nexus_admins_aprova(app, fila, cliente, concluir):
-    app.config["NEXUS_ADMINS"] = "chefe@exemplo.test"
-    _sessao_nexus(cliente)
-    _ler_fila(cliente)
-    _fracttal_de(app, cliente, "chefe@exemplo.test", "Chefe")
-    assert cliente.post("/os/_nexus/aprovacao/16001/aprovar", json={}).status_code == 200
-
-
-def test_portao_sem_login_fora_da_fila_e_de_outro_site(app, fila, logado, concluir):
-    _ler_fila(logado)
-    r = logado.post("/os/_nexus/aprovacao/15088/aprovar", json={})
-    assert r.status_code == 401 and r.get_json()["login"] is True               # sem login do Fracttal
-    _fracttal_de(app, logado, "supervisora@exemplo.test", "Supervisora C.")
-    assert logado.post("/os/_nexus/aprovacao/77777/aprovar", json={}).status_code == 404   # não está na fila
-    r = logado.post("/os/_nexus/aprovacao/15088/aprovar", json={}, headers={"Origin": "https://fora.test"})
-    assert r.status_code == 403
-    assert concluir == []
-
-
-def test_clone_recusou_a_os_fica_na_fila(app, fila, logado, monkeypatch):
-    def clone_recusa(environ, start_response):
-        start_response("400 BAD REQUEST", [("Content-Type", "application/json")])
-        return [json.dumps({"erro": "Não foi possível concluir."}).encode()]
-    monkeypatch.setattr(aprovar_os, "_clone", lambda: clone_recusa)
-    _ler_fila(logado)
-    _fracttal_de(app, logado, "supervisora@exemplo.test", "Supervisora C.")
-    r = logado.post("/os/_nexus/aprovacao/15088/aprovar", json={})
-    assert r.status_code == 400 and "Não foi possível" in r.get_json()["erro"] and aprovacao.os_na_fila(15088)
-
-
-def test_sessao_antiga_com_o_nome_do_supervisor_nao_vale_como_papel(app, fila, cliente):
-    """Quem entrou antes da estrutura de 10/2026 tem no `supervisor_padrao` o nome do supervisor (texto): a tela não
-    quebra e não filtra por ele."""
-    _sessao_nexus(cliente, papel="Beltrano Supervisor")
-    _ler_fila(cliente)
-    html = cliente.get("/t/campo/aprovacao").get_data(as_text=True)
-    assert 'data-wo="15088"' in html and 'data-wo="16001"' in html
-    assert cliente.get("/t/campo/rondas").status_code == 200
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="sem node nesta máquina")

@@ -31,11 +31,8 @@ def test_por_regiao_soma_os_cartoes_das_equipes_e_por_gestor_soma_as_usinas(banc
     assert (se["longa_pendente"], se["pts"], se["parada"], se["tecnicos"]) == (1, 2, 1, 2)
     assert (se["supervisor_campo"], se["coordenador_campo"], se["base"]) == ("Supervisora Campo", "Coordenador Campo",
                                                                              "São José do Rio Preto/SP")
-    assert (se["aprovador"]["tipo"], se["aprovador"]["pessoa_id"]) == ("supervisor", 92)
     assert (sul["usinas"], sul["pendentes"], sul["pct_feitas"], sul["nunca"], sul["tecnicos"]) == (1, 1, 0, 1, 1)
-    # vaga de supervisor aberta: quem aprova é o coordenador, e o texto diz isso
-    assert sul["supervisor_campo"] == "vaga" and sul["aprovador"]["tipo"] == "coordenador"
-    assert "Vaga aberta de supervisor de campo na região Sul 01: aprova o coordenador" in sul["aprovador"]["texto"]
+    assert sul["supervisor_campo"] == "vaga"                                        # vaga de supervisor aberta
     # dois cartões de equipe da mesma região viram um, com a soma e o % refeito sobre a soma
     junto = visao.por_regiao([dict(eq[0], regiao_campo="X"), dict(eq[1], regiao_campo="X")])[0]
     assert (junto["n_equipes"], junto["usinas"], junto["pendentes"], junto["pct_feitas"]) == (2, 3, 2, 33)

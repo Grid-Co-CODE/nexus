@@ -165,9 +165,7 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     # o porquê do grupo fica no selo da OS; a OS abre o card do OS Creator, cujo Concluir aprova (Levi, 18/10/2026)
     assert "Nota do registro 71%" in html and 'data-wo="15088"' in html and "NexusOsCard.abrir(" in html
     assert "Aprovar a OS 15088" not in html
-    # o portão do Aprovar do Nexus segue no servidor: sem login do Fracttal, 401 pedindo login
-    r = logado.post("/os/_nexus/aprovacao/15088/aprovar", json={})
-    assert r.status_code == 401 and r.get_json()["login"] is True
+    # o voltar do login do Fracttal (o da assinatura da PT) só leva a telas do Campo
     assert logado.get("/os/_nexus/voltar?para=/t/campo/aprovacao%3Fver%3DSudeste%2B03").headers["Location"].endswith("/t/campo/aprovacao?ver=Sudeste+03")
     assert logado.get("/os/_nexus/voltar?para=https://fora.test/x").headers["Location"].endswith("/t/campo/aprovacao")
     # aprovada, sai da fila guardada na hora (o portão chama isto depois do Concluir, test_campo_aprovacao_supervisor.py)
