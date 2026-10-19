@@ -785,6 +785,15 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
     (provado nas 52 equipes). Depois, as 5 OS com nota mais baixa: a nota, a OS, a usina, quem fez, o dia e os pontos de
     cada critério que perdeu ("Fotos 0/20 · Observações 0/15"; a ronda, as falhas); tarefas iguais da mesma OS numa
     linha ("7 tarefas iguais").
+  - **A OS citada é o botão verde que abre o card dela** (Levi, 19/10/2026: "ao citar uma OS tem que ficar verde grid e
+    deve ser possível clicar e ver o card da OS que nem quando clicamos em uma OS no OS Creator Web"): nas provas
+    (parada, atrasadas, chamados, pausadas) e nas OS com nota mais baixa, `cr-os` com o número e o id do Fracttal quando
+    o dado tem (a atrasada e a pausada pelo `fato_tarefa_os`, a tarefa pelo `fato_fechamento.id_os_fracttal`; a parada,
+    o chamado e a ronda só com o número, e o card acha a OS por ele). A janela é um `<dialog>` modal, na camada do topo, e
+    cobriria o card: o clique fecha a janela, abre o card (`NexusOsCard`) e a reabre como estava quando o card fecha
+    (`aoFechar`), no script da Visão. A PT segue pelo número dela.
+  - **Focar e Acompanhar encolhem** (Levi, 19/10/2026: "eles aparecem expandidos que nem estão agora mas deve ser
+    possível encolher!"): `<details open>`, o título com a seta e quantos itens.
   - `responsaveis.ranking_detalhe` lê as MESMAS linhas da conta (o número de notas bate com o do cartão nas 52
     equipes). A janela leva 0,1 a 0,2 s; sem as notas do App, diz, e o "Em quê cobrar" continua.
 

@@ -921,6 +921,11 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
   font:700 11.5px/16px var(--font-sans);letter-spacing:.06em;text-transform:uppercase}
 .cr-rk-j-nivel b{font:700 18px/1 var(--font-sans);letter-spacing:0;font-variant-numeric:tabular-nums}
 .cr-rk-j-nivel span{font-weight:600;letter-spacing:0;text-transform:none;color:var(--mudo)}
+/* Focar e Acompanhar encolhem (19/10/2026): o título é o botão, com a seta que gira */
+.cr-rk-j-dobra > summary{cursor:pointer;list-style:none}
+.cr-rk-j-dobra > summary::-webkit-details-marker{display:none}
+.cr-rk-j-dobra > summary::before{content:"\25B8";display:inline-block;margin-right:2px;transition:transform .15s}
+.cr-rk-j-dobra[open] > summary::before{transform:rotate(90deg)}
 .cr-rk-j-itens,.cr-rk-j-os{display:grid;margin:0;padding:0;list-style:none;border:1px solid var(--linha);
   border-radius:var(--raio-md)}
 .cr-rk-j-itens li{display:grid;grid-template-columns:130px minmax(0,1fr);gap:2px 12px;padding:8px 12px;font-size:13px;

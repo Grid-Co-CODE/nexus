@@ -268,7 +268,8 @@ def _itens(faltas=None):
 
 
 def _detalhe():
-    tarefas = [{"dia": "2026-10-17", "usina_id": 3, "os": "801", "tarefa": "Limpeza do inversor", "tecnico": "Técnico Um",
+    tarefas = [{"dia": "2026-10-17", "usina_id": 3, "os": "801", "wid": "8001", "tarefa": "Limpeza do inversor",
+                "tecnico": "Técnico Um",
                 "nota": 60, "itens": _itens({"Fotos": (0, "0 fotos (3 dá o total)"), "GPS no fechamento": (0, "sem posição")})},
                {"dia": "2026-10-16", "usina_id": 3, "os": "802", "tarefa": "Inspeção", "tecnico": "Técnico Dois",
                 "nota": 100, "itens": _itens()}]
@@ -296,6 +297,8 @@ def test_o_motivo_da_nota_fecha_com_a_nota():
     assert [(p["nota"], p["usina"], p["tecnico"]) for p in m["piores"]] == [(50, "Coração 1", "Técnico Um"),
                                                                             (60, "Coração 1", "Técnico Um")]
     assert m["piores"][0]["o_que"] == "Ronda · OS 501" and m["piores"][1]["o_que"] == "OS 801 · Limpeza do inversor"
+    # a OS de cada nota, para o card: a tarefa com o id do Fracttal (o fato tem), a ronda só com o número
+    assert [(p["tipo"], p["os"], p["wid"]) for p in m["piores"]] == [("ronda", "501", ""), ("tarefa", "801", "8001")]
     assert m["piores"][1]["faltou"] == "Fotos: 0 fotos (3 dá o total); GPS no fechamento: sem posição"
     assert m["piores"][0]["faltou"] == "checklist incompleto; item sem foto de evidência"
     # por técnico: a média das notas dele, a menor primeiro
@@ -348,11 +351,16 @@ def test_tarefas_iguais_da_mesma_os_viram_uma_linha():
 # ── O "Em quê cobrar" na janela (Levi, 18/10/2026: "quero ao clicar na equipe um detalhamento melhor, não cheio de
 # informações mas quero a informação, ao resumido e direto onde o supervisor bata o olho e possa cobrar o técnico com
 # dados!"; no quiz, "Item a item com a prova") e os pontos das OS mais baixas ("Faltou os pontos") ───────────────────
+def _ler(provas) -> list[str]:
+    """A prova como a tela a lê: a OS (o botão que abre o card) e o resto do texto."""
+    return [(f"OS {p['os']} · " if p.get("os") else "") + p["txt"] for p in provas]
+
+
 def test_em_que_cobrar_item_a_item_com_a_prova():
     altair = _ua(1, usina="Altair", manut=[("parada", "critico"), ("atrasadas", "critico")], acomp=[("pt", "critico")],
                  paradas_abertas=[{"os": "13002", "escopo": "Inversor 1", "tipo": "Corretiva", "inicio": "02/10 08:00",
                                    "_ini": "2026-10-02T08:00"}],
-                 manutencao={"atrasadas": 5, "atrasadas_os": 2, "lista_atrasadas": [{"os": "14909", "dias": 12},
+                 manutencao={"atrasadas": 5, "atrasadas_os": 2, "lista_atrasadas": [{"os": "14909", "dias": 12, "wid": 900014909},
                                                                                     {"os": "15403", "dias": 10}]},
                  pt={"lista": [{"numero": "PT-1", "os": "700", "solicitante": "Técnico Um", "idade_min": 2 * 1440 + 60,
                                 "parada": True, "hoje": False, "dia": "2026-10-16"}]})
@@ -371,14 +379,19 @@ def test_em_que_cobrar_item_a_item_com_a_prova():
                                                    ("critico", "PT parada"), ("critico", "Ronda"),
                                                    ("alerta", "Extintores")]
     parada, atrasadas, pt, ronda, ext = c
-    assert parada["provas"] == ["OS 13002 · Altair · Inversor 1 · desde 02/10 08:00"] and parada["mais"] == 0
+    assert _ler(parada["provas"]) == ["OS 13002 · Altair · Inversor 1 · desde 02/10 08:00"] and parada["mais"] == 0
     # as tarefas atrasadas de todas as usinas com o alerta, a OS mais antiga primeiro; "e mais" conta as OS de fora
-    assert atrasadas["cabeca"] == "9 tarefas" and atrasadas["provas"] == [
+    assert atrasadas["cabeca"] == "9 tarefas" and _ler(atrasadas["provas"]) == [
         "OS 14909 · Altair · há 12 d", "OS 15538 · Brodowski 1 · há 11 d", "OS 15403 · Altair · há 10 d"]
     assert atrasadas["mais"] == 2
-    assert pt["provas"] == ["PT-1 · Altair · pedida por Técnico Um há 2 d 1 h · sem decisão desde 16/10"]
-    assert ronda["provas"] == ["Coração 1 · Nunca teve ronda", "Brodowski 1 · Sem ronda há 9 dias"]   # a pior primeiro
-    assert ext["provas"] == ["Extintor COR-EXT02 · Coração 1 · sem conferência há 60 dias"]
+    assert _ler(pt["provas"]) == ["PT-1 · Altair · pedida por Técnico Um há 2 d 1 h · sem decisão desde 16/10"]
+    assert _ler(ronda["provas"]) == ["Coração 1 · Nunca teve ronda", "Brodowski 1 · Sem ronda há 9 dias"]   # a pior primeiro
+    assert _ler(ext["provas"]) == ["Extintor COR-EXT02 · Coração 1 · sem conferência há 60 dias"]
+    # a OS citada vai com o número e, quando o fato tem, o id do Fracttal: a tela a abre no card do OS Creator (Levi,
+    # 19/10/2026: "ao citar uma OS tem que ficar verde grid e deve ser possível clicar e ver o card da OS")
+    assert (atrasadas["provas"][0]["os"], atrasadas["provas"][0]["wid"]) == ("14909", "900014909")
+    assert (parada["provas"][0]["os"], parada["provas"][0]["wid"]) == ("13002", "")
+    assert pt["provas"][0]["os"] == "" and ext["provas"][0]["os"] == ""
     # as mesmas áreas e níveis das etiquetas do cartão, na mesma ordem
     assert [e["cls"] for e in RE.etiquetas({}, [altair, brodowski, coracao])] == [x["nivel"] for x in c]
 
@@ -400,4 +413,4 @@ def test_as_os_mais_baixas_levam_os_pontos():
 def test_a_disponibilidade_da_pior_para_a_melhor_sem_repetir_a_palavra():
     us = [_ua(1, usina="Altair", perf=[("disp", "atencao")], disp={"disp": 98.4}),
           _ua(2, usina="Brodowski 1", perf=[("disp", "critico")], disp={"disp": 71.2})]
-    assert RE.cobrar({}, us)[0]["provas"] == ["Brodowski 1 · 71,2%", "Altair · 98,4%"]
+    assert _ler(RE.cobrar({}, us)[0]["provas"]) == ["Brodowski 1 · 71,2%", "Altair · 98,4%"]

@@ -383,7 +383,11 @@ document.addEventListener('click', function (ev) {
   if (!b || !window.NexusOsCard) { return; }
   ev.preventDefault(); ev.stopPropagation();
   var wid = b.getAttribute('data-wid'), folio = b.getAttribute('data-folio');
-  if (wid) { NexusOsCard.abrir(wid, {status: '', folio: folio}); } else { NexusOsCard.abrirFolio(folio, {status: ''}); }
+  // a OS de dentro de uma janela (o Em quê cobrar do Ranking, 19/10/2026): o <dialog> modal mora na camada do topo e
+  // cobriria o card; fecha a janela e a reabre como estava quando o card fecha
+  var janela = b.closest('dialog[open]'), op = {status: ''};
+  if (janela) { janela.close(); op.aoFechar = function () { if (!janela.open) { janela.showModal(); } }; }
+  if (wid) { op.folio = folio; NexusOsCard.abrir(wid, op); } else { NexusOsCard.abrirFolio(folio, op); }
 });
 (function () {
   var dlg = document.getElementById('cr-modal');
