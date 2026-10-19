@@ -127,7 +127,10 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     est_m = M.ler(cfg)
     aviso_m = session.pop("pcm_motivos_aviso", None) or {}
     ok, erro = ok or aviso_m.get("ok"), erro or aviso_m.get("erro")
-    return {"conf": geracao.conferir(cfg, semana), "ultimas": geracao.ultimas(cfg), "sel": sel,
+    ultimas = geracao.ultimas(cfg)
+    # as rodadas que têm a planilha para baixar (19/10/2026: "tem que ter a opção de baixar!")
+    com_planilha = {u["id"] for u in ultimas + ([sel] if sel else []) if geracao.planilha(cfg, u.get("id") or "")}
+    return {"conf": geracao.conferir(cfg, semana), "ultimas": ultimas, "sel": sel, "com_planilha": com_planilha,
             "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,
             "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,
@@ -196,6 +199,21 @@ def registrar_pcm(bp) -> None:
             return render_template("pcm/gerar.html", **_ctx_gerar(
                 cfg, erro=f"Já tem uma geração rodando (rodada {ex}). Espere ela terminar.")), 409
         return redirect(na_raiz("/t/pcm/gerar?rodada=") + r["id"], code=303)
+
+    @bp.route("/gerar/planilha")
+    def gerar_planilha():
+        """A planilha da rodada (a `sombra.xlsx`, a mesma que o Publicar no App manda), para baixar. Levi, 19/10/2026:
+        "tem que ter a opção de baixar!" (ela só existia no disco do servidor). Vale para quem abre a tela Gerar."""
+        from flask import send_file
+        rid = str(request.args.get("rodada") or "")
+        f = geracao.planilha(current_app.config, rid)
+        if not f:
+            abort(404)
+        st = geracao.ler_status(current_app.config, rid) or {}
+        semana = str(st.get("semana") or rid[-8:])
+        return send_file(f, as_attachment=True, max_age=0,
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                         download_name=f"Programação Semana {semana[-2:]} - rodada {rid[:15]}.xlsx")
 
     @bp.route("/gerar/importar", methods=["POST"])
     def gerar_importar():
@@ -563,7 +581,7 @@ def registrar_pcm(bp) -> None:
         acao = f.get("acao") or ""
         try:
             r = M.cadastro(cfg, acao, _usuario(), motivo_id=f.get("motivo_id"), nome=f.get("nome"),
-                           descricao=f.get("descricao"), tira=f.get("tira") == "1")
+                           descricao=f.get("descricao"), tira=f.get("tira") == "1", etiqueta=f.get("etiqueta"))
         except M.Recusada as ex:
             session["pcm_motivos_aviso"] = {"erro": str(ex)}
         else:
@@ -1328,6 +1346,25 @@ def _ctx_historico(cfg, args) -> dict:
             "gestao_ok": g is not None, "lido": datetime.now(_BRT).strftime("%H:%M")}
 
 
+def _etiquetas_sugeridas(cfg, motivos) -> list[str]:
+    """As etiquetas do Fracttal para sugerir no cadastro (19/10/2026): as que já estão nas OS (as tarefas do
+    gestao_pcm.json, a mais usada primeiro; 44 nomes em 19/10) e as que os motivos já usam. O catálogo inteiro do
+    Fracttal só sai com o login de uma pessoa, que o Nexus não tem; o campo aceita qualquer nome (o App casa sem acento
+    e sem caixa)."""
+    conta = Counter()
+    try:
+        for t in (fonte.ler_gestao(cfg).dados or {}).get("tarefas") or []:
+            for e in t.get("etiquetas") or []:
+                if isinstance(e, str) and e.strip():
+                    conta[" ".join(e.split())] += 1
+    except Exception:            # noqa: BLE001 — sem o arquivo, o campo segue livre
+        pass
+    for m in motivos:
+        if m.get("etiqueta"):
+            conta[m["etiqueta"]] += 0
+    return sorted(conta, key=lambda e: (-conta[e], M.norm(e)))[:200]
+
+
 def _ctx_cadastro(cfg) -> dict:
     """O cadastro dos motivos, com quantas tarefas estão com cada um agora."""
     est = M.ler(cfg)
@@ -1335,6 +1372,7 @@ def _ctx_cadastro(cfg) -> dict:
     vig.pop("_ilegiveis", None)
     conta = Counter(m["motivo_id"] for m in vig.values())
     aviso = session.pop("pcm_motivos_aviso", None) or {}
-    return {"motivos": [dict(m, n=conta.get(m["id"], 0)) for m in M.ativos(est)], "inicial": est.get("inicial"),
+    motivos = [dict(m, n=conta.get(m["id"], 0)) for m in M.ativos(est)]
+    return {"motivos": motivos, "inicial": est.get("inicial"), "etiquetas": _etiquetas_sugeridas(cfg, motivos),
             "erro_banco": est.get("erro") or "", "pode": pode_programar(), "ok": aviso.get("ok"),
             "erro": aviso.get("erro"), "lido": datetime.now(_BRT).strftime("%H:%M")}

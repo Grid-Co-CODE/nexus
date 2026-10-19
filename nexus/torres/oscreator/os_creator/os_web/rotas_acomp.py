@@ -166,6 +166,19 @@ def _guardado_com_idade(chave) -> tuple:
     return (time.monotonic() - v[0], v[1]) if v else (None, None)
 
 
+def esquecer_se_no_quadro(wid) -> bool:
+    """Gravação feita fora desta tela (o responsável trocado no card da OS ou na tela do chamado, 19/10/2026): se a OS
+    está num quadro guardado, mesmo vencido, ele sai da memória, como depois do ticket. OS que não é de acompanhamento
+    não custa a ninguém a releitura do quadro."""
+    with rotas._MEMO_LOCK:
+        achou = any(isinstance(k, tuple) and k and k[0] in ("acomp", "acomp_linhas") and isinstance(v[1], dict)
+                    and any(str(l.get("id")) == str(wid) for l in v[1].get("linhas") or [])
+                    for k, v in rotas._MEMO.items())
+    if achou:
+        _esquecer(wid)
+    return achou
+
+
 def _esquecer_pessoa(pessoa):
     with rotas._MEMO_LOCK:
         for k in (("acomp", pessoa), ("acomp_linhas", pessoa)):

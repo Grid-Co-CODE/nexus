@@ -10,16 +10,20 @@ Levi, 13/10/2026: "Contestação ligada ao Nexus: em contratos e clientes no Nex
 contestações separando setores!"; "ficaria na API do PG, pode aplicar e construir!".
 
 **De onde vem.** O cliente contesta um dia no Dashboard Thopen (5080): clica na barra do dia no gráfico Energia ×
-Irradiação e marca geração, disponibilidade, desligamento, string, tracker e/ou ronda. O 5080 avisa no Teams (ronda →
-O&M › Zeladoria, o resto → O&M › Performance) e grava no banco o livro `thopen_contestacoes` · `contestacoes`
-(`thopen/contestacao_banco.py` do repositório da plataforma). O 5080 é a FONTE; no catálogo, fato
+Irradiação e marca geração, disponibilidade, desligamento, string, tracker e/ou ronda. O 5080 grava no banco o livro
+`thopen_contestacoes` · `contestacoes` (`thopen/contestacao_banco.py` do repositório da plataforma), **e esta tela é o
+destino** (Levi, 19/10/2026: "vai direto para contestações do Nexus e a gente resolve lá, esquece teams" — o COS não
+tinha fluxo do Teams, e Disponibilidade e Desligamento nem marcavam no 5080): o 5080 grava na hora e só diz "enviada"
+depois de o livro conferir. O Teams é um aviso a mais onde o setor tem fluxo (O&M › Performance e O&M › Zeladoria; o
+COS não tem). O 5080 é a FONTE; no catálogo, fato
 `contestacao_cliente` (área `contratos`), registrado antes da 1ª gravação; "quem grava" = Dashboard Thopen (5080)
 (`telas.QUEM_GRAVA_ORIGEM`).
 
 **Grão.** 1 linha = 1 contestação × 1 setor (as mesmas mensagens do Teams). Colunas: `id`, `contestacao_id` (junta as
 duas linhas quando o cliente marcou dos dois lados), `recebida_em` (UTC), `data_id_recebida`, `data_id_contestada_ini` e
 `_fim`, `usina` (o nome do 5080), `usina_id` (o de-para do 5080; vazio quando a usina tem dois ids, como Primavera),
-`setor`, `itens` (só os do setor, `;`), `avisado_teams` (sim/não: o Teams do setor recebeu), `origem`
+`setor`, `itens` (só os do setor, `;`), `avisado_teams` ("sim" o Teams do setor recebeu, "não" recusou, "sem canal" o
+setor não tem fluxo do Teams, desde 19/10/2026), `origem`
 (`dashboard_thopen`) e `dados_cifrados`.
 
 **O que é do cliente vai só cifrado** (regra 8: a API do banco tem leitura aberta): nome, contato, mensagem e o que ele
@@ -35,8 +39,9 @@ vive só na memória da tela. Sem a chave, a tela lista as contestações com "c
 `.segredo`, nunca impressa): perder a privada é perder o que já foi gravado; a cópia em cofre é item da virada.
 
 **A tela.** Uma aba por setor com a contagem; a mais nova em cima: quando chegou (Brasília), a usina, o dia contestado,
-o que contesta, o cliente e o contato, a mensagem, o que ele via na tela, se o Teams do setor recebeu ("não recebeu" = a
-contestação só está aqui) e o responsável. Tela nova nasce FECHADA para os setores (Base → Acessos): o administrador vê;
+o que contesta, o cliente e o contato, a mensagem, o que ele via na tela, o Teams ("recebeu"; "não recebeu" em vermelho =
+o Teams recusou; "só no Nexus" em cinza = o setor não tem fluxo, o caso do COS, e não é falha: `_avisado`) e o
+responsável. Tela nova nasce FECHADA para os setores (Base → Acessos): o administrador vê;
 marcar "Contestações" para Performance, COS e Zeladoria. **Que setor recebe o quê** (o 5080 decide, `thopen/contestacao.py`):
 geração, string e tracker → Performance; disponibilidade e desligamento → COS (Levi, 15/10/2026: "Disponibilidade e
 desligamento vão para o setor de COS"); ronda → Zeladoria.

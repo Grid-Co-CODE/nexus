@@ -242,3 +242,18 @@ def test_disponibilidade_e_desligamento_sao_do_cos(trat, app, cliente, monkeypat
     _como(cliente, ANA)
     html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
     assert "COS<i>1</i>" in html and "Mandaguaçu" in html and "Performance<i>" not in html and "Zeladoria<i>" not in html
+
+
+def test_setor_sem_teams_aparece_so_no_nexus_e_nao_como_recusa(trat, app, cliente, monkeypatch):
+    # 19/10/2026 (Levi: "vai direto para contestações do Nexus e a gente resolve lá, esquece teams"): o COS não tem fluxo
+    # do Teams; o 5080 grava "sem canal" e a tela diz "só no Nexus", sem o vermelho de "o Teams recusou"
+    cab = list(banco_linha := _linha("c8", "cos", "disponibilidade", "2026-10-19T12:00:00Z", usina="Altair",
+                                     avisado="sem canal"))
+    trat._id(CT.LIVRO, CT.ABA)["linhas"].append({"headers": cab, "values": [banco_linha[c] for c in cab]})
+    d = CT.contestacoes()
+    assert d["por_setor"]["cos"][0]["avisado"] is None and d["por_setor"]["zeladoria"][0]["avisado"] is False
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 5, "nome": "COS"}, "erro": ""})
+    _como(cliente, ANA)
+    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    assert "só no Nexus" in html and "não recebeu" not in html and "recusou" not in html

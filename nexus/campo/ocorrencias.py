@@ -80,6 +80,8 @@ _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
 _GERACAO = [0]          # sobe a cada limpar(): a leitura que começou antes de uma gravação não pisa na cópia dela
+_RELENDO = [False]      # a releitura por trás do `ler_sem_esperar` (uma por vez; trava própria: a `_TRAVA` é das gravações)
+_TRAVA_RELER = threading.Lock()
 
 
 class Recusada(ValueError):
@@ -202,6 +204,43 @@ def ler(forcar: bool = False) -> dict:
         _CACHE["livro"] = novo
         _CACHE.pop("falha", None)
     return novo
+
+
+def ler_sem_esperar() -> dict:
+    """O `ler` de quem só mostra (a etiqueta das ocorrências na Visão geral do responsável): a cópia que houver volta NA
+    HORA e, vencida, a releitura vai por trás (uma por vez), pelas regras do `ler` (a falha espera o minuto dela). Sem
+    cópia nenhuma (a 1ª vez depois de subir), lê agora. Levi, 19/10/2026: "quando eu já filtrei o responsável e vou
+    filtrar o cliente carrega de novo ... e acaba demorando": cada filtro é um pedido, e quem olhava a tela mais de um
+    minuto antes de filtrar esperava a releitura deste livro (a listagem do banco: 0,4 a 0,9 s no banco real). Quem grava
+    neste processo já deixa a cópia nova (`_publicar`); a de outra máquina aparece na volta seguinte."""
+    g = _CACHE.get("livro")
+    if not g:
+        return ler()
+    if time.time() - g["lido_em"] >= TTL_S:
+        _reler_por_tras()
+    return g
+
+
+def _reler_por_tras() -> None:
+    with _TRAVA_RELER:
+        if _RELENDO[0]:
+            return
+        _RELENDO[0] = True
+    app = current_app._get_current_object()
+
+    def rodar():
+        try:
+            with app.app_context():
+                ler()
+        except Exception:       # noqa: BLE001 — a etiqueta segue com a cópia que tem
+            pass
+        finally:
+            with _TRAVA_RELER:
+                _RELENDO[0] = False
+    if app.config.get("TESTING"):
+        rodar()
+    else:
+        threading.Thread(target=rodar, daemon=True, name="nexus-ocorrencias-reler").start()
 
 
 def _abre(cofre, l: dict) -> dict:

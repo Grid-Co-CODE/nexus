@@ -70,7 +70,7 @@
         <td>{% if x.aberto %}<span class="ext-par"><span>{{ x.nome }}</span><span class="det">{{ x.contato }}</span></span>{% elif x.aberto is false %}<span class="cn-t-critico" title="A cifra desta linha não abre com a chave deste Nexus">não abre</span>{% else %}<span class="mudo">cifrado</span>{% endif %}</td>
         <td class="ct-msg ct-esq">{% if x.aberto %}{{ x.mensagem or '—' }}{% else %}<span class="mudo">—</span>{% endif %}</td>
         <td class="ct-esq">{% if x.tela %}<ul class="ct-tela">{% for rot, v in x.tela %}<li><b>{{ rot }}</b> {{ v }}</li>{% endfor %}</ul>{% else %}<span class="mudo">—</span>{% endif %}</td>
-        <td>{% if x.avisado %}<span class="cn-t-ok">recebeu</span>{% else %}<span class="cn-t-critico" title="O Teams recusou o aviso: a contestação só está aqui">não recebeu</span>{% endif %}</td>
+        <td>{% if x.avisado %}<span class="cn-t-ok">recebeu</span>{% elif x.avisado is none %}<span class="mudo" title="O setor não tem aviso no Teams: a contestação chega por aqui">só no Nexus</span>{% else %}<span class="cn-t-critico" title="O Teams recusou o aviso: a contestação só está aqui">não recebeu</span>{% endif %}</td>
         <td class="ct-resp">{% if trat_erro %}<span class="mudo">—</span>
           {% elif r %}<span>{{ r.nome or 'responsável' }}{% if meu_r %} (você){% endif %}</span>
             <span class="ct-n">{{ t.atualizacoes|length }} atualizaç{{ 'ão' if t.atualizacoes|length == 1 else 'ões' }}</span>

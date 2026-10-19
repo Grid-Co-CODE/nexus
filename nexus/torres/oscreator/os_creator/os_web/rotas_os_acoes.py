@@ -259,7 +259,16 @@ def api_responsavel(wid):
     r = api.mudar_responsavel(wid, idp)                              # os_detalhe.py:331 — (self._wo, p["id_personnel"])
     if not (isinstance(r, dict) and r.get("ok")):
         return _erro((r or {}).get("erro") or "não deu")
-    return jsonify({"ok": True, "mensagem": "OS %s agora está com %s." % (c.get("folio") or wid, c.get("name") or "—")})
+    # 19/10/2026 (a troca também na tela do chamado): o quadro do Acompanhamento que mostra esta OS sai da memória, senão
+    # voltar a ele mostraria o responsável de antes por até 3 min; e `da_equipe` é a cor do nome na tela do chamado, pela
+    # regra do quadro. A troca já está no Fracttal: nada daqui vira erro na tela.
+    from . import acomp_web, rotas_acomp
+    try:
+        rotas_acomp.esquecer_se_no_quadro(wid)
+    except Exception:                                                  # noqa: BLE001
+        pass
+    return jsonify({"ok": True, "mensagem": "OS %s agora está com %s." % (c.get("folio") or wid, c.get("name") or "—"),
+                    "da_equipe": acomp_web.da_equipe({"id_atribuido": idp, "atribuido_a": c.get("name")})})
 
 
 @bp.route("/api/os/<int:wid>/etiquetas", methods=["POST"])

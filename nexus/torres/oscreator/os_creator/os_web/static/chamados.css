@@ -177,6 +177,7 @@ body.cham .ac .campo-tk:disabled{color:var(--mu)}
 .msg{font-size:12.5px;min-height:18px;margin-top:8px}
 .msg:empty{min-height:0;margin:0}
 .msg.ok{color:var(--ok-t)}.msg.er{color:var(--rd-t)}.msg.av{color:var(--am-t)}
+.msg.ruim{color:var(--rd-t)}            /* o erro das ações do card (os_acoes.js) na tela do chamado */
 ol.cadeia{list-style:none;margin:0;padding:0}
 ol.cadeia li{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--ln)}
 ol.cadeia li:last-child{border-bottom:0}
@@ -191,6 +192,7 @@ dl.dados dt{color:var(--mu)}
 dl.dados dd{margin:0;color:var(--tx);text-align:right;min-width:0;overflow-wrap:anywhere}
 dl.dados dd.mono{font-family:var(--mono);font-size:12px}
 dl.dados dd.a{color:var(--am-t)}
+dl.dados dd.resp{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px 8px}   /* nome + "trocar" */
 table.t{width:100%;border-collapse:collapse;font-size:12.5px}
 table.t th{font:600 10.5px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--mu);text-align:left;
   padding:0 8px 7px;border-bottom:1px solid var(--ln2);white-space:nowrap}

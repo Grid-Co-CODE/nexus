@@ -512,6 +512,14 @@ def _pasta_rodada(config, rid: str) -> Path | None:
     return p if (p / "status.json").exists() else None
 
 
+def planilha(config, rid: str) -> Path | None:
+    """A `saida/sombra.xlsx` da rodada (a que o Publicar no App manda como "Programação Semana NN.xlsx"), ou None:
+    rodada que não existe, id fora do formato (nada de caminho montado de fora) ou rodada sem a planilha."""
+    p = _pasta_rodada(config, rid)
+    f = p / "saida" / "sombra.xlsx" if p else None
+    return f if f and f.is_file() else None
+
+
 def ler_status(config, rid: str) -> dict | None:
     p = _pasta_rodada(config, rid)
     if not p:

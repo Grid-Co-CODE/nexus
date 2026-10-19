@@ -10,7 +10,8 @@
 {% with parte="cab", aba="cadastro", n=None %}{% include "pcm/_fora_topo.html" %}{% endwith %}
 {% with parte="abas", aba="cadastro", n=motivos|length %}{% include "pcm/_fora_topo.html" %}{% endwith %}
 <p class="pcm-sub fp-sub">Os motivos que o PCM e os supervisores marcam nas tarefas. "Tira da programação" = a tarefa com o
-  motivo não entra na geração da semana e, na semana em curso, o robô do PCM a tira.</p>
+  motivo não entra na geração da semana e, na semana em curso, o robô do PCM a tira. "Etiqueta no Fracttal" = a etiqueta
+  que o App põe na OS quando o técnico justifica com o motivo (e tira quando ele troca ou tira a justificativa).</p>
 
 {% if ok %}<div class="cn-certo" role="status"><span>{{ ok }}</span></div>{% endif %}
 {% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
@@ -20,7 +21,7 @@
   16/10/2026. Ele vai ao banco junto com a primeira marca ou a primeira mudança aqui.</span></p>{% endif %}
 
 <div class="cn-tab"><table class="fp-cad">
-    <thead><tr><th>Motivo</th><th class="fp-esq">Descrição</th><th>Tira da programação</th><th>Tarefas com ele</th>{% if pode %}<th></th>{% endif %}</tr></thead>
+    <thead><tr><th>Motivo</th><th class="fp-esq">Descrição</th><th>Tira da programação</th><th>Etiqueta no Fracttal</th><th>Tarefas com ele</th>{% if pode %}<th></th>{% endif %}</tr></thead>
     <tbody>
     {# a linha é o formulário (Levi, 18/10/2026: o Editar abria "um card nada a ver abaixo"; o nome, a descrição e o
        "tira" se mudam na própria coluna). O <form> fica na célula das ações e os campos se ligam a ele pelo `form`. #}
@@ -34,6 +35,9 @@
                    placeholder="Sem descrição" aria-label="Descrição do motivo {{ m.nome }}">{{ m.descricao }}</textarea></td>
         <td><label class="fp-cad-tira"><input type="checkbox" name="tira" value="1" form="{{ f }}"{% if m.tira %} checked{% endif %}>
           <span data-sim-nao>{{ 'Sim' if m.tira else 'Não' }}</span></label></td>
+        {# 19/10/2026: o nome da etiqueta do Fracttal; as que já estão nas OS vêm de sugestão, e vale qualquer nome #}
+        <td><input class="gc-campo fp-cad-etq" name="etiqueta" form="{{ f }}" value="{{ m.etiqueta }}" list="etiquetas-fracttal"
+                   maxlength="80" placeholder="nenhuma" aria-label="Etiqueta no Fracttal do motivo {{ m.nome }}"></td>
         <td class="m">{{ m.n }}</td>
         <td class="fp-acoes">
           {% set volta = (m.n ~ (' tarefa com este motivo volta' if m.n == 1 else ' tarefas com este motivo voltam') ~ ' à programação. Salvar?') %}
@@ -55,12 +59,14 @@
         <td><span class="q-mp q-mp--texto{% if m.tira %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if m.tira else 'tag' }}"></i>{{ m.nome }}</span></td>
         <td class="fp-esq">{{ m.descricao or '—' }}</td>
         <td>{% if m.tira %}<span class="cn-st cn-t-critico">Sim</span>{% else %}<span class="cn-st cn-t-neutro">Não</span>{% endif %}</td>
+        <td>{{ m.etiqueta or '—' }}</td>
         <td class="m">{{ m.n }}</td>
       {% endif %}
       </tr>
     {% endfor %}
     </tbody>
   </table></div>
+{% if pode %}<datalist id="etiquetas-fracttal">{% for e in etiquetas %}<option value="{{ e }}">{% endfor %}</datalist>{% endif %}
 
 {% if pode %}
 <section class="pcm-passo">
@@ -72,6 +78,8 @@
     <label class="gc-rotulo" for="novo-desc">Descrição (opcional)</label>
     <textarea id="novo-desc" name="descricao" class="gc-campo" maxlength="300"></textarea>
     <label class="gc-rotulo"><input type="checkbox" name="tira" value="1"> Tira da programação</label>
+    <label class="gc-rotulo" for="novo-etq">Etiqueta no Fracttal (opcional)</label>
+    <input id="novo-etq" name="etiqueta" class="gc-campo" maxlength="80" list="etiquetas-fracttal" placeholder="nenhuma">
     <div class="fp-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-plus"></i> Incluir</button></div>
   </form>
 </section>

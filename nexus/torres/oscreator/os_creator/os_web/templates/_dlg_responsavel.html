@@ -1,0 +1,10 @@
+{# TrocarResponsavelDialog: o diálogo de trocar o responsável, o MESMO no card da OS (Histórico) e na tela do chamado
+   (Acompanhamento de chamados, Levi 19/10/2026: "que nem fazemos no card da OS no histórico de OS Creator"). Espera `d`
+   com `folio` e `responsavel`; o os_acoes.js clona o <template> por cima da tela. #}
+<template data-dlg="responsavel">
+  <div class="acoes-t">Trocar o responsável da OS {{ d.folio }}</div>
+  {% if d.responsavel and d.responsavel != '—' %}<div class="acoes-s">Hoje está com <b>{{ d.responsavel }}</b>.</div>{% endif %}
+  <select data-resp-sel data-busca="1" aria-label="Responsável"><option value="">carregando o pessoal…</option></select>
+  <div class="acoes-hint" data-hint></div>
+  <div class="acoes-bts"><button type="button" class="det-b ghost" data-fechar>Cancelar</button><button type="button" class="det-b verde" data-conf="responsavel" disabled>Atribuir</button></div>
+</template>

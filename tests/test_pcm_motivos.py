@@ -925,3 +925,40 @@ def test_cadastro_edita_na_propria_linha_e_o_selo_so_com_a_cor(app, logado, tela
     css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
     regra = css.split(".q-mp--texto{", 1)[1].split("}", 1)[0]
     assert "background:none" in regra and "padding:0" in regra
+
+
+def test_a_etiqueta_do_fracttal_de_cada_motivo(app, logado, tela):
+    """Levi, 19/10/2026: "dar para ligar a uma etiqueta do Fracttal para quando o técnico justificasse etiquetaria aquela
+    OS, além de sair ou não da programação". O cadastro guarda o NOME da etiqueta de cada motivo (coluna nova no FIM da
+    dim_motivo), a tela a edita na própria linha (com as etiquetas que já existem nas OS como sugestão) e o arquivo do
+    App leva a etiqueta em `motivos`: quem etiqueta é o App, com o login do técnico (o pacote _propostas/etiqueta-motivo)."""
+    cfg = app.config
+    assert M.CAB_MOTIVO[-1] == "etiqueta_fracttal"
+    am = next(m for m in M.ativos(M.ler(cfg, forcar=True)) if m["nome"] == "Aguardando material")
+    assert am["etiqueta"] == ""
+    M.cadastro(cfg, "editar", PESSOA, motivo_id=am["id"], nome=am["nome"], descricao=am["descricao"], tira=am["tira"],
+               etiqueta="  Sem Material   Sobressalente ")
+    novo = next(m for m in M.ativos(M.ler(cfg, forcar=True)) if m["id"] == am["id"])
+    assert novo["etiqueta"] == "Sem Material Sobressalente" and novo["tira"] is True
+    # quem edita sem mandar a etiqueta (a chamada antiga) não a apaga; mandar vazio apaga
+    r = M.cadastro(cfg, "editar", PESSOA, motivo_id=am["id"], nome=am["nome"], descricao="Falta peça.", tira=True)
+    assert r["mudou"] and next(m for m in M.ativos(M.ler(cfg, forcar=True)) if m["id"] == am["id"])["etiqueta"] == \
+        "Sem Material Sobressalente"
+    criado = M.cadastro(cfg, "criar", PESSOA, nome="Aguardando laudo", tira=False, etiqueta="ENGENHARIA")
+    assert next(m for m in M.ativos(M.ler(cfg, forcar=True)) if m["id"] == criado["motivo_id"])["etiqueta"] == "ENGENHARIA"
+    # o arquivo do App leva a etiqueta de cada motivo
+    arq = {m["id"]: m for m in M.arquivo(cfg)["motivos"]}
+    assert arq[am["id"]]["etiqueta"] == "Sem Material Sobressalente" and arq[criado["motivo_id"]]["etiqueta"] == "ENGENHARIA"
+    assert all("etiqueta" in m for m in arq.values())
+    # a tela: o campo na linha, ligado ao formulário dela, e a rota grava
+    html = logado.get("/t/pcm/fora-da-programacao?ver=cadastro").get_data(as_text=True)
+    assert "Etiqueta no Fracttal" in html.split("<thead>", 1)[1].split("</thead>", 1)[0]
+    linha = html.split(f'data-motivo="{am["id"]}"', 1)[1].split("</tr>", 1)[0]
+    campo = linha.split('name="etiqueta"', 1)[1].split(">", 1)[0]
+    assert f'form="f-motivo-{am["id"]}"' in campo and 'value="Sem Material Sobressalente"' in campo
+    assert 'list="etiquetas-fracttal"' in campo and '<datalist id="etiquetas-fracttal">' in html
+    r = logado.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "editar", "motivo_id": str(am["id"]),
+                                                                  "nome": am["nome"], "descricao": "Falta peça.",
+                                                                  "tira": "1", "etiqueta": ""})
+    assert r.status_code == 303
+    assert next(m for m in M.ativos(M.ler(cfg, forcar=True)) if m["id"] == am["id"])["etiqueta"] == ""

@@ -381,10 +381,11 @@ def _responsavel_do_login(d) -> str:
 
 
 def _ocorrencias_abertas() -> dict:
-    """{usina_id: {"n", "pior"}} das ocorrências abertas (o livro nexus_ocorrencias, com a cópia de 1 minuto). O livro que
-    não abre não derruba a Visão geral: fica sem as etiquetas."""
+    """{usina_id: {"n", "pior"}} das ocorrências abertas (o livro nexus_ocorrencias, com a cópia de 1 minuto, que volta na
+    hora e se relê por trás: `ler_sem_esperar`, 19/10/2026). O livro que não abre não derruba a Visão geral: fica sem as
+    etiquetas."""
     try:
-        return campo_oc.abertas_por_usina(campo_oc.estado(campo_oc.ler()["eventos"]))
+        return campo_oc.abertas_por_usina(campo_oc.estado(campo_oc.ler_sem_esperar()["eventos"]))
     except Exception:           # noqa: BLE001 — sem as etiquetas, a Visão geral segue
         _log_campo.exception("Visão geral: as ocorrências não abriram")
         return {}
@@ -496,7 +497,7 @@ def responsaveis():
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
         opcoes_responsavel=nomes, opcoes_cliente=opcoes_cliente,
         sem_responsavel=visao.SEM_RESPONSAVEL, reguas=campo_resp.REGUAS, rotulo_area=campo_resp.ROTULO_AREA,
-        sites=campo_resp.sites_fracttal() if modo == "geral" else {}, info=d.get("info") or {},
+        sites=(d.get("sites_fracttal") or {}) if modo == "geral" else {}, info=d.get("info") or {},
         erros=d.get("erros") or {},
         mes_id=d.get("mes_id"),
         limites={"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,

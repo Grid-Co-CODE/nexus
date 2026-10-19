@@ -77,6 +77,11 @@
   <p class="pcm-quadro-link"><a class="pcm-link" href="{{ raiz }}/t/pcm/quadro?rodada={{ sel.id }}"><i class="ph ph-kanban"></i> Ver esta
     semana no Quadro da semana</a> <span class="gc-ajuda">para revisar e reprogramar antes de gerar de novo.</span></p>
   {% endif %}
+  {# a planilha da rodada para baixar (19/10/2026): a mesma que o Publicar no App manda como "Programação Semana NN.xlsx" #}
+  {% if sel.id in com_planilha %}
+  <p class="pcm-quadro-link"><a class="pcm-link" href="{{ raiz }}/t/pcm/gerar/planilha?rodada={{ sel.id }}" download><i class="ph ph-download-simple"></i>
+    Baixar a planilha</a> <span class="gc-ajuda">a programação desta rodada em Excel, a mesma que o Publicar no App manda.</span></p>
+  {% endif %}
 
   {# publicar no App (09/10/2026): a situação da publicação ou o botão, e o que conferir antes #}
   {% if sel.publicacao %}
@@ -255,7 +260,7 @@
   </header>
 <div class="pcm-rolagem">
   <table class="pcm-tabela">
-    <thead><tr><th>Começou</th><th>Semana</th><th>Situação</th><th class="num">Linhas</th><th>Contra a oficial</th></tr></thead>
+    <thead><tr><th>Começou</th><th>Semana</th><th>Situação</th><th class="num">Linhas</th><th>Contra a oficial</th><th>Planilha</th></tr></thead>
     <tbody>
     {% for u in ultimas %}
       <tr>
@@ -265,6 +270,8 @@
           <span class="pcm-sit pcm-sit--publicada">Publicada no App</span>{% endif %}</td>
         <td class="num">{{ u.resumo.linhas if u.resumo else '—' }}</td>
         <td>{% if u.comparacao %}{{ 'Idênticas' if u.comparacao.identicas else 'Diferentes' }}{% elif u.estado == 'ok' %}sem a oficial ainda{% else %}—{% endif %}</td>
+        <td>{% if u.id in com_planilha %}<a class="pcm-link" href="{{ raiz }}/t/pcm/gerar/planilha?rodada={{ u.id }}" download
+          title="Baixar a planilha desta rodada" aria-label="Baixar a planilha da rodada de {{ hora(u.inicio) }}"><i class="ph ph-download-simple"></i> Baixar</a>{% else %}—{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

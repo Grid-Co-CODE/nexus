@@ -186,7 +186,14 @@ def carregar(pares) -> dict:
     """Põe na cópia (2 min), com UMA listagem do banco, os livros pedidos que não estão nela, e devolve o que a listagem
     disse de cada aba ({(livro, aba): (id, linhas)}; vazio quando nada faltava). Medido em 17/10/2026 (Técnicos por
     usina, a 1ª abertura em 11,6 s): cada `livros.ler` pede de novo a lista de todas as tabelas do banco (~0,6 s, 95 KB),
-    e uma tela que lê 7 livros pagava 7 listagens."""
+    e uma tela que lê 7 livros pagava 7 listagens.
+
+    As páginas também vão juntas (19/10/2026, Visão do responsável: a 1ª abertura depois de um deploy levou 26 a 46 s, e
+    4 a 15 s eram as 23 páginas do `nexus_equipamentos · dim_equipamento`, uma depois da outra): a listagem diz quantas
+    linhas cada aba tem, e as páginas de todas as abas pedidas saem no mesmo grupo de 6. A aba que cresceu depois da
+    listagem (a última página veio cheia) segue página a página até a incompleta, como o `livros._linhas`; a que encolheu
+    para na 1ª incompleta. `(livro, None)` é a 1ª aba do livro na listagem, como no `livros.ler`. Aba que falha: as que
+    vieram ficam na cópia e o erro sobe (quem chama decide)."""
     agora = time.time()
     faltam = [p for p in pares if not (_LIVROS.get(p) and agora - _LIVROS[p][0] < LIVRO_S)]
     if not faltam:
@@ -194,17 +201,57 @@ def carregar(pares) -> dict:
     base, sessao = _base(), _sessao()
     r = sessao.get(f"{base}/api/sheets", timeout=60)
     r.raise_for_status()
-    meta = {(x.get("workbook_key"), x.get("sheet_name")): (x.get("id"), int(x.get("row_count") or 0)) for x in r.json()}
-    from concurrent.futures import ThreadPoolExecutor
+    lista = r.json()
+    meta = {(x.get("workbook_key"), x.get("sheet_name")): (x.get("id"), int(x.get("row_count") or 0)) for x in lista}
+    primeira, abas = {}, collections.defaultdict(dict)
+    for x in lista:
+        primeira.setdefault(x.get("workbook_key"), (x.get("id"), int(x.get("row_count") or 0)))
+        abas[x.get("workbook_key")][x.get("sheet_name")] = x.get("id")
+    # a mesma listagem serve ao `_ciclo` das abas de cada livro (o `livros.abas` do `_abas_dos_fatos`, mais uma listagem)
+    for livro, a in abas.items():
+        _LIVROS[("_abas", livro)] = (agora, dict(a))
 
-    def ler(p):
-        sid = (meta.get(p) or (None,))[0]
-        return livros._linhas(base, sessao, sid) if sid else []
-    # as abas são independentes: lidas juntas (a espera é a rede, não o processo)
-    with ThreadPoolExecutor(max_workers=min(6, len(faltam))) as ex:
-        lidas = list(ex.map(ler, faltam))
-    for p, linhas in zip(faltam, lidas):
+    def onde(p):
+        return (meta.get(p) if p[1] is not None else primeira.get(p[0])) or (None, 0)
+    # (par, aba, offset) de cada página que a listagem promete (a vazia do fim, quando a conta fecha em mil, inclusive:
+    # é a mesma que o `livros._linhas` pede para saber que acabou)
+    paginas = [(p, onde(p)[0], off) for p in faltam if onde(p)[0]
+               for off in range(0, onde(p)[1] + 1, livros.PAGINA)]
+    from concurrent.futures import ThreadPoolExecutor
+    lidas, falhas = collections.defaultdict(dict), {}
+    if paginas:
+        # as abas e as páginas são independentes: lidas juntas (a espera é a rede, não o processo)
+        with ThreadPoolExecutor(max_workers=min(6, len(paginas))) as ex:
+            futuros = [(p, off, ex.submit(livros.pagina, base, sessao, sid, off)) for p, sid, off in paginas]
+        for p, off, f in futuros:
+            try:
+                lidas[p][off] = f.result()
+            except Exception as e:      # noqa: BLE001 — a aba que falhou não entra na cópia; o erro sobe no fim
+                falhas.setdefault(p, e)
+    for p in faltam:
+        if p in falhas:
+            continue
+        sid = onde(p)[0]
+        linhas, off = [], 0
+        try:
+            for off in sorted(lidas[p]):
+                linhas += lidas[p][off]
+                if len(lidas[p][off]) < livros.PAGINA:
+                    break
+            else:
+                # a última página prometida veio cheia: a aba cresceu depois da listagem; segue até a incompleta
+                while sid:
+                    off += livros.PAGINA
+                    rows = livros.pagina(base, sessao, sid, off)
+                    linhas += rows
+                    if len(rows) < livros.PAGINA:
+                        break
+        except Exception as e:          # noqa: BLE001 — idem
+            falhas[p] = e
+            continue
         _LIVROS[p] = (time.time(), linhas)
+    if falhas:
+        raise next(iter(falhas.values()))
     return meta
 
 
