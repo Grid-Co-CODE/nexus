@@ -1,47 +1,50 @@
-{# O motivo da nota da equipe (18/10/2026, Levi: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da
-   equipe estar abaixo para que o supervisor possa cobrar a equipe"): um pedaço de página, sem a moldura, que o Ranking
-   das equipes põe na janela da Visão do responsável. A conta é a do cartão (nexus/campo/ranking_equipes.py, `motivos`):
-   os pontos que a nota perde na qualidade e na cobertura, as notas mais baixas com o que faltou, a média por técnico e as
-   usinas sem ronda. #}
+{# A janela da equipe no Ranking das equipes (18/10/2026), um pedaço de página na janela da Visão do responsável. Levi:
+   "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe estar abaixo para que o supervisor
+   possa cobrar a equipe"; depois, "quero ao clicar na equipe um detalhamento melhor [do Em quê cobrar], não cheio de
+   informações mas quero a informação, ao resumido e direto onde o supervisor bata o olho e possa cobrar o técnico com
+   dados!" (no quiz, "Item a item com a prova"; nas OS mais baixas, "Faltou os pontos"). Em cima, o "Em quê cobrar" do
+   cartão, item a item com a prova (`ranking_equipes.cobrar`); embaixo, a nota do App: onde perdeu pontos e as OS com
+   nota mais baixa, com os pontos de cada critério (`ranking_equipes.motivos`). #}
 {% set seta_txt = {'sobe': 'subiu ', 'desce': 'desceu ', 'igual': 'mesma posição de antes', 'sem': 'sem posição antes'} %}
 <header class="cr-jan-cab">
-  <div><p class="gc-eyebrow">Motivo da nota{% if info.get('atual') %} · de {{ dia_curto(info.atual[0]) }} a {{ dia_curto(info.atual[1]) }}{% endif %}</p><h2>{{ equipe }}</h2>
-    <p class="mudo">{{ n.usinas }} usina{{ 's' if n.usinas != 1 }} · {{ tecnicos }} técnico{{ 's' if tecnicos != 1 }}{% if regiao_campo and regiao_campo != sem_regiao %} · {{ regiao_campo }}{% endif %}</p></div>
+  <div><p class="gc-eyebrow">Em quê cobrar</p><h2>{{ equipe }}</h2>
+    <p class="mudo">{% if nomes_tecnicos %}Técnicos: {{ nomes_tecnicos|join(', ') }}{% else %}{{ tecnicos }} técnico{{ 's' if tecnicos != 1 }}{% endif %} · {{ n.usinas }} usina{{ 's' if n.usinas != 1 }}{% if regiao_campo and regiao_campo != sem_regiao %} · {{ regiao_campo }}{% endif %}</p></div>
   <div class="cr-jan-resumo">
     <span class="gc-rotulo">{% if posicao %}{{ posicao }}º de {{ total }} no ranking{% else %}fora do ranking{% endif %}</span>
     <b class="cr-v cr-v--{{ cor }}">{{ n.nota if n.nota is not none else '—' }}</b>
-    <span class="mudo">{% if posicao %}{{ seta_txt[seta.tipo] }}{{ seta.n if seta.tipo in ('sobe', 'desce') }}{% endif %}{% if antes.nota is not none %} · antes {{ antes.nota }}{% if antes.posicao %} ({{ antes.posicao }}º){% endif %}{% endif %}</span>
+    <span class="mudo">nota do App{% if posicao %} · {{ seta_txt[seta.tipo] }}{{ seta.n if seta.tipo in ('sobe', 'desce') }}{% endif %}{% if antes.nota is not none %} · antes {{ antes.nota }}{% if antes.posicao %} ({{ antes.posicao }}º){% endif %}{% endif %}</span>
   </div>
 </header>
-{% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}.</b></div>
-{% elif n.nota is none %}
-<p class="cr-jan-vazio">Sem nota do App nos últimos 30 dias: {% if n.n_ronda %}{{ n.n_ronda }} ronda{{ 's' if n.n_ronda != 1 }} pelo App, nenhuma com nota{% else %}nenhuma OS nem ronda pelo App{% endif %}. O App deixa a equipe fora do ranking; ela entra quando as tarefas e as rondas passam pelo App.</p>
-{% if m and m.cobertura.sem_ronda %}<p class="cr-rk-mot-sem"><b>Sem ronda em 30 dias:</b> {{ m.cobertura.sem_ronda|join(', ') }}{% if m.cobertura.mais_sem_ronda %} e mais {{ m.cobertura.mais_sem_ronda }}{% endif %}.</p>{% endif %}
-{% elif m %}
-<p class="cr-rk-mot-conta">A nota {{ n.nota }} perde <b>{{ m.perde }}</b> pontos de 100: <b>{{ m.qualidade.perde }}</b> na qualidade e <b>{{ m.cobertura.perde }}</b> na cobertura (nota = 60% qualidade + 40% cobertura, a régua do App).</p>
-<div class="cr-rk-mot">
-  <section class="cr-rk-mot-bloco">
-    <h3>Qualidade <b class="cn-t-{{ ranking_cor(n.qualidade) }}">{{ n.qualidade }}</b><span>tira {{ m.qualidade.perde }}</span></h3>
-    <p class="mudo">A média de {{ n.n_notas }} nota{{ 's' if n.n_notas != 1 }} do App: {{ n.n_os }} tarefa{{ 's' if n.n_os != 1 }} e {{ n.n_ronda }} ronda{{ 's' if n.n_ronda != 1 }}. Onde ela perdeu pontos:</p>
-    <ul>{% for p in m.qualidade.partes %}<li><b>{{ p.rot }}</b><span>tira {{ p.perde }}</span><small>{{ p.det }}</small></li>{% else %}<li class="mudo">nada a cobrar na qualidade</li>{% endfor %}</ul>
-  </section>
-  <section class="cr-rk-mot-bloco">
-    <h3>Cobertura <b class="cn-t-{{ ranking_cor(n.cobertura) }}">{{ n.cobertura }}%</b><span>tira {{ m.cobertura.perde }}</span></h3>
-    <p class="mudo">{{ m.cobertura.com }} de {{ m.cobertura.usinas }} usina{{ 's' if m.cobertura.usinas != 1 }} com ronda em 30 dias (a avulsa do Nexus conta).</p>
-    {% if m.cobertura.sem_ronda %}<p class="cr-rk-mot-sem"><b>Sem ronda:</b> {{ m.cobertura.sem_ronda|join(', ') }}{% if m.cobertura.mais_sem_ronda %} e mais {{ m.cobertura.mais_sem_ronda }}{% endif %}.</p>{% else %}<p class="cr-rk-mot-sem">Todas as usinas tiveram ronda.</p>{% endif %}
-  </section>
-</div>
-{% if m.piores %}
-<h3 class="cr-rk-mot-tit">As notas mais baixas</h3>
-<div class="cr-jan-tab cr-rk-mot-tab"><table>
-  <thead><tr><th>Nota</th><th>Dia</th><th>O quê</th><th>Usina</th><th>Técnico</th><th>O que faltou</th></tr></thead>
-  <tbody>{% for p in m.piores %}<tr><td class="t"><span class="cr-v cr-v--{{ p.cor }}">{{ p.nota }}</span></td><td class="t">{{ dia_curto(p.dia) }}</td><td class="t">{{ p.o_que }}{% if p.vezes > 1 %} <small class="mudo">({{ p.vezes }} tarefas iguais)</small>{% endif %}</td><td class="t">{{ p.usina }}</td><td class="t">{{ p.tecnico or '—' }}</td><td class="t cr-rk-mot-falta">{{ p.faltou or '—' }}</td></tr>{% endfor %}</tbody>
-</table></div>
-{% if m.mais_piores %}<p class="cr-jan-nota">E mais {{ m.mais_piores }} nota{{ 's' if m.mais_piores != 1 }} abaixo de 100 no período.</p>{% endif %}
-{% endif %}
-{% if m.tecnicos %}
-<h3 class="cr-rk-mot-tit">Por técnico <small>a média das notas de cada um, a menor primeiro</small></h3>
-<p class="cr-rk-mot-tec">{% for t in m.tecnicos %}<span class="cr-tag cr-tag--{{ t.cor }}">{{ t.nome }} · {{ t.media }} ({{ t.n }} nota{{ 's' if t.n != 1 }})</span>{% endfor %}{% if m.mais_tecnicos %}<span class="cr-tag cr-tag--neutro">e mais {{ m.mais_tecnicos }}</span>{% endif %}</p>
-{% endif %}
-{% endif %}
-<p class="cr-jan-nota">De onde vem: a nota de cada tarefa e de cada ronda feitas pelo App no período (fato_fechamento e fato_ronda, no banco do Nexus). O que faltou é a composição da nota que o App grava em cada tarefa (subtarefas, fotos, descrição das fotos, assinatura, observação e GPS) e as falhas que ele aponta na ronda. <a class="cn-link" href="{{ url_for('torre_campo.responsaveis', modo='geral', equipe=equipe, responsavel=responsavel) }}">Ver as usinas da equipe na Visão geral</a></p>
+{% set focar = cob|selectattr('nivel', 'equalto', 'critico')|list %}
+{% set acomp = cob|rejectattr('nivel', 'equalto', 'critico')|list %}
+{% for titulo, itens, cls in (('Focar', focar, 'critico'), ('Acompanhar', acomp, 'alerta')) %}{% if itens %}
+<section class="cr-rk-j-bloco">
+  <h3 class="cr-rk-j-nivel cn-t-{{ cls }}">{{ titulo }}</h3>
+  <ul class="cr-rk-j-itens">
+    {% for x in itens %}<li><b>{{ x.rot }}</b><div>{% if x.cabeca %}<span class="cr-rk-j-cab">{{ x.cabeca }}</span>{% endif %}{% for p in x.provas %}<span>{{ p }}</span>{% endfor %}{% if x.mais %}<span class="mudo">e mais {{ x.mais }}</span>{% endif %}</div></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}{% endfor %}
+{% if not cob %}<p class="cr-rk-j-ok">Nada a cobrar nos três blocos: o semáforo da equipe está em dia.</p>{% endif %}
+<section class="cr-rk-j-bloco">
+  <h3 class="cr-rk-j-nivel">Nota do App{% if m and m.perde %} <b class="cn-t-{{ cor }}">{{ n.nota }}</b><span>perde {{ m.perde }}{% if info.get('atual') %} nos 30 dias até {{ dia_curto(info.atual[1]) }}{% endif %}</span>{% endif %}</h3>
+  {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}.</b></div>
+  {% elif n.nota is none %}
+  <p class="cr-rk-j-txt">Sem nota do App nos últimos 30 dias: {% if n.n_ronda %}{{ n.n_ronda }} ronda{{ 's' if n.n_ronda != 1 }} pelo App, nenhuma com nota{% else %}nenhuma OS nem ronda pelo App{% endif %}. O App deixa a equipe fora do ranking; ela entra quando as tarefas e as rondas passam pelo App.{% if m and m.cobertura.sem_ronda %} Sem ronda em 30 dias: {{ m.cobertura.sem_ronda|join(', ') }}{% if m.cobertura.mais_sem_ronda %} e mais {{ m.cobertura.mais_sem_ronda }}{% endif %}.{% endif %}</p>
+  {% elif m %}
+  {% if m.perde %}
+  <ul class="cr-rk-j-perdas">
+    {% if m.cobertura.perde %}<li>Cobertura <b>−{{ m.cobertura.perde }}</b> <small>{{ m.cobertura.usinas - m.cobertura.com }} de {{ m.cobertura.usinas }} usina{{ 's' if m.cobertura.usinas != 1 }} sem ronda{% if m.cobertura.sem_ronda and not m.cobertura.mais_sem_ronda and m.cobertura.sem_ronda|length <= 3 %}: {{ m.cobertura.sem_ronda|join(', ') }}{% endif %}</small></li>{% endif %}
+    {% for p in m.qualidade.partes %}<li>{{ p.rot }} <b>−{{ p.perde }}</b></li>{% endfor %}
+  </ul>
+  {% else %}<p class="cr-rk-j-txt">Nota cheia: nada a cobrar na nota do App.</p>{% endif %}
+  {% if m.piores %}
+  <h4 class="cr-rk-j-sub">OS com nota mais baixa</h4>
+  <ol class="cr-rk-j-os">
+    {% for p in m.piores %}<li><span class="cr-v cr-v--{{ p.cor }}">{{ p.nota }}</span><div><b{% if p.tarefa %} title="{{ p.tarefa }}"{% endif %}>{{ p.curto }} · {{ p.usina }} · {{ p.tecnico or 'técnico sem nome no cadastro do App' }} · {{ dia_curto(p.dia) }}{% if p.vezes > 1 %} · {{ p.vezes }} tarefas iguais{% endif %}</b><small>{{ p.pontos|join(' · ') if p.pontos else (p.faltou or '—') }}</small></div></li>{% endfor %}
+  </ol>
+  {% if m.mais_piores %}<p class="cr-rk-j-txt mudo">E mais {{ m.mais_piores }} nota{{ 's' if m.mais_piores != 1 }} abaixo de 100 no período.</p>{% endif %}
+  {% endif %}
+  {% endif %}
+</section>
+<p class="cr-jan-nota">De onde vem: o "Em quê cobrar" são os alertas da Visão (cada um na régua da tela dona); a nota é a de cada tarefa e ronda feitas pelo App (fato_fechamento e fato_ronda), e os pontos, a composição que o App grava em cada tarefa. <a class="cn-link" href="{{ url_for('torre_campo.responsaveis', modo='geral', equipe=equipe, responsavel=responsavel) }}">Ver as usinas da equipe na Visão geral</a></p>

@@ -343,3 +343,61 @@ def test_tarefas_iguais_da_mesma_os_viram_uma_linha():
     assert [(p["o_que"], p["nota"], p["vezes"]) for p in m["piores"]] == [
         ("OS 16226 · Verificação de tracker", 48, 1), ("OS 14909 · Verificação de tracker", 55, 4)]
     assert m["mais_piores"] == 0
+
+
+# ── O "Em quê cobrar" na janela (Levi, 18/10/2026: "quero ao clicar na equipe um detalhamento melhor, não cheio de
+# informações mas quero a informação, ao resumido e direto onde o supervisor bata o olho e possa cobrar o técnico com
+# dados!"; no quiz, "Item a item com a prova") e os pontos das OS mais baixas ("Faltou os pontos") ───────────────────
+def test_em_que_cobrar_item_a_item_com_a_prova():
+    altair = _ua(1, usina="Altair", manut=[("parada", "critico"), ("atrasadas", "critico")], acomp=[("pt", "critico")],
+                 paradas_abertas=[{"os": "13002", "escopo": "Inversor 1", "tipo": "Corretiva", "inicio": "02/10 08:00",
+                                   "_ini": "2026-10-02T08:00"}],
+                 manutencao={"atrasadas": 5, "atrasadas_os": 2, "lista_atrasadas": [{"os": "14909", "dias": 12},
+                                                                                    {"os": "15403", "dias": 10}]},
+                 pt={"lista": [{"numero": "PT-1", "os": "700", "solicitante": "Técnico Um", "idade_min": 2 * 1440 + 60,
+                                "parada": True, "hoje": False, "dia": "2026-10-16"}]})
+    brodowski = _ua(2, usina="Brodowski 1", manut=[("atrasadas", "atencao")], acomp=[("ronda", "critico")],
+                    manutencao={"atrasadas": 4, "atrasadas_os": 3,
+                                "lista_atrasadas": [{"os": "15538", "dias": 11}, {"os": "15600", "dias": 8},
+                                                    {"os": "15601", "dias": 7}]})
+    brodowski["acomp"]["alertas"][0]["titulo"] = "Sem ronda há 9 dias"
+    brodowski["ronda"] = {"tipo": "sem_ronda", "dias": 9}
+    coracao = _ua(3, usina="Coração 1", acomp=[("ronda", "critico"), ("extintores", "atencao")],
+                  extintores={"lista": [{"ext": "COR-EXT02", "onde": "", "txt": "sem conferência há 60 dias"}]})
+    coracao["acomp"]["alertas"][0]["titulo"] = "Nunca teve ronda"
+    coracao["ronda"] = {"tipo": "nunca"}
+    c = RE.cobrar({}, [altair, brodowski, coracao])
+    assert [(x["nivel"], x["rot"]) for x in c] == [("critico", "Parada agora"), ("critico", "Atrasadas"),
+                                                   ("critico", "PT parada"), ("critico", "Ronda"),
+                                                   ("alerta", "Extintores")]
+    parada, atrasadas, pt, ronda, ext = c
+    assert parada["provas"] == ["OS 13002 · Altair · Inversor 1 · desde 02/10 08:00"] and parada["mais"] == 0
+    # as tarefas atrasadas de todas as usinas com o alerta, a OS mais antiga primeiro; "e mais" conta as OS de fora
+    assert atrasadas["cabeca"] == "9 tarefas" and atrasadas["provas"] == [
+        "OS 14909 · Altair · há 12 d", "OS 15538 · Brodowski 1 · há 11 d", "OS 15403 · Altair · há 10 d"]
+    assert atrasadas["mais"] == 2
+    assert pt["provas"] == ["PT-1 · Altair · pedida por Técnico Um há 2 d 1 h · sem decisão desde 16/10"]
+    assert ronda["provas"] == ["Coração 1 · Nunca teve ronda", "Brodowski 1 · Sem ronda há 9 dias"]   # a pior primeiro
+    assert ext["provas"] == ["Extintor COR-EXT02 · Coração 1 · sem conferência há 60 dias"]
+    # as mesmas áreas e níveis das etiquetas do cartão, na mesma ordem
+    assert [e["cls"] for e in RE.etiquetas({}, [altair, brodowski, coracao])] == [x["nivel"] for x in c]
+
+
+def test_em_que_cobrar_sem_alerta_fica_vazio():
+    assert RE.cobrar({}, [_ua(1, usina="Altair")]) == []
+
+
+def test_as_os_mais_baixas_levam_os_pontos():
+    us = [{"usina_id": 3, "usina": "Coração 1"}]
+    tarefas = [{"dia": "2026-10-17", "usina_id": 3, "os": "801", "tarefa": "Limpeza do inversor", "tecnico": "Técnico Um",
+                "nota": 53, "itens": _itens({"Fotos": (13.3, "2 fotos (3 dá o total)"),
+                                             "GPS no fechamento": (0, "sem posição"), "Observações": (5, "x")})}]
+    n = RE.nota_da_equipe([{"q_soma": 53, "q_n": 1, "n_os": 1, "n_ronda": 0, "rondada": True}])
+    m = RE.motivos(n, {"tarefas": tarefas, "rondas": []}, us, {3: {"atual": {"rondada": True}}})
+    assert m["piores"][0]["pontos"] == ["Fotos 13,3/20", "Observações 5/15", "GPS no fechamento 0/20"]
+
+
+def test_a_disponibilidade_da_pior_para_a_melhor_sem_repetir_a_palavra():
+    us = [_ua(1, usina="Altair", perf=[("disp", "atencao")], disp={"disp": 98.4}),
+          _ua(2, usina="Brodowski 1", perf=[("disp", "critico")], disp={"disp": 71.2})]
+    assert RE.cobrar({}, us)[0]["provas"] == ["Brodowski 1 · 71,2%", "Altair · 98,4%"]

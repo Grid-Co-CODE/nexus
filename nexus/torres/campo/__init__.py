@@ -551,7 +551,10 @@ def _resp_equipe_montar(equipe: str):
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados or {}
     todas = d.get("usinas") or []
-    us = [u for u in todas if u.get("equipe") == equipe]
+    # as usinas da equipe com o bloco Manutenção no limite de quem olha (o cookie da Visão): as mesmas etiquetas do
+    # cartão, agora com a prova (`ranking_equipes.cobrar`)
+    limite = campo_resp.limite_do_pedido(request.cookies.get(COOKIE_LIMITE))
+    us = campo_resp.com_manutencao([u for u in todas if u.get("equipe") == equipe], limite)
     if not equipe or equipe == visao.SEM_EQUIPE or not us:
         abort(404)
     por = d.get("ranking_por_usina") or {}
@@ -563,7 +566,12 @@ def _resp_equipe_montar(equipe: str):
            "cor": campo_ranking.cor(n["nota"]), "ranking_cor": campo_ranking.cor, "tecnicos": (d.get("tecnicos_por_equipe") or {}).get(equipe, 0),
            "regiao_campo": next((u["regiao_campo"] for u in us if u.get("regiao_campo")), ""),
            "sem_regiao": visao.SEM_REGIAO, "info": (d.get("info") or {}).get("ranking") or {}, "dia_curto": _dia_curto,
-           "erro": "", "m": None, "responsavel": request.args.get("responsavel") or TODOS}
+           "erro": "", "m": None, "responsavel": request.args.get("responsavel") or TODOS,
+           "cob": campo_ranking.cobrar(campo_resp.soma(equipe, us), us), "nomes_tecnicos": []}
+    try:
+        ctx["nomes_tecnicos"] = campo_resp.tecnicos_da_equipe({u["usina_id"] for u in us})
+    except Exception:       # noqa: BLE001 — sem o cadastro agora: a janela diz quantos são
+        _log_campo.exception("Visão do responsável: os nomes dos técnicos da equipe não vieram")
     if "ranking" in (d.get("erros") or {}):
         ctx["erro"] = "Não consegui ler as notas do App agora: sem elas, o motivo da nota não sai"
     else:

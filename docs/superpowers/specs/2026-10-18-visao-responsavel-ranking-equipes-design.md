@@ -231,6 +231,15 @@ rondas).
   com o dia, a usina, o técnico e o que faltou; a média por técnico; as usinas sem ronda; o link à Visão geral. Os
   inteiros fecham com a nota (maior resto). Nada novo no banco: a composição é lida do livro cru pela chave do fato.
 
+- **A janela vira "Em quê cobrar"** (o Levi testando, no mesmo dia): "quero ao clicar na equipe um detalhamento melhor,
+  não cheio de informações mas quero a informação, ao resumido e direto onde o supervisor bata o olho e possa cobrar o
+  técnico com dados!" e "falta a nota das OSs com nota mais baixa". No quiz, ele escolheu "Item a item com a prova"
+  (contra "Agrupado por técnico") e respondeu "Faltou os pontos". A janela passa a ter: os técnicos da equipe no topo;
+  Focar e Acompanhar com as áreas das etiquetas do cartão, até 3 provas cada (a OS e os dias, a PT e quem pediu, o
+  extintor, a usina e o valor); a nota do App em pílulas (o que cada parte tira) e as 5 OS mais baixas com os pontos de
+  cada critério (Fotos 0/20). Saíram a média por técnico e o texto longo da conta. Decisão minha: a OS atrasada não
+  tem técnico no banco (o fato das tarefas não guarda pessoa), e a linha cobra a equipe.
+
 ## Fica para o construtor
 
 O nome das funções e das rotas internas; o desenho fino do cartão e da barra (sempre por token, nos dois temas); a ordem
