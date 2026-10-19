@@ -341,13 +341,14 @@ FATOS = (
          "1 linha = 1 tarefa de 1 técnico no mês que não pontuou cheio (devolvida, abaixo do piso ou anulada), como o "
          "App a listou na hora da publicação",
          _d(data=("cod", "Mês (AAAA-MM); Registrado em"), pessoa=("hmac", "Técnico (HMAC)"), os=("cod", "OS")),
-         tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)", "OS", "Tarefa"),
+         tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)", "OS", "Tarefa", "Situação"),
          medidas=_m((("nota_pts", "pts", "nao"), ("pontos_pts", "pts", "aditiva"))),
          fontes=("ranking_tarefas_app_campo · Tarefas",), janela_origem="o mês corrente e o anterior (App)",
-         observacao="quem lista é o App (_ciclo_v2); o Nexus mostra. Situação = devolvida, abaixo do piso ou anulada; o "
-                    "motivo é o do App (o texto da devolução pelo painel, ou 'devolvida no Fracttal, sem motivo no "
-                    "App'; o porquê da nota; ou 'anulada por N tarefa(s) abaixo do piso no mês'). Até o App publicar, "
-                    "o livro não existe"),
+         observacao="quem lista é o App (_ciclo_v2, a v287), do mesmo cálculo do placar: por pessoa e mês as linhas "
+                    "batem com Devolvidas, Anuladas e Abaixo do piso do ranking_app_campo. Situação = devolvida, abaixo "
+                    "do piso ou anulada (a anulada é uma tarefa boa que caiu pelas abaixo do piso do mês); Pontos = os "
+                    "que a tarefa tinha antes da devolução e da anulação; o Motivo é o texto do App. Sobe com o "
+                    "ranking_app_campo, aos :25; livro vazio não sobe"),
     Fato("fechamento_coletor", "Fechamento pelo coletor", "campo", "campo_nexus · fechamentos",
          "1 linha = 1 tarefa da fila do Fracttal",
          _d(data=("cod", "fim"), usina=("id", "usina_id"), equipe=("nome", "regiao"), pessoa=("id", "pessoa_id"),

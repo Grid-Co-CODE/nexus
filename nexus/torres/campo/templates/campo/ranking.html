@@ -98,11 +98,11 @@
       <tr class="cn-detalhe" hidden><td colspan="11">
         {% set ts = tarefas_de(p) %}
         {% if ts %}
-        <table class="rk-tarefas"><thead><tr><th>OS</th><th>Tarefa</th><th>Situação</th><th>Nota</th><th>Pontos</th><th>Motivo</th><th>Registrada</th></tr></thead>
+        <table class="rk-tarefas"><thead><tr><th>OS</th><th>Tarefa</th><th>Situação</th><th>Nota</th><th title="Os pontos que a tarefa tinha antes da devolução ou da anulação">Pontos</th><th>Motivo</th><th>Registrada</th></tr></thead>
           <tbody>{% for t in ts %}<tr><td class="m"><b>{{ t.os or '—' }}</b></td><td class="rk-motivo">{{ t.tarefa or '—' }}</td>
             <td><span class="cn-selo cn-selo--{{ {'devolvida': 'critico', 'abaixo do piso': 'alerta'}.get(t.situacao, 'neutro') }}">{{ t.situacao or '—' }}</span></td>
             <td>{{ t.nota if t.nota is not none else '—' }}</td><td>{{ t.pontos if t.pontos is not none else '—' }}</td>
-            <td class="rk-motivo">{{ t.motivo or '—' }}</td><td>{{ hora_brt(t.registrado_em) or '—' }}</td></tr>{% endfor %}</tbody></table>
+            <td class="rk-motivo">{{ t.motivo or '—' }}</td><td>{{ hora_do_app(t.registrado_em) or '—' }}</td></tr>{% endfor %}</tbody></table>
         {% elif not tarefas_publicado %}
         <p class="mudo">A lista das OS ainda não chegou do App: ele vai publicar, de hora em hora, cada tarefa devolvida, abaixo do piso ou anulada, com o motivo.</p>
         {% else %}

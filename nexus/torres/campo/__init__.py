@@ -1137,6 +1137,16 @@ def _nome_do_mes(mes: str) -> str:
         return mes
 
 
+def _hora_do_app(iso: str) -> str:
+    """A hora de uma tarefa no extrato do App ("2026-10-10T17:00", sem fuso) em Brasília, "10/10 14:00": o App grava em
+    UTC, como o "Registrado em" dos fechamentos (`fatos.data_do_registro`)."""
+    try:
+        d = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(_BRT).strftime("%d/%m %H:%M")
+
+
 def _hora_brt(iso: str) -> str:
     """A hora (de Brasília) em que o App calculou o placar, "13/10 18:25"."""
     try:
@@ -1168,7 +1178,7 @@ def ranking():
         "ranking", leitura, meses=meses, atual=atual, regioes=regioes, regiao=regiao, classificacao=classificacao,
         fora=fora, nome_do_mes=_nome_do_mes, calculado=_hora_brt(atual["calculado_em"]) if atual else "",
         tarefas_de=lambda p: por.get((atual["mes"], p.get("hmac")), []) if atual else [],
-        tarefas_publicado=bool((tarefas.dados or {}).get("publicado")), hora_brt=_hora_brt,
+        tarefas_publicado=bool((tarefas.dados or {}).get("publicado")), hora_do_app=_hora_do_app,
         media=round(sum(p["total"] for p in classificacao) / len(classificacao)) if classificacao else None))
 
 

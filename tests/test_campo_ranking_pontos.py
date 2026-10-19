@@ -201,7 +201,7 @@ def test_o_podio_e_o_das_olimpiadas(ranking, logado):
 # linha e mostre qual foi a OS e o motivo!"), pela lista que o App publica (a sessão do App, 18/10/2026) ────────────────
 def _tarefa(email, os_, situacao, nota, motivo, tarefa="Troca de fusível", mes="2026-10"):
     return {"Mês": mes, "Técnico (HMAC)": codigo_da_pessoa(CHAVE, email), "OS": os_, "Tarefa": tarefa,
-            "Situação": situacao, "Nota": nota, "Pontos": 0, "Motivo": motivo, "Registrado em": "2026-10-10T17:00:00Z"}
+            "Situação": situacao, "Nota": nota, "Pontos": 37, "Motivo": motivo, "Registrado em": "2026-10-10T17:00"}
 
 
 def _detalhe(html, nome):
@@ -223,7 +223,8 @@ def test_a_linha_abre_as_os_devolvidas_e_anuladas_com_o_motivo(ranking, logado):
     html = logado.get("/t/campo/ranking").get_data(as_text=True)
     bruno = _detalhe(html, "Bruno Lima")
     for trecho in ("16001", "Faltou a foto do antes", "16002", "Sem a observação do serviço", "16003",
-                   "anulada por 1 tarefa abaixo do piso no mês", "Troca de fusível", "10/10 14:00"):
+                   "anulada por 1 tarefa abaixo do piso no mês", "Troca de fusível",
+                   "10/10 14:00"):                       # a hora do App vem sem fuso, em UTC (como nos fechamentos)
         assert trecho in bruno, trecho
     assert "15001" not in bruno and "17001" not in bruno                    # outro mês, outra pessoa
     assert bruno.index("devolvida") < bruno.index("abaixo do piso") < bruno.index("anulada")
@@ -240,3 +241,5 @@ def test_a_lista_do_app_esta_no_catalogo_de_dados():
     f = next(x for x in catalogo.FATOS if x.id == "ranking_tarefas")
     assert f.livro == "ranking_tarefas_app_campo · Tarefas" and f.area == "campo" and f.tipo == "snapshot_acumulado"
     assert f.dims["pessoa"][0] == "hmac" and f.dims["os"][0] == "cod"
+    # a chave do contrato com o App (a sessão do App, 18/10/2026)
+    assert f.chave == ("Mês", "Técnico (HMAC)", "OS", "Tarefa", "Situação")
