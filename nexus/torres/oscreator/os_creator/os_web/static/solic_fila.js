@@ -91,6 +91,11 @@
   });
 
   // ── a ficha ──
+  // a data sugerida já lida pelo servidor, no jeito do app ("21/10/2026 08:00"); sem leitura, o texto cru
+  function dataSug(f) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})$/.exec(f.data_sug_iso || '');
+    return m ? m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] : (f.data_sug || '');
+  }
   function tituloDoTema() {
     var t = temaDe(tema.value);
     if (!t || !atual) return atual ? (atual.titulo_orig || '') : '';
@@ -144,7 +149,7 @@
     obs.value = f.relato || ''; obsOriginal = f.relato || ''; obs.readOnly = true;
     expandida = false; obs.classList.remove('aberta'); obs.style.height = '';
     preSelecionar(f.tecnico);
-    $('fl_data').textContent = f.data_sug || '—';
+    $('fl_data').textContent = dataSug(f) || '—';
     tipo.value = temOpcao(tipo, D.tipo_padrao) ? D.tipo_padrao : (tipo.options[0] ? tipo.options[0].value : '');
     c1.value = ''; c2.value = '';
     pai.value = ''; paiSel = null; paiLista.hidden = true;
@@ -344,7 +349,11 @@
     }
     if (pai.value.trim() && !paiSel) { SP.aviso('Escolha a OS pai na lista que aparece ao digitar o número — ou apague o campo.', true); return; }
     var subs = editor.itens(), t = (titulo.textContent || '').trim() || tituloDoTema(), n = subs.length || 3;
-    var quando = f.data_sug ? ', programada para ' + f.data_sug : ' (sem data sugerida: programada para agora)';
+    // só promete a data que o servidor entendeu (f.data_sug_iso): a SS 3944 dizia "programada para 2026-10-21 08:00" e
+    // a OS nasceu programada agora (19/10/2026)
+    var quando = f.data_sug_iso ? ', programada para ' + dataSug(f)
+      : (f.data_sug ? ' (a data sugerida "' + f.data_sug + '" não foi entendida: programada para agora)'
+                    : ' (sem data sugerida: programada para agora)');
     if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)' + quando + '?\n\nA API do Fracttal NÃO edita OS '
                         + 'já criada — confira as subtarefas antes.')) return;
     ocupado(true, 'criando a OS…');

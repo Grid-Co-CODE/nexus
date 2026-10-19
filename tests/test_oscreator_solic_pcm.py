@@ -640,3 +640,26 @@ def test_a_data_sugerida_vira_a_data_programada_da_os(monkeypatch):
     assert chamadas[-1]["prog_date"] == quando and chamadas[-1]["event_date"] is None
     api.aprovar_solicitacao({"id": 11, "code": "TST-INV11"}, "T", [], 5001, 1, "Ana")       # sem data: como antes
     assert chamadas[-1]["prog_date"] is None
+
+
+def test_a_data_sugerida_da_solicitacao_web_tambem_vale(monkeypatch):
+    """19/10/2026, Levi: "A data sugerida que dão na solicitação tem que ser a data programada, a data programada tá
+    sendo a data do evento" (SS 3944 → OS 16784: sugerida 21/10 08:00, programada 19/10 na hora da aprovação). A Nova
+    solicitação do OS Creator web gravava "2026-10-21 08:00" (o valor do campo de data) e a leitura só entendia
+    "21/10/2026 08:00" (o app): ficava sem data e a OS nascia programada agora, enquanto a confirmação mostrava o texto
+    cru. A leitura entende os dois (as solicitações já na fila também); a Nova solicitação grava como o app."""
+    import datetime as _dt
+    brt = _dt.timezone(_dt.timedelta(hours=-3))
+    alvo = _dt.datetime(2026, 10, 21, 8, 0, tzinfo=brt)
+    for texto in ("2026-10-21 08:00", "2026-10-21T08:00", "21/10/2026 08:00", "2026-10-21", "21/10/2026"):
+        assert sw.data_sugerida_dt(texto) == alvo, texto
+        assert sw._data_sugerida_iso(texto) == "2026-10-21T08:00", texto
+    assert sw.data_sugerida_dt("2026-13-40 08:00") is None
+    # a Nova solicitação grava a data como o app ("21/10/2026 08:00"), legível na observação no Fracttal web
+    obs = sw.observacao("Relato", tema="", tecnico="", data="2026-10-21 08:00")
+    assert "Data sugerida: 21/10/2026 08:00" in obs and "2026-10-21" not in obs
+    # a ficha manda à tela a data já lida, e a confirmação só promete a data que o servidor entendeu
+    f = sw.ficha({"_data_sug": "2026-10-21 08:00", "_subs": []})
+    assert f["data_sug_iso"] == "2026-10-21T08:00"
+    js = (Path(sw.__file__).parent / "static" / "solic_fila.js").read_text(encoding="utf-8")
+    assert "f.data_sug_iso" in js.split("var quando", 1)[1].split(";", 1)[0]

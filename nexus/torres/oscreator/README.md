@@ -870,6 +870,13 @@ da aprovação, como no app de mesa.
   prog_date=)` → `clonar_os` → `create_os_rpc(prog_date=)`: `date_maintenance`, `initial_date` e o fim 20 min depois).
   A data do evento segue sendo a da aprovação. Sem data sugerida legível, como antes: programada agora.
 - A confirmação e o aviso de "OS criada" dizem para quando ela ficou programada. A data vem da solicitação, nunca da tela.
+- **Os dois jeitos de escrever a data (19/10/2026).** A Nova solicitação web gravava "2026-10-21 08:00" (o valor do campo
+  de data) e a leitura só entendia o do app ("21/10/2026 08:00"): a SS 3944 ficou sem data, a OS 16784 nasceu programada
+  na hora da aprovação, e a confirmação dizia "programada para 2026-10-21 08:00" (o texto cru). Agora a leitura entende
+  os dois (`solic_web._FORMATOS_SUG`; vale para as solicitações que já estão na fila), a Nova solicitação grava como o app
+  (`solic_web.observacao`), e a confirmação só promete a data que o servidor leu (`data_sug_iso`); a que não foi
+  entendida aparece como tal. A OS que já nasceu com a data errada se acerta à mão no Fracttal web (a API não edita data
+  de OS criada).
 - O app de mesa (`steps/solic_pcm.py`) não mudou. Prova: `tests/test_oscreator_solic_pcm.py`.
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)

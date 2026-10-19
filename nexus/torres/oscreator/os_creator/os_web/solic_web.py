@@ -224,9 +224,12 @@ def subtarefas_do_tema(tema: str, tipo_ativo: str = "") -> list:
 
 def observacao(relato: str, tema: str = "", tecnico: str = "", data: str = "",
                subtarefas: list | None = None) -> str:
-    """O relato do supervisor MAIS o bloco [PCM] — é assim que a sugestão chega à fila."""
+    """O relato do supervisor MAIS o bloco [PCM] — é assim que a sugestão chega à fila. A data vai como o app a escreve
+    ("21/10/2026 08:00", legível na observação no Fracttal web); a que não dá para ler vai como veio."""
+    iso = _data_sugerida_iso(data)
+    data = dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M").strftime("%d/%m/%Y %H:%M") if iso else (data or "")
     return sp.observacao_com_bloco(relato or "", {"tema": tema or "", "tecnico": tecnico or "",
-                                                  "data": data or "", "subtarefas": subtarefas or []})
+                                                  "data": data, "subtarefas": subtarefas or []})
 
 
 def data_brt(texto) -> dt.datetime:
@@ -383,16 +386,22 @@ def data_sugerida_dt(texto):
     return dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M").replace(tzinfo=_BRT_SUG) if iso else None
 
 
+# Os jeitos de escrever a data sugerida que chegam à fila: o do app ("15/10/2026 08:00", ou só o dia) e o do campo de
+# data da Nova solicitação web ("2026-10-21 08:00"). Até 19/10/2026 só o do app era lido: a SS 3944, da web, ficou sem
+# data, e a OS 16784 nasceu programada na hora da aprovação, com a confirmação dizendo "programada para 2026-10-21"
+_FORMATOS_SUG = ("%d/%m/%Y %H:%M", "%d/%m/%Y", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d")
+
+
 def _data_sugerida_iso(texto) -> str:
-    """'15/10/2026 08:00' ou só '15/10/2026' (as solicitações antigas: o dia vira 08:00, como no app) → o valor do
+    """A data sugerida ('15/10/2026 08:00', '2026-10-21 08:00', ou só o dia, que vira 08:00 como no app) → o valor do
     <input type=datetime-local>. '' se não der para ler."""
     t = str(texto or "").strip()
-    for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
+    for fmt in _FORMATOS_SUG:
         try:
             d = dt.datetime.strptime(t, fmt)
         except ValueError:
             continue
-        if fmt == "%d/%m/%Y":
+        if "%H" not in fmt:
             d = d.replace(hour=8)
         return d.strftime("%Y-%m-%dT%H:%M")
     return ""

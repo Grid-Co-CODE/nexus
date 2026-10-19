@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-19T13:02:32",
+ "atualizado_em": "2026-10-19T16:02:10",
  "arquivos": {
   "chamado_garantia/README.md": "0207d35ae741a620",
   "chamado_garantia/__init__.py": "2362f95d3b2fc918",
@@ -52,7 +52,7 @@
   "os_creator/os_web/servir.py": "d7263551ee6057cc",
   "os_creator/os_web/sessao.py": "a2d5415817759742",
   "os_creator/os_web/solic_eng_web.py": "f6a45972ed7a9447",
-  "os_creator/os_web/solic_web.py": "dc9fe59560878d8f",
+  "os_creator/os_web/solic_web.py": "e0acde52eddf46cf",
   "os_creator/os_web/sso.py": "9aa026041869a64e",
   "os_creator/os_web/static/abas.css": "33f73bf86e898444",
   "os_creator/os_web/static/abas.js": "0be2674de70f8b02",
@@ -78,7 +78,7 @@
   "os_creator/os_web/static/perf.js": "ea01b1da10206f3f",
   "os_creator/os_web/static/solic_eng.css": "047c9121e84fb683",
   "os_creator/os_web/static/solic_eng.js": "d25f47462952757d",
-  "os_creator/os_web/static/solic_fila.js": "144a2d048b8d2ac3",
+  "os_creator/os_web/static/solic_fila.js": "6dae01cd259c97d8",
   "os_creator/os_web/static/solic_hist.js": "a6fc3aef3315eddd",
   "os_creator/os_web/static/solic_pcm.css": "94c3ea068a657168",
   "os_creator/os_web/static/solic_pcm.js": "0e1746b1442681c0",
