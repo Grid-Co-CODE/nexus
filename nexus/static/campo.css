@@ -25,6 +25,9 @@
   background:var(--critico-suave);color:var(--tinta);font-size:13px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
 
 .cn-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:18px}
+/* o rótulo e a caixa do filtro juntos na quebra de linha (a Central, 19/10/2026; o mesmo de Extintores) */
+.cn-filtro-par{display:inline-flex;align-items:center;gap:8px;max-width:100%}
+.cn-filtro-par .gc-campo{min-width:0;max-width:100%}
 /* flex-wrap: com muitas opções (as 5 faixas de qualidade) o segmento não cabe no celular numa linha só */
 .cn-seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md)}
 .cn-seg a{font:600 12.5px/18px var(--font-sans);color:var(--mudo);text-decoration:none;padding:6px 12px;border-radius:7px;white-space:nowrap}

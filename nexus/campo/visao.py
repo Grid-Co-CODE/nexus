@@ -1649,13 +1649,19 @@ def atencao(dias: int = 14) -> leitura.Leitura:
                 continue
             pendentes.append({"tipo": tipo, "usina": c["usina"], "usina_id": c["usina_id"], "uf": c["uf"],
                               "cidade": c["cidade"], "equipe": c["equipe"], "regiao_br": c["regiao_br"],
+                              "cliente": c.get("cliente") or "",
                               **{k: c[k] for k in _PAPEIS}, "dias": c["dias"], "ultima": c["ultima"],
                               "tecnico": c["tecnico"], "obs": obs})
         # a última ronda e quem a fez vão junto: o kanban do responsável mostra também as usinas em dia
         # e a OS dela: a Visão do responsável abre o card da ronda pela OS (18/10/2026)
-        usinas = [{k: c[k] for k in ("usina", "usina_id", "equipe", "uf", "regiao_br", "cidade", "dias", "ultima",
-                                     "tecnico", "os") + _PAPEIS}
-                  for c in _cobertura(b, rond, hoje)]
+        cob = _cobertura(b, rond, hoje)
+        # a equipe da usina pode ser mais de uma (o kanban do responsável, 19/10/2026): na conta guardada da Central, que
+        # se renova em segundo plano, e não no clique (as atribuições do PCM levam ~2 s na 1ª leitura)
+        eqs = equipes_das_usinas([c["usina_id"] for c in cob], b)
+        usinas = [{**{k: c[k] for k in ("usina", "usina_id", "equipe", "uf", "regiao_br", "cidade", "dias", "ultima",
+                                        "tecnico", "os") + _PAPEIS}, "cliente": c.get("cliente") or "",
+                   "equipes": eqs.get(c["usina_id"]) or ([c["equipe"]] if c.get("equipe") else [])}
+                  for c in cob]
         feitas = []
         for r in sorted((r for r in rond if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True):
             faltas = [f.strip() for f in r["falhas"].split(";") if f.strip() and f.strip().lower() != LONGA_PENDENTE]
@@ -1840,6 +1846,45 @@ def kanban(usinas, pendentes) -> dict:
     out["feita"].sort(key=lambda u: (u.get("dias") or 0, u["usina"]))
     return out
 
+
+
+def pt_por_responsavel(pts) -> list[dict]:
+    """Um cartão por Responsável UFV (o Responsável O&M da ficha da usina) com as PT esperando o De acordo nas usinas dele
+    (Levi, 19/10/2026: "Em permissão de trabalho deixe por responsável, tire por equipe"): quantas, quantas paradas há
+    mais de 2 h, as usinas e as equipes. A PT sem usina ligada ao cadastro vai ao "Sem responsável O&M". A ordem é a dos
+    cartões de PT: mais paradas, mais PT, o nome; o "Sem" por último."""
+    g: dict[str, dict] = {}
+    for p in pts:
+        r = p.get("responsavel") or SEM_RESPONSAVEL
+        c = g.setdefault(r, {"responsavel": r, "pts": 0, "parada": 0, "usinas": set(), "equipes": set()})
+        c["pts"] += 1
+        c["parada"] += bool(p.get("parada"))
+        c["usinas"].add(p.get("usina") or "")
+        if p.get("equipe"):
+            c["equipes"].add(p["equipe"])
+    out = [{**c, "usinas": len(c["usinas"] - {""}), "equipes": sorted(c["equipes"])} for c in g.values()]
+    out.sort(key=lambda c: (c["responsavel"] == SEM_RESPONSAVEL, -c["parada"], -c["pts"], c["responsavel"]))
+    return out
+
+
+def equipes_das_usinas(uids, b: "_Base | None" = None) -> dict:
+    """{usina_id: [equipes]}: a equipe do cadastro da usina e as dos técnicos que a tela Técnicos por usina do PCM põe
+    nela hoje (`pcm.atribuicoes`, as que valem) (Levi, 19/10/2026, no kanban do responsável: "tem que aparecer também a
+    equipe da usina, pode ser uma ou mais"). Medido em 19/10/2026: 125 das 131 usinas da Central com técnico e nenhuma
+    com técnico de outra equipe; a lista vale quando houver. Sem as atribuições, só a do cadastro."""
+    b = b or _Base()
+    out = {uid: {b.equipe_da_usina(uid)} - {""} for uid in uids}
+    try:
+        from ..pcm import atribuicoes as A
+        est = A.ler(current_app.config)
+        if not (est.get("erro") and not est.get("velha")):
+            eq = {D._id(p.get("pessoa_id")): b.nome_equipe.get(D._id(p.get("equipe_id")), "") for p in b.pessoas}
+            for (uid, pid, _papel), x in A.atuais(est, int(_agora().strftime("%Y%m%d"))).items():
+                if uid in out and x.get("status") == "vale" and eq.get(pid):
+                    out[uid].add(eq[pid])
+    except Exception:       # noqa: BLE001 — sem as atribuições do PCM: a equipe do cadastro basta
+        pass
+    return {uid: sorted(e) for uid, e in out.items()}
 
 def limpar():
     _CACHE.clear()

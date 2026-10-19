@@ -506,38 +506,27 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   - **Rondas feitas:** o histórico do período, com "Feito por" (só aqui aparece quem fez), Status (Sem OS no
     Fracttal, Evidência incompleta, Sem pendência), Observação, OS e nota. Medido: 232 em 14 dias (178, 39 e 15).
   - **Permissões de trabalho:** as PT esperando, Técnico e a OS em verde, que abre a aprovação. Medido: 22 (21 paradas).
-  - **Três visões em cada aba** (Levi, 05/10: "tem que ter a visão por equipe (CARDS grandes agrupados) e a visão
-    da tabela!"; 08/10: "além de por equipe e tabela, adicione mais um botão (por supervisor). Faça o mesmo na tela
-    permissões de trabalho"): abre nos **cartões por equipe** (`visao.por_equipe`): usinas pendentes de ronda, % feitas
-    (= usinas da equipe que não estão pendentes ÷ usinas da equipe, com a barra feitas × pendentes), o detalhe por
-    status, as rondas do período e as PT esperando. O cartão leva à tabela da equipe (`?equipe=`). **Por região de
-    campo** (era "por supervisor"; `modo=regioes`, e o endereço antigo `modo=supervisores` cai aqui;
-    `visao.por_regiao`): os cartões de equipe já filtrados, somados pela região de campo da equipe; o % e as feitas
-    refeitos sobre a soma; o Supervisor de Campo e o Coordenador (ou "vaga"), a base, as equipes (com o código) e os
-    técnicos. **Alternância "Agrupar por"** para **Gestor de contrato (Supervisor PM)** (`modo=gestores`,
-    `visao.por_gestor`): pelas USINAS do gestor (o gestor é da usina, não da equipe), com as equipes delas e os técnicos
-    de cada equipe uma vez. Na aba PT, só os grupos com PT esperando. **"Sem região de campo"** (equipe de fora da
-    estrutura) e **"Sem gestor de contrato"** são cartões próprios, tracejados, sempre por último; a linha sem região
-    ou sem gestor (PT sem usina ligada) conta como deles (`_do_papel`), para o clique achar as mesmas linhas. O cartão
-    leva à tabela da região ou do gestor (`?modo=tabela&regiao_campo=` / `&gestor=`). Filtro pela **região do Brasil**
-    no lugar do estado. Medido em 05/10: 53 equipes; PR Norte 02 com 6 de 6 usinas pendentes. Conferido em 08/10
-    (cadastro do ensaio da publicação): as somas dos cartões por equipe, por região e por gestor batem (128 usinas, 82
-    pendentes; 37 PT).
-  - **Por Responsável O&M, com o kanban** (Levi, 12/10/2026: "Precisamos deixar filtrado por responsável ... tem que
-    mostrar usinas desse responsável que nunca tiveram ronda, rondas pendentes e feitas! Ao clicar aparecerá um kanban
-    com essas três colunas!"). O responsável é o **Responsável O&M da ficha da usina** (confirmado pelo Levi em 12/10:
-    "é o Responsável O&M mesmo"; `usinas.responsavel_om_id`,
-    `_Base.responsavel_da_usina`, no `onde()` e no `_PAPEIS`), não o gestor de contrato: medido em 12/10, 175 das 177
-    usinas em operação com ele, 9 pessoas (os supervisores de antes; 5 delas também são gestores, de OUTRAS usinas).
-    Filtro "Responsável O&M" (`responsavel=`, sem padrão pelo login; `*` = todos) nas duas abas; a visão **Por
-    responsável** (`modo=responsaveis`, `visao.por_responsavel`: as usinas dele, pendentes por status, feitas = as não
-    pendentes, a regra dos cartões de equipe) e, com um responsável escolhido (o cartão ou o filtro), o **kanban**
-    (`visao.kanban`, `COLUNAS_KANBAN`): Nunca teve ronda | Ronda pendente (sem ronda há 7 d ou mais, ou a longa pendente,
-    com o motivo e quem fez a última) | Ronda feita (a usina em dia: a última ronda e quem fez). O status sai da ronda,
-    não se arrasta; o cartão da usina leva ao histórico de rondas dela; a Tabela continua a um clique (`modo=tabela`
-    mantém o responsável), e Por equipe / Por região de campo tiram o filtro. "Sem responsável O&M" tem cartão próprio.
-    **Medido em 12/10 (banco real):** 128 usinas mobilizadas, 89 pendentes, 6 responsáveis + 2 usinas sem responsável;
-    a soma dos cartões bate (128 / 89 / 39 feitas) e cada kanban bate com o cartão dele. Prova:
+  - **Só Por responsável e a tabela, nas duas abas** (Levi, 19/10/2026: "tire essa visão por região, e gestor de
+    contrato. Uma visão só por responsável serve! tanto em Rondas pendentes quanto permissão de trabalho ... A tabela
+    mantém"). Saíram os cartões por equipe, por região de campo e por gestor de contrato (seguem em HSEQ › APR e PT, que
+    usa o mesmo `_pt_esperando.html` com os modos dela); os endereços de antes (`modo=equipes`, `regioes`, `gestores`,
+    `supervisores`) abrem Por responsável (`_modo_central`). O responsável é o **Responsável UFV**, o Responsável O&M da
+    ficha da usina (`usinas.responsavel_om_id`; confirmado pelo Levi em 12/10: "é o Responsável O&M mesmo"), não o
+    gestor de contrato. **Rondas pendentes:** um cartão por responsável (`visao.por_responsavel`: as usinas dele,
+    pendentes por status, feitas = as não pendentes, o %), e o responsável escolhido (no cartão ou no filtro) abre o
+    **kanban** (`visao.kanban`, `COLUNAS_KANBAN`): Nunca teve ronda | Ronda pendente (com o motivo e quem fez a última) |
+    Ronda feita (a usina em dia). Cada usina do kanban diz a **equipe** com o rótulo ("pode ser uma ou mais": a do
+    cadastro e as dos técnicos que a tela Técnicos por usina do PCM põe nela, `visao.equipes_das_usinas`, na conta
+    guardada da Central; medido em 19/10: as 131 usinas com equipe no cadastro, 125 com técnico, nenhuma com duas). O
+    cartão da usina leva ao histórico de rondas dela. **Permissões de trabalho:** um cartão por responsável com as PT
+    esperando nas usinas dele (`visao.pt_por_responsavel`: quantas, quantas paradas há mais de 2 h, as usinas e as
+    equipes; a soma bate com as 24 PT de 19/10); o cartão leva à tabela das PT dele. "Sem responsável O&M" tem cartão
+    próprio, por último.
+  - **Os filtros** (Levi, 19/10/2026: "tire o filtro de região do brasil, região de campo, gestor de contrato e
+    responsável O&M. Deixe responsável UFV, cliente, UFV, equipe e o canto para escrever", nas duas abas): Responsável
+    UFV, Cliente, UFV e Equipe (`FILTROS_CENTRAL`) e a busca, em cascata como em Extintores (cada lista com o que existe
+    com os outros filtros, `_opcoes_central`), sem padrão pelo login (o Supervisor de Campo abria na região dele); `*`
+    no responsável vale como todos. O cliente entrou nas linhas de ronda da Central (`visao.atencao`). Prova:
     `tests/test_campo_central_responsavel.py`.
   - Todas as colunas e cabeçalhos das tabelas do campo **centralizados** (Levi, 05/10).
   - **No cartão, do cadastro de pessoas** (`visao._Base._time`): o ícone de homem de capacete com o número de

@@ -264,45 +264,36 @@ def test_sem_a_chave_do_cadastro_a_pessoa_sai_pelo_numero(app, banco):
     assert {x["supervisor_campo"] for x in us} == {"Supervisor 92", "vaga"}
 
 
-def test_central_abre_nos_cartoes_e_o_cartao_leva_a_tabela_da_equipe(banco, logado):
+def test_central_abre_por_responsavel_e_a_equipe_e_filtro(banco, logado):
+    # Levi, 19/10/2026: "Uma visão só por responsável serve!" e os filtros "responsável UFV, cliente, UFV, equipe e o
+    # canto para escrever" (a região do Brasil saiu)
     html = logado.get("/t/campo/atencao").get_data(as_text=True)
-    assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "SC Oeste 01" in html and "<table>" not in html
-    assert "50%" in html and "feitas" in html and "Sudeste" in html
-    assert "modo=tabela&amp;equipe=SP+Norte+01" in html or "equipe=SP+Norte+01" in html
-    html = logado.get("/t/campo/atencao?equipe=SP+Norte+01").get_data(as_text=True)
-    assert "<table>" in html and "Altair" in html and "Coração 1" not in html and "Equipe: SP Norte 01" in html
-    # filtro pela região do Brasil, no lugar do estado
-    html = logado.get("/t/campo/atencao?regiao=Sul&modo=tabela").get_data(as_text=True)
-    assert "Coração 1" in html and "Altair" not in html and 'id="cn-regiao"' in html and 'id="cn-uf"' not in html
+    assert 'class="cn-equipes"' in html and "<table>" not in html and 'aria-current="page">Por responsável</a>' in html
+    assert "<b>" + visao.SEM_RESPONSAVEL.replace("&", "&amp;") + "</b>" in html and "feitas" in html   # sem a ficha: o "Sem"
+    html = logado.get("/t/campo/atencao?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
+    corpo = html[html.index("<tbody>"):html.index("</tbody>")]
+    assert "Altair" in corpo and "Coração 1" not in corpo and '<option value="SP Norte 01" selected>' in html
+    assert 'id="cn-regiao"' not in html and 'id="cn-uf"' not in html
     html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
-    assert "PT esperando o De acordo" in html and "SC Oeste 01" not in html   # equipe sem PT não ganha cartão
-
-
-def test_cartao_tem_tecnicos_regiao_de_campo_e_total_e_os_dois_filtros(banco, logado):
-    html = logado.get("/t/campo/atencao").get_data(as_text=True)
-    assert 'class="cn-capacete"' in html and "<b>2</b>" in html and "2 técnicos na equipe" in html
+    assert "PT esperando o De acordo" in html
+def test_cartao_de_equipe_da_pt_tem_tecnicos_e_a_regiao_de_campo(banco, logado):
+    # os cartões por equipe saíram da Central em 19/10/2026; seguem em HSEQ › APR e PT, com os técnicos e a região
+    html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
+    assert 'class="cn-capacete"' in html and "2 técnicos na equipe" in html
     assert 'E-31 · Sudeste 03 · Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
-    assert "E-30 · Sul 01 · Supervisor de Campo: <span class=\"cn-vaga\"" in html          # a vaga, como vaga
-    assert "<b>2 usinas</b>total" in html and "<b>1 usina</b>pendente" in html
-    # o filtro "Supervisor" virou dois: região de campo (com o supervisor ou a vaga) e gestor de contrato
-    assert 'id="cn-supervisor"' not in html and 'id="cn-regiao-campo"' in html and 'id="cn-gestor"' in html
-    assert '<option value="Sul 01">Sul 01 · vaga</option>' in html and "Ciclano Chefe" in html
-    html = logado.get("/t/campo/atencao?regiao_campo=Sul+01").get_data(as_text=True)
-    assert "SC Oeste 01" in html and "SP Norte 01" not in html
-    html = logado.get("/t/campo/atencao?gestor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
-    assert "Coração 1" in html and "Altair" not in html
-
-
+    assert 'id="cn-regiao-campo"' in html and 'id="cn-gestor"' in html
 def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
     """Levi, 05/10: divisão por equipe com o que está pendente, filtro de supervisor, linha que abre o detalhe,
     equipamento no lugar do estado, espera no fim e só o número da OS, em verde, no lugar do número da PT."""
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
     assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "Supervisora Campo" in html
     assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
-    # a mesma tela da Central de atenção > Permissões de trabalho (Levi, 05/10)
+    # o mesmo pedaço da Central de atenção > Permissões de trabalho (Levi, 05/10); desde 19/10/2026 a Central é só por
+    # responsável e a tabela, e a tabela é a mesma
     import re as _re
-    corpo = lambda h: " ".join(_re.sub(r'href="[^"]*"', "", h[h.index('<div class="cn-equipes">'):h.index('<div class="cn-nota">')]).split())
-    assert corpo(html) == corpo(logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True))
+    oss = lambda h: _re.findall(r'class="cn-link cn-os"[^>]*>([^<]+)<', h)
+    assert oss(logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)) == oss(
+        logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True))
     html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     assert html.count('class="cn-link cn-os"') == 2 and ">700<" in html                    # PT-1 e PT-2, pela OS
     html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)

@@ -2,11 +2,11 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Central de atenção, visão do Nexus (05/10/2026): só o que está pendente, em duas abas (rondas pendentes e PT), cada uma em cartões
-   por equipe, por região de campo (com a alternância para gestor de contrato: a estrutura de O&M de 10/2026; antes, "por
-   supervisor") ou em tabela (nexus/campo/visao.py: atencao, por_equipe, por_regiao, por_gestor). Só usina mobilizada; a
-   PT esperando aparece sempre. #}
-{% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna, quem %}
+{# Central de atenção, visão do Nexus (05/10/2026): só o que está pendente, em duas abas (rondas pendentes e PT), cada uma
+   Por responsável ou em tabela (Levi, 19/10/2026: "tire essa visão por região, e gestor de contrato. Uma visão só por
+   responsável serve! tanto em Rondas pendentes quanto permissão de trabalho"; nexus/campo/visao.py: atencao,
+   por_responsavel, kanban, pt_por_responsavel). Filtros: responsável UFV, cliente, UFV, equipe e a busca, em cascata.
+   Só usina mobilizada; a PT esperando aparece sempre. #}
 {# O "homem de capacete" (Levi, 05/10) é um ícone desenhado, não emoji: a regra da casa é sem emoji na interface #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% set no_cartao = {'nunca': ('nunca teve ronda', 'nunca tiveram ronda'), 'sem_ronda': ('sem ronda há 7 d ou mais', 'sem ronda há 7 d ou mais'),
@@ -35,7 +35,6 @@
     <div class="cn-frescor">rondas e PT do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
-  {% include 'campo/_aviso_estrutura.html' %}
 
   <nav class="cn-abas" aria-label="Abas">
     {% for v, nome, n in vistas %}<a href="{{ url(vista=v, f=None) }}"{% if v == vista %} aria-current="page"{% endif %}>{{ nome }}<i>{{ n }}</i></a>{% endfor %}
@@ -44,24 +43,20 @@
   <form class="cn-filtros" method="get">
     <input type="hidden" name="vista" value="{{ vista }}">
     <div class="cn-seg" aria-label="Visão">
-      <a href="{{ url(modo=None, equipe=None, responsavel=None) }}"{% if modo == 'equipes' %} aria-current="page"{% endif %}>Por equipe</a>
-      <a href="{{ url(modo='regioes', equipe=None, responsavel=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por região de campo</a>
-      {% if vista == 'pendentes' %}<a href="{{ url(modo='responsaveis', equipe=None, responsavel=None) }}"{% if modo in ('responsaveis', 'kanban') %} aria-current="page"{% endif %}>Por responsável</a>{% endif %}
+      <a href="{{ url(modo=None) }}"{% if modo in ('responsaveis', 'kanban') %} aria-current="page"{% endif %}>Por responsável</a>
       <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
     </div>
-    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
-    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
-      <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
-    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
-    {# o Responsável O&M da usina (12/10/2026): escolhido, a aba de rondas abre o kanban dele #}
-    <label class="gc-rotulo" for="cn-responsavel">Responsável O&amp;M</label>
-    <select class="gc-campo" id="cn-responsavel" name="responsavel" onchange="this.form.submit()">
-      <option value="*"{% if not responsavel %} selected{% endif %}>Todos</option>{% for r in opcoes_responsavel %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
+    {# os filtros (Levi, 19/10/2026): responsável UFV (o Responsável O&M da ficha; escolhido, a aba de rondas abre o
+       kanban dele), cliente, UFV, equipe e a busca; cada lista com o que existe com os outros filtros #}
+    {# o rótulo e a caixa juntos: soltos, a 1440 px o rótulo Equipe ficava no fim de uma linha e a caixa na outra #}
+    {% for campo, rot in filtros_central %}
+    <label class="cn-filtro-par" for="cn-{{ campo }}"><span class="gc-rotulo">{{ rot }}</span>
+    <select class="gc-campo" id="cn-{{ campo }}" name="{{ campo }}" onchange="this.form.submit()">
+      <option value="">{{ 'Todas' if campo in ('usina', 'equipe') else 'Todos' }}</option>{% for v in fl.opcoes[campo] %}<option value="{{ v }}"{% if v == fl[campo] %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select></label>
+    {% endfor %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, equipe, cidade{{ ', OS ou técnico' if vista != 'pendentes' else '' }}" aria-label="Buscar">
-    {% for k in ('f', 'modo', 'equipe') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-    {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
+    {% for k in ('f', 'modo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
 
   {% if vista == 'pt' %}
@@ -75,61 +70,16 @@
   </div>
   {% endif %}
 
-  {% if modo == 'equipes' %}
-  {# cartões por equipe: o cartão leva à tabela da equipe #}
-  <div class="cn-equipes">
-    {% for c in cartoes %}
-      {% set pct = c.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
-      <a class="cn-equipe cn-equipe--{{ cor }}" href="{{ url(modo='tabela', equipe=c.equipe, f=None) }}">
-        <div class="cn-eq-cab">
-          <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>
-            <span class="cn-eq-tec" title="{{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }} na equipe (cadastro){% for k, n in c.cargos.items() %}{{ ':' if loop.first else ',' }} {{ n }} {{ k }}{% endfor %}">{{ capacete() }}<b>{{ c.tecnicos }}</b></span></div>
-          <span>{{ c.regioes|join(', ') or '—' }}{% if c.ufs %} · {{ c.ufs|join(', ') }}{% endif %}</span>
-          {% if c.regiao_campo == sem_regiao %}<span>{{ sem_regiao }}</span>{% else %}<span>{% if c.codigo %}{{ c.codigo }} · {% endif %}{{ c.regiao_campo }} · Supervisor de Campo: {{ quem(c.supervisor_campo) }}</span>{% endif %}
-        </div>
-        {{ numeros_ronda(c) }}
-      </a>
-    {% else %}
-      <p class="mudo">Nenhuma equipe com esses filtros.</p>
-    {% endfor %}
-  </div>
-  {% elif modo in ('regioes', 'gestores') %}
-  {# por região de campo (estrutura de O&M de 10/2026; era "por supervisor", Levi, 08/10): a soma das equipes da região,
-     com o Supervisor de Campo e o Coordenador (ou a vaga); a alternância leva aos cartões por gestor de contrato (pelas
-     usinas dele). O cartão leva à tabela da região ou do gestor #}
-  {{ alterna(modo == 'gestores', url(modo='regioes', equipe=None), url(modo='gestores', equipe=None)) }}
-  <div class="cn-equipes">
-    {% if modo == 'regioes' %}
-    {% for s in cartoes_reg %}
-      {% set pct = s.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
-      <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.regiao == sem_regiao %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', regiao_campo=s.regiao, equipe=None, f=None) }}">
-        {{ cab_regiao(s, sem_regiao) }}
-        {{ numeros_ronda(s) }}
-      </a>
-    {% else %}
-      <p class="mudo">Nenhuma região de campo com esses filtros.</p>
-    {% endfor %}
-    {% else %}
-    {% for s in cartoes_gest %}
-      {% set pct = s.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
-      <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.gestor == sem_gestor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', gestor=s.gestor, equipe=None, f=None) }}">
-        {{ cab_gestor(s, sem_gestor) }}
-        {{ numeros_ronda(s) }}
-      </a>
-    {% else %}
-      <p class="mudo">Nenhum gestor de contrato com esses filtros.</p>
-    {% endfor %}
-    {% endif %}
-  </div>
-  {% elif modo == 'responsaveis' %}
-  {# um cartão por Responsável O&M (Levi, 12/10/2026): as usinas dele, pendentes e feitas; o cartão abre o kanban #}
+  {% if modo == 'responsaveis' %}
+  {# um cartão por Responsável UFV (o Responsável O&M da ficha; Levi, 12/10/2026): as usinas dele, pendentes e feitas; o
+     cartão abre o kanban #}
   <div class="cn-equipes">
     {% for s in cartoes_resp %}
       {% set pct = s.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
       <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=s.responsavel, modo=None, equipe=None, f=None) }}">
         <div class="cn-eq-cab">
           <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b></div>
-          <span>{{ 'usinas sem responsável O&M no cadastro' if s.responsavel == sem_responsavel else 'Responsável O&M' }}</span>
+          <span>{{ 'usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }}</span>
           <span>{{ s.usinas }} usina{{ 's' if s.usinas != 1 }} · {{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}</span>
           <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
         </div>
@@ -144,8 +94,8 @@
      em três colunas; o status sai da ronda (não se arrasta) e o cartão leva ao histórico de rondas da usina #}
   {% set n_kb = colunas.nunca|length + colunas.pendente|length + colunas.feita|length %}
   <div class="cn-kb-cab">
-    <div><span class="gc-rotulo">Responsável O&amp;M</span><b>{{ responsavel }}</b>
-      <span class="mudo">{{ n_kb }} usina{{ 's' if n_kb != 1 }} mobilizada{{ 's' if n_kb != 1 }}{% if regiao or regiao_campo or gestor or q %}, com os outros filtros{% endif %}</span></div>
+    <div><span class="gc-rotulo">Responsável UFV</span><b>{{ responsavel }}</b>
+      <span class="mudo">{{ n_kb }} usina{{ 's' if n_kb != 1 }} mobilizada{{ 's' if n_kb != 1 }}{% if fl.cliente or fl.usina or fl.equipe or q %}, com os outros filtros{% endif %}</span></div>
     <a class="cn-filtro-ativo" href="{{ url(responsavel=None, modo='responsaveis') }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>
   </div>
   <div class="cn-kanban">
@@ -155,7 +105,9 @@
       {% for u in itens %}
       <a class="cn-kb-card" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}" title="Histórico de rondas de {{ u.usina }}">
         <b>{{ u.usina }}</b>
-        <span class="kb-sub">{{ u.equipe or '—' }} · {{ u.cidade or '—' }}{% if u.uf %}/{{ u.uf }}{% endif %}</span>
+        {% set eqs = u.equipes or ([u.equipe] if u.equipe else []) %}
+        <span class="kb-sub"><b>Equipe{{ 's' if eqs|length > 1 }}:</b> {{ eqs|join(', ') or '—' }}</span>
+        <span class="kb-sub">{{ u.cidade or '—' }}{% if u.uf %}/{{ u.uf }}{% endif %}</span>
         {% if col == 'nunca' %}<span class="kb-st cn-t-critico">Nenhuma ronda desde a mobilização</span>
         {% elif col == 'pendente' %}<span class="kb-st cn-t-{{ 'critico' if u.tipo == 'sem_ronda' else 'alerta' }}">{{ u.obs }}</span>{% if u.tecnico %}<span class="kb-sub">última por {{ u.tecnico }}</span>{% endif %}
         {% else %}<span class="kb-st cn-t-ok">Última ronda {{ dia_curto(u.ultima) }} · {{ 'hoje' if u.dias == 0 else ('ontem' if u.dias == 1 else 'há ' ~ u.dias ~ ' dias') }}</span>{% if u.tecnico %}<span class="kb-sub">por {{ u.tecnico }}</span>{% endif %}{% endif %}
@@ -194,23 +146,23 @@
     </tbody>
   {% endif %}
   </table></div>
-  {% if lista|length > 300 %}<p class="mudo">Mostrando 300 de {{ lista|length }}: use a região, a equipe ou a busca para afunilar.</p>{% endif %}
+  {% if lista|length > 300 %}<p class="mudo">Mostrando 300 de {{ lista|length }}: use o responsável, o cliente, a equipe ou a busca para afunilar.</p>{% endif %}
   {% endif %}
 
   {% endif %}
   <div class="cn-nota">
   {% if vista == 'pendentes' %}<b>O que entra.</b> Usina mobilizada (OPERAÇÃO no cadastro, com a data de mobilização já
     passada) sem ronda há 7 dias ou mais, ou cuja última ronda deixou a ronda longa pendente. Uma linha por usina. As
-    rondas feitas, com o que ficou faltando nelas, estão na tela Rondas. No
-    cartão, "feitas" são as usinas da equipe que não estão pendentes, e o % é sobre as usinas da equipe. Por responsável:
-    o Responsável O&amp;M da ficha da usina; o cartão abre o kanban das usinas dele (nunca teve ronda, ronda pendente e
-    ronda feita, a feita sendo a usina em dia).
+    rondas feitas, com o que ficou faltando nelas, estão na tela Rondas. Por responsável: o Responsável UFV (o
+    Responsável O&amp;M da ficha da usina); no cartão, "feitas" são as usinas dele que não estão pendentes, e o % é sobre
+    as usinas dele; o cartão abre o kanban das usinas dele (nunca teve ronda, ronda pendente e ronda feita, a feita sendo
+    a usina em dia), com a equipe de cada usina.
     {% if d.get('sem_mobilizacao') %}<br>{{ d.sem_mobilizacao|length }} usinas estão em OPERAÇÃO no cadastro sem data de
     mobilização e ficam de fora até a data entrar no cadastro.{% endif %}
   {% else %}<b>O que entra.</b> As PT esperando o De acordo, da mais antiga para a mais nova; parada = mais de 2 h. Clique
-    na OS para abrir a PT e decidir. O livro de PT do App chega de hora em hora.{% endif %}
-    A região do Brasil sai do estado da usina no cadastro. A região de campo é a da equipe da usina (estrutura de O&amp;M de
-    10/2026: o Supervisor de Campo lidera a região e aprova as OS); o gestor de contrato (Supervisor PM) é o da usina.
+    na OS para abrir a PT e decidir. Por responsável: o Responsável UFV da usina da PT; o cartão leva à tabela das PT
+    dele. O livro de PT do App chega de hora em hora.{% endif %}
+    A região da tabela sai do estado da usina no cadastro.
   </div>
 </div>
 {% endblock %}
