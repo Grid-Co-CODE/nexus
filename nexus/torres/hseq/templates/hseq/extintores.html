@@ -5,9 +5,9 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
 {# Extintores (Segurança · HSEQ, 09/10/2026): a situação de cada extintor das usinas, pelo livro que o App de Campo grava
    no banco (nexus/hseq/extintores.py). O mesmo desenho da Central de atenção do Campo, a tela mais parecida: a faixa de
-   números que filtra a tabela, os cartões por região de campo (o Supervisor de Campo), com a alternância para o gestor
-   de contrato, e a tabela. Os filtros e os cartões vêm dos pedaços do Campo (uma regra só). #}
-{% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna %}
+   números que filtra a tabela, a caixa dos não reconhecidos, os filtros e, logo abaixo deles, a tabela (por cliente ou
+   por extintor) ou os cartões por Responsável O&M (Levi, 18/10/2026). #}
+{% from 'campo/_cartoes_papeis.html' import capacete %}
 {% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
 {# os números de um cartão: atrasados e perto de vencer em cima; a barra das quatro situações (somam o total) e a
    legenda embaixo; no pé, o que não soma (sem atualização) e quantas usinas têm extintor atrasado #}
@@ -50,6 +50,13 @@
 {% set status_no_grupo = {'CRITICO': ('crítico', 'críticos', 'critico'), 'ATENCAO': ('atenção', 'atenção', 'alerta'),
                           'OK_SEM_VALIDADE': ('ok sem validade', 'ok sem validade', 'neutro'), 'OK': ('ok', 'ok', 'ok'),
                           '': ('sem conferência', 'sem conferência', 'neutro')} %}
+{# as células que o cliente e a usina repetem: a quantidade (e quantos em cada situação), a recarga mais próxima e o
+   status da TST mais grave (e quantos em cada um) #}
+{% macro qtd(g) %}<span class="ext-par"><b>{{ g.qtd }}</b><span class="det ext-lista">{% for k, (um, varios, cor) in no_grupo.items() if g[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g[k] }} {{ um if g[k] == 1 else varios }}</span>{% endfor %}</span></span>{% endmacro %}
+{% macro recarga(g) %}{% if g.recarga_fim %}{{ etiqueta(g.recarga, g.recarga_fim) }}{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}{% endmacro %}
+{% macro status_grupo(g) %}{% set t = status_tst.get(g.status) %}<span class="ext-par">{% if t %}<span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}<span class="det ext-lista">{% for k, (um, varios, cor) in status_no_grupo.items() if g.status_qtd[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g.status_qtd[k] }} {{ um if g.status_qtd[k] == 1 else varios }}</span>{% endfor %}</span></span>{% endmacro %}
+{# os técnicos da usina (a tela Técnicos por usina do PCM), um embaixo do outro, como lá #}
+{% macro tecnicos(g) %}{% if d.get('tecnicos_erro') %}<span class="cn-t-neutro" title="A lista de técnicos por usina do PCM não foi lida agora">não lido</span>{% elif g.tecnicos %}<span class="ext-tecs">{% for n in g.tecnicos %}<span>{{ n }}</span>{% endfor %}</span>{% else %}<span class="cn-t-neutro">sem técnico</span>{% endif %}{% endmacro %}
 {% set pronto = not leitura.erro and d.get('aba_existe') and not d.get('colunas_faltando') %}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -64,146 +71,134 @@
     Sem ela não há o que contar: o App precisa publicar a aba com esse nome.</div>
   {% elif d.get('colunas_faltando') %}<div class="cn-erro" role="alert"><b>O livro dos extintores chegou sem a coluna {{ d.colunas_faltando|join(', ') }}.</b>
     Sem ela a conta sairia errada (validade vazia vira "sem validade"), então a tela não mostra número pela metade.</div>{% endif %}
-  {% include 'campo/_aviso_estrutura.html' %}
-
-  <form class="cn-filtros" method="get">
-    <div class="cn-seg" aria-label="Visão">
-      <a href="{{ url(modo=None, f=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por supervisor</a>
-      <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
-    </div>
-    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
-    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
-      <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
-    {# o cliente pelo cadastro, pela usina (Levi, 09/10/2026: "Em extintores quero um filtro por cliente!") #}
-    <label class="gc-rotulo" for="cn-cliente">Cliente</label>
-    <select class="gc-campo" id="cn-cliente" name="cliente" onchange="this.form.submit()">
-      <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
-    </select>
-    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
-    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, extintor ou local" aria-label="Buscar">
-    {% for k in ('f', 'modo', 'ver') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-  </form>
 
   {% if pronto %}
   {# o pedido (Levi, 09/10): atrasado, perto de atrasar e sem atualização há mais de 30 dias; cada número filtra a tabela #}
   <div class="cn-numeros cn-numeros--filtro">
-    <a href="{{ url(f=None, modo='tabela') }}"{% if not f and modo == 'tabela' %} aria-current="page"{% endif %}><span class="gc-rotulo">Extintores</span><span class="v">{{ contagem.total }}</span><span class="d">em {{ plural(contagem.usinas, 'usina', 'usinas') }}</span></a>
-    <a href="{{ url(f='atrasado', modo='tabela') }}"{% if f == 'atrasado' %} aria-current="page"{% endif %}><span class="gc-rotulo">Atrasados</span><span class="v{% if contagem.atrasado %} cn-t-critico{% endif %}">{{ contagem.atrasado }}</span><span class="d">recarga ou teste hidrostático vencido</span></a>
-    <a href="{{ url(f='perto', modo='tabela') }}"{% if f == 'perto' %} aria-current="page"{% endif %}><span class="gc-rotulo">Perto de vencer</span><span class="v{% if contagem.perto %} cn-t-alerta{% endif %}">{{ contagem.perto }}</span><span class="d">vencem em até {{ alerta_dias }} dias</span></a>
-    <a href="{{ url(f='sem_atualizacao', modo='tabela') }}"{% if f == 'sem_atualizacao' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem atualização</span><span class="v{% if contagem.sem_atualizacao %} cn-t-info{% endif %}">{{ contagem.sem_atualizacao }}</span><span class="d">conferido há mais de {{ sem_atualizacao_dias }} dias, ou nunca</span></a>
-    <a href="{{ url(f='sem_validade', modo='tabela') }}"{% if f == 'sem_validade' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem validade</span><span class="v">{{ contagem.sem_validade }}</span><span class="d">recarga sem data na etiqueta</span></a>
+    <a href="{{ url(f=None, modo=None) }}"{% if not f and modo == 'tabela' %} aria-current="page"{% endif %}><span class="gc-rotulo">Extintores</span><span class="v">{{ contagem.total }}</span><span class="d">em {{ plural(contagem.usinas, 'usina', 'usinas') }}</span></a>
+    <a href="{{ url(f='atrasado', modo=None) }}"{% if f == 'atrasado' %} aria-current="page"{% endif %}><span class="gc-rotulo">Atrasados</span><span class="v{% if contagem.atrasado %} cn-t-critico{% endif %}">{{ contagem.atrasado }}</span><span class="d">recarga ou teste hidrostático vencido</span></a>
+    <a href="{{ url(f='perto', modo=None) }}"{% if f == 'perto' %} aria-current="page"{% endif %}><span class="gc-rotulo">Perto de vencer</span><span class="v{% if contagem.perto %} cn-t-alerta{% endif %}">{{ contagem.perto }}</span><span class="d">vencem em até {{ alerta_dias }} dias</span></a>
+    <a href="{{ url(f='sem_atualizacao', modo=None) }}"{% if f == 'sem_atualizacao' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem atualização</span><span class="v{% if contagem.sem_atualizacao %} cn-t-info{% endif %}">{{ contagem.sem_atualizacao }}</span><span class="d">conferido há mais de {{ sem_atualizacao_dias }} dias, ou nunca</span></a>
+    <a href="{{ url(f='sem_validade', modo=None) }}"{% if f == 'sem_validade' %} aria-current="page"{% endif %}><span class="gc-rotulo">Sem validade</span><span class="v">{{ contagem.sem_validade }}</span><span class="d">recarga sem data na etiqueta</span></a>
     {% if nao_rec %}<a href="#nao-reconhecidos"><span class="gc-rotulo">Não reconhecidos</span><span class="v cn-t-alerta">{{ nao_rec|length }}</span><span class="d">a equipe não achou na usina</span></a>{% endif %}
   </div>
 
   {% if nao_rec %}
   {# Não reconhecidos em campo (Levi, 14/10/2026, na Axis Linhares 1: a equipe só achou 4 dos 17 extintores do
      cadastro, "e aí apareceria para a pessoa da Segurança"): o "Não reconhecido" da ronda de extintores do App. Ficam
-     fora de todas as contas da tela; a TST confere o cadastro. A marca mais nova primeiro #}
+     fora de todas as contas da tela; a TST confere o cadastro. A marca mais nova primeiro. A linha leva à tabela
+     filtrada naquela usina (Levi, 18/10/2026: "ao clicar na linha já encaminhe para a tabela filtrando aquela usina") #}
   <section class="ext-naorec" id="nao-reconhecidos" aria-labelledby="ext-naorec-t">
     <p class="ext-naorec-t" id="ext-naorec-t"><b>{{ plural(nao_rec|length, 'extintor não reconhecido', 'extintores não reconhecidos') }} em campo</b></p>
-    <p class="ext-naorec-d">A equipe não achou estes extintores na usina (o "Não reconhecido" da ronda de extintores do App). Eles ficam fora das contas desta tela até a TST conferir o cadastro: dar baixa, mudar de usina ou corrigir o código.</p>
+    <p class="ext-naorec-d">A equipe não achou estes extintores na usina (o "Não reconhecido" da ronda de extintores do App). Eles ficam fora das contas desta tela até a TST conferir o cadastro: dar baixa, mudar de usina ou corrigir o código. A linha abre a usina na tabela.</p>
     <div class="cn-tab cn-tab--compacta ext-tab"><table class="ext-naorec-tab">
       <thead><tr><th>Não reconhecido em</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Conferência antes</th></tr></thead>
-      <tbody>{% for x in nao_rec[:limite] %}
-        <tr><td><span class="ext-par"><span class="m">{{ x.nao_reconhecido.strftime('%d/%m/%Y') }}</span><span class="det">há {{ tempo(x.dias_nao_reconhecido) }}</span>{% if x.nao_reconhecido_por %}<span class="det">{{ x.nao_reconhecido_por }}</span>{% endif %}</span></td>
-          <td class="ext-usina">{{ x.usina }}</td>
+      <tbody>{% for x in nao_rec[:limite] %}{% set ir = url(usina=x.usina, f=None, modo=None, ver=None) ~ '#tabela' %}
+        <tr class="ext-ir" data-href="{{ ir }}" title="Ver a usina na tabela"><td><span class="ext-par"><span class="m">{{ x.nao_reconhecido.strftime('%d/%m/%Y') }}</span><span class="det">há {{ tempo(x.dias_nao_reconhecido) }}</span>{% if x.nao_reconhecido_por %}<span class="det">{{ x.nao_reconhecido_por }}</span>{% endif %}</span></td>
+          <td class="ext-usina"><a class="cn-link" href="{{ url(usina=x.usina, f=None, modo=None, ver=None) }}#tabela">{{ x.usina }}</a></td>
           <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
           <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
           <td>{{ conferencia(x) }}</td></tr>
       {% endfor %}</tbody>
     </table></div>
-    {% if nao_rec|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ nao_rec|length }}: use a região de campo, o gestor ou a busca para afunilar.</p>{% endif %}
+    {% if nao_rec|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ nao_rec|length }}: use os filtros ou a busca para afunilar.</p>{% endif %}
   </section>
   {% endif %}
+  {% endif %}
 
-  {# o relatório em PDF (Levi, 09/10, com as observações da TST): agrupado por usina e dia, com os filtros da tela; o
-     status da TST escolhe quais entram e as fotos vão ao lado de cada extintor (o padrão). Abre noutra aba #}
-  <form class="ext-relatorio" method="get" action="{{ url_for('torre_hseq.extintores_relatorio') }}" target="_blank">
-    {% for k in ('regiao', 'cliente', 'regiao_campo', 'gestor', 'q') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-    <span class="gc-rotulo">Relatório em PDF</span>
-    <select class="gc-campo" name="status" aria-label="Quais extintores entram no relatório">
-      <option value="todos">Todos os extintores</option><option value="criticos">Só os críticos</option>
-      <option value="atencao">Só os de atenção</option><option value="ok">Só os OK</option>
-    </select>
-    <input type="hidden" name="fotos" value="0">
-    <label class="ext-check"><input type="checkbox" name="fotos" value="1" checked> com as fotos</label>
-    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Gerar PDF</button>
+  {# os filtros logo acima da tabela (Levi, 18/10/2026: "Quero os filtros que estão antes de extintores não reconhecidos,
+     acima da tabela"; "De filtros quero apenas cliente, usina, responsável UFV, equipe e o campo para digitar!"). Em
+     cascata: cada lista traz o que existe com os outros filtros; o "Todos" de cada um volta ao vazio #}
+  <form class="cn-filtros" method="get" id="tabela">
+    <div class="cn-seg" aria-label="Visão">
+      <a href="{{ url(modo=None) }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
+      <a href="{{ url(modo='responsaveis', f=None) }}"{% if modo == 'responsaveis' %} aria-current="page"{% endif %}>Por responsável</a>
+    </div>
+    {# o rótulo e a caixa juntos: a 375 px, soltos, o rótulo ficava no fim de uma linha e a caixa no começo da outra #}
+    {% for campo, rotulo in filtros_ext %}
+    <label class="ext-filtro"><span class="gc-rotulo">{{ rotulo }}</span>
+    <select class="gc-campo" id="ext-{{ campo }}" name="{{ campo }}" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for v in fl.opcoes[campo] %}<option value="{{ v }}"{% if v == fl[campo] %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select></label>
+    {% endfor %}
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, extintor ou local" aria-label="Buscar">
+    {% for k in ('f', 'modo', 'ver') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
 
-  {% if modo in ('regioes', 'gestores') %}
-  {# por supervisor: a região de campo (estrutura de O&M de 10/2026), com o Supervisor de Campo e o Coordenador; a
-     alternância leva ao gestor de contrato (pelas usinas dele). O cartão leva à tabela da região ou do gestor #}
-  {{ alterna(modo == 'gestores', url(modo=None, f=None), url(modo='gestores', f=None)) }}
+  {% if pronto %}
+  {% if modo == 'responsaveis' %}
+  {# por responsável (Levi, 18/10/2026: os cartões seguiram o filtro novo): um cartão por Responsável O&M da usina, como
+     a Central de atenção; o cartão leva à tabela filtrada por ele #}
   <div class="cn-equipes">
-    {% if modo == 'regioes' %}
-    {% for s in cartoes_reg %}
-      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.regiao == sem_regiao %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', regiao_campo=s.regiao, f=None) }}">
-        {{ cab_regiao(s, sem_regiao, ' · ' ~ plural(s.usinas, 'usina', 'usinas')) }}
+    {% for s in cartoes %}
+      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(modo=None, responsavel=s.responsavel, f=None) }}#tabela">
+        <div class="cn-eq-cab">
+          <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b>
+            <span class="cn-eq-tec" title="{{ s.tecnicos }} técnico{{ 's' if s.tecnicos != 1 }} nas equipes das usinas (cadastro)">{{ capacete() }}<b>{{ s.tecnicos }}</b></span></div>
+          <span>{{ 'usinas sem responsável no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }}</span>
+          <span>{{ plural(s.usinas, 'usina', 'usinas') }} · {{ plural(s.n_equipes, 'equipe', 'equipes') }}</span>
+          <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
+        </div>
         {{ numeros(s) }}
       </a>
     {% else %}
       <p class="mudo">Nenhum extintor com esses filtros.</p>
     {% endfor %}
-    {% else %}
-    {% for s in cartoes_gest %}
-      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.gestor == sem_gestor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', gestor=s.gestor, f=None) }}">
-        {{ cab_gestor(s, sem_gestor) }}
-        {{ numeros(s) }}
-      </a>
-    {% else %}
-      <p class="mudo">Nenhum extintor com esses filtros.</p>
-    {% endfor %}
-    {% endif %}
   </div>
   {% else %}
-  {# a tabela (Levi, 09/10: "queria agrupado por usina e dia!"): primeiro por usina e dia da última conferência, e a
-     linha da usina abre os extintores dela; a visão por extintor fica ao lado #}
-  <div class="cn-alterna" role="group" aria-label="Ver a tabela">
-    <span class="gc-rotulo">Ver</span>
+  {# a tabela (Levi, 18/10/2026: "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse cliente"): o
+     cliente abre as usinas dele, uma linha por usina com o responsável e os técnicos, e a usina abre os extintores; a
+     visão por extintor fica ao lado. Com o filtro de usina (o clique num não reconhecido) ou de cliente, já abre #}
+  <div class="cn-alterna" role="group" aria-label="Agrupar a tabela por">
+    <span class="gc-rotulo">Agrupar por</span>
     <div class="cn-seg cn-seg--mini">
-      <a href="{{ url(ver=None) }}"{% if ver == 'usina' %} aria-current="page"{% endif %}>Por usina e dia</a>
-      <a href="{{ url(ver='extintor') }}"{% if ver == 'extintor' %} aria-current="page"{% endif %}>Por extintor</a>
+      <a href="{{ url(ver=None) }}#tabela"{% if ver == 'cliente' %} aria-current="page"{% endif %}>Cliente</a>
+      <a href="{{ url(ver='extintor') }}#tabela"{% if ver == 'extintor' %} aria-current="page"{% endif %}>Extintor</a>
     </div>
   </div>
-  {% if ver == 'usina' %}
-  <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande">
-    <thead><tr><th>Situação</th><th>Última conferência</th><th>Usina</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status da TST</th><th>PDF</th></tr></thead>
+  {% if ver == 'cliente' %}
+  {% if d.get('tecnicos_erro') %}<div class="cn-erro cn-aviso" role="status"><b>Os técnicos de cada usina não foram lidos agora.</b> A lista vem da tela Técnicos por usina do PCM; a coluna diz "não lido" até a próxima leitura.</div>{% endif %}
+  {% set abre_cliente = fl.cliente or fl.usina %}
+  {% set abre_usina = fl.usina %}
+  {# UMA tabela: a linha do cliente e, logo abaixo, as das usinas dele (escondidas até o cliente abrir), nas mesmas
+     colunas; só os extintores abrem numa tabela menor. Com o cliente abrindo uma tabela dentro da linha e a usina
+     outra dentro dela, a tabela aberta pedia 1.212 px a 1440 (a caixa tem 1.168) #}
+  <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande ext-clientes">
+    <thead><tr><th>Situação</th><th>Última conferência</th><th>Cliente e usina</th><th>Responsável</th><th>Técnicos</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status da TST</th><th>PDF</th></tr></thead>
     <tbody>
-    {% for g in grupos[:limite] %}{% set s = situacoes[g.situacao] %}{% set t = status_tst.get(g.status) %}
-      <tr class="cn-linha" tabindex="0" aria-expanded="false" title="Ver os {{ g.qtd }} extintores">
+    {% for c in grupos %}{% set s = situacoes[c.situacao] %}{% set n = loop.index %}
+      <tr class="cn-linha ext-cli" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente">
         <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        <td>{{ conferencia(g) }}</td>
-        <td class="ext-usina"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</td>
-        <td><span class="ext-par"><b>{{ g.qtd }}</b><span class="det">{% for k, (um, varios, cor) in no_grupo.items() if g[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g[k] }} {{ um if g[k] == 1 else varios }}</span>{% endfor %}</span></span></td>
-        <td>{% if g.recarga_fim %}{{ etiqueta(g.recarga, g.recarga_fim) }}{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}</td>
-        <td><span class="ext-par">{% if t %}<span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}<span class="det">{% for k, (um, varios, cor) in status_no_grupo.items() if g.status_qtd[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g.status_qtd[k] }} {{ um if g.status_qtd[k] == 1 else varios }}</span>{% endfor %}</span></span></td>
-        <td><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', usina=g.usina, dia=(g.conferencia.isoformat() if g.conferencia else 'nunca'), baixar=1, **filtros_url) }}" title="O relatório desta usina e deste dia, com as fotos">Baixar</a></td>
+        <td></td>
+        <td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span><b>{{ c.cliente }}</b></span><span class="det">{{ plural(c.n_usinas, 'usina', 'usinas') }}</span>{% if c.usinas_atrasado %}<span class="det cn-t-critico">{{ c.usinas_atrasado }} com extintor atrasado</span>{% endif %}</span></td>
+        <td></td><td></td>
+        <td>{{ qtd(c) }}</td>
+        <td>{{ recarga(c) }}</td>
+        <td>{{ status_grupo(c) }}</td>
+        <td></td>
       </tr>
-      <tr class="cn-detalhe" hidden><td colspan="7">
+      {% for g in c.usinas %}{% set su = situacoes[g.situacao] %}
+      <tr class="cn-linha ext-us" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver os {{ g.qtd }} extintores"{% if not abre_cliente %} hidden{% endif %}>
+        <td><span class="cn-st cn-t-{{ su[1] }}">{{ su[0] }}</span></td>
+        <td>{{ conferencia(g) }}</td>
+        <td class="ext-usina ext-us-nome"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</td>
+        <td class="ext-esq">{% if g.responsavel == sem_responsavel %}<span class="cn-t-neutro">sem responsável</span>{% else %}{{ g.responsavel }}{% endif %}</td>
+        <td class="ext-esq">{{ tecnicos(g) }}</td>
+        <td>{{ qtd(g) }}</td>
+        <td>{{ recarga(g) }}</td>
+        <td>{{ status_grupo(g) }}</td>
+        <td><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', usina=g.usina, baixar=1, **filtros_url) }}" title="O relatório desta usina, com as fotos">Baixar</a></td>
+      </tr>
+      <tr class="cn-detalhe" data-cli="{{ n }}"{% if not abre_usina %} hidden{% endif %}><td colspan="9">
         <table class="ext-sub cn-fotos-grupo">
-          <thead><tr><th>Situação</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
-          <tbody>{% for x in g.extintores %}{{ linha_extintor(x, false, false) }}{% endfor %}</tbody>
+          <thead><tr><th>Situação</th><th>Última conferência</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
+          <tbody>{% for x in g.extintores %}{{ linha_extintor(x, false) }}{% endfor %}</tbody>
         </table>
       </td></tr>
-    {% else %}<tr><td colspan="7" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
+      {% endfor %}
+    {% else %}<tr><td colspan="9" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
-  {% if grupos|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ grupos|length }} usinas e dias: use a região de campo, o gestor, a situação ou a busca para afunilar.</p>{% endif %}
-  <script>
-    // a linha da usina abre (e fecha) os extintores dela logo abaixo; Enter e espaço também
-    document.querySelectorAll('.ext-tab table.cn-expande > tbody > tr.cn-linha').forEach(function (tr) {
-      function alterna(ev) {
-        if (ev.target.closest('a')) return;
-        var det = tr.nextElementSibling;
-        if (!det || !det.classList.contains('cn-detalhe')) return;
-        det.hidden = !det.hidden;
-        tr.setAttribute('aria-expanded', String(!det.hidden));
-      }
-      tr.addEventListener('click', alterna);
-      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
-    });
-  </script>
   {% else %}
   <div class="cn-tab cn-tab--compacta ext-tab cn-fotos-grupo"><table>
     <thead><tr><th>Situação</th><th>Última conferência</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
@@ -212,11 +207,39 @@
     {% else %}<tr><td colspan="8" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
-  {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use a região de campo, o gestor, a situação ou a busca para afunilar.</p>{% endif %}
+  {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use os filtros, a situação ou a busca para afunilar.</p>{% endif %}
   {% endif %}
+  {% endif %}
+  <script>
+    // a linha da usina abre (e fecha) os extintores dela logo abaixo; a do cliente mostra (e esconde) as usinas dele,
+    // e fechar o cliente fecha também os extintores abertos. Enter e espaço também
+    document.querySelectorAll('.ext-tab table.cn-expande > tbody > tr.cn-linha').forEach(function (tr) {
+      function alterna(ev) {
+        if (ev.target.closest('a')) return;
+        var abrir = tr.getAttribute('aria-expanded') !== 'true';
+        if (tr.classList.contains('ext-cli')) {
+          tr.closest('tbody').querySelectorAll('tr[data-cli="' + tr.dataset.cli + '"]').forEach(function (l) {
+            if (l === tr) return;
+            if (l.classList.contains('ext-us')) { l.hidden = !abrir; l.setAttribute('aria-expanded', 'false'); }
+            else if (!abrir) { l.hidden = true; }
+          });
+        } else {
+          var det = tr.nextElementSibling;
+          if (!det || !det.classList.contains('cn-detalhe')) return;
+          det.hidden = !abrir;
+        }
+        tr.setAttribute('aria-expanded', String(abrir));
+      }
+      tr.addEventListener('click', alterna);
+      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
+    });
+    // a linha do não reconhecido leva à tabela filtrada naquela usina (o link da usina faz o mesmo pelo teclado)
+    document.querySelectorAll('.ext-naorec tr.ext-ir').forEach(function (tr) {
+      tr.addEventListener('click', function (ev) { if (!ev.target.closest('a')) window.location.href = tr.dataset.href; });
+    });
+  </script>
   {# a caixa que amplia a foto (a mesma das fotos da ronda): setas andam entre as fotos da usina, Esc fecha #}
   {% include 'campo/_ronda_fotos_caixa.html' %}
-  {% endif %}
   {% endif %}
 
   <div class="cn-nota"><b>Como cada extintor entra.</b> <b>Atrasado</b>: a recarga (2º nível) ou o teste hidrostático
@@ -226,8 +249,9 @@
     dele, no Forms da TST) foi há mais de {{ sem_atualizacao_dias }} dias, ou nunca houve; ela se soma às outras, por isso
     os números da faixa não fecham o total. <b>Não reconhecido</b>: a equipe marcou na ronda do App que não achou o
     extintor na usina; ele sai de todas as contas e fica na caixa própria até a TST conferir o cadastro. O <b>status da TST</b> é a regra da planilha de controle da TST, a mesma do App:
-    olha também a carga e os 9 itens do checklist. A região de campo é a da equipe da usina (o Supervisor de Campo lidera a
-    região); o gestor de contrato (Supervisor PM) é o da usina.
+    olha também a carga e os 9 itens do checklist. O <b>responsável</b> (Responsável UFV) é o Responsável O&amp;M da ficha da
+    usina no cadastro; os <b>técnicos</b> são os da tela Técnicos por usina do PCM. Na usina, a última conferência é a mais
+    recente dos extintores dela, e o Baixar traz o relatório da usina inteira, com as fotos.
   </div>
 </div>
 {% endblock %}
