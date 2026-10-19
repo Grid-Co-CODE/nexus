@@ -421,7 +421,7 @@ def registrar_pcm(bp) -> None:
                 ctx = _ctx_quadro(cfg, volta, erro="Nada foi gravado: " + ("; ".join(problemas) if problemas
                                                                               else "a fila está vazia") + ".")
                 return render_template("pcm/quadro.html", **ctx), 400
-            Q.salvar_no_nexus(cfg, sem["week"], linhas, quem)
+            Q.salvar_no_nexus(cfg, sem["week"], linhas, quem, Q.tarefas_por_os(sem))
             return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="salvo", n=len(linhas))), code=303)
         if dest["id"] != "atual":
             ctx = _ctx_quadro(cfg, volta, erro="Esta semana não aceita gravar reprogramação: " + dest["texto"])
@@ -435,7 +435,7 @@ def registrar_pcm(bp) -> None:
                 cfg, sem["week"], linhas, problemas, itens_json, erro="Nada foi gravado.")), 400
         try:
             res = Q.aplicar_na_semana_em_curso(cfg, sem["week"], linhas, quem, f.get("sha_visto") or "",
-                                               apagar_sem_semana=f.get("apagar") == "1")
+                                               apagar_sem_semana=f.get("apagar") == "1", ativos=Q.tarefas_por_os(sem))
         except (Q.QuadroErro, PB.PublicacaoErro) as ex:
             return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
                 cfg, sem["week"], linhas, problemas, itens_json, erro=f"Não gravei: {ex}.")), 409

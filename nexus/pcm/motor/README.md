@@ -1,7 +1,8 @@
 # Motor da programação semanal (cópia)
 
 Estes quatro arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
-`fillipefigueiro-source/gridco-pcm-data` no commit `0560d5d` (16/10/2026, a carga de 70% já na W43; antes, `6215ceb` e
+`fillipefigueiro-source/gridco-pcm-data` no commit `bfbc76c` (19/10/2026, a subtarefa `nome @ CÓDIGO`; antes, `0560d5d`
+(16/10/2026, a carga de 70% já na W43), `6215ceb` e
 `fdad64e` de 16/10,
 `bd4f673` e `fd39672` de 15/10, `3ce6205` de 09/10 e `8ee58d9` de 30/09):
 
@@ -16,7 +17,7 @@ Conferido pelo hash (SHA-256 da cópia com CRLF):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `9cf5161cf06d…` |
+| `programacao_v7.py` | `8d0fc5942cea…` |
 | `fonte_bd_api.py` | `b81d2c394d67…` |
 | `gerar_bd_via_api.py` | `6c580738ab5e…` |
 | `fora_da_programacao.py` | `91f9a81140c0…` |
@@ -28,6 +29,17 @@ substituir. Reescrever o motor tornaria a comparação inútil.
 
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
 sistemas rodarem juntos, as duas cópias precisam ser iguais.
+
+## O que mudou em 19/10/2026 (`bfbc76c`): a subtarefa, `nome @ CÓDIGO`
+
+O programador do PCM tirou da semana UM inversor da OS 16739 e saíam os 15: o `sem:`, o campo de tarefas e o "só:"
+casavam só pelo nome. A palavra pode ser `nome @ CÓDIGO do ativo` e casa só a tarefa com aquele código (exato, sem
+caixa) cujo nome contém o nome; sem `@`, como sempre. No motor, `_casa_tarefa` (usada por `_tarefa_excluida`,
+`_tarefa_matches_pin` e o "só:" do modo A); no robô (`atualizacao_semanal.py`, fora desta cópia), a mesma função no
+STEP A2 (a tarefa tirada não volta como OS nova) e no A3 (exclusões, pins e pendentes). O Quadro do Nexus grava a
+subtarefa assim. O `test_subtarefa_o_motor_e_o_nexus_casam_igual` prende o motor e o `geracao.casa_tarefa` do Nexus.
+Prova do robô na planilha real da W43 (OS 15968, 12 QGBTs): só o QGBT1 saiu e só o QGBT2 foi para a quarta; as linhas
+só por nome deram a planilha idêntica, célula a célula, à do robô de antes.
 
 ## O que mudou em 16/10/2026 (`6215ceb` e `0560d5d`): carga máxima do dia a 70%
 

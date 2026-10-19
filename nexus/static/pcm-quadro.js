@@ -1,7 +1,9 @@
 /* Quadro da semana (nexus/pcm/quadro.py, templates/pcm/quadro.html): a janela da OS e a fila de reprogramação.
 
    A fila mora no navegador (localStorage, por semana), como no painel do PCM; ao gravar, a página manda só
-   {os, tarefa, dia, turno} e o servidor refaz cada linha com a tarefa e o tipo da SEMANA (quadro.linhas_da_fila).
+   {os, tarefa, codigo, dia, turno} e o servidor refaz cada linha com a tarefa e o tipo da SEMANA (quadro.linhas_da_fila).
+   A SUBTAREFA (19/10/2026) é a tarefa num ativo: com o código, a linha leva "nome @ CÓDIGO" e o robô e o motor do PCM
+   tiram ou movem só ela (pelo nome, os 15 inversores da OS 16739 saíam juntos).
    `linha` abaixo é a mesma de quadro.linha (e do rpLinha do painel do PCM): o teste roda as duas com os mesmos casos. */
 (function (raiz) {
   "use strict";
@@ -20,25 +22,76 @@
   function nomeDaTarefa(tarefa) {
     return String(tarefa || "").split(",")[0].split(";")[0].trim();
   }
-  function linha(os, dia, turno, tarefa, tipo) {
+  function linha(os, dia, turno, tarefa, tipo, codigo) {
     os = String(os).trim(); turno = turno || "";
+    var cod = String(codigo || "").trim();
+    function noAtivo(nome) { return cod ? (nome + " @ " + cod) : nome; }
     if (dia === "não") return os + "; não";
     // tirar só ESTA tarefa da semana (15/10/2026): o "sem:" do motor e do robô, com o nome até a 1ª vírgula
-    if (dia === "sem") { var n = nomeDaTarefa(tarefa); return n ? (os + "; sem: " + n) : null; }
+    if (dia === "sem") { var n = nomeDaTarefa(tarefa); return n ? (os + "; sem: " + noAtivo(n)) : null; }
     if (!tarefa) return turno ? (os + "; " + dia + "; ; " + turno) : (os + "; " + dia);
     var sig = sigla(tipo), partes;
     if (sig) {
       var ch = chaveDaTarefa(tarefa);
-      partes = [os, dia, sig, turno, ch ? ("só: " + ch) : ""];
+      partes = [os, dia, sig, turno, ch ? ("só: " + noAtivo(ch)) : ""];
     } else {
       var nome = nomeDaTarefa(tarefa);
       if (!nome) return null;
-      partes = [os, dia, nome, turno];
+      partes = [os, dia, noAtivo(nome), turno];
     }
     return partes.filter(function (v, i) { return i < 3 || v; }).join("; ");
   }
 
-  raiz.QuadroLinha = { linha: linha, sigla: sigla, chaveDaTarefa: chaveDaTarefa, nomeDaTarefa: nomeDaTarefa };
+  // ── a subtarefa no "O que" da janela (19/10/2026) ──
+  // irmas = oss[os]: [{t, pend, n, cods: [[código, linhas], ...]}]. Cada opção é [tarefa, código]: código "" = a tarefa
+  // em todos os ativos; ["", ""] = a OS inteira. O padrão é a subtarefa do cartão aberto.
+  function cods(x) { return (x.cods && x.cods.length) ? x.cods : [["", x.n || 1]]; }
+  function contarSub(irmas) { return irmas.reduce(function (s, x) { return s + cods(x).length; }, 0); }
+  function curto(t) { return t.length > 60 ? t.slice(0, 60) + "…" : t; }
+  function opcoesAlvo(irmas, t) {
+    var ops = [];
+    irmas.forEach(function (x) {
+      var cs = cods(x);
+      // o ativo na frente: no celular o fim do rótulo some, e é o código que separa uma subtarefa da outra
+      if (cs.length > 1) ops.push({v: [x.t, ""], rotulo: "Em todos os " + cs.length + " ativos · " + curto(x.t)});
+      cs.forEach(function (c) {
+        ops.push({v: [x.t, c[0]], rotulo: (c[0] ? c[0] + " · " : "") + curto(x.t) + (x.pend ? " (pendente)" : "")});
+      });
+    });
+    var sel = -1;
+    ops.forEach(function (o, i) { if (sel < 0 && o.v[0] === t.t && o.v[1] === (t.cod || "")) sel = i; });
+    ops.forEach(function (o, i) { if (sel < 0 && o.v[0] === t.t) sel = i; });
+    if (sel < 0) sel = 0;
+    var n = contarSub(irmas);
+    ops.unshift({v: ["", ""], rotulo: "a OS inteira (" + n + (n === 1 ? " tarefa" : " tarefas") + ")"});
+    ops[sel + 1].sel = true;
+    return ops;
+  }
+  // a confirmação do "Tirar da semana" de uma tarefa: o que sai e o que fica
+  function textoTirar(irmas, os, alvo, cod) {
+    var x = irmas.filter(function (i) { return i.t === alvo; })[0] || {t: alvo, cods: [[cod || "", 1]]};
+    var cs = cods(x), sai, msg;
+    if (cod) {
+      var c = cs.filter(function (k) { return k[0] === cod; })[0] || [cod, 1];
+      sai = 1;
+      msg = "Tirar da programação desta semana só a tarefa\n“" + alvo + "”\nno ativo " + cod + " (OS " + os + ")?" +
+        (c[1] > 1 ? "\n\nEla está em " + c[1] + " blocos da semana: saem todos." : "");
+    } else {
+      // a tarefa em todos os ativos: o robô e o motor acham pelo NOME (contém a palavra), e as de nome parecido vão junto
+      var chave = nomeDaTarefa(alvo).toLowerCase();
+      var junto = irmas.filter(function (i) { return i.t !== alvo && i.t.toLowerCase().indexOf(chave) >= 0; });
+      sai = cs.length + contarSub(junto);
+      msg = "Tirar da programação desta semana a tarefa\n“" + alvo + "”\n" +
+        (cs.length > 1 ? "em todos os " + cs.length + " ativos " : "") + "da OS " + os + "?" +
+        (junto.length ? "\n\nSaem junto as de nome parecido: " + junto.map(function (i) { return "“" + i.t + "”"; }).join(", ") + "." : "");
+    }
+    var fica = contarSub(irmas) - sai;
+    return msg + "\n\n" + (fica <= 0 ? "Com isso, nenhuma tarefa da OS fica na semana." : fica === 1
+      ? "A outra tarefa da OS continua na semana." : "As outras " + fica + " tarefas da OS continuam na semana.");
+  }
+
+  raiz.QuadroLinha = { linha: linha, sigla: sigla, chaveDaTarefa: chaveDaTarefa, nomeDaTarefa: nomeDaTarefa,
+                       opcoesAlvo: opcoesAlvo, textoTirar: textoTirar };
   if (typeof document === "undefined") return;          // no node (o teste), só a linha
 
   var no = document.getElementById("q-dados");
@@ -57,8 +110,11 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
   }
-  function idx(os, tarefa) {
-    for (var i = 0; i < FILA.length; i++) if (FILA[i].os === String(os) && FILA[i].tarefa === (tarefa || "")) return i;
+  function idx(os, tarefa, codigo) {
+    for (var i = 0; i < FILA.length; i++) {
+      var x = FILA[i];
+      if (x.os === String(os) && x.tarefa === (tarefa || "") && (x.codigo || "") === (codigo || "")) return i;
+    }
     return -1;
   }
   function tipoDe(os, tarefa) {
@@ -67,7 +123,7 @@
     for (var i = 0; i < ITENS.length; i++) if (ITENS[i].os === String(os) && ITENS[i].t === tarefa) return ITENS[i].tp;
     return "";
   }
-  function linhaDoItem(r) { return linha(r.os, r.dia, r.turno, r.tarefa, r.tipo); }
+  function linhaDoItem(r) { return linha(r.os, r.dia, r.turno, r.tarefa, r.tipo, r.codigo); }
   function aviso(msg) {
     var a = document.getElementById("q-aviso");
     if (!a) return;
@@ -75,18 +131,21 @@
     clearTimeout(aviso._t); aviso._t = setTimeout(function () { a.hidden = true; }, 4000);
   }
 
-  // A mesma tarefa duas vezes na fila: vale a última. "OS; não" é a OS inteira (a gramática não filtra tarefa no "não");
-  // dia "sem" tira só a tarefa.
-  function inserir(os, tarefa, dia, turno) {
+  // A mesma tarefa (no mesmo ativo) duas vezes na fila: vale a última. "OS; não" é a OS inteira (a gramática não filtra
+  // tarefa no "não"); dia "sem" tira só a tarefa. `codigo` = o ativo da subtarefa ("" = a tarefa em todos os ativos).
+  function inserir(os, tarefa, dia, turno, codigo) {
     if (!dia) { aviso("Escolha o dia primeiro."); return null; }
     var r = { os: String(os), tarefa: dia === "não" ? "" : (tarefa || ""), tipo: "", dia: dia,
               turno: (dia === "não" || dia === "sem") ? "" : (turno || "") };
+    r.codigo = r.tarefa ? String(codigo || "") : "";
     r.tipo = r.tarefa ? tipoDe(os, r.tarefa) : "";
     if (linhaDoItem(r) === null) { aviso("Esta tarefa não tem nome que o motor reconheça: reprograme a OS inteira."); return null; }
-    var i = idx(r.os, r.tarefa);
+    var i = idx(r.os, r.tarefa, r.codigo);
     if (i >= 0) FILA.splice(i, 1);
-    // a OS inteira (fora ou num dia) apaga o que a fila tinha por tarefa dela, como a mescla do servidor (quadro.mesclar)
+    // a OS inteira (fora ou num dia) apaga o que a fila tinha por tarefa dela, como a mescla do servidor (quadro.mesclar);
+    // a tarefa em todos os ativos apaga as subtarefas dela
     if (!r.tarefa) FILA = FILA.filter(function (x) { return !(x.os === r.os && x.tarefa); });
+    else if (!r.codigo) FILA = FILA.filter(function (x) { return !(x.os === r.os && x.tarefa === r.tarefa && x.codigo); });
     FILA.push(r); salvar(); pintarFila(); marcar();
     return r;
   }
@@ -101,7 +160,7 @@
     dock.querySelector("[data-fila-linhas]").textContent = FILA.map(linhaDoItem).join("\n");
     var campo = dock.querySelector("input[name=itens]");
     if (campo) campo.value = JSON.stringify(FILA.map(function (r) {
-      return { os: r.os, tarefa: r.tarefa, dia: r.dia, turno: r.turno };
+      return { os: r.os, tarefa: r.tarefa, codigo: r.codigo || "", dia: r.dia, turno: r.turno };
     }));
     var st = document.getElementById("q-det-fila");
     if (st) st.innerHTML = n ? ("<b>" + n + "</b> na fila") : "A fila está vazia.";
@@ -177,14 +236,15 @@
   function blocoReprogramar(t) {
     if (!D.destino) return "";
     var irmas = OSS[t.os] || [];
-    var alvo = irmas.length > 1
+    // o "O que" (19/10/2026): a subtarefa do cartão por padrão, a tarefa em todos os ativos ou a OS inteira
+    var alvo = contarSub(irmas) > 1
       ? "<label class=\"q-campo\"><span>O que</span><select class=\"gc-campo\" data-rp-alvo>" +
-        "<option value=\"\">a OS inteira (" + irmas.length + " tarefas)</option>" +
-        irmas.map(function (x) {
-          return "<option value=\"" + esc(x.t) + "\"" + (x.t === t.t ? " selected" : "") + ">" +
-            esc(x.t.length > 70 ? x.t.slice(0, 70) + "…" : x.t) + (x.pend ? " (pendente)" : "") + "</option>";
+        opcoesAlvo(irmas, t).map(function (o) {
+          return "<option value=\"" + esc(JSON.stringify(o.v)) + "\"" + (o.sel ? " selected" : "") + ">" +
+            esc(o.rotulo) + "</option>";
         }).join("") + "</select></label>"
-      : "<input type=\"hidden\" data-rp-alvo value=\"" + esc(t.t) + "\"><p class=\"q-rp-alvo\">" + esc(t.t) + "</p>";
+      : "<input type=\"hidden\" data-rp-alvo value=\"" + esc(JSON.stringify([t.t, t.cod || ""])) + "\"><p class=\"q-rp-alvo\">" +
+        esc(t.t) + (t.cod ? " · " + esc(t.cod) : "") + "</p>";
     return "<h3>Reprogramar</h3><div class=\"q-rp\">" + alvo +
       "<div class=\"q-rp-linha\"><label class=\"q-campo\"><span>Dia</span><select class=\"gc-campo\" data-rp-dia>" +
       opcoesDia("escolha…") + "</select></label><label class=\"q-campo\"><span>Turno</span><select class=\"gc-campo\" " +
@@ -329,11 +389,15 @@
     }
     if (mpSalvar) mpSalvar.addEventListener("click", function () { enviarMotivo(i, t, c, false); });
     if (mpTirar) mpTirar.addEventListener("click", function () { enviarMotivo(i, t, c, true); });
+    // o valor do "O que" é [tarefa, código]; ["", ""] = a OS inteira
+    var alvoEscolhido = function () {
+      var el = c.querySelector("[data-rp-alvo]");
+      try { return JSON.parse(el ? el.value : "") || ["", ""]; } catch (e) { return ["", ""]; }
+    };
     var ins = c.querySelector("[data-rp-inserir]");
     if (ins) ins.addEventListener("click", function () {
-      var alvo = c.querySelector("[data-rp-alvo]");
-      var r = inserir(t.os, alvo ? alvo.value : "", c.querySelector("[data-rp-dia]").value,
-                      c.querySelector("[data-rp-turno]").value);
+      var v = alvoEscolhido();
+      var r = inserir(t.os, v[0], c.querySelector("[data-rp-dia]").value, c.querySelector("[data-rp-turno]").value, v[1]);
       if (!r) return;
       var txt = c.querySelector("[data-rp-txt]");
       txt.hidden = false;
@@ -345,29 +409,20 @@
     var tir = c.querySelector("[data-rp-tirar]");
     if (tir) tir.addEventListener("click", function () {
       var irmas = OSS[t.os] || [];
-      var sel = c.querySelector("[data-rp-alvo]");
-      var alvo = irmas.length > 1 ? (sel ? sel.value : t.t) : "";
+      var n = contarSub(irmas);
+      var v = n > 1 ? alvoEscolhido() : ["", ""];
       var r;
-      if (!alvo) {
-        if (!confirm(irmas.length > 1
-            ? "Tirar a OS " + t.os + " INTEIRA da programação desta semana?\n\nSaem as " + irmas.length + " tarefas dela."
+      if (!v[0]) {
+        if (!confirm(n > 1
+            ? "Tirar a OS " + t.os + " INTEIRA da programação desta semana?\n\nSaem as " + n + " tarefas dela."
             : "Tirar da programação desta semana a OS " + t.os + "?\n\nEla só tem esta tarefa na semana.")) return;
         r = inserir(t.os, "", "não", "");
         if (r) { aviso("A OS " + t.os + " sai da semana · " + FILA.length + " na fila"); fechar(); }
         return;
       }
-      // o robô e o motor acham a tarefa pelo NOME (contém a palavra): as de mesmo nome saem juntas, e o aviso diz quais
-      var chave = nomeDaTarefa(alvo).toLowerCase();
-      var esta = irmas.filter(function (x) { return x.t === alvo; })[0] || { n: 1 };
-      var junto = irmas.filter(function (x) { return x.t !== alvo && x.t.toLowerCase().indexOf(chave) >= 0; });
-      var fica = irmas.length - 1 - junto.length;
-      if (!confirm("Tirar da programação desta semana só a tarefa\n“" + alvo + "”\nda OS " + t.os + "?" +
-          ((esta.n || 1) > 1 ? "\n\nEla está em " + esta.n + " linhas da semana (uma por equipamento ou bloco): saem " +
-            "todas, porque o arquivo do PCM separa a tarefa só pelo nome." : "") +
-          (junto.length ? "\n\nSaem junto as de nome parecido: " + junto.map(function (x) { return "“" + x.t + "”"; }).join(", ") + "." : "") +
-          "\n\n" + (fica === 0 ? "Com isso, nenhuma tarefa da OS fica na semana." : fica === 1
-            ? "A outra tarefa da OS continua na semana." : "As outras " + fica + " tarefas da OS continuam na semana."))) return;
-      r = inserir(t.os, alvo, "sem", "");
+      // a subtarefa sai sozinha (19/10/2026); a tarefa em todos os ativos sai pelo nome, e o aviso diz o que vai junto
+      if (!confirm(textoTirar(irmas, t.os, v[0], v[1]))) return;
+      r = inserir(t.os, v[0], "sem", "", v[1]);
       if (r) { aviso("A tarefa sai da semana (OS " + t.os + ") · " + FILA.length + " na fila"); fechar(); }
     });
     pintarFila();
@@ -408,7 +463,7 @@
     ctr.appendChild(tplPend.content.cloneNode(true));
     var bt = ctr.querySelector("[data-pend-inserir]");
     bt.addEventListener("click", function () {
-      var r = inserir(t.os, t.t, el.querySelector("[data-pend-dia]").value, el.querySelector("[data-pend-turno]").value);
+      var r = inserir(t.os, t.t, el.querySelector("[data-pend-dia]").value, el.querySelector("[data-pend-turno]").value, t.cod);
       if (r) aviso("OS " + t.os + " → " + r.dia + (r.turno ? " (" + r.turno + ")" : "") + " · " + FILA.length + " na fila");
     });
   });
@@ -423,7 +478,7 @@
       var n = 0;
       el.closest("[data-usina]").querySelectorAll("[data-pend]").forEach(function (p) {
         var t = ITENS[+p.getAttribute("data-pend")];
-        if (t && inserir(t.os, t.t, dia, tur)) n++;
+        if (t && inserir(t.os, t.t, dia, tur, t.cod)) n++;
       });
       aviso(n + (n === 1 ? " tarefa inserida" : " tarefas inseridas") + " · " + FILA.length + " na fila");
     });

@@ -34,9 +34,11 @@
   {% endif %}
 
   {% if rp.pode %}
-<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Tirar uma linha não desfaz o que o robô já
-  aplicou.</strong> A OS que ele tirou da semana não volta sozinha: para pôr de volta, escreva a linha que a põe num dia (por
-  exemplo, <span class="gc-dado">15269; qua</span>).</div></div>
+{# 19/10/2026: o robô refaz a semana a cada rodada a partir da planilha publicada (só o banco_dados.json vai ao
+   repositório): tirar a linha desfaz o que ela fazia. O aviso de antes dizia o contrário. #}
+<p class="pcm-fonte"><i class="ph ph-info"></i><span>O robô refaz a semana a cada rodada, a partir da programação publicada,
+  e aplica o arquivo inteiro de novo: tirar uma linha desfaz o que ela fazia na rodada seguinte (até 15 minutos). A
+  subtarefa, a tarefa num ativo só, vai como <span class="gc-dado">nome @ CÓDIGO do ativo</span>.</span></p>
 <form class="rp-form" method="post" action="{{ raiz }}/t/pcm/quadro/reprogramacoes" data-rp-form>
   <input type="hidden" name="semana" value="{{ rp.semana }}">
   <input type="hidden" name="sha_visto" value="{{ rp.sha }}">
@@ -76,6 +78,9 @@
       <dt><span class="gc-dado">15269; qua</span> · <span class="gc-dado">15269; qua; ; tarde</span></dt><dd>a OS inteira no dia (e no turno)</dd>
       <dt><span class="gc-dado">15269; qua; MPM; tarde; só: Transformador</span></dt><dd>preventiva por sigla (MPA, MPS, MPT, MPM, MPQ, Handover): só a tarefa daquele equipamento</dd>
       <dt><span class="gc-dado">15289; ter; Troca de fusível; manhã</span></dt><dd>as outras: o nome da tarefa até a 1ª vírgula</dd>
+      <dt><span class="gc-dado">16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2.7</span></dt><dd>a subtarefa: a tarefa só
+        naquele ativo (o código depois do <span class="gc-dado">@</span>); vale no <span class="gc-dado">sem:</span>, no nome
+        da tarefa e no <span class="gc-dado">só:</span>. Sem o <span class="gc-dado">@</span>, a tarefa em todos os ativos</dd>
       <dt><span class="gc-dado"># texto</span></dt><dd>comentário: o robô não aplica</dd>
     </dl>
     <p class="gc-ajuda">Dias: seg, ter, qua, qui e sex (o robô não entende sábado). Turnos: manhã, tarde e noite.</p>

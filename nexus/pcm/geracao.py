@@ -400,13 +400,27 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
     _gravar(pasta, st)
 
 
+def casa_tarefa(palavra, tarefa, codigo="") -> bool:
+    """A palavra do "sem:" casa com a linha? A regra do `_casa_tarefa` do robô e do motor do PCM (19/10/2026): "nome"
+    = o nome da tarefa contém a palavra, sem diferenciar maiúscula; "nome @ CÓDIGO" = a subtarefa, o nome contém e o
+    código do ativo é esse."""
+    k = str(palavra or "").strip().lower()
+    t = str(tarefa or "").lower()
+    if "@" in k:
+        nome, _, cod = k.rpartition("@")
+        nome, cod = nome.strip(), cod.strip()
+        return bool(cod) and cod == str(codigo or "").strip().lower() and (not nome or nome in t)
+    return bool(k) and k in t
+
+
 def aplicar_sem(obs: Path, planilha: Path) -> dict:
     """O "sem:" das observações na planilha que o motor gerou, como o robô do PCM o aplica na semana em curso
     (`atualizacao_semanal`, STEP A3): em toda aba com "OSs ID" e "Tarefa" (as das equipes e a _Pendentes), apaga a
     linha da OS cuja tarefa contém uma das palavras, sem diferenciar maiúscula. É o "Tirar da semana" de UMA tarefa do
     Quadro (15/10/2026). O motor só aplica o "sem:" nas OS de plano (Handover e MPx, o modo A: lá a tarefa nem é
     programada e aqui não sobra nada); na OS comum (modo B) ele programa a tarefa mesmo assim, e é aqui que ela sai, com
-    o horário dela vazio na agenda. Devolve {linhas apagadas, OS}; sem nada a apagar, a planilha nem é regravada."""
+    o horário dela vazio na agenda. A subtarefa ("nome @ CÓDIGO", 19/10/2026) sai só no ativo dela, como no robô
+    (`_casa_tarefa`). Devolve {linhas apagadas, OS}; sem nada a apagar, a planilha nem é regravada."""
     try:
         texto = Path(obs).read_text(encoding="utf-8")
     except OSError:
@@ -426,13 +440,15 @@ def aplicar_sem(obs: Path, planilha: Path) -> dict:
         if "OSs ID" not in cab or "Tarefa" not in cab:
             continue
         col_os, col_t = cab.index("OSs ID") + 1, cab.index("Tarefa") + 1
+        col_c = next((cab.index(h) + 1 for h in ("Código Equipamento", "Código") if h in cab), None)
         for lin in range(ws.max_row, 1, -1):              # de baixo para cima: apagar não desloca o que falta ler
             try:
                 os_ = int(ws.cell(row=lin, column=col_os).value)
             except (TypeError, ValueError):
                 continue
             palavras = tirar.get(os_)
-            if palavras and any(p in str(ws.cell(row=lin, column=col_t).value or "").lower() for p in palavras):
+            cod = ws.cell(row=lin, column=col_c).value if col_c else ""
+            if palavras and any(casa_tarefa(p, ws.cell(row=lin, column=col_t).value, cod) for p in palavras):
                 ws.delete_rows(lin, 1)
                 n += 1
                 oss.add(str(os_))

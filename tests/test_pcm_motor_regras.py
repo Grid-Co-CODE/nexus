@@ -115,3 +115,35 @@ def test_zeladoria_pelo_tipo_da_tarefa():
     # pelo nome, estes eram zeladoria: a corretiva de limpeza, a troca ("roça" sem acento) e o religamento de Sorocaba
     for tipo in ("Corretiva", "Preventiva", "Religamento", "Inspeção", "", None, float("nan")):
         assert not is_zeladoria(tipo)
+
+
+
+# ── a subtarefa (19/10/2026): "nome @ CÓDIGO" ───────────────────────────────────────────────────────────────
+def test_subtarefa_o_motor_e_o_nexus_casam_igual():
+    """O `_casa_tarefa` do motor (a palavra do "sem:", do campo de tarefas e do "só:") e o `geracao.casa_tarefa` do
+    Nexus (o "sem:" na planilha gerada) respondem igual; o robô da semana em curso tem a mesma função. Caso que criou: a
+    OS 16739 com "[GreenYellow] - MPT - Inversor" em 15 inversores; tirar UM levava os 15."""
+    from nexus.pcm import geracao as G
+    texto = (MOTOR / "programacao_v7.py").read_text(encoding="utf-8")
+    ns = {"re": re}
+    for no in ast.parse(texto).body:
+        if isinstance(no, ast.FunctionDef) and no.name in ("_casa_tarefa", "_norm_usina"):
+            exec(compile(ast.Module([no], []), "programacao_v7", "exec"), ns)
+    inv = "[GreenYellow] - MPT - Inversor"
+    casos = [
+        (f"{inv} @ MCB100-INVR2.7", inv, "MCB100-INVR2.7", True),
+        (f"{inv} @ MCB100-INVR2.7", inv, "MCB100-INVR2.6", False),
+        ("QGBT @ THPN-SDI100-QGBT1", "[Grid Co.] - MPM - QGBT", "THPN-SDI100-QGBT10", False),   # o código é exato
+        ("inversor @ mcb100-invr2.7", inv, "MCB100-INVR2.7", True),                            # sem caixa
+        ("@ MCB100-INVR2.7", inv, "MCB100-INVR2.7", True),                                      # só o código
+        ("Trafo @ MCB100-INVR2.7", inv, "MCB100-INVR2.7", False),                               # nome que não bate
+        ("Inversor", inv, "MCB100-INVR2.7", True),                                              # sem "@": pelo nome
+        ("inversor", inv, "", True),
+        ("QGBT", inv, "", False),
+        ("Inversor @ ", inv, "", False),                                                        # código vazio
+    ]
+    for kw, tarefa, cod, esperado in casos:
+        tk = {"tarefa_txt": tarefa, "codigo": cod}
+        assert ns["_casa_tarefa"](kw, tk) is esperado, (kw, cod)
+        assert ns["_casa_tarefa"](kw, tk, ns["_norm_usina"]) is esperado, (kw, cod)
+        assert G.casa_tarefa(kw, tarefa, cod) is esperado, (kw, cod)

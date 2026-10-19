@@ -169,7 +169,7 @@ def nome_da_tarefa(tarefa) -> str:
     return str(tarefa or "").split(",")[0].split(";")[0].strip()
 
 
-def linha(os_id, dia: str, turno_: str = "", tarefa: str = "", tipo: str = "") -> str | None:
+def linha(os_id, dia: str, turno_: str = "", tarefa: str = "", tipo: str = "", codigo: str = "") -> str | None:
     """A linha que reprograma, a mesma do `rpLinha` do painel do PCM (e do `linha` de `static/pcm-quadro.js`):
 
         15269; não                                   a OS sai da semana (sempre a OS inteira)
@@ -183,25 +183,65 @@ def linha(os_id, dia: str, turno_: str = "", tarefa: str = "", tipo: str = "") -
     inteira: Levi, 15/10/2026, "quando o PCM tenta tirar da semana uma tarefa aparece uma notificação de tirar todas
     as tarefas da OS, isso não pode acontecer".
 
+    Com `codigo` (19/10/2026), a SUBTAREFA: a tarefa só naquele ativo, "nome @ CÓDIGO" no lugar do nome
+    (`16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2.7`). O robô e o motor do PCM casam o nome e o código
+    (`_casa_tarefa` deles); só pelo nome, tirar ou mover UM dos 15 inversores da OS 16739 levava os 15.
+
     None quando a tarefa não tem nome que o motor reconheça (a linha viraria a OS inteira)."""
     os_s = str(os_id).strip()
+    cod = str(codigo or "").strip()
+
+    def no_ativo(nome: str) -> str:
+        return f"{nome} @ {cod}" if cod else nome
+
     if dia == "não":
         return f"{os_s}; não"
     if dia == "sem":
         nome = nome_da_tarefa(tarefa)
-        return f"{os_s}; sem: {nome}" if nome else None
+        return f"{os_s}; sem: {no_ativo(nome)}" if nome else None
     if not tarefa:
         return f"{os_s}; {dia}; ; {turno_}" if turno_ else f"{os_s}; {dia}"
     sig = sigla(tipo)
     if sig:
         ch = chave_da_tarefa(tarefa)
-        partes = [os_s, dia, sig, turno_, f"só: {ch}" if ch else ""]
+        partes = [os_s, dia, sig, turno_, f"só: {no_ativo(ch)}" if ch else ""]
     else:
         nome = nome_da_tarefa(tarefa)
         if not nome:
             return None
-        partes = [os_s, dia, nome, turno_]
+        partes = [os_s, dia, no_ativo(nome), turno_]
     return "; ".join(v for i, v in enumerate(partes) if i < 3 or v)
+
+
+def _token(s) -> tuple[str, str]:
+    """ "nome @ CÓDIGO" -> (nome, código), normalizados; sem "@", (nome, "")."""
+    s = str(s or "")
+    if "@" in s:
+        n, _, c = s.rpartition("@")
+        return _norm(n), _norm(c)
+    return _norm(s), ""
+
+
+def legivel(s) -> str:
+    """ "nome @ CÓDIGO" como a tela diz: "nome (ativo CÓDIGO)"."""
+    s = str(s or "")
+    if "@" not in s:
+        return s
+    n, _, c = s.rpartition("@")
+    return f"{n.strip()} (ativo {c.strip()})" if n.strip() else f"ativo {c.strip()}"
+
+
+def tarefas_por_os(sem: dict | None) -> dict[int, list[tuple[str, str]]]:
+    """{OS: [(tarefa, código do ativo)]} da semana (agenda e pendentes), para a mescla separar o "sem:" de uma tarefa
+    em todos os ativos quando UMA subtarefa dela volta para um dia."""
+    out: dict[int, list[tuple[str, str]]] = {}
+    for r in ((sem or {}).get("rows") or []) + ((sem or {}).get("pendentes") or []):
+        os_s = str(r.get("os_id") or "").strip()
+        if os_s.isdigit():
+            par = (str(r.get("tarefa") or ""), str(r.get("codigo") or "").strip())
+            if par not in out.setdefault(int(os_s), []):
+                out[int(os_s)].append(par)
+    return out
 
 
 def _so_sem(regra: dict) -> bool:
@@ -221,14 +261,37 @@ def _alvo(regra: dict):
     return None
 
 
-def _volta(palavra: str, regra: dict) -> bool:
-    """A tarefa que a linha por tarefa põe num dia é a que a palavra do "sem:" tirou? Na OS de plano a linha diz a
-    tarefa pelo "só:" (o campo de tarefas leva a sigla, que todas as tarefas do plano têm: sem "só:", a linha é "o
-    resto do plano", e o motor tira o "sem:" antes dela); na comum, pelo nome."""
-    p = _norm(palavra)
+def _volta(palavra: str, regra: dict):
+    """Quanto da palavra do "sem:" a linha por tarefa põe de volta num dia: "tudo", o código do ativo (a linha põe UMA
+    subtarefa de uma palavra que tirava a tarefa em todos os ativos) ou None. Na OS de plano a linha diz a tarefa pelo
+    "só:" (o campo de tarefas leva a sigla, que todas as tarefas do plano têm: sem "só:", a linha é "o resto do plano",
+    e o motor tira o "sem:" antes dela); na comum, pelo nome. A subtarefa ("nome @ CÓDIGO", 19/10/2026) só volta pela
+    linha do mesmo ativo ou da tarefa em todos os ativos."""
+    pn, pc = _token(palavra)
     if regra.get("so"):
-        return any(_norm(s) in p for s in regra["so"])
-    return any(_norm(t) in p or p in _norm(t) for t in regra.get("tarefas") or [] if not sigla(t))
+        alvos = [(_token(s), True) for s in regra["so"]]
+    else:
+        alvos = [(_token(t), False) for t in regra.get("tarefas") or [] if not sigla(t)]
+    for (tn, tc), do_so in alvos:
+        if not (tn in pn or (not do_so and pn in tn)):
+            continue
+        if pc and tc and pc != tc:
+            continue
+        return "tudo" if (pc or not tc) else tc
+    return None
+
+
+def _sem_menos_o_ativo(palavra: str, os_id: int, cod: str, ativos: dict | None) -> list[str]:
+    """A palavra do "sem:" que tirava a tarefa em todos os ativos, menos o ativo `cod` que voltou para um dia: uma
+    subtarefa por ativo que continua fora. Sem saber os ativos da semana, a palavra sai inteira (a regra de antes)."""
+    pn, _ = _token(palavra)
+    out = []
+    for t, c in (ativos or {}).get(int(os_id), []):
+        if c and pn in _norm(t) and _norm(c) != cod:
+            w = f"{nome_da_tarefa(t)} @ {c}"
+            if w not in out:
+                out.append(w)
+    return out
 
 
 def _unicas(palavras) -> list[str]:
@@ -240,7 +303,7 @@ def _unicas(palavras) -> list[str]:
     return out
 
 
-def mesclar(texto: str, novas: list[str]) -> tuple[str, dict]:
+def mesclar(texto: str, novas: list[str], ativos: dict | None = None) -> tuple[str, dict]:
     """Junta as linhas novas ao texto das observações, sem duplicar ordem para a mesma OS:
     - a linha nova substitui a que já havia para o MESMO alvo (a OS, as tarefas e o "só:");
     - "OS; não" tira todas as linhas daquela OS (a OS sai inteira);
@@ -249,6 +312,9 @@ def mesclar(texto: str, novas: list[str]) -> tuple[str, dict]:
     - "OS; sem: ..." (tirar UMA tarefa, 15/10/2026) não mexe nas outras linhas da OS: junta as tarefas tiradas da OS
       numa linha só, a última da OS (o motor guarda só o "sem:" da última linha da OS que tem um, e o robô do PCM soma
       todos: assim os dois tiram as mesmas), levando também o "sem:" escrito à mão numa linha de dia.
+    A subtarefa ("nome @ CÓDIGO", 19/10/2026) é um alvo próprio: as subtarefas da mesma tarefa em dias diferentes
+    convivem, e a que volta para um dia sai do "sem:" sozinha. Quando o "sem:" tirava a tarefa em TODOS os ativos e só
+    uma volta, ele passa a listar uma subtarefa por ativo que continua fora (`ativos`: `tarefas_por_os` da semana).
     O resto (usinas, comentários, outras OS) fica igual e na mesma ordem. Devolve (texto, {novas, saem})."""
     linhas = (texto or "").replace("\r\n", "\n").split("\n")
     while linhas and not linhas[-1].strip():
@@ -285,8 +351,14 @@ def mesclar(texto: str, novas: list[str]) -> tuple[str, dict]:
             elif inteira or x["tipo"] == "fora" or _alvo(x) == alvo:
                 sai(l, nova)
             elif _so_sem(x):
-                resto = [p for p in x["sem"] if not _volta(p, r)]
-                if len(resto) == len(x["sem"]):
+                resto = []
+                for p in x["sem"]:
+                    v = _volta(p, r)
+                    if v is None:
+                        resto.append(p)
+                    elif v != "tudo":
+                        resto.extend(_sem_menos_o_ativo(p, x["os"], v, ativos))
+                if resto == list(x["sem"]):
                     fica.append(l)
                     continue
                 sai(l, nova)
@@ -624,24 +696,34 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
     sems = [(s["week"], s.get("rows") or []) for s in publicadas if s.get("week") and s["week"] < week]
     sems.append((week, rows))
     indices = _indices(sems)
-    # as tarefas de cada OS na semana (agenda e pendentes): o "OS inteira (N tarefas)" da janela. `n` = em quantas
-    # linhas o nome aparece (uma por equipamento ou bloco): tirar a tarefa pelo "sem:" tira todas, e a janela avisa
+    # as tarefas de cada OS na semana (agenda e pendentes): o "O que" da janela. `n` = em quantas linhas o nome
+    # aparece; `cods` = os ativos dela, [código, linhas] (19/10/2026: a janela tira e move a SUBTAREFA, a tarefa
+    # naquele ativo; pelo nome, os 15 inversores da OS 16739 saíam juntos)
     por_os: dict[str, list[dict]] = {}
     for r, eh_pend in [(r, False) for r in rows] + [(p, True) for p in sem.get("pendentes") or []]:
         lst = por_os.setdefault(str(r.get("os_id") or ""), [])
         t = str(r.get("tarefa") or "")
+        cod = str(r.get("codigo") or "").strip()
         x = next((x for x in lst if x["t"] == t), None)
         if x is None:
-            lst.append({"t": t, "tp": str(r.get("tipo") or ""), "pend": eh_pend, "n": 1})
+            lst.append({"t": t, "tp": str(r.get("tipo") or ""), "pend": eh_pend, "n": 1, "cods": [[cod, 1]]})
         else:
             x["n"] += 1
+            c = next((c for c in x["cods"] if c[0] == cod), None)
+            if c is None:
+                x["cods"].append([cod, 1])
+            else:
+                c[1] += 1
+    for lst in por_os.values():
+        for x in lst:
+            x["cods"].sort(key=lambda c: c[0])
 
     itens: list[dict] = []
     oss: dict[str, list[dict]] = {}
 
     def _novo_item(r, pend_):
         os_s = str(r.get("os_id") or "")
-        if len(por_os.get(os_s, [])) > 1:
+        if sum(len(x["cods"]) for x in por_os.get(os_s, [])) > 1:      # mais de uma subtarefa
             oss[os_s] = por_os[os_s]
         itens.append(_item(r, pend_, trajetoria(r, indices, week) if not pend_ else [], dia_data))
         return len(itens) - 1
@@ -699,9 +781,11 @@ def linhas_da_fila(sem: dict, itens: list) -> tuple[list[str], list[str]]:
     arquivo que o motor e o robô do PCM leem. Dia "sem" = tirar da semana só aquela tarefa (pede a tarefa). As linhas
     saem já mescladas entre si (`mesclar`): as tarefas tiradas da mesma OS numa linha só."""
     tarefas: dict[str, dict[str, str]] = {}
+    cods: dict[tuple[str, str], set] = {}            # os, tarefa -> os ativos dela na semana (a subtarefa, 19/10/2026)
     for r in (sem.get("rows") or []) + (sem.get("pendentes") or []):
-        tarefas.setdefault(str(r.get("os_id") or "").strip(), {}).setdefault(str(r.get("tarefa") or ""),
-                                                                            str(r.get("tipo") or ""))
+        os_r, t_r = str(r.get("os_id") or "").strip(), str(r.get("tarefa") or "")
+        tarefas.setdefault(os_r, {}).setdefault(t_r, str(r.get("tipo") or ""))
+        cods.setdefault((os_r, t_r), set()).add(str(r.get("codigo") or "").strip())
     linhas, problemas, vistos = [], [], {}
     for it in itens if isinstance(itens, list) else []:
         if not isinstance(it, dict):
@@ -710,6 +794,7 @@ def linhas_da_fila(sem: dict, itens: list) -> tuple[list[str], list[str]]:
         dia = str(it.get("dia") or "").strip()
         tur = str(it.get("turno") or "").strip()
         tarefa = str(it.get("tarefa") or "")
+        codigo = str(it.get("codigo") or "").strip()
         if not os_s.isdigit() or os_s not in tarefas:
             problemas.append(f"OS {os_s[:12] or '(vazia)'}: não está nesta semana")
             continue
@@ -731,16 +816,21 @@ def linhas_da_fila(sem: dict, itens: list) -> tuple[list[str], list[str]]:
         elif tarefa and tarefa not in tarefas[os_s]:
             problemas.append(f"OS {os_s}: a tarefa não está nesta semana")
             continue
-        l = linha(os_s, dia, tur, tarefa, tarefas[os_s].get(tarefa, ""))
+        if not tarefa:
+            codigo = ""
+        elif codigo and codigo not in cods.get((os_s, tarefa), ()):
+            problemas.append(f"OS {os_s}: o ativo {codigo[:40]} não tem essa tarefa nesta semana")
+            continue
+        l = linha(os_s, dia, tur, tarefa, tarefas[os_s].get(tarefa, ""), codigo)
         if l is None:
             problemas.append(f"OS {os_s}: a tarefa não tem nome que o motor reconheça; reprograme a OS inteira")
             continue
-        alvo = (os_s, tarefa)
-        if alvo in vistos:                 # a mesma tarefa duas vezes na fila: vale a última
+        alvo = (os_s, tarefa, codigo)
+        if alvo in vistos:                 # a mesma tarefa (no mesmo ativo) duas vezes na fila: vale a última
             linhas.remove(vistos[alvo])
         vistos[alvo] = l
         linhas.append(l)
-    return (mesclar("", linhas)[0].splitlines() if linhas else []), problemas
+    return (mesclar("", linhas, tarefas_por_os(sem))[0].splitlines() if linhas else []), problemas
 
 
 # ── gravar ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -772,11 +862,11 @@ def gravadas(config, semana: str, n: int = 12) -> list[dict]:
     return out
 
 
-def salvar_no_nexus(config, semana: str, linhas: list[str], quem: str) -> dict:
+def salvar_no_nexus(config, semana: str, linhas: list[str], quem: str, ativos: dict | None = None) -> dict:
     """As linhas entram nas observações da semana no Nexus (o texto que a tela Gerar mostra e o motor recebe)."""
     trab = geracao.pasta_trabalho(config)
     texto, herdada = I.observacoes_efetivas(trab, semana)
-    novo, res = mesclar(texto, linhas)
+    novo, res = mesclar(texto, linhas, ativos)
     I.salvar_observacoes(trab, semana, novo, autor=f"quadro da semana · {quem}")
     registrar(config, {"quando": datetime.now(_BRT).isoformat(timespec="seconds"), "quem": quem, "semana": semana,
                        "destino": "nexus", "linhas": linhas, "saem": res["saem"]})
@@ -791,7 +881,8 @@ def semana_do_cabecalho(texto: str) -> str | None:
     return None
 
 
-def novo_texto_atual(texto: str, semana: str, linhas: list[str], apagar_sem_semana: bool = False) -> tuple[str, dict]:
+def novo_texto_atual(texto: str, semana: str, linhas: list[str], apagar_sem_semana: bool = False,
+                     ativos: dict | None = None) -> tuple[str, dict]:
     """O `Observacoes_Semana_Atual.txt` depois de juntar as linhas. O arquivo vale para qualquer semana que estiver em
     curso: linha que ficou da semana passada se aplicaria à nova. Por isso o Nexus escreve a semana no cabeçalho e,
     quando o cabeçalho é de outra semana, o que estava lá sai. Sem cabeçalho (gravado pelo painel do PCM), fica, a não
@@ -805,7 +896,7 @@ def novo_texto_atual(texto: str, semana: str, linhas: list[str], apagar_sem_sema
     if (sem_cab and sem_cab != semana) or (not sem_cab and apagar_sem_semana):
         saem_semana = [l for l in corpo if l.strip()]
         corpo = []
-    mesclado, res = mesclar("\n".join(corpo), linhas)
+    mesclado, res = mesclar("\n".join(corpo), linhas, ativos)
     final = CAB_ATUAL.format(semana=semana) + "\n" + mesclado.lstrip("\n")
     return final, dict(res, saem_outra_semana=saem_semana, semana_antes=sem_cab)
 
@@ -831,7 +922,7 @@ def ler_atual(config) -> dict:
 
 
 def aplicar_na_semana_em_curso(config, semana: str, linhas: list[str], quem: str, sha_visto: str,
-                               apagar_sem_semana: bool = False) -> dict:
+                               apagar_sem_semana: bool = False, ativos: dict | None = None) -> dict:
     """Grava as linhas no `Observacoes_Semana_Atual.txt` do repositório do PCM (o PUT do `publicar.py`) e confere
     relendo. `sha_visto` é o do arquivo que a pessoa conferiu na tela: se o arquivo mudou desde então (o painel do PCM
     grava no mesmo arquivo), não grava."""
@@ -848,7 +939,7 @@ def aplicar_na_semana_em_curso(config, semana: str, linhas: list[str], quem: str
             raise QuadroErro("o arquivo de ajustes da semana em curso mudou desde que você abriu a confirmação; "
                              "confira de novo")
         texto = atual["bytes"].decode("utf-8", errors="replace") if atual else ""
-        novo, res = novo_texto_atual(texto, semana, linhas, apagar_sem_semana)
+        novo, res = novo_texto_atual(texto, semana, linhas, apagar_sem_semana, ativos)
         dados = novo.encode("utf-8")
         commit = PB._gravar(s, tok, repo, ramo, PB.OBS_ATUAL, dados,
                             f"chore: Nexus reprograma a semana em curso ({semana}, {len(linhas)} "
@@ -955,18 +1046,18 @@ def descrever(l: str, sem: dict | None) -> dict:
     if r["tipo"] == "fora":
         out["o_que"] = "Tira da semana a OS inteira"
     elif _so_sem(r):
-        out["o_que"] = "Tira da semana só: " + "; ".join(r["sem"])
+        out["o_que"] = "Tira da semana só: " + "; ".join(legivel(p) for p in r["sem"])
     elif r["dias"]:
         nomes = [O.NOMES_DIA[d].lower() for d in r["dias"]]
         quando = "na " + (", ".join(nomes[:-1]) + " e " + nomes[-1] if len(nomes) > 1 else nomes[0])
         tur = _TURNO_FRASE.get(O._sem_acento(r.get("turno") or "").upper())
         if r["so"]:
-            alvo = ", ".join(r["so"]) + (f" ({', '.join(r['tarefas'])})" if r["tarefas"] else "")
+            alvo = ", ".join(legivel(s) for s in r["so"]) + (f" ({', '.join(r['tarefas'])})" if r["tarefas"] else "")
         else:
-            alvo = ", ".join(r["tarefas"]) or "A OS inteira"
+            alvo = ", ".join(legivel(t) for t in r["tarefas"]) or "A OS inteira"
         out["o_que"] = f"{alvo} {quando}" + (f", {tur}" if tur else "")
         if r["sem"]:
-            out["o_que"] += "; tira da semana: " + "; ".join(r["sem"])
+            out["o_que"] += "; tira da semana: " + "; ".join(legivel(p) for p in r["sem"])
     if sem:
         r0 = next((x for x in (sem.get("rows") or []) + (sem.get("pendentes") or [])
                    if str(x.get("os_id") or "").strip() == os_s), None)

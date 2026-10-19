@@ -48,6 +48,15 @@ CASOS = [
     (("15290", "sem", "", "Troca de fusível, string 3", "Corretiva"), "15290; sem: Troca de fusível"),
     (("15291", "sem", "", ", sem nome", "Corretiva"), None),
     (("15292", "sem", "", "", "Corretiva"), None),
+    # a SUBTAREFA (19/10/2026): a tarefa num ativo, "nome @ CÓDIGO" (o robô e o motor casam o nome e o código)
+    (("16739", "sem", "", "[GreenYellow] - MPT - Inversor", "Preventiva", "MCB100-INVR2.7"),
+     "16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2.7"),
+    (("16739", "qua", "tarde", "[GreenYellow] - MPT - Inversor", "Preventiva", "MCB100-INVR2.6"),
+     "16739; qua; [GreenYellow] - MPT - Inversor @ MCB100-INVR2.6; tarde"),
+    (("15269", "qua", "manhã", "[Grid Co.] - MPM - Transformador Aéreo", "MPM", "ABC-TRFR1"),
+     "15269; qua; MPM; manhã; só: Transformador Aéreo @ ABC-TRFR1"),
+    (("15269", "não", "", "[Grid Co.] - MPM - Trafo", "MPM", "ABC-TRFR1"), "15269; não"),
+    (("15269", "qua", "", "", "", "ABC-TRFR1"), "15269; qua"),             # código sem tarefa: a OS inteira
 ]
 
 
@@ -65,7 +74,7 @@ def test_linha_do_javascript_igual_a_do_python():
     """A fila mostra na página a linha do pcm-quadro.js; o servidor grava a do quadro.py. Têm de ser a mesma."""
     script = ("require(process.argv[1]); const L = globalThis.QuadroLinha;"
               "const c = JSON.parse(process.argv[2]);"
-              "process.stdout.write(JSON.stringify(c.map(a => L.linha(a[0], a[1], a[2], a[3], a[4]))));")
+              "process.stdout.write(JSON.stringify(c.map(a => L.linha(a[0], a[1], a[2], a[3], a[4], a[5]))));")
     r = subprocess.run(["node", "-e", script, str(JS), json.dumps([list(a) for a, _ in CASOS])],
                        capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert r.returncode == 0, r.stderr
@@ -556,6 +565,8 @@ def test_linhas_do_arquivo_da_semana_em_curso():
     ("@usina Usina 1 = seg", True),        # regra de usina é da geração, não da semana em curso
     ("15001; ter" + " " * 400, False),     # espaço no fim não conta
     ("15001; ter; " + "x" * 400, True),    # longa demais
+    ("16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2", False),   # a subtarefa (19/10/2026)
+    ("16739; qua; [GreenYellow] - MPT - Inversor @ MCB100-INVR3; tarde", False),
 ], ids=lambda v: str(v).strip()[:24] if isinstance(v, str) else None)
 def test_problema_da_linha_da_semana_em_curso(linha, ruim):
     assert bool(Q.problemas_das_linhas([linha])) is ruim
@@ -737,3 +748,96 @@ def test_tela_reprogramacoes_cabecalho_de_outra_semana(app, logado, tmp_path, mo
     assert "aplica nesta" in html
     assert logado.post("/t/pcm/quadro/reprogramacoes", data=_form_reprogramacoes(html)).status_code == 303
     assert Q.semana_do_cabecalho(gh.arquivos["Observacoes_Semana_Atual.txt"].decode()) == "2026-W41"
+
+
+
+# ── a subtarefa: a tarefa num ativo (19/10/2026) ────────────────────────────────────────────────────────────
+# O programador do PCM tirou da semana UM inversor da OS 16739 e a confirmação disse que saíam os 15 ("parece que está
+# puxando pelo nome"): o robô do PCM e o motor achavam a tarefa só pelo nome. A linha agora aponta a subtarefa,
+# "nome @ CÓDIGO do ativo", e o robô e o motor casam o nome e o código.
+def _semana_com_ativos():
+    rows = [_r(16739, "Terça-feira", f"0{7 + i}:00", tarefa="[GreenYellow] - MPT - Inversor", tipo="Preventiva",
+               codigo=f"MCB100-INVR{i}") for i in (1, 2, 3)]
+    rows.append(_r(16739, "Quinta-feira", "08:00", tarefa="[GreenYellow] - MPT - QGBT", tipo="Preventiva",
+                   codigo="MCB100-QGBT1"))
+    rows.append(_r(16740, "Quarta-feira", "08:00", tarefa="Limpeza", tipo="Corretiva", codigo="MCB100-INVR1"))
+    rows.append(_r(16740, "Quarta-feira", "10:00", tarefa="Limpeza", tipo="Corretiva", codigo="MCB100-INVR2"))
+    return {"week": "2026-W43", "label": "Semana 43", "rows": rows, "pendentes": [],
+            "dates": {"seg": "19/10", "ter": "20/10", "qua": "21/10", "qui": "22/10", "sex": "23/10"}}
+
+
+def test_mescla_da_subtarefa():
+    inv = "[GreenYellow] - MPT - Inversor"
+    # duas subtarefas tiradas da mesma OS: uma linha só, com as duas
+    novo, _ = Q.mesclar(f"16739; sem: {inv} @ MCB100-INVR1\n", [f"16739; sem: {inv} @ MCB100-INVR2"])
+    assert novo == f"16739; sem: {inv} @ MCB100-INVR1, {inv} @ MCB100-INVR2\n"
+    # pôr UMA de volta num dia tira só ela do "sem:"
+    novo, _ = Q.mesclar(novo, [f"16739; qua; {inv} @ MCB100-INVR1; tarde"])
+    assert novo.splitlines() == [f"16739; sem: {inv} @ MCB100-INVR2", f"16739; qua; {inv} @ MCB100-INVR1; tarde"]
+    # subtarefas da mesma tarefa em dias diferentes convivem; a mesma de novo, vale a última
+    novo, _ = Q.mesclar("", [f"16739; qua; {inv} @ MCB100-INVR1", f"16739; qui; {inv} @ MCB100-INVR2",
+                             f"16739; sex; {inv} @ MCB100-INVR1"])
+    assert novo.splitlines() == [f"16739; qui; {inv} @ MCB100-INVR2", f"16739; sex; {inv} @ MCB100-INVR1"]
+    # a tarefa em todos os ativos num dia põe de volta a subtarefa que o "sem:" tirava
+    novo, _ = Q.mesclar(f"16739; sem: {inv} @ MCB100-INVR1\n", [f"16739; qua; {inv}"])
+    assert novo.splitlines() == [f"16739; qua; {inv}"]
+    # o "sem:" da tarefa em TODOS os ativos e UMA de volta num dia: as outras continuam fora, uma por uma
+    ativos = Q.tarefas_por_os(_semana_com_ativos())
+    novo, _ = Q.mesclar(f"16739; sem: {inv}\n", [f"16739; qua; {inv} @ MCB100-INVR2"], ativos)
+    assert novo.splitlines() == [f"16739; sem: {inv} @ MCB100-INVR1, {inv} @ MCB100-INVR3",
+                                 f"16739; qua; {inv} @ MCB100-INVR2"]
+    # a subtarefa de outro ativo não mexe no "sem:"
+    novo, _ = Q.mesclar(f"16739; sem: {inv} @ MCB100-INVR1\n", [f"16739; qua; {inv} @ MCB100-INVR2"], ativos)
+    assert novo.splitlines() == [f"16739; sem: {inv} @ MCB100-INVR1", f"16739; qua; {inv} @ MCB100-INVR2"]
+
+
+def test_fila_da_subtarefa():
+    """O item da fila leva o código do ativo da SEMANA: a linha aponta a subtarefa; sem código, a tarefa em todos os
+    ativos (pelo nome); código que a tarefa não tem na semana não grava."""
+    sem = _semana_com_ativos()
+    inv = "[GreenYellow] - MPT - Inversor"
+    itens = [{"os": "16739", "tarefa": inv, "codigo": "MCB100-INVR2", "dia": "sem"},
+             {"os": "16739", "tarefa": inv, "codigo": "MCB100-INVR3", "dia": "qua", "turno": "tarde"},
+             {"os": "16740", "tarefa": "Limpeza", "codigo": "", "dia": "sex"},
+             {"os": "16739", "tarefa": inv, "codigo": "MCB100-QGBT1", "dia": "seg"},        # o QGBT não tem essa tarefa
+             {"os": "16739", "tarefa": inv, "codigo": "OUTRO-ATIVO", "dia": "seg"}]
+    linhas, problemas = Q.linhas_da_fila(sem, itens)
+    assert linhas == [f"16739; sem: {inv} @ MCB100-INVR2", f"16739; qua; {inv} @ MCB100-INVR3; tarde", "16740; sex; Limpeza"]
+    assert len(problemas) == 2 and all("ativo" in p for p in problemas)
+
+
+def test_oss_traz_os_ativos_de_cada_tarefa():
+    """A janela oferece a subtarefa: em `oss`, cada tarefa com os ativos dela e quantas linhas cada um tem. A OS com uma
+    tarefa só, em vários ativos, também vai (antes, o "Tirar da semana" dela virava a OS inteira)."""
+    q = Q.montar(_semana_com_ativos(), [], {})
+    inv = next(x for x in q["oss"]["16739"] if x["t"] == "[GreenYellow] - MPT - Inversor")
+    assert inv["cods"] == [["MCB100-INVR1", 1], ["MCB100-INVR2", 1], ["MCB100-INVR3", 1]] and inv["n"] == 3
+    assert [x["cods"] for x in q["oss"]["16740"]] == [[["MCB100-INVR1", 1], ["MCB100-INVR2", 1]]]
+
+
+def test_descrever_a_subtarefa():
+    d = Q.descrever("16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2", _semana_com_ativos())
+    assert "Inversor (ativo MCB100-INVR2)" in d["o_que"] and "@" not in d["o_que"]
+    d = Q.descrever("16739; qua; [GreenYellow] - MPT - Inversor @ MCB100-INVR3; tarde", _semana_com_ativos())
+    assert "Inversor (ativo MCB100-INVR3) na quarta, à tarde" in d["o_que"]
+    assert not Q.problemas_das_linhas(["16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2",
+                                       "16739; qua; [GreenYellow] - MPT - Inversor @ MCB100-INVR3; tarde"])
+
+
+def test_tela_quadro_tira_uma_subtarefa_da_semana_em_curso(app, logado, tmp_path, monkeypatch):
+    monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 21))
+    s43 = _semana_com_ativos()
+    p = tmp_path / "banco_dados.json"
+    p.write_text(json.dumps({"geradoEm": "2026-10-19T12:00:00Z", "semana_ativa": "2026-W43", "semanas": [s43]}),
+                 encoding="utf-8")
+    app.config.update(NEXUS_PCM_FONTE=str(p), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
+    gh = _com_github(app.config, GitHubFalso({"Observacoes_Semana_Atual.txt": b""}))
+    itens = json.dumps([{"os": "16739", "tarefa": "[GreenYellow] - MPT - Inversor", "codigo": "MCB100-INVR2",
+                         "dia": "sem"}])
+    html = logado.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W43", "itens": itens}).get_data(as_text=True)
+    assert "16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2" in html and not gh.commits
+    sha = html.split('name="sha_visto" value="', 1)[1].split('"', 1)[0]
+    r = logado.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W43", "itens": itens, "confirmo": "1",
+                                                       "sha_visto": sha})
+    assert r.status_code == 303 and gh.arquivos["Observacoes_Semana_Atual.txt"].decode("utf-8").splitlines()[1:] == [
+        "16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2"]
