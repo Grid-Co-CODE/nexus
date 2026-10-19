@@ -956,7 +956,9 @@ def test_a_etiqueta_do_fracttal_de_cada_motivo(app, logado, tela):
     linha = html.split(f'data-motivo="{am["id"]}"', 1)[1].split("</tr>", 1)[0]
     campo = linha.split('name="etiqueta"', 1)[1].split(">", 1)[0]
     assert f'form="f-motivo-{am["id"]}"' in campo and 'value="Sem Material Sobressalente"' in campo
-    assert 'list="etiquetas-fracttal"' in campo and '<datalist id="etiquetas-fracttal">' in html
+    # a lista de sugestões é a do Nexus (pcm-etiqueta.js), não o <datalist> do navegador ("tá todo torto", 19/10)
+    assert "data-etq" in campo and 'autocomplete="off"' in campo and "list=" not in campo and "<datalist" not in html
+    assert '<script type="application/json" id="etq-lista">' in html and "pcm-etiqueta.js" in html
     r = logado.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "editar", "motivo_id": str(am["id"]),
                                                                   "nome": am["nome"], "descricao": "Falta peça.",
                                                                   "tira": "1", "etiqueta": ""})

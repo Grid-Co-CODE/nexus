@@ -820,6 +820,16 @@ html.pgp-aberto{overflow:hidden}
 .fp-cad-nome--tira{color:var(--critico)}
 .fp-cad-desc{min-width:220px;min-height:0;resize:none;overflow:hidden;color:var(--tinta-2)}
 .fp-cad-etq{min-width:170px}
+/* a lista de sugestões da etiqueta (pcm-etiqueta.js, 19/10/2026): o mesmo cartão dos menus do Fora da programação */
+.fp-etq-menu{position:fixed;z-index:60;max-height:280px;overflow-y:auto;padding:6px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);box-shadow:0 10px 28px var(--sombra);box-sizing:border-box}
+.fp-etq-menu[hidden]{display:none}
+.fp-etq-op{display:block;width:100%;border:0;border-radius:6px;background:transparent;color:var(--tinta);
+  font:500 13px/18px var(--font-sans);padding:8px 10px;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.fp-etq-op:hover,.fp-etq-op[aria-selected="true"]{background:var(--superficie-2)}
+.fp-etq-op--nenhuma{color:var(--mudo);font-style:italic;border-bottom:1px solid var(--linha);border-radius:6px 6px 0 0;
+  margin-bottom:4px}
+.fp-etq-vazio{margin:0;padding:8px 10px;font-size:12.5px;color:var(--mudo)}
 .cn-tab table.fp-cad th{white-space:normal}   /* "Tira da programação" e "Tarefas com ele" quebram: a tabela cabe a 1366 px */
 .fp-cad-tira{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:var(--mudo);white-space:nowrap}
 .fp-cad-tira:has(input:checked){color:var(--critico)}

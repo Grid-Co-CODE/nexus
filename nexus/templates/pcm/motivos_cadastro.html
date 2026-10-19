@@ -36,7 +36,7 @@
         <td><label class="fp-cad-tira"><input type="checkbox" name="tira" value="1" form="{{ f }}"{% if m.tira %} checked{% endif %}>
           <span data-sim-nao>{{ 'Sim' if m.tira else 'Não' }}</span></label></td>
         {# 19/10/2026: o nome da etiqueta do Fracttal; as que já estão nas OS vêm de sugestão, e vale qualquer nome #}
-        <td><input class="gc-campo fp-cad-etq" name="etiqueta" form="{{ f }}" value="{{ m.etiqueta }}" list="etiquetas-fracttal"
+        <td><input class="gc-campo fp-cad-etq" name="etiqueta" form="{{ f }}" value="{{ m.etiqueta }}" data-etq autocomplete="off"
                    maxlength="80" placeholder="nenhuma" aria-label="Etiqueta no Fracttal do motivo {{ m.nome }}"></td>
         <td class="m">{{ m.n }}</td>
         <td class="fp-acoes">
@@ -66,7 +66,9 @@
     {% endfor %}
     </tbody>
   </table></div>
-{% if pode %}<datalist id="etiquetas-fracttal">{% for e in etiquetas %}<option value="{{ e }}">{% endfor %}</datalist>{% endif %}
+{# as etiquetas que já estão nas OS, para a lista de sugestões do campo (pcm-etiqueta.js; o <datalist> do navegador
+   saía fora do estilo e torto, 19/10/2026) #}
+{% if pode %}<script type="application/json" id="etq-lista">{{ etiquetas|tojson }}</script>{% endif %}
 
 {% if pode %}
 <section class="pcm-passo">
@@ -79,7 +81,7 @@
     <textarea id="novo-desc" name="descricao" class="gc-campo" maxlength="300"></textarea>
     <label class="gc-rotulo"><input type="checkbox" name="tira" value="1"> Tira da programação</label>
     <label class="gc-rotulo" for="novo-etq">Etiqueta no Fracttal (opcional)</label>
-    <input id="novo-etq" name="etiqueta" class="gc-campo" maxlength="80" list="etiquetas-fracttal" placeholder="nenhuma">
+    <input id="novo-etq" name="etiqueta" class="gc-campo" maxlength="80" data-etq autocomplete="off" placeholder="nenhuma">
     <div class="fp-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-plus"></i> Incluir</button></div>
   </form>
 </section>
@@ -112,5 +114,6 @@
   window.addEventListener("resize", medir);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(medir);
 </script>
+<script src="{{ url_for('static', filename='pcm-etiqueta.js') }}"></script>
 {% endif %}
 {% endblock %}
