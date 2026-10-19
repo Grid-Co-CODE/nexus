@@ -1,0 +1,59 @@
+{# As peças das telas de Ocorrências (18/10/2026): os selos, as datas e os formulários da ocorrência e da ação. As regras de
+   cada campo (o que é recusado e por quê) moram em nexus/campo/ocorrencias.py; aqui só os limites que o navegador ajuda
+   a respeitar. #}
+{% macro dia(d) %}{{ d.strftime('%d/%m/%Y') if d else '—' }}{% endmacro %}
+{% macro quando(q) %}{{ q.strftime('%d/%m/%Y às %H:%M') if q else '—' }}{% endmacro %}
+{% macro selo_crit(c, criticidades, cor) %}<span class="gc-status gc-status--{{ cor.get(c, 'neutro') }}">{{ criticidades.get(c, c or '—') }}</span>{% endmacro %}
+{% macro selo_status(s, status_rot, cor) %}<span class="gc-status gc-status--{{ cor.get(s, 'neutro') }}">{{ status_rot.get(s, s or '—') }}</span>{% endmacro %}
+{% macro selo_situacao(s, situacoes, cor) %}<span class="gc-status gc-status--{{ cor.get(s, 'neutro') }}">{{ situacoes.get(s, s or '—') }}</span>{% endmacro %}
+
+{% macro campos_ocorrencia(form, usinas, criticidades, status_rot, piso, hoje) %}
+<div class="oc-form-grade">
+  <label class="oc-largo"><span class="gc-rotulo">Título</span>
+    <input class="gc-campo" name="titulo" maxlength="120" required value="{{ form.get('titulo', '') }}" placeholder="O que está acontecendo, em poucas palavras"></label>
+  <label><span class="gc-rotulo">Usina</span>
+    <select class="gc-campo" name="usina_id" required><option value="">escolha a usina</option>
+      {% for u in usinas %}<option value="{{ u.usina_id }}"{% if form.get('usina_id', '')|string == u.usina_id|string %} selected{% endif %}>{{ u.nome }}{% if u.uf %} - {{ u.uf }}{% endif %}</option>{% endfor %}
+    </select></label>
+  <label><span class="gc-rotulo">Código do ativo <i class="mudo">(opcional)</i></span>
+    <input class="gc-campo" name="codigo_ativo" maxlength="60" value="{{ form.get('codigo_ativo', '') }}" placeholder="o código do Fracttal, como THPN-ALT100-INVR1" autocomplete="off"></label>
+  <label><span class="gc-rotulo">Criticidade</span>
+    <select class="gc-campo" name="criticidade" required>{% for c, rot in criticidades.items() %}<option value="{{ c }}"{% if form.get('criticidade') == c %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
+  <label><span class="gc-rotulo">Status</span>
+    <select class="gc-campo" name="status" required>{% for s, rot in status_rot.items() %}<option value="{{ s }}"{% if form.get('status') == s %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
+  <label><span class="gc-rotulo">Início</span>
+    <input class="gc-campo" type="date" name="inicio" required min="{{ piso }}" max="{{ hoje }}" value="{{ form.get('inicio', '') }}"></label>
+  <label><span class="gc-rotulo">Fim <i class="mudo">(só da finalizada; vazio, termina hoje)</i></span>
+    <input class="gc-campo" type="date" name="fim" min="{{ piso }}" max="{{ hoje }}" value="{{ form.get('fim', '') }}"></label>
+  <label><span class="gc-rotulo">OS do Fracttal <i class="mudo">(opcional; várias com vírgula)</i></span>
+    <input class="gc-campo" name="os" inputmode="text" maxlength="120" value="{{ form.get('os', '') }}" placeholder="16034, 16040" autocomplete="off"></label>
+  <label><span class="gc-rotulo">Chamado <i class="mudo">(opcional)</i></span>
+    <input class="gc-campo" name="chamado" maxlength="120" value="{{ form.get('chamado', '') }}" placeholder="o protocolo do fabricante ou do cliente"></label>
+  <label class="oc-largo"><span class="gc-rotulo">Descrição <i class="mudo">(opcional)</i></span>
+    <textarea class="gc-campo" name="descricao" rows="4" maxlength="2000" placeholder="O que se sabe até agora: desde quando, o que já foi visto, o que pode estar causando">{{ form.get('descricao', '') }}</textarea></label>
+</div>
+{% endmacro %}
+
+{# `fora` = o responsável de agora quando ele saiu da lista do cadastro (desligado): continua escolhido, para a ação
+   dele poder ser fechada sem trocar a pessoa #}
+{% macro campos_acao(form, pessoas, situacoes, piso, prazo_max, fora=None) %}
+<label class="oc-largo"><span class="gc-rotulo">Ação</span>
+  <textarea class="gc-campo" name="texto" rows="2" maxlength="500" required placeholder="O que tem de ser feito">{{ form.get('texto', '') }}</textarea></label>
+<div class="oc-form-grade">
+  <label><span class="gc-rotulo">Responsável</span>
+    <select class="gc-campo" name="responsavel_id" required><option value="">escolha a pessoa</option>{% if fora %}<option value="{{ fora.id }}" selected>{{ fora.nome or 'Pessoa ' ~ fora.id }} (fora da lista)</option>{% endif %}{% for p in pessoas %}<option value="{{ p.id }}"{% if form.get('responsavel_id', '')|string == p.id|string %} selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select></label>
+  <label><span class="gc-rotulo">Prazo</span>
+    <input class="gc-campo" type="date" name="prazo" required min="{{ piso }}" max="{{ prazo_max }}" value="{{ form.get('prazo', '') }}"></label>
+  <label><span class="gc-rotulo">Situação</span>
+    <select class="gc-campo" name="situacao" required>{% for s, rot in situacoes.items() %}<option value="{{ s }}"{% if form.get('situacao', 'a_fazer') == s %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
+</div>
+{% endmacro %}
+
+{# Por que esta pessoa, nesta máquina, não grava: a senha de administrador (não diz quem é), a chave do cadastro (o texto
+   vai cifrado) ou outra chave de gravar que falta no .env. Sem formulário nenhum nesses casos. #}
+{% macro avisos_de_gravar(quem, sem_chave, cad) %}
+{% if cad.erro %}<div class="cn-erro" role="alert"><b>{{ cad.erro }}.</b> As usinas e os responsáveis podem sair sem nome, e sem eles não dá para registrar.</div>{% endif %}
+{% if sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave do cadastro.</b> Os títulos e os textos vão cifrados e não abrem aqui, e nada se grava; as usinas, os códigos e as datas continuam.</div>
+{% elif quem.pode and quem.faltam %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não grava ocorrências agora:</b> falta {{ quem.faltam|join(', ') }} no .env desta máquina.</div>
+{% elif quem.pode and not quem.grava %}<div class="cn-erro cn-aviso" role="status"><b>Para registrar, entre com o seu login (Fracttal ou Microsoft).</b> A senha de administrador não diz quem é a pessoa, e o histórico guarda quem fez cada mudança.</div>{% endif %}
+{% endmacro %}

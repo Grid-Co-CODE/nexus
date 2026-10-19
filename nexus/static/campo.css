@@ -751,6 +751,9 @@ button.cr-v:hover,button.cr-v:focus-visible{outline:2px solid var(--verde);outli
 /* a etiqueta do ativo abre a janela dos ativos (13/10/2026) */
 button.cr-tag{border:0;cursor:pointer;font-family:var(--font-sans)}
 button.cr-tag:hover{filter:brightness(1.1)}
+/* a etiqueta que é link (as ocorrências abertas da usina, 18/10/2026): sem o sublinhado dos links */
+a.cr-tag{text-decoration:none}
+a.cr-tag:hover{filter:brightness(1.1)}
 .cr-tag--neutro{color:var(--tinta-2);background:var(--superficie-2)}
 .cr-dot--critico{background:var(--critico-cheio)}
 .cr-dot--alerta{background:var(--alerta-cheio)}

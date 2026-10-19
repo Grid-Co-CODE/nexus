@@ -18,6 +18,7 @@ RESUMO = {
     "ronda_checklist": "As respostas das rondas antigas que ficaram sem OS",
     "ronda_avulsa": "Ronda lançada à mão no Nexus e o nível validado pela foto",
     "observacao_responsavel": "A observação do Responsável O&M sobre a usina, com dia e hora",
+    "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
@@ -87,6 +88,12 @@ PARA_QUE = {
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
                               "serve para juntar as observações nos relatórios.",
+    "evento_ocorrencia": "Guarda as ocorrências que o Responsável O&M registra nas usinas (um problema que pede "
+                         "acompanhamento: o equipamento, a criticidade, o status, o começo e o fim), o plano de ação "
+                         "de cada uma (o que fazer, quem faz, até quando e em que pé está) e o andamento, com o dia e "
+                         "a hora. Serve para cobrar as ações que vencem, ver as ocorrências abertas de cada usina na "
+                         "Visão geral e, com o tempo, saber o que se repete por usina e equipamento. O texto e quem "
+                         "escreveu vão cifrados; a tela Campo · App → Ocorrências mostra.",
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",

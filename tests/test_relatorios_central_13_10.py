@@ -101,8 +101,10 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # Vou criar um setor de Responsáveis UFV"), pelo nome, sem acento nem caixa
         # e, desde 16/10/2026, o Fora da programação (os motivos que tiram a tarefa da semana; tests/test_pcm_motivos.py)
         # e, desde 17/10/2026, os Técnicos por usina (quem vê cada usina no App; tests/test_pcm_tecnicos_tela.py)
+        # e, desde 18/10/2026, as Ocorrências do Campo · App (o painel de ocorrências dos supervisores, no Nexus;
+        # tests/test_campo_ocorrencias.py)
         assert ST.das_do_setor("Responsáveis UFV") == ST.das_do_setor("responsaveis ufv") == {
-            "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina"}
+            "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "campo/ocorrencias"}
         assert ST.das_do_setor("") == set()
 
 

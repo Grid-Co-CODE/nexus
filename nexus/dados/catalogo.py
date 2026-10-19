@@ -182,6 +182,24 @@ FATOS = (
          observacao="o texto e o nome de quem escreveu só cifrados (Cofre, a chave do cadastro); do_responsavel = sim "
                     "quando quem escreveu é o Responsável O&M da usina, não quando cobria outro (férias). Só "
                     "responsável escreve (pelo login do Fracttal). O banco não apaga: nada se edita"),
+    # o Nexus é a FONTE deste (Levi, 18/10/2026: "Próximas peças: o mapa das usinas e as ocorrências com plano de ação.
+    # siga!"): a ocorrência de uma usina, o plano de ação e o andamento, escritos na tela Campo · App > Ocorrências.
+    # Registrado antes da 1ª gravação
+    Fato("evento_ocorrencia", "Ocorrência com plano de ação", "campo", "nexus_ocorrencias · fato_evento_ocorrencia",
+         "1 linha = 1 evento (criou, dados, acao, andamento) sobre 1 ocorrência de 1 usina",
+         _d(data=("id", "data_id (o dia de Brasília do evento); papéis data_id_inicio, data_id_fim e data_id_prazo"),
+            usina=("id", "usina_id (escolhida na tela, da lista do cadastro; usina_ligada_por)"),
+            equipamento=("id", "equipamento_id (o código do ativo, quando está na dimensão; equipamento_ligado_por)"),
+            pessoa=("id", "pessoa_id de quem fez (e o pessoa_hmac) e responsavel_pessoa_id, o responsável da ação"),
+            os=("cod", "os (os números das OS do Fracttal, separados por vírgula)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_ocorrencias · fato_evento_ocorrencia",),
+         janela_origem="o Nexus é a fonte",
+         observacao="ocorrencia_id junta os eventos de uma ocorrência: criou e dados levam a ocorrência inteira como "
+                    "ficou (vale a última), acao leva uma ação do plano inteira (acao_id; vale a última de cada) e "
+                    "andamento é uma linha do histórico. Domínios: criticidade baixa, media, alta, muito_alta; status "
+                    "em_andamento, pausado, finalizado; situacao (da ação) a_fazer, em_andamento, concluida. O título, "
+                    "a descrição, o chamado, o texto da ação, o andamento e quem só cifrados (Cofre, a chave do "
+                    "cadastro). Só acrescenta: nada se edita nem se apaga"),
     # Contratos e clientes → Contestações (Levi, 13/10/2026: "contestação ligada ao Nexus"; "ficaria na API do PG"). O
     # Dashboard Thopen (5080) é a FONTE: grava 1 linha por contestação × setor, a mesma divisão das mensagens do Teams.
     # Registrado antes da 1ª gravação. O que é do cliente vai só cifrado com a chave PÚBLICA (o 5080 não abre nada)
@@ -873,6 +891,11 @@ LIVROS = (
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,
           "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável",
+          so_cresce=True),
+    Livro("nexus_ocorrencias", ("fato_evento_ocorrencia",),
+          "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Campo · App > Ocorrências)",
+          "nexus/campo/ocorrencias.py, pela tela Campo · App > Ocorrências", False,
+          "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª ocorrência registrada",
           so_cresce=True),
     Livro("nexus_pt_decisoes", ("fato_decisao_pt",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "o livro não existe no banco (GET em 11/10/2026): nenhuma decisão gravada. A aba era 'decisoes' até a "
