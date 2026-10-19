@@ -1592,7 +1592,8 @@ def usinas_do_fracttal() -> leitura.Leitura:
                 gestores.setdefault(o["gestor"], set()).add(n)
                 # o nome do Fracttal (normalizado como a cópia do App normaliza) -> a usina do cadastro
                 por_nome[regras_app._norm(n)] = {**{k: o[k] for k in ("usina", "equipe", "regiao_campo", "supervisor_campo",
-                                                                      "coordenador_campo", "gestor", "uf", "regiao_br")},
+                                                                      "coordenador_campo", "gestor", "uf", "regiao_br",
+                                                                      "responsavel", "cliente")},
                                                  "aprovador": aprovador}
         return {"equipes": {k: sorted(v) for k, v in equipes.items() if k},
                 "regioes": {k: sorted(v) for k, v in regioes.items() if k},

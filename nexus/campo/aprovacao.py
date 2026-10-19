@@ -50,6 +50,12 @@ _SEMPRE = 10 ** 9             # a cópia do App nunca relê a fila na hora da te
 _BRT = timezone(timedelta(hours=-3))
 _ESTADO = {"lendo": False, "erro": "", "erro_em": 0.0}
 _TRAVA = threading.Lock()
+# a conta pronta da fila inteira (Levi, 18/10/2026: "Está demorando muito para carregar"): a regra do App sobre as ~5.500
+# tarefas leva uns 3,5 s só de conta (medido em 18/10 com uma fila falsa do tamanho da real), mais a leitura das notas no
+# banco, e a cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava a conta. Ela é
+# feita uma vez por fila lida (logo depois da releitura e ao subir, em segundo plano) e vale até a fila mudar; o filtro
+# da tela (o responsável) é feito sobre ela, na hora
+_PRONTA: dict = {}
 
 
 class _Usinas(list):
@@ -192,12 +198,23 @@ def aquecer(app):
     carregar_do_disco(app)
     lida = _lida_em()
     if lida and time.time() - lida < VALIDADE_S:
+        # a fila do disco ainda vale: a conta da tela fica pronta em segundo plano, e a 1ª visita não espera por ela
+        threading.Thread(target=lambda: _preparar(app), daemon=True, name="nexus-fila-conta").start()
         return
     with _TRAVA:
         if _ESTADO["lendo"]:
             return
         _ESTADO["lendo"] = True
     threading.Thread(target=lambda: _reler(app), daemon=True, name="nexus-fila-fracttal").start()
+
+
+def _preparar(app):
+    """A conta da tela sobre a fila da memória (o boot com a fila do disco ainda nova). Conforto: sem ela, a tela faz."""
+    try:
+        with app.test_request_context():
+            fila_toda(FILA_INTEIRA)
+    except Exception:      # noqa: BLE001
+        logging.exception("fila da Aprovação: a conta pronta não saiu")
 
 
 def fila(params: dict, usinas=None) -> Leitura:
@@ -253,7 +270,16 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
         return {"janela": primeira.get("janela"), "resumo": primeira.get("resumo"), "baldes": primeira.get("baldes"),
                 "sem_cadastro": primeira.get("sem_cadastro"), "linhas": todas}
     filtro = tuple(sorted(usinas)) if usinas is not None else None
-    return leitura.ler(("fila_toda", str(lida), filtro) + tuple(sorted(p.items())), calcular)
+    chave = ("fila_toda", str(lida), filtro) + tuple(sorted(p.items()))
+    pronta = _PRONTA.get(chave)
+    if pronta is not None:
+        return pronta
+    r = leitura.ler(chave, calcular)
+    if not r.erro and isinstance((r.dados or {}).get("linhas"), list):
+        for velha in [k for k in _PRONTA if k[1] != str(lida)]:      # só as contas da fila de agora
+            del _PRONTA[velha]
+        _PRONTA[chave] = r
+    return r
 
 
 def motivos(x) -> list[tuple[str, str]]:
@@ -303,6 +329,8 @@ def tirar_da_fila(id_wo) -> int:
     restam = [w for w in linhas if str(w.get("id_work_order")) != str(id_wo)]
     regras_app._FILA_CACHE["linhas"] = restam
     leitura.limpar()
+    for r in _PRONTA.values():          # a conta pronta perde a OS também, sem ser refeita
+        r.dados["linhas"] = [x for x in r.dados.get("linhas") or [] if str(x.get("id_wo")) != str(id_wo)]
     if has_app_context() and len(restam) != len(linhas):
         # a cópia em disco também: um reinício logo depois não pode trazer de volta a OS que acabou de ser aprovada
         app = current_app._get_current_object()
@@ -315,5 +343,6 @@ def tirar_da_fila(id_wo) -> int:
 
 
 def limpar():
+    _PRONTA.clear()
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)
     regras_app._FILA_CACHE.update(t=0.0, ts=None, linhas=None)

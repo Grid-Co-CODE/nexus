@@ -42,10 +42,14 @@ class FracttalFalso:
         if self.recusar:
             raise fracttal.Recusado("o Fracttal recusou por excesso de pedidos (HTTP 429)")
         assert path.startswith("work_orders?id_status_work_order=2"), path
+        linhas = self.linhas
+        folio = re.search(r"wo_folio=(\d+)", path)       # a conferência de uma OS (o REST filtra pelo número)
+        if folio:
+            linhas = [w for w in linhas if str(w.get("wo_folio")) == folio.group(1)]
         if "start=" not in path:
-            return {"total": len(self.linhas), "data": self.linhas[:1]}
+            return {"total": len(linhas), "data": linhas[:1]}
         ini = int(re.search(r"start=(\d+)", path).group(1))
-        return {"data": self.linhas[ini:ini + 100]}
+        return {"data": linhas[ini:ini + 100]}
 
 
 @pytest.fixture
@@ -160,3 +164,32 @@ def test_tela_com_fracttal_recusando_avisa(logado, campo):
     leitura.limpar_cache()
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
     assert "O Fracttal não entregou a fila" in html and "Abrir no App" not in html and "azurewebsites" not in html
+
+
+def test_a_conta_da_fila_fica_pronta_ate_a_fila_mudar(app, campo, monkeypatch):
+    """Levi, 18/10/2026: "Está demorando muito para carregar". A regra do App sobre a fila inteira leva uns 3,5 s só de
+    conta (medido em 18/10 com uma fila falsa de 5.500 tarefas), mais a leitura das notas no banco, e a cópia de 5 min
+    vencia entre uma releitura e outra: quase toda visita pagava. A conta vale até a fila mudar."""
+    from nexus.campo import regras_app
+    contas = []
+    original = regras_app._fila_supervisao
+    monkeypatch.setattr(regras_app, "_fila_supervisao", lambda *a, **k: contas.append(1) or original(*a, **k))
+    with app.test_request_context():
+        primeira = aprovacao.fila_toda(aprovacao.FILA_INTEIRA)        # lê a fila (nos testes, na hora) e faz a conta
+        feitas = len(contas)
+        assert feitas and primeira.dados.get("linhas")
+        monkeypatch.setattr(leitura, "TTL_S", 0)                      # a cópia de 5 min venceu
+        assert aprovacao.fila_toda(aprovacao.FILA_INTEIRA).dados == primeira.dados
+        assert len(contas) == feitas                                  # a conta pronta vale até a fila mudar
+        regras_app._FILA_CACHE["t"] = regras_app._FILA_CACHE["t"] + 1  # a fila foi relida
+        aprovacao.fila_toda(aprovacao.FILA_INTEIRA)
+        assert len(contas) > feitas
+
+
+def test_a_os_que_sai_da_fila_sai_da_conta_pronta(app, campo):
+    with app.test_request_context():
+        antes = aprovacao.fila_toda(aprovacao.FILA_INTEIRA)
+        assert 15102 in {x.get("id_wo") for x in antes.dados["linhas"]}
+        aprovacao.tirar_da_fila(15102)
+        depois = aprovacao.fila_toda(aprovacao.FILA_INTEIRA)
+    assert 15102 not in {x.get("id_wo") for x in depois.dados["linhas"]}

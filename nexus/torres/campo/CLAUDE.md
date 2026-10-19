@@ -11,9 +11,9 @@ App nem no Fracttal. Devolver OS e encaminhar ponto continuam no App. Sem link p
 "Abrir no App". **A OS aparece só com o número, sem "#"** (Levi, 05/10: "Em OS tira esse #").
 
 **Exceções: a decisão da PT** (Levi, 05/10: "Técnico faz APR e PT -> Chega no PG -> Atualiza para os steakholders ->
-Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!"; ver "Aprovação de PT no Nexus" abaixo) **e o Aprovar da
-Aprovação de OS** (o Concluir do OS Creator no Fracttal, só para quem aprova a OS: o Supervisor de Campo da região da
-usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação de OS" e "Estrutura de O&M de 10/2026").
+Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!"; ver "Aprovação de PT no Nexus" abaixo) **e a
+Aprovação de OS** (desde 18/10/2026 a OS abre o card do OS Creator, cujo Concluir aprova no Fracttal com o login de quem
+clica, como no OS Creator Web; ver "Aprovação de OS").
 
 ## As telas
 
@@ -22,7 +22,7 @@ usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação d
 | **Visão do responsável** (12/10/2026, a 1ª do Campo) | três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
-| Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App; Aprovar pelo portão `/os/_nexus/aprovacao/<id>/aprovar` | regras copiadas do App |
+| Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App + o Responsável O&M da usina (cadastro); aprovar é o Concluir do card do OS Creator | regras copiadas do App (a conta pronta por fila lida) |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
 | Rondas | `fato_ronda` (App, checklist da carga única, avulsa) + usinas mobilizadas do cadastro + `fato_fechamento` (última OS da usina) + a validação por foto (só sujidade e vegetação) | `visao.rondas` (conta nossa) |
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
@@ -1111,10 +1111,33 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     antiga); criação = `creation_date` da OS, que vem na MESMA linha do REST que a fila já lê (sem pedido novo;
     conferido em 08/10 nas 1.583 linhas em verificação guardadas pela Engenharia, todas com a data); datas em Brasília
     (o Fracttal fala UTC); Prontas, Pedem olho e Fora do App = tarefas da OS em cada grupo; Uso do App = % das tarefas
-    pelo App; Nota média = das tarefas pelo App; Devolvidas = tarefas já devolvidas. A coluna "supervisor" é hoje o
-    **Supervisor de campo** da região da usina (ou "vaga"). CSV com as mesmas colunas, mais região de campo, gestor de
-    contrato e "Quem aprova" (do cartão aberto, ou de todos). Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas esperando; 937 prontas; 1.780
-    tarefas paradas há 30 dias ou mais; uso do App 41%; o supervisor com mais fila tinha 1.373 tarefas (uso do App 29%).
+    pelo App; Nota média = das tarefas pelo App; Devolvidas = tarefas já devolvidas. Medido em 05/10 (90 dias): 1.827 OS
+    e 4.736 tarefas esperando; 937 prontas; 1.780 tarefas paradas há 30 dias ou mais; uso do App 41%.
+  - **Por responsável da UFV, com o card da OS (18/10/2026)** (Levi: "está por região e gestor de contrato quero apenas
+    por responsável da UFV, quando abrir aparece uma lista das usinas que tem OSs não concluídas, ao clicar na linha
+    aparece o mesmo card que aparece ao clicar na OS do histórico de OS do OS Creator Web"; e, no quiz do mesmo dia: só
+    as OS esperando aprovação, a usina abre as OS dela, aprovar pelo Concluir do card, os indicadores do responsável
+    escolhido). Os cartões por região de campo e por gestor de contrato, o `ver=`, o `por=` e os filtros de equipe,
+    região e gestor SAÍRAM (o endereço velho abre a lista). O filtro é o **Responsável O&M da usina** (`responsavel=`,
+    "*" = todos; quem entrou pelo Fracttal e é responsável já vem nele, `_responsavel_logado_pelo_cadastro`); o
+    responsável e o cliente vêm do cadastro pela usina do Fracttal (`por_nome` de `visao.usinas_do_fracttal`; usina sem
+    de-para sai com o nome do Fracttal, só em "Todos"). **A lista é uma linha por usina** (`_usinas_da_fila`: as OS, os
+    três grupos, a mais antiga e o uso do App; a com mais OS paradas há 30 dias, e depois a que espera há mais tempo,
+    primeiro) que abre a tabela das OS dela (a mais antiga primeiro; colunas OS, Dia, criação, fim, Técnicos, Grupo,
+    Prontas, Pedem olho, Fora do App, Uso do App, Nota média, Devolvidas; o porquê do grupo, `aprovacao.motivos`, fica
+    no selo do Grupo, no mouse). **A OS abre o card do OS Creator** (`NexusOsCard.abrir`, status "Em Verificação"): o
+    Concluir dele aprova, com o login do Fracttal de quem clica, como no OS Creator Web (a regra de "só o supervisor de
+    campo da região ou admin" era do botão do Nexus, que saiu da tela). Fechado o card com mudança, a tela chama
+    `POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada a OS que o Fracttal já não tem em verificação (1
+    pedido de leitura, `work_orders?id_status_work_order=2&wo_folio=`), e ninguém esconde OS da fila. Os seis
+    indicadores e a idade são do responsável escolhido e filtram a lista. CSV: OS, dias, criação, fim, Responsável O&M,
+    usina, cliente, técnicos, tarefas, os grupos, uso do App, nota, devolvidas e o grupo.
+  - **A conta pronta (18/10/2026, "Está demorando muito para carregar")**: a regra do App sobre a fila inteira leva uns
+    3,5 s só de conta (medido em 18/10 com uma fila falsa de 5.500 tarefas), mais a leitura das notas no banco, e a
+    cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava, e cada filtro de região
+    fazia a sua. Agora `aprovacao.fila_toda` guarda a conta da fila inteira até a fila mudar (`_PRONTA`, pela hora da
+    leitura), feita logo depois da releitura e ao subir com a fila do disco (`_preparar`), e a tela filtra sobre ela. A OS
+    que sai da fila (`tirar_da_fila`) sai da conta pronta também. Prova: `test_a_visita_nao_refaz_a_conta_da_fila`.
   - **Contada por OS, não por tarefa** (Levi, 05/10: "ele não consegue aprovar uma tarefa em si, e sim uma PT ou uma
     OS"; `_por_os`, `_agrupa_os`): a OS fica no pior grupo das tarefas dela (olho > fora do App > completa), a espera é
     a da tarefa mais antiga, a nota é a pior; indicadores, idade, cartões e técnicos em OS. A linha aberta mostra cada
@@ -1124,7 +1147,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     do técnico, foto divergente; ou por que está completa). **Aprovar = o Concluir do OS Creator Web** ("usando o
     mesmo caminho que o OS Creator Web"), com o login do Fracttal de quem clica (status 3 + recalculate +
     reconferência da data de fim; IRREVERSÍVEL, pede confirmação). O id da OS vem da fila crua.
-  - **Só quem aprova a OS ou um administrador aprova** (Levi, 08/10: "deve ser possível só o supervisor ou ADM
+  - **O portão do Aprovar do Nexus (de 08/10 a 18/10/2026 na tela; hoje sem botão, a rota segue no servidor)**:
+    **só quem aprova a OS ou um administrador aprova** (Levi, 08/10: "deve ser possível só o supervisor ou ADM
     conseguir aprovar a OS logando pelo Fracttal"; com a estrutura de O&M de 10/2026, "o supervisor" é o **Supervisor de
     Campo da região da usina da OS**; com a vaga aberta, o **Coordenador de Campo** da região; sem os dois, só um
     administrador; o Gestor de contrato NÃO aprova; `nexus/torres/campo/aprovar_os.py`). A regra é no SERVIDOR: o botão
@@ -1139,19 +1163,13 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     (NEXUS_ADMINS ou a senha de admin, como o Cadastro) ou o e-mail do Fracttal em NEXUS_ADMINS. Passou: o portão
     repassa ao clone o MESMO POST de antes (`/os/api/os/<id>/concluir`, número da OS pela fila do servidor, cookie de
     quem clicou) e, aprovada, tira a OS da fila guardada na hora (a rota `/t/campo/aprovacao/<id>/tirar` saiu: deixava
-    qualquer um esconder OS da fila). Na tela, quem não pode vê o botão apagado com o texto de quem aprova
-    (`pode_na_tela`, pela sessão do Nexus: admin ou o `pessoa_id` do papel igual ao de quem aprova a OS). **Fica aberta** a rota do clone
+    qualquer um esconder OS da fila). **Fica aberta** a rota do clone
     `/os/api/os/<id>/concluir` para o próprio OS Creator (o Concluir do card dele): o portão vale para a Aprovação do
     Nexus, não para o OS Creator. Testes com Fracttal e Concluir falsos (`test_campo_aprovacao_supervisor.py`).
     **Até 08/10 o script desta tela não rodava**: o `confirm()` do Aprovar tinha uma quebra de linha dentro da string
     (SyntaxError no navegador), então nem a linha abria nem o Aprovar funcionava; um teste roda `node --check` no script.
     **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas; as rondas aprovadas vêm do arquivo desde 06/10); em 05/10, com
     muitos reinícios seguidos, o Fracttal passou a recusar (429). Em desenvolvimento, `NEXUS_CAMPO_AQUECER=0`.
-  - **Filtro de equipe, de região de campo e de gestor** pelo cadastro: as usinas da equipe (ou da região, ou do
-    gestor) pelo nome no Fracttal
-    (de-para "Fracttal · Classificação 1", `visao.usinas_do_fracttal`) viram o escopo de usinas da conta do App
-    (`_area_ok`, `clusters.usinas`): grupos, números e lista saem já filtrados. Usina sem de-para do Fracttal não entra
-    em filtro nenhum (a lista sai em `sem_de_para`).
 
 ## Peças em `nexus/campo/`
 

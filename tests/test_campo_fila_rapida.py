@@ -103,17 +103,16 @@ def fila_e_cadastro(app):
     app.extensions.pop("nexus_dados_sessao", None)
 
 
-def test_filtro_de_equipe_e_de_regiao_de_campo_pelo_cadastro(fila_e_cadastro, logado):
-    # as OS aparecem na tabela da região de campo (o cartão abre com ver=): a usina "SP 01" é da Sudeste 03
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
-    assert 'name="equipe"' in html and 'name="regiao_campo"' in html and "SP Norte 01" in html
-    assert ">15102<" in html and ">15002<" in html
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03&equipe=SP+Norte+01").get_data(as_text=True)
-    assert ">15102<" in html and ">15088<" in html and ">15002<" in html          # as 3 são da usina "SP 01"
-    html = logado.get("/t/campo/aprovacao?equipe=SC+Oeste+01").get_data(as_text=True)
-    assert "Sudeste 03" not in html.split('class="cn-equipes"')[1] and "Nada na fila com esses filtros" in html
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03&regiao_campo=Sul+01").get_data(as_text=True)
-    assert ">15102<" not in html                                                  # a Sul 01 é da SC Oeste 01
+def test_o_filtro_e_so_o_responsavel_e_os_de_antes_nao_valem_mais(fila_e_cadastro, logado):
+    """Levi, 18/10/2026: "está por região e gestor de contrato quero apenas por responsável da UFV". A usina "SP 01" do
+    Fracttal é a Usina A do cadastro; os filtros de equipe e de região de campo de antes são ignorados."""
+    html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
+    assert 'name="responsavel"' in html and 'name="equipe"' not in html and 'name="regiao_campo"' not in html
+    assert "Usina A</b>" in html and ">15102<" in html and ">15088<" in html and ">15002<" in html
+    html = logado.get("/t/campo/aprovacao?equipe=SC+Oeste+01&regiao_campo=Sul+01").get_data(as_text=True)
+    assert ">15102<" in html                                                      # o endereço velho abre a lista
+    html = logado.get("/t/campo/aprovacao?responsavel=Ningu%C3%A9m").get_data(as_text=True)
+    assert "Nada na fila com esses filtros" in html and ">15102<" not in html
 
 
 # ── OS Creator: sessão do Fracttal vencida volta ao login ──────────────────────────────────────────────────────
@@ -140,16 +139,15 @@ def test_jwt_vencido_no_os_creator_volta_ao_login(logado, monkeypatch):
 def test_aprovacao_para_insight(fila_e_cadastro, logado):
     """Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights"."""
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
-    # abre nos cartões por região de campo (do cadastro, pela usina do Fracttal "SP 01"), com quem aprova ali
-    assert 'class="cn-equipes"' in html and "Sudeste 03" in html and "OS esperando aprovação" in html
-    assert 'Supervisor de Campo: <b class="cn-eq-sup">Supervisor 90</b>' in html
+    # abre na lista das usinas (do cadastro, pela usina do Fracttal "SP 01"), com os números de cada uma
+    assert 'class="ap-usinas"' in html and "Usina A</b>" in html and "Usinas com OS esperando aprovação" in html
     assert "Prontas para aprovar" in html and "Precisam do seu olho" in html and "Uso do App" in html
     assert "Idade da fila" in html and "31 a 60 dias" in html                       # a OS 15002 espera 33 dias
-    # os indicadores e a idade filtram os cartões e a tabela do supervisor
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03&balde=completa").get_data(as_text=True)
-    assert ">15102<" in html and ">15088<" not in html and "OS de Sudeste 03" in html
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03&idade=31-60").get_data(as_text=True)
-    assert ">15002<" in html and ">15102<" not in html and "Usina A" in html and "SP Norte 01" in html
+    # os indicadores e a idade filtram a lista
+    html = logado.get("/t/campo/aprovacao?balde=completa").get_data(as_text=True)
+    assert ">15102<" in html and ">15088<" not in html
+    html = logado.get("/t/campo/aprovacao?idade=31-60").get_data(as_text=True)
+    assert ">15002<" in html and ">15102<" not in html and "Usina A</b>" in html
     r = logado.get("/t/campo/aprovacao?csv=1")
     assert r.mimetype == "text/csv" and "15102" in r.get_data(as_text=True)
 
@@ -163,11 +161,11 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     assert "abaixo de 80%" in aprovacao.motivos(olho)[0][1] and "devolvida" in aprovacao.motivos(olho)[1][1]
     assert aprovacao.motivos({"pelo_app": True, "qualidade": 96})[0][0] == "ok"
     assert "fora do App" in aprovacao.motivos({"pelo_app": False})[0][1]
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
-    assert 'class="cn-detalhe" hidden' in html and "Por que a OS está em" in html and "Nota do registro 71%" in html
-    # o Aprovar passa pelo portão do Nexus (08/10/2026), não direto pela rota do clone
-    assert 'data-wo="15088"' in html and "Aprovar a OS 15088" in html and "/os/_nexus/aprovacao/" in html
-    # sem login do Fracttal: 401 pedindo login (a tela leva ao login e volta)
+    html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
+    # o porquê do grupo fica no selo da OS; a OS abre o card do OS Creator, cujo Concluir aprova (Levi, 18/10/2026)
+    assert "Nota do registro 71%" in html and 'data-wo="15088"' in html and "NexusOsCard.abrir(" in html
+    assert "Aprovar a OS 15088" not in html
+    # o portão do Aprovar do Nexus segue no servidor: sem login do Fracttal, 401 pedindo login
     r = logado.post("/os/_nexus/aprovacao/15088/aprovar", json={})
     assert r.status_code == 401 and r.get_json()["login"] is True
     assert logado.get("/os/_nexus/voltar?para=/t/campo/aprovacao%3Fver%3DSudeste%2B03").headers["Location"].endswith("/t/campo/aprovacao?ver=Sudeste+03")
@@ -177,7 +175,7 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     antes = len(regras_app._FILA_CACHE["linhas"])
     assert _ap.tirar_da_fila(15088) == 1
     assert len(regras_app._FILA_CACHE["linhas"]) == antes - 1
-    assert ">15088<" not in logado.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
+    assert ">15088<" not in logado.get("/t/campo/aprovacao").get_data(as_text=True)
 
 
 def test_a_fila_e_contada_por_os():
