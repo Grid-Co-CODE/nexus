@@ -1,0 +1,4 @@
+{# O pedaço que a linha da usina busca ao abrir (rota `extintores_usina`, 19/10/2026): só a tabela dos extintores dela,
+   com os filtros da tela. Sem as fotos: o botão "Foto" pede a imagem no clique (`_extintores_linha.html`). #}
+{% from 'hseq/_extintores_linha.html' import tabela_usina with context %}
+{{ tabela_usina(extintores) }}

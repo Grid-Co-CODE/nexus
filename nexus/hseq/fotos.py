@@ -15,6 +15,12 @@ aberta e foto não é tabela).
 O App envia desde a v265 (14/10/2026). O PDF usa uma cópia de 600 px (`foto_pdf`, em `pdf/<código>.jpg`), feita UMA vez
 por foto recebida: com as 90 primeiras fotos, o PDF de todos os extintores reduzia as 90 a cada pedido (~30 ms cada no
 PC, várias vezes isso no servidor), e o custo crescia com cada conferência nova.
+
+A miniatura (`mini`) segue a mesma regra desde 19/10/2026 (cópia em `mini/<código>.jpg`, feita uma vez e guardada na
+memória), e a listagem da pasta (`disponiveis`) fica guardada 30 s: no Raio-X das 17:15 a tela de Extintores levou 21 s
+no servidor, e cada miniatura lia a foto inteira do disco antes de olhar a memória, listava a pasta inteira e, sem a
+cópia na memória (depois de cada deploy), decodificava a foto inteira. A tela parou de pedir miniaturas (a foto só vem
+no clique), mas a rota `?mini=1` continua e não pode pesar.
 """
 import hashlib
 import hmac
@@ -37,6 +43,8 @@ PDF_PX, PDF_QUALIDADE = 600, 75                # a do PDF: o quadro tem 40 mm (6
 CODIGO = re.compile(r"[A-Z0-9][A-Z0-9.\-]{2,60}")
 DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
 _MINIS: OrderedDict = OrderedDict()            # (código, dia) -> JPEG da miniatura; as últimas 600 na memória
+DISPONIVEIS_S = 30                             # a listagem da pasta fica guardada este tempo (`receber` a renova)
+_DISP: dict = {}                               # pasta -> (quando, {código: dia})
 
 
 def pasta(config) -> Path | None:
@@ -98,6 +106,7 @@ def receber(config, codigo, dia, ts, assinatura_recebida, dados: bytes, agora=No
     tmp.write_bytes(out.getvalue())
     tmp.replace(destino / f"{codigo}.jpg")
     meta.write_text(json.dumps({"dia": dia, "recebida_em": int(agora or time.time())}), encoding="utf-8")
+    _DISP.pop(str(destino), None)                # a foto nova aparece na tela na hora
     return 200, "foto guardada"
 
 
@@ -130,25 +139,25 @@ def reduzir(dados: bytes, px: int, qualidade: int):
         return None
 
 
-def foto_pdf(config, codigo) -> bytes | None:
-    """A foto do PDF (`reduzir` a PDF_PX), guardada em `pdf/<código>.jpg` ao lado da inteira e refeita só quando a
+def _copia(config, codigo, sub: str, px: int, qualidade: int) -> bytes | None:
+    """A foto reduzida (`reduzir` a `px`), guardada em `<sub>/<código>.jpg` ao lado da inteira e refeita só quando a
     inteira muda (a inteira mais nova que a cópia: o App mandou outra). Sem conseguir gravar a cópia, devolve a reduzida
-    do mesmo jeito. Por que existe: ver o cabeçalho do módulo (14/10/2026)."""
+    do mesmo jeito. A cópia que vale não lê a foto inteira."""
     p = pasta(config)
     codigo = str(codigo or "")
     if p is None or not CODIGO.fullmatch(codigo):
         return None
-    arq, copia = p / f"{codigo}.jpg", p / "pdf" / f"{codigo}.jpg"
+    arq, copia = p / f"{codigo}.jpg", p / sub / f"{codigo}.jpg"
     try:
         if copia.stat().st_mtime_ns >= arq.stat().st_mtime_ns:
             return copia.read_bytes()
     except OSError:         # sem a cópia (ou sem a foto): segue
         pass
     dados = foto(config, codigo)
-    red = reduzir(dados, PDF_PX, PDF_QUALIDADE) if dados else None
+    red = reduzir(dados, px, qualidade) if dados else None
     if not red:
         return None
-    tmp = copia.with_name(f"{codigo}.jpg.{threading.get_ident()}.parcial")    # dois PDFs ao mesmo tempo não se cruzam
+    tmp = copia.with_name(f"{codigo}.jpg.{threading.get_ident()}.parcial")    # dois pedidos ao mesmo tempo não se cruzam
     try:
         copia.parent.mkdir(exist_ok=True)
         tmp.write_bytes(red[0])
@@ -161,35 +170,45 @@ def foto_pdf(config, codigo) -> bytes | None:
     return red[0]
 
 
+def foto_pdf(config, codigo) -> bytes | None:
+    """A foto do PDF (600 px), em `pdf/<código>.jpg`. Por que existe: ver o cabeçalho do módulo (14/10/2026)."""
+    return _copia(config, codigo, "pdf", PDF_PX, PDF_QUALIDADE)
+
+
 def mini(config, codigo) -> bytes | None:
-    """A miniatura (160 px) da foto, feita na hora e guardada na memória (pelo código e o dia da foto)."""
-    dados = foto(config, codigo)
-    if not dados:
+    """A miniatura (160 px): a da memória (pelo código e o dia da foto) e, sem ela, a cópia em `mini/<código>.jpg`, que
+    sobrevive ao reinício de cada deploy. Só a 1ª vez de cada foto lê a inteira (ver o cabeçalho, 19/10/2026)."""
+    codigo = str(codigo or "")
+    dia = disponiveis(config).get(codigo)
+    if dia is None:
         return None
-    k = (codigo, disponiveis(config).get(codigo, ""))
+    k = (codigo, dia)
     if k in _MINIS:
         _MINIS.move_to_end(k)
         return _MINIS[k]
-    from PIL import Image
-    im = Image.open(io.BytesIO(dados))
-    im.thumbnail((MINI_PX, MINI_PX))
-    out = io.BytesIO()
-    im.save(out, "JPEG", quality=75)
-    _MINIS[k] = out.getvalue()
+    dados = _copia(config, codigo, "mini", MINI_PX, 75)
+    if not dados:
+        return None
+    _MINIS[k] = dados
     while len(_MINIS) > 600:
         _MINIS.popitem(last=False)
-    return _MINIS[k]
+    return dados
 
 
 def disponiveis(config) -> dict:
-    """{código: dia da foto} das fotos guardadas (uma leitura da pasta por chamada)."""
+    """{código: dia da foto} das fotos guardadas. A listagem fica guardada `DISPONIVEIS_S` (cada miniatura e cada tela a
+    pediam; `receber` a renova quando chega foto)."""
     p = pasta(config)
     if p is None or not p.is_dir():
         return {}
+    g = _DISP.get(str(p))
+    if g and time.time() - g[0] < DISPONIVEIS_S:
+        return g[1]
     out = {}
     for arq in p.glob("*.jpg"):
         try:
             out[arq.stem] = json.loads((p / f"{arq.stem}.json").read_text(encoding="utf-8")).get("dia", "")
         except (OSError, ValueError):
             out[arq.stem] = ""
+    _DISP[str(p)] = (time.time(), out)
     return out

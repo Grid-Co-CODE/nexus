@@ -348,7 +348,8 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
                    "Recarga mais próxima Status da TST Relatório")
     # 3 clientes (Thopen, Outro Cliente e "Sem cliente", a Irecê 2 fora do cadastro) e 4 usinas, tudo fechado
     assert html.count('<tr class="cn-linha ext-cli"') == 3 and html.count('<tr class="cn-linha ext-us"') == 4
-    assert html.count('extintores" hidden>') == 4 and len(re.findall(r'<tr class="cn-detalhe" data-cli="\d" hidden>', html)) == 4
+    assert len(re.findall(r'<tr class="cn-linha ext-us"[^>]* hidden>', html)) == 4
+    assert len(re.findall(r'<tr class="cn-detalhe" data-cli="\d" hidden data-url="[^"]+">', html)) == 4
     ordem = re.findall(r'<span class="ext-seta" aria-hidden="true"></span>(?:<b>)?([^<]+)<', html)
     assert ordem == ["Thopen", "Altair", "Brodowski 1", "Outro Cliente", "Coração 1", "Sem cliente",
                      "Thopen - Irecê 2 - BA"]
@@ -365,9 +366,10 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     assert "Brodowski 1 Supervisora Campo sem técnico" in _abre(html, "</span>Brodowski 1</td>")
     assert "Coração 1 Coordenador Campo Técnico Gama" in _abre(html, "</span>Coração 1</td>")
     assert "Thopen - Irecê 2 - BA sem responsável sem técnico" in _abre(html, "</span>Thopen - Irecê 2 - BA</td>")
-    # a usina abre os extintores dela, de todos os dias, com a conferência de cada um e sem repetir a usina
-    i = html.index('<table class="ext-sub cn-fotos-grupo">')
-    sub = html[i:html.index("</table>", i)]
+    # os extintores NÃO vêm na página (19/10/2026): a usina os busca ao abrir, de todos os dias, com a conferência de
+    # cada um e sem repetir a usina
+    assert _linhas(html) == [] and "ext-sub cn-fotos-grupo" not in html
+    sub = _pedaco(logado, html, "Altair")
     assert _linhas(sub) == ["ALT100-INFC1-PPCI-EXT04", "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02",
                             "ALT100-INFC1-PPCI-EXT05", "ALT100-INFC1-PPCI-EXT03"]
     assert "01/08/2026" in _texto(sub) and "Altair" not in _texto(sub) and "sobrecarga" in _texto(sub)
@@ -378,9 +380,53 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     # com o cliente escolhido, o cliente já abre; com a usina, a usina também
     cli = logado.get("/t/hseq/extintores?cliente=Thopen").get_data(as_text=True)
     assert cli.count('aria-expanded="true"') == 1 and cli.count('<tr class="cn-linha ext-us"') == 2
-    assert 'extintores" hidden>' not in cli and cli.count('<tr class="cn-detalhe" data-cli="1" hidden>') == 2
+    assert not re.search(r'<tr class="cn-linha ext-us"[^>]* hidden>', cli) and len(re.findall(r'<tr class="cn-detalhe" data-cli="1" hidden', cli)) == 2
+    # com a usina (uma só), os extintores dela já vêm na página
     us = logado.get("/t/hseq/extintores?usina=Altair").get_data(as_text=True)
     assert us.count('aria-expanded="true"') == 2 and us.count('<tr class="cn-detalhe" data-cli="1">') == 1
+    assert len(_linhas(us)) == 5 and "data-url" not in us
+
+
+def _pedaco(cliente, html, usina):
+    """O pedaço que a linha da usina busca ao abrir (o data-url da linha de detalhe dela)."""
+    i = html.index(f"</span>{usina}</td>")
+    url = re.search(r'data-url="([^"]+)"', html[i:]).group(1).replace("&amp;", "&")
+    r = cliente.get(url)
+    assert r.status_code == 200
+    return r.get_data(as_text=True)
+
+
+def test_a_pagina_leva_so_o_resumo_e_a_usina_busca_os_extintores_ao_abrir(com_cadastro, logado):
+    """O orçamento de Extintores (19/10/2026: o Raio-X do servidor pegou a tela 21 s montando a página, que levava todos
+    os extintores escondidos, 897 KB; Levi: "primeiro mostra a informação e só quando a pessoa clica que começa a
+    carregar"). A página leva só o cliente e a usina, com todos os campos de hoje; os extintores vêm por usina."""
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    assert _linhas(html) == [] and not re.search(r"<img[^>]+src=", html.split('id="tabela"')[1])
+    # a linha da usina segue com os campos de antes: situação, conferência, usina, responsável, técnicos, quantidade,
+    # recarga, status da TST e o relatório
+    assert _abre(html, "</span>Altair</td>").startswith(
+        "Atrasado 05/10/2026 há 4 d · App Altair Supervisora Campo Eletricista Beta Técnico Alfa 3 1 atrasado · "
+        "1 perto de vencer · 1 em dia 08/2026 venceu há 39 d Crítico 1 crítico · 2 atenção PDF Excel")
+    # o pedaço: só os extintores daquela usina (e do cliente dela), com os filtros da tela e o da faixa
+    sub = _pedaco(logado, html, "Altair")
+    assert _linhas(sub) == ["ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02", "ALT100-INFC1-PPCI-EXT03"]
+    assert "<html" not in sub and "Brodowski" not in sub
+    atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)
+    assert _linhas(_pedaco(logado, atr, "Altair")) == ["ALT100-INFC1-PPCI-EXT01"]
+    # sem a usina, ou sem login, o pedaço não sai
+    assert logado.get("/t/hseq/extintores/usina").status_code == 404
+    assert logado.application.test_client().get("/t/hseq/extintores/usina?usina=Altair").status_code == 302
+
+
+def test_com_800_extintores_a_pagina_fica_abaixo_de_200_kb(com_livro, logado):
+    """O tamanho do real (19/10/2026: ~800 extintores em ~90 usinas; eram 897 KB). Meta do desenho: abaixo de 200 KB."""
+    livro = [_ext(f"U{u:02d}100-INFC1-PPCI-EXT{e:02d}", f"Usina de teste {u:02d}", "08/2026", "2027", "2026-10-05")
+             for u in range(90) for e in range(9)]
+    _aba(com_livro, EXT.LIVRO, EXT.ABA, livro)
+    visao.limpar()
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    assert "Extintores 810 em 90 usinas" in _texto(html) and _linhas(html) == []
+    assert len(html.encode()) < 200 * 1024, len(html.encode())
 
 
 def test_sem_ler_os_tecnicos_a_coluna_diz_que_nao_leu(com_cadastro, logado, monkeypatch):
@@ -669,13 +715,53 @@ def test_o_app_envia_a_foto_assinada_e_ela_aparece_na_tabela_e_no_pdf(com_livro,
     assert anon.get("/t/hseq/extintores/foto/ALT100-INFC1-PPCI-EXT01.jpg").status_code == 302
     assert logado.get("/t/hseq/extintores/foto/ALT100-INFC1-PPCI-EXT01.jpg").mimetype == "image/jpeg"
     assert logado.get("/t/hseq/extintores/foto/ALT100-INFC1-PPCI-EXT02.jpg").status_code == 404
-    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
-    assert html.count('class="cn-foto ext-foto"') == 1 and "foto de 08/10/2026" in html
-    assert 'class="cn-caixa-foto"' in html and 'class="ext-sub cn-fotos-grupo"' in html
+    # a tabela: o botão "Foto" com o dia, sem miniatura (a imagem só no clique; 19/10/2026), na usina aberta e por extintor
+    for url in ("/t/hseq/extintores?ver=extintor", "/t/hseq/extintores?usina=Altair"):
+        html = logado.get(url).get_data(as_text=True)
+        assert html.count('class="cn-foto ext-foto-bt"') == 1 and "foto de 08/10/2026" in html and ">Foto 08/10</a>" in html
+        assert not re.search(r"<img[^>]+extintores/foto/", html) and 'class="cn-caixa-foto"' in html
+    pedaco = _pedaco(logado, logado.get("/t/hseq/extintores").get_data(as_text=True), "Altair")
+    assert ">Foto 08/10</a>" in pedaco and "<img" not in pedaco
     pypdf = pytest.importorskip("pypdf")
     import io
     paginas = pypdf.PdfReader(io.BytesIO(logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos").data)).pages
     assert len([im for p in paginas for im in p.images if im.name.endswith(".jpg")]) == 1
+
+
+def test_a_miniatura_le_a_foto_inteira_uma_vez_so(com_livro, app, logado, tmp_path, monkeypatch):
+    """19/10/2026: cada miniatura lia a foto inteira do disco antes de olhar a memória e, sem a memória (cada deploy),
+    decodificava a inteira. Agora: memória, depois a cópia de 160 px no disco, e a inteira só na 1ª vez."""
+    from PIL import Image
+    from nexus.hseq import fotos as FOT
+    cod = "ALT100-INFC1-PPCI-EXT01"
+    pasta = tmp_path / "hseq" / "extintores" / "fotos"
+    pasta.mkdir(parents=True)
+    Image.new("RGB", (1200, 1600), (200, 30, 30)).save(pasta / f"{cod}.jpg", quality=82)
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    lidas = []
+    original = FOT.foto
+    monkeypatch.setattr(FOT, "foto", lambda cfg, c: lidas.append(c) or original(cfg, c))
+    FOT._MINIS.clear()
+    r = logado.get(f"/t/hseq/extintores/foto/{cod}.jpg?mini=1")
+    assert r.status_code == 200 and max(Image.open(__import__("io").BytesIO(r.data)).size) == FOT.MINI_PX
+    assert lidas == [cod] and (pasta / "mini" / f"{cod}.jpg").is_file()
+    logado.get(f"/t/hseq/extintores/foto/{cod}.jpg?mini=1")
+    assert lidas == [cod]                                              # da memória
+    FOT._MINIS.clear()                                                  # o reinício de um deploy
+    assert logado.get(f"/t/hseq/extintores/foto/{cod}.jpg?mini=1").status_code == 200 and lidas == [cod]   # do disco
+    assert FOT.mini(app.config, "ALT100-INFC1-PPCI-EXT09") is None and lidas == [cod]   # sem foto: nem tenta ler
+
+
+def test_a_lista_das_fotos_fica_guardada_e_a_foto_nova_aparece_na_hora(com_livro, app, tmp_path):
+    from nexus.hseq import fotos as FOT
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    pasta = tmp_path / "hseq" / "extintores" / "fotos"
+    pasta.mkdir(parents=True)
+    assert FOT.disponiveis(app.config) == {}
+    (pasta / "ALT100-INFC1-PPCI-EXT02.jpg").write_bytes(_foto_jpeg())
+    assert FOT.disponiveis(app.config) == {}                            # guardada: não lista a pasta a cada pedido
+    assert _enviar(app.test_client(), app).status_code == 200            # a foto que chega renova a lista
+    assert set(FOT.disponiveis(app.config)) == {"ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02"}
 
 
 def test_sem_a_chave_o_recebimento_de_fotos_fica_desligado(com_livro, app, tmp_path):

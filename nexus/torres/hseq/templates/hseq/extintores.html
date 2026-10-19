@@ -26,25 +26,8 @@
         </div>
         <div class="cn-eq-pe">{% if s.sem_atualizacao %}<span class="cn-st cn-t-info">{{ s.sem_atualizacao }} sem atualização há mais de {{ sem_atualizacao_dias }} dias</span>{% endif %}{% if s.usinas_atrasado %}<span class="cn-st cn-t-critico">{{ plural(s.usinas_atrasado, 'usina', 'usinas') }} com extintor atrasado</span>{% endif %}</div>
 {% endmacro %}
-{# uma etiqueta (recarga ou hidrostático): o que está escrito nela e, ao lado, só o que pede ação: quando venceu, ou
-   quanto falta se vence em até 30 dias. Vencer daqui a anos não precisa de frase (e alargava a coluna) #}
-{% macro etiqueta(v, fim) %}<span class="ext-par">{% if fim %}{% set n = (fim - d.hoje).days %}<span class="m">{{ v }}</span>{% if n <= alerta_dias %}<span class="det{{ ' cn-t-critico' if n < 0 else ' cn-t-alerta' }}">{% if n < 0 %}venceu há {{ tempo(n) }}{% elif n == 0 %}vence hoje{% else %}vence em {{ tempo(n) }}{% endif %}</span>{% endif %}{% else %}<span class="cn-t-neutro">{{ v }}</span>{% endif %}</span>{% endmacro %}
-{# as células de um extintor, iguais na tabela por extintor e dentro da linha da usina (cada parte lado a lado: Levi,
-   09/10, "se tem espaço para botar paralelo então deixe paralelo"). A usina vai sem a região ao lado (Levi, 11/10:
-   "Em usina pode tirar a região do lado, fica estranho!"; a região está nos cartões e no filtro); o status da TST não
-   repete a validade (está nas colunas ao lado): só a carga e os itens com NÃO, e o motivo inteiro no title.
-   Ordem das colunas (Levi, 11/10): Situação, Última conferência, Usina e o resto #}
-{% macro conferencia(x) %}{% if x.conferencia %}<span class="ext-par"><span class="m">{{ x.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.sem_atualizacao }}">há {{ tempo(x.dias_conferencia) }}{% if x.origem_conferencia %} · <span title="{{ x.origem_conferencia }}">{{ 'Forms' if x.origem_conferencia.startswith('Forms') else x.origem_conferencia }}</span>{% endif %}</span>{% if x.conferido_por %}<span class="det">{{ x.conferido_por }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca conferido</span>{% endif %}{% endmacro %}
-{% macro linha_extintor(x, com_usina=true, com_conferencia=true) %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}
-      <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        {% if com_conferencia %}<td>{{ conferencia(x) }}</td>{% endif %}
-        {% if com_usina %}<td class="ext-usina">{{ x.usina }}</td>{% endif %}
-        <td><span class="ext-par">{% if fotos.get(x.codigo) is not none %}<a class="cn-foto ext-foto" href="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo) }}" data-legenda="{{ x.ext }} · {{ x.local or 'local não informado' }} · {{ x.usina }}{% if fotos[x.codigo] %} · foto de {{ fotos[x.codigo][8:10] }}/{{ fotos[x.codigo][5:7] }}/{{ fotos[x.codigo][:4] }}{% endif %}" title="Ver a foto do extintor"><img src="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo, mini=1) }}" alt="Foto do {{ x.ext }}" loading="lazy"></a>{% endif %}<span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
-        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
-        <td>{{ etiqueta(x.val2, x.fim2) }}</td>
-        <td>{{ etiqueta(x.val3, x.fim3) }}</td>
-        <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
-{% endmacro %}
+{# as linhas dos extintores (e o botão Foto, que só pede a imagem no clique): as mesmas do pedaço da usina #}
+{% from 'hseq/_extintores_linha.html' import etiqueta, conferencia, linha_extintor, tabela_usina with context %}
 {% set no_grupo = {'atrasado': ('atrasado', 'atrasados', 'critico'), 'perto': ('perto de vencer', 'perto de vencer', 'alerta'),
                    'sem_validade': ('sem validade', 'sem validade', 'neutro'), 'em_dia': ('em dia', 'em dia', 'ok')} %}
 {% set status_no_grupo = {'CRITICO': ('crítico', 'críticos', 'critico'), 'ATENCAO': ('atenção', 'atenção', 'alerta'),
@@ -58,7 +41,7 @@
 {# o relatório de um cliente ou de uma usina (o da tela, unitário: Levi, 18/10/2026), em PDF, com as fotos, e em Excel
    (a TST, 19/10/2026: "tem como eu baixar um relatório dos extintores por cliente?"; "e excel tbm? pq às vezes o cliente
    pede"), com os filtros da tela e o da faixa #}
-{% macro relatorios(args, de) %}<span class="ext-par ext-rel"><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', baixar=1, **args) }}" title="O relatório {{ de }} em PDF, com as fotos">PDF</a><a class="cn-link" href="{{ url_for('torre_hseq.extintores_planilha', **args) }}" title="Os extintores {{ de }} em Excel">Excel</a></span>{% endmacro %}
+{% macro relatorios(args) %}<span class="ext-par ext-rel"><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', baixar=1, **args) }}" title="Com as fotos">PDF</a><a class="cn-link" href="{{ url_for('torre_hseq.extintores_planilha', **args) }}">Excel</a></span>{% endmacro %}
 {# os técnicos da usina (a tela Técnicos por usina do PCM), um embaixo do outro, como lá #}
 {% macro tecnicos(g) %}{% if d.get('tecnicos_erro') %}<span class="cn-t-neutro" title="A lista de técnicos por usina do PCM não foi lida agora">não lido</span>{% elif g.tecnicos %}<span class="ext-tecs">{% for n in g.tecnicos %}<span>{{ n }}</span>{% endfor %}</span>{% else %}<span class="cn-t-neutro">sem técnico</span>{% endif %}{% endmacro %}
 {% set pronto = not leitura.erro and d.get('aba_existe') and not d.get('colunas_faltando') %}
@@ -167,37 +150,18 @@
   {# UMA tabela: a linha do cliente e, logo abaixo, as das usinas dele (escondidas até o cliente abrir), nas mesmas
      colunas; só os extintores abrem numa tabela menor. Com o cliente abrindo uma tabela dentro da linha e a usina
      outra dentro dela, a tabela aberta pedia 1.212 px a 1440 (a caixa tem 1.168) #}
+  {# cada linha de cliente e de usina vai numa linha só do HTML (o recuo entre as células pesava ~20 KB) #}
   <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande ext-clientes">
     <thead><tr><th>Situação</th><th>Última conferência</th><th>Cliente e usina</th><th>Responsável</th><th>Técnicos</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status da TST</th><th>Relatório</th></tr></thead>
     <tbody>
     {% for c in grupos %}{% set s = situacoes[c.situacao] %}{% set n = loop.index %}
-      <tr class="cn-linha ext-cli" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente">
-        <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        <td></td>
-        <td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span><b>{{ c.cliente }}</b></span><span class="det">{{ plural(c.n_usinas, 'usina', 'usinas') }}</span>{% if c.usinas_atrasado %}<span class="det cn-t-critico">{{ c.usinas_atrasado }} com extintor atrasado</span>{% endif %}</span></td>
-        <td></td><td></td>
-        <td>{{ qtd(c) }}</td>
-        <td>{{ recarga(c) }}</td>
-        <td>{{ status_grupo(c) }}</td>
-        <td>{{ relatorios(dict(filtros_url, cliente=c.cliente), 'deste cliente') }}</td>
-      </tr>
+      <tr class="cn-linha ext-cli" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente"><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td></td><td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span><b>{{ c.cliente }}</b></span><span class="det">{{ plural(c.n_usinas, 'usina', 'usinas') }}</span>{% if c.usinas_atrasado %}<span class="det cn-t-critico">{{ c.usinas_atrasado }} com extintor atrasado</span>{% endif %}</span></td><td></td><td></td><td>{{ qtd(c) }}</td><td>{{ recarga(c) }}</td><td>{{ status_grupo(c) }}</td><td>{{ relatorios(dict(filtros_url, cliente=c.cliente)) }}</td></tr>
       {% for g in c.usinas %}{% set su = situacoes[g.situacao] %}
-      <tr class="cn-linha ext-us" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver os {{ g.qtd }} extintores"{% if not abre_cliente %} hidden{% endif %}>
-        <td><span class="cn-st cn-t-{{ su[1] }}">{{ su[0] }}</span></td>
-        <td>{{ conferencia(g) }}</td>
-        <td class="ext-usina ext-us-nome"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</td>
-        <td class="ext-esq">{% if g.responsavel == sem_responsavel %}<span class="cn-t-neutro">sem responsável</span>{% else %}{{ g.responsavel }}{% endif %}</td>
-        <td class="ext-esq">{{ tecnicos(g) }}</td>
-        <td>{{ qtd(g) }}</td>
-        <td>{{ recarga(g) }}</td>
-        <td>{{ status_grupo(g) }}</td>
-        <td>{{ relatorios(dict(filtros_url, cliente=g.cliente, usina=g.usina), 'desta usina') }}</td>
-      </tr>
-      <tr class="cn-detalhe" data-cli="{{ n }}"{% if not abre_usina %} hidden{% endif %}><td colspan="9">
-        <table class="ext-sub cn-fotos-grupo">
-          <thead><tr><th>Situação</th><th>Última conferência</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
-          <tbody>{% for x in g.extintores %}{{ linha_extintor(x, false) }}{% endfor %}</tbody>
-        </table>
+      <tr class="cn-linha ext-us" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver {{ 'o extintor' if g.qtd == 1 else 'os ' ~ g.qtd ~ ' extintores' }}"{% if not abre_cliente %} hidden{% endif %}><td><span class="cn-st cn-t-{{ su[1] }}">{{ su[0] }}</span></td><td>{{ conferencia(g) }}</td><td class="ext-usina ext-us-nome"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</td><td class="ext-esq">{% if g.responsavel == sem_responsavel %}<span class="cn-t-neutro">sem responsável</span>{% else %}{{ g.responsavel }}{% endif %}</td><td class="ext-esq">{{ tecnicos(g) }}</td><td>{{ qtd(g) }}</td><td>{{ recarga(g) }}</td><td>{{ status_grupo(g) }}</td><td>{{ relatorios(dict(filtros_url, cliente=g.cliente, usina=g.usina)) }}</td></tr>
+      {# os extintores da usina só vêm quando ela abre (19/10/2026: com todos na página, escondidos, eram 897 KB e o
+         servidor levava 21 s montando); com o filtro de usina (o clique num não reconhecido) já vêm na página #}
+      <tr class="cn-detalhe" data-cli="{{ n }}"{% if not abre_usina %} hidden data-url="{{ url_for('torre_hseq.extintores_usina', **dict(filtros_url, cliente=g.cliente, usina=g.usina)) }}"{% endif %}><td colspan="9">
+        {% if abre_usina %}{{ tabela_usina(g.extintores) }}{% else %}<span class="mudo">Carregando {{ 'o extintor' if g.qtd == 1 else 'os ' ~ g.qtd ~ ' extintores' }}...</span>{% endif %}
       </td></tr>
       {% endfor %}
     {% else %}<tr><td colspan="9" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
@@ -215,6 +179,23 @@
   {% endif %}
   {% endif %}
   <script>
+    // os extintores de uma usina vêm do servidor na 1ª vez que ela abre e ficam na página (fechar e abrir não busca de
+    // novo); se falhar, a linha diz e oferece "Tentar de novo"
+    function carregar(det) {
+      var td = det.firstElementChild, aviso = td.textContent;
+      det.dataset.carregada = '1';
+      fetch(det.dataset.url, {credentials: 'same-origin'}).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      }).then(function (html) { td.innerHTML = html; }).catch(function () {
+        delete det.dataset.carregada;
+        td.innerHTML = '<span class="cn-t-critico">Não consegui buscar os extintores desta usina.</span> '
+          + '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno ext-tentar">Tentar de novo</button>';
+        td.querySelector('.ext-tentar').addEventListener('click', function (ev) {
+          ev.stopPropagation(); td.textContent = aviso; carregar(det);
+        });
+      });
+    }
     // a linha da usina abre (e fecha) os extintores dela logo abaixo; a do cliente mostra (e esconde) as usinas dele,
     // e fechar o cliente fecha também os extintores abertos. Enter e espaço também
     document.querySelectorAll('.ext-tab table.cn-expande > tbody > tr.cn-linha').forEach(function (tr) {
@@ -231,6 +212,7 @@
           var det = tr.nextElementSibling;
           if (!det || !det.classList.contains('cn-detalhe')) return;
           det.hidden = !abrir;
+          if (abrir && det.dataset.url && !det.dataset.carregada) carregar(det);
         }
         tr.setAttribute('aria-expanded', String(abrir));
       }

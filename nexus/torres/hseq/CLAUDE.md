@@ -67,6 +67,20 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
   quem vê e ronda a usina no App, um embaixo do outro; o apoio agendado para depois de hoje ainda não conta). Lista que
   não foi lida: a coluna diz "não lido" e a tela avisa, e nunca "sem técnico". Medido em 18/10: 174 usinas com técnico,
   68 com dois.
+- **A página é leve: o resumo vem nela, os extintores só ao abrir a usina e a foto só no clique** (19/10/2026). O
+  Raio-X do servidor às 17:15 pegou a tela 21 s montando a página (o servidor é um notebook que também roda o banco, e
+  enquanto isso o resto do Nexus fica lento): a visão por cliente levava TODOS os extintores, escondidos (897 KB, 1.105
+  linhas), e abrir uma usina pedia todas as miniaturas juntas. Levi: "primeiro mostra a informação e só quando a pessoa
+  clica que começa a carregar as imagens". Agora a página leva só as linhas de cliente e de usina, com todos os campos
+  de antes; a linha da usina busca os extintores dela na 1ª vez que abre (rota `extintores_usina`, o pedaço
+  `_extintores_usina.html`, os mesmos filtros da tela e o da faixa, a usina com o cliente) e os guarda na página
+  ("Carregando os N extintores...", e na falha o "Tentar de novo"); com o filtro de usina (o clique num não
+  reconhecido) eles já vêm na página. Nenhuma lista leva `<img>` de extintor: no lugar da miniatura, o botão "Foto" com o
+  dia da foto, e a caixa das Rondas pede a imagem no clique. As linhas do extintor moram em `_extintores_linha.html`
+  (a tela e o pedaço usam as mesmas). Cada linha de cliente e de usina vai numa linha só do HTML (o recuo pesava ~20 KB).
+  Medido no banco real (só leitura, no PC): de 897 KB e 1.105 linhas para 199 KB e 207; quente, de 0,16 s para 0,05 s;
+  o pedaço de uma usina, 1 a 10 KB em 0,01 s. Os testes do orçamento: nenhuma `<img>` de foto nas listas, a página sem
+  linha de extintor, com 810 extintores abaixo de 200 KB, o pedaço só com a usina dele e a linha da usina com os campos.
 - **Cabe a 1440 px** com as usinas e os extintores abertos (medido no banco real, 18/10: a caixa tem 1.168 px). O cliente
   abrindo uma tabela dentro da linha e a usina outra dentro dela pedia 1.212 px; com as listas "N atrasados · ..." numa
   parte só, 1.391. Por isso: cliente e usinas na mesma tabela, as listas quebram entre os itens (`ext-lista`) e o nome da
@@ -144,16 +158,19 @@ a foto de cada conferência num `POST /t/hseq/extintores/foto` (multipart: `codi
 nova (sem ela a rota responde 503). O Nexus confere a assinatura e a hora (15 min), abre a imagem, regrava em JPEG de
 até 1600 px e guarda a mais recente de cada extintor em `<dados>/hseq/extintores/fotos/<código>.jpg` (+ `.json` com o
 dia); foto de dia mais velho não substitui. É a única rota sem login (`auth.ROTAS_PUBLICAS`), e só por POST. Na tabela
-(a linha da usina aberta e a visão por extintor), o extintor com foto ganha a miniatura antes do código; o clique abre a
-caixa das fotos da ronda (setas andam entre as fotos da usina). O PDF põe a mesma foto ao lado do extintor.
+(a usina aberta e a visão por extintor), o extintor com foto ganha o botão "Foto" com o dia dela (até 19/10/2026, uma
+miniatura: ver "A página é leve"); o clique abre a caixa das fotos da ronda e só então pede a imagem (setas andam entre
+as fotos da usina). O PDF põe a mesma foto ao lado do extintor. No servidor (19/10): a listagem da pasta
+(`fotos.disponiveis`) fica guardada 30 s e o `receber` a renova; a miniatura da rota `?mini=1` (que a tela não usa mais)
+vem da memória ou da cópia de 160 px em `mini/<código>.jpg` e só a 1ª vez lê a foto inteira, reduzida com o `draft`.
 
 **O App envia desde a v265 (14/10/2026).** Até ali a foto ficava só no App: o técnico fotografava, e o PDF de 13/10 saía
 sem foto (Levi, 14/10: "o Nexus precisa receber a foto!"). Um timer do App, a cada 10 min (minutos 4, 14, 24...), manda
 as conferências com foto que o Nexus ainda não aceitou, da mais velha para a mais nova; a conferência refeita com outra
 foto vai de novo. A 1ª volta (03:54Z) mandou as 90 pendentes desde a v257, todas "200 foto guardada". Conferido no
 Nexus de produção: 90 extintores com miniatura, em 16 usinas, e o PDF da Aquiraz 2 (CRS200-INFC1-PPCI-EXT01) de 13/10
-com a foto ao lado. Prova de uma foto: `GET /t/hseq/extintores/foto/<código>.jpg` (com login) e a miniatura na Tabela
-(os cartões Por responsável não têm foto).
+com a foto ao lado. Prova de uma foto: `GET /t/hseq/extintores/foto/<código>.jpg` (com login) e o botão "Foto" na
+Tabela (os cartões Por responsável não têm foto).
 
 **Não reconhecido em campo** (Levi, 14/10/2026). Na Axis Linhares 1 - ES a equipe fez a ronda e só achou 4 dos 17
 extintores do cadastro, e o App não tinha como dizer isso ("pode ter um botão no app de campo de 'Não reconhecido' para

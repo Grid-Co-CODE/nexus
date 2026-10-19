@@ -135,6 +135,20 @@ def extintores():
         filtros_url={k: request.args.get(k) for k in FILTROS_URL if request.args.get(k)}, nao_rec=nao_rec)
 
 
+@bp.route("/extintores/usina")
+def extintores_usina():
+    """Os extintores de UMA usina, o pedaço que a linha da usina busca quando abre (19/10/2026: com todos os extintores
+    na página, escondidos, eram 897 KB, e o Raio-X do servidor pegou 21 s montando a tela). Os mesmos filtros da tela e
+    o da faixa; a usina vem com o cliente (o nome sozinho é de duas usinas: as duas Linhares 1). Sem o livro, vazio."""
+    leitura, d, todas, base, nao_rec, fl = _filtrados()
+    if leitura.erro or not d.get("aba_existe") or d.get("colunas_faltando") or not fl["usina"]:
+        abort(404)
+    f = request.args.get("f") if request.args.get("f") in EXT.FILTROS else ""
+    return render_template("hseq/_extintores_usina.html", d=d, extintores=EXT.ordenar([x for x in base if not f or x[f]]),
+                           situacoes=EXT.SITUACOES, status_tst=EXT.STATUS_TST, tempo=EXT.tempo,
+                           alerta_dias=EXT.ALERTA_DIAS, fotos=FOT.disponiveis(current_app.config))
+
+
 def _slug(s) -> str:
     s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-")[:60] or "usina"

@@ -1,0 +1,38 @@
+{# As linhas dos extintores, num lugar só: a tela (visão por extintor e a usina aberta com o filtro de usina) e o pedaço
+   que a usina busca ao abrir (`_extintores_usina.html`) usam as mesmas. Importar com `with context` (usam d, situacoes,
+   status_tst, fotos, tempo e alerta_dias da tela).
+
+   A FOTO SÓ NO CLIQUE (19/10/2026). Às 17:15 o Raio-X do servidor pegou a tela de Extintores 21 s montando a página
+   (todos os extintores iam nela, escondidos: 897 KB, 1.105 linhas), e abrir uma usina pedia todas as miniaturas juntas
+   (cada uma lia a foto inteira no servidor). Levi: "primeiro mostra a informação e só quando a pessoa clica que começa a
+   carregar as imagens". Por isso a linha não leva <img>: leva o botão "Foto" com o dia da foto, e a caixa que amplia
+   (a mesma das Rondas) só pede a imagem no clique. #}
+
+{# uma etiqueta (recarga ou hidrostático): o que está escrito nela e, ao lado, só o que pede ação: quando venceu, ou
+   quanto falta se vence em até 30 dias. Vencer daqui a anos não precisa de frase (e alargava a coluna) #}
+{% macro etiqueta(v, fim) %}<span class="ext-par">{% if fim %}{% set n = (fim - d.hoje).days %}<span class="m">{{ v }}</span>{% if n <= alerta_dias %}<span class="det{{ ' cn-t-critico' if n < 0 else ' cn-t-alerta' }}">{% if n < 0 %}venceu há {{ tempo(n) }}{% elif n == 0 %}vence hoje{% else %}vence em {{ tempo(n) }}{% endif %}</span>{% endif %}{% else %}<span class="cn-t-neutro">{{ v }}</span>{% endif %}</span>{% endmacro %}
+
+{# a última conferência: o dia, há quanto tempo, a origem e quem conferiu #}
+{% macro conferencia(x) %}{% if x.conferencia %}<span class="ext-par"><span class="m">{{ x.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.sem_atualizacao }}">há {{ tempo(x.dias_conferencia) }}{% if x.origem_conferencia %} · <span title="{{ x.origem_conferencia }}">{{ 'Forms' if x.origem_conferencia.startswith('Forms') else x.origem_conferencia }}</span>{% endif %}</span>{% if x.conferido_por %}<span class="det">{{ x.conferido_por }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca conferido</span>{% endif %}{% endmacro %}
+
+{# as células de um extintor, iguais na tabela por extintor e dentro da usina (cada parte lado a lado: Levi, 09/10, "se
+   tem espaço para botar paralelo então deixe paralelo"). A usina vai sem a região ao lado (Levi, 11/10); o status da
+   TST não repete a validade: só a carga e os itens com NÃO, e o motivo inteiro no title. Ordem das colunas (Levi,
+   11/10): Situação, Última conferência, Usina e o resto #}
+{% macro linha_extintor(x, com_usina=true, com_conferencia=true) %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}{% set dia_foto = fotos.get(x.codigo) %}
+      <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+        {% if com_conferencia %}<td>{{ conferencia(x) }}</td>{% endif %}
+        {% if com_usina %}<td class="ext-usina">{{ x.usina }}</td>{% endif %}
+        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span>{% if dia_foto is not none %}<a class="cn-foto ext-foto-bt" href="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo) }}" data-legenda="{{ x.ext }} · {{ x.local or 'local não informado' }} · {{ x.usina }}{% if dia_foto %} · foto de {{ dia_foto[8:10] }}/{{ dia_foto[5:7] }}/{{ dia_foto[:4] }}{% endif %}" title="Ver a foto do extintor">Foto{% if dia_foto %} {{ dia_foto[8:10] }}/{{ dia_foto[5:7] }}{% endif %}</a>{% endif %}</span></td>
+        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
+        <td>{{ etiqueta(x.val2, x.fim2) }}</td>
+        <td>{{ etiqueta(x.val3, x.fim3) }}</td>
+        <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
+{% endmacro %}
+
+{# os extintores de uma usina, a tabela menor que a linha da usina abre (cada um com a conferência dele: a linha da
+   usina junta todos os dias) #}
+{% macro tabela_usina(exts) %}<table class="ext-sub cn-fotos-grupo">
+          <thead><tr><th>Situação</th><th>Última conferência</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
+          <tbody>{% for x in exts %}{{ linha_extintor(x, false) }}{% else %}<tr><td colspan="7" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}</tbody>
+        </table>{% endmacro %}
