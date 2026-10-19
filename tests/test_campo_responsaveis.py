@@ -1131,17 +1131,20 @@ def test_o_numero_de_usinas_do_bloco_e_o_que_o_filtro_mostra(manut):
 
 
 def test_o_destaque_do_bloco_e_uma_faixa_verde_do_cabecalho_ao_fim(manut, logado):
-    """Levi: "esse destaque em azul tá feio (...) Mude para um verde grid com uma transparência de 70% pegando
-    cabeçalho e célula pegando a área do bloco toda!". Uma faixa verde (70% transparente) em cada linha, nas colunas do
-    bloco e no espaço entre elas, do cabeçalho do grupo à última usina. A etiqueta do número fica sobre o fundo da lista:
-    o verde do "em dia" não some no verde (o porquê do cinza da revisão)."""
+    """Levi: "esse destaque em azul tá feio (...) pegando cabeçalho e célula pegando a área do bloco toda!"; na mesma
+    noite, "o verde está muito forte, deixe 1/3 do que está" e "tem que ser uma cor só destacando a área inteira". Uma
+    faixa em cada linha, nas colunas do bloco e no espaço entre elas, do cabeçalho do grupo à última usina, OPACA e por
+    cima da linha que separa as usinas: as linhas juntas fazem uma área só, de uma cor."""
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&bloco=manut").get_data(as_text=True)
     assert '<div class="cr-gr-lista" data-bloco="manut">' in html
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     assert '<div class="cr-gr-lista">' in html
     css = _campo_css()
     faixa = re.search(r"\.cr-gr-lista\[data-bloco\] \.cr-gr-g::before\{([^}]*)\}", css).group(1)
-    assert "background:var(--verde-a30)" in faixa and "position:absolute" in faixa and "z-index:-1" in faixa
+    assert "background:var(--faixa-verde)" in faixa and "position:absolute" in faixa and "z-index:-1" in faixa
+    assert "bottom:-9px" in faixa                    # cobre a linha de 1 px entre as usinas (o padding é de 8 px)
+    nexus = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
+    assert re.findall(r"--faixa-verde:(#[0-9a-f]{6});", nexus) == ["#24302b", "#f6fbe9"]      # opaca nos dois temas
     meio = re.search(r"@media \(min-width:1181px\) and \(max-width:1366px\)\{(.*?)\n\}", css, re.S).group(1)
     for b, larga, estreita in (("perf", "2 / span 3", "2 / span 2"), ("manut", "5 / span 4", "4 / span 3"),
                                ("acomp", "9 / span 5", "7 / span 2")):
@@ -1150,8 +1153,6 @@ def test_o_destaque_do_bloco_e_uma_faixa_verde_do_cabecalho_ao_fim(manut, logado
     cartoes = re.search(r"@media \(max-width:1180px\)\{\n  \.cr-gr-grupos(.*?)\n\}", css, re.S).group(1)
     assert ".cr-gr-lista[data-bloco] .cr-gr-g::before{display:none}" in cartoes
     assert not re.search(r"\.cr-gr-csel\{[^}]*superficie-3", css)                      # o azul saiu
-    for nv, tinta in (("ok", "--verde-suave"), ("alerta", "--alerta-suave"), ("critico", "--critico-suave")):
-        assert f".cr-gr-csel .cr-v--{nv}{{background:linear-gradient(var({tinta}),var({tinta})) var(--superficie)}}" in css
 
 
 def test_as_reguas_ficam_no_ponto_de_exclamacao_abaixo_da_tabela(manut, logado):

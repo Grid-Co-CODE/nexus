@@ -948,23 +948,22 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-gr-grupos{padding:10px 16px 0;font:700 11px/14px var(--font-sans);color:var(--tinta)}
 .cr-gr-gp{text-align:center;padding-bottom:6px;border-bottom:2px solid var(--linha)}
 .cr-gr-gp--sel{border-bottom-color:var(--verde)}
-/* o bloco destacado (Levi, 18/10/2026: "verde grid com uma transparência de 70% pegando cabeçalho e célula pegando a área
-   do bloco toda"): uma faixa por linha, o ::before da grade posto nas colunas do bloco (com o espaço entre elas) e
-   esticado até a borda da linha; as linhas juntas fazem uma faixa só, do nome do grupo à última usina. A etiqueta do
-   número leva o fundo da lista por baixo da cor dela: o "em dia" verde não some no verde (o porquê do cinza que havia) */
+/* o bloco destacado (Levi, 18/10/2026: "pegando cabeçalho e célula pegando a área do bloco toda"; na mesma noite, "o verde
+   está muito forte, deixe 1/3 do que está", "tem que ser uma cor só destacando a área inteira", "algo discreto mas que
+   mostre!"): o ::before de cada linha da grade, posto nas colunas do bloco (com o espaço entre elas) e esticado até a
+   borda da linha, POR CIMA da linha que separa as usinas: opaco (o verde a 10% já misturado na superfície), as linhas
+   juntas fazem uma área só, do nome do grupo à última usina. Com o verde fraco, o "em dia" verde continua legível (o
+   porquê do cinza que havia antes, quando o realce era o verde-suave) */
 .cr-gr-lista[data-bloco] .cr-gr-g{position:relative;isolation:isolate}
-.cr-gr-lista[data-bloco] .cr-gr-g::before{content:"";position:absolute;grid-row:1;top:-8px;bottom:-8px;left:-4px;right:-4px;
-  z-index:-1;background:var(--verde-a30);pointer-events:none}
-.cr-gr-lista[data-bloco] .cr-cols::before{top:-9px;bottom:-9px}
+.cr-gr-lista[data-bloco] .cr-gr-g::before{content:"";position:absolute;grid-row:1;top:-8px;bottom:-9px;left:-4px;right:-4px;
+  z-index:-1;background:var(--faixa-verde);pointer-events:none}
+.cr-gr-lista[data-bloco] .cr-lin[open] > summary::before{bottom:-8px}
+.cr-gr-lista[data-bloco] .cr-cols::before{top:-9px;bottom:-10px}
 .cr-gr-lista[data-bloco] .cr-gr-grupos::before{top:-10px;bottom:0}
 .cr-gr-lista[data-bloco="perf"] .cr-gr-g::before{grid-column:2 / span 3}
 .cr-gr-lista[data-bloco="manut"] .cr-gr-g::before{grid-column:5 / span 4}
 .cr-gr-lista[data-bloco="acomp"] .cr-gr-g::before{grid-column:9 / span 5}
 .cr-cols .cr-gr-csel{color:var(--tinta)}
-.cr-gr-csel .cr-v--ok{background:linear-gradient(var(--verde-suave),var(--verde-suave)) var(--superficie)}
-.cr-gr-csel .cr-v--alerta{background:linear-gradient(var(--alerta-suave),var(--alerta-suave)) var(--superficie)}
-.cr-gr-csel .cr-v--critico{background:linear-gradient(var(--critico-suave),var(--critico-suave)) var(--superficie)}
-.cr-gr-csel .cr-v--neutro{background:var(--superficie)}
 .cr-gr-gp--perf{grid-column:span 3}
 .cr-gr-gp--manut{grid-column:span 4}
 .cr-gr-gp--acomp{grid-column:span 5}

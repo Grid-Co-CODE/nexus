@@ -762,11 +762,13 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
   Pausadas, Semana passada, Ronda e PT (o resto no detalhe). Até 1180 px a lista vira cartões, com as etiquetas P, M e A
   na cor do nível de cada bloco e o alerta principal (a do bloco destacado, com contorno).
 - **O destaque do bloco** (Levi, 18/10/2026: "esse destaque em azul tá feio (...) Mude para um verde grid com uma
-  transparência de 70% pegando cabeçalho e célula pegando a área do bloco toda!"): uma faixa `--verde-a30` (o verde Grid
-  70% transparente) do nome do grupo à última usina, nas colunas do bloco e no espaço entre elas. É o `::before` de cada
-  linha da grade, posto nas colunas do bloco pelo `data-bloco` da lista (a 1366 px, nas colunas que sobram; nos cartões,
-  sai). A etiqueta do número leva o fundo da lista por baixo da cor dela: o "em dia" verde não some no verde (o porquê do
-  cinza que havia antes).
+  transparência de 70% pegando cabeçalho e célula pegando a área do bloco toda!"; visto na tela, "o verde está muito
+  forte, deixe 1/3 do que está" e "tem que ser uma cor só destacando a área inteira (...) discreto mas que mostre!"): uma
+  área `--faixa-verde` (o verde Grid a 10% já misturado na superfície, opaco) do nome do grupo à última usina, nas
+  colunas do bloco e no espaço entre elas. É o `::before` de cada linha da grade, posto nas colunas do bloco pelo
+  `data-bloco` da lista e por cima da linha que separa as usinas (por isso opaco: translúcido, as linhas apareciam como
+  listras). A 1366 px, nas colunas que sobram; nos cartões, sai. Com o verde fraco, o "em dia" verde segue legível (o
+  porquê do cinza que havia antes, quando o realce era o verde-suave).
 - **O centro das colunas:** o cabeçalho e as células `cr-col-*` ficam no centro (`.cr-g > [class*="cr-col-"]`); a Usina,
   à esquerda.
 - **Prova (18/10/2026, o banco real só lido):** 131 usinas; o clique em Manutenção pôs as críticas da Manutenção em cima,
