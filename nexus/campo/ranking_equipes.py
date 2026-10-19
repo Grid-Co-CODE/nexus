@@ -256,6 +256,13 @@ ROTULO_COBRAR = {"parada": "Parada agora", "atrasadas": "Atrasadas", "pt": "PT",
 MAX_PROVAS = 3
 
 
+def _prova(txt, os_="", wid="") -> dict:
+    """Uma prova: o texto e, quando ela cita uma OS, o número e o id do Fracttal (a janela faz da OS o botão verde que
+    abre o card dela: Levi, 19/10/2026, "ao citar uma OS tem que ficar verde grid e deve ser possível clicar e ver o
+    card da OS que nem quando clicamos em uma OS no OS Creator Web"). Sem o id, o card acha a OS pelo número."""
+    return {"os": str(os_ or ""), "wid": str(wid or ""), "txt": txt}
+
+
 def _provas(area: str, us: list[dict]) -> tuple[str, list[tuple], int]:
     """(o número que abre a linha, [(ordem, prova)], quantas provas há ao todo) de uma área, nas usinas `us` (as que têm
     o alerta dela). A prova é a coisa que se cobra (a OS e os dias, a PT e quem pediu, o extintor), com a usina; a área
@@ -263,12 +270,12 @@ def _provas(area: str, us: list[dict]) -> tuple[str, list[tuple], int]:
     texto da Visão."""
     from .responsaveis import _dm, _duracao
     if area == "parada":
-        ps = [(str(p.get("_ini") or ""), f"OS {p['os']} · {u['usina']} · {p.get('escopo') or '—'} · desde {p.get('inicio')}")
+        ps = [(str(p.get("_ini") or ""), _prova(f"{u['usina']} · {p.get('escopo') or '—'} · desde {p.get('inicio')}", p["os"]))
               for u in us for p in u.get("paradas_abertas") or ()]
         return "", ps, len(ps)
     if area == "atrasadas":
         ms = [(u, u.get("manutencao") or {}) for u in us]
-        ps = [(-(x.get("dias") or 0), f"OS {x['os']} · {u['usina']} · há {x.get('dias')} d")
+        ps = [(-(x.get("dias") or 0), _prova(f"{u['usina']} · há {x.get('dias')} d", x["os"], x.get("wid")))
               for u, m in ms for x in m.get("lista_atrasadas") or ()]
         n = sum(m.get("atrasadas") or 0 for _u, m in ms)
         return _pl(n, "tarefa", "tarefas"), ps, max(len(ps), sum(m.get("atrasadas_os") or 0 for _u, m in ms))
@@ -281,32 +288,33 @@ def _provas(area: str, us: list[dict]) -> tuple[str, list[tuple], int]:
                 txt = f"{qual} · {u['usina']} · {quem}há {_duracao(x.get('idade_min'))}"
                 if x.get("parada") and not x.get("hoje"):
                     txt += f" · sem decisão desde {_dm(x.get('dia'))}"
-                ps.append(((0 if x.get("parada") else 1, -(x.get("idade_min") or 0)), txt))
+                ps.append(((0 if x.get("parada") else 1, -(x.get("idade_min") or 0)), _prova(txt)))
         return "", ps, len(ps)
     if area == "extintores":
-        ps = [((x.get("ordem", 2), x.get("ext") or ""), f"Extintor {x.get('ext')} · {u['usina']} · {x.get('txt')}")
+        ps = [((x.get("ordem", 2), x.get("ext") or ""), _prova(f"Extintor {x.get('ext')} · {u['usina']} · {x.get('txt')}"))
               for u in us for x in (u.get("extintores") or {}).get("lista") or ()]
         return "", ps, len(ps)
     if area == "chamados":
-        ps = [(-(x.get("dias") or 0), " · ".join(t for t in (
-                  f"OS {x.get('os')}", u["usina"], x.get("equip"), x.get("fabricante"),
-                  f"há {x['dias']} d" if x.get("dias") is not None else "") if t))
+        ps = [(-(x.get("dias") or 0), _prova(" · ".join(t for t in (
+                  u["usina"], x.get("equip"), x.get("fabricante"),
+                  f"há {x['dias']} d" if x.get("dias") is not None else "") if t), x.get("os")))
               for u in us for x in (u.get("chamados") or {}).get("lista") or () if x.get("situacao") == "aberto"]
         return "", ps, len(ps)
     if area == "ativos":
         ps = [((0 if x.get("nivel") == "critico" else 1, -(x.get("falhas") or 0)),
-               " · ".join(t for t in (x.get("nome"), u["usina"], x.get("porque")) if t))
+               _prova(" · ".join(t for t in (x.get("nome"), u["usina"], x.get("porque")) if t)))
               for u in us for x in (u.get("ativos") or {}).get("lista") or () if x.get("nivel") in ("critico", "atencao")]
         return "", ps, len(ps)
     if area == "paradas":
-        ps = [(str(x.get("desde") or ""), " · ".join(t for t in (
-                  f"OS {x['os']}", u["usina"], x.get("motivo"), f"desde {_dm(x['desde'])}" if x.get("desde") else "") if t))
+        ps = [(str(x.get("desde") or ""), _prova(" · ".join(t for t in (
+                  u["usina"], x.get("motivo"), f"desde {_dm(x['desde'])}" if x.get("desde") else "") if t),
+                  x["os"], x.get("wid")))
               for u in us for x in (u.get("manutencao") or {}).get("lista_paradas") or ()]
         return "", ps, len(ps)
     if area == "disp":
         from .responsaveis import _pct
-        ps = [((u.get("disp") or {}).get("disp") or 0, f"{u['usina']} · {_pct((u.get('disp') or {}).get('disp'), 1)}")
-              for u in us]
+        ps = [((u.get("disp") or {}).get("disp") or 0,
+               _prova(f"{u['usina']} · {_pct((u.get('disp') or {}).get('disp'), 1)}")) for u in us]
         return "", ps, len(ps)
 
     def chave(u, a):
@@ -317,7 +325,7 @@ def _provas(area: str, us: list[dict]) -> tuple[str, list[tuple], int]:
         if area == "meta":
             return ((u.get("meta") or {}).get("atingimento") or 999, u["usina"])
         return (0 if a["nivel"] in ("agora", "critico") else 1, u["usina"])
-    ps = [(chave(u, a), " · ".join(t for t in (u["usina"], a.get("titulo")) if t))
+    ps = [(chave(u, a), _prova(" · ".join(t for t in (u["usina"], a.get("titulo")) if t)))
           for u in us for b in ("perf", "acomp", "manut") for a in (u.get(b) or {}).get("alertas") or ()
           if a["area"] == area]
     return "", ps, len(ps)
@@ -333,7 +341,7 @@ def cobrar(s: dict, usinas: list[dict]) -> list[dict]:
     for a in _ordem(areas):
         com = [u for u in us if u.get("usina_id") in areas[a]["todas"]]
         cabeca, ps, total = _provas(a, com)
-        ps = [t for _k, t in sorted(ps, key=lambda kt: kt[0])]
+        ps = [t for _k, t in sorted(ps, key=lambda kt: kt[0])]           # estável: no empate, a ordem de leitura
         rot = ROTULO_COBRAR.get(a, a)
         if a == "pt":
             rot = "PT parada" if areas[a]["crit"] else "PT esperando"
@@ -515,6 +523,7 @@ def motivos(n: dict, det: dict, usinas: list[dict], por_usina: dict) -> dict:
              "o_que": " · ".join(x for x in (f"OS {t['os']}" if t.get("os") else "", t.get("tarefa") or "") if x)
              or "Tarefa",
              "curto": f"OS {t['os']}" if t.get("os") else "Tarefa", "tarefa": t.get("tarefa") or "",
+             "tipo": "tarefa", "os": str(t.get("os") or ""), "wid": str(t.get("wid") or ""),
              "faltou": "; ".join(f"{it.get('rot')}: {it.get('det')}" if it.get("det") else str(it.get("rot"))
                                  for it in t.get("itens") or () if _perdeu(it) > 0.05),
              "pontos": [f"{it.get('rot')} {_num(it.get('pts'))}/{_num(it.get('peso'))}"
@@ -523,6 +532,7 @@ def motivos(n: dict, det: dict, usinas: list[dict], por_usina: dict) -> dict:
     regs += [{"nota": r["nota"], "dia": r.get("dia") or "", "usina": nome.get(r.get("usina_id"), ""),
               "tecnico": r.get("tecnico") or "", "o_que": f"Ronda · OS {r['os']}" if r.get("os") else "Ronda sem OS",
               "curto": f"Ronda · OS {r['os']}" if r.get("os") else "Ronda sem OS", "tarefa": "",
+              "tipo": "ronda", "os": str(r.get("os") or ""), "wid": "",
               "faltou": "; ".join(_falhas(r.get("falhas"))), "pontos": []} for r in baixas]
     # as tarefas iguais da mesma OS (a mesma nota, o mesmo dia, o mesmo que faltou) viram uma linha só, com quantas:
     # medido em 18/10/2026, uma OS de verificação de tracker com 4 tarefas iguais ocupava 4 das 5 linhas
