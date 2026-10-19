@@ -40,9 +40,12 @@
   {% set mes_txt = nome_do_mes(atual.mes) %}
   {% set g = atual.regua %}
   {# o "fora do ciclo" do App, explicado pela régua que ele publicou no mês #}
-  {% set dica_fora = 'Fora do ciclo: quem tem menos de ' ~ (g.get('min_tarefas') if g.get('min_tarefas') is not none else 'o mínimo de')
-       ~ ' tarefas registradas ou menos de ' ~ ((g.get('min_cumprimento') ~ '%') if g.get('min_cumprimento') is not none else 'o mínimo')
-       ~ ' do programado cumprido em ' ~ mes_txt ~ ' não entra na classificação do mês (fica sem posição). Os pontos aparecem só para conferir.' %}
+  {# a regra é a do App (confirmada pela sessão dele em 18/10/2026): vale a primeira que pegar #}
+  {% set dica_fora = 'Fora do ciclo: fica sem posição na classificação de ' ~ mes_txt ~ ' quem tem menos de '
+       ~ (g.get('min_tarefas') if g.get('min_tarefas') is not none else 'o mínimo de')
+       ~ ' tarefas registradas no mês (contam todas, inclusive as devolvidas e as de 0 ponto; ronda não conta) ou, tendo o mínimo, menos de '
+       ~ ((g.get('min_cumprimento') ~ '%') if g.get('min_cumprimento') is not none else 'o mínimo')
+       ~ ' do programado cumprido (concluídas ÷ programadas, só os dias já vencidos; sem nada programado, conta 0%). Os pontos aparecem só para conferir.' %}
   {% macro fora_do_ciclo() %}<span class="rk-dica" tabindex="0" title="{{ dica_fora }}">Fora do ciclo</span>{% endmacro %}
   {% set podio = classificacao[:3] %}
   {% if podio %}

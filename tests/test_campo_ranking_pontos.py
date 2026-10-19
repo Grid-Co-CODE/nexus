@@ -175,6 +175,9 @@ def test_a_classificacao_e_dita_pelo_mes_e_o_fora_do_ciclo_se_explica_no_mouse(r
     assert len(dicas) == 2                                         # no número e no título da lista
     for d in dicas:
         assert "menos de 10 tarefas registradas" in d and "menos de 70% do programado" in d and "outubro de 2026" in d
+        # a regra como o App conta (a sessão do App, 18/10/2026): as devolvidas contam nas registradas, a ronda não; o
+        # cumprimento é só dos dias já vencidos, e sem nada programado ele é 0%
+        assert "inclusive as devolvidas" in d and "ronda não conta" in d and "sem nada programado, conta 0%" in d
     # o mês de setembro fala de setembro
     assert "Classificação de setembro de 2026" in _texto(logado.get("/t/campo/ranking?mes=2026-09").get_data(as_text=True))
 
