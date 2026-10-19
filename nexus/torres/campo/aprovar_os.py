@@ -20,7 +20,8 @@ POST /os/_nexus/aprovacao/<id>/aprovar, que:
   ou entrou com a senha de admin, como o Cadastro decide; ou o e-mail do Fracttal em NEXUS_ADMINS). Os demais levam 403
   com o texto de quem aprova aquela OS, inclusive quem montar o pedido à mão;
 - repassa ao clone o MESMO pedido que a tela fazia e, aprovada, tira a OS da fila guardada na hora.
-A tela só esconde o botão de quem não pode (`pode_na_tela`, pela sessão do Nexus); quem decide é este portão.
+Desde 18/10/2026 a tela da Aprovação não tem mais o botão (Levi: a OS abre o card do OS Creator, cujo Concluir
+aprova); o portão segue para quem montar o pedido.
 """
 import logging
 from urllib.parse import urlsplit
@@ -45,15 +46,6 @@ def papel_da_sessao() -> dict:
     O&M de 10/2026 guardava ali o nome do supervisor (texto): não vale como papel."""
     p = session.get("supervisor_padrao")
     return p if isinstance(p, dict) else {}
-
-
-def pode_na_tela(aprovadores) -> bool:
-    """Se a tela mostra o Aprovar na linha: admin do Nexus, ou quem entrou pelo Fracttal é quem aprova a OS (o
-    `pessoa_id` do papel da sessão). É só aparência: a regra vale no servidor (`aprovar`)."""
-    if _admin_do_nexus():
-        return True
-    pid = papel_da_sessao().get("pessoa_id")
-    return bool(pid) and any(a.get("pessoa_id") == pid for a in aprovadores or ())
 
 
 def aprovadores_da_os(os_fila: dict) -> list[dict]:

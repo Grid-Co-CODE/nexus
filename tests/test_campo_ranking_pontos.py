@@ -74,9 +74,9 @@ def test_a_tela_mostra_o_podio_a_classificacao_e_quem_esta_fora(ranking, logado)
     podio = _texto(html.split('class="rk-podio"', 1)[1].split('class="cn-numeros"', 1)[0])
     assert re.search(r"1º lugar Ana Souza SP Norte 01 1\.480 pts .*2º lugar Bruno Lima .*1\.137 pts .*3º lugar Carla Dias", podio)
     assert "Davi Rocha" not in podio                                               # o pódio são três
-    assert "No ciclo 4 técnicos classificados" in t and "Fora do ciclo 1 " in t and "Líder 1.480 pontos" in t
-    assert "Média no ciclo 1.040 pontos por técnico classificado" in t           # (1480+1137+905+640)/4
-    fora = _texto(html.split("Fora do ciclo</h2>", 1)[1])
+    assert "Classificados 4 técnicos no mês" in t and "Fora do ciclo 1 " in t and "Líder 1.480 pontos" in t
+    assert "Média do mês 1.040 pontos por técnico classificado" in t             # (1480+1137+905+640)/4
+    fora = _texto(html.split("Fora do ciclo</span></h2>", 1)[1])
     assert "Eva Prado SC Oeste 01 210 40 90% 6 tarefas registradas — o mínimo é 10" in fora
     # a régua do mês, com os números que o App publicou
     regua = _texto(html.split("Como o App calcula.", 1)[1])
@@ -93,8 +93,8 @@ def test_o_mes_anterior_e_a_regiao_mantem_a_posicao_do_ciclo(ranking, logado):
     html = logado.get("/t/campo/ranking?regiao=SC+Oeste+01").get_data(as_text=True)
     t = _texto(html)
     assert "Ana Souza" not in t and "Bruno Lima" not in t
-    # a posição é a do ciclo inteiro (a que o técnico vê no App), mesmo com a região escolhida
-    assert "3º lugar no ciclo Carla Dias" in t and "4º lugar no ciclo Davi Rocha" in t
+    # a posição é a do mês inteiro (a que o técnico vê no App), mesmo com a região escolhida
+    assert "3º lugar no mês Carla Dias" in t and "4º lugar no mês Davi Rocha" in t
     assert '<option value="SC Oeste 01" selected>' in html
     # região que não existe no mês = todas
     assert "Ana Souza" in _texto(logado.get("/t/campo/ranking?regiao=Nenhuma").get_data(as_text=True))
@@ -160,3 +160,86 @@ def test_a_tela_so_le_colunas_que_o_app_publica():
     assert lidas and lidas <= set(COLUNAS_DO_APP), lidas - set(COLUNAS_DO_APP)
     # e o livro de mentira destes testes é o do App, na ordem dele
     assert list(_linha("2026-10", "ana@exemplo.test", 100, 1).keys()) == COLUNAS_DO_APP
+
+
+# ── o pedido de 18/10/2026 ───────────────────────────────────────────────────────────────────────────────────────────
+def test_a_classificacao_e_dita_pelo_mes_e_o_fora_do_ciclo_se_explica_no_mouse(ranking, logado):
+    """Levi, 18/10/2026: "a classificação é mensal, estamos no mês de outubro"; "O que significa fora do ciclo? quero que
+    apareça a explicação ao passar o mouse nesse nome". A tela diz o mês (o App chama o mês de ciclo); o "Fora do ciclo"
+    fica com o nome do App e a explicação vem da régua que ele publicou."""
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    t = _texto(html)
+    assert "Classificação de outubro de 2026" in t and 'aria-label="Pódio de outubro de 2026"' in html
+    assert '<span class="gc-rotulo">Mês</span>' in html and '<span class="gc-rotulo">Ciclo</span>' not in html
+    dicas = re.findall(r'<span class="rk-dica" tabindex="0" title="([^"]+)">Fora do ciclo</span>', html)
+    assert len(dicas) == 2                                         # no número e no título da lista
+    for d in dicas:
+        assert "menos de 10 tarefas registradas" in d and "menos de 70% do programado" in d and "outubro de 2026" in d
+        # a regra como o App conta (a sessão do App, 18/10/2026): as devolvidas contam nas registradas, a ronda não; o
+        # cumprimento é só dos dias já vencidos, e sem nada programado ele é 0%
+        assert "inclusive as devolvidas" in d and "ronda não conta" in d and "sem nada programado, conta 0%" in d
+    # o mês de setembro fala de setembro
+    assert "Classificação de setembro de 2026" in _texto(logado.get("/t/campo/ranking?mes=2026-09").get_data(as_text=True))
+
+
+def test_o_podio_e_o_das_olimpiadas(ranking, logado):
+    """"1°, 2° e 3° lugar quero estilo podium das olimpíadas": o 1º no meio e no degrau mais alto, o 2º à esquerda e o 3º à
+    direita, em ouro, prata e bronze. Na página a ordem segue 1º, 2º e 3º (quem lê a tela ouve nessa ordem)."""
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    podio = html.split('class="rk-podio"', 1)[1].split('class="cn-numeros"', 1)[0]
+    assert re.findall(r'class="rk-lugar rk-(\d)"', podio) == ["1", "2", "3"]
+    assert podio.count('class="rk-degrau"') == 3
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    for pos, coluna, cor in (("1", "2", "ouro"), ("2", "1", "prata"), ("3", "3", "bronze")):
+        assert f".rk-lugar.rk-{pos}{{grid-column:{coluna};grid-row:1}}" in css, pos
+        assert re.search(rf"\.rk-{pos} \.rk-degrau\{{[^}}]*background:var\(--{cor}\)", css), pos
+    altura = {p: int(re.search(rf"\.rk-{p} \.rk-degrau\{{[^}}]*height:(\d+)px", css).group(1)) for p in "123"}
+    assert altura["1"] > altura["2"] > altura["3"]
+
+
+# ── as OS devolvidas e anuladas (Levi, 18/10/2026: "Quando tiver OSs devolvidas ou anuladas quero que dê para clicar na
+# linha e mostre qual foi a OS e o motivo!"), pela lista que o App publica (a sessão do App, 18/10/2026) ────────────────
+def _tarefa(email, os_, situacao, nota, motivo, tarefa="Troca de fusível", mes="2026-10"):
+    return {"Mês": mes, "Técnico (HMAC)": codigo_da_pessoa(CHAVE, email), "OS": os_, "Tarefa": tarefa,
+            "Situação": situacao, "Nota": nota, "Pontos": 37, "Motivo": motivo, "Registrado em": "2026-10-10T17:00"}
+
+
+def _detalhe(html, nome):
+    """O pedaço que a linha da pessoa abre (a linha de baixo, escondida até o clique)."""
+    resto = html.split(f"{nome}<span", 1)[1]
+    det = resto[resto.index('<tr class="cn-detalhe"'):]
+    fim = [i for i in (det.find('<tr class="cn-linha', 1), det.find("</tbody></table></div>")) if i > 0]
+    return det[:min(fim)]
+
+
+def test_a_linha_abre_as_os_devolvidas_e_anuladas_com_o_motivo(ranking, logado):
+    _aba(ranking, "ranking_tarefas_app_campo", "Tarefas", [
+        _tarefa("bruno@exemplo.test", "16001", "devolvida", 55, "Faltou a foto do antes"),
+        _tarefa("bruno@exemplo.test", "16002", "abaixo do piso", 62, "Sem a observação do serviço"),
+        _tarefa("bruno@exemplo.test", "16003", "anulada", 92, "anulada por 1 tarefa abaixo do piso no mês"),
+        _tarefa("bruno@exemplo.test", "15001", "devolvida", 40, "Do mês passado", mes="2026-09"),
+        _tarefa("ana@exemplo.test", "17001", "devolvida", 50, "Foto do quadro trocada")])
+    visao.limpar()
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    bruno = _detalhe(html, "Bruno Lima")
+    for trecho in ("16001", "Faltou a foto do antes", "16002", "Sem a observação do serviço", "16003",
+                   "anulada por 1 tarefa abaixo do piso no mês", "Troca de fusível",
+                   "10/10 14:00"):                       # a hora do App vem sem fuso, em UTC (como nos fechamentos)
+        assert trecho in bruno, trecho
+    assert "15001" not in bruno and "17001" not in bruno                    # outro mês, outra pessoa
+    assert bruno.index("devolvida") < bruno.index("abaixo do piso") < bruno.index("anulada")
+    assert re.search(r'<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false"[^>]*>\s*<td class="m">2º</td>', html)
+    assert codigo_da_pessoa(CHAVE, "bruno@exemplo.test") not in html        # o código da pessoa nunca vai à tela
+
+
+def test_sem_a_lista_do_app_a_linha_diz_que_ainda_nao_chegou(ranking, logado):
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    assert "A lista das OS ainda não chegou do App" in _detalhe(html, "Bruno Lima")
+
+
+def test_a_lista_do_app_esta_no_catalogo_de_dados():
+    f = next(x for x in catalogo.FATOS if x.id == "ranking_tarefas")
+    assert f.livro == "ranking_tarefas_app_campo · Tarefas" and f.area == "campo" and f.tipo == "snapshot_acumulado"
+    assert f.dims["pessoa"][0] == "hmac" and f.dims["os"][0] == "cod"
+    # a chave do contrato com o App (a sessão do App, 18/10/2026)
+    assert f.chave == ("Mês", "Técnico (HMAC)", "OS", "Tarefa", "Situação")

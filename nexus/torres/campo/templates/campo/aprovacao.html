@@ -3,23 +3,20 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Aprovação de OS, para tirar insight (Levi, 05/10/2026), contada por OS: é a OS que se aprova, não a tarefa. A fila, os
-   grupos e os números são os do App (a fila inteira pela _fila_supervisao, nexus/campo/aprovacao.py: fila_toda); equipe
-   e supervisor vêm do cadastro do Nexus pela usina do Fracttal.
-   08/10/2026 (Levi): a fila inteira, sem "OS fechadas nos X dias"; só a visão por supervisor ("a visão de por técnico e
-   fila pode matar"); o cartão abre a tabela das OS dele ("quando clica aparece a OS, dia, data da criação da OS, data
-   fim, supervisor, prontas, pedem olho, fora do App, uso do App, nota média e devolvidas"), e é nela que se aprova.
-   Estrutura de O&M de 10/2026: os cartões são por região de campo (com a alternância para gestor de contrato) e quem
-   aprova é o Supervisor de Campo da região da usina da OS; com a vaga aberta, o Coordenador; sem os dois, só um
-   administrador (o portão é no servidor: nexus/torres/campo/aprovar_os.py). #}
-{% from 'campo/_cartoes_papeis.html' import alterna, quem %}
-{% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
+   grupos e os números são os do App (a fila inteira pela _fila_supervisao, nexus/campo/aprovacao.py: fila_toda).
+   18/10/2026 (Levi): "está por região e gestor de contrato quero apenas por responsável da UFV, quando abrir aparece uma
+   lista das usinas que tem OSs não concluídas, ao clicar na linha aparece o mesmo card que aparece ao clicar na OS do
+   histórico de OS do OS Creator Web". O filtro é só o Responsável O&M da usina (do cadastro, pela usina do Fracttal); a
+   lista é das usinas com OS esperando aprovação; a usina abre a tabela das OS dela e a OS abre o card do OS Creator,
+   cujo Concluir aprova (com o login do Fracttal de quem clica, como no OS Creator Web). Os indicadores e a idade são do
+   responsável escolhido e filtram a lista. #}
 {% macro barra_grupos(a) %}<div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ a.completa }} prontas, {{ a.olho }} pedem olho, {{ a.fora_do_app }} fora do App">{% if a.ordens %}<span class="ok" style="width: {{ (100 * a.completa / a.ordens)|round(1) }}%"></span><span class="alerta" style="width: {{ (100 * a.olho / a.ordens)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * a.fora_do_app / a.ordens)|round(1) }}%"></span>{% endif %}</div>{% endmacro %}
 {% macro cor_uso(u) %}{{ 'ok' if (u or 0) >= 80 else ('alerta' if (u or 0) >= 50 else 'critico') }}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
-      <p class="cn-pergunta">Toda OS fechada no Fracttal espera o supervisor de campo da região aprovar. Quem está acumulando,
-        o que dá para aprovar já e o que precisa de olho?</p></div>
+      <p class="cn-pergunta">Toda OS fechada no Fracttal espera aprovação. Nas usinas de cada responsável, o que dá para
+        aprovar já e o que precisa de olho?</p></div>
     <div class="cn-frescor">fila de verificação do Fracttal, inteira{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}</div>
   </div>
 
@@ -37,27 +34,25 @@
     {{ fila.lida_em }}; o Nexus tenta de novo em 5 minutos.</div>
   {% endif %}
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
-  {% include 'campo/_aviso_estrutura.html' %}
+  {% if mapa_erro %}<div class="cn-erro cn-aviso" role="status"><b>Não consegui ler o cadastro agora ({{ mapa_erro }}).</b> As usinas saem com o nome do Fracttal, sem o responsável.</div>{% endif %}
 
-  {# sem período (Levi, 08/10: "não deve ter filtro 'OS fechadas nos X dias'"): a fila inteira, filtrada só por equipe
-     e supervisor do cadastro #}
+  {# só o responsável da usina (Levi, 18/10/2026: "quero apenas por responsável da UFV") #}
   <form class="cn-barra-filtros" method="get">
-    {% if equipes %}
-    <select class="gc-campo" name="equipe" aria-label="Equipe" onchange="this.form.submit()">
-      <option value="">todas as equipes</option>{% for e in equipes %}<option value="{{ e }}"{% if e == equipe %} selected{% endif %}>{{ e }}</option>{% endfor %}
+    <label class="gc-rotulo" for="ap-responsavel">Responsável O&amp;M</label>
+    <select class="gc-campo" id="ap-responsavel" name="responsavel" onchange="this.form.submit()">
+      <option value="*"{% if not responsavel %} selected{% endif %}>Todos</option>{% for r in opcoes_responsavel %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
-    {% with com_rotulo=false %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}{% endif %}
-    {% for x in ('balde', 'idade', 'ver', 'por') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+    {% for x in ('balde', 'idade') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>
   </form>
 
-  {# os indicadores filtram os cartões e a tabela; o ativo fica marcado e o clique de novo tira #}
+  {# os indicadores filtram a lista; o ativo fica marcado e o clique de novo tira #}
   {% set limpo = dict(balde=None, idade=None) %}
   {% macro card(ativo, destino) %}<a class="cn-kpi cn-kpi--link" href="{{ url(**dict(limpo, **({} if ativo else destino))) }}"{% if ativo %} aria-current="true"{% endif %}>{% endmacro %}
   {% set b = k.baldes %}
   <div class="cn-kpis">
     {{ card(not balde and not idade, {}) }}<span class="gc-rotulo">Esperando aprovação</span>
-      <span class="v">{{ k.ordens }}<small>OS</small></span><span class="d">com {{ k.tarefas }} tarefas, a fila inteira</span></a>
+      <span class="v">{{ k.ordens }}<small>OS</small></span><span class="d">com {{ k.tarefas }} tarefas{% if not responsavel %}, a fila inteira{% else %}, nas usinas de {{ responsavel }}{% endif %}</span></a>
     {{ card(balde == 'completa', dict(balde='completa')) }}<span class="gc-rotulo">Prontas para aprovar</span>
       <span class="v cn-t-ok">{{ b.get('completa', 0) }}<small>OS</small></span><span class="d">todas as tarefas com evidência completa: é decisão, não análise</span></a>
     {{ card(balde == 'olho', dict(balde='olho')) }}<span class="gc-rotulo">Precisam do seu olho</span>
@@ -67,7 +62,7 @@
       <span class="v{% if k.aged30 %} cn-t-critico{% endif %}">{{ k.aged30 }}<small>OS</small></span><span class="d">esquecidas na fila</span></a>
     {{ card(idade and idade[0] == '61-', dict(idade='61-')) }}<span class="gc-rotulo">Espera máxima</span>
       <span class="v{% if k.espera_max >= 30 %} cn-t-critico{% endif %}">{{ k.espera_max }}<small>dias</small></span>
-      <span class="d">{% if k.mais_antiga %}OS {{ k.mais_antiga.os }} · {{ k.mais_antiga.tecnicos|join(', ') }}{% endif %}</span></a>
+      <span class="d">{% if k.mais_antiga %}OS {{ k.mais_antiga.os }} · {{ k.mais_antiga.usina_cad or '—' }}{% endif %}</span></a>
     {{ card(balde == 'fora_do_app', dict(balde='fora_do_app')) }}<span class="gc-rotulo">Uso do App</span>
       <span class="v{% if k.uso_app is not none and k.uso_app < 50 %} cn-t-alerta{% endif %}">{{ '—' if k.uso_app is none else k.uso_app }}<small>%</small></span>
       <span class="d">das OS com todas as tarefas pelo App · {{ b.get('fora_do_app', 0) }} com tarefa fechada fora do App</span></a>
@@ -88,170 +83,76 @@
     </div>
     {% endif %}
 
-    {% if not ver %}
-    {# quem acumula: um cartão por região de campo (do cadastro, pela usina da OS: a equipe dela e a região da equipe), o
-       que mais tem parada há 30 dias primeiro, com quem aprova ali; a alternância leva aos cartões por gestor de contrato.
-       O cartão abre a tabela das OS dele #}
-    <div class="cn-lista-cab"><h2>{{ 'Por gestor de contrato' if por == 'gestor' else 'Por região de campo' }}</h2><span class="mudo">clique no cartão para ver as OS e aprovar</span></div>
-    {{ alterna(por == 'gestor', url(por=None, ver=None), url(por='gestor', ver=None)) }}
-    <div class="cn-equipes">
-      {% for a in cartoes %}
-        {% set cor = 'critico' if a.aged30 else ('alerta' if a.aged7 else 'ok') %}
-        <a class="cn-equipe cn-equipe--{{ cor }}{% if a.nome in (sem_cadastro, sem_regiao, sem_gestor) %} cn-sup--sem{% endif %}" href="{{ url(ver=a.nome) }}" title="Ver as OS de {{ a.nome }}">
-          <div class="cn-eq-cab">
-            <div class="cn-eq-titulo"><b>{{ a.nome }}</b><span class="cn-eq-tec" title="{{ a.n_tecnicos }} técnicos com OS na fila">{{ capacete() }}<b>{{ a.n_tecnicos }}</b></span></div>
-            {% if a.regiao %}<span>Supervisor de Campo: {{ quem(a.regiao.supervisor) }}</span>
-            <span>Coordenador: {{ quem(a.regiao.coordenador) }}</span>
-            <span class="cn-quem-aprova">{{ a.regiao.aprovador.texto }}</span>
-            {% elif por == 'gestor' and a.nome not in (sem_cadastro, sem_gestor) %}<span>Gestor de contrato (Supervisor PM): não aprova OS</span>
-            {% elif a.nome == sem_cadastro %}<span>usina sem de-para do Fracttal: só um administrador aprova</span>
-            {% elif a.nome == sem_regiao %}<span>equipes fora da estrutura de campo: só um administrador aprova</span>{% endif %}
-            <span>{{ a.n_equipes }} equipe{{ 's' if a.n_equipes != 1 }} · {{ a.tarefas }} tarefas</span>
-          </div>
-          <div class="cn-eq-num">
-            <span><span class="v cn-t-{{ cor }}">{{ a.ordens }}</span><span class="d">OS esperando aprovação</span></span>
-            <span class="dir"><span class="v{% if a.espera_max >= 30 %} cn-t-critico{% endif %}">{{ a.espera_max }}<small> d</small></span><span class="d">a mais antiga</span></span>
-          </div>
-          {{ barra_grupos(a) }}
-          <div class="cn-eq-leg">
-            <span><b class="cn-t-ok">{{ a.completa }}</b>prontas</span>
-            <span><b class="cn-t-alerta">{{ a.olho }}</b>pedem olho</span>
-            <span><b>{{ a.fora_do_app }}</b>fora do App</span>
-          </div>
-          <div class="cn-eq-pe">
-            {% if a.aged30 %}<span class="cn-st cn-t-critico">{{ a.aged30 }} há 30 dias ou mais</span>{% endif %}
-            {% if a.aged7 - a.aged30 %}<span class="cn-st cn-t-alerta">{{ a.aged7 - a.aged30 }} de 7 a 29 dias</span>{% endif %}
-            <span class="cn-st cn-t-{{ cor_uso(a.uso_app) }}">uso do App {{ a.uso_app }}%</span>
-          </div>
-        </a>
-      {% else %}<p class="mudo">Nada na fila com esses filtros.</p>{% endfor %}
+    <div class="cn-lista-cab"><h2>Usinas com OS esperando aprovação</h2><span class="mudo">{{ usinas_fila|length }} usina{{ 's' if usinas_fila|length != 1 }}, a com OS parada há mais tempo primeiro. A usina abre as OS dela; a OS abre o card do OS Creator, onde o Concluir aprova</span></div>
+    <div class="ap-usinas">
+    {% for a in usinas_fila %}{% set cor = 'critico' if a.aged30 else ('alerta' if a.aged7 else 'ok') %}
+      <details class="ap-usina ap-usina--{{ cor }}">
+        <summary class="ap-u">
+          <span class="ap-u-nome"><b>{{ a.nome }}</b><small>{{ a.cliente or '—' }}{% if not responsavel %} · {{ a.responsavel or sem_responsavel }}{% endif %}{% if not a.cadastrada %} · sem de-para do Fracttal no cadastro{% endif %}</small></span>
+          <span class="ap-u-n"><b class="cn-t-{{ cor }}">{{ a.ordens }}</b> OS</span>
+          <span class="ap-u-g">{{ barra_grupos(a) }}<span class="ap-u-leg"><b class="cn-t-ok">{{ a.completa }}</b> prontas · <b class="cn-t-alerta">{{ a.olho }}</b> pedem olho · <b>{{ a.fora_do_app }}</b> fora do App</span></span>
+          <span class="ap-u-d"><b{% if a.espera_max >= 30 %} class="cn-t-critico"{% endif %}>{{ a.espera_max }} d</b> a mais antiga · uso do App <b class="cn-t-{{ cor_uso(a.uso_app) }}">{{ a.uso_app }}%</b></span>
+          <i class="ph ph-caret-down ap-seta" aria-hidden="true"></i>
+        </summary>
+        <div class="cn-tab cn-tab--compacta"><table class="ap-tab">
+          <thead><tr><th>OS</th><th title="Dias esperando aprovação, desde o fim da tarefa mais antiga da OS">Dia</th><th>Data da criação da OS</th><th>Data fim</th><th>Técnicos</th>
+            <th title="O grupo da OS pela regra do App: o porquê no mouse">Grupo</th><th title="Tarefas da OS com evidência completa">Prontas</th><th title="Tarefas da OS que pedem o seu olho">Pedem olho</th><th title="Tarefas da OS fechadas fora do App">Fora do App</th>
+            <th title="Tarefas da OS feitas pelo App">Uso do App</th><th title="Nota média do registro das tarefas feitas pelo App">Nota média</th><th title="Tarefas da OS já devolvidas ao técnico">Devolvidas</th></tr></thead>
+          <tbody>
+          {% for o in a.oss %}{% set g = nome_grupo.get(o.balde, (o.balde, 'neutro')) %}{% set n = o.n_por_grupo %}
+            <tr class="ap-os" tabindex="0" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}">
+              <td class="m"><b>{{ o.os }}</b></td>
+              <td><span class="cn-st cn-t-{{ cor_espera(o.espera_d) }}">{{ 'hoje' if o.espera_d == 0 else o.espera_d ~ ' d' }}</span></td>
+              <td class="m">{{ data_br(o.criada) }}</td>
+              <td class="m">{{ data_br(o.fim) }}</td>
+              <td class="cn-menor">{{ o.tecnicos|join(', ') or '—' }}</td>
+              <td><span class="cn-selo cn-selo--{{ g[1] }}" title="{{ porque(o) }}">{{ g[0] }}</span></td>
+              <td class="m{% if n.completa %} cn-t-ok{% endif %}">{{ n.completa }}</td>
+              <td class="m{% if n.olho %} cn-t-alerta{% endif %}">{{ n.olho }}</td>
+              <td class="m">{{ n.fora_do_app }}</td>
+              <td><span class="cn-st cn-t-{{ cor_uso(o.uso_app) }}">{{ o.uso_app }}%</span></td>
+              <td class="m">{% if o.nota_media is not none %}<span class="cn-t-{{ 'ok' if o.nota_media >= 80 else 'alerta' }}">{{ o.nota_media }}%</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+              <td class="m{% if o.n_devolvidas %} cn-t-critico{% endif %}">{{ o.n_devolvidas or '—' }}</td></tr>
+          {% endfor %}
+          </tbody></table></div>
+      </details>
+    {% else %}<p class="mudo">Nada na fila com esses filtros.</p>{% endfor %}
     </div>
-
-    {% else %}
-    {# a tabela do cartão aberto: uma linha por OS, a mais antiga primeiro; a linha abre o porquê e o Aprovar #}
-    <div class="cn-faixa-equipe cn-faixa-aprov">
-      <a class="cn-link" href="{{ url(ver=None) }}">&larr; {{ 'todos os gestores de contrato' if por == 'gestor' else 'todas as regiões de campo' }}</a>
-      <b>{{ ver }}</b>
-      {% if aberto %}<span><b>{{ aberto.ordens }}</b> OS esperando · <b class="cn-t-ok">{{ aberto.completa }}</b> prontas · <b class="cn-t-alerta">{{ aberto.olho }}</b> pedem olho · <b>{{ aberto.fora_do_app }}</b> fora do App</span>
-      <span>a mais antiga há <b{% if aberto.espera_max >= 30 %} class="cn-t-critico"{% endif %}>{{ aberto.espera_max }} d</b> · uso do App <b>{{ aberto.uso_app }}%</b></span>{% endif %}
-    </div>
-    <div class="cn-lista-cab"><h2>OS de {{ ver }}</h2><span class="mudo">{{ [tabela|length, limite]|min }} de {{ tabela|length }} OS, a mais antiga primeiro; clique na linha para ver o porquê e aprovar</span>
-      {% if tabela|length > limite %}<span class="cn-selo cn-selo--alerta">exibindo {{ limite }} de {{ tabela|length }}</span>{% endif %}</div>
-    <div class="cn-tab cn-tab--compacta"><table class="cn-expande cn-tab-aprov">
-      <thead><tr><th>OS</th><th title="Dias esperando aprovação, desde o fim da tarefa mais antiga da OS">Dia</th><th>Data da criação da OS</th><th>Data fim</th><th title="O Supervisor de Campo da região da usina da OS (estrutura de O&amp;M de 10/2026)">Supervisor de campo</th>
-        <th title="Tarefas da OS com evidência completa">Prontas</th><th title="Tarefas da OS que pedem o seu olho">Pedem olho</th><th title="Tarefas da OS fechadas fora do App">Fora do App</th>
-        <th title="Tarefas da OS feitas pelo App">Uso do App</th><th title="Nota média do registro das tarefas feitas pelo App">Nota média</th><th title="Tarefas da OS já devolvidas ao técnico">Devolvidas</th></tr></thead>
-      <tbody>
-      {% for o in tabela[:limite] %}{% set g = nome_grupo.get(o.balde, (o.balde, 'neutro')) %}{% set n = o.n_por_grupo %}
-        <tr class="cn-linha" tabindex="0" aria-expanded="false" data-wo="{{ o.id_wo or '' }}">
-          <td class="m"><b>{{ o.os }}</b></td>
-          <td><span class="cn-st cn-t-{{ cor_espera(o.espera_d) }}">{{ 'hoje' if o.espera_d == 0 else o.espera_d ~ ' d' }}</span></td>
-          <td class="m">{{ data_br(o.criada) }}</td>
-          <td class="m">{{ data_br(o.fim) }}</td>
-          <td class="cn-menor">{% if o.supervisor_campo_cad == vaga %}<span class="cn-vaga">vaga</span>{% else %}{{ o.supervisor_campo_cad or '—' }}{% endif %}</td>
-          <td class="m{% if n.completa %} cn-t-ok{% endif %}">{{ n.completa }}</td>
-          <td class="m{% if n.olho %} cn-t-alerta{% endif %}">{{ n.olho }}</td>
-          <td class="m">{{ n.fora_do_app }}</td>
-          <td><span class="cn-st cn-t-{{ cor_uso(o.uso_app) }}">{{ o.uso_app }}%</span></td>
-          <td class="m">{% if o.nota_media is not none %}<span class="cn-t-{{ 'ok' if o.nota_media >= 80 else 'alerta' }}">{{ o.nota_media }}%</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
-          <td class="m{% if o.n_devolvidas %} cn-t-critico{% endif %}">{{ o.n_devolvidas or '—' }}</td></tr>
-        {# a OS aberta: cada tarefa com o grupo e o porquê (a regra do App), e o Aprovar (o Concluir do OS Creator Web) #}
-        <tr class="cn-detalhe" hidden><td colspan="11">
-          <div class="cn-detalhe-grade">
-            <div>
-              <h3>Por que a OS está em "{{ g[0] }}"{% if o.tarefas|length > 1 %} · {{ o.tarefas|length }} tarefas{% endif %}</h3>
-              <ul class="cn-tarefas-os">
-              {% for x in o.tarefas %}{% set gx = nome_grupo.get(x.balde, (x.balde, 'neutro')) %}
-                <li><div class="cn-tarefa-cab"><span class="cn-selo cn-selo--{{ gx[1] }}">{{ gx[0] }}</span><b>{{ x.tarefa or 'Tarefa' }}</b><span class="mudo">{{ x.tecnico }}{% if x.pelo_app %} · nota {{ x.qualidade or 0 }}%{% endif %}</span></div>
-                  <ul class="cn-motivos">{% for cor, texto in motivos(x) %}<li class="cn-t-{{ cor }}"><span>{{ texto }}</span></li>{% endfor %}</ul></li>
-              {% endfor %}
-              </ul>
-            </div>
-            <div>
-              <dl class="cn-dados">
-                <dt>OS</dt><dd class="m">{{ o.os }}{% if o.ronda %} · OS de ronda{% endif %}</dd>
-                <dt>Técnicos</dt><dd>{{ o.tecnicos|join(', ') }}</dd>
-                <dt>Usina</dt><dd>{{ o.usina_cad or '—' }}{% if o.equipe_cad %} · {{ o.equipe_cad }}{% endif %}</dd>
-                <dt>Região de campo</dt><dd>{{ o.regiao_cad or '—' }} · gestor de contrato {{ o.gestor_cad or '—' }}</dd>
-                <dt>Criada em</dt><dd>{{ data_br(o.criada) }}</dd>
-                <dt>Fechada em</dt><dd>{{ data_br(o.fim) }} · esperando há {{ o.espera_d }} dia{{ 's' if o.espera_d != 1 }}</dd>
-                <dt>Pelo App</dt><dd>{{ o.n_app }} de {{ o.tarefas|length }} tarefa{{ 's' if o.tarefas|length != 1 }}{% if o.devolvida %} · já devolvida{% endif %}</dd>
-              </dl>
-              {% if o.id_wo %}
-              {% if pode_aprovar(o.aprovadores) %}
-              <div class="cn-aprovar" data-wo="{{ o.id_wo }}" data-os="{{ o.os }}">
-                <button class="gc-btn gc-btn--primario" type="button">Aprovar a OS {{ o.os }}</button>
-                <span class="cn-aprovar-msg mudo">Conclui a OS inteira no Fracttal{% if o.tarefas|length > 1 %} (as {{ o.tarefas|length }} tarefas){% endif %}, com o seu login do Fracttal (o mesmo do OS Creator). Não dá para desfazer.</span>
-              </div>
-              {% else %}
-              <div class="cn-aprovar cn-aprovar--so-supervisor">
-                <button class="gc-btn" type="button" disabled>Aprovar a OS {{ o.os }}</button>
-                <span class="mudo">{% for a in o.aprovadores %}{{ a.texto }} {% endfor %}Quem aprova entra no Nexus com o login do Fracttal.</span>
-              </div>
-              {% endif %}
-              {% endif %}
-            </div>
-          </div>
-        </td></tr>
-      {% else %}<tr><td colspan="11" class="mudo">Nenhuma OS de {{ ver }} na fila com esses filtros.</td></tr>{% endfor %}
-      </tbody></table></div>
-    {% endif %}
   </section>
 
-  <div class="cn-nota"><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e esperando a aprovação do
-    supervisor), inteira, relida pelo Nexus a cada 10 minutos, contada por OS, que é o que se aprova. Cada tarefa ganha o
-    grupo pela regra do painel do App, e a OS fica no pior grupo das tarefas dela: <b>prontas</b> =
-    subtarefas respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80,
-    tempo muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. A
-    equipe, a região de campo e o gestor de contrato saem do cadastro do Nexus pela usina da OS. <b>Aprovar</b> conclui a
-    OS no Fracttal com o login do Fracttal de quem clica, e só vale para o Supervisor de Campo da região da usina (com a
-    vaga aberta, o Coordenador de Campo) ou um administrador. O gestor de contrato (Supervisor PM) não aprova.</div>
+  <div class="cn-nota"><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e esperando a
+    aprovação), inteira, relida pelo Nexus a cada 10 minutos, contada por OS, que é o que se aprova. Cada tarefa ganha o
+    grupo pela regra do painel do App, e a OS fica no pior grupo das tarefas dela: <b>prontas</b> = subtarefas
+    respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80, tempo
+    muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. O
+    responsável e o cliente saem do cadastro do Nexus pela usina da OS (o de-para do Fracttal). <b>Aprovar</b> é o
+    Concluir do card da OS, o mesmo do OS Creator Web, com o login do Fracttal de quem clica; aprovada, a OS sai da
+    lista.</div>
 </div>
+{% include "oscreator/card_os_abrir.html" %}
 <script>
-  // clicar na linha abre o porquê do grupo e o Aprovar (Levi, 05/10)
-  document.querySelectorAll('table.cn-expande tr.cn-linha').forEach(function (tr) {
-    function alterna(ev) {
-      if (ev.target.closest('a, button')) return;
-      var det = tr.nextElementSibling;
-      if (!det || !det.classList.contains('cn-detalhe')) return;
-      det.hidden = !det.hidden;
-      tr.setAttribute('aria-expanded', String(!det.hidden));
+  // a OS abre o card do OS Creator por cima (Levi, 18/10/2026: "ao clicar na linha aparece o mesmo card que aparece ao
+  // clicar na OS do histórico de OS do OS Creator Web"): o Concluir dele aprova. Fechado o card com mudança, o Nexus
+  // confere a OS no Fracttal e, fora da verificação, tira da lista
+  (function () {
+    function conferir(wo) {
+      fetch(nexusRota('/t/campo/aprovacao/') + wo + '/conferir', {method: 'POST', credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (j && j.saiu) { location.reload(); } })
+        .catch(function () { /* sem resposta: a OS sai na releitura de 10 min */ });
     }
-    tr.addEventListener('click', alterna);
-    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
-  });
-  // Aprovar = o Concluir do OS Creator Web, pelo portão do Nexus (POST /os/_nexus/aprovacao/<id>/aprovar), que só
-  // deixa o supervisor da OS ou um administrador (Levi, 08/10). Irreversível: pede confirmação. Sem login do Fracttal,
-  // leva ao login e volta para esta tela. Aprovada, o servidor já tira a OS da fila guardada.
-  document.querySelectorAll('.cn-aprovar[data-wo]').forEach(function (box) {
-    var bt = box.querySelector('button'), msg = box.querySelector('.cn-aprovar-msg');
-    bt.addEventListener('click', function () {
-      if (!confirm('Aprovar a OS ' + box.dataset.os + '?\n\nEla é concluída no Fracttal com o seu login do Fracttal e isso não dá para desfazer.')) return;
-      bt.disabled = true; msg.textContent = 'Aprovando no Fracttal…';
-      fetch(nexusRota('/os/_nexus/aprovacao/') + box.dataset.wo + '/aprovar', {method: 'POST', credentials: 'same-origin',
-        headers: {'Content-Type': 'application/json'}, body: '{}'})
-        .then(function (r) { return r.json().then(function (j) { return {status: r.status, j: j}; }, function () { return {status: r.status, j: null}; }); })
-        .then(function (res) {
-          if (res.j && res.j.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(res.j.entrar); return; }
-          if (res.status === 401 || (res.j && res.j.login)) {
-            var volta = '/os/_nexus/voltar?para=' + encodeURIComponent(location.pathname + location.search);
-            msg.textContent = 'Para aprovar, ';
-            var a = document.createElement('a');
-            a.className = 'cn-link'; a.href = nexusRota('/os/login') + '?next=' + encodeURIComponent(volta);
-            a.textContent = 'entre com o seu login do Fracttal';
-            msg.appendChild(a); msg.appendChild(document.createTextNode('.'));
-            bt.disabled = false; return;
-          }
-          if (res.status === 403) { msg.textContent = (res.j && res.j.erro) || 'Só quem aprova esta OS (o supervisor de campo da região) ou um administrador aprova.'; msg.className = 'cn-aprovar-msg cn-t-critico'; return; }
-          if (!res.j || !res.j.ok) { msg.textContent = 'O Fracttal não aprovou: ' + ((res.j && (res.j.erro || res.j.msg)) || 'erro'); bt.disabled = false; return; }
-          msg.textContent = res.j.mensagem || 'OS aprovada.';
-          msg.className = 'cn-aprovar-msg cn-t-ok';
-          bt.textContent = 'Aprovada';
-          var tr = box.closest('tr.cn-detalhe').previousElementSibling;
-          if (tr) tr.classList.add('cn-aprovada');
-        })
-        .catch(function () { msg.textContent = 'Não consegui falar com o Fracttal. Tente de novo.'; bt.disabled = false; });
+    function abrir(tr) {
+      if (!window.NexusOsCard) { return; }
+      var wo = tr.getAttribute('data-wo'), folio = tr.getAttribute('data-folio');
+      var op = {status: 'Em Verificação', folio: folio, aoFechar: function (mudou) { if (mudou && wo) { conferir(wo); } }};
+      if (wo) { NexusOsCard.abrir(wo, op); } else { NexusOsCard.abrirFolio(folio, op); }
+    }
+    document.querySelectorAll('tr.ap-os').forEach(function (tr) {
+      var wo = tr.getAttribute('data-wo');
+      if (wo && window.NexusOsCard) { NexusOsCard.prepararAoParar(tr, wo); }
+      tr.addEventListener('click', function () { abrir(tr); });
+      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrir(tr); } });
     });
-  });
+  })();
 </script>
 {% endblock %}

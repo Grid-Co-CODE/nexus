@@ -1524,7 +1524,9 @@ _REGUA_RANKING = (("piso", "Piso da nota"), ("teto", "Teto de tarefas"), ("anula
 def _pessoa_do_ranking(r: dict, nome: str) -> dict:
     def n(col):
         return _int(r.get(col)) or 0
+    # o código da pessoa fica só no servidor: é por ele que a linha acha as tarefas dela (`ranking_tarefas`)
     return {"posicao": _int(r.get("Posição")), "tecnico": nome, "regiao": str(r.get("Região") or "").strip(),
+            "hmac": str(r.get("Técnico (HMAC)") or "").strip(),
             "total": n("Total (pts)"), "tarefas_pts": n("Tarefas (pts)"), "rondas_pts": n("Rondas (pts)"),
             "bonus": n("Bônus (pts)"), "bonus_prog": n("Bônus programação (pts)"),
             "bonus_prev": n("Bônus preventivas (pts)"), "tarefas": n("Tarefas registradas"), "os": n("OS distintas"),
@@ -1563,6 +1565,35 @@ def ranking_pontos() -> leitura.Leitura:
     return _ler(("visao_ranking_pontos",), calcular)
 
 
+LIVRO_TAREFAS_RANKING, ABA_TAREFAS_RANKING = "ranking_tarefas_app_campo", "Tarefas"
+SITUACOES_RANKING = ("devolvida", "abaixo do piso", "anulada")      # a ordem da lista: o que cobrar primeiro
+
+
+def ranking_tarefas() -> leitura.Leitura:
+    """As tarefas de cada técnico que não pontuaram cheio no mês, com a OS, a nota, os pontos e o motivo (Levi,
+    18/10/2026: "Quando tiver OSs devolvidas ou anuladas quero que dê para clicar na linha e mostre qual foi a OS e o
+    motivo!"). Quem lista é o App, no livro `ranking_tarefas_app_campo` (a sessão do App, 18/10/2026: o extrato dele não
+    vai ao banco e a anulação depende da ordem por pontos; pelo banco não fecha: em outubro, 17 devolvidas nos
+    fechamentos contra 43 no placar). O Nexus só mostra. {"publicado", "por": {(mês, código da pessoa): [tarefa]}}."""
+    def calcular():
+        linhas = _livro(LIVRO_TAREFAS_RANKING, ABA_TAREFAS_RANKING)
+        por = {}
+        for r in linhas:
+            mes, hmac = str(r.get("Mês") or "").strip()[:7], str(r.get("Técnico (HMAC)") or "").strip()
+            if not _MES_RANKING.match(mes) or not hmac:
+                continue
+            por.setdefault((mes, hmac), []).append({
+                "os": str(r.get("OS") or "").strip(), "tarefa": str(r.get("Tarefa") or "").strip(),
+                "situacao": str(r.get("Situação") or "").strip().lower(), "nota": _int(r.get("Nota")),
+                "pontos": _int(r.get("Pontos")), "motivo": str(r.get("Motivo") or "").strip(),
+                "registrado_em": str(r.get("Registrado em") or "").strip()})
+        ordem = {s: i for i, s in enumerate(SITUACOES_RANKING)}
+        for lista in por.values():
+            lista.sort(key=lambda t: (ordem.get(t["situacao"], len(ordem)), t["registrado_em"], t["os"]))
+        return {"publicado": bool(linhas), "por": por}
+    return _ler(("visao_ranking_tarefas",), calcular)
+
+
 # ── Equipe e supervisor das usinas do Fracttal ───────────────────────────────────────────────────────────────────
 FRACTTAL_C1 = "Fracttal · Classificação 1"
 
@@ -1592,7 +1623,8 @@ def usinas_do_fracttal() -> leitura.Leitura:
                 gestores.setdefault(o["gestor"], set()).add(n)
                 # o nome do Fracttal (normalizado como a cópia do App normaliza) -> a usina do cadastro
                 por_nome[regras_app._norm(n)] = {**{k: o[k] for k in ("usina", "equipe", "regiao_campo", "supervisor_campo",
-                                                                      "coordenador_campo", "gestor", "uf", "regiao_br")},
+                                                                      "coordenador_campo", "gestor", "uf", "regiao_br",
+                                                                      "responsavel", "cliente")},
                                                  "aprovador": aprovador}
         return {"equipes": {k: sorted(v) for k, v in equipes.items() if k},
                 "regioes": {k: sorted(v) for k, v in regioes.items() if k},

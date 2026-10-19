@@ -4,13 +4,16 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Ranking de pontos (13/10/2026, Levi: "Cria uma seção de Ranking de Pontos no App de Campo!"): o placar do ciclo que o
    App calcula e publica no livro ranking_app_campo (nexus/campo/visao.py, ranking_pontos). Nada é recalculado aqui: a
-   posição, os pontos e quem está fora do ciclo são os do App, os mesmos que o técnico vê. #}
+   posição, os pontos e quem está fora do ciclo são os do App, os mesmos que o técnico vê.
+   18/10/2026 (Levi): "a classificação é mensal, estamos no mês de outubro": a tela diz o mês (o App chama o mês de
+   ciclo); "O que significa fora do ciclo? quero que apareça a explicação ao passar o mouse nesse nome": o nome do App
+   fica, com a explicação da régua do mês no mouse; e "1°, 2° e 3° lugar quero estilo podium das olimpíadas". #}
 {% macro pts(n) %}{{ '{:,}'.format(n or 0).replace(',', '.') }}{% endmacro %}
 {% macro pct(n) %}{{ (n ~ '%') if n is not none else '—' }}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">placar do ciclo do App{% if calculado %}<br><b>calculado em {{ calculado }}</b>{% endif %}</div>
+    <div class="cn-frescor">placar do mês do App{% if calculado %}<br><b>calculado em {{ calculado }}</b>{% endif %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
 
@@ -20,8 +23,8 @@
   </tbody></table></div>
   {% else %}
   <form class="cn-barra-filtros" method="get">
-    <span class="gc-rotulo">Ciclo</span>
-    <select class="gc-campo" name="mes" aria-label="Mês do ciclo" onchange="this.form.submit()">
+    <span class="gc-rotulo">Mês</span>
+    <select class="gc-campo" name="mes" aria-label="Mês da classificação" onchange="this.form.submit()">
       {% for m in meses %}<option value="{{ m.mes }}"{% if m.mes == atual.mes %} selected{% endif %}>{{ nome_do_mes(m.mes) }}</option>{% endfor %}
     </select>
     <select class="gc-campo" name="regiao" aria-label="Região" onchange="this.form.submit()">
@@ -34,37 +37,53 @@
     veem a pontuação de antes.</div>
   {% endif %}
 
+  {% set mes_txt = nome_do_mes(atual.mes) %}
+  {% set g = atual.regua %}
+  {# o "fora do ciclo" do App, explicado pela régua que ele publicou no mês #}
+  {# a regra é a do App (confirmada pela sessão dele em 18/10/2026): vale a primeira que pegar #}
+  {% set dica_fora = 'Fora do ciclo: fica sem posição na classificação de ' ~ mes_txt ~ ' quem tem menos de '
+       ~ (g.get('min_tarefas') if g.get('min_tarefas') is not none else 'o mínimo de')
+       ~ ' tarefas registradas no mês (contam todas, inclusive as devolvidas e as de 0 ponto; ronda não conta) ou, tendo o mínimo, menos de '
+       ~ ((g.get('min_cumprimento') ~ '%') if g.get('min_cumprimento') is not none else 'o mínimo')
+       ~ ' do programado cumprido (concluídas ÷ programadas, só os dias já vencidos; sem nada programado, conta 0%). Os pontos aparecem só para conferir.' %}
+  {% macro fora_do_ciclo() %}<span class="rk-dica" tabindex="0" title="{{ dica_fora }}">Fora do ciclo</span>{% endmacro %}
   {% set podio = classificacao[:3] %}
   {% if podio %}
-  <div class="rk-podio" aria-label="Pódio do ciclo">
+  {# o pódio das olimpíadas: o 1º no meio e no degrau mais alto, o 2º à esquerda, o 3º à direita (a ordem da página
+     segue 1º, 2º e 3º: quem lê a tela ouve nessa ordem; quem arruma é o campo.css) #}
+  <div class="rk-podio" aria-label="Pódio de {{ mes_txt }}">
     {% for p in podio %}
     <div class="rk-lugar rk-{{ loop.index }}">
-      <span class="rk-pos">{{ p.posicao }}º lugar{% if regiao %} no ciclo{% endif %}</span>
-      <span class="rk-nome">{{ p.tecnico or 'Sem nome no cadastro do App' }}</span>
-      <span class="rk-reg">{{ p.regiao or 'sem região' }}</span>
-      <span class="rk-pts">{{ pts(p.total) }} <small>pts</small></span>
-      <span class="rk-det">{{ pts(p.tarefas_pts) }} de tarefas · {{ pts(p.rondas_pts) }} de rondas · {{ pts(p.bonus) }} de bônus</span>
+      <div class="rk-cartao">
+        <span class="rk-pos">{{ p.posicao }}º lugar{% if regiao %} no mês{% endif %}</span>
+        <span class="rk-nome">{{ p.tecnico or 'Sem nome no cadastro do App' }}</span>
+        <span class="rk-reg">{{ p.regiao or 'sem região' }}</span>
+        <span class="rk-pts">{{ pts(p.total) }} <small>pts</small></span>
+        <span class="rk-det">{{ pts(p.tarefas_pts) }} de tarefas · {{ pts(p.rondas_pts) }} de rondas · {{ pts(p.bonus) }} de bônus</span>
+      </div>
+      <div class="rk-degrau"><span class="rk-medalha" aria-hidden="true">{{ p.posicao }}</span></div>
     </div>
     {% endfor %}
   </div>
   {% endif %}
 
   <div class="cn-numeros">
-    <span><span class="gc-rotulo">No ciclo</span><span class="v">{{ classificacao|length }}</span><span class="d">técnicos classificados</span></span>
-    <span><span class="gc-rotulo">Fora do ciclo</span><span class="v">{{ fora|length }}</span><span class="d">sem o mínimo de tarefas ou do programado</span></span>
+    <span><span class="gc-rotulo">Classificados</span><span class="v">{{ classificacao|length }}</span><span class="d">técnicos no mês</span></span>
+    <span><span class="gc-rotulo">{{ fora_do_ciclo() }}</span><span class="v">{{ fora|length }}</span><span class="d">sem o mínimo de tarefas ou do programado</span></span>
     <span><span class="gc-rotulo">Líder</span><span class="v">{{ pts(classificacao[0].total) if classificacao else '—' }}</span><span class="d">pontos</span></span>
-    <span><span class="gc-rotulo">Média no ciclo</span><span class="v">{{ pts(media) if media is not none else '—' }}</span><span class="d">pontos por técnico classificado</span></span>
+    <span><span class="gc-rotulo">Média do mês</span><span class="v">{{ pts(media) if media is not none else '—' }}</span><span class="d">pontos por técnico classificado</span></span>
   </div>
 
-  <h2 class="ui-kicker">Classificação</h2>
+  <h2 class="ui-kicker">Classificação de {{ mes_txt }}</h2>
   <div class="cn-tab"><table>
     {# a região vai embaixo do nome e devolvidas e anuladas numa coluna só: com 13 colunas, a 1.400 px a última saía da
        tela e o nome quebrava em três linhas (visto no navegador em 13/10/2026) #}
     <thead><tr><th>Posição</th><th>Técnico</th><th>Total</th><th>Tarefas</th><th>Rondas</th><th>Bônus</th>
       <th>Nota média</th><th>Cumprimento</th><th>Pontualidade</th><th>Sequência</th><th>Devolvidas · anuladas</th></tr></thead>
     <tbody>
-    {% for p in classificacao %}
-      <tr><td class="m">{{ p.posicao }}º</td><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
+    {% for p in classificacao %}{% set abre = p.devolvidas or p.anuladas or p.abaixo_do_piso %}
+      {% if abre %}<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false" title="Ver as OS devolvidas, abaixo do piso e anuladas, com o motivo">{% else %}<tr>{% endif %}
+        <td class="m">{{ p.posicao }}º</td><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
         <td><b>{{ pts(p.total) }}</b></td>
         <td>{{ pts(p.tarefas_pts) }}<span class="det">{{ p.contadas }} de {{ p.tarefas }} tarefa{{ 's' if p.tarefas != 1 }}</span></td>
         <td>{{ pts(p.rondas_pts) }}<span class="det">{{ p.rondas }} ronda{{ 's' if p.rondas != 1 }}{% if p.rondas_no_teto %} · no teto{% endif %}</span></td>
@@ -73,14 +92,31 @@
         <td>{{ pct(p.cumprimento) }}<span class="det">{{ p.concluido }} de {{ p.programado }} programada{{ 's' if p.programado != 1 }}</span></td>
         <td>{{ pct(p.pontualidade) }}</td>
         <td>{{ p.sequencia }} dia{{ 's' if p.sequencia != 1 }}</td>
-        <td>{{ p.devolvidas }} · {{ p.anuladas }}</td></tr>
+        <td>{{ p.devolvidas }} · {{ p.anuladas }}{% if abre %} <i class="ph ph-caret-down rk-seta" aria-hidden="true"></i>{% endif %}</td></tr>
+      {% if abre %}
+      {# a linha aberta: as OS que não pontuaram cheio, como o App listou (devolvida, abaixo do piso, anulada) #}
+      <tr class="cn-detalhe" hidden><td colspan="11">
+        {% set ts = tarefas_de(p) %}
+        {% if ts %}
+        <table class="rk-tarefas"><thead><tr><th>OS</th><th>Tarefa</th><th>Situação</th><th>Nota</th><th title="Os pontos que a tarefa tinha antes da devolução ou da anulação">Pontos</th><th>Motivo</th><th>Registrada</th></tr></thead>
+          <tbody>{% for t in ts %}<tr><td class="m"><b>{{ t.os or '—' }}</b></td><td class="rk-motivo">{{ t.tarefa or '—' }}</td>
+            <td><span class="cn-selo cn-selo--{{ {'devolvida': 'critico', 'abaixo do piso': 'alerta'}.get(t.situacao, 'neutro') }}">{{ t.situacao or '—' }}</span></td>
+            <td>{{ t.nota if t.nota is not none else '—' }}</td><td>{{ t.pontos if t.pontos is not none else '—' }}</td>
+            <td class="rk-motivo">{{ t.motivo or '—' }}</td><td>{{ hora_do_app(t.registrado_em) or '—' }}</td></tr>{% endfor %}</tbody></table>
+        {% elif not tarefas_publicado %}
+        <p class="mudo">A lista das OS ainda não chegou do App: ele vai publicar, de hora em hora, cada tarefa devolvida, abaixo do piso ou anulada, com o motivo.</p>
+        {% else %}
+        <p class="mudo">O App não listou tarefas desta pessoa em {{ mes_txt }}.</p>
+        {% endif %}
+      </td></tr>
+      {% endif %}
     {% else %}
-      <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}neste ciclo ainda.</td></tr>
+      <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}em {{ mes_txt }} ainda.</td></tr>
     {% endfor %}
     </tbody></table></div>
 
   {% if fora %}
-  <h2 class="ui-kicker">Fora do ciclo</h2>
+  <h2 class="ui-kicker">{{ fora_do_ciclo() }}</h2>
   <div class="cn-tab"><table>
     <thead><tr><th>Técnico</th><th>Pontos</th><th>Tarefas</th><th>Cumprimento</th><th>Por que está fora</th></tr></thead>
     <tbody>
@@ -96,7 +132,6 @@
     sem nome: o código da pessoa não bate com o cadastro do App, e ela aparece como "—".</p>
   {% endif %}
 
-  {% set g = atual.regua %}
   <div class="cn-nota"><b>Como o App calcula.</b> Cada tarefa pontua pela nota dela, se a nota chegou ao piso
     {%- if g.get('piso') is not none %} ({{ g.piso }}){% endif %} e houve GPS; contam as
     {% if g.get('teto') is not none %}{{ g.teto }} {% endif %}melhores do mês, com o peso do tipo (religamento e
@@ -108,7 +143,21 @@
     preventivas feitas na semana{% endif %}. Fica fora do ciclo quem tem menos
     {%- if g.get('min_tarefas') is not none %} de {{ g.min_tarefas }}{% endif %} tarefas registradas ou menos
     {%- if g.get('min_cumprimento') is not none %} de {{ g.min_cumprimento }}%{% endif %} do programado. No empate, vence
-    quem teve mais tarefas contadas. A posição é a do ciclo inteiro, mesmo com uma região escolhida.</div>
+    quem teve mais tarefas contadas. A classificação é do mês (o App chama o mês de ciclo), e a posição é a do mês
+    inteiro, mesmo com uma região escolhida.</div>
   {% endif %}
 </div>
+<script>
+  // a linha com devolvida, abaixo do piso ou anulada abre a lista do App (Levi, 18/10/2026)
+  document.querySelectorAll('tr.rk-linha').forEach(function (tr) {
+    function alterna() {
+      var det = tr.nextElementSibling;
+      if (!det || !det.classList.contains('cn-detalhe')) { return; }
+      det.hidden = !det.hidden;
+      tr.setAttribute('aria-expanded', String(!det.hidden));
+    }
+    tr.addEventListener('click', alterna);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(); } });
+  });
+</script>
 {% endblock %}

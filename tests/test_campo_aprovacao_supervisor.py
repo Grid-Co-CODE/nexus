@@ -87,10 +87,10 @@ def fila(app):
     app.extensions.pop("nexus_dados_sessao", None)
 
 
-def _tabela(html):
-    """As linhas da tabela do cartão aberto: [[célula, ...], ...] em texto, sem as linhas de detalhe."""
-    corpo = html.split('<table class="cn-expande cn-tab-aprov">')[1].split("</table>")[0]
-    linhas = re.findall(r'<tr class="cn-linha".*?</tr>', corpo, re.S)
+def _tabela(html, usina="Usina A"):
+    """As linhas da tabela das OS da usina: [[célula, ...], ...] em texto (18/10/2026: a lista é por usina)."""
+    corpo = html.split(f'<span class="ap-u-nome"><b>{usina}</b>')[1].split("</details>")[0]
+    linhas = re.findall(r'<tr class="ap-os".*?</tr>', corpo, re.S)
     return [[" ".join(re.sub(r"<[^>]+>", " ", c).split()) for c in re.findall(r"<td[^>]*>(.*?)</td>", l, re.S)]
             for l in linhas]
 
@@ -120,49 +120,36 @@ def test_conta_da_fila_inteira_fica_pronta_depois_da_releitura(fila, logado, mon
     assert chamadas and all(c["dias"] == "3650" for c in chamadas)
     feitas, pedidos = len(chamadas), len(fila.pedidos)
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
-    assert "Sudeste 03" in html and "fila lida em" in html
+    assert "Usina A" in html and "fila lida em" in html
     assert len(chamadas) == feitas and len(fila.pedidos) == pedidos     # nada refeito, nada pedido ao Fracttal
 
 
-# ── 2. o cartão da região de campo abre a tabela das OS dela ────────────────────────────────────────────────────
-def test_cartao_da_regiao_abre_a_tabela_com_as_colunas_pedidas(fila, logado):
+# ── 2. a lista das usinas, cada uma com a tabela das OS dela (18/10/2026, Levi: "quero apenas por responsável da UFV,
+# quando abrir aparece uma lista das usinas que tem OSs não concluídas") ─────────────────────────────────────────────
+def test_a_usina_abre_a_tabela_das_os_com_as_colunas_pedidas(fila, logado):
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
-    assert "<h2>Por região de campo</h2>" in html
-    assert 'href="?ver=Sudeste+03"' in html and 'href="?ver=Sul+01"' in html
-    # o cartão diz quem aprova ali: a supervisora de campo na Sudeste 03; o coordenador na Sul 01, de vaga aberta
-    assert "Quem aprova é o supervisor de campo da região Sudeste 03 (Supervisora Campo) ou um administrador." in html
-    assert ("Vaga aberta de supervisor de campo na região Sul 01: aprova o coordenador de campo (Coordenador Campo) ou "
-            "um administrador.") in html
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
-    cab = re.findall(r"<th[^>]*>([^<]+)</th>", html.split('<table class="cn-expande cn-tab-aprov">')[1].split("</thead>")[0])
-    assert cab == ["OS", "Dia", "Data da criação da OS", "Data fim", "Supervisor de campo", "Prontas", "Pedem olho",
+    corpo = html.split('<span class="ap-u-nome"><b>Usina A</b>')[1].split("</details>")[0]
+    cab = re.findall(r"<th[^>]*>([^<]+)</th>", corpo.split("</thead>")[0])
+    assert cab == ["OS", "Dia", "Data da criação da OS", "Data fim", "Técnicos", "Grupo", "Prontas", "Pedem olho",
                    "Fora do App", "Uso do App", "Nota média", "Devolvidas"]
     linhas = {l[0]: l for l in _tabela(html)}
     assert list(linhas) == ["15002", "15088", "15102"]                          # a mais antiga primeiro
     fim = (datetime.utcnow() - timedelta(days=8)).replace(tzinfo=timezone.utc).astimezone(BRT).strftime("%d/%m/%y")
-    # OS, Dia, criação (em Brasília: 01:30 UTC de 01/09 é 31/08), fim, supervisor de campo, prontas, olho, fora, uso,
-    # nota, devolvidas
-    assert linhas["15088"] == ["15088", "8 d", "31/08/26", fim, "Supervisora Campo", "0", "2", "0", "100%", "71%", "2"]
-    assert linhas["15102"][5:] == ["1", "0", "0", "100%", "96%", "—"]
-    assert linhas["15002"][1] == "120 d" and linhas["15002"][5:] == ["0", "0", "1", "0%", "—", "—"]
-    assert "16001" not in linhas                                                 # é da Sul 01
-    # a linha continua abrindo o porquê do grupo
-    assert 'class="cn-detalhe" hidden' in html and "Nota do registro 71%" in html and "Já foi devolvida" in html
-    # na Sul 01, a coluna diz que a vaga está aberta
-    sul = logado.get("/t/campo/aprovacao?ver=Sul+01").get_data(as_text=True)
-    assert _tabela(sul)[0][4] == "vaga" and 'class="cn-vaga">vaga</span>' in sul
+    # OS, Dia, criação (em Brasília: 01:30 UTC de 01/09 é 31/08), fim, técnicos, grupo, prontas, olho, fora, uso, nota,
+    # devolvidas
+    assert linhas["15088"] == ["15088", "8 d", "31/08/26", fim, "Técnico 1", "Precisa do seu olho", "0", "2", "0",
+                               "100%", "71%", "2"]
+    assert linhas["15102"][6:] == ["1", "0", "0", "100%", "96%", "—"]
+    assert linhas["15002"][1] == "120 d" and linhas["15002"][6:] == ["0", "0", "1", "0%", "—", "—"]
+    assert [l[0] for l in _tabela(html, "Usina C")] == ["16001"]               # a SC 01 é a Usina C
 
 
-def test_alternancia_por_gestor_de_contrato(fila, logado):
-    html = logado.get("/t/campo/aprovacao?por=gestor").get_data(as_text=True)
-    assert "<h2>Por gestor de contrato</h2>" in html and 'href="?por=gestor&amp;ver=Beltrano+Supervisor"' in html
-    assert "Gestor de contrato (Supervisor PM): não aprova OS" in html
-    tabela = logado.get("/t/campo/aprovacao?por=gestor&ver=Beltrano+Supervisor").get_data(as_text=True)
-    assert [l[0] for l in _tabela(tabela)] == ["15002", "15088", "15102"]
-    # o filtro de gestor e o de região de campo, na barra
-    assert 'name="regiao_campo"' in html and 'name="gestor"' in html and 'name="supervisor"' not in html
-    so_sc = logado.get("/t/campo/aprovacao?gestor=Ciclano+Chefe").get_data(as_text=True)
-    assert 'href="?gestor=Ciclano+Chefe&amp;ver=Sul+01"' in so_sc and "ver=Sudeste+03" not in so_sc
+def test_enderecos_antigos_abrem_a_lista(fila, logado):
+    """Os cartões por região de campo e por gestor de contrato saíram (Levi, 18/10/2026: "quero apenas por responsável
+    da UFV"): quem guardou o endereço de antes cai na lista das usinas."""
+    for q in ("?por=gestor", "?ver=Sudeste+03", "?regiao_campo=Sudeste+03", "?gestor=Ciclano+Chefe", "?equipe=SP+Norte+01"):
+        html = logado.get("/t/campo/aprovacao" + q).get_data(as_text=True)
+        assert 'class="ap-usinas"' in html and "<h2>Por gestor de contrato</h2>" not in html, q
 
 
 def test_paradas_ha_30_dias_ou_mais_mostra_todas_as_que_conta(fila, logado):
@@ -170,9 +157,10 @@ def test_paradas_ha_30_dias_ou_mais_mostra_todas_as_que_conta(fila, logado):
     levava a "31 a 60 dias": com a fila inteira (08/10), a 15002, parada há 120 dias, contava no cartão e sumia no clique."""
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
     assert 'href="?idade=30-"' in html and 'href="?idade=31-60"><span class="gc-rotulo">Paradas' not in html
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03&idade=30-").get_data(as_text=True)
+    html = logado.get("/t/campo/aprovacao?idade=30-").get_data(as_text=True)
     assert [l[0] for l in _tabela(html)] == ["15002"] and "esperando há 30 dias ou mais" in html
-    assert 'href="?ver=Sudeste+03" aria-current="true"><span class="gc-rotulo">Paradas' in html   # ativo
+    assert "Usina C</b>" not in html
+    assert 'aria-current="true"><span class="gc-rotulo">Paradas' in html                       # ativo
     # a barra de idade continua com as cinco faixas (a de "30 dias ou mais" é só do cartão)
     assert "?idade=30-" not in html.split('class="cn-idades-barra"')[1].split("</div>")[0]
 
@@ -181,20 +169,18 @@ def test_por_tecnico_e_fila_sairam(fila, logado):
     """Levi, 08/10: "a visão de por técnico e fila pode matar, pode tirar que é irrelevante!"."""
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
     assert "Por técnico" not in html and "Fila de verificação</h2>" not in html and "vista=" not in html
-    html = logado.get("/t/campo/aprovacao?vista=tecnicos").get_data(as_text=True)    # endereço antigo: os cartões
-    assert 'class="cn-equipes"' in html and "<th>Técnico</th>" not in html
+    html = logado.get("/t/campo/aprovacao?vista=tecnicos").get_data(as_text=True)    # endereço antigo: a lista
+    assert 'class="ap-usinas"' in html and "<th>Técnico</th>" not in html
 
 
 def test_csv_tem_as_colunas_da_tabela(fila, logado):
-    r = logado.get("/t/campo/aprovacao?ver=Sudeste+03&csv=1")
+    r = logado.get("/t/campo/aprovacao?csv=1")
     texto = r.get_data(as_text=True)
     assert r.mimetype == "text/csv" and "aprovacao-os.csv" in r.headers["Content-Disposition"]
-    assert texto.splitlines()[0].lstrip("﻿").startswith(
-        "OS;Dias esperando;Criação da OS;Data fim;Região de campo;Supervisor de campo;Gestor de contrato")
-    assert "15088;8;31/08/26;" in texto and "16001" not in texto
-    assert ";Sudeste 03;Supervisora Campo;Beltrano Supervisor;" in texto
-    assert texto.splitlines()[1].endswith("Quem aprova é o supervisor de campo da região Sudeste 03 (Supervisora Campo) "
-                                          "ou um administrador.")
+    assert texto.splitlines()[0].lstrip("\ufeff") == (
+        "OS;Dias esperando;Criação da OS;Data fim;Responsável O&M;Usina;Cliente;Técnicos;Tarefas;Prontas;Pedem olho;"
+        "Fora do App;Uso do App (%);Nota média;Devolvidas;Grupo da OS")
+    assert "15088;8;31/08/26;" in texto and "\n16001;" in texto
 
 
 # ── 4. quem aprova: o supervisor de campo da região; com a vaga aberta, o coordenador; senão, admin ──────────────
@@ -250,14 +236,6 @@ def _ler_fila(cliente):
 def test_supervisor_de_campo_aprova_a_os_da_regiao_dele(app, fila, cliente, concluir):
     _sessao_nexus(cliente, papel=SUPERVISORA)
     _ler_fila(cliente)
-    # na tela: entra filtrada na região dela; o botão na OS da Sudeste 03, apagado na da Sul 01 com quem aprova lá
-    html = cliente.get("/t/campo/aprovacao").get_data(as_text=True)
-    assert '<option value="Sudeste 03" selected>' in html and 'href="?ver=Sul+01"' not in html
-    html = cliente.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
-    assert 'data-wo="15088" data-os="15088"' in html and "/os/_nexus/aprovacao/" in html
-    outro = cliente.get("/t/campo/aprovacao?ver=Sul+01&regiao_campo=*").get_data(as_text=True)
-    assert 'data-wo="16001" data-os' not in outro
-    assert "Vaga aberta de supervisor de campo na região Sul 01: aprova o coordenador de campo (Coordenador Campo)" in outro
     # no servidor: quem entrou no Fracttal é a supervisora (pelo e-mail da ficha), e a 15088 é da região dela
     _fracttal_de(app, cliente, "supervisora@exemplo.test", "Supervisora C.")
     r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={"folio": "99999"})
@@ -274,10 +252,6 @@ def test_supervisor_de_campo_aprova_a_os_da_regiao_dele(app, fila, cliente, conc
 def test_coordenador_aprova_so_onde_a_vaga_esta_aberta(app, fila, cliente, concluir):
     _sessao_nexus(cliente, papel=COORDENADOR)
     _ler_fila(cliente)
-    html = cliente.get("/t/campo/aprovacao?ver=Sul+01").get_data(as_text=True)
-    assert 'data-wo="16001" data-os="16001"' in html                                    # vaga aberta: é dele
-    html = cliente.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
-    assert 'data-wo="15088" data-os' not in html                                       # a região tem supervisora
     _fracttal_de(app, cliente, "coordenador@exemplo.test", "Coordenador C.")
     assert cliente.post("/os/_nexus/aprovacao/16001/aprovar", json={}).status_code == 200
     r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={})
@@ -291,7 +265,6 @@ def test_gestor_de_contrato_e_quem_nao_tem_papel_levam_403_mesmo_forjando(app, f
     _sessao_nexus(cliente, papel={"pessoa_id": 90, "nome": "Beltrano Supervisor", "papel": "gestor",
                                   "gestor": "Beltrano Supervisor"})
     _ler_fila(cliente)
-    assert 'data-wo="15088" data-os' not in cliente.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
     _fracttal_de(app, cliente, "beltrano@exemplo.test", "Beltrano S.")
     r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={})
     assert r.status_code == 403 and "supervisor de campo da região Sudeste 03" in r.get_json()["erro"]
@@ -310,10 +283,6 @@ def test_regiao_sem_supervisor_e_sem_coordenador_so_admin_aprova(app, fila, clie
     _aba(fila.api, "cadastro_nexus", "regioes_campo", sem_ninguem)
     visao.limpar()
     _ler_fila(logado)
-    html = logado.get("/t/campo/aprovacao").get_data(as_text=True)          # o cartão da região diz quem aprova
-    assert ("Só um administrador aprova: a região Sul 01 está sem supervisor e sem coordenador de campo no cadastro "
-            "(as duas vagas abertas).") in html
-    assert 'data-wo="16001" data-os="16001"' in logado.get("/t/campo/aprovacao?ver=Sul+01").get_data(as_text=True)
     # (o `logado` e o `cliente` são o mesmo navegador: a sessão é trocada aqui)
     _sessao_nexus(cliente, papel=COORDENADOR)
     _fracttal_de(app, cliente, "coordenador@exemplo.test", "Coordenador C.")
@@ -326,13 +295,11 @@ def test_regiao_sem_supervisor_e_sem_coordenador_so_admin_aprova(app, fila, clie
 
 def test_estrutura_nao_publicada_so_admin_aprova(app, fila, cliente, concluir):
     """Sem a aba `regioes_campo` no banco (antes da 1ª publicação), ninguém é supervisor de campo de nada: só um
-    administrador aprova, e a tela e o portão dizem por quê."""
+    administrador aprova pelo portão, e ele diz por quê."""
     _aba(fila.api, "cadastro_nexus", "regioes_campo", [])
     visao.limpar()
     _sessao_nexus(cliente, papel=SUPERVISORA)
     _ler_fila(cliente)
-    html = cliente.get("/t/campo/aprovacao?ver=Sem+regi%C3%A3o+de+campo&regiao_campo=*").get_data(as_text=True)
-    assert "Estrutura de campo ainda não publicada" in html and 'data-wo="15088" data-os' not in html
     _fracttal_de(app, cliente, "supervisora@exemplo.test", "Supervisora C.")
     r = cliente.post("/os/_nexus/aprovacao/15088/aprovar", json={})
     assert r.status_code == 403 and "a estrutura de campo (regiões e supervisores de campo) ainda não foi publicada" in r.get_json()["erro"]
@@ -341,8 +308,6 @@ def test_estrutura_nao_publicada_so_admin_aprova(app, fila, cliente, concluir):
 def test_administrador_aprova_qualquer_os(app, fila, logado, cliente, concluir):
     # logado = senha de admin do Nexus; o login do Fracttal pode ser de quem não tem papel nenhum
     _ler_fila(logado)
-    html = logado.get("/t/campo/aprovacao?ver=Sul+01").get_data(as_text=True)
-    assert 'data-wo="16001" data-os="16001"' in html
     _fracttal_de(app, logado, "tecnico@exemplo.test", "Fulano de Tal")
     assert logado.post("/os/_nexus/aprovacao/16001/aprovar", json={}).status_code == 200
     assert [p["caminho"] for p in concluir] == ["/os/api/os/16001/concluir"]
@@ -380,21 +345,21 @@ def test_clone_recusou_a_os_fica_na_fila(app, fila, logado, monkeypatch):
 
 def test_sessao_antiga_com_o_nome_do_supervisor_nao_vale_como_papel(app, fila, cliente):
     """Quem entrou antes da estrutura de 10/2026 tem no `supervisor_padrao` o nome do supervisor (texto): a tela não
-    quebra e não filtra nem mostra o Aprovar por ele."""
+    quebra e não filtra por ele."""
     _sessao_nexus(cliente, papel="Beltrano Supervisor")
     _ler_fila(cliente)
-    html = cliente.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
-    assert 'data-wo="15088" data-os' not in html and 'href="?ver=Sul+01"' not in html
+    html = cliente.get("/t/campo/aprovacao").get_data(as_text=True)
+    assert 'data-wo="15088"' in html and 'data-wo="16001"' in html
     assert cliente.get("/t/campo/rondas").status_code == 200
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="sem node nesta máquina")
 def test_o_script_da_tela_e_javascript_valido(fila, logado, tmp_path):
     """Até 08/10 o confirm() do Aprovar tinha uma quebra de linha DENTRO da string: o script inteiro não rodava (nem a
-    linha abria, nem o Aprovar funcionava)."""
+    linha abria, nem o Aprovar funcionava). Desde 18/10 o script é o que abre o card da OS."""
     _ler_fila(logado)
-    html = logado.get("/t/campo/aprovacao?ver=Sudeste+03").get_data(as_text=True)
-    scripts = [s for s in re.findall(r"<script>(.*?)</script>", html, re.S) if "cn-aprovar" in s]
+    html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
+    scripts = [s for s in re.findall(r"<script>(.*?)</script>", html, re.S) if "tr.ap-os" in s]
     assert scripts
     arq = tmp_path / "aprovacao.js"
     arq.write_text(scripts[0], encoding="utf-8")

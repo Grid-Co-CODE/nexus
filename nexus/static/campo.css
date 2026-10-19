@@ -353,18 +353,6 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-idade--4{background:var(--critico-cheio)}
 .cn-idade:hover,.cn-idade.ativa{outline:2px solid var(--tinta);outline-offset:1px}
 
-/* o porquê do grupo e o Aprovar, na linha aberta da fila */
-.cn-motivos{margin:0;padding:0;list-style:none;display:grid;gap:8px;font-size:13px}
-.cn-motivos li{display:grid;grid-template-columns:8px minmax(0,1fr);gap:10px;align-items:start}
-.cn-motivos li::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;margin-top:5px}
-.cn-motivos li span{color:var(--tinta)}
-.cn-aprovar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px}
-.cn-aprovar-msg{font-size:12.5px;max-width:52ch}
-tr.cn-aprovada td{opacity:.45}
-/* no claro a aprovada não esmaece (a opacidade derruba o texto abaixo de 4,5:1 no branco): cinza das seções e texto mudo */
-:root[data-tema="claro"] tr.cn-aprovada td{opacity:1;background:var(--superficie-2);color:var(--mudo)}
-.cn-tarefas-os{margin:0;padding:0;list-style:none;display:grid;gap:14px}
-.cn-tarefa-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:6px;font-size:13px}
 
 /* histórico da usina: a evolução de sujidade e vegetação (1 a 5) */
 .cn-evolucao svg{width:100%;height:auto;display:block;margin-top:6px}
@@ -542,14 +530,6 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 /* a alternância dos cartões: por região de campo ou por gestor de contrato */
 .cn-alterna{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:16px}
 .cn-seg--mini a{font-size:12px;padding:4px 10px;white-space:normal}
-/* quem aprova as OS da região, no cartão da Aprovação */
-.cn-eq-cab .cn-quem-aprova{color:var(--tinta-2)}
-/* a faixa do supervisor aberto na Aprovação: voltar aos cartões, quem é e os números dele */
-.cn-faixa-aprov{gap:8px 18px}
-.cn-faixa-aprov .cn-link{font-weight:600}
-/* a tabela das OS do supervisor (11 colunas) usa o mínimo de 980 px do .cn-tab: no celular rola dentro do quadro */
-/* o Aprovar de quem não pode: o botão aparece apagado, com quem pode */
-.cn-aprovar--so-supervisor .gc-btn[disabled]{opacity:.5;cursor:not-allowed}
 
 /* ── Passo 4 do Kimball e validação por foto (08/10/2026) ──────────────────────────────────────────────────────────
    O aviso discreto de que o fato foi calculado na hora (o banco ainda não tem o fato desta versão dos livros); o selo
@@ -846,12 +826,35 @@ a.cr-tag:hover{filter:brightness(1.1)}
 
 /* Ranking de pontos (13/10/2026, Levi: "Cria uma seção de Ranking de Pontos no App de Campo!"): o pódio do ciclo do App,
    os três primeiros da classificação (com a região escolhida, os três primeiros dela, com a posição do ciclo inteiro) */
-.rk-podio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
-.rk-lugar{display:flex;flex-direction:column;gap:4px;min-width:0;padding:16px 18px;background:var(--superficie);
-  border:1px solid var(--linha);border-radius:var(--raio-md)}
-.rk-lugar.rk-1{border-color:var(--verde-a45);box-shadow:inset 0 3px 0 var(--verde)}
+/* o pódio das olimpíadas (Levi, 18/10/2026: "1°, 2° e 3° lugar quero estilo podium das olimpíadas"): o 1º no meio e no
+   degrau mais alto, o 2º à esquerda, o 3º à direita, em ouro, prata e bronze; a página segue 1º, 2º, 3º */
+.rk-podio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:12px;margin-top:16px}
+.rk-lugar.rk-1{grid-column:2;grid-row:1}
+.rk-lugar.rk-2{grid-column:1;grid-row:1}
+.rk-lugar.rk-3{grid-column:3;grid-row:1}
+.rk-lugar{display:flex;flex-direction:column;min-width:0}
+.rk-cartao{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:14px 16px;text-align:center;
+  background:var(--superficie);border:1px solid var(--linha);border-bottom:0;border-radius:var(--raio-md) var(--raio-md) 0 0}
+.rk-1 .rk-cartao{border-color:var(--ouro)}
+.rk-2 .rk-cartao{border-color:var(--prata)}
+.rk-3 .rk-cartao{border-color:var(--bronze)}
+.rk-degrau{display:grid;place-items:center;border-radius:0 0 var(--raio-md) var(--raio-md)}
+.rk-1 .rk-degrau{height:96px;background:var(--ouro)}
+.rk-2 .rk-degrau{height:68px;background:var(--prata)}
+.rk-3 .rk-degrau{height:48px;background:var(--bronze)}
+.rk-medalha{font:800 30px/1 var(--font-sans);color:var(--sobre-cheio)}
+.rk-dica{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}
+/* a linha que abre as OS devolvidas, abaixo do piso e anuladas (18/10/2026) */
+tr.rk-linha{cursor:pointer}
+tr.rk-linha:hover td{background:var(--superficie-2)}
+tr.rk-linha:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.rk-seta{color:var(--mudo);transition:transform .15s ease}
+tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
+.rk-tarefas{width:100%;border-collapse:collapse;font-size:12.5px}
+.rk-tarefas th{text-align:left;font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.rk-tarefas td,.rk-tarefas th{padding:6px 8px;border-bottom:1px solid var(--linha)}
 .rk-pos{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
-.rk-1 .rk-pos{color:var(--verde-texto)}
+.rk-1 .rk-pos{color:var(--tinta)}
 .rk-nome{font:600 16px/1.3 var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rk-reg{font-size:12px;color:var(--mudo)}
 .rk-pts{font:600 26px/1.15 var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:6px;color:var(--tinta)}
@@ -859,7 +862,18 @@ a.cr-tag:hover{filter:brightness(1.1)}
 .rk-det{font-size:12px;color:var(--mudo)}
 .cn-tab td.rk-tec{text-align:left;font-weight:500;white-space:nowrap}
 .cn-tab td.rk-motivo{text-align:left;color:var(--tinta-2)}
-@media (max-width:700px){.rk-podio{grid-template-columns:1fr}}
+/* no celular o pódio continua o das olimpíadas, mais baixo e sem o detalhe dos pontos */
+@media (max-width:700px){
+  .rk-podio{gap:6px}
+  .rk-cartao{padding:10px 6px}
+  .rk-nome{font-size:13px;white-space:normal;overflow-wrap:anywhere}
+  .rk-pts{font-size:18px}
+  .rk-det{display:none}
+  .rk-1 .rk-degrau{height:64px}
+  .rk-2 .rk-degrau{height:44px}
+  .rk-3 .rk-degrau{height:30px}
+  .rk-medalha{font-size:22px}
+}
 
 /* ── O Ranking das equipes na Visão do responsável (18/10/2026): os quatro números do painel do App, a régua numa frase
    e um cartão por equipe (o cartão v2 do protótipo aprovado pelo Levi), por cima do `cn-equipe` dos cartões ── */
@@ -1076,3 +1090,37 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-ronda-amp[hidden]{display:none}
 .cr-ronda-amp img{max-width:100%;max-height:60vh;border-radius:var(--raio-md);background:var(--superficie-2)}
 .cr-ronda-amp figcaption{color:var(--mudo);font-size:12px;text-align:center}
+
+/* A lista da Aprovação de OS por responsável da UFV (18/10/2026, Levi: "quando abrir aparece uma lista das usinas que
+   tem OSs não concluídas, ao clicar na linha aparece o mesmo card que aparece ao clicar na OS do histórico de OS do OS
+   Creator Web"): uma linha por usina, que abre a tabela das OS dela; a OS abre o card */
+/* a coluna da lista não cresce com a tabela (980 px de mínimo): no celular a tabela rola dentro do quadro */
+.ap-usinas{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.ap-usina{min-width:0;background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--ok-cheio);
+  border-radius:var(--raio-md)}
+.ap-usina--alerta{border-left-color:var(--alerta-cheio)}
+.ap-usina--critico{border-left-color:var(--critico-cheio)}
+.ap-u{display:grid;grid-template-columns:minmax(180px,2fr) minmax(64px,.5fr) minmax(220px,2fr) minmax(150px,1.2fr) 14px;
+  align-items:center;gap:12px;padding:10px 14px;cursor:pointer;list-style:none}
+.ap-u::-webkit-details-marker{display:none}
+.ap-u:hover,.ap-usina[open] > .ap-u{background:var(--superficie-2)}
+.ap-u:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.ap-u-nome{display:grid;min-width:0}
+.ap-u-nome b{font:600 14px/1.3 var(--font-sans);overflow-wrap:anywhere}
+.ap-u-nome small{color:var(--mudo);font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.ap-u-n{font-size:12.5px;color:var(--mudo)}
+.ap-u-n b{font:700 18px/1 var(--font-sans)}
+.ap-u-g{display:grid;gap:5px;min-width:0}
+.ap-u-leg{font-size:12px;color:var(--tinta-2)}
+.ap-u-d{font-size:12.5px;color:var(--mudo)}
+.ap-seta{color:var(--mudo);transition:transform .15s ease}
+.ap-usina[open] .ap-seta{transform:rotate(180deg)}
+.ap-usina > .cn-tab{margin:0 14px 12px}
+tr.ap-os{cursor:pointer}
+tr.ap-os:hover td{background:var(--superficie-2)}
+tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+@media (max-width:760px){
+  .ap-u{grid-template-columns:minmax(0,1fr) auto 14px}
+  .ap-u-g,.ap-u-d{grid-column:1 / -1}
+  .ap-seta{grid-row:1;grid-column:3}
+}

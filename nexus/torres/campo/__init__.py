@@ -10,7 +10,7 @@ saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da ronda e ranking s�
 """
 import re
 from datetime import date, datetime, timedelta, timezone
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from flask import Response, abort, current_app, make_response, redirect, render_template, request, session
 from markupsafe import Markup, escape
@@ -31,7 +31,7 @@ from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
 from ...prefixo import na_raiz, raiz
-from .aprovar_os import bp_aprovar_os, papel_da_sessao, pode_na_tela
+from .aprovar_os import bp_aprovar_os, papel_da_sessao
 from .assinatura import _login as _login_da_pt, _tela as _tela_da_pt, bp_assinatura
 
 FONTE_APP = "Livros que o App de Campo grava no banco do Nexus + cadastro do Nexus"
@@ -70,7 +70,7 @@ TORRE = Torre(
         Tela("triagem", "Triagem de qualidade", "O que exige ação hoje na qualidade do fechamento?", FONTE_APP),
         # o placar do ciclo de pontos do App (Levi, 13/10/2026: "Cria uma seção de Ranking de Pontos no App de Campo!"):
         # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
-        Tela("ranking", "Ranking de pontos", "Quem lidera o ciclo de pontos do App neste mês, e por quê?",
+        Tela("ranking", "Ranking de pontos", "Quem lidera a classificação de pontos do App no mês, e por quê?",
              "Livro ranking_app_campo (o placar do ciclo do App) no banco do Nexus"),
         Tela("rotas", "Rotas do dia", "Qual a melhor ordem de visitas para cada equipe?",
              "Programação do PCM + localização das usinas"),
@@ -1137,6 +1137,16 @@ def _nome_do_mes(mes: str) -> str:
         return mes
 
 
+def _hora_do_app(iso: str) -> str:
+    """A hora de uma tarefa no extrato do App ("2026-10-10T17:00", sem fuso) em Brasília, "10/10 14:00": o App grava em
+    UTC, como o "Registrado em" dos fechamentos (`fatos.data_do_registro`)."""
+    try:
+        d = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(_BRT).strftime("%d/%m %H:%M")
+
+
 def _hora_brt(iso: str) -> str:
     """A hora (de Brasília) em que o App calculou o placar, "13/10 18:25"."""
     try:
@@ -1161,9 +1171,14 @@ def ranking():
         return [p for p in lista if not regiao or p["regiao"] == regiao]
     classificacao = da_regiao(atual["classificacao"]) if atual else []
     fora = da_regiao(atual["fora"]) if atual else []
+    # as OS que não pontuaram cheio, da lista que o App publica (18/10/2026): a linha da pessoa abre as dela no mês
+    tarefas = visao.ranking_tarefas()
+    por = (tarefas.dados or {}).get("por") or {}
     return render_template("campo/ranking.html", **_comum(
         "ranking", leitura, meses=meses, atual=atual, regioes=regioes, regiao=regiao, classificacao=classificacao,
         fora=fora, nome_do_mes=_nome_do_mes, calculado=_hora_brt(atual["calculado_em"]) if atual else "",
+        tarefas_de=lambda p: por.get((atual["mes"], p.get("hmac")), []) if atual else [],
+        tarefas_publicado=bool((tarefas.dados or {}).get("publicado")), hora_do_app=_hora_do_app,
         media=round(sum(p["total"] for p in classificacao) / len(classificacao)) if classificacao else None))
 
 
@@ -1219,8 +1234,10 @@ def _por_os(linhas) -> list[dict]:
         o["fim"] = max(str(t.get("fim") or "") for t in ts)
         o["tecnicos"] = sorted({t.get("tecnico") or "—" for t in ts})
         primeira = next((t for t in ts if t.get("usina_cad")), ts[0])
-        for c in ("usina_cad", "equipe_cad", "regiao_cad", "supervisor_campo_cad", "gestor_cad", "regiao_br"):
+        for c in ("usina_cad", "equipe_cad", "regiao_cad", "supervisor_campo_cad", "gestor_cad", "regiao_br",
+                  "responsavel_cad", "cliente_cad"):
             o[c] = primeira.get(c) or ""
+        o["cadastrada"] = bool(primeira.get("cadastrada"))
         # quem aprova a OS: o das usinas das tarefas (OS em duas regiões, rara, é das duas)
         o["aprovadores"] = []
         for t in ts:
@@ -1282,88 +1299,136 @@ def _agrupa_os(oss, chaves) -> list[dict]:
     return list(g.values())
 
 
+def _responsavel_logado_pelo_cadastro() -> str:
+    """O Responsável O&M de quem entrou pelo Fracttal, para o filtro da Aprovação já vir nele (o `_responsavel_do_login`
+    da Visão do responsável), com o mapa pessoa → responsável montado da ficha das usinas: sem a conta inteira da Visão,
+    que esta tela não usa. Quem não é responsável de nenhuma usina (o coordenador, o administrador) abre em todas."""
+    if "responsavel_padrao" in session:
+        return session["responsavel_padrao"] or ""
+    try:
+        b = visao._Base()
+    except Exception:       # noqa: BLE001 — sem cadastro: abre em todas
+        return ""
+    mapa = {}
+    for uid in b.mobilizadas:
+        pid = visao.D._id((b.por_id.get(uid) or {}).get("responsavel_om_id"))
+        if pid:
+            mapa[pid] = b.responsavel_da_usina(uid)
+    return _responsavel_do_login({"responsaveis_por_pessoa": mapa})
+
+
+def _usinas_da_fila(oss) -> list[dict]:
+    """A lista da Aprovação (Levi, 18/10/2026: "quando abrir aparece uma lista das usinas que tem OSs não concluídas"):
+    uma linha por usina, com as OS esperando, os três grupos, a idade e o uso do App (a conta dos cartões de antes,
+    `_agrupa_os`), e as OS dela, a mais antiga primeiro. A que tem mais OS paradas há 30 dias, e depois a que espera há
+    mais tempo, vem primeiro."""
+    por = {}
+    for o in oss:
+        por.setdefault(o["usina_cad"] or SEM_CADASTRO, []).append(o)
+    out = _agrupa_os(oss, lambda o: [o["usina_cad"] or SEM_CADASTRO])
+    for a in out:
+        lista = por[a["nome"]]
+        a["oss"] = sorted(lista, key=lambda o: (-o["espera_d"], str(o["os"])))
+        a["cliente"], a["responsavel"], a["cadastrada"] = (lista[0]["cliente_cad"], lista[0]["responsavel_cad"],
+                                                           lista[0]["cadastrada"])
+    out.sort(key=lambda a: (-a["aged30"], -a["espera_max"], -a["ordens"], a["nome"]))
+    return out
+
+
+def _porque(o) -> str:
+    """O porquê do grupo da OS, cada motivo uma vez (a regra do App): vai no selo do grupo, sem abrir nada."""
+    vistos = []
+    for x in o["tarefas"]:
+        for _cor, texto in campo_aprovacao.motivos(x):
+            if texto not in vistos:
+                vistos.append(texto)
+    return " · ".join(vistos)
+
+
 @bp.route("/aprovacao")
 def aprovacao():
-    """A fila de verificação do Fracttal para tirar insight (Levi, 05/10: "refaça essa parte de aprovação de OS para
-    retirada de bons insights"), contada por OS, que é o que se aprova. Os grupos de cada tarefa são os do App (a fila
-    inteira pela `_fila_supervisao`); a equipe, a região de campo e o gestor vêm do cadastro do Nexus, pela usina do
-    Fracttal (de-para "Fracttal · Classificação 1").
-    Desde 08/10/2026 (Levi): a fila INTEIRA, sem "OS fechadas nos X dias"; uma visão só, os cartões (por região de campo,
-    a estrutura de O&M de 10/2026, com a alternância para gestor de contrato); o cartão abre a tabela das OS dele
-    (`ver=`), uma linha por OS que abre o porquê do grupo e o Aprovar, que só quem aprova a OS (o Supervisor de Campo da
-    região; com a vaga aberta, o Coordenador) ou um administrador usa (`aprovar_os.py`). Os indicadores e a barra da
-    idade filtram cartões e tabela."""
-    equipe, regiao_campo, gestor = request.args.get("equipe", ""), _regiao_campo(), _gestor()
-    por = "gestor" if request.args.get("por") == "gestor" else "regiao"
+    """A fila de verificação do Fracttal, contada por OS, que é o que se aprova (Levi, 05/10: "refaça essa parte de
+    aprovação de OS para retirada de bons insights"). Os grupos de cada tarefa são os do App (a fila inteira pela
+    `_fila_supervisao`). Desde 18/10/2026 (Levi: "está por região e gestor de contrato quero apenas por responsável da UFV,
+    quando abrir aparece uma lista das usinas que tem OSs não concluídas, ao clicar na linha aparece o mesmo card que
+    aparece ao clicar na OS do histórico de OS do OS Creator Web"): o filtro é só o Responsável O&M da usina (do cadastro,
+    pela usina do Fracttal; quem entrou pelo Fracttal e é responsável já vem nele), a lista é das usinas com OS esperando
+    aprovação, a usina abre as OS dela e a OS abre o card do OS Creator, cujo Concluir aprova. Os indicadores e a barra
+    da idade são do responsável escolhido e filtram a lista. "Está demorando muito para carregar": a conta das regras do
+    App fica pronta por fila lida (`aprovacao.fila_toda`), e o filtro é feito sobre ela."""
+    v = request.args.get("responsavel")
+    responsavel = _responsavel_logado_pelo_cadastro() if v is None else ("" if v == TODOS else v)
     mapa = visao.usinas_do_fracttal()
     opcoes = mapa.dados or {}
-    usinas = None
-    for escolhido, grupo in ((equipe, "equipes"), (regiao_campo, "regioes"), (gestor, "gestores")):
-        if escolhido:
-            nomes = set((opcoes.get(grupo) or {}).get(escolhido) or [])
-            usinas = nomes if usinas is None else usinas & nomes
-    leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA, usinas)
+    leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
     d = leitura.dados or {}
     por_nome = opcoes.get("por_nome") or {}
     todas = d.get("linhas") or []
     for x in todas:
         cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
         x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
-        x["regiao_cad"], x["gestor_cad"] = cad.get("regiao_campo") or "", cad.get("gestor") or ""
-        x["supervisor_campo_cad"], x["regiao_br"] = cad.get("supervisor_campo") or "", cad.get("regiao_br") or ""
-        x["aprovador"] = cad.get("aprovador") or visao.aprovador_sem_cadastro()
-    oss = _por_os(todas)
+        x["responsavel_cad"], x["cliente_cad"] = cad.get("responsavel") or "", cad.get("cliente") or ""
+        x["cadastrada"] = bool(cad)
+    todas_os = _por_os(todas)
+    oss = [o for o in todas_os if not responsavel or o["responsavel_cad"] == responsavel]
     balde = request.args.get("balde") if request.args.get("balde") in ORDEM_DO_GRUPO else ""
     idade = next((i for i in IDADES + (IDADE_PARADAS,) if i[0] == request.args.get("idade")), None)
-    # os indicadores e a idade filtram os cartões e a tabela; os números do topo seguem sobre a fila inteira
+    # os indicadores e a idade filtram a lista; os números do topo são das usinas do responsável escolhido
     filtradas = [o for o in oss if (not balde or o["balde"] == balde)
                  and (not idade or idade[2] <= o["espera_d"] <= idade[3])]
-    # o supervisor aberto (Levi, 08/10: "nessa visão por supervisor deve ser clicável, quando clica aparece a OS ...")
-    ver = request.args.get("ver", "")
-    tabela = [o for o in filtradas if (o.get(AGRUPAR[por]) or SEM_CADASTRO) == ver] if ver else []
     nome_grupo = {g[0]: g[1] for g in GRUPOS}
     if request.args.get("csv") == "1":
         import csv
         import io
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
-        w.writerow(["OS", "Dias esperando", "Criação da OS", "Data fim", "Região de campo", "Supervisor de campo",
-                    "Gestor de contrato", "Equipe", "Usina", "Técnicos",
-                    "Tarefas", "Prontas", "Pedem olho", "Fora do App", "Uso do App (%)", "Nota média",
-                    "Devolvidas", "Grupo da OS", "Quem aprova"])
-        for o in (tabela if ver else filtradas):
+        w.writerow(["OS", "Dias esperando", "Criação da OS", "Data fim", "Responsável O&M", "Usina", "Cliente",
+                    "Técnicos", "Tarefas", "Prontas", "Pedem olho", "Fora do App", "Uso do App (%)", "Nota média",
+                    "Devolvidas", "Grupo da OS"])
+        for o in filtradas:
             n = o["n_por_grupo"]
             w.writerow([o["os"], o["espera_d"], _data_br(o["criada"]) if o["criada"] else "", _data_br(o["fim"]),
-                        o["regiao_cad"], o["supervisor_campo_cad"], o["gestor_cad"], o["equipe_cad"], o["usina_cad"],
-                        ", ".join(o["tecnicos"]),
+                        o["responsavel_cad"], o["usina_cad"], o["cliente_cad"], ", ".join(o["tecnicos"]),
                         len(o["tarefas"]), n["completa"], n["olho"], n["fora_do_app"], o["uso_app"],
                         "" if o["nota_media"] is None else o["nota_media"], o["n_devolvidas"],
-                        nome_grupo.get(o["balde"]), " ".join(a["texto"] for a in o["aprovadores"])])
+                        nome_grupo.get(o["balde"])])
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": 'attachment; filename="aprovacao-os.csv"'})
     mais_antiga = oss[0] if oss else None
-    k = {"ordens": len(oss), "tarefas": len(todas), "baldes": {b: sum(1 for o in oss if o["balde"] == b) for b in ORDEM_DO_GRUPO},
+    k = {"ordens": len(oss), "tarefas": sum(len(o["tarefas"]) for o in oss),
+         "baldes": {b: sum(1 for o in oss if o["balde"] == b) for b in ORDEM_DO_GRUPO},
          "aged30": sum(1 for o in oss if o["espera_d"] >= 30), "espera_max": mais_antiga["espera_d"] if mais_antiga else 0,
          "mais_antiga": mais_antiga, "uso_app": round(100 * sum(o["pelo_app"] for o in oss) / len(oss)) if oss else None}
     idades = [(i, sum(1 for o in oss if i[2] <= o["espera_d"] <= i[3])) for i in IDADES]
-    info = {r["nome"]: r for r in opcoes.get("regioes_info") or []}
-    # sem cadastro (usina sem de-para), sem região de campo e sem gestor: cartões próprios, sempre por último
-    sem = (SEM_CADASTRO, visao.SEM_REGIAO, visao.SEM_GESTOR)
-    cartoes = sorted(_agrupa_os(filtradas, lambda o: [o.get(AGRUPAR[por])]),
-                     key=lambda a: (a["nome"] in sem, -a["aged30"], -a["ordens"], a["nome"]))
-    for a in cartoes:
-        a["regiao"] = info.get(a["nome"]) if por == "regiao" else None
-    aberto = next((a for a in cartoes if a["nome"] == ver), None) if ver else None
-    linhas_filtro = [{"regiao_campo": x["regiao_campo"], "gestor": x["gestor"]} for x in (opcoes.get("por_nome") or {}).values()]
     return render_template("campo/aprovacao.html", **_comum(
         "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS}, balde=balde,
-        cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), equipe=equipe,
-        equipes=sorted(opcoes.get("equipes") or {}), por=por,
-        **_papeis({"regioes": opcoes.get("regioes_info") or [], "estrutura_publicada": opcoes.get("estrutura_publicada", True)},
-                  linhas_filtro, regiao_campo, gestor),
-        mapa_erro=mapa.erro, k=k, idades=idades, idade=idade, ver=ver, aberto=aberto, tabela=tabela,
-        limite=LIMITE_LINHAS, cartoes=cartoes, sem_cadastro=SEM_CADASTRO, data_br=_data_br,
-        pode_aprovar=pode_na_tela, motivos=campo_aprovacao.motivos))
+        cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), responsavel=responsavel,
+        opcoes_responsavel=_opcoes_responsavel([{"responsavel": o["responsavel_cad"]} for o in todas_os], responsavel),
+        mapa_erro=mapa.erro, k=k, idades=idades, idade=idade, usinas_fila=_usinas_da_fila(filtradas),
+        sem_responsavel=visao.SEM_RESPONSAVEL, data_br=_data_br, porque=_porque))
+
+
+@bp.route("/aprovacao/<int:id_wo>/conferir", methods=["POST"])
+def aprovacao_conferir(id_wo):
+    """Depois do card da OS (o Concluir do OS Creator aprova; Levi, 18/10/2026: "ao clicar na linha aparece o mesmo card
+    que aparece ao clicar na OS do histórico de OS do OS Creator Web"), a tela pede para conferir: a OS que o Fracttal
+    já não tem em verificação sai da fila guardada na hora, sem esperar a releitura de 10 min. Só sai o que o Fracttal
+    confirma (1 pedido de leitura): ninguém esconde OS da fila (o porquê de a rota /tirar ter saído em 08/10)."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    o = campo_aprovacao.os_na_fila(id_wo)
+    if not o:
+        return {"saiu": True}
+    from ...campo import fracttal
+    try:
+        r = fracttal.ler(f"work_orders?id_status_work_order=2&wo_folio={quote(o['os'])}&limit=1")
+    except Exception as e:      # noqa: BLE001 — sem o Fracttal agora: a OS segue na fila até a releitura
+        return {"saiu": False, "erro": type(e).__name__}, 502
+    if any(str(w.get("wo_folio")) == o["os"] for w in (r or {}).get("data") or []):
+        return {"saiu": False}
+    campo_aprovacao.tirar_da_fila(id_wo)
+    return {"saiu": True}
 
 
 # ── Triagem de qualidade (a mesa de triagem do App, nexus/campo/triagem.py) ──────────────────────────────────────

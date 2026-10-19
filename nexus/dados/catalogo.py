@@ -333,6 +333,22 @@ FATOS = (
          fontes=("ranking_app_campo · Ranking",), janela_origem="o mês corrente e o anterior (App)",
          observacao="quem calcula é o App; o Nexus mostra, não recalcula (recalcular a nota deu 14% de acerto em 05/10). "
                     "A régua do mês vem nas colunas do próprio livro. Até o App publicar, o livro não existe"),
+    # as tarefas que não pontuaram cheio no placar (18/10/2026, Levi: "Quando tiver OSs devolvidas ou anuladas quero que
+    # dê para clicar na linha e mostre qual foi a OS e o motivo!"): quem calcula e publica é o App (o extrato dele não vai
+    # ao banco, e a anulação depende da ordem por pontos: a sessão do App, 18/10/2026). Registrado antes da 1ª publicação.
+    # Tela: Campo · App > Ranking de pontos, a linha da pessoa
+    Fato("ranking_tarefas", "Tarefas que não pontuaram cheio no ranking", "campo", "ranking_tarefas_app_campo · Tarefas",
+         "1 linha = 1 tarefa de 1 técnico no mês que não pontuou cheio (devolvida, abaixo do piso ou anulada), como o "
+         "App a listou na hora da publicação",
+         _d(data=("cod", "Mês (AAAA-MM); Registrado em"), pessoa=("hmac", "Técnico (HMAC)"), os=("cod", "OS")),
+         tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)", "OS", "Tarefa", "Situação"),
+         medidas=_m((("nota_pts", "pts", "nao"), ("pontos_pts", "pts", "aditiva"))),
+         fontes=("ranking_tarefas_app_campo · Tarefas",), janela_origem="o mês corrente e o anterior (App)",
+         observacao="quem lista é o App (_ciclo_v2, a v287), do mesmo cálculo do placar: por pessoa e mês as linhas "
+                    "batem com Devolvidas, Anuladas e Abaixo do piso do ranking_app_campo. Situação = devolvida, abaixo "
+                    "do piso ou anulada (a anulada é uma tarefa boa que caiu pelas abaixo do piso do mês); Pontos = os "
+                    "que a tarefa tinha antes da devolução e da anulação; o Motivo é o texto do App. Sobe com o "
+                    "ranking_app_campo, aos :25; livro vazio não sobe"),
     Fato("fechamento_coletor", "Fechamento pelo coletor", "campo", "campo_nexus · fechamentos",
          "1 linha = 1 tarefa da fila do Fracttal",
          _d(data=("cod", "fim"), usina=("id", "usina_id"), equipe=("nome", "regiao"), pessoa=("id", "pessoa_id"),
