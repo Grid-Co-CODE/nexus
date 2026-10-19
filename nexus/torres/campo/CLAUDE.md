@@ -676,6 +676,23 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
 A peça 2 da Visão (Levi: os responsáveis largarem os painéis próprios). Responde "qual equipe cobrar": a aba `modo=ranking`
 mostra um cartão por equipe das usinas do filtro (o responsável logado vê as dele; quem não é responsável, todas), da pior
 para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md`.
+- **Filtrado, o ranking é o mesmo** (Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados, o que
+  está acontecendo agora é que se eu filtro [um responsável] vai contar de 1 a 11"): `ranking_equipes.classificar` faz a
+  nota, a posição, o "de N" e a seta sobre TODAS as equipes; o filtro (responsável, cliente, busca, equipe) só escolhe os
+  cartões, e o cartão é o da equipe inteira. Os números de cima são os dos cartões que aparecem. O "Sem equipe" fica com
+  as usinas do filtro (é a lista do conserto no cadastro). Medido em 18/10/2026: nenhuma das 55 equipes tem usina de dois
+  responsáveis; o responsável com 12 equipes passou de 1º a 12º para 7º a 42º de 52.
+- **O motivo da nota** (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe
+  estar abaixo para que o supervisor possa cobrar a equipe"): o clique no cartão abre a janela
+  `/t/campo/responsaveis/equipe?equipe=` (`ranking_equipes.motivos`, o pedaço `_resp_equipe.html`). A nota perde 100 −
+  nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte da qualidade vai a cada critério da
+  nota do App (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas 25, fotos 20, descrição
+  das fotos 10, assinatura 10, observação 15, GPS 20, que somam a nota; medido em 18/10/2026, fecha em 3.790 de 3.790
+  tarefas) e às rondas (os pontos que perderam, com as falhas que o App aponta). Os inteiros da tela são repartidos pelo
+  maior resto e sempre fecham com a nota (provado nas 52 equipes). Depois: as 5 notas mais baixas (tarefas iguais da
+  mesma OS numa linha, "7 tarefas iguais"), a média por técnico, as usinas sem ronda e o link à Visão geral da equipe.
+  `responsaveis.ranking_detalhe` lê as MESMAS linhas da conta (o número de notas bate com o do cartão nas 52 equipes).
+  A janela leva 0,1 s; sem as notas do App, diz.
 
 - **A posição é a régua do App** ("de acordo com as regras do ranking do app de campo"): o Ranking por região do painel
   do App (`_ranking_regioes`), a única conta por equipe que o App tem (o placar do ciclo é só por técnico). Nota = 60%
@@ -701,10 +718,12 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
 - **De onde vem:** `responsaveis.ranking_fonte` agrega por usina, nos dois períodos, na cópia de 5 min da Visão (as duas
   leituras já estão no ciclo quando a Visão é feita); `ranking_equipes.cartoes` agrupa no pedido, porque os filtros e o
   limite das atrasadas são de quem olha. Nada novo no banco. Sem as notas, a aba diz e não mostra cartão.
-- **O filtro `equipe=`**: o cartão abre a Visão geral só com as usinas da equipe (o nome exato do cadastro), com o "×";
-  a volta aos cartões dos responsáveis tira o filtro (revisão de 18/10/2026: ele vazava escondido para lá).
-- **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta;
-  mutações pegas) e os testes da aba em `tests/test_campo_responsaveis.py`. Com o banco real (18/10/2026, só GET, o
+- **O filtro `equipe=`**: o endereço do cartão (quem abre noutra aba) e o link da janela do motivo levam à Visão geral só
+  com as usinas da equipe (o nome exato do cadastro), com o "×"; a volta aos cartões dos responsáveis tira o filtro
+  (revisão de 18/10/2026: ele vazava escondido para lá).
+- **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta,
+  a posição com filtro, o motivo que fecha com a nota; mutações pegas) e os testes da aba e da janela em
+  `tests/test_campo_responsaveis.py` (`duas_equipes`: a SC Oeste 01 com nota, 2ª de 2 com qualquer filtro). Com o banco real (18/10/2026, só GET, o
   `test_client` com a sessão de administrador e o HTML servido local): em "Todos", 55 cartões (52 ranqueadas, notas de 41
   a 98; 2 sem nota; 1 "Sem equipe"); o responsável com mais equipes vê 12. O agrupamento no pedido leva 7 a 8 ms para as
   55; a conta fria da Visão ficou em 22 a 24 s, como antes (as leituras do ranking já estão no ciclo). A 1440 e a 375 px,

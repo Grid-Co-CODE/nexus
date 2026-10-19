@@ -397,6 +397,55 @@ def ranking_fonte(b, hoje) -> tuple[dict, dict]:
              **{p: (ini.isoformat(), fim.isoformat()) for p, (ini, fim) in per.items()}})
 
 
+def _itens_da_nota(v) -> list[dict]:
+    """A "Composição da nota" que o App grava em cada tarefa (JSON: rótulo, peso, pontos e o detalhe de cada critério);
+    texto que não é a lista esperada vira lista vazia (a tarefa fica em "sem a composição da nota")."""
+    import json
+    try:
+        itens = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        return []
+    if not isinstance(itens, list):
+        return []
+    return [{"rot": str(i.get("rot") or ""), "peso": i.get("peso"), "pts": i.get("pts"), "det": str(i.get("det") or "")}
+            for i in itens if isinstance(i, dict) and i.get("rot")]
+
+
+def ranking_detalhe(usina_ids: set, hoje) -> dict:
+    """As notas do App do período atual nas usinas de UMA equipe, cada uma com o porquê, para a janela do motivo da nota
+    (`ranking_equipes.motivos`). São as MESMAS linhas da conta do ranking (`ranking_fonte` -> `agregar`): a tarefa
+    fechada pelo App com nota (`fato_fechamento`) e a ronda do App com nota (`fato_ronda`; a avulsa não tem nota). O
+    porquê vem do livro cru, pela chave do fato: a "Composição da nota" da tarefa (`fechamento_id`) e as "Falhas" da ronda
+    (`_rondas_ligadas`). O nome é o "Nome padrão" da ficha pelo `pessoa_id`; sem ele, o do cadastro do App pelo código."""
+    from . import ranking_equipes
+    D = visao.D
+    b = visao._Base()
+    ini, fim = ranking_equipes.periodos(hoje)["atual"]
+    linhas = []
+    for x in visao._fato("fechamento", b)["linhas"]:
+        uid, nota = D._id(x.get("usina_id")), D._int(x.get("nota_pts"))
+        dia = ranking_equipes._dia_do_id(x.get("data_id"))
+        if uid in usina_ids and nota is not None and dia and ini <= dia <= fim:
+            linhas.append((x, uid, nota, dia))
+    cru = {D.chave_fechamento(a): a for a in visao._livro(*visao.C.ORIGEM_FECHAMENTOS)} if linhas else {}
+    quem = visao._quem() if linhas else {}
+    nomes = b.nomes({D._id(x.get("pessoa_id")) for x, *_ in linhas})
+    tarefas = []
+    for x, uid, nota, dia in linhas:
+        a = cru.get(D._txt(x.get("fechamento_id"))) or {}
+        tarefas.append({"dia": dia.isoformat(), "usina_id": uid, "os": D._txt(x.get("os")),
+                        "tarefa": D._txt(a.get("Tarefa")),
+                        "tecnico": nomes.get(D._id(x.get("pessoa_id"))) or visao._nome(quem, a.get("Técnico (HMAC)")),
+                        "nota": nota, "itens": _itens_da_nota(a.get("Composição da nota"))})
+    de, ate = ini.isoformat(), fim.isoformat()
+    rondas = [{"dia": r["data"], "usina_id": r["usina_id"], "os": r.get("os") or "", "tecnico": r.get("tecnico") or "",
+               "nota": r["nota"], "falhas": r.get("falhas") or ""}
+              for r in visao._rondas_ligadas(b)
+              if r["usina_id"] in usina_ids and not r.get("avulsa") and r.get("nota") is not None
+              and de <= (r.get("data") or "") <= ate]
+    return {"tarefas": tarefas, "rondas": rondas}
+
+
 # ── Ativos falhando (Engenharia › Confiabilidade) ───────────────────────────────────────────────────────────────
 def _engenharia() -> dict:
     """Os dados da Confiabilidade, com a cópia dela (as OS de falha do Fracttal lidas em segundo plano)."""
