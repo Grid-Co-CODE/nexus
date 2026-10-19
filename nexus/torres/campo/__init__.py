@@ -259,36 +259,70 @@ def _modo(equipe, historico=False) -> str:
     return "gestores" if pedido == "gestores" else "equipes"
 
 
+# Os filtros da Central (Levi, 19/10/2026: "em permissão de trabalho tire o filtro de região do brasil, região de campo,
+# gestor de contrato e responsável O&M. Deixe responsável UFV, cliente, UFV, equipe e o canto para escrever"; "Mesma coisa
+# do 3 só que em rondas pendentes!"), na ordem dele e no padrão de Extintores (18/10/2026): em cascata, e ninguém abre
+# filtrado pelo login (o Supervisor de Campo abria na região dele). O "Responsável UFV" é o Responsável O&M da ficha da
+# usina; "*" (o "Todos" de antes) vale como todos.
+FILTROS_CENTRAL = (("responsavel", "Responsável UFV"), ("cliente", "Cliente"), ("usina", "UFV"), ("equipe", "Equipe"))
+CAMPOS_DA_BUSCA_CENTRAL = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
+
+
+def _valor_central(x, campo) -> str:
+    if campo == "responsavel":
+        return x.get("responsavel") or visao.SEM_RESPONSAVEL
+    if campo == "equipe":
+        return x.get("equipe") or visao.SEM_EQUIPE
+    return str(x.get(campo) or "")
+
+
+def _opcoes_central(linhas, fl: dict, passa) -> dict:
+    """{filtro: [valores]}: cada lista com o que existe com os OUTROS filtros aplicados (em cascata: escolhido o cliente,
+    a lista de UFV traz só as dele), a escolhida mesmo sem resultado e os "Sem ..." por último."""
+    sem = {visao.SEM_RESPONSAVEL, visao.SEM_EQUIPE}
+    out = {}
+    for campo, _rot in FILTROS_CENTRAL:
+        vals = {_valor_central(x, campo) for x in linhas if passa(x, campo)} - {""}
+        if fl[campo]:
+            vals.add(fl[campo])
+        out[campo] = sorted(vals, key=lambda v: (v in sem, v.lower()))
+    return out
+
+
+def _modo_central(vista, responsavel) -> str:
+    """Por responsável (o padrão) ou a tabela (Levi, 19/10/2026: "Uma visão só por responsável serve! tanto em Rondas
+    pendentes quanto permissão de trabalho ... A tabela mantém"); nas rondas, o responsável escolhido (no cartão ou no
+    filtro) abre o kanban dele. Os endereços de antes (por equipe, por região de campo, por gestor) caem aqui."""
+    if request.args.get("modo") == "tabela":
+        return "tabela"
+    return "kanban" if vista == "pendentes" and responsavel else "responsaveis"
+
+
 @bp.route("/atencao")
 def atencao():
-    """Três visões em cada aba (Levi, 05/10: "tem que ter a visão por equipe (CARDS grandes agrupados) e a visão da
-    tabela!"; 08/10: "adicione mais um botão (por supervisor)"): cartões por equipe, por região de campo (com a
-    alternância para por gestor de contrato: a estrutura de O&M de 10/2026) ou a tabela. Filtros da região do Brasil, da
-    região de campo e do gestor; o cartão leva à tabela da equipe, da região ou do gestor."""
+    """Duas abas (Rondas pendentes e Permissões de trabalho), cada uma Por responsável ou em tabela, com os filtros
+    responsável UFV, cliente, UFV, equipe e a busca. Nas rondas, o cartão do responsável abre o kanban das usinas dele
+    (Levi, 12/10/2026: "Ao clicar aparecerá um kanban com essas três colunas!"), com a equipe de cada usina; na PT, o
+    cartão leva à tabela das PT dele."""
     dias = _dias((7, 14, 30), 14)
     leitura = visao.atencao(dias)
     d = leitura.dados
     ids = [v[0] for v in VISTAS]
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
-    f, regiao, equipe = request.args.get("f", ""), request.args.get("regiao", ""), request.args.get("equipe", "")
-    regiao_campo, gestor, responsavel = _regiao_campo(), _gestor(), _responsavel()
-    modo = _modo(equipe)
-    # Por Responsável O&M (Levi, 12/10/2026: "tem que mostrar usinas desse responsável que nunca tiveram ronda, rondas
-    # pendentes e feitas! Ao clicar aparecerá um kanban com essas três colunas!"): os cartões dos responsáveis e, com um
-    # escolhido (no cartão ou no filtro), o kanban das usinas dele. A tabela continua a um clique.
-    if vista == "pendentes" and not equipe:
-        if responsavel and request.args.get("modo") != "tabela":
-            modo = "kanban"
-        elif request.args.get("modo") == "responsaveis":
-            modo = "responsaveis"
+    f = request.args.get("f", "")
+    fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_CENTRAL}
+    if fl["responsavel"] == TODOS:
+        fl["responsavel"] = ""
+    responsavel, equipe = fl["responsavel"], fl["equipe"]
+    modo = _modo_central(vista, responsavel)
     q = request.args.get("q", "").strip().lower()
-    campos = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
+
+    def passa(x, menos=None):
+        return (all(not v or c == menos or _valor_central(x, c) == v for c, v in fl.items())
+                and (not q or q in " ".join(str(x.get(c) or "") for c in CAMPOS_DA_BUSCA_CENTRAL).lower()))
 
     def filtra(lista):
-        return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
-                and (not equipe or x.get("equipe") == equipe)
-                and _do_papel(x, regiao_campo, gestor, responsavel)
-                and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower())]
+        return [x for x in lista if passa(x)]
     fontes = {"pendentes": filtra(d.get("pendentes") or []),
               "pt": com_quem_assina(filtra(d.get("pts") or [])) if vista == "pt" else filtra(d.get("pts") or [])}
     base = fontes[vista]
@@ -297,29 +331,20 @@ def atencao():
         contagem[_status(vista, x)] = contagem.get(_status(vista, x), 0) + 1
     lista = [x for x in base if not f or _status(vista, x) == f]
     usinas_f = filtra(d.get("usinas") or [])
+    # os cartões de equipe ficam só para a faixa da tabela de PT filtrada por uma equipe (`_pt_esperando.html`)
     cartoes = visao.por_equipe(usinas_f, fontes["pendentes"], [], fontes["pt"], d.get("times") or {})
-    if vista == "pt":
-        cartoes = [c for c in cartoes if c["pts"]]
-    cartoes.sort(key=ORDEM_DOS_CARTOES[vista])
-    # por região de campo: a soma dos cartões de equipe dela (já filtrados); por gestor: pelas usinas dele
-    cartoes_reg = sorted(visao.por_regiao(cartoes, d.get("regioes") or []), key=ORDEM_DAS_REGIOES[vista])
-    cartoes_gest = visao.por_gestor(*((usinas_f, fontes["pendentes"]) if vista == "pendentes" else ([], [])),
-                                    fontes["pt"], d.get("times") or {})
-    if vista == "pt":
-        cartoes_gest = [c for c in cartoes_gest if c["pts"]]
-    cartoes_gest.sort(key=ORDEM_DOS_GESTORES[vista])
     cartoes_resp = sorted(visao.por_responsavel(usinas_f, fontes["pendentes"]), key=ORDEM_DOS_RESPONSAVEIS)
+    # o kanban leva a equipe de cada usina, uma ou mais (`visao.equipes_das_usinas`, na conta guardada da Central)
     colunas = visao.kanban(usinas_f, fontes["pendentes"]) if modo == "kanban" else None
     return render_template("campo/atencao.html", **_comum(
         "atencao", leitura, dias=dias, vista=vista, vistas=[(v, n, len(fontes[v])) for v, n in VISTAS],
         status=STATUS_DA_VISTA[vista], status_de=lambda x: _status(vista, x), contagem=contagem, total=len(base),
-        lista=lista, f=f, regiao=regiao, equipe=equipe, modo=modo, cartoes=cartoes, regioes=visao.REGIOES,
-        cartoes_reg=cartoes_reg, cartoes_gest=cartoes_gest, situacoes=SITUACAO_PT,
-        responsavel=responsavel, opcoes_responsavel=_opcoes_responsavel(d.get("usinas") or [], responsavel),
-        sem_responsavel=visao.SEM_RESPONSAVEL, cartoes_resp=cartoes_resp, colunas=colunas,
-        colunas_kanban=visao.COLUNAS_KANBAN,
-        **_papeis(d, (d.get("usinas") or []) + (d.get("pts") or []), regiao_campo, gestor),
-        q=request.args.get("q", ""), idade_min=_idade_min))
+        lista=lista, f=f, equipe=equipe, modo=modo, cartoes=cartoes, situacoes=SITUACAO_PT,
+        responsavel=responsavel, fl=dict(fl, opcoes=_opcoes_central((d.get("usinas") or []) + (d.get("pts") or []),
+                                                                    fl, passa)),
+        filtros_central=FILTROS_CENTRAL, sem_responsavel=visao.SEM_RESPONSAVEL, sem_regiao=visao.SEM_REGIAO,
+        cartoes_resp=cartoes_resp, cartoes_resp_pt=visao.pt_por_responsavel(fontes["pt"]) if vista == "pt" else [],
+        colunas=colunas, colunas_kanban=visao.COLUNAS_KANBAN, q=request.args.get("q", ""), idade_min=_idade_min))
 
 
 # ── Visão do responsável (12/10/2026) ───────────────────────────────────────────────────────────────────────────

@@ -215,7 +215,8 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   região de campo e o gestor, **quem assina**, as duas assinaturas lado a lado (a do técnico na APR, do Fracttal pelo
   login de quem olha, carregada ao abrir; a da aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
   com o motivo, Ver PT, Baixar APR), que volta para a lista com os filtros dela. É o mesmo pedaço da Central de atenção
-  > Permissões de trabalho (`campo/_pt_esperando.html`).
+  > Permissões de trabalho (`campo/_pt_esperando.html`); desde 19/10/2026 a Central só pede dele o Por responsável
+  (o modo `responsaveis`, só dela) e a tabela, e esta tela segue com os cartões por equipe, região e gestor.
 - **Quem pode dar o De acordo** (Levi, 09/10): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador de Campo), o gestor de contrato da usina, quem é do COS e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no servidor; quem não pode recebe a recusa dizendo quem pode).

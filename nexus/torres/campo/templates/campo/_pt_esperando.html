@@ -10,7 +10,24 @@
 {% macro capacete_pt() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
-{% if modo == 'equipes' %}
+{% if modo == 'responsaveis' %}
+{# por Responsável UFV (a Central de atenção, Levi, 19/10/2026: "Em permissão de trabalho deixe por responsável"): as PT
+   esperando nas usinas de cada um; o cartão leva à tabela das PT dele #}
+<div class="cn-equipes">
+  {% for s in cartoes_resp_pt %}{% set cor = 'critico' if s.parada else 'alerta' %}
+    <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', responsavel=s.responsavel, f=None) }}">
+      <div class="cn-eq-cab">
+        <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b></div>
+        <span>{{ 'PT de usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }}</span>
+        <span>{{ s.usinas }} usina{{ 's' if s.usinas != 1 }} com PT esperando · {{ s.equipes|length }} equipe{{ 's' if s.equipes|length != 1 }}</span>
+        <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
+      </div>
+      <div class="cn-eq-num"><span><span class="v cn-t-{{ cor }}">{{ s.pts }}</span><span class="d">PT esperando o De acordo</span></span></div>
+      <div class="cn-eq-pe"><span class="cn-st cn-t-critico">{{ s.parada }} parada{{ 's' if s.parada != 1 }} há mais de 2 h</span><span class="cn-st cn-t-alerta">{{ s.pts - s.parada }} aguardando</span></div>
+    </a>
+  {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
+</div>
+{% elif modo == 'equipes' %}
 <div class="cn-equipes">
   {% for c in cartoes %}{% set cor = 'critico' if c.parada else 'alerta' %}
     <a class="cn-equipe cn-equipe--{{ cor }}" href="{{ url(modo='tabela', equipe=c.equipe, f=None) }}">

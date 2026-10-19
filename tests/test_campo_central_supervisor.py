@@ -15,6 +15,11 @@ from test_campo_visao import EQUIPES, REGIOES, USINAS, _MOB, _aba, banco  # noqa
 from nexus.campo import visao
 
 
+def _tabela(html):
+    """As linhas da tabela de PT (a OS de cada uma), para comparar duas telas."""
+    return re.findall(r'class="cn-link cn-os"[^>]*>([^<]+)<', html)
+
+
 def _cartoes(html):
     """O pedaço dos cartões, sem os endereços, para comparar duas telas."""
     corpo = html[html.index('<div class="cn-equipes">'):html.index('<div class="cn-nota">')]
@@ -47,56 +52,27 @@ def test_por_regiao_soma_os_cartoes_das_equipes_e_por_gestor_soma_as_usinas(banc
     assert (c["usinas"], c["pendentes"], c["nunca"], c["pts"], c["tecnicos"]) == (1, 1, 1, 0, 1)
 
 
-def test_central_por_regiao_de_campo_com_a_alternancia_para_gestor(banco, logado):
-    html = logado.get("/t/campo/atencao").get_data(as_text=True)
-    assert ">Por equipe</a>" in html and ">Por região de campo</a>" in html and ">Tabela</a>" in html
-    assert ">Por supervisor</a>" not in html
-    html = logado.get("/t/campo/atencao?modo=regioes").get_data(as_text=True)
-    assert 'aria-current="page">Por região de campo</a>' in html and "<table>" not in html
-    assert "<b>Sudeste 03</b>" in html and "<b>Sul 01</b>" in html
-    assert 'Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
-    assert 'Coordenador: <b class="cn-eq-sup">Coordenador Campo</b>' in html
-    assert re.search(r'Supervisor de Campo: <span class="cn-vaga"[^>]*>vaga</span>', html)       # a Sul 01, vaga
-    assert "1 equipe · base São José do Rio Preto/SP" in html and "<b>2 usinas</b>total" in html
-    assert 'href="?modo=tabela&amp;regiao_campo=Sudeste+03"' in html
-    # a ordem: quem tem mais pendentes primeiro, e no empate o menor % feito (Sul 0%, Sudeste 50%)
-    assert html.index("<b>Sul 01</b>") < html.index("<b>Sudeste 03</b>")
-    # a alternância: por gestor de contrato (Supervisor PM)
-    assert 'aria-current="page">Região de campo (Supervisor de Campo)</a>' in html
-    assert 'href="?modo=gestores">Gestor de contrato (Supervisor PM)</a>' in html
-    gest = logado.get("/t/campo/atencao?modo=gestores").get_data(as_text=True)
-    assert 'aria-current="page">Por região de campo</a>' in gest and "<b>Beltrano Supervisor</b>" in gest
-    assert "Gestor de contrato (Supervisor PM)</span>" in gest and "2 usinas · 1 equipe" in gest
-    assert 'href="?modo=tabela&amp;gestor=Beltrano+Supervisor"' in gest
-    # o endereço antigo (modo=supervisores) cai na visão por região
-    assert "<b>Sudeste 03</b>" in logado.get("/t/campo/atencao?modo=supervisores").get_data(as_text=True)
+def test_a_central_nao_tem_mais_regiao_de_campo_nem_gestor(banco, logado):
+    # Levi, 19/10/2026: "tire essa visão por região, e gestor de contrato. Uma visão só por responsável serve!" Os
+    # endereços de antes abrem Por responsável; os cartões por região e por gestor seguem em HSEQ › APR e PT
+    for modo in ("regioes", "gestores", "supervisores"):
+        html = logado.get(f"/t/campo/atencao?modo={modo}").get_data(as_text=True)
+        assert 'aria-current="page">Por responsável</a>' in html and "<b>Sudeste 03</b>" not in html, modo
+        assert "Gestor de contrato (Supervisor PM)" not in html, modo
     tabela = logado.get("/t/campo/atencao?modo=tabela&regiao_campo=Sudeste+03").get_data(as_text=True)
-    assert "<table>" in tabela and "Altair" in tabela and "Coração 1" not in tabela
-    assert '<option value="Sudeste 03" selected>' in tabela
-
-
-def test_cartao_sem_regiao_e_sem_gestor_e_proprio_e_acha_as_linhas(banco, logado):
-    # uma equipe de fora da estrutura de campo, numa usina sem gestor de contrato
+    assert "Coração 1" in tabela and 'id="cn-regiao-campo"' not in tabela          # o parâmetro de antes não filtra
+def test_linha_sem_regiao_e_sem_gestor_acha_as_linhas_em_rondas(banco, logado):
+    # uma equipe de fora da estrutura de campo, numa usina sem gestor de contrato: a linha conta como "Sem região de
+    # campo" e "Sem gestor de contrato" (`_do_papel`), e o filtro de Rondas acha (a Central saiu dessa régua em 19/10/2026)
     _aba(banco, "cadastro_nexus", "usinas", USINAS + [
         {"usina_id": 6, "nome": "Órfã", "codigo": "THPN-ORF100", "status": "OPERAÇÃO", "equipe_id": 30,
          "data_mobilizacao": _MOB, "uf": "MS", "cidade": "Órfã", "cliente_id": 1, "cluster": "MS Leste"}])
     _aba(banco, "cadastro_nexus", "equipes", EQUIPES + [{"equipe_id": 30, "nome": "MS Leste 01"}])
     visao.limpar()
-    html = logado.get("/t/campo/atencao?modo=regioes").get_data(as_text=True)
-    assert "<b>Sem região de campo</b>" in html and "cn-sup--sem" in html
-    assert "equipes fora da estrutura de campo" in html
-    assert html.index("<b>Sem região de campo</b>") > html.index("<b>Sudeste 03</b>")         # por último
-    assert 'href="?modo=tabela&amp;regiao_campo=Sem+regi%C3%A3o+de+campo"' in html
-    tabela = logado.get("/t/campo/atencao?modo=tabela&regiao_campo=Sem+região+de+campo").get_data(as_text=True)
-    assert "Órfã" in tabela and "Altair" not in tabela
-    assert '<option value="Sem região de campo" selected>' in tabela
-    gest = logado.get("/t/campo/atencao?modo=gestores").get_data(as_text=True)
-    assert "<b>Sem gestor de contrato</b>" in gest and gest.index("<b>Sem gestor de contrato</b>") > gest.index(
-        "<b>Ciclano Chefe</b>")
-    tabela = logado.get("/t/campo/atencao?modo=tabela&gestor=Sem+gestor+de+contrato").get_data(as_text=True)
-    assert "Órfã" in tabela and "Coração 1" not in tabela
-
-
+    html = logado.get("/t/campo/rondas?aba=sem&cob=nunca&regiao_campo=Sem+região+de+campo").get_data(as_text=True)
+    assert "Órfã" in html and "Coração 1" not in html
+    html = logado.get("/t/campo/rondas?aba=sem&cob=nunca&gestor=Sem+gestor+de+contrato").get_data(as_text=True)
+    assert "Órfã" in html and "Coração 1" not in html
 def test_pt_por_regiao_e_por_gestor_na_tela_de_pt_e_na_central_e_a_mesma(banco, logado):
     html = logado.get("/t/hseq/apr-pt?modo=regioes").get_data(as_text=True)
     assert ">Por equipe</a>" in html and 'aria-current="page">Por região de campo</a>' in html and ">Tabela</a>" in html
@@ -104,10 +80,10 @@ def test_pt_por_regiao_e_por_gestor_na_tela_de_pt_e_na_central_e_a_mesma(banco, 
     assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
     assert "1 equipe com PT esperando" in html
     assert 'href="?modo=tabela&amp;regiao_campo=Sudeste+03"' in html
-    # _pt_esperando.html é o mesmo nas duas telas (Levi, 05/10): mudou uma, mudou a outra
-    for modo in ("regioes", "gestores"):
-        assert _cartoes(logado.get(f"/t/hseq/apr-pt?modo={modo}").get_data(as_text=True)) == _cartoes(
-            logado.get(f"/t/campo/atencao?vista=pt&modo={modo}").get_data(as_text=True)), modo
+    # _pt_esperando.html é o mesmo pedaço nas duas telas; desde 19/10/2026 a Central só pede o Por responsável e a tabela
+    # (Levi: "Uma visão só por responsável serve!"), e a tabela é a mesma
+    assert _tabela(logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)) == _tabela(
+        logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True))
     gest = logado.get("/t/hseq/apr-pt?modo=gestores").get_data(as_text=True)
     assert "<b>Beltrano Supervisor</b>" in gest and "Ciclano Chefe</b>" not in gest     # o Ciclano não tem PT
     tabela = logado.get("/t/hseq/apr-pt?modo=tabela&regiao_campo=Sudeste+03").get_data(as_text=True)
@@ -121,16 +97,18 @@ def test_estrutura_nao_publicada_avisa_e_nao_quebra(banco, logado):
     "Sem região de campo" e o filtro de gestor (que já está no banco, pela usina) continua valendo."""
     _aba(banco, "cadastro_nexus", "regioes_campo", [])
     visao.limpar()
-    for url in ("/t/campo/atencao?modo=regioes", "/t/hseq/apr-pt", "/t/campo/rondas", "/t/campo/rondas?aba=painel"):
+    # a Central saiu da régua da região de campo em 19/10/2026 (só por responsável): o aviso não é dela
+    for url in ("/t/hseq/apr-pt", "/t/campo/rondas", "/t/campo/rondas?aba=painel"):
         html = logado.get(url).get_data(as_text=True)
         assert "Estrutura de campo ainda não publicada" in html, url
-    html = logado.get("/t/campo/atencao?modo=regioes").get_data(as_text=True)
+    assert "Estrutura de campo ainda não publicada" not in logado.get("/t/campo/atencao").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?modo=regioes").get_data(as_text=True)
     assert html.count('class="cn-equipe ') == 1 and "<b>Sem região de campo</b>" in html
-    assert "Coração 1" in logado.get("/t/campo/atencao?modo=tabela&gestor=Ciclano+Chefe").get_data(as_text=True)
+    assert "Altair" in logado.get("/t/campo/rondas?gestor=Beltrano+Supervisor").get_data(as_text=True)
     # com a estrutura no banco, o aviso some
     _aba(banco, "cadastro_nexus", "regioes_campo", REGIOES)
     visao.limpar()
-    assert "Estrutura de campo ainda não publicada" not in logado.get("/t/campo/atencao").get_data(as_text=True)
+    assert "Estrutura de campo ainda não publicada" not in logado.get("/t/hseq/apr-pt").get_data(as_text=True)
 
 
 def test_rondas_filtram_por_regiao_de_campo_e_por_gestor_e_o_csv_leva_os_dois(banco, logado):

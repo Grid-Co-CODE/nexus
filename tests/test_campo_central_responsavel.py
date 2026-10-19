@@ -3,6 +3,8 @@ mostrar usinas desse responsável que nunca tiveram ronda, rondas pendentes e fe
 essas três colunas!"). O responsável é o da ficha da USINA (`usinas.responsavel_om_id`), não o gestor de contrato.
 Banco falso do test_campo_visao: a Altair (ronda longa pendente) e a Brodowski 1 (em dia) passam ao responsável 91
 (Ciclano Chefe) e a Coração 1 (nunca teve ronda) ao 90 (Beltrano Supervisor): o contrário dos gestores delas."""
+import re
+
 import pytest
 from test_campo_visao import USINAS, _aba, banco  # noqa: F401  (banco é fixture)
 
@@ -75,9 +77,10 @@ def test_tela_por_responsavel_e_o_kanban_ao_clicar(com_responsavel, logado):
     tab = logado.get("/t/campo/atencao?responsavel=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
     corpo = tab[tab.index("<tbody>"):tab.index("</tbody>")]
     assert "Altair" in corpo and "Coração" not in corpo and "Brodowski" not in corpo
-    # os outros modos tiram o responsável; "Todos" no filtro volta ao padrão
-    assert "Por equipe</a>" in tab and "responsavel=Ciclano" not in tab.split("Por equipe</a>")[0].split('class="cn-seg"')[1]
+    # "Por responsável" volta ao kanban dele (o responsável é filtro, 19/10/2026); "Todos" no filtro volta aos cartões
+    assert "responsavel=Ciclano+Chefe" in _seg(tab).split(">Por responsável</a>")[0]
     assert "cn-kanban" not in logado.get("/t/campo/atencao?responsavel=*").get_data(as_text=True)
+    assert "cn-kanban" not in logado.get("/t/campo/atencao?responsavel=").get_data(as_text=True)
 
 
 def test_usina_sem_responsavel_vai_para_o_cartao_proprio(banco, logado):
@@ -88,3 +91,83 @@ def test_usina_sem_responsavel_vai_para_o_cartao_proprio(banco, logado):
     html = logado.get("/t/campo/atencao", query_string={"responsavel": visao.SEM_RESPONSAVEL}).get_data(as_text=True)
     col = _colunas(html)
     assert "Coração 1" in col["nunca"] and "Altair" in col["pendente"] and "Brodowski 1" in col["feita"]
+
+
+# ── Só por responsável (Levi, 19/10/2026: "tire essa visão por região, e gestor de contrato. Uma visão só por responsável
+# serve! tanto em Rondas pendentes quanto permissão de trabalho ... A tabela mantém"; os filtros "responsável UFV,
+# cliente, Ufv, equipe e o canto para escrever", nas duas abas; e no kanban, "a equipe da usina, pode ser uma ou mais") ──
+def _seg(html) -> str:
+    """O seletor de visões (Por responsável | Tabela)."""
+    ini = html.index('class="cn-seg"')
+    return html[ini:html.index("</div>", ini)]
+
+
+def test_a_central_so_tem_por_responsavel_e_a_tabela(com_responsavel, logado):
+    for vista in ("pendentes", "pt"):
+        html = logado.get(f"/t/campo/atencao?vista={vista}").get_data(as_text=True)
+        seg = _seg(html)
+        assert 'aria-current="page">Por responsável</a>' in seg and ">Tabela</a>" in seg, vista
+        assert "Por equipe" not in seg and "Por região de campo" not in seg and "Gestor de contrato" not in html, vista
+    # os endereços de antes (por equipe, região de campo, gestor, supervisor) abrem por responsável
+    for modo in ("equipes", "regioes", "gestores", "supervisores"):
+        html = logado.get(f"/t/campo/atencao?modo={modo}").get_data(as_text=True)
+        assert 'aria-current="page">Por responsável</a>' in _seg(html) and "<b>Ciclano Chefe</b>" in html, modo
+
+
+def test_pt_por_responsavel_e_o_cartao_leva_a_tabela_dele(com_responsavel, logado):
+    html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
+    cartoes = html[html.index('class="cn-equipes"'):html.index('class="cn-nota"')]
+    # a PT-1 (parada) e a PT-2 são da Altair, do Ciclano Chefe; o Beltrano não tem PT esperando: sem cartão
+    assert "<b>Ciclano Chefe</b>" in cartoes and "Beltrano Supervisor" not in cartoes and "Responsável UFV" in cartoes
+    assert '2</span><span class="d">PT esperando o De acordo' in cartoes and "1 parada há mais de 2 h" in cartoes
+    href = re.search(r'<a class="cn-equipe[^"]*" href="([^"]*)"', cartoes).group(1).replace("&amp;", "&")
+    assert "modo=tabela" in href and "responsavel=Ciclano+Chefe" in href and "vista=pt" in href
+    tabela = logado.get("/t/campo/atencao" + href).get_data(as_text=True)
+    assert tabela.count('class="cn-link cn-os"') == 2
+
+
+def test_os_filtros_da_central_sao_responsavel_ufv_cliente_ufv_equipe_e_a_busca(com_responsavel, logado):
+    for vista in ("pendentes", "pt"):
+        html = logado.get(f"/t/campo/atencao?vista={vista}&modo=tabela").get_data(as_text=True)
+        ini = html.index('class="cn-filtros"')
+        form = html[ini:html.index("</form>", ini)]
+        rotulos = re.findall(r'<label class="cn-filtro-par" for="[^"]+"><span class="gc-rotulo">([^<]+)</span>', form)
+        assert rotulos == ["Responsável UFV", "Cliente", "UFV", "Equipe"], vista
+        assert 'type="search" name="q"' in form, vista
+        for fora in ('id="cn-regiao"', 'id="cn-regiao-campo"', 'id="cn-gestor"', "Responsável O&amp;M", "Região"):
+            assert fora not in form, (vista, fora)
+    # em cascata: escolhido o cliente, a lista de UFV e a de equipe trazem só as dele
+    html = logado.get("/t/campo/atencao?modo=tabela&cliente=Thopen").get_data(as_text=True)
+    ufv = html[html.index('id="cn-usina"'):]
+    ufv = ufv[:ufv.index("</select>")]
+    assert "Altair" in ufv and "Brodowski 1" in ufv and "Coração 1" not in ufv
+    corpo = html[html.index("<tbody>"):html.index("</tbody>")]
+    assert "Altair" in corpo and "Coração" not in corpo
+    # a UFV e a equipe filtram as duas abas
+    corpo = logado.get("/t/campo/atencao?modo=tabela&usina=Cora%C3%A7%C3%A3o+1").get_data(as_text=True)
+    assert "Coração 1" in corpo[corpo.index("<tbody>"):] and "Altair" not in corpo[corpo.index("<tbody>"):]
+    pt = logado.get("/t/campo/atencao?vista=pt&modo=tabela&equipe=SC+Oeste+01").get_data(as_text=True)
+    assert "Nenhuma PT esperando o De acordo com esses filtros" in pt
+    # a região de campo e o gestor saíram: o parâmetro de antes não filtra mais nada
+    html = logado.get("/t/campo/atencao?modo=tabela&regiao_campo=Sul+01&gestor=Ciclano+Chefe").get_data(as_text=True)
+    corpo = html[html.index("<tbody>"):html.index("</tbody>")]
+    assert "Altair" in corpo and "Coração 1" in corpo
+
+
+def test_o_kanban_mostra_a_equipe_da_usina(com_responsavel, logado):
+    html = logado.get("/t/campo/atencao?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    col = _colunas(html)
+    assert "<b>Equipe:</b> SP Norte 01" in col["pendente"] and "<b>Equipe:</b> SP Norte 01" in col["feita"]
+
+
+def test_a_equipe_da_usina_pode_ser_mais_de_uma(com_responsavel, monkeypatch):
+    # a do cadastro e as dos técnicos que a tela Técnicos por usina do PCM põe nela (um técnico da SC Oeste 01 na Altair)
+    from nexus.pcm import atribuicoes as A
+    monkeypatch.setattr(A, "ler", lambda cfg, forcar=False: {"decisoes": [], "erro": "", "lido_em": 0})
+    monkeypatch.setattr(A, "atuais", lambda est, hoje: {(1, 4, "titular"): {"status": "vale"},
+                                                       (2, 1, "titular"): {"status": "agendado"}})
+    eq = visao.equipes_das_usinas([1, 2, 3])
+    assert eq == {1: ["SC Oeste 01", "SP Norte 01"], 2: ["SP Norte 01"], 3: ["SC Oeste 01"]}
+    # sem as atribuições, só a do cadastro
+    monkeypatch.setattr(A, "ler", lambda cfg, forcar=False: (_ for _ in ()).throw(ConnectionError("banco fora")))
+    assert visao.equipes_das_usinas([1]) == {1: ["SP Norte 01"]}
