@@ -9,7 +9,7 @@ saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da ronda e ranking s�
 à Central.
 """
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from flask import Response, abort, current_app, make_response, redirect, render_template, request, session
@@ -415,9 +415,11 @@ def responsaveis():
     lista_geral = campo_resp.lista_geral(usinas, filtro, bloco_ordem) if modo == "geral" else []
     contagem_geral = ({k: len(campo_resp.filtrar_geral(usinas, k)) for k in campo_resp.FILTROS_GERAL}
                       if modo == "geral" else {})
-    # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre as
-    # usinas que passaram pelos filtros, no limite das atrasadas de quem olha (nexus/campo/ranking_equipes.py)
-    ranking = (campo_ranking.cartoes(usinas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {})
+    # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre TODAS
+    # as usinas, no limite das atrasadas de quem olha; os filtros só escolhem os cartões ("O ranking das equipes tem que
+    # permancer mesmo filtrados": filtrado por um responsável, as equipes dele contavam de 1 a 11). Em
+    # nexus/campo/ranking_equipes.py
+    ranking = (campo_ranking.cartoes(todas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {}, usinas)
                if modo == "ranking" else None)
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
@@ -461,6 +463,57 @@ def responsaveis_painel(usina_id, painel):
     if painel not in PAINEIS:
         abort(404)
     return _resp_painel(usina_id, painel)
+
+
+@bp.route("/responsaveis/equipe")
+def responsaveis_equipe():
+    """O motivo da nota da equipe, por cima do Ranking das equipes (Levi, 18/10/2026: "Clicando na equipe deve dar um
+    breve resumo do motivo da pontuação da equipe estar abaixo para que o supervisor possa cobrar a equipe"): os pontos
+    que a nota perde na qualidade (por critério da nota do App e nas rondas) e na cobertura, as notas mais baixas com o
+    que faltou, a média por técnico e as usinas sem ronda (`ranking_equipes.motivos`). A equipe vai pelo nome exato do
+    cadastro; o `responsavel` só leva o filtro da tela ao link da Visão geral."""
+    from werkzeug.exceptions import HTTPException
+    equipe = request.args.get("equipe", "")
+    try:
+        return _resp_equipe_montar(equipe)
+    except HTTPException:
+        raise
+    except Exception as e:      # noqa: BLE001 — a janela diz o erro; o Ranking segue
+        _log_campo.exception("Visão do responsável: o motivo da nota da equipe não montou")
+        return (f'<header class="cr-jan-cab"><div><p class="gc-eyebrow">Motivo da nota</p>'
+                f'<h2>Não consegui montar esta janela</h2></div></header>'
+                f'<div class="cn-erro" role="alert"><b>{escape(type(e).__name__)}: {escape(str(e)[:200])}.</b> Feche e '
+                f'abra de novo; se repetir, mande este texto a quem cuida do Nexus.</div>')
+
+
+def _resp_equipe_montar(equipe: str):
+    leitura = campo_resp.visao_responsaveis()
+    d = leitura.dados or {}
+    todas = d.get("usinas") or []
+    us = [u for u in todas if u.get("equipe") == equipe]
+    if not equipe or equipe == visao.SEM_EQUIPE or not us:
+        abort(404)
+    por = d.get("ranking_por_usina") or {}
+    cl = campo_ranking.classificar(todas, por)
+    n = cl["atual"][equipe]
+    ctx = {"equipe": equipe, "n": n, "posicao": cl["pos"].get(equipe), "total": cl["total"],
+           "antes": {"nota": cl["antes"][equipe]["nota"], "posicao": cl["pos_antes"].get(equipe)},
+           "seta": campo_ranking.seta(cl["pos"].get(equipe), cl["pos_antes"].get(equipe)),
+           "cor": campo_ranking.cor(n["nota"]), "ranking_cor": campo_ranking.cor, "tecnicos": (d.get("tecnicos_por_equipe") or {}).get(equipe, 0),
+           "regiao_campo": next((u["regiao_campo"] for u in us if u.get("regiao_campo")), ""),
+           "sem_regiao": visao.SEM_REGIAO, "info": (d.get("info") or {}).get("ranking") or {}, "dia_curto": _dia_curto,
+           "erro": "", "m": None, "responsavel": request.args.get("responsavel") or TODOS}
+    if "ranking" in (d.get("erros") or {}):
+        ctx["erro"] = "Não consegui ler as notas do App agora: sem elas, o motivo da nota não sai"
+    else:
+        try:
+            det = campo_resp.ranking_detalhe({u["usina_id"] for u in us}, date.fromisoformat(d["hoje"]))
+        except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, o Ranking segue
+            _log_campo.exception("Visão do responsável: a leitura do motivo da nota da equipe falhou")
+            det, ctx["erro"] = None, f"Não consegui ler as notas do App no banco ({type(e).__name__}: {str(e)[:160]})"
+        if det is not None:
+            ctx["m"] = campo_ranking.motivos(n, det, us, por)
+    return render_template("campo/_resp_equipe.html", **ctx)
 
 
 def _observacoes(u: dict, d: dict, aviso: str = "", erro: str = "", texto: str = "") -> dict:

@@ -155,7 +155,7 @@
     <div class="cr-rk-kpi"><span>Equipes</span><b>{{ k.equipes }}</b><small>{{ k.tecnicos }} técnico{{ 's' if k.tecnicos != 1 }}</small></div>
     <div class="cr-rk-kpi"><span>Melhor nota</span><b{% if k.melhor %} class="cn-t-{{ ranking_cor(k.melhor.nota) }}"{% endif %}>{{ k.melhor.nota if k.melhor else '—' }}</b><small>{{ k.melhor.equipe if k.melhor else 'nenhuma equipe com nota' }}</small></div>
     <div class="cr-rk-kpi"><span>Menor nota</span><b{% if k.menor %} class="cn-t-{{ ranking_cor(k.menor.nota) }}"{% endif %}>{{ k.menor.nota if k.menor else '—' }}</b><small>{{ k.menor.equipe if k.menor else 'nenhuma equipe com nota' }}</small></div>
-    <div class="cr-rk-kpi"><span>Amplitude</span><b>{{ '—' if k.amplitude is none else k.amplitude ~ ' pts' }}</b><small>entre a 1ª e a última</small></div>
+    <div class="cr-rk-kpi"><span>Amplitude</span><b>{{ '—' if k.amplitude is none else k.amplitude ~ ' pts' }}</b><small>entre a melhor e a menor nota</small></div>
   </div>
   <p class="cr-rk-regua"><b>A régua do App (Ranking por região):</b> nota = 60% qualidade (a nota média das tarefas e das
     rondas feitas pelo App) + 40% cobertura (usinas da equipe com ronda nos últimos 30 dias). A posição é só essa nota.
@@ -163,7 +163,9 @@
     Visão, na régua de cada tela, e não muda a posição. A cor é a do painel do App (85
     ou mais verde, 70 ou mais âmbar). A seta compara com os 30 dias anteriores. Diferenças contra o painel do App: a
     equipe da usina é a do cadastro do Nexus (no App, a do catálogo e da programação dele), a base da cobertura são as
-    usinas mobilizadas, o dia é o de Brasília e a ronda avulsa do Nexus conta na cobertura.
+    usinas mobilizadas, o dia é o de Brasília e a ronda avulsa do Nexus conta na cobertura. Com filtro, a posição e a
+    nota continuam as do ranking de todas as equipes: o filtro só escolhe os cartões. O clique no cartão abre o motivo
+    da nota.
     {# o período e de onde vieram as notas (revisão de 18/10/2026): o fato de fechamento pode sair na hora quando o banco
        ainda não tem a carga desta versão do livro do App (`visao._fato`) #}
     {% set rk_i = info.get('ranking') or {} %}{% if rk_i.get('atual') %}Período: de {{ dia_curto(rk_i.atual[0]) }} a {{ dia_curto(rk_i.atual[1]) }} (o anterior: de {{ dia_curto(rk_i.anterior[0]) }} a {{ dia_curto(rk_i.anterior[1]) }}).{% endif %}
@@ -174,7 +176,10 @@
   {% set seta_txt = {'sobe': 'sobe ', 'desce': 'desce ', 'igual': 'mesma posição', 'sem': 'sem nota antes'} %}
   <div class="cn-equipes cr-rk">
     {% for c in ranking.cartoes %}
-    <a class="cn-equipe{% if c.cor != 'neutro' %} cn-equipe--{{ c.cor }}{% endif %} cr-rk-cartao" href="{{ url(modo='geral', equipe=c.equipe, responsavel=responsavel or '*', filtro=None, bloco=None) }}">
+    {# o clique abre o motivo da nota por cima (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo
+       da pontuação da equipe estar abaixo para que o supervisor possa cobrar a equipe"); o endereço é o da Visão geral
+       da equipe, para quem abre noutra aba #}
+    <a class="cn-equipe{% if c.cor != 'neutro' %} cn-equipe--{{ c.cor }}{% endif %} cr-rk-cartao" href="{{ url(modo='geral', equipe=c.equipe, responsavel=responsavel or '*', filtro=None, bloco=None) }}"{% if not c.sem_equipe %} data-cr-painel="{{ url_for('torre_campo.responsaveis_equipe', equipe=c.equipe, responsavel=responsavel or '*') }}"{% endif %}>
       <div class="cr-rk-topo">
         <div class="cr-rk-pos">{% if c.posicao %}{{ c.posicao }}º<small> de {{ ranking.total }}</small>
           <span class="cr-rk-seta cr-rk-seta--{{ c.seta.tipo }}">{{ seta_txt[c.seta.tipo] }}{{ c.seta.n if c.seta.tipo in ('sobe', 'desce') }}</span>{% else %}—{% endif %}</div>
@@ -195,7 +200,7 @@
         {% for e in c.etiquetas %}<span class="cr-tag cr-tag--{{ e.cls }}">{{ e.txt }}</span>{% else %}<span class="cr-tag cr-tag--ok">nada a cobrar nos três blocos</span>{% endfor %}
         {% if c.mais %}<span class="cr-tag cr-tag--neutro">e mais {{ c.mais }}</span>{% endif %}
       </div>
-      <span class="cr-rk-ir">Ver as usinas da equipe na Visão geral</span>
+      <span class="cr-rk-ir">{{ 'Ver as usinas na Visão geral' if c.sem_equipe else 'Ver o motivo da nota' }}</span>
     </a>
     {% else %}
     <p class="mudo">Nenhuma equipe com esses filtros.</p>

@@ -141,11 +141,44 @@ def test_cartoes_da_pior_para_a_melhor(tela):  # noqa: F811
                          "menor": {"nota": 93, "equipe": "SP Norte 01"}, "amplitude": 0}
 
 
-def test_a_nota_e_refeita_sobre_as_usinas_do_filtro(tela):  # noqa: F811
+def test_filtrado_o_cartao_da_equipe_e_o_mesmo(tela):  # noqa: F811
+    # Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados". Até aqui a nota era refeita só sobre
+    # as usinas do filtro (só a Brodowski 1: 94); agora o cartão é o da equipe inteira, e o filtro escolhe os cartões
     d = R.visao_responsaveis().dados
-    so_brodowski = [u for u in R.com_manutencao(d["usinas"], 30) if u["usina"] == "Brodowski 1"]
-    c = RE.cartoes(so_brodowski, d["ranking_por_usina"], d["tecnicos_por_equipe"])["cartoes"][0]
-    assert (c["usinas"], c["qualidade"], c["cobertura"], c["nota"]) == (1, 90, 100, 94)
+    todas = R.com_manutencao(d["usinas"], 30)
+    so_brodowski = [u for u in todas if u["usina"] == "Brodowski 1"]
+    r = RE.cartoes(todas, d["ranking_por_usina"], d["tecnicos_por_equipe"], so_brodowski)
+    assert [c["equipe"] for c in r["cartoes"]] == ["SP Norte 01"]
+    c = r["cartoes"][0]
+    assert (c["usinas"], c["qualidade"], c["cobertura"], c["nota"], c["posicao"]) == (2, 88, 100, 93, 1)
+
+
+def test_filtrado_a_posicao_e_a_do_ranking_inteiro(tela):  # noqa: F811
+    # "se eu filtro [um responsável] vai contar de 1 a 11, tem que contar de acordo com o ranking": a posição, o "de N" e
+    # a seta são os de todas as equipes; os números de cima, os dos cartões que aparecem
+    d = R.visao_responsaveis().dados
+    todas = R.com_manutencao(d["usinas"], 30)
+
+    def agg(s, n):
+        return {"q_soma": s, "q_n": n, "n_os": n, "n_ronda": 0, "rondada": True}
+    # SP Norte 01: 540 ÷ 6 = 90 -> 94 (1º; antes 70 -> 82, 2º); SC Oeste 01: 80 -> 88 (2º; antes 100 -> 100, 1º)
+    por = {1: {"atual": agg(450, 5), "anterior": agg(350, 5)}, 2: {"atual": agg(90, 1), "anterior": agg(70, 1)},
+           3: {"atual": agg(80, 1), "anterior": agg(100, 1)}}
+    r = RE.cartoes(todas, por, d["tecnicos_por_equipe"], [u for u in todas if u["usina"] == "Coração 1"])
+    assert [c["equipe"] for c in r["cartoes"]] == ["SC Oeste 01"]
+    sc = r["cartoes"][0]
+    assert (sc["posicao"], r["total"], sc["nota"], sc["antes"]["posicao"]) == (2, 2, 88, 1)
+    assert sc["seta"] == {"tipo": "desce", "n": 1}
+    assert r["kpis"] == {"equipes": 1, "tecnicos": 1, "melhor": {"nota": 88, "equipe": "SC Oeste 01"},
+                         "menor": {"nota": 88, "equipe": "SC Oeste 01"}, "amplitude": 0}
+
+
+def test_sem_equipe_filtrado_conta_so_as_usinas_do_filtro(tela):  # noqa: F811
+    # "Sem equipe" não é equipe do ranking: é a lista do conserto no cadastro, e quem filtra vê só as usinas do filtro
+    d = R.visao_responsaveis().dados
+    us = [dict(u, equipe=visao.SEM_EQUIPE) if u["usina"] != "Altair" else u for u in R.com_manutencao(d["usinas"], 30)]
+    r = RE.cartoes(us, d["ranking_por_usina"], d["tecnicos_por_equipe"], [u for u in us if u["usina"] == "Coração 1"])
+    assert [(c["equipe"], c["usinas"]) for c in r["cartoes"]] == [(visao.SEM_EQUIPE, 1)]
 
 
 def test_sem_equipe_vai_para_o_fim_sem_posicao(tela):  # noqa: F811
@@ -219,3 +252,94 @@ def test_usina_mobilizada_depois_do_periodo_anterior_fica_fora_dele(tela):  # no
            3: {"atual": agg(80, 1), "anterior": agg(100, 1)}}
     r = {c["equipe"]: c for c in RE.cartoes(R.com_manutencao(d["usinas"], 30), por, d["tecnicos_por_equipe"])["cartoes"]}
     assert r["SP Norte 01"]["antes"]["nota"] == 82          # só a Altair: 0,6 × 70 + 0,4 × 100 (antes: 62, com 50%)
+
+
+# ── O motivo da nota (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe
+# estar abaixo para que o supervisor possa cobrar a equipe") ────────────────────────────────────────────────────────
+CRITERIOS = (("Subtarefas obrigatórias", 25), ("Fotos", 20), ("Fotos com descrição", 10), ("Assinatura", 10),
+             ("Observações", 15), ("GPS no fechamento", 20))
+
+
+def _itens(faltas=None):
+    """A "Composição da nota" do App já lida: os seis critérios, cheios menos os de `faltas` = {critério: (pts, det)}."""
+    faltas = faltas or {}
+    return [{"rot": r, "peso": p, "pts": faltas.get(r, (p, ""))[0], "det": faltas.get(r, (p, "ok"))[1]}
+            for r, p in CRITERIOS]
+
+
+def _detalhe():
+    tarefas = [{"dia": "2026-10-17", "usina_id": 3, "os": "801", "tarefa": "Limpeza do inversor", "tecnico": "Técnico Um",
+                "nota": 60, "itens": _itens({"Fotos": (0, "0 fotos (3 dá o total)"), "GPS no fechamento": (0, "sem posição")})},
+               {"dia": "2026-10-16", "usina_id": 3, "os": "802", "tarefa": "Inspeção", "tecnico": "Técnico Dois",
+                "nota": 100, "itens": _itens()}]
+    rondas = [{"dia": "2026-10-17", "usina_id": 3, "os": "501", "tecnico": "Técnico Um", "nota": 50,
+               "falhas": "checklist incompleto; item sem foto de evidência"}]
+    return {"tarefas": tarefas, "rondas": rondas}
+
+
+def test_o_motivo_da_nota_fecha_com_a_nota():
+    us = [{"usina_id": 3, "usina": "Coração 1"}, {"usina_id": 6, "usina": "Nova Era"}]
+    por = {3: {"atual": {"rondada": True}}, 6: {"atual": {"rondada": False}}}
+    # qualidade (60 + 100 + 50) ÷ 3 = 70; cobertura 1 de 2 = 50%; 0,6 × 70 + 0,4 × 50 = 62: perde 38 = 18 + 20
+    n = RE.nota_da_equipe([{"q_soma": 210, "q_n": 3, "n_os": 2, "n_ronda": 1, "rondada": True},
+                           {"q_soma": 0, "q_n": 0, "n_os": 0, "n_ronda": 0, "rondada": False}])
+    m = RE.motivos(n, _detalhe(), us, por)
+    assert (m["perde"], m["qualidade"]["perde"], m["cobertura"]["perde"]) == (38, 18, 20)
+    # a ronda tira 0,6 × 50 ÷ 3 = 10; as fotos e o GPS da tarefa, 0,6 × 20 ÷ 3 = 4 cada (no empate, a ordem do App)
+    assert [(p["rot"], p["perde"]) for p in m["qualidade"]["partes"]] == [("Rondas", 10), ("Fotos", 4),
+                                                                         ("GPS no fechamento", 4)]
+    assert m["qualidade"]["partes"][1]["det"] == "em 1 de 2 tarefas"
+    assert m["qualidade"]["partes"][0]["det"] == ("1 de 1 ronda abaixo de 100; falhas: checklist incompleto (1), item "
+                                                  "sem foto de evidência (1)")
+    assert (m["cobertura"]["com"], m["cobertura"]["usinas"], m["cobertura"]["sem_ronda"]) == (1, 2, ["Nova Era"])
+    # as notas mais baixas, a menor primeiro (a de 100 não perdeu nada), com o que faltou
+    assert [(p["nota"], p["usina"], p["tecnico"]) for p in m["piores"]] == [(50, "Coração 1", "Técnico Um"),
+                                                                            (60, "Coração 1", "Técnico Um")]
+    assert m["piores"][0]["o_que"] == "Ronda · OS 501" and m["piores"][1]["o_que"] == "OS 801 · Limpeza do inversor"
+    assert m["piores"][1]["faltou"] == "Fotos: 0 fotos (3 dá o total); GPS no fechamento: sem posição"
+    assert m["piores"][0]["faltou"] == "checklist incompleto; item sem foto de evidência"
+    # por técnico: a média das notas dele, a menor primeiro
+    assert [(t["nome"], t["media"], t["n"]) for t in m["tecnicos"]] == [("Técnico Um", 55, 2), ("Técnico Dois", 100, 1)]
+
+
+def test_os_pontos_que_a_nota_perde_sempre_fecham():
+    # a parte de cada critério é exata; o inteiro na tela é repartido pelo maior resto, e a soma é a perda da nota
+    for notas in ([67, 93, 88], [99, 98, 97, 61], [55]):
+        tarefas = [{"dia": "2026-10-10", "usina_id": 1, "os": str(i), "tarefa": "", "tecnico": "", "nota": v,
+                    "itens": _itens({"Fotos": (20 - (100 - v) * 0.4, "x"), "GPS no fechamento": (20 - (100 - v) * 0.35, "y"),
+                                     "Observações": (15 - (100 - v) * 0.25, "z")})}
+                   for i, v in enumerate(notas)]
+        n = RE.nota_da_equipe([{"q_soma": sum(notas), "q_n": len(notas), "n_os": len(notas), "n_ronda": 0,
+                                "rondada": True}])
+        m = RE.motivos(n, {"tarefas": tarefas, "rondas": []}, [{"usina_id": 1, "usina": "A"}],
+                       {1: {"atual": {"rondada": True}}})
+        assert sum(p["perde"] for p in m["qualidade"]["partes"]) == m["qualidade"]["perde"], notas
+        assert m["qualidade"]["perde"] + m["cobertura"]["perde"] == m["perde"] == 100 - n["nota"], notas
+
+
+def test_tarefa_sem_a_composicao_da_nota_nao_some_da_conta():
+    tarefas = [{"dia": "2026-10-10", "usina_id": 1, "os": "9", "tarefa": "", "tecnico": "", "nota": 70, "itens": []}]
+    n = RE.nota_da_equipe([{"q_soma": 70, "q_n": 1, "n_os": 1, "n_ronda": 0, "rondada": True}])
+    m = RE.motivos(n, {"tarefas": tarefas, "rondas": []}, [{"usina_id": 1, "usina": "A"}],
+                   {1: {"atual": {"rondada": True}}})
+    assert [(p["rot"], p["perde"]) for p in m["qualidade"]["partes"]] == [("Sem a composição da nota", 18)]
+
+
+def test_equipe_sem_nota_nao_tem_conta_de_pontos():
+    n = RE.nota_da_equipe([{"q_soma": 0, "q_n": 0, "n_os": 0, "n_ronda": 0, "rondada": False}])
+    m = RE.motivos(n, {"tarefas": [], "rondas": []}, [{"usina_id": 1, "usina": "A"}],
+                   {1: {"atual": {"rondada": False}}})
+    assert m["perde"] is None and m["qualidade"]["partes"] == [] and m["cobertura"]["sem_ronda"] == ["A"]
+
+
+def test_tarefas_iguais_da_mesma_os_viram_uma_linha():
+    # medido em 18/10/2026: uma OS com 4 tarefas iguais (a mesma nota e o mesmo que faltou) ocupava 4 das 5 linhas
+    igual = {"dia": "2026-10-15", "usina_id": 1, "os": "14909", "tarefa": "Verificação de tracker", "tecnico": "Técnico Um",
+             "nota": 55, "itens": _itens({"Fotos": (0, "0 fotos (3 dá o total)")})}
+    tarefas = [dict(igual) for _ in range(4)] + [dict(igual, os="16226", nota=48)]
+    n = RE.nota_da_equipe([{"q_soma": 268, "q_n": 5, "n_os": 5, "n_ronda": 0, "rondada": True}])
+    m = RE.motivos(n, {"tarefas": tarefas, "rondas": []}, [{"usina_id": 1, "usina": "A"}],
+                   {1: {"atual": {"rondada": True}}})
+    assert [(p["o_que"], p["nota"], p["vezes"]) for p in m["piores"]] == [
+        ("OS 16226 · Verificação de tracker", 48, 1), ("OS 14909 · Verificação de tracker", 55, 4)]
+    assert m["mais_piores"] == 0

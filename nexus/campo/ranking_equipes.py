@@ -19,6 +19,7 @@ para a composta.
 Puro: recebe as linhas e devolve números; quem lê o banco é `responsaveis.ranking_fonte`.
 Desenho: docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md.
 """
+import collections
 from datetime import date, timedelta
 
 from ..dados import fatos as D
@@ -236,42 +237,67 @@ def etiquetas(s: dict, usinas: list[dict]) -> list[dict]:
     return out
 
 
-def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict) -> dict:
-    """Um cartão por equipe das usinas que passaram pelos filtros da tela (as usinas já com o bloco Manutenção no limite
-    de quem olha, `com_manutencao`: o limite está nos alertas, e daí no semáforo e nas etiquetas): a nota e a posição pela régua do App (refeitas só sobre essas usinas), a posição de antes (a MESMA
-    lista de equipes no período anterior) e a seta, o semáforo dos três blocos (`responsaveis.soma`) e as etiquetas.
+def _grupos(usinas: list[dict]) -> dict:
+    g: dict[str, list] = {}
+    for u in usinas:
+        g.setdefault(u.get("equipe") or visao.SEM_EQUIPE, []).append(u)
+    return g
+
+
+def _nota_do_grupo(us: list[dict], por_usina: dict, per: str) -> dict:
+    """A nota do período `per` sobre as usinas `us`. A usina fora do período (mobilizada depois dele: `anterior` =
+    None) não entra na conta dele."""
+    aggs = []
+    for u in us:
+        p = por_usina.get(u.get("usina_id"))
+        a = _vazio() if p is None else p.get(per)
+        if a is not None:
+            aggs.append(a)
+    return nota_da_equipe(aggs)
+
+
+def classificar(usinas: list[dict], por_usina: dict) -> dict:
+    """A régua sobre TODAS as equipes das usinas dadas (as mobilizadas da Visão, antes de qualquer filtro): a nota de cada
+    equipe nos dois períodos, as posições e quantas têm posição. A "Sem equipe" fica fora (não é equipe: o conserto é no
+    cadastro). Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados, o que está acontecendo agora é
+    que se eu filtro [um responsável] vai contar de 1 a 11": a nota é a da equipe inteira, a posição é a do ranking de
+    todas, e o filtro da tela só escolhe quais cartões aparecem."""
+    grupos = {e: us for e, us in _grupos(usinas).items() if e != visao.SEM_EQUIPE}
+    atual = {e: _nota_do_grupo(us, por_usina, "atual") for e, us in grupos.items()}
+    antes = {e: _nota_do_grupo(us, por_usina, "anterior") for e, us in grupos.items()}
+    pos = posicoes(atual)
+    return {"grupos": grupos, "atual": atual, "antes": antes, "pos": pos, "pos_antes": posicoes(antes),
+            "total": len(pos)}
+
+
+def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict, filtradas: list[dict] | None = None) -> dict:
+    """Um cartão por equipe das usinas que passaram pelos filtros da tela (`filtradas`; sem ela, todas). `usinas` são
+    TODAS as mobilizadas, já com o bloco Manutenção no limite de quem olha (`com_manutencao`: o limite está nos alertas,
+    e daí no semáforo e nas etiquetas). O cartão é o da equipe inteira, com ou sem filtro (`classificar`): a nota e a
+    posição pela régua do App, a posição de antes e a seta, o semáforo dos três blocos (`responsaveis.soma`) e as
+    etiquetas. Só o "Sem equipe" fica com as usinas do filtro: não é equipe, é a lista do conserto no cadastro. Os
+    números de cima (`kpis`) são os dos cartões que aparecem; o "de N" (`total`) é o ranking inteiro.
     A ordem é a de quem cobra: as sem nota primeiro (sem OS nem ronda do App no período: o App as deixa fora, mas é o
     pior caso para quem cobra), depois as ranqueadas da última posição para a 1ª, e a "Sem equipe" no fim, sem posição
     (o conserto é no cadastro)."""
     from .responsaveis import soma
-    grupos: dict[str, list] = {}
-    for u in usinas:
-        grupos.setdefault(u.get("equipe") or visao.SEM_EQUIPE, []).append(u)
-
-    def nota(us, per):
-        # a usina fora do período (mobilizada depois dele: `anterior` = None) não entra na conta dele
-        aggs = []
-        for u in us:
-            p = por_usina.get(u.get("usina_id"))
-            a = _vazio() if p is None else p.get(per)
-            if a is not None:
-                aggs.append(a)
-        return nota_da_equipe(aggs)
-    atual = {e: nota(us, "atual") for e, us in grupos.items()}
-    antes = {e: nota(us, "anterior") for e, us in grupos.items()}
-    reais = [e for e in grupos if e != visao.SEM_EQUIPE]
-    pos = posicoes({e: atual[e] for e in reais})
-    pos_antes = posicoes({e: antes[e] for e in reais})
+    cl = classificar(usinas, por_usina)
+    vistas = usinas if filtradas is None else filtradas
     out = []
-    for e, us in grupos.items():
-        n, s, sem = atual[e], soma(e, us), e == visao.SEM_EQUIPE
+    for e, filtro in _grupos(vistas).items():
+        sem = e == visao.SEM_EQUIPE
+        us = filtro if sem else (cl["grupos"].get(e) or filtro)
+        n = cl["atual"].get(e) or _nota_do_grupo(us, por_usina, "atual")
+        na = cl["antes"].get(e) or _nota_do_grupo(us, por_usina, "anterior")
+        s = soma(e, us)
         etq = etiquetas(s, us)
-        p, pa = pos.get(e), pos_antes.get(e)
+        p, pa = cl["pos"].get(e), cl["pos_antes"].get(e)
         out.append({"equipe": e, "sem_equipe": sem, "usinas": len(us), "tecnicos": tecnicos.get(e, 0),
                     "regiao_campo": next((u["regiao_campo"] for u in us if u.get("regiao_campo")), ""),
                     "base_pequena": len(us) < visao.BASE_PEQUENA, "posicao": p, "nota": n["nota"],
                     "qualidade": n["qualidade"], "cobertura": n["cobertura"], "n_os": n["n_os"], "n_ronda": n["n_ronda"],
-                    "cor": "neutro" if sem else cor(n["nota"]), "antes": {"nota": antes[e]["nota"], "posicao": pa},
+                    "n_notas": n["n_notas"], "cor": "neutro" if sem else cor(n["nota"]),
+                    "antes": {"nota": na["nota"], "posicao": pa},
                     "seta": seta(p, pa), "tri": {q: s[q] for q in ("perf", "acomp", "manut")},
                     "etiquetas": etq[:MAX_ETIQUETAS], "mais": max(0, len(etq) - MAX_ETIQUETAS)})
     out.sort(key=lambda c: (2 if c["sem_equipe"] else (0 if c["posicao"] is None else 1), -(c["posicao"] or 0),
@@ -279,8 +305,132 @@ def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict) -> dict:
     equipes = [c for c in out if not c["sem_equipe"]]
     rk = sorted((c for c in equipes if c["posicao"] is not None), key=lambda c: c["posicao"])
     melhor, menor = (rk[0], rk[-1]) if rk else (None, None)
-    return {"cartoes": out, "total": len(rk),
+    return {"cartoes": out, "total": cl["total"],
             "kpis": {"equipes": len(equipes), "tecnicos": sum(c["tecnicos"] for c in equipes),
                      "melhor": {"nota": melhor["nota"], "equipe": melhor["equipe"]} if melhor else None,
                      "menor": {"nota": menor["nota"], "equipe": menor["equipe"]} if menor else None,
                      "amplitude": melhor["nota"] - menor["nota"] if rk else None}}
+
+
+# ── O motivo da nota (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe
+# estar abaixo para que o supervisor possa cobrar a equipe") ────────────────────────────────────────────────────────
+PARTE_RONDAS = "Rondas"
+PARTE_SEM_COMPOSICAO = "Sem a composição da nota"
+MAX_PIORES, MAX_TECNICOS, MAX_SEM_RONDA = 5, 6, 8
+
+
+def _repartir(total: int, partes: list[float]) -> list[int]:
+    """Inteiros proporcionais a `partes` que somam `total`, pelo maior resto: a janela mostra pontos inteiros, e a soma
+    das partes tem de ser a perda que a frase de cima diz (no empate do resto, a parte que vem antes)."""
+    soma_p = sum(partes)
+    if total <= 0 or soma_p <= 0:
+        return [0] * len(partes)
+    exatos = [total * x / soma_p for x in partes]
+    base = [int(x) for x in exatos]
+    for i in sorted(range(len(partes)), key=lambda i: (-(exatos[i] - base[i]), i))[:total - sum(base)]:
+        base[i] += 1
+    return base
+
+
+def _perdeu(it: dict) -> float:
+    try:
+        return float(it.get("peso") or 0) - float(it.get("pts") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _falhas(texto) -> list[str]:
+    return [f.strip() for f in str(texto or "").split(";") if f.strip()]
+
+
+def motivos(n: dict, det: dict, usinas: list[dict], por_usina: dict) -> dict:
+    """O porquê da nota da equipe, para quem cobra. A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 −
+    qualidade) e a cobertura o resto (as duas já arredondadas, como o App faz a nota). A parte da qualidade vai às rondas,
+    pelos pontos que elas perderam, e a cada critério da nota do App, pelos pontos que as tarefas perderam nele (a
+    "Composição da nota": seis critérios com peso e pontos, que somam a nota; medido em 18/10/2026, fecha em 3.790 de
+    3.790 tarefas), sobre as MESMAS notas da média; o inteiro na tela é repartido pelo maior resto (`_repartir`). Depois,
+    as notas mais baixas (com o que faltou, para cobrar), a média por técnico e as usinas sem ronda.
+    `n` = `nota_da_equipe` do período atual; `det` = `responsaveis.ranking_detalhe` (as tarefas e as rondas com nota);
+    `usinas` = as da equipe; `por_usina` = `responsaveis.ranking_fonte` (quem teve ronda, a avulsa inclusive)."""
+    nome = {u.get("usina_id"): u.get("usina") or "" for u in usinas}
+    sem_ronda = sorted(nm for uid, nm in nome.items()
+                       if not ((por_usina.get(uid) or {}).get("atual") or {}).get("rondada"))
+    cob = {"valor": n.get("cobertura"), "com": len(nome) - len(sem_ronda), "usinas": len(nome),
+           "sem_ronda": sem_ronda[:MAX_SEM_RONDA], "mais_sem_ronda": max(0, len(sem_ronda) - MAX_SEM_RONDA)}
+    tarefas, rondas = det.get("tarefas") or [], det.get("rondas") or []
+    if n.get("nota") is None:
+        return {"perde": None, "qualidade": {"valor": None, "n": 0, "perde": None, "partes": []},
+                "cobertura": {**cob, "perde": None}, "piores": [], "mais_piores": 0, "tecnicos": [], "mais_tecnicos": 0}
+    perde = 100 - n["nota"]
+    perde_q = min(perde, max(0, int(round(visao.PESO_QUALIDADE * (100 - n["qualidade"])))))
+    # as partes da qualidade, em pontos perdidos pelas notas (a proporção é o que importa: `_repartir`)
+    partes = []
+    baixas = [r for r in rondas if r["nota"] < 100]
+    if baixas:
+        cont = collections.Counter(f for r in baixas for f in _falhas(r.get("falhas")))
+        txt = f"{len(baixas)} de {_pl(len(rondas), 'ronda', 'rondas')} abaixo de 100"
+        if cont:
+            txt += "; falhas: " + ", ".join(f"{f} ({k})" for f, k in cont.most_common(3))
+        partes.append({"rot": PARTE_RONDAS, "exato": float(sum(100 - r["nota"] for r in baixas)), "ordem": -1,
+                       "det": txt})
+    crit, sem_comp = {}, []
+    for t in tarefas:
+        itens = t.get("itens") or []
+        if not itens:
+            if t["nota"] < 100:
+                sem_comp.append(t)
+            continue
+        for i, it in enumerate(itens):
+            c = crit.setdefault(str(it.get("rot") or "?"), {"soma": 0.0, "n": 0, "ordem": i})
+            if _perdeu(it) > 0.05:
+                c["soma"] += _perdeu(it)
+                c["n"] += 1
+    for rot, c in crit.items():
+        if c["soma"] > 0:
+            partes.append({"rot": rot, "exato": c["soma"], "ordem": c["ordem"],
+                           "det": f"em {c['n']} de {_pl(len(tarefas), 'tarefa', 'tarefas')}"})
+    if sem_comp:
+        partes.append({"rot": PARTE_SEM_COMPOSICAO, "exato": float(sum(100 - t["nota"] for t in sem_comp)), "ordem": 99,
+                       "det": f"{_pl(len(sem_comp), 'tarefa', 'tarefas')} sem o detalhe da nota no livro do App"})
+    partes.sort(key=lambda x: (-x["exato"], x["ordem"]))
+    for x, v in zip(partes, _repartir(perde_q, [x["exato"] for x in partes])):
+        x["perde"] = v
+    partes = [{k: x[k] for k in ("rot", "perde", "det")} for x in partes if x["perde"] > 0]
+    # as notas mais baixas: a menor primeiro e, na mesma nota, a mais nova
+    regs = [{"nota": t["nota"], "dia": t.get("dia") or "", "usina": nome.get(t.get("usina_id"), ""),
+             "tecnico": t.get("tecnico") or "",
+             "o_que": " · ".join(x for x in (f"OS {t['os']}" if t.get("os") else "", t.get("tarefa") or "") if x)
+             or "Tarefa",
+             "faltou": "; ".join(f"{it.get('rot')}: {it.get('det')}" if it.get("det") else str(it.get("rot"))
+                                 for it in t.get("itens") or () if _perdeu(it) > 0.05)}
+            for t in tarefas if t["nota"] < 100]
+    regs += [{"nota": r["nota"], "dia": r.get("dia") or "", "usina": nome.get(r.get("usina_id"), ""),
+              "tecnico": r.get("tecnico") or "", "o_que": f"Ronda · OS {r['os']}" if r.get("os") else "Ronda sem OS",
+              "faltou": "; ".join(_falhas(r.get("falhas")))} for r in baixas]
+    # as tarefas iguais da mesma OS (a mesma nota, o mesmo dia, o mesmo que faltou) viram uma linha só, com quantas:
+    # medido em 18/10/2026, uma OS de verificação de tracker com 4 tarefas iguais ocupava 4 das 5 linhas
+    juntas: dict[tuple, dict] = {}
+    for x in regs:
+        k = (x["nota"], x["dia"], x["o_que"], x["usina"], x["tecnico"], x["faltou"])
+        if k in juntas:
+            juntas[k]["vezes"] += 1
+        else:
+            juntas[k] = {**x, "vezes": 1, "cor": cor(x["nota"])}
+    regs = sorted(juntas.values(), key=lambda x: x["dia"], reverse=True)
+    regs.sort(key=lambda x: x["nota"])
+    # a média por técnico, sobre as mesmas notas
+    por_tec: dict[str, list] = {}
+    for x in [*tarefas, *rondas]:
+        a = por_tec.setdefault(x.get("tecnico") or "", [0, 0])
+        a[0] += x["nota"]
+        a[1] += 1
+    tecs = [{"nome": k or "sem nome no cadastro do App", "n": q, "media": int(round(s / q))}
+            for k, (s, q) in por_tec.items()]
+    tecs.sort(key=lambda t: (t["media"], -t["n"], t["nome"]))
+    for t in tecs:
+        t["cor"] = cor(t["media"])
+    return {"perde": perde, "qualidade": {"valor": n["qualidade"], "n": n.get("n_notas", 0), "perde": perde_q,
+                                          "partes": partes},
+            "cobertura": {**cob, "perde": perde - perde_q}, "piores": regs[:MAX_PIORES],
+            "mais_piores": sum(x["vezes"] for x in regs[MAX_PIORES:]), "tecnicos": tecs[:MAX_TECNICOS],
+            "mais_tecnicos": max(0, len(tecs) - MAX_TECNICOS)}
