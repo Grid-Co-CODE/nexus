@@ -635,36 +635,20 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 .cr-mini small{font-size:11.5px;font-weight:500}
 .cr-pior{font-size:12px;color:var(--tinta-2)}
 /* os dois blocos (o de Acompanhamento é mais largo: quatro colunas contra três) */
-.cr-blocos{display:grid;grid-template-columns:minmax(0,9fr) minmax(0,11fr);gap:16px;margin-top:16px;align-items:start}
+
 /* empilham abaixo de 1500 px (era 1180 até 18/10/2026): com a coluna Limpeza, lado a lado, o nome da usina no
    Acompanhamento ficava com 74 px a 1366 px e 109 px a 1440 px ("Assis Chateaubriand" invadia a ronda); a 1536 px
    (o 1920 com zoom de 125%), lado a lado, ele tem ~170 px */
-@media (max-width:1500px){.cr-blocos{grid-template-columns:minmax(0,1fr)}}
-.cr-bloco{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden;min-width:0}
-.cr-cab{display:grid;gap:12px;padding:16px 18px 14px;border-bottom:1px solid var(--linha);background:var(--superficie-2)}
-.cr-tit{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.cr-tit i{font-size:18px;color:var(--verde-texto);align-self:center}
-.cr-tit h2{margin:0;font:800 20px/1.2 var(--font-display)}
-.cr-tit p{margin:0;color:var(--mudo);font-size:12.5px}
-.cr-resumo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.cr-resumo > div{min-width:0}
-.cr-resumo .r{display:block;font:700 10px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
-.cr-resumo b{display:block;font:600 22px/28px var(--font-sans);font-variant-numeric:tabular-nums}
-.cr-resumo small{display:block;font-size:11px;line-height:1.3;color:var(--mudo)}
-.cr-cab .cr-tri-leg{margin-top:-4px}
+
 .cr-g{display:grid;align-items:center;gap:10px}
-.cr-bloco--perf .cr-g{grid-template-columns:minmax(0,1fr) 62px 104px 72px 14px}
+
 /* 18/10/2026: a Limpeza entra no Acompanhamento (as colunas apertam um pouco para o nome da usina caber a 1366 px) */
-.cr-bloco--acomp .cr-g{grid-template-columns:minmax(0,1fr) 84px 60px 92px 76px 92px 14px}
+
 /* o 3º bloco, Manutenção (o modelo A do Levi, 18/10/2026): embaixo dos dois, na largura toda */
-.cr-bloco--manut{grid-column:1 / -1}
-.cr-bloco--manut .cr-g{grid-template-columns:minmax(0,1fr) 84px 104px 112px 150px 104px 112px 14px}
+
 /* até 1180 px (os blocos empilham): sem "Vencem" e "Zeladoria" na linha, que ficam no detalhe; com as seis, o nome da
    usina ficava com ~60 px a 1024 px (prova de 18/10/2026) */
-@media (max-width:1180px){
-  .cr-bloco--manut .cr-g{grid-template-columns:minmax(0,1fr) 64px 90px 110px 80px 14px}
-  .cr-bloco--manut .cr-col-vencem,.cr-bloco--manut .cr-col-zeladoria{display:none}
-}
+
 .cr-limite{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:12.5px;color:var(--mudo)}
 .cr-limite input{width:72px}
 .cr-nota-bloco{margin:0;font-size:12px;color:var(--mudo)}
@@ -719,14 +703,7 @@ button.cr-v--neutro{background:transparent}
 .cr-reguas .cr-reguas-bloco{grid-column:1 / -1;font:700 10.5px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;
   color:var(--verde-texto)}
 @media (max-width:700px){
-  .cr-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .cr-bloco--perf .cr-g{grid-template-columns:minmax(0,1fr) 52px 60px 62px 12px}
-  .cr-bloco--acomp .cr-g{grid-template-columns:minmax(0,1fr) 70px 70px 12px}
-  .cr-bloco--acomp .cr-col-limpeza,.cr-bloco--acomp .cr-col-chamados,.cr-bloco--acomp .cr-col-extintores{display:none}
   /* no celular a Manutenção fica com as atrasadas e as paradas; o resto está no detalhe da linha */
-  .cr-bloco--manut .cr-g{grid-template-columns:minmax(0,1fr) 70px 70px 12px}
-  .cr-bloco--manut .cr-col-os,.cr-bloco--manut .cr-col-vencem,.cr-bloco--manut .cr-col-semana,
-  .cr-bloco--manut .cr-col-zeladoria{display:none}
   .cr-v small,.cr-u small{display:none}
   .cr-dl,.cr-reguas{grid-template-columns:minmax(0,1fr)}
   .cr-det{padding-left:16px}
