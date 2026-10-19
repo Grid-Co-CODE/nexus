@@ -1386,3 +1386,12 @@ def test_o_card_da_ronda_por_cima_com_data_quem_fez_e_as_fotos(tela, logado):
     assert re.search(r"<dt>Sujidade</dt><dd[^>]*>4", card) and re.search(r"<dt>Vegetação</dt><dd[^>]*>2", card)
     sem = logado.get("/t/campo/responsaveis/usina/1/ronda?os=999").get_data(as_text=True)
     assert "Não achei esta ronda" in sem and "data-cr-fotos" not in sem
+
+
+def test_o_bloco_sem_sublinhado_ao_passar_o_mouse():
+    """Levi, 18/10/2026: "Tire esse underline dos blocos quando eu passo o mouse, está nos títulos e ícones de cada
+    bloco": o bloco inteiro é o link do nome, e o mouse em qualquer parte dele sublinhava o nome e o ícone. Fica a
+    borda do cartão como sinal de que ele é clicável."""
+    css = _campo_css()
+    assert not re.search(r"\.cr-gr-tit:hover\{[^}]*underline", css)
+    assert re.search(r"\.cr-gr-bloco:not\(\.cr-gr-bloco--sel\):hover\{[^}]*border-color", css)
