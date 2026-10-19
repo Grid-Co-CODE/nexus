@@ -67,12 +67,17 @@ Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking p
   bronze (`--ouro`, `--prata`, `--bronze`); a página segue 1º, 2º e 3º para quem lê a tela.
 - **As OS que não pontuaram cheio (18/10/2026)** (Levi: "Quando tiver OSs devolvidas ou anuladas quero que dê para
   clicar na linha e mostre qual foi a OS e o motivo!"): a linha da pessoa com devolvida, abaixo do piso ou anulada abre a
-  lista do mês, com a OS, a tarefa, a situação, a nota, os pontos, o motivo e quando foi registrada. Quem lista é o
-  **App**, no livro `ranking_tarefas_app_campo · Tarefas` (fato `ranking_tarefas` no catálogo, registrado antes da 1ª
-  publicação): pelo banco não fecha (a sessão do App, 18/10/2026: o extrato do App não vai ao banco e a anulação depende
-  da ordem por pontos; em outubro, 17 devolvidas nos fechamentos contra 43 no placar). O motivo é o do App: o texto da
-  devolução pelo painel (a feita direto no Fracttal vem "sem motivo no App"), o porquê da nota, ou "anulada por N
-  tarefa(s) abaixo do piso no mês". Sem o livro, a linha diz que a lista ainda não chegou do App. A regra do "fora do
+  lista do mês, com a OS, a tarefa, a situação, a nota, os pontos, o motivo e quando foi registrada. Abre na
+  classificação **e no "Fora do ciclo"** (19/10/2026: no 1º livro, 12 dos 17 técnicos de outubro com lista estavam fora,
+  e a linha deles não abria). A OS vai em verde e abre o card do OS Creator pelo número (`NexusOsCard.abrirFolio`; Levi,
+  18/10/2026: "ao citar uma OS tem que ficar verde grid e deve ser possível clicar e ver o card da OS"). Quem lista é o
+  **App**, no livro `ranking_tarefas_app_campo · Tarefas` (fato `ranking_tarefas` no catálogo; no banco desde a v287,
+  19/10/2026, e o número de linhas por situação bate com as colunas do placar): pelo banco não fecha (a sessão do App,
+  18/10/2026: o extrato do App não vai ao banco e a anulação depende da ordem por pontos; em outubro, 17 devolvidas nos
+  fechamentos contra 43 no placar). O motivo é o do App: o texto da devolução pelo painel (a feita direto no Fracttal,
+  quase todas hoje, vem "Devolvida no Fracttal: o motivo não passou pelo App."), o porquê da nota, ou "anulada por N
+  tarefa(s) abaixo do piso no mês"; o "Registrado em" chega em UTC e a tela mostra em Brasília. Sem o livro, a linha diz
+  que a lista ainda não chegou do App. A regra do "fora do
   ciclo" no mouse é a que a sessão do App confirmou: menos tarefas registradas que o mínimo (contam todas, inclusive as
   devolvidas e as de 0 ponto; ronda não), ou, tendo o mínimo, cumprimento abaixo do mínimo (só os dias já vencidos; sem
   nada programado, 0%). Régua em `sombra` no App = aviso de que o técnico ainda vê a pontuação de antes.

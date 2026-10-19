@@ -47,6 +47,25 @@
        ~ ((g.get('min_cumprimento') ~ '%') if g.get('min_cumprimento') is not none else 'o mínimo')
        ~ ' do programado cumprido (concluídas ÷ programadas, só os dias já vencidos; sem nada programado, conta 0%). Os pontos aparecem só para conferir.' %}
   {% macro fora_do_ciclo() %}<span class="rk-dica" tabindex="0" title="{{ dica_fora }}">Fora do ciclo</span>{% endmacro %}
+  {# a linha aberta: as OS que não pontuaram cheio, como o App listou (devolvida, abaixo do piso, anulada); serve à
+     classificação e ao fora do ciclo (no livro de 19/10/2026, 12 dos 17 técnicos de outubro com lista estavam fora).
+     A OS vai em verde e abre o card do OS Creator (Levi, 18/10/2026: "ao citar uma OS tem que ficar verde grid") #}
+  {% macro lista_do_app(p, colunas) %}
+      <tr class="cn-detalhe" hidden><td colspan="{{ colunas }}">
+        {% set ts = tarefas_de(p) %}
+        {% if ts %}
+        <table class="rk-tarefas"><thead><tr><th>OS</th><th>Tarefa</th><th>Situação</th><th>Nota</th><th title="Os pontos que a tarefa tinha antes da devolução ou da anulação">Pontos</th><th>Motivo</th><th>Registrada</th></tr></thead>
+          <tbody>{% for t in ts %}<tr><td class="m">{% if t.os %}<button type="button" class="cn-link cr-link-botao rk-os" data-folio="{{ t.os }}" title="Abrir o card da OS">{{ t.os }}</button>{% else %}—{% endif %}</td><td class="rk-motivo">{{ t.tarefa or '—' }}</td>
+            <td><span class="cn-selo cn-selo--{{ {'devolvida': 'critico', 'abaixo do piso': 'alerta'}.get(t.situacao, 'neutro') }}">{{ t.situacao or '—' }}</span></td>
+            <td>{{ t.nota if t.nota is not none else '—' }}</td><td>{{ t.pontos if t.pontos is not none else '—' }}</td>
+            <td class="rk-motivo">{{ t.motivo or '—' }}</td><td>{{ hora_do_app(t.registrado_em) or '—' }}</td></tr>{% endfor %}</tbody></table>
+        {% elif not tarefas_publicado %}
+        <p class="mudo">A lista das OS ainda não chegou do App: ele vai publicar, de hora em hora, cada tarefa devolvida, abaixo do piso ou anulada, com o motivo.</p>
+        {% else %}
+        <p class="mudo">O App não listou tarefas desta pessoa em {{ mes_txt }}.</p>
+        {% endif %}
+      </td></tr>
+  {% endmacro %}
   {% set podio = classificacao[:3] %}
   {% if podio %}
   {# o pódio das olimpíadas: o 1º no meio e no degrau mais alto, o 2º à esquerda, o 3º à direita (a ordem da página
@@ -93,23 +112,7 @@
         <td>{{ pct(p.pontualidade) }}</td>
         <td>{{ p.sequencia }} dia{{ 's' if p.sequencia != 1 }}</td>
         <td>{{ p.devolvidas }} · {{ p.anuladas }}{% if abre %} <i class="ph ph-caret-down rk-seta" aria-hidden="true"></i>{% endif %}</td></tr>
-      {% if abre %}
-      {# a linha aberta: as OS que não pontuaram cheio, como o App listou (devolvida, abaixo do piso, anulada) #}
-      <tr class="cn-detalhe" hidden><td colspan="11">
-        {% set ts = tarefas_de(p) %}
-        {% if ts %}
-        <table class="rk-tarefas"><thead><tr><th>OS</th><th>Tarefa</th><th>Situação</th><th>Nota</th><th title="Os pontos que a tarefa tinha antes da devolução ou da anulação">Pontos</th><th>Motivo</th><th>Registrada</th></tr></thead>
-          <tbody>{% for t in ts %}<tr><td class="m"><b>{{ t.os or '—' }}</b></td><td class="rk-motivo">{{ t.tarefa or '—' }}</td>
-            <td><span class="cn-selo cn-selo--{{ {'devolvida': 'critico', 'abaixo do piso': 'alerta'}.get(t.situacao, 'neutro') }}">{{ t.situacao or '—' }}</span></td>
-            <td>{{ t.nota if t.nota is not none else '—' }}</td><td>{{ t.pontos if t.pontos is not none else '—' }}</td>
-            <td class="rk-motivo">{{ t.motivo or '—' }}</td><td>{{ hora_do_app(t.registrado_em) or '—' }}</td></tr>{% endfor %}</tbody></table>
-        {% elif not tarefas_publicado %}
-        <p class="mudo">A lista das OS ainda não chegou do App: ele vai publicar, de hora em hora, cada tarefa devolvida, abaixo do piso ou anulada, com o motivo.</p>
-        {% else %}
-        <p class="mudo">O App não listou tarefas desta pessoa em {{ mes_txt }}.</p>
-        {% endif %}
-      </td></tr>
-      {% endif %}
+      {% if abre %}{{ lista_do_app(p, 11) }}{% endif %}
     {% else %}
       <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}em {{ mes_txt }} ainda.</td></tr>
     {% endfor %}
@@ -120,9 +123,11 @@
   <div class="cn-tab"><table>
     <thead><tr><th>Técnico</th><th>Pontos</th><th>Tarefas</th><th>Cumprimento</th><th>Por que está fora</th></tr></thead>
     <tbody>
-    {% for p in fora %}
-      <tr><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td><td>{{ pts(p.total) }}</td><td>{{ p.tarefas }}</td>
-        <td>{{ pct(p.cumprimento) }}</td><td class="rk-motivo">{{ p.motivo or '—' }}</td></tr>
+    {% for p in fora %}{% set abre = p.devolvidas or p.anuladas or p.abaixo_do_piso %}
+      {% if abre %}<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false" title="Ver as OS devolvidas, abaixo do piso e anuladas, com o motivo">{% else %}<tr>{% endif %}
+        <td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td><td>{{ pts(p.total) }}</td><td>{{ p.tarefas }}</td>
+        <td>{{ pct(p.cumprimento) }}</td><td class="rk-motivo">{{ p.motivo or '—' }}{% if abre %} <i class="ph ph-caret-down rk-seta" aria-hidden="true"></i>{% endif %}</td></tr>
+      {% if abre %}{{ lista_do_app(p, 5) }}{% endif %}
     {% endfor %}
     </tbody></table></div>
   {% endif %}
@@ -147,7 +152,16 @@
     inteiro, mesmo com uma região escolhida.</div>
   {% endif %}
 </div>
+{% include "oscreator/card_os_abrir.html" %}
 <script>
+  // a OS da lista abre o card dela por cima, sem sair do Ranking, pelo número (o livro do App não traz o id do
+  // Fracttal; o clone acha o id), como na Visão do responsável
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('.rk-os');
+    if (!b || !window.NexusOsCard) { return; }
+    ev.preventDefault(); ev.stopPropagation();
+    NexusOsCard.abrirFolio(b.getAttribute('data-folio'), {status: ''});
+  });
   // a linha com devolvida, abaixo do piso ou anulada abre a lista do App (Levi, 18/10/2026)
   document.querySelectorAll('tr.rk-linha').forEach(function (tr) {
     function alterna() {

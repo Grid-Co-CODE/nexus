@@ -237,6 +237,32 @@ def test_sem_a_lista_do_app_a_linha_diz_que_ainda_nao_chegou(ranking, logado):
     assert "A lista das OS ainda não chegou do App" in _detalhe(html, "Bruno Lima")
 
 
+def test_quem_esta_fora_do_ciclo_tambem_abre_as_os_com_o_motivo(ranking, logado):
+    """No livro real de 19/10/2026, 12 dos 17 técnicos de outubro com tarefa listada pelo App estavam fora do ciclo, e a
+    linha deles não abria: a devolvida e a anulada de quem mais precisa de cobrança sumiam da tela."""
+    _aba(ranking, "ranking_tarefas_app_campo", "Tarefas", [
+        _tarefa("eva@exemplo.test", "16101", "devolvida", 48, "Devolvida no Fracttal: o motivo não passou pelo App.")])
+    visao.limpar()
+    fora = logado.get("/t/campo/ranking").get_data(as_text=True).split("Fora do ciclo</span></h2>", 1)[1]
+    assert re.search(r'<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false"[^>]*>\s*<td class="rk-tec">Eva Prado', fora)
+    eva = _detalhe(fora, "Eva Prado")
+    assert "16101" in eva and "Devolvida no Fracttal: o motivo não passou pelo App." in eva and "10/10 14:00" in eva
+    assert '<td colspan="5">' in eva                                   # a tabela do fora do ciclo tem 5 colunas
+
+
+def test_a_os_da_lista_fica_verde_e_abre_o_card_do_os_creator(ranking, logado):
+    """Levi, 18/10/2026 (no Ranking das equipes, e vale para a OS citada aqui também): "ao citar uma OS tem que ficar
+    verde grid e deve ser possível clicar e ver o card da OS que nem quando clicamos em uma OS no OS Creator Web"."""
+    _aba(ranking, "ranking_tarefas_app_campo", "Tarefas", [
+        _tarefa("bruno@exemplo.test", "16001", "devolvida", 55, "Faltou a foto do antes")])
+    visao.limpar()
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    assert re.search(r'<button type="button" class="cn-link cr-link-botao rk-os" data-folio="16001" '
+                     r'title="Abrir o card da OS">16001</button>', _detalhe(html, "Bruno Lima"))
+    # o card do OS Creator vem na página, e o clique abre pelo número da OS (o livro do App não traz o id do Fracttal)
+    assert "window.NexusOsCard" in html and "NexusOsCard.abrirFolio(" in html
+
+
 def test_a_lista_do_app_esta_no_catalogo_de_dados():
     f = next(x for x in catalogo.FATOS if x.id == "ranking_tarefas")
     assert f.livro == "ranking_tarefas_app_campo · Tarefas" and f.area == "campo" and f.tipo == "snapshot_acumulado"
