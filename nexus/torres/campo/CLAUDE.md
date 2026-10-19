@@ -854,6 +854,8 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
 - **Em cima, os três blocos** na ordem Performance, Manutenção e Acompanhamento (`BLOCOS_GERAL`), com os MESMOS números
   do resumo (`soma`) e a triagem de cada um; o campo do limite das atrasadas e a nota de onde vem a semana e as OS ficam
   no bloco Manutenção.
+- **O filtro de Cliente** lista só os clientes das usinas do responsável escolhido (Levi, 18/10/2026: "O filtro de
+  cliente deve filtrar de acordo com o responsável"); o cliente que não é dele deixa de valer, e a tela não esvazia.
 - **Embaixo, uma lista só** com as usinas do filtro da tela (responsável, cliente, busca, equipe), com as colunas na
   ordem do Levi: Meta, PR / prev. e Disp.; OS abertas, Atrasadas, Pausadas e Semana passada; Ronda, Limpeza, PT, Chamados
   e Extintores. As células são os `valores` de cada bloco, com a mesma cor; o valor da Performance abre o dia a dia; a

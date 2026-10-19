@@ -1424,3 +1424,17 @@ def test_o_bloco_sem_sublinhado_ao_passar_o_mouse():
     css = _campo_css()
     assert not re.search(r"\.cr-gr-tit:hover\{[^}]*underline", css)
     assert re.search(r"\.cr-gr-bloco:not\(\.cr-gr-bloco--sel\):hover\{[^}]*border-color", css)
+
+
+def test_o_cliente_e_o_das_usinas_do_responsavel(tela, logado):
+    """Levi, 18/10/2026: "O filtro de cliente deve filtrar de acordo com o responsável": o Cliente lista só os clientes
+    das usinas do responsável escolhido; o cliente que não é dele deixa de valer (a tela não esvazia)."""
+    def clientes(html):
+        sel = html.split('id="cr-cliente"', 1)[1].split("</select>", 1)[0]
+        return re.findall(r'<option value="([^"]*)"', sel)
+    url = "/t/campo/responsaveis?modo=geral&responsavel="
+    assert clientes(logado.get(url + "Beltrano+Supervisor").get_data(as_text=True)) == ["", "Outro Cliente"]
+    assert clientes(logado.get(url + "Ciclano+Chefe").get_data(as_text=True)) == ["", "Thopen"]
+    assert clientes(logado.get(url + "*").get_data(as_text=True)) == ["", "Outro Cliente", "Thopen"]
+    html = logado.get(url + "Beltrano+Supervisor&cliente=Thopen").get_data(as_text=True)
+    assert "<b>Coração 1" in html and '<option value="Thopen" selected>' not in html
