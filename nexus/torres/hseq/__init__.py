@@ -1,10 +1,11 @@
 """Torre Segurança · HSEQ: Extintores, EPI e EPC, Riscos da semana, APR e PT, DSS e incidentes.
 
-Extintores (09/10/2026) é visão nossa (`nexus/hseq/extintores.py`), pelo livro que o App de Campo grava no banco. Os
-filtros e os cartões da estrutura de O&M de 10/2026 (a região de campo com o Supervisor de Campo, o gestor de contrato)
-são os MESMOS da torre Campo · App (`_regiao_campo`, `_gestor`, `_do_papel`, `_papeis` e os pedaços de template
-`campo/_filtros_papeis.html`, `campo/_cartoes_papeis.html`, `campo/_aviso_estrutura.html`): quem entra pelo Fracttal já
-vem filtrado, como lá. Uma regra só: mudou lá, muda aqui.
+Extintores (09/10/2026) é visão nossa (`nexus/hseq/extintores.py`), pelo livro que o App de Campo grava no banco, com
+os filtros próprios desde 18/10/2026 (cliente, usina, responsável UFV, equipe e a busca, em cascata; `FILTROS_EXT`).
+No EPI, os filtros e os cartões da estrutura de O&M de 10/2026 (a região de campo com o Supervisor de Campo, o gestor de
+contrato) são os MESMOS da torre Campo · App (`_regiao_campo`, `_gestor`, `_do_papel`, `_papeis` e os pedaços de
+template `campo/_filtros_papeis.html`, `campo/_cartoes_papeis.html`, `campo/_aviso_estrutura.html`): quem entra pelo
+Fracttal já vem filtrado, como lá. Uma regra só: mudou lá, muda aqui.
 
 As outras telas ainda caem no placeholder da casca (view com a mesma rota vence a genérica). Leia o CLAUDE.md desta
 pasta antes de mexer.
@@ -31,7 +32,8 @@ TORRE = Torre(
     descricao="Extintores, EPI e EPC, riscos da semana, APR e PT, DSS e incidentes.",
     telas=[
         Tela("extintores", "Extintores",
-             "Que extintor está vencido, perto de vencer ou sem conferência há mais de 30 dias, e de qual supervisor?",
+             "Que extintor está vencido, perto de vencer ou sem conferência há mais de 30 dias, em que cliente e usina, "
+             "e com qual responsável?",
              "Ronda de extintores do App de Campo (livro extintores_app_campo) + cadastro do Nexus"),
         Tela("epi", "EPI e EPC",
              "Que usina está sem as luvas isolantes, segundo a última ronda diária?",
@@ -58,8 +60,13 @@ bp = TORRE.criar_blueprint(__name__)
 # onde a busca procura: o nome do cadastro e o que o App escreveu, o código, o local, o ativo, a cidade e a equipe
 BUSCA = ("usina", "usina_fonte", "codigo", "local", "ativo", "classe", "cidade", "equipe")
 LIMITE_LINHAS = 300
-# os filtros da tela que o PDF e o "Baixar" de cada linha repetem
-FILTROS_URL = ("regiao", "regiao_campo", "gestor", "cliente", "q", "f")
+# Os filtros de Extintores (Levi, 18/10/2026: "De filtros quero apenas cliente, usina, responsável UFV, equipe e o campo
+# para digitar!"), na ordem da tela, com o rótulo. Saíram a região do Brasil, a região de campo e o gestor de contrato, e
+# com eles o filtro que já vinha marcado pelo login (o Supervisor de Campo abria na região dele): ninguém abre filtrado.
+# O "Responsável UFV" é o Responsável O&M da ficha da usina (o setor "Responsáveis UFV" de Base → Acessos).
+FILTROS_EXT = (("cliente", "Cliente"), ("usina", "Usina"), ("responsavel", "Responsável UFV"), ("equipe", "Equipe"))
+# os filtros da tela que o "Baixar" de cada usina repete (a usina vai no próprio link)
+FILTROS_URL = ("cliente", "responsavel", "equipe", "q", "f")
 
 
 def _clientes(linhas) -> list[str]:
@@ -68,53 +75,63 @@ def _clientes(linhas) -> list[str]:
     return sorted({x.get("cliente") for x in linhas if x.get("cliente")})
 
 
+def _opcoes_ext(linhas, escolhidos: dict, passa) -> dict:
+    """{filtro: [valores]}: cada lista mostra o que existe com os OUTROS filtros aplicados (em cascata, como a tela
+    Técnicos por usina do PCM: escolhido o cliente, a lista de usinas traz só as dele), e a opção escolhida fica mesmo
+    sem resultado. Os "Sem ..." vão por último."""
+    out = {}
+    for campo, _rot in FILTROS_EXT:
+        vals = {EXT.valor_do_filtro(x, campo) for x in linhas if passa(x, campo)}
+        if escolhidos[campo]:
+            vals.add(escolhidos[campo])
+        out[campo] = sorted(vals, key=lambda v: (v == EXT.SEM_VALOR.get(campo), v.lower()))
+    return out
+
+
 def _filtrados():
-    """A leitura e os extintores com os filtros da tela (região do Brasil, cliente, região de campo, gestor e busca): a
-    tela, o relatório em PDF e o "Baixar" de cada linha contam o mesmo. Os não reconhecidos em campo (14/10/2026) vêm à
-    parte, com os mesmos filtros: estão fora de todas as contas (`extintores.nao_reconhecido`)."""
+    """A leitura e os extintores com os filtros da tela (cliente, usina, responsável UFV, equipe e busca): a tela e o
+    "Baixar" de cada usina contam o mesmo. Os não reconhecidos em campo (14/10/2026) vêm à parte, com os mesmos
+    filtros: estão fora de todas as contas (`extintores.nao_reconhecido`)."""
     leitura = EXT.extintores()
     d = leitura.dados
-    regiao, cliente = request.args.get("regiao", ""), request.args.get("cliente", "")
-    regiao_campo, gestor = _regiao_campo(), _gestor()
+    fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_EXT}
     q = request.args.get("q", "").strip().lower()
 
-    def passa(x):
-        return ((not regiao or x.get("regiao_br") == regiao) and (not cliente or x.get("cliente") == cliente)
-                and _do_papel(x, regiao_campo, gestor)
+    def passa(x, menos=None):
+        return (all(not v or c == menos or EXT.valor_do_filtro(x, c) == v for c, v in fl.items())
                 and (not q or q in " ".join(str(x.get(c) or "") for c in BUSCA).lower()))
     todas = d.get("extintores") or []
     base = [x for x in todas if passa(x)]
     nao_rec = [x for x in d.get("nao_reconhecidos") or [] if passa(x)]
-    return leitura, d, todas, base, nao_rec, {"regiao": regiao, "cliente": cliente, "regiao_campo": regiao_campo,
-                                              "gestor": gestor}
+    opcoes = _opcoes_ext(todas + (d.get("nao_reconhecidos") or []), fl, passa)
+    return leitura, d, todas, base, nao_rec, dict(fl, opcoes=opcoes)
 
 
 @bp.route("/extintores")
 def extintores():
-    """Duas visões (Levi, 09/10/2026: "Preciso da visão por supervisor"): cartões por supervisor (a região de campo,
-    com a alternância para o gestor de contrato, como na Central de atenção) e a tabela, que abre por usina e dia da
-    última conferência (Levi, 09/10: "queria agrupado por usina e dia!"; a linha da usina abre os extintores dela, com a
-    foto de cada um quando o App a enviou, e tem o PDF dela em "Baixar") e tem ao lado a visão por extintor. A faixa de
-    números filtra a tabela pelas situações do pedido: atrasado, perto de vencer, sem atualização há mais de 30 dias (e
-    sem validade). Os filtros da região do Brasil, do cliente, da região de campo, do gestor e a busca valem em tudo.
-    Os não reconhecidos em campo (14/10/2026) ganham a caixa deles logo abaixo da faixa, para a TST."""
+    """A tabela, que abre por cliente (Levi, 18/10/2026: "Quero agrupado por Cliente, abrindo o cliente terá as usinas
+    desse cliente"; a usina, uma linha só, com o responsável, os técnicos e o PDF dela em "Baixar", abre os extintores,
+    com a foto de cada um quando o App a enviou) e tem ao lado a visão por extintor; e os cartões por Responsável O&M
+    (o "Responsável UFV"), no lugar dos de região de campo e gestor. A faixa de números filtra a tabela pelas situações
+    do pedido de 09/10: atrasado, perto de vencer, sem atualização há mais de 30 dias (e sem validade). Os não
+    reconhecidos em campo (14/10/2026) ganham a caixa deles logo abaixo da faixa, para a TST; a linha leva à tabela
+    filtrada naquela usina. Os filtros (cliente, usina, responsável UFV, equipe e a busca) ficam logo acima da tabela e
+    valem em tudo."""
     leitura, d, todas, base, nao_rec, fl = _filtrados()
     f = request.args.get("f") if request.args.get("f") in EXT.FILTROS else ""
-    pedido = request.args.get("modo")
-    modo = "tabela" if pedido == "tabela" or f else ("gestores" if pedido == "gestores" else "regioes")
-    ver = "extintor" if request.args.get("ver") == "extintor" else "usina"
+    modo = "responsaveis" if request.args.get("modo") == "responsaveis" and not f else "tabela"
+    ver = "extintor" if request.args.get("ver") == "extintor" else "cliente"
     lista = EXT.ordenar([x for x in base if not f or x[f]], f)
     return render_template(
         "hseq/extintores.html", torre=TORRE, tela=TORRE.tela("extintores"), leitura=leitura, d=d, lido=_lido(leitura),
-        url=_url, f=f, modo=modo, ver=ver, regiao=fl["regiao"], regioes=visao.REGIOES, cliente=fl["cliente"],
-        clientes=_clientes(todas), q=request.args.get("q", ""), contagem=EXT.contar(base), lista=lista,
-        limite=LIMITE_LINHAS, grupos=EXT.por_usina_dia(lista) if modo == "tabela" and ver == "usina" else [],
-        cartoes_reg=EXT.por_regiao(base, d.get("regioes") or [], d.get("times") or {}),
-        cartoes_gest=EXT.por_gestor(base, d.get("times") or {}), situacoes=EXT.SITUACOES,
+        url=_url, f=f, modo=modo, ver=ver, fl=fl, filtros_ext=FILTROS_EXT, q=request.args.get("q", ""),
+        contagem=EXT.contar(base), lista=lista, limite=LIMITE_LINHAS,
+        grupos=EXT.por_cliente(lista) if modo == "tabela" and ver == "cliente" else [],
+        cartoes=EXT.por_responsavel(base, d.get("times") or {}) if modo == "responsaveis" else [],
+        sem_responsavel=visao.SEM_RESPONSAVEL, situacoes=EXT.SITUACOES,
         status_tst=EXT.STATUS_TST, tempo=EXT.tempo, alerta_dias=EXT.ALERTA_DIAS,
         sem_atualizacao_dias=EXT.SEM_ATUALIZACAO_DIAS, fotos=FOT.disponiveis(current_app.config),
-        filtros_url={k: request.args.get(k) for k in FILTROS_URL if request.args.get(k)}, nao_rec=nao_rec,
-        **_papeis(d, todas, fl["regiao_campo"], fl["gestor"]))
+        filtros_url={k: request.args.get(k) for k in FILTROS_URL if request.args.get(k)}, nao_rec=nao_rec)
 
 
 def _slug(s) -> str:
@@ -126,10 +143,12 @@ def _slug(s) -> str:
 def extintores_relatorio():
     """O relatório em PDF (Levi, 09/10/2026, com as observações da TST): agrupado por usina e dia, com os filtros da
     tela, o filtro do status da TST (todos, críticos, atenção, OK) e as fotos ao lado de cada extintor (o padrão;
-    `fotos=0` tira). O "Baixar" de cada linha da tabela (como o PDF da tabela de PT) pede só aquela usina e aquele dia
-    (`usina`, `dia`, `baixar=1`; o filtro da faixa, `f`, vem junto). Sem o livro do App, volta para a tela. Os não
-    reconhecidos em campo vão numa seção à parte, só no relatório de todos e sem o filtro da faixa (não têm status da
-    TST); no "Baixar", os daquela usina marcados naquele dia."""
+    `fotos=0` tira). Desde 18/10/2026 a tela só pede o relatório UNITÁRIO (Levi: "O relatório quero a opção de ser
+    unitário (...), pode tirar esse RELATÓRIO EM PDF que tira em massa!"): o "Baixar" de cada usina (`usina`,
+    `baixar=1`; os filtros da tela e o da faixa, `f`, vêm junto) traz a usina inteira, todos os dias; o `dia` ainda
+    filtra, para quem tinha o link de antes. Sem o livro do App, volta para a tela. Os não reconhecidos em campo vão numa
+    seção à parte, só no relatório de todos e sem o filtro da faixa (não têm status da TST); no "Baixar", os daquela
+    usina (e daquele dia, com o `dia`)."""
     leitura, d, todas, base, nao_rec, fl = _filtrados()
     if leitura.erro or not d.get("aba_existe") or d.get("colunas_faltando"):
         return redirect(na_raiz("/t/hseq/extintores"))
@@ -142,9 +161,9 @@ def extintores_relatorio():
     rotulo_f = (EXT.SITUACOES[f][0] if f in EXT.SITUACOES else "Sem atualização") if f else ""
     dia_txt = "nunca conferido" if dia == "nunca" else (f"{dia[8:10]}/{dia[5:7]}/{dia[:4]}" if dia else "")
     filtros_tela = [f"{rot}: {v}" for rot, v in (
-        ("Usina", usina), ("Dia da conferência", dia_txt), ("Região do Brasil", fl["regiao"]),
-        ("Cliente", fl["cliente"]), ("Região de campo", fl["regiao_campo"]), ("Gestor de contrato", fl["gestor"]),
-        ("Situação", rotulo_f), ("Busca", request.args.get("q", "").strip())) if v]
+        ("Usina", usina), ("Dia da conferência", dia_txt), ("Cliente", fl["cliente"]),
+        ("Responsável UFV", fl["responsavel"]), ("Equipe", fl["equipe"]), ("Situação", rotulo_f),
+        ("Busca", request.args.get("q", "").strip())) if v]
     hoje = d.get("hoje") or visao._agora().date()
     nr = [x for x in nao_rec if (not usina or x["usina"] == usina)
           and (not dia or x["nao_reconhecido"].isoformat() == dia)] if filtro == "todos" and not f else []
@@ -153,7 +172,7 @@ def extintores_relatorio():
                     gerado_em=visao._agora().strftime("%d/%m/%Y %H:%M"),
                     logo=str(current_app.static_folder) + "/grid-h-branco.png",
                     foto=lambda c: FOT.foto_pdf(current_app.config, c))   # a cópia de 600 px, feita uma vez por foto
-    nome = (f"extintores-{_slug(usina)}-{dia or 'todos'}.pdf" if usina
+    nome = (f"extintores-{_slug(usina)}-{dia or f'{hoje:%Y-%m-%d}'}.pdf" if usina
             else f"extintores-{filtro}-{hoje:%Y-%m-%d}.pdf")
     modo = "attachment" if request.args.get("baixar") else "inline"
     return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'{modo}; filename="{nome}"'})

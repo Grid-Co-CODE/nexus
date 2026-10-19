@@ -7,9 +7,12 @@ observações abaixo do commit") e ganhou a aba de baixo ("Inclua no início uma
 
 - o cartão "Versão no ar": a hora do commit em execução, o commit curto (o mesmo do /saude) e desde quando ESTE processo
   está no ar (o deploy reinicia o Nexus: é a hora em que a versão entrou). Clicar leva às Atualizações;
-- a aba **Atualizações** (`/?aba=atualizacoes`): os últimos commits desta pasta, do mais novo, por dia, com o tipo (novidade,
-  correção...), a área e o que mudou (o título e, aberto, o resto da mensagem em tópicos, sem a prova nem a coautoria:
-  `blocos`). Sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa.
+- a aba **Atualizações** (`/?aba=atualizacoes`): só as NOVIDADES e as CORREÇÕES (`feat` e `fix`) dos últimos 60 dias
+  (19/10/2026, Levi: "deixe só novidade e correção, sempre os últimos 60 dias!"; até então eram os últimos 60 commits de
+  todo tipo), do mais novo, por dia, com a área e o que mudou (o título e, aberto, o resto da mensagem em tópicos, sem a
+  prova nem a coautoria: `blocos`). O corte dos 60 dias é na hora do pedido (`da_aba`): o processo pode ficar dias no
+  ar. O "no ar" marca o commit em execução, que pode nem estar na lista (uma documentação). Sem horários (14/10/2026,
+  Levi: "Esconda os horários!"): o dia agrupa.
 
 Tudo sai do git da própria pasta (no servidor, a /opt/nexus, do usuário do serviço), lido uma vez por processo: cada
 deploy reinicia o Nexus, e a lista nova vem junto. Sem git (a vitrine estática, uma pasta copiada), o cartão diz "—" e a
@@ -24,7 +27,11 @@ from functools import lru_cache
 _BRT = timezone(timedelta(hours=-3))
 # importado pelo create_app: é a hora em que este processo subiu (cada deploy reinicia o Nexus)
 NO_AR_DESDE = datetime.now(_BRT)
-LIMITE_HISTORICO = 60
+# a aba mostra as novidades e as correções dos últimos JANELA_DIAS dias; o git lê um dia a mais (o corte é na hora do
+# pedido) e no máximo LIMITE_HISTORICO commits (60 dias davam 427 em 19/10/2026, 304 deles feat ou fix)
+JANELA_DIAS = 60
+TIPOS_NA_ABA = ("feat", "fix")
+LIMITE_HISTORICO = 3000
 _PASTA = os.path.dirname(os.path.abspath(__file__))
 # o tipo do commit ("feat(base): ...") como a pessoa entende
 TIPOS = {"feat": "Novidade", "fix": "Correção", "perf": "Desempenho", "docs": "Documentação", "chore": "Manutenção",
@@ -106,7 +113,8 @@ def historico() -> tuple:
     """Os últimos commits desta pasta, do mais novo: ({sha, curto, em, tipo, area, manchete, resto, corpo}, ...). Vazio
     sem git. Uma leitura por processo (o deploy reinicia)."""
     try:
-        saida = _git("log", "-n", str(LIMITE_HISTORICO), "--format=%H%x1f%cI%x1f%s%x1f%b%x1e", timeout=10)
+        saida = _git("log", f"--since={JANELA_DIAS + 1}.days.ago", "-n", str(LIMITE_HISTORICO),
+                     "--format=%H%x1f%cI%x1f%s%x1f%b%x1e", timeout=15)
     except (OSError, subprocess.SubprocessError, RuntimeError):
         return ()
     out = []
@@ -115,6 +123,13 @@ def historico() -> tuple:
         if len(partes) >= 3 and partes[0].strip():
             out.append(_item(partes[0].strip(), partes[1], partes[2], partes[3] if len(partes) > 3 else ""))
     return tuple(out)
+
+
+def da_aba(itens, agora: datetime | None = None) -> list:
+    """O que a aba Atualizações mostra: só novidade e correção, dos últimos JANELA_DIAS dias (19/10/2026, Levi: "deixe só
+    novidade e correção, sempre os últimos 60 dias!")."""
+    corte = (agora or datetime.now(_BRT)) - timedelta(days=JANELA_DIAS)
+    return [x for x in itens if x["tipo_id"] in TIPOS_NA_ABA and x["em"] is not None and x["em"] >= corte]
 
 
 def _hora(d: datetime | None, agora: datetime) -> str:

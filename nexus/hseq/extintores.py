@@ -1,5 +1,6 @@
 """Extintores das usinas (Segurança · HSEQ): o que está vencido, perto de vencer e sem conferência há mais de 30 dias,
-por supervisor de campo e por gestor de contrato.
+por cliente (com o responsável e os técnicos de cada usina) e por Responsável O&M (18/10/2026; até ali, por supervisor
+de campo e por gestor de contrato).
 
 Levi, 09/10/2026: "Gostaria de adicionar no Nexus algo que inseri no app: Extintores. Ficará no módulo de segurança.
 Nele será possível ver a tabela dos extintores com uma visão do que está atrasado, perto de atrasar e sem atualização a
@@ -40,8 +41,11 @@ comparações e 0 diferença; o status gravado no cadastro, 773 de 773. O teste 
 grade de casos do App, inclusive a virada do mês.
 """
 import calendar
+import collections
 import re
 from datetime import date
+
+from flask import current_app
 
 from ..campo import leitura, visao
 from ..dados import livros
@@ -71,6 +75,10 @@ SITUACOES = {"atrasado": ("Atrasado", "critico"), "perto": ("Perto de vencer", "
 FILTROS = ("atrasado", "perto", "sem_atualizacao", "sem_validade")
 STATUS_TST = {"CRITICO": ("Crítico", "critico"), "ATENCAO": ("Atenção", "alerta"), "OK": ("OK", "ok"),
               "OK_SEM_VALIDADE": ("OK sem validade", "neutro")}
+SEM_CLIENTE = "Sem cliente"
+# o que cada filtro da tela vale quando o cadastro não tem: o mesmo nome que o agrupamento e os cartões mostram, para o
+# clique neles achar as mesmas linhas
+SEM_VALOR = {"cliente": SEM_CLIENTE, "responsavel": visao.SEM_RESPONSAVEL, "equipe": visao.SEM_EQUIPE}
 _LONGE = 10 ** 6
 
 
@@ -221,9 +229,27 @@ def linha(x: dict, b, quem: dict, hoje: date) -> dict:
             "nao_reconhecido_por": visao._nome(quem, x.get("Não reconhecido por (HMAC)")) if nr else "", **sit}
 
 
+def tecnicos_por_usina(b, hoje: date) -> tuple[dict, str]:
+    """({usina_id: [nomes]}, erro): os técnicos de cada usina (Levi, 18/10/2026: "É importante ter a coluna do
+    responsável desse usina e o ou os técnicos da usina!"). A fonte é a tela Técnicos por usina do PCM
+    (`pcm.atribuicoes`, livro `nexus_pcm_atribuicoes`): quem vê e ronda a usina no App, um ou dois por usina (medido em
+    18/10: 174 usinas, 68 com dois). O apoio agendado para depois de hoje ainda não conta. Livro que não foi lido (e sem
+    cópia anterior): nenhum técnico e o erro, para a tela dizer que não leu em vez de mostrar "sem técnico"."""
+    from ..pcm import atribuicoes as A
+    est = A.ler(current_app.config)
+    if est.get("erro") and not est.get("velha"):
+        return {}, est["erro"]
+    out = collections.defaultdict(set)
+    for (uid, pid, _papel), x in A.atuais(est, int(hoje.strftime("%Y%m%d"))).items():
+        if x.get("status") == "vale":
+            out[uid].add(b.nome_da_pessoa(pid, "Técnico"))
+    return {u: sorted(n) for u, n in out.items()}, ""
+
+
 def extintores() -> leitura.Leitura:
-    """Todos os extintores do livro, com a situação de hoje. Cópia de 5 min e renovada em segundo plano, como as telas
-    do Campo (`visao._ler`). Livro que ainda não existe: lista vazia e `livro_existe` falso (a tela diz)."""
+    """Todos os extintores do livro, com a situação de hoje e os técnicos da usina. Cópia de 5 min e renovada em
+    segundo plano, como as telas do Campo (`visao._ler`). Livro que ainda não existe: lista vazia e `livro_existe`
+    falso (a tela diz)."""
     def calcular():
         abas = visao._ciclo(("_abas", LIVRO), lambda: livros.abas(visao._base(), visao._sessao(), LIVRO))
         linhas = visao._livro(LIVRO, ABA) if ABA in abas else []
@@ -239,6 +265,9 @@ def extintores() -> leitura.Leitura:
         hmacs = ("Conferido por (HMAC)", "Não reconhecido por (HMAC)")
         quem = visao._quem() if any(_txt(x.get(c)) for x in linhas for c in hmacs) else {}
         todos = [linha(x, b, quem, hoje) for x in linhas if _txt(x.get("Código"))]
+        tec, d["tecnicos_erro"] = tecnicos_por_usina(b, hoje) if todos else ({}, "")
+        for x in todos:
+            x["tecnicos"] = tec.get(x["usina_id"], []) if x["usina_id"] else []
         # o não reconhecido fica fora de todas as contas; a tela o lista à parte (ver o topo do módulo)
         return {**d, "extintores": [x for x in todos if not x["nao_reconhecido"]],
                 "nao_reconhecidos": ordenar_nao_reconhecidos(x for x in todos if x["nao_reconhecido"])}
@@ -278,12 +307,34 @@ def ordenar(lista, filtro: str = "") -> list:
 ORDEM_STATUS = ("CRITICO", "ATENCAO", "OK_SEM_VALIDADE", "OK", "")     # do pior para o melhor; "" = sem conferência
 
 
+def _resumo(s: dict) -> dict:
+    """Fecha um grupo (`s["extintores"]`, a usina e dia, a usina ou o cliente): a quantidade e quantas em cada situação,
+    a situação mais grave, a recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a
+    próxima a vencer), quantos sem atualização e o status da TST mais grave (e quantos em cada um). Os extintores ficam
+    na ordem da tabela."""
+    exts = s["extintores"] = ordenar(s["extintores"])
+    s.update(dict.fromkeys(SITUACOES, 0), status_qtd=dict.fromkeys(ORDEM_STATUS, 0), qtd=len(exts),
+             sem_atualizacao_qtd=sum(x["sem_atualizacao"] for x in exts))
+    for x in exts:
+        s[x["situacao"]] += 1
+        s["status_qtd"][x["status"] if x["status"] in ORDEM_STATUS else ""] += 1
+    s["situacao"] = exts[0]["situacao"]
+    com_data = [x for x in exts if x["fim2"]]
+    prox = min(com_data, key=lambda x: (x["fim2"], x["codigo"])) if com_data else None
+    s["recarga"], s["recarga_fim"], s["recarga_ext"] = ((prox["val2"], prox["fim2"], prox["ext"]) if prox
+                                                        else (SEM_DATA, None, ""))
+    s["status"] = next(st for st in ORDEM_STATUS if s["status_qtd"][st])
+    return s
+
+
+def _gravidade(s: dict) -> tuple:
+    """A ordem dos grupos: o mais grave primeiro, depois a recarga mais próxima."""
+    return list(SITUACOES).index(s["situacao"]), s["recarga_fim"] or date.max
+
+
 def por_usina_dia(lista) -> list[dict]:
-    """Uma linha por usina × dia da última conferência, com: a situação mais grave, a quantidade (e quantas em cada
-    situação), a recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a próxima a vencer),
-    a conferência e o status da TST mais grave (e quantos em cada um). Os extintores do grupo vão junto, na ordem da
-    tabela. Ordem: o mais grave primeiro, depois a recarga mais próxima, a usina e o dia mais recente."""
-    rank = {s: i for i, s in enumerate(SITUACOES)}
+    """Uma linha por usina × dia da última conferência (`_resumo`), com a conferência do dia. É o agrupamento do
+    relatório em PDF. Ordem: o mais grave primeiro, depois a recarga mais próxima, a usina e o dia mais recente."""
     g = {}
     for x in lista:
         s = g.get((x["usina"], x["conferencia"]))
@@ -293,27 +344,67 @@ def por_usina_dia(lista) -> list[dict]:
                 "supervisor_campo": x.get("supervisor_campo", ""), "gestor": x.get("gestor", ""),
                 "conferencia": x["conferencia"], "dias_conferencia": x["dias_conferencia"],
                 "sem_atualizacao": x["sem_atualizacao"], "origem_conferencia": x.get("origem_conferencia", ""),
-                "extintores": [], "status_qtd": dict.fromkeys(ORDEM_STATUS, 0), **dict.fromkeys(SITUACOES, 0)}
+                "extintores": []}
         s["extintores"].append(x)
-        s[x["situacao"]] += 1
-        s["status_qtd"][x["status"] if x["status"] in ORDEM_STATUS else ""] += 1
     for s in g.values():
-        exts = s["extintores"] = ordenar(s["extintores"])
-        s["qtd"] = len(exts)
-        s["situacao"] = exts[0]["situacao"]
-        com_data = [x for x in exts if x["fim2"]]
-        prox = min(com_data, key=lambda x: (x["fim2"], x["codigo"])) if com_data else None
-        s["recarga"], s["recarga_fim"], s["recarga_ext"] = ((prox["val2"], prox["fim2"], prox["ext"]) if prox
-                                                            else (SEM_DATA, None, ""))
-        s["status"] = next(st for st in ORDEM_STATUS if s["status_qtd"][st])
-    return sorted(g.values(), key=lambda s: (rank[s["situacao"]], s["recarga_fim"] or date.max, s["usina"],
+        _resumo(s)
+    return sorted(g.values(), key=lambda s: (*_gravidade(s), s["usina"],
                                              -(s["conferencia"].toordinal() if s["conferencia"] else 0)))
 
 
-# ── Cartões por supervisor (região de campo) e por gestor de contrato ─────────────────────────────────────────────
-# A "visão por supervisor" do pedido segue a estrutura de O&M de 10/2026, como a Central de atenção: o cartão é o da
-# REGIÃO DE CAMPO, com o Supervisor de Campo e o Coordenador (ou a vaga), e a alternância leva ao GESTOR DE CONTRATO
-# (Supervisor PM, pela usina). As listas chegam já filtradas pela tela, então o cartão conta o mesmo que a tabela.
+# ── Por cliente (Levi, 18/10/2026) ────────────────────────────────────────────────────────────────────────────────
+# "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse cliente. É importante ter a coluna do responsável
+# desse usina e o ou os técnicos da usina!". A tabela abre por cliente; o cliente abre as usinas dele, UMA linha por
+# usina (a última conferência é a mais recente dos extintores dela; o Baixar dá o PDF da usina inteira), e a usina abre
+# os extintores. O "por usina e dia" saiu da tela (fica no PDF).
+def valor_do_filtro(x: dict, campo: str) -> str:
+    """O valor de um extintor num filtro da tela (cliente, usina, responsável, equipe); sem ele no cadastro, o "Sem ..."
+    que o agrupamento e os cartões mostram."""
+    return str(x.get(campo) or "") or SEM_VALOR.get(campo, "")
+
+
+def por_usina(lista) -> list[dict]:
+    """Uma linha por usina (`_resumo`), com o cliente, o Responsável O&M da ficha da usina, a equipe e os técnicos, e a
+    última conferência (a mais recente dos extintores dela; nunca conferida, nenhuma). Ordem: o mais grave primeiro,
+    depois a recarga mais próxima e a usina."""
+    g = {}
+    for x in lista:
+        s = g.get(x["usina"])
+        if s is None:
+            s = g[x["usina"]] = {"usina": x["usina"], "usina_id": x.get("usina_id"),
+                                 **{c: valor_do_filtro(x, c) for c in SEM_VALOR},
+                                 "tecnicos": x.get("tecnicos") or [], "extintores": []}
+        s["extintores"].append(x)
+    for s in g.values():
+        _resumo(s)
+        ultima = max((x for x in s["extintores"] if x["conferencia"]), key=lambda x: x["conferencia"], default=None)
+        s.update(conferencia=ultima["conferencia"] if ultima else None,
+                 dias_conferencia=ultima["dias_conferencia"] if ultima else None,
+                 sem_atualizacao=ultima["sem_atualizacao"] if ultima else True,
+                 origem_conferencia=ultima.get("origem_conferencia", "") if ultima else "")
+    return sorted(g.values(), key=lambda s: (*_gravidade(s), s["usina"]))
+
+
+def por_cliente(lista) -> list[dict]:
+    """Uma linha por cliente (`_resumo`), com as usinas dele (`por_usina`) e quantas têm extintor atrasado. Ordem: o
+    mais grave primeiro, depois a recarga mais próxima e o nome; "Sem cliente" por último."""
+    g = {}
+    for u in por_usina(lista):
+        s = g.setdefault(u["cliente"], {"cliente": u["cliente"], "usinas": [], "extintores": []})
+        s["usinas"].append(u)
+        s["extintores"] += u["extintores"]
+    for s in g.values():
+        _resumo(s)
+        s["n_usinas"] = len(s["usinas"])
+        s["usinas_atrasado"] = sum(1 for u in s["usinas"] if u["atrasado"])
+    return sorted(g.values(), key=lambda s: (s["cliente"] == SEM_CLIENTE, *_gravidade(s), s["cliente"]))
+
+
+# ── Cartões por Responsável O&M (o "Responsável UFV" da tela) ───────────────────────────────────────────────────
+# Até 18/10/2026 a "visão por supervisor" do pedido de 09/10 era a região de campo (o Supervisor de Campo) com a
+# alternância para o gestor de contrato. Levi, 18/10: os filtros passaram a ser cliente, usina, responsável UFV, equipe
+# e a busca, e os cartões seguiram o filtro novo (um por Responsável O&M da usina, como a Central de atenção). As listas
+# chegam já filtradas pela tela, então o cartão conta o mesmo que a tabela.
 _SOMA = ("extintores", "atrasado", "perto", "sem_validade", "em_dia", "sem_atualizacao")
 
 
@@ -343,30 +434,15 @@ def _fechar(s, times, com_codigo) -> dict:
     return s
 
 
-def por_regiao(lista, regioes=(), times=None) -> list[dict]:
-    """Um cartão por região de campo (`regioes` = `_Base.regioes()`), com o Supervisor de Campo e o Coordenador ("vaga"
-    quando não há ninguém), a base, as equipes das usinas e os técnicos delas. Usina sem região vai para o cartão
-    próprio `SEM_REGIAO`, sempre por último. Ordem: mais atrasados, mais perto de vencer, a ordem da estrutura."""
-    info = {r["nome"]: r for r in regioes or ()}
+def por_responsavel(lista, times=None) -> list[dict]:
+    """Um cartão por Responsável O&M da usina (Levi, 18/10/2026: os cartões da tela de Extintores passaram da região de
+    campo e do gestor para o "Responsável UFV", o filtro novo; a régua é a da Central de atenção), pelas usinas dele.
+    Usina sem responsável no cadastro vai para o cartão próprio `SEM_RESPONSAVEL`, sempre por último. Ordem: mais
+    atrasados, mais perto de vencer, o nome."""
     g = {}
     for x in lista:
-        nome = x.get("regiao_campo") or visao.SEM_REGIAO
-        r = info.get(nome) or {}
-        s = g.get(nome) or g.setdefault(nome, _cartao(
-            regiao=nome, supervisor_campo=r.get("supervisor", ""), coordenador_campo=r.get("coordenador", ""),
-            base=r.get("base", ""), ordem=r.get("ordem", _LONGE)))
-        _somar(s, x)
-    out = [_fechar(s, times, True) for s in g.values()]
-    return sorted(out, key=lambda s: (s["regiao"] == visao.SEM_REGIAO, -s["atrasado"], -s["perto"], s["ordem"],
-                                      s["regiao"]))
-
-
-def por_gestor(lista, times=None) -> list[dict]:
-    """Um cartão por gestor de contrato (Supervisor PM), pelas usinas dele; usina sem gestor no cadastro vai para o
-    cartão próprio `SEM_GESTOR`, sempre por último."""
-    g = {}
-    for x in lista:
-        nome = x.get("gestor") or visao.SEM_GESTOR
-        _somar(g.get(nome) or g.setdefault(nome, _cartao(gestor=nome)), x)
+        nome = valor_do_filtro(x, "responsavel")
+        _somar(g.get(nome) or g.setdefault(nome, _cartao(responsavel=nome)), x)
     out = [_fechar(s, times, False) for s in g.values()]
-    return sorted(out, key=lambda s: (s["gestor"] == visao.SEM_GESTOR, -s["atrasado"], -s["perto"], s["gestor"]))
+    return sorted(out, key=lambda s: (s["responsavel"] == visao.SEM_RESPONSAVEL, -s["atrasado"], -s["perto"],
+                                      s["responsavel"]))

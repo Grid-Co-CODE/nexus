@@ -4,16 +4,24 @@ atrasado, perto de atrasar e sem atualização a mais de 30 dias. Preciso da vis
 As regras (`nexus/hseq/extintores.py`) num dia fixo, 09/10/2026, e a tela com o banco falso do Campo
 (test_campo_visao.py): Altair (pelo de-para do Fracttal) e Brodowski 1 (pelo código do ativo) são da SP Norte 01, região
 Sudeste 03 (Supervisora Campo), gestor Beltrano Supervisor; Coração 1 (pelo código da usina) é da Sul 01, com a vaga de
-supervisor aberta, gestor Ciclano Chefe; Irecê 2 não está no cadastro (sem região e sem gestor)."""
+supervisor aberta, gestor Ciclano Chefe; Irecê 2 não está no cadastro (sem região e sem gestor).
+
+Desde 18/10/2026 (Levi: a tabela "agrupado por Cliente", "a coluna do responsável desse usina e o ou os técnicos da
+usina", os filtros "cliente, usina, responsável UFV, equipe e o campo para digitar" e o PDF só unitário), o
+`com_cadastro` põe o Responsável O&M nas fichas (Altair e Brodowski 1: Supervisora Campo; Coração 1: Coordenador Campo)
+e os técnicos da tela Técnicos por usina do PCM (Altair: dois; Brodowski 1: só um apoio agendado; Coração 1: um)."""
+import json
 import re
 from datetime import date, datetime
 
 import pytest
-from test_campo_visao import BRT, CHAVE, _aba, banco  # noqa: F401  (banco é fixture)
+from test_campo_visao import BRT, CHAVE, CHAVE_CADASTRO, USINAS, _aba, _pessoas, banco  # noqa: F401  (banco é fixture)
 
+from nexus.cadastro.cifra import Cofre
 from nexus.campo import visao
 from nexus.campo.ligacao_cadastro import codigo_da_pessoa
 from nexus.hseq import extintores as EXT
+from nexus.pcm import atribuicoes as ATR
 
 HOJE = date(2026, 10, 9)
 
@@ -52,6 +60,41 @@ def com_livro(banco, monkeypatch):
     _aba(banco, EXT.LIVRO, EXT.ABA, LIVRO)
     visao.limpar()
     return banco
+
+
+# os técnicos de campo da SP Norte 01 (1, 2) e da SC Oeste 01 (4) ganham nome (fictício), cifrado como no banco
+NOMES = {1: "Técnico Alfa", 2: "Eletricista Beta", 4: "Técnico Gama"}
+RESPONSAVEL = {1: 92, 2: 92, 3: 93}          # Altair e Brodowski 1: Supervisora Campo; Coração 1: Coordenador Campo
+
+
+def _atribuicao(usina_id, pessoa_id, de=""):
+    return {"decidida_em": "2026-10-01T10:00:00-03:00", "data_id": 20261001, "usina_id": usina_id,
+            "usina_fracttal": "", "pessoa_id": pessoa_id, "pessoa_hmac": "", "papel": "executa", "na_usina": "sim",
+            "de_data_id": de, "ate_data_id": "", "origem": "tela", "decidida_por_hmac": "", "dados_cifrados": "",
+            "assinatura": ""}
+
+
+@pytest.fixture
+def com_cadastro(com_livro, app, tmp_path):
+    """O Responsável O&M nas fichas das usinas e os técnicos da tela Técnicos por usina do PCM (o livro como arquivo,
+    `NEXUS_PCM_ATRIBUICOES_ARQUIVO`): Altair com dois, Brodowski 1 só com um apoio que começa em 20/10 (ainda não
+    conta) e Coração 1 com um."""
+    cofre = Cofre(CHAVE_CADASTRO)
+    pessoas = [dict(p, sensivel_cifrado=cofre.cifrar(json.dumps({"nome": NOMES[p["pessoa_id"]],
+                                                                 "nome_padrao": NOMES[p["pessoa_id"]]}),
+                                                     f"banco/pessoas/{p['pessoa_id']}"))
+               if p["pessoa_id"] in NOMES else p for p in _pessoas()]
+    _aba(com_livro, "cadastro_nexus", "pessoas", pessoas)
+    _aba(com_livro, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id=RESPONSAVEL.get(u["usina_id"]))
+                                                 for u in USINAS])
+    arq = tmp_path / "atribuicoes.json"
+    arq.write_text(json.dumps({ATR.ABA: [_atribuicao(1, 1), _atribuicao(1, 2), _atribuicao(2, 2, de=20261020),
+                                         _atribuicao(3, 4)]}), encoding="utf-8")
+    app.config["NEXUS_PCM_ATRIBUICOES_ARQUIVO"] = str(arq)
+    ATR.limpar()
+    visao.limpar()
+    yield com_livro
+    ATR.limpar()
 
 
 def _texto(html):
@@ -150,26 +193,31 @@ def test_a_faixa_conta_o_que_o_pedido_quer_e_cada_numero_filtra_a_tabela(com_liv
     assert "Sem atualização 3 conferido há mais de 30 dias, ou nunca" in t
     assert "Sem validade 1 recarga sem data na etiqueta" in t
     for f in EXT.FILTROS:
-        assert f'href="?f={f}&amp;modo=tabela"' in html, f
+        assert f'href="?f={f}"' in html, f
 
 
-def test_por_supervisor_cartoes_da_regiao_de_campo_e_do_gestor(com_livro, logado):
-    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
-    assert 'aria-current="page">Por supervisor</a>' in html and "<table>" not in html
-    assert 'Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
-    assert re.search(r'Supervisor de Campo: <span class="cn-vaga"[^>]*>vaga</span>', html)          # Sul 01
-    # Sudeste 03: Altair e Brodowski 1 (4 extintores); antes da Sul 01 (mesmos atrasados, mais perto de vencer)
-    assert html.index("<b>Sudeste 03</b>") < html.index("<b>Sul 01</b>") < html.index("<b>Sem região de campo</b>")
-    corpo = _texto(html[html.index("<b>Sudeste 03</b>"):html.index("<b>Sul 01</b>")])
-    assert "1 equipe · 2 usinas" in corpo and "1 extintor atrasado" in corpo and "1 vence em até 30 dias" in corpo
+def test_por_responsavel_um_cartao_por_responsavel_da_usina(com_cadastro, logado):
+    """Os cartões seguiram o filtro novo (18/10/2026): um por Responsável O&M da ficha da usina, no lugar dos de região
+    de campo e de gestor de contrato; o cartão leva à tabela filtrada por ele."""
+    html = logado.get("/t/hseq/extintores?modo=responsaveis").get_data(as_text=True)
+    assert 'aria-current="page">Por responsável</a>' in html and "<table" not in html.split('id="tabela"')[1]
+    assert "Região de campo" not in html and "Gestor de contrato" not in html
+    # Supervisora Campo: Altair e Brodowski 1 (4 extintores); antes do Coordenador Campo (mesmos atrasados, mais perto
+    # de vencer); Irecê 2, fora do cadastro, no cartão "Sem responsável O&M", por último
+    assert html.index("<b>Supervisora Campo</b>") < html.index("<b>Coordenador Campo</b>") < html.index(
+        "<b>Sem responsável O&amp;M</b>")
+    corpo = _texto(html[html.index("<b>Supervisora Campo</b>"):html.index("<b>Coordenador Campo</b>")])
+    assert "Responsável UFV" in corpo and "2 usinas · 1 equipe" in corpo
+    assert "1 extintor atrasado" in corpo and "1 vence em até 30 dias" in corpo
     assert "1 em dia 1 sem validade 4 total" in corpo and "2 sem atualização há mais de 30 dias" in corpo
-    assert "1 usina com extintor atrasado" in corpo
-    assert 'href="?modo=tabela&amp;regiao_campo=Sudeste+03"' in html
-    gest = logado.get("/t/hseq/extintores?modo=gestores").get_data(as_text=True)
-    assert 'aria-current="page">Gestor de contrato (Supervisor PM)</a>' in gest
-    assert gest.index("<b>Beltrano Supervisor</b>") < gest.index("<b>Ciclano Chefe</b>") < gest.index(
-        "<b>Sem gestor de contrato</b>")
-    assert 'href="?modo=tabela&amp;gestor=Beltrano+Supervisor"' in gest
+    assert "usinas sem responsável no cadastro" in _texto(html[html.index("<b>Sem responsável O&amp;M</b>"):])
+    assert 'href="?responsavel=Supervisora+Campo#tabela"' in html
+    tab = logado.get("/t/hseq/extintores?responsavel=Supervisora+Campo&ver=extintor").get_data(as_text=True)
+    assert sorted(_linhas(tab)) == ["ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02", "ALT100-INFC1-PPCI-EXT03",
+                                    "BWK100-INFC1-PPCI-EXT01"]
+    # o filtro da faixa sempre abre a tabela
+    assert 'aria-current="page">Tabela</a>' in logado.get(
+        "/t/hseq/extintores?modo=responsaveis&f=atrasado").get_data(as_text=True)
 
 
 def test_a_tabela_poe_o_mais_grave_primeiro_e_filtra_pela_situacao(com_livro, logado):
@@ -193,21 +241,48 @@ def test_a_tabela_poe_o_mais_grave_primeiro_e_filtra_pela_situacao(com_livro, lo
     assert _linhas(atr) == ["ALT100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01"]
     sem = logado.get("/t/hseq/extintores?f=sem_atualizacao&ver=extintor").get_data(as_text=True)    # o mais antigo primeiro
     assert _linhas(sem) == ["BWK100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02"]
-    reg = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor&regiao_campo=Sul+01").get_data(as_text=True)
-    assert _linhas(reg) == ["COR100-INFC1-PPCI-EXT01"] and '<option value="Sul 01" selected>' in reg
+    eq = logado.get("/t/hseq/extintores?ver=extintor&equipe=SC+Oeste+01").get_data(as_text=True)
+    assert _linhas(eq) == ["COR100-INFC1-PPCI-EXT01"] and '<option value="SC Oeste 01" selected>' in eq
     busca = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor&q=skid1").get_data(as_text=True)
     assert _linhas(busca) == ["BWK100-INFC1-PPCI-EXT01"]
 
 
-def test_supervisor_que_entra_pelo_fracttal_ja_ve_a_regiao_dele(com_livro, cliente):
+def test_so_os_cinco_filtros_em_cascata_e_logo_acima_da_tabela(com_nao_reconhecido, logado):
+    """Levi, 18/10/2026: "Quero os filtros que estão antes de extintores não reconhecidos, acima da tabela" e "De
+    filtros quero apenas cliente, usina, responsável UFV, equipe e o campo para digitar!"."""
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    ini = html.index('<form class="cn-filtros"')
+    form = html[ini:html.index("</form>", ini)]
+    assert re.findall(r'<select class="gc-campo" id="ext-(\w+)" name="(\w+)"', form) == [
+        ("cliente", "cliente"), ("usina", "usina"), ("responsavel", "responsavel"), ("equipe", "equipe")]
+    assert _texto(form).count("Responsável UFV") == 1 and 'type="search" name="q"' in form
+    assert not re.search(r'name="(regiao|regiao_campo|gestor)"', html)
+    # a ordem na tela: a faixa, a caixa dos não reconhecidos, os filtros e a tabela
+    assert html.index("cn-numeros") < html.index('id="nao-reconhecidos"') < html.index('id="tabela"') < html.index(
+        '<table class="cn-expande ext-clientes">')
+    # em cascata: com o cliente escolhido, a lista de usinas traz só as dele (e a escolhida fica, mesmo sem resultado)
+    outro = logado.get("/t/hseq/extintores?cliente=Outro+Cliente").get_data(as_text=True)
+    assert re.findall(r'<option value="([^"]*)"', outro[outro.index('id="ext-usina"'):outro.index('id="ext-responsavel"')]) == [
+        "", "Coração 1"]
+    vazio = logado.get("/t/hseq/extintores?cliente=Outro+Cliente&usina=Altair").get_data(as_text=True)
+    assert '<option value="Altair" selected>' in vazio and "Nenhum extintor com esses filtros." in vazio
+    # o "Sem cliente" (Irecê 2, fora do cadastro) é uma opção, por último, e acha a usina
+    cli = re.findall(r'<option value="([^"]*)"', html[html.index('id="ext-cliente"'):html.index('id="ext-usina"')])
+    assert cli == ["", "Outro Cliente", "Thopen", "Sem cliente"]
+    sem = logado.get("/t/hseq/extintores?cliente=Sem+cliente&ver=extintor").get_data(as_text=True)
+    assert _linhas(sem) == ["IRC200-INFC1-PPCI-EXT01"]
+
+
+def test_ninguem_abre_filtrado_pelo_login(com_livro, cliente):
+    """Até 18/10/2026 o Supervisor de Campo abria na região dele; o filtro de região saiu, e com ele o padrão do login
+    (sem o filtro na tela, a pessoa não teria como desfazer)."""
     with cliente.session_transaction() as s:
         s.update(logado=True, admin=False, usuario={"email": "x@exemplo.test", "nome": "X", "perfil": "Supervisor"},
                  supervisor_padrao={"pessoa_id": 93, "nome": "Coordenador Campo", "papel": "supervisor_campo",
                                     "regioes": ["Sul 01"]})
-    html = cliente.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
-    assert _linhas(html) == ["COR100-INFC1-PPCI-EXT01"] and '<option value="Sul 01" selected>' in html
-    todas = cliente.get("/t/hseq/extintores?modo=tabela&regiao_campo=*").get_data(as_text=True)    # "Todas" vence
-    assert len(_linhas(todas)) == 6
+    html = cliente.get("/t/hseq/extintores?ver=extintor").get_data(as_text=True)
+    form = html[html.index('<form class="cn-filtros"'):]
+    assert len(_linhas(html)) == 6 and " selected>" not in form[:form.index("</form>")]
 
 
 def test_coluna_da_conta_faltando_a_tela_nao_mostra_numero_pela_metade(com_livro, logado):
@@ -252,30 +327,70 @@ def test_por_usina_e_dia_junta_os_extintores_da_mesma_conferencia():
     assert ordem[0] == ("Alta", date(2026, 10, 5))           # o atrasado com a recarga mais antiga primeiro
 
 
-def test_a_tabela_abre_por_usina_e_dia_e_a_linha_abre_os_extintores(com_livro, logado):
-    _aba(com_livro, EXT.LIVRO, EXT.ABA, LIVRO + DIA_DO_GRUPO)
+def _abre(html, inicio):
+    """O texto da linha (a do cliente ou a da usina) em que está `inicio`."""
+    i = html.index(inicio)
+    return _texto(html[html.rindex("<tr ", 0, i):html.index("</tr>", i)])
+
+
+def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, logado):
+    """Levi, 18/10/2026: "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse cliente. É importante ter a
+    coluna do responsável desse usina e o ou os técnicos da usina!". A usina é UMA linha (todos os dias dela) e abre os
+    extintores."""
+    _aba(com_cadastro, EXT.LIVRO, EXT.ABA, LIVRO + DIA_DO_GRUPO)
     visao.limpar()
-    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
-    assert 'aria-current="page">Por usina e dia</a>' in html and 'href="?modo=tabela&amp;ver=extintor"' in html
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)                  # a tabela é o padrão
+    assert 'aria-current="page">Tabela</a>' in html and 'aria-current="page">Cliente</a>' in html
+    assert 'href="?ver=extintor#tabela"' in html and "Por usina e dia" not in html
+    # UMA tabela: a linha do cliente e as das usinas nas mesmas colunas (aninhadas, não cabiam a 1440 px)
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
-    # a ordem do Levi (11/10): Situação, Última conferência, Usina, quantidade, recarga mais próxima, Status da TST, PDF
-    assert cab == "Situação Última conferência Usina Quantidade de extintores Recarga mais próxima Status da TST PDF"
-    linhas = html.count('<tr class="cn-linha"')
-    assert linhas == 6 and html.count('<tr class="cn-detalhe" hidden>') == 6       # Altair em 2 dias, mais 4 usinas
-    primeira = _texto(html[html.index('<tr class="cn-linha"'):html.index('<tr class="cn-detalhe"')])
-    assert primeira.startswith("Atrasado 05/10/2026 há 4 d") and "Altair 3 2 atrasados · 1 sem validade" in primeira
-    assert "02/2026 venceu há 7 meses" in primeira and "Sudeste 03" not in primeira
-    assert "Crítico 2 críticos · 1 ok sem validade" in primeira
-    # a linha abre os extintores dela, sem repetir a usina nem a conferência
-    ini = html.index('<table class="ext-sub cn-fotos-grupo">')
-    sub = html[ini:html.index("</table>", ini)]
-    assert re.findall(r'title="([A-Z]{3}\d{3}-INFC1-PPCI-EXT\d+)"', sub) == [
-        "ALT100-INFC1-PPCI-EXT04", "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT05"]
-    assert "Altair" not in _texto(sub) and "Sobrecarga" not in sub and "sobrecarga" in _texto(sub)
-    # o filtro da faixa vale para o agrupamento: só os atrasados entram na conta da linha
+    assert cab == ("Situação Última conferência Cliente e usina Responsável Técnicos Quantidade de extintores "
+                   "Recarga mais próxima Status da TST PDF")
+    # 3 clientes (Thopen, Outro Cliente e "Sem cliente", a Irecê 2 fora do cadastro) e 4 usinas, tudo fechado
+    assert html.count('<tr class="cn-linha ext-cli"') == 3 and html.count('<tr class="cn-linha ext-us"') == 4
+    assert html.count('extintores" hidden>') == 4 and len(re.findall(r'<tr class="cn-detalhe" data-cli="\d" hidden>', html)) == 4
+    ordem = re.findall(r'<span class="ext-seta" aria-hidden="true"></span>(?:<b>)?([^<]+)<', html)
+    assert ordem == ["Thopen", "Altair", "Brodowski 1", "Outro Cliente", "Coração 1", "Sem cliente",
+                     "Thopen - Irecê 2 - BA"]
+    thopen = _abre(html, "<b>Thopen</b>")
+    assert thopen.startswith("Atrasado Thopen 2 usinas 1 com extintor atrasado 6 2 atrasados · 1 perto de vencer · "
+                             "2 sem validade · 1 em dia")
+    assert "02/2026 venceu há 7 meses" in thopen and "Crítico 2 críticos" in thopen
+    # a usina, uma linha só: a última conferência é a mais recente, com o responsável e os técnicos (um embaixo do outro)
+    alt = _abre(html, "</span>Altair</td>")
+    assert alt.startswith("Atrasado 05/10/2026 há 4 d · App Altair Supervisora Campo Eletricista Beta Técnico Alfa 5 "
+                          "2 atrasados · 1 perto de vencer · 1 sem validade · 1 em dia")
+    assert '<span class="ext-tecs"><span>Eletricista Beta</span><span>Técnico Alfa</span></span>' in html
+    # o apoio agendado para 20/10 ainda não conta; a usina fora do cadastro não tem responsável nem técnico
+    assert "Brodowski 1 Supervisora Campo sem técnico" in _abre(html, "</span>Brodowski 1</td>")
+    assert "Coração 1 Coordenador Campo Técnico Gama" in _abre(html, "</span>Coração 1</td>")
+    assert "Thopen - Irecê 2 - BA sem responsável sem técnico" in _abre(html, "</span>Thopen - Irecê 2 - BA</td>")
+    # a usina abre os extintores dela, de todos os dias, com a conferência de cada um e sem repetir a usina
+    i = html.index('<table class="ext-sub cn-fotos-grupo">')
+    sub = html[i:html.index("</table>", i)]
+    assert _linhas(sub) == ["ALT100-INFC1-PPCI-EXT04", "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02",
+                            "ALT100-INFC1-PPCI-EXT05", "ALT100-INFC1-PPCI-EXT03"]
+    assert "01/08/2026" in _texto(sub) and "Altair" not in _texto(sub) and "sobrecarga" in _texto(sub)
+    # o filtro da faixa vale para o agrupamento: só os atrasados entram na conta
     atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)
-    assert atr.count('<tr class="cn-linha"') == 2
-    assert "Altair 2 2 atrasados" in _texto(atr[atr.index('<tr class="cn-linha"'):atr.index('<tr class="cn-detalhe"')])
+    assert atr.count('<tr class="cn-linha') == 4                          # Thopen › Altair e Outro Cliente › Coração 1
+    assert "Altair Supervisora Campo Eletricista Beta Técnico Alfa 2 2 atrasados" in _abre(atr, "</span>Altair</td>")
+    # com o cliente escolhido, o cliente já abre; com a usina, a usina também
+    cli = logado.get("/t/hseq/extintores?cliente=Thopen").get_data(as_text=True)
+    assert cli.count('aria-expanded="true"') == 1 and cli.count('<tr class="cn-linha ext-us"') == 2
+    assert 'extintores" hidden>' not in cli and cli.count('<tr class="cn-detalhe" data-cli="1" hidden>') == 2
+    us = logado.get("/t/hseq/extintores?usina=Altair").get_data(as_text=True)
+    assert us.count('aria-expanded="true"') == 2 and us.count('<tr class="cn-detalhe" data-cli="1">') == 1
+
+
+def test_sem_ler_os_tecnicos_a_coluna_diz_que_nao_leu(com_cadastro, logado, monkeypatch):
+    """A lista do PCM fora do ar: "não lido", e não "sem técnico" (seria dizer que a usina não tem técnico)."""
+    monkeypatch.setattr(ATR, "ler", lambda cfg, forcar=False: {"decisoes": [], "erro": "ConnectionError: x",
+                                                                 "lido_em": None})
+    visao.limpar()
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    assert "Os técnicos de cada usina não foram lidos agora." in html
+    assert "não lido" in _abre(html, "</span>Altair</td>") and "sem técnico" not in html
 
 
 # ── o relatório em PDF (Levi, 09/10, com as observações da TST) ──────────────────────────────────────────────────
@@ -300,8 +415,8 @@ def test_relatorio_pdf_por_usina_e_dia_com_o_filtro_da_tst(com_livro, logado):
     assert "Só os críticos" in crit and "ALT100-INFC1-PPCI-EXT01" in crit and "COR100-INFC1-PPCI-EXT01" in crit
     assert "EXT02" not in crit and "IRC200" not in crit and "Brodowski" not in crit
     # sem fotos: uma tabela por usina e dia, sem o quadro da foto; os filtros da tela valem e o PDF diz quais
-    sem = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?fotos=0&fotos=0&regiao_campo=Sul+01").data)
-    assert "sem fotos" in sem and "Sem foto no Nexus" not in sem and "Filtros: Região de campo: Sul 01" in sem
+    sem = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?fotos=0&fotos=0&equipe=SC+Oeste+01").data)
+    assert "sem fotos" in sem and "Sem foto no Nexus" not in sem and "Filtros: Equipe: SC Oeste 01" in sem
     assert "Coração 1" in sem and "Altair" not in sem
 
 
@@ -360,39 +475,47 @@ def test_sem_o_livro_o_relatorio_volta_para_a_tela(banco, logado):
 
 
 # ── o "Baixar" de cada linha, o filtro de cliente e a foto do extintor (Levi, 09/10, depois da 1ª carga no banco) ──
-def test_baixar_de_cada_linha_traz_o_pdf_daquela_usina_e_dia(com_livro, logado):
+def _baixar(html):
+    return [h.replace("&amp;", "&") for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', html)]
+
+
+def test_baixar_de_cada_usina_traz_o_pdf_da_usina_inteira(com_livro, logado):
+    """O relatório só unitário (Levi, 18/10/2026: "O relatório quero a opção de ser unitário (...), pode tirar esse
+    RELATÓRIO EM PDF que tira em massa!"): a tela não tem mais o formulário do PDF de todos; o "Baixar" de cada usina
+    traz a usina inteira, todos os dias."""
     _aba(com_livro, EXT.LIVRO, EXT.ABA, LIVRO + DIA_DO_GRUPO)
     visao.limpar()
-    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
-    links = re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', html)
-    assert len(links) == 6
-    alt = next(h for h in links if "dia=2026-10-05" in h).replace("&amp;", "&")
-    assert "usina=Altair" in alt and "baixar=1" in alt
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    assert "Relatório em PDF" not in html and "Gerar PDF" not in html and 'name="status"' not in html
+    links = _baixar(html)
+    assert len(links) == 4 and not any("dia=" in h for h in links)                  # uma por usina
+    alt = next(h for h in links if "usina=Altair" in h)
+    assert "baixar=1" in alt
     r = logado.get(alt)
     assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("attachment;")
-    assert 'filename="extintores-altair-2026-10-05.pdf"' in r.headers["Content-Disposition"]
+    assert 'filename="extintores-altair-2026-10-09.pdf"' in r.headers["Content-Disposition"]
     t = _pdf_texto(r.data)
-    assert "ALT100-INFC1-PPCI-EXT04" in t and "ALT100-INFC1-PPCI-EXT01" in t and "ALT100-INFC1-PPCI-EXT05" in t
-    assert "ALT100-INFC1-PPCI-EXT02" not in t and "Coração" not in t                    # outro dia, outra usina
-    assert "Usina: Altair" in t and "Dia da conferência: 05/10/2026" in t
-    # a usina nunca conferida também baixa (dia=nunca), e o filtro da faixa vai junto no link
-    bwk = next(h for h in links if "dia=nunca" in h).replace("&amp;", "&")
+    assert all(f"ALT100-INFC1-PPCI-EXT0{n}" in t for n in range(1, 6)) and "Coração" not in t     # os 3 dias dela
+    assert "Usina: Altair" in t and "Dia da conferência" not in t
+    # a usina nunca conferida também baixa, e os filtros da tela e o da faixa vão junto no link
+    bwk = next(h for h in links if "usina=Brodowski" in h)
     assert "BWK100-INFC1-PPCI-EXT01" in _pdf_texto(logado.get(bwk).data)
-    atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)
-    assert all("f=atrasado" in h for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', atr))
+    atr = _baixar(logado.get("/t/hseq/extintores?f=atrasado&cliente=Thopen").get_data(as_text=True))
+    assert atr and all("f=atrasado" in h and "cliente=Thopen" in h for h in atr)
+    # o link de antes, com o dia, ainda filtra aquele dia
+    dia = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?usina=Altair&dia=2026-10-05&baixar=1").data)
+    assert "ALT100-INFC1-PPCI-EXT04" in dia and "ALT100-INFC1-PPCI-EXT02" not in dia
 
 
 def test_filtro_por_cliente_vale_na_tela_no_pdf_e_no_epi(com_livro, logado):
     html = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor").get_data(as_text=True)
-    assert '<select class="gc-campo" id="cn-cliente" name="cliente"' in html
+    assert '<select class="gc-campo" id="ext-cliente" name="cliente"' in html
     assert '<option value="Outro Cliente">Outro Cliente</option>' in html and '<option value="Thopen">Thopen</option>' in html
     outro = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor&cliente=Outro+Cliente").get_data(as_text=True)
     assert _linhas(outro) == ["COR100-INFC1-PPCI-EXT01"] and '<option value="Outro Cliente" selected>' in outro
     pdf = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?cliente=Thopen").data)
     assert "Filtros: Cliente: Thopen" in pdf and "Coração" not in pdf and "Altair" in pdf
-    # o formulário do PDF da tela leva o cliente escolhido
-    assert '<input type="hidden" name="cliente" value="Outro Cliente">' in outro
-    epi = logado.get("/t/hseq/epi?modo=tabela&cliente=Outro+Cliente").get_data(as_text=True)
+    epi =logado.get("/t/hseq/epi?modo=tabela&cliente=Outro+Cliente").get_data(as_text=True)
     assert '<select class="gc-campo" id="cn-cliente" name="cliente"' in epi and "Coração 1" in epi and "Altair" not in epi
 
 
@@ -485,9 +608,24 @@ def test_nao_reconhecido_sai_das_contas_e_vai_para_a_caixa_da_tst(com_nao_reconh
     assert "Extintores 5" in faixa and "Perto de vencer 0" in faixa and "Não reconhecidos 1" in faixa
     sem = logado.get("/t/hseq/extintores?f=sem_atualizacao&ver=extintor").get_data(as_text=True)
     assert "ALT100-INFC1-PPCI-EXT02" not in _linhas(sem[sem.index("</section>"):])
-    # os filtros da tela valem na caixa: a região do Coração (Sul 01) não tem não reconhecido, e a caixa some
-    sul = logado.get("/t/hseq/extintores?regiao_campo=Sul+01").get_data(as_text=True)
-    assert 'id="nao-reconhecidos"' not in sul and "Não reconhecidos" not in sul
+    # os filtros da tela valem na caixa: o cliente do Coração não tem não reconhecido, e a caixa some
+    outro = logado.get("/t/hseq/extintores?cliente=Outro+Cliente").get_data(as_text=True)
+    assert 'id="nao-reconhecidos"' not in outro and "Não reconhecidos" not in outro
+
+
+def test_a_linha_do_nao_reconhecido_leva_a_tabela_filtrada_na_usina(com_nao_reconhecido, logado):
+    """Levi, 18/10/2026: "Em extintores não reconhecidos quero que ao clicar na linha já encaminhe para a tabela
+    filtrando aquela usina". A linha (e o nome da usina, pelo teclado) leva à tabela por cliente com a usina no filtro,
+    o cliente e a usina já abertos; a situação, a visão e o agrupamento de antes saem."""
+    html = logado.get("/t/hseq/extintores?f=sem_atualizacao&ver=extintor&cliente=Thopen").get_data(as_text=True)
+    caixa = html[html.index('id="nao-reconhecidos"'):html.index("</section>")]
+    assert '<tr class="ext-ir" data-href="?cliente=Thopen&amp;usina=Altair#tabela"' in caixa
+    assert '<a class="cn-link" href="?cliente=Thopen&amp;usina=Altair#tabela">Altair</a>' in caixa
+    us = logado.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
+    assert '<option value="Altair" selected>' in us and us.count('aria-expanded="true"') == 2
+    tab = us[us.index('<table class="cn-expande ext-clientes">'):]
+    assert _linhas(tab) == ["ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT03"]      # o EXT02 segue fora das contas
+    assert _linhas(us[us.index('id="nao-reconhecidos"'):us.index("</section>")]) == ["ALT100-INFC1-PPCI-EXT02"]
 
 
 def test_sem_as_colunas_novas_ninguem_e_nao_reconhecido(com_livro, logado):
@@ -510,10 +648,12 @@ def test_nao_reconhecido_no_pdf_vai_a_parte_so_no_relatorio_de_todos(com_nao_rec
         logado.get("/t/hseq/extintores/relatorio.pdf?status=criticos&fotos=0").data)
     assert "Não reconhecidos em campo" not in _pdf_texto(
         logado.get("/t/hseq/extintores/relatorio.pdf?f=atrasado&fotos=0").data)
-    # o "Baixar" da Altair de 05/10 (a ronda em que o EXT02 não foi achado) leva a seção; o de 01/10, não
-    html = logado.get("/t/hseq/extintores?modo=tabela").get_data(as_text=True)
-    links = [h.replace("&amp;", "&") for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', html)]
-    dia05 = _pdf_texto(logado.get(next(h for h in links if "dia=2026-10-05" in h)).data)
-    assert "Não reconhecidos em campo 1 extintor" in dia05 and "ALT100-INFC1-PPCI-EXT02" in dia05
-    dia01 = _pdf_texto(logado.get(next(h for h in links if "dia=2026-10-01" in h)).data)
+    # o "Baixar" da Altair (a usina em que o EXT02 não foi achado) leva a seção; o do Coração, não
+    links = _baixar(logado.get("/t/hseq/extintores").get_data(as_text=True))
+    alt = _pdf_texto(logado.get(next(h for h in links if "usina=Altair" in h)).data)
+    assert "Não reconhecidos em campo 1 extintor" in alt and "ALT100-INFC1-PPCI-EXT02" in alt
+    cor = _pdf_texto(logado.get(next(h for h in links if "usina=Cora" in h)).data)
+    assert "Não reconhecidos em campo" not in cor
+    # o link de antes, com o dia: só os marcados naquele dia
+    dia01 = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?usina=Altair&dia=2026-10-01&baixar=1").data)
     assert "Não reconhecidos em campo" not in dia01

@@ -43,23 +43,43 @@ a tela diz qual falta e não mostra número.
 - **Status da TST** (crítico, atenção, ok, ok sem validade): a regra da aba Legenda da planilha da TST, a MESMA do App
   (`_ext_status`), com a carga e os 9 itens. Sem conferência nenhuma, não há status.
 
-**A tela.** Faixa de números (cada um filtra a tabela), "Por supervisor" (cartões por região de campo, com o Supervisor
-de Campo e o Coordenador ou a vaga, e a alternância para o gestor de contrato, como a Central de atenção) e Tabela. A
-tabela abre **por usina e dia** (Levi, 09/10: "queria agrupado por usina e dia!"; `extintores.por_usina_dia`): uma linha
-por usina × dia da última conferência, com Situação (a mais grave), Última conferência, Usina, Quantidade de extintores
-(e quantos em cada situação), Recarga mais próxima (a data mais antiga: a vencida há mais tempo ou, sem vencida, a
-próxima), Status da TST (o mais grave, e quantos em cada) e PDF, nesta ordem (Levi, 11/10/2026); a linha abre os
-extintores dela logo abaixo. A visão por extintor segue a mesma ordem (Situação, Última conferência, Usina e o resto).
-A usina vai **sem a região ao lado** (Levi, 11/10: "Em usina pode tirar a região do lado, fica estranho!"): a região de
-campo está nos cartões e no filtro. Ao lado, a
-visão **por extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
-primeiro). A faixa filtra as duas (no agrupamento, a linha conta só os extintores do filtro). Cada linha por usina e
-dia tem a coluna **PDF** com o **Baixar** (como a tabela de PT; Levi, 09/10): o relatório só daquela usina e daquele dia
-(`usina`, `dia` ou `dia=nunca`, `baixar=1`, com os filtros da tela e o da faixa), como anexo. 300 linhas. Filtros: região do
-Brasil, **cliente** (pelo cadastro, pela usina; Levi, 09/10: "Em extintores quero um filtro por cliente!"; vale também no
-EPI e no PDF), região de campo, gestor e busca. Quem entra pelo Fracttal já vem filtrado (o papel da sessão). Os filtros, os
-cartões e o aviso da estrutura são os do Campo (`nexus/torres/campo/__init__.py` e os pedaços `campo/_*.html`): mudou
-lá, muda aqui. O CSS é o `campo.css` e o `hseq.css` (só a tabela).
+**A tela** (o desenho de 18/10/2026; o de antes, por usina e dia com cartões por região de campo e gestor, saiu). De
+cima para baixo: a faixa de números (cada um filtra a tabela), a caixa dos não reconhecidos, os **filtros** e, logo abaixo
+deles, a Tabela (o padrão) ou os cartões **Por responsável**.
+- **Filtros** (Levi, 18/10: "Quero os filtros que estão antes de extintores não reconhecidos, acima da tabela"; "De
+  filtros quero apenas cliente, usina, responsável UFV, equipe e o campo para digitar!"; `FILTROS_EXT` na torre):
+  Cliente, Usina, Responsável UFV, Equipe e a busca, **em cascata** como a tela Técnicos por usina do PCM (cada lista
+  traz o que existe com os outros filtros; a escolhida fica mesmo sem resultado), com o "Sem cliente / Sem responsável
+  O&M / Sem equipe" no fim (`extintores.valor_do_filtro`). O Responsável UFV é o Responsável O&M da ficha da usina (o
+  setor "Responsáveis UFV"). Saíram a região do Brasil, a região de campo e o gestor, e com eles o filtro que vinha do
+  login (o Supervisor de Campo abria na região dele): **ninguém abre filtrado**. Valem na faixa, na caixa, na tabela,
+  nos cartões e no "Baixar". O cliente vale também no EPI, que segue com os filtros do Campo.
+- **Agrupar por Cliente** (o padrão; Levi, 18/10: "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse
+  cliente. É importante ter a coluna do responsável desse usina e o ou os técnicos da usina!"; `extintores.por_cliente`)
+  e **por Extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
+  primeiro). Colunas: Situação, Última conferência, Cliente e usina, Responsável, Técnicos, Quantidade de extintores
+  (e quantos em cada situação), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a próxima), Status da
+  TST (o mais grave, e quantos em cada) e PDF. A linha do cliente abre as usinas dele **na mesma tabela** (UMA linha por
+  usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os extintores numa
+  tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais próxima; "Sem
+  cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
+- **Os técnicos** vêm da tela Técnicos por usina do PCM (`extintores.tecnicos_por_usina`, livro `nexus_pcm_atribuicoes`:
+  quem vê e ronda a usina no App, um embaixo do outro; o apoio agendado para depois de hoje ainda não conta). Lista que
+  não foi lida: a coluna diz "não lido" e a tela avisa, e nunca "sem técnico". Medido em 18/10: 174 usinas com técnico,
+  68 com dois.
+- **Cabe a 1440 px** com as usinas e os extintores abertos (medido no banco real, 18/10: a caixa tem 1.168 px). O cliente
+  abrindo uma tabela dentro da linha e a usina outra dentro dela pedia 1.212 px; com as listas "N atrasados · ..." numa
+  parte só, 1.391. Por isso: cliente e usinas na mesma tabela, as listas quebram entre os itens (`ext-lista`) e o nome da
+  usina, do cliente e do responsável quebram entre as palavras (cada técnico numa linha). A 375 px a tabela rola dentro
+  da caixa e a página não passa da largura.
+- **Por responsável** (`modo=responsaveis`; o filtro da faixa volta à tabela): um cartão por Responsável O&M da usina,
+  como a Central de atenção, com os mesmos números dos cartões de antes; o clique leva à tabela filtrada por ele.
+- A usina vai **sem a região ao lado** (Levi, 11/10: "Em usina pode tirar a região do lado, fica estranho!"). 300 linhas
+  na visão por extintor. O CSS é o `campo.css` e o `hseq.css` (a tabela, os filtros e a caixa).
+- **O PDF é só unitário** (Levi, 18/10: "O relatório quero a opção de ser unitário (...), pode tirar esse RELATÓRIO EM
+  PDF que tira em massa!"): o formulário do PDF de todos saiu da tela; fica o **Baixar** de cada usina (`usina`,
+  `baixar=1`, com os filtros da tela e o da faixa), a usina inteira, todos os dias, como anexo
+  (`extintores-<usina>-<hoje>.pdf`). A rota ainda aceita `dia` (o link de antes) e, sem `usina`, gera o de todos.
 
 **Na tabela, as partes de cada célula ficam lado a lado** (Levi, 09/10/2026, sobre a 1ª versão, que punha o detalhe
 sempre na linha de baixo: "se tem espaço para botar paralelo então deixe paralelo"). A parte é inteira e só desce de
@@ -77,8 +97,10 @@ ligaram ao cadastro do Nexus; todas as regiões estavam com supervisor e coorden
 
 **Como provar.**
 - `python -m pytest -q tests/test_hseq_extintores.py`: as regras num dia fixo (inclusive a virada do mês e os limites
-  de 30 dias) e a tela com o banco falso do Campo (livro ausente, faixa, cartões, tabela e ordem, filtros, login de
-  supervisor, coluna faltando).
+  de 30 dias) e a tela com o banco falso do Campo (livro ausente, faixa, cartões por responsável, a tabela por cliente
+  com o responsável e os técnicos e a que abre sozinha, a ordem, os cinco filtros em cascata acima da tabela, ninguém
+  abre filtrado pelo login, os técnicos não lidos, coluna faltando, o Baixar de cada usina e o não reconhecido que leva
+  à usina).
 - Regra igual à do App (fora do repositório: o cadastro tem nome de usina e o repositório é público): extrair
   `_ext_status` e `_ext_validade_fim` do `function_app.py` pelo AST e rodar as duas no `extintores_cadastro.json`. Em
   09/10: 424.377 comparações (773 × 549 dias, 01/08/2026 a 31/01/2028), 0 diferença; o status gravado no cadastro,
@@ -86,8 +108,9 @@ ligaram ao cadastro do Nexus; todas as regiões estavam com supervisor e coorden
 
 **Relatório em PDF** (`nexus/hseq/relatorio.py`, rota `/t/hseq/extintores/relatorio.pdf`; Levi, 09/10, com as
 observações da TST: "TODOS OS EXTINTORES, CRÍTICOS, ATENÇÃO, OK · DETALHES DO EXTINTOR · o padrão será as fotos ao lado
-de cada extintor, mas será possível puxar relatório só dos críticos"). O mesmo agrupamento por usina e dia e os mesmos
-filtros da tela; o filtro do relatório é o status da TST (`status=todos|criticos|atencao|ok`; o OK leva o "OK sem
+de cada extintor, mas será possível puxar relatório só dos críticos"). Desde 18/10/2026 a tela só pede o de cada usina
+(o "Baixar"; o de todos saiu da tela, ver "A tela"). Dentro do PDF, o agrupamento é por usina e dia, com os filtros da
+tela; o filtro do relatório é o status da TST (`status=todos|criticos|atencao|ok`; o OK leva o "OK sem
 validade"; nunca conferido só entra em "todos"). Com fotos (o padrão): cada extintor num quadro, a foto ao lado dos
 detalhes; `fotos=0`: uma tabela por usina e dia. A FOTO é a cópia de 600 px em
 `<dados>/hseq/extintores/fotos/pdf/<código>.jpg` (`fotos.foto_pdf`), feita UMA vez por foto recebida e refeita quando o
@@ -116,7 +139,7 @@ as conferências com foto que o Nexus ainda não aceitou, da mais velha para a m
 foto vai de novo. A 1ª volta (03:54Z) mandou as 90 pendentes desde a v257, todas "200 foto guardada". Conferido no
 Nexus de produção: 90 extintores com miniatura, em 16 usinas, e o PDF da Aquiraz 2 (CRS200-INFC1-PPCI-EXT01) de 13/10
 com a foto ao lado. Prova de uma foto: `GET /t/hseq/extintores/foto/<código>.jpg` (com login) e a miniatura na Tabela
-(a visão Por supervisor não tem foto).
+(os cartões Por responsável não têm foto).
 
 **Não reconhecido em campo** (Levi, 14/10/2026). Na Axis Linhares 1 - ES a equipe fez a ronda e só achou 4 dos 17
 extintores do cadastro, e o App não tinha como dizer isso ("pode ter um botão no app de campo de 'Não reconhecido' para
@@ -128,9 +151,12 @@ faz:
 - o não reconhecido sai de TODAS as contas: situações, sem atualização, cartões, Visão do responsável e o PDF por
   status (pode não existir);
 - a tela o lista numa caixa âmbar logo abaixo da faixa (a marca mais nova primeiro, com quem marcou e a conferência de
-  antes), e a faixa ganha o número "Não reconhecidos", que leva a ela;
-- o PDF de todos põe uma seção à parte no fim e o número na casa que sobrava do resumo; o "Baixar" de uma usina e dia
-  leva os daquela usina marcados naquele dia; o de só críticos/atenção/OK e o da faixa, não;
+  antes), e a faixa ganha o número "Não reconhecidos", que leva a ela; a linha (e o nome da usina, pelo teclado) leva à
+  tabela filtrada naquela usina, com o cliente e a usina abertos (Levi, 18/10/2026: "ao clicar na linha já encaminhe
+  para a tabela filtrando aquela usina");
+- o PDF de todos põe uma seção à parte no fim e o número na casa que sobrava do resumo; o "Baixar" de uma usina leva
+  os daquela usina (com o `dia` do link de antes, os marcados naquele dia); o de só críticos/atenção/OK e o da faixa,
+  não;
 - livro sem as duas colunas (o App antes da versão que as publica): ninguém é não reconhecido.
 A TST resolve no cadastro (dar baixa, mudar de usina ou corrigir o código), que hoje é do App. Prova:
 `tests/test_hseq_extintores.py` (os três testes do não reconhecido).

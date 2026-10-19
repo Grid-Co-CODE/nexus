@@ -12,11 +12,14 @@
   <a href="{{ url_for('casca.inicio', aba='atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
 </nav>
 
-{# sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa, e a de cima é a versão no ar #}
-<p class="lead">O que mudou no Nexus, do mais novo para o mais antigo. A de cima é a versão no ar.</p>
+{# sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa. Só novidade e correção dos últimos 60 dias
+   (19/10/2026, Levi: "deixe só novidade e correção, sempre os últimos 60 dias!") #}
+<p class="lead">As novidades e as correções do Nexus nos últimos {{ janela }} dias, da mais nova para a mais antiga.</p>
 
-{% if not dias %}
+{% if not tem_git %}
 <p class="aviso">Sem o histórico de atualizações nesta máquina (o Nexus não está num clone do repositório).</p>
+{% elif not dias %}
+<p class="aviso">Nenhuma novidade ou correção nos últimos {{ janela }} dias.</p>
 {% else %}
 <div class="atualizacoes">
   {% for rotulo, itens in dias %}
@@ -24,12 +27,13 @@
     <h2 class="ui-kicker">{{ rotulo }}</h2>
     <ol class="atu-lista">
       {% for x in itens %}
-      <li class="atu-item{% if loop.first and loop.index0 == 0 and rotulo == dias[0][0] %} atu-item--no-ar{% endif %}">
+      <li class="atu-item{% if no_ar and x.sha == no_ar %} atu-item--no-ar{% endif %}">
         <div class="atu-cab">
           {% if x.tipo %}<span class="gc-status gc-status--{{ {'feat': 'ok', 'fix': 'alerta', 'perf': 'info'}.get(x.tipo_id, 'neutro') }}">{{ x.tipo }}</span>{% endif %}
           {% if x.area %}<span class="atu-area">{{ x.area }}</span>{% endif %}
           <code class="atu-commit">{{ x.curto }}</code>
-          {% if loop.first and rotulo == dias[0][0] %}<span class="gc-status gc-status--ok">no ar</span>{% endif %}
+          {# o "no ar" é o commit em execução, que pode nem estar na lista (uma documentação, um merge) #}
+          {% if no_ar and x.sha == no_ar %}<span class="gc-status gc-status--ok">no ar</span>{% endif %}
         </div>
         <p class="atu-manchete">{{ x.manchete }}</p>
         {% if x.resto %}<p class="atu-resto">{{ x.resto }}</p>{% endif %}
@@ -48,7 +52,7 @@
     </ol>
   </section>
   {% endfor %}
-  <p class="mudo atu-rodape">Os últimos {{ total }} commits do Nexus.</p>
+  <p class="mudo atu-rodape">{{ total }} {{ 'novidade ou correção' if total == 1 else 'novidades e correções' }} nos últimos {{ janela }} dias.</p>
 </div>
 {% endif %}
 {% endblock %}

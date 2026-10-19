@@ -34,9 +34,29 @@
   text-align:center;padding:8px 6px;border-bottom:1px solid var(--linha);background:none}
 .ext-tab tr.cn-detalhe .ext-sub td{text-align:center;padding:8px 6px;border-bottom:1px solid var(--linha);background:none}
 .ext-tab tr.cn-detalhe .ext-sub tr:last-child td{border-bottom:0}
-/* o relatório em PDF: uma linha discreta abaixo da faixa de números */
-.ext-relatorio{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:14px}
-.ext-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--tinta-2)}
+/* por cliente (Levi, 18/10/2026): a linha do cliente e, abaixo dela, as das usinas, na MESMA tabela (o nome da usina
+   recuado, para ler como parte do cliente); a usina abre os extintores numa tabela menor. O responsável e os técnicos
+   vão à esquerda, como a usina; os técnicos um embaixo do outro, como na tela Técnicos por usina do PCM ("os técnicos
+   um embaixo do outro, sem borda") */
+.ext-tab td.ext-esq{text-align:left}
+.ext-tab td.ext-us-nome{padding-left:30px}
+.ext-tecs{display:inline-flex;flex-direction:column;gap:2px}
+/* o nome da usina, o do cliente e o do responsável quebram entre as palavras (cada técnico fica numa linha só): sem
+   isso, as nove colunas com as usinas abertas pediam 1.219 px a 1440 (a caixa tem 1.168; medido em 18/10/2026 com o
+   banco real); quebrando, cabem, e com espaço o nome segue numa linha */
+.ext-tab td.ext-us-nome,.ext-tab td.ext-esq,.ext-tab tr.ext-cli td.ext-usina{white-space:normal}
+.ext-tecs > span{white-space:nowrap}
+/* as contas ao lado do número ("36 atrasados · 2 perto de vencer · 13 em dia") quebram entre os itens, nunca no meio
+   de um: com o responsável e os técnicos, a lista inteira numa parte só levava a tabela aberta a 1.391 px a 1440 (a
+   caixa tem 1.168); quebrando, ela cabe, e com espaço os itens seguem lado a lado */
+.ext-tab .ext-par > .det.ext-lista{white-space:normal}
+.ext-tab .ext-lista > span{white-space:nowrap}
+/* os filtros de Extintores: o rótulo e a caixa ficam juntos ao quebrar a linha */
+.ext-filtro{display:inline-flex;align-items:center;gap:8px;max-width:100%}
+.ext-filtro .gc-campo{min-width:0;max-width:100%}
+/* a linha do não reconhecido leva à tabela filtrada naquela usina */
+.ext-naorec tr.ext-ir{cursor:pointer}
+.ext-naorec tr.ext-ir:hover td{background:var(--superficie-2)}
 /* EPI e EPC (09/10/2026): as últimas respostas das luvas, da mais nova para a mais velha, num quadradinho cada (verde =
    Sim, vermelho = Não; a data e quem respondeu no title); a aba do EPC fica apagada até haver de onde ler */
 .ext-tab .ext-par > .epi-hist{display:inline-flex;gap:3px}     /* vence o inline-block das partes */
