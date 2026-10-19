@@ -136,7 +136,10 @@ só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-1
   filtrada pela usina (para quem abre a tela Ocorrências; para o setor sem ela, a etiqueta sem link). O livro que não
   abre deixa a Visão geral sem as etiquetas, nunca quebrada, e a leitura que falhou espera 1 minuto antes de tentar de
   novo (a Visão geral não fica esperando o banco lento a cada carga). Depois de gravar, a cópia de 1 minuto já tem o
-  que foi gravado; a página que não acha a ocorrência relê o livro antes do 404 (gravada noutro processo).
+  que foi gravado; a página que não acha a ocorrência relê o livro antes do 404 (gravada noutro processo). **A Visão
+  geral não espera a releitura** (19/10/2026, `ocorrencias.ler_sem_esperar`): a cópia vencida volta na hora e o livro
+  é relido por trás, uma releitura por vez (só a 1ª vez depois de subir lê no pedido). A tela Ocorrências segue no
+  `ler` (espera a cópia nova).
 - **Fora, por agora:** as anotações privadas, exportar para .xlsx, o comunicado por IA e a importação do painel antigo.
 - **Prova:** `tests/test_campo_ocorrencias.py` (o estado, a ordem, o catálogo, gravar e ler no banco falso com o texto
   cifrado, as recusas, a releitura que falha não grava, a tela inteira, a etiqueta da Visão geral e, da revisão final,
@@ -575,6 +578,12 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   **44,6 s → 15,2 s** e **38,1 s → 18,5 s** (o banco lento, na carga das 11:10), com a conta igual (131 usinas). Falhou a pré-leitura, cada fonte lê a sua, como antes. **Fonte nova que lê um livro pelo
   `_livro` entra na `pre_leitura`** (o `test_a_pre_leitura_cobre_as_fontes` cobra). O resto da espera fria é o banco
   (as 62 páginas, 8 a 12 s com ele lento) e a Manutenção (a programação do fim para trás e os motivos do PCM, ~5 s).
+  **O filtro também não espera o banco** (Levi, 19/10/2026: "quando eu já filtrei o responsável e vou filtrar o cliente
+  carrega de novo ... e acaba demorando"): cada filtro é um pedido novo e a conta vem da memória, mas o pedido relia as
+  duas cópias curtas quando venciam (quem olhava a tela mais de um minuto antes de filtrar): as ocorrências abertas
+  (1 min) e o de-para dos sites do Fracttal (2 min). Medido no banco real, trocando o cliente: depois de 1 min parado
+  0,97 s → 0,02 s, depois de 2 min 1,47 s → 0,04 s, sem nenhuma leitura no pedido (o site agora vem na conta; as
+  ocorrências voltam na hora e se releem por trás). Prova: `tests/test_campo_filtro_responsavel_19_10.py`.
 - **Três blocos, uma lista** (desde 18/10/2026 na Visão geral, que tirou Onde focar; seção própria abaixo):
   **Performance** (meta, PR, disponibilidade; os ativos falhando como etiqueta no nome), **Manutenção** (seção própria
   abaixo) e **Acompanhamento** (rondas, limpeza, PT, chamados, extintores). Acima, a faixa **Parada agora**. Cada usina
@@ -735,7 +744,8 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   iniciado"): esperando a aprovação, **não iniciada** (OS em processo sem nenhuma tarefa em progresso, pausada no App ou
   feita) e em execução (com uma); as três somam as abertas. A não iniciada é um link para o Quadro da semana com o
   cliente e a usina filtrados ("filtrando o cliente com o nome da usina pesquisada"): a busca vai pelo site do Fracttal
-  do de-para ("Cliente - Usina - UF", o nome do arquivo do PCM; `sites_fracttal`), e sem ele, ou com o provisório
+  do de-para ("Cliente - Usina - UF", o nome do arquivo do PCM; `sites_fracttal`, feito na conta da tela desde
+  19/10/2026, e não no pedido), e sem ele, ou com o provisório
   "(sem Classificação 1) ...", pelo nome do cadastro. Medido em 18/10/2026: 72 dos 80 links acham tarefa na semana ou nas
   que não couberam. **Atrasada é a régua do PCM** (Levi: "Régua do PCM: +10 dias"; o
   `DIAS_ALERTA` do robô da Gestão PCM): tarefa aberta com a Data Programada há MAIS de 10 dias, contada por tarefa, como

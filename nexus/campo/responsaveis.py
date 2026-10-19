@@ -1538,5 +1538,8 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
                 "ranking_por_usina": rk,
                 "tecnicos_por_equipe": {nome: t.get("tecnicos", 0) for nome, t in b.times().items()},
                 "responsaveis_por_pessoa": responsaveis_por_pessoa, "sem_mobilizacao": b.sem_mobilizacao,
+                # o nome do site no Fracttal (o link das OS não iniciadas) vem na conta, e não no pedido: o de-para do
+                # cadastro relido a cada 2 min fazia o filtro esperar o banco (19/10/2026)
+                "sites_fracttal": sites_fracttal(),
                 "fatos": at.dados.get("fatos") or {}, **visao._estrutura(b)}
     return visao._ler(("visao_responsaveis",), calcular)
