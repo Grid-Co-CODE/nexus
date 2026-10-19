@@ -84,11 +84,13 @@ def inicio():
 
 def _atualizacoes():
     """A aba Atualizações do Início (13/10/2026, Levi: "Inclua no início uma sub aba de atualizações mostrando as últimas
-    atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva para lá!"): os últimos commits desta pasta,
-    por dia, com o que mudou."""
-    itens = versao.historico()
-    return render_template("atualizacoes.html", dias=versao.dias(itens), total=len(itens), versao=versao.cartao(
-        current_app._get_current_object()), aba="atualizacoes")
+    atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva para lá!"): por dia, com o que mudou; desde
+    19/10/2026 só novidade e correção dos últimos 60 dias (`versao.da_aba`)."""
+    historico = versao.historico()
+    itens = versao.da_aba(historico)
+    return render_template("atualizacoes.html", dias=versao.dias(itens), total=len(itens), tem_git=bool(historico),
+                           janela=versao.JANELA_DIAS, no_ar=versao.local()["sha"],
+                           versao=versao.cartao(current_app._get_current_object()), aba="atualizacoes")
 
 
 @bp.route("/tema", methods=["POST"])
