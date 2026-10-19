@@ -207,10 +207,12 @@
   {# a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"; no mesmo dia, no lugar de Onde focar: "A
      IDEIA É QUE A VISÃO GERAL SEJA UMA MELHORIA DO ONDE FOCAR, ENTÃO PODE TIRAR O ONDE FOCAR"). Os três blocos em cima,
      na ordem Performance, Manutenção e Acompanhamento, com os números do resumo (`soma`), e as usinas do filtro numa
-     lista só. O clique no nome do bloco ordena a lista pela régua do bloco e destaca as colunas dele (`bloco`; "AO
-     CLICAR NO BLOCO EM VISÃO GERAL DESTAQUE AS COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO"); o "pedem
-     atenção", o nível e cada número filtram (`filtro`; FILTROS_GERAL em nexus/campo/responsaveis.py, a condição de cada
-     número do resumo) e também ordenam e destacam pelo bloco deles. Número zero não é link #}
+     lista só. O clique no bloco (o cartão inteiro: "deve ser possível clicar no bloco (...) inteiro, e não só no
+     título") ordena a lista pela régua do bloco e destaca as colunas dele numa faixa verde (`bloco`; "AO CLICAR NO BLOCO
+     EM VISÃO GERAL DESTAQUE AS COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO"); o "pedem atenção", o nível e
+     cada número, por cima do link do bloco, filtram (`filtro`; FILTROS_GERAL em nexus/campo/responsaveis.py, a condição
+     de cada número do resumo: "funcionará como filtro os KPIs do bloco") e destacam o bloco deles. Número zero não é
+     link #}
   {% set fg = filtros_geral.get(filtro) if filtro else none %}
   {% set nome_bloco = {'perf': 'Performance', 'acomp': 'Acompanhamento', 'manut': 'Manutenção'} %}
   {% macro kpi(chave, rot, valor, cls, sub) %}{% set n = contagem_geral.get(chave, 0) if chave else 0 %}{% if n %}<a class="cr-gr-kpi{% if filtro == chave %} cr-gr-sel{% endif %}" href="{{ url(filtro=None if filtro == chave else chave, bloco=None) }}" title="Ver {{ 'a usina' if n == 1 else 'as ' ~ n ~ ' usinas' }}">{% else %}<div class="cr-gr-kpi">{% endif %}<span class="r">{{ rot }}</span><b class="{{ cls }}">{{ valor }}</b><small>{{ sub }}</small>{% if n %}</a>{% else %}</div>{% endif %}{% endmacro %}
@@ -236,7 +238,7 @@
         {{ kpi('perf.pr_abaixo', 'PR abaixo', resumo.pr_abaixo, 'cn-t-alerta' if resumo.pr_abaixo else '', 'usinas abaixo do previsto') }}
         {{ kpi('perf.disp', 'Disponibilidade', pct(resumo.disp, 1), c_disp(resumo.disp), 'média do mês, pela potência') }}
         {% elif b == 'manut' %}
-        {{ kpi(none, 'OS abertas', resumo.os_abertas, '', 'em processo e em verificação') }}
+        {{ kpi('manut.os', 'OS abertas', resumo.os_abertas, '', 'em processo e em verificação') }}
         {{ kpi('manut.atrasadas', 'Tarefas atrasadas', resumo.atrasadas, 'cn-t-alerta' if resumo.atrasadas else '', 'programadas há mais de 10 dias') }}
         {{ kpi('manut.paradas', 'Tarefas pausadas', resumo.tarefas_paradas, 'cn-t-alerta' if resumo.tarefas_paradas else '', 'fora da programação') }}
         {{ kpi('manut.semana', 'Semana passada', pct(resumo.semana_pct, 0), '', 'do plano feito (meta de 85%)') }}
@@ -269,7 +271,7 @@
     <b>{{ lista_geral|length }} de {{ usinas|length }} usina{{ 's' if usinas|length != 1 }}</b>
     {% if fg %}<span class="cr-gr-filtro">{{ nome_bloco[fg[0]] }} · {{ fg[1] }}<a class="cr-gr-limpar" href="{{ url(filtro=None, bloco=None) }}" title="Tirar o filtro" aria-label="Tirar o filtro">×</a></span>
     {% elif bloco_ordem %}<span class="cr-gr-filtro">Ordenado por {{ nome_bloco[bloco_ordem] }}<a class="cr-gr-limpar" href="{{ url(bloco=None) }}" title="Voltar à ordem geral" aria-label="Voltar à ordem geral">×</a></span>
-    {% else %}<span class="mudo">Clique no nome de um bloco para ordenar as usinas por ele; num número, para ver só as que pedem atenção nele.</span>{% endif %}
+    {% else %}<span class="mudo">Clique num bloco para ordenar as usinas por ele; num número dele, para ver só as usinas que o número conta.</span>{% endif %}
   </div>
   {# as colunas na ordem do Levi (18/10/2026): Performance (Meta, PR / prev., Disp.), Manutenção (OS abertas, Atrasadas,
      Pausadas, Semana passada) e Acompanhamento (Ronda, Limpeza, PT, Chamados, Extintores); o resto fica no detalhe #}
@@ -312,7 +314,8 @@
     </aside>
   </div>
   {% else %}
-  <div class="cr-gr-lista">
+  {# `data-bloco`: a faixa verde nas colunas do bloco destacado (campo.css, "o bloco destacado") #}
+  <div class="cr-gr-lista"{% if bloco_sel %} data-bloco="{{ bloco_sel }}"{% endif %}>
     <div class="cr-g cr-gr-grupos cr-gr-g"><span></span>{% for b in ('perf', 'manut', 'acomp') %}<span class="cr-gr-gp cr-gr-gp--{{ b }}{% if bloco_sel == b %} cr-gr-gp--sel{% endif %}">{{ nome_bloco[b] }}</span>{% endfor %}<span></span></div>
     <div class="cr-cols cr-g cr-gr-g"><span>Usina</span>{% for b, k, rot in cols %}<span class="cr-col-{{ k }}{% if bloco_sel == b %} cr-gr-csel{% endif %}">{{ rot }}</span>{% endfor %}<span></span></div>
     {% for u in lista_geral %}{% set nv = u[bloco_sel].nivel if bloco_sel else u.nivel %}
@@ -341,6 +344,10 @@
   </div>
   {% endif %}
 
+  {# as réguas atrás do "!" abaixo da tabela (Levi, 18/10/2026: o texto "deve ficar em um símbolo de exclamação abaixo
+     da tabela!"): fechado ao abrir a tela, o símbolo abre o texto de sempre #}
+  <details class="cr-info">
+  <summary title="De onde vem cada número e a régua de cada alerta" aria-label="De onde vem cada número e a régua de cada alerta"><i class="ph ph-warning-circle" aria-hidden="true"></i></summary>
   <div class="cn-nota">
     <b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
     dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.
@@ -356,6 +363,7 @@
     {% if info.get('extintores') and not info.extintores.publicado %}<br>O livro de extintores do App ainda não chegou ao banco: a coluna Extintores fica vazia.{% endif %}
     {% if info.get('ativos') and not info.ativos.completa %}<br>A leitura das OS de falha do Fracttal ainda não terminou: os ativos podem estar incompletos.{% endif %}
   </div>
+  </details>
 
   {# as janelas por cima da tela, com o fundo desfocado: o pedaço de página vem da rota (`responsaveis_painel`,
      `responsaveis_pt`) e entra aqui; Esc, o Fechar e o clique fora fecham #}
