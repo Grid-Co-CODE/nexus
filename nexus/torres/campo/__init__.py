@@ -391,6 +391,12 @@ def responsaveis():
     else:
         responsavel = "" if pedido == TODOS else pedido
     cliente = request.args.get("cliente", "")
+    # o Cliente lista os clientes das usinas do responsável escolhido (Levi, 18/10/2026: "O filtro de cliente deve
+    # filtrar de acordo com o responsável"); o cliente que não é dele deixa de valer, e a tela não esvazia
+    opcoes_cliente = sorted({u.get("cliente") for u in todas if u.get("cliente") and (
+        not responsavel or (u.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel)})
+    if cliente not in opcoes_cliente:
+        cliente = ""
     # a equipe (18/10/2026): o cartão do Ranking das equipes abre a Visão geral só com as usinas dela; o nome exato do
     # cadastro, nunca um pedaço (a busca continua para isso)
     equipe = request.args.get("equipe", "")
@@ -466,7 +472,7 @@ def responsaveis():
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
-        opcoes_responsavel=nomes, opcoes_cliente=sorted({u.get("cliente") for u in todas if u.get("cliente")}),
+        opcoes_responsavel=nomes, opcoes_cliente=opcoes_cliente,
         sem_responsavel=visao.SEM_RESPONSAVEL, reguas=campo_resp.REGUAS, rotulo_area=campo_resp.ROTULO_AREA,
         sites=campo_resp.sites_fracttal() if modo == "geral" else {}, info=d.get("info") or {},
         erros=d.get("erros") or {},
