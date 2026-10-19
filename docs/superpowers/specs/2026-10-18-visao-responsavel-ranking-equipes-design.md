@@ -199,15 +199,15 @@ rondas).
 ## Como provar que funciona
 
 - **A régua, num módulo puro** (escolha do Claude: `nexus/campo/ranking_equipes.py`), com testes num dia fixo: a média
-  única de OS e rondas; o arredondamento (0,6 × 79 + 0,4 × 50 = 67,4 → 67); a cobertura sobre as usinas da equipe que
-  passam pelo filtro; a avulsa na cobertura e fora da qualidade; a nota vazia fora; os limites do período (hoje − 29
+  única de OS e rondas; o arredondamento (0,6 × 79 + 0,4 × 50 = 67,4 → 67); a cobertura sobre todas as usinas da equipe
+  (com qualquer filtro, ver "Depois da 1ª entrega"); a avulsa na cobertura e fora da qualidade; a nota vazia fora; os limites do período (hoje − 29
   dentro, hoje − 30 no anterior); a cor em 84/85 e 69/70; o desempate; a equipe sem nota (sem posição, antes das
   ranqueadas); a "Sem equipe" no fim; a seta (sobe, desce, mesma, sem nota antes). Com mutações que os testes pegam.
 - **Contra o App:** a mesma conta sobre o mesmo conjunto de notas dá o mesmo número que o `_ranking_regioes` (um teste
   com a fórmula do App copiada como referência, num caso pequeno).
 - **A tela** (`tests/test_campo_responsaveis.py`): a aba aparece para o administrador e para o responsável logado; o
-  responsável vê só as equipes dele; o filtro de cliente muda a lista; o cartão leva a `modo=foco&equipe=`; o filtro
-  `equipe=` em Onde focar e o "×".
+  responsável vê só as equipes dele; o filtro de cliente escolhe as equipes; o cartão abre o motivo da nota, e o link
+  dele leva à Visão geral da equipe (`modo=geral&equipe=`, com o "×").
 - **No navegador**, com o dado real (cópia de prova, só GET): 1440 e 375 px, escuro e claro, sem rolagem lateral.
 - **Desempenho:** a conta da tela não pode pesar. O agregado por usina (notas e ronda nos dois períodos) entra na cópia
   de 5 min da Visão (`visao_responsaveis`); o agrupamento por equipe sai no pedido (os filtros mudam). Medir a conta fria
@@ -217,6 +217,20 @@ rondas).
 - Atualizar no mesmo trabalho: `nexus/torres/campo/CLAUDE.md` (Visão do responsável: a aba e a régua; Rondas › Painel:
   o nome novo do índice).
 
+## Depois da 1ª entrega (18/10/2026, o Levi testando)
+
+- **5.1, a posição com filtro.** "O ranking das equipes tem que permancer mesmo filtrados, o que está acontecendo agora é
+  que se eu filtro [um responsável] vai contar de 1 a 11, tem que contar de acordo com o ranking". A conta passa a ser
+  sobre todas as equipes (`ranking_equipes.classificar`): nota, posição, "de N" e seta são os do ranking inteiro, e o
+  filtro só escolhe os cartões; o cartão é o da equipe inteira (medido: nenhuma equipe tem usina de dois responsáveis).
+  Os números de cima ficam com os cartões que aparecem; o "Sem equipe", com as usinas do filtro.
+- **5.2, o motivo da nota.** "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe estar abaixo
+  para que o supervisor possa cobrar a equipe". O clique abre uma janela por cima (o mesmo `<dialog>` das janelas da
+  Visão): quantos pontos a nota perde na qualidade e na cobertura; na qualidade, quanto cada critério da nota do App tira
+  (a "Composição da nota" que o App grava em cada tarefa) e quanto as rondas tiram, com as falhas; as 5 notas mais baixas
+  com o dia, a usina, o técnico e o que faltou; a média por técnico; as usinas sem ronda; o link à Visão geral. Os
+  inteiros fecham com a nota (maior resto). Nada novo no banco: a composição é lida do livro cru pela chave do fato.
+
 ## Fica para o construtor
 
 O nome das funções e das rotas internas; o desenho fino do cartão e da barra (sempre por token, nos dois temas); a ordem
@@ -224,8 +238,8 @@ fixa das etiquetas de mesma gravidade; o texto exato dos avisos.
 
 ## Pendente
 
-- **Publicar o placar do ciclo no banco** (`ranking_app_campo`): depende do Levi; a sessão do App de Campo reaplica o
-  pacote sobre a v283, roda a suíte e publica se ele pedir. Com o livro no banco, a tela Ranking de pontos passa a mostrar
-  o placar, e o ranking por equipe pode ganhar os pontos ao lado.
-- **Achado fora deste trabalho (Performance):** a meta do mês de uma usina no `fato_meta_usina_mes` está com produção de
-  10,7 GWh contra meta de 149 MWh (7.209%), e duas usinas passam de 200%. Conserto na publicação do Gerencial.
+- **O placar do ciclo** (`ranking_app_campo`) está no banco desde a v285 do App (18/10/2026) e a tela Ranking de pontos o
+  mostra; 10 linhas saem sem nome (o código do técnico não está no cadastro do App que o Nexus lê). O ranking por equipe
+  pode ganhar os pontos ao lado, se o Levi pedir.
+- **A meta anômala** (Performance): a plataforma sinaliza no `fato_meta_usina_mes.anomalia` e a Visão mostra "anômalo"
+  com o motivo; o conserto do número é na publicação do Gerencial.
