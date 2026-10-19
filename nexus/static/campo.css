@@ -973,3 +973,30 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 @media (max-width:760px){
   .cr-gr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* O mapa das usinas na Visão geral (18/10/2026, Levi: "Para o mapa podemos usar o IBGE como a performance faz"): o desenho
+   do servidor (o contorno dos estados e o ponto de cada usina) e o resumo da usina clicada ao lado */
+.cr-gr-ver{margin-right:4px}
+.cr-mapa{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
+.cr-mapa-quadro{min-width:0;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:8px}
+.cr-mapa-svg{display:block;width:100%;height:auto;max-height:72vh}
+.cr-mapa-ufs path{fill:var(--superficie-2);stroke:var(--linha-forte);stroke-width:1;stroke-linejoin:round}
+.cr-mapa-siglas text{font:600 13px var(--font-sans);fill:var(--mudo);text-anchor:middle;pointer-events:none}
+.cr-mapa-p{stroke:var(--superficie);stroke-width:2;cursor:pointer}
+.cr-mapa-p--critico{fill:var(--critico-cheio)}
+.cr-mapa-p--alerta{fill:var(--alerta-cheio)}
+.cr-mapa-p--ok{fill:var(--ok-cheio)}
+.cr-mapa-p--sel{stroke:var(--verde);stroke-width:4}
+.cr-mapa-lado{display:grid;gap:10px;padding:14px 16px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);font-size:13px}
+.cr-mapa-lado h3{margin:0;font:700 16px/1.3 var(--font-sans)}
+.cr-mapa-lado p{margin:0}
+.cr-mapa-bloco h4{display:flex;align-items:center;gap:6px;margin:0 0 2px;font:700 10.5px/14px var(--font-sans);
+  letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.cr-mapa-nv{display:inline-block;width:9px;height:9px;border-radius:999px;background:var(--ok-cheio)}
+.cr-mapa-nv--critico{background:var(--critico-cheio)}
+.cr-mapa-nv--alerta{background:var(--alerta-cheio)}
+.cr-mapa-leg{display:flex;flex-wrap:wrap;gap:12px}
+.cr-mapa-leg span{display:inline-flex;align-items:center;gap:6px}
+.cr-mapa-sem{font-size:12px}
+@media (max-width:1180px){.cr-mapa{grid-template-columns:minmax(0,1fr)}}
