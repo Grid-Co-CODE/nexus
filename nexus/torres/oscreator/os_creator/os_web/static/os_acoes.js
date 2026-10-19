@@ -5,6 +5,10 @@
 //
 // DELEGAÇÃO no document, e não um listener por card: o card chega por innerHTML (o Histórico injeta o fragmento no modal) e
 // é trocado inteiro a cada recarga — um listener preso ao elemento se perderia. Basta o script estar na página.
+//
+// Fora do card, uma caixa com data-os-acoes (e data-wid/data-folio) também recebe as ações: a tela do chamado do
+// Acompanhamento troca o responsável assim (19/10/2026). Com data-no-lugar, o que mudou é escrito ali mesmo
+// (trocouNoLugar), porque não há card para recarregar.
 (function () {
   'use strict';
   if (window.OsAcoes) return;                         // incluído duas vezes (página cheia + card) não duplica handlers
@@ -12,7 +16,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const apiErro = (j, r) => (j && j.erro) ? (j.login ? j.erro + ' Entre de novo em /os/login.' : j.erro) : ('HTTP ' + (r && r.status));
   const q = (el, s) => el.querySelector(s);
-  const card = (el) => el.closest('.det');
+  const card = (el) => el.closest('.det, [data-os-acoes]');
   const anexosCache = new WeakMap();                  // a lista de anexos por card — duas rodadas de RPC, não repetir a cada clique
 
   async function pedir(url, corpo, texto) {
@@ -120,6 +124,26 @@
     q(d, '[data-acao="nota-salvar"]').hidden = !editando; q(d, '[data-acao="nota-cancelar"]').hidden = !editando;
   }
 
+  // A tela do chamado (Garantias, 19/10/2026): o nome muda ali mesmo, a cor de "no nome de outra pessoa" segue a regra
+  // do servidor (j.da_equipe, a do quadro) e o diálogo, aberto de novo, já diz com quem a OS ficou.
+  function trocouNoLugar(d, nome, j) {
+    const n = q(d, '[data-resp-nome]');
+    if (n) {
+      n.textContent = nome;
+      const dd = n.closest('dd'); if (dd && typeof j.da_equipe === 'boolean') dd.classList.toggle('a', !j.da_equipe);
+    }
+    const t = q(d, 'template[data-dlg="responsavel"]');
+    if (t) {
+      let s = t.content.querySelector('.acoes-s');
+      if (!s) {
+        s = document.createElement('div'); s.className = 'acoes-s'; s.innerHTML = 'Hoje está com <b></b>.';
+        t.content.querySelector('.acoes-t').after(s);
+      }
+      s.querySelector('b').textContent = nome;
+    }
+    mensagem(d, j.mensagem);
+  }
+
   const ACOES = {
     // TrocarResponsavelDialog: lista o pessoal, a pessoa escolhe, 'Atribuir' grava (api.mudar_responsavel)
     async responsavel(d) {
@@ -137,7 +161,9 @@
         trava(ok, true); hint(dlg, 'gravando no Fracttal…');
         try {
           const j = await pedir('/os/api/os/' + d.dataset.wid + '/responsavel', {id_personnel: numero(opt.value), name: opt.textContent, folio: d.dataset.folio});
-          alterou(d); dlg.fechar(); await recarregar(d, urlCard(d), j.mensagem);
+          alterou(d); dlg.fechar();
+          if (d.hasAttribute('data-no-lugar')) { trocouNoLugar(d, opt.textContent, j); return; }
+          await recarregar(d, urlCard(d), j.mensagem);
         } catch (e) { trava(ok, false); hint(dlg, e.message); }
       });
     },

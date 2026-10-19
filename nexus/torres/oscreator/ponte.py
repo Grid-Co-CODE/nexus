@@ -218,11 +218,30 @@ def _segredo(app) -> str:
     return hmac.new(str(app.config["SECRET_KEY"]).encode(), b"nexus/os_web", hashlib.sha256).hexdigest()
 
 
+def token_do_banco_para_o_clone(config, ambiente=None) -> bool:
+    """Põe no ambiente do processo o GRIDCO_SQL_TOKEN que o Nexus leu do .env dele. True se pôs.
+
+    O Nexus lê o .env para o `app.config` e não mexe no ambiente (`nexus.config.ler_ambiente`); o clone procura o token
+    no ambiente (`tickets_escrita._token`: ambiente → cofre do Windows → pasta do usuário → tokens.txt). No servidor não
+    há cofre nem pasta do usuário, e o .env do clone só traz a credencial do Fracttal: as observações do Acompanhamento
+    de chamados, os modelos do Controle de fornecedores e os temas abriam só para ler (Levi, 19/10/2026, em Garantias:
+    "também não está sendo possível digitar observações"). O que já estiver no ambiente vale mais, como sempre."""
+    ambiente = os.environ if ambiente is None else ambiente
+    tk = str(config.get("GRIDCO_SQL_TOKEN") or "").strip()
+    if not tk or str(ambiente.get("GRIDCO_SQL_TOKEN") or "").strip():
+        return False
+    ambiente["GRIDCO_SQL_TOKEN"] = tk
+    return True
+
+
 def _criar_clone(app):
     # append, não insert: o que já está instalado continua vencendo; os nomes do clone (api, steps, tickets_*...)
     # não existem no Nexus nem na biblioteca padrão
     if RAIZ_CLONE not in sys.path:
         sys.path.append(RAIZ_CLONE)
+    # nos testes, não: o ambiente é do processo inteiro, e o token falso de um teste ficaria para os seguintes
+    if not app.config.get("TESTING"):
+        token_do_banco_para_o_clone(app.config)
     from os_web import criar_app
 
     clone = criar_app(segredo=_segredo(app))

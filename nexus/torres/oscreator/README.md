@@ -125,7 +125,10 @@ nesta pasta.
   Nexus). Nenhum teste fala com o Fracttal.
 - **O que não funciona igual:**
   - o login pelo OAuth do Fracttal tem a volta configurada para o supervisório; e-mail e senha funcionam normal;
-  - gravar ticket precisa do `GRIDCO_SQL_TOKEN`, que vem da variável ou do `%APPDATA%` da máquina.
+  - gravar no banco da Gridco (observações dos chamados, modelos do Controle de fornecedores, temas) precisa do
+    `GRIDCO_SQL_TOKEN`. Sozinho, o clone o lê da variável ou do `%APPDATA%` da máquina; no Nexus, é o do `.env` do Nexus,
+    que a ponte põe no ambiente ao criar o clone (`ponte.token_do_banco_para_o_clone`, 19/10/2026: até então o servidor
+    abria tudo isso só para ler).
 
 ## Nova solicitação: PCM ou Engenharia (06/10/2026)
 
@@ -349,7 +352,8 @@ com o App de Campo): nada aqui faz pedido a mais, e o que fica guardado é **por
     Antes, com o quadro vencido, ela relia o ticket de TODAS as OS para abrir uma. O quadro reaproveita estas linhas;
   - `("acomp_tk", pessoa)`: o ticket das OS **concluídas**, 30 min. Concluída não volta e o Fracttal recusa editar OS
     fechada (`api.editar_nota_os`). Então o "Atualizar" relê a lista, as abertas e as em verificação, e não as
-    concluídas dos 90 dias. Gravar ticket ou finalizar tira a OS da memória (`_esquecer(wid)`);
+    concluídas dos 90 dias. Gravar ticket ou finalizar tira a OS da memória (`_esquecer(wid)`); trocar o responsável
+    (no card ou na tela do chamado) também, mas só quando a OS está num quadro guardado (`esquecer_se_no_quadro`);
   - na tela de um chamado, a lista, o detalhe e as observações (banco da Gridco) vão ao mesmo tempo. O id da OS vem
     de uma leitura anterior da própria pessoa, mesmo vencida (o id de um nº não muda), e o detalhe é conferido pelo nº;
   - os cartões dos "outros chamados" são montados uma vez por leitura (eram ~0,2 s de CPU a cada chamado aberto);
@@ -690,7 +694,8 @@ barra dela no alto de cada uma (`_solic_nav.html`: "‹ PCM", Nova solicitação
   (nome, tipo de equipamento do cadastro de ativos, tipo de OS, motivo, Classificação 1, etiquetas, subtarefas);
   Salvar / Descartar / Arquivar gravam pelo `temas_store`, o mesmo livro do app (o que se salva aqui vale para o app). As
   validações do app (nome obrigatório, a chave nasce do nome e nunca muda, nome repetido não entra) estão no
-  `solic_web.tema_para_salvar`. Sem o `GRIDCO_SQL_TOKEN` no servidor a tela abre e não grava (403, com o motivo).
+  `solic_web.tema_para_salvar`. Sem o `GRIDCO_SQL_TOKEN` a tela abre e não grava (403, com o motivo); no Nexus ele vem
+  do `.env` do Nexus desde 19/10/2026 (seção "Trocar o responsável na tela do chamado").
 
 **A mais que o app, de propósito:** as datas em horário de Brasília nas quatro páginas (o app mostra a do Fracttal crua
 no Painel e na Fila, 3 h adiantada); o "só para ler" vale para a solicitação aberta do Painel, não para a Fila inteira;
@@ -866,3 +871,31 @@ da aprovação, como no app de mesa.
   A data do evento segue sendo a da aprovação. Sem data sugerida legível, como antes: programada agora.
 - A confirmação e o aviso de "OS criada" dizem para quando ela ficou programada. A data vem da solicitação, nunca da tela.
 - O app de mesa (`steps/solic_pcm.py`) não mudou. Prova: `tests/test_oscreator_solic_pcm.py`.
+
+## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
+
+Levi, 19/10/2026, em Nexus > Chamados > Garantias: "ao clicar na OS em responsável dê para alterar o responsável da OS que
+nem fazemos no card da OS no histórico de OS Creator!"
+
+- Nos Dados da tela do chamado (`acomp_os.html`), o "trocar" ao lado do nome abre o MESMO diálogo do card: o
+  `<template data-dlg="responsavel">` saiu do `os_detalhe_conteudo.html` para `templates/_dlg_responsavel.html`, que as duas
+  telas incluem (mudou o diálogo, muda nos dois). A busca digitável, o Esc e o "Atribuir" são os de sempre.
+- As ações são as do `os_acoes.js`: além do `.det` (o card), ele acha uma caixa com `data-os-acoes` (e `data-wid`,
+  `data-folio`). Com `data-no-lugar`, a troca é escrita ali mesmo (`trocouNoLugar`: o nome, o "Hoje está com" do
+  diálogo e a mensagem), porque não há card para recarregar. A cor de "no nome de outra pessoa" vem do servidor
+  (`da_equipe` na resposta de `/os/api/os/<id>/responsavel`, a regra do quadro, `acomp_web.da_equipe`).
+- A rota do responsável tira da memória o quadro que mostra a OS (`rotas_acomp.esquecer_se_no_quadro`): voltar ao quadro
+  ou recarregar a tela mostra quem ficou, e não o de antes por até 3 min. OS que não está em nenhum quadro guardado (a
+  troca pelo card do Histórico, numa OS que não é de chamado) não faz ninguém esperar a releitura. A troca já está no
+  Fracttal quando isso roda: erro aqui não vira erro na tela.
+- Conferido numa bancada local com o Fracttal falso: duas trocas seguidas (para a equipe, nome sem cor; para outra
+  pessoa, âmbar), o "Hoje está com" do diálogo acompanhando, o quadro e a tela relidos com o nome novo.
+- **As observações não abriam para escrever** (Levi, no mesmo dia: "também não está sendo possível digitar
+  observações"). A tela dizia "Este servidor não tem a credencial de escrita do banco da Gridco": o Nexus lê o `.env`
+  para o `app.config` e não mexe no ambiente (`nexus.config.ler_ambiente`), e o clone procura o `GRIDCO_SQL_TOKEN` no
+  ambiente (`tickets_escrita._token`: ambiente, cofre do Windows, pasta do usuário, tokens.txt). No servidor não há cofre
+  nem pasta do usuário, e o `.env` do clone só traz a credencial do Fracttal. Desde 30/09 (o clone no servidor) as
+  observações, os modelos do Controle de fornecedores e os temas abriam só para ler. A ponte agora põe o token do Nexus
+  no ambiente ao criar o clone (`ponte.token_do_banco_para_o_clone`; o que já estiver no ambiente vale mais). Nos testes
+  não (o ambiente é do processo inteiro), e o envio dos tickets não muda: direto só com `RELAY_DIRETO_ENV=1`.
+- Prova: `tests/test_oscreator_garantia_responsavel.py`.
