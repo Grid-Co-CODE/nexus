@@ -162,8 +162,8 @@
     ou mais verde, 70 ou mais âmbar). A seta compara com os 30 dias anteriores. Diferenças contra o painel do App: a
     equipe da usina é a do cadastro do Nexus (no App, a do catálogo e da programação dele), a base da cobertura são as
     usinas mobilizadas, o dia é o de Brasília e a ronda avulsa do Nexus conta na cobertura. Com filtro, a posição e a
-    nota continuam as do ranking de todas as equipes: o filtro só escolhe os cartões. O clique no cartão abre o motivo
-    da nota.
+    nota continuam as do ranking de todas as equipes: o filtro só escolhe os cartões. O clique no cartão abre o detalhe
+    para cobrar, item a item com a prova, e a nota com os pontos que as OS perderam.
     {# o período e de onde vieram as notas (revisão de 18/10/2026): o fato de fechamento pode sair na hora quando o banco
        ainda não tem a carga desta versão do livro do App (`visao._fato`) #}
     {% set rk_i = info.get('ranking') or {} %}{% if rk_i.get('atual') %}Período: de {{ dia_curto(rk_i.atual[0]) }} a {{ dia_curto(rk_i.atual[1]) }} (o anterior: de {{ dia_curto(rk_i.anterior[0]) }} a {{ dia_curto(rk_i.anterior[1]) }}).{% endif %}
@@ -198,7 +198,7 @@
         {% for e in c.etiquetas %}<span class="cr-tag cr-tag--{{ e.cls }}">{{ e.txt }}</span>{% else %}<span class="cr-tag cr-tag--ok">nada a cobrar nos três blocos</span>{% endfor %}
         {% if c.mais %}<span class="cr-tag cr-tag--neutro">e mais {{ c.mais }}</span>{% endif %}
       </div>
-      <span class="cr-rk-ir">{{ 'Ver as usinas na Visão geral' if c.sem_equipe else 'Ver o motivo da nota' }}</span>
+      <span class="cr-rk-ir">{{ 'Ver as usinas na Visão geral' if c.sem_equipe else 'Abrir o detalhe para cobrar' }}</span>
     </a>
     {% else %}
     <p class="mudo">Nenhuma equipe com esses filtros.</p>

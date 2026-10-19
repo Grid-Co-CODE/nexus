@@ -416,6 +416,15 @@ def ranking_fonte(b, hoje) -> tuple[dict, dict]:
              **{p: (ini.isoformat(), fim.isoformat()) for p, (ini, fim) in per.items()}})
 
 
+def tecnicos_da_equipe(usina_ids) -> list[str]:
+    """Os nomes dos técnicos da equipe dessas usinas, pelo cadastro de pessoas (a regra de `visao._tecnicos_por_equipe`:
+    colaborador de campo da equipe que não está Desligado), para o topo da janela da equipe: quem o supervisor cobra."""
+    b = visao._Base()
+    eids = {visao.D._id((b.por_id.get(uid) or {}).get("equipe_id")) for uid in usina_ids} - {None, 0}
+    nomes = visao._tecnicos_por_equipe(b) if eids else {}
+    return sorted({n for e in eids for n in nomes.get(e, [])})
+
+
 def _itens_da_nota(v) -> list[dict]:
     """A "Composição da nota" que o App grava em cada tarefa (JSON: rótulo, peso, pontos e o detalhe de cada critério);
     texto que não é a lista esperada vira lista vazia (a tarefa fica em "sem a composição da nota")."""
@@ -921,7 +930,9 @@ def montar(b, usinas_ronda, pendentes, pts, fontes, hoje) -> list[dict]:
                     p["desde"] = dia
             p["lista"].append({"numero": x.get("numero"), "codigo": x.get("codigo"), "os": x.get("os"),
                                "tarefa": str(x.get("tarefa") or "")[:70], "idade_min": x.get("idade_min"),
-                               "parada": bool(x.get("parada")), "hoje": de_hoje, "dia": dia})
+                               "parada": bool(x.get("parada")), "hoje": de_hoje, "dia": dia,
+                               # quem pediu a PT, para o "Em quê cobrar" da janela da equipe (18/10/2026)
+                               "solicitante": x.get("solicitante") or ""})
     out = []
     for uid in b.mobilizadas:
         o = b.onde(uid)

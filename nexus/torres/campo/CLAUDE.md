@@ -759,17 +759,29 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
   cartões, e o cartão é o da equipe inteira. Os números de cima são os dos cartões que aparecem. O "Sem equipe" fica com
   as usinas do filtro (é a lista do conserto no cadastro). Medido em 18/10/2026: nenhuma das 55 equipes tem usina de dois
   responsáveis; o responsável com 12 equipes passou de 1º a 12º para 7º a 42º de 52.
-- **O motivo da nota** (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe
-  estar abaixo para que o supervisor possa cobrar a equipe"): o clique no cartão abre a janela
-  `/t/campo/responsaveis/equipe?equipe=` (`ranking_equipes.motivos`, o pedaço `_resp_equipe.html`). A nota perde 100 −
-  nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte da qualidade vai a cada critério da
-  nota do App (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas 25, fotos 20, descrição
-  das fotos 10, assinatura 10, observação 15, GPS 20, que somam a nota; medido em 18/10/2026, fecha em 3.790 de 3.790
-  tarefas) e às rondas (os pontos que perderam, com as falhas que o App aponta). Os inteiros da tela são repartidos pelo
-  maior resto e sempre fecham com a nota (provado nas 52 equipes). Depois: as 5 notas mais baixas (tarefas iguais da
-  mesma OS numa linha, "7 tarefas iguais"), a média por técnico, as usinas sem ronda e o link à Visão geral da equipe.
-  `responsaveis.ranking_detalhe` lê as MESMAS linhas da conta (o número de notas bate com o do cartão nas 52 equipes).
-  A janela leva 0,1 s; sem as notas do App, diz.
+- **A janela da equipe** (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da
+  equipe estar abaixo para que o supervisor possa cobrar a equipe"; depois, "quero ao clicar na equipe um detalhamento
+  melhor [do Em quê cobrar], não cheio de informações mas quero a informação, ao resumido e direto onde o supervisor
+  bata o olho e possa cobrar o técnico com dados!"; no quiz, "Item a item com a prova" e, nas OS mais baixas, "Faltou
+  os pontos"): o clique no cartão abre `/t/campo/responsaveis/equipe?equipe=` (o pedaço `_resp_equipe.html`).
+  - No topo, os técnicos da equipe pelo nome (`responsaveis.tecnicos_da_equipe`, o cadastro), a posição e a nota.
+  - **Em quê cobrar** (`ranking_equipes.cobrar`): as MESMAS áreas e níveis das etiquetas do cartão (Focar = crítico,
+    Acompanhar = atenção; as usinas da equipe com o bloco Manutenção no limite de quem olha, o cookie da Visão), cada
+    uma com até 3 provas, uma por linha, a pior primeiro: a OS e os dias (parada, atrasadas, pausadas, chamados), a PT e
+    quem pediu (o `solicitante` entra na lista da PT em `montar`), o extintor, o ativo; nas áreas sem lista (ronda,
+    limpeza, meta, semana, zeladoria), o título do alerta da usina; a disponibilidade, a usina e o valor. A OS atrasada
+    não tem técnico no banco (o `fato_tarefa_os` não guarda pessoa, regra 8): ela cobra a equipe, cujos técnicos estão
+    no topo.
+  - **Nota do App** (`ranking_equipes.motivos`): o que ela perde, em pílulas (cobertura, cada critério da nota do App e
+    as rondas). A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte
+    da qualidade vai a cada critério (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas
+    25, fotos 20, descrição das fotos 10, assinatura 10, observação 15, GPS 20, que somam a nota; medido em 18/10/2026,
+    fecha em 3.790 de 3.790 tarefas) e às rondas. Os inteiros são repartidos pelo maior resto e sempre fecham com a nota
+    (provado nas 52 equipes). Depois, as 5 OS com nota mais baixa: a nota, a OS, a usina, quem fez, o dia e os pontos de
+    cada critério que perdeu ("Fotos 0/20 · Observações 0/15"; a ronda, as falhas); tarefas iguais da mesma OS numa
+    linha ("7 tarefas iguais").
+  - `responsaveis.ranking_detalhe` lê as MESMAS linhas da conta (o número de notas bate com o do cartão nas 52
+    equipes). A janela leva 0,1 a 0,2 s; sem as notas do App, diz, e o "Em quê cobrar" continua.
 
 - **A posição é a régua do App** ("de acordo com as regras do ranking do app de campo"): o Ranking por região do painel
   do App (`_ranking_regioes`), a única conta por equipe que o App tem (o placar do ciclo é só por técnico). Nota = 60%
