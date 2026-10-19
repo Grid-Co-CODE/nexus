@@ -829,10 +829,104 @@ def test_equipe_com_ronda_sem_nota_nao_e_chamada_de_sem_ronda(tela, logado, monk
     assert "sem nota do App: nenhuma OS nem ronda pelo App em 30 dias" in html      # a SP Norte 01, sem nada
 
 
-def test_o_filtro_de_cliente_muda_o_ranking(tela, logado):
+def test_o_filtro_de_cliente_escolhe_as_equipes(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking&cliente=Thopen").get_data(as_text=True)
     grade = html[html.index('class="cn-equipes cr-rk"'):]
     assert "SP Norte 01" in grade and "SC Oeste 01" not in grade              # a Coração 1 é de outro cliente
+
+
+def _comp(faltas=None) -> str:
+    """A "Composição da nota" como o App grava no livro: os seis critérios, cheios menos os de `faltas`."""
+    import json
+    faltas = faltas or {}
+    return json.dumps([{"rot": r, "peso": p, "pts": faltas.get(r, (p, ""))[0], "det": faltas.get(r, (p, "ok"))[1]}
+                       for r, p in (("Subtarefas obrigatórias", 25), ("Fotos", 20), ("Fotos com descrição", 10),
+                                    ("Assinatura", 10), ("Observações", 15), ("GPS no fechamento", 20))],
+                      ensure_ascii=False)
+
+
+@pytest.fixture
+def duas_equipes(tela):
+    """A SC Oeste 01 com nota: uma ronda do App na Coração 1 (50, com falhas) e uma tarefa (60: sem fotos e sem GPS).
+    0,6 × 55 + 0,4 × 100 = 73, a 2ª de 2, atrás da SP Norte 01 (93)."""
+    from test_campo_visao import _fech
+    _aba(tela, "rondas_app_campo", "OS de ronda", [
+        _ronda(_dia(1), Falhas="ronda longa pendente; item sem foto de evidência"),
+        _ronda(_dia(3), Falhas="ronda longa pendente"),
+        _ronda(_dia(2), usina="Thopen - Brodowski 1 - SP", ativo="THPN-BWK100", OS=None,
+               **{"Situação da OS": "Não criada — Fracttal: Conecte"}),
+        _ronda(_dia(1), usina="Outro Cliente - Coração 1 - SC", ativo="THPN-COR100", OS="501", Região="SC Oeste 01",
+               Falhas="checklist incompleto; item sem foto de evidência",
+               **{"Nota da ronda": 50, "ID da OS no Fracttal": "5001", "Início": f"{_dia(1)}T12:00:00.000Z",
+                  "Fim": f"{_dia(1)}T13:00:00.000Z"})])
+    # a linha com a composição vem primeiro: o cabeçalho da aba falsa sai da 1ª linha
+    _aba(tela, "fechamentos_app_campo", "Fechamentos", [
+        _fech(4, 60, regiao="SC Oeste 01", OS="801", Tarefa="Limpeza do inversor", Usina="Outro Cliente · Coração 1",
+              **{"ID da OS no Fracttal": "8001", "Código do ativo": "THPN-COR100-INVR1",
+                 "Composição da nota": _comp({"Fotos": (0, "0 fotos (3 dá o total)"),
+                                              "GPS no fechamento": (0, "sem posição")})}),
+        _fech(5, 90), _fech(6, 70), _fech(7, 100, regiao="Grid Co.")])
+    visao.limpar()
+    return tela
+
+
+def _grade(html):
+    return html[html.index('class="cn-equipes cr-rk"'):]
+
+
+def test_filtrado_a_posicao_fica_a_do_ranking_inteiro(duas_equipes, logado):
+    # Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados, o que está acontecendo agora é que se
+    # eu filtro [um responsável] vai contar de 1 a 11, tem que contar de acordo com o ranking"
+    grade = _grade(logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True))
+    assert grade.index("SC Oeste 01") < grade.index("SP Norte 01")          # da última para a 1ª
+    assert '2º<small> de 2</small>' in grade and '1º<small> de 2</small>' in grade
+    for filtro in ("responsavel=Beltrano+Supervisor", "responsavel=*&cliente=Outro+Cliente", "responsavel=*&q=cora"):
+        html = logado.get(f"/t/campo/responsaveis?{filtro}&modo=ranking").get_data(as_text=True)
+        grade = _grade(html)
+        assert "SC Oeste 01" in grade and "SP Norte 01" not in grade, filtro
+        assert '2º<small> de 2</small>' in grade and "1º" not in grade, filtro
+        assert ">73<" in grade, filtro
+
+
+def test_o_responsavel_logado_ve_a_posicao_do_ranking_inteiro(duas_equipes, cliente):
+    grade = _grade(_responsavel(cliente).get("/t/campo/responsaveis?modo=ranking").get_data(as_text=True))
+    assert "SC Oeste 01" in grade and "SP Norte 01" not in grade and '2º<small> de 2</small>' in grade
+
+
+def test_o_cartao_abre_o_motivo_da_nota(duas_equipes, logado):
+    # Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe estar abaixo para
+    # que o supervisor possa cobrar a equipe"
+    html = logado.get("/t/campo/responsaveis?responsavel=Beltrano+Supervisor&modo=ranking").get_data(as_text=True)
+    painel = re.search(r'data-cr-painel="([^"]*/responsaveis/equipe\?[^"]*)"', _grade(html)).group(1)
+    assert "equipe=SC+Oeste+01" in painel and "responsavel=Beltrano+Supervisor" in painel
+    jan = logado.get(painel.replace("&amp;", "&")).get_data(as_text=True)
+    assert "SC Oeste 01" in jan and "2º de 2" in jan and ">73<" in jan
+    # perde 27: todos na qualidade (55; a cobertura está em 100%): a ronda tira 15 (0,6 × 50 ÷ 2), as fotos e o GPS da
+    # tarefa, 6 cada (0,6 × 20 ÷ 2)
+    assert "perde <b>27</b> pontos" in jan
+    assert re.findall(r'<li><b>([^<]+)</b><span>tira (\d+)</span>', jan) == [
+        ("Rondas", "15"), ("Fotos", "6"), ("GPS no fechamento", "6")]
+    # as notas mais baixas, com quem fez e o que faltou
+    piores = jan[jan.index("As notas mais baixas"):]
+    assert piores.index("checklist incompleto; item sem foto de evidência") < piores.index(
+        "Fotos: 0 fotos (3 dá o total); GPS no fechamento: sem posição")
+    assert "Limpeza do inversor" in piores and "Técnico Silva" in piores and "Fulano Souza" in piores
+    visao_geral = re.search(r'href="([^"]*modo=geral[^"]*)"', jan).group(1)
+    assert "equipe=SC+Oeste+01" in visao_geral and "responsavel=Beltrano+Supervisor" in visao_geral
+
+
+def test_o_motivo_da_equipe_sem_nota_diz_o_que_falta(tela, logado):
+    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SC+Oeste+01").get_data(as_text=True)
+    assert "Sem nota do App" in jan and "Coração 1" in jan                    # a usina sem ronda em 30 dias
+    assert logado.get("/t/campo/responsaveis/equipe?equipe=Nao+Existe").status_code == 404
+    assert logado.get("/t/campo/responsaveis/equipe").status_code == 404
+
+
+def test_sem_as_notas_do_app_o_motivo_avisa(tela, logado, monkeypatch):
+    monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("fato fora")))
+    visao.limpar()
+    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
+    assert "Não consegui ler as notas do App" in jan and "perde <b>" not in jan
 
 
 # ── A Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que
