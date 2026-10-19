@@ -1094,6 +1094,9 @@ FILTROS_GERAL = {
     "acomp.pts": ("acomp", "PT esperando", lambda u: bool((u.get("pt") or {}).get("aguardando"))),
     "acomp.chamados": ("acomp", "Chamados", lambda u: bool((u.get("chamados") or {}).get("abertos"))),
     "acomp.ext": ("acomp", "Extintores vencidos", lambda u: bool((u.get("extintores") or {}).get("vencidos"))),
+    # o OS abertas filtra também (Levi, 18/10/2026: "funcionará como filtro os KPIs do bloco"): a OS em processo ou em
+    # verificação da usina, a mesma conta do número do bloco
+    "manut.os": ("manut", "Com OS abertas", lambda u: bool(_manut(u).get("os_abertas"))),
     "manut.atrasadas": ("manut", "Tarefas atrasadas", lambda u: bool(_manut(u).get("atrasadas"))),
     "manut.paradas": ("manut", "Tarefas pausadas", lambda u: bool(_manut(u).get("paradas"))),
     "manut.semana": ("manut", "Semana passada abaixo de 85%", _semana_abaixo),

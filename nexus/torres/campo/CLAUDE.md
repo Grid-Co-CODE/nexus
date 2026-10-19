@@ -501,7 +501,9 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   ela; "Ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a Performance pela
   meta do mês, da pior para a melhor, sem meta no fim (`ordem_da_meta`); a Manutenção pelo nível e pelas atrasadas
   (`ordem_da_manutencao`); o Acompanhamento pela ronda, a pior em cima (`ordem_da_ronda`: nunca teve; sem ronda há 7
-  dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado).
+  dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado). As réguas de cada alerta
+  ficam atrás do "!" abaixo da tabela (Levi, 18/10/2026: "deve ficar em um símbolo de exclamação abaixo da tabela!"),
+  fechadas ao abrir a tela.
 - **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
@@ -744,24 +746,33 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
   e Extintores. As células são os `valores` de cada bloco, com a mesma cor; o valor da Performance abre o dia a dia; a
   etiqueta de cada bloco (parada, ativos) vai no nome; ao abrir, o detalhe dos três blocos (o macro `det_bloco`).
   "Pausadas" (o nome do Levi) é a tarefa fora da programação; "parada" fica para a usina parada.
-- **O clique:** o nome do bloco ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta; `manut`:
-  `ordem_da_manutencao`; `acomp`: a pior ronda) e destaca as colunas dele (`lista_geral`, `bloco_geral`); clicar de novo
-  volta à ordem geral (a do foco). O "pedem atenção", "focar", "acompanhar" e cada número FILTRAM (`filtro=`;
-  `FILTROS_GERAL` guarda a condição de cada um, a MESMA que conta o número no `soma`, nenhuma régua nova) e destacam o
-  bloco deles, MAS a lista segue na ordem do foco (revisão de 18/10/2026: "PT esperando" ordenado pela ronda jogava a PT
-  parada hoje para o fim, contra a regra da tela). Chave que não existe é ignorada; número zero não é link; OS abertas
-  não filtra; o × limpa. O filtro e o bloco seguem quando se troca o responsável, o cliente ou a busca; o "Todos os
+- **O clique:** o bloco (o cartão inteiro, não só o nome: "deve ser possível clicar no bloco (...) inteiro, e não só no
+  título"; o link do nome cobre o cartão pelo `::after`) ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta;
+  `manut`: `ordem_da_manutencao`; `acomp`: a pior ronda) e destaca as colunas dele (`lista_geral`, `bloco_geral`);
+  clicar de novo volta à ordem geral (a do foco). O "pedem atenção", "focar", "acompanhar" e cada número, por cima do
+  link do bloco, FILTRAM ("funcionará como filtro os KPIs do bloco"; `filtro=`; `FILTROS_GERAL` guarda a condição de
+  cada um, a MESMA que conta o número no `soma`, nenhuma régua nova: o "Abaixo da meta: 80" mostra as 80 usinas) e
+  destacam o bloco deles, MAS a lista segue na ordem do foco (revisão de 18/10/2026: "PT esperando" ordenado pela ronda
+  jogava a PT parada hoje para o fim, contra a regra da tela). Chave que não existe é ignorada; número zero não é link;
+  o OS abertas filtra as usinas com OS em processo ou em verificação (`manut.os`); o × limpa. O filtro e o bloco seguem quando se troca o responsável, o cliente ou a busca; o "Todos os
   responsáveis ×" fica na Visão geral, e o cartão de um responsável abre sem filtro. A bolinha da linha é o nível do
   bloco destacado (sem bloco, o da usina); a zeladoria vencida (fora das colunas) vai como etiqueta no nome.
 - **A largura:** as colunas dividem a largura em frações (a Usina com 160 px no mínimo e duas partes), e o valor quebra
   a linha se precisar. De 1181 a 1366 px (o notebook comum) ficam as colunas principais: Meta, Disp., Atrasadas,
   Pausadas, Semana passada, Ronda e PT (o resto no detalhe). Até 1180 px a lista vira cartões, com as etiquetas P, M e A
-  na cor do nível de cada bloco e o alerta principal (a do bloco destacado, com contorno). O realce das colunas é o
-  cinza `--superficie-3` (o verde-suave apagava as células verdes).
+  na cor do nível de cada bloco e o alerta principal (a do bloco destacado, com contorno).
+- **O destaque do bloco** (Levi, 18/10/2026: "esse destaque em azul tá feio (...) Mude para um verde grid com uma
+  transparência de 70% pegando cabeçalho e célula pegando a área do bloco toda!"): uma faixa `--verde-a30` (o verde Grid
+  70% transparente) do nome do grupo à última usina, nas colunas do bloco e no espaço entre elas. É o `::before` de cada
+  linha da grade, posto nas colunas do bloco pelo `data-bloco` da lista (a 1366 px, nas colunas que sobram; nos cartões,
+  sai). A etiqueta do número leva o fundo da lista por baixo da cor dela: o "em dia" verde não some no verde (o porquê do
+  cinza que havia antes).
 - **O centro das colunas:** o cabeçalho e as células `cr-col-*` ficam no centro (`.cr-g > [class*="cr-col-"]`); a Usina,
   à esquerda.
 - **Prova (18/10/2026, o banco real só lido):** 131 usinas; o clique em Manutenção pôs as críticas da Manutenção em cima,
-  com as colunas realçadas; a 1920, 1440, 1300 e 375 px, nos dois temas, sem rolagem de lado.
+  com as colunas realçadas; a 1920, 1440, 1300 e 375 px, nos dois temas, sem rolagem de lado. Na mesma noite, o bloco
+  inteiro: o clique no vazio do cartão ordena e cada um dos 12 números leva ao filtro dele (OS abertas: 2.697 OS em 127
+  usinas, a lista com as 127); a faixa verde a 1440 e 1300 px nos dois temas, fora a 375 px.
 
 ### O mapa das usinas na Visão geral (18/10/2026)
 

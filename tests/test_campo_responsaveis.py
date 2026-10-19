@@ -1090,9 +1090,79 @@ def test_a_zeladoria_vencida_aparece_no_nome(manut, logado):
     assert "zeladoria vencida" in lista[i:lista.index("</b>", i)]
 
 
-def test_o_realce_nao_apaga_o_verde_das_celulas():
-    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
-    assert re.search(r"\.cr-gr-csel\{[^}]*background:var\(--superficie-3\)", css)
+# ── O bloco inteiro, os números que filtram, a faixa verde e as réguas no "!" (Levi, 18/10/2026) ─────────────────────
+def _campo_css():
+    return (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+
+
+def test_o_bloco_inteiro_ordena_e_os_numeros_por_cima_filtram():
+    """Levi: "deve ser possível clicar no bloco da performance, manutenção ou acompanhamento inteiro, e não só no
+    título". O link do nome cobre o cartão todo (o ::after dele); o "pedem atenção", os números, o nível e o limite das
+    atrasadas ficam por cima e continuam filtrando."""
+    css = _campo_css()
+    assert re.search(r"\.cr-gr-bloco\{[^}]*position:relative", css)
+    assert re.search(r'\.cr-gr-tit::after\{content:"";position:absolute;inset:0', css)
+    por_cima = re.search(r"\n([^{}\n]*a\.cr-gr-kpi[^{}]*)\{position:relative;z-index:1\}", css).group(1)
+    for sel in (".cr-gr-bloco a.cr-gr-atn", ".cr-gr-bloco a.cr-gr-kpi", ".cr-gr-bloco a.cr-gr-chip", ".cr-gr-limite"):
+        assert sel in por_cima, sel
+
+
+def test_os_abertas_tambem_filtra(manut, logado):
+    """Levi: "em clicar no card, por exemplo 'abaixo da meta : 2' vai filtrar as duas usinas citadas, funcionará como
+    filtro os KPIs do bloco": o OS abertas era o único número dos blocos sem filtro."""
+    us = list(_com_manut().values())
+    com_os = [u["usina"] for u in us if (u.get("manutencao") or {}).get("os_abertas")]
+    assert com_os and R.FILTROS_GERAL["manut.os"][:2] == ("manut", "Com OS abertas")
+    assert [u["usina"] for u in R.filtrar_geral(us, "manut.os")] == com_os
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert re.search(r'<a class="cr-gr-kpi" href="[^"]*filtro=manut\.os[^"]*" title="Ver [^"]*"><span class="r">OS abertas<',
+                     html)
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&filtro=manut.os").get_data(as_text=True)
+    assert _nomes_da_lista(html) == com_os and "Manutenção · Com OS abertas" in html
+
+
+def test_o_numero_de_usinas_do_bloco_e_o_que_o_filtro_mostra(manut):
+    """O "abaixo da meta: 2" mostra as 2 usinas: o número que conta usinas é o tamanho do filtro dele."""
+    us = list(_com_manut().values())
+    s = R.soma("Todos", us)
+    assert s["abaixo_meta"]
+    for chave, campo in (("perf.abaixo_meta", "abaixo_meta"), ("perf.pr_abaixo", "pr_abaixo")):
+        assert len(R.filtrar_geral(us, chave)) == s[campo], chave
+
+
+def test_o_destaque_do_bloco_e_uma_faixa_verde_do_cabecalho_ao_fim(manut, logado):
+    """Levi: "esse destaque em azul tá feio (...) Mude para um verde grid com uma transparência de 70% pegando
+    cabeçalho e célula pegando a área do bloco toda!". Uma faixa verde (70% transparente) em cada linha, nas colunas do
+    bloco e no espaço entre elas, do cabeçalho do grupo à última usina. A etiqueta do número fica sobre o fundo da lista:
+    o verde do "em dia" não some no verde (o porquê do cinza da revisão)."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&bloco=manut").get_data(as_text=True)
+    assert '<div class="cr-gr-lista" data-bloco="manut">' in html
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert '<div class="cr-gr-lista">' in html
+    css = _campo_css()
+    faixa = re.search(r"\.cr-gr-lista\[data-bloco\] \.cr-gr-g::before\{([^}]*)\}", css).group(1)
+    assert "background:var(--verde-a30)" in faixa and "position:absolute" in faixa and "z-index:-1" in faixa
+    meio = re.search(r"@media \(min-width:1181px\) and \(max-width:1366px\)\{(.*?)\n\}", css, re.S).group(1)
+    for b, larga, estreita in (("perf", "2 / span 3", "2 / span 2"), ("manut", "5 / span 4", "4 / span 3"),
+                               ("acomp", "9 / span 5", "7 / span 2")):
+        assert f'.cr-gr-lista[data-bloco="{b}"] .cr-gr-g::before{{grid-column:{larga}}}' in css, b
+        assert f'.cr-gr-lista[data-bloco="{b}"] .cr-gr-g::before{{grid-column:{estreita}}}' in meio, b
+    cartoes = re.search(r"@media \(max-width:1180px\)\{\n  \.cr-gr-grupos(.*?)\n\}", css, re.S).group(1)
+    assert ".cr-gr-lista[data-bloco] .cr-gr-g::before{display:none}" in cartoes
+    assert not re.search(r"\.cr-gr-csel\{[^}]*superficie-3", css)                      # o azul saiu
+    for nv, tinta in (("ok", "--verde-suave"), ("alerta", "--alerta-suave"), ("critico", "--critico-suave")):
+        assert f".cr-gr-csel .cr-v--{nv}{{background:linear-gradient(var({tinta}),var({tinta})) var(--superficie)}}" in css
+
+
+def test_as_reguas_ficam_no_ponto_de_exclamacao_abaixo_da_tabela(manut, logado):
+    """Levi: o texto "De onde vem cada número, e a régua de cada alerta. (...)" "deve ficar em um símbolo de exclamação
+    abaixo da tabela!". Fechado ao abrir a tela; o símbolo abre o texto de sempre."""
+    for modo, tabela in (("geral", 'class="cr-gr-lista"'), ("cartoes", 'class="cn-equipes"')):
+        html = logado.get(f"/t/campo/responsaveis?responsavel=*&modo={modo}").get_data(as_text=True)
+        i = html.index('<details class="cr-info">')
+        assert html.index(tabela) < i < html.index("<b>De onde vem cada número, e a régua de cada alerta.</b>"), modo
+        resumo = html[i:html.index("</summary>", i)]
+        assert 'aria-label="De onde vem cada número e a régua de cada alerta"' in resumo and "ph-warning-circle" in resumo
 
 
 # ── O número anômalo (Levi, 18/10/2026: "apenas sinalize que o número está anômalo e o dado pode estar errado, temos

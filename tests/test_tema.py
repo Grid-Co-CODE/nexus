@@ -72,6 +72,9 @@ ESCURO_DE_SEMPRE = {
     "--calor-risco-1": "#503f2b", "--calor-risco-2": "#724a26", "--calor-risco-3": "#985224", "--calor-risco-4": "#bf582b",
     "--calor-risco-5": "#e75b3c", "--calor-densidade-1": "#234950", "--calor-densidade-2": "#1e5e68",
     "--calor-densidade-3": "#0e7580", "--calor-densidade-4": "#068b95", "--calor-densidade-5": "#09a2a9",
+    # a faixa do bloco destacado da Visão geral (18/10/2026, Levi: "verde grid com uma transparência de 70%"): token
+    # novo, nenhum valor de antes mudou
+    "--verde-a30": "rgba(163,217,0,.3)",
 }
 
 COR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(", re.I)
