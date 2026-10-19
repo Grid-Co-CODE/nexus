@@ -16,6 +16,7 @@ import api
 
 from . import perf_web
 from . import solic_eng_web as reg
+from . import rotas
 from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_solic_eng", __name__, url_prefix="/os")
@@ -64,7 +65,7 @@ def api_responsaveis():
     nomes = reg.nomes_configurados()
     if not nomes:
         return jsonify({"pessoas": [], "faltam": [], "configurado": False})
-    pessoas, faltam = reg.responsaveis(api.get_responsaveis() or [], nomes)
+    pessoas, faltam = reg.responsaveis(rotas.responsaveis_fracttal(), nomes)
     return jsonify({"pessoas": pessoas, "faltam": faltam, "configurado": True})
 
 
@@ -98,6 +99,7 @@ def api_criar():
     corpo, brutos = _corpo_e_anexos()
     por_id = {str(a.get("id")): a for a in (api.load_assets_cached() or []) if isinstance(a, dict)}
     # o responsável é conferido de novo AQUI: a lista da tela é só a primeira barreira
+    # na criação (uma gravação), o pessoal e as etiquetas vêm do Fracttal na hora, sem a cópia de 10 min
     permitidos, _ = reg.responsaveis(api.get_responsaveis() or [], reg.nomes_configurados())
     ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome)
     if erro:

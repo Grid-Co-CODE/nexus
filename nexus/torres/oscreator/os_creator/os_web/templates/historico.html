@@ -70,27 +70,13 @@
   <div class="hf-tabela">
     <div class="hf-barra">
       <label class="hf-filtro">{{ icone('search', '#8A93A8', 15) }}<input type="search" name="busca" form="f_hist" id="busca_no" value="{{ busca }}" placeholder="Filtrar por nº, cliente, usina, ativo, descrição, status…" title="Filtra as OS carregadas por nº, cliente, usina, ativo, descrição, status, tipo de tarefa e etiqueta  [Ctrl+F]"></label>
-      <span class="hf-hint" id="hint">{{ linhas|length }} OS no período {{ fmt(de + 'T03:00:00', False) }} a {{ fmt(ate + 'T03:00:00', False) }}.</span>
+      <span class="hf-hint" id="hint">{{ linhas|length }} OS no período {{ fmt(de + 'T03:00:00', False) }} a {{ fmt(ate + 'T03:00:00', False) }}.</span>{% if lista_de %}<span class="hf-hint" title="A lista se renova sozinha a cada poucos minutos; o ↻ busca no Fracttal na hora"> Lista das {{ lista_de }}.</span>{% endif %}
     </div>
   <div class="os-tbl-wrap">
     <table class="os-tbl os-hist" id="tab_hist">
       <thead><tr>{% for rot, chave in cols %}<th class="k-{{ chave }}">{{ rot }}</th>{% endfor %}</tr></thead>
       <tbody>
-      {% for l in linhas %}
-      <tr data-id="{{ l.id }}" data-cliente="{{ l.cliente }}" data-usina="{{ l.usina }}" data-tipo="{{ l.tipo }}" data-status="{{ l.status }}" data-tarefa="{{ l.tipo_tarefa or '' }}" data-texto="{{ l._texto }}">
-        {% for rot, chave in cols %}
-        {% if chave == 'folio' %}<td class="k-folio"><a class="os-folio" href="/os/os/{{ l.id }}?status={{ l.status|urlencode }}">{{ l.folio }}</a></td>
-        {% elif chave == 'status' %}<td class="k-status">{% if l.status %}<span class="os-status" {% if l._status_cor %}style="color:{{ l._status_cor }};background:{{ l._status_cor }}29;border-color:{{ l._status_cor }}6b"{% endif %}>{{ l.status }}</span>{% endif %}</td>
-        {% elif chave == 'etiqueta' %}<td class="k-etiqueta">{{ l._etiqueta }}</td>
-        {% elif chave == 'descricao' %}<td class="c-desc k-descricao">{{ l.descricao }}</td>
-        {% elif chave == 'ativo' %}<td class="k-ativo" data-k="ativo" title="{{ l.ativo }}" data-csv="{{ l.ativo }}">{{ l._ativo_curto or l.ativo or '—' }}</td>
-        {% elif chave in datas %}<td class="c-data k-{{ chave }}" data-k="{{ chave }}">{{ fmt(l[chave]) if l.get(chave) else '—' }}</td>
-        {% else %}<td class="k-{{ chave }}" data-k="{{ chave }}">{{ l.get(chave) or '—' }}</td>{% endif %}
-        {% endfor %}
-      </tr>
-      {% else %}
-      <tr class="vazio"><td colspan="{{ cols|length }}">Nenhuma OS no período.</td></tr>
-      {% endfor %}
+      {{ linhas_html }}
       </tbody>
     </table>
   </div>
@@ -287,7 +273,7 @@
   // sem card aberto: recarregar por baixo de uma OS que a pessoa esta lendo fecharia a leitura.
   setInterval(function () {
     if (document.hidden || !modal.hidden) return;
-    enviar(true);
+    enviar(false);
   }, 10 * 60 * 1000);
 
   document.getElementById("b_atualizar").addEventListener("click", function () { document.getElementById("atualizar").value = "1"; });

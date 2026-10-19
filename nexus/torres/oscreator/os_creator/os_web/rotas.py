@@ -14,6 +14,8 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
 import api
 
 from . import ativo_curto, engenharia_web, lancador, oauth_fracttal, perf_web, sessao, sso
+from . import historico_store as HS
+from markupsafe import Markup
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _ASSETS = os.path.join(os.path.dirname(_AQUI), "assets")           # os_creator/assets (logo e ícone do app)
@@ -458,7 +460,7 @@ def api_contagens():
 @bp.route("/api/responsaveis")
 @exige_sessao
 def api_responsaveis():
-    pessoas = sorted(api.get_responsaveis() or [], key=lambda x: (x.get("name") or "").lower())
+    pessoas = sorted(responsaveis_fracttal(), key=lambda x: (x.get("name") or "").lower())
     return jsonify({"pessoas": pessoas})
 
 
@@ -545,6 +547,33 @@ def _progresso_de(token):
     return _aviso
 
 
+# Os catálogos do Fracttal iguais para todos (19/10/2026, superplano do OS Creator): o pessoal ativo (2 pedidos), as
+# etiquetas, os motivos de cancelamento e as OS recentes da tinta dos Ativos eram relidos a cada tela e a cada clique,
+# por cada pessoa. Ficam TTL_CATALOGO na memória, um para todos; o erro não é guardado (a próxima tela tenta de novo).
+TTL_CATALOGO = 600
+
+
+def responsaveis_fracttal() -> list:
+    return [dict(p) for p in _memo(("cat", "responsaveis"), TTL_CATALOGO, lambda: api.get_responsaveis() or [])]
+
+
+def etiquetas_fracttal() -> list:
+    return [dict(e) for e in _memo(("cat", "etiquetas"), TTL_CATALOGO, lambda: api.get_labels() or [])]
+
+
+def motivos_cancelamento() -> list:
+    return list(_memo(("cat", "cancel_motivos"), TTL_CATALOGO, lambda: api.get_cancel_motivos() or []))
+
+
+def os_recentes(dias: int) -> list:
+    return list(_memo(("cat", "os_recentes", dias), TTL_CATALOGO, lambda: api.codigos_os_recentes(dias) or []))
+
+
+def _em_segundo_plano(fn):
+    """Onde a renovação do Histórico roda: uma thread solta (os testes trocam para rodar quando querem)."""
+    threading.Thread(target=fn, daemon=True, name="os-web-historico").start()
+
+
 def _quem() -> str:
     """A pessoa, para a memória não servir a lista de um para outro ("criadas por MIM" depende de quem é o mim)."""
     return (session.get("conta") or {}).get("email") or sessao.email_do_jwt(session.get("jwt") or "") or "?"
@@ -610,22 +639,49 @@ def historico():
     nome_para_id = {v: k for k, v in api.WO_STATUS.items()}
     status_sel = [x for x in request.args.getlist("status") if x in nome_para_id]
     status_ids = [nome_para_id[x] for x in status_sel] or None
-    linhas, erro, info = [], None, {}
+    linhas, erro, info, lista = [], None, {}, None
     forcar = request.args.get("atualizar") == "1"
-    chave = ("hist", _quem(), modo_srv, id_account, id_label, de, ate, tuple(status_ids or ()))
+    # a lista guardada e renovada sem repetir o Fracttal (19/10/2026, `historico_store`): a de "Todos" é uma só para
+    # quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min); a de cada pessoa segue dela
+    filtros = (modo_srv, id_account, id_label, de, ate, tuple(status_ids or ()))
+    chave = ("hist", _quem()) + filtros
+    if id_account == "TODOS":
+        comum = ("hist", "TODOS") + filtros
+        if HS.mesma_visao(_quem(), comum, lambda: (api.list_minhas_os_pagina(
+                modo_srv, "TODOS", id_label, de, ate, status_ids, "", 1, 1) or {}).get("total") or 0):
+            chave = comum
 
     aviso = _progresso_de(request.args.get("p"))
 
-    def _buscar():
+    def _inteira():
         inf = {}
+        g = HS.guardada(chave)
+        ja = {d["id"]: {k: d.get(k) for k in ("status_id", "tipo_tarefa", "event_date", "data_fim", "note", "inicio",
+                                               "gatilho")}
+              for d in (g.linhas if g else []) if d.get("status_id") in api.STATUS_FECHADOS}
         return (api.list_minhas_os(modo=modo_srv, id_account=id_account, id_label=id_label, de=de, ate=ate,
-                                   status_ids=status_ids, info=inf, progresso=aviso) or []), inf
+                                   status_ids=status_ids, info=inf, progresso=aviso, meta_ja=ja) or []), inf
+
+    def _novas(desde):
+        inf = {}
+        return (api.list_minhas_os(modo=modo_srv, id_account=id_account, id_label=id_label, de=desde, ate=ate,
+                                   status_ids=status_ids, info=inf) or []), inf
+
+    jwt, email = sessao.jwt_atual(), sessao.email_atual()
+
+    def _por_tras(fn):
+        def rodar():
+            with sessao.contexto(jwt, email):
+                fn()
+        _em_segundo_plano(rodar)
     try:
-        linhas, info = _memo(chave, TTL_HISTORICO, _buscar, forcar)
-        linhas = list(linhas)
+        lista, _como = HS.ler(chave, _inteira, _novas, forcar=forcar, por_tras=_por_tras)
+        linhas, info = lista.linhas, lista.info
     except api.FracttalError as e:
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
+        erro = str(e)
+    except (TimeoutError, LookupError) as e:
         erro = str(e)
     # o teto de 2.000 corta as OS MAIS ANTIGAS do período em silêncio — dizer, com o total do servidor e o que CHEGOU (a
     # conta é total − carregadas, antes da busca local; o teto só entra para saber se houve corte)
@@ -635,13 +691,13 @@ def historico():
         b = busca.lower()
         linhas = [l for l in linhas if b in " ".join(str(l.get(k) or "") for k in ("folio", "usina", "ativo", "descricao", "cliente", "status")).lower()]
     labels, pessoas, eu = [], [], None
+    # etiquetas e pessoas quase não mudam: o ↻ não as busca de novo (2 pedidos a menos a cada ↻; 10 min na memória)
     try:
-        labels = sorted(_memo(("etiquetas",), TTL_APOIO, lambda: api.get_labels() or [], forcar),
-                        key=lambda x: (x.get("description") or "").lower())
+        labels = sorted(etiquetas_fracttal(), key=lambda x: (x.get("description") or "").lower())
     except Exception:                                    # noqa: BLE001 — sem etiquetas o filtro fica em 'Todas'
         pass
     try:
-        r = _memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {}, forcar)
+        r = _memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {})
         pessoas, eu = (r.get("pessoas") or []), r.get("eu")
     except Exception:                                    # noqa: BLE001 — idem
         pass
@@ -656,14 +712,24 @@ def historico():
     # o nome curto do ativo ("Inversor 1.10", "Tracker 35.100"): a frase de cada tipo sai do catálogo que já está no disco
     # — ler o do Fracttal aqui (quando o cache venceu) poria minutos na frente do Histórico por um detalhe de exibição
     frases = _memo(("frases_ativo",), 3600, lambda: ativo_curto.frases(api._read_asset_cache() or []))
-    for l in linhas:
-        l["_ativo_curto"] = ativo_curto.curto(l.get("ativo"), frases.get(l.get("tipo")))
-        l["_status_cor"] = STATUS_COR.get(l.get("status") or "")
-        l["_etiqueta"] = ", ".join(e.get("nome") or "" for e in (l.get("etiquetas") or []) if isinstance(e, dict))
-        l["_texto"] = (" ".join(str(l.get(k) or "") for k in ("folio", "cliente", "usina", "ativo", "descricao", "status")) + " " + l["_etiqueta"]).lower()
+    # o que a tabela mostra de cada linha sai uma vez por versão da lista (a lista é dividida entre quem a vê)
+    if lista is not None and not getattr(lista, "preparada", False):
+        for l in lista.linhas:
+            l["_ativo_curto"] = ativo_curto.curto(l.get("ativo"), frases.get(l.get("tipo")))
+            l["_status_cor"] = STATUS_COR.get(l.get("status") or "")
+            l["_etiqueta"] = ", ".join(e.get("nome") or "" for e in (l.get("etiquetas") or []) if isinstance(e, dict))
+            l["_texto"] = (" ".join(str(l.get(k) or "") for k in ("folio", "cliente", "usina", "ativo", "descricao", "status")) + " " + l["_etiqueta"]).lower()
+        lista.preparada = True
+    cols_v = COLS_COS if modo == "cos" else COLS
+    # as linhas da tabela montadas UMA vez por versão da lista, visão e busca (eram 2.000 linhas a cada pedido: 43 s no
+    # servidor, Raio-X de 19/10/2026 às 17:15)
+    linhas_html = Markup(HS.html_das_linhas(lista, (modo, busca), lambda: render_template(
+        "_historico_linhas.html", linhas=linhas, cols=cols_v, datas=DATAS, fmt=api.fmt_data_br))) if lista else Markup("")
     pessoa_sel = "TODOS" if id_account == "TODOS" else (str(id_account) if isinstance(id_account, int) else (str(eu) if eu is not None else ""))
     return render_template("historico.html", conta=_conta(), aba="hist", linhas=linhas, modo=modo, de=de, ate=ate, busca=busca, erro=erro,
-                           cols=(COLS_COS if modo == "cos" else COLS), datas=DATAS, fmt=api.fmt_data_br,
+                           cols=cols_v, datas=DATAS, fmt=api.fmt_data_br, linhas_html=linhas_html,
+                           lista_de=(dt.datetime.fromtimestamp(lista.criada_em, api._BR_TZ).strftime("%H:%M")
+                                     if lista else ""),
                            labels=labels, pessoas=pessoas, pessoa_sel=pessoa_sel, etiqueta_sel=str(id_label or ""),
                            status_opts=list(api.WO_STATUS.values()), status_sel=status_sel, clientes=clientes,
                            usinas=sorted(usina_cli), usina_cli=usina_cli, tipos_ativo=tipos_ativo,

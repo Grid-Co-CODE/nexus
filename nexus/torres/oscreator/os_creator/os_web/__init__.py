@@ -55,6 +55,11 @@ def criar_app(segredo: str | None = None, testing: bool = False) -> Flask:
         MAX_CONTENT_LENGTH=4 * 1024 * 1024,
     )
     app.json.ensure_ascii = False
+    if testing:
+        # cada app de teste começa sem as listas do Histórico de outro teste (elas são do processo, divididas entre
+        # quem vê a mesma lista: `historico_store`, 19/10/2026)
+        from . import historico_store
+        historico_store.limpar()
     app.jinja_env.filters["iniciais"] = lancador.iniciais
     app.jinja_env.globals.update(icone=lancador.icone, abas=lancador.ABAS, abas_secoes=lancador.ABAS_SECOES,
                                  icone_secao=lancador.ICONE_SECAO)

@@ -311,7 +311,7 @@ def api_etiquetas(wid):
     """Catálogo (`get_labels`, como o `_EtiquetasDialog` carrega) + as etiquetas da OS. O card manda as atuais pelos chips
     (`?atuais=1,2` — o desktop também recebe `atuais` do card, sem ir ao servidor); sem o parâmetro, lê a OS."""
     catalogo = [{"id": l.get("id"), "description": str(l.get("description") or "").strip(), "color": regra.cor_hex(l.get("color"))}
-                for l in (api.get_labels() or []) if isinstance(l, dict) and l.get("id") is not None
+                for l in _rotas.etiquetas_fracttal() if isinstance(l, dict) and l.get("id") is not None
                 and str(l.get("description") or "").strip()]                 # o `_filtrar` do app pula etiqueta sem descrição
     lista = request.args.get("atuais")
     if lista is not None:
@@ -326,7 +326,7 @@ def api_etiquetas(wid):
 @exige_sessao
 def api_cancel_motivos(wid):
     # cancelar_os.py:50 — ApiWorker(api.get_cancel_motivos)
-    return jsonify({"motivos": api.get_cancel_motivos() or []})
+    return jsonify({"motivos": _rotas.motivos_cancelamento()})
 
 
 # ── escritas ──────────────────────────────────────────────────────────────────────────────────────────

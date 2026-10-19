@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, render_template, request
 import api
 
 from . import clonar_web
+from . import rotas
 from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_clonar", __name__, url_prefix="/os")
@@ -29,7 +30,7 @@ def clonar():
     folio = (request.args.get("folio") or "").strip()
     folio = folio if folio.isdigit() else ""
     try:
-        pessoas = sorted(api.get_responsaveis() or [], key=lambda x: (x.get("name") or "").lower())
+        pessoas = sorted(rotas.responsaveis_fracttal(), key=lambda x: (x.get("name") or "").lower())
     except api.FracttalError:
         raise
     except Exception:                                   # noqa: BLE001 — a lista pode ser recarregada pela tela

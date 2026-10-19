@@ -1,0 +1,17 @@
+{# as linhas da tabela do Histórico, montadas uma vez por versão da lista (`historico_store.html_das_linhas`,
+   19/10/2026): eram 2.000 linhas montadas a cada pedido, 43 s no servidor #}
+      {% for l in linhas %}
+      <tr data-id="{{ l.id }}" data-cliente="{{ l.cliente }}" data-usina="{{ l.usina }}" data-tipo="{{ l.tipo }}" data-status="{{ l.status }}" data-tarefa="{{ l.tipo_tarefa or '' }}" data-texto="{{ l._texto }}">
+        {% for rot, chave in cols %}
+        {% if chave == 'folio' %}<td class="k-folio"><a class="os-folio" href="/os/os/{{ l.id }}?status={{ l.status|urlencode }}">{{ l.folio }}</a></td>
+        {% elif chave == 'status' %}<td class="k-status">{% if l.status %}<span class="os-status" {% if l._status_cor %}style="color:{{ l._status_cor }};background:{{ l._status_cor }}29;border-color:{{ l._status_cor }}6b"{% endif %}>{{ l.status }}</span>{% endif %}</td>
+        {% elif chave == 'etiqueta' %}<td class="k-etiqueta">{{ l._etiqueta }}</td>
+        {% elif chave == 'descricao' %}<td class="c-desc k-descricao">{{ l.descricao }}</td>
+        {% elif chave == 'ativo' %}<td class="k-ativo" data-k="ativo" title="{{ l.ativo }}" data-csv="{{ l.ativo }}">{{ l._ativo_curto or l.ativo or '—' }}</td>
+        {% elif chave in datas %}<td class="c-data k-{{ chave }}" data-k="{{ chave }}">{{ fmt(l[chave]) if l.get(chave) else '—' }}</td>
+        {% else %}<td class="k-{{ chave }}" data-k="{{ chave }}">{{ l.get(chave) or '—' }}</td>{% endif %}
+        {% endfor %}
+      </tr>
+      {% else %}
+      <tr class="vazio"><td colspan="{{ cols|length }}">Nenhuma OS no período.</td></tr>
+      {% endfor %}

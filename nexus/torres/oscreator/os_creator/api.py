@@ -372,15 +372,27 @@ def _seed_cache():
             pass
 
 
+# O catálogo lido do disco fica na memória por versão do arquivo (19/10/2026, superplano do OS Creator): cada
+# `load_assets_cached()` relia e decodificava o JSON de ~22 mil ativos (26 lugares chamam, a prévia do COS a cada
+# 120 ms de digitação). Quem pede recebe uma cópia de cada registro (são planos), para mexer à vontade.
+_ASSETS_MEM: dict = {"chave": None, "c": None}
+_ASSETS_RECARGA = threading.Lock()      # uma recarga do Fracttal por vez (~110 pedidos); quem chega espera a dela
+
+
 def _read_asset_cache():
     """Lê o catálogo de ativos do cache (mesma versão, dentro do TTL). None se ausente/expirado."""
     try:
-        with open(ASSETS_CACHE, encoding="utf-8") as f:
-            c = json.load(f)
+        st = os.stat(ASSETS_CACHE)
+        chave = (st.st_mtime_ns, st.st_size)
+        if _ASSETS_MEM["chave"] != chave:
+            with open(ASSETS_CACHE, encoding="utf-8") as f:
+                c = json.load(f)
+            _ASSETS_MEM.update(chave=chave, c=c)
+        c = _ASSETS_MEM["c"]
     except Exception:
         return None
     if c.get("assets") and c.get("ver") == _CACHE_VER and (time.time() - c.get("ts", 0)) < ASSETS_TTL:
-        return c["assets"]
+        return [dict(a) for a in c["assets"]]
     return None
 
 
@@ -441,12 +453,18 @@ def load_assets_cached(force: bool = False) -> list:
         cached = _read_asset_cache()
         if cached:
             return _corrigir_itens_usina_estrangeiros(cached)
-    assets = get_assets()
-    try:
-        with open(ASSETS_CACHE, "w", encoding="utf-8") as f:
-            json.dump({"ts": time.time(), "ver": _CACHE_VER, "assets": assets}, f, ensure_ascii=False)
-    except Exception:
-        pass
+    pedido = time.time()
+    with _ASSETS_RECARGA:
+        # quem esperou a recarga de outro pedido usa a dela: o arquivo foi gravado depois deste pedido
+        cached = _read_asset_cache()
+        if cached and (not force or (_ASSETS_MEM["c"] or {}).get("ts", 0) >= pedido):
+            return _corrigir_itens_usina_estrangeiros(cached)
+        assets = get_assets()
+        try:
+            with open(ASSETS_CACHE, "w", encoding="utf-8") as f:
+                json.dump({"ts": time.time(), "ver": _CACHE_VER, "assets": assets}, f, ensure_ascii=False)
+        except Exception:
+            pass
     return _corrigir_itens_usina_estrangeiros(assets)
 
 
@@ -1390,11 +1408,19 @@ def _usina_curta(usina_full: str) -> str:
     return " - ".join(parts)
 
 
+_CODE_LOC_TENTOU = [0.0]
+
+
 def _code_to_loc():
     """{code do ativo: (cliente, usina_curta, tipo)} a partir do catálogo (cacheado).
-    `tipo` = rótulo do tipo de ativo (Inversor, Tracker, Cabine, Transformador, Usina…)."""
+    `tipo` = rótulo do tipo de ativo (Inversor, Tracker, Cabine, Transformador, Usina…).
+    Sem o catálogo (o Fracttal fora na recarga), não tenta de novo por 10 min: quem chama é cada linha do Histórico, e
+    2.000 linhas eram 2.000 tentativas de recarregar ~22 mil ativos (19/10/2026)."""
     if _code_loc:
         return _code_loc
+    if time.time() - _CODE_LOC_TENTOU[0] < 600:
+        return _code_loc
+    _CODE_LOC_TENTOU[0] = time.time()
     try:
         for a in load_assets_cached():
             c = a.get("code")
@@ -1522,7 +1548,7 @@ class _Passos:
 
 def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
                    de: str = None, ate: str = None, status_ids=None, cap: int = HISTORICO_CAP,
-                   info: dict = None, progresso=None) -> list:
+                   info: dict = None, progresso=None, meta_ja: dict = None) -> list:
     """OS do Fracttal no PERÍODO [de, ate] (datas 'YYYY-MM-DD' — filtradas NO SERVIDOR por
     creation_date, então o período governa a busca de verdade). modo='criadas' (Histórico Geral, por
     'id_created_by') ou 'atribuidas' (id_assigned_user = id_personnel do logado). Em 'criadas',
@@ -1536,7 +1562,12 @@ def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
 
     `progresso(feito, total)` (opcional) é chamado a cada pedido ao Fracttal que termina — as páginas da listagem e os
     lotes do meta das tarefas. É o que desenha o círculo de carga do Histórico web (Levi, 27/09: "no período de
-    carregamento poderia ter um círculo mostrando o progresso"). O total só se sabe depois da 1ª página."""
+    carregamento poderia ter um círculo mostrando o progresso"). O total só se sabe depois da 1ª página.
+
+    `meta_ja` (opcional, 19/10/2026): {id: {"status_id", "tipo_tarefa", "event_date", "data_fim", "note", "inicio",
+    "gatilho"}} do que já se sabia de cada OS. A OS que estava fechada (Concluída ou Cancelada) e continua com o MESMO
+    status não tem as tarefas lidas de novo: o tipo, as datas e o gatilho de uma OS fechada não mudam. Na busca inteira
+    do Histórico (a cada 10 min), só as abertas e as novas vão ao RPC de tarefas."""
     # quem é o logado só quando o filtro é dele: "TODOS" (o Acompanhamento de chamados, a Visão COS) não usa, e a
     # primeira busca da pessoa no processo lia o pessoal inteiro do Fracttal só para isso (08/10/2026)
     todos = False
@@ -1589,7 +1620,15 @@ def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
     out = list(vistos.values())
     out.sort(key=lambda x: x["data"], reverse=True)
     ids = [d["id"] for d in out]                           # enriquece: tipo de tarefa + evento + fim
+    sabido = {}
+    for d in out:
+        m = (meta_ja or {}).get(d["id"])
+        if m and d.get("status_id") in STATUS_FECHADOS and m.get("status_id") == d.get("status_id"):
+            sabido[d["id"]] = m
+    ids = [i for i in ids if i not in sabido]
+    passo.total = max(1, 1 + len(starts) + -(-len(ids) // 130))
     meta = _meta_tarefa_por_os(ids, passo=passo) if progresso is not None else _meta_tarefa_por_os(ids)
+    meta.update(sabido)
     passo.fim()
     for d in out:
         m = meta.get(d["id"], {})
@@ -4418,15 +4457,19 @@ def os_por_folio(folio) -> dict:
     folio = str(folio).strip()
     if not folio:
         return None
-    for st in (1, 2, 3, 4):
+    # 1º, UM pedido sem o status (a lista do Histórico, sem ele, traz os quatro status: 19/10/2026, superplano do OS
+    # Creator; eram até 4 pedidos um depois do outro); sem achar, a varredura de sempre, status por status
+    for st in (None, 1, 2, 3, 4):
+        params = {"page": 1, "limit": 50, "start": 0, "append": True,
+                  "filter": [{"operator": "=", "property": "wo_folio", "value": folio}],
+                  "sort": [{"property": "id", "direction": "desc"}]}
+        if st is not None:
+            params["id_status_work_order"] = st
         try:
-            res = _rpc_call(RPC_WO_LIST, {"page": 1, "limit": 50, "start": 0, "append": True,
-                            "id_status_work_order": st,
-                            "filter": [{"operator": "=", "property": "wo_folio", "value": folio}],
-                            "sort": [{"property": "id", "direction": "desc"}]})
+            res = _rpc_call(RPC_WO_LIST, params)
         except FracttalError:
             continue
-        for w in (res.get("data") or []):
+        for w in ((res.get("data") or []) if isinstance(res, dict) else []):
             if str(w.get("wo_folio")).strip() == folio:
                 return w
     return None

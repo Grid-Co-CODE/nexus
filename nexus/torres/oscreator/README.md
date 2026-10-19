@@ -933,3 +933,58 @@ várias imagens e incluir no PDF") e "inclua a opção de baixar na cadeia de ch
   amostra de 3 páginas com 7 fotos. Falta o olho do Levi com uma OS de verdade (o Fracttal só abre com a sessão de cada
   pessoa). Prova: `tests/test_oscreator_os_pdf.py`.
 
+
+## O Histórico sem repetir o Fracttal (19/10/2026)
+
+Levi, 19/10/2026: "o que causa essa busca de 2.000, todas as buscas são necessárias?" e "tem como atualizar só o dia
+somando com o que já carregou ou tem que carregar tudo de novo?". No Raio-X do servidor (17:15) o `GET /os/historico`
+ficou 43 s montando a página e outro ficou 2 min esperando o Fracttal. A Visão COS (e o "Criado por: Todos") pede as OS
+de todos os criadores em 30 dias, que passam de 2.000: cada carga eram ~26 pedidos (10 páginas de 200 OS e 16 lotes
+com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa), a cada atualização automática de
+10 min de cada aba (que passava por cima da memória) e a cada ↻; e as 2.000 linhas eram montadas a cada pedido.
+
+- **Uma lista para quem vê o mesmo** (`os_web/historico_store.py`): a de "Todos" é uma só; a 1ª visita de cada pessoa
+  confere, com 1 pedido de 1 linha na sessão DELA, se o Fracttal dá a ela o mesmo total (±1%, ou 2 OS); quem vê outro
+  total (visão restrita no Fracttal) segue com a lista dela. As listas de cada pessoa ("criadas por mim", "atribuídas
+  a mim") seguem por pessoa.
+- **A lista guardada abre na hora**; vencida (3 min), se renova por trás, uma renovação por vez: só as OS criadas
+  desde a mais nova guardada (menos 10 min de margem; 1 ou 2 pedidos) e, a cada 10 min, a lista inteira. A OS do
+  Fracttal não diz quando foi alterada (conferido no REST em 19/10/2026: só criação, programada, evento, início, fim e
+  revisão), então o status, o responsável e a data fim das OS antigas só mudam na busca inteira.
+- **O ↻** busca a lista inteira na hora, uma busca por vez (quem aperta junto espera a mesma); até 1 min depois da
+  última inteira, só as novas. A atualização automática de 10 min usa a lista guardada. Etiquetas e pessoas não são
+  relidas no ↻ (10 min na memória).
+- **As tarefas das OS fechadas não são relidas** (`api.list_minhas_os(meta_ja=...)`): Concluída ou Cancelada com o
+  mesmo status de antes guarda o tipo, as datas e o gatilho.
+- **As linhas são montadas uma vez por versão da lista** (`_historico_linhas.html`, guardado na lista): medido com
+  2.000 OS, cada pedido gastava ~0,25 s de processador no PC; agora a 1ª monta (0,38 s) e as seguintes levam
+  0,05–0,07 s, de qualquer pessoa.
+- A tela mostra "Lista das HH:MM" (quando a lista guardada veio). Erro do Fracttal por trás mantém a lista guardada.
+- Prova: `tests/test_oscreator_historico_compartilhado_19_10.py` (conta cada ida ao Fracttal: uma busca para várias
+  pessoas, a visão restrita com a dela, a vencida que soma só as novas, a inteira a cada 10 min sem reler as tarefas
+  das fechadas, o ↻, três pessoas ao mesmo tempo, o Fracttal fora, as linhas montadas uma vez).
+
+## Os catálogos e o catálogo de ativos uma vez para todos (19/10/2026)
+
+O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão fez em 19/10/2026):
+
+- **Pessoal ativo, etiquetas, motivos de cancelamento, tipos de solicitação e as OS recentes da tinta dos Ativos**
+  (`rotas.responsaveis_fracttal`, `etiquetas_fracttal`, `motivos_cancelamento`, `os_recentes`; os tipos no
+  `("solic_cat", "tipos")`): iguais para todos, eram relidos a cada tela e a cada clique, por cada pessoa (o pessoal são
+  2 pedidos; as OS recentes, 17 a 40 pedidos em sequência a cada visita aos Ativos). Agora 10 min na memória, um para
+  todos; o erro não fica guardado. Na CRIAÇÃO (uma gravação) o pessoal e as etiquetas seguem lidos na hora
+  (`rotas_solic_eng.criar`).
+- **O catálogo de ~22 mil ativos** (`api.load_assets_cached`): lido do disco uma vez por versão do arquivo (antes cada
+  uma das 26 chamadas decodificava o JSON inteiro, a prévia do COS a cada 120 ms de digitação), entregue em cópia por
+  registro; e a recarga do Fracttal (~110 pedidos) é uma por vez: quem acha o catálogo vencido junto espera a mesma.
+- **`_code_to_loc` sem catálogo não tenta de novo por 10 min**: é chamado por linha do Histórico, e com a recarga
+  falhando eram 2.000 tentativas numa lista.
+- **A OS pelo número num pedido só** (`api.os_por_folio`): sem o status, a lista traz os quatro; eram até 4 pedidos em
+  sequência (o "Buscar OS", o card pelo nº, a cadeia do chamado, o PDF). Sem achar, a varredura de antes, status por
+  status.
+- Prova: `tests/test_oscreator_catalogos_19_10.py`.
+- **Fica para depois (precisa do Fracttal de verdade para conferir):** a contagem de anexos do card relê as tarefas e o
+  formulário que o card acabou de ler; o `_ids_tarefas_da_os` pode estar pegando o id do MODELO da tarefa (`id_task`)
+  em vez do id da tarefa da OS (o mapa de 19/10 aponta; sem conferir com uma OS real, não muda); o quadro do
+  Acompanhamento de chamados segue por pessoa (decisão de 08/10: "uma pessoa nunca vê a cópia de outra"; quem usa
+  são 1 ou 2 pessoas).

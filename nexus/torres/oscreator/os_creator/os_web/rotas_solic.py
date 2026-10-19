@@ -249,7 +249,7 @@ def solicitacao():
     """O formulário. A cascata (cliente→usina→ativo) usa o catálogo cacheado, como o app."""
     assets = api.load_assets_cached()
     try:
-        tipos = api.get_request_types() or {}
+        tipos = _memo(("solic_cat", "tipos"), CATALOGO_TTL, lambda: api.get_request_types() or {})
     except api.FracttalError:                       # a tela abre mesmo sem o catálogo de classificação:
         tipos = {}                                  # a pessoa recarrega, em vez de levar um erro na cara
     pessoas = _pessoas()                            # "técnico sugerido" é opcional: sem a lista, a tela abre

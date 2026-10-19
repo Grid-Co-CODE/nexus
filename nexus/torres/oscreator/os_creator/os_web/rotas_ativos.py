@@ -11,6 +11,7 @@ import api
 import chamado_insp_spec as ci
 
 from . import ativos_web
+from . import rotas
 from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_ativos", __name__, url_prefix="/os")
@@ -39,7 +40,7 @@ def api_recentes():
     """Codes com OS criada nos últimos 30 dias — a tinta verde da tabela (item 11); em 2º plano, como no app."""
     dias = request.args.get("dias", "30")
     try:
-        codes = api.codigos_os_recentes(int(dias) if dias.isdigit() else 30) or []
+        codes = rotas.os_recentes(int(dias) if dias.isdigit() else 30)       # 10 min, igual para todos
     except api.FracttalError:
         raise
     except Exception:                                   # noqa: BLE001 — a tinta é enfeite; a tela já está usável sem ela

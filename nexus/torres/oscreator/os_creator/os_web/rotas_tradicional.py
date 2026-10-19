@@ -19,6 +19,7 @@ import api
 
 from . import ativo_curto
 from . import tradicional_web as trad
+from . import rotas
 from .rotas import _conta, _memo, exige_sessao
 
 bp = Blueprint("os_web_tradicional", __name__, url_prefix="/os")
@@ -70,7 +71,7 @@ def api_tipos():
 @bp.route("/api/tradicional/etiquetas")
 @exige_sessao
 def api_etiquetas():
-    return jsonify({"etiquetas": api.get_labels() or []})
+    return jsonify({"etiquetas": rotas.etiquetas_fracttal()})
 
 
 @bp.route("/api/tradicional/os-pai")

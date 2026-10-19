@@ -18,6 +18,7 @@ import api
 import chamado_modelos_store as modelos
 
 from . import insp_web as iw
+from . import rotas
 from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_chamados", __name__, url_prefix="/os")
@@ -135,7 +136,7 @@ def api_pai():
     if not d:
         return jsonify({"erro": "OS não encontrada — confira o número."}), 404
     try:
-        pessoas = api.get_responsaveis() or []
+        pessoas = rotas.responsaveis_fracttal()
     except Exception:                                   # noqa: BLE001 — sem a lista, herda só a data
         pessoas = []
     h = iw.herdar_do_pai(d, pessoas, data_painel=(request.args.get("data") or "").strip() or None)
