@@ -151,7 +151,7 @@
 {# As reprogramações da semana em curso (19/10/2026), no lugar de "Já gravadas" (Levi escolheu "Dentro do Quadro"): o
    Observacoes_Semana_Atual.txt inteiro, cada linha editável e removível. Aberto e carregado pelo pcm-reprogramacoes.js
    depois da página (ler o GitHub não atrasa o Quadro); na gravação barrada, já vem montado com o que a pessoa escreveu. #}
-<details class="q-gravadas q-rp" id="reprogramacoes" data-rp-url="{{ rp_url }}" open{% if rp %} data-rp-carregado="1" data-rp-ir="1"{% endif %}>
+<details class="q-gravadas q-rpb" id="reprogramacoes" data-rp-url="{{ rp_url }}" open{% if rp %} data-rp-carregado="1" data-rp-ir="1"{% endif %}>
   <summary><i class="ph ph-caret-right q-seta"></i> Reprogramações da semana em curso</summary>
   {# o "gravado" fica aqui, onde a pessoa está depois de gravar (a página volta rolada até o bloco) #}
   {% if rp_ok %}<div class="pcm-aviso pcm-aviso--ok q-rp-ok" role="status"><i class="ph ph-check-circle"></i><div>{{ rp_ok }}</div></div>{% endif %}

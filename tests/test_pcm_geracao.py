@@ -283,6 +283,25 @@ def test_sem_das_observacoes_tira_a_tarefa_da_planilha_gerada(tmp_path, monkeypa
     assert G.aplicar_sem(obs, p) == {"linhas": 0, "os": []} and p.read_bytes() == antes
 
 
+def test_sem_da_subtarefa_tira_so_o_ativo_dela(tmp_path):
+    """A subtarefa (19/10/2026): "nome @ CÓDIGO" tira só a linha daquele ativo, como o robô do PCM (`_casa_tarefa`); o
+    mesmo nome em outro ativo fica. Na _Pendentes do motor a coluna é "Código"."""
+    p = tmp_path / "sombra.xlsx"
+    outro_ativo = list(LINHAS[1])
+    outro_ativo[4] = "ALT1-CAB09"
+    planilha(p, [LINHAS[0], LINHAS[1], outro_ativo],
+             pendentes=[["SP Leste 02", 15021, "ALT1-CAB01", "MPM cabine", "Sem capacidade"],
+                        ["SP Leste 02", 15021, "ALT1-CAB02", "MPM cabine", "Sem capacidade"]])
+    obs = tmp_path / "Observacoes_Semana.txt"
+    obs.write_text("15021; sem: MPM cabine @ ALT1-CAB01\n", encoding="utf-8")
+    assert G.aplicar_sem(obs, p) == {"linhas": 2, "os": ["15021"]}
+    wb = openpyxl.load_workbook(p, read_only=True)
+    ficam = {ws.title: [(r[2], r[4]) if ws.title != "_Pendentes" else (r[1], r[2])
+                        for r in ws.iter_rows(min_row=2, values_only=True)] for ws in wb.worksheets}
+    wb.close()
+    assert ficam == {"SP Leste 02": [(15020, "ALT1-INV01"), (15021, "ALT1-CAB09")], "_Pendentes": [(15021, "ALT1-CAB02")]}
+
+
 def test_rodada_aplica_o_sem_das_observacoes(config):
     I.salvar_observacoes(G.pasta_trabalho(config), "2026-W41", "15021; sem: MPM cabine\n", autor="teste")
     st = G.aguardar(config, G.iniciar(config, "2026-W41")["id"], 60)

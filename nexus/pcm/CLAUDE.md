@@ -551,10 +551,24 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   PCM nunca usou nos dois arquivos). Agora vale o que está no **"O que"** da janela: a tarefa (o padrão é a do cartão)
   vira `OS; sem: nome da tarefa` (o nome até a 1ª vírgula: a vírgula separa palavras no `sem:`); "a OS inteira"
   continua `OS; não`; a OS com uma tarefa só na semana também sai pelo `não`. A confirmação diz o que sai e o que fica.
-  **O `sem:` acha a tarefa pelo NOME** (contém a palavra, sem diferenciar maiúscula): tarefas de mesmo nome na OS saem
-  juntas, e são muitas (W42: 92 das 128 OS com mais de uma tarefa repetem nome; a OS 15067 tem "MPM - QGBT" nas linhas
-  do QGBT1, QGBT2 e QGBT3). A janela avisa ("está em 3 linhas da semana") e lista as de nome parecido que saem junto.
-  Separar por equipamento pediria mudar o robô e o motor do PCM.
+  **A SUBTAREFA: a tarefa num ativo** (19/10/2026; o programador do PCM tirou UM inversor da OS 16739 e a confirmação
+  disse que saíam os 15: "parece que está puxando pelo nome"). Só pelo nome, o `sem:` e o "Mover" levavam todas as
+  linhas de mesmo nome (W43: 138 OS + nome em mais de um ativo; a linha `16739; ter; ... Inversor` empilhou os 15 na
+  terça até "31:27"). O `banco_dados.json` não traz o id da subtarefa do Fracttal; a identidade dela é OS + código do
+  ativo + tarefa, a mesma do STEP A2 do robô e do `fonte_bd_api`. A palavra pode ser `nome @ CÓDIGO`
+  (`16739; sem: [GreenYellow] - MPT - Inversor @ MCB100-INVR2.7`, `16739; qua; ... Inversor @ MCB100-INVR2.6; tarde`,
+  `só: Inversor @ CÓDIGO`): casa só a linha com aquele código (exato, sem caixa) cujo nome contém o nome; sem `@`, o
+  nome como sempre. Quem casa: `_casa_tarefa` no robô (STEP A2, A3 exclusões, pins e pendentes) e no motor
+  (`_tarefa_excluida`, `_tarefa_matches_pin`, o "só:" do modo A), e `geracao.casa_tarefa` no `aplicar_sem`; o
+  `test_subtarefa_o_motor_e_o_nexus_casam_igual` prende o motor e o Nexus. A janela da OS oferece no **"O que"** a
+  subtarefa do cartão (o padrão), cada subtarefa, a tarefa "em todos os N ativos" (pelo nome, com o aviso das de nome
+  parecido) e a OS inteira; `oss` leva os ativos de cada tarefa (`cods`), e a OS com uma tarefa só em vários ativos
+  também ganha o "O que" (antes o "Tirar da semana" dela virava `não`). A fila manda o `codigo` e o servidor confere
+  que a tarefa da SEMANA está naquele ativo. A mescla: subtarefas são alvos próprios; a que volta para um dia sai do
+  `sem:` sozinha; se o `sem:` tirava a tarefa em todos os ativos e UMA volta, ele vira uma subtarefa por ativo que
+  continua fora (`tarefas_por_os` da semana). Prova no robô (planilha real da W43, OS 15968 com 12 QGBTs): só o QGBT1
+  saiu (o QGBT10 a 12 ficaram) e só o QGBT2 foi para a quarta; as linhas só por nome deram a planilha idêntica, célula a
+  célula, à do robô de antes, e o robô de antes ignora o `@` (não casa nada): sobe primeiro o robô, depois o Nexus.
   Quem aplica: **semana em curso**, o robô (`atualizacao_semanal`, STEP A3) apaga as linhas da tarefa (agenda e
   `_Pendentes`), em qualquer OS, e não reposiciona nada (a linha não tem dia nem turno); e desde o `bd4f673` (15/10) o
   passo A2 dele não reinclui a tarefa tirada (nem a OS do `não`) como OS nova (seção "Horas por tarefa e zeladoria no
@@ -610,8 +624,10 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   (`quadro.problemas_das_linhas`): a linha que o robô não entende (texto livre, `@usina`, sábado, turno errado, sem dia
   nem "não" nem "sem:", mais de 300 caracteres), a repetida e a que outra da mesma OS, mais abaixo, anula pela regra do
   `mesclar` (o motor e o robô leriam cada um de um jeito); duas `sem:` da mesma OS vão numa linha só. Barrada, o Quadro
-  volta com o bloco aberto, o que a pessoa escreveu e o problema de cada linha. **Tirar uma linha não desfaz o que o
-  robô já aplicou** (ele apaga as linhas da planilha): o bloco diz isso e ensina a linha que põe a OS de volta. No
+  volta com o bloco aberto, o que a pessoa escreveu e o problema de cada linha. **Tirar uma linha desfaz o que ela
+  fazia na rodada seguinte**: o robô refaz a semana a cada rodada a partir da planilha publicada (o `semanal.yml` só
+  commita o `banco_dados.json`; a planilha só muda pela publicação) e aplica o arquivo inteiro de novo. Até 19/10 o
+  bloco dizia o contrário. No
   registro, `acao: "edicao"` com o que entrou ou mudou e o que saiu.
 - **Onde o PCM vê a reprogramação** (Levi, 09/10: "Onde o PCM tem essa informação?", sobre a frase "vira linha de
   observação, que só o PCM grava"): a frase da fonte do quadro diz o lugar pelo nome, conforme a semana. Semana em

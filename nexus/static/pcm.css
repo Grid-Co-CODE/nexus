@@ -524,8 +524,9 @@ details[open]>summary .q-seta{transform:rotate(90deg)}
 
 /* as reprogramações da semana em curso, o bloco do fim do Quadro (19/10/2026, templates/pcm/_reprogramacoes.html) */
 .q-rp-link{margin-left:auto;align-self:center}
-/* o details do Quadro é grade: sem a coluna limitada, ela crescia até a tabela (860 px) e a página passava de 375 */
-.q-rp{scroll-margin-top:16px;grid-template-columns:minmax(0,1fr)}
+/* o details do Quadro é grade: sem a coluna limitada, ela crescia até a tabela (860 px) e a página passava de 375.
+   `q-rpb`, não `q-rp`: o `.q-rp` é a caixa verde do "Reprogramar" da janela da OS, e o bloco herdava o verde dela */
+.q-rpb{scroll-margin-top:16px;grid-template-columns:minmax(0,1fr)}
 .q-rp-corpo{padding:0 14px 14px}
 .q-rp-ok{margin:0 14px 12px}
 .q-rp-corpo>.gc-ajuda,.rp-falha{margin:0;font-size:13px;color:var(--mudo)}
