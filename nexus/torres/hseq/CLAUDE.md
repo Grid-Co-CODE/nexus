@@ -76,10 +76,24 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
   como a Central de atenção, com os mesmos números dos cartões de antes; o clique leva à tabela filtrada por ele.
 - A usina vai **sem a região ao lado** (Levi, 11/10: "Em usina pode tirar a região do lado, fica estranho!"). 300 linhas
   na visão por extintor. O CSS é o `campo.css` e o `hseq.css` (a tabela, os filtros e a caixa).
-- **O PDF é só unitário** (Levi, 18/10: "O relatório quero a opção de ser unitário (...), pode tirar esse RELATÓRIO EM
-  PDF que tira em massa!"): o formulário do PDF de todos saiu da tela; fica o **Baixar** de cada usina (`usina`,
-  `baixar=1`, com os filtros da tela e o da faixa), a usina inteira, todos os dias, como anexo
-  (`extintores-<usina>-<hoje>.pdf`). A rota ainda aceita `dia` (o link de antes) e, sem `usina`, gera o de todos.
+- **O relatório é só unitário, de cada cliente e de cada usina, em PDF e em Excel** (coluna Relatório). Levi, 18/10: "O
+  relatório quero a opção de ser unitário (...), pode tirar esse RELATÓRIO EM PDF que tira em massa!" (o formulário do
+  PDF de todos saiu da tela); a TST, 19/10: "tem como eu baixar um relatório dos extintores por cliente?" e "e excel
+  tbm? pq às vezes o cliente pede". A linha do cliente leva `cliente`, a da usina leva `cliente` e `usina` (o nome da
+  usina sozinho não basta, ver abaixo), sempre com os filtros da tela e o da faixa; o cliente ou a usina inteira, todos
+  os dias, como anexo (`extintores-<cliente ou usina>-<hoje>.pdf|.xlsx`). O PDF e o Excel saem do MESMO recorte
+  (`_do_relatorio` na torre). A rota do PDF ainda aceita `dia` (o link de antes) e, sem `usina` nem `cliente`, gera o de
+  todos. **Excel** (`nexus/hseq/planilha.py`, rota `/t/hseq/extintores/relatorio.xlsx`): aba "Extintores", uma linha por
+  extintor na ordem da tabela (cliente, usina, responsável, técnicos, o extintor, as validades como a etiqueta diz e o
+  dia em que vencem como data, a situação, a conferência como data, quem conferiu pelo nome, a carga, os itens com NÃO,
+  o status da TST e o motivo), com o título, quando foi gerado e os filtros em cima, o cabeçalho congelado e o filtro do
+  Excel; aba "Não reconhecidos" quando o recorte os leva (a regra do PDF). Sem cor nem fórmula. Medido em 19/10 no banco
+  real (só leitura): os 11 clientes com o Excel igual à tela, extintor por extintor contado; o da Thopen (550
+  extintores) em 0,5 s, o PDF dela em 3,4 s.
+- **A usina se separa pelo ID do cadastro, não pelo nome** (`extintores.chave_usina`): o cadastro tem duas "Linhares 1"
+  (ES), uma da Axis e outra da Thopen, e pelo nome as duas se juntavam (achado em 19/10/2026 conferindo o Excel com a
+  tela: 13 extintores da Thopen estavam na Axis). Vale nos grupos, na contagem de usinas da faixa e nos cartões; os
+  links da usina levam também o cliente.
 
 **Na tabela, as partes de cada célula ficam lado a lado** (Levi, 09/10/2026, sobre a 1ª versão, que punha o detalhe
 sempre na linha de baixo: "se tem espaço para botar paralelo então deixe paralelo"). A parte é inteira e só desce de

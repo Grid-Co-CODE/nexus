@@ -5,7 +5,8 @@ observações da TST: "RELATÓRIO: TODOS OS EXTINTORES, CRÍTICOS, ATENÇÃO, OK
 RELATÓRIO O PADRÃO SERÁ AS FOTOS AO LADO DE CADA EXTINTOR MAS SERÁ POSSÍVEL PUXAR RELATÓRIO SÓ DOS CRÍTICOS".
 
 - O mesmo agrupamento da tabela da tela (`extintores.por_usina_dia`): usina × dia da última conferência, o mais grave
-  primeiro; os mesmos filtros (região do Brasil, região de campo, gestor, busca) e as mesmas contas.
+  primeiro; os mesmos filtros da tela (cliente, usina, responsável UFV, equipe e busca; 18/10/2026) e as mesmas
+  contas. A tela pede o de cada cliente e o de cada usina; o Excel (`planilha.py`) sai do mesmo recorte.
 - O filtro do relatório é o STATUS DA TST (`FILTROS`): todos, críticos, atenção ou OK (o OK leva o "OK sem validade",
   que também é checklist limpo). Extintor nunca conferido não tem status: só entra em "todos".
 - Com fotos (o padrão): cada extintor num quadro, a foto ao lado dos detalhes. Sem fotos: uma tabela por usina e dia.

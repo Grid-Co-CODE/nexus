@@ -55,6 +55,10 @@
 {% macro qtd(g) %}<span class="ext-par"><b>{{ g.qtd }}</b><span class="det ext-lista">{% for k, (um, varios, cor) in no_grupo.items() if g[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g[k] }} {{ um if g[k] == 1 else varios }}</span>{% endfor %}</span></span>{% endmacro %}
 {% macro recarga(g) %}{% if g.recarga_fim %}{{ etiqueta(g.recarga, g.recarga_fim) }}{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}{% endmacro %}
 {% macro status_grupo(g) %}{% set t = status_tst.get(g.status) %}<span class="ext-par">{% if t %}<span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}<span class="det ext-lista">{% for k, (um, varios, cor) in status_no_grupo.items() if g.status_qtd[k] %}{% if not loop.first %} · {% endif %}<span class="cn-t-{{ cor }}">{{ g.status_qtd[k] }} {{ um if g.status_qtd[k] == 1 else varios }}</span>{% endfor %}</span></span>{% endmacro %}
+{# o relatório de um cliente ou de uma usina (o da tela, unitário: Levi, 18/10/2026), em PDF, com as fotos, e em Excel
+   (a TST, 19/10/2026: "tem como eu baixar um relatório dos extintores por cliente?"; "e excel tbm? pq às vezes o cliente
+   pede"), com os filtros da tela e o da faixa #}
+{% macro relatorios(args, de) %}<span class="ext-par ext-rel"><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', baixar=1, **args) }}" title="O relatório {{ de }} em PDF, com as fotos">PDF</a><a class="cn-link" href="{{ url_for('torre_hseq.extintores_planilha', **args) }}" title="Os extintores {{ de }} em Excel">Excel</a></span>{% endmacro %}
 {# os técnicos da usina (a tela Técnicos por usina do PCM), um embaixo do outro, como lá #}
 {% macro tecnicos(g) %}{% if d.get('tecnicos_erro') %}<span class="cn-t-neutro" title="A lista de técnicos por usina do PCM não foi lida agora">não lido</span>{% elif g.tecnicos %}<span class="ext-tecs">{% for n in g.tecnicos %}<span>{{ n }}</span>{% endfor %}</span>{% else %}<span class="cn-t-neutro">sem técnico</span>{% endif %}{% endmacro %}
 {% set pronto = not leitura.erro and d.get('aba_existe') and not d.get('colunas_faltando') %}
@@ -93,9 +97,9 @@
     <p class="ext-naorec-d">A equipe não achou estes extintores na usina (o "Não reconhecido" da ronda de extintores do App). Eles ficam fora das contas desta tela até a TST conferir o cadastro: dar baixa, mudar de usina ou corrigir o código. A linha abre a usina na tabela.</p>
     <div class="cn-tab cn-tab--compacta ext-tab"><table class="ext-naorec-tab">
       <thead><tr><th>Não reconhecido em</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Conferência antes</th></tr></thead>
-      <tbody>{% for x in nao_rec[:limite] %}{% set ir = url(usina=x.usina, f=None, modo=None, ver=None) ~ '#tabela' %}
+      <tbody>{% for x in nao_rec[:limite] %}{% set ir = url(usina=x.usina, cliente=x.cliente or sem_cliente, f=None, modo=None, ver=None) ~ '#tabela' %}
         <tr class="ext-ir" data-href="{{ ir }}" title="Ver a usina na tabela"><td><span class="ext-par"><span class="m">{{ x.nao_reconhecido.strftime('%d/%m/%Y') }}</span><span class="det">há {{ tempo(x.dias_nao_reconhecido) }}</span>{% if x.nao_reconhecido_por %}<span class="det">{{ x.nao_reconhecido_por }}</span>{% endif %}</span></td>
-          <td class="ext-usina"><a class="cn-link" href="{{ url(usina=x.usina, f=None, modo=None, ver=None) }}#tabela">{{ x.usina }}</a></td>
+          <td class="ext-usina"><a class="cn-link" href="{{ url(usina=x.usina, cliente=x.cliente or sem_cliente, f=None, modo=None, ver=None) }}#tabela">{{ x.usina }}</a></td>
           <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
           <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
           <td>{{ conferencia(x) }}</td></tr>
@@ -164,7 +168,7 @@
      colunas; só os extintores abrem numa tabela menor. Com o cliente abrindo uma tabela dentro da linha e a usina
      outra dentro dela, a tabela aberta pedia 1.212 px a 1440 (a caixa tem 1.168) #}
   <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande ext-clientes">
-    <thead><tr><th>Situação</th><th>Última conferência</th><th>Cliente e usina</th><th>Responsável</th><th>Técnicos</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status da TST</th><th>PDF</th></tr></thead>
+    <thead><tr><th>Situação</th><th>Última conferência</th><th>Cliente e usina</th><th>Responsável</th><th>Técnicos</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status da TST</th><th>Relatório</th></tr></thead>
     <tbody>
     {% for c in grupos %}{% set s = situacoes[c.situacao] %}{% set n = loop.index %}
       <tr class="cn-linha ext-cli" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente">
@@ -175,7 +179,7 @@
         <td>{{ qtd(c) }}</td>
         <td>{{ recarga(c) }}</td>
         <td>{{ status_grupo(c) }}</td>
-        <td></td>
+        <td>{{ relatorios(dict(filtros_url, cliente=c.cliente), 'deste cliente') }}</td>
       </tr>
       {% for g in c.usinas %}{% set su = situacoes[g.situacao] %}
       <tr class="cn-linha ext-us" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver os {{ g.qtd }} extintores"{% if not abre_cliente %} hidden{% endif %}>
@@ -187,7 +191,7 @@
         <td>{{ qtd(g) }}</td>
         <td>{{ recarga(g) }}</td>
         <td>{{ status_grupo(g) }}</td>
-        <td><a class="cn-link" href="{{ url_for('torre_hseq.extintores_relatorio', usina=g.usina, baixar=1, **filtros_url) }}" title="O relatório desta usina, com as fotos">Baixar</a></td>
+        <td>{{ relatorios(dict(filtros_url, cliente=g.cliente, usina=g.usina), 'desta usina') }}</td>
       </tr>
       <tr class="cn-detalhe" data-cli="{{ n }}"{% if not abre_usina %} hidden{% endif %}><td colspan="9">
         <table class="ext-sub cn-fotos-grupo">
@@ -251,7 +255,8 @@
     extintor na usina; ele sai de todas as contas e fica na caixa própria até a TST conferir o cadastro. O <b>status da TST</b> é a regra da planilha de controle da TST, a mesma do App:
     olha também a carga e os 9 itens do checklist. O <b>responsável</b> (Responsável UFV) é o Responsável O&amp;M da ficha da
     usina no cadastro; os <b>técnicos</b> são os da tela Técnicos por usina do PCM. Na usina, a última conferência é a mais
-    recente dos extintores dela, e o Baixar traz o relatório da usina inteira, com as fotos.
+    recente dos extintores dela. Na coluna Relatório, o PDF (com as fotos) e o Excel trazem o cliente ou a usina inteira,
+    com os filtros da tela.
   </div>
 </div>
 {% endblock %}

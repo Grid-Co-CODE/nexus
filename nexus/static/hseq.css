@@ -54,6 +54,8 @@
 /* os filtros de Extintores: o rótulo e a caixa ficam juntos ao quebrar a linha */
 .ext-filtro{display:inline-flex;align-items:center;gap:8px;max-width:100%}
 .ext-filtro .gc-campo{min-width:0;max-width:100%}
+/* o PDF e o Excel do cliente e da usina, lado a lado (descem um embaixo do outro se faltar espaço) */
+.ext-tab .ext-par.ext-rel > * + *{margin-left:10px}
 /* a linha do não reconhecido leva à tabela filtrada naquela usina */
 .ext-naorec tr.ext-ir{cursor:pointer}
 .ext-naorec tr.ext-ir:hover td{background:var(--superficie-2)}

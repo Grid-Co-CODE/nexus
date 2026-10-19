@@ -274,9 +274,16 @@ def extintores() -> leitura.Leitura:
     return visao._ler(("hseq_extintores",), calcular)
 
 
+def chave_usina(x: dict):
+    """A usina de um extintor nas contas e nos grupos: o `usina_id` do cadastro e, sem ligação, o nome que o App
+    escreveu. Pelo nome, duas usinas se juntavam: o cadastro tem duas "Linhares 1" (ES), uma da Axis e outra da Thopen
+    (achado em 19/10/2026: no agrupamento por cliente, 13 extintores da Thopen apareciam na Axis)."""
+    return x.get("usina_id") or ("fonte", x["usina"])
+
+
 def contar(lista) -> dict:
     """Os números da faixa: o total, as usinas e cada situação (as exclusivas e a sem atualização)."""
-    c = {"total": len(lista), "usinas": len({x["usina"] for x in lista}),
+    c = {"total": len(lista), "usinas": len({chave_usina(x) for x in lista}),
          "sem_atualizacao": sum(x["sem_atualizacao"] for x in lista)}
     c.update({s: sum(x["situacao"] == s for x in lista) for s in SITUACOES})
     return c
@@ -337,9 +344,9 @@ def por_usina_dia(lista) -> list[dict]:
     relatório em PDF. Ordem: o mais grave primeiro, depois a recarga mais próxima, a usina e o dia mais recente."""
     g = {}
     for x in lista:
-        s = g.get((x["usina"], x["conferencia"]))
+        s = g.get((chave_usina(x), x["conferencia"]))
         if s is None:
-            s = g[(x["usina"], x["conferencia"])] = {
+            s = g[(chave_usina(x), x["conferencia"])] = {
                 "usina": x["usina"], "usina_id": x.get("usina_id"), "regiao_campo": x.get("regiao_campo", ""),
                 "supervisor_campo": x.get("supervisor_campo", ""), "gestor": x.get("gestor", ""),
                 "conferencia": x["conferencia"], "dias_conferencia": x["dias_conferencia"],
@@ -369,9 +376,9 @@ def por_usina(lista) -> list[dict]:
     depois a recarga mais próxima e a usina."""
     g = {}
     for x in lista:
-        s = g.get(x["usina"])
+        s = g.get(chave_usina(x))
         if s is None:
-            s = g[x["usina"]] = {"usina": x["usina"], "usina_id": x.get("usina_id"),
+            s = g[chave_usina(x)] = {"usina": x["usina"], "usina_id": x.get("usina_id"),
                                  **{c: valor_do_filtro(x, c) for c in SEM_VALOR},
                                  "tecnicos": x.get("tecnicos") or [], "extintores": []}
         s["extintores"].append(x)
@@ -416,9 +423,9 @@ def _somar(s, x):
     s["extintores"] += 1
     s[x["situacao"]] += 1
     s["sem_atualizacao"] += x["sem_atualizacao"]
-    s["_usinas"].add(x["usina"])
+    s["_usinas"].add(chave_usina(x))
     if x["atrasado"]:
-        s["_usinas_atrasado"].add(x["usina"])
+        s["_usinas_atrasado"].add(chave_usina(x))
     if x.get("equipe") and x["equipe"] not in s["equipes"]:
         s["equipes"].append(x["equipe"])
 

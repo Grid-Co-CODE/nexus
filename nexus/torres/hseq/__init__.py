@@ -19,6 +19,7 @@ from ...campo import visao
 from ...hseq import epi as EPI
 from ...hseq import extintores as EXT
 from ...hseq import fotos as FOT
+from ...hseq import planilha as PLA
 from ...hseq import relatorio as REL
 from ..campo import _do_papel, _gestor, _lido, _papeis, _regiao_campo, _url
 from ..modelo import Tela, Torre
@@ -128,7 +129,7 @@ def extintores():
         contagem=EXT.contar(base), lista=lista, limite=LIMITE_LINHAS,
         grupos=EXT.por_cliente(lista) if modo == "tabela" and ver == "cliente" else [],
         cartoes=EXT.por_responsavel(base, d.get("times") or {}) if modo == "responsaveis" else [],
-        sem_responsavel=visao.SEM_RESPONSAVEL, situacoes=EXT.SITUACOES,
+        sem_responsavel=visao.SEM_RESPONSAVEL, sem_cliente=EXT.SEM_CLIENTE, situacoes=EXT.SITUACOES,
         status_tst=EXT.STATUS_TST, tempo=EXT.tempo, alerta_dias=EXT.ALERTA_DIAS,
         sem_atualizacao_dias=EXT.SEM_ATUALIZACAO_DIAS, fotos=FOT.disponiveis(current_app.config),
         filtros_url={k: request.args.get(k) for k in FILTROS_URL if request.args.get(k)}, nao_rec=nao_rec)
@@ -139,21 +140,14 @@ def _slug(s) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-")[:60] or "usina"
 
 
-@bp.route("/extintores/relatorio.pdf")
-def extintores_relatorio():
-    """O relatório em PDF (Levi, 09/10/2026, com as observações da TST): agrupado por usina e dia, com os filtros da
-    tela, o filtro do status da TST (todos, críticos, atenção, OK) e as fotos ao lado de cada extintor (o padrão;
-    `fotos=0` tira). Desde 18/10/2026 a tela só pede o relatório UNITÁRIO (Levi: "O relatório quero a opção de ser
-    unitário (...), pode tirar esse RELATÓRIO EM PDF que tira em massa!"): o "Baixar" de cada usina (`usina`,
-    `baixar=1`; os filtros da tela e o da faixa, `f`, vêm junto) traz a usina inteira, todos os dias; o `dia` ainda
-    filtra, para quem tinha o link de antes. Sem o livro do App, volta para a tela. Os não reconhecidos em campo vão numa
-    seção à parte, só no relatório de todos e sem o filtro da faixa (não têm status da TST); no "Baixar", os daquela
-    usina (e daquele dia, com o `dia`)."""
+def _do_relatorio(filtro: str = "todos"):
+    """O recorte que o PDF e o Excel levam: os filtros da tela (`_filtrados`), o da faixa (`f`), a usina e o dia do
+    "Baixar" de cada linha e o cliente da linha do cliente. Devolve None sem o livro do App (a rota volta para a tela).
+    Os não reconhecidos em campo vão à parte, só sem o filtro da faixa e no relatório de todos (não têm status da TST);
+    com a usina ou o dia, os daquela usina (e daquele dia)."""
     leitura, d, todas, base, nao_rec, fl = _filtrados()
     if leitura.erro or not d.get("aba_existe") or d.get("colunas_faltando"):
-        return redirect(na_raiz("/t/hseq/extintores"))
-    filtro = request.args.get("status") if request.args.get("status") in REL.FILTROS else "todos"
-    com_fotos = (request.args.getlist("fotos") or ["1"])[-1] != "0"
+        return None
     f = request.args.get("f") if request.args.get("f") in EXT.FILTROS else ""
     usina, dia = request.args.get("usina", ""), request.args.get("dia", "")
     lista = [x for x in base if (not f or x[f]) and (not usina or x["usina"] == usina)
@@ -167,15 +161,48 @@ def extintores_relatorio():
     hoje = d.get("hoje") or visao._agora().date()
     nr = [x for x in nao_rec if (not usina or x["usina"] == usina)
           and (not dia or x["nao_reconhecido"].isoformat() == dia)] if filtro == "todos" and not f else []
-    pdf = REL.gerar(EXT.ordenar(lista), filtro=filtro, com_fotos=com_fotos, filtros_tela=filtros_tela, hoje=hoje,
-                    nao_reconhecidos=nr,
-                    gerado_em=visao._agora().strftime("%d/%m/%Y %H:%M"),
+    # o nome do arquivo: a usina (e o dia do link de antes), o cliente da linha do cliente, ou o filtro do relatório
+    quem = (f"{_slug(usina)}-{dia}" if usina and dia else _slug(usina) if usina
+            else _slug(fl["cliente"]) if fl["cliente"] else filtro)
+    nome = f"extintores-{quem}" + ("" if usina and dia else f"-{hoje:%Y-%m-%d}")
+    return {"lista": lista, "nr": nr, "filtros_tela": filtros_tela, "hoje": hoje, "nome": nome,
+            "gerado_em": visao._agora().strftime("%d/%m/%Y %H:%M"),
+            "modo": "attachment" if request.args.get("baixar") else "inline"}
+
+
+@bp.route("/extintores/relatorio.pdf")
+def extintores_relatorio():
+    """O relatório em PDF (Levi, 09/10/2026, com as observações da TST): agrupado por usina e dia, com os filtros da
+    tela, o filtro do status da TST (todos, críticos, atenção, OK) e as fotos ao lado de cada extintor (o padrão;
+    `fotos=0` tira). Desde 18/10/2026 a tela só pede o relatório UNITÁRIO (Levi: "O relatório quero a opção de ser
+    unitário (...), pode tirar esse RELATÓRIO EM PDF que tira em massa!"): o de cada usina (`usina`, `baixar=1`; os
+    filtros da tela e o da faixa, `f`, vêm junto), a usina inteira, todos os dias, e desde 19/10 o de cada cliente
+    (`cliente`; a TST: "tem como eu baixar um relatório dos extintores por cliente?"). O `dia` ainda filtra, para quem
+    tinha o link de antes. Sem o livro do App, volta para a tela."""
+    filtro = request.args.get("status") if request.args.get("status") in REL.FILTROS else "todos"
+    r = _do_relatorio(filtro)
+    if r is None:
+        return redirect(na_raiz("/t/hseq/extintores"))
+    com_fotos = (request.args.getlist("fotos") or ["1"])[-1] != "0"
+    pdf = REL.gerar(EXT.ordenar(r["lista"]), filtro=filtro, com_fotos=com_fotos, filtros_tela=r["filtros_tela"],
+                    hoje=r["hoje"], nao_reconhecidos=r["nr"], gerado_em=r["gerado_em"],
                     logo=str(current_app.static_folder) + "/grid-h-branco.png",
                     foto=lambda c: FOT.foto_pdf(current_app.config, c))   # a cópia de 600 px, feita uma vez por foto
-    nome = (f"extintores-{_slug(usina)}-{dia or f'{hoje:%Y-%m-%d}'}.pdf" if usina
-            else f"extintores-{filtro}-{hoje:%Y-%m-%d}.pdf")
-    modo = "attachment" if request.args.get("baixar") else "inline"
-    return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'{modo}; filename="{nome}"'})
+    return Response(pdf, mimetype="application/pdf",
+                    headers={"Content-Disposition": f'{r["modo"]}; filename="{r["nome"]}.pdf"'})
+
+
+@bp.route("/extintores/relatorio.xlsx")
+def extintores_planilha():
+    """O mesmo relatório em Excel (a TST, 19/10/2026: "e excel tbm? pq às vezes o cliente pede"), com o mesmo recorte
+    do PDF (`_do_relatorio`): uma linha por extintor, na ordem da tabela da tela, e os não reconhecidos numa aba à parte
+    (`hseq/planilha.py`). Sempre como anexo."""
+    r = _do_relatorio()
+    if r is None:
+        return redirect(na_raiz("/t/hseq/extintores"))
+    xlsx = PLA.gerar(r["lista"], filtros_tela=r["filtros_tela"], hoje=r["hoje"], gerado_em=r["gerado_em"],
+                     nao_reconhecidos=r["nr"])
+    return Response(xlsx, mimetype=PLA.MIME, headers={"Content-Disposition": f'attachment; filename="{r["nome"]}.xlsx"'})
 
 
 @bp.route("/extintores/foto", methods=["POST"])

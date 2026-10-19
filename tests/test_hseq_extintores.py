@@ -345,7 +345,7 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     # UMA tabela: a linha do cliente e as das usinas nas mesmas colunas (aninhadas, não cabiam a 1440 px)
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
     assert cab == ("Situação Última conferência Cliente e usina Responsável Técnicos Quantidade de extintores "
-                   "Recarga mais próxima Status da TST PDF")
+                   "Recarga mais próxima Status da TST Relatório")
     # 3 clientes (Thopen, Outro Cliente e "Sem cliente", a Irecê 2 fora do cadastro) e 4 usinas, tudo fechado
     assert html.count('<tr class="cn-linha ext-cli"') == 3 and html.count('<tr class="cn-linha ext-us"') == 4
     assert html.count('extintores" hidden>') == 4 and len(re.findall(r'<tr class="cn-detalhe" data-cli="\d" hidden>', html)) == 4
@@ -474,15 +474,17 @@ def test_sem_o_livro_o_relatorio_volta_para_a_tela(banco, logado):
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/extintores")
 
 
-# ── o "Baixar" de cada linha, o filtro de cliente e a foto do extintor (Levi, 09/10, depois da 1ª carga no banco) ──
-def _baixar(html):
-    return [h.replace("&amp;", "&") for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>Baixar</a>', html)]
+# ── o relatório de cada linha (PDF e Excel), o filtro de cliente e a foto do extintor ─────────────────────────────
+def _baixar(html, rotulo="PDF", de="usina"):
+    """Os links da coluna Relatório: os das usinas (`de="usina"`) ou os dos clientes (`de="cliente"`)."""
+    links = [h.replace("&amp;", "&") for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>' + rotulo + "</a>", html)]
+    return [h for h in links if ("usina=" in h) == (de == "usina")]
 
 
-def test_baixar_de_cada_usina_traz_o_pdf_da_usina_inteira(com_livro, logado):
+def test_o_pdf_de_cada_usina_traz_a_usina_inteira(com_livro, logado):
     """O relatório só unitário (Levi, 18/10/2026: "O relatório quero a opção de ser unitário (...), pode tirar esse
-    RELATÓRIO EM PDF que tira em massa!"): a tela não tem mais o formulário do PDF de todos; o "Baixar" de cada usina
-    traz a usina inteira, todos os dias."""
+    RELATÓRIO EM PDF que tira em massa!"): a tela não tem mais o formulário do PDF de todos; o PDF de cada usina traz a
+    usina inteira, todos os dias."""
     _aba(com_livro, EXT.LIVRO, EXT.ABA, LIVRO + DIA_DO_GRUPO)
     visao.limpar()
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
@@ -505,6 +507,114 @@ def test_baixar_de_cada_usina_traz_o_pdf_da_usina_inteira(com_livro, logado):
     # o link de antes, com o dia, ainda filtra aquele dia
     dia = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?usina=Altair&dia=2026-10-05&baixar=1").data)
     assert "ALT100-INFC1-PPCI-EXT04" in dia and "ALT100-INFC1-PPCI-EXT02" not in dia
+
+
+def test_o_pdf_de_cada_cliente_traz_as_usinas_dele(com_livro, logado):
+    """A TST, 19/10/2026: "tem como eu baixar um relatório dos extintores por cliente?". A linha do cliente tem o PDF
+    dele (todas as usinas do cliente, com os filtros da tela)."""
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
+    assert cab.endswith("Status da TST Relatório")
+    clientes = _baixar(html, de="cliente")
+    assert len(clientes) == 3                                       # Thopen, Outro Cliente e Sem cliente
+    th = next(h for h in clientes if "cliente=Thopen" in h)
+    r = logado.get(th)
+    assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("attachment;")
+    assert 'filename="extintores-thopen-2026-10-09.pdf"' in r.headers["Content-Disposition"]
+    t = _pdf_texto(r.data)
+    assert "Cliente: Thopen" in t and "Altair" in t and "Brodowski" in t and "Coração" not in t and "Irecê" not in t
+    sem = _pdf_texto(logado.get(next(h for h in clientes if "cliente=Sem+cliente" in h)).data)
+    assert "IRC200-INFC1-PPCI-EXT01" in sem and "Altair" not in sem
+    # com um filtro na tela, ele vai junto (e o cliente da linha vence o do filtro)
+    eq = _baixar(logado.get("/t/hseq/extintores?equipe=SP+Norte+01").get_data(as_text=True), de="cliente")
+    assert eq == ["/t/hseq/extintores/relatorio.pdf?baixar=1&equipe=SP+Norte+01&cliente=Thopen"]
+
+
+def _planilha(corpo):
+    import io
+    from openpyxl import load_workbook
+    return load_workbook(io.BytesIO(corpo))
+
+
+def test_o_excel_do_cliente_e_da_usina_tem_um_extintor_por_linha(com_cadastro, logado):
+    """A TST, 19/10/2026: "e excel tbm? pq às vezes o cliente pede". O mesmo recorte do PDF, em planilha: uma linha por
+    extintor, na ordem da tabela, com a conferência como data e o filtro do Excel no cabeçalho."""
+    from nexus.hseq import planilha as PLA
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    assert len(_baixar(html, "Excel", "cliente")) == 3 and len(_baixar(html, "Excel")) == 4
+    url = next(h for h in _baixar(html, "Excel", "cliente") if "cliente=Thopen" in h)
+    r = logado.get(url)
+    assert r.status_code == 200 and r.mimetype == PLA.MIME
+    assert r.headers["Content-Disposition"] == 'attachment; filename="extintores-thopen-2026-10-09.xlsx"'
+    wb = _planilha(r.data)
+    assert wb.sheetnames == ["Extintores"]                                  # sem não reconhecido no livro
+    ws = wb["Extintores"]
+    assert ws["A1"].value == "Relatório de extintores" and ws["A3"].value == "Filtros: Cliente: Thopen"
+    assert ws["A4"].value == "4 extintores"
+    cab = [c.value for c in ws[6]]
+    assert cab[:6] == ["Cliente", "Usina", "Responsável", "Técnicos", "Extintor", "Código"]
+    assert ws.freeze_panes == "A7" and ws.auto_filter.ref.startswith("A6:")
+    linhas = [dict(zip(cab, (c.value for c in l))) for l in ws.iter_rows(min_row=7)]
+    # a ordem da tabela: Altair (o mais grave primeiro dentro dela) e depois Brodowski 1
+    assert [x["Código"] for x in linhas] == ["ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02",
+                                              "ALT100-INFC1-PPCI-EXT03", "BWK100-INFC1-PPCI-EXT01"]
+    alt = linhas[0]
+    assert (alt["Cliente"], alt["Usina"], alt["Responsável"], alt["Técnicos"]) == (
+        "Thopen", "Altair", "Supervisora Campo", "Eletricista Beta, Técnico Alfa")
+    assert (alt["Situação"], alt["Validade da recarga"], alt["Status da TST"]) == ("Atrasado", "08/2026", "Crítico")
+    assert alt["Recarga vence em"].date() == date(2026, 8, 31) and alt["Última conferência"].date() == date(2026, 10, 5)
+    assert alt["Conferido por"] == "Técnico Silva" and alt["Sem atualização há mais de 30 dias"] == "não"
+    assert ws.cell(row=7, column=cab.index("Última conferência") + 1).number_format == "DD/MM/YYYY"
+    bwk = linhas[3]
+    assert bwk["Última conferência"] is None and bwk["Status da TST"] == "sem conferência" and bwk["Técnicos"] is None
+    assert not any(codigo_da_pessoa(CHAVE, "tec1@exemplo.test") in str(c.value or "") for l in ws.iter_rows() for c in l)
+    # o da usina: só ela
+    us = _planilha(logado.get(next(h for h in _baixar(html, "Excel") if "usina=Cora" in h)).data)["Extintores"]
+    assert [c.value for c in us["F"][6:]] == ["COR100-INFC1-PPCI-EXT01"]
+
+
+def test_o_excel_leva_os_nao_reconhecidos_numa_aba_a_parte(com_nao_reconhecido, logado):
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    wb = _planilha(logado.get(next(h for h in _baixar(html, "Excel") if "usina=Altair" in h)).data)
+    assert wb.sheetnames == ["Extintores", "Não reconhecidos"]
+    nr = wb["Não reconhecidos"]
+    cab = [c.value for c in nr[6]]
+    assert cab[:4] == ["Cliente", "Usina", "Extintor", "Código"]
+    assert [c.value for c in nr[7]][:4] == ["Thopen", "Altair", "EXT02", "ALT100-INFC1-PPCI-EXT02"]
+    assert "ALT100-INFC1-PPCI-EXT02" not in [c.value for c in wb["Extintores"]["F"]]      # fora das contas
+    # o filtro da faixa tira a aba (a regra do PDF)
+    atr = _planilha(logado.get("/t/hseq/extintores/relatorio.xlsx?usina=Altair&f=atrasado").data)
+    assert atr.sheetnames == ["Extintores"]
+
+
+def test_duas_usinas_com_o_mesmo_nome_em_clientes_diferentes_nao_se_juntam(com_livro, logado):
+    """O cadastro tem duas "Linhares 1" (ES), uma de cada cliente (19/10/2026: pelo nome, 13 extintores da Thopen
+    apareciam na Axis). A usina se separa pelo ID do cadastro; o link da usina leva também o cliente."""
+    from test_campo_visao import _MOB
+    outra = {"usina_id": 6, "nome": "Altair", "codigo": "OUTR-ALT200", "status": "OPERAÇÃO", "equipe_id": 20,
+             "data_mobilizacao": _MOB, "uf": "SC", "cidade": "Altair", "cliente_id": 2, "cluster": "SC oeste"}
+    _aba(com_livro, "cadastro_nexus", "usinas", USINAS + [outra])
+    _aba(com_livro, EXT.LIVRO, EXT.ABA, LIVRO + [
+        _ext("ALT200-INFC1-PPCI-EXT01", "Outro - Altair - SC", "11/2026", "Sem selo", "2026-10-08", cb="ALT200")])
+    visao.limpar()
+    html = logado.get("/t/hseq/extintores").get_data(as_text=True)
+    assert "Extintores 7 em 5 usinas" in _texto(html)
+    assert "Outro Cliente 2 usinas" in _abre(html, "<b>Outro Cliente</b>")
+    assert "Thopen 2 usinas" in _abre(html, "<b>Thopen</b>")
+    links = _baixar(html, "Excel")
+    th = next(h for h in links if "usina=Altair" in h and "cliente=Thopen" in h)
+    ou = next(h for h in links if "usina=Altair" in h and "cliente=Outro+Cliente" in h)
+    assert [c.value for c in _planilha(logado.get(th).data)["Extintores"]["F"][6:]] == [
+        "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02", "ALT100-INFC1-PPCI-EXT03"]
+    assert [c.value for c in _planilha(logado.get(ou).data)["Extintores"]["F"][6:]] == ["ALT200-INFC1-PPCI-EXT01"]
+    # o PDF da usina também
+    pdf = _pdf_texto(logado.get(next(h for h in _baixar(html) if "cliente=Outro+Cliente" in h and "Altair" in h)).data)
+    assert "ALT200-INFC1-PPCI-EXT01" in pdf and "ALT100" not in pdf
+
+
+def test_sem_o_livro_o_excel_volta_para_a_tela(banco, logado):
+    r = logado.get("/t/hseq/extintores/relatorio.xlsx")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/extintores")
 
 
 def test_filtro_por_cliente_vale_na_tela_no_pdf_e_no_epi(com_livro, logado):
