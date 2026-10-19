@@ -83,6 +83,14 @@ def _dia(v):
         return None
 
 
+def _avisado(v) -> bool | None:
+    """O Teams do setor: True recebeu, False recusou, None = o setor não tem fluxo do Teams ("sem canal"). O None nasceu em
+    19/10/2026 (Levi: "vai direto para contestações do Nexus e a gente resolve lá, esquece teams"): o COS não tem fluxo,
+    a contestação dele chega só aqui por regra, e pintá-la de "o Teams recusou" seria falso."""
+    v = str(v or "").strip().lower()
+    return True if v == "sim" else (None if v == "sem canal" else False)
+
+
 def _linha(l: dict, privada: str | None) -> dict:
     dados, aberto = {}, None
     if privada:
@@ -97,7 +105,7 @@ def _linha(l: dict, privada: str | None) -> dict:
             "usina": str(l.get("usina") or ""), "usina_id": D._id(l.get("usina_id")),
             "setor": str(l.get("setor") or ""), "ini": ini, "fim": fim or ini,
             "itens": [ITENS.get(i, i) for i in str(l.get("itens") or "").split(";") if i],
-            "avisado": str(l.get("avisado_teams") or "").strip().lower() == "sim",
+            "avisado": _avisado(l.get("avisado_teams")),
             "aberto": aberto, "nome": dados.get("nome") or "", "contato": dados.get("contato") or "",
             "mensagem": dados.get("mensagem") or "",
             "tela": [(rot, tela[k]) for k, rot in TELA if tela.get(k)]}

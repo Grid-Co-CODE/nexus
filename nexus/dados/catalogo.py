@@ -244,7 +244,9 @@ FATOS = (
          janela_origem="o 5080 é a fonte (tudo desde a 1ª contestação)",
          observacao="contestacao_id junta as linhas de uma contestação que foi aos dois setores. Nome, contato, "
                     "mensagem e o que o cliente via só em dados_cifrados (X25519 + AES-GCM; abre com "
-                    "NEXUS_CONTESTACAO_CHAVE_PRIVADA, no Nexus). avisado_teams = sim/não: o Teams do setor recebeu. "
+                    "NEXUS_CONTESTACAO_CHAVE_PRIVADA, no Nexus). avisado_teams = sim/não/sem canal: o Teams do setor "
+                    "recebeu, recusou ou o setor não tem fluxo (o COS, desde 19/10/2026: a contestação chega pelo "
+                    "Nexus). "
                     "O livro é trocado inteiro a cada contestação, relido antes e conferido depois"),
     Fato("pt", "Permissão de trabalho", "hseq", "pt_app_campo · PT", fato_pt.GRAO,
          _d(data=("id", "data_id_criacao, data_id_decisao (papéis)"), usina=("id", "usina_id"),
