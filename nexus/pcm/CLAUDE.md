@@ -153,8 +153,14 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   administrador e do setor PCM (`pode_programar`). **O Cadastro de motivos edita na própria linha** (Levi, 18/10/2026:
   o Editar abria "um card nada a ver abaixo"; o nome, a descrição e o "tira" se mudam na coluna deles): o `<form>` de
   cada linha fica na célula das ações e os campos se ligam a ele pelo atributo `form`; o Salvar só aparece na linha que
-  mudou, e mudar o "tira" de motivo com tarefas pede confirmação. A lista do backoffice, de quem abre o Gerar a semana
-  (como as observações).
+  mudou, e mudar o "tira" de motivo com tarefas pede confirmação. **A etiqueta do Fracttal de cada motivo** (Levi,
+  19/10/2026: "ligar a uma etiqueta do Fracttal para quando o técnico justificasse etiquetaria aquela OS"): a coluna
+  "Etiqueta no Fracttal" guarda o NOME (`dim_motivo.etiqueta_fracttal`, no fim), com as etiquetas que já estão nas OS
+  (o gestao_pcm.json) de sugestão e qualquer nome aceito; vai no `Fora_da_programacao.json` (`motivos[].etiqueta`).
+  Quem etiqueta é o App, com o login do técnico (o Nexus não tem login de gente no Fracttal): ao justificar, põe a do
+  motivo; ao trocar ou tirar a justificativa, tira a antiga (decisões do Levi, 19/10); só a justificativa do técnico
+  etiqueta (a marca do PCM no Nexus, não). O contrato: `app-campo-docs/_propostas/etiqueta-motivo/LEIA.md`. A lista do
+  backoffice, de quem abre o Gerar a semana (como as observações).
 - **Pelo App** (`motivos_app.py`, a rota `POST /t/pcm/motivos/app`, pública só para quem assina, como a das fotos dos
   extintores): corpo JSON {os, codigo, tarefa, motivo (id; null = tirar), obs, tecnico_hmac, tecnico_nome}; cabeçalhos
   `X-Nexus-Ts` (epoch) e `X-Nexus-Assinatura` = HMAC-SHA256 de "<ts>." + o corpo cru, com a chave derivada da

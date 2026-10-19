@@ -61,15 +61,18 @@ log = logging.getLogger(__name__)
 LIVRO, NOME_LIVRO = "nexus_pcm_motivos", "Nexus · motivos das tarefas do PCM e o backoffice"
 ABA_MOTIVO, ABA_MARCA, ABA_BACKOFFICE = "dim_motivo", "fato_decisao_motivo", "fato_decisao_backoffice"
 ABAS = (ABA_MOTIVO, ABA_MARCA, ABA_BACKOFFICE)
+# `etiqueta_fracttal` (19/10/2026, no FIM: o livro é lido pelo nome da coluna): o NOME da etiqueta do Fracttal que o App
+# põe na OS quando o técnico justifica com este motivo (e tira quando ele troca ou tira a justificativa). Quem etiqueta é
+# o App, com o login do técnico: o Nexus não tem login de gente no Fracttal (pacote _propostas/etiqueta-motivo do App)
 CAB_MOTIVO = ("motivo_id", "nome", "descricao", "tira_da_programacao", "criado_em", "alterado_em", "excluido",
-              "alterado_por_hmac")
+              "alterado_por_hmac", "etiqueta_fracttal")
 CAB_MARCA = ("decidida_em", "data_id", "item_id", "os", "codigo_ativo", "equipamento_id", "tarefa_chave", "motivo_id",
              "semana", "origem", "decidida_por_hmac", "dados_cifrados")
 CAB_BACKOFFICE = ("decidida_em", "data_id", "nome_hmac", "na_lista", "decidida_por_hmac", "dados_cifrados")
 CABS = {ABA_MOTIVO: CAB_MOTIVO, ABA_MARCA: CAB_MARCA, ABA_BACKOFFICE: CAB_BACKOFFICE}
 ARQUIVO = "Fora_da_programacao.json"
 VERSAO_ARQUIVO = 1
-NOME_MIN, NOME_MAX, DESCRICAO_MAX, OBS_MAX, PESSOA_MAX = 2, 60, 300, 500, 80
+NOME_MIN, NOME_MAX, DESCRICAO_MAX, OBS_MAX, PESSOA_MAX, ETIQUETA_MAX = 2, 60, 300, 500, 80, 80
 TTL_S = 60
 ORIGENS = ("quadro", "painel", "app")       # app: o técnico pelo App de Campo (motivos_app.py)
 _BRT = timezone(timedelta(hours=-3))
@@ -230,12 +233,17 @@ def _motivo(x: dict) -> dict | None:
     return {"id": mid, "nome": " ".join(D._txt(x.get("nome")).split()), "descricao": D._txt(x.get("descricao")),
             "tira": _sim(x.get("tira_da_programacao")), "criado_em": D._txt(x.get("criado_em")),
             "alterado_em": D._txt(x.get("alterado_em")), "excluido": _sim(x.get("excluido")),
-            "alterado_por_hmac": D._txt(x.get("alterado_por_hmac"))}
+            "alterado_por_hmac": D._txt(x.get("alterado_por_hmac")), "etiqueta": _etiqueta(x.get("etiqueta_fracttal"))}
+
+
+def _etiqueta(v) -> str:
+    """O nome da etiqueta do Fracttal como o PCM escreveu, com espaço único (o App casa sem acento e sem caixa)."""
+    return " ".join(D._txt(v).split())[:ETIQUETA_MAX]
 
 
 def cadastro_inicial() -> list[dict]:
     return [{"id": i, "nome": n, "descricao": d, "tira": t, "criado_em": "", "alterado_em": "", "excluido": False,
-             "alterado_por_hmac": ""} for i, (n, d, t) in enumerate(CADASTRO_INICIAL, start=1)]
+             "alterado_por_hmac": "", "etiqueta": ""} for i, (n, d, t) in enumerate(CADASTRO_INICIAL, start=1)]
 
 
 def _estado(cru: dict) -> dict:
@@ -489,7 +497,7 @@ def _gravar(cfg, mudar):
         if not [m for m in (_motivo(x) for x in cru[ABA_MOTIVO]) if m]:
             cru[ABA_MOTIVO] = [{"motivo_id": m["id"], "nome": m["nome"], "descricao": m["descricao"],
                                 "tira_da_programacao": "sim" if m["tira"] else "não", "criado_em": _iso(_agora()),
-                                "alterado_em": "", "excluido": "", "alterado_por_hmac": ""}
+                                "alterado_em": "", "excluido": "", "alterado_por_hmac": "", "etiqueta_fracttal": ""}
                                for m in cadastro_inicial()]
         resultado, mudou = mudar(cru)
         if mudou:
@@ -589,9 +597,10 @@ def _descricao(d) -> str:
 
 
 def cadastro(cfg, acao: str, usuario: dict | None, motivo_id=None, nome=None, descricao=None,
-             tira=None) -> dict:
+             tira=None, etiqueta=None) -> dict:
     """O cadastro dos motivos (administrador e setor PCM): `acao` criar | editar | excluir. Excluir não apaga: marca
-    `excluido = sim` e o ID não volta; as tarefas com ele perdem o motivo (a confirmação da tela diz quantas)."""
+    `excluido = sim` e o ID não volta; as tarefas com ele perdem o motivo (a confirmação da tela diz quantas).
+    `etiqueta` (19/10/2026): o nome da etiqueta do Fracttal; None = não mexe (quem edita sem o campo), "" = sem etiqueta."""
     cod_quem, _ = _quem(cfg, usuario)
     mid = D._id(motivo_id) if motivo_id not in (None, "") else None
 
@@ -604,7 +613,7 @@ def cadastro(cfg, acao: str, usuario: dict | None, motivo_id=None, nome=None, de
                 raise Recusada(f"Já existe o motivo {n}.")
             novo = {"motivo_id": max((m["id"] for m in motivos), default=0) + 1, "nome": n, "descricao": d,
                     "tira_da_programacao": "sim" if tira else "não", "criado_em": agora, "alterado_em": "",
-                    "excluido": "", "alterado_por_hmac": cod_quem}
+                    "excluido": "", "alterado_por_hmac": cod_quem, "etiqueta_fracttal": _etiqueta(etiqueta)}
             cru[ABA_MOTIVO].append(novo)
             return {"acao": acao, "motivo_id": novo["motivo_id"], "nome": n}, True
         linha = next((x for x in cru[ABA_MOTIVO] if D._id(x.get("motivo_id")) == mid and not _sim(x.get("excluido"))),
@@ -616,10 +625,13 @@ def cadastro(cfg, acao: str, usuario: dict | None, motivo_id=None, nome=None, de
             if any(not m["excluido"] and m["id"] != mid and norm(m["nome"]) == norm(n) for m in motivos):
                 raise Recusada(f"Já existe o motivo {n}.")
             t = "sim" if tira else "não"
+            e = _etiqueta(linha.get("etiqueta_fracttal")) if etiqueta is None else _etiqueta(etiqueta)
             if (" ".join(D._txt(linha.get("nome")).split()) == n and D._txt(linha.get("descricao")) == d
-                    and ("sim" if _sim(linha.get("tira_da_programacao")) else "não") == t):
+                    and ("sim" if _sim(linha.get("tira_da_programacao")) else "não") == t
+                    and _etiqueta(linha.get("etiqueta_fracttal")) == e):
                 return {"acao": acao, "motivo_id": mid, "nome": n, "mudou": False}, False
-            linha.update(nome=n, descricao=d, tira_da_programacao=t, alterado_em=agora, alterado_por_hmac=cod_quem)
+            linha.update(nome=n, descricao=d, tira_da_programacao=t, alterado_em=agora, alterado_por_hmac=cod_quem,
+                         etiqueta_fracttal=e)
             return {"acao": acao, "motivo_id": mid, "nome": n, "mudou": True}, True
         if acao == "excluir":
             linha.update(excluido="sim", alterado_em=agora, alterado_por_hmac=cod_quem)
@@ -678,8 +690,10 @@ def arquivo(cfg, est: dict | None = None) -> dict:
     todo motivo das tarefas está em `motivos`."""
     est = est or ler(cfg)
     vig = vigentes(cfg, est)
+    # `etiqueta` (19/10/2026): o nome da etiqueta do Fracttal que o App põe na OS quando o técnico justifica com o
+    # motivo ("" = nenhuma); o App acha o id pelo nome no catálogo do Fracttal, com o login do técnico
     motivos = [{"id": m["id"], "nome": m["nome"], "descricao": m["descricao"], "tira_da_programacao": m["tira"],
-                "ativo": True}
+                "ativo": True, "etiqueta": m.get("etiqueta") or ""}
                for m in ativos(est)]
     tarefas = sorted(({"os": m["os"], "codigo": m["codigo"], "tarefa": m["tarefa"], "usina": m["usina"],
                        "cluster": m["cluster"], "data_prog": m["data_prog"], "motivo": m["motivo_id"],
