@@ -55,8 +55,9 @@ def test_a_aba_atualizacoes_lista_os_commits_por_dia_com_o_que_mudou(app, logado
     assert "Novidade" in html and "Correção" in html and ">base<" in html
     assert "Equipamentos das usinas liga pela aba" in html and "cada chave vai a usina" in html
     assert "Corpo da mensagem." in html and "Co-Authored-By" not in html        # a coautoria não aparece
-    assert "mensagem sem tipo" in html and "no ar</span>" in html
-    assert "Os últimos 3 commits do Nexus." in html
+    # só novidade e correção (19/10/2026, Levi: "deixe só novidade e correção, sempre os últimos 60 dias!")
+    assert "mensagem sem tipo" not in html and "no ar</span>" in html
+    assert "2 novidades e correções nos últimos 60 dias." in html
 
 
 def test_sem_git_o_cartao_diz_traco_e_a_aba_diz_por_que(app, logado, monkeypatch):
@@ -112,6 +113,12 @@ def test_a_aba_nao_mostra_horario_e_mostra_os_topicos(app, logado, monkeypatch):
     monkeypatch.setattr(versao, "_git", lambda *a, **k: log if a[1] != "-1" else
                         f"{SHA}\x1f2026-10-14T03:10:00Z\x1ffeat(base): sai a tela\n")
     monkeypatch.setattr(casca, "_commit", lambda: "648c100")
+
+    class Dia(datetime):                         # a data fica fixa: a aba só mostra os últimos 60 dias
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 14, 20, 0, tzinfo=tz)
+    monkeypatch.setattr(versao, "datetime", Dia)
     versao.local.cache_clear()
     versao.historico.cache_clear()
     try:
@@ -131,3 +138,49 @@ def test_o_cartao_da_versao_tem_o_mesmo_recheio_das_outras_caixas():
     espaço interno e a linha das caixas valiam só para <div>."""
     css = open("nexus/static/nexus.css", encoding="utf-8").read()
     assert ".gc-numeros>div,.gc-numeros>a{padding:18px 22px;border-left:1px solid var(--linha)}" in css
+
+
+
+def test_a_aba_so_mostra_novidade_e_correcao_dos_ultimos_60_dias(app, logado, monkeypatch):
+    """19/10/2026, Levi: "Em início > atualização deixe só novidade e correção sempre os últimos 60 dias!". A versão no
+    ar pode ser um commit que não entra na lista (uma documentação): aí nenhum item leva o "no ar"."""
+    doc = "dddd111222333444555666777888999000dddd"
+    log = (f"{doc}\x1f2026-10-19T12:00:00-03:00\x1fdocs(base): o CLAUDE.md da base\x1f\x1e"
+           "eeee111222333444555666777888999000eeee\x1f2026-10-18T12:00:00-03:00\x1ffeat(pcm): o quadro novo\x1f\x1e"
+           "ffff111222333444555666777888999000ffff\x1f2026-09-01T12:00:00-03:00\x1ffix(campo): a foto da ronda\x1f\x1e"
+           "1111111222333444555666777888999000aaaa\x1f2026-08-01T12:00:00-03:00\x1ffeat(base): velho demais\x1f\x1e"
+           "2222111222333444555666777888999000bbbb\x1f2026-10-17T12:00:00-03:00\x1fMerge do setor Campo\x1f\x1e"
+           "3333111222333444555666777888999000cccc\x1f2026-10-16T12:00:00-03:00\x1fperf(casca): mais rapido\x1f\x1e")
+    monkeypatch.setattr(versao, "_git", lambda *a, **k: log if a[1] != "-1" else
+                        f"{doc}\x1f2026-10-19T12:00:00-03:00\x1fdocs(base): o CLAUDE.md da base\n")
+    monkeypatch.setattr(casca, "_commit", lambda: doc[:7])
+
+    class Dia(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 19, 15, 0, tzinfo=tz)
+    monkeypatch.setattr(versao, "datetime", Dia)
+    versao.local.cache_clear()
+    versao.historico.cache_clear()
+    try:
+        html = logado.get("/?aba=atualizacoes").get_data(as_text=True)
+    finally:
+        versao.local.cache_clear()
+        versao.historico.cache_clear()
+    aba = html.split('class="lead"', 1)[1]
+    assert "o quadro novo" in aba and "a foto da ronda" in aba          # feat e fix dentro dos 60 dias
+    for fora in ("velho demais", "o CLAUDE.md da base", "Merge do setor", "mais rapido"):
+        assert fora not in aba                                          # mais de 60 dias, docs, merge e perf
+    assert "no ar</span>" not in aba                                    # a versão no ar é a documentação
+    assert "2 novidades e correções nos últimos 60 dias." in aba
+    assert "Documentação" not in aba and "Desempenho" not in aba
+
+
+def test_da_aba_corta_no_dia_do_pedido():
+    from datetime import timedelta, timezone
+    brt = timezone(timedelta(hours=-3))
+    agora = datetime(2026, 10, 19, 12, 0, tzinfo=brt)
+    itens = [{"tipo_id": "feat", "em": agora - timedelta(days=59, hours=23)},
+             {"tipo_id": "fix", "em": agora - timedelta(days=60, hours=1)},
+             {"tipo_id": "docs", "em": agora}, {"tipo_id": "feat", "em": None}]
+    assert versao.da_aba(itens, agora) == [itens[0]]
