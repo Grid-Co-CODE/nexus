@@ -843,7 +843,7 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
   etiqueta de cada bloco (parada, ativos) vai no nome; ao abrir, o detalhe dos três blocos (o macro `det_bloco`).
   "Pausadas" (o nome do Levi) é a tarefa fora da programação; "parada" fica para a usina parada.
 - **O clique:** o bloco (o cartão inteiro, não só o nome: "deve ser possível clicar no bloco (...) inteiro, e não só no
-  título"; o link do nome cobre o cartão pelo `::after`) ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta;
+  título"; o link do nome cobre o cartão pelo `::after`, sem sublinhar o nome nem o ícone ao passar o mouse: "Tire esse underline dos blocos"; o sinal é a borda do cartão) ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta;
   `manut`: `ordem_da_manutencao`; `acomp`: a pior ronda) e destaca as colunas dele (`lista_geral`, `bloco_geral`);
   clicar de novo volta à ordem geral (a do foco). O "pedem atenção", "focar", "acompanhar" e cada número, por cima do
   link do bloco, FILTRAM ("funcionará como filtro os KPIs do bloco"; `filtro=`; `FILTROS_GERAL` guarda a condição de
