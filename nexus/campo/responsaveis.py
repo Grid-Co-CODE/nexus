@@ -367,6 +367,25 @@ def foto_das_os(gerado_em, agora) -> dict:
     return {"quando": quando, "horas": int(horas), "velha": horas > FOTO_VELHA_H}
 
 
+def sites_fracttal() -> dict[int, str]:
+    """{usina_id: o nome do site no Fracttal}, pelo de-para "Fracttal · Classificação 1" do cadastro: é o nome que o
+    arquivo do PCM dá à usina ("Cliente - Usina - UF"), e o Quadro da semana busca por ele (o link das OS não iniciadas,
+    18/10/2026). Usina com dois sites, o primeiro em ordem; sem o banco, vazio (o link busca pelo nome do cadastro)."""
+    try:
+        linhas = visao._livro("cadastro_nexus", "de_para")
+    except Exception:           # noqa: BLE001 — sem o de-para, o link usa o nome do cadastro
+        return {}
+    out: dict[int, str] = {}
+    for d in linhas or ():
+        uid, nome = visao.D._id(d.get("usina_id")), str(d.get("chave_externa") or "").strip()
+        # só o nome no formato do arquivo ("Cliente - Usina - UF"): o provisório do cadastro, "(sem Classificação 1)
+        # BWK100", não acha nada no Quadro (medido em 18/10/2026)
+        if uid and " - " in nome and not nome.startswith("(") and \
+                str(d.get("sistema") or "").strip() == visao.FRACTTAL_C1:
+            out[uid] = min(out.get(uid) or nome, nome)
+    return out
+
+
 def limpeza() -> tuple[dict, dict]:
     """{usina_id: a última leitura de sujidade e vegetação} (18/10/2026): a conta das Rondas (`visao.sujidade_vegetacao`,
     a régua `visao.criticidade`), com o checklist do fato de ronda e as respostas das OS de ronda que o processo já tem
@@ -772,10 +791,16 @@ def linha_performance(u: dict) -> dict:
     return {"valores": valores, "tag": tag, "det": det}
 
 
-def _limpeza(x) -> tuple[dict, str]:
-    """A coluna Limpeza ("S2 V5", na cor do achado mais grave da régua das Rondas) e o texto do detalhe."""
+def _ronda_ref(os_, dia, txt) -> dict:
+    """A ronda que o detalhe abre no card (`responsaveis_painel` com `painel=ronda`): a OS e o dia."""
+    return {"os": visao.D._id(os_) or None, "data": dia, "txt": txt}
+
+
+def _limpeza(x) -> tuple[dict, str, dict | None]:
+    """A coluna Limpeza ("S2 V5", na cor do achado mais grave da régua das Rondas), o texto do detalhe e a ronda da
+    leitura (o "ronda de 13/10", que abre o card dela)."""
     if not x:
-        return _v("—", "neutro"), ""
+        return _v("—", "neutro"), "", None
     s, v = x.get("sujidade"), x.get("vegetacao")
     cores = {c for _t, c in x.get("status") or ()}
     cls = "critico" if "critico" in cores else ("alerta" if "alerta" in cores else "ok")
@@ -785,26 +810,37 @@ def _limpeza(x) -> tuple[dict, str]:
         partes.append(f"vala {vala.lower()}")
     if x.get("sensores_sujos"):
         partes.append("sensor sujo (" + ", ".join(x["sensores_sujos"]) + ")")
-    partes.append(f"ronda de {_dm(x.get('data'))}")
     txt = " ".join(p for p in (f"S{s}" if s else "", f"V{v}" if v else "") if p) or "—"
-    return _v(txt, cls), " · ".join(p for p in partes if p)
+    return (_v(txt, cls), " · ".join(p for p in partes if p),
+            _ronda_ref(x.get("os"), x.get("data"), f"ronda de {_dm(x.get('data'))}") if x.get("data") else None)
 
 
 def linha_acompanhamento(u: dict) -> dict:
     """Os valores da linha (ronda, limpeza, PT, chamados, extintores) e o detalhe."""
     r, p, c, e = u.get("ronda") or {}, u.get("pt") or {}, u.get("chamados") or {}, u.get("extintores") or {}
-    lim, lim_txt = _limpeza(u.get("limpeza"))
+    lim, lim_txt, lim_ronda = _limpeza(u.get("limpeza"))
+    # a data da última ronda uma vez só (Levi, 18/10/2026: "Deixe a informação da última ronda apenas em limpeza pois
+    # está redundante repetindo em ronda e em limpeza"): quando a leitura da limpeza é da última ronda, a data fica na
+    # Limpeza; quando não é (a última ronda veio sem a limpeza), fica na Ronda. Nas duas, ela abre o card da ronda
+    ultima = r.get("ultima")
+    repete = bool(lim_ronda and ultima and lim_ronda["data"] == ultima)
+    ronda_ref = None
     if r.get("tipo") == "nunca":
         ronda, ronda_txt = _v("nunca", "critico"), "Nunca teve ronda pelo App desde a mobilização"
     elif r.get("tipo") == "sem_ronda":
-        ronda, ronda_txt = _v(f"há {r['dias']} d", "critico"), f"Sem ronda há {r['dias']} dias (última em {_dm(r.get('ultima'))})"
+        ronda, ronda_txt = _v(f"há {r['dias']} d", "critico"), f"Sem ronda há {r['dias']} dias"
+        ronda_ref = _ronda_ref(r.get("os"), ultima, f"última em {_dm(ultima)}")
     elif r.get("tipo") == "longa_pendente":
-        ronda, ronda_txt = _v("longa pend.", "alerta"), f"Ronda longa pendente · última ronda em {_dm(r.get('ultima'))}"
+        ronda, ronda_txt = _v("longa pend.", "alerta"), "Ronda longa pendente"
+        ronda_ref = _ronda_ref(r.get("os"), ultima, f"última ronda em {_dm(ultima)}")
     elif r.get("dias") is not None and r["dias"] < 999:
         ronda = _v("hoje" if r["dias"] == 0 else f"há {r['dias']} d", "ok")
-        ronda_txt = f"Em dia · última ronda em {_dm(r.get('ultima'))}"
+        ronda_txt = "Em dia"
+        ronda_ref = _ronda_ref(r.get("os"), ultima, f"última ronda em {_dm(ultima)}")
     else:
         ronda, ronda_txt = _v("—", "neutro"), ""
+    if repete or not ultima:
+        ronda_ref = None
     if p.get("paradas_hoje"):
         pt = _v(f"{p['paradas_hoje']} agora", "critico")
     elif p.get("paradas_antigas"):
@@ -831,9 +867,9 @@ def linha_acompanhamento(u: dict) -> dict:
         ext = _v("—", "neutro")
     det = []
     if ronda_txt:
-        det.append({"rot": "Ronda", "forte": "", "resto": ronda_txt, "itens": []})
+        det.append({"rot": "Ronda", "forte": "", "resto": ronda_txt, "itens": [], "ronda": ronda_ref})
     if lim_txt:
-        det.append({"rot": "Limpeza", "forte": "", "resto": lim_txt, "itens": []})
+        det.append({"rot": "Limpeza", "forte": "", "resto": lim_txt, "itens": [], "ronda": lim_ronda})
     if p.get("aguardando"):
         det.append({"rot": "PT", "forte": "", "resto": f"{p['aguardando']} esperando o De acordo",
                     "itens": [{"forte": f"OS {x['os'] or x['numero']}", "txt": f"há {_duracao(x['idade_min'])}",
@@ -995,9 +1031,14 @@ def linha_manutencao(u: dict, limite: int) -> dict:
                                "os_card": {"wid": None, "folio": p["os"]}} for p in pa[:3]],
                     "mais": max(0, len(pa) - 3)})
     if abertas:
-        det.append({"rot": "OS abertas", "forte": "", "resto": _plural(abertas, "OS aberta", "OS abertas")
-                    + (f" · {m['em_verificacao']} esperando a aprovação" if m.get("em_verificacao") else ""),
-                    "itens": []})
+        # uma linha por situação (Levi, 18/10/2026: "separe por linha, o que está dependendo de aprovação e o que não
+        # foi iniciado"); a não iniciada abre o Quadro da semana com o cliente e a usina (`quadro`, o link no template)
+        nao = m.get("nao_iniciadas") or 0
+        det.append({"rot": "OS abertas", "forte": "", "resto": _plural(abertas, "OS aberta", "OS abertas"),
+                    "itens": [{"forte": f"{n} {txt}", "txt": "", "quadro": q} for n, txt, q in (
+                        (m.get("em_verificacao") or 0, "esperando a aprovação", False),
+                        (nao, "não iniciada" if nao == 1 else "não iniciadas", True),
+                        (m.get("em_execucao") or 0, "em execução", False)) if n]})
     if atr:
         det.append({"rot": "Atrasadas", "forte": "",
                     "resto": f"{_plural(atr, 'tarefa', 'tarefas')} em {_plural(m.get('atrasadas_os') or 0, 'OS', 'OS')}, "

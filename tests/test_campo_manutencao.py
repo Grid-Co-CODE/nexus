@@ -124,3 +124,16 @@ def test_semana_passada_pela_conta_do_fechamento():
 def test_usina_sem_programacao_fica_neutra():
     r = M.semana_por_usina([_p(2, 20261019, 20261021, "finalizada")], HOJE, "10:00")
     assert r[2]["passada_pct"] is None and r.get(3) is None
+
+
+def test_a_os_em_processo_nao_iniciada_ou_em_execucao():
+    """Levi, 18/10/2026: "Em OSs abertas quero que separe por linha, o que está dependendo de aprovação e o que não foi
+    iniciado". A OS em processo sem nenhuma tarefa começada (em progresso, pausada ou feita) não foi iniciada; com uma
+    começada, está em execução; a em verificação espera a aprovação. As três somam as abertas."""
+    r = _usina([_t(1, 500), _t(2, 500),                                        # nenhuma começada: não iniciada
+                _t(3, 501), _t(4, 501, estado="em_progresso"),                 # uma em progresso: em execução
+                _t(5, 502, estado="finalizada"), _t(6, 502),                   # uma feita: em execução
+                _t(7, 503, estado="pausada"),                                  # pausada no App: em execução
+                _t(8, 504, status="em_verificacao", estado="finalizada")])     # esperando a aprovação
+    assert (r["os_abertas"], r["em_verificacao"], r["nao_iniciadas"], r["em_execucao"]) == (5, 1, 1, 3)
+    assert r["nao_iniciadas"] + r["em_execucao"] + r["em_verificacao"] == r["os_abertas"]

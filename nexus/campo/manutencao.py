@@ -27,6 +27,9 @@ DIAS_ATRASO = 10
 META_SEMANA = 85.0
 LIMITE_PADRAO, LIMITE_MIN, LIMITE_MAX = 30, 10, 365
 _VIVA = ("em_processo", "em_verificacao")
+# a tarefa que mostra que a OS começou (Levi, 18/10/2026: separar nas OS abertas "o que não foi iniciado"): em progresso,
+# pausada no App ou feita. Sem nenhuma, a OS em processo não foi iniciada (estado vazio não prova começo)
+_COMECOU = ("em_progresso", "pausada", "finalizada")
 
 
 def _dia(v) -> date | None:
@@ -55,7 +58,8 @@ def marcas_paradas(vigentes: dict, usina_de) -> list[dict]:
 
 
 def _vazio() -> dict:
-    return {"os_abertas": 0, "em_verificacao": 0, "atrasadas": 0, "atrasadas_os": 0, "maior_atraso": None,
+    return {"os_abertas": 0, "em_verificacao": 0, "nao_iniciadas": 0, "em_execucao": 0, "atrasadas": 0,
+            "atrasadas_os": 0, "maior_atraso": None,
             "lista_atrasadas": [], "vencem": 0, "paradas": 0, "motivo_comum": None, "lista_paradas": [],
             "zeladoria_proxima": None, "zeladoria_vencida": None, "zeladoria_ultima": None}
 
@@ -69,6 +73,7 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
     texto); None = o fato ainda não está no banco: só as paradas, por marca, como o painel faz sem a Gestão PCM."""
     idx = {(m["os"], m["codigo"], m["chave"]): m for m in marcas}
     out, abertas, verif, atr, tipo_atr, wids, paradas = {}, {}, {}, {}, {}, {}, {}
+    comecou = set()
 
     def r_(uid):
         return out.setdefault(uid, _vazio())
@@ -78,6 +83,8 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
             continue
         r = r_(uid)
         wids[os_] = D._id(t.get("fracttal_os_id"))
+        if D._txt(t.get("estado_tarefa")) in _COMECOU:
+            comecou.add(os_)
         tipo, prog = D._txt(t.get("tipo_tarefa")), _dia(t.get("data_id_programada"))
         viva = D._txt(t.get("estado_tarefa")) != "finalizada" and D._txt(t.get("status_os")) in _VIVA
         if tipo == "zeladoria":
@@ -121,6 +128,9 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
                 paradas.setdefault(m["usina_id"], []).append(m)
     for uid, r in out.items():
         r["os_abertas"], r["em_verificacao"] = len(abertas.get(uid, ())), len(verif.get(uid, ()))
+        em_processo = abertas.get(uid, set()) - verif.get(uid, set())
+        r["nao_iniciadas"] = len(em_processo - comecou)
+        r["em_execucao"] = len(em_processo) - r["nao_iniciadas"]
         a = atr.get(uid, {})
         r["atrasadas_os"], r["maior_atraso"] = len(a), (max(a.values()) if a else None)
         r["lista_atrasadas"] = [{"os": o, "wid": wids.get(o), "dias": d, "tipo": tipo_atr.get(o)}
