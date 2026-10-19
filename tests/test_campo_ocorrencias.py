@@ -309,3 +309,205 @@ def test_as_pessoas_do_cadastro_para_o_responsavel_da_acao(banco):
     nomes = [p["nome"] for p in O.pessoas_do_cadastro()]
     assert nomes == sorted(nomes) and {"Beltrano Supervisor", "Ciclano Chefe"} <= set(nomes)
     assert all(p["id"] for p in O.pessoas_do_cadastro())
+
+
+# ── a tela (Campo · App → Ocorrências) ───────────────────────────────────────────────────────────────────────────────
+TECNICO = {"email": "tecnico@exemplo.test", "nome": "Técnico Qualquer"}
+
+
+@pytest.fixture(autouse=True)
+def _sem_copia():
+    O.limpar()
+    yield
+    O.limpar()
+
+
+@pytest.fixture
+def cad(banco, app):
+    """O cadastro com o Responsável O&M de cada usina (a Altair e a Brodowski 1 do 91, a Coração 1 do 90) e o
+    administrador pelo e-mail (NEXUS_ADMINS)."""
+    from test_campo_visao import USINAS, _aba
+    from nexus.campo import visao
+    _aba(banco, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id={1: 91, 2: 91, 3: 90}.get(u["usina_id"]))
+                                             for u in USINAS])
+    app.config["NEXUS_ADMINS"] = ADMIN["email"]
+    visao.limpar()
+    return banco
+
+
+def _entra(cliente, usuario=None):
+    from conftest import SENHA_TESTE
+    cliente.post("/entrar", data={"senha": SENHA_TESTE})
+    if usuario:
+        with cliente.session_transaction() as s:
+            s["usuario"] = dict(usuario, perfil="")
+    return cliente
+
+
+def _oid(resp) -> str:
+    return resp.headers["Location"].split("/ocorrencias/")[1].split("?")[0].split("#")[0]
+
+
+def test_a_tela_esta_no_menu_do_campo_e_e_dos_responsaveis_ufv():
+    from nexus.torres.campo import TORRE
+    t = TORRE.tela("ocorrencias")
+    assert t.nome == "Ocorrências" and t.do_setor == "Responsáveis UFV"
+    ids = [x.id for x in TORRE.telas]
+    assert ids.index("ocorrencias") == ids.index("responsaveis") + 1
+
+
+def test_a_lista_abre_nas_abertas_e_o_quadro_tem_as_tres_colunas(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    a = O.criar(_form(titulo="Inversor 2 desarmando", criticidade="alta"), ADMIN, True)["ocorrencia_id"]
+    O.criar(_form(titulo="Cerca caída", usina_id="3", criticidade="baixa", status="pausado"), ADMIN, True)
+    O.criar(_form(titulo="Trafo aquecendo", status="finalizado"), ADMIN, True)
+    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
+    assert "Inversor 2 desarmando" in html and "Cerca caída" in html and "Trafo aquecendo" not in html
+    assert f"/t/campo/ocorrencias/{a}" in html and "Nova ocorrência" in html and "Altair" in html
+    assert "Todas" in html and "Abertas" in html
+    html = c.get("/t/campo/ocorrencias?responsavel=*&status=*").get_data(as_text=True)
+    assert "Trafo aquecendo" in html
+    q = c.get("/t/campo/ocorrencias?responsavel=*&ver=quadro").get_data(as_text=True)
+    assert all(f">{col}<" in q for col in ("Em andamento", "Pausado", "Finalizado")) and "Trafo aquecendo" in q
+
+
+def test_criar_pela_tela(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    html = c.get("/t/campo/ocorrencias/nova?usina=3").get_data(as_text=True)
+    assert 'name="titulo"' in html and '<option value="3" selected>' in html
+    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída", usina_id="3"))
+    assert r.status_code == 302
+    html = c.get(r.headers["Location"]).get_data(as_text=True)
+    assert "Ocorrência registrada" in html and "Cerca caída" in html and "Coração 1" in html
+    assert "Fulana Administradora" in html and O.estado(O.ler(forcar=True)["eventos"], None)[_oid(r)]["usina_id"] == 3
+
+
+def test_a_recusa_na_tela_diz_o_porque_e_guarda_o_que_foi_digitado(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída", inicio="2026-13-01"))
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Data inválida no início" in html and 'value="Cerca caída"' in html
+    assert cad.syncs == 0
+
+
+def test_quem_nao_pode_so_ve(cad, cliente):
+    oid = O.criar(_form(titulo="Inversor 2 desarmando"), ADMIN, True)["ocorrencia_id"]
+    c = _entra(cliente, TECNICO)
+    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
+    assert "Inversor 2 desarmando" in html and "Nova ocorrência" not in html
+    html = c.get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
+    assert "Inversor 2 desarmando" in html and "Registrar andamento" not in html and "Salvar a ação" not in html
+    r = c.post("/t/campo/ocorrencias/nova", data=_form())
+    assert r.status_code == 403 and "Responsável O&amp;M" in r.get_data(as_text=True)
+    assert c.post(f"/t/campo/ocorrencias/{oid}/andamento", data={"texto": "x"}).status_code == 403
+    assert len(cad.linhas(O.LIVRO, O.ABA)) == 1
+
+
+def test_o_administrador_da_senha_ve_o_aviso_de_entrar_com_o_login(cad, logado):
+    html = logado.get("/t/campo/ocorrencias").get_data(as_text=True)
+    assert "entre com o seu login" in html.lower() and "Nova ocorrência" not in html
+
+
+def test_o_responsavel_registra_e_a_lista_abre_nas_usinas_dele(cad, cliente):
+    O.criar(_form(titulo="Inversor 2 desarmando"), ADMIN, True)                 # na Altair, do Ciclano
+    c = _entra(cliente, RESP)                                    # o Beltrano é o Responsável O&M da Coração 1
+    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída", usina_id="3"))
+    assert r.status_code == 302
+    html = c.get("/t/campo/ocorrencias").get_data(as_text=True)
+    assert "Cerca caída" in html and "Inversor 2 desarmando" not in html
+    assert "Inversor 2 desarmando" in c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
+
+
+def test_o_plano_de_acao_e_o_andamento_pela_tela(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
+    html = c.get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
+    assert "Nenhuma ação no plano ainda" in html and '<option value="91">Ciclano Chefe</option>' in html
+    ontem = (HOJE - timedelta(days=1)).isoformat()
+    r = c.post(f"/t/campo/ocorrencias/{oid}/acao", data={"acao_id": "", "texto": "Trocar o fusível",
+                                                          "responsavel_id": "91", "prazo": ontem, "situacao": "a_fazer"})
+    assert r.status_code == 302
+    r = c.post(f"/t/campo/ocorrencias/{oid}/andamento", data={"texto": "Fusível comprado"})
+    html = c.get(r.headers["Location"]).get_data(as_text=True)
+    assert "Andamento registrado" in html and "Fusível comprado" in html and "Trocar o fusível" in html
+    assert "Ciclano Chefe" in html and "oc-atrasada" in html
+    aid = O.estado(O.ler(forcar=True)["eventos"], None)[oid]["acoes"][0]["id"]
+    r = c.post(f"/t/campo/ocorrencias/{oid}/acao", data={"acao_id": aid, "texto": "Trocar o fusível",
+                                                          "responsavel_id": "91", "prazo": ontem,
+                                                          "situacao": "concluida"})
+    html = c.get(r.headers["Location"]).get_data(as_text=True)
+    assert "Ação salva" in html and "Concluída" in html and "oc-atrasada" not in html
+    lista = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
+    assert "Sem ação em aberto" in lista
+
+
+def test_a_lista_mostra_a_proxima_acao_e_o_atraso(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
+    O.salvar_acao(oid, {"acao_id": "", "texto": "Chamar o fabricante", "responsavel_id": "90",
+                        "prazo": (HOJE - timedelta(days=2)).isoformat(), "situacao": "em_andamento"}, ADMIN, True,
+                  [{"id": 90, "nome": "Beltrano Supervisor"}])
+    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
+    assert "Chamar o fabricante" in html and "Beltrano Supervisor" in html and "oc-atrasada" in html
+
+
+def test_editar_pela_tela(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
+    r = c.post(f"/t/campo/ocorrencias/{oid}/dados", data=_form(status="pausado"))
+    assert r.status_code == 302
+    html = c.get(r.headers["Location"]).get_data(as_text=True)
+    assert "Ocorrência salva" in html and ">Pausado<" in html
+    html = c.post(f"/t/campo/ocorrencias/{oid}/dados", data=_form(status="pausado")).get_data(as_text=True)
+    assert "Nada mudou" in html
+
+
+def test_os_filtros(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    O.criar(_form(titulo="Ocorrencia Altair"), ADMIN, True)
+    O.criar(_form(titulo="Ocorrencia Coracao", usina_id="3", criticidade="baixa"), ADMIN, True)
+    O.criar(_form(titulo="Ocorrencia Brodowski", usina_id="2", criticidade="muito_alta", status="pausado"), ADMIN, True)
+
+    def titulos(q):
+        html = c.get("/t/campo/ocorrencias?" + q).get_data(as_text=True)
+        return {t for t in ("Ocorrencia Altair", "Ocorrencia Coracao", "Ocorrencia Brodowski") if t in html}
+    assert titulos("responsavel=*&usina=3") == {"Ocorrencia Coracao"}
+    assert titulos("responsavel=*&criticidade=alta") == {"Ocorrencia Altair"}
+    assert titulos("responsavel=*&status=pausado") == {"Ocorrencia Brodowski"}
+    assert titulos("responsavel=Ciclano+Chefe") == {"Ocorrencia Altair", "Ocorrencia Brodowski"}
+
+
+def test_pedido_de_outro_site_e_403(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
+    acao = {"acao_id": "", "texto": "x", "responsavel_id": "91", "prazo": "", "situacao": "a_fazer"}
+    for caminho, dados in (("/t/campo/ocorrencias/nova", _form()), (f"/t/campo/ocorrencias/{oid}/dados", _form()),
+                           (f"/t/campo/ocorrencias/{oid}/acao", acao),
+                           (f"/t/campo/ocorrencias/{oid}/andamento", {"texto": "x"})):
+        assert c.post(caminho, data=dados, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403, caminho
+    assert len(cad.linhas(O.LIVRO, O.ABA)) == 1
+
+
+def test_sem_a_chave_do_cadastro_a_tela_avisa_e_continua_mostrando(cad, cliente, app):
+    c = _entra(cliente, ADMIN)
+    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
+    app.config["NEXUS_CHAVE_CADASTRO"] = None
+    O.limpar()
+    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
+    assert "chave do cadastro" in html and f"/t/campo/ocorrencias/{oid}" in html
+    r = c.get(f"/t/campo/ocorrencias/{oid}")
+    assert r.status_code == 200 and "chave do cadastro" in r.get_data(as_text=True)
+
+
+def test_banco_fora_a_tela_diz(cad, cliente, monkeypatch):
+    c = _entra(cliente, ADMIN)
+    monkeypatch.setattr(O, "ler", lambda forcar=False: {"eventos": [], "lido_em": None,
+                                                        "erro": "ConnectionError: banco fora"})
+    r = c.get("/t/campo/ocorrencias")
+    assert r.status_code == 200 and "Não consegui ler as ocorrências no banco" in r.get_data(as_text=True)
+
+
+def test_ocorrencia_que_nao_existe_e_404(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    assert c.get("/t/campo/ocorrencias/000000000000").status_code == 404
+    assert c.get("/t/campo/ocorrencias/nao-e-id").status_code == 404

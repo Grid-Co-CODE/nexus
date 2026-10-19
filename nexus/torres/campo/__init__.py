@@ -46,6 +46,11 @@ TORRE = Torre(
         Tela("responsaveis", "Visão do responsável",
              "Nas minhas usinas, onde focar primeiro e o que pode esperar?",
              "Gerencial, Confiabilidade, COS, tickets, rondas e PT, no banco do Nexus"),
+        # as ocorrências com plano de ação (Levi, 18/10/2026: "as ocorrências com plano de ação. siga!"): o painel próprio
+        # de um supervisor, no Nexus. Dos Responsáveis UFV sem marcar em Base → Acessos (como o Gerar e o Quadro do PCM);
+        # os outros setores, pela marca
+        Tela("ocorrencias", "Ocorrências", "Que ocorrência das minhas usinas tem ação vencendo, e com quem ela está?",
+             "Livro nexus_ocorrencias (escrito nesta tela) + cadastro do Nexus", do_setor="Responsáveis UFV"),
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",
@@ -1265,3 +1270,8 @@ def triagem():
     dias = _dias((7, 30, 90), 30)
     return render_template("campo/triagem.html", **_comum("triagem", campo_triagem.painel(dias), dias=dias,
                                                           rot_item=_rot_item, motivo=_motivo, coleta=_coleta()))
+
+
+# As ocorrências com plano de ação (18/10/2026): as rotas moram em ocorrencias_tela.py, importada aqui no fim porque
+# precisa do `bp`, da `TORRE` e do `_responsavel_do_login` definidos acima; a regra mora em nexus/campo/ocorrencias.py.
+from . import ocorrencias_tela  # noqa: E402,F401

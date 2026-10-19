@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "campo/_ocorrencia_macros.html" import dia, selo_crit, selo_status %}
+{% block titulo %}Ocorrências{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='ocorrencias.css') }}">
+{# As ocorrências com plano de ação (Levi, 18/10/2026: "as ocorrências com plano de ação. siga!"): o painel próprio de um
+   supervisor, no Nexus. Lista (na ordem do prazo da próxima ação em aberto) e quadro (uma coluna por status); o
+   Responsável O&M e o administrador registram. A regra mora em nexus/campo/ocorrencias.py. #}
+<div class="campo-nativa oc">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Ocorrências</p>
+      <h1 class="cn-titulo">Ocorrências</h1>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    {% if quem.grava %}<a class="gc-btn gc-btn--primario oc-nova" href="{{ url_for('torre_campo.ocorrencia_nova', usina=f.usina or None) }}">Nova ocorrência</a>{% endif %}
+  </div>
+  {% if quem.pode and not quem.grava %}<div class="cn-erro cn-aviso" role="status"><b>Para registrar, entre com o seu login (Fracttal ou Microsoft).</b> A senha de administrador não diz quem é a pessoa, e o histórico guarda quem fez cada mudança.</div>{% endif %}
+  {% if sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave do cadastro.</b> Os títulos e os textos vão cifrados e não abrem aqui, e nada se grava; as usinas, os códigos e as datas continuam.</div>{% endif %}
+  {% if lido.erro %}<div class="cn-erro" role="alert"><b>Não consegui ler as ocorrências no banco</b> ({{ lido.erro }}){% if lido.velha %}: mostro a última leitura boa{% endif %}.</div>{% endif %}
+  {% if cad.erro %}<div class="cn-erro" role="alert"><b>{{ cad.erro }}.</b> As usinas e os responsáveis podem sair sem nome.</div>{% endif %}
+
+  <p class="oc-numeros"><span><b>{{ numeros.abertas }}</b>aberta{{ 's' if numeros.abertas != 1 }}</span>
+    <span{% if numeros.atrasadas %} class="oc-atrasada"{% endif %}><b>{{ numeros.atrasadas }}</b>com ação atrasada</span>
+    <span><b>{{ numeros.sem_plano }}</b>sem ação em aberto</span></p>
+
+  <form class="cn-filtros oc-filtros" method="get" action="{{ url_for('torre_campo.ocorrencias') }}">
+    <div class="cn-seg" aria-label="Ver as ocorrências"><a href="{{ url(ver=None) }}"{% if ver == 'lista' %} aria-current="page"{% endif %}>Lista</a><a href="{{ url(ver='quadro') }}"{% if ver == 'quadro' %} aria-current="page"{% endif %}>Quadro</a></div>
+    {% if ver == 'quadro' %}<input type="hidden" name="ver" value="quadro">{% endif %}
+    <label><span class="gc-rotulo">Responsável O&amp;M</span>
+      <select class="gc-campo" name="responsavel" onchange="this.form.submit()"><option value="{{ todos }}"{% if not f.responsavel %} selected{% endif %}>Todos</option>{% for n in opcoes_responsavel %}<option{% if n == f.responsavel %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+    <label><span class="gc-rotulo">Usina</span>
+      <select class="gc-campo" name="usina" onchange="this.form.submit()"><option value="">Todas</option>{% for u in cad.mobilizadas %}<option value="{{ u.usina_id }}"{% if u.usina_id == f.usina %} selected{% endif %}>{{ u.nome }}</option>{% endfor %}</select></label>
+    {% if ver == 'lista' %}<label><span class="gc-rotulo">Status</span>
+      <select class="gc-campo" name="status" onchange="this.form.submit()"><option value="abertas"{% if f.status == 'abertas' %} selected{% endif %}>Abertas</option><option value="{{ todos }}"{% if f.status == todos %} selected{% endif %}>Todas</option>{% for s, rot in status_rot.items() %}<option value="{{ s }}"{% if f.status == s %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>{% endif %}
+    <label><span class="gc-rotulo">Criticidade</span>
+      <select class="gc-campo" name="criticidade" onchange="this.form.submit()"><option value="">Todas</option>{% for c, rot in criticidades.items() %}<option value="{{ c }}"{% if f.criticidade == c %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
+    <noscript><button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button></noscript>
+  </form>
+
+  {% if ver == 'lista' %}
+  <div class="oc-lista">
+    <div class="oc-lin oc-lin--cab" aria-hidden="true"><span>Ocorrência</span><span>Criticidade</span><span>Status</span><span>Próxima ação</span><span>Plano</span><span>Início</span></div>
+    {% for i in lista %}{% set o = i.o %}
+    <a class="oc-lin{% if not o.aberta %} oc-lin--fim{% endif %}" href="{{ url_for('torre_campo.ocorrencia', oid=o.id) }}">
+      <span class="oc-tit"><b>{{ o.titulo or '(o título vai cifrado: falta a chave do cadastro)' }}</b><small class="mudo">{{ i.u.nome }} · {{ i.u.responsavel }}</small></span>
+      <span>{{ selo_crit(o.criticidade, criticidades, cor_crit) }}</span>
+      <span>{{ selo_status(o.status, status_rot, cor_status) }}</span>
+      <span class="oc-prox">{% if i.proxima %}<span><span class="oc-rot">Próxima ação: </span><span{% if i.proxima.atrasada %} class="oc-atrasada"{% endif %}>{{ dia(i.proxima.prazo) if i.proxima.prazo else 'sem prazo' }}</span> · {{ i.proxima.texto }}</span><small class="mudo">{{ i.proxima.responsavel }}</small>{% elif o.aberta %}<span class="mudo">Sem ação em aberto</span>{% else %}<span class="mudo">Finalizada em {{ dia(o.fim) }}</span>{% endif %}</span>
+      <span class="oc-num"><span class="oc-rot">Plano: </span>{{ o.acoes_abertas }} de {{ o.acoes|length }} em aberto</span>
+      <span class="oc-num"><span class="oc-rot">Início: </span>{{ dia(o.inicio) }}</span>
+    </a>
+    {% else %}
+    <p class="cn-vazio">Nenhuma ocorrência com esse filtro.{% if quem.grava %} Use "Nova ocorrência" para registrar uma.{% endif %}</p>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="oc-quadro">
+    {% for s, rot, col in colunas %}
+    <section class="oc-col" aria-label="{{ rot }}">
+      <h2><span>{{ rot }}</span><b>{{ col|length }}</b></h2>
+      {% for i in (col[:quadro_max] if s == 'finalizado' else col) %}{% set o = i.o %}
+      <a class="oc-card" href="{{ url_for('torre_campo.ocorrencia', oid=o.id) }}">
+        <span class="oc-card-topo">{{ selo_crit(o.criticidade, criticidades, cor_crit) }}{% if o.atrasada %}<span class="oc-atrasada">ação atrasada</span>{% endif %}</span>
+        <b>{{ o.titulo or '(o título vai cifrado: falta a chave do cadastro)' }}</b>
+        <small class="mudo">{{ i.u.nome }} · {{ i.u.responsavel }}</small>
+        {% if i.proxima %}<small>Próxima: {{ dia(i.proxima.prazo) if i.proxima.prazo else 'sem prazo' }} · {{ i.proxima.texto }}</small>{% elif o.aberta %}<small class="mudo">Sem ação em aberto</small>{% endif %}
+      </a>
+      {% else %}
+      <p class="mudo oc-col-vazia">Nenhuma</p>
+      {% endfor %}
+      {% if s == 'finalizado' and col|length > quadro_max %}<a class="cn-link" href="{{ url(ver=None, status='finalizado') }}">E mais {{ col|length - quadro_max }} na lista</a>{% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
