@@ -42,6 +42,7 @@
      borda grossa de destaque do cartão. No claro é o tom médio do matiz: o de texto é escuro demais para área */
   --ok-cheio:#4ade80; --lima-cheio:#a8e05f; --alerta-cheio:#ffd83d; --severo-cheio:#ff8f3c; --critico-cheio:#ff5b6e;
   --info-cheio:#7fb8ff; --sobre-cheio:#0b1220;
+  --ouro:#e3b341; --prata:#c3cad7; --bronze:#cd8a52;
   /* séries dos gráficos e o mapa */
   --serie-sujidade:#7fb8ff; --serie-vegetacao:#a3d900; --serie-nasa:#c3cad7; --serie-etm:#6ec1e4;
   --mapa-mar:#0d1526; --mapa-terra:#1c2640; --mapa-borda:rgba(255,255,255,.22); --mapa-sigla:rgba(233,238,246,.42);
@@ -97,6 +98,7 @@
   --semcom:#7442d1; --semcom-suave:rgba(130,80,223,.08);
   --ok-cheio:#3dbb68; --lima-cheio:#a8e05f; --alerta-cheio:#f0b429; --severo-cheio:#f59342; --critico-cheio:#ef5d6e;
   --info-cheio:#5c9cf5; --sobre-cheio:#0b1220;
+  --ouro:#e0ac2b; --prata:#b9c1cd; --bronze:#c47f45;
   /* séries e mapa: o mar azulado e a terra branca; a sigla do estado passa 4,5:1 também sobre a mancha de um aviso */
   --serie-sujidade:#1b64c4; --serie-vegetacao:#4a7300; --serie-nasa:#64748b; --serie-etm:#0e7490;
   --mapa-mar:#e4ebf3; --mapa-terra:#ffffff; --mapa-borda:rgba(15,23,42,.28); --mapa-sigla:rgba(31,41,55,.8);

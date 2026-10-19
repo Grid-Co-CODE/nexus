@@ -70,7 +70,7 @@ TORRE = Torre(
         Tela("triagem", "Triagem de qualidade", "O que exige ação hoje na qualidade do fechamento?", FONTE_APP),
         # o placar do ciclo de pontos do App (Levi, 13/10/2026: "Cria uma seção de Ranking de Pontos no App de Campo!"):
         # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
-        Tela("ranking", "Ranking de pontos", "Quem lidera o ciclo de pontos do App neste mês, e por quê?",
+        Tela("ranking", "Ranking de pontos", "Quem lidera a classificação de pontos do App no mês, e por quê?",
              "Livro ranking_app_campo (o placar do ciclo do App) no banco do Nexus"),
         Tela("rotas", "Rotas do dia", "Qual a melhor ordem de visitas para cada equipe?",
              "Programação do PCM + localização das usinas"),
