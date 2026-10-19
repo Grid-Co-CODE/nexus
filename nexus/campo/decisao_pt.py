@@ -212,7 +212,10 @@ def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin
     if not cfg.get("GRIDCO_SQL_TOKEN"):
         raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN).")
     with _TRAVA:
-        visao.limpar()                        # decide sobre o livro do App lido agora, não a cópia de 5 min
+        # decide sobre o livro do App lido agora, não a cópia de 5 min: saem da memória só a conta das PT e os livros
+        # dela (até 19/10/2026 era o `visao.limpar()`, que zerava TODAS as telas do Campo a cada decisão e as fazia
+        # voltar do zero juntas: o Nexus travou às 15:04 com duas Visões do responsável lendo o banco ao mesmo tempo)
+        visao.esquecer_pt()
         p, n_linhas = _linha(numero, codigo)
         cod = D._txt(p.get("codigo"))
         # na PT de mais de um equipamento, a recusa diz de qual linha se fala

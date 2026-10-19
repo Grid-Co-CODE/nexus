@@ -215,7 +215,8 @@ def acrescentar(novas: list[dict], repetida=None) -> tuple[list[dict], list[dict
         if entram:
             _gravar(linhas + entram)
     if entram:
-        visao.limpar()
+        # só as telas que contam ronda saem da memória (até 19/10/2026 era o `visao.limpar()`, que zerava todas)
+        visao.esquecer_ronda()
     return entram, puladas
 
 
@@ -307,7 +308,7 @@ def anular(rid: str, usuario: dict | None) -> dict:
         linha.update({"id": uuid.uuid4().hex[:12], "lancada_em": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
                       "pessoa_hmac": codigo, "anula_id": str(rid), "origem": ORIGEM_ANULACAO})
         _gravar(linhas + [linha])
-    visao.limpar()
+    visao.esquecer_ronda()
     return linha
 
 

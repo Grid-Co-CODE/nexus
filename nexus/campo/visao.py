@@ -27,6 +27,7 @@ import collections
 import json
 import re
 import statistics
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -86,6 +87,16 @@ _LIVROS: dict = {}           # (livro, aba) -> (quando, linhas): as contas de um
 LIVRO_S = 120
 USO_S = 2 * 3600             # conta que ninguém abriu em 2 h para de ser renovada (volta na próxima visita)
 _TRAVA = __import__("threading").Lock()
+# a conta em andamento de cada chave (fria, no pedido, ou por trás, no `_renovar`): {"pronto": Event, "r": Leitura}.
+# Quem chega enquanto ela roda espera a MESMA conta em vez de fazer outra (19/10/2026, Raio-X das 15:06: duas Visões do
+# responsável frias calculando juntas, cada uma lendo ~60 páginas do banco, que mora no mesmo servidor, e o Nexus parou)
+_EM_CALCULO: dict = {}
+ESPERA_S = 60                # quem espera a conta de outro desiste aqui e a tela diz que a conta está sendo feita
+AVISO_CALCULANDO = ("A conta desta tela está sendo feita agora e o banco está lento: atualize a página em instantes")
+# as páginas do banco lidas em paralelo pelo `carregar`, somando todas as threads do processo: sem o teto, cada conta fria
+# abria 6 leituras juntas, e várias contas juntas viravam dezenas de pedidos ao banco (19/10/2026)
+VAGAS_BANCO = 6
+_VAGAS_BANCO = threading.BoundedSemaphore(VAGAS_BANCO)
 
 
 def _calcular(chave, calcular) -> leitura.Leitura:
@@ -105,9 +116,11 @@ def _calcular(chave, calcular) -> leitura.Leitura:
 def _renovar(chave, app=None):
     """Refaz uma conta em segundo plano (uma por vez por chave); a tela segue com a cópia anterior até lá."""
     with _TRAVA:
-        if chave in _RENOVANDO or chave not in _CALCULOS:
+        if chave in _RENOVANDO or chave in _EM_CALCULO or chave not in _CALCULOS:
             return
         _RENOVANDO.add(chave)
+        _VENCIDAS.discard(chave)     # vencida de novo durante a conta (outra gravação): volta à lista e se refaz depois
+        em = _EM_CALCULO[chave] = {"pronto": threading.Event(), "r": None}
     app = app or current_app._get_current_object()
 
     def rodar():
@@ -117,9 +130,12 @@ def _renovar(chave, app=None):
                 nova = _calcular(chave, _CALCULOS[chave])
                 if nova.erro and velha:      # banco fora: fica a cópia boa, que a tela já mostra com a hora dela
                     _CACHE[chave] = velha
+                em["r"] = _CACHE.get(chave) or nova
         finally:
             with _TRAVA:
                 _RENOVANDO.discard(chave)
+                _EM_CALCULO.pop(chave, None)
+            em["pronto"].set()
     if app.config.get("TESTING"):
         rodar()
     else:
@@ -136,10 +152,72 @@ def _ler(chave, calcular) -> leitura.Leitura:
     _USADO[chave] = time.time()
     g = _CACHE.get(chave)
     if g:
-        if time.time() - g.lido_em >= TTL_S:
+        if chave in _VENCIDAS or time.time() - g.lido_em >= TTL_S:
             _renovar(chave)
         return g
-    return _calcular(chave, calcular)
+    return _fria(chave, calcular)
+
+
+def _fria(chave, calcular) -> leitura.Leitura:
+    """A conta sem cópia nenhuma, UMA por chave: o 1º pedido faz, e quem chega enquanto ela roda (outra pessoa, o mesmo
+    que recarregou a página, a renovação por trás) espera a mesma, até ESPERA_S."""
+    with _TRAVA:
+        em = _EM_CALCULO.get(chave)
+        dono = em is None
+        if dono:
+            em = _EM_CALCULO[chave] = {"pronto": threading.Event(), "r": None}
+    if not dono:
+        em["pronto"].wait(ESPERA_S)
+        return _CACHE.get(chave) or em["r"] or leitura.Leitura({}, time.time(), AVISO_CALCULANDO)
+    try:
+        r = _calcular(chave, calcular)
+        em["r"] = r
+        return r
+    finally:
+        with _TRAVA:
+            _EM_CALCULO.pop(chave, None)
+        em["pronto"].set()
+
+
+# o que cada gravação do Nexus muda (19/10/2026): a decisão de PT e a ronda avulsa chamavam o `limpar`, que zerava TODAS
+# as contas e livros do Campo; cada tela voltava a ser feita do zero na visita seguinte, várias juntas, e com o banco no
+# mesmo servidor o Nexus travou (Levi, 19/10: "o nexus travou foi tudo não carrega nada"). Agora sai só o que mudou: a
+# conta de quem gravou é refeita na hora (a de quem precisa ver o que acabou de gravar); as outras que usam o mesmo dado
+# ficam com a cópia e se refazem por trás (`_VENCIDAS`), sem ninguém esperar.
+_VENCIDAS: set = set()
+
+
+def _livros_dos_fatos(fato: str, outros) -> tuple:
+    """Os livros e as cópias de ciclo de um fato do Campo (o do banco, a qualidade, a versão dos livros, o mapa das
+    pessoas e o livro de origem que mudou)."""
+    return (("_fato", fato), (C.LIVRO_FATOS, f"fato_{fato}"), (C.LIVRO_FATOS, "qualidade"), ("_abas", C.LIVRO_FATOS),
+            ("_workbooks",), ("_mapas",), *outros)
+
+
+def esquecer(contas=(), livros_=(), envelhecer=()) -> None:
+    """Tira da memória as `contas` (pelo nome, o 1º item da chave: a Central tem uma por janela de dias), que voltam na
+    próxima visita (uma vez, `_fria`), e os `livros_`; as de `envelhecer` ficam com a cópia e são refeitas por trás na
+    próxima visita ou na volta do `manter_quente`. O resto não muda."""
+    with _TRAVA:
+        for k in [k for k in _CACHE if k and k[0] in contas]:
+            _CACHE.pop(k, None)
+        _VENCIDAS.update(k for k in _CACHE if k and k[0] in envelhecer)
+        for p in livros_:
+            _LIVROS.pop(p, None)
+
+
+def esquecer_pt() -> None:
+    """Antes de decidir uma PT: a conta das PT e os livros dela lidos de novo (a decisão vale sobre o livro do App de
+    agora). As outras telas não mudam com a decisão: a decisão do Nexus aparece pela leitura do livro de decisões na
+    própria página (`decisao_pt.da_pt`), e o livro do App só muda quando o App a processa (aí a renovação de sempre)."""
+    esquecer(("visao_pt",), _livros_dos_fatos("pt", (C.ORIGEM_PT,)))
+
+
+def esquecer_ronda() -> None:
+    """Depois de lançar ou anular uma ronda avulsa: as Rondas (onde quem lançou se vê) refeitas na hora; a Central e a
+    Visão do responsável, por trás."""
+    esquecer(("visao_rondas",), _livros_dos_fatos("ronda", (C.ORIGEM_AVULSAS, ("_avulsas_tela",))),
+             envelhecer=("visao_atencao", "visao_responsaveis"))
 
 
 def manter_quente(app, intervalo_s: int = 60):
@@ -162,7 +240,7 @@ def manter_quente(app, intervalo_s: int = 60):
                 g = _CACHE.get(chave)
                 if agora - _USADO.get(chave, 0) > USO_S:
                     continue
-                if not g or agora - g.lido_em >= TTL_S - intervalo_s:
+                if not g or chave in _VENCIDAS or agora - g.lido_em >= TTL_S - intervalo_s:
                     _renovar(chave, app)
     __import__("threading").Thread(target=laco, daemon=True, name="nexus-campo-quente").start()
 
@@ -222,7 +300,7 @@ def carregar(pares) -> dict:
     if paginas:
         # as abas e as páginas são independentes: lidas juntas (a espera é a rede, não o processo)
         with ThreadPoolExecutor(max_workers=min(6, len(paginas))) as ex:
-            futuros = [(p, off, ex.submit(livros.pagina, base, sessao, sid, off)) for p, sid, off in paginas]
+            futuros = [(p, off, ex.submit(_pagina, base, sessao, sid, off)) for p, sid, off in paginas]
         for p, off, f in futuros:
             try:
                 lidas[p][off] = f.result()
@@ -242,7 +320,7 @@ def carregar(pares) -> dict:
                 # a última página prometida veio cheia: a aba cresceu depois da listagem; segue até a incompleta
                 while sid:
                     off += livros.PAGINA
-                    rows = livros.pagina(base, sessao, sid, off)
+                    rows = _pagina(base, sessao, sid, off)
                     linhas += rows
                     if len(rows) < livros.PAGINA:
                         break
@@ -253,6 +331,11 @@ def carregar(pares) -> dict:
     if falhas:
         raise next(iter(falhas.values()))
     return meta
+
+
+def _pagina(base, sessao, sid, off) -> list[dict]:
+    with _VAGAS_BANCO:
+        return livros.pagina(base, sessao, sid, off)
 
 
 def _livro(nome, aba=None) -> list[dict]:
@@ -1938,3 +2021,5 @@ def limpar():
     _LIVROS.clear()
     _CALCULOS.clear()
     _USADO.clear()
+    _EM_CALCULO.clear()
+    _VENCIDAS.clear()

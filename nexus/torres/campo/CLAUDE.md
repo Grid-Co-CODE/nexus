@@ -584,6 +584,22 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   (1 min) e o de-para dos sites do Fracttal (2 min). Medido no banco real, trocando o cliente: depois de 1 min parado
   0,97 s → 0,02 s, depois de 2 min 1,47 s → 0,04 s, sem nenhuma leitura no pedido (o site agora vem na conta; as
   ocorrências voltam na hora e se releem por trás). Prova: `tests/test_campo_filtro_responsavel_19_10.py`.
+- **O Nexus travado de 19/10/2026 e as três travas contra a avalanche** (Levi: "o nexus travou foi tudo não carrega
+  nada"; das 14:47 às 14:55 até o /saude estourava 40 s, e o Raio-X das 15:06 mostrou duas Visões do responsável frias
+  calculando juntas, presas lendo o banco, e o Desempenho esperando a listagem dele). O banco mora no mesmo servidor
+  (app.gridco.com.br; a máquina com carga 3,8 de 4 núcleos), e tudo que o Nexus pede a ele junto vira fila:
+  1. **A decisão de PT e a ronda avulsa zeravam TODAS as contas do Campo** (`visao.limpar()`, desde 05/10 e 08/10):
+     cada tela voltava do zero na visita seguinte, todas juntas. Agora sai só o que mudou (`visao.esquecer_pt`,
+     `esquecer_ronda`): a decisão relê só a conta das PT e os livros dela (a decisão do Nexus aparece na página pelo
+     `decisao_pt.da_pt`, e o livro do App só muda quando o App a processa); a avulsa refaz as Rondas na hora (quem
+     lançou se vê) e deixa a Central e a Visão do responsável com a cópia, refeitas por trás (`_VENCIDAS`).
+  2. **Uma conta fria por tela** (`visao._fria`): quem chega enquanto ela roda (outra pessoa, quem recarregou a página,
+     a renovação por trás) espera a mesma, até `ESPERA_S` (60 s; depois, a tela diz que a conta está sendo feita). As
+     contas guardadas não se pedem em círculo (a Visão usa a Central, as PT e as Rondas; a Central usa as PT).
+  3. **Teto de páginas do banco no processo inteiro** (`VAGAS_BANCO` = 6, no `carregar`): antes eram 6 por conta.
+  Medido no banco real, três aberturas frias da Visão ao mesmo tempo: o que estava no ar fazia 3 contas, 238 pedidos ao
+  banco (até 18 juntos) e levava 52 s; agora 1 conta, 80 pedidos (no máximo 6 juntos), 18 s. Prova:
+  `tests/test_campo_sem_avalanche_19_10.py`.
 - **Três blocos, uma lista** (desde 18/10/2026 na Visão geral, que tirou Onde focar; seção própria abaixo):
   **Performance** (meta, PR, disponibilidade; os ativos falhando como etiqueta no nome), **Manutenção** (seção própria
   abaixo) e **Acompanhamento** (rondas, limpeza, PT, chamados, extintores). Acima, a faixa **Parada agora**. Cada usina
