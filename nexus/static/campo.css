@@ -826,12 +826,26 @@ a.cr-tag:hover{filter:brightness(1.1)}
 
 /* Ranking de pontos (13/10/2026, Levi: "Cria uma seção de Ranking de Pontos no App de Campo!"): o pódio do ciclo do App,
    os três primeiros da classificação (com a região escolhida, os três primeiros dela, com a posição do ciclo inteiro) */
-.rk-podio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
-.rk-lugar{display:flex;flex-direction:column;gap:4px;min-width:0;padding:16px 18px;background:var(--superficie);
-  border:1px solid var(--linha);border-radius:var(--raio-md)}
-.rk-lugar.rk-1{border-color:var(--verde-a45);box-shadow:inset 0 3px 0 var(--verde)}
+/* o pódio das olimpíadas (Levi, 18/10/2026: "1°, 2° e 3° lugar quero estilo podium das olimpíadas"): o 1º no meio e no
+   degrau mais alto, o 2º à esquerda, o 3º à direita, em ouro, prata e bronze; a página segue 1º, 2º, 3º */
+.rk-podio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:12px;margin-top:16px}
+.rk-lugar.rk-1{grid-column:2;grid-row:1}
+.rk-lugar.rk-2{grid-column:1;grid-row:1}
+.rk-lugar.rk-3{grid-column:3;grid-row:1}
+.rk-lugar{display:flex;flex-direction:column;min-width:0}
+.rk-cartao{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:14px 16px;text-align:center;
+  background:var(--superficie);border:1px solid var(--linha);border-bottom:0;border-radius:var(--raio-md) var(--raio-md) 0 0}
+.rk-1 .rk-cartao{border-color:var(--ouro)}
+.rk-2 .rk-cartao{border-color:var(--prata)}
+.rk-3 .rk-cartao{border-color:var(--bronze)}
+.rk-degrau{display:grid;place-items:center;border-radius:0 0 var(--raio-md) var(--raio-md)}
+.rk-1 .rk-degrau{height:96px;background:var(--ouro)}
+.rk-2 .rk-degrau{height:68px;background:var(--prata)}
+.rk-3 .rk-degrau{height:48px;background:var(--bronze)}
+.rk-medalha{font:800 30px/1 var(--font-sans);color:var(--sobre-cheio)}
+.rk-dica{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}
 .rk-pos{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
-.rk-1 .rk-pos{color:var(--verde-texto)}
+.rk-1 .rk-pos{color:var(--tinta)}
 .rk-nome{font:600 16px/1.3 var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rk-reg{font-size:12px;color:var(--mudo)}
 .rk-pts{font:600 26px/1.15 var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:6px;color:var(--tinta)}
@@ -839,7 +853,18 @@ a.cr-tag:hover{filter:brightness(1.1)}
 .rk-det{font-size:12px;color:var(--mudo)}
 .cn-tab td.rk-tec{text-align:left;font-weight:500;white-space:nowrap}
 .cn-tab td.rk-motivo{text-align:left;color:var(--tinta-2)}
-@media (max-width:700px){.rk-podio{grid-template-columns:1fr}}
+/* no celular o pódio continua o das olimpíadas, mais baixo e sem o detalhe dos pontos */
+@media (max-width:700px){
+  .rk-podio{gap:6px}
+  .rk-cartao{padding:10px 6px}
+  .rk-nome{font-size:13px;white-space:normal;overflow-wrap:anywhere}
+  .rk-pts{font-size:18px}
+  .rk-det{display:none}
+  .rk-1 .rk-degrau{height:64px}
+  .rk-2 .rk-degrau{height:44px}
+  .rk-3 .rk-degrau{height:30px}
+  .rk-medalha{font-size:22px}
+}
 
 /* ── O Ranking das equipes na Visão do responsável (18/10/2026): os quatro números do painel do App, a régua numa frase
    e um cartão por equipe (o cartão v2 do protótipo aprovado pelo Levi), por cima do `cn-equipe` dos cartões ── */
@@ -914,7 +939,6 @@ a.cr-tag:hover{filter:brightness(1.1)}
 .cr-gr-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .cr-gr-cab h2{display:flex;align-items:center;gap:8px;margin:0;font:700 17px/1.3 var(--font-sans)}
 .cr-gr-tit{display:inline-flex;align-items:center;gap:8px;color:inherit;text-decoration:none}
-.cr-gr-tit:hover{text-decoration:underline}
 .cr-gr-tit[aria-current]{color:var(--verde)}
 :root[data-tema="claro"] .cr-gr-tit[aria-current]{color:var(--verde-texto)}
 .cr-gr-cab h2 .ph{color:var(--verde)}

@@ -58,8 +58,13 @@ Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking p
   rondas, mínimos, bônus) vem nas oito últimas colunas, e o "Como o App calcula" da tela usa esses números. Coluna nova
   só no FIM, dos dois lados.
 - **Tela:** o mês (o corrente e o anterior) e a região que o App escreve; o pódio (os três primeiros), os números, a
-  classificação e o "Fora do ciclo". Com uma região escolhida, a posição continua a do ciclo inteiro ("3º lugar no
-  ciclo"): é a que o técnico vê no App. Régua em `sombra` no App = aviso de que o técnico ainda vê a pontuação de antes.
+  classificação e o "Fora do ciclo". Com uma região escolhida, a posição continua a do mês inteiro ("3º lugar no
+  mês"): é a que o técnico vê no App. Desde 18/10/2026 (Levi: "a classificação é mensal, estamos no mês de outubro") a
+  tela fala do mês ("Classificação de outubro de 2026", o filtro "Mês"; o App chama o mês de ciclo); o "Fora do ciclo"
+  fica com o nome do App e a explicação no mouse, montada da régua que ele publicou ("O que significa fora do ciclo?
+  quero que apareça a explicação ao passar o mouse nesse nome"); e o pódio é o das olimpíadas ("1°, 2° e 3° lugar quero
+  estilo podium das olimpíadas"): o 1º no meio e no degrau mais alto, o 2º à esquerda, o 3º à direita, em ouro, prata e
+  bronze (`--ouro`, `--prata`, `--bronze`); a página segue 1º, 2º e 3º para quem lê a tela. Régua em `sombra` no App = aviso de que o técnico ainda vê a pontuação de antes.
   Sem o livro, a tela diz que o ranking ainda não chegou.
 - **O lado do App é o pacote** `C:\GridcoBuild\app-campo-docs\_propostas\ranking-pontos-nexus\` (`LEIA.md`,
   `aplicar.py --conferir`, o `.diff` contra a v262 que casa também na v263, e o teste do App). Enquanto o App não
@@ -843,7 +848,7 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
   etiqueta de cada bloco (parada, ativos) vai no nome; ao abrir, o detalhe dos três blocos (o macro `det_bloco`).
   "Pausadas" (o nome do Levi) é a tarefa fora da programação; "parada" fica para a usina parada.
 - **O clique:** o bloco (o cartão inteiro, não só o nome: "deve ser possível clicar no bloco (...) inteiro, e não só no
-  título"; o link do nome cobre o cartão pelo `::after`) ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta;
+  título"; o link do nome cobre o cartão pelo `::after`, sem sublinhar o nome nem o ícone ao passar o mouse: "Tire esse underline dos blocos"; o sinal é a borda do cartão) ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta;
   `manut`: `ordem_da_manutencao`; `acomp`: a pior ronda) e destaca as colunas dele (`lista_geral`, `bloco_geral`);
   clicar de novo volta à ordem geral (a do foco). O "pedem atenção", "focar", "acompanhar" e cada número, por cima do
   link do bloco, FILTRAM ("funcionará como filtro os KPIs do bloco"; `filtro=`; `FILTROS_GERAL` guarda a condição de

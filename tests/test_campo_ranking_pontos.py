@@ -74,9 +74,9 @@ def test_a_tela_mostra_o_podio_a_classificacao_e_quem_esta_fora(ranking, logado)
     podio = _texto(html.split('class="rk-podio"', 1)[1].split('class="cn-numeros"', 1)[0])
     assert re.search(r"1º lugar Ana Souza SP Norte 01 1\.480 pts .*2º lugar Bruno Lima .*1\.137 pts .*3º lugar Carla Dias", podio)
     assert "Davi Rocha" not in podio                                               # o pódio são três
-    assert "No ciclo 4 técnicos classificados" in t and "Fora do ciclo 1 " in t and "Líder 1.480 pontos" in t
-    assert "Média no ciclo 1.040 pontos por técnico classificado" in t           # (1480+1137+905+640)/4
-    fora = _texto(html.split("Fora do ciclo</h2>", 1)[1])
+    assert "Classificados 4 técnicos no mês" in t and "Fora do ciclo 1 " in t and "Líder 1.480 pontos" in t
+    assert "Média do mês 1.040 pontos por técnico classificado" in t             # (1480+1137+905+640)/4
+    fora = _texto(html.split("Fora do ciclo</span></h2>", 1)[1])
     assert "Eva Prado SC Oeste 01 210 40 90% 6 tarefas registradas — o mínimo é 10" in fora
     # a régua do mês, com os números que o App publicou
     regua = _texto(html.split("Como o App calcula.", 1)[1])
@@ -93,8 +93,8 @@ def test_o_mes_anterior_e_a_regiao_mantem_a_posicao_do_ciclo(ranking, logado):
     html = logado.get("/t/campo/ranking?regiao=SC+Oeste+01").get_data(as_text=True)
     t = _texto(html)
     assert "Ana Souza" not in t and "Bruno Lima" not in t
-    # a posição é a do ciclo inteiro (a que o técnico vê no App), mesmo com a região escolhida
-    assert "3º lugar no ciclo Carla Dias" in t and "4º lugar no ciclo Davi Rocha" in t
+    # a posição é a do mês inteiro (a que o técnico vê no App), mesmo com a região escolhida
+    assert "3º lugar no mês Carla Dias" in t and "4º lugar no mês Davi Rocha" in t
     assert '<option value="SC Oeste 01" selected>' in html
     # região que não existe no mês = todas
     assert "Ana Souza" in _texto(logado.get("/t/campo/ranking?regiao=Nenhuma").get_data(as_text=True))
@@ -160,3 +160,35 @@ def test_a_tela_so_le_colunas_que_o_app_publica():
     assert lidas and lidas <= set(COLUNAS_DO_APP), lidas - set(COLUNAS_DO_APP)
     # e o livro de mentira destes testes é o do App, na ordem dele
     assert list(_linha("2026-10", "ana@exemplo.test", 100, 1).keys()) == COLUNAS_DO_APP
+
+
+# ── o pedido de 18/10/2026 ───────────────────────────────────────────────────────────────────────────────────────────
+def test_a_classificacao_e_dita_pelo_mes_e_o_fora_do_ciclo_se_explica_no_mouse(ranking, logado):
+    """Levi, 18/10/2026: "a classificação é mensal, estamos no mês de outubro"; "O que significa fora do ciclo? quero que
+    apareça a explicação ao passar o mouse nesse nome". A tela diz o mês (o App chama o mês de ciclo); o "Fora do ciclo"
+    fica com o nome do App e a explicação vem da régua que ele publicou."""
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    t = _texto(html)
+    assert "Classificação de outubro de 2026" in t and 'aria-label="Pódio de outubro de 2026"' in html
+    assert '<span class="gc-rotulo">Mês</span>' in html and '<span class="gc-rotulo">Ciclo</span>' not in html
+    dicas = re.findall(r'<span class="rk-dica" tabindex="0" title="([^"]+)">Fora do ciclo</span>', html)
+    assert len(dicas) == 2                                         # no número e no título da lista
+    for d in dicas:
+        assert "menos de 10 tarefas registradas" in d and "menos de 70% do programado" in d and "outubro de 2026" in d
+    # o mês de setembro fala de setembro
+    assert "Classificação de setembro de 2026" in _texto(logado.get("/t/campo/ranking?mes=2026-09").get_data(as_text=True))
+
+
+def test_o_podio_e_o_das_olimpiadas(ranking, logado):
+    """"1°, 2° e 3° lugar quero estilo podium das olimpíadas": o 1º no meio e no degrau mais alto, o 2º à esquerda e o 3º à
+    direita, em ouro, prata e bronze. Na página a ordem segue 1º, 2º e 3º (quem lê a tela ouve nessa ordem)."""
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    podio = html.split('class="rk-podio"', 1)[1].split('class="cn-numeros"', 1)[0]
+    assert re.findall(r'class="rk-lugar rk-(\d)"', podio) == ["1", "2", "3"]
+    assert podio.count('class="rk-degrau"') == 3
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    for pos, coluna, cor in (("1", "2", "ouro"), ("2", "1", "prata"), ("3", "3", "bronze")):
+        assert f".rk-lugar.rk-{pos}{{grid-column:{coluna};grid-row:1}}" in css, pos
+        assert re.search(rf"\.rk-{pos} \.rk-degrau\{{[^}}]*background:var\(--{cor}\)", css), pos
+    altura = {p: int(re.search(rf"\.rk-{p} \.rk-degrau\{{[^}}]*height:(\d+)px", css).group(1)) for p in "123"}
+    assert altura["1"] > altura["2"] > altura["3"]
