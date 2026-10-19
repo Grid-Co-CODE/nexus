@@ -25,6 +25,7 @@ RESUMO = {
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
     "ranking_pontos": "O placar de pontos do ciclo de cada técnico, como o App calcula",
+    "ranking_tarefas": "As OS que não pontuaram cheio no ranking, com o motivo",
     # ── Segurança · HSEQ ──
     "pt": "Cada Permissão de Trabalho pedida no App, por equipamento",
     "decisao_pt": "A decisão sobre cada equipamento de uma PT, tomada no Nexus",
@@ -108,6 +109,10 @@ PARA_QUE = {
                "quê, quando e sobre qual OS.",
     "zeladoria": "Guarda cada etapa da vistoria de zeladoria feita pelo App, com as fotos e as respostas do "
                  "checklist. Serve para acompanhar a conservação das usinas e o que ficou com resposta \"não\".",
+    "ranking_tarefas": "Guarda, para cada técnico e mês, as tarefas que não pontuaram cheio no placar do App: as "
+                       "devolvidas, as de nota abaixo do piso e as anuladas por elas, com a OS, a nota e o motivo. "
+                       "Quem lista é o App; o Nexus mostra na linha do técnico no Ranking de pontos, para o supervisor "
+                       "cobrar com o dado na mão.",
     "ranking_pontos": "Guarda o placar do ciclo de pontos do App de Campo: uma linha por técnico e mês, com a posição, "
                       "os pontos de tarefas, de rondas e de bônus, e quem ficou fora do ciclo e por quê. Quem calcula é "
                       "o App, pela régua do ciclo; o Nexus mostra na tela Ranking de pontos, sem recalcular.",

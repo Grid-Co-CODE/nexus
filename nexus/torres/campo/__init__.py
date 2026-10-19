@@ -1161,9 +1161,14 @@ def ranking():
         return [p for p in lista if not regiao or p["regiao"] == regiao]
     classificacao = da_regiao(atual["classificacao"]) if atual else []
     fora = da_regiao(atual["fora"]) if atual else []
+    # as OS que não pontuaram cheio, da lista que o App publica (18/10/2026): a linha da pessoa abre as dela no mês
+    tarefas = visao.ranking_tarefas()
+    por = (tarefas.dados or {}).get("por") or {}
     return render_template("campo/ranking.html", **_comum(
         "ranking", leitura, meses=meses, atual=atual, regioes=regioes, regiao=regiao, classificacao=classificacao,
         fora=fora, nome_do_mes=_nome_do_mes, calculado=_hora_brt(atual["calculado_em"]) if atual else "",
+        tarefas_de=lambda p: por.get((atual["mes"], p.get("hmac")), []) if atual else [],
+        tarefas_publicado=bool((tarefas.dados or {}).get("publicado")), hora_brt=_hora_brt,
         media=round(sum(p["total"] for p in classificacao) / len(classificacao)) if classificacao else None))
 
 

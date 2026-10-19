@@ -64,7 +64,18 @@ Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking p
   fica com o nome do App e a explicação no mouse, montada da régua que ele publicou ("O que significa fora do ciclo?
   quero que apareça a explicação ao passar o mouse nesse nome"); e o pódio é o das olimpíadas ("1°, 2° e 3° lugar quero
   estilo podium das olimpíadas"): o 1º no meio e no degrau mais alto, o 2º à esquerda, o 3º à direita, em ouro, prata e
-  bronze (`--ouro`, `--prata`, `--bronze`); a página segue 1º, 2º e 3º para quem lê a tela. Régua em `sombra` no App = aviso de que o técnico ainda vê a pontuação de antes.
+  bronze (`--ouro`, `--prata`, `--bronze`); a página segue 1º, 2º e 3º para quem lê a tela.
+- **As OS que não pontuaram cheio (18/10/2026)** (Levi: "Quando tiver OSs devolvidas ou anuladas quero que dê para
+  clicar na linha e mostre qual foi a OS e o motivo!"): a linha da pessoa com devolvida, abaixo do piso ou anulada abre a
+  lista do mês, com a OS, a tarefa, a situação, a nota, os pontos, o motivo e quando foi registrada. Quem lista é o
+  **App**, no livro `ranking_tarefas_app_campo · Tarefas` (fato `ranking_tarefas` no catálogo, registrado antes da 1ª
+  publicação): pelo banco não fecha (a sessão do App, 18/10/2026: o extrato do App não vai ao banco e a anulação depende
+  da ordem por pontos; em outubro, 17 devolvidas nos fechamentos contra 43 no placar). O motivo é o do App: o texto da
+  devolução pelo painel (a feita direto no Fracttal vem "sem motivo no App"), o porquê da nota, ou "anulada por N
+  tarefa(s) abaixo do piso no mês". Sem o livro, a linha diz que a lista ainda não chegou do App. A regra do "fora do
+  ciclo" no mouse é a que a sessão do App confirmou: menos tarefas registradas que o mínimo (contam todas, inclusive as
+  devolvidas e as de 0 ponto; ronda não), ou, tendo o mínimo, cumprimento abaixo do mínimo (só os dias já vencidos; sem
+  nada programado, 0%). Régua em `sombra` no App = aviso de que o técnico ainda vê a pontuação de antes.
   Sem o livro, a tela diz que o ranking ainda não chegou.
 - **O lado do App é o pacote** `C:\GridcoBuild\app-campo-docs\_propostas\ranking-pontos-nexus\` (`LEIA.md`,
   `aplicar.py --conferir`, o `.diff` contra a v262 que casa também na v263, e o teste do App). Enquanto o App não

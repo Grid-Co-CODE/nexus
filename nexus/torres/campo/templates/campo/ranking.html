@@ -81,8 +81,9 @@
     <thead><tr><th>Posição</th><th>Técnico</th><th>Total</th><th>Tarefas</th><th>Rondas</th><th>Bônus</th>
       <th>Nota média</th><th>Cumprimento</th><th>Pontualidade</th><th>Sequência</th><th>Devolvidas · anuladas</th></tr></thead>
     <tbody>
-    {% for p in classificacao %}
-      <tr><td class="m">{{ p.posicao }}º</td><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
+    {% for p in classificacao %}{% set abre = p.devolvidas or p.anuladas or p.abaixo_do_piso %}
+      {% if abre %}<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false" title="Ver as OS devolvidas, abaixo do piso e anuladas, com o motivo">{% else %}<tr>{% endif %}
+        <td class="m">{{ p.posicao }}º</td><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
         <td><b>{{ pts(p.total) }}</b></td>
         <td>{{ pts(p.tarefas_pts) }}<span class="det">{{ p.contadas }} de {{ p.tarefas }} tarefa{{ 's' if p.tarefas != 1 }}</span></td>
         <td>{{ pts(p.rondas_pts) }}<span class="det">{{ p.rondas }} ronda{{ 's' if p.rondas != 1 }}{% if p.rondas_no_teto %} · no teto{% endif %}</span></td>
@@ -91,7 +92,24 @@
         <td>{{ pct(p.cumprimento) }}<span class="det">{{ p.concluido }} de {{ p.programado }} programada{{ 's' if p.programado != 1 }}</span></td>
         <td>{{ pct(p.pontualidade) }}</td>
         <td>{{ p.sequencia }} dia{{ 's' if p.sequencia != 1 }}</td>
-        <td>{{ p.devolvidas }} · {{ p.anuladas }}</td></tr>
+        <td>{{ p.devolvidas }} · {{ p.anuladas }}{% if abre %} <i class="ph ph-caret-down rk-seta" aria-hidden="true"></i>{% endif %}</td></tr>
+      {% if abre %}
+      {# a linha aberta: as OS que não pontuaram cheio, como o App listou (devolvida, abaixo do piso, anulada) #}
+      <tr class="cn-detalhe" hidden><td colspan="11">
+        {% set ts = tarefas_de(p) %}
+        {% if ts %}
+        <table class="rk-tarefas"><thead><tr><th>OS</th><th>Tarefa</th><th>Situação</th><th>Nota</th><th>Pontos</th><th>Motivo</th><th>Registrada</th></tr></thead>
+          <tbody>{% for t in ts %}<tr><td class="m"><b>{{ t.os or '—' }}</b></td><td class="rk-motivo">{{ t.tarefa or '—' }}</td>
+            <td><span class="cn-selo cn-selo--{{ {'devolvida': 'critico', 'abaixo do piso': 'alerta'}.get(t.situacao, 'neutro') }}">{{ t.situacao or '—' }}</span></td>
+            <td>{{ t.nota if t.nota is not none else '—' }}</td><td>{{ t.pontos if t.pontos is not none else '—' }}</td>
+            <td class="rk-motivo">{{ t.motivo or '—' }}</td><td>{{ hora_brt(t.registrado_em) or '—' }}</td></tr>{% endfor %}</tbody></table>
+        {% elif not tarefas_publicado %}
+        <p class="mudo">A lista das OS ainda não chegou do App: ele vai publicar, de hora em hora, cada tarefa devolvida, abaixo do piso ou anulada, com o motivo.</p>
+        {% else %}
+        <p class="mudo">O App não listou tarefas desta pessoa em {{ mes_txt }}.</p>
+        {% endif %}
+      </td></tr>
+      {% endif %}
     {% else %}
       <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}em {{ mes_txt }} ainda.</td></tr>
     {% endfor %}
@@ -129,4 +147,17 @@
     inteiro, mesmo com uma região escolhida.</div>
   {% endif %}
 </div>
+<script>
+  // a linha com devolvida, abaixo do piso ou anulada abre a lista do App (Levi, 18/10/2026)
+  document.querySelectorAll('tr.rk-linha').forEach(function (tr) {
+    function alterna() {
+      var det = tr.nextElementSibling;
+      if (!det || !det.classList.contains('cn-detalhe')) { return; }
+      det.hidden = !det.hidden;
+      tr.setAttribute('aria-expanded', String(!det.hidden));
+    }
+    tr.addEventListener('click', alterna);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(); } });
+  });
+</script>
 {% endblock %}

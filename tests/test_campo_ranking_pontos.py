@@ -195,3 +195,48 @@ def test_o_podio_e_o_das_olimpiadas(ranking, logado):
         assert re.search(rf"\.rk-{pos} \.rk-degrau\{{[^}}]*background:var\(--{cor}\)", css), pos
     altura = {p: int(re.search(rf"\.rk-{p} \.rk-degrau\{{[^}}]*height:(\d+)px", css).group(1)) for p in "123"}
     assert altura["1"] > altura["2"] > altura["3"]
+
+
+# ── as OS devolvidas e anuladas (Levi, 18/10/2026: "Quando tiver OSs devolvidas ou anuladas quero que dê para clicar na
+# linha e mostre qual foi a OS e o motivo!"), pela lista que o App publica (a sessão do App, 18/10/2026) ────────────────
+def _tarefa(email, os_, situacao, nota, motivo, tarefa="Troca de fusível", mes="2026-10"):
+    return {"Mês": mes, "Técnico (HMAC)": codigo_da_pessoa(CHAVE, email), "OS": os_, "Tarefa": tarefa,
+            "Situação": situacao, "Nota": nota, "Pontos": 0, "Motivo": motivo, "Registrado em": "2026-10-10T17:00:00Z"}
+
+
+def _detalhe(html, nome):
+    """O pedaço que a linha da pessoa abre (a linha de baixo, escondida até o clique)."""
+    resto = html.split(f"{nome}<span", 1)[1]
+    det = resto[resto.index('<tr class="cn-detalhe"'):]
+    fim = [i for i in (det.find('<tr class="cn-linha', 1), det.find("</tbody></table></div>")) if i > 0]
+    return det[:min(fim)]
+
+
+def test_a_linha_abre_as_os_devolvidas_e_anuladas_com_o_motivo(ranking, logado):
+    _aba(ranking, "ranking_tarefas_app_campo", "Tarefas", [
+        _tarefa("bruno@exemplo.test", "16001", "devolvida", 55, "Faltou a foto do antes"),
+        _tarefa("bruno@exemplo.test", "16002", "abaixo do piso", 62, "Sem a observação do serviço"),
+        _tarefa("bruno@exemplo.test", "16003", "anulada", 92, "anulada por 1 tarefa abaixo do piso no mês"),
+        _tarefa("bruno@exemplo.test", "15001", "devolvida", 40, "Do mês passado", mes="2026-09"),
+        _tarefa("ana@exemplo.test", "17001", "devolvida", 50, "Foto do quadro trocada")])
+    visao.limpar()
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    bruno = _detalhe(html, "Bruno Lima")
+    for trecho in ("16001", "Faltou a foto do antes", "16002", "Sem a observação do serviço", "16003",
+                   "anulada por 1 tarefa abaixo do piso no mês", "Troca de fusível", "10/10 14:00"):
+        assert trecho in bruno, trecho
+    assert "15001" not in bruno and "17001" not in bruno                    # outro mês, outra pessoa
+    assert bruno.index("devolvida") < bruno.index("abaixo do piso") < bruno.index("anulada")
+    assert re.search(r'<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false"[^>]*>\s*<td class="m">2º</td>', html)
+    assert codigo_da_pessoa(CHAVE, "bruno@exemplo.test") not in html        # o código da pessoa nunca vai à tela
+
+
+def test_sem_a_lista_do_app_a_linha_diz_que_ainda_nao_chegou(ranking, logado):
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    assert "A lista das OS ainda não chegou do App" in _detalhe(html, "Bruno Lima")
+
+
+def test_a_lista_do_app_esta_no_catalogo_de_dados():
+    f = next(x for x in catalogo.FATOS if x.id == "ranking_tarefas")
+    assert f.livro == "ranking_tarefas_app_campo · Tarefas" and f.area == "campo" and f.tipo == "snapshot_acumulado"
+    assert f.dims["pessoa"][0] == "hmac" and f.dims["os"][0] == "cod"
