@@ -88,17 +88,27 @@ def abas(base: str, sessao, livro: str) -> dict:
     return {x["sheet_name"]: x["id"] for x in r.json() if x.get("workbook_key") == livro}
 
 
+PAGINA = 1000
+
+
+def pagina(base, sessao, sid, offset: int) -> list[dict]:
+    """Uma página (até PAGINA linhas) de uma aba, a partir de `offset`, na ordem do banco. A que vem com menos de PAGINA
+    linhas é a última."""
+    r = sessao.get(f"{base}/api/sheets/{sid}/rows", params={"limit": PAGINA, "offset": offset}, timeout=60)
+    r.raise_for_status()
+    rows = r.json()
+    rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
+    return [dict(zip(x.get("headers") or [], x.get("values") or [])) for x in rows]
+
+
 def _linhas(base, sessao, sid) -> list[dict]:
     out, offset = [], 0
     while True:
-        r = sessao.get(f"{base}/api/sheets/{sid}/rows", params={"limit": 1000, "offset": offset}, timeout=60)
-        r.raise_for_status()
-        rows = r.json()
-        rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
-        out += [dict(zip(x.get("headers") or [], x.get("values") or [])) for x in rows]
-        if len(rows) < 1000:
+        rows = pagina(base, sessao, sid, offset)
+        out += rows
+        if len(rows) < PAGINA:
             return out
-        offset += 1000
+        offset += PAGINA
 
 
 def ler(base: str, sessao, livro: str, aba: str | None = None) -> list[dict]:

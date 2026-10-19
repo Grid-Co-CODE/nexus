@@ -281,20 +281,23 @@ def paradas_abertas(nomes: Nomes, mes: str) -> tuple[dict, dict]:
                        "sem_usina": sorted({n for (n, _f), u in uid_de.items() if not u})}
 
 
-def _programacao_recente(segundas: set) -> list[dict]:
+def _programacao_recente(segundas: set, listagem: dict | None = None) -> list[dict]:
     """As linhas do `fato_programacao` das semanas pedidas (a passada e a corrente), lidas do FIM para trás, como a tela
     Técnicos por usina (`pcm.tecnicos_usina._programacao_do_fim`): a carga põe as 4 semanas do arquivo do PCM no fim
     (`programacao.mesclar_semanas`), e a aba inteira (16.540 linhas em 18/10/2026) levava 4,4 s a cada conta da Visão.
-    Para depois de passar das semanas pedidas. Sem a listagem das abas, a aba inteira."""
+    Para depois de passar das semanas pedidas. Sem a listagem das abas, a aba inteira. A `listagem` é a da pré-leitura da
+    mesma conta (`visao.carregar`, segundos antes): com ela, uma listagem a menos."""
     from ..dados import programacao as PG
     base, s = visao._base(), visao._sessao()
-    try:
-        r = s.get(f"{base}/api/sheets", timeout=60)
-        r.raise_for_status()
-        meta = next(((x.get("id"), int(x.get("row_count") or 0)) for x in r.json()
-                     if x.get("workbook_key") == PG.LIVRO and x.get("sheet_name") == PG.ABA), None)
-    except Exception:       # noqa: BLE001 — sem a listagem: a aba inteira, pela cópia de sempre
-        meta = None
+    meta = (listagem or {}).get((PG.LIVRO, PG.ABA))
+    if meta is None:
+        try:
+            r = s.get(f"{base}/api/sheets", timeout=60)
+            r.raise_for_status()
+            meta = next(((x.get("id"), int(x.get("row_count") or 0)) for x in r.json()
+                         if x.get("workbook_key") == PG.LIVRO and x.get("sheet_name") == PG.ABA), None)
+        except Exception:       # noqa: BLE001 — sem a listagem: a aba inteira, pela cópia de sempre
+            meta = None
     if not meta or not meta[0]:
         return visao._livro(PG.LIVRO, PG.ABA)
     sid, n = meta
@@ -315,7 +318,7 @@ def _programacao_recente(segundas: set) -> list[dict]:
     return out
 
 
-def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
+def manutencao_fonte(b, hoje, agora, listagem: dict | None = None) -> tuple[dict, dict]:
     """{usina_id: o dado cru do bloco Manutenção} (18/10/2026; a conta é `nexus/campo/manutencao.py`): as tarefas das OS
     do Fracttal (`nexus_os`), os motivos do Fora da programação (decifrados aqui: a marca guarda a usina e a tarefa
     cifradas), as OS de chamado e a programação. O nível NÃO sai daqui: depende do limite de quem olha
@@ -343,7 +346,7 @@ def manutencao_fonte(b, hoje, agora) -> tuple[dict, dict]:
     chamados_os = {visao.D._id(r.get("os")) for r in visao._livro(LIVRO_CHAMADOS, ABA_CHAMADOS)} - {None}
     t = M.tarefas_por_usina(tarefas if tarefas else None, marcas, chamados_os, hoje)
     passada = hoje - timedelta(days=hoje.weekday() + 7)
-    prog = _programacao_recente({data_id(passada), data_id(passada + timedelta(days=7))})
+    prog = _programacao_recente({data_id(passada), data_id(passada + timedelta(days=7))}, listagem)
     s = M.semana_por_usina(prog, hoje, agora.strftime("%H:%M"))
     ano, sem, _ = passada.isocalendar()
     por = {uid: {**t.get(uid, {}), **s.get(uid, {})} for uid in set(t) | set(s)}
@@ -1470,9 +1473,34 @@ def _ler_fonte(nome, f, erros):
         return {}, {}
 
 
+def pre_leitura() -> tuple:
+    """As abas que as fontes da Visão leem pelo `visao._livro`, lidas juntas antes da conta (`visao.carregar`: UMA
+    listagem do banco e as páginas em paralelo). Levi, 19/10/2026: "as vezes abre rápido e as vezes é um parto para
+    abrir". Medido no banco real, num processo novo como o de cada deploy: a 1ª abertura levava 26 s com a Central, as
+    Rondas e as PT já prontas (o `manter_quente` as faz ao subir) e 46 s sem elas; 23 a 27 listagens (~0,5 s cada) e as
+    abas grandes página por página. Aberta de novo, 0,01 s: a demora era só a conta fria, a 1ª depois de cada deploy.
+    Fonte nova que lê um livro pelo `_livro` entra aqui (o test_a_pre_leitura_cobre_as_fontes cobra). Ficam fora as
+    abas das contas guardadas à parte (Central, Rondas, PT: `visao._ler`), que quase sempre já estão prontas."""
+    from ..dados import fato_tarefa_os as FT
+    from ..hseq import extintores as E
+    return (("cadastro_nexus", "usinas"), ("cadastro_nexus", "equipes"), ("cadastro_nexus", "de_para"),
+            ("cadastro_nexus", "pessoas"), ("cadastro_nexus", "clientes"), ("cadastro_nexus", "regioes_campo"),
+            (LIVRO_META, ABA_META), (LIVRO_DISP, ABA_DISP), (LIVRO_DISP, ABA_DISP_OS),
+            (LIVRO_CHAMADOS, ABA_CHAMADOS), (LIVRO_EQUIP, ABA_EQUIP), (E.LIVRO, E.ABA),
+            (FT.LIVRO, FT.ABA), (FT.LIVRO, "qualidade"),
+            # o Ranking das equipes: o fato de fechamento do banco ou, quando ele está atrás do livro do App (o App
+            # grava o dia todo e a carga é de hora em hora), o livro do App (`visao._fato`); e as rondas ligadas
+            (visao.LIVRO_FATOS, "qualidade"), (visao.LIVRO_FATOS, "fato_fechamento"), visao.C.ORIGEM_FECHAMENTOS,
+            visao.C.ORIGEM_RONDAS, visao.C.ORIGEM_CHECKLIST, visao.C.ORIGEM_AVULSAS)
+
+
 def visao_responsaveis() -> "visao.leitura.Leitura":
     """A conta da tela, numa cópia de 5 min (`visao._ler`)."""
     def calcular():
+        try:
+            listagem = visao.carregar(pre_leitura())
+        except Exception:       # noqa: BLE001 — sem a pré-leitura, cada fonte lê a sua (e a que falhar a tela diz)
+            listagem = {}
         b = visao._Base()
         agora = visao._agora()
         hoje = agora.date()
@@ -1490,7 +1518,7 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
         ext, ext_i = _ler_fonte("extintores", extintores, erros)
         lim, lim_i = _ler_fonte("limpeza", limpeza, erros)
         par, par_i = _ler_fonte("paradas", lambda: paradas_abertas(nomes, mes), erros)
-        man, man_i = _ler_fonte("manut", lambda: manutencao_fonte(b, hoje, agora), erros)
+        man, man_i = _ler_fonte("manut", lambda: manutencao_fonte(b, hoje, agora, listagem), erros)
         rk, rk_i = _ler_fonte("ranking", lambda: ranking_fonte(b, hoje), erros)
         if pts.erro:
             erros["pt"] = pts.erro
