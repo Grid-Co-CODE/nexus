@@ -1,0 +1,31 @@
+{# O card da ronda por cima da Visão do responsável (Levi, 18/10/2026: "ao clicar na última ronda aparece um card
+   sobreposto sobre a tela com um blur de fundo mostrando como foi a última ronda, fotos, data, quem fez"). Pedaço da
+   janela `cr-modal` (`responsaveis_painel` com `painel=ronda`): os dados vêm do histórico da usina (o mesmo do Rondas ›
+   usina); as fotos chegam depois, pelo `data-cr-fotos` (o script da janela busca), e a miniatura abre grande no card #}
+{% macro nivel(n) %}<dd class="{{ 'cn-t-critico' if n == 5 else ('cn-t-alerta' if n == 4 else '') }}">{{ '—' if n is none else n }}</dd>{% endmacro %}
+<header class="cr-jan-cab"><div><p class="gc-eyebrow">{{ 'Validação por foto' if r and r.validada else 'Ronda' }}</p><h2>{{ usina or 'Usina' }}</h2></div></header>
+{% if erro %}
+<div class="cn-erro" role="alert"><b>Não consegui ler as rondas agora</b> ({{ erro }}). Tente de novo em instantes.</div>
+{% elif not r %}
+<p class="mudo">Não achei esta ronda no histórico da usina (os últimos 90 dias do App).</p>
+{% else %}
+<dl class="cr-dl cr-ronda-dl">
+  <dt>Data</dt><dd><b>{{ dia_longo(r.data) }}</b>{% if r.ini_hm %} · das {{ r.ini_hm }}{% if r.fim_hm %} às {{ r.fim_hm }}{% endif %}{% endif %}{% if r.dur_min is not none %} ({{ duracao(r.dur_min) }}){% endif %}</dd>
+  <dt>Quem fez</dt><dd>{{ r.tecnico or '—' }}</dd>
+  {% if not r.validada %}<dt>Tipo</dt><dd>{{ r.tipo or '—' }}{% if r.avulsa %} · avulsa, lançada no Nexus{% endif %}</dd>
+  <dt>Qualidade</dt><dd>{{ '—' if r.nota is none else r.nota ~ '%' }}{% if r.veredito and r.veredito[1] != '—' %} · <span class="cn-selo cn-selo--{{ r.veredito[0] }}">{{ r.veredito[1] }}</span>{% endif %}</dd>{% endif %}
+  <dt>Sujidade</dt>{{ nivel(r.sujidade) }}
+  <dt>Vegetação</dt>{{ nivel(r.vegetacao) }}
+  <dt>Vala</dt><dd>{{ r.vala or '—' }}</dd>
+  <dt>Sensores</dt><dd>{% if r.sensores_sujos %}<span class="cn-t-alerta">sujos: {{ r.sensores_sujos|join(', ') }}</span>{% elif r.lida %}limpos{% else %}—{% endif %}</dd>
+  {% if r.revisada %}<dt>Revisada</dt><dd>pela validação por foto de {{ r.revisada.por or '—' }}: sujidade {{ r.revisada.sujidade or '—' }}, vegetação {{ r.revisada.vegetacao or '—' }}</dd>{% endif %}
+  {% if r.falhas or r.pend_obs %}<dt>Pendências</dt><dd>{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pend_obs and r.pend_obs not in (r.falhas or '') %}{% if r.falhas %} · {% endif %}{{ r.pend_obs }}{% endif %}</dd>{% endif %}
+  {% if r.os %}<dt>OS</dt><dd>{{ r.os }}</dd>{% endif %}
+</dl>
+{% if r.os %}
+<figure class="cr-ronda-amp" hidden><img alt=""><figcaption></figcaption></figure>
+<div class="cr-ronda-fotos" data-cr-fotos="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}"><p class="mudo">Buscando as fotos da OS no Fracttal…</p></div>
+{% else %}
+<p class="mudo">{{ 'As fotos são as da ronda do App que a validação revisou.' if r.validada else 'Ronda sem OS no Fracttal: as fotos ficam só no App.' }}</p>
+{% endif %}
+{% endif %}

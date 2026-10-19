@@ -22,17 +22,14 @@
 {% macro det_bloco(u, b) %}{% set x = u[b] %}
           <dl class="cr-dl">
             {% for i in x.det %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp', 'Ativos falhando': 'ativos'}.get(i.rot) if b == 'perf' else none %}
-              <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
+              {# a ronda abre o card dela por cima (Levi, 18/10/2026: "ao clicar na última ronda aparece um card sobreposto") #}
+              <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('ronda') %} · <button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='ronda', os=i.ronda.os, data=i.ronda.data) }}" title="Ver a ronda: data, quem fez e as fotos">{{ i.ronda.txt }}</button>{% endif %}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
               {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">{{ 'ver os ativos' if jan == 'ativos' else 'dia a dia' }}</button>{% endif %}
               {# a OS da PT abre a PT por cima, para aprovar sem sair da tela (Levi, 12/10/2026) #}
               {# a OS da Manutenção abre o card dela no Nexus (o do OS Creator), como a Gestão PCM: `os_card` #}
-              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% elif it.get('os_card') %}<button type="button" class="cn-link cr-os cr-link-botao" data-wid="{{ it.os_card.wid or '' }}" data-folio="{{ it.os_card.folio }}" title="Abrir o card da OS">{{ it.forte }}</button>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
+              {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('numero') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.numero, ativo=it.codigo, volta=request.full_path) }}" title="{{ it.titulo }}">{{ it.forte }}</button>{% elif it.get('os_card') %}<button type="button" class="cn-link cr-os cr-link-botao" data-wid="{{ it.os_card.wid or '' }}" data-folio="{{ it.os_card.folio }}" title="Abrir o card da OS">{{ it.forte }}</button>{% elif it.get('quadro') %}<a class="cn-link" href="{{ url_for('torre_pcm.quadro', cliente=u.cliente or None, q=sites.get(u.usina_id) or u.usina) }}" title="Ver no Quadro da semana, com o cliente e a usina já filtrados">{{ it.forte }}</a>{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
               {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
           </dl>
-          <div class="cr-links">
-            {% if b == 'acomp' %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}">Rondas da usina</a>{% endif %}
-            {% for rot, area in links_do_bloco[b] %}<a class="cn-link" href="{{ url_for(tela_dona[area]) }}">{{ rot }}</a>{% endfor %}
-          </div>
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -394,6 +391,33 @@ document.addEventListener('click', function (ev) {
   var corpo = dlg.querySelector('.cr-modal-corpo');
   // a PT na janela: a assinatura do técnico e quem assina vêm do login do Fracttal (cookie só em /os), como na tela da
   // PT; o script que vem no pedaço de página não roda, então é daqui
+  // a ronda na janela (18/10/2026): as fotos da OS chegam depois do card (o Fracttal só é lido quando ele abre); a
+  // miniatura abre grande dentro do próprio card (a caixa de foto das Rondas ficaria por baixo da janela)
+  function completarRonda() {
+    var caixa = corpo.querySelector('[data-cr-fotos]');
+    if (!caixa) { return; }
+    caixa.innerHTML = '<p class="mudo">Buscando as fotos da OS no Fracttal…</p>';
+    fetch(caixa.getAttribute('data-cr-fotos'), {credentials: 'same-origin'}).then(function (r) {
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.text();
+    }).then(function (html) { caixa.innerHTML = html; }).catch(function (e) {
+      caixa.innerHTML = '<p class="cn-t-alerta">Não consegui buscar as fotos agora (' + e.message + '). <button type="button" class="cn-bt-tentar">Tentar de novo</button></p>';
+    });
+  }
+  dlg.addEventListener('click', function (ev) {
+    if (ev.target.closest('.cn-bt-tentar') && corpo.querySelector('[data-cr-fotos]')) { ev.preventDefault(); completarRonda(); return; }
+    var amp = corpo.querySelector('.cr-ronda-amp');
+    if (!amp) { return; }
+    if (ev.target.closest('.cr-ronda-amp')) { amp.hidden = true; return; }
+    var a = ev.target.closest('a.cn-foto');
+    if (!a) { return; }
+    ev.preventDefault();
+    var img = amp.querySelector('img');
+    img.src = a.href; img.alt = a.getAttribute('data-legenda') || '';
+    amp.querySelector('figcaption').textContent = (a.getAttribute('data-legenda') || '') + ' · clique na foto para fechar';
+    amp.hidden = false;
+    amp.scrollIntoView({block: 'nearest'});
+  });
   function completarPT() {
     var fig = corpo.querySelector('[data-cr-assinatura]');
     if (fig) {
@@ -434,6 +458,7 @@ document.addEventListener('click', function (ev) {
       if (html === null) { return; }
       corpo.innerHTML = html;
       completarPT();
+      completarRonda();
     }).catch(function (e) {
       corpo.innerHTML = '<div class="cn-erro" role="alert"><b>Não consegui abrir agora (' + e.message + ').</b> Tente de novo.</div>';
     });

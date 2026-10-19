@@ -550,8 +550,10 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
 - **Três blocos, uma lista** (desde 18/10/2026 na Visão geral, que tirou Onde focar; seção própria abaixo):
   **Performance** (meta, PR, disponibilidade; os ativos falhando como etiqueta no nome), **Manutenção** (seção própria
   abaixo) e **Acompanhamento** (rondas, limpeza, PT, chamados, extintores). Acima, a faixa **Parada agora**. Cada usina
-  é uma linha compacta com os valores coloridos pela régua; clicar abre o detalhe dos três blocos e os links das telas
-  donas (`<details>`, sem script). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só
+  é uma linha compacta com os valores coloridos pela régua; clicar abre o detalhe dos três blocos (`<details>`, sem
+  script), com os títulos no centro e sem os links das telas donas no fim (Levi, 18/10/2026: "Esses links no final com
+  palavras em verde grid pode tirar, a ideia é resolver a maior parte por essa tela"): o que se resolve dali abre por
+  cima, na janela de fundo desfocado (o dia a dia, os ativos, a PT, o card da OS, o card da ronda). Cada bloco tem a própria triagem (focar = crítico ou PT parada; acompanhar = só
   atenção; em dia) e **todas as usinas viram linha, inclusive as em dia** (Levi, 13/10/2026: "Tem que aparecer todas as
   usinas do responsável inclusive as que estão em dia"). **A ordem de cada bloco** (o clique no nome do bloco ordena por
   ela; "Ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a Performance pela
@@ -637,7 +639,19 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
     ela vai ter que voltar para ver mais usinas"): `/t/campo/responsaveis/pt/<numero>?ativo=&volta=`
     (`responsaveis_pt`, `_resp_pt.html`), a mesma linha e a mesma decisão da tela da PT, assinada com o login do
     Fracttal; o `volta` (só /t/campo/) traz de volta à Visão com os filtros. A página do Nexus não abre em iframe
-    (`base.html` sai do iframe): por isso o pedaço de página, e o script da tela busca a assinatura e quem assina.
+    (`base.html` sai do iframe): por isso o pedaço de página, e o script da tela busca a assinatura e quem assina. É o
+    mesmo card que o Levi pediu de novo em 18/10/2026 ("Em PT, quando tiver, quero a mesma solução do card com blur para
+    a pessoa conseguir assinar a PT alí mesmo!"): De acordo e Não autorizo, com o login do Fracttal.
+  - **Ronda e Limpeza** (Levi, 18/10/2026: "Deixe a informação da última ronda apenas em limpeza pois está redundante";
+    "ao clicar na última ronda aparece um card sobreposto sobre a tela com um blur de fundo mostrando como foi a última
+    ronda, fotos, data, quem fez"): a data da ronda aparece uma vez só. Se a leitura da Limpeza é da última ronda, a
+    data fica na Limpeza ("ronda de 07/10"); se a última ronda veio sem a limpeza, fica na Ronda ("última ronda em
+    15/10"). A data abre o card da ronda: `/t/campo/responsaveis/usina/<id>/ronda?os=&data=` (`_resp_ronda`,
+    `_resp_ronda.html`), a ronda do histórico da usina (o mesmo do Rondas › usina) pela OS ou, sem OS, pelo dia: data e
+    hora, quem fez, tipo, qualidade, sujidade, vegetação, vala, sensores, pendências e as fotos da OS no Fracttal (o
+    pedaço `ronda_fotos_os`, pedido pela janela só quando ela abre; a miniatura amplia dentro do card, porque a caixa de
+    foto das Rondas ficaria por baixo da janela). Na cópia de prova as fotos não vêm (a trava recusa o pedido de token do
+    Fracttal) e o card mostra o "Tentar de novo" de sempre.
   - **Ativos falhando** (Levi, 13/10/2026: "Para esses ativos falhando da engenharia, conseguimos criar uma visão?"):
     a etiqueta "N ativo(s) crítico(s)/em atenção" da linha e o "ver os ativos" do detalhe abrem a janela `ativos`
     (`ativos_da_usina`): os sinais da Engenharia › Confiabilidade da usina em crítico e atenção (os mesmos do detalhe,
@@ -688,7 +702,14 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   externa é a programação (cópia do `banco_dados.json` do PCM), e o bloco diz isso.
 - **O que conta (`nexus/campo/manutencao.py`, puro):** OS abertas = OS não finalizadas, em processo e em verificação;
   no detalhe, as que esperam a aprovação: TODA OS em verificação, com as tarefas feitas ou não (é a fila da Aprovação;
-  a revisão de 18/10/2026 achou que só a tarefa ainda aberta contava, e a OS que o técnico terminou sumia). **Atrasada é a régua do PCM** (Levi: "Régua do PCM: +10 dias"; o
+  a revisão de 18/10/2026 achou que só a tarefa ainda aberta contava, e a OS que o técnico terminou sumia). No detalhe,
+  uma linha por situação (Levi, 18/10/2026: "separe por linha, o que está dependendo de aprovação e o que não foi
+  iniciado"): esperando a aprovação, **não iniciada** (OS em processo sem nenhuma tarefa em progresso, pausada no App ou
+  feita) e em execução (com uma); as três somam as abertas. A não iniciada é um link para o Quadro da semana com o
+  cliente e a usina filtrados ("filtrando o cliente com o nome da usina pesquisada"): a busca vai pelo site do Fracttal
+  do de-para ("Cliente - Usina - UF", o nome do arquivo do PCM; `sites_fracttal`), e sem ele, ou com o provisório
+  "(sem Classificação 1) ...", pelo nome do cadastro. Medido em 18/10/2026: 72 dos 80 links acham tarefa na semana ou nas
+  que não couberam. **Atrasada é a régua do PCM** (Levi: "Régua do PCM: +10 dias"; o
   `DIAS_ALERTA` do robô da Gestão PCM): tarefa aberta com a Data Programada há MAIS de 10 dias, contada por tarefa, como
   o PCM conta. Ficam fora de OS abertas e atrasadas, para nada contar duas vezes: o backoffice (decisão do Levi: o
   supervisor não age sobre elas), a tarefa com motivo do recorte do painel (motivo que tira ou justificativa do App:

@@ -503,7 +503,8 @@ def test_limpeza_na_regua_das_rondas(tela):
     assert {"area": "limpeza", "nivel": "critico", "titulo": "Vegetação muito alta"} in alt["acomp"]["alertas"]
     assert alt["acomp"]["nivel"] == "critico"
     det = next(i for i in alt["acomp"]["det"] if i["rot"] == "Limpeza")
-    assert "Sujidade 2" in det["resto"] and "Vegetação 5" in det["resto"] and _dia(1)[8:10] in det["resto"]
+    assert "Sujidade 2" in det["resto"] and "Vegetação 5" in det["resto"]
+    assert det["ronda"]["txt"] == f"ronda de {_dia(1)[8:10]}/{_dia(1)[5:7]}"       # a data abre o card da ronda
     assert bwk["acomp"]["valores"]["limpeza"]["cls"] == "alerta"
     assert {"area": "limpeza", "nivel": "atencao", "titulo": "Sujidade alta"} in bwk["acomp"]["alertas"]
     assert cor["acomp"]["valores"]["limpeza"] == {"txt": "—", "cls": "neutro", "sub": ""}
@@ -1035,13 +1036,13 @@ def test_a_usina_parada_tem_a_etiqueta_na_lista_geral(manut, logado):
 
 def test_o_bloco_sem_detalhe_nao_diz_em_dia(manut, logado, monkeypatch):
     """Revisão de 18/10/2026: o bloco sem nenhuma linha de detalhe é, quase sempre, falta de dado; "em dia" contradizia a
-    regra da tela (falta de dado não é em dia) e tirava os links do bloco. Aqui, a Manutenção sem detalhe."""
+    regra da tela (falta de dado não é em dia). Aqui, a Manutenção sem detalhe."""
     original = R.linha_manutencao
     monkeypatch.setattr(R, "linha_manutencao", lambda u, limite: {**original(u, limite), "det": []})
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
     lista = html[html.index('class="cr-gr-lista"'):]
     assert "em dia</p>" not in lista and "Nada a mostrar neste bloco" in lista
-    assert "Gestão PCM" in lista.split("Nada a mostrar neste bloco")[1][:600]          # os links do bloco ficam
+    assert "Gestão PCM</a>" not in lista         # os links do fim saíram (Levi, 18/10/2026: "pode tirar")
 
 
 def test_a_visao_geral_diz_com_os_filtros_com_a_equipe(manut, logado):
@@ -1297,3 +1298,91 @@ def test_o_dominio_da_anomalia_e_a_regua_unica_da_plataforma():
     assert "acima de 8 kWh por kWp por dia" in DOM.ANOMALIA_META["meta_alta"]
     # a frase que a plataforma tinha montado não é código: vira o sinal genérico, nunca some
     assert DOM.anomalias("meta do mês de 0,9 kWh por kWp por dia (o normal é de 2 a 8)") == [DOM.ANOMALIA_DESCONHECIDA]
+
+
+# ── O detalhe da usina na Visão geral (Levi, 18/10/2026: "quando expandir a informação dos blocos clicando na usina em
+# visão geral eu gostaria de algumas mudanças"; "o restante deixe como estar") ─────────────────────────────────────────
+def test_o_detalhe_sem_os_links_do_fim_e_com_os_titulos_no_centro(manut, logado):
+    """"os títulos PERFORMANCE, MANUTENÇÃO E ACOMPANHAMENTO QUERO CENTRALIZADOS"; "Esses links no final com palavras em
+    verde grid pode tirar, a ideia é resolver a maior parte por essa tela"."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    lista = _bloco_manut(html)
+    assert 'class="cr-gr-det"' in lista and 'class="cr-links"' not in lista
+    assert "Rondas da usina" not in lista and "Gestão PCM</a>" not in lista and "Visão gerencial</a>" not in lista
+    assert re.search(r"\.cr-gr-det h3\{[^}]*text-align:center", _campo_css())
+
+
+def test_as_os_abertas_em_linhas_e_a_nao_iniciada_abre_o_quadro(manut, logado):
+    """"Em OSs abertas quero que separe por linha, o que está dependendo de aprovação e o que não foi iniciado, ao clicar
+    em o que não foi iniciado abre o link do quadro da semana filtrando o cliente com o nome da usina pesquisada!". O
+    nome é o do site no Fracttal (o do arquivo do PCM) quando o de-para tem; senão, o do cadastro."""
+    _aba(manut, "nexus_os", "fato_tarefa_os", [
+        _tarefa(1, 901, 2, 31), _tarefa(2, 902, 2, 3), _tarefa(3, 902, 2, 3, estado="em_progresso"),
+        _tarefa(4, 903, 2, 3, status="em_verificacao", estado="finalizada"),
+        _tarefa(5, 904, 1, 3)])
+    # o nome provisório que o cadastro dá ao site ainda sem a Classificação 1 do Fracttal não é nome de usina no arquivo
+    # do PCM (medido em 18/10/2026: 3 dos 8 links sem tarefa eram ele): fica o nome do cadastro
+    _aba(manut, "cadastro_nexus", "de_para", [
+        {"usina_id": 1, "sistema": "Fracttal · Classificação 1", "chave_externa": "Thopen - Altair 1 - SP"},
+        {"usina_id": 2, "sistema": "Fracttal · Classificação 1", "chave_externa": "(sem Classificação 1) BWK100"},
+        {"usina_id": 2, "sistema": "BD_Thopen · aba", "chave_externa": "Brodowski I A"},
+        {"usina_id": 2, "sistema": "BD_Thopen · aba", "chave_externa": "Brodowski I B"}])
+    visao.limpar()
+    us = _com_manut()
+    det = next(i for i in us["Brodowski 1"]["manut"]["det"] if i["rot"] == "OS abertas")
+    assert det["resto"] == "3 OS abertas"
+    assert [(x["forte"], bool(x.get("quadro"))) for x in det["itens"]] == [
+        ("1 esperando a aprovação", False), ("1 não iniciada", True), ("1 em execução", False)]
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    links = re.findall(r'<a class="cn-link" href="(/t/pcm/quadro\?[^"]*)"[^>]*>([^<]+)</a>', html)
+    assert sorted(t for _h, t in links) == ["1 não iniciada", "1 não iniciada"]           # Brodowski 1 e Altair
+    hrefs = [h.replace("&amp;", "&") for h, _t in links]
+    assert any("cliente=Thopen" in h and "q=Brodowski+1" in h for h in hrefs)              # sem o site no de-para
+    assert any("cliente=Thopen" in h and "q=Thopen+-+Altair+1+-+SP" in h for h in hrefs)   # o site do Fracttal
+
+
+def test_a_ultima_ronda_fica_so_na_limpeza(tela):
+    """"aparece a longa pendente e a data da última ronda (...) Deixe a informação da última ronda apenas em limpeza
+    pois está redundante repetindo em ronda e em limpeza". A ronda da limpeza é a última: a data sai da linha Ronda e
+    fica na Limpeza, onde abre o card."""
+    _aba(tela, "rondas_app_campo", "OS de ronda", [_ronda(_dia(3), OS="501", **{SUJ: 4, VEG: 2})])
+    visao.limpar()
+    u = _por_usina()["Altair"]
+    ronda = next(i for i in u["acomp"]["det"] if i["rot"] == "Ronda")
+    limpeza = next(i for i in u["acomp"]["det"] if i["rot"] == "Limpeza")
+    dm = f"{_dia(3)[8:10]}/{_dia(3)[5:7]}"
+    assert ronda["resto"] == "Em dia" and not ronda.get("ronda")
+    assert limpeza["resto"] == "Sujidade 4 · Vegetação 2" and limpeza["ronda"] == {"os": 501, "data": _dia(3),
+                                                                                  "txt": f"ronda de {dm}"}
+
+
+def test_a_ronda_sem_limpeza_mais_nova_fica_na_linha_ronda(tela):
+    """Quando a última ronda não tem a limpeza (a leitura é de uma ronda mais antiga), a data dela não é repetida: fica
+    na linha Ronda, e abre o card dela."""
+    _aba(tela, "rondas_app_campo", "OS de ronda", [_ronda(_dia(5), OS="501", **{SUJ: 3, VEG: 3}),
+                                                   _ronda(_dia(1), OS="502")])
+    visao.limpar()
+    u = _por_usina()["Altair"]
+    ronda = next(i for i in u["acomp"]["det"] if i["rot"] == "Ronda")
+    limpeza = next(i for i in u["acomp"]["det"] if i["rot"] == "Limpeza")
+    assert ronda["resto"] == "Em dia" and ronda["ronda"]["os"] == 502
+    assert ronda["ronda"]["txt"] == f"última ronda em {_dia(1)[8:10]}/{_dia(1)[5:7]}"
+    assert limpeza["ronda"]["os"] == 501
+
+
+def test_o_card_da_ronda_por_cima_com_data_quem_fez_e_as_fotos(tela, logado):
+    """"ao clicar na última ronda aparece um card sobreposto sobre a tela com um blur de fundo mostrando como foi a última
+    ronda, fotos, data, quem fez". O card é a janela da Visão (o fundo desfocado); as fotos são as da OS no Fracttal,
+    pedidas só quando o card abre (o mesmo pedaço do botão Fotos do histórico da usina)."""
+    _aba(tela, "rondas_app_campo", "OS de ronda", [_ronda(_dia(3), OS="501", **{SUJ: 4, VEG: 2})])
+    visao.limpar()
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert re.search(r'data-cr-painel="/t/campo/responsaveis/usina/1/ronda\?os=501[^"]*"[^>]*>ronda de ', html)
+    assert "[data-cr-fotos]" in html                                   # a janela busca as fotos ao abrir
+    card = logado.get("/t/campo/responsaveis/usina/1/ronda?os=501").get_data(as_text=True)
+    assert "<html" not in card and "<dt>Quem fez</dt><dd>Fulano Souza</dd>" in card         # o nome curto da tela
+    assert f"{_dia(3)[8:10]}/{_dia(3)[5:7]}/{_dia(3)[:4]}" in card
+    assert 'data-cr-fotos="/t/campo/rondas/os/501/fotos"' in card
+    assert re.search(r"<dt>Sujidade</dt><dd[^>]*>4", card) and re.search(r"<dt>Vegetação</dt><dd[^>]*>2", card)
+    sem = logado.get("/t/campo/responsaveis/usina/1/ronda?os=999").get_data(as_text=True)
+    assert "Não achei esta ronda" in sem and "data-cr-fotos" not in sem
