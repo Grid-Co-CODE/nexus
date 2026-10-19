@@ -6,6 +6,9 @@
    cartão, item a item com a prova (`ranking_equipes.cobrar`); embaixo, a nota do App: onde perdeu pontos e as OS com
    nota mais baixa, com os pontos de cada critério (`ranking_equipes.motivos`). #}
 {% set seta_txt = {'sobe': 'subiu ', 'desce': 'desceu ', 'igual': 'mesma posição de antes', 'sem': 'sem posição antes'} %}
+{# a OS citada é o botão verde que abre o card dela, o mesmo do OS Creator Web (Levi, 19/10/2026); o clique fecha esta
+   janela, abre o card e a janela volta quando o card fecha (o script da Visão, `.cr-os`) #}
+{% macro os_card(os, wid) %}<button type="button" class="cn-link cr-os cr-link-botao" data-wid="{{ wid or '' }}" data-folio="{{ os }}" title="Abrir o card da OS {{ os }}">OS {{ os }}</button>{% endmacro %}
 <header class="cr-jan-cab">
   <div><p class="gc-eyebrow">Em quê cobrar</p><h2>{{ equipe }}</h2>
     <p class="mudo">{% if nomes_tecnicos %}Técnicos: {{ nomes_tecnicos|join(', ') }}{% else %}{{ tecnicos }} técnico{{ 's' if tecnicos != 1 }}{% endif %} · {{ n.usinas }} usina{{ 's' if n.usinas != 1 }}{% if regiao_campo and regiao_campo != sem_regiao %} · {{ regiao_campo }}{% endif %}</p></div>
@@ -18,12 +21,14 @@
 {% set focar = cob|selectattr('nivel', 'equalto', 'critico')|list %}
 {% set acomp = cob|rejectattr('nivel', 'equalto', 'critico')|list %}
 {% for titulo, itens, cls in (('Focar', focar, 'critico'), ('Acompanhar', acomp, 'alerta')) %}{% if itens %}
-<section class="cr-rk-j-bloco">
-  <h3 class="cr-rk-j-nivel cn-t-{{ cls }}">{{ titulo }}</h3>
+{# Focar e Acompanhar abrem expandidos e encolhem no título (Levi, 19/10/2026: "deve ser possível encolher Focar e
+   acompanhar, eles aparecem expandidos que nem estão agora") #}
+<details class="cr-rk-j-bloco cr-rk-j-dobra" open>
+  <summary class="cr-rk-j-nivel cn-t-{{ cls }}">{{ titulo }} <span>{{ itens|length }} ite{{ 'ns' if itens|length != 1 else 'm' }}</span></summary>
   <ul class="cr-rk-j-itens">
-    {% for x in itens %}<li><b>{{ x.rot }}</b><div>{% if x.cabeca %}<span class="cr-rk-j-cab">{{ x.cabeca }}</span>{% endif %}{% for p in x.provas %}<span>{{ p }}</span>{% endfor %}{% if x.mais %}<span class="mudo">e mais {{ x.mais }}</span>{% endif %}</div></li>{% endfor %}
+    {% for x in itens %}<li><b>{{ x.rot }}</b><div>{% if x.cabeca %}<span class="cr-rk-j-cab">{{ x.cabeca }}</span>{% endif %}{% for p in x.provas %}<span>{% if p.os %}{{ os_card(p.os, p.wid) }} · {% endif %}{{ p.txt }}</span>{% endfor %}{% if x.mais %}<span class="mudo">e mais {{ x.mais }}</span>{% endif %}</div></li>{% endfor %}
   </ul>
-</section>
+</details>
 {% endif %}{% endfor %}
 {% if not cob %}<p class="cr-rk-j-ok">Nada a cobrar nos três blocos: o semáforo da equipe está em dia.</p>{% endif %}
 <section class="cr-rk-j-bloco">
@@ -41,7 +46,7 @@
   {% if m.piores %}
   <h4 class="cr-rk-j-sub">OS com nota mais baixa</h4>
   <ol class="cr-rk-j-os">
-    {% for p in m.piores %}<li><span class="cr-v cr-v--{{ p.cor }}">{{ p.nota }}</span><div><b{% if p.tarefa %} title="{{ p.tarefa }}"{% endif %}>{{ p.curto }} · {{ p.usina }} · {{ p.tecnico or 'técnico sem nome no cadastro do App' }} · {{ dia_curto(p.dia) }}{% if p.vezes > 1 %} · {{ p.vezes }} tarefas iguais{% endif %}</b><small>{{ p.pontos|join(' · ') if p.pontos else (p.faltou or '—') }}</small></div></li>{% endfor %}
+    {% for p in m.piores %}<li><span class="cr-v cr-v--{{ p.cor }}">{{ p.nota }}</span><div><b{% if p.tarefa %} title="{{ p.tarefa }}"{% endif %}>{% if p.tipo == 'ronda' %}Ronda · {% endif %}{% if p.os %}{{ os_card(p.os, p.wid) }}{% else %}{{ 'Ronda sem OS' if p.tipo == 'ronda' else 'Tarefa' }}{% endif %} · {{ p.usina }} · {{ p.tecnico or 'técnico sem nome no cadastro do App' }} · {{ dia_curto(p.dia) }}{% if p.vezes > 1 %} · {{ p.vezes }} tarefas iguais{% endif %}</b><small>{{ p.pontos|join(' · ') if p.pontos else (p.faltou or '—') }}</small></div></li>{% endfor %}
   </ol>
   {% if m.mais_piores %}<p class="cr-rk-j-txt mudo">E mais {{ m.mais_piores }} nota{{ 's' if m.mais_piores != 1 }} abaixo de 100 no período.</p>{% endif %}
   {% endif %}

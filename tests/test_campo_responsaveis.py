@@ -923,7 +923,11 @@ def test_o_cartao_abre_o_que_cobrar_com_a_prova(duas_equipes, logado):
     # o "Em quê cobrar": as áreas da etiqueta do cartão, com a prova (o extintor, a OS do chamado) e a usina
     cobrar = jan[jan.index('class="cr-rk-j-itens"'):jan.index("Nota do App")]
     assert "Acompanhar" in jan and ">Extintores</b>" in cobrar and ">Chamados</b>" in cobrar
-    assert "Extintor EXT01 · Coração 1 · " in cobrar and "OS 16050 · Coração 1 · " in cobrar
+    assert "Extintor EXT01 · Coração 1 · " in cobrar
+    # a OS citada é o botão verde que abre o card dela (Levi, 19/10/2026: "ao citar uma OS tem que ficar verde grid e
+    # deve ser possível clicar e ver o card da OS que nem quando clicamos em uma OS no OS Creator Web")
+    assert re.search(r'<button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="16050"[^>]*>'
+                     r'OS 16050</button> · Coração 1 · ', cobrar)
     # a nota: perde 27, todos na qualidade (55; cobertura 100%): a ronda tira 15 (0,6 × 50 ÷ 2), as fotos e o GPS da
     # tarefa, 6 cada (0,6 × 20 ÷ 2)
     nota = jan[jan.index("Nota do App"):]
@@ -933,14 +937,15 @@ def test_o_cartao_abre_o_que_cobrar_com_a_prova(duas_equipes, logado):
     os_ = nota[nota.index("OS com nota mais baixa"):]
     assert os_.index(">50<") < os_.index(">60<")
     assert "Fotos 0/20 · GPS no fechamento 0/20" in os_ and "checklist incompleto; item sem foto de evidência" in os_
-    assert "OS 801 · Coração 1 · Técnico Silva" in os_ and "Ronda · OS 501 · Coração 1 · Fulano Souza" in os_
+    assert re.search(r'data-wid="8001" data-folio="801"[^>]*>OS 801</button> · Coração 1 · Técnico Silva', os_)
+    assert re.search(r'Ronda · <button[^>]*data-folio="501"[^>]*>OS 501</button> · Coração 1 · Fulano Souza', os_)
     visao_geral = re.search(r'href="([^"]*modo=geral[^"]*)"', jan).group(1)
     assert "equipe=SC+Oeste+01" in visao_geral and "responsavel=Beltrano+Supervisor" in visao_geral
 
 
 def test_o_que_cobrar_traz_a_pt_e_quem_pediu(duas_equipes, logado):
     jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
-    focar = jan[jan.index(">Focar<"):jan.index("Nota do App")]
+    focar = jan[jan.index(">Focar "):jan.index("Nota do App")]
     assert ">PT parada</b>" in focar and "PT-1 · Altair · pedida por Técnico Silva há 1 d 6 h" in focar
 
 
@@ -1438,3 +1443,29 @@ def test_o_cliente_e_o_das_usinas_do_responsavel(tela, logado):
     assert clientes(logado.get(url + "*").get_data(as_text=True)) == ["", "Outro Cliente", "Thopen"]
     html = logado.get(url + "Beltrano+Supervisor&cliente=Thopen").get_data(as_text=True)
     assert "<b>Coração 1" in html and '<option value="Thopen" selected>' not in html
+
+
+def test_focar_e_acompanhar_encolhem(duas_equipes, logado):
+    # Levi, 19/10/2026: "deve ser possível encolher Focar e acompanhar, eles aparecem expandidos que nem estão agora"
+    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
+    assert re.search(r'<details class="cr-rk-j-bloco cr-rk-j-dobra" open>\s*<summary class="cr-rk-j-nivel '
+                     r'cn-t-critico">Focar', jan)
+    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SC+Oeste+01").get_data(as_text=True)
+    assert re.search(r'<details class="cr-rk-j-bloco cr-rk-j-dobra" open>\s*<summary class="cr-rk-j-nivel '
+                     r'cn-t-alerta">Acompanhar', jan)
+
+
+def test_o_card_da_os_abre_por_cima_da_janela_e_ela_volta(tela, logado, tmp_path):
+    # a janela é um <dialog> modal (a camada do topo): o card da OS ficaria por baixo dela. O clique na OS de dentro da
+    # janela a fecha, abre o card e, quando o card fecha (`aoFechar`), a janela volta como estava
+    import shutil
+    import subprocess
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
+    scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
+    js = "\n;\n".join(scripts)
+    assert "closest('dialog[open]')" in js and "aoFechar" in js and "showModal" in js
+    if shutil.which("node"):
+        arq = tmp_path / "pagina.js"
+        arq.write_text(js, encoding="utf-8")
+        r = subprocess.run(["node", "--check", str(arq)], capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr

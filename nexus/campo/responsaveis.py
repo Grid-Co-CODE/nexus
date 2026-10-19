@@ -462,6 +462,7 @@ def ranking_detalhe(usina_ids: set, hoje) -> dict:
     for x, uid, nota, dia in linhas:
         a = cru.get(D._txt(x.get("fechamento_id"))) or {}
         tarefas.append({"dia": dia.isoformat(), "usina_id": uid, "os": D._txt(x.get("os")),
+                        "wid": D._txt(x.get("id_os_fracttal")),
                         "tarefa": D._txt(a.get("Tarefa")),
                         "tecnico": nomes.get(D._id(x.get("pessoa_id"))) or visao._nome(quem, a.get("Técnico (HMAC)")),
                         "nota": nota, "itens": _itens_da_nota(a.get("Composição da nota"))})
