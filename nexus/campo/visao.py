@@ -1656,8 +1656,9 @@ def atencao(dias: int = 14) -> leitura.Leitura:
                               **{k: c[k] for k in _PAPEIS}, "dias": c["dias"], "ultima": c["ultima"],
                               "tecnico": c["tecnico"], "obs": obs})
         # a última ronda e quem a fez vão junto: o kanban do responsável mostra também as usinas em dia
+        # e a OS dela: a Visão do responsável abre o card da ronda pela OS (18/10/2026)
         usinas = [{k: c[k] for k in ("usina", "usina_id", "equipe", "uf", "regiao_br", "cidade", "dias", "ultima",
-                                     "tecnico") + _PAPEIS}
+                                     "tecnico", "os") + _PAPEIS}
                   for c in _cobertura(b, rond, hoje)]
         feitas = []
         for r in sorted((r for r in rond if r["data"] >= piso), key=lambda r: (r["data"], r["fim"] or ""), reverse=True):

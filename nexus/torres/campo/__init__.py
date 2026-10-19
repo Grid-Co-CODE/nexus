@@ -322,17 +322,9 @@ def atencao():
 # em um formato reduzido que quando eu expanda aparece mais informações / Separe a visão em dois blocos". A conta mora em
 # nexus/campo/responsaveis.py (cada número da tela dona dele, com a régua de lá); aqui, os filtros, os cartões e os dois
 # blocos (Performance e Acompanhamento), cada usina numa linha que abre o detalhe.
-# o link de cada área leva à tela dona do número
-TELA_DONA = {"meta": "torre_performance.moldura_gerencial", "disp": "torre_performance.moldura_disponibilidade",
-             "ativos": "torre_engenharia.confiabilidade", "pt": "torre_hseq.apr_pt",
-             "chamados": "torre_chamados.abrir_garantias", "extintores": "torre_hseq.extintores",
-             # o bloco Manutenção (18/10/2026): as telas do PCM e a Aprovação de OS
-             "gestao": "torre_pcm.gestao", "fora": "torre_pcm.fora", "quadro": "torre_pcm.quadro",
-             "aprovacao": "torre_campo.aprovacao"}
-LINKS_DO_BLOCO = {"perf": (("Visão gerencial", "meta"), ("Disponibilidade", "disp"), ("Confiabilidade", "ativos")),
-                  "acomp": (("APR e PT", "pt"), ("Acompanhamento de chamados", "chamados"), ("Extintores", "extintores")),
-                  "manut": (("Gestão PCM", "gestao"), ("Fora da programação", "fora"), ("Quadro da semana", "quadro"),
-                            ("Aprovação de OS", "aprovacao"))}
+# os links do fim de cada bloco do detalhe saíram em 18/10/2026 (Levi: "Esses links no final com palavras em verde grid
+# pode tirar, a ideia é resolver a maior parte por essa tela"): o que se resolve daqui abre por cima (o dia a dia, os
+# ativos, a PT, o card da OS, o card da ronda)
 # o limite das atrasadas de quem olha (Levi, 18/10/2026: "o supervisor decide, começa com 30 dias mas pode alterar";
 # "no navegador dele"): um cookie de preferência de tela, não dado de negócio, então não vai ao banco
 COOKIE_LIMITE = "nexus_resp_limite"
@@ -450,7 +442,8 @@ def responsaveis():
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
         opcoes_responsavel=nomes, opcoes_cliente=sorted({u.get("cliente") for u in todas if u.get("cliente")}),
         sem_responsavel=visao.SEM_RESPONSAVEL, reguas=campo_resp.REGUAS, rotulo_area=campo_resp.ROTULO_AREA,
-        tela_dona=TELA_DONA, links_do_bloco=LINKS_DO_BLOCO, info=d.get("info") or {}, erros=d.get("erros") or {},
+        sites=campo_resp.sites_fracttal() if modo == "geral" else {}, info=d.get("info") or {},
+        erros=d.get("erros") or {},
         mes_id=d.get("mes_id"),
         limites={"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,
                  "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO}))
@@ -470,9 +463,41 @@ PAINEIS = {"meta": "Meta do mês", "pr": "PR do mês", "disp": "Disponibilidade 
 
 @bp.route("/responsaveis/usina/<int:usina_id>/<painel>")
 def responsaveis_painel(usina_id, painel):
+    if painel == "ronda":
+        return _resp_ronda(usina_id)
     if painel not in PAINEIS:
         abort(404)
     return _resp_painel(usina_id, painel)
+
+
+def _num(v) -> int | None:
+    try:
+        return int(float(str(v).strip()))
+    except (TypeError, ValueError):
+        return None
+
+
+def _resp_ronda(usina_id):
+    """O card da ronda por cima da Visão do responsável (Levi, 18/10/2026: "ao clicar na última ronda aparece um card
+    sobreposto sobre a tela com um blur de fundo mostrando como foi a última ronda, fotos, data, quem fez"): a ronda do
+    histórico da usina (o mesmo do Rondas › usina, 90 dias) pela OS ou, sem OS (avulsa, validação por foto), pelo dia.
+    As fotos são as da OS no Fracttal, pedidas pela janela só quando ela abre (`ronda_fotos_os`). O que quebrar vira a
+    mensagem dentro da janela, nunca um 500 cru (como `_resp_painel`)."""
+    os_, dia = _num(request.args.get("os")), str(request.args.get("data") or "")[:10]
+    try:
+        leitura = visao.rondas()
+        d = leitura.dados or {}
+        hist = [] if leitura.erro else visao.historico_usina(d.get("todas") or [], ronda_checklist.respostas(),
+                                                              usina_id, d.get("validacoes") or [])
+        r = (next((x for x in hist if _num(x.get("os")) == os_ and not x.get("validada")), None) if os_ else
+             next((x for x in hist if dia and x.get("data") == dia), None))
+        nome = next((c.get("usina") for c in d.get("cobertura") or [] if c.get("usina_id") == usina_id), "")
+        erro = leitura.erro or ""
+    except Exception as e:      # noqa: BLE001 — a janela diz o erro; a Visão segue
+        _log_campo.exception("Visão do responsável: o card da ronda da usina %s não montou", usina_id)
+        r, nome, erro = None, "", f"{type(e).__name__}: {str(e)[:160]}"
+    return render_template("campo/_resp_ronda.html", r=r, usina=nome, erro=erro, duracao=_duracao,
+                           dia_longo=lambda s: f"{s[8:10]}/{s[5:7]}/{s[:4]}" if s and len(s) >= 10 else (s or "—"))
 
 
 def _observacoes(u: dict, d: dict, aviso: str = "", erro: str = "", texto: str = "") -> dict:

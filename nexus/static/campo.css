@@ -692,7 +692,6 @@ button.cr-v--neutro{background:transparent}
 .cr-dl dt{color:var(--mudo)}
 .cr-dl dd{margin:0;min-width:0}
 .cr-dl .it{display:block;margin-top:2px;color:var(--tinta-2);font-size:12px}
-.cr-links{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px}
 .cr-agora{display:inline-block;margin-right:6px;padding:0 6px;border-radius:5px;font:700 10.5px/16px var(--font-sans);
   color:var(--critico);background:var(--critico-suave)}
 
@@ -974,7 +973,10 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-gr-det{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--superficie-2)}
 .cr-gr-det > .cr-det{align-content:start;padding-left:16px;border-right:1px solid var(--linha)}
 .cr-gr-det > .cr-det:last-child{border-right:0}
-.cr-gr-det h3{margin:8px 0 0;font:700 10.5px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+/* os títulos do detalhe no centro (Levi, 18/10/2026: "os títulos PERFORMANCE, MANUTENÇÃO E ACOMPANHAMENTO QUERO
+   CENTRALIZADOS") */
+.cr-gr-det h3{margin:8px 0 0;font:700 10.5px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);
+  text-align:center}
 .cr-gr-det .cr-dl{grid-template-columns:minmax(0,1fr)}
 @media (max-width:1180px){
   .cr-gr-blocos{grid-template-columns:minmax(0,1fr)}
@@ -1035,3 +1037,11 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-mapa-leg span{display:inline-flex;align-items:center;gap:6px}
 .cr-mapa-sem{font-size:12px}
 @media (max-width:1180px){.cr-mapa{grid-template-columns:minmax(0,1fr)}}
+
+/* O card da ronda na janela da Visão do responsável (18/10/2026, Levi: "ao clicar na última ronda aparece um card
+   sobreposto (...) mostrando como foi a última ronda, fotos, data, quem fez"): os dados, a foto grande e as miniaturas */
+.cr-ronda-dl{margin-bottom:14px}
+.cr-ronda-amp{display:grid;gap:6px;justify-items:center;margin:0 0 12px;cursor:zoom-out}
+.cr-ronda-amp[hidden]{display:none}
+.cr-ronda-amp img{max-width:100%;max-height:60vh;border-radius:var(--raio-md);background:var(--superficie-2)}
+.cr-ronda-amp figcaption{color:var(--mudo);font-size:12px;text-align:center}
