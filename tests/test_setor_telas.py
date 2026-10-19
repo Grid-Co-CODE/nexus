@@ -102,7 +102,7 @@ def test_o_caminho_segue_a_tela_a_torre_e_o_os_creator(app):
         assert ST.pode("/t/performance/clima/mapa", telas)               # o id com barra: a mais longa que casa
         assert not ST.pode("/t/performance/clima", telas)
         assert not ST.pode("/os/", telas) and ST.pode("/os/", telas | {"os/inicio"})   # o OS Creator é a torre OS
-        assert ST.pode("/os/_nexus/aprovacao/1/aprovar", telas)          # as ações do Campo e do HSEQ, não
+        assert ST.pode("/os/_nexus/card/1", telas)                       # as ações do Campo e do HSEQ, não
         assert ST.pode("/", telas) and ST.pode("/tema", telas)
 
 

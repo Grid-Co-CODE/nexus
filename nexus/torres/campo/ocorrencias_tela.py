@@ -15,7 +15,7 @@ from ...campo import ocorrencias as O
 from ...campo import visao
 from ...dados import fatos as D
 from . import TODOS, TORRE, _url, bp
-from .aprovar_os import papel_da_sessao
+from .papel import papel_da_sessao
 
 _log = logging.getLogger("nexus.campo")
 OID = O.ID_RE["o"]

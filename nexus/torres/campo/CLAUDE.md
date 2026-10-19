@@ -854,6 +854,8 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
 - **Em cima, os três blocos** na ordem Performance, Manutenção e Acompanhamento (`BLOCOS_GERAL`), com os MESMOS números
   do resumo (`soma`) e a triagem de cada um; o campo do limite das atrasadas e a nota de onde vem a semana e as OS ficam
   no bloco Manutenção.
+- **O filtro de Cliente** lista só os clientes das usinas do responsável escolhido (Levi, 18/10/2026: "O filtro de
+  cliente deve filtrar de acordo com o responsável"); o cliente que não é dele deixa de valer, e a tela não esvazia.
 - **Embaixo, uma lista só** com as usinas do filtro da tela (responsável, cliente, busca, equipe), com as colunas na
   ordem do Levi: Meta, PR / prev. e Disp.; OS abertas, Atrasadas, Pausadas e Semana passada; Ronda, Limpeza, PT, Chamados
   e Extintores. As células são os `valores` de cada bloco, com a mesma cor; o valor da Performance abre o dia a dia; a
@@ -1164,25 +1166,13 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     do técnico, foto divergente; ou por que está completa). **Aprovar = o Concluir do OS Creator Web** ("usando o
     mesmo caminho que o OS Creator Web"), com o login do Fracttal de quem clica (status 3 + recalculate +
     reconferência da data de fim; IRREVERSÍVEL, pede confirmação). O id da OS vem da fila crua.
-  - **O portão do Aprovar do Nexus (de 08/10 a 18/10/2026 na tela; hoje sem botão, a rota segue no servidor)**:
-    **só quem aprova a OS ou um administrador aprova** (Levi, 08/10: "deve ser possível só o supervisor ou ADM
-    conseguir aprovar a OS logando pelo Fracttal"; com a estrutura de O&M de 10/2026, "o supervisor" é o **Supervisor de
-    Campo da região da usina da OS**; com a vaga aberta, o **Coordenador de Campo** da região; sem os dois, só um
-    administrador; o Gestor de contrato NÃO aprova; `nexus/torres/campo/aprovar_os.py`). A regra é no SERVIDOR: o botão
-    chama `POST /os/_nexus/aprovacao/<id>/aprovar` (mora em /os porque só lá chega o cookie `os_sessao` do login do
-    Fracttal, como a assinatura da PT), que recusa: outra origem (403); sem login do Fracttal (401, a tela leva ao login
-    e volta por `/os/_nexus/voltar?para=`, só /t/campo/); OS fora da fila guardada (404); e quem não é admin nem quem
-    aprova a OS (403 com o texto de quem aprova aquela OS, inclusive "Vaga aberta de supervisor de campo na região X:
-    aprova o coordenador de campo (Y)", também para quem montar o pedido à mão). Quem aprova = `aprovador` da região
-    da usina do Fracttal de cada tarefa pelo cadastro (`visao._Base._aprovador`, a mesma conta da tela; OS em duas
-    regiões é das duas); quem clicou = `visao.pessoa_do_login` do e-mail e nome do login do Fracttal, comparado por
-    `pessoa_id` (vale quem entrou no Fracttal, não o filtro da sessão do Nexus). Admin = sessão de admin do Nexus
-    (NEXUS_ADMINS ou a senha de admin, como o Cadastro) ou o e-mail do Fracttal em NEXUS_ADMINS. Passou: o portão
-    repassa ao clone o MESMO POST de antes (`/os/api/os/<id>/concluir`, número da OS pela fila do servidor, cookie de
-    quem clicou) e, aprovada, tira a OS da fila guardada na hora (a rota `/t/campo/aprovacao/<id>/tirar` saiu: deixava
-    qualquer um esconder OS da fila). **Fica aberta** a rota do clone
-    `/os/api/os/<id>/concluir` para o próprio OS Creator (o Concluir do card dele): o portão vale para a Aprovação do
-    Nexus, não para o OS Creator. Testes com Fracttal e Concluir falsos (`test_campo_aprovacao_supervisor.py`).
+  - **O portão do Aprovar do Nexus saiu (18/10/2026, Levi: "pode tirar a rota antiga!")**: de 08/10 a 18/10 o Aprovar
+    da linha chamava `POST /os/_nexus/aprovacao/<id>/aprovar`, que só deixava o Supervisor de Campo da região da usina
+    (com a vaga aberta, o Coordenador) ou um administrador. Com a OS abrindo o card do OS Creator, cujo Concluir aprova
+    (a mesma rota do clone, `/os/api/os/<id>/concluir`, como no OS Creator Web), o botão saiu da tela e a rota, o
+    `aprovar_os.py` e a conta de quem aprova por região (`visao._Base._aprovador`) saíram do servidor. O papel de quem
+    entrou pelo Fracttal, que as outras telas usam para vir filtradas, mora em `papel.py`. A OS aprovada pelo card sai
+    da lista pela conferência (`POST /t/campo/aprovacao/<id>/conferir`, acima).
     **Até 08/10 o script desta tela não rodava**: o `confirm()` do Aprovar tinha uma quebra de linha dentro da string
     (SyntaxError no navegador), então nem a linha abria nem o Aprovar funcionava; um teste roda `node --check` no script.
     **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas; as rondas aprovadas vêm do arquivo desde 06/10); em 05/10, com
@@ -1202,8 +1192,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   de ação (o livro `nexus_ocorrencias`, acima).
 - `livros_app.py`, `fonte_pg.py`, `tabelas.py`: os livros do App no formato que as regras copiadas consultam
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
-- `aprovacao.py`, `triagem.py`: as telas pelas regras copiadas (`aprovacao.os_na_fila` e `tirar_da_fila` servem ao
-  portão do Aprovar, `nexus/torres/campo/aprovar_os.py`). `leitura.py`: cópia de 5 min e `limpar_cache()` (que também
+- `aprovacao.py`, `triagem.py`: as telas pelas regras copiadas (`aprovacao.os_na_fila` e `tirar_da_fila` servem à
+  conferência da OS que o card aprovou, `aprovacao_conferir`). `leitura.py`: cópia de 5 min e `limpar_cache()` (que também
   recarrega a cópia das regras).
 - `pessoas.py`: `identidades.json` e a tabela dos tokens só na partição `cadastro`.
 - `nota_fracttal.py`, `coletor.py`, `banco_campo.py`: o caminho do coletor aposentado.

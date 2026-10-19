@@ -459,49 +459,21 @@ class _Base:
         return self.nomes({pid}).get(pid) or f"{papel} {pid}"
 
     def info_regiao(self, rid) -> dict:
-        """A região de campo como as telas mostram: nome, base, quem é o Supervisor de Campo e o Coordenador (ou "vaga"),
-        o rótulo do filtro ("Nordeste 02 · vaga") e quem aprova a OS dali (`aprovador`)."""
+        """A região de campo como as telas mostram: nome, base, quem é o Supervisor de Campo e o Coordenador (ou "vaga")
+        e o rótulo do filtro ("Nordeste 02 · vaga")."""
         r = self.regiao.get(rid)
         if not r:
             return {"nome": SEM_REGIAO, "base": "", "supervisor": "", "coordenador": "", "supervisor_id": None,
-                    "coordenador_id": None, "ordem": 10 ** 6, "rotulo": SEM_REGIAO, "aprovador": self._aprovador(None)}
+                    "coordenador_id": None, "ordem": 10 ** 6, "rotulo": SEM_REGIAO}
         sup = self.nome_da_pessoa(r["supervisor_id"], "Supervisor")
         coord = self.nome_da_pessoa(r["coordenador_id"], "Coordenador")
         return {"nome": r["nome"], "base": r["base"], "ordem": r["ordem"], "supervisor_id": r["supervisor_id"],
                 "coordenador_id": r["coordenador_id"], "supervisor": sup or VAGA, "coordenador": coord or VAGA,
-                "rotulo": f"{r['nome']} · {sup or VAGA}", "aprovador": self._aprovador(rid)}
+                "rotulo": f"{r['nome']} · {sup or VAGA}"}
 
     def regioes(self) -> list[dict]:
         """As regiões de campo na ordem da estrutura (a da carga), para os filtros e os cartões."""
         return [self.info_regiao(rid) for rid in sorted(self.regiao, key=lambda i: (self.regiao[i]["ordem"], i))]
-
-    def _aprovador(self, rid) -> dict:
-        """Quem aprova a OS de uma usina da região `rid` (Levi, 08/10/2026, sobre a estrutura de O&M de 10/2026: o
-        Supervisor de Campo "aprova e fecha as OS"; o Gestor de contrato NÃO aprova): o Supervisor de Campo da região;
-        com a vaga aberta, o Coordenador de Campo; sem os dois, só um administrador. Usina sem região (equipe de fora da
-        estrutura) ou estrutura ainda não publicada no banco: só administrador. Um administrador aprova sempre.
-        {"tipo": supervisor|coordenador|admin, "pessoa_id", "nome", "regiao", "texto"}: o `texto` é o que a tela e o
-        portão do servidor dizem a quem não pode."""
-        r = self.regiao.get(rid)
-        if not self.estrutura_publicada:
-            return {"tipo": "admin", "pessoa_id": None, "nome": "", "regiao": "",
-                    "texto": "Só um administrador aprova: a estrutura de campo (regiões e supervisores de campo) ainda "
-                             "não foi publicada no banco."}
-        if not r:
-            return {"tipo": "admin", "pessoa_id": None, "nome": "", "regiao": SEM_REGIAO,
-                    "texto": "Só um administrador aprova: a usina desta OS não tem região de campo no cadastro."}
-        if r["supervisor_id"]:
-            nome = self.nome_da_pessoa(r["supervisor_id"], "Supervisor")
-            return {"tipo": "supervisor", "pessoa_id": r["supervisor_id"], "nome": nome, "regiao": r["nome"],
-                    "texto": f"Quem aprova é o supervisor de campo da região {r['nome']} ({nome}) ou um administrador."}
-        if r["coordenador_id"]:
-            nome = self.nome_da_pessoa(r["coordenador_id"], "Coordenador")
-            return {"tipo": "coordenador", "pessoa_id": r["coordenador_id"], "nome": nome, "regiao": r["nome"],
-                    "texto": f"Vaga aberta de supervisor de campo na região {r['nome']}: aprova o coordenador de campo "
-                             f"({nome}) ou um administrador."}
-        return {"tipo": "admin", "pessoa_id": None, "nome": "", "regiao": r["nome"],
-                "texto": f"Só um administrador aprova: a região {r['nome']} está sem supervisor e sem coordenador de "
-                         "campo no cadastro (as duas vagas abertas)."}
 
     def regiao_da_usina(self, uid):
         u = self.por_id.get(uid) or {}
@@ -1616,7 +1588,6 @@ def usinas_do_fracttal() -> leitura.Leitura:
         equipes, regioes, gestores, por_nome = {}, {}, {}, {}
         for uid in b.por_id:
             o = b.onde(uid)
-            aprovador = b.info_regiao(b.regiao_da_usina(uid))["aprovador"]
             for n in nomes.get(uid, ()):
                 equipes.setdefault(o["equipe"], set()).add(n)
                 regioes.setdefault(o["regiao_campo"], set()).add(n)
@@ -1624,20 +1595,13 @@ def usinas_do_fracttal() -> leitura.Leitura:
                 # o nome do Fracttal (normalizado como a cópia do App normaliza) -> a usina do cadastro
                 por_nome[regras_app._norm(n)] = {**{k: o[k] for k in ("usina", "equipe", "regiao_campo", "supervisor_campo",
                                                                       "coordenador_campo", "gestor", "uf", "regiao_br",
-                                                                      "responsavel", "cliente")},
-                                                 "aprovador": aprovador}
+                                                                      "responsavel", "cliente")}}
         return {"equipes": {k: sorted(v) for k, v in equipes.items() if k},
                 "regioes": {k: sorted(v) for k, v in regioes.items() if k},
                 "gestores": {k: sorted(v) for k, v in gestores.items() if k}, "por_nome": por_nome,
                 "sem_de_para": sorted(str(u.get("nome") or "") for uid, u in b.mobilizadas.items() if uid not in nomes),
                 "regioes_info": b.regioes(), "estrutura_publicada": b.estrutura_publicada}
     return _ler(("visao_usinas_fracttal",), calcular)
-
-
-def aprovador_sem_cadastro() -> dict:
-    """A OS de usina que o de-para do Fracttal não liga ao cadastro: sem região, só um administrador aprova."""
-    return {"tipo": "admin", "pessoa_id": None, "nome": "", "regiao": "",
-            "texto": "Só um administrador aprova: a usina desta OS não está ligada ao cadastro (de-para do Fracttal)."}
 
 
 # ── Central de atenção ───────────────────────────────────────────────────────────────────────────────────────────
@@ -1779,7 +1743,7 @@ def _fechar_soma(s) -> dict:
 def por_regiao(cartoes, regioes=()) -> list[dict]:
     """Um cartão por região de campo, somando os cartões de equipe dela (`por_equipe`, já filtrados pela tela): usinas
     pendentes, % feitas, o detalhe por status, PT esperando e paradas, técnicos e equipes; e, da estrutura, o Supervisor
-    de Campo e o Coordenador ("vaga" quando não há ninguém), a base e quem aprova as OS. A região é a da equipe; equipe
+    de Campo e o Coordenador ("vaga" quando não há ninguém) e a base. A região é a da equipe; equipe
     de fora da estrutura vai para o cartão próprio `SEM_REGIAO`. `regioes` = `_Base.regioes()`."""
     info = {r["nome"]: r for r in regioes or ()}
     g = {}
@@ -1788,7 +1752,7 @@ def por_regiao(cartoes, regioes=()) -> list[dict]:
         r = info.get(nome) or {}
         s = g.setdefault(nome, {"regiao": nome, "supervisor_campo": r.get("supervisor", ""),
                                 "coordenador_campo": r.get("coordenador", ""), "base": r.get("base", ""),
-                                "ordem": r.get("ordem", 10 ** 6), "aprovador": r.get("aprovador") or {},
+                                "ordem": r.get("ordem", 10 ** 6),
                                 "equipes": [], "regioes": set(), "ufs": set(), **dict.fromkeys(_SOMA, 0)})
         s["equipes"].append(f"{c['codigo']} {c['equipe']}" if c.get("codigo") else c["equipe"])
         for k in _SOMA:
