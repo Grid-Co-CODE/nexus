@@ -222,6 +222,13 @@ def etiquetas(s: dict, usinas: list[dict]) -> list[dict]:
     contra meta de 149 MWh no Gerencial punha a equipe em 2.207%; na disponibilidade, as usinas, e não a média do grupo
     pela potência, que escondia uma usina abaixo de 80%."""
     us = usinas or []
+    areas = _areas(us)
+    return [{"cls": "critico" if areas[a]["crit"] else "alerta",
+             "txt": _texto(a, s, us, len(areas[a]["crit"]), len(areas[a]["todas"]))} for a in _ordem(areas)]
+
+
+def _areas(us: list[dict]) -> dict:
+    """{área: {"crit": usinas com o alerta dela em crítico, "todas": usinas com o alerta}} dos três blocos."""
     areas: dict[str, dict] = {}
     for u in us:
         for b in ("perf", "acomp", "manut"):
@@ -230,12 +237,109 @@ def etiquetas(s: dict, usinas: list[dict]) -> list[dict]:
                 x["todas"].add(u.get("usina_id"))
                 if a["nivel"] in ("agora", "critico"):
                     x["crit"].add(u.get("usina_id"))
-    ordem = [a for a in ORDEM_DAS_AREAS if a in areas] + sorted(a for a in areas if a not in ORDEM_DAS_AREAS)
-    out = [{"cls": "critico" if areas[a]["crit"] else "alerta",
-            "txt": _texto(a, s, us, len(areas[a]["crit"]), len(areas[a]["todas"]))} for a in ordem]
-    out.sort(key=lambda e: e["cls"] != "critico")       # estável: o crítico primeiro, a ordem fixa dentro do nível
-    return out
+    return areas
 
+
+def _ordem(areas: dict) -> list[str]:
+    """O crítico primeiro e, no mesmo nível, a ordem de `ORDEM_DAS_AREAS` (as de fora dela, pelo nome)."""
+    ordem = [a for a in ORDEM_DAS_AREAS if a in areas] + sorted(a for a in areas if a not in ORDEM_DAS_AREAS)
+    return sorted(ordem, key=lambda a: not areas[a]["crit"])     # estável
+
+
+
+# ── O "Em quê cobrar" na janela da equipe (Levi, 18/10/2026: "quero ao clicar na equipe um detalhamento melhor, não
+# cheio de informações mas quero a informação, ao resumido e direto onde o supervisor bata o olho e possa cobrar o
+# técnico com dados!"; no quiz, "Item a item com a prova") ─────────────────────────────────────────────────────────
+ROTULO_COBRAR = {"parada": "Parada agora", "atrasadas": "Atrasadas", "pt": "PT", "ronda": "Ronda", "limpeza": "Limpeza",
+                 "extintores": "Extintores", "ativos": "Ativos", "meta": "Meta", "disp": "Disponibilidade",
+                 "zeladoria": "Zeladoria", "semana": "Semana passada", "chamados": "Chamados", "paradas": "Pausadas"}
+MAX_PROVAS = 3
+
+
+def _provas(area: str, us: list[dict]) -> tuple[str, list[tuple], int]:
+    """(o número que abre a linha, [(ordem, prova)], quantas provas há ao todo) de uma área, nas usinas `us` (as que têm
+    o alerta dela). A prova é a coisa que se cobra (a OS e os dias, a PT e quem pediu, o extintor), com a usina; a área
+    sem lista própria (ronda, limpeza, meta, disponibilidade, semana, zeladoria) usa o título do alerta da usina, o mesmo
+    texto da Visão."""
+    from .responsaveis import _dm, _duracao
+    if area == "parada":
+        ps = [(str(p.get("_ini") or ""), f"OS {p['os']} · {u['usina']} · {p.get('escopo') or '—'} · desde {p.get('inicio')}")
+              for u in us for p in u.get("paradas_abertas") or ()]
+        return "", ps, len(ps)
+    if area == "atrasadas":
+        ms = [(u, u.get("manutencao") or {}) for u in us]
+        ps = [(-(x.get("dias") or 0), f"OS {x['os']} · {u['usina']} · há {x.get('dias')} d")
+              for u, m in ms for x in m.get("lista_atrasadas") or ()]
+        n = sum(m.get("atrasadas") or 0 for _u, m in ms)
+        return _pl(n, "tarefa", "tarefas"), ps, max(len(ps), sum(m.get("atrasadas_os") or 0 for _u, m in ms))
+    if area == "pt":
+        ps = []
+        for u in us:
+            for x in (u.get("pt") or {}).get("lista") or ():
+                quem = f"pedida por {x['solicitante']} " if x.get("solicitante") else ""
+                qual = x.get("numero") or f"OS {x.get('os') or ''}"
+                txt = f"{qual} · {u['usina']} · {quem}há {_duracao(x.get('idade_min'))}"
+                if x.get("parada") and not x.get("hoje"):
+                    txt += f" · sem decisão desde {_dm(x.get('dia'))}"
+                ps.append(((0 if x.get("parada") else 1, -(x.get("idade_min") or 0)), txt))
+        return "", ps, len(ps)
+    if area == "extintores":
+        ps = [((x.get("ordem", 2), x.get("ext") or ""), f"Extintor {x.get('ext')} · {u['usina']} · {x.get('txt')}")
+              for u in us for x in (u.get("extintores") or {}).get("lista") or ()]
+        return "", ps, len(ps)
+    if area == "chamados":
+        ps = [(-(x.get("dias") or 0), " · ".join(t for t in (
+                  f"OS {x.get('os')}", u["usina"], x.get("equip"), x.get("fabricante"),
+                  f"há {x['dias']} d" if x.get("dias") is not None else "") if t))
+              for u in us for x in (u.get("chamados") or {}).get("lista") or () if x.get("situacao") == "aberto"]
+        return "", ps, len(ps)
+    if area == "ativos":
+        ps = [((0 if x.get("nivel") == "critico" else 1, -(x.get("falhas") or 0)),
+               " · ".join(t for t in (x.get("nome"), u["usina"], x.get("porque")) if t))
+              for u in us for x in (u.get("ativos") or {}).get("lista") or () if x.get("nivel") in ("critico", "atencao")]
+        return "", ps, len(ps)
+    if area == "paradas":
+        ps = [(str(x.get("desde") or ""), " · ".join(t for t in (
+                  f"OS {x['os']}", u["usina"], x.get("motivo"), f"desde {_dm(x['desde'])}" if x.get("desde") else "") if t))
+              for u in us for x in (u.get("manutencao") or {}).get("lista_paradas") or ()]
+        return "", ps, len(ps)
+    if area == "disp":
+        from .responsaveis import _pct
+        ps = [((u.get("disp") or {}).get("disp") or 0, f"{u['usina']} · {_pct((u.get('disp') or {}).get('disp'), 1)}")
+              for u in us]
+        return "", ps, len(ps)
+
+    def chave(u, a):
+        # a pior primeiro: a ronda que nunca houve e a mais atrasada; a meta mais baixa; no resto, o crítico e o nome
+        if area == "ronda":
+            r = u.get("ronda") or {}
+            return (0 if r.get("tipo") == "nunca" else 1, -(r.get("dias") or 0), u["usina"])
+        if area == "meta":
+            return ((u.get("meta") or {}).get("atingimento") or 999, u["usina"])
+        return (0 if a["nivel"] in ("agora", "critico") else 1, u["usina"])
+    ps = [(chave(u, a), " · ".join(t for t in (u["usina"], a.get("titulo")) if t))
+          for u in us for b in ("perf", "acomp", "manut") for a in (u.get(b) or {}).get("alertas") or ()
+          if a["area"] == area]
+    return "", ps, len(ps)
+
+
+def cobrar(s: dict, usinas: list[dict]) -> list[dict]:
+    """As MESMAS áreas e níveis das etiquetas do cartão (`_areas`, na mesma ordem), cada uma com até `MAX_PROVAS` provas
+    tiradas das usinas que têm o alerta dela e quantas ficaram de fora. O nível é o da etiqueta: "critico" vai em
+    Focar, "alerta" em Acompanhar. `s` = `responsaveis.soma` da equipe, como nas etiquetas."""
+    us = usinas or []
+    areas = _areas(us)
+    out = []
+    for a in _ordem(areas):
+        com = [u for u in us if u.get("usina_id") in areas[a]["todas"]]
+        cabeca, ps, total = _provas(a, com)
+        ps = [t for _k, t in sorted(ps, key=lambda kt: kt[0])]
+        rot = ROTULO_COBRAR.get(a, a)
+        if a == "pt":
+            rot = "PT parada" if areas[a]["crit"] else "PT esperando"
+        out.append({"area": a, "nivel": "critico" if areas[a]["crit"] else "alerta", "rot": rot, "cabeca": cabeca,
+                    "provas": ps[:MAX_PROVAS], "mais": max(0, total - min(len(ps), MAX_PROVAS))})
+    return out
 
 def _grupos(usinas: list[dict]) -> dict:
     g: dict[str, list] = {}
@@ -339,6 +443,15 @@ def _perdeu(it: dict) -> float:
         return 0.0
 
 
+def _num(v) -> str:
+    """O ponto como o App mostra: inteiro sem casa, o resto com uma casa e vírgula (13,3)."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "?"
+    return str(int(round(x))) if abs(x - round(x)) < 0.05 else f"{x:.1f}".replace(".", ",")
+
+
 def _falhas(texto) -> list[str]:
     return [f.strip() for f in str(texto or "").split(";") if f.strip()]
 
@@ -401,12 +514,16 @@ def motivos(n: dict, det: dict, usinas: list[dict], por_usina: dict) -> dict:
              "tecnico": t.get("tecnico") or "",
              "o_que": " · ".join(x for x in (f"OS {t['os']}" if t.get("os") else "", t.get("tarefa") or "") if x)
              or "Tarefa",
+             "curto": f"OS {t['os']}" if t.get("os") else "Tarefa", "tarefa": t.get("tarefa") or "",
              "faltou": "; ".join(f"{it.get('rot')}: {it.get('det')}" if it.get("det") else str(it.get("rot"))
-                                 for it in t.get("itens") or () if _perdeu(it) > 0.05)}
+                                 for it in t.get("itens") or () if _perdeu(it) > 0.05),
+             "pontos": [f"{it.get('rot')} {_num(it.get('pts'))}/{_num(it.get('peso'))}"
+                        for it in t.get("itens") or () if _perdeu(it) > 0.05]}
             for t in tarefas if t["nota"] < 100]
     regs += [{"nota": r["nota"], "dia": r.get("dia") or "", "usina": nome.get(r.get("usina_id"), ""),
               "tecnico": r.get("tecnico") or "", "o_que": f"Ronda · OS {r['os']}" if r.get("os") else "Ronda sem OS",
-              "faltou": "; ".join(_falhas(r.get("falhas")))} for r in baixas]
+              "curto": f"Ronda · OS {r['os']}" if r.get("os") else "Ronda sem OS", "tarefa": "",
+              "faltou": "; ".join(_falhas(r.get("falhas"))), "pontos": []} for r in baixas]
     # as tarefas iguais da mesma OS (a mesma nota, o mesmo dia, o mesmo que faltou) viram uma linha só, com quantas:
     # medido em 18/10/2026, uma OS de verificação de tracker com 4 tarefas iguais ocupava 4 das 5 linhas
     juntas: dict[tuple, dict] = {}

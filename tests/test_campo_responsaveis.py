@@ -894,26 +894,54 @@ def test_o_responsavel_logado_ve_a_posicao_do_ranking_inteiro(duas_equipes, clie
     assert "SC Oeste 01" in grade and "SP Norte 01" not in grade and '2º<small> de 2</small>' in grade
 
 
-def test_o_cartao_abre_o_motivo_da_nota(duas_equipes, logado):
+def _com_nome(api, pid, nome):
+    """O técnico `pid` com o nome na ficha (cifrado, como no banco); só a aba de pessoas é trocada."""
+    import json
+    from test_campo_visao import CHAVE_CADASTRO, _pessoas
+    from nexus.cadastro.cifra import Cofre
+    linhas = _pessoas()
+    for x in linhas:
+        if x["pessoa_id"] == pid:
+            x["sensivel_cifrado"] = Cofre(CHAVE_CADASTRO).cifrar(
+                json.dumps({"nome": nome, "nome_padrao": nome, "email": None}), f"banco/pessoas/{pid}")
+    cab = list(linhas[0])
+    api._id("cadastro_nexus", "pessoas")["linhas"] = [{"headers": cab, "values": [x.get(c) for c in cab]} for x in linhas]
+    visao.limpar()
+
+
+def test_o_cartao_abre_o_que_cobrar_com_a_prova(duas_equipes, logado):
     # Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe estar abaixo para
-    # que o supervisor possa cobrar a equipe"
+    # que o supervisor possa cobrar a equipe"; depois, "quero ao clicar na equipe um detalhamento melhor [do Em quê
+    # cobrar], não cheio de informações mas quero a informação, ao resumido e direto onde o supervisor bata o olho e
+    # possa cobrar o técnico com dados!" (no quiz: "Item a item com a prova") e, nas OS mais baixas, "Faltou os pontos"
+    _com_nome(duas_equipes, 4, "Operador Lima")
     html = logado.get("/t/campo/responsaveis?responsavel=Beltrano+Supervisor&modo=ranking").get_data(as_text=True)
     painel = re.search(r'data-cr-painel="([^"]*/responsaveis/equipe\?[^"]*)"', _grade(html)).group(1)
     assert "equipe=SC+Oeste+01" in painel and "responsavel=Beltrano+Supervisor" in painel
     jan = logado.get(painel.replace("&amp;", "&")).get_data(as_text=True)
-    assert "SC Oeste 01" in jan and "2º de 2" in jan and ">73<" in jan
-    # perde 27: todos na qualidade (55; a cobertura está em 100%): a ronda tira 15 (0,6 × 50 ÷ 2), as fotos e o GPS da
+    assert "SC Oeste 01" in jan and "2º de 2" in jan and ">73<" in jan and "Técnicos: Operador Lima" in jan
+    # o "Em quê cobrar": as áreas da etiqueta do cartão, com a prova (o extintor, a OS do chamado) e a usina
+    cobrar = jan[jan.index('class="cr-rk-j-itens"'):jan.index("Nota do App")]
+    assert "Acompanhar" in jan and ">Extintores</b>" in cobrar and ">Chamados</b>" in cobrar
+    assert "Extintor EXT01 · Coração 1 · " in cobrar and "OS 16050 · Coração 1 · " in cobrar
+    # a nota: perde 27, todos na qualidade (55; cobertura 100%): a ronda tira 15 (0,6 × 50 ÷ 2), as fotos e o GPS da
     # tarefa, 6 cada (0,6 × 20 ÷ 2)
-    assert "perde <b>27</b> pontos" in jan
-    assert re.findall(r'<li><b>([^<]+)</b><span>tira (\d+)</span>', jan) == [
-        ("Rondas", "15"), ("Fotos", "6"), ("GPS no fechamento", "6")]
-    # as notas mais baixas, com quem fez e o que faltou
-    piores = jan[jan.index("As notas mais baixas"):]
-    assert piores.index("checklist incompleto; item sem foto de evidência") < piores.index(
-        "Fotos: 0 fotos (3 dá o total); GPS no fechamento: sem posição")
-    assert "Limpeza do inversor" in piores and "Técnico Silva" in piores and "Fulano Souza" in piores
+    nota = jan[jan.index("Nota do App"):]
+    assert "perde 27" in nota
+    assert re.findall(r"<li>([^<]+) <b>−(\d+)</b>", nota) == [("Rondas", "15"), ("Fotos", "6"), ("GPS no fechamento", "6")]
+    # as OS com nota mais baixa: a nota, a OS, a usina, quem fez, o dia e os pontos que perdeu
+    os_ = nota[nota.index("OS com nota mais baixa"):]
+    assert os_.index(">50<") < os_.index(">60<")
+    assert "Fotos 0/20 · GPS no fechamento 0/20" in os_ and "checklist incompleto; item sem foto de evidência" in os_
+    assert "OS 801 · Coração 1 · Técnico Silva" in os_ and "Ronda · OS 501 · Coração 1 · Fulano Souza" in os_
     visao_geral = re.search(r'href="([^"]*modo=geral[^"]*)"', jan).group(1)
     assert "equipe=SC+Oeste+01" in visao_geral and "responsavel=Beltrano+Supervisor" in visao_geral
+
+
+def test_o_que_cobrar_traz_a_pt_e_quem_pediu(duas_equipes, logado):
+    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
+    focar = jan[jan.index(">Focar<"):jan.index("Nota do App")]
+    assert ">PT parada</b>" in focar and "PT-1 · Altair · pedida por Técnico Silva há 1 d 6 h" in focar
 
 
 def test_o_motivo_da_equipe_sem_nota_diz_o_que_falta(tela, logado):
@@ -927,7 +955,8 @@ def test_sem_as_notas_do_app_o_motivo_avisa(tela, logado, monkeypatch):
     monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("fato fora")))
     visao.limpar()
     jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
-    assert "Não consegui ler as notas do App" in jan and "perde <b>" not in jan
+    assert "Não consegui ler as notas do App" in jan and "perde " not in jan
+    assert ">PT parada</b>" in jan                          # o "Em quê cobrar" não depende das notas do App
 
 
 # ── A Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que
