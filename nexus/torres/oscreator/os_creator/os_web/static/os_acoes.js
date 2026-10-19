@@ -395,6 +395,34 @@
     e.preventDefault();
     Promise.resolve(fn(d, b)).catch((err) => mensagem(d, String((err && err.message) || err), true));
   });
+  // ── o PDF da OS (19/10/2026: a seta de cada OS na cadeia do chamado) ──
+  // Como o "Baixar todos": o POST monta o PDF no servidor (as fotos vêm do S3) com o círculo de carga, e o arquivo baixa
+  // pelo link que ele devolve. O aviso (foto que não veio, erro) vai para o [data-pdf-msg] da caixa, nunca em alert().
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-os-pdf]'); if (!b) return;
+    e.preventDefault();
+    if (b.getAttribute('aria-busy') === 'true') return;                 // o 2º clique espera o 1º
+    const caixa = b.closest('[data-pdf-caixa]') || document;
+    const msg = caixa.querySelector('[data-pdf-msg]');
+    const dizer = (texto, ruim) => {
+      if (!msg) return;
+      msg.hidden = !texto; msg.textContent = texto || ''; msg.classList.toggle('ruim', !!ruim); msg.classList.toggle('ok', !ruim);
+    };
+    const folio = b.getAttribute('data-os-pdf');
+    b.setAttribute('aria-busy', 'true'); dizer('');
+    try {
+      const j = await pedir('/os/api/os/pdf', {folio: folio, wid: b.getAttribute('data-wid') || ''}, 'Montando o PDF da OS ' + folio + '…');
+      const a = document.createElement('a');
+      a.href = j.url; a.download = j.nome || '';
+      document.body.appendChild(a); a.click(); a.remove();
+      dizer(j.falhas ? ('PDF da OS ' + folio + ' baixado; ' + j.falhas + ' foto(s) não vieram do Fracttal.') : '', !!j.falhas);
+    } catch (err) {
+      dizer('Não consegui montar o PDF da OS ' + folio + ': ' + err.message, true);
+    } finally {
+      b.removeAttribute('aria-busy');
+    }
+  });
+
   document.addEventListener('keydown', (e) => {          // os cards de anexos são divs com role=button: Enter/Espaço também abrem
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.det-anexo[data-acao]')) { e.preventDefault(); e.target.click(); }
   });

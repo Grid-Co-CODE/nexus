@@ -15,6 +15,11 @@
 {% macro recolher(alvo) -%}
 <button type="button" class="recolher" data-recolher aria-expanded="true" aria-controls="{{ alvo }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="q-esc">Esconder</span><span class="q-mos">Mostrar</span></button>
 {%- endmacro %}
+{# a seta do PDF de cada OS da cadeia (Levi, 19/10/2026: "inclua a opção de baixar na cadeia de chamado, uma seta de
+   download!"): o mesmo conteúdo que o Fracttal junta para imprimir a OS (os_pdf.py), montado no servidor #}
+{% macro seta_pdf(folio, wid='') -%}
+<button type="button" class="cad-pdf" data-os-pdf="{{ folio }}"{% if wid %} data-wid="{{ wid }}"{% endif %} title="Baixar o PDF da OS {{ folio }}" aria-label="Baixar o PDF da OS {{ folio }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+{%- endmacro %}
 {% set eb = {'chegou': 'u-r', 'ticket': 'u-a', 'fim': 'u-g', '': 'u-m'}[c.col] %}
 <section class="ac" id="acomp-os" data-folio="{{ c.folio }}" data-wid="{{ wid }}" data-ativo="{{ c.code }}">
   <div class="ac-head">
@@ -64,13 +69,14 @@
         <div class="bloco-h"><h2>Como abrir</h2></div>
         <p class="canal">{{ canal or 'Canal de abertura ainda não documentado para este fornecedor.' }}</p>
       </section>
-      <section class="bloco">
+      <section class="bloco" data-pdf-caixa>
         <div class="bloco-h"><h2>A cadeia do chamado</h2></div>
         <ol class="cadeia">
-          <li><span class="i">1</span><span class="t">OS de campo</span>{% if c.os_campo %}<a href="/os/os/folio/{{ c.os_campo }}">{{ c.os_campo }}</a>{% else %}<span class="t">—</span>{% endif %}</li>
-          <li><span class="i">2</span><span class="t">Inspeção · fotos e vídeos</span>{% if c.inspecao %}<a href="/os/os/folio/{{ c.inspecao }}">{{ c.inspecao }}</a>{% else %}<span class="t">—</span>{% endif %}</li>
-          <li class="aqui"><span class="i">3</span><span class="t">Acompanhamento</span><a href="/os/os/{{ wid }}">{{ c.folio }}</a></li>
+          <li><span class="i">1</span><span class="t">OS de campo</span>{% if c.os_campo %}<a href="/os/os/folio/{{ c.os_campo }}">{{ c.os_campo }}</a>{{ seta_pdf(c.os_campo) }}{% else %}<span class="t">—</span><span></span>{% endif %}</li>
+          <li><span class="i">2</span><span class="t">Inspeção · fotos e vídeos</span>{% if c.inspecao %}<a href="/os/os/folio/{{ c.inspecao }}">{{ c.inspecao }}</a>{{ seta_pdf(c.inspecao) }}{% else %}<span class="t">—</span><span></span>{% endif %}</li>
+          <li class="aqui"><span class="i">3</span><span class="t">Acompanhamento</span><a href="/os/os/{{ wid }}">{{ c.folio }}</a>{{ seta_pdf(c.folio, wid) }}</li>
         </ol>
+        <div class="msg" data-pdf-msg hidden></div>
       </section>
       {# o responsável troca aqui mesmo, com o diálogo do card da OS no Histórico (Levi, 19/10/2026: "ao clicar na OS em
          responsável dê para alterar o responsável da OS que nem fazemos no card da OS no histórico de OS Creator!"). As

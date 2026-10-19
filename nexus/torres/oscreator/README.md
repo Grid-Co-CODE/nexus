@@ -899,3 +899,30 @@ nem fazemos no card da OS no histórico de OS Creator!"
   no ambiente ao criar o clone (`ponte.token_do_banco_para_o_clone`; o que já estiver no ambiente vale mais). Nos testes
   não (o ambiente é do processo inteiro), e o envio dos tickets não muda: direto só com `RELAY_DIRETO_ENV=1`.
 - Prova: `tests/test_oscreator_garantia_responsavel.py`.
+
+## O PDF da OS, com a seta na cadeia do chamado (Garantias, 19/10/2026)
+
+Levi, 19/10/2026: "Gostaria de incluir a opção de baixar o mesmo PDF que o fractall gera" ("pelo o que entendo ele baixa
+várias imagens e incluir no PDF") e "inclua a opção de baixar na cadeia de chamado, uma seta de download!".
+
+- **Não há PDF pronto no Fracttal para buscar:** a web dele monta o PDF no navegador, com os pedidos do curl do Levi
+  (o cabeçalho, as tarefas, as subtarefas, as fotos das subtarefas, os arquivos de cada tarefa, os recursos e cada foto
+  baixada do S3). O servidor junta o mesmo com o que o card da OS já lê: `api.get_os_detalhes` (agora com o `status_id`),
+  os anexos do card (`_anexos_da_os`) e `api.get_os_recursos` (novo: `tasks.work_orders_resources_all_list`, o pedido do
+  print; os campos são os do lançamento que o App de Campo copia desde a v274). Recurso que o Fracttal não devolveu sai
+  no PDF como "não consegui ler", e não como "nenhum".
+- **O PDF** (`os_web/os_pdf.py`, reportlab): faixa navy com o logo e a OS; o status com a cor do card; os dados da OS;
+  cada tarefa com as subtarefas e as respostas, na ordem do card; os recursos; as observações da OS; as fotos, duas por
+  linha, num quadro da mesma altura (as das subtarefas com a subtarefa embaixo; a foto da OS que já é de subtarefa não
+  repete), reduzidas a 1000 px (JPEG 72, deitada pelo EXIF fica em pé); os outros anexos pelo nome. Foto que não veio
+  do S3 sai com o quadro vazio dizendo isso; mais de 200 fotos, o PDF diz quantas ficaram de fora. `modelo()` é o
+  conteúdo (os testes conferem nele) e `gerar()` desenha; o reportlab e o Pillow só são importados ali.
+- **A tela:** em "A cadeia do chamado" (`acomp_os.html`), uma seta em cada OS (de campo, inspeção e o acompanhamento).
+  O clique (`os_acoes.js`, `[data-os-pdf]`) faz como o "Baixar todos": `POST /os/api/os/pdf` com o nº (e o id, quando a
+  tela já sabe) monta o PDF no disco com o círculo de carga, e o arquivo baixa por `GET /os/api/os/pdf/<token>` (10
+  minutos, só para quem pediu; o link do .zip não o entrega). O aviso (foto que não veio, OS que não existe) aparece
+  embaixo da cadeia, em vermelho, nunca em alert().
+- Conferido numa bancada local com o Fracttal falso (as três setas, o download, o aviso de OS que não existe) e numa
+  amostra de 3 páginas com 7 fotos. Falta o olho do Levi com uma OS de verdade (o Fracttal só abre com a sessão de cada
+  pessoa). Prova: `tests/test_oscreator_os_pdf.py`.
+

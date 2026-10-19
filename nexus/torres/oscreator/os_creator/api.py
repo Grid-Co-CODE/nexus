@@ -2143,7 +2143,9 @@ def get_os_detalhes(id_work_order) -> dict:
             "tarefas": tarefas,
             "etiquetas": [{"id": l.get("id"), "nome": l.get("description"), "cor": l.get("color")}
                           for l in (det.get("labels") or []) if isinstance(l, dict) and l.get("id") is not None],
-            "code": code0, "ativo": ativo0}
+            "code": code0, "ativo": ativo0,
+            # o status da OS (1..4, `WO_STATUS`): o PDF da OS diz em que pé ela está (19/10/2026)
+            "status_id": det.get("id_status_work_order") or t0.get("id_status_work_order")}
 
 
 def get_os_detalhes_por_folio(folio) -> dict:
@@ -2556,6 +2558,42 @@ def get_os_imagens(id_work_order) -> list:
                     "ativo": str(d.get("items_description") or d.get("item_description")
                                  or d.get("assets_description") or d.get("description_item") or "").strip(),
                     "raw": d})
+    return out
+
+
+# ── Recursos lançados na OS (peças, mão de obra, serviços) ─────────────────────────────────────────────────────────
+RPC_WO_RESOURCES = "tasks.work_orders_resources_all_list"
+# o tipo do recurso como o Fracttal grava (`type_description`; o App de Campo lança a peça como INVENTORY desde a v274)
+TIPO_RECURSO = {"INVENTORY": "Peça / inventário", "INVENTORIES": "Peça / inventário", "HUMAN_RESOURCES": "Mão de obra",
+                "SERVICES": "Serviço", "SERVICE": "Serviço", "TOOLS": "Ferramenta", "THIRD_PARTY": "Terceiro"}
+
+
+def get_os_recursos(id_work_order) -> list:
+    """Os RECURSOS lançados na OS: o que o PDF do Fracttal lista (o pedido do print da web, `{id_work_order}`, que o Levi
+    mandou em 19/10/2026). Os campos são os do lançamento que a web faz e o App de Campo copia desde a v274
+    (`type_description`, `description`, `qty`, `real_qty_used`, `units_description`, `source_description`, `unit_cost`,
+    `total_cost`, `note`); o parse é defensivo, como o das fotos. Erro do Fracttal sobe: quem chama decide (o PDF diz
+    que não leu, em vez de dizer que não há recurso).
+    → [{'tipo','descricao','qtd','usado','unidade','origem','custo_unit','custo_total','nota','id_tarefa'}]."""
+    res = _rpc_call(RPC_WO_RESOURCES, {"id_work_order": id_work_order})
+    data = res.get("data") if isinstance(res, dict) else res
+    out = []
+    for r in (data if isinstance(data, list) else []):
+        if not isinstance(r, dict):
+            continue
+        tipo = str(r.get("type_description") or "").strip()
+        desc = str(r.get("description") or r.get("resource_description") or r.get("items_description")
+                   or r.get("personnel_description") or "").strip()
+        if not desc and not tipo:
+            continue
+        out.append({"tipo": TIPO_RECURSO.get(tipo.upper(), tipo.replace("_", " ").capitalize() or "—"),
+                    "descricao": desc or "—",
+                    "qtd": r.get("qty"), "usado": r.get("real_qty_used"),
+                    "unidade": str(r.get("units_description") or "").strip(),
+                    "origem": str(r.get("source_description") or r.get("external_source") or "").strip(),
+                    "custo_unit": r.get("unit_cost"), "custo_total": r.get("total_cost"),
+                    "nota": str(r.get("note") or "").strip(),
+                    "id_tarefa": r.get("id_work_orders_tasks") or r.get("id_work_order_task")})
     return out
 
 

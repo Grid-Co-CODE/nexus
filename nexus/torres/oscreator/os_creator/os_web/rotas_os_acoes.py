@@ -153,7 +153,7 @@ def _varrer_zips(agora: float):
         pasta = _pasta_zips()
         for n in os.listdir(pasta):
             cam = os.path.join(pasta, n)
-            if n.endswith(".zip") and agora - os.path.getmtime(cam) > _ZIP_TTL:
+            if n.endswith((".zip", ".pdf")) and agora - os.path.getmtime(cam) > _ZIP_TTL:   # o PDF da OS mora aqui também
                 os.remove(cam)
     except OSError:
         pass                                                         # arquivo ainda sendo entregue: fica para a próxima
@@ -213,10 +213,94 @@ def api_anexos_zip(wid):
 def api_anexos_zip_baixar(wid, token):
     with _ZIPS_LOCK:
         z = _ZIPS.get(str(token))
-    if (not z or z["wid"] != int(wid) or z["email"] != _email() or time.time() - z["criado"] > _ZIP_TTL
-            or not os.path.exists(z["caminho"])):
+    if (not z or z.get("pdf") or z["wid"] != int(wid) or z["email"] != _email()
+            or time.time() - z["criado"] > _ZIP_TTL or not os.path.exists(z["caminho"])):
         return _erro("Este .zip venceu (vale 10 minutos) — clique de novo em Baixar todos.", 404)
     resp = send_file(z["caminho"], mimetype="application/zip", as_attachment=True, download_name=z["nome"], max_age=0)
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+# ── o PDF da OS (Levi, 19/10/2026, em Garantias: "o mesmo PDF que o fractall gera"; a seta de cada OS na cadeia do
+# chamado) ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+# Como o "Baixar todos": o POST junta o que o Fracttal junta para imprimir (o detalhe, os anexos do card e os recursos),
+# baixa as fotos 6 de cada vez, monta o PDF no disco (`os_pdf`) e diz quantas fotos vieram; o GET entrega. O arquivo
+# vale 10 minutos, só para quem pediu (o mesmo registro e a mesma pasta dos .zip).
+def _recursos_ou_none(wid):
+    """Os recursos da OS; None quando o Fracttal não respondeu (o PDF diz que não leu, e não que não há)."""
+    try:
+        return api.get_os_recursos(wid)
+    except api.SessionExpired:
+        raise
+    except api.FracttalError:
+        return None
+
+
+@bp.route("/api/os/pdf", methods=["POST"])
+@exige_sessao
+def api_os_pdf():
+    """O PDF de UMA OS: pelo `wid` quando a tela já o sabe, senão pelo nº (`folio`, a OS de campo e a inspeção da
+    cadeia do chamado)."""
+    from datetime import datetime
+
+    from . import os_pdf
+    c = _corpo()
+    folio = "".join(ch for ch in str(c.get("folio") or "") if ch.isdigit())[:12]
+    wid = str(c.get("wid") or "").strip()
+    wid = int(wid) if wid.isdigit() else None
+    if not wid:
+        if not folio:
+            return _erro("Qual OS? Falta o número.")
+        wid = api._wo_id_por_folio(folio)
+        if not wid:
+            return _erro("Não achei a OS %s no Fracttal." % folio, 404)
+    with api._ExecutorComContexto(max_workers=2) as ex:
+        f_det = ex.submit(api.get_os_detalhes, wid)
+        f_rec = ex.submit(_recursos_ou_none, wid)
+        subs, oss = _anexos_da_os(wid)                   # na thread do pedido: a memória dos anexos é por pessoa
+        d = f_det.result() or {}
+        recursos = f_rec.result()
+    if not d.get("folio") and not folio:
+        return _erro("Não consegui ler a OS no Fracttal.", 502)
+    d.setdefault("folio", folio)
+    # o cliente e a usina do ativo, se o catálogo já está na memória (carregá-lo aqui seria ler todos os ativos)
+    local = (getattr(api, "_code_loc", None) or {}).get(str(d.get("code") or ""))
+    m = os_pdf.modelo(d, recursos=recursos, anexos_sub=subs, anexos_os=oss, local=local)
+
+    def _foto(f):
+        try:
+            return os_pdf.reduzir(_baixar_anexo(f["item"]))
+        except Exception:                                   # noqa: BLE001 — a que não vem sai no PDF dizendo isso
+            return None
+    with api._ExecutorComContexto(max_workers=6) as ex:
+        fotos = list(ex.map(_foto, m["fotos"]))
+    conta = session.get("conta") or {}
+    logo = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "grid-logo.png")
+    dados = os_pdf.gerar(m, fotos=fotos, gerado_em=datetime.now(api._BR_TZ).strftime("%d/%m/%Y %H:%M"),
+                         quem=str(conta.get("nome") or "").strip(), logo=logo if os.path.exists(logo) else None)
+    agora = time.time()
+    _varrer_zips(agora)
+    token = secrets.token_urlsafe(18)
+    caminho = os.path.join(_pasta_zips(), token + ".pdf")
+    with open(caminho, "wb") as fh:
+        fh.write(dados)
+    nome = "OS %s.pdf" % (m["folio"] or folio or wid)
+    with _ZIPS_LOCK:
+        _ZIPS[token] = {"caminho": caminho, "nome": nome, "wid": int(wid), "email": _email(), "criado": agora, "pdf": True}
+    falhas = sum(1 for f in fotos if not f)
+    return jsonify({"ok": True, "nome": nome, "url": "/os/api/os/pdf/%s" % token, "bytes": len(dados),
+                    "fotos": len(fotos) - falhas, "falhas": falhas})
+
+
+@bp.route("/api/os/pdf/<token>")
+@exige_sessao
+def api_os_pdf_baixar(token):
+    with _ZIPS_LOCK:
+        z = _ZIPS.get(str(token))
+    if (not z or not z.get("pdf") or z["email"] != _email() or time.time() - z["criado"] > _ZIP_TTL
+            or not os.path.exists(z["caminho"])):
+        return _erro("Este PDF venceu (vale 10 minutos): clique de novo na seta da OS.", 404)
+    resp = send_file(z["caminho"], mimetype="application/pdf", as_attachment=True, download_name=z["nome"], max_age=0)
     resp.headers["Cache-Control"] = "private, no-store"
     return resp
 
