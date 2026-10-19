@@ -13,7 +13,10 @@ atropelam: na semana da troca, o PC do PCM não publica.
 
 **O fluxo da semana, do Gerar ao App** (o que responder a "após a sombra, o que acontece?", Levi, 16/10/2026):
 1. **Gerar a semana** (bloco 3): o Nexus roda o motor do PCM com os insumos e as observações da semana e grava uma
-   rodada (a "sombra": a planilha `saida/sombra.xlsx` e a conferência). Nada vai ao campo.
+   rodada (a "sombra": a planilha `saida/sombra.xlsx` e a conferência). Nada vai ao campo. A planilha da rodada **baixa
+   pela tela** (Levi, 19/10/2026: "tem que ter a opção de baixar!"): "Baixar a planilha" na rodada aberta e "Baixar" em
+   cada linha das Últimas gerações (`/t/pcm/gerar/planilha?rodada=`, `geracao.planilha`; o arquivo sai como
+   "Programação Semana NN - rodada AAAAMMDD-HHMMSS.xlsx"). Ela mora em `dados/pcm/geracoes/<rodada>/saida/` no servidor.
 2. **Revisar**: a rodada abre no Quadro da semana como "rascunho do Nexus"; o que mudar vira linha nas observações da
    semana (pelo Quadro ou pelo bloco 2) e vale na PRÓXIMA geração: gera de novo. Cada geração é uma rodada nova, e o
    Quadro mostra a mais recente.

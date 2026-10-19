@@ -127,7 +127,10 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     est_m = M.ler(cfg)
     aviso_m = session.pop("pcm_motivos_aviso", None) or {}
     ok, erro = ok or aviso_m.get("ok"), erro or aviso_m.get("erro")
-    return {"conf": geracao.conferir(cfg, semana), "ultimas": geracao.ultimas(cfg), "sel": sel,
+    ultimas = geracao.ultimas(cfg)
+    # as rodadas que têm a planilha para baixar (19/10/2026: "tem que ter a opção de baixar!")
+    com_planilha = {u["id"] for u in ultimas + ([sel] if sel else []) if geracao.planilha(cfg, u.get("id") or "")}
+    return {"conf": geracao.conferir(cfg, semana), "ultimas": ultimas, "sel": sel, "com_planilha": com_planilha,
             "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,
             "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,
@@ -196,6 +199,21 @@ def registrar_pcm(bp) -> None:
             return render_template("pcm/gerar.html", **_ctx_gerar(
                 cfg, erro=f"Já tem uma geração rodando (rodada {ex}). Espere ela terminar.")), 409
         return redirect(na_raiz("/t/pcm/gerar?rodada=") + r["id"], code=303)
+
+    @bp.route("/gerar/planilha")
+    def gerar_planilha():
+        """A planilha da rodada (a `sombra.xlsx`, a mesma que o Publicar no App manda), para baixar. Levi, 19/10/2026:
+        "tem que ter a opção de baixar!" (ela só existia no disco do servidor). Vale para quem abre a tela Gerar."""
+        from flask import send_file
+        rid = str(request.args.get("rodada") or "")
+        f = geracao.planilha(current_app.config, rid)
+        if not f:
+            abort(404)
+        st = geracao.ler_status(current_app.config, rid) or {}
+        semana = str(st.get("semana") or rid[-8:])
+        return send_file(f, as_attachment=True, max_age=0,
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                         download_name=f"Programação Semana {semana[-2:]} - rodada {rid[:15]}.xlsx")
 
     @bp.route("/gerar/importar", methods=["POST"])
     def gerar_importar():

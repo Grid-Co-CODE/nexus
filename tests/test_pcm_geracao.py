@@ -507,3 +507,29 @@ def test_fuso_do_motor_so_vai_pelo_tz_fora_do_windows(monkeypatch, tmp_path):
     assert "TZ" not in G._ambiente(cred, tmp_path, tmp_path / "s.xlsx")
     monkeypatch.setattr(G.os, "name", "posix")
     assert G._ambiente(cred, tmp_path, tmp_path / "s.xlsx")["TZ"] == "America/Sao_Paulo"
+
+def test_baixar_a_planilha_da_rodada(app, logado, config, origem):
+    """Levi, 19/10/2026: "tem que ter a opção de baixar!". A sombra.xlsx de cada rodada (a mesma que o Publicar no App
+    manda como "Programação Semana NN.xlsx") baixa pela tela: o botão na rodada aberta e em cada linha das Últimas
+    gerações. Rodada que não existe, id fora do formato ou rodada sem a planilha: 404."""
+    from urllib.parse import unquote
+    app.config.update({k: v for k, v in config.items() if k != "TESTING"})
+    planilha(origem / "Programação Semana 41.xlsx")
+    rodada = logado.post("/t/pcm/gerar", data={"semana": "2026-W41", "confirmo": "1"}).headers["Location"].split(
+        "rodada=")[1]
+    G.aguardar(app.config, rodada, 60)
+    url = f"/t/pcm/gerar/planilha?rodada={rodada}"
+    html = logado.get("/t/pcm/gerar?rodada=" + rodada).get_data(as_text=True)
+    assert html.count(f'href="{url}"') == 2 and "Baixar a planilha" in html      # na rodada e na linha da tabela
+    r = logado.get(url)
+    assert r.status_code == 200 and r.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    disp = unquote(r.headers["Content-Disposition"])
+    assert "attachment" in disp and f"Programação Semana 41 - rodada {rodada[:15]}.xlsx" in disp
+    sombra = G.pasta_trabalho(app.config) / "geracoes" / rodada / "saida" / "sombra.xlsx"
+    assert r.data == sombra.read_bytes()
+    r.close()                      # no Windows, a resposta segura o arquivo aberto até fechar
+    for ruim in ("../../etc/passwd", "20261019-102300-2026-W41", "", rodada + "x"):
+        assert logado.get("/t/pcm/gerar/planilha", query_string={"rodada": ruim}).status_code == 404, ruim
+    sombra.unlink()
+    assert logado.get(url).status_code == 404
+    assert f'href="{url}"' not in logado.get("/t/pcm/gerar?rodada=" + rodada).get_data(as_text=True)
