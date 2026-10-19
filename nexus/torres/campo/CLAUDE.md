@@ -77,11 +77,21 @@ só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-1
   evento por linha (`criou`, `dados`, `acao`, `andamento`), só acrescenta; o estado sai dos eventos (`estado`: vale a
   última decisão da ocorrência e de cada ação; o andamento, o mais novo em cima). O título, a descrição, o chamado, o
   texto da ação, o andamento e quem fez vão só cifrados (o Cofre); em claro, IDs, códigos e datas (regra 8).
-- **Quem grava:** o Responsável O&M (o login do Fracttal, em qualquer usina, como a observação: quem cobre as férias de
+- **Quem grava:** o Responsável O&M (o login de pessoa, em qualquer usina, como a observação: quem cobre as férias de
   outro registra nas usinas dele) e o administrador, sempre com um login de pessoa (a senha de administrador vê o aviso
-  "entre com o seu login": o histórico guarda quem fez). Os outros só veem (sem botões; o POST é 403). A tela é dos
-  **Responsáveis UFV sem marcar** em Base → Acessos (`Tela.do_setor`, como o Gerar e o Quadro do PCM); os outros
-  setores, pela marca.
+  "entre com o seu login": o histórico guarda quem fez). Os outros só veem (sem botões; o POST é 403). A permissão sai
+  do cadastro de AGORA a cada pedido; na sessão fica só o `pessoa_id` (o nome guardado por 12 h travava quem pegou uma
+  leitura vazia do cadastro). Sem as chaves de gravar no .env (`faltam_chaves`), nenhum formulário, e a tela diz qual
+  falta. A tela é dos **Responsáveis UFV sem marcar** em Base → Acessos (`Tela.do_setor`, como o Gerar e o Quadro do
+  PCM); os outros setores, pela marca.
+- **Página velha e clique duplo** (revisão final de 18/10/2026): o formulário de editar leva a `versao` (o id do último
+  evento da ocorrência ou da ação) e a gravação recusa se ela mudou ("mudou depois que você abriu a página": a página
+  velha reabria a ocorrência que outro finalizou). O de criar leva o id do que vai nascer (`novo_id`, `nova_acao_id`,
+  `evento_id`): o 2º envio acha o id no livro e não grava de novo (o livro é para sempre). O botão se desliga no envio.
+- **Os ids** têm a letra do que são (`o` ocorrência, `a` ação, `e` evento) e 11 hexadecimais: a API infere o tipo da
+  coluna, e um id só de algarismos voltaria como número. A cifra é amarrada à linha inteira (ocorrência, evento, ação,
+  id). O estado aplica o `criou` primeiro e o resto pela hora com milissegundos: o PC e o servidor gravam o mesmo livro,
+  e o evento da máquina de relógio atrasado não some.
 - **A tela** (`nexus/torres/campo/ocorrencias_tela.py`, `templates/campo/ocorrencias.html`, `ocorrencia.html`,
   `ocorrencia_nova.html`, `static/ocorrencias.css`): a lista abre nas abertas, na ordem do prazo da próxima ação em
   aberto (sem prazo depois, a mais crítica primeiro; as finalizadas no fim); o quadro tem uma coluna por status (as 20
@@ -89,17 +99,28 @@ só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-1
   vai como `*`), status e criticidade. A página da ocorrência tem os dados (editar), o plano de ação (cada ação com o
   responsável escolhido na lista do cadastro, o prazo e a situação; a vencida em vermelho) e o andamento.
 - **As recusas dizem o porquê e guardam o que foi digitado** (título vazio ou comprido, data inválida ou antes de
-  01/01/2024, início ou fim depois de hoje, fim antes do início, fim sem o status Finalizado, OS com letra, código do
-  ativo com e-mail, responsável fora da lista, prazo além de 3 anos, "Nada mudou"). Finalizada sem o fim termina hoje.
-  Gravar volta pela página (`?ok=`), para o F5 não gravar de novo.
-- **O ativo** é o código do Fracttal (opcional, canônico); liga ao `equipamento_id` só quando o código está na dimensão
-  de equipamento (não liga = vazio; `equipamento_ligado_por`).
+  01/01/2024, início ou fim depois de hoje, fim antes do início, fim sem o status Finalizado, OS com letra ou com
+  algarismo de outra escrita, código do ativo fora do formato do Fracttal ou de outra usina, responsável fora da lista,
+  prazo vazio ou além de 3 anos, "Nada mudou"). O prazo da ação é obrigatório (o desenho: "cada ação com responsável,
+  prazo e situação"). Finalizada sem o fim termina hoje; a ação esquecida aberta na finalizada não fica "atrasada". A
+  ocorrência de usina que saiu da operação continua editável (só não muda PARA usina fora da operação), e a ação de
+  quem saiu da lista do cadastro fecha sem trocar a pessoa. Gravar volta pela página (303, `?ok=`), para o F5 não
+  gravar de novo; a falha que não é recusa vai ao log da máquina (503).
+- **O ativo** é o código do Fracttal (opcional, canônico) e vai em claro: só letras, números e hífen (`COD_RE`; um
+  nome, um telefone ou uma fórmula da planilha não passam) e só desta usina: o que está na dimensão de equipamento
+  (que não seja de outra usina) ou o que leva o código da usina (a regra do `equipamento.valido`). Liga ao
+  `equipamento_id` só quando está na dimensão (não liga = vazio; `equipamento_ligado_por`).
 - **Na Visão geral**, a etiqueta "N ocorrências" no nome da usina (as abertas: status diferente de finalizado), na cor da
   criticidade mais alta delas (`COR_ETIQUETA`: muito alta vermelha, alta amarela, média e baixa neutras), leva à tela
-  filtrada pela usina. O livro que não abre deixa a Visão geral sem as etiquetas, nunca quebrada.
+  filtrada pela usina (para quem abre a tela Ocorrências; para o setor sem ela, a etiqueta sem link). O livro que não
+  abre deixa a Visão geral sem as etiquetas, nunca quebrada, e a leitura que falhou espera 1 minuto antes de tentar de
+  novo (a Visão geral não fica esperando o banco lento a cada carga). Depois de gravar, a cópia de 1 minuto já tem o
+  que foi gravado; a página que não acha a ocorrência relê o livro antes do 404 (gravada noutro processo).
 - **Fora, por agora:** as anotações privadas, exportar para .xlsx, o comunicado por IA e a importação do painel antigo.
 - **Prova:** `tests/test_campo_ocorrencias.py` (o estado, a ordem, o catálogo, gravar e ler no banco falso com o texto
-  cifrado, as recusas, a releitura que falha não grava, a tela inteira e a etiqueta da Visão geral).
+  cifrado, as recusas, a releitura que falha não grava, a tela inteira, a etiqueta da Visão geral e, da revisão final,
+  a página velha, o clique duplo, a usina que saiu da operação, o código do ativo, o relógio de duas máquinas e o banco
+  que devolve tudo como texto).
 
 ## De onde vem o dado
 

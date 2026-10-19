@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "campo/_ocorrencia_macros.html" import dia, quando, selo_crit, selo_status, selo_situacao, campos_ocorrencia, campos_acao %}
+{% from "campo/_ocorrencia_macros.html" import dia, quando, selo_crit, selo_status, selo_situacao, campos_ocorrencia, campos_acao, avisos_de_gravar %}
 {% block titulo %}{{ (o.titulo if o and o.titulo else 'Ocorrência') }} · Ocorrências{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
@@ -19,8 +19,7 @@
   {% if aviso %}<div class="cn-certo" role="status"><b>{{ aviso }}</b></div>{% endif %}
   {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}</b></div>{% endif %}
   {% if lido.erro %}<div class="cn-erro" role="alert"><b>A última leitura do banco falhou</b> ({{ lido.erro }}): mostro a última leitura boa.</div>{% endif %}
-  {% if sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave do cadastro.</b> Os textos vão cifrados e não abrem aqui, e nada se grava; as datas, os códigos e as situações continuam.</div>{% endif %}
-  {% if quem.pode and not quem.grava %}<div class="cn-erro cn-aviso" role="status"><b>Para registrar, entre com o seu login (Fracttal ou Microsoft).</b> A senha de administrador não diz quem é a pessoa, e o histórico guarda quem fez cada mudança.</div>{% endif %}
+  {{ avisos_de_gravar(quem, sem_chave, cad) }}
 
   <div class="oc-grade">
     <section class="cn-cartao oc-ficha" aria-label="A ocorrência">
@@ -39,8 +38,9 @@
       {% if quem.grava %}
       <details class="oc-abre"{% if qual == 'dados' %} open{% endif %}>
         <summary class="gc-btn gc-btn--contorno">Editar a ocorrência</summary>
-        <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_dados', oid=o.id) }}">
-          {{ campos_ocorrencia(form if qual == 'dados' else atual, usinas_do_form, criticidades, status_rot, piso, hoje) }}
+        <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_dados', oid=o.id) }}" onsubmit="this.querySelectorAll('[type=submit]').forEach(function (b) { b.disabled = true })">
+          {% set dg = form if qual == 'dados' else atual %}<input type="hidden" name="versao" value="{{ dg.get('versao', '') }}">
+          {{ campos_ocorrencia(dg, usinas_do_form, criticidades, status_rot, piso, hoje) }}
           <div><button class="gc-btn gc-btn--primario" type="submit">Salvar a ocorrência</button></div>
         </form>
       </details>
@@ -56,9 +56,10 @@
         {% if quem.grava %}
         <details class="oc-abre oc-abre--acao"{% if qual == 'acao:' ~ a.id %} open{% endif %}>
           <summary class="cn-link">Mudar a ação</summary>
-          <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_acao', oid=o.id) }}">
-            <input type="hidden" name="acao_id" value="{{ a.id }}">
-            {{ campos_acao(form if qual == 'acao:' ~ a.id else {'texto': a.texto, 'responsavel_id': a.responsavel_id, 'prazo': a.prazo.isoformat() if a.prazo else '', 'situacao': a.situacao}, pessoas, situacoes, piso, prazo_max) }}
+          <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_acao', oid=o.id) }}" onsubmit="this.querySelectorAll('[type=submit]').forEach(function (b) { b.disabled = true })">
+            {% set fa = form if qual == 'acao:' ~ a.id else {'texto': a.texto, 'responsavel_id': a.responsavel_id, 'prazo': a.prazo.isoformat() if a.prazo else '', 'situacao': a.situacao, 'versao': a.versao} %}
+            <input type="hidden" name="acao_id" value="{{ a.id }}"><input type="hidden" name="versao" value="{{ fa.get('versao', '') }}">
+            {{ campos_acao(fa, pessoas, situacoes, piso, prazo_max, {'id': a.responsavel_id, 'nome': a.responsavel} if a.responsavel_id and a.responsavel_id not in nome_pessoa else none) }}
             <div><button class="gc-btn gc-btn--primario" type="submit">Salvar a ação</button></div>
           </form>
         </details>
@@ -71,8 +72,8 @@
       <details class="oc-abre oc-nova-acao"{% if qual == 'acao:nova' or not o.acoes %} open{% endif %}>
         <summary class="gc-btn gc-btn--contorno">Nova ação</summary>
         {% if not pessoas %}<p class="gc-ajuda gc-ajuda--erro">A lista de pessoas do cadastro não abriu (sem a chave do cadastro ou sem o cadastro): sem ela não dá para escolher o responsável.</p>{% endif %}
-        <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_acao', oid=o.id) }}">
-          <input type="hidden" name="acao_id" value="">
+        <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_acao', oid=o.id) }}" onsubmit="this.querySelectorAll('[type=submit]').forEach(function (b) { b.disabled = true })">
+          <input type="hidden" name="acao_id" value=""><input type="hidden" name="nova_acao_id" value="{{ ids.nova_acao_id }}">
           {{ campos_acao(form if qual == 'acao:nova' else {}, pessoas, situacoes, piso, prazo_max) }}
           <div><button class="gc-btn gc-btn--primario" type="submit">Salvar a ação</button></div>
         </form>
@@ -83,7 +84,8 @@
     <section class="cn-cartao oc-andamento" id="andamento" aria-label="Andamento">
       <h2>Andamento</h2>
       {% if quem.grava %}
-      <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_andamento', oid=o.id) }}">
+      <form class="oc-form" method="post" action="{{ url_for('torre_campo.ocorrencia_andamento', oid=o.id) }}" onsubmit="this.querySelectorAll('[type=submit]').forEach(function (b) { b.disabled = true })">
+        <input type="hidden" name="evento_id" value="{{ ids.evento_id }}">
         <textarea class="gc-campo" name="texto" rows="3" maxlength="2000" aria-label="O andamento" placeholder="O que foi feito, o que mudou, o que falta">{{ form.get('texto', '') if qual == 'andamento' else '' }}</textarea>
         <div><button class="gc-btn gc-btn--primario" type="submit">Registrar andamento</button></div>
       </form>

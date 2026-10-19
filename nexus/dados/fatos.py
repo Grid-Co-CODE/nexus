@@ -76,9 +76,11 @@ def _sim(v) -> int:
 
 
 def _int(v):
+    # OverflowError: "inf" e "1e999" viram float infinito, e o round dele estoura (revisão de 18/10/2026: ?usina=inf no
+    # endereço dava 500 na tela das Ocorrências)
     try:
         return int(round(float(v)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 

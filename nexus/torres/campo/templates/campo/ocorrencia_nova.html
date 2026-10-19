@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "campo/_ocorrencia_macros.html" import campos_ocorrencia %}
+{% from "campo/_ocorrencia_macros.html" import campos_ocorrencia, avisos_de_gravar %}
 {% block titulo %}Nova ocorrência · Ocorrências{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
@@ -13,12 +13,12 @@
         conte o andamento na página dela.</p></div>
   </div>
   {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}</b></div>{% endif %}
+  {{ avisos_de_gravar(quem, not quem.grava and 'NEXUS_CHAVE_CADASTRO' in quem.faltam, cad) }}
   {% if not quem.pode %}
   <div class="cn-erro cn-aviso" role="status"><b>Só o Responsável O&amp;M (pelo login do Fracttal) ou um administrador registra ocorrências.</b> Você pode ver todas na lista.</div>
-  {% elif not quem.grava %}
-  <div class="cn-erro cn-aviso" role="status"><b>Para registrar, entre com o seu login (Fracttal ou Microsoft).</b> A senha de administrador não diz quem é a pessoa, e o histórico guarda quem fez cada mudança.</div>
-  {% else %}
-  <form class="cn-cartao oc-form oc-form-nova" method="post" action="{{ url_for('torre_campo.ocorrencia_nova') }}">
+  {% elif quem.grava %}
+  <form class="cn-cartao oc-form oc-form-nova" method="post" action="{{ url_for('torre_campo.ocorrencia_nova') }}" onsubmit="this.querySelectorAll('[type=submit]').forEach(function (b) { b.disabled = true })">
+    <input type="hidden" name="novo_id" value="{{ form.novo_id }}">
     <p class="mudo">Registrada por <b>{{ quem.usuario.nome or quem.usuario.email }}</b>, com a data e a hora de agora. O
       texto vai cifrado para o banco.</p>
     {{ campos_ocorrencia(form, cad.mobilizadas, criticidades, status_rot, piso, hoje) }}

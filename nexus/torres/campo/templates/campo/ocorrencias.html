@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "campo/_ocorrencia_macros.html" import dia, selo_crit, selo_status %}
+{% from "campo/_ocorrencia_macros.html" import dia, selo_crit, selo_status, avisos_de_gravar %}
 {% block titulo %}Ocorrências{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
@@ -14,14 +14,14 @@
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     {% if quem.grava %}<a class="gc-btn gc-btn--primario oc-nova" href="{{ url_for('torre_campo.ocorrencia_nova', usina=f.usina or None) }}">Nova ocorrência</a>{% endif %}
   </div>
-  {% if quem.pode and not quem.grava %}<div class="cn-erro cn-aviso" role="status"><b>Para registrar, entre com o seu login (Fracttal ou Microsoft).</b> A senha de administrador não diz quem é a pessoa, e o histórico guarda quem fez cada mudança.</div>{% endif %}
-  {% if sem_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave do cadastro.</b> Os títulos e os textos vão cifrados e não abrem aqui, e nada se grava; as usinas, os códigos e as datas continuam.</div>{% endif %}
+  {{ avisos_de_gravar(quem, sem_chave, cad) }}
   {% if lido.erro %}<div class="cn-erro" role="alert"><b>Não consegui ler as ocorrências no banco</b> ({{ lido.erro }}){% if lido.velha %}: mostro a última leitura boa{% endif %}.</div>{% endif %}
-  {% if cad.erro %}<div class="cn-erro" role="alert"><b>{{ cad.erro }}.</b> As usinas e os responsáveis podem sair sem nome.</div>{% endif %}
+  {# sem nenhuma leitura boa do banco, nada de zeros nem de "nenhuma": a tela não sabe #}
+  {% set leu = lido.lido_em is not none %}
 
-  <p class="oc-numeros"><span><b>{{ numeros.abertas }}</b>aberta{{ 's' if numeros.abertas != 1 }}</span>
-    <span{% if numeros.atrasadas %} class="oc-atrasada"{% endif %}><b>{{ numeros.atrasadas }}</b>com ação atrasada</span>
-    <span><b>{{ numeros.sem_plano }}</b>sem ação em aberto</span></p>
+  {% if leu %}<p class="oc-numeros"><span><b>{{ numeros.abertas }}</b> aberta{{ 's' if numeros.abertas != 1 }}</span>
+    <span{% if numeros.atrasadas %} class="oc-atrasada"{% endif %}><b>{{ numeros.atrasadas }}</b> com ação atrasada</span>
+    <span><b>{{ numeros.sem_plano }}</b> sem ação em aberto</span></p>{% endif %}
 
   <form class="cn-filtros oc-filtros" method="get" action="{{ url_for('torre_campo.ocorrencias') }}">
     <div class="cn-seg" aria-label="Ver as ocorrências"><a href="{{ url(ver=None) }}"{% if ver == 'lista' %} aria-current="page"{% endif %}>Lista</a><a href="{{ url(ver='quadro') }}"{% if ver == 'quadro' %} aria-current="page"{% endif %}>Quadro</a></div>
@@ -43,14 +43,14 @@
     {% for i in lista %}{% set o = i.o %}
     <a class="oc-lin{% if not o.aberta %} oc-lin--fim{% endif %}" href="{{ url_for('torre_campo.ocorrencia', oid=o.id) }}">
       <span class="oc-tit"><b>{{ o.titulo or '(o título vai cifrado: falta a chave do cadastro)' }}</b><small class="mudo">{{ i.u.nome }} · {{ i.u.responsavel }}</small></span>
-      <span>{{ selo_crit(o.criticidade, criticidades, cor_crit) }}</span>
-      <span>{{ selo_status(o.status, status_rot, cor_status) }}</span>
-      <span class="oc-prox">{% if i.proxima %}<span><span class="oc-rot">Próxima ação: </span><span{% if i.proxima.atrasada %} class="oc-atrasada"{% endif %}>{{ dia(i.proxima.prazo) if i.proxima.prazo else 'sem prazo' }}</span> · {{ i.proxima.texto }}</span><small class="mudo">{{ i.proxima.responsavel }}</small>{% elif o.aberta %}<span class="mudo">Sem ação em aberto</span>{% else %}<span class="mudo">Finalizada em {{ dia(o.fim) }}</span>{% endif %}</span>
+      <span><span class="oc-rot">Criticidade: </span>{{ selo_crit(o.criticidade, criticidades, cor_crit) }}</span>
+      <span><span class="oc-rot">Status: </span>{{ selo_status(o.status, status_rot, cor_status) }}</span>
+      <span class="oc-prox">{% if not o.aberta %}<span class="mudo">Finalizada em {{ dia(o.fim) }}</span>{% elif i.proxima %}<span><span class="oc-rot">Próxima ação: </span><span{% if i.proxima.atrasada %} class="oc-atrasada"{% endif %}>{{ dia(i.proxima.prazo) if i.proxima.prazo else 'sem prazo' }}{% if i.proxima.atrasada %} (atrasada){% endif %}</span> · {{ i.proxima.texto }}</span><small class="mudo">{{ i.proxima.responsavel }}</small>{% else %}<span class="mudo">Sem ação em aberto</span>{% endif %}</span>
       <span class="oc-num"><span class="oc-rot">Plano: </span>{{ o.acoes_abertas }} de {{ o.acoes|length }} em aberto</span>
       <span class="oc-num"><span class="oc-rot">Início: </span>{{ dia(o.inicio) }}</span>
     </a>
     {% else %}
-    <p class="cn-vazio">Nenhuma ocorrência com esse filtro.{% if quem.grava %} Use "Nova ocorrência" para registrar uma.{% endif %}</p>
+    {% if leu %}<p class="cn-vazio">Nenhuma ocorrência com esse filtro.{% if quem.grava %} Use "Nova ocorrência" para registrar uma.{% endif %}</p>{% endif %}
     {% endfor %}
   </div>
   {% else %}
@@ -66,7 +66,7 @@
         {% if i.proxima %}<small>Próxima: {{ dia(i.proxima.prazo) if i.proxima.prazo else 'sem prazo' }} · {{ i.proxima.texto }}</small>{% elif o.aberta %}<small class="mudo">Sem ação em aberto</small>{% endif %}
       </a>
       {% else %}
-      <p class="mudo oc-col-vazia">Nenhuma</p>
+      {% if leu %}<p class="mudo oc-col-vazia">Nenhuma</p>{% endif %}
       {% endfor %}
       {% if s == 'finalizado' and col|length > quadro_max %}<a class="cn-link" href="{{ url(ver=None, status='finalizado') }}">E mais {{ col|length - quadro_max }} na lista</a>{% endif %}
     </section>

@@ -434,6 +434,10 @@ def responsaveis():
     # as ocorrências abertas de cada usina (18/10/2026, decisão do Levi: "na Visão geral, quantas ocorrências abertas
     # cada usina tem, com link para a tela"): a etiqueta no nome, na cor da criticidade mais alta delas
     ocorrencias_abertas = _ocorrencias_abertas() if modo == "geral" else {}
+    # o link da etiqueta só para quem abre a tela Ocorrências (o setor sem ela veria a página de tela fechada)
+    from ...auth import setor_telas
+    liberadas = setor_telas.liberadas_do_menu() if ocorrencias_abertas else None
+    ocorrencias_link = liberadas is None or "campo/ocorrencias" in liberadas
     # o mapa das usinas (18/10/2026, Levi: "Para o mapa podemos usar o IBGE como a performance faz"): Lista | Mapa na
     # Visão geral, as MESMAS usinas da lista (filtro e ordem), a cor pelo bloco destacado; o ponto clicado (`usina`) abre
     # o resumo ao lado. A coordenada fica no servidor (nexus/campo/mapa_responsaveis.py)
@@ -459,7 +463,7 @@ def responsaveis():
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
-        ocorrencias_abertas=ocorrencias_abertas, cor_ocorrencia=campo_oc.COR_ETIQUETA,
+        ocorrencias_abertas=ocorrencias_abertas, cor_ocorrencia=campo_oc.COR_ETIQUETA, ocorrencias_link=ocorrencias_link,
         bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, ver=ver, mapa=mapa, usina_sel=usina_sel, erro_mapa=erro_mapa,
         blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
