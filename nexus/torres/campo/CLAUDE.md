@@ -20,6 +20,7 @@ usina, com a vaga aberta o Coordenador de Campo, ou um admin; ver "Aprovação d
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
 | **Visão do responsável** (12/10/2026, a 1ª do Campo) | três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
+| **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App; Aprovar pelo portão `/os/_nexus/aprovacao/<id>/aprovar` | regras copiadas do App |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
@@ -65,6 +66,40 @@ Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking p
   publicar com ele, o livro não existe e a tela diz isso; nada aqui depende da ordem.
 - **Prova:** `tests/test_campo_ranking_pontos.py` (9; 7 mutações pegas, uma delas a coluna com nome errado); no
   navegador, com o banco falso dos testes: escuro, claro, região e 390 px.
+
+## Ocorrências com plano de ação (18/10/2026)
+
+Levi: "Próximas peças: o mapa das usinas e as ocorrências com plano de ação. siga!". A origem é o painel próprio de um
+supervisor (a ocorrência, o histórico e o plano de ação, em quadro e lista); o objetivo é largar o painel próprio e usar
+só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-10-18-ocorrencias-plano-de-acao-design.md`.
+
+- **O Nexus é a fonte, no banco:** `nexus_ocorrencias · fato_evento_ocorrencia` (`nexus/campo/ocorrencias.py`), um
+  evento por linha (`criou`, `dados`, `acao`, `andamento`), só acrescenta; o estado sai dos eventos (`estado`: vale a
+  última decisão da ocorrência e de cada ação; o andamento, o mais novo em cima). O título, a descrição, o chamado, o
+  texto da ação, o andamento e quem fez vão só cifrados (o Cofre); em claro, IDs, códigos e datas (regra 8).
+- **Quem grava:** o Responsável O&M (o login do Fracttal, em qualquer usina, como a observação: quem cobre as férias de
+  outro registra nas usinas dele) e o administrador, sempre com um login de pessoa (a senha de administrador vê o aviso
+  "entre com o seu login": o histórico guarda quem fez). Os outros só veem (sem botões; o POST é 403). A tela é dos
+  **Responsáveis UFV sem marcar** em Base → Acessos (`Tela.do_setor`, como o Gerar e o Quadro do PCM); os outros
+  setores, pela marca.
+- **A tela** (`nexus/torres/campo/ocorrencias_tela.py`, `templates/campo/ocorrencias.html`, `ocorrencia.html`,
+  `ocorrencia_nova.html`, `static/ocorrencias.css`): a lista abre nas abertas, na ordem do prazo da próxima ação em
+  aberto (sem prazo depois, a mais crítica primeiro; as finalizadas no fim); o quadro tem uma coluna por status (as 20
+  finalizadas mais novas; o resto pela lista). Filtros: usina, Responsável O&M (o logado abre nas usinas dele; "Todos"
+  vai como `*`), status e criticidade. A página da ocorrência tem os dados (editar), o plano de ação (cada ação com o
+  responsável escolhido na lista do cadastro, o prazo e a situação; a vencida em vermelho) e o andamento.
+- **As recusas dizem o porquê e guardam o que foi digitado** (título vazio ou comprido, data inválida ou antes de
+  01/01/2024, início ou fim depois de hoje, fim antes do início, fim sem o status Finalizado, OS com letra, código do
+  ativo com e-mail, responsável fora da lista, prazo além de 3 anos, "Nada mudou"). Finalizada sem o fim termina hoje.
+  Gravar volta pela página (`?ok=`), para o F5 não gravar de novo.
+- **O ativo** é o código do Fracttal (opcional, canônico); liga ao `equipamento_id` só quando o código está na dimensão
+  de equipamento (não liga = vazio; `equipamento_ligado_por`).
+- **Na Visão geral**, a etiqueta "N ocorrências" no nome da usina (as abertas: status diferente de finalizado), na cor da
+  criticidade mais alta delas (`COR_ETIQUETA`: muito alta vermelha, alta amarela, média e baixa neutras), leva à tela
+  filtrada pela usina. O livro que não abre deixa a Visão geral sem as etiquetas, nunca quebrada.
+- **Fora, por agora:** as anotações privadas, exportar para .xlsx, o comunicado por IA e a importação do painel antigo.
+- **Prova:** `tests/test_campo_ocorrencias.py` (o estado, a ordem, o catálogo, gravar e ler no banco falso com o texto
+  cifrado, as recusas, a releitura que falha não grava, a tela inteira e a etiqueta da Visão geral).
 
 ## De onde vem o dado
 
@@ -1054,7 +1089,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
   grava o `nexus_os` (acima). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
-  `chamados_acompanhamento.py`: os chamados de garantia no banco (acima).
+  `chamados_acompanhamento.py`: os chamados de garantia no banco (acima). `ocorrencias.py`: as ocorrências com plano
+  de ação (o livro `nexus_ocorrencias`, acima).
 - `livros_app.py`, `fonte_pg.py`, `tabelas.py`: os livros do App no formato que as regras copiadas consultam
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
 - `aprovacao.py`, `triagem.py`: as telas pelas regras copiadas (`aprovacao.os_na_fila` e `tirar_da_fila` servem ao
@@ -1066,7 +1102,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_responsaveis.py`
-(a Visão do responsável), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
+(a Visão do responsável), `test_campo_ocorrencias.py` (as ocorrências com plano de ação), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
 contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo; 08/10: vala do App, sensor em três estados, anulação sem dia nem usina, o caminho de gravação que a importação usa), `test_campo_importar_avulsas.py` (a importação da validação por foto com planilha sintética: de-para exato, data mais recente, "Sem foto", a pessoa que tem de ser uma ficha com e-mail, gravação, conferência linha a linha, idempotência, fora do fato de ronda), `test_campo_rondas_pedido_0810.py` (Rondas de 08/10: colunas e dica da duração, Fotos na tabela, nunca tiveram ronda, Sem ronda, criticidade, Quem ronda em blocos com as pendentes, Painel), `test_campo_sujidade.py`, `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_fila_rapida.py`,
 `test_campo_aprovacao_supervisor.py` (08/10: fila inteira, cartões por região e por gestor, a tabela, o portão do
 Aprovar: supervisor de campo, coordenador com a vaga aberta, só admin sem os dois ou sem a estrutura publicada, gestor

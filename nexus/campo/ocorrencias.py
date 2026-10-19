@@ -48,6 +48,9 @@ EVENTOS = ("criou", "dados", "acao", "andamento")
 # os domínios (o código vai ao banco; o rótulo, à tela). A criticidade e o status são os do painel do supervisor
 CRITICIDADES = {"baixa": "Baixa", "media": "Média", "alta": "Alta", "muito_alta": "Muito alta"}
 PESO = {"baixa": 1, "media": 2, "alta": 3, "muito_alta": 4}
+# a etiqueta da usina na Visão geral, pela criticidade mais alta das abertas: as cores das etiquetas de lá (a média e a
+# baixa não pedem atenção sozinhas: ficam neutras)
+COR_ETIQUETA = {"muito_alta": "critico", "alta": "alerta", "media": "neutro", "baixa": "neutro"}
 STATUS = {"em_andamento": "Em andamento", "pausado": "Pausado", "finalizado": "Finalizado"}
 SITUACOES = {"a_fazer": "A fazer", "em_andamento": "Em andamento", "concluida": "Concluída"}
 TITULO_MAX, TEXTO_MAX, ACAO_MAX, CHAMADO_MAX, COD_MAX, OS_MAX = 120, 2000, 500, 120, 60, 10

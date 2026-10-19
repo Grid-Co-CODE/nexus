@@ -10,6 +10,7 @@ import json
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+from test_campo_responsaveis import tela  # noqa: F401  (fixture: a Visão do responsável inteira)
 from test_campo_visao import CHAVE_CADASTRO, banco  # noqa: F401  (banco é fixture)
 
 from nexus.cadastro.cifra import Cofre
@@ -511,3 +512,18 @@ def test_ocorrencia_que_nao_existe_e_404(cad, cliente):
     c = _entra(cliente, ADMIN)
     assert c.get("/t/campo/ocorrencias/000000000000").status_code == 404
     assert c.get("/t/campo/ocorrencias/nao-e-id").status_code == 404
+
+
+# ── na Visão geral: quantas ocorrências abertas cada usina tem ────────────────────────────────────────────────────────
+def test_a_visao_geral_mostra_as_ocorrencias_abertas_da_usina(tela, logado):
+    import re
+    O.criar(_form(titulo="A", criticidade="alta"), ADMIN, True)
+    O.criar(_form(titulo="B", criticidade="media", status="pausado"), ADMIN, True)
+    O.criar(_form(titulo="C", criticidade="muito_alta", status="finalizado"), ADMIN, True)     # finalizada não conta
+    html = logado.get("/t/campo/responsaveis?modo=geral&responsavel=*").get_data(as_text=True)
+    # a cor é a da criticidade mais alta das abertas (alta = atenção), e o link abre a tela filtrada pela usina
+    assert re.search(r'<a class="cr-tag cr-tag--alerta" href="[^"]*/t/campo/ocorrencias\?usina=1[^"]*"[^>]*>2 ocorrências</a>',
+                     html), html[:200]
+    assert html.count("/t/campo/ocorrencias?usina=") == 1                    # só a Altair tem ocorrência aberta
+    # nos cartões dos responsáveis e no ranking, nada muda
+    assert "/t/campo/ocorrencias?usina=" not in logado.get("/t/campo/responsaveis?modo=cartoes").get_data(as_text=True)

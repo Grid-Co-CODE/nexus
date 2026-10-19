@@ -24,6 +24,7 @@ from ...campo import fonte_pg as campo_fonte
 from ...campo import responsaveis as campo_resp
 from ...campo import ranking_equipes as campo_ranking
 from ...campo import observacao_responsavel as campo_obs
+from ...campo import ocorrencias as campo_oc
 from ...campo import responsaveis_graficos as campo_graficos
 from ...campo import triagem as campo_triagem
 from ...campo import regras_app, visao
@@ -365,6 +366,16 @@ def _responsavel_do_login(d) -> str:
     return nome
 
 
+def _ocorrencias_abertas() -> dict:
+    """{usina_id: {"n", "pior"}} das ocorrências abertas (o livro nexus_ocorrencias, com a cópia de 1 minuto). O livro que
+    não abre não derruba a Visão geral: fica sem as etiquetas."""
+    try:
+        return campo_oc.abertas_por_usina(campo_oc.estado(campo_oc.ler()["eventos"]))
+    except Exception:           # noqa: BLE001 — sem as etiquetas, a Visão geral segue
+        _log_campo.exception("Visão geral: as ocorrências não abriram")
+        return {}
+
+
 @bp.route("/responsaveis")
 def responsaveis():
     """Os cartões dos responsáveis (o padrão de quem não é responsável) ou, com um escolhido (no cartão, no filtro, ou o
@@ -420,6 +431,9 @@ def responsaveis():
     lista_geral = campo_resp.lista_geral(usinas, filtro, bloco_ordem) if modo == "geral" else []
     contagem_geral = ({k: len(campo_resp.filtrar_geral(usinas, k)) for k in campo_resp.FILTROS_GERAL}
                       if modo == "geral" else {})
+    # as ocorrências abertas de cada usina (18/10/2026, decisão do Levi: "na Visão geral, quantas ocorrências abertas
+    # cada usina tem, com link para a tela"): a etiqueta no nome, na cor da criticidade mais alta delas
+    ocorrencias_abertas = _ocorrencias_abertas() if modo == "geral" else {}
     # o mapa das usinas (18/10/2026, Levi: "Para o mapa podemos usar o IBGE como a performance faz"): Lista | Mapa na
     # Visão geral, as MESMAS usinas da lista (filtro e ordem), a cor pelo bloco destacado; o ponto clicado (`usina`) abre
     # o resumo ao lado. A coordenada fica no servidor (nexus/campo/mapa_responsaveis.py)
@@ -445,6 +459,7 @@ def responsaveis():
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
+        ocorrencias_abertas=ocorrencias_abertas, cor_ocorrencia=campo_oc.COR_ETIQUETA,
         bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, ver=ver, mapa=mapa, usina_sel=usina_sel, erro_mapa=erro_mapa,
         blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
