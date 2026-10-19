@@ -21,6 +21,7 @@
   --sobre-verde:#191528; --sobre-barra:#fff; --sobre-barra-mudo:#a6adb4; --foco:#a3d900;
   --verde-a16:rgba(163,217,0,.16); --verde-a35:rgba(163,217,0,.35); --verde-a40:rgba(163,217,0,.4);
   --verde-a42:rgba(163,217,0,.42); --verde-a45:rgba(163,217,0,.45); --verde-a60:rgba(163,217,0,.6);
+  --faixa-verde:#24302b;
   /* semáforo: a palavra colorida, o fundo suave e as transparências que cada tela usava */
   --ok:#4ade80; --ok-suave:rgba(74,222,128,.14); --ok-a12:rgba(74,222,128,.12);
   --alerta:#ffd83d; --alerta-suave:rgba(255,216,61,.14);
@@ -78,6 +79,7 @@
   --sobre-verde:#0d1526; --sobre-barra:#fff; --sobre-barra-mudo:#a6adb4; --foco:#566610;
   --verde-a16:rgba(169,219,33,.24); --verde-a35:rgba(107,138,0,.45); --verde-a40:rgba(107,138,0,.5);
   --verde-a42:rgba(107,138,0,.5); --verde-a45:rgba(107,138,0,.5); --verde-a60:rgba(107,138,0,.7);
+  --faixa-verde:#f6fbe9;
   /* semáforo: os fundos (a08 a a18) viram o suave do matiz, as bordas (a35 a a60) um contorno mais firme */
   --ok:#166b36; --ok-suave:rgba(31,136,61,.12); --ok-a12:rgba(31,136,61,.12);
   --fogo-nasa:#c2185b;

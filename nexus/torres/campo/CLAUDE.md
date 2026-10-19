@@ -557,7 +557,9 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   ela; "Ordene da pior meta para a melhor em performance e em acompanhamento ordene pelas rondas"): a Performance pela
   meta do mês, da pior para a melhor, sem meta no fim (`ordem_da_meta`); a Manutenção pelo nível e pelas atrasadas
   (`ordem_da_manutencao`); o Acompanhamento pela ronda, a pior em cima (`ordem_da_ronda`: nunca teve; sem ronda há 7
-  dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado).
+  dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado). As réguas de cada alerta
+  ficam atrás do "!" abaixo da tabela (Levi, 18/10/2026: "deve ficar em um símbolo de exclamação abaixo da tabela!"),
+  fechadas ao abrir a tela.
 - **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
@@ -730,6 +732,23 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
 A peça 2 da Visão (Levi: os responsáveis largarem os painéis próprios). Responde "qual equipe cobrar": a aba `modo=ranking`
 mostra um cartão por equipe das usinas do filtro (o responsável logado vê as dele; quem não é responsável, todas), da pior
 para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md`.
+- **Filtrado, o ranking é o mesmo** (Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados, o que
+  está acontecendo agora é que se eu filtro [um responsável] vai contar de 1 a 11"): `ranking_equipes.classificar` faz a
+  nota, a posição, o "de N" e a seta sobre TODAS as equipes; o filtro (responsável, cliente, busca, equipe) só escolhe os
+  cartões, e o cartão é o da equipe inteira. Os números de cima são os dos cartões que aparecem. O "Sem equipe" fica com
+  as usinas do filtro (é a lista do conserto no cadastro). Medido em 18/10/2026: nenhuma das 55 equipes tem usina de dois
+  responsáveis; o responsável com 12 equipes passou de 1º a 12º para 7º a 42º de 52.
+- **O motivo da nota** (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe
+  estar abaixo para que o supervisor possa cobrar a equipe"): o clique no cartão abre a janela
+  `/t/campo/responsaveis/equipe?equipe=` (`ranking_equipes.motivos`, o pedaço `_resp_equipe.html`). A nota perde 100 −
+  nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte da qualidade vai a cada critério da
+  nota do App (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas 25, fotos 20, descrição
+  das fotos 10, assinatura 10, observação 15, GPS 20, que somam a nota; medido em 18/10/2026, fecha em 3.790 de 3.790
+  tarefas) e às rondas (os pontos que perderam, com as falhas que o App aponta). Os inteiros da tela são repartidos pelo
+  maior resto e sempre fecham com a nota (provado nas 52 equipes). Depois: as 5 notas mais baixas (tarefas iguais da
+  mesma OS numa linha, "7 tarefas iguais"), a média por técnico, as usinas sem ronda e o link à Visão geral da equipe.
+  `responsaveis.ranking_detalhe` lê as MESMAS linhas da conta (o número de notas bate com o do cartão nas 52 equipes).
+  A janela leva 0,1 s; sem as notas do App, diz.
 
 - **A posição é a régua do App** ("de acordo com as regras do ranking do app de campo"): o Ranking por região do painel
   do App (`_ranking_regioes`), a única conta por equipe que o App tem (o placar do ciclo é só por técnico). Nota = 60%
@@ -755,10 +774,12 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
 - **De onde vem:** `responsaveis.ranking_fonte` agrega por usina, nos dois períodos, na cópia de 5 min da Visão (as duas
   leituras já estão no ciclo quando a Visão é feita); `ranking_equipes.cartoes` agrupa no pedido, porque os filtros e o
   limite das atrasadas são de quem olha. Nada novo no banco. Sem as notas, a aba diz e não mostra cartão.
-- **O filtro `equipe=`**: o cartão abre a Visão geral só com as usinas da equipe (o nome exato do cadastro), com o "×";
-  a volta aos cartões dos responsáveis tira o filtro (revisão de 18/10/2026: ele vazava escondido para lá).
-- **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta;
-  mutações pegas) e os testes da aba em `tests/test_campo_responsaveis.py`. Com o banco real (18/10/2026, só GET, o
+- **O filtro `equipe=`**: o endereço do cartão (quem abre noutra aba) e o link da janela do motivo levam à Visão geral só
+  com as usinas da equipe (o nome exato do cadastro), com o "×"; a volta aos cartões dos responsáveis tira o filtro
+  (revisão de 18/10/2026: ele vazava escondido para lá).
+- **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta,
+  a posição com filtro, o motivo que fecha com a nota; mutações pegas) e os testes da aba e da janela em
+  `tests/test_campo_responsaveis.py` (`duas_equipes`: a SC Oeste 01 com nota, 2ª de 2 com qualquer filtro). Com o banco real (18/10/2026, só GET, o
   `test_client` com a sessão de administrador e o HTML servido local): em "Todos", 55 cartões (52 ranqueadas, notas de 41
   a 98; 2 sem nota; 1 "Sem equipe"); o responsável com mais equipes vê 12. O agrupamento no pedido leva 7 a 8 ms para as
   55; a conta fria da Visão ficou em 22 a 24 s, como antes (as leituras do ranking já estão no ciclo). A 1440 e a 375 px,
@@ -800,24 +821,35 @@ COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO" e "deixe mais adaptá
   e Extintores. As células são os `valores` de cada bloco, com a mesma cor; o valor da Performance abre o dia a dia; a
   etiqueta de cada bloco (parada, ativos) vai no nome; ao abrir, o detalhe dos três blocos (o macro `det_bloco`).
   "Pausadas" (o nome do Levi) é a tarefa fora da programação; "parada" fica para a usina parada.
-- **O clique:** o nome do bloco ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta; `manut`:
-  `ordem_da_manutencao`; `acomp`: a pior ronda) e destaca as colunas dele (`lista_geral`, `bloco_geral`); clicar de novo
-  volta à ordem geral (a do foco). O "pedem atenção", "focar", "acompanhar" e cada número FILTRAM (`filtro=`;
-  `FILTROS_GERAL` guarda a condição de cada um, a MESMA que conta o número no `soma`, nenhuma régua nova) e destacam o
-  bloco deles, MAS a lista segue na ordem do foco (revisão de 18/10/2026: "PT esperando" ordenado pela ronda jogava a PT
-  parada hoje para o fim, contra a regra da tela). Chave que não existe é ignorada; número zero não é link; OS abertas
-  não filtra; o × limpa. O filtro e o bloco seguem quando se troca o responsável, o cliente ou a busca; o "Todos os
+- **O clique:** o bloco (o cartão inteiro, não só o nome: "deve ser possível clicar no bloco (...) inteiro, e não só no
+  título"; o link do nome cobre o cartão pelo `::after`) ORDENA a lista pela régua do bloco (`bloco=perf`: a pior meta;
+  `manut`: `ordem_da_manutencao`; `acomp`: a pior ronda) e destaca as colunas dele (`lista_geral`, `bloco_geral`);
+  clicar de novo volta à ordem geral (a do foco). O "pedem atenção", "focar", "acompanhar" e cada número, por cima do
+  link do bloco, FILTRAM ("funcionará como filtro os KPIs do bloco"; `filtro=`; `FILTROS_GERAL` guarda a condição de
+  cada um, a MESMA que conta o número no `soma`, nenhuma régua nova: o "Abaixo da meta: 80" mostra as 80 usinas) e
+  destacam o bloco deles, MAS a lista segue na ordem do foco (revisão de 18/10/2026: "PT esperando" ordenado pela ronda
+  jogava a PT parada hoje para o fim, contra a regra da tela). Chave que não existe é ignorada; número zero não é link;
+  o OS abertas filtra as usinas com OS em processo ou em verificação (`manut.os`); o × limpa. O filtro e o bloco seguem quando se troca o responsável, o cliente ou a busca; o "Todos os
   responsáveis ×" fica na Visão geral, e o cartão de um responsável abre sem filtro. A bolinha da linha é o nível do
   bloco destacado (sem bloco, o da usina); a zeladoria vencida (fora das colunas) vai como etiqueta no nome.
 - **A largura:** as colunas dividem a largura em frações (a Usina com 160 px no mínimo e duas partes), e o valor quebra
   a linha se precisar. De 1181 a 1366 px (o notebook comum) ficam as colunas principais: Meta, Disp., Atrasadas,
   Pausadas, Semana passada, Ronda e PT (o resto no detalhe). Até 1180 px a lista vira cartões, com as etiquetas P, M e A
-  na cor do nível de cada bloco e o alerta principal (a do bloco destacado, com contorno). O realce das colunas é o
-  cinza `--superficie-3` (o verde-suave apagava as células verdes).
+  na cor do nível de cada bloco e o alerta principal (a do bloco destacado, com contorno).
+- **O destaque do bloco** (Levi, 18/10/2026: "esse destaque em azul tá feio (...) Mude para um verde grid com uma
+  transparência de 70% pegando cabeçalho e célula pegando a área do bloco toda!"; visto na tela, "o verde está muito
+  forte, deixe 1/3 do que está" e "tem que ser uma cor só destacando a área inteira (...) discreto mas que mostre!"): uma
+  área `--faixa-verde` (o verde Grid a 10% já misturado na superfície, opaco) do nome do grupo à última usina, nas
+  colunas do bloco e no espaço entre elas. É o `::before` de cada linha da grade, posto nas colunas do bloco pelo
+  `data-bloco` da lista e por cima da linha que separa as usinas (por isso opaco: translúcido, as linhas apareciam como
+  listras). A 1366 px, nas colunas que sobram; nos cartões, sai. Com o verde fraco, o "em dia" verde segue legível (o
+  porquê do cinza que havia antes, quando o realce era o verde-suave).
 - **O centro das colunas:** o cabeçalho e as células `cr-col-*` ficam no centro (`.cr-g > [class*="cr-col-"]`); a Usina,
   à esquerda.
 - **Prova (18/10/2026, o banco real só lido):** 131 usinas; o clique em Manutenção pôs as críticas da Manutenção em cima,
-  com as colunas realçadas; a 1920, 1440, 1300 e 375 px, nos dois temas, sem rolagem de lado.
+  com as colunas realçadas; a 1920, 1440, 1300 e 375 px, nos dois temas, sem rolagem de lado. Na mesma noite, o bloco
+  inteiro: o clique no vazio do cartão ordena e cada um dos 12 números leva ao filtro dele (OS abertas: 2.697 OS em 127
+  usinas, a lista com as 127); a faixa verde a 1440 e 1300 px nos dois temas, fora a 375 px.
 
 ### O mapa das usinas na Visão geral (18/10/2026)
 
