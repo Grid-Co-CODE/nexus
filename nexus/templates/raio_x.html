@@ -20,16 +20,19 @@
 {% if travamentos %}<div class="cad-aviso cad-aviso--{{ 'critico' if travamentos.classe == 'critico' else ('alerta' if travamentos.classe == 'alerta' else 'ok') }}"><i class="ph ph-clock-countdown"></i><div><strong>{{ travamentos.rotulo }}.</strong> {{ travamentos.detalhe }}{% if travamentos.titulo %}<br><span class="mudo">{{ travamentos.titulo }}</span>{% endif %}</div></div>{% endif %}
 {% if not ligado %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>O registro dos pedidos só liga no servidor (servir.py): aqui não há pedidos para mostrar.</div></div>{% endif %}
 
-{% if quem %}
+{% if quem %}{% set lista = quem.anterior if quem.atrasado else quem %}
 <section class="cad-secao">
   <h2>Quem ocupa a memória da máquina</h2>
+  {% if quem.atrasado %}<p class="cad-pe">O /proc não respondeu em {{ "%g"|format(prazo_memoria) }} s: a máquina está esperando o disco (o swap). {% if lista %}Abaixo, a lista das {{ quem.anterior_quando }}.{% else %}Leia de novo em instantes.{% endif %}</p>{% endif %}
+  {% if lista %}
   <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
     <thead><tr><th>Programa</th><th>Memória</th><th>No swap</th><th>Processos</th></tr></thead>
-    <tbody>{% for p in quem.programas %}
+    <tbody>{% for p in lista.programas %}
       <tr><td><span class="gc-dado">{{ p.programa }}</span></td><td class="gc-num">{{ p.mem_mb }} MB</td><td class="gc-num">{{ p.swap_mb }} MB</td><td class="gc-num">{{ p.processos }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
-  <p class="cad-pe">{% if quem.outros %}E mais {{ quem.outros }} programa{{ "s" if quem.outros != 1 }}: {{ quem.outros_mem_mb }} MB de memória, {{ quem.outros_swap_mb }} MB no swap. {% endif %}A memória de cada programa é a própria de cada processo, somada, mais a compartilhada uma vez só (os buffers do banco aparecem em todo processo dele).</p>
+  <p class="cad-pe">{% if lista.outros %}E mais {{ lista.outros }} programa{{ "s" if lista.outros != 1 }}: {{ lista.outros_mem_mb }} MB de memória, {{ lista.outros_swap_mb }} MB no swap. {% endif %}A memória de cada programa é a própria de cada processo, somada, mais a compartilhada uma vez só (os buffers do banco aparecem em todo processo dele).</p>
+  {% endif %}
 </section>
 {% endif %}
 

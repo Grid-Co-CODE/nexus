@@ -196,7 +196,11 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   buffers do PostgreSQL aparecem em todo processo dele) e o swap (VmSwap); o Nexus é "este processo", e do Python sai só
   o arquivo do script e a pasta dele, nunca a linha de comando (pode ter senha). O caso: Raio-X das 14:17 de 20/10, 0,2
   GB livres de 7,1 GB e 3,2 GB no swap com o Nexus em 690 MB, e o PDF das 13:45 1 min "trabalhando" no desenho do logo.
-  Prova: `tests/test_raio_x_memoria_por_programa.py`.
+  **A lista sai de uma thread à parte, com prazo de 2 s** (`_memoria_por_programa`): na travada das 16:12 de 20/10 o
+  próprio Raio-X ficou 4 min 18 s preso em `_ler_proc`, porque ler a linha de comando de um processo que está no swap faz
+  o kernel trazê-la do disco, e com o disco tomado ela não volta. Passou do prazo, a página diz que o /proc não respondeu
+  e mostra a última lista; enquanto a leitura presa não volta, nenhuma outra é aberta; o nome de cada processo é lido uma
+  vez só (`_ROTULOS`). Prova: `tests/test_raio_x_memoria_por_programa.py`.
 - **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O

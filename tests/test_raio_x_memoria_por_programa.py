@@ -4,9 +4,18 @@ no desenho do logo (coisa de milissegundos). Levi escolheu ver no Raio-X quem oc
 processo (só leitura, quando o Raio-X abre), somado por programa. Aqui o /proc é de mentira."""
 import os
 
+import pytest
+
 from nexus.casca import raio_x as R
 
 EU = os.getpid()                       # este processo é o Nexus
+
+
+@pytest.fixture(autouse=True)
+def _memoria_limpa(monkeypatch):
+    """Os nomes guardados por processo e a última lista não passam de um teste para outro."""
+    monkeypatch.setattr(R, "_ROTULOS", {}, raising=False)
+    monkeypatch.setattr(R, "_MEMORIA", {"thread": None, "ultimo": None, "quando": None}, raising=False)
 
 
 def _status(nome, anon_kb, shmem_kb=0, swap_kb=0):
@@ -64,6 +73,64 @@ def test_a_linha_de_comando_nao_aparece(monkeypatch):
 def test_sem_o_proc_do_linux_nao_ha_lista(monkeypatch):
     monkeypatch.setattr(R, "_pids", lambda: [])
     assert R._quem_ocupa() is None
+
+
+def _proc_preso(monkeypatch, solta):
+    """O /proc com a linha de comando de um processo que não volta (a página dele está no swap) até `solta`."""
+    _proc(monkeypatch)
+    ler_ok = R._ler_proc
+
+    def ler(nome):
+        if nome.endswith("/cmdline"):
+            solta.wait(10)
+        return ler_ok(nome)
+    monkeypatch.setattr(R, "_ler_proc", ler)
+
+
+def test_o_proc_preso_nao_prende_o_raio_x(monkeypatch):
+    """Raio-X das 16:16 de 20/10/2026: a máquina trocando com o disco e o Raio-X 4 min 18 s parado em `_ler_proc`. Ler a
+    linha de comando de um processo que está no swap faz o kernel trazê-la do disco, e com o disco tomado ela não volta.
+    A lista sai de uma thread à parte com prazo; enquanto aquela não voltar, nenhuma outra é aberta."""
+    import threading
+    import time
+    solta = threading.Event()
+    _proc_preso(monkeypatch, solta)
+    monkeypatch.setattr(R, "_ROTULOS", {})
+    monkeypatch.setattr(R, "_MEMORIA", {"thread": None, "ultimo": None, "quando": None})
+    try:
+        t0 = time.monotonic()
+        q = R._memoria_por_programa(prazo_s=0.2)
+        assert time.monotonic() - t0 < 2 and q["atrasado"] and q["anterior"] is None
+        vivas = threading.active_count()
+        assert R._memoria_por_programa(prazo_s=0.1)["atrasado"] and threading.active_count() == vivas   # nada de outra
+    finally:
+        solta.set()
+    R._MEMORIA["thread"].join(5)
+    q = R._memoria_por_programa(prazo_s=5)                             # o /proc voltou: a lista de novo
+    assert not q.get("atrasado") and q["programas"][0]["programa"] == "python3 · plataforma/servir.py"
+
+
+def test_a_linha_de_comando_e_lida_uma_vez_por_processo(monkeypatch):
+    _proc(monkeypatch)
+    lidas, ler_ok = [], R._ler_proc
+    monkeypatch.setattr(R, "_ler_proc", lambda nome: (lidas.append(nome) if nome.endswith("/cmdline") else None)
+                        or ler_ok(nome))
+    monkeypatch.setattr(R, "_ROTULOS", {})
+    R._quem_ocupa()
+    n = len(lidas)
+    assert n == 2 and R._quem_ocupa()["programas"][0]["programa"] == "python3 · plataforma/servir.py"
+    assert len(lidas) == n                                              # a 2ª vez, do que já foi lido
+
+
+def test_a_pagina_com_o_proc_preso_diz_isso_e_mostra_a_anterior(app, logado, monkeypatch):
+    monkeypatch.setattr(R, "_processador", lambda janela_s=1.0: {"pct": 13, "nucleos": 4, "carga": [3.08, 3.65, 3.79],
+                                                                   "maquina": None})
+    monkeypatch.setattr(R, "_memoria_por_programa", lambda prazo_s=R.PRAZO_MEMORIA_S: {
+        "atrasado": True, "anterior_quando": "16:05:10",
+        "anterior": {"programas": [{"programa": "python · worker.py", "mem_mb": 3277, "swap_mb": 391, "processos": 1}],
+                     "outros": 0, "outros_mem_mb": 0, "outros_swap_mb": 0}})
+    h = logado.get("/t/base/raio-x").get_data(as_text=True)
+    assert "O /proc não respondeu em 2 s" in h and "a lista das 16:05:10" in h and "python · worker.py" in h
 
 
 def test_a_pagina_mostra_quem_ocupa_a_memoria(app, logado, monkeypatch):

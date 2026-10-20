@@ -157,6 +157,17 @@ def _pids() -> list[int]:
         return []
 
 
+# A lista da memória por programa sai de uma thread à parte, com prazo (Raio-X das 16:16 de 20/10/2026: a máquina
+# trocando com o disco e o próprio Raio-X 4 min 18 s parado em `_ler_proc`). Ler a linha de comando de um processo que
+# está no swap faz o kernel trazê-la do disco, e com o disco tomado ela não volta; a ferramenta da lentidão não pode
+# travar na lentidão. Enquanto a leitura presa não volta, nenhuma outra é aberta, e a página mostra a última lista. O
+# nome de cada processo é lido uma vez só: a linha de comando de um pid não muda.
+PRAZO_MEMORIA_S = 2.0
+_ROTULOS: dict = {}                    # (pid, nome) -> o nome do programa na lista
+_MEMORIA = {"thread": None, "ultimo": None, "quando": None}
+_MEMORIA_TRAVA = threading.Lock()
+
+
 def _programa(pid: int, nome: str) -> str:
     """O nome do programa na lista da memória. O do Python leva o script (o Nexus e a plataforma de Performance são
     ambos python): só o arquivo e a pasta dele, nunca a linha de comando inteira, que pode ter senha."""
@@ -164,13 +175,37 @@ def _programa(pid: int, nome: str) -> str:
         return "Nexus (este processo)"
     if not nome.startswith("python"):
         return nome
-    args = _ler_proc(f"{pid}/cmdline").split("\0")
-    for i, a in enumerate(args[1:], 1):
-        if a == "-m" and i + 1 < len(args):
-            return f"{nome} · -m {args[i + 1]}"
-        if a.endswith(".py"):
-            return f"{nome} · " + "/".join(a.replace("\\", "/").split("/")[-2:])
-    return nome
+    rotulo = _ROTULOS.get((pid, nome))
+    if rotulo is None:
+        rotulo = nome
+        args = _ler_proc(f"{pid}/cmdline").split("\0")
+        for i, a in enumerate(args[1:], 1):
+            if a == "-m" and i + 1 < len(args):
+                rotulo = f"{nome} · -m {args[i + 1]}"
+                break
+            if a.endswith(".py"):
+                rotulo = f"{nome} · " + "/".join(a.replace("\\", "/").split("/")[-2:])
+                break
+        _ROTULOS[(pid, nome)] = rotulo
+    return rotulo
+
+
+def _memoria_por_programa(prazo_s: float = PRAZO_MEMORIA_S):
+    """`_quem_ocupa` numa thread à parte, esperando no máximo `prazo_s`. Passou do prazo: {"atrasado": True, "anterior":
+    a última lista que voltou (ou None), "anterior_quando"}; com a leitura anterior ainda presa, não abre outra."""
+    with _MEMORIA_TRAVA:
+        t = _MEMORIA["thread"]
+        if t is None or not t.is_alive():
+            def ler():
+                r = _quem_ocupa()
+                _MEMORIA.update(ultimo=r, quando=time.strftime("%H:%M:%S"))
+            t = threading.Thread(target=ler, name="nexus-raio-x-memoria", daemon=True)
+            _MEMORIA["thread"] = t
+            t.start()
+    t.join(prazo_s)
+    if t.is_alive():
+        return {"atrasado": True, "anterior": _MEMORIA["ultimo"], "anterior_quando": _MEMORIA["quando"]}
+    return _MEMORIA["ultimo"]
 
 
 def _quem_ocupa(teto: int = 6):
@@ -178,7 +213,11 @@ def _quem_ocupa(teto: int = 6):
     (RssAnon), a compartilhada uma vez só por programa (RssShmem: os buffers do PostgreSQL aparecem em todo processo
     dele, e somá-los contaria a mesma memória várias vezes) e o swap (VmSwap). None fora do Linux."""
     grupos = {}
-    for pid in _pids():
+    pids = _pids()
+    vivos = set(pids)
+    for chave in [k for k in list(_ROTULOS) if k[0] not in vivos]:          # o processo que saiu leva o nome junto
+        _ROTULOS.pop(chave, None)
+    for pid in pids:
         texto = _ler_proc(f"{pid}/status")
         kb = _kb(texto, "Name", "RssAnon", "RssShmem", "VmSwap")
         if "RssAnon" not in kb:                     # thread do kernel, ou o processo já saiu
@@ -227,6 +266,7 @@ def registrar_raio_x(bp) -> None:
         if teto and teto["ultimo_recusado"]:
             teto["ultimo_txt"] = time.strftime("%d/%m %H:%M", time.localtime(teto["ultimo_recusado"]))
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
-                               threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_quem_ocupa(),
+                               threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
+                               prazo_memoria=PRAZO_MEMORIA_S,
                                travamentos=P.cartao(app) if estado is not None else None,
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))
