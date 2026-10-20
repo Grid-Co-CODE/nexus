@@ -22,11 +22,13 @@ clique do administrador:
 
 Nada é gravado nem vai à rede; a pilha só sai como rótulo (arquivo, linha e função), nunca com dados.
 """
+import json
 import os
 import sys
 import threading
 import time
 import traceback
+from datetime import datetime
 
 from flask import current_app, render_template, session
 
@@ -190,22 +192,67 @@ def _programa(pid: int, nome: str) -> str:
     return rotulo
 
 
-def _memoria_por_programa(prazo_s: float = PRAZO_MEMORIA_S):
-    """`_quem_ocupa` numa thread à parte, esperando no máximo `prazo_s`. Passou do prazo: {"atrasado": True, "anterior":
-    a última lista que voltou (ou None), "anterior_quando"}; com a leitura anterior ainda presa, não abre outra."""
+def _com_prazo(estado: dict, funcao, prazo_s: float, nome: str):
+    """`funcao()` numa thread à parte, esperando no máximo `prazo_s`. Passou do prazo: {"atrasado": True, "anterior": o
+    último resultado que voltou (ou None), "anterior_quando"}; com a leitura anterior ainda presa, não abre outra."""
     with _MEMORIA_TRAVA:
-        t = _MEMORIA["thread"]
+        t = estado["thread"]
         if t is None or not t.is_alive():
             def ler():
-                r = _quem_ocupa()
-                _MEMORIA.update(ultimo=r, quando=time.strftime("%H:%M:%S"))
-            t = threading.Thread(target=ler, name="nexus-raio-x-memoria", daemon=True)
-            _MEMORIA["thread"] = t
+                r = funcao()
+                estado.update(ultimo=r, quando=time.strftime("%H:%M:%S"))
+            t = threading.Thread(target=ler, name=nome, daemon=True)
+            estado["thread"] = t
             t.start()
     t.join(prazo_s)
     if t.is_alive():
-        return {"atrasado": True, "anterior": _MEMORIA["ultimo"], "anterior_quando": _MEMORIA["quando"]}
-    return _MEMORIA["ultimo"]
+        return {"atrasado": True, "anterior": estado["ultimo"], "anterior_quando": estado["quando"]}
+    return estado["ultimo"]
+
+
+def _memoria_por_programa(prazo_s: float = PRAZO_MEMORIA_S):
+    """`_quem_ocupa` com prazo (`_com_prazo`)."""
+    return _com_prazo(_MEMORIA, _quem_ocupa, prazo_s, "nexus-raio-x-memoria")
+
+
+# Dentro do worker da plataforma de Performance (20/10/2026). No servidor o worker foi de 3,7 para 5,0 GB (com o swap) em
+# 26 min, entre 16:12 e 16:38, e o Nexus travou esperando o disco; a medição de dentro só dava no PC, que não roda os
+# backfills do servidor. A cada 10 min o próprio worker grava em /dev/shm quanto cada variável dele ocupa, por amostra,
+# com as últimas 3 h (PerformancePainel, `_relatorio_memoria_worker`); aqui só se lê, com o mesmo prazo (no swap, até a
+# memória compartilhada espera o disco). Relatório parado há mais de WORKER_VELHO_MIN = o worker não está anotando.
+RELATORIO_WORKER = "/dev/shm/gridco_plataforma_worker.json"
+WORKER_VELHO_MIN = 30
+_WORKER = {"thread": None, "ultimo": None, "quando": None}
+
+
+def _ler_relatorio_worker(caminho: str | None = None, agora: datetime | None = None):
+    """O relatório do worker e o de ~1 h antes (a passada mais nova com ao menos 50 min de diferença). None sem ele."""
+    try:
+        with open(caminho or RELATORIO_WORKER, encoding="utf-8") as f:
+            rel = json.load(f)
+        quando = datetime.fromisoformat(rel["quando"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    antes_q, antes = None, {}
+    for h in rel.get("historico") or []:
+        try:
+            q = datetime.fromisoformat(h["quando"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if (quando - q).total_seconds() >= 50 * 60:
+            antes_q, antes = q, h
+    idade = round(((agora or datetime.now()) - quando).total_seconds() / 60)
+    ant = antes.get("caches") or {}
+    return {"quando": quando.strftime("%H:%M"), "idade_min": idade, "velho": idade > WORKER_VELHO_MIN,
+            "rss_mb": rel.get("rss_mb"), "swap_mb": rel.get("swap_mb"), "parcial": bool(rel.get("parcial")),
+            "antes_quando": antes_q.strftime("%H:%M") if antes_q else None,
+            "rss_antes_mb": antes.get("rss_mb"), "swap_antes_mb": antes.get("swap_mb"),
+            "caches": [dict(c, antes_mb=ant.get(c.get("nome"))) for c in (rel.get("caches") or [])[:10]]}
+
+
+def _worker_plataforma(prazo_s: float = PRAZO_MEMORIA_S):
+    """`_ler_relatorio_worker` com prazo (`_com_prazo`)."""
+    return _com_prazo(_WORKER, _ler_relatorio_worker, prazo_s, "nexus-raio-x-worker")
 
 
 def _quem_ocupa(teto: int = 6):
@@ -267,6 +314,6 @@ def registrar_raio_x(bp) -> None:
             teto["ultimo_txt"] = time.strftime("%d/%m %H:%M", time.localtime(teto["ultimo_recusado"]))
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
-                               prazo_memoria=PRAZO_MEMORIA_S,
+                               worker=_worker_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
                                travamentos=P.cartao(app) if estado is not None else None,
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

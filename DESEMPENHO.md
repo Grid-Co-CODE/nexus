@@ -74,7 +74,8 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 | 20/10 | volta da tela de um chamado ao Acompanhamento "travada" | quadro de 3 min, e cada gravação da tela (ticket, finalizar, responsável) apagava o quadro: a volta relia a lista e os tickets do Fracttal | quadro de 30 min (Levi: "só pesquisar caso a singrid clique em atualizar"), a gravação ajusta a cópia, o teto da memória a tira por último | `d59aef1` (chat de chamados) |
 | 20/10 | 3 testes do oem falhando desde 14/10; com a sessão do Fracttal caída, a tela inicial do OS Creator não voltava ao login | `bb91eb0` tirou o selo de dentro da tela (ela não espera o Fracttal) e o 401 do `/os/api/selo` era ignorado | o script do selo leva ao login com o 401 (como o `acomp.js`), conferido no navegador; os 3 testes do oem cobram o selo pelo `/os/api/selo` (no disco do oem, sem commit lá: decisão do Levi) | `39f806d` |
 | 20/10 | Raio-X das 14:17: 0,2 GB livres de 7,1 GB, 3,2 GB no swap trocando 4,5 MB/s, disco 60% do tempo, com o Nexus em 690 MB | a máquina sem memória, e a página não dizia de quem eram os outros ~6 GB | a seção "Quem ocupa a memória da máquina" (somada por programa, pelo /proc de cada processo) | `57d5217` |
-| 20/10 | travada das 16:12 (GET /os/ ~4 min em linhas de microssegundos) e o próprio Raio-X 4 min 18 s preso em `_ler_proc` | a máquina trocando com o disco (o Nexus com 1,5 GB no swap); ler a linha de comando de um processo no swap espera o disco | a lista da memória numa thread à parte com prazo de 2 s, uma leitura presa por vez, o nome de cada processo lido uma vez | este |
+| 20/10 | travada das 16:12 (GET /os/ ~4 min em linhas de microssegundos) e o próprio Raio-X 4 min 18 s preso em `_ler_proc` | a máquina trocando com o disco (o Nexus com 1,5 GB no swap); ler a linha de comando de um processo no swap espera o disco | a lista da memória numa thread à parte com prazo de 2 s, uma leitura presa por vez, o nome de cada processo lido uma vez | `7d9de73` |
+| 20/10 | o worker da plataforma de 3,7 para 5,0 GB (com o swap) em 26 min (16:12 a 16:38), e o que crescia no servidor ninguém via (a medição de dentro só dava no PC, sem os backfills de lá) | — | o worker grava a cada 10 min, em /dev/shm, quanto cada variável ocupa (por amostra, últimas 3 h; PerformancePainel), e o Raio-X mostra "Dentro do worker da plataforma", agora × 1 h antes | este |
 
 ## A fila
 
@@ -85,10 +86,14 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
    16:12 o worker tinha 3,3 GB e o Nexus 1,5 GB no swap, e tudo esperava o disco. O worker cresce ao longo do dia: medido
    dentro do worker do PC (15:18), o dia de hoje dos trackers da API PV (~2,6 milhões de pontos às 15:24, um dict de
    ~218 B cada; ~850 MB à noite), as strings da 2C (518 MB, hoje e ontem) e ~0,7 GB de outros caches, mais ~1,3 GB do
-   próprio processo. Correções na plataforma (repositório PerformancePainel, ramo `desempenho/memoria-worker`): as strings
-   da 2C com um datetime por minuto (−35%, montagem de minutos para segundos) e o worker devolvendo ao Linux a memória
-   solta (2 arenas de malloc, `malloc_trim` a cada passada do faxineiro). O dia de trackers compacto (o maior ganho,
-   ~400–570 MB) espera: Levi, 20/10, "não mexa nos trackers agora". Mais memória no notebook é a outra saída (T.I.).
+   próprio processo. No ar na plataforma desde 16:51 de 20/10 (`f3a8200`): as strings da 2C com um datetime por minuto
+   (−35%, montagem de minutos para segundos) e o worker devolvendo ao Linux a memória solta (2 arenas de malloc,
+   `malloc_trim` a cada passada do faxineiro). Entre 16:12 e 16:38 ele foi de 3,7 para 5,0 GB (com o swap) no servidor,
+   rápido demais para o que se mediu no PC: um backfill que só roda lá. **Próximo passo:** na próxima subida, o print da
+   seção "Dentro do worker da plataforma" do Raio-X diz qual variável cresce. O dia de trackers compacto (o maior ganho
+   conhecido, ~400–570 MB) espera: Levi, 20/10, "não mexa nos trackers agora". O worker só se recicla de madrugada com
+   12 h no ar (cada deploy da plataforma zera a conta), e no servidor não se sabe o que o religa quando ele sai (o
+   guardião é do Windows): perguntar à T.I. Mais memória no notebook é a outra saída (T.I.).
 3. **Clima e risco:** 21 s de processador na 1ª carga (o LZW do GeoTIFF do INPE em Python puro, 183 pedidos; volta a cada
    6 h, a cada deploy e a cada 15 min com o INPE atrasado). Proposta: o decodificador do Pillow (em C) por tile e uma
    cópia em disco.

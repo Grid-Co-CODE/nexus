@@ -200,7 +200,13 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   próprio Raio-X ficou 4 min 18 s preso em `_ler_proc`, porque ler a linha de comando de um processo que está no swap faz
   o kernel trazê-la do disco, e com o disco tomado ela não volta. Passou do prazo, a página diz que o /proc não respondeu
   e mostra a última lista; enquanto a leitura presa não volta, nenhuma outra é aberta; o nome de cada processo é lido uma
-  vez só (`_ROTULOS`). Prova: `tests/test_raio_x_memoria_por_programa.py`.
+  vez só (`_ROTULOS`). Prova: `tests/test_raio_x_memoria_por_programa.py`. **E dentro do worker da plataforma**
+  (`_worker_plataforma`, 20/10/2026): a cada 10 min o worker da plataforma de Performance grava em
+  `/dev/shm/gridco_plataforma_worker.json` (`RELATORIO_WORKER`) quanto cada variável dele ocupa, por amostra, com as
+  últimas 3 h (PerformancePainel, `_relatorio_memoria_worker`); o Raio-X mostra agora × ~1 h antes, com o mesmo prazo de
+  2 s, e avisa quando o relatório tem mais de 30 min (o worker parou de anotar). O caso: no servidor o worker foi de 3,7
+  para 5,0 GB (com o swap) entre 16:12 e 16:38 de 20/10, e a medição de dentro só dava no PC, que não roda os backfills do
+  servidor. Prova: `tests/test_raio_x_worker_plataforma.py`.
 - **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O

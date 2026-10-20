@@ -36,6 +36,23 @@
 </section>
 {% endif %}
 
+{% if worker %}{% set w = worker.anterior if worker.atrasado else worker %}
+<section class="cad-secao">
+  <h2>Dentro do worker da plataforma</h2>
+  {% if worker.atrasado %}<p class="cad-pe">O relatório do worker não respondeu em {{ "%g"|format(prazo_memoria) }} s.{% if w %} Abaixo, o lido às {{ worker.anterior_quando }}.{% endif %}</p>{% endif %}
+  {% if w %}
+  <p class="cad-pe">Relatório das {{ w.quando }} (há {{ w.idade_min }} min): o worker ocupa {{ w.rss_mb }} MB{% if w.swap_mb %} e {{ w.swap_mb }} MB no swap{% endif %}{% if w.antes_quando %}; às {{ w.antes_quando }}, {{ w.rss_antes_mb }} MB{% if w.swap_antes_mb %} e {{ w.swap_antes_mb }} MB no swap{% endif %}{% endif %}.{% if w.velho %} <strong>O worker não anota há {{ w.idade_min }} min (anota a cada 10): pode estar parado.</strong>{% endif %}</p>
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
+    <thead><tr><th>Variável</th><th>Agora</th><th>{% if w.antes_quando %}Às {{ w.antes_quando }}{% else %}1 h antes{% endif %}</th><th>Itens</th></tr></thead>
+    <tbody>{% for c in w.caches %}
+      <tr><td><span class="gc-dado">{{ c.nome }}</span></td><td class="gc-num">{{ c.mb|round|int }} MB</td><td class="gc-num">{% if c.antes_mb is not none %}{{ c.antes_mb|round|int }} MB{% else %}—{% endif %}</td><td class="gc-num">{{ c.itens if c.itens is defined and c.itens is not none else "—" }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="cad-pe">Estimado por amostra pelo próprio worker a cada 10 min (o faxineiro dele, no PerformancePainel). A variável que cresce de uma coluna para a outra é a que está enchendo a máquina.{% if w.parcial %} Este relatório parou no teto de tempo: faltam variáveis.{% endif %}</p>
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="cad-secao">
   <h2>Pedidos em andamento, do mais antigo</h2>
   {% if pedidos %}
