@@ -16,7 +16,9 @@
       <p class="ac-sub">As subtarefas que descem na inspeção de chamado, por tipo de ativo e fornecedor: a base, depois o tipo, depois o fornecedor.</p>
     </div>
   </div>
-  <p class="aviso">O App de Campo, onde o técnico abre a maioria das inspeções, ainda usa o modelo que está no código dele. O que se salva aqui vale na hora para a Inspeção de chamados do OS Creator; o App passa a valer junto quando ler este mesmo banco.</p>
+  {# o App lê esta mesma aba desde a versão que aplica o `chamado_garantia.registro` (20/10/2026); até ela ser publicada,
+     ele segue o código dele. Publicada, este aviso sai. #}
+  <p class="aviso">O App de Campo, onde o técnico abre a maioria das inspeções, passa a usar esta mesma lista (fornecedores, tipos de ativo e perguntas) na versão que lê este banco; até ela ser publicada, ele usa o modelo do código dele. O que se salva aqui vale na hora para a Inspeção de chamados do OS Creator.</p>
   {% if not dados.pode_gravar %}<p class="aviso">Este servidor não tem a credencial de escrita do banco da Gridco: dá para ver e ajustar, mas não para salvar.</p>{% endif %}
   {% if erro_banco %}<p class="aviso err">O banco da Gridco não respondeu na última leitura ({{ erro_banco }}). A tela mostra o que estava valendo.</p>{% endif %}
   <div class="abas" id="f_abas"></div>

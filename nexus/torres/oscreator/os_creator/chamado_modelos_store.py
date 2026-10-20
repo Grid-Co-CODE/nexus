@@ -14,14 +14,15 @@ semente e rede de segurança. As chaves:
 
 Bloco sem linha no banco vale o do código. Com o banco fora do ar a tela funciona igual — só não salva.
 
-O QUE ISTO NÃO ALCANÇA: o App de Campo. Ele carrega a SUA cópia do pacote `chamado_garantia`, e é por ele que o
-técnico abre a maioria das inspeções. Até o App ler esta aba, o que se salva aqui vale para a Inspeção do OS Creator
-e o App segue no código. A tela diz isso em cima, porque é justamente a divergência que o pacote veio evitar ("a OS do
-supervisor e a do técnico pedindo coisas diferentes ao mesmo fabricante").
+O App de Campo: carrega a SUA cópia do pacote `chamado_garantia`, e é por ele que o técnico abre a maioria das
+inspeções. Desde 20/10/2026 a regra de pôr esta aba por cima do código mora no pacote (`chamado_garantia.registro`),
+para o App ler a mesma aba e aplicar igual (Levi: "quando a singrid adicione novos fabricantes em chamados > fabricantes
+apareça atualizado no app"). Enquanto o App não publicar a versão que lê a aba, ele segue no código.
 
-COMO VALE NO PROCESSO: `aplicar()` reescreve, EM MEMÓRIA e NO LUGAR, as estruturas do `chamado_garantia.spec` (e o
-`chamado_spec.CANAL`). No lugar, e não trocando o objeto, porque o `chamado_insp_spec` fez
-`from chamado_garantia.spec import BASE, POR_TIPO, …` — nomes presos ao objeto de origem. Nada no disco muda.
+COMO VALE NO PROCESSO: `aplicar()` reescreve, EM MEMÓRIA e NO LUGAR, as estruturas do `chamado_garantia.spec`
+(`registro.aplicar`) e o `chamado_spec.CANAL` (o canal de abertura, que é só do OS Creator). No lugar, e não trocando o
+objeto, porque o `chamado_insp_spec` fez `from chamado_garantia.spec import BASE, POR_TIPO, …` — nomes presos ao objeto
+de origem. Nada no disco muda.
 
 QUEM APLICA: o os_web chama `garantir()` antes de cada rota da Inspeção (TTL de 5 min). O app de mesa lê UMA vez, na
 abertura (`modelos_banco.py`: `carregar` no worker, `aplicar` na thread da interface) — o que se salva aqui chega nele
@@ -37,11 +38,12 @@ import time
 import chamado_insp_spec  # noqa: F401 — a ponte põe a raiz do repositório no sys.path, onde o pacote mora
 import chamado_spec as cs
 import gridco_abas as ga
+from chamado_garantia import registro as R
 from chamado_garantia import spec as sp
 
-WORKBOOK = "os_creator"
-NOME_ABA = "chamado_modelos"
-COLUNAS = ["chave", "valor"]
+WORKBOOK = R.WORKBOOK
+NOME_ABA = R.ABA
+COLUNAS = list(R.COLUNAS)
 TTL = 300          # s: de quanto em quanto tempo o processo relê o banco (a edição de outra máquina chega assim)
 TTL_ERRO = 60      # s: banco fora do ar → tenta de novo depois disto, sem travar cada requisição
 
@@ -51,7 +53,7 @@ SemCredencial = ga.SemCredencial
 TIPOS = tuple(sp.TIPO_ID)                       # texto, longo, num, simnao, verif, lista
 LIMITE_DESC = 250
 LIMITE_CANAL = 300
-LIMITE_NOME = 40
+LIMITE_NOME = R.LIMITE_NOME
 
 
 class Conflito(RuntimeError):
@@ -63,20 +65,11 @@ class Conflito(RuntimeError):
                          % ((" (%s)" % por) if por else ""))
 
 
-# ── a foto do código, tirada na importação — é a ela que `aplicar` sempre volta antes de pôr o banco por cima ─────
-def _foto() -> dict:
-    return {"BASE": copy.deepcopy(sp.BASE), "POR_TIPO": copy.deepcopy(sp.POR_TIPO),
-            # deepcopy por marca quebra a identidade dos clones de propósito: ela é refeita por `CLONES`
-            "POR_FABRICANTE": {m: copy.deepcopy(v) for m, v in sp.POR_FABRICANTE.items()},
-            "TIPOS_DA_MARCA": copy.deepcopy(sp.TIPOS_DA_MARCA), "MARCAS_CONHECIDAS": list(sp.MARCAS_CONHECIDAS),
-            "CANAL": dict(cs.CANAL)}
-
-
-_ORIG = _foto()
+# ── a foto do código (a do pacote, tirada na importação dele) e o canal, que é só daqui ─────────────────────────────
+_ORIG = dict(R._ORIG, CANAL=copy.deepcopy(dict(cs.CANAL)))
 # No código, Brametal e Romiotto não têm lista própria: são o MESMO objeto da STI e da Hukseflux (chamado_spec,
 # "CLONES (28/07)"). Enquanto ninguém salvar o clone sozinho, ele segue o original — inclusive a versão editada dele.
-CLONES = {c: o for c, o in {"Brametal": "STI", "Romiotto": "Hukseflux"}.items()
-          if c in sp.POR_FABRICANTE and sp.POR_FABRICANTE.get(c) is sp.POR_FABRICANTE.get(o)}
+CLONES = R.CLONES
 
 _estado = {"banco": None, "lido": 0.0, "proxima": 0.0, "erro": ""}
 _trava = threading.Lock()
@@ -86,41 +79,15 @@ def agora_iso() -> str:
     return dt.datetime.now(dt.timezone(dt.timedelta(hours=-3))).replace(microsecond=0).isoformat()
 
 
-# ── subtarefa: o dict do pacote (`spec._s`, com `so_para` em set) ↔ o JSON do banco ───────────────────────────────
-def para_json(s: dict) -> dict:
-    return {"desc": str(s.get("desc") or ""), "tipo": s.get("tipo") or "texto", "obrig": bool(s.get("obrig")),
-            "anexo": bool(s.get("anexo")), "opcoes": list(s.get("opcoes") or []), "chave": str(s.get("chave") or ""),
-            "so_para": sorted(s.get("so_para") or [])}
-
-
-def de_json(d: dict) -> dict:
-    return sp._s(str(d.get("desc") or "").strip(), d.get("tipo") or "texto", obrig=bool(d.get("obrig")),
-                 anexo=bool(d.get("anexo")), opcoes=list(d.get("opcoes") or []) or None,
-                 chave=str(d.get("chave") or ""), so_para=list(d.get("so_para") or []) or None)
-
-
-def chave_valida(ch: str) -> bool:
-    ch = str(ch or "")
-    if ch == "BASE":
-        return True
-    if ch.startswith("TIPO:"):
-        return ch[5:] in _ORIG["POR_TIPO"]
-    if ch.startswith("MARCA:"):
-        nome = ch[6:]
-        return bool(nome.strip()) and nome == nome.strip() and len(nome) <= LIMITE_NOME and ":" not in nome
-    return False
+# ── subtarefa e chave: as do pacote (o App aplica com as mesmas) ───────────────────────────────────────────────
+para_json = R.para_json
+de_json = R.de_json
+chave_valida = R.chave_valida
 
 
 def semente() -> dict:
-    """Os blocos como estão no código — o valor inicial e a rede de segurança."""
-    out = {"BASE": {"subtarefas": [para_json(s) for s in _ORIG["BASE"]]}}
-    for t, subs in _ORIG["POR_TIPO"].items():
-        out["TIPO:" + t] = {"subtarefas": [para_json(s) for s in subs]}
-    for m in sorted(set(_ORIG["POR_FABRICANTE"]) | set(_ORIG["TIPOS_DA_MARCA"])):
-        out["MARCA:" + m] = {"subtarefas": [para_json(s) for s in _ORIG["POR_FABRICANTE"].get(m, [])],
-                             "canal": _ORIG["CANAL"].get(m, ""), "atende": sorted(_ORIG["TIPOS_DA_MARCA"].get(m, [])),
-                             "arquivado": False, "igual_a": CLONES.get(m, "")}
-    return out
+    """Os blocos como estão no código — o valor inicial e a rede de segurança (com o canal daqui)."""
+    return R.semente(_ORIG["CANAL"])
 
 
 # ── leitura ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -131,19 +98,8 @@ def _linhas() -> list:
 
 def _de_linha(l: dict):
     """Linha do banco → (chave, valor) ou None. Linha ilegível é PULADA: um JSON estragado num fornecedor não pode
-    tirar os outros da tela."""
-    r = ABA.registro(l)
-    ch = str(r.get("chave") or "").strip()
-    if not chave_valida(ch):
-        return None
-    try:
-        v = json.loads(r.get("valor") or "{}")
-    except (TypeError, ValueError):
-        return None
-    if not isinstance(v, dict) or not isinstance(v.get("subtarefas", []), list):
-        return None
-    v["_linha"] = r.get("_linha")
-    return ch, v
+    tirar os outros da tela (`registro.de_registro`, a mesma leitura do App)."""
+    return R.de_registro(ABA.registro(l))
 
 
 def carregar(forcar: bool = False) -> dict:
@@ -151,15 +107,8 @@ def carregar(forcar: bool = False) -> dict:
     with _trava:
         if _estado["banco"] is not None and not forcar and time.time() - _estado["lido"] < TTL:
             return _estado["banco"]
-    banco = {}
-    for l in _linhas():
-        x = _de_linha(l)
-        if not x:
-            continue
-        ch, v = x
-        # chave repetida (duas máquinas criando o mesmo fornecedor ao mesmo tempo): vale a versão mais nova
-        if ch not in banco or str(v.get("versao") or "") >= str(banco[ch].get("versao") or ""):
-            banco[ch] = v
+    # chave repetida (duas máquinas criando o mesmo fornecedor ao mesmo tempo): vale a versão mais nova
+    banco = R.de_linhas(ABA.registro(l) for l in _linhas())
     with _trava:
         _estado.update(banco=banco, lido=time.time())
     return banco
@@ -169,45 +118,21 @@ def efetivo(banco: dict = None) -> dict:
     """Cada bloco como vale AGORA: o do banco quando existe, o do código quando não. `origem` diz qual."""
     if banco is None:
         banco = _estado["banco"] or {}
-    out = {ch: dict(v, origem="codigo", versao="", por="") for ch, v in semente().items()}
-    for ch, v in banco.items():
-        out[ch] = dict(out.get(ch, {"subtarefas": [], "canal": "", "atende": [], "arquivado": False, "igual_a": ""}),
-                       **{k: x for k, x in v.items() if not k.startswith("_")}, origem="banco")
-        if ch.startswith("MARCA:"):
-            out[ch]["igual_a"] = ""                       # salvo sozinho, o clone passou a ter a lista dele
-    return out
+    return R.efetivo(banco, _ORIG["CANAL"])
 
 
-def _trocar_dict(d: dict, novo: dict):
-    """Troca o conteúdo sem esvaziar no meio: quem lê em outra thread nunca vê o dicionário vazio."""
-    d.update(novo)
-    for k in [k for k in d if k not in novo]:
-        del d[k]
+_trocar_dict = R._trocar_dict
 
 
 def aplicar(banco: dict = None):
-    """Joga os blocos do banco por cima do código, em memória, no lugar. Sem banco (ou `{}`), volta ao código puro."""
+    """Joga os blocos do banco por cima do código, em memória, no lugar (`registro.aplicar`, a mesma regra do App), e o
+    canal de abertura de cada fornecedor no `chamado_spec.CANAL`. Sem banco (ou `{}`), volta ao código puro."""
     banco_efetivo = (_estado["banco"] or {}) if banco is None else banco
-    ef = efetivo(banco_efetivo)
-    base = [de_json(x) for x in ef["BASE"].get("subtarefas") or []]
-    tipos = {ch[5:]: [de_json(x) for x in v.get("subtarefas") or []] for ch, v in ef.items() if ch.startswith("TIPO:")}
-    fabr, atende, canal = {}, {}, dict(_ORIG["CANAL"])
-    for ch, v in ef.items():
-        if not ch.startswith("MARCA:") or v.get("arquivado"):
-            continue                                      # arquivado some da escolha; o histórico fica na OS criada
-        m = ch[6:]
-        fabr[m] = [de_json(x) for x in v.get("subtarefas") or []]
-        if v.get("atende"):
-            atende[m] = set(v["atende"])
-        canal[m] = str(v.get("canal") or "")
-    for c, o in CLONES.items():
-        if ("MARCA:" + c) not in banco_efetivo and c in fabr and o in fabr:
-            fabr[c] = fabr[o]                             # a mesma lista, como no código
-    sp.BASE[:] = base
-    _trocar_dict(sp.POR_TIPO, tipos)
-    _trocar_dict(sp.POR_FABRICANTE, fabr)
-    _trocar_dict(sp.TIPOS_DA_MARCA, atende)
-    sp.MARCAS_CONHECIDAS[:] = sorted(set(_ORIG["MARCAS_CONHECIDAS"]) | set(atende))
+    R.aplicar(banco_efetivo)
+    canal = dict(_ORIG["CANAL"])
+    for ch, v in efetivo(banco_efetivo).items():
+        if ch.startswith("MARCA:") and not v.get("arquivado"):
+            canal[ch[6:]] = str(v.get("canal") or "")
     _trocar_dict(cs.CANAL, canal)
 
 

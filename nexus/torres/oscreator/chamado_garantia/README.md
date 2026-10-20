@@ -55,11 +55,36 @@ subtarefas do fabricante.
 `cg.descobrir_marca(ativo, catalogo)` tenta em duas etapas:
 
 1. **texto do ativo** — acerta 94% dos inversores e 85% das estruturas de tracker (medido no
-   catálogo inteiro em 29/07);
+   catálogo inteiro em 29/07). A marca vale como **palavra inteira** (20/10/2026: como pedaço de
+   palavra, o "STI" achava "Justiniano" e "São Sebastião" no endereço de 16 cabines, skids e estações,
+   e o código STI100 de Santo Inácio fazia os trackers dela virarem STI), e conta também como o
+   Fracttal a escreve (`APELIDOS_NO_FRACTTAL`: "CANANDIAN SOLAR", o modelo "SUN2000", "HUAWEII",
+   "AXIALtracker"). O nome do fornecedor vale antes do apelido;
 2. **ativos irmãos da usina** — para NCU, RSU e sensores da estação, que se chamam só "NCU 1" ou
-   "Piranômetro 1". A NCU de uma planta de trackers STI é STI.
+   "Piranômetro 1". A NCU de uma planta de trackers STI é STI. Só vale com o `catalogo`: sem ele, a
+   tela pergunta.
 
 Devolve `""` quando não dá para saber — e aí a tela **tem** de perguntar. Nunca chuta.
+
+## A lista de fornecedores é a do Nexus (`registro.py`, 20/10/2026)
+
+A tela **Nexus > Chamados > Fabricantes** (o Controle de fornecedores do OS Creator) grava na aba
+`os_creator · chamado_modelos` do banco da Gridco, um bloco por linha (`BASE`, `TIPO:<tipo>`,
+`MARCA:<fornecedor>` com as perguntas, o canal, os tipos que ele atende e se está arquivado). Quem
+monta a inspeção lê a aba e chama:
+
+```python
+banco = cg.registro.de_linhas(linhas)   # [{"chave", "valor"}] da aba → {chave: valor}
+cg.registro.aplicar(banco)              # por cima do código, em memória, no lugar
+cg.marcas_para("Inversor")              # a lista do técnico: só quem atende o tipo
+```
+
+Fornecedor novo entra na lista dos tipos que atende e passa a ser reconhecido no nome do ativo;
+arquivado sai da lista. Bloco sem linha no banco vale o do código (`registro.semente`). O OS Creator
+aplica assim desde 27/09 (`chamado_modelos_store`, que agora chama o pacote); o App de Campo passa a
+aplicar igual na versão que lê a aba. **O nome do fornecedor tem de ser como o Fracttal escreve**
+(é por ele que a marca vem marcada sozinha); grafia diferente que já existe no Fracttal vai no
+`APELIDOS_NO_FRACTTAL`.
 
 ## Campos que o app preenche no lugar do técnico
 

@@ -113,7 +113,11 @@
     let h = '<div class="cf-lh"><span class="lbl">' + H(a.nome) + "</span>" +
             (D.pode_gravar ? '<button type="button" data-novo="1">+ novo fornecedor</button>' : "") + "</div>";
     if (S.novo) {
-      h += '<div class="li novo"><input class="in" id="novo_nome" maxlength="40" placeholder="nome do fornecedor">' +
+      // o nome como o Fracttal escreve (Levi, 20/10/2026: "Se a lista de fabricantes ... tiver nome diferentes do
+      // fractall altere o nome em fabricante!"): é por ele que o fabricante já vem marcado no App e na Inspeção
+      h += '<div class="li novo"><input class="in" id="novo_nome" maxlength="40" placeholder="nome como está no Fracttal">' +
+           '<div class="dica">Escreva como aparece no nome dos ativos no Fracttal (ex.: "Inversor 1.1 Huawei SUN2000"): é por ' +
+           'esse nome que o fabricante já vem marcado quando o técnico abre o chamado.</div>' +
            '<div class="bar"><button type="button" class="btn btn-g btn-p" data-novo-ok="1">Criar</button>' +
            '<button type="button" class="btn btn-o btn-p" data-novo="0">Cancelar</button></div><div class="msg er" id="novo_msg"></div></div>';
     }

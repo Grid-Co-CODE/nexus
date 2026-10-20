@@ -23,12 +23,13 @@ Uso no app de campo, dentro da OS que o técnico está preenchendo:
 Quem for criar a OS de fato precisa de um cliente Fracttal. O `payload.py` monta os parâmetros do
 RPC sem falar com a rede, então serve tanto ao desktop quanto a um backend do app de campo.
 """
+from . import registro
 from .ativos import TIPO_POR_SUFIXO, tipo_do_ativo, tipo_e_sufixo
 from .regras import (CLASSIF_1, CLASSIF_2, ETIQUETA, ETIQUETA_ACOMPANHAMENTO, TIPO_TAREFA,
                      TIPO_TAREFA_ACOMPANHAMENTO, TIPOS_ORIGEM, derivados, descobrir_marca,
                      marca_do_ativo, marca_pelos_irmaos, montar, pode_abrir, titulo)
-from .spec import (ALIAS_TIPO, BASE, MARCAS_CONHECIDAS, POR_FABRICANTE, POR_TIPO, TIPO_ID,
-                   TIPOS_DA_MARCA, aceita, grupo_de, marcas_para, resumo, subtarefas)
+from .spec import (ALIAS_TIPO, APELIDOS_NO_FRACTTAL, BASE, MARCAS_CONHECIDAS, POR_FABRICANTE, POR_TIPO,
+                   TIPO_ID, TIPOS_DA_MARCA, aceita, grupo_de, marcas_para, resumo, subtarefas)
 
 __all__ = [
     # o tipo do ativo NÃO vem do Fracttal: é derivado do código. Use `tipo_do_ativo` — não
@@ -39,6 +40,8 @@ __all__ = [
     "TIPO_TAREFA", "CLASSIF_1", "CLASSIF_2", "ETIQUETA", "TIPOS_ORIGEM",
     "TIPO_TAREFA_ACOMPANHAMENTO", "ETIQUETA_ACOMPANHAMENTO",
     "BASE", "POR_TIPO", "POR_FABRICANTE", "ALIAS_TIPO", "TIPOS_DA_MARCA", "MARCAS_CONHECIDAS",
-    "TIPO_ID",
+    "TIPO_ID", "APELIDOS_NO_FRACTTAL",
+    # o Controle de fornecedores do Nexus por cima do código (20/10/2026): quem lê a aba entrega as linhas aqui
+    "registro",
 ]
-__version__ = "1.1.0"     # 1.1.0: ativos.py (tipo do ativo pelo código)
+__version__ = "1.2.0"     # 1.1.0: ativos.py (tipo do ativo pelo código); 1.2.0: registro.py e a marca por palavra inteira

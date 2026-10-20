@@ -37,17 +37,9 @@ def _n(s) -> str:
 
 
 def marca_do_ativo(asset: dict) -> str:
-    """Marca lida da DESCRIÇÃO do ativo ('' se não reconhecer).
-
-    Medido no catálogo inteiro (29/07): a descrição carrega a marca em 94% dos inversores
-    ('Inversor 1.1 Huawei SUN2000-250KTL-H1') e 85% das estruturas de tracker ('Tracker 1.100 STI
-    STI-H250'). Na Estação Meteorológica é inútil — 1 de 106 — porque ali a descrição é o endereço.
-    É PRÉ-SELEÇÃO: quem abre confirma."""
-    txt = _n("%s %s" % (asset.get("description") or "", asset.get("label") or ""))
-    for m in spec.MARCAS_CONHECIDAS:
-        if _n(m) in txt:
-            return m
-    return ""
+    """Marca lida da DESCRIÇÃO do ativo ('' se não reconhecer). A regra é uma só, a do `spec` (palavra inteira e os
+    apelidos do Fracttal, 20/10/2026): até então havia duas cópias, e as duas achavam o STI em "Justiniano"."""
+    return spec.marca_do_ativo(asset)
 
 
 def marca_pelos_irmaos(asset: dict, catalogo, marcas_validas=None) -> str:

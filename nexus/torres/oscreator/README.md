@@ -1051,3 +1051,27 @@ O que tinha ficado de fora do superplano. Levi, 19/10/2026: "1 - quebre essa reg
   - Ficam 3 falhas na suíte do oem que não são destas mudanças: `test_os_web_home::test_selo_do_card_performance` e
     duas de `test_os_web_sessao`, que ainda cobram o selo da Performance na página e a volta ao login pela 1ª chamada
     ao Fracttal da tela inicial; desde 14/10 (`bb91eb0`) a tela inicial abre sem esperar o Fracttal.
+
+## A lista de fabricantes do chamado é a do Nexus (Chamados > Fabricantes, 20/10/2026)
+
+Levi, 20/10/2026: "1 - corrija canadian 2 - insira NCU e RSU 3 - Essa lista tem que ser a mesma do nexus > fabricantes:
+ele escolhe o fabricante o app já filtra se é inversor, cabine etc 4 - Se a lista de fabricantes do chamados >
+fabricantes tiver nome diferentes do fractall altere o nome em fabricante!" e "quando a singrid adicione novos
+fabricantes em chamados > fabricantes apareça atualizado no app".
+
+- **A regra mora no pacote** `chamado_garantia` (o mesmo no OS Creator, no oem e no App): `registro.py` põe a aba
+  `os_creator · chamado_modelos` (a que a tela Fabricantes grava) por cima do código. O `chamado_modelos_store` do OS
+  Creator passou a chamar o pacote (o canal de abertura continua só aqui); os nomes públicos dele não mudaram.
+- **A marca no nome do ativo** (`spec.marca_do_ativo`, a única: a de `regras` chama esta) vale como palavra inteira e
+  pelos apelidos do Fracttal (`APELIDOS_NO_FRACTTAL`). No catálogo de 14/10: +80 Canadian ("CANANDIAN SOLAR"), +169
+  Huawei (só o modelo SUN2000), os 131 Axial grudados ("AXIALtracker") seguem Axial, e saem os falsos STI (16
+  cabines, skids e estações pelo endereço "Justiniano"/"Sebastião"; os 43 trackers de Santo Inácio pelo código STI100).
+- **Os nomes da tela contra o Fracttal** (o item 4): dos 11 fornecedores, só a Canadian difere, e o erro é do Fracttal
+  ("CANANDIAN"): o nome fica certo na tela e a grafia do Fracttal entra como apelido. Hukseflux e Romiotto não
+  aparecem no nome de nenhum ativo (o nome da estação é o endereço). O campo de fornecedor novo pede o nome como está no
+  Fracttal.
+- **O App de Campo** lê a aba e aplica pelo pacote na versão que for publicada pela sessão do App (o pedido e o código
+  testado estão em `app-campo-docs/_propostas/fabricantes-do-nexus`): a lista do técnico passa a ser a da tela,
+  filtrada pelo tipo do ativo, e a NCU e a RSU pegam a marca dos trackers da usina. Até lá, a tela avisa em cima.
+- Prova: `tests/test_chamado_garantia_fabricantes.py` (aqui) e os testes do oem (`test_chamado_modelos_store.py`,
+  `test_modelos_na_abertura.py`, `test_os_web_fornecedores.py`), rodados com a cópia sincronizada.

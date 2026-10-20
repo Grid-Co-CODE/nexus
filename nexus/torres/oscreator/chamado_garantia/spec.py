@@ -29,6 +29,9 @@ Tipos de subtarefa
 Sondados ao vivo na conta 4987 (1=Texto, 2=Sim/Não, 3=Número, 4=Verificação, 7=Lista). NÃO existe tipo Data nesta conta (o id 3 é
 Número), então data/hora vai como texto com o formato na própria pergunta.
 """
+import re
+import unicodedata
+
 
 # apelido → id_task_form_item_type do Fracttal
 TIPO_ID = {
@@ -275,6 +278,19 @@ TIPOS_DA_MARCA = {
 # aquela marca não tem processo, em vez de deixar o campo vazio sem explicação.
 MARCAS_CONHECIDAS = sorted(set(TIPOS_DA_MARCA) | {"SolarEdge", "Growatt", "Solplanet", "WEG"})
 
+# Como o Fracttal escreve a marca quando não é o nome do fornecedor (Levi, 20/10/2026: "corrija canadian"). Medido no
+# catálogo de 14/10 (22.496 ativos): os 80 inversores Canadian das duas Matões estão como "CANANDIAN SOLAR"; 169
+# inversores Huawei trazem só o modelo ("Inversor (P.E.) 1.1  SUN2000-60KTL-H0") e 28 a marca dobrada ("HUAWEII"); 131
+# trackers Axial vêm grudados ("AXIALtracker", "AXIALtracker1V"). Vale a palavra inteira, como a marca, e só depois do
+# nome: o inversor "Sungrow SUN2000-100KTL-H1" (50, a marca e o modelo não batem) segue Sungrow, como antes.
+APELIDOS_NO_FRACTTAL = {"Axial": ("AXIALtracker", "AXIALtracker1V"), "Canadian Solar": ("Canandian Solar",),
+                        "Huawei": ("SUN2000", "Huaweii")}
+
+
+def _sem_acento(s) -> str:
+    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
+    return " " + " ".join(re.sub(r"[^a-z0-9]+", " ", s).split()) + " "
+
 
 def marca_do_ativo(asset: dict) -> str:
     """Marca lida da DESCRIÇÃO do ativo no Fracttal ('' se não reconhecer).
@@ -283,17 +299,17 @@ def marca_do_ativo(asset: dict) -> str:
     (1.764 de 1.877 — 'Inversor 1.1 Huawei SUN2000-250KTL-H1') e **85% das estruturas de tracker**
     (5.386 de 6.306 — 'Tracker 1.100 STI STI-H250'). Na Estação Meteorológica é inútil: só 1 de 106,
     porque ali a descrição é o endereço da planta. Então isto é PRÉ-SELEÇÃO, nunca substitui o
-    campo — quem confirma é quem abre a OS."""
-    import re
-    import unicodedata
+    campo — quem confirma é quem abre a OS.
 
-    def _n(s):
-        s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-        return re.sub(r"[^a-z0-9]+", " ", s)
-
-    txt = _n("%s %s" % (asset.get("description") or "", asset.get("label") or ""))
-    for m in MARCAS_CONHECIDAS:
-        if _n(m) in txt:
+    A marca vale como PALAVRA INTEIRA (20/10/2026): como pedaço de palavra, o "STI" achava "Justiniano" e "São
+    Sebastião" no endereço, e 16 cabines, skids e estações saíam como STI. Os apelidos (`APELIDOS_NO_FRACTTAL`) contam
+    como a marca. Os fornecedores que a tela Fabricantes cadastra entram em MARCAS_CONHECIDAS pelo `registro`."""
+    txt = _sem_acento("%s %s" % (asset.get("description") or "", asset.get("label") or ""))
+    for m in MARCAS_CONHECIDAS:                              # 1º o nome do fornecedor
+        if _sem_acento(m) in txt:
+            return m
+    for m in MARCAS_CONHECIDAS:                              # depois como o Fracttal escreve
+        if any(_sem_acento(n) in txt for n in APELIDOS_NO_FRACTTAL.get(m, ())):
             return m
     return ""
 
