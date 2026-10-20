@@ -938,6 +938,15 @@ várias imagens e incluir no PDF") e "inclua a opção de baixar na cadeia de ch
   repete), reduzidas a 1000 px (JPEG 72, deitada pelo EXIF fica em pé); os outros anexos pelo nome. Foto que não veio
   do S3 sai com o quadro vazio dizendo isso; mais de 200 fotos, o PDF diz quantas ficaram de fora. `modelo()` é o
   conteúdo (os testes conferem nele) e `gerar()` desenha; o reportlab e o Pillow só são importados ali.
+- **A foto entra no PDF como saiu do `reduzir`** (20/10/2026; Raio-X das 09:56: um PDF ~2 min no servidor, em `gerar`).
+  Dada como `Image(BytesIO)`, o reportlab decodificava cada foto em RGB só para dar nome a ela e guardava o RGB até o
+  fim (2,25 MB por foto). `os_pdf._JpegPronto` entrega o JPEG pelo caminho que o reportlab usa para JPEG de arquivo
+  (`jpeg_fh`, embutido como veio, DCTDecode) com o hash do JPEG como nome (a mesma foto duas vezes vai uma vez). Medido
+  no PC, com o reportlab já carregado: 200 fotos, `gerar` de 3,2 a 4,0 s e +1 GB para 0,3 s e +20 a 27 MB; a rota
+  inteira, com o Fracttal falso e sem rede, de 7,7 a 8,3 s e +1.068 MB para 5,2 s e +128 MB. O PDF é o mesmo: páginas,
+  texto, as imagens byte a byte e o desenho de cada página (só o nome interno das imagens muda). O que sobra é o
+  `reduzir` (~90 ms de CPU por foto no PC) e o download das fotos. Se um dia o reportlab mudar esse caminho, o teste
+  quebra: `test_o_pdf_embute_a_foto_como_veio_sem_decodificar_de_novo`.
 - **A tela:** em "A cadeia do chamado" (`acomp_os.html`), uma seta em cada OS (de campo, inspeção e o acompanhamento).
   O clique (`os_acoes.js`, `[data-os-pdf]`) faz como o "Baixar todos": `POST /os/api/os/pdf` com o nº (e o id, quando a
   tela já sabe) monta o PDF no disco com o círculo de carga, e o arquivo baixa por `GET /os/api/os/pdf/<token>` (10
@@ -1070,9 +1079,11 @@ fabricantes em chamados > fabricantes apareça atualizado no app".
   ("CANANDIAN"): o nome fica certo na tela e a grafia do Fracttal entra como apelido. Hukseflux e Romiotto não
   aparecem no nome de nenhum ativo (o nome da estação é o endereço). O campo de fornecedor novo pede o nome como está no
   Fracttal.
-- **O App de Campo** lê a aba e aplica pelo pacote na versão que for publicada pela sessão do App (o pedido e o código
-  testado estão em `app-campo-docs/_propostas/fabricantes-do-nexus`): a lista do técnico passa a ser a da tela,
-  filtrada pelo tipo do ativo, e a NCU e a RSU pegam a marca dos trackers da usina. Até lá, a tela avisa em cima.
+- **O App de Campo** lê a aba e aplica pelo pacote desde a v290 (20/10/2026 15:06Z, servidor `26d79be6f7506438`; o
+  pedido e o código testado em `app-campo-docs/_propostas/fabricantes-do-nexus`): a lista do técnico é a da tela,
+  filtrada pelo tipo do ativo, relida de 5 em 5 minutos (`/health` → `chamadoGarantia.fabricantes`). A NCU e a RSU
+  pegam a marca dos trackers da usina depois do catálogo da ronda rodar (segunda 04:30 UTC). O aviso do topo da tela
+  saiu; a linha de baixo do título diz que o App usa a mesma lista.
 - Prova: `tests/test_chamado_garantia_fabricantes.py` (aqui) e os testes do oem (`test_chamado_modelos_store.py`,
   `test_modelos_na_abertura.py`, `test_os_web_fornecedores.py`), rodados com a cópia sincronizada.
 

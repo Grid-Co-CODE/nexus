@@ -141,6 +141,33 @@ def test_o_pdf_sai_com_as_fotos_dentro():
     assert fotos_no_pdf == len(ler.pages) + 1                              # o logo em cada página + a foto que veio
 
 
+def test_o_pdf_embute_a_foto_como_veio_sem_decodificar_de_novo():
+    """Raio-X das 09:56 de 20/10/2026: o PDF de uma OS ~2 min no servidor, em `gerar`. O reportlab decodificava cada
+    foto já reduzida em RGB só para dar nome a ela (1000 x 750 = 2,25 MB por foto, guardados até o fim): no PC, com 200
+    fotos, +1 GB de memória e 64% do `gerar`. O JPEG do `reduzir` vai ao PDF como veio, sem passar pelo RGB."""
+    import tracemalloc
+    pypdf = pytest.importorskip("pypdf")
+    m = os_pdf.modelo(DET, recursos=RECURSOS, anexos_sub=SUBS, anexos_os=OSS)
+    os_pdf.gerar(m)                                                        # o reportlab e as fontes já carregados
+    jpegs = [_jpeg(cor=(20 * i, 120, 200 - 10 * i), tam=(1000, 750)) for i in range(12)]
+    m["fotos"] = [{"legenda": "foto %d" % i, "de": "Foto da placa", "item": {}} for i in range(13)]
+    fotos = [os_pdf.reduzir(j) for j in jpegs + jpegs[:1]]                # a 13ª repete a 1ª (2 subtarefas)
+    assert [f[0] for f in fotos] == jpegs + jpegs[:1]                      # já cabem: passam como vieram
+    tracemalloc.start()
+    try:
+        pdf = os_pdf.gerar(m, fotos=fotos)
+        pico = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert pico < 12 * 2**20, "%.0f MB: as fotos decodificadas (2,25 MB cada) na memória" % (pico / 2**20)
+    # o MESMO PDF: cada foto dentro dele é o JPEG que o `reduzir` entregou, byte a byte (DCTDecode, sem recodificar),
+    # e a repetida vai uma vez só, como quando o reportlab as comparava pelo RGB
+    ler = pypdf.PdfReader(io.BytesIO(pdf))
+    refs = {x.idnum: x.get_object() for p in ler.pages for x in p["/Resources"].get("/XObject", {}).values()}
+    assert all(x["/Filter"] in ("/DCTDecode", ["/DCTDecode"]) for x in refs.values())
+    assert sorted(x.get_data() for x in refs.values()) == sorted(jpegs)
+
+
 def test_texto_que_a_helvetica_nao_tem_nao_vira_quadrado():
     assert os_pdf._texto("Painel ok \U0001F600 <b>") == "Painel ok  &lt;b&gt;"
     assert os_pdf._seguro("Usina São João – CO₂") == "Usina São João – CO2"
