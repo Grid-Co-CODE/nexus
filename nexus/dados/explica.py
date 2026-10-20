@@ -34,6 +34,7 @@ RESUMO = {
     # ── Performance ──
     "decisao_cobertura": "Que usina de cada fonte entra no tempo real, decidido pela tela",
     "decisao_depara": "Como cada usina e inversor de cada fonte liga ao cadastro",
+    "decisao_vinculo_os": "A OS do Fracttal vinculada a cada falha de string e de tracker",
     "meta_usina_mes": "Quanto cada usina gerou no mês contra a meta, pelo Gerencial",
     "desempenho_usina_dia": "A geração, o POA e o PR de cada usina dia a dia, contra a meta",
     "disponibilidade_os": "As OS de religamento e corretiva que tiraram disponibilidade",
@@ -137,6 +138,11 @@ PARA_QUE = {
     "decisao_depara": "Guarda cada decisão de ligar uma usina ou um inversor de uma fonte ao cadastro, tomada por um "
                       "administrador na tela De-para de equipamentos (quando a fonte renomeia a usina ou não dá nome ao "
                       "inversor). A Plataforma de Performance lê esta tabela e ela vence o de-para escrito no código.",
+    "decisao_vinculo_os": "Guarda cada decisão de vincular (ou desvincular) uma OS do Fracttal a uma falha que a "
+                          "plataforma mediu (a ocorrência de strings paradas de um inversor ou a parada de um tracker), "
+                          "tomada na tela Strings e trackers. A Plataforma de Performance lê esta tabela para mostrar as "
+                          "OS de cada falha sem perguntar nada ao Fracttal (a busca lá só acontece no clique em Vincular "
+                          "OS). Guarda só o número da OS: nem a descrição nem quem vinculou.",
     "decisao_setor": "Guarda cada decisão de pôr uma pessoa do Fracttal num setor (ou de tirá-la), tomada por um "
                      "administrador na tela Integração Fracttal; a lista de setores fica no mesmo livro. O setor de cada "
                      "pessoa é a última decisão dela, e as de antes contam quando ela mudou. Não guarda nome nem e-mail: "

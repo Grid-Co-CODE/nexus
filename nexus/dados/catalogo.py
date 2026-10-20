@@ -402,6 +402,33 @@ FATOS = (
                     "o de-para em código). O cadastro entra pela chave de negócio, que a plataforma confere antes de "
                     "gravar (nunca texto livre). Quem decidiu fica no log da máquina (logs/depara.log da plataforma), "
                     "não no banco (regra 8)"),
+    # Vincular OS na tela Strings e trackers (20/10/2026, Levi: "Opção de vincular OS, eu clico no botão e buscas as OSs de
+    # recomposição de string desse inversor"; "faça algo parecido com os trackers!"): até aqui não existia vínculo entre a
+    # falha medida e a OS em lugar nenhum. A tela /painel/falhas da plataforma grava pela mesma cobertura.Decisoes dos dois
+    # livros acima; a OS vinculada aparece na linha vinda daqui, e o Fracttal só é consultado no clique em Vincular OS.
+    # Registrado antes da 1ª gravação (regra 10).
+    Fato("decisao_vinculo_os", "Decisão de vínculo de OS a falha de string ou tracker", "performance",
+         "nexus_falhas · fato_decisao_vinculo_os",
+         "1 linha = 1 decisão de vincular ou desvincular 1 OS do Fracttal a 1 ocorrência de string (o inversor) ou 1 "
+         "parada de tracker, tomada na tela Strings e trackers da plataforma",
+         _d(data=("id", "data_id (o dia de Brasília da decisão) e data_id_inicio (o dia em que a falha começou: "
+                        "papel, regra 7)"),
+            usina=("cod", "plant_id + fonte, os mesmos dos episódios das falhas; o plant_id por fonte ainda não está no "
+                          "de_para (pendência 10)"),
+            equipamento=("nome", "equipamento: o inversor (\"Inversor 1.2\") ou o tracker, como a tela e os episódios o "
+                                 "nomeiam; sem equipamento_id (o nome não é o código do ativo: regra 4)"),
+            os=("cod", "os (o nº da OS do Fracttal: dimensão degenerada)")),
+         tipo="sem_medida", chave=("decidida_em", "tipo", "fonte", "plant_id", "equipamento", "data_id_inicio", "os"),
+         fontes=("nexus_falhas · fato_decisao_vinculo_os",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada tipo, fonte, plant_id, "
+                       "equipamento, dia de início e OS)",
+         observacao="tipo = strings (a ocorrência do inversor: os episódios das strings dele que se sobrepõem no tempo, "
+                    "numa linha só) ou trackers (a parada de 1 tracker); data_id_inicio = o dia (AAAAMMDD) em que a ocorrência ou a parada "
+                    "começou: com tipo, fonte, plant_id e equipamento é a chave de negócio da falha (a mesma da chave da "
+                    "ocorrência na plataforma); decisao = vincular ou desvincular; origem = tela. Na tela o vínculo cola "
+                    "na falha do mesmo tipo, fonte, plant_id e equipamento cujos dias contêm o data_id_inicio (o início anda "
+                    "quando o backfill refaz o dia). Só o número da OS: a descrição não vai. Quem vinculou fica no log da "
+                    "máquina (logs/falhas_vinculos.log da plataforma), não no banco (regra 8)"),
     # Setor do pessoal do Fracttal (12/10/2026, Levi: "Como faço para definir um setor???? tem que dar possibilidade"):
     # o Fracttal não tem setor e ainda não há base; a tela Base > Integração Fracttal cria a lista (dim_setor, no mesmo
     # livro) e põe cada pessoa num setor.
@@ -928,6 +955,16 @@ LIVROS = (
           "plataforma/depara.py (PerformancePainel), pela tela /admin/de-para da plataforma", True,
           "no banco desde 11/10/2026 (conferido por GET; a cada decisão cresce); a plataforma lê com cache de 60 s, "
           "no PC e no servidor"),
+    # o Vincular OS da tela Strings e trackers (20/10/2026): grava a plataforma, pela mesma classe dos dois livros acima.
+    # so_cresce declara o dado (a aba só cresce); a trava que ele liga é a do livros.publicar do Nexus, e a gravação da
+    # plataforma não passa por ela
+    Livro("nexus_falhas", ("fato_decisao_vinculo_os",), "a cada Vincular ou desvincular na tela Strings e trackers",
+          "plataforma/falhas_vinculos.py (PerformancePainel), pela tela /painel/falhas da plataforma", False,
+          "registrado em 20/10/2026 antes da 1ª gravação (regra 10): nasce no 1º vínculo feito na tela. A plataforma lê "
+          "com cache de 60 s, no PC e no servidor, e grava pela cobertura.Decisoes (relê o livro, acrescenta, troca "
+          "inteiro e confere a contagem), que não passa pela trava do livros.publicar; a dela, desde 20/10/2026: "
+          "livro que existe e foi relido vazio ou menor que a última leitura boa não é gravado",
+          so_cresce=True),
     Livro("nexus_performance", ("fato_meta_usina_mes", "fato_desempenho_usina_dia"), "de hora em hora, e só quando muda",
           "plataforma/gerencial_publicar.py (worker do servidor, `_ger_publicar` no app.py)", True,
           "no banco desde 12/10/2026 19:55 (1ª volta do worker do servidor depois do deploy da plataforma, conferida "

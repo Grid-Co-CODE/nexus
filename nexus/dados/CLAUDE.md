@@ -27,7 +27,7 @@ hora em hora do servidor passa a gravar o que está marcado "grava"). A exceçã
 
 | Peça | Onde | Grava? | O que é |
 |---|---|---|---|
-| Catálogo (a matriz de barramento) | `catalogo.py` | — | os fatos ativos (a conta viva é a do `catalogo.resumo()`, que a tela mostra; os dois de extintor do HSEQ entraram em 09/10, antes de o App publicar o livro) + os que viraram fonte de outro, 7 dimensões e os **livros do Nexus** (`LIVROS`, registrados antes de existir: 24 em 17/10/2026, com o `nexus_pcm_atribuicoes`; `no_banco` diz quais já existiam quando foram conferidos por GET). Todo fato declara `tipo`, `chave`, `medidas` (`Medida`: coluna com a unidade, unidade, soma `aditiva`/`semi`/`nao`), `fontes` e `janela_origem`. Mais as `CONHECIDAS` (09/10): as tabelas do banco que não são fato nem livro do Nexus, aba por aba, com o papel e o porquê (o radar). **Fonte única** da tela, dos testes e desta página |
+| Catálogo (a matriz de barramento) | `catalogo.py` | — | os fatos ativos (a conta viva é a do `catalogo.resumo()`, que a tela mostra; os dois de extintor do HSEQ entraram em 09/10, antes de o App publicar o livro) + os que viraram fonte de outro, 7 dimensões e os **livros do Nexus** (`LIVROS`, registrados antes de existir: 28 em 20/10/2026, com o `nexus_falhas`, que a plataforma grava; `no_banco` diz quais já existiam quando foram conferidos por GET). Todo fato declara `tipo`, `chave`, `medidas` (`Medida`: coluna com a unidade, unidade, soma `aditiva`/`semi`/`nao`), `fontes` e `janela_origem`. Mais as `CONHECIDAS` (09/10): as tabelas do banco que não são fato nem livro do Nexus, aba por aba, com o papel e o porquê (o radar). **Fonte única** da tela, dos testes e desta página |
 | Domínios | `dominios.py` | — | a lista fechada de cada atributo (vala 1 limpa, 2 parcial, 3 obstruída; sensor 1 sujo, 0 VERIFICADO limpo, vazio = não verificado; situação da OS da ronda; as 6 falhas; situação da PT). Valor fora = vazio + conta na qualidade. `MAPA_ANTIGO` traduz o que cada fonte grava (inclusive o formulário da avulsa de 07/10, que nunca chegou ao banco). A avulsa usa as opções de vala do App (`VALA_OPCOES`) e grava o sensor como a palavra (`SENSOR_ROTULO`: "Sujo", "Limpo"; vazio = não verificado) desde 08/10. A anomalia da meta do Gerencial (`ANOMALIA_META`, 18/10/2026): os códigos que a plataforma põe na coluna `anomalia` do `fato_meta_usina_mes`; a frase é do Nexus |
 | Calendário | `calendario.py` → `nexus_dimensoes · dim_data` | hora em hora | 1 linha por dia, 2025 a 2027: `data_id` (AAAAMMDD), semana ISO, mês, trimestre, fim de semana, feriado nacional, dia útil |
 | Feriados locais | → `nexus_dimensoes · feriados_locais` | hora em hora | estaduais e municipais (UF, município), cruzam com a usina pela cidade |
@@ -126,6 +126,23 @@ decisão de ligar 1 usina (id na fonte) ou 1 inversor (id na fonte) ao cadastro,
 plataforma; livro ilegível = vale o código. Quando o de_para do cadastro ganhar o sistema plant_id (pendência 10), a ponte
 da usina migra para lá; a regra mora no `plataforma/CLAUDE.md` (seção "De-para de equipamentos"). No banco desde
 11/10/2026 (conferido por GET).
+
+**Vínculo de OS às falhas (20/10/2026):** Levi: "Opção de vincular OS, eu clico no botão e buscas as OSs de
+recomposição de string desse inversor" ("faça algo parecido com os trackers!"). Até aqui a falha medida e a OS não se
+ligavam em lugar nenhum. A tela da plataforma `/painel/falhas` (no Nexus, Performance · Strings e trackers) grava no
+livro `nexus_falhas · fato_decisao_vinculo_os` (`catalogo.py`, sem medida, só acrescenta), pela mesma
+`cobertura.Decisoes` dos dois livros acima: 1 linha = 1 decisão de vincular ou desvincular 1 OS do Fracttal a 1
+ocorrência de string (o inversor) ou 1 parada de tracker; o vigente é a última decisão de cada (tipo, fonte, plant_id,
+equipamento, data_id_inicio, os). Colunas: `decidida_em`, `data_id` (o dia de Brasília da decisão), `tipo`
+(`strings`/`trackers`), `fonte` e `plant_id` (os dos episódios das falhas; a usina liga quando o de_para ganhar o
+plant_id, pendência 10), `equipamento` (o inversor ou o tracker como a tela os nomeia, sem `equipamento_id`: regra 4),
+`data_id_inicio` (o dia em que a falha começou, AAAAMMDD: a 2ª data vai como papel, regra 7; com tipo, fonte,
+plant_id e equipamento, a chave de negócio dela), `os` (o
+número: dimensão degenerada), `decisao` (`vincular`/`desvincular`) e `origem` (`tela`). Sem pessoa nem texto livre
+(regra 8): quem vinculou fica no log da máquina da plataforma (`logs/falhas_vinculos.log`) e a descrição da OS não vai.
+É daqui que a tela mostra a OS vinculada sem pedir nada ao Fracttal (a busca lá só acontece no clique em Vincular OS);
+quem lê é só a própria plataforma (PC e servidor, cache de 60 s). Registrado em 20/10/2026 antes da 1ª gravação (regra
+10): nasce no 1º vínculo. A regra mora no `plataforma/CLAUDE.md` (Strings e trackers, Vincular OS).
 
 **Setor do pessoal (12/10/2026):** Levi: "Como faço para definir um setor???? tem que dar possibilidade". O Fracttal não
 diz o setor de ninguém e ainda não há base, então a lista nasce no Nexus: a tela Base · Integração Fracttal (só admin)
@@ -292,9 +309,12 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
    a leitura devolve). Ligado nos 14 livros dos módulos que só acrescentam (setores, telas por setor, dono dos
    relatórios, estrutura das usinas sem a `aba_equipamentos`, que é visão, decisão da PT, observação do responsável,
    ronda avulsa, contas dos clientes, Contestações, curadoria, técnicos por usina, motivos do PCM, o acompanhamento da
-   Engenharia e as ocorrências com plano de ação). A carga de hora em hora fica sem trava: encolhe de propósito, pela janela da fonte. A trava não vê a
-   troca com a mesma contagem: o módulo que põe uma lista de partida no lugar da aba que veio vazia confere antes com
-   `livros.existe` que o livro ainda não existe (o acompanhamento da Engenharia confere; os motivos do PCM, com o
+   Engenharia e as ocorrências com plano de ação). O `nexus_falhas` (20/10/2026) também declara, porque a aba só cresce,
+   mas quem grava é a plataforma, pela `cobertura.Decisoes`, que não passa pelo `livros.publicar`: lá a declaração não
+   liga trava nenhuma; a `Decisoes.acrescentar` tem a dela desde 20/10/2026 (livro que existe e relido vazio ou menor
+   que a última leitura boa não é gravado; vale também para o `nexus_tempo_real` e o `nexus_depara`). A carga de hora em hora fica sem trava: encolhe de propósito, pela janela da fonte. A trava não
+   vê a troca com a mesma contagem: o módulo que põe uma lista de partida no lugar da aba que veio vazia confere antes
+   com `livros.existe` que o livro ainda não existe (o acompanhamento da Engenharia confere; os motivos do PCM, com o
    `dim_motivo` de 12 linhas, ainda não, 18/10/2026). Prova: `tests/test_dados_livros_trava.py`.
 10. **Livro no banco é para sempre** (a API não apaga): nome `nexus_<assunto>`, abas `fato_<processo>`,
     `dim_<assunto>`, `<dimensão>_historico`, `qualidade`, `atualizacao`; exceção só com motivo em
@@ -445,13 +465,13 @@ cadastro, recusar carga encolhida. **Nada disto está feito**; onde cada peça h
    tracker (episódios, tracker × dia, cobertura, OS de string), parada de tracker, perda por equipamento (o gêmeo ainda
    tem usina própria), meta mensal.
 10. **De-para do `plant_id` (08/10):** o estado `cod` de `falha_string_episodio`, `falha_tracker`, `falha_tracker_dia`,
-   `cobertura_falhas`, `os_string` e `parada_tracker` quer dizer "liga pelo de-para", mas o `de_para` do cadastro
-   ainda não tem sistema de `plant_id` (API PV, SunOp, scadaGridco; hoje só Fracttal, BD_Performance, Tickets e
-   BD_Thopen, em `cadastro/ligacoes.py`). Entra como sistema novo no `cadastro_nexus · de_para` (tela Base →
-   Ligações). Cada grão já é um fato (regra 1), sem trocar id: a `falha_string` (dois grãos num registro) virou
-   `falha_string_episodio`, que liga por `plant_id`, e `falha_string_inversor_dia`, que só tem o nome da usina
-   (auditoria de 08/10, GR-2); o id antigo ficou como `parte`, com a história. O tracker × dia entrou como
-   `falha_tracker_dia`, ao lado do `falha_tracker` (episódio), que não mudou de id.
+   `cobertura_falhas`, `os_string`, `parada_tracker` e `decisao_vinculo_os` (20/10) quer dizer "liga pelo de-para", mas
+   o `de_para` do cadastro ainda não tem sistema de `plant_id` (API PV, SunOp, scadaGridco; hoje só Fracttal,
+   BD_Performance, Tickets e BD_Thopen, em `cadastro/ligacoes.py`). Entra como sistema novo no
+   `cadastro_nexus · de_para` (tela Base → Ligações). Cada grão já é um fato (regra 1), sem trocar id: a `falha_string`
+   (dois grãos num registro) virou `falha_string_episodio`, que liga por `plant_id`, e `falha_string_inversor_dia`, que
+   só tem o nome da usina (auditoria de 08/10, GR-2); o id antigo ficou como `parte`, com a história. O tracker × dia
+   entrou como `falha_tracker_dia`, ao lado do `falha_tracker` (episódio), que não mudou de id.
 
 ## Como provar
 

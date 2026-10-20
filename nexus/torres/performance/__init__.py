@@ -33,9 +33,11 @@ TORRE = Torre(
         Tela("diagnostico", "Diagnóstico",
              "Qual anomalia é falha real e qual é clima, e virou OS?",
              "Plataforma de Performance + Fracttal, por usina"),
+        # o Vincular OS (20/10/2026): a tela da plataforma grava e lê a OS ligada a cada falha no livro nexus_falhas do
+        # banco (catálogo em nexus/dados/catalogo.py), como as Fontes do tempo real e o De-para gravam os deles
         Tela("strings-trackers", "Strings e trackers",
              "Quais strings e trackers estão perdendo energia?",
-             "Plataforma de Performance"),
+             "Plataforma de Performance e o livro nexus_falhas no banco (as OS vinculadas a cada falha)"),
         Tela("gerencial", "Visão gerencial",
              "O mês fecha dentro da meta de PR e geração?",
              "Plataforma de Performance (BD_Performance e BD_Thopen)"),

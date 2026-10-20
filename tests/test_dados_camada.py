@@ -141,6 +141,24 @@ def test_decisao_da_pt_no_catalogo_e_o_contrato_com_o_app():
     assert "decisoes" not in catalogo.ABAS_FORA_DA_REGRA and not catalogo.aba_segue_a_regra("decisoes")
 
 
+def test_vinculo_de_os_das_falhas_registrado_antes_da_1a_gravacao():
+    """O Vincular OS da tela Strings e trackers (Levi, 20/10/2026: "Opção de vincular OS, eu clico no botão e buscas as
+    OSs de recomposição de string desse inversor"): quem grava é a plataforma (`plataforma/falhas_vinculos.py`, pela
+    `cobertura.Decisoes` do nexus_tempo_real e do nexus_depara). O livro entra no catálogo antes da 1ª gravação (regra
+    10), sem medida, com o cabeçalho do contrato com a plataforma e sem pessoa nem texto livre (regra 8)."""
+    cab = ("decidida_em", "data_id", "tipo", "fonte", "plant_id", "equipamento", "data_id_inicio", "os", "decisao", "origem")
+    lv = catalogo.LIVRO_POR_NOME["nexus_falhas"]
+    assert lv.abas == lv.so_cresce == ("fato_decisao_vinculo_os",) and not lv.no_banco
+    assert "plataforma/falhas_vinculos.py" in lv.quem_grava
+    f = catalogo.POR_ID["decisao_vinculo_os"]
+    assert f.livro == "nexus_falhas · fato_decisao_vinculo_os" and f.fontes == (f.livro,) and f.estado == "origem"
+    assert f.tipo == "sem_medida" and f.medidas == () and f.chave[0] == cab[0] and set(f.chave) <= set(cab)
+    # o dia da decisão liga por ID; a usina pelo plant_id da fonte (pendência 10); o equipamento só pelo nome que a tela
+    # usa, sem equipamento_id chutado (regra 4); a OS pelo número (dimensão degenerada); pessoa nenhuma
+    assert [f.dims[d][0] for d in ("data", "usina", "equipamento", "os", "pessoa")] == ["id", "cod", "nome", "cod", "nao"]
+    assert not [c for c in cab if any(c == p or c.startswith(p + "_") for p in PROIBIDAS)]
+
+
 # ── calendário ────────────────────────────────────────────────────────────────────────────────────────────────────
 def test_pascoa_e_os_feriados_moveis():
     assert [calendario._pascoa(a) for a in (2025, 2026, 2027)] == [date(2025, 4, 20), date(2026, 4, 5), date(2027, 3, 28)]
