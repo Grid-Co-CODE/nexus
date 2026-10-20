@@ -56,6 +56,12 @@ class SemCadastro(RuntimeError):
     pass
 
 
+# o serviço do cadastro por arquivo e chave (19/10/2026, Levi: "faça 2 e 3", o PCM mais leve): cada visita ao Gerar a
+# semana montava um serviço novo, e o novo decifrava de novo as ~570 fichas do cadastro (0,27 s de processador por
+# visita no PC). O serviço guarda o que decifrou até o arquivo mudar (`Servico._carregar`, pela marca do armazém).
+_SERVICOS: dict = {}
+
+
 def servico(config):
     """O serviço do cadastro, montado só com a configuração (a geração roda fora da tela do cadastro)."""
     if config.get("TESTING"):
@@ -73,10 +79,16 @@ def servico(config):
     caminho = Path(config.get("NEXUS_ARMAZEM_LOCAL") or ARMAZEM_PADRAO)
     if not caminho.exists():
         raise SemCadastro(f"o cadastro não está nesta máquina ({caminho.name})")
+    import hashlib
+    k = (str(caminho.resolve()), hashlib.sha256(chave.encode()).hexdigest())
+    s = _SERVICOS.get(k)
+    if s is not None:
+        return s
     try:
-        return Servico(ArmazemLocal(caminho), Cofre(chave))
+        s = _SERVICOS[k] = Servico(ArmazemLocal(caminho), Cofre(chave))
     except CifraErro as ex:
         raise SemCadastro(str(ex)) from None
+    return s
 
 
 def _texto(v) -> str:

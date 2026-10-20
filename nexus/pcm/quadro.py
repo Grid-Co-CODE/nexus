@@ -386,6 +386,24 @@ def tem_zeladoria(sem: dict) -> bool:
     return any(_eh_zeladoria(r.get("tipo")) for r in (sem.get("rows") or []) + (sem.get("pendentes") or []))
 
 
+_INDICE_TIPO: dict = {"tarefas": None, "tipo": None}
+
+
+def _indice_de_tipo(tarefas: list) -> dict:
+    """{(OS, tarefa normalizada): tipo} das tarefas da Gestão PCM, feito uma vez por leitura dela (19/10/2026: o Quadro
+    normalizava as milhares de tarefas a cada visita). A leitura da Gestão PCM é a mesma lista enquanto vale a cópia
+    dela (`fonte.ler_gestao`); lista nova, índice novo."""
+    g = _INDICE_TIPO
+    if g["tarefas"] is tarefas and g["tipo"] is not None:
+        return g["tipo"]
+    tipo: dict[tuple[str, str], str] = {}
+    for t in tarefas:
+        if isinstance(t, dict):
+            tipo.setdefault((_os(t.get("os")), _norm(t.get("tarefa"))), str(t.get("tipo") or "").strip())
+    g.update(tarefas=tarefas, tipo=tipo)
+    return tipo
+
+
 def tipo_do_fracttal(sem: dict, tarefas: list[dict] | None) -> tuple[dict, int]:
     """O tipo "Zeladoria" que a planilha traz e o Fracttal não confirma volta a ser o tipo do Fracttal (15/10/2026).
 
@@ -397,10 +415,7 @@ def tipo_do_fracttal(sem: dict, tarefas: list[dict] | None) -> tuple[dict, int]:
     Devolve (semana, quantas linhas mudaram); a semana que entrou não muda."""
     if not tarefas or not tem_zeladoria(sem):
         return sem, 0
-    tipo: dict[tuple[str, str], str] = {}
-    for t in tarefas:
-        if isinstance(t, dict):
-            tipo.setdefault((_os(t.get("os")), _norm(t.get("tarefa"))), str(t.get("tipo") or "").strip())
+    tipo = _indice_de_tipo(tarefas)
     n = 0
 
     def troca(lst):

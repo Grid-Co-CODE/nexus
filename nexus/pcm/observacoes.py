@@ -144,6 +144,12 @@ def casa(usina_fracttal: str, regra_norm: str) -> bool:
     return re.search(r"\b" + re.escape(regra_norm) + r"\b", norm_usina(usina_fracttal)) is not None
 
 
+def _casador(regra_norm: str):
+    """O `casa` de uma regra, compilado uma vez, sobre o nome JÁ normalizado (o mesmo resultado do `casa`)."""
+    padrao = re.compile(r"\b" + re.escape(regra_norm) + r"\b")
+    return lambda nome_norm: padrao.search(nome_norm) is not None
+
+
 def separar_nome(fracttal: str) -> dict | None:
     """'Athon -  Timon 1 - MA' -> cliente Athon, nome Timon 1, UF MA. O que não tem esse formato não é usina (os
     níveis de criticidade '1.Essencial', o nome solto de um cliente, 'Usina Teste')."""
@@ -168,20 +174,25 @@ def usinas_por_dia(regras: list[dict], usinas_fracttal: list[str]) -> list[dict]
             valendo[norm_usina(r["usina"])] = i
     from . import clientes
     m, saida = clientes.mapa(), []
+    # cada nome normalizado e cada regra compilada UMA vez (19/10/2026): a comparação de todos com todos fazia ~28 mil
+    # normalizações por visita ao Gerar a semana; o resultado é o mesmo do `casa`
+    regras_c = [(_casador(chave), i) for chave, i in valendo.items()]
     for f in usinas_fracttal:
         info = separar_nome(f)
         if not info:
             continue
         info["cliente"] = clientes.nome(info["cliente"], m)      # o nome do cadastro (Levi, 18/10/2026)
-        regra = next((i for chave, i in valendo.items() if casa(f, chave)), None)
+        nf = norm_usina(f)
+        regra = next((i for casa_r, i in regras_c if casa_r(nf)), None)
         info["regra"] = regra
         info["dias"] = list(regras[regra]["dias"]) if regra is not None else list(DIAS)
         saida.append(info)
     saida.sort(key=lambda u: (_sem_acento(u["cliente"]).lower(), _sem_acento(u["nome"]).lower()))
     # o nome curto vira a regra quando ele só casa com esta usina; senão, o nome inteiro do Fracttal
+    normas = [(x, norm_usina(x["fracttal"])) for x in saida]
     for u in saida:
-        curto = norm_usina(u["nome"])
-        outras = [x for x in saida if x is not u and casa(x["fracttal"], curto)]
+        casa_u = _casador(norm_usina(u["nome"]))
+        outras = [x for x, nx in normas if x is not u and casa_u(nx)]
         u["nome_regra"] = u["nome"] if not outras else u["fracttal"]
         u["divide"] = [x["nome"] for x in saida if x is not u and u["regra"] is not None and x["regra"] == u["regra"]]
     return saida

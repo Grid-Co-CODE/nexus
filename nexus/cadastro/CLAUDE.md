@@ -379,6 +379,20 @@ de entender para você, quando eu for fazer não vou entender nada".
   Pará 1 à mão (chave digitada, 2 cabines, 8 inversores gerados, distribuir fechando 6.804 kWp, nome repetido recusado),
   no celular sem rolagem lateral e no tema claro.
 
+## As listas montadas uma vez por versão (`telas._lista`, `cadastro/_lista_linhas.html`; 19/10/2026)
+
+Levi, 19/10/2026: "faça 2 e 3" (o Registro mestre entre os pesos do Nexus). O Registro mestre são ~300 usinas x 53
+colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a página tinha 1,3 MB e gastava 0,31 a
+0,42 s de processador a cada visita no PC, para a mesma tabela.
+
+- As linhas de toda lista do cadastro (Registro mestre, Clientes, Equipes, Regiões de campo, Colaboradores) saem do
+  `_lista_linhas.html` e ficam guardadas (`_LINHAS_PRONTAS`, as últimas 40) pela chave: o arquivo do armazém e a marca
+  dele (muda a cada gravação, inclusive por fora do Nexus), a lista, o dia (os avisos olham a data), a busca, os filtros,
+  as colunas à vista e a raiz do endereço. Gravou, a próxima visita monta de novo.
+- Sem o espaço em branco entre as células e sem o `class=""` vazio: a mesma tabela, 936 KB.
+- Depois: 0,02 a 0,03 s por visita. Prova: `tests/test_pcm_e_registro_leves_19_10.py` (montadas uma vez; outra busca e
+  outras colunas, outra chave; gravou, monta de novo).
+
 ## No banco (PostgreSQL): `banco.py`
 
 - Workbook `cadastro_nexus` da API db_performace: `clientes`, `equipes`, `pessoas`, `usinas`, `regioes_campo`,

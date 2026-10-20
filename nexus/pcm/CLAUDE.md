@@ -762,6 +762,23 @@ finalizadas no período" e a lista "Só atrasadas"), "Confiabilidade por ativo" 
 `confiabilidade.json`), "Tempo médio de reparo por Equipe Cluster" e o Relatório Executivo. Dos filtros de cima, não
 vieram Tipo, Etiqueta, Estado, OS, Solicitação e Período.
 
+## O processador por visita (19/10/2026)
+
+Levi, 19/10/2026: "faça 2 e 3" (o PCM entre os pesos do Nexus). Medido no PC com o cadastro e o banco reais, cada visita
+ao Gerar a semana gastava 0,34 a 0,39 s de processador e o Quadro 0,14 s; no notebook do servidor isso é várias vezes
+mais, e enquanto uma tela é montada as outras esperam (o Python faz uma coisa de cada vez).
+
+- **O serviço do cadastro é um só por arquivo e chave** (`auxiliar.servico`, `_SERVICOS`): cada visita montava um
+  `Servico` novo, e o novo decifrava de novo as ~570 fichas (0,27 s). O serviço guarda o que decifrou até o arquivo do
+  cadastro mudar (a marca do armazém).
+- **As usinas por dia** (`observacoes.usinas_por_dia`): cada nome do Fracttal normalizado uma vez e cada regra
+  compilada uma vez (`_casador`); eram ~28 mil normalizações por visita (a comparação de todos com todos). O resultado é
+  o mesmo do `casa` (o teste compara com a conta de antes).
+- **O tipo do Fracttal no Quadro** (`quadro._indice_de_tipo`): o índice (OS, tarefa) -> tipo das tarefas da Gestão PCM
+  é feito uma vez por leitura dela (a mesma lista enquanto vale a cópia do `fonte.ler_gestao`).
+- Depois: Gerar a semana 0,12 a 0,16 s e Quadro 0,05 s por visita, as páginas iguais byte a byte às de antes. Prova:
+  `tests/test_pcm_e_registro_leves_19_10.py`.
+
 ## Armadilhas já vividas
 
 - **Endereço nunca a partir da raiz** (porta única, 09/10/2026): debaixo do `/nexus` (o servidor até a fase 4; hoje na raiz, e o prefixo é a volta) um

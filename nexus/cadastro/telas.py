@@ -257,6 +257,22 @@ def _celula_vaga(r, f, texto) -> str:
     return ""
 
 
+# as linhas das listas do cadastro, montadas uma vez por versão do cadastro (19/10/2026; Levi: "faça 2 e 3"): o
+# Registro mestre são ~300 usinas x 53 colunas, 1,3 MB e ~0,35 s de processador a cada visita no PC (mais no servidor),
+# para a mesma tabela. A chave leva tudo de que as linhas dependem: a lista, a versão do arquivo do cadastro (que muda a
+# cada gravação, inclusive por fora do Nexus), o dia (os avisos olham a data), a busca, os filtros e as colunas à vista.
+_LINHAS_PRONTAS: "OrderedDict" = None
+_LINHAS_MAX = 40
+
+
+def _linhas_prontas():
+    global _LINHAS_PRONTAS
+    if _LINHAS_PRONTAS is None:
+        from collections import OrderedDict
+        _LINHAS_PRONTAS = OrderedDict()
+    return _LINHAS_PRONTAS
+
+
 def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto_novo, extras=None, visoes=None,
            nota=""):
     q = request.args.get("q", "").strip()
@@ -273,8 +289,18 @@ def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto
     for c in colunas:
         c["visivel"] = c["id"] in visiveis
     titulo_col = next((c["id"] for c in colunas if c["padrao"]), None)
-    linhas = []
     total = srv.registros(ent.id)
+    marca = getattr(getattr(srv, "armazem", None), "marca", lambda: None)()
+    from datetime import date as _date
+    chave = (str(getattr(srv.armazem, "caminho", "")), ent.id, titulo, marca, _date.today().isoformat(), q,
+             tuple(sorted(filtros.items())), tuple(sorted(visiveis)), request.script_root or "") if marca else None
+    prontas = _linhas_prontas()
+    if chave is not None and chave in prontas:
+        prontas.move_to_end(chave)
+        n_linhas, linhas_html = prontas[chave]
+        return _render_lista(srv, ent, titulo, colunas, n_linhas, linhas_html, total, q, filtros_def, filtros,
+                             url_nova, texto_novo, visoes, nota)
+    linhas = []
     for r in total:
         if q:
             partes = [r.id] + [exibir_valor(srv, ent.campo(b), r.valor(b)) for b in busca_campos]
@@ -298,6 +324,20 @@ def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto
         linhas.append({"id": r.id, "url": ent.rota_ficha + r.id, "selo_ok": r.selo_ok, "celulas": celulas,
                        "avisos": len(avisos), "pendencias": avisos,
                        "gravidade": avisos[0]["gravidade"] if avisos else ""})
+    n_colunas = 2 + sum(1 for c in colunas if c["visivel"])
+    linhas_html = Markup(render_template("cadastro/_lista_linhas.html", linhas=linhas, n_colunas=n_colunas,
+                                         n_cols_vazio=len(colunas) + 2, nomes=NOMES_PENDENCIA,
+                                         gravidades=GRAVIDADES))
+    if chave is not None:
+        prontas[chave] = (len(linhas), linhas_html)
+        while len(prontas) > _LINHAS_MAX:
+            prontas.popitem(last=False)
+    return _render_lista(srv, ent, titulo, colunas, len(linhas), linhas_html, total, q, filtros_def, filtros,
+                         url_nova, texto_novo, visoes, nota)
+
+
+def _render_lista(srv, ent, titulo, colunas, n_linhas, linhas_html, total, q, filtros_def, filtros, url_nova,
+                  texto_novo, visoes, nota):
     opcoes = []
     for k, rotulo, fonte in filtros_def:
         if fonte in ENTIDADES:
@@ -308,7 +348,8 @@ def _lista(srv: Servico, ent, titulo, filtros_def, busca_campos, url_nova, texto
     grupos = defaultdict(list)
     for c in colunas:
         grupos[c["secao"]].append(c)
-    return render_template("cadastro/lista.html", titulo=titulo, ent=ent, colunas=colunas, linhas=linhas,
+    return render_template("cadastro/lista.html", titulo=titulo, ent=ent, colunas=colunas, n_linhas=n_linhas,
+                           linhas_html=linhas_html,
                            total=len(total), q=q, filtros=opcoes, url_nova=url_nova, texto_novo=texto_novo,
                            vazio=srv.vazio(),
                            grupos_colunas=list(grupos.items()), visoes=_visoes_nav(visoes, ""),

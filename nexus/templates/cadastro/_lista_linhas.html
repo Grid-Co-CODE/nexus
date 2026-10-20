@@ -1,0 +1,30 @@
+{# as linhas das listas do cadastro (Registro mestre, Clientes, Equipes, Regiões, Colaboradores), montadas uma vez por
+   versão do cadastro (`telas._lista`, 19/10/2026; Levi: "faça 2 e 3"). O Registro mestre são ~300 usinas x 53 colunas
+   (a maioria escondida, para o seletor de colunas mostrar sem recarregar): 1,3 MB e ~0,35 s de processador a cada visita.
+   Sem o espaço em branco entre as células nem o class vazio, a mesma tabela. #}
+{%- for l in linhas %}
+<tr{% if l.avisos %} class="cad-com-aviso"{% endif %}><td class="id">{{ l.id }}</td>
+{%- for cel in l.celulas -%}
+<td data-col="{{ cel.col }}"{% if cel.esquerda or cel.legado %} class="{{ 'esq' if cel.esquerda }}{{ ' legado' if cel.legado }}"{% endif %}{% if not cel.visivel %} hidden{% endif %}>
+{%- if cel.link -%}<a class="linha" href="{{ (l.url)|na_raiz }}">{{ cel.texto or '(sem nome)' }}</a>
+{%- elif cel.chip and cel.texto -%}<span class="cad-chip{{ ' cad-chip--operacao' if cel.texto in ('OPERAÇÃO', 'Ativo') }}">{{ cel.texto }}</span>
+{%- elif cel.texto -%}{{ cel.texto }}
+{%- elif cel.vaga -%}<span class="cad-vaga">{{ cel.vaga }}</span>
+{%- else -%}<span class="vazio">—</span>{%- endif -%}
+</td>
+{%- endfor -%}
+<td>{% if not l.selo_ok %}<span class="cad-chip cad-chip--critico">selo</span> {% endif %}
+{%- if l.avisos -%}
+<button type="button" class="cad-chip cad-chip--{{ l.gravidade }} cad-avisos-botao" aria-expanded="false" aria-controls="av-{{ l.id }}" title="Ver os avisos">{{ l.avisos }} <i class="ph ph-caret-down" aria-hidden="true"></i></button>
+{%- else -%}<span class="vazio">—</span>{%- endif -%}
+</td></tr>
+{%- if l.avisos %}
+<tr class="cad-detalhe" id="av-{{ l.id }}" hidden><td colspan="{{ n_colunas }}"><ul class="cad-avisos-lista">
+{%- for p in l.pendencias %}
+<li><span class="cad-chip cad-chip--{{ p.gravidade }}">{{ gravidades.get(p.gravidade, p.gravidade) }}</span> <strong>{{ nomes.get(p.tipo, p.tipo) }}</strong> <span>{{ p.detalhe }}</span></li>
+{%- endfor %}
+</ul><a class="cad-detalhe-ir" href="{{ (l.url)|na_raiz }}">Abrir a ficha para corrigir <i class="ph ph-arrow-right" aria-hidden="true"></i></a></td></tr>
+{%- endif %}
+{%- else %}
+<tr><td colspan="{{ n_cols_vazio }}" class="vazio">Nada encontrado.</td></tr>
+{%- endfor %}

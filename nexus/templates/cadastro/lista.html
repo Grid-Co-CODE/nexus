@@ -49,7 +49,7 @@
 </form>
 
 <div class="cad-barra-tabela">
-  <p class="cad-conta"><span class="gc-num">{{ linhas|length }}</span> de <span class="gc-num">{{ total }}</span> {{ ent.plural }}</p>
+  <p class="cad-conta"><span class="gc-num">{{ n_linhas }}</span> de <span class="gc-num">{{ total }}</span> {{ ent.plural }}</p>
   <details class="cad-colunas" id="cad-colunas">
     <summary class="gc-btn gc-btn--ui gc-btn--contorno"><i class="ph ph-columns"></i> Colunas</summary>
     <div class="cad-colunas-painel">
@@ -76,41 +76,7 @@
       </tr>
     </thead>
     <tbody>
-      {% for l in linhas %}
-      <tr{% if l.avisos %} class="cad-com-aviso"{% endif %}>
-        <td class="id">{{ l.id }}</td>
-        {% for cel in l.celulas %}
-        <td data-col="{{ cel.col }}" class="{{ 'esq' if cel.esquerda }}{{ ' legado' if cel.legado }}"{% if not cel.visivel %} hidden{% endif %}>
-          {%- if cel.link -%}<a class="linha" href="{{ (l.url)|na_raiz }}">{{ cel.texto or '(sem nome)' }}</a>
-          {%- elif cel.chip and cel.texto -%}<span class="cad-chip{{ ' cad-chip--operacao' if cel.texto in ('OPERAÇÃO', 'Ativo') }}">{{ cel.texto }}</span>
-          {%- elif cel.texto -%}{{ cel.texto }}
-          {%- elif cel.vaga -%}<span class="cad-vaga">{{ cel.vaga }}</span>
-          {%- else -%}<span class="vazio">—</span>{%- endif -%}
-        </td>
-        {% endfor %}
-        <td>{% if not l.selo_ok %}<span class="cad-chip cad-chip--critico">selo</span> {% endif %}
-          {%- if l.avisos -%}
-          <button type="button" class="cad-chip cad-chip--{{ l.gravidade }} cad-avisos-botao" aria-expanded="false"
-                  aria-controls="av-{{ l.id }}" title="Ver os avisos">{{ l.avisos }} <i class="ph ph-caret-down" aria-hidden="true"></i></button>
-          {%- else -%}<span class="vazio">—</span>{%- endif -%}
-        </td>
-      </tr>
-      {% if l.avisos %}
-      <tr class="cad-detalhe" id="av-{{ l.id }}" hidden>
-        <td colspan="{{ n_colunas }}">
-          <ul class="cad-avisos-lista">
-            {% for p in l.pendencias %}
-            <li><span class="cad-chip cad-chip--{{ p.gravidade }}">{{ gravidades.get(p.gravidade, p.gravidade) }}</span>
-              <strong>{{ nomes.get(p.tipo, p.tipo) }}</strong> <span>{{ p.detalhe }}</span></li>
-            {% endfor %}
-          </ul>
-          <a class="cad-detalhe-ir" href="{{ (l.url)|na_raiz }}">Abrir a ficha para corrigir <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-        </td>
-      </tr>
-      {% endif %}
-      {% else %}
-      <tr><td colspan="{{ colunas|length + 2 }}" class="vazio">Nada encontrado.</td></tr>
-      {% endfor %}
+      {{ linhas_html }}
     </tbody>
   </table>
 </div>
