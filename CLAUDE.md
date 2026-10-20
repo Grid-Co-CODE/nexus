@@ -56,6 +56,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Segurança · HSEQ (Extintores: por cliente, com o responsável e os técnicos de cada usina, por responsável e o relatório de cada cliente e usina em PDF e Excel; EPI e EPC: as luvas isolantes pela ronda diária; APR e PT: as Permissões de trabalho que vieram do Campo, com a PT e a APR) | `nexus/torres/hseq/CLAUDE.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |
+| **Desempenho (Nexus lento: como ler o Raio-X, as regras de prova, o que já foi corrigido e a fila do chat de desempenho)** | `DESEMPENHO.md` |
 | Servidor da T.I. | `DEPLOY.md` |
 
 Desenho da fase atual: `docs/superpowers/specs/2026-09-29-casca-nexus-design.md`; a porta única da Performance (o Nexus
