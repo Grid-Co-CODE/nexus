@@ -499,6 +499,10 @@ TTL_HISTORICO = 180          # s — a lista de uma visão; o botão ↻ busca d
 TTL_APOIO = 600              # s — etiquetas e pessoas, que quase não mudam
 _MEMO: dict = {}
 _MEMO_LOCK = threading.Lock()
+# o 1º elemento das chaves que o teto da memória tira POR ÚLTIMO (quem guarda por muito tempo se registra aqui). Caso: o
+# quadro do Acompanhamento de chamados vale 30 min (20/10/2026) e, sendo o guardado há mais tempo, seria o 1º a sair
+# quando os anexos dos cards do Histórico enchem a memória: a volta ao quadro releria o Fracttal na frente de quem voltou
+MEMO_FICA: set = set()
 
 
 def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
@@ -517,7 +521,9 @@ def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
     with _MEMO_LOCK:
         _MEMO[chave] = (agora, r)
         if len(_MEMO) > 300:                              # memória com teto: sai o que foi guardado há mais tempo
-            for k in sorted(_MEMO, key=lambda k: _MEMO[k][0])[:len(_MEMO) - 300]:
+            def fica(k):                                  # (e o do MEMO_FICA por último)
+                return isinstance(k, tuple) and bool(k) and k[0] in MEMO_FICA
+            for k in sorted(_MEMO, key=lambda k: (fica(k), _MEMO[k][0]))[:len(_MEMO) - 300]:
                 _MEMO.pop(k, None)
     return r
 

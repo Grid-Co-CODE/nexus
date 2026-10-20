@@ -32,10 +32,14 @@ from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_acomp", __name__, url_prefix="/os")
 
-TTL_QUADRO = 180          # s: a cópia do quadro (ver `_dono`) — trocar de tela e voltar não busca de novo
+# s: a cópia do quadro (ver `_dono`). Era 3 min até 20/10/2026 (Levi: "quando tento voltar para acompanhamento dá uma
+# travada, faz outra pesquisa no fractal? ... só pesquisar caso a singrid clique em atualizar, fora isso fica mostrando o
+# que já carregou ou carrega a cada 30 min"): a volta da tela de um chamado ao quadro não vai ao Fracttal, e o que a
+# própria tela grava (ticket, finalizar, responsável) ajusta a cópia em vez de apagá-la (`_ajustar`). O Atualizar relê.
+TTL_QUADRO = 30 * 60
 DIAS_BUSCA = 365          # a primeira OS de acompanhamento é de ago/2026; um ano cobre as abertas com folga
 TTL_TICKET_FIM = 1800     # s: o ticket de OS CONCLUÍDA (ver `_tickets`)
-# Passados os 3 min, o quadro abre NA HORA com a leitura anterior e relê o Fracttal por trás, com a sessão da pessoa
+# Passados os 30 min, o quadro abre NA HORA com a leitura anterior e relê o Fracttal por trás, com a sessão da pessoa
 # (Levi, 09/10/2026: "teria como utilizarmos essas requisições de forma mais inteligente?"): até então, quadro vencido
 # era a tela esperando o Fracttal na frente de quem abriu. Mais velha que VELHA_MAX, espera a leitura como antes: um
 # quadro de horas atrás, mesmo com a hora na tela, já engana (chamado que ganhou ticket direto no Fracttal, por exemplo).
@@ -117,6 +121,7 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
     como a conferência de quem leu (`historico_store.anotar_total`): é a mesma conta do `api.total_chamados`. `pessoa`
     é o dono da cópia: vem de quem chama; sem ele, o de quem está na requisição (`_dono`)."""
     def _buscar():
+        inicio = time.monotonic()
         hoje = aw.agora_brt()
         de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
         inf = {}
@@ -125,7 +130,7 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         _conferir_sessao()
         total = int(inf.get("total") or 0)
         HS.anotar_total(_quem_le(), ("acomp", "TODOS"), total)
-        return {"linhas": linhas, "quando": hoje.strftime("%d/%m/%Y %H:%M"), "total": total}
+        return _reaplicar({"linhas": linhas, "quando": hoje.strftime("%d/%m/%Y %H:%M"), "total": total}, inicio)
     return rotas._memo(("acomp_linhas", pessoa or _dono()), TTL_QUADRO, _buscar, forcar)
 
 
@@ -174,13 +179,67 @@ def _dados(forcar: bool = False, pessoa=None) -> dict:
     pessoa = pessoa or _dono()
 
     def _buscar():
+        inicio = time.monotonic()
         _sessao_viva()
         hoje = aw.agora_brt()
         lv = _linhas(forcar, pessoa)
         tickets = _tickets(lv["linhas"], hoje)
         _conferir_sessao()
-        return {"linhas": lv["linhas"], "tickets": tickets, "quando": lv["quando"]}
+        return _reaplicar({"linhas": lv["linhas"], "tickets": tickets, "quando": lv["quando"]}, inicio)
     return rotas._memo(("acomp", pessoa), TTL_QUADRO, _buscar, forcar)
+
+
+# ── a gravação ajusta o quadro guardado (20/10/2026) ──────────────────────────────────────────────────────────────
+# Até então cada gravação desta tela apagava o quadro da memória (`_esquecer`), e a volta ao quadro esperava o Fracttal.
+# Agora a gravação põe na cópia o que ELA gravou (e o Fracttal aceitou): o ticket, o status depois de finalizar, o
+# responsável. A releitura que começou antes da gravação e termina depois leva a gravação por cima (`_reaplicar`).
+_AJUSTES: list = []        # (quando, id da OS, campos da linha, ticket), as últimas AJUSTES_MAX gravações
+AJUSTES_MAX = 200
+rotas.MEMO_FICA.update({"acomp", "acomp_linhas", "acomp_tk"})      # 30 min: o teto da memória os tira por último
+
+
+def _com_ajuste(v: dict, wid, campos: dict, ticket):
+    """A cópia `v` (o quadro de `_dados` ou a lista de `_linhas`) com a linha da OS `wid` ajustada, numa cópia nova (quem
+    está montando a tela com a de antes não a vê mudar no meio); None se a OS não está nela."""
+    linhas = v.get("linhas") or []
+    alvo = next((l for l in linhas if str(l.get("id")) == str(wid)), None)
+    if alvo is None:
+        return None
+    novo = {k: x for k, x in v.items() if k != "_cartoes"}           # os "outros chamados" montados são refeitos
+    novo["linhas"] = [dict(l, **campos) if l is alvo else l for l in linhas]
+    if ticket is not None and isinstance(v.get("tickets"), dict):
+        novo["tickets"] = dict(v["tickets"])
+        novo["tickets"][alvo.get("id")] = ticket
+    return novo
+
+
+def _ajustar(wid, campos=None, ticket=None) -> bool:
+    """Põe a gravação na cópia guardada de todo mundo; True se a OS estava em alguma."""
+    campos, achou = dict(campos or {}), False
+    with rotas._MEMO_LOCK:
+        _AJUSTES.append((time.monotonic(), wid, campos, ticket))
+        del _AJUSTES[:-AJUSTES_MAX]
+        for k, (q, v) in list(rotas._MEMO.items()):
+            if not (isinstance(k, tuple) and k and isinstance(v, dict)):
+                continue
+            if k[0] in ("acomp", "acomp_linhas"):
+                novo = _com_ajuste(v, wid, campos, ticket)
+                if novo is not None:
+                    rotas._MEMO[k] = (q, novo)                       # a idade fica: o ajuste não é uma leitura nova
+                    achou = True
+            elif k[0] == "acomp_tk":
+                v.pop(wid, None)
+    rotas._esquecer_preparo(wid)            # o detalhe lido antes da gravação (o mouse parado no cartão) também sai
+    return achou
+
+
+def _reaplicar(r: dict, inicio: float) -> dict:
+    """A leitura que começou em `inicio`, com as gravações feitas desde então por cima."""
+    with rotas._MEMO_LOCK:
+        depois = [a for a in _AJUSTES if a[0] >= inicio]
+    for _q, wid, campos, ticket in depois:
+        r = _com_ajuste(r, wid, campos, ticket) or r
+    return r
 
 
 def _esquecer(wid=None):
@@ -218,8 +277,14 @@ def _guardado_com_idade(chave) -> tuple:
 
 def esquecer_se_no_quadro(wid) -> bool:
     """Gravação feita fora desta tela (o responsável trocado no card da OS ou na tela do chamado, 19/10/2026): se a OS
-    está num quadro guardado, mesmo vencido, ele sai da memória, como depois do ticket. OS que não é de acompanhamento
-    não custa a ninguém a releitura do quadro."""
+    está num quadro guardado, mesmo vencido, ele é ajustado com o responsável novo (20/10/2026: antes saía da memória, e
+    a volta ao quadro relia o Fracttal). Quem chama é a rota do responsável (`rotas_os_acoes.api_responsavel`), cujo corpo
+    traz o `id_personnel` e o `name` que o Fracttal acabou de aceitar; sem eles (fora de uma requisição), o quadro sai
+    da memória, como antes. OS que não é de acompanhamento não custa a ninguém a releitura do quadro."""
+    corpo = (request.get_json(silent=True) or {}) if has_request_context() else {}
+    nome = " ".join(str(corpo.get("name") or "").split())
+    if nome and corpo.get("id_personnel"):
+        return _ajustar(wid, {"atribuido_a": nome, "id_atribuido": corpo.get("id_personnel")})
     with rotas._MEMO_LOCK:
         achou = any(isinstance(k, tuple) and k and k[0] in ("acomp", "acomp_linhas") and isinstance(v[1], dict)
                     and any(str(l.get("id")) == str(wid) for l in v[1].get("linhas") or [])
@@ -543,7 +608,7 @@ def api_ticket(folio):
         return jsonify({"ok": True, "ticket": novo, "mensagem": "O ticket já era este.", "aviso": ""})
     api.salvar_subtarefas(wid, item["id_tarefa"], [{"id_form_item": item["id_form_item"], "valor": novo,
                                                    "tipo": item.get("tipo_id") or 1}])
-    _esquecer(wid)
+    _ajustar(wid, ticket=novo)                  # a volta ao quadro mostra o ticket sem reler o Fracttal (20/10/2026)
     aviso = _anotar(folio, aw.texto_ticket(novo, antigo), "ticket", det)
     return jsonify({"ok": True, "ticket": novo, "mensagem": "Ticket gravado na OS %s." % folio, "aviso": aviso})
 
@@ -564,6 +629,14 @@ def api_obs(folio):
     return jsonify({"ok": True, "entrada": dict(aw.entrada(reg), novo=True)})
 
 
+def _status_depois_de_concluir(wid):
+    """O status da OS no Fracttal (o cabeçalho, 1 pedido); None se não deu para ler."""
+    try:
+        return int(api._cabecalho_os(wid).get("id_status_work_order") or 0) or None
+    except (api.FracttalError, TypeError, ValueError):
+        return None
+
+
 @bp.route("/api/acomp/<int:folio>/finalizar", methods=["POST"])
 @exige_sessao
 def api_finalizar(folio):
@@ -573,7 +646,13 @@ def api_finalizar(folio):
     res = api.concluir_os_checado(wid)                           # o Concluir do card (os_detalhe.py:896)
     if isinstance(res, dict) and res.get("ok") is False:
         return _erro(res.get("msg") or "O Fracttal não concluiu a OS.")
-    _esquecer(wid)
+    # o quadro guardado leva o status que o Fracttal deu depois de concluir (em verificação ou concluída: 1 pedido, aqui,
+    # e não a lista inteira na volta ao quadro); sem ele, o quadro não chuta e sai da memória, como até 20/10/2026
+    st = _status_depois_de_concluir(wid)
+    if st in (2, 3):
+        _ajustar(wid, {"status_id": st, "status": api.WO_STATUS.get(st, "")})
+    else:
+        _esquecer(wid)
     # O card da OS avisa em vermelho quando a conclusão fica SEM data de fim — lá é defeito (o cronômetro não foi usado
     # numa OS de campo). Aqui é o esperado: ninguém executa a OS administrativa, e a data que vale é a da finalização,
     # que vai para o banco logo abaixo. Dizer isso é melhor que assustar a analista de chamados a cada chamado fechado.

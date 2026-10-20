@@ -93,7 +93,7 @@ def test_o_dialogo_e_um_so_nas_duas_telas():
         assert '<template data-dlg="responsavel">' not in html, t
 
 
-def test_trocar_grava_no_fracttal_e_tira_o_quadro_da_memoria(cli, monkeypatch):
+def test_trocar_grava_no_fracttal_e_ajusta_o_quadro_guardado(cli, monkeypatch):
     pedidos = []
     monkeypatch.setattr(api, "mudar_responsavel", lambda wid, idp, nota=None: pedidos.append((wid, idp, nota)) or {"ok": True})
     cli.get("/os/chamados/acompanhamento")                               # o quadro, guardado na memória
@@ -105,7 +105,12 @@ def test_trocar_grava_no_fracttal_e_tira_o_quadro_da_memoria(cli, monkeypatch):
     assert j["mensagem"] == "OS %d agora está com %s." % (FOLIO, EQUIPE_NOME)
     assert j["da_equipe"] is True                                         # a cor do nome na tela do chamado
     assert pedidos == [(WID, EQUIPE_ID, None)]                            # sem nota: a observação da OS não muda
-    assert _quadro() == []                                                # voltar ao quadro relê o Fracttal
+    # o quadro guardado fica, com o responsável novo (20/10/2026: antes saía da memória, e a volta ao quadro relia o
+    # Fracttal na frente de quem voltou; ver test_oscreator_acomp_30min_20_10.py)
+    assert _quadro()
+    with rotas._MEMO_LOCK:
+        linhas = [l for k in _quadro() for l in rotas._MEMO[k][1]["linhas"]]
+    assert {(l["atribuido_a"], l["id_atribuido"]) for l in linhas} == {(EQUIPE_NOME, EQUIPE_ID)}
     # para outra pessoa, a cor de aviso
     j = cli.post("/os/api/os/%d/responsavel" % WID, json={"id_personnel": 900003, "name": "Pessoa Teste"}).get_json()
     assert j["da_equipe"] is False

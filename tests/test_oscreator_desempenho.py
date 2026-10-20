@@ -211,9 +211,9 @@ def test_a_tela_de_um_chamado_com_o_quadro_vencido_nao_rele_os_tickets(quadro, m
     monkeypatch.setattr(rotas_acomp, "_em_segundo_plano", por_tras.append)
     cli = _cliente()
     cli.get("/os/chamados/acompanhamento")
-    with rotas._MEMO_LOCK:                                                # passaram os 3 min do quadro
+    with rotas._MEMO_LOCK:                                                # passou o prazo do quadro (30 min)
         for k, (t, v) in list(rotas._MEMO.items()):
-            rotas._MEMO[k] = (t - 1000, v)
+            rotas._MEMO[k] = (t - rotas_acomp.TTL_QUADRO - 5, v)
     r = cli.get("/os/chamados/acompanhamento/9104")
     assert r.status_code == 200 and 'data-folio="9104"' in r.get_data(as_text=True)
     assert quadro["tickets"] == [[1, 2, 3]]                               # só os da 1ª visita ao quadro

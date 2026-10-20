@@ -34,6 +34,24 @@
   // ── o quadro: os filtros escondem cards, e cada coluna recontra e mostra o "vazio" quando zera ──
   const quadro = document.getElementById("acomp");
   if (quadro) {
+    // 6 cartões à vista em cada coluna (Levi, 20/10/2026: "aumente o tamanho em acompanhamento de chamados para mostrar 6
+    // usinas nas colunas kanban"): a coluna vai até o fim do 6º cartão visível, MEDIDO (o cartão cresce com o título longo
+    // e as etiquetas, e a largura muda a quebra); com até 6, sem teto. No celular a coluna não tem teto (chamados.css).
+    const CARTOES_A_VISTA = 6;
+    const medir = function () {
+      quadro.querySelectorAll(".cards").forEach(function (box) {
+        const vis = Array.prototype.filter.call(box.querySelectorAll(".card"), function (c) { return !c.classList.contains("oculto"); });
+        if (vis.length <= CARTOES_A_VISTA) { box.style.setProperty("--cards-max", "none"); return; }
+        const fim = vis[CARTOES_A_VISTA - 1].getBoundingClientRect().bottom - box.getBoundingClientRect().top + box.scrollTop;
+        box.style.setProperty("--cards-max", Math.ceil(fim + (parseFloat(getComputedStyle(box).paddingBottom) || 0)) + "px");
+      });
+    };
+    let quadroPedido = 0;
+    const remedir = function () { if (!quadroPedido) quadroPedido = requestAnimationFrame(function () { quadroPedido = 0; medir(); }); };
+    medir();
+    window.addEventListener("resize", remedir);
+    window.addEventListener("load", remedir);                             // a fonte Inter chega e muda a altura
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(remedir);
     const campos = quadro.querySelectorAll("[data-f]");
     const aplicar = function () {
       const f = {};
@@ -52,6 +70,7 @@
         const vazio = col.querySelector("[data-vazio]");
         if (vazio) vazio.classList.toggle("oculto", n > 0);
       });
+      medir();                                                            // o filtro muda quais são os 6 primeiros
     };
     campos.forEach(function (c) { c.addEventListener(c.tagName === "INPUT" ? "input" : "change", aplicar); });
     const limpar = quadro.querySelector("[data-limpar]");

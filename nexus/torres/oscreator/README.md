@@ -350,7 +350,8 @@ Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro
   com as URLs. As duas listas (subtarefas e OS) vão ao mesmo tempo, nas duas rotas.
 - **Acompanhamento de chamados** (`rotas_acomp.py`), tudo em `rotas._MEMO`, por dono da cópia (`_dono`: "TODOS" para
   quem vê o mesmo no Fracttal, ou a pessoa; ver "O quadro do Acompanhamento dividido"):
-  - `("acomp_linhas", dono)`: as OS de acompanhamento sem os tickets, 3 min. A tela de um chamado usa só isto.
+  - `("acomp_linhas", dono)`: as OS de acompanhamento sem os tickets, 30 min (era 3 até 20/10/2026, ver "O quadro
+    só relê no Atualizar ou a cada 30 min"). A tela de um chamado usa só isto.
     Antes, com o quadro vencido, ela relia o ticket de TODAS as OS para abrir uma. O quadro reaproveita estas linhas;
   - `("acomp_tk", "TODOS")`: o ticket das OS **concluídas**, 30 min, um para todos (é da OS). Concluída não volta e o Fracttal recusa editar OS
     fechada (`api.editar_nota_os`). Então o "Atualizar" relê a lista, as abertas e as em verificação, e não as
@@ -369,7 +370,7 @@ Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro
     listagem engole o erro de cada página e devolve vazio, e o quadro vazio ficaria 3 min guardado. Até 08/10 a busca
     da etiqueta acusava a sessão morta; com a lista reaproveitada, o quadro pode nem passar por ela. Pelo mesmo motivo
     o id da etiqueta CHAMADOS não é guardado (`api._label_id`).
-  - **Passados os 3 min, o quadro abre na hora com a leitura anterior e relê por trás** (Levi, 09/10/2026: "teria
+  - **Passados os 30 min, o quadro abre na hora com a leitura anterior e relê por trás** (Levi, 09/10/2026: "teria
     como utilizarmos essas requisições de forma mais inteligente?"; `_renovar_por_tras`). Ao lado da hora da leitura
     aparece "· atualizando"; a nova vale na próxima abertura (ou no Atualizar, que lê na hora). A releitura roda numa
     thread com o JWT e o e-mail de quem abriu (`sessao.contexto`: a thread nasce sem o contexto da requisição), uma
@@ -437,8 +438,8 @@ faixa do Quadro da equipe da Engenharia, `nexus/torres/engenharia/CLAUDE.md`).
   `static/chamados.css` com a paleta daqui: o OS Creator não carrega o CSS do Nexus e roda sozinho no 5090. Mudou o quadro
   da Engenharia, traga para cá.
   - Coluna: um cartão com a faixa da cor no topo (Chegaram vermelho, Ticket aberto âmbar, Finalizados verde), o título,
-    a pílula da contagem e, à direita, o subtítulo de antes. No computador a coluna rola por dentro (72vh), como na
-    Engenharia; no celular (uma coluna embaixo da outra) quem rola é a página.
+    a pílula da contagem e, à direita, o subtítulo de antes. No computador a coluna rola por dentro, com 6 cartões à
+    vista (20/10/2026; até então 72vh, como na Engenharia); no celular (uma coluna embaixo da outra) quem rola é a página.
   - Cartão: "OS 12875" em verde, mono; o estado no canto, colorido pela idade (`tempo_curto`: "35 d", "8 d sem
     atualização", "atualizado hoje", "fechado 26/09", "em verificação 26/09"); o ativo em negrito; onde (código ·
     cliente · usina); as etiquetas (fornecedor, tipo de ativo, inspeção de origem, ticket); o responsável com o avatar
@@ -905,8 +906,8 @@ nem fazemos no card da OS no histórico de OS Creator!"
   `data-folio`). Com `data-no-lugar`, a troca é escrita ali mesmo (`trocouNoLugar`: o nome, o "Hoje está com" do
   diálogo e a mensagem), porque não há card para recarregar. A cor de "no nome de outra pessoa" vem do servidor
   (`da_equipe` na resposta de `/os/api/os/<id>/responsavel`, a regra do quadro, `acomp_web.da_equipe`).
-- A rota do responsável tira da memória o quadro que mostra a OS (`rotas_acomp.esquecer_se_no_quadro`): voltar ao quadro
-  ou recarregar a tela mostra quem ficou, e não o de antes por até 3 min. OS que não está em nenhum quadro guardado (a
+- A rota do responsável ajusta o quadro guardado que mostra a OS com quem ficou (`rotas_acomp.esquecer_se_no_quadro`;
+  até 20/10/2026 ele saía da memória, e a volta ao quadro relia o Fracttal). OS que não está em nenhum quadro guardado (a
   troca pelo card do Histórico, numa OS que não é de chamado) não faz ninguém esperar a releitura. A troca já está no
   Fracttal quando isso roda: erro aqui não vira erro na tela.
 - Conferido numa bancada local com o Fracttal falso: duas trocas seguidas (para a equipe, nome sem cor; para outra
@@ -1115,3 +1116,29 @@ na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
 - Prova: `tests/test_oscreator_chamado_retroativo.py` (a nota dela com nomes e números de mentira, a nota do App lida
   igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
   e a 375 px.
+
+## O quadro só relê no Atualizar ou a cada 30 min, com 6 cartões à vista (Garantias, 20/10/2026)
+
+Levi, 20/10/2026: "aumente o tamanho em acompanhamento de chamados para mostrar 6 usinas nas colunas kanban" e "quando
+tento voltar para acompanhamento dá uma travada, faz outra pesquisa no fractal? ... só pesquisar caso a singrid clique em
+atualizar, fora isso fica mostrando o que já carregou ou carrega a cada 30 min".
+
+- **O quadro guardado vale 30 min** (`TTL_QUADRO`, era 3): a volta da tela de um chamado ao quadro sai da memória. Depois
+  dos 30 min, abre na hora com a leitura anterior e relê por trás, como antes; o Atualizar relê na hora. Até `VELHA_MAX`
+  (2 h), sem mudança.
+- **A gravação ajusta o quadro em vez de apagá-lo** (`rotas_acomp._ajustar`): o ticket (a OS passa a "Ticket aberto"), o
+  finalizar (pelo status que o Fracttal deu depois de concluir, `_status_depois_de_concluir`, 1 pedido na própria
+  gravação; sem ele, o quadro sai da memória como antes) e o responsável (`esquecer_se_no_quadro`, com o nome que a
+  rota do responsável mandou). Até então cada uma apagava o quadro, e a volta esperava a lista e os tickets do
+  Fracttal. A releitura que começou antes da gravação e termina depois leva a gravação por cima (`_AJUSTES`,
+  `_reaplicar`); a idade da cópia não muda com o ajuste.
+- **O teto da memória tira o quadro por último** (`rotas.MEMO_FICA`): com 30 min ele seria o guardado há mais tempo, e
+  os anexos dos cards do Histórico (uma entrada por card aberto) o tirariam primeiro.
+- **6 cartões à vista** (`acomp.js`, `CARTOES_A_VISTA`): a coluna vai até o fim do 6º cartão visível, medido na tela
+  (o cartão cresce com o título e as etiquetas), e é refeita no filtro, na troca de largura e quando a fonte chega; o
+  CSS usa a medida (`--cards-max`, 72vh antes do JavaScript). Até 6 cartões, sem teto; no celular, sem teto, como antes.
+- Prova: `tests/test_oscreator_acomp_30min_20_10.py` (30 min, depois dos 30, o Atualizar, ticket, finalizar com e sem o
+  status, responsável, a releitura no meio da gravação, o teto da memória); a releitura e o teto conferidos por mutação.
+  Na bancada local (Fracttal falso, 1545 px): 6 cartões inteiros em cada coluna (966 px), a ida e volta a um chamado
+  sem nenhuma leitura da lista, o ticket gravado e o cartão já em "Ticket aberto" na volta; a 375 px, sem teto e sem
+  rolagem lateral.
