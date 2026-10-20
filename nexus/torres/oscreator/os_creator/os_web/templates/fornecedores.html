@@ -13,12 +13,10 @@
   <div class="ac-head">
     <div style="min-width:0">
       <div class="ac-tit"><a class="ac-volta" href="/os/chamados">← Chamados</a><h1>Controle <span>de fornecedores</span></h1></div>
-      <p class="ac-sub">As subtarefas que descem na inspeção de chamado, por tipo de ativo e fornecedor: a base, depois o tipo, depois o fornecedor.</p>
+      <p class="ac-sub">As subtarefas que descem na inspeção de chamado, por tipo de ativo e fornecedor: a base, depois o tipo, depois o fornecedor. O App de Campo usa esta mesma lista: o que se salva aqui vale na hora para a Inspeção de chamados do OS Creator e em até 5 minutos para o técnico.</p>
     </div>
   </div>
-  {# o App lê esta mesma aba desde a versão que aplica o `chamado_garantia.registro` (20/10/2026); até ela ser publicada,
-     ele segue o código dele. Publicada, este aviso sai. #}
-  <p class="aviso">O App de Campo, onde o técnico abre a maioria das inspeções, passa a usar esta mesma lista (fornecedores, tipos de ativo e perguntas) na versão que lê este banco; até ela ser publicada, ele usa o modelo do código dele. O que se salva aqui vale na hora para a Inspeção de chamados do OS Creator.</p>
+  {# o App lê esta mesma aba desde a v290 (20/10/2026 15:06Z), de 5 em 5 minutos: o aviso de que ele seguia o código saiu #}
   {% if not dados.pode_gravar %}<p class="aviso">Este servidor não tem a credencial de escrita do banco da Gridco: dá para ver e ajustar, mas não para salvar.</p>{% endif %}
   {% if erro_banco %}<p class="aviso err">O banco da Gridco não respondeu na última leitura ({{ erro_banco }}). A tela mostra o que estava valendo.</p>{% endif %}
   <div class="abas" id="f_abas"></div>

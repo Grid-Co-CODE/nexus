@@ -1079,8 +1079,10 @@ fabricantes em chamados > fabricantes apareça atualizado no app".
   ("CANANDIAN"): o nome fica certo na tela e a grafia do Fracttal entra como apelido. Hukseflux e Romiotto não
   aparecem no nome de nenhum ativo (o nome da estação é o endereço). O campo de fornecedor novo pede o nome como está no
   Fracttal.
-- **O App de Campo** lê a aba e aplica pelo pacote na versão que for publicada pela sessão do App (o pedido e o código
-  testado estão em `app-campo-docs/_propostas/fabricantes-do-nexus`): a lista do técnico passa a ser a da tela,
-  filtrada pelo tipo do ativo, e a NCU e a RSU pegam a marca dos trackers da usina. Até lá, a tela avisa em cima.
+- **O App de Campo** lê a aba e aplica pelo pacote desde a v290 (20/10/2026 15:06Z, servidor `26d79be6f7506438`; o
+  pedido e o código testado em `app-campo-docs/_propostas/fabricantes-do-nexus`): a lista do técnico é a da tela,
+  filtrada pelo tipo do ativo, relida de 5 em 5 minutos (`/health` → `chamadoGarantia.fabricantes`). A NCU e a RSU
+  pegam a marca dos trackers da usina depois do catálogo da ronda rodar (segunda 04:30 UTC). O aviso do topo da tela
+  saiu; a linha de baixo do título diz que o App usa a mesma lista.
 - Prova: `tests/test_chamado_garantia_fabricantes.py` (aqui) e os testes do oem (`test_chamado_modelos_store.py`,
   `test_modelos_na_abertura.py`, `test_os_web_fornecedores.py`), rodados com a cópia sincronizada.

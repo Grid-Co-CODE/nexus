@@ -17,7 +17,7 @@ Bloco sem linha no banco vale o do código. Com o banco fora do ar a tela funcio
 O App de Campo: carrega a SUA cópia do pacote `chamado_garantia`, e é por ele que o técnico abre a maioria das
 inspeções. Desde 20/10/2026 a regra de pôr esta aba por cima do código mora no pacote (`chamado_garantia.registro`),
 para o App ler a mesma aba e aplicar igual (Levi: "quando a singrid adicione novos fabricantes em chamados > fabricantes
-apareça atualizado no app"). Enquanto o App não publicar a versão que lê a aba, ele segue no código.
+apareça atualizado no app"). O App aplica desde a v290 (20/10/2026 15:06Z), relendo a aba de 5 em 5 minutos.
 
 COMO VALE NO PROCESSO: `aplicar()` reescreve, EM MEMÓRIA e NO LUGAR, as estruturas do `chamado_garantia.spec`
 (`registro.aplicar`) e o `chamado_spec.CANAL` (o canal de abertura, que é só do OS Creator). No lugar, e não trocando o

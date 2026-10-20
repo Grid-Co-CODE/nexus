@@ -82,7 +82,7 @@ cg.marcas_para("Inversor")              # a lista do técnico: só quem atende o
 Fornecedor novo entra na lista dos tipos que atende e passa a ser reconhecido no nome do ativo;
 arquivado sai da lista. Bloco sem linha no banco vale o do código (`registro.semente`). O OS Creator
 aplica assim desde 27/09 (`chamado_modelos_store`, que agora chama o pacote); o App de Campo passa a
-aplicar igual na versão que lê a aba. **O nome do fornecedor tem de ser como o Fracttal escreve**
+aplicar igual desde a v290 (20/10/2026), relendo a aba de 5 em 5 minutos. **O nome do fornecedor tem de ser como o Fracttal escreve**
 (é por ele que a marca vem marcada sozinha); grafia diferente que já existe no Fracttal vai no
 `APELIDOS_NO_FRACTTAL`.
 
