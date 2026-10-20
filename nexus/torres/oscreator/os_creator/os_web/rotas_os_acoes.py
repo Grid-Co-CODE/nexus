@@ -266,14 +266,16 @@ def api_os_pdf():
     # o cliente e a usina do ativo, se o catálogo já está na memória (carregá-lo aqui seria ler todos os ativos)
     local = (getattr(api, "_code_loc", None) or {}).get(str(d.get("code") or ""))
     m = os_pdf.modelo(d, recursos=recursos, anexos_sub=subs, anexos_os=oss, local=local)
+    pasta_fotos = os.path.join(api._data_dir(), "os_pdf_fotos")    # a cópia reduzida de cada foto (os_pdf)
 
     def _foto(f):
         try:
-            return os_pdf.reduzir(_baixar_anexo(f["item"]))
+            return os_pdf.reduzir_guardada(_baixar_anexo(f["item"]), pasta_fotos)
         except Exception:                                   # noqa: BLE001 — a que não vem sai no PDF dizendo isso
             return None
     with api._ExecutorComContexto(max_workers=6) as ex:
         fotos = list(ex.map(_foto, m["fotos"]))
+    os_pdf.varrer_guardadas(pasta_fotos)
     conta = session.get("conta") or {}
     logo = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "grid-logo.png")
     dados = os_pdf.gerar(m, fotos=fotos, gerado_em=datetime.now(api._BR_TZ).strftime("%d/%m/%Y %H:%M"),

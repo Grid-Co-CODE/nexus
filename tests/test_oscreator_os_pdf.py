@@ -173,11 +173,89 @@ def test_texto_que_a_helvetica_nao_tem_nao_vira_quadrado():
     assert os_pdf._seguro("Usina São João – CO₂") == "Usina São João – CO2"
 
 
+# ── a cópia reduzida guardada: a mesma foto noutro PDF não é reduzida de novo (20/10/2026) ───────────────────────────
+def _contar_reducoes(monkeypatch) -> list:
+    """Cada `reduzir` de verdade que acontecer, contado (a foto continua sendo reduzida)."""
+    feitas, reduzir = [], os_pdf.reduzir
+
+    def contando(dados, *a, **k):
+        feitas.append(len(dados))
+        return reduzir(dados, *a, **k)
+    monkeypatch.setattr(os_pdf, "reduzir", contando)
+    return feitas
+
+
+def test_a_foto_reduzida_fica_guardada_pelo_conteudo_da_original(monkeypatch, tmp_path):
+    """Levi, 20/10/2026, sobre guardar a cópia de cada foto: "se a saída for óbvia, faça". A chave é o conteúdo da foto
+    original, e não o caminho no S3: no Fracttal, outro arquivo com o mesmo nome na mesma OS apaga o primeiro (README do
+    OS Creator), e o caminho guardado voltaria com a foto errada num PDF de garantia."""
+    feitas, pasta = _contar_reducoes(monkeypatch), str(tmp_path)
+    a, b = _jpeg(cor=(200, 30, 30)), _jpeg(cor=(30, 200, 30))
+    ra = os_pdf.reduzir_guardada(a, pasta)
+    assert ra[1] == (1000, 750) and len(feitas) == 1 and len(list(tmp_path.iterdir())) == 1
+    assert os_pdf.reduzir_guardada(a, pasta) == ra and len(feitas) == 1          # a mesma foto: da cópia
+    rb = os_pdf.reduzir_guardada(b, pasta)
+    assert len(feitas) == 2 and rb[0] != ra[0] and len(list(tmp_path.iterdir())) == 2    # outra foto: outra cópia
+    assert os_pdf.reduzir_guardada(a, pasta, px=500)[1] == (500, 375)            # outro tamanho: outra cópia
+    pequena = _jpeg(tam=(800, 600))                                              # já cabe: passa como veio, e não há
+    assert os_pdf.reduzir_guardada(pequena, pasta) == (pequena, (800, 600))      # o que poupar guardando
+    assert len(list(tmp_path.iterdir())) == 3
+
+
+class _Morreu(BaseException):
+    """O processo morto no meio da gravação (o reinício do deploy): nenhum `except` roda."""
+
+
+def test_a_copia_so_aparece_no_lugar_inteira(monkeypatch, tmp_path):
+    """O servidor reinicia a cada push: uma gravação cortada no meio com o nome da cópia faria todo PDF com aquela foto
+    sair com o JPEG pela metade. Grava num nome provisório e troca de uma vez."""
+    import os
+    feitas, troca = _contar_reducoes(monkeypatch), os.replace
+
+    def disco_cheio(*a, **k):
+        raise OSError("disco cheio")
+    monkeypatch.setattr(os, "replace", disco_cheio)                    # sem conseguir gravar: a foto sai, nada fica
+    assert os_pdf.reduzir_guardada(_jpeg(), str(tmp_path))[1] == (1000, 750) and list(tmp_path.iterdir()) == []
+
+    def morre(*a, **k):
+        raise _Morreu()
+    monkeypatch.setattr(os, "replace", morre)                          # morto antes da troca: só o provisório fica
+    with pytest.raises(_Morreu):
+        os_pdf.reduzir_guardada(_jpeg(), str(tmp_path))
+    assert [p.name for p in tmp_path.iterdir() if not p.name.endswith(".parcial")] == []
+    monkeypatch.setattr(os, "replace", troca)
+    assert os_pdf.reduzir_guardada(_jpeg(), str(tmp_path))[1] == (1000, 750) and len(feitas) == 3   # reduz de novo
+
+
+def test_a_varrida_tira_as_copias_sem_uso_e_segura_o_teto(monkeypatch, tmp_path):
+    """Cópia sem uso há GUARDADAS_DIAS sai (usar de novo conta como uso); passando de GUARDADAS_TETO, saem as mais
+    antigas primeiro."""
+    import os
+    import time
+    pasta, agora = str(tmp_path), time.time()
+    fotos = {k: _jpeg(cor=c) for k, c in (("a", (250, 0, 0)), ("b", (0, 250, 0)), ("c", (0, 0, 250)))}
+    reduzidas = {k: os_pdf.reduzir_guardada(f, pasta)[0] for k, f in fotos.items()}
+
+    def copia_de(k):
+        return next(p for p in tmp_path.iterdir() if p.read_bytes() == reduzidas[k])
+    velho = agora - (os_pdf.GUARDADAS_DIAS + 1) * 86400
+    for i, k in enumerate("abc"):
+        os.utime(copia_de(k), (velho + i, velho + i))                    # as três sem uso há 31 dias
+    os_pdf.reduzir_guardada(fotos["b"], pasta)                          # a b é usada hoje
+    os.utime(copia_de("c"), (agora - 60, agora - 60))                   # a c foi feita há 1 minuto
+    os_pdf.varrer_guardadas(pasta, agora)
+    assert {p.read_bytes() for p in tmp_path.iterdir()} == {reduzidas["b"], reduzidas["c"]}
+    monkeypatch.setattr(os_pdf, "GUARDADAS_TETO", len(reduzidas["b"]) + len(reduzidas["c"]) - 1)
+    os_pdf.varrer_guardadas(pasta, agora)                               # passou do teto: sai a mais antiga (a c)
+    assert {p.read_bytes() for p in tmp_path.iterdir()} == {reduzidas["b"]}
+
+
 # ── a rota e a tela ──────────────────────────────────────────────────────────────────────────────────────────────
 @pytest.fixture
-def cli(monkeypatch):
+def cli(monkeypatch, tmp_path):
     with rotas._MEMO_LOCK:
         rotas._MEMO.clear()
+    monkeypatch.setattr(api, "_data_dir", lambda: str(tmp_path))      # as cópias das fotos do PDF, fora do %APPDATA%
     monkeypatch.setattr(api, "_code_to_loc", lambda: {})
     monkeypatch.setattr(api, "list_chamados", lambda **k: [
         {"id": WID, "folio": str(FOLIO), "cliente": "Cliente Teste", "usina": "Usina Teste", "ativo": "Tracker 1.100",
@@ -262,6 +340,23 @@ def test_com_o_id_nao_busca_pelo_numero_e_foto_que_nao_vem_nao_derruba(cli, monk
     j = cli.post("/os/api/os/pdf", json={"folio": "9102", "wid": "9202"}).get_json()
     assert j["ok"] and (j["fotos"], j["falhas"]) == (0, 2) and pedidos["folio"] == []
     assert cli.get(j["url"]).data.startswith(b"%PDF")
+
+
+def test_o_segundo_pdf_da_mesma_os_nao_reduz_as_fotos_de_novo(cli, monkeypatch, tmp_path):
+    """A rota guarda a cópia reduzida de cada foto (na pasta de dados do clone) e varre as sem uso a cada PDF."""
+    import os
+    import time
+    pedidos = _fracttal_da_os(monkeypatch, foto=_jpeg())
+    feitas = _contar_reducoes(monkeypatch)
+    antiga = tmp_path / "os_pdf_fotos" / "antiga.jpg"                   # uma cópia sem uso há 40 dias
+    antiga.parent.mkdir()
+    antiga.write_bytes(b"x")
+    os.utime(antiga, (time.time() - 40 * 86400,) * 2)
+    j1 = cli.post("/os/api/os/pdf", json={"folio": "9102", "wid": "9202"}).get_json()
+    n1 = len(feitas)
+    j2 = cli.post("/os/api/os/pdf", json={"folio": "9102", "wid": "9202"}).get_json()
+    assert (j1["fotos"], j2["fotos"]) == (2, 2) and n1 >= 1 and len(feitas) == n1     # a 2ª vez, só da cópia
+    assert pedidos["fotos"] == 4 and not antiga.exists()               # as fotos ainda vêm do Fracttal
 
 
 def test_os_que_nao_existe(cli, monkeypatch):

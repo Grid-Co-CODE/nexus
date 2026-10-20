@@ -26,11 +26,17 @@ A foto entra no PDF como o `reduzir` a deixou, sem ser decodificada de novo (`_J
 09:56: um PDF ~2 min no servidor, em `gerar`. Com a foto em `Image(BytesIO)`, o reportlab decodificava cada uma em RGB
 só para dar nome a ela, e guardava o RGB até o fim: 2,25 MB por foto de 1000 px. No PC, com 200 fotos, o `gerar` ia de
 3,2 a 4,0 s e +1 GB de memória para 0,3 s e +20 a 27 MB; o PDF é o mesmo (as fotos dentro dele, os mesmos bytes).
+
+A cópia reduzida de cada foto fica guardada (`reduzir_guardada`, 20/10/2026): reduzir custa ~90 ms de processador por
+foto no PC, e a mesma foto volta noutro PDF (a mesma OS de novo, ou a foto que o OS Creator subiu em várias OS).
 """
 from __future__ import annotations
 
 import hashlib
 import io
+import os
+import threading
+import time
 import unicodedata
 from xml.sax.saxutils import escape
 
@@ -40,6 +46,7 @@ from . import os_acoes_web as regra
 
 FOTO_PX, FOTO_QUALIDADE = 1000, 72          # a foto no PDF: nítida no zoom, e uma OS de 60 fotos fica em poucos MB
 FOTOS_MAX = 200                             # mais que isso, o PDF diz quantas ficaram de fora
+GUARDADAS_DIAS, GUARDADAS_TETO = 30, 2**30  # a cópia sem uso há 30 dias sai; e a pasta fica em até 1 GB (~10 mil)
 TOM_STATUS = {1: "alerta", 2: "info", 3: "ok", 4: "critico"}     # as cores do STATUS_COR do card, no papel
 TOM_SITUACAO = {"ok": "ok", "and": "alerta", "nao": "neutro"}    # `os_acoes_web.situacao_tarefa`
 SEMPRE = ("Ativo", "Responsável", "Data do evento", "Data fim")  # sem valor, saem com "—"; os outros dados somem
@@ -165,6 +172,59 @@ def reduzir(dados: bytes, px: int = FOTO_PX, qualidade: int = FOTO_QUALIDADE):
         return out.getvalue(), im.size
     except Exception:       # noqa: BLE001 — arquivo que não é foto (ou ilegível) sai como "a foto não veio"
         return None
+
+
+def reduzir_guardada(dados: bytes, pasta: str, px: int = FOTO_PX, qualidade: int = FOTO_QUALIDADE):
+    """`reduzir`, com a cópia reduzida guardada em `pasta` pelo hash da foto ORIGINAL (e o tamanho e a qualidade): a
+    mesma foto noutro PDF sai da cópia. Pelo conteúdo, e não pelo caminho no S3: no Fracttal, outro arquivo com o mesmo
+    nome na mesma OS apaga o primeiro (README do OS Creator), e o caminho guardado voltaria com a foto errada num PDF de
+    garantia. A cópia é gravada com outro nome e trocada de uma vez: o servidor reinicia a cada push, e uma gravação
+    cortada no meio deixaria um JPEG pela metade em todo PDF com aquela foto. A que já cabe passa como veio e não é
+    guardada (não há o que poupar)."""
+    arq = os.path.join(pasta, "%s-%d-%d.jpg" % (hashlib.sha256(dados).hexdigest(), px, qualidade))
+    try:
+        with open(arq, "rb") as fh:
+            jpeg = fh.read()
+        from PIL import Image
+        tamanho = Image.open(io.BytesIO(jpeg)).size
+        os.utime(arq)                                # usada agora: os GUARDADAS_DIAS contam daqui
+        return jpeg, tamanho
+    except Exception:       # noqa: BLE001 — sem a cópia (ou ilegível): reduz de novo e guarda
+        pass
+    red = reduzir(dados, px, qualidade)
+    if red and red[0] is not dados:
+        tmp = "%s.%d.parcial" % (arq, threading.get_ident())   # duas threads com a mesma foto não se cruzam
+        try:
+            os.makedirs(pasta, exist_ok=True)
+            with open(tmp, "wb") as fh:
+                fh.write(red[0])
+            os.replace(tmp, arq)
+        except OSError:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+    return red
+
+
+def varrer_guardadas(pasta: str, agora: float | None = None):
+    """Tira as cópias sem uso há GUARDADAS_DIAS e, passando de GUARDADAS_TETO, as mais antigas primeiro: sem isso a
+    pasta só cresceria (cada foto nova de cada PDF, ~100 KB)."""
+    agora = time.time() if agora is None else agora
+    try:
+        copias = sorted((st.st_mtime, st.st_size, e.path) for e in os.scandir(pasta) if e.is_file()
+                        for st in (e.stat(),))
+    except OSError:
+        return
+    total = sum(c[1] for c in copias)
+    for mtime, tamanho, caminho in copias:          # da mais antiga para a mais nova
+        if agora - mtime <= GUARDADAS_DIAS * 86400 and total <= GUARDADAS_TETO:
+            break
+        try:
+            os.remove(caminho)
+            total -= tamanho
+        except OSError:
+            pass
 
 
 class _JpegPronto:

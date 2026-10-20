@@ -945,9 +945,19 @@ várias imagens e incluir no PDF") e "inclua a opção de baixar na cadeia de ch
   (`jpeg_fh`, embutido como veio, DCTDecode) com o hash do JPEG como nome (a mesma foto duas vezes vai uma vez). Medido
   no PC, com o reportlab já carregado: 200 fotos, `gerar` de 3,2 a 4,0 s e +1 GB para 0,3 s e +20 a 27 MB; a rota
   inteira, com o Fracttal falso e sem rede, de 7,7 a 8,3 s e +1.068 MB para 5,2 s e +128 MB. O PDF é o mesmo: páginas,
-  texto, as imagens byte a byte e o desenho de cada página (só o nome interno das imagens muda). O que sobra é o
-  `reduzir` (~90 ms de CPU por foto no PC) e o download das fotos. Se um dia o reportlab mudar esse caminho, o teste
-  quebra: `test_o_pdf_embute_a_foto_como_veio_sem_decodificar_de_novo`.
+  texto, as imagens byte a byte e o desenho de cada página (só o nome interno das imagens muda). Se um dia o reportlab
+  mudar esse caminho, o teste quebra: `test_o_pdf_embute_a_foto_como_veio_sem_decodificar_de_novo`.
+- **A cópia reduzida de cada foto fica guardada** (20/10/2026; Levi: "se a saída for óbvia, faça"):
+  `os_pdf.reduzir_guardada`, na pasta `os_pdf_fotos` do `api._data_dir()`. Reduzir custa ~90 ms de CPU por foto no PC,
+  e a mesma foto volta noutro PDF (a mesma OS de novo; a foto que o OS Creator subiu em várias OS). A chave é o hash da
+  foto ORIGINAL, e não o caminho no S3: outro arquivo com o mesmo nome na mesma OS apaga o primeiro (os Anexos da
+  Solicitação da Engenharia, acima), e o caminho voltaria com a foto errada. Por isso a foto ainda é baixada a cada PDF;
+  só não é reduzida de novo.
+  A cópia é gravada com outro nome e trocada de uma vez (o reinício de cada push não deixa JPEG pela metade); a foto que
+  já cabe não é guardada. A cada PDF, a rota varre as cópias sem uso há 30 dias e segura a pasta em 1 GB, as mais
+  antigas primeiro. Medido no PC, sem rede: 200 fotos, o 2º PDF da mesma OS de 5,1 a 5,5 s para 0,8 s (CPU de 19 a 20 s
+  para 0,9 s); o 1º, 0,3 a 0,8 s mais lento (o hash e as cópias, 18,9 MB). Prova: os testes de "a cópia reduzida
+  guardada" e `test_o_segundo_pdf_da_mesma_os_nao_reduz_as_fotos_de_novo`.
 - **A tela:** em "A cadeia do chamado" (`acomp_os.html`), uma seta em cada OS (de campo, inspeção e o acompanhamento).
   O clique (`os_acoes.js`, `[data-os-pdf]`) faz como o "Baixar todos": `POST /os/api/os/pdf` com o nº (e o id, quando a
   tela já sabe) monta o PDF no disco com o círculo de carga, e o arquivo baixa por `GET /os/api/os/pdf/<token>` (10
