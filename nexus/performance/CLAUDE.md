@@ -95,7 +95,8 @@ navegador fala com cada sistema.
 - **Diagnóstico:** sem `?p=` a página mostra o seletor e "Escolha uma usina". A lista vem da PLATAFORMA, pelo navegador
   (o processo do Nexus não busca): o mesmo `/api/macro` e `/api/gerencial` do Painel NOC, com a regra dele (o `FMAP` e o
   `drillUrl` de `painel_portfolio.html`, copiados no `porta.js`: a usina de fonte ao vivo abre com `?fonte=`, a que só
-  existe no Gerencial abre com `?hist=1`; mudou lá, muda aqui e no `tests/test_porta_js.py`). Sem a sessão da plataforma
+  existe no Gerencial abre com `?hist=1`; mudou lá, muda aqui e no `tests/test_porta_js.py`; a Alves Lima — Morada Nova,
+  no `/api/macro` desde 19/10/2026 — abre como a SEMP, `pv`). Sem a sessão da plataforma
   (401), o `porta.js` abre a sessão por `fetch` com um passe próprio da página (`passe_lista`, destino `/painel`, o 303
   não é seguido) e lê de novo. Escolher a usina recarrega a página do Nexus com `?p=/painel/usina/<id>?...` (passe novo
   para aquele destino).

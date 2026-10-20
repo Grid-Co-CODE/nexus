@@ -33,6 +33,7 @@ def test_o_seletor_usa_os_enderecos_do_painel_noc():
         {"usina": "Pau D'Arco", "plant_id": "pda-1", "fonte": "Athon"},
         {"usina": "Sem Drill", "plant_id": 5, "fonte": "GreenYellow"},          # sem drill no NOC, fora daqui também
         {"usina": "Lagoa 1", "plant_id": 77, "fonte": "Thopen"},
+        {"usina": "Morada Nova", "plant_id": 18766373, "fonte": "Alves Lima"},   # no macro desde 19/10/2026
     ]}
     ger = {"usinas": [
         {"usina": "Usina Agata", "cliente": "Cliente G"},       # casa com a Ágata (sem acento): não repete
@@ -42,7 +43,8 @@ def test_o_seletor_usa_os_enderecos_do_painel_noc():
     ]}
     lista = rodar("P.usinasDoSeletor(V.macro, V.ger)", macro=macro, ger=ger)
     por_nome = {u["nome"]: u for u in lista}
-    assert set(por_nome) == {"Usina Ágata", "Pau D'Arco", "Lagoa 1", "Só Gerencial"}
+    assert set(por_nome) == {"Usina Ágata", "Pau D'Arco", "Lagoa 1", "Morada Nova", "Só Gerencial"}
+    assert por_nome["Morada Nova"]["valor"] == "/painel/usina/18766373?fonte=pv&nome=Morada%20Nova"
     assert por_nome["Usina Ágata"]["valor"] == "/painel/usina/297410?fonte=pv&nome=Usina%20%C3%81gata"
     assert por_nome["Usina Ágata"]["grupo"] == "Cliente G"           # o cliente do Gerencial, como no NOC
     assert por_nome["Pau D'Arco"]["valor"] == "/painel/usina/pda-1?fonte=athon&nome=Pau%20D%27Arco"

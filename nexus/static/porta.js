@@ -19,9 +19,10 @@
   "use strict";
 
   // A mesma tabela do Painel NOC da plataforma (painel_portfolio.html, FMAP e drillUrl): de qual fonte ao vivo cada
-  // usina vem e como o diagnóstico dela se abre. Mudou lá, muda aqui (o teste no node fixa os endereços).
+  // usina vem e como o diagnóstico dela se abre. Mudou lá, muda aqui (o teste no node fixa os endereços). A Alves Lima
+  // (Morada Nova) entrou no /api/macro em 19/10/2026 e abre como a SEMP: "pv" (o id é global na API PV).
   var FONTE_DO_DIAGNOSTICO = {"API PV": "pv", "Thopen": "pg", "Athon": "athon", "Axis": "axis", "2C": "2c",
-                              "SEMP": "pv", "RenoGrid": "solaredge"};
+                              "SEMP": "pv", "Alves Lima": "pv", "RenoGrid": "solaredge"};
 
   function norm(s) {
     return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
