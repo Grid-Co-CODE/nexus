@@ -872,7 +872,13 @@ da aprovação, como no app de mesa.
   que vira 08:00 como no app; horário de Brasília) e a manda como data PROGRAMADA da OS (`api.aprovar_solicitacao(...,
   prog_date=)` → `clonar_os` → `create_os_rpc(prog_date=)`: `date_maintenance`, `initial_date` e o fim 20 min depois).
   A data do evento segue sendo a da aprovação. Sem data sugerida legível, como antes: programada agora.
-- A confirmação e o aviso de "OS criada" dizem para quando ela ficou programada. A data vem da solicitação, nunca da tela.
+- A confirmação e o aviso de "OS criada" dizem para quando ela ficou programada.
+- **O PCM troca a data na decisão (20/10/2026).** O programador do PCM: "não consigo alterar a data, o campo não abre
+  mais". No app de mesa o "Data:" da decisão é um `_CampoClicavel` com o calendário, que começa na sugerida; na web
+  ele era só texto. Agora é o `<input type=datetime-local id=fl_data>` no mesmo traço tracejado dos outros valores,
+  com a sugerida (`data_sug_iso`); o aprovar manda `data_programada` e o servidor usa a do campo no lugar da sugerida
+  (`solic_web.data_programada_escolhida`: só o formato do campo, data que existe e até um ano de hoje; fora disso, 400
+  e nada é criado). Vazio, a sugerida (ou agora, sem sugerida). A confirmação diz "(data trocada na decisão)".
 - **Os dois jeitos de escrever a data (19/10/2026).** A Nova solicitação web gravava "2026-10-21 08:00" (o valor do campo
   de data) e a leitura só entendia o do app ("21/10/2026 08:00"): a SS 3944 ficou sem data, a OS 16784 nasceu programada
   na hora da aprovação, e a confirmação dizia "programada para 2026-10-21 08:00" (o texto cru). Agora a leitura entende
@@ -972,10 +978,11 @@ com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa
 O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão fez em 19/10/2026):
 
 - **Pessoal ativo, etiquetas, motivos de cancelamento, tipos de solicitação e as OS recentes da tinta dos Ativos**
-  (`rotas.responsaveis_fracttal`, `etiquetas_fracttal`, `motivos_cancelamento`, `os_recentes`; os tipos no
-  `("solic_cat", "tipos")`): iguais para todos, eram relidos a cada tela e a cada clique, por cada pessoa (o pessoal são
+  (`rotas.responsaveis_fracttal`, `etiquetas_fracttal`, `motivos_cancelamento`, `os_recentes`; os tipos da
+  solicitação no `("solic_cat", "tipos_solicitacao")`): iguais para todos, eram relidos a cada tela e a cada clique, por cada pessoa (o pessoal são
   2 pedidos; as OS recentes, 17 a 40 pedidos em sequência a cada visita aos Ativos). Agora 10 min na memória, um para
-  todos; o erro não fica guardado. Na CRIAÇÃO (uma gravação) o pessoal e as etiquetas seguem lidos na hora
+  todos; o erro não fica guardado, e o catálogo vazio também não (`_memo(..., guardar=)`, 20/10/2026: a lista vazia da
+  sessão de alguém sem a permissão esvaziaria a tela de todo mundo pelo TTL). Na CRIAÇÃO (uma gravação) o pessoal e as etiquetas seguem lidos na hora
   (`rotas_solic_eng.criar`).
 - **O catálogo de ~22 mil ativos** (`api.load_assets_cached`): lido do disco uma vez por versão do arquivo (antes cada
   uma das 26 chamadas decodificava o JSON inteiro, a prévia do COS a cada 120 ms de digitação), entregue em cópia por
@@ -985,6 +992,11 @@ O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão f
 - **A OS pelo número num pedido só** (`api.os_por_folio`): sem o status, a lista traz os quatro; eram até 4 pedidos em
   sequência (o "Buscar OS", o card pelo nº, a cadeia do chamado, o PDF). Sem achar, a varredura de antes, status por
   status.
+- **A chave que colidia (20/10/2026).** O programador do PCM: "não consigo solicitar pelo nexus porque a classificação 1
+  não abre opção de preencher". Os tipos da Nova solicitação (`get_request_types`: grupo, classif1, classif2) ficaram
+  na chave `("solic_cat", "tipos")`, a mesma do Tipo de tarefa e das Classificações da OS da Fila do PCM
+  (`get_tipos_classif`: tipos, c1, c2). Quem abria a Fila primeiro deixava a Solicitação sem Grupo e sem Classificação
+  por 30 min, e o contrário esvaziava a Fila. Cada um na sua chave agora.
 - Prova: `tests/test_oscreator_catalogos_19_10.py`.
 
 ## O quadro do Acompanhamento dividido e os anexos do card (19/10/2026)

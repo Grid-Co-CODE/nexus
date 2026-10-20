@@ -31,6 +31,7 @@
       chips = $('fl_chips'), etqAdd = $('fl_etq_add'), tipo = $('fl_tipo'), c1 = $('fl_c1'), c2 = $('fl_c2'),
       classif = $('fl_classif'), tema = $('fl_tema'), pai = $('fl_pai'), paiLista = $('fl_pai_lista'),
       aprovar = $('fl_aprovar'), devolver = $('fl_devolver'), bStatus = $('fl_status'), hint = $('fl_hint'),
+      data = $('fl_data'),
       modal = $('fl_modal'), mT = $('fl_m_t'), mSt = $('fl_m_st'), mMot = $('fl_m_mot'), mOk = $('fl_m_ok');
 
   function up(t) { return String(t == null ? '' : t).trim().toUpperCase(); }
@@ -127,7 +128,7 @@
     ver.textContent = expandida ? 'ver menos' : 'ver inteira';
   }
   function habilitar(on) {
-    [tema, resp, tipo, c1, c2, etqAdd, pai, aprovar, devolver, bStatus].forEach(function (el) { el.disabled = !on; });
+    [tema, resp, tipo, c1, c2, etqAdd, pai, data, aprovar, devolver, bStatus].forEach(function (el) { el.disabled = !on; });
     editor.editavel(on);
     titulo.classList.toggle('travado', !on);
   }
@@ -149,7 +150,8 @@
     obs.value = f.relato || ''; obsOriginal = f.relato || ''; obs.readOnly = true;
     expandida = false; obs.classList.remove('aberta'); obs.style.height = '';
     preSelecionar(f.tecnico);
-    $('fl_data').textContent = dataSug(f) || '—';
+    // a Data é campo (20/10/2026, como no app): começa na sugerida pelo supervisor e o PCM troca no calendário
+    data.value = f.data_sug_iso || '';
     tipo.value = temOpcao(tipo, D.tipo_padrao) ? D.tipo_padrao : (tipo.options[0] ? tipo.options[0].value : '');
     c1.value = ''; c2.value = '';
     pai.value = ''; paiSel = null; paiLista.hidden = true;
@@ -349,18 +351,19 @@
     }
     if (pai.value.trim() && !paiSel) { SP.aviso('Escolha a OS pai na lista que aparece ao digitar o número — ou apague o campo.', true); return; }
     var subs = editor.itens(), t = (titulo.textContent || '').trim() || tituloDoTema(), n = subs.length || 3;
-    // só promete a data que o servidor entendeu (f.data_sug_iso): a SS 3944 dizia "programada para 2026-10-21 08:00" e
-    // a OS nasceu programada agora (19/10/2026)
-    var quando = f.data_sug_iso ? ', programada para ' + dataSug(f)
-      : (f.data_sug ? ' (a data sugerida "' + f.data_sug + '" não foi entendida: programada para agora)'
-                    : ' (sem data sugerida: programada para agora)');
+    // só promete a data que o servidor vai usar: a do campo Data (a sugerida, ou a que o PCM trocou); a SS 3944 dizia
+    // "programada para 2026-10-21 08:00" e a OS nasceu programada agora (19/10/2026)
+    var quando = data.value ? ', programada para ' + dataSug({data_sug_iso: data.value})
+        + (data.value !== (f.data_sug_iso || '') ? ' (data trocada na decisão)' : '')
+      : (f.data_sug ? ' (a data sugerida "' + f.data_sug + '" não foi entendida e o campo Data está vazio: programada para agora)'
+                    : ' (sem data: programada para agora)');
     if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)' + quando + '?\n\nA API do Fracttal NÃO edita OS '
                         + 'já criada — confira as subtarefas antes.')) return;
     ocupado(true, 'criando a OS…');
     SP.pedir('/os/api/solic/' + encodeURIComponent(f.id) + '/aprovar', {
       id_responsible: resp.value, responsavel: resp.options[resp.selectedIndex].text, titulo: t, subtarefas: subs,
       tipo: tipo.value, classif1: c1.value, classif2: c2.value, etiquetas: etq.map(function (e) { return e.id; }),
-      id_parent: paiSel
+      id_parent: paiSel, data_programada: data.value
     }, 'Criando a OS no Fracttal…').then(function (x) {
       ocupado(false, '');
       if (!x.ok) { SP.aviso(x.j.erro || 'Não consegui criar a OS.', true); return; }

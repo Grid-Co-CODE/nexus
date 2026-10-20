@@ -145,6 +145,14 @@ body.os-form textarea.spc-obs:focus{border-color:var(--spc-verde);outline:none}
 .spc-topo{align-self:start;padding-top:3px}
 .spc-data{border-bottom:1px dashed var(--spc-tracejado);padding:1px 2px;justify-self:start}
 /* o valor que vira campo: sublinhado tracejado é o convite, sem virar caixa (o `valorEditavel` / `etqInline` do app) */
+/* a Data da decisão (20/10/2026): o mesmo valor tracejado que abre o calendário, como o `_CampoClicavel` do app */
+body.os-form .spc-inline--data{max-width:220px}
+body.os-form .spc-inline input[type=datetime-local]{width:100%;height:26px;background:transparent;border:none;
+  border-bottom:1px dashed var(--spc-tracejado);border-radius:0;color:var(--spc-tinta);font-size:13px;padding:0 2px;color-scheme:dark}
+:where(html[data-tema="claro"]) body.os-form .spc-inline input[type=datetime-local]{color-scheme:light}
+body.os-form .spc-inline input[type=datetime-local]:hover{border-bottom-color:var(--spc-verde)}
+body.os-form .spc-inline input[type=datetime-local]:focus{border-bottom:1px solid var(--spc-verde);outline:none}
+body.os-form .spc-inline input[type=datetime-local]:disabled{opacity:.55}
 body.os-form .spc-inline select,body.os-form .spc-inline .osb-in{width:100%;height:26px;background:transparent;border:none;border-bottom:1px dashed var(--spc-tracejado);
   border-radius:0;color:var(--spc-tinta);font-size:13px;padding:0 2px}
 body.os-form .spc-inline select:hover,body.os-form .spc-inline .osb-in:hover{border-bottom-color:var(--spc-verde)}

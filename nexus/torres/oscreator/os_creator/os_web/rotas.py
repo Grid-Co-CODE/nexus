@@ -501,8 +501,10 @@ _MEMO: dict = {}
 _MEMO_LOCK = threading.Lock()
 
 
-def _memo(chave, ttl: float, fn, forcar: bool = False):
-    """O resultado de `fn()` guardado por `ttl` segundos. Erro não é guardado (sobe como sempre)."""
+def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
+    """O resultado de `fn()` guardado por `ttl` segundos. Erro não é guardado (sobe como sempre). `guardar(r)` falso =
+    devolve sem guardar: o catálogo que veio vazio (a sessão de alguém sem a permissão no Fracttal) não esvazia a tela
+    de todo mundo pelo TTL inteiro (20/10/2026)."""
     agora = time.monotonic()
     if not forcar:
         with _MEMO_LOCK:
@@ -510,6 +512,8 @@ def _memo(chave, ttl: float, fn, forcar: bool = False):
         if v and agora - v[0] < ttl:
             return v[1]
     r = fn()
+    if guardar is not None and not guardar(r):
+        return r
     with _MEMO_LOCK:
         _MEMO[chave] = (agora, r)
         if len(_MEMO) > 300:                              # memória com teto: sai o que foi guardado há mais tempo
@@ -554,19 +558,21 @@ TTL_CATALOGO = 600
 
 
 def responsaveis_fracttal() -> list:
-    return [dict(p) for p in _memo(("cat", "responsaveis"), TTL_CATALOGO, lambda: api.get_responsaveis() or [])]
+    return [dict(p) for p in _memo(("cat", "responsaveis"), TTL_CATALOGO, lambda: api.get_responsaveis() or [],
+                                   guardar=bool)]
 
 
 def etiquetas_fracttal() -> list:
-    return [dict(e) for e in _memo(("cat", "etiquetas"), TTL_CATALOGO, lambda: api.get_labels() or [])]
+    return [dict(e) for e in _memo(("cat", "etiquetas"), TTL_CATALOGO, lambda: api.get_labels() or [], guardar=bool)]
 
 
 def motivos_cancelamento() -> list:
-    return list(_memo(("cat", "cancel_motivos"), TTL_CATALOGO, lambda: api.get_cancel_motivos() or []))
+    return list(_memo(("cat", "cancel_motivos"), TTL_CATALOGO, lambda: api.get_cancel_motivos() or [], guardar=bool))
 
 
 def os_recentes(dias: int) -> list:
-    return list(_memo(("cat", "os_recentes", dias), TTL_CATALOGO, lambda: api.codigos_os_recentes(dias) or []))
+    return list(_memo(("cat", "os_recentes", dias), TTL_CATALOGO, lambda: api.codigos_os_recentes(dias) or [],
+                      guardar=bool))
 
 
 def _em_segundo_plano(fn):

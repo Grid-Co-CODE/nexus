@@ -162,3 +162,46 @@ def test_a_os_pelo_numero_sem_achar_varre_os_status_como_antes(monkeypatch):
         return {"data": [{"id": 5, "wo_folio": "9"}]} if st == 4 else {"data": []}
     monkeypatch.setattr(api, "_rpc_call", rpc)
     assert api._wo_id_por_folio("9") == 5 and pedidos == [None, 1, 2, 3, 4]
+
+
+
+def test_os_tipos_da_fila_e_as_classificacoes_da_solicitacao_nao_se_misturam(monkeypatch):
+    """20/10/2026, o programador do PCM: "não consigo solicitar pelo nexus porque a classificação 1 não abre opção de
+    preencher". A Fila guarda o Tipo de tarefa e as Classificações da OS (`get_tipos_classif`: tipos, c1, c2) e, desde
+    19/10, a Solicitação guardava o Grupo e as Classificações da solicitação (`get_request_types`: grupo, classif1,
+    classif2) na MESMA chave: quem abria a Fila primeiro deixava a Solicitação sem nenhuma opção por 30 min (e o
+    contrário esvaziava a Fila)."""
+    from os_web import rotas_solic as RS
+    monkeypatch.setattr(api, "get_tipos_classif", lambda: {"tipos": [{"id": 1, "description": "Corretiva"}],
+                                                           "c1": [{"id": 7, "description": "Programada"}], "c2": []})
+    monkeypatch.setattr(api, "get_request_types", lambda: {"grupo": [{"id": 3, "description": "Grupo Teste"}],
+                                                           "classif1": [{"id": 9, "description": "Classe Teste"}],
+                                                           "classif2": []})
+    monkeypatch.setattr(api, "load_assets_cached", lambda force=False: [])
+    monkeypatch.setattr(api, "get_responsaveis", lambda: [])
+    c = _cliente("pcm@exemplo.invalid")
+    with c.application.test_request_context():
+        assert RS._tipos()["c1"]                                         # a Fila abriu primeiro
+    html = c.get("/os/solicitacao").get_data(as_text=True)
+    assert '<option value="9">Classe Teste</option>' in html and '<option value="3">Grupo Teste</option>' in html
+    with c.application.test_request_context():
+        assert RS._tipos()["tipos"] and RS._tipos()["c1"]                # e a Fila segue com os dela
+
+
+def test_a_classificacao_vazia_nao_fica_guardada(monkeypatch):
+    """O Fracttal que devolve a lista de Classificação 1 vazia (a sessão de alguém sem a permissão) não deixa a tela
+    vazia para todos: só a lista com opções é guardada."""
+    lidas = []
+
+    def tipos():
+        lidas.append(1)
+        return {"grupo": [], "classif1": [] if len(lidas) == 1 else [{"id": 9, "description": "Classe Teste"}],
+                "classif2": []}
+    monkeypatch.setattr(api, "get_request_types", tipos)
+    monkeypatch.setattr(api, "load_assets_cached", lambda force=False: [])
+    monkeypatch.setattr(api, "get_responsaveis", lambda: [])
+    c = _cliente("pcm@exemplo.invalid")
+    assert "Classe Teste" not in c.get("/os/solicitacao").get_data(as_text=True)
+    assert "Classe Teste" in c.get("/os/solicitacao").get_data(as_text=True)
+    c.get("/os/solicitacao")
+    assert len(lidas) == 2                                               # a lista com opções, sim, fica guardada

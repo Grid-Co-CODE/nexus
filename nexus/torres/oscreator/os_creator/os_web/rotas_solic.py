@@ -111,11 +111,12 @@ def _esquecer_lista() -> None:
             _MEMO.pop(k, None)
 
 
-def _catalogo(nome: str, fn, padrao):
+def _catalogo(nome: str, fn, padrao, guardar=bool):
     """Um catálogo do Fracttal, guardado por CATALOGO_TTL. O erro não derruba a página (a Fila abre sem a lista de
-    etiquetas, como no app) e não é guardado: a próxima página tenta de novo. Sessão caída sobe — é o login."""
+    etiquetas, como no app) e não é guardado: a próxima página tenta de novo; o catálogo vazio também não (20/10/2026).
+    Sessão caída sobe — é o login."""
     try:
-        return _memo(("solic_cat", nome), CATALOGO_TTL, fn)
+        return _memo(("solic_cat", nome), CATALOGO_TTL, fn, guardar=guardar)
     except api.SessionExpired:
         raise
     except Exception:                                       # noqa: BLE001
@@ -132,7 +133,10 @@ def _etiquetas() -> list:
 
 
 def _tipos() -> dict:
-    return _catalogo("tipos", lambda: api.get_tipos_classif() or {}, {})
+    """O Tipo de tarefa e as Classificações da OS (a decisão da Fila). A Solicitação tem outro catálogo, o
+    `get_request_types`, na chave dela (`solicitacao`): os dois na mesma chave se apagavam (20/10/2026)."""
+    return _catalogo("tipos", lambda: api.get_tipos_classif() or {}, {},
+                     guardar=lambda t: bool(t.get("tipos") or t.get("c1")))
 
 
 def _status_cat() -> list:
@@ -249,7 +253,13 @@ def solicitacao():
     """O formulário. A cascata (cliente→usina→ativo) usa o catálogo cacheado, como o app."""
     assets = api.load_assets_cached()
     try:
-        tipos = _memo(("solic_cat", "tipos"), CATALOGO_TTL, lambda: api.get_request_types() or {})
+        # o Grupo e as Classificações da SOLICITAÇÃO, na chave dela: até 20/10/2026 ficavam em ("solic_cat", "tipos"),
+        # a mesma do Tipo de tarefa e das Classificações da OS da Fila (`_tipos`). Quem abria a Fila primeiro deixava
+        # a Classificação 1 daqui sem opção ("não consigo solicitar pelo nexus porque a classificação 1 não abre opção
+        # de preencher", o programador do PCM), e o contrário esvaziava a Fila. A lista sem a Classificação 1 não fica
+        # guardada.
+        tipos = _memo(("solic_cat", "tipos_solicitacao"), CATALOGO_TTL, lambda: api.get_request_types() or {},
+                      guardar=lambda t: bool(t.get("classif1")))
     except api.FracttalError:                       # a tela abre mesmo sem o catálogo de classificação:
         tipos = {}                                  # a pessoa recarrega, em vez de levar um erro na cara
     pessoas = _pessoas()                            # "técnico sugerido" é opcional: sem a lista, a tela abre
@@ -420,9 +430,14 @@ def api_aprovar(id_code):
     except (TypeError, ValueError):
         return jsonify({"erro": "OS pai inválida: escolha a OS na lista que aparece ao digitar o número."}), 400
     # a OS nasce PROGRAMADA na data sugerida da solicitação (15/10/2026, Levi: "No OS Creator em fila a OS programada do
-    # PCM tem que ser a data sugerida da solicitação!"); sem data sugerida legível, como antes (programada agora). Vem da
-    # própria solicitação (o bloco [PCM]), nunca da tela
+    # PCM tem que ser a data sugerida da solicitação!"); sem data sugerida legível, como antes (programada agora). A
+    # sugerida vem da própria solicitação (o bloco [PCM]). O PCM pode trocá-la no "Data:" da decisão, como no app
+    # (20/10/2026, o programador do PCM: "não consigo alterar a data, o campo não abre mais"): a do campo vale.
     prog = sw.data_sugerida_dt(s.get("_data_sug"))
+    if str(corpo.get("data_programada") or "").strip():
+        prog = sw.data_programada_escolhida(corpo.get("data_programada"))
+        if prog is None:
+            return jsonify({"erro": "Data programada inválida: escolha o dia e a hora no campo Data da decisão."}), 400
     res = api.aprovar_solicitacao(
         asset, titulo, subs, s.get("id_code"), corpo.get("id_responsible"), corpo.get("responsavel") or "",
         tipo=corpo.get("tipo") or sw.TIPO_PADRAO, note=str(s.get("observacao") or ""),

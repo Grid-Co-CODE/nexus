@@ -386,6 +386,21 @@ def data_sugerida_dt(texto):
     return dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M").replace(tzinfo=_BRT_SUG) if iso else None
 
 
+def data_programada_escolhida(texto, agora=None):
+    """A data que o PCM escolheu no "Data:" da decisão (o valor do <input type=datetime-local>, "2026-10-22T13:30") como
+    datetime de Brasília, ou None: outro formato, data que não existe, ou a mais de um ano de hoje (o ano digitado
+    errado programaria a OS para 2031)."""
+    t = str(texto or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", t):
+        return None
+    try:
+        d = dt.datetime.strptime(t, "%Y-%m-%dT%H:%M").replace(tzinfo=_BRT_SUG)
+    except ValueError:
+        return None
+    agora = agora or dt.datetime.now(_BRT_SUG)
+    return d if abs(d - agora) <= dt.timedelta(days=366) else None
+
+
 # Os jeitos de escrever a data sugerida que chegam à fila: o do app ("15/10/2026 08:00", ou só o dia) e o do campo de
 # data da Nova solicitação web ("2026-10-21 08:00"). Até 19/10/2026 só o do app era lido: a SS 3944, da web, ficou sem
 # data, e a OS 16784 nasceu programada na hora da aprovação, com a confirmação dizendo "programada para 2026-10-21"

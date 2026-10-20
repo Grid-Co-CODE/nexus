@@ -197,9 +197,10 @@ def test_a_carga_fria_e_paralela(cli, monkeypatch):
             return valor
         return f
     monkeypatch.setattr(api, "list_minhas_solicitacoes", lento("lista", [dict(x) for x in LINHAS]))
-    monkeypatch.setattr(api, "get_responsaveis", lento("pessoas", []))
-    monkeypatch.setattr(api, "get_labels", lento("etiquetas", []))
-    monkeypatch.setattr(api, "get_tipos_classif", lento("tipos", {}))
+    # catálogos com conteúdo: o vazio não fica guardado (20/10/2026) e seria lido de novo
+    monkeypatch.setattr(api, "get_responsaveis", lento("pessoas", [{"id": 1, "name": "Ana Teste Silva"}]))
+    monkeypatch.setattr(api, "get_labels", lento("etiquetas", [{"id": 7, "description": "Etiqueta Teste"}]))
+    monkeypatch.setattr(api, "get_tipos_classif", lento("tipos", {"tipos": [{"id": 1, "description": "Corretiva"}]}))
     monkeypatch.setattr(api, "status_solicitacao_catalogo", lento("status", list(api.STATUS_SOLICITACAO)))
     t0 = time.perf_counter()
     assert cli.get("/os/solicitacao/fila").status_code == 200
@@ -663,3 +664,24 @@ def test_a_data_sugerida_da_solicitacao_web_tambem_vale(monkeypatch):
     assert f["data_sug_iso"] == "2026-10-21T08:00"
     js = (Path(sw.__file__).parent / "static" / "solic_fila.js").read_text(encoding="utf-8")
     assert "f.data_sug_iso" in js.split("var quando", 1)[1].split(";", 1)[0]
+
+
+
+def test_o_pcm_troca_a_data_programada_na_decisao(cli):
+    """20/10/2026, o programador do PCM: "não consigo alterar a data, o campo não abre mais". No app, o "Data:" da
+    decisão é um campo que abre o calendário com a data sugerida, e o PCM troca; na web ele era só texto. A data do
+    campo (o valor do <input type=datetime-local>) vai no pedido e vale no lugar da sugerida; vazia, a sugerida."""
+    import datetime as _dt
+    brt = _dt.timezone(_dt.timedelta(hours=-3))
+    assert 'type="datetime-local" id="fl_data"' in cli.get("/os/solicitacao/fila").get_data(as_text=True)
+    corpo = {"id_responsible": 1, "responsavel": "Ana Teste Silva"}
+    r = cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, data_programada="2026-10-22T13:30"))
+    assert r.status_code == 200 and r.get_json()["programada"] == "22/10/2026 13:30"
+    assert cli.gravado[-1][-1]["prog_date"] == _dt.datetime(2026, 10, 22, 13, 30, tzinfo=brt)
+    cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, data_programada=""))       # vazia: a sugerida
+    assert cli.gravado[-1][-1]["prog_date"] == _dt.datetime(2026, 10, 15, 8, 0, tzinfo=brt)
+    n = len(cli.gravado)
+    for ruim in ("amanhã", "22/10/2026", "2026-13-40T08:00", "2031-10-22T08:00"):        # não é a do campo, ou longe
+        r = cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, data_programada=ruim))
+        assert r.status_code == 400 and "Data" in r.get_json()["erro"], ruim
+    assert len(cli.gravado) == n                                                            # nada foi criado
