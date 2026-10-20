@@ -140,8 +140,17 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   compartilhado ela seria lida por outros sistemas e o Nexus dependeria dele no ar para alguém conseguir administrar. É a
   exceção consciente à regra "nada de JSON como banco" da raiz. Entra na cópia diária da `dados/` (`DEPLOY.md`).
 - **Escrita atômica e com trava:** temporário na mesma pasta + `fsync` + `os.replace` (com 5 tentativas no
-  `PermissionError` do Windows), dentro de uma `RLock` que cobre o ler-mudar-gravar inteiro (as 8 threads do waitress;
-  um processo só, como o servidor roda). Falhou no meio: o arquivo de antes fica intacto e o temporário sai.
+  `PermissionError` do Windows), dentro de uma `RLock` POR ARQUIVO (`acessos._trava`) que cobre o ler-mudar-gravar
+  inteiro (as threads do waitress; um processo só, como o servidor roda). Falhou no meio: o arquivo de antes fica intacto
+  e o temporário sai.
+- **O portão não espera o disco** (20/10/2026): a leitura da lista a cada pedido (`admins_da_tela` pelo `_admin_em_dia`)
+  é um `stat` e a cópia da memória, SEM trava, quando o arquivo não mudou; a trava só entra para reler o que mudou (e
+  confere de novo lá dentro: quem grava troca o arquivo e a memória juntos). O caso: Raio-X das 08:56 de 20/10, a Visão
+  do responsável e a conferência de 5 min de outra aba paradas havia 2 s na trava, que era UMA para tudo e ficava presa
+  durante o `fsync` de cada login (`registrar_login`) e de cada mudança da lista; com o disco do servidor ocupado (o
+  banco na mesma máquina), um login segurava as telas de todo mundo. O registro de logins tem a trava dele. Prova:
+  `tests/test_base_acessos_portao_sem_fila_20_10.py` (o `fsync` preso de propósito: o portão e uma tela de quem já
+  entrou respondem em menos de 1-2 s; a lista de antes vale até a troca, a nova logo depois).
 - **Arquivo que não abre FECHA:** JSON corrompido = nenhum admin da tela (só os do servidor), a tela mostra o aviso
   crítico e se recusa a gravar por cima (409), porque gravar apagaria o que estava nele. Erro de disco passageiro não fica
   no cache: o próximo pedido tenta de novo.

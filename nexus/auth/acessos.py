@@ -14,10 +14,16 @@ NÃO vai ao banco, de propósito: é configuração de acesso deste Nexus (quem 
 negócio a cruzar com os setores; no banco compartilhado ela seria lida por outros sistemas e dependeria de ele estar
 no ar para alguém conseguir administrar. Fica fora do git (a pasta de dados é gitignorada): o repositório é público.
 
-Escrita atômica (arquivo temporário na mesma pasta + `os.replace`) e uma trava para as 8 threads do waitress: duas
-pessoas dando acesso ao mesmo tempo não perdem uma a mudança da outra, e um arquivo nunca fica pela metade. Arquivo
+Escrita atômica (arquivo temporário na mesma pasta + `os.replace`) e uma trava POR ARQUIVO para as threads do waitress:
+duas pessoas dando acesso ao mesmo tempo não perdem uma a mudança da outra, e um arquivo nunca fica pela metade. Arquivo
 que existe e não abre (editado à mão, disco) FECHA: só valem os do servidor, e a tela se recusa a gravar por cima
 (gravar apagaria o que estava nele).
+
+A leitura do portão (a cada pedido de toda sessão, `admins_da_tela`) NÃO pega trava quando o arquivo não mudou: um stat
+e a cópia da memória (20/10/2026). Até então ela esperava a mesma trava global que a gravação segura durante o `fsync`;
+no Raio-X das 08:56 a Visão do responsável e a conferência de 5 min de outra aba estavam paradas havia 2 s nela, e com o
+disco do servidor ocupado (o banco mora na mesma máquina) um login gravando o registro de quem entrou segurava as telas
+de todo mundo. A trava fica só para reler o arquivo que mudou e para gravar.
 """
 import contextlib
 import copy
@@ -45,8 +51,10 @@ MAX_AUDITORIA = 1000
 # e-mail como o Fracttal o trata: minúsculas, sem espaço; a régua é a prática (nome@dominio.tld), não a RFC inteira
 _EMAIL = re.compile(r"[a-z0-9_%+'-]+(?:\.[a-z0-9_%+'-]+)*@[a-z0-9-]+(?:\.[a-z0-9-]+)+")
 _MAX_EMAIL = 254
-# RLock: a leitura (com cache) roda dentro da escrita, que segura a trava do ler-mudar-gravar inteiro
-_TRAVA = threading.RLock()
+# uma trava por arquivo, RLock: a leitura (com cache) roda dentro da escrita, que segura a trava do ler-mudar-gravar
+# inteiro. Por arquivo para o registro de quem entrou (gravado a cada login) não fazer fila com a lista de acessos
+_TRAVAS: dict[str, threading.RLock] = {}
+_TRAVAS_TRAVA = threading.Lock()
 # {caminho: ((mtime_ns, tamanho), dado)}: o portão consulta a lista a cada pedido; um stat por pedido, e o arquivo só é
 # relido quando muda
 _CACHE: dict[str, tuple] = {}
@@ -148,6 +156,34 @@ def _nao_abriu(p: Path, e: OSError) -> Ilegivel:
     return erro
 
 
+def _trava(p: Path) -> threading.RLock:
+    with _TRAVAS_TRAVA:
+        return _TRAVAS.setdefault(str(p), threading.RLock())
+
+
+def _do_cache(p: Path, chave):
+    """O que a memória tem deste arquivo nesta versão (mtime e tamanho), ou None: cópia, ou o Ilegivel guardado sobe."""
+    guardado = _CACHE.get(str(p))
+    if guardado and guardado[0] == chave:
+        if isinstance(guardado[1], Ilegivel):
+            raise guardado[1]
+        return copy.deepcopy(guardado[1])
+    return None
+
+
+def _versao(p: Path):
+    """(mtime_ns, tamanho) do arquivo, ou None se ele não existe; outra falha de disco ou de permissão sobe Ilegivel."""
+    try:
+        st = p.stat()
+    except FileNotFoundError:
+        _CACHE.pop(str(p), None)
+        _esquecer_aviso(str(p))
+        return None
+    except OSError as e:
+        raise _nao_abriu(p, e) from None
+    return (st.st_mtime_ns, st.st_size)
+
+
 def _ler(p: Path, forma) -> dict | None:
     """O arquivo já na forma certa (cópia do cache: quem recebe pode mexer), ou None se ele não existe.
     Ilegivel se existe e não abre, e NADA além disso sobe daqui: o portão chama isto a cada pedido de toda sessão do
@@ -156,22 +192,23 @@ def _ler(p: Path, forma) -> dict | None:
     Corrompido fica no cache até o arquivo mudar (o portão lê a cada pedido: nada de reler e registrar o erro a cada
     clique); falha de disco ou de permissão (o Windows recusa a abertura no meio de uma troca por outro processo; a
     pasta sem permissão; a NEXUS_DADOS apontando para um arquivo, NotADirectoryError no Linux) não fica: o próximo
-    pedido tenta de novo."""
-    with _TRAVA:
-        try:
-            st = p.stat()
-        except FileNotFoundError:
-            _CACHE.pop(str(p), None)
-            _esquecer_aviso(str(p))
+    pedido tenta de novo.
+
+    Arquivo que não mudou sai da memória SEM trava (ver o topo): quem grava troca o arquivo e a memória juntos, e quem
+    lê no meio vê a versão do disco diferente da memória, pega a trava (espera a gravação terminar) e confere de novo."""
+    chave = _versao(p)
+    if chave is None:
+        return None
+    pronto = _do_cache(p, chave)
+    if pronto is not None:
+        return pronto
+    with _trava(p):
+        chave = _versao(p)
+        if chave is None:
             return None
-        except OSError as e:
-            raise _nao_abriu(p, e) from None
-        chave = (st.st_mtime_ns, st.st_size)
-        guardado = _CACHE.get(str(p))
-        if guardado and guardado[0] == chave:
-            if isinstance(guardado[1], Ilegivel):
-                raise guardado[1]
-            return copy.deepcopy(guardado[1])
+        pronto = _do_cache(p, chave)
+        if pronto is not None:
+            return pronto
         try:
             bruto = p.read_bytes()
         except OSError as e:
@@ -275,7 +312,7 @@ def _mudar(config, mudanca):
     if p is None:
         raise Recusado("Este Nexus está sem pasta de dados (NEXUS_DADOS): nada foi gravado.")
     alvo = p / ARQUIVO
-    with _TRAVA:
+    with _trava(alvo):
         dado = _ler(alvo, _forma_acessos) or _vazio()     # Ilegivel sobe: nada é gravado por cima do que não abriu
         resultado = mudanca(dado)
         dado["auditoria"] = dado["auditoria"][-MAX_AUDITORIA:]
@@ -336,7 +373,7 @@ def registrar_login(config, email: str) -> None:
         if p is None or not e:
             return
         alvo = p / ARQUIVO_LOGINS
-        with _TRAVA:
+        with _trava(alvo):      # a trava do registro, não a da lista: o portão não espera este fsync
             try:
                 logins = (_ler(alvo, _forma_logins) or {"logins": {}})["logins"]
             except Ilegivel:
