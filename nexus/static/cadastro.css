@@ -183,6 +183,8 @@
 .cad-secao{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);margin:0 0 16px}
 .cad-secao>h2{font:700 13px/18px var(--font-sans);margin:0;padding:12px 16px;border-bottom:1px solid var(--linha);
   color:var(--tinta)}
+.cad-secao>.cad-pe{margin:0;padding:10px 16px 12px;font-size:12px;line-height:17px;color:var(--mudo)}
+.cad-secao>.cad-rolagem--secao{border:0;border-radius:0}      /* a seção já tem a borda; no celular a tabela rola */
 .cad-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px 16px;padding:14px 16px 16px}
 .cad-campo{display:flex;flex-direction:column;gap:5px;min-width:0}
 .cad-campo--largo{grid-column:1/-1}

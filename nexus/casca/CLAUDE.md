@@ -191,7 +191,12 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   disco. O caso: Raio-X das 10:08 de 20/10, `GET /os/` há 18 s numa cópia de 17 ms com o Nexus a 13% e carga 2,5 a 3,9:
   a carga do Linux soma quem espera o disco, e a página não dizia qual era o gargalo. Leitura: "esperando o disco" alto
   ou swap trocando = a máquina (disco, memória), não o código; Nexus a ~100% = o processo (o GIL). Prova:
-  `tests/test_raio_x_maquina_20_10.py`.
+  `tests/test_raio_x_maquina_20_10.py`. **E quem ocupa a memória da máquina** (`raio_x._quem_ocupa`, 20/10/2026), somado
+  por programa pelo /proc de cada processo: a memória própria (RssAnon) somada, a compartilhada uma vez só (RssShmem: os
+  buffers do PostgreSQL aparecem em todo processo dele) e o swap (VmSwap); o Nexus é "este processo", e do Python sai só
+  o arquivo do script e a pasta dele, nunca a linha de comando (pode ter senha). O caso: Raio-X das 14:17 de 20/10, 0,2
+  GB livres de 7,1 GB e 3,2 GB no swap com o Nexus em 690 MB, e o PDF das 13:45 1 min "trabalhando" no desenho do logo.
+  Prova: `tests/test_raio_x_memoria_por_programa.py`.
 - **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O

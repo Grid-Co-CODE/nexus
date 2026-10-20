@@ -16,6 +16,9 @@ clique do administrador:
   tempo com algo parado esperando memória ou disco. O caso: no Raio-X das 10:08 de 20/10 o `GET /os/` estava há 18 s
   numa cópia que leva 17 ms, com o Nexus a 13% do processador e a carga em 2,5 a 3,9; a carga do Linux soma quem espera
   o disco, e a página não dizia qual era o gargalo. São só leituras de arquivos do /proc, quando o Raio-X abre.
+- quem ocupa a memória da máquina, somado por programa (`_quem_ocupa`, 20/10/2026). Raio-X das 14:17: 0,2 GB livres de
+  7,1 GB e 3,2 GB no swap, com o Nexus em só 690 MB; o PDF das 13:45 ficou 1 min "trabalhando" no desenho do logo, e
+  daqui não se via de quem eram os outros ~6 GB.
 
 Nada é gravado nem vai à rede; a pilha só sai como rótulo (arquivo, linha e função), nunca com dados.
 """
@@ -146,6 +149,56 @@ def _maquina(s0, s1, v0: dict, v1: dict, janela_s: float):
             "pressao_mem": _pressao(_ler_proc("pressure/memory")), "pressao_io": _pressao(_ler_proc("pressure/io"))}
 
 
+def _pids() -> list[int]:
+    """Os processos da máquina (as pastas numéricas do /proc); [] fora do Linux."""
+    try:
+        return [int(n) for n in os.listdir("/proc") if n.isdigit()]
+    except OSError:
+        return []
+
+
+def _programa(pid: int, nome: str) -> str:
+    """O nome do programa na lista da memória. O do Python leva o script (o Nexus e a plataforma de Performance são
+    ambos python): só o arquivo e a pasta dele, nunca a linha de comando inteira, que pode ter senha."""
+    if pid == os.getpid():
+        return "Nexus (este processo)"
+    if not nome.startswith("python"):
+        return nome
+    args = _ler_proc(f"{pid}/cmdline").split("\0")
+    for i, a in enumerate(args[1:], 1):
+        if a == "-m" and i + 1 < len(args):
+            return f"{nome} · -m {args[i + 1]}"
+        if a.endswith(".py"):
+            return f"{nome} · " + "/".join(a.replace("\\", "/").split("/")[-2:])
+    return nome
+
+
+def _quem_ocupa(teto: int = 6):
+    """Os programas que mais ocupam a memória da máquina, somados por programa: a memória própria de cada processo
+    (RssAnon), a compartilhada uma vez só por programa (RssShmem: os buffers do PostgreSQL aparecem em todo processo
+    dele, e somá-los contaria a mesma memória várias vezes) e o swap (VmSwap). None fora do Linux."""
+    grupos = {}
+    for pid in _pids():
+        texto = _ler_proc(f"{pid}/status")
+        kb = _kb(texto, "Name", "RssAnon", "RssShmem", "VmSwap")
+        if "RssAnon" not in kb:                     # thread do kernel, ou o processo já saiu
+            continue
+        nome = next((linha.split(":", 1)[1].strip() for linha in texto.splitlines() if linha.startswith("Name:")), "?")
+        g = grupos.setdefault(_programa(pid, nome), {"anon": 0, "shmem": 0, "swap": 0, "n": 0})
+        g["anon"] += kb["RssAnon"]
+        g["shmem"] = max(g["shmem"], kb.get("RssShmem", 0))
+        g["swap"] += kb.get("VmSwap", 0)
+        g["n"] += 1
+    if not grupos:
+        return None
+    lista = sorted(({"programa": p, "mem_mb": round((g["anon"] + g["shmem"]) / 1024), "swap_mb": round(g["swap"] / 1024),
+                     "processos": g["n"]} for p, g in grupos.items()),
+                   key=lambda x: (-(x["mem_mb"] + x["swap_mb"]), x["programa"]))
+    resto = lista[teto:]
+    return {"programas": lista[:teto], "outros": len(resto), "outros_mem_mb": sum(x["mem_mb"] for x in resto),
+            "outros_swap_mb": sum(x["swap_mb"] for x in resto)}
+
+
 def _processador(janela_s: float = 1.0) -> dict:
     """O processador deste processo numa janela curta (100% = um núcleo inteiro), a carga da máquina e, na mesma janela,
     a máquina pelo /proc (`_maquina`; só Linux)."""
@@ -174,6 +227,6 @@ def registrar_raio_x(bp) -> None:
         if teto and teto["ultimo_recusado"]:
             teto["ultimo_txt"] = time.strftime("%d/%m %H:%M", time.localtime(teto["ultimo_recusado"]))
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
-                               threads=getattr(estado, "threads", 0), cpu=_processador(),
+                               threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_quem_ocupa(),
                                travamentos=P.cartao(app) if estado is not None else None,
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

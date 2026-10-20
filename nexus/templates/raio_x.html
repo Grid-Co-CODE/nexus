@@ -20,27 +20,40 @@
 {% if travamentos %}<div class="cad-aviso cad-aviso--{{ 'critico' if travamentos.classe == 'critico' else ('alerta' if travamentos.classe == 'alerta' else 'ok') }}"><i class="ph ph-clock-countdown"></i><div><strong>{{ travamentos.rotulo }}.</strong> {{ travamentos.detalhe }}{% if travamentos.titulo %}<br><span class="mudo">{{ travamentos.titulo }}</span>{% endif %}</div></div>{% endif %}
 {% if not ligado %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>O registro dos pedidos só liga no servidor (servir.py): aqui não há pedidos para mostrar.</div></div>{% endif %}
 
+{% if quem %}
+<section class="cad-secao">
+  <h2>Quem ocupa a memória da máquina</h2>
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
+    <thead><tr><th>Programa</th><th>Memória</th><th>No swap</th><th>Processos</th></tr></thead>
+    <tbody>{% for p in quem.programas %}
+      <tr><td><span class="gc-dado">{{ p.programa }}</span></td><td class="gc-num">{{ p.mem_mb }} MB</td><td class="gc-num">{{ p.swap_mb }} MB</td><td class="gc-num">{{ p.processos }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="cad-pe">{% if quem.outros %}E mais {{ quem.outros }} programa{{ "s" if quem.outros != 1 }}: {{ quem.outros_mem_mb }} MB de memória, {{ quem.outros_swap_mb }} MB no swap. {% endif %}A memória de cada programa é a própria de cada processo, somada, mais a compartilhada uma vez só (os buffers do banco aparecem em todo processo dele).</p>
+</section>
+{% endif %}
+
 <section class="cad-secao">
   <h2>Pedidos em andamento, do mais antigo</h2>
   {% if pedidos %}
-  <table class="cad-tabela">
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
     <thead><tr><th>Há</th><th>Pedido</th><th>Onde está</th><th>Esperando</th></tr></thead>
     <tbody>{% for p in pedidos %}
       <tr><td class="gc-num">{{ p.ha }}</td><td><span class="gc-dado">{{ p.metodo }} {{ p.caminho }}</span></td><td>{{ p.quem }}<br><span class="mudo">{{ p.onde }}</span></td><td>{{ p.como }}</td></tr>
     {% endfor %}</tbody>
-  </table>
+  </table></div>
   {% else %}<p class="cad-vazio">Nenhum pedido em andamento além deste.</p>{% endif %}
 </section>
 
 <section class="cad-secao">
   <h2>Tarefas de fundo</h2>
   {% if outras %}
-  <table class="cad-tabela">
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
     <thead><tr><th>Tarefa</th><th>Onde está</th><th>Fazendo</th></tr></thead>
     <tbody>{% for t in outras %}
       <tr><td><span class="gc-dado">{{ t.nome }}</span></td><td>{{ t.quem }}<br><span class="mudo">{{ t.onde }}</span></td><td>{{ t.como }}</td></tr>
     {% endfor %}</tbody>
-  </table>
+  </table></div>
   {% else %}<p class="cad-vazio">Nenhuma tarefa de fundo agora.</p>{% endif %}
 </section>
 {% endblock %}
