@@ -338,6 +338,18 @@ def _detalhe_enxuto(wid, pessoa=None) -> dict:
         return api.get_os_detalhes(wid) or {}
 
 
+def _os_mae(pai_id) -> dict:
+    """O nº e o tipo da OS mãe ({folio, tipo}) para a cadeia da OS 3 que não a traz na nota. Fracttal que recusa: {} (a
+    cadeia fica "—", a tela abre); a sessão morta sobe, como em qualquer leitura da tela."""
+    try:
+        with api.enxuta("vinculos"):
+            return api.get_os_detalhes(pai_id) or {}
+    except api.SessionExpired:
+        raise
+    except api.FracttalError:
+        return {}
+
+
 def _obs_do_os(folio) -> tuple:
     """(observações desta OS, erro) — do banco da Gridco."""
     try:
@@ -450,9 +462,17 @@ def detalhe(folio):
     fim_tela = max((o["quando"] for o in obs if o["tipo"] == "finalizado"), default="")
     c = aw.cartao(dict(linha, note=nota), ticket, (obs[-1]["quando"] if obs else ""), hoje, fim_tela)
     n = aw.ler_nota(nota)
+    # a OS 3 criada à mão sem a cadeia na nota (20/10/2026): a OS mãe do Fracttal entra no lugar. Só nesse caso há um
+    # pedido a mais; a do App sempre traz a cadeia, e o id da mãe já vem no detalhe enxuto (`os_pai_id`)
+    if not (n["os_campo"] or n["inspecao"]) and det.get("os_pai_id"):
+        mae = _os_mae(det["os_pai_id"])
+        c.update(aw.cadeia_pela_mae(n, mae.get("folio"), mae.get("tipo")))
+    if not c["code"]:
+        c["code"] = str(det.get("code") or "").strip()     # o ativo da própria OS, quando a nota não diz
     todos = _cartoes(d, hoje)
     return render_template("acomp_os.html", conta=_conta(), aba="criar", c=c, n=n, wid=wid, item=item,
-                           tl=aw.linha_do_tempo(c, obs), outros=aw.outros(c, todos), canal=cs.CANAL.get(c["marca"], ""),
+                           tl=aw.linha_do_tempo(c, obs, n["historico"]), outros=aw.outros(c, todos),
+                           canal=cs.CANAL.get(c["marca"], ""),
                            menos7=aw.menos_7d(n["data_falha"], hoje), copiar=aw.copiar_tudo(n["campos"]),
                            erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1])
 

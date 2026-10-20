@@ -3,9 +3,11 @@
 Flask e sem rede; as rotas moram em `rotas_acomp.py`.
 
 O QUE É A OS DE ACOMPANHAMENTO (a "OS 3" do chamado de garantia; ver app-campo-docs/notas-e-os-administrativa.html):
-ninguém cria na mão. Quando o técnico fecha a inspeção do chamado no App de Campo, o servidor do App cria sozinho a OS
+quando o técnico fecha a inspeção do chamado no App de Campo, o servidor do App cria sozinho a OS
 "[Ativo] - Acompanhamento de chamado <marca>" — tipo Administrativa, etiqueta CHAMADOS, filha da inspeção, no nome
 da equipe de chamados — com as respostas do técnico na NOTA e UMA subtarefa: o nº do ticket aberto no fornecedor.
+Desde 20/10/2026 há também a RETROATIVA: a analista de chamados cria à mão a OS 3 de um chamado que já existia, com a
+nota no jeito dela (a cadeia, a abertura do chamado e o histórico; ver `ler_nota`).
 
 AS TRÊS COLUNAS saem da própria OS, sem estado paralelo em lugar nenhum:
     Chegaram       em processo e a subtarefa do ticket ainda vazia — é a fila da analista de chamados
@@ -92,14 +94,53 @@ def _perguntas() -> list:
     return sorted({s["desc"] for b in blocos for s in b if s.get("desc")}, key=len, reverse=True)
 
 
+# A OS 3 RETROATIVA (20/10/2026): a analista de chamados criou à mão, no Fracttal, a OS de acompanhamento de um chamado
+# que só existia na planilha de gestão de chamados, com a nota no jeito dela: "OS de abertura: 11199 · OS de campo:
+# 12565 · Solicitação: 3504 · Ativo: …" (a 11199 é a corretiva onde a falha apareceu, a OS de campo do App; a 12565, do
+# tipo Inspeção, é a inspeção), a "Data da ocorrência / abertura do chamado" e o "Histórico (importado …)" com uma linha
+# por data. A tela mostrou a cadeia e o ativo vazios e o chamado "chegando hoje". Levi, no mesmo dia: a nota dela vale
+# como ela escreve, e sem cadeia na nota entra a OS mãe do Fracttal (`cadeia_pela_mae`).
+_RX_CADEIA = re.compile(r"\b(?:OS de campo|OS de abertura|Inspeção|Ativo)\s*:")
+_RX_ABERTURA = re.compile(r"^(?:Data da ocorrência(?:\s*/\s*abertura do chamado)?|Abertura do chamado)\s*:\s*(.*)$",
+                          re.IGNORECASE)
+_RX_HISTORICO = re.compile(r"^(\d{2}/\d{2}(?:/\d{4})?)\s*[-–—:]\s*(.+)$")
+_CHAVES_DA_CADEIA = {"os de campo", "os de abertura", "inspecao", "ativo"}
+
+
+def _num(rx: str, s: str) -> str:
+    m = re.search(rx, s)
+    return m.group(1) if m else ""
+
+
+def _data_br(s: str):
+    """'21/08/2026' → datetime (00:00). Vazio ou estragado ('31/02/2026') → None."""
+    try:
+        return dt.datetime.strptime(str(s or "").strip()[:10], "%d/%m/%Y")
+    except ValueError:
+        return None
+
+
+def _com_ano(ddmm: str, base) -> str:
+    """'05/01' do histórico → '05/01/2026': o ano da abertura, e o seguinte quando a data cai antes dela (o chamado aberto
+    em 20/12 e respondido em 05/01). Com o ano escrito, fica o escrito; sem a abertura, sem ano."""
+    if len(ddmm) == 10 or base is None:
+        return ddmm
+    try:
+        d = dt.datetime.strptime("%s/%d" % (ddmm, base.year), "%d/%m/%Y")
+    except ValueError:
+        return ddmm
+    return (d.replace(year=base.year + 1) if d < base else d).strftime("%d/%m/%Y")
+
+
 def ler_nota(nota: str) -> dict:
     """A nota da OS 3 de volta em partes: marca e tipo, a cadeia (OS de campo → inspeção → ativo), a data da falha, os
-    campos do formulário do fornecedor e as demais respostas.
+    campos do formulário do fornecedor e as demais respostas; da retroativa, também a data de abertura do chamado, as
+    outras linhas "rótulo: valor" (`info`) e o histórico, com o ano.
 
     A pergunta das "Demais respostas" é casada contra o texto do modelo, porque ela mesma tem ':' ("Localização na
     planta: fileira, posição e nº dos trackers afetados: Tracker 40") — partir no primeiro ':' cortaria a pergunta."""
     out = {"marca": "", "tipo": "", "os_campo": "", "inspecao": "", "ativo": "", "data_falha": "", "menos7_nota": None,
-           "campos": [], "demais": []}
+           "campos": [], "demais": [], "abertura": "", "info": [], "historico": []}
     txt = str(nota or "")
     i = txt.find(MARCA_NOTA)
     if i < 0:
@@ -114,11 +155,28 @@ def ler_nota(nota: str) -> dict:
         s = l.strip()
         if not s:
             continue
-        if s.startswith("OS de campo:"):
-            for k, rx in (("os_campo", r"OS de campo:\s*(\d+)"), ("inspecao", r"Inspeção:\s*(\d+)"),
-                          ("ativo", r"Ativo:\s*(\S+)")):
-                mm = re.search(rx, s)
-                out[k] = mm.group(1) if mm else ""
+        if not modo and _RX_CADEIA.search(s):
+            # a cadeia em qualquer ordem: a do App começa por "OS de campo:"; a retroativa, por "OS de abertura:"
+            abertura, campo = _num(r"OS de abertura:\s*(\d+)", s), _num(r"OS de campo:\s*(\d+)", s)
+            insp = _num(r"Inspeção:\s*(\d+)", s)
+            out["os_campo"], out["inspecao"] = (abertura, insp or campo) if abertura else (campo, insp)
+            out["ativo"] = _num(r"Ativo:\s*(\S+)", s)
+            for parte in s.split("·"):
+                k, _, v = parte.partition(":")
+                if v.strip() and _norm(k) not in _CHAVES_DA_CADEIA:
+                    out["info"].append({"rotulo": k.strip(), "valor": v.strip()})
+        elif not modo and _RX_ABERTURA.match(s):
+            out["abertura"] = _num(r"(\d{2}/\d{2}/\d{4})", _RX_ABERTURA.match(s).group(1))
+        elif not modo and s.startswith("Histórico") and s.endswith(":"):
+            modo = "historico"
+        elif modo == "historico" and not s.startswith(("Campos do formulário", "Demais respostas")):
+            mm = _RX_HISTORICO.match(s)
+            if mm:
+                out["historico"].append({"data": mm.group(1), "texto": mm.group(2).strip()})
+            elif out["historico"]:
+                out["historico"][-1]["texto"] += " " + s           # a linha que continua a de cima
+            else:
+                out["historico"].append({"data": "", "texto": s})
         elif s.startswith("Data da falha:"):
             mm = re.search(r"Data da falha:\s*(\d{2}/\d{2}/\d{4}(?: \d{2}:\d{2})?)", s)
             out["data_falha"] = mm.group(1) if mm else ""
@@ -140,7 +198,42 @@ def ler_nota(nota: str) -> dict:
             else:
                 k, _, v = s.partition(":")
                 out["demais"].append({"pergunta": k.strip(), "resposta": v.strip()})
+        elif not modo:
+            # o resto do cabeçalho da retroativa (Status atual, Ticket, S/N, Título do e-mail…): mostrado, nunca jogado fora.
+            # O título do e-mail tem ' - ' e '/', mas nenhum '·': só o '·' separa um rótulo do outro
+            for parte in s.split("·"):
+                k, _, v = parte.partition(":")
+                out["info"].append({"rotulo": k.strip(), "valor": v.strip()} if v.strip() else
+                                   {"rotulo": "", "valor": parte.strip()})
+    base = _data_br(out["abertura"])
+    for h in out["historico"]:
+        h["data"] = _com_ano(h["data"], base)
+    if out["abertura"] and not out["data_falha"]:
+        out["data_falha"] = out["abertura"]          # ela escreveu "ocorrência / abertura": é também o dia da falha
     return out
+
+
+def abertura_valida(n: dict, criada):
+    """A abertura do chamado escrita na nota (`ler_nota`), como datetime à 00:00, quando ela vale: data de verdade e não
+    depois da criação da OS (abertura "no futuro" da OS é erro de digitação). Senão None, e vale a criação da OS."""
+    a = _data_br(n.get("abertura"))
+    if a is None or (criada is not None and a.date() > criada.date()):
+        return None
+    return a
+
+
+def cadeia_pela_mae(n: dict, folio_mae: str, tipo_mae: str) -> dict:
+    """A cadeia do chamado ({os_campo, inspecao}). Com ela na nota, vale a nota. Sem ela (a retroativa escrita sem a linha
+    da cadeia), a OS mãe da OS 3 no Fracttal entra pelo tipo dela: a do tipo Inspeção é a inspeção (a OS 3 do App é filha
+    da inspeção); outra (a corretiva onde a falha apareceu) é a OS de campo."""
+    if n.get("os_campo") or n.get("inspecao"):
+        return {"os_campo": n.get("os_campo") or "", "inspecao": n.get("inspecao") or ""}
+    folio_mae = str(folio_mae or "").strip()
+    if not folio_mae:
+        return {"os_campo": "", "inspecao": ""}
+    if "inspecao" in _norm(tipo_mae):
+        return {"os_campo": "", "inspecao": folio_mae}
+    return {"os_campo": folio_mae, "inspecao": ""}
 
 
 def marca_do_titulo(titulo: str) -> str:
@@ -251,10 +344,15 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
     `finalizado` = quando a tela finalizou (do banco). A OS de acompanhamento é concluída sem registro de execução, e
     o Fracttal deixa a data de fim vazia nesse caso — então a data da finalização é a que diz "em 26/09"."""
     n = ler_nota(l.get("note"))
-    chegou = utc_para_brt(l.get("data"))
+    criada = utc_para_brt(l.get("data"))
+    # a retroativa (criada à mão para um chamado que já existia) conta a idade da abertura escrita na nota, e não do dia
+    # em que a OS entrou no Fracttal: a 1ª, de um chamado de 21/08, aparecia "chegou hoje" em 20/10
+    aberto = abertura_valida(n, criada)
+    chegou = aberto or criada
     fim = utc_para_brt(l.get("data_fim")) or (brt_iso(finalizado) if finalizado else None)
     ult = brt_iso(ultima_obs) if ultima_obs else None
-    referencia = max([x for x in (chegou, ult) if x is not None], default=None)
+    hist = [_data_br(h["data"]) for h in n["historico"]] if aberto else []
+    referencia = max([x for x in [chegou, ult] + hist if x is not None], default=None)
     col = coluna(l.get("status_id"), ticket)
     d_chegou, d_sem = dias(chegou, hoje), dias(referencia, hoje)
     marca = n["marca"] or marca_do_titulo(l.get("descricao"))
@@ -264,7 +362,9 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
          "local": local_txt(l.get("cliente"), l.get("usina")), "marca": marca, "tipo": n["tipo"] or l.get("tipo") or "",
          "inspecao": n["inspecao"], "os_campo": n["os_campo"], "data_falha": n["data_falha"],
          "ticket": str(ticket or "").strip(), "ticket_nao_lido": ticket is None,
-         "chegou": chegou.strftime("%d/%m/%Y %H:%M") if chegou else "", "dias": d_chegou, "dias_sem": d_sem,
+         "chegou": (aberto.strftime("%d/%m/%Y") if aberto else criada.strftime("%d/%m/%Y %H:%M") if criada else ""),
+         "criada": criada.strftime("%d/%m/%Y %H:%M") if criada else "", "retroativa": aberto is not None,
+         "dias": d_chegou, "dias_sem": d_sem,
          # sem data nenhuma de fim (concluída direto no Fracttal, sem execução), a idade vem da chegada — senão a OS
          # nunca sairia da coluna dos 90 dias
          "fim": fim.strftime("%d/%m") if fim else "", "dias_fim": dias(fim or chegou, hoje),
@@ -350,17 +450,36 @@ def entrada(reg: dict) -> dict:
             "ev": reg.get("tipo") in ("ticket", "finalizado"), "quando": reg.get("quando") or ""}
 
 
-def linha_do_tempo(c: dict, obs) -> list:
+def linha_do_tempo(c: dict, obs, historico=None) -> list:
     """As observações da mais nova para a mais antiga, com a chegada da OS no fim (ela nasceu antes de tudo). O verde é
-    EXCLUSIVO da entrada mais recente — "é o que aconteceu por último" (revisão do design do 1B)."""
-    chegada = {"d": (c["chegou"] or "")[:5], "a": (c["chegou"] or "")[6:10],
-               "texto": "Chegou: a OS %s nasceu sozinha no fechamento da inspeção %s." % (c["folio"], c["inspecao"] or "—"),
-               "autor": "App de Campo · %s" % c["chegou"] if c["chegou"] else "App de Campo", "ev": False, "quando": ""}
+    EXCLUSIVO da entrada mais recente — "é o que aconteceu por último" (revisão do design do 1B).
+
+    Na retroativa (`c["retroativa"]`), a OS não "nasceu sozinha": a entrada diz que ela foi criada à mão e de quando é o
+    chamado, e o `historico` da nota (`ler_nota`) vem depois dela, do mais novo ao mais antigo, com as datas dele."""
+    if c.get("retroativa"):
+        chegada = {"d": c["criada"][:5], "a": c["criada"][6:10],
+                   "texto": "Criada à mão no Fracttal em %s: o chamado é de %s, e o histórico abaixo veio na nota."
+                            % (c["criada"][:10], c["chegou"]),
+                   "autor": "Fracttal · %s" % c["criada"], "ev": False, "quando": ""}
+    else:
+        chegada = {"d": (c["chegou"] or "")[:5], "a": (c["chegou"] or "")[6:10],
+                   "texto": "Chegou: a OS %s nasceu sozinha no fechamento da inspeção %s." % (c["folio"],
+                                                                                         c["inspecao"] or "—"),
+                   "autor": "App de Campo · %s" % c["chegou"] if c["chegou"] else "App de Campo", "ev": False,
+                   "quando": ""}
+    antes = []
+    if c.get("retroativa"):
+        # do mais novo ao mais antigo pela data (a do ano escrito ou deduzido); a sem data fica no fim, na ordem da nota
+        com_data = [h for h in historico or [] if _data_br(h.get("data"))]
+        com_data.sort(key=lambda h: _data_br(h["data"]), reverse=True)
+        antes = [{"d": h["data"][:5], "a": h["data"][6:10], "texto": h["texto"], "autor": "Histórico importado na nota",
+                  "ev": False, "quando": ""}
+                 for h in com_data + [h for h in historico or [] if not _data_br(h.get("data"))]]
     # ordena do mais velho ao mais novo e VIRA: no empate (duas anotações no mesmo segundo — o ticket e a finalização
     # automáticos podem cair assim), a gravada depois fica em cima. `sorted(..., reverse=True)` manteria o empate na
     # ordem de gravação, e a finalização apareceria ABAIXO do ticket (visto na foto da bancada, 27/09).
     ordem = sorted(obs or [], key=lambda r: str(r.get("quando") or ""))
-    lista = [entrada(r) for r in reversed(ordem)] + [chegada]
+    lista = [entrada(r) for r in reversed(ordem)] + [chegada] + antes
     for i, e in enumerate(lista):
         e["novo"] = i == 0 and len(lista) > 1
     return lista

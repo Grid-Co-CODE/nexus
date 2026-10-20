@@ -45,8 +45,11 @@
       <span class="note">OS de campo {{ c.os_campo or '—' }}</span></div></div>
     <div class="kpi"><div class="lbl">Menos de 7 dias</div><div class="linha"><span class="val pq">{% if menos7.sim is none %}—{% else %}{{ 'Sim' if menos7.sim else 'Não' }} · {{ menos7.dias }} dia{{ '' if menos7.dias == 1 else 's' }}{% endif %}</span>
       <span class="note" title="{% if n.menos7_nota is not none and menos7.sim is not none and n.menos7_nota != menos7.sim %}a nota diz &quot;{{ 'Sim' if n.menos7_nota else 'Não' }}&quot;: foi calculado no fechamento da inspeção{% else %}recalculado pela data da falha{% endif %}">{% if n.menos7_nota is not none and menos7.sim is not none and n.menos7_nota != menos7.sim %}a nota diz "{{ 'Sim' if n.menos7_nota else 'Não' }}"{% else %}recalculado hoje{% endif %}</span></div></div>
-    <div class="kpi"><div class="lbl">Chegou</div><div class="linha"><span class="val pq">{{ c.chegou or '—' }}</span>
-      <span class="note">inspeção {{ c.inspecao or '—' }}</span></div></div>
+    {# a retroativa (criada à mão para um chamado que já existia, 20/10/2026) conta da abertura escrita na nota #}
+    {% if c.retroativa %}<div class="kpi"><div class="lbl">Aberto em</div><div class="linha"><span class="val pq">{{ c.chegou }}</span>
+      <span class="note" title="a OS entrou no Fracttal em {{ c.criada }}">criada em {{ c.criada[:5] }}</span></div></div>
+    {% else %}<div class="kpi"><div class="lbl">Chegou</div><div class="linha"><span class="val pq">{{ c.chegou or '—' }}</span>
+      <span class="note">inspeção {{ c.inspecao or '—' }}</span></div></div>{% endif %}
     <div class="kpi"><div class="lbl">Ticket no fornecedor</div><div class="linha"><span class="val mono">{{ c.ticket or '—' }}</span>
       <span class="note">{{ 'na subtarefa da OS' if c.ticket else 'ainda não aberto' }}</span></div></div>
   </div>
@@ -96,6 +99,17 @@
       </section>
     </aside>
     <div>
+      {# o resto do cabeçalho da nota (a OS criada à mão para um chamado que já existia, 20/10/2026: Status atual, Ticket,
+         S/N, Título do e-mail…). A nota do App não tem essas linhas, e o bloco não aparece. #}
+      {% if n.info %}<section class="bloco" data-recolhe="nota">
+        <div class="bloco-h"><h2>Na nota da OS</h2><span class="n">{{ n.info|length }}</span>
+          <div class="bloco-a">{{ recolher('corpo_nota') }}</div></div>
+        <div class="bloco-c" id="corpo_nota">
+        <table class="t qa"><tbody>
+          {% for x in n.info %}<tr><td class="k">{{ x.rotulo or '—' }}</td><td class="v">{{ x.valor }}</td></tr>{% endfor %}
+        </tbody></table>
+        </div>
+      </section>{% endif %}
       <section class="bloco" data-recolhe="campos">
         <div class="bloco-h"><h2>Para abrir o ticket</h2><span class="n">{{ n.campos|length }} campos</span>
           <div class="bloco-a">{% if n.campos %}<button type="button" class="btn btn-o btn-p" data-copia="{{ copiar }}">Copiar tudo</button>{% endif %}{{ recolher('corpo_campos') }}</div></div>

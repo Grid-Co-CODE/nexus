@@ -1075,3 +1075,32 @@ fabricantes em chamados > fabricantes apareça atualizado no app".
   filtrada pelo tipo do ativo, e a NCU e a RSU pegam a marca dos trackers da usina. Até lá, a tela avisa em cima.
 - Prova: `tests/test_chamado_garantia_fabricantes.py` (aqui) e os testes do oem (`test_chamado_modelos_store.py`,
   `test_modelos_na_abertura.py`, `test_os_web_fornecedores.py`), rodados com a cópia sincronizada.
+
+## A OS de acompanhamento retroativa (Garantias, 20/10/2026)
+
+A analista de chamados passou a criar à mão no Fracttal a OS de acompanhamento (a OS 3) dos chamados que só existiam na
+planilha de gestão de chamados, e a 1ª (16858) saiu errada na tela: cadeia e ativo vazios, "chegou hoje ... nasceu
+sozinha no fechamento da inspeção" e nada do histórico. A OS estava certa no Fracttal (marca, etiqueta CHAMADOS, OS mãe,
+ativo); a tela só entendia a nota escrita pelo App. Levi, no mesmo dia: a nota dela vale como ela escreve, e sem a cadeia
+na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
+
+- **A nota dela** (`acomp_web.ler_nota`): a linha da cadeia é lida em qualquer ordem. "OS de abertura: 11199 · OS de
+  campo: 12565" quer dizer OS de campo 11199 (a corretiva onde a falha apareceu, a OS mãe que ela vinculou) e inspeção
+  12565 (do tipo Inspeção); sem "OS de abertura", "OS de campo" e "Inspeção" são os do App. "Data da ocorrência / abertura
+  do chamado" (ou "Abertura do chamado") é a `abertura`, que também vale como a data da falha. As outras linhas "rótulo:
+  valor" (Status atual, Ticket, S/N, Título do e-mail, Solicitação, UFV…) vão para `info`, o bloco "Na nota da OS"; o
+  "Histórico (...):" vira `historico`, uma entrada por "dd/mm - texto", com o ano da abertura (o seguinte quando a data
+  cai antes dela).
+- **A idade** (`cartao`, `abertura_valida`): com a abertura válida (data de verdade, não depois da criação da OS), o
+  chamado conta dela (`retroativa`, `chegou` = o dia da abertura, `criada` = quando a OS entrou no Fracttal); a última
+  data do histórico conta como atualização. No topo da tela, "Aberto em" no lugar de "Chegou".
+- **A linha do tempo**: "Criada à mão no Fracttal em … : o chamado é de …" no lugar do "nasceu sozinha", e o histórico
+  da nota depois dela, do mais novo ao mais antigo ("Histórico importado na nota").
+- **Sem a cadeia na nota** (`rotas_acomp._os_mae`, `acomp_web.cadeia_pela_mae`): o id da OS mãe já vem no detalhe
+  enxuto (`os_pai_id`); só nesse caso a tela lê a mãe (1 detalhe a mais) e a põe pelo tipo: Inspeção é a inspeção; outra
+  é a OS de campo. Fracttal que recusa deixa "—". O Ativo sem a nota é o código da própria OS (`det["code"]`).
+- **No banco** (`nexus/dados/fato_chamado.py`): `data_id_abertura` e `duracao_min` contam da abertura da nota, e a coluna
+  nova `abertura_por` diz `nota` ou `os`.
+- Prova: `tests/test_oscreator_chamado_retroativo.py` (a nota dela com nomes e números de mentira, a nota do App lida
+  igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
+  e a 375 px.

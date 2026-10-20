@@ -24,6 +24,13 @@ Sem pessoa e sem texto livre (a API do banco tem leitura aberta): o fabricante e
 (categorias, como "STI · Estrutura Trackers"); a nota, o técnico e a analista não vão. A usina liga pelo de-para do
 Fracttal (o site da OS) ou pelo código do ativo; o equipamento, pelo código na dimensão de equipamento. Não liga = vazio
 (regra 4), com o site e o código para consertar no cadastro.
+
+A OS RETROATIVA (20/10/2026): a analista de chamados cria à mão a OS de acompanhamento de um chamado que já existia na
+planilha de gestão de chamados, com a "Data da ocorrência / abertura do chamado" na nota. Levi, no mesmo dia: no banco, o
+chamado abre nessa data ("A abertura do chamado"), e não no dia em que a OS entrou no Fracttal; a 1ª, de 21/08, contaria
+0 dias. A data da nota vale quando é uma data de verdade e não depois da criação da OS; a duração conta dela (o dia, 00:00
+em Brasília: a nota não traz a hora). `abertura_por` diz de onde veio (regra 5, linhagem): `nota` ou `os` (a criação).
+A mesma leitura da tela está em `acomp_web.ler_nota` e `acomp_web.abertura_valida` (o OS Creator não importa o Nexus).
 """
 import re
 import unicodedata
@@ -36,7 +43,7 @@ LIVRO, ABA = "nexus_chamados", "fato_chamado"
 NOME_LIVRO = "Nexus · chamados de garantia (OS de acompanhamento de chamado do Fracttal)"
 CAB_CHAMADO = ["os", "data_id_abertura", "data_id_fim", "usina_id", "usina_ligada_por", "site_fracttal",
                "equipamento_id", "equipamento_ligado_por", "codigo_ativo", "situacao", "fabricante", "componente",
-               "duracao_min"]
+               "duracao_min", "abertura_por"]
 TIPO = "snapshot_acumulado"
 GRAO = ("1 linha = 1 OS de acompanhamento de chamado do Fracttal (em processo, em verificação ou concluída nos "
         "últimos 90 dias)")
@@ -50,6 +57,8 @@ MARCA = "[CHAMADO] Acompanhamento"
 DIAS_CONCLUIDOS = 90                                             # os Finalizados do quadro
 _BRT = timezone(timedelta(hours=-3))
 _RX_MARCA = re.compile(r"\[CHAMADO\] Acompanhamento\s*[—-]\s*([^·\n]+?)\s*·\s*([^\n]+)")
+_RX_ABERTURA = re.compile(r"^\s*(?:Data da ocorrência(?:\s*/\s*abertura do chamado)?|Abertura do chamado)\s*:\s*"
+                          r"(\d{2}/\d{2}/\d{4})", re.IGNORECASE | re.MULTILINE)
 
 
 def _norm(s) -> str:
@@ -70,6 +79,22 @@ def marca(nota) -> tuple[str, str]:
     """("STI", "Estrutura Trackers") da marca "[CHAMADO] Acompanhamento — STI · Estrutura Trackers"; ("", "") sem ela."""
     m = _RX_MARCA.search(str(nota or ""))
     return (m.group(1).strip()[:40], m.group(2).strip()[:40]) if m else ("", "")
+
+
+def abertura_da_nota(nota, criada: datetime | None) -> datetime | None:
+    """A abertura do chamado escrita na nota da retroativa ("Data da ocorrência / abertura do chamado: 21/08/2026"),
+    à 00:00 de Brasília. None sem ela, com data que não existe ou com data depois da criação da OS (erro de digitação):
+    aí vale a criação, como sempre."""
+    m = _RX_ABERTURA.search(str(nota or ""))
+    if not m:
+        return None
+    try:
+        a = datetime.strptime(m.group(1), "%d/%m/%Y").replace(tzinfo=_BRT)
+    except ValueError:
+        return None
+    if criada is not None and a.date() > criada.astimezone(_BRT).date():
+        return None
+    return a
 
 
 def _dt(v) -> datetime | None:
@@ -111,9 +136,12 @@ def linhas(rows, lig, equip=None, hoje=None) -> list[list]:
         site, codigo = _txt(w.get("groups_1_description")), _txt(w.get("code"))
         uid, como = lig.usina(site, codigo)
         eid, ecomo = ligar_equipamento(equip, codigo)
-        fab, comp = marca(w.get("task_note") or w.get("note"))
-        dur = round((fim - cri).total_seconds() / 60) if fim and cri and fim >= cri else None
-        out.append([os_, _dia(cri), _dia(fim), uid, como, site or None, eid, ecomo, codigo or None, SITUACAO[st],
-                    fab or None, comp or None, dur])
+        nota = w.get("task_note") or w.get("note")
+        fab, comp = marca(nota)
+        aberta = abertura_da_nota(nota, cri)
+        ini = aberta or cri
+        dur = round((fim - ini).total_seconds() / 60) if fim and ini and fim >= ini else None
+        out.append([os_, _dia(ini), _dia(fim), uid, como, site or None, eid, ecomo, codigo or None, SITUACAO[st],
+                    fab or None, comp or None, dur, "nota" if aberta else ("os" if cri else None)])
     out.sort(key=lambda r: r[0])
     return out

@@ -781,7 +781,8 @@ FATOS = (
     Fato("chamado", "Chamado de garantia (OS de acompanhamento)", "chamados",
          "fora do banco: API REST do Fracttal (OS de acompanhamento de chamado, tarefa Administrativa)",
          fato_chamado.GRAO,
-         _d(data=("id", "data_id_abertura, data_id_fim (dia de Brasília)"),
+         _d(data=("id", "data_id_abertura, data_id_fim (dia de Brasília; a abertura da OS retroativa vem da nota, "
+                        "abertura_por = nota)"),
             usina=("id", "usina_id (de-para do Fracttal pelo site da OS; código do ativo)"),
             equipamento=("id", "equipamento_id (o código do ativo na dimensão de equipamento)"),
             os=("cod", "os (o nº da OS de acompanhamento)")),
