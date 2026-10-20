@@ -670,3 +670,31 @@ def test_git_ignora_so_a_pasta_de_dado_real_da_raiz():
         return subprocess.run(["git", "check-ignore", "-q", p], cwd=raiz).returncode == 0
     assert ignorado("dados/pcm/insumos.json") and ignorado("dados/cadastro_ensaio.json")
     assert not ignorado("nexus/dados/catalogo.py") and not ignorado("nexus/templates/dados/governanca.html")
+
+
+
+def test_governanca_mostra_a_classificacao_1_de_outra_usina(app):
+    """20/10/2026: o radar das tarefas abertas cuja Classificação 1 é de outra usina que a da localização do ativo, para
+    quem administra o Fracttal corrigir na origem (o Nexus não escreve no Fracttal)."""
+    import json
+    import time
+    lista = [{"classificacao_1": "Cliente X - Oito - BA", "localizacao": "Cliente X - Sete II - BA", "certeza": "trocada",
+              "ativos": ["CLX-STE200-INFC1-SDRN1", "CLX-STE200-NBRK1"], "n_ativos": 2, "n_tarefas": 3, "os": [16341]},
+             {"classificacao_1": "Thopen - Altair 1 - SP", "localizacao": "Thopen - Altair 1 - MT", "certeza": "conferir",
+              "ativos": ["THPN-ALT100-INVR3"], "n_ativos": 1, "n_tarefas": 1, "os": [16401]}]
+    q = {"fato": "tarefa_os", "linhas": 10, "livro_origem": "Fracttal (API REST) · work_orders",
+         "extra": json.dumps({"lidas": 10, "usina_trocada_ativos": 2, "usina_a_conferir_ativos": 1,
+                              "usina_trocada": lista})}
+    telas_dados._CACHE.update(t=time.time(), v={"qualidade": {"tarefa_os": q}, "atualizacao": {}, "historico": [],
+                                                "equipamento": [], "erro": None, "radar": None, "radar_erro": None})
+    c = app.test_client()
+    from conftest import SENHA_TESTE
+    c.post("/entrar", data={"senha": SENHA_TESTE})
+    html = c.get("/t/base/governanca?ver=matriz").get_data(as_text=True)
+    telas_dados._CACHE.update(t=0.0, v=None)
+    assert "Ativo com a Classificação 1 de outra usina" in html
+    i = html.index("Ativo com a Classificação 1 de outra usina")
+    bloco = html[i:i + 4000]
+    assert "Cliente X - Oito - BA" in bloco and "Cliente X - Sete II - BA" in bloco and "CLX-STE200-NBRK1" in bloco
+    assert "usina trocada" in bloco and "nome a conferir" in bloco and "16341" in bloco
+    assert bloco.index("Cliente X - Oito - BA") < bloco.index("Thopen - Altair 1 - SP")     # a troca vem primeiro

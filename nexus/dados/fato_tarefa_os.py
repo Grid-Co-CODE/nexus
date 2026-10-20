@@ -53,6 +53,52 @@ TIPOS_TAREFA = {"preventiva": "preventiva", "corretiva": "corretiva", "corretiva
                 "handover": "handover", "teste": "teste"}
 
 
+# O radar da usina trocada (20/10/2026). O programador do PCM: a OS de "Apolo - Iramaia II - BA" aparecia como Ibipeba no
+# App e no programador. Os ativos ficam na localização de Iramaia II, mas a Classificação 1 deles (a "usina" do robô do
+# PCM, do App e do `Ligador` daqui) dizia Ibipeba: 21 dos 29 ativos de Iramaia II com tarefa, na foto de 15/10. A mesma
+# linha do REST traz os dois (`groups_1_description` e `parent_description`), e o radar compara: os dois nomes ligam a
+# usinas DIFERENTES do Registro mestre pelo de-para = "trocada"; nomes diferentes com um deles sem ligação = "conferir".
+# Mesmo nome com outra grafia ligado à MESMA usina não entra. Medido na foto de 15/10: 10 pares, 217 ativos.
+RADAR_ATIVOS_MAX, RADAR_OS_MAX = 30, 10
+
+
+def _usina_da_localizacao(caminho) -> str:
+    """ "// Cliente/ Cliente - Usina - UF/ Cabine 1/ " -> "Cliente - Usina - UF": o 2º trecho (o 1º é o cliente). Vazio se
+    o caminho não chega à usina (o ativo da própria usina, ou só o cliente)."""
+    segs = [s.strip() for s in _txt(caminho).split("/") if s.strip()]
+    return segs[1] if len(segs) >= 2 else ""
+
+
+def _eh_teste(*nomes) -> bool:
+    return any("teste" in _sem_acento(n).lower() for n in nomes)
+
+
+def radar_usina_trocada(rows, lig) -> list[dict]:
+    """Os pares (Classificação 1, usina da localização) que não batem, com os ativos, quantas tarefas e as OS: a
+    "trocada" primeiro, depois a que tem mais ativos. Não liga nada nem muda a usina do fato: só mostra, para quem
+    administra o Fracttal corrigir na origem (o Nexus não escreve no Fracttal)."""
+    from ..campo.ligacao_cadastro import _norm as norm_fracttal
+    pares: dict = {}
+    for w in rows or ():
+        site, loc = _txt(w.get("groups_1_description")), _usina_da_localizacao(w.get("parent_description"))
+        if not site or not loc or norm_fracttal(site) == norm_fracttal(loc) or _eh_teste(site, loc):
+            continue
+        u_site, u_loc = lig.usina_do_fracttal(site), lig.usina_do_fracttal(loc)
+        if u_site and u_loc and u_site == u_loc:
+            continue                                   # a mesma usina, com outra grafia no Fracttal
+        p = pares.setdefault((site, loc), {"certeza": "trocada" if (u_site and u_loc) else "conferir",
+                                           "ativos": set(), "tarefas": set(), "os": set()})
+        if _txt(w.get("code")):
+            p["ativos"].add(_txt(w.get("code")))
+        p["tarefas"].add(_id(w.get("id_work_orders_tasks") or w.get("id_task")))
+        if _id(w.get("wo_folio")):
+            p["os"].add(_id(w.get("wo_folio")))
+    out = [{"classificacao_1": s, "localizacao": l, "certeza": p["certeza"],
+            "ativos": sorted(p["ativos"])[:RADAR_ATIVOS_MAX], "n_ativos": len(p["ativos"]),
+            "n_tarefas": len(p["tarefas"]), "os": sorted(p["os"])[:RADAR_OS_MAX]} for (s, l), p in pares.items()]
+    return sorted(out, key=lambda x: (x["certeza"] != "trocada", -x["n_ativos"], x["classificacao_1"]))
+
+
 def _sem_acento(v) -> str:
     return " ".join(unicodedata.normalize("NFKD", _txt(v)).encode("ascii", "ignore").decode().split())
 
@@ -104,7 +150,8 @@ def linhas(rows, lig, equip_idx, backoffice_hmac, chave_hmac) -> tuple[list[list
     i_u, i_e, i_b = (CAB_TAREFA_OS.index(c) for c in ("usina_id", "equipamento_id", "do_backoffice"))
     rel = {"lidas": lidas, "repetidas": repetidas, "sem_chave": sem_chave, "fora_do_dominio": dict(fora),
            "sem_usina": sum(1 for r in out if not r[i_u]), "sem_equipamento": sum(1 for r in out if not r[i_e]),
-           "backoffice": sum(r[i_b] for r in out) if chave_hmac else None}
+           "backoffice": sum(r[i_b] for r in out) if chave_hmac else None,
+           "usina_trocada": radar_usina_trocada([por_tarefa[t] for t in sorted(por_tarefa)], lig)}
     return out, rel
 
 
@@ -122,6 +169,11 @@ def linha_qualidade(linhas: list[list], rel: dict, origem_em: str, agora: str) -
     como = Counter(l[i["usina_ligada_por"]] for l in linhas)
     extra = {k: rel.get(k) for k in ("lidas", "repetidas", "sem_chave", "fora_do_dominio", "backoffice", "paginas",
                                      "faltaram")}
+    # o radar da usina trocada (20/10/2026): as contagens saem com as outras na tela; a lista, no quadro dela
+    radar = rel.get("usina_trocada") or []
+    extra.update(usina_trocada=radar,
+                 usina_trocada_ativos=sum(r["n_ativos"] for r in radar if r["certeza"] == "trocada"),
+                 usina_a_conferir_ativos=sum(r["n_ativos"] for r in radar if r["certeza"] == "conferir"))
     valores = {"fato": "tarefa_os", "livro_origem": "Fracttal (API REST) · work_orders", "linhas": n,
                "com_data": com["data_id_programada"], "com_usina": com["usina_id"],
                "com_equipamento": com["equipamento_id"], "pct_data": _pct(com["data_id_programada"], n),

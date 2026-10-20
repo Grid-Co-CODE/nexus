@@ -62,6 +62,25 @@ qualidade, da carga de hora em hora.</p>
   {% set ex = extra(l.get('extra')) %}{% if ex %}
   <p class="dd-extra">{% for k, x in ex.items() %}<span><b>{{ k | replace('_', ' ') }}</b> {{ x }}</span>{% endfor %}</p>
   {% endif %}
+  {# o radar da usina trocada (20/10/2026; a OS de Iramaia II que aparecia como Ibipeba no App e no programador) #}
+  {% set trocadas = extra_lista(l.get('extra'), 'usina_trocada') %}{% if trocadas %}
+  <div class="dd-trocada">
+    <h3>Ativo com a Classificação 1 de outra usina</h3>
+    <p class="dd-mudo">A Classificação 1 do ativo é a usina que o robô do PCM, o App e esta ligação usam; a localização diz
+      onde ele fica. Corrija no cadastro do Fracttal (o Nexus não escreve lá). <b>Usina trocada</b>: os dois nomes ligam a
+      usinas diferentes do Registro mestre. <b>Nome a conferir</b>: um dos nomes não está no de-para do Fracttal.
+      Só os ativos com tarefa aberta.</p>
+    <div class="dd-rolagem"><table class="dd-tab">
+      <thead><tr><th>Situação</th><th>Classificação 1 (Fracttal)</th><th>Usina da localização</th><th>Ativos</th><th>Tarefas abertas</th><th>OS</th></tr></thead>
+      <tbody>{% for r in trocadas %}
+      <tr><td class="{{ 'dd-ruim' if r.certeza == 'trocada' else 'dd-conferir' }}">{{ 'usina trocada' if r.certeza == 'trocada' else 'nome a conferir' }}</td>
+        <td>{{ r.classificacao_1 }}</td><td>{{ r.localizacao }}</td>
+        <td><b>{{ r.n_ativos }}</b> <span class="dd-codigos">{{ (r.ativos or [])|join(', ') }}{% if (r.n_ativos or 0) > (r.ativos or [])|length %}…{% endif %}</span></td>
+        <td>{{ r.n_tarefas }}</td><td class="dd-codigos">{{ (r.os or [])|join(', ') }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
 </section>
 {% endfor %}
 

@@ -98,6 +98,17 @@ def _extra(v) -> dict:
     return {k: x for k, x in d.items() if isinstance(x, (int, float, str)) and not isinstance(x, bool)}
 
 
+def _extra_lista(v, chave: str) -> list[dict]:
+    """Uma lista de registros guardada no `extra` da qualidade (o radar da usina trocada das tarefas das OS, 20/10/2026);
+    o que não for registro fica fora."""
+    try:
+        d = json.loads(v or "{}")
+    except (TypeError, ValueError):
+        return []
+    lst = d.get(chave) if isinstance(d, dict) else None
+    return [x for x in lst if isinstance(x, dict)] if isinstance(lst, list) else []
+
+
 # ── o organograma (08/10/2026) ────────────────────────────────────────────────────────────────────────────────────
 # a primeira é o padrão (Levi, 09/10/2026: "Deixe organograma como padrão, Matriz em segundo")
 VISOES = ("organograma", "matriz")
@@ -359,7 +370,8 @@ def registrar_governanca(bp):
                                lig_ver=ver,
                                resumo=catalogo.resumo(), q=v["qualidade"], atualizacao=v["atualizacao"],
                                hist_q=v["historico"], eq_q=v["equipamento"], erro=v["erro"], hora=_hora, pct=_pct,
-                               num=_num, extra=_extra, ver=ver, org=org, degraus=DEGRAUS, estado_org=ESTADO_ORG,
+                               num=_num, extra=_extra, extra_lista=_extra_lista, ver=ver, org=org, degraus=DEGRAUS,
+                               estado_org=ESTADO_ORG,
                                url_matriz=url_for(f"{bp.name}.governanca", ver="matriz"),
                                url_organograma=url_for(f"{bp.name}.governanca"),
                                url_tabela=url_for(f"{bp.name}.governanca_tabela"), radar=v.get("radar"),

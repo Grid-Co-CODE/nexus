@@ -209,6 +209,20 @@ leitura pula as linhas dela numa borda de página): fica no `faltaram` da qualid
 (`recusou`): sem a `NEXUS_PESSOA_HMAC` ou a lista do backoffice (o `do_backoffice` iria 0 para todas), com a usina ou o
 de-para do cadastro vazios, ou com menos de 90% das tarefas ligadas a uma usina. Grava também a `qualidade` do livro
 (`linha_qualidade`), que a Governança lê.
+**O radar da usina trocada (20/10/2026):** o programador do PCM viu a OS de "Apolo - Iramaia II - BA" como Ibipeba no
+App e no programador. Os ativos ficam na localização de Iramaia II, mas a Classificação 1 deles (a usina do robô do PCM,
+do App e do `Ligador` daqui, que liga primeiro por ela) dizia Ibipeba: 21 dos 29 ativos de Iramaia II com tarefa, na foto
+de 15/10. A mesma linha do REST traz os dois (`groups_1_description` e `parent_description`, cujo 2º trecho é a usina):
+`fato_tarefa_os.radar_usina_trocada` liga cada nome ao Registro mestre pelo de-para (`Ligador.usina_do_fracttal`) e
+separa "trocada" (usinas diferentes) de "conferir" (nomes diferentes, um sem de-para). A grafia diferente da mesma usina
+não entra, e o que tem "teste" também não. Ele não muda a usina do fato: só mostra. Vai no `extra` da qualidade: as
+contagens `usina_trocada_ativos` e `usina_a_conferir_ativos`, e a lista `usina_trocada` (até 30 ativos e 10 OS por par).
+A Governança mostra o quadro "Ativo com a Classificação 1 de outra usina", para quem administra o Fracttal corrigir na
+origem: o Nexus não escreve no Fracttal. O robô do PCM relê o cadastro dos ativos a cada rodada na nuvem (o cache não
+fica entre as execuções), então a correção chega ao App em até ~30 min. Na foto de 15/10 havia 10 pares e 217 ativos;
+duas eram trocas de verdade (Ibipeba × Iramaia 2, Tucano 1 × Tucano 2), e as outras, grafias da mesma usina. Prova:
+`tests/test_dados_tarefa_os.py::test_radar_da_classificacao_1_de_outra_usina` e
+`tests/test_dados_camada.py::test_governanca_mostra_a_classificacao_1_de_outra_usina`.
 **1º ensaio (18/10/2026, ~02:50, só GET, `ferramentas/ensaio_tarefas_os.py`):** 89 páginas em 118 s (status 1: 29;
 status 2: 59; zeladoria finalizada: 1); 8.737 tarefas, nenhuma repetida, nenhuma fora do domínio; usina ligada 98,6%
 (de-para 8.367, código 251), equipamento e data programada 100%; 65 do backoffice. Os tipos no REST: Preventiva 4.180,

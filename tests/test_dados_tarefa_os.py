@@ -21,13 +21,15 @@ CHAVE = "chave-hmac-de-teste"
 
 def _w(tarefa, folio, st, estado="NO_STARTED", tipo="Corretiva", prog="2026-10-01T10:00:00+00:00",
        criada="2026-09-20T12:00:00+00:00", fim=None, site="Thopen - Altair 1 - SP", code="THPN-ALT100-INVR1",
-       desc="Troca de fusível", dur=5400, resp="Fulana Responsável", pessoa="Ciclano Técnico"):
+       desc="Troca de fusível", dur=5400, resp="Fulana Responsável", pessoa="Ciclano Técnico",
+       loc="// Thopen/ Thopen - Altair 1 - SP/ Cabine 1/ "):
     """Uma linha do REST `work_orders`, com todos os campos que o fato lê e os que ele NÃO pode levar (pessoa, texto)."""
     return {"id_work_orders_tasks": tarefa, "wo_folio": str(folio), "id_work_order": 50000 + folio,
             "id_status_work_order": str(st), "task_status": estado, "tasks_log_task_type_main": tipo,
             "date_maintenance": prog, "creation_date": criada, "final_date": fim, "wo_final_date": fim,
             "code": code, "groups_1_description": site, "description": desc, "tasks_duration": dur,
-            "user_assigned": resp, "personnel_description": pessoa, "task_note": "observação do técnico"}
+            "user_assigned": resp, "personnel_description": pessoa, "task_note": "observação do técnico",
+            "parent_description": loc}
 
 
 def _lig():
@@ -124,3 +126,46 @@ def test_conferir_grao_pega_chave_repetida_ou_vazia():
     vazia[0] = None
     with pytest.raises(GraoDuplicado):
         F.conferir_grao([vazia])
+
+
+
+# ── o radar da usina trocada (20/10/2026) ────────────────────────────────────────────────────────────────────
+# O programador do PCM: a OS de "Apolo - Iramaia II - BA" aparecia como Ibipeba no App e no programador. Os ativos ficam
+# na localização de Iramaia II, mas a Classificação 1 deles (a "usina" do robô do PCM, do App e do Ligador daqui) diz
+# Ibipeba. A mesma linha do REST traz os dois: o radar compara, ligando cada nome ao Registro mestre pelo de-para.
+USINAS_RADAR = USINAS + [{"usina_id": 7, "nome": "Usina Sete", "codigo": None},
+                         {"usina_id": 8, "nome": "Usina Oito", "codigo": None}]
+DE_PARA_RADAR = DE_PARA + [{"usina_id": 7, "sistema": "Fracttal · Classificação 1", "chave_externa": "Cliente X - Sete 2 - BA"},
+                           {"usina_id": 7, "sistema": "Fracttal · Classificação 1", "chave_externa": "Cliente X - Sete II - BA"},
+                           {"usina_id": 8, "sistema": "Fracttal · Classificação 1", "chave_externa": "Cliente X - Oito - BA"}]
+LOC_SETE = "// Cliente X/ Cliente X - Sete II - BA/ Cabine 1/ "
+
+
+def test_radar_da_classificacao_1_de_outra_usina():
+    lig = D.Ligador(USINAS_RADAR, DE_PARA_RADAR, [], {})
+    rows = [_w(1, 16341, 1, site="Cliente X - Oito - BA", code="CLX-STE200-NBRK1", loc=LOC_SETE),
+            _w(2, 16341, 1, site="Cliente X - Oito - BA", code="CLX-STE200-INFC1-SDRN1",
+               loc="// Cliente X/ Cliente X - Sete II - BA/ Infraestrutura Civil/ "),
+            _w(3, 16403, 1, site="Cliente X - Oito - BA", code="CLX-STE200-NBRK1", loc=LOC_SETE),   # o mesmo ativo
+            # a mesma usina com outro nome (os dois ligam ao 7): não é troca
+            _w(4, 16341, 1, site="Cliente X - Sete 2 - BA", code="CLX-STE200-SSEG1", loc=LOC_SETE),
+            # o hífen sem espaço é o mesmo nome (o `_norm` das Ligações)
+            _w(5, 16400, 1, code="THPN-ALT100-INVR2", loc="// Thopen/ Thopen - Altair 1- SP/ Cabine/ "),
+            # um dos nomes não liga: a conferir, não "trocada"
+            _w(6, 16401, 1, code="THPN-ALT100-INVR3", loc="// Thopen/ Thopen - Altair 1 - MT/ Cabine/ "),
+            _w(7, 16402, 1, site="Usina Teste", code="TESTE100-INFC1", loc="// Teste/ teste1/ "),     # teste fica fora
+            _w(8, 16404, 1, code="THPN-ALT100-INVR4", loc="// Thopen/ "),     # só o cliente: não tem usina para comparar
+            _w(9, 16405, 2, site="", code="THPN-ALT100-INVR5", loc=LOC_SETE)]        # sem Classificação 1: sem usina, já conta
+    _, rel = F.linhas(rows, lig, DIM, set(), CHAVE)
+    assert rel["usina_trocada"] == [
+        {"classificacao_1": "Cliente X - Oito - BA", "localizacao": "Cliente X - Sete II - BA", "certeza": "trocada",
+         "ativos": ["CLX-STE200-INFC1-SDRN1", "CLX-STE200-NBRK1"], "n_ativos": 2, "n_tarefas": 3, "os": [16341, 16403]},
+        {"classificacao_1": "Thopen - Altair 1 - SP", "localizacao": "Thopen - Altair 1 - MT", "certeza": "conferir",
+         "ativos": ["THPN-ALT100-INVR3"], "n_ativos": 1, "n_tarefas": 1, "os": [16401]}]
+    # na qualidade: as contagens (que a tela mostra como as outras) e a lista, no `extra`
+    import json
+    out, rel = F.linhas(rows, lig, DIM, set(), CHAVE)
+    q = dict(zip(D.CAB_QUALIDADE, F.linha_qualidade(out, rel, "2026-10-20T12:00:00", "2026-10-20T12:00:00")))
+    ex = json.loads(q["extra"])
+    assert ex["usina_trocada_ativos"] == 2 and ex["usina_a_conferir_ativos"] == 1
+    assert ex["usina_trocada"] == rel["usina_trocada"]

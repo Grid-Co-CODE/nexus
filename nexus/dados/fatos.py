@@ -150,10 +150,14 @@ class Ligador:
         self.equipes = {n: next(iter(ids)) for n, ids in eq.items() if len(ids) == 1}
         self.pessoas = dict(pessoa_por_codigo or {})
 
-    def usina(self, texto, codigo_ativo) -> tuple[int | None, str | None]:
+    def usina_do_fracttal(self, texto) -> int | None:
+        """A usina do Registro mestre de um nome do Fracttal, só pelo de-para (sem o código do ativo)."""
         t = _txt(texto)
         nome = t.split(" · ", 1)[1] if " · " in t else t
-        uid = self.por_fracttal.get(norm_fracttal(nome)) if nome else None
+        return self.por_fracttal.get(norm_fracttal(nome)) if nome else None
+
+    def usina(self, texto, codigo_ativo) -> tuple[int | None, str | None]:
+        uid = self.usina_do_fracttal(texto)
         if uid:
             return uid, "de-para do Fracttal"
         cod = codigo_do_equipamento(codigo_ativo)
