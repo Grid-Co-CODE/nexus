@@ -56,10 +56,14 @@ def criar_app(segredo: str | None = None, testing: bool = False) -> Flask:
     )
     app.json.ensure_ascii = False
     if testing:
-        # cada app de teste começa sem as listas do Histórico de outro teste (elas são do processo, divididas entre
-        # quem vê a mesma lista: `historico_store`, 19/10/2026)
-        from . import historico_store
+        # cada app de teste começa sem as listas do Histórico e sem os catálogos de outro teste: são do processo, um
+        # para todos (`historico_store` e os ("cat", ...)/("solic_cat", ...) do `rotas._MEMO`, 19/10/2026). No servidor o
+        # app é um só por processo; nos testes, o pessoal de mentira de um teste aparecia no seguinte (o oem acusou)
+        from . import historico_store, rotas as _rotas
         historico_store.limpar()
+        with _rotas._MEMO_LOCK:
+            for k in [k for k in _rotas._MEMO if isinstance(k, tuple) and k and k[0] in ("cat", "solic_cat")]:
+                _rotas._MEMO.pop(k, None)
     app.jinja_env.filters["iniciais"] = lancador.iniciais
     app.jinja_env.globals.update(icone=lancador.icone, abas=lancador.ABAS, abas_secoes=lancador.ABAS_SECOES,
                                  icone_secao=lancador.ICONE_SECAO)

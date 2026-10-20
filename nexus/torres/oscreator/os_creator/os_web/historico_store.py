@@ -15,7 +15,8 @@ Aqui:
 - sem lista guardada, ou com o ↻ (`forcar`), a busca inteira é feita NA HORA, uma por vez por lista: quem chega no meio
   espera a mesma (até `ESPERA_S`); o ↻ dentro de `REFRESCO_MIN_S` da última inteira só busca as novas;
 - quem decide a CHAVE é quem chama (a rota): a lista de "Todos" pode ser uma só para quem vê o mesmo universo no
-  Fracttal (`mesma_visao`); a de cada pessoa ("criadas por mim", "atribuídas a mim") segue por pessoa;
+  Fracttal (`mesma_visao`, que também serve o quadro do Acompanhamento de chamados); a de cada pessoa ("criadas por
+  mim", "atribuídas a mim") segue por pessoa;
 - a lista guarda o HTML das linhas por versão (`html_das_linhas`): as 2.000 linhas são montadas uma vez por versão, e
   não a cada pedido.
 Erro do Fracttal não apaga a lista guardada: a tela segue com ela, com a hora dela.
@@ -36,7 +37,7 @@ TOLERANCIA = 0.01          # a mesma visão: o total que o Fracttal dá à pesso
 
 _LISTAS: dict = {}         # chave -> Lista
 _EM_CURSO: dict = {}       # chave -> {"pronto": Event, "lista": Lista | None, "erro": Exception | None}
-_CONFERIDOS: dict = {}     # (pessoa, chave) -> (quando, mesma visão?)
+_CONFERIDOS: dict = {}     # (pessoa, chave) -> (quando, o total que o Fracttal dá a ela)
 _TRAVA = threading.Lock()
 _VERSOES = itertools.count(1)
 
@@ -175,30 +176,46 @@ def _novas(chave, buscar_novas):
     return _uma_vez(chave, fazer)
 
 
-def mesma_visao(pessoa, chave, total_da_pessoa) -> bool:
+def mesma_visao(pessoa, chave, total_da_pessoa, guardado=None) -> bool:
     """A pessoa vê no Fracttal o mesmo universo da lista guardada em `chave`? `total_da_pessoa()` é o total que o
     Fracttal dá a ela com os mesmos filtros (1 pedido, na sessão dela). Sem lista guardada: sim (a dela vira a de todos).
-    O resultado vale CONFERE_S por pessoa e lista; o Fracttal fora conta como "não" (ela fica com a dela)."""
-    g = _LISTAS.get(chave)
-    if g is None:
-        return True
-    guardado = int(g.info.get("total") or 0)
+    `guardado`: o total da lista dividida quando ela não mora aqui (o quadro do Acompanhamento de chamados, no
+    `rotas._MEMO`).
+
+    O que vale CONFERE_S por pessoa e lista é o total DELA, e não o veredito: a comparação é com o total guardado de
+    AGORA, a cada visita. A lista dividida pode ter sido lida de novo, por outra pessoa, nesse meio-tempo (o quadro do
+    Acompanhamento sai da memória a cada ticket gravado, e a 1ª visita depois disso faz a cópia nova, 19/10/2026): com o
+    veredito guardado, quem tem a visão restrita veria por até 30 min a cópia de quem vê tudo. O Fracttal fora conta
+    como "não" (ela fica com a dela)."""
+    if guardado is None:
+        g = _LISTAS.get(chave)
+        if g is None:
+            return True
+        guardado = g.info.get("total")
+    guardado = int(guardado or 0)
     agora = _relogio()
     k = (pessoa, chave)
     c = _CONFERIDOS.get(k)
     if c and agora - c[0] < CONFERE_S:
-        return c[1]
-    try:
-        dela = int(total_da_pessoa())
-    except Exception:           # noqa: BLE001 — sem conferir, ela fica com a lista dela
-        return False
-    ok = abs(dela - guardado) <= max(2, TOLERANCIA * max(dela, guardado))
+        dela = c[1]
+    else:
+        try:
+            dela = int(total_da_pessoa())
+        except Exception:       # noqa: BLE001 — sem conferir, ela fica com a lista dela
+            return False
+        with _TRAVA:
+            _CONFERIDOS[k] = (agora, dela)
+            if len(_CONFERIDOS) > 2000:
+                for kk in sorted(_CONFERIDOS, key=lambda x: _CONFERIDOS[x][0])[:len(_CONFERIDOS) - 2000]:
+                    _CONFERIDOS.pop(kk, None)
+    return abs(dela - guardado) <= max(2, TOLERANCIA * max(dela, guardado))
+
+
+def anotar_total(pessoa, chave, total) -> None:
+    """O total que o Fracttal acabou de dar à pessoa numa leitura inteira, com os mesmos filtros da conferência: vale
+    como a conferência dela (`mesma_visao`), sem o pedido a mais."""
     with _TRAVA:
-        _CONFERIDOS[k] = (agora, ok)
-        if len(_CONFERIDOS) > 2000:
-            for kk in sorted(_CONFERIDOS, key=lambda x: _CONFERIDOS[x][0])[:len(_CONFERIDOS) - 2000]:
-                _CONFERIDOS.pop(kk, None)
-    return ok
+        _CONFERIDOS[(pessoa, chave)] = (_relogio(), int(total or 0))
 
 
 def html_das_linhas(lista, chave_html, montar) -> str:

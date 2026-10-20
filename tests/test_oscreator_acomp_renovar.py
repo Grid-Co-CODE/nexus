@@ -4,7 +4,8 @@ segundo plano e deixe todos prontos"). Antes, passados os 3 min da cópia, a tel
 abriu.
 
 Fracttal FALSO: nenhum pedido vai à rede, cada leitura é contada, e a releitura por trás fica parada numa fila até o
-teste mandar rodar. Nomes e números de mentira: o repositório é público."""
+teste mandar rodar. Ele dá a todos o mesmo total de OS com a etiqueta: o quadro é a cópia dividida ("TODOS", 19/10/2026,
+ver `test_oscreator_acomp_dividido_19_10.py`). Nomes e números de mentira: o repositório é público."""
 import sys
 import threading
 
@@ -70,6 +71,8 @@ def fracttal(monkeypatch):
     def listar(**k):
         lido["listas"] += 1
         lido["jwt"].append(api._read_jwt())          # com a sessão de quem? (a da pessoa, mesmo fora da requisição)
+        if isinstance(k.get("info"), dict):
+            k["info"]["total"] = 2                     # o total do período, como o `list_minhas_os` preenche
         return [_linha(1, 9103), _linha(2, 9104)]
 
     def tickets(ids):
@@ -77,6 +80,7 @@ def fracttal(monkeypatch):
         return {i: "TK-%d" % i for i in ids}
     monkeypatch.setattr(api, "list_chamados", listar)
     monkeypatch.setattr(api, "tickets_os3_em_massa", tickets)
+    monkeypatch.setattr(api, "total_chamados", lambda de=None: 2)    # a mesma visão (a conferência do `_dono`)
     return lido
 
 
@@ -95,7 +99,7 @@ def _rodar_fora_da_requisicao(job):
 
 
 def _tem_quadro_na_memoria() -> bool:
-    return any(k in rotas._MEMO for k in (("acomp", PESSOA[1]), ("acomp_linhas", PESSOA[1])))
+    return any(isinstance(k, tuple) and k and k[0] in ("acomp", "acomp_linhas") for k in rotas._MEMO)
 
 
 def test_quadro_vencido_abre_na_hora_e_rele_por_tras(fracttal, fila):
@@ -138,7 +142,7 @@ def test_quadro_novo_nao_rele(fracttal, fila):
     assert fracttal["listas"] == 1 and not fila
 
 
-def test_uma_releitura_por_pessoa(fracttal, fila):
+def test_uma_releitura_por_copia(fracttal, fila):
     cli = _cliente()
     cli.get(URL)
     _envelhecer(rotas_acomp.TTL_QUADRO + 5)

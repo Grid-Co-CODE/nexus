@@ -216,3 +216,18 @@ def test_list_minhas_os_reaproveita_as_tarefas_das_fechadas(monkeypatch):
     out = {d["id"]: d for d in api.list_minhas_os(id_account="TODOS", meta_ja=ja)}
     assert pedidos == [[3, 2]]                     # a fechada que seguiu fechada não vai; a reaberta (2) e a nova vão
     assert out[1]["tipo_tarefa"] == "Antiga" and out[2]["tipo_tarefa"] == "Nova"
+
+
+def test_o_circulo_de_carga_nao_muda_o_total_no_meio(monkeypatch):
+    """O círculo do Histórico (Levi, 27/09) conta os pedidos ao Fracttal: o total sai depois da 1ª página e não muda no
+    meio da carga, e o último aviso fecha em 100% (o oem cobra o mesmo). Os lotes das tarefas que não vão ao Fracttal
+    (as fechadas já sabidas, ou menos OS do que o total do servidor) contam como feitos logo depois das páginas."""
+    monkeypatch.setattr(api, "_current_user_ids", lambda: (10, 77))
+    monkeypatch.setattr(api, "_rpc_call", lambda metodo, params: {"total": 450, "data": [{"id": params.get("start", 0) + 1}]}
+                        if metodo == api.RPC_WO_LIST else {"data": []})
+    monkeypatch.setattr(api, "_shape_wo_row", lambda w: {"id": w["id"], "data": "2026-09-11T12:00:00"})
+    vistos = []
+    api.list_minhas_os(progresso=lambda f, t: vistos.append((f, t)))
+    # 3 páginas (200 + 200 + 50) + 4 lotes estimados (450 / 130) = 7; chegaram 3 OS: 1 lote só, os outros 3 contam já
+    assert vistos[0] == (1, 7) and vistos[-1] == (7, 7) and all(t == 7 for _, t in vistos)
+    assert [f for f, _ in vistos] == sorted(f for f, _ in vistos)

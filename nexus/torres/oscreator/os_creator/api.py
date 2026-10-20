@@ -1104,8 +1104,79 @@ _WO_TASK_DEFAULTS = {
 }
 
 
+# As leituras de UMA OS que o card e a contagem de anexos fazem uma logo depois da outra (19/10/2026, superplano do
+# OS Creator; Levi: "resolva!"): o card lê as tarefas e as subtarefas da OS, e a contagem de anexos, ~1 s depois, lia
+# as mesmas de novo (2 pedidos a mais por card aberto). Ficam TTL_LEITURA_OS na memória, por OS; qualquer gravação
+# (o que não é leitura) tira as da OS dela, ou todas quando não diz a OS.
+TTL_LEITURA_OS = 20
+_LEITURAS_OS: dict = {}
+_LEITURAS_TRAVA = threading.Lock()
+
+
+def _eh_leitura(method) -> bool:
+    m = str(method or "").split(".", 1)[-1]
+    return "_list" in m or "get" in m or "details" in m or m.startswith("load_")    # load_: companies.load_account_info
+
+
+def _chave_os(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return v
+
+
+def _esquecer_leituras(params=None) -> None:
+    wid = params.get("id_work_order") if isinstance(params, dict) else None
+    with _LEITURAS_TRAVA:
+        if wid is None:
+            _LEITURAS_OS.clear()
+        else:
+            for k in [k for k in _LEITURAS_OS if k[1] == _chave_os(wid)]:
+                _LEITURAS_OS.pop(k, None)
+
+
+def esquecer_os(wid=None) -> None:
+    """Tira da memória as leituras desta OS (ou de todas): quem grava por fora do `_rpc_call` chama."""
+    _esquecer_leituras({"id_work_order": wid} if wid is not None else None)
+
+
+_LEITURAS_DONO = [None]
+
+
+def _leitura_da_os(metodo, wid, params, usar_guardada: bool = True) -> list:
+    """A lista (`data`) de uma leitura de UMA OS, entregue em cópia. O card (`usar_guardada=False`) lê sempre na hora e
+    guarda; a contagem de anexos, que vem logo depois, usa a guardada por até TTL_LEITURA_OS. Erro sobe e não fica.
+    Trocou o `_rpc_call` (os testes trocam por um Fracttal de mentira), a memória começa vazia."""
+    k, agora = (metodo, _chave_os(wid)), time.time()
+    with _LEITURAS_TRAVA:
+        if _LEITURAS_DONO[0] is not _rpc_call:
+            _LEITURAS_OS.clear()
+            _LEITURAS_DONO[0] = _rpc_call
+        v = _LEITURAS_OS.get(k)
+    if not usar_guardada or v is None or agora - v[0] >= TTL_LEITURA_OS:
+        r = _rpc_call(metodo, params)
+        d = r.get("data") if isinstance(r, dict) else r
+        v = (agora, d if isinstance(d, list) else [])
+        with _LEITURAS_TRAVA:
+            _LEITURAS_OS[k] = v
+            if len(_LEITURAS_OS) > 200:
+                for kk in sorted(_LEITURAS_OS, key=lambda x: _LEITURAS_OS[x][0])[:len(_LEITURAS_OS) - 200]:
+                    _LEITURAS_OS.pop(kk, None)
+    return [dict(x) if isinstance(x, dict) else x for x in v[1]]
+
+
 def _rpc_call(method: str, params: dict, timeout: int = 45):
-    """Chamada genérica ao rpc/proxy. Devolve o 'result' (ou levanta FracttalError)."""
+    """Chamada genérica ao rpc/proxy. Devolve o 'result' (ou levanta FracttalError). Gravação (o que não é leitura)
+    tira da memória as leituras da OS dela (`_leitura_da_os`)."""
+    if not _eh_leitura(method):
+        try:
+            return _rpc_chamar(method, params, timeout)
+        finally:
+            _esquecer_leituras(params)
+    return _rpc_chamar(method, params, timeout)
+
+
+def _rpc_chamar(method: str, params: dict, timeout: int = 45):
     body = [{"id": str(uuid.uuid4()), "jsonrpc": "2.0", "method": method, "params": params}]
     try:
         r = requests.post(RPC_PROXY_URL, headers=_rpc_headers(), json=body, timeout=timeout)
@@ -1626,7 +1697,11 @@ def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
         if m and d.get("status_id") in STATUS_FECHADOS and m.get("status_id") == d.get("status_id"):
             sabido[d["id"]] = m
     ids = [i for i in ids if i not in sabido]
-    passo.total = max(1, 1 + len(starts) + -(-len(ids) // 130))
+    # os lotes das tarefas que não vão ao Fracttal (as fechadas já sabidas, ou menos OS do que o total do servidor
+    # dizia) contam como feitos já: o total do círculo, dito depois da 1ª página, não muda no meio da carga, e o círculo
+    # anda em vez de esperar o fim (19/10/2026; o teste do oem cobra o total fixo e o fechamento em 100%)
+    for _ in range(max(0, n_meta - -(-len(ids) // 130))):
+        passo()
     meta = _meta_tarefa_por_os(ids, passo=passo) if progresso is not None else _meta_tarefa_por_os(ids)
     meta.update(sabido)
     passo.fim()
@@ -2053,8 +2128,10 @@ def get_os_detalhes(id_work_order) -> dict:
         r = _rpc_call(metodo, params)
         d = r.get("data") if isinstance(r, dict) else r
         return d if isinstance(d, list) else []
-    lev1 = _juntos({"tasks": (_lista, RPC_WO_TASKS, {"id_work_order": id_work_order, "sort": []}),
-                    "items": (_lista, RPC_WO_FORMIT, {"id_work_order": id_work_order}),
+    # o card lê na hora (e guarda, para a contagem de anexos que vem logo depois usar a mesma leitura)
+    lev1 = _juntos({"tasks": (_leitura_da_os, RPC_WO_TASKS, id_work_order, {"id_work_order": id_work_order, "sort": []},
+                              False),
+                    "items": (_leitura_da_os, RPC_WO_FORMIT, id_work_order, {"id_work_order": id_work_order}, False),
                     "det": (_cabecalho_os, id_work_order)})
     tasks, items = lev1["tasks"], lev1["items"]
     t0 = tasks[0] if tasks else {}
@@ -2252,14 +2329,25 @@ def parse_bloco_chamado(texto) -> dict:
     return out
 
 
-def list_chamados(de=None, ate=None, status_ids=None) -> list:
+def list_chamados(de=None, ate=None, status_ids=None, info: dict = None) -> list:
     """OSs com a etiqueta CHAMADOS no período [de, ate] (de TODOS os criadores), mais recentes
-    primeiro. [] se a etiqueta 'CHAMADOS' não existir no Fracttal."""
+    primeiro. [] se a etiqueta 'CHAMADOS' não existir no Fracttal (e o `info` fica sem o total). `info`
+    recebe o total do período (o do `list_minhas_os`)."""
     lid = _label_id("CHAMADOS")
     if not lid:
         return []
     return list_minhas_os(modo="criadas", id_account="TODOS", id_label=lid,
-                          de=de, ate=ate, status_ids=status_ids)
+                          de=de, ate=ate, status_ids=status_ids, info=info)
+
+
+def total_chamados(de=None) -> int:
+    """Quantas OS com a etiqueta CHAMADOS o Fracttal dá a quem está logado desde `de` (a etiqueta e 1 página de 1
+    linha): a conferência de que a pessoa vê o mesmo quadro que a cópia dividida do Acompanhamento de chamados
+    (19/10/2026). 0 sem a etiqueta."""
+    lid = _label_id("CHAMADOS")
+    if not lid:
+        return 0
+    return int((list_minhas_os_pagina("criadas", "TODOS", lid, de, None, None, "", 1, 1) or {}).get("total") or 0)
 
 
 def list_performance(de=None, ate=None) -> list:
@@ -2641,7 +2729,13 @@ RPC_WO_FILES = "tasks.work_orders_tasks_files_list"
 
 def _ids_tarefas_da_os(id_work_order) -> list:
     """id_work_order_task de todas as tarefas da OS. Colhe da lista de tarefas E do endpoint de imagens
-    (esse traz o id_work_order_task certo dos anexos), pra não errar o id."""
+    (esse traz o id_work_order_task certo dos anexos), pra não errar o id.
+
+    Na lista de tarefas (`tasks.work_orders_tasks_new_list`) o id da tarefa DESTA OS é o `id`; o `id_task` é o MODELO
+    da tarefa (conferido ao vivo, ver `id_tarefa_da_os`: 20878948 era o modelo e o Fracttal recusou; o certo era
+    55875684). Até 19/10/2026 a lista caía no `id_task` (ela não traz `id_work_order_task`): a tarefa sem foto não tinha
+    os anexos lidos, e o número do modelo podia cair na tarefa antiga de outra OS. As tarefas vêm da mesma leitura que o
+    card acabou de fazer (`_leitura_da_os`)."""
     tids = []
 
     def _add(v):
@@ -2656,15 +2750,20 @@ def _ids_tarefas_da_os(id_work_order) -> list:
         d = r.get("data") if isinstance(r, dict) else r
         return d if isinstance(d, list) else []
     # as duas listas ao mesmo tempo (08/10/2026): uma não depende da outra; a ordem dos ids é a de antes
-    lidas = _juntos({"tarefas": (_ler, RPC_WO_TASKS, {"id_work_order": id_work_order, "sort": []}),
+    def _tarefas():
+        try:
+            return _leitura_da_os(RPC_WO_TASKS, id_work_order, {"id_work_order": id_work_order, "sort": []})
+        except Exception:
+            return []
+    lidas = _juntos({"tarefas": (_tarefas,),
                      "imagens": (_ler, RPC_WO_IMAGES, {"id_work_order": id_work_order,
                                                        "sort": [{"property": "order_number", "direction": "asc"}]})})
     for t in lidas["tarefas"]:
         if isinstance(t, dict):
-            _add(t.get("id_work_order_task") or t.get("id_task") or t.get("id"))
+            _add(t.get("id_work_order_task") or t.get("id"))
     for d in lidas["imagens"]:
         if isinstance(d, dict):
-            _add(d.get("id_work_order_task") or d.get("id_task"))
+            _add(d.get("id_work_order_task"))
     return tids
 
 
@@ -2777,10 +2876,9 @@ def get_os_subtarefa_anexos(id_work_order) -> list:
     Dentro de `enxuta("url")` não resolve a URL pré-assinada de cada arquivo: só para CONTAR (ver `get_os_anexos`)."""
     com_url = not _cortado("url")
     try:
-        rf = _rpc_call(RPC_WO_FORMIT, {"id_work_order": id_work_order})
+        items = _leitura_da_os(RPC_WO_FORMIT, id_work_order, {"id_work_order": id_work_order})
     except FracttalError:
         return []
-    items = rf.get("data") if isinstance(rf, dict) else rf
     alvos = []
     for it in (items if isinstance(items, list) else []):
         if not isinstance(it, dict):
@@ -3757,6 +3855,7 @@ def attach_imagem_os(id_work_order, id_work_order_task, data_bytes: bytes, filen
                         "id_work_orders_tasks_files": None, "id_work_orders_tasks_form_items": None, "id_request": None,
                         "link_attachment": False, "value": nome_s3, "description": "", "type": 1, "typeRender": "",
                         "link": "", "can_edit": True}]}]
+    esquecer_os(id_work_order)                    # o anexo novo muda o que a contagem do card leria
     r2 = requests.post(RPC_PROXY_URL, headers=_rpc_headers(), json=reg, timeout=45)
     if r2.status_code >= 400:
         raise FracttalError(f"files_insert HTTP {r2.status_code}: {(r2.text or '')[:200]}")

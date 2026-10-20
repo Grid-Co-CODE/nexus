@@ -18,7 +18,7 @@ import threading
 import time
 
 import requests
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, has_request_context, jsonify, redirect, render_template, request, session, url_for
 
 import api
 import chamado_spec as cs
@@ -26,35 +26,66 @@ import chamados_obs_store as obs_store
 import gridco_abas as ga
 
 from . import acomp_web as aw
+from . import historico_store as HS
 from . import rotas, sessao
 from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_acomp", __name__, url_prefix="/os")
 
-TTL_QUADRO = 180          # s: a lista do Fracttal por pessoa — trocar de tela e voltar não busca de novo
+TTL_QUADRO = 180          # s: a cópia do quadro (ver `_dono`) — trocar de tela e voltar não busca de novo
 DIAS_BUSCA = 365          # a primeira OS de acompanhamento é de ago/2026; um ano cobre as abertas com folga
-TTL_TICKET_FIM = 1800     # s: o ticket de OS CONCLUÍDA, por pessoa (ver `_tickets`)
+TTL_TICKET_FIM = 1800     # s: o ticket de OS CONCLUÍDA (ver `_tickets`)
 # Passados os 3 min, o quadro abre NA HORA com a leitura anterior e relê o Fracttal por trás, com a sessão da pessoa
 # (Levi, 09/10/2026: "teria como utilizarmos essas requisições de forma mais inteligente?"): até então, quadro vencido
 # era a tela esperando o Fracttal na frente de quem abriu. Mais velha que VELHA_MAX, espera a leitura como antes: um
 # quadro de horas atrás, mesmo com a hora na tela, já engana (chamado que ganhou ticket direto no Fracttal, por exemplo).
 VELHA_MAX = 2 * 3600      # s
 
-# O que cada leitura guarda, POR PESSOA (a lista vem com a sessão dela no Fracttal; uma pessoa nunca vê a cópia de
-# outra). Levi, 08/10/2026: "O carregamento de Acompanhamento de chamados e a tela que abre quando clica na OS está
-# demorando um pouco para carregar". Com o Fracttal falso a 300 ms por pedido (65 tickets lidos, 8 de cada vez):
-# - ("acomp_linhas", pessoa): as OS de acompanhamento (lista + tarefas), SEM os tickets. É o que a tela de um chamado
-#   precisa; antes, abrir um chamado com o quadro vencido relia os 65 tickets só para achar a linha;
-# - ("acomp", pessoa): o quadro inteiro, as linhas acima + o ticket de cada uma;
-# - ("acomp_tk", pessoa): o ticket das OS CONCLUÍDAS, {id: (quando, ticket)}. Concluída não volta e o Fracttal não
-#   aceita mais editar (ver `api.editar_nota_os`: ERROR_WO_FINISHED_BY_OTHER_USER), então o ticket dela não muda: vale
-#   30 min. O "Atualizar" relê a lista, as abertas e as em verificação.
+# O que cada leitura guarda, por DONO da cópia (`_dono`). Até 19/10/2026 o dono era sempre a pessoa ("uma pessoa
+# nunca vê a cópia de outra": a lista vem com a sessão dela no Fracttal), e cada pessoa com o quadro aberto relia a
+# lista e os tickets a cada 3 min, para o mesmo quadro. Desde então (Levi, 19/10/2026: "quebre essa regra"), quem vê no
+# Fracttal o MESMO total de OS com a etiqueta CHAMADOS divide a cópia "TODOS": a pessoa confere o total na sessão dela
+# (`api.total_chamados`, 2 pedidos pequenos a cada 30 min, `historico_store.mesma_visao`; quem acabou de ler a lista já
+# tem o total dela), e quem vê outro total (visão restrita no Fracttal), ou não conseguiu conferir, segue com a cópia
+# dela, como antes.
+# Levi, 08/10/2026: "O carregamento de Acompanhamento de chamados e a tela que abre quando clica na OS está demorando
+# um pouco para carregar". Com o Fracttal falso a 300 ms por pedido (65 tickets lidos, 8 de cada vez):
+# - ("acomp_linhas", dono): as OS de acompanhamento (lista + tarefas) e o total do Fracttal, SEM os tickets. É o que a
+#   tela de um chamado precisa; antes, abrir um chamado com o quadro vencido relia os 65 tickets só para achar a linha;
+# - ("acomp", dono): o quadro inteiro, as linhas acima + o ticket de cada uma;
+# - ("acomp_tk", "TODOS"): o ticket das OS CONCLUÍDAS, {id: (quando, ticket)}, um só para todos (o ticket é da OS, e
+#   cada pessoa só pede o das OS da lista que ela vê). Concluída não volta e o Fracttal não aceita mais editar (ver
+#   `api.editar_nota_os`: ERROR_WO_FINISHED_BY_OTHER_USER), então o ticket dela não muda: vale 30 min. O "Atualizar"
+#   relê a lista, as abertas e as em verificação.
 # Tudo na memória do rotas (`rotas._MEMO`, com o teto dela): quem limpa a memória limpa tudo.
 
 
 def _quem() -> tuple:
     c = session.get("conta") or {}
     return (str(c.get("nome") or "").strip(), str(c.get("email") or "").strip())
+
+
+def _dono(pessoa=None) -> str:
+    """De quem é a cópia do quadro que esta pessoa vê (ver o topo): "TODOS" quando o Fracttal dá a ela o mesmo total
+    de OS com a etiqueta CHAMADOS da cópia dividida; senão, ela mesma.
+    - sem cópia dividida, ou abandonada (mais velha que VELHA_MAX: quem a usa relê a cada 3 min): "TODOS", e a leitura
+      desta pessoa vira a de todos;
+    - quem leu a lista (`_linhas`) já tem o total dela anotado: não confere de novo.
+    Sem a etiqueta CHAMADOS no Fracttal o total é 0, para todos (a etiqueta é da empresa), e o quadro vazio é um só."""
+    pessoa = pessoa or rotas._quem()
+    idade, v = _guardado_com_idade(("acomp_linhas", "TODOS"))
+    if not isinstance(v, dict) or idade >= VELHA_MAX:
+        return "TODOS"
+    de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
+    ok = HS.mesma_visao(pessoa, ("acomp", "TODOS"), lambda: api.total_chamados(de), guardado=v.get("total") or 0)
+    return "TODOS" if ok else pessoa
+
+
+def _quem_le() -> str:
+    """Quem está lendo o Fracttal: a pessoa da requisição ou, na releitura por trás, a do contexto da sessão."""
+    if has_request_context():
+        return rotas._quem()
+    return sessao.email_atual() or sessao.email_do_jwt(sessao.jwt_atual()) or "?"
 
 
 def _guardado(chave, ttl: float = None):
@@ -81,26 +112,31 @@ def _conferir_sessao():
 
 
 def _linhas(forcar: bool = False, pessoa=None) -> dict:
-    """{"linhas", "quando"}: as OS de acompanhamento do Fracttal, sem os tickets, na memória por TTL_QUADRO. `pessoa`
-    vem de quem chama fora da requisição (a releitura por trás, `_renovar_por_tras`); dentro dela, sai da sessão."""
+    """{"linhas", "quando", "total"}: as OS de acompanhamento do Fracttal, sem os tickets, na memória por TTL_QUADRO, e
+    o total de OS com a etiqueta que o Fracttal deu (o que o `_dono` confere; 0 sem a etiqueta). O total fica anotado
+    como a conferência de quem leu (`historico_store.anotar_total`): é a mesma conta do `api.total_chamados`. `pessoa`
+    é o dono da cópia: vem de quem chama; sem ele, o de quem está na requisição (`_dono`)."""
     def _buscar():
         hoje = aw.agora_brt()
         de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
-        linhas = [l for l in (api.list_chamados(de=de) or []) if aw.eh_os3(l)]
+        inf = {}
+        linhas = [l for l in (api.list_chamados(de=de, info=inf) or []) if aw.eh_os3(l)]
         _conferir_sessao()
-        return {"linhas": linhas, "quando": hoje.strftime("%d/%m/%Y %H:%M")}
-    return rotas._memo(("acomp_linhas", pessoa or rotas._quem()), TTL_QUADRO, _buscar, forcar)
+        total = int(inf.get("total") or 0)
+        HS.anotar_total(_quem_le(), ("acomp", "TODOS"), total)
+        return {"linhas": linhas, "quando": hoje.strftime("%d/%m/%Y %H:%M"), "total": total}
+    return rotas._memo(("acomp_linhas", pessoa or _dono()), TTL_QUADRO, _buscar, forcar)
 
 
-def _tickets(linhas, hoje, pessoa) -> dict:
-    """{id: ticket} das OS que o quadro mostra (`aw.precisa_ticket`). O das concluídas sai de ("acomp_tk", pessoa)
-    quando lido há menos de 30 min; o resto vai ao Fracttal (8 de cada vez, `api.tickets_os3_em_massa`). None = não
-    li: não é guardado."""
+def _tickets(linhas, hoje) -> dict:
+    """{id: ticket} das OS que o quadro mostra (`aw.precisa_ticket`). O das concluídas sai de ("acomp_tk", "TODOS")
+    quando lido há menos de 30 min (o ticket é da OS: o mesmo para todos, e cada um só pede o das OS da lista que vê);
+    o resto vai ao Fracttal (8 de cada vez, `api.tickets_os3_em_massa`). None = não li: não é guardado."""
     ids = [l.get("id") for l in linhas if aw.precisa_ticket(l, hoje)]
     if not ids:
         return {}
     fechadas = {l.get("id") for l in linhas if l.get("status_id") == 3}
-    chave, agora = ("acomp_tk", pessoa), time.monotonic()
+    chave, agora = ("acomp_tk", "TODOS"), time.monotonic()
     with rotas._MEMO_LOCK:
         v = rotas._MEMO.get(chave)
         meus = v[1] if v and isinstance(v[1], dict) else {}
@@ -118,16 +154,15 @@ def _tickets(linhas, hoje, pessoa) -> dict:
 
 
 def _dados(forcar: bool = False, pessoa=None) -> dict:
-    """A lista das OS de acompanhamento + o ticket de cada uma, na memória por TTL_QUADRO (por pessoa: a lista vem
-    com a sessão dela no Fracttal). A lista é a de `_linhas`: se a tela de um chamado acabou de lê-la, o quadro só
-    busca os tickets."""
-    pessoa = pessoa or rotas._quem()
+    """A lista das OS de acompanhamento + o ticket de cada uma, na memória por TTL_QUADRO, na cópia do dono (`_dono`).
+    A lista é a de `_linhas`: se a tela de um chamado acabou de lê-la, o quadro só busca os tickets."""
+    pessoa = pessoa or _dono()
 
     def _buscar():
         _sessao_viva()
         hoje = aw.agora_brt()
         lv = _linhas(forcar, pessoa)
-        tickets = _tickets(lv["linhas"], hoje, pessoa)
+        tickets = _tickets(lv["linhas"], hoje)
         _conferir_sessao()
         return {"linhas": lv["linhas"], "tickets": tickets, "quando": lv["quando"]}
     return rotas._memo(("acomp", pessoa), TTL_QUADRO, _buscar, forcar)
@@ -149,7 +184,7 @@ def _esquecer(wid=None):
 
 
 # ── a releitura por trás (Levi, 09/10/2026) ─────────────────────────────────────────────────────────────────────────
-_RENOVANDO: set = set()            # pessoas com a releitura do quadro em andamento: uma por pessoa
+_RENOVANDO: set = set()            # donos (`_dono`) com a releitura da cópia em andamento: uma por cópia
 _RENOV_TRAVA = threading.Lock()
 _ESQUECIDO = {"em": 0.0}           # quando uma gravação (`_esquecer`) tirou o quadro da memória pela última vez
 
@@ -186,12 +221,13 @@ def _esquecer_pessoa(pessoa):
 
 
 def _renovar_por_tras(pessoa) -> None:
-    """Relê o quadro desta pessoa fora da requisição, com a sessão DELA no Fracttal: o JWT e o e-mail vão junto, porque a
-    thread nasce sem o contexto da requisição e o `api` cairia no arquivo de token do app de mesa (ver
-    `api._ExecutorComContexto`). São os mesmos pedidos que a tela faria na frente da pessoa, só que fora do caminho dela:
-    nenhum a mais na cota do Fracttal.
+    """Relê a cópia do quadro deste dono (`_dono`: "TODOS" ou a pessoa) fora da requisição, com a sessão de quem abriu
+    no Fracttal: o JWT e o e-mail vão junto, porque a thread nasce sem o contexto da requisição e o `api` cairia no
+    arquivo de token do app de mesa (ver `api._ExecutorComContexto`). São os mesmos pedidos que a tela faria na frente
+    da pessoa, só que fora do caminho dela: nenhum a mais na cota do Fracttal.
     - erro do Fracttal (429, rede): fica a leitura anterior, e a próxima visita vencida tenta de novo;
-    - sessão caída: a cópia sai da memória, e a próxima visita lê na frente e volta ao login, como sempre;
+    - sessão caída: a cópia sai da memória, e a próxima visita lê na frente (a de quem caiu volta ao login, como
+      sempre);
     - gravação no meio (ticket, finalizar): a leitura começou antes dela e mostraria o quadro de antes, então sai."""
     with _RENOV_TRAVA:
         if pessoa in _RENOVANDO:
@@ -226,9 +262,9 @@ def _ultimas(forcar: bool = False) -> tuple:
         return {}, {}, "Não consegui ler as observações no banco da Gridco (%s)." % str(e)[:120]
 
 
-def _ler_quadro(forcar: bool = False) -> tuple:
+def _ler_quadro(forcar: bool = False, dono=None) -> tuple:
     try:
-        return _dados(forcar), None
+        return _dados(forcar, dono), None
     except api.FracttalError as e:
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
@@ -239,18 +275,20 @@ def _ler_quadro(forcar: bool = False) -> tuple:
 @exige_sessao
 def quadro():
     forcar = request.args.get("atualizar") == "1"
-    pessoa = rotas._quem()
-    idade, guardado = (None, None) if forcar else _guardado_com_idade(("acomp", pessoa))
-    # vencido (3 min) e não velho demais (VELHA_MAX): abre com a leitura anterior e relê por trás. O Atualizar lê na hora
-    por_tras = guardado is not None and TTL_QUADRO <= idade < VELHA_MAX
-    # as observações (banco da Gridco) vêm ao mesmo tempo que o Fracttal, e não depois dele (08/10/2026)
+    # as observações (banco da Gridco) vêm ao mesmo tempo que o Fracttal, e não depois dele (08/10/2026), e a conferência
+    # de quem é a cópia (`_dono`) também
     with api._ExecutorComContexto(max_workers=1) as ex:
         f_obs = ex.submit(_ultimas, forcar)
+        dono = _dono()
+        idade, guardado = (None, None) if forcar else _guardado_com_idade(("acomp", dono))
+        # vencido (3 min) e não velho demais (VELHA_MAX): abre com a leitura anterior e relê por trás. O Atualizar lê
+        # na hora
+        por_tras = guardado is not None and TTL_QUADRO <= idade < VELHA_MAX
         if por_tras:
             d, erro = guardado, None
-            _renovar_por_tras(pessoa)
+            _renovar_por_tras(dono)
         else:
-            d, erro = _ler_quadro(forcar)
+            d, erro = _ler_quadro(forcar, dono)
         ultimas, fins, erro_obs = f_obs.result()
     q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins)
     return render_template("acomp.html", conta=_conta(), aba="criar", q=q, quando=d.get("quando") or "", erro=erro,
@@ -293,25 +331,26 @@ def _obs_do_os(folio) -> tuple:
         return [], "Não consegui ler as observações no banco da Gridco (%s)." % str(e)[:120]
 
 
-def _lista_da_tela(pessoa) -> dict:
-    """As linhas para a tela de um chamado: o quadro inteiro, se ainda vale; senão só as linhas (`_linhas`, sem os
-    tickets). A tela só usa a linha desta OS e os "outros chamados" (nº, marca, ativo, chegada), e nada disso vem do
-    ticket: reler os tickets de todas as OS só para abrir uma era o que levava 5,6 s com o quadro vencido."""
-    cheio = _guardado(("acomp", pessoa), TTL_QUADRO)
+def _lista_da_tela(dono) -> dict:
+    """As linhas para a tela de um chamado, da cópia do `dono`: o quadro inteiro, se ainda vale; senão só as linhas
+    (`_linhas`, sem os tickets). A tela só usa a linha desta OS e os "outros chamados" (nº, marca, ativo, chegada), e
+    nada disso vem do ticket: reler os tickets de todas as OS só para abrir uma era o que levava 5,6 s com o quadro
+    vencido."""
+    cheio = _guardado(("acomp", dono), TTL_QUADRO)
     if cheio is not None:
         return cheio
     try:
-        return _linhas()
+        return _linhas(pessoa=dono)
     except api.FracttalError as e:
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
         return {"linhas": [], "quando": ""}
 
 
-def _wid_ja_lido(folio, pessoa):
-    """O id da OS deste nº numa leitura anterior DESTA pessoa, mesmo vencida (o id de um nº não muda). Com ele, o
-    detalhe da OS vai ao Fracttal junto com a lista, e não depois dela."""
-    for chave in (("acomp", pessoa), ("acomp_linhas", pessoa)):
+def _wid_ja_lido(folio, dono):
+    """O id da OS deste nº numa leitura anterior da cópia que a pessoa vê (a do `dono`), mesmo vencida (o id de um nº
+    não muda). Com ele, o detalhe da OS vai ao Fracttal junto com a lista, e não depois dela."""
+    for chave in (("acomp", dono), ("acomp_linhas", dono)):
         v = _guardado(chave)
         linha = _linha_de(v, folio) if v else None
         if linha and linha.get("id"):
@@ -337,11 +376,12 @@ def detalhe(folio):
     """A tela de um chamado. A lista, o detalhe da OS e as observações vão ao mesmo tempo (Levi, 08/10/2026: "a tela que
     abre quando clica na OS está demorando"); o detalhe vem sem a solicitação e a OS pai, que esta tela não mostra."""
     pessoa = rotas._quem()
-    talvez = _wid_ja_lido(folio, pessoa)
     with api._ExecutorComContexto(max_workers=2) as ex:
         f_obs = ex.submit(_obs_do_os, folio)
+        dono = _dono(pessoa)
+        talvez = _wid_ja_lido(folio, dono)
         f_det = ex.submit(_detalhe_enxuto, talvez, pessoa) if talvez else None
-        d = _lista_da_tela(pessoa)
+        d = _lista_da_tela(dono)
         linha = _linha_de(d, folio)
         wid = (linha or {}).get("id") or talvez or api._wo_id_por_folio(folio)
         if not wid:
@@ -376,10 +416,10 @@ def detalhe(folio):
 @exige_sessao
 def preparar_chamado(folio):
     """O mouse parado sobre o cartão do quadro (Levi, 09/10/2026): o detalhe desta OS começa a ser lido por trás
-    (`rotas.preparar`, enxuto, com o teto de lá). Só com o id que o quadro da própria pessoa já leu: sem ele, nada, e o
-    clique lê como sempre."""
+    (`rotas.preparar`, enxuto, com o teto de lá). Só com o id que a cópia do quadro que a pessoa vê já leu (`_dono`):
+    sem ele, nada, e o clique lê como sempre. O detalhe preparado segue sendo da pessoa (lido com a sessão dela)."""
     pessoa = rotas._quem()
-    wid = _wid_ja_lido(folio, pessoa)
+    wid = _wid_ja_lido(folio, _dono(pessoa))
     return jsonify({"pedido": bool(wid) and rotas.preparar(pessoa, wid, "chamado")}), 202
 
 

@@ -4,8 +4,8 @@ abre quando clica na OS está demorando um pouco para carregar, verificar se dá
 O que mudou e é conferido aqui, com um Fracttal FALSO (cada pedido é contado; nenhum vai à rede):
 - o detalhe da OS (o card do Histórico e a tela de um chamado) faz os mesmos pedidos de antes, em duas levas paralelas;
 - a contagem dos anexos do card não paga a URL pré-assinada de cada arquivo (era um s3_object_get por foto);
-- o Acompanhamento de chamados guarda, POR PESSOA, o ticket das OS concluídas, e a tela de um chamado não relê os
-  tickets de todas as OS para abrir uma;
+- o Acompanhamento de chamados guarda o ticket das OS concluídas (um só para todos desde 19/10/2026: o ticket é da OS),
+  e a tela de um chamado não relê os tickets de todas as OS para abrir uma;
 - leitura feita com a sessão do Fracttal morta não fica na memória.
 A medida (antes e depois, com 300 ms por pedido) e a comparação valor a valor das telas estão no README da torre.
 Nomes e números são de mentira: o repositório é público."""
@@ -150,11 +150,13 @@ def _linha(i, folio, status=1, data_fim=""):
 @pytest.fixture
 def quadro(monkeypatch):
     """O quadro com 2 abertas e 1 concluída (que aparece: fechou há poucos dias). Conta o que vai ao Fracttal."""
-    lido = {"listas": 0, "tickets": [], "detalhes": []}
+    lido = {"listas": 0, "tickets": [], "detalhes": [], "total": 3}
     fechou = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 3 * 86400))
 
     def listar(**k):
         lido["listas"] += 1
+        if isinstance(k.get("info"), dict):
+            k["info"]["total"] = 3                     # o total do período, como o `list_minhas_os` preenche
         return [_linha(1, 9103), _linha(2, 9104), _linha(3, 9105, status=3, data_fim=fechou)]
 
     def tickets(ids):
@@ -167,6 +169,8 @@ def quadro(monkeypatch):
     monkeypatch.setattr(api, "list_chamados", listar)
     monkeypatch.setattr(api, "tickets_os3_em_massa", tickets)
     monkeypatch.setattr(api, "get_os_detalhes", detalhe)
+    # o total que o Fracttal dá a quem confere (o `_dono`): o mesmo da cópia, até o teste dizer outro
+    monkeypatch.setattr(api, "total_chamados", lambda de=None: lido["total"])
     return lido
 
 
@@ -177,9 +181,19 @@ def test_atualizar_o_quadro_nao_rele_o_ticket_da_concluida(quadro):
     h = cli.get("/os/chamados/acompanhamento?atualizar=1").get_data(as_text=True)
     assert quadro["listas"] == 2 and quadro["tickets"][-1] == [1, 2]     # a concluída (3) veio da memória
     assert "TK-3" in h                                                    # e continua no quadro
-    # é POR PESSOA: quem entra com outro login lê tudo de novo (a cópia de um nunca aparece para outro)
+    # outro login com a mesma visão no Fracttal abre a mesma cópia: nada de novo no Fracttal (até 19/10/2026 era por
+    # pessoa, e ele lia tudo de novo; Levi: "quebre essa regra")
+    h = _cliente(OUTRO_JWT, "outra@exemplo.invalid").get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert quadro["listas"] == 2 and len(quadro["tickets"]) == 2 and "TK-3" in h
+
+
+def test_outro_login_com_outra_visao_le_a_lista_dele(quadro):
+    """A visão restrita no Fracttal (outro total de OS com a etiqueta) não abre a cópia dividida: a lista é a dele, como
+    antes. O ticket da concluída vem da memória: é da OS, o mesmo para todos (e ele só pede o das OS da lista dele)."""
+    _cliente().get("/os/chamados/acompanhamento")
+    quadro["total"] = 40
     _cliente(OUTRO_JWT, "outra@exemplo.invalid").get("/os/chamados/acompanhamento")
-    assert quadro["tickets"][-1] == [1, 2, 3]
+    assert quadro["listas"] == 2 and quadro["tickets"] == [[1, 2, 3], [1, 2]]
 
 
 def test_gravar_o_ticket_tira_a_os_da_memoria(quadro):

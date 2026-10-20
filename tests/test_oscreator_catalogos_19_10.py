@@ -32,13 +32,22 @@ def _limpo(monkeypatch):
     monkeypatch.setattr(requests.Session, "request", sem_rede)
     with rotas._MEMO_LOCK:
         rotas._MEMO.clear()
+    _APP.clear()
     yield
     with rotas._MEMO_LOCK:
         rotas._MEMO.clear()
+    _APP.clear()
+
+
+_APP = {}
 
 
 def _cliente(email):
-    c = criar_app(segredo="teste", testing=True).test_client()
+    """Um navegador de cada pessoa no MESMO app, como no servidor (um app de teste novo começa sem os catálogos)."""
+    app = _APP.get("app")
+    if app is None:
+        app = _APP["app"] = criar_app(segredo="teste", testing=True)
+    c = app.test_client()
     with c.session_transaction() as s:
         s["jwt"] = JWT
         s["conta"] = {"nome": "Pessoa Teste", "email": email, "perfil": "ADMINISTRATOR"}

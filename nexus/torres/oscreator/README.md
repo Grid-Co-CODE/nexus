@@ -334,7 +334,8 @@ filtro do histórico".
 
 O pedido do Levi, de 08/10: "O carregamento de: Acompanhamento de chamados e a tela que abre quando clica na OS está
 demorando um pouco para carregar, verificar se dá para melhorar!". A cota do Fracttal é da empresa (200/min, dividida
-com o App de Campo): nada aqui faz pedido a mais, e o que fica guardado é **por pessoa**.
+com o App de Campo): nada aqui faz pedido a mais. O que fica guardado era **por pessoa**; desde 19/10/2026 o quadro do
+Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro do Acompanhamento dividido").
 
 - **O detalhe da OS em duas levas paralelas** (`api.get_os_detalhes`: o card do Histórico, a tela de um chamado e a
   conferência antes de gravar o ticket). Eram até 5 pedidos em fila. Tarefas, subtarefas e cabeçalho vão juntos;
@@ -347,15 +348,17 @@ com o App de Campo): nada aqui faz pedido a mais, e o que fica guardado é **por
 - **A contagem dos anexos do card não paga a URL de cada foto:** era um `s3_object_get` por arquivo só para mostrar o
   número. A conta casa pelo caminho do arquivo, que vem sem a URL: o número é o mesmo. A lista (o clique) continua
   com as URLs. As duas listas (subtarefas e OS) vão ao mesmo tempo, nas duas rotas.
-- **Acompanhamento de chamados** (`rotas_acomp.py`), tudo em `rotas._MEMO`, por pessoa:
-  - `("acomp_linhas", pessoa)`: as OS de acompanhamento sem os tickets, 3 min. A tela de um chamado usa só isto.
+- **Acompanhamento de chamados** (`rotas_acomp.py`), tudo em `rotas._MEMO`, por dono da cópia (`_dono`: "TODOS" para
+  quem vê o mesmo no Fracttal, ou a pessoa; ver "O quadro do Acompanhamento dividido"):
+  - `("acomp_linhas", dono)`: as OS de acompanhamento sem os tickets, 3 min. A tela de um chamado usa só isto.
     Antes, com o quadro vencido, ela relia o ticket de TODAS as OS para abrir uma. O quadro reaproveita estas linhas;
-  - `("acomp_tk", pessoa)`: o ticket das OS **concluídas**, 30 min. Concluída não volta e o Fracttal recusa editar OS
+  - `("acomp_tk", "TODOS")`: o ticket das OS **concluídas**, 30 min, um para todos (é da OS). Concluída não volta e o Fracttal recusa editar OS
     fechada (`api.editar_nota_os`). Então o "Atualizar" relê a lista, as abertas e as em verificação, e não as
     concluídas dos 90 dias. Gravar ticket ou finalizar tira a OS da memória (`_esquecer(wid)`); trocar o responsável
     (no card ou na tela do chamado) também, mas só quando a OS está num quadro guardado (`esquecer_se_no_quadro`);
   - na tela de um chamado, a lista, o detalhe e as observações (banco da Gridco) vão ao mesmo tempo. O id da OS vem
-    de uma leitura anterior da própria pessoa, mesmo vencida (o id de um nº não muda), e o detalhe é conferido pelo nº;
+    de uma leitura anterior da cópia que a pessoa vê, mesmo vencida (o id de um nº não muda), e o detalhe é conferido
+    pelo nº;
   - os cartões dos "outros chamados" são montados uma vez por leitura (eram ~0,2 s de CPU a cada chamado aberto);
   - **leitura feita com a sessão do Fracttal morta não fica na memória** (`_sessao_viva`, `_conferir_sessao`). A
     listagem engole o erro de cada página e devolve vazio, e o quadro vazio ficaria 3 min guardado. Até 08/10 a busca
@@ -364,8 +367,8 @@ com o App de Campo): nada aqui faz pedido a mais, e o que fica guardado é **por
   - **Passados os 3 min, o quadro abre na hora com a leitura anterior e relê por trás** (Levi, 09/10/2026: "teria
     como utilizarmos essas requisições de forma mais inteligente?"; `_renovar_por_tras`). Ao lado da hora da leitura
     aparece "· atualizando"; a nova vale na próxima abertura (ou no Atualizar, que lê na hora). A releitura roda numa
-    thread com o JWT e o e-mail da pessoa (`sessao.contexto`: a thread nasce sem o contexto da requisição), uma por
-    pessoa, com os mesmos pedidos que a tela faria na frente dela: nada a mais na cota. Vale até `VELHA_MAX` (2 h); mais
+    thread com o JWT e o e-mail de quem abriu (`sessao.contexto`: a thread nasce sem o contexto da requisição), uma
+    por cópia, com os mesmos pedidos que a tela faria na frente da pessoa: nada a mais na cota. Vale até `VELHA_MAX` (2 h); mais
     velho, a tela espera, como antes (quadro de horas atrás engana, mesmo com a hora). Erro do Fracttal: fica a leitura
     anterior. Sessão caída: a cópia sai, e a próxima visita volta ao login. Gravação no meio da releitura (ticket,
     finalizar): a cópia dela sai (`_ESQUECIDO`). Medido com o Fracttal falso a 300 ms por pedido (65 chamados): quadro
@@ -983,8 +986,49 @@ O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão f
   sequência (o "Buscar OS", o card pelo nº, a cadeia do chamado, o PDF). Sem achar, a varredura de antes, status por
   status.
 - Prova: `tests/test_oscreator_catalogos_19_10.py`.
-- **Fica para depois (precisa do Fracttal de verdade para conferir):** a contagem de anexos do card relê as tarefas e o
-  formulário que o card acabou de ler; o `_ids_tarefas_da_os` pode estar pegando o id do MODELO da tarefa (`id_task`)
-  em vez do id da tarefa da OS (o mapa de 19/10 aponta; sem conferir com uma OS real, não muda); o quadro do
-  Acompanhamento de chamados segue por pessoa (decisão de 08/10: "uma pessoa nunca vê a cópia de outra"; quem usa
-  são 1 ou 2 pessoas).
+
+## O quadro do Acompanhamento dividido e os anexos do card (19/10/2026)
+
+O que tinha ficado de fora do superplano. Levi, 19/10/2026: "1 - quebre essa regra 2 - resolva!".
+
+- **O quadro do Acompanhamento de chamados é um só para quem vê o mesmo no Fracttal** (`rotas_acomp._dono`). Caiu a
+  regra de 08/10 ("uma pessoa nunca vê a cópia de outra"): cada pessoa com o quadro aberto relia a lista e os tickets a
+  cada 3 min, para o mesmo quadro. A cópia é de "TODOS" para quem o Fracttal dá o mesmo total de OS com a etiqueta
+  CHAMADOS (±1%, ou 2 OS). A conferência é na sessão da pessoa (`api.total_chamados`: a etiqueta e 1 página de 1
+  linha) e vale 30 min; quem acabou de ler a lista já tem o total dela anotado (`historico_store.anotar_total`, a
+  mesma conta). Quem vê outro total (visão restrita) ou não conseguiu conferir segue com a cópia dela, como antes.
+  - O que vale 30 min é o TOTAL da pessoa, e não o veredito (`historico_store.mesma_visao`, que serve também ao
+    Histórico): a comparação é com a cópia de AGORA. A cópia sai da memória a cada ticket gravado, e a próxima pode ser
+    de quem vê outra coisa; com o veredito guardado, a visão restrita veria por até 30 min o quadro de quem vê tudo.
+  - Cópia sem uso há mais de 2 h (`VELHA_MAX`: quem a usa relê a cada 3 min) vira a de quem chega. Sem a etiqueta no
+    Fracttal (é da empresa) o total é 0 para todos, e o quadro vazio é um só.
+  - O ticket das concluídas é um para todos (`("acomp_tk", "TODOS")`): é da OS, e cada um só pede o das OS da lista
+    que vê. A releitura por trás é uma por cópia, com a sessão de quem abriu. O detalhe que o mouse parado prepara
+    segue sendo da pessoa (lido com a sessão dela).
+  - Prova: `tests/test_oscreator_acomp_dividido_19_10.py` (9 cenários, com um Fracttal falso por pessoa) e os testes de
+    antes ajustados (`acomp_renovar`, `card_preparo`, `desempenho`: os dublês da lista dão o total, como a função real).
+- **Os anexos do card pelo id certo da tarefa** (`api._ids_tarefas_da_os`). Na lista de tarefas da OS o id da tarefa
+  DESTA OS é o `id`; o `id_task` é o MODELO da tarefa. O código caía no `id_task` (a lista não traz
+  `id_work_order_task`): a tarefa sem foto ficava sem os arquivos lidos (as com foto vinham pelo endpoint das imagens),
+  e o número do modelo é o de uma tarefa antiga de outra OS, cujos arquivos podiam aparecer na OS errada. Conferido
+  numa OS real de ronda em 19/10/2026 (REST, só leitura): os 31 anexos estão no id da tarefa da OS
+  (`id_work_orders_tasks`), e o `id_task` dela é outro número. A mesma diferença já tinha derrubado o 1º teste ao vivo
+  do cronômetro (`api.id_tarefa_da_os`).
+- **A contagem de anexos não relê o que o card acabou de ler** (`api._leitura_da_os`): as tarefas e as subtarefas da OS
+  ficam 20 s na memória, por OS. O card sempre lê na hora (e guarda); a contagem, ~1 s depois, usa a guardada: 2
+  pedidos a menos por card aberto. Toda gravação pelo `_rpc_call` (o que não é leitura: `_eh_leitura`) tira as leituras
+  da OS dela, ou todas quando não diz a OS; o anexo enviado também (`attach_imagem_os`).
+  - Prova: `tests/test_oscreator_anexos_19_10.py`.
+- As 10 partes das duas frentes foram desfeitas uma a uma, e cada uma derrubou o teste dela.
+- **A suíte do próprio oem, rodada com a cópia nova, achou duas falhas do superplano de 19/10** (a suíte do Nexus não
+  as via), corrigidas aqui:
+  - o círculo de carga do Histórico (`api.list_minhas_os`) recalculava o total depois das páginas (com as fechadas já
+    sabidas há menos lotes de tarefas); o total volta a ser o dito depois da 1ª página, e os lotes que não vão ao
+    Fracttal contam como feitos logo depois das páginas: o círculo anda e fecha em 100%
+    (`test_o_circulo_de_carga_nao_muda_o_total_no_meio`, o mesmo contrato do teste do oem);
+  - os catálogos "um para todos" (`("cat", ...)`, `("solic_cat", ...)`) passavam de um teste para outro (o pessoal de
+    mentira de um aparecia no seguinte): o app de teste (`criar_app(testing=True)`) começa sem eles, como já começava
+    sem as listas do Histórico. No servidor o app é um só por processo.
+  - Ficam 3 falhas na suíte do oem que não são destas mudanças: `test_os_web_home::test_selo_do_card_performance` e
+    duas de `test_os_web_sessao`, que ainda cobram o selo da Performance na página e a volta ao login pela 1ª chamada
+    ao Fracttal da tela inicial; desde 14/10 (`bb91eb0`) a tela inicial abre sem esperar o Fracttal.

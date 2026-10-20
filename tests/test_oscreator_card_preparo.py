@@ -167,6 +167,8 @@ def chamados(monkeypatch):
     lido = {"detalhes": [], "enxuta": []}
 
     def listar(**k):
+        if isinstance(k.get("info"), dict):
+            k["info"]["total"] = 1                     # o total do período, como o `list_minhas_os` preenche
         return [{"id": WID, "folio": "9103", "cliente": "Cliente Teste", "usina": "Usina Teste", "ativo": "Inversor 1.1",
                  "tipo": "Inversor", "tipo_tarefa": "Administrativa", "note": "",
                  "descricao": "[Inversor 1.1] - Acompanhamento de chamado Marca", "status_id": 1,
@@ -180,6 +182,7 @@ def chamados(monkeypatch):
     monkeypatch.setattr(api, "list_chamados", listar)
     monkeypatch.setattr(api, "tickets_os3_em_massa", lambda ids: {i: "TK-%d" % i for i in ids})
     monkeypatch.setattr(api, "get_os_detalhes", detalhe)
+    monkeypatch.setattr(api, "total_chamados", lambda de=None: 1)    # a mesma visão (a conferência do `_dono`)
     return lido
 
 
@@ -196,9 +199,21 @@ def test_o_chamado_pega_a_leitura_enxuta_que_o_mouse_pediu(chamados):
 
 
 def test_sem_o_quadro_lido_o_chamado_nao_prepara(chamados):
-    """Sem o id que o quadro da própria pessoa leu, nada: o clique lê como sempre."""
+    """Sem o id que a cópia do quadro que a pessoa vê já leu, nada: o clique lê como sempre."""
     assert _cliente().get("/os/chamados/acompanhamento/9103/preparar").get_json() == {"pedido": False}
     assert chamados["detalhes"] == []
+
+
+def test_outra_pessoa_com_a_mesma_visao_prepara_pela_copia_dividida(chamados):
+    """O quadro que a 1ª pessoa leu é o da 2ª (a mesma visão no Fracttal, 19/10/2026): o mouse parado dela já tem o id
+    da OS, e o detalhe preparado é DELA (o clique dela pega, uma vez)."""
+    _cliente().get("/os/chamados/acompanhamento")
+    outra = _cliente(email="outra@exemplo.invalid")
+    assert outra.get("/os/chamados/acompanhamento/9103/preparar").get_json() == {"pedido": True}
+    _esperar()
+    assert chamados["detalhes"] == [WID]
+    assert outra.get("/os/chamados/acompanhamento/9103").status_code == 200
+    assert chamados["detalhes"] == [WID]                                  # o clique dela não foi ao Fracttal
 
 
 def test_gravar_o_ticket_joga_fora_a_leitura_de_antes(chamados):
