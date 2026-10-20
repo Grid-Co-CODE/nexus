@@ -184,7 +184,14 @@ s), a plataforma e a API do banco, no mesmo servidor, em 0,2 s: as threads do wa
 OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
 - **Raio-X** (`/t/base/raio-x`, `casca/raio_x.py`; só administrador, sem item no menu): os pedidos em andamento e onde
   cada um espera, as tarefas de fundo, o processador, a carga da máquina, o teto do OS Creator e os travamentos de 24 h.
-  Nexus lento de novo = pedir o print dele na hora.
+  Nexus lento de novo = pedir o print dele na hora. **Desde 20/10/2026 diz também onde a MÁQUINA engasga** (pelo /proc do
+  Linux, só leitura, quando a página abre): na "Carga da máquina", o processador da máquina inteira e o tempo esperando o
+  disco na mesma janela de 1 s; no cartão "Memória da máquina", a memória livre, o swap em uso e se está trocando agora
+  (MB/s), o quanto o Nexus ocupa (e dele no swap) e, com a PSI do kernel, o tempo com algo parado esperando memória ou
+  disco. O caso: Raio-X das 10:08 de 20/10, `GET /os/` há 18 s numa cópia de 17 ms com o Nexus a 13% e carga 2,5 a 3,9:
+  a carga do Linux soma quem espera o disco, e a página não dizia qual era o gargalo. Leitura: "esperando o disco" alto
+  ou swap trocando = a máquina (disco, memória), não o código; Nexus a ~100% = o processo (o GIL). Prova:
+  `tests/test_raio_x_maquina_20_10.py`.
 - **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O
