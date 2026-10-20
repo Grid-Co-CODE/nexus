@@ -358,7 +358,12 @@ Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro
     (no card ou na tela do chamado) também, mas só quando a OS está num quadro guardado (`esquecer_se_no_quadro`);
   - na tela de um chamado, a lista, o detalhe e as observações (banco da Gridco) vão ao mesmo tempo. O id da OS vem
     de uma leitura anterior da cópia que a pessoa vê, mesmo vencida (o id de um nº não muda), e o detalhe é conferido
-    pelo nº;
+    pelo nº. **A lista vencida (até `VELHA_MAX`) serve na hora e se relê por trás**, como no quadro (20/10/2026, Raio-X
+    das 09:56: a tela de um chamado ficou 39 s relendo a lista inteira, com as tarefas de todas as OS, na frente de quem
+    abriu); a situação, o fim e o responsável vêm do detalhe, lido na hora (`_com_o_detalhe`: responsável trocado tira o
+    id da lista, e a equipe é conferida pelo nome). Prova: `tests/test_oscreator_acomp_tela_vencida_20_10.py`;
+  - **a releitura não relê as tarefas das OS que já estavam fechadas** (`_fechadas_ja_lidas` → `api.list_chamados
+    (meta_ja=...)`, a mesma regra do Histórico de 19/10): concluída não volta e o Fracttal não deixa editar;
   - os cartões dos "outros chamados" são montados uma vez por leitura (eram ~0,2 s de CPU a cada chamado aberto);
   - **leitura feita com a sessão do Fracttal morta não fica na memória** (`_sessao_viva`, `_conferir_sessao`). A
     listagem engole o erro de cada página e devolve vazio, e o quadro vazio ficaria 3 min guardado. Até 08/10 a busca
@@ -986,7 +991,9 @@ O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão f
   (`rotas_solic_eng.criar`).
 - **O catálogo de ~22 mil ativos** (`api.load_assets_cached`): lido do disco uma vez por versão do arquivo (antes cada
   uma das 26 chamadas decodificava o JSON inteiro, a prévia do COS a cada 120 ms de digitação), entregue em cópia por
-  registro; e a recarga do Fracttal (~110 pedidos) é uma por vez: quem acha o catálogo vencido junto espera a mesma.
+  registro; e a recarga do Fracttal (~110 pedidos) é uma por vez: quem acha o catálogo vencido junto espera a mesma. O
+  resumo "N ativos, catálogo de quando" (`api.assets_cache_info`, da tela inicial e da de Ativos) usa o mesmo
+  decodificado (`_catalogo_cru`, 20/10/2026: decodificava o arquivo inteiro, 10,5 MB, a cada chamada).
 - **`_code_to_loc` sem catálogo não tenta de novo por 10 min**: é chamado por linha do Histórico, e com a recarga
   falhando eram 2.000 tentativas numa lista.
 - **A OS pelo número num pedido só** (`api.os_por_folio`): sem o status, a lista traz os quatro; eram até 4 pedidos em

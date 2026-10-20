@@ -204,7 +204,11 @@ def test_gravar_o_ticket_tira_a_os_da_memoria(quadro):
     assert quadro["listas"] == 2 and quadro["tickets"][-1] == [1, 2, 3]
 
 
-def test_a_tela_de_um_chamado_com_o_quadro_vencido_nao_rele_os_tickets(quadro):
+def test_a_tela_de_um_chamado_com_o_quadro_vencido_nao_rele_os_tickets(quadro, monkeypatch):
+    """Desde 20/10/2026 nem a lista: a cópia vencida (até VELHA_MAX) serve na hora e a releitura vai por trás
+    (`rotas_acomp._lista_da_tela`; até então a tela relia a lista na frente, 39 s no Raio-X das 09:56)."""
+    por_tras = []
+    monkeypatch.setattr(rotas_acomp, "_em_segundo_plano", por_tras.append)
     cli = _cliente()
     cli.get("/os/chamados/acompanhamento")
     with rotas._MEMO_LOCK:                                                # passaram os 3 min do quadro
@@ -213,7 +217,8 @@ def test_a_tela_de_um_chamado_com_o_quadro_vencido_nao_rele_os_tickets(quadro):
     r = cli.get("/os/chamados/acompanhamento/9104")
     assert r.status_code == 200 and 'data-folio="9104"' in r.get_data(as_text=True)
     assert quadro["tickets"] == [[1, 2, 3]]                               # só os da 1ª visita ao quadro
-    assert quadro["listas"] == 2 and quadro["detalhes"] == [2]            # a lista de novo, e o detalhe uma vez só
+    assert quadro["listas"] == 1 and quadro["detalhes"] == [2]            # a lista não, e o detalhe uma vez só
+    assert len(por_tras) == 1                                             # a lista se relê por trás
 
 
 def test_leitura_com_a_sessao_morta_nao_fica_na_memoria(monkeypatch):

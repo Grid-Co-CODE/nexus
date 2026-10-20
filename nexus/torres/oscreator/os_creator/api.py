@@ -379,8 +379,9 @@ _ASSETS_MEM: dict = {"chave": None, "c": None}
 _ASSETS_RECARGA = threading.Lock()      # uma recarga do Fracttal por vez (~110 pedidos); quem chega espera a dela
 
 
-def _read_asset_cache():
-    """Lê o catálogo de ativos do cache (mesma versão, dentro do TTL). None se ausente/expirado."""
+def _catalogo_cru():
+    """O arquivo do catálogo decodificado UMA vez por versão (mtime e tamanho) e guardado em `_ASSETS_MEM`, sem cópia:
+    quem chama só lê. None se ele não abre."""
     try:
         st = os.stat(ASSETS_CACHE)
         chave = (st.st_mtime_ns, st.st_size)
@@ -391,7 +392,13 @@ def _read_asset_cache():
         c = _ASSETS_MEM["c"]
     except Exception:
         return None
-    if c.get("assets") and c.get("ver") == _CACHE_VER and (time.time() - c.get("ts", 0)) < ASSETS_TTL:
+    return c if isinstance(c, dict) else None
+
+
+def _read_asset_cache():
+    """Lê o catálogo de ativos do cache (mesma versão, dentro do TTL). None se ausente/expirado."""
+    c = _catalogo_cru()
+    if c and c.get("assets") and c.get("ver") == _CACHE_VER and (time.time() - c.get("ts", 0)) < ASSETS_TTL:
         return [dict(a) for a in c["assets"]]
     return None
 
@@ -433,11 +440,13 @@ def _corrigir_itens_usina_estrangeiros(assets: list) -> list:
 def assets_cache_info() -> dict:
     """Quando o catálogo local foi gravado. → {'ts': epoch|0, 'n': ativos, 'idade_h': float,
     'expirado': bool}. Serve para a aba Ativos dizer de QUANDO é a lista que está na tela —
-    sem isso, "18.259 ativos" parece um número de agora mesmo quando é de dez dias atrás."""
-    try:
-        with open(ASSETS_CACHE, encoding="utf-8") as f:
-            c = json.load(f)
-    except Exception:
+    sem isso, "18.259 ativos" parece um número de agora mesmo quando é de dez dias atrás.
+
+    Pelo catálogo já decodificado (`_catalogo_cru`, 20/10/2026): até então decodificava o arquivo inteiro (10,5 MB, ~28
+    MB na memória) a cada chamada só para a data e a conta; a tela inicial chama a cada 5 min, e no Raio-X das 10:08 o
+    `GET /os/` estava há 18 s no catálogo."""
+    c = _catalogo_cru()
+    if c is None:
         return {"ts": 0, "n": 0, "idade_h": 0.0, "expirado": True}
     ts = float(c.get("ts") or 0)
     idade = max(0.0, time.time() - ts)
@@ -2329,15 +2338,15 @@ def parse_bloco_chamado(texto) -> dict:
     return out
 
 
-def list_chamados(de=None, ate=None, status_ids=None, info: dict = None) -> list:
+def list_chamados(de=None, ate=None, status_ids=None, info: dict = None, meta_ja: dict = None) -> list:
     """OSs com a etiqueta CHAMADOS no período [de, ate] (de TODOS os criadores), mais recentes
     primeiro. [] se a etiqueta 'CHAMADOS' não existir no Fracttal (e o `info` fica sem o total). `info`
-    recebe o total do período (o do `list_minhas_os`)."""
+    recebe o total do período (o do `list_minhas_os`); `meta_ja`, o que já se sabia das OS fechadas (ver lá)."""
     lid = _label_id("CHAMADOS")
     if not lid:
         return []
     return list_minhas_os(modo="criadas", id_account="TODOS", id_label=lid,
-                          de=de, ate=ate, status_ids=status_ids, info=info)
+                          de=de, ate=ate, status_ids=status_ids, info=info, meta_ja=meta_ja)
 
 
 def total_chamados(de=None) -> int:

@@ -111,6 +111,21 @@ def test_o_catalogo_e_lido_do_disco_uma_vez_por_versao_e_entregue_em_copia(catal
     assert b[0]["code"] == "TST-INV11" and lidos == [1]
 
 
+def test_o_resumo_do_catalogo_nao_decodifica_o_arquivo_de_novo(catalogo, monkeypatch):
+    """A tela inicial e a de Ativos dizem quantos ativos e de quando é o catálogo (`assets_cache_info`): até 20/10/2026
+    ele decodificava o arquivo inteiro (10,5 MB) a cada chamada; agora usa o mesmo decodificado do `_read_asset_cache`."""
+    catalogo([{"id": i, "code": "TST-%d" % i} for i in range(3)], ts=time.time() - 3600)
+    lidos = []
+    original = json.load
+    monkeypatch.setattr(api.json, "load", lambda f: lidos.append(1) or original(f))
+    info = api.assets_cache_info()
+    assert info["n"] == 3 and not info["expirado"] and 0.9 < info["idade_h"] < 1.1
+    api.assets_cache_info()
+    assert len(api._read_asset_cache()) == 3 and lidos == [1]            # uma decodificação para os três
+    catalogo([{"id": 9, "code": "TST-9"}])                               # o arquivo mudou: lido de novo
+    assert api.assets_cache_info()["n"] == 1 and lidos == [1, 1]
+
+
 def test_uma_recarga_do_fracttal_por_vez(catalogo, monkeypatch):
     catalogo([{"id": 1, "code": "VELHO"}], ts=time.time() - api.ASSETS_TTL - 10)     # vencido
     recargas = []

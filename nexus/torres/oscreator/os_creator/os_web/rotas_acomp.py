@@ -120,12 +120,27 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         hoje = aw.agora_brt()
         de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
         inf = {}
-        linhas = [l for l in (api.list_chamados(de=de, info=inf) or []) if aw.eh_os3(l)]
+        linhas = [l for l in (api.list_chamados(de=de, info=inf, meta_ja=_fechadas_ja_lidas(pessoa or _dono())) or [])
+                  if aw.eh_os3(l)]
         _conferir_sessao()
         total = int(inf.get("total") or 0)
         HS.anotar_total(_quem_le(), ("acomp", "TODOS"), total)
         return {"linhas": linhas, "quando": hoje.strftime("%d/%m/%Y %H:%M"), "total": total}
     return rotas._memo(("acomp_linhas", pessoa or _dono()), TTL_QUADRO, _buscar, forcar)
+
+
+_META = ("status_id", "tipo_tarefa", "event_date", "data_fim", "note", "inicio", "gatilho")
+
+
+def _fechadas_ja_lidas(dono) -> dict:
+    """{id: o que a leitura anterior trouxe} das OS FECHADAS da cópia deste dono, mesmo vencida: a releitura não relê as
+    tarefas delas (`api.list_minhas_os(meta_ja=...)`, 20/10/2026). Concluída não volta e o Fracttal não aceita mais
+    editar (a nota e o ticket não mudam); se ela voltou a outro status, a lista diz e as tarefas são relidas."""
+    _idade, v = _guardado_com_idade(("acomp_linhas", dono))
+    if not isinstance(v, dict):
+        return {}
+    return {l["id"]: {k: l.get(k) for k in _META} for l in v.get("linhas") or []
+            if isinstance(l, dict) and l.get("id") is not None and l.get("status_id") in api.STATUS_FECHADOS}
 
 
 def _tickets(linhas, hoje) -> dict:
@@ -335,16 +350,44 @@ def _lista_da_tela(dono) -> dict:
     """As linhas para a tela de um chamado, da cópia do `dono`: o quadro inteiro, se ainda vale; senão só as linhas
     (`_linhas`, sem os tickets). A tela só usa a linha desta OS e os "outros chamados" (nº, marca, ativo, chegada), e
     nada disso vem do ticket: reler os tickets de todas as OS só para abrir uma era o que levava 5,6 s com o quadro
-    vencido."""
+    vencido.
+
+    Vencida (3 min) e não velha demais (VELHA_MAX), a cópia serve NA HORA e se relê por trás, como no quadro (20/10/2026,
+    Raio-X das 09:56: a tela de um chamado ficou 39 s relendo a lista, com as tarefas de todas as OS). O que muda na OS
+    (a situação, o fim, o responsável) vem do detalhe, lido na hora (`_com_o_detalhe`)."""
     cheio = _guardado(("acomp", dono), TTL_QUADRO)
     if cheio is not None:
         return cheio
+    linhas = _guardado(("acomp_linhas", dono), TTL_QUADRO)
+    if linhas is not None:
+        return linhas
+    for chave in (("acomp", dono), ("acomp_linhas", dono)):
+        idade, v = _guardado_com_idade(chave)
+        if isinstance(v, dict) and idade < VELHA_MAX:
+            _renovar_por_tras(dono)
+            return v
     try:
         return _linhas(pessoa=dono)
     except api.FracttalError as e:
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
         return {"linhas": [], "quando": ""}
+
+
+def _com_o_detalhe(linha: dict, det: dict) -> dict:
+    """A linha da lista (que pode ser da cópia de até VELHA_MAX, `_lista_da_tela`) com o que o detalhe da OS, lido agora,
+    diz: a situação, o fim e o responsável. Responsável trocado: o id da lista sai, e a equipe é conferida pelo nome
+    (`acomp_web.da_equipe`)."""
+    out = dict(linha)
+    if det.get("status_id"):
+        out["status_id"] = det["status_id"]
+        out["status"] = api.WO_STATUS.get(det["status_id"], out.get("status") or "")
+    if det.get("data_fim"):
+        out["data_fim"] = det["data_fim"]
+    resp = " ".join(str(det.get("responsavel") or "").split())
+    if resp and resp != " ".join(str(out.get("atribuido_a") or "").split()):
+        out["atribuido_a"], out["id_atribuido"] = resp, None
+    return out
 
 
 def _wid_ja_lido(folio, dono):
@@ -401,6 +444,8 @@ def detalhe(folio):
     if linha is None:                                  # fora da lista (mais velha que DIAS_BUSCA): o mínimo do detalhe
         linha = {"id": wid, "folio": folio, "note": nota, "descricao": det.get("descricao"), "ativo": det.get("ativo"),
                  "status_id": 3 if det.get("data_fim") else 1, "atribuido_a": det.get("responsavel")}
+    else:
+        linha = _com_o_detalhe(linha, det)
     hoje = aw.agora_brt()
     fim_tela = max((o["quando"] for o in obs if o["tipo"] == "finalizado"), default="")
     c = aw.cartao(dict(linha, note=nota), ticket, (obs[-1]["quando"] if obs else ""), hoje, fim_tela)
