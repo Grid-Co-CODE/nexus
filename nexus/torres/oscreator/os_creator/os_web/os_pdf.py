@@ -21,9 +21,15 @@ do card e `api.get_os_recursos`) e desenha com o reportlab, nesta ordem:
 `modelo()` é o conteúdo, sem desenhar (os testes conferem nele); `gerar()` desenha. O reportlab e o Pillow só são
 importados aqui, na hora: o OS Creator de mesa nunca passa por este arquivo. Fonte Helvetica (cobre o português); o que
 ela não tem (emoji, símbolos) sai sem o caractere, em vez de um quadrado.
+
+A foto entra no PDF como o `reduzir` a deixou, sem ser decodificada de novo (`_JpegPronto`, 20/10/2026). Raio-X das
+09:56: um PDF ~2 min no servidor, em `gerar`. Com a foto em `Image(BytesIO)`, o reportlab decodificava cada uma em RGB
+só para dar nome a ela, e guardava o RGB até o fim: 2,25 MB por foto de 1000 px. No PC, com 200 fotos, o `gerar` ia de
+3,2 a 4,0 s e +1 GB de memória para 0,3 s e +20 a 27 MB; o PDF é o mesmo (as fotos dentro dele, os mesmos bytes).
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import unicodedata
 from xml.sax.saxutils import escape
@@ -161,6 +167,22 @@ def reduzir(dados: bytes, px: int = FOTO_PX, qualidade: int = FOTO_QUALIDADE):
         return None
 
 
+class _JpegPronto:
+    """O JPEG do `reduzir` como o reportlab o embute sem decodificar: o `PDFImageXObject` copia para o PDF, como veio
+    (DCTDecode), o que tem `jpeg_fh` (o caminho do JPEG lido de arquivo); o canvas dá à imagem o nome `str()` dela, aqui
+    o hash do JPEG, e a mesma foto duas vezes vai uma vez só ao PDF (como quando ele comparava o RGB)."""
+
+    def __init__(self, dados: bytes):
+        self.dados = dados
+        self.nome = "jpeg-" + hashlib.sha1(dados).hexdigest()
+
+    def jpeg_fh(self):
+        return io.BytesIO(self.dados)
+
+    def __str__(self):
+        return self.nome
+
+
 # ── o desenho ──────────────────────────────────────────────────────────────────────────────────────────────────────
 def _seguro(v) -> str:
     """Só o que a Helvetica tem (cp1252): o acento que vem decomposto fica; emoji e símbolo saem."""
@@ -190,8 +212,21 @@ def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str |
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
-    from reportlab.platypus import CondPageBreak, Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import CondPageBreak, Flowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     rl_config.useA85 = 0                             # imagens em binário: o ASCII85 aumenta o arquivo em 25%
+
+    class Foto(Flowable):
+        """A foto do tamanho dado, desenhada como o `Image` do reportlab a desenhava, mas pelo `_JpegPronto`."""
+
+        def __init__(self, jpeg: bytes, largura, altura):
+            super().__init__()
+            self.jpeg, self.largura, self.altura = _JpegPronto(jpeg), largura, altura
+
+        def wrap(self, *_):
+            return self.largura, self.altura
+
+        def draw(self):
+            self.canv.drawImage(self.jpeg, 0, 0, self.largura, self.altura, mask="auto")
 
     navy, verde = colors.HexColor("#090d18"), colors.HexColor("#b5d334")
     linha, fundo, mudo, tinta = (colors.HexColor("#d8dce4"), colors.HexColor("#f3f5f8"), colors.HexColor("#5b6475"),
@@ -363,7 +398,7 @@ def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str |
             if pronta:
                 jpeg, (w, h) = pronta
                 k = min(lado_w / w, lado_h / h)
-                img = Image(io.BytesIO(jpeg), width=w * k, height=h * k)
+                img = Foto(jpeg, w * k, h * k)
             else:
                 img = Paragraph("A foto não veio do Fracttal<br/>(o link do arquivo expira: gere o PDF de novo).",
                                 e["vazio"])

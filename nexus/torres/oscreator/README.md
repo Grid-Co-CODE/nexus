@@ -938,6 +938,15 @@ várias imagens e incluir no PDF") e "inclua a opção de baixar na cadeia de ch
   repete), reduzidas a 1000 px (JPEG 72, deitada pelo EXIF fica em pé); os outros anexos pelo nome. Foto que não veio
   do S3 sai com o quadro vazio dizendo isso; mais de 200 fotos, o PDF diz quantas ficaram de fora. `modelo()` é o
   conteúdo (os testes conferem nele) e `gerar()` desenha; o reportlab e o Pillow só são importados ali.
+- **A foto entra no PDF como saiu do `reduzir`** (20/10/2026; Raio-X das 09:56: um PDF ~2 min no servidor, em `gerar`).
+  Dada como `Image(BytesIO)`, o reportlab decodificava cada foto em RGB só para dar nome a ela e guardava o RGB até o
+  fim (2,25 MB por foto). `os_pdf._JpegPronto` entrega o JPEG pelo caminho que o reportlab usa para JPEG de arquivo
+  (`jpeg_fh`, embutido como veio, DCTDecode) com o hash do JPEG como nome (a mesma foto duas vezes vai uma vez). Medido
+  no PC, com o reportlab já carregado: 200 fotos, `gerar` de 3,2 a 4,0 s e +1 GB para 0,3 s e +20 a 27 MB; a rota
+  inteira, com o Fracttal falso e sem rede, de 7,7 a 8,3 s e +1.068 MB para 5,2 s e +128 MB. O PDF é o mesmo: páginas,
+  texto, as imagens byte a byte e o desenho de cada página (só o nome interno das imagens muda). O que sobra é o
+  `reduzir` (~90 ms de CPU por foto no PC) e o download das fotos. Se um dia o reportlab mudar esse caminho, o teste
+  quebra: `test_o_pdf_embute_a_foto_como_veio_sem_decodificar_de_novo`.
 - **A tela:** em "A cadeia do chamado" (`acomp_os.html`), uma seta em cada OS (de campo, inspeção e o acompanhamento).
   O clique (`os_acoes.js`, `[data-os-pdf]`) faz como o "Baixar todos": `POST /os/api/os/pdf` com o nº (e o id, quando a
   tela já sabe) monta o PDF no disco com o círculo de carga, e o arquivo baixa por `GET /os/api/os/pdf/<token>` (10

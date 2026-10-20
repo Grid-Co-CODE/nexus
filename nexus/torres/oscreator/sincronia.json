@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-20T10:50:55",
+ "atualizado_em": "2026-10-20T11:51:22",
  "arquivos": {
   "chamado_garantia/README.md": "ad126aad3d3e3b5d",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -34,7 +34,7 @@
   "os_creator/os_web/lancador.py": "77ef78286174ddf1",
   "os_creator/os_web/oauth_fracttal.py": "21359a9d0dcf1217",
   "os_creator/os_web/os_acoes_web.py": "78a7a8ccbfb25fa5",
-  "os_creator/os_web/os_pdf.py": "5d4b3a0a5ceb7b3d",
+  "os_creator/os_web/os_pdf.py": "875902f452db47ab",
   "os_creator/os_web/pcm_web.py": "b87b0507492e1616",
   "os_creator/os_web/perf_web.py": "1cb148f505192ddb",
   "os_creator/os_web/relay/volta.html": "c59f69695a000fcd",

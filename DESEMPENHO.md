@@ -69,25 +69,27 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 | 20/10 | Visão do responsável "um parto" (08:56) | o portão esperava a trava presa no `fsync` de cada login | leitura sem trava, trava por arquivo | `1889303` |
 | 20/10 | tela de um chamado em 39 s (09:56) | relia a lista inteira na frente de quem abriu | cópia vencida e releitura por trás, sem reler as fechadas | `c70d778` |
 | 20/10 | `GET /os/` em 18 s (10:08) com o Nexus a 13% | a máquina engasgada, sem número para provar | o Raio-X mostra memória, swap e espera do disco | `65c25e7` |
+| 20/10 | PDF da OS ~2 min (09:56), em `gerar` | o reportlab decodificava cada foto em RGB só para dar nome a ela (2,25 MB por foto até o fim: +1 GB com 200) | o JPEG do `reduzir` entra como veio; 200 fotos no PC: `gerar` de 3,2 a 4,0 s para 0,3 s, rota de +1.068 MB para +128 MB, o mesmo PDF | este |
 
 ## A fila
 
-1. **PDF da OS** (Garantias; pedido da área, NÃO tirar nada): ~2 min gerando no servidor (Raio-X das 09:56 de 20/10:
-   `os_pdf.py` em `gerar`, as fotos em `reduzir`). Medir onde vão os 2 min (baixar as fotos, reduzir, montar o PDF) e
-   deixar mais leve com o mesmo PDF. Precedente: o PDF dos extintores (`d8f8d85`). Código:
-   `nexus/torres/oscreator/os_creator/os_web/os_pdf.py` (vai ao oem). A sessão de Garantias também mexe nele.
-2. **Push só de documentação também reinicia o servidor** (`deploy/atualizar.sh`): pular o restart quando o commit novo
+1. **Push só de documentação também reinicia o servidor** (`deploy/atualizar.sh`): pular o restart quando o commit novo
    só muda `.md`, para um documento não esfriar as telas de todo mundo. Mexe no deploy do servidor: prova com cuidado.
-3. **Ler o Raio-X novo numa lentidão:** máquina trocando swap ou esperando o disco = memória ou disco do servidor (o
-   notebook, 4 núcleos, com o banco na mesma máquina). Levar os números ao Levi.
-4. **Clima e risco:** 21 s de processador na 1ª carga (o LZW do GeoTIFF do INPE em Python puro, 183 pedidos; volta a cada
+2. **Ler o Raio-X novo numa lentidão:** máquina trocando swap ou esperando o disco = memória ou disco do servidor (o
+   notebook, 4 núcleos, com o banco na mesma máquina). Levar os números ao Levi. O PDF da OS de 09:56 segurava +1 GB
+   (200 fotos) e às 10:08 a máquina engasgou: depois do deploy, um PDF grande com o Raio-X aberto confirma se era isso.
+3. **Clima e risco:** 21 s de processador na 1ª carga (o LZW do GeoTIFF do INPE em Python puro, 183 pedidos; volta a cada
    6 h, a cada deploy e a cada 15 min com o INPE atrasado). Proposta: o decodificador do Pillow (em C) por tile e uma
    cópia em disco.
-5. **Conta fria pós-deploy** (~15 s na 1ª abertura de uma tela nos ~5 min depois de cada push). Opções: agrupar os
+4. **Conta fria pós-deploy** (~15 s na 1ª abertura de uma tela nos ~5 min depois de cada push). Opções: agrupar os
    deploys (no máximo um reinício a cada 30 min, por exemplo) ou uma cópia em disco das abas lidas (servir a última com
    a hora dela e renovar por trás). É parâmetro: perguntar ao Levi antes.
-6. **Testes do oem:** 3 falham desde 14/10 (`bb91eb0`: a tela inicial não espera mais o Fracttal):
+5. **Testes do oem:** 3 falham desde 14/10 (`bb91eb0`: a tela inicial não espera mais o Fracttal):
    `test_os_web_home::test_selo_do_card_performance` e dois de `test_os_web_sessao`.
+6. **PDF da OS, o que sobra na 1ª vez:** o `reduzir` (~90 ms de CPU por foto no PC: 200 fotos, ~18 s de CPU) e o
+   download das fotos (sem como medir no PC). Opção: a cópia de 1000 px de cada foto guardada, como a dos extintores (o
+   2º PDF da mesma OS não reduz de novo). Guardar foto do Fracttal no disco do servidor e a chave da cópia (o caminho no
+   S3, que pode repetir com outra foto, ou o hash da original, que ainda baixa) são decisão do Levi.
 
 ## Onde está cada peça
 
