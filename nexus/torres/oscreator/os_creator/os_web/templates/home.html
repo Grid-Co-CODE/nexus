@@ -62,13 +62,22 @@
     </div>
   </section>
 </section>
-{# o selo do card Performance chega depois da tela (14/10/2026): ela não espera o Fracttal para abrir #}
+{# o selo do card Performance chega depois da tela (14/10/2026): ela não espera o Fracttal para abrir. Com a sessão do
+   Fracttal caída, o 401 dele leva ao login com o aviso, como as outras telas (acomp.js) e como a tela fazia antes de
+   14/10, quando pedia o selo ela mesma (20/10/2026) #}
 <script>
 (function () {
   var tag = document.querySelector('[data-selo]');
   if (!tag || !tag.hidden) return;
   fetch('/os/api/selo', {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
-    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (r) {
+      return r.json().then(function (j) {
+        if (r.status === 401 && j && j.login) {
+          location.href = '/os/login?next=' + encodeURIComponent(location.pathname + location.search);
+        }
+        return r.ok ? j : null;
+      });
+    })
     .then(function (j) { if (j && j.selo) { tag.textContent = j.selo; tag.hidden = false; } })
     .catch(function () {});
 })();

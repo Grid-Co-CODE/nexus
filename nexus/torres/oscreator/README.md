@@ -862,11 +862,20 @@ pedia de novo os planos e as subtarefas (o "GET /os/api/performance/contagens, 2
 
 - A tela inicial sai na hora: o selo vem da memória (2 min por pessoa, `rotas._selo_guardado`) e, sem ele, o navegador o
   pede depois em `/os/api/selo`; o selo nunca segura a tela nem a derruba.
+- **A sessão do Fracttal caída leva ao login pelo selo** (20/10/2026). Antes, era a própria tela inicial que pedia o selo e
+  voltava ao login com o aviso; com o selo depois da tela, o 401 dele era ignorado, e a pessoa ficava na tela inicial
+  até o clique seguinte (achado pelos 3 testes do oem que falhavam desde 14/10). O script do `home.html` faz como as
+  outras telas (`acomp.js`): 401 com `login` leva ao `/os/login?next=...`, que mostra "A sessão do Fracttal caiu"; no
+  Nexus, a ponte já encerrou a sessão e o portão leva ao Entrar. Conferido no navegador numa cópia com o Fracttal falso:
+  `GET /os/` 200, `/os/api/selo` 401, `/os/login?next=/os/` com o aviso. Sem o selo pedido (o da memória ainda vale),
+  quem descobre a queda é o próximo pedido ao Fracttal, como em qualquer tela.
 - As subtarefas de cada plano da Performance (os "N subtarefas" dos cards) ficam 6 h na memória (`CONTAGENS_TTL_S`): são
   as mesmas para todo mundo e só mudam quando o PCM mexe num plano. Erro não fica guardado.
 - Levado ao oem pela `ferramentas/sincronizar_oscreator.py --aplicar` (sem commit lá: o oem é público).
 - Prova: `tests/test_oscreator_abre_sem_esperar_14_10.py` (a tela não pede nada ao Fracttal; o selo uma vez a cada 2 min;
-  o Fracttal fora não fica guardado; a contagem uma vez em 6 h).
+  o Fracttal fora não fica guardado; a contagem uma vez em 6 h; o script do selo rodado no node com a resposta da rota:
+  401 vai ao login, o selo que chega aparece). No oem, `test_os_web_home::test_selo_do_card_performance` e os dois de
+  `test_os_web_sessao` (o JWT da pessoa no selo, a sessão caída) cobram o selo pelo `/os/api/selo` desde 20/10/2026.
 
 ## Fila do PCM: a OS nasce programada na data sugerida (15/10/2026)
 

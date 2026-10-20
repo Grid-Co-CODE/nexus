@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-20T13:02:59",
+ "atualizado_em": "2026-10-20T13:20:13",
  "arquivos": {
   "chamado_garantia/README.md": "ebd082efad2568dc",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -102,7 +102,7 @@
   "os_creator/os_web/templates/erro.html": "30c966d47683634f",
   "os_creator/os_web/templates/fornecedores.html": "b424a005109477dc",
   "os_creator/os_web/templates/historico.html": "cfd9f825b8d2906b",
-  "os_creator/os_web/templates/home.html": "eac2af0016e75caa",
+  "os_creator/os_web/templates/home.html": "4a080e9c46304b8c",
   "os_creator/os_web/templates/insp.html": "32c0bad1de380c0c",
   "os_creator/os_web/templates/login.html": "e52abf45390e2c86",
   "os_creator/os_web/templates/oauth_diag.html": "4378b7f24cb58a36",
