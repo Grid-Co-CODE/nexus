@@ -693,6 +693,11 @@ def historico():
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
         erro = str(e)
+        # o ↻ que o Fracttal não respondeu fica com a lista que já estava, com a hora dela (21/10/2026): a busca pela
+        # metade não é guardada (`api._lista_pela_metade`), e a tela sem nenhuma linha parecia "nenhuma OS no período"
+        lista = HS.guardada(chave)
+        if lista is not None:
+            linhas, info = lista.linhas, lista.info
     except (TimeoutError, LookupError) as e:
         erro = str(e)
     # o teto de 2.000 corta as OS MAIS ANTIGAS do período em silêncio — dizer, com o total do servidor e o que CHEGOU (a

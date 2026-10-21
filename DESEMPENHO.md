@@ -49,6 +49,17 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 - Commit só dos próprios arquivos, num worktree do `origin/main` atualizado, com rebase antes do push.
 - A cota do Fracttal é de 200 pedidos por minuto para a EMPRESA (o App de Campo vive dela): cópia guardada e releitura
   por trás, nunca pedido a mais.
+- **APIs avançadas do Fracttal** (add-on pago; avaliadas em 21/10/2026, Levi: "podem ajudar a gente a melhorar o
+  desempenho do OS Creator?"): quase nada. Criar OS, atualizar tarefa, tarefa não planejada e tarefa pendente o OS
+  Creator já faz com 1 pedido cada, pelo RPC do site com o login da pessoa (pela API oficial quem grava é a chave da
+  integração, e o Fracttal perde quem fez). Só a consulta de anexos da OS (`GET /api/work_orders_attachments/<folio>/`)
+  ajuda: até 100 anexos num pedido, já com a URL assinada do S3 (24 h), no lugar de 1 pedido por tarefa, 1 por
+  subtarefa com anexo e 1 `s3_object_get` por arquivo (a lista de anexos do card e o PDF da OS). A documentação não
+  diz se ela traz os anexos das subtarefas (o checklist do App): conferir num teste do add-on antes de comprar. A
+  versão grátis (`work_orders_tasks_files`) traz só nota e link. O add-on não aumenta os 200/min (página "Limites de
+  Requests": a empresa inteira, todas as integrações; o 429 pede 1 min de espera; mais que isso é pedido ao
+  representante). Alternativa grátis, não testada: o RPC já recebe uma lista JSON-RPC (sempre com 1 item); se
+  aceitar vários, os links das fotos de uma OS iriam numa chamada só.
 
 ## O que já foi feito (não refazer; o porquê está no commit)
 
@@ -75,7 +86,8 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 | 20/10 | 3 testes do oem falhando desde 14/10; com a sessão do Fracttal caída, a tela inicial do OS Creator não voltava ao login | `bb91eb0` tirou o selo de dentro da tela (ela não espera o Fracttal) e o 401 do `/os/api/selo` era ignorado | o script do selo leva ao login com o 401 (como o `acomp.js`), conferido no navegador; os 3 testes do oem cobram o selo pelo `/os/api/selo` (no disco do oem, sem commit lá: decisão do Levi) | `39f806d` |
 | 20/10 | Raio-X das 14:17: 0,2 GB livres de 7,1 GB, 3,2 GB no swap trocando 4,5 MB/s, disco 60% do tempo, com o Nexus em 690 MB | a máquina sem memória, e a página não dizia de quem eram os outros ~6 GB | a seção "Quem ocupa a memória da máquina" (somada por programa, pelo /proc de cada processo) | `57d5217` |
 | 20/10 | travada das 16:12 (GET /os/ ~4 min em linhas de microssegundos) e o próprio Raio-X 4 min 18 s preso em `_ler_proc` | a máquina trocando com o disco (o Nexus com 1,5 GB no swap); ler a linha de comando de um processo no swap espera o disco | a lista da memória numa thread à parte com prazo de 2 s, uma leitura presa por vez, o nome de cada processo lido uma vez | `7d9de73` |
-| 20/10 | o worker da plataforma de 3,7 para 5,0 GB (com o swap) em 26 min (16:12 a 16:38), e o que crescia no servidor ninguém via (a medição de dentro só dava no PC, sem os backfills de lá) | — | o worker grava a cada 10 min, em /dev/shm, quanto cada variável ocupa (por amostra, últimas 3 h; PerformancePainel), e o Raio-X mostra "Dentro do worker da plataforma", agora × 1 h antes | este |
+| 20/10 | o worker da plataforma de 3,7 para 5,0 GB (com o swap) em 26 min (16:12 a 16:38), e o que crescia no servidor ninguém via (a medição de dentro só dava no PC, sem os backfills de lá) | — | o worker grava a cada 10 min, em /dev/shm, quanto cada variável ocupa (por amostra, últimas 3 h; PerformancePainel), e o Raio-X mostra "Dentro do worker da plataforma", agora × 1 h antes | `2137e2d`; `62a00c2` na plataforma |
+| 21/10 | Raio-X das 14:36: "pedido preso 24 vezes em 24 h", o último um GET /os/historico de 45 s esperando o Fracttal (45 s é o tempo-limite) | a busca da lista (`api.list_minhas_os`, Histórico e quadro do Acompanhamento) engolia o erro de cada página e lote: sem a 1ª página, a lista VAZIA ficava guardada sem aviso; sem uma do meio, sumiam até 200 OS; e a vazia de "Todos" fazia cada pessoa buscar a sua inteira até o reinício | a busca em que o Fracttal não entregou algum pedido falha inteira (`_lista_pela_metade`): nada é guardado, a tela avisa e fica com a lista anterior e a hora dela; 3 pessoas depois de um estouro: 30 pedidos → 11 | este |
 
 ## A fila
 

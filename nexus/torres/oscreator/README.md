@@ -366,10 +366,11 @@ Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro
   - **a releitura não relê as tarefas das OS que já estavam fechadas** (`_fechadas_ja_lidas` → `api.list_chamados
     (meta_ja=...)`, a mesma regra do Histórico de 19/10): concluída não volta e o Fracttal não deixa editar;
   - os cartões dos "outros chamados" são montados uma vez por leitura (eram ~0,2 s de CPU a cada chamado aberto);
-  - **leitura feita com a sessão do Fracttal morta não fica na memória** (`_sessao_viva`, `_conferir_sessao`). A
-    listagem engole o erro de cada página e devolve vazio, e o quadro vazio ficaria 3 min guardado. Até 08/10 a busca
-    da etiqueta acusava a sessão morta; com a lista reaproveitada, o quadro pode nem passar por ela. Pelo mesmo motivo
-    o id da etiqueta CHAMADOS não é guardado (`api._label_id`).
+  - **leitura feita com a sessão do Fracttal morta não fica na memória** (`_sessao_viva`, `_conferir_sessao`). Os
+    tickets engolem o erro de cada pedido, e o quadro vazio ficaria guardado. Até 08/10 a busca da etiqueta acusava a
+    sessão morta; com a lista reaproveitada, o quadro pode nem passar por ela. Pelo mesmo motivo o id da etiqueta
+    CHAMADOS não é guardado (`api._label_id`). A página da listagem que falha derruba a busca inteira desde 21/10/2026
+    (seção "A lista pela metade não vai para a tela").
   - **Passados os 30 min, o quadro abre na hora com a leitura anterior e relê por trás** (Levi, 09/10/2026: "teria
     como utilizarmos essas requisições de forma mais inteligente?"; `_renovar_por_tras`). Ao lado da hora da leitura
     aparece "· atualizando"; a nova vale na próxima abertura (ou no Atualizar, que lê na hora). A releitura roda numa
@@ -1172,3 +1173,30 @@ atualizar, fora isso fica mostrando o que já carregou ou carrega a cada 30 min"
   Na bancada local (Fracttal falso, 1545 px): 6 cartões inteiros em cada coluna (966 px), a ida e volta a um chamado
   sem nenhuma leitura da lista, o ticket gravado e o cartão já em "Ticket aberto" na volta; a 375 px, sem teto e sem
   rolagem lateral.
+
+## A lista pela metade não vai para a tela (21/10/2026, chat de desempenho)
+
+Raio-X do servidor às 14:36 de 21/10: "Pedido preso 24 vezes em 24 h", o último um `GET /os/historico` de 45 s
+esperando o Fracttal (`api._rpc_chamar`); 45 s é o tempo-limite do pedido. A busca da lista (`api.list_minhas_os`, que
+serve o Histórico e o quadro do Acompanhamento de chamados) engolia o erro de cada página e de cada lote das tarefas:
+- sem a 1ª página, a lista saía VAZIA, sem aviso, e ficava guardada como se não houvesse OS no período (no
+  Acompanhamento, por 30 min);
+- sem uma página do meio, sumiam até 200 OS sem aviso; sem um lote das tarefas, 130 OS ficavam sem o tipo e as datas
+  (as fechadas, para sempre: o `meta_ja` não as relê), e a Visão COS, que filtra pelo tipo, as escondia;
+- a lista vazia de "Todos" fazia cada pessoa buscar a dela inteira dali em diante (o total dela não batia com o 0
+  guardado, `historico_store.mesma_visao`), até o Nexus reiniciar: mais carga no Fracttal, mais chance de outro estouro.
+
+Agora a busca em que o Fracttal não entregou algum pedido (tempo esgotado, 429, erro) falha INTEIRA
+(`api._lista_pela_metade`; o lote das tarefas avisa pelo `falhas` do `_MetaLida`, atributo e não argumento, porque os
+testes do oem trocam o `_meta_tarefa_por_os` por `lambda ids: {...}`). Nada é guardado, a sessão caída numa página do
+meio leva ao login, e a tela diz "O Fracttal não respondeu a tempo em N de M pedidos da lista. Para não mostrar OS pela
+metade, a lista não foi atualizada; tente de novo em instantes." O ↻ do Histórico e o Atualizar do quadro ficam com a
+lista que já estava, com a hora dela (o quadro, até `VELHA_MAX`). Sem a 1ª página, nem pede as outras; sem uma do meio,
+não lê as tarefas.
+- Medido com o Fracttal de mentira (650 OS; a 1ª pessoa sem resposta, depois mais 3 abrindo a Visão COS): antes, a lista
+  vazia sem aviso e 30 pedidos para as 3 (uma cópia inteira para cada, e a vazia de "Todos" guardada); depois, o aviso
+  e 11 pedidos (uma lista para todos).
+- Prova: `tests/test_oscreator_lista_pela_metade_21_10.py` (a busca, o Histórico e o quadro); as 7 mutações (página
+  engolida, sem conferir as páginas, sem conferir o meta, lote engolido, sessão caída como erro comum, Histórico e
+  quadro sem a lista anterior) derrubam cada uma o seu teste. Na bancada (o clone sozinho, Fracttal falso, sem rede),
+  a 1280 e a 375 px: o aviso, a lista anterior com a hora dela no Histórico e no quadro.

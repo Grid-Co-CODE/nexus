@@ -1626,6 +1626,28 @@ class _Passos:
                 pass
 
 
+def _lista_pela_metade(falhas: list, pedidos: int):
+    """A lista em que o Fracttal não entregou algum pedido (tempo esgotado, 429, erro) falha INTEIRA (21/10/2026, chat de
+    desempenho). Raio-X do servidor às 14:36 de 21/10: um GET /os/historico de 45 s esperando o Fracttal, 24 pedidos
+    presos em 24 h; 45 s é o tempo-limite do `_rpc_chamar`. Até aqui o erro de cada página e de cada lote das tarefas era
+    engolido: sem a 1ª página a lista saía vazia e ficava guardada como se não houvesse OS (no Histórico e no quadro do
+    Acompanhamento), sem uma do meio sumiam até 200 OS sem aviso, e a lista vazia de "Todos" fazia cada pessoa buscar a
+    dela inteira dali em diante (o total dela não batia com o 0 guardado). Quem chama fica com a lista anterior, com a
+    hora dela, ou mostra este aviso. A sessão que caiu continua sessão caída: leva ao login."""
+    for e in falhas:
+        if isinstance(e, SessionExpired):
+            raise e
+    txt = " ".join(str(e) for e in falhas).lower()
+    if "timed out" in txt or "timeout" in txt:
+        motivo = "não respondeu a tempo"
+    elif "429" in txt:
+        motivo = "recusou pedidos (o limite de 200 por minuto da empresa)"
+    else:
+        motivo = "devolveu erro"
+    raise FracttalError("O Fracttal %s em %d de %d pedidos da lista. Para não mostrar OS pela metade, a lista não foi "
+                        "atualizada; tente de novo em instantes." % (motivo, len(falhas), pedidos))
+
+
 def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
                    de: str = None, ate: str = None, status_ids=None, cap: int = HISTORICO_CAP,
                    info: dict = None, progresso=None, meta_ja: dict = None) -> list:
@@ -1670,15 +1692,17 @@ def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
     if ate:
         cond.append({"operator": "<=", "property": "creation_date", "value": ate + "T23:59:59"})
     limit = 200
+    falhas = []                             # os pedidos que o Fracttal não entregou (ver `_lista_pela_metade`)
 
     def _fetch_page(start):                 # uma página da listagem (período já está em cond)
         try:
             return _rpc_call(RPC_WO_LIST, {"page": start // limit + 1, "limit": limit, "start": start,
                 "append": True, "sort": [{"property": "id", "direction": "desc"}], "filter": cond})
-        except FracttalError:
+        except FracttalError as e:
+            falhas.append(e)
             return None
 
-    first = _fetch_page(0)                   # 1ª página dá o total; as demais em paralelo
+    first = _fetch_page(0)                   # 1ª página dá o total; as demais em paralelo (sem ela, total 0: nenhuma)
     total = int(first.get("total") or 0) if isinstance(first, dict) else 0
     if isinstance(info, dict):               # quem chama pode AVISAR que o teto cortou as mais antigas
         info.update({"total": total, "cap": cap})
@@ -1691,6 +1715,8 @@ def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
     if starts:
         with _ExecutorComContexto(max_workers=min(6, len(starts))) as ex:
             paginas.extend(ex.map(lambda s: passo(_fetch_page(s)), starts))
+    if falhas:                               # nem lê as tarefas de uma lista que não vai à tela
+        _lista_pela_metade(falhas, 1 + len(starts))
     vistos = {}
     for res in paginas:
         for w in ((res.get("data") or []) if isinstance(res, dict) else []):
@@ -1712,6 +1738,8 @@ def list_minhas_os(modo: str = "criadas", id_account=None, id_label=None,
     for _ in range(max(0, n_meta - -(-len(ids) // 130))):
         passo()
     meta = _meta_tarefa_por_os(ids, passo=passo) if progresso is not None else _meta_tarefa_por_os(ids)
+    if getattr(meta, "falhas", None):        # 130 OS sem o tipo e as datas (fechadas, ficariam assim no `meta_ja`)
+        _lista_pela_metade(meta.falhas, -(-len(ids) // 130))
     meta.update(sabido)
     passo.fim()
     for d in out:
@@ -1857,15 +1885,24 @@ RPC_WO_TASKS  = "tasks.work_orders_tasks_new_list"       # tarefa(s) da OS (even
 RPC_WO_FORMIT = "tasks.work_orders_task_form_items_list"  # subtarefas (checklist)
 
 
+class _MetaLida(dict):
+    """O meta das tarefas por OS, com os erros dos lotes que o Fracttal não entregou (`falhas`). Quem não mostra lista
+    pela metade (o `list_minhas_os`) confere; quem usa como dict não vê diferença. É atributo, e não argumento novo,
+    porque os testes do oem trocam o `_meta_tarefa_por_os` por `lambda ids: {...}`."""
+    falhas: list = []
+
+
 def _meta_tarefa_por_os(wo_ids, passo=None):
     """{id_work_order: {'tipo_tarefa': 'Tipo' (ou 'A / B'), 'event_date': ISO}} p/ as OS dadas. A
     listagem NÃO traz tipo de tarefa nem a data do evento — vêm do RPC de tarefas (1 chamada por lote,
-    em paralelo). Best-effort: erro num lote → ignora (sem quebrar a lista)."""
+    em paralelo). Erro num lote não quebra a resposta: as OS dele ficam sem o meta, e o erro vai no `falhas` do
+    resultado (`_MetaLida`); a lista do Histórico e do Acompanhamento não sai assim (`_lista_pela_metade`)."""
     ids = [w for w in dict.fromkeys(wo_ids) if w]            # únicos, preserva ordem
     if not ids:
-        return {}
+        return _MetaLida()
     CH = 130
     chunks = [ids[i:i + CH] for i in range(0, len(ids), CH)]
+    falhas = []
 
     fim_keys = ("final_date", "date_end", "end_date", "real_final_date", "finished_date",
                 "date_finished", "closing_date")
@@ -1878,7 +1915,8 @@ def _meta_tarefa_por_os(wo_ids, passo=None):
                 r = _rpc_call(RPC_WO_TASKS, {"page": 1, "limit": limit, "start": start,
                               "sort": [{"property": "id", "direction": "desc"}],
                               "filter": [{"operator": "in", "property": "id_work_order", "value": chunk}]})
-            except FracttalError:
+            except FracttalError as e:
+                falhas.append(e)
                 break
             data = (r.get("data") or []) if isinstance(r, dict) else []
             for t in data:
@@ -1943,13 +1981,15 @@ def _meta_tarefa_por_os(wo_ids, passo=None):
                 if wid not in gat_out or (gat_out[wid] == "NO_SCHEDULE_TASK"
                                           and gv != "NO_SCHEDULE_TASK"):
                     gat_out[wid] = gv
-    return {wid: {"tipo_tarefa": " / ".join(sorted(tipos_out.get(wid, set()))),
-                  "event_date": evt_out.get(wid, ""), "data_fim": fim_out.get(wid, ""),
-                  "note": notas_out.get(wid, ""),
-                  "inicio": ini_out.get(wid, ""),
-                  "gatilho": decodifica_gatilho(gat_out.get(wid, ""))}
-            for wid in set(tipos_out) | set(evt_out) | set(fim_out) | set(notas_out)
-                       | set(ini_out) | set(gat_out)}
+    out = _MetaLida({wid: {"tipo_tarefa": " / ".join(sorted(tipos_out.get(wid, set()))),
+                           "event_date": evt_out.get(wid, ""), "data_fim": fim_out.get(wid, ""),
+                           "note": notas_out.get(wid, ""),
+                           "inicio": ini_out.get(wid, ""),
+                           "gatilho": decodifica_gatilho(gat_out.get(wid, ""))}
+                     for wid in set(tipos_out) | set(evt_out) | set(fim_out) | set(notas_out)
+                                | set(ini_out) | set(gat_out)})
+    out.falhas = falhas
+    return out
 
 
 # Campos onde o Fracttal pode guardar a RESPOSTA de uma subtarefa (o nome varia por tipo/versão).
@@ -2288,8 +2328,9 @@ def _label_id(nome: str):
     """id da etiqueta pelo nome (case-insensitive). None se não existir no Fracttal.
 
     Sem cópia guardada DE PROPÓSITO (08/10/2026): nas listas por etiqueta (Acompanhamento de chamados, Performance)
-    é este o primeiro pedido, e é ele que acusa a sessão morta. A listagem engole o erro de cada página
-    (`_fetch_page`), e com o id guardado a sessão morta virava um quadro vazio em vez de voltar ao login."""
+    é este o primeiro pedido, e é ele que acusa a sessão morta. Até 21/10/2026 a listagem engolia o erro de cada página
+    (`_fetch_page`), e com o id guardado a sessão morta virava um quadro vazio em vez de voltar ao login (hoje a página
+    que falha derruba a busca inteira, `_lista_pela_metade`)."""
     alvo = str(nome or "").strip().lower()
     for l in (get_labels() or []):
         if str(l.get("description") or "").strip().lower() == alvo:

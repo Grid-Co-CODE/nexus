@@ -103,9 +103,9 @@ def _guardado(chave, ttl: float = None):
 
 
 def _sessao_viva():
-    """Leitura feita com a sessão morta NÃO vai para a memória. A listagem e os tickets engolem o erro de cada pedido
-    (o `api` devolve vazio ou None), e o quadro vazio ficaria 3 min guardado para a pessoa, mesmo depois de ela entrar
-    de novo. Até 08/10 quem acusava era a busca da etiqueta, o 1º pedido de toda leitura; com a lista guardada para o
+    """Leitura feita com a sessão morta NÃO vai para a memória. Os tickets engolem o erro de cada pedido (o `api` devolve
+    None; a listagem também engolia até 21/10/2026, `api._lista_pela_metade`), e o quadro vazio ficaria guardado para a
+    pessoa, mesmo depois de ela entrar de novo. Até 08/10 quem acusava era a busca da etiqueta, o 1º pedido de toda leitura; com a lista guardada para o
     quadro reaproveitar, o quadro pode nem passar por ela. JWT vencido sem renovação levanta aqui mesmo (sem pedido)."""
     api._rpc_headers()
 
@@ -348,6 +348,11 @@ def _ler_quadro(forcar: bool = False, dono=None) -> tuple:
     except api.FracttalError as e:
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
+        # o Atualizar que o Fracttal não respondeu fica com o quadro que já estava, com a hora dele (21/10/2026): a lista
+        # pela metade não é guardada (`api._lista_pela_metade`). Até VELHA_MAX, como a abertura vencida
+        idade, v = _guardado_com_idade(("acomp", dono or _dono()))
+        if isinstance(v, dict) and idade < VELHA_MAX:
+            return v, str(e)
         return {"linhas": [], "tickets": {}, "quando": ""}, str(e)
 
 
