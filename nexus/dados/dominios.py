@@ -187,6 +187,27 @@ def codigo(v):
     return n if _CODIGO.match(n) else None
 
 
+# ── Estrutura das usinas: a linhagem do kWp e do ativo do Fracttal (20/10/2026) ───────────────────────────────────
+# O de-para do tempo real (o "Modo de-para" da plataforma) passou a gravar o kWp de cada inversor pela regra do Levi
+# ("kWp da usina no Registro mestre ÷ strings corretas da usina × strings do inversor"; sem a potência real, a
+# contratual) e o ativo do Fracttal de cada inversor e cabine. O livro `nexus_estrutura_usina` diz de onde veio cada um
+# (regra 5, linhagem): `potencia_regra` no `dim_cabine` e no `dim_inversor`, `fracttal_ligado_por` no `dim_inversor`.
+# Vazio = de antes desta linhagem (os 1.932 inversores do "Ligar pela aba" de 13/10) ou sem número. Valor fora da lista
+# vira vazio na leitura, nunca o vizinho mais parecido (regra 4).
+POTENCIA_REGRA = ("real_por_string",          # a regra, com a potência REAL do Registro mestre (MWp × 1.000)
+                  "contratual_por_string",    # a regra, com a CONTRATUAL (usina sem a real: decisão do Levi, 20/10)
+                  "informada")                # digitado na Base > Equipamentos das usinas (o "Distribuir" inclusive)
+# "conferido": alguém clicou Conferido na linha; "sugestao": gravado como a tela sugeriu, ainda sem conferir
+FRACTTAL_LIGADO_POR = ("conferido", "sugestao")
+
+
+def da_lista(v, lista) -> str:
+    """O código da lista fechada, ou vazio. A estrutura das usinas guarda texto vazio (não None): o selo da usina tem
+    de sair igual do que está na memória e do que o banco devolve depois de gravar."""
+    n = codigo(v)
+    return n if n in lista else ""
+
+
 # ── O número anômalo da Performance (18/10/2026) ──────────────────────────────────────────────────────────────────
 # Levi: "apenas sinalize que o número está anômalo e o dado pode estar errado, temos que sinalizar pela plataforma e não
 # ficar travando a construção!". A plataforma marca, na coluna `anomalia` do `nexus_performance · fato_meta_usina_mes`

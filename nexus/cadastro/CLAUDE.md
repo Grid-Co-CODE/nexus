@@ -282,6 +282,8 @@ de entender para você, quando eu for fazer não vou entender nada".
   cabine e inversor (com o "Sugerir ativos pelo nome") e a leitura dos ~22 mil ativos ao abrir a usina (6,7 s medidos do
   PC). As rotas `/equipamentos/fracttal` e `/equipamentos/ativos` e os campos `equipamento_id`/`codigo_fracttal` do
   livro ficam (o que já foi gravado segue no Salvar, intacto); a "Usina Fractall" da visão continua vindo das Ligações.
+  Desde 20/10/2026 quem grava os dois campos é o **de-para do tempo real** (abaixo), com o ID derivado do código; esta
+  tela continua sem mostrá-los.
 - **Ligar pela aba Equipamentos (13/10/2026, à tarde; Levi: "Em "Equipamentos da Usinas" ligue automaticamente pelos
   dados que temos na aba equipamentos do BD_Performance!" — o "não quero conexões automáticas" da manhã ficou para trás).**
   A seção do topo da tela e o POST `/equipamentos/ligar-aba` (`estrutura_usina.proposta_pela_aba` +
@@ -327,14 +329,21 @@ de entender para você, quando eu for fazer não vou entender nada".
   tela diz qual). Medido em 13/10: a aba bate com a real (Araputanga 1: real 3,469 MWp, contratual 3,25; UFV da aba
   3.469,2 kWp); 68 das 258 usinas não têm a real. Conferência contra a soma das cabines e a dos inversores: até 0,5% fecha
   (verde), até 5% perto (amarelo), acima não fecha (vermelho). Inversor sem kWp conta o da cabine ÷ os inversores dela,
-  e a soma diz quanto é calculado.
+  e a soma diz quanto é calculado. A linhagem do kWp gravado (`potencia_regra`, 20/10/2026): o número que o Salvar desta
+  tela devolve igual guarda a regra que tinha (o kWp que o de-para calculou segue `real_por_string`); número novo, o
+  digitado e o do "Distribuir potência", é `informada`; o que veio da aba (o "Ligar pela aba") e o de antes de 20/10
+  ficam vazios. O código do Fracttal trocado por aqui apaga o Conferido (era daquele código).
 - **O livro `nexus_estrutura_usina`** (no catálogo antes de existir; nasce com a 1ª chave ligada): `dim_supervisorio`,
   `dim_cabine`, `dim_inversor`, estado atual (troca integral do livro inteiro, relido do banco sob trava antes de cada
   gravação; leitura que falha não grava). ID = maior + 1 e não volta; excluir marca `excluido = sim`; indicador 1/0
   (regra 3); quem mudou só em `alterado_por_hmac` (regra 8; o e-mail vai ao log da máquina). **Selo:** o Salvar leva a
   impressão do que a usina tinha quando a tela abriu (só os campos do negócio, para a data relida não dar mudança
   falsa); se outra aba ou pessoa mudou a usina no meio, nada grava e a tela pede para recarregar. A ordem é gravada
-  (tirar um inversor muda a ordem dos seguintes, e isso conta como mudança).
+  (tirar um inversor muda a ordem dos seguintes, e isso conta como mudança). **Colunas de 20/10/2026, no FIM** (depois
+  do controle, para quem lê por posição; a linha gravada antes lê vazio): `dim_cabine.potencia_regra`;
+  `dim_inversor.potencia_regra`, `fracttal_ligado_por` e `conferido_em` (listas fechadas em
+  `nexus/dados/dominios.py`; fora da lista = vazio). Entram no selo, menos a data do Conferido: o selo de toda usina
+  mudou uma vez, no deploy delas (a aba aberta antes pede para recarregar).
 - **A aba Equipamentos não muda** (o BD é do Levi e da equipe, nunca se mata). Medido em 13/10: 2.602 linhas, 301
   chaves, 247 UG, 2.201 inversores (214 sem nome no supervisório), 85 usinas de exibição com mais de uma chave, só UFV,
   UG e inversor (e 8 linhas vazias); "Chave" e "Chave 2" são concatenações de fórmula e "Observações" é texto livre.
@@ -355,13 +364,209 @@ de entender para você, quando eu for fazer não vou entender nada".
   cadastro.py`, a versão do cadastro leva o `updated_at` do livro), as **Ligações** daqui (a ponte aba → Fracttal) e o
   **coletor** (`load_name_mapping`, DESLIGADO por padrão: liga com `COLETOR_ESTRUTURA_NEXUS=1` ou `[nexus]
   estrutura_no_lugar_da_aba = sim` no config.ini, e na 22:30 só depois de build e release, que são do Levi). A mesma
-  regra (`sobrepor`) nos quatro: mudou num, muda nos outros.
+  regra (`sobrepor`) nos quatro: mudou num, muda nos outros. **A linha da visão herda a grafia da aba** quando a chave
+  bate pelo `texto` (espaços juntados; 20/10/2026): o Nexus guarda "Assis Chateaubriand Skid 1 (79)" e a aba e a API PV
+  escrevem "Assis Chateaubriand  Skid 1 (79)", com espaço DUPLO; a plataforma busca o cadastro pela grafia exata da
+  fonte, e a Skid 1 marcada perdia as strings esperadas, os nomes, o kWp e o Full O&M no tempo real. Vale a grafia da 1ª
+  linha da aba com a chave, na "Usina Supervisório" (ou na "Usina") e no "Chave"/"Chave 2"; chave só do Nexus segue
+  como ele grava. **O "Usina Fractall" também herda** (2ª revisão final, 21/10/2026), pela MESMA chave e quando o `texto`
+  bate (só os espaços mudam): a plataforma acha a usina no índice do Fracttal pela description EXATA, e a Belo Jardim
+  (usina 32, "Thopen - Belo Jardim  1 - PE", espaço duplo na aba, no Fracttal e nas Ligações) marcada com o nome de
+  espaços juntados ficava "fora do Fracttal" (sem o badge de OS, sem as OS no Diagnóstico e com a cascata de queda em 0).
+  Nos três leitores que este trabalho mexe: `sobrepor` daqui (as Ligações), `plataforma/estrutura_nexus.py`
+  (`grafias_fracttal` + `herda_grafia`) e o gêmeo (`sobrepor_nexus`). O coletor não foi mexido (há trabalho de outra
+  sessão sem commit lá; ele não usa o "Usina Fractall" no `load_name_mapping` e está desligado por padrão).
 - **Antes de marcar, a tela compara** (`comparar_usina` → `comparar_chave`): chave a chave, a aba contra a visão do que
   está SALVO (nome de exibição, Fracttal, cliente, Full O&M, String Box, UFV e o total de inversores, cabines e kWp, e
   cada inversor: nome, cabine, kWp, strings, o que só está de um lado). Coluna "Diferença com a aba": "igual à aba", "N
   diferenças" (clique abre a lista) ou "fora da aba"; com rascunho não salvo diz "(do que está salvo)". Salvar uma chave
   recém-marcada que ainda tem diferença pede confirmação. O botão **Refazer a visão** (no topo, com chave marcada) é para
-  quando o Registro mestre ou o Fracttal mudaram fora da tela.
+  quando o Registro mestre ou o Fracttal mudaram fora da tela. A comparação olha só o que a aba tem: o "Código
+  Fracttal" da visão não conta (a chave com o ativo ligado continua "igual à aba"). Desde 20/10/2026 ela devolve
+  também `itens` (cada diferença com o `tipo`), que o de-para do tempo real usa para decidir se a chave vale no lugar da aba (abaixo).
+  Duas regras de 21/10/2026 (2ª revisão final): o **nome de exibição** é conferido contra TODOS os "Usina" das linhas da
+  chave na aba (`agrupar_aba` guarda `usinas`, e o `usina` é o das linhas de inversor): na Taguaí (usina 136) a 1ª linha
+  da "Taguaí 1 (173)" é uma UFV solta com Usina "Taguaí 1 (173)" e os inversores dizem "Taguaí"; o "Ligar pela aba"
+  guardava o da UFV solta, a visão o escrevia em todos os inversores, a comparação (só com a 1ª linha) não via e o
+  USINA_GRUPO dos leitores trocava. Hoje o "Ligar pela aba" semeia "Taguaí"; as duas chaves do banco de 20/10 (com
+  "Taguaí 1 (173)" e "Taguaí 2 (174)") não valem no lugar da aba até alguém acertar a exibição delas na tela (ou tirar da
+  aba as duas UFV soltas), o que não foi feito no banco. O **nome do Fracttal** é comparado pelo `texto` sem caixa (o
+  acento conta, os espaços não): espaço o `sobrepor` resolve; acento ("Taguai" × "Taguaí") é outra description no índice.
+- **De-para do tempo real (20/10/2026; Levi, com o protótipo do "Modo de-para": "Boa, é isso mesmo. Implementa no tempo
+  real e adapta na base o de-para").** O "Modo de-para" do Tempo real e a Base · De-para de equipamentos (telas da
+  plataforma, abertas pela porta única na MESMA origem) leem e gravam a estrutura por duas rotas JSON desta tela, só
+  administrador (`_tela`) e só da mesma origem (`_de_outro_site`, o GET inclusive). O livro é do Nexus (um escritor por
+  livro: a troca integral sob a trava deste processo); a ponte fonte → chave continua no `nexus_depara` da plataforma, e
+  o Salvar da plataforma grava primeiro aqui e depois a ponte. O contrato:
+  - `GET /t/base/equipamentos/depara/estado?chaves=A|B` (ou `?usinas=93,108`) → `{ok, usinas: [{usina_id, nome,
+    codigo, selo, kwp, kwp_de ("real"|"contratual"|null), chaves: [{supervisorio_id, usina_supervisorio, principal,
+    substitui_aba}], cabines: [{cabine_id, nome, codigo_fracttal, potencia_kwp, potencia_regra}], inversores:
+    [{inversor_id, supervisorio_id, usina_supervisorio, nome, equipamento_supervisorio, cabine_id,
+    strings_esperadas_qtd, potencia_kwp, codigo_fracttal, equipamento_id, potencia_regra, fracttal_ligado_por,
+    conferido_em}]}], chaves_sem_usina, usinas_fora_do_registro, gravando}`: a usina INTEIRA de cada chave, relida do
+    banco (o selo que sai daqui é o que o salvar confere; a cópia de 1 minuto de outra máquina daria 409 em seguida).
+    `gravando` (2ª revisão final, 21/10/2026) = há um salvar do de-para em curso neste processo (da chegada do pedido à
+    resposta, `estrutura_usina.em_curso`) ou a trava do livro ocupada: no estouro de 180 s e no 502/504 do proxy o pedido
+    abandonado continua aqui (o waitress serve em threads), e o estado relido na hora devolvia o selo de antes (provado com
+    o `livros.publicar` segurado). A tela espera o `gravando` cair antes de concluir "está como antes".
+  - `POST /t/base/equipamentos/depara/salvar` `{itens: [{usina_supervisorio, usina_id, selo, inversores:
+    [{equipamento_supervisorio, nome, strings, cabine_codigo_fracttal, codigo_fracttal, conferido}]}]}` (o `nome` é o
+    do cadastro: a tela passou a mandar na 2ª revisão de 20/10) → `{ok, usinas (o estado novo, como o GET), kwp:
+    {inversor_id: kWp}, visao_mudou, erros: [], avisos: [{usina_id, usina_supervisorio, tipo, texto}], mudancas,
+    cabines_excluidas: [{cabine_id, usina_id, nome}], marcacao: [{usina_id, usina_supervisorio, principal, marcada,
+    fora_da_regra: [textos]}]}`. O `tipo` do aviso é curto e ESTÁVEL (`estrutura_usina.TIPOS_AVISO`: `semeada_pela_aba`,
+    `nao_marcada`, `sem_potencia`, `sem_strings`, `cabine_fora_do_padrao`, `cabine_excluida`, `cabine_sem_inversores`;
+    `usina_supervisorio` vazio = aviso da usina inteira); a `marcacao` diz, chave a chave conferida, se passou a valer no
+    lugar da aba e por que não. Recusa `{ok: false, motivo}` e, quando a recusa é de UMA usina, também `usina_id` e
+    `usina_supervisorio` da culpada (a tela tira só ela do lote e reenvia o resto, no máximo 3 vezes; antes uma recusa
+    derrubava até 50 chaves sem dizer de quem era): 400 o pedido torto (código fora da dimensão ou de outro tipo, strings
+    que não são inteiro maior que zero, usina fora do Registro mestre), 409 o conflito com o gravado (selo velho, chave
+    de outra usina, código em outro inversor, UG de mesmo número com outro código, inversor de outra chave, sem strings
+    que já cobrem o Registro, a chave fora da aba E do livro, a chave irmã da aba fora do livro), 503 o banco, a
+    dimensão, a aba (para semear) ou o token fora.
+  - As regras (`estrutura_usina.salvar_depara`, num só `_gravar`): **remendo**, nunca exclui o que não veio (código,
+    cabine ou strings vazios no pedido = não mexe); o selo de cada usina conferido antes de mexer em qualquer uma (um
+    que não confere recusa tudo); a chave liga à usina como o `ligar_supervisorio`.
+  - **A chave que o livro ainda não tem nasce SEMEADA PELA ABA (2ª revisão, 20/10/2026), antes do remendo**
+    (`_semear_pela_aba`, o mesmo `estrutura_da_aba` do "Ligar pela aba"): Full O&M, String Box, o nome de exibição, as
+    UG e TODOS os inversores da aba com o nome, as strings e o kWp da aba. Caso: a Coração 2 (usina 77, nada no Nexus)
+    nascia com Full O&M = Não, só com os inversores que leram naquela hora e com o nome do código ("Inversor 2.1" no
+    lugar do "Inversor 1.1" da aba, a coluna do BD); marcada, a usina saía de trackers, PR e ocorrências e o INVERSOR04
+    parado deixava de ser esperado. A semeada só é a chave da usina (`principal`) se a usina não tem uma E a aba põe a
+    UFV ou as UG nela (a "Coração 2 (112)" só tem inversores; a UFV está na "Coração 2"). A cabine de mesmo nome que a
+    usina já tem é a mesma; o nome de inversor que a usina já usa em outra chave ganha a chave no nome (como no "Ligar
+    pela aba": na Coração 1 e 2 as duas chaves têm "Inversor 1.1", e a 2ª semeada fica com "Inversor 1.1 · Coração 2
+    (112)", que difere da aba e por isso não marca). Sem a aba lida, a chave nova é recusada (503), para não nascer pela
+    metade. **A chave que não está na aba NEM no livro é recusada (409, com a culpada; 2ª revisão final, 21/10/2026):** era
+    a "Nova chave" da tela (o nome que a fonte manda). Ela nunca vale no lugar da aba (os leitores não a conhecem), e
+    gravada virava a chave da usina (`principal`) e prendia os códigos do Fracttal nos inversores dela: na Pharma 2 (usina
+    108) vazia, a "PHARMA 2 API" criava "Inversor 2.1" a "2.6" com os THPN-PHS100-INVR2.x, e a "Pharma 2" da aba com os
+    mesmos códigos levava 409 para sempre (o de-para não solta código). A tela tirou a opção; a chave nova liga na Base >
+    Equipamentos das usinas, à vista. **A chave da aba que é da MESMA usina e não está no livro nem no pedido recusa a
+    usina** (409, `irmas_da_aba`: a usina de cada chave da aba pela regra do "Ligar pela aba", a Usina Fractall nas
+    Ligações, com o livro vazio; `telas_equipamentos._irmas_da_aba`): a regra do kWp dividiria o Registro só pelas strings
+    das chaves do Nexus (a Coração 2 sozinha, 250 → 812,5 kWp, e a usina somaria 6.500 nos leitores contra 3.250). Na aba
+    real a Usina Fractall da "Coração 1 (111)" é "Thopen - Coração 1 - SC", que as Ligações não têm: lá quem pega é a
+    tela (as duas plantas estão na `pv`, e ela pede para salvar juntas). Medido com as Ligações reais: nenhuma das 66
+    usinas da medida abaixo é recusada por isto.
+  - **O inversor** se acha pela chave + nome no supervisório; sem ele, pelo NOME dentro da usina (o `nome` do pedido,
+    senão o da aba para a chave e o nome no supervisório): o achado SEM nome no supervisório ganha o do pedido (os 214
+    da aba de 13/10 sem ele, a Aquiraz 1 entre eles); o achado em OUTRA chave da usina recusa a usina (409, "o de-para
+    dele é por essa chave": a Cambé pela chave de exibição "Cambé", com os inversores na "Cambé (85)"); o achado na
+    mesma chave com OUTRO nome no supervisório também recusa (409: trocar o nome no supervisório é na Base > Equipamentos,
+    à vista). Sem nenhum, o novo nasce com o `nome` do pedido, senão o da aba, e só então o "Inversor N.M" do código (o
+    número do CÓDIGO, nunca da descrição: pela descrição com a marca, 2,2% de acerto na frota). O nome do que já existe
+    NUNCA muda (decisão 5: é a coluna do BD).
+  - **Só vale no lugar da aba o que difere da aba APENAS pela regra (2ª revisão, 20/10/2026; a decisão 1 do Levi era
+    marcar toda chave salva, e a revisão provou o estrago na Coração 2 e no que a tela Equipamentos já listava: 103 de
+    263 chaves diferentes em 13/10).** Depois do remendo, cada chave do pedido ainda não marcada é comparada com a aba
+    (`comparar_chave`, que dá cada diferença com o `tipo`) e só marca se TODA diferença for da regra (`fora_da_regra`):
+    as strings corretas; o kWp de inversor e de cabine que a regra calculou (linhagem `real_por_string`/
+    `contratual_por_string`); a cabine pela CABN (a cabine que só o Nexus tem e a do inversor que mudou de UG têm o
+    código; a UG que só a aba tem vale quando todas as UG vivas já são CABN); a potência da UFV quando vem do Registro
+    mestre e o "N de Inversores" da UFV, que o Nexus conta (com a aba real a "Itajá" tem 2.596,16 × 2.596,0 e "—" × 8:
+    só marca por isto); e o "Código Fracttal" (que a comparação nem olha). Qualquer outra (Full O&M, String Box, nome do
+    inversor, exibição, nome no Fracttal, cliente, inversor de um lado só, a chave fora da aba, a UFV em outra chave)
+    GRAVA a estrutura, NÃO marca e vai nos avisos (`nao_marcada`: "não vale no lugar da aba porque: ..."). A chave já
+    marcada continua marcada (não é mais conferida). A aba que não se leu (a rota manda `None`) não marca nada.
+    **A usina vale por INTEIRO ou nada (2ª revisão final, 21/10/2026; `_marcar`):** todas as chaves da usina que ainda
+    seguem com a aba são conferidas JUNTAS (as do pedido, a da UFV e das cabines e as outras com inversor no Nexus ou na
+    aba) e só marcam se TODAS passarem; a que não passa segura as outras (`nao_marcada` com "“X”, da mesma usina, não
+    vale(m) no lugar da aba, e a usina vale por inteiro ou nada", e um aviso da usina com quanto os leitores somariam se
+    só as outras marcassem). Por quê: a regra recalcula o kWp da usina inteira, e marcar só parte deixava os leitores
+    misturando a UFV e as UG do Nexus com inversores da aba (a Assis só com a Skid 1: UFV 6.296 e inversores 6.446,0,
+    +2,4%; a Rodrigues II: 2.116,8 × 2.339,4; a "Itajá" marcada sozinha com a UG 01 excluída e os inversores da Itaja 1,
+    da aba, apontando para ela). A exceção é a chave do pedido IGUAL à aba (nenhuma diferença, nem de kWp além dos 0,05):
+    ela marca mesmo com a usina segura, porque os leitores não mudam com ela. Na Itajá salvando só a Itaja 1, as três
+    marcam (a Itaja 2 é conferida junto). A chave da UFV, que não é planta da API PV, entra sempre na conferência: sem ela
+    a UG com o código da CABN e o kWp da soma ficariam fora dos leitores.
+  - **Cabine = sempre a CABN do Fracttal** (decisão 2): "UG NN" pelo número da CABN (CABN2 → UG 02; o nome segue "UG"
+    porque os leitores só reconhecem cabine assim); adota a UG de mesmo número ainda sem código (a da aba), cria se não
+    houver; a UG de mesmo número com OUTRO código recusa a usina (Ipixuna do Pará, usina 56: a Santa Cecilia 1 é
+    IPX100-CABN1 e a 2 é 2C-IPX100-CABN1, duas árvores no Fracttal, as duas "UG 01"). **A cabine que o salvar esvaziou e
+    NÃO tem código do Fracttal sai (ajuste B):** exclusão lógica (`excluido = sim`, conta nas `mudancas`, vai em
+    `cabines_excluidas` e no aviso `cabine_excluida`). Pharma II: os inversores vão para a UG 02 da THPN-PHS100-CABN2 e a
+    UG 01 da aba sai. **Nem ela sai** quando a chave da UFV e das cabines vale no lugar da aba e uma chave que segue com a
+    aba ainda tem, na aba, inversor com "Equipamento Parente" nela (o guarda da cabine órfã, 21/10/2026: os inversores
+    ficariam numa UG que os leitores não têm; aviso `cabine_sem_inversores`, e ela sai quando essas chaves valerem). Por
+    quê, leitor a leitor: na **disponibilidade** da plataforma (`plataforma/disponibilidade.py`,
+    `montar_catalogo`) toda linha UG entra em `ugs`, com kWp ou sem, e `n_cab` conta; a UG 01 vazia daria 2 cabines à
+    Pharma II e desligaria a régua "site agrupado com 1 cabine por usina → a Cabine N é a usina N"
+    (`disponibilidade.py:415`; a THPN-PHS100 é um site só para as Pharmas 2, 3 e 4); a cascata por inversor usa o
+    "Equipamento Parente" e não muda. O **gêmeo** só usa a UG como agrupador quando a usina não tem UFV (a visão sempre
+    tem). A cabine COM código do Fracttal (uma CABN) nunca sai por este caminho: fica, com o aviso
+    `cabine_sem_inversores`. **Cabine cujo nome não é "UG NN"** (a "UFV" da Aparecida do Taboado, usina 11, e a "PEI" da
+    usina 85, vindas do "Equipamento Parente" da aba no "Ligar pela aba") fica fora da conta do kWp e NÃO sai como linha
+    de UG na visão (`visao_da_usina`): uma linha de Equipamento "UFV" com o kWp dela (458) seria lida pela plataforma e
+    pelas Falhas como a usina (2.422); aviso `cabine_fora_do_padrao`. O inversor dela segue com o "Equipamento Parente"
+    que tem.
+  - **Ativo do Fracttal:** o `equipamento_id` é DERIVADO do código no servidor (`equipamento.equipamento_id`), nunca o do
+    pedido, e o código tem de ser membro da `dim_equipamento` (o THPN-PHS100, sem usina na dimensão, é membro e liga);
+    a dimensão com outro ID para o código recusa. Inversor só INVRn.m, cabine só CABNn. Um código num inversor vivo só
+    da frota, conferido depois de aplicar (a troca entre dois inversores passa; a culpada é a usina que o recebeu).
+  - **kWp, a regra do Levi, na usina INTEIRA** (todos os inversores vivos, não só os do pedido: na Itajá, só a Itaja 1
+    daria 649 kWp por inversor em vez de 324,5): kWp do Registro mestre (`potencia_real` × 1.000; sem a real, a
+    contratual, decisão 3 alterada em 20/10) ÷ Σ strings corretas × strings do inversor, inclusive o kWp que era
+    `informada`; a cabine = a soma dos inversores dela, dos valores sem arredondar (a Pharma II fecha 990,0). O Registro
+    divergente da aba (Linhares 1 ×3,19, Diamantino ×0,5, Coração, Assis 6.296 contra 6.483,4) NÃO muda a regra: o
+    Levi decidiu "aplica direto", e a tela mostra "kWp de hoje → novo". Nunca 0 nem vazio por cima de dado:
+    - **sem a real E sem a contratual**, o kWp e a linhagem ficam COMO ESTAVAM, com o aviso `sem_potencia` (até a 2ª
+      revisão viravam branco na usina inteira, o digitado à mão inclusive, e a chave marcada perdia o kWp nos leitores);
+    - **o inversor vivo sem strings corretas** guarda o kWp de antes, e esse kWp é DESCONTADO do Registro antes de
+      dividir pelos que têm strings: a usina continua somando o Registro (aviso `sem_strings`, com os nomes e o kWp de
+      cada um). Sem o desconto a Sapopema, com 2 dos 20 sem strings, ia a 3.515,6 kWp contra 3.196 (+10%); com ele, os
+      18 ficam com (3.196 − 319,6) ÷ 288 × 16 = 159,8 e a usina soma 3.196,0. Se o descontado já cobre o Registro, a
+      usina é recusada (409, não sobra kWp). A tela faz a MESMA conta (`plataforma/static/depara_tabela.js`).
+    O kWp e a origem vêm do `_usinas` da tela (o Registro DESTA máquina: o servidor e o PC podem divergir até o
+    Publicar, ver "dois donos" acima).
+  - **Conferido:** `fracttal_ligado_por` = `conferido` ou `sugestao` (com código; sem código, vazio); `conferido_em` =
+    a hora (UTC) da 1ª vez com aquele código (conferir de novo não muda nada; desconferir apaga).
+  - A visão leva o "Código Fracttal" (inversor e UG) depois dos IDs; os leitores de fora (a plataforma
+    `estrutura_nexus.py`, o gêmeo, o coletor) mudam no mesmo trabalho, e o `sobrepor` herda a grafia da aba (acima). O
+    "Usina Fractall" da visão sai COMO as Ligações o escrevem (só sem as pontas, nunca com o `texto`: 21/10/2026, a Belo
+    Jardim acima).
+  - **Prova:** `tests/test_base_equipamentos_depara.py` (49 casos; os 11 da 2ª revisão final de 21/10: a Nova chave
+    recusada e a chave da aba que passa com os mesmos códigos, a Assis só com a Skid 1 conferida inteira e os leitores
+    fechando, a Assis segura pela Skid 3, a Rodrigues II segura pela principal, a Itajá sem a cabine órfã e o guarda com a
+    "Itajá" já marcada, a Coração 2 recusada sem a irmã e as duas juntas, a Belo Jardim (os dois nomes) e o acento, a
+    Taguaí, o `gravando` durante e antes da trava; e 12 mutações, cada regra nova quebrada de propósito derruba um teste:
+    `scratchpad/depara/r3/mutar_r3.py`. Os 38 de antes: a regra na Itajá e na Pharma II, a contratual na
+    Aquiraz 1 semeada, o kWp que fica sem as duas potências, o desconto dos sem strings e a recusa quando não sobra, a
+    cabine "UFV" fora da conta e da visão, o remendo, o Conferido, a Coração 2 semeada pela aba com os 4 inversores e o
+    nome da aba, a aba não lida, o nome do inversor novo pelo pedido e pela aba, o casar pelo nome sem o nome no
+    supervisório, o inversor de outra chave, as três chaves da Itajá marcadas, a diferença fora da regra que grava e não
+    marca — cliente, Full O&M da UFV e da chave, nome —, o inversor só do Nexus, a já marcada que fica, a CABN vazia que
+    fica, o `fora_da_regra` pelo tipo, as recusas com a culpada, o código num inversor só, a comparação que ignora a
+    coluna, o `sobrepor` que herda a grafia na Assis Skid 1 com os mapas da plataforma pela chave da API, a linhagem da
+    tela, colunas no fim, só admin e mesma origem) e 17 mutações da 2ª rodada (cada regra nova quebrada de propósito
+    derruba um teste). **Com o dado real, em memória** (a cópia do banco por GET de 20/10 e a aba real
+    `BD_Performance_copia.xlsx`; nada gravado fora; script e saída em `scratchpad/depara/r2_nexus/prova_r2*` e, com as
+    regras de 21/10, `scratchpad/depara/r3/medida_r3*`): Itajá 8 ×
+    324,5 = 2.596,0, UG 01/02 1.298,0 com a CABN e as TRÊS chaves marcadas; salvar de novo = 0 mudanças, 0 gravações; os
+    1.924 inversores das outras usinas sem nenhum valor diferente. Pharma II 4 × 169,024 + 2 × 156,951, UG 02 990,0, UG
+    01 excluída, marcada. Coração 2 semeada (Full O&M Sim, 4 inversores "Inversor 1.x", o INVERSOR04 com 20 strings,
+    812,5 kWp pela regra) e NÃO marcada: o nome no Fracttal da aba é vazio e o das Ligações é "Thopen - Coração 1 e 2 -
+    SC". Assis Skid 1 marcada e, pela chave da API (espaço duplo), ESPERADO_INV, EQUIP_NAMES, USINA_DISPLAY,
+    EQUIP_PARENTE e FULL_OM iguais a antes, POWER_INV com o kWp da regra (323,4 → 314,052: o Registro tem a contratual
+    6.296) e o FRAC_COD_INV novo; pela grafia do Nexus, nada. Sapopema marcada, soma 3.196,0. Aquiraz 1: os 10 ganham o
+    nome no supervisório pelo nome do cadastro e 326 kWp (contratual), e a chave NÃO marca (a aba não tem o nome no
+    supervisório: a comparação vê 10 inversores de cada lado). **Medida da marca nas fontes da API PV** (pv, semp,
+    alveslima, 2capi: as 130 plantas do levantamento salvas como a tela mandaria, com o nome do cadastro, as strings do
+    Nexus ou da aba, o código e a CABN verdadeiros e Conferido; regras de 21/10, com as Ligações reais): 119 chaves do
+    pedido em 66 usinas; **84 marcadas, 23 não (diferença própria), 6 seguras pela usina, 6 recusadas**; fora do pedido,
+    as 43 chaves da UFV conferidas e 32 marcadas; 48 usinas inteiras no lugar da aba, 15 sem nenhuma chave marcada, e
+    **0 no estado misto** (eram 6: Junco, Parelhas, Rodrigues I, Saturnino 1, Senador Elói I, Tanabi, com a UFV do Nexus e
+    inversores da aba). Na 2ª rodada (as regras de 20/10) eram 92 marcadas, 21 não e 6 recusadas, com 39 das 43 da UFV
+    marcadas. Por que não: inversor só no Nexus 10 (o "(OLD)", "Cancelado", "xxxx" que a API ainda lista: a tela tem o
+    "deixar de fora"), nome no Fracttal 6 (Brodowski "(sem Classificação 1) BWK100" nas Ligações, Coração, Santo Antônio
+    da Platina), a UG que só a aba tem 5 (Ouro Branco 1 a 5), o nome de exibição 2 (Taguaí 1 e 2, a regra nova), nome do
+    inversor 1 (Coração 2, o "· chave"), a cabine só no Nexus 1, a UFV em outra chave 1. As seguras: Junco 2.1 a 2.3 (pela
+    Junco 1), Primavera 2 (116) (pela "Primavera 2"), Rodrigues 2.2 e 2.3 (pela 2.1). A Belo Jardim marca e os leitores
+    seguem com "Thopen - Belo Jardim  1 - PE" (espaço duplo). As recusadas: Ipixuna do Pará (as duas CABN1, 3 chaves), Jucurutu (o "INVERSOR01 - OLD" da fonte casa com o de outra
+    chave, 2) e Pharma 2 pela grafia da fonte de 20/10 ("Inversor 1.1" contra o "INVERSOR01" gravado, 1). Fora da conta: 4
+    plantas sem chave na aba (a tela pede a escolha: Itaja 1/2 (228/229), Pharma 3/4) e 2 usinas com código repetido
+    (Embu Guaçu, Indaiatuba: pendência "inversor repetido" na tela). **Gravar em produção é com o OK do Levi**; a
+    Pharmas espera a foto do Fracttal renovada (PHS100 × PHS200/300/400, `nexus/dados/CLAUDE.md`).
 - **Provas (13/10):** `tests/test_base_equipamentos.py` (20, entre eles a usina montada igual à aba: a comparação diz
   igual e `agrupar_aba(sobrepor(aba, visão)) == agrupar_aba(aba)`); na plataforma, `tests/test_estrutura_nexus.py` (os 13
   mapas do cadastro iguais com a estrutura igual à aba, e a esperada acompanha o Nexus quando muda); no gêmeo e no

@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app, jsonify, redirect, render_template, request, session, url_for
 
 from ..dados import fatos as D
+from ..dados.livros import GravacaoRecusada
 from . import banco as B
 from . import estrutura_usina as E
 from . import ligacoes as L
@@ -83,11 +84,12 @@ def _usinas(srv) -> list[dict]:
 
 
 def _info_usinas(srv, cfg, usinas: list | None = None) -> dict:
-    """{usina_id: {nome, cliente, kwp, fracttal}}: o que a visão no formato da aba leva de cada usina, do Registro mestre
-    (o nome, o cliente e a potência da conferência) e das Ligações (o 1º nome do Fracttal ligado)."""
+    """{usina_id: {nome, codigo, cliente, kwp, kwp_de, fracttal}}: o que a visão no formato da aba e o de-para do tempo
+    real levam de cada usina, do Registro mestre (o nome, o código, o cliente e a potência da conferência, com a origem
+    dela: o de-para grava a linhagem do kWp) e das Ligações (o 1º nome do Fracttal ligado)."""
     _nomes, fr_da_usina, _dono, _lido = _fracttal(cfg)
-    return {u["id"]: {"nome": u["nome"], "cliente": u["cliente"], "kwp": u["kwp"],
-                      "fracttal": (fr_da_usina.get(u["id"]) or [{}])[0].get("chave", "")}
+    return {u["id"]: {"nome": u["nome"], "codigo": u["codigo"], "cliente": u["cliente"], "kwp": u["kwp"],
+                      "kwp_de": u["kwp_de"], "fracttal": (fr_da_usina.get(u["id"]) or [{}])[0].get("chave", "")}
             for u in (usinas if usinas is not None else _usinas(srv))}
 
 
@@ -445,6 +447,121 @@ def _ativos():
     return jsonify(E.ativos_da_usina(base, sessao, uid))
 
 
+# ── o de-para do tempo real (20/10/2026) ─────────────────────────────────────────────────────────────────────────────
+# O "Modo de-para" do tempo real e a Base · De-para de equipamentos (telas da plataforma de Performance, abertas dentro do
+# Nexus pela porta única, na MESMA origem) leem e gravam a estrutura por aqui. O livro é do Nexus: a troca integral sob
+# a trava deste processo não aceita um segundo escritor, então a plataforma manda só o remendo e o Nexus calcula o kWp
+# com o Registro mestre DESTA máquina (o mesmo que a tela Equipamentos mostra). Só administrador (`_tela`), só da mesma
+# origem (`_de_outro_site`, inclusive o GET: é a rota que o fetch da página chama), JSON nos dois sentidos. O formato é o
+# contrato com a plataforma: `nexus/cadastro/CLAUDE.md`, seção "De-para do tempo real".
+def _recusa_json(motivo: str, status: int, usina_id=None, usina_supervisorio: str = ""):
+    """`{ok: false, motivo}`; a recusa que é de UMA usina leva também `usina_id` e `usina_supervisorio` da culpada
+    (20/10/2026): o pedido leva até 50 chaves de várias usinas, e a tela tira só a culpada do lote e reenvia o resto."""
+    corpo = {"ok": False, "motivo": motivo}
+    if usina_id is not None or usina_supervisorio:
+        corpo.update(usina_id=usina_id, usina_supervisorio=usina_supervisorio or "")
+    r = jsonify(**corpo)
+    r.status_code = status
+    return r
+
+
+def _depara_estado(srv):
+    """`GET /t/base/equipamentos/depara/estado?chaves=A|B` (ou `?usinas=93,108`): a usina inteira de cada chave, com o
+    selo, o kWp do Registro mestre e de onde veio, as chaves, as cabines e os inversores. Relê o banco (nunca a cópia de
+    1 minuto): o selo que sai daqui é o que o salvar confere, e a cópia de outra máquina daria 409 em seguida."""
+    if _de_outro_site():
+        return _recusa_json("Pedido de outro site.", 403)
+    chaves = [E.texto(c) for c in str(request.args.get("chaves") or "").split("|") if E.texto(c)]
+    pedidas = [x.strip() for x in str(request.args.get("usinas") or "").split(",") if x.strip()]
+    if not chaves and not pedidas:
+        return _recusa_json("Diga as chaves do supervisório (?chaves=A|B) ou as usinas (?usinas=93,108).", 400)
+    if len(chaves) > E.MAX_DEPARA or len(pedidas) > E.MAX_DEPARA:
+        return _recusa_json(f"No máximo {E.MAX_DEPARA} chaves e {E.MAX_DEPARA} usinas por pedido.", 400)
+    try:
+        base, sessao = _banco()
+        est = E.ler(base, sessao, forcar=True)
+    except Exception as ex:      # noqa: BLE001 — sem banco
+        return _recusa_json(f"Não consegui ler a estrutura no banco ({type(ex).__name__}).", 503)
+    if est.get("erro"):
+        return _recusa_json("Não consegui ler a estrutura no banco: sem ela o selo não vale. Tente de novo.", 503)
+    info = _info_usinas(srv, current_app.config)
+    uids, sem = E.usinas_das_chaves(est, chaves, set(info))
+    fora, ordem = [], []
+    for x in pedidas:
+        uid = D._id(x)
+        if uid not in info:
+            fora.append(x)
+        elif uid not in ordem:
+            ordem.append(uid)
+    ordem += [u for u in uids if u not in ordem]
+    # `gravando` (2ª revisão final, 21/10/2026): há gravação do livro em curso neste processo. Depois do estouro de 180 s
+    # ou do 502/504 do proxy o pedido abandonado continua aqui, e o estado de agora ainda é o de antes: a tela espera o
+    # `gravando` cair antes de concluir "está como antes" (sem isso ela guardava o selo velho e o 2º Salvar levava 409)
+    return jsonify(ok=True, usinas=[E.estado_da_usina(est, uid, info[uid]) for uid in ordem], chaves_sem_usina=sem,
+                   usinas_fora_do_registro=fora, gravando=E.gravando())
+
+
+def _irmas_da_aba(aba_chaves: dict | None, cfg, info: dict) -> dict | None:
+    """{usina_id: [chaves da aba]}: a que usina cada chave da aba pertence pela regra do "Ligar pela aba" (a Usina
+    Fractall dela no de-para do Fracttal das Ligações, sem chutar), como se o livro estivesse vazio. O salvar recusa a
+    usina que tem na aba uma chave assim fora do Nexus e fora do pedido (2ª revisão final, 21/10/2026: a Coração 2 salva
+    sozinha dividia o Registro só pelas strings dela). Sem a aba ou sem as Ligações, None (não confere)."""
+    if aba_chaves is None:
+        return None
+    try:
+        return E.proposta_pela_aba(aba_chaves, L.ler(cfg), {"supervisorios": [], "cabines": [], "inversores": []},
+                                   set(info))["ligar"]
+    except Exception as ex:      # noqa: BLE001 — as Ligações ilegíveis não seguram o de-para; o log diz
+        log.warning("Equipamentos: as Ligações não foram lidas para o de-para (%s: %s).", type(ex).__name__, ex)
+        return None
+
+
+def _pede_codigo(itens) -> bool:
+    return any(isinstance(i, dict) and (i.get("codigo_fracttal") or i.get("cabine_codigo_fracttal"))
+               for it in itens if isinstance(it, dict) and isinstance(it.get("inversores"), list)
+               for i in it["inversores"])
+
+
+def _depara_salvar(srv):
+    """`POST /t/base/equipamentos/depara/salvar` (JSON `{itens: [...]}`): o remendo do modo de-para
+    (`estrutura_usina.salvar_depara`). Recusa com `{ok: false, motivo}` e o HTTP da recusa (o selo velho, 409), mais
+    `usina_id`/`usina_supervisorio` quando a recusa é de uma usina só. Os `avisos` vão como `{usina_id,
+    usina_supervisorio, tipo, texto}` (`estrutura_usina.TIPOS_AVISO`) e a `marcacao` diz, chave a chave, se passou a
+    valer no lugar da aba e, se não, por quê."""
+    cfg = current_app.config
+    if _de_outro_site():
+        return _recusa_json("Pedido de outro site: nada foi gravado.", 403)
+    dados = request.get_json(silent=True)
+    if not isinstance(dados, dict) or not isinstance(dados.get("itens"), list):
+        return _recusa_json("Pedido sem os itens do de-para: nada foi gravado.", 400)
+    try:
+        with E.em_curso():                # o estado diz `gravando` enquanto este pedido roda (a tela espera)
+            base, sessao = _banco()
+            info = _info_usinas(srv, cfg)
+            dim = E.dimensao(base, sessao)
+            if _pede_codigo(dados["itens"]) and dim.get("erro") and not dim["por_codigo"]:
+                return _recusa_json("Não consegui ler a dimensão de equipamento do Nexus: sem ela o código do Fracttal "
+                                    "não se confere. Nada foi gravado.", 503)
+            # a aba que não se leu (sem nenhuma cópia) vai como None, não como vazia: o salvar não marca a chave da UFV
+            # e das cabines sem comparar e diz por quê; vazia diria "a chave não está na aba", que é outra coisa
+            aba = E.aba_equipamentos(base, sessao)
+            aba_chaves = aba.get("chaves") if aba.get("chaves") or not aba.get("erro") else None
+            r = E.salvar_depara(dados["itens"], cfg, base, sessao, info=info, por_codigo=dim["por_codigo"],
+                                aba_chaves=aba_chaves, quem_email=_meu_email(),
+                                irmas_da_aba=_irmas_da_aba(aba_chaves, cfg, info))
+    except E.Recusada as ex:
+        return _recusa_json(str(ex), ex.status, ex.usina_id, ex.usina_supervisorio)
+    except GravacaoRecusada as ex:
+        return _recusa_json(f"O banco recusou a gravação ({ex}): nada foi gravado.", 409)
+    except Exception as ex:      # noqa: BLE001 — a gravação ou a conferência falhou: a tela diz, nada some calado
+        log.error("Equipamentos: o de-para do tempo real não foi gravado (%s: %s).", type(ex).__name__, ex)
+        return _recusa_json(f"A gravação no banco falhou ({type(ex).__name__}). Leia o estado de novo: se nada mudou, "
+                            "tente outra vez.", 500)
+    return jsonify(ok=True, usinas=r["usinas"], kwp={str(k): v for k, v in r["kwp"].items()},
+                   visao_mudou=r["visao_mudou"], erros=[], avisos=r["avisos"], mudancas=r["mudancas"],
+                   cabines_excluidas=r["cabines_excluidas"], marcacao=r["marcacao"])
+
+
 def registrar_equipamentos(bp) -> None:
     """Pendura a tela na torre Base (`/t/base/equipamentos`), vencendo o placeholder, e as ações dela."""
     @bp.route("/equipamentos")
@@ -481,3 +598,13 @@ def registrar_equipamentos(bp) -> None:
     @_tela(TITULO)
     def equipamentos_ativos(srv):  # noqa: ARG001 — o decorador garante administrador e cadastro
         return _ativos()
+
+    @bp.route("/equipamentos/depara/estado")
+    @_tela(TITULO)
+    def equipamentos_depara_estado(srv):
+        return _depara_estado(srv)
+
+    @bp.route("/equipamentos/depara/salvar", methods=["POST"])
+    @_tela(TITULO)
+    def equipamentos_depara_salvar(srv):
+        return _depara_salvar(srv)

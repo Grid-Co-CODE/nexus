@@ -28,7 +28,7 @@ hora em hora do servidor passa a gravar o que está marcado "grava"). A exceçã
 | Peça | Onde | Grava? | O que é |
 |---|---|---|---|
 | Catálogo (a matriz de barramento) | `catalogo.py` | — | os fatos ativos (a conta viva é a do `catalogo.resumo()`, que a tela mostra; os dois de extintor do HSEQ entraram em 09/10, antes de o App publicar o livro) + os que viraram fonte de outro, 7 dimensões e os **livros do Nexus** (`LIVROS`, registrados antes de existir: 28 em 20/10/2026, com o `nexus_falhas`, que a plataforma grava; `no_banco` diz quais já existiam quando foram conferidos por GET). Todo fato declara `tipo`, `chave`, `medidas` (`Medida`: coluna com a unidade, unidade, soma `aditiva`/`semi`/`nao`), `fontes` e `janela_origem`. Mais as `CONHECIDAS` (09/10): as tabelas do banco que não são fato nem livro do Nexus, aba por aba, com o papel e o porquê (o radar). **Fonte única** da tela, dos testes e desta página |
-| Domínios | `dominios.py` | — | a lista fechada de cada atributo (vala 1 limpa, 2 parcial, 3 obstruída; sensor 1 sujo, 0 VERIFICADO limpo, vazio = não verificado; situação da OS da ronda; as 6 falhas; situação da PT). Valor fora = vazio + conta na qualidade. `MAPA_ANTIGO` traduz o que cada fonte grava (inclusive o formulário da avulsa de 07/10, que nunca chegou ao banco). A avulsa usa as opções de vala do App (`VALA_OPCOES`) e grava o sensor como a palavra (`SENSOR_ROTULO`: "Sujo", "Limpo"; vazio = não verificado) desde 08/10. A anomalia da meta do Gerencial (`ANOMALIA_META`, 18/10/2026): os códigos que a plataforma põe na coluna `anomalia` do `fato_meta_usina_mes`; a frase é do Nexus |
+| Domínios | `dominios.py` | — | a lista fechada de cada atributo (vala 1 limpa, 2 parcial, 3 obstruída; sensor 1 sujo, 0 VERIFICADO limpo, vazio = não verificado; situação da OS da ronda; as 6 falhas; situação da PT). Valor fora = vazio + conta na qualidade. `MAPA_ANTIGO` traduz o que cada fonte grava (inclusive o formulário da avulsa de 07/10, que nunca chegou ao banco). A avulsa usa as opções de vala do App (`VALA_OPCOES`) e grava o sensor como a palavra (`SENSOR_ROTULO`: "Sujo", "Limpo"; vazio = não verificado) desde 08/10. A anomalia da meta do Gerencial (`ANOMALIA_META`, 18/10/2026): os códigos que a plataforma põe na coluna `anomalia` do `fato_meta_usina_mes`; a frase é do Nexus. A linhagem da estrutura das usinas (`POTENCIA_REGRA`, `FRACTTAL_LIGADO_POR`, 20/10/2026: de onde veio o kWp e como o ativo do Fracttal foi ligado; `da_lista` lê vazio o que estiver fora) |
 | Calendário | `calendario.py` → `nexus_dimensoes · dim_data` | hora em hora | 1 linha por dia, 2025 a 2027: `data_id` (AAAAMMDD), semana ISO, mês, trimestre, fim de semana, feriado nacional, dia útil |
 | Feriados locais | → `nexus_dimensoes · feriados_locais` | hora em hora | estaduais e municipais (UF, município), cruzam com a usina pela cidade |
 | Histórico (SCD tipo 2) | `historico.py` → `pessoas_historico`, `usinas_historico`, `qualidade_historico` | hora em hora | **1 linha = 1 versão de 1 membro, troca no dia de Brasília.** Cabeçalho `<id>, <rastreados…>, versao, valido_de, valido_ate, valido_de_id, valido_ate_id, vigente, inicio_presumido`. A 1ª versão vale "desde sempre" (19000101) com `inicio_presumido = 1`. 1ª medida (08/10): fechamentos que acham exatamente 1 versão, pessoa 25,4% → 100%, usina 26,4% → 100%; checklist 6,2% → 100%. As 135 + 258 linhas gravadas migram sozinhas na 1ª carga com este código |
@@ -165,7 +165,19 @@ Substitui no Nexus a aba Equipamentos do `bd_performance`, que segue como refer�
 (exceção à regra 10, declarada em `ABAS_FORA_DA_REGRA`), é a VISÃO no formato da aba Equipamentos das chaves marcadas "no
 lugar da aba", refeita a cada gravação: os leitores antigos da aba (a plataforma, o gêmeo, as Ligações e o coletor,
 quando ligado nele) trocam as linhas dessas chaves por ela. Registrado antes de existir: nasce com a 1ª chave ligada na
-tela.
+tela. **Segundo caminho de gravação (20/10/2026): o de-para do tempo real** (o "Modo de-para" da plataforma, pelas rotas
+JSON da tela, `estrutura_usina.salvar_depara`; regras em `nexus/cadastro/CLAUDE.md`), um remendo que liga o ativo do
+Fracttal ao inversor e à cabine e recalcula o kWp pela regra do Levi (a chave que o livro não tem nasce semeada pela
+aba, a chave fora da aba e do livro é recusada, e só passa a valer no lugar da aba a que difere dela apenas pela regra,
+com as outras chaves da mesma usina juntas: a usina vale por inteiro ou nada, 21/10; nunca vazio por cima do kWp
+gravado). Por
+ele vieram três colunas no FIM das dimensões
+(como o `banco.COLUNAS_NO_FIM`; a linha de antes lê vazio), a linhagem da regra 5: `potencia_regra` no `dim_cabine` e no
+`dim_inversor` (`real_por_string`, `contratual_por_string`, `informada`), `fracttal_ligado_por` (`conferido`,
+`sugestao`) e `conferido_em` no `dim_inversor`, com as listas em `dominios.py`. O `equipamento_id` do inversor e da cabine
+é derivado do código e o código tem de ser membro da `dim_equipamento` (regra 4: até 20/10 o Salvar aceitava o ID que
+viesse no pedido). A visão ganhou o "Código Fracttal" (inversor e UG) depois dos IDs. Livro, não fato: o histórico das
+conferências é o histórico por linha da API; fato próprio (`fato_decisao_conferencia`) só se o Levi pedir.
 
 **Meta do mês por usina (12/10/2026):** para a Visão do responsável (Campo · App; Levi: "construa a visão dos
 responsáveis da usina!"), a plataforma publica o Gerencial no livro `nexus_performance · fato_meta_usina_mes`

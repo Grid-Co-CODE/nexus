@@ -984,14 +984,21 @@ LIVROS = (
           "1 minuto e relê o banco antes de cada gravação",
           so_cresce=True),
     Livro("nexus_estrutura_usina", ("dim_supervisorio", "dim_cabine", "dim_inversor", "aba_equipamentos"),
-          "a cada ligação de chave e a cada Salvar da tela Equipamentos das usinas",
-          "nexus/cadastro/estrutura_usina.py, pela tela Base > Equipamentos das usinas", False,
+          "a cada ligação de chave e a cada Salvar da tela Equipamentos das usinas, e a cada Salvar do modo de-para do "
+          "tempo real (a plataforma, pelas rotas /t/base/equipamentos/depara/*)",
+          "nexus/cadastro/estrutura_usina.py, pela tela Base > Equipamentos das usinas e pelo de-para do tempo real "
+          "(salvar_depara)", False,
           "registrado em 13/10/2026 antes de existir: nasce com a 1ª chave do supervisório ligada na tela. Substitui, no "
           "Nexus, a aba Equipamentos do bd_performance (que segue como referência e não muda); a tela lê com cache de "
           "1 minuto e relê o banco antes de cada gravação. Quem mudou, só como HMAC (alterado_por_hmac). A aba "
           "aba_equipamentos é a VISÃO no formato da aba Equipamentos das chaves marcadas \"no lugar da aba\", refeita a "
           "cada gravação: a plataforma, o gêmeo, as Ligações e o coletor (quando ligado nele) trocam as linhas dessas "
-          "chaves por ela",
+          "chaves por ela. Desde 20/10/2026 (o de-para do tempo real), colunas no FIM: dim_cabine.potencia_regra e "
+          "dim_inversor.potencia_regra, fracttal_ligado_por e conferido_em (listas em dominios.POTENCIA_REGRA e "
+          "FRACTTAL_LIGADO_POR; a linha de antes lê vazio), e a visão leva o \"Código Fracttal\" do inversor e da UG "
+          "depois dos IDs. O equipamento_id do ativo é derivado do código e conferido na dimensão de equipamento; o kWp "
+          "do de-para é a regra do Levi (kWp do Registro mestre, a real ou, sem ela, a contratual, ÷ strings corretas da "
+          "usina × strings do inversor)",
           so_cresce=("dim_supervisorio", "dim_cabine", "dim_inversor")),
     Livro("nexus_setor_telas", ("fato_decisao_tela_setor",), "a cada Salvar da seção Telas por setor (Base > Acessos)",
           "nexus/auth/setor_telas.py, pela tela Base > Acessos", False,
