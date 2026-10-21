@@ -63,7 +63,8 @@ ABA_MOTIVO, ABA_MARCA, ABA_BACKOFFICE = "dim_motivo", "fato_decisao_motivo", "fa
 ABAS = (ABA_MOTIVO, ABA_MARCA, ABA_BACKOFFICE)
 # `etiqueta_fracttal` (19/10/2026, no FIM: o livro é lido pelo nome da coluna): o NOME da etiqueta do Fracttal que o App
 # põe na OS quando o técnico justifica com este motivo (e tira quando ele troca ou tira a justificativa). Quem etiqueta é
-# o App, com o login do técnico: o Nexus não tem login de gente no Fracttal (pacote _propostas/etiqueta-motivo do App)
+# o App, com o login do técnico: a justificativa chega ao Nexus pelo servidor do App, sem esse login (pacote
+# _propostas/etiqueta-motivo do App)
 CAB_MOTIVO = ("motivo_id", "nome", "descricao", "tira_da_programacao", "criado_em", "alterado_em", "excluido",
               "alterado_por_hmac", "etiqueta_fracttal")
 CAB_MARCA = ("decidida_em", "data_id", "item_id", "os", "codigo_ativo", "equipamento_id", "tarefa_chave", "motivo_id",

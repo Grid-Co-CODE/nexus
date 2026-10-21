@@ -159,9 +159,19 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   (o gestao_pcm.json) de sugestão e qualquer nome aceito. A sugestão é uma lista do Nexus (`static/pcm-etiqueta.js`:
   filtra sem acento, setas, Enter, Esc, "Sem etiqueta" limpa), não o `<datalist>` do navegador, que abria fora do estilo
   e torto (Levi, 19/10: "tá bugadasso"); vai no `Fora_da_programacao.json` (`motivos[].etiqueta`).
-  Quem etiqueta é o App, com o login do técnico (o Nexus não tem login de gente no Fracttal): ao justificar, põe a do
-  motivo; ao trocar ou tirar a justificativa, tira a antiga (decisões do Levi, 19/10); só a justificativa do técnico
-  etiqueta (a marca do PCM no Nexus, não). O contrato: `app-campo-docs/_propostas/etiqueta-motivo/LEIA.md`. A lista do
+  Quem etiqueta é o App, com o login do técnico (a justificativa chega ao Nexus pelo servidor do App, sem esse login):
+  ao justificar, põe a do motivo; ao trocar ou tirar a justificativa, tira a antiga (decisões do Levi, 19/10); só a
+  justificativa do técnico etiqueta (a marca do PCM no Nexus, não). O contrato: `app-campo-docs/_propostas/etiqueta-motivo/LEIA.md`.
+  **A nota da OS ao escolher o motivo** (20/10/2026, Levi: "quando selecionar o motivo vai preencher na nota da OS a
+  data, o nome da tarefa, o ativo e o motivo de não fazer a tarefa"; "a justificativa do técnico também deve estar na
+  OS"): uma linha no FIM da nota da OS no Fracttal ("20/10/2026 14:32 · Fora da programação: <motivo>", "Tarefa: <nome> ·
+  Ativo: <código ou todos os ativos da OS>", "Observação: <texto>"), o que já existe fica. Ao escolher (marcar ou trocar)
+  no Nexus, o Nexus escreve (`nota_os.py`, na janela do Quadro e na troca do Painel) com o login do Fracttal de quem
+  marcou: o login do Nexus pelo Fracttal abre a sessão do OS Creator da pessoa (`ponte.sessao_do_os`), e o
+  `api.editar_nota_os` reescreve a nota inteira, por isso lê a atual antes. A observação editada e o motivo tirado não
+  escrevem; quem entra pela senha não tem o login e a resposta diz que a nota não saiu; a falha na nota nunca derruba a
+  marca (a janela e o aviso dizem o resultado). A justificativa do técnico, o App escreve com o login dele, com a mesma
+  linha (`app-campo-docs/_propostas/nota-motivo/LEIA.md`). Prova: `tests/test_pcm_nota_os.py`. A lista do
   backoffice, de quem abre o Gerar a semana (como as observações).
 - **Pelo App** (`motivos_app.py`, a rota `POST /t/pcm/motivos/app`, pública só para quem assina, como a das fotos dos
   extintores): corpo JSON {os, codigo, tarefa, motivo (id; null = tirar), obs, tecnico_hmac, tecnico_nome}; cabeçalhos
@@ -198,7 +208,11 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
 - **O painel Fora da programação** (`/t/pcm/fora-da-programacao`, `templates/pcm/fora.html`): as tarefas com motivo
   que tira e TODA justificativa que veio do App, de qualquer motivo, com o texto do técnico, quem e desde quando; a
   marca do PCM que não tira não aparece (16/10/2026: as 10 justificativas "Prioridade" de um técnico estavam gravadas e
-  o painel mostrava 0; o Levi escolheu listá-las aqui). "Do App" é pelo MOTIVO (`origem_motivo`/`quem_motivo` de
+  o painel mostrava 0; o Levi escolheu listá-las aqui). **A que não tira fica no painel só no dia em que foi
+  justificada** (20/10/2026, Levi: "Se o motivo não tira da programação deve ir para o painel só se o motivo for no
+  mesmo dia que eu estou vendo, se já passou e a tarefa já voltou para programação deve ir apenas para histórico"): pela
+  justificativa mais nova do motivo (`telas._ultima_justificativa`, no relógio das marcas, `M._agora`); no dia seguinte
+  ela sai do painel e o Histórico diz "Seguiu na programação"; justificada de novo hoje, volta. "Do App" é pelo MOTIVO (`origem_motivo`/`quem_motivo` de
   `motivos.vigentes`: a 1ª decisão da sequência com o mesmo motivo), não pela última decisão: o PCM que edita a
   observação não tira a justificativa daqui nem troca quem marcou (antes ela sumia e virava do PCM). A FINALIZADA no
   Fracttal sai sozinha (pelo estado da tarefa na Gestão PCM; a marca fica no histórico). **Filtros** (Levi, 16/10:

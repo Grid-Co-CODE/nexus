@@ -964,3 +964,36 @@ def test_a_etiqueta_do_fracttal_de_cada_motivo(app, logado, tela):
                                                                   "tira": "1", "etiqueta": ""})
     assert r.status_code == 303
     assert next(m for m in M.ativos(M.ler(cfg, forcar=True)) if m["id"] == am["id"])["etiqueta"] == ""
+
+
+
+def test_justificativa_que_nao_tira_fica_no_painel_so_no_dia(app, logado, tela, monkeypatch):
+    """20/10/2026, Levi: "Se o motivo não tira da programação deve ir para o painel só se o motivo for no mesmo dia que eu
+    estou vendo, se já passou e a tarefa já voltou para programação deve ir apenas para histórico". A justificativa do
+    App com um motivo que não tira fica no painel no dia em que foi feita; no dia seguinte sai dele e fica no Histórico
+    ("Seguiu na programação"). Justificada de novo hoje, volta. O motivo que tira segue no painel enquanto valer."""
+    cfg = app.config
+    hora = [datetime(2026, 10, 19, 14, 0, tzinfo=timezone.utc)]                     # 11:00 de Brasília
+    monkeypatch.setattr(M, "_agora", lambda: hora[0])
+    ids = {m["nome"]: m["id"] for m in M.ativos(M.ler(cfg))}
+    pri = {"os": "5", "codigo": "UFV1-CAB01", "tarefa": "[Grid Co.] - MPM - Cabine", "motivo": ids["Prioridade"],
+           "obs": "atendi a parada antes", "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
+    mat = {"os": "5", "codigo": "UFV1-TR01", "tarefa": "[Grid Co.] - MPM - Trafo", "motivo": ids["Aguardando material"],
+           "obs": "sem o fusível", "tecnico_hmac": TEC, "tecnico_nome": "Técnico Teste"}
+    assert _pelo_app(app, pri).get_json()["gravou"] and _pelo_app(app, mat).get_json()["gravou"]
+
+    def painel():
+        return " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
+    html = painel()                                                          # no mesmo dia, as duas
+    assert "atendi a parada antes" in html and "sem o fusível" in html
+    hora[0] = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)             # no dia seguinte
+    html = painel()
+    assert "atendi a parada antes" not in html and "sem o fusível" in html
+    assert '<span data-fp-n="so_app">0</span>' in html
+    hist = " ".join(logado.get("/t/pcm/fora-da-programacao?ver=historico").get_data(as_text=True).split())
+    linha = next(t for t in hist.split("<tr") if "atendi a parada antes" in t)      # a linha da Cabine
+    assert "Seguiu na programação" in linha and "Ainda no painel" not in linha
+    trafo = next(t for t in hist.split("<tr") if "sem o fusível" in t)                # o que tira segue no painel
+    assert "Ainda no painel" in trafo
+    assert _pelo_app(app, dict(pri, obs="de novo hoje")).get_json()["gravou"]  # justificada de novo hoje: volta
+    assert "de novo hoje" in painel()

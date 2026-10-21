@@ -337,7 +337,8 @@
           return;
         }
         aplicarMarca(t, x.j);
-        t._mpMsg = (x.j.gravou ? x.j.efeito : "Nada mudou.") + (x.j.arquivo && x.j.arquivo.texto ? " " + x.j.arquivo.texto : "");
+        t._mpMsg = (x.j.gravou ? x.j.efeito : "Nada mudou.") + (x.j.arquivo && x.j.arquivo.texto ? " " + x.j.arquivo.texto : "") +
+          (x.j.nota_txt ? " " + x.j.nota_txt : "");          // a nota da OS no Fracttal (20/10/2026)
         abrir(i, abriu);
         delete t._mpMsg;
       })

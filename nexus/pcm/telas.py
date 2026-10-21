@@ -20,7 +20,7 @@ from flask import abort, current_app, jsonify, redirect, render_template, reques
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, motivos_app as MA
 from . import observacoes as O
 from . import atribuicoes as AT, tecnicos_usina as TU
-from . import publicar as PB, quadro as Q, semana as S
+from . import nota_os as NO, publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
 
@@ -524,11 +524,17 @@ def registrar_pcm(bp) -> None:
         arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
         marca = r["marca"]
         geral = not alvo["codigo"]
+        # a nota da OS no Fracttal ao ESCOLHER o motivo (20/10/2026, `nota_os`): marcar ou trocar; a observação e o tirar, não
+        nota = None
+        if not tirar and r["gravou"] and marca and (not atual or atual["motivo_id"] != marca["motivo_id"]):
+            nota = NO.escrever(current_app._get_current_object(), linha["os"], NO.linha(
+                M._agora(), marca["motivo"], linha["tarefa"], alvo["codigo"], str(d.get("obs") or "")))
         os_, t_ = linha["os"], M.norm(linha["tarefa"])
         # a que passou a valer na linha: a do ativo vence a da OS
         efetiva = ((antes.get((os_, M.canon(linha["codigo"]), t_)) if linha["codigo"] else None) or marca) if geral             else (marca or antes.get((os_, "", t_)))
         return jsonify(ok=True, gravou=r["gravou"], geral=geral, marca=_marca_curta(marca) if marca else None,
-                       efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq,
+                       efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq, nota=nota,
+                       nota_txt=NO.frase(nota),
                        efeito=_efeito(efetiva, _destino_quadro(cfg, base)["id"], tirou=tirar and not efetiva))
 
     @bp.route("/motivos/app", methods=["POST"])
@@ -605,12 +611,20 @@ def registrar_pcm(bp) -> None:
         else:
             arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
             nova = r["marca"]
+            # trocar o motivo é escolher: a nota da OS no Fracttal (20/10/2026, `nota_os`)
+            nota = None
+            if not tirar and r["gravou"] and nova and nova["motivo_id"] != m["motivo_id"]:
+                nota = NO.escrever(current_app._get_current_object(), alvo["os"], NO.linha(
+                    M._agora(), nova["motivo"], alvo["tarefa"], alvo["codigo"], obs))
             ok = ("Nada mudou." if not r["gravou"] else
                   f"Motivo tirado da OS {alvo['os']}." if tirar else
                   f"OS {alvo['os']}: {nova['motivo']}." if nova and nova["motivo_id"] != m["motivo_id"] else
                   f"OS {alvo['os']}: observação salva.")
-            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
-                                            "erro": "" if arq["ok"] else arq["texto"]}
+            session["pcm_motivos_aviso"] = {
+                "ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "",
+                                           NO.frase(nota) if nota and nota.get("ok") else "") if x),
+                "erro": " ".join(x for x in ("" if arq["ok"] else arq["texto"],
+                                             NO.frase(nota) if nota and not nota.get("ok") else "") if x)}
         return redirect(na_raiz("/t/pcm/fora-da-programacao") + ("?" + urlencode(volta) if volta else ""), code=303)
 
     @bp.route("/fora-da-programacao/cadastro", methods=["POST"])
@@ -1350,6 +1364,20 @@ def _com_os(texto, g: dict | None) -> Markup:
     return Markup(_NUM_OS.sub(lambda x: _botao_os(x.group(1), g), str(escape(texto or ""))))
 
 
+def _ultima_justificativa(hist: list[dict], motivo_id, desde: str = ""):
+    """A hora (Brasília) da justificativa mais nova do motivo `motivo_id` desde `desde`, no histórico da tarefa."""
+    hs = [M._brt(h["quando"]) for h in hist if h.get("motivo_id") == motivo_id and str(h.get("quando") or "") >= desde]
+    hs = [h for h in hs if h]
+    return max(hs) if hs else None
+
+
+def _so_no_dia(tira: bool, ultima, dia_hoje) -> bool:
+    """O motivo que NÃO tira da programação fica no painel só no dia em que foi justificado (20/10/2026, Levi: "Se o
+    motivo não tira da programação deve ir para o painel só se o motivo for no mesmo dia que eu estou vendo, se já passou
+    e a tarefa já voltou para programação deve ir apenas para histórico"). True = sai do painel."""
+    return not tira and (ultima is None or ultima.date() != dia_hoje)
+
+
 def _ctx_fora(cfg, args) -> dict:
     """O painel Fora da programação: as tarefas com um motivo que tira da programação e TODA justificativa que veio do
     App, de qualquer motivo, menos as finalizadas no Fracttal; o filtro é só o Motivo (Levi, 16/10/2026). A justificativa
@@ -1360,6 +1388,7 @@ def _ctx_fora(cfg, args) -> dict:
     motivos = M.ativos(est)
     g = _gestao_tarefas(cfg)
     hoje = Q.hoje()
+    dia_hoje = M._agora().astimezone(_BRT).date()        # o mesmo relógio das marcas
     linhas, finalizadas = [], 0
     for m in vig.values():
         # a marca do PCM só aparece se tira; a do App, sempre (16/10/2026: as 10 justificativas "Prioridade" do técnico,
@@ -1377,6 +1406,8 @@ def _ctx_fora(cfg, args) -> dict:
         hist = [dict(h, quando_txt=M._brt(h["quando"]).strftime("%d/%m/%Y %H:%M") if M._brt(h["quando"]) else "",
                      do_app=h["origem"] == "app", obs_html=_com_os(h["obs"], g))
                 for h in M.historico(cfg, est, {m["item_id"], M.item_id(m["os"], "", m["tarefa"])})]
+        if _so_no_dia(m["tira"], _ultima_justificativa(hist, m["motivo_id"]) or d, dia_hoje):
+            continue                                     # o que não tira e já passou do dia: só no Histórico
         linhas.append(dict(m, usina=usina, usina_nome=_nome_da_usina(usina), vezes=len(hist), historico=hist,
                            desde_txt=d.strftime("%d/%m/%Y %H:%M") if d else "", os_html=Markup(_botao_os(m["os"], g)),
                            obs_html=_com_os(m["obs"], g),
@@ -1416,7 +1447,9 @@ def _ctx_fora(cfg, args) -> dict:
 
 # como o período acabou, no Histórico: o texto e o tom (o resolvido em verde, o que segue no painel em âmbar)
 _SAIDA = {"tirado": ("Retornou à programação", "ok"), "finalizada": ("Finalizada no Fracttal", "ok"),
-          "excluido": ("Motivo tirado do cadastro", "neutro"), "painel": ("Ainda no painel", "alerta")}
+          "excluido": ("Motivo tirado do cadastro", "neutro"), "painel": ("Ainda no painel", "alerta"),
+          # o motivo que não tira, de um dia que já passou: a tarefa seguiu programada e saiu do painel (20/10/2026)
+          "seguiu": ("Seguiu na programação", "ok")}
 
 
 def _ctx_historico(cfg, args) -> dict:
@@ -1428,6 +1461,7 @@ def _ctx_historico(cfg, args) -> dict:
     est = M.ler(cfg)
     g = _gestao_tarefas(cfg)
     hoje = Q.hoje()
+    dia_hoje = M._agora().astimezone(_BRT).date()
     linhas = []
     for e in M.episodios(cfg, est):
         if not (e["tira"] or e["origem"] == "app"):
@@ -1438,8 +1472,12 @@ def _ctx_historico(cfg, args) -> dict:
         if e["saida"] == "troca":
             saida, tom = f"Trocou para {e['para']}", "neutro"
         else:
-            saida, tom = _SAIDA[e["saida"] or ("excluido" if e["excluido"] else
-                                                "finalizada" if finalizada else "painel")]
+            aberto = "excluido" if e["excluido"] else "finalizada" if finalizada else "painel"
+            if aberto == "painel" and not e["saida"]:
+                hist = M.historico(cfg, est, {e["item_id"], M.item_id(e["os"], "", e["tarefa"])})
+                if _so_no_dia(e["tira"], _ultima_justificativa(hist, e["motivo_id"], e["desde"]) or d, dia_hoje):
+                    aberto = "seguiu"
+            saida, tom = _SAIDA[e["saida"] or aberto]
         usina = e["usina"] or next((str(t.get("usina") or "") for t in (g or {}).get("por_os", {}).get(e["os"], [])), "")
         linhas.append(dict(e, usina=usina, usina_nome=_nome_da_usina(usina), os_html=Markup(_botao_os(e["os"], g)),
                            obs_html=_com_os(e["obs"], g), desde_txt=d.strftime("%d/%m/%Y %H:%M") if d else "",
@@ -1467,8 +1505,8 @@ def _ctx_historico(cfg, args) -> dict:
 def _etiquetas_sugeridas(cfg, motivos) -> list[str]:
     """As etiquetas do Fracttal para sugerir no cadastro (19/10/2026): as que já estão nas OS (as tarefas do
     gestao_pcm.json, a mais usada primeiro; 44 nomes em 19/10) e as que os motivos já usam. O catálogo inteiro do
-    Fracttal só sai com o login de uma pessoa, que o Nexus não tem; o campo aceita qualquer nome (o App casa sem acento
-    e sem caixa)."""
+    Fracttal sai com o login de uma pessoa (a sessão do OS Creator de quem entrou pelo Fracttal), e não é lido aqui; o
+    campo aceita qualquer nome (o App casa sem acento e sem caixa)."""
     conta = Counter()
     try:
         for t in (fonte.ler_gestao(cfg).dados or {}).get("tarefas") or []:

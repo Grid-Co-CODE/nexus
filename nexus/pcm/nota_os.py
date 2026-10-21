@@ -1,0 +1,73 @@
+"""A nota da OS no Fracttal quando o motivo é escolhido (20/10/2026).
+
+Levi: "quando selecionar o motivo vai preencher na nota da OS a data, o nome da tarefa, o ativo e o motivo de não fazer a
+tarefa"; e "a justificativa do técnico também deve estar na OS". O Nexus escreve nas marcas feitas nele (a janela do
+Quadro e o Painel do Fora da programação), com o login do Fracttal de quem marcou: a sessão do OS Creator da pessoa (o
+cookie `os_sessao`, que o login do Nexus pelo Fracttal abre). A justificativa do técnico chega do App sem o login dele:
+quem escreve é o App (o pedido `_propostas/nota-motivo/LEIA.md` do App de Campo).
+
+A linha vai no FIM da nota, e o que já existe fica: o `editar_nota_os` do OS Creator reescreve a nota inteira, então se
+lê a nota atual (o `note` da 1ª tarefa da OS no `work_orders_tasks_new_list`, o mesmo que ele lê) e grava ela + a linha.
+Escreve ao ESCOLHER o motivo (marcar ou trocar); a observação editada e o motivo tirado não escrevem. A nota é efeito
+colateral: a falha nela (sem login do Fracttal, OS concluída, o Fracttal fora) nunca derruba a marca, só é dita.
+"""
+from datetime import datetime, timedelta, timezone
+
+_BRT = timezone(timedelta(hours=-3))
+
+
+def linha(quando: datetime, motivo: str, tarefa: str, codigo: str, obs: str) -> str:
+    """O que vai na nota, como o Levi escolheu (20/10/2026): a data e a hora, o motivo, a tarefa, o ativo e a observação."""
+    partes = [f"{quando.astimezone(_BRT):%d/%m/%Y %H:%M} · Fora da programação: {str(motivo or '').strip()}",
+              f"Tarefa: {str(tarefa or '').strip()} · Ativo: {str(codigo or '').strip() or 'todos os ativos da OS'}"]
+    if str(obs or "").strip():
+        partes.append(f"Observação: {str(obs).strip()}")
+    return "\n".join(partes)
+
+
+def juntar(atual, nova: str) -> str:
+    """A nota de agora com a linha nova no fim (o RPC às vezes manda o texto "None" na nota vazia)."""
+    a = str(atual or "").strip()
+    if a.lower() == "none":
+        a = ""
+    return f"{a}\n\n{nova}" if a else nova
+
+
+def gravar(api, folio, texto: str) -> dict:
+    """Acrescenta `texto` à nota da OS `folio` pelo `api` do OS Creator (na sessão de quem marcou). {"ok"} ou
+    {"ok": False, "erro"}."""
+    wid = api._wo_id_por_folio(folio)
+    if not wid:
+        return {"ok": False, "erro": f"não achei a OS {folio} no Fracttal"}
+    r = api._rpc_call(api.RPC_WO_TASKS, {"page": 1, "limit": 50, "start": 0, "id_work_order": wid})
+    d = r.get("data") if isinstance(r, dict) else r
+    t0 = d[0] if isinstance(d, list) and d else {}
+    res = api.editar_nota_os(wid, juntar(t0.get("note"), texto))
+    return {"ok": True} if res.get("ok") else {"ok": False, "erro": res.get("erro") or "o Fracttal recusou a nota"}
+
+
+def escrever(app, folio, texto: str) -> dict:
+    """A nota da OS com o login do Fracttal de quem está no pedido. Sem ele (o administrador pela senha), não escreve."""
+    from ..torres.oscreator import ponte
+    s = ponte.sessao_do_os(app)
+    jwt = str(s.get("jwt") or "")
+    if not jwt:
+        return {"ok": False, "erro": "sem o login do Fracttal nesta sessão (quem entra pela senha não tem)"}
+    email = str((s.get("conta") or {}).get("email") or "")
+    ponte.clone(app)                             # põe o `api` do clone no sys.path
+    import api as os_api                         # noqa: E402
+    from os_web import sessao as os_sessao       # noqa: E402
+    with os_sessao.contexto(jwt, email):
+        try:
+            return gravar(os_api, folio, texto)
+        except os_api.SessionExpired:
+            return {"ok": False, "erro": "a sessão do Fracttal caiu: entre de novo"}
+        except Exception as e:                   # noqa: BLE001 — rede, 429, Fracttal fora: a marca vale, a nota não
+            return {"ok": False, "erro": f"o Fracttal não respondeu ({type(e).__name__})"}
+
+
+def frase(r: dict | None) -> str:
+    """O que a tela diz da nota."""
+    if not r:
+        return ""
+    return "Nota da OS escrita no Fracttal." if r.get("ok") else f"A nota da OS não foi escrita: {r.get('erro')}."
