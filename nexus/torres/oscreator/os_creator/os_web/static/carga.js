@@ -111,7 +111,35 @@
     return p;
   }
 
-  function buscar(url, opcoes, texto) { return durante(fetch(url, opcoes), texto); }
+  // A GRAVAÇÃO que fica sem resposta (21/10/2026): o deploy das 09:57 reiniciou o servidor no meio de um "Criar OS", o
+  // proxy devolveu a resposta vazia e a tela mostrou "SyntaxError: ... Unexpected end of JSON input"; a OS 16932 tinha
+  // sido criada no Fracttal (o ticket, que vem depois, não). Quem lê "erro" cria de novo e duplica. Numa gravação, a
+  // resposta vazia, o erro sem JSON (o 502 do proxy, a página de erro) e a rede que caiu viram uma resposta em JSON com o
+  // aviso: as telas já mostram o `erro` que vem nela. A leitura e a resposta da rota (o erro dela em JSON, o PDF) passam
+  // como vieram.
+  const SEM_RESPOSTA = 'O servidor não respondeu (pode ter sido reiniciado agora). A gravação pode ter sido feita: '
+    + 'confira no Fracttal antes de tentar de novo.';
+  function gravacao(opcoes) {
+    const m = String((opcoes && opcoes.method) || 'GET').toUpperCase();
+    return m !== 'GET' && m !== 'HEAD';
+  }
+  function semResposta(status) {
+    return new Response(JSON.stringify({ok: false, erro: SEM_RESPOSTA, sem_resposta: true}),
+                        {status: status >= 400 ? status : 502, headers: {'Content-Type': 'application/json'}});
+  }
+  async function conferida(pedido, opcoes) {
+    if (!gravacao(opcoes)) return pedido;
+    let r;
+    try { r = await pedido; } catch (e) { return semResposta(502); }          // a rede caiu no meio
+    const tipo = (r.headers && r.headers.get('Content-Type')) || '';
+    if (tipo.indexOf('json') >= 0) return r;                                   // a resposta da rota
+    if (!r.ok) return semResposta(r.status);                                   // o erro do proxy ou do servidor
+    if (tipo && tipo.indexOf('text/') !== 0) return r;                         // um arquivo (o PDF da OS)
+    const corpo = await r.clone().text().catch(function () { return ''; });
+    return corpo.trim() ? r : semResposta(502);                                // 200 sem corpo: não se sabe se gravou
+  }
+
+  function buscar(url, opcoes, texto) { return durante(conferida(fetch(url, opcoes), opcoes), texto); }
 
   function mostrar(t, repetir) {
     montar(); clearTimeout(atraso); clearInterval(relogio);

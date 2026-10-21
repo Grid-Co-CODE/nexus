@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-20T13:20:13",
+ "atualizado_em": "2026-10-21T15:42:45",
  "arquivos": {
   "chamado_garantia/README.md": "ebd082efad2568dc",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -61,7 +61,7 @@
   "os_creator/os_web/static/acomp.js": "9bd40a787f890048",
   "os_creator/os_web/static/ativos.css": "6880fc9b2877824e",
   "os_creator/os_web/static/ativos.js": "ade856c5b6f90f7f",
-  "os_creator/os_web/static/carga.js": "b50bf2e4f2fa6682",
+  "os_creator/os_web/static/carga.js": "8b0c67cd85dd0d9a",
   "os_creator/os_web/static/chamados.css": "cbfaad7ca53e6d5b",
   "os_creator/os_web/static/clonar.css": "184e2ba24e005a65",
   "os_creator/os_web/static/clonar.js": "a31709ed5c0fccdd",

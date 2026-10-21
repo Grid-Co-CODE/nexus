@@ -783,6 +783,17 @@ chegado, então o catálogo de ativos não era a espera daquele clique.
   dois botões; Tentar de novo zerou a conta e o círculo seguiu; aos 48 s de novo os botões; Fechar escondeu o círculo.
   Testes do tema claro e da torre verdes; oem: `--aplicar` levou `carga.js` e `os.css`, 680 testes web verdes lá.
 
+- **A gravação sem resposta** (21/10/2026): Levi criou uma OS pelo Performance › Trackers às 10:03 e a tela disse
+  "SyntaxError: Failed to execute 'json' on 'Response': Unexpected end of JSON input". O deploy das 09:57 reiniciou o
+  servidor no meio do pedido, o proxy devolveu a resposta vazia, e a OS tinha sido criada no Fracttal (o ticket da aba
+  Trackers, que vem depois, não). Quem lê "erro" cria de novo e duplica. Agora o `OsCarga.buscar`, numa GRAVAÇÃO (método
+  que não é GET), troca a resposta vazia, o erro sem JSON (o 502 do proxy, a página de erro) e a rede que caiu por uma
+  resposta em JSON com `erro` = "O servidor não respondeu (pode ter sido reiniciado agora). A gravação pode ter sido
+  feita: confira no Fracttal antes de tentar de novo." e `sem_resposta: true`. Todas as telas que gravam passam por ele
+  e já mostram o `erro` do JSON. A leitura e a resposta da própria rota (o erro dela em JSON, o PDF) passam como vieram.
+  Prova: `tests/test_oscreator_sem_resposta_21_10.py` (o `carga.js` no node com uma página de mentira). O que corta o
+  pedido, o restart do deploy no meio de uma gravação, está na fila do `DESEMPENHO.md`.
+
 ## Debaixo do /nexus (porta única, 09/10/2026)
 
 Levi: "a partir de segunda quero o Nexus como link principal". O servidor serviu o Nexus em `app.gridco.com.br/nexus` até a
