@@ -44,11 +44,12 @@ corretas, a cabine (sempre a CABN do Fracttal, "UG NN"), o ativo do Fracttal do 
 código e conferido na dimensão de equipamento) e o Conferido; o kWp da usina inteira é recalculado pela regra do Levi.
 A chave só passa a valer no lugar da aba se, depois do remendo, ela difere da aba APENAS pela regra do de-para (strings,
 cabine pela CABN, o kWp que a regra calculou, a UFV do Registro e o "N de Inversores" contado; `fora_da_regra`), e a
-usina vale por inteiro ou nada (`_marcar`, 21/10/2026): as chaves dela que seguem com a aba marcam juntas ou nenhuma (a
-do pedido igual à aba marca sozinha). O resto grava, não marca e vai nos avisos. A chave fora da aba e do livro (a "Nova
-chave") e a usina com uma chave irmã da aba fora do livro são recusadas. Nunca exclui o que não veio (a diferença para o
-Salvar da tela); só sai a cabine da aba, sem código do Fracttal, que o salvar esvaziou (e nem ela se ficaria órfã nos
-leitores). A linhagem vai em três colunas no fim (`potencia_regra`, `fracttal_ligado_por`, `conferido_em`, listas em
+usina vale por inteiro ou nada (`_marcar`, 21/10/2026): as chaves dela que seguem com a aba marcam juntas ou nenhuma,
+sem exceção, e a já marcada cuja visão o salvar mudou numa usina segura volta para a aba. O resto grava, não marca e vai
+nos avisos. A chave fora da aba e do livro (a "Nova chave"), a usina com uma chave irmã da aba fora do livro e, com a
+chave da UFV valendo, mover de cabine os inversores de uma chave que segue com a aba são recusados. Nunca exclui o que
+não veio (a diferença para o Salvar da tela); só sai a cabine sem código do Fracttal e sem inversor no Nexus (e nem ela
+se ficaria órfã nos leitores). A linhagem vai em três colunas no fim (`potencia_regra`, `fracttal_ligado_por`, `conferido_em`, listas em
 `nexus/dados/dominios.py`), e a visão ganhou o "Código Fracttal".
 """
 import contextlib
@@ -1495,9 +1496,10 @@ def _soma_na_aba(aba_chaves: dict | None, chave: str) -> float:
     return sum(a.get("kwp") or 0 for a in ((aba_chaves or {}).get(chave) or {}).get("inversores") or ())
 
 
-def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos) -> list[dict]:
+def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos, visao_antes: dict) -> list[dict]:
     """Marca no lugar da aba, usina a usina, o que passa (`fora_da_regra` vazio) e devolve a `marcacao` [{usina_id,
-    usina_supervisorio, principal, marcada, fora_da_regra}] (as do pedido primeiro, na ordem dele).
+    usina_supervisorio, principal, marcada, fora_da_regra}] (as do pedido primeiro, na ordem dele). `visao_antes` =
+    {usina_id: as linhas de `visao_da_usina(..., todas=True)` do começo do salvar}, para saber o que ele mudou.
 
     A usina vale por INTEIRO ou nada (2ª revisão final, 21/10/2026): a regra do kWp recalcula a usina inteira, e marcar só
     parte das chaves deixava os leitores misturando a UFV e as UG do Nexus com inversores da aba, nada fechando entre si nem
@@ -1506,10 +1508,16 @@ def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos) -> 
     2ª revisão achou em 6 usinas reais: Junco, Parelhas, Rodrigues I, Saturnino 1, Senador Elói I, Tanabi). Então:
     - todas as chaves da usina que ainda seguem com a aba são conferidas JUNTAS: as do pedido, a da UFV e das cabines
       (`principal`) e as outras com inversor no Nexus ou na aba. Só marcam se TODAS passarem; a que não passa segura as
-      outras, e o aviso diz qual, por quê e quanto os leitores somariam se só as outras marcassem;
-    - a exceção é a chave do pedido IGUAL à aba (nenhuma diferença, nem de kWp além dos 0,05 da comparação): ela marca
-      mesmo com a usina segura, porque com ela os leitores não mudam (só ganham o "Código Fracttal");
-    - a já marcada continua marcada (não é conferida de novo)."""
+      outras, e o aviso diz qual, por quê e quanto os leitores somariam se só as outras marcassem. SEM exceção (3ª
+      revisão, 21/10/2026): até ela a chave do pedido IGUAL à aba marcava sozinha com a usina segura ("os leitores não
+      mudam"), e era a porta do estado parcial: a Itaja 2 marcada sozinha (a Itaja 1 com o Full O&M diferente na aba), o
+      Salvar seguinte da Itaja 1 com 20 strings refazia o kWp da usina inteira e a Itaja 2 levava 316,18 por inversor
+      aos leitores (2.596 ÷ 156 × 19) ao lado da UG 02 da aba com 1.298,08;
+    - a já marcada não é conferida de novo e continua marcada enquanto este salvar não mudar o que ela leva aos leitores
+      (as linhas dela na visão, `visao_antes`). Numa usina que fica segura, a já marcada cuja visão MUDOU volta para a
+      aba (com o aviso): é o mesmo estado parcial pela outra porta (a chave marcada na Base > Equipamentos, ou a
+      principal marcada sozinha antes desta regra), o kWp e as UG recalculados indo aos leitores ao lado dos inversores
+      da aba. A já marcada cuja visão não mudou fica como está: tirá-la agora mudaria os leitores sem motivo."""
     marcacao = []
     pos = {sid: n for n, sid in enumerate(dict.fromkeys(sid_de.values()))}
 
@@ -1519,6 +1527,10 @@ def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos) -> 
         u, info_u = da_usina(est, uid), info.get(uid)
         nome = texto((info_u or {}).get("nome")) or f"usina {uid}"
         linhas_u = visao_da_usina(u, info_u, todas=True)
+        antes = (visao_antes or {}).get(uid) or []
+        mudaram = [s for s in u["supervisorios"] if ja(s) and not _mesma_visao(
+            [x for x in antes if x["supervisorio_id"] == s["supervisorio_id"]],
+            [x for x in linhas_u if x["supervisorio_id"] == s["supervisorio_id"]])]
         com_inv = {i["supervisorio_id"] for i in u["inversores"]}
         alvo = sorted((s for s in u["supervisorios"] if s["supervisorio_id"] in pos and not ja(s)),
                       key=lambda s: pos[s["supervisorio_id"]])
@@ -1543,7 +1555,7 @@ def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos) -> 
         seguras = []
         for s in alvo:
             sid, f = s["supervisorio_id"], fora[s["supervisorio_id"]]
-            ok = not presas or (sid in pos and bool((cmp[sid] or {}).get("iguais")))
+            ok = not presas
             papel = f" (a chave da UFV e das cabines de {nome})" if s["principal"] and sid not in pos else ""
             if ok:
                 muda(s, substitui_aba=True)
@@ -1562,7 +1574,22 @@ def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos) -> 
                                      "A estrutura ficou gravada no Nexus; os leitores seguem com a aba nesta chave."))
             marcacao.append({"usina_id": uid, "usina_supervisorio": s["usina_supervisorio"], "principal": s["principal"],
                              "marcada": ok, "fora_da_regra": f})
-        if seguras:
+        # a já marcada cuja visão este salvar mudou, numa usina que fica segura: volta para a aba (ver a docstring)
+        voltaram = mudaram if presas else []
+        for s in voltaram:
+            muda(s, substitui_aba=False)
+            papel = f" (a chave da UFV e das cabines de {nome})" if s["principal"] else ""
+            f = [f"{quem}, da mesma usina, não vale(m) no lugar da aba, e a usina vale por inteiro ou nada: ela valia, e "
+                 "este Salvar mudou o que ela leva aos leitores"]
+            avisos.append(_aviso(uid, s["usina_supervisorio"], "nao_marcada",
+                                 f"A chave “{s['usina_supervisorio']}”{papel} valia no lugar da aba e voltou para a aba: "
+                                 "este Salvar mudou o que ela leva aos leitores (a regra recalcula o kWp e as cabines da "
+                                 f"usina inteira), e {quem}, da mesma usina, não vale(m) no lugar da aba; a usina vale por "
+                                 "inteiro ou nada. A estrutura ficou gravada no Nexus; os leitores seguem com a aba nesta "
+                                 "chave até a usina valer inteira."))
+            marcacao.append({"usina_id": uid, "usina_supervisorio": s["usina_supervisorio"], "principal": s["principal"],
+                             "marcada": False, "fora_da_regra": f})
+        if seguras or voltaram:
             # o que os leitores somariam se as que passam marcassem sem as outras (o estado misto que a regra evita)
             def soma(vale):
                 t = 0.0
@@ -1572,7 +1599,7 @@ def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos) -> 
                     else:
                         t += _soma_na_aba(aba_chaves, s["usina_supervisorio"])
                 return round(t, 3)
-            passam = {s["supervisorio_id"] for s in seguras}
+            passam = {s["supervisorio_id"] for s in seguras + voltaram}
             ja_vale = [s["usina_supervisorio"] for s in u["supervisorios"] if s["substitui_aba"]]
             t = (f"{nome}: a usina não passou a valer no lugar da aba, porque {quem} não vale(m), e a usina vale por inteiro "
                  "ou nada (a regra recalcula o kWp da usina inteira). Marcando só as outras, os leitores somariam "
@@ -1648,22 +1675,24 @@ def salvar_depara(itens, cfg, base, sessao, *, info: dict, por_codigo: dict, aba
     5. MARCA no lugar da aba (`_marcar`) só o que, depois do remendo, difere da aba APENAS pela regra do de-para
        (`fora_da_regra`: strings, cabine pela CABN, kWp que a regra calculou, a UFV do Registro e o "N de Inversores"
        contado); qualquer outra diferença grava a estrutura, NÃO marca e vai nos avisos ("não vale no lugar da aba
-       porque: ..."). A chave já marcada continua marcada. **A usina vale por inteiro ou nada** (2ª revisão final,
-       21/10/2026): quando o salvar mexe no kWp ou nas cabines da usina (ou a chave do pedido difere da aba em qualquer
-       coisa), TODAS as chaves dela que ainda seguem com a aba (as do pedido, a da UFV e das cabines, e as outras com
-       inversor no Nexus ou na aba) são conferidas juntas e só marcam se todas passarem. Caso: a regra recalcula o kWp da
-       usina inteira, e marcar só parte deixava os leitores com a UFV e as UG do Nexus e os inversores da aba (a Assis só
-       com a Skid 1: UFV 6.296 e inversores 6.446,0, +2,4%; a Rodrigues II: 2.116,8 × 2.339,4, +10,5%; a Itajá com o Full
-       O&M da Itaja 1 diferente: a UG 01 excluída e os 4 inversores da Itaja 1, vindos da aba, apontando para ela). A
-       chave do pedido igual à aba (nenhuma diferença), sem mexer em kWp nem cabine, marca sozinha: os leitores não mudam.
+       porque: ..."). **A usina vale por inteiro ou nada** (2ª revisão final e 3ª revisão, 21/10/2026): TODAS as chaves
+       dela que ainda seguem com a aba (as do pedido, a da UFV e das cabines, e as outras com inversor no Nexus ou na
+       aba) são conferidas juntas e só marcam se todas passarem, sem exceção (nem a chave igual à aba); a já marcada
+       fica, menos numa usina segura em que este salvar mudou a visão dela: volta para a aba. Caso: a regra recalcula o
+       kWp da usina inteira, e marcar só parte deixava os leitores com a UFV e as UG do Nexus e os inversores da aba (a
+       Assis só com a Skid 1: UFV 6.296 e inversores 6.446,0, +2,4%; a Rodrigues II: 2.116,8 × 2.339,4, +10,5%; a Itajá
+       com o Full O&M da Itaja 1 diferente: a UG 01 excluída e os 4 inversores da Itaja 1, vindos da aba, apontando para
+       ela; a Itaja 2 marcada sozinha por ser igual à aba e, no salvar seguinte, levando 316,18 por inversor aos leitores).
     Até a 2ª revisão de 20/10/2026 toda chave do pedido virava "no lugar da aba" sem comparar: a chave da aba que o
     Nexus não tinha nascia com Full O&M = Não, só com os inversores que leram naquela hora e com o nome do código (a
     Coração 2: "Inversor 1.1" virava "Inversor 2.1", a usina saía de trackers e PR, o inversor parado sumia).
     O que não veio fica como está (código, cabine ou strings vazios no pedido = não mexe): o remendo não exclui inversor
-    nem chave; só sai a cabine da aba, SEM código do Fracttal, que este salvar esvaziou (a UG 01 da Pharma II, quando os
-    inversores vão para a CABN2, "UG 02"; a UG vazia contaria cabine a mais na disponibilidade), e nem ela quando a chave
-    da UFV vale no lugar da aba e uma chave que segue com a aba ainda tem, na aba, inversor nela (ficaria órfão nos
-    leitores). A cabine COM código nunca sai por aqui (vai nos avisos).
+    nem chave; só sai a cabine da usina SEM código do Fracttal e sem inversor no Nexus, a cada salvar (a UG 01 da Pharma
+    II, quando os inversores vão para a CABN2, "UG 02"; a UG vazia contaria cabine a mais na disponibilidade), e nem ela
+    quando a chave da UFV vale no lugar da aba e uma chave que segue com a aba ainda tem, na aba, inversor nela (ficaria
+    órfão nos leitores). Com a chave da UFV já valendo, mover de cabine os inversores de uma chave que segue com a aba
+    recusa a usina (409): a UFV e as UG dos leitores não fechariam com eles. A cabine COM código nunca sai por aqui (vai
+    nos avisos).
     Avisos: [{usina_id, usina_supervisorio, tipo, texto}] (`TIPOS_AVISO`). `info` = {usina_id: nome, codigo, cliente,
     kwp, kwp_de, fracttal}, da tela (o Registro mestre e as Ligações); `por_codigo` = a dimensão de equipamento
     (`dimensao`); `aba_chaves` = a aba Equipamentos agrupada (`aba_equipamentos`; None = não se leu)."""
@@ -1693,6 +1722,13 @@ def salvar_depara(itens, cfg, base, sessao, *, info: dict, por_codigo: dict, aba
                 raise Recusada(f"A estrutura da usina da chave “{it['chave']}” mudou desde que a tela abriu (outra aba "
                                "ou outra pessoa): recarregue. Nada foi gravado.", 409, it["usina_id"], it["chave"])
         com_inversor = {i["cabine_id"] for i in est["inversores"] if i["usina_id"] in usinas and not i["excluido"]}
+        # o começo do salvar: o que cada chave levava aos leitores (a já marcada cuja visão muda volta para a aba numa
+        # usina segura, `_marcar`), quem já valia e a cabine de cada inversor (o guarda da cabine órfã, lá embaixo)
+        visao_antes = {uid: visao_da_usina(da_usina(est, uid), info.get(uid), todas=True) for uid in usinas}
+        valia = {s["supervisorio_id"] for s in est["supervisorios"] if s["usina_id"] in usinas and not s["excluido"]
+                 and s["substitui_aba"]}
+        cabine_antes = {i["inversor_id"]: i["cabine_id"] for i in est["inversores"]
+                        if i["usina_id"] in usinas and not i["excluido"]}
         sid_de, ja_marcada, avisos = {}, {}, []
         for it in limpos:
             uid, chave = it["usina_id"], it["chave"]
@@ -1815,30 +1851,59 @@ def salvar_depara(itens, cfg, base, sessao, *, info: dict, por_codigo: dict, aba
             else:
                 c["excluido"] = True
                 vazias.append(c)
-        marcacao = _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos)
-        # o guarda da cabine órfã (2ª revisão final, 21/10/2026): com a chave da UFV e das cabines no lugar da aba, a UG
-        # que sai do Nexus some dos leitores, e o inversor de uma chave que segue com a aba ainda aponta para ela pela aba
-        # (a Itajá: a UG 01 excluída e os 4 inversores da Itaja 1, vindos da aba, com "Equipamento Parente" UG 01: a
-        # disponibilidade os punha numa UG sem linha). Nesse caso ela fica, com o aviso, até essas chaves valerem
-        excluidas = []
+        marcacao = _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos, visao_antes)
+        # o guarda da cabine órfã (2ª revisão final e 3ª revisão, 21/10/2026). Com a chave da UFV e das cabines no lugar
+        # da aba, as UFV e as UG dos leitores são as do Nexus, e o inversor de uma chave que segue com a aba aponta para a
+        # UG pela aba ("Equipamento Parente").
+        # 1. Este salvar mover de cabine os inversores de uma chave que seguia e segue com a aba, com a da UFV já valendo,
+        #    RECUSA a usina: a UFV e as UG iriam aos leitores com o kWp e a contagem do Nexus, e os inversores dela com a
+        #    cabine da aba. Caso (3ª revisão): a "Itajá" marcada na Base e a Itaja 1 com o Full O&M diferente na aba; levar
+        #    a Itaja 1 para a CABN2 deixava a UG 02 com 2.596 kWp nos leitores e só os 1.298,08 da Itaja 2 apontando para
+        #    ela, e a UG 01 presa no Nexus (até então o salvar passava e só segurava a UG 01, com um aviso)
+        for uid in usinas:
+            u = da_usina(est, uid)
+            if not any(s["principal"] and s["supervisorio_id"] in valia for s in u["supervisorios"]):
+                continue
+            segue = {s["supervisorio_id"]: s["usina_supervisorio"] for s in u["supervisorios"]
+                     if not s["substitui_aba"] and s["supervisorio_id"] not in valia}
+            movido = next((i for i in u["inversores"] if i["supervisorio_id"] in segue
+                           and cabine_antes.get(i["inversor_id"]) not in (None, i["cabine_id"])), None)
+            if movido:
+                x = segue[movido["supervisorio_id"]]
+                nome = texto((info.get(uid) or {}).get("nome")) or f"usina {uid}"
+                raise Recusada(f"{nome}: a chave da UFV vale no lugar da aba e “{x}” segue com a aba: mover os inversores "
+                               f"de “{x}” de cabine deixaria a UFV e as UG dos leitores sem fechar; acerte “{x}” ou salve "
+                               "as chaves juntas. Nada foi gravado.", 409, uid, x)
+        # 2. A cabine sem código do Fracttal e sem inversor no Nexus sai a CADA salvar da usina, não só a que este salvar
+        #    esvaziou (a UG 01 da Itajá que o guarda segurou ficava no Nexus para sempre, com o kWp antigo: depois que a
+        #    Itaja 1 passou a valer, ia aos leitores vazia, ao lado da UG 02 com a usina toda). Fica só a UG para a qual
+        #    uma chave que segue com a aba ainda aponta na aba, com a da UFV valendo (sem ela, os inversores dessa chave
+        #    ficariam órfãos nos leitores: a disponibilidade os punha numa UG sem linha), com o aviso, até a chave valer
         for c in vazias:
             c["excluido"] = False
+        esvaziou = {c["cabine_id"] for c in vazias}
+        com_inv = {i["cabine_id"] for i in est["inversores"] if i["usina_id"] in usinas and not i["excluido"]}
+        excluidas = []
+        for c in est["cabines"]:
+            if c["usina_id"] not in usinas or c["excluido"] or c["codigo_fracttal"] or c["cabine_id"] in com_inv:
+                continue
+            ficou = "ficou" if c["cabine_id"] in esvaziou else "estava"
             u = da_usina(est, c["usina_id"])
             presas = [s["usina_supervisorio"] for s in u["supervisorios"] if not s["substitui_aba"] and any(
                 norm(a.get("cabine")) == norm(c["nome"])
                 for a in ((aba_chaves or {}).get(s["usina_supervisorio"]) or {}).get("inversores") or ())]
             if presas and any(s["principal"] and s["substitui_aba"] for s in u["supervisorios"]):
                 avisos.append(_aviso(c["usina_id"], "", "cabine_sem_inversores",
-                                     f"A cabine {c['nome']} (usina {c['usina_id']}) ficou sem inversores no Nexus e fica: "
-                                     "a chave da UFV e das cabines vale no lugar da aba, e na aba os inversores de "
+                                     f"A cabine {c['nome']} (usina {c['usina_id']}) {ficou} sem inversores no Nexus e "
+                                     "fica: a chave da UFV e das cabines vale no lugar da aba, e na aba os inversores de "
                                      + ", ".join(f"“{p}”" for p in presas[:4]) + " (que seguem com a aba) ainda estão "
-                                     "nela; sem ela eles ficariam órfãos nos leitores. Sai quando essas chaves valerem no "
-                                     "lugar da aba."))
+                                     "nela; sem ela eles ficariam órfãos nos leitores. Sai no salvar em que essas chaves "
+                                     "valerem no lugar da aba."))
                 continue
             muda(c, excluido=True)
             excluidas.append({"cabine_id": c["cabine_id"], "usina_id": c["usina_id"], "nome": c["nome"]})
             avisos.append(_aviso(c["usina_id"], "", "cabine_excluida",
-                                 f"A cabine {c['nome']} (usina {c['usina_id']}) ficou sem inversores e saiu: era a "
+                                 f"A cabine {c['nome']} (usina {c['usina_id']}) {ficou} sem inversores e saiu: era a "
                                  "da aba, sem código do Fracttal, e a cabine é a CABN."))
         return {"mudancas": conta["n"], "usinas": [estado_da_usina(est, uid, info.get(uid)) for uid in usinas],
                 "kwp": kwp, "avisos": avisos, "cabines_excluidas": excluidas, "marcacao": marcacao,

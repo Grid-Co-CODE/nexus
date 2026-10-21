@@ -389,8 +389,10 @@ de entender para você, quando eu for fazer não vou entender nada".
   da "Taguaí 1 (173)" é uma UFV solta com Usina "Taguaí 1 (173)" e os inversores dizem "Taguaí"; o "Ligar pela aba"
   guardava o da UFV solta, a visão o escrevia em todos os inversores, a comparação (só com a 1ª linha) não via e o
   USINA_GRUPO dos leitores trocava. Hoje o "Ligar pela aba" semeia "Taguaí"; as duas chaves do banco de 20/10 (com
-  "Taguaí 1 (173)" e "Taguaí 2 (174)") não valem no lugar da aba até alguém acertar a exibição delas na tela (ou tirar da
-  aba as duas UFV soltas), o que não foi feito no banco. O **nome do Fracttal** é comparado pelo `texto` sem caixa (o
+  "Taguaí 1 (173)" e "Taguaí 2 (174)") não valem no lugar da aba, e **acertar a exibição no Nexus NÃO basta** (3ª
+  revisão, 21/10/2026): a chave tem na aba os dois "Usina" (a UFV solta com "Taguaí 1 (173)", os inversores com
+  "Taguaí"), e qualquer exibição que o Nexus tenha difere de um deles. Só tirar da aba as duas linhas de UFV solta
+  ("Taguaí 1 (173)" e "Taguaí 2 (174)", linhas 2213-2214 da aba) faz a usina valer; não foi feito. O **nome do Fracttal** é comparado pelo `texto` sem caixa (o
   acento conta, os espaços não): espaço o `sobrepor` resolve; acento ("Taguai" × "Taguaí") é outra description no índice.
 - **De-para do tempo real (20/10/2026; Levi, com o protótipo do "Modo de-para": "Boa, é isso mesmo. Implementa no tempo
   real e adapta na base o de-para").** O "Modo de-para" do Tempo real e a Base · De-para de equipamentos (telas da
@@ -468,27 +470,43 @@ de entender para você, quando eu for fazer não vou entender nada".
     só marca por isto); e o "Código Fracttal" (que a comparação nem olha). Qualquer outra (Full O&M, String Box, nome do
     inversor, exibição, nome no Fracttal, cliente, inversor de um lado só, a chave fora da aba, a UFV em outra chave)
     GRAVA a estrutura, NÃO marca e vai nos avisos (`nao_marcada`: "não vale no lugar da aba porque: ..."). A chave já
-    marcada continua marcada (não é mais conferida). A aba que não se leu (a rota manda `None`) não marca nada.
-    **A usina vale por INTEIRO ou nada (2ª revisão final, 21/10/2026; `_marcar`):** todas as chaves da usina que ainda
-    seguem com a aba são conferidas JUNTAS (as do pedido, a da UFV e das cabines e as outras com inversor no Nexus ou na
-    aba) e só marcam se TODAS passarem; a que não passa segura as outras (`nao_marcada` com "“X”, da mesma usina, não
-    vale(m) no lugar da aba, e a usina vale por inteiro ou nada", e um aviso da usina com quanto os leitores somariam se
-    só as outras marcassem). Por quê: a regra recalcula o kWp da usina inteira, e marcar só parte deixava os leitores
-    misturando a UFV e as UG do Nexus com inversores da aba (a Assis só com a Skid 1: UFV 6.296 e inversores 6.446,0,
-    +2,4%; a Rodrigues II: 2.116,8 × 2.339,4; a "Itajá" marcada sozinha com a UG 01 excluída e os inversores da Itaja 1,
-    da aba, apontando para ela). A exceção é a chave do pedido IGUAL à aba (nenhuma diferença, nem de kWp além dos 0,05):
-    ela marca mesmo com a usina segura, porque os leitores não mudam com ela. Na Itajá salvando só a Itaja 1, as três
-    marcam (a Itaja 2 é conferida junto). A chave da UFV, que não é planta da API PV, entra sempre na conferência: sem ela
-    a UG com o código da CABN e o kWp da soma ficariam fora dos leitores.
+    marcada não é mais conferida (fica marcada, menos no caso da usina segura abaixo). A aba que não se leu (a rota manda
+    `None`) não marca nada.
+    **A usina vale por INTEIRO ou nada (2ª revisão final e 3ª revisão, 21/10/2026; `_marcar`):** todas as chaves da usina
+    que ainda seguem com a aba são conferidas JUNTAS (as do pedido, a da UFV e das cabines e as outras com inversor no
+    Nexus ou na aba) e só marcam se TODAS passarem, **sem exceção**; a que não passa segura as outras (`nao_marcada` com
+    "“X”, da mesma usina, não vale(m) no lugar da aba, e a usina vale por inteiro ou nada", e um aviso da usina com
+    quanto os leitores somariam se só as outras marcassem). Por quê: a regra recalcula o kWp da usina inteira, e marcar
+    só parte deixava os leitores misturando a UFV e as UG do Nexus com inversores da aba (a Assis só com a Skid 1: UFV
+    6.296 e inversores 6.446,0, +2,4%; a Rodrigues II: 2.116,8 × 2.339,4; a "Itajá" marcada sozinha com a UG 01 excluída
+    e os inversores da Itaja 1, da aba, apontando para ela). Até a 3ª revisão a chave do pedido IGUAL à aba marcava
+    sozinha ("os leitores não mudam com ela"), e era a porta do estado parcial: a Itaja 2 marcada sozinha e, no Salvar
+    seguinte da Itaja 1 com 20 strings, levando 316,18 por inversor aos leitores (2.596 ÷ 156 × 19) ao lado da UG 02 da
+    aba com 1.298,08. **A já marcada numa usina que fica segura:** se este Salvar mudou a visão dela (o que ela leva aos
+    leitores, linha a linha contra a do começo do Salvar), ela VOLTA para a aba (`substitui_aba = 0`, aviso
+    `nao_marcada` "valia no lugar da aba e voltou para a aba: este Salvar mudou o que ela leva aos leitores..."; na
+    `marcacao`, `marcada: false`); é a mesma mistura pela outra porta (a chave marcada na Base > Equipamentos, ou a
+    principal marcada sozinha antes desta regra). Se a visão dela não mudou, fica como está (tirá-la mudaria os leitores
+    sem motivo). Na Itajá salvando só a Itaja 1, as três marcam (a Itaja 2 é conferida junto). A chave da UFV, que não é
+    planta da API PV, entra sempre na conferência: sem ela a UG com o código da CABN e o kWp da soma ficariam fora dos
+    leitores.
   - **Cabine = sempre a CABN do Fracttal** (decisão 2): "UG NN" pelo número da CABN (CABN2 → UG 02; o nome segue "UG"
     porque os leitores só reconhecem cabine assim); adota a UG de mesmo número ainda sem código (a da aba), cria se não
     houver; a UG de mesmo número com OUTRO código recusa a usina (Ipixuna do Pará, usina 56: a Santa Cecilia 1 é
-    IPX100-CABN1 e a 2 é 2C-IPX100-CABN1, duas árvores no Fracttal, as duas "UG 01"). **A cabine que o salvar esvaziou e
-    NÃO tem código do Fracttal sai (ajuste B):** exclusão lógica (`excluido = sim`, conta nas `mudancas`, vai em
-    `cabines_excluidas` e no aviso `cabine_excluida`). Pharma II: os inversores vão para a UG 02 da THPN-PHS100-CABN2 e a
-    UG 01 da aba sai. **Nem ela sai** quando a chave da UFV e das cabines vale no lugar da aba e uma chave que segue com a
-    aba ainda tem, na aba, inversor com "Equipamento Parente" nela (o guarda da cabine órfã, 21/10/2026: os inversores
-    ficariam numa UG que os leitores não têm; aviso `cabine_sem_inversores`, e ela sai quando essas chaves valerem). Por
+    IPX100-CABN1 e a 2 é 2C-IPX100-CABN1, duas árvores no Fracttal, as duas "UG 01"). **A cabine SEM código do Fracttal
+    e sem inversor no Nexus sai, a cada Salvar da usina (ajuste B; 3ª revisão: não só a que este Salvar esvaziou):**
+    exclusão lógica (`excluido = sim`, conta nas `mudancas`, vai em `cabines_excluidas` e no aviso `cabine_excluida`).
+    Pharma II: os inversores vão para a UG 02 da THPN-PHS100-CABN2 e a UG 01 da aba sai. **O guarda da cabine órfã**
+    (21/10/2026), com a chave da UFV e das cabines no lugar da aba: (1) a UG para a qual uma chave que segue com a aba
+    ainda aponta na aba ("Equipamento Parente") fica, com o aviso `cabine_sem_inversores` (sem ela os inversores dessa
+    chave ficariam numa UG que os leitores não têm), e sai no Salvar em que nenhuma chave que segue com a aba apontar
+    mais para ela; até a 3ª revisão só a recém-esvaziada era olhada, e a UG 01 da Itajá que o guarda segurou ficava no
+    Nexus para sempre, indo aos leitores vazia e com o kWp antigo depois que a Itaja 1 passava a valer. (2) Com a chave da
+    UFV JÁ valendo no começo do Salvar, mover de cabine os inversores de uma chave que seguia e segue com a aba **recusa a
+    usina** (409, com a culpada: "a chave da UFV vale no lugar da aba e “X” segue com a aba: mover os inversores de “X”
+    de cabine deixaria a UFV e as UG dos leitores sem fechar; acerte “X” ou salve as chaves juntas"): a "Itajá" marcada
+    na Base e a Itaja 1 (Full O&M diferente na aba) levada para a CABN2 deixava a UG 02 com 2.596 kWp nos leitores e só
+    os 1.298,08 da Itaja 2 apontando para ela. Com a Itaja 1 acertada, o mesmo Salvar marca as três e a UG 01 sai. Por
     quê, leitor a leitor: na **disponibilidade** da plataforma (`plataforma/disponibilidade.py`,
     `montar_catalogo`) toda linha UG entra em `ugs`, com kWp ou sem, e `n_cab` conta; a UG 01 vazia daria 2 cabines à
     Pharma II e desligaria a régua "site agrupado com 1 cabine por usina → a Cabine N é a usina N"
@@ -525,10 +543,14 @@ de entender para você, quando eu for fazer não vou entender nada".
     `estrutura_nexus.py`, o gêmeo, o coletor) mudam no mesmo trabalho, e o `sobrepor` herda a grafia da aba (acima). O
     "Usina Fractall" da visão sai COMO as Ligações o escrevem (só sem as pontas, nunca com o `texto`: 21/10/2026, a Belo
     Jardim acima).
-  - **Prova:** `tests/test_base_equipamentos_depara.py` (49 casos; os 11 da 2ª revisão final de 21/10: a Nova chave
+  - **Prova:** `tests/test_base_equipamentos_depara.py` (51 casos; os 3 da 3ª revisão de 21/10, que falham no código
+    de antes: a "Itajá" já valendo e a Itaja 1 movida de cabine recusada com 409 (e, acertada, as três marcam e a UG 01
+    sai), a UG vazia que o guarda segurou saindo quando a Itaja 1 passa a valer, a Itaja 2 já marcada voltando para a aba
+    quando o Salvar da Itaja 1 muda a visão dela (e ficando quando não muda); e a diferença fora da regra sem a exceção
+    da chave igual à aba. Os 11 da 2ª revisão final: a Nova chave
     recusada e a chave da aba que passa com os mesmos códigos, a Assis só com a Skid 1 conferida inteira e os leitores
-    fechando, a Assis segura pela Skid 3, a Rodrigues II segura pela principal, a Itajá sem a cabine órfã e o guarda com a
-    "Itajá" já marcada, a Coração 2 recusada sem a irmã e as duas juntas, a Belo Jardim (os dois nomes) e o acento, a
+    fechando, a Assis segura pela Skid 3, a Rodrigues II segura pela principal, a Itajá sem a cabine órfã,
+    a Coração 2 recusada sem a irmã e as duas juntas, a Belo Jardim (os dois nomes) e o acento, a
     Taguaí, o `gravando` durante e antes da trava; e 12 mutações, cada regra nova quebrada de propósito derruba um teste:
     `scratchpad/depara/r3/mutar_r3.py`. Os 38 de antes: a regra na Itajá e na Pharma II, a contratual na
     Aquiraz 1 semeada, o kWp que fica sem as duas potências, o desconto dos sem strings e a recusa quando não sobra, a
@@ -557,7 +579,10 @@ de entender para você, quando eu for fazer não vou entender nada".
     as 43 chaves da UFV conferidas e 32 marcadas; 48 usinas inteiras no lugar da aba, 15 sem nenhuma chave marcada, e
     **0 no estado misto** (eram 6: Junco, Parelhas, Rodrigues I, Saturnino 1, Senador Elói I, Tanabi, com a UFV do Nexus e
     inversores da aba). Na 2ª rodada (as regras de 20/10) eram 92 marcadas, 21 não e 6 recusadas, com 39 das 43 da UFV
-    marcadas. Por que não: inversor só no Nexus 10 (o "(OLD)", "Cancelado", "xxxx" que a API ainda lista: a tela tem o
+    marcadas. A 3ª revisão (sem a exceção da chave igual à aba, a volta da já marcada, o 409 e a limpeza das UG vazias)
+    não muda a medida (84/23/6/6, 0 misto, nenhum 409 novo): o banco de 20/10 não tem chave marcada. A limpeza tira 18
+    cabines contra 17: a mais é a UG 01 da Nova Londrina 2 (usina 103), vazia e sem código já antes do Salvar, e nenhum
+    inversor da aba aponta para ela (os 10 estão na UG 02). Por que não: inversor só no Nexus 10 (o "(OLD)", "Cancelado", "xxxx" que a API ainda lista: a tela tem o
     "deixar de fora"), nome no Fracttal 6 (Brodowski "(sem Classificação 1) BWK100" nas Ligações, Coração, Santo Antônio
     da Platina), a UG que só a aba tem 5 (Ouro Branco 1 a 5), o nome de exibição 2 (Taguaí 1 e 2, a regra nova), nome do
     inversor 1 (Coração 2, o "· chave"), a cabine só no Nexus 1, a UFV em outra chave 1. As seguras: Junco 2.1 a 2.3 (pela
