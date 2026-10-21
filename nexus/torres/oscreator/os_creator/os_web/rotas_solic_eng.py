@@ -2,8 +2,9 @@
 """Rotas da Nova solicitação para a ENGENHARIA (06/10/2026). As regras moram no `solic_eng_web`; aqui só a tela, a
 cascata e a criação. Uma OS por ativo sai pelo `api.create_work_orders_bulk` — o mesmo caminho da OS de análise
 (`api.create_os_analise`); uma OS com todos os ativos (08/10), pelo `api.create_work_orders_agrupada`, o do "Agrupar em
-UMA OS" do Tradicional. Nos dois: tipo 'Administrativa', só a Classificação 1 'Programada' (pelo nome), as etiquetas
-BACKOFFICE e ENGENHARIA (só elas; até 13/10/2026 era a REMOTO), sem plano e com o título por ativo no `por_ativo`. Os anexos (08/10) sobem depois de a
+UMA OS" do Tradicional. Nos dois: tipo 'Administrativa', só a Classificação 1 'Programada' (pelo nome), a etiqueta
+ENGENHARIA (só ela desde 21/10/2026; antes ia também a BACKOFFICE, e até 13/10 a REMOTO), sem plano e com o título por
+ativo no `por_ativo`. Os anexos (08/10) sobem depois de a
 OS existir, pelo `api.attach_imagem_os`, o mesmo caminho das imagens da Performance e do Tradicional."""
 from __future__ import annotations
 import datetime as dt
@@ -110,7 +111,7 @@ def api_criar():
         erro = reg.erro_envios(anexos, 1 if c["agrupar"] else len(ativos))
     if erro:
         return jsonify({"erro": erro}), 400
-    # as etiquetas ANTES de criar: BACKOFFICE e ENGENHARIA sempre, e só elas — faltando uma no Fracttal, nenhuma OS sai
+    # a etiqueta ANTES de criar: a ENGENHARIA sempre, e só ela — faltando no Fracttal, nenhuma OS sai
     etiquetas, faltam = reg.etiquetas(api.get_labels() or [])
     if faltam:
         return jsonify({"erro": reg.erro_etiquetas(faltam)}), 400

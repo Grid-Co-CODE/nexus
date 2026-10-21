@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-21T15:58:43",
+ "atualizado_em": "2026-10-21T16:27:51",
  "arquivos": {
   "chamado_garantia/README.md": "ebd082efad2568dc",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -49,11 +49,11 @@
   "os_creator/os_web/rotas_os_acoes.py": "274c6caed826791a",
   "os_creator/os_web/rotas_pcm.py": "bd04b924070117f1",
   "os_creator/os_web/rotas_solic.py": "30bba86b576acc2f",
-  "os_creator/os_web/rotas_solic_eng.py": "742c85c1bfa72df6",
+  "os_creator/os_web/rotas_solic_eng.py": "896f943c5374c07e",
   "os_creator/os_web/rotas_tradicional.py": "874a0b599ed5f316",
   "os_creator/os_web/servir.py": "d7263551ee6057cc",
   "os_creator/os_web/sessao.py": "a2d5415817759742",
-  "os_creator/os_web/solic_eng_web.py": "f6a45972ed7a9447",
+  "os_creator/os_web/solic_eng_web.py": "063bb0e19f77a5ed",
   "os_creator/os_web/solic_web.py": "98ceb2d383015b48",
   "os_creator/os_web/sso.py": "9aa026041869a64e",
   "os_creator/os_web/static/abas.css": "33f73bf86e898444",

@@ -69,18 +69,18 @@ def test_responsavel_so_entre_os_nomes_da_engenharia():
     assert reg.nomes_configurados("") == [] and reg.nomes_configurados(" A ; B,C ") == ["A", "B", "C"]
 
 
-def test_etiquetas_so_backoffice_e_engenharia_pelo_nome_inteiro():
-    """Levi, 06/10/2026: "Etiqueta de remoto e engenharia fixas sempre! só essas etiquetas viu, sem performance"; e
-    13/10/2026: "SOLICITAÇÃO ENGENHARIA INVÉS DE REMOTO É Backoffice"."""
-    assert reg.ETIQUETAS == ("Backoffice", "ENGENHARIA")
-    assert reg.etiquetas(ETIQ) == ([901, 900], [])                  # a Remoto (904) está no catálogo e NÃO vai
-    # sem a "Backoffice" no catálogo, nenhuma outra serve no lugar: a falta é dita, e nada é criado
-    assert reg.etiquetas([e for e in ETIQ if e["id"] != 901]) == ([900], ["Backoffice"])
-    # o nome casa escrito de qualquer jeito (caixa, espaço, hífen), mas INTEIRO
-    for escrita in ("BACKOFFICE", "Back Office", "back-office", "Back_Office"):
-        assert reg.etiquetas([{"id": 77, "description": escrita}, {"id": 900, "description": "ENGENHARIA"}]) == ([77, 900], [])
-    assert reg.etiquetas([{"id": 78, "description": "Backoffice Remoto"}, {"id": 900, "description": "ENGENHARIA"}]) \
-        == ([900], ["Backoffice"])
+def test_so_a_etiqueta_engenharia_pelo_nome_inteiro():
+    """Levi, 06/10/2026: "Etiqueta de remoto e engenharia fixas sempre! só essas etiquetas viu, sem performance"; 13/10:
+    "SOLICITAÇÃO ENGENHARIA INVÉS DE REMOTO É Backoffice"; e 21/10/2026: "tire a obrigatoriedade da etiqueta backoffice,
+    deixe só a etiqueta engenharia mesmo"."""
+    assert reg.ETIQUETAS == ("ENGENHARIA",)
+    assert reg.etiquetas(ETIQ) == ([900], [])                       # a Backoffice (901) e a Remoto (904) estão e NÃO vão
+    # sem a "ENGENHARIA" no catálogo, nenhuma outra serve no lugar: a falta é dita, e nada é criado
+    assert reg.etiquetas([e for e in ETIQ if e["id"] != 900]) == ([], ["ENGENHARIA"])
+    # o nome casa escrito de qualquer jeito (caixa, espaço, hífen, acento), mas INTEIRO
+    for escrita in ("ENGENHARIA", "Engenharia", "engenharia", " Engenharia "):
+        assert reg.etiquetas([{"id": 77, "description": escrita}]) == ([77], [])
+    assert reg.etiquetas([{"id": 78, "description": "Engenharia Remota"}]) == ([], ["ENGENHARIA"])
     assert (reg.TIPO_TAREFA, reg.CLASSIF_1) == ("Administrativa", "Programada")
 
 
@@ -237,8 +237,8 @@ def test_criar_sai_como_a_os_de_analise_com_a_etiqueta_da_engenharia(cli):
     assert _perto(f["prog_date"], dt.datetime.now(reg.BRT) + dt.timedelta(days=7)) and f["event_date"] == ontem
     assert r.get_json()["mensagem"] == ("2 OS criada(s) para a Engenharia — Nº 15000, 15001 — programada(s) para %s."
                                         % f["prog_date"].strftime("%d/%m/%Y %H:%M"))
-    # tipo Administrativa, só a Classificação 1 (Programada) e só as etiquetas BACKOFFICE + ENGENHARIA — sem PERFORMANCE
-    assert (f["task_type"], f["subtasks"], f["etiqueta_ids"]) == ("Administrativa", [], [901, 900])
+    # tipo Administrativa, só a Classificação 1 (Programada) e só a etiqueta ENGENHARIA — sem PERFORMANCE nem Backoffice
+    assert (f["task_type"], f["subtasks"], f["etiqueta_ids"]) == ("Administrativa", [], [900])
     assert f["tipo"] == {"id_c1": 11, "desc_c1": "Programada"}
     assert (f["id_responsible"], f["responsible_name"], f["note"]) == (501, "Ana Teste Silva", "Desarma toda manhã.")
     assert f["por_ativo"]["TST-NBRK1"] == {"description": "[Nobreak 1] - Avaliar o religamento"}
@@ -248,15 +248,22 @@ def test_urgente_so_muda_a_data_as_etiquetas_sao_as_mesmas(cli):
     r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(urgente=True, programada="2030-01-01T08:00"))
     assert r.status_code == 200
     assert _perto(cli.feito["prog_date"], dt.datetime.now(reg.BRT) + dt.timedelta(days=2))
-    assert cli.feito["etiqueta_ids"] == [901, 900]                  # sem "Dar prioridade": só BACKOFFICE e ENGENHARIA
+    assert cli.feito["etiqueta_ids"] == [900]                       # sem "Dar prioridade": só a ENGENHARIA
 
 
 def test_sem_a_etiqueta_no_fracttal_nenhuma_os_e_criada(cli, monkeypatch):
-    monkeypatch.setattr(api, "get_labels", lambda: [dict(e) for e in ETIQ if e["id"] != 901])
+    monkeypatch.setattr(api, "get_labels", lambda: [dict(e) for e in ETIQ if e["id"] != 900])
     r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo())
     assert r.status_code == 400
-    assert r.get_json()["erro"] == "Não achei no Fracttal a etiqueta Backoffice. Nenhuma OS foi criada."
+    assert r.get_json()["erro"] == "Não achei no Fracttal a etiqueta ENGENHARIA. Nenhuma OS foi criada."
     assert cli.feito == {}
+
+
+def test_sem_a_backoffice_no_fracttal_a_os_sai(cli, monkeypatch):
+    """21/10/2026: a Backoffice não é mais obrigatória; o Fracttal sem ela não segura a Solicitação de Engenharia."""
+    monkeypatch.setattr(api, "get_labels", lambda: [dict(e) for e in ETIQ if e["id"] != 901])
+    r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo())
+    assert r.status_code == 200 and cli.feito["etiqueta_ids"] == [900]
 
 
 def test_responsavel_de_fora_da_lista_e_recusado(cli):
@@ -470,12 +477,12 @@ def test_anexos_passam_pela_ponte_do_nexus(cli, app, logado):
 # ── uma OS com todos os ativos (Levi, 08/10/2026: "Agrupar ativos em atividades por OS") ─────────────────────────────
 def test_uma_os_com_todos_os_ativos_uma_atividade_por_ativo(cli):
     """O `create_work_orders_agrupada`, o mesmo do "Agrupar em UMA OS" do Tradicional, com as regras de sempre:
-    Administrativa, só a Classificação 1 Programada, só BACKOFFICE + ENGENHARIA e a data programada do servidor."""
+    Administrativa, só a Classificação 1 Programada, só a ENGENHARIA e a data programada do servidor."""
     r = cli.post(CRIAR, json=_corpo(agrupar=True, programada="2030-01-01T08:00"))
     assert r.status_code == 200 and cli.feito == {}                   # nada pelo caminho de uma OS por ativo
     g = cli.agrupada
     assert [a["code"] for a in g["assets"]] == ["TST-NBRK1", "TST-RELE1"]
-    assert (g["task_type"], g["subtasks"], g["etiqueta_ids"]) == ("Administrativa", [], [901, 900])
+    assert (g["task_type"], g["subtasks"], g["etiqueta_ids"]) == ("Administrativa", [], [900])
     assert g["tipo"] == {"id_c1": 11, "desc_c1": "Programada"} and "responsible_code" not in g
     assert (g["id_responsible"], g["responsible_name"], g["note"]) == (501, "Ana Teste Silva", "Desarma toda manhã.")
     # cada atividade com o seu '[Ativo] - Descrição'

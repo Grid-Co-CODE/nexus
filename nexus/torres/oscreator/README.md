@@ -144,15 +144,16 @@ aba, sem abrir outra.
   - tipo de tarefa `Administrativa` e **só a Classificação 1, `Programada`** (pelo nome, via `_classif_ids`), sem
     plano. Levi, 06/10: "o tipo de tarefa seria administrativa e class1 é programada!". A Classificação 2 fica vazia: a
     tela vale para qualquer ativo, e "Elétrica" não serve a uma cerca;
-  - **as etiquetas `Backoffice` e `ENGENHARIA`, sempre, e só elas.** Nem `PERFORMANCE` nem `Dar prioridade` no urgente.
-    Levi, 06/10: "Etiqueta de remoto e engenharia fixas sempre! só essas etiquetas viu, sem performance"; e 13/10:
-    "SOLICITAÇÃO ENGENHARIA INVÉS DE REMOTO É Backoffice" (até 13/10 era a `Remoto`, que não vai mais).
-    - Casam pelo nome **inteiro** (`solic_eng_web.etiquetas`), sem acento, sem caixa e sem espaço, hífen, ponto ou
-      sublinhado ("BACKOFFICE", "Back Office" e "Back-office" são a mesma). A busca por trecho do `label_id_por_nome`
-      tomaria a "Religamento Remoto" pela "Remoto". O catálogo do Fracttal não foi lido na troca de 13/10 (sem login
-      válido no PC): a 1ª Solicitação de Engenharia criada é a prova de que a `Backoffice` existe.
-    - As etiquetas são conferidas **antes** de criar. Faltando uma no Fracttal, nenhuma OS sai, e a tela diz "Não achei
-      no Fracttal a etiqueta Backoffice. Nenhuma OS foi criada.";
+  - **a etiqueta `ENGENHARIA`, sempre, e só ela.** Nem `PERFORMANCE` nem `Dar prioridade` no urgente, nem a `Remoto`,
+    nem a `Backoffice`. Levi, 06/10: "Etiqueta de remoto e engenharia fixas sempre! só essas etiquetas viu, sem
+    performance"; 13/10: "SOLICITAÇÃO ENGENHARIA INVÉS DE REMOTO É Backoffice"; e 21/10: "tire a obrigatoriedade da
+    etiqueta backoffice, deixe só a etiqueta engenharia mesmo" (de 13/10 a 21/10 ia também a `Backoffice`, que era
+    obrigatória; até 13/10, a `Remoto`).
+    - Casa pelo nome **inteiro** (`solic_eng_web.etiquetas`), sem acento, sem caixa e sem espaço, hífen, ponto ou
+      sublinhado ("ENGENHARIA", "Engenharia" e " engenharia " são a mesma). A busca por trecho do `label_id_por_nome`
+      tomaria a "Religamento Remoto" pela "Remoto".
+    - A etiqueta é conferida **antes** de criar. Faltando no Fracttal, nenhuma OS sai, e a tela diz "Não achei no
+      Fracttal a etiqueta ENGENHARIA. Nenhuma OS foi criada.";
   - título `[Ativo] - Descrição`, montado pelo `perf_os_nome` em cada ativo (na OS agrupada, o de cada atividade);
   - a "Descrição" é a atividade que o solicitante escreve, com o subtexto "Atividade a ser realizada (de forma
     direta)";
@@ -211,7 +212,7 @@ Os pedidos do Levi, de 08/10: "Agrupar ativos em atividades por OS" e "Engenhari
   centenas de linhas), com o padrão em "Uma OS por ativo", o comportamento de antes.
   - A agrupada sai pelo `api.create_work_orders_agrupada`, o mesmo do "Agrupar em UMA OS" do Tradicional: cada ativo
     vira uma atividade (tarefa) com o seu `[Ativo] - Descrição`, todas numa OS só. As regras da seção acima valem
-    iguais: Administrativa, só a Classificação 1, só `Backoffice` + `ENGENHARIA`, as duas datas e o responsável do `.env`.
+    iguais: Administrativa, só a Classificação 1, só a `ENGENHARIA`, as duas datas e o responsável do `.env`.
   - Com um ativo só, as duas escolhas dão a mesma OS: vai pelo caminho de sempre.
   - A OS que não fecha (o Fracttal recusa o `work_order_insert`) deixa as atividades pendentes lá. A tela diz isso e
     manda gerar a OS no Fracttal; a resposta é 200, para os ativos saírem da seleção (um 2º clique criaria tudo de novo).
