@@ -255,6 +255,19 @@ def _worker_plataforma(prazo_s: float = PRAZO_MEMORIA_S):
     return _com_prazo(_WORKER, _ler_relatorio_worker, prazo_s, "nexus-raio-x-worker")
 
 
+# Dentro do web da plataforma (21/10/2026). Raio-X das 14:55 de 21/10: o processo web da plataforma (o `app.py` servido
+# pelo waitress) foi de 0,8 GB às 14:36 para 3,1 GB e 0,7 GB no swap, com a máquina sem memória, e o relatório só existia
+# no worker. O web grava o mesmo relatório, num arquivo dele (PerformancePainel, `_memoria_web_loop`); aqui, a mesma
+# leitura do worker, com o prazo e o estado próprios (um relatório preso não prende o outro).
+RELATORIO_WEB = "/dev/shm/gridco_plataforma_web.json"
+_WEB = {"thread": None, "ultimo": None, "quando": None}
+
+
+def _web_plataforma(prazo_s: float = PRAZO_MEMORIA_S):
+    """O relatório do web da plataforma com prazo (`_com_prazo`); o caminho é lido na hora (os testes o trocam)."""
+    return _com_prazo(_WEB, lambda: _ler_relatorio_worker(RELATORIO_WEB), prazo_s, "nexus-raio-x-web")
+
+
 def _quem_ocupa(teto: int = 6):
     """Os programas que mais ocupam a memória da máquina, somados por programa: a memória própria de cada processo
     (RssAnon), a compartilhada uma vez só por programa (RssShmem: os buffers do PostgreSQL aparecem em todo processo
@@ -314,6 +327,6 @@ def registrar_raio_x(bp) -> None:
             teto["ultimo_txt"] = time.strftime("%d/%m %H:%M", time.localtime(teto["ultimo_recusado"]))
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
-                               worker=_worker_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
+                               worker=_worker_plataforma(), web=_web_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
                                travamentos=P.cartao(app) if estado is not None else None,
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

@@ -88,6 +88,7 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 | 20/10 | travada das 16:12 (GET /os/ ~4 min em linhas de microssegundos) e o próprio Raio-X 4 min 18 s preso em `_ler_proc` | a máquina trocando com o disco (o Nexus com 1,5 GB no swap); ler a linha de comando de um processo no swap espera o disco | a lista da memória numa thread à parte com prazo de 2 s, uma leitura presa por vez, o nome de cada processo lido uma vez | `7d9de73` |
 | 20/10 | o worker da plataforma de 3,7 para 5,0 GB (com o swap) em 26 min (16:12 a 16:38), e o que crescia no servidor ninguém via (a medição de dentro só dava no PC, sem os backfills de lá) | — | o worker grava a cada 10 min, em /dev/shm, quanto cada variável ocupa (por amostra, últimas 3 h; PerformancePainel), e o Raio-X mostra "Dentro do worker da plataforma", agora × 1 h antes | `2137e2d`; `62a00c2` na plataforma |
 | 21/10 | Raio-X das 14:36: "pedido preso 24 vezes em 24 h", o último um GET /os/historico de 45 s esperando o Fracttal (45 s é o tempo-limite) | a busca da lista (`api.list_minhas_os`, Histórico e quadro do Acompanhamento) engolia o erro de cada página e lote: sem a 1ª página, a lista VAZIA ficava guardada sem aviso; sem uma do meio, sumiam até 200 OS; e a vazia de "Todos" fazia cada pessoa buscar a sua inteira até o reinício | a busca em que o Fracttal não entregou algum pedido falha inteira (`_lista_pela_metade`): nada é guardado, a tela avisa e fica com a lista anterior e a hora dela; 3 pessoas depois de um estouro: 30 pedidos → 11 | este |
+| 21/10 | Raio-X das 14:55: o web da plataforma (`app.py`) de 0,8 GB (14:36) para 3,1 GB + 0,7 GB no swap; a máquina com 0,2 GB livres, 2,9 GB no swap e o disco 71% do tempo; às 15:00 um POST do Registro mestre 3,5 min preso | o relatório por dentro e a devolução de memória só rodavam no worker: o que o web guarda ninguém via | o web grava o mesmo relatório (`gridco_plataforma_web.json`), devolve a memória livre a cada 10 min e usa no máximo 2 arenas de malloc (sem descartar cache: trackers); o Raio-X mostra "Dentro do web da plataforma" | este |
 
 ## A fila
 
@@ -101,8 +102,10 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
    próprio processo. No ar na plataforma desde 16:51 de 20/10 (`f3a8200`): as strings da 2C com um datetime por minuto
    (−35%, montagem de minutos para segundos) e o worker devolvendo ao Linux a memória solta (2 arenas de malloc,
    `malloc_trim` a cada passada do faxineiro). Entre 16:12 e 16:38 ele foi de 3,7 para 5,0 GB (com o swap) no servidor,
-   rápido demais para o que se mediu no PC: um backfill que só roda lá. **Próximo passo:** na próxima subida, o print da
-   seção "Dentro do worker da plataforma" do Raio-X diz qual variável cresce. O dia de trackers compacto (o maior ganho
+   rápido demais para o que se mediu no PC: um backfill que só roda lá. Por dentro do worker às 14:46 de 21/10: o
+   dia de trackers da API PV 513 MB, eventos de tracker 157, combiners 122, strings SunOp 108, Gerencial 88 (~1,1 dos
+   2,3 GB). **Em 21/10 o maior passou a ser o web** (0,8 → 3,9 GB com o swap em 19 min, depois do deploy das 14:25):
+   **próximo passo**, o print de "Dentro do web da plataforma" depois que a medida dele subir diz qual variável cresce. O dia de trackers compacto (o maior ganho
    conhecido, ~400–570 MB) espera: Levi, 20/10, "não mexa nos trackers agora". O worker só se recicla de madrugada com
    12 h no ar (cada deploy da plataforma zera a conta), e no servidor não se sabe o que o religa quando ele sai (o
    guardião é do Windows): perguntar à T.I. Mais memória no notebook é a outra saída (T.I.).

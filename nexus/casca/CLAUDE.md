@@ -206,7 +206,12 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   últimas 3 h (PerformancePainel, `_relatorio_memoria_worker`); o Raio-X mostra agora × ~1 h antes, com o mesmo prazo de
   2 s, e avisa quando o relatório tem mais de 30 min (o worker parou de anotar). O caso: no servidor o worker foi de 3,7
   para 5,0 GB (com o swap) entre 16:12 e 16:38 de 20/10, e a medição de dentro só dava no PC, que não roda os backfills do
-  servidor. Prova: `tests/test_raio_x_worker_plataforma.py`.
+  servidor. Prova: `tests/test_raio_x_worker_plataforma.py`. **E dentro do web da plataforma** (`_web_plataforma`,
+  21/10/2026): o processo web grava o mesmo relatório em `/dev/shm/gridco_plataforma_web.json` (`RELATORIO_WEB`;
+  PerformancePainel, `_memoria_web_loop`), e o Raio-X o mostra igual, com o prazo e o estado próprios (um relatório preso
+  não prende o outro; as duas seções saem da macro `dentro` do `raio_x.html`). O caso: Raio-X das 14:55 de 21/10, o web
+  de 0,8 GB (14:36) para 3,1 GB e 0,7 GB no swap, com 0,2 GB livres na máquina, e por dentro só se via o worker. Prova:
+  `tests/test_raio_x_web_plataforma.py`.
 - **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O
