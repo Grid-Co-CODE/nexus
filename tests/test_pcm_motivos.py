@@ -129,7 +129,9 @@ def test_o_painel_mostra_quantas_vezes_e_o_historico(app, logado, tela, monkeypa
     assert _pelo_app(app, cab).get_json()["gravou"]
     rel.t += timedelta(days=1)
     assert _pelo_app(app, cab).get_json()["gravou"]                   # no dia seguinte, a mesma justificativa grava
-    assert not _pelo_app(app, cab).get_json()["gravou"]               # no mesmo dia, não
+    n = len(M.ler(cfg, forcar=True)["marcas"])
+    assert _pelo_app(app, cab).get_json()["gravou"]                   # no mesmo dia, o reenvio volta "gravou" (22/10)
+    assert len(M.ler(cfg, forcar=True)["marcas"]) == n                # mas não grava de novo nem conta
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
     assert 'aria-controls="fp-h-1"' in html and ">2</button>" in html
     lista = html.split('id="fp-h-1"', 1)[1].split("</ol>", 1)[0]
@@ -640,7 +642,11 @@ def test_o_tecnico_marca_pelo_app(app, logado, tela):
     assert ultima["origem"] == "app" and ultima["decidida_por_hmac"] == TEC and "Técnico Teste" not in json.dumps(ultima)
     no_repo = json.loads(tela.arquivos[M.ARQUIVO])["tarefas"][0]
     assert len(tela.commits) == 1 and no_repo["tarefa"] == cab["tarefa"] and no_repo["origem"] == "app"
-    assert not _pelo_app(app, cab).get_json()["gravou"] and len(tela.commits) == 1          # o mesmo envio de novo
+    # o mesmo envio de novo: volta "gravou" (a resposta do 1º pode não ter chegado ao App: 22/10/2026), sem gravar nada
+    n = len(M.ler(cfg, forcar=True)["marcas"])
+    j = _pelo_app(app, cab).get_json()
+    assert j["gravou"] and j["arquivo"] == "sem mudança" and len(tela.commits) == 1
+    assert len(M.ler(cfg, forcar=True)["marcas"]) == n
     html = " ".join(logado.get("/t/pcm/fora-da-programacao").get_data(as_text=True).split())
     assert "Técnico Teste <span class=\"gc-ajuda\">(App)</span>" in html and "falta o disjuntor" in html
     # a OS avulsa do App (aberta na Gestão PCM, fora da programação): marca com o código que o App mandou

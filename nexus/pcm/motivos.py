@@ -109,6 +109,11 @@ class Recusada(ValueError):
     """Nada foi gravado: o texto diz por quê, para a tela mostrar."""
 
 
+class BancoFora(Recusada):
+    """Nada foi gravado porque o livro não pôde ser relido: passa, e tentar de novo resolve. A tela mostra como as
+    outras recusas; o App recebe 503 (o 400 ele toma por recusa definitiva e descarta a justificativa: 22/10/2026)."""
+
+
 # ── a tarefa e o nome ─────────────────────────────────────────────────────────────────────────────────────────
 def norm(s) -> str:
     """Sem acento, sem caixa, espaço único: a mesma conta do `tarefa_chave` (e a do robô do PCM no arquivo)."""
@@ -447,6 +452,14 @@ def episodios(cfg, est: dict) -> list[dict]:
     return sorted(out, key=lambda e: (e["desde"], e["item_id"]), reverse=True)
 
 
+def _ultima(est: dict, iid: str) -> dict | None:
+    """A última decisão (a linha crua do livro) sobre a tarefa, marcar ou tirar; no empate da hora, a gravada depois
+    (a mesma conta do `vigentes`)."""
+    lst = sorted((x for x in est["marcas"] if D._txt(x.get("item_id")) == iid),
+                 key=lambda x: D._txt(x.get("decidida_em")))
+    return lst[-1] if lst else None
+
+
 def indice(vig: dict) -> dict:
     """{(os, código canônico, nome normalizado): marca} para achar a marca de uma linha da semana."""
     return {(m["os"], canon(m["codigo"]), norm(m["tarefa"])): m for k, m in vig.items() if not k.startswith("_")}
@@ -489,24 +502,57 @@ def _quem(cfg, usuario: dict | None) -> tuple[str, str]:
 def _gravar(cfg, mudar):
     """Relê o livro, aplica `mudar(tabelas) -> (resultado, mudou)` e, se mudou, grava as três abas. A 1ª gravação leva
     o cadastro inicial junto (antes dela ele só existe no código)."""
+    r = _gravar_lote(cfg, [mudar])[0]
+    if isinstance(r, BaseException):
+        raise r
+    return r
+
+
+def _gravar_lote(cfg, mudancas: list) -> list:
+    """As mudanças numa leitura e numa gravação do livro (22/10/2026: as justificativas do App que esperam o banco vão
+    juntas, `motivos_app`). Cada `mudar` roda numa cópia, na ordem, e vê as de antes; a que levanta fica com a exceção
+    e não muda nada. Leitura que falha: `BancoFora` para todas. Gravação que falha: a exceção para quem mudou e para quem
+    foi decidido depois de uma mudança (o que viu não chegou ao banco); quem foi decidido antes fica com o resultado.
+    [resultado ou exceção], na ordem."""
     with _TRAVA:
         try:
             cru = _ler_cru(cfg)
         except Exception as ex:  # noqa: BLE001
-            raise Recusada(f"Não consegui ler os motivos no banco ({type(ex).__name__}): nada foi gravado, para não "
-                           "apagar o que já está lá.") from ex
+            return [_banco_fora(ex) for _ in mudancas]
         if not [m for m in (_motivo(x) for x in cru[ABA_MOTIVO]) if m]:
             cru[ABA_MOTIVO] = [{"motivo_id": m["id"], "nome": m["nome"], "descricao": m["descricao"],
                                 "tira_da_programacao": "sim" if m["tira"] else "não", "criado_em": _iso(_agora()),
                                 "alterado_em": "", "excluido": "", "alterado_por_hmac": "", "etiqueta_fracttal": ""}
                                for m in cadastro_inicial()]
-        resultado, mudou = mudar(cru)
-        if mudou:
-            _gravar_cru(cfg, cru)
+        saidas, depende, sujo = [], [], False
+        for mudar in mudancas:
+            copia = {aba: [dict(x) for x in cru[aba]] for aba in ABAS}
+            try:
+                resultado, mudou = mudar(copia)
+            except Exception as ex:  # noqa: BLE001 — a recusa (ou o defeito) de uma não derruba as outras
+                saidas.append(ex)
+                depende.append(False)
+                continue
+            if mudou:
+                cru, sujo = copia, True
+            saidas.append(resultado)
+            depende.append(sujo)
+        if sujo:
+            try:
+                _gravar_cru(cfg, cru)
+            except Exception as ex:  # noqa: BLE001
+                return [ex if d and not isinstance(s, BaseException) else s for s, d in zip(saidas, depende)]
         # o que acabou de ser lido (e gravado) vale como a leitura de agora: a tela e o arquivo do robô não voltam ao
         # banco logo em seguida (no 1º uso real do Justificar do App, cada marca lia o livro três vezes)
         _CACHE[str(_arquivo_local(cfg) or "banco")] = dict(_estado(cru), erro="", lido_em=time.time())
-        return resultado
+        return saidas
+
+
+def _banco_fora(ex: Exception) -> "BancoFora":
+    e = BancoFora(f"Não consegui ler os motivos no banco ({type(ex).__name__}): nada foi gravado, para não apagar o "
+                  "que já está lá.")
+    e.__cause__, e.__suppress_context__ = ex, True
+    return e
 
 
 def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana: str = "",
@@ -515,7 +561,38 @@ def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana:
     tirada da SEMANA ou da Gestão PCM pelo servidor, nunca da página. Um motivo por tarefa: marcar outro troca. Marcar o
     mesmo motivo com a mesma observação no MESMO dia não grava; no dia seguinte, grava (a tarefa que segue atrasada é
     cobrada de novo, e cada dia conta no histórico: Levi, 16/10/2026). `quem_hmac`: o código de quem marcou quando ele
-    chega pronto (o técnico pelo App, que não tem e-mail no pedido). {"gravou", "marca"}."""
+    chega pronto (o técnico pelo App, que não tem e-mail no pedido). {"gravou", "marca", "repetida"}: `repetida` = não
+    gravou porque a última decisão da tarefa já é esta, de hoje, por quem pede e pelo mesmo caminho (o reenvio do App
+    cuja resposta não chegou a ele: `motivos_app`)."""
+    mudar, registrar = _preparar_marca(cfg, tarefa, motivo_id, obs, usuario, semana, origem, quem_hmac)
+    r = _gravar(cfg, mudar)
+    registrar()
+    return r
+
+
+def marcar_lote(cfg, pedidos: list[dict]) -> list:
+    """Várias marcas numa leitura e numa gravação do livro (22/10/2026: as justificativas do App que esperam o banco,
+    `motivos_app`). Cada pedido = os argumentos do `marcar` pelo nome (tarefa, motivo_id, obs, usuario, semana, origem,
+    quem_hmac). [o que o `marcar` devolveria, ou a exceção que ele levantaria], na ordem."""
+    saidas: list = [None] * len(pedidos)
+    prontos = []
+    for i, p in enumerate(pedidos):
+        try:
+            prontos.append((i, *_preparar_marca(cfg, **p)))
+        except Exception as ex:  # noqa: BLE001 — a recusa (ou o defeito) de uma não derruba as outras
+            saidas[i] = ex
+    if prontos:
+        for (i, _mudar, registrar), r in zip(prontos, _gravar_lote(cfg, [m for _, m, _ in prontos])):
+            saidas[i] = r
+            if not isinstance(r, BaseException):
+                registrar()
+    return saidas
+
+
+def _preparar_marca(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana: str = "",
+                    origem: str = "quadro", quem_hmac: str | None = None):
+    """(mudar, registrar) da marca: as conferências que não dependem do livro levantam `Recusada` aqui; `mudar` decide
+    sobre o livro relido, e `registrar` vai ao log depois de gravar."""
     os_s = os_de(tarefa.get("os"))
     # o texto EXATO da linha da programação (o App de Campo casa OS|ativo|nome como estão no banco_dados.json); a
     # identidade da tarefa (`item_id`) e a comparação do motor e do robô seguem normalizadas
@@ -535,17 +612,25 @@ def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana:
         cod_quem = quem_hmac
     iid = item_id(os_s, codigo, nome_t)
 
+    def _repetida(est, agora) -> bool:
+        # a última decisão da tarefa já é esta: o reenvio do App cuja resposta não chegou a ele (o servidor do App
+        # desiste em 20 s; em 22/10/2026, com o banco lento, as 7 justificativas das 13:51 às 14:08 gravaram assim e os
+        # reenvios voltaram "sem mudança": o App não escreveu a nota nem a etiqueta no Fracttal de nenhuma)
+        ult = _ultima(est, iid)
+        return bool(ult and D._id(ult.get("motivo_id")) == mid and D._txt(ult.get("origem")) == origem
+                    and D._txt(ult.get("decidida_por_hmac")) == cod_quem and _mesmo_dia(ult.get("decidida_em"), agora))
+
     def mudar(cru):
         est = _estado(cru)
         if mid and mid not in {m["id"] for m in ativos(est)}:
             raise Recusada("Esse motivo não existe mais (alguém mudou o cadastro): atualize a página.")
         atual = vigentes(cfg, est).get(iid)
-        if not mid and not atual:
-            return {"gravou": False, "marca": None}, False
         agora = _agora()
+        if not mid and not atual:
+            return {"gravou": False, "marca": None, "repetida": _repetida(est, agora)}, False
         if (mid and atual and atual["motivo_id"] == mid and atual["obs"] == obs
                 and _mesmo_dia(atual["quando"], agora)):
-            return {"gravou": False, "marca": atual}, False
+            return {"gravou": False, "marca": atual, "repetida": _repetida(est, agora)}, False
         quando = _iso(agora)
         corpo = {"tarefa": nome_t, "codigo": codigo, "usina": str(tarefa.get("usina") or "").strip(),
                  "cluster": str(tarefa.get("cluster") or "").strip(),
@@ -558,12 +643,13 @@ def marcar(cfg, tarefa: dict, motivo_id, obs: str, usuario: dict | None, semana:
             "tarefa_chave": D.tarefa_chave(nome_t), "motivo_id": mid, "semana": semana or "", "origem": origem,
             "decidida_por_hmac": cod_quem,
             "dados_cifrados": cofre.cifrar(json.dumps(corpo, ensure_ascii=False), _ctx_marca(iid, quando))})
-        return {"gravou": True, "marca": vigentes(cfg, _estado(cru)).get(iid)}, True
+        return {"gravou": True, "marca": vigentes(cfg, _estado(cru)).get(iid), "repetida": False}, True
 
-    r = _gravar(cfg, mudar)
-    log.info("Motivos do PCM: OS %s, %s %s, por %s.", os_s, "motivo" if mid else "tirou o motivo", mid or "",
-             nome_quem if not cod_quem else cod_quem[:6])
-    return r
+    def registrar():
+        log.info("Motivos do PCM: OS %s, %s %s, por %s.", os_s, "motivo" if mid else "tirou o motivo", mid or "",
+                 nome_quem if not cod_quem else cod_quem[:6])
+
+    return mudar, registrar
 
 
 def padronizar(nome) -> str:

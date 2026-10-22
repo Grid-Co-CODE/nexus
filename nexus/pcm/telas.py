@@ -547,25 +547,10 @@ def registrar_pcm(bp) -> None:
                                 request.get_data())
         if status != 200:
             return jsonify(ok=False, erro=d), status
-        linha = _tarefa_do_app(cfg, d)
-        if linha is None:
-            return jsonify(ok=False, erro="a tarefa não está na programação nem aberta na Gestão PCM"), 404
-        est = M.ler(cfg)
-        if est.get("erro"):
-            return jsonify(ok=False, erro=f"não consegui ler os motivos no banco ({est['erro']})"), 503
-        atual = M.motivo_de(M.indice(M.vigentes(cfg, est)), linha["os"], linha["codigo"], linha["tarefa"])
-        alvo = dict(linha, codigo="") if atual and not atual["codigo"] else linha
-        try:
-            r = M.marcar(cfg, alvo, d["motivo"], "" if d["motivo"] is None else d["obs"],
-                         {"nome": d["tecnico_nome"]}, semana=linha.get("semana") or "", origem="app",
-                         quem_hmac=d["tecnico_hmac"])
-        except M.Recusada as ex:
-            return jsonify(ok=False, erro=str(ex)), 400
-        arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
-        marca = r["marca"]
-        # o arquivo do robô vai em instantes, fora do pedido (`arquivo_em_dia` fica por compatibilidade: null)
-        return jsonify(ok=True, gravou=r["gravou"], marca=_marca_curta(marca) if marca else None,
-                       arquivo="em instantes" if r["gravou"] else "sem mudança", arquivo_em_dia=None)
+        # na fila do gravador, numa leitura e numa gravação do livro com as outras que esperam; das 8 threads do Nexus,
+        # o App segura no máximo duas, por no máximo 15 s (22/10/2026, `motivos_app.entregar`)
+        corpo, st = MA.entregar(current_app._get_current_object(), d, _motivos_do_app)
+        return jsonify(corpo), st
 
     @bp.route("/fora-da-programacao")
     def fora():
@@ -1166,6 +1151,53 @@ def _tarefa_da_semana(sem: dict, d: dict) -> dict | None:
                 "tipo": str(r.get("tipo") or "").strip(), "cluster": str(r.get("cluster") or "").strip(),
                 "data_prog": data_prog}
     return None
+
+
+def _motivos_do_app(cfg, ds: list[dict]) -> list[tuple[dict, int]]:
+    """As justificativas do App já conferidas (assinatura e formato), num lote do gravador (`motivos_app.entregar`):
+    uma leitura e uma gravação do livro para todas (`motivos.marcar_lote`). [(corpo, status)], na ordem."""
+    saidas: list = [None] * len(ds)
+    pedidos = []
+    for i, d in enumerate(ds):
+        try:
+            linha = _tarefa_do_app(cfg, d)
+            if linha is None:
+                saidas[i] = {"ok": False, "erro": "a tarefa não está na programação nem aberta na Gestão PCM"}, 404
+                continue
+            est = M.ler(cfg)
+            if est.get("erro"):
+                saidas[i] = {"ok": False, "erro": f"não consegui ler os motivos no banco ({est['erro']})"}, 503
+                continue
+            atual = M.motivo_de(M.indice(M.vigentes(cfg, est)), linha["os"], linha["codigo"], linha["tarefa"])
+        except Exception as ex:      # noqa: BLE001 — o defeito numa não segura as outras do lote
+            M.log.exception("Motivos do App: a OS %s não foi conferida", d.get("os"))
+            saidas[i] = {"ok": False, "erro": f"o Nexus não gravou ({type(ex).__name__}); o App tenta de novo"}, 503
+            continue
+        alvo = dict(linha, codigo="") if atual and not atual["codigo"] else linha
+        pedidos.append((i, {"tarefa": alvo, "motivo_id": d["motivo"], "obs": "" if d["motivo"] is None else d["obs"],
+                            "usuario": {"nome": d["tecnico_nome"]}, "semana": linha.get("semana") or "",
+                            "origem": "app", "quem_hmac": d["tecnico_hmac"]}))
+    gravou = False
+    for (i, _p), r in zip(pedidos, M.marcar_lote(cfg, [p for _, p in pedidos]) if pedidos else []):
+        if isinstance(r, M.BancoFora):          # passa: o App tenta de novo (o 400 ele descarta)
+            saidas[i] = {"ok": False, "erro": str(r)}, 503
+        elif isinstance(r, M.Recusada):
+            saidas[i] = {"ok": False, "erro": str(r)}, 400
+        elif isinstance(r, BaseException):      # a gravação falhou: nada mudou para esta; o App tenta de novo
+            M.log.error("Motivos do App: a gravação falhou (%s: %s)", type(r).__name__, str(r)[:200])
+            saidas[i] = {"ok": False, "erro": f"o Nexus não gravou ({type(r).__name__}); o App tenta de novo"}, 503
+        else:
+            gravou = gravou or r["gravou"]
+            marca = r["marca"]
+            # o reenvio da justificativa que o mesmo técnico já gravou hoje volta "gravou" (`repetida`): a resposta do
+            # envio que gravou não chegou ao App, e só com "gravou" ele escreve a nota e a etiqueta no Fracttal. O
+            # arquivo do robô vai em instantes, fora do pedido (`arquivo_em_dia` fica por compatibilidade: null)
+            saidas[i] = {"ok": True, "gravou": r["gravou"] or r["repetida"],
+                         "marca": _marca_curta(marca) if marca else None,
+                         "arquivo": "em instantes" if r["gravou"] else "sem mudança", "arquivo_em_dia": None}, 200
+    if gravou:
+        _publicar_arquivo(cfg)
+    return saidas
 
 
 def _tarefa_do_app(cfg, d: dict) -> dict | None:

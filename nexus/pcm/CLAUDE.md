@@ -182,8 +182,25 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   nome só cifrado; o painel e a janela mostram "(App)"), mexe na marca da OS quando é ela que vale (como a janela do
   Quadro) e agenda o arquivo do robô (fora do pedido, abaixo). Respostas: 200 {ok, gravou, marca, arquivo ("em
   instantes" ou "sem mudança"), arquivo_em_dia (null, por compatibilidade)}; 400 pedido fora do
-  formato ou motivo que não existe; 401 assinatura ou hora; 404 tarefa; 503 sem a chave ou banco fora. Testes:
+  formato ou motivo que não existe; 401 assinatura ou hora; 404 tarefa; 503 sem a chave, banco fora ou a
+  justificativa na fila (abaixo: ela é gravada assim mesmo). Testes:
   `test_o_tecnico_marca_pelo_app` e `test_o_app_sem_assinatura_ou_com_tarefa_que_nao_existe_nao_grava`.
+  **O App não segura o Nexus** (22/10/2026; `motivos_app.entregar`, `tests/test_pcm_motivos_app_sem_travar_22_10.py`):
+  das 13:51 às 14:08, com o servidor no swap, cada gravação no livro levava minutos, o servidor do App desiste em 20 s
+  e manda de novo, e 7 justificativas viraram 46 envios, cada um numa das 8 threads do Nexus esperando a vez de gravar
+  (Raio-X das 14:02: 6 de 8 threads nesta rota; o Nexus parou para todo mundo). Agora a justificativa entra numa FILA
+  na 1ª tentativa e um gravador por trás (a thread `nexus-motivos-do-app`) grava as que esperam juntas, numa leitura e
+  numa gravação do livro (`motivos.marcar_lote`; a recusa ou o defeito de uma não derruba as outras). O pedido espera a resposta
+  até 15 s (o App desiste em 20) e, com dois já esperando, responde 503 na hora; nos dois casos a justificativa é
+  gravada assim mesmo. O reenvio (o mesmo envio: OS, ativo, tarefa, motivo, observação e técnico) não entra de novo na
+  fila: espera a mesma, ou recebe a resposta guardada dela (só a boa, por 30 min). A leitura que falha DENTRO da
+  gravação também é 503 (`motivos.BancoFora`): era 400, que o App toma por recusa definitiva e tira a justificativa do
+  aparelho. E o reenvio do que o mesmo técnico já gravou HOJE pelo App volta `gravou: true` sem gravar nada (`marcar`,
+  `repetida`; vale depois de um reinício, quando a resposta guardada se perde): o App só escreve a nota e a etiqueta no
+  Fracttal com `gravou`, e naquele dia as 7 foram gravadas pelo envio que ele já tinha dado por perdido e nenhuma
+  ganhou a nota nem a etiqueta (a linha que já está na nota ele não repete). Pelo Nexus (Quadro, painel) nada mudou.
+  Simulado em escala (as 7, o banco lento, o App desistindo e reenviando até 8 vezes): antes 56 threads presas e o
+  Nexus livre só em 85 s, nenhuma com "gravou" no Sincronizar; depois 3 threads, livre em 8 s, as 7 com "gravou".
 - **O nome do motivo** segue a regra do Levi (16/10/2026, "Padronizar texto: sempre a primeira letra maiúscula o resto
   minúscula conforme regra gramatical"), a MESMA do App: tudo minúsculo menos a sigla de 2 a 4 letras escrita em
   maiúsculas (PCM, COS, UFV), e a 1ª letra maiúscula (`motivos.padronizar`). O cadastro inicial já nasce assim

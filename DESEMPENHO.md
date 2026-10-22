@@ -90,7 +90,8 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 | 21/10 | Raio-X das 14:36: "pedido preso 24 vezes em 24 h", o último um GET /os/historico de 45 s esperando o Fracttal (45 s é o tempo-limite) | a busca da lista (`api.list_minhas_os`, Histórico e quadro do Acompanhamento) engolia o erro de cada página e lote: sem a 1ª página, a lista VAZIA ficava guardada sem aviso; sem uma do meio, sumiam até 200 OS; e a vazia de "Todos" fazia cada pessoa buscar a sua inteira até o reinício | a busca em que o Fracttal não entregou algum pedido falha inteira (`_lista_pela_metade`): nada é guardado, a tela avisa e fica com a lista anterior e a hora dela; 3 pessoas depois de um estouro: 30 pedidos → 11 | `dadae16` |
 | 21/10 | Raio-X das 14:55: o web da plataforma (`app.py`) de 0,8 GB (14:36) para 3,1 GB + 0,7 GB no swap; a máquina com 0,2 GB livres, 2,9 GB no swap e o disco 71% do tempo; às 15:00 um POST do Registro mestre 3,5 min preso | o relatório por dentro e a devolução de memória só rodavam no worker: o que o web guarda ninguém via | o web grava o mesmo relatório (`gridco_plataforma_web.json`), devolve a memória livre a cada 10 min e usa no máximo 2 arenas de malloc (sem descartar cache: trackers); o Raio-X mostra "Dentro do web da plataforma" | `1853a39`; `0a83c8a` na plataforma |
 | 22/10 | relatório do web às 08:51: o dia de trackers da API PV 545 MB (19 dias de usina) e o dia de strings da API PV 493 MB (3 dias), parados desde antes das 07:59, com a máquina em 0,5 GB livres e 3,6 GB no swap | a poda do dia de trackers só rodava no worker (a aba Perdas, que lia esse cache no web, saiu em 12/10), e o dia de strings só tinha o teto de 3 dias (o código contava ~6 MB por dia; usina grande dá ~165 MB) | o dia de strings sai com 20 min sem releitura e tem teto de 30 mil registros; a poda do dia de trackers (2 h parado, 1,5 milhão de pontos) vale também no web; as duas a cada 10 min no web e na hora de guardar | `a3e3cc1` na plataforma |
-| 22/10 | Raio-X das 08:57: o próprio GET /t/base/raio-x 1 min 15 s preso em `_threads` | para cada thread, o `extract_stack` lia no disco o código de todas as linhas da pilha (o rótulo só usa a de dentro), com a máquina no swap | pilha sem o código (`presos.pilha`, também na ronda dos presos) e a lista de threads com o prazo de 2 s das outras seções | este |
+| 22/10 | Raio-X das 08:57: o próprio GET /t/base/raio-x 1 min 15 s preso em `_threads` | para cada thread, o `extract_stack` lia no disco o código de todas as linhas da pilha (o rótulo só usa a de dentro), com a máquina no swap | pilha sem o código (`presos.pilha`, também na ronda dos presos) e a lista de threads com o prazo de 2 s das outras seções | `e5a7259` |
+| 22/10 | Raio-X das 14:02: 6 de 8 threads em POST /t/pcm/motivos/app (a justificativa do App), de 3,5 a 6 min cada, e o Nexus parado para todos | com o servidor no swap, cada gravação no livro dos motivos levava minutos; o servidor do App desiste em 20 s e manda de novo, e cada reenvio esperava numa thread a vez de gravar (7 justificativas, 46 envios das 13:51 às 14:08); os reenvios voltavam "sem mudança", e o App não escreveu a nota nem a etiqueta no Fracttal de nenhuma | a justificativa entra numa fila e um gravador por trás grava as que esperam juntas (uma leitura e uma gravação do livro); o pedido espera até 15 s e só dois esperam; o reenvio pega a resposta guardada ou volta "gravou" (`repetida`); a leitura que falha na gravação é 503, não 400 (que o App descarta) | este |
 
 ## A fila
 
@@ -119,6 +120,13 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
    `deploy/atualizar.sh`, antes do `systemctl restart`, espera os pedidos em andamento terminarem (até ~60 s), pelo
    registro do `casca/presos.py` (os `em_curso`). Mexe no deploy do servidor: prova com cuidado. A tela já avisa a
    gravação sem resposta (`carga.js`, chat Nexus).
+6. **A justificativa do App com o banco lento, do lado do App** (22/10/2026; é do chat do App de Campo): o aparelho
+   para depois de 8 envios ("Parei de tentar sozinho"), e a justificativa fica nele até o técnico tocar em Sincronizar,
+   mesmo quando o Nexus já a tem (na fila ou gravada). O reenvio no MESMO dia volta "gravou" e o App escreve a nota e a
+   etiqueta; no dia seguinte, o Nexus grava como justificativa nova (conta de novo nas Vezes), porque a hora que vale é
+   a da chegada, não a do técnico. Proposta: o App manda a hora em que o técnico justificou (a `ts` do evento, que ele
+   já usa na linha da nota) e o Nexus decide o "mesmo dia" por ela. Das 7 de 22/10, 2 da OS 13473 voltaram "sem
+   mudança" e ficaram sem a nota e a etiqueta; as outras 5 estão nos aparelhos.
 
 ## Onde está cada peça
 
