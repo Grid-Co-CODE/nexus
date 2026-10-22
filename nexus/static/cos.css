@@ -27,3 +27,11 @@
 /* Parede de eventos: o texto do evento quebra (é a frase da nota); o que veio depois da última fotografia fica marcado */
 .cos-texto{white-space:normal;max-width:640px}
 .cn-tab tr.cos-recente td:first-child{box-shadow:inset 3px 0 0 var(--verde)}
+
+/* Ocorrências: uma coluna por etapa — a hora (ou a palavra) em cima, o caminho e a demora embaixo */
+.cos-ciclo td.cos-etapa{min-width:128px;white-space:normal}
+.cos-ciclo td.cos-etapa .det{max-width:200px}
+.cos-ciclo th .det{font-weight:400;text-transform:none;letter-spacing:0}
+.cos-ciclo td.cos-usina{min-width:190px}
+.cos-neutro{font:500 12.5px/16px var(--font-mono);color:var(--tinta-2)}
+.cos-abrir{display:inline-block;margin-top:6px;font-size:12.5px}
