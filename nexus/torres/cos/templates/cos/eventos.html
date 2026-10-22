@@ -14,7 +14,8 @@
 
   {% if not ligada %}
   <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
-    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>). O resto do Nexus segue igual.</div>
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
   {% else %}
   {% if erro_clientes %}<div class="cn-erro" role="alert"><b>{{ erro_clientes[:1]|upper }}{{ erro_clientes[1:] }}.</b></div>{% endif %}
   {% for c, erro, velha in erros %}<div class="cn-erro" role="alert"><b>{{ c }}: {{ erro }}.</b>

@@ -270,3 +270,77 @@ def test_a_parede_diz_qual_cliente_ficou_de_fora(ligada, logado, monkeypatch):
     assert "Cliente B: o Andamento não tem este cliente" in html and "Os eventos dele ficam de fora" in html
     assert "Usina Exemplo Vermelha" in html
 
+
+
+# --- a tela Base → Chaves do Nexus (22/10/2026) -------------------------------------------------------------------------
+
+def _andamento_falso(monkeypatch, chave_certa=CHAVE, fora_do_ar=False, codigo=None):
+    """O Andamento dublado para a conferência: 200 com a chave certa, 401 com outra, sem resposta fora do ar."""
+    vistos = []
+
+    def pedir(f, caminho):
+        vistos.append((f.url, caminho))
+        if fora_do_ar:
+            raise AND.FonteErro("o Andamento não respondeu (URLError)")
+        if codigo:
+            raise AND.FonteErro(f"o Andamento respondeu {codigo}", codigo)
+        if f.chave != chave_certa:
+            raise AND.FonteErro("o Andamento recusou a chave do Nexus", 401)
+        return {"clientes": ["Cliente A", "Cliente B"]}
+    monkeypatch.setattr(AND, "_pedir", pedir)
+    return vistos
+
+
+def test_a_conferencia_do_endereco(app, monkeypatch):
+    with pytest.raises(AND.FonteErro, match="não é um endereço"):
+        AND.conferir_para_a_tela(AND.URL, "andamento.exemplo:3002/api", app.config)
+    _andamento_falso(monkeypatch, fora_do_ar=True)
+    with pytest.raises(AND.FonteErro, match="não consegui falar"):
+        AND.conferir_para_a_tela(AND.URL, "http://andamento.exemplo:3002", app.config)
+    _andamento_falso(monkeypatch)
+    assert "falta gravar a chave" in AND.conferir_para_a_tela(AND.URL, "http://andamento.exemplo:3002", app.config)
+    app.config["NEXUS_COS_ANDAMENTO_CHAVE"] = CHAVE
+    assert "abre os dados" in AND.conferir_para_a_tela(AND.URL, "http://andamento.exemplo:3002/", app.config)
+    app.config["NEXUS_COS_ANDAMENTO_CHAVE"] = "outra-chave-qualquer-0000"
+    assert "não abre" in AND.conferir_para_a_tela(AND.URL, "http://andamento.exemplo:3002", app.config)
+    _andamento_falso(monkeypatch, codigo=404)
+    assert "desligada" in AND.conferir_para_a_tela(AND.URL, "http://andamento.exemplo:3002", app.config)
+    _andamento_falso(monkeypatch, codigo=500)
+    with pytest.raises(AND.FonteErro, match="não parece o Andamento"):
+        AND.conferir_para_a_tela(AND.URL, "http://andamento.exemplo:3002", app.config)
+
+
+def test_a_conferencia_da_chave_e_nunca_a_chave_na_mensagem(app, monkeypatch):
+    with pytest.raises(AND.FonteErro, match="não parece a chave"):
+        AND.conferir_para_a_tela(AND.CHAVE, "curta", app.config)
+    assert "sem conferir" in AND.conferir_para_a_tela(AND.CHAVE, CHAVE, app.config)       # sem endereço gravado ainda
+    app.config["NEXUS_COS_ANDAMENTO_URL"] = "http://andamento.exemplo:3002"
+    _andamento_falso(monkeypatch)
+    assert AND.conferir_para_a_tela(AND.CHAVE, CHAVE, app.config) == "o Andamento aceitou a chave (2 clientes)"
+    with pytest.raises(AND.FonteErro, match="recusou esta chave") as e:
+        AND.conferir_para_a_tela(AND.CHAVE, "chave-errada-0000000000", app.config)
+    assert "chave-errada" not in str(e.value)
+
+
+def test_as_chaves_gravadas_pela_tela_ligam_as_telas(tmp_path, monkeypatch):
+    """O caminho de verdade: a tela grava (cifrado, na pasta de dados do teste) e a leitura do COS passa a usar."""
+    from conftest import SENHA_TESTE
+    from nexus import create_app
+    from nexus.auth import chaves as K
+    app = create_app({"NEXUS_SECRET_KEY": "chave-de-teste-" + "x" * 20, "NEXUS_SENHA_ADMIN": SENHA_TESTE,
+                      "NEXUS_DADOS": str(tmp_path / "dados")})
+    app.config.update(TESTING=True, SESSION_COOKIE_SECURE=False)
+    K._CACHE.clear()
+    _andamento_falso(monkeypatch)
+    with app.app_context():
+        assert AND.fonte(app.config).ligada is False
+        aviso = K.gravar(app.config, AND.URL, " http://andamento.exemplo:3002 ", "admin@exemplo.test")
+        assert "falta gravar a chave" in aviso
+        assert "aceitou a chave" in K.gravar(app.config, AND.CHAVE, CHAVE, "admin@exemplo.test")
+        f = AND.fonte(app.config)
+        assert (f.ligada, f.url, f.chave) == (True, "http://andamento.exemplo:3002", CHAVE)
+        with pytest.raises(K.Recusada, match="nada foi gravado"):
+            K.gravar(app.config, AND.CHAVE, "chave-errada-0000000000", "admin@exemplo.test")
+        assert AND.fonte(app.config).chave == CHAVE                                        # a recusada não trocou
+    assert CHAVE not in (tmp_path / "dados" / K.ARQUIVO).read_text(encoding="utf-8")    # cifrada no disco
+    K._CACHE.clear()
