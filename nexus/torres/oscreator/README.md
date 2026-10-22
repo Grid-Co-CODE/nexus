@@ -916,6 +916,26 @@ da aprovação, como no app de mesa.
   de OS criada).
 - O app de mesa (`steps/solic_pcm.py`) não mudou. Prova: `tests/test_oscreator_solic_pcm.py`.
 
+## Fila do PCM: o tempo estimado na decisão (21/10/2026)
+
+Levi: "Gostaria que o PCM conseguisse mudar o tempo estimado para cada atividade na fila de PCM". Cada solicitação da
+Fila vira uma OS de uma tarefa, e a tarefa nascia sempre com 10 min (o `duration: 600` do `create_os_rpc`, o que o web
+manda no formulário da tarefa não planejada; `api.DURACAO_OS_AVULSA`). As subtarefas do Fracttal não têm tempo: o tempo é
+da tarefa.
+
+- **O campo:** "Tempo estimado:" logo abaixo da Data, em HH:mm, começando em 00:10 a cada solicitação; a seta (e as
+  teclas para cima e para baixo) anda de 30 em 30 min, como o tempo da linha na tela PCM (`pcm.js`, o `_TempoTarefa` do
+  app); o que não é tempo volta ao último válido. Vai de 00:01 a 23:59.
+- **O caminho:** o aprovar manda `duracao` em segundos só quando o PCM mudou o tempo (`null` sem mexer); o servidor confere
+  (`solic_web.duracao_escolhida`: número inteiro de 60 a 23:59; fora disso, 400 e nada é criado) e passa
+  `api.aprovar_solicitacao(..., duracao=)` → `clonar_os` → `create_os_rpc(duracao=)`: `duration` e `real_duration` com o
+  tempo (o web manda os dois iguais) e o fim da janela da programação = início + tempo, como o `create_planned_os` (14/09).
+  Sem o tempo, o pedido de sempre (10 min, a janela de 20), e nenhum outro caminho (COS, Chamados, PCM, Clonar) muda.
+- A confirmação e o aviso de "OS criada" dizem o tempo estimado. Na retomada (a tarefa da solicitação já existia de uma
+  tentativa anterior), o tempo dela fica o da primeira tentativa.
+- **Prova:** `tests/test_oscreator_solic_pcm.py::test_o_pcm_troca_o_tempo_estimado_na_decisao` (a rota) e
+  `::test_o_tempo_estimado_vai_na_tarefa_da_os` (o pedido ao Fracttal, de mentira). No app de mesa a Fila não tem o campo.
+
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
 Levi, 19/10/2026, em Nexus > Chamados > Garantias: "ao clicar na OS em responsável dê para alterar o responsável da OS que

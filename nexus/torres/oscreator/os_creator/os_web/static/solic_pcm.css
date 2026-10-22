@@ -153,6 +153,17 @@ body.os-form .spc-inline input[type=datetime-local]{width:100%;height:26px;backg
 body.os-form .spc-inline input[type=datetime-local]:hover{border-bottom-color:var(--spc-verde)}
 body.os-form .spc-inline input[type=datetime-local]:focus{border-bottom:1px solid var(--spc-verde);outline:none}
 body.os-form .spc-inline input[type=datetime-local]:disabled{opacity:.55}
+/* o Tempo estimado da decisão (21/10/2026): HH:mm no mesmo tracejado, com as setas de 30 em 30 min da tela PCM */
+.spc-tempo{display:inline-flex;align-items:center;gap:6px}
+body.os-form .spc-tempo input{width:64px;height:26px;background:transparent;border:none;border-bottom:1px dashed var(--spc-tracejado);
+  border-radius:0;color:var(--spc-tinta);font-size:13px;padding:0 2px;text-align:center}
+body.os-form .spc-tempo input:hover{border-bottom-color:var(--spc-verde)}
+body.os-form .spc-tempo input:focus{border-bottom:1px solid var(--spc-verde);outline:none}
+body.os-form .spc-tempo input:disabled,body.os-form .spc-tempo .tp-b:disabled{opacity:.55}
+.spc-tempo .tp-setas{display:inline-flex;flex-direction:column;gap:2px}
+body.os-form .spc-tempo .tp-b{width:22px;height:14px;padding:0;border:1px solid var(--spc-tracejado);border-radius:4px;background:transparent;
+  color:var(--spc-tinta);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+body.os-form .spc-tempo .tp-b:hover:not(:disabled){border-color:var(--spc-verde);color:var(--spc-verde)}
 body.os-form .spc-inline select,body.os-form .spc-inline .osb-in{width:100%;height:26px;background:transparent;border:none;border-bottom:1px dashed var(--spc-tracejado);
   border-radius:0;color:var(--spc-tinta);font-size:13px;padding:0 2px}
 body.os-form .spc-inline select:hover,body.os-form .spc-inline .osb-in:hover{border-bottom-color:var(--spc-verde)}

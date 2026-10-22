@@ -9,6 +9,8 @@
    - o TÉCNICO sugerido vem pré-escolhido pelo nome; a DATA sugerida pelo supervisor é a data PROGRAMADA da OS (15/10/2026,
      Levi: "No OS Creator em fila a OS programada do PCM tem que ser a data sugerida da solicitação!"; o servidor a lê da
      própria solicitação; sem ela, a OS nasce programada agora, como antes);
+   - o TEMPO ESTIMADO começa no de sempre (10 min) e o PCM troca (21/10/2026, Levi: "Gostaria que o PCM conseguisse mudar
+     o tempo estimado para cada atividade na fila de PCM"); HH:mm, a seta anda de 30 em 30 min, como na tela PCM;
    - as ETIQUETAS do tema entram marcadas "(tema)" e saem só nesta solicitação; tema sem a lista cai na regra antiga da
      PERFORMANCE — tracker, ETM e garantia (`_CardEtiquetas.aplicar_regra`);
    - CLASSIFICAÇÃO 1 = "Programada" e 2 = a disciplina do tema, só em campo vazio (`_sugerir_classif`);
@@ -31,7 +33,7 @@
       chips = $('fl_chips'), etqAdd = $('fl_etq_add'), tipo = $('fl_tipo'), c1 = $('fl_c1'), c2 = $('fl_c2'),
       classif = $('fl_classif'), tema = $('fl_tema'), pai = $('fl_pai'), paiLista = $('fl_pai_lista'),
       aprovar = $('fl_aprovar'), devolver = $('fl_devolver'), bStatus = $('fl_status'), hint = $('fl_hint'),
-      data = $('fl_data'),
+      data = $('fl_data'), tempo = $('fl_tempo'), tempoSetas = tempo.parentNode.querySelectorAll('.tp-b'),
       modal = $('fl_modal'), mT = $('fl_m_t'), mSt = $('fl_m_st'), mMot = $('fl_m_mot'), mOk = $('fl_m_ok');
 
   function up(t) { return String(t == null ? '' : t).trim().toUpperCase(); }
@@ -127,8 +129,39 @@
     ver.hidden = !(expandida || obs.scrollHeight > obs.clientHeight + 2);
     ver.textContent = expandida ? 'ver menos' : 'ver inteira';
   }
+  // ── o tempo estimado: o HH:mm da tela PCM (pcm.js: lerTempo, hhmm, passoTempo) ──
+  var TEMPO_PADRAO = Math.floor((Number(D.tempo_padrao) || 600) / 60), tempoMin = TEMPO_PADRAO;
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+  function hhmm(min) { var t = Math.max(0, Math.min(min, 23 * 60 + 59)); return p2(Math.floor(t / 60)) + ':' + p2(t % 60); }
+  function lerTempo(txt) {                                   // "01:30" (ou "1:30", "0130") → minutos; null se não é tempo
+    var m = /^\s*(\d{1,2}):?(\d{2})\s*$/.exec(txt || '');
+    if (!m) return null;
+    var h = Number(m[1]), mi = Number(m[2]), t = h * 60 + mi;
+    return (h <= 23 && mi <= 59 && t > 0) ? t : null;
+  }
+  // vai para o múltiplo de 30 seguinte NA DIREÇÃO do passo (01:10 sobe para 01:30 e desce para 01:00); piso de 15 min (ou o
+  // atual, se for menor); para em 23:30; no limite não anda
+  function passoTempo(m, passos) {
+    var PASSO = 30, TETO = 23 * 60 + 30;
+    var novo = passos > 0 ? (Math.floor(m / PASSO) + 1) * PASSO : (Math.floor((m + PASSO - 1) / PASSO) - 1) * PASSO;
+    novo = Math.max(Math.min(15, m) || 15, Math.min(TETO, novo));
+    if ((passos > 0 && novo < m) || (passos < 0 && novo > m)) novo = m;
+    return novo;
+  }
+  function andarTempo(passos) { tempoMin = passoTempo(tempoMin, passos); tempo.value = hhmm(tempoMin); }
+  tempo.addEventListener('input', function () { var m = lerTempo(tempo.value); if (m != null) tempoMin = m; });
+  tempo.addEventListener('change', function () { tempo.value = hhmm(tempoMin); });   // o que não é tempo volta ao que era
+  tempo.addEventListener('keydown', function (e) {
+    var passos = {ArrowUp: 1, PageUp: 1, ArrowDown: -1, PageDown: -1}[e.key];
+    if (passos) { e.preventDefault(); andarTempo(passos); }
+  });
+  Array.prototype.forEach.call(tempoSetas, function (b) {
+    b.addEventListener('click', function () { andarTempo(Number(b.getAttribute('data-passo'))); });
+  });
+
   function habilitar(on) {
-    [tema, resp, tipo, c1, c2, etqAdd, pai, data, aprovar, devolver, bStatus].forEach(function (el) { el.disabled = !on; });
+    [tema, resp, tipo, c1, c2, etqAdd, pai, data, tempo, aprovar, devolver, bStatus].forEach(function (el) { el.disabled = !on; });
+    Array.prototype.forEach.call(tempoSetas, function (b) { b.disabled = !on; });
     editor.editavel(on);
     titulo.classList.toggle('travado', !on);
   }
@@ -152,6 +185,7 @@
     preSelecionar(f.tecnico);
     // a Data é campo (20/10/2026, como no app): começa na sugerida pelo supervisor e o PCM troca no calendário
     data.value = f.data_sug_iso || '';
+    tempoMin = TEMPO_PADRAO; tempo.value = hhmm(tempoMin);
     tipo.value = temOpcao(tipo, D.tipo_padrao) ? D.tipo_padrao : (tipo.options[0] ? tipo.options[0].value : '');
     c1.value = ''; c2.value = '';
     pai.value = ''; paiSel = null; paiLista.hidden = true;
@@ -357,18 +391,20 @@
         + (data.value !== (f.data_sug_iso || '') ? ' (data trocada na decisão)' : '')
       : (f.data_sug ? ' (a data sugerida "' + f.data_sug + '" não foi entendida e o campo Data está vazio: programada para agora)'
                     : ' (sem data: programada para agora)');
-    if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)' + quando + '?\n\nA API do Fracttal NÃO edita OS '
-                        + 'já criada — confira as subtarefas antes.')) return;
+    if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)' + quando + ', tempo estimado ' + hhmm(tempoMin)
+                        + '?\n\nA API do Fracttal NÃO edita OS já criada — confira as subtarefas antes.')) return;
     ocupado(true, 'criando a OS…');
     SP.pedir('/os/api/solic/' + encodeURIComponent(f.id) + '/aprovar', {
       id_responsible: resp.value, responsavel: resp.options[resp.selectedIndex].text, titulo: t, subtarefas: subs,
       tipo: tipo.value, classif1: c1.value, classif2: c2.value, etiquetas: etq.map(function (e) { return e.id; }),
-      id_parent: paiSel, data_programada: data.value
+      id_parent: paiSel, data_programada: data.value,
+      duracao: tempoMin !== TEMPO_PADRAO ? tempoMin * 60 : null      // sem mexer: o de sempre do servidor
     }, 'Criando a OS no Fracttal…').then(function (x) {
       ocupado(false, '');
       if (!x.ok) { SP.aviso(x.j.erro || 'Não consegui criar a OS.', true); return; }
       SP.aviso('OS ' + x.j.folio + ' criada a partir da solicitação Nº ' + f.id
-               + (x.j.programada ? ', programada para ' + x.j.programada : '') + '.');
+               + (x.j.programada ? ', programada para ' + x.j.programada : '')
+               + (x.j.tempo ? ', tempo estimado ' + x.j.tempo : '') + '.');
       tirar(f);          // "Aprovar avança para a próxima": são várias na fila
     });
   });

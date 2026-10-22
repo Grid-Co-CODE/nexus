@@ -50,6 +50,11 @@
               <label class="spc-fixo" for="fl_data">Data:</label>
               <div class="spc-inline spc-inline--data"><input type="datetime-local" id="fl_data" aria-label="Data programada da OS"
                 title="a data sugerida pelo supervisor: a OS nasce programada nela; clique para trocar"></div>
+              <label class="spc-fixo" for="fl_tempo">Tempo estimado:</label>
+              <div class="spc-inline spc-inline--tempo"><span class="spc-tempo" title="Quanto a tarefa deve durar (HH:mm). A seta anda de 30 em 30 minutos.">
+                <input type="text" id="fl_tempo" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="Tempo estimado da tarefa (HH:mm)">
+                <span class="tp-setas"><button type="button" class="tp-b" data-passo="1" tabindex="-1" aria-label="Mais 30 minutos"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
+                  <button type="button" class="tp-b" data-passo="-1" tabindex="-1" aria-label="Menos 30 minutos"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></span></span></div>
               <span class="spc-fixo spc-topo">Etiquetas:</span>
               <div class="spc-etqs"><div class="spc-chips" id="fl_chips"></div>
                 <div class="spc-inline"><select id="fl_etq_add" aria-label="Adicionar etiqueta"></select></div>
@@ -104,7 +109,7 @@
   "fichas": fichas, "sel": sel, "leitura": leitura, "n_hoje": n_hoje,
   "pessoas": pessoas, "etiquetas": etiquetas, "tipos": tipos, "cl1": cl1, "cl2": cl2, "status": status,
   "temas": temas, "tipos_sub": tipos_sub, "tipo_padrao": tipo_padrao, "classif1_padrao": classif1_padrao,
-  "nenhuma": nenhuma, "etiqueta_perf": etiqueta_perf}|tojson }}</script>
+  "nenhuma": nenhuma, "etiqueta_perf": etiqueta_perf, "tempo_padrao": tempo_padrao}|tojson }}</script>
 {% endblock %}
 
 {% block scripts %}

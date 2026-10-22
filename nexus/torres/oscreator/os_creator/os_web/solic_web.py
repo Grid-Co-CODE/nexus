@@ -386,6 +386,25 @@ def data_sugerida_dt(texto):
     return dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M").replace(tzinfo=_BRT_SUG) if iso else None
 
 
+TEMPO_MAX = 23 * 3600 + 59 * 60          # o campo vai de 00:01 a 23:59, como o tempo da linha na tela PCM
+
+
+def duracao_escolhida(v):
+    """O "Tempo estimado:" da decisão (21/10/2026) em segundos: a tela manda os minutos do HH:mm vezes 60. None quando não
+    é um número inteiro (o texto "1:30" chegando cru, o True do JSON), tem menos de 1 minuto ou passa de 23:59."""
+    if isinstance(v, str) and re.fullmatch(r"\d{1,5}", v.strip()):
+        v = int(v.strip())
+    if isinstance(v, bool) or not isinstance(v, int) or not 60 <= v <= TEMPO_MAX:
+        return None
+    return v
+
+
+def tempo_hhmm(seg) -> str:
+    """Os segundos como a tela escreve o tempo: 5400 → "01:30"."""
+    m = int(seg or 0) // 60
+    return "%02d:%02d" % (m // 60, m % 60)
+
+
 def data_programada_escolhida(texto, agora=None):
     """A data que o PCM escolheu no "Data:" da decisão (o valor do <input type=datetime-local>, "2026-10-22T13:30") como
     datetime de Brasília, ou None: outro formato, data que não existe, ou a mais de um ano de hoje (o ano digitado

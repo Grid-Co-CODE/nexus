@@ -946,11 +946,16 @@ def _msg_rpc(bruto) -> str:
     return ("%s  (%s)" % (amigavel, cod)) if amigavel else (cod or "sem detalhe")
 
 
+# O tempo estimado da OS avulsa quando ninguém escolhe outro: o `duration` que o web manda no formulário da tarefa não
+# planejada (a captura deste caminho). A Fila do PCM mostra ele no "Tempo estimado:" da decisão (21/10/2026).
+DURACAO_OS_AVULSA = 600
+
+
 def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
                   requested_by: str = "", etiqueta: str = "", note: str = "",
                   event_date: datetime = None, tipo: dict = None, finalizar: dict = None,
                   id_parent=None, falha: dict = None, prog_date: datetime = None,
-                  id_request=None) -> dict:
+                  id_request=None, duracao: int = None) -> dict:
     """Cria uma OS (tarefa não-planejada) via RPC interno do Fracttal. asset = registro do
     get_assets() (precisa de id/id_parent/id_type_item/id_group_task). `event_date` = data
     programada (datetime; default = agora). `tipo` = dict opcional com id_main (id_task_type_main),
@@ -958,6 +963,7 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
     `finalizar` (opcional) = OS JÁ REALIZADA → cria a WO concluída direto, com:
     {to_in_review(bool: True=Verificação, False=Finalizados), final_date(datetime), id_assigned_user
     (=id_personnel do responsável), name(str), respostas(list paralela às subtarefas)}.
+    `duracao` = o tempo estimado da tarefa, em segundos (None = DURACAO_OS_AVULSA, como sempre).
     Devolve {'id_work_order','wo_folio','raw'}. Em erro, a mensagem do RPC é propagada (FracttalError)."""
     id_item = asset.get("id")
     if not id_item:
@@ -987,7 +993,13 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
     fdt = fin.get("final_date")
     if fdt is not None and getattr(fdt, "tzinfo", None) is None:
         fdt = fdt.replace(tzinfo=timezone.utc)
-    final_iso = _iso_z(fdt) if fdt is not None else _iso_z(prog + timedelta(minutes=20))
+    # O TEMPO ESTIMADO pode vir da tela (21/10/2026, Levi: "Gostaria que o PCM conseguisse mudar o tempo estimado para
+    # cada atividade na fila de PCM"): a OS da Fila nascia sempre com 10 min. Com ele, a duração e o fim da janela da
+    # programação saem dele, como no `create_planned_os` (14/09): é a janela que ocupa a agenda do técnico. Sem ele, o
+    # pedido de sempre (10 min, a janela de 20), para nenhum outro caminho (COS, Chamados, PCM, Clonar) mudar.
+    dur = int(duracao) if duracao else DURACAO_OS_AVULSA
+    fim = prog + (timedelta(seconds=dur) if duracao else timedelta(minutes=20))
+    final_iso = _iso_z(fdt) if fdt is not None else _iso_z(fim)
     params = {
         "event_date": _iso_z(ev),
         # CONFIRMADO em 07/08, e era mesmo o que eu suspeitava em 30/07 sem conseguir medir.
@@ -1012,7 +1024,7 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
         "work_done": finalizada and not em_verificacao,  # Finalizados → concluída
         "to_work_order": finalizada,                     # finalizada vira WO direto (sem Fase 2)
         "stop_assets": False,
-        "duration": 600, "real_duration": 600,
+        "duration": dur, "real_duration": dur,           # o web manda os dois iguais (a captura: 600 e 600)
         "requested_by": (requested_by or "").strip() or "GridCo O&M",
         "edit_mode": False,
         "tasks_types_main_description": task_type,
@@ -4788,7 +4800,8 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
     'note' (se preenchido) sobrescreve a observação de TODAS as tarefas; senão usa a de cada uma.
     Data programada: cada tarefa pode trazer seu próprio 'event_date' (datetime); 'scheduled_date'
     é o fallback p/ as que não tiverem (default de ambos = agora). 'prog_date' (datetime) separa a data PROGRAMADA da
-    do evento (a solicitação aprovada na Fila do PCM nasce programada na data sugerida, 15/10/2026).
+    do evento (a solicitação aprovada na Fila do PCM nasce programada na data sugerida, 15/10/2026). 'duracao' (segundos)
+    é o tempo estimado da tarefa (o "Tempo estimado:" da Fila, 21/10/2026); sem ele, o do `create_os_rpc`.
     → {'ok','os':{id_work_order,wo_folio,id_tasks[,etiquetas]}|None,'erro','aviso','n_tarefas','n_criadas'}."""
     val = [t for t in (tarefas or []) if isinstance(t.get("asset"), dict) and t["asset"].get("id")]
     if not val:
@@ -4816,7 +4829,7 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
                                 tipo=_tipo or None,
                                 note=(note or t.get("notas") or ""),
                                 event_date=(t.get("event_date") or scheduled_date),
-                                prog_date=t.get("prog_date"),
+                                prog_date=t.get("prog_date"), duracao=t.get("duracao"),
                                 id_parent=id_parent, id_request=id_request)
             if os_.get("id_task"):
                 id_tasks.append(os_["id_task"])
@@ -4895,9 +4908,11 @@ def _tarefa_da_solicitacao(id_request):
 def aprovar_solicitacao(asset: dict, descricao: str, subtarefas: list, id_request,
                         id_responsible, responsible_name: str = "", note: str = "",
                         tipo: str = "Corretiva", etiqueta_ids: list = None,
-                        id_parent=None, classif=None, prog_date: datetime = None) -> dict:
+                        id_parent=None, classif=None, prog_date: datetime = None, duracao: int = None) -> dict:
     """Converte a solicitacao em OS NUMERADA. Mesmo envelope do `clonar_os`. `prog_date` = a data PROGRAMADA da OS (a
-    data sugerida da solicitacao, na Fila do PCM web, 15/10/2026); None = agora, como sempre.
+    data sugerida da solicitacao, na Fila do PCM web, 15/10/2026); None = agora, como sempre. `duracao` = o tempo estimado
+    da tarefa em segundos (o "Tempo estimado:" da decisao, 21/10/2026); None = o de sempre. Na retomada (a tarefa ja
+    existia) ele nao muda: a tarefa nasceu na tentativa anterior.
 
     Aguenta ser chamada duas vezes: se a tentativa anterior parou no meio (tarefa criada, OS
     nao), retoma pela fase 2 em vez de tentar criar outra tarefa — o que so devolveria
@@ -4925,7 +4940,7 @@ def aprovar_solicitacao(asset: dict, descricao: str, subtarefas: list, id_reques
         # caminho da OS clonada — um lugar so decidindo o que vai no payload.
         return clonar_os([{"asset": asset, "tipo": tipo, "descricao": descricao,
                            "classif_1": c1, "classif_2": c2,
-                           "subtarefas": subtarefas or [], "prog_date": prog_date}],
+                           "subtarefas": subtarefas or [], "prog_date": prog_date, "duracao": duracao}],
                          id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
                          note=note, id_request=id_request, id_parent=id_parent)
     if not id_responsible:

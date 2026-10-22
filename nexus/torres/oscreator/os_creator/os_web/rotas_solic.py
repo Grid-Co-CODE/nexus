@@ -377,7 +377,8 @@ def fila():
         cl2=[t.get("description") for t in (tipos.get("c2") or []) if t.get("description")],
         status=[{"id": i, "cod": cod, "rot": rot} for i, cod, rot in status],
         temas=sw.temas_da_fila(), tipos_sub=sw.TIPOS_SUB, tipo_padrao=sw.TIPO_PADRAO,
-        classif1_padrao=sw.CLASSIF1_PADRAO, nenhuma=sw.SEM_CLASSIF, etiqueta_perf=sp.ETIQUETA_PERFORMANCE)
+        classif1_padrao=sw.CLASSIF1_PADRAO, nenhuma=sw.SEM_CLASSIF, etiqueta_perf=sp.ETIQUETA_PERFORMANCE,
+        tempo_padrao=api.DURACAO_OS_AVULSA)
 
 
 @bp.route("/api/solic/<id_code>")
@@ -438,14 +439,22 @@ def api_aprovar(id_code):
         prog = sw.data_programada_escolhida(corpo.get("data_programada"))
         if prog is None:
             return jsonify({"erro": "Data programada inválida: escolha o dia e a hora no campo Data da decisão."}), 400
+    # o TEMPO ESTIMADO da tarefa (21/10/2026, Levi: "Gostaria que o PCM conseguisse mudar o tempo estimado para cada
+    # atividade na fila de PCM"): o do campo vale; sem ele (o PCM não mexeu), o de sempre do `create_os_rpc`
+    dur = None
+    if corpo.get("duracao") not in (None, ""):
+        dur = sw.duracao_escolhida(corpo.get("duracao"))
+        if dur is None:
+            return jsonify({"erro": "Tempo estimado inválido: escreva de 00:01 a 23:59 (HH:mm) no campo da decisão."}), 400
     res = api.aprovar_solicitacao(
         asset, titulo, subs, s.get("id_code"), corpo.get("id_responsible"), corpo.get("responsavel") or "",
         tipo=corpo.get("tipo") or sw.TIPO_PADRAO, note=str(s.get("observacao") or ""),
         etiqueta_ids=corpo.get("etiquetas") or None, id_parent=id_parent,
-        classif=(corpo.get("classif1") or "", corpo.get("classif2") or ""), prog_date=prog)
+        classif=(corpo.get("classif1") or "", corpo.get("classif2") or ""), prog_date=prog, duracao=dur)
     out = sw.mensagem_aprovacao(res, id_code)
     if out.get("ok"):
         out["programada"] = prog.strftime("%d/%m/%Y %H:%M") if prog else ""
+        out["tempo"] = sw.tempo_hhmm(dur or api.DURACAO_OS_AVULSA)
     if out.get("ok") or (res or {}).get("ok"):
         _esquecer_lista()              # nasceu OS (ou a tarefa): a solicitação saiu da fila para todo mundo
     return (jsonify(out), 200) if out.get("ok") else (jsonify({"erro": out["mensagem"]}), 400)

@@ -685,3 +685,66 @@ def test_o_pcm_troca_a_data_programada_na_decisao(cli):
         r = cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, data_programada=ruim))
         assert r.status_code == 400 and "Data" in r.get_json()["erro"], ruim
     assert len(cli.gravado) == n                                                            # nada foi criado
+
+
+def test_o_pcm_troca_o_tempo_estimado_na_decisao(cli):
+    """21/10/2026, Levi: "Gostaria que o PCM conseguisse mudar o tempo estimado para cada atividade na fila de PCM". A OS
+    da Fila nascia sempre com 10 min (o `duration: 600` do `create_os_rpc`). O "Tempo estimado:" da decisão (HH:mm, como o
+    tempo da linha na tela PCM) vai no pedido em segundos e vale na tarefa; sem ele (o PCM não mexeu), como antes."""
+    html = cli.get("/os/solicitacao/fila").get_data(as_text=True)
+    assert 'id="fl_tempo"' in html and _dados(html, "fl_dados")["tempo_padrao"] == 600
+    corpo = {"id_responsible": 1, "responsavel": "Ana Teste Silva"}
+    r = cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, duracao=5400))
+    assert r.status_code == 200 and cli.gravado[-1][-1]["duracao"] == 5400
+    assert r.get_json()["tempo"] == "01:30"
+    for sem in (dict(corpo, duracao=None), dict(corpo, duracao=""), corpo):                 # o PCM não mexeu
+        cli.post("/os/api/solic/5001/aprovar", json=sem)
+        assert cli.gravado[-1][-1]["duracao"] is None
+    n = len(cli.gravado)
+    for ruim in (0, 30, -600, 24 * 3600, "1:30", "abc", True, 5400.5):
+        r = cli.post("/os/api/solic/5001/aprovar", json=dict(corpo, duracao=ruim))
+        assert r.status_code == 400 and "Tempo estimado" in r.get_json()["erro"], ruim
+    assert len(cli.gravado) == n                                                            # nada foi criado
+
+
+def test_o_tempo_estimado_vai_na_tarefa_da_os(monkeypatch):
+    """O caminho até o Fracttal: aprovar_solicitacao → clonar_os → create_os_rpc(duracao=). No pedido ao Fracttal, a
+    duração e a janela da programação (o fim = o início + o tempo), como o `create_planned_os` da tela PCM (14/09); sem o
+    tempo, o pedido de sempre (10 min, a janela de 20)."""
+    import datetime as _dt
+    chamadas = []
+
+    def criar(asset, desc, task_type, subs, **k):
+        chamadas.append(k)
+        return {"id_task": 501}
+    monkeypatch.setattr(api, "create_os_rpc", criar)
+    monkeypatch.setattr(api, "_classif_ids", lambda *a: {})
+    monkeypatch.setattr(api, "_solicitacao_row", lambda idc: {})
+    monkeypatch.setattr(api, "_tarefa_da_solicitacao", lambda idc: None)
+    monkeypatch.setattr(api, "_work_order_insert", lambda recs, idr, nome: {"id_work_order": 9, "wo_folio": 1234})
+    monkeypatch.setattr(api, "apply_labels", lambda *a: None)
+    api.aprovar_solicitacao({"id": 11, "code": "TST-INV11"}, "T", [], 5001, 1, "Ana", duracao=5400)
+    assert chamadas[-1]["duracao"] == 5400
+    api.aprovar_solicitacao({"id": 11, "code": "TST-INV11"}, "T", [], 5001, 1, "Ana")
+    assert chamadas[-1]["duracao"] is None
+
+    monkeypatch.undo()
+    enviados = []
+
+    class Resp:
+        status_code, text = 200, ""
+
+        def json(self):
+            return [{"result": {"success": True, "data": {"id_task": 77}}}]
+    monkeypatch.setattr(api, "_rpc_headers", lambda: {})
+    monkeypatch.setattr(api.requests, "post", lambda url, headers=None, json=None, timeout=None:
+                        enviados.append(json[0]["params"]) or Resp())
+    prog = _dt.datetime(2026, 10, 22, 11, 0, tzinfo=_dt.timezone.utc)
+    ativo = {"id": 11, "code": "TST-INV11", "id_type_item": 1}
+    assert api.create_os_rpc(ativo, "T", "Corretiva", [], prog_date=prog, duracao=5400)["id_task"] == 77
+    p = enviados[-1]
+    assert p["duration"] == 5400 and p["initial_date"] == "2026-10-22T11:00:00.000Z"
+    assert p["final_date"] == "2026-10-22T12:30:00.000Z"
+    api.create_os_rpc(ativo, "T", "Corretiva", [], prog_date=prog)                         # sem o tempo: como sempre
+    p = enviados[-1]
+    assert p["duration"] == 600 and p["real_duration"] == 600 and p["final_date"] == "2026-10-22T11:20:00.000Z"
