@@ -211,7 +211,12 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   PerformancePainel, `_memoria_web_loop`), e o Raio-X o mostra igual, com o prazo e o estado próprios (um relatório preso
   não prende o outro; as duas seções saem da macro `dentro` do `raio_x.html`). O caso: Raio-X das 14:55 de 21/10, o web
   de 0,8 GB (14:36) para 3,1 GB e 0,7 GB no swap, com 0,2 GB livres na máquina, e por dentro só se via o worker. Prova:
-  `tests/test_raio_x_web_plataforma.py`.
+  `tests/test_raio_x_web_plataforma.py`. **E a lista de threads também tem prazo** (22/10/2026): às 08:57 de 22/10, com a
+  máquina em 3,6 GB de swap, o próprio Raio-X ficou 1 min 15 s preso em `_threads`, porque o `traceback.extract_stack`
+  lia no disco o código de todas as linhas de cada pilha, e o rótulo só usa a de dentro. As pilhas saem de
+  `presos.pilha` (sem o código; também na ronda dos presos), e os pedidos em andamento e as tarefas de fundo saem com o
+  mesmo prazo de 2 s (`_THREADS`): passou dele, a página mostra a última lista, com a hora dela. Prova:
+  `tests/test_raio_x_threads_sem_disco_22_10.py`.
 - **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O

@@ -27,7 +27,6 @@ import os
 import sys
 import threading
 import time
-import traceback
 from datetime import datetime
 
 from flask import current_app, render_template, session
@@ -48,7 +47,7 @@ def _threads(estado) -> tuple[list, list]:
     for p in sorted(em_curso.values(), key=lambda p: p["inicio"]):
         das_requisicoes.add(p["thread"])
         quadro = pilhas.get(p["thread"])
-        r = P.rotulo(traceback.extract_stack(quadro) if quadro is not None else [])
+        r = P.rotulo(P.pilha(quadro) if quadro is not None else [])
         pedidos.append({"metodo": p["metodo"], "caminho": p["caminho"], "ha": P._duracao(agora - p["inicio"]),
                         "ha_s": agora - p["inicio"], **r})
     eu = threading.get_ident()
@@ -60,7 +59,7 @@ def _threads(estado) -> tuple[list, list]:
         # as do waitress com pedido já estão na lista de cima; as outras dele estão livres; a principal só escuta a porta
         if nome.startswith("waitress-") or nome == "MainThread":
             continue
-        outras.append({"nome": nome, **P.rotulo(traceback.extract_stack(quadro))})
+        outras.append({"nome": nome, **P.rotulo(P.pilha(quadro))})
     outras.sort(key=lambda x: (x["como"] != "trabalhando", x["nome"]))
     return pedidos, outras
 
@@ -168,6 +167,10 @@ PRAZO_MEMORIA_S = 2.0
 _ROTULOS: dict = {}                    # (pid, nome) -> o nome do programa na lista
 _MEMORIA = {"thread": None, "ultimo": None, "quando": None}
 _MEMORIA_TRAVA = threading.Lock()
+# A lista de threads (os pedidos em andamento e as tarefas de fundo) também, desde 22/10/2026: às 08:57 o próprio Raio-X
+# ficou 1 min 15 s preso em `_threads`, com a máquina em 3,6 GB de swap (as pilhas já não leem o código de cada linha,
+# `presos.pilha`; andar por elas ainda pode esperar a memória voltar do disco).
+_THREADS = {"thread": None, "ultimo": None, "quando": None}
 
 
 def _programa(pid: int, nome: str) -> str:
@@ -320,7 +323,9 @@ def registrar_raio_x(bp) -> None:
                                    area="O Raio-X do Nexus", email=""), 403
         app = current_app._get_current_object()
         estado = app.extensions.get(P.CHAVE)
-        pedidos, outras = _threads(estado)
+        lista = _com_prazo(_THREADS, lambda: _threads(estado), PRAZO_MEMORIA_S, "nexus-raio-x-threads")
+        threads_atrasado = isinstance(lista, dict)           # passou do prazo: a última lista, com a hora dela
+        pedidos, outras = (lista.get("anterior") or ([], [])) if threads_atrasado else lista
         teto = app.extensions.get("nexus_teto_os")
         teto = teto.estado() if teto is not None else None
         if teto and teto["ultimo_recusado"]:
@@ -328,5 +333,7 @@ def registrar_raio_x(bp) -> None:
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
                                worker=_worker_plataforma(), web=_web_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
+                               threads_atrasado=threads_atrasado,
+                               threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
                                travamentos=P.cartao(app) if estado is not None else None,
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

@@ -87,34 +87,38 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 | 20/10 | Raio-X das 14:17: 0,2 GB livres de 7,1 GB, 3,2 GB no swap trocando 4,5 MB/s, disco 60% do tempo, com o Nexus em 690 MB | a máquina sem memória, e a página não dizia de quem eram os outros ~6 GB | a seção "Quem ocupa a memória da máquina" (somada por programa, pelo /proc de cada processo) | `57d5217` |
 | 20/10 | travada das 16:12 (GET /os/ ~4 min em linhas de microssegundos) e o próprio Raio-X 4 min 18 s preso em `_ler_proc` | a máquina trocando com o disco (o Nexus com 1,5 GB no swap); ler a linha de comando de um processo no swap espera o disco | a lista da memória numa thread à parte com prazo de 2 s, uma leitura presa por vez, o nome de cada processo lido uma vez | `7d9de73` |
 | 20/10 | o worker da plataforma de 3,7 para 5,0 GB (com o swap) em 26 min (16:12 a 16:38), e o que crescia no servidor ninguém via (a medição de dentro só dava no PC, sem os backfills de lá) | — | o worker grava a cada 10 min, em /dev/shm, quanto cada variável ocupa (por amostra, últimas 3 h; PerformancePainel), e o Raio-X mostra "Dentro do worker da plataforma", agora × 1 h antes | `2137e2d`; `62a00c2` na plataforma |
-| 21/10 | Raio-X das 14:36: "pedido preso 24 vezes em 24 h", o último um GET /os/historico de 45 s esperando o Fracttal (45 s é o tempo-limite) | a busca da lista (`api.list_minhas_os`, Histórico e quadro do Acompanhamento) engolia o erro de cada página e lote: sem a 1ª página, a lista VAZIA ficava guardada sem aviso; sem uma do meio, sumiam até 200 OS; e a vazia de "Todos" fazia cada pessoa buscar a sua inteira até o reinício | a busca em que o Fracttal não entregou algum pedido falha inteira (`_lista_pela_metade`): nada é guardado, a tela avisa e fica com a lista anterior e a hora dela; 3 pessoas depois de um estouro: 30 pedidos → 11 | este |
-| 21/10 | Raio-X das 14:55: o web da plataforma (`app.py`) de 0,8 GB (14:36) para 3,1 GB + 0,7 GB no swap; a máquina com 0,2 GB livres, 2,9 GB no swap e o disco 71% do tempo; às 15:00 um POST do Registro mestre 3,5 min preso | o relatório por dentro e a devolução de memória só rodavam no worker: o que o web guarda ninguém via | o web grava o mesmo relatório (`gridco_plataforma_web.json`), devolve a memória livre a cada 10 min e usa no máximo 2 arenas de malloc (sem descartar cache: trackers); o Raio-X mostra "Dentro do web da plataforma" | este |
+| 21/10 | Raio-X das 14:36: "pedido preso 24 vezes em 24 h", o último um GET /os/historico de 45 s esperando o Fracttal (45 s é o tempo-limite) | a busca da lista (`api.list_minhas_os`, Histórico e quadro do Acompanhamento) engolia o erro de cada página e lote: sem a 1ª página, a lista VAZIA ficava guardada sem aviso; sem uma do meio, sumiam até 200 OS; e a vazia de "Todos" fazia cada pessoa buscar a sua inteira até o reinício | a busca em que o Fracttal não entregou algum pedido falha inteira (`_lista_pela_metade`): nada é guardado, a tela avisa e fica com a lista anterior e a hora dela; 3 pessoas depois de um estouro: 30 pedidos → 11 | `dadae16` |
+| 21/10 | Raio-X das 14:55: o web da plataforma (`app.py`) de 0,8 GB (14:36) para 3,1 GB + 0,7 GB no swap; a máquina com 0,2 GB livres, 2,9 GB no swap e o disco 71% do tempo; às 15:00 um POST do Registro mestre 3,5 min preso | o relatório por dentro e a devolução de memória só rodavam no worker: o que o web guarda ninguém via | o web grava o mesmo relatório (`gridco_plataforma_web.json`), devolve a memória livre a cada 10 min e usa no máximo 2 arenas de malloc (sem descartar cache: trackers); o Raio-X mostra "Dentro do web da plataforma" | `1853a39`; `0a83c8a` na plataforma |
+| 22/10 | relatório do web às 08:51: o dia de trackers da API PV 545 MB (19 dias de usina) e o dia de strings da API PV 493 MB (3 dias), parados desde antes das 07:59, com a máquina em 0,5 GB livres e 3,6 GB no swap | a poda do dia de trackers só rodava no worker (a aba Perdas, que lia esse cache no web, saiu em 12/10), e o dia de strings só tinha o teto de 3 dias (o código contava ~6 MB por dia; usina grande dá ~165 MB) | o dia de strings sai com 20 min sem releitura e tem teto de 30 mil registros; a poda do dia de trackers (2 h parado, 1,5 milhão de pontos) vale também no web; as duas a cada 10 min no web e na hora de guardar | `a3e3cc1` na plataforma |
+| 22/10 | Raio-X das 08:57: o próprio GET /t/base/raio-x 1 min 15 s preso em `_threads` | para cada thread, o `extract_stack` lia no disco o código de todas as linhas da pilha (o rótulo só usa a de dentro), com a máquina no swap | pilha sem o código (`presos.pilha`, também na ronda dos presos) e a lista de threads com o prazo de 2 s das outras seções | este |
 
 ## A fila
 
 1. **Push só de documentação também reinicia o servidor** (`deploy/atualizar.sh`): pular o restart quando o commit novo
    só muda `.md`, para um documento não esfriar as telas de todo mundo. Mexe no deploy do servidor: prova com cuidado.
-2. **A memória do servidor (o notebook, 4 núcleos, 7,1 GB):** quem a ocupa é a plataforma de Performance (Raio-X das
-   14:45 de 20/10: o `worker.py` 3,0 GB, o `app.py` 1,3 GB + 0,7 no swap, o Gêmeo 0,6 + 0,3; o Nexus 0,6). Na travada das
-   16:12 o worker tinha 3,3 GB e o Nexus 1,5 GB no swap, e tudo esperava o disco. O worker cresce ao longo do dia: medido
-   dentro do worker do PC (15:18), o dia de hoje dos trackers da API PV (~2,6 milhões de pontos às 15:24, um dict de
-   ~218 B cada; ~850 MB à noite), as strings da 2C (518 MB, hoje e ontem) e ~0,7 GB de outros caches, mais ~1,3 GB do
-   próprio processo. No ar na plataforma desde 16:51 de 20/10 (`f3a8200`): as strings da 2C com um datetime por minuto
-   (−35%, montagem de minutos para segundos) e o worker devolvendo ao Linux a memória solta (2 arenas de malloc,
-   `malloc_trim` a cada passada do faxineiro). Entre 16:12 e 16:38 ele foi de 3,7 para 5,0 GB (com o swap) no servidor,
-   rápido demais para o que se mediu no PC: um backfill que só roda lá. Por dentro do worker às 14:46 de 21/10: o
-   dia de trackers da API PV 513 MB, eventos de tracker 157, combiners 122, strings SunOp 108, Gerencial 88 (~1,1 dos
-   2,3 GB). **Em 21/10 o maior passou a ser o web** (0,8 → 3,9 GB com o swap em 19 min, depois do deploy das 14:25):
-   **próximo passo**, o print de "Dentro do web da plataforma" depois que a medida dele subir diz qual variável cresce. O dia de trackers compacto (o maior ganho
-   conhecido, ~400–570 MB) espera: Levi, 20/10, "não mexa nos trackers agora". O worker só se recicla de madrugada com
-   12 h no ar (cada deploy da plataforma zera a conta), e no servidor não se sabe o que o religa quando ele sai (o
-   guardião é do Windows): perguntar à T.I. Mais memória no notebook é a outra saída (T.I.).
+2. **A memória do servidor (o notebook, 4 núcleos, 7,1 GB):** os programas pedem mais do que a máquina tem (22/10
+   08:55: o worker da plataforma 5,1 GB com o swap, o web dela 1,9, o Nexus 1,8 e o Gêmeo 0,6: 9,5 GB; 3,6 GB no swap
+   e o disco ocupado até 61% do tempo). No ar: as strings da 2C 35% menores e a memória solta devolvida no worker
+   (`f3a8200`); o relatório por dentro do worker (`62a00c2`) e do web (`0a83c8a`) no Raio-X; os caches da API PV com
+   prazo e teto também no web (`a3e3cc1`). **Próximo passo:** no worker, as variáveis somam 1,3 dos 4,2 GB (08:46 de
+   22/10); o resto está em tarefas rodando (variáveis locais de thread) ou preso no alocador, e o relatório deve medir
+   também o que cada thread segura. O Nexus em si (1,8 GB, 1,1 no swap) ainda não tem o "por dentro". O dia de
+   trackers compacto no worker (~400 a 570 MB) espera o OK do Levi. Para a T.I. (o que mais resolve, grátis): limitar
+   a memória da plataforma e proteger a do Nexus no systemd (MemoryHigh e MemoryMax nela, MemoryLow no Nexus) e religar
+   o worker sozinho (Restart=always); depois, mais memória (16 GB) ou a plataforma numa máquina à parte.
 3. **Clima e risco:** 21 s de processador na 1ª carga (o LZW do GeoTIFF do INPE em Python puro, 183 pedidos; volta a cada
    6 h, a cada deploy e a cada 15 min com o INPE atrasado). Proposta: o decodificador do Pillow (em C) por tile e uma
    cópia em disco.
 4. **Conta fria pós-deploy** (~15 s na 1ª abertura de uma tela nos ~5 min depois de cada push). Opções: agrupar os
    deploys (no máximo um reinício a cada 30 min, por exemplo) ou uma cópia em disco das abas lidas (servir a última com
    a hora dela e renovar por trás). É parâmetro: perguntar ao Levi antes.
+5. **O deploy não pode cortar uma gravação no meio** (21/10/2026, pedido pelo chat Nexus com o OK do Levi): o push das
+   09:57 (`dc60042`) reiniciou o servidor às ~10:03 no meio de um "Criar OS" do OS Creator (Performance › Trackers): a
+   OS nasceu no Fracttal às 10:03:19, mas o ticket da aba Trackers, gravado depois no mesmo pedido
+   (`api.create_performance_os` → `nascer_ticket`), não chegou, e a tela recebeu a resposta vazia do proxy. Proposta: o
+   `deploy/atualizar.sh`, antes do `systemctl restart`, espera os pedidos em andamento terminarem (até ~60 s), pelo
+   registro do `casca/presos.py` (os `em_curso`). Mexe no deploy do servidor: prova com cuidado. A tela já avisa a
+   gravação sem resposta (`carga.js`, chat Nexus).
 
 ## Onde está cada peça
 

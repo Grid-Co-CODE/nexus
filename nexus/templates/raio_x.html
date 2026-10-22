@@ -59,6 +59,7 @@
 
 <section class="cad-secao">
   <h2>Pedidos em andamento, do mais antigo</h2>
+  {% if threads_atrasado %}<p class="cad-pe">A lista de threads não respondeu em {{ "%g"|format(prazo_memoria) }} s: a máquina está esperando o disco (o swap).{% if threads_quando %} Abaixo, a das {{ threads_quando }} (os tempos são daquela hora).{% else %} Ainda não há uma lista anterior.{% endif %}</p>{% endif %}
   {% if pedidos %}
   <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
     <thead><tr><th>Há</th><th>Pedido</th><th>Onde está</th><th>Esperando</th></tr></thead>

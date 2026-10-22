@@ -88,8 +88,18 @@ def _como(f) -> str:
     return "trabalhando"
 
 
+def pilha(quadro) -> traceback.StackSummary:
+    """A pilha de `quadro`, de fora para dentro, como o `traceback.extract_stack`, mas SEM ler no disco o código de cada
+    linha (22/10/2026): o rótulo só usa o texto da linha de dentro (`_como`), lido quando pedido. Raio-X das 08:57 de 22/10,
+    com a máquina em 3,6 GB de swap: a lista de threads ficou 1 min 15 s presa lendo, para cada thread, o código de todas
+    as ~40 linhas da pilha (o linecache vai ao disco)."""
+    s = traceback.StackSummary.extract(traceback.walk_stack(quadro), lookup_lines=False)
+    s.reverse()
+    return s
+
+
 def rotulo(pilha) -> dict:
-    """{"quem", "como", "onde"} de uma pilha (`traceback.extract_stack`, de fora para dentro)."""
+    """{"quem", "como", "onde"} de uma pilha (`pilha` ou `traceback.extract_stack`, de fora para dentro)."""
     if not pilha:
         return {"quem": "?", "como": "?", "onde": ""}
     nossa = next((f for f in reversed(pilha) if _nossa(f)), None)
@@ -154,7 +164,7 @@ class _Estado:
             pilhas = sys._current_frames()
             for seq, p in presos:
                 quadro = pilhas.get(p["thread"])
-                rotulos[seq] = rotulo(traceback.extract_stack(quadro) if quadro is not None else [])
+                rotulos[seq] = rotulo(pilha(quadro) if quadro is not None else [])
         with self.trava:
             for seq, p in presos:
                 r = rotulos[seq]
