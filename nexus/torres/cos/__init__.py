@@ -1,7 +1,7 @@
 """Torre COS: Mesa do operador: ver, informar o cliente e acionar o campo em minutos.
 
-Ronda padronizada e Parede de eventos leem o Andamento da Ronda COS (22/10/2026, nexus/cos/andamento.py). As outras
-telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a mesma rota (ela vence a genérica),
+Ronda padronizada, Parede de eventos e Ocorrências leem o Andamento da Ronda COS (22/10/2026, nexus/cos/andamento.py;
+os prazos das Ocorrências em nexus/cos/ocorrencias.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a mesma rota (ela vence a genérica),
 por exemplo:
 
     @bp.route("/mesa")
@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 from flask import current_app, render_template, request
 
 from ...cos import andamento as AND
+from ...cos import ocorrencias as OC
 from ..modelo import Tela, Torre
 from ..moldura import registrar_molduras
 
@@ -27,9 +28,6 @@ TORRE = Torre(
         Tela("mesa", "Mesa do operador",
              "O que está aberto na minha mesa e o que falta avisar ao cliente?",
              "Tempo real da Performance + ocorrências do Nexus"),
-        Tela("ocorrencias", "Ocorrências",
-             "Cada ocorrência cumpriu as cinco etapas no prazo?",
-             "Ocorrências do Nexus (detecção, aviso, acionamento, normalização, encerramento)"),
         Tela("acionamentos", "Acionamentos e distribuidoras",
              "Quem aciono e qual o canal da distribuidora desta UF?",
              "Cadastro de distribuidoras e contatos por cliente"),
@@ -52,6 +50,11 @@ TORRE = Torre(
         # contam como prontas mesmo antes de a fonte ser ligada no servidor (a conta de telas_com_conteudo é pela rota).
         # 22/10/2026: a ronda é a do Andamento da Ronda COS (a fotografia de hora em hora que vai ao cliente). As nove
         # verificações da spec R04 ainda não têm de onde ler: a pergunta diz o que a tela responde hoje.
+        # 22/10/2026: as Ocorrências também vêm do Andamento (o ciclo de cada uma: quando cada etapa aconteceu); o prazo
+        # da spec R04 e o veredito são daqui (nexus/cos/ocorrencias.py).
+        Tela("ocorrencias", "Ocorrências",
+             "Cada ocorrência cumpriu as cinco etapas no prazo?",
+             "Andamento da Ronda COS (registro, envios ao cliente, mudanças de estado)"),
         Tela("ronda", "Ronda padronizada",
              "A fotografia da hora saiu, e o que está aberto agora em cada usina?",
              "Andamento da Ronda COS (fotografia de hora em hora)"),
@@ -130,3 +133,28 @@ def eventos():
         situacoes=AND.SITUACOES, janelas=AND.JANELAS, problema=request.args.get("problema", ""),
         situacao=request.args.get("situacao", ""), lido=_lido(leituras), url=_url, limite=LIMITE_EVENTOS)
 
+
+@bp.route("/ocorrencias")
+def ocorrencias():
+    """Ocorrências (22/10/2026): o ciclo de cada ocorrência registrada no período — detectada, cliente informado, campo
+    acionado, normalizada, encerrada — com o prazo da spec R04. Os fatos vêm do Andamento; o veredito, de
+    nexus/cos/ocorrencias.py. Só lê: agir na ocorrência é na Ronda COS (o link de cada linha)."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    clientes, erro_clientes = AND.clientes(cfg)
+    cliente = request.args.get("cliente", "")
+    if cliente not in clientes:
+        cliente = clientes[0] if clientes else ""
+    dias = OC.dias_pedidos(request.args.get("dias"))
+    leitura = AND.ler_ocorrencias(cfg, cliente, dias) if cliente else AND.Leitura("", None, erro=erro_clientes or (
+        "" if not fonte.ligada else "o Andamento não informou nenhum cliente"))
+    if not fonte.ligada:
+        leitura.erro = ""
+    situacao = request.args.get("situacao", "")
+    if situacao not in OC.SITUACOES:
+        situacao = ""
+    return render_template(
+        "cos/ocorrencias.html", torre=TORRE, tela=TORRE.tela("ocorrencias"), ligada=fonte.ligada, clientes=clientes,
+        cliente=cliente, leitura=leitura, p=OC.painel(leitura, AND.agora(), situacao, fonte.url), dias=dias,
+        dias_opcoes=AND.DIAS_DAS_OCORRENCIAS, situacao=situacao, situacoes=OC.SITUACOES, etapas=OC.ETAPAS,
+        prazos=OC.PRAZOS, lido=_lido([leitura]), url=_url)

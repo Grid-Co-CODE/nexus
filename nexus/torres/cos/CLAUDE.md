@@ -5,8 +5,8 @@ do programador do tempo real/COS. Leia também o `CLAUDE.md` da raiz (convençõ
 
 ## O que a torre vai ser
 
-As oito telas estão declaradas em `__init__.py` e hoje são placeholder (cada uma diz a pergunta que vai responder e
-a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
+As telas estão declaradas em `__init__.py`. Ronda padronizada, Parede de eventos e Ocorrências já leem o Andamento da
+Ronda COS (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
 
 - **R04, COS como visão global:**
   - **Mesas:** cada operador tem uma carteira de clientes, e o líder enxerga todas.
@@ -78,6 +78,37 @@ usina e o que entra nos eventos (só o que já tem OS) são regra do Andamento, 
   verificações são decisão de produto em aberto.
 - ⚠ **O Andamento fala http**, sem TLS: a chave atravessa a internet em claro até haver HTTPS (ou rede privada) lá. Ela
   só abre leitura.
+
+## Ocorrências: o ciclo de cada ocorrência no prazo da R04 (22/10/2026)
+
+*"Cada ocorrência cumpriu as cinco etapas no prazo?"* — detectada → cliente informado (15 min) → campo acionado (30 min)
+→ normalizada → encerrada. Só lê: agir na ocorrência é na Ronda COS, pelo link de cada linha.
+
+- **De onde:** `GET <Andamento>/api/nexus/<cliente>/ocorrencias?dias=N` (1, 7 ou 30 na tela; contrato próprio,
+  `versao: 1`), lido em `andamento.ler_ocorrencias` com 60 s de cópia. O Andamento diz QUANDO cada etapa aconteceu e por
+  qual caminho (sem nome de pessoa); **o prazo e o veredito são daqui** (`nexus/cos/ocorrencias.py`), porque a spec mora
+  no Nexus. Os prazos são dado (`PRAZOS`, com o porquê) e a origem do relógio também (`CONTA_DE`).
+- **O que o Andamento já separou e a tela não junta de volta:** "cliente informado" é o primeiro flash ou fotografia que
+  nomeou a ocorrência ao grupo do CLIENTE (a cópia do COS não conta, e a ocorrência sem OS não é nomeada); antes de o
+  Andamento mandar a um cliente, isso não se mede. "Campo acionado" é a primeira passagem a "Técnico acionado" feita por
+  pessoa ou pela OS aberta com religamento local. A passagem automática da Ronda COS (quando a tratativa remota passa do
+  tempo) não é ninguém acionando o campo: aparece como **só automático**, em âmbar, e fica fora da conta. Medido em
+  22/10/2026: 80 de 195 entradas em "Técnico acionado" em 7 dias foram esse escalonamento.
+- **Decisões tomadas na construção, para o dono revisar** (cada uma é uma linha em `ocorrencias.py`):
+  1. os prazos contam do **início da falha** (`CONTA_DE = "inicio"`), o mesmo relógio do escalonamento a campo e do MTTA
+     da Ronda COS. A outra leitura é a hora em que a Ronda COS registrou a ocorrência — mediana de 24 min depois do início
+     na Thopen, e é essa demora que empurra o flash para depois dos 15 min;
+  2. no **religamento remoto** o cliente sabe pelo aviso da volta (decisão de 21/10/2026: "pode ser só a normalização"):
+     quando a volta foi avisada antes da ocorrência, é essa a hora de "cliente informado";
+  3. normalizada **sem ir a campo**: dentro dos 30 min, "não precisou"; depois, "sem campo", em âmbar, fora da conta;
+  4. o prazo se compara em **minutos inteiros** (o início é digitado em minutos; "em 30 min (prazo 30 min)" lido como fora
+     por causa de segundos seria a tela se contradizendo);
+  5. o link "abrir na Ronda COS" sai do endereço do Andamento, na porta 3000 (`PORTA_DA_PLATAFORMA`), como o painel do
+     próprio Andamento faz; o endereço não entra no repositório.
+- A tela vem **depois do Acompanhamento** no menu, como a Ronda e a Parede: o cartão do COS na página inicial leva à
+  primeira tela pronta, e ela continua sendo o Acompanhamento.
+- Testes: `tests/test_cos_ocorrencias.py`, com controle positivo (o escalonamento contado, "só automático" e "não
+  precisou" contados como cumpridos, a régua de "antes do envio" desligada e a porta do link trocada: vermelhos).
 
 ## Regras desta torre
 

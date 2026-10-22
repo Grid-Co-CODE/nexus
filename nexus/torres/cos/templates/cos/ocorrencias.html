@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="60"></noscript>
+{# Ocorrências (22/10/2026): o ciclo de cada ocorrência da spec R04 — detectada, cliente informado (15 min), campo
+   acionado (30 min), normalizada, encerrada. Os fatos vêm do Andamento da Ronda COS; o prazo e o veredito, de
+   nexus/cos/ocorrencias.py. Só lê. #}
+{% macro placar(nome, r, prazo) %}
+<span><span class="gc-rotulo">{{ nome }} em até {{ prazo.minutos }} min</span>
+  <span class="v{% if r.pct is not none and r.pct < 100 %} ruim{% endif %}">{% if r.pct is none %}—{% else %}{{ r.pct }}%{% endif %}</span>
+  <span class="d">{{ r.cumpriu }} no prazo · {{ r.nao_cumpriu }} fora{% if r.pendente %} · {{ r.pendente }} correndo{% endif %}{% if r.automatico %} · {{ r.automatico }} só automático{% endif %}</span></span>
+{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if p and p.gerado_em %}<br>leitura das <b>{{ p.gerado_em.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if clientes|length > 1 %}
+  <nav class="cn-abas" aria-label="Clientes">
+    {% for c in clientes %}<a href="{{ url(cliente=c, situacao=None) }}"{% if c == cliente %} aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
+  </nav>
+  {% endif %}
+
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro[:1]|upper }}{{ leitura.erro[1:] }}.</b>
+    {% if leitura.velha %}A tela mostra a última leitura boa, das {{ lido }}.{% endif %}</div>{% endif %}
+
+  {% if p %}
+  <div class="cn-filtros">
+    <div class="cn-seg" aria-label="Período">
+      {% for d in dias_opcoes %}<a href="{{ url(dias=d) }}"{% if d == dias %} aria-current="page"{% endif %}>{{ 'Último dia' if d == 1 else 'Últimos ' ~ d ~ ' dias' }}</a>{% endfor %}
+    </div>
+  </div>
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Ocorrências</span><span class="v">{{ p.total }}</span><span class="d">registradas {% if p.desde %}desde {{ p.desde.strftime('%d/%m %H:%M') }}{% endif %}</span></span>
+    {{ placar('Cliente informado', p.resumo.informado, prazos.informado) }}
+    {{ placar('Campo acionado', p.resumo.campo, prazos.campo) }}
+    <span><span class="gc-rotulo">Abertas agora</span><span class="v">{{ p.contagem.abertas }}</span><span class="d">das {{ p.total }} do período</span></span>
+  </div>
+  {% if p.truncado %}<p class="mudo">O Andamento mandou só as mais recentes: o período tem mais ocorrências do que cabem numa resposta.</p>{% endif %}
+
+  <div class="cn-chips" aria-label="Situação">
+    <a href="{{ url(situacao=None) }}"{% if not situacao %} aria-current="page"{% endif %}>Todas<b>{{ p.total }}</b></a>
+    {% for s, rot in situacoes.items() if p.contagem.get(s) %}
+    <a href="{{ url(situacao=s) }}"{% if s == situacao %} aria-current="page"{% endif %}>{{ rot }}<b>{{ p.contagem.get(s) }}</b></a>
+    {% endfor %}
+  </div>
+
+  {% if p.itens %}
+  <div class="cn-tab cos-tab cos-ciclo"><table>
+    <thead><tr><th class="cos-esq">Ocorrência</th>{% for id, nome in etapas %}<th class="cos-esq">{{ nome }}{% if prazos.get(id) %}<span class="det">até {{ prazos[id].minutos }} min</span>{% endif %}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for x in p.itens %}
+      <tr>
+        <td class="cos-esq cos-usina"><b>{{ x.usina }}</b>{% if x.equipamentos %}<span class="det">{{ x.equipamentos }}</span>{% endif %}
+          <div class="cos-oc-pe">{% if x.severidade %}<span class="cn-pill cn-{{ x.severidade_tom }}">{{ x.severidade }}</span>{% endif %}
+            <span class="det">{{ x.tipo }} · {{ x.estado }}{% if x.os %} · OS {{ x.os }}{% else %} · sem OS{% endif %}</span></div>
+          {% if x.link_plataforma %}<a class="cn-link cos-abrir" href="{{ x.link_plataforma }}" target="_blank" rel="noopener">abrir na Ronda COS</a>{% endif %}</td>
+        {% for id, nome in etapas %}{% set e = x.etapas[id] %}
+        <td class="cos-esq cos-etapa"><span class="{{ 'cn-pill cn-' ~ e.tom if e.tom != 'neutro' else 'cos-neutro' }}">{{ e.rotulo }}</span>{% if e.detalhe %}<span class="det">{{ e.detalhe }}</span>{% endif %}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">Nenhuma ocorrência {% if situacao %}nesta situação {% endif %}no período.</p>{% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>De onde vem.</b> Do Andamento da Ronda COS: as ocorrências registradas no período, abertas ou
+    não, e quando cada etapa aconteceu. Os prazos são os da spec R04 ({{ prazos.informado.minutos }} min para o cliente
+    saber, {{ prazos.campo.minutos }} min para acionar o campo) e contam do <b>início da falha</b>, o mesmo relógio do
+    escalonamento a campo da Ronda COS. <b>Cliente informado</b> é o primeiro flash ou a primeira fotografia que nomeou a
+    ocorrência ao grupo do cliente (a ocorrência sem OS não é nomeada); antes de o Andamento mandar ao cliente, não se
+    mede. <b>Campo acionado</b> é a primeira passagem a "Técnico acionado" feita por pessoa ou pela OS aberta com
+    religamento local; a passagem automática da Ronda COS, quando a tratativa remota passa do tempo, aparece como
+    <b>só automático</b> e fica fora da conta. A tela relê sozinha a cada minuto.</div>
+  {% endif %}
+</div>
+<script>
+  // Relê a cada minuto; nunca com um campo em uso.
+  setInterval(function () {
+    var a = document.activeElement;
+    if (!a || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) location.reload();
+  }, 60000);
+</script>
+{% endblock %}

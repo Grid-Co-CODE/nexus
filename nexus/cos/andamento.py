@@ -221,6 +221,50 @@ def conferir_para_a_tela(nome: str, valor: str, config) -> str:
     raise FonteErro("chave desconhecida")
 
 
+# A tela Ocorrências (22/10/2026) lê outra rota do Andamento, com contrato próprio: o ciclo de cada ocorrência de um
+# período (`GET /api/nexus/<cliente>/ocorrencias?dias=N`). Os dias que a tela oferece; o Andamento aceita de 1 a 30.
+VERSAO_DAS_OCORRENCIAS = 1
+DIAS_DAS_OCORRENCIAS = (1, 7, 30)
+DIAS_PADRAO = 7
+# O ciclo muda devagar (um envio, uma transição): 60 s de cópia por cliente e período.
+TTL_OCORRENCIAS_S = 60
+
+
+def validar_ocorrencias(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("a resposta do Andamento não é um objeto")
+    if d.get("versao") != VERSAO_DAS_OCORRENCIAS:
+        raise FonteErro(f"o Andamento fala a versão {d.get('versao')!r} das ocorrências, e o Nexus entende a "
+                        f"{VERSAO_DAS_OCORRENCIAS}")
+    if not isinstance(d.get("ocorrencias"), list) or not isinstance(d.get("envio_ao_cliente"), dict):
+        raise FonteErro("a resposta do Andamento não tem as ocorrências")
+    return d
+
+
+def ler_ocorrencias(config, cliente: str, dias: int) -> Leitura:
+    """O ciclo das ocorrências de um cliente nos últimos `dias` (a tela Ocorrências). Na falha, a última cópia boa
+    continua, dita velha — o mesmo trato da leitura da fotografia."""
+    f = fonte(config)
+    if not f.ligada:
+        return Leitura(cliente, None, erro="a fonte do Andamento não está ligada neste servidor")
+    dias = dias if dias in DIAS_DAS_OCORRENCIAS else DIAS_PADRAO
+    chave = (f.url, f"{cliente}|ocorrencias|{dias}")
+    agora = time.monotonic()
+    with _trava:
+        em_cache = _cache.get(chave)
+        if em_cache and agora - em_cache[0] < TTL_OCORRENCIAS_S:
+            return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
+    try:
+        dados = validar_ocorrencias(_pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/ocorrencias?dias={dias}"))
+    except FonteErro as ex:
+        if em_cache:
+            return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
+        return Leitura(cliente, None, erro=str(ex))
+    with _trava:
+        _cache[chave] = (agora, dados, time.time())
+    return Leitura(cliente, dados, lido_em=time.time())
+
+
 def limpar_cache() -> None:
     with _trava:
         _cache.clear()
