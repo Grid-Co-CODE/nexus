@@ -6,8 +6,8 @@ para o Nexus (`GET /api/nexus/<cliente>`, com a chave de máquina no cabeçalho 
 prepara o que as telas mostram. **A regra mora no Andamento**: o que é ocorrência, o problema de cada uma, a cor da
 usina, o que entra nos eventos ("nada sem OS"). Reescrevê-la aqui daria duas respostas para a mesma pergunta.
 
-Configuração (`.env` do Nexus ou variável de ambiente; não é obrigatória, sem ela as telas dizem que a fonte não está
-ligada e o resto do Nexus segue igual):
+Configuração (a tela Base → Chaves do Nexus, desde 22/10/2026; ou o `.env` do Nexus, ou variável de ambiente; não é
+obrigatória, sem ela as telas dizem que a fonte não está ligada e o resto do Nexus segue igual):
 
 - `NEXUS_COS_ANDAMENTO_URL`: o endereço do Andamento (a porta 3002 do servidor da Ronda COS);
 - `NEXUS_COS_ANDAMENTO_CHAVE`: a chave de máquina, a MESMA do `ANDAMENTO_NEXUS_CHAVE` de lá. Nunca vai ao log nem à tela;
@@ -19,6 +19,7 @@ A leitura não trava a tela: 5 s de teto por pedido, 30 s de cópia em memória 
 minuto em minuto, e as duas telas recarregam sozinhas), e na falha a última cópia boa continua na tela, dita velha.
 """
 import json
+import re
 import threading
 import time
 import urllib.error
@@ -49,7 +50,11 @@ _trava = threading.Lock()
 
 
 class FonteErro(RuntimeError):
-    pass
+    """O que deu errado, em palavras (nunca a chave). `codigo` é o status HTTP do Andamento, ou None sem resposta."""
+
+    def __init__(self, motivo: str, codigo: int | None = None):
+        super().__init__(motivo)
+        self.codigo = codigo
 
 
 @dataclass
@@ -74,10 +79,19 @@ class Fonte:
 
 
 def _valor(config, chave: str) -> str:
+    """A config do app, depois a tela Base → Chaves do Nexus (que já cai na config), depois o .env e o ambiente. Nos
+    testes, o .env da máquina nunca: a tela só lê a pasta de dados que o teste deu (acessos.pasta)."""
     v = config.get(chave)
     if v:
         return str(v).strip()
-    if config.get("TESTING"):           # nos testes, só o que o teste pôs na config
+    try:
+        from ..auth import chaves
+        v = chaves.valor(chave, config)
+    except Exception:                   # noqa: BLE001 — a tela de chaves fora do ar não derruba as telas do COS
+        v = None
+    if v:
+        return str(v).strip()
+    if config.get("TESTING"):
         return ""
     return str(ler_ambiente().get(chave) or "").strip()
 
@@ -102,7 +116,7 @@ def _pedir(f: Fonte, caminho: str):
             404: "o Andamento não tem este cliente, ou a rota do Nexus está desligada lá",
             503: "o Andamento ainda não tem leitura deste cliente",
         }.get(ex.code, f"o Andamento respondeu {ex.code}")
-        raise FonteErro(motivo) from None
+        raise FonteErro(motivo, ex.code) from None
     except (urllib.error.URLError, TimeoutError, OSError) as ex:
         raise FonteErro(f"o Andamento não respondeu ({type(ex).__name__})") from None
     except ValueError:
@@ -161,6 +175,50 @@ def ler(config, cliente: str) -> Leitura:
     with _trava:
         _cache[chave] = (agora, dados, time.time())
     return Leitura(cliente, dados, lido_em=time.time())
+
+
+# O que a tela Base → Chaves do Nexus aceita (nexus/auth/chaves.py chama `conferir_para_a_tela`).
+ENDERECO = re.compile(r"https?://[A-Za-z0-9.\-]+(?::\d{1,5})?/?")
+FORMATO_DA_CHAVE = re.compile(r"[A-Za-z0-9_\-]{16,256}")
+
+
+def conferir_para_a_tela(nome: str, valor: str, config) -> str:
+    """A conferência das duas chaves do Andamento antes de a tela gravar (22/10/2026). Devolve o que se viu, para o aviso
+    da tela; FonteErro = nada é gravado. O texto nunca leva a chave.
+
+    O endereço se confere falando com ele (qualquer resposta HTTP prova que há um servidor ali; a do Andamento diz se a
+    chave já gravada abre). A chave se confere pedindo a lista de clientes com ela, no endereço já gravado; sem endereço
+    ela é gravada sem conferir, e a gravação do endereço diz depois se ela abre."""
+    atual = fonte(config)
+    if nome == URL:
+        if not ENDERECO.fullmatch(valor):
+            raise FonteErro("isto não é um endereço como http://servidor:3002, sem caminho depois da porta")
+        try:
+            _pedir(Fonte(url=valor.rstrip("/"), chave=atual.chave or "sem-chave"), "/api/nexus/clientes")
+            return "o Andamento respondeu, e a chave gravada abre os dados"
+        except FonteErro as e:
+            if e.codigo == 401:
+                return ("o Andamento respondeu, mas a chave gravada não abre: cole a chave de novo" if atual.chave
+                        else "o Andamento respondeu; falta gravar a chave")
+            if e.codigo == 404:
+                return "o Andamento respondeu, mas a rota do Nexus está desligada nele (falta a ANDAMENTO_NEXUS_CHAVE lá)"
+            if e.codigo is None:
+                raise FonteErro(f"não consegui falar com {valor} ({e})") from None
+            raise FonteErro(f"{valor} respondeu {e.codigo}: não parece o Andamento") from None
+    if nome == CHAVE:
+        if not FORMATO_DA_CHAVE.fullmatch(valor):
+            raise FonteErro("isto não parece a chave do Andamento (a ANDAMENTO_NEXUS_CHAVE do servidor da Ronda COS)")
+        if not atual.url:
+            return "gravada sem conferir: grave também o endereço do Andamento, e ele diz se a chave abre"
+        try:
+            d = _pedir(Fonte(url=atual.url, chave=valor), "/api/nexus/clientes")
+        except FonteErro as e:
+            if e.codigo == 401:
+                raise FonteErro("o Andamento recusou esta chave") from None
+            raise FonteErro(str(e)) from None
+        n = len(d.get("clientes") or []) if isinstance(d, dict) else 0
+        return f"o Andamento aceitou a chave ({n} {'cliente' if n == 1 else 'clientes'})"
+    raise FonteErro("chave desconhecida")
 
 
 def limpar_cache() -> None:

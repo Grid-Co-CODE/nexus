@@ -63,10 +63,12 @@ usina e o que entra nos eventos (só o que já tem OS) são regra do Andamento, 
 - **De onde:** `GET <Andamento>/api/nexus/<cliente>` e `GET <Andamento>/api/nexus/clientes`, com a chave de máquina
   no cabeçalho `X-Nexus-Chave`. O contrato é versionado (`versao: 1`): outro número é recusado com aviso na tela, em vez
   de mostrar campo errado. Sem nome de pessoa na resposta.
-- **Configuração** (`.env` do Nexus ou variável de ambiente; opcional, sem ela as telas dizem que a fonte não está
-  ligada): `NEXUS_COS_ANDAMENTO_URL` (a porta 3002 do servidor da Ronda COS), `NEXUS_COS_ANDAMENTO_CHAVE` (a mesma do
-  `ANDAMENTO_NEXUS_CHAVE` de lá; quem a tem é o dono da Ronda COS, e ela nunca vai a commit nem a mensagem) e, se
-  quiser fixar a ordem, `NEXUS_COS_ANDAMENTO_CLIENTES` (senão a lista vem do Andamento).
+- **Configuração** (opcional; sem ela as telas dizem que a fonte não está ligada): `NEXUS_COS_ANDAMENTO_URL` (a porta
+  3002 do servidor da Ronda COS) e `NEXUS_COS_ANDAMENTO_CHAVE` (a mesma do `ANDAMENTO_NEXUS_CHAVE` de lá; quem a tem é o
+  dono da Ronda COS, e ela nunca vai a commit nem a mensagem). **O caminho é a tela Base → Chaves do Nexus** (desde
+  22/10/2026): um administrador cola os dois, sem T.I. e sem reiniciar; o endereço é conferido falando com ele e a chave
+  pedindo a lista de clientes com ela (`conferir_para_a_tela`). O `.env` e o ambiente continuam valendo, abaixo da tela.
+  Se quiser fixar a ordem dos clientes, `NEXUS_COS_ANDAMENTO_CLIENTES` (senão a lista vem do Andamento).
 - **A leitura** (`nexus/cos/andamento.py`): 5 s de teto, 30 s de cópia em memória por cliente, e na falha a última
   leitura boa continua na tela, dita velha. Nos testes, sem a chave na config do app, não se vai à rede.
 - **A fotografia dos clientes vai ao WhatsApp pelo Andamento**, não pelo Nexus. A tela mostra o estado de cada envio
