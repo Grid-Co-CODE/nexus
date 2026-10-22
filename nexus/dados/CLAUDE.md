@@ -138,7 +138,8 @@ equipamento, data_id_inicio, os). Colunas: `decidida_em`, `data_id` (o dia de Br
 plant_id, pendência 10), `equipamento` (o inversor ou o tracker como a tela os nomeia, sem `equipamento_id`: regra 4),
 `data_id_inicio` (o dia em que a falha começou, AAAAMMDD: a 2ª data vai como papel, regra 7; com tipo, fonte,
 plant_id e equipamento, a chave de negócio dela), `os` (o
-número: dimensão degenerada), `decisao` (`vincular`/`desvincular`) e `origem` (`tela`). Sem pessoa nem texto livre
+número: dimensão degenerada), `decisao` (`vincular`/`desvincular`) e `origem` (`tela`, a OS da busca no ativo; `forcado`, o número digitado à
+mão no "Forçar vínculo" desde 22/10/2026, que pode não ser do ativo). Sem pessoa nem texto livre
 (regra 8): quem vinculou fica no log da máquina da plataforma (`logs/falhas_vinculos.log`) e a descrição da OS não vai.
 É daqui que a tela mostra a OS vinculada sem pedir nada ao Fracttal (a busca lá só acontece no clique em Vincular OS);
 quem lê é só a própria plataforma (PC e servidor, cache de 60 s). Registrado em 20/10/2026 antes da 1ª gravação (regra

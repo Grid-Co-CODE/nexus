@@ -425,7 +425,8 @@ FATOS = (
          observacao="tipo = strings (a ocorrência do inversor: os episódios das strings dele que se sobrepõem no tempo, "
                     "numa linha só) ou trackers (a parada de 1 tracker); data_id_inicio = o dia (AAAAMMDD) em que a ocorrência ou a parada "
                     "começou: com tipo, fonte, plant_id e equipamento é a chave de negócio da falha (a mesma da chave da "
-                    "ocorrência na plataforma); decisao = vincular ou desvincular; origem = tela. Na tela o vínculo cola "
+                    "ocorrência na plataforma); decisao = vincular ou desvincular; origem = tela (a OS da busca no ativo) ou forcado (o "
+                    "nº digitado à mão no Forçar vínculo, 22/10/2026: pode não ser do ativo). Na tela o vínculo cola "
                     "na falha do mesmo tipo, fonte, plant_id e equipamento cujos dias contêm o data_id_inicio (o início anda "
                     "quando o backfill refaz o dia). Só o número da OS: a descrição não vai. Quem vinculou fica no log da "
                     "máquina (logs/falhas_vinculos.log da plataforma), não no banco (regra 8)"),
