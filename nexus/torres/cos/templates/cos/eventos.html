@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="60"></noscript>
+{# Parede de eventos (22/10/2026): os eventos das ocorrências que o Andamento da Ronda COS guarda (nova, atualizada,
+   normalizada), de todos os clientes, do mais novo para o mais velho (nexus/cos/andamento.py). #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>). O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if erro_clientes %}<div class="cn-erro" role="alert"><b>{{ erro_clientes[:1]|upper }}{{ erro_clientes[1:] }}.</b></div>{% endif %}
+  {% for c, erro, velha in erros %}<div class="cn-erro" role="alert"><b>{{ c }}: {{ erro }}.</b>
+    {% if velha %}Os eventos dele são os da última leitura boa.{% else %}Os eventos dele ficam de fora.{% endif %}</div>{% endfor %}
+
+  <form class="cn-filtros" method="get">
+    <div class="cn-seg" aria-label="Janela">
+      {% for j in janelas %}<a href="{{ url(janela=j) }}"{% if j == p.janela %} aria-current="page"{% endif %}>Últimas {{ '7 dias' if j == '7d' else j.replace('h', ' h') }}</a>{% endfor %}
+    </div>
+    {% if clientes|length > 1 %}
+    <label class="gc-rotulo" for="cos-cliente">Cliente</label>
+    <select class="gc-campo" id="cos-cliente" name="cliente" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    {% for k in ('janela', 'problema', 'situacao') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+  </form>
+
+  <div class="cn-chips" aria-label="Situação">
+    <a href="{{ url(situacao=None) }}"{% if not situacao %} aria-current="page"{% endif %}>Todas<b>{{ p.total }}</b></a>
+    {% for s, (rot, tom) in situacoes.items() if p.contagem.situacao.get(s) %}
+    <a href="{{ url(situacao=s) }}"{% if s == situacao %} aria-current="page"{% endif %}><span class="cn-t-{{ tom }}">{{ rot }}</span><b>{{ p.contagem.situacao.get(s) }}</b></a>
+    {% endfor %}
+  </div>
+  {% if p.contagem.problema %}
+  <div class="cn-chips" aria-label="Problema">
+    <a href="{{ url(problema=None) }}"{% if not problema %} aria-current="page"{% endif %}>Todos os problemas</a>
+    {% for id, n in p.contagem.problema.items()|sort(attribute='1', reverse=true) %}
+    <a href="{{ url(problema=id) }}"{% if id == problema %} aria-current="page"{% endif %}>{{ problemas.get(id, id) }}<b>{{ n }}</b></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if p.itens %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th>Quando</th>{% if not cliente and clientes|length > 1 %}<th>Cliente</th>{% endif %}<th>Usina</th><th>Situação</th><th>OS</th><th>O que aconteceu</th></tr></thead>
+    <tbody>
+    {% for e in p.itens[:limite] %}
+      <tr{% if e.desde_a_anterior %} class="cos-recente"{% endif %}>
+        <td class="m">{{ e.hora }}{% if not e.hoje %}<span class="det">{{ e.dia }}</span>{% endif %}</td>
+        {% if not cliente and clientes|length > 1 %}<td>{{ e.cliente }}</td>{% endif %}
+        <td class="cos-esq cos-usina"><b>{{ e.nome }}</b><span class="det">{{ e.cod }} · {{ e.problema_nome }}</span></td>
+        <td><span class="cn-pill cn-{{ e.tom }}">{{ e.situacao_rotulo }}</span>{% if e.retro %}<span class="det">aberta {{ e.retro.strftime('%d/%m %H:%M') }}</span>{% endif %}</td>
+        <td class="m">{{ e.os }}</td>
+        <td class="cos-esq cos-texto">{{ e.texto }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if p.itens|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ p.itens|length }}: use a janela, o cliente ou os filtros para afunilar.</p>{% endif %}
+  {% else %}<p class="cn-vazio">Nenhum evento nesta janela{% if problema or situacao %} com esses filtros{% endif %}.</p>{% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>De onde vem.</b> Do Andamento da Ronda COS: cada ocorrência que entra (<b>nova</b>), que recebe
+    nota ou muda de etapa (<b>atualizada</b>) e que volta (<b>normalizada</b>), na hora em que aconteceu. Só entra o que já
+    tem OS no Fracttal. As linhas em destaque são as de depois da última fotografia emitida. O Andamento guarda 7 dias. A
+    tela relê sozinha a cada minuto.</div>
+</div>
+<script>
+  // Relê a cada minuto, como o Andamento lê a Ronda COS; nunca com um campo em uso.
+  setInterval(function () {
+    var a = document.activeElement;
+    if (!a || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) location.reload();
+  }, 60000);
+</script>
+{% endblock %}
