@@ -53,6 +53,30 @@ Quem programa o COS tem escrita no repositório, mas a `main` só aceita o traba
 `tests/test_cos*.py`. Precisou mexer fora (menu, casca, cadastro, `requirements.txt`)? Abra o pedido assim mesmo e
 peça ao Levi: ele revisa e junta.
 
+## Ronda padronizada e Parede de eventos: o Andamento da Ronda COS (22/10/2026)
+
+As duas telas leem o **Andamento**, o sistema da Ronda COS que tira a fotografia da operação de hora em hora, manda o
+flash de desligou e religou ao cliente e guarda os eventos das ocorrências. Decisão do dono: *"o ANDAMENTO e o RONDA COS
+vão ser somente base de dados pra esse NEXUS"*. O Nexus **só lê e mostra**: o que é ocorrência, o problema, a cor da
+usina e o que entra nos eventos (só o que já tem OS) são regra do Andamento, e reescrevê-las aqui daria duas respostas.
+
+- **De onde:** `GET <Andamento>/api/nexus/<cliente>` e `GET <Andamento>/api/nexus/clientes`, com a chave de máquina
+  no cabeçalho `X-Nexus-Chave`. O contrato é versionado (`versao: 1`): outro número é recusado com aviso na tela, em vez
+  de mostrar campo errado. Sem nome de pessoa na resposta.
+- **Configuração** (`.env` do Nexus ou variável de ambiente; opcional, sem ela as telas dizem que a fonte não está
+  ligada): `NEXUS_COS_ANDAMENTO_URL` (a porta 3002 do servidor da Ronda COS), `NEXUS_COS_ANDAMENTO_CHAVE` (a mesma do
+  `ANDAMENTO_NEXUS_CHAVE` de lá; quem a tem é o dono da Ronda COS, e ela nunca vai a commit nem a mensagem) e, se
+  quiser fixar a ordem, `NEXUS_COS_ANDAMENTO_CLIENTES` (senão a lista vem do Andamento).
+- **A leitura** (`nexus/cos/andamento.py`): 5 s de teto, 30 s de cópia em memória por cliente, e na falha a última
+  leitura boa continua na tela, dita velha. Nos testes, sem a chave na config do app, não se vai à rede.
+- **A fotografia dos clientes vai ao WhatsApp pelo Andamento**, não pelo Nexus. A tela mostra o estado de cada envio
+  (enviada, retida até zerar as pendências, sem grupo, falhou).
+- ⚠ **A "Ronda padronizada" da spec R04 (nove verificações às 08h, 12h, 16h, 20h, 00h e 04h) ainda não tem de onde
+  ler.** A pergunta da tela foi trocada pelo que ela responde hoje (a fotografia da hora e o que está aberto); as nove
+  verificações são decisão de produto em aberto.
+- ⚠ **O Andamento fala http**, sem TLS: a chave atravessa a internet em claro até haver HTTPS (ou rede privada) lá. Ela
+  só abre leitura.
+
 ## Regras desta torre
 
 - Prazo e meta (15 min, 30 min, horários de ronda) são **dado**, e não número solto no código: um só lugar, com o
