@@ -129,6 +129,20 @@ def _conferir_github_pcm(valor: str) -> str:
     return f"o token abre o repositório {repo} e pode gravar nele"
 
 
+def _conferir_andamento(nome: str):
+    """As duas chaves do Andamento da Ronda COS (torre COS, 22/10/2026): as telas Ronda padronizada e Parede de eventos
+    leem o Andamento pelo servidor do Nexus. A conferência mora com a leitura, em nexus/cos/andamento.py: o endereço é
+    conferido falando com ele, e a chave pedindo a lista de clientes com ela."""
+    def conferir(valor: str) -> str:
+        from ..cos import andamento as AND
+        try:
+            return AND.conferir_para_a_tela(nome, valor, current_app.config)
+        except AND.FonteErro as e:
+            m = str(e)
+            raise Recusada(f"{m[:1].upper()}{m[1:]}: nada foi gravado.") from None
+    return conferir
+
+
 # nome da variável → o que é, para que serve, e a conferência antes de gravar
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
@@ -154,6 +168,21 @@ CHAVES = {
         "arquivo": "",
         "dica": "o token que o GitHub mostra uma vez só, ao criar (começa com ghp_ ou github_pat_)",
         "conferir": _conferir_github_pcm,
+    },
+    # a torre COS (22/10/2026): o endereço não é segredo, mas fica fora do repositório (público), como a chave
+    "NEXUS_COS_ANDAMENTO_URL": {
+        "nome": "Andamento da Ronda COS (endereço)",
+        "para": "as telas Ronda padronizada e Parede de eventos da torre COS",
+        "arquivo": "",
+        "dica": "o endereço da porta 3002 do servidor da Ronda COS, como http://servidor:3002",
+        "conferir": _conferir_andamento("NEXUS_COS_ANDAMENTO_URL"),
+    },
+    "NEXUS_COS_ANDAMENTO_CHAVE": {
+        "nome": "Andamento da Ronda COS (chave de leitura)",
+        "para": "as telas Ronda padronizada e Parede de eventos da torre COS (grave o endereço antes)",
+        "arquivo": "",
+        "dica": "a ANDAMENTO_NEXUS_CHAVE do .env do servidor da Ronda COS",
+        "conferir": _conferir_andamento("NEXUS_COS_ANDAMENTO_CHAVE"),
     },
 }
 
