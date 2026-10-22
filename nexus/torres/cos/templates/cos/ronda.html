@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="60"></noscript>
+{# Ronda padronizada (22/10/2026): a fotografia de hora em hora do Andamento da Ronda COS, por cliente. O Nexus só
+   mostra: o que é ocorrência, o problema e a cor da usina vêm prontos de lá (nexus/cos/andamento.py). #}
+{% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if r and r.gerado_em %}<br>leitura das <b>{{ r.gerado_em.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>). O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if clientes|length > 1 %}
+  <nav class="cn-abas" aria-label="Clientes">
+    {% for c in clientes %}<a href="{{ url(cliente=c) }}"{% if c == cliente %} aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
+  </nav>
+  {% endif %}
+
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro[:1]|upper }}{{ leitura.erro[1:] }}.</b>
+    {% if leitura.velha %}A tela mostra a última leitura boa, das {{ lido }}.{% endif %}</div>{% endif %}
+
+  {% if r %}
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Usinas</span><span class="v">{{ r.placar.usinas or 0 }}</span><span class="d">{{ r.cliente }}</span></span>
+    <span><span class="gc-rotulo">Crítico ou alto</span><span class="v{% if r.placar.critico_alto %} cn-t-critico{% endif %}">{{ r.placar.critico_alto or 0 }}</span><span class="d">usinas com ocorrência grave</span></span>
+    <span><span class="gc-rotulo">Atenção</span><span class="v{% if r.placar.atencao %} cn-t-alerta{% endif %}">{{ r.placar.atencao or 0 }}</span><span class="d">médio, baixo ou sem classificação</span></span>
+    <span><span class="gc-rotulo">Operando</span><span class="v{% if r.placar.operando %} cn-t-ok{% endif %}">{{ r.placar.operando or 0 }}</span><span class="d">sem ocorrência aberta</span></span>
+    <span><span class="gc-rotulo">Desde a fotografia anterior</span><span class="v">{{ (r.desde.novas or 0) + (r.desde.atualizadas or 0) + (r.desde.voltas or 0) }}</span><span class="d">{{ r.desde.novas or 0 }} novas · {{ r.desde.atualizadas or 0 }} atualizadas · {{ r.desde.voltas or 0 }} {{ r.volta }}s{% if r.anterior %} · desde {{ r.anterior.strftime('%H:%M') }}{% endif %}</span></span>
+  </div>
+
+  <div class="cos-duas">
+    <section>
+      <h2 class="cos-sub">Por problema</h2>
+      {% if r.problemas %}
+      <div class="cn-tab cos-tab-curta"><table>
+        <thead><tr><th>Problema</th><th>Crítico ou alto</th><th>Atenção</th><th>Desde a anterior</th></tr></thead>
+        <tbody>
+        {% for p in r.problemas %}
+          <tr><td class="cos-esq">{{ p.nome }}</td>
+            <td><span class="{{ 'cn-t-critico' if p.vermelhas else 'mudo' }}">{{ p.vermelhas }}</span></td>
+            <td><span class="{{ 'cn-t-alerta' if p.amarelas else 'mudo' }}">{{ p.amarelas }}</span></td>
+            <td class="m">{% if p.novas or p.voltas %}{% if p.novas %}<span class="cn-t-critico">+{{ p.novas }}</span>{% endif %}{% if p.novas and p.voltas %} · {% endif %}{% if p.voltas %}<span class="cn-t-ok">{{ plural(p.voltas, r.volta, r.volta ~ 's') }}</span>{% endif %}{% else %}<span class="mudo">—</span>{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}<p class="cn-vazio">Nenhuma ocorrência aberta.</p>{% endif %}
+    </section>
+    <section>
+      <h2 class="cos-sub">Fotografias das últimas 24 h</h2>
+      {% if r.fotografias %}
+      <div class="cn-tab cos-tab-curta"><table>
+        <thead><tr><th>Hora</th><th>Envio ao cliente</th></tr></thead>
+        <tbody>
+        {% for f in r.fotografias[:12] %}
+          <tr><td class="m">{{ f.rotulo }}</td>
+            <td class="cos-esq">{% for e in f.envios %}<span class="cos-envio"><span class="cn-st cn-t-{{ e.tom }}">{{ e.rotulo }}</span>{% if f.envios|length > 1 %}<span class="det">{{ e.regiao }}</span>{% endif %}{% if e.enviada and e.estado == 'ENVIADO' %}<span class="det">às {{ e.enviada }}</span>{% endif %}</span>{% endfor %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}<p class="cn-vazio">Nenhuma fotografia nas últimas 24 h.</p>{% endif %}
+    </section>
+  </div>
+
+  <h2 class="cos-sub">Usinas com ocorrência aberta</h2>
+  {% if r.usinas %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th>Usina</th><th>Situação</th><th>Ocorrências</th></tr></thead>
+    <tbody>
+    {% for u in r.usinas %}
+      <tr><td class="cos-esq cos-usina"><b>{{ u.nome }}</b><span class="det">{{ u.cod }}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}</span></td>
+        <td><span class="cn-pill cn-{{ u.tom }}">{{ u.status_rotulo }}</span>{% if u.problema_nome %}<span class="det">{{ u.problema_nome }}</span>{% endif %}</td>
+        <td class="cos-esq">
+          {% for o in u.ocorrencias %}
+          <div class="cos-oc">
+            <div class="cos-oc-cab"><span class="cn-st cn-t-{{ o.tom }}">{{ o.severidade }}</span>
+              <span class="cos-os">{{ o.os_rotulo }}</span>
+              <span class="mudo">{{ o.problema_nome }}{% if o.equipamentos %} · {{ o.equipamentos|join(', ') }}{% endif %}</span>
+              {% if o.dias_aberta is not none %}<span class="mudo">· aberta há {{ plural(o.dias_aberta, 'dia', 'dias') }}</span>{% endif %}</div>
+            <div class="cos-oc-falha">{{ o.falha }}</div>
+            <div class="cos-oc-pe"><span class="cn-tag">{{ o.etapa }}</span>{% for a in o.aguardando %}<span class="cn-tag">Aguardando {{ a }}</span>{% endfor %}
+              {% if o.impacto %}<span class="mudo">{{ o.impacto }}</span>{% endif %}</div>
+            {% if o.nota %}<div class="cos-oc-nota"><span class="m">{{ o.nota.quando }}</span> {{ o.nota.texto }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">Nenhuma usina com ocorrência aberta neste cliente.</p>{% endif %}
+  {% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>De onde vem.</b> Do Andamento da Ronda COS, que lê as ocorrências abertas da Ronda COS de minuto
+    em minuto e tira a fotografia de hora em hora para o cliente. A cor da usina é a da pior ocorrência aberta; o
+    problema, a etapa e a última nota são os da Ronda COS. <b>Desde a fotografia anterior</b> conta o que mudou desde a
+    última fotografia emitida e só conta o que já tem OS no Fracttal; a ocorrência ainda sem OS entra no placar e na lista
+    das usinas, dita "ainda sem OS". A tela relê sozinha a cada minuto.</div>
+</div>
+<script>
+  // Relê a cada minuto, como o Andamento lê a Ronda COS; nunca com um campo em uso.
+  setInterval(function () {
+    var a = document.activeElement;
+    if (!a || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) location.reload();
+  }, 60000);
+</script>
+{% endblock %}
