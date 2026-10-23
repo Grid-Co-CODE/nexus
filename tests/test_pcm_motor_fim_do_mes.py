@@ -27,7 +27,8 @@ import pytest
 MOTOR = Path(__file__).resolve().parents[1] / "nexus" / "pcm" / "motor" / "programacao_v7.py"
 FUNCOES = {"DayCapacity", "alloc_diurno", "commit_diurno", "alloc_noturno", "agendar_mpa_janela", "commit_noturno",
            "distribute_days", "assign_days_to_usinas", "schedule_team", "_row", "_pend", "t", "norm",
-           "haversine_km", "_usina_match", "_os_eh_multi", "_casa_tarefa", "_tarefa_excluida"}
+           "haversine_km", "_usina_match", "_norm_usina", "_usina_pode_no_dia", "_os_eh_multi", "_casa_tarefa",
+           "_tarefa_excluida"}
 CONSTANTES = re.compile(r"^(WORK_|FIRST_OS|LUNCH_|PCM_END|NIGHT_|TERMO_|GAP_|TRAVEL_|DESLOC_|CARGA_MAX|USEFUL_|MPA_|TIER_"
                         r"|PREVENTIVA_ORDER)")
 
@@ -115,3 +116,20 @@ def test_a_corretiva_segue_forcada_no_dia_da_usina(semana):
     tarefas = [_tarefa(900 + n, "Usina A", n, "OUTRA", True, 4.0) for n in range(3)]   # 12 h de corretiva, 1 usina
     rows, pend = ns["schedule_team"]("PA Teste", tarefas)
     assert pend == [] and len(rows) == 3
+
+
+@pytest.mark.parametrize("semana", [date(2026, 10, 26), date(2026, 10, 19)])
+def test_o_preenchimento_respeita_o_dia_fixo_da_usina(semana):
+    """"@usina X = qua" nas observações: a sobra da usina não vai para outro dia livre (na W44, a Santa Bárbara 1, fixada
+    na quarta, ganhou 14 tarefas na sexta pelo passe de preenchimento). Na última semana do mês ela entra forçada na
+    quarta; fora dela, vira pendência, como sempre."""
+    ns = _escalonador(semana)
+    ns["USINA_DIAS"] = {"usina a": {2}}
+    tarefas = [_tarefa(15765, "Usina A", n, dur_h=1.0) for n in range(12)] + [_tarefa(15305, "Usina B", 0)]
+    rows, pend = ns["schedule_team"]("SP Teste", tarefas)
+    dias_a = {r["DiaIdx"] for r in rows if r["Ativo (Usina)"] == "Usina A"}
+    assert dias_a == {2}, dias_a
+    if ns["ULTIMA_SEMANA_MES"]:
+        assert pend == [] and sum(r["Ativo (Usina)"] == "Usina A" for r in rows) == 12
+    else:
+        assert pend and all(p["Ativo"] == "Usina A" for p in pend)

@@ -1,8 +1,8 @@
 # Motor da programação semanal (cópia)
 
 Estes quatro arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
-`fillipefigueiro-source/gridco-pcm-data` no commit `8d84669` (23/10/2026, a MPM da última semana do mês pelos dias
-livres; antes, `bfbc76c` (19/10/2026, a subtarefa `nome @ CÓDIGO`), `0560d5d`
+`fillipefigueiro-source/gridco-pcm-data` no commit `cb8239c` (23/10/2026, o preenchimento respeita o dia fixo da usina,
+sobre o `8d84669`, a MPM da última semana do mês pelos dias livres; antes, `bfbc76c` (19/10/2026, a subtarefa `nome @ CÓDIGO`), `0560d5d`
 (16/10/2026, a carga de 70% já na W43), `6215ceb` e
 `fdad64e` de 16/10,
 `bd4f673` e `fd39672` de 15/10, `3ce6205` de 09/10 e `8ee58d9` de 30/09):
@@ -18,7 +18,7 @@ Conferido pelo hash (SHA-256 da cópia com CRLF):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `c9da95f98757…` |
+| `programacao_v7.py` | `92e30be10bfd…` |
 | `fonte_bd_api.py` | `b81d2c394d67…` |
 | `gerar_bd_via_api.py` | `6c580738ab5e…` |
 | `fora_da_programacao.py` | `91f9a81140c0…` |
@@ -31,7 +31,7 @@ substituir. Reescrever o motor tornaria a comparação inútil.
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
 sistemas rodarem juntos, as duas cópias precisam ser iguais.
 
-## O que mudou em 23/10/2026 (`8d84669`): a MPM da última semana do mês pelos dias livres
+## O que mudou em 23/10/2026 (`8d84669` e `cb8239c`): a MPM da última semana do mês pelos dias livres
 
 Levi: "o programador da w44 jogou a maioria das tarefas para segunda-feira sem distribuir corretamente, corrija". A
 semana com o dia 30 ou 31 (`ULTIMA_SEMANA_MES`) dá à MPM prioridade de corretiva, e o `schedule_team` a FORÇAVA no dia
@@ -45,18 +45,26 @@ segunda, 79 na sexta).
 - **Sobra:** vai para os dias livres pelo passe de preenchimento, como em qualquer semana.
 - **Passe 5:** só a MPM que não coube em dia nenhum entra forçada ([EXCEDE HH]), no dia da própria usina que termina
   mais cedo. Continua sem virar pendência, e usina sem dia na semana segue para pendência, como antes.
+- **O preenchimento respeita o dia fixo** (`cb8239c`): o passe de preenchimento escolhia a usina só pela carga e a punha
+  em qualquer dia livre, contra o "@usina X = dias" das observações e o feriado municipal. Já acontecia antes (98 linhas
+  fora do dia fixo na W44), mas com a sobra da MPM passando por ele subiu para 137 (a Santa Bárbara 1, fixada na quarta,
+  ganhou 14 tarefas na sexta). Agora ele só escolhe usina que pode receber o dia (`_usina_pode_no_dia`, a mesma conta da
+  atribuição dos dias): nenhuma tarefa de dia fora do dia fixo; o que sobra fora dele é MPA da noite e zeladoria, que
+  têm regra própria.
 
 Com a foto do Fracttal de 23/10 (`gerar_semana_foto --semana 2026-W44`):
 
 | | Seg | Ter | Qua | Qui | Sex | MPM [EXCEDE HH] |
 |---|---|---|---|---|---|---|
 | Antes | 438 | 356 | 223 | 159 | 107 | 312 |
-| Depois | 337 | 320 | 250 | 189 | 176 | 162 |
+| `8d84669` | 337 | 320 | 250 | 189 | 176 | 162 |
+| `cb8239c` | 327 | 316 | 255 | 176 | 178 | 179 |
 
-As 162 que sobram são usinas com um dia só (equipe de 5 usinas: um dia para cada, a regra de uma usina por dia),
+As 179 que sobram são usinas com um dia só (equipe de 5 usinas: um dia para cada, a regra de uma usina por dia),
 muitas em dia encurtado pela MPA à noite (acaba às 15:30), e com mais MPM do mês do que cabe nesse dia. Medido também
 deixar essa sobra ir para a folga dos outros dias da equipe, quebrando a regra de uma usina por dia: baixava só para
-144, e não entrou. Prova: `tests/test_pcm_motor_fim_do_mes.py`, que tira o `schedule_team` do arquivo pelo `ast`.
+144 (de 162), e não entrou. Das 179, as de dia fixo nas observações (Santa Bárbara 1, Caxambu 1) estouram no dia que o
+PCM escolheu. Prova: `tests/test_pcm_motor_fim_do_mes.py`, que tira o `schedule_team` do arquivo pelo `ast`.
 
 ## O que mudou em 19/10/2026 (`bfbc76c`): a subtarefa, `nome @ CÓDIGO`
 
@@ -152,7 +160,7 @@ zeladoria, não só pelo nome".
   Fracttal, falha.
 - **Saída:** a planilha fica em `saida/sombra.xlsx` e é comparada com a `Programação Semana NN.xlsx` oficial.
 - **Conferido em 23/10/2026:** sem o CR do Windows, os quatro arquivos são iguais aos do repositório do PCM no commit
-  `8d84669`. O hash da tabela acima é o da cópia com CRLF.
+  `cb8239c`. O hash da tabela acima é o da cópia com CRLF.
 - **O que mudou em `3ce6205` (09/10/2026):** a W42 do PC do PCM quebrou na quinta (08/10 21:46, `ValueError: cannot
   convert float NaN to integer` no RPN dinâmico): a AUXILIAR atualizada naquele dia tinha 67 usinas sem MWp, e o motor
   guardava o vazio como NaN. O motor passou a ler o porte da coluna `POTÊNCIA CONTRATUAL (MWp)` (vazio e zero não
