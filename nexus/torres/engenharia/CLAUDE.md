@@ -185,8 +185,16 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   `[24/10/2026 14:32] Nome (Engenharia): texto` entra no fim da nota (`api.editar_nota_os`, relida na hora, uma escrita
   por vez). A regra medida do card vale: OS concluída, cancelada ou de várias tarefas não deixa editar a nota (com
   várias, sobrescreveria a observação da tarefa errada); aí o comentário fica só no Nexus e a linha do tempo diz por
-  quê. Sem a sessão do Fracttal (quem entrou pela Microsoft), a resposta traz o login do Fracttal, que volta para a
-  página; erro do Fracttal não grava nada. O comentário também fica no livro (texto e nome cifrados).
+  quê. Da revisão final (24/10/2026): a OS que o Fracttal devolve sem tarefas (a leitura que falha "mole") não é
+  gravada, porque a nota inteira viraria a linha nova; e a nota que a página mostra tem de estar no que vai ser
+  regravado (o Fracttal tem a nota da OS e a da tarefa, e a OS 12191 tinha as duas diferentes), senão o comentário fica
+  só no Nexus. Sem a sessão do Fracttal (quem entrou pela Microsoft), a resposta traz o login do Fracttal, que volta
+  para a página; a sessão cassada antes do vencimento encerra o Nexus de quem entrou pelo Fracttal (o /os/login, com o
+  JWT morto no cookie, voltava direto para a página) e tira o cookie do OS Creator de quem entrou pela Microsoft. Erro
+  do Fracttal não grava nada. O comentário também fica no livro (texto e nome cifrados).
+- **O banco no caminho do clique:** o quadro e a página leem o livro com prazo curto (`PRAZO_S`, 8 s) e guardam a
+  falha pelo minuto da cópia; o livro que existe e veio sem a aba dos eventos é leitura incompleta, não "nada". Sem ler
+  o livro, nem pulso no quadro nem "Última atualização" na página (só as datas do Fracttal chutariam a parada).
 - **Solicitar OS:** a Nova solicitação do OS Creator com o ativo marcado e esta OS como OS pai
   (`/os/solicitacao?ativo=&os_pai=&os_pai_folio=`, pelo `/os/_nexus/ir`; regra no README do OS Creator). O PCM cria a OS
   filha pela Fila, ligada a esta.

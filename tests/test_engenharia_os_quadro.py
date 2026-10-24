@@ -368,3 +368,94 @@ def test_os_quatro_numeros_da_os_viram_duas_colunas_no_celular():
     from pathlib import Path
     css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
     assert re.search(r"@media \(max-width:900px\)\{\.eg-os-kpis\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}", css)
+
+
+# ── revisão final (24/10/2026) ───────────────────────────────────────────────────────────────────────────────────────
+def test_os_que_o_fracttal_nao_devolveu_inteira_nao_tem_a_nota_apagada(fracttal_do_os, pagina, cliente, app):
+    # o get_os_detalhes que falha "mole" volta sem tarefas e com a nota vazia: gravar ali trocaria a nota inteira pela
+    # linha nova (as anteriores e os blocos [PCM] iriam embora para sempre)
+    from test_engenharia_acompanhamento import SAME, _como
+    fracttal_do_os["det"].update(tarefas=[], notas="")
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"}, headers=SAME)
+    assert r.status_code == 502 and "Nada foi gravado" in r.get_json()["erro"]
+    assert not fracttal_do_os["escritas"] and not _est(pagina["id_work_order"])
+
+
+def test_nota_que_nao_bate_com_a_leitura_fica_so_no_nexus(fracttal_do_os, pagina, cliente, app):
+    # o Fracttal tem a nota da OS e a da tarefa (a OS 12191 tinha as duas diferentes): se a nota que a página mostra não
+    # está no que vai ser regravado, acrescentar apagaria a da página
+    from test_engenharia_acompanhamento import SAME, _como
+    fracttal_do_os["det"]["notas"] = "TESTE 3"
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "Visto", "folio": "16502"}, headers=SAME)
+    assert r.status_code == 200 and "só no Nexus" in r.get_json()["mensagem"]
+    assert not fracttal_do_os["escritas"] and "não bateu" in _est(pagina["id_work_order"])["eventos"][0]["nota"]
+
+
+def test_sessao_do_fracttal_vencida_encerra_quem_entrou_pelo_fracttal(fracttal_do_os, pagina, cliente, app, monkeypatch):
+    # o token cassado (antes do exp) voltava do /os/login direto para a página: o portão só olha o exp
+    import api as os_api
+    from test_engenharia_acompanhamento import SAME, _como
+
+    def vencida(wid):
+        raise os_api.SessionExpired("sessão expirada")
+    monkeypatch.setattr(os_api, "get_os_detalhes", vencida)
+    _como(cliente, ANA)                                   # sem "via": a sessão nasceu do Fracttal
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"}, headers=SAME)
+    j = r.get_json()
+    assert r.status_code == 401 and j["sessao_encerrada"] and j["login"] is True
+    assert not _est(pagina["id_work_order"])
+
+
+def test_sessao_do_fracttal_vencida_de_quem_entrou_pela_microsoft_tira_o_cookie(fracttal_do_os, pagina, cliente, app,
+                                                                                monkeypatch):
+    import time
+
+    import api as os_api
+    from test_engenharia_acompanhamento import SAME
+
+    def vencida(wid):
+        raise os_api.SessionExpired("sessão expirada")
+    monkeypatch.setattr(os_api, "get_os_detalhes", vencida)
+    with cliente.session_transaction() as s:
+        s["logado"], s["admin"], s["usuario"] = True, False, ANA
+        s["via"], s["ms_ate"] = "microsoft", time.time() + 3600
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"}, headers=SAME)
+    assert r.status_code == 401 and r.get_json()["login"].startswith("/os/login?next=")
+    assert any(h.startswith("os_sessao=;") for h in r.headers.getlist("Set-Cookie"))   # o /os/login mostra o formulário
+
+
+def test_leitura_do_livro_que_falha_fica_guardada_e_tem_prazo_curto(banco, monkeypatch):
+    # o quadro passou a ler o banco: com a API pendurada, cada abertura esperava os 60 s do pedido
+    prazos, pedidos = [], []
+
+    def pendurada(url, *a, **k):
+        pedidos.append(url)
+        prazos.append(k.get("timeout"))
+        raise TimeoutError("sem resposta")
+    monkeypatch.setattr(banco, "get", pendurada)
+    O.limpar()
+    assert O.ler()["erro"] and O.ler()["erro"]
+    assert len(pedidos) == 1 and prazos[0] <= O.PRAZO_S
+
+
+def test_livro_existente_sem_a_aba_dos_eventos_e_leitura_incompleta(banco):
+    # a listagem que omite a aba por um instante não vira "sem nada" por 1 minuto (pulso e números chutados)
+    O.classificar(OS1, 1, None, ANA, True)
+    banco.omitir.add(O.LIVRO)
+    O.limpar()
+    lido = O.ler()
+    assert lido["erro"] and lido["lido_em"] is None
+
+
+def test_pagina_sem_o_livro_nao_chuta_a_ultima_atualizacao(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+    monkeypatch.setattr(O, "ler", lambda forcar=False: {"eventos": [], "lido_em": None, "erro": "ConnectionError: x"})
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    _rot, valores = _kpis(html)
+    assert valores[0] == valores[1] == valores[3] == "—" and "Não consegui ler o status" in html

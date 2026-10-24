@@ -165,7 +165,7 @@ def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
         status = ""
     return {
         "os": folio, "url": OS_URL.format(id=w0["id_work_order"]) if w0.get("id_work_order") else "",
-        # o id da OS abre o card do OS Creator (/os/os/<id>); o REST já traz, sem pedido a mais ao Fracttal
+        # o id da OS: a ponte do comentário na nota e o OS pai do Solicitar OS; o REST já traz, sem pedido a mais
         "wid": w0.get("id_work_order"), "status": status,
         "titulo": str(w0.get("description") or "").strip()[:140], "pessoa": pessoa["nome"], "pid": pessoa["id"],
         "coluna": col, "tipo": str(w0.get("tasks_log_task_type_main") or ""),

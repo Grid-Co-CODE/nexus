@@ -762,9 +762,10 @@ def _ultima_da_os(o: dict, est: dict) -> tuple:
     return ultima, next((q for d, q in fontes if d and d == ultima), "")
 
 
-def _faixa_da_os(o: dict, est: dict, agora) -> list[dict]:
+def _faixa_da_os(o: dict, est: dict, agora, sem_livro: bool = False) -> list[dict]:
     """Os quatro números da OS, no modelo da faixa do Acompanhamento de chamados: Status e Prioridade da engenharia,
-    Programada e Última atualização. Sem escolha, "—" (nunca um padrão chutado)."""
+    Programada e Última atualização. Sem escolha, "—" (nunca um padrão chutado); sem ler o livro, a última atualização
+    também é "—" (só as datas do Fracttal chutariam uma OS parada, o que o quadro já não faz)."""
     from ...engenharia import os_acompanhamento as O
     st, pr = est.get("status_id"), est.get("prioridade_id")
     ult = next((e for e in est.get("eventos") or [] if e["evento"] == "status"), None)
@@ -790,7 +791,9 @@ def _faixa_da_os(o: dict, est: dict, agora) -> list[dict]:
     else:
         n3 = [("abre em " if col == "fazer" else "vence em ", False), (_dias(dias), True)]
     ultima, de_onde = _ultima_da_os(o, est)
-    if ultima:
+    if sem_livro:
+        v4, g4, n4 = "—", "", [("sem ler o registro da engenharia", False)]
+    elif ultima:
         d = max(0, (agora - ultima).days)
         parada = O.parada(col, ultima, agora)
         v4, g4 = ("hoje" if d == 0 else "há " + _dias(d)), ("alerta" if parada else "")
@@ -840,7 +843,8 @@ def equipe_os(folio: int):
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
-        kpis=_faixa_da_os(o, est, datetime.now(BRT)), pode=pode and not erro_livro, status=O.STATUS,
+        kpis=_faixa_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)), pode=pode and not erro_livro,
+        status=O.STATUS,
         prioridades=O.PRIORIDADES, nome_status=O.nome_status, nome_prioridade=O.nome_prioridade,
         prioridade_fracttal=PRIORIDADE_FRACTTAL.get(o.get("prioridade_fracttal") or "",
                                                     o.get("prioridade_fracttal") or ""),
@@ -899,9 +903,9 @@ def _com_a_engenharia(oss: list[dict]) -> tuple[list[dict], str]:
 
 @bp.route("/equipe")
 def equipe():
-    """O clique numa OS abre o card dela do OS Creator, o mesmo do Histórico (Levi, 08/10/2026: "Ao clicar na OS quero
-    que abra o mesmo card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os
-    setores se conversarem"). Quem muda a OS por ele volta com ?atualizar=1, e o quadro relê o Fracttal na hora."""
+    """O clique numa OS abre a página da OS da engenharia (Levi, 24/10/2026; até então era o card do OS Creator). Cada
+    cartão leva o status e a prioridade da engenharia e o pulso da parada (`_com_a_engenharia`). Quem volta com
+    ?atualizar=1 faz o quadro reler o Fracttal na hora."""
     from ...engenharia import os_equipe
     os_equipe.marcar_uso()          # o quadro segue relido por trás nas próximas 2 h (`os_equipe.manter_quente`)
     if request.args.get("atualizar") == "1":

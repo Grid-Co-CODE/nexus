@@ -44,6 +44,9 @@ ABERTAS = ("fazer", "execucao", "verificacao")   # as colunas do quadro em que a
 DIAS_PARADA = 7                                   # "OSs que não tiveram atualizações nos últimos 7 dias" (Levi)
 TEXTO_MAX = AC.TEXTO_MAX
 TTL_S = 60
+# o quadro e a página leem o livro no caminho do clique: com a API do banco pendurada, o pedido espera no máximo isto, e
+# a falha fica guardada pelo TTL (revisão final de 24/10/2026: o quadro, que nunca dependeu do banco, esperava os 60 s)
+PRAZO_S = 8
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
@@ -81,19 +84,42 @@ def _ler_banco(base: str, sessao) -> dict:
     return {"eventos": livros._linhas(base, sessao, a[ABA]) if ABA in a else []}
 
 
+class _Curta:
+    """A sessão do banco com prazo curto (a mesma ideia das telas por setor, `setor_telas._Curta`)."""
+
+    def __init__(self, sessao):
+        self._s = sessao
+
+    def get(self, *a, **k):
+        k["timeout"] = min(float(k.get("timeout") or PRAZO_S), PRAZO_S)
+        return self._s.get(*a, **k)
+
+
 def ler(forcar: bool = False) -> dict:
     """{"eventos" (as linhas cruas), "lido_em", "erro"}, guardado por 1 minuto. Leitura que falha devolve a última boa com
-    o erro; sem nenhuma, vazio com o erro (a tela diz que não leu, e não "sem status")."""
+    o erro; sem nenhuma, vazio com o erro (a tela diz que não leu, e não "sem status"). A falha também fica guardada pelo
+    minuto, e o livro que existe e veio sem a aba dos eventos é leitura incompleta, não "nada" (revisão final: um
+    minuto de pulso e de números chutados no quadro)."""
     g = _CACHE.get("livro")
     if g and not forcar and time.time() - g["lido_em"] < TTL_S:
         return g
+    f = _CACHE.get("falha")
+    if f and not forcar and time.time() - f["em"] < TTL_S:
+        return dict(g, erro=f["erro"], velha=True) if g else {"eventos": [], "lido_em": None, "erro": f["erro"]}
     try:
-        d = _ler_banco(*AC._banco())
+        base, sessao = AC._banco()
+        curta = _Curta(sessao)
+        d = _ler_banco(base, curta)
+        token = current_app.config.get("GRIDCO_SQL_TOKEN")
+        if not d["eventos"] and token and livros.existe(LIVRO, base=base, token=token, sessao=curta):
+            raise livros.GravacaoRecusada(f"{LIVRO}: o livro existe e a aba dos eventos não veio na leitura")
     except Exception as ex:      # noqa: BLE001 — banco fora, rede: a tela diz e não deixa gravar
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
+        _CACHE["falha"] = {"em": time.time(), "erro": erro}
         if g:
             return dict(g, erro=erro, velha=True)
         return {"eventos": [], "lido_em": None, "erro": erro}
+    _CACHE.pop("falha", None)
     g = dict(d, lido_em=time.time(), erro="")
     _CACHE["livro"] = g
     return g

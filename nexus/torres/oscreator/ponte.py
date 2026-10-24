@@ -710,10 +710,21 @@ def engenharia_comentar(wid: int):
     with _trava_nota, os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
         try:
             d = os_api.get_os_detalhes(wid) or {}
+            if not d.get("tarefas"):
+                # a leitura que falha "mole" volta sem tarefas e com a nota vazia: gravar trocaria a nota inteira pela
+                # linha nova (revisão final de 24/10/2026)
+                return jsonify({"erro": "O Fracttal não devolveu a OS inteira agora. Nada foi gravado; tente de "
+                                        "novo."}), 502
             pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(o.get("status"), d),
                                                        len(d.get("tarefas") or []))
+            atual = str(d.get("notas") or "").strip()
+            na_pagina = " ".join(str(o.get("nota") or "").split())
+            if pode_nota and na_pagina and na_pagina not in " ".join(atual.split()):
+                # o Fracttal tem a nota da OS e a da tarefa (a OS 12191 tinha as duas diferentes): a que a página
+                # mostra tem de estar no que vai ser regravado, senão acrescentar a apagaria
+                pode_nota, motivo = False, ("a nota da OS no Fracttal não bateu com a leitura da página; para não "
+                                            "sobrescrever, o comentário ficou só no Nexus")
             if pode_nota:
-                atual = str(d.get("notas") or "").strip()
                 r = os_api.editar_nota_os(wid, atual + "\n" + linha if atual else linha)
                 if not (isinstance(r, dict) and r.get("ok")):
                     return jsonify({"erro": "O Fracttal não gravou a nota (%s). Nada foi gravado; tente de novo."
@@ -721,7 +732,16 @@ def engenharia_comentar(wid: int):
             else:
                 nota = motivo
         except os_api.SessionExpired:
-            return jsonify({"erro": "A sessão do Fracttal venceu: entre de novo.", "login": login}), 401
+            # o token cassado antes do exp: quem entrou pelo Fracttal sai do Nexus junto (o /os/login, com o JWT morto
+            # no cookie, voltava direto para a página); quem entrou pela Microsoft perde só o cookie do OS Creator, e o
+            # login dele mostra o formulário (revisão final de 24/10/2026)
+            from ...auth import encerrar, os_cookie_path, via_fracttal
+            if via_fracttal():
+                return encerrar("caiu", json=True)
+            resp = jsonify({"erro": "A sessão do Fracttal venceu: entre de novo.", "login": login})
+            resp.status_code = 401
+            resp.delete_cookie("os_sessao", path=os_cookie_path())
+            return resp
         except Exception as e:                   # noqa: BLE001 — Fracttal fora, cota: nada foi gravado
             logging.warning("comentário da OS %s: o Fracttal não respondeu (%s: %s)", wid, type(e).__name__,
                             str(e)[:160])
