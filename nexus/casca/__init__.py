@@ -1,6 +1,7 @@
 """A casca: Início, troca de tema, saúde e o que todo template recebe (menu, setor, tema). A cadeira saiu em 12/10/2026:
 os setores (Base → Acessos) dizem o que cada pessoa vê."""
 import hmac
+import io
 import os
 import secrets
 import subprocess
@@ -167,9 +168,19 @@ def _enviar_sugestao(S, areas: dict) -> tuple[str, dict]:
 
 
 def _anexo_da_sugestao(S, admin: bool):
-    """`/?aba=sugestoes&anexo=<id>&n=<n>`: só o administrador baixa. Imagem abre no navegador; o resto baixa."""
+    """`/?aba=sugestoes&anexo=<id>&n=<n>`: só o administrador baixa. Imagem abre no navegador; o resto baixa. Com
+    `n=todos` (o "Baixar arquivos", 24/10/2026), todos os anexos da sugestão num .zip."""
     if not admin:
         abort(403)
+    if request.args.get("n") == "todos":
+        pacote = S.zip_da_sugestao(request.args.get("anexo"))
+        if not pacote:
+            abort(404)
+        dados, nome = pacote
+        resp = send_file(io.BytesIO(dados), mimetype="application/zip", as_attachment=True, download_name=nome,
+                         max_age=0)
+        resp.headers["Cache-Control"] = "private, no-store"
+        return resp
     achado = S.arquivo(request.args.get("anexo"), request.args.get("n"))
     if not achado:
         abort(404)
