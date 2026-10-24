@@ -100,11 +100,12 @@ def test_os_livros_que_so_crescem_estao_declarados_no_catalogo():
     from nexus.cadastro import estrutura_usina, setores
     from nexus.campo import decisao_pt, observacao_responsavel, ocorrencias, ronda_avulsa
     from nexus.contratos import acessos_clientes, tratamento
-    from nexus.engenharia import acompanhamento
+    from nexus.engenharia import acompanhamento, os_acompanhamento
     from nexus.pcm import atribuicoes, motivos
     from nexus.pcm.acompanhamento import curadoria
     for m in (dono_relatorio, setor_telas, estrutura_usina, setores, decisao_pt, observacao_responsavel, ronda_avulsa,
-              acessos_clientes, tratamento, atribuicoes, motivos, curadoria, acompanhamento, ocorrencias):
+              acessos_clientes, tratamento, atribuicoes, motivos, curadoria, acompanhamento, ocorrencias,
+              os_acompanhamento):
         l = catalogo.LIVRO_POR_NOME[m.LIVRO]
         assert l.so_cresce and set(l.so_cresce) <= set(l.abas), m.LIVRO
     assert "aba_equipamentos" not in catalogo.LIVRO_POR_NOME[estrutura_usina.LIVRO].so_cresce
