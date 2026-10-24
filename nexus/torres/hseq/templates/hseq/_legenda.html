@@ -1,0 +1,10 @@
+{# O aviso do fim das telas da Segurança (Levi, 24/10/2026: "Esses avisos no final da tela pode ficar como bevel mas com
+   uma borda parecida com o aviso de extintores não reconhecidos, com as bordas bevel amarelo"): o título, cada termo
+   com a cor dele e o que ele quer dizer, e um pé. Até ali era um parágrafo corrido (o `cn-nota` do Campo).
+   Uso: {% call legenda('Título', 'o pé, em texto') %}{{ termo('Atrasado', 'critico') }}<dd>...</dd>{% endcall %} #}
+{% macro legenda(titulo, pe='') %}<section class="hs-legenda" aria-label="{{ titulo }}">
+    <p class="hs-leg-t"><b>{{ titulo }}</b></p>
+    <dl class="hs-leg">{{ caller() }}</dl>
+    {% if pe %}<p class="hs-leg-pe">{{ pe }}</p>{% endif %}
+  </section>{% endmacro %}
+{% macro termo(rotulo, tom='') %}<dt>{% if tom %}<span class="cn-st cn-t-{{ tom }}">{{ rotulo }}</span>{% else %}<b>{{ rotulo }}</b>{% endif %}</dt>{% endmacro %}

@@ -130,27 +130,27 @@ def _somar(s, x):
         s["equipes"].append(x["equipe"])
 
 
-def por_regiao(lista, regioes=(), times=None) -> list[dict]:
-    """Um cartão por região de campo (o Supervisor de Campo), como os dos extintores e da Central; "Sem região de
-    campo" por último."""
-    info = {r["nome"]: r for r in regioes or ()}
+ORDEM_SITUACAO = {"sem_luvas": 0, "sem_verificacao": 1, "com_luvas": 2}
+
+
+def responsavel(x) -> str:
+    """O Responsável O&M da ficha da usina (o "Responsável UFV"), ou "Sem responsável O&M"."""
+    return x.get("responsavel") or visao.SEM_RESPONSAVEL
+
+
+def por_responsavel(lista, times=None) -> list[dict]:
+    """Um cartão por Responsável O&M da usina, com as usinas dele (Levi, 24/10/2026: "tirar visão de região de campo e
+    gestor de contrato, tem que ser por responsável da usina, aí mostra as usinas"): as sem luvas primeiro, depois as
+    sem verificação. Ordem dos cartões: mais usinas sem luvas, mais sem verificação, o nome; "Sem responsável O&M" por
+    último."""
     g = {}
     for x in lista:
-        nome = x.get("regiao_campo") or visao.SEM_REGIAO
-        r = info.get(nome) or {}
-        s = g.get(nome) or g.setdefault(nome, _cartao(
-            regiao=nome, supervisor_campo=r.get("supervisor", ""), coordenador_campo=r.get("coordenador", ""),
-            base=r.get("base", ""), ordem=r.get("ordem", 10 ** 6)))
+        nome = responsavel(x)
+        s = g.get(nome) or g.setdefault(nome, _cartao(responsavel=nome, lista=[]))
         _somar(s, x)
-    return sorted((_fechar(s, times, True) for s in g.values()),
-                  key=lambda s: (s["regiao"] == visao.SEM_REGIAO, -s["sem_luvas"], -s["sem_verificacao"], s["ordem"],
-                                 s["regiao"]))
-
-
-def por_gestor(lista, times=None) -> list[dict]:
-    g = {}
-    for x in lista:
-        nome = x.get("gestor") or visao.SEM_GESTOR
-        _somar(g.get(nome) or g.setdefault(nome, _cartao(gestor=nome)), x)
+        s["lista"].append(x)
+    for s in g.values():
+        s["lista"].sort(key=lambda x: (ORDEM_SITUACAO.get(x["situacao"], 9), x["usina"]))
     return sorted((_fechar(s, times, False) for s in g.values()),
-                  key=lambda s: (s["gestor"] == visao.SEM_GESTOR, -s["sem_luvas"], -s["sem_verificacao"], s["gestor"]))
+                  key=lambda s: (s["responsavel"] == visao.SEM_RESPONSAVEL, -s["sem_luvas"], -s["sem_verificacao"],
+                                 s["responsavel"]))

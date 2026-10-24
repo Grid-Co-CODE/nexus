@@ -181,7 +181,7 @@ def test_sem_o_livro_a_tela_diz_que_os_extintores_ainda_nao_chegaram(banco, loga
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     assert "Os extintores ainda não chegaram ao banco do Nexus" in html and "extintores_app_campo" in html
     assert "cn-numeros" not in html and "<table>" not in html
-    assert "Como cada extintor entra." in html                       # a explicação das regras fica
+    assert "Como cada extintor entra" in html and 'class="hs-legenda"' in html     # a explicação das regras fica
 
 
 def test_a_faixa_conta_o_que_o_pedido_quer_e_cada_numero_filtra_a_tabela(com_livro, logado):
@@ -344,8 +344,10 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     assert 'href="?ver=extintor#tabela"' in html and "Por usina e dia" not in html
     # UMA tabela: a linha do cliente e as das usinas nas mesmas colunas (aninhadas, não cabiam a 1440 px)
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
+    # a última coluna é a dos três pontos, sem nome (Levi, 24/10/2026: "tira esse nome ações de uma coluna que não existe")
     assert cab == ("Situação Última conferência Cliente e usina Responsável Técnicos Quantidade de extintores "
-                   "Recarga mais próxima Status da TST Relatório")
+                   "Recarga mais próxima Status da TST")
+    assert '<th aria-label="Ações"></th>' in html
     # 3 clientes (Thopen, Outro Cliente e "Sem cliente", a Irecê 2 fora do cadastro) e 4 usinas, tudo fechado
     assert html.count('<tr class="cn-linha ext-cli"') == 3 and html.count('<tr class="cn-linha ext-us"') == 4
     assert len(re.findall(r'<tr class="cn-linha ext-us"[^>]* hidden>', html)) == 4
@@ -406,7 +408,7 @@ def test_a_pagina_leva_so_o_resumo_e_a_usina_busca_os_extintores_ao_abrir(com_ca
     # recarga, status da TST e o relatório
     assert _abre(html, "</span>Altair</td>").startswith(
         "Atrasado 05/10/2026 há 4 d · App Altair Supervisora Campo Eletricista Beta Técnico Alfa 3 1 atrasado · "
-        "1 perto de vencer · 1 em dia 08/2026 venceu há 39 d Crítico 1 crítico · 2 atenção PDF Excel")
+        "1 perto de vencer · 1 em dia 08/2026 venceu há 39 d Crítico 1 crítico · 2 atenção")
     # o pedaço: só os extintores daquela usina (e do cliente dela), com os filtros da tela e o da faixa
     sub = _pedaco(logado, html, "Altair")
     assert _linhas(sub) == ["ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02", "ALT100-INFC1-PPCI-EXT03"]
@@ -522,9 +524,14 @@ def test_sem_o_livro_o_relatorio_volta_para_a_tela(banco, logado):
 
 # ── o relatório de cada linha (PDF e Excel), o filtro de cliente e a foto do extintor ─────────────────────────────
 def _baixar(html, rotulo="PDF", de="usina"):
-    """Os links da coluna Relatório: os das usinas (`de="usina"`) ou os dos clientes (`de="cliente"`)."""
-    links = [h.replace("&amp;", "&") for h in re.findall(r'<a class="cn-link" href="([^"]+)"[^>]*>' + rotulo + "</a>", html)]
-    return [h for h in links if ("usina=" in h) == (de == "usina")]
+    """Os endereços do menu dos três pontos de cada linha (24/10/2026: o menu é um só e o clique põe nele os filtros da
+    linha, `data-args`): os das usinas (`de="usina"`) ou os dos clientes (`de="cliente"`). A mesma conta do JavaScript
+    da tela."""
+    args = [a.replace("&amp;", "&") for a in re.findall(r'<button class="hs-tres"[^>]*data-args="([^"]*)"', html)]
+    args = [a for a in args if ("usina=" in a) == (de == "usina")]
+    if rotulo == "PDF":
+        return ["/t/hseq/extintores/relatorio.pdf?baixar=1" + ("&" + a if a else "") for a in args]
+    return ["/t/hseq/extintores/relatorio.xlsx" + ("?" + a if a else "") for a in args]
 
 
 def test_o_pdf_de_cada_usina_traz_a_usina_inteira(com_livro, logado):
@@ -560,7 +567,7 @@ def test_o_pdf_de_cada_cliente_traz_as_usinas_dele(com_livro, logado):
     dele (todas as usinas do cliente, com os filtros da tela)."""
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
-    assert cab.endswith("Status da TST Relatório")
+    assert cab.endswith("Status da TST")
     clientes = _baixar(html, de="cliente")
     assert len(clientes) == 3                                       # Thopen, Outro Cliente e Sem cliente
     th = next(h for h in clientes if "cliente=Thopen" in h)
@@ -792,7 +799,7 @@ def test_nao_reconhecido_sai_das_contas_e_vai_para_a_caixa_da_tst(com_nao_reconh
     caixa = html[html.index('id="nao-reconhecidos"'):html.index("</section>")]
     assert _linhas(caixa) == ["ALT100-INFC1-PPCI-EXT02"]                 # a marca velha do Coração não vale
     t = _texto(caixa)
-    assert "1 extintor não reconhecido em campo" in t and "a TST conferir o cadastro" in t
+    assert "1 extintor não reconhecido em campo" in t and "é lá que a Segurança aceita (dá baixa) ou pede uma nova ronda" in t
     assert "05/10/2026 há 4 d Técnico Silva" in t                           # quando e quem marcou, pelo nome
     assert "01/08/2026" in t                                                # a conferência de antes da marca
     assert codigo_da_pessoa(CHAVE, "tec1@exemplo.test") not in html
@@ -820,7 +827,10 @@ def test_a_linha_do_nao_reconhecido_leva_a_tabela_filtrada_na_usina(com_nao_reco
     us = logado.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
     assert '<option value="Altair" selected>' in us and us.count('aria-expanded="true"') == 2
     tab = us[us.index('<table class="cn-expande ext-clientes">'):]
-    assert _linhas(tab) == ["ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT03"]      # o EXT02 segue fora das contas
+    # na usina, o não reconhecido vem em cima dos outros, para a Segurança decidir ali (24/10/2026), e segue fora das contas
+    assert _linhas(tab) == ["ALT100-INFC1-PPCI-EXT02", "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT03"]
+    assert tab.count('<tr class="hs-nr">') == 1
+    assert "2 1 atrasado · 1 em dia · 1 não reconhecido" in _abre(us, "</span>Altair</td>")    # na conta, à parte
     assert _linhas(us[us.index('id="nao-reconhecidos"'):us.index("</section>")]) == ["ALT100-INFC1-PPCI-EXT02"]
 
 

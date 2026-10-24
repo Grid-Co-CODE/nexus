@@ -4,9 +4,9 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
 {# EPI e EPC (Segurança · HSEQ, 09/10/2026): começa pelo EPI, as luvas isolantes de cada usina pela ronda diária
-   (nexus/hseq/epi.py). O mesmo desenho dos Extintores e da Central de atenção: a faixa que filtra a tabela, os cartões
-   por região de campo (o Supervisor de Campo) com a alternância para o gestor de contrato, e a tabela. #}
-{% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna %}
+   (nexus/hseq/epi.py). O mesmo desenho dos Extintores: a faixa que filtra a tabela, os cartões por Responsável O&M da
+   usina com as usinas dele (24/10/2026; até ali, por região de campo e por gestor de contrato) e a tabela. #}
+{% from 'hseq/_legenda.html' import legenda, termo %}
 {% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
 {% macro numeros(s) %}
         <div class="cn-eq-num">
@@ -31,7 +31,6 @@
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
   {% elif d.get('rondas_com_checklist') and not d.get('respostas') %}<div class="cn-erro" role="alert"><b>Nenhuma ronda respondeu a pergunta das luvas.</b>
     As rondas trazem o checklist, mas nenhuma tem "{{ pergunta }}": o App pode ter mudado o texto da pergunta.</div>{% endif %}
-  {% include 'campo/_aviso_estrutura.html' %}
 
   {# EPI e EPC: começa pelo EPI (as luvas isolantes); o EPC entra quando houver de onde ler #}
   <nav class="cn-abas" aria-label="EPI e EPC">
@@ -41,19 +40,23 @@
 
   <form class="cn-filtros" method="get">
     <div class="cn-seg" aria-label="Visão">
-      <a href="{{ url(modo=None, f=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por supervisor</a>
+      <a href="{{ url(modo=None, f=None) }}"{% if modo == 'responsaveis' %} aria-current="page"{% endif %}>Por responsável</a>
       <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
     </div>
-    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
+    {# o rótulo e a caixa juntos (como em Extintores); saíram a região de campo e o gestor de contrato (24/10/2026) #}
+    <label class="ext-filtro"><span class="gc-rotulo">Região do Brasil</span>
     <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
       <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
+    </select></label>
     {# o cliente pelo cadastro, pela usina (Levi, 09/10/2026: "Em extintores quero um filtro por cliente!") #}
-    <label class="gc-rotulo" for="cn-cliente">Cliente</label>
+    <label class="ext-filtro"><span class="gc-rotulo">Cliente</span>
     <select class="gc-campo" id="cn-cliente" name="cliente" onchange="this.form.submit()">
       <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
-    </select>
-    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
+    </select></label>
+    <label class="ext-filtro"><span class="gc-rotulo">Responsável UFV</span>
+    <select class="gc-campo" id="cn-responsavel" name="responsavel" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for r in responsaveis %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select></label>
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, cidade ou equipe" aria-label="Buscar">
     {% for k in ('f', 'modo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
@@ -66,24 +69,21 @@
     <a href="{{ url(f='com_luvas', modo='tabela') }}"{% if f == 'com_luvas' %} aria-current="page"{% endif %}><span class="gc-rotulo">Com luvas</span><span class="v{% if contagem.com_luvas %} cn-t-ok{% endif %}">{{ contagem.com_luvas }}</span><span class="d">a última ronda respondeu Sim</span></a>
   </div>
 
-  {% if modo in ('regioes', 'gestores') %}
-  {{ alterna(modo == 'gestores', url(modo=None, f=None), url(modo='gestores', f=None)) }}
+  {% if modo == 'responsaveis' %}
+  {# um cartão por Responsável O&M da usina, com as usinas dele (Levi, 24/10/2026: "aí mostra as usinas"): as sem luvas
+     primeiro, em vermelho, depois as sem verificação, em azul; o cartão leva à tabela filtrada por ele #}
   <div class="cn-equipes">
-    {% if modo == 'regioes' %}
-    {% for s in cartoes_reg %}
-      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.regiao == sem_regiao %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', regiao_campo=s.regiao, f=None) }}">
-        {{ cab_regiao(s, sem_regiao, ' · ' ~ plural(s.usinas, 'usina', 'usinas')) }}
+    {% for s in cartoes %}
+      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', responsavel=s.responsavel, f=None) }}">
+        <div class="cn-eq-cab">
+          <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b></div>
+          <span>{{ 'usinas sem responsável no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }}</span>
+          <span>{{ plural(s.usinas, 'usina', 'usinas') }} · {{ plural(s.n_equipes, 'equipe', 'equipes') }}</span>
+        </div>
         {{ numeros(s) }}
+        <div class="hs-usinas" aria-label="As usinas">{% for x in s.lista %}<span class="hs-usina hs-usina--{{ x.situacao }}" title="{{ x.usina }}: {{ situacoes[x.situacao][0]|lower }}">{{ x.usina }}</span>{% endfor %}</div>
       </a>
     {% else %}<p class="mudo">Nenhuma usina com esses filtros.</p>{% endfor %}
-    {% else %}
-    {% for s in cartoes_gest %}
-      <a class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.gestor == sem_gestor %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', gestor=s.gestor, f=None) }}">
-        {{ cab_gestor(s, sem_gestor) }}
-        {{ numeros(s) }}
-      </a>
-    {% else %}<p class="mudo">Nenhuma usina com esses filtros.</p>{% endfor %}
-    {% endif %}
   </div>
   {% else %}
   <div class="cn-tab cn-tab--compacta ext-tab"><table>
@@ -91,7 +91,7 @@
     <tbody>
     {% for x in lista[:limite] %}{% set s = situacoes[x.situacao] %}{% set u = x.ultima %}
       <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
-        <td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span><span class="det">{{ x.regiao_campo if x.regiao_campo and x.regiao_campo != sem_regiao else 'sem região' }}{% if x.supervisor_campo and x.supervisor_campo != vaga %} · {{ x.supervisor_campo }}{% endif %}</span></span></td>
+        <td class="ext-usina"><span class="ext-par"><span>{{ x.usina }}</span><span class="det">{{ x.responsavel if x.responsavel and x.responsavel != sem_responsavel else 'sem responsável' }}</span></span></td>
         <td>{% if u %}<span class="ext-par"><span class="{{ 'cn-t-critico' if u.luvas is false else 'cn-t-ok' }}"><b>{{ 'Não' if u.luvas is false else 'Sim' }}</b></span>{% if x.desde %}<span class="det cn-t-critico">desde {{ x.desde.strftime('%d/%m') }} · há {{ tempo((d.hoje - x.desde).days) }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca verificada</span>{% endif %}</td>
         <td>{% if u %}<span class="ext-par"><span class="m">{{ u.dia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.dias >= dias_sem }}">{{ 'hoje' if x.dias == 0 else 'há ' ~ tempo(x.dias) }}</span>{% if u.tecnico %}<span class="det">{{ u.tecnico }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">—</span>{% endif %}</td>
         <td>{% if x.historico %}<span class="ext-par"><span class="epi-hist" role="img" aria-label="Últimas {{ x.historico|length }} rondas: {% for v in x.historico %}{{ v.dia.strftime('%d/%m') }} {{ 'Não' if v.luvas is false else 'Sim' }}{{ ', ' if not loop.last }}{% endfor %}">{% for v in x.historico %}<i class="{{ 'nao' if v.luvas is false else 'sim' }}" title="{{ v.dia.strftime('%d/%m') }}: {{ 'Não' if v.luvas is false else 'Sim' }}{% if v.tecnico %} ({{ v.tecnico }}){% endif %}"></i>{% endfor %}</span>{% if x.nao %}<span class="det cn-t-critico">{{ x.nao }} Não em {{ x.verificacoes }}</span>{% else %}<span class="det">{{ plural(x.verificacoes, 'resposta', 'respostas') }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">—</span>{% endif %}</td>
@@ -100,17 +100,16 @@
     {% else %}<tr><td colspan="6" class="mudo">Nenhuma usina com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
-  {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use a região de campo, o gestor ou a busca para afunilar.</p>{% endif %}
+  {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use os filtros ou a busca para afunilar.</p>{% endif %}
   {% include 'campo/_ronda_fotos_caixa.html' %}
   {% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> A ronda diária pergunta "{{ pergunta }}" (Sim ou Não, com foto). <b>Sem
-    luvas</b>: a última ronda respondeu Não; "desde" é o primeiro Não da sequência até ela. <b>Sem verificação</b>:
-    nenhuma resposta há {{ dias_sem }} dias ou mais, ou nunca (a mesma régua da ronda pendente). <b>Com luvas</b>: a última
-    ronda respondeu Sim. O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda
-    junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal. A região de campo é a da
-    equipe da usina; o gestor de contrato é o da usina.
-  </div>
+  {% call legenda('Como cada usina entra', 'A ronda diária pergunta "' ~ pergunta ~ '" (Sim ou Não, com foto). O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal.') %}
+    {{ termo('Sem luvas', 'critico') }}<dd>A última ronda respondeu Não; o "desde" é o primeiro Não da sequência até ela.</dd>
+    {{ termo('Sem verificação', 'info') }}<dd>Nenhuma resposta há {{ dias_sem }} dias ou mais, ou nunca (a mesma régua da ronda pendente).</dd>
+    {{ termo('Com luvas', 'ok') }}<dd>A última ronda respondeu Sim.</dd>
+    {{ termo('Responsável') }}<dd>O Responsável O&amp;M da ficha da usina (o Responsável UFV). O cartão mostra as usinas dele, as sem luvas primeiro.</dd>
+  {% endcall %}
 </div>
 {% endblock %}

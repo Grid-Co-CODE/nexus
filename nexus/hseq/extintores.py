@@ -325,18 +325,22 @@ def _resumo(s: dict) -> dict:
     for x in exts:
         s[x["situacao"]] += 1
         s["status_qtd"][x["status"] if x["status"] in ORDEM_STATUS else ""] += 1
-    s["situacao"] = exts[0]["situacao"]
+    # a usina em que a equipe não achou NENHUM extintor só tem não reconhecidos: sem situação (a tela diz "Não
+    # reconhecido") e sem status
+    s["situacao"] = exts[0]["situacao"] if exts else None
     com_data = [x for x in exts if x["fim2"]]
     prox = min(com_data, key=lambda x: (x["fim2"], x["codigo"])) if com_data else None
     s["recarga"], s["recarga_fim"], s["recarga_ext"] = ((prox["val2"], prox["fim2"], prox["ext"]) if prox
                                                         else (SEM_DATA, None, ""))
-    s["status"] = next(st for st in ORDEM_STATUS if s["status_qtd"][st])
+    s["status"] = next((st for st in ORDEM_STATUS if s["status_qtd"][st]), "")
     return s
 
 
 def _gravidade(s: dict) -> tuple:
-    """A ordem dos grupos: o mais grave primeiro, depois a recarga mais próxima."""
-    return list(SITUACOES).index(s["situacao"]), s["recarga_fim"] or date.max
+    """A ordem dos grupos: o mais grave primeiro, depois a recarga mais próxima. O grupo só de não reconhecidos vem
+    antes de todos: espera a decisão da Segurança."""
+    rank = list(SITUACOES).index(s["situacao"]) if s["situacao"] else -1
+    return rank, s["recarga_fim"] or date.max
 
 
 def por_usina_dia(lista) -> list[dict]:
@@ -370,18 +374,25 @@ def valor_do_filtro(x: dict, campo: str) -> str:
     return str(x.get(campo) or "") or SEM_VALOR.get(campo, "")
 
 
-def por_usina(lista) -> list[dict]:
+def por_usina(lista, nao_reconhecidos=()) -> list[dict]:
     """Uma linha por usina (`_resumo`), com o cliente, o Responsável O&M da ficha da usina, a equipe e os técnicos, e a
-    última conferência (a mais recente dos extintores dela; nunca conferida, nenhuma). Ordem: o mais grave primeiro,
-    depois a recarga mais próxima e a usina."""
+    última conferência (a mais recente dos extintores dela; nunca conferida, nenhuma). Os não reconhecidos da usina vão
+    junto (`nao_reconhecidos`), fora das contas: é na usina que a Segurança os decide (Levi, 24/10/2026: "ao ir para a
+    usina a TST resolve"); a usina só com eles também entra. Ordem: a só de não reconhecidos primeiro, depois o mais
+    grave, a recarga mais próxima e a usina."""
     g = {}
-    for x in lista:
+
+    def grupo(x):
         s = g.get(chave_usina(x))
         if s is None:
-            s = g[chave_usina(x)] = {"usina": x["usina"], "usina_id": x.get("usina_id"),
-                                 **{c: valor_do_filtro(x, c) for c in SEM_VALOR},
-                                 "tecnicos": x.get("tecnicos") or [], "extintores": []}
-        s["extintores"].append(x)
+            s = g[chave_usina(x)] = {"usina": x["usina"], "usina_id": x.get("usina_id"), "chave": chave_usina(x),
+                                     **{c: valor_do_filtro(x, c) for c in SEM_VALOR},
+                                     "tecnicos": x.get("tecnicos") or [], "extintores": [], "nao_reconhecidos": []}
+        return s
+    for x in lista:
+        grupo(x)["extintores"].append(x)
+    for x in nao_reconhecidos:
+        grupo(x)["nao_reconhecidos"].append(x)
     for s in g.values():
         _resumo(s)
         ultima = max((x for x in s["extintores"] if x["conferencia"]), key=lambda x: x["conferencia"], default=None)
@@ -392,17 +403,19 @@ def por_usina(lista) -> list[dict]:
     return sorted(g.values(), key=lambda s: (*_gravidade(s), s["usina"]))
 
 
-def por_cliente(lista) -> list[dict]:
-    """Uma linha por cliente (`_resumo`), com as usinas dele (`por_usina`) e quantas têm extintor atrasado. Ordem: o
-    mais grave primeiro, depois a recarga mais próxima e o nome; "Sem cliente" por último."""
+def por_cliente(lista, nao_reconhecidos=()) -> list[dict]:
+    """Uma linha por cliente (`_resumo`), com as usinas dele (`por_usina`, com os não reconhecidos de cada uma) e quantas
+    têm extintor atrasado. Ordem: o mais grave primeiro, depois a recarga mais próxima e o nome; "Sem cliente" por
+    último."""
     g = {}
-    for u in por_usina(lista):
+    for u in por_usina(lista, nao_reconhecidos):
         s = g.setdefault(u["cliente"], {"cliente": u["cliente"], "usinas": [], "extintores": []})
         s["usinas"].append(u)
         s["extintores"] += u["extintores"]
     for s in g.values():
         _resumo(s)
         s["n_usinas"] = len(s["usinas"])
+        s["nao_reconhecidos_qtd"] = sum(len(u["nao_reconhecidos"]) for u in s["usinas"])
         s["usinas_atrasado"] = sum(1 for u in s["usinas"] if u["atrasado"])
     return sorted(g.values(), key=lambda s: (s["cliente"] == SEM_CLIENTE, *_gravidade(s), s["cliente"]))
 

@@ -310,6 +310,37 @@ FATOS = (
          janela_origem="todas as conferências feitas pelo App",
          observacao="o histórico das conferências pelo App (as do Forms da TST, antes dele, ficaram na planilha da "
                     "TST). Mesma regra da observação: só sim/não. Até o App publicar, o livro não existe"),
+    # as decisões da Segurança sobre os extintores (24/10/2026, Levi: a pessoa da Segurança "pode aceitar e aí o
+    # extintor vai sumir ou solicitar que o técnico faça uma nova ronda", e editar a quantidade de extintores): o Nexus é
+    # a FONTE; o App de Campo lê o pedido de nova ronda daqui. Registrado antes da 1ª gravação.
+    Fato("decisao_extintor", "Decisão sobre extintor não reconhecido", "hseq",
+         "nexus_hseq_extintores · fato_decisao_extintor",
+         "1 linha = 1 decisão da Segurança sobre 1 extintor não reconhecido, respondendo a uma marca do App (o dia do "
+         "Não reconhecido); vale a última de cada extintor e marca",
+         _d(data=("id", "data_id (o dia de Brasília da decisão; marca_dia, o dia da marca do App a que responde)"),
+            usina=("id", "usina_id (vazio para extintor de usina fora do cadastro)"),
+            pessoa=("hmac", "decidida_por_hmac (quem decidiu)"),
+            equipamento=("prop", "codigo: o código do extintor (cadastro próprio do App, fora do Fracttal)")),
+         tipo="sem_medida", chave=("decidida_em", "codigo"),
+         fontes=("nexus_hseq_extintores · fato_decisao_extintor",),
+         janela_origem="o Nexus é a fonte (só acrescenta: vale a última decisão de cada extintor e marca)",
+         observacao="acao: aceitar (dar baixa: o extintor sai das telas do Nexus enquanto a marca valer) ou nova_ronda "
+                    "(pedir à equipe uma nova ronda: o App mostra a ronda pendente). Marca nova do App (outro dia) pede "
+                    "decisão nova; conferência depois da marca a desfaz no App. Cada linha vai assinada (assinatura, "
+                    "HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo nexus:hseq:extintores): o App lê pela "
+                    "leitura aberta da API e só aplica a linha assinada"),
+    Fato("quantidade_extintores", "Quantidade de extintores (Segurança)", "hseq",
+         "nexus_hseq_extintores · fato_quantidade_extintores",
+         "1 linha = 1 decisão da Segurança sobre quantos extintores existem em 1 usina; vale a última de cada usina",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)"), usina=("id", "usina_id"),
+            pessoa=("hmac", "decidida_por_hmac (quem decidiu)")),
+         tipo="transacao", chave=("decidida_em", "usina_id"),
+         medidas=_m((("quantidade_qtd", "qtd", "semi"), ("no_cadastro_qtd", "qtd", "semi"))),
+         fontes=("nexus_hseq_extintores · fato_quantidade_extintores",),
+         janela_origem="o Nexus é a fonte (só acrescenta: vale a última decisão de cada usina)",
+         observacao="quantidade_qtd = quantos a Segurança diz que existem; no_cadastro_qtd = quantos o cadastro do App "
+                    "tinha naquela hora. Não apaga nada do cadastro (que é do App): a tela mostra as duas contas. Soma "
+                    "entre usinas, não no tempo. O motivo vai só cifrado (dados_cifrados, regra 8)"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
@@ -1041,6 +1072,13 @@ LIVROS = (
           "nexus/pcm/atribuicoes.py, pela tela Técnicos por usina do PCM", False,
           "registrado em 17/10/2026 antes de existir: nasce com a 1ª decisão ou com a carga inicial (a regra da equipe "
           "do cadastro). A tela lê com cache de 1 minuto e a gravação relê o banco antes (troca o livro inteiro)",
+          so_cresce=True),
+    # as decisões da Segurança sobre os extintores (24/10/2026): aceitar ou pedir nova ronda para o não reconhecido e
+    # a quantidade de extintores de cada usina; o App de Campo lê o pedido de nova ronda daqui
+    Livro("nexus_hseq_extintores", ("fato_decisao_extintor", "fato_quantidade_extintores"),
+          "a cada decisão na tela de Extintores", "nexus/hseq/decisoes.py, pela tela Extintores da Segurança", False,
+          "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "
+          "gravação relê o banco antes (troca o livro inteiro, as duas abas juntas)",
           so_cresce=True),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}

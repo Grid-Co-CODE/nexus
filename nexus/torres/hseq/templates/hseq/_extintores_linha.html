@@ -30,9 +30,28 @@
         <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
 {% endmacro %}
 
+{# o extintor que a equipe não achou na usina, em cima dos outros (fora das contas): a Segurança decide AQUI, na usina
+   (Levi, 24/10/2026: "a tabela de contestações tem que servir para apontar para a usina, ao ir para a usina a TST
+   resolve"). Aceitar = dar baixa (sai da tela); Pedir nova ronda = o App mostra à equipe a ronda pendente. Quem não é
+   da Segurança vê só a situação. A decisão responde à marca daquele dia (`marca`) #}
+{% macro linha_nao_reconhecido(x) %}{% set nr = x.nova_ronda_em %}
+      <tr class="hs-nr"><td><span class="ext-par"><span class="cn-st cn-t-alerta">Não reconhecido</span>{% if nr %}<span class="det">nova ronda pedida em {{ nr[8:10] }}/{{ nr[5:7] }}</span>{% endif %}</span></td>
+        <td><span class="ext-par"><span class="m">{{ x.nao_reconhecido.strftime('%d/%m/%Y') }}</span><span class="det">não achado há {{ tempo(x.dias_nao_reconhecido) }}</span>{% if x.nao_reconhecido_por %}<span class="det">{{ x.nao_reconhecido_por }}</span>{% endif %}</span></td>
+        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
+        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
+        <td>{{ etiqueta(x.val2, x.fim2) }}</td>
+        <td>{{ etiqueta(x.val3, x.fim3) }}</td>
+        <td>{% if pode %}<form class="hs-decide" method="post" action="{{ url_for('torre_hseq.extintores_decidir') }}">
+          <input type="hidden" name="codigo" value="{{ x.codigo }}"><input type="hidden" name="marca" value="{{ x.nao_reconhecido.isoformat() }}">
+          <input type="hidden" name="cliente" value="{{ x.cliente or sem_cliente }}"><input type="hidden" name="usina" value="{{ x.usina }}">
+          <button type="submit" name="acao" value="aceitar" class="gc-btn gc-btn--ui gc-btn--contorno" data-confirma="Aceitar dá baixa: o {{ x.ext }} sai da {{ x.usina }}. Confirma?">Aceitar</button>
+          {% if not nr %}<button type="submit" name="acao" value="nova_ronda" class="gc-btn gc-btn--ui gc-btn--primario">Pedir nova ronda</button>{% endif %}
+        </form>{% else %}<span class="cn-t-neutro">{{ 'nova ronda pedida' if nr else 'esperando a Segurança' }}</span>{% endif %}</td></tr>
+{% endmacro %}
+
 {# os extintores de uma usina, a tabela menor que a linha da usina abre (cada um com a conferência dele: a linha da
-   usina junta todos os dias) #}
-{% macro tabela_usina(exts) %}<table class="ext-sub cn-fotos-grupo">
+   usina junta todos os dias); os não reconhecidos dela em cima #}
+{% macro tabela_usina(exts, nrs=()) %}<table class="ext-sub cn-fotos-grupo">
           <thead><tr><th>Situação</th><th>Última conferência</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
-          <tbody>{% for x in exts %}{{ linha_extintor(x, false) }}{% else %}<tr><td colspan="7" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}</tbody>
+          <tbody>{% for x in nrs %}{{ linha_nao_reconhecido(x) }}{% endfor %}{% for x in exts %}{{ linha_extintor(x, false) }}{% else %}{% if not nrs %}<tr><td colspan="7" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endif %}{% endfor %}</tbody>
         </table>{% endmacro %}

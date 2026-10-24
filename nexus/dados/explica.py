@@ -47,6 +47,8 @@ RESUMO = {
     "decisao_motivo_pcm": "O motivo de cada tarefa do PCM, e as que saíram da programação por ele",
     "decisao_backoffice_pcm": "Quem é do backoffice: as OS dessas pessoas ficam fora da programação",
     "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
+    "decisao_extintor": "O que a Segurança decidiu sobre o extintor que a equipe não achou",
+    "quantidade_extintores": "Quantos extintores existem em cada usina, segundo a Segurança",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -163,6 +165,11 @@ PARA_QUE = {
     "decisao_backoffice_pcm": "Guarda quem entra e quem sai da lista do backoffice, mantida no Gerar a semana: a OS "
                               "cujo responsável no Fracttal é alguém da lista não entra na programação da semana. O "
                               "nome vai cifrado.",
+    "decisao_extintor": "Guarda cada vez que a Segurança decide um extintor que a equipe não achou na usina, na tela "
+                        "Extintores: aceitar (dar baixa: ele sai das telas) ou pedir uma nova ronda, que o App de "
+                        "Campo mostra à equipe como ronda pendente.",
+    "quantidade_extintores": "Guarda cada vez que a Segurança diz quantos extintores existem numa usina, ao lado de "
+                             "quantos o cadastro do App tinha. A tela mostra as duas contas; o motivo vai cifrado.",
     "decisao_atribuicao_pcm": "Guarda cada vez que o PCM põe ou tira um técnico de uma usina na tela Técnicos por "
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",
