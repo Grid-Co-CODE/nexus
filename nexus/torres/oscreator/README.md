@@ -984,9 +984,8 @@ vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo ma
   torre OS Creator do Nexus). O comentário daquela página vai à nota da OS pela ponte
   (`/os/_nexus/engenharia/os/<id>/comentar`, só do Nexus, na sessão do Fracttal da pessoa; `editar_nota_os` com a regra
   do card: OS concluída, cancelada ou de várias tarefas não deixa).
-- **Prova:** `tests/test_oscreator_solic_pcm.py` (os dois de 24/10 da sugestão). Levado ao oem pela
-  `ferramentas/sincronizar_oscreator.py --aplicar` só depois do OK do Levi (rotas_solic.py, tradicional_web.py e
-  solic.html); até lá o `test_copia_do_os_creator_igual_ao_oem` aponta os três.
+- **Prova:** `tests/test_oscreator_solic_pcm.py` (os dois de 24/10 da sugestão). Levado ao oem em 24/10/2026 pela
+  `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi (rotas_solic.py, tradicional_web.py e solic.html).
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
