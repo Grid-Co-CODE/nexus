@@ -361,3 +361,10 @@ def test_pulso_usa_a_sombra_em_camadas_por_token():
     assert "prefers-reduced-motion:reduce" in css
     tokens = Path("nexus/static/nexus.css").read_text(encoding="utf-8")
     assert tokens.count("--pulso-a71:") == 2 and tokens.count("--pulso-a14:") == 2                      # os dois temas
+
+
+def test_os_quatro_numeros_da_os_viram_duas_colunas_no_celular():
+    # prova a 375 px (24/10/2026): a regra das quatro colunas vencia a de duas do celular (.kb-kpis a 900 px)
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r"@media \(max-width:900px\)\{\.eg-os-kpis\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}", css)

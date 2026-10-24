@@ -374,6 +374,7 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 .eg-os-tit .cn-titulo span{font-weight:500;color:var(--mudo)}
 .eg-os-acoes{display:flex;gap:8px;flex-wrap:wrap}
 .eg-os-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:900px){.eg-os-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .eg-os-det{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:0 16px;align-items:start}
 @media (max-width:1100px){.eg-os-det{grid-template-columns:minmax(0,1fr)}}
 .eg-os-col{min-width:0}
