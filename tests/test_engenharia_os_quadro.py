@@ -306,3 +306,58 @@ def test_comentario_de_outro_site_ou_de_fora_da_engenharia_e_recusado(fracttal_d
                                   headers={"Sec-Fetch-Site": "same-origin"})
     assert r.status_code == 400 and "Engenharia" in r.get_json()["erro"]
     assert not fracttal_do_os["escritas"]
+
+
+# ── Task 4: o quadro (o clique abre a página, o status e a prioridade nos cartões, o pulso das paradas) ──────────────
+def _quadro(cliente, monkeypatch, oss):
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.engenharia import os_equipe as E
+    monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
+    monkeypatch.setattr(E, "dados", lambda: {"os": oss, "equipe": [{"id": 1, "nome": "Ana", "nome_fracttal": "Ana Teste"}],
+                                             "faltam": [], "lido": 1.0, "lendo": False, "erro": ""})
+    html = _como(cliente, ANA).get("/t/engenharia/equipe").get_data(as_text=True)
+    dados = json.loads(html.split('id="kb-dados">', 1)[1].split("</script>", 1)[0])
+    return html, {o["os"]: o for o in dados["oss"]}
+
+
+def test_quadro_leva_status_prioridade_e_parada_de_cada_os(banco, cliente, monkeypatch):
+    # a OS 1 foi criada há semanas e ninguém mexeu: pulsa; a 2 a engenharia classificou agora: não pulsa
+    from test_engenharia_equipe import AGORA, _w
+
+    from nexus.engenharia import os_equipe as E
+    oss = E.montar([_w("1", 1, prog_dias=2), _w("2", 2)], {"id": 1, "nome": "Ana"}, AGORA)
+    O.classificar({"wid": 9002, "folio": "2", "codigo": "X-INV1.1"}, 6, 3, ANA, True)
+    _html, por = _quadro(cliente, monkeypatch, oss)
+    assert por["1"]["parada"] is True and por["1"]["eng_status"] == "" and por["1"]["ultima_iso"]
+    assert por["2"]["parada"] is False and por["2"]["eng_status"] == "Validação Final"
+    assert por["2"]["eng_prioridade"] == "Urgente" and por["2"]["eng_prioridade_id"] == 3
+
+
+def test_quadro_sem_o_livro_nao_pulsa_e_diz(banco, cliente, monkeypatch):
+    from test_engenharia_equipe import AGORA, _w
+
+    from nexus.engenharia import os_equipe as E
+    monkeypatch.setattr(O, "ler", lambda forcar=False: {"eventos": [], "lido_em": None, "erro": "ConnectionError: x"})
+    oss = E.montar([_w("1", 1, prog_dias=2)], {"id": 1, "nome": "Ana"}, AGORA)
+    html, por = _quadro(cliente, monkeypatch, oss)
+    assert por["1"]["parada"] is False and "Agora sem o status da engenharia (ConnectionError)" in html
+
+
+def test_clique_no_cartao_abre_a_pagina_da_os():
+    from pathlib import Path
+    t = Path("nexus/torres/engenharia/templates/engenharia/equipe.html").read_text(encoding="utf-8")
+    assert "nexusRota('/t/engenharia/equipe/os/')" in t and "NexusOsCard" not in t and "card_os_abrir" not in t
+    assert "kb-card--parada" in t and "o.eng_status" in t and "o.eng_prioridade" in t
+
+
+def test_pulso_usa_a_sombra_em_camadas_por_token():
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    regra = re.search(r"\.kb-card--parada::after\{([^}]*)\}", css)
+    assert regra and "animation:kb-pulso" in regra.group(1)
+    assert re.findall(r"var\((--pulso-a\d+)\)", regra.group(1)) == [f"--pulso-a{n}" for n in (71, 57, 43, 28, 14)]
+    assert re.search(r"@keyframes kb-pulso\{from\{opacity:\.5\}to\{opacity:1\}\}", css)
+    assert "prefers-reduced-motion:reduce" in css
+    tokens = Path("nexus/static/nexus.css").read_text(encoding="utf-8")
+    assert tokens.count("--pulso-a71:") == 2 and tokens.count("--pulso-a14:") == 2                      # os dois temas

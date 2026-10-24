@@ -399,3 +399,16 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 .eg-painel>.eg-acomp-tl{padding:0 18px 16px}
 .eg-os-aviso{margin-top:16px;padding:12px 16px;border:1px solid var(--ok);border-radius:var(--raio-md);background:var(--ok-suave);
   font-size:13px;color:var(--tinta)}
+
+/* ── o Quadro da equipe com a engenharia (24/10/2026): o status e a prioridade no cartão, e o pulso da OS aberta sem
+   atualização há mais de 7 dias (Levi: "QUERO O CRISPY PULSANDO DE 0.5 A 1"): a sombra em camadas numa camada por
+   cima do cartão, que vai de 0,5 a 1 de opacidade e volta; com "reduzir movimento", parada em 1 ── */
+.kb-eng{display:flex;flex-wrap:wrap;gap:4px}
+.kb-eng .eg-tag{font-size:10.5px;line-height:14px;padding:1px 6px}
+.kb-card--parada{position:relative}
+.kb-card--parada::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  box-shadow:0.3px 0.5px 0.4px var(--pulso-a71),0.4px 0.6px 0.5px -1.2px var(--pulso-a57),
+    1px 1.7px 1.5px -2.5px var(--pulso-a43),2.8px 4.6px 4px -3.7px var(--pulso-a28),6.3px 10.2px 9px -5px var(--pulso-a14);
+  animation:kb-pulso 1.4s ease-in-out infinite alternate}
+@keyframes kb-pulso{from{opacity:.5}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.kb-card--parada::after{animation:none;opacity:1}}

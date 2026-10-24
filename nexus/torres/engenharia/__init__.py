@@ -876,6 +876,27 @@ def equipe_os_classificar(folio: int):
         return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__)}), 303)
 
 
+def _com_a_engenharia(oss: list[dict]) -> tuple[list[dict], str]:
+    """Cada OS do quadro com o status e a prioridade da engenharia (o livro da OS) e o pulso da parada: a OS aberta sem
+    atualização há mais de 7 dias, contando o registro da engenharia, as tarefas no Fracttal e a criação. Sem ler o
+    livro, nenhum pulso: não dá para saber se a engenharia mexeu nela (o erro volta para a tela dizer)."""
+    from ...engenharia import os_acompanhamento as O
+    lido = O.ler()
+    erro = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0] or "sem leitura"
+    est = O.estado(lido["eventos"]) if not erro else {}
+    agora = datetime.now(BRT)
+    out = []
+    for o in oss:
+        e = est.get(str(o.get("wid"))) or {}
+        ultima, _de = _ultima_da_os(o, e)
+        out.append(dict(o, eng_status=O.nome_status(e.get("status_id")),
+                        eng_prioridade=O.nome_prioridade(e.get("prioridade_id")),
+                        eng_prioridade_id=e.get("prioridade_id") or 0,
+                        ultima_iso=ultima.isoformat() if ultima else "",
+                        parada=bool(not erro and O.parada(o["coluna"], ultima, agora))))
+    return out, erro
+
+
 @bp.route("/equipe")
 def equipe():
     """O clique numa OS abre o card dela do OS Creator, o mesmo do Histórico (Levi, 08/10/2026: "Ao clicar na OS quero
@@ -894,10 +915,11 @@ def equipe():
     ini = {c["id"]: c["iniciais"] for c in cards}          # as do supercard (pelo nome no Fracttal)
     oss = [dict(o, cor=cor.get(o["pid"], CORES_PESSOA[-1]), iniciais=ini.get(o["pid"]) or _iniciais(o["pessoa"]))
            for o in d["os"]]
+    oss, erro_eng = _com_a_engenharia(oss)
     piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
     return render_template(
         "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss,
         kpis=faixa_kpis(oss, hoje, JANELA_CONCLUIDAS),
-        faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS,
+        faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS, erro_eng=erro_eng,
         hoje=hoje.isoformat(), piso_concluidas=piso, janela=JANELA_CONCLUIDAS, dias_faixa=DIAS_FAIXA,
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
