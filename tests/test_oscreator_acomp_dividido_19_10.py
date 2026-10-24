@@ -169,9 +169,21 @@ def test_copia_abandonada_vira_a_de_quem_chega(fr):
     _cliente(RESTRITA).get(URL)
     _envelhecer(rotas_acomp.VELHA_MAX + 5)
     assert "9104" in _cliente(TODA).get(URL).get_data(as_text=True)
-    assert fr["listas"] == [RESTRITA, TODA] and fr["totais"] == []                  # leu na frente, sem conferir
+    # a cópia velha não é da visão dela (24/10/2026: a de ontem só abre na hora para quem vê o mesmo total): leu na frente
+    assert fr["listas"] == [RESTRITA, TODA] and fr["totais"] == [TODA]
     _cliente(OUTRA).get(URL)
-    assert fr["listas"] == [RESTRITA, TODA] and fr["totais"] == [OUTRA]
+    assert fr["listas"] == [RESTRITA, TODA] and fr["totais"] == [TODA, OUTRA]
+
+
+def test_a_copia_de_ontem_de_quem_ve_tudo_nao_abre_para_a_visao_restrita(fr, monkeypatch):
+    """A cópia de ontem é de quem vê todas as OS; quem tem a visão restrita não a vê nem por um instante: lê a dela."""
+    jobs = []
+    monkeypatch.setattr(rotas_acomp, "_em_segundo_plano", jobs.append)
+    _cliente(TODA).get(URL)
+    _envelhecer(rotas_acomp.VELHA_MAX + 5)
+    h = _cliente(RESTRITA).get(URL).get_data(as_text=True)
+    assert "9104" not in h and "data-renovando" not in h and not jobs
+    assert fr["listas"] == [TODA, RESTRITA]
 
 
 def test_uma_releitura_por_tras_por_copia(fr, monkeypatch):

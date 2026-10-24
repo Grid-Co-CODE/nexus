@@ -454,14 +454,23 @@ def assets_cache_info() -> dict:
             "expirado": idade > ASSETS_TTL or c.get("ver") != _CACHE_VER}
 
 
-def load_assets_cached(force: bool = False) -> list:
+def load_assets_cached(force: bool = False, em_dia: bool = False) -> list:
     """Ativos do cache (se < 24h e mesma versão) ou recarrega via RPC (sessão do usuário — sem
-    OAuth) e salva. force=True ignora o cache."""
+    OAuth) e salva. force=True ignora o cache (o botão Atualizar da tela de Ativos: o arquivo é um só, vale para todos).
+
+    VENCIDO (24/10/2026): devolve o de ontem na hora e baixa o novo por trás (`_renovar_catalogo_por_tras`). Em 23/10 às
+    10:44 o 1º a precisar do catálogo vencido baixou os ~22 mil ativos DENTRO do pedido: um "Criar OS" da Performance
+    ficou 3 min 51 s em `get_assets` e o Histórico 1 min 52 s esperando o mesmo download. `em_dia=True` (resolver o
+    ativo da OS na aprovação) espera o novo, como antes; sem catálogo nenhum, também."""
     if not force:
         _seed_cache()
-        cached = _read_asset_cache()
-        if cached:
-            return _corrigir_itens_usina_estrangeiros(cached)
+        c = _catalogo_cru()
+        if c and c.get("assets") and c.get("ver") == _CACHE_VER:
+            vencido = time.time() - c.get("ts", 0) >= ASSETS_TTL
+            if not vencido or not em_dia:
+                if vencido:
+                    _renovar_catalogo_por_tras()
+                return _corrigir_itens_usina_estrangeiros([dict(a) for a in c["assets"]])
     pedido = time.time()
     with _ASSETS_RECARGA:
         # quem esperou a recarga de outro pedido usa a dela: o arquivo foi gravado depois deste pedido
@@ -475,6 +484,29 @@ def load_assets_cached(force: bool = False) -> list:
         except Exception:
             pass
     return _corrigir_itens_usina_estrangeiros(assets)
+
+
+ASSETS_ESPERA_TENTATIVA = 600     # s: o download por trás que falhou (Fracttal fora, cota) só tenta de novo depois disto
+_ASSETS_RENOVA = {"tentou": 0.0}
+_ASSETS_RENOVA_TRAVA = threading.Lock()
+
+
+def _renovar_catalogo_por_tras() -> None:
+    """Baixa o catálogo vencido numa thread, com a sessão de quem pediu (a cópia do contexto leva o JWT). Uma thread por
+    ASSETS_ESPERA_TENTATIVA (a que achar outro download em curso espera a vez e usa o dele: `load_assets_cached`), e a
+    que falhou só tenta de novo depois disso."""
+    with _ASSETS_RENOVA_TRAVA:
+        if time.time() - _ASSETS_RENOVA["tentou"] < ASSETS_ESPERA_TENTATIVA:
+            return
+        _ASSETS_RENOVA["tentou"] = time.time()
+    ctx = contextvars.copy_context()
+
+    def rodar():
+        try:
+            ctx.run(load_assets_cached, True)
+        except Exception:                               # noqa: BLE001 — fica o de ontem; o próximo pedido tenta depois
+            pass
+    threading.Thread(target=rodar, name="os-catalogo-por-tras", daemon=True).start()
 
 
 def get_responsaveis() -> list:

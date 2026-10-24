@@ -54,6 +54,7 @@
   {% endif %}
 </section>
 {% endmacro %}
+{% if nexus %}{{ dentro(nexus, "Dentro do Nexus", "Nexus", "Estimado por amostra pelo próprio Nexus a cada 10 min (casca/memoria_nexus.py): as variáveis dos módulos dele e do OS Creator, e as extensões do app.", prazo_memoria) }}{% endif %}
 {% if worker %}{{ dentro(worker, "Dentro do worker da plataforma", "worker", "Estimado por amostra pelo próprio worker a cada 10 min (o faxineiro dele, no PerformancePainel).", prazo_memoria) }}{% endif %}
 {% if web %}{{ dentro(web, "Dentro do web da plataforma", "web", "Estimado por amostra pelo próprio web a cada 10 min (no PerformancePainel); o web não descarta cache nenhum, só devolve a memória livre.", prazo_memoria) }}{% endif %}
 

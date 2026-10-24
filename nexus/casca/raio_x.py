@@ -233,8 +233,16 @@ def _ler_relatorio_worker(caminho: str | None = None, agora: datetime | None = N
     try:
         with open(caminho or RELATORIO_WORKER, encoding="utf-8") as f:
             rel = json.load(f)
+    except (OSError, ValueError, TypeError):
+        return None
+    return _resumir(rel, agora)
+
+
+def _resumir(rel, agora: datetime | None = None):
+    """O relatório de memória (o do worker, o do web ou o do próprio Nexus) e o de ~1 h antes, para a macro `dentro`."""
+    try:
         quando = datetime.fromisoformat(rel["quando"])
-    except (OSError, ValueError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError):
         return None
     antes_q, antes = None, {}
     for h in rel.get("historico") or []:
@@ -269,6 +277,14 @@ _WEB = {"thread": None, "ultimo": None, "quando": None}
 def _web_plataforma(prazo_s: float = PRAZO_MEMORIA_S):
     """O relatório do web da plataforma com prazo (`_com_prazo`); o caminho é lido na hora (os testes o trocam)."""
     return _com_prazo(_WEB, lambda: _ler_relatorio_worker(RELATORIO_WEB), prazo_s, "nexus-raio-x-web")
+
+
+def _dentro_do_nexus(app):
+    """A última medida do Nexus por dentro (`memoria_nexus`, 24/10/2026: na máquina nova o Nexus tinha 682 MB na memória
+    e 1.917 MB no swap, e a página não dizia de quê). Já está pronta na memória: não mede nada ao abrir."""
+    from . import memoria_nexus
+    rel = memoria_nexus.ultimo(app)
+    return _resumir(rel) if rel else None
 
 
 def _quem_ocupa(teto: int = 6):
@@ -333,6 +349,7 @@ def registrar_raio_x(bp) -> None:
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
                                worker=_worker_plataforma(), web=_web_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
+                               nexus=_dentro_do_nexus(app),
                                threads_atrasado=threads_atrasado,
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
                                travamentos=P.cartao(app) if estado is not None else None,

@@ -230,7 +230,7 @@ def _catalogo_para_aprovar() -> list:
     esse download em vez de começar outro."""
     if _RENOVANDO.acquire(timeout=240):
         _RENOVANDO.release()
-    return api.load_assets_cached()
+    return api.load_assets_cached(em_dia=True)
 
 
 def _tipo_do_ativo(s: dict, idx: dict):

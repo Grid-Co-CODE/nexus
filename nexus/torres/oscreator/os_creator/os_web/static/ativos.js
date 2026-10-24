@@ -141,7 +141,7 @@
       const delta = TODOS.length - antes;
       if (delta) $('rodape').textContent = 'catálogo atualizado — ' + (delta > 0 ? '+' : '') + delta + ' ativo(s) em relação à lista anterior';
     } catch (e) { $('sub').textContent = 'não consegui atualizar: ' + String(e.message || e).slice(0, 90); }
-    b.disabled = false; b.textContent = 'Atualizar';
+    b.disabled = false; b.textContent = 'Atualizar ativos';
   });
 
   // a busca da tela inicial chega pela URL (/os/ativos?busca=…, Levi 27/09): o campo já nasce preenchido e o filtro vale

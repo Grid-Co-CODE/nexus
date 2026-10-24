@@ -127,6 +127,8 @@ def test_o_resumo_do_catalogo_nao_decodifica_o_arquivo_de_novo(catalogo, monkeyp
 
 
 def test_uma_recarga_do_fracttal_por_vez(catalogo, monkeypatch):
+    """Quem precisa do catálogo em dia (`em_dia`; desde 24/10/2026 o vencido volta na hora e renova por trás,
+    `test_oscreator_catalogo_por_tras_24_10.py`) espera uma recarga só."""
     catalogo([{"id": 1, "code": "VELHO"}], ts=time.time() - api.ASSETS_TTL - 10)     # vencido
     recargas = []
 
@@ -136,7 +138,7 @@ def test_uma_recarga_do_fracttal_por_vez(catalogo, monkeypatch):
         return [{"id": 2, "code": "NOVO", "usina": "", "cliente": "", "tipo": "", "description": ""}]
     monkeypatch.setattr(api, "get_assets", recarregar)
     saidas = []
-    ts = [threading.Thread(target=lambda: saidas.append(api.load_assets_cached())) for _ in range(3)]
+    ts = [threading.Thread(target=lambda: saidas.append(api.load_assets_cached(em_dia=True))) for _ in range(3)]
     for t in ts:
         t.start()
     for t in ts:

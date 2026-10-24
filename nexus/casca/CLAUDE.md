@@ -216,7 +216,13 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   lia no disco o código de todas as linhas de cada pilha, e o rótulo só usa a de dentro. As pilhas saem de
   `presos.pilha` (sem o código; também na ronda dos presos), e os pedidos em andamento e as tarefas de fundo saem com o
   mesmo prazo de 2 s (`_THREADS`): passou dele, a página mostra a última lista, com a hora dela. Prova:
-  `tests/test_raio_x_threads_sem_disco_22_10.py`.
+  `tests/test_raio_x_threads_sem_disco_22_10.py`. **E dentro do próprio Nexus** (`casca/memoria_nexus.py`, 24/10/2026):
+  na máquina nova (16 GB) o Raio-X das 12:05 mostrou o Nexus com 682 MB na memória e 1.917 MB no swap, e a página não
+  dizia de quê. A mesma conta da plataforma, por amostra, das variáveis dos módulos do Nexus (e do clone do OS Creator)
+  e das extensões do app (medidas uma a uma; o app do Flask nunca como um bloco só), a cada 10 min numa thread
+  (`nexus-memoria`, ligada no servir.py e no app.py; a 1ª 90 s depois de subir), com teto de 3 s (a medida segura as
+  outras threads: o GIL). O Raio-X só mostra a última, sem medir nada ao abrir, na seção "Dentro do Nexus" (a mesma macro
+  `dentro`). Prova: `tests/test_raio_x_dentro_do_nexus_24_10.py`.
 - **Teto do OS Creator** (`casca/teto_os.py`, ligado no servir.py antes do presos): o servidor sobe com 32 threads e
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O

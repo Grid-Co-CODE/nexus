@@ -41,8 +41,9 @@ DIAS_BUSCA = 365          # a primeira OS de acompanhamento é de ago/2026; um a
 TTL_TICKET_FIM = 1800     # s: o ticket de OS CONCLUÍDA (ver `_tickets`)
 # Passados os 30 min, o quadro abre NA HORA com a leitura anterior e relê o Fracttal por trás, com a sessão da pessoa
 # (Levi, 09/10/2026: "teria como utilizarmos essas requisições de forma mais inteligente?"): até então, quadro vencido
-# era a tela esperando o Fracttal na frente de quem abriu. Mais velha que VELHA_MAX, espera a leitura como antes: um
-# quadro de horas atrás, mesmo com a hora na tela, já engana (chamado que ganhou ticket direto no Fracttal, por exemplo).
+# era a tela esperando o Fracttal na frente de quem abriu. Mais velha que VELHA_MAX, a tela de um chamado espera a leitura
+# como antes; o quadro abre com ela desde 24/10/2026 (a 1ª abertura do dia esperava ~40 s), com a hora à vista, e troca
+# sozinho quando a nova chega (`quadro_estado`), só para quem vê o mesmo total no Fracttal (`_mesma_visao_da_velha`).
 VELHA_MAX = 2 * 3600      # s
 
 # O que cada leitura guarda, por DONO da cópia (`_dono`). Até 19/10/2026 o dono era sempre a pessoa ("uma pessoa
@@ -366,9 +367,11 @@ def quadro():
         f_obs = ex.submit(_ultimas, forcar)
         dono = _dono()
         idade, guardado = (None, None) if forcar else _guardado_com_idade(("acomp", dono))
-        # vencido (3 min) e não velho demais (VELHA_MAX): abre com a leitura anterior e relê por trás. O Atualizar lê
-        # na hora
-        por_tras = guardado is not None and TTL_QUADRO <= idade < VELHA_MAX
+        # vencido (30 min): abre com a leitura anterior e relê por trás, e a tela troca sozinha quando a nova chega
+        # (`quadro_estado`). Mais velho que VELHA_MAX também (24/10/2026, Levi: a 1ª abertura do dia esperava ~40 s o
+        # Fracttal), mas só para quem vê no Fracttal o mesmo total da cópia: a de ontem pode ser de outra visão. O
+        # Atualizar lê na hora
+        por_tras = guardado is not None and idade >= TTL_QUADRO and (idade < VELHA_MAX or _mesma_visao_da_velha(dono))
         if por_tras:
             d, erro = guardado, None
             _renovar_por_tras(dono)
@@ -378,6 +381,29 @@ def quadro():
     q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins)
     return render_template("acomp.html", conta=_conta(), aba="criar", q=q, quando=d.get("quando") or "", erro=erro,
                            erro_obs=erro_obs, equipe=aw.equipe()[1], renovando=por_tras)
+
+
+@bp.route("/chamados/acompanhamento/estado")
+@exige_sessao
+def quadro_estado():
+    """A tela que abriu com a leitura anterior pergunta, de 5 em 5 s, se a nova já chegou (`acomp.js`): a hora da
+    cópia de agora e se ela ainda está sendo relida. Não vai ao Fracttal (a conferência do `_dono` já está guardada)."""
+    dono = _dono()
+    _, v = _guardado_com_idade(("acomp", dono))
+    with _RENOV_TRAVA:
+        relendo = dono in _RENOVANDO
+    return jsonify({"quando": (v or {}).get("quando") or "", "renovando": relendo})
+
+
+def _mesma_visao_da_velha(dono) -> bool:
+    """Quem abre vê no Fracttal o mesmo total de OS com a etiqueta CHAMADOS da cópia velha (mais de VELHA_MAX)? A cópia
+    "TODOS" largada vale para quem chegar (`_dono`), e a de quem tem a visão restrita mostraria a outra pessoa o quadro
+    errado (ou a dela, o de quem vê tudo). O total dela fica guardado por pessoa (`HS.mesma_visao`)."""
+    _, v = _guardado_com_idade(("acomp_linhas", dono))
+    if not isinstance(v, dict):
+        return False
+    de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
+    return HS.mesma_visao(rotas._quem(), ("acomp", dono), lambda: api.total_chamados(de), guardado=v.get("total") or 0)
 
 
 @bp.route("/em-breve/chamados")

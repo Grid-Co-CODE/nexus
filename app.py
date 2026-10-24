@@ -59,6 +59,8 @@ if __name__ == "__main__":
     threads = 32 if plataforma else 8
     from nexus.casca import presos
     presos.ligar(app, threads)               # o que cada pedido esperava quando o Nexus parou (13/10/2026)
+    from nexus.casca import memoria_nexus
+    memoria_nexus.ligar(app)                 # o Nexus por dentro no Raio-X, a cada 10 min (24/10/2026)
     alvo = app
     if plataforma:
         alvo = juntar_com_a_plataforma(app, plataforma)

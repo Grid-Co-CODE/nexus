@@ -4,6 +4,27 @@
 (function () {
   "use strict";
 
+  // A tela que abriu com a leitura anterior (vencida, ou a de ontem na 1ª abertura do dia) troca sozinha quando a nova
+  // chega (24/10/2026): pergunta de 5 em 5 s, por até 3 min, e recarrega quando a hora da cópia muda. Se a releitura
+  // terminar sem cópia nova (o Fracttal falhou), fica a que está, com a hora dela.
+  (function esperarANova() {
+    const f = document.querySelector(".ac-fonte[data-renovando]");
+    if (!f) return;
+    const antes = f.getAttribute("data-quando") || "";
+    let vezes = 0;
+    const t = setInterval(async () => {
+      vezes += 1;
+      try {
+        const r = await fetch("/os/chamados/acompanhamento/estado", {headers: {"X-Requested-With": "fetch"}});
+        const j = r.ok ? await r.json() : {};
+        if (j.quando && j.quando !== antes) { clearInterval(t); location.reload(); return; }
+        if (j.renovando === false || vezes >= 36) clearInterval(t);
+      } catch (e) {
+        if (vezes >= 36) clearInterval(t);
+      }
+    }, 5000);
+  })();
+
   function norm(s) {
     return String(s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
   }

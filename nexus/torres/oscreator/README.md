@@ -374,10 +374,15 @@ Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro
     (seção "A lista pela metade não vai para a tela").
   - **Passados os 30 min, o quadro abre na hora com a leitura anterior e relê por trás** (Levi, 09/10/2026: "teria
     como utilizarmos essas requisições de forma mais inteligente?"; `_renovar_por_tras`). Ao lado da hora da leitura
-    aparece "· atualizando"; a nova vale na próxima abertura (ou no Atualizar, que lê na hora). A releitura roda numa
+    aparece "· atualizando", e a tela troca sozinha quando a nova chega (`acomp.js`, `esperarANova`: pergunta ao
+    `/os/chamados/acompanhamento/estado` de 5 em 5 s, por até 3 min; o Atualizar lê na hora). A releitura roda numa
     thread com o JWT e o e-mail de quem abriu (`sessao.contexto`: a thread nasce sem o contexto da requisição), uma
-    por cópia, com os mesmos pedidos que a tela faria na frente da pessoa: nada a mais na cota. Vale até `VELHA_MAX` (2 h); mais
-    velho, a tela espera, como antes (quadro de horas atrás engana, mesmo com a hora). Erro do Fracttal: fica a leitura
+    por cópia, com os mesmos pedidos que a tela faria na frente da pessoa: nada a mais na cota. **Também a de ontem**
+    (mais velha que `VELHA_MAX`, 2 h; 24/10/2026, Levi escolheu abrir a 1ª vez do dia com ela em vez de esperar ~40 s o
+    Fracttal), mas só para quem vê no Fracttal o mesmo total da cópia (`_mesma_visao_da_velha`: a cópia largada pode ser
+    de outra visão; quem tem a visão restrita lê a dela na frente). A tela de UM chamado segue com o `VELHA_MAX` (lê na
+    frente passadas as 2 h). Provas: `tests/test_oscreator_acomp_troca_sozinha_24_10.py` (o script no node) e os
+    testes da de ontem em `test_oscreator_acomp_renovar.py` e `test_oscreator_acomp_dividido_19_10.py`. Erro do Fracttal: fica a leitura
     anterior. Sessão caída: a cópia sai, e a próxima visita volta ao login. Gravação no meio da releitura (ticket,
     finalizar): a cópia dela sai (`_ESQUECIDO`). Medido com o Fracttal falso a 300 ms por pedido (65 chamados): quadro
     vencido de 4,8 s para 0,007 s. Prova: `tests/test_oscreator_acomp_renovar.py` (8 testes).
@@ -777,9 +782,8 @@ chegado, então o catálogo de ativos não era a espera daquele clique.
 - **No Histórico**, que mostra o progresso, o prazo conta do último pedido ao Fracttal que terminou: busca grande andando
   não é demora.
 - Onde o Fracttal segura uma página (para quem for mexer): a tela inicial (`/os/`) espera o selo
-  `api.contar_minhas_analises()` (até 2 chamadas de 45 s) antes de desenhar; e quem usa o `api.load_assets_cached()` com o
-  catálogo vencido (mais de 24 h) baixa os ~110 lotes de ativos DENTRO do pedido, sem trava: duas pessoas, duas baixas
-  (a Área PCM já lê o vencido e renova por trás, `rotas_solic._indice_ativos`).
+  `api.contar_minhas_analises()` (até 2 chamadas de 45 s) antes de desenhar. O catálogo de ativos vencido não segura
+  mais o pedido desde 24/10/2026 (seção "O catálogo de ativos vencido por trás").
 - **Prova** (13/10/2026): Nexus descartável com o RPC do Fracttal mudo, clique no cartão do Performance dentro do Nexus
   (a moldura `/os/performance` dentro da casca `/os/`): aos 20 s "Esperando o servidor há 20 s"; aos 50 s a mensagem e os
   dois botões; Tentar de novo zerou a conta e o círculo seguiu; aos 48 s de novo os botões; Fechar escondeu o círculo.
@@ -1039,6 +1043,23 @@ com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa
 - Prova: `tests/test_oscreator_historico_compartilhado_19_10.py` (conta cada ida ao Fracttal: uma busca para várias
   pessoas, a visão restrita com a dela, a vencida que soma só as novas, a inteira a cada 10 min sem reler as tarefas
   das fechadas, o ↻, três pessoas ao mesmo tempo, o Fracttal fora, as linhas montadas uma vez).
+
+## O catálogo de ativos vencido por trás (24/10/2026)
+
+Em 23/10/2026 às 10:44 o catálogo de ~22 mil ativos passou das 24 h (`api.ASSETS_TTL`) e o 1º a precisar dele o baixou
+DENTRO do pedido (~110 pedidos ao Fracttal, 6 de cada vez): um "Criar OS" da Performance ficou 3 min 51 s em
+`get_assets`, e o Histórico 1 min 52 s esperando o mesmo download. Levi, 24/10: "deixe um botão de atualizar ativos e
+quando atualizar vai atualizar a lista de todos, não só daquela pessoa".
+
+- **Vencido, o de ontem volta na hora** (`api.load_assets_cached`) e o novo é baixado por trás
+  (`_renovar_catalogo_por_tras`, a thread `os-catalogo-por-tras`), com a sessão de quem pediu (a cópia do contexto leva o
+  JWT). Uma tentativa a cada `ASSETS_ESPERA_TENTATIVA` (10 min): a que falhou deixa o de ontem.
+- **Espera o novo** só quem precisa dele em dia: `em_dia=True` (resolver o ativo da OS na aprovação,
+  `rotas_solic._catalogo_para_aprovar`); e quem não tem catálogo nenhum na máquina.
+- **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) baixa na hora; o arquivo do catálogo
+  é um só (`assets_cache.json`), então vale para todos. Ativo cadastrado hoje que não aparece: é ele.
+- Prova: `tests/test_oscreator_catalogo_por_tras_24_10.py` (7; 6 falham no código de antes, o outro segura o "sem
+  catálogo, espera"); 5 mutações, todas pegas.
 
 ## Os catálogos e o catálogo de ativos uma vez para todos (19/10/2026)
 

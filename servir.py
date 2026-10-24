@@ -48,6 +48,9 @@ if __name__ == "__main__":
     teto_os.ligar(app, teto=THREADS // 2)
     from nexus.casca import presos
     presos.ligar(app, THREADS)
+    # o Nexus por dentro no Raio-X (24/10/2026: 2,6 GB, 1,9 no swap, e a página não dizia de quê), a cada 10 min
+    from nexus.casca import memoria_nexus
+    memoria_nexus.ligar(app)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"

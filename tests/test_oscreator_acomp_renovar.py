@@ -118,13 +118,20 @@ def test_quadro_vencido_abre_na_hora_e_rele_por_tras(fracttal, fila):
     assert "data-renovando" not in h and fracttal["listas"] == 2 and not fila
 
 
-def test_quadro_velho_demais_espera_a_leitura(fracttal, fila):
-    """Um quadro de horas atrás engana mesmo com a hora na tela: passa de VELHA_MAX, a tela espera, como antes."""
+def test_quadro_de_ontem_abre_na_hora_e_troca_sozinho(fracttal, fila):
+    """A 1ª abertura do dia (a cópia passou de VELHA_MAX) esperava ~40 s o Fracttal (Levi, 24/10/2026, escolheu abrir
+    com a de ontem): abre na hora, com a hora dela e o "atualizando", relê por trás, e a tela pergunta pelo `estado` até
+    a nova chegar. Quem vê no Fracttal o mesmo total da cópia: a conferência é 1 pedido pequeno, guardado 30 min."""
     cli = _cliente()
     cli.get(URL)
     _envelhecer(rotas_acomp.VELHA_MAX + 5)
     h = cli.get(URL).get_data(as_text=True)
-    assert fracttal["listas"] == 2 and not fila and "data-renovando" not in h
+    assert fracttal["listas"] == 1 and "data-renovando" in h and "TK-1" in h and len(fila) == 1
+    quando = h.split('data-quando="', 1)[1].split('"', 1)[0]
+    assert cli.get(URL + "/estado").get_json() == {"quando": quando, "renovando": True}
+    _rodar_fora_da_requisicao(fila.pop())
+    j = cli.get(URL + "/estado").get_json()
+    assert j["renovando"] is False and j["quando"] and fracttal["listas"] == 2
 
 
 def test_atualizar_le_na_hora(fracttal, fila):
