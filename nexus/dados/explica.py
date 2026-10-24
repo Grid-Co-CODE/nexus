@@ -19,6 +19,7 @@ RESUMO = {
     "ronda_avulsa": "Ronda lançada à mão no Nexus e o nível validado pela foto",
     "observacao_responsavel": "A observação do Responsável O&M sobre a usina, com dia e hora",
     "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
+    "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
@@ -92,6 +93,9 @@ PARA_QUE = {
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
                               "serve para juntar as observações nos relatórios.",
+    "sugestao": "Guarda cada sugestão que alguém mandou pelo Início → Sugestões: o título, a descrição, a área do "
+                "Nexus a que se refere e os anexos, com o dia e quem mandou. O texto e quem mandou vão cifrados; os "
+                "administradores leem a lista na mesma aba.",
     "evento_ocorrencia": "Guarda as ocorrências que o Responsável O&M registra nas usinas (um problema que pede "
                          "acompanhamento: o equipamento, a criticidade, o status, o começo e o fim), o plano de ação "
                          "de cada uma (o que fazer, quem faz, até quando e em que pé está) e o andamento, com o dia e "

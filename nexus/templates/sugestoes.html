@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block titulo %}Sugestões{% endblock %}
+{% block conteudo %}
+{# A aba Sugestões do Início (24/10/2026, Levi: "Vai ter uma tela para a pessoa sugerir, os administradores verão em
+   lista a pessoa que pediu, o que pediu e anexos"). O formulário é de todos; a lista, só do administrador
+   (casca/sugestoes.py). #}
+<p class="gc-eyebrow">{{ ("Setor " ~ setor.nome) if setor else "Nexus" }}</p>
+<h1 class="titulo-pagina">Início</h1>
+{% include "_inicio_abas.html" %}
+
+<p class="lead">Mande uma ideia, um pedido de melhoria ou um problema que você encontrou no Nexus. Os administradores
+  recebem e leem cada sugestão por aqui.</p>
+
+{% if aviso %}<p class="sug-aviso sug-aviso--ok" role="status"><i class="ph ph-check-circle" aria-hidden="true"></i> {{ aviso }}</p>{% endif %}
+{% if erro %}<p class="sug-aviso sug-aviso--erro" role="alert"><i class="ph ph-warning" aria-hidden="true"></i> {{ erro }}</p>{% endif %}
+
+<section class="sug-bloco" aria-labelledby="sug-nova">
+  <h2 class="ui-kicker" id="sug-nova">Nova sugestão</h2>
+  {% if faltam %}
+  <p class="aviso">Este Nexus ainda não grava sugestões: faltam as chaves {{ faltam|join(', ') }} no .env do servidor.</p>
+  {% elif not tem_login %}
+  <p class="aviso">Entre com o seu login (Microsoft ou Fracttal) para mandar uma sugestão: a senha de administrador não
+    diz quem é a pessoa.</p>
+  {% else %}
+  <form class="sug-form" method="post" enctype="multipart/form-data" action="{{ url_for('casca.inicio', aba='sugestoes') }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <input type="hidden" name="novo_id" value="{{ form.novo_id or novo_id }}">
+    <div class="sug-linha">
+      <div class="sug-campo sug-campo--titulo">
+        <label class="gc-rotulo" for="sug-titulo">Título</label>
+        <input class="gc-campo" id="sug-titulo" name="titulo" type="text" maxlength="{{ titulo_max }}" required
+               value="{{ form.titulo or '' }}" placeholder="Em poucas palavras, o que você sugere">
+      </div>
+      <div class="sug-campo sug-campo--area">
+        <label class="gc-rotulo" for="sug-area">Área</label>
+        <select class="gc-campo" id="sug-area" name="area">
+          <option value="">Nenhuma em especial</option>
+          {% for id, nome in areas.items() %}<option value="{{ id }}"{% if form.area == id %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="sug-campo">
+      <label class="gc-rotulo" for="sug-descricao">Descrição</label>
+      <textarea class="gc-campo" id="sug-descricao" name="descricao" rows="6" maxlength="{{ texto_max }}" required
+                placeholder="O que acontece hoje, o que você gostaria que acontecesse e onde (tela, botão, relatório)">{{ form.descricao or '' }}</textarea>
+    </div>
+    <div class="sug-campo">
+      <label class="gc-rotulo" for="sug-anexos">Anexos (opcional)</label>
+      <input class="sug-arquivos" id="sug-anexos" name="anexos" type="file" multiple accept="{{ aceitos|replace(' ', '') }}"
+             aria-describedby="sug-anexos-ajuda" data-max-mb="{{ max_mb }}" data-max-arquivos="{{ max_arquivos }}"
+             data-max-total="{{ max_total }}">
+      <p class="gc-ajuda" id="sug-anexos-ajuda">Até {{ max_arquivos }} arquivos, {{ max_mb }} MB cada e {{ max_total }} MB
+        juntos. Aceitos: {{ aceitos }}.</p>
+      <p class="gc-ajuda gc-ajuda--erro" id="sug-anexos-erro" role="alert" hidden></p>
+    </div>
+    <div><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar sugestão</button></div>
+  </form>
+  {% endif %}
+</section>
+
+{% if admin %}
+<section class="sug-bloco" aria-labelledby="sug-recebidas">
+  <h2 class="ui-kicker" id="sug-recebidas">Sugestões recebidas{% if recebidas %} ({{ recebidas|length }}){% endif %}</h2>
+  <p class="gc-ajuda sug-so-admin">Só os administradores veem esta lista.</p>
+  {% if erro_lista %}<p class="sug-aviso sug-aviso--erro">Não consegui ler as sugestões do banco agora ({{ erro_lista }}){% if recebidas %}: a lista é a da última leitura{% endif %}.</p>{% endif %}
+  {% if not recebidas and not erro_lista %}
+  <p class="aviso">Nenhuma sugestão ainda.</p>
+  {% else %}
+  <ol class="sug-lista">
+    {% for s in recebidas %}
+    <li class="sug-item">
+      <div class="sug-cab">
+        <span class="sug-quem">{{ s.nome or 'Sem o nome (texto ilegível)' }}</span>
+        {% if s.email %}<span class="mudo">{{ s.email }}</span>{% endif %}
+        {% if s.area %}<span class="atu-area">{{ s.area_nome }}</span>{% endif %}
+        <span class="sug-quando">{{ s.quando_txt }}</span>
+      </div>
+      {% if s.legivel %}
+      <p class="sug-titulo">{{ s.titulo }}</p>
+      <p class="sug-texto">{{ s.descricao }}</p>
+      {% if s.anexos %}
+      <ul class="sug-anexos" aria-label="Anexos">
+        {% for a in s.anexos %}
+        <li><a href="{{ url_for('casca.inicio', aba='sugestoes', anexo=s.id, n=a.n) }}"{% if a.imagem %} target="_blank" rel="noopener"{% endif %}>
+          <i class="ph {{ 'ph-image' if a.imagem else 'ph-file-text' }}" aria-hidden="true"></i> {{ a.nome }}</a>
+          <span class="mudo">{{ a.tamanho_txt }}</span></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% else %}
+      <p class="mudo">O texto desta sugestão não abriu (a chave do cadastro deste Nexus não é a que gravou).</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</section>
+{% endif %}
+
+<script>
+/* confere os anexos ANTES de enviar (o servidor confere de novo): sem isto, 40 MB subiam inteiros só para voltar
+   recusados */
+(function () {
+  var campo = document.getElementById('sug-anexos');
+  if (!campo) return;
+  var erro = document.getElementById('sug-anexos-erro'), MB = 1024 * 1024;
+  function conferir() {
+    var max = +campo.dataset.maxMb, qtd = +campo.dataset.maxArquivos, teto = +campo.dataset.maxTotal;
+    var fs = Array.prototype.slice.call(campo.files || []), total = 0, msg = '';
+    if (fs.length > qtd) msg = 'São ' + fs.length + ' arquivos: o limite é ' + qtd + '.';
+    fs.forEach(function (f) {
+      total += f.size;
+      if (!msg && f.size > max * MB) msg = '“' + f.name + '” passa de ' + max + ' MB.';
+    });
+    if (!msg && total > teto * MB) msg = 'Os anexos passam de ' + teto + ' MB juntos.';
+    erro.textContent = msg;
+    erro.hidden = !msg;
+    campo.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    return !msg;
+  }
+  campo.addEventListener('change', conferir);
+  campo.form.addEventListener('submit', function (e) {
+    if (!conferir()) { e.preventDefault(); campo.focus(); return; }
+    var b = campo.form.querySelector('button[type=submit]');
+    b.disabled = true;
+    b.lastChild.textContent = ' Enviando…';
+  });
+})();
+</script>
+{% endblock %}

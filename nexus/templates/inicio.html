@@ -3,12 +3,7 @@
 {% block conteudo %}
 <p class="gc-eyebrow">{{ ("Setor " ~ setor.nome) if setor else "Nexus" }}</p>
 <h1 class="titulo-pagina">Início</h1>
-{% if aba is defined %}{# as abas do Início (13/10/2026): a visão geral e as Atualizações (os últimos commits e o que mudou) #}
-<nav class="gc-subabas" aria-label="Início">
-  <a href="{{ url_for('casca.inicio') }}"{% if aba == 'inicio' %} aria-current="page"{% endif %}>Visão geral</a>
-  <a href="{{ url_for('casca.inicio', aba='atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
-</nav>
-{% endif %}{# Honesto (auditoria A3 da porta única, 10/10/2026): o Início dizia "fase 0" e "Com dado real: 0" com 40 telas prontas
+{% if aba is defined %}{% include "_inicio_abas.html" %}{% endif %}{# Honesto (auditoria A3 da porta única, 10/10/2026): o Início dizia "fase 0" e "Com dado real: 0" com 40 telas prontas
    no ar. O número é o das telas prontas, pela mesma conta do verde do menu (casca.inicio). #}
 <p class="lead">O Nexus reúne Performance, PCM, App de Campo, Fracttal e COS numa casca só, organizada
   pelas torres da Estrutura O&amp;M. Cada torre abre na primeira tela pronta; as que ainda estão em construção

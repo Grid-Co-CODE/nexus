@@ -748,3 +748,89 @@ def test_o_tempo_estimado_vai_na_tarefa_da_os(monkeypatch):
     api.create_os_rpc(ativo, "T", "Corretiva", [], prog_date=prog)                         # sem o tempo: como sempre
     p = enviados[-1]
     assert p["duration"] == 600 and p["real_duration"] == 600 and p["final_date"] == "2026-10-22T11:20:00.000Z"
+
+
+# ── Nova solicitação: o título é só o motivo, e a OS pai vai até a Fila (24/10/2026) ───────────────────────────────────
+# Levi: "o título está com um subtexto de "[Ativo] - Motivo": O certo seria só motivo pois o ativo já tem que ir no
+# título automático!" e "ao lado de buscar ativo deixe um espaço do lado direito para "OS Pai" quando preenchido e o PCM
+# for criar a OS na fila do PCM já vai vincular aquela OS como OS pai!"
+INV = {"code": "TST-INV15", "description": "Inversor 1.5 Marca X { TST-INV15 }", "tipo": "Inversor"}
+
+
+@pytest.mark.parametrize("escrito,esperado", [
+    ("Troca do cabo", "[Inversor 1.5] - Troca do cabo"),             # só o motivo: o ativo entra sozinho na frente
+    ("  Troca do cabo  ", "[Inversor 1.5] - Troca do cabo"),
+    ("[Ativo] - Troca do cabo", "[Inversor 1.5] - Troca do cabo"),   # o jeito de antes (uma tela aberta antes do deploy)
+    ("[Inversor 1.5] - Troca do cabo", "[Inversor 1.5] - Troca do cabo"),   # já com o ativo: não repete
+    ("[inversor 1.5] Troca", "[inversor 1.5] Troca"),
+])
+def test_o_titulo_e_o_motivo_com_o_ativo_na_frente(escrito, esperado):
+    assert sw.titulo_do_ativo(escrito, INV) == esperado
+
+
+def _criar(cli, monkeypatch, **corpo):
+    ativos = [dict(INV), {"code": "TST-INV16", "description": "Inversor 1.6 Marca X", "tipo": "Inversor"}]
+    monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [dict(x) for x in ativos])
+    monkeypatch.setattr(api, "_read_asset_cache", lambda: [dict(x) for x in ativos])
+    feitas = []
+    monkeypatch.setattr(api, "create_solicitacoes_bulk", lambda assets, desc, c1, **k: feitas.append(
+        ([a["code"] for a in assets], desc, k.get("observation"))) or [{"code": a["code"], "ok": True, "id_code": 1}
+                                                                       for a in assets])
+    r = cli.post("/os/api/solic/criar", json=dict({"ativos": ["TST-INV15", "TST-INV16"], "descricao": "Troca de ventilador",
+                                                    "classif1": 7, "observacao": "Parou de tarde."}, **corpo))
+    return r, feitas
+
+
+def test_criar_poe_o_nome_de_cada_ativo_no_titulo(cli, monkeypatch):
+    r, feitas = _criar(cli, monkeypatch)
+    assert r.status_code == 200
+    assert [(c, d) for c, d, _o in feitas] == [(["TST-INV15"], "[Inversor 1.5] - Troca de ventilador"),
+                                               (["TST-INV16"], "[Inversor 1.6] - Troca de ventilador")]
+
+
+def test_a_os_pai_vai_no_bloco_pcm_de_cada_solicitacao(cli, monkeypatch):
+    r, feitas = _criar(cli, monkeypatch, os_pai={"id": 555, "folio": "16784"})
+    assert r.status_code == 200 and len(feitas) == 2
+    for _c, _d, obs in feitas:
+        assert obs.startswith("Parou de tarde.") and "OS pai: 16784 (id 555)" in sp.so_bloco(obs)
+    _r, feitas = _criar(cli, monkeypatch, os_pai=None)                    # sem OS pai: o bloco de sempre
+    assert all("OS pai" not in o for _c, _d, o in feitas)
+
+
+@pytest.mark.parametrize("ruim", [{"id": "abc", "folio": "16784"}, {"id": 555, "folio": "x1"}, {"folio": "16784"},
+                                  {"id": 0, "folio": "16784"}, {"id": True, "folio": "16784"}, "16784"])
+def test_a_os_pai_torta_nao_cria_nada(cli, monkeypatch, ruim):
+    r, feitas = _criar(cli, monkeypatch, os_pai=ruim)
+    assert r.status_code == 400 and "OS pai" in r.get_json()["erro"] and feitas == []
+
+
+def test_o_bloco_le_a_os_pai_de_volta():
+    obs = sw.observacao("Relato.", "inversor_inspecao", "", "2026-10-25 08:00", [], os_pai=("16784", 555))
+    assert sp.parse(obs)["os_pai"] == "16784 (id 555)" and sp.parse(obs)["data"] == "25/10/2026 08:00"
+    assert sw.os_pai_do_bloco("16784 (id 555)") == ("16784", 555)
+    assert sw.os_pai_do_bloco("16784") == ("16784", None)        # escrito à mão no Fracttal web: o PCM escolhe na lista
+    assert sw.os_pai_do_bloco("") == ("", None) and sw.os_pai_do_bloco("veja a outra") == ("", None)
+
+
+def test_a_fila_ja_traz_a_os_pai_da_solicitacao(cli, monkeypatch):
+    obs = sw.observacao("Inversor desligando.", "", "", "", [], os_pai=("16784", 555))
+    monkeypatch.setitem(LINHAS[0], "observacao", obs)
+    d = _dados(cli.get("/os/solicitacao/fila").get_data(as_text=True), "fl_dados")
+    f = next(x for x in d["fichas"] if x["id"] == 5001)
+    assert f["os_pai"] == "16784" and f["os_pai_id"] == 555 and "OS pai" not in f["relato"]
+    outra = next(x for x in d["fichas"] if x["id"] == 5005)
+    assert outra["os_pai"] == "" and outra["os_pai_id"] is None
+    r = cli.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1, "responsavel": "Ana Teste Silva",
+                                                     "id_parent": f["os_pai_id"]})
+    assert r.status_code == 200 and cli.gravado[-1][-1]["id_parent"] == 555
+    js = (WEB / "static" / "solic_fila.js").read_text(encoding="utf-8")
+    assert "paiSel = f.os_pai_id || null" in js                       # a ficha abre com a OS pai escolhida
+
+
+def test_a_tela_da_nova_solicitacao_pede_o_motivo_e_a_os_pai(cli, monkeypatch):
+    monkeypatch.setattr(api, "get_request_types", lambda: {"classif1": [{"id": 7, "description": "Corretiva"}]})
+    h = cli.get("/os/solicitacao").get_data(as_text=True)
+    assert 'placeholder="Motivo"' in h and '"[Ativo] - "' not in h
+    busca, pai = h.index('id="busca"'), h.index('id="ed_pai"')
+    assert busca < pai < h.index('id="tbody"')                         # no bloco 1, à direita do Buscar ativo
+    assert "/os/api/pcm/os-pai?termo=" in h and "os_pai:" in h

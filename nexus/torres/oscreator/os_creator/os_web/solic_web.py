@@ -110,6 +110,7 @@ def linha(s: dict) -> dict:
     d["_tecnico"] = b.get("tecnico") or ""
     d["_data_sug"] = b.get("data") or ""
     d["_subs"] = b.get("subtarefas") or []
+    d["_os_pai"], d["_os_pai_id"] = os_pai_do_bloco(b.get("os_pai"))
     d["_coluna"] = coluna_de(d)
     return d
 
@@ -196,10 +197,12 @@ def tipos_do_tema(chave: str) -> list:
     return []
 
 
-# ── o título "[Ativo] - Motivo" (Levi, 27/09/2026) ─────────────────────────────────────────────────
-# O tema sugere "[Ativo] - <motivo>" e a marca vira o nome curto de CADA ativo ao criar: são N solicitações com os mesmos
-# campos, uma por ativo, e o título de uma não pode levar o nome da outra. O nome curto é o da coluna Ativo do
-# Histórico ("Inversor 1.5", sem marca nem modelo — `os_web/ativo_curto.py`).
+# ── o título "[Ativo] - Motivo" (Levi, 27/09/2026; só o motivo na tela desde 24/10/2026) ───────────────────────────────
+# Cada solicitação sai com o nome curto do SEU ativo na frente: são N solicitações com os mesmos campos, uma por ativo, e
+# o título de uma não pode levar o nome da outra. O nome curto é o da coluna Ativo do Histórico ("Inversor 1.5", sem marca
+# nem modelo — `os_web/ativo_curto.py`). Até 24/10 a pessoa escrevia a marca "[Ativo] - Motivo" e o título sem a marca
+# saía sem o ativo; Levi: "O certo seria só motivo pois o ativo já tem que ir no título automático!". A marca ainda vale
+# (uma tela aberta antes do deploy), e o título que já começa pelo ativo não o repete.
 MARCA_ATIVO = "[Ativo]"
 
 
@@ -208,10 +211,13 @@ def nome_curto(asset: dict, frases=None) -> str:
 
 
 def titulo_do_ativo(descricao: str, asset: dict, frases=None) -> str:
-    descricao = str(descricao or "")
-    if MARCA_ATIVO not in descricao:
+    descricao = str(descricao or "").strip()
+    nome = nome_curto(asset, frases)
+    if MARCA_ATIVO in descricao:
+        return descricao.replace(MARCA_ATIVO, "[%s]" % nome)
+    if not nome or descricao.lower().startswith("[%s]" % nome.lower()):
         return descricao
-    return descricao.replace(MARCA_ATIVO, "[%s]" % nome_curto(asset, frases))
+    return "[%s] - %s" % (nome, descricao)
 
 
 def subtarefas_do_tema(tema: str, tipo_ativo: str = "") -> list:
@@ -223,13 +229,46 @@ def subtarefas_do_tema(tema: str, tipo_ativo: str = "") -> list:
 
 
 def observacao(relato: str, tema: str = "", tecnico: str = "", data: str = "",
-               subtarefas: list | None = None) -> str:
+               subtarefas: list | None = None, os_pai=None) -> str:
     """O relato do supervisor MAIS o bloco [PCM] — é assim que a sugestão chega à fila. A data vai como o app a escreve
-    ("21/10/2026 08:00", legível na observação no Fracttal web); a que não dá para ler vai como veio."""
+    ("21/10/2026 08:00", legível na observação no Fracttal web); a que não dá para ler vai como veio. `os_pai` é o
+    (nº, id) do `os_pai_escolhida`."""
     iso = _data_sugerida_iso(data)
     data = dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M").strftime("%d/%m/%Y %H:%M") if iso else (data or "")
+    pai = "%s (id %s)" % os_pai if os_pai else ""
     return sp.observacao_com_bloco(relato or "", {"tema": tema or "", "tecnico": tecnico or "",
-                                                  "data": data, "subtarefas": subtarefas or []})
+                                                  "data": data, "os_pai": pai, "subtarefas": subtarefas or []})
+
+
+ERRO_OS_PAI = "OS pai inválida: escolha a OS na lista que aparece ao digitar o número."
+
+
+def os_pai_escolhida(v):
+    """A OS pai da Nova solicitação ({'id','folio'}, o que a busca `/os/api/pcm/os-pai` devolve e a tela guarda ao
+    escolher) → (nº, id), ou None sem OS pai. ValueError quando veio torta: nada é criado (uma OS pai errada ligaria a OS
+    da Fila a outra OS, e a API do Fracttal não desfaz)."""
+    if v in (None, "", {}):
+        return None
+    if not isinstance(v, dict):
+        raise ValueError(ERRO_OS_PAI)
+    idp, folio = v.get("id"), str(v.get("folio") or "").strip()
+    if isinstance(idp, str) and idp.strip().isdigit():
+        idp = int(idp.strip())
+    if isinstance(idp, bool) or not isinstance(idp, int) or idp <= 0 or not folio.isdigit():
+        raise ValueError(ERRO_OS_PAI)
+    return folio, idp
+
+
+_OS_PAI = re.compile(r"^\s*(\d+)\s*(?:\(\s*id\s*(\d+)\s*\))?")
+
+
+def os_pai_do_bloco(texto) -> tuple:
+    """A linha "OS pai" do bloco ("16784 (id 555)") → ("16784", 555). Só o nº (escrito à mão no Fracttal web) → ("16784",
+    None): a Fila mostra o nº e o PCM escolhe na lista. O que não começa por um nº → ("", None)."""
+    m = _OS_PAI.match(str(texto or ""))
+    if not m:
+        return "", None
+    return m.group(1), int(m.group(2)) if m.group(2) else None
 
 
 def data_brt(texto) -> dt.datetime:
@@ -462,6 +501,7 @@ def ficha(s: dict, asset=None, agora=None) -> dict:
             "relato": s.get("_relato") or "", "bloco": sp.so_bloco(s.get("observacao") or ""),
             "tema": tema, "tecnico": s.get("_tecnico") or "", "data_sug": s.get("_data_sug") or "",
             "data_sug_iso": _data_sugerida_iso(s.get("_data_sug")),
+            "os_pai": s.get("_os_pai") or "", "os_pai_id": s.get("_os_pai_id"),
             "subs": subs, "subs_do_bloco": bool(s.get("_subs")), "ativo_ok": bool(asset), "tipo_ativo": tipo_ativo,
             "perf_ativo": sp.exige_performance("", s.get("ativo") or "", []),
             "os_folio": s.get("os_folio"), "id_work_order": s.get("id_work_order"), "coluna": s.get("_coluna")}

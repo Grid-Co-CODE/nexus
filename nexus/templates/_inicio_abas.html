@@ -1,0 +1,7 @@
+{# as abas do Início: a visão geral, as Atualizações (13/10/2026: os últimos commits e o que mudou) e as Sugestões
+   (24/10/2026: a pessoa sugere, o administrador lê) #}
+<nav class="gc-subabas" aria-label="Início">
+  <a href="{{ url_for('casca.inicio') }}"{% if aba == 'inicio' %} aria-current="page"{% endif %}>Visão geral</a>
+  <a href="{{ url_for('casca.inicio', aba='atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
+  <a href="{{ url_for('casca.inicio', aba='sugestoes') }}"{% if aba == 'sugestoes' %} aria-current="page"{% endif %}>Sugestões</a>
+</nav>

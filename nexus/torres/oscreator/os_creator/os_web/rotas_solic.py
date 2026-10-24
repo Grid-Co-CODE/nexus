@@ -296,24 +296,27 @@ def api_criar():
     escolhidos = [por_code[c] for c in (corpo.get("ativos") or []) if c in por_code]
     if not escolhidos:
         return jsonify({"erro": sw.ERRO_SEM_ASSET}), 400
+    try:
+        # a OS pai (24/10/2026) viaja no bloco [PCM], como o tema e a data sugerida: a solicitação do Fracttal não tem
+        # campo para ela, e é a Fila que a manda no id_parent da OS
+        os_pai = sw.os_pai_escolhida(corpo.get("os_pai"))
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
     obs = sw.observacao(corpo.get("observacao") or "", corpo.get("tema") or "",
                         corpo.get("tecnico") or "", corpo.get("data_sugerida") or "",
-                        corpo.get("subtarefas") or [])
+                        corpo.get("subtarefas") or [], os_pai=os_pai)
     desc = str(corpo.get("descricao") or "").strip()
     campos = dict(id_type=corpo.get("grupo") or None, id_type_2=corpo.get("classif2") or None,
                   observation=obs, date_incident=sw.data_brt(corpo.get("data")),
                   is_urgent=bool(corpo.get("urgente")),
                   desc_type_1=corpo.get("classif1_txt") or "", desc_type=corpo.get("grupo_txt") or "",
                   desc_type_2=corpo.get("classif2_txt") or "")
-    if sw.MARCA_ATIVO in desc:
-        # "[Ativo] - Motivo" (27/09): uma chamada por ativo, cada uma com o nome DELE no título — a de lote repete a
-        # mesma descrição em todas. As frases do tipo são as do Histórico (mesma memória de 1 h).
-        frases = _memo(("frases_ativo",), 3600, lambda: ativo_curto.frases(api._read_asset_cache() or []))
-        res = []
-        for a in escolhidos:
-            res += api.create_solicitacoes_bulk([a], sw.titulo_do_ativo(desc, a, frases), corpo.get("classif1"), **campos)
-    else:
-        res = api.create_solicitacoes_bulk(escolhidos, desc, corpo.get("classif1"), **campos)
+    # uma chamada por ativo, cada uma com o nome DELE na frente do título (`titulo_do_ativo`): a de lote repetiria a
+    # mesma descrição em todas, e o lote já era uma chamada por ativo. As frases do tipo são as do Histórico (1 h).
+    frases = _memo(("frases_ativo",), 3600, lambda: ativo_curto.frases(api._read_asset_cache() or []))
+    res = []
+    for a in escolhidos:
+        res += api.create_solicitacoes_bulk([a], sw.titulo_do_ativo(desc, a, frases), corpo.get("classif1"), **campos)
     _esquecer_lista()
     return jsonify(sw.mensagem_bulk(res))
 

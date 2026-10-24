@@ -362,7 +362,10 @@ MARCADOR = "[PCM]"
 # "Data sugerida" desde 03/09 (era "Data pretendida"). O parse aceita os DOIS rotulos: as
 # solicitacoes ja criadas trazem o nome antigo, e perder a data delas seria apagar informacao
 # que alguem escreveu.
-_CAMPOS = [("Tema", "tema"), ("Técnico sugerido", "tecnico"), ("Data sugerida", "data")]
+# A "OS pai" (24/10/2026, Levi: "quando preenchido e o PCM for criar a OS na fila do PCM já vai vincular aquela OS como
+# OS pai!") vai como "16784 (id 123)": o nº para quem lê no Fracttal web, o id para a Fila mandar no id_parent sem buscar
+# de novo. O app de mesa que lê um bloco com ela ignora a linha (rótulo que ele não conhece).
+_CAMPOS = [("Tema", "tema"), ("Técnico sugerido", "tecnico"), ("Data sugerida", "data"), ("OS pai", "os_pai")]
 _ALIAS = {"data pretendida": "data"}
 
 # Rotulo legivel de cada tipo de campo da subtarefa. O PCM precisa saber se aquela linha vai
@@ -405,7 +408,7 @@ def bloco(dados: dict) -> str:
 
 
 def parse(texto) -> dict:
-    """INVERSO: lê o bloco de uma observação → {'tema','tecnico','data'}. {} quando não tem bloco.
+    """INVERSO: lê o bloco de uma observação → {'tema','tecnico','data','os_pai'}. {} quando não tem bloco.
 
     Tolera acento e caixa no rótulo — quem edita a observação no Fracttal web digita como quiser,
     e um acento perdido não pode fazer a fila do PCM esquecer o tema."""

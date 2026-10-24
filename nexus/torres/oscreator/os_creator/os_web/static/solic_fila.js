@@ -188,7 +188,10 @@
     tempoMin = TEMPO_PADRAO; tempo.value = hhmm(tempoMin);
     tipo.value = temOpcao(tipo, D.tipo_padrao) ? D.tipo_padrao : (tipo.options[0] ? tipo.options[0].value : '');
     c1.value = ''; c2.value = '';
-    pai.value = ''; paiSel = null; paiLista.hidden = true;
+    // a OS pai escolhida na Nova solicitação (24/10/2026, Levi: "quando preenchido e o PCM for criar a OS na fila do PCM
+    // já vai vincular aquela OS como OS pai!") já vem escolhida; o PCM troca ou apaga. Só com o nº (escrito à mão no
+    // Fracttal web) o campo fica com ele e o Aprovar pede a escolha na lista
+    pai.value = f.os_pai || ''; paiSel = f.os_pai_id || null; paiLista.hidden = true;
     etq = []; doTema = new Set(); tirados = new Set();
     aplicarRegra();
     sugerirClassif();
@@ -391,8 +394,9 @@
         + (data.value !== (f.data_sug_iso || '') ? ' (data trocada na decisão)' : '')
       : (f.data_sug ? ' (a data sugerida "' + f.data_sug + '" não foi entendida e o campo Data está vazio: programada para agora)'
                     : ' (sem data: programada para agora)');
+    var filha = paiSel ? ', filha da OS ' + pai.value.trim().split(/\s/)[0] : '';
     if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)' + quando + ', tempo estimado ' + hhmm(tempoMin)
-                        + '?\n\nA API do Fracttal NÃO edita OS já criada — confira as subtarefas antes.')) return;
+                        + filha + '?\n\nA API do Fracttal NÃO edita OS já criada — confira as subtarefas antes.')) return;
     ocupado(true, 'criando a OS…');
     SP.pedir('/os/api/solic/' + encodeURIComponent(f.id) + '/aprovar', {
       id_responsible: resp.value, responsavel: resp.options[resp.selectedIndex].text, titulo: t, subtarefas: subs,

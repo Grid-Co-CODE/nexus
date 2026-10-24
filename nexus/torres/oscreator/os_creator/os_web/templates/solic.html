@@ -32,8 +32,18 @@
       <label class="os-cell"><span class="os-lbl">Tipo de ativo</span>
         <select id="cb_tipo" data-busca="1" disabled><option value="">{{ todos_tipo }}</option></select></label>
     </div>
-    <label class="os-cell" style="margin-top:8px"><span class="os-lbl">Buscar ativo</span>
-      <input type="search" id="busca" placeholder="parte do nome do ativo" disabled></label>
+    {# 24/10/2026, Levi: "ao lado de buscar ativo deixe um espaço do lado direito para "OS Pai" quando preenchido e o PCM
+       for criar a OS na fila do PCM já vai vincular aquela OS como OS pai!". A lista é a mesma da Fila (/os/api/pcm/os-pai),
+       nas classes da busca comum (`.osb-*`, os dois temas já pintados) #}
+    <div class="os-hist-grid" style="margin-top:8px">
+      <label class="os-cell os-cell-2"><span class="os-lbl">Buscar ativo</span>
+        <input type="search" id="busca" placeholder="parte do nome do ativo" disabled></label>
+      <div class="os-cell"><label class="os-lbl" for="ed_pai">OS pai (opcional)</label>
+        <div class="osb"><input type="text" id="ed_pai" inputmode="numeric" placeholder="nº da OS" autocomplete="off"
+            title="Opcional: na Fila do PCM a OS já nasce ligada a esta OS pai. Digite o número e escolha na lista.">
+          <div class="osb-lista" id="pai_lista" role="listbox" hidden></div></div>
+        <div class="osb-aviso" id="pai_aviso" hidden></div></div>
+    </div>
     <div class="os-tbl-wrap" style="max-height:260px;margin-top:8px">
       <table class="os-tbl"><thead><tr><th class="c-chk"></th><th>Ativo</th><th>Tipo</th></tr></thead>
         <tbody id="tbody"><tr class="vazio"><td colspan="3">Selecione cliente e usina para ver os ativos.</td></tr></tbody></table>
@@ -50,7 +60,7 @@
       </select></label>
     <div class="os-ajuda" id="hint_tema">Escolha o tipo de ativo (ou marque um ativo) para ver os temas dele.</div>
     <label class="os-cell" style="margin-top:8px"><span class="os-lbl">Título</span>
-      <input type="text" id="ed_desc" maxlength="180" placeholder="[Ativo] - Motivo"></label>
+      <input type="text" id="ed_desc" maxlength="180" placeholder="Motivo"></label>
     <div class="os-ajuda" id="hint_titulo"></div>
     <label class="os-cell" style="margin-top:8px"><span class="os-lbl">Relato (observação)</span>
       <textarea id="ed_obs" rows="4" placeholder="o que aconteceu, com o detalhe que o PCM precisa para programar"></textarea></label>
@@ -280,23 +290,78 @@
     if (atual && !segue) cbTema.dispatchEvent(new Event("change"));      // o tema saiu: volta a base e o título
     else dicaTema();
   }
+  // o título é só o MOTIVO: o servidor põe o nome curto de cada ativo na frente (`solic_web.titulo_do_ativo`; Levi,
+  // 24/10/2026: "O certo seria só motivo pois o ativo já tem que ir no título automático!"). A prévia mostra o do 1º
+  // marcado com a mesma regra: a marca [Ativo] ainda vale, e o título que já começa pelo ativo não o repete.
   function sugerirTitulo() {
     var op = cbTema.options[cbTema.selectedIndex];
-    var novo = cbTema.value && op && op.getAttribute("data-motivo") ? "[Ativo] - " + op.getAttribute("data-motivo") : "";
+    var novo = cbTema.value && op && op.getAttribute("data-motivo") ? op.getAttribute("data-motivo") : "";
     if (!edDesc.value.trim() || edDesc.value === sugerido) { edDesc.value = novo; sugerido = novo; }
     previaTitulo();
   }
+  function tituloCom(v, curto) {
+    if (v.indexOf("[Ativo]") >= 0) return v.replace("[Ativo]", "[" + curto + "]");
+    return v.toLowerCase().indexOf(("[" + curto + "]").toLowerCase()) === 0 ? v : "[" + curto + "] - " + v;
+  }
   function previaTitulo() {
-    var v = edDesc.value || "";
-    if (v.indexOf("[Ativo]") < 0) { hintTit.textContent = ""; return; }
-    var m = marcadosLista();
+    var v = (edDesc.value || "").trim(), m = marcadosLista();
+    if (!v) { hintTit.textContent = "Escreva só o motivo: o nome do ativo entra sozinho na frente."; return; }
     hintTit.textContent = m.length
-      ? "Vai sair “" + v.replace("[Ativo]", "[" + (m[0].curto || "Ativo") + "]") + "”"
+      ? "Vai sair “" + tituloCom(v, m[0].curto || "Ativo") + "”"
         + (m.length > 1 ? " — e assim com o nome de cada um dos " + m.length + " ativos marcados." : ".")
-      : "[Ativo] vira o nome de cada ativo marcado.";
+      : "O nome de cada ativo marcado entra sozinho na frente: “" + tituloCom(v, "Ativo") + "”.";
   }
   edDesc.addEventListener("input", previaTitulo);
   filtrarTemas();
+  previaTitulo();
+
+  // ── OS pai (24/10/2026): a mesma busca da Fila do PCM — digitou → 300 ms → a lista; escolher guarda o ID (não é o
+  //    nº); digitar de novo desfaz. Vai no bloco [PCM] de cada solicitação e a Fila já abre com ela escolhida. ──
+  var edPai = document.getElementById("ed_pai"), paiLista = document.getElementById("pai_lista"),
+      paiAviso = document.getElementById("pai_aviso");
+  var pai = null, paiRelogio = null, paiSeq = 0;
+  function avisoPai(t) { paiAviso.textContent = t || ""; paiAviso.hidden = !t; }
+  edPai.addEventListener("input", function () {
+    pai = null; avisoPai(""); clearTimeout(paiRelogio); paiRelogio = setTimeout(buscarPai, 300);
+  });
+  function buscarPai() {
+    var termo = edPai.value.trim(), meu = ++paiSeq;
+    if (!termo) { paiLista.hidden = true; return; }
+    OsCarga.buscar("/os/api/pcm/os-pai?termo=" + encodeURIComponent(termo), {credentials: "same-origin"}, "Buscando a OS pai…")
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (meu !== paiSeq) return;
+        paiLista.innerHTML = (j.resultados || []).map(function (r, i) {
+          return '<div class="osb-op' + (i === 0 ? ' on' : '') + '" role="option" data-id="' + esc(r.id) + '" data-folio="'
+            + esc(r.folio) + '">' + esc(r.folio) + (r.descricao ? ' — ' + esc(r.descricao) : '')
+            + (r.responsavel ? ' · ' + esc(r.responsavel) : '') + '</div>';
+        }).join("") || '<div class="osb-vazio">Nenhuma OS com esse número.</div>';
+        paiLista.hidden = document.activeElement !== edPai;
+      })
+      .catch(function () { if (meu === paiSeq) avisoPai("Não consegui buscar a OS pai agora. Tente de novo."); });
+  }
+  function escolherPai(op) {
+    pai = {id: Number(op.dataset.id), folio: op.dataset.folio};
+    edPai.value = op.textContent; paiLista.hidden = true; avisoPai("");
+  }
+  paiLista.addEventListener("mousedown", function (e) {
+    var op = e.target.closest(".osb-op"); if (op) { e.preventDefault(); escolherPai(op); }
+  });
+  edPai.addEventListener("keydown", function (e) {
+    if (paiLista.hidden) return;
+    var ops = Array.prototype.slice.call(paiLista.querySelectorAll(".osb-op"));
+    var k = ops.findIndex(function (o) { return o.classList.contains("on"); });
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!ops.length) return;
+      if (k >= 0) ops[k].classList.remove("on");
+      k = e.key === "ArrowDown" ? Math.min(ops.length - 1, k + 1) : Math.max(0, k - 1);
+      ops[k].classList.add("on"); ops[k].scrollIntoView({block: "nearest"});
+    } else if (e.key === "Enter") {
+      e.preventDefault(); if (ops[k]) escolherPai(ops[k]);
+    } else if (e.key === "Escape") { paiLista.hidden = true; }
+  });
+  edPai.addEventListener("blur", function () { setTimeout(function () { paiLista.hidden = true; }, 150); });
 
   // ── criar ──
   var btn = document.getElementById("b_criar"), hint = document.getElementById("hint"),
@@ -316,9 +381,14 @@
       data_sugerida: document.getElementById("dt_sug").value.replace("T", " "),
       tecnico: document.getElementById("cb_tec").value,
       tema: cbTema.value, urgente: document.getElementById("ck_urg").checked,
-      subtarefas: subs.filter(function (s) { return String(s.desc || "").trim(); })
+      subtarefas: subs.filter(function (s) { return String(s.desc || "").trim(); }),
+      os_pai: pai
     };
     if (!corpo.ativos.length) { hint.textContent = "Marque ao menos um ativo."; return; }
+    if (edPai.value.trim() && !pai) {
+      avisoPai("Escolha a OS pai na lista que aparece ao digitar o número — ou apague o campo.");
+      hint.textContent = "Falta escolher a OS pai na lista."; edPai.focus(); return;
+    }
     if (marcados.size > 1 && !confirm("Vão ser criadas " + marcados.size + " solicitações, uma por ativo, com os mesmos campos. Confirma?")) return;
     btn.disabled = true; hint.textContent = "criando…"; res.hidden = true;
     OsCarga.buscar("/os/api/solic/criar", {method: "POST", credentials: "same-origin",
@@ -329,7 +399,7 @@
         res.hidden = false;
         res.className = "os-resultado" + (x.ok && !x.j.falhas ? "" : " ruim");
         res.textContent = x.j.erro || x.j.mensagem || "Sem resposta do servidor.";
-        if (x.ok && x.j.ok) { marcados.clear(); pintar(); document.getElementById("ed_desc").value = ""; document.getElementById("ed_obs").value = ""; filtrarTemas(); sugerirTitulo(); }
+        if (x.ok && x.j.ok) { marcados.clear(); pintar(); document.getElementById("ed_desc").value = ""; document.getElementById("ed_obs").value = ""; edPai.value = ""; pai = null; filtrarTemas(); sugerirTitulo(); }
       })
       .catch(function (e) { btn.disabled = false; hint.textContent = ""; res.hidden = false; res.className = "os-resultado ruim"; res.textContent = "Falhou: " + e; });
   });
