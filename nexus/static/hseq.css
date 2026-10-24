@@ -88,7 +88,6 @@
 
 /* Quantidade de extintores com as palavras à esquerda (Levi, 24/10: "não centralizada") */
 .ext-clientes th:nth-child(6),.ext-clientes td:nth-child(6){text-align:left}
-.ext-tab .hs-qtd-seg{color:var(--info)}
 
 /* os três pontos no lugar da coluna Relatório (Levi, 24/10: "três pontos ao passar o mouse na linha"); no celular,
    sem mouse, ficam sempre à vista */
@@ -109,6 +108,9 @@
 
 /* o não reconhecido na usina, com as ações da Segurança */
 .ext-tab tr.cn-detalhe .ext-sub tr.hs-nr td{background:var(--alerta-suave)}
+/* o status da TST da usina aberta não se espreme: a conferência do não reconhecido (dia, há quanto e quem, lado a lado)
+   tomava a largura e o motivo quebrava palavra a palavra (prova de 24/10/2026, Ibaté 1) */
+.ext-tab tr.cn-detalhe .ext-sub td.ext-status{min-width:170px}
 .hs-decide{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
 .hs-decide .gc-btn{padding:4px 10px;font-size:12px}
 .hs-feito{margin:12px 0 0;padding:10px 14px;border:1px solid var(--verde-texto);border-radius:var(--raio-md);background:var(--verde-suave);
@@ -159,3 +161,41 @@
 .hs-usina{padding:2px 8px;border:1px solid var(--linha);border-radius:var(--raio-tag);font-size:11.5px;color:var(--tinta-2)}
 .hs-usina--sem_luvas{border-color:var(--critico);color:var(--critico)}
 .hs-usina--sem_verificacao{border-color:var(--info);color:var(--info)}
+
+/* ── 24/10/2026, 2ª rodada ──────────────────────────────────────────────────────────────────────────────────────
+   As colunas Responsável e Técnicos só com um cliente aberto (Levi: "não precisa das colunas responsável e técnico na
+   primeira visão, só ao clicar na linha deve aparecer essas colunas") */
+.ext-clientes.hs-sem-pessoas .hs-col-pessoa{display:none}
+/* a quantidade é só o total; o Status (no lugar do "Status da TST") é uma linha por situação, com a cor dela, e a
+   barrinha das proporções em cima ("A ideia é ficar algo bem mais visual") */
+.ext-tab .hs-qtd{font-size:15px;font-variant-numeric:tabular-nums}
+.hs-status{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:120px;text-align:left}
+.hs-status .cn-st{white-space:nowrap}
+.hs-barra{display:flex;width:100%;height:6px;margin-bottom:2px;border-radius:999px;overflow:hidden;background:var(--superficie-3)}
+.hs-barra .pend{background:var(--critico-cheio)}
+.hs-barra .alerta{background:var(--alerta-cheio)}
+.hs-barra .neutro{background:var(--linha-forte)}
+.hs-barra .ok{background:var(--ok-cheio)}
+.hs-barra .nr{background:var(--alerta)}
+.ext-clientes th:nth-child(8),.ext-clientes td:nth-child(8){text-align:left}
+/* a nova ronda pedida, na linha da usina */
+.hs-ronda{display:block;margin:2px 0 0 13px;font-size:11.5px;color:var(--info);white-space:normal}
+.hs-menu-nota{display:block;padding:8px 10px;font-size:12px;color:var(--mudo)}
+.hs-menu-nota[hidden]{display:none}
+/* o botão direito na linha do extintor: o menu onde o clique foi */
+.hs-ctx{position:fixed;right:auto;top:0;left:0;min-width:180px}
+.ext-tab tr.hs-ext{cursor:context-menu}
+/* o histórico de excluídos */
+.hs-excluidos td{white-space:normal}
+
+/* a Mesa por grupos: um cartão por responsável ou por cliente, com as quatro contas */
+.hs-mesa-grupos .cn-equipe{cursor:default}
+.hs-total{margin-left:auto;padding:1px 9px;border-radius:999px;background:var(--superficie-2);font:700 13px/20px var(--font-sans);
+  color:var(--tinta)}
+.hs-contas{display:grid;gap:2px}
+.hs-conta{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:baseline;gap:8px;padding:5px 8px;margin:0 -8px;
+  border-radius:var(--raio-controle);color:var(--tinta-2);text-decoration:none}
+.hs-conta:hover,.hs-conta:focus-visible{background:var(--superficie-2);outline:none}
+.hs-conta b{font:700 18px/1 var(--font-sans);text-align:right;font-variant-numeric:tabular-nums;color:var(--mudo)}
+.hs-conta span{font-size:13px}
+.hs-conta--zero{opacity:.55}

@@ -14,15 +14,18 @@ parecida com o aviso de extintores não reconhecidos"). Até ali era o parágraf
 
 ## Mesa da Segurança (24/10/2026)
 
-Levi: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos, usinas sem luvas". A primeira tela da
-torre, do setor Segurança (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos), no desenho da Mesa do
-engenheiro (a faixa `kb-kpis` e os painéis `eg-painel` do `engenharia.css`). Rota `/t/hseq/mesa` (`mesa()`), template
-`mesa.html`. Quatro números e um painel para cada, até 8 itens, o mais urgente primeiro, cada item levando à tela de
-origem já filtrada: **PTs paradas** (esperando o De acordo há mais de 2 h, a régua do Campo; a mais antiga primeiro; o
-item abre o detalhe da PT), **Extintores vencidos** (por usina, a com mais vencidos primeiro; leva a Extintores na usina
-com o filtro Atrasados), **Não reconhecidos** (os que esperam a Segurança, já com as decisões; leva à usina) e **Usinas
-sem luvas** (a mais antiga primeiro; leva ao EPI). Só lê; a fonte que falha diz no painel dela e o número vira "—", sem
-derrubar os outros. Não lê o Fracttal. Prova: `tests/test_hseq_mesa.py`.
+Levi: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos, usinas sem luvas"; e, no mesmo dia, "quero
+duas visões: Por responsável e cliente (...) não queria em formato de lista mas em agrupamentos para o TST saber onde
+atacar!". A primeira tela da torre, do setor Segurança (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos).
+Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`. Em cima, a faixa `kb-kpis` com os quatro números da Segurança
+inteira: **PTs paradas** (esperando o De acordo há mais de 2 h, a régua do Campo), **Extintores vencidos** (e em quantas
+usinas), **Não reconhecidos** (já sem os excluídos) e **Usinas sem luvas**. Embaixo, **Agrupar por Responsável UFV** (o
+padrão) ou **Cliente** (`?ver=cliente`): um cartão por grupo (o desenho dos cartões de responsável, em bevel), com o
+total do que pede ação e os quatro números dele; o que tem mais primeiro, o "Sem responsável O&M / Sem cliente" por
+último. Nenhum caso aparece um por um. Cada número leva à tela de origem já filtrada pelo grupo: Extintores com o Status
+Atrasados ou Não reconhecidos, EPI na tabela com "Sem luvas"; a PT ainda não tem o filtro de responsável nem de
+cliente, e o número leva a APR e PT inteira. Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as
+outras. Não lê o Fracttal. Prova: `tests/test_hseq_mesa.py`.
 
 ## Extintores
 
@@ -68,18 +71,26 @@ cima para baixo: a faixa de números (cada um filtra a tabela), a caixa dos não
 deles, a Tabela (o padrão) ou os cartões **Por responsável**.
 - **Filtros** (Levi, 18/10: "Quero os filtros que estão antes de extintores não reconhecidos, acima da tabela"; "De
   filtros quero apenas cliente, usina, responsável UFV, equipe e o campo para digitar!"; `FILTROS_EXT` na torre):
-  Cliente, Usina, Responsável UFV, Equipe e a busca, **em cascata** como a tela Técnicos por usina do PCM (cada lista
-  traz o que existe com os outros filtros; a escolhida fica mesmo sem resultado), com o "Sem cliente / Sem responsável
-  O&M / Sem equipe" no fim (`extintores.valor_do_filtro`). O Responsável UFV é o Responsável O&M da ficha da usina (o
-  setor "Responsáveis UFV"). Saíram a região do Brasil, a região de campo e o gestor, e com eles o filtro que vinha do
-  login (o Supervisor de Campo abria na região dele): **ninguém abre filtrado**. Valem na faixa, na caixa, na tabela,
-  nos cartões e no "Baixar". O cliente vale também no EPI, que segue com os filtros do Campo.
+  Cliente, Usina, Responsável UFV, Equipe, a busca e, desde 24/10/2026, o **Status** (`f`, o mesmo da faixa:
+  Atrasados, Perto de vencer, Sem validade, Em dia, Sem atualização e Não reconhecidos; Levi: "Adicione também um
+  filtro de status (...) Insira não reconhecidos no status também!"). Com "Não reconhecidos", a tabela fica só com as
+  usinas que têm não reconhecido e, nelas, só eles (`_lista` na torre: o não reconhecido não tem situação). Os cinco
+  primeiros: **em cascata** como a tela Técnicos por usina do PCM (cada lista traz o que existe com os outros filtros;
+  a escolhida fica mesmo sem resultado), com o "Sem cliente / Sem responsável O&M / Sem equipe" no fim
+  (`extintores.valor_do_filtro`). O Responsável UFV é o Responsável O&M da ficha da usina (o setor "Responsáveis
+  UFV"). Saíram a região do Brasil, a região de campo e o gestor, e com eles o filtro que vinha do login (o Supervisor
+  de Campo abria na região dele): **ninguém abre filtrado**. Valem na faixa, na caixa, na tabela, nos cartões e no
+  "Baixar". O cliente vale também no EPI, que segue com os filtros do Campo.
 - **Agrupar por Cliente** (o padrão; Levi, 18/10: "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse
   cliente. É importante ter a coluna do responsável desse usina e o ou os técnicos da usina!"; `extintores.por_cliente`)
   e **por Extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
   primeiro). Colunas: Situação, Última conferência, Cliente e usina, Responsável, Técnicos, Quantidade de extintores
-  (e quantos em cada situação), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a próxima), Status da
-  TST (o mais grave, e quantos em cada) e PDF. A linha do cliente abre as usinas dele **na mesma tabela** (UMA linha por
+  (só o total), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a próxima), **Status** e os três pontos.
+  O Status (24/10/2026, no lugar do "Status da TST": "vai quebrar o texto a cada assuntos (...) A ideia é ficar algo bem
+  mais visual") é uma barra com a proporção de cada situação e, embaixo, uma linha por situação com a cor dela ("116
+  atrasados", "40 perto de vencer", "77 sem validade", "335 em dia", "13 não reconhecidos"). **Responsável e Técnicos só
+  aparecem com um cliente aberto** (Levi: "não precisa das colunas responsável e técnico na primeira visão, só ao clicar
+  na linha"): a tabela leva `hs-sem-pessoas` enquanto nenhum cliente está aberto, e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela** (UMA linha por
   usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os extintores numa
   tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais próxima; "Sem
   cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
@@ -115,8 +126,7 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
   coluna, sem nome ("tira esse nome ações de uma coluna que não existe"), tem o botão que aparece ao passar o mouse (no
   celular, sempre). O menu é UM só, no fim da tabela: o clique o leva para a linha e põe nele os endereços dela
   (`data-args`, os filtros da linha; `nexusRota`); com um menu por linha a página passava dos 200 KB do orçamento. Na
-  usina, para a Segurança, o menu tem também **Editar quantidade de extintores** (`data-editar`), ver abaixo. A
-  Quantidade de extintores vai com as palavras à esquerda (Levi, 24/10: "não centralizada").
+  usina, para a Segurança, o menu tem também **Pedir nova ronda** (`data-ronda`), ver abaixo.
 - **O relatório é só unitário, de cada cliente e de cada usina, em PDF e em Excel** (nos três pontos). Levi, 18/10: "O
   relatório quero a opção de ser unitário (...), pode tirar esse RELATÓRIO EM PDF que tira em massa!" (o formulário do
   PDF de todos saiu da tela); a TST, 19/10: "tem como eu baixar um relatório dos extintores por cliente?" e "e excel
@@ -219,32 +229,38 @@ faz:
 Prova: `tests/test_hseq_extintores.py` (os testes do não reconhecido).
 
 **A Segurança decide na usina** (24/10/2026; `nexus/hseq/decisoes.py`, o livro `nexus_hseq_extintores`, registrado no
-catálogo antes da 1ª gravação). Levi: a pessoa da Segurança "pode aceitar e aí o extintor vai sumir ou solicitar que o
-técnico faça uma nova ronda, se ele solicitar vai aparecer no app de campo 'ronda pendente' 'O TST solicitou uma nova
-ronda'"; e "tem que ser feito na tabela geral de extintores e não só na tabela de contestações, a tabela de
-contestações tem que servir para apontar para a usina, ao ir para a usina a TST resolve".
+catálogo antes da 1ª gravação). Levi: a pessoa da Segurança pode aceitar o não reconhecido "e aí o extintor vai sumir ou
+solicitar que o técnico faça uma nova ronda"; "ao ir para a usina a TST resolve"; e, na 2ª rodada, "pedir uma nova
+ronda é uma nova ronda do zero então será por usina, por extintor é só o botão de aceitar, quando a TST aceita o
+extintor é excluído e vai para um histórico de extintores excluídos com o motivo 'Não reconhecido em campo'".
 - **Onde:** na usina, na tabela geral. Os não reconhecidos dela vêm em cima dos outros extintores (fundo âmbar, situação
-  "Não reconhecido"), fora das contas; a linha da usina diz "N não reconhecidos" ao lado da quantidade, e a usina em que
-  a equipe não achou nenhum extintor também aparece (situação "Não reconhecido", antes das outras). A caixa âmbar do
-  alto só aponta para a usina.
-- **Aceitar** (pergunta antes) = dar baixa: o extintor sai das telas do Nexus (a caixa, a usina, a faixa, a Mesa, o
-  PDF). **Pedir nova ronda** = a linha segue, com "nova ronda pedida em dd/mm", e o botão some. A decisão responde à
-  marca daquele dia: marca nova do App pede decisão nova; conferência depois da marca a desfaz (o App limpa) e o extintor
-  volta às contas, porque existe.
-- **Editar quantidade de extintores** (Levi: "Opção da pessoa do setor de segurança editar a quantidade de
-  extintores"): a caixa pede quantos existem na usina e o motivo (só cifrado). NÃO mexe no cadastro, que é do App: a linha
-  da usina mostra "Segurança: N em dd/mm" ao lado da conta do cadastro, e a diferença é o que a TST e o App acertam.
+  "Não reconhecido"), fora das contas; a linha da usina diz "N não reconhecidos", e a usina em que a equipe não achou
+  nenhum extintor também aparece. A caixa âmbar do alto só aponta para a usina.
+- **Excluir** (`fato_exclusao_extintor`), por extintor, de dois jeitos: o **Aceitar** do não reconhecido (pergunta
+  antes; motivo "Não reconhecido em campo", responde à marca daquele dia) e o **botão direito** na linha de qualquer
+  extintor (Levi: "o técnico pode ir na linha do extintor, clicar com o botão direito e poder excluir o extintor"; a
+  caixa pede o motivo, Retirado da usina, Duplicado no cadastro ou Outro, este com a observação, que vai só cifrada).
+  O excluído sai das contas, da faixa, da tabela, da Mesa, do PDF e do Excel (`decisoes.separar`) e vai para
+  **Excluídos** (`modo=excluidos`, o mais novo primeiro, com o motivo e quem). **Volta** se a equipe o conferir numa
+  ronda de um dia depois da exclusão (existe), e o histórico diz "voltou: conferido em dd/mm".
+- **Pedir nova ronda** (`fato_pedido_ronda`), da usina inteira, do zero, nos três pontos da linha da usina. A linha
+  mostra "nova ronda pedida em dd/mm" até uma conferência de um dia depois do pedido (`decisoes.rondas_pendentes`); o
+  item do menu diz que já foi pedida. Grava também o nome da usina que o App usa (`usina_app`).
+- Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
+  exclusão por extintor).
 - **Quem:** o administrador e quem é do setor Segurança (`decisoes.pode_decidir`), sempre com um login de pessoa (a
-  senha de administrador vê os botões e é recusada: o histórico guarda quem fez). Os outros veem a situação sem botões.
-  Gravar: POST com a trava `_de_outro_site`, 303 de volta à usina com o aviso (`?ok=`/`?erro=`, que não seguem nos links).
-- **O App ainda não lê o livro.** Até ler, o "Pedir nova ronda" não chega ao campo e a baixa não sai do cadastro do App
-  (o Nexus já esconde o aceito). O contrato: as linhas do `fato_decisao_extintor` (código, ação, `marca_dia`) e do
-  `fato_quantidade_extintores`, cada uma assinada com HMAC (rótulo `nexus:hseq:extintores`, a chave derivada da
-  NEXUS_PESSOA_HMAC, como as atribuições do PCM): o App aplica só a linha assinada.
-Prova: `tests/test_hseq_decisoes.py` (a regra da marca, quem pode, a assinatura, pedir e aceitar na usina, a senha de
-administrador, a quantidade com o motivo cifrado, os três pontos, o catálogo).
+  senha de administrador vê os botões e é recusada: o histórico guarda quem fez). Os outros veem a situação sem botões
+  nem botão direito. Gravar: POST com a trava `_de_outro_site`, 303 de volta à usina com o aviso (`?ok=`/`?erro=`, que
+  não seguem nos links).
+- **O App ainda não lê o livro.** Até ler, a nova ronda não chega ao campo e o excluído segue no cadastro do App (o
+  Nexus já o tira das telas). O contrato: as linhas do `fato_exclusao_extintor` (código, motivo, `marca_dia`) e do
+  `fato_pedido_ronda` (`usina_id`, `usina_app`), cada uma assinada com HMAC (rótulo `nexus:hseq:extintores`, a chave
+  derivada da NEXUS_PESSOA_HMAC, como as atribuições do PCM; os textos assinados em `decisoes.assinatura`): o App
+  aplica só a linha assinada.
+Prova: `tests/test_hseq_decisoes.py` (as regras da volta e da ronda pendente, quem pode, a assinatura, o Aceitar e o
+histórico, o botão direito com o motivo, a ronda da usina, a senha de administrador, o filtro de Status, o catálogo).
 
-**Pendências.** O App ler o `nexus_hseq_extintores` (a ronda pendente "O TST solicitou uma nova ronda" e a baixa no
+**Pendências.** O App ler o `nexus_hseq_extintores` (a ronda pendente "O TST solicitou uma nova ronda" e a exclusão no
 cadastro dele). A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (confirmação dos
 extintores novos) são do App; entram aqui quando houver o livro e o pedido.
 

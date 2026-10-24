@@ -1,22 +1,24 @@
 """As decisões da Segurança sobre os extintores (24/10/2026): o Nexus é a FONTE.
 
-Levi, 24/10/2026: "Opção da pessoa do setor de segurança editar a quantidade de extintores, quando alguém não reconhece o
-extintor aparece como situação 'não reconhecida' a pessoa da Segurança pode aceitar e aí o extintor vai sumir ou
-solicitar que o técnico faça uma nova ronda, se ele solicitar vai aparecer no app de campo 'ronda pendente' 'O TST
-solicitou uma nova ronda'". E, sobre onde: "tem que ser feito na tabela geral de extintores e não só na tabela de
-contestações, a tabela de contestações tem que servir para apontar para a usina, ao ir para a usina a TST resolve".
+Levi, 24/10/2026, em duas rodadas. A 1ª: a pessoa da Segurança, diante do extintor que a equipe não reconheceu, "pode
+aceitar e aí o extintor vai sumir ou solicitar que o técnico faça uma nova ronda, se ele solicitar vai aparecer no app de
+campo 'ronda pendente' 'O TST solicitou uma nova ronda'". A 2ª, que corrigiu a 1ª: "pedir uma nova ronda é uma nova ronda
+do zero então será por usina, por extintor é só o botão de aceitar, quando a TST aceita o extintor é excluído e vai para
+um histórico de extintores excluídos com o motivo 'Não reconhecido em campo'"; e, no lugar de editar a quantidade de
+extintores da usina, "como cada extintor tem um cadastro unitário então o certo seria (...) clicar com o botão direito e
+poder excluir o extintor".
 
 O dado (livro `nexus_hseq_extintores`, registrado em `nexus/dados/catalogo.py` antes da 1ª gravação; regras em
-`nexus/dados/CLAUDE.md`), só acrescenta, e vale a última decisão:
-- `fato_decisao_extintor`: 1 linha = 1 decisão da Segurança sobre 1 extintor NÃO RECONHECIDO, respondendo a UMA marca
-  do App (`marca_dia`, o "Não reconhecido em"). `aceitar` = dar baixa (o extintor sai das telas do Nexus); `nova_ronda` =
-  pedir à equipe uma nova ronda (o App lê e mostra a ronda pendente). Marca nova do App (outro dia) pede decisão nova;
-  conferência depois da marca a desfaz no App, e o extintor volta às contas (existe).
-- `fato_quantidade_extintores`: 1 linha = 1 decisão da Segurança sobre QUANTOS extintores existem em 1 usina, ao lado de
-  quantos o cadastro tinha naquela hora. Não apaga nada do cadastro (que é do App): a tela mostra as duas contas, e a
-  diferença é o que a TST e o App acertam. O motivo vai só cifrado (o Cofre, regra 8).
-Em claro: os IDs, o código do extintor, a ação, os dias e os códigos HMAC. Cada linha vai assinada (`assinatura`, HMAC
-com a chave derivada da NEXUS_PESSOA_HMAC): o App lê o livro pela leitura aberta da API e só aplica a linha assinada.
+`nexus/dados/CLAUDE.md`), só acrescenta:
+- `fato_exclusao_extintor`: 1 linha = 1 exclusão (a baixa) de 1 extintor pela Segurança, com o motivo (`MOTIVOS`): o não
+  reconhecido aceito leva "nao_reconhecido" e o dia da marca do App que aceitou (`marca_dia`); a exclusão pelo botão
+  direito, "retirado", "duplicado" ou "outro". O excluído some das telas e das contas do Nexus e vai para o histórico
+  de excluídos; volta sozinho se uma conferência de DEPOIS do dia da exclusão aparecer (o extintor existe).
+- `fato_pedido_ronda`: 1 linha = 1 pedido da Segurança de uma NOVA RONDA de extintores, do zero, em 1 usina, com o nome
+  que o App usa para a usina (`usina_app`). Fica pendente até uma conferência na usina num dia DEPOIS do pedido.
+Em claro: os IDs, o código do extintor, o motivo (domínio), os dias e os códigos HMAC. Quem decidiu (o nome) e a
+observação vão só cifrados (o Cofre, regra 8). Cada linha vai assinada (`assinatura`, HMAC com a chave derivada da
+NEXUS_PESSOA_HMAC): o App lê o livro pela leitura aberta da API e só aplica a linha assinada.
 
 Quem decide: o administrador e quem é do setor Segurança (Base → Acessos), sempre com um login de pessoa (a senha de
 administrador não diz quem é: o histórico guarda quem fez). Gravar troca o livro inteiro, relido do banco antes (leitura
@@ -28,21 +30,23 @@ import json
 import threading
 import time
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from ..dados import fatos as D
 from ..dados import livros
 
 LIVRO, NOME_LIVRO = "nexus_hseq_extintores", "Nexus · decisões da Segurança sobre os extintores"
-ABA_EXT, ABA_QTD = "fato_decisao_extintor", "fato_quantidade_extintores"
-CAB_EXT = ("decidida_em", "data_id", "usina_id", "codigo", "acao", "marca_dia", "decidida_por_hmac", "assinatura")
-CAB_QTD = ("decidida_em", "data_id", "usina_id", "quantidade_qtd", "no_cadastro_qtd", "decidida_por_hmac",
-           "dados_cifrados", "assinatura")
-ACOES = {"aceitar": "Aceito (baixa)", "nova_ronda": "Nova ronda pedida"}
+ABA_EXC, ABA_RONDA = "fato_exclusao_extintor", "fato_pedido_ronda"
+CAB_EXC = ("decidida_em", "data_id", "usina_id", "codigo", "motivo", "marca_dia", "decidida_por_hmac", "dados_cifrados",
+           "assinatura")
+CAB_RONDA = ("decidida_em", "data_id", "usina_id", "usina_app", "decidida_por_hmac", "dados_cifrados", "assinatura")
+# o motivo da exclusão (domínio fechado: valor fora não grava). O não reconhecido aceito é o único que vem do Aceitar
+MOTIVOS = {"nao_reconhecido": "Não reconhecido em campo", "retirado": "Retirado da usina",
+           "duplicado": "Duplicado no cadastro", "outro": "Outro motivo"}
+MOTIVOS_DO_BOTAO_DIREITO = ("retirado", "duplicado", "outro")
 SETOR = "seguranca"                          # o nome do setor sem acento nem caixa (Base → Acessos)
-MOTIVO_MAX = 300
-QTD_MAX = 500
+OBS_MAX = 300
 TTL_S = 60
 ROTULO_CHAVE = b"nexus:hseq:extintores"     # a chave da assinatura (a MESMA conta no App, quando ele ler este livro)
 _BRT = timezone(timedelta(hours=-3))
@@ -64,7 +68,7 @@ def _norm(s) -> str:
 
 
 def pode_decidir(setor: dict | None, admin: bool) -> bool:
-    """Aceitar, pedir nova ronda e editar a quantidade: o administrador e quem é do setor Segurança."""
+    """Excluir extintor, aceitar o não reconhecido e pedir nova ronda: o administrador e quem é do setor Segurança."""
     return bool(admin) or _norm((setor or {}).get("nome")) == SETOR
 
 
@@ -72,6 +76,13 @@ def _int(v) -> int | None:
     try:
         return int(float(v)) if D._txt(v) else None
     except (TypeError, ValueError):
+        return None
+
+
+def _dia(iso) -> date | None:
+    try:
+        return date.fromisoformat(D._txt(iso)[:10])
+    except ValueError:
         return None
 
 
@@ -90,18 +101,18 @@ def _ler_cru(cfg) -> dict:
             d = json.loads(loc.read_text(encoding="utf-8"))
         except FileNotFoundError:
             d = {}
-        return {a: [dict(x) for x in d.get(a) or []] for a in (ABA_EXT, ABA_QTD)}
+        return {a: [dict(x) for x in d.get(a) or []] for a in (ABA_EXC, ABA_RONDA)}
     if cfg.get("TESTING"):
-        return {ABA_EXT: [], ABA_QTD: []}
+        return {ABA_EXC: [], ABA_RONDA: []}
     from ..pcm.motivos import _banco
     base, sessao = _banco(cfg)
     a = livros.abas(base, sessao, LIVRO)
-    return {aba: (list(livros._linhas(base, sessao, a[aba])) if aba in a else []) for aba in (ABA_EXT, ABA_QTD)}
+    return {aba: (list(livros._linhas(base, sessao, a[aba])) if aba in a else []) for aba in (ABA_EXC, ABA_RONDA)}
 
 
 def ler(cfg, forcar: bool = False) -> dict:
-    """{"extintor", "quantidade", "erro", "lido_em"}: o livro, guardado por 1 minuto. Leitura que falha devolve a
-    última boa (`velha`) com o erro; sem nenhuma, nada, com o erro (a tela não deixa gravar sem saber o que há)."""
+    """{"exclusoes", "rondas", "erro", "lido_em"}: o livro, guardado por 1 minuto. Leitura que falha devolve a última
+    boa (`velha`) com o erro; sem nenhuma, nada, com o erro (a tela diz e não grava sem saber o que há)."""
     chave = str(_arquivo_local(cfg) or "banco")
     g = _CACHE.get(chave)
     if g and not forcar and time.time() - g["lido_em"] < TTL_S:
@@ -112,8 +123,8 @@ def ler(cfg, forcar: bool = False) -> dict:
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         if g:
             return dict(g, erro=erro, velha=True)
-        return {"extintor": [], "quantidade": [], "erro": erro, "lido_em": None}
-    g = {"extintor": cru[ABA_EXT], "quantidade": cru[ABA_QTD], "erro": "", "lido_em": time.time()}
+        return {"exclusoes": [], "rondas": [], "erro": erro, "lido_em": None}
+    g = {"exclusoes": cru[ABA_EXC], "rondas": cru[ABA_RONDA], "erro": "", "lido_em": time.time()}
     _CACHE[chave] = g
     return g
 
@@ -127,55 +138,87 @@ def _ordem(linhas):
     return [x for _i, x in sorted(enumerate(linhas), key=lambda t: (D._txt(t[1].get("decidida_em")), t[0]))]
 
 
-def por_extintor(est: dict) -> dict:
-    """{(código, marca_dia): a última decisão}: a decisão vale para a marca do App a que respondeu."""
+def exclusoes_por_codigo(est: dict) -> dict:
+    """{código: a última exclusão}."""
     out = {}
-    for x in _ordem(est.get("extintor") or []):
-        out[(D._txt(x.get("codigo")), D._txt(x.get("marca_dia")))] = x
+    for x in _ordem(est.get("exclusoes") or []):
+        out[D._txt(x.get("codigo"))] = x
     return out
 
 
-def por_usina(est: dict) -> dict:
-    """{usina_id: a última decisão de quantidade}."""
-    out = {}
-    for x in _ordem(est.get("quantidade") or []):
+def excluido(x: dict, exc: dict | None) -> bool:
+    """O extintor está excluído: há exclusão e nenhuma conferência num dia DEPOIS dela (a conferência depois prova que
+    ele existe, e ele volta sozinho). No mesmo dia vale a exclusão."""
+    if not exc:
+        return False
+    dia = _dia(exc.get("decidida_em"))
+    conf = x.get("conferencia")
+    return not (dia and conf and conf > dia)
+
+
+def separar(extintores: list, nao_reconhecidos: list, est: dict) -> tuple[list, list, list]:
+    """(extintores, não reconhecidos, excluídos): tira das duas listas da tela os que a Segurança excluiu e ainda valem
+    (`excluido`); os excluídos vêm com a exclusão (`exclusao`) para o histórico."""
+    exc = exclusoes_por_codigo(est)
+    fora, ext, nr = [], [], []
+    for lista, destino in ((extintores, ext), (nao_reconhecidos, nr)):
+        for x in lista:
+            e = exc.get(x["codigo"])
+            if excluido(x, e):
+                fora.append(dict(x, exclusao=e))
+            else:
+                destino.append(x)
+    return ext, nr, fora
+
+
+def rondas_pendentes(est: dict, ultima_conferencia: dict) -> dict:
+    """{usina_id: o último pedido de nova ronda ainda pendente}: pendente até uma conferência na usina num dia DEPOIS do
+    pedido (`ultima_conferencia` = {usina_id: o dia da conferência mais recente})."""
+    ult = {}
+    for x in _ordem(est.get("rondas") or []):
         uid = _int(x.get("usina_id"))
         if uid:
+            ult[uid] = x
+    out = {}
+    for uid, x in ult.items():
+        dia, conf = _dia(x.get("decidida_em")), ultima_conferencia.get(uid)
+        if not (dia and conf and conf > dia):
             out[uid] = x
     return out
 
 
-def aplicar(nao_reconhecidos: list, est: dict) -> tuple[list, list]:
-    """(os que seguem esperando a Segurança, os aceitos). O aceito sai da tela (a baixa); o de nova ronda segue, com o
-    dia do pedido em `nova_ronda_em` (o App ainda não conferiu de novo). A decisão vale para a marca daquele dia: marca
-    nova do App pede decisão nova."""
-    dec = por_extintor(est)
-    seguem, aceitos = [], []
-    for x in nao_reconhecidos:
-        d = dec.get((x["codigo"], x["nao_reconhecido"].isoformat()))
-        acao = D._txt(d.get("acao")) if d else ""
-        if acao == "aceitar":
-            aceitos.append(x)
-            continue
-        y = dict(x)
-        y["nova_ronda_em"] = D._txt(d.get("decidida_em"))[:10] if acao == "nova_ronda" else ""
-        seguem.append(y)
-    return seguem, aceitos
+def historico(cfg, est: dict, extintores_por_codigo: dict) -> list[dict]:
+    """O histórico de excluídos, a exclusão mais nova primeiro: {quando, codigo, usina_id, motivo, motivo_txt, marca_dia,
+    quem, obs, ext (a linha do extintor no livro do App, se ainda estiver lá), voltou (o dia da conferência que o trouxe
+    de volta)}. Quem e a observação saem decifrados; sem a chave do cadastro, vazios."""
+    cofre = _cofre(cfg)
+    out = []
+    for x in reversed(_ordem(est.get("exclusoes") or [])):
+        cod, quando = D._txt(x.get("codigo")), D._txt(x.get("decidida_em"))
+        dados = _decifrar(cofre, x, _ctx("exclusao", cod, quando))
+        e = extintores_por_codigo.get(cod)
+        dia = _dia(quando)
+        voltou = e["conferencia"] if e and e.get("conferencia") and dia and e["conferencia"] > dia else None
+        out.append({"quando": quando, "codigo": cod, "usina_id": _int(x.get("usina_id")), "motivo": D._txt(x.get("motivo")),
+                    "motivo_txt": MOTIVOS.get(D._txt(x.get("motivo")), D._txt(x.get("motivo"))),
+                    "marca_dia": D._txt(x.get("marca_dia")), "quem": dados.get("quem", ""), "obs": dados.get("obs", ""),
+                    "ext": e, "voltou": voltou})
+    return out
 
 
 # ── gravar ────────────────────────────────────────────────────────────────────────────────────────────────────
 def assinatura(linha: dict, aba: str, chave_base: str) -> str:
     """HMAC-SHA256 em hex minúsculo com a chave derivada da NEXUS_PESSOA_HMAC (`ROTULO_CHAVE`): do texto
-    "extintor|código|ação|marca_dia|decidida_em" ou "quantidade|usina_id|quantidade_qtd|decidida_em". Sem chave: ""
-    (o App não aplica a linha)."""
+    "exclusao|código|motivo|marca_dia|decidida_em" ou "ronda|usina_id|usina_app|decidida_em". Sem chave: "" (o App não
+    aplica a linha)."""
     base = (chave_base or "").strip()
     if not base:
         return ""
     chave = hmac.new(base.encode("utf-8"), ROTULO_CHAVE, hashlib.sha256).digest()
-    if aba == ABA_EXT:
-        partes = ("extintor", linha.get("codigo"), linha.get("acao"), linha.get("marca_dia"), linha.get("decidida_em"))
+    if aba == ABA_EXC:
+        partes = ("exclusao", linha.get("codigo"), linha.get("motivo"), linha.get("marca_dia"), linha.get("decidida_em"))
     else:
-        partes = ("quantidade", linha.get("usina_id"), linha.get("quantidade_qtd"), linha.get("decidida_em"))
+        partes = ("ronda", linha.get("usina_id"), linha.get("usina_app"), linha.get("decidida_em"))
     return hmac.new(chave, "|".join(D._txt(p) for p in partes).encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -187,27 +230,25 @@ def _cofre(cfg):
     return Cofre(chave)
 
 
-def _ctx(usina_id, quando: str) -> str:
-    return f"hseq/quantidade/{usina_id}/{quando}"
+def _ctx(tipo: str, chave, quando: str) -> str:
+    return f"hseq/{tipo}/{chave}/{quando}"
 
 
-def motivo(cfg, linha: dict) -> str:
-    """O motivo da decisão de quantidade, decifrado (sem a chave do cadastro ou com cifra de outra chave: vazio)."""
-    cofre, cif = _cofre(cfg), D._txt(linha.get("dados_cifrados"))
+def _decifrar(cofre, linha: dict, ctx: str) -> dict:
+    cif = D._txt(linha.get("dados_cifrados"))
     if not cofre or not cif:
-        return ""
+        return {}
     try:
-        return D._txt(json.loads(cofre.decifrar(cif, _ctx(_int(linha.get("usina_id")), D._txt(linha.get("decidida_em"))))
-                                 ).get("motivo"))
-    except Exception:  # noqa: BLE001
-        return ""
+        return json.loads(cofre.decifrar(cif, ctx))
+    except Exception:  # noqa: BLE001 — cifra de outra chave ou linha mexida: sem os dados
+        return {}
 
 
 def _gravar_cru(cfg, cru: dict) -> None:
     """Troca o livro inteiro e confere (`livros.publicar` relê e compara a contagem). Na cópia de prova, o arquivo."""
     vazio = (lambda v: None if v in ("", None) else v)      # noqa: E731
     tabelas = {aba: (list(cab), [[vazio(x.get(c)) for c in cab] for x in cru[aba]])
-               for aba, cab in ((ABA_EXT, CAB_EXT), (ABA_QTD, CAB_QTD))}
+               for aba, cab in ((ABA_EXC, CAB_EXC), (ABA_RONDA, CAB_RONDA))}
     loc = _arquivo_local(cfg)
     if loc is not None:
         loc.parent.mkdir(parents=True, exist_ok=True)
@@ -224,21 +265,27 @@ def _gravar_cru(cfg, cru: dict) -> None:
     livros.publicar(LIVRO, NOME_LIVRO, tabelas, base=base, token=token, sessao=sessao)
 
 
-def _quem(cfg, usuario: dict | None) -> str:
-    """O código de quem decide; sem login de pessoa (a senha de administrador), Recusada: o histórico guarda quem fez."""
+def _quem(cfg, usuario: dict | None) -> tuple[str, str]:
+    """(o código de quem decide, o nome); sem login de pessoa (a senha de administrador), Recusada."""
     from ..campo.ligacao_cadastro import codigo_da_pessoa
     email = str((usuario or {}).get("email") or "").strip().lower()
     codigo = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email) if email else ""
     if not codigo:
         raise Recusada("Entre com o seu login (Microsoft ou Fracttal) para decidir: a senha de administrador não diz "
                        "quem é, e o histórico guarda quem fez.")
-    return codigo
+    return codigo, " ".join(str((usuario or {}).get("nome") or "").split())
 
 
-def _gravar(cfg, aba: str, nova: dict) -> None:
+def _gravar(cfg, aba: str, nova: dict, ctx: str, dados: dict) -> None:
     if not str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip():
         raise Recusada("Este Nexus não tem a NEXUS_PESSOA_HMAC: a linha iria sem assinatura e o App não a aplicaria. "
                        "Nada foi gravado.")
+    dados = {k: v for k, v in dados.items() if v}
+    if dados.get("obs") and _cofre(cfg) is None:
+        raise Recusada("Este Nexus não tem a chave do cadastro (NEXUS_CHAVE_CADASTRO): a observação vai cifrada, e sem "
+                       "ela nada é gravado.")
+    cofre = _cofre(cfg)
+    nova["dados_cifrados"] = cofre.cifrar(json.dumps(dados, ensure_ascii=False), ctx) if cofre and dados else ""
     with _TRAVA:
         try:
             cru = _ler_cru(cfg)
@@ -248,47 +295,46 @@ def _gravar(cfg, aba: str, nova: dict) -> None:
         nova["assinatura"] = assinatura(nova, aba, cfg.get("NEXUS_PESSOA_HMAC"))
         cru[aba] = cru[aba] + [nova]
         _gravar_cru(cfg, cru)
-        _CACHE[str(_arquivo_local(cfg) or "banco")] = {"extintor": cru[ABA_EXT], "quantidade": cru[ABA_QTD], "erro": "",
+        _CACHE[str(_arquivo_local(cfg) or "banco")] = {"exclusoes": cru[ABA_EXC], "rondas": cru[ABA_RONDA], "erro": "",
                                                        "lido_em": time.time()}
 
 
-def decidir_extintor(cfg, *, extintor: dict, acao: str, usuario: dict | None, pode: bool) -> str:
-    """Aceitar ou pedir nova ronda para UM não reconhecido (`extintor`, a linha da tela, que ainda espera a
-    Segurança). O texto do que foi feito; Recusada com o motivo quando não vale."""
+def excluir(cfg, *, extintor: dict, motivo: str, usuario: dict | None, pode: bool, obs: str = "") -> str:
+    """Exclui (dá baixa) UM extintor: o não reconhecido aceito (`motivo` nao_reconhecido, com a marca do App) ou o de
+    qualquer linha pelo botão direito (retirado, duplicado, outro). O texto do que foi feito; Recusada com o motivo."""
     if not pode:
-        raise Recusada("Só quem é da Segurança ou administrador decide os extintores não reconhecidos.")
-    if acao not in ACOES:
-        raise Recusada("Ação que o Nexus não conhece.")
-    quem = _quem(cfg, usuario)
-    agora = _agora()
-    _gravar(cfg, ABA_EXT, {"decidida_em": agora.isoformat(timespec="seconds"), "data_id": int(agora.strftime("%Y%m%d")),
-                           "usina_id": extintor.get("usina_id") or "", "codigo": extintor["codigo"], "acao": acao,
-                           "marca_dia": extintor["nao_reconhecido"].isoformat(), "decidida_por_hmac": quem})
-    return (f"{extintor['ext']} aceito: sai da {extintor['usina']}." if acao == "aceitar"
-            else f"Nova ronda pedida para o {extintor['ext']} da {extintor['usina']}.")
-
-
-def decidir_quantidade(cfg, *, usina_id: int, usina: str, no_cadastro: int, quantidade, motivo_txt: str,
-                       usuario: dict | None, pode: bool) -> str:
-    """Quantos extintores existem na usina, segundo a Segurança (ao lado de quantos o cadastro tem agora)."""
-    if not pode:
-        raise Recusada("Só quem é da Segurança ou administrador edita a quantidade de extintores.")
-    if not usina_id:
-        raise Recusada("Esta usina não está no cadastro do Nexus: acerte o cadastro antes de editar a quantidade.")
-    n = _int(quantidade)
-    if n is None or not 0 <= n <= QTD_MAX:
-        raise Recusada(f"A quantidade é um número de 0 a {QTD_MAX}.")
-    texto = " ".join(D._txt(motivo_txt).split())[:MOTIVO_MAX]
-    quem = _quem(cfg, usuario)
+        raise Recusada("Só quem é da Segurança ou administrador exclui extintores.")
+    if motivo not in MOTIVOS:
+        raise Recusada("Motivo que o Nexus não conhece: escolha um da lista.")
+    marca = extintor.get("nao_reconhecido")
+    if motivo == "nao_reconhecido" and not marca:
+        raise Recusada("Este extintor não está marcado como não reconhecido: use o botão direito para excluir.")
+    texto = " ".join(D._txt(obs).split())[:OBS_MAX]
+    if motivo == "outro" and not texto:
+        raise Recusada("Para \"Outro motivo\", escreva qual.")
+    codigo, nome = _quem(cfg, usuario)
     agora = _agora()
     quando = agora.isoformat(timespec="seconds")
-    nova = {"decidida_em": quando, "data_id": int(agora.strftime("%Y%m%d")), "usina_id": usina_id, "quantidade_qtd": n,
-            "no_cadastro_qtd": no_cadastro, "decidida_por_hmac": quem, "dados_cifrados": ""}
-    if texto:
-        cofre = _cofre(cfg)
-        if cofre is None:
-            raise Recusada("Este Nexus não tem a chave do cadastro (NEXUS_CHAVE_CADASTRO): o motivo vai cifrado, e sem "
-                           "ela nada é gravado.")
-        nova["dados_cifrados"] = cofre.cifrar(json.dumps({"motivo": texto}, ensure_ascii=False), _ctx(usina_id, quando))
-    _gravar(cfg, ABA_QTD, nova)
-    return f"Quantidade da {usina}: {n} extintor{'es' if n != 1 else ''} (o cadastro tem {no_cadastro})."
+    _gravar(cfg, ABA_EXC, {"decidida_em": quando, "data_id": int(agora.strftime("%Y%m%d")),
+                           "usina_id": extintor.get("usina_id") or "", "codigo": extintor["codigo"], "motivo": motivo,
+                           "marca_dia": marca.isoformat() if motivo == "nao_reconhecido" else "",
+                           "decidida_por_hmac": codigo},
+            _ctx("exclusao", extintor["codigo"], quando), {"quem": nome, "obs": texto})
+    return f"{extintor['ext']} excluído da {extintor['usina']} ({MOTIVOS[motivo].lower()}); está no histórico de excluídos."
+
+
+def pedir_ronda(cfg, *, usina_id: int, usina: str, usina_app: str, usuario: dict | None, pode: bool) -> str:
+    """Pede à equipe uma NOVA RONDA de extintores, do zero, na usina (o App mostra a ronda pendente)."""
+    if not pode:
+        raise Recusada("Só quem é da Segurança ou administrador pede nova ronda.")
+    if not usina_id:
+        raise Recusada("Esta usina não está no cadastro do Nexus: acerte o cadastro antes de pedir a ronda.")
+    if not D._txt(usina_app):
+        raise Recusada("Não achei o nome que o App usa para esta usina: atualize a página.")
+    codigo, nome = _quem(cfg, usuario)
+    agora = _agora()
+    quando = agora.isoformat(timespec="seconds")
+    _gravar(cfg, ABA_RONDA, {"decidida_em": quando, "data_id": int(agora.strftime("%Y%m%d")), "usina_id": usina_id,
+                             "usina_app": D._txt(usina_app), "decidida_por_hmac": codigo},
+            _ctx("ronda", usina_id, quando), {"quem": nome})
+    return f"Nova ronda de extintores pedida para a {usina}: o App mostra à equipe como ronda pendente."

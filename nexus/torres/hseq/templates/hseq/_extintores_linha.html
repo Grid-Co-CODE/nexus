@@ -1,12 +1,16 @@
 {# As linhas dos extintores, num lugar só: a tela (visão por extintor e a usina aberta com o filtro de usina) e o pedaço
    que a usina busca ao abrir (`_extintores_usina.html`) usam as mesmas. Importar com `with context` (usam d, situacoes,
-   status_tst, fotos, tempo e alerta_dias da tela).
+   status_tst, fotos, tempo, alerta_dias, pode e sem_cliente da tela).
 
    A FOTO SÓ NO CLIQUE (19/10/2026). Às 17:15 o Raio-X do servidor pegou a tela de Extintores 21 s montando a página
    (todos os extintores iam nela, escondidos: 897 KB, 1.105 linhas), e abrir uma usina pedia todas as miniaturas juntas
    (cada uma lia a foto inteira no servidor). Levi: "primeiro mostra a informação e só quando a pessoa clica que começa a
    carregar as imagens". Por isso a linha não leva <img>: leva o botão "Foto" com o dia da foto, e a caixa que amplia
-   (a mesma das Rondas) só pede a imagem no clique. #}
+   (a mesma das Rondas) só pede a imagem no clique.
+
+   O BOTÃO DIREITO (24/10/2026, Levi: "como cada extintor tem um cadastro unitário então o certo seria (...) ir na linha
+   do extintor, clicar com o botão direito e poder excluir o extintor"): para quem pode, a linha leva `hs-ext` e o
+   código (`data-codigo`); o menu e a caixa de excluir moram na tela. #}
 
 {# uma etiqueta (recarga ou hidrostático): o que está escrito nela e, ao lado, só o que pede ação: quando venceu, ou
    quanto falta se vence em até 30 dias. Vencer daqui a anos não precisa de frase (e alargava a coluna) #}
@@ -15,38 +19,43 @@
 {# a última conferência: o dia, há quanto tempo, a origem e quem conferiu #}
 {% macro conferencia(x) %}{% if x.conferencia %}<span class="ext-par"><span class="m">{{ x.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.sem_atualizacao }}">há {{ tempo(x.dias_conferencia) }}{% if x.origem_conferencia %} · <span title="{{ x.origem_conferencia }}">{{ 'Forms' if x.origem_conferencia.startswith('Forms') else x.origem_conferencia }}</span>{% endif %}</span>{% if x.conferido_por %}<span class="det">{{ x.conferido_por }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca conferido</span>{% endif %}{% endmacro %}
 
+{# o extintor (o código, a classe e o peso, e o botão da foto) #}
+{% macro extintor(x) %}{% set dia_foto = fotos.get(x.codigo) %}<span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span>{% if dia_foto is not none %}<a class="cn-foto ext-foto-bt" href="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo) }}" data-legenda="{{ x.ext }} · {{ x.local or 'local não informado' }} · {{ x.usina }}{% if dia_foto %} · foto de {{ dia_foto[8:10] }}/{{ dia_foto[5:7] }}/{{ dia_foto[:4] }}{% endif %}" title="Ver a foto do extintor">Foto{% if dia_foto %} {{ dia_foto[8:10] }}/{{ dia_foto[5:7] }}{% endif %}</a>{% endif %}</span>{% endmacro %}
+{% macro local(x) %}<td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>{% endmacro %}
+
 {# as células de um extintor, iguais na tabela por extintor e dentro da usina (cada parte lado a lado: Levi, 09/10, "se
    tem espaço para botar paralelo então deixe paralelo"). A usina vai sem a região ao lado (Levi, 11/10); o status da
    TST não repete a validade: só a carga e os itens com NÃO, e o motivo inteiro no title. Ordem das colunas (Levi,
    11/10): Situação, Última conferência, Usina e o resto #}
-{% macro linha_extintor(x, com_usina=true, com_conferencia=true) %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}{% set dia_foto = fotos.get(x.codigo) %}
-      <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
+{% macro linha_extintor(x, com_usina=true, com_conferencia=true) %}{% set s = situacoes[x.situacao] %}{% set t = status_tst.get(x.status) %}
+      <tr{% if pode %} class="hs-ext" data-codigo="{{ x.codigo }}"{% endif %}><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
         {% if com_conferencia %}<td>{{ conferencia(x) }}</td>{% endif %}
         {% if com_usina %}<td class="ext-usina">{{ x.usina }}</td>{% endif %}
-        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span>{% if dia_foto is not none %}<a class="cn-foto ext-foto-bt" href="{{ url_for('torre_hseq.extintores_foto', codigo=x.codigo) }}" data-legenda="{{ x.ext }} · {{ x.local or 'local não informado' }} · {{ x.usina }}{% if dia_foto %} · foto de {{ dia_foto[8:10] }}/{{ dia_foto[5:7] }}/{{ dia_foto[:4] }}{% endif %}" title="Ver a foto do extintor">Foto{% if dia_foto %} {{ dia_foto[8:10] }}/{{ dia_foto[5:7] }}{% endif %}</a>{% endif %}</span></td>
-        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
+        <td>{{ extintor(x) }}</td>
+        {{ local(x) }}
         <td>{{ etiqueta(x.val2, x.fim2) }}</td>
         <td>{{ etiqueta(x.val3, x.fim3) }}</td>
         <td class="ext-status"{% if x.motivo %} title="{{ x.motivo }}"{% endif %}>{% if t %}<span class="ext-par"><span class="cn-st cn-t-{{ t[1] }}">{{ t[0] }}</span>{% if x.motivo_checklist %}<span class="det">{{ x.motivo_checklist }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">sem conferência</span>{% endif %}</td></tr>
 {% endmacro %}
 
 {# o extintor que a equipe não achou na usina, em cima dos outros (fora das contas): a Segurança decide AQUI, na usina
-   (Levi, 24/10/2026: "a tabela de contestações tem que servir para apontar para a usina, ao ir para a usina a TST
-   resolve"). Aceitar = dar baixa (sai da tela); Pedir nova ronda = o App mostra à equipe a ronda pendente. Quem não é
-   da Segurança vê só a situação. A decisão responde à marca daquele dia (`marca`) #}
-{% macro linha_nao_reconhecido(x) %}{% set nr = x.nova_ronda_em %}
-      <tr class="hs-nr"><td><span class="ext-par"><span class="cn-st cn-t-alerta">Não reconhecido</span>{% if nr %}<span class="det">nova ronda pedida em {{ nr[8:10] }}/{{ nr[5:7] }}</span>{% endif %}</span></td>
+   (Levi, 24/10/2026: "ao ir para a usina a TST resolve"). Por extintor, só o Aceitar: o extintor é excluído com o
+   motivo "Não reconhecido em campo" e vai para o histórico ("por extintor é só o botão de aceitar"); a nova ronda é da
+   usina inteira, nos três pontos dela. Quem não é da Segurança vê só a situação. O Aceitar responde à marca daquele dia #}
+{% macro linha_nao_reconhecido(x, com_usina=false) %}
+      <tr class="hs-nr"><td><span class="cn-st cn-t-alerta">Não reconhecido</span></td>
         <td><span class="ext-par"><span class="m">{{ x.nao_reconhecido.strftime('%d/%m/%Y') }}</span><span class="det">não achado há {{ tempo(x.dias_nao_reconhecido) }}</span>{% if x.nao_reconhecido_por %}<span class="det">{{ x.nao_reconhecido_por }}</span>{% endif %}</span></td>
-        <td><span class="ext-par"><span class="m" title="{{ x.codigo }}">{{ x.ext }}</span><span class="det">{{ x.classe or 'sem classe' }}{% if x.peso %} · {{ x.peso }} kg{% endif %}</span></span></td>
-        <td{% if x.ativo %} title="Ativo no Fracttal: {{ x.ativo }}"{% endif %}><span class="ext-par"><span>{{ x.local or '—' }}</span>{% if x.posicao %}<span class="det">{{ x.posicao|lower }}</span>{% endif %}</span></td>
+        {% if com_usina %}<td class="ext-usina">{{ x.usina }}</td>{% endif %}
+        <td>{{ extintor(x) }}</td>
+        {{ local(x) }}
         <td>{{ etiqueta(x.val2, x.fim2) }}</td>
         <td>{{ etiqueta(x.val3, x.fim3) }}</td>
-        <td>{% if pode %}<form class="hs-decide" method="post" action="{{ url_for('torre_hseq.extintores_decidir') }}">
+        <td>{% if pode %}<form class="hs-decide" method="post" action="{{ url_for('torre_hseq.extintores_excluir') }}">
           <input type="hidden" name="codigo" value="{{ x.codigo }}"><input type="hidden" name="marca" value="{{ x.nao_reconhecido.isoformat() }}">
+          <input type="hidden" name="motivo" value="nao_reconhecido">
           <input type="hidden" name="cliente" value="{{ x.cliente or sem_cliente }}"><input type="hidden" name="usina" value="{{ x.usina }}">
-          <button type="submit" name="acao" value="aceitar" class="gc-btn gc-btn--ui gc-btn--contorno" data-confirma="Aceitar dá baixa: o {{ x.ext }} sai da {{ x.usina }}. Confirma?">Aceitar</button>
-          {% if not nr %}<button type="submit" name="acao" value="nova_ronda" class="gc-btn gc-btn--ui gc-btn--primario">Pedir nova ronda</button>{% endif %}
-        </form>{% else %}<span class="cn-t-neutro">{{ 'nova ronda pedida' if nr else 'esperando a Segurança' }}</span>{% endif %}</td></tr>
+          <button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno" data-confirma="Aceitar exclui o {{ x.ext }} da {{ x.usina }}: ele vai para o histórico de excluídos, com o motivo Não reconhecido em campo. Confirma?">Aceitar</button>
+        </form>{% else %}<span class="cn-t-neutro">esperando a Segurança</span>{% endif %}</td></tr>
 {% endmacro %}
 
 {# os extintores de uma usina, a tabela menor que a linha da usina abre (cada um com a conferência dele: a linha da
