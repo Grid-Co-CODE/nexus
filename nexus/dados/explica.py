@@ -180,7 +180,7 @@ PARA_QUE = {
                          "outro). O excluído sai das telas e vai para o histórico de excluídos; volta se a equipe o "
                          "conferir numa ronda depois.",
     "pedido_ronda_extintor": "Guarda cada nova ronda de extintores, do zero, que a Segurança pede numa usina. É para o "
-                             "App de Campo mostrar à equipe como ronda pendente; vale até a equipe fazer a ronda.",
+                             "App de Campo mostrar à equipe como ronda pendente; vale até a equipe refazer a ronda inteira.",
     "decisao_atribuicao_pcm": "Guarda cada vez que o PCM põe ou tira um técnico de uma usina na tela Técnicos por "
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",

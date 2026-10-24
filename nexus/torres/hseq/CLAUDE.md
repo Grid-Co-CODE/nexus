@@ -82,18 +82,20 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
   de Campo abria na região dele): **ninguém abre filtrado**. Valem na faixa, na caixa, na tabela, nos cartões e no
   "Baixar". O cliente vale também no EPI, que segue com os filtros do Campo.
 - **Agrupar por Cliente** (o padrão; Levi, 18/10: "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse
-  cliente. É importante ter a coluna do responsável desse usina e o ou os técnicos da usina!"; `extintores.por_cliente`)
-  e **por Extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
-  primeiro). Colunas: Situação, Última conferência, Cliente e usina, Responsável, Técnicos, Quantidade de extintores
-  (só o total), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a próxima), **Status** e os três pontos.
-  O Status (24/10/2026, no lugar do "Status da TST": "vai quebrar o texto a cada assuntos (...) A ideia é ficar algo bem
-  mais visual") é uma barra com a proporção de cada situação e, embaixo, uma linha por situação com a cor dela ("116
-  atrasados", "40 perto de vencer", "77 sem validade", "335 em dia", "13 não reconhecidos"). **Responsável e Técnicos só
-  aparecem com um cliente aberto** (Levi: "não precisa das colunas responsável e técnico na primeira visão, só ao clicar
-  na linha"): a tabela leva `hs-sem-pessoas` enquanto nenhum cliente está aberto, e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela** (UMA linha por
-  usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os extintores numa
-  tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais próxima; "Sem
-  cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
+  cliente. É importante ter a coluna do responsável desse usina e o ou os técnicos da usina!";
+  `extintores.por_cliente`) e **por Extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a
+  conferência mais antiga primeiro). Colunas: Situação, Última conferência, Cliente e usina, Responsável, Técnicos,
+  Quantidade de extintores (só o total, centrada), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a
+  próxima; a data em cima e o "venceu há" embaixo, centrados: "como as linhas são grossas da para botar"), **Status**
+  e os três pontos. O Status (24/10/2026, no lugar do "Status da TST": "vai quebrar o texto a cada assuntos (...) A
+  ideia é ficar algo bem mais visual") é uma linha por situação com a cor dela (a barra das proporções em cima saiu no
+  mesmo dia: "Tira essa barra de cores da coluna de status"; "116 atrasados", "40 perto de vencer", "77 sem validade",
+  "335 em dia", "13 não reconhecidos"). **Responsável e Técnicos só aparecem com um cliente aberto** (Levi: "não
+  precisa das colunas responsável e técnico na primeira visão, só ao clicar na linha"): a tabela leva `hs-sem-pessoas`
+  enquanto nenhum cliente está aberto, e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela**
+  (UMA linha por usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os
+  extintores numa tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais
+  próxima; "Sem cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
 - **Os técnicos** vêm da tela Técnicos por usina do PCM (`extintores.tecnicos_por_usina`, livro `nexus_pcm_atribuicoes`:
   quem vê e ronda a usina no App, um embaixo do outro; o apoio agendado para depois de hoje ainda não conta). Lista que
   não foi lida: a coluna diz "não lido" e a tela avisa, e nunca "sem técnico". Medido em 18/10: 174 usinas com técnico,
@@ -244,8 +246,14 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
   **Excluídos** (`modo=excluidos`, o mais novo primeiro, com o motivo e quem). **Volta** se a equipe o conferir numa
   ronda de um dia depois da exclusão (existe), e o histórico diz "voltou: conferido em dd/mm".
 - **Pedir nova ronda** (`fato_pedido_ronda`), da usina inteira, do zero, nos três pontos da linha da usina. A linha
-  mostra "nova ronda pedida em dd/mm" até uma conferência de um dia depois do pedido (`decisoes.rondas_pendentes`); o
-  item do menu diz que já foi pedida. Grava também o nome da usina que o App usa (`usina_app`).
+  mostra "nova ronda pedida em dd/mm · N de M refeitos" e o item do menu diz que já foi pedida. A ronda é do zero e
+  vale pela hora (combinado com o App de Campo em 24/10/2026, v296, que aplica a MESMA regra e mostra a ronda pendente
+  à equipe): o pedido sai quando TODOS os extintores atuais da usina, sem os excluídos, chegam conferidos depois dele
+  (a "Recebida em", UTC, do livro `extintores_conferencias_app_campo · Conferências`, lido só quando há pedido:
+  `extintores.recebidas`) ou marcados como não reconhecidos depois dele; pedido às 10h e ronda às 14h do mesmo dia é
+  atendido. A marca de não reconhecido conta pela hora a partir da v296 do App (o "Não reconhecido em" passa a vir com a hora UTC
+  em que o servidor a recebeu); antes, só com o dia, ela conta do dia seguinte ao pedido em diante; usina sem extintor segue
+  pendente. Grava também o nome da usina que o App usa (`usina_app`).
 - Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
   exclusão por extintor).
 - **Quem:** o administrador e quem é do setor Segurança (`decisoes.pode_decidir`), sempre com um login de pessoa (a

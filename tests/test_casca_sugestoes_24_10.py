@@ -227,3 +227,36 @@ def test_o_livro_esta_no_catalogo_antes_da_1a_gravacao():
     assert f.livro == f"{S.LIVRO} · {S.ABA}" and f.chave == ("id",) and f.tipo == "sem_medida"
     assert f.chave[0] == S.CAB[0] and "pessoa_id" in S.CAB and "data_id" in S.CAB
     assert "sugestao" in explica.RESUMO and "sugestao" in explica.PARA_QUE
+
+
+def test_baixar_arquivos_leva_todos_os_anexos_num_zip_so_para_o_administrador(app, banco, dados):
+    """Levi, 24/10/2026: "gostaria a opção 'Baixar arquivos' baixa todos os arquivos da sugestão"."""
+    import zipfile
+    c = _cliente(app)
+    c.post(URL, data=dict(_form(c, titulo="Filtro/por usina"), anexos=[_arq("Plano.pdf", PDF), _arq("print.png", PNG),
+                                                                       _arq("Plano.pdf", PDF + b"2")]),
+           content_type="multipart/form-data")
+    sid = banco.linhas(S.LIVRO, S.ABA)[0]["id"]
+    assert c.get(f"{URL}&anexo={sid}&n=todos").status_code == 403
+    app.config["NEXUS_ADMINS"] = "chefe@exemplo.test"
+    adm = _cliente(app, admin=True, usuario={"email": "chefe@exemplo.test", "nome": "Chefe"})
+    assert f"anexo={sid}&amp;n=todos" in adm.get(URL).get_data(as_text=True)
+    r = adm.get(f"{URL}&anexo={sid}&n=todos")
+    assert r.status_code == 200 and r.mimetype == "application/zip"
+    assert "attachment" in r.headers["Content-Disposition"] and "Filtro_por usina.zip" in r.headers["Content-Disposition"]
+    z = zipfile.ZipFile(io.BytesIO(r.data))
+    assert z.namelist() == ["Plano.pdf", "print.png", "Plano (2).pdf"]      # o nome repetido não apaga o outro
+    assert z.read("Plano.pdf") == PDF and z.read("Plano (2).pdf") == PDF + b"2" and z.read("print.png") == PNG
+    for ruim in ("anexo=s000000000000&n=todos", "anexo=../x&n=todos"):
+        assert adm.get(f"{URL}&{ruim}").status_code == 404, ruim
+
+
+def test_sugestao_sem_anexo_nao_mostra_baixar_arquivos(app, banco, dados):
+    c = _cliente(app)
+    c.post(URL, data=_form(c))
+    app.config["NEXUS_ADMINS"] = "chefe@exemplo.test"
+    adm = _cliente(app, admin=True, usuario={"email": "chefe@exemplo.test", "nome": "Chefe"})
+    html = adm.get(URL).get_data(as_text=True)
+    assert "Filtro por usina no relatório" in html and "Baixar arquivos" not in html
+    sid = banco.linhas(S.LIVRO, S.ABA)[0]["id"]
+    assert adm.get(f"{URL}&anexo={sid}&n=todos").status_code == 404

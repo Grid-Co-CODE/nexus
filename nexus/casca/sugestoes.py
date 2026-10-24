@@ -9,6 +9,7 @@ gravação (nexus/dados/CLAUDE.md, regra 10). Em claro só o dia, a área (o id 
 descrição, o nome de quem pediu e os nomes dos anexos vão cifrados (o Cofre, como as ocorrências): o banco tem leitura
 aberta. Os anexos ficam no disco do servidor (a pasta de dados do Nexus, como as fotos do HSEQ), com nome de arquivo
 neutro (1.pdf, 2.png); o nome original só no livro, cifrado."""
+import io
 import json
 import os
 import re
@@ -17,6 +18,7 @@ import threading
 import time
 import unicodedata
 import uuid
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -191,6 +193,37 @@ def arquivo(sid: str, n) -> tuple[Path, dict] | None:
         return None
     caminho = _pasta(sid) / a["arquivo"]
     return (caminho, a) if caminho.is_file() else None
+
+
+def zip_da_sugestao(sid: str) -> tuple[bytes, str] | None:
+    """Todos os anexos da sugestão num .zip (Levi, 24/10/2026: "gostaria a opção 'Baixar arquivos' baixa todos os
+    arquivos da sugestão"), com o nome original de cada um; dois com o mesmo nome ganham " (2)". Montado na memória: são
+    15 MB no máximo. None se a sugestão não existe ou nenhum anexo está no disco."""
+    if not ID_RE.fullmatch(_txt(sid)):
+        return None
+    s = next((x for x in lista() if x["id"] == sid), None)
+    if not s:
+        return None
+    buf, vistos, n = io.BytesIO(), set(), 0
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for a in s["anexos"]:
+            achado = arquivo(sid, a.get("n"))
+            if not achado:
+                continue
+            caminho, a = achado
+            nome = nome_seguro(a.get("nome")) or a["arquivo"]
+            raiz, ext = os.path.splitext(nome)
+            novo, i = nome, 2
+            while novo.lower() in vistos:
+                novo, i = f"{raiz} ({i}){ext}", i + 1
+            vistos.add(novo.lower())
+            z.write(caminho, novo)
+            n += 1
+    if not n:
+        return None
+    # o título vira o nome do .zip; a barra dele ("Filtro/por usina") não é caminho: vira "_" antes do nome_seguro
+    titulo = nome_seguro(re.sub(r"[\\/]", "_", s["titulo"]) + ".zip") if s["titulo"] else ""
+    return buf.getvalue(), titulo or f"sugestao-{sid}.zip"
 
 
 def tipo_servido(nome_arquivo: str) -> str:

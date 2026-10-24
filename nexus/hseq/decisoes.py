@@ -15,7 +15,8 @@ O dado (livro `nexus_hseq_extintores`, registrado em `nexus/dados/catalogo.py` a
   direito, "retirado", "duplicado" ou "outro". O excluído some das telas e das contas do Nexus e vai para o histórico
   de excluídos; volta sozinho se uma conferência de DEPOIS do dia da exclusão aparecer (o extintor existe).
 - `fato_pedido_ronda`: 1 linha = 1 pedido da Segurança de uma NOVA RONDA de extintores, do zero, em 1 usina, com o nome
-  que o App usa para a usina (`usina_app`). Fica pendente até uma conferência na usina num dia DEPOIS do pedido.
+  que o App usa para a usina (`usina_app`). Fica pendente até TODOS os extintores da usina chegarem conferidos (ou
+  marcados como não reconhecidos) DEPOIS do pedido, pela hora (`rondas_pendentes`, a mesma regra do App).
 Em claro: os IDs, o código do extintor, o motivo (domínio), os dias e os códigos HMAC. Quem decidiu (o nome) e a
 observação vão só cifrados (o Cofre, regra 8). Cada linha vai assinada (`assinatura`, HMAC com a chave derivada da
 NEXUS_PESSOA_HMAC): o App lê o livro pela leitura aberta da API e só aplica a linha assinada.
@@ -171,9 +172,24 @@ def separar(extintores: list, nao_reconhecidos: list, est: dict) -> tuple[list, 
     return ext, nr, fora
 
 
-def rondas_pendentes(est: dict, ultima_conferencia: dict) -> dict:
-    """{usina_id: o último pedido de nova ronda ainda pendente}: pendente até uma conferência na usina num dia DEPOIS do
-    pedido (`ultima_conferencia` = {usina_id: o dia da conferência mais recente})."""
+def _hora(iso) -> datetime | None:
+    """Um ISO com hora (o `decidida_em` com -03:00, a "Recebida em" do App em UTC); sem fuso, Brasília."""
+    try:
+        d = datetime.fromisoformat(D._txt(iso).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone(timedelta(hours=-3)))
+
+
+def rondas_pendentes(est: dict, por_usina: dict, recebidas: dict) -> dict:
+    """{usina_id: o último pedido de nova ronda ainda pendente, com `feitos` e `total`}. A ronda é do zero (Levi,
+    24/10/2026: "pedir uma nova ronda é uma nova ronda do zero"): o pedido só sai quando TODOS os extintores atuais da
+    usina (`por_usina` = {usina_id: [extintores]}, os excluídos já fora) têm conferência RECEBIDA pelo App depois dele
+    (`recebidas` = {código: a hora}, a "Recebida em" do livro de conferências) ou marca de não reconhecido depois dele.
+    Pela hora, não pelo dia: pedido às 10h e ronda às 14h do mesmo dia é atendido. A regra é a MESMA do App de Campo
+    (combinada com ele em 24/10/2026, v296), que mostra a ronda pendente à equipe. A marca de não reconhecido só com o
+    dia conta do dia seguinte ao pedido em diante (nunca dá por feito o que pode ter sido antes). Usina sem extintor
+    nenhum segue pendente: nada prova a ronda."""
     ult = {}
     for x in _ordem(est.get("rondas") or []):
         uid = _int(x.get("usina_id"))
@@ -181,9 +197,21 @@ def rondas_pendentes(est: dict, ultima_conferencia: dict) -> dict:
             ult[uid] = x
     out = {}
     for uid, x in ult.items():
-        dia, conf = _dia(x.get("decidida_em")), ultima_conferencia.get(uid)
-        if not (dia and conf and conf > dia):
-            out[uid] = x
+        t = _hora(x.get("decidida_em"))
+        exts = por_usina.get(uid) or []
+
+        def feito(e):
+            r, marca = recebidas.get(e.get("codigo")), e.get("marca_em")
+            if t is None:
+                return False
+            if r and r > t:
+                return True
+            if marca:
+                return marca > t
+            return bool(e.get("nao_reconhecido") and e["nao_reconhecido"] > t.astimezone(timezone(timedelta(hours=-3))).date())
+        n = sum(1 for e in exts if feito(e))
+        if not exts or n < len(exts):
+            out[uid] = dict(x, feitos=n, total=len(exts))
     return out
 
 
