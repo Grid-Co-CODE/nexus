@@ -98,3 +98,107 @@ def test_ultima_atualizacao_e_parada():
     assert not O.parada("fazer", agora - timedelta(days=6), agora)
     assert not O.parada("concluida", b, agora) and not O.parada("cancelada", b, agora)
     assert not O.parada("fazer", None, agora)                   # sem data não se chuta parada
+
+
+# ── Task 2: a página da OS e o classificar ──────────────────────────────────────────────────────────────────────────
+URL = "/t/engenharia/equipe/os/16502"
+
+
+@pytest.fixture
+def pagina(banco, app, monkeypatch):
+    """A OS 16502 (a fazer) com duas filhas: a 16510 respondeu "Descreva a atividade realizada", a 16511 não tem a
+    subtarefa. Quem entra é do setor Engenharia."""
+    from test_engenharia_equipe import AGORA, _w
+
+    from nexus.auth import setor_telas as ST
+    from nexus.engenharia import os_equipe as E
+    from nexus.torres import engenharia as torre
+    mae = _w("16502", 1, note="Nota antiga da OS", personnel_description="Ana  Lima")
+    f1 = _w("16510", 1, id_parent_wo=mae["id_work_order"], description="Troca do cabo")
+    f2 = _w("16511", 3, task="DONE", fim=AGORA.isoformat(), id_parent_wo=mae["id_work_order"], description="Limpeza")
+    subs = {"16510": [{"description": "Descreva a atividade realizada", "value": "Troquei o cabo do MPPT 2"},
+                      {"description": "Registro fotográfico da atividade", "value": None}],
+            "16511": [{"description": "Registro fotográfico da atividade", "value": None}]}
+
+    def rest(path):
+        valor = path.split("=", 1)[1].split("&", 1)[0]
+        if path.startswith("work_orders?wo_folio="):
+            return {"data": [w for w in (mae, f1, f2) if w["wo_folio"] == valor]}
+        if path.startswith("work_orders?id_parent_wo="):
+            return {"data": [w for w in (f1, f2) if str(w["id_parent_wo"]) == valor]}
+        if path.startswith("work_orders_subtasks/?folio="):
+            return {"data": subs.get(valor, [])}
+        raise AssertionError(path)
+    monkeypatch.setattr(E, "_ler_fracttal", rest)
+    monkeypatch.setattr(torre, "_onde_do_cadastro",
+                        lambda: (lambda texto, cod: {"usina_id": 7, "ligada_por": "de-para do Fracttal"}))
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+                                               "erro": ""})
+    return mae
+
+
+def _secao(html, titulo):
+    marca = f">{titulo}</h2>"
+    return html.split(marca, 1)[1].split("</section>", 1)[0] if marca in html else ""
+
+
+def _kpis(html):
+    import re
+    faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
+    return (re.findall(r'<span class="kb-kpi-rot">([^<]+)</span>', faixa),
+            re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', faixa))
+
+
+def test_pagina_da_os_tem_os_quatro_numeros_e_os_blocos(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    rotulos, valores = _kpis(html)
+    assert rotulos == ["Status", "Prioridade", "Programada", "Última atualização"] and valores[:2] == ["—", "—"]
+    for b in ("Status e prioridade", "Dados", "OS filhas", "Na nota da OS", "Demais respostas do técnico",
+              "Comentários"):
+        assert _secao(html, b), b
+    assert "Nota antiga da OS" in _secao(html, "Na nota da OS")
+    assert "Solicitar OS" in html and "Abrir a OS" not in html
+    assert "ativo%3DX-INV1.1" in html and f"os_pai%3D{pagina['id_work_order']}" in html and "os_pai_folio%3D16502" in html
+    assert "OS 16510" in _secao(html, "OS filhas") and "OS 16511" in _secao(html, "OS filhas")
+
+
+def test_demais_respostas_vem_da_os_filha(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    html = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Demais respostas do técnico")
+    assert "Troquei o cabo do MPPT 2" in html and "16510" in html
+    assert "16511" in html and "não tem a subtarefa" in html
+
+
+def test_classificar_grava_e_volta_com_o_aviso(pagina, cliente):
+    from test_engenharia_acompanhamento import SAME, _como
+    r = _como(cliente, ANA).post(URL + "/classificar", data={"status_id": "3", "prioridade_id": "3"}, headers=SAME)
+    assert r.status_code == 303 and r.headers["Location"].split("?", 1)[0].endswith(URL)
+    html = cliente.get(r.headers["Location"]).get_data(as_text=True)
+    _rot, valores = _kpis(html)
+    assert valores[:2] == ["Diagnóstico em Andamento", "Urgente"] and 'kb-kpi-v--critico">Urgente<' in html
+    assert "Status: Diagnóstico em Andamento" in _secao(html, "Comentários")       # a linha do tempo diz a mudança
+    r = cliente.post(URL + "/classificar", data={"status_id": "3", "prioridade_id": "3"}, headers=SAME)
+    assert "Nada+mudou" in r.headers["Location"] or "Nada%20mudou" in r.headers["Location"]
+
+
+def test_quem_nao_e_da_engenharia_le_sem_formularios(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+                                               "erro": ""})
+    html = _como(cliente, BETO).get(URL).get_data(as_text=True)
+    assert "Nota antiga da OS" in html and "/classificar" not in html and "<textarea" not in html
+
+
+def test_classificar_de_outro_site_e_recusado(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    r = _como(cliente, ANA).post(URL + "/classificar", data={"status_id": "3"}, headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+
+
+def test_os_que_nao_existe_diz_que_nao_achou(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    r = _como(cliente, ANA).get("/t/engenharia/equipe/os/99999")
+    assert r.status_code == 404 and "Não achei a OS 99999" in r.get_data(as_text=True)

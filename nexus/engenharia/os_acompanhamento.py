@@ -197,7 +197,9 @@ def classificar(os_: dict, status_id, prioridade_id, usuario, pode: bool) -> dic
         if not novos:
             raise Recusada("Nada mudou")
         _publicar(lido["eventos"] + novos)
-    return {"status": nome_status(st) if st else "", "prioridade": nome_prioridade(pr) if pr else "",
+    # o aviso diz só o que mudou (a prioridade igual à de antes não aparece como "salva")
+    return {"status": next((nome_status(e["status_id"]) for e in novos if e["evento"] == "status"), ""),
+            "prioridade": next((nome_prioridade(e["prioridade_id"]) for e in novos if e["evento"] == "prioridade"), ""),
             "eventos": novos}
 
 

@@ -135,46 +135,112 @@ def montar(linhas: list[dict], pessoa: dict, agora: datetime) -> list[dict]:
             continue
         por.setdefault(str(w.get("wo_folio") or w.get("id_work_order")), []).append(w)
     hoje = agora.astimezone(BRT).date()
-    out = []
-    for folio, ts in por.items():
-        w0 = ts[0]
-        col = coluna(w0.get("id_status_work_order"), ts)
-        prog = min((d for d in (_dt(t.get("date_maintenance")) for t in ts) if d), default=None)
-        fim = max((d for d in (_dt(t.get("wo_final_date") or t.get("final_date")) for t in ts) if d), default=None)
-        criada = _dt(w0.get("creation_date"))
-        dias = (prog.astimezone(BRT).date() - hoje).days if prog else None
-        prazo = ("atrasada" if dias is not None and dias < 0 and col in ("fazer", "execucao") else
-                 "vence" if dias is not None and dias <= 2 and col in ("fazer", "execucao") else
-                 "futura" if dias is not None and dias > 2 and col == "fazer" else "")
-        etiquetas = []
-        for t in ts:
-            for e in t.get("labels") or []:
-                if isinstance(e, dict) and e.get("enabled", True) and e.get("description") and \
-                        e["description"] not in [x["nome"] for x in etiquetas]:
-                    etiquetas.append({"nome": e["description"], "cor": "#" + str(e.get("color") or "8892a6").lstrip("#")})
-        try:
-            status = STATUS_OS.get(int(w0.get("id_status_work_order") or 0), "")
-        except (TypeError, ValueError):
-            status = ""
-        out.append({
-            "os": folio, "url": OS_URL.format(id=w0["id_work_order"]) if w0.get("id_work_order") else "",
-            # o id da OS abre o card do OS Creator (/os/os/<id>); o REST já traz, sem pedido a mais ao Fracttal
-            "wid": w0.get("id_work_order"), "status": status,
-            "titulo": str(w0.get("description") or "").strip()[:140], "pessoa": pessoa["nome"], "pid": pessoa["id"],
-            "coluna": col, "tipo": str(w0.get("tasks_log_task_type_main") or ""),
-            "ativo": str(w0.get("items_log_description") or "").split("{")[0].strip()[:80], "codigo": str(w0.get("code") or ""),
-            "usina": str(w0.get("groups_1_description") or ""), "prioridade": str(w0.get("priorities_description") or ""),
-            "etiquetas": etiquetas, "prazo": prazo, "dias": dias,
-            "programada": prog.astimezone(BRT).strftime("%d/%m/%Y") if prog else "",
-            "programada_iso": prog.astimezone(BRT).date().isoformat() if prog else "",
-            "criada": criada.astimezone(BRT).strftime("%d/%m/%Y %H:%M") if criada else "",
-            "fim": fim.astimezone(BRT).strftime("%d/%m/%Y") if fim else "",
-            "fim_iso": fim.astimezone(BRT).date().isoformat() if fim else "",
-            "solicitante": str(w0.get("requested_by") or w0.get("created_by") or "").strip(),
-            "nota": str(w0.get("note") or "").strip()[:600],
-            "tarefas": [{"t": str(t.get("description") or "")[:120], "st": str(t.get("task_status") or ""),
-                         "obs": str(t.get("task_note") or "").strip()[:300]} for t in ts]})
+    return [_cartao(folio, ts, pessoa, hoje) for folio, ts in por.items()]
+
+
+def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
+    """Uma OS (as linhas das tarefas dela) no formato do quadro."""
+    w0 = ts[0]
+    col = coluna(w0.get("id_status_work_order"), ts)
+    prog = min((d for d in (_dt(t.get("date_maintenance")) for t in ts) if d), default=None)
+    fim = max((d for d in (_dt(t.get("wo_final_date") or t.get("final_date")) for t in ts) if d), default=None)
+    criada = _dt(w0.get("creation_date"))
+    # o que se mexeu na OS no Fracttal: o começo e o fim das tarefas (a "última atualização" da página da OS e o
+    # pulso do quadro, junto com o que a Engenharia gravou no Nexus; 24/10/2026)
+    atividade = max((d for t in ts for d in (_dt(t.get("initial_date")), _dt(t.get("final_date")),
+                                             _dt(t.get("wo_final_date"))) if d), default=None)
+    dias = (prog.astimezone(BRT).date() - hoje).days if prog else None
+    prazo = ("atrasada" if dias is not None and dias < 0 and col in ("fazer", "execucao") else
+             "vence" if dias is not None and dias <= 2 and col in ("fazer", "execucao") else
+             "futura" if dias is not None and dias > 2 and col == "fazer" else "")
+    etiquetas = []
+    for t in ts:
+        for e in t.get("labels") or []:
+            if isinstance(e, dict) and e.get("enabled", True) and e.get("description") and \
+                    e["description"] not in [x["nome"] for x in etiquetas]:
+                etiquetas.append({"nome": e["description"], "cor": "#" + str(e.get("color") or "8892a6").lstrip("#")})
+    try:
+        status = STATUS_OS.get(int(w0.get("id_status_work_order") or 0), "")
+    except (TypeError, ValueError):
+        status = ""
+    return {
+        "os": folio, "url": OS_URL.format(id=w0["id_work_order"]) if w0.get("id_work_order") else "",
+        # o id da OS abre o card do OS Creator (/os/os/<id>); o REST já traz, sem pedido a mais ao Fracttal
+        "wid": w0.get("id_work_order"), "status": status,
+        "titulo": str(w0.get("description") or "").strip()[:140], "pessoa": pessoa["nome"], "pid": pessoa["id"],
+        "coluna": col, "tipo": str(w0.get("tasks_log_task_type_main") or ""),
+        "ativo": str(w0.get("items_log_description") or "").split("{")[0].strip()[:80], "codigo": str(w0.get("code") or ""),
+        "usina": str(w0.get("groups_1_description") or ""), "prioridade": str(w0.get("priorities_description") or ""),
+        "etiquetas": etiquetas, "prazo": prazo, "dias": dias,
+        "programada": prog.astimezone(BRT).strftime("%d/%m/%Y") if prog else "",
+        "programada_iso": prog.astimezone(BRT).date().isoformat() if prog else "",
+        "criada": criada.astimezone(BRT).strftime("%d/%m/%Y %H:%M") if criada else "",
+        "criada_iso": criada.isoformat() if criada else "", "atividade_iso": atividade.isoformat() if atividade else "",
+        "prioridade_fracttal": str(w0.get("priorities_description") or ""),
+        "fim": fim.astimezone(BRT).strftime("%d/%m/%Y") if fim else "",
+        "fim_iso": fim.astimezone(BRT).date().isoformat() if fim else "",
+        "solicitante": str(w0.get("requested_by") or w0.get("created_by") or "").strip(),
+        "nota": str(w0.get("note") or "").strip()[:600],
+        "tarefas": [{"t": str(t.get("description") or "")[:120], "st": str(t.get("task_status") or ""),
+                     "obs": str(t.get("task_note") or "").strip()[:300]} for t in ts]}
+
+
+# ── a página da OS do quadro (24/10/2026): a OS lida agora, as filhas e a resposta do técnico ─────────────────────────
+TETO_PAGINAS = 3              # um filtro que o REST passasse a ignorar não pode virar a leitura do Fracttal inteiro
+
+
+def _paginas_ate(path, teto=TETO_PAGINAS):
+    out, inicio = [], 0
+    for _ in range(teto):
+        r = _ler_fracttal(f"{path}&limit=100&start={inicio}")
+        d = (r.get("data") if isinstance(r, dict) else r) or []
+        out += d
+        if len(d) < 100:
+            break
+        inicio += 100
     return out
+
+
+def ler_os(folio) -> dict | None:
+    """A OS pelo nº, lida agora no REST (só leitura): o formato do quadro, sem filtro de pessoa (as tarefas de todos) e
+    com a nota inteira. None quando o Fracttal não tem esse nº."""
+    f = str(int(folio))
+    linhas = [w for w in _paginas_ate(f"work_orders?wo_folio={f}") if str(w.get("wo_folio")) == f]
+    if not linhas:
+        return None
+    w0 = linhas[0]
+    nome = " ".join(str(w0.get("personnel_description") or "").split())
+    o = _cartao(f, linhas, {"id": w0.get("id_personnel"), "nome": nome}, datetime.now(timezone.utc).astimezone(BRT).date())
+    o["nota"] = str(w0.get("note") or "").strip()
+    return o
+
+
+def filhas(wid) -> list[dict]:
+    """As OS que nasceram com esta como OS pai (o REST filtra por `id_parent_wo`, medido em 24/10/2026), uma por nº."""
+    if not wid:
+        return []
+    linhas = [w for w in _paginas_ate(f"work_orders?id_parent_wo={int(wid)}")
+              if str(w.get("id_parent_wo")) == str(int(wid))]
+    por: dict = {}
+    for w in linhas:
+        por.setdefault(str(w.get("wo_folio") or w.get("id_work_order")), []).append(w)
+    hoje = datetime.now(timezone.utc).astimezone(BRT).date()
+    out = []
+    for f, ts in por.items():
+        nome = " ".join(str(ts[0].get("personnel_description") or "").split())
+        out.append(_cartao(f, ts, {"id": ts[0].get("id_personnel"), "nome": nome}, hoje))
+    return sorted(out, key=lambda o: int(o["os"]) if str(o["os"]).isdigit() else 0)
+
+
+ATIVIDADE = "descreva a atividade realizada"     # a subtarefa de toda OS que nasce de uma solicitação (solic_spec.BASE)
+
+
+def resposta_da_atividade(folio) -> dict:
+    """A resposta de "Descreva a atividade realizada" de uma OS: {"tem": a subtarefa existe, "resposta": o texto}."""
+    subs = _paginas_ate(f"work_orders_subtasks/?folio={int(folio)}")
+    achadas = [s for s in subs if _norm(s.get("description")) == ATIVIDADE]
+    textos = [str(s.get("value") or "").strip() for s in achadas if str(s.get("value") or "").strip()]
+    return {"tem": bool(achadas), "resposta": " / ".join(textos)}
 
 
 def _reler(app):
