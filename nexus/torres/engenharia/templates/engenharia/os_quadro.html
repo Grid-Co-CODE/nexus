@@ -24,7 +24,7 @@
         <h1 class="cn-titulo">OS {{ o.os }} <span>{{ o.ativo or o.codigo }}</span></h1></div>
       <p class="cn-pergunta">{{ o.usina or '—' }}{% if o.tipo %} · {{ o.tipo }}{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
-    <div class="eg-os-acoes"><a class="gc-btn gc-btn--primario" href="{{ solicitar_url }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
+    <div class="eg-os-acoes"><a class="gc-btn gc-btn--primario" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
   </div>
   {% if msg_ok %}<p class="eg-os-aviso eg-os-aviso--ok" role="status">{{ msg_ok }}</p>{% endif %}
   {% if msg_erro %}<p class="cn-erro" role="status">{{ msg_erro }}</p>{% endif %}
@@ -70,7 +70,7 @@
           <dt>Criada</dt><dd>{{ o.criada or '—' }}</dd>
           <dt>Criticidade</dt><dd>{{ prioridade_fracttal or '—' }} no Fracttal</dd>
           {% if o.etiquetas %}<dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% endfor %}</dd>{% endif %}
-          {% if o.url %}<dt>No Fracttal</dt><dd><a href="{{ o.url }}" target="_blank" rel="noopener">abrir a OS {{ o.os }}</a></dd>{% endif %}
+          {% if o.url %}<dt>No Fracttal</dt><dd><a href="{{ o.url|na_raiz }}" target="_blank" rel="noopener">abrir a OS {{ o.os }}</a></dd>{% endif %}
         </dl>
       </section>
       <section class="eg-painel">
