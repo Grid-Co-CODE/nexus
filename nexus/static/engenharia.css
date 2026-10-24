@@ -365,16 +365,6 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 @media (max-width:480px){.eg-gav-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.eg-item-tags .eg-tag{white-space:normal}}
 
 /* ── a OS do Quadro da equipe (24/10/2026): a tela do chamado da Garantia, no desenho do Nexus ── */
-.eg-os-volta{display:inline-block;margin-bottom:6px;font-size:12.5px;color:var(--mudo);text-decoration:none}
-.eg-os-volta:hover{color:var(--tinta)}
-.eg-os-cab{align-items:flex-start}
-.eg-os-cab-txt{min-width:0}
-.eg-os-tit{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.eg-os-tit .cn-titulo{margin:0}
-.eg-os-tit .cn-titulo span{font-weight:500;color:var(--mudo)}
-.eg-os-acoes{display:flex;gap:8px;flex-wrap:wrap}
-.eg-os-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
-@media (max-width:900px){.eg-os-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .eg-os-det{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:0 16px;align-items:start}
 @media (max-width:1100px){.eg-os-det{grid-template-columns:minmax(0,1fr)}}
 .eg-os-col{min-width:0}
@@ -413,3 +403,48 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
   animation:kb-pulso 1.4s ease-in-out infinite alternate}
 @keyframes kb-pulso{from{opacity:.5}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.kb-card--parada::after{animation:none;opacity:1}}
+
+/* ── o topo da OS do Quadro da equipe igual ao da tela do chamado da Garantia (Levi, 24/10/2026: "quero quase idêntico
+   na estrutura mesmo então essa parte de cima quero na mesma estrutura e fonte os botões quero nas mesmas posições"):
+   as medidas do chamados.css do OS Creator (.ac-head, .tag, .btn-o, .kpis), com os tokens do Nexus e a Inter de lá ── */
+.eg-ac{--fonte-ac:"Inter","Segoe UI",Arial,sans-serif}
+.eg-ac-volta{display:inline-flex;align-items:center;gap:6px;font:500 12.5px var(--fonte-ac);color:var(--mudo);text-decoration:none;
+  white-space:nowrap}
+.eg-ac-volta:hover{color:var(--verde-texto)}
+.eg-ac-head{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:6px 0 14px;border-bottom:1px solid var(--linha)}
+.eg-ac-esq{min-width:0}
+.eg-ac-tit{display:flex;align-items:center;gap:16px;min-width:0;flex-wrap:wrap}
+.eg-ac-head h1{font:700 21px/1.25 var(--fonte-ac);color:var(--tinta);letter-spacing:-.01em;margin:0}
+.eg-ac-head h1 span{color:var(--verde-texto);font-weight:600}
+.eg-ac-sub{margin:4px 0 0;font:400 12.5px/1.4 var(--fonte-ac);color:var(--mudo)}
+.eg-ac-sub b{color:var(--tinta);font-weight:600}
+.eg-ac-acoes{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.eg-ac-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:8px;
+  font:600 12.5px/1 var(--fonte-ac);padding:9px 15px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.eg-ac-btn--o{background:transparent;color:var(--tinta);border:1px solid var(--linha-forte);padding:8px 14px}
+.eg-ac-btn--o:hover{border-color:var(--verde);color:var(--tinta)}
+.eg-ac-tag{display:inline-block;font:700 10px/1.4 var(--fonte-ac);letter-spacing:.05em;text-transform:uppercase;border-radius:5px;
+  padding:2px 7px;white-space:nowrap}
+.eg-ac-tag--r{background:var(--critico-suave);color:var(--critico)}
+.eg-ac-tag--a{background:var(--alerta-suave);color:var(--alerta)}
+.eg-ac-tag--g{background:var(--ok-suave);color:var(--ok)}
+.eg-ac-tag--m{background:var(--superficie-2);color:var(--mudo)}
+.eg-ac-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--superficie);border:1px solid var(--linha);
+  border-radius:12px;padding:12px 18px;margin:14px 0 16px}
+.eg-ac-kpi{padding:0 18px;border-left:1px solid var(--linha);min-width:0}
+.eg-ac-kpi:first-child{padding-left:0;border-left:0}
+.eg-ac-kpi .lbl{font:600 10.5px/1 var(--fonte-ac);letter-spacing:.08em;text-transform:uppercase;color:var(--mudo);margin-bottom:6px}
+.eg-ac-kpi .linha{display:flex;align-items:baseline;gap:2px 10px;min-width:0;flex-wrap:wrap}
+.eg-ac-kpi .val{font:700 24px/1 var(--fonte-ac);color:var(--tinta);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* o status da engenharia é texto comprido ("Tratativa com Equipe de Campo"): quebra, em vez de cobrir o vizinho */
+.eg-ac-kpi .val.pq{font:600 15px/1.3 var(--fonte-ac);white-space:normal;min-width:0}
+.eg-ac-kpi .val.r{color:var(--critico)}
+.eg-ac-kpi .val.a{color:var(--alerta)}
+.eg-ac-kpi .note{font:400 11.5px/1.35 var(--fonte-ac);color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  min-width:0}
+.eg-ac-kpi .note b{color:var(--tinta);font-weight:600}
+@media (max-width:980px){.eg-ac-kpis{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:14px}
+  .eg-ac-kpi:nth-child(3){padding-left:0;border-left:0}}
+@media (max-width:640px){.eg-ac-head h1{font-size:18px}.eg-ac-kpis{padding:12px}
+  .eg-ac-kpi:nth-child(odd){padding-left:0;border-left:0}.eg-ac-kpi:nth-child(even){padding:0 0 0 12px;border-left:1px solid var(--linha)}
+  .eg-ac-kpi .note{white-space:normal}}

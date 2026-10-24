@@ -807,6 +807,34 @@ def _faixa_da_os(o: dict, est: dict, agora, sem_livro: bool = False) -> list[dic
             {"rotulo": "Última atualização", "valor": v4, "grav": g4, "nota": n4}]
 
 
+def _topo_da_os(o: dict, est: dict, agora, sem_livro: bool = False) -> dict:
+    """A pílula e o local do topo, no desenho da tela do chamado da Garantia (Levi, 24/10/2026: "quero quase idêntico na
+    estrutura mesmo"): a cor diz o estado como o semáforo de lá (vermelho = atrasada, âmbar = aberta, verde = concluída,
+    apagada = cancelada) e o texto diz o que pede atenção, como o "COM O FORNECEDOR · HÁ 39 DIAS SEM ATUALIZAÇÃO" de lá.
+    Sem ler o livro, não se diz "sem atualização" (só as datas do Fracttal chutariam)."""
+    from ...engenharia import os_acompanhamento as O
+    rot = {"fazer": "A fazer", "execucao": "Em execução", "verificacao": "Em verificação", "concluida": "Concluída",
+           "cancelada": "Cancelada"}
+    col = o["coluna"]
+    texto, cor = rot.get(col, col), "a"
+    if col == "cancelada":
+        cor = "m"
+    elif col == "concluida":
+        cor = "g"
+        texto += (" em " + o["fim"][:5]) if o.get("fim") else ""
+    elif o.get("prazo") == "atrasada" and o.get("dias") is not None:
+        cor = "r"
+        texto += " · atrasada há " + _dias(-o["dias"])
+    elif not sem_livro:
+        ultima, _de = _ultima_da_os(o, est)
+        if ultima and O.parada(col, ultima, agora):
+            texto += " · há " + _dias((agora - ultima).days) + " sem atualização"
+    # o local como o da tela do chamado ("Athon · Santa Maria do Pará 1"): o cliente e a usina do grupo do Fracttal
+    partes = [x.strip() for x in str(o.get("usina") or "").split(" - ") if x.strip()]
+    local = " · ".join(partes[:2]) if len(partes) >= 2 else (o.get("usina") or "—")
+    return {"texto": texto, "cor": cor, "local": local}
+
+
 @bp.route("/equipe/os/<int:folio>")
 def equipe_os(folio: int):
     import logging
@@ -844,6 +872,7 @@ def equipe_os(folio: int):
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
         kpis=_faixa_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)), pode=pode and not erro_livro,
+        topo=_topo_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)),
         status=O.STATUS,
         prioridades=O.PRIORIDADES, nome_status=O.nome_status, nome_prioridade=O.nome_prioridade,
         prioridade_fracttal=PRIORIDADE_FRACTTAL.get(o.get("prioridade_fracttal") or "",

@@ -3,6 +3,9 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+{# a fonte da tela do chamado da Garantia (o chamados.css do OS Creator usa a Inter): o topo fica na mesma letra #}
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 {# A OS do Quadro da equipe (Levi, 24/10/2026: "Ao clicar quero uma visão parecida com o que aparece quando clica na OS da
    parte de CHAMADOS > GARANTIA"). O desenho da tela do chamado: em cima a etiqueta, o botão e os quatro números; à
    esquerda o que a engenharia FAZ (o status e a prioridade, no lugar do ticket do fornecedor; os dados; as OS filhas);
@@ -10,35 +13,35 @@
    lugar do "Abrir a OS". #}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
 {% set ROT = {'fazer': 'A fazer', 'execucao': 'Em execução', 'verificacao': 'Em verificação', 'concluida': 'Concluída', 'cancelada': 'Cancelada'} %}
-<div class="campo-nativa eg-os">
-  <a class="eg-os-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
+<div class="campo-nativa eg-os eg-ac">
   {% if not o %}
+  <a class="eg-ac-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
   <h1 class="cn-titulo">OS {{ folio }}</h1>
   {% if nao_achou %}<p class="cn-erro" role="status"><b>Não achei a OS {{ folio }} no Fracttal.</b> Confira o número.</p>
   {% else %}<p class="cn-erro" role="status"><b>O Fracttal não respondeu ({{ erro_fracttal }}).</b> Recarregue em instantes.</p>{% endif %}
   {% else %}
-  <div class="cn-cab eg-os-cab">
-    <div class="eg-os-cab-txt">
-      <p class="gc-eyebrow">{{ torre.nome }} · Quadro da equipe</p>
-      <div class="eg-os-tit">{{ tag(ROT.get(o.coluna, o.coluna) ~ (' · atrasada' if o.prazo == 'atrasada' else ''), {'atrasada': 'critico', 'vence': 'alerta'}.get(o.prazo, 'neutro')) }}
-        <h1 class="cn-titulo">OS {{ o.os }} <span>{{ o.ativo or o.codigo }}</span></h1></div>
-      <p class="cn-pergunta">{{ o.usina or '—' }}{% if o.tipo %} · {{ o.tipo }}{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
+  {# o topo da tela do chamado da Garantia (Levi, 24/10/2026: "essa parte de cima quero na mesma estrutura e fonte os
+     botões quero nas mesmas posições"): numa linha a volta, a pílula do estado e o título com o ativo em verde; embaixo o
+     local, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o "Solicitar OS" #}
+  <div class="eg-ac-head">
+    <div class="eg-ac-esq">
+      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
+        <span class="eg-ac-tag eg-ac-tag--{{ topo.cor }}">{{ topo.texto }}</span>
+        <h1>OS {{ o.os }} <span>{{ o.ativo or o.codigo }}</span></h1></div>
+      <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
-    <div class="eg-os-acoes"><a class="gc-btn gc-btn--primario" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
+    <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
   </div>
   {% if msg_ok %}<p class="eg-os-aviso eg-os-aviso--ok" role="status">{{ msg_ok }}</p>{% endif %}
   {% if msg_erro %}<p class="cn-erro" role="status">{{ msg_erro }}</p>{% endif %}
   {% if velha_em %}<p class="cn-erro cn-aviso" role="status"><b>Mostrando a última leitura boa da engenharia ({{ velha_em }}).</b> O banco não respondeu agora; recarregue em instantes.</p>{% endif %}
   {% if erro_livro %}<p class="cn-erro cn-aviso" role="status"><b>Não consegui ler o status e os comentários da engenharia ({{ erro_livro }}).</b> Recarregue em instantes.</p>{% endif %}
 
-  <section class="kb-kpis eg-os-kpis" aria-label="A OS agora">
-    {% for k in kpis %}<div class="kb-kpi">
-      <span class="kb-kpi-rot">{{ k.rotulo }}</span>
-      <span class="kb-kpi-linha"><b class="kb-kpi-v{{ ' kb-kpi-v--' ~ k.grav if k.grav }}">{{ k.valor }}</b><span class="kb-kpi-nota">
-        {%- for texto, negrito in k.nota %}{% if negrito %}<b>{{ texto }}</b>{% else %}{{ texto }}{% endif %}{% endfor -%}
-      </span></span>
-    </div>{% endfor %}
-  </section>
+  <div class="eg-ac-kpis" aria-label="A OS agora">
+    {% for k in kpis %}<div class="eg-ac-kpi"><div class="lbl">{{ k.rotulo }}</div><div class="linha"><span class="val pq{{ ' ' ~ {'critico': 'r', 'alerta': 'a'}.get(k.grav, '') if k.grav }}">{{ k.valor }}</span><span class="note">
+      {%- for texto, negrito in k.nota %}{% if negrito %}<b>{{ texto }}</b>{% else %}{{ texto }}{% endif %}{% endfor -%}
+    </span></div></div>{% endfor %}
+  </div>
 
   <div class="eg-os-det">
     <div class="eg-os-col">

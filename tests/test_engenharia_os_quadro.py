@@ -144,10 +144,10 @@ def _secao(html, titulo):
 
 
 def _kpis(html):
-    import re
-    faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
-    return (re.findall(r'<span class="kb-kpi-rot">([^<]+)</span>', faixa),
-            re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', faixa))
+    """Os quatro números do topo, no desenho da faixa da tela do chamado (.kpis da Garantia)."""
+    faixa = html.split('<div class="eg-ac-kpis"', 1)[1].split("</section>", 1)[0]
+    return (re.findall(r'<div class="lbl">([^<]+)</div>', faixa),
+            re.findall(r'<span class="val[^"]*">([^<]+)</span>', faixa))
 
 
 def test_pagina_da_os_tem_os_quatro_numeros_e_os_blocos(pagina, cliente):
@@ -177,7 +177,7 @@ def test_classificar_grava_e_volta_com_o_aviso(pagina, cliente):
     assert r.status_code == 303 and r.headers["Location"].split("?", 1)[0].endswith(URL)
     html = cliente.get(r.headers["Location"]).get_data(as_text=True)
     _rot, valores = _kpis(html)
-    assert valores[:2] == ["Diagnóstico em Andamento", "Urgente"] and 'kb-kpi-v--critico">Urgente<' in html
+    assert valores[:2] == ["Diagnóstico em Andamento", "Urgente"] and '<span class="val pq r">Urgente<' in html
     assert "Status: Diagnóstico em Andamento" in _secao(html, "Comentários")       # a linha do tempo diz a mudança
     r = cliente.post(URL + "/classificar", data={"status_id": "3", "prioridade_id": "3"}, headers=SAME)
     assert "Nada+mudou" in r.headers["Location"] or "Nada%20mudou" in r.headers["Location"]
@@ -364,10 +364,10 @@ def test_pulso_usa_a_sombra_em_camadas_por_token():
 
 
 def test_os_quatro_numeros_da_os_viram_duas_colunas_no_celular():
-    # prova a 375 px (24/10/2026): a regra das quatro colunas vencia a de duas do celular (.kb-kpis a 900 px)
+    # prova a 375 px (24/10/2026); a faixa é a da tela do chamado: duas colunas a 980 px, como a .kpis de lá
     from pathlib import Path
     css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
-    assert re.search(r"@media \(max-width:900px\)\{\.eg-os-kpis\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}", css)
+    assert re.search(r"@media \(max-width:980px\)\{\.eg-ac-kpis\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)", css)
 
 
 # ── revisão final (24/10/2026) ───────────────────────────────────────────────────────────────────────────────────────
@@ -459,3 +459,46 @@ def test_pagina_sem_o_livro_nao_chuta_a_ultima_atualizacao(pagina, cliente, monk
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     _rot, valores = _kpis(html)
     assert valores[0] == valores[1] == valores[3] == "—" and "Não consegui ler o status" in html
+
+
+
+# ── o topo igual ao da tela do chamado da Garantia (Levi, 24/10/2026: "quero quase idêntico na estrutura mesmo então essa
+# parte de cima quero na mesma estrutura e fonte os botões quero nas mesmas posições") ─────────────────────────────────
+def test_topo_na_estrutura_da_tela_do_chamado(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    topo = html.split('<div class="eg-ac-head">', 1)[1].split('<div class="eg-ac-kpis"', 1)[0]
+    # numa linha: a volta, a pílula do estado e o título com o ativo em verde; embaixo, o local, o tipo e o Fracttal
+    tit = topo.split('<div class="eg-ac-tit">', 1)[1].split("</div>", 1)[0]
+    assert tit.index("eg-ac-volta") < tit.index("eg-ac-tag") < tit.index("<h1>OS 16502 <span>")
+    assert '<p class="eg-ac-sub">Thopen · Altair 1 · <b>Administrativa</b> · Em Processo no Fracttal</p>' in topo
+    # o botão no lugar do "Abrir a OS": à direita, no fim da linha, contorno
+    acoes = topo.split('<div class="eg-ac-acoes">', 1)[1]
+    assert 'class="eg-ac-btn eg-ac-btn--o"' in acoes and ">Solicitar OS<" in acoes
+    assert "gc-eyebrow" not in topo and "kb-kpis" not in html
+    assert "family=Inter:wght@400;500;600;700" in html                   # a fonte da tela do chamado
+
+
+def test_pilula_do_topo_diz_o_estado_como_a_do_chamado(pagina, cliente):
+    # a OS de teste está atrasada (programada antes de hoje): a pílula vermelha diz há quantos dias
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    tag = re.search(r'<span class="eg-ac-tag eg-ac-tag--(\w+)">([^<]+)</span>', html)
+    assert tag.group(1) == "r" and tag.group(2).startswith("A fazer · atrasada há ")
+
+
+def test_topo_usa_a_fonte_e_as_medidas_da_tela_do_chamado():
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r'\.eg-ac\{[^}]*--fonte-ac:"Inter"', css)
+    assert re.search(r"\.eg-ac-head h1\{font:700 21px/1\.25 var\(--fonte-ac\)", css)
+    assert re.search(r"\.eg-ac-kpi \.val\.pq\{font:600 15px/1\.3 var\(--fonte-ac\)", css)
+    assert re.search(r"\.eg-ac-acoes\{margin-left:auto", css)
+
+
+def test_valor_longo_da_faixa_quebra_em_vez_de_invadir_o_vizinho():
+    # prova a 375 px: "Diagnóstico em Andamento" (sem quebra, como as datas da tela do chamado) cobria a Prioridade
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r"\.eg-ac-kpi \.val\.pq\{[^}]*white-space:normal", css)
+    assert re.search(r"\.eg-ac-kpi \.linha\{[^}]*flex-wrap:wrap", css)

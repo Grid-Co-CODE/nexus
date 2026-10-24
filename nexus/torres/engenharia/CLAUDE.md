@@ -168,8 +168,14 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 `docs/superpowers/specs/2026-10-24-engenharia-os-do-quadro-design.md`.
 
 - **A página:** `/t/engenharia/equipe/os/<nº>` (`equipe_os`, template `os_quadro.html`, classes `eg-os-*`), lida na hora
-  no Fracttal (`os_equipe.ler_os`, só leitura: a OS de todas as tarefas, com a nota inteira). Em cima, a etiqueta da
-  coluna, o "Solicitar OS" e os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
+  no Fracttal (`os_equipe.ler_os`, só leitura: a OS de todas as tarefas, com a nota inteira). **O topo é o da tela do
+  chamado da Garantia** (Levi, 24/10/2026: "quero quase idêntico na estrutura mesmo então essa parte de cima quero na
+  mesma estrutura e fonte os botões quero nas mesmas posições"): as medidas do `chamados.css` do OS Creator copiadas em
+  `eg-ac-*`, com os tokens do Nexus e a Inter de lá. Numa linha a volta, a pílula do estado (`_topo_da_os`: vermelho
+  atrasada, âmbar aberta, com "há N dias sem atualização" quando parada, verde concluída, apagada cancelada) e o título
+  com o ativo em verde; embaixo o cliente · usina, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o
+  "Solicitar OS"; e a faixa dos quatro números no desenho da de lá (o valor de texto comprido quebra, em vez de cobrir o
+  vizinho). Os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
   Programada (atrasada, vence ou abre em) e Última atualização (o mais novo entre o registro da engenharia, o início e o
   fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). À esquerda o que a
   engenharia faz (Status e prioridade, Dados, OS filhas); à direita o que ela lê (Na nota da OS, Demais respostas do
