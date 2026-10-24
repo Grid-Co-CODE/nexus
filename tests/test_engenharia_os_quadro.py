@@ -3,6 +3,7 @@ aparece quando clica na OS da parte de CHAMADOS > GARANTIA"), com o status e a p
 na nota da OS, as OS filhas e o pulso das paradas. Desenho em docs/superpowers/specs/2026-10-24-engenharia-os-do-quadro-
 design.md. Banco falso (tests/pg_falso.py) e Fracttal falso; os nomes são fictícios."""
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -202,3 +203,106 @@ def test_os_que_nao_existe_diz_que_nao_achou(pagina, cliente):
     from test_engenharia_acompanhamento import _como
     r = _como(cliente, ANA).get("/t/engenharia/equipe/os/99999")
     assert r.status_code == 404 and "Não achei a OS 99999" in r.get_data(as_text=True)
+
+
+# ── Task 3: o comentário na nota da OS (pela ponte do OS Creator, na sessão do Fracttal da pessoa) ───────────────────
+COMENTAR = "/os/_nexus/engenharia/os/{}/comentar"
+
+
+def _login_do_fracttal(app, cliente):
+    """O cookie do OS Creator como o login pelo Fracttal o deixa (JWT de mentira; nada vai ao Fracttal)."""
+    from nexus.torres.oscreator import ponte
+    clone = ponte.clone(app)
+    jwt = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.sig"
+    valor = clone.session_interface.get_signing_serializer(clone).dumps(
+        {"jwt": jwt, "conta": {"nome": "Pessoa Teste", "email": "teste@exemplo.invalid"}})
+    cliente.set_cookie("os_sessao", valor, path="/os")
+
+
+@pytest.fixture
+def fracttal_do_os(app, pagina, monkeypatch):
+    """O api do clone com a OS de uma tarefa e a nota antiga; o que seria escrito no Fracttal fica em `escritas`."""
+    pytest.importorskip("PyQt6")
+    from nexus.torres.oscreator import ponte
+    ponte.clone(app)
+    import api as os_api
+    det = {"notas": "Nota antiga da OS", "tarefas": [{"id": 1}], "cancel_motivo": "", "cancel_nota": ""}
+    escritas, resposta = [], {"ok": True}
+    monkeypatch.setattr(os_api, "get_os_detalhes", lambda wid: dict(det))
+
+    def editar(wid, nota):
+        escritas.append((wid, nota))
+        return dict(resposta, nota=nota) if resposta.get("ok") else dict(resposta)
+    monkeypatch.setattr(os_api, "editar_nota_os", editar)
+    return {"det": det, "escritas": escritas, "resposta": resposta}
+
+
+def test_comentario_vai_para_a_nota_com_data_e_hora(fracttal_do_os, pagina, cliente, app):
+    from test_engenharia_acompanhamento import SAME, _como
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "Trocar o cabo", "folio": "16502"},
+                     headers=SAME)
+    assert r.status_code == 200 and r.get_json()["ok"] and "nota da OS 16502" in r.get_json()["mensagem"]
+    (wid, nota), = fracttal_do_os["escritas"]
+    assert wid == pagina["id_work_order"]
+    assert re.fullmatch(r"Nota antiga da OS\n\[\d\d/\d\d/\d{4} \d\d:\d\d\] Ana Lima \(Engenharia\): Trocar o cabo", nota)
+    c = _est(pagina["id_work_order"])["eventos"][0]
+    assert c["evento"] == "comentario" and c["texto"] == "Trocar o cabo" and c["nota"] == "sim"
+
+
+def test_sem_login_do_fracttal_pede_o_login_e_nao_grava(fracttal_do_os, pagina, cliente):
+    # quem entrou pela conta Microsoft não tem a sessão do Fracttal no OS Creator (pelo Fracttal, o portão encerra o
+    # Nexus junto com ela, e o caso nem chega aqui)
+    import time
+
+    from test_engenharia_acompanhamento import SAME
+    with cliente.session_transaction() as s:
+        s["logado"], s["admin"], s["usuario"] = True, False, ANA
+        s["via"], s["ms_ate"] = "microsoft", time.time() + 3600
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"}, headers=SAME)
+    j = r.get_json()
+    assert r.status_code == 401 and j["login"].startswith("/os/login?next=")
+    assert "%2Ft%2Fengenharia%2Fequipe%2Fos%2F16502" in j["login"]        # o login do Fracttal volta para a página
+    assert not fracttal_do_os["escritas"] and not _est(pagina["id_work_order"])
+
+
+def test_os_de_varias_tarefas_fica_so_no_nexus_com_o_motivo(fracttal_do_os, pagina, cliente, app):
+    # a regra medida do OS Creator: com várias tarefas a nota sobrescreveria a observação da tarefa errada
+    from test_engenharia_acompanhamento import SAME, _como
+    fracttal_do_os["det"]["tarefas"] = [{"id": 1}, {"id": 2}]
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "Visto", "folio": "16502"}, headers=SAME)
+    assert r.status_code == 200 and "só no Nexus" in r.get_json()["mensagem"]
+    assert not fracttal_do_os["escritas"]
+    c = _est(pagina["id_work_order"])["eventos"][0]
+    assert c["texto"] == "Visto" and "tarefas" in c["nota"]
+
+
+def test_erro_do_fracttal_nao_grava_nada(fracttal_do_os, pagina, cliente, app):
+    from test_engenharia_acompanhamento import SAME, _como
+    fracttal_do_os["resposta"].update(ok=False, erro="O Fracttal recusou")
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"}, headers=SAME)
+    assert r.status_code == 502 and "Nada foi gravado" in r.get_json()["erro"]
+    assert not _est(pagina["id_work_order"])
+
+
+def test_comentario_de_outro_site_ou_de_fora_da_engenharia_e_recusado(fracttal_do_os, pagina, cliente, app,
+                                                                      monkeypatch):
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.auth import setor_telas as ST
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"},
+                     headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+                                               "erro": ""})
+    r = _como(cliente, BETO).post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"},
+                                  headers={"Sec-Fetch-Site": "same-origin"})
+    assert r.status_code == 400 and "Engenharia" in r.get_json()["erro"]
+    assert not fracttal_do_os["escritas"]

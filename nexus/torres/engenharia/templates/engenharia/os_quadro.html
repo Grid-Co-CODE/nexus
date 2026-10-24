@@ -139,6 +139,8 @@
       .then(function (x) {
         btn.disabled = false;
         if (x.r.ok && x.j.ok) { location.replace(location.pathname + '?' + new URLSearchParams({ok: x.j.mensagem || 'Comentário salvo.'}).toString()); return; }
+        // a sessão do Nexus que acabou (o portão responde com "login": true e o endereço do Entrar): de volta a ele
+        if (x.j.login === true || x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; return; }
         if (x.j.login) { diz(x.j.erro || 'Para ir à nota da OS, entre pelo Fracttal.', true, x.j.login); return; }
         diz(x.j.erro || ('O Nexus não gravou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), true);
       })
