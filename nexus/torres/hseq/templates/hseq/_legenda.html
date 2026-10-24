@@ -7,4 +7,21 @@
     <dl class="hs-leg">{{ caller() }}</dl>
     {% if pe %}<p class="hs-leg-pe">{{ pe }}</p>{% endif %}
   </section>{% endmacro %}
+{# O mesmo aviso, compactado numa exclamação amarela que abre ao clicar (Levi, 24/10/2026, na tela de Extintores: "deve
+   ficar compactado em um símbolo de exclamação amarelo, quando a pessoa clica aparece o comunicado"). Clicar fora ou
+   Esc fecha. Uso: {% call aviso('Título', 'o pé') %}...{% endcall %} #}
+{% macro aviso(titulo, pe='') %}<details class="hs-aviso"><summary class="hs-aviso-bt" title="{{ titulo }}" aria-label="{{ titulo }}">!</summary>
+    <section class="hs-legenda hs-aviso-caixa" aria-label="{{ titulo }}">
+      <p class="hs-leg-t"><b>{{ titulo }}</b></p>
+      <dl class="hs-leg">{{ caller() }}</dl>
+      {% if pe %}<p class="hs-leg-pe">{{ pe }}</p>{% endif %}
+    </section>
+  </details>
+  <script>
+    (function () {
+      var d = document.currentScript.previousElementSibling;
+      document.addEventListener('click', function (ev) { if (d.open && !d.contains(ev.target)) d.open = false; });
+      document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && d.open) { d.open = false; d.querySelector('summary').focus(); } });
+    })();
+  </script>{% endmacro %}
 {% macro termo(rotulo, tom='') %}<dt>{% if tom %}<span class="cn-st cn-t-{{ tom }}">{{ rotulo }}</span>{% else %}<b>{{ rotulo }}</b>{% endif %}</dt>{% endmacro %}

@@ -101,6 +101,12 @@ def _texto(html):
     return " ".join(re.sub(r"<[^>]+>", " ", html).split())
 
 
+def _caixa(html):
+    """Só a caixa dos não reconhecidos (o aviso do título também é uma <section>, antes dela)."""
+    i = html.index('id="nao-reconhecidos"')
+    return html[i:html.index("</section>", i)]
+
+
 def _linhas(html):
     """Os códigos dos extintores na tabela, na ordem."""
     return re.findall(r'title="([A-Z]{3}\d{3}-INFC1-PPCI-EXT\d+)"', html)
@@ -181,7 +187,7 @@ def test_sem_o_livro_a_tela_diz_que_os_extintores_ainda_nao_chegaram(banco, loga
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     assert "Os extintores ainda não chegaram ao banco do Nexus" in html and "extintores_app_campo" in html
     assert "cn-numeros" not in html and "<table>" not in html
-    assert "Como cada extintor entra" in html and 'class="hs-legenda"' in html     # a explicação das regras fica
+    assert "Como cada extintor entra" in html and 'class="hs-legenda hs-aviso-caixa"' in html   # a explicação das regras fica, na exclamação
 
 
 def test_a_faixa_conta_o_que_o_pedido_quer_e_cada_numero_filtra_a_tabela(com_livro, logado):
@@ -357,8 +363,8 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     # o Status no lugar do "Status da TST" (24/10/2026, 2ª rodada); Responsável e Técnicos só com um cliente aberto
     assert cab == ("Situação Última conferência Cliente e usina Responsável Técnicos Quantidade de extintores "
                    "Recarga mais próxima Status")
-    assert '<th aria-label="Ações"></th>' in html and 'class="cn-expande ext-clientes hs-sem-pessoas"' in html
-    assert html.count('<th class="hs-col-pessoa">') == 2
+    assert '<th aria-label="Ações"></th>' in html and 'class="cn-expande ext-clientes hs-fechada"' in html
+    assert html.count('<th class="hs-col-aberta">') == 3
     # 3 clientes (Thopen, Outro Cliente e "Sem cliente", a Irecê 2 fora do cadastro) e 4 usinas, tudo fechado
     assert html.count('<tr class="cn-linha ext-cli"') == 3 and html.count('<tr class="cn-linha ext-us"') == 4
     assert len(re.findall(r'<tr class="cn-linha ext-us"[^>]* hidden>', html)) == 4
@@ -811,7 +817,7 @@ def com_nao_reconhecido(banco, monkeypatch):
 
 def test_nao_reconhecido_sai_das_contas_e_vai_para_a_caixa_da_tst(com_nao_reconhecido, logado):
     html = logado.get("/t/hseq/extintores?modo=tabela&ver=extintor").get_data(as_text=True)
-    caixa = html[html.index('id="nao-reconhecidos"'):html.index("</section>")]
+    caixa = _caixa(html)
     assert _linhas(caixa) == ["ALT100-INFC1-PPCI-EXT02"]                 # a marca velha do Coração não vale
     t = _texto(caixa)
     assert "1 extintor não reconhecido em campo" in t and "é lá que a Segurança aceita (o extintor é excluído) ou pede uma nova ronda da usina" in t
@@ -819,13 +825,13 @@ def test_nao_reconhecido_sai_das_contas_e_vai_para_a_caixa_da_tst(com_nao_reconh
     assert "01/08/2026" in t                                                # a conferência de antes da marca
     assert codigo_da_pessoa(CHAVE, "tec1@exemplo.test") not in html
     # fora de TODAS as contas: a tabela, o total da faixa (5, não 6) e o perto de vencer (o EXT02 vencia em 22 dias)
-    assert _linhas(html[html.index("</section>"):]) == ["ALT100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01",
+    assert _linhas(html[html.index('id="tabela"'):]) == ["ALT100-INFC1-PPCI-EXT01", "COR100-INFC1-PPCI-EXT01",
                                                         "BWK100-INFC1-PPCI-EXT01", "IRC200-INFC1-PPCI-EXT01",
                                                         "ALT100-INFC1-PPCI-EXT03"]
     faixa = _texto(html[html.index("cn-numeros"):html.index('id="nao-reconhecidos"')])
     assert "Extintores 5" in faixa and "Perto de vencer 0" in faixa and "Não reconhecidos 1" in faixa
     sem = logado.get("/t/hseq/extintores?f=sem_atualizacao&ver=extintor").get_data(as_text=True)
-    assert "ALT100-INFC1-PPCI-EXT02" not in _linhas(sem[sem.index("</section>"):])
+    assert "ALT100-INFC1-PPCI-EXT02" not in _linhas(sem[sem.index('id="tabela"'):])
     # os filtros da tela valem na caixa: o cliente do Coração não tem não reconhecido, e a caixa some
     outro = logado.get("/t/hseq/extintores?cliente=Outro+Cliente").get_data(as_text=True)
     assert 'id="nao-reconhecidos"' not in outro and 'gc-rotulo">Não reconhecidos' not in outro
@@ -836,7 +842,7 @@ def test_a_linha_do_nao_reconhecido_leva_a_tabela_filtrada_na_usina(com_nao_reco
     filtrando aquela usina". A linha (e o nome da usina, pelo teclado) leva à tabela por cliente com a usina no filtro,
     o cliente e a usina já abertos; a situação, a visão e o agrupamento de antes saem."""
     html = logado.get("/t/hseq/extintores?f=sem_atualizacao&ver=extintor&cliente=Thopen").get_data(as_text=True)
-    caixa = html[html.index('id="nao-reconhecidos"'):html.index("</section>")]
+    caixa = _caixa(html)
     assert '<tr class="ext-ir" data-href="?cliente=Thopen&amp;usina=Altair#tabela"' in caixa
     assert '<a class="cn-link" href="?cliente=Thopen&amp;usina=Altair#tabela">Altair</a>' in caixa
     us = logado.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
@@ -847,7 +853,7 @@ def test_a_linha_do_nao_reconhecido_leva_a_tabela_filtrada_na_usina(com_nao_reco
     assert tab.count('<tr class="hs-nr">') == 1
     # no total da usina e no Status, à parte das situações
     assert "3 08/2026 venceu há 39 d 1 atrasado 1 em dia 1 não reconhecido" in _abre(us, "</span>Altair</td>")
-    assert _linhas(us[us.index('id="nao-reconhecidos"'):us.index("</section>")]) == ["ALT100-INFC1-PPCI-EXT02"]
+    assert _linhas(_caixa(us)) == ["ALT100-INFC1-PPCI-EXT02"]
 
 
 def test_sem_as_colunas_novas_ninguem_e_nao_reconhecido(com_livro, logado):

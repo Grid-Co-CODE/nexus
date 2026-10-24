@@ -166,7 +166,7 @@
 /* ── 24/10/2026, 2ª rodada ──────────────────────────────────────────────────────────────────────────────────────
    As colunas Responsável e Técnicos só com um cliente aberto (Levi: "não precisa das colunas responsável e técnico na
    primeira visão, só ao clicar na linha deve aparecer essas colunas") */
-.ext-clientes.hs-sem-pessoas .hs-col-pessoa{display:none}
+.ext-clientes.hs-fechada .hs-col-aberta{display:none}
 /* a quantidade é só o total; o Status (no lugar do "Status da TST") é uma linha por situação, com a cor dela, e a
    barrinha das proporções em cima ("A ideia é ficar algo bem mais visual") */
 .ext-tab .hs-qtd{font-size:15px;font-variant-numeric:tabular-nums}
@@ -194,3 +194,30 @@
 .hs-conta b{font:700 18px/1 var(--font-sans);text-align:right;font-variant-numeric:tabular-nums;color:var(--mudo)}
 .hs-conta span{font-size:13px}
 .hs-conta--zero{opacity:.55}
+
+/* a caixa dos não reconhecidos recolhe (Levi, 24/10/2026: "ser possível encolher essa informação para ter o foco na
+   tabela"): o título é o botão, com o "Recolher"/"Mostrar" à direita */
+.ext-naorec-dobra > summary{display:flex;align-items:baseline;gap:12px;cursor:pointer;list-style:none}
+.ext-naorec-dobra > summary::-webkit-details-marker{display:none}
+.ext-naorec-acao{margin-left:auto;font-size:12.5px;color:var(--alerta);white-space:nowrap}
+.ext-naorec-acao::after{content:"Mostrar"}
+.ext-naorec-dobra[open] .ext-naorec-acao::after{content:"Recolher"}
+.ext-naorec-dobra > summary:focus-visible{outline:2px solid var(--alerta);outline-offset:4px;border-radius:4px}
+
+/* o aviso numa exclamação amarela ao lado do título; o clique abre a caixa por cima da tela */
+.hs-titulo{display:flex;align-items:center;gap:12px}
+.hs-titulo .hs-aviso{margin-top:6px}
+.hs-aviso{position:relative;align-self:center}
+.hs-aviso-bt{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1.5px solid var(--alerta);
+  border-radius:50%;background:var(--alerta-suave);color:var(--alerta);font:800 14px/1 var(--font-sans);cursor:pointer;list-style:none}
+.hs-aviso-bt::-webkit-details-marker{display:none}
+.hs-aviso-bt:hover,.hs-aviso[open] .hs-aviso-bt{background:var(--alerta);color:var(--sobre-cheio)}
+.hs-aviso-bt:focus-visible{outline:2px solid var(--alerta);outline-offset:2px}
+.hs-aviso-caixa{position:absolute;z-index:30;top:calc(100% + 8px);left:0;width:min(620px,calc(100vw - 32px));margin:0;
+  background:linear-gradient(var(--alerta-suave),var(--alerta-suave)),var(--superficie-3);box-shadow:0 8px 24px var(--sombra)}
+.hs-aviso-caixa .hs-leg{grid-template-columns:minmax(0,190px) minmax(0,1fr)}
+.hs-aviso-caixa .hs-leg dt{white-space:normal}
+.hs-aviso-caixa{max-height:calc(100vh - 140px);overflow:auto}
+/* no celular a caixa vem presa à tela, com 16 px de cada lado, e os termos um embaixo do outro */
+@media (max-width:640px){.hs-aviso-caixa{position:fixed;top:72px;left:16px;right:16px;width:auto;max-height:calc(100vh - 96px)}
+  .hs-aviso-caixa .hs-leg{grid-template-columns:minmax(0,1fr)}}
