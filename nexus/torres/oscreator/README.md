@@ -699,7 +699,8 @@ barra dela no alto de cada uma (`_solic_nav.html`: "‹ PCM", Nova solicitação
   sair do campo, com o bloco [PCM] de volta depois de uma linha em branco, como o app) e A DECISÃO (o técnico sugerido
   pré-escolhido, a data pretendida, as etiquetas do tema marcadas "(tema)" e a regra da PERFORMANCE, Tipo de tarefa,
   Classificação 1 = Programada e 2 = a disciplina do tema só em campo vazio, o Tema e a OS pai pela busca do
-  `buscar_os_pai`, que guarda o ID); as subtarefas editáveis em faixa inteira; Aprovar (e passa para a próxima), Devolver
+  `buscar_os_pai`, que guarda o ID, já escolhida quando veio da Nova solicitação, seção "Nova solicitação: o título é
+  só o motivo, e a OS pai"); as subtarefas editáveis em faixa inteira; Aprovar (e passa para a próxima), Devolver
   ao supervisor e Mudar status (motivo obrigatório).
 - **Histórico** (`/os/solicitacao/historico`, `static/solic_hist.js`): Criado por, a busca direta pelo nº (ignora os
   filtros; fora das 400 carregadas, busca no Fracttal), a busca ampla, Cliente / Usina em cascata / Tipo de ativo /
@@ -939,6 +940,34 @@ da tarefa.
   tentativa anterior), o tempo dela fica o da primeira tentativa.
 - **Prova:** `tests/test_oscreator_solic_pcm.py::test_o_pcm_troca_o_tempo_estimado_na_decisao` (a rota) e
   `::test_o_tempo_estimado_vai_na_tarefa_da_os` (o pedido ao Fracttal, de mentira). No app de mesa a Fila não tem o campo.
+
+## Nova solicitação: o título é só o motivo, e a OS pai (24/10/2026)
+
+Levi: "o título está com um subtexto de "[Ativo] - Motivo": O certo seria só motivo pois o ativo já tem que ir no título
+automático!" e "ao lado de buscar ativo deixe um espaço do lado direito para "OS Pai" quando preenchido e o PCM for criar
+a OS na fila do PCM já vai vincular aquela OS como OS pai!".
+
+- **O título:** a pessoa escreve só o motivo (o tema põe o motivo dele, sem a marca). O servidor põe o nome curto de CADA
+  ativo na frente (`solic_web.titulo_do_ativo`: "Troca do cabo" → "[Inversor 1.5] - Troca do cabo"), uma chamada por
+  ativo. Até 24/10 só a marca `[Ativo]` virava o nome, e o título escrito sem ela saía sem o ativo. A marca ainda vale (uma
+  tela aberta antes do deploy), e o título que já começa por "[o ativo]" não o repete. A prévia embaixo do campo usa a
+  mesma regra.
+- **A OS pai:** no bloco 1, à direita do Buscar ativo (2/3 e 1/3; abaixo dele a menos de 900 px), opcional. É a busca da
+  Fila (`/os/api/pcm/os-pai`): digitou → 300 ms → a lista; escolher (clique, setas e Enter) guarda o id; digitar de novo
+  desfaz; número digitado e não escolhido não deixa criar. Usa as classes da busca comum (`.osb-*`): nada de cor nova.
+- **O caminho até a Fila:** a solicitação do Fracttal não tem campo para isso, então a OS pai vai no bloco [PCM] da
+  observação de cada solicitação, como o tema e a data sugerida: "OS pai: 16784 (id 555)" (o nº para quem lê no Fracttal
+  web, o id para a Fila mandar no `id_parent` sem buscar de novo; `solic_spec._CAMPOS`). O servidor recusa (400, nada
+  criado) a OS pai torta (`solic_web.os_pai_escolhida`). A Fila lê de volta (`solic_web.os_pai_do_bloco`, a `ficha` com
+  `os_pai` e `os_pai_id`) e abre com ela escolhida; o PCM troca ou apaga, e a confirmação do Aprovar diz "filha da OS N".
+  Só o nº na linha (escrito à mão no Fracttal web): o campo vem com ele e o Aprovar pede a escolha na lista. O app de mesa
+  ignora a linha (rótulo que ele não conhece).
+- **Prova:** `tests/test_oscreator_solic_pcm.py` (os testes de 24/10: o título, um título por ativo, a OS pai no bloco de
+  cada solicitação, a torta que não cria nada, o bloco lido de volta, a Fila com ela escolhida e o aprovar com o
+  `id_parent`, a tela). Na bancada (as páginas do fixture, a busca de mentira), a 1280 e a 375 px, no escuro e no claro: a
+  prévia "[Inversor 1.5] - Troca de ventilador", a OS pai escolhida pelo teclado indo no corpo do criar, o nº não
+  escolhido barrado, a Fila com a 16784 e a confirmação "filha da OS 16784", sem rolagem lateral. No oem, o
+  `test_os_web_solic_27_09.py` (fora do git de lá) passou a cobrar a regra nova junto com a sincronia.
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
