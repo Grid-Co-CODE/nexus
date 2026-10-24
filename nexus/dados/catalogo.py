@@ -200,6 +200,19 @@ FATOS = (
                     "em_andamento, pausado, finalizado; situacao (da ação) a_fazer, em_andamento, concluida. O título, "
                     "a descrição, o chamado, o texto da ação, o andamento e quem só cifrados (Cofre, a chave do "
                     "cadastro). Só acrescenta: nada se edita nem se apaga"),
+    # o Nexus é a FONTE deste (Levi, 24/10/2026: "em início quero uma sub aba chamada 'Sugestões'"): a sugestão que
+    # qualquer pessoa manda pelo Início > Sugestões; o administrador lê a lista. Registrado antes da 1ª gravação
+    Fato("sugestao", "Sugestão para o Nexus", "base", "nexus_sugestoes · fato_sugestao",
+         "1 linha = 1 sugestão mandada por 1 pessoa no Início > Sugestões",
+         _d(data=("id", "data_id (o dia de Brasília em que foi mandada)"),
+            pessoa=("id", "pessoa_id de quem mandou (e o pessoa_hmac, o código do e-mail)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_sugestoes · fato_sugestao",),
+         janela_origem="o Nexus é a fonte",
+         observacao="area = o id da torre do Nexus que a pessoa escolheu entre as que vê (cos, pcm, performance...), "
+                    "vazio = nenhuma em especial. O título, a descrição, o nome e o e-mail de quem mandou e os nomes "
+                    "dos anexos só cifrados (Cofre, a chave do cadastro). Os anexos ficam no disco do servidor "
+                    "(pasta de dados do Nexus, sugestoes/<id>/), não no banco. Só acrescenta: nada se edita nem se "
+                    "apaga"),
     # Contratos e clientes → Contestações (Levi, 13/10/2026: "contestação ligada ao Nexus"; "ficaria na API do PG"). O
     # Dashboard Thopen (5080) é a FONTE: grava 1 linha por contestação × setor, a mesma divisão das mensagens do Teams.
     # Registrado antes da 1ª gravação. O que é do cliente vai só cifrado com a chave PÚBLICA (o 5080 não abre nada)
@@ -974,6 +987,10 @@ LIVROS = (
           "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Campo · App > Ocorrências)",
           "nexus/campo/ocorrencias.py, pela tela Campo · App > Ocorrências", False,
           "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª ocorrência registrada",
+          so_cresce=True),
+    Livro("nexus_sugestoes", ("fato_sugestao",), "a cada sugestão mandada (Início > Sugestões)",
+          "nexus/casca/sugestoes.py, pela aba Início > Sugestões", False,
+          "registrado em 24/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª sugestão mandada",
           so_cresce=True),
     Livro("nexus_pt_decisoes", ("fato_decisao_pt",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "o livro não existe no banco (GET em 11/10/2026): nenhuma decisão gravada. A aba era 'decisoes' até a "

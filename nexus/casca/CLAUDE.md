@@ -13,6 +13,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
 | `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho dos últimos 60 dias, por dia); seção "Versão no ar e Atualizações" abaixo |
+| `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
@@ -380,7 +381,7 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   do `/saude`) e "no ar desde" (a hora em que este processo subiu, o import da casca; cada deploy reinicia o Nexus, então
   é a hora em que a versão entrou). O cartão inteiro é o link para as Atualizações. Saíram o semáforo com o GitHub (e a
   conferência por trás dele: API do GitHub e `git ls-remote`), o assunto do commit e os pedidos presos.
-- **As abas do Início** (`gc-subabas`, em `inicio.html` e `atualizacoes.html`): Visão geral | Atualizações.
+- **As abas do Início** (`gc-subabas`, um só `_inicio_abas.html` incluído em `inicio.html`, `atualizacoes.html` e `sugestoes.html`): Visão geral | Atualizações | Sugestões.
 - **A aba Atualizações** (`/?aba=atualizacoes`, exige login como o Início; era `/atualizacoes`, que no servidor ia à plataforma, ver "Regras que já custaram caro"): **só as novidades, as correções e as melhorias de desempenho (`feat`, `fix` e `perf`) dos últimos 60 dias** (o
   `perf` desde 24/10/2026: o Levi não achou ali a correção da lentidão do dia, um `perf`; 19/10/2026,
   Levi: "deixe só novidade e correção, sempre os últimos 60 dias!"; até então eram os últimos 60 commits de todo tipo). O
@@ -394,6 +395,33 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
 - Sem git (a vitrine estática, uma pasta copiada): o cartão diz "—" e a aba diz que não há histórico. O `/saude` segue
   enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
 - **Prova:** `tests/test_casca_versao.py` (o git dublado).
+
+## Sugestões no Início (24/10/2026)
+
+Levi: "em início quero uma sub aba chamada 'Sugestões'. Vai ter uma tela para a pessoa sugerir, os administradores verão
+em lista a pessoa que pediu, o que pediu e anexos ... Bote um limite no tamanho desses arquivos para não pesar tanto no
+server".
+
+- **Onde**: `/?aba=sugestoes` (o Caddy só manda a raiz exata ao Nexus). O envio é `POST /?aba=sugestoes`, o único POST da
+  raiz (`POST /` sem a aba = 405). Rota em `casca/__init__.py` (`_sugestoes`), regra em `casca/sugestoes.py`.
+- **Quem manda**: qualquer pessoa com login (Microsoft ou Fracttal). A senha de administrador não diz quem é: lê a lista,
+  mas não manda. **Quem lê**: só `session["admin"]` vê "Sugestões recebidas" e baixa os anexos (o resto, 403).
+- **Campos**: título (120), descrição (4.000, guarda as quebras de linha), área = as torres que a pessoa vê
+  (`_torres_da_pessoa`, a mesma conta dos cartões do Início; vazio = "Nenhuma em especial"; área fora delas é recusada)
+  e anexos.
+- **Limites dos anexos**: 5 arquivos, 5 MB cada, 15 MB juntos; `.md .txt .pdf .doc .docx .png .jpg .jpeg .webp`, e o
+  conteúdo confere pelo começo do arquivo (executável renomeado não passa). Pedido com corpo acima de 16 MB é recusado
+  pelo tamanho declarado, antes de ler o formulário (`request.max_content_length` segura o que vem sem tamanho). A tela
+  confere no navegador antes de enviar; o servidor confere de novo. Anexo recusado recusa a sugestão inteira, com o
+  motivo.
+- **Onde fica**: o livro `nexus_sugestoes · fato_sugestao` (registrado no catálogo, `so_cresce`; 1 linha por sugestão;
+  em claro só `id`, o dia, a `area` e a pessoa por `pessoa_id` + `pessoa_hmac`; título, descrição, nome, e-mail e os
+  nomes dos anexos cifrados pelo Cofre). Os anexos no disco: `<pasta de dados>/sugestoes/<id>/1.pdf` (nome neutro; o
+  original só no livro). O banco que recusa apaga os anexos já gravados (nada órfão). O `novo_id` do formulário
+  segura o duplo clique.
+- **Proteção**: `moldura._de_outro_site()` + o código do formulário na sessão (`sugestoes_codigo`). Anexo servido com
+  `nosniff` e `no-store`; imagem abre no navegador, o resto baixa.
+- **Prova**: `tests/test_casca_sugestoes_24_10.py`.
 
 ## Um cabeçalho só: quem entrou no topo do Nexus (13/10/2026)
 
