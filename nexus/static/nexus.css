@@ -238,6 +238,9 @@ a{color:inherit}
 .sug-anexos a{color:var(--verde-texto);text-decoration:none;overflow-wrap:anywhere}
 .sug-anexos a:hover,.sug-anexos a:focus-visible{text-decoration:underline}
 .sug-anexos .mudo{font-size:12px;margin-left:4px}
+.sug-anexos li{display:flex;align-items:center;gap:4px}
+.sug-todos{margin-left:auto}
+.sug-anexos .sug-todos a{color:var(--tinta);text-decoration:none}
 @media (max-width:640px){.sug-linha{grid-template-columns:1fr}.sug-quando{margin-left:0;flex-basis:100%}}
 
 /* Tipografia da casca */

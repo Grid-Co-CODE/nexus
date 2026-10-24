@@ -421,6 +421,9 @@ server".
   segura o duplo clique.
 - **Proteção**: `moldura._de_outro_site()` + o código do formulário na sessão (`sugestoes_codigo`). Anexo servido com
   `nosniff` e `no-store`; imagem abre no navegador, o resto baixa.
+- **Baixar arquivos** (24/10/2026, Levi: "gostaria a opção 'Baixar arquivos' baixa todos os arquivos da sugestão"):
+  `/?aba=sugestoes&anexo=<id>&n=todos` devolve um .zip com todos os anexos (o nome original; repetido ganha " (2)"),
+  chamado pelo título da sugestão. Montado na memória (15 MB no máximo); só o administrador; sem anexo, sem o botão.
 - **Prova**: `tests/test_casca_sugestoes_24_10.py`.
 
 ## Um cabeçalho só: quem entrou no topo do Nexus (13/10/2026)

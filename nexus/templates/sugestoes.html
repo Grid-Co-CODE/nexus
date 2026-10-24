@@ -85,6 +85,9 @@
           <i class="ph {{ 'ph-image' if a.imagem else 'ph-file-text' }}" aria-hidden="true"></i> {{ a.nome }}</a>
           <span class="mudo">{{ a.tamanho_txt }}</span></li>
         {% endfor %}
+        {# todos num .zip (24/10/2026, Levi: "gostaria a opção 'Baixar arquivos' baixa todos os arquivos da sugestão") #}
+        <li class="sug-todos"><a class="gc-btn gc-btn--ui" href="{{ url_for('casca.inicio', aba='sugestoes', anexo=s.id, n='todos') }}">
+          <i class="ph ph-download-simple" aria-hidden="true"></i> Baixar arquivos</a></li>
       </ul>
       {% endif %}
       {% else %}
