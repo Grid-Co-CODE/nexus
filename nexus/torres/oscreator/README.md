@@ -969,6 +969,25 @@ a OS na fila do PCM já vai vincular aquela OS como OS pai!".
   escolhido barrado, a Fila com a 16784 e a confirmação "filha da OS 16784", sem rolagem lateral. No oem, o
   `test_os_web_solic_27_09.py` (fora do git de lá) passou a cobrar a regra nova junto com a sincronia.
 
+## Nova solicitação com a sugestão pelo endereço (24/10/2026)
+
+Levi, sobre a OS do Quadro da equipe da Engenharia: "Ao invés do botão "Abrir OS" bote um botão de "Solicitar OS" que já
+vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo mas sai como aquela OS como OS pai".
+
+- **O endereço:** `/os/solicitacao?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>` abre a Nova solicitação com o cliente,
+  a usina e o ativo marcados e a OS pai escolhida (`rotas_solic._sugestao`, `tradicional_web.onde_do_ativo`; na página,
+  o `#sug` com os `data-sug-*` e o `sugerir()` no fim do script). A cascata virou duas funções que devolvem a promessa
+  (`carregarUsinas`, `carregarAtivos`), para a sugestão esperar cada etapa.
+- **O que fica de fora:** o ativo que o catálogo não tem e a OS pai torta (o criar recusa a torta de qualquer jeito); sem
+  nada no endereço, a tela abre como sempre (o oem usa a mesma página).
+- **Quem chama:** a página da OS do Quadro da equipe (`/t/engenharia/equipe/os/<nº>`), pelo `/os/_nexus/ir` (abre na
+  torre OS Creator do Nexus). O comentário daquela página vai à nota da OS pela ponte
+  (`/os/_nexus/engenharia/os/<id>/comentar`, só do Nexus, na sessão do Fracttal da pessoa; `editar_nota_os` com a regra
+  do card: OS concluída, cancelada ou de várias tarefas não deixa).
+- **Prova:** `tests/test_oscreator_solic_pcm.py` (os dois de 24/10 da sugestão). Levado ao oem pela
+  `ferramentas/sincronizar_oscreator.py --aplicar` só depois do OK do Levi (rotas_solic.py, tradicional_web.py e
+  solic.html); até lá o `test_copia_do_os_creator_igual_ao_oem` aponta os três.
+
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
 Levi, 19/10/2026, em Nexus > Chamados > Garantias: "ao clicar na OS em responsável dê para alterar o responsável da OS que

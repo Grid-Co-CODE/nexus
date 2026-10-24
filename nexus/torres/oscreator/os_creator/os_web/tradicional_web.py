@@ -55,6 +55,20 @@ def usinas_de(assets: list, cliente: str) -> list:
     return sorted({a.get("usina") for a in (assets or []) if a.get("cliente") == cliente and a.get("usina")})
 
 
+def onde_do_ativo(assets: list, code: str) -> dict | None:
+    """O cliente e a usina de um ativo pelo código, para a sugestão da Nova solicitação (24/10/2026, o "Solicitar OS" da
+    OS do Quadro da equipe da Engenharia): só o ativo que a cascata mostra (com tipo, de cliente que aparece), sem
+    diferença de caixa nem de espaço. None quando o catálogo não tem."""
+    alvo = " ".join(str(code or "").split()).upper()
+    if not alvo:
+        return None
+    for a in (assets or []):
+        if (" ".join(str(a.get("code") or "").split()).upper() == alvo and a.get("tipo") and a.get("usina")
+                and a.get("cliente") and not _cliente_oculto(a.get("cliente"))):
+            return {"cliente": a.get("cliente"), "usina": a.get("usina"), "code": a.get("code")}
+    return None
+
+
 def tipos_de(assets: list, cliente: str, usina: str) -> list:
     """`a["tipo"] in ALLOWED_TIPOS` no app é "qualquer tipo não vazio" (o filtro por tipo foi removido em 01/07)."""
     if not usina:
