@@ -12,7 +12,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
-| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade e correção dos últimos 60 dias, por dia); seção "Versão no ar e Atualizações" abaixo |
+| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho dos últimos 60 dias, por dia); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
@@ -381,7 +381,8 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   é a hora em que a versão entrou). O cartão inteiro é o link para as Atualizações. Saíram o semáforo com o GitHub (e a
   conferência por trás dele: API do GitHub e `git ls-remote`), o assunto do commit e os pedidos presos.
 - **As abas do Início** (`gc-subabas`, em `inicio.html` e `atualizacoes.html`): Visão geral | Atualizações.
-- **A aba Atualizações** (`/?aba=atualizacoes`, exige login como o Início; era `/atualizacoes`, que no servidor ia à plataforma, ver "Regras que já custaram caro"): **só as novidades e as correções (`feat` e `fix`) dos últimos 60 dias** (19/10/2026,
+- **A aba Atualizações** (`/?aba=atualizacoes`, exige login como o Início; era `/atualizacoes`, que no servidor ia à plataforma, ver "Regras que já custaram caro"): **só as novidades, as correções e as melhorias de desempenho (`feat`, `fix` e `perf`) dos últimos 60 dias** (o
+  `perf` desde 24/10/2026: o Levi não achou ali a correção da lentidão do dia, um `perf`; 19/10/2026,
   Levi: "deixe só novidade e correção, sempre os últimos 60 dias!"; até então eram os últimos 60 commits de todo tipo). O
   `git log` lê 61 dias (no máximo 3.000 commits), uma vez por processo (o deploy reinicia e a lista nova vem junto); o
   corte dos 60 dias e dos tipos é na hora do pedido (`versao.da_aba`), porque o processo pode ficar dias no ar. Em

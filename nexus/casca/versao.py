@@ -30,7 +30,7 @@ NO_AR_DESDE = datetime.now(_BRT)
 # a aba mostra as novidades e as correções dos últimos JANELA_DIAS dias; o git lê um dia a mais (o corte é na hora do
 # pedido) e no máximo LIMITE_HISTORICO commits (60 dias davam 427 em 19/10/2026, 304 deles feat ou fix)
 JANELA_DIAS = 60
-TIPOS_NA_ABA = ("feat", "fix")
+TIPOS_NA_ABA = ("feat", "fix", "perf")     # o desempenho desde 24/10/2026 (o Levi não viu a correção da lentidão)
 LIMITE_HISTORICO = 3000
 _PASTA = os.path.dirname(os.path.abspath(__file__))
 # o tipo do commit ("feat(base): ...") como a pessoa entende

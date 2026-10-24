@@ -57,7 +57,7 @@ def test_a_aba_atualizacoes_lista_os_commits_por_dia_com_o_que_mudou(app, logado
     assert "Corpo da mensagem." in html and "Co-Authored-By" not in html        # a coautoria não aparece
     # só novidade e correção (19/10/2026, Levi: "deixe só novidade e correção, sempre os últimos 60 dias!")
     assert "mensagem sem tipo" not in html and "no ar</span>" in html
-    assert "2 novidades e correções nos últimos 60 dias." in html
+    assert "2 atualizações nos últimos 60 dias." in html
 
 
 def test_sem_git_o_cartao_diz_traco_e_a_aba_diz_por_que(app, logado, monkeypatch):
@@ -169,11 +169,12 @@ def test_a_aba_so_mostra_novidade_e_correcao_dos_ultimos_60_dias(app, logado, mo
         versao.historico.cache_clear()
     aba = html.split('class="lead"', 1)[1]
     assert "o quadro novo" in aba and "a foto da ronda" in aba          # feat e fix dentro dos 60 dias
-    for fora in ("velho demais", "o CLAUDE.md da base", "Merge do setor", "mais rapido"):
-        assert fora not in aba                                          # mais de 60 dias, docs, merge e perf
+    assert "mais rapido" in aba and "Desempenho" in aba                 # e o perf (24/10/2026)
+    for fora in ("velho demais", "o CLAUDE.md da base", "Merge do setor"):
+        assert fora not in aba                                          # mais de 60 dias, docs e merge
     assert "no ar</span>" not in aba                                    # a versão no ar é a documentação
-    assert "2 novidades e correções nos últimos 60 dias." in aba
-    assert "Documentação" not in aba and "Desempenho" not in aba
+    assert "3 atualizações nos últimos 60 dias." in aba
+    assert "Documentação" not in aba
 
 
 def test_da_aba_corta_no_dia_do_pedido():

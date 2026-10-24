@@ -14,12 +14,12 @@
 
 {# sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa. Só novidade e correção dos últimos 60 dias
    (19/10/2026, Levi: "deixe só novidade e correção, sempre os últimos 60 dias!") #}
-<p class="lead">As novidades e as correções do Nexus nos últimos {{ janela }} dias, da mais nova para a mais antiga.</p>
+<p class="lead">As novidades, as correções e as melhorias de desempenho do Nexus nos últimos {{ janela }} dias, da mais nova para a mais antiga.</p>
 
 {% if not tem_git %}
 <p class="aviso">Sem o histórico de atualizações nesta máquina (o Nexus não está num clone do repositório).</p>
 {% elif not dias %}
-<p class="aviso">Nenhuma novidade ou correção nos últimos {{ janela }} dias.</p>
+<p class="aviso">Nenhuma novidade, correção ou melhoria de desempenho nos últimos {{ janela }} dias.</p>
 {% else %}
 <div class="atualizacoes">
   {% for rotulo, itens in dias %}
@@ -52,7 +52,7 @@
     </ol>
   </section>
   {% endfor %}
-  <p class="mudo atu-rodape">{{ total }} {{ 'novidade ou correção' if total == 1 else 'novidades e correções' }} nos últimos {{ janela }} dias.</p>
+  <p class="mudo atu-rodape">{{ total }} {{ 'atualização' if total == 1 else 'atualizações' }} nos últimos {{ janela }} dias.</p>
 </div>
 {% endif %}
 {% endblock %}
