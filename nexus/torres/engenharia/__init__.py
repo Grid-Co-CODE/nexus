@@ -672,7 +672,7 @@ def _dias(n: int) -> str:
     return "1 dia" if n == 1 else f"{n} dias"
 
 
-def faixa_kpis(oss: list[dict], hoje, janela: int = JANELA_CONCLUIDAS) -> list[dict]:
+def faixa_kpis(oss: list[dict], hoje, janela: int = JANELA_CONCLUIDAS, sem_engenharia: bool = False) -> list[dict]:
     """A faixa de números do quadro no modelo do Acompanhamento de chamados do OS Creator (Levi, 08/10/2026: "Precisamos
     padronizar a estética ... o card de KPIS eu gostei mais do de chamados"): o rótulo em cima, o número grande colorido
     pela gravidade e, ao lado, o detalhe que diz por onde começar (a OS mais atrasada, a próxima a vencer, a que espera a
@@ -684,7 +684,9 @@ def faixa_kpis(oss: list[dict], hoje, janela: int = JANELA_CONCLUIDAS) -> list[d
     abertas = col["fazer"] + col["execucao"]
     piso = (hoje - timedelta(days=janela)).isoformat()
     atrasadas = sorted((o for o in abertas if o["prazo"] == "atrasada"), key=lambda o: (o["dias"], o["os"]))
-    vencem = sorted((o for o in abertas if o["prazo"] == "vence"), key=lambda o: (o["dias"], o["os"]))
+    # as que pulsam no quadro (Levi, 24/10/2026: "tire o VENCEM EM 2 DIAS e bote OSs sem atualização"): a mais parada é
+    # a de atualização mais antiga
+    paradas = sorted((o for o in oss if o.get("parada")), key=lambda o: (o.get("ultima_iso") or "", o["os"]))
     fechadas = sorted((o for o in col["concluida"] if (o["fim_iso"] or "") >= piso), key=lambda o: o["fim_iso"], reverse=True)
     # em verificação a OS já foi feita: espera desde o fim da execução (a tarefa fechada); sem ele, a data programada
     verif = sorted(col["verificacao"], key=lambda o: (o["fim_iso"] or o["programada_iso"] or "9999", o["os"]))
@@ -700,13 +702,19 @@ def faixa_kpis(oss: list[dict], hoje, janela: int = JANELA_CONCLUIDAS) -> list[d
     k_atraso = {"rotulo": "Atrasadas", "valor": len(atrasadas), "grav": "critico" if atrasadas else "",
                 "nota": [("a mais atrasada: ", False), os_(atrasadas[0]), (f", {_dias(-atrasadas[0]['dias'])}", False)]
                 if atrasadas else [("nenhuma passou da data programada", False)]}
-    if vencem:
-        d = vencem[0]["dias"]
-        nota_vence = [("a próxima: ", False), os_(vencem[0]),
-                      (", vence " + ("hoje" if d == 0 else "amanhã" if d == 1 else f"em {_dias(d)}"), False)]
+    if sem_engenharia:
+        # sem ler o livro da engenharia não se sabe se ela mexeu: nunca um 0 chutado
+        k_parada = {"rotulo": "OSs sem atualização", "valor": "—", "grav": "",
+                    "nota": [("sem ler o registro da engenharia", False)]}
     else:
-        nota_vence = [(f"nenhuma até {hoje + timedelta(days=2):%d/%m}", False)]
-    k_vence = {"rotulo": "Vencem em 2 dias", "valor": len(vencem), "grav": "alerta" if vencem else "", "nota": nota_vence}
+        if paradas:
+            ult = _iso(paradas[0].get("ultima_iso"))
+            d = max(0, (hoje - ult.date()).days) if ult else 0
+            nota_parada = [("a mais parada: ", False), os_(paradas[0]), (f", há {_dias(d)}", False)]
+        else:
+            nota_parada = [("nenhuma parada há mais de 7 dias", False)]
+        k_parada = {"rotulo": "OSs sem atualização", "valor": len(paradas), "grav": "alerta" if paradas else "",
+                    "nota": nota_parada}
     grav_verif, nota_verif = "", [("nenhuma esperando", False)]
     if verif:
         o = verif[0]
@@ -722,7 +730,7 @@ def faixa_kpis(oss: list[dict], hoje, janela: int = JANELA_CONCLUIDAS) -> list[d
     k_fechadas = {"rotulo": f"Fechadas em {janela} dias", "valor": len(fechadas), "grav": "ok" if fechadas else "",
                   "nota": [("a última: ", False), os_(fechadas[0]), (f", em {fechadas[0]['fim'][:5]}", False)]
                   if fechadas else [(f"nenhuma nos últimos {janela} dias", False)]}
-    return [k_aberto, k_atraso, k_vence, k_verif, k_fechadas]
+    return [k_aberto, k_atraso, k_parada, k_verif, k_fechadas]
 
 
 # ── a OS do Quadro da equipe (24/10/2026) ───────────────────────────────────────────────────────────────────────────
@@ -838,7 +846,7 @@ def _topo_da_os(o: dict, est: dict, agora, sem_livro: bool = False) -> dict:
 @bp.route("/equipe/os/<int:folio>")
 def equipe_os(folio: int):
     import logging
-    from urllib.parse import urlencode
+    from urllib.parse import quote, urlencode
 
     from ...prefixo import na_raiz
     from ...engenharia import os_acompanhamento as O
@@ -878,6 +886,9 @@ def equipe_os(folio: int):
         prioridade_fracttal=PRIORIDADE_FRACTTAL.get(o.get("prioridade_fracttal") or "",
                                                     o.get("prioridade_fracttal") or ""),
         solicitar_url=na_raiz("/os/_nexus/ir") + "?" + urlencode({"url": solicitar}),
+        # a seta do PDF de cada OS da cadeia vai ao OS Creator na sessão do Fracttal: sem ela, este login volta para cá
+        login_fracttal=na_raiz("/os/login") + "?next=" + quote(
+            "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/equipe/os/{o['os']}"}, safe="/"), safe=""),
         comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"), **base)
 
 
@@ -952,7 +963,7 @@ def equipe():
     piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
     return render_template(
         "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss,
-        kpis=faixa_kpis(oss, hoje, JANELA_CONCLUIDAS),
+        kpis=faixa_kpis(oss, hoje, JANELA_CONCLUIDAS, sem_engenharia=bool(erro_eng)),
         faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS, erro_eng=erro_eng,
         hoje=hoje.isoformat(), piso_concluidas=piso, janela=JANELA_CONCLUIDAS, dias_faixa=DIAS_FAIXA,
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")

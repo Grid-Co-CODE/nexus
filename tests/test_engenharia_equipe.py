@@ -95,6 +95,7 @@ def test_o_quadro_abre_a_pagina_da_os_da_engenharia(logado, monkeypatch):
     html = logado.get("/t/engenharia/equipe").get_data(as_text=True)
     assert "nexusRota('/t/engenharia/equipe/os/') + encodeURIComponent(o.os)" in html and "NexusOsCard" not in html
     assert "num.href = paginaOs(o)" in html                       # o nº é o link da página: Ctrl+clique abre numa aba
+    assert "abrir o card dela no OS Creator" not in html and "numa OS para abrir a página dela" in html
     dados = html.split('id="kb-dados">', 1)[1].split("</script>", 1)[0]
     assert '"wid": 9001' in dados and '"status": "Em Processo"' in dados and '"os": "1"' in dados
     assert "eg-gaveta" not in html
@@ -132,7 +133,12 @@ def _quadro_para_a_faixa():
               _w("5", 1, prog_dias=9), _w("6", 1, task="IN_PROGRESS", prog_dias=3),
               _w("7", 2, prog_dias=-20, fim=dias(-10), task="DONE"), _w("8", 2, prog_dias=-20, fim=dias(-2), task="DONE"),
               _w("9", 3, fim=dias(-3)), _w("10", 3, fim=dias(-1)), _w("11", 3, fim=dias(-40)), _w("12", 4)]
-    return E.montar(linhas, {"id": 1, "nome": "Ana"}, AGORA)
+    oss = E.montar(linhas, {"id": 1, "nome": "Ana"}, AGORA)
+    # o pulso de cada OS (a tela junta pelo livro da engenharia): a 1 parada há 12 dias e a 5 há 9
+    for o in oss:
+        parada = {"1": 12, "5": 9}.get(o["os"])
+        o.update(parada=bool(parada), ultima_iso=(AGORA - timedelta(days=parada)).isoformat() if parada else "")
+    return oss
 
 
 def _texto(nota):
@@ -142,14 +148,15 @@ def _texto(nota):
 def test_a_faixa_diz_o_numero_a_gravidade_e_por_onde_comecar():
     from nexus.torres.engenharia import faixa_kpis
     k = {x["rotulo"]: x for x in faixa_kpis(_quadro_para_a_faixa(), AGORA.astimezone(E.BRT).date(), 30)}
-    assert list(k) == ["Em aberto", "Atrasadas", "Vencem em 2 dias", "Esperando verificação", "Fechadas em 30 dias"]
+    assert list(k) == ["Em aberto", "Atrasadas", "OSs sem atualização", "Esperando verificação", "Fechadas em 30 dias"]
     assert (k["Em aberto"]["valor"], k["Em aberto"]["grav"]) == (8, "")
     assert _texto(k["Em aberto"]["nota"]) == "5 a fazer, 1 em execução e 2 em verificação"
     # a mais atrasada é a que passou mais da data (a 2, 5 dias), e o nº da OS vai em negrito
     assert (k["Atrasadas"]["valor"], k["Atrasadas"]["grav"]) == (2, "critico")
     assert k["Atrasadas"]["nota"] == [("a mais atrasada: ", False), ("OS 2", True), (", 5 dias", False)]
-    assert (k["Vencem em 2 dias"]["valor"], k["Vencem em 2 dias"]["grav"]) == (2, "alerta")
-    assert _texto(k["Vencem em 2 dias"]["nota"]) == "a próxima: OS 4, vence hoje"
+    # Levi, 24/10/2026: "tire o VENCEM EM 2 DIAS e bote OSs sem atualização" (as que pulsam no quadro)
+    assert (k["OSs sem atualização"]["valor"], k["OSs sem atualização"]["grav"]) == (2, "alerta")
+    assert k["OSs sem atualização"]["nota"] == [("a mais parada: ", False), ("OS 1", True), (", há 12 dias", False)]
     # em verificação conta desde a execução terminada: a 7 espera há 10 dias, mais que os 7 da régua -> âmbar
     assert (k["Esperando verificação"]["valor"], k["Esperando verificação"]["grav"]) == (2, "alerta")
     assert _texto(k["Esperando verificação"]["nota"]) == "a mais antiga: OS 7, feita há 10 dias"
@@ -164,7 +171,11 @@ def test_a_faixa_vazia_explica_em_vez_de_inventar():
     k = faixa_kpis([], hoje, 30)
     assert [x["valor"] for x in k] == [0] * 5 and [x["grav"] for x in k] == [""] * 5
     assert [_texto(x["nota"]) for x in k] == ["nenhuma OS em aberto", "nenhuma passou da data programada",
-                                              "nenhuma até 08/10", "nenhuma esperando", "nenhuma nos últimos 30 dias"]
+                                              "nenhuma parada há mais de 7 dias", "nenhuma esperando",
+                                              "nenhuma nos últimos 30 dias"]
+    # sem ler o livro da engenharia, o número das paradas é "—" (nunca um 0 chutado)
+    s = faixa_kpis(_quadro_para_a_faixa(), hoje, 30, sem_engenharia=True)[2]
+    assert (s["valor"], s["grav"], _texto(s["nota"])) == ("—", "", "sem ler o registro da engenharia")
     # verificação recente (2 dias) não pinta; sem a execução terminada, vale a data programada, dita como tal
     oss = E.montar([_w("8", 2, prog_dias=-20, fim=(AGORA - timedelta(days=2)).isoformat(), task="DONE")], {"id": 1, "nome": "Ana"}, AGORA)
     v = faixa_kpis(oss, hoje, 30)[3]
@@ -176,6 +187,9 @@ def test_a_faixa_vazia_explica_em_vez_de_inventar():
 
 def test_a_faixa_da_tela_tem_rotulo_numero_e_explicacao(logado, monkeypatch):
     import re
+
+    from nexus.engenharia import os_acompanhamento as O
+    monkeypatch.setattr(O, "ler", lambda forcar=False: {"eventos": [], "lido_em": 1.0, "erro": ""})
     oss = _quadro_para_a_faixa()
     monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
     monkeypatch.setattr(E, "dados", lambda: {"os": oss, "equipe": [{"id": 1, "nome": "Ana", "nome_fracttal": "Ana Teste"}],

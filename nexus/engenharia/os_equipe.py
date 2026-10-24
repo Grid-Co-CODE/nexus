@@ -138,6 +138,18 @@ def montar(linhas: list[dict], pessoa: dict, agora: datetime) -> list[dict]:
     return [_cartao(folio, ts, pessoa, hoje) for folio, ts in por.items()]
 
 
+def _nota_da_os(ts: list[dict]) -> str:
+    """A nota da OS como o card do OS Creator a lê (`api.get_os_detalhes`): a de cada tarefa (`task_note`, senão a
+    `note`), sem repetir. Caso real (24/10/2026, Levi: "não está puxando a nota da OS da engenharia"): a página mostrava
+    só a `note`, e a nota das OS da engenharia mora na tarefa."""
+    vistas = []
+    for t in ts:
+        n = str(t.get("task_note") or t.get("note") or "").strip()
+        if n and n not in vistas:
+            vistas.append(n)
+    return "\n".join(vistas)
+
+
 def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
     """Uma OS (as linhas das tarefas dela) no formato do quadro."""
     w0 = ts[0]
@@ -180,7 +192,7 @@ def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
         "fim": fim.astimezone(BRT).strftime("%d/%m/%Y") if fim else "",
         "fim_iso": fim.astimezone(BRT).date().isoformat() if fim else "",
         "solicitante": str(w0.get("requested_by") or w0.get("created_by") or "").strip(),
-        "nota": str(w0.get("note") or "").strip()[:600],
+        "nota": _nota_da_os(ts)[:600],
         "tarefas": [{"t": str(t.get("description") or "")[:120], "st": str(t.get("task_status") or ""),
                      "obs": str(t.get("task_note") or "").strip()[:300]} for t in ts]}
 
@@ -211,7 +223,7 @@ def ler_os(folio) -> dict | None:
     w0 = linhas[0]
     nome = " ".join(str(w0.get("personnel_description") or "").split())
     o = _cartao(f, linhas, {"id": w0.get("id_personnel"), "nome": nome}, datetime.now(timezone.utc).astimezone(BRT).date())
-    o["nota"] = str(w0.get("note") or "").strip()
+    o["nota"] = _nota_da_os(linhas)
     return o
 
 
