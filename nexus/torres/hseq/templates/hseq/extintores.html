@@ -28,7 +28,7 @@
 {% endmacro %}
 {# as linhas dos extintores (o botão Foto, que só pede a imagem no clique, e o botão direito): as mesmas do pedaço #}
 {% from 'hseq/_extintores_linha.html' import etiqueta, conferencia, linha_extintor, linha_nao_reconhecido, tabela_usina with context %}
-{% from 'hseq/_legenda.html' import legenda, termo %}
+{% from 'hseq/_legenda.html' import aviso, termo %}
 {# a coluna Status (Levi, 24/10/2026: "a coluna 'STATUS DA TST' vira o nome 'STATUS' que vai quebrar o texto a cada
    assuntos (...) A ideia é ficar algo bem mais visual"): uma linha por situação, com a cor dela; os não reconhecidos
    entram também ("Insira não reconhecidos no status também!"). A barra das proporções saiu ("Tira essa barra de cores
@@ -51,7 +51,19 @@
 {% set pronto = not leitura.erro and d.get('aba_existe') and not d.get('colunas_faltando') %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="hs-titulo"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+    {# o "Como cada extintor entra" numa exclamação amarela; o clique abre o aviso (Levi, 24/10/2026: "deve ficar
+       compactado em um símbolo de exclamação amarelo, quando a pessoa clica aparece o comunicado") #}
+    {% call aviso('Como cada extintor entra', 'Na usina, a última conferência é a mais recente dos extintores dela. Os três pontos da linha exportam o cliente ou a usina em PDF (com as fotos) ou em planilha, com os filtros da tela; na usina, a Segurança pede ali uma nova ronda, do zero. O botão direito na linha de um extintor o exclui (vai para o histórico de excluídos).') %}
+      {{ termo('Atrasado', 'critico') }}<dd>A recarga (2º nível) ou o teste hidrostático (3º nível) venceu. A data da etiqueta vale até o último dia do mês; só o ano, até 31/12.</dd>
+      {{ termo('Perto de vencer', 'alerta') }}<dd>Uma das duas vence nos próximos {{ alerta_dias }} dias.</dd>
+      {{ termo('Sem validade', 'neutro') }}<dd>A etiqueta da recarga está sem data e nada venceu: não dá para dizer se está em dia.</dd>
+      {{ termo('Sem atualização', 'info') }}<dd>A última conferência (no App ou, antes dele, no Forms da TST) foi há mais de {{ sem_atualizacao_dias }} dias, ou nunca houve. Soma-se às outras, por isso os números da faixa não fecham o total.</dd>
+      {{ termo('Não reconhecido', 'alerta') }}<dd>A equipe marcou na ronda do App que não achou o extintor na usina. Sai das contas; na usina, a Segurança aceita (o extintor é excluído, com o motivo Não reconhecido em campo) ou pede uma nova ronda da usina inteira.</dd>
+      {{ termo('Status') }}<dd>Quantos extintores do cliente ou da usina estão em cada situação, um por linha, com a cor dela. Na linha do extintor, o status da TST: a regra da planilha de controle da TST, a mesma do App, que olha também a carga e os 9 itens do checklist.</dd>
+      {{ termo('Última conferência, responsável e técnicos') }}<dd>Aparecem ao abrir um cliente. O responsável (Responsável UFV) é o Responsável O&amp;M da ficha da usina; os técnicos são os da tela Técnicos por usina do PCM.</dd>
+    {% endcall %}
+    </div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · livro gravado em {{ d.publicado_em }}{% endif %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
@@ -79,8 +91,10 @@
      cadastro, "e aí apareceria para a pessoa da Segurança"): o "Não reconhecido" da ronda de extintores do App. Ficam
      fora de todas as contas da tela. A marca mais nova primeiro. A linha leva à tabela filtrada naquela usina (Levi,
      18/10/2026: "ao clicar na linha já encaminhe para a tabela filtrando aquela usina"), onde a Segurança decide #}
-  <section class="ext-naorec" id="nao-reconhecidos" aria-labelledby="ext-naorec-t">
-    <p class="ext-naorec-t" id="ext-naorec-t"><b>{{ plural(nao_rec|length, 'extintor não reconhecido', 'extintores não reconhecidos') }} em campo</b></p>
+  {# recolhe para o foco ficar na tabela (Levi, 24/10/2026: "devem ser possível encolher essa informação"); aberta na
+     1ª vez, e cada pessoa fica com a última escolha (no navegador dela) #}
+  <section class="ext-naorec" id="nao-reconhecidos" aria-labelledby="ext-naorec-t"><details class="ext-naorec-dobra" open>
+    <summary class="ext-naorec-t" id="ext-naorec-t"><b>{{ plural(nao_rec|length, 'extintor não reconhecido', 'extintores não reconhecidos') }} em campo</b><span class="ext-naorec-acao" aria-hidden="true"></span></summary>
     <p class="ext-naorec-d">A equipe não achou estes extintores na usina (o "Não reconhecido" da ronda de extintores do App). Eles ficam fora das contas desta tela. A linha abre a usina na tabela, e é lá que a Segurança aceita (o extintor é excluído) ou pede uma nova ronda da usina.</p>
     <div class="cn-tab cn-tab--compacta ext-tab"><table class="ext-naorec-tab">
       <thead><tr><th>Não reconhecido em</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Conferência antes</th></tr></thead>
@@ -93,7 +107,7 @@
       {% endfor %}</tbody>
     </table></div>
     {% if nao_rec|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ nao_rec|length }}: use os filtros ou a busca para afunilar.</p>{% endif %}
-  </section>
+  </details></section>
   {% endif %}
   {% endif %}
 
@@ -178,16 +192,17 @@
   {% set abre_cliente = fl.cliente or fl.usina %}
   {% set abre_usina = fl.usina %}
   {# UMA tabela: a linha do cliente e, logo abaixo, as das usinas dele (escondidas até o cliente abrir), nas mesmas
-     colunas; só os extintores abrem numa tabela menor. As colunas Responsável e Técnicos só aparecem com um cliente
-     aberto (Levi, 24/10/2026: "não precisa das colunas responsável e técnico na primeira visão, só ao clicar na linha
-     deve aparecer essas colunas"). Cada linha vai numa linha só do HTML (o recuo entre as células pesava ~20 KB) #}
-  <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande ext-clientes{% if not abre_cliente %} hs-sem-pessoas{% endif %}">
-    <thead><tr><th>Situação</th><th>Última conferência</th><th>Cliente e usina</th><th class="hs-col-pessoa">Responsável</th><th class="hs-col-pessoa">Técnicos</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status</th><th aria-label="Ações"></th></tr></thead>
+     colunas; só os extintores abrem numa tabela menor. As colunas Última conferência, Responsável e Técnicos só aparecem
+     com um cliente aberto (Levi, 24/10/2026: "não precisa das colunas responsável e técnico na primeira visão, só ao
+     clicar na linha deve aparecer essas colunas"; e "a coluna de última conferência (...) também só deve aparecer no
+     drill down"). Cada linha vai numa linha só do HTML (o recuo entre as células pesava ~20 KB) #}
+  <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande ext-clientes{% if not abre_cliente %} hs-fechada{% endif %}">
+    <thead><tr><th>Situação</th><th class="hs-col-aberta">Última conferência</th><th>Cliente e usina</th><th class="hs-col-aberta">Responsável</th><th class="hs-col-aberta">Técnicos</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status</th><th aria-label="Ações"></th></tr></thead>
     <tbody>
     {% for c in grupos %}{% set s = situacoes.get(c.situacao, ('Não reconhecido', 'alerta')) %}{% set n = loop.index %}
-      <tr class="cn-linha ext-cli" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente"><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td></td><td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span><b>{{ c.cliente }}</b></span><span class="det">{{ plural(c.n_usinas, 'usina', 'usinas') }}</span>{% if c.usinas_atrasado %}<span class="det cn-t-critico">{{ c.usinas_atrasado }} com extintor atrasado</span>{% endif %}</span></td><td class="hs-col-pessoa"></td><td class="hs-col-pessoa"></td><td><b class="hs-qtd">{{ c.qtd + nnr(c)|int }}</b></td><td>{{ recarga(c) }}</td><td>{{ status(c) }}</td><td>{{ acoes(dict(filtros_url, cliente=c.cliente)) }}</td></tr>
+      <tr class="cn-linha ext-cli" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente"><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td class="hs-col-aberta"></td><td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span><b>{{ c.cliente }}</b></span><span class="det">{{ plural(c.n_usinas, 'usina', 'usinas') }}</span>{% if c.usinas_atrasado %}<span class="det cn-t-critico">{{ c.usinas_atrasado }} com extintor atrasado</span>{% endif %}</span></td><td class="hs-col-aberta"></td><td class="hs-col-aberta"></td><td><b class="hs-qtd">{{ c.qtd + nnr(c)|int }}</b></td><td>{{ recarga(c) }}</td><td>{{ status(c) }}</td><td>{{ acoes(dict(filtros_url, cliente=c.cliente)) }}</td></tr>
       {% for g in c.usinas %}{% set su = situacoes.get(g.situacao, ('Não reconhecido', 'alerta')) %}{% set tot = g.qtd + g.nao_reconhecidos|length %}{% set rp = rondas.get(g.usina_id) if g.usina_id else none %}
-      <tr class="cn-linha ext-us" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver {{ 'o extintor' if tot == 1 else 'os ' ~ tot ~ ' extintores' }}"{% if not abre_cliente %} hidden{% endif %}><td><span class="cn-st cn-t-{{ su[1] }}">{{ su[0] }}</span></td><td>{{ conferencia(g) }}</td><td class="ext-usina ext-us-nome"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}{% if rp %}<span class="hs-ronda" title="A ronda é do zero: o pedido sai quando todos os extintores da usina forem conferidos de novo (ou marcados como não reconhecidos) depois dele">nova ronda pedida em {{ rp.decidida_em[8:10] }}/{{ rp.decidida_em[5:7] }} · {{ rp.feitos }} de {{ rp.total }} refeitos</span>{% endif %}</td><td class="ext-esq hs-col-pessoa">{% if g.responsavel == sem_responsavel %}<span class="cn-t-neutro">sem responsável</span>{% else %}{{ g.responsavel }}{% endif %}</td><td class="ext-esq hs-col-pessoa">{{ tecnicos(g) }}</td><td><b class="hs-qtd">{{ tot }}</b></td><td>{{ recarga(g) }}</td><td>{{ status(g) }}</td><td>{{ acoes(dict(filtros_url, cliente=g.cliente, usina=g.usina), g) }}</td></tr>
+      <tr class="cn-linha ext-us" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver {{ 'o extintor' if tot == 1 else 'os ' ~ tot ~ ' extintores' }}"{% if not abre_cliente %} hidden{% endif %}><td><span class="cn-st cn-t-{{ su[1] }}">{{ su[0] }}</span></td><td class="hs-col-aberta">{{ conferencia(g) }}</td><td class="ext-usina ext-us-nome"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}{% if rp %}<span class="hs-ronda" title="A ronda é do zero: o pedido sai quando todos os extintores da usina forem conferidos de novo (ou marcados como não reconhecidos) depois dele">nova ronda pedida em {{ rp.decidida_em[8:10] }}/{{ rp.decidida_em[5:7] }} · {{ rp.feitos }} de {{ rp.total }} refeitos</span>{% endif %}</td><td class="ext-esq hs-col-aberta">{% if g.responsavel == sem_responsavel %}<span class="cn-t-neutro">sem responsável</span>{% else %}{{ g.responsavel }}{% endif %}</td><td class="ext-esq hs-col-aberta">{{ tecnicos(g) }}</td><td><b class="hs-qtd">{{ tot }}</b></td><td>{{ recarga(g) }}</td><td>{{ status(g) }}</td><td>{{ acoes(dict(filtros_url, cliente=g.cliente, usina=g.usina), g) }}</td></tr>
       {# os extintores da usina só vêm quando ela abre (19/10/2026: com todos na página, escondidos, eram 897 KB e o
          servidor levava 21 s montando); com o filtro de usina (o clique num não reconhecido) já vêm na página #}
       <tr class="cn-detalhe" data-cli="{{ n }}"{% if not abre_usina %} hidden data-url="{{ url_for('torre_hseq.extintores_usina', **dict(filtros_url, cliente=g.cliente, usina=g.usina)) }}"{% endif %}><td colspan="9">
@@ -265,7 +280,7 @@
           });
           tr.setAttribute('aria-expanded', String(abrir));
           var t = tr.closest('table');
-          t.classList.toggle('hs-sem-pessoas', !t.querySelector('tr.ext-cli[aria-expanded="true"]'));
+          t.classList.toggle('hs-fechada', !t.querySelector('tr.ext-cli[aria-expanded="true"]'));
           return;
         }
         var det = tr.nextElementSibling;
@@ -277,6 +292,13 @@
       tr.addEventListener('click', alterna);
       tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
     });
+    // a caixa dos não reconhecidos lembra se a pessoa a recolheu (só neste navegador; sem armazenamento, abre)
+    (function () {
+      var d = document.querySelector('.ext-naorec-dobra'), K = 'nexus.hseq.naorec';
+      if (!d) return;
+      try { if (localStorage.getItem(K) === 'fechada') d.open = false; } catch (e) {}
+      d.addEventListener('toggle', function () { try { localStorage.setItem(K, d.open ? 'aberta' : 'fechada'); } catch (e) {} });
+    })();
     // a linha do não reconhecido leva à tabela filtrada naquela usina (o link da usina faz o mesmo pelo teclado)
     document.querySelectorAll('.ext-naorec tr.ext-ir').forEach(function (tr) {
       tr.addEventListener('click', function (ev) { if (!ev.target.closest('a')) window.location.href = tr.dataset.href; });
@@ -346,14 +368,5 @@
   {% include 'campo/_ronda_fotos_caixa.html' %}
   {% endif %}
 
-  {% call legenda('Como cada extintor entra', 'Na usina, a última conferência é a mais recente dos extintores dela. Os três pontos da linha exportam o cliente ou a usina em PDF (com as fotos) ou em planilha, com os filtros da tela; na usina, a Segurança pede ali uma nova ronda, do zero. O botão direito na linha de um extintor o exclui (vai para o histórico de excluídos).') %}
-    {{ termo('Atrasado', 'critico') }}<dd>A recarga (2º nível) ou o teste hidrostático (3º nível) venceu. A data da etiqueta vale até o último dia do mês; só o ano, até 31/12.</dd>
-    {{ termo('Perto de vencer', 'alerta') }}<dd>Uma das duas vence nos próximos {{ alerta_dias }} dias.</dd>
-    {{ termo('Sem validade', 'neutro') }}<dd>A etiqueta da recarga está sem data e nada venceu: não dá para dizer se está em dia.</dd>
-    {{ termo('Sem atualização', 'info') }}<dd>A última conferência (no App ou, antes dele, no Forms da TST) foi há mais de {{ sem_atualizacao_dias }} dias, ou nunca houve. Soma-se às outras, por isso os números da faixa não fecham o total.</dd>
-    {{ termo('Não reconhecido', 'alerta') }}<dd>A equipe marcou na ronda do App que não achou o extintor na usina. Sai das contas; na usina, a Segurança aceita (o extintor é excluído, com o motivo Não reconhecido em campo) ou pede uma nova ronda da usina inteira.</dd>
-    {{ termo('Status') }}<dd>Quantos extintores do cliente ou da usina estão em cada situação, com a barrinha das proporções. Na linha do extintor, o status da TST: a regra da planilha de controle da TST, a mesma do App, que olha também a carga e os 9 itens do checklist.</dd>
-    {{ termo('Responsável e técnicos') }}<dd>Aparecem ao abrir um cliente. O responsável (Responsável UFV) é o Responsável O&amp;M da ficha da usina; os técnicos são os da tela Técnicos por usina do PCM.</dd>
-  {% endcall %}
 </div>
 {% endblock %}

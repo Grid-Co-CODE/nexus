@@ -10,7 +10,10 @@ cartões de responsável, a caixa dos não reconhecidos e o aviso do fim da tela
 navegador que ainda não o desenha mostra o arredondado de sempre); o resto como no Campo. O aviso do fim da tela
 (`_legenda.html`, macros `legenda` e `termo`) é a caixa com a borda amarela da dos não reconhecidos: o título, cada termo
 com a cor dele e o que quer dizer, e o pé ("Esses avisos no final da tela pode ficar como bevel mas com uma borda
-parecida com o aviso de extintores não reconhecidos"). Até ali era o parágrafo corrido do `cn-nota`.
+parecida com o aviso de extintores não reconhecidos"). Até ali era o parágrafo corrido do `cn-nota`. Em Extintores
+o aviso ("Como cada extintor entra") fica numa exclamação amarela ao lado do título, que abre a caixa por cima da tela
+(macro `aviso`; Levi, 24/10/2026: "deve ficar compactado em um símbolo de exclamação amarelo, quando a pessoa clica
+aparece o comunicado"); clicar fora ou Esc fecha; no celular a caixa vem presa à tela.
 
 ## Mesa da Segurança (24/10/2026)
 
@@ -90,9 +93,10 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
   e os três pontos. O Status (24/10/2026, no lugar do "Status da TST": "vai quebrar o texto a cada assuntos (...) A
   ideia é ficar algo bem mais visual") é uma linha por situação com a cor dela (a barra das proporções em cima saiu no
   mesmo dia: "Tira essa barra de cores da coluna de status"; "116 atrasados", "40 perto de vencer", "77 sem validade",
-  "335 em dia", "13 não reconhecidos"). **Responsável e Técnicos só aparecem com um cliente aberto** (Levi: "não
-  precisa das colunas responsável e técnico na primeira visão, só ao clicar na linha"): a tabela leva `hs-sem-pessoas`
-  enquanto nenhum cliente está aberto, e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela**
+  "335 em dia", "13 não reconhecidos"). **Última conferência, Responsável e Técnicos só aparecem com um cliente
+  aberto** (Levi: "não precisa das colunas responsável e técnico na primeira visão, só ao clicar na linha"; e "a coluna
+  de última conferência (...) também só deve aparecer no drill down"): a tabela leva `hs-fechada` enquanto nenhum
+  cliente está aberto (as colunas `hs-col-aberta` somem), e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela**
   (UMA linha por usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os
   extintores numa tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais
   próxima; "Sem cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
@@ -221,7 +225,9 @@ faz:
 - o não reconhecido sai de TODAS as contas: situações, sem atualização, cartões, Visão do responsável e o PDF por
   status (pode não existir);
 - a tela o lista numa caixa âmbar logo abaixo da faixa (a marca mais nova primeiro, com quem marcou e a conferência de
-  antes), e a faixa ganha o número "Não reconhecidos", que leva a ela; a linha (e o nome da usina, pelo teclado) leva à
+  antes), e a faixa ganha o número "Não reconhecidos", que leva a ela; a caixa recolhe pelo título (Levi, 24/10/2026:
+  "ser possível encolher essa informação para ter o foco na tabela"), aberta na 1ª vez, e cada navegador lembra a
+  última escolha (`localStorage`, `nexus.hseq.naorec`); a linha (e o nome da usina, pelo teclado) leva à
   tabela filtrada naquela usina, com o cliente e a usina abertos (Levi, 18/10/2026: "ao clicar na linha já encaminhe
   para a tabela filtrando aquela usina");
 - o PDF de todos põe uma seção à parte no fim e o número na casa que sobrava do resumo; o "Baixar" de uma usina leva
