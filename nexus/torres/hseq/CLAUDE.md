@@ -82,18 +82,20 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
   de Campo abria na região dele): **ninguém abre filtrado**. Valem na faixa, na caixa, na tabela, nos cartões e no
   "Baixar". O cliente vale também no EPI, que segue com os filtros do Campo.
 - **Agrupar por Cliente** (o padrão; Levi, 18/10: "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse
-  cliente. É importante ter a coluna do responsável desse usina e o ou os técnicos da usina!"; `extintores.por_cliente`)
-  e **por Extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a conferência mais antiga
-  primeiro). Colunas: Situação, Última conferência, Cliente e usina, Responsável, Técnicos, Quantidade de extintores
-  (só o total), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a próxima), **Status** e os três pontos.
-  O Status (24/10/2026, no lugar do "Status da TST": "vai quebrar o texto a cada assuntos (...) A ideia é ficar algo bem
-  mais visual") é uma barra com a proporção de cada situação e, embaixo, uma linha por situação com a cor dela ("116
-  atrasados", "40 perto de vencer", "77 sem validade", "335 em dia", "13 não reconhecidos"). **Responsável e Técnicos só
-  aparecem com um cliente aberto** (Levi: "não precisa das colunas responsável e técnico na primeira visão, só ao clicar
-  na linha"): a tabela leva `hs-sem-pessoas` enquanto nenhum cliente está aberto, e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela** (UMA linha por
-  usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os extintores numa
-  tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais próxima; "Sem
-  cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
+  cliente. É importante ter a coluna do responsável desse usina e o ou os técnicos da usina!";
+  `extintores.por_cliente`) e **por Extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a
+  conferência mais antiga primeiro). Colunas: Situação, Última conferência, Cliente e usina, Responsável, Técnicos,
+  Quantidade de extintores (só o total, centrada), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a
+  próxima; a data em cima e o "venceu há" embaixo, centrados: "como as linhas são grossas da para botar"), **Status**
+  e os três pontos. O Status (24/10/2026, no lugar do "Status da TST": "vai quebrar o texto a cada assuntos (...) A
+  ideia é ficar algo bem mais visual") é uma linha por situação com a cor dela (a barra das proporções em cima saiu no
+  mesmo dia: "Tira essa barra de cores da coluna de status"; "116 atrasados", "40 perto de vencer", "77 sem validade",
+  "335 em dia", "13 não reconhecidos"). **Responsável e Técnicos só aparecem com um cliente aberto** (Levi: "não
+  precisa das colunas responsável e técnico na primeira visão, só ao clicar na linha"): a tabela leva `hs-sem-pessoas`
+  enquanto nenhum cliente está aberto, e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela**
+  (UMA linha por usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os
+  extintores numa tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais
+  próxima; "Sem cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
 - **Os técnicos** vêm da tela Técnicos por usina do PCM (`extintores.tecnicos_por_usina`, livro `nexus_pcm_atribuicoes`:
   quem vê e ronda a usina no App, um embaixo do outro; o apoio agendado para depois de hoje ainda não conta). Lista que
   não foi lida: a coluna diz "não lido" e a tela avisa, e nunca "sem técnico". Medido em 18/10: 174 usinas com técnico,

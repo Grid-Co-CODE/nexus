@@ -86,8 +86,9 @@
 .cn-equipe{corner-shape:bevel;border-radius:14px}
 .ext-naorec{corner-shape:bevel;border-radius:14px}
 
-/* Quantidade de extintores com as palavras à esquerda (Levi, 24/10: "não centralizada") */
-.ext-clientes th:nth-child(6),.ext-clientes td:nth-child(6){text-align:left}
+/* a recarga mais próxima do cliente e da usina: a data em cima e o "venceu há" embaixo, centrados (Levi, 24/10) */
+.ext-tab .hs-empilha .ext-par > *{display:block;text-align:center}
+.ext-tab .hs-empilha .ext-par > * + *{margin-left:0;margin-top:2px}
 
 /* os três pontos no lugar da coluna Relatório (Levi, 24/10: "três pontos ao passar o mouse na linha"); no celular,
    sem mouse, ficam sempre à vista */
@@ -171,12 +172,6 @@
 .ext-tab .hs-qtd{font-size:15px;font-variant-numeric:tabular-nums}
 .hs-status{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:120px;text-align:left}
 .hs-status .cn-st{white-space:nowrap}
-.hs-barra{display:flex;width:100%;height:6px;margin-bottom:2px;border-radius:999px;overflow:hidden;background:var(--superficie-3)}
-.hs-barra .pend{background:var(--critico-cheio)}
-.hs-barra .alerta{background:var(--alerta-cheio)}
-.hs-barra .neutro{background:var(--linha-forte)}
-.hs-barra .ok{background:var(--ok-cheio)}
-.hs-barra .nr{background:var(--alerta)}
 .ext-clientes th:nth-child(8),.ext-clientes td:nth-child(8){text-align:left}
 /* a nova ronda pedida, na linha da usina */
 .hs-ronda{display:block;margin:2px 0 0 13px;font-size:11.5px;color:var(--info);white-space:normal}

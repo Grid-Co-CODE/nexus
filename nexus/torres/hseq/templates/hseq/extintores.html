@@ -30,13 +30,16 @@
 {% from 'hseq/_extintores_linha.html' import etiqueta, conferencia, linha_extintor, linha_nao_reconhecido, tabela_usina with context %}
 {% from 'hseq/_legenda.html' import legenda, termo %}
 {# a coluna Status (Levi, 24/10/2026: "a coluna 'STATUS DA TST' vira o nome 'STATUS' que vai quebrar o texto a cada
-   assuntos (...) A ideia é ficar algo bem mais visual"): uma linha por situação, com a cor dela, e a barrinha das
-   proporções em cima; os não reconhecidos entram também ("Insira não reconhecidos no status também!") #}
-{% set no_status = (('atrasado', 'atrasado', 'atrasados', 'critico', 'pend'), ('perto', 'perto de vencer', 'perto de vencer', 'alerta', 'alerta'),
-                    ('sem_validade', 'sem validade', 'sem validade', 'neutro', 'neutro'), ('em_dia', 'em dia', 'em dia', 'ok', 'ok')) %}
+   assuntos (...) A ideia é ficar algo bem mais visual"): uma linha por situação, com a cor dela; os não reconhecidos
+   entram também ("Insira não reconhecidos no status também!"). A barra das proporções saiu ("Tira essa barra de cores
+   da coluna de status") #}
+{% set no_status = (('atrasado', 'atrasado', 'atrasados', 'critico'), ('perto', 'perto de vencer', 'perto de vencer', 'alerta'),
+                    ('sem_validade', 'sem validade', 'sem validade', 'neutro'), ('em_dia', 'em dia', 'em dia', 'ok')) %}
 {% macro nnr(g) %}{{ g.nao_reconhecidos|length if g.nao_reconhecidos is defined else (g.nao_reconhecidos_qtd or 0) }}{% endmacro %}
-{% macro status(g) %}{% set n_nr = nnr(g)|int %}{% set tot = g.qtd + n_nr %}<span class="hs-status">{% if tot %}<span class="hs-barra" aria-hidden="true">{% for k, um, varios, cor, barra in no_status if g[k] %}<span class="{{ barra }}" style="width: {{ (100 * g[k] / tot)|round(1) }}%"></span>{% endfor %}{% if n_nr %}<span class="nr" style="width: {{ (100 * n_nr / tot)|round(1) }}%"></span>{% endif %}</span>{% endif %}{% for k, um, varios, cor, barra in no_status if g[k] %}<span class="cn-st cn-t-{{ cor }}">{{ g[k] }} {{ um if g[k] == 1 else varios }}</span>{% endfor %}{% if n_nr %}<span class="cn-st cn-t-alerta hs-st-nr">{{ n_nr }} não reconhecido{{ 's' if n_nr != 1 }}</span>{% endif %}</span>{% endmacro %}
-{% macro recarga(g) %}{% if g.recarga_fim %}{{ etiqueta(g.recarga, g.recarga_fim) }}{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}{% endmacro %}
+{% macro status(g) %}{% set n_nr = nnr(g)|int %}<span class="hs-status">{% for k, um, varios, cor in no_status if g[k] %}<span class="cn-st cn-t-{{ cor }}">{{ g[k] }} {{ um if g[k] == 1 else varios }}</span>{% endfor %}{% if n_nr %}<span class="cn-st cn-t-alerta hs-st-nr">{{ n_nr }} não reconhecido{{ 's' if n_nr != 1 }}</span>{% endif %}</span>{% endmacro %}
+{# a recarga mais próxima do cliente e da usina em duas linhas, centradas (Levi, 24/10/2026: "como as linhas são grossas
+   da para botar" a data em cima e o "venceu há 16 meses" embaixo) #}
+{% macro recarga(g) %}{% if g.recarga_fim %}<span class="hs-empilha">{{ etiqueta(g.recarga, g.recarga_fim) }}</span>{% else %}<span class="cn-t-neutro">sem data</span>{% endif %}{% endmacro %}
 {# os três pontos da linha (Levi, 24/10/2026: "ao invés da coluna relatório, pode substituir para três pontos ao passar
    o mouse na linha"): o relatório do cliente ou da usina em PDF (com as fotos) e em planilha, com os filtros da tela
    (o unitário de 18/10; a TST, 19/10: "por cliente" e "excel tbm"), e, na usina, para a Segurança, o "Pedir nova ronda"

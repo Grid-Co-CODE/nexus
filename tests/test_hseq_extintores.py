@@ -370,7 +370,8 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     # a quantidade é só o total; o Status, uma linha por situação ("A ideia é ficar algo bem mais visual")
     assert thopen.startswith("Atrasado Thopen 2 usinas 1 com extintor atrasado 6 02/2026 venceu há 7 meses "
                              "2 atrasados 1 perto de vencer 2 sem validade 1 em dia")
-    assert "Crítico" not in thopen and 'class="hs-barra"' in html
+    assert "Crítico" not in thopen and "hs-barra" not in html           # a barra de cores saiu (24/10, 3ª rodada)
+    assert '<span class="hs-empilha"><span class="ext-par"><span class="m">02/2026</span>' in html
     # a usina, uma linha só: a última conferência é a mais recente, com o responsável e os técnicos (um embaixo do outro)
     alt = _abre(html, "</span>Altair</td>")
     assert alt.startswith("Atrasado 05/10/2026 há 4 d · App Altair Supervisora Campo Eletricista Beta Técnico Alfa 5 "
