@@ -6,14 +6,15 @@ O caso dos testes é o do `com_nao_reconhecido` de test_hseq_extintores.py: o EX
 05/10/2026; a tela está no dia 09/10/2026."""
 import json
 import re
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from test_campo_visao import CHAVE, banco  # noqa: F401  (banco é fixture)
+from test_campo_visao import CHAVE, _aba, banco  # noqa: F401  (banco é fixture)
 from test_hseq_extintores import _abre, _linhas, _planilha, _tabela, _texto, com_nao_reconhecido  # noqa: F401
 
 from nexus.campo import visao
+from nexus.hseq import extintores as EXT
 from nexus.hseq import decisoes as DEC
 
 EXT02 = "ALT100-INFC1-PPCI-EXT02"
@@ -60,11 +61,41 @@ def test_o_excluido_volta_so_com_uma_conferencia_depois_da_exclusao():
     assert DEC.excluido({"conferencia": None}, exc) and not DEC.excluido({"conferencia": None}, None)
 
 
-def test_o_pedido_de_ronda_fica_pendente_ate_uma_conferencia_depois_dele():
-    est = {"rondas": [{"decidida_em": "2026-10-06T09:00:00-03:00", "usina_id": 1},
-                      {"decidida_em": "2026-10-06T09:00:00-03:00", "usina_id": 2}]}
-    p = DEC.rondas_pendentes(est, {1: date(2026, 10, 6), 2: date(2026, 10, 7)})
-    assert set(p) == {1}                                                  # a 2 já teve ronda no dia seguinte
+def test_a_nova_ronda_e_do_zero_e_vale_pela_hora():
+    """Combinado com o App de Campo em 24/10/2026 (v296), que aplica a mesma regra: o pedido sai quando TODOS os
+    extintores da usina têm conferência recebida depois dele (ou marca de não reconhecido depois dele), pela hora."""
+    brt = timezone(timedelta(hours=-3))
+
+    def h(dia, hora):
+        return datetime(2026, 10, dia, hora, tzinfo=brt)
+    pedido = "2026-10-06T10:00:00-03:00"
+    est = {"rondas": [{"decidida_em": pedido, "usina_id": u} for u in (1, 2, 3)]}
+    por_usina = {1: [{"codigo": "A"}, {"codigo": "B"}],
+                 2: [{"codigo": "C"}, {"codigo": "D", "nao_reconhecido": date(2026, 10, 6)}], 3: []}
+    rec = {"A": h(6, 14), "B": h(6, 9), "C": h(6, 14)}
+    p = DEC.rondas_pendentes(est, por_usina, rec)
+    assert (p[1]["feitos"], p[1]["total"]) == (1, 2)                      # o B foi conferido antes do pedido
+    assert (p[2]["feitos"], p[2]["total"]) == (1, 2)                      # marca só com o dia, no dia do pedido: não prova
+    assert (p[3]["feitos"], p[3]["total"]) == (0, 0)                      # sem extintor, nada prova a ronda
+    rec["B"] = h(6, 14)                                                   # pedido às 10h, ronda às 14h: atendido
+    por_usina[2][1]["marca_em"] = h(6, 15)                                # a marca com a hora, depois do pedido
+    assert set(DEC.rondas_pendentes(est, por_usina, rec)) == {3}
+    por_usina[2][1] = {"codigo": "D", "nao_reconhecido": date(2026, 10, 7)}
+    assert 2 not in DEC.rondas_pendentes(est, por_usina, rec)             # só o dia, mas do dia seguinte
+    assert set(DEC.rondas_pendentes(est, por_usina, {"A": h(6, 14)})) == {1, 2, 3}
+
+
+
+def test_a_marca_de_nao_reconhecido_com_a_hora_do_app():
+    """Desde a v296 do App, o "Não reconhecido em" vem com a hora UTC em que o servidor recebeu a marca (o mesmo relógio
+    da "Recebida em"): o dia continua o de Brasília, e a ronda pedida compara pela hora."""
+    x = {"Não reconhecido em": "2026-10-08T02:00:00.000Z"}                # 23h do dia 07 em Brasília
+    assert EXT.nao_reconhecido(x, date(2026, 10, 5)) == date(2026, 10, 7)
+    assert EXT._com_hora(x["Não reconhecido em"]) == datetime(2026, 10, 7, 23, 0, tzinfo=timezone(timedelta(hours=-3)))
+    assert EXT._com_hora("2026-10-07") is None
+    est = {"rondas": [{"decidida_em": "2026-10-07T22:00:00-03:00", "usina_id": 1}]}
+    e = {"codigo": "A", "nao_reconhecido": date(2026, 10, 7), "marca_em": EXT._com_hora(x["Não reconhecido em"])}
+    assert DEC.rondas_pendentes(est, {1: [e]}, {}) == {}                  # a marca chegou 1 h depois do pedido
 
 
 def test_quem_pode_e_a_assinatura():
@@ -146,8 +177,10 @@ def test_o_excluido_volta_quando_a_equipe_o_confere_depois(com_nao_reconhecido, 
     assert "voltou: conferido em 05/10" in exc
 
 
-def test_pedir_nova_ronda_e_da_usina_inteira(com_nao_reconhecido, livro, tst):
-    """Levi, 24/10/2026: "pedir uma nova ronda é uma nova ronda do zero então será por usina"; nos três pontos."""
+def test_pedir_nova_ronda_e_da_usina_inteira(com_nao_reconhecido, livro, tst, monkeypatch):
+    """Levi, 24/10/2026: "pedir uma nova ronda é uma nova ronda do zero então será por usina"; nos três pontos. O pedido
+    sai quando os três extintores da Altair (o não reconhecido junto) chegam conferidos depois dele."""
+    monkeypatch.setattr(DEC, "_agora", lambda: datetime(2026, 10, 9, 10, 0, tzinfo=timezone(timedelta(hours=-3))))
     us = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
     assert re.search(r'<button class="hs-tres"[^>]*data-args="cliente=Thopen&amp;usina=Altair" data-ronda="1">', us)
     assert ">Pedir nova ronda</button>" in us and '<form id="hs-form-ronda"' in us
@@ -157,7 +190,21 @@ def test_pedir_nova_ronda_e_da_usina_inteira(com_nao_reconhecido, livro, tst):
     assert (linha["usina_id"], linha["usina_app"]) == (1, "Thopen - Altair 1 - SP")    # o nome que o App usa
     assert re.fullmatch(r"[0-9a-f]{64}", linha["assinatura"])
     depois = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
-    assert "nova ronda pedida em" in _abre(depois, "Altair<span") and re.search(r'data-ronda="1" data-ronda-em="\d\d/\d\d"', depois)
+    assert "nova ronda pedida em 09/10 · 0 de 3 refeitos" in _abre(depois, "Altair<span")
+    assert 'data-ronda="1" data-ronda-em="09/10"' in depois
+    # a equipe refaz: duas chegam às 11h (14h UTC) e uma antes do pedido; depois, a terceira
+    conf = [{"Código": f"ALT100-INFC1-PPCI-EXT0{n}", "Mês": "2026-10", "Usina": "Thopen - Altair 1 - SP",
+             "Recebida em": r} for n, r in ((1, "2026-10-09T14:00:00.000Z"), (2, "2026-10-09T14:00:01.000Z"),
+                                            (3, "2026-10-09T12:59:00.000Z"))]
+    _aba(com_nao_reconhecido, EXT.LIVRO_CONF, EXT.ABA_CONF, conf)
+    visao.limpar()
+    meio = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
+    assert "2 de 3 refeitos" in _abre(meio, "Altair<span")
+    conf[2]["Recebida em"] = "2026-10-09T14:05:00.000Z"
+    _aba(com_nao_reconhecido, EXT.LIVRO_CONF, EXT.ABA_CONF, conf)
+    visao.limpar()
+    fim = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
+    assert "nova ronda pedida" not in fim and 'data-ronda-em' not in fim
 
 
 def test_quem_nao_e_da_seguranca_so_ve(com_nao_reconhecido, livro, cliente):

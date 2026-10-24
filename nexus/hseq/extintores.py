@@ -26,12 +26,13 @@ Essas quatro são exclusivas (cada extintor em uma, nessa ordem) e somam o total
 
 NÃO RECONHECIDO (Levi, 14/10/2026, na Axis Linhares 1 - ES: a equipe fez a ronda e só achou 4 dos 17 extintores do
 cadastro; "pode ter um botão no app de campo de 'Não reconhecido' para o extintor e aí apareceria para a pessoa da
-Segurança"). O App marca o extintor que a equipe não achou na usina e publica `Não reconhecido em` (o dia de Brasília da
-marca) e `Não reconhecido por (HMAC)`. Conferência depois da marca a desfaz (o extintor foi achado: o App limpa a marca;
-`nao_reconhecido` é a defesa). O não reconhecido sai de TODAS as contas (as situações, a sem atualização, os cartões, a
-Visão do responsável e o PDF por status), porque pode não existir, e a tela o lista à parte para a TST conferir o
-cadastro (dar baixa, mudar de usina ou corrigir o código). Livro sem as duas colunas (o App antes da versão que as
-publica): ninguém é não reconhecido.
+Segurança"). O App marca o extintor que a equipe não achou na usina e publica `Não reconhecido em` (o dia de Brasília
+da marca; desde a v296 do App, a hora em que o servidor dele a recebeu, ISO UTC, a mesma da "Recebida em" das
+conferências) e `Não reconhecido por (HMAC)`. Conferência depois da marca a desfaz (o extintor foi achado: o App limpa
+a marca; `nao_reconhecido` é a defesa). O não reconhecido sai de TODAS as contas (as situações, a sem atualização, os
+cartões, a Visão do responsável e o PDF por status), porque pode não existir, e a tela o lista à parte para a TST
+conferir o cadastro (dar baixa, mudar de usina ou corrigir o código). Livro sem as duas colunas (o App antes da versão
+que as publica): ninguém é não reconhecido.
 
 O status da TST (crítico, atenção, ok, ok sem validade), que olha também a carga e os itens do checklist, é a MESMA
 regra do App (`_ext_status` no function_app.py, conferida 831 de 831 com o "Status geral" da planilha da TST em
@@ -52,6 +53,9 @@ from ..dados import livros
 
 LIVRO = "extintores_app_campo"
 ABA = "Extintores"
+# o histórico das conferências pelo App, com a hora em que cada uma chegou ("Recebida em", UTC): a nova ronda pedida
+# pela Segurança fica atendida por ela (`decisoes.rondas_pendentes`)
+LIVRO_CONF, ABA_CONF = "extintores_conferencias_app_campo", "Conferências"
 # O contrato com o App (a ordem do livro). Coluna nova entra no FIM. A pessoa vai como HMAC do e-mail e a observação do
 # técnico NÃO vai (a API do banco tem leitura aberta): só "Tem informação adicional" (sim/não)
 COLUNAS = ("Código", "Usina", "Código da usina", "Tipo de ativo", "Ativo", "Local", "Posição", "Classe", "Peso (kg)",
@@ -192,6 +196,11 @@ def situacao(x: dict, hoje: date) -> dict:
             "status": st, "motivo": motivo, "motivo_checklist": checklist, "itens_nao": sorted(nao)}
 
 
+def _com_hora(v):
+    """A hora da marca de não reconhecido, quando o App a manda com hora (ISO); só o dia, None."""
+    return visao._dt(v) if "T" in _txt(v) else None
+
+
 def nao_reconhecido(x: dict, conf: date | None) -> date | None:
     """O dia em que a equipe marcou o extintor como não reconhecido na usina (ver o topo do módulo), ou None. Conferência
     depois da marca a desfaz: o extintor foi achado. No mesmo dia vale a marca (o App só a publica quando é a última)."""
@@ -226,6 +235,7 @@ def linha(x: dict, b, quem: dict, hoje: date) -> dict:
             "info_adicional": visao._sim(x.get("Tem informação adicional")),
             "origem_cadastro": _txt(x.get("Origem do cadastro")),
             "nao_reconhecido": nr, "dias_nao_reconhecido": (hoje - nr).days if nr else None,
+            "marca_em": _com_hora(x.get("Não reconhecido em")) if nr else None,
             "nao_reconhecido_por": visao._nome(quem, x.get("Não reconhecido por (HMAC)")) if nr else "", **sit}
 
 
@@ -272,6 +282,21 @@ def extintores() -> leitura.Leitura:
         return {**d, "extintores": [x for x in todos if not x["nao_reconhecido"]],
                 "nao_reconhecidos": ordenar_nao_reconhecidos(x for x in todos if x["nao_reconhecido"])}
     return visao._ler(("hseq_extintores",), calcular)
+
+
+def recebidas() -> leitura.Leitura:
+    """{código do extintor: a hora em que o App recebeu a conferência mais recente dele} (a "Recebida em" do livro de
+    conferências; reenviar no mesmo mês regrava a linha). Só se lê quando há nova ronda pedida (a torre); livro que não
+    existe: nenhuma, e todo pedido segue pendente."""
+    def calcular():
+        abas = visao._ciclo(("_abas", LIVRO_CONF), lambda: livros.abas(visao._base(), visao._sessao(), LIVRO_CONF))
+        out = {}
+        for x in (visao._livro(LIVRO_CONF, ABA_CONF) if ABA_CONF in abas else []):
+            c, t = _txt(x.get("Código")), visao._dt(x.get("Recebida em"))
+            if c and t and (c not in out or t > out[c]):
+                out[c] = t
+        return out
+    return visao._ler(("hseq_ext_recebidas",), calcular)
 
 
 def chave_usina(x: dict):

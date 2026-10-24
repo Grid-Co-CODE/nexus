@@ -134,7 +134,7 @@ def _filtrados():
     base = [x for x in todas if passa(x)]
     nao_rec = [x for x in seguem if passa(x)]
     opcoes = _opcoes_ext(todas + seguem, fl, passa)
-    return leitura, d, todas, base, nao_rec, dict(fl, opcoes=opcoes, excluidos=excluidos, passa=passa)
+    return leitura, d, todas, base, nao_rec, dict(fl, opcoes=opcoes, excluidos=excluidos, passa=passa, seguem=seguem)
 
 
 def _decisoes() -> dict:
@@ -153,13 +153,16 @@ def _url_ext(**mudar) -> str:
     return _url(ok=None, erro=None, **mudar)
 
 
-def _ultima_conferencia(d) -> dict:
-    """{usina_id: o dia da conferência mais recente na usina}: o pedido de nova ronda fica pendente até uma depois dele."""
-    out = {}
-    for x in (d.get("extintores") or []) + (d.get("nao_reconhecidos") or []):
-        if x.get("usina_id") and x.get("conferencia"):
-            out[x["usina_id"]] = max(out.get(x["usina_id"]) or x["conferencia"], x["conferencia"])
-    return out
+def _rondas(est, todas, seguem) -> dict:
+    """Os pedidos de nova ronda ainda pendentes (`decisoes.rondas_pendentes`): os extintores atuais de cada usina, sem
+    os excluídos e sem os filtros da tela, e a hora em que o App recebeu cada conferência. Sem pedido, nada se lê."""
+    if not est.get("rondas"):
+        return {}
+    por_usina = {}
+    for x in todas + seguem:
+        if x.get("usina_id"):
+            por_usina.setdefault(x["usina_id"], []).append(x)
+    return DEC.rondas_pendentes(est, por_usina, EXT.recebidas().dados or {})
 
 
 def _historico(d, fl) -> list[dict]:
@@ -288,7 +291,7 @@ def extintores():
         grupos=EXT.por_cliente(lista, nrs) if modo == "tabela" and ver == "cliente" else [],
         nr_lista=nrs if ver == "extintor" and f == NR else [],
         historico=_historico(d, fl) if modo == "excluidos" else [], n_excluidos=len(fl["excluidos"]),
-        pode=_pode(), rondas=DEC.rondas_pendentes(est, _ultima_conferencia(d)), decisoes_erro=est.get("erro"),
+        pode=_pode(), rondas=_rondas(est, todas, fl["seguem"]), decisoes_erro=est.get("erro"),
         motivos=DEC.MOTIVOS, motivos_botao=DEC.MOTIVOS_DO_BOTAO_DIREITO,
         aviso_ok=request.args.get("ok", ""), aviso_erro=request.args.get("erro", ""),
         cartoes=EXT.por_responsavel(base, d.get("times") or {}) if modo == "responsaveis" else [],

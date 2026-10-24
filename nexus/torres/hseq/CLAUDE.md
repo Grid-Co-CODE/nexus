@@ -244,8 +244,14 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
   **Excluídos** (`modo=excluidos`, o mais novo primeiro, com o motivo e quem). **Volta** se a equipe o conferir numa
   ronda de um dia depois da exclusão (existe), e o histórico diz "voltou: conferido em dd/mm".
 - **Pedir nova ronda** (`fato_pedido_ronda`), da usina inteira, do zero, nos três pontos da linha da usina. A linha
-  mostra "nova ronda pedida em dd/mm" até uma conferência de um dia depois do pedido (`decisoes.rondas_pendentes`); o
-  item do menu diz que já foi pedida. Grava também o nome da usina que o App usa (`usina_app`).
+  mostra "nova ronda pedida em dd/mm · N de M refeitos" e o item do menu diz que já foi pedida. A ronda é do zero e
+  vale pela hora (combinado com o App de Campo em 24/10/2026, v296, que aplica a MESMA regra e mostra a ronda pendente
+  à equipe): o pedido sai quando TODOS os extintores atuais da usina, sem os excluídos, chegam conferidos depois dele
+  (a "Recebida em", UTC, do livro `extintores_conferencias_app_campo · Conferências`, lido só quando há pedido:
+  `extintores.recebidas`) ou marcados como não reconhecidos depois dele; pedido às 10h e ronda às 14h do mesmo dia é
+  atendido. A marca de não reconhecido conta pela hora a partir da v296 do App (o "Não reconhecido em" passa a vir com a hora UTC
+  em que o servidor a recebeu); antes, só com o dia, ela conta do dia seguinte ao pedido em diante; usina sem extintor segue
+  pendente. Grava também o nome da usina que o App usa (`usina_app`).
 - Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
   exclusão por extintor).
 - **Quem:** o administrador e quem é do setor Segurança (`decisoes.pode_decidir`), sempre com um login de pessoa (a

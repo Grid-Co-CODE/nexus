@@ -339,8 +339,9 @@ FATOS = (
          fontes=("nexus_hseq_extintores · fato_pedido_ronda",),
          janela_origem="o Nexus é a fonte (só acrescenta)",
          observacao="o App mostra à equipe da usina a ronda pendente (\"O TST solicitou uma nova ronda\"); o Nexus o "
-                    "dá por atendido quando aparece uma conferência na usina num dia depois do pedido. Assinado como a "
-                    "exclusão"),
+                    "dá por atendido, como o App, quando TODOS os extintores da usina chegam conferidos (a 'Recebida em' "
+                    "do livro de conferências, pela hora) ou marcados como não reconhecidos depois do pedido. Assinado "
+                    "como a exclusão"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
