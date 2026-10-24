@@ -227,12 +227,14 @@ def test_gravar_o_ticket_joga_fora_a_leitura_de_antes(chamados):
 
 
 # ── o lado do navegador ──────────────────────────────────────────────────────────────────────────────────────────
-def test_os_dois_quadros_pedem_com_o_mouse_parado_250_ms():
+def test_o_quadro_de_chamados_pede_com_o_mouse_parado_250_ms():
     componente = (RAIZ / "nexus/torres/oscreator/templates/oscreator/card_os_abrir.html").read_text(encoding="utf-8")
     assert "nexusRota('/os/api/os/') + encodeURIComponent(wid) + '/preparar'" in componente and ", 250)" in componente
     assert "preparar: preparar, prepararAoParar: prepararAoParar" in componente
     assert "delete pedidos[wid];" in componente                          # aberta: o próximo mouse parado lê de novo
+    # o Quadro da equipe da Engenharia não abre mais o card do OS Creator (24/10/2026: o clique vai para a página da OS
+    # da engenharia), então não pede o card com o mouse parado
     equipe = (RAIZ / "nexus/torres/engenharia/templates/engenharia/equipe.html").read_text(encoding="utf-8")
-    assert "NexusOsCard.prepararAoParar(c, o.wid)" in equipe
+    assert "prepararAoParar" not in equipe
     acomp = Path(ponte.RAIZ_CLONE, "os_web", "static", "acomp.js").read_text(encoding="utf-8")
     assert 'card.getAttribute("href") + "/preparar"' in acomp and "setTimeout(preparar, 250)" in acomp

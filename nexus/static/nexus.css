@@ -32,6 +32,9 @@
   /* o fogo das últimas 24 h da NASA no Clima e risco (10/10/2026): não é o laranja do foco da última hora nem o vermelho do agir */
   --fogo-nasa:#ff4f86;
   --severo:#ff9f43; --severo-suave:rgba(255,159,67,.14); --laranja:#ff9f5a; --laranja-a16:rgba(255,143,60,.16);
+  /* o pulso da OS parada no Quadro da equipe (24/10/2026): o laranja do Nexus nas transparências da sombra em
+     camadas que o Levi mandou (--shadow-elevation-medium: .71, .57, .43, .28 e .14) */
+  --pulso-a71:rgba(255,143,60,.71); --pulso-a57:rgba(255,143,60,.57); --pulso-a43:rgba(255,143,60,.43); --pulso-a28:rgba(255,143,60,.28); --pulso-a14:rgba(255,143,60,.14);
   --critico:#ff5b6e; --critico-suave:rgba(255,91,110,.14);
   --critico-a12:rgba(255,91,110,.12); --critico-a18:rgba(255,91,110,.18); --critico-a30:rgba(255,91,110,.30);
   --critico-a35:rgba(255,91,110,.35); --critico-a45:rgba(255,91,110,.45); --agir-tinta:#fff;
@@ -90,6 +93,7 @@
   --alerta-a40:rgba(176,124,0,.45); --alerta-a45:rgba(176,124,0,.5); --alerta-a50:rgba(176,124,0,.55);
   --alerta-a55:rgba(176,124,0,.55); --alerta-a60:rgba(176,124,0,.6);
   --severo:#a33d00; --severo-suave:rgba(247,140,60,.16); --laranja:#a33d00; --laranja-a16:rgba(247,140,60,.16);
+  --pulso-a71:rgba(247,140,60,.71); --pulso-a57:rgba(247,140,60,.57); --pulso-a43:rgba(247,140,60,.43); --pulso-a28:rgba(247,140,60,.28); --pulso-a14:rgba(247,140,60,.14);
   --critico:#b42230; --critico-suave:rgba(220,53,69,.09);
   --critico-a12:rgba(220,53,69,.10); --critico-a18:rgba(220,53,69,.12); --critico-a30:rgba(220,53,69,.18);
   --critico-a35:rgba(220,53,69,.22); --critico-a45:rgba(180,34,48,.40); --agir-tinta:#8a1822;

@@ -834,3 +834,27 @@ def test_a_tela_da_nova_solicitacao_pede_o_motivo_e_a_os_pai(cli, monkeypatch):
     busca, pai = h.index('id="busca"'), h.index('id="ed_pai"')
     assert busca < pai < h.index('id="tbody"')                         # no bloco 1, à direita do Buscar ativo
     assert "/os/api/pcm/os-pai?termo=" in h and "os_pai:" in h
+
+
+# ── a sugestão pelo endereço (24/10/2026): o "Solicitar OS" da OS do Quadro da equipe da Engenharia ──────────────────
+def _sugestao(h):
+    return dict(re.findall(r'data-sug-([a-z-]+)="([^"]*)"', h.split('id="sug"', 1)[1].split(">", 1)[0]))
+
+
+def test_solicitacao_com_sugestao_traz_o_ativo_e_a_os_pai(cli, monkeypatch):
+    # Levi: "um botão de 'Solicitar OS' que já vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o
+    # ativo mas sai como aquela OS como OS pai"
+    monkeypatch.setattr(api, "get_request_types", lambda: {"classif1": [{"id": 7, "description": "Corretiva"}]})
+    h = cli.get("/os/solicitacao?ativo=TST-INV11&os_pai=555&os_pai_folio=16784").get_data(as_text=True)
+    assert _sugestao(h) == {"cliente": "Cliente X", "usina": USINA, "ativo": "TST-INV11", "os-pai": "555",
+                            "os-pai-folio": "16784"}
+    assert "sugerir()" in h                                               # a página aplica a sugestão ao abrir
+    # o ativo que o catálogo não tem fica de fora; a OS pai torta também (o criar recusa a torta de qualquer jeito)
+    h = cli.get("/os/solicitacao?ativo=NAO-EXISTE&os_pai=abc&os_pai_folio=16784").get_data(as_text=True)
+    assert _sugestao(h) == {"cliente": "", "usina": "", "ativo": "", "os-pai": "", "os-pai-folio": ""}
+
+
+def test_solicitacao_sem_sugestao_segue_igual(cli, monkeypatch):
+    monkeypatch.setattr(api, "get_request_types", lambda: {"classif1": [{"id": 7, "description": "Corretiva"}]})
+    h = cli.get("/os/solicitacao").get_data(as_text=True)
+    assert _sugestao(h) == {"cliente": "", "usina": "", "ativo": "", "os-pai": "", "os-pai-folio": ""}

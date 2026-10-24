@@ -2,7 +2,8 @@
 
 Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje são telas de verdade
 a **Mesa do engenheiro** (a primeira da torre, 18/10/2026), a **Confiabilidade** (com o **acompanhamento** dos ativos
-com sinal desde 18/10/2026) e o **Quadro da equipe**; as outras caem no placeholder da casca.
+com sinal desde 18/10/2026) e o **Quadro da equipe** (com a **página da OS** desde 24/10/2026); as outras caem no
+placeholder da casca.
 
 Endereços nunca a partir da raiz (porta única, 09/10/2026: o Nexus pode rodar debaixo de `/nexus`, como no servidor até a fase 4): o link da OS na
 Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusRota` (regra das torres em
@@ -148,16 +149,61 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
   clique filtra o quadro. Busca, Quadro/Por pessoa, concluídas de todo o período e canceladas sem recarregar.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_equipe.py` (a faixa: número, gravidade e nota de cada um, e
   a tela com rótulo + número + explicação nos cinco).
-- **Clique no cartão abre o card da OS do OS Creator, o mesmo do Histórico** (Levi, 08/10/2026: "Ao clicar na OS quero
-  que abra o mesmo card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os
-  setores se conversarem"). É o componente da torre OS Creator (`oscreator/card_os_abrir.html`, regra no README de lá),
-  com as ações dele: trocar o responsável, etiquetas, notas, concluir, cancelar, clonar. O id da OS (`wid`) e o status
-  com o nome do OS Creator (`STATUS_OS` = `api.WO_STATUS`) já vêm do REST, sem pedido a mais. O nº da OS é o link de
-  `/os/os/<id>?status=` (Ctrl+clique abre a página inteira numa aba nova). Sem o login do Fracttal (senha de admin), o
-  card diz para entrar pelo Fracttal. Quem mudou a OS pelo card volta com `?atualizar=1`: o quadro relê o Fracttal na
-  hora (`pedir_releitura(forcar=True)`, no máximo uma a cada 5 s). A gaveta própria (descrição, tarefas, link no
-  Fracttal) saiu. O mouse parado 250 ms no cartão já pede o card (`NexusOsCard.prepararAoParar`, 09/10/2026): o clique
-  pega a leitura pronta (regras e teto no README da torre OS Creator).
+- **O clique no cartão abre a página da OS da engenharia** (24/10/2026, seção abaixo; de 08/10 até então era o card do
+  OS Creator, que segue no Histórico de lá). O nº da OS é o link dela (Ctrl+clique abre numa aba nova). O cartão mostra
+  a prioridade e o status da engenharia, e **pulsa em laranja** a OS aberta (a fazer, em execução, em verificação) sem
+  atualização há mais de 7 dias: a sombra em camadas que o Levi mandou ("QUERO O CRISPY PULSANDO DE 0.5 A 1"), numa
+  camada por cima do cartão que vai de 0,5 a 1 de opacidade, pelos tokens `--pulso-a71` a `--pulso-a14` (o laranja do
+  Nexus nos dois temas; o teste do tema lê todo token como cor, então a sombra mora no `engenharia.css`). Com "reduzir
+  movimento", fica parada. Sem ler o livro da engenharia, nenhum pulso (não se sabe se ela mexeu), e o rodapé diz.
+  Quem mudou a OS e volta com `?atualizar=1` faz o quadro reler o Fracttal na hora (`pedir_releitura(forcar=True)`, no
+  máximo uma a cada 5 s).
+
+## A OS do Quadro da equipe (24/10/2026)
+
+Levi: "Ao clicar quero uma visão parecida com o que aparece quando clica na OS da parte de CHAMADOS > GARANTIA", com os
+KPIs da engenharia, o status dela no lugar do ticket do fornecedor, a prioridade (média, alta, urgente), todo comentário
+na nota da OS com a data e a hora, o "Solicitar OS" no lugar do "Abrir OS" e, no "Demais respostas do técnico", a
+resposta de "Descreva a atividade realizada" da OS filha. Desenho em
+`docs/superpowers/specs/2026-10-24-engenharia-os-do-quadro-design.md`.
+
+- **A página:** `/t/engenharia/equipe/os/<nº>` (`equipe_os`, template `os_quadro.html`, classes `eg-os-*`), lida na hora
+  no Fracttal (`os_equipe.ler_os`, só leitura: a OS de todas as tarefas, com a nota inteira). Em cima, a etiqueta da
+  coluna, o "Solicitar OS" e os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
+  Programada (atrasada, vence ou abre em) e Última atualização (o mais novo entre o registro da engenharia, o início e o
+  fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). À esquerda o que a
+  engenharia faz (Status e prioridade, Dados, OS filhas); à direita o que ela lê (Na nota da OS, Demais respostas do
+  técnico, Comentários com a linha do tempo).
+- **Status e prioridade** moram no livro `nexus_engenharia_os` (`nexus/engenharia/os_acompanhamento.py`; regra no
+  `nexus/dados/CLAUDE.md`): os oito do time (Análise de Solução, Atividade em Andamento, Diagnóstico em Andamento,
+  Agendamento de OS, Tratativa com Equipe de Campo, Validação Final, Stand-By, Diagnóstico Concluído; o id é a ordem do
+  pedido, nunca reordenar) e Média, Alta, Urgente. A prioridade é a da engenharia, não a criticidade do Fracttal (que
+  aparece nos Dados): o caminho do OS Creator não muda a criticidade de OS criada. O salvar é formulário com volta e o
+  aviso no endereço; a OS é conferida no Fracttal, não no que o formulário diz.
+- **O comentário vai para a nota da OS** pela ponte do OS Creator (`/os/_nexus/engenharia/os/<id>/comentar`, em
+  `oscreator/ponte.py`, porque o cookie do Fracttal só vai para /os), na sessão do Fracttal da pessoa: a linha
+  `[24/10/2026 14:32] Nome (Engenharia): texto` entra no fim da nota (`api.editar_nota_os`, relida na hora, uma escrita
+  por vez). A regra medida do card vale: OS concluída, cancelada ou de várias tarefas não deixa editar a nota (com
+  várias, sobrescreveria a observação da tarefa errada); aí o comentário fica só no Nexus e a linha do tempo diz por
+  quê. Da revisão final (24/10/2026): a OS que o Fracttal devolve sem tarefas (a leitura que falha "mole") não é
+  gravada, porque a nota inteira viraria a linha nova; e a nota que a página mostra tem de estar no que vai ser
+  regravado (o Fracttal tem a nota da OS e a da tarefa, e a OS 12191 tinha as duas diferentes), senão o comentário fica
+  só no Nexus. Sem a sessão do Fracttal (quem entrou pela Microsoft), a resposta traz o login do Fracttal, que volta
+  para a página; a sessão cassada antes do vencimento encerra o Nexus de quem entrou pelo Fracttal (o /os/login, com o
+  JWT morto no cookie, voltava direto para a página) e tira o cookie do OS Creator de quem entrou pela Microsoft. Erro
+  do Fracttal não grava nada. O comentário também fica no livro (texto e nome cifrados).
+- **O banco no caminho do clique:** o quadro e a página leem o livro com prazo curto (`PRAZO_S`, 8 s) e guardam a
+  falha pelo minuto da cópia; o livro que existe e veio sem a aba dos eventos é leitura incompleta, não "nada". Sem ler
+  o livro, nem pulso no quadro nem "Última atualização" na página (só as datas do Fracttal chutariam a parada).
+- **Solicitar OS:** a Nova solicitação do OS Creator com o ativo marcado e esta OS como OS pai
+  (`/os/solicitacao?ativo=&os_pai=&os_pai_folio=`, pelo `/os/_nexus/ir`; regra no README do OS Creator). O PCM cria a OS
+  filha pela Fila, ligada a esta.
+- **OS filhas e Demais respostas do técnico:** o REST filtra por `id_parent_wo` (medido em 24/10/2026; a leitura para em
+  3 páginas, para um filtro ignorado não virar o Fracttal inteiro), e de cada filha a resposta de "Descreva a atividade
+  realizada" (`work_orders_subtasks`; toda OS que nasce de solicitação tem a subtarefa).
+- **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.
+- **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
+  tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao"` e a página na cópia de prova.
 
 ## Confiabilidade (06/10/2026)
 

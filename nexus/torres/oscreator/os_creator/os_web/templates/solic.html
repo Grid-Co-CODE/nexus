@@ -9,6 +9,10 @@
    rearranjam. A única parte viva é a cascata, que não tem como não ser. #}
 {% block conteudo %}
 <section class="os-pagina">
+  {# a sugestão pelo endereço (24/10/2026): o "Solicitar OS" da OS do Quadro da equipe da Engenharia abre esta tela com o
+     ativo dela marcado e ela como OS pai (`rotas_solic._sugestao`); a pessoa pode trocar os dois #}
+  {% set sug = sugestao or {} %}
+  <div id="sug" hidden data-sug-cliente="{{ sug.cliente or '' }}" data-sug-usina="{{ sug.usina or '' }}" data-sug-ativo="{{ sug.ativo or '' }}" data-sug-os-pai="{{ sug.os_pai or '' }}" data-sug-os-pai-folio="{{ sug.os_pai_folio or '' }}"></div>
   {# 27/09: sem os botões da Fila do PCM e do Histórico — eles moram no setor PCM; a Nova solicitação, nas Solicitações
      da tela inicial #}
   <div class="os-topo-linha">
@@ -152,27 +156,30 @@
   // a cascata reaproveita o catalogo do Tradicional: e o MESMO `load_assets_cached` do lado de la,
   // e ter dois endpoints para a mesma pergunta so criaria duas respostas possiveis.
   function busca_json(u) { return OsCarga.buscar(u, {credentials: "same-origin"}, "Carregando…").then(function (r) { return r.json(); }); }
-  cbCli.addEventListener("change", function () {
+  // as duas etapas da cascata devolvem a promessa: a sugestão pelo endereço (sugerir, no fim) espera cada uma
+  function carregarUsinas() {
     cbUsi.innerHTML = '<option value="">{{ todos_usina }}</option>'; cbUsi.disabled = true;
     cbTipo.innerHTML = '<option value="">{{ todos_tipo }}</option>'; cbTipo.disabled = true;
     busca.disabled = true; ativos = []; marcados.clear(); pintar(); filtrarTemas();
-    if (!cbCli.value) return;
-    busca_json("/os/api/tradicional/catalogo?cliente=" + encodeURIComponent(cbCli.value)).then(function (j) {
+    if (!cbCli.value) return Promise.resolve();
+    return busca_json("/os/api/tradicional/catalogo?cliente=" + encodeURIComponent(cbCli.value)).then(function (j) {
       (j.usinas || []).forEach(function (u) { cbUsi.add(new Option(u, u)); });
       cbUsi.disabled = false;
     });
-  });
-  cbUsi.addEventListener("change", function () {
+  }
+  function carregarAtivos() {
     ativos = []; marcados.clear(); pintar(); filtrarTemas();
-    if (!cbUsi.value) { cbTipo.disabled = true; busca.disabled = true; return; }
-    busca_json("/os/api/tradicional/catalogo?cliente=" + encodeURIComponent(cbCli.value)
+    if (!cbUsi.value) { cbTipo.disabled = true; busca.disabled = true; return Promise.resolve(); }
+    return busca_json("/os/api/tradicional/catalogo?cliente=" + encodeURIComponent(cbCli.value)
       + "&usina=" + encodeURIComponent(cbUsi.value)).then(function (j) {
       cbTipo.innerHTML = '<option value="">{{ todos_tipo }}</option>';
       (j.tipos || []).forEach(function (t) { cbTipo.add(new Option(t, t)); });
       cbTipo.disabled = false; busca.disabled = false;
       ativos = j.ativos || []; limite = PAGINA; pintar();
     });
-  });
+  }
+  cbCli.addEventListener("change", carregarUsinas);
+  cbUsi.addEventListener("change", carregarAtivos);
   cbTipo.addEventListener("change", function () { limite = PAGINA; pintar(); filtrarTemas(); });
   busca.addEventListener("input", function () { limite = PAGINA; pintar(); });
 
@@ -403,6 +410,27 @@
       })
       .catch(function (e) { btn.disabled = false; hint.textContent = ""; res.hidden = false; res.className = "os-resultado ruim"; res.textContent = "Falhou: " + e; });
   });
+
+  // ── a sugestão pelo endereço (24/10/2026): a OS do Quadro da equipe da Engenharia abre esta tela com o ativo dela
+  //    marcado e ela mesma como OS pai ("a pessoa pode até mudar o ativo mas sai como aquela OS como OS pai") ──
+  function sugerir() {
+    var s = document.getElementById("sug").dataset;
+    if (s.sugOsPai && s.sugOsPaiFolio) { pai = {id: Number(s.sugOsPai), folio: s.sugOsPaiFolio}; edPai.value = s.sugOsPaiFolio; }
+    if (!s.sugCliente || !s.sugUsina) return;
+    cbCli.value = s.sugCliente;
+    carregarUsinas().then(function () {
+      cbUsi.value = s.sugUsina;
+      return carregarAtivos();
+    }).then(function () {
+      var alvo = ativos.filter(function (a) { return a.code === s.sugAtivo; })[0];
+      if (!alvo) return;
+      marcados.add(alvo.code);
+      // a busca mostra o ativo marcado na primeira página (o nome da tabela traz o código)
+      if (String(alvo.label || "").toLowerCase().indexOf(alvo.code.toLowerCase()) >= 0) busca.value = alvo.code;
+      limite = PAGINA; pintar(); filtrarTemas(); previaTitulo();
+    });
+  }
+  sugerir();
 })();
 </script>
 {% endblock %}

@@ -12,7 +12,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import abort, redirect, render_template, request, session
+from flask import abort, redirect, render_template, request, session, url_for
 
 from ..modelo import Tela, Torre
 
@@ -725,11 +725,187 @@ def faixa_kpis(oss: list[dict], hoje, janela: int = JANELA_CONCLUIDAS) -> list[d
     return [k_aberto, k_atraso, k_vence, k_verif, k_fechadas]
 
 
+# ── a OS do Quadro da equipe (24/10/2026) ───────────────────────────────────────────────────────────────────────────
+# Levi: "Ao clicar quero uma visão parecida com o que aparece quando clica na OS da parte de CHAMADOS > GARANTIA", com os
+# números da engenharia, o status dela no lugar do ticket do fornecedor, a prioridade (média, alta, urgente), todo
+# comentário na nota da OS, o "Solicitar OS" com esta como OS pai e, no "Demais respostas do técnico", a resposta de
+# "Descreva a atividade realizada" da OS filha. Regras e livro em nexus/engenharia/os_acompanhamento.py; o comentário
+# vai à nota pela ponte do OS Creator (oscreator/ponte.py, na sessão do Fracttal da pessoa).
+PRIORIDADE_FRACTTAL = {"VERY_HIGH": "Muito alta", "HIGH": "Alta", "MEDIUM": "Média", "LOW": "Baixa",
+                       "VERY_LOW": "Muito baixa"}
+GRAV_PRIORIDADE = {2: "alerta", 3: "critico"}
+
+
+def _os_para_gravar(o: dict) -> dict:
+    """A OS no formato do livro: o id, o nº, o ativo e a usina ligada ao cadastro (a mesma ligação da Confiabilidade)."""
+    onde = _onde_do_cadastro()(o.get("usina") or "", o.get("codigo") or "")
+    return {"wid": o.get("wid"), "folio": o.get("os"), "codigo": o.get("codigo"), "usina_id": onde.get("usina_id"),
+            "usina_ligada_por": onde.get("ligada_por")}
+
+
+def _iso(v):
+    try:
+        d = datetime.fromisoformat(str(v or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(BRT)
+
+
+def _ultima_da_os(o: dict, est: dict) -> tuple:
+    """(a última atualização, de onde ela veio): o mais novo entre o registro da Engenharia, a mexida nas tarefas no
+    Fracttal e a criação da OS (a mesma conta do pulso do quadro)."""
+    from ...engenharia import os_acompanhamento as O
+    fontes = [(est.get("ultimo"), "o último registro da Engenharia"),
+              (_iso(o.get("atividade_iso")), "a última mexida nas tarefas no Fracttal"),
+              (_iso(o.get("criada_iso")), "a criação da OS")]
+    ultima = O.ultima_atualizacao([d for d, _ in fontes])
+    return ultima, next((q for d, q in fontes if d and d == ultima), "")
+
+
+def _faixa_da_os(o: dict, est: dict, agora, sem_livro: bool = False) -> list[dict]:
+    """Os quatro números da OS, no modelo da faixa do Acompanhamento de chamados: Status e Prioridade da engenharia,
+    Programada e Última atualização. Sem escolha, "—" (nunca um padrão chutado); sem ler o livro, a última atualização
+    também é "—" (só as datas do Fracttal chutariam uma OS parada, o que o quadro já não faz)."""
+    from ...engenharia import os_acompanhamento as O
+    st, pr = est.get("status_id"), est.get("prioridade_id")
+    ult = next((e for e in est.get("eventos") or [] if e["evento"] == "status"), None)
+    n1 = ([("por ", False), (ult["nome"] or "alguém", True), (" em " + ult["quando"].strftime("%d/%m"), False)]
+          if ult and ult.get("quando") else [("a engenharia ainda não deu", False)])
+    pf = PRIORIDADE_FRACTTAL.get(o.get("prioridade_fracttal") or "", o.get("prioridade_fracttal") or "—")
+    col, dias = o["coluna"], o.get("dias")
+    v3, g3 = (o.get("programada") or "—")[:5], ""
+    if col == "concluida":
+        v3, n3 = (o.get("fim") or "—")[:5], [("concluída", False)]
+    elif col == "cancelada":
+        n3 = [("cancelada", False)]
+    elif col == "verificacao":
+        n3 = [("em verificação: já foi feita", False)]
+    elif dias is None:
+        n3 = [("sem data programada", False)]
+    elif dias < 0:
+        g3, n3 = "critico", [("atrasada há ", False), (_dias(-dias), True)]
+    elif dias == 0:
+        g3, n3 = "alerta", [("vence ", False), ("hoje", True)]
+    elif dias <= 2:
+        g3, n3 = "alerta", [("vence em ", False), (_dias(dias), True)]
+    else:
+        n3 = [("abre em " if col == "fazer" else "vence em ", False), (_dias(dias), True)]
+    ultima, de_onde = _ultima_da_os(o, est)
+    if sem_livro:
+        v4, g4, n4 = "—", "", [("sem ler o registro da engenharia", False)]
+    elif ultima:
+        d = max(0, (agora - ultima).days)
+        parada = O.parada(col, ultima, agora)
+        v4, g4 = ("hoje" if d == 0 else "há " + _dias(d)), ("alerta" if parada else "")
+        n4 = [("sem atualização há mais de 7 dias", True)] if parada else [(de_onde, False)]
+    else:
+        v4, g4, n4 = "—", "", [("sem data no Fracttal", False)]
+    return [{"rotulo": "Status", "valor": O.nome_status(st) or "—", "grav": "", "nota": n1},
+            {"rotulo": "Prioridade", "valor": O.nome_prioridade(pr) or "—", "grav": GRAV_PRIORIDADE.get(pr, ""),
+             "nota": [("criticidade no Fracttal: ", False), (pf, True)]},
+            {"rotulo": "Programada", "valor": v3, "grav": g3, "nota": n3},
+            {"rotulo": "Última atualização", "valor": v4, "grav": g4, "nota": n4}]
+
+
+@bp.route("/equipe/os/<int:folio>")
+def equipe_os(folio: int):
+    import logging
+    from urllib.parse import urlencode
+
+    from ...prefixo import na_raiz
+    from ...engenharia import os_acompanhamento as O
+    from ...engenharia import os_equipe
+    pode, _meu = _quem_pode()
+    base = {"torre": TORRE, "tela": TORRE.tela("equipe"), "folio": folio,
+            "msg_ok": request.args.get("ok", ""), "msg_erro": request.args.get("erro", "")}
+    try:
+        o = os_equipe.ler_os(folio)
+    except Exception as e:      # noqa: BLE001 — Fracttal fora ou cota: a página diz, sem número chutado
+        logging.warning("quadro da equipe: a OS %s não veio do Fracttal (%s: %s)", folio, type(e).__name__, str(e)[:160])
+        return render_template("engenharia/os_quadro.html", o=None, erro_fracttal=type(e).__name__, **base), 502
+    if not o:
+        return render_template("engenharia/os_quadro.html", o=None, nao_achou=True, **base), 404
+    lido = O.ler()
+    erro_livro = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
+    est = O.estado(lido["eventos"]).get(str(o["wid"])) or {}
+    erro_filhas = ""
+    try:
+        fs = os_equipe.filhas(o["wid"])
+        for f in fs:
+            try:
+                f["atividade"] = os_equipe.resposta_da_atividade(f["os"])
+            except Exception:  # noqa: BLE001 — a resposta de uma filha não derruba a página: a linha diz que não leu
+                f["atividade"] = None
+    except Exception as e:      # noqa: BLE001
+        fs, erro_filhas = [], type(e).__name__
+    solicitar = "/os/solicitacao?" + urlencode({"ativo": o.get("codigo") or "", "os_pai": o.get("wid") or "",
+                                                "os_pai_folio": o["os"]})
+    return render_template(
+        "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
+        velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
+        kpis=_faixa_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)), pode=pode and not erro_livro,
+        status=O.STATUS,
+        prioridades=O.PRIORIDADES, nome_status=O.nome_status, nome_prioridade=O.nome_prioridade,
+        prioridade_fracttal=PRIORIDADE_FRACTTAL.get(o.get("prioridade_fracttal") or "",
+                                                    o.get("prioridade_fracttal") or ""),
+        solicitar_url=na_raiz("/os/_nexus/ir") + "?" + urlencode({"url": solicitar}),
+        comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"), **base)
+
+
+@bp.route("/equipe/os/<int:folio>/classificar", methods=["POST"])
+def equipe_os_classificar(folio: int):
+    import logging
+    from urllib.parse import urlencode
+
+    from ...engenharia import os_acompanhamento as O
+    from ...engenharia import os_equipe
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    pode, _meu = _quem_pode()
+    volta = url_for("torre_engenharia.equipe_os", folio=folio)
+    try:
+        o = os_equipe.ler_os(folio)                     # a OS conferida agora no Fracttal, não o que o formulário diz
+        if not o:
+            raise O.Recusada(f"Não achei a OS {folio} no Fracttal")
+        r = O.classificar(_os_para_gravar(o), request.form.get("status_id"), request.form.get("prioridade_id"),
+                          session.get("usuario"), pode)
+        partes = [x for x in (r["status"] and "status " + r["status"],
+                              r["prioridade"] and "prioridade " + r["prioridade"]) if x]
+        return redirect(volta + "?" + urlencode({"ok": "Salvo: " + " e ".join(partes) + "."}), 303)
+    except O.Recusada as e:
+        return redirect(volta + "?" + urlencode({"erro": str(e)}), 303)
+    except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
+        logging.exception("quadro da equipe: o status da OS %s não gravou", folio)
+        return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__)}), 303)
+
+
+def _com_a_engenharia(oss: list[dict]) -> tuple[list[dict], str]:
+    """Cada OS do quadro com o status e a prioridade da engenharia (o livro da OS) e o pulso da parada: a OS aberta sem
+    atualização há mais de 7 dias, contando o registro da engenharia, as tarefas no Fracttal e a criação. Sem ler o
+    livro, nenhum pulso: não dá para saber se a engenharia mexeu nela (o erro volta para a tela dizer)."""
+    from ...engenharia import os_acompanhamento as O
+    lido = O.ler()
+    erro = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0] or "sem leitura"
+    est = O.estado(lido["eventos"]) if not erro else {}
+    agora = datetime.now(BRT)
+    out = []
+    for o in oss:
+        e = est.get(str(o.get("wid"))) or {}
+        ultima, _de = _ultima_da_os(o, e)
+        out.append(dict(o, eng_status=O.nome_status(e.get("status_id")),
+                        eng_prioridade=O.nome_prioridade(e.get("prioridade_id")),
+                        eng_prioridade_id=e.get("prioridade_id") or 0,
+                        ultima_iso=ultima.isoformat() if ultima else "",
+                        parada=bool(not erro and O.parada(o["coluna"], ultima, agora))))
+    return out, erro
+
+
 @bp.route("/equipe")
 def equipe():
-    """O clique numa OS abre o card dela do OS Creator, o mesmo do Histórico (Levi, 08/10/2026: "Ao clicar na OS quero
-    que abra o mesmo card que aparece quando clicamos em uma OS no histórico do OS Creator Web ... precisamos fazer os
-    setores se conversarem"). Quem muda a OS por ele volta com ?atualizar=1, e o quadro relê o Fracttal na hora."""
+    """O clique numa OS abre a página da OS da engenharia (Levi, 24/10/2026; até então era o card do OS Creator). Cada
+    cartão leva o status e a prioridade da engenharia e o pulso da parada (`_com_a_engenharia`). Quem volta com
+    ?atualizar=1 faz o quadro reler o Fracttal na hora."""
     from ...engenharia import os_equipe
     os_equipe.marcar_uso()          # o quadro segue relido por trás nas próximas 2 h (`os_equipe.manter_quente`)
     if request.args.get("atualizar") == "1":
@@ -743,10 +919,11 @@ def equipe():
     ini = {c["id"]: c["iniciais"] for c in cards}          # as do supercard (pelo nome no Fracttal)
     oss = [dict(o, cor=cor.get(o["pid"], CORES_PESSOA[-1]), iniciais=ini.get(o["pid"]) or _iniciais(o["pessoa"]))
            for o in d["os"]]
+    oss, erro_eng = _com_a_engenharia(oss)
     piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
     return render_template(
         "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss,
         kpis=faixa_kpis(oss, hoje, JANELA_CONCLUIDAS),
-        faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS,
+        faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS, erro_eng=erro_eng,
         hoje=hoje.isoformat(), piso_concluidas=piso, janela=JANELA_CONCLUIDAS, dias_faixa=DIAS_FAIXA,
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")

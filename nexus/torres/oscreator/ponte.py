@@ -657,3 +657,104 @@ def ir():
     from flask import redirect
     url = _endereco_do_os(request.args.get("url")) or "/os/"
     return redirect(na_raiz(f"/t/os/{tela_do_endereco(url)}") + "?" + urlencode({"abrir": url}))
+
+
+# ── o comentário da Engenharia na nota da OS (24/10/2026) ──────────────────────────────────────────────────────────
+# Levi: "Todo comentário que a engenharia fizer vai para a nota da OS com data e hora do comentário." A página da OS do
+# Quadro da equipe (/t/engenharia/equipe/os/<nº>) manda aqui, em /os/_nexus, porque o cookie do Fracttal (os_sessao) só
+# vai para /os: a nota é escrita pelo `api.editar_nota_os` do clone na sessão do Fracttal da PESSOA, o mesmo caminho do
+# card da OS, e a regra medida do card vale (OS concluída, cancelada ou de várias tarefas não deixa editar a nota: com
+# várias tarefas, ela sobrescreveria a observação da tarefa errada). O que é só do Nexus fica aqui, nunca na cópia.
+_trava_nota = threading.Lock()      # dois comentários juntos na mesma OS: um não apaga o outro na nota
+
+
+@bp_raiz.route("/os/_nexus/engenharia/os/<int:wid>/comentar", methods=["POST"])
+def engenharia_comentar(wid: int):
+    import logging
+    from datetime import datetime, timedelta, timezone
+    from urllib.parse import quote, urlencode
+
+    from flask import current_app, jsonify, session
+
+    from ...engenharia import os_acompanhamento as O
+    from ...engenharia import os_equipe
+    from ..engenharia import _os_para_gravar, _quem_pode
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
+    c = request.get_json(silent=True) or {}
+    pode, _meu = _quem_pode()
+    try:
+        texto = O.texto_do_comentario(c.get("texto"))
+        quem = O.quem_comenta(session.get("usuario"), pode)       # quem o Nexus recusaria não chega ao Fracttal
+    except O.Recusada as e:
+        return jsonify({"erro": str(e)}), 400
+    folio = str(c.get("folio") or "").strip()
+    # a volta do login do Fracttal, como no card da OS: o /os/login do clone e o /os/_nexus/card/voltar até a página
+    de = f"/t/engenharia/equipe/os/{folio}" if folio.isdigit() else "/t/engenharia/equipe"
+    login = na_raiz("/os/login") + "?next=" + quote("/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/"), safe="")
+    app = current_app._get_current_object()
+    s = sessao_do_os(app)
+    jwt = str(s.get("jwt") or "")
+    if not jwt:
+        return jsonify({"erro": "Para ir à nota da OS, entre pelo Fracttal.", "login": login}), 401
+    o = os_equipe.ler_os(folio) if folio.isdigit() else None
+    if not o or str(o.get("wid")) != str(wid):
+        return jsonify({"erro": "Não achei esta OS no Fracttal: recarregue a página."}), 404
+    linha = O.linha_da_nota(texto, quem["nome"], datetime.now(timezone(timedelta(hours=-3))))
+    clone(app)                                   # põe o `api` do clone no sys.path
+    import api as os_api                         # noqa: E402
+    from os_web import os_acoes_web as regra     # noqa: E402
+    from os_web import sessao as os_sessao       # noqa: E402
+    nota = "sim"
+    with _trava_nota, os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
+        try:
+            d = os_api.get_os_detalhes(wid) or {}
+            if not d.get("tarefas"):
+                # a leitura que falha "mole" volta sem tarefas e com a nota vazia: gravar trocaria a nota inteira pela
+                # linha nova (revisão final de 24/10/2026)
+                return jsonify({"erro": "O Fracttal não devolveu a OS inteira agora. Nada foi gravado; tente de "
+                                        "novo."}), 502
+            pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(o.get("status"), d),
+                                                       len(d.get("tarefas") or []))
+            atual = str(d.get("notas") or "").strip()
+            na_pagina = " ".join(str(o.get("nota") or "").split())
+            if pode_nota and na_pagina and na_pagina not in " ".join(atual.split()):
+                # o Fracttal tem a nota da OS e a da tarefa (a OS 12191 tinha as duas diferentes): a que a página
+                # mostra tem de estar no que vai ser regravado, senão acrescentar a apagaria
+                pode_nota, motivo = False, ("a nota da OS no Fracttal não bateu com a leitura da página; para não "
+                                            "sobrescrever, o comentário ficou só no Nexus")
+            if pode_nota:
+                r = os_api.editar_nota_os(wid, atual + "\n" + linha if atual else linha)
+                if not (isinstance(r, dict) and r.get("ok")):
+                    return jsonify({"erro": "O Fracttal não gravou a nota (%s). Nada foi gravado; tente de novo."
+                                            % ((r or {}).get("erro") or "sem resposta")}), 502
+            else:
+                nota = motivo
+        except os_api.SessionExpired:
+            # o token cassado antes do exp: quem entrou pelo Fracttal sai do Nexus junto (o /os/login, com o JWT morto
+            # no cookie, voltava direto para a página); quem entrou pela Microsoft perde só o cookie do OS Creator, e o
+            # login dele mostra o formulário (revisão final de 24/10/2026)
+            from ...auth import encerrar, os_cookie_path, via_fracttal
+            if via_fracttal():
+                return encerrar("caiu", json=True)
+            resp = jsonify({"erro": "A sessão do Fracttal venceu: entre de novo.", "login": login})
+            resp.status_code = 401
+            resp.delete_cookie("os_sessao", path=os_cookie_path())
+            return resp
+        except Exception as e:                   # noqa: BLE001 — Fracttal fora, cota: nada foi gravado
+            logging.warning("comentário da OS %s: o Fracttal não respondeu (%s: %s)", wid, type(e).__name__,
+                            str(e)[:160])
+            return jsonify({"erro": "O Fracttal não respondeu (%s). Nada foi gravado; tente de novo."
+                                    % type(e).__name__}), 502
+    try:
+        O.registrar_comentario(_os_para_gravar(o), texto, session.get("usuario"), pode, nota)
+    except Exception as e:                       # noqa: BLE001 — a nota já foi: dizer, sem pedir para repetir
+        logging.exception("comentário da OS %s: foi à nota, mas não ao livro do Nexus", wid)
+        if nota == "sim":
+            return jsonify({"ok": True, "mensagem": "Foi para a nota da OS %s, mas não entrou nos comentários do Nexus "
+                                                    "(%s). Não repita." % (o["os"], type(e).__name__)})
+        return jsonify({"erro": "Não consegui gravar no banco (%s). Nada mudou; tente de novo." % type(e).__name__}), 502
+    if nota == "sim":
+        return jsonify({"ok": True, "mensagem": "Comentário salvo na nota da OS %s, com a data e a hora." % o["os"]})
+    return jsonify({"ok": True, "mensagem": "Comentário salvo só no Nexus: %s" % nota})

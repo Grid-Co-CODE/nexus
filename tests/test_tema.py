@@ -44,6 +44,8 @@ ESCURO_DE_SEMPRE = {
     "--alerta-a45": "rgba(255,216,61,.45)", "--alerta-a50": "rgba(255,216,61,.5)",
     "--alerta-a55": "rgba(255,216,61,.55)", "--alerta-a60": "rgba(255,216,61,.6)", "--severo": "#ff9f43",
     "--severo-suave": "rgba(255,159,67,.14)", "--laranja": "#ff9f5a", "--laranja-a16": "rgba(255,143,60,.16)",
+    # o pulso da OS parada no Quadro da equipe (tokens novos, 24/10/2026)
+    "--pulso-a71": "rgba(255,143,60,.71)", "--pulso-a57": "rgba(255,143,60,.57)", "--pulso-a43": "rgba(255,143,60,.43)", "--pulso-a28": "rgba(255,143,60,.28)", "--pulso-a14": "rgba(255,143,60,.14)",
     "--critico": "#ff5b6e", "--critico-suave": "rgba(255,91,110,.14)", "--critico-a12": "rgba(255,91,110,.12)",
     "--critico-a18": "rgba(255,91,110,.18)", "--critico-a30": "rgba(255,91,110,.30)",
     "--critico-a35": "rgba(255,91,110,.35)", "--critico-a45": "rgba(255,91,110,.45)", "--agir-tinta": "#fff",

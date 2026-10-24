@@ -247,6 +247,20 @@ FATOS = (
                     "mesmo livro). As medidas são a foto do sinal na entrada, só no evento que começa (somam entre "
                     "acompanhamentos, não no tempo de um ativo). Quem, o nome de quem acompanha e o texto só "
                     "cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+    Fato("acompanhamento_os", "A OS acompanhada pela Engenharia", "engenharia",
+         "nexus_engenharia_os · fato_acompanhamento_os",
+         "1 linha = 1 evento (status, prioridade ou comentario) da Engenharia sobre 1 OS do Fracttal",
+         _d(data=("id", "data_id (o dia de Brasília do evento)"),
+            usina=("id", "usina_id (a ligação do Quadro da equipe com o cadastro; usina_ligada_por)"),
+            equipamento=("id", "equipamento_id (o código do ativo da OS)"),
+            pessoa=("cod", "pessoa_hmac (quem fez)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_engenharia_os · fato_acompanhamento_os",),
+         janela_origem="o Nexus é a fonte",
+         observacao="os_id é o id da OS no Fracttal e os_folio o nº; status_id e prioridade_id apontam as abas "
+                    "dim_status_os e dim_prioridade_os do mesmo livro (as listas fixas do pedido de 24/10/2026); o "
+                    "estado de agora é o do último evento de cada tipo. nota_fracttal diz se o comentário foi para a "
+                    "nota da OS (\"sim\") ou por que não foi. Quem e o texto só cifrados (Cofre, a chave do cadastro). "
+                    "Só acrescenta: nada se edita nem se apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
          "ou Zeladoria)",
@@ -979,6 +993,13 @@ LIVROS = (
           "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª gravação (o 1º Pegar ou a 1ª "
           "mudança no cadastro dos diagnósticos), com o cadastro inicial (Comunicação, Disjuntor). As duas abas "
           "vão juntas a cada gravação, sobre o livro relido do banco",
+          so_cresce=True),
+    Livro("nexus_engenharia_os", ("dim_status_os", "dim_prioridade_os", "fato_acompanhamento_os"),
+          "a cada status, prioridade e comentário na página da OS (tela Engenharia > Quadro da equipe)",
+          "nexus/engenharia/os_acompanhamento.py, pela página da OS do Quadro da equipe", False,
+          "registrado em 24/10/2026 antes da 1ª gravação (regra 10): nasce no 1º status, prioridade ou comentário. As "
+          "três abas vão juntas a cada gravação, sobre o livro relido do banco; as duas dim são as listas fixas do "
+          "código",
           so_cresce=True),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,

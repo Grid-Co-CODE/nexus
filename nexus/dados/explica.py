@@ -22,6 +22,7 @@ RESUMO = {
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
+    "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
@@ -111,6 +112,11 @@ PARA_QUE = {
                             "cada ativo e, com o tempo, quais diagnósticos se repetem por família, usina e cliente, "
                             "quanto leva uma análise e se o ativo voltou a falhar depois dela. Quem e o texto vão "
                             "cifrados; a tela Engenharia → Confiabilidade mostra.",
+    "acompanhamento_os": "Guarda o que a Engenharia diz de cada OS no Quadro da equipe: o status da análise (os oito "
+                         "do time, como Diagnóstico em Andamento ou Stand-By), a prioridade (média, alta ou urgente) "
+                         "e cada comentário, com o dia e a hora; o comentário vai também para a nota da OS no "
+                         "Fracttal. Serve para saber em que pé está cada OS da Engenharia, quais pararam e, com o "
+                         "tempo, quanto cada etapa leva por tipo de ativo e usina. Quem e o texto vão cifrados.",
     "decisao": "Registra as decisões tomadas no painel do App de Campo: a aprovação de uma tarefa, o tratamento de um "
                "alerta da Central de atenção e a devolução de uma tarefa ao técnico. Serve para saber quem decidiu o "
                "quê, quando e sobre qual OS.",

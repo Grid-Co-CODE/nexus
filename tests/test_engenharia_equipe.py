@@ -85,20 +85,19 @@ def test_cada_os_leva_o_id_e_o_status_do_card():
     assert [oss[k]["status"] for k in "567"] == ["Em Verificação", "Concluída", "Cancelada"]
 
 
-def test_o_quadro_abre_o_card_do_os_creator(logado, monkeypatch):
+def test_o_quadro_abre_a_pagina_da_os_da_engenharia(logado, monkeypatch):
+    # até 24/10/2026 o clique abria o card do OS Creator; agora é a página da OS da engenharia (Levi: "Ao clicar quero
+    # uma visão parecida com o que aparece quando clica na OS da parte de CHAMADOS > GARANTIA")
     oss = E.montar([_w("1", 1, prog_dias=-2)], {"id": 1, "nome": "Ana"}, AGORA)
     monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
     monkeypatch.setattr(E, "dados", lambda: {"os": oss, "equipe": [{"id": 1, "nome": "Ana", "nome_fracttal": "Ana Teste"}],
                                              "faltam": [], "lido": 1.0, "lendo": False, "erro": ""})
     html = logado.get("/t/engenharia/equipe").get_data(as_text=True)
-    # o componente que abre o card (oscreator/card_os_abrir.html) e a moldura dele, /os/_nexus/card/<id>
-    assert "window.NexusOsCard" in html and "nexusRota('/os/_nexus/card/') + encodeURIComponent(wid)" in html
-    assert "NexusOsCard.abrir(o.wid, {status: o.status, folio: o.os" in html
-    # o nº da OS é o link da página dela no OS Creator (o mesmo do Histórico: /os/os/<id>?status=...)
-    assert "num.href = nexusRota('/os/os/') + encodeURIComponent(o.wid) + '?status=' + encodeURIComponent(o.status || '')" in html
+    assert "nexusRota('/t/engenharia/equipe/os/') + encodeURIComponent(o.os)" in html and "NexusOsCard" not in html
+    assert "num.href = paginaOs(o)" in html                       # o nº é o link da página: Ctrl+clique abre numa aba
     dados = html.split('id="kb-dados">', 1)[1].split("</script>", 1)[0]
     assert '"wid": 9001' in dados and '"status": "Em Processo"' in dados and '"os": "1"' in dados
-    assert "eg-gaveta" not in html                                 # a gaveta própria saiu: o card é o do OS Creator
+    assert "eg-gaveta" not in html
 
 
 def test_quem_mudou_a_os_pelo_card_volta_com_o_quadro_relido(logado, monkeypatch):
