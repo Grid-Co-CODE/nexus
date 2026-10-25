@@ -12,20 +12,23 @@ As duas listas:
   "Precisa de PT" vazio é "ainda não medido" (as APRs de antes da v298 são lidas do documento aos poucos): não entra.
   Caso real: a OS 16866 TINHA PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal, onde só vai o PDF
   da APR. A busca da tela de APR e PT acha a PT pelo número da OS.
-- **OS fechada pelo App sem APR**: cada tarefa do `fato_fechamento` desde 09/10/2026 sem APR da mesma OS no mesmo dia
-  de Brasília, nem APR da tarefa com a mesma OS e a mesma tarefa. Por OS e dia, com quantas tarefas. A régua não olha o
+- **OS fechada pelo App sem APR**: cada tarefa do `fato_fechamento` desde 10/10/2026 sem APR da mesma OS no mesmo dia
+  de Brasília ou no anterior (a tarefa da noite fecha depois da meia-noite), nem APR da tarefa com a mesma OS e a mesma
+  tarefa. Por OS e dia, com quantas tarefas. A régua não olha o
   técnico (a do App olha): melhor deixar passar um caso do que apontar quem fez a APR. Deve ser raro: o servidor do App
   barra a 1ª tarefa da OS no dia sem a APR do dia desde a v246; o que aparecer tende a ser App velho, o robô ou APR
   feita no Fracttal.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from ..campo import leitura, visao
 from ..dados import fatos as D
 from ..dados import livros
 
 LIVRO, ABA = "apr_app_campo", "APR"
-INICIO = date(2026, 10, 9)          # a fila do PDF da APR do App registra toda APR desde a v251
+# a fila do PDF da APR do App registra toda APR desde a v251, que entrou ao longo de 09/10/2026: conta do dia seguinte
+# (medido em 25/10: 48 dos 138 casos de OS sem APR eram de 09/10, o dia da troca)
+INICIO = date(2026, 10, 10)
 
 
 def _txt(v) -> str:
@@ -50,11 +53,12 @@ def sem_apr_ou_pt() -> leitura.Leitura:
             return {"livro_existe": False, "sem_pt": [], "sem_apr": [], "hoje": hoje, **visao._estrutura(b)}
         aprs = visao._livro(LIVRO, ABA)
         quem = visao._quem() if aprs else {}
-        sem_pt, por_os_dia, por_os_tarefa = [], set(), set()
+        sem_pt, por_os_dia, por_os_tarefa, dias_da_os = [], set(), set(), {}
         for x in aprs:
             os_, dia = _txt(x.get("OS")), _dia(x.get("Dia"))
             if os_ and dia:
                 por_os_dia.add((os_, dia))
+                dias_da_os.setdefault(os_, set()).add(dia)
             if os_ and _txt(x.get("Tipo")) == "tarefa" and _txt(x.get("Tarefa")):
                 por_os_tarefa.add((os_, D.tarefa_chave(x.get("Tarefa"))))
             if _txt(x.get("Precisa de PT")).lower() == "sim" and not _txt(x.get("PT")):
@@ -71,11 +75,17 @@ def sem_apr_ou_pt() -> leitura.Leitura:
             if not os_ or not quando or quando.date() < INICIO:
                 continue
             dia = quando.date()
-            if (os_, dia) in por_os_dia or (os_, _txt(x.get("tarefa_chave"))) in por_os_tarefa:
+            # a APR do dia anterior também vale: a tarefa feita à noite fecha (ou chega do celular) depois da meia-noite
+            # (medido em 25/10: 89 dos 138 casos tinham a APR da mesma OS no dia anterior)
+            if ((os_, dia) in por_os_dia or (os_, dia - timedelta(days=1)) in por_os_dia
+                    or (os_, _txt(x.get("tarefa_chave"))) in por_os_tarefa):
                 continue
             uid = D._id(x.get("usina_id"))
+            # a última APR da OS antes do fechamento, se houve: fechada 24/10 com APR em 22/10 é, quase sempre, o
+            # fechamento registrado dias depois do serviço (medido em 25/10: 27 dos 39 casos); a TST vê e decide
+            antes = [d_ for d_ in dias_da_os.get(os_, ()) if d_ < dia]
             g = grupos.setdefault((os_, dia), {"dia": dia, "os": os_, **(b.onde(uid) if uid else {"usina": ""}),
-                                               "tarefas": 0,
+                                               "apr_antes": max(antes) if antes else None, "tarefas": 0,
                                                "tipo_os": _txt(x.get("tipo_os")), "pessoas": set()})
             g["tarefas"] += 1
             if D._id(x.get("pessoa_id")):

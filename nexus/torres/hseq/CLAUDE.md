@@ -383,8 +383,12 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   `nexus/hseq/apr.py`): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
   1ª gravação, fato `apr`; contrato com a sessão do App de Campo), duas listas de 20 em 20 com os mesmos filtros:
   **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
-  fechada sem APR** (a tarefa do `fato_fechamento` desde 09/10/2026 sem APR da mesma OS no mesmo dia, nem APR da tarefa
-  com a mesma OS e tarefa; por OS e dia; a régua não olha o técnico). Sem o livro, a aba diz que ele ainda não chegou.
+  fechada sem APR** (a tarefa do `fato_fechamento` desde 10/10/2026 sem APR da mesma OS no mesmo dia ou no anterior,
+  nem APR da tarefa com a mesma OS e tarefa; por OS e dia, com a coluna "APR da OS", a última antes do fechamento, ou
+  "nenhuma"; a régua não olha o técnico). Medido no livro real em 25/10 (875 APRs, 149 já medidas): 2 APRs pediam PT e
+  ficaram sem (a mesma conta do App) e 39 OS fechadas sem APR, 12 sem APR nenhuma; a régua começou com 138, dos quais
+  48 eram de 09/10 (o dia da troca para a v251) e 89 tinham a APR no dia anterior (a tarefa da noite fecha depois da
+  meia-noite). Sem o livro, a aba diz que ele ainda não chegou.
   Caso que motivou: a OS 16866 tinha PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal.
 - **O histórico inteiro, de 20 em 20** ("Em histórico quero todo o período mostrando de 20 em 20 para não pesar tanto";
   saiu o período 7/30/90 dias): `POR_PAGINA_PT`, `?pag=`, com "1–20 de N" e as páginas em volta da atual; leva a coluna
