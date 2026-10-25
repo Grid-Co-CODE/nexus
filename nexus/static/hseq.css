@@ -239,3 +239,13 @@
 .hs-dlg-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
 @media (max-width:480px){.hs-dlg-grade{grid-template-columns:minmax(0,1fr)}}
 .ext-tab .ext-par > .hs-editado{font-weight:600}
+
+/* a prévia do e-mail semanal (24/10/2026): quem recebe e o e-mail como vai para o App */
+.hs-voltar{margin:12px 0 0;font-size:13px}
+.hs-email-quem{margin-top:16px}
+.hs-email-seg{flex-wrap:wrap}
+.hs-email{margin-top:16px;max-width:760px;padding:16px 20px;border:1px solid var(--linha);border-radius:12px;background:var(--superficie)}
+.hs-email-assunto{margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--linha);font-weight:600}
+.hs-email-corpo{font-size:14px;line-height:1.5;color:var(--tinta)}
+.hs-email-corpo ul{margin:4px 0 12px;padding-left:20px}
+.hs-email-corpo a{color:var(--verde-texto)}

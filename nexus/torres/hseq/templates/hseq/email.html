@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Prévia do e-mail semanal{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{# A prévia do e-mail semanal das pendências (a TST, 24/10/2026: "Receber report semanal das pendências por email, pra
+   mim e pro supervisor responsável"): quem recebe nesta semana e o e-mail de cada um, como o Nexus publica para o App de
+   Campo mandar. Os nomes dos responsáveis só aparecem aqui; o livro leva o número e o código da pessoa. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa da Segurança</p><h1 class="cn-titulo">Prévia do e-mail semanal</h1>
+      <p class="cn-pergunta">Toda segunda depois das 7h, o Nexus monta o e-mail de cada um e o App de Campo manda.</p></div>
+    <div class="cn-frescor">semana {{ d.semana }}<br><b>{{ 'publicação ligada' if ligado else 'publicação desligada (NEXUS_HSEQ_EMAIL_AUTO)' }}</b></div>
+  </div>
+  <p class="hs-voltar"><a class="cn-link" href="{{ url_for('torre_hseq.mesa')|na_raiz }}">Voltar à Mesa</a></p>
+  {% if d.erros %}<p class="cn-erro cn-aviso" role="status"><b>Uma fonte não foi lida agora ({{ d.erros|join(', ') }}).</b> Sem ela, o e-mail não sai: o Nexus tenta de novo daqui a 10 minutos.</p>{% endif %}
+  {% if d.tst_sem_setor %}<p class="cn-erro cn-aviso" role="status"><b>Não consegui ler os setores ({{ d.tst_sem_setor }}).</b> Sem eles, a TST não recebe.</p>{% endif %}
+
+  <section class="hs-email-quem" aria-label="Quem recebe">
+    <div class="cn-seg cn-seg--mini hs-email-seg">
+      <a href="{{ url_for('torre_hseq.mesa_email', ver='tst')|na_raiz }}"{% if ver == 'tst' %} aria-current="page"{% endif %}>TST · {{ d.n_tst }} {{ 'pessoa' if d.n_tst == 1 else 'pessoas' }}</a>
+      {% for x in resp %}<a href="{{ url_for('torre_hseq.mesa_email', ver=x.pessoa_id)|na_raiz }}"{% if ver == x.pessoa_id|string %} aria-current="page"{% endif %}>{{ x.nome }}</a>{% endfor %}
+    </div>
+    {% if d.sem_codigo %}<p class="hs-dlg-nota"><b>Sem e-mail ligado ({{ d.sem_codigo|length }}):</b> {{ d.sem_codigo|join(', ') }}. Para receber, a pessoa precisa estar ligada ao usuário do Fracttal (Base → Integração Fracttal) ou ter e-mail na ficha.</p>{% endif %}
+    {% if not d.n_tst %}<p class="hs-dlg-nota">Ninguém está no setor Segurança (Base → Integração Fracttal): a TST não recebe.</p>{% endif %}
+  </section>
+
+  {% if escolhido %}
+  <article class="hs-email">
+    <p class="hs-email-assunto"><span class="gc-rotulo">Assunto</span> {{ escolhido.assunto }}</p>
+    <div class="hs-email-corpo">{{ escolhido.corpo_html|safe }}</div>
+  </article>
+  {% else %}
+  <p class="mudo">Ninguém recebe nesta semana: nenhuma pendência, ou ninguém com e-mail ligado.</p>
+  {% endif %}
+</div>
+{% endblock %}

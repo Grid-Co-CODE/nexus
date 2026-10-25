@@ -61,6 +61,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # Operações e dos feriados
              "NEXUS_PCM_RELATORIOS_AUTO", "NEXUS_PCM_GERENCIAL_FONTE", "NEXUS_PCM_ENGENHARIA_FONTE",
              "NEXUS_PCM_OPERACOES_FONTE", "NEXUS_PCM_FERIADOS_FONTE", "NEXUS_PCM_CONFIABILIDADE_FONTE",
+             # o e-mail semanal das pendências da Segurança (24/10/2026, nexus/hseq/email_semanal.py): "1" liga a
+             # publicação de segunda, que o App de Campo manda; sem ela, desligado
+             "NEXUS_HSEQ_EMAIL_AUTO",
              # a curadoria do Acompanhamento do PCM num arquivo (só na cópia de prova; no servidor ela vem do banco)
              "NEXUS_PCM_CURADORIA_ARQUIVO",
              # o caminho em que o Nexus é servido (09/10/2026, "a partir de segunda quero o Nexus como link principal"):

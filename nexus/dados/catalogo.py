@@ -386,6 +386,21 @@ FATOS = (
                     "O Nexus mostra o editado por cima do livro do App até uma conferência num dia depois da edição. "
                     "Quem editou e a observação só cifrados. Assinado como a exclusão (o texto leva o campos como "
                     "está gravado)"),
+    # o e-mail semanal das pendências da Segurança (24/10/2026, a TST: "Receber report semanal das pendências por
+    # email, pra mim e pro supervisor responsável"): o Nexus monta e publica, o App de Campo manda
+    Fato("email_pendencias_seguranca", "E-mail semanal das pendências da Segurança", "hseq",
+         "nexus_hseq_email · fato_email_pendencias",
+         "1 linha = 1 e-mail de 1 destinatário numa semana (a TST, com todas as usinas, ou um Responsável UFV, com as "
+         "usinas dele)",
+         _d(data=("id", "data_id (o dia de Brasília em que foi montado; semana = a semana ISO)"),
+            pessoa=("id", "pessoa_id (o número no cadastro) + destinatario_hmac (o código do e-mail, como o do login)")),
+         tipo="sem_medida", chave=("semana", "destinatario_hmac"),
+         fontes=("nexus_hseq_email · fato_email_pendencias",),
+         janela_origem="o Nexus é a fonte (só acrescenta, uma vez por semana)",
+         observacao="papel tst ou responsavel; assunto, corpo_texto e corpo_html com usinas, clientes e números, nunca "
+                    "nome nem e-mail de pessoa (o link da Mesa leva o número da pessoa, ?r=). Assinado (assinatura, HMAC "
+                    "com a chave derivada da NEXUS_PESSOA_HMAC, rótulo nexus:hseq:email): o App só manda a linha "
+                    "assinada e acha o e-mail pelo código"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
@@ -1131,6 +1146,11 @@ LIVROS = (
           so_cresce=True),
     # as decisões da Segurança sobre os extintores (24/10/2026): a exclusão de extintor (o não reconhecido aceito e o
     # botão direito) e o pedido de nova ronda por usina; o App de Campo lê os dois daqui
+    Livro("nexus_hseq_email", ("fato_email_pendencias",),
+          "toda segunda depois das 07:00 (com NEXUS_HSEQ_EMAIL_AUTO=1)", "nexus/hseq/email_semanal.py", False,
+          "registrado em 24/10/2026 antes de existir: nasce com a 1ª semana publicada, quando o App de Campo estiver "
+          "pronto para ler e mandar",
+          so_cresce=True),
     Livro("nexus_hseq_extintores", ("fato_exclusao_extintor", "fato_pedido_ronda", "fato_edicao_extintor"),
           "a cada decisão na tela de Extintores", "nexus/hseq/decisoes.py, pela tela Extintores da Segurança", False,
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "
