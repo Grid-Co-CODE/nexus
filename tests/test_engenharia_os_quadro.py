@@ -617,3 +617,68 @@ def test_ativo_ao_lado_da_os_segue_em_verde():
     from pathlib import Path
     css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
     assert re.search(r"\.eg-ac-titulo span\{color:var\(--verde-texto\)", css)
+
+
+# ── 4ª rodada de 24/10/2026: trocar o responsável como no chamado, e os ativos de 5 em 5 ─────────────────────────────
+def test_trocar_o_responsavel_como_no_chamado(pagina, cliente):
+    # Levi: "em responsável quero a opção de mudar de responsável que nem é feito no chamados": o "trocar" ao lado do
+    # nome nos Dados abre o diálogo de lá (Hoje está com..., a pessoa, Atribuir), pela API do OS Creator
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    dados = _secao(html, "Dados")
+    assert re.search(r"<dt>Responsável</dt><dd class=\"eg-resp\"><span data-resp-nome>Ana Lima</span>"
+                     r"<button type=\"button\" class=\"eg-resp-bt\" data-trocar-resp[^>]*>trocar</button>", dados)
+    assert "Trocar o responsável da OS 16502" in html and "Hoje está com <b data-resp-hoje>Ana Lima</b>." in html
+    assert "nexusRota('/os/api/responsaveis')" in html and "nexusRota('/os/api/os/' + wid + '/responsavel')" in html
+
+
+def test_depois_da_troca_a_volta_rele_o_quadro(pagina, cliente):
+    # a OS muda de pessoa no Fracttal na hora, mas o quadro guarda a leitura por até 5 min: depois do Atribuir, o
+    # "← Quadro da equipe" volta com ?atualizar=1 (o mesmo que o quadro pede depois de uma mudança pelo card do OS Creator)
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    assert re.search(r'data-trocar-resp[^>]*data-volta="/t/engenharia/equipe\?atualizar=1"', html)
+    assert "getAttribute('data-volta')" in html
+
+
+def test_quem_nao_e_da_engenharia_nao_troca_o_responsavel(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+                                               "erro": ""})
+    html = _como(cliente, BETO).get(URL).get_data(as_text=True)
+    assert "data-trocar-resp" not in html and "Ana Lima" in _secao(html, "Dados")
+
+
+def test_ativos_de_cinco_em_cinco(pagina, cliente, monkeypatch):
+    # Levi: "no ativos também quero que limite a 5 por vez!": os 5 primeiros e o "Mostrar mais", como a tabela de ativos
+    # da Nova solicitação (lá de 10 em 10)
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.engenharia import os_equipe as E
+    extras = [dict(pagina, code=f"X-INV{n}.1", items_log_description=f"Inversor {n}.1 {{X-INV{n}.1}}") for n in range(2, 8)]
+    lido = E._ler_fracttal
+
+    def com_sete(path):
+        r = lido(path)
+        if path.startswith("work_orders?wo_folio=16502"):
+            r = {"data": list(r["data"]) + extras}
+        return r
+    monkeypatch.setattr(E, "_ler_fracttal", com_sete)
+    ativos = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Ativos")
+    linhas = re.findall(r"<tr data-ativo( hidden)?>", ativos)
+    assert len(linhas) == 7 and linhas[:5] == [""] * 5 and linhas[5:] == [" hidden"] * 2
+    assert "Mostrando 5 de 7" in ativos and 'data-mais-ativos="5">Mostrar mais 2</button>' in ativos
+
+
+def test_ate_cinco_ativos_sem_o_mostrar_mais(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.engenharia import os_equipe as E
+    outra = dict(pagina, code="X-INV2.1", items_log_description="Inversor 2.1 {X-INV2.1}")
+    lido = E._ler_fracttal
+    monkeypatch.setattr(E, "_ler_fracttal", lambda path: ({"data": list(lido(path)["data"]) + [outra]}
+                                                           if path.startswith("work_orders?wo_folio=16502") else lido(path)))
+    ativos = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Ativos")
+    assert "hidden" not in ativos and "Mostrar mais" not in ativos

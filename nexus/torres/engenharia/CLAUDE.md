@@ -180,18 +180,24 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   atrasada, âmbar aberta, com "há N dias sem atualização" quando parada, verde concluída, apagada cancelada) e o título
   da OS; embaixo a OS e o ativo em verde (Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no
   lugar do título da OS bote OS e ativo"; com mais de um ativo, "N ativos", e o bloco Ativos lista os de cada tarefa,
-  em cima da nota), e o cliente · usina, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o
+  em cima da nota, de 5 em 5 com o "Mostrar mais", como a tabela de ativos da Nova solicitação; Levi, 24/10/2026: "no
+  ativos também quero que limite a 5 por vez!"), e o cliente · usina, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o
   "Solicitar OS"; e a faixa dos quatro números no desenho da de lá (o valor de texto comprido quebra, em vez de cobrir o
   vizinho). Os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
   Programada (atrasada, vence ou abre em) e Última atualização (o mais novo entre o registro da engenharia, o início e o
-  fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). Embaixo da OS e do
-  ativo, o título da OS. O corpo também é o da tela do chamado (`.ac-det`, `.bloco`, `ol.cadeia`, `dl.dados`, `.tl`,
+  fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). O corpo também é o da tela do chamado (`.ac-det`, `.bloco`, `ol.cadeia`, `dl.dados`, `.tl`,
   copiados em `eg-ac-det`, `eg-bloco`, `eg-cadeia`, `eg-ac-dados`, `eg-tl`): à esquerda, em 310 px, o que a engenharia
   faz (Status e prioridade; A cadeia da OS; Dados, só ativo, usina, responsável, criação e etiquetas); à direita o que
   ela lê (Na nota da OS; Demais respostas do técnico, numa tabela por OS de campo; Comentários, na linha do tempo das
   Observações de lá: a data e o ano à esquerda, o mais novo em verde, a mudança de status ou prioridade com o ponto
   âmbar). **A nota da OS** é a que o card do OS Creator lê (`os_equipe._nota_da_os`: a da tarefa, `task_note`, senão a
   `note`; Levi, 24/10/2026: "não está puxando a nota da OS da engenharia", a página mostrava só a `note`).
+- **Trocar o responsável** (Levi, 24/10/2026: "em responsável quero a opção de mudar de responsável que nem é feito
+  no chamados"): o "trocar" ao lado do nome nos Dados, só para a Engenharia, abre o diálogo da tela do chamado (Hoje
+  está com..., a busca pelo nome, Atribuir), pela API do OS Creator (`/os/api/responsaveis` e
+  `/os/api/os/<id>/responsavel`, a mesma do `os_acoes.js`), na sessão do Fracttal da pessoa; sem ela, o aviso traz o
+  login do Fracttal. O nome muda ali mesmo, e a volta ao quadro passa a levar `?atualizar=1`: o quadro guarda a leitura
+  do Fracttal por até 5 min, e a OS seguiria com quem estava.
 - **Status e prioridade** moram no livro `nexus_engenharia_os` (`nexus/engenharia/os_acompanhamento.py`; regra no
   `nexus/dados/CLAUDE.md`): os oito do time (Análise de Solução, Atividade em Andamento, Diagnóstico em Andamento,
   Agendamento de OS, Tratativa com Equipe de Campo, Validação Final, Stand-By, Diagnóstico Concluído; o id é a ordem do
