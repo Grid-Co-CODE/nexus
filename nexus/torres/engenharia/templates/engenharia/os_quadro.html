@@ -3,120 +3,171 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+{# a fonte da tela do chamado da Garantia (o chamados.css do OS Creator usa a Inter): o topo fica na mesma letra #}
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 {# A OS do Quadro da equipe (Levi, 24/10/2026: "Ao clicar quero uma visão parecida com o que aparece quando clica na OS da
    parte de CHAMADOS > GARANTIA"). O desenho da tela do chamado: em cima a etiqueta, o botão e os quatro números; à
    esquerda o que a engenharia FAZ (o status e a prioridade, no lugar do ticket do fornecedor; os dados; as OS filhas);
    à direita o que ela LÊ (a nota da OS, a resposta do técnico nas filhas, os comentários). O "Solicitar OS" fica no
    lugar do "Abrir a OS". #}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
+{# a seta do PDF de cada OS da cadeia, a mesma da cadeia do chamado da Garantia (o PDF que o Fracttal junta, com as fotos) #}
+{% macro seta_pdf(folio, wid='') -%}
+<button type="button" class="eg-cad-pdf" data-os-pdf="{{ folio }}"{% if wid %} data-wid="{{ wid }}"{% endif %} title="Baixar o PDF da OS {{ folio }}" aria-label="Baixar o PDF da OS {{ folio }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+{%- endmacro %}
 {% set ROT = {'fazer': 'A fazer', 'execucao': 'Em execução', 'verificacao': 'Em verificação', 'concluida': 'Concluída', 'cancelada': 'Cancelada'} %}
-<div class="campo-nativa eg-os">
-  <a class="eg-os-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
+<div class="campo-nativa eg-os eg-ac">
   {% if not o %}
+  <a class="eg-ac-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
   <h1 class="cn-titulo">OS {{ folio }}</h1>
   {% if nao_achou %}<p class="cn-erro" role="status"><b>Não achei a OS {{ folio }} no Fracttal.</b> Confira o número.</p>
   {% else %}<p class="cn-erro" role="status"><b>O Fracttal não respondeu ({{ erro_fracttal }}).</b> Recarregue em instantes.</p>{% endif %}
   {% else %}
-  <div class="cn-cab eg-os-cab">
-    <div class="eg-os-cab-txt">
-      <p class="gc-eyebrow">{{ torre.nome }} · Quadro da equipe</p>
-      <div class="eg-os-tit">{{ tag(ROT.get(o.coluna, o.coluna) ~ (' · atrasada' if o.prazo == 'atrasada' else ''), {'atrasada': 'critico', 'vence': 'alerta'}.get(o.prazo, 'neutro')) }}
-        <h1 class="cn-titulo">OS {{ o.os }} <span>{{ o.ativo or o.codigo }}</span></h1></div>
-      <p class="cn-pergunta">{{ o.usina or '—' }}{% if o.tipo %} · {{ o.tipo }}{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
+  {# o topo da tela do chamado da Garantia (Levi, 24/10/2026: "essa parte de cima quero na mesma estrutura e fonte os
+     botões quero nas mesmas posições"): numa linha a volta, a pílula do estado e o título com o ativo em verde; embaixo o
+     local, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o "Solicitar OS" #}
+  <div class="eg-ac-head">
+    <div class="eg-ac-esq">
+      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
+        <span class="eg-ac-tag eg-ac-tag--{{ topo.cor }}">{{ topo.texto }}</span>
+        <h1>OS {{ o.os }} <span>{{ o.ativo or o.codigo }}</span></h1></div>
+      {% if o.titulo %}<p class="eg-ac-titulo">{{ o.titulo }}</p>{% endif %}
+      <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
-    <div class="eg-os-acoes"><a class="gc-btn gc-btn--primario" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
+    <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
   </div>
   {% if msg_ok %}<p class="eg-os-aviso eg-os-aviso--ok" role="status">{{ msg_ok }}</p>{% endif %}
   {% if msg_erro %}<p class="cn-erro" role="status">{{ msg_erro }}</p>{% endif %}
   {% if velha_em %}<p class="cn-erro cn-aviso" role="status"><b>Mostrando a última leitura boa da engenharia ({{ velha_em }}).</b> O banco não respondeu agora; recarregue em instantes.</p>{% endif %}
   {% if erro_livro %}<p class="cn-erro cn-aviso" role="status"><b>Não consegui ler o status e os comentários da engenharia ({{ erro_livro }}).</b> Recarregue em instantes.</p>{% endif %}
 
-  <section class="kb-kpis eg-os-kpis" aria-label="A OS agora">
-    {% for k in kpis %}<div class="kb-kpi">
-      <span class="kb-kpi-rot">{{ k.rotulo }}</span>
-      <span class="kb-kpi-linha"><b class="kb-kpi-v{{ ' kb-kpi-v--' ~ k.grav if k.grav }}">{{ k.valor }}</b><span class="kb-kpi-nota">
-        {%- for texto, negrito in k.nota %}{% if negrito %}<b>{{ texto }}</b>{% else %}{{ texto }}{% endif %}{% endfor -%}
-      </span></span>
-    </div>{% endfor %}
-  </section>
+  <div class="eg-ac-kpis" aria-label="A OS agora">
+    {% for k in kpis %}<div class="eg-ac-kpi"><div class="lbl">{{ k.rotulo }}</div><div class="linha"><span class="val pq{{ ' ' ~ {'critico': 'r', 'alerta': 'a'}.get(k.grav, '') if k.grav }}">{{ k.valor }}</span><span class="note">
+      {%- for texto, negrito in k.nota %}{% if negrito %}<b>{{ texto }}</b>{% else %}{{ texto }}{% endif %}{% endfor -%}
+    </span></div></div>{% endfor %}
+  </div>
 
-  <div class="eg-os-det">
-    <div class="eg-os-col">
-      <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>Status e prioridade</h2><span>da engenharia</span></div>
+  {# o corpo da tela do chamado (Levi, 24/10/2026: "quero quase idêntico na estrutura"): à esquerda o que a engenharia FAZ
+     (o status e a prioridade, no lugar do ticket; a cadeia da OS; os Dados), à direita o que ela LÊ (a nota da OS, a
+     resposta do técnico nas OS de campo e os comentários, na linha do tempo das Observações de lá) #}
+  <div class="eg-ac-det">
+    <aside>
+      <section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Status e prioridade</h2></div>
         {% if pode %}
-        <form class="eg-os-form" method="post" action="{{ url_for('torre_engenharia.equipe_os_classificar', folio=o.os) }}">
-          <label><span class="gc-rotulo">Status</span>
-            <select class="gc-campo" name="status_id">{% if not est.status_id %}<option value="">Escolha o status</option>{% endif %}
+        <form class="eg-ac-form" method="post" action="{{ url_for('torre_engenharia.equipe_os_classificar', folio=o.os) }}">
+          <label><span class="eg-ac-lbl">Status</span>
+            <select class="eg-ac-campo" name="status_id">{% if not est.status_id %}<option value="">Escolha o status</option>{% endif %}
               {% for i, n in status %}<option value="{{ i }}"{% if i == est.status_id %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
-          <label><span class="gc-rotulo">Prioridade</span>
-            <select class="gc-campo" name="prioridade_id">{% if not est.prioridade_id %}<option value="">Escolha a prioridade</option>{% endif %}
+          <label><span class="eg-ac-lbl">Prioridade</span>
+            <select class="eg-ac-campo" name="prioridade_id">{% if not est.prioridade_id %}<option value="">Escolha a prioridade</option>{% endif %}
               {% for i, n in prioridades %}<option value="{{ i }}"{% if i == est.prioridade_id %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
-          <button type="submit" class="gc-btn gc-btn--primario">Salvar</button>
-          <p class="eg-os-dica">Fica no Nexus com o seu nome, a data e a hora, e entra nos comentários.</p>
+          <button type="submit" class="eg-ac-btn eg-ac-btn--g">Salvar</button>
         </form>
+        <p class="eg-dica">Fica no Nexus com o seu nome, a data e a hora, e entra nos comentários.</p>
         {% else %}
-        <dl class="eg-dados"><dt>Status</dt><dd>{{ nome_status(est.status_id) or '—' }}</dd>
+        <dl class="eg-ac-dados"><dt>Status</dt><dd>{{ nome_status(est.status_id) or '—' }}</dd>
           <dt>Prioridade</dt><dd>{{ nome_prioridade(est.prioridade_id) or '—' }}</dd></dl>
         {% endif %}
       </section>
-      <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>Dados</h2></div>
-        <dl class="eg-dados">
-          <dt>Ativo</dt><dd><code>{{ o.codigo or '—' }}</code></dd>
+      <section class="eg-bloco" data-pdf-caixa data-login-fracttal="{{ login_fracttal }}">
+        <div class="eg-bloco-h"><h2>A cadeia da OS</h2></div>
+        {# a OS da engenharia como OS pai das OS de campo que nascem do Solicitar OS (Levi: "o ideal é que essa OS da
+           engenharia se torne OS pai de OSs de campo futuramente") #}
+        <ol class="eg-cadeia">
+          <li class="aqui"><span class="i">1</span><span class="t">OS da engenharia</span><a href="{{ url_for('torre_engenharia.equipe_os', folio=o.os) }}">{{ o.os }}</a>{{ seta_pdf(o.os, o.wid) }}</li>
+          {% for f in filhas %}<li><span class="i">{{ loop.index + 1 }}</span><span class="t">OS de campo{% if f.coluna in ('concluida', 'cancelada') %} · {{ ROT.get(f.coluna) }}{% endif %}</span><a href="{{ url_for('torre_engenharia.equipe_os', folio=f.os) }}">{{ f.os }}</a>{{ seta_pdf(f.os, f.wid) }}</li>{% endfor %}
+        </ol>
+        {% if erro_filhas %}<p class="eg-dica">Não consegui ler as OS de campo ({{ erro_filhas }}).</p>
+        {% elif not filhas %}<p class="eg-dica">As OS de campo que nascerem do Solicitar OS entram aqui, com o PDF e as fotos.</p>{% endif %}
+        <p class="eg-pdf-msg" data-pdf-msg hidden></p>
+      </section>
+      <section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Dados</h2></div>
+        <dl class="eg-ac-dados">
+          <dt>Ativo</dt><dd class="mono">{{ o.codigo or '—' }}</dd>
           <dt>Usina</dt><dd>{{ o.usina or '—' }}</dd>
-          <dt>Tipo</dt><dd>{{ o.tipo or '—' }}</dd>
           <dt>Responsável</dt><dd>{{ o.pessoa or '—' }}</dd>
-          <dt>Criada</dt><dd>{{ o.criada or '—' }}</dd>
-          <dt>Criticidade</dt><dd>{{ prioridade_fracttal or '—' }} no Fracttal</dd>
-          {% if o.etiquetas %}<dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% endfor %}</dd>{% endif %}
-          {% if o.url %}<dt>No Fracttal</dt><dd><a href="{{ o.url|na_raiz }}" target="_blank" rel="noopener">abrir a OS {{ o.os }}</a></dd>{% endif %}
+          <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
+          <dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% else %}—{% endfor %}</dd>
         </dl>
       </section>
-      <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>OS filhas</h2><span>nascidas desta pelo Solicitar OS</span></div>
-        {% if erro_filhas %}<p class="mudo eg-vazio">Não consegui ler as OS filhas ({{ erro_filhas }}).</p>
-        {% elif filhas %}<ul class="eg-os-filhas">{% for f in filhas %}<li><a href="{{ url_for('torre_engenharia.equipe_os', folio=f.os) }}">OS {{ f.os }}</a>
-          <span>{{ ROT.get(f.coluna, f.coluna) }}{% if f.titulo %} · {{ f.titulo }}{% endif %}</span></li>{% endfor %}</ul>
-        {% else %}<p class="mudo eg-vazio">Nenhuma OS filha ainda.</p>{% endif %}
+    </aside>
+    <div>
+      <section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Na nota da OS</h2></div>
+        {% if o.nota %}<p class="eg-ac-nota">{{ o.nota }}</p>{% else %}<p class="eg-vazio-l">A OS está sem nota.</p>{% endif %}
       </section>
-    </div>
-    <div class="eg-os-col">
-      <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>Na nota da OS</h2><span>como está no Fracttal</span></div>
-        {% if o.nota %}<p class="eg-os-nota">{{ o.nota }}</p>{% else %}<p class="mudo eg-vazio">A OS está sem nota.</p>{% endif %}
+      <section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Demais respostas do técnico</h2><span class="n">{{ filhas|length }}</span></div>
+        {% if erro_filhas %}<p class="eg-vazio-l">Não consegui ler as OS de campo ({{ erro_filhas }}).</p>
+        {% elif filhas %}<table class="eg-t"><thead><tr><th>OS de campo</th><th>Descreva a atividade realizada</th></tr></thead><tbody>
+          {% for f in filhas %}<tr><td class="k">{{ f.os }}<small>{% if f.fim %}concluída em {{ f.fim }}{% elif f.criada %}criada em {{ f.criada[:10] }}{% endif %}</small></td>
+            <td class="v">{% if f.atividade is none %}<span class="eg-vazio-l">Não consegui ler as respostas desta OS agora.</span>
+              {% elif not f.atividade.tem %}<span class="eg-vazio-l">Esta OS não tem a subtarefa "Descreva a atividade realizada".</span>
+              {% elif f.atividade.resposta %}{{ f.atividade.resposta }}
+              {% else %}<span class="eg-vazio-l">Ainda sem resposta do técnico.</span>{% endif %}</td></tr>{% endfor %}
+        </tbody></table>
+        {% else %}<p class="eg-vazio-l">Sem OS de campo: use o Solicitar OS, e a resposta de "Descreva a atividade realizada" da OS que nascer dela aparece aqui.</p>{% endif %}
       </section>
-      <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>Demais respostas do técnico</h2><span>"Descreva a atividade realizada" das OS filhas</span></div>
-        {% if erro_filhas %}<p class="mudo eg-vazio">Não consegui ler as OS filhas ({{ erro_filhas }}).</p>
-        {% elif filhas %}<ul class="eg-os-respostas">{% for f in filhas %}<li><span class="q">OS {{ f.os }}{% if f.fim %} · concluída em {{ f.fim }}{% elif f.criada %} · criada em {{ f.criada[:10] }}{% endif %}</span>
-          {% if f.atividade is none %}<span class="mudo">Não consegui ler as respostas desta OS agora.</span>
-          {% elif not f.atividade.tem %}<span class="mudo">Esta OS não tem a subtarefa "Descreva a atividade realizada".</span>
-          {% elif f.atividade.resposta %}<span class="eg-os-resp">{{ f.atividade.resposta }}</span>
-          {% else %}<span class="mudo">Ainda sem resposta do técnico.</span>{% endif %}</li>{% endfor %}</ul>
-        {% else %}<p class="mudo eg-vazio">Sem OS filha: use o Solicitar OS, e a resposta de "Descreva a atividade realizada" da OS que nascer dela aparece aqui.</p>{% endif %}
-      </section>
-      <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>Comentários</h2><span>vão para a nota da OS com a data e a hora</span></div>
+      <section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Comentários</h2><span class="n">{{ (est.eventos or [])|length }}</span></div>
         {% if pode %}
         <div class="eg-os-coment" data-comentar="{{ comentar_url }}" data-folio="{{ o.os }}">
-          <textarea class="gc-campo" maxlength="2000" aria-label="Comentário" placeholder="O que a engenharia viu ou fez? (a data e a hora entram sozinhas)"></textarea>
-          <div class="eg-os-coment-pe"><span class="eg-os-dica">Vai para a nota da OS {{ o.os }} no Fracttal, com o seu nome, a data e a hora.</span>
-            <button type="button" class="gc-btn gc-btn--primario">Salvar comentário</button></div>
+          <textarea class="eg-tl-obs" maxlength="2000" aria-label="Comentário" placeholder="O que a engenharia viu ou fez? (a data entra sozinha)"></textarea>
+          <div class="eg-tl-comp"><span class="eg-dica">Vai para a nota da OS {{ o.os }} no Fracttal, com o seu nome, a data e a hora.</span>
+            <button type="button" class="eg-ac-btn eg-ac-btn--g">Salvar comentário</button></div>
           <p class="eg-os-msg" role="status" hidden></p>
         </div>
         {% endif %}
-        {% if est.eventos %}<ul class="eg-acomp-tl">{% for e in est.eventos %}<li>
-          <span class="q">{{ e.quando_txt }} · {{ e.nome or 'alguém' }}</span>
-          {% if e.evento == 'comentario' %}<span>{{ e.texto }}</span>{% if e.nota and e.nota != 'sim' %}<span class="q">Só no Nexus: {{ e.nota }}</span>{% endif %}
-          {% elif e.evento == 'status' %}<span>Status: {{ nome_status(e.status_id) }}</span>
-          {% else %}<span>Prioridade: {{ nome_prioridade(e.prioridade_id) }}</span>{% endif %}</li>{% endfor %}</ul>
-        {% else %}<p class="mudo eg-vazio">Nenhum comentário nem mudança da engenharia ainda.</p>{% endif %}
+        {% if est.eventos %}<div class="eg-tl">
+          {% for e in est.eventos %}<div class="eg-tl-e{{ ' novo' if loop.first }}{{ ' ev' if e.evento != 'comentario' }}"><div class="eg-tl-g"><div class="eg-tl-d">{{ e.quando.strftime('%d/%m') if e.quando else '—' }}</div><div class="eg-tl-a">{{ e.quando.strftime('%Y') if e.quando else '' }}</div></div>
+            <div class="eg-tl-b"><div class="eg-tl-x"><div class="eg-tl-t">{% if e.evento == 'comentario' %}{{ e.texto }}{% elif e.evento == 'status' %}Status: {{ nome_status(e.status_id) }}{% else %}Prioridade: {{ nome_prioridade(e.prioridade_id) }}{% endif %}</div><div class="eg-tl-u">{{ e.nome or 'alguém' }} · {{ e.quando_txt }}{% if e.evento == 'comentario' and e.nota and e.nota != 'sim' %} · só no Nexus: {{ e.nota }}{% endif %}</div></div></div></div>{% endfor %}
+        </div>
+        {% else %}<p class="eg-vazio-l">Nenhum comentário nem mudança da engenharia ainda.</p>{% endif %}
       </section>
     </div>
   </div>
   {% endif %}
 </div>
+{% if o %}<script>
+(function () {
+  // a seta do PDF de cada OS da cadeia, como a da cadeia do chamado (os_acoes.js do OS Creator): o POST monta o PDF no
+  // servidor do OS Creator (as fotos vêm do Fracttal) e o arquivo baixa pelo link que ele devolve. Sem a sessão do
+  // Fracttal, o aviso traz o login dele, que volta para cá.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-os-pdf]'); if (!b) return;
+    e.preventDefault();
+    if (b.getAttribute('aria-busy') === 'true') return;
+    var caixa = b.closest('[data-pdf-caixa]') || document, msg = caixa.querySelector('[data-pdf-msg]');
+    var folio = b.getAttribute('data-os-pdf');
+    function dizer(texto, ruim, link) {
+      if (!msg) return;
+      msg.replaceChildren(document.createTextNode(texto || ''));
+      if (link) { var a = document.createElement('a'); a.href = link; a.textContent = 'Entrar pelo Fracttal'; msg.appendChild(document.createTextNode(' ')); msg.appendChild(a); }
+      msg.hidden = !texto; msg.classList.toggle('eg-os-msg--ruim', !!ruim);
+    }
+    b.setAttribute('aria-busy', 'true'); dizer('Montando o PDF da OS ' + folio + '…');
+    fetch(nexusRota('/os/api/os/pdf'), {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: JSON.stringify({folio: folio, wid: b.getAttribute('data-wid') || ''})})
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
+      .then(function (x) {
+        if (x.r.ok && x.j.url) {
+          var a = document.createElement('a');
+          a.href = nexusRota(x.j.url); a.download = x.j.nome || '';
+          document.body.appendChild(a); a.click(); a.remove();
+          dizer(x.j.falhas ? ('PDF da OS ' + folio + ' baixado; ' + x.j.falhas + ' foto(s) não vieram do Fracttal.') : '', !!x.j.falhas);
+        } else if (x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; }
+        else if (x.j.login) { dizer('Para baixar o PDF, entre pelo Fracttal.', true, caixa.getAttribute('data-login-fracttal')); }
+        else { dizer('Não consegui montar o PDF da OS ' + folio + ': ' + (x.j.erro || ('HTTP ' + x.r.status)), true); }
+      })
+      .catch(function () { dizer('Não consegui falar com o Nexus. Tente de novo.', true); })
+      .then(function () { b.removeAttribute('aria-busy'); });
+  });
+})();
+</script>{% endif %}
 {% if o and pode %}<script>
 (function () {
   // o comentário vai à nota da OS pela ponte do OS Creator (na sessão do Fracttal da pessoa) e fica no Nexus; a página

@@ -144,10 +144,10 @@ def _secao(html, titulo):
 
 
 def _kpis(html):
-    import re
-    faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
-    return (re.findall(r'<span class="kb-kpi-rot">([^<]+)</span>', faixa),
-            re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', faixa))
+    """Os quatro números do topo, no desenho da faixa da tela do chamado (.kpis da Garantia)."""
+    faixa = html.split('<div class="eg-ac-kpis"', 1)[1].split("</section>", 1)[0]
+    return (re.findall(r'<div class="lbl">([^<]+)</div>', faixa),
+            re.findall(r'<span class="val[^"]*">([^<]+)</span>', faixa))
 
 
 def test_pagina_da_os_tem_os_quatro_numeros_e_os_blocos(pagina, cliente):
@@ -155,13 +155,14 @@ def test_pagina_da_os_tem_os_quatro_numeros_e_os_blocos(pagina, cliente):
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     rotulos, valores = _kpis(html)
     assert rotulos == ["Status", "Prioridade", "Programada", "Última atualização"] and valores[:2] == ["—", "—"]
-    for b in ("Status e prioridade", "Dados", "OS filhas", "Na nota da OS", "Demais respostas do técnico",
+    for b in ("Status e prioridade", "Dados", "A cadeia da OS", "Na nota da OS", "Demais respostas do técnico",
               "Comentários"):
         assert _secao(html, b), b
     assert "Nota antiga da OS" in _secao(html, "Na nota da OS")
     assert "Solicitar OS" in html and "Abrir a OS" not in html
     assert "ativo%3DX-INV1.1" in html and f"os_pai%3D{pagina['id_work_order']}" in html and "os_pai_folio%3D16502" in html
-    assert "OS 16510" in _secao(html, "OS filhas") and "OS 16511" in _secao(html, "OS filhas")
+    assert "16510" in _secao(html, "A cadeia da OS") and "16511" in _secao(html, "A cadeia da OS")
+    assert _secao(html, "OS filhas") == ""
 
 
 def test_demais_respostas_vem_da_os_filha(pagina, cliente):
@@ -177,7 +178,7 @@ def test_classificar_grava_e_volta_com_o_aviso(pagina, cliente):
     assert r.status_code == 303 and r.headers["Location"].split("?", 1)[0].endswith(URL)
     html = cliente.get(r.headers["Location"]).get_data(as_text=True)
     _rot, valores = _kpis(html)
-    assert valores[:2] == ["Diagnóstico em Andamento", "Urgente"] and 'kb-kpi-v--critico">Urgente<' in html
+    assert valores[:2] == ["Diagnóstico em Andamento", "Urgente"] and '<span class="val pq r">Urgente<' in html
     assert "Status: Diagnóstico em Andamento" in _secao(html, "Comentários")       # a linha do tempo diz a mudança
     r = cliente.post(URL + "/classificar", data={"status_id": "3", "prioridade_id": "3"}, headers=SAME)
     assert "Nada+mudou" in r.headers["Location"] or "Nada%20mudou" in r.headers["Location"]
@@ -364,10 +365,10 @@ def test_pulso_usa_a_sombra_em_camadas_por_token():
 
 
 def test_os_quatro_numeros_da_os_viram_duas_colunas_no_celular():
-    # prova a 375 px (24/10/2026): a regra das quatro colunas vencia a de duas do celular (.kb-kpis a 900 px)
+    # prova a 375 px (24/10/2026); a faixa é a da tela do chamado: duas colunas a 980 px, como a .kpis de lá
     from pathlib import Path
     css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
-    assert re.search(r"@media \(max-width:900px\)\{\.eg-os-kpis\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}", css)
+    assert re.search(r"@media \(max-width:980px\)\{\.eg-ac-kpis\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)", css)
 
 
 # ── revisão final (24/10/2026) ───────────────────────────────────────────────────────────────────────────────────────
@@ -459,3 +460,111 @@ def test_pagina_sem_o_livro_nao_chuta_a_ultima_atualizacao(pagina, cliente, monk
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     _rot, valores = _kpis(html)
     assert valores[0] == valores[1] == valores[3] == "—" and "Não consegui ler o status" in html
+
+
+
+# ── o topo igual ao da tela do chamado da Garantia (Levi, 24/10/2026: "quero quase idêntico na estrutura mesmo então essa
+# parte de cima quero na mesma estrutura e fonte os botões quero nas mesmas posições") ─────────────────────────────────
+def test_topo_na_estrutura_da_tela_do_chamado(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    topo = html.split('<div class="eg-ac-head">', 1)[1].split('<div class="eg-ac-kpis"', 1)[0]
+    # numa linha: a volta, a pílula do estado e o título com o ativo em verde; embaixo, o local, o tipo e o Fracttal
+    tit = topo.split('<div class="eg-ac-tit">', 1)[1].split("</div>", 1)[0]
+    assert tit.index("eg-ac-volta") < tit.index("eg-ac-tag") < tit.index("<h1>OS 16502 <span>")
+    assert '<p class="eg-ac-sub">Thopen · Altair 1 · <b>Administrativa</b> · Em Processo no Fracttal</p>' in topo
+    # o botão no lugar do "Abrir a OS": à direita, no fim da linha, contorno
+    acoes = topo.split('<div class="eg-ac-acoes">', 1)[1]
+    assert 'class="eg-ac-btn eg-ac-btn--o"' in acoes and ">Solicitar OS<" in acoes
+    assert "gc-eyebrow" not in topo and "kb-kpis" not in html
+    assert "family=Inter:wght@400;500;600;700" in html                   # a fonte da tela do chamado
+
+
+def test_pilula_do_topo_diz_o_estado_como_a_do_chamado(pagina, cliente):
+    # a OS de teste está atrasada (programada antes de hoje): a pílula vermelha diz há quantos dias
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    tag = re.search(r'<span class="eg-ac-tag eg-ac-tag--(\w+)">([^<]+)</span>', html)
+    assert tag.group(1) == "r" and tag.group(2).startswith("A fazer · atrasada há ")
+
+
+def test_topo_usa_a_fonte_e_as_medidas_da_tela_do_chamado():
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r'\.eg-ac\{[^}]*--fonte-ac:"Inter"', css)
+    assert re.search(r"\.eg-ac-head h1\{font:700 21px/1\.25 var\(--fonte-ac\)", css)
+    assert re.search(r"\.eg-ac-kpi \.val\.pq\{font:600 15px/1\.3 var\(--fonte-ac\)", css)
+    assert re.search(r"\.eg-ac-acoes\{margin-left:auto", css)
+
+
+def test_valor_longo_da_faixa_quebra_em_vez_de_invadir_o_vizinho():
+    # prova a 375 px: "Diagnóstico em Andamento" (sem quebra, como as datas da tela do chamado) cobria a Prioridade
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r"\.eg-ac-kpi \.val\.pq\{[^}]*white-space:normal", css)
+    assert re.search(r"\.eg-ac-kpi \.linha\{[^}]*flex-wrap:wrap", css)
+
+
+
+# ── 2ª rodada de 24/10/2026 (Levi: o título da OS, a nota de verdade, a cadeia, os Dados e os comentários como os de
+# chamados) ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+def test_titulo_da_os_embaixo_da_os_e_do_ativo(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    esq = html.split('<div class="eg-ac-esq">', 1)[1].split('<div class="eg-ac-acoes">', 1)[0]
+    assert esq.index("<h1>OS 16502") < esq.index('<p class="eg-ac-titulo">Análise 16502</p>') < esq.index("eg-ac-sub")
+
+
+def test_nota_da_os_e_a_que_o_card_do_os_creator_mostra(pagina, cliente):
+    # Levi: "não está puxando a nota da OS da engenharia": a nota fica na TAREFA (task_note), como o card lê
+    from test_engenharia_acompanhamento import _como
+    pagina["task_note"] = "Inversor desarmando à tarde; pedir as curvas."
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    nota = _secao(html, "Na nota da OS")
+    assert "Inversor desarmando à tarde; pedir as curvas." in nota and "Nota antiga da OS" not in nota
+
+
+def test_dados_so_com_ativo_usina_responsavel_criacao_e_etiquetas(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    dados = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Dados")
+    assert re.findall(r"<dt>([^<]+)</dt>", dados) == ["Ativo", "Usina", "Responsável", "Criada em", "Etiquetas"]
+
+
+def test_cadeia_da_os_com_o_numero_e_o_pdf_de_cada_uma(pagina, cliente):
+    # a OS da engenharia como OS pai das OS de campo: cada uma com o nº e a seta do PDF (com as fotos), como a cadeia
+    # do chamado da Garantia
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    cadeia = _secao(html, "A cadeia da OS")
+    itens = re.findall(r'<li( class="aqui")?>.*?</li>', cadeia, re.S)
+    assert len(itens) == 3 and itens[0] == ' class="aqui"'
+    assert cadeia.index("OS da engenharia") < cadeia.index("16502") < cadeia.index("OS de campo") < cadeia.index("16510")
+    for folio in ("16502", "16510", "16511"):
+        assert f'data-os-pdf="{folio}"' in cadeia
+    assert "nexusRota('/os/api/os/pdf')" in html                          # o mesmo PDF da cadeia do chamado
+
+
+def test_comentarios_no_estilo_das_observacoes_do_chamado(pagina, cliente):
+    from test_engenharia_acompanhamento import SAME, _como
+    _como(cliente, ANA).post(URL + "/classificar", data={"status_id": "3"}, headers=SAME)
+    O.registrar_comentario({"wid": pagina["id_work_order"], "folio": "16502", "codigo": "X-INV1.1"}, "Trocar o cabo", ANA,
+                           True, "sim")
+    html = cliente.get(URL).get_data(as_text=True)
+    sec = html.split(">Comentários</h2>", 1)[1].split("</section>", 1)[0]
+    assert sec.startswith('<span class="n">2</span>')                      # a contagem ao lado do título
+    entradas = re.findall(r'<div class="eg-tl-e([^"]*)">', sec)
+    assert entradas == [" novo", " ev"]                                   # o mais novo em destaque; a mudança é evento
+    assert re.search(r'<div class="eg-tl-d">\d\d/\d\d</div><div class="eg-tl-a">\d{4}</div>', sec)
+    assert '<div class="eg-tl-t">Trocar o cabo</div>' in sec and "Status: Diagnóstico em Andamento" in sec
+    assert re.search(r'<div class="eg-tl-u">Ana Lima · \d\d/\d\d/\d{4} \d\d:\d\d</div>', sec)
+    assert "Salvar comentário" in sec and "eg-tl-comp" in sec
+
+
+def test_pulso_vale_mesmo_com_reduzir_movimento():
+    # Levi: "a sombra não está pulsando" - o Windows dele está sem os efeitos de animação, e o nexus.css tira toda
+    # animação com "reduzir movimento"; o pulso (só a opacidade de uma sombra, sem movimento) fica de fora
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r"@media \(prefers-reduced-motion:reduce\)\{\.kb-card--parada::after\{animation:kb-pulso 1\.4s "
+                     r"ease-in-out infinite alternate!important\}\}", css)
+    assert "kb-card--parada::after{animation:none" not in css

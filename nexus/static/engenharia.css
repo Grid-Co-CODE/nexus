@@ -365,16 +365,6 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 @media (max-width:480px){.eg-gav-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.eg-item-tags .eg-tag{white-space:normal}}
 
 /* ── a OS do Quadro da equipe (24/10/2026): a tela do chamado da Garantia, no desenho do Nexus ── */
-.eg-os-volta{display:inline-block;margin-bottom:6px;font-size:12.5px;color:var(--mudo);text-decoration:none}
-.eg-os-volta:hover{color:var(--tinta)}
-.eg-os-cab{align-items:flex-start}
-.eg-os-cab-txt{min-width:0}
-.eg-os-tit{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.eg-os-tit .cn-titulo{margin:0}
-.eg-os-tit .cn-titulo span{font-weight:500;color:var(--mudo)}
-.eg-os-acoes{display:flex;gap:8px;flex-wrap:wrap}
-.eg-os-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
-@media (max-width:900px){.eg-os-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .eg-os-det{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:0 16px;align-items:start}
 @media (max-width:1100px){.eg-os-det{grid-template-columns:minmax(0,1fr)}}
 .eg-os-col{min-width:0}
@@ -412,4 +402,124 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
     1px 1.7px 1.5px -2.5px var(--pulso-a43),2.8px 4.6px 4px -3.7px var(--pulso-a28),6.3px 10.2px 9px -5px var(--pulso-a14);
   animation:kb-pulso 1.4s ease-in-out infinite alternate}
 @keyframes kb-pulso{from{opacity:.5}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){.kb-card--parada::after{animation:none;opacity:1}}
+/* Levi, 24/10/2026: "a sombra não está pulsando" - o Windows dele está sem os efeitos de animação ("reduzir movimento"),
+   e o pulso só muda a opacidade de uma sombra, sem movimento: ele fica de fora da regra da casa (nexus.css) */
+@media (prefers-reduced-motion:reduce){.kb-card--parada::after{animation:kb-pulso 1.4s ease-in-out infinite alternate!important}}
+
+/* ── o topo da OS do Quadro da equipe igual ao da tela do chamado da Garantia (Levi, 24/10/2026: "quero quase idêntico
+   na estrutura mesmo então essa parte de cima quero na mesma estrutura e fonte os botões quero nas mesmas posições"):
+   as medidas do chamados.css do OS Creator (.ac-head, .tag, .btn-o, .kpis), com os tokens do Nexus e a Inter de lá ── */
+.eg-ac{--fonte-ac:"Inter","Segoe UI",Arial,sans-serif}
+.eg-ac-volta{display:inline-flex;align-items:center;gap:6px;font:500 12.5px var(--fonte-ac);color:var(--mudo);text-decoration:none;
+  white-space:nowrap}
+.eg-ac-volta:hover{color:var(--verde-texto)}
+.eg-ac-head{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:6px 0 14px;border-bottom:1px solid var(--linha)}
+.eg-ac-esq{min-width:0}
+.eg-ac-tit{display:flex;align-items:center;gap:16px;min-width:0;flex-wrap:wrap}
+.eg-ac-head h1{font:700 21px/1.25 var(--fonte-ac);color:var(--tinta);letter-spacing:-.01em;margin:0}
+.eg-ac-head h1 span{color:var(--verde-texto);font-weight:600}
+.eg-ac-sub{margin:4px 0 0;font:400 12.5px/1.4 var(--fonte-ac);color:var(--mudo)}
+.eg-ac-sub b{color:var(--tinta);font-weight:600}
+.eg-ac-acoes{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.eg-ac-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:8px;
+  font:600 12.5px/1 var(--fonte-ac);padding:9px 15px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.eg-ac-btn--o{background:transparent;color:var(--tinta);border:1px solid var(--linha-forte);padding:8px 14px}
+.eg-ac-btn--o:hover{border-color:var(--verde);color:var(--tinta)}
+.eg-ac-tag{display:inline-block;font:700 10px/1.4 var(--fonte-ac);letter-spacing:.05em;text-transform:uppercase;border-radius:5px;
+  padding:2px 7px;white-space:nowrap}
+.eg-ac-tag--r{background:var(--critico-suave);color:var(--critico)}
+.eg-ac-tag--a{background:var(--alerta-suave);color:var(--alerta)}
+.eg-ac-tag--g{background:var(--ok-suave);color:var(--ok)}
+.eg-ac-tag--m{background:var(--superficie-2);color:var(--mudo)}
+.eg-ac-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--superficie);border:1px solid var(--linha);
+  border-radius:12px;padding:12px 18px;margin:14px 0 16px}
+.eg-ac-kpi{padding:0 18px;border-left:1px solid var(--linha);min-width:0}
+.eg-ac-kpi:first-child{padding-left:0;border-left:0}
+.eg-ac-kpi .lbl{font:600 10.5px/1 var(--fonte-ac);letter-spacing:.08em;text-transform:uppercase;color:var(--mudo);margin-bottom:6px}
+.eg-ac-kpi .linha{display:flex;align-items:baseline;gap:2px 10px;min-width:0;flex-wrap:wrap}
+.eg-ac-kpi .val{font:700 24px/1 var(--fonte-ac);color:var(--tinta);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* o status da engenharia é texto comprido ("Tratativa com Equipe de Campo"): quebra, em vez de cobrir o vizinho */
+.eg-ac-kpi .val.pq{font:600 15px/1.3 var(--fonte-ac);white-space:normal;min-width:0}
+.eg-ac-kpi .val.r{color:var(--critico)}
+.eg-ac-kpi .val.a{color:var(--alerta)}
+.eg-ac-kpi .note{font:400 11.5px/1.35 var(--fonte-ac);color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  min-width:0}
+.eg-ac-kpi .note b{color:var(--tinta);font-weight:600}
+@media (max-width:980px){.eg-ac-kpis{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:14px}
+  .eg-ac-kpi:nth-child(3){padding-left:0;border-left:0}}
+@media (max-width:640px){.eg-ac-head h1{font-size:18px}.eg-ac-kpis{padding:12px}
+  .eg-ac-kpi:nth-child(odd){padding-left:0;border-left:0}.eg-ac-kpi:nth-child(even){padding:0 0 0 12px;border-left:1px solid var(--linha)}
+  .eg-ac-kpi .note{white-space:normal}}
+
+/* ── o corpo da OS do Quadro da equipe na estrutura da tela do chamado da Garantia (24/10/2026): o .ac-det, o .bloco,
+   a ol.cadeia, o dl.dados, a table.t e a linha do tempo (.tl) do chamados.css, com os tokens do Nexus e a Inter ── */
+.eg-ac-titulo{margin:4px 0 0;font:500 14px/1.35 var(--fonte-ac);color:var(--tinta)}
+.eg-ac-det{display:grid;grid-template-columns:310px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1000px){.eg-ac-det{grid-template-columns:minmax(0,1fr)}}
+.eg-ac-det>aside,.eg-ac-det>div{display:flex;flex-direction:column;gap:14px;min-width:0}
+.eg-bloco{background:var(--superficie);border:1px solid var(--linha);border-radius:12px;padding:14px 16px;min-width:0;
+  font-family:var(--fonte-ac)}
+.eg-bloco-h{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.eg-bloco h2{font:600 13.5px/1.3 var(--fonte-ac);color:var(--tinta);margin:0}
+.eg-bloco-h .n{font:600 11.5px var(--fonte-ac);color:var(--mudo);font-variant-numeric:tabular-nums}
+.eg-dica{font-size:11.5px;line-height:1.5;color:var(--mudo);margin:8px 0 0}
+.eg-vazio-l{font-size:12.5px;color:var(--mudo);padding:4px 0;margin:0}
+.eg-ac-form{display:grid;gap:10px}
+.eg-ac-form label{display:grid;gap:4px}
+.eg-ac-lbl{font:600 10.5px/1 var(--fonte-ac);letter-spacing:.08em;text-transform:uppercase;color:var(--mudo)}
+.eg-ac-campo{width:100%;background:transparent;border:0;border-bottom:1px solid var(--linha-forte);border-radius:0;
+  color:var(--tinta);font:500 13px/1.4 var(--fonte-ac);padding:6px 0}
+.eg-ac-campo:focus{outline:none;border-bottom-color:var(--verde)}
+.eg-ac-campo option{color:var(--tinta);background:var(--superficie)}
+.eg-ac-form .eg-ac-btn{justify-self:start}
+.eg-ac-btn--g{background:var(--verde);color:var(--sobre-verde)}
+.eg-ac-btn--g:hover{background:var(--verde-hover)}
+.eg-ac-btn:disabled{opacity:.4;cursor:not-allowed}
+ol.eg-cadeia{list-style:none;margin:0;padding:0}
+ol.eg-cadeia li{display:grid;grid-template-columns:24px 1fr auto 26px;gap:10px;align-items:center;padding:7px 0;
+  border-bottom:1px solid var(--linha)}
+ol.eg-cadeia li:last-child{border-bottom:0}
+ol.eg-cadeia .i{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;
+  font:700 10.5px var(--fonte-ac);color:var(--mudo);background:var(--superficie-2)}
+ol.eg-cadeia li.aqui .i{background:var(--verde);color:var(--sobre-verde)}
+ol.eg-cadeia .t{font-size:12.5px;color:var(--mudo)}
+ol.eg-cadeia a{font:700 13px var(--fonte-ac);color:var(--tinta);text-decoration:none;font-variant-numeric:tabular-nums}
+ol.eg-cadeia a:hover{color:var(--verde-texto)}
+.eg-cad-pdf{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border-radius:6px;
+  border:1px solid var(--linha-forte);background:transparent;color:var(--mudo);cursor:pointer}
+.eg-cad-pdf:hover,.eg-cad-pdf:focus-visible{color:var(--verde);border-color:var(--verde)}
+.eg-cad-pdf svg{width:14px;height:14px}
+.eg-cad-pdf[aria-busy="true"]{cursor:progress;opacity:.55}
+.eg-pdf-msg{margin:8px 0 0;font-size:12px;color:var(--tinta-2)}
+dl.eg-ac-dados{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;margin:0;font-size:12.5px}
+dl.eg-ac-dados dt{color:var(--mudo)}
+dl.eg-ac-dados dd{margin:0;color:var(--tinta);text-align:right;min-width:0;overflow-wrap:anywhere}
+dl.eg-ac-dados dd.mono{font-family:var(--font-mono);font-size:12px}
+.eg-ac-nota{margin:0;font-size:13px;line-height:1.55;color:var(--tinta);white-space:pre-wrap;overflow-wrap:anywhere}
+table.eg-t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.eg-t th{text-align:left;font:600 10.5px/1 var(--fonte-ac);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);
+  padding:0 8px 8px 0;border-bottom:1px solid var(--linha)}
+table.eg-t td{padding:9px 8px 9px 0;border-bottom:1px solid var(--linha);vertical-align:top;color:var(--tinta)}
+table.eg-t tr:last-child td{border-bottom:0}
+table.eg-t td.k{width:30%;font-weight:600;font-variant-numeric:tabular-nums}
+table.eg-t td.k small{display:block;font-weight:400;font-size:11px;color:var(--mudo)}
+table.eg-t td.v{overflow-wrap:anywhere;white-space:pre-wrap}
+.eg-tl-obs{width:100%;min-height:70px;background:var(--fundo);border:1px solid var(--linha-forte);border-radius:8px;
+  color:var(--tinta);font:400 13px/1.55 var(--fonte-ac);padding:9px 11px;resize:vertical}
+.eg-tl-obs:focus{outline:none;border-color:var(--verde)}
+.eg-tl-comp{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap}
+.eg-tl-comp .eg-dica{margin:0}
+.eg-tl{margin-top:16px}
+.eg-tl-e{display:grid;grid-template-columns:50px 1fr;gap:12px}
+.eg-tl-g{text-align:right;padding-top:1px}
+.eg-tl-d{font:700 12px var(--fonte-ac);color:var(--mudo);font-variant-numeric:tabular-nums}
+.eg-tl-a{font-size:10px;color:var(--mudo)}
+.eg-tl-b{position:relative;border-left:1px solid var(--linha-forte);padding:0 0 14px 16px;min-width:0}
+.eg-tl-e:last-child .eg-tl-b{padding-bottom:2px}
+.eg-tl-b::before{content:"";position:absolute;left:-4.5px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--linha-forte)}
+.eg-tl-e.ev .eg-tl-b::before{background:var(--alerta)}
+.eg-tl-e.novo .eg-tl-b::before{background:var(--verde);box-shadow:0 0 0 3px var(--verde-a16)}
+.eg-tl-e.novo .eg-tl-d{color:var(--verde-texto)}
+.eg-tl-e.novo .eg-tl-x{background:var(--verde-a16);border-radius:8px;padding:8px 11px}
+.eg-tl-t{font-size:13px;line-height:1.5;color:var(--tinta);white-space:pre-wrap;overflow-wrap:anywhere}
+.eg-tl-u{font-size:11px;color:var(--mudo);margin-top:2px}

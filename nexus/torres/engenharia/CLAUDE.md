@@ -133,7 +133,8 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
   engenharia porém o card de KPIS eu gostei mais do de chamados"). Era número em cima e rótulo embaixo; agora é o rótulo
   em cima e, na mesma linha, o número colorido pela gravidade e o detalhe que diz por onde começar (classes `kb-kpi*`):
   Em aberto (quantas a fazer, em execução e em verificação), Atrasadas (vermelho; a mais atrasada e há quantos dias),
-  Vencem em 2 dias (âmbar; a próxima), Esperando verificação (âmbar quando a mais antiga espera há mais de 7 dias,
+  OSs sem atualização (âmbar; a mais parada e há quantos dias; "—" sem ler o livro da engenharia: Levi, 24/10/2026,
+  "tire o VENCEM EM 2 DIAS e bote OSs sem atualização"), Esperando verificação (âmbar quando a mais antiga espera há mais de 7 dias,
   `ESPERA_VERIFICACAO`, contados do fim da execução; sem ele vale a data programada, e a nota diz "programada") e
   Fechadas em 30 dias (verde; a última). As contas são as dos supercards. Não filtram (nunca filtraram). Os 7 dias da
   verificação foram escolha nossa (o mesmo corte do "HÁ MAIS DE 7 DIAS" dos chamados), mostrada ao Levi e aprovada com a
@@ -154,8 +155,10 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
   a prioridade e o status da engenharia, e **pulsa em laranja** a OS aberta (a fazer, em execução, em verificação) sem
   atualização há mais de 7 dias: a sombra em camadas que o Levi mandou ("QUERO O CRISPY PULSANDO DE 0.5 A 1"), numa
   camada por cima do cartão que vai de 0,5 a 1 de opacidade, pelos tokens `--pulso-a71` a `--pulso-a14` (o laranja do
-  Nexus nos dois temas; o teste do tema lê todo token como cor, então a sombra mora no `engenharia.css`). Com "reduzir
-  movimento", fica parada. Sem ler o livro da engenharia, nenhum pulso (não se sabe se ela mexeu), e o rodapé diz.
+  Nexus nos dois temas; o teste do tema lê todo token como cor, então a sombra mora no `engenharia.css`). Pulsa também
+  com "reduzir movimento" (Levi, 24/10/2026: "a sombra não está pulsando": o Windows dele está sem os efeitos de
+  animação, e o nexus.css tira toda animação nesse caso; o pulso só muda a opacidade de uma sombra, sem movimento).
+  Sem ler o livro da engenharia, nenhum pulso (não se sabe se ela mexeu), e o rodapé diz.
   Quem mudou a OS e volta com `?atualizar=1` faz o quadro reler o Fracttal na hora (`pedir_releitura(forcar=True)`, no
   máximo uma a cada 5 s).
 
@@ -168,12 +171,23 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 `docs/superpowers/specs/2026-10-24-engenharia-os-do-quadro-design.md`.
 
 - **A página:** `/t/engenharia/equipe/os/<nº>` (`equipe_os`, template `os_quadro.html`, classes `eg-os-*`), lida na hora
-  no Fracttal (`os_equipe.ler_os`, só leitura: a OS de todas as tarefas, com a nota inteira). Em cima, a etiqueta da
-  coluna, o "Solicitar OS" e os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
+  no Fracttal (`os_equipe.ler_os`, só leitura: a OS de todas as tarefas, com a nota inteira). **O topo é o da tela do
+  chamado da Garantia** (Levi, 24/10/2026: "quero quase idêntico na estrutura mesmo então essa parte de cima quero na
+  mesma estrutura e fonte os botões quero nas mesmas posições"): as medidas do `chamados.css` do OS Creator copiadas em
+  `eg-ac-*`, com os tokens do Nexus e a Inter de lá. Numa linha a volta, a pílula do estado (`_topo_da_os`: vermelho
+  atrasada, âmbar aberta, com "há N dias sem atualização" quando parada, verde concluída, apagada cancelada) e o título
+  com o ativo em verde; embaixo o cliente · usina, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o
+  "Solicitar OS"; e a faixa dos quatro números no desenho da de lá (o valor de texto comprido quebra, em vez de cobrir o
+  vizinho). Os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
   Programada (atrasada, vence ou abre em) e Última atualização (o mais novo entre o registro da engenharia, o início e o
-  fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). À esquerda o que a
-  engenharia faz (Status e prioridade, Dados, OS filhas); à direita o que ela lê (Na nota da OS, Demais respostas do
-  técnico, Comentários com a linha do tempo).
+  fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). Embaixo da OS e do
+  ativo, o título da OS. O corpo também é o da tela do chamado (`.ac-det`, `.bloco`, `ol.cadeia`, `dl.dados`, `.tl`,
+  copiados em `eg-ac-det`, `eg-bloco`, `eg-cadeia`, `eg-ac-dados`, `eg-tl`): à esquerda, em 310 px, o que a engenharia
+  faz (Status e prioridade; A cadeia da OS; Dados, só ativo, usina, responsável, criação e etiquetas); à direita o que
+  ela lê (Na nota da OS; Demais respostas do técnico, numa tabela por OS de campo; Comentários, na linha do tempo das
+  Observações de lá: a data e o ano à esquerda, o mais novo em verde, a mudança de status ou prioridade com o ponto
+  âmbar). **A nota da OS** é a que o card do OS Creator lê (`os_equipe._nota_da_os`: a da tarefa, `task_note`, senão a
+  `note`; Levi, 24/10/2026: "não está puxando a nota da OS da engenharia", a página mostrava só a `note`).
 - **Status e prioridade** moram no livro `nexus_engenharia_os` (`nexus/engenharia/os_acompanhamento.py`; regra no
   `nexus/dados/CLAUDE.md`): os oito do time (Análise de Solução, Atividade em Andamento, Diagnóstico em Andamento,
   Agendamento de OS, Tratativa com Equipe de Campo, Validação Final, Stand-By, Diagnóstico Concluído; o id é a ordem do
@@ -198,9 +212,13 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 - **Solicitar OS:** a Nova solicitação do OS Creator com o ativo marcado e esta OS como OS pai
   (`/os/solicitacao?ativo=&os_pai=&os_pai_folio=`, pelo `/os/_nexus/ir`; regra no README do OS Creator). O PCM cria a OS
   filha pela Fila, ligada a esta.
-- **OS filhas e Demais respostas do técnico:** o REST filtra por `id_parent_wo` (medido em 24/10/2026; a leitura para em
-  3 páginas, para um filtro ignorado não virar o Fracttal inteiro), e de cada filha a resposta de "Descreva a atividade
-  realizada" (`work_orders_subtasks`; toda OS que nasce de solicitação tem a subtarefa).
+- **A cadeia da OS e Demais respostas do técnico:** a OS da engenharia é a 1ª da cadeia e as OS de campo que nascem dela
+  pelo Solicitar OS vêm depois (Levi: "o ideal é que essa OS da engenharia se torne OS pai de OSs de campo
+  futuramente"), cada uma com o nº e a seta do PDF da cadeia do chamado (o `/os/api/os/pdf` do OS Creator, com as
+  fotos; sem a sessão do Fracttal, o aviso traz o login dele, que volta para a página). O REST filtra as filhas por
+  `id_parent_wo` (medido em 24/10/2026; a leitura para em 3 páginas, para um filtro ignorado não virar o Fracttal
+  inteiro), e de cada filha a resposta de "Descreva a atividade realizada" (`work_orders_subtasks`; toda OS que nasce
+  de solicitação tem a subtarefa).
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
   tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao"` e a página na cópia de prova.
