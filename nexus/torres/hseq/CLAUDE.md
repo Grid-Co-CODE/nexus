@@ -56,6 +56,12 @@ linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou
   O assunto e o corpo (texto e HTML) levam os quatro de agora, os de atenção, as usinas com mais pendências (até 25) e
   o link para a Mesa e a planilha filtradas pelo número da pessoa (`?r=`, que a Mesa traduz no Responsável UFV dela).
   Cada linha assinada (HMAC, rótulo `nexus:hseq:email`).
+- **O App** (contrato fechado com a sessão do App de Campo em 24/10/2026, a construir com o OK do Levi): acha o e-mail
+  pelo código (o cadastro e as atribuições que ele conhece; a TST sem código casa no e-mail do aviso das luvas), manda
+  pelo Microsoft Graph com fila e reenvio, e confirma no livro `email_app_campo · Envios` (no catálogo: Semana,
+  Destinatário (HMAC), Papel, Enviado em, Via, Tentativas, Erro e Situação; o que não sai até a segunda seguinte vence).
+  **Hoje nada sai:** o tenant barra o Graph do App ("AppOnly AccessPolicy", desde 23/09; o aviso das luvas também está
+  parado) até a T.I. liberar.
 - **Ligar:** `NEXUS_HSEQ_EMAIL_AUTO=1` no `.env` do servidor (sem ela, desligado: o livro só nasce quando o App estiver
   pronto para ler). A **prévia** (`/t/hseq/mesa/email`, o botão "Prévia do e-mail semanal" da Mesa, só para quem decide
   na Segurança) mostra quem recebe nesta semana e o e-mail de cada um, com os nomes, que o livro não leva.

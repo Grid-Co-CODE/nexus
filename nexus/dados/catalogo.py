@@ -401,6 +401,18 @@ FATOS = (
                     "nome nem e-mail de pessoa (o link da Mesa leva o número da pessoa, ?r=). Assinado (assinatura, HMAC "
                     "com a chave derivada da NEXUS_PESSOA_HMAC, rótulo nexus:hseq:email): o App só manda a linha "
                     "assinada e acha o e-mail pelo código"),
+    # o que o App de Campo mandou do e-mail semanal (contrato fechado com a sessão do App em 24/10/2026): registrado
+    # antes de o App publicar, com as colunas combinadas
+    Fato("envio_email_seguranca", "Envio do e-mail semanal da Segurança (App)", "hseq", "email_app_campo · Envios",
+         "1 linha = 1 e-mail da semana para 1 destinatário, regravada a cada tentativa",
+         _d(pessoa=("hmac", "Destinatário (HMAC): o mesmo código do nexus_hseq_email")),
+         tipo="sem_medida", chave=("Semana", "Destinatário (HMAC)"),
+         fontes=("email_app_campo · Envios",),
+         janela_origem="todas as semanas que o App tentou mandar",
+         observacao="colunas Semana, Destinatário (HMAC), Papel, Enviado em (UTC), Via (graph ou smtp), Tentativas, Erro "
+                    "(só o código e o texto curto, sem e-mail nem nome) e Situação (enviado, pendente, vencido ou sem "
+                    "e-mail); o que não saiu até a segunda seguinte vira vencido. Até o App publicar, o livro não "
+                    "existe (e nada sai enquanto o tenant barrar o Microsoft Graph do App)"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
