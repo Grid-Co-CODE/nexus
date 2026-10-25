@@ -20,15 +20,28 @@ aparece o comunicado"); clicar fora ou Esc fecha; no celular a caixa vem presa �
 Levi: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos, usinas sem luvas"; e, no mesmo dia, "quero
 duas visões: Por responsável e cliente (...) não queria em formato de lista mas em agrupamentos para o TST saber onde
 atacar!". A primeira tela da torre, do setor Segurança (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos).
-Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`. Em cima, a faixa `kb-kpis` com os quatro números da Segurança
-inteira: **PTs paradas** (esperando o De acordo há mais de 2 h, a régua do Campo), **Extintores vencidos** (e em quantas
-usinas), **Não reconhecidos** (já sem os excluídos) e **Usinas sem luvas**. Embaixo, **Agrupar por Responsável UFV** (o
-padrão) ou **Cliente** (`?ver=cliente`): um cartão por grupo (o desenho dos cartões de responsável, em bevel), com o
-total do que pede ação e os quatro números dele; o que tem mais primeiro, o "Sem responsável O&M / Sem cliente" por
-último. Nenhum caso aparece um por um. Cada número leva à tela de origem já filtrada pelo grupo: Extintores com o Status
-Atrasados ou Não reconhecidos, EPI na tabela com "Sem luvas"; a PT ainda não tem o filtro de responsável nem de
-cliente, e o número leva a APR e PT inteira. Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as
-outras. Não lê o Fracttal. Prova: `tests/test_hseq_mesa.py`.
+Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`; as contas em `_pendencias()` e `_cartoes()` na torre.
+- **A faixa** (`kb-kpis`) com os quatro números de agora: **PTs paradas** (esperando o De acordo há mais de 2 h, a régua
+  do Campo), **Extintores vencidos** (e em quantas usinas), **Não reconhecidos** (já sem os excluídos) e **Usinas sem
+  luvas**. Embaixo, a linha **Atenção** (Levi, na visão geral: "Os quatro + os de atenção"): extintor perto de vencer,
+  sem atualização (só o que não está vencido nem perto de vencer, para não contar duas vezes), usina sem verificar as
+  luvas e nova ronda pedida que a equipe ainda não refez.
+- **Agrupar por Responsável UFV** (o padrão) ou **Cliente** (`?ver=cliente`): um cartão por grupo (bevel), com o total do
+  que pede ação agora, os quatro números e, no pé, os de atenção que ele tem; o que tem mais primeiro, o "Sem
+  responsável O&M / Sem cliente" por último. Nenhum caso aparece um por um na tela.
+- **A visão geral** (a TST, 24/10/2026: "Adicionar uma opção de visão geral (um resumo com todas as pendências, sendo
+  possível filtrar por cliente, por UFV e por supervisor) e ter a opção de baixar"): os filtros **Cliente, UFV e
+  Responsável UFV** (`FILTROS_MESA`; o supervisor é o Responsável UFV, o mesmo dos cartões), em cascata como os de
+  Extintores (`_opcoes_ext`, com as listas tiradas das pendências), valem na faixa, na linha de atenção, nos cartões e
+  na planilha. **Baixar planilha** (`/t/hseq/mesa/pendencias.xlsx`, `planilha.gerar_pendencias`): a aba Resumo (uma
+  linha por responsável ou cliente, os oito números) e uma aba por pendência, caso a caso (`ABAS_PENDENCIAS`), com os
+  filtros e a fonte que não foi lida no topo. Medido no banco real em 24/10: 42 KB.
+- Cada número leva à tela de origem filtrada pelo grupo e pelos filtros do alto (`_links`): Extintores com o Status
+  (Atrasados, Não reconhecidos, Perto de vencer, Sem atualização), EPI na tabela com "Sem luvas" ou "Sem verificação"
+  (a UFV vai na busca dele, que não tem o filtro de usina); a PT ainda não tem o filtro de responsável nem de cliente, e
+  o número leva a APR e PT inteira.
+- Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as outras. Não lê o Fracttal.
+Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenção e a planilha).
 
 ## Extintores
 

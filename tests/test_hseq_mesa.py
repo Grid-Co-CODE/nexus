@@ -69,3 +69,72 @@ def test_sem_os_extintores_a_mesa_diz_e_os_outros_seguem(banco, logado):
     html = logado.get("/t/hseq/mesa").get_data(as_text=True)
     assert "Não consegui ler os extintores agora" in html and "PTs paradas" in html
     assert "Extintores vencidos —" in _texto(html[html.index('class="kb-kpis'):html.index("</section>")])
+
+
+# ── a visão geral (a TST, 24/10/2026: "Adicionar uma opção de visão geral (um resumo com todas as pendências, sendo
+#    possível filtrar por cliente, por UFV e por supervisor) e ter a opção de baixar"; Levi: "Os quatro + os de
+#    atenção") ──────────────────────────────────────────────────────────────────────────────────────────────────────
+def _form(html):
+    i = html.index('class="cn-filtros hs-mesa-filtros"')
+    return html[i:html.index("</form>", i)]
+
+
+def test_a_visao_geral_filtra_por_cliente_ufv_e_responsavel_em_cascata(com_cadastro, logado):
+    import re
+    _com_casos(com_cadastro)
+    html = logado.get("/t/hseq/mesa").get_data(as_text=True)
+    form = _form(html)
+    assert re.findall(r'<select class="gc-campo" id="mesa-(\w+)" name="(\w+)"', form) == [
+        ("cliente", "cliente"), ("usina", "usina"), ("responsavel", "responsavel")]
+    assert "Responsável UFV" in _texto(form) and "UFV" in _texto(form)
+    assert 'href="/t/hseq/mesa/pendencias.xlsx"' in form and ">Baixar planilha</a>" in form
+    # o Outro Cliente: só o Coração 1 e o Coordenador Campo nas listas, e os números só dele
+    out = logado.get("/t/hseq/mesa?cliente=Outro+Cliente").get_data(as_text=True)
+    faixa = _texto(out[out.index('class="kb-kpis'):out.index("</section>")])
+    assert "PTs paradas 0" in faixa and "Extintores vencidos 1" in faixa and "Não reconhecidos 0" in faixa
+    f2 = _form(out)
+    usinas = re.findall(r'<option value="([^"]+)"', f2[f2.index('id="mesa-usina"'):f2.index('id="mesa-responsavel"')])
+    resp = re.findall(r'<option value="([^"]+)"', f2[f2.index('id="mesa-responsavel"'):])
+    assert usinas == ["Coração 1"] and resp == ["Coordenador Campo"]
+    assert "<b>Supervisora Campo</b>" not in out
+    # o link do cartão leva também o filtro do alto; a planilha, o mesmo recorte
+    assert 'href="/t/hseq/extintores?f=atrasado&amp;cliente=Outro+Cliente&amp;responsavel=Coordenador+Campo#tabela"' in out
+    assert 'href="/t/hseq/mesa/pendencias.xlsx?cliente=Outro+Cliente"' in out
+
+
+def test_os_de_atencao_na_faixa_e_nos_cartoes(com_cadastro, logado):
+    _com_casos(com_cadastro)
+    html = logado.get("/t/hseq/mesa").get_data(as_text=True)
+    i = html.index('<p class="hs-atencao">')
+    linha = _texto(html[i:html.index("</p>", i)])
+    # o Brodowski nunca foi conferido (sem validade): sem atualização; o Coração também, mas está vencido e não conta
+    assert linha.startswith("Atenção 0 perto de vencer 1 sem atualização")
+    assert 'href="/t/hseq/extintores?f=sem_atualizacao#tabela"' in html
+    sup = _cartao(html, "Supervisora Campo")
+    assert "Atenção 1 sem atualização" in sup and "perto de vencer" not in sup
+    assert 'href="/t/hseq/extintores?f=sem_atualizacao&amp;responsavel=Supervisora+Campo#tabela"' in html
+
+
+def test_a_planilha_leva_caso_a_caso_com_os_filtros(com_cadastro, logado):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from nexus.hseq import planilha as PLA
+    _com_casos(com_cadastro)
+    r = logado.get("/t/hseq/mesa/pendencias.xlsx?responsavel=Supervisora+Campo")
+    assert r.status_code == 200 and r.mimetype == PLA.MIME
+    assert r.headers["Content-Disposition"] == 'attachment; filename="pendencias-seguranca-supervisora-campo-2026-10-09.xlsx"'
+    wb = load_workbook(BytesIO(r.data))
+    assert wb.sheetnames == ["Resumo", "PTs paradas", "Extintores vencidos", "Não reconhecidos", "Usinas sem luvas",
+                             "Perto de vencer", "Sem atualização", "Luvas sem verificação", "Nova ronda pedida"]
+    res = [[c.value for c in linha] for linha in wb["Resumo"].iter_rows()]
+    assert "Filtros: Responsável UFV: Supervisora Campo" in [x[0] for x in res]
+    cab = next(i for i, x in enumerate(res) if x[0] == "Responsável UFV")
+    assert res[cab][:5] == ["Responsável UFV", "PTs paradas", "Extintores vencidos", "Não reconhecidos", "Usinas sem luvas"]
+    assert res[cab + 1][:7] == ["Supervisora Campo", 1, 1, 1, 0, 0, 1] and len(res) == cab + 2
+    pts = [[c.value for c in linha] for linha in wb["PTs paradas"].iter_rows()]
+    cab = next(i for i, x in enumerate(pts) if x[0] == "Cliente")
+    assert pts[cab + 1][:4] == ["Thopen", "Altair", "Supervisora Campo", "PT-1"] and pts[cab + 1][-1] == 26.0
+    venc = [[c.value for c in linha] for linha in wb["Extintores vencidos"].iter_rows()]
+    assert [x[4] for x in venc if x[0] == "Thopen"] == ["ALT100-INFC1-PPCI-EXT01"]

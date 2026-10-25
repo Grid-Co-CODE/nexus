@@ -6,13 +6,16 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
 {# A Mesa da Segurança (Levi, 24/10/2026: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos, usinas
    sem luvas"), por grupos (2ª rodada: "quero duas visões: Por responsável e cliente (...) não queria em formato de lista
-   mas em agrupamentos para o TST saber onde atacar!"): a faixa com os quatro números (o modelo do Acompanhamento de
-   chamados) e um cartão por responsável ou por cliente, o que tem mais primeiro; cada número leva à tela de origem
-   filtrada pelo grupo. A mesa só lê. #}
+   mas em agrupamentos para o TST saber onde atacar!") e, no mesmo dia, a visão geral da TST ("um resumo com todas as
+   pendências, sendo possível filtrar por cliente, por UFV e por supervisor) e ter a opção de baixar"): os filtros, a
+   faixa com os quatro números de agora e a linha dos de atenção, um cartão por responsável ou por cliente (o que tem
+   mais primeiro) e a planilha com caso a caso. Cada número leva à tela de origem filtrada. A mesa só lê. #}
 {% from 'hseq/_legenda.html' import legenda, termo %}
 {% macro kpi(rot, v, grav, nota) %}<div class="kb-kpi"><span class="kb-kpi-rot">{{ rot }}</span><span class="kb-kpi-linha"><b class="kb-kpi-v kb-kpi-v--{{ grav }}">{{ v }}</b><span class="kb-kpi-nota">{{ nota }}</span></span></div>{% endmacro %}
 {# uma linha do cartão: o número (colorido quando há), o que ele conta e o link para a tela de origem filtrada #}
 {% macro conta(n, rotulo, tom, href, erro=false) %}<a class="hs-conta{% if not n %} hs-conta--zero{% endif %}" href="{{ href|na_raiz }}"><b class="{{ 'cn-t-' ~ tom if n else '' }}">{{ '—' if erro else n }}</b><span>{{ rotulo }}</span></a>{% endmacro %}
+{# os de atenção, curtos (no cartão só os que têm caso) #}
+{% macro rot_atencao(k, v) %}{% if k == 'perto' %}perto de vencer{% elif k == 'sem_atual' %}sem atualização{% elif k == 'luvas_semv' %}{{ 'usina sem verificar as luvas' if v == 1 else 'usinas sem verificar as luvas' }}{% else %}{{ 'nova ronda pedida' if v == 1 else 'novas rondas pedidas' }}{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab eg-mesa-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa da Segurança</p><h1 class="cn-titulo">A mesa da Segurança</h1>
@@ -20,15 +23,28 @@
     <div class="cn-frescor">PT do App, extintores e rondas do App + cadastro do Nexus{% if lido %}<br><b>lido às {{ lido }}</b>{% endif %}</div>
   </div>
 
+  {# os filtros da visão geral, em cascata (cada lista traz o que existe com os outros), e a planilha com o mesmo recorte #}
+  <form class="cn-filtros hs-mesa-filtros" method="get">
+    {% for campo, rotulo in filtros_mesa %}
+    <label class="ext-filtro"><span class="gc-rotulo">{{ rotulo }}</span>
+    <select class="gc-campo" id="mesa-{{ campo }}" name="{{ campo }}" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for v in opcoes[campo] %}<option value="{{ v }}"{% if v == fl[campo] %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select></label>
+    {% endfor %}
+    {% if chave == 'cliente' %}<input type="hidden" name="ver" value="cliente">{% endif %}
+    <a class="gc-btn gc-btn--ui gc-btn--contorno hs-baixar" href="{{ url_for('torre_hseq.mesa_planilha', **request.args.to_dict())|na_raiz }}" download>Baixar planilha</a>
+  </form>
+
   <section class="kb-kpis hs-mesa-kpis" aria-label="A mesa agora">
-    {{ kpi('PTs paradas', '—' if erros.pts else n_pts, 'critico' if n_pts else 'ok',
-           'esperando o De acordo há mais de 2 h' ~ ('; a mais antiga há ' ~ espera(mais_antiga) if n_pts else '')) }}
-    {{ kpi('Extintores vencidos', '—' if erros.ext else n_atr, 'critico' if n_atr else 'ok',
+    {{ kpi('PTs paradas', '—' if erros.pts else n.pts, 'critico' if n.pts else 'ok',
+           'esperando o De acordo há mais de 2 h' ~ ('; a mais antiga há ' ~ espera(mais_antiga) if n.pts else '')) }}
+    {{ kpi('Extintores vencidos', '—' if erros.ext else n.vencidos, 'critico' if n.vencidos else 'ok',
            'em ' ~ n_usinas_atr ~ (' usina' if n_usinas_atr == 1 else ' usinas') ~ ' · recarga ou teste hidrostático') }}
-    {{ kpi('Não reconhecidos', '—' if erros.ext else n_nr, 'alerta' if n_nr else 'ok', 'a equipe não achou na usina; aceitar ou pedir nova ronda') }}
-    {{ kpi('Usinas sem luvas', '—' if erros.epi else n_luv, 'critico' if n_luv else 'ok',
-           'pela última ronda; ' ~ n_semv ~ ' sem verificar há ' ~ dias_sem ~ ' dias ou mais') }}
+    {{ kpi('Não reconhecidos', '—' if erros.ext else n.nr, 'alerta' if n.nr else 'ok', 'a equipe não achou na usina; aceitar ou pedir nova ronda') }}
+    {{ kpi('Usinas sem luvas', '—' if erros.epi else n.sem_luvas, 'critico' if n.sem_luvas else 'ok', 'pela última ronda diária') }}
   </section>
+  {# os de atenção, numa linha só embaixo da faixa (Levi: "Os quatro + os de atenção") #}
+  <p class="hs-atencao"><span class="gc-rotulo">Atenção</span>{% for k, rot in atencao %}<a href="{{ geral[k]|na_raiz }}"{% if not n[k] %} class="hs-conta--zero"{% endif %}><b>{{ '—' if (erros.epi if k == 'luvas_semv' else erros.ext) else n[k] }}</b> {{ rot_atencao(k, n[k]) }}</a>{% endfor %}</p>
   {% for qual, txt in (('pts', 'as PT'), ('ext', 'os extintores'), ('epi', 'as rondas das luvas')) if erros.get(qual) %}
   <p class="cn-erro cn-aviso" role="status"><b>Não consegui ler {{ txt }} agora ({{ erros[qual] }}).</b> O número fica "—" e os outros seguem.</p>
   {% endfor %}
@@ -40,32 +56,31 @@
 
   {# um cartão por grupo, o que tem mais para atacar primeiro; cada número leva à tela de origem filtrada pelo grupo #}
   <div class="cn-equipes hs-mesa-grupos">
-    {% for s in cartoes %}{% set filtro = {chave: s.nome} %}
+    {% for s in cartoes %}
       <div class="cn-equipe cn-equipe--{{ s.cor }} cn-sup{% if s.nome == sem %} cn-sup--sem{% endif %}">
         <div class="cn-eq-cab">
-          <div class="cn-eq-titulo"><b>{{ s.nome }}</b><span class="hs-total" title="Tudo o que pede ação">{{ s.total }}</span></div>
+          <div class="cn-eq-titulo"><b>{{ s.nome }}</b><span class="hs-total" title="Tudo o que pede ação agora">{{ s.total }}</span></div>
           <span>{{ ('usinas sem responsável no cadastro' if chave == 'responsavel' else 'usinas sem cliente no cadastro') if s.nome == sem else ('Responsável UFV' if chave == 'responsavel' else 'Cliente') }}</span>
         </div>
         <div class="hs-contas">
-          {{ conta(s.pts, 'PTs paradas', 'critico', url_for('torre_hseq.apr_pt'), erros.pts) }}
-          {{ conta(s.vencidos, ('extintor vencido' if s.vencidos == 1 else 'extintores vencidos') ~ (' em ' ~ s.usinas_venc ~ (' usina' if s.usinas_venc == 1 else ' usinas') if s.vencidos else ''), 'critico',
-                   url_for('torre_hseq.extintores', f='atrasado', **filtro) ~ '#tabela', erros.ext) }}
-          {{ conta(s.nr, 'não reconhecido' if s.nr == 1 else 'não reconhecidos', 'alerta',
-                   url_for('torre_hseq.extintores', f='nao_reconhecido', **filtro) ~ '#tabela', erros.ext) }}
-          {{ conta(s.sem_luvas, 'usina sem luvas' if s.sem_luvas == 1 else 'usinas sem luvas', 'critico',
-                   url_for('torre_hseq.epi', modo='tabela', f='sem_luvas', **filtro), erros.epi) }}
+          {{ conta(s.pts, 'PTs paradas', 'critico', s.links.pts, erros.pts) }}
+          {{ conta(s.vencidos, ('extintor vencido' if s.vencidos == 1 else 'extintores vencidos') ~ (' em ' ~ s.usinas_venc ~ (' usina' if s.usinas_venc == 1 else ' usinas') if s.vencidos else ''), 'critico', s.links.vencidos, erros.ext) }}
+          {{ conta(s.nr, 'não reconhecido' if s.nr == 1 else 'não reconhecidos', 'alerta', s.links.nr, erros.ext) }}
+          {{ conta(s.sem_luvas, 'usina sem luvas' if s.sem_luvas == 1 else 'usinas sem luvas', 'critico', s.links.sem_luvas, erros.epi) }}
         </div>
+        {% if s.atencao %}<p class="hs-atencao hs-atencao--cartao"><span class="gc-rotulo">Atenção</span>{% for k, rot in atencao if s[k] %}<a href="{{ s.links[k]|na_raiz }}"><b>{{ s[k] }}</b> {{ rot_atencao(k, s[k]) }}</a>{% endfor %}</p>{% endif %}
       </div>
     {% else %}
-      <p class="mudo">Nada pede ação agora.</p>
+      <p class="mudo">Nada pede ação{{ ' com esses filtros' if fl.values()|select|list else '' }} agora.</p>
     {% endfor %}
   </div>
 
-  {% call legenda('Como ler a mesa', 'A mesa só lê: cada número leva à tela de origem, já filtrada pelo responsável ou pelo cliente, onde a Segurança age. A PT ainda não tem o filtro de responsável nem de cliente: o número leva a APR e PT inteira.') %}
+  {% call legenda('Como ler a mesa', 'A mesa só lê: cada número leva à tela de origem, já filtrada pelo responsável ou pelo cliente (e pelos filtros do alto), onde a Segurança age. A PT ainda não tem o filtro de responsável nem de cliente: o número leva a APR e PT inteira. A planilha leva caso a caso, com os mesmos filtros.') %}
     {{ termo('PTs paradas', 'critico') }}<dd>A PT está esperando o De acordo há mais de 2 h.</dd>
     {{ termo('Extintores vencidos', 'critico') }}<dd>A recarga ou o teste hidrostático do extintor venceu.</dd>
     {{ termo('Não reconhecidos', 'alerta') }}<dd>A equipe não achou o extintor na usina; na usina, a Segurança aceita (o extintor é excluído) ou pede nova ronda.</dd>
     {{ termo('Usinas sem luvas', 'critico') }}<dd>A última ronda diária respondeu Não à pergunta das luvas isolantes.</dd>
+    {{ termo('Atenção') }}<dd>O que ainda não pede ação, mas vai pedir: extintor perto de vencer (30 dias) ou sem atualização há mais de 30 dias (sem contar os vencidos e os perto de vencer), usina sem verificar as luvas há {{ dias_sem }} dias ou mais e nova ronda de extintores pedida que a equipe ainda não refez.</dd>
   {% endcall %}
 </div>
 {% endblock %}

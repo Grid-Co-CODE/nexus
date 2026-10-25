@@ -221,3 +221,16 @@
 /* no celular a caixa vem presa à tela, com 16 px de cada lado, e os termos um embaixo do outro */
 @media (max-width:640px){.hs-aviso-caixa{position:fixed;top:72px;left:16px;right:16px;width:auto;max-height:calc(100vh - 96px)}
   .hs-aviso-caixa .hs-leg{grid-template-columns:minmax(0,1fr)}}
+
+/* a visão geral da Mesa (a TST, 24/10/2026): os filtros com o "Baixar planilha" na ponta, e a linha dos de atenção
+   embaixo da faixa e no pé de cada cartão (o que vai pedir ação: perto de vencer, sem atualização, luvas sem
+   verificação e nova ronda pedida) */
+.hs-mesa-filtros{margin-top:18px}
+.hs-mesa-filtros .hs-baixar{margin-left:auto}
+.hs-atencao{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;margin:12px 0 0;font-size:13px;color:var(--tinta-2)}
+.hs-atencao > a{color:var(--tinta-2);text-decoration:none}
+.hs-atencao > a b{color:var(--alerta);font-variant-numeric:tabular-nums}
+.hs-atencao > a:hover,.hs-atencao > a:focus-visible{color:var(--tinta)}
+.hs-atencao > a.hs-conta--zero b{color:var(--mudo)}
+.hs-atencao--cartao{margin-top:10px;padding-top:9px;border-top:1px dashed var(--linha);font-size:12.5px;gap:4px 12px}
+@media (max-width:640px){.hs-mesa-filtros .hs-baixar{margin-left:0}}
