@@ -1132,3 +1132,9 @@ tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
   .ap-u-g,.ap-u-d{grid-column:1 / -1}
   .ap-seta{grid-row:1;grid-column:3}
 }
+
+/* APR e PT (24/10/2026): as páginas do histórico, de 20 em 20 */
+.cn-paginas{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px}
+.cn-paginas a{padding:3px 9px;border:1px solid var(--linha);border-radius:8px;color:var(--tinta-2);text-decoration:none}
+.cn-paginas a:hover,.cn-paginas a:focus-visible{border-color:var(--verde-texto);color:var(--tinta)}
+.cn-paginas a[aria-current="page"]{border-color:var(--verde);color:var(--tinta);font-weight:700}

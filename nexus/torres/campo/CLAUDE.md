@@ -483,13 +483,14 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   fica como o App mandou, com o dia marcado. Levi, 11/10: "aparece como 'APR do dia'? sendo que está ligado a atividade de
   um ativo no fractal".
 - **"Esperando o De acordo" é a MESMA tela da Central > Permissões de trabalho** (Levi, 05/10): as duas incluem
-  `templates/campo/_pt_esperando.html` (cartões compactos por equipe, por região de campo ou por gestor de contrato;
-  tabela com a OS em verde,
+  `templates/campo/_pt_esperando.html` (desde 24/10/2026 as duas só pedem os cartões por responsável e a tabela; a da
+  APR e PT leva a coluna Responsável no lugar da região, `coluna_responsavel`; tabela com a OS em verde,
   Equipamento, Espera no fim e a linha que abre o detalhe). Mudou uma, mudou a outra (o teste compara os cartões das
   duas).
-- **Tela de PT** (Levi, 05/10): abas "Esperando o De acordo" (cartões por equipe, por região de campo, por gestor de
-  contrato ou tabela) e "Histórico" (decididas, período 7/30/90 dias, por situação; só tabela). Filtros de região de
-  campo e de gestor; o cartão leva à tabela da equipe, da região ou do gestor. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
+- **Tela de PT** (Levi, 05/10; desde 24/10/2026 a regra está em `nexus/torres/hseq/CLAUDE.md`, "APR e PT"): abas
+  "Esperando o De acordo" (cartões por responsável ou tabela) e "Histórico" (todas as decididas, de 20 em 20, por
+  situação; só tabela). Filtros de cliente, usina e Responsável UFV com a conta de cada opção, nas duas abas; o cartão
+  leva à tabela do responsável. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
   lugar do Estado; Espera na última coluna; clicar na linha abre o detalhe (PT, equipamento, equipe, região de campo
   com o Supervisor de Campo, gestor de contrato,
   atividades críticas com sim/não/NA, respostas NÃO, 1º aviso, decisão e motivo). O cartão inteiro leva à tabela

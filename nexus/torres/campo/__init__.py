@@ -767,53 +767,81 @@ def pt():
     return redirect(na_raiz(TELA_PT) + ("?" + request.query_string.decode() if request.query_string else ""))
 
 
+# Os filtros de APR e PT (Levi, 24/10/2026: "Tire o filtro de região e gestor de contrato e região do brasil. Quero filtro
+# para cliente, usina e responsável com contador para cada! Quero os mesmos filtros no histórico!"), em cascata como os
+# da Central, cada opção com quantas PT tem com os outros filtros. O Responsável UFV é o Responsável O&M da ficha da usina.
+FILTROS_PT = (("cliente", "Cliente"), ("usina", "Usina"), ("responsavel", "Responsável UFV"))
+POR_PAGINA_PT = 20          # o histórico inteiro, de 20 em 20 ("para não pesar tanto")
+
+
+def _opcoes_pt(linhas, fl: dict, passa) -> dict:
+    """{filtro: [(valor, quantas PT)]}: o que existe com os OUTROS filtros aplicados, com a conta de cada um; a escolhida
+    fica mesmo sem resultado (com 0) e o "Sem responsável" por último."""
+    out = {}
+    for campo, _rot in FILTROS_PT:
+        n = {}
+        for x in linhas:
+            if passa(x, campo):
+                v = _valor_central(x, campo)
+                if v:
+                    n[v] = n.get(v, 0) + 1
+        if fl[campo] and fl[campo] not in n:
+            n[fl[campo]] = 0
+        out[campo] = sorted(n.items(), key=lambda kv: (kv[0] == visao.SEM_RESPONSAVEL, kv[0].lower()))
+    return out
+
+
+def _pagina() -> int:
+    try:
+        return max(1, int(request.args.get("pag") or 1))
+    except ValueError:
+        return 1
+
+
 def pagina_pt():
     """Permissões de trabalho e Análise Preliminar de Risco (em Segurança · HSEQ desde 09/10/2026). Duas abas (Levi,
-    05/10): as PT esperando o De acordo (por equipe, por região de campo ou por gestor de contrato, ou em tabela, a linha
-    abre o detalhe com a assinatura do técnico e a decisão) e o histórico das decididas, com o PDF da PT e o da APR em
-    colunas (Levi, 09/10). Filtros de região de campo e de gestor; a equipe vem do cartão."""
+    05/10): as PT esperando o De acordo, por responsável ou em tabela (a linha abre o detalhe com a assinatura do técnico
+    e a decisão), e o histórico das decididas, com o PDF da PT e o da APR em colunas (Levi, 09/10). Desde 24/10/2026
+    (Levi: "Tire por equipe e por região de campo e deixe apenas por responsável"; "Em tabela tire a coluna região e
+    coloque a coluna responsável"; os filtros de cliente, usina e responsável com contador, os mesmos no histórico; "Em
+    histórico quero todo o período mostrando de 20 em 20 para não pesar tanto")."""
     leitura = visao.pts()
     d = leitura.dados
     aba = "historico" if request.args.get("aba") == "historico" else "esperando"
-    regiao_campo, gestor, equipe = _regiao_campo(), _gestor(), request.args.get("equipe", "")
+    fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_PT}
     sit, q = request.args.get("sit", ""), request.args.get("q", "").strip().lower()
-    modo = _modo(equipe, historico=aba == "historico")
-    dias = _dias((7, 30, 90), 30)
-    piso = visao._agora() - timedelta(days=dias)
+    modo = "tabela" if request.args.get("modo") == "tabela" or aba == "historico" else "responsaveis"
     campos = ("os", "numero", "tarefa", "usina", "ativo", "codigo", "equipe", "solicitante", "decidida_por")
 
-    def filtra(lista):
-        return [p for p in lista if _do_papel(p, regiao_campo, gestor)
-                and (not equipe or p.get("equipe") == equipe)
-                and (not q or q in " ".join(str(p.get(c) or "") for c in campos).lower())]
-    aguardando = com_quem_assina(filtra(d.get("aguardando") or []))
+    def passa(x, menos=None):
+        return (all(not v or c == menos or _valor_central(x, c) == v for c, v in fl.items())
+                and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower()))
+    aguardando = com_quem_assina([p for p in d.get("aguardando") or [] if passa(p)])
     # a aba Esperando é a MESMA da Central de atenção > Permissões de trabalho (Levi, 05/10)
     f = request.args.get("f", "") if request.args.get("f") in visao.PT_STATUS else ""
-    regiao = request.args.get("regiao", "")
-    if regiao:
-        aguardando = [p for p in aguardando if p.get("regiao_br") == regiao]
-    contagem_pt = {s: sum(1 for p in aguardando if _status("pt", p) == s) for s in visao.PT_STATUS}
-    cartoes_pt = sorted((c for c in visao.por_equipe([], [], [], aguardando, d.get("times") or {}) if c["pts"]),
-                        key=ORDEM_DOS_CARTOES["pt"])
-    cartoes_reg = sorted(visao.por_regiao(cartoes_pt, d.get("regioes") or []), key=ORDEM_DAS_REGIOES["pt"])
-    cartoes_gest = sorted((c for c in visao.por_gestor([], [], aguardando, d.get("times") or {}) if c["pts"]),
-                          key=ORDEM_DOS_GESTORES["pt"])
+    contagem_pt = {s_: sum(1 for p in aguardando if _status("pt", p) == s_) for s_ in visao.PT_STATUS}
     lista_pt = [p for p in aguardando if not f or _status("pt", p) == f]
-    historico = [p for p in filtra(d.get("historico") or []) if (p.get("criada") or piso) >= piso]
+    historico = [p for p in d.get("historico") or [] if passa(p)]
     contagem = {}
     for p in historico:
         contagem[p["situacao"]] = contagem.get(p["situacao"], 0) + 1
     historico = [p for p in historico if not sit or p.get("situacao") == sit]
-    todas = (d.get("aguardando") or []) + (d.get("historico") or [])
+    n_pag = max(1, -(-len(historico) // POR_PAGINA_PT))
+    pag = min(_pagina(), n_pag)
+    fonte = d.get("historico") if aba == "historico" else d.get("aguardando")
     torre, tela = _onde_pt()
     return render_template("campo/pt.html", **_comum(
         "pt", leitura, torre=torre, tela=tela, titulo="Permissões de trabalho e Análise Preliminar de Risco",
         aviso=session.pop("pt_aviso", ""), gravada=session.pop("pt_gravada", ""),
-        aba=aba, modo=modo, aguardando=aguardando, historico=historico, contagem_hist=contagem, sit=sit,
-        dias=dias, equipe=equipe, q=request.args.get("q", ""), situacoes=SITUACAO_PT,
-        idade_min=_idade_min, cartoes=cartoes_pt, lista=lista_pt, contagem=contagem_pt, total=len(aguardando), f=f,
-        cartoes_reg=cartoes_reg, cartoes_gest=cartoes_gest,
-        status=visao.PT_STATUS, regiao=regiao, regioes=visao.REGIOES, **_papeis(d, todas, regiao_campo, gestor)))
+        aba=aba, modo=modo, aguardando=aguardando, n_hist=len(historico), contagem_hist=contagem, sit=sit,
+        historico=historico[(pag - 1) * POR_PAGINA_PT:pag * POR_PAGINA_PT], pag=pag, n_pag=n_pag,
+        por_pagina=POR_PAGINA_PT, equipe="", q=request.args.get("q", ""), situacoes=SITUACAO_PT,
+        idade_min=_idade_min, cartoes=[], lista=lista_pt, contagem=contagem_pt, total=len(aguardando), f=f,
+        cartoes_resp_pt=visao.pt_por_responsavel(aguardando), sem_responsavel=visao.SEM_RESPONSAVEL,
+        sem_regiao=visao.SEM_REGIAO, coluna_responsavel=True, status=visao.PT_STATUS,
+        fl=fl, opcoes=_opcoes_pt(fonte or [], fl, passa), filtros_pt=FILTROS_PT,
+        # o aviso da estrutura de campo segue: sem ela, só um administrador dá o De acordo
+        estrutura_publicada=(d or {}).get("estrutura_publicada", True)))
 
 
 @bp.route("/pt/<numero>/pdf")
