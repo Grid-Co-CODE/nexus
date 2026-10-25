@@ -32,6 +32,7 @@ RESUMO = {
     "pt": "Cada Permissão de Trabalho pedida no App, por equipamento",
     "decisao_pt": "A decisão sobre cada equipamento de uma PT, tomada no Nexus",
     "extintor": "Cada extintor das usinas, com as validades e a última conferência",
+    "apr": "Cada APR de pré-execução feita no App, com as atividades críticas",
     "conferencia_extintor": "Cada conferência mensal de extintor feita pelo App",
     # ── Performance ──
     "decisao_cobertura": "Que usina de cada fonte entra no tempo real, decidido pela tela",
@@ -210,6 +211,9 @@ PARA_QUE = {
                 "fica, a classe, o peso, as duas validades (recarga e teste hidrostático) e a última conferência. "
                 "Serve para saber o que está vencido, o que vence nos próximos 30 dias e o que ninguém confere há mais "
                 "de 30 dias, por supervisor de campo e por gestor de contrato (a tela Extintores, em Segurança).",
+    "apr": "Guarda cada APR de pré-execução que o técnico faz no App antes do serviço: a OS, o dia, as atividades "
+           "críticas marcadas, se pedia PT e o número da PT feita. É o que mostra a atividade feita sem APR ou a APR "
+           "que pedia PT e ficou sem.",
     "conferencia_extintor": "Guarda cada conferência de extintor feita na ronda mensal do App: a carga, os itens "
                             "com \"não\", as validades lidas na etiqueta e quem conferiu. Serve para acompanhar, mês a "
                             "mês, se a ronda de extintores está sendo feita e o que ela encontrou.",

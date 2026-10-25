@@ -276,46 +276,57 @@ def test_central_abre_por_responsavel_e_a_equipe_e_filtro(banco, logado):
     assert 'id="cn-regiao"' not in html and 'id="cn-uf"' not in html
     html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
     assert "PT esperando o De acordo" in html
-def test_cartao_de_equipe_da_pt_tem_tecnicos_e_a_regiao_de_campo(banco, logado):
-    # os cartões por equipe saíram da Central em 19/10/2026; seguem em HSEQ › APR e PT, com os técnicos e a região
+def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_responsavel(banco, logado):
+    """Levi, 24/10/2026: "Tire por equipe e por região de campo e deixe apenas por responsável"; "Tire o filtro de região
+    e gestor de contrato e região do brasil. Quero filtro para cliente, usina e responsável com contador para cada!"."""
+    import re as _re
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    assert 'class="cn-capacete"' in html and "2 técnicos na equipe" in html
-    assert 'E-31 · Sudeste 03 · Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
-    assert 'id="cn-regiao-campo"' in html and 'id="cn-gestor"' in html
-def test_tela_de_pt_por_equipe_tabela_e_historico(banco, logado):
-    """Levi, 05/10: divisão por equipe com o que está pendente, filtro de supervisor, linha que abre o detalhe,
-    equipamento no lugar do estado, espera no fim e só o número da OS, em verde, no lugar do número da PT."""
-    html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    assert 'class="cn-equipes"' in html and "SP Norte 01" in html and "Supervisora Campo" in html
+    assert 'aria-current="page">Por responsável</a>' in html and ">Tabela</a>" in html
+    assert ">Por equipe</a>" not in html and ">Por região de campo</a>" not in html
     assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
-    # o mesmo pedaço da Central de atenção > Permissões de trabalho (Levi, 05/10); desde 19/10/2026 a Central é só por
-    # responsável e a tabela, e a tabela é a mesma
+    for antigo in ('id="cn-regiao"', 'id="cn-regiao-campo"', 'id="cn-gestor"'):
+        assert antigo not in html
+    assert _re.findall(r'<select class="gc-campo" id="pt-(\w+)" name="(\w+)"', html) == [
+        ("cliente", "cliente"), ("usina", "usina"), ("responsavel", "responsavel")]
+    assert '<option value="Thopen">Thopen (2)</option>' in html and '<option value="Altair">Altair (2)</option>' in html
+    # o endereço de antes (por região, por gestor, a equipe) cai no Por responsável e não filtra
+    antigo = logado.get("/t/hseq/apr-pt?modo=regioes&regiao_campo=Sul+01&gestor=Ciclano+Chefe").get_data(as_text=True)
+    assert 'aria-current="page">Por responsável</a>' in antigo and "2</span><span class=\"d\">PT esperando" in antigo
+
+
+def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
+    """Levi, 05/10: linha que abre o detalhe, equipamento no lugar do estado, espera no fim e só o número da OS, em
+    verde; 24/10/2026: "Em tabela tire a coluna região e coloque a coluna responsável"."""
     import re as _re
     oss = lambda h: _re.findall(r'class="cn-link cn-os"[^>]*>([^<]+)<', h)
+    # o mesmo pedaço da Central de atenção > Permissões de trabalho (Levi, 05/10): as mesmas PT
     assert oss(logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)) == oss(
         logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True))
     html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     assert html.count('class="cn-link cn-os"') == 2 and ">700<" in html                    # PT-1 e PT-2, pela OS
-    html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     # 09/10/2026: a PT e a APR em colunas (Levi: "invés de PDF e baixar terá uma coluna de PT e APR")
-    cab = ("<th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th>"
+    cab = ("<th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Responsável</th>"
            "<th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th>")
     assert cab in html and "<th>Estado</th>" not in html and "/t/campo/pt/PT-1/apr.pdf" in html
     assert 'class="cn-detalhe" hidden' in html and "Atividades críticas" in html and "Eletricidade" in html
     assert "Inversor 1" in html and "THPN-ALT100-INVR1" in html
-    html = logado.get("/t/hseq/apr-pt?gestor=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
+    # a Central segue com a região na tabela (o pedaço é o mesmo; só a APR e PT pede o responsável)
+    assert "<th>Região</th>" in logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True)
+    html = logado.get("/t/hseq/apr-pt?cliente=Outro+Cliente&modo=tabela").get_data(as_text=True)
     assert "Nenhuma PT esperando o De acordo com esses filtros" in html
     html = logado.get("/t/hseq/apr-pt?aba=historico").get_data(as_text=True)
     assert "<th>Situação</th>" in html and "De acordo" in html and "/t/campo/pt/PT-3" in html
     assert "/t/campo/pt/PT-3/pdf" in html and "<th>PT</th><th>APR</th>" in html and "/t/campo/pt/PT-3/apr.pdf" in html
+    assert "<th>Usina</th><th>Responsável</th>" in html and 'name="dias"' not in html     # sem o período: tudo
 
 
-def test_cartao_leva_a_tabela_da_equipe_com_a_regiao_e_o_supervisor_de_campo(banco, logado):
+def test_o_cartao_do_responsavel_leva_a_tabela_dele(banco, logado):
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    assert '<a class="cn-equipe cn-equipe--critico" href="?modo=tabela&amp;equipe=SP+Norte+01">' in html
-    html = logado.get("/t/hseq/apr-pt?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
-    assert 'class="cn-faixa-equipe"' in html and "2</b> técnicos" in html
-    assert 'Sudeste 03 · Supervisor de Campo: <b class="cn-eq-sup">Supervisora Campo</b>' in html
+    i = html.index('<a class="cn-equipe cn-equipe--critico')
+    href = html[i:html.index(">", i)].split('href="')[1].split('"')[0].replace("&amp;", "&")
+    assert href.startswith("?modo=tabela&responsavel=")
+    tabela = logado.get("/t/hseq/apr-pt" + href).get_data(as_text=True)
+    assert tabela.count('class="cn-link cn-os"') == 2
 
 
 class _FracttalPT:

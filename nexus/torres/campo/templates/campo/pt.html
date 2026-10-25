@@ -3,9 +3,10 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Permissões de trabalho, visão do Nexus (05/10/2026): o livro de PT que o App grava no banco (nexus/campo/visao.py,
-   pts, por_equipe, por_regiao e por_gestor). Duas abas: esperando o De acordo (por equipe, por região de campo, por
-   gestor de contrato ou tabela) e o histórico das decididas. A OS em verde abre a aprovação; clicar na linha abre o
-   detalhe. #}
+   pts e pt_por_responsavel). Duas abas: esperando o De acordo (por responsável ou tabela; Levi, 24/10/2026: "Tire por
+   equipe e por região de campo e deixe apenas por responsável") e o histórico das decididas, inteiro, de 20 em 20. Os
+   filtros (cliente, usina e Responsável UFV, com a conta de cada opção) valem nas duas. A OS em verde abre a aprovação;
+   clicar na linha abre o detalhe. #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
@@ -56,54 +57,91 @@
 
   <nav class="cn-abas" aria-label="Abas">
     <a href="{{ url(aba=None, sit=None, dias=None) }}"{% if aba == 'esperando' %} aria-current="page"{% endif %}>Esperando o De acordo<i>{{ (d.get('aguardando') or [])|length }}</i></a>
-    <a href="{{ url(aba='historico', modo=None, equipe=None) }}"{% if aba == 'historico' %} aria-current="page"{% endif %}>Histórico<i>{{ (d.get('historico') or [])|length }}</i></a>
+    <a href="{{ url(aba='historico', modo=None, equipe=None, pag=None, tipo=None) }}"{% if aba == 'historico' %} aria-current="page"{% endif %}>Histórico<i>{{ (d.get('historico') or [])|length }}</i></a>
+    <a href="{{ url(aba='sem', modo=None, sit=None, f=None, pag=None) }}"{% if aba == 'sem' %} aria-current="page"{% endif %}>Sem APR ou PT</a>
   </nav>
 
   <form class="cn-filtros" method="get">
     {% if aba == 'esperando' %}
     <div class="cn-seg" aria-label="Visão">
-      <a href="{{ url(modo=None, equipe=None) }}"{% if modo == 'equipes' %} aria-current="page"{% endif %}>Por equipe</a>
-      <a href="{{ url(modo='regioes', equipe=None) }}"{% if modo in ('regioes', 'gestores') %} aria-current="page"{% endif %}>Por região de campo</a>
+      <a href="{{ url(modo=None) }}"{% if modo == 'responsaveis' %} aria-current="page"{% endif %}>Por responsável</a>
       <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
     </div>
     {% else %}
-    <input type="hidden" name="aba" value="historico">
-    <span class="gc-rotulo">Período</span>
-    <div class="cn-seg">{% for p in (7, 30, 90) %}<a href="{{ url(dias=p) }}"{% if p == dias %} aria-current="page"{% endif %}>{{ p }} dias</a>{% endfor %}</div>
-    <input type="hidden" name="dias" value="{{ dias }}">
+    <input type="hidden" name="aba" value="{{ aba }}">
+    {% if aba == 'sem' %}<input type="hidden" name="tipo" value="{{ tipo }}">{% endif %}
     {% endif %}
-    <label class="gc-rotulo" for="cn-regiao">Região do Brasil</label>
-    <select class="gc-campo" id="cn-regiao" name="regiao" onchange="this.form.submit()">
-      <option value="">Todas</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
-    {% with com_rotulo=true %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
+    {# cliente, usina e Responsável UFV, em cascata, cada opção com quantas PT tem com os outros filtros (o rótulo e a
+       caixa juntos, como em Extintores) #}
+    {% for campo, rotulo in filtros_pt %}
+    <label class="cn-filtro-par"><span class="gc-rotulo">{{ rotulo }}</span>
+    <select class="gc-campo" id="pt-{{ campo }}" name="{{ campo }}" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for v, n in opcoes[campo] %}<option value="{{ v }}"{% if v == fl[campo] %} selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    {% endfor %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, usina, equipamento ou técnico" aria-label="Buscar">
-    {% for k in ('modo', 'equipe', 'sit', 'f') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
-    {% if equipe %}<a class="cn-filtro-ativo" href="{{ url(equipe=None) }}" title="Tirar o filtro de equipe">Equipe: {{ equipe }} <span aria-hidden="true">×</span></a>{% endif %}
+    {% for k in ('modo', 'sit', 'f') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
 
   {% if aba == 'esperando' %}
   {% include 'campo/_pt_esperando.html' %}
+  {% elif aba == 'sem' %}
+  {# Sem APR ou PT (a TST, 24/10/2026): a APR que pedia PT e ficou sem, e a OS fechada pelo App sem APR, do livro da
+     APR que o App publica (nexus/hseq/apr.py), de 20 em 20 #}
+  <div class="cn-seg cn-seg--mini" aria-label="O que mostrar">
+    <a href="{{ url(tipo=None, pag=None) }}"{% if tipo == 'pt' %} aria-current="page"{% endif %}>APR que pedia PT e ficou sem</a>
+    <a href="{{ url(tipo='apr', pag=None) }}"{% if tipo == 'apr' %} aria-current="page"{% endif %}>OS fechada sem APR</a>
+  </div>
+  {% if not livro_apr %}
+  <div class="cn-erro cn-aviso" role="status"><b>O livro da APR ainda não chegou ao banco do Nexus.</b> O App de Campo publica as APRs (o livro apr_app_campo) a partir da versão 298 do servidor; até lá, esta aba fica vazia. Para achar a PT de uma OS, use a busca nas outras abas.</div>
+  {% else %}
+  <div class="cn-tab"><table>
+    {% if tipo == 'pt' %}
+    <thead><tr><th>Dia</th><th>OS</th><th>Usina</th><th>Responsável</th><th>APR</th><th>Atividades críticas</th><th>Técnico</th></tr></thead>
+    <tbody>{% for x in sem %}<tr><td class="m">{{ x.dia.strftime('%d/%m/%Y') if x.dia else '—' }}</td><td class="m">{{ x.os or '—' }}</td><td>{{ x.usina or '—' }}</td><td>{{ x.responsavel or sem_responsavel }}</td>
+      <td>{{ x.tipo }}{% if x.tarefa %}<span class="det">{{ x.tarefa[:70] }}</span>{% endif %}</td><td>{% for a in x.atividades %}<span class="pt-chip">{{ a }}</span>{% endfor %}</td><td>{{ x.tecnico or '—' }}</td></tr>
+    {% else %}<tr><td colspan="7" class="mudo">Nenhuma APR pedindo PT ficou sem PT{{ ' com esses filtros' if fl.values()|select|list or q else '' }}.</td></tr>{% endfor %}</tbody>
+    {% else %}
+    <thead><tr><th>Dia</th><th>OS</th><th>Usina</th><th>Responsável</th><th>Tarefas fechadas</th><th>Tipo de OS</th><th>Técnico</th></tr></thead>
+    <tbody>{% for x in sem %}<tr><td class="m">{{ x.dia.strftime('%d/%m/%Y') if x.dia else '—' }}</td><td class="m">{{ x.os or '—' }}</td><td>{{ x.usina or '—' }}</td><td>{{ x.responsavel or sem_responsavel }}</td>
+      <td>{{ x.tarefas }}</td><td>{{ x.tipo_os or '—' }}</td><td>{{ x.tecnico or '—' }}</td></tr>
+    {% else %}<tr><td colspan="7" class="mudo">Nenhuma OS fechada pelo App sem APR{{ ' com esses filtros' if fl.values()|select|list or q else '' }}.</td></tr>{% endfor %}</tbody>
+    {% endif %}
+  </table></div>
+  {% if n_pag > 1 %}<nav class="cn-paginas" aria-label="Páginas">
+    <span class="mudo">{{ (pag - 1) * por_pagina + 1 }}–{{ (pag - 1) * por_pagina + sem|length }} de {{ n_sem }}</span>
+    {% if pag > 1 %}<a href="{{ url(pag=pag - 1 if pag > 2 else None) }}">Anterior</a>{% endif %}
+    {% for i in range(1, n_pag + 1) if i in (1, n_pag) or (i - pag)|abs <= 2 %}{% if not loop.first and i - loop.previtem > 1 %}<span class="mudo">…</span>{% endif %}<a href="{{ url(pag=i if i > 1 else None) }}"{% if i == pag %} aria-current="page"{% endif %}>{{ i }}</a>{% endfor %}
+    {% if pag < n_pag %}<a href="{{ url(pag=pag + 1) }}">Próxima</a>{% endif %}
+  </nav>{% endif %}
+  <p class="cn-nota">{% if tipo == 'pt' %}<b>Como entra:</b> a APR de pré-execução feita no App com uma das 5 atividades críticas marcada (altura, escada, telhados, químicos, eletricidade energizada), que pede PT, e sem o número de PT ligado a ela. A APR ainda não medida (as de antes da versão 298 são lidas aos poucos) não entra.{% else %}<b>Como entra:</b> a tarefa fechada pelo App desde 09/10/2026 sem APR da mesma OS no mesmo dia, nem APR da tarefa com a mesma OS e tarefa, por OS e dia. Antes de 09/10 a APR só existe no Fracttal. A régua não olha o técnico.{% endif %}</p>
+  {% endif %}
   {% else %}
   <div class="cn-chips">
     <a href="{{ url(sit=None) }}"{% if not sit %} aria-current="page"{% endif %}>Todas <b>{{ contagem_hist.values()|sum }}</b></a>
     {% for s, (rot, cor) in situacoes.items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem_hist.get(s, 0) }}</b></a>{% endfor %}
   </div>
   <div class="cn-tab"><table class="cn-expande">
-    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th><th>PT</th><th>APR</th></tr></thead>
+    <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Responsável</th><th>Equipamento</th><th>Equipe</th><th>Técnico</th><th>Situação</th><th>Decidida por</th><th>Criada</th><th>Esperou</th><th>PT</th><th>APR</th></tr></thead>
     <tbody>
-    {% for p in historico[:300] %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
+    {% for p in historico %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}{% if p.apr_dia %}<span class="det">APR do dia {{ p.apr_dia }}</span>{% endif %}</td>
-        <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.solicitante or '—' }}</td>
+        <td>{{ p.usina }}</td><td>{{ p.responsavel or sem_responsavel }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.solicitante or '—' }}</td>
         <td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td>{{ p.decidida_por or p.papel or '—' }}</td>
         <td class="m">{{ p.criada.strftime('%d/%m %H:%M') if p.criada else '—' }}</td>
         <td class="m">{{ '—' if p.espera_min is none else idade_min(p.espera_min) }}</td>
         <td>{% if p.situacao in ('de_acordo', 'vencida') %}<a class="cn-link" href="{{ url_for('torre_campo.pt_pdf', numero=p.numero) }}" title="O PDF da PT que o App anexou no Fracttal, com as assinaturas">Baixar</a>{% else %}<span class="mudo" title="PT não autorizada não tem PDF">—</span>{% endif %}</td>
         <td><a class="cn-link" href="{{ url_for('torre_campo.pt_apr_pdf', numero=p.numero) }}" title="O PDF da APR que o App anexou na tarefa do Fracttal">Baixar</a></td></tr>
-      {{ detalhe(p, 12) }}
-    {% else %}<tr><td colspan="12" class="mudo">Nenhuma PT decidida com esses filtros.</td></tr>{% endfor %}
+      {{ detalhe(p, 13) }}
+    {% else %}<tr><td colspan="13" class="mudo">Nenhuma PT decidida com esses filtros.</td></tr>{% endfor %}
     </tbody></table></div>
-  {% if historico|length > 300 %}<p class="mudo">Mostrando 300 de {{ historico|length }}: use o período, o supervisor ou a busca.</p>{% endif %}
+  {# todo o período, de 20 em 20 (Levi, 24/10/2026: "para não pesar tanto") #}
+  {% if n_pag > 1 %}<nav class="cn-paginas" aria-label="Páginas do histórico">
+    <span class="mudo">{{ (pag - 1) * por_pagina + 1 }}–{{ (pag - 1) * por_pagina + historico|length }} de {{ n_hist }}</span>
+    {% if pag > 1 %}<a href="{{ url(pag=pag - 1 if pag > 2 else None) }}">Anterior</a>{% endif %}
+    {% for i in range(1, n_pag + 1) if i in (1, n_pag) or (i - pag)|abs <= 2 %}{% if not loop.first and i - loop.previtem > 1 %}<span class="mudo">…</span>{% endif %}<a href="{{ url(pag=i if i > 1 else None) }}"{% if i == pag %} aria-current="page"{% endif %}>{{ i }}</a>{% endfor %}
+    {% if pag < n_pag %}<a href="{{ url(pag=pag + 1) }}">Próxima</a>{% endif %}
+  </nav>{% endif %}
   {% endif %}
 
   <div class="cn-nota"><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do

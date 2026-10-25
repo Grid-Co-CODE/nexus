@@ -70,23 +70,14 @@ def test_linha_sem_regiao_e_sem_gestor_acha_as_linhas_em_rondas(banco, logado):
     assert "Órfã" in html and "Coração 1" not in html
     html = logado.get("/t/campo/rondas?aba=sem&cob=nunca&gestor=Sem+gestor+de+contrato").get_data(as_text=True)
     assert "Órfã" in html and "Coração 1" not in html
-def test_pt_por_regiao_e_por_gestor_na_tela_de_pt_e_na_central_e_a_mesma(banco, logado):
-    html = logado.get("/t/hseq/apr-pt?modo=regioes").get_data(as_text=True)
-    assert ">Por equipe</a>" in html and 'aria-current="page">Por região de campo</a>' in html and ">Tabela</a>" in html
-    assert "<b>Sudeste 03</b>" in html and "<b>Sul 01</b>" not in html                 # a Sul 01 não tem PT
-    assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
-    assert "1 equipe com PT esperando" in html
-    assert 'href="?modo=tabela&amp;regiao_campo=Sudeste+03"' in html
+def test_a_tabela_de_pt_e_a_mesma_na_tela_de_pt_e_na_central(banco, logado):
     # _pt_esperando.html é o mesmo pedaço nas duas telas; desde 19/10/2026 a Central só pede o Por responsável e a tabela
-    # (Levi: "Uma visão só por responsável serve!"), e a tabela é a mesma
-    assert _tabela(logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)) == _tabela(
+    # (Levi: "Uma visão só por responsável serve!"), e desde 24/10 a APR e PT também. As mesmas PT nas duas tabelas (a
+    # da APR e PT leva o responsável no lugar da região)
+    import re as _re
+    oss = lambda h: _re.findall(r'class="cn-link cn-os"[^>]*>([^<]+)<', h)
+    assert oss(logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)) == oss(
         logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True))
-    gest = logado.get("/t/hseq/apr-pt?modo=gestores").get_data(as_text=True)
-    assert "<b>Beltrano Supervisor</b>" in gest and "Ciclano Chefe</b>" not in gest     # o Ciclano não tem PT
-    tabela = logado.get("/t/hseq/apr-pt?modo=tabela&regiao_campo=Sudeste+03").get_data(as_text=True)
-    assert tabela.count('class="cn-link cn-os"') == 2
-    tabela = logado.get("/t/hseq/apr-pt?modo=tabela&regiao_campo=Sul+01").get_data(as_text=True)
-    assert "Nenhuma PT esperando o De acordo com esses filtros" in tabela
 
 
 def test_estrutura_nao_publicada_avisa_e_nao_quebra(banco, logado):
@@ -99,8 +90,6 @@ def test_estrutura_nao_publicada_avisa_e_nao_quebra(banco, logado):
         html = logado.get(url).get_data(as_text=True)
         assert "Estrutura de campo ainda não publicada" in html, url
     assert "Estrutura de campo ainda não publicada" not in logado.get("/t/campo/atencao").get_data(as_text=True)
-    html = logado.get("/t/hseq/apr-pt?modo=regioes").get_data(as_text=True)
-    assert html.count('class="cn-equipe ') == 1 and "<b>Sem região de campo</b>" in html
     assert "Altair" in logado.get("/t/campo/rondas?gestor=Beltrano+Supervisor").get_data(as_text=True)
     # com a estrutura no banco, o aviso some
     _aba(banco, "cadastro_nexus", "regioes_campo", REGIOES)
