@@ -53,6 +53,18 @@ def test_a_os_fechada_sem_apr_e_a_que_tem(banco, logado):
     html = logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
     corpo = html[html.index("<tbody>"):html.index("</tbody>")]
     assert ">800<" in corpo and "Altair" in corpo and "Preventiva" in corpo           # as tarefas da OS 800, sem APR
+    assert ">nenhuma<" in corpo                                                         # a OS 800 nunca teve APR
+    # a APR do dia anterior também vale (a tarefa da noite fecha depois da meia-noite)
+    from datetime import date as _date, timedelta as _td
+    _aba(banco, "apr_app_campo", "APR", [_apr("800", (_date.fromisoformat(d) - _td(days=1)).isoformat())
+                                         for d in _dias_dos_fechamentos()])
+    visao.limpar()
+    assert "Nenhuma OS fechada pelo App sem APR" in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+    # a de dois dias antes não vale, e a coluna diz quando foi
+    dois_antes = (_date.fromisoformat(_dias_dos_fechamentos()[0]) - _td(days=2)).isoformat()
+    _aba(banco, "apr_app_campo", "APR", [_apr("800", dois_antes)])
+    visao.limpar()
+    assert ">em " in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
     # com a APR do dia da OS 800 (nos dias em que as tarefas fecharam), sai
     _aba(banco, "apr_app_campo", "APR", [_apr("800", d) for d in _dias_dos_fechamentos()])
     visao.limpar()

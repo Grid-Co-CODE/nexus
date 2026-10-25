@@ -102,10 +102,10 @@
       <td>{{ x.tipo }}{% if x.tarefa %}<span class="det">{{ x.tarefa[:70] }}</span>{% endif %}</td><td>{% for a in x.atividades %}<span class="pt-chip">{{ a }}</span>{% endfor %}</td><td>{{ x.tecnico or '—' }}</td></tr>
     {% else %}<tr><td colspan="7" class="mudo">Nenhuma APR pedindo PT ficou sem PT{{ ' com esses filtros' if fl.values()|select|list or q else '' }}.</td></tr>{% endfor %}</tbody>
     {% else %}
-    <thead><tr><th>Dia</th><th>OS</th><th>Usina</th><th>Responsável</th><th>Tarefas fechadas</th><th>Tipo de OS</th><th>Técnico</th></tr></thead>
+    <thead><tr><th>Fechada em</th><th>OS</th><th>Usina</th><th>Responsável</th><th>Tarefas fechadas</th><th>Tipo de OS</th><th>APR da OS</th><th>Técnico</th></tr></thead>
     <tbody>{% for x in sem %}<tr><td class="m">{{ x.dia.strftime('%d/%m/%Y') if x.dia else '—' }}</td><td class="m">{{ x.os or '—' }}</td><td>{{ x.usina or '—' }}</td><td>{{ x.responsavel or sem_responsavel }}</td>
-      <td>{{ x.tarefas }}</td><td>{{ x.tipo_os or '—' }}</td><td>{{ x.tecnico or '—' }}</td></tr>
-    {% else %}<tr><td colspan="7" class="mudo">Nenhuma OS fechada pelo App sem APR{{ ' com esses filtros' if fl.values()|select|list or q else '' }}.</td></tr>{% endfor %}</tbody>
+      <td>{{ x.tarefas }}</td><td>{{ x.tipo_os or '—' }}</td><td>{% if x.apr_antes %}<span title="A última APR desta OS foi antes do fechamento: pode ser o fechamento registrado dias depois do serviço">em {{ x.apr_antes.strftime('%d/%m') }}</span>{% else %}<span class="cn-t-critico">nenhuma</span>{% endif %}</td><td>{{ x.tecnico or '—' }}</td></tr>
+    {% else %}<tr><td colspan="8" class="mudo">Nenhuma OS fechada pelo App sem APR{{ ' com esses filtros' if fl.values()|select|list or q else '' }}.</td></tr>{% endfor %}</tbody>
     {% endif %}
   </table></div>
   {% if n_pag > 1 %}<nav class="cn-paginas" aria-label="Páginas">
@@ -114,7 +114,7 @@
     {% for i in range(1, n_pag + 1) if i in (1, n_pag) or (i - pag)|abs <= 2 %}{% if not loop.first and i - loop.previtem > 1 %}<span class="mudo">…</span>{% endif %}<a href="{{ url(pag=i if i > 1 else None) }}"{% if i == pag %} aria-current="page"{% endif %}>{{ i }}</a>{% endfor %}
     {% if pag < n_pag %}<a href="{{ url(pag=pag + 1) }}">Próxima</a>{% endif %}
   </nav>{% endif %}
-  <p class="cn-nota">{% if tipo == 'pt' %}<b>Como entra:</b> a APR de pré-execução feita no App com uma das 5 atividades críticas marcada (altura, escada, telhados, químicos, eletricidade energizada), que pede PT, e sem o número de PT ligado a ela. A APR ainda não medida (as de antes da versão 298 são lidas aos poucos) não entra.{% else %}<b>Como entra:</b> a tarefa fechada pelo App desde 09/10/2026 sem APR da mesma OS no mesmo dia, nem APR da tarefa com a mesma OS e tarefa, por OS e dia. Antes de 09/10 a APR só existe no Fracttal. A régua não olha o técnico.{% endif %}</p>
+  <p class="cn-nota">{% if tipo == 'pt' %}<b>Como entra:</b> a APR de pré-execução feita no App com uma das 5 atividades críticas marcada (altura, escada, telhados, químicos, eletricidade energizada), que pede PT, e sem o número de PT ligado a ela. A APR ainda não medida (as de antes da versão 298 são lidas aos poucos) não entra.{% else %}<b>Como entra:</b> a tarefa fechada pelo App desde 10/10/2026 sem APR da mesma OS no mesmo dia ou no anterior (a tarefa da noite fecha depois da meia-noite), nem APR da tarefa com a mesma OS e tarefa, por OS e dia. "APR da OS" mostra a última APR da OS antes do fechamento: com ela, quase sempre é o fechamento registrado dias depois do serviço; "nenhuma" é a OS sem APR nenhuma. Antes de 10/10 a APR só existe no Fracttal. A régua não olha o técnico.{% endif %}</p>
   {% endif %}
   {% else %}
   <div class="cn-chips">
