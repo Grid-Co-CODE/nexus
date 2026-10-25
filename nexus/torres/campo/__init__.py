@@ -807,11 +807,11 @@ def pagina_pt():
     histórico quero todo o período mostrando de 20 em 20 para não pesar tanto")."""
     leitura = visao.pts()
     d = leitura.dados
-    aba = "historico" if request.args.get("aba") == "historico" else "esperando"
+    aba = request.args.get("aba") if request.args.get("aba") in ("historico", "sem") else "esperando"
     fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_PT}
     sit, q = request.args.get("sit", ""), request.args.get("q", "").strip().lower()
     modo = "tabela" if request.args.get("modo") == "tabela" or aba == "historico" else "responsaveis"
-    campos = ("os", "numero", "tarefa", "usina", "ativo", "codigo", "equipe", "solicitante", "decidida_por")
+    campos = ("os", "numero", "tarefa", "usina", "ativo", "codigo", "equipe", "solicitante", "decidida_por", "tecnico")
 
     def passa(x, menos=None):
         return (all(not v or c == menos or _valor_central(x, c) == v for c, v in fl.items())
@@ -826,14 +826,26 @@ def pagina_pt():
     for p in historico:
         contagem[p["situacao"]] = contagem.get(p["situacao"], 0) + 1
     historico = [p for p in historico if not sit or p.get("situacao") == sit]
-    n_pag = max(1, -(-len(historico) // POR_PAGINA_PT))
+    # a aba Sem APR ou PT (a TST, 24/10/2026: "preciso de uma visibilidade de atividades realizadas sem APR e sem PT"):
+    # a APR que pedia PT e ficou sem, e a OS fechada pelo App sem APR (`hseq/apr.py`, o livro da APR do App)
+    tipo, sem, livro_apr, sem_todas = "", [], True, []
+    if aba == "sem":
+        from ...hseq import apr as APR
+        da = APR.sem_apr_ou_pt().dados or {}
+        livro_apr = bool(da.get("livro_existe"))
+        tipo = "apr" if request.args.get("tipo") == "apr" else "pt"
+        sem_todas = da.get("sem_apr" if tipo == "apr" else "sem_pt") or []
+        sem = [x for x in sem_todas if passa(x)]
+    paginada = sem if aba == "sem" else historico
+    n_pag = max(1, -(-len(paginada) // POR_PAGINA_PT))
     pag = min(_pagina(), n_pag)
-    fonte = d.get("historico") if aba == "historico" else d.get("aguardando")
+    fonte = {"historico": d.get("historico"), "sem": sem_todas}.get(aba, d.get("aguardando"))
     torre, tela = _onde_pt()
     return render_template("campo/pt.html", **_comum(
         "pt", leitura, torre=torre, tela=tela, titulo="Permissões de trabalho e Análise Preliminar de Risco",
         aviso=session.pop("pt_aviso", ""), gravada=session.pop("pt_gravada", ""),
         aba=aba, modo=modo, aguardando=aguardando, n_hist=len(historico), contagem_hist=contagem, sit=sit,
+        tipo=tipo, sem=sem[(pag - 1) * POR_PAGINA_PT:pag * POR_PAGINA_PT], n_sem=len(sem), livro_apr=livro_apr,
         historico=historico[(pag - 1) * POR_PAGINA_PT:pag * POR_PAGINA_PT], pag=pag, n_pag=n_pag,
         por_pagina=POR_PAGINA_PT, equipe="", q=request.args.get("q", ""), situacoes=SITUACAO_PT,
         idade_min=_idade_min, cartoes=[], lista=lista_pt, contagem=contagem_pt, total=len(aguardando), f=f,

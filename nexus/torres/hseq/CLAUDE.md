@@ -379,6 +379,13 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   ("Thopen (12)"), nas duas abas; a busca fica (o número da OS acha a PT: a TST procurou a da OS 16866 no Fracttal, onde
   só vai o PDF da APR). Os endereços de antes (por equipe, região ou gestor, `regiao`, `regiao_campo`, `gestor`) caem no
   Por responsável e não filtram.
+- **A aba Sem APR ou PT** (a TST, 24/10/2026: "preciso de uma visibilidade de atividades realizadas sem APR e sem PT";
+  `nexus/hseq/apr.py`): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
+  1ª gravação, fato `apr`; contrato com a sessão do App de Campo), duas listas de 20 em 20 com os mesmos filtros:
+  **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
+  fechada sem APR** (a tarefa do `fato_fechamento` desde 09/10/2026 sem APR da mesma OS no mesmo dia, nem APR da tarefa
+  com a mesma OS e tarefa; por OS e dia; a régua não olha o técnico). Sem o livro, a aba diz que ele ainda não chegou.
+  Caso que motivou: a OS 16866 tinha PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal.
 - **O histórico inteiro, de 20 em 20** ("Em histórico quero todo o período mostrando de 20 em 20 para não pesar tanto";
   saiu o período 7/30/90 dias): `POR_PAGINA_PT`, `?pag=`, com "1–20 de N" e as páginas em volta da atual; leva a coluna
   Responsável depois da Usina. Medido no banco real em 24/10: 598 decididas, 74 KB a página; com 13 colunas a tabela
