@@ -1,4 +1,4 @@
-"""Base > Integração Fracttal (Levi, 12/10/2026: "Temos a relação do time de campo, precisamos da relação do pessoal do
+"""Base > Acessos, aba Pessoas e setores (até 25/10/2026, a tela Base > Integração Fracttal; Levi, 12/10/2026: "Temos a relação do time de campo, precisamos da relação do pessoal do
 fractall e também posteriormente vamos precisar relacionar os setores"): o pessoal do Fracttal ao lado do cadastro de
 pessoas, pelo critério do login (e-mail da ficha; sem ele, o nome de UMA ficha), as fichas sem conta no Fracttal e o
 setor de cada pessoa (Levi: "Como faço para definir um setor???? tem que dar possibilidade"), gravado no livro
@@ -9,6 +9,7 @@ from test_campo_visao import banco  # noqa: F401  (fixture)
 
 from nexus.cadastro import fracttal_pessoal as FP
 from nexus.cadastro import setores as S
+from nexus.cadastro import telas_fracttal as TF
 from nexus.campo import fracttal
 from nexus.dados import catalogo
 
@@ -23,6 +24,13 @@ PESSOAL = [
      "groups_permissions_description": None, "account_active": False},
 ]
 JSON = {"Accept": "application/json"}
+URL = "/t/base/acessos?aba=pessoas"
+
+
+def _visivel(html: str, pid: int) -> bool:
+    """A linha está na página e não chega escondida (o filtro é na própria página: todas as linhas vêm)."""
+    i = html.index(f'id="p-{pid}"')
+    return " hidden" not in html[i:html.index(">", i)]
 
 
 @pytest.fixture(autouse=True)
@@ -41,9 +49,11 @@ def com_fracttal(app):
         return {"data": PESSOAL if path.startswith("personnel") else []}
     fracttal.usar_fornecedor(fornecedor)
     FP._CACHE.clear()
+    TF.esquecer()
     yield pedidos
     fracttal.usar_fornecedor(None)
     FP._CACHE.clear()
+    TF.esquecer()
 
 
 def _ficha(pid, nome, padrao=None, email="", status="Ativo"):
@@ -83,8 +93,8 @@ def test_acesso_e_conta_do_fracttal():
 
 
 def test_a_tela_mostra_o_pessoal_e_as_fichas_sem_conta(banco, com_fracttal, logado):
-    html = logado.get("/t/base/fracttal").get_data(as_text=True)
-    assert "Integração Fracttal" in html
+    html = logado.get(URL).get_data(as_text=True)
+    assert "Pessoas e setores" in html and 'aria-current="page">Pessoas e setores' in html
     # 12/10, Levi: sem o título "Pessoal do Fracttal", sem a coluna Código e o "Como liga" vira a dica do (!)
     assert "Pessoal do Fracttal" not in html and "<th>Código</th>" not in html
     assert 'class="fr-dica-botao"' in html and 'role="tooltip"' in html and "Como liga." in html
@@ -99,14 +109,14 @@ def test_a_tela_mostra_o_pessoal_e_as_fichas_sem_conta(banco, com_fracttal, loga
     sem = html[html.index("Fichas do Nexus sem conta no Fracttal"):]
     assert "Supervisora Campo" in sem and "Coordenador Campo" in sem and "Beltrano" not in sem
     assert "0 da Grid Co. · 2 externos" in html                                   # Fulana e a sem conta, sem gridco
-    so_ext = logado.get("/t/base/fracttal?origem=Externo").get_data(as_text=True)
-    assert "Fulana Escritorio" in so_ext
+    so_ext = logado.get(URL + "&origem=Externo").get_data(as_text=True)
+    assert _visivel(so_ext, 503)                                                  # os quatro são externos
     # filtros e a leitura guardada: a 2ª visita não pede de novo ao Fracttal
     n = len(com_fracttal)
-    sem_ficha = logado.get("/t/base/fracttal?ligacao=sem_ficha").get_data(as_text=True)
-    assert "Fulana Escritorio" in sem_ficha and "Beltrano" not in sem_ficha.split("Fichas do Nexus")[0]
+    sem_ficha = logado.get(URL + "&ligacao=sem_ficha").get_data(as_text=True)
+    assert _visivel(sem_ficha, 503) and not _visivel(sem_ficha, 501)
     assert len(com_fracttal) == n
-    logado.get("/t/base/fracttal?reler=1")
+    logado.get(URL + "&reler=1")
     assert len(com_fracttal) == n + 1
 
 
@@ -115,7 +125,7 @@ def test_so_administrador(app, banco, com_fracttal):
     with c.session_transaction() as s:
         s["logado"], s["admin"] = True, False
         s["usuario"] = {"email": "pessoa.teste@exemplo.test", "nome": "Pessoa Teste", "perfil": "PCM"}
-    r = c.get("/t/base/fracttal")
+    r = c.get(URL)
     assert r.status_code == 403 and "só para administradores" in r.get_data(as_text=True)
     assert not com_fracttal                                                      # nem chega a ler o Fracttal
     # e não grava: nem o setor de uma pessoa, nem a lista
@@ -189,31 +199,31 @@ def test_leitura_que_falha_nao_grava_e_sem_token_nao_grava(app, banco):
 
 def test_a_tela_cria_o_setor_e_poe_a_pessoa_nele(banco, com_fracttal, logado):
     # sem setor ainda: a coluna diz "a definir" e o painel convida a criar
-    html = logado.get("/t/base/fracttal").get_data(as_text=True)
+    html = logado.get(URL).get_data(as_text=True)
     assert "a definir" in html and "Nenhum setor ainda" in html and "Setores (0)" in html
     # criar pela lista (formulário: volta à mesma tela, com os filtros e o painel aberto)
     r = logado.post("/t/base/fracttal/setores", data={"acao": "criar", "nome": "PCM", "volta": "origem=Externo&x=1"})
-    assert r.status_code == 303 and r.headers["Location"].endswith("/t/base/fracttal?origem=Externo")
-    html = logado.get("/t/base/fracttal?origem=Externo").get_data(as_text=True)
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/base/acessos?aba=pessoas&origem=Externo")
+    html = logado.get(URL + "&origem=Externo").get_data(as_text=True)
     assert "Setor PCM criado." in html and 'id="fr-setores" open' in html and "Setores (1)" in html
     # o setor de UMA pessoa pelo fetch: JSON, sem recarregar
     r = logado.post("/t/base/fracttal/setor", data={"pessoa": "501", "setor_id": "1"}, headers=JSON)
     assert r.status_code == 200 and r.get_json()["ok"] and r.get_json()["setor"] == "PCM"
     assert [x["fracttal_id"] for x in banco.linhas(S.LIVRO, S.ABA_DECISAO)] == [501]
-    html = logado.get("/t/base/fracttal").get_data(as_text=True)
+    html = logado.get(URL).get_data(as_text=True)
     linha = html[html.index('id="p-501"'):html.index('id="p-502"')]
     assert '<option value="1" selected>PCM</option>' in linha
     assert "PCM (1)" in html and "Sem setor (3)" in html and "1 pessoa</span>" in html
     # o painel não deixa excluir setor com gente; o filtro acha quem está nele
     assert 'value="excluir" formnovalidate disabled' in html
-    so_pcm = logado.get("/t/base/fracttal?setor=1").get_data(as_text=True)
-    assert 'id="p-501"' in so_pcm and 'id="p-503"' not in so_pcm
-    sem = logado.get("/t/base/fracttal?setor=sem").get_data(as_text=True)
-    assert 'id="p-501"' not in sem and 'id="p-503"' in sem
+    so_pcm = logado.get(URL + "&setor=1").get_data(as_text=True)
+    assert _visivel(so_pcm, 501) and not _visivel(so_pcm, 503)
+    sem = logado.get(URL + "&setor=sem").get_data(as_text=True)
+    assert not _visivel(sem, 501) and _visivel(sem, 503)
     # as marcadas de uma vez (formulário da barra): 303 de volta, uma linha por pessoa que mudou
     r = logado.post("/t/base/fracttal/setor", data={"pessoa": ["501", "502", "503"], "setor_id": "1", "volta": "setor=sem"})
-    assert r.status_code == 303 and r.headers["Location"].endswith("/t/base/fracttal?setor=sem")
-    assert "2 pessoas no setor PCM; 1 já estavam." in logado.get("/t/base/fracttal").get_data(as_text=True)
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/base/acessos?aba=pessoas&setor=sem")
+    assert "2 pessoas no setor PCM; 1 já estavam." in logado.get(URL).get_data(as_text=True)
     assert len(banco.linhas(S.LIVRO, S.ABA_DECISAO)) == 3
 
 
@@ -231,7 +241,7 @@ def test_a_tela_recusa_o_que_nao_deve_gravar(banco, com_fracttal, logado):
     assert banco.linhas(S.LIVRO, S.ABA_DECISAO) == []
     # a volta só leva os filtros conhecidos: nada de endereço vindo do formulário
     r = logado.post("/t/base/fracttal/setores", data={"acao": "criar", "nome": "COS", "volta": "//mal.test/x?q=a"})
-    assert r.headers["Location"].startswith("/t/base/fracttal")
+    assert r.headers["Location"].startswith("/t/base/acessos?aba=pessoas")
 
 
 def test_setores_no_catalogo_da_governanca():

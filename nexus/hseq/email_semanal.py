@@ -6,10 +6,10 @@ segunda de manhã e publica no livro `nexus_hseq_email` (registrado no catálogo
 diz o que mandou.
 
 Quem recebe:
-- a TST: todas as pessoas do setor Segurança (Base → Integração Fracttal), pelo código do e-mail delas (`pessoa_hmac`),
+- a TST: todas as pessoas do setor Segurança (Base → Acessos → Pessoas e setores), pelo código do e-mail delas (`pessoa_hmac`),
   com as pendências de todas as usinas;
 - cada Responsável UFV (o Responsável O&M da ficha da usina, o mesmo dos cartões da Mesa), só com as usinas dele, pelo
-  código do e-mail: o da Integração Fracttal (a pessoa ligada ao usuário do Fracttal) ou, sem ele, o do e-mail da ficha.
+  código do e-mail: o da aba Pessoas e setores (Base → Acessos) (a pessoa ligada ao usuário do Fracttal) ou, sem ele, o do e-mail da ficha.
   Quem não tem código fica sem e-mail e a prévia diz.
 
 O que vai no livro (a API é compartilhada, regra 8): o código da pessoa (HMAC) e o número dela no cadastro, nunca o nome

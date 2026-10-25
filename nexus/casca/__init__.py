@@ -233,7 +233,7 @@ def instalar_contexto(app) -> None:
         return {
             "menu": montar_menu(app.extensions["nexus_torres"], torre_atual, _telas_prontas(app),
                                 None if a["tudo"] else a["telas"]),
-            # o setor da pessoa, no topo (Base → Integração Fracttal); o administrador sem setor não mostra nada
+            # o setor da pessoa, no topo (Base → Acessos → Pessoas e setores); o administrador sem setor não mostra nada
             "setor": a["setor"],
             "caminho": request.path,
             # a volta do formulário do tema (sem JavaScript) para a mesma tela, com os filtros

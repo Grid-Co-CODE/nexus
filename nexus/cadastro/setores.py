@@ -1,4 +1,4 @@
-"""O setor do pessoal do Fracttal (Base > Integração Fracttal; 12/10/2026, Levi: "Como faço para definir um setor????
+"""O setor do pessoal do Fracttal (Base > Acessos > Pessoas e setores; 12/10/2026, Levi: "Como faço para definir um setor????
 tem que dar possibilidade"). O Fracttal não diz o setor de ninguém (grupo 1, grupo 2 e campos próprios vazios nas 150
 pessoas em 12/10) e ainda não há uma base de setores: a lista nasce na tela. Quem é administrador cria, renomeia e
 exclui setores e escolhe o de cada pessoa, uma a uma ou as marcadas de uma vez.

@@ -31,7 +31,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `importar.py` | importa o `BD_Operacoes.xlsx` (por comando desde 14/10/2026: a tela saiu) e monta a prévia do que muda antes de gravar |
 | `importar_csv.py` | Base → Registro mestre → Atualizar pelo CSV: o CSV do BD_Operações novo, usina a usina pela ficha, com prévia por coluna (15/10/2026) |
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
-| `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Integração Fracttal: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
+| `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Acessos → Pessoas e setores: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
 | `estrutura_usina.py` + `telas_equipamentos.py` | tela Base → Equipamentos das usinas: a usina ligada à mão às chaves do supervisório e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings, potência), no livro `nexus_estrutura_usina` (13/10/2026; sem Fracttal na tela) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
@@ -170,7 +170,7 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
 **Onde grava:** no cadastro da máquina em que a tela abre (`NEXUS_ARMAZEM_LOCAL`: o do servidor em app.gridco.com.br; o do
 PC em `C:\GridcoAuto\nexus\cadastro_ensaio.json`). Os dois e a cópia no banco (`cadastro_nexus`) são donos
 separados: aplicar no servidor não muda o PC nem o banco (os "dois donos do ID": equipe criada num não existe no outro).
-**As telas de campo leem o BANCO** (`campo/visao.py`, chamados, Integração Fracttal: `cadastro_nexus`), não o arquivo:
+**As telas de campo leem o BANCO** (`campo/visao.py`, chamados, Acessos → Pessoas e setores: `cadastro_nexus`), não o arquivo:
 para o responsável novo chegar nelas, aplique no PC e publique (`ferramentas/publicar_cadastro.py --bases-guardadas`,
 com `--ensaio` e a comparação com o banco antes). Foi o caminho de 16/10/2026 (Levi: "mude logo pois precisamos da
 informação de responsáveis, técnicos, usinas"): o banco era igual ao PC (0 diferenças, publicado do PC em 12/10); depois
@@ -232,7 +232,20 @@ Gestor de contrato.
   como o login acha a pessoa); publicar; o histórico (SCD2) da região da equipe e do supervisor da região ainda não
   existe (o `historico.py` guarda só pessoa e usina).
 
-## Integração Fracttal (`fracttal_pessoal.py`, `telas_fracttal.py`, `/t/base/fracttal`; 12/10/2026)
+## Pessoas e setores, a antiga Integração Fracttal (`fracttal_pessoal.py`, `telas_fracttal.py`; 12/10/2026)
+
+**Mora em Base → Acessos, aba Pessoas e setores** (`/t/base/acessos?aba=pessoas`, desde 25/10/2026; Levi: "gostaria que
+não tivesse uma tela só para integração fractall e sim fosse para acessos"). O `/t/base/fracttal` leva à aba, com os
+filtros; a aba de telas e administradores não lê o Fracttal. **A busca e os filtros são da própria página** (Levi, no
+mesmo dia: "cada pesquisa faz um carregamento novo na tabela que já está carregada"): todas as linhas vêm, cada uma com o
+que cada filtro olha (`data-f-*`, `static/filtro-local.js`), e as de fora do filtro do endereço chegam escondidas; o
+setor gravado na linha muda o filtro dela na hora (`static/acessos-pessoas.js`). **O campo Setor de cada linha vem só
+com o setor dela** e a lista inteira entra ao tocar nele (o `<template id="fr-opcoes">`): com a lista em cada linha a
+página passava de 300 KB (medido com 180 pessoas: 319 KB). **O Fracttal ligado às fichas fica guardado 2 min**
+(`telas_fracttal._dados`, `RELACAO_S`): vencido, a cópia na hora e a releitura por trás, uma por vez (a 1ª abertura
+fria levava ~2,4 s no PC); o "Ler o Fracttal de novo" lê na hora; leitura ruim não fica guardada. Prova:
+`tests/test_base_acessos_pessoas_25_10.py` e `tests/test_base_fracttal.py`.
+
 
 Levi: "Temos a relação do time de campo, precisamos da relação do pessoal do fractall e também posteriormente vamos
 precisar relacionar os setores, mas não tenho uma base em mãos agora para setores". O cadastro de pessoas é a "Relação

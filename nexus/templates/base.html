@@ -33,7 +33,7 @@
     <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co.">
     <span class="marca-nexus">Nexus</span>
   </a>
-  {# O setor da pessoa (Base → Integração Fracttal), no lugar da cadeira, que saiu em 12/10/2026: é o setor que diz o
+  {# O setor da pessoa (Base → Acessos → Pessoas e setores), no lugar da cadeira, que saiu em 12/10/2026: é o setor que diz o
      que ela vê (Base → Acessos). O espaço fica mesmo sem setor: é ele que empurra o resto do topo para a direita. #}
   <span class="setor-topo">{% if setor %}Setor: <b>{{ setor.nome }}</b>{% endif %}</span>
   {# Tema escuro (padrão) ou claro (08/10/2026): o botão diz o de agora. Sem JavaScript, o formulário troca pelo servidor.

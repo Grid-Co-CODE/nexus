@@ -9,7 +9,7 @@ as regras moram em `acessos.py`; aqui ficam a página e o portão do POST:
 
 Telas por setor (12/10/2026, Levi: "uma seção no BASE > ACESSOS onde eu possa controlar o que cada pessoa de setor pode
 ver ao logar no Nexus"): um setor por vez, com a árvore do menu em caixas de marcar; o Salvar grava só o que mudou no
-livro `nexus_setor_telas` (regras e portão em `setor_telas.py`). O setor de cada pessoa é o da tela Integração Fracttal;
+livro `nexus_setor_telas` (regras e portão em `setor_telas.py`). O setor de cada pessoa é o da aba Pessoas e setores de Base → Acessos;
 aqui aparece também na lista de quem entrou, pelo código do e-mail (sem o e-mail ir ao banco).
 """
 import hmac
@@ -144,6 +144,10 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
 
 def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = "", setor_escolhido: int | None = None):
     cfg = current_app.config
+    if request.method == "GET" and request.args.get("aba") == "pessoas":
+        # a aba Pessoas e setores (25/10/2026: era a tela Base > Acessos > Pessoas e setores); só ela lê o Fracttal
+        from ..cadastro import telas_fracttal as TF
+        return render_template("acessos/acessos.html", aba="pessoas", **TF.contexto(cfg, request.args)), status
     servidor = admins_do_servidor()
     est = A.estado(cfg)
     da_tela = {a["email"] for a in est["admins"]}
@@ -168,7 +172,7 @@ def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = ""
         "pode_gravar": not est["sem_pasta"] and not est["erro"],
         **secao,
     }
-    return render_template("acessos/acessos.html", **contexto), status
+    return render_template("acessos/acessos.html", aba="telas", **contexto), status
 
 
 def _sem_permissao():

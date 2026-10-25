@@ -235,6 +235,10 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 @media (max-width:560px){
   .cad-grade{grid-template-columns:1fr;padding:12px}
   .cad-filtros select.gc-campo{max-width:none;flex:1 1 140px}
+  /* o select dentro de um .campo (coluna): o flex de cima viraria ALTURA (140 px; a aba Pessoas e setores de Acessos,
+     25/10/2026); quem cresce é o campo, e o select ocupa a largura dele */
+  .cad-filtros .campo{flex:1 1 140px}
+  .cad-filtros .campo select.gc-campo{flex:0 0 auto;width:100%}
   .cad-barra{justify-content:stretch}
   .cad-barra .gc-btn{flex:1;justify-content:center}
 }
@@ -344,6 +348,9 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 /* O "Como liga" virou a dica do (!) ao lado do botão (Levi: "invés de botar um texto ridículo de gigante"): aparece
    ao passar o mouse e no foco do teclado (no celular, o toque foca); Esc fecha. Sem transição (Windows sem animação). */
 .fr-acoes{display:flex;align-items:center;gap:8px}
+/* a barra da aba Pessoas e setores de Acessos (25/10/2026): o texto ocupa o que sobra, os botões à direita */
+.fr-acoes--aba{margin:12px 0 4px;flex-wrap:wrap}
+.fr-acoes--aba .cad-sub{flex:1 1 320px;margin:0}
 .fr-dica{position:relative;display:inline-flex}
 .fr-dica-botao{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;
   border:1px solid var(--linha-forte);border-radius:50%;background:var(--superficie);color:var(--mudo);font-size:18px;

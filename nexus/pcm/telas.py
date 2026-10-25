@@ -34,7 +34,7 @@ SETORES_MARCAM = ("pcm", "responsaveis ufv")
 def pode_programar() -> bool:
     """Publicar a semana no App e gravar a reprogramação do Quadro: administrador ou pessoa do setor PCM (16/10/2026,
     Levi: "mude as configurações para administradores e pessoas do setor de PCM conseguir gerar uma programação
-    semanal!"). O setor é o da pessoa do login (Base → Integração Fracttal, `setor_telas.acesso`), pelo nome, sem acento
+    semanal!"). O setor é o da pessoa do login (Base → Acessos → Pessoas e setores, `setor_telas.acesso`), pelo nome, sem acento
     nem caixa. Gerar e as observações já eram de quem abre a tela Gerar a semana, que agora é do setor PCM."""
     if session.get("admin"):
         return True

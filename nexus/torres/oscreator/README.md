@@ -726,7 +726,7 @@ alteração não salva.
 **Quem entra na Área PCM** (Levi, 13/10/2026: "Só o setor PCM ou administrador! Quem não é nenhum dos dois recebe a
 notificação!"). A Fila do PCM (aprovar, devolver, mudar status, gravar a observação, recarregar o catálogo) e os Temas
 (salvar, arquivar) são do setor PCM e dos administradores do Nexus; no app essa área pede a senha do PCM. Quem decide é a
-ponte (`ponte.area_pcm`): administrador passa sem ler nada; o resto, pelo setor de Base → Integração Fracttal, pelo NOME
+ponte (`ponte.area_pcm`): administrador passa sem ler nada; o resto, pelo setor de Base → Acessos → Pessoas e setores, pelo NOME
 ("PCM", sem acento nem caixa). Sem saber o setor (banco fora, Nexus sem a `NEXUS_PESSOA_HMAC`), fecha — só o
 administrador passa. A decisão vai ao clone no pedido (`request.environ["os_web.area_pcm"]`): no lugar da Fila e dos
 Temas vem o aviso (`solic_sem_acesso.html`, com a barra de sempre e o setor da pessoa), e as gravações voltam 403 com o

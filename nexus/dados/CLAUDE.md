@@ -151,7 +151,7 @@ quem lê é só a própria plataforma (PC e servidor, cache de 60 s). Registrado
 10): nasce no 1º vínculo. A regra mora no `plataforma/CLAUDE.md` (Strings e trackers, Vincular OS).
 
 **Setor do pessoal (12/10/2026):** Levi: "Como faço para definir um setor???? tem que dar possibilidade". O Fracttal não
-diz o setor de ninguém e ainda não há base, então a lista nasce no Nexus: a tela Base · Integração Fracttal (só admin)
+diz o setor de ninguém e ainda não há base, então a lista nasce no Nexus: a aba Pessoas e setores de Base · Acessos (só admin)
 grava o livro `nexus_setores` (`nexus/cadastro/setores.py`), com `dim_setor` (1 linha = 1 setor; excluir marca
 `excluido = sim` e o ID não volta) e `fato_decisao_setor` (1 linha = 1 decisão de pôr 1 pessoa do Fracttal num setor, ou
 de tirá-la; só acrescenta, vale a última de cada pessoa). O setor é atributo da **pessoa** (como a região de campo é da

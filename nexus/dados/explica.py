@@ -160,7 +160,7 @@ PARA_QUE = {
                           "OS de cada falha sem perguntar nada ao Fracttal (a busca lá só acontece no clique em Vincular "
                           "OS). Guarda só o número da OS: nem a descrição nem quem vinculou.",
     "decisao_setor": "Guarda cada decisão de pôr uma pessoa do Fracttal num setor (ou de tirá-la), tomada por um "
-                     "administrador na tela Integração Fracttal; a lista de setores fica no mesmo livro. O setor de cada "
+                     "administrador na aba Pessoas e setores de Base → Acessos; a lista de setores fica no mesmo livro. O setor de cada "
                      "pessoa é a última decisão dela, e as de antes contam quando ela mudou. Não guarda nome nem e-mail: "
                      "a pessoa vai pelo número do Fracttal e pela ficha do cadastro.",
     "decisao_dono_relatorio": "Guarda cada escolha do setor dono de um relatório da Central de emissão, feita por um "

@@ -324,7 +324,7 @@ def _fim_na_resposta(alvo, resp) -> str | None:
 # do app (a Fila do PCM, que aprova e cria a OS, e os Temas, que gravam no banco com a chave do servidor); no app ela
 # pede a senha do PCM. Aqui quem decide é o Nexus, e a decisão vai ao clone no pedido (`request.environ`), onde o
 # `rotas_solic` mostra o aviso no lugar da tela e recusa as gravações. O Painel, o Histórico e a Nova solicitação seguem
-# abertos (são a Área do Solicitante do app). O setor é o de Base → Integração Fracttal, pelo NOME ("PCM"); sem saber o
+# abertos (são a Área do Solicitante do app). O setor é o de Base → Acessos → Pessoas e setores, pelo NOME ("PCM"); sem saber o
 # setor (banco fora, Nexus sem a NEXUS_PESSOA_HMAC), fecha: só o administrador passa.
 AREA_PCM = "os_web.area_pcm"
 SETOR_PCM = "pcm"
@@ -355,7 +355,7 @@ def area_pcm() -> dict:
         return {"pode": True, "aviso": ""}
     onde = ("Você está no setor %s." % setor["nome"]) if setor else "Você está sem setor no Nexus."
     return {"pode": False, "aviso": regra + " " + onde + " Quem põe você no setor PCM é o administrador "
-                                                         "(Base → Integração Fracttal)."}
+                                                         "(Base → Acessos → Pessoas e setores)."}
 
 
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)

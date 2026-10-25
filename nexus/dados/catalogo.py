@@ -550,11 +550,11 @@ FATOS = (
                     "quando o backfill refaz o dia). Só o número da OS: a descrição não vai. Quem vinculou fica no log da "
                     "máquina (logs/falhas_vinculos.log da plataforma), não no banco (regra 8)"),
     # Setor do pessoal do Fracttal (12/10/2026, Levi: "Como faço para definir um setor???? tem que dar possibilidade"):
-    # o Fracttal não tem setor e ainda não há base; a tela Base > Integração Fracttal cria a lista (dim_setor, no mesmo
+    # o Fracttal não tem setor e ainda não há base; a tela Base > Acessos > Pessoas e setores cria a lista (dim_setor, no mesmo
     # livro) e põe cada pessoa num setor.
     Fato("decisao_setor", "Decisão de setor do pessoal", "base", "nexus_setores · fato_decisao_setor",
          "1 linha = 1 decisão de pôr 1 pessoa do Fracttal em 1 setor, ou de tirá-la (setor_id vazio), tomada por um "
-         "administrador na tela Integração Fracttal",
+         "administrador na aba Pessoas e setores de Base → Acessos",
          _d(data=("id", "data_id (o dia de Brasília da decisão)"),
             pessoa=("id", "pessoa_id quando a pessoa do Fracttal tem ficha (o critério do login; pessoa_ligada_por diz "
                           "como; vazio = sem ficha) + fracttal_id (o id_personnel) + pessoa_hmac (o código do e-mail)")),
@@ -1109,8 +1109,8 @@ LIVROS = (
           "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "
           "8.746 tarefas, conferidas por GET depois de gravar); grava só a leitura inteira do Fracttal e se a "
           "última gravação tiver mais de 50 min"),
-    Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
-          "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
+    Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na aba Pessoas e setores de Base → Acessos",
+          "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
           "1 minuto e relê o banco antes de cada gravação",
           so_cresce=True),

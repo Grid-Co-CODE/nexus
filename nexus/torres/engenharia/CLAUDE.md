@@ -54,7 +54,7 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
 - **Filtros:** os de hoje valem nas três listas; "Quem acompanha" (Em acompanhamento) e "Quem acompanhava" (Encerrados),
   o parâmetro `quem` (o código da pessoa, nunca o nome). O nível é o de agora em Em acompanhamento e o da entrada em
   Encerrados. Nenhum filtro entra sem o Levi pedir (o de diagnóstico ele não quis).
-- **Quem age** (pega, encaminha, salva, comenta, mexe no cadastro): o setor Engenharia (Base → Integração Fracttal; o
+- **Quem age** (pega, encaminha, salva, comenta, mexe no cadastro): o setor Engenharia (Base → Acessos → Pessoas e setores; o
   nome do setor, sem acento nem caixa) e o administrador, com login de pessoa: a senha de administrador não diz quem é, e
   a ação é recusada. Quem só vê a tela lê tudo, sem botões. Na lista Ativos com sinal o cartão só abre a gaveta, e o
   Pegar e o Encaminhar ficam nela (Levi, 18/10/2026: "tire esses botões ... da tela inicial, deixe apenas quando clica no
