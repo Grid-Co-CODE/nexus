@@ -17,6 +17,10 @@ O dado (livro `nexus_hseq_extintores`, registrado em `nexus/dados/catalogo.py` a
 - `fato_pedido_ronda`: 1 linha = 1 pedido da Segurança de uma NOVA RONDA de extintores, do zero, em 1 usina, com o nome
   que o App usa para a usina (`usina_app`). Fica pendente até TODOS os extintores da usina chegarem conferidos (ou
   marcados como não reconhecidos) DEPOIS do pedido, pela hora (`rondas_pendentes`, a mesma regra do App).
+- `fato_edicao_extintor` (24/10/2026, pedido da TST: "Eu consigo editar o cadastro de extintores?"): 1 linha = 1 edição
+  de 1 extintor, com os campos que mudaram (`campos`, um JSON {coluna do livro do App: valor novo}; `CAMPOS_EDICAO`). O
+  código não muda. O Nexus mostra o valor editado por cima do livro do App até uma conferência de um dia DEPOIS da
+  edição (aí vale o que o App publicar); o App grava a edição no cadastro dele.
 Em claro: os IDs, o código do extintor, o motivo (domínio), os dias e os códigos HMAC. Quem decidiu (o nome) e a
 observação vão só cifrados (o Cofre, regra 8). Cada linha vai assinada (`assinatura`, HMAC com a chave derivada da
 NEXUS_PESSOA_HMAC): o App lê o livro pela leitura aberta da API e só aplica a linha assinada.
@@ -38,10 +42,19 @@ from ..dados import fatos as D
 from ..dados import livros
 
 LIVRO, NOME_LIVRO = "nexus_hseq_extintores", "Nexus · decisões da Segurança sobre os extintores"
-ABA_EXC, ABA_RONDA = "fato_exclusao_extintor", "fato_pedido_ronda"
+ABA_EXC, ABA_RONDA, ABA_EDIT = "fato_exclusao_extintor", "fato_pedido_ronda", "fato_edicao_extintor"
 CAB_EXC = ("decidida_em", "data_id", "usina_id", "codigo", "motivo", "marca_dia", "decidida_por_hmac", "dados_cifrados",
            "assinatura")
 CAB_RONDA = ("decidida_em", "data_id", "usina_id", "usina_app", "decidida_por_hmac", "dados_cifrados", "assinatura")
+CAB_EDIT = ("decidida_em", "data_id", "usina_id", "codigo", "campos", "decidida_por_hmac", "dados_cifrados", "assinatura")
+ABAS = ((ABA_EXC, CAB_EXC), (ABA_RONDA, CAB_RONDA), (ABA_EDIT, CAB_EDIT))
+# o que a Segurança edita no cadastro de um extintor (Levi, 24/10/2026: "Pode construir"), pelo nome da coluna no livro
+# do App; o código não muda (é ele que liga o extintor em tudo)
+CAMPOS_EDICAO = (("local", "Local"), ("posicao", "Posição"), ("classe", "Classe"), ("peso", "Peso (kg)"),
+                 ("val2", "Validade da recarga"), ("val3", "Validade do hidrostático"))
+NOMES_CAMPOS = {"Local": "local", "Posição": "posição", "Classe": "classe", "Peso (kg)": "peso",
+                "Validade da recarga": "validade da recarga", "Validade do hidrostático": "validade do hidrostático"}
+TEXTO_MAX = 60
 # o motivo da exclusão (domínio fechado: valor fora não grava). O não reconhecido aceito é o único que vem do Aceitar
 MOTIVOS = {"nao_reconhecido": "Não reconhecido em campo", "retirado": "Retirado da usina",
            "duplicado": "Duplicado no cadastro", "outro": "Outro motivo"}
@@ -102,17 +115,17 @@ def _ler_cru(cfg) -> dict:
             d = json.loads(loc.read_text(encoding="utf-8"))
         except FileNotFoundError:
             d = {}
-        return {a: [dict(x) for x in d.get(a) or []] for a in (ABA_EXC, ABA_RONDA)}
+        return {a: [dict(x) for x in d.get(a) or []] for a, _cab in ABAS}
     if cfg.get("TESTING"):
-        return {ABA_EXC: [], ABA_RONDA: []}
+        return {a: [] for a, _cab in ABAS}
     from ..pcm.motivos import _banco
     base, sessao = _banco(cfg)
     a = livros.abas(base, sessao, LIVRO)
-    return {aba: (list(livros._linhas(base, sessao, a[aba])) if aba in a else []) for aba in (ABA_EXC, ABA_RONDA)}
+    return {aba: (list(livros._linhas(base, sessao, a[aba])) if aba in a else []) for aba, _cab in ABAS}
 
 
 def ler(cfg, forcar: bool = False) -> dict:
-    """{"exclusoes", "rondas", "erro", "lido_em"}: o livro, guardado por 1 minuto. Leitura que falha devolve a última
+    """{"exclusoes", "rondas", "edicoes", "erro", "lido_em"}: o livro, guardado por 1 minuto. Leitura que falha devolve a última
     boa (`velha`) com o erro; sem nenhuma, nada, com o erro (a tela diz e não grava sem saber o que há)."""
     chave = str(_arquivo_local(cfg) or "banco")
     g = _CACHE.get(chave)
@@ -124,10 +137,15 @@ def ler(cfg, forcar: bool = False) -> dict:
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         if g:
             return dict(g, erro=erro, velha=True)
-        return {"exclusoes": [], "rondas": [], "erro": erro, "lido_em": None}
-    g = {"exclusoes": cru[ABA_EXC], "rondas": cru[ABA_RONDA], "erro": "", "lido_em": time.time()}
+        return {"exclusoes": [], "rondas": [], "edicoes": [], "erro": erro, "lido_em": None}
+    g = _estado(cru)
     _CACHE[chave] = g
     return g
+
+
+def _estado(cru: dict) -> dict:
+    return {"exclusoes": cru[ABA_EXC], "rondas": cru[ABA_RONDA], "edicoes": cru[ABA_EDIT], "erro": "",
+            "lido_em": time.time()}
 
 
 def limpar() -> None:
@@ -157,9 +175,40 @@ def excluido(x: dict, exc: dict | None) -> bool:
     return not (dia and conf and conf > dia)
 
 
+def _campos(e: dict) -> dict:
+    try:
+        c = json.loads(D._txt(e.get("campos")) or "{}")
+    except ValueError:
+        return {}
+    return {k: v for k, v in c.items() if k in NOMES_CAMPOS} if isinstance(c, dict) else {}
+
+
+def aplicar_edicoes(lista: list, est: dict) -> list:
+    """Os extintores com as edições da Segurança que ainda valem por cima do livro do App (`extintores.editado`): a
+    edição vale até uma conferência num dia DEPOIS dela (aí vale o que o App publicar, que já tem a edição gravada no
+    cadastro ou o que a equipe conferiu depois). Várias edições do mesmo extintor se somam, na ordem."""
+    por = {}
+    for e in _ordem(est.get("edicoes") or []):
+        c = _campos(e)
+        if c:
+            por.setdefault(D._txt(e.get("codigo")), []).append(dict(e, _campos=c))
+    if not por:
+        return lista
+    from ..campo import visao
+    from . import extintores as EXT
+    hoje = visao._agora().date()
+    out = []
+    for x in lista:
+        valem = [e for e in por.get(x["codigo"], []) if excluido(x, e)]      # a mesma régua da exclusão
+        out.append(EXT.editado(x, valem, hoje) if valem else x)
+    return out
+
+
 def separar(extintores: list, nao_reconhecidos: list, est: dict) -> tuple[list, list, list]:
-    """(extintores, não reconhecidos, excluídos): tira das duas listas da tela os que a Segurança excluiu e ainda valem
-    (`excluido`); os excluídos vêm com a exclusão (`exclusao`) para o histórico."""
+    """(extintores, não reconhecidos, excluídos): as edições da Segurança aplicadas (`aplicar_edicoes`) e, das duas
+    listas da tela, fora os que a Segurança excluiu e ainda valem (`excluido`); os excluídos vêm com a exclusão
+    (`exclusao`) para o histórico."""
+    extintores, nao_reconhecidos = aplicar_edicoes(extintores, est), aplicar_edicoes(nao_reconhecidos, est)
     exc = exclusoes_por_codigo(est)
     fora, ext, nr = [], [], []
     for lista, destino in ((extintores, ext), (nao_reconhecidos, nr)):
@@ -237,7 +286,8 @@ def historico(cfg, est: dict, extintores_por_codigo: dict) -> list[dict]:
 # ── gravar ────────────────────────────────────────────────────────────────────────────────────────────────────
 def assinatura(linha: dict, aba: str, chave_base: str) -> str:
     """HMAC-SHA256 em hex minúsculo com a chave derivada da NEXUS_PESSOA_HMAC (`ROTULO_CHAVE`): do texto
-    "exclusao|código|motivo|marca_dia|decidida_em" ou "ronda|usina_id|usina_app|decidida_em". Sem chave: "" (o App não
+    "exclusao|código|motivo|marca_dia|decidida_em", "ronda|usina_id|usina_app|decidida_em" ou
+    "edicao|código|campos|decidida_em" (o `campos` como está gravado, sem refazer o JSON). Sem chave: "" (o App não
     aplica a linha)."""
     base = (chave_base or "").strip()
     if not base:
@@ -245,6 +295,8 @@ def assinatura(linha: dict, aba: str, chave_base: str) -> str:
     chave = hmac.new(base.encode("utf-8"), ROTULO_CHAVE, hashlib.sha256).digest()
     if aba == ABA_EXC:
         partes = ("exclusao", linha.get("codigo"), linha.get("motivo"), linha.get("marca_dia"), linha.get("decidida_em"))
+    elif aba == ABA_EDIT:
+        partes = ("edicao", linha.get("codigo"), linha.get("campos"), linha.get("decidida_em"))
     else:
         partes = ("ronda", linha.get("usina_id"), linha.get("usina_app"), linha.get("decidida_em"))
     return hmac.new(chave, "|".join(D._txt(p) for p in partes).encode("utf-8"), hashlib.sha256).hexdigest()
@@ -276,7 +328,7 @@ def _gravar_cru(cfg, cru: dict) -> None:
     """Troca o livro inteiro e confere (`livros.publicar` relê e compara a contagem). Na cópia de prova, o arquivo."""
     vazio = (lambda v: None if v in ("", None) else v)      # noqa: E731
     tabelas = {aba: (list(cab), [[vazio(x.get(c)) for c in cab] for x in cru[aba]])
-               for aba, cab in ((ABA_EXC, CAB_EXC), (ABA_RONDA, CAB_RONDA))}
+               for aba, cab in ABAS}
     loc = _arquivo_local(cfg)
     if loc is not None:
         loc.parent.mkdir(parents=True, exist_ok=True)
@@ -323,8 +375,7 @@ def _gravar(cfg, aba: str, nova: dict, ctx: str, dados: dict) -> None:
         nova["assinatura"] = assinatura(nova, aba, cfg.get("NEXUS_PESSOA_HMAC"))
         cru[aba] = cru[aba] + [nova]
         _gravar_cru(cfg, cru)
-        _CACHE[str(_arquivo_local(cfg) or "banco")] = {"exclusoes": cru[ABA_EXC], "rondas": cru[ABA_RONDA], "erro": "",
-                                                       "lido_em": time.time()}
+        _CACHE[str(_arquivo_local(cfg) or "banco")] = _estado(cru)
 
 
 def excluir(cfg, *, extintor: dict, motivo: str, usuario: dict | None, pode: bool, obs: str = "") -> str:
@@ -366,3 +417,71 @@ def pedir_ronda(cfg, *, usina_id: int, usina: str, usina_app: str, usuario: dict
                              "usina_app": D._txt(usina_app), "decidida_por_hmac": codigo},
             _ctx("ronda", usina_id, quando), {"quem": nome})
     return f"Nova ronda de extintores pedida para a {usina}: o App mostra à equipe como ronda pendente."
+
+
+def _validar(campo: str, valor):
+    """O valor novo de um campo, conferido: as validades no formato da etiqueta (a mesma leitura das contas), o peso em kg
+    e o texto curto. Fora disso, Recusada com o porquê."""
+    from . import extintores as EXT
+    v = " ".join(D._txt(valor).split())
+    if campo == "peso":
+        try:
+            p = float(v.replace(",", "."))
+        except ValueError:
+            raise Recusada("O peso é um número em kg (ex.: 6 ou 4,5).") from None
+        if not 0 < p <= 100:
+            raise Recusada("O peso fica entre 0 e 100 kg.")
+        return int(p) if p == int(p) else p
+    if campo == "val2":
+        if v.lower() in ("", "sem data"):
+            return EXT.SEM_DATA
+        if not (len(v) in (6, 7) and "/" in v and EXT.validade_fim(v)):
+            raise Recusada("A validade da recarga é mês e ano, MM/AAAA (ex.: 08/2027), ou Sem data.")
+        m, a = v.split("/")
+        return f"{int(m):02d}/{a}"
+    if campo == "val3":
+        if v.lower() in ("", "sem selo"):
+            return EXT.SEM_SELO
+        if not EXT.validade_fim(v) or not (v.isdigit() or "/" in v):
+            raise Recusada("A validade do hidrostático é o ano, AAAA (ex.: 2028), ou MM/AAAA, ou Sem selo.")
+        if "/" in v:
+            m, a = v.split("/")
+            return f"{int(m):02d}/{a}"
+        return v
+    if len(v) > TEXTO_MAX:
+        raise Recusada(f"Texto longo demais ({TEXTO_MAX} letras no máximo).")
+    return v
+
+
+def editar(cfg, *, extintor: dict, valores: dict, usuario: dict | None, pode: bool, obs: str = "") -> str:
+    """Edita o cadastro de UM extintor (a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?"): grava só o que
+    mudou em relação ao que a tela mostra. O texto do que foi feito; Recusada com o motivo."""
+    if not pode:
+        raise Recusada("Só quem é da Segurança ou administrador edita extintores.")
+    atual = {"local": extintor.get("local") or "", "posicao": extintor.get("posicao") or "",
+             "classe": extintor.get("classe") or "", "peso": extintor.get("peso"),
+             "val2": extintor.get("val2") or "", "val3": extintor.get("val3") or ""}
+    mudou = {}
+    for campo, col in CAMPOS_EDICAO:
+        # o peso vazio não mexe (há extintor sem peso no cadastro do App, e a caixa não obriga a inventar um)
+        if campo not in valores or (campo == "peso" and not D._txt(valores[campo])):
+            continue
+        novo, velho = _validar(campo, valores[campo]), atual[campo]
+        igual = (velho is not None and float(velho) == float(novo)) if campo == "peso" else (
+            D._txt(velho).casefold() == D._txt(novo).casefold())
+        if not igual:
+            mudou[col] = novo
+    if not mudou:
+        raise Recusada("Nada mudou: o extintor já está assim.")
+    texto = " ".join(D._txt(obs).split())[:OBS_MAX]
+    codigo, nome = _quem(cfg, usuario)
+    agora = _agora()
+    quando = agora.isoformat(timespec="seconds")
+    campos = json.dumps(mudou, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    _gravar(cfg, ABA_EDIT, {"decidida_em": quando, "data_id": int(agora.strftime("%Y%m%d")),
+                            "usina_id": extintor.get("usina_id") or "", "codigo": extintor["codigo"], "campos": campos,
+                            "decidida_por_hmac": codigo},
+            _ctx("edicao", extintor["codigo"], quando), {"quem": nome, "obs": texto})
+    return (f"{extintor['ext']} da {extintor['usina']} editado: {', '.join(NOMES_CAMPOS[c] for c in mudou)}. O App grava "
+            "no cadastro dele.")
+

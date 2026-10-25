@@ -275,20 +275,30 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
   pendente. Grava também o nome da usina que o App usa (`usina_app`).
 - Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
   exclusão por extintor).
+- **Editar o extintor** (`fato_edicao_extintor`; a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?"), no
+  mesmo botão direito ("Editar extintor"): a caixa vem com o que a tela mostra (local, posição, classe, peso e as duas
+  validades; o código não muda, nem se cadastra extintor novo, que entra pelo App) e grava só o que mudou
+  (`decisoes.editar`, `campos` = JSON {coluna do livro do App: valor novo}). As validades no formato da etiqueta
+  (recarga MM/AAAA ou Sem data; hidrostático AAAA, MM/AAAA ou Sem selo), o peso em kg (vazio não mexe: há extintor
+  sem peso no cadastro). A tela mostra o editado na hora, com a situação refeita (`extintores.editado`, por cima da
+  linha do livro guardada em `_bruto`) e a marca "editado dd/mm", em todas as contas (a Mesa, o PDF e o Excel
+  também, porque a edição entra no `decisoes.separar`), até uma conferência num dia depois da edição; aí vale o que o
+  App publicar.
 - **Quem:** o administrador e quem é do setor Segurança (`decisoes.pode_decidir`), sempre com um login de pessoa (a
   senha de administrador vê os botões e é recusada: o histórico guarda quem fez). Os outros veem a situação sem botões
   nem botão direito. Gravar: POST com a trava `_de_outro_site`, 303 de volta à usina com o aviso (`?ok=`/`?erro=`, que
   não seguem nos links).
-- **O App ainda não lê o livro.** Até ler, a nova ronda não chega ao campo e o excluído segue no cadastro do App (o
-  Nexus já o tira das telas). O contrato: as linhas do `fato_exclusao_extintor` (código, motivo, `marca_dia`) e do
-  `fato_pedido_ronda` (`usina_id`, `usina_app`), cada uma assinada com HMAC (rótulo `nexus:hseq:extintores`, a chave
-  derivada da NEXUS_PESSOA_HMAC, como as atribuições do PCM; os textos assinados em `decisoes.assinatura`): o App
-  aplica só a linha assinada.
+- **O App lê o livro desde a v296 (24/10/2026)**, a cada 5 min: aplica as exclusões e os pedidos de ronda (as mesmas
+  regras daqui). A edição entra no App quando ele ler o `fato_edicao_extintor` (o contrato foi mandado à sessão do App
+  de Campo); até lá, ela vale só no Nexus. O contrato: as linhas do `fato_exclusao_extintor` (código, motivo,
+  `marca_dia`), do `fato_pedido_ronda` (`usina_id`, `usina_app`) e do `fato_edicao_extintor` (código, `campos`), cada
+  uma assinada com HMAC (rótulo `nexus:hseq:extintores`, a chave derivada da NEXUS_PESSOA_HMAC, como as atribuições do
+  PCM; os textos assinados em `decisoes.assinatura`): o App aplica só a linha assinada.
 Prova: `tests/test_hseq_decisoes.py` (as regras da volta e da ronda pendente, quem pode, a assinatura, o Aceitar e o
-histórico, o botão direito com o motivo, a ronda da usina, a senha de administrador, o filtro de Status, o catálogo).
+histórico, o botão direito com o motivo, a ronda da usina, a edição e a régua dela, a senha de administrador, o filtro
+de Status, o catálogo).
 
-**Pendências.** O App ler o `nexus_hseq_extintores` (a ronda pendente "O TST solicitou uma nova ronda" e a exclusão no
-cadastro dele). A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (confirmação dos
+**Pendências.** O App gravar a edição no cadastro dele (`fato_edicao_extintor`). A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (confirmação dos
 extintores novos) são do App; entram aqui quando houver o livro e o pedido.
 
 ## EPI e EPC

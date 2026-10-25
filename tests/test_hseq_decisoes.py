@@ -142,7 +142,7 @@ def test_o_botao_direito_exclui_o_extintor_com_o_motivo(com_nao_reconhecido, liv
     """Levi, 24/10/2026: "como cada extintor tem um cadastro unitário então o certo seria (...) ir na linha do extintor,
     clicar com o botão direito e poder excluir o extintor"."""
     us = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
-    assert '<tr class="hs-ext" data-codigo="ALT100-INFC1-PPCI-EXT03">' in us and '<dialog class="hs-dialogo" id="hs-excluir"' in us
+    assert '<tr class="hs-ext" data-codigo="ALT100-INFC1-PPCI-EXT03" ' in us and '<dialog class="hs-dialogo" id="hs-excluir"' in us
     dlg = us[us.index('id="hs-excluir"'):]
     assert re.findall(r'<option value="(\w+)">', dlg[:dlg.index("</select>")]) == ["retirado", "duplicado", "outro"]
     # "Outro motivo" pede a observação; motivo fora da lista não grava
@@ -240,9 +240,68 @@ def test_o_filtro_de_status_com_os_nao_reconhecidos(com_nao_reconhecido, livro, 
 def test_o_livro_esta_no_catalogo_antes_da_primeira_gravacao():
     from nexus.dados import catalogo as C
     livro = C.LIVRO_POR_NOME[DEC.LIVRO]
-    assert set(livro.abas) == {DEC.ABA_EXC, DEC.ABA_RONDA} and livro.so_cresce and not livro.no_banco
+    assert set(livro.abas) == {DEC.ABA_EXC, DEC.ABA_RONDA, DEC.ABA_EDIT} and livro.so_cresce and not livro.no_banco
     fatos = {f.id: f for f in C.FATOS}
     assert fatos["exclusao_extintor"].livro.endswith(DEC.ABA_EXC)
     assert fatos["pedido_ronda_extintor"].livro.endswith(DEC.ABA_RONDA)
+    assert fatos["edicao_extintor"].livro.endswith(DEC.ABA_EDIT)
     assert set(DEC.MOTIVOS_DO_BOTAO_DIREITO) | {"nao_reconhecido"} == set(DEC.MOTIVOS)
     visao.limpar()
+
+
+# ── a edição do cadastro (a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?") ────────────────────────
+EXT03 = "ALT100-INFC1-PPCI-EXT03"
+
+
+def _editar(c, **campos):
+    base = {"codigo": EXT03, "local": "Cabine", "posicao": "Interno", "classe": "ABC pó", "peso": "6", "val2": "12/2027",
+            "val3": "2026"}
+    return c.post("/t/hseq/extintores/editar", data=dict(base, **campos))
+
+
+def test_editar_grava_so_o_que_mudou_e_a_tela_mostra_na_hora(com_nao_reconhecido, livro, tst, monkeypatch):
+    monkeypatch.setattr(DEC, "_agora", lambda: datetime(2026, 10, 9, 10, 0, tzinfo=timezone(timedelta(hours=-3))))
+    us = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
+    assert 'class="hs-editar-abre">Editar extintor</button>' in us and '<dialog class="hs-dialogo" id="hs-editar"' in us
+    assert (f'<tr class="hs-ext" data-codigo="{EXT03}" data-local="Cabine" data-posicao="Interno" data-classe="ABC pó" '
+            'data-peso="6" data-val2="12/2027" data-val3="2026">') in us
+    # nada mudou, ou fora do formato: nada grava
+    assert "Nada mudou" in _aviso(_editar(tst))[1]
+    assert "MM/AAAA" in _aviso(_editar(tst, val2="13/2026"))[1]
+    assert "número em kg" in _aviso(_editar(tst, peso="seis"))[1] and not livro.exists()
+    assert "Nada mudou" in _aviso(_editar(tst, peso=""))[1]                   # o peso vazio não mexe
+    # a recarga de 12/2027 para 01/2026 (a etiqueta trocada na usina): vira atrasado na hora
+    r = _editar(tst, val2="1/2026", obs="etiqueta conferida na usina")
+    assert _aviso(r)[0] == "EXT03 da Altair editado: validade da recarga. O App grava no cadastro dele."
+    linha = _linhas_livro(livro, DEC.ABA_EDIT)[0]
+    assert (linha["codigo"], linha["campos"], linha["usina_id"]) == (EXT03, '{"Validade da recarga":"01/2026"}', 1)
+    assert re.fullmatch(r"[0-9a-f]{64}", linha["assinatura"]) and "etiqueta conferida" not in livro.read_text(encoding="utf-8")
+    depois = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair&ver=extintor").get_data(as_text=True)
+    tr = depois[depois.index(f'data-codigo="{EXT03}"'):]
+    tr = tr[:tr.index("</tr>")]
+    assert ">Atrasado<" in tr and 'data-val2="01/2026"' in tr and "editado 09/10" in tr
+    assert 'title="Editado pela Segurança em 09/10: validade da recarga.' in tr
+    assert "Atrasados 3" in _texto(tst.get("/t/hseq/extintores").get_data(as_text=True))       # eram 2
+
+
+def test_a_edicao_vale_ate_uma_conferencia_num_dia_depois(com_nao_reconhecido, livro, tst):
+    """O EXT01 foi conferido em 05/10 e o EXT03 em 01/10: a edição de 01/10 vale no EXT03 (no mesmo dia vale a edição) e
+    não no EXT01 (a conferência depois dela é o que vale; o App já tem a edição ou a equipe conferiu outra coisa)."""
+    def ed(codigo):
+        return {"decidida_em": "2026-10-01T09:00:00-03:00", "data_id": 20261001, "usina_id": 1, "codigo": codigo,
+                "campos": '{"Local":"Casa de força"}', "decidida_por_hmac": "x", "assinatura": "y"}
+    livro.write_text(json.dumps({DEC.ABA_EDIT: [ed("ALT100-INFC1-PPCI-EXT01"), ed(EXT03)]}), encoding="utf-8")
+    DEC.limpar()
+    us = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
+    assert f'data-codigo="{EXT03}" data-local="Casa de força"' in us
+    assert 'data-codigo="ALT100-INFC1-PPCI-EXT01" data-local="Cabine"' in us
+
+
+def test_a_assinatura_da_edicao_e_quem_nao_e_da_seguranca(com_nao_reconhecido, livro, cliente):
+    linha = {"codigo": EXT03, "campos": '{"Local":"Cabine 2"}', "decidida_em": "2026-10-09T10:00:00-03:00"}
+    a = DEC.assinatura(linha, DEC.ABA_EDIT, CHAVE)
+    assert re.fullmatch(r"[0-9a-f]{64}", a) and a != DEC.assinatura(dict(linha, campos='{"Local":"Cabine 3"}'), DEC.ABA_EDIT, CHAVE)
+    with cliente.session_transaction() as s:
+        s.update(logado=True, admin=False, usuario={"email": "sup@exemplo.test", "nome": "Sup"})
+    assert "Só quem é da Segurança" in _aviso(_editar(cliente, local="Outro"))[1] and not livro.exists()
+

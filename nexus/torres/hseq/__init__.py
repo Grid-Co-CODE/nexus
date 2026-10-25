@@ -372,6 +372,7 @@ def extintores():
         nr_lista=nrs if ver == "extintor" and f == NR else [],
         historico=_historico(d, fl) if modo == "excluidos" else [], n_excluidos=len(fl["excluidos"]),
         pode=_pode(), rondas=_rondas(est, todas, fl["seguem"]), decisoes_erro=est.get("erro"),
+        classes=sorted({x["classe"] for x in todas + fl["seguem"] if x.get("classe")}, key=str.lower),
         motivos=DEC.MOTIVOS, motivos_botao=DEC.MOTIVOS_DO_BOTAO_DIREITO,
         aviso_ok=request.args.get("ok", ""), aviso_erro=request.args.get("erro", ""),
         cartoes=EXT.por_responsavel(base, d.get("times") or {}) if modo == "responsaveis" else [],
@@ -444,6 +445,23 @@ def extintores_excluir():
                                "atualize a página.")
         return (DEC.excluir(current_app.config, extintor=x, motivo=motivo, obs=form.get("obs", ""),
                             usuario=session.get("usuario"), pode=_pode()), x.get("cliente") or EXT.SEM_CLIENTE, x["usina"])
+    return _decidir(fazer)
+
+
+@bp.route("/extintores/editar", methods=["POST"])
+def extintores_editar():
+    """Edita o cadastro de um extintor pelo botão direito na linha (a TST, 24/10/2026: "Eu consigo editar o cadastro de
+    extintores?"): local, posição, classe, peso e as validades; só o que mudou em relação à tela é gravado
+    (`decisoes.editar`). Quem pode: o administrador e quem é do setor Segurança."""
+    def fazer(form):
+        d = EXT.extintores().dados or {}
+        todas, seguem, _ = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], _decisoes())
+        x = next((x for x in todas + seguem if x["codigo"] == form.get("codigo", "")), None)
+        if x is None:
+            raise DEC.Recusada("Este extintor não está mais na tela (alguém o excluiu): atualize a página.")
+        valores = {c: form[c] for c, _col in DEC.CAMPOS_EDICAO if c in form}
+        return (DEC.editar(current_app.config, extintor=x, valores=valores, obs=form.get("obs", ""),
+                           usuario=session.get("usuario"), pode=_pode()), x.get("cliente") or EXT.SEM_CLIENTE, x["usina"])
     return _decidir(fazer)
 
 

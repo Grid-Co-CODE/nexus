@@ -234,3 +234,8 @@
 .hs-atencao > a.hs-conta--zero b{color:var(--mudo)}
 .hs-atencao--cartao{margin-top:10px;padding-top:9px;border-top:1px dashed var(--linha);font-size:12.5px;gap:4px 12px}
 @media (max-width:640px){.hs-mesa-filtros .hs-baixar{margin-left:0}}
+
+/* a caixa de editar o extintor: os seis campos em duas colunas (no celular, uma) e a marca "editado dd/mm" na linha */
+.hs-dlg-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+@media (max-width:480px){.hs-dlg-grade{grid-template-columns:minmax(0,1fr)}}
+.ext-tab .ext-par > .hs-editado{font-weight:600}
