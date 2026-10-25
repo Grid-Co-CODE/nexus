@@ -168,7 +168,8 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
 
 Levi: "Ao clicar quero uma visão parecida com o que aparece quando clica na OS da parte de CHAMADOS > GARANTIA", com os
 KPIs da engenharia, o status dela no lugar do ticket do fornecedor, a prioridade (média, alta, urgente), todo comentário
-na nota da OS com a data e a hora, o "Solicitar OS" no lugar do "Abrir OS" e, no "Demais respostas do técnico", a
+na nota da OS com a data e a hora, o "Solicitar OS" no lugar do "Abrir OS" (e, desde 25/10, o "Criar OS") e, no
+"Demais respostas do técnico", a
 resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 `docs/superpowers/specs/2026-10-24-engenharia-os-do-quadro-design.md`.
 
@@ -182,7 +183,7 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   lugar do título da OS bote OS e ativo"; com mais de um ativo, "N ativos", e o bloco Ativos lista os de cada tarefa,
   em cima da nota, de 5 em 5 com o "Mostrar mais", como a tabela de ativos da Nova solicitação; Levi, 24/10/2026: "no
   ativos também quero que limite a 5 por vez!"), e o cliente · usina, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o
-  "Solicitar OS"; e a faixa dos quatro números no desenho da de lá (o valor de texto comprido quebra, em vez de cobrir o
+  "Solicitar OS" e o "Criar OS"; e a faixa dos quatro números no desenho da de lá (o valor de texto comprido quebra, em vez de cobrir o
   vizinho). Os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
   Programada (atrasada, vence ou abre em) e Última atualização (o mais novo entre o registro da engenharia, o início e o
   fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). O corpo também é o da tela do chamado (`.ac-det`, `.bloco`, `ol.cadeia`, `dl.dados`, `.tl`,
@@ -224,8 +225,15 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   o `event_date` do Fracttal, guardado em UTC, levado a Brasília (o campo da Nova solicitação é de Brasília; a OS 16502
   de 08/10 às 09:00 UTC vai como 06:00). O PCM cria a OS
   filha pela Fila, ligada a esta.
+- **Criar OS** (Levi, 25/10/2026: "ao lado do botão de solicitação quero um botão de 'Criar OS'. Fará os mesmos
+  preenchimentos automáticos que já faz na solicitação"): o Criar OS do zero do OS Creator (o Tradicional,
+  `/os/tradicional?` com o mesmo endereço do Solicitar OS) com o cliente, a usina e o ativo marcados, a data do
+  incidente desta OS e ela como OS pai no Passo 4, e as subtarefas "Descreva a atividade realizada" e "Ficou alguma
+  pendência? Se sim, descreva", que viraram o padrão do Criar OS do zero para todos (`tradicional_web.SUBS_PADRAO`,
+  as mesmas palavras da base da Solicitação; regra no README do OS Creator). A engenharia cria a OS de campo direto,
+  sem passar pela Fila do PCM, e a resposta dela entra em Demais respostas do técnico.
 - **A cadeia da OS e Demais respostas do técnico:** a OS da engenharia é a 1ª da cadeia e as OS de campo que nascem dela
-  pelo Solicitar OS vêm depois (Levi: "o ideal é que essa OS da engenharia se torne OS pai de OSs de campo
+  pelo Solicitar OS ou pelo Criar OS vêm depois (Levi: "o ideal é que essa OS da engenharia se torne OS pai de OSs de campo
   futuramente"), cada uma com o nº e a seta do PDF da cadeia do chamado (o `/os/api/os/pdf` do OS Creator, com as
   fotos; sem a sessão do Fracttal, o aviso traz o login dele, que volta para a página). O REST filtra as filhas por
   `id_parent_wo` (medido em 24/10/2026; a leitura para em 3 páginas, para um filtro ignorado não virar o Fracttal

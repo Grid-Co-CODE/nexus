@@ -37,7 +37,7 @@
       <p class="eg-ac-titulo">OS {{ o.os }} <span>{{ (o.ativos|length ~ ' ativos') if o.ativos|length > 1 else (o.ativo or o.codigo) }}</span></p>
       <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
-    <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
+    <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a><a class="eg-ac-btn eg-ac-btn--o" href="{{ criar_url|na_raiz }}" title="O Criar OS do zero com o ativo desta OS, ela como OS pai e as subtarefas Descreva a atividade realizada e Ficou alguma pendência">Criar OS</a></div>
   </div>
   {% if msg_ok %}<p class="eg-os-aviso eg-os-aviso--ok" role="status">{{ msg_ok }}</p>{% endif %}
   {% if msg_erro %}<p class="cn-erro" role="status">{{ msg_erro }}</p>{% endif %}

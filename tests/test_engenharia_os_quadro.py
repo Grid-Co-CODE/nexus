@@ -586,6 +586,25 @@ def test_solicitar_os_leva_a_data_do_incidente_da_os_pai(pagina, cliente):
     assert "data%3D2026-10-08T06%253A00" in html or "data%3D2026-10-08T06%3A00" in html
 
 
+def test_criar_os_ao_lado_do_solicitar_com_os_mesmos_preenchimentos(pagina, cliente):
+    # Levi, 25/10/2026: "ao lado do botão de solicitação quero um botão de 'Criar OS' (...) Fará os mesmos preenchimentos
+    # automáticos que já faz na solicitação": o Criar OS do zero do OS Creator com o ativo, esta OS como OS pai e a data
+    # do incidente dela
+    from urllib.parse import parse_qs, urlsplit
+
+    from test_engenharia_acompanhamento import _como
+    pagina["event_date"] = "2026-10-08T09:00:00+00:00"
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    acoes = html.split('<div class="eg-ac-acoes">', 1)[1].split("</div>", 1)[0]
+    links = re.findall(r'<a class="eg-ac-btn eg-ac-btn--o" href="([^"]+)"[^>]*>([^<]+)</a>', acoes)
+    assert [t for _, t in links] == ["Solicitar OS", "Criar OS"]
+    destino = {t: urlsplit(parse_qs(urlsplit(h.replace("&amp;", "&")).query)["url"][0]) for h, t in links}
+    assert destino["Solicitar OS"].path == "/os/solicitacao" and destino["Criar OS"].path == "/os/tradicional"
+    sugestao = parse_qs(destino["Criar OS"].query)
+    assert sugestao == parse_qs(destino["Solicitar OS"].query)
+    assert sugestao["os_pai_folio"] == ["16502"] and sugestao["data"] == ["2026-10-08T06:00"]
+
+
 def test_os_de_varios_ativos_tem_o_bloco_ativos_em_cima_da_nota(pagina, cliente, monkeypatch):
     from test_engenharia_acompanhamento import _como
 

@@ -874,9 +874,11 @@ def equipe_os(folio: int):
                 f["atividade"] = None
     except Exception as e:      # noqa: BLE001
         fs, erro_filhas = [], type(e).__name__
-    # Levi, 24/10/2026: "Ao clicar em criar Solicitar OS a data do incidente deve ser a mesma da OS pai"
-    solicitar = "/os/solicitacao?" + urlencode({"ativo": o.get("codigo") or "", "os_pai": o.get("wid") or "",
-                                                "os_pai_folio": o["os"], "data": o.get("evento_local") or ""})
+    # Levi, 24/10/2026: "Ao clicar em criar Solicitar OS a data do incidente deve ser a mesma da OS pai". O "Criar OS"
+    # (25/10/2026: "Fará os mesmos preenchimentos automáticos que já faz na solicitação") leva a mesma sugestão ao Criar
+    # OS do zero, que abre com as subtarefas padrão (`tradicional_web.SUBS_PADRAO`)
+    sugestao = urlencode({"ativo": o.get("codigo") or "", "os_pai": o.get("wid") or "", "os_pai_folio": o["os"],
+                          "data": o.get("evento_local") or ""})
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
@@ -886,7 +888,8 @@ def equipe_os(folio: int):
         prioridades=O.PRIORIDADES, nome_status=O.nome_status, nome_prioridade=O.nome_prioridade,
         prioridade_fracttal=PRIORIDADE_FRACTTAL.get(o.get("prioridade_fracttal") or "",
                                                     o.get("prioridade_fracttal") or ""),
-        solicitar_url=na_raiz("/os/_nexus/ir") + "?" + urlencode({"url": solicitar}),
+        solicitar_url=na_raiz("/os/_nexus/ir") + "?" + urlencode({"url": "/os/solicitacao?" + sugestao}),
+        criar_url=na_raiz("/os/_nexus/ir") + "?" + urlencode({"url": "/os/tradicional?" + sugestao}),
         # a seta do PDF de cada OS da cadeia vai ao OS Creator na sessão do Fracttal: sem ela, este login volta para cá
         login_fracttal=na_raiz("/os/login") + "?next=" + quote(
             "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/equipe/os/{o['os']}"}, safe="/"), safe=""),

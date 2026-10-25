@@ -35,6 +35,10 @@ ERRO_SEM_SUB = "Adicione ao menos uma subtarefa no Passo 3."
 ERRO_SEM_RESP = "Escolha o responsável."
 ERRO_FUTURO = "Data do evento não aceita futuro — é quando aconteceu."
 ERRO_DATA = "Data inválida."
+# as subtarefas com que o Criar OS do zero abre (Levi, 25/10/2026: "quero que essas subtarefas já fiquem como padrão na
+# parte de criação de OS do zero!"); a pessoa edita, tira ou põe mais. As mesmas palavras da BASE do `solic_spec`: a
+# "Descreva a atividade realizada" é a que a página da OS da Engenharia lê nas OS filhas (Demais respostas do técnico)
+SUBS_PADRAO = ["Descreva a atividade realizada", "Ficou alguma pendência? Se sim, descreva"]
 # folga para relógio do navegador adiantado em relação ao servidor: o desktop trava no próprio widget (teto = agora, renovado
 # a cada minuto); aqui o teto é o do servidor, e 10 min evitam recusar quem lançou "agora" num PC com o relógio adiantado
 _FOLGA_FUTURO = dt.timedelta(minutes=10)
@@ -67,6 +71,37 @@ def onde_do_ativo(assets: list, code: str) -> dict | None:
                 and a.get("cliente") and not _cliente_oculto(a.get("cliente"))):
             return {"cliente": a.get("cliente"), "usina": a.get("usina"), "code": a.get("code")}
     return None
+
+
+def sugestao(assets: list, args) -> dict:
+    """A tela aberta já com o ativo, a OS pai e a data do incidente escolhidos, pelo endereço
+    (`?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>&data=<AAAA-MM-DDTHH:MM>`): a Nova solicitação pelo "Solicitar OS" da
+    OS do Quadro da equipe da Engenharia (Levi, 24/10/2026: "um botão de 'Solicitar OS' que já vai preencher o ativo pelo
+    o da OS original, a pessoa pode até mudar o ativo mas sai como aquela OS como OS pai") e o Criar OS do zero pelo
+    "Criar OS" dela (25/10/2026: "Fará os mesmos preenchimentos automáticos que já faz na solicitação"). O ativo que o
+    catálogo não tem e a OS pai torta ficam de fora (o criar recusa a torta de qualquer jeito); sem nada no endereço, a
+    tela abre como sempre."""
+    onde = onde_do_ativo(assets, args.get("ativo"))
+    pai = str(args.get("os_pai") or "").strip()
+    folio = str(args.get("os_pai_folio") or "").strip()
+    ok_pai = pai.isdigit() and folio.isdigit()
+    return {"cliente": onde["cliente"] if onde else "", "usina": onde["usina"] if onde else "",
+            "ativo": onde["code"] if onde else "", "os_pai": pai if ok_pai else "", "os_pai_folio": folio if ok_pai else "",
+            "data": data_sugerida(args.get("data"))}
+
+
+def data_sugerida(texto) -> str:
+    """A data do incidente da OS pai (Levi, 24/10/2026: "a data do incidente deve ser a mesma da OS pai"), no formato do
+    campo (`AAAA-MM-DDTHH:MM`, Brasília). Torta ou no futuro fica de fora (o incidente não aceita futuro): o campo
+    começa em agora, como sempre."""
+    s = str(texto or "").strip()
+    try:
+        quando = data_brt(s)
+    except ValueError:
+        return ""
+    if len(s) != 16 or quando > agora_brt():
+        return ""
+    return s
 
 
 def tipos_de(assets: list, cliente: str, usina: str) -> list:

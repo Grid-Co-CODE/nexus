@@ -11,6 +11,9 @@
   const apiErro = (j, r) => (j && j.erro) ? (j.login ? j.erro + ' Entre de novo em /os/login.' : j.erro) : ('HTTP ' + r.status);
   const PASSOS = ['Ativo + Data', 'Detalhes da Tarefa', 'Sub tarefas', 'Responsável'];   // app.py::STEP_LABELS
   const CRIT_DEFAULT = root.dataset.critDefault;
+  // as subtarefas com que a tela abre (Levi, 25/10/2026: "quero que essas subtarefas já fiquem como padrão na parte de
+  // criação de OS do zero!"), as de `tradicional_web.SUBS_PADRAO`
+  const SUBS_PADRAO = (() => { try { return JSON.parse(root.dataset.subsPadrao || '[]'); } catch (e) { return []; } })();
   const LIMITE = 4 * 1024 * 1024;                                                          // MAX_CONTENT_LENGTH do app
 
   async function getJson(url) {
@@ -207,6 +210,7 @@
   });
   subsEl.addEventListener('input', updSubs);
   $('b_add_sub').onclick = () => addSub('');
+  function subtarefasPadrao() { subsEl.innerHTML = ''; (SUBS_PADRAO.length ? SUBS_PADRAO : ['']).forEach((s) => addSub(s)); }
   $('b_back3').onclick = () => irPara(1);
 
   function mostrarResultado(msg, ruim) {
@@ -227,6 +231,7 @@
   const ckFin = $('ck_fin'), finpanel = $('finpanel'), finIni = $('fin_ini'), finFim = $('fin_fim'), finResp = $('fin_resp');
   const ckAgrupar = $('ck_agrupar'), wAgrupar = $('w_agrupar'), ospaiIn = $('ospai_in'), ospaiLista = $('ospai_lista'), respErro = $('resp_erro');
   let pessoas = null, pessoaSel = null, ospaiSel = null, ospaiTimer = null;
+  let ospaiSug = null;                // a OS pai que veio pelo endereço (o "Criar OS" da Engenharia): o Passo 4 abre com ela
 
   function erroModal(m) { respErro.hidden = !m; respErro.textContent = m ? '⚠ ' + m : ''; }
 
@@ -240,7 +245,7 @@
     finIni.value = dtProg.value; finFim.value = dtProg.value;                            // data inicial = incidente do Passo 1
     finResp.innerHTML = subtarefas().map(() => '').length
       ? subtarefas().map((s) => '<div class="trad-sub-lbl">' + esc(s) + '</div><input type="text" class="resp" placeholder="Resposta…">').join('') : '';
-    ospaiIn.value = ''; ospaiSel = null; ospaiLista.hidden = true; erroModal('');
+    ospaiSel = ospaiSug; ospaiIn.value = ospaiSug ? ospaiSug.folio : ''; ospaiLista.hidden = true; erroModal('');
     modal.hidden = false; document.body.classList.add('os-modal-aberto');
     irPara(3, false);
     if (!pessoas) await carregarPessoas(); else filtrarPessoas();
@@ -373,7 +378,8 @@
     etiqMarcadas.clear(); etiqBusca.value = ''; filtrarEtiq();
     cbCrit.value = CRIT_DEFAULT; if (cbC1.options.length) cbC1.selectedIndex = 0; if (cbC2.options.length) cbC2.selectedIndex = 0;
     if (cbTipoTarefa.options.length) cbTipoTarefa.selectedIndex = 0;
-    subsEl.innerHTML = ''; addSub('');
+    subtarefasPadrao();
+    ospaiSug = null;                                          // a OS seguinte não herda a OS pai da sugestão (como na Solicitação)
     irPara(0);
   }
 
@@ -441,10 +447,31 @@
     if (!modalImg.hidden) fecharImagens(); else if (!modal.hidden && !bCancel.disabled) fecharModal();
   });
 
+  // ── a sugestão pelo endereço (25/10/2026): o "Criar OS" da OS do Quadro da equipe da Engenharia abre esta tela com o
+  //    ativo dela marcado, a data do incidente dela (já no campo) e ela como OS pai no Passo 4 ──
+  async function sugerir() {
+    const s = $('sug') ? $('sug').dataset : {};
+    if (s.sugOsPai && s.sugOsPaiFolio) ospaiSug = {id: Number(s.sugOsPai), folio: s.sugOsPaiFolio};
+    if (!s.sugCliente || !s.sugUsina) return;
+    cbCli.value = s.sugCliente;
+    if (cbCli.value !== s.sugCliente) return;
+    await onCliente();
+    cbUsi.value = s.sugUsina;
+    if (cbUsi.value !== s.sugUsina) return;
+    await onUsina();
+    const a = assets.find((x) => x.code === s.sugAtivo);
+    if (!a) return;
+    marcados.set(a.id, a);
+    // a busca mostra o ativo marcado na primeira página (o nome da tabela traz o código)
+    if (String(a.label || '').toLowerCase().includes(String(a.code).toLowerCase())) busca.value = a.code;
+    limite = PAGINA; refreshAtivos();
+  }
+
   // arranque
-  addSub('');
+  subtarefasPadrao();
   irPara(0, false);
   atualizaHint('Selecione cliente e usina para ver os ativos.');
   carregarEtiquetas();
   carregarTipos();
+  sugerir();
 })();

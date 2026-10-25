@@ -8,7 +8,12 @@
    2 Detalhes da Tarefa (steps/step2.py: cards "Detalhes da OS" e "Classificação"), 3 Sub tarefas (steps/step3.py) e
    4 Responsável (app.py::ResponsavelDialog, um diálogo — aqui um modal), com "Esta tarefa já foi realizada?" (steps/finalizar.py),
    "Agrupar em UMA OS com várias tarefas" e a OS pai (steps/ospai.py). O diálogo de imagens por ativo é o PerfAnexoDialog. #}
-<section class="os-pagina" id="trad" data-agora="{{ agora }}" data-programada="{{ programada }}" data-crit-default="{{ crit_default }}">
+<section class="os-pagina" id="trad" data-agora="{{ agora }}" data-programada="{{ programada }}" data-crit-default="{{ crit_default }}" data-subs-padrao='{{ subs_padrao|tojson }}'>
+  {# a sugestão pelo endereço (25/10/2026): o "Criar OS" da OS do Quadro da equipe da Engenharia abre esta tela com o
+     ativo dela marcado, a data do incidente dela e ela como OS pai no Passo 4 (`tradicional_web.sugestao`, a mesma da
+     Nova solicitação); a pessoa pode trocar tudo #}
+  {% set sug = sugestao or {} %}
+  <div id="sug" hidden data-sug-cliente="{{ sug.cliente or '' }}" data-sug-usina="{{ sug.usina or '' }}" data-sug-ativo="{{ sug.ativo or '' }}" data-sug-os-pai="{{ sug.os_pai or '' }}" data-sug-os-pai-folio="{{ sug.os_pai_folio or '' }}"></div>
   <div class="os-topo-linha">
     <a class="os-btn secondary os-voltar" href="/os/">← Voltar</a>
     <span class="trad-clonar-lbl">Clonar OS nº</span>
@@ -44,7 +49,7 @@
     <div class="os-ajuda" id="hint">Selecione cliente e usina para ver os ativos.</div>
     <div class="os-linha2">
       <label class="os-campo"><span class="os-lbl">Data do incidente <small>(Brasília)</small></span>
-        <span class="trad-dt-agora"><input id="dt_prog" type="datetime-local" value="{{ agora }}" max="{{ agora }}" title="Data do evento não aceita futuro — é quando aconteceu."><button type="button" class="os-btn secondary" id="b_agora">Agora</button></span></label>
+        <span class="trad-dt-agora"><input id="dt_prog" type="datetime-local" value="{{ sug.data or agora }}" max="{{ agora }}" title="Data do evento não aceita futuro — é quando aconteceu."><button type="button" class="os-btn secondary" id="b_agora">Agora</button></span></label>
       <label class="os-campo"><span class="os-lbl">Data programada <small>(quando executar)</small></span>
         <input id="dt_exec" type="datetime-local" value="{{ programada }}"></label>
     </div>

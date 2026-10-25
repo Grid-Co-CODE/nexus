@@ -969,15 +969,15 @@ a OS na fila do PCM já vai vincular aquela OS como OS pai!".
   escolhido barrado, a Fila com a 16784 e a confirmação "filha da OS 16784", sem rolagem lateral. No oem, o
   `test_os_web_solic_27_09.py` (fora do git de lá) passou a cobrar a regra nova junto com a sincronia.
 
-## Nova solicitação com a sugestão pelo endereço (24/10/2026)
+## Nova solicitação e Criar OS do zero com a sugestão pelo endereço (24 e 25/10/2026)
 
 Levi, sobre a OS do Quadro da equipe da Engenharia: "Ao invés do botão "Abrir OS" bote um botão de "Solicitar OS" que já
 vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo mas sai como aquela OS como OS pai".
 
 - **O endereço:** `/os/solicitacao?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>&data=<AAAA-MM-DDTHH:MM>` abre a Nova
   solicitação com o cliente, a usina e o ativo marcados, a OS pai escolhida e a data do incidente dela (Levi, 24/10/2026:
-  "a data do incidente deve ser a mesma da OS pai"; `rotas_solic._data_sugerida`: torta ou no futuro fica de fora, e o
-  campo começa em agora) (`rotas_solic._sugestao`, `tradicional_web.onde_do_ativo`; na página,
+  "a data do incidente deve ser a mesma da OS pai"; `tradicional_web.data_sugerida`: torta ou no futuro fica de fora, e
+  o campo começa em agora) (`tradicional_web.sugestao`, uma regra só para as duas telas, e `onde_do_ativo`; na página,
   o `#sug` com os `data-sug-*` e o `sugerir()` no fim do script). A cascata virou duas funções que devolvem a promessa
   (`carregarUsinas`, `carregarAtivos`), para a sugestão esperar cada etapa.
 - **O que fica de fora:** o ativo que o catálogo não tem e a OS pai torta (o criar recusa a torta de qualquer jeito); sem
@@ -986,8 +986,19 @@ vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo ma
   torre OS Creator do Nexus). O comentário daquela página vai à nota da OS pela ponte
   (`/os/_nexus/engenharia/os/<id>/comentar`, só do Nexus, na sessão do Fracttal da pessoa; `editar_nota_os` com a regra
   do card: OS concluída, cancelada ou de várias tarefas não deixa).
-- **Prova:** `tests/test_oscreator_solic_pcm.py` (os dois de 24/10 da sugestão). Levado ao oem em 24/10/2026 pela
-  `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi (rotas_solic.py, tradicional_web.py e solic.html).
+- **Criar OS do zero (25/10/2026):** o mesmo endereço em `/os/tradicional?` (o "Criar OS" da OS do Quadro da equipe;
+  Levi: "Fará os mesmos preenchimentos automáticos que já faz na solicitação"): o Passo 1 abre com o cliente, a usina e
+  o ativo marcados (a busca mostra o ativo) e a data do incidente no campo; o Passo 4 abre com a OS pai escolhida
+  (`ospaiSug`), e a OS seguinte, depois de gerar, não herda a OS pai (como na Solicitação).
+- **As subtarefas padrão do Criar OS do zero (25/10/2026):** Levi: "quero que essas subtarefas já fiquem como padrão na
+  parte de criação de OS do zero!". O Passo 3 abre, e volta depois de gerar, com "Descreva a atividade realizada" e
+  "Ficou alguma pendência? Se sim, descreva" (`tradicional_web.SUBS_PADRAO`, no `data-subs-padrao` da página); a pessoa
+  edita, tira (fica o mínimo de 1) ou põe mais. São as mesmas palavras da `BASE` do `solic_spec`, e a primeira é a que a
+  página da OS da Engenharia lê nas OS filhas. Vão como as outras do Tradicional: tipo Texto, sem obrigatoriedade.
+- **Prova:** `tests/test_oscreator_solic_pcm.py` (os de 24/10 da sugestão) e `tests/test_oscreator_criar_os_25_10.py`.
+  Levado ao oem em 24/10/2026 pela `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi (rotas_solic.py,
+  tradicional_web.py e solic.html); o de 25/10 (rotas_solic.py, rotas_tradicional.py, tradicional_web.py,
+  tradicional.html e tradicional.js) vai com o OK dele.
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 

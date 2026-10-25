@@ -36,7 +36,10 @@ def tradicional():
                            clientes=trad.clientes(assets), criticidades=api.CRITICIDADES, crit_default=api.CRITICIDADE_DEFAULT,
                            todos_cliente=trad.TODOS_CLIENTE, todos_usina=trad.TODOS_USINA, todos_tipo=trad.TODOS_TIPO, nenhuma=trad.NENHUMA,
                            agora=agora.strftime("%Y-%m-%dT%H:%M"),
-                           programada=(agora + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"))   # default do Step1: amanhã
+                           programada=(agora + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),   # default do Step1: amanhã
+                           # o "Criar OS" da OS do Quadro da equipe da Engenharia (25/10/2026): o ativo, a OS pai e a data
+                           # do incidente pelo endereço, a mesma regra da Nova solicitação
+                           sugestao=trad.sugestao(assets, request.args), subs_padrao=trad.SUBS_PADRAO)
 
 
 @bp.route("/api/tradicional/catalogo")
