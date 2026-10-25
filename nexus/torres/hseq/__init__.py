@@ -18,7 +18,7 @@ import unicodedata
 
 from urllib.parse import urlencode
 
-from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session
+from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 
 from ...campo import visao
 from ...hseq import decisoes as DEC
@@ -87,12 +87,12 @@ def _clientes(linhas) -> list[str]:
     return sorted({x.get("cliente") for x in linhas if x.get("cliente")})
 
 
-def _opcoes_ext(linhas, escolhidos: dict, passa) -> dict:
+def _opcoes_ext(linhas, escolhidos: dict, passa, filtros=FILTROS_EXT) -> dict:
     """{filtro: [valores]}: cada lista mostra o que existe com os OUTROS filtros aplicados (em cascata, como a tela
     Técnicos por usina do PCM: escolhido o cliente, a lista de usinas traz só as dele), e a opção escolhida fica mesmo
     sem resultado. Os "Sem ..." vão por último."""
     out = {}
-    for campo, _rot in FILTROS_EXT:
+    for campo, _rot in filtros:
         vals = {EXT.valor_do_filtro(x, campo) for x in linhas if passa(x, campo)}
         if escolhidos[campo]:
             vals.add(escolhidos[campo])
@@ -184,6 +184,16 @@ def _historico(d, fl) -> list[dict]:
 
 
 MESA_VISOES = (("responsavel", "Por responsável"), ("cliente", "Por cliente"))
+# A visão geral (a TST, 24/10/2026: "Adicionar uma opção de visão geral (um resumo com todas as pendências, sendo possível
+# filtrar por cliente, por UFV e por supervisor) e ter a opção de baixar"): os filtros da Mesa, em cascata como os de
+# Extintores. O supervisor é o Responsável UFV (o Responsável O&M da ficha da usina), o mesmo dos cartões.
+FILTROS_MESA = (("cliente", "Cliente"), ("usina", "UFV"), ("responsavel", "Responsável UFV"))
+# o que pede ação agora e, à parte, o que pede atenção (Levi, 24/10/2026: "Os quatro + os de atenção"). Os de atenção
+# não se somam aos de agora: o extintor sem atualização conta só se não está vencido nem perto de vencer
+AGIR = (("pts", "PTs paradas"), ("vencidos", "Extintores vencidos"), ("nr", "Não reconhecidos"),
+        ("sem_luvas", "Usinas sem luvas"))
+ATENCAO = (("perto", "Extintores perto de vencer"), ("sem_atual", "Extintores sem atualização"),
+           ("luvas_semv", "Usinas com luvas sem verificação"), ("ronda", "Novas rondas pedidas"))
 
 
 def _grupo(x, chave) -> str:
@@ -196,23 +206,19 @@ def _espera(minutos) -> str:
     return f"{m} min" if m < 60 else (f"{m // 60} h" if m < 48 * 60 else f"{m // 1440} dias")
 
 
-@bp.route("/mesa")
-def mesa():
-    """A Mesa da Segurança (Levi, 24/10/2026: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos,
-    usinas sem luvas"), por grupos (2ª rodada, no mesmo dia: "quero duas visões: Por responsável e cliente (...) não
-    queria em formato de lista mas em agrupamentos para o TST saber onde atacar!"): a faixa com os quatro números e um
-    cartão por Responsável O&M (ou por cliente), com os quatro números dele, o que tem mais primeiro; cada número leva à
-    tela de origem filtrada pelo grupo. Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as outras."""
-    chave = "cliente" if request.args.get("ver") == "cliente" else "responsavel"
+def _pendencias() -> dict:
+    """Todas as pendências da Segurança, com os filtros da Mesa: {listas: {pts, vencidos, nr, sem_luvas, perto,
+    sem_atual, luvas_semv, ronda}, fl, opcoes, erros, lido}. A Mesa e a planilha contam o mesmo. A fonte que falha diz
+    (`erros`) e as outras seguem."""
     erros, lido = {}, ""
-    pts, atr, nrs, luv, semv = [], [], [], [], 0
+    L = {k: [] for k, _rot in AGIR + ATENCAO}
     try:
         lp = visao.pts()
         lido = _lido(lp)
         if lp.erro:
             erros["pts"] = lp.erro
         else:
-            pts = [x for x in (lp.dados or {}).get("aguardando") or [] if x.get("parada")]
+            L["pts"] = [x for x in (lp.dados or {}).get("aguardando") or [] if x.get("parada")]
     except Exception as e:      # noqa: BLE001 — uma fonte fora não derruba a mesa
         erros["pts"] = type(e).__name__
     try:
@@ -221,8 +227,21 @@ def mesa():
             erros["ext"] = le.erro or "os extintores ainda não chegaram ao banco"
         else:
             d = le.dados
-            todas, nrs, _exc = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], _decisoes())
-            atr = [x for x in todas if x["atrasado"]]
+            est = _decisoes()
+            todas, nrs, _exc = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], est)
+            L["vencidos"] = [x for x in todas if x["atrasado"]]
+            L["nr"] = nrs
+            L["perto"] = [x for x in todas if x["perto"]]
+            L["sem_atual"] = [x for x in todas if x["sem_atualizacao"] and not (x["atrasado"] or x["perto"])]
+            uma = {}
+            for x in todas + nrs:
+                uma.setdefault(x.get("usina_id"), x)
+            for uid, p in _rondas(est, todas, nrs).items():
+                if uid in uma:
+                    x = uma[uid]
+                    L["ronda"].append({"usina": x["usina"], "usina_id": uid, "cliente": x.get("cliente") or "",
+                                       "responsavel": x.get("responsavel") or "", "pedida_em": p.get("decidida_em"),
+                                       "feitos": p["feitos"], "total": p["total"]})
     except Exception as e:      # noqa: BLE001
         erros["ext"] = type(e).__name__
     try:
@@ -231,40 +250,101 @@ def mesa():
             erros["epi"] = lu.erro
         else:
             us = (lu.dados or {}).get("usinas") or []
-            luv = [u for u in us if u["situacao"] == "sem_luvas"]
-            semv = sum(u["situacao"] == "sem_verificacao" for u in us)
+            L["sem_luvas"] = [u for u in us if u["situacao"] == "sem_luvas"]
+            L["luvas_semv"] = [u for u in us if u["situacao"] == "sem_verificacao"]
     except Exception as e:      # noqa: BLE001
         erros["epi"] = type(e).__name__
+    fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_MESA}
+
+    def passa(x, menos=None):
+        return all(not v or c == menos or EXT.valor_do_filtro(x, c) == v for c, v in fl.items())
+    opcoes = _opcoes_ext([x for lista in L.values() for x in lista], fl, passa, FILTROS_MESA)
+    return {"listas": {k: [x for x in v if passa(x)] for k, v in L.items()}, "fl": fl, "opcoes": opcoes,
+            "erros": erros, "lido": lido}
+
+
+def _cartoes(L, chave) -> list[dict]:
+    """Um cartão por responsável (ou cliente): os quatro de agora e os de atenção. O que tem mais para atacar primeiro;
+    o "Sem ..." por último."""
     grupos = {}
 
-    def g(nome):
-        return grupos.setdefault(nome, {"nome": nome, "pts": 0, "vencidos": 0, "usinas_venc": set(), "nr": 0,
-                                        "sem_luvas": 0, "nova_ronda": 0})
-    for x in pts:
-        g(_grupo(x, chave))["pts"] += 1
-    for x in atr:
-        s_ = g(_grupo(x, chave))
-        s_["vencidos"] += 1
-        s_["usinas_venc"].add(EXT.chave_usina(x))
-    for x in nrs:
-        g(_grupo(x, chave))["nr"] += 1
-    for u in luv:
-        g(_grupo(u, chave))["sem_luvas"] += 1
+    def g(x):
+        nome = _grupo(x, chave)
+        return grupos.setdefault(nome, {"nome": nome, "usinas_venc": set(), **{k: 0 for k, _rot in AGIR + ATENCAO}})
+    for k, _rot in AGIR + ATENCAO:
+        for x in L[k]:
+            c = g(x)
+            c[k] += 1
+            if k == "vencidos":
+                c["usinas_venc"].add(EXT.chave_usina(x))
     sem = EXT.SEM_VALOR[chave]
-    cartoes = []
-    for s_ in grupos.values():
-        s_["usinas_venc"] = len(s_["usinas_venc"])
-        s_["total"] = s_["pts"] + s_["vencidos"] + s_["nr"] + s_["sem_luvas"]
-        s_["cor"] = "critico" if s_["pts"] or s_["sem_luvas"] or s_["vencidos"] else ("alerta" if s_["nr"] else "ok")
-        cartoes.append(s_)
-    # o que tem mais para atacar primeiro; o "Sem ..." por último
-    cartoes.sort(key=lambda s_: (s_["nome"] == sem, -s_["total"], s_["nome"].lower()))
-    return render_template("hseq/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"), lido=lido, erros=erros,
-                           chave=chave, visoes=MESA_VISOES, cartoes=cartoes, sem=sem,
-                           n_pts=len(pts), n_atr=len(atr), n_usinas_atr=len({EXT.chave_usina(x) for x in atr}),
-                           n_nr=len(nrs), n_luv=len(luv), n_semv=semv, espera=_espera,
-                           mais_antiga=max((x.get("idade_min") or 0 for x in pts), default=0),
+    for c in grupos.values():
+        c["usinas_venc"] = len(c["usinas_venc"])
+        c["total"] = sum(c[k] for k, _rot in AGIR)
+        c["atencao"] = sum(c[k] for k, _rot in ATENCAO)
+        c["cor"] = "critico" if c["pts"] or c["sem_luvas"] or c["vencidos"] else (
+            "alerta" if c["nr"] else ("info" if c["atencao"] else "ok"))
+    return sorted(grupos.values(), key=lambda c: (c["nome"] == sem, -c["total"], -c["atencao"], c["nome"].lower()))
+
+
+def _links(nome, chave, fl) -> dict:
+    """Para onde leva cada número de um cartão: a tela de origem filtrada pelo grupo e pelos filtros da Mesa. O EPI não
+    tem o filtro de UFV: a usina vai na busca dele. A PT ainda não tem filtro de responsável nem de cliente."""
+    f = {c: v for c, v in fl.items() if v}
+    if chave:
+        f[chave] = nome
+
+    def ext(st=None):
+        return url_for("torre_hseq.extintores", **({"f": st} if st else {}), **f) + "#tabela"
+    epi_f = {c: v for c, v in f.items() if c in ("cliente", "responsavel")}
+    if f.get("usina"):
+        epi_f["q"] = f["usina"]
+
+    def epi(st):
+        return url_for("torre_hseq.epi", modo="tabela", f=st, **epi_f)
+    return {"pts": url_for("torre_hseq.apr_pt"), "vencidos": ext("atrasado"), "nr": ext(NR), "sem_luvas": epi("sem_luvas"),
+            "perto": ext("perto"), "sem_atual": ext("sem_atualizacao"), "luvas_semv": epi("sem_verificacao"),
+            "ronda": ext()}
+
+
+@bp.route("/mesa")
+def mesa():
+    """A Mesa da Segurança (Levi, 24/10/2026: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos,
+    usinas sem luvas"), por grupos ("quero duas visões: Por responsável e cliente (...) não queria em formato de lista
+    mas em agrupamentos para o TST saber onde atacar!") e, desde o pedido da TST do mesmo dia, a visão geral: os
+    filtros (cliente, UFV, Responsável UFV), os de atenção e a planilha de todas as pendências. Só lê; a fonte que falha
+    diz e o número dela vira "—", sem derrubar as outras."""
+    chave = "cliente" if request.args.get("ver") == "cliente" else "responsavel"
+    p = _pendencias()
+    L = p["listas"]
+    cartoes = _cartoes(L, chave)
+    for c in cartoes:
+        c["links"] = _links(c["nome"], chave, p["fl"])
+    return render_template("hseq/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"), lido=p["lido"], erros=p["erros"],
+                           chave=chave, visoes=MESA_VISOES, cartoes=cartoes, sem=EXT.SEM_VALOR[chave],
+                           fl=p["fl"], opcoes=p["opcoes"], filtros_mesa=FILTROS_MESA, atencao=ATENCAO,
+                           geral=_links(None, None, p["fl"]),
+                           n={k: len(v) for k, v in L.items()},
+                           n_usinas_atr=len({EXT.chave_usina(x) for x in L["vencidos"]}),
+                           espera=_espera,
+                           mais_antiga=max((x.get("idade_min") or 0 for x in L["pts"]), default=0),
                            dias_sem=EPI.DIAS_SEM_VERIFICAR, url=_url)
+
+
+@bp.route("/mesa/pendencias.xlsx")
+def mesa_planilha():
+    """A planilha de todas as pendências da visão geral (a TST: "ter a opção de baixar"), com os filtros da Mesa: o
+    resumo por responsável (ou cliente) e uma aba por pendência, uma linha por caso. Sempre como anexo."""
+    chave = "cliente" if request.args.get("ver") == "cliente" else "responsavel"
+    p = _pendencias()
+    rot = dict(FILTROS_MESA)
+    filtros_tela = [f"{rot[c]}: {v}" for c, v in p["fl"].items() if v]
+    agora = visao._agora()
+    xlsx = PLA.gerar_pendencias(p["listas"], _cartoes(p["listas"], chave), chave=chave, filtros_tela=filtros_tela,
+                                hoje=agora.date(), gerado_em=agora.strftime("%d/%m/%Y %H:%M"), erros=p["erros"])
+    nome = "pendencias-seguranca-" + ("-".join(_slug(v) for v in p["fl"].values() if v) + "-" if any(p["fl"].values())
+                                      else "") + agora.strftime("%Y-%m-%d")
+    return Response(xlsx, mimetype=PLA.MIME, headers={"Content-Disposition": f'attachment; filename="{nome}.xlsx"'})
 
 
 @bp.route("/extintores")
@@ -292,6 +372,7 @@ def extintores():
         nr_lista=nrs if ver == "extintor" and f == NR else [],
         historico=_historico(d, fl) if modo == "excluidos" else [], n_excluidos=len(fl["excluidos"]),
         pode=_pode(), rondas=_rondas(est, todas, fl["seguem"]), decisoes_erro=est.get("erro"),
+        classes=sorted({x["classe"] for x in todas + fl["seguem"] if x.get("classe")}, key=str.lower),
         motivos=DEC.MOTIVOS, motivos_botao=DEC.MOTIVOS_DO_BOTAO_DIREITO,
         aviso_ok=request.args.get("ok", ""), aviso_erro=request.args.get("erro", ""),
         cartoes=EXT.por_responsavel(base, d.get("times") or {}) if modo == "responsaveis" else [],
@@ -364,6 +445,23 @@ def extintores_excluir():
                                "atualize a página.")
         return (DEC.excluir(current_app.config, extintor=x, motivo=motivo, obs=form.get("obs", ""),
                             usuario=session.get("usuario"), pode=_pode()), x.get("cliente") or EXT.SEM_CLIENTE, x["usina"])
+    return _decidir(fazer)
+
+
+@bp.route("/extintores/editar", methods=["POST"])
+def extintores_editar():
+    """Edita o cadastro de um extintor pelo botão direito na linha (a TST, 24/10/2026: "Eu consigo editar o cadastro de
+    extintores?"): local, posição, classe, peso e as validades; só o que mudou em relação à tela é gravado
+    (`decisoes.editar`). Quem pode: o administrador e quem é do setor Segurança."""
+    def fazer(form):
+        d = EXT.extintores().dados or {}
+        todas, seguem, _ = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], _decisoes())
+        x = next((x for x in todas + seguem if x["codigo"] == form.get("codigo", "")), None)
+        if x is None:
+            raise DEC.Recusada("Este extintor não está mais na tela (alguém o excluiu): atualize a página.")
+        valores = {c: form[c] for c, _col in DEC.CAMPOS_EDICAO if c in form}
+        return (DEC.editar(current_app.config, extintor=x, valores=valores, obs=form.get("obs", ""),
+                           usuario=session.get("usuario"), pode=_pode()), x.get("cliente") or EXT.SEM_CLIENTE, x["usina"])
     return _decidir(fazer)
 
 

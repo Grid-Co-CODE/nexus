@@ -20,15 +20,28 @@ aparece o comunicado"); clicar fora ou Esc fecha; no celular a caixa vem presa �
 Levi: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos, usinas sem luvas"; e, no mesmo dia, "quero
 duas visões: Por responsável e cliente (...) não queria em formato de lista mas em agrupamentos para o TST saber onde
 atacar!". A primeira tela da torre, do setor Segurança (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos).
-Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`. Em cima, a faixa `kb-kpis` com os quatro números da Segurança
-inteira: **PTs paradas** (esperando o De acordo há mais de 2 h, a régua do Campo), **Extintores vencidos** (e em quantas
-usinas), **Não reconhecidos** (já sem os excluídos) e **Usinas sem luvas**. Embaixo, **Agrupar por Responsável UFV** (o
-padrão) ou **Cliente** (`?ver=cliente`): um cartão por grupo (o desenho dos cartões de responsável, em bevel), com o
-total do que pede ação e os quatro números dele; o que tem mais primeiro, o "Sem responsável O&M / Sem cliente" por
-último. Nenhum caso aparece um por um. Cada número leva à tela de origem já filtrada pelo grupo: Extintores com o Status
-Atrasados ou Não reconhecidos, EPI na tabela com "Sem luvas"; a PT ainda não tem o filtro de responsável nem de
-cliente, e o número leva a APR e PT inteira. Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as
-outras. Não lê o Fracttal. Prova: `tests/test_hseq_mesa.py`.
+Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`; as contas em `_pendencias()` e `_cartoes()` na torre.
+- **A faixa** (`kb-kpis`) com os quatro números de agora: **PTs paradas** (esperando o De acordo há mais de 2 h, a régua
+  do Campo), **Extintores vencidos** (e em quantas usinas), **Não reconhecidos** (já sem os excluídos) e **Usinas sem
+  luvas**. Embaixo, a linha **Atenção** (Levi, na visão geral: "Os quatro + os de atenção"): extintor perto de vencer,
+  sem atualização (só o que não está vencido nem perto de vencer, para não contar duas vezes), usina sem verificar as
+  luvas e nova ronda pedida que a equipe ainda não refez.
+- **Agrupar por Responsável UFV** (o padrão) ou **Cliente** (`?ver=cliente`): um cartão por grupo (bevel), com o total do
+  que pede ação agora, os quatro números e, no pé, os de atenção que ele tem; o que tem mais primeiro, o "Sem
+  responsável O&M / Sem cliente" por último. Nenhum caso aparece um por um na tela.
+- **A visão geral** (a TST, 24/10/2026: "Adicionar uma opção de visão geral (um resumo com todas as pendências, sendo
+  possível filtrar por cliente, por UFV e por supervisor) e ter a opção de baixar"): os filtros **Cliente, UFV e
+  Responsável UFV** (`FILTROS_MESA`; o supervisor é o Responsável UFV, o mesmo dos cartões), em cascata como os de
+  Extintores (`_opcoes_ext`, com as listas tiradas das pendências), valem na faixa, na linha de atenção, nos cartões e
+  na planilha. **Baixar planilha** (`/t/hseq/mesa/pendencias.xlsx`, `planilha.gerar_pendencias`): a aba Resumo (uma
+  linha por responsável ou cliente, os oito números) e uma aba por pendência, caso a caso (`ABAS_PENDENCIAS`), com os
+  filtros e a fonte que não foi lida no topo. Medido no banco real em 24/10: 42 KB.
+- Cada número leva à tela de origem filtrada pelo grupo e pelos filtros do alto (`_links`): Extintores com o Status
+  (Atrasados, Não reconhecidos, Perto de vencer, Sem atualização), EPI na tabela com "Sem luvas" ou "Sem verificação"
+  (a UFV vai na busca dele, que não tem o filtro de usina); a PT ainda não tem o filtro de responsável nem de cliente, e
+  o número leva a APR e PT inteira.
+- Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as outras. Não lê o Fracttal.
+Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenção e a planilha).
 
 ## Extintores
 
@@ -262,20 +275,30 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
   pendente. Grava também o nome da usina que o App usa (`usina_app`).
 - Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
   exclusão por extintor).
+- **Editar o extintor** (`fato_edicao_extintor`; a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?"), no
+  mesmo botão direito ("Editar extintor"): a caixa vem com o que a tela mostra (local, posição, classe, peso e as duas
+  validades; o código não muda, nem se cadastra extintor novo, que entra pelo App) e grava só o que mudou
+  (`decisoes.editar`, `campos` = JSON {coluna do livro do App: valor novo}). As validades no formato da etiqueta
+  (recarga MM/AAAA ou Sem data; hidrostático AAAA, MM/AAAA ou Sem selo), o peso em kg (vazio não mexe: há extintor
+  sem peso no cadastro). A tela mostra o editado na hora, com a situação refeita (`extintores.editado`, por cima da
+  linha do livro guardada em `_bruto`) e a marca "editado dd/mm", em todas as contas (a Mesa, o PDF e o Excel
+  também, porque a edição entra no `decisoes.separar`), até uma conferência num dia depois da edição; aí vale o que o
+  App publicar.
 - **Quem:** o administrador e quem é do setor Segurança (`decisoes.pode_decidir`), sempre com um login de pessoa (a
   senha de administrador vê os botões e é recusada: o histórico guarda quem fez). Os outros veem a situação sem botões
   nem botão direito. Gravar: POST com a trava `_de_outro_site`, 303 de volta à usina com o aviso (`?ok=`/`?erro=`, que
   não seguem nos links).
-- **O App ainda não lê o livro.** Até ler, a nova ronda não chega ao campo e o excluído segue no cadastro do App (o
-  Nexus já o tira das telas). O contrato: as linhas do `fato_exclusao_extintor` (código, motivo, `marca_dia`) e do
-  `fato_pedido_ronda` (`usina_id`, `usina_app`), cada uma assinada com HMAC (rótulo `nexus:hseq:extintores`, a chave
-  derivada da NEXUS_PESSOA_HMAC, como as atribuições do PCM; os textos assinados em `decisoes.assinatura`): o App
-  aplica só a linha assinada.
+- **O App lê o livro desde a v296 (24/10/2026)**, a cada 5 min: aplica as exclusões e os pedidos de ronda (as mesmas
+  regras daqui). A edição entra no App quando ele ler o `fato_edicao_extintor` (o contrato foi mandado à sessão do App
+  de Campo); até lá, ela vale só no Nexus. O contrato: as linhas do `fato_exclusao_extintor` (código, motivo,
+  `marca_dia`), do `fato_pedido_ronda` (`usina_id`, `usina_app`) e do `fato_edicao_extintor` (código, `campos`), cada
+  uma assinada com HMAC (rótulo `nexus:hseq:extintores`, a chave derivada da NEXUS_PESSOA_HMAC, como as atribuições do
+  PCM; os textos assinados em `decisoes.assinatura`): o App aplica só a linha assinada.
 Prova: `tests/test_hseq_decisoes.py` (as regras da volta e da ronda pendente, quem pode, a assinatura, o Aceitar e o
-histórico, o botão direito com o motivo, a ronda da usina, a senha de administrador, o filtro de Status, o catálogo).
+histórico, o botão direito com o motivo, a ronda da usina, a edição e a régua dela, a senha de administrador, o filtro
+de Status, o catálogo).
 
-**Pendências.** O App ler o `nexus_hseq_extintores` (a ronda pendente "O TST solicitou uma nova ronda" e a exclusão no
-cadastro dele). A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (confirmação dos
+**Pendências.** O App gravar a edição no cadastro dele (`fato_edicao_extintor`). A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (confirmação dos
 extintores novos) são do App; entram aqui quando houver o livro e o pedido.
 
 ## EPI e EPC

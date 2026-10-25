@@ -369,6 +369,23 @@ FATOS = (
                     "dá por atendido, como o App, quando TODOS os extintores da usina chegam conferidos (a 'Recebida em' "
                     "do livro de conferências, pela hora) ou marcados como não reconhecidos depois do pedido. Assinado "
                     "como a exclusão"),
+    # a edição do cadastro de um extintor pela Segurança (24/10/2026, a TST: "Eu consigo editar o cadastro de
+    # extintores?"): o Nexus é a FONTE; o App grava a edição no cadastro dele
+    Fato("edicao_extintor", "Edição do cadastro de extintor (Segurança)", "hseq",
+         "nexus_hseq_extintores · fato_edicao_extintor",
+         "1 linha = 1 edição do cadastro de 1 extintor pela Segurança, só com os campos que mudaram",
+         _d(data=("id", "data_id (o dia de Brasília da edição)"),
+            usina=("id", "usina_id (vazio para extintor de usina fora do cadastro)"),
+            pessoa=("hmac", "decidida_por_hmac (quem editou; o nome só cifrado)"),
+            equipamento=("prop", "codigo: o código do extintor (cadastro próprio do App, fora do Fracttal)")),
+         tipo="sem_medida", chave=("decidida_em", "codigo"),
+         fontes=("nexus_hseq_extintores · fato_edicao_extintor",),
+         janela_origem="o Nexus é a fonte (só acrescenta)",
+         observacao="campos: JSON {coluna do livro do App: valor novo} com Local, Posição, Classe, Peso (kg), Validade "
+                    "da recarga e Validade do hidrostático (o código não muda); são dados do equipamento, em claro. "
+                    "O Nexus mostra o editado por cima do livro do App até uma conferência num dia depois da edição. "
+                    "Quem editou e a observação só cifrados. Assinado como a exclusão (o texto leva o campos como "
+                    "está gravado)"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
@@ -1114,10 +1131,10 @@ LIVROS = (
           so_cresce=True),
     # as decisões da Segurança sobre os extintores (24/10/2026): a exclusão de extintor (o não reconhecido aceito e o
     # botão direito) e o pedido de nova ronda por usina; o App de Campo lê os dois daqui
-    Livro("nexus_hseq_extintores", ("fato_exclusao_extintor", "fato_pedido_ronda"),
+    Livro("nexus_hseq_extintores", ("fato_exclusao_extintor", "fato_pedido_ronda", "fato_edicao_extintor"),
           "a cada decisão na tela de Extintores", "nexus/hseq/decisoes.py, pela tela Extintores da Segurança", False,
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "
-          "gravação relê o banco antes (troca o livro inteiro, as duas abas juntas)",
+          "gravação relê o banco antes (troca o livro inteiro, as abas juntas)",
           so_cresce=True),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}

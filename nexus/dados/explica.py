@@ -51,6 +51,7 @@ RESUMO = {
     "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
     "exclusao_extintor": "Os extintores que a Segurança excluiu, e por quê",
     "pedido_ronda_extintor": "As novas rondas de extintores que a Segurança pediu, por usina",
+    "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -181,6 +182,9 @@ PARA_QUE = {
                          "conferir numa ronda depois.",
     "pedido_ronda_extintor": "Guarda cada nova ronda de extintores, do zero, que a Segurança pede numa usina. É para o "
                              "App de Campo mostrar à equipe como ronda pendente; vale até a equipe refazer a ronda inteira.",
+    "edicao_extintor": "Guarda cada edição que a Segurança fez no cadastro de um extintor na tela Extintores (local, "
+                       "posição, classe, peso e as validades), só com o que mudou. A tela mostra o editado na hora, e o "
+                       "App de Campo grava no cadastro dele. Quem editou vai cifrado.",
     "decisao_atribuicao_pcm": "Guarda cada vez que o PCM põe ou tira um técnico de uma usina na tela Técnicos por "
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",

@@ -196,6 +196,20 @@ def situacao(x: dict, hoje: date) -> dict:
             "status": st, "motivo": motivo, "motivo_checklist": checklist, "itens_nao": sorted(nao)}
 
 
+def editado(x: dict, edicoes: list, hoje: date) -> dict:
+    """O extintor com as edições da Segurança que ainda valem (`decisoes.aplicar_edicoes`, cada uma com `_campos`, as
+    colunas do livro que mudaram) por cima do livro do App: os campos editados e a situação refeita com as validades
+    novas (a mesma conta de `situacao`). Leva `editado` (a última edição) e `editados` (as colunas) para a tela marcar."""
+    bruto = dict(x.get("_bruto") or {})
+    cols = []
+    for e in edicoes:
+        bruto.update(e["_campos"])
+        cols += [c for c in e["_campos"] if c not in cols]
+    return dict(x, **situacao(bruto, hoje), local=_txt(bruto.get("Local")), posicao=_txt(bruto.get("Posição")),
+                classe=_txt(bruto.get("Classe")), peso=_num(bruto.get("Peso (kg)")), _bruto=bruto,
+                editado=edicoes[-1], editados=cols)
+
+
 def _com_hora(v):
     """A hora da marca de não reconhecido, quando o App a manda com hora (ISO); só o dia, None."""
     return visao._dt(v) if "T" in _txt(v) else None
@@ -236,7 +250,9 @@ def linha(x: dict, b, quem: dict, hoje: date) -> dict:
             "origem_cadastro": _txt(x.get("Origem do cadastro")),
             "nao_reconhecido": nr, "dias_nao_reconhecido": (hoje - nr).days if nr else None,
             "marca_em": _com_hora(x.get("Não reconhecido em")) if nr else None,
-            "nao_reconhecido_por": visao._nome(quem, x.get("Não reconhecido por (HMAC)")) if nr else "", **sit}
+            "nao_reconhecido_por": visao._nome(quem, x.get("Não reconhecido por (HMAC)")) if nr else "",
+            # a linha do livro como veio, para a edição da Segurança refazer a situação por cima dela (`editado`)
+            "_bruto": x, **sit}
 
 
 def tecnicos_por_usina(b, hoje: date) -> tuple[dict, str]:

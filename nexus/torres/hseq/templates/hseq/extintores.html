@@ -234,7 +234,31 @@
   <form id="hs-form-ronda" method="post" action="{{ url_for('torre_hseq.extintores_ronda') }}" hidden>
     <input type="hidden" name="usina_id"><input type="hidden" name="usina"><input type="hidden" name="cliente">
   </form>
-  <div class="hs-menu hs-ctx" id="hs-ctx" role="menu" hidden><button type="button" role="menuitem" class="hs-excluir-abre">Excluir extintor</button></div>
+  <div class="hs-menu hs-ctx" id="hs-ctx" role="menu" hidden><button type="button" role="menuitem" class="hs-editar-abre">Editar extintor</button><button type="button" role="menuitem" class="hs-excluir-abre">Excluir extintor</button></div>
+  {# editar o cadastro do extintor (a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?"): a caixa vem com
+     o que a tela mostra, e só o que mudar é gravado; o código não muda #}
+  <dialog class="hs-dialogo" id="hs-editar" aria-labelledby="hs-editar-t">
+    <form method="post" action="{{ url_for('torre_hseq.extintores_editar') }}">
+      <h2 id="hs-editar-t">Editar extintor</h2>
+      <p class="hs-dlg-ext"></p>
+      <input type="hidden" name="codigo">
+      <div class="hs-dlg-grade">
+        <label><span class="gc-rotulo">Local</span><input class="gc-campo" name="local" maxlength="60"></label>
+        <label><span class="gc-rotulo">Posição</span><input class="gc-campo" name="posicao" maxlength="60" list="hs-posicoes"></label>
+        <label><span class="gc-rotulo">Classe</span><input class="gc-campo" name="classe" maxlength="60" list="hs-classes"></label>
+        <label><span class="gc-rotulo">Peso (kg)</span><input class="gc-campo" name="peso" inputmode="decimal" placeholder="vazio não muda"></label>
+        <label><span class="gc-rotulo">Validade da recarga</span><input class="gc-campo" name="val2" placeholder="MM/AAAA ou Sem data" list="hs-sem-data"></label>
+        <label><span class="gc-rotulo">Validade do hidrostático</span><input class="gc-campo" name="val3" placeholder="AAAA ou Sem selo" list="hs-sem-selo"></label>
+      </div>
+      <label><span class="gc-rotulo">Observação</span><input class="gc-campo" name="obs" maxlength="300" placeholder="opcional"></label>
+      <datalist id="hs-posicoes"><option value="Interno"><option value="Externo"></datalist>
+      <datalist id="hs-classes">{% for c in classes %}<option value="{{ c }}">{% endfor %}</datalist>
+      <datalist id="hs-sem-data"><option value="Sem data"></datalist><datalist id="hs-sem-selo"><option value="Sem selo"></datalist>
+      <p class="hs-dlg-nota">Só o que mudar é gravado. A tela mostra o novo valor na hora, e o App de Campo grava no cadastro dele. Se a equipe conferir o extintor numa ronda depois, vale o que ela conferiu.</p>
+      <div class="hs-dlg-botoes"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno hs-cancelar">Cancelar</button>
+        <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario">Gravar</button></div>
+    </form>
+  </dialog>
   <dialog class="hs-dialogo" id="hs-excluir" aria-labelledby="hs-excluir-t">
     <form method="post" action="{{ url_for('torre_hseq.extintores_excluir') }}">
       <h2 id="hs-excluir-t">Excluir extintor</h2>
@@ -332,7 +356,7 @@
         if (!tr || !ctx) return;
         ev.preventDefault(); fecha(); alvo = tr;
         ctx.style.left = Math.min(ev.clientX, window.innerWidth - 200) + 'px';
-        ctx.style.top = Math.min(ev.clientY, window.innerHeight - 60) + 'px';
+        ctx.style.top = Math.min(ev.clientY, window.innerHeight - 100) + 'px';
         ctx.hidden = false; ctx.querySelector('button').focus();
       });
       document.addEventListener('click', function (ev) {
@@ -346,6 +370,15 @@
             f.submit();
           }
           fecha(); return;
+        }
+        if (ev.target.closest('.hs-editar-abre') && alvo) {
+          ev.stopPropagation();
+          var de = el('hs-editar'), fe = de.querySelector('form'), ce = alvo.dataset.codigo, me = alvo.querySelector('.m[title="' + ce + '"]');
+          fe.elements.codigo.value = ce;
+          ['local', 'posicao', 'classe', 'peso', 'val2', 'val3'].forEach(function (k) { fe.elements[k].value = alvo.dataset[k] || ''; });
+          fe.elements.obs.value = '';
+          de.querySelector('.hs-dlg-ext').textContent = (me ? me.textContent : ce) + ' · ' + ce;
+          fecha(); de.showModal(); fe.elements.local.focus(); return;
         }
         if (ev.target.closest('.hs-excluir-abre') && alvo) {
           ev.stopPropagation();
