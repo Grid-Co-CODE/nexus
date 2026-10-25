@@ -357,7 +357,10 @@ def test_pulso_usa_a_sombra_em_camadas_por_token():
     css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
     regra = re.search(r"\.kb-card--parada::after\{([^}]*)\}", css)
     assert regra and "animation:kb-pulso" in regra.group(1)
-    assert re.findall(r"var\((--pulso-a\d+)\)", regra.group(1)) == [f"--pulso-a{n}" for n in (71, 57, 43, 28, 14)]
+    # Levi, 24/10/2026: "poderia fazer algo mais forte que destacasse um pouco mais porém sem destacar tanto": um contorno
+    # e um halo laranjas por cima da sombra em camadas dele, pulsando juntos
+    assert re.findall(r"var\((--pulso-a\d+)\)", regra.group(1)) == [f"--pulso-a{n}" for n in (71, 43, 71, 57, 43, 28, 14)]
+    assert "0 0 0 1.5px var(--pulso-a71),0 0 16px 3px var(--pulso-a43)" in regra.group(1)
     assert re.search(r"@keyframes kb-pulso\{from\{opacity:\.5\}to\{opacity:1\}\}", css)
     assert "prefers-reduced-motion:reduce" in css
     tokens = Path("nexus/static/nexus.css").read_text(encoding="utf-8")
@@ -471,7 +474,7 @@ def test_topo_na_estrutura_da_tela_do_chamado(pagina, cliente):
     topo = html.split('<div class="eg-ac-head">', 1)[1].split('<div class="eg-ac-kpis"', 1)[0]
     # numa linha: a volta, a pílula do estado e o título com o ativo em verde; embaixo, o local, o tipo e o Fracttal
     tit = topo.split('<div class="eg-ac-tit">', 1)[1].split("</div>", 1)[0]
-    assert tit.index("eg-ac-volta") < tit.index("eg-ac-tag") < tit.index("<h1>OS 16502 <span>")
+    assert tit.index("eg-ac-volta") < tit.index("eg-ac-tag") < tit.index("<h1>Análise 16502</h1>")
     assert '<p class="eg-ac-sub">Thopen · Altair 1 · <b>Administrativa</b> · Em Processo no Fracttal</p>' in topo
     # o botão no lugar do "Abrir a OS": à direita, no fim da linha, contorno
     acoes = topo.split('<div class="eg-ac-acoes">', 1)[1]
@@ -508,11 +511,13 @@ def test_valor_longo_da_faixa_quebra_em_vez_de_invadir_o_vizinho():
 
 # ── 2ª rodada de 24/10/2026 (Levi: o título da OS, a nota de verdade, a cadeia, os Dados e os comentários como os de
 # chamados) ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-def test_titulo_da_os_embaixo_da_os_e_do_ativo(pagina, cliente):
+def test_titulo_da_os_em_cima_e_a_os_e_o_ativo_embaixo(pagina, cliente):
+    # Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no lugar do título da OS bote OS e ativo"
     from test_engenharia_acompanhamento import _como
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     esq = html.split('<div class="eg-ac-esq">', 1)[1].split('<div class="eg-ac-acoes">', 1)[0]
-    assert esq.index("<h1>OS 16502") < esq.index('<p class="eg-ac-titulo">Análise 16502</p>') < esq.index("eg-ac-sub")
+    assert (esq.index("<h1>Análise 16502</h1>") < esq.index('<p class="eg-ac-titulo">OS 16502 <span>Inversor 1.1</span></p>')
+            < esq.index("eg-ac-sub"))
 
 
 def test_nota_da_os_e_a_que_o_card_do_os_creator_mostra(pagina, cliente):
@@ -568,3 +573,47 @@ def test_pulso_vale_mesmo_com_reduzir_movimento():
     assert re.search(r"@media \(prefers-reduced-motion:reduce\)\{\.kb-card--parada::after\{animation:kb-pulso 1\.4s "
                      r"ease-in-out infinite alternate!important\}\}", css)
     assert "kb-card--parada::after{animation:none" not in css
+
+
+
+# ── 3ª rodada de 24/10/2026: a data do incidente da OS pai e os ativos da OS ─────────────────────────────────────────
+def test_solicitar_os_leva_a_data_do_incidente_da_os_pai(pagina, cliente):
+    # Levi: "Ao clicar em criar Solicitar OS a data do incidente deve ser a mesma da OS pai". O Fracttal guarda o
+    # event_date em UTC; o campo da Nova solicitação é de Brasília
+    from test_engenharia_acompanhamento import _como
+    pagina["event_date"] = "2026-10-08T09:00:00+00:00"
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    assert "data%3D2026-10-08T06%253A00" in html or "data%3D2026-10-08T06%3A00" in html
+
+
+def test_os_de_varios_ativos_tem_o_bloco_ativos_em_cima_da_nota(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.engenharia import os_equipe as E
+    outra = dict(pagina, code="X-INV2.1", items_log_description="Inversor 2.1 {X-INV2.1}", description="Análise 16502")
+    lido = E._ler_fracttal
+
+    def com_dois_ativos(path):
+        r = lido(path)
+        if path.startswith("work_orders?wo_folio=16502"):
+            r = {"data": list(r["data"]) + [outra]}
+        return r
+    monkeypatch.setattr(E, "_ler_fracttal", com_dois_ativos)
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    ativos = _secao(html, "Ativos")
+    assert "X-INV1.1" in ativos and "X-INV2.1" in ativos and "Inversor 2.1" in ativos
+    assert html.index(">Ativos</h2>") < html.index(">Na nota da OS</h2>")
+    assert '<p class="eg-ac-titulo">OS 16502 <span>2 ativos</span></p>' in html
+    assert re.search(r"<dt>Ativo</dt><dd[^>]*>2 ativos</dd>", _secao(html, "Dados"))
+
+
+def test_os_de_um_ativo_nao_tem_o_bloco_ativos(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    assert ">Ativos</h2>" not in _como(cliente, ANA).get(URL).get_data(as_text=True)
+
+
+def test_ativo_ao_lado_da_os_segue_em_verde():
+    # na tela do chamado o ativo vai em verde ao lado da OS; saiu do título grande e ficou na linha de baixo
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert re.search(r"\.eg-ac-titulo span\{color:var\(--verde-texto\)", css)

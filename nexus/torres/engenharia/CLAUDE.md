@@ -155,7 +155,9 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
   a prioridade e o status da engenharia, e **pulsa em laranja** a OS aberta (a fazer, em execução, em verificação) sem
   atualização há mais de 7 dias: a sombra em camadas que o Levi mandou ("QUERO O CRISPY PULSANDO DE 0.5 A 1"), numa
   camada por cima do cartão que vai de 0,5 a 1 de opacidade, pelos tokens `--pulso-a71` a `--pulso-a14` (o laranja do
-  Nexus nos dois temas; o teste do tema lê todo token como cor, então a sombra mora no `engenharia.css`). Pulsa também
+  Nexus nos dois temas; o teste do tema lê todo token como cor, então a sombra mora no `engenharia.css`), com um
+  contorno de 1,5 px e um halo por cima, pulsando juntos (Levi, 24/10/2026: "algo mais forte que destacasse um pouco
+  mais porém sem destacar tanto"). Pulsa também
   com "reduzir movimento" (Levi, 24/10/2026: "a sombra não está pulsando": o Windows dele está sem os efeitos de
   animação, e o nexus.css tira toda animação nesse caso; o pulso só muda a opacidade de uma sombra, sem movimento).
   Sem ler o livro da engenharia, nenhum pulso (não se sabe se ela mexeu), e o rodapé diz.
@@ -176,7 +178,9 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   mesma estrutura e fonte os botões quero nas mesmas posições"): as medidas do `chamados.css` do OS Creator copiadas em
   `eg-ac-*`, com os tokens do Nexus e a Inter de lá. Numa linha a volta, a pílula do estado (`_topo_da_os`: vermelho
   atrasada, âmbar aberta, com "há N dias sem atualização" quando parada, verde concluída, apagada cancelada) e o título
-  com o ativo em verde; embaixo o cliente · usina, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o
+  da OS; embaixo a OS e o ativo em verde (Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no
+  lugar do título da OS bote OS e ativo"; com mais de um ativo, "N ativos", e o bloco Ativos lista os de cada tarefa,
+  em cima da nota), e o cliente · usina, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o
   "Solicitar OS"; e a faixa dos quatro números no desenho da de lá (o valor de texto comprido quebra, em vez de cobrir o
   vizinho). Os quatro números: Status e Prioridade da engenharia ("—" sem escolha: não há padrão),
   Programada (atrasada, vence ou abre em) e Última atualização (o mais novo entre o registro da engenharia, o início e o
@@ -209,8 +213,10 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 - **O banco no caminho do clique:** o quadro e a página leem o livro com prazo curto (`PRAZO_S`, 8 s) e guardam a
   falha pelo minuto da cópia; o livro que existe e veio sem a aba dos eventos é leitura incompleta, não "nada". Sem ler
   o livro, nem pulso no quadro nem "Última atualização" na página (só as datas do Fracttal chutariam a parada).
-- **Solicitar OS:** a Nova solicitação do OS Creator com o ativo marcado e esta OS como OS pai
-  (`/os/solicitacao?ativo=&os_pai=&os_pai_folio=`, pelo `/os/_nexus/ir`; regra no README do OS Creator). O PCM cria a OS
+- **Solicitar OS:** a Nova solicitação do OS Creator com o ativo marcado, esta OS como OS pai e a data do incidente dela
+  (`/os/solicitacao?ativo=&os_pai=&os_pai_folio=&data=`, pelo `/os/_nexus/ir`; regra no README do OS Creator). A data é
+  o `event_date` do Fracttal, guardado em UTC, levado a Brasília (o campo da Nova solicitação é de Brasília; a OS 16502
+  de 08/10 às 09:00 UTC vai como 06:00). O PCM cria a OS
   filha pela Fila, ligada a esta.
 - **A cadeia da OS e Demais respostas do técnico:** a OS da engenharia é a 1ª da cadeia e as OS de campo que nascem dela
   pelo Solicitar OS vêm depois (Levi: "o ideal é que essa OS da engenharia se torne OS pai de OSs de campo

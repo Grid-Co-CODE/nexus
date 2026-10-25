@@ -858,3 +858,15 @@ def test_solicitacao_sem_sugestao_segue_igual(cli, monkeypatch):
     monkeypatch.setattr(api, "get_request_types", lambda: {"classif1": [{"id": 7, "description": "Corretiva"}]})
     h = cli.get("/os/solicitacao").get_data(as_text=True)
     assert _sugestao(h) == {"cliente": "", "usina": "", "ativo": "", "os-pai": "", "os-pai-folio": ""}
+
+
+
+def test_solicitacao_com_a_data_do_incidente_da_os_pai(cli, monkeypatch):
+    # Levi, 24/10/2026: "Ao clicar em criar Solicitar OS a data do incidente deve ser a mesma da OS pai"
+    monkeypatch.setattr(api, "get_request_types", lambda: {"classif1": [{"id": 7, "description": "Corretiva"}]})
+    h = cli.get("/os/solicitacao?ativo=TST-INV11&os_pai=555&os_pai_folio=16784&data=2026-10-08T06:00").get_data(as_text=True)
+    assert 'id="dt_inc" value="2026-10-08T06:00"' in h
+    # data torta ou no futuro fica de fora: o campo começa em agora, como sempre
+    for ruim in ("amanha", "2999-01-01T00:00"):
+        h = cli.get("/os/solicitacao?data=" + ruim).get_data(as_text=True)
+        assert 'id="dt_inc" value="' + ruim not in h

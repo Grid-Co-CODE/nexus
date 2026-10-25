@@ -31,8 +31,10 @@
     <div class="eg-ac-esq">
       <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
         <span class="eg-ac-tag eg-ac-tag--{{ topo.cor }}">{{ topo.texto }}</span>
-        <h1>OS {{ o.os }} <span>{{ o.ativo or o.codigo }}</span></h1></div>
-      {% if o.titulo %}<p class="eg-ac-titulo">{{ o.titulo }}</p>{% endif %}
+        <h1>{{ o.titulo or ('OS ' ~ o.os) }}</h1></div>
+      {# Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no lugar do título da OS bote OS e ativo";
+         com mais de um ativo, a conta (a lista fica no bloco Ativos) #}
+      <p class="eg-ac-titulo">OS {{ o.os }} <span>{{ (o.ativos|length ~ ' ativos') if o.ativos|length > 1 else (o.ativo or o.codigo) }}</span></p>
       <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
     <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
@@ -86,7 +88,8 @@
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Dados</h2></div>
         <dl class="eg-ac-dados">
-          <dt>Ativo</dt><dd class="mono">{{ o.codigo or '—' }}</dd>
+          {% if o.ativos|length > 1 %}<dt>Ativo</dt><dd>{{ o.ativos|length }} ativos</dd>
+          {% else %}<dt>Ativo</dt><dd class="mono">{{ o.codigo or '—' }}</dd>{% endif %}
           <dt>Usina</dt><dd>{{ o.usina or '—' }}</dd>
           <dt>Responsável</dt><dd>{{ o.pessoa or '—' }}</dd>
           <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
@@ -95,6 +98,10 @@
       </section>
     </aside>
     <div>
+      {% if o.ativos|length > 1 %}<section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Ativos</h2><span class="n">{{ o.ativos|length }}</span></div>
+        <table class="eg-t"><tbody>{% for a in o.ativos %}<tr><td class="k eg-mono">{{ a.codigo }}</td><td class="v">{{ a.nome }}</td></tr>{% endfor %}</tbody></table>
+      </section>{% endif %}
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Na nota da OS</h2></div>
         {% if o.nota %}<p class="eg-ac-nota">{{ o.nota }}</p>{% else %}<p class="eg-vazio-l">A OS está sem nota.</p>{% endif %}

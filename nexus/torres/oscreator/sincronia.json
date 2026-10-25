@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-24T19:32:03",
+ "atualizado_em": "2026-10-24T23:16:12",
  "arquivos": {
   "chamado_garantia/README.md": "ebd082efad2568dc",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -48,7 +48,7 @@
   "os_creator/os_web/rotas_fornecedores.py": "629e27fb066a3043",
   "os_creator/os_web/rotas_os_acoes.py": "274c6caed826791a",
   "os_creator/os_web/rotas_pcm.py": "bd04b924070117f1",
-  "os_creator/os_web/rotas_solic.py": "73734b72a2ba96d6",
+  "os_creator/os_web/rotas_solic.py": "b66b1f2618feaf35",
   "os_creator/os_web/rotas_solic_eng.py": "896f943c5374c07e",
   "os_creator/os_web/rotas_tradicional.py": "874a0b599ed5f316",
   "os_creator/os_web/servir.py": "d7263551ee6057cc",
@@ -112,7 +112,7 @@
   "os_creator/os_web/templates/perf_criar.html": "1ef3835df7722042",
   "os_creator/os_web/templates/performance.html": "841a44fa43b4045f",
   "os_creator/os_web/templates/setor.html": "18ac3dccc6ccae07",
-  "os_creator/os_web/templates/solic.html": "dd3e16bb1210a100",
+  "os_creator/os_web/templates/solic.html": "2d46d4c7bd7fa78d",
   "os_creator/os_web/templates/solic_eng.html": "054af9ab792f5897",
   "os_creator/os_web/templates/solic_fila.html": "8c5759ec19ae7757",
   "os_creator/os_web/templates/solic_hist.html": "2682680d22aba2f9",

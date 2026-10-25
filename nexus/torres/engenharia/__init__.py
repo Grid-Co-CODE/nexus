@@ -874,8 +874,9 @@ def equipe_os(folio: int):
                 f["atividade"] = None
     except Exception as e:      # noqa: BLE001
         fs, erro_filhas = [], type(e).__name__
+    # Levi, 24/10/2026: "Ao clicar em criar Solicitar OS a data do incidente deve ser a mesma da OS pai"
     solicitar = "/os/solicitacao?" + urlencode({"ativo": o.get("codigo") or "", "os_pai": o.get("wid") or "",
-                                                "os_pai_folio": o["os"]})
+                                                "os_pai_folio": o["os"], "data": o.get("evento_local") or ""})
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",

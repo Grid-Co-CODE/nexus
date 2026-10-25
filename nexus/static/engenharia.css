@@ -398,7 +398,9 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 .kb-eng .eg-tag{font-size:10.5px;line-height:14px;padding:1px 6px}
 .kb-card--parada{position:relative}
 .kb-card--parada::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-  box-shadow:0.3px 0.5px 0.4px var(--pulso-a71),0.4px 0.6px 0.5px -1.2px var(--pulso-a57),
+  /* Levi, 24/10/2026: "poderia fazer algo mais forte que destacasse um pouco mais porém sem destacar tanto": um
+     contorno de 1,5 px e um halo por cima da sombra em camadas dele, pulsando juntos de 0,5 a 1 */
+  box-shadow:0 0 0 1.5px var(--pulso-a71),0 0 16px 3px var(--pulso-a43),0.3px 0.5px 0.4px var(--pulso-a71),0.4px 0.6px 0.5px -1.2px var(--pulso-a57),
     1px 1.7px 1.5px -2.5px var(--pulso-a43),2.8px 4.6px 4px -3.7px var(--pulso-a28),6.3px 10.2px 9px -5px var(--pulso-a14);
   animation:kb-pulso 1.4s ease-in-out infinite alternate}
 @keyframes kb-pulso{from{opacity:.5}to{opacity:1}}
@@ -454,6 +456,7 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
 /* ── o corpo da OS do Quadro da equipe na estrutura da tela do chamado da Garantia (24/10/2026): o .ac-det, o .bloco,
    a ol.cadeia, o dl.dados, a table.t e a linha do tempo (.tl) do chamados.css, com os tokens do Nexus e a Inter ── */
 .eg-ac-titulo{margin:4px 0 0;font:500 14px/1.35 var(--fonte-ac);color:var(--tinta)}
+.eg-ac-titulo span{color:var(--verde-texto);font-weight:600}   /* o ativo em verde, como no título da tela do chamado */
 .eg-ac-det{display:grid;grid-template-columns:310px minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:1000px){.eg-ac-det{grid-template-columns:minmax(0,1fr)}}
 .eg-ac-det>aside,.eg-ac-det>div{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -504,6 +507,7 @@ table.eg-t tr:last-child td{border-bottom:0}
 table.eg-t td.k{width:30%;font-weight:600;font-variant-numeric:tabular-nums}
 table.eg-t td.k small{display:block;font-weight:400;font-size:11px;color:var(--mudo)}
 table.eg-t td.v{overflow-wrap:anywhere;white-space:pre-wrap}
+table.eg-t td.eg-mono{font:500 12px var(--font-mono);white-space:nowrap}
 .eg-tl-obs{width:100%;min-height:70px;background:var(--fundo);border:1px solid var(--linha-forte);border-radius:8px;
   color:var(--tinta);font:400 13px/1.55 var(--fonte-ac);padding:9px 11px;resize:vertical}
 .eg-tl-obs:focus{outline:none;border-color:var(--verde)}
