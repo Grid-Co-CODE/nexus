@@ -3282,10 +3282,20 @@ def salvar_subtarefas(id_work_order, id_work_order_task, valores: list) -> dict:
         return {"ok": False, "n": 0, "erro": "Nenhum campo preenchido para gravar."}
     res = _rpc_call(RPC_WO_FORMIT_VALUES, params)
     if isinstance(res, dict) and res.get("success") is False:
-        raise FracttalError("O Fracttal recusou o checklist: "
-                            + (str(res.get("message") or "").replace("_", " ").strip()
-                               or "motivo não informado"))
+        cod = str(res.get("message") or "").strip()
+        if cod.upper() == "WITHOUT_PERMITS":
+            raise FracttalError(_CHECKLIST_SEM_PERMISSAO + "  (WITHOUT_PERMITS)")
+        raise FracttalError("O Fracttal recusou o checklist: " + (cod.replace("_", " ").strip() or "motivo não informado"))
     return {"ok": True, "n": len(params), "raw": res}
+
+
+# 24/10/2026: uma analista de chamados não conseguia salvar o nº do ticket (a subtarefa da OS de acompanhamento) e via
+# "O Fracttal recusou o checklist: WITHOUT PERMITS"; outra, na mesma tela, salvava. A gravação vai com a conta de QUEM
+# ESTÁ LOGADO, e o perfil dela no Fracttal não pode responder subtarefas: não é o app que libera, e a mensagem diz isso.
+_CHECKLIST_SEM_PERMISSAO = ("Sua conta do Fracttal não tem permissão para responder as subtarefas (o checklist) "
+                            "das OS. A gravação vai com a sua conta, com as permissões dela; quem libera é o "
+                            "administrador do Fracttal (perfil do usuário). Para confirmar: tente preencher a mesma "
+                            "subtarefa direto no Fracttal; se lá também recusar, é o perfil.")
 
 
 def validar_seguranca_tarefa(id_work_order_task) -> dict:

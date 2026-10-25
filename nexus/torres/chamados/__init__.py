@@ -19,16 +19,18 @@ TORRE = Torre(
     ordem=50,
     icone="ticket",
     descricao="Chamados a fabricantes, solicitações de clientes e garantias.",
+    # a ordem do menu (Levi, 24/10/2026: "Ordene as janelas de chamados em: Garantias, Fabricantes e Solicitação de
+    # Clientes")
     telas=[
+        Tela("garantias", "Garantias",
+             "Qual chamado de garantia está aberto, com quem e há quanto tempo?",
+             "Acompanhamento de chamados do OS Creator Web"),
         Tela("fabricantes", "Fabricantes",
              "Como abrir o chamado com cada fabricante e o que a inspeção precisa levar?",
              "Controle de fornecedores do OS Creator Web"),
         Tela("clientes", "Solicitações de clientes",
              "O que o cliente pediu e qual o prazo pelo contrato?",
              "Solicitações do Nexus"),
-        Tela("garantias", "Garantias",
-             "Qual chamado de garantia está aberto, com quem e há quanto tempo?",
-             "Acompanhamento de chamados do OS Creator Web"),
     ],
 )
 

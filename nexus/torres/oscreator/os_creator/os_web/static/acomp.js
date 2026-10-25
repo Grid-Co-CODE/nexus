@@ -73,10 +73,18 @@
     window.addEventListener("resize", remedir);
     window.addEventListener("load", remedir);                             // a fonte Inter chega e muda a altura
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(remedir);
+    // o filtro e a rolagem ficam ao abrir um chamado e voltar (Levi, 24/10/2026: "Quando eu faço um filtro em garantias >
+    // acompanhamento de chamados e clico na os, ao voltar para o acompanhamento o filtro se desfaz e carrega novamente,
+    // quero que mantenha o filtro anterior!"): guardados NESTA aba do navegador, valem na volta, no Atualizar e quando a
+    // tela troca sozinha (esperarANova). Valor que saiu da lista (a marca sem chamado aberto) não vira filtro.
+    const CHAVE_FILTRO = "acomp.filtros", CHAVE_ROLAGEM = "acomp.rolagem";
+    const lerGuardado = function (k) { try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } };
+    const guardar = function (k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* aba anônima: vale só agora */ } };
     const campos = quadro.querySelectorAll("[data-f]");
     const aplicar = function () {
-      const f = {};
-      campos.forEach(function (c) { f[c.dataset.f] = c.dataset.f === "busca" ? norm(c.value) : c.value; });
+      const f = {}, crus = {};
+      campos.forEach(function (c) { crus[c.dataset.f] = c.value; f[c.dataset.f] = c.dataset.f === "busca" ? norm(c.value) : c.value; });
+      guardar(CHAVE_FILTRO, crus);
       quadro.querySelectorAll(".col").forEach(function (col) {
         let n = 0;
         col.querySelectorAll(".card").forEach(function (card) {
@@ -98,6 +106,25 @@
     if (limpar) limpar.addEventListener("click", function () {
       campos.forEach(function (c) { c.value = ""; });
       aplicar();
+    });
+    const salvo = lerGuardado(CHAVE_FILTRO) || {};
+    let comFiltro = false;
+    campos.forEach(function (c) {
+      const v = salvo[c.dataset.f];
+      if (!v) return;
+      if (c.tagName === "SELECT" && !Array.prototype.some.call(c.options || [], function (o) { return o.value === v; })) return;
+      c.value = v;
+      comFiltro = true;
+    });
+    if (comFiltro) aplicar();
+    const caixas = quadro.querySelectorAll(".cards");
+    window.addEventListener("pagehide", function () {
+      guardar(CHAVE_ROLAGEM, {pagina: window.scrollY || 0, colunas: Array.prototype.map.call(caixas, function (b) { return b.scrollTop || 0; })});
+    });
+    const rolagem = lerGuardado(CHAVE_ROLAGEM);
+    if (rolagem) requestAnimationFrame(function () {              // depois do medir: a coluna já tem a altura dela
+      (rolagem.colunas || []).forEach(function (t, i) { if (caixas[i]) caixas[i].scrollTop = t || 0; });
+      if (rolagem.pagina) window.scrollTo(0, rolagem.pagina);
     });
     // o chamado começa a ser lido quando o mouse PARA em cima do cartão (Levi, 09/10/2026): o clique pega a leitura
     // pronta (rotas_acomp.preparar_chamado, com o teto por pessoa do rotas.preparar). Uma vez por cartão; 250 ms parado,

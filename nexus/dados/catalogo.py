@@ -326,6 +326,22 @@ FATOS = (
                     "reconhecido em/por (14/10/2026, duas colunas no fim): a equipe não achou o extintor na usina; "
                     "conferência depois da marca a desfaz, e o Nexus o tira de todas as contas e o lista à parte para "
                     "a TST conferir o cadastro"),
+    # a APR de pré-execução feita no App (24/10/2026, a TST: "preciso de uma visibilidade de atividades realizadas sem
+    # APR e sem PT"): o App publica desde a v298 do servidor; registrado antes da 1ª gravação, com as colunas combinadas
+    Fato("apr", "APR de pré-execução (App)", "hseq", "apr_app_campo · APR",
+         "1 linha = 1 APR de pré-execução feita no App (a do dia: 1 por técnico, OS e dia, com as versões do Novo risco "
+         "juntas; a da tarefa e a da ronda, 1 cada)",
+         _d(data=("cod", "Dia (de Brasília)"), usina=("nome", "Usina (o nome dos outros livros do App)"),
+            pessoa=("hmac", "Técnico (HMAC)"), equipamento=("cod", "Código do ativo (vazio na do dia)"),
+            os=("cod", "OS")),
+         tipo="sem_medida", chave=("APR",),
+         fontes=("apr_app_campo · APR",),
+         janela_origem="90 dias pelo Dia (App), desde 09/10/2026 (v251; antes, a APR só existe no Fracttal)",
+         observacao="colunas APR, Tipo (do dia, tarefa, ronda), OS, Dia, Criada em (UTC), Usina, Técnico (HMAC), Tarefa, "
+                    "Código do ativo, Versões, Atividades críticas (os títulos da PT separados por \"; \"), Precisa de PT "
+                    "(sim, não ou vazio = ainda não medido) e PT (o Número do livro PT). Sem nome nem e-mail. A tela "
+                    "APR e PT (aba Sem APR ou PT, nexus/hseq/apr.py) cruza com o livro PT e o fato_fechamento. Até o "
+                    "App publicar, o livro não existe"),
     Fato("conferencia_extintor", "Conferência de extintor", "hseq", "extintores_conferencias_app_campo · Conferências",
          "1 linha = 1 extintor conferido num mês (reenviar no mesmo mês regrava a linha)",
          _d(data=("cod", "Dia (de Brasília)"), usina=("nome", "Usina (nome do Fracttal; Código da usina)"),

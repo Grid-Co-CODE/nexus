@@ -369,6 +369,27 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   formulário vem sem o prefixo; `nexus/torres/campo/CLAUDE.md`, "Debaixo do /nexus"). Os redirecionamentos da torre
   (Extintores, relatório) também passam pelo `na_raiz`: regra das torres em `nexus/torres/CLAUDE.md`.
 - **Título:** "Permissões de trabalho e Análise Preliminar de Risco" (no menu, "APR e PT").
+- **Só por responsável, e os filtros de cliente, usina e responsável** (24/10/2026, Levi: "Tire por equipe e por região
+  de campo e deixe apenas por responsável"; "Em tabela tire a coluna região e coloque a coluna responsável"; "Tire o
+  filtro de região e gestor de contrato e região do brasil. Quero filtro para cliente, usina e responsável com contador
+  para cada! Quero os mesmos filtros no histórico!"). A aba Esperando abre nos cartões por Responsável UFV (o mesmo
+  `visao.pt_por_responsavel` da Central; o cartão leva à tabela dele) ou na Tabela, que leva a coluna Responsável no
+  lugar da região (`coluna_responsavel`: o pedaço é o mesmo da Central, que segue com a região). Os filtros
+  (`FILTROS_PT`: Cliente, Usina, Responsável UFV) vão em cascata, cada opção com quantas PT tem com os outros filtros
+  ("Thopen (12)"), nas duas abas; a busca fica (o número da OS acha a PT: a TST procurou a da OS 16866 no Fracttal, onde
+  só vai o PDF da APR). Os endereços de antes (por equipe, região ou gestor, `regiao`, `regiao_campo`, `gestor`) caem no
+  Por responsável e não filtram.
+- **A aba Sem APR ou PT** (a TST, 24/10/2026: "preciso de uma visibilidade de atividades realizadas sem APR e sem PT";
+  `nexus/hseq/apr.py`): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
+  1ª gravação, fato `apr`; contrato com a sessão do App de Campo), duas listas de 20 em 20 com os mesmos filtros:
+  **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
+  fechada sem APR** (a tarefa do `fato_fechamento` desde 09/10/2026 sem APR da mesma OS no mesmo dia, nem APR da tarefa
+  com a mesma OS e tarefa; por OS e dia; a régua não olha o técnico). Sem o livro, a aba diz que ele ainda não chegou.
+  Caso que motivou: a OS 16866 tinha PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal.
+- **O histórico inteiro, de 20 em 20** ("Em histórico quero todo o período mostrando de 20 em 20 para não pesar tanto";
+  saiu o período 7/30/90 dias): `POR_PAGINA_PT`, `?pag=`, com "1–20 de N" e as páginas em volta da atual; leva a coluna
+  Responsável depois da Usina. Medido no banco real em 24/10: 598 decididas, 74 KB a página; com 13 colunas a tabela
+  passa ~130 px da caixa a 1440 px e rola dentro dela (com 12 já passava 18).
 - **Colunas PT e APR** no lugar do "PDF", cada uma com o Baixar dela: a PT é o PDF que o App anexa no De acordo
   ("Permissão de Trabalho <número>"; PT negada não tem); a APR é o PDF que o App anexa desde a v251 ("APR OS 15223
   09-10-2026 07h42", + " v2" no Novo risco da APR do dia), e na OS com mais de uma APR vale a de horário mais perto da
@@ -382,8 +403,8 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   região de campo e o gestor, **quem assina**, as duas assinaturas lado a lado (a do técnico na APR, do Fracttal pelo
   login de quem olha, carregada ao abrir; a da aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
   com o motivo, Ver PT, Baixar APR), que volta para a lista com os filtros dela. É o mesmo pedaço da Central de atenção
-  > Permissões de trabalho (`campo/_pt_esperando.html`); desde 19/10/2026 a Central só pede dele o Por responsável
-  (o modo `responsaveis`, só dela) e a tabela, e esta tela segue com os cartões por equipe, região e gestor.
+  > Permissões de trabalho (`campo/_pt_esperando.html`); desde 19/10/2026 a Central e, desde 24/10, esta tela só
+  pedem dele o Por responsável (o modo `responsaveis`) e a tabela.
 - **Quem pode dar o De acordo** (Levi, 09/10): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador de Campo), o gestor de contrato da usina, quem é do COS e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no servidor; quem não pode recebe a recusa dizendo quem pode).

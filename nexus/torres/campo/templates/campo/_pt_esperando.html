@@ -5,7 +5,8 @@
    permissões de trabalho") ou a tabela (a da tela de PT: só a OS, em verde, abre a PT; Equipamento; Espera no fim; a
    linha abre o detalhe). Espera do contexto: modo, cartoes (visao.por_equipe), cartoes_reg (visao.por_regiao),
    cartoes_gest (visao.por_gestor), sem_regiao, sem_gestor, lista, contagem, total, f, status (visao.PT_STATUS),
-   situacoes (SITUACAO_PT), equipe, idade_min, url. #}
+   situacoes (SITUACAO_PT), equipe, idade_min, url. Em APR e PT (24/10/2026, Levi: "Em tabela tire a coluna região e
+   coloque a coluna responsável") a tabela leva o Responsável UFV no lugar da região (`coluna_responsavel`). #}
 {% from 'campo/_cartoes_papeis.html' import cab_regiao, cab_gestor, alterna, quem %}
 {% macro capacete_pt() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
 {% macro os_link(p) %}<a class="cn-link cn-os" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}" title="Abrir a PT {{ p.numero }}">{{ p.os or p.numero }}</a>{% endmacro %}
@@ -76,11 +77,11 @@
   {% for s, (rot, cor) in status.items() %}<a href="{{ url(f=s) }}"{% if s == f %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
 </div>
 <div class="cn-tab"><table class="cn-expande">
-  <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Região</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th></tr></thead>
+  <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>{{ 'Responsável' if coluna_responsavel else 'Região' }}</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th></tr></thead>
   <tbody>
   {% for p in lista %}
     <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}{% if p.apr_dia %}<span class="det">APR do dia {{ p.apr_dia }}</span>{% endif %}</td>
-      <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{{ p.regiao_br or '—' }}</td>
+      <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{% if coluna_responsavel %}{{ p.responsavel or sem_responsavel }}{% else %}{{ p.regiao_br or '—' }}{% endif %}</td>
       <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td>
       <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td>
       <td><span class="mudo" title="O PDF da PT sai no De acordo">—</span></td>

@@ -1302,3 +1302,20 @@ não lê as tarefas.
   engolida, sem conferir as páginas, sem conferir o meta, lote engolido, sessão caída como erro comum, Histórico e
   quadro sem a lista anterior) derrubam cada uma o seu teste. Na bancada (o clone sozinho, Fracttal falso, sem rede),
   a 1280 e a 375 px: o aviso, a lista anterior com a hora dela no Histórico e no quadro.
+
+## O filtro do quadro fica na volta, e o checklist sem permissão diz o que fazer (Garantias, 24/10/2026)
+
+- **O filtro e a rolagem do Acompanhamento de chamados ficam** (Levi: "Quando eu faço um filtro em garantias >
+  acompanhamento de chamados e clico na os, ao voltar para o acompanhamento o filtro se desfaz e carrega novamente,
+  quero que mantenha o filtro anterior!"). O `acomp.js` guarda o filtro a cada mudança e a rolagem da página e de cada
+  coluna ao sair (`pagehide`), no `sessionStorage` desta aba do navegador (`acomp.filtros`, `acomp.rolagem`), e põe de
+  volta quando o quadro abre: na volta de um chamado, no Atualizar e quando a tela troca sozinha (`esperarANova`). O que
+  saiu da lista (uma marca sem chamado no quadro) não vira filtro; o Limpar filtros limpa o guardado. Prova:
+  `tests/test_oscreator_acomp_filtro_guardado_24_10.py` (o script no node); na bancada, Fornecedor = Sungrow, um chamado
+  aberto e a volta com o mesmo filtro e os mesmos 6 de 16 cartões.
+- **"O Fracttal recusou o checklist: WITHOUT PERMITS"** ao salvar o ticket (uma analista de chamados; outra, na mesma
+  tela, salvava): o ticket é a subtarefa da OS, e a gravação (`api.salvar_subtarefas`) vai com a conta de QUEM ESTÁ
+  LOGADO no Fracttal. O perfil dessa conta não pode responder subtarefas: não é o OS Creator nem o Nexus que libera, é o
+  administrador do Fracttal (o perfil do usuário). A tela passa a dizer isso (`_CHECKLIST_SEM_PERMISSAO`, com o código
+  entre parênteses), como o `WITHOUT_PERMITS` de criar OS (`_RPC_MSG`). Prova: `tests/test_chamados_ordem_icone_permissao_24_10.py`.
+- No Nexus, a torre Chamados ficou na ordem Garantias, Fabricantes e Solicitações de clientes (`nexus/torres/chamados`).

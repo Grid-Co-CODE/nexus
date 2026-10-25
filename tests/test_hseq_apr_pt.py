@@ -168,3 +168,20 @@ def test_a_apr_do_dia_mostra_as_tarefas_da_os_do_fracttal(banco, logado, app, tm
     html = logado.get("/t/hseq/apr-pt?aba=historico").get_data(as_text=True)
     assert "Religamento da Cabine 2 (+1)" in html and "APR do dia 10/10" in html and "Cabine 2, Cabine 3" in html
     assert "APR do dia 2026-10-10" not in html
+
+
+def test_o_historico_inteiro_de_20_em_20_com_os_filtros(banco, logado):
+    """Levi, 24/10/2026: "Quero os mesmos filtros no histórico! Em histórico quero todo o período mostrando de 20 em 20
+    para não pesar tanto!". As 25 decididas há 100 dias (fora dos 90 dias de antes) entram todas, em duas páginas."""
+    antigas = [_pt(f"PT-{100 + i}", 2400 + i, "de_acordo", 2399 + i) for i in range(25)]
+    _aba(banco, "pt_app_campo", "PT", [_pt("PT-1", 30), _pt("PT-2", 1)] + antigas)
+    visao.limpar()
+    h1 = logado.get("/t/hseq/apr-pt?aba=historico").get_data(as_text=True)
+    assert h1.count('class="cn-link cn-os"') == 20 and "1–20 de 25" in h1 and ">Próxima</a>" in h1
+    h2 = logado.get("/t/hseq/apr-pt?aba=historico&pag=2").get_data(as_text=True)
+    assert h2.count('class="cn-link cn-os"') == 5 and "21–25 de 25" in h2 and ">Anterior</a>" in h2
+    assert logado.get("/t/hseq/apr-pt?aba=historico&pag=9").get_data(as_text=True).count('class="cn-link cn-os"') == 5
+    # os mesmos filtros, com a conta de cada opção
+    assert '<option value="Thopen">Thopen (25)</option>' in h1 and 'id="pt-responsavel"' in h1
+    nada = logado.get("/t/hseq/apr-pt?aba=historico&cliente=Outro+Cliente").get_data(as_text=True)
+    assert "Nenhuma PT decidida com esses filtros" in nada and '<option value="Outro Cliente" selected>Outro Cliente (0)' in nada
