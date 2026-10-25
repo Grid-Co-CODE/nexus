@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-24T23:16:12",
+ "atualizado_em": "2026-10-25T00:04:20",
  "arquivos": {
   "chamado_garantia/README.md": "ebd082efad2568dc",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -8,7 +8,7 @@
   "chamado_garantia/registro.py": "de93430921043512",
   "chamado_garantia/regras.py": "bf2bbf933aad78d0",
   "chamado_garantia/spec.py": "6c4a221fddc68521",
-  "os_creator/api.py": "be4235f64fd91506",
+  "os_creator/api.py": "1ea3baa934671ece",
   "os_creator/assets/chamados.qss": "f5e222357226608f",
   "os_creator/assets/fonts/LEIA-ME.txt": "481bfed83ca359c7",
   "os_creator/assets/grid-icon.ico": "46b6cf136f0ffaff",
@@ -58,7 +58,7 @@
   "os_creator/os_web/sso.py": "9aa026041869a64e",
   "os_creator/os_web/static/abas.css": "33f73bf86e898444",
   "os_creator/os_web/static/abas.js": "0be2674de70f8b02",
-  "os_creator/os_web/static/acomp.js": "9128463872997f4a",
+  "os_creator/os_web/static/acomp.js": "14771832443b154c",
   "os_creator/os_web/static/ativos.css": "6880fc9b2877824e",
   "os_creator/os_web/static/ativos.js": "c5ab09a3ce364d74",
   "os_creator/os_web/static/carga.js": "8b0c67cd85dd0d9a",
