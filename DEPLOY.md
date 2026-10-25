@@ -473,6 +473,10 @@ fazer da T.I.:** leem os arquivos do repositório do PCM pela saída que o Nexus
 mandam e-mail. `NEXUS_PCM_RELATORIOS_AUTO=0` no `.env` desliga a emissão automática numa máquina (a tela segue). Regras:
 `nexus/pcm/relatorios/CLAUDE.md`.
 
+O e-mail semanal das pendências da Segurança (24/10/2026) sai pelo App de Campo, não pelo Nexus: o Nexus só publica o
+livro `nexus_hseq_email` na segunda depois das 07:00, e só com `NEXUS_HSEQ_EMAIL_AUTO=1` no `.env` (sem ela, desligado).
+**Nada a fazer da T.I.** além de pôr a variável quando o App estiver pronto. Regras: `nexus/torres/hseq/CLAUDE.md`.
+
 O Relatório executivo do PCM (Interno Grid, Cliente e Abertura da Semana, no bloco "Relatório Gerencial PCM" da mesma
 Central) mostra "MPA/MPS atrasadas" quando o servidor abre a planilha Gerencial do PCM (o `mpas.json`, cifrado no
 repositório público de lá). Para isso, **uma linha no `.env`** (o Levi passa o valor por fora; é segredo):

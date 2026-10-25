@@ -52,6 +52,8 @@ RESUMO = {
     "exclusao_extintor": "Os extintores que a Segurança excluiu, e por quê",
     "pedido_ronda_extintor": "As novas rondas de extintores que a Segurança pediu, por usina",
     "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
+    "email_pendencias_seguranca": "O e-mail semanal das pendências da Segurança, por destinatário",
+    "envio_email_seguranca": "O que o App mandou do e-mail semanal da Segurança",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
     "geracao_thopen": "A planilha de geração das usinas Thopen, uma aba por usina",
@@ -182,6 +184,11 @@ PARA_QUE = {
                          "conferir numa ronda depois.",
     "pedido_ronda_extintor": "Guarda cada nova ronda de extintores, do zero, que a Segurança pede numa usina. É para o "
                              "App de Campo mostrar à equipe como ronda pendente; vale até a equipe refazer a ronda inteira.",
+    "envio_email_seguranca": "Guarda, para cada e-mail semanal da Segurança, se o App de Campo conseguiu mandar, por "
+                             "onde, em quantas tentativas e o erro, quando houve. Não leva e-mail nem nome, só o código.",
+    "email_pendencias_seguranca": "Guarda o e-mail de cada segunda com as pendências da Segurança: um para a TST, "
+                                  "com todas as usinas, e um para cada Responsável UFV, com as usinas dele. O Nexus "
+                                  "monta e o App de Campo manda. Não leva nome nem e-mail de pessoa, só o código.",
     "edicao_extintor": "Guarda cada edição que a Segurança fez no cadastro de um extintor na tela Extintores (local, "
                        "posição, classe, peso e as validades), só com o que mudou. A tela mostra o editado na hora, e o "
                        "App de Campo grava no cadastro dele. Quem editou vai cifrado.",

@@ -33,6 +33,7 @@
     {% endfor %}
     {% if chave == 'cliente' %}<input type="hidden" name="ver" value="cliente">{% endif %}
     <a class="gc-btn gc-btn--ui gc-btn--contorno hs-baixar" href="{{ url_for('torre_hseq.mesa_planilha', **request.args.to_dict())|na_raiz }}" download>Baixar planilha</a>
+    {% if pode %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_hseq.mesa_email')|na_raiz }}">Prévia do e-mail semanal</a>{% endif %}
   </form>
 
   <section class="kb-kpis hs-mesa-kpis" aria-label="A mesa agora">

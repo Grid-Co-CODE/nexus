@@ -206,10 +206,20 @@ def _espera(minutos) -> str:
     return f"{m} min" if m < 60 else (f"{m // 60} h" if m < 48 * 60 else f"{m // 1440} dias")
 
 
-def _pendencias() -> dict:
-    """Todas as pendências da Segurança, com os filtros da Mesa: {listas: {pts, vencidos, nr, sem_luvas, perto,
-    sem_atual, luvas_semv, ronda}, fl, opcoes, erros, lido}. A Mesa e a planilha contam o mesmo. A fonte que falha diz
-    (`erros`) e as outras seguem."""
+def _filtros_mesa() -> dict:
+    """Os filtros da Mesa no endereço. O `r` (o número da pessoa no cadastro) vira o Responsável UFV dela: é o link do
+    e-mail semanal, que não leva o nome da pessoa (o livro do e-mail fica na API compartilhada)."""
+    fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_MESA}
+    r = request.args.get("r", "").strip()
+    if r.isdigit() and not fl["responsavel"]:
+        fl["responsavel"] = visao._Base().nome_da_pessoa(int(r), "Responsável")
+    return fl
+
+
+def _pendencias(fl: dict | None = None) -> dict:
+    """Todas as pendências da Segurança, com os filtros da Mesa (os do endereço, ou `fl`, o e-mail semanal): {listas:
+    {pts, vencidos, nr, sem_luvas, perto, sem_atual, luvas_semv, ronda}, fl, opcoes, erros, lido}. A Mesa, a planilha e
+    o e-mail contam o mesmo. A fonte que falha diz (`erros`) e as outras seguem."""
     erros, lido = {}, ""
     L = {k: [] for k, _rot in AGIR + ATENCAO}
     try:
@@ -254,7 +264,7 @@ def _pendencias() -> dict:
             L["luvas_semv"] = [u for u in us if u["situacao"] == "sem_verificacao"]
     except Exception as e:      # noqa: BLE001
         erros["epi"] = type(e).__name__
-    fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_MESA}
+    fl = _filtros_mesa() if fl is None else {c: (fl.get(c) or "").strip() for c, _rot in FILTROS_MESA}
 
     def passa(x, menos=None):
         return all(not v or c == menos or EXT.valor_do_filtro(x, c) == v for c, v in fl.items())
@@ -328,7 +338,31 @@ def mesa():
                            n_usinas_atr=len({EXT.chave_usina(x) for x in L["vencidos"]}),
                            espera=_espera,
                            mais_antiga=max((x.get("idade_min") or 0 for x in L["pts"]), default=0),
-                           dias_sem=EPI.DIAS_SEM_VERIFICAR, url=_url)
+                           dias_sem=EPI.DIAS_SEM_VERIFICAR, url=_url, pode=_pode())
+
+
+@bp.route("/mesa/email")
+def mesa_email():
+    """A prévia do e-mail semanal das pendências (a TST, 24/10/2026: "Receber report semanal das pendências por email,
+    pra mim e pro supervisor responsável"): quem recebe nesta semana e o e-mail de cada um, como vai para o App de Campo
+    mandar (`hseq/email_semanal.py`). Só para quem decide na Segurança: os nomes dos responsáveis aparecem aqui, e não
+    no livro."""
+    if not _pode():
+        abort(403)
+    from ...hseq import email_semanal as ES
+    cfg = current_app.config
+    d = ES.da_semana(cfg)
+    nomes = d["nomes"]
+    resp = [dict(x, nome=nomes.get(x["pessoa_id"], f"Responsável {x['pessoa_id']}")) for x in d["linhas"]
+            if x["papel"] == "responsavel"]
+    resp.sort(key=lambda x: x["nome"].lower())
+    tst = next((x for x in d["linhas"] if x["papel"] == "tst"), None)
+    ver = request.args.get("ver", "tst")
+    escolhido = tst if ver == "tst" else next((x for x in resp if str(x["pessoa_id"]) == ver), None)
+    if escolhido is None and tst is None and resp:
+        escolhido = resp[0]
+    return render_template("hseq/email.html", torre=TORRE, tela=TORRE.tela("mesa"), d=d, resp=resp, tst=tst,
+                           escolhido=escolhido, ver=ver, ligado=str(cfg.get("NEXUS_HSEQ_EMAIL_AUTO") or "") == "1")
 
 
 @bp.route("/mesa/pendencias.xlsx")

@@ -43,6 +43,31 @@ Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`; as contas em `_pendencias(
 - Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as outras. Não lê o Fracttal.
 Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenção e a planilha).
 
+**O e-mail semanal das pendências** (24/10/2026; `nexus/hseq/email_semanal.py`, livro
+`nexus_hseq_email · fato_email_pendencias`, no catálogo antes da 1ª gravação). A TST: "Receber report semanal das pendências por email, pra mim e pro
+supervisor responsável"; Levi escolheu mandar pelo App de Campo, que já manda e-mail. Toda segunda depois das 07:00 de
+Brasília o Nexus monta o e-mail de cada destinatário com as mesmas contas da Mesa (`_pendencias(fl)`) e publica uma
+linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou.
+- **Quem recebe:** a TST (as pessoas do setor Segurança em Base → Integração Fracttal, pelo código do e-mail) com todas
+  as usinas, e cada Responsável UFV com pendência, só com as usinas dele, pelo código do usuário do Fracttal ligado a ele
+  ou, sem ele, do e-mail da ficha (`destinatarios`). Sem código, não recebe: a prévia lista quem ficou de fora (medido
+  no banco real em 24/10: 1 da TST e 5 responsáveis recebem, 2 responsáveis sem código).
+- **O que vai no livro** (a API é compartilhada, regra 8): o código (HMAC) e o número da pessoa, nunca nome nem e-mail.
+  O assunto e o corpo (texto e HTML) levam os quatro de agora, os de atenção, as usinas com mais pendências (até 25) e
+  o link para a Mesa e a planilha filtradas pelo número da pessoa (`?r=`, que a Mesa traduz no Responsável UFV dela).
+  Cada linha assinada (HMAC, rótulo `nexus:hseq:email`).
+- **O App** (contrato fechado com a sessão do App de Campo em 24/10/2026, a construir com o OK do Levi): acha o e-mail
+  pelo código (o cadastro e as atribuições que ele conhece; a TST sem código casa no e-mail do aviso das luvas), manda
+  pelo Microsoft Graph com fila e reenvio, e confirma no livro `email_app_campo · Envios` (no catálogo: Semana,
+  Destinatário (HMAC), Papel, Enviado em, Via, Tentativas, Erro e Situação; o que não sai até a segunda seguinte vence).
+  **Hoje nada sai:** o tenant barra o Graph do App ("AppOnly AccessPolicy", desde 23/09; o aviso das luvas também está
+  parado) até a T.I. liberar.
+- **Ligar:** `NEXUS_HSEQ_EMAIL_AUTO=1` no `.env` do servidor (sem ela, desligado: o livro só nasce quando o App estiver
+  pronto para ler). A **prévia** (`/t/hseq/mesa/email`, o botão "Prévia do e-mail semanal" da Mesa, só para quem decide
+  na Segurança) mostra quem recebe nesta semana e o e-mail de cada um, com os nomes, que o livro não leva.
+Prova: `tests/test_hseq_email.py` (quem recebe, o e-mail sem nome de pessoa e assinado, o link `?r=`, a prévia e quem a
+vê, a publicação uma vez por semana, o catálogo).
+
 ## Extintores
 
 Levi, 09/10/2026: "Gostaria de adicionar no Nexus algo que inseri no app: Extintores. Ficará no módulo de segurança.
