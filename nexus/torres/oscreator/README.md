@@ -974,8 +974,10 @@ a OS na fila do PCM já vai vincular aquela OS como OS pai!".
 Levi, sobre a OS do Quadro da equipe da Engenharia: "Ao invés do botão "Abrir OS" bote um botão de "Solicitar OS" que já
 vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo mas sai como aquela OS como OS pai".
 
-- **O endereço:** `/os/solicitacao?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>` abre a Nova solicitação com o cliente,
-  a usina e o ativo marcados e a OS pai escolhida (`rotas_solic._sugestao`, `tradicional_web.onde_do_ativo`; na página,
+- **O endereço:** `/os/solicitacao?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>&data=<AAAA-MM-DDTHH:MM>` abre a Nova
+  solicitação com o cliente, a usina e o ativo marcados, a OS pai escolhida e a data do incidente dela (Levi, 24/10/2026:
+  "a data do incidente deve ser a mesma da OS pai"; `rotas_solic._data_sugerida`: torta ou no futuro fica de fora, e o
+  campo começa em agora) (`rotas_solic._sugestao`, `tradicional_web.onde_do_ativo`; na página,
   o `#sug` com os `data-sug-*` e o `sugerir()` no fim do script). A cascata virou duas funções que devolvem a promessa
   (`carregarUsinas`, `carregarAtivos`), para a sugestão esperar cada etapa.
 - **O que fica de fora:** o ativo que o catálogo não tem e a OS pai torta (o criar recusa a torta de qualquer jeito); sem

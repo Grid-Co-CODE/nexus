@@ -80,7 +80,7 @@
       <label class="os-cell"><span class="os-lbl">Classificação 2</span>
         <select id="cb_c2"><option value="">— selecione —</option>{% for o in c2 %}<option value="{{ o.id }}">{{ o.description }}</option>{% endfor %}</select></label>
       <label class="os-cell"><span class="os-lbl">Data do incidente</span>
-        <input type="datetime-local" id="dt_inc" value="{{ agora }}"></label>
+        <input type="datetime-local" id="dt_inc" value="{{ sug.data or agora }}"></label>
       <label class="os-cell"><span class="os-lbl">Data Programada (Sugestão)</span>
         <input type="datetime-local" id="dt_sug" value="{{ sugerida }}"></label>
       <label class="os-cell"><span class="os-lbl">Técnico sugerido</span>

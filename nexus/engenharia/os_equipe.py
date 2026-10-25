@@ -150,6 +150,18 @@ def _nota_da_os(ts: list[dict]) -> str:
     return "\n".join(vistas)
 
 
+def _ativos_da_os(ts: list[dict]) -> list[dict]:
+    """Os ativos de uma OS, um por código, na ordem das tarefas (a OS agrupada tem um ativo por tarefa: a 16289 tinha
+    seis inversores; 24/10/2026)."""
+    vistos, out = set(), []
+    for t in ts:
+        cod = str(t.get("code") or "").strip()
+        if cod and cod not in vistos:
+            vistos.add(cod)
+            out.append({"codigo": cod, "nome": str(t.get("items_log_description") or "").split("{")[0].strip()[:80]})
+    return out
+
+
 def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
     """Uma OS (as linhas das tarefas dela) no formato do quadro."""
     w0 = ts[0]
@@ -157,6 +169,7 @@ def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
     prog = min((d for d in (_dt(t.get("date_maintenance")) for t in ts) if d), default=None)
     fim = max((d for d in (_dt(t.get("wo_final_date") or t.get("final_date")) for t in ts) if d), default=None)
     criada = _dt(w0.get("creation_date"))
+    evento = _dt(w0.get("event_date"))          # a data do incidente: o Fracttal guarda em UTC
     # o que se mexeu na OS no Fracttal: o começo e o fim das tarefas (a "última atualização" da página da OS e o
     # pulso do quadro, junto com o que a Engenharia gravou no Nexus; 24/10/2026)
     atividade = max((d for t in ts for d in (_dt(t.get("initial_date")), _dt(t.get("final_date")),
@@ -188,6 +201,9 @@ def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
         "programada_iso": prog.astimezone(BRT).date().isoformat() if prog else "",
         "criada": criada.astimezone(BRT).strftime("%d/%m/%Y %H:%M") if criada else "",
         "criada_iso": criada.isoformat() if criada else "", "atividade_iso": atividade.isoformat() if atividade else "",
+        # no formato do campo de data da Nova solicitação (Brasília): o Solicitar OS leva a da OS pai
+        "evento_local": evento.astimezone(BRT).strftime("%Y-%m-%dT%H:%M") if evento else "",
+        "ativos": _ativos_da_os(ts),
         "prioridade_fracttal": str(w0.get("priorities_description") or ""),
         "fim": fim.astimezone(BRT).strftime("%d/%m/%Y") if fim else "",
         "fim_iso": fim.astimezone(BRT).date().isoformat() if fim else "",

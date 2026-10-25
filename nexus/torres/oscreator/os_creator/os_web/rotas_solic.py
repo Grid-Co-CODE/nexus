@@ -257,7 +257,22 @@ def _sugestao(assets) -> dict:
     folio = str(request.args.get("os_pai_folio") or "").strip()
     ok_pai = pai.isdigit() and folio.isdigit()
     return {"cliente": onde["cliente"] if onde else "", "usina": onde["usina"] if onde else "",
-            "ativo": onde["code"] if onde else "", "os_pai": pai if ok_pai else "", "os_pai_folio": folio if ok_pai else ""}
+            "ativo": onde["code"] if onde else "", "os_pai": pai if ok_pai else "", "os_pai_folio": folio if ok_pai else "",
+            "data": _data_sugerida(request.args.get("data"))}
+
+
+def _data_sugerida(texto) -> str:
+    """A data do incidente da OS pai (Levi, 24/10/2026: "a data do incidente deve ser a mesma da OS pai"), no formato do
+    campo (`AAAA-MM-DDTHH:MM`, Brasília). Torta ou no futuro fica de fora (o incidente não aceita futuro): o campo
+    começa em agora, como sempre."""
+    s = str(texto or "").strip()
+    try:
+        quando = trad.data_brt(s)
+    except ValueError:
+        return ""
+    if len(s) != 16 or quando > trad.agora_brt():
+        return ""
+    return s
 
 
 @bp.route("/solicitacao")
