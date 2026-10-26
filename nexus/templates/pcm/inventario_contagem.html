@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block titulo %}Inventário · {% if c %}{{ c.almox or 'contagem' }}{% else %}contagem{% endif %}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# Uma contagem aberta (26/10/2026, Levi): Sistema × Contado × Δ × Situação, com o Sistema LIDO NA HORA do Fracttal, e a
+   confirmação do lote nos seis grupos (só os três primeiros mexem no estoque; o zerar abre aberto e destacado, para
+   conferir peça a peça). O PCM tira uma peça do lote, corrige o número ou pede a recontagem, sempre com o motivo (a
+   auditoria); a gravação no Fracttal é da próxima entrega. Sem o login do Fracttal a tela mostra só o contado. A revisão
+   não fala com o Fracttal: grava um evento no livro do inventário (nexus/pcm/inventario/revisao.py). #}
+<div class="pg alm inv">
+<p class="gc-eyebrow">PCM · Almoxarifado · Inventário</p>
+<h1 class="titulo-pagina">{% if c %}{{ c.almox or 'Contagem' }}{% else %}Contagem{% endif %}</h1>
+{% include "pcm/_almox_abas.html" %}
+<p class="inv-voltar"><a href="{{ raiz }}/t/pcm/pecas/inventario">Todas as contagens</a></p>
+
+{% if erro %}
+<div class="cn-erro" role="alert">{{ erro }}</div>
+{% else %}
+<p class="pcm-sub">{% if c.usina %}{{ c.usina }} · {% endif %}contada em {{ contada_txt }} (hora do celular), enviada em {{ enviada_txt }}.
+  <span class="inv-estado inv-estado--{{ c.estado }}">{{ rotulo }}</span></p>
+
+{% if c.aviso %}
+<div class="cn-erro" role="alert">O App mandou esta contagem fora do contrato ({{ c.aviso }}): ela não pode ser revisada, e nenhum
+  número é mostrado, para não mostrar conta pela metade. Avise quem cuida do App.</div>
+{% else %}
+{% if not c.aprovavel %}<div class="cn-erro cn-aviso" role="status">Esta contagem não se aprova: {{ c.motivo_nao_aprovavel }}.</div>{% endif %}
+{% if aviso_sistema %}<div class="cn-erro cn-aviso" role="status">{{ aviso_sistema }}</div>{% endif %}
+{% for a in avisos_curadoria %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
+{% if c.aprovavel and not pode %}<p class="alm-ajuda inv-so-pcm">{{ so_pcm }}</p>{% endif %}
+
+<section class="kb-kpis alm-kpis inv-kpis" aria-label="Resumo da contagem">
+{% if com_sistema %}
+  {% for g in grupos %}
+  <div class="kb-kpi"><span class="kb-kpi-rot">{{ g.titulo }}</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v{% if g.id == 'zerar' and g.n %} kb-kpi-v--critico{% endif %}">{{ g.n }}</b></div></div>
+  {% endfor %}
+{% else %}
+  <div class="kb-kpi"><span class="kb-kpi-rot">Contadas</span><div class="kb-kpi-linha"><b class="kb-kpi-v">{{ c.n_contadas }}</b></div></div>
+  <div class="kb-kpi"><span class="kb-kpi-rot">Em branco</span><div class="kb-kpi-linha"><b class="kb-kpi-v">{{ c.n_em_branco }}</b></div></div>
+  <div class="kb-kpi"><span class="kb-kpi-rot">Na curadoria</span><div class="kb-kpi-linha"><b class="kb-kpi-v{% if c.n_curadoria %} kb-kpi-v--alerta{% endif %}">{{ c.n_curadoria }}</b></div></div>
+{% endif %}
+</section>
+
+<section class="alm-painel">
+  <h2>{% if com_sistema %}Sistema × Contado{% else %}O que o técnico contou{% endif %}</h2>
+  <p class="alm-ajuda">{% if com_sistema %}O Sistema é o saldo do Fracttal lido agora; o Δ é o contado menos o Sistema. O contado do técnico é cego:
+    ele não viu o saldo.{% else %}Sem o saldo do sistema não há Δ nem situação: só o número que o técnico contou.{% endif %}</p>
+  {% if itens %}
+  <table class="alm-t">
+    <thead><tr><th>Peça</th>{% if com_sistema %}<th class="num">Sistema</th>{% endif %}<th class="num">Contado</th>{% if com_sistema %}<th class="num">Δ</th><th>Situação</th>{% else %}<th>Observação</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for x in itens %}
+    <tr{% if x.id_item %} data-item="{{ x.id_item }}"{% endif %}{% if x.tirada %} class="inv-tirada"{% endif %}>
+      <td data-r="Peça"><span class="alm-v">{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.nome }}{% if x.unidade %} <span class="alm-un">· {{ x.unidade }}</span>{% endif %}{% if com_sistema %}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}{% endif %}</span></td>
+      {% if com_sistema %}<td data-r="Sistema" class="num"><span class="alm-v">{{ x.sistema_txt }}</span></td>{% endif %}
+      <td data-r="Contado" class="num"><span class="alm-v">{{ x.contado_txt }}</span></td>
+      {% if com_sistema %}
+      <td data-r="Δ" class="num"><span class="alm-v{% if x.delta_sinal %} inv-delta--{{ x.delta_sinal }}{% endif %}">{{ x.delta_txt }}</span></td>
+      <td data-r="Situação"><span class="alm-v">{{ x.rotulo }}</span></td>
+      {% else %}
+      <td data-r="Observação"><span class="alm-v">{% if x.notas %}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}{% else %}—{% endif %}</span></td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="mudo">Nenhuma peça nesta contagem.</p>{% endif %}
+</section>
+
+{% if com_sistema %}
+<section class="alm-painel inv-confirma">
+  <h2>Revisar lote</h2>
+  <p class="alm-ajuda">Só o ajuste para cima, para baixo e o zerar mexem no estoque do Fracttal. O zerar fica aberto para conferência.
+    {% if pode and c.aprovavel %}Tirar a peça do lote ou corrigir o número pede o motivo, que fica na auditoria.{% endif %}</p>
+  <div class="inv-grupos">
+  {% for g in grupos %}
+    <details class="inv-grupo inv-grupo--{{ g.id }}{% if not g.n %} inv-grupo--vazio{% endif %}" data-grupo="{{ g.id }}" data-n="{{ g.n }}"{% if g.aberto %} open{% endif %}>
+      <summary><span class="inv-grupo-t">{{ g.titulo }}</span><span class="inv-grupo-n">{{ g.n }}</span></summary>
+      <div class="inv-grupo-corpo">
+        <p class="alm-ajuda">{{ g.ajuda }}</p>
+        {% if g.itens %}
+        <ul class="inv-lista">
+        {% for x in g.itens %}
+          <li class="inv-item">
+            <span class="inv-item-t">{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.nome }}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}</span>
+            <span class="inv-item-n">{% if g.id in ('para_cima', 'para_baixo', 'zerar') %}{{ x.sistema_txt }} para {{ x.contado_txt }} <span{% if x.delta_sinal %} class="inv-delta--{{ x.delta_sinal }}"{% endif %}>({{ x.delta_txt }})</span>{% elif g.id == 'sem_alteracao' %}{{ x.contado_txt }}{% elif x.contado is not none %}contado {{ x.contado_txt }}{% endif %}</span>
+            {% if x.acoes %}
+            <span class="inv-item-a">
+              <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="corrigir" data-item="{{ x.id_item }}" data-peca="{{ x.codigo }} {{ x.nome }}" data-valor="{{ x.contado_txt }}">Corrigir número</button>
+              {% if g.id != 'nao_tocada' %}<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-rev="tirar" data-item="{{ x.id_item }}" data-peca="{{ x.codigo }} {{ x.nome }}">Tirar do lote</button>{% endif %}
+            </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+        </ul>
+        {% else %}<p class="mudo">Nenhuma peça.</p>{% endif %}
+      </div>
+    </details>
+  {% endfor %}
+  </div>
+  <div class="inv-rodape">
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="a gravação chega na próxima entrega">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+    {% if pode and c.aprovavel %}<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Pedir recontagem</button>{% endif %}
+  </div>
+  <p class="alm-ajuda">A gravação no Fracttal chega na próxima entrega. Por enquanto a revisão fica registrada na auditoria, no nome de quem a fez.</p>
+</section>
+{% elif pode and c.aprovavel %}
+<div class="inv-rodape">
+  <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Pedir recontagem</button>
+</div>
+{% endif %}
+
+{% if pode and c.aprovavel %}
+<dialog class="q-det" id="inv-rev" aria-label="Revisar a contagem" data-url="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/revisar">
+  <div class="q-det-corpo">
+    <div class="q-det-acoes"><button type="button" data-rev-fechar aria-label="Fechar"><i class="ph ph-x"></i></button></div>
+    <p class="gc-eyebrow">Revisar a contagem</p>
+    <h2 class="q-det-titulo" data-rev-titulo></h2>
+    <p class="alm-ajuda" data-rev-ajuda></p>
+    <form class="inv-rev-form" data-rev-form novalidate>
+      <div data-rev-valor hidden>
+        <label class="gc-rotulo" for="inv-rev-valor">Número certo</label>
+        <input id="inv-rev-valor" class="gc-campo" inputmode="decimal" autocomplete="off">
+      </div>
+      <label class="gc-rotulo" for="inv-rev-motivo">Motivo</label>
+      <textarea id="inv-rev-motivo" class="gc-campo" rows="3" maxlength="1000"></textarea>
+      <div class="cn-erro" role="alert" data-rev-erro hidden></div>
+      <div class="inv-rev-pe"><button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-rev-enviar>Confirmar</button></div>
+    </form>
+  </div>
+</dialog>
+<script>
+  // a revisão: UM painel só, montado a cada clique (tirar, corrigir ou recontagem). O servidor confere tudo de novo; ao dar
+  // certo a página recarrega, e o Sistema é lido outra vez, com a revisão já valendo
+  (function () {
+    var dlg = document.getElementById('inv-rev');
+    if (!dlg) return;
+    var rota = (window.nexusRota || String)(dlg.dataset.url);
+    var form = dlg.querySelector('[data-rev-form]'), erro = dlg.querySelector('[data-rev-erro]');
+    var caixaValor = dlg.querySelector('[data-rev-valor]'), titulo = dlg.querySelector('[data-rev-titulo]');
+    var ajuda = dlg.querySelector('[data-rev-ajuda]'), enviar = dlg.querySelector('[data-rev-enviar]');
+    var valor = document.getElementById('inv-rev-valor'), motivo = document.getElementById('inv-rev-motivo');
+    var TEXTOS = {
+      tirar: ['Tirar do lote', 'A peça não será gravada no Fracttal, e fica na auditoria com o motivo. As outras peças seguem.', 'Tirar do lote'],
+      corrigir: ['Corrigir o número', 'O Fracttal recebe este número no lugar do que o técnico contou. A auditoria guarda os dois e o motivo.', 'Corrigir'],
+      recontagem: ['Pedir recontagem', 'Recusa a contagem inteira: nada é gravado e o técnico pode contar de novo no App. O motivo fica na auditoria.', 'Pedir recontagem']
+    };
+    var atual = null;
+    function mostrar(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
+    function abrir(b) {
+      atual = {acao: b.dataset.rev, id_item: b.dataset.item || ''};
+      var t = TEXTOS[atual.acao];
+      titulo.textContent = t[0] + (b.dataset.peca ? ': ' + b.dataset.peca : '');
+      ajuda.textContent = t[1];
+      enviar.textContent = t[2];
+      caixaValor.hidden = atual.acao !== 'corrigir';
+      valor.value = atual.acao === 'corrigir' && b.dataset.valor !== '—' ? (b.dataset.valor || '') : '';
+      motivo.value = '';
+      mostrar('');
+      enviar.disabled = false;
+      if (!dlg.open) dlg.showModal();
+      (atual.acao === 'corrigir' ? valor : motivo).focus();
+    }
+    document.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-rev]');
+      if (b) { abrir(b); return; }
+      // o <dialog> não tem margem interna: o clique que cai nele mesmo (e não no corpo) foi no véu
+      if (ev.target === dlg || ev.target.closest('[data-rev-fechar]')) dlg.close();
+    });
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (!atual) return;
+      var corpo = {acao: atual.acao, motivo: motivo.value};
+      if (atual.id_item) corpo.id_item = atual.id_item;
+      if (atual.acao === 'corrigir') corpo.valor = valor.value;
+      enviar.disabled = true;
+      mostrar('');
+      fetch(rota, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+                   body: JSON.stringify(corpo)})
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
+        })
+        .then(function (r) {
+          if (r.ok) { location.reload(); return; }
+          enviar.disabled = false;
+          mostrar(r.j.erro || 'Não consegui gravar a revisão agora: tente de novo.');
+        })
+        .catch(function () { enviar.disabled = false; mostrar('Não consegui falar com o servidor: tente de novo.'); });
+    });
+  })();
+</script>
+{% endif %}
+{% endif %}
+{% endif %}
+</div>
+{% endblock %}

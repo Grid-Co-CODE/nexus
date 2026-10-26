@@ -25,6 +25,7 @@ from ..dados import almoxarifado as A
 from ..dados import fato_almoxarifado as F
 from ..dados import livros
 from ..dados.dominios import norm
+from .inventario import revisao
 
 TELA = "pecas"
 _RECUSA = "recusada"
@@ -250,5 +251,8 @@ def registrar(bp) -> None:
     @bp.route(f"/{TELA}", endpoint=TELA)
     def tela():
         g = montar()
-        return render_template("pcm/almoxarifado.html", d=g.dados or {}, erro=g.erro)
+        # quantas contagens do inventário esperam o PCM (o número da aba Inventário); fora da conta guardada de 5 min, porque o
+        # estado vem dos eventos e muda a cada revisão. Sem ler o livro, a aba segue sem número
+        return render_template("pcm/almoxarifado.html", d=g.dados or {}, erro=g.erro,
+                               inventario_a_revisar=revisao.a_revisar(current_app.config))
 

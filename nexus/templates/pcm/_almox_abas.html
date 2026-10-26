@@ -1,0 +1,9 @@
+{# As abas do Almoxarifado nas telas que são OUTRA página (o Inventário, 26/10/2026): as cinco da tela principal voltam a ela,
+   na aba delas (`?aba=`), e a do Inventário fica marcada. A tela principal (almoxarifado.html) troca as suas cinco no lugar,
+   por JavaScript, e põe a do Inventário como link. `a_revisar`: quantas contagens esperam o PCM (a lista do Inventário). #}
+<nav class="alm-abas" role="tablist" aria-label="Partes do almoxarifado">
+  {% for chave, rotulo in (('reposicao', 'Reposição'), ('almoxarifados', 'Por almoxarifado'), ('catalogo', 'Catálogo e saldo'), ('consumo', 'Consumo nas OS'), ('cadastro', 'Cadastro a corrigir')) %}
+  <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas?aba={{ chave }}">{{ rotulo }}</a>
+  {% endfor %}
+  <a class="alm-aba" role="tab" aria-selected="true" href="{{ raiz }}/t/pcm/pecas/inventario">Inventário{% if a_revisar %} ({{ a_revisar }}){% endif %}</a>
+</nav>

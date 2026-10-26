@@ -8,3 +8,46 @@ efetivo com a curadoria, a contagem mais nova que substitui as velhas, a janela 
 o lote e grava chama as mesmas. `leitura` lê as contagens que o App publica e o estado de cada uma pelos eventos do livro
 do inventário. As telas e a gravação em segundo plano entram nas tarefas seguintes.
 """
+
+
+def registrar(bp) -> None:
+    """As rotas da aba Inventário na torre PCM, todas debaixo de `/pecas/inventario` (sub-rotas da tela Almoxarifado, que é do
+    setor PCM: quem não a vê, não vê estas). Importa dentro da função: o pacote é importado pelos testes do adaptador sem a
+    torre, e `pcm.telas` puxa o motor inteiro."""
+    from flask import abort, current_app, jsonify, render_template, request, session
+
+    from ...dados import fato_inventario as F
+    from ..telas import _de_outro_site, pode_programar
+    from . import estoque as E
+    from . import revisao as R
+
+    @bp.route("/pecas/inventario", endpoint="inventario")
+    def inventario():
+        return render_template("pcm/inventario.html", **R.montar_lista(current_app.config))
+
+    @bp.route("/pecas/inventario/<contagem_id>", endpoint="inventario_contagem")
+    def inventario_contagem(contagem_id):
+        """A contagem aberta: o Sistema (o saldo do Fracttal) lido agora com o login de quem abre, contra o contado."""
+        app = current_app._get_current_object()
+        # `E.estoque_da_sessao` pelo módulo, no momento do pedido: os testes o trocam pelo `EstoqueFalso`
+        try:
+            ctx = R.montar(app.config, contagem_id, lambda id_almox: E.estoque_da_sessao(app).ler(id_almox), pode_programar())
+        except F.Recusada as ex:
+            return render_template("pcm/inventario_contagem.html", erro=str(ex), c=None, a_revisar=None)
+        if ctx is None:
+            abort(404)
+        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, **ctx)
+
+    @bp.route("/pecas/inventario/<contagem_id>/revisar", methods=["POST"], endpoint="inventario_revisar")
+    def inventario_revisar(contagem_id):
+        """Tirar uma peça do lote, corrigir o número ou pedir a recontagem (JSON), só de quem `pode_programar` (o
+        administrador e o setor PCM) e de uma página deste mesmo endereço. Grava um evento; nunca fala com o Fracttal."""
+        if _de_outro_site() or not pode_programar():
+            return jsonify(ok=False, erro=R.SO_PCM), 403
+        usuario = session.get("usuario")
+        email = usuario.get("email") if isinstance(usuario, dict) else None
+        try:
+            return jsonify(R.revisar(current_app.config, contagem_id, request.get_json(silent=True),
+                                     R.pessoa(current_app.config, email)))
+        except R.Recusa as ex:
+            return jsonify(ok=False, erro=ex.mensagem), ex.status

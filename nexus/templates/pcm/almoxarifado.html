@@ -49,6 +49,8 @@
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="catalogo">Catálogo e saldo ({{ d.catalogo|length }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="consumo">Consumo nas OS ({{ d.consumo|length }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="cadastro">Cadastro a corrigir</button>
+  {# o Inventário (26/10/2026) é OUTRA página: um link na fila das abas, com quantas contagens esperam o PCM #}
+  <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario">Inventário{% if inventario_a_revisar %} ({{ inventario_a_revisar }}){% endif %}</a>
 </nav>
 
 <form class="cn-filtros alm-filtros" method="get" id="alm-f" data-filtro-local>
@@ -168,7 +170,7 @@
 <script>
   // as abas: mostrar uma esconde as outras (a tabela escondida não conta no filtro) e o endereço guarda qual está aberta
   (function () {
-    var abas = Array.prototype.slice.call(document.querySelectorAll('.alm-aba'));
+    var abas = Array.prototype.slice.call(document.querySelectorAll('.alm-aba[data-aba]'));
     var paineis = Array.prototype.slice.call(document.querySelectorAll('[data-painel]'));
     function abrir(nome) {
       if (!abas.some(function (b) { return b.dataset.aba === nome; })) nome = 'reposicao';

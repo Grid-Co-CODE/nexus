@@ -14,7 +14,7 @@ O Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do 
 PCM essa visão de acompanhamento. O design quero alá Nexus [...] mas as estruturas quero sim que mantenha!"): as abas
 MPA, MPS, Radar de Backlog, Mapa e One Page, com as fontes do Nexus (`nexus/pcm/acompanhamento`), do setor PCM.
 """
-from ...pcm import acompanhamento, almoxarifado
+from ...pcm import acompanhamento, almoxarifado, inventario
 from ...pcm.telas import registrar_pcm
 from ..modelo import Tela, Torre
 
@@ -86,3 +86,5 @@ registrar_pcm(bp)
 acompanhamento.registrar(bp)
 # o Almoxarifado (nexus/pcm/almoxarifado.py)
 almoxarifado.registrar(bp)
+# a aba Inventário do Almoxarifado, as contagens do App que o PCM revisa (nexus/pcm/inventario)
+inventario.registrar(bp)

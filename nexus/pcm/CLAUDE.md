@@ -62,7 +62,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
-| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo; as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
+| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo; a gravação em segundo plano, a régua e a curadoria vêm nas próximas tarefas do plano |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
@@ -422,7 +422,7 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   `nexus/dados/almoxarifado.py`, os MESMOS da carga do histórico (`nexus/dados/CLAUDE.md`, linha Almoxarifado).
 - **O que a tela mostra:** 6 números (almoxarifados, peças com saldo, abaixo do mínimo e no limite, sem mínimo,
   avariadas, lançadas pelo App com as recusadas) e 5 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
-  (tudo desde o início, Levi 25/10/2026) e Cadastro a corrigir. Filtro na própria página (`filtro-local.js`).
+  (tudo desde o início, Levi 25/10/2026) e Cadastro a corrigir. Desde 26/10/2026, uma 6ª aba, Inventário, é um link para outra página (a seção do inventário, abaixo). Filtro na própria página (`filtro-local.js`).
 - **As contas:** abaixo = mínimo > 0 e saldo < mínimo; **no limite** = saldo igual ao mínimo, separado porque o Fracttal
   costuma ter o mínimo igual ao saldo (25/10: 0 abaixo, 54 no limite); sem mínimo = mínimo 0; zerada = saldo 0.
 - **Número pela metade não vai:** o saldo é o do ciclo mais novo do App só com Ciclo, Itens e Saldo do mesmo ciclo e 90%
@@ -589,6 +589,50 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
 - **Provar:** `tests/test_pcm_inventario_leitura.py` (os estados, a substituição, o livro que não existe e o que não lê, a janela de
   90 dias, o contrato violado, a cópia que ninguém estraga); mutações no lote vazio, nas contagens vivas, nas gravadas, na cópia
   das linhas e na falha de leitura, todas pegas.
+
+## Inventário do almoxarifado: a aba Inventário (`inventario/revisao.py`, as rotas em `inventario/__init__.py`; 26/10/2026)
+
+Levi, 26/10/2026: o técnico conta no App e o PCM revisa e aprova no Nexus. A aba é um LINK na fila das abas do Almoxarifado (depois
+das cinco), com quantas contagens esperam o PCM; é outra página, `pcm/inventario.html` (a lista) e `pcm/inventario_contagem.html`
+(a contagem aberta), com as abas em `pcm/_almox_abas.html` (as cinco voltam à tela principal, em `?aba=`). As rotas são sub-rotas da
+tela `pecas`, que é do setor PCM (outros, pela marca em Base → Acessos): `GET /t/pcm/pecas/inventario`, `GET .../<contagem_id>` e
+`POST .../<contagem_id>/revisar` (JSON). O código das telas é o `revisao.py`, sem Flask (as rotas só passam a configuração, a
+função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada uma é o `leitura.py` (seção acima).
+
+- **O Sistema é lido NA HORA**, não o da varredura da madrugada (o saldo muda durante o dia): uma leitura do almoxarifado inteiro
+  pelo adaptador (`estoque.estoque_da_sessao(app).ler(id_almox)`, com o login do Fracttal de quem abre; os testes trocam esse
+  `estoque_da_sessao` pelo `EstoqueFalso`). **Sem o login** (quem entrou pela senha de administrador, ou a sessão do Fracttal que
+  acabou), com a cota esgotada (429) ou com o Fracttal fora do ar, a tela mostra SÓ o que o técnico contou, sem Sistema, Δ nem
+  situação, e diz por quê ("entre pelo Fracttal para ver o saldo do sistema e gravar", "o Fracttal pediu uma pausa; tente de novo em
+  1 minuto"): a situação de cada peça depende do saldo, e uma conta com o saldo 0 chutado mandaria "subir" o estoque inteiro. Nunca
+  500. **A contagem que já não se aprova** (velha, substituída, gravada, recontagem pedida) também não lê o Fracttal (gastaria a cota
+  de toda a empresa à toa), e a que o App mandou fora do contrato (sem "ID da linha") não mostra número nenhum.
+- **Os seis grupos da confirmação** (`contas.SITUACOES`): para cima, para baixo, zerar, sem alteração, não será tocada e curadoria;
+  só os três primeiros mexem no estoque, e o botão "Gravar N alterações" conta só eles, sem a peça tirada. **O zerar abre aberto e
+  destacado** (é a única ação que apaga estoque). A peça tirada do lote vai a "não será tocada" com o motivo; a de contado negativo
+  também, com "contado inválido"; a peça nunca ligada ao almoxarifado mostra "será ligada ao gravar" e a ligada com o saldo vazio, "não
+  informado" (vale 0 na conta, e contar 0 nela não é zerar). **O botão de gravar está desligado até a Task 7** (dica: "a gravação chega
+  na próxima entrega").
+- **Curadoria aberta avisa e não bloqueia:** "N achados por decidir na curadoria; decidir depois soma ao contado da peça escolhida" (e o
+  mesmo, dizendo o genérico, quando ele tem unidades ainda por identificar). O genérico por identificar e o achado não têm Δ: as
+  unidades ainda não têm dono.
+- **Revisar** (`POST .../revisar`, `{"acao": "tirar" | "corrigir" | "recontagem", "id_item", "valor", "motivo"}`): só quem
+  `telas.pode_programar()` (administrador e setor PCM) e de uma página deste mesmo endereço, senão 403. O motivo é OBRIGATÓRIO nas
+  três (o desenho: "cada um com o motivo, na auditoria") e vai só cifrado (`dados={"motivo": ...}`; a API do banco é aberta). `corrigir`
+  aceita número de zero para cima, com vírgula ou ponto (o 0 vale: a peça acabou; negativo, vazio, texto e notação científica, 400);
+  contagem que não se aprova, 409 com o `motivo_nao_aprovavel`; peça que não é da contagem, 400; peça já tirada, 409; corrigir peça com
+  unidades por identificar, 409 (decide a curadoria antes). **Nada disso fala com o Fracttal:** grava UM evento no livro do inventário
+  (`peca_tirada`, `numero_corrigido` com `de_qtd` = o do campo, `para_qtd` = o corrigido e `contado_qtd` = o do campo, ou
+  `recontagem_pedida`), com a usina pela de-para do Fracttal (`usina_id` + `usina_ligada_por`) e a pessoa como `pessoa_hmac` (o código do
+  e-mail) e `pessoa_id` (quando a ficha do cadastro a acha). **Quem entrou pela senha de administrador não revisa** (409): não é uma
+  pessoa, e a revisão ficaria sem dono na auditoria.
+- **Por que a lista não guarda o estado:** a cópia de 5 min é do livro do App; o estado sai dos eventos a cada abertura, e a revisão
+  renova a cópia dos eventos. Pedir a recontagem e ver "nova" por mais 5 min faria o PCM pedir de novo.
+- **Provar:** `tests/test_pcm_inventario_telas.py` (a lista e a contagem com os seis grupos e os números certos, o login do Fracttal que
+  falta, o 429 e a queda, cada ação com o evento e o motivo só cifrado, as recusas, o 403 dos outros setores, a aba, as cores só por
+  token e os endereços pela `{{ raiz }}`); mutações em cada regra acima, todas pegas. Conferida no navegador (1366 e 375 px, escuro e
+  claro) com a página que os testes renderizam servida estática, sem rolagem lateral e com o painel de revisão abrindo; a prova com o
+  servidor de verdade e o `EstoqueFalso` é da Task 10.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 
