@@ -112,9 +112,22 @@
     atualizaHint(rows.length + ' ativo(s) nesta seleção');
   }
 
+  // ── as usinas dos marcados (Levi, 26/10/2026). O marcado continua marcado ao trocar de usina (Step1._checked), e
+  //    ninguém via: a OS 16996 nasceu num tracker de outra usina, junto com a 16995 (um inversor), com o título do
+  //    inversor. Cada marcado guarda a usina em que foi marcado; mais de uma usina, a tela diz em cada passo. ──
+  const comUsina = (a) => Object.assign({usina: cbUsi.value}, a);
+  function usinasMarcadas() {                                  // usina → [ativos marcados nela], na ordem em que entraram
+    const m = new Map();
+    marcados.forEach((a) => { const u = a.usina || '?'; m.set(u, (m.get(u) || []).concat([a])); });
+    return m;
+  }
+  function textoUsinas(sep) {
+    return [...usinasMarcadas()].map(([u, l]) => u + ': ' + l.map((a) => a.curto || a.label || a.code).join(', ')).join(sep);
+  }
+
   function atualizaHint(base) {                                // Step1._atualiza_hint
-    const n = marcados.size;
-    hint.textContent = n ? base + '  ·  ' + n + ' marcado(s)' : base;
+    const n = marcados.size, nu = usinasMarcadas().size;
+    hint.textContent = n ? base + '  ·  ' + n + ' marcado(s)' + (nu > 1 ? ' em ' + nu + ' usinas diferentes' : '') : base;
     bNext1.textContent = n ? 'Próximo (' + n + ') ›››' : 'Próximo ›››';
     bNext1.disabled = !n;
   }
@@ -122,7 +135,7 @@
   tbody.addEventListener('change', (ev) => {
     if (!ev.target.classList.contains('chk')) return;
     const id = Number(ev.target.closest('tr').dataset.id), a = assets.find((x) => x.id === id);
-    if (ev.target.checked && a) marcados.set(id, a); else marcados.delete(id);
+    if (ev.target.checked && a) marcados.set(id, comUsina(a)); else marcados.delete(id);
     atualizaHint(hint.textContent.split('  ·')[0]);
   });
   tbody.addEventListener('click', (ev) => {
@@ -154,7 +167,7 @@
       await onCliente();
     } catch (e) { hint.textContent = '⚠ ' + e.message; }
   };
-  bNext1.onclick = () => irPara(1);
+  bNext1.onclick = () => { previaDesc(); irPara(1); };
 
   // ═══ Passo 2 — Step2 + TipoTarefaBox ═══
   const desc = $('desc'), obs = $('obs'), etiqBusca = $('etiq_busca'), etiqLista = $('etiq_lista');
@@ -189,7 +202,19 @@
     } catch (e) { cbTipoTarefa.innerHTML = '<option value="">⚠ falha ao carregar — relogue</option>'; }
   }
   const tipoPronto = () => !!cbTipoTarefa.value;              // TipoTarefaBox.is_ready
-  desc.oninput = () => { bNext2.disabled = !desc.value.trim(); };
+  // o título de cada OS é a descrição com o nome curto do SEU ativo na frente (26/10/2026; o servidor monta com
+  // `solic_web.titulo_do_ativo`): a marca [Ativo] vale, e o que já começa pelo ativo não repete
+  function tituloCom(v, curto) {
+    if (v.indexOf('[Ativo]') >= 0) return v.replace('[Ativo]', '[' + curto + ']');
+    return v.toLowerCase().indexOf(('[' + curto + ']').toLowerCase()) === 0 ? v : '[' + curto + '] - ' + v;
+  }
+  function previaDesc() {
+    const v = desc.value.trim(), m = [...marcados.values()], el = $('hint_desc');
+    if (!v || !m.length) { el.textContent = 'Escreva só a ação: o nome de cada ativo entra sozinho na frente do título.'; return; }
+    el.textContent = 'Vai sair “' + tituloCom(v, m[0].curto || 'Ativo') + '”'
+      + (m.length > 1 ? ' — e assim com o nome de cada um dos ' + m.length + ' ativos marcados.' : '.');
+  }
+  desc.oninput = () => { bNext2.disabled = !desc.value.trim(); previaDesc(); };
   $('b_back2').onclick = () => irPara(0);
   bNext2.onclick = () => { if (desc.value.trim()) irPara(2); };
 
@@ -236,8 +261,11 @@
   function erroModal(m) { respErro.hidden = !m; respErro.textContent = m ? '⚠ ' + m : ''; }
 
   async function abrirResponsavel() {
-    const n = marcados.size;
+    const n = marcados.size, nu = usinasMarcadas().size;
     $('resp_titulo').innerHTML = '<b>' + n + ' OS</b> a gerar — escolha o <b>responsável</b> <small>(obrigatório na criação)</small>:';
+    $('resp_usinas').hidden = nu < 2;
+    $('resp_usinas').textContent = nu < 2 ? '' : 'Atenção: os ativos marcados são de ' + nu + ' usinas diferentes — confira: '
+      + textoUsinas(' · ') + '.';
     bGerar.textContent = n > 1 ? 'Gerar ' + n + ' OS' : 'Gerar OS'; bGerar.disabled = true; pessoaSel = null;
     wAgrupar.hidden = !(n > 1); ckAgrupar.checked = false; $('fin').hidden = false;     // agrupar só com mais de um ativo
     ckFin.checked = false; finpanel.hidden = true;
@@ -346,7 +374,9 @@
     const frase = agrupar ? 'Vou criar 1 OS com ' + ativos.length + ' tarefas (uma por ativo marcado), responsável ' + pessoaSel.name + '.'
                           : 'Vou criar ' + ativos.length + ' OS — uma por ativo marcado —, responsável ' + pessoaSel.name + '.';
     const extra = finalizar ? '\nA OS nasce já realizada (' + (finalizar.to_in_review ? 'Verificação' : 'Finalizados') + ').' : '';
-    if (!confirm(frase + extra + (ospaiSel ? '\nOS pai: ' + ospaiSel.folio + '.' : '') + '\n\nContinuar?')) return;
+    const usinas = usinasMarcadas().size > 1
+      ? '\n\nATENÇÃO: os ativos são de ' + usinasMarcadas().size + ' usinas diferentes:\n- ' + textoUsinas('\n- ') : '';
+    if (!confirm(frase + extra + (ospaiSel ? '\nOS pai: ' + ospaiSel.folio + '.' : '') + usinas + '\n\nContinuar?')) return;
     bGerar.disabled = true; bCancel.disabled = true; erroModal('');
     respBusca.placeholder = agrupar ? 'Gerando 1 OS com ' + ativos.length + ' tarefas…' : 'Gerando ' + ativos.length + ' OS (resp.: ' + pessoaSel.name + ')…';
     try {
@@ -374,7 +404,7 @@
     imgs.forEach((lista) => lista.forEach((im) => { if (im.url) URL.revokeObjectURL(im.url); })); imgs.clear();
     dtProg.value = agoraLocal(); progTocada = false; dtExec.value = amanhaLocal();
     busca.value = ''; cbCli.value = ''; onCliente();
-    desc.value = ''; obs.value = ''; bNext2.disabled = true;
+    desc.value = ''; obs.value = ''; bNext2.disabled = true; previaDesc();
     etiqMarcadas.clear(); etiqBusca.value = ''; filtrarEtiq();
     cbCrit.value = CRIT_DEFAULT; if (cbC1.options.length) cbC1.selectedIndex = 0; if (cbC2.options.length) cbC2.selectedIndex = 0;
     if (cbTipoTarefa.options.length) cbTipoTarefa.selectedIndex = 0;
@@ -461,7 +491,7 @@
     await onUsina();
     const a = assets.find((x) => x.code === s.sugAtivo);
     if (!a) return;
-    marcados.set(a.id, a);
+    marcados.set(a.id, comUsina(a));
     // a busca mostra o ativo marcado na primeira página (o nome da tabela traz o código)
     if (String(a.label || '').toLowerCase().includes(String(a.code).toLowerCase())) busca.value = a.code;
     limite = PAGINA; refreshAtivos();

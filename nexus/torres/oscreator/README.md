@@ -1000,6 +1000,30 @@ vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo ma
   tradicional_web.py e solic.html); o de 25/10 (rotas_solic.py, rotas_tradicional.py, tradicional_web.py,
   tradicional.html e tradicional.js) vai com o OK dele.
 
+## Criar OS: o ativo no título de cada OS e o aviso das usinas (26/10/2026)
+
+O caso: as OS 16995 (um inversor de uma usina) e 16996 (um tracker de OUTRA usina) nasceram no mesmo minuto, da mesma
+pessoa, com o mesmo responsável, programada, duração e etiqueta, e o título "[<código da usina do inversor>] - Inspeção do
+Inversor com alarme de Ventoinha" nas duas. Foi uma geração só no Criar OS (Tradicional): o ativo marcado continua
+marcado quando se troca de usina (o `Step1._checked` do app de mesa, de propósito), a descrição digitada ia igual para
+cada OS, e o tracker marcado em outra usina levou o título escrito para o inversor. Levi escolheu: o ativo entra sozinho
+no título e a tela avisa quando os marcados são de mais de uma usina.
+
+- **O título:** a pessoa escreve só a ação; cada OS (e cada tarefa, na agrupada) sai "[Ativo] - descrição", com a regra da
+  Nova solicitação (`solic_web.titulo_do_ativo`: o nome curto do catálogo, a marca `[Ativo]` vale, o que já começa pelo
+  ativo não repete). Vai pelo `por_ativo` do `create_work_orders_bulk` e do `create_work_orders_agrupada` (o mesmo caminho
+  do COS e da Engenharia); o `desc` posicional segue o digitado (`tradicional_web.montar_payload`, com as frases do tipo
+  que a rota já guarda por 1 h). O Passo 2 mostra "Vai sair “[Inversor 5.1] - …”" com o 1º marcado.
+- **As usinas:** cada marcado guarda a usina em que foi marcado (`comUsina`). Com mais de uma, o Passo 1 diz "N
+  marcado(s) em K usinas diferentes", o Passo 4 mostra em âmbar (`.osb-aviso`, sem cor nova) quais ativos de quais usinas,
+  e a confirmação repete a lista antes de criar. A marcação entre usinas continua valendo (é o app de mesa).
+- **Prova:** `tests/test_oscreator_criar_os_titulo_26_10.py` (uma OS por ativo e a agrupada com o título de cada ativo, a
+  marca e o título que já tem o ativo, o payload puro, a tela). Na bancada (o Criar OS do fixture, a cascata de mentira
+  com duas usinas), a 1280 e a 375 px, no escuro e no claro: o inversor marcado na usina A segue marcado na B, o Passo 1
+  com "2 marcado(s) em 2 usinas diferentes", a prévia do título, o aviso âmbar do Passo 4 e a confirmação com as duas
+  usinas, sem rolagem lateral. No oem, o `test_os_web_tradicional.py` passou a cobrar o `por_ativo` junto com a sincronia
+  (cópia de trabalho; sem commit lá).
+
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
 Levi, 19/10/2026, em Nexus > Chamados > Garantias: "ao clicar na OS em responsável dê para alterar o responsável da OS que

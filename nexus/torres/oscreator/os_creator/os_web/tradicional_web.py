@@ -15,6 +15,7 @@ import datetime as dt
 import api
 
 from . import ativo_curto
+from .solic_web import titulo_do_ativo
 
 STEP_LABELS = ["Ativo + Data", "Detalhes da Tarefa", "Sub tarefas", "Responsável"]   # app.py::STEP_LABELS
 CLIENTES_OCULTOS = {"almoxarifado", "teste - pa"}                                    # steps/step1.py — almoxarifado e ambiente de teste
@@ -164,7 +165,7 @@ def agrupar_imagens(pares) -> dict:
 
 
 # ── o payload do ResponsavelDialog._gerar ────────────────────────────────────────────────────────
-def montar_payload(corpo: dict, assets: list, imagens: dict | None = None) -> tuple[str, tuple, dict, str]:
+def montar_payload(corpo: dict, assets: list, imagens: dict | None = None, frases=None) -> tuple[str, tuple, dict, str]:
     """Do JSON da tela → ('bulk'|'agrupada', args posicionais, kwargs, erro).
 
     Espelha `MainWindow._gerar_os` (validação de ativo e de tipo) e `ResponsavelDialog._gerar` (datas, finalizar, agrupar,
@@ -218,6 +219,13 @@ def montar_payload(corpo: dict, assets: list, imagens: dict | None = None) -> tu
     id_parent = _int_ou_none(os_pai.get("id")) if isinstance(os_pai, dict) else _int_ou_none(os_pai)
     codes = {a.get("code") for a in ativos}
     imagens_por_ativo = {c: lista for c, lista in (imagens or {}).items() if c in codes and lista}   # só dos MARCADOS
+    # o TÍTULO de cada OS (ou de cada tarefa, na agrupada) com o nome curto do SEU ativo na frente (Levi, 26/10/2026). As
+    # OS 16995 e 16996 nasceram juntas com "[<código da usina do inversor>] - Inspeção do Inversor com alarme de
+    # Ventoinha": o marcado continua marcado ao trocar de usina (Step1._checked), a descrição ia igual para todas, e o
+    # tracker marcado em outra usina levou o título do inversor. Agora a pessoa escreve a ação e o ativo entra sozinho,
+    # com a regra da Nova solicitação (`solic_web.titulo_do_ativo`: a marca [Ativo] vale; o que já começa pelo ativo não
+    # repete). O `desc` posicional segue o digitado: quem manda é o `por_ativo`, o mesmo caminho do COS e da Engenharia.
+    por_ativo = {a.get("code"): {"description": titulo_do_ativo(desc, a, frases)} for a in ativos}
     finalizar = None
     fin = corpo.get("finalizar") if isinstance(corpo.get("finalizar"), dict) else None
     # Agrupar e "já realizada" não combinam (app.py::_on_agrupar esconde o painel): com agrupar, o painel é ignorado.
@@ -237,11 +245,11 @@ def montar_payload(corpo: dict, assets: list, imagens: dict | None = None) -> tu
     if agrupar:                                                       # app.py:999-1003
         args = (ativos, desc, tipo_txt, subs, etiqueta, nome_resp, id_personnel, etiqueta_ids, obs)
         kwargs = {"tipo": tipo_dict, "event_date": event, "id_parent": id_parent,
-                  "imagens_por_ativo": imagens_por_ativo, "prog_date": prog}
+                  "imagens_por_ativo": imagens_por_ativo, "prog_date": prog, "por_ativo": por_ativo}
         return "agrupada", args, kwargs, ""
     args = (ativos, desc, tipo_txt, subs, etiqueta, code_resp, nome_resp, id_personnel, etiqueta_ids, obs)   # app.py:1009-1011
     kwargs = {"tipo": tipo_dict, "finalizar": finalizar, "event_date": event, "id_parent": id_parent,
-              "imagens_por_ativo": imagens_por_ativo, "prog_date": prog}
+              "imagens_por_ativo": imagens_por_ativo, "prog_date": prog, "por_ativo": por_ativo}
     return "bulk", args, kwargs, ""
 
 

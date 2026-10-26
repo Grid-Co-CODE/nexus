@@ -64,6 +64,8 @@
     <div class="trad-sub-t">Detalhes da OS</div>
     <label class="os-campo"><span class="os-lbl">Descrição da tarefa <i>*</i></span>
       <textarea id="desc" rows="2" placeholder="Somente uma ação"></textarea></label>
+    {# 26/10/2026: o nome do ativo entra sozinho no título de cada OS; aqui a prévia com o 1º marcado #}
+    <div class="os-ajuda" id="hint_desc">Escreva só a ação: o nome de cada ativo entra sozinho na frente do título.</div>
     <label class="os-campo"><span class="os-lbl">Observação <small>(opcional)</small></span>
       <textarea id="obs" rows="2" placeholder="Observações da OS (opcional)"></textarea></label>
     <label class="os-campo"><span class="os-lbl">Etiquetas <small>(opcional — marque as que quiser)</small></span>
@@ -109,6 +111,8 @@
     <div class="trad-modal-h"><span class="os-badge">4</span><span class="os-cardf-t">{{ passos[3] }}</span></div>
     <div class="trad-modal-corpo">
       <p class="trad-txt" id="resp_titulo"><b>1 OS</b> a gerar — escolha o <b>responsável</b> <small>(obrigatório na criação)</small>:</p>
+      {# 26/10/2026: os marcados de mais de uma usina, em âmbar (a OS 16996 nasceu num tracker de outra usina) #}
+      <p class="osb-aviso" id="resp_usinas" hidden></p>
       <input id="resp_busca" type="search" placeholder="Filtrar responsável…" autocomplete="off">
       <div class="trad-lista trad-pessoas" id="resp_lista"></div>
       <div id="fin">

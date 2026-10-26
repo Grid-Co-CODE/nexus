@@ -112,7 +112,9 @@ def _corpo_e_imagens() -> tuple[dict, dict]:
 @exige_sessao
 def api_criar():
     corpo, imagens = _corpo_e_imagens()
-    modo, args, kwargs, erro = trad.montar_payload(corpo, api.load_assets_cached(), imagens)
+    # as frases do tipo dão o nome curto de cada ativo no título da OS (26/10/2026), as mesmas da prévia da tela
+    frases = _memo(("frases_ativo",), 3600, lambda: ativo_curto.frases(api._read_asset_cache() or []))
+    modo, args, kwargs, erro = trad.montar_payload(corpo, api.load_assets_cached(), imagens, frases)
     if erro:
         return jsonify({"erro": erro}), 400
     if modo == "agrupada":                                            # app.py:999 — "Agrupar em UMA OS com várias tarefas"
