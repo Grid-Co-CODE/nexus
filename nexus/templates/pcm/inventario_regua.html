@@ -88,6 +88,8 @@
         {% if not (x.acordado[0] is none and x.acordado[1] is none) %}
         <form method="post" action="{{ raiz }}/os/_nexus/inventario/regua/gravar" data-ponte class="rg-grava">
           <input type="hidden" name="almox" value="{{ almox.id }}"><input type="hidden" name="item" value="{{ x.id_item }}">
+          {# o acordado que esta tela mostra: a ponte recusa (409) se, enquanto a tela estava aberta, outra pessoa o mudou #}
+          <input type="hidden" name="aco_min" value="{{ fmt(x.acordado[0]) }}"><input type="hidden" name="aco_max" value="{{ fmt(x.acordado[1]) }}">
           <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">{{ 'Gravar de novo' if x.gravado else 'Gravar no Fracttal' }}</button></form>
         {% endif %}
         <form id="{{ f }}" method="post" action="{{ raiz }}/t/pcm/pecas/inventario/regua/decidir">

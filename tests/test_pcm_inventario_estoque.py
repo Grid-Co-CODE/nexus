@@ -483,16 +483,23 @@ def test_achar_peca_pelo_codigo_exato():
     """A curadoria (Task 9) cadastra sem duplicar: antes de criar de novo, procura a peça pelo código que ela reservou (o
     `criar_peca` pode ter criado e perdido a resposta). Pede a lista de peças pelo filtro do código, e confere a linha: o
     filtro que o Fracttal ignora devolveria o catálogo inteiro, e o código parecido (SP-CAB-0130) não é o procurado."""
-    pecas = [{"id": 12, "code": "SP-CAB-0130"}, {"id": 11, "code": "SP-CAB-013"}, {"id": 13, "code": None}, {"id": 14}]
+    pecas = [{"id": 12, "code": "SP-CAB-0130", "field_1": "Outra"}, {"id": 11, "code": "SP-CAB-013", "field_1": " Cabo azul 6 mm "},
+             {"id": 13, "code": None}, {"id": 14}]
     fr = Fracttal({PECAS: em_paginas(pecas)})
     est = estoque(fr)
     assert est.achar_peca(" sp-cab-013 ") == "11"
+    assert est.peca("SP-CAB-013") == {"id": "11", "nome": "Cabo azul 6 mm"}        # o nome (`field_1`) vem junto, sem a folga
+    assert est.peca("SP-CAB-0130") == {"id": "12", "nome": "Outra"} and est.peca("SP-CAB-999") is None
     assert fr.pedidos[0] == (PECAS, {"filter": [{"operator": "=", "property": "code", "value": "sp-cab-013"}], "sort": [],
                                      "page": 1, "limit": 200, "start": 0, "is_tree": False, "node": 0, "id_type_item": 4})
     assert est.achar_peca("SP-CAB-999") is None
     for vazio in ("", "  ", None):
         with pytest.raises(ValueError):
             est.achar_peca(vazio)
+        with pytest.raises(ValueError):
+            est.peca(vazio)
+    sem_nome = estoque(Fracttal({PECAS: em_paginas([{"id": 7, "code": "SP-X-001"}])}))
+    assert sem_nome.peca("SP-X-001") == {"id": "7", "nome": ""}                   # a linha sem `field_1`: nome vazio, não erro
 
 
 def test_achar_peca_para_na_pagina_que_acha_e_lista_pela_metade_e_erro():
@@ -647,6 +654,8 @@ def test_falso_acha_a_peca_criada_e_a_que_ja_estava_no_almoxarifado():
     assert f.achar_peca("sp-tst-009") == novo and f.achar_peca("SP-TST-001") == ITEM
     assert f.achar_peca("SP-TST-777") is None
     assert f.chamadas[-3:] == ["achar_peca"] * 3
+    assert f.peca("SP-TST-009") == {"id": novo, "nome": "Peça nova"} and f.peca("SP-TST-001") == {"id": ITEM, "nome": ""}
+    assert f.peca("SP-TST-777") is None
     with pytest.raises(ValueError):
         f.achar_peca("")
 

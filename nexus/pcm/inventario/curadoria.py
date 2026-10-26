@@ -23,16 +23,23 @@ Regras com o caso que as criou:
 - **Cadastrar sem duplicar.** O `criar_peca` pode criar a peça e perder a resposta (a conexão cai depois de o Fracttal gravar).
   Antes de criar, o código escolhido vai para um controle local (`<NEXUS_DADOS>/almox_inventario/curadoria_<contagem>.json`,
   sem login, sem nome): na nova tentativa da mesma linha o código reservado é o da linha; se ele já existe no Fracttal
-  (`Estoque.achar_peca`), não cria de novo, acha o ID e só grava a decisão; se não existe, cria com ele. A reserva também vale
-  para as outras linhas da mesma sigla (a peça recém-criada pode ainda não aparecer na lista do Fracttal).
+  (`Estoque.peca`), não cria de novo, acha o ID e só grava a decisão; se não existe, cria com ele. A reserva também vale
+  para as outras linhas da mesma sigla (a peça recém-criada pode ainda não aparecer na lista do Fracttal). A reserva guarda a sigla,
+  o nome e a unidade, e a nova tentativa tem de vir com os mesmos (`Conflito` se não); e a peça achada pelo código reservado tem de ter
+  o mesmo nome (`field_1`), senão o código foi usado por outra pessoa e a decisão não se liga a ela.
+- **Antes de escrever, o estado da contagem é conferido de novo** (o cadastro leva segundos, e a gravação pode chegar no meio): a
+  decisão que chega à contagem já fechada é recusada, e a mensagem do cadastro diz o código que ficou criado no Fracttal.
+- **As travas são por chave** (`travas.Travas`: a linha, a sigla, o arquivo de controle), nunca uma do módulo segurada enquanto se
+  espera o Fracttal.
 - **O próximo código usa o `Estoque.codigos`**, que traz as peças DESATIVADAS também (a lista de Peças e Suprimentos do Fracttal
   mostra "Não" em "Habilitado" e as mantém): o código de peça desativada não é reaproveitado.
 - **A sigla `TST` só no almoxarifado de teste** (`almoxarifado.ids_de_teste`): a prova das gravações é lá, e `SP-TST-NNN` não
   pode nascer no catálogo de um cliente.
 - **A foto** é a do achado, guardada em `<NEXUS_DADOS>/almox_inventario/fotos/<nome_da_foto(chave)>.jpg` e servida pela rota
   `.../curadoria/foto/<nome>.jpg` (como as dos extintores, que o App envia ao Nexus e ficam em disco: nunca no banco, que a API
-  abre a quem quiser). Sem a foto, a tela diz "sem foto". Como a foto chega a essa pasta é o contrato com o App (a chave em
-  `Foto` do livro das contagens; ainda não definido), e o nome é o SHA-1 da chave: qualquer chave cabe num nome de arquivo.
+  abre a quem quiser). Sem a foto, a tela diz "sem foto". **Pendente:** falta a rota assinada App→Nexus, como a do extintor
+  (`hseq/fotos.receber`), combinada com a sessão do App; o nome é o SHA-1 da chave (qualquer chave cabe num nome de arquivo). A
+  descrição do técnico e a foto só aparecem para quem decide (`pode_programar`).
 - **Grupo, criticidade e Curva ABC não se gravam pela API** (testado pelo PCM em 09/10): a tela lembra de completar na tela do
   Fracttal.
 """
@@ -41,7 +48,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -59,6 +65,7 @@ from . import erros, quem
 from . import estoque as E
 from .erros import Conflito
 from .regua import fmt
+from .travas import Travas
 
 # as siglas do catálogo de peças (design 3.8); a do teste só no almoxarifado de teste
 SIGLAS = ("PEL", "PME", "CAB", "SEN", "CTR", "COM", "INS", "ARM", "EAX", "HSE", "CSM", "GER")
@@ -67,7 +74,12 @@ DECISOES_DO_TIPO = {"fora_do_catalogo": ("cadastrar", "e_a_peca", "descartar"), 
 UNIDADES = ("UNIDADE", "METRO", "MASSA")        # as que o catálogo de peças tem (as opções da tela)
 NOME_MAX, MOTIVO_MAX = 120, 300
 _FOTO_ID = re.compile(r"[0-9a-f]{24}")
-_TRAVA = threading.Lock()           # a decisão é ler, conferir e escrever; a mesma linha decidida por dois ao mesmo tempo
+# Uma trava por chave, nunca uma do módulo inteiro (o `criar_peca` e as páginas do catálogo levam segundos, e todo o PCM esperaria):
+# - `_LINHA`, por (contagem, linha): ler, conferir e escrever a decisão (a mesma linha por dois ao mesmo tempo: um ganha, o outro 409);
+# - `_SIGLA`, por sigla: escolher o próximo código e reservá-lo (duas linhas da mesma sigla não escolhem o mesmo número);
+# - `_ARQUIVO`, por arquivo de controle: ler e regravar as reservas de uma contagem (linhas de siglas diferentes dividem o arquivo).
+# A ordem é sempre essa (linha, sigla, arquivo), para uma não esperar pela outra em círculo.
+_LINHA, _SIGLA, _ARQUIVO = Travas(), Travas(), Travas()
 _txt, _id = A._txt, A._id
 
 
@@ -119,6 +131,14 @@ def _estados(cfg, forcar: bool = False) -> tuple[dict, dict]:
     estado = {cid: ("gravada" if cid in gravadas else "recontagem" if cid in recusadas
                     else "substituida" if cid in substituidas or cid in velhas else "aberta") for cid in por}
     return por, estado
+
+
+# por que a contagem não se decide mais: (como está agora, como já estava quando a decisão chegou ao fim)
+_PORQUE = {"gravada": ("já foi gravada no Fracttal (ou a gravação já começou)",
+                       "já tinha sido gravada no Fracttal (ou a gravação já tinha começado)"),
+           "recontagem": ("foi recusada (recontagem pedida)", "já tinha sido recusada (recontagem pedida)"),
+           "substituida": ("foi substituída por uma contagem mais nova do almoxarifado",
+                           "já tinha sido substituída por uma contagem mais nova do almoxarifado")}
 
 
 def contagens_abertas(cfg) -> dict[str, list[dict]]:
@@ -213,15 +233,27 @@ def _quando_txt(iso) -> str:
     return d.astimezone(_BRT).strftime("%d/%m, %H:%M")
 
 
+def _reservas_da_contagem(cfg, cid: str) -> dict:
+    """As reservas de código desta contagem para a tela repetir os mesmos dados (`reserva` na pendência). Sem pasta de dados ou
+    com o controle ilegível, vazio: quem decide encontra o erro de verdade ao cadastrar (`_ler_reservas`), a tela só não ajuda."""
+    try:
+        with _ARQUIVO.de(_arquivo_reserva(cfg, cid).name):
+            return _ler_reservas(_arquivo_reserva(cfg, cid))
+    except (F.Recusada, OSError):
+        return {}
+
+
 def pendencias(cfg) -> list[dict]:
     """As linhas `fora_do_catalogo` e `identificar` das contagens que não foram gravadas, na ordem em que a contagem as trouxe
     (a mais antiga primeiro), cada uma com a foto e a decisão que já tem (`decisao`: None se pende). `contado` já é número.
-    No genérico, o específico que o técnico escolheu vem com o código e o nome do catálogo do App (quando o catálogo veio)."""
+    No genérico, o específico que o técnico escolheu vem com o código e o nome do catálogo do App (quando o catálogo veio). A
+    `reserva` é o que uma tentativa anterior de cadastrar esta linha reservou (código, sigla, nome, unidade), ou None."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
     catalogo = _catalogo() or {}
     out = []
     for cid, linhas in sorted(abertas.items(), key=lambda kv: (_txt(kv[1][0].get("Contada em")), kv[0])):
+        reservas = _reservas_da_contagem(cfg, cid)
         for l in linhas:
             if not _eh_pendencia(l):
                 continue
@@ -238,6 +270,7 @@ def pendencias(cfg) -> list[dict]:
                 "id_item": _id(l.get("ID do item")), "codigo": _txt(l.get("Código")),
                 "identificado_como": como, "identificado_codigo": catalogo.get(como, {}).get("codigo", ""),
                 "identificado_nome": catalogo.get(como, {}).get("nome", ""),
+                "reserva": reservas.get(chave) if isinstance(reservas.get(chave), dict) else None,
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
                     "codigo_criado": _txt(d.get("codigo_criado")), "quando": _txt(d.get("decidida_em")),
@@ -305,10 +338,8 @@ def _achar_a_linha(cfg, contagem_id: str, chave_linha: str) -> dict:
     if cid not in por:
         raise ValueError(f"A contagem {cid[:30]!r} não está no livro das contagens do App.")
     if estado[cid] != "aberta":
-        porque = {"gravada": "já foi gravada no Fracttal (ou a gravação já começou)",
-                  "recontagem": "foi recusada (recontagem pedida)",
-                  "substituida": "foi substituída por uma contagem mais nova do almoxarifado"}[estado[cid]]
-        raise Conflito(f"Esta contagem {porque}: a decisão não muda o que já foi gravado. Faça uma nova contagem.")
+        raise Conflito(f"Esta contagem {_PORQUE[estado[cid]][0]}: a decisão não muda o que já foi gravado. Faça uma nova "
+                       "contagem.")
     chave = _id(chave_linha)
     for l in C._unicas(por[cid]):
         if _id(l.get("ID da linha")) == chave:
@@ -337,8 +368,48 @@ def _peca_do_catalogo(cfg, id_item, cadastradas: set[str]) -> str:
     return alvo
 
 
+def _nome_igual(a, b) -> bool:
+    """O mesmo nome de peça, sem ligar para a caixa nem para o espaço a mais."""
+    return " ".join(_txt(a).split()).casefold() == " ".join(_txt(b).split()).casefold()
+
+
+def _conferir_a_reserva(reserva: dict, sigla: str, nome: str, unidade: str) -> None:
+    """A nova tentativa de uma linha que já reservou código tem de vir com os MESMOS dados: o código reservado é de uma peça com
+    aquela sigla, aquele nome e aquela unidade, e uma tentativa com outros dados criaria, se a anterior não chegou ao Fracttal,
+    uma peça diferente da que a pessoa pensa ter pedido, ou, se chegou, ligaria a decisão a uma peça com o nome errado. A
+    página já volta preenchida com a reserva (`pendencias`, `reserva`). `Conflito`; nada vai ao Fracttal."""
+    diferencas = []
+    if _txt(reserva.get("sigla")) and _txt(reserva.get("sigla")).upper() != sigla:
+        diferencas.append(f"a sigla ({_txt(reserva.get('sigla')).upper()}, e não {sigla})")
+    if _txt(reserva.get("nome")) and not _nome_igual(reserva.get("nome"), nome):
+        diferencas.append(f"o nome ({_txt(reserva.get('nome'))!r}, e não {nome!r})")
+    if _txt(reserva.get("unidade")) and _txt(reserva.get("unidade")).upper() != unidade:
+        diferencas.append(f"a unidade ({_txt(reserva.get('unidade')).lower()}, e não {unidade.lower()})")
+    if diferencas:
+        raise Conflito(f"Uma tentativa anterior desta linha já reservou o código {_txt(reserva.get('codigo'))}, e esta vem com "
+                       f"outro dado: {'; '.join(diferencas)}. Repita com os dados da reserva (a página já vem preenchida com "
+                       "eles): trocar agora poderia criar uma segunda peça. Nada foi enviado ao Fracttal.")
+
+
+def _conferir_o_nome_da_peca(achada: dict, reserva: dict, codigo: str) -> None:
+    """A peça que o código reservado achou no Fracttal tem de ser a que ESTA linha pediu: com outro nome, o código foi usado por
+    outra pessoa depois da reserva, e ligar a decisão a ela juntaria as unidades achadas à peça dos outros. O nome que o
+    Fracttal não diz (a linha da lista sem `field_1`) não prova diferença e não bloqueia. `Conflito`."""
+    do_fracttal = _txt(achada.get("nome"))
+    if do_fracttal and not _nome_igual(do_fracttal, reserva.get("nome")):
+        raise Conflito(f"O código {codigo} existe no Fracttal com outro nome ({do_fracttal!r}; esta linha reservou "
+                       f"{_txt(reserva.get('nome'))!r}): não é a peça criada pela tentativa anterior, e a decisão NÃO foi ligada "
+                       "a ela. Decida de outro jeito (é a peça de tal código, ou descartar) ou confira o código na tela do "
+                       "Fracttal.")
+
+
 def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) -> tuple[str, str, bool]:
-    """Cria a peça no Fracttal sem duplicar. Devolve (id do item, código, criou agora)."""
+    """Cria a peça no Fracttal sem duplicar. Devolve (id do item, código, criou agora).
+
+    Linha SEM reserva: escolhe o próximo código da sigla (a lista do Fracttal e as reservas de todas as contagens), RESERVA-O no
+    controle (com a sigla, o nome e a unidade pedidos) e só então cria. Linha COM reserva (uma tentativa anterior): confere que os
+    dados são os mesmos (`_conferir_a_reserva`); se o código já existe no Fracttal, a peça foi criada e a resposta se perdeu:
+    confere o nome (`_conferir_o_nome_da_peca`) e só devolve o ID, sem criar outra; se não existe, cria com o MESMO código."""
     sigla = _txt(sigla).upper()
     if sigla not in siglas(cfg, almox):
         raise ValueError(f"A sigla {sigla[:10]!r} não é uma das do catálogo ({', '.join(siglas(cfg, almox))}).")
@@ -349,18 +420,23 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
     if estoque is None:
         raise ValueError("Cadastrar fala com o Fracttal: é preciso o login do Fracttal de quem decide.")
     arq = _arquivo_reserva(cfg, contagem_id)
-    reservas = _ler_reservas(arq)
-    reserva = reservas.get(chave)
+    with _ARQUIVO.de(arq.name):
+        reserva = _ler_reservas(arq).get(chave)
     if isinstance(reserva, dict) and _txt(reserva.get("codigo")):
         codigo = _txt(reserva["codigo"])             # o código desta linha já foi escolhido numa tentativa anterior
-        id_item = estoque.achar_peca(codigo)         # criou e perdeu a resposta? então só falta o ID
+        _conferir_a_reserva(reserva, sigla, nome, unidade)
+        achada = estoque.peca(codigo)                # criou e perdeu a resposta? então só falta o ID
+        if achada is not None:
+            _conferir_o_nome_da_peca(achada, reserva, codigo)
+            return achada["id"], codigo, False
     else:
-        codigo = proximo_codigo(list(estoque.codigos(sigla)) + _reservados(cfg, sigla), sigla)
-        reservas[chave] = {"codigo": codigo, "sigla": sigla, "reservado_em": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
-        _gravar_reservas(arq, reservas)              # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
-        id_item = None
-    if id_item is not None:
-        return id_item, codigo, False
+        with _SIGLA.de(sigla):
+            codigo = proximo_codigo(list(estoque.codigos(sigla)) + _reservados(cfg, sigla), sigla)
+            with _ARQUIVO.de(arq.name):
+                reservas = _ler_reservas(arq)
+                reservas[chave] = {"codigo": codigo, "sigla": sigla, "nome": nome, "unidade": unidade,
+                                   "reservado_em": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+                _gravar_reservas(arq, reservas)      # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
     return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
 
 
@@ -385,7 +461,7 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
     motivo = " ".join(_txt(motivo).split())
     if len(motivo) > MOTIVO_MAX:
         raise ValueError(f"O motivo passa de {MOTIVO_MAX} letras.")
-    with _TRAVA:
+    with _LINHA.de((cid, chave)):
         l = _achar_a_linha(cfg, cid, chave)
         tipo = _txt(l.get("Tipo")).lower()
         if decisao not in DECISOES_DO_TIPO[tipo]:
@@ -415,6 +491,15 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             texto = ("As unidades saem do genérico e entram na peça escolhida." if decisao == "confirmar"
                      else "As unidades achadas contam como unidades dessa peça nesta contagem.")
         usina = _usina_id(_txt(l.get("Usina")))
+        # a contagem pode ter sido gravada (ou recusada, ou substituída) enquanto o catálogo era paginado e a peça criada: a
+        # decisão só vale para o lote de uma contagem ainda aberta. O estado vem do livro de AGORA, logo antes de escrever
+        estado_agora = _estados(cfg, forcar=True)[1].get(_txt(cid))
+        if estado_agora != "aberta":
+            ja = _PORQUE.get(estado_agora, ("deixou de estar aberta", "já tinha deixado de estar aberta"))[1]
+            if decisao == "cadastrar" and codigo:
+                raise Conflito(f"A peça {codigo} foi criada no Fracttal, mas a contagem {ja}: a decisão não foi registrada, e o "
+                               "código continua reservado nesta linha. Faça uma nova contagem.")
+            raise Conflito(f"Esta contagem {ja} enquanto você decidia: a decisão não foi registrada. Faça uma nova contagem.")
         quem_ = quem.colunas(cfg, pessoa)
         linha = {"contagem_id": cid, "chave_linha": chave, "decisao": decisao, "id_item": id_final or None,
                  "codigo_criado": codigo or None, "id_almoxarifado": almox, "usina_id": usina,
@@ -453,10 +538,15 @@ def _pagina(*, erro: str = "", status: int = 200):
         erro_livro = f"Não consegui ler as contagens no banco ({type(ex).__name__}): tente de novo em instantes."
     catalogo = _catalogo() or {}
     aviso = session.pop("pcm_curadoria_aviso", None) if status == 200 else None
+    pode = telas.pode_programar()
+    if not pode:
+        # o que o técnico escreveu e a foto dele são de quem decide (podem mostrar gente, placa de equipamento, o que estiver à
+        # volta): quem só olha vê que há um achado, a quantidade e a usina
+        lista = [dict(p, descricao="", foto="", foto_id="", tem_foto=False, reserva=None) for p in lista]
     pendentes = [p for p in lista if p["decisao"] is None]
     resp = render_template(
         "pcm/inventario_curadoria.html", pendentes=pendentes, decididas=[p for p in lista if p["decisao"] is not None],
-        siglas_de=lambda almox: siglas(cfg, almox), unidades=UNIDADES, fmt=fmt, pode=telas.pode_programar(), ok=aviso or "",
+        siglas_de=lambda almox: siglas(cfg, almox), unidades=UNIDADES, fmt=fmt, pode=pode, ok=aviso or "",
         erro=erro, erro_livro=erro_livro,
         pecas=sorted(((v["codigo"], v["nome"]) for v in catalogo.values() if v["codigo"])))
     return resp, status
@@ -469,7 +559,10 @@ def registrar(bp) -> None:
 
     @bp.route("/pecas/inventario/curadoria/foto/<foto_id>.jpg", endpoint="inventario_curadoria_foto")
     def curadoria_foto(foto_id):
-        """A foto do achado, para quem vê a tela (o portão de login e o da tela valem; não é rota pública)."""
+        """A foto do achado, só para quem decide (`pode_programar`: administrador e setor PCM; quem só vê a tela não a vê). O portão de
+        login e o da tela valem; não é rota pública."""
+        if not telas.pode_programar():
+            abort(403)
         dados = foto(current_app.config, foto_id)
         if dados is None:
             abort(404)

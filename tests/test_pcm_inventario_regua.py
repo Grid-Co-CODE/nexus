@@ -413,7 +413,7 @@ def test_decidir_pela_tela_grava_e_volta_para_o_almoxarifado(inv, monkeypatch):
     _no_setor(monkeypatch, "PCM")
     c = _pessoa_ms(inv)
     r = c.post("/t/pcm/pecas/inventario/regua/decidir", data={
-        "almox": "10", "item": "1", "rec_min": "1", "rec_max": "4", "aco_min": "2,5", "aco_max": "9"})
+        "almox": "10", "item": "2", "rec_min": "1", "rec_max": "4", "aco_min": "2,5", "aco_max": "9"})
     assert r.status_code == 303 and r.headers["Location"].endswith("/t/pcm/pecas/inventario/regua?almox=10")
     linha = F.ler(inv.config, forcar=True)[F.ABA_REGUA][0]
     assert (linha["recomendado_min_qtd"], linha["recomendado_max_qtd"]) == (1, 4)
@@ -422,6 +422,8 @@ def test_decidir_pela_tela_grava_e_volta_para_o_almoxarifado(inv, monkeypatch):
     assert re.fullmatch(r"[0-9a-f]{24}", linha["pessoa_hmac"])
     html = c.get(r.headers["Location"]).get_data(as_text=True)
     assert "Registrado" in html and 'value="2,5"' in html
+    # o formulário de gravar leva o acordado que a tela mostra (a ponte confere se ele ainda é o registrado)
+    assert 'name="aco_min" value="2,5"' in html and 'name="aco_max" value="9"' in html
 
 
 def test_minimo_acima_do_maximo_e_400_e_nao_grava(inv, monkeypatch):
@@ -440,6 +442,7 @@ def test_peca_de_outro_almoxarifado_e_400(inv, monkeypatch):
 
 
 PONTE = "/os/_nexus/inventario/regua/gravar"
+GRAVAR = {"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}      # o que o formulário manda: a peça e o acordado que a tela mostrava
 
 
 def test_gravar_pela_ponte_usa_o_login_de_quem_aprova(inv, monkeypatch):
@@ -452,7 +455,7 @@ def test_gravar_pela_ponte_usa_o_login_de_quem_aprova(inv, monkeypatch):
     corpo = {"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 303
     assert falso.chamadas == []
-    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 200 and r.get_json()["ok"] is True
     assert r.get_json()["volta"].endswith("/t/pcm/pecas/inventario/regua?almox=10")
     assert falso.chamadas == ["ler", "definir_regua", "ler"]
@@ -471,7 +474,7 @@ def test_gravar_sem_o_acordado_e_409(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa_ms(inv).post(PONTE, data={"almox": "10", "item": "1"})
+    r = _pessoa_ms(inv).post(PONTE, data=GRAVAR)
     assert r.status_code == 409 and "acordad" in r.get_json()["erro"].lower() and falso.chamadas == []
 
 
@@ -480,7 +483,7 @@ def test_quem_entrou_pela_senha_nao_grava_no_fracttal(inv, logado, monkeypatch):
     link do login do Fracttal (o `/os/login`, com a volta à página). Registrar a decisão no Nexus continua valendo."""
     assert logado.post("/t/pcm/pecas/inventario/regua/decidir",
                        data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}).status_code == 303
-    r = logado.post(PONTE, data={"almox": "10", "item": "1"})
+    r = logado.post(PONTE, data=GRAVAR)
     assert r.status_code == 401 and "Fracttal" in r.get_json()["erro"]
     assert "/os/login?next=" in r.get_json()["login"] and "voltar" in r.get_json()["login"]
 
@@ -491,7 +494,7 @@ def test_limite_do_fracttal_e_429_com_o_que_fazer(inv, monkeypatch):
     _no_setor(monkeypatch, "PCM")
     c = _pessoa_ms(inv)
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
-    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 429 and "tente de novo" in r.get_json()["erro"].lower()
 
 
@@ -504,13 +507,144 @@ def test_resposta_perdida_do_fracttal_grava_de_novo_sem_duplicar(inv, monkeypatc
     _no_setor(monkeypatch, "PCM")
     c = _pessoa_ms(inv)
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
-    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 502 and "grave de novo" in r.get_json()["erro"]
     assert F.ler(inv.config, forcar=True)[F.ABA_EVENTO] == []             # nada anotado como gravado
-    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 200
     assert [e["tipo"] for e in F.ler(inv.config, forcar=True)[F.ABA_EVENTO]] == ["regua_gravada"]
     assert (falso.ler("10")["1"]["minimo"], falso.ler("10")["1"]["maximo"]) == (2.0, 9.0)
+
+
+def test_gravar_com_a_regua_que_mudou_desde_que_a_tela_abriu_e_409(inv, monkeypatch):
+    """Duas pessoas do PCM com a tela aberta: uma muda o acordado, a outra aperta Gravar com o número que via. O formulário leva
+    o acordado que a tela mostrava; a ponte compara com o registrado de agora e, se mudou, não envia nada ao Fracttal."""
+    falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(inv)
+    c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
+    c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "4", "aco_max": "9"})   # a outra pessoa
+    r = c.post(PONTE, data=GRAVAR)                         # a tela da 1ª pessoa ainda mostrava 2 e 9
+    assert r.status_code == 409 and "a régua mudou desde que você abriu a tela" in r.get_json()["erro"]
+    assert "mínimo 4" in r.get_json()["erro"] and falso.chamadas == []
+    r = c.post(PONTE, data={**GRAVAR, "aco_min": "4"})     # depois de recarregar, vê 4 e 9
+    assert r.status_code == 200 and falso.ler("10")["1"]["minimo"] == 4.0
+
+
+def test_gravar_sem_o_acordado_que_a_tela_mostrava_e_400(inv, monkeypatch):
+    falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(inv)
+    c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
+    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 400 and "acordado que mostrava" in r.get_json()["erro"]
+    r = c.post(PONTE, data={**GRAVAR, "aco_max": "abc"})
+    assert r.status_code == 400 and falso.chamadas == []
+
+
+def test_acordado_decimal_so_em_metro_e_massa(cfg):
+    """O Fracttal guarda o que se manda: 2,5 de uma peça contada em unidades seria um estoque que não existe. A unidade que a
+    varredura diz vale já ao registrar; a que o Fracttal diz (`ler()["unidade"]`) vale antes do pedido que grava. O que não é
+    METRO nem MASSA (inclusive a unidade que ninguém disse) é inteiro."""
+    for unidade in ("unidade", "", "par"):
+        with pytest.raises(ValueError, match="casa decimal"):
+            R.decidir(cfg, ALMOX, "5001", acordado=(2.5, 9), pessoa=PESSOA, varredura=[_v(5001, "SP-CAB-001", 10, unidade=unidade)])
+    assert _livro(cfg, F.ABA_REGUA) == []
+    R.decidir(cfg, ALMOX, "5001", acordado=(2.5, 9), pessoa=PESSOA, varredura=[_v(5001, "SP-CAB-001", 10, unidade="massa")])
+    R.decidir(cfg, ALMOX, "5002", acordado=("2", "9"), pessoa=PESSOA, varredura=[_v(5002, "SP-CAB-002", 10, unidade="unidade")])
+    # a varredura dizia metro, o Fracttal diz unidade: a gravação para depois da leitura e antes do `definir_regua`
+    R.decidir(cfg, ALMOX, "5001", acordado=(2.5, 9), pessoa=PESSOA, varredura=[_v(5001, "SP-CAB-001", 10, unidade="metro")])
+    inteiro = EstoqueFalso({ALMOX: {"5001": {"saldo": 10, "minimo": 1, "maximo": 4, "codigo": "SP-CAB-001", "unidade": "UNIDADE"}}})
+    with pytest.raises(ValueError, match="UNIDADE|unidade"):
+        R.gravar_acordado(cfg, ALMOX, "5001", inteiro, PESSOA)
+    assert inteiro.chamadas == ["ler"] and inteiro.ler(ALMOX)["5001"]["maximo"] == 4.0
+    metro = EstoqueFalso({ALMOX: {"5001": {"saldo": 10, "minimo": 1, "maximo": 4, "codigo": "SP-CAB-001", "unidade": "METRO"}}})
+    R.gravar_acordado(cfg, ALMOX, "5001", metro, PESSOA)
+    assert (metro.ler(ALMOX)["5001"]["minimo"], metro.ler(ALMOX)["5001"]["maximo"]) == (2.5, 9.0)
+
+
+def test_acordado_decimal_em_unidade_inteira_e_400_pela_tela(inv, monkeypatch):
+    _no_setor(monkeypatch, "PCM")
+    r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2,5",
+                                                                           "aco_max": "9"})
+    assert r.status_code == 400 and "casa decimal" in r.get_data(as_text=True)
+    assert F.ler(inv.config, forcar=True)[F.ABA_REGUA] == []
+
+
+def test_acordado_incompleto_no_livro_e_409_e_nao_quebra(cfg):
+    """O livro é de quem o escreve (a API aceita linha à mão): um retrato com só o mínimo acordado não chega ao `definir_regua` nem
+    quebra na conferência (comparar o máximo vazio). 409 com o que falta, nenhum pedido."""
+    F.acrescentar(cfg, F.ABA_REGUA, [{"id_almoxarifado": ALMOX, "id_item": "5001", "codigo": "SP-CAB-001",
+                                      "acordado_min_qtd": 2, "pessoa_hmac": "a1b2c3d4e5f60718293a4b5c"}])
+    falso = _falso()
+    with pytest.raises(F.Recusada, match="incompleto"):
+        R.gravar_acordado(cfg, ALMOX, "5001", falso, PESSOA)
+    assert falso.chamadas == [] and not any(e["tipo"] == "regua_gravada" for e in _livro(cfg, F.ABA_EVENTO))
+
+
+class _Lento(EstoqueFalso):
+    """O Fracttal que demora no `definir_regua` (a gravação lenta de uma peça) até o teste soltar."""
+
+    def __init__(self, *a, **k):
+        import threading
+        super().__init__(*a, **k)
+        self.entrou, self.soltar = threading.Event(), threading.Event()
+
+    def definir_regua(self, id_almox, id_item, minimo, maximo):
+        self.entrou.set()
+        self.soltar.wait(10)
+        return super().definir_regua(id_almox, id_item, minimo, maximo)
+
+
+def test_a_trava_e_por_peca_e_a_gravacao_lenta_de_uma_nao_segura_as_outras(cfg):
+    """Uma trava do módulo inteiro, segurada enquanto o Fracttal responde, faria todo o PCM esperar uma gravação de uma peça. A
+    trava é da peça: enquanto a 5001 espera o Fracttal, registrar a 5002 passa na hora."""
+    import threading
+    var = [_v(5001, "SP-CAB-001", 10), _v(5002, "SP-CAB-002", 4)]
+    R.decidir(cfg, ALMOX, "5001", acordado=(2, 20), pessoa=PESSOA, varredura=var)
+    lento = _Lento({ALMOX: {"5001": {"saldo": 10, "minimo": 1, "maximo": 4, "codigo": "SP-CAB-001"}}})
+    t = threading.Thread(target=lambda: R.gravar_acordado(cfg, ALMOX, "5001", lento, PESSOA))
+    t.start()
+    try:
+        assert lento.entrou.wait(10)
+        feito = threading.Event()
+        threading.Thread(target=lambda: (R.decidir(cfg, ALMOX, "5002", acordado=(1, 8), pessoa=PESSOA, varredura=var),
+                                         feito.set())).start()
+        assert feito.wait(5), "registrar outra peça esperou a gravação lenta no Fracttal"
+        # nem a GRAVAÇÃO de outra peça espera: a trava da gravação também é da peça
+        outro = EstoqueFalso({ALMOX: {"5002": {"saldo": 4, "minimo": 0, "maximo": 0, "codigo": "SP-CAB-002"}}})
+        gravou = threading.Event()
+        threading.Thread(target=lambda: (R.gravar_acordado(cfg, ALMOX, "5002", outro, PESSOA), gravou.set())).start()
+        assert gravou.wait(5), "gravar outra peça esperou a gravação lenta no Fracttal"
+        assert (outro.ler(ALMOX)["5002"]["minimo"], outro.ler(ALMOX)["5002"]["maximo"]) == (1.0, 8.0)
+    finally:
+        lento.soltar.set()
+        t.join(10)
+    assert [e["tipo"] for e in _livro(cfg, F.ABA_EVENTO)] == ["regua_gravada", "regua_gravada"]
+
+
+def test_duas_pessoas_na_mesma_peca_nao_apagam_o_que_a_outra_registrou(cfg, monkeypatch):
+    """Ler o retrato de antes e escrever o de agora é uma conta só por peça: a Grid registra o recomendado e o cliente o acordado
+    ao mesmo tempo, e as duas ficam no último retrato (sem a trava, o 2º retrato nascia do "antes" vazio e perdia o 1º)."""
+    import threading
+    import time
+    var = [_v(5001, "SP-CAB-001", 10)]
+    escrever = F.acrescentar
+
+    def devagar(cfg_, aba, linhas):
+        time.sleep(0.3)                  # entre ler o retrato de antes e gravar o de agora, a outra pessoa entra
+        return escrever(cfg_, aba, linhas)
+    monkeypatch.setattr(F, "acrescentar", devagar)
+    ts = [threading.Thread(target=lambda: R.decidir(cfg, ALMOX, "5001", recomendado=(3, 30), pessoa=PESSOA, varredura=var)),
+          threading.Thread(target=lambda: R.decidir(cfg, ALMOX, "5001", acordado=(2, 20), pessoa=PESSOA, varredura=var))]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join(10)
+    q = R.quadro(cfg, ALMOX, varredura=var)[0]
+    assert q["recomendado"] == (3, 30) and q["acordado"] == (2, 20)
 
 
 def _jwt_e_cookie(app):
@@ -559,7 +693,7 @@ def test_o_login_do_fracttal_so_chega_na_ponte(inv, api_do_clone, monkeypatch):
                                                                    "aco_max": "9"}).status_code == 303
     assert c.get("/t/pcm/pecas/inventario/_sonda").get_data(as_text=True) == "sem login"
     assert pedidos == []
-    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 200 and r.get_json()["ok"] is True
     assert [m for m, _ in pedidos] == ["inventories.warehouses_items_stock", "inventories.warehouses_items_update",
                                        "inventories.warehouses_items_stock"]
@@ -567,7 +701,7 @@ def test_o_login_do_fracttal_so_chega_na_ponte(inv, api_do_clone, monkeypatch):
     assert nivel == {"min": 2.0, "max": 9.0}
     assert [e["tipo"] for e in F.ler(inv.config, forcar=True)[F.ABA_EVENTO]] == ["regua_gravada"]
     # sem o cookie (a senha de administrador, ou o login que venceu), a mesma ponte responde 401 com o link do login
-    r = _pessoa_ms(inv).post(PONTE, data={"almox": "10", "item": "1"})
+    r = _pessoa_ms(inv).post(PONTE, data=GRAVAR)
     assert r.status_code == 401 and "/os/login" in r.get_json()["login"]
 
 
@@ -577,7 +711,7 @@ def test_pedido_de_outro_site_e_recusado(inv, monkeypatch):
                                                                         "aco_max": "2"},
                           headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
-    r = _pessoa_ms(inv).post(PONTE, data={"almox": "10", "item": "1"}, headers={"Sec-Fetch-Site": "cross-site"})
+    r = _pessoa_ms(inv).post(PONTE, data=GRAVAR, headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403 and "erro" in r.get_json()
 
 

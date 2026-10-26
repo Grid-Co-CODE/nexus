@@ -255,6 +255,12 @@ class Estoque(abc.ABC):
         duplicar: o `criar_peca` pode ter criado a peça e perdido a resposta, e a nova tentativa procura o código que ela
         reservou antes de criar de novo."""
 
+    @abc.abstractmethod
+    def peca(self, codigo: str) -> dict | None:
+        """A peça de código exatamente `codigo` (sem caixa) como `{"id", "nome"}`, ou None. O `nome` é o `field_1` da linha da
+        lista de peças (vazio se o Fracttal não o diz). A curadoria confere o nome antes de ligar a decisão à peça que achou
+        pelo código reservado: o código que outra pessoa usou depois não pode virar a peça desta contagem."""
+
 
 # ── o de verdade ───────────────────────────────────────────────────────────────────────────────────────────────────────
 class EstoqueFracttal(Estoque):
@@ -505,12 +511,13 @@ class EstoqueFracttal(Estoque):
         return [str(l["code"]) for l in self._linhas(PECAS, base)
                 if isinstance(l, dict) and l.get("code") and str(l["code"]).upper().startswith(prefixo)]
 
-    def achar_peca(self, codigo: str) -> str | None:
+    def peca(self, codigo: str) -> dict | None:
         """Pede a lista de peças com o filtro do código (`code =`, o mesmo `filter` que o `api.py` do OS Creator usa nas
         listas do Fracttal) e CONFERE a linha que volta: o filtro que o Fracttal ignorasse devolveria o catálogo inteiro (o
         `api.py` anota esse caso com o `id_parent_wo`), e o código parecido (SP-CAB-0130) não é o procurado. Para na primeira
-        página que acha: a cota é de todos. O filtro `code =` ainda não foi provado contra o Fracttal de verdade (o passo 0 só
-        listou); a conferência da linha vale de qualquer jeito, e a prova com o App (Task 10) confirma."""
+        página que acha: a cota é de todos. O filtro `code =` e o `field_1` (o nome) nas linhas da lista de peças ainda não
+        foram provados contra o Fracttal de verdade (o passo 0 só listou os códigos); a conferência da linha vale de qualquer
+        jeito, e a prova com o App (Task 10) confirma."""
         alvo = str(codigo or "").strip()
         if not alvo:
             raise ValueError("sem o código, qualquer peça seria a achada")
@@ -518,8 +525,12 @@ class EstoqueFracttal(Estoque):
                 "id_type_item": TIPO_PECA}
         for l in self._linhas(PECAS, base):
             if isinstance(l, dict) and l.get("id") is not None and str(l.get("code") or "").strip().upper() == alvo.upper():
-                return str(l["id"])
+                return {"id": str(l["id"]), "nome": str(l.get("field_1") or "").strip()}
         return None
+
+    def achar_peca(self, codigo: str) -> str | None:
+        achada = self.peca(codigo)
+        return None if achada is None else achada["id"]
 
 
 # ── a sessão do pedido ─────────────────────────────────────────────────────────────────────────────────────────────────

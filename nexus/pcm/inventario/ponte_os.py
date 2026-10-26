@@ -56,8 +56,9 @@ def _barrar():
     return None
 
 
-def _com_o_fracttal(de: str, fazer):
-    """Roda `fazer(estoque)` com o login do Fracttal de quem apertou e devolve a resposta JSON. `fazer` devolve o texto que a
+def _com_o_fracttal(de: str, fazer, ao: str | None = None):
+    """Roda `fazer(estoque)` com o login do Fracttal de quem apertou e devolve a resposta JSON (`ao`: o que se faz, para o texto
+    do erro de rede, `erros.resposta`). `fazer` devolve o texto que a
     página mostra ao recarregar. Sem login do Fracttal na sessão (a senha de administrador não tem; ou o `os_sessao` não
     veio): 401 com o link do login. O que o Fracttal ou o livro recusam sobe pela tabela de `erros.resposta`."""
     barrado = _barrar()
@@ -66,7 +67,7 @@ def _com_o_fracttal(de: str, fazer):
     try:
         texto = fazer(E.estoque_da_sessao(current_app._get_current_object()))
     except (ValueError, OSError, E.Limite, E.SemLogin, E.ErroFracttal) as ex:
-        status, msg = erros.resposta(ex)
+        status, msg = erros.resposta(ex, ao=ao)
         corpo = {"erro": msg}
         if status == 401:
             corpo["login"] = _login(de)
@@ -82,11 +83,20 @@ def _ok(chave_aviso: str, texto: str, de: str):
 # ── a régua: gravar o acordado no Fracttal (Task 8) ─────────────────────────────────────────────────────────────────────
 @bp.route("/regua/gravar", methods=["POST"])
 def regua_gravar():
-    """Manda o acordado registrado ao Fracttal, relê e anota (`regua.gravar_acordado`). Só o que está no livro: o formulário
-    traz só o almoxarifado e a peça, nunca os números."""
-    almox, item = A._id(request.form.get("almox")), A._id(request.form.get("item"))
+    """Manda o acordado registrado ao Fracttal, relê e anota (`regua.gravar_acordado`). Só o que está no livro vai: o formulário
+    traz o almoxarifado, a peça e o acordado que a tela MOSTRAVA (`aco_min`, `aco_max`), só para conferir: se o registrado agora é
+    outro, 409 "a régua mudou desde que você abriu a tela"."""
+    f = request.form
+    almox, item = A._id(f.get("almox")), A._id(f.get("item"))
     de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
-    r = _com_o_fracttal(de, lambda est: regua.gravar_acordado(current_app.config, almox, item, est, quem.do_pedido()))
+
+    def gravar(est):
+        if "aco_min" not in f or "aco_max" not in f:
+            raise ValueError("A página não mandou o acordado que mostrava: recarregue a página. Nada foi enviado.")
+        esperado = (regua.nivel(f.get("aco_min"), "O acordado que a tela mostrava, mínimo"),
+                    regua.nivel(f.get("aco_max"), "O acordado que a tela mostrava, máximo"))
+        return regua.gravar_acordado(current_app.config, almox, item, est, quem.do_pedido(), esperado=esperado)
+    r = _com_o_fracttal(de, gravar, ao="regua")
     return r if not isinstance(r, str) else _ok("pcm_regua_aviso", r, de)
 
 
@@ -99,5 +109,6 @@ def curadoria_cadastrar():
     de = "/t/pcm/pecas/inventario/curadoria"
     r = _com_o_fracttal(de, lambda est: curadoria.decidir(
         current_app.config, str(f.get("contagem") or "").strip(), str(f.get("linha") or "").strip(), "cadastrar",
-        sigla=f.get("sigla"), nome=f.get("nome"), unidade=f.get("unidade"), estoque=est, pessoa=quem.do_pedido())["texto"])
+        sigla=f.get("sigla"), nome=f.get("nome"), unidade=f.get("unidade"), estoque=est, pessoa=quem.do_pedido())["texto"],
+        ao="cadastro")
     return r if not isinstance(r, str) else _ok("pcm_curadoria_aviso", r, de)

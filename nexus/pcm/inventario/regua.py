@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import math
 import re
-import threading
 import unicodedata
 from urllib.parse import urlencode
 
@@ -37,12 +36,15 @@ from ...prefixo import na_raiz
 from .. import telas
 from . import erros, quem
 from . import estoque as E
+from .travas import Travas
 from .erros import Conflito, NaoConfere
 
 # a unidade que aceita casa decimal: METRO e MASSA (o `units_description` do Fracttal); a UNIDADE e o que não se sabe é inteira
 UNIDADES_DECIMAIS = ("metro", "massa")
 _AVARIADA = re.compile(r"-AV(?:-|\s|$)")
-_TRAVA = threading.Lock()           # ler o retrato de antes e escrever o de agora é uma conta só (duas pessoas, uma peça)
+# ler o retrato de antes e escrever o de agora é uma conta só: uma trava POR PEÇA do almoxarifado (duas pessoas na mesma peça
+# esperam uma pela outra; o resto não espera ninguém, nem a gravação lenta no Fracttal de outra peça)
+_PECA = Travas()
 _TOLERANCIA = 1e-9
 LIGADA = F.USINA_LIGADA_POR[0]      # por onde a usina do almoxarifado liga: só a de-para do Fracttal
 
@@ -95,7 +97,7 @@ def fmt(n) -> str:
 
 
 # ── os números que entram ────────────────────────────────────────────────────────────────────────────────────────────
-def _nivel(v, o_que: str):
+def nivel(v, o_que: str):
     """Um mínimo ou máximo que veio da tela (texto com a vírgula do Brasil) ou do chamador: em branco é None; o que não é
     número, ou é negativo, é erro de quem chama (nunca vira 0: o 0 é "sem mínimo cadastrado" no Fracttal)."""
     if v is None or (isinstance(v, str) and not v.strip()):
@@ -115,7 +117,7 @@ def _par(par, o_que: str, *, completo: bool = False):
         mn, mx = par
     except (TypeError, ValueError):
         raise ValueError(f"{o_que}: informe o mínimo e o máximo.") from None
-    mn, mx = _nivel(mn, f"{o_que}, mínimo"), _nivel(mx, f"{o_que}, máximo")
+    mn, mx = nivel(mn, f"{o_que}, mínimo"), nivel(mx, f"{o_que}, máximo")
     if mn is None and mx is None:
         raise ValueError(f"{o_que}: o mínimo e o máximo estão em branco.")
     if completo and (mn is None or mx is None):
@@ -240,7 +242,9 @@ def decidir(cfg, id_almox: str, id_item: str, *, recomendado=None, acordado=None
         raise ValueError("Nada para registrar: informe o recomendado ou o acordado.")
     almox, item = _id(id_almox), _id(id_item)
     l = _linha_da_peca(almox, item, varredura)
-    with _TRAVA:
+    if aco is not None:
+        _confere_a_unidade(aco, l.get("unidade"))
+    with _PECA.de((almox, item)):
         livro = F.ler(cfg, forcar=True)
         antes = _vigentes(livro[F.ABA_REGUA]).get((almox, item)) or {}
         agora = _montar(l, almox, {}, _saldos_gravados(livro[F.ABA_EVENTO]))
@@ -253,30 +257,55 @@ def decidir(cfg, id_almox: str, id_item: str, *, recomendado=None, acordado=None
             rec_final, aco_final, gravado, quem.colunas(cfg, pessoa))])
 
 
+def _confere_a_unidade(par, unidade) -> None:
+    """O acordado com casa decimal só vale em METRO e MASSA: o Fracttal guarda o que se manda, e 2,5 de uma peça contada em
+    unidades seria um estoque que não existe. A unidade que não se sabe é inteira (a mesma regra da sugestão). `ValueError`."""
+    if any(isinstance(n, float) and not n.is_integer() for n in par) and not decimal(unidade):
+        raise ValueError(f"O acordado ({fmt(par[0]) or 'sem mínimo'} a {fmt(par[1])}) tem casa decimal, e a unidade da peça "
+                         f"({_txt_unidade(unidade)}) é inteira: só METRO e MASSA aceitam decimais. Nada foi registrado.")
+
+
+def _txt_unidade(unidade) -> str:
+    return A._txt(unidade).lower() or "não informada"
+
+
 def _igual(lido, esperado) -> bool:
     return lido is not None and abs(lido - esperado) <= _TOLERANCIA
 
 
-def gravar_acordado(cfg, id_almox: str, id_item: str, estoque: E.Estoque, pessoa: dict | None) -> str:
+def gravar_acordado(cfg, id_almox: str, id_item: str, estoque: E.Estoque, pessoa: dict | None, *,
+                    esperado: tuple | None = None) -> str:
     """Manda ao Fracttal o mínimo e o máximo ACORDADOS (o recomendado nunca vai), relê e só então anota o evento
     `regua_gravada` e o retrato `gravado_fracttal`. Devolve o texto para a tela. O Fracttal que o chamador passa é o da
     sessão de quem aprovou (`estoque_da_sessao`).
 
-    `Conflito` quando a peça não tem acordado registrado ou não está ligada ao almoxarifado (nada foi enviado); `NaoConfere`
-    quando o Fracttal respondeu e a releitura não bateu (anota um `erro`, nunca o `regua_gravada`); `Limite`, `SemLogin` e
-    `ErroFracttal` sobem como são. Idempotente: gravar o mesmo par duas vezes dá o mesmo resultado."""
+    `esperado` é o `(mínimo, máximo)` que a página MOSTRAVA a quem apertou: se o acordado registrado agora é outro (outra pessoa
+    do PCM mexeu enquanto a tela estava aberta), nada é enviado: `Conflito` ("a régua mudou desde que você abriu a tela").
+    `ValueError` quando o acordado tem decimal e a unidade que o Fracttal diz é inteira (antes do pedido que grava).
+    `Conflito` também quando a peça não tem acordado registrado, o par registrado está incompleto (uma linha do livro só com
+    um dos números) ou a peça não está ligada ao almoxarifado (nada foi enviado); `NaoConfere` quando o Fracttal respondeu e a
+    releitura não bateu (anota um `erro`, nunca o `regua_gravada`); `Limite`, `SemLogin` e `ErroFracttal` sobem como são.
+    Idempotente: gravar o mesmo par duas vezes dá o mesmo resultado."""
     almox, item = _id(id_almox), _id(id_item)
-    with _TRAVA:
+    with _PECA.de((almox, item)):
         v = _vigentes(F.ler(cfg, forcar=True)[F.ABA_REGUA]).get((almox, item))
-        if not v or v["acordado"] in ((None, None), None):
+        if not v or v["acordado"] == (None, None):
             raise Conflito("Esta peça ainda não tem o mínimo e o máximo ACORDADOS registrados: nada foi enviado ao Fracttal "
                            "(só o acordado vai; o recomendado fica no Nexus).")
         mn, mx = v["acordado"]
+        if mn is None or mx is None:
+            raise Conflito(f"O acordado registrado desta peça está incompleto (mínimo {fmt(mn) or 'em branco'}, máximo "
+                           f"{fmt(mx) or 'em branco'}): os dois vão ao Fracttal. Registre o mínimo e o máximo de novo; nada foi "
+                           "enviado.")
+        if esperado is not None and tuple(esperado) != (mn, mx):
+            raise Conflito(f"Nada foi enviado: a régua mudou desde que você abriu a tela; recarregue a página e confira antes de "
+                           f"gravar (o acordado registrado agora é mínimo {fmt(mn)}, máximo {fmt(mx)}).")
         quem_ = quem.colunas(cfg, pessoa)
         peca = estoque.ler(almox).get(item)            # a leitura também guarda a ligação que o `definir_regua` usa
         if peca is None:
             raise Conflito(f"A peça {v['codigo'] or item} não está ligada ao almoxarifado {almox} no Fracttal: a régua é do "
                            "vínculo dela com o almoxarifado (a gravação da contagem a liga). Nada foi enviado.")
+        _confere_a_unidade((mn, mx), peca.get("unidade"))      # a unidade que o Fracttal diz, antes do pedido que grava
         estoque.definir_regua(almox, item, mn, mx)
         depois = estoque.ler(almox).get(item) or {}
         base = {"id_almoxarifado": almox, "id_item": item, "codigo": v["codigo"] or None,
@@ -350,7 +379,7 @@ def registrar(bp) -> None:
         try:
             decidir(current_app.config, almox, item, recomendado=_do_form(f, "rec"), acordado=_do_form(f, "aco"),
                     pessoa=quem.do_pedido())
-        except ValueError as ex:
+        except (ValueError, OSError) as ex:
             status, texto = erros.resposta(ex)
             return _pagina(almox, erro=texto, status=status)
         session["pcm_regua_aviso"] = "Registrado. Só o acordado vai ao Fracttal, quando você mandar gravar."

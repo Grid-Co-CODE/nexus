@@ -550,6 +550,16 @@ def test_limite_do_fracttal_na_curadoria_e_429(cur, monkeypatch):
     assert r.status_code == 429 and "tente de novo" in r.get_json()["erro"].lower()
 
 
+def test_rede_que_cai_no_cadastro_diz_que_o_codigo_ficou_reservado(cur, monkeypatch):
+    """A resposta do `criar_peca` se perde: a ponte responde 502 com o texto do CADASTRO (o código ficou reservado, repetir com os
+    mesmos dados não cria outra peça), e não o da régua ("grave de novo, é o mesmo número")."""
+    _estoque_da_sessao(monkeypatch, _falso(perder_resposta={"criar_peca"}))
+    _no_setor(monkeypatch, "PCM")
+    r = _pessoa_ms(cur).post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
+    assert r.status_code == 502 and "reservado" in r.get_json()["erro"] and "mesmo número" not in r.get_json()["erro"]
+    assert F.ler(cur.config, forcar=True)[F.ABA_CURADORIA] == []
+
+
 def test_o_login_do_fracttal_so_chega_na_ponte(cur, api_do_clone, monkeypatch):
     """O mesmo defeito da régua, no cadastro: o cookie `os_sessao` tem Path=/os e não vai para /t/pcm. O `estoque_da_sessao` é o
     DE VERDADE (só a rede do `api` do clone é de mentira) e o cookie vai com Path=/os: a ponte vê o login e cria a peça no
@@ -598,12 +608,226 @@ def test_o_login_do_fracttal_so_chega_na_ponte(cur, api_do_clone, monkeypatch):
     assert r.status_code == 401 and "/os/login" in r.get_json()["login"]
 
 
-def test_tela_de_quem_so_olha_nao_tem_formulario(cur, monkeypatch):
+def test_tela_de_quem_so_olha_nao_tem_formulario_nem_descricao_nem_foto(cur, monkeypatch):
+    """O que o técnico escreveu e a foto dele (que podem mostrar gente, a placa de um equipamento, o que estiver à volta) são de
+    quem decide: quem só vê a tela lê que há um achado fora do catálogo, a quantidade e a usina."""
+    from nexus.cadastro.ligacoes import pasta_dados
     from nexus.pcm import telas
+    destino = pasta_dados(cur.config) / "almox_inventario" / "fotos"
+    destino.mkdir(parents=True)
+    foto_id = CU.nome_da_foto("foto-abc")
+    (destino / f"{foto_id}.jpg").write_bytes(b"\xff\xd8\xff jpeg de mentira")
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(cur)
+    assert f"{URL}/foto/{foto_id}.jpg" in c.get(URL).get_data(as_text=True)         # quem decide vê
     monkeypatch.setattr(telas, "pode_programar", lambda: False)
+    html = c.get(URL).get_data(as_text=True)
+    assert "Achado fora do catálogo" in html and "2 unidades" in html
+    assert "Cabo azul 6 mm" not in html and "Conector estanque" not in html and "/foto/" not in html and "sem foto" not in html
+    assert "curadoria/decidir" not in html and 'name="decisao"' not in html
+    assert c.get(f"{URL}/foto/{foto_id}.jpg").status_code == 403                    # nem a rota da foto
+
+
+# ── a contagem gravada durante a decisão ────────────────────────────────────────────────────────────────────────────
+
+class _GravaNoMeio(EstoqueFalso):
+    """O Fracttal em cujo `criar_peca` outra pessoa grava a contagem (o PCM aprova e a gravação começa): o `_estados` do começo da
+    decisão já era velho quando a peça foi criada."""
+
+    def __init__(self, *a, cfg, **k):
+        super().__init__(*a, **k)
+        self._cfg = cfg
+
+    def criar_peca(self, codigo, nome, unidade="UNIDADE"):
+        r = super().criar_peca(codigo, nome, unidade)
+        F.acrescentar(self._cfg, F.ABA_EVENTO, [{"tipo": "peca_gravada", "contagem_id": "C-1", "id_almoxarifado": ALMOX,
+                                                  "id_item": "1", "para_qtd": 3}])
+        return r
+
+
+def test_a_contagem_gravada_durante_o_cadastro_nao_recebe_a_decisao(cur):
+    """O estado da contagem é lido no começo, e o cadastro pagina o catálogo e cria a peça antes de escrever: a gravação pode
+    chegar nesse intervalo. A decisão não entra no livro (valeria para um lote que já foi), e a mensagem diz o código que ficou
+    criado no Fracttal; a reserva continua, para ele não ser escolhido de novo."""
+    from nexus.cadastro.ligacoes import pasta_dados
+    falso = _GravaNoMeio({ALMOX: {"5": {"saldo": 1, "codigo": "SP-CAB-001"}, "6": {"saldo": 1, "codigo": "SP-CAB-012"}}},
+                         cfg=cur.config)
+    with pytest.raises(Conflito, match=r"SP-CAB-013 foi criada no Fracttal, mas a contagem já tinha sido gravada"):
+        _cadastrar(cur.config, falso)
+    assert _livro(cur.config, F.ABA_CURADORIA) == [] and [e["tipo"] for e in _livro(cur.config, F.ABA_EVENTO)] == ["peca_gravada"]
+    assert falso.codigos("CAB")[-1] == "SP-CAB-013"                                     # a peça existe no Fracttal
+    (arq,) = list((pasta_dados(cur.config) / "almox_inventario").glob("curadoria_*.json"))
+    assert "SP-CAB-013" in arq.read_text("utf-8")                                      # e a reserva segue
+    with pytest.raises(Conflito, match="nova contagem"):                               # depois, a contagem já está fechada
+        _cadastrar(cur.config, _falso())
+
+
+def test_a_decisao_que_chega_depois_da_contagem_fechada_tambem_e_recusada(cur, monkeypatch):
+    """O mesmo para as decisões que só gravam no livro: o estado é conferido de novo logo antes de escrever (o que fechou a
+    contagem pode ser a recontagem pedida, a substituição ou a gravação)."""
+    original = CU._usina_id
+
+    def com_a_recontagem_no_meio(nome):
+        F.acrescentar(cur.config, F.ABA_EVENTO, [{"tipo": "recontagem_pedida", "contagem_id": "C-1", "id_almoxarifado": ALMOX}])
+        return original(nome)
+    monkeypatch.setattr(CU, "_usina_id", com_a_recontagem_no_meio)
+    with pytest.raises(Conflito, match="já tinha sido recusada"):
+        CU.decidir(cur.config, "C-1", "L-2", "e_a_peca", id_item="1", pessoa=PESSOA)
+    assert _livro(cur.config, F.ABA_CURADORIA) == []
+
+
+# ── a reserva: os mesmos dados, e a peça achada é a desta linha ─────────────────────────────────────────────────────────
+
+def test_nova_tentativa_com_outros_dados_nao_reaproveita_a_reserva(cur):
+    """O código reservado é de uma peça com aquela sigla, aquele nome e aquela unidade. A tentativa seguinte da linha com outro
+    dado é recusada (409) antes de qualquer pedido: com a peça já criada, a decisão ficaria ligada a uma peça com o nome errado; sem
+    ela, criaria uma peça diferente da que a pessoa acha ter pedido. O mesmo nome com outra caixa ou espaço é o mesmo."""
+    falso = _falso(perder_resposta={"criar_peca"})
+    with pytest.raises(ConnectionError):
+        _cadastrar(cur.config, falso)
+    chamadas = list(falso.chamadas)
+    for outro in (dict(sigla="PEL"), dict(nome="Cabo vermelho 6 mm"), dict(unidade="UNIDADE")):
+        args = {**dict(sigla="CAB", nome="Cabo azul 6 mm", unidade="METRO", estoque=falso, pessoa=PESSOA), **outro}
+        with pytest.raises(Conflito, match="SP-CAB-013.*outro dado"):
+            CU.decidir(cur.config, "C-1", "L-2", "cadastrar", **args)
+    assert falso.chamadas == chamadas and _livro(cur.config, F.ABA_CURADORIA) == []
+    r = CU.decidir(cur.config, "C-1", "L-2", "cadastrar", sigla="cab", nome="  cabo AZUL 6 mm ", unidade="metro", estoque=falso,
+                   pessoa=PESSOA)
+    assert r["codigo"] == "SP-CAB-013" and r["criada"] is False
+
+
+def test_a_tela_volta_preenchida_com_a_reserva(cur, monkeypatch):
+    falso = _falso(perder_resposta={"criar_peca"})
+    with pytest.raises(ConnectionError):
+        _cadastrar(cur.config, falso)
+    p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
+    assert p["L-2"]["reserva"]["codigo"] == "SP-CAB-013" and p["L-3"]["reserva"] is None
     _no_setor(monkeypatch, "PCM")
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
-    assert "Cabo azul 6 mm" in html and "curadoria/decidir" not in html and 'name="decisao"' not in html
+    assert "já reservou o código SP-CAB-013" in html and '<option value="CAB" selected>' in html
+    assert '<option value="METRO" selected>' in html and 'value="Cabo azul 6 mm"' in html
+
+
+def test_a_peca_achada_com_outro_nome_nao_recebe_a_decisao(cur):
+    """O código reservado foi achado no Fracttal, mas com outro nome: outra pessoa o usou depois (ou o nome foi trocado). Ligar a
+    decisão a essa peça juntaria as unidades achadas ao estoque de uma peça que não é desta linha."""
+    falso = _falso(perder_resposta={"criar_peca"})
+    with pytest.raises(ConnectionError):
+        _cadastrar(cur.config, falso)
+    (id_item,) = [i for i, v in falso._catalogo.items() if v["codigo"] == "SP-CAB-013"]
+    falso._catalogo[id_item]["nome"] = "Fusível de outra pessoa"
+    with pytest.raises(Conflito, match=r"SP-CAB-013 existe no Fracttal com outro nome.*NÃO foi ligada"):
+        _cadastrar(cur.config, falso)
+    assert _livro(cur.config, F.ABA_CURADORIA) == [] and falso.chamadas.count("criar_peca") == 1
+
+
+def test_nome_que_o_fracttal_nao_diz_nao_bloqueia():
+    """A linha da lista sem o nome não prova diferença: só o nome que o Fracttal DIZ e que difere é conflito."""
+    CU._conferir_o_nome_da_peca({"id": "9", "nome": ""}, {"nome": "Cabo azul"}, "SP-CAB-013")
+    CU._conferir_o_nome_da_peca({"id": "9", "nome": "CABO  azul"}, {"nome": "Cabo azul"}, "SP-CAB-013")
+    with pytest.raises(Conflito):
+        CU._conferir_o_nome_da_peca({"id": "9", "nome": "Cabo preto"}, {"nome": "Cabo azul"}, "SP-CAB-013")
+
+
+# ── as travas: uma por chave ───────────────────────────────────────────────────────────────────────────────────────────
+
+def _em_fio(app, fazer):
+    """Roda `fazer()` num fio com o contexto do app (a leitura dos livros do Campo pede o app). Devolve o fio."""
+    import threading
+
+    def correr():
+        with app.app_context():
+            fazer()
+    t = threading.Thread(target=correr)
+    t.start()
+    return t
+
+
+def test_duas_pessoas_na_mesma_linha_uma_ganha_e_a_outra_leva_409(cur, monkeypatch):
+    """Com a tela aberta nas duas máquinas, o clique chega junto: a trava é da linha, e o que chega depois lê a decisão do que
+    ganhou. Sem ela, os dois passavam da conferência e a linha ganhava duas decisões."""
+    import time
+    original = CU._usina_id
+
+    def devagar(nome):
+        time.sleep(0.4)                  # depois da conferência de "já decidida" e antes de escrever: onde a corrida acontece
+        return original(nome)
+    monkeypatch.setattr(CU, "_usina_id", devagar)
+    resultados = []
+
+    def decide():
+        try:
+            CU.decidir(cur.config, "C-1", "L-2", "e_a_peca", id_item="1", pessoa=PESSOA)
+            resultados.append("ok")
+        except Conflito as ex:
+            resultados.append(str(ex))
+    for t in [_em_fio(cur, decide), _em_fio(cur, decide)]:
+        t.join(15)
+    assert sorted(r == "ok" for r in resultados) == [False, True]
+    assert "esta linha já foi decidida" in [r for r in resultados if r != "ok"][0]
+    assert len(_livro(cur.config, F.ABA_CURADORIA)) == 1
+
+
+class _CriarDevagar(EstoqueFalso):
+    """O Fracttal que demora no `criar_peca` (a criação lenta) até o teste soltar."""
+
+    def __init__(self, *a, **k):
+        import threading
+        super().__init__(*a, **k)
+        self.entrou, self.soltar = threading.Event(), threading.Event()
+
+    def criar_peca(self, codigo, nome, unidade="UNIDADE"):
+        self.entrou.set()
+        self.soltar.wait(10)
+        return super().criar_peca(codigo, nome, unidade)
+
+
+def test_o_cadastro_lento_de_uma_linha_nao_segura_a_decisao_de_outra(cur):
+    """Uma trava do módulo, segurada enquanto o Fracttal cria a peça, faria todo o PCM esperar. A trava é da linha: com a L-2
+    esperando o Fracttal, descartar a L-3 passa na hora."""
+    import threading
+    falso = _CriarDevagar({ALMOX: {"5": {"saldo": 1, "codigo": "SP-CAB-001"}}})
+    t = _em_fio(cur, lambda: _cadastrar(cur.config, falso))
+    try:
+        assert falso.entrou.wait(10)
+        feito = threading.Event()
+        t2 = _em_fio(cur, lambda: (CU.decidir(cur.config, "C-1", "L-3", "descartar", motivo="não é peça", pessoa=PESSOA),
+                                   feito.set()))
+        assert feito.wait(10), "decidir outra linha esperou o cadastro lento no Fracttal"
+        t2.join(10)
+    finally:
+        falso.soltar.set()
+        t.join(10)
+    assert sorted(x["chave_linha"] for x in _livro(cur.config, F.ABA_CURADORIA)) == ["L-2", "L-3"]
+
+
+class _CodigosDevagar(EstoqueFalso):
+    """A lista de códigos que leva um tempo: duas linhas da mesma sigla se cruzam entre ler a lista e reservar o código."""
+
+    def codigos(self, sigla):
+        import time
+        r = super().codigos(sigla)
+        time.sleep(0.3)
+        return r
+
+
+def test_duas_linhas_da_mesma_sigla_ao_mesmo_tempo_nao_escolhem_o_mesmo_codigo(cur):
+    """Escolher o código e reservá-lo é uma conta só por sigla: sem a trava da sigla, as duas leriam a lista antes de qualquer
+    reserva e as duas reservariam o 013 (e a 2ª criação recusada, ou, no pior caso, uma peça só para duas linhas)."""
+    falso = _CodigosDevagar({ALMOX: {"5": {"saldo": 1, "codigo": "SP-CAB-001"}, "6": {"saldo": 1, "codigo": "SP-CAB-012"}}})
+    resultados = {}
+
+    def cadastra(linha):
+        resultados[linha] = _cadastrar(cur.config, falso, linha)["codigo"]
+    for t in [_em_fio(cur, lambda: cadastra("L-2")), _em_fio(cur, lambda: cadastra("L-3"))]:
+        t.join(20)
+    assert sorted(resultados.values()) == ["SP-CAB-013", "SP-CAB-014"]
+
+
+def test_a_trava_de_uma_chave_e_so_dela():
+    from nexus.pcm.inventario.travas import Travas
+    t = Travas()
+    assert t.de(("C-1", "L-2")) is t.de(("C-1", "L-2")) and t.de(("C-1", "L-2")) is not t.de(("C-1", "L-3"))
 
 
 def test_sem_cor_fora_de_token_nem_endereco_da_raiz():

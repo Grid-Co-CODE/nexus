@@ -254,6 +254,20 @@ class EstoqueFalso(Estoque):
         return sorted(c for c in self._todos_os_codigos() if c.upper().startswith(prefixo))
 
     @_operacao
+    def peca(self, codigo: str) -> dict | None:
+        alvo = str(codigo or "").strip().upper()
+        if not alvo:
+            raise ValueError("sem o código, qualquer peça seria a achada")
+        for id_item, v in self._catalogo.items():
+            if v["codigo"].upper() == alvo:
+                return {"id": id_item, "nome": v["nome"]}
+        for itens in self._itens.values():
+            for id_item, v in itens.items():
+                if v["codigo"] and v["codigo"].upper() == alvo:
+                    return {"id": id_item, "nome": ""}         # a peça que veio do saldo não traz o nome
+        return None
+
+    @_operacao
     def achar_peca(self, codigo: str) -> str | None:
         alvo = str(codigo or "").strip().upper()
         if not alvo:

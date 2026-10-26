@@ -24,9 +24,17 @@ class NaoConfere(Recusada):
     """O Fracttal respondeu, e a releitura não bateu com o que se mandou: nada é anotado como gravado. 502."""
 
 
-def resposta(ex: Exception) -> tuple[int, str]:
-    """(status, texto para a tela) de um erro das telas da régua e da curadoria. Erro que não é de nenhum destes tipos
-    sobe (bug nosso: a tela não o disfarça de mensagem)."""
+def _de_rede(ex: Exception) -> bool:
+    """A conexão (com o Fracttal ou com o banco) caiu ou demorou: o erro de rede, e não o de arquivo local. O `requests` tem a
+    hierarquia dele (`RequestException` é um `OSError`, mas não um `ConnectionError` do Python)."""
+    from requests import RequestException
+    return isinstance(ex, (ConnectionError, TimeoutError, RequestException))
+
+
+def resposta(ex: Exception, *, ao: str | None = None) -> tuple[int, str]:
+    """(status, texto para a tela) de um erro das telas da régua e da curadoria. `ao` diz o que se fazia quando a rede caiu:
+    "regua" (gravar o acordado no Fracttal), "cadastro" (criar a peça no Fracttal) ou nada (só leitura e livro). O erro que não
+    é de nenhum destes tipos sobe (bug nosso: a tela não o disfarça de mensagem)."""
     if isinstance(ex, Limite):
         return 429, ("O Fracttal pediu para esperar (o limite de pedidos é da empresa inteira): tente de novo em um "
                      "minuto. Nada foi anotado como gravado.")
@@ -36,10 +44,18 @@ def resposta(ex: Exception) -> tuple[int, str]:
     if isinstance(ex, ErroFracttal):
         return 502, f"O Fracttal recusou o pedido: {ex.mensagem}. Nada foi anotado como gravado."
     if isinstance(ex, OSError):
-        # a conexão caiu: a resposta pode ter se perdido DEPOIS de o Fracttal gravar (a régua é idempotente: gravar o mesmo
-        # par de novo é seguro, e o evento só sai quando a releitura confere)
-        return 502, ("Não consegui falar com o Fracttal agora (rede). Ele pode ter gravado: nada foi anotado como gravado; "
-                     "grave de novo, é o mesmo número.")
+        if _de_rede(ex):
+            # a conexão caiu: se havia um pedido ao Fracttal a caminho, a resposta pode ter se perdido DEPOIS de ele gravar
+            if ao == "regua":
+                return 502, ("Não consegui falar com o Fracttal agora (rede). Ele pode ter gravado: nada foi anotado como "
+                             "gravado; grave de novo, é o mesmo número.")
+            if ao == "cadastro":
+                return 502, ("Não consegui falar com o Fracttal agora (rede). Se a peça chegou a ser criada, o código ficou "
+                             "reservado nesta linha e tentar de novo, com os mesmos dados, não cria outra. Nada foi decidido.")
+            return 502, "Não consegui falar com o banco ou com o Fracttal agora (rede): tente de novo em instantes. Nada foi feito."
+        # arquivo do Nexus (o controle do código reservado, a pasta de dados): nada a ver com o Fracttal
+        return 500, (f"Não consegui ler ou gravar um arquivo do Nexus ({type(ex).__name__}): nada foi decidido. Se repetir, avise "
+                     "o suporte.")
     if isinstance(ex, Conflito):
         return 409, str(ex)
     if isinstance(ex, NaoConfere):
