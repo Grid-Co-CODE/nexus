@@ -562,6 +562,19 @@ não instalou) para na conferência do boot, sem restart e sem mexer na pasta do
 com ele; o `.env`, por exemplo) deixa o Nexus fora até o próximo commit consertar, como na plataforma: ele já ficou
 marcado como instalado, para o timer não reiniciar a cada 2 min (cada boot relê a Aprovação no Fracttal).
 
+**O restart espera o lote aberto da gravação do inventário (26/10/2026, Levi).** A gravação do inventário (PCM →
+Almoxarifado → Inventário) grava no Fracttal por sessão de ajuste, e enquanto um lote está aberto o almoxarifado fica
+travado (nem entrada, nem saída, nem pedido de compra). O restart no meio do lote mataria a gravação com o almoxarifado
+travado até quem aprovou voltar e continuar. Por isso, depois do pip e da conferência do boot e antes de a pasta do serviço
+andar, o script pergunta ao `ferramentas/gravacao_aberta.py` **do Nexus que está no ar** se há gravação viva com lote aberto
+(o controle em `<NEXUS_DADOS>/almox_inventario/` em "gravando", um lote em `abrindo`, `aberto` ou `fechando`, salvo há
+menos de 5 min). Havendo, a rodada para sem reiniciar e sem mexer na pasta, e a seguinte (2 min depois) pergunta de novo;
+**no máximo 10 minutos** contados da 1ª espera (a hora fica em `almox_inventario/deploy-espera.txt`), e então reinicia
+assim mesmo. Só a saída 1 com a linha `ESPERAR` segura o restart: sem o ajudante (o 1º deploy que o traz), ou com
+qualquer falha dele (o Python, o `sudo`, um controle ilegível), o deploy segue como sempre. A gravação parada (sem login,
+ou a que um restart já matou) não segura nada: esperar não a ajuda, e o "Continuar" de quem aprovou a retoma. Conferir à
+mão: `sudo -u nexus /opt/nexus/.venv/bin/python -B /opt/nexus/ferramentas/gravacao_aberta.py; echo $?`.
+
 **Depois da 1ª subida, a `dados/` do servidor é a original**: o que se edita no Nexus (cadastro, decisões do de-para,
 observações e gerações do PCM) mora lá. Se o Levi mandar um pacote novo, descompacte **só os `.env`**, a menos que ele
 diga o contrário:

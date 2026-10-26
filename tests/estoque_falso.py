@@ -219,11 +219,13 @@ class EstoqueFalso(Estoque):
         return None
 
     @_operacao
-    def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None) -> set[str] | None:
+    def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None,
+                      ignorar_prefixo: str | None = None) -> set[str] | None:
         corte = instante(desde_iso)
         return {m["id_item"] for m in self.movimentos
                 if m["id_almox"] == str(id_almox) and instante(m["quando"]) >= corte
-                and not (ignorar_referencia and m["referencia"] == ignorar_referencia)}
+                and not (ignorar_referencia and m["referencia"] == ignorar_referencia)
+                and not (ignorar_prefixo and m["referencia"].startswith(ignorar_prefixo))}
 
     @_operacao
     def definir_regua(self, id_almox: str, id_item: str, minimo: float | None, maximo: float | None) -> None:

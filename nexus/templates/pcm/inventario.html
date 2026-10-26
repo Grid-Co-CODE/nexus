@@ -12,6 +12,13 @@
 <h1 class="titulo-pagina">Almoxarifado</h1>
 {% include "pcm/_almox_abas.html" %}
 
+{# a gravação parada com o almoxarifado travado em ajuste no Fracttal (nexus/pcm/inventario/gravacao.py): avisa aqui também,
+   porque quem aprovou talvez nem abra a contagem, e o técnico em campo não lança peça enquanto isso #}
+{% for t in travadas or [] %}
+<div class="cn-erro" role="alert" data-travada="{{ t.contagem_id }}">{{ t.aviso }}
+  <a href="{{ raiz }}/t/pcm/pecas/inventario/{{ t.contagem_id|urlencode }}">Abrir a contagem</a></div>
+{% endfor %}
+
 {% if erro %}
 <div class="cn-erro" role="alert">{{ erro }}</div>
 {% elif not livro_existe %}

@@ -27,7 +27,8 @@
    em ajuste e o "Continuar", só para quem aprovou #}
 <section class="alm-painel inv-gravacao" id="inv-gravacao" aria-live="polite" data-situacao="{{ gravacao.estado }}"
   data-estado="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/estado.json"
-  data-continuar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/continuar">
+  data-continuar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/continuar"
+  data-encerrar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/encerrar">
   <h2>Gravação no Fracttal</h2>
   <p class="alm-ajuda" data-grav-texto>{{ gravacao.texto }}</p>
   <div class="cn-erro" role="alert" data-grav-aviso{% if not gravacao.aviso %} hidden{% endif %}>{{ gravacao.aviso }}</div>
@@ -40,6 +41,8 @@
   <div class="cn-erro" role="alert" data-grav-erro hidden></div>
   <div class="inv-rodape">
     <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-grav-continuar{% if not (pode_continuar and gravacao.estado == 'parada') %} hidden{% endif %}>Continuar</button>
+    {# encerrar: quem aprovou a qualquer hora, o administrador depois de 24 h parada; só com o almoxarifado fora do modo 2 #}
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-grav-encerrar{% if not pode_encerrar %} hidden{% endif %}>Encerrar a gravação</button>
   </div>
 </section>
 <script>
@@ -49,9 +52,10 @@
     var box = document.getElementById('inv-gravacao');
     if (!box) return;
     var rota = window.nexusRota || String;
-    var urlEstado = rota(box.dataset.estado), urlContinuar = rota(box.dataset.continuar);
+    var urlEstado = rota(box.dataset.estado), urlContinuar = rota(box.dataset.continuar), urlEncerrar = rota(box.dataset.encerrar);
     var texto = box.querySelector('[data-grav-texto]'), aviso = box.querySelector('[data-grav-aviso]');
     var botao = box.querySelector('[data-grav-continuar]'), erro = box.querySelector('[data-grav-erro]');
+    var encerrar = box.querySelector('[data-grav-encerrar]');
     var situacao = box.dataset.situacao;
     function mostrarErro(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
     function mostrar(j) {
@@ -63,6 +67,7 @@
         if (el) el.textContent = j[k];
       });
       botao.hidden = !(j.pode_continuar && j.estado === 'parada');
+      encerrar.hidden = !j.pode_encerrar;
       if (situacao === 'gravando' && j.estado !== 'gravando') { location.reload(); return; }
       situacao = j.estado;
     }
@@ -88,6 +93,27 @@
           if (r.j.login) location.href = r.j.login;
         })
         .catch(function () { botao.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
+    });
+    // encerrar: o motivo vai à auditoria (cifrado); o servidor confere no Fracttal que o almoxarifado não está em ajuste
+    encerrar.addEventListener('click', function () {
+      var motivo = window.prompt('Encerrar a gravação: as peças que faltam ficam de fora (conflito), e o almoxarifado fica livre '
+                                 + 'para outra contagem. Qual o motivo? (fica na auditoria)');
+      if (motivo === null) return;
+      if (!motivo.trim()) { mostrarErro('Escreva o motivo: ele fica na auditoria.'); return; }
+      encerrar.disabled = true;
+      mostrarErro('');
+      fetch(urlEncerrar, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+                          body: JSON.stringify({motivo: motivo})})
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
+        })
+        .then(function (r) {
+          encerrar.disabled = false;
+          if (r.ok) { location.reload(); return; }
+          mostrarErro(r.j.erro || 'Não consegui encerrar agora: tente de novo.');
+          if (r.j.login) location.href = r.j.login;
+        })
+        .catch(function () { encerrar.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
     });
   })();
 </script>
@@ -174,7 +200,7 @@
   </div>
   <div class="inv-rodape">
     {% if pode and c.aprovavel and n_gravar %}
-    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-gravar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/gravar" data-n="{{ n_gravar }}">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-gravar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/gravar" data-n="{{ n_gravar }}" data-assinatura="{{ assinatura }}">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
     {% else %}
     <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="{% if not n_gravar %}nada a gravar: nenhuma peça mexe no estoque{% else %}só o setor PCM grava{% endif %}">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
     {% endif %}
@@ -187,8 +213,9 @@
 </section>
 {% if pode and c.aprovavel and n_gravar %}
 <script>
-  // o "Gravar N alterações": confirma, manda o N que a tela mostrou (se o lote mudou desde então, o servidor recusa) à ponte
-  // /os/_nexus (o cookie do Fracttal só vai para /os) e recarrega: a página passa a mostrar o andamento
+  // o "Gravar N alterações": confirma, manda o N e a assinatura do lote que a tela mostrou (se ele mudou desde então, o
+  // servidor recusa) à ponte /os/_nexus (o cookie do Fracttal só vai para /os) e recarrega: a página passa a mostrar o
+  // andamento
   (function () {
     var b = document.querySelector('[data-gravar]');
     var erro = document.querySelector('[data-gravar-erro]');
@@ -201,7 +228,7 @@
       b.disabled = true;
       mostrar('');
       fetch((window.nexusRota || String)(b.dataset.gravar), {method: 'POST', credentials: 'same-origin',
-             headers: {'Content-Type': 'application/json'}, body: JSON.stringify({n: n})})
+             headers: {'Content-Type': 'application/json'}, body: JSON.stringify({n: n, assinatura: b.dataset.assinatura})})
         .then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
         })

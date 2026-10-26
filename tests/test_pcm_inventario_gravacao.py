@@ -116,7 +116,7 @@ def test_grava_e_confirma(app, grav):
     d = _iniciar(grav, falso)
     assert d["estado"] == "gravando" and d["total"] == 3
     assert falso.chamadas == ["modo", "mexidas_desde", "ler", "modo", "abrir_ajuste", "ler", "gravar_saldo", "gravar_saldo",
-                              "gravar_saldo", "fechar_ajuste", "voltar_ao_normal", "ler"]
+                              "gravar_saldo", "fechar_ajuste", "voltar_ao_normal", "achar_movimento", "ler"]
     assert _saldos(falso) == {"501": 12, "502": 3, "503": 0} and falso.modo("10") == 0
     assert _pares(falso) == {"501": ["saida", "entrada"], "502": ["saida", "entrada"], "503": ["saida", "entrada"]}
     assert {m["referencia"] for m in falso.movimentos} == {"INVENTARIO-C-1-L1"}
@@ -125,7 +125,9 @@ def test_grava_e_confirma(app, grav):
     gravadas = {e["id_item"]: e for e in _eventos(app, "peca_gravada")}
     assert set(gravadas) == {"501", "502", "503"}
     e = gravadas["501"]
-    assert e["movimento_fracttal"] == "7"                # o folio_return do fechamento (o próximo número de movimento)
+    # o folio do movimento achado pela referência depois de fechar (MOV-6, o mais novo), e não o `folio_return` ("7", o
+    # próximo número): o mesmo que a retomada acha
+    assert e["movimento_fracttal"] == "6"
     assert (float(e["de_qtd"]), float(e["para_qtd"]), e["situacao"], e["lote"]) == (10, 12, "para_cima", 1)
     assert e["pessoa_hmac"] == APROVADOR["pessoa_hmac"] and e["usina_ligada_por"] == LIGADA_DE_PARA
     assert gravadas["503"]["situacao"] == "zerar"
@@ -265,6 +267,7 @@ def test_finalizar_perdido_nao_finaliza_duas_vezes(app, grav):
     est = G.estado(app.config, "C-1")
     assert est["estado"] == "parada" and "ConnectionError" in est["motivo"] and not est["travado"]
     assert falso.modo("10") == 0 and falso.chamadas.count("fechar_ajuste") == 1
+    assert grav["esperas"] == [62]                       # esperou antes de procurar: o histórico pode ainda não mostrar
     erro = _eventos(app, "erro")
     assert len(erro) == 1 and F.decifrar(app.config, F.ABA_EVENTO, erro[0])["motivo"].endswith("ConnectionError")
     _continuar(grav, falso)
@@ -401,7 +404,7 @@ def test_releitura_que_nao_bate_vira_erro_e_o_continuar_decide(app, grav):
     falso.fechar_ajuste = fechar
     _continuar(grav, falso)
     assert G.estado(app.config, "C-1")["estado"] == "concluida"
-    assert [e["id_item"] for e in _eventos(app, "conflito")] == ["502"] and falso.chamadas[12:] == ["ler"]   # só relê
+    assert [e["id_item"] for e in _eventos(app, "conflito")] == ["502"] and falso.chamadas[13:] == ["ler"]   # só relê
     assert L.estado_dos_eventos(_eventos(app)) == "gravada_com_conflitos"
 
 
@@ -443,6 +446,150 @@ def test_o_disco_que_falha_nao_deixa_o_almoxarifado_travado(app, grav, monkeypat
     monkeypatch.setattr(G, "_gravar_json", disco_cheio)
     _iniciar(grav, falso)
     assert vezes and falso.modo("10") == 0 and falso.chamadas.count("fechar_ajuste") == 1
+
+
+def test_a_gravacao_nao_conta_as_proprias_sessoes_como_mexidas(app, grav):
+    """O que se moveu depois da contagem é lido sem as sessões da própria contagem (`INVENTARIO-<contagem>-`): o movimento
+    que o Nexus fez num lote (ou numa sessão anterior do mesmo lote) não é conflito."""
+    falso = _falso(agora=grav["relogio"])
+    pedidos, mexidas = [], falso.mexidas_desde
+
+    def anotar(*args):
+        pedidos.append(args)
+        return mexidas(*args)
+    falso.mexidas_desde = anotar
+    _iniciar(grav, falso)
+    assert pedidos == [("10", CONTADA, None, "INVENTARIO-C-1-")]
+
+
+def test_o_adaptador_e_o_falso_ignoram_o_prefixo():
+    """`mexidas_desde(..., ignorar_prefixo=...)`: o de verdade (pelo histórico do passo 0) e o falso tiram os movimentos cuja
+    referência começa pelo prefixo; a referência exata segue como era."""
+    from test_pcm_inventario_estoque import ALMOX, HIST, HISTORICO, ITEM, Fracttal, em_paginas, estoque
+    est = estoque(Fracttal({HISTORICO: em_paginas(HIST)}), pagina=2)
+    assert est.mexidas_desde(ALMOX, "2026-10-26T13:00:00Z") == {ITEM, "53248313", "53248314"}
+    assert est.mexidas_desde(ALMOX, "2026-10-26T13:00:00Z", ignorar_prefixo="INVENTARIO-") == {"53248313", "53248314"}
+    assert est.mexidas_desde(ALMOX, "2026-10-26T13:00:00Z", None, "Consumo") == {ITEM, "53248314"}
+    falso = EstoqueFalso({"10": {"501": 1, "502": 1}})
+    falso.mover("10", "501", "entrada", 1, quando="2026-10-26T14:00:00Z", referencia="INVENTARIO-C-1-L1")
+    falso.mover("10", "502", "entrada", 1, quando="2026-10-26T14:00:00Z", referencia="Compra 9")
+    assert falso.mexidas_desde("10", "2026-10-26T13:00:00Z") == {"501", "502"}
+    assert falso.mexidas_desde("10", "2026-10-26T13:00:00Z", ignorar_prefixo="INVENTARIO-C-1-") == {"502"}
+
+
+def test_retomada_com_movimento_de_outro_nao_finaliza_a_sessao_dos_outros(app, grav):
+    """A nossa sessão ficou aberta (o login expirou); alguém a finalizou no Fracttal e abriu outra. O controle velho diz
+    "aberto", e o modo é 2: o histórico desde que a nossa abriu tem movimento sem a nossa referência, então a sessão saiu
+    das nossas mãos. Para sem gravar nem finalizar."""
+    falso = _falso(expirar_em=8, agora=grav["relogio"])
+    _iniciar(grav, falso)
+    falso._expira_em = None
+    falso.fechar_ajuste("10", "Ajuste feito na tela do Fracttal")      # outra pessoa finaliza a nossa sessão...
+    falso.abrir_ajuste("10")                                          # ...e abre a dela
+    n = len(falso.chamadas)
+    _continuar(grav, falso)
+    est = G.estado(app.config, "C-1")
+    assert est["estado"] == "parada" and "ajuste por outra pessoa ou outra tela" in est["motivo"]
+    assert falso.chamadas[n:] == ["modo", "mexidas_desde"] and falso.modo("10") == 2
+
+
+def test_retomada_com_modo_2_procura_antes_de_finalizar(app, grav):
+    """A falha dupla: o finalizar valeu, o modo 0 falhou, e o controle não soube que o lote estava "fechando" (o disco que
+    falhou enquanto parava). A retomada com o modo 2 procura o fechamento pela referência antes de gravar mais ou de
+    finalizar de novo: achou, só volta ao normal."""
+    falso = _falso(expirar_em=11, agora=grav["relogio"])     # o login morre no modo 0 de dentro do fechar
+    _iniciar(grav, falso)
+    caminho = next(grav_pasta(app).glob("C-1*.json"))
+    ctrl = json.loads(caminho.read_text("utf-8"))
+    assert ctrl["lotes"][0]["estado"] == "fechando"
+    ctrl["lotes"][0]["estado"] = "aberto"                    # o "fechando" que o disco engoliu
+    caminho.write_text(json.dumps(ctrl), "utf-8")
+    falso._expira_em = None
+    _continuar(grav, falso)
+    assert G.estado(app.config, "C-1")["estado"] == "concluida"
+    assert falso.chamadas.count("fechar_ajuste") == 1 and falso.modo("10") == 0
+    assert _pares(falso) == {i: ["saida", "entrada"] for i in ("501", "502", "503")}
+
+
+def test_confirmar_sem_alvo_e_pendente_e_segura_o_especifico(app, grav):
+    """Como as contas (`contas._ler`): o "confirmar" sem alvo (nem na decisão, nem no "Identificado como") é linha pendente,
+    e o específico que recebeu a outra linha confirmada do mesmo genérico espera a curadoria."""
+    falso = _falso({"501": 10, "502": 5, "507": 6}, agora=grav["relogio"])
+    linhas = [_linha("C-1", "L1", "501", "12", contada=CONTADA), _linha("C-1", "L2", "502", "3", contada=CONTADA),
+              _linha("C-1", "L3", "507", "2", tipo="identificar", contada=CONTADA, **{"Identificado como": "501"}),
+              _linha("C-1", "L4", "507", "1", tipo="identificar", contada=CONTADA)]
+    curadoria = {"L3": {"decisao": "confirmar", "id_item": "501"}, "L4": {"decisao": "confirmar", "id_item": ""}}
+    _iniciar(grav, falso, linhas=linhas, curadoria=curadoria)
+    assert [e["id_item"] for e in _eventos(app, "conflito")] == ["501"] and _saldos(falso)["501"] == 10
+
+
+# ── encerrar (Levi, 26/10/2026) ──────────────────────────────────────────────────────────────────────────────────────────
+def _encerrar(grav, falso, pessoa=APROVADOR, motivo="o almoxarifado vai ser recontado", admin=False, horas=0.0):
+    agora = (lambda: grav["relogio"].t + timedelta(hours=horas)) if horas else grav["relogio"]
+    return G.encerrar(grav["cfg"], "C-1", falso, pessoa, motivo, admin=admin, agora=agora)
+
+
+def test_encerrar_quem_aprovou(app, grav):
+    """Quem aprovou encerra a gravação parada (a qualquer hora), com o motivo e o almoxarifado fora do modo 2: as peças já
+    conferidas ficam `peca_gravada`, a que faltava vira `conflito` com o motivo (só cifrado), a contagem sai de "gravando",
+    e a vez do almoxarifado é solta (outra contagem grava)."""
+    falso = _falso(agora=grav["relogio"])
+    fechar = falso.fechar_ajuste
+
+    def fechar_e_alguem_lanca(id_almox, referencia):
+        folio = fechar(id_almox, referencia)
+        falso.mover("10", "502", "saida", 1)
+        return folio
+    falso.fechar_ajuste = fechar_e_alguem_lanca
+    _iniciar(grav, falso)                                     # a 502 não bate na releitura: parada
+    assert G.estado(app.config, "C-1")["estado"] == "parada"
+    with pytest.raises(F.Recusada, match="motivo"):
+        _encerrar(grav, falso, motivo="   ")
+    with pytest.raises(G.Recusada, match="Só quem aprovou"):
+        _encerrar(grav, falso, pessoa=OUTRA)
+    est = _encerrar(grav, falso)
+    assert est["estado"] == "encerrada" and est["gravadas"] == 2 and est["conflitos"] == 1 and not est["travado"]
+    conf = _eventos(app, "conflito")
+    assert [e["id_item"] for e in conf] == ["502"] and conf[0]["pessoa_hmac"] == APROVADOR["pessoa_hmac"]
+    assert "o almoxarifado vai ser recontado" in F.decifrar(app.config, F.ABA_EVENTO, conf[0])["motivo"]
+    assert {e["id_item"] for e in _eventos(app, "peca_gravada")} == {"501", "503"}
+    assert L.estado_dos_eventos(_eventos(app)) == "gravada_com_conflitos"
+    controle = next(grav_pasta(app).glob("C-1*.json")).read_text("utf-8")
+    assert "recontado" not in controle and not list(grav_pasta(app).glob("trava-*"))
+    with pytest.raises(F.Recusada):
+        _continuar(grav, falso)                               # encerrada não volta
+    _iniciar(grav, _falso({"501": 12, "502": 2, "503": 0}), {"501": 1}, cid="C-2")
+    assert G.estado(app.config, "C-2")["estado"] == "concluida"
+
+
+def test_encerrar_administrador_so_depois_de_24h(app, grav):
+    """O administrador do Nexus encerra a gravação parada de outra pessoa só depois de 24 h parada; o conflito fica no nome
+    dele."""
+    falso = _falso(agora=grav["relogio"])
+    falso.definir_modo("10", 3)
+    _iniciar(grav, falso)                                     # parada sem mexer: nada gravado
+    with pytest.raises(G.Recusada, match="24 h") as erro:
+        _encerrar(grav, falso, pessoa=OUTRA, admin=True, horas=23)
+    assert erro.value.status == 403
+    assert not G.pode_encerrar(app.config, "C-1", OUTRA, admin=True, agora=lambda: grav["relogio"].t)
+    assert G.pode_encerrar(app.config, "C-1", OUTRA, admin=True, agora=lambda: grav["relogio"].t + timedelta(hours=25))
+    est = _encerrar(grav, falso, pessoa=OUTRA, admin=True, horas=25)
+    assert est["estado"] == "encerrada" and est["conflitos"] == 3 and est["gravadas"] == 0
+    assert {e["pessoa_hmac"] for e in _eventos(app, "conflito")} == {OUTRA["pessoa_hmac"]}
+    assert falso.modo("10") == 3                              # o modo 3 é de outra pessoa: encerrar não mexe nele
+
+
+def test_encerrar_com_o_almoxarifado_em_modo_2_e_recusado(app, grav):
+    """A sessão ficou aberta (o login expirou): encerrar agora largaria o almoxarifado travado sem dono. Recusado, e nada
+    muda; quem aprovou continua (ou fecha o ajuste no Fracttal) antes."""
+    falso = _falso(expirar_em=8, agora=grav["relogio"])
+    _iniciar(grav, falso)
+    falso._expira_em = None
+    antes = len(_eventos(app))
+    with pytest.raises(G.Recusada, match="modo 2") as erro:
+        _encerrar(grav, falso)
+    assert erro.value.status == 409 and len(_eventos(app)) == antes
+    assert G.estado(app.config, "C-1")["estado"] == "parada" and list(grav_pasta(app).glob("trava-*"))
 
 
 # ── quem continua e a vez do almoxarifado ────────────────────────────────────────────────────────────────────────────────
@@ -540,13 +687,13 @@ def test_contagem_vazia_ou_sem_pessoa_e_recusada(app, grav):
 
 
 # ── as telas e a ponte do Fracttal ───────────────────────────────────────────────────────────────────────────────────────
-def _cookie_os(app, cliente, jwt="x.eyJ.y"):
+def _cookie_os(app, cliente, jwt="x.eyJ.y", email=EMAIL):
     """O cookie `os_sessao` do OS Creator como o login do Nexus pelo Fracttal o grava: no caminho /os, que o navegador só
-    manda para /os/..."""
+    manda para /os/... `email`: a conta do Fracttal (a ponte confere que é a da sessão do Nexus)."""
     from nexus.torres.oscreator import ponte
     clone = ponte.clone(app)
     valor = clone.session_interface.get_signing_serializer(clone).dumps(
-        {"jwt": jwt, "conta": {"email": EMAIL, "nome": "Pessoa"}})
+        {"jwt": jwt, "conta": {"email": email, "nome": "Pessoa"}})
     cliente.set_cookie("os_sessao", valor, path="/os")
 
 
@@ -565,18 +712,29 @@ def ponte_falsa(app, grav, monkeypatch):
     return {"falso": falso, "montados": montados}
 
 
+def _visto(app, falso, contagem="C-1"):
+    """O que a tela mostrou do lote (o N e a assinatura), como a página o calcula: as contas com o saldo lido agora."""
+    c = next(x for x in L.contagens(app.config) if x["contagem_id"] == contagem)
+    itens = contas.itens_do_lote(c["linhas"], falso.ler(c["id_almox"]), L.curadoria_da(app.config, contagem),
+                                 L.revisao_da(app.config, contagem))
+    falso.chamadas.clear()                                    # a numeração do `expirar_em` começa no gravar
+    return {"n": sum(1 for i in itens if i["id_item"] and not i["tirada"] and i["situacao"] in contas.MEXEM),
+            "assinatura": G.assinatura(itens)}
+
+
 def test_o_login_do_fracttal_so_chega_na_ponte(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     """O cookie do Fracttal (`os_sessao`) vale só em /os: numa rota /t/pcm/... o `estoque_da_sessao` de verdade não vê o
     login (SemLogin), e na ponte /os/_nexus/inventario/... vê. É por isso que gravar e continuar moram na ponte."""
     _cenario(inv)
     c = _pcm(app, monkeypatch)
     _cookie_os(app, c)
+    visto = _visto(app, ponte_falsa["falso"])
     with c:
         c.get(f"{LISTA}/C-1/estado.json")
         with pytest.raises(E.SemLogin):
             E.estoque_da_sessao(app)
     with c:
-        r = c.post(f"{PONTE}/C-1/gravar", json={"n": 5})
+        r = c.post(f"{PONTE}/C-1/gravar", json=visto)
         assert isinstance(E.estoque_da_sessao(app), EstoqueFalso)
     assert r.status_code == 200 and r.get_json()["ok"] is True, r.get_json()
     assert ponte_falsa["montados"][0] == "x.eyJ.y"
@@ -585,24 +743,26 @@ def test_o_login_do_fracttal_so_chega_na_ponte(app, inv, ponte_falsa, monkeypatc
 
 
 def test_gravar_pela_tela(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
-    """A tela: o botão "Gravar 5 alterações" liga e chama a ponte; o progresso vem do estado.json (a cada 3 s); ao fim a
-    contagem fica "gravada com conflitos" ou "gravada" pelo livro, e o botão some (ela não se aprova mais)."""
+    """A tela: o botão "Gravar 5 alterações" liga, com o N e a assinatura do lote que ela mostra, e chama a ponte; o
+    progresso vem do estado.json (a cada 3 s); ao fim a contagem fica "gravada" pelo livro, e o botão some."""
     _cenario(inv)
     # o saldo que a página da Task 6 lê para mostrar o lote (essa leitura vai para a ponte na correção das Tasks 5/6); a
     # ponte do gravar usaria o mesmo Fracttal de mentira
     monkeypatch.setattr(E, "estoque_da_sessao", lambda app_: ponte_falsa["falso"])
     c = _pcm(app, monkeypatch)
     _cookie_os(app, c)
+    visto = _visto(app, ponte_falsa["falso"])
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert re.search(r'<button[^>]*\bdata-gravar="/os/_nexus/inventario/C-1/gravar"[^>]*>\s*Gravar 5 alterações', html)
-    assert 'data-n="5"' in html and "estado.json" not in html            # sem gravação, sem o bloco do progresso
+    assert 'data-n="5"' in html and f'data-assinatura="{visto["assinatura"]}"' in html and visto["n"] == 5
+    assert "estado.json" not in html                                     # sem gravação, sem o bloco do progresso
     assert c.get(f"{LISTA}/C-1/estado.json").status_code == 404
-    r = c.post(f"{PONTE}/C-1/gravar", json={"n": 5})
+    r = c.post(f"{PONTE}/C-1/gravar", json=visto)
     assert r.status_code == 200, r.get_json()
     G.aguardar("C-1")
     j = c.get(f"{LISTA}/C-1/estado.json").get_json()
     assert j["estado"] == "concluida" and j["total"] == 5 and j["gravadas"] == 5 and j["pode_continuar"] is False
-    assert j["texto"]
+    assert j["texto"] and j["pode_encerrar"] is False
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert "Gravação no Fracttal" in html and "data-gravar=" not in html and 'data-estado="/t/pcm/pecas/inventario/C-1/estado.json"' in html
     assert ponte_falsa["falso"].ler("10")["508"]["saldo"] == 3            # a nunca ligada foi ligada e gravada
@@ -611,37 +771,50 @@ def test_gravar_pela_tela(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
 
 def test_gravar_pela_ponte_recusa(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     """Outro setor: 403. Outro site: 403. A senha de administrador (não é uma pessoa): 409. Sem o login do Fracttal: 401
-    com o link do login. O lote mudou desde que a tela abriu: 409 e nada é gravado."""
+    com o link do login. A conta do Fracttal de outra pessoa: 409. Sem o N ou a assinatura: 400. O lote mudou desde que a
+    tela abriu (o N, ou um saldo que mudou sem mudar o N): 409, e nada é gravado."""
     _cenario(inv)
+    falso = ponte_falsa["falso"]
+    visto = _visto(app, falso)
     outro = _pcm(app, monkeypatch, setor="Performance")
     _cookie_os(app, outro)
-    assert outro.post(f"{PONTE}/C-1/gravar", json={"n": 5}).status_code == 403
+    assert outro.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 403
     c = _pcm(app, monkeypatch)
     _cookie_os(app, c)
-    assert c.post(f"{PONTE}/C-1/gravar", json={"n": 5}, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert c.post(f"{PONTE}/C-1/gravar", json=visto, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     admin = app.test_client()
     with admin.session_transaction() as s:
         s["logado"], s["admin"] = True, True
-    r = admin.post(f"{PONTE}/C-1/gravar", json={"n": 5})
+    r = admin.post(f"{PONTE}/C-1/gravar", json=visto)
     assert r.status_code == 409 and "Fracttal" in r.get_json()["erro"]
     # quem entrou pela conta Microsoft e não tem o login do Fracttal: 401 com o link do login, e a volta para a contagem
     sem = _pcm(app, monkeypatch)
     with sem.session_transaction() as s:
         s["via"], s["ms_ate"] = "microsoft", time.time() + 3600
-    r = sem.post(f"{PONTE}/C-1/gravar", json={"n": 5})
+    r = sem.post(f"{PONTE}/C-1/gravar", json=visto)
     assert r.status_code == 401 and "entre pelo Fracttal" in r.get_json()["erro"]
     assert r.get_json()["login"].startswith("/os/login?next=") and "inventario%2FC-1" in r.get_json()["login"]
     # quem entrou pelo Fracttal e já não tem o cookie dele: o portão encerra a sessão do Nexus junto, antes da ponte
     caiu = _pcm(app, monkeypatch)
-    r = caiu.post(f"{PONTE}/C-1/gravar", json={"n": 5})
+    r = caiu.post(f"{PONTE}/C-1/gravar", json=visto)
     assert r.status_code == 401 and r.get_json().get("sessao_encerrada") is True
-    r = c.post(f"{PONTE}/C-1/gravar", json={"n": 4})
+    # o cookie do Fracttal de outra conta no mesmo navegador: a gravação iria no nome de um e no login de outro
+    trocada = _pcm(app, monkeypatch)
+    _cookie_os(app, trocada, email="outra.pessoa@exemplo.test")
+    r = trocada.post(f"{PONTE}/C-1/gravar", json=visto)
+    assert r.status_code == 409 and r.get_json()["erro"] == "A sessão do Fracttal é de outra conta; entre de novo pelo Fracttal."
+    assert c.post(f"{PONTE}/C-1/gravar", json={"n": 5}).status_code == 400
+    r = c.post(f"{PONTE}/C-1/gravar", json=dict(visto, n=4))
+    assert r.status_code == 409 and "a contagem mudou desde que você abriu a tela; recarregue" in r.get_json()["erro"].lower()
+    falso.mover("10", "501", "entrada", 1, quando="2026-10-20T12:00:00Z")    # 10 → 11: o N segue 5, a assinatura não
+    r = c.post(f"{PONTE}/C-1/gravar", json=visto)
     assert r.status_code == 409 and "recarregue" in r.get_json()["erro"]
-    assert c.post(f"{PONTE}/C-9/gravar", json={"n": 1}).status_code == 404
-    assert _eventos(app) == [] and ponte_falsa["falso"].chamadas.count("abrir_ajuste") == 0
-    assert c.post(f"{PONTE}/C-1/gravar", json={"n": 5}).status_code == 200
+    assert c.post(f"{PONTE}/C-9/gravar", json=visto).status_code == 404
+    assert _eventos(app) == [] and falso.chamadas.count("abrir_ajuste") == 0
+    visto = _visto(app, falso)
+    assert c.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 200
     G.aguardar("C-1")
-    r = c.post(f"{PONTE}/C-1/gravar", json={"n": 5})                   # a 2ª vez: já não se aprova
+    r = c.post(f"{PONTE}/C-1/gravar", json=visto)                     # a 2ª vez: já não se aprova
     assert r.status_code == 409
 
 
@@ -650,20 +823,27 @@ def test_continuar_pela_ponte_so_de_quem_aprovou(app, inv, ponte_falsa, monkeypa
     leva 403 na ponte. Quem aprovou continua e a gravação termina."""
     _cenario(inv)
     falso = ponte_falsa["falso"]
+    visto = _visto(app, falso)
     falso.definir_modo("10", 3)
     c = _pcm(app, monkeypatch)
     _cookie_os(app, c)
-    assert c.post(f"{PONTE}/C-1/gravar", json={"n": 5}).status_code == 200
+    assert c.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 200
     G.aguardar("C-1")
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert re.search(r"<button[^>]*data-grav-continuar(?![^>]*hidden)[^>]*>", html)
+    assert re.search(r"<button[^>]*data-grav-encerrar(?![^>]*hidden)[^>]*>", html)     # quem aprovou encerra a qualquer hora
     assert "Inventário físico" in html
     outra = _pcm(app, monkeypatch, email="outra.pessoa@exemplo.test")
-    _cookie_os(app, outra)
-    assert re.search(r"<button[^>]*data-grav-continuar[^>]*hidden", outra.get(f"{LISTA}/C-1").get_data(as_text=True))
-    assert outra.get(f"{LISTA}/C-1/estado.json").get_json()["pode_continuar"] is False
+    _cookie_os(app, outra, email="outra.pessoa@exemplo.test")
+    html = outra.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert re.search(r"<button[^>]*data-grav-continuar[^>]*hidden", html)
+    assert re.search(r"<button[^>]*data-grav-encerrar[^>]*hidden", html)
+    j = outra.get(f"{LISTA}/C-1/estado.json").get_json()
+    assert j["pode_continuar"] is False and j["pode_encerrar"] is False
     r = outra.post(f"{PONTE}/C-1/continuar", json={})
     assert r.status_code == 403 and "só quem aprovou continua" in r.get_json()["erro"]
+    r = outra.post(f"{PONTE}/C-1/encerrar", json={"motivo": "x"})
+    assert r.status_code == 403 and "Só quem aprovou" in r.get_json()["erro"]
     falso.definir_modo("10", 0)
     r = c.post(f"{PONTE}/C-1/continuar", json={})
     assert r.status_code == 200, r.get_json()
@@ -672,14 +852,56 @@ def test_continuar_pela_ponte_so_de_quem_aprovou(app, inv, ponte_falsa, monkeypa
     assert c.post(f"{PONTE}/C-9/continuar", json={}).status_code == 404
 
 
-def test_a_tela_mostra_o_aviso_de_travado(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
+def test_o_controle_ilegivel_na_ponte_e_409(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
+    """O controle que não se lê: a ponte diz isso (409), e não "só quem aprovou" (ninguém sabe quem aprovou)."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    _cookie_os(app, c)
+    falso = ponte_falsa["falso"]
+    falso.definir_modo("10", 3)
+    assert c.post(f"{PONTE}/C-1/gravar", json=_visto(app, falso)).status_code == 200
+    G.aguardar("C-1")
+    next(grav_pasta(app).glob("C-1*.json")).write_text("{não é json", "utf-8")
+    for acao, corpo in (("continuar", {}), ("encerrar", {"motivo": "x"})):
+        r = c.post(f"{PONTE}/C-1/{acao}", json=corpo)
+        assert r.status_code == 409 and "ilegível" in r.get_json()["erro"], acao
+
+
+def test_encerrar_pela_ponte(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
+    """Quem aprovou encerra pela ponte (o modo lido na hora no Fracttal, por isso na ponte): o motivo é obrigatório, e com o
+    almoxarifado em modo 2 é recusado."""
     _cenario(inv)
     falso = ponte_falsa["falso"]
+    visto = _visto(app, falso)
+    falso._expira_em = 8                                      # para com a sessão aberta (modo 2)
+    c = _pcm(app, monkeypatch)
+    _cookie_os(app, c)
+    assert c.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 200
+    G.aguardar("C-1")
+    falso._expira_em = None
+    assert c.post(f"{PONTE}/C-1/encerrar", json={}).status_code == 400
+    r = c.post(f"{PONTE}/C-1/encerrar", json={"motivo": "o almoxarifado vai ser recontado"})
+    assert r.status_code == 409 and "modo 2" in r.get_json()["erro"]
+    falso.voltar_ao_normal("10")                              # alguém fechou o ajuste no Fracttal
+    r = c.post(f"{PONTE}/C-1/encerrar", json={"motivo": "o almoxarifado vai ser recontado"})
+    assert r.status_code == 200, r.get_json()
+    assert G.estado(app.config, "C-1")["estado"] == "encerrada"
+    assert L.contagens(app.config)[0]["estado"] == "gravada_com_conflitos"
+
+
+def test_a_tela_e_a_lista_mostram_o_aviso_de_travado(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
+    """O aviso forte na contagem e também na lista das contagens: quem aprovou talvez nem abra a contagem."""
+    _cenario(inv)
+    falso = ponte_falsa["falso"]
+    visto = _visto(app, falso)
     falso._expira_em = 8
     c = _pcm(app, monkeypatch)
     _cookie_os(app, c)
-    assert c.post(f"{PONTE}/C-1/gravar", json={"n": 5}).status_code == 200
+    assert c.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 200
     G.aguardar("C-1")
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert "ficou travado em ajuste no Fracttal; quem aprovou precisa continuar para destravar" in html
     assert "o login do Fracttal expirou" in html
+    lista = c.get(LISTA).get_data(as_text=True)
+    assert "ficou travado em ajuste no Fracttal; quem aprovou precisa continuar para destravar" in lista
+    assert 'data-travada="C-1"' in lista and 'href="/t/pcm/pecas/inventario/C-1"' in lista

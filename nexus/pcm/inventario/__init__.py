@@ -33,13 +33,18 @@ def registrar(bp) -> None:
         grav = G.estado(current_app.config, contagem_id)
         usuario = session.get("usuario")
         email = usuario.get("email") if isinstance(usuario, dict) else None
+        parada = bool(grav) and grav["estado"] == "parada"
         return {"gravacao": grav,
-                "pode_continuar": bool(grav) and grav["estado"] == "parada"
-                and G.e_o_aprovador(current_app.config, contagem_id, {"email": email})}
+                "pode_continuar": parada and G.e_o_aprovador(current_app.config, contagem_id, {"email": email}),
+                # quem aprovou, a qualquer hora; o administrador, parada há mais de 24 h
+                "pode_encerrar": parada and G.pode_encerrar(current_app.config, contagem_id, {"email": email},
+                                                            admin=bool(session.get("admin")))}
 
     @bp.route("/pecas/inventario", endpoint="inventario")
     def inventario():
-        return render_template("pcm/inventario.html", **R.montar_lista(current_app.config))
+        # a gravação parada com o almoxarifado travado no Fracttal avisa também aqui (quem aprovou talvez nem abra a contagem)
+        return render_template("pcm/inventario.html", **R.montar_lista(current_app.config),
+                               travadas=G.travadas(current_app.config))
 
     @bp.route("/pecas/inventario/<contagem_id>", endpoint="inventario_contagem")
     def inventario_contagem(contagem_id):
@@ -52,7 +57,10 @@ def registrar(bp) -> None:
             return render_template("pcm/inventario_contagem.html", erro=str(ex), c=None, a_revisar=None)
         if ctx is None:
             abort(404)
-        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, **ctx, **_da_gravacao(contagem_id))
+        # a assinatura do lote que esta tela mostra: o "Gravar" a manda de volta, e o servidor recusa se o lote mudou
+        assinatura = G.assinatura(ctx["itens"]) if ctx.get("com_sistema") else ""
+        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, assinatura=assinatura, **ctx,
+                               **_da_gravacao(contagem_id))
 
     @bp.route("/pecas/inventario/<contagem_id>/estado.json", endpoint="inventario_estado")
     def inventario_estado(contagem_id):
@@ -60,7 +68,7 @@ def registrar(bp) -> None:
         d = _da_gravacao(contagem_id)
         if d["gravacao"] is None:
             return jsonify(ok=False, erro="Esta contagem não tem gravação."), 404
-        return jsonify(ok=True, pode_continuar=d["pode_continuar"], **d["gravacao"])
+        return jsonify(ok=True, pode_continuar=d["pode_continuar"], pode_encerrar=d["pode_encerrar"], **d["gravacao"])
 
     @bp.route("/pecas/inventario/<contagem_id>/revisar", methods=["POST"], endpoint="inventario_revisar")
     def inventario_revisar(contagem_id):

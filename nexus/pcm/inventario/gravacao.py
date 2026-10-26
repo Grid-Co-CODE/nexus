@@ -12,15 +12,21 @@ ATHN-MTS200 estava parado em "Inventário físico" (modo 3) com tudo travado. Po
   volta ao normal). A referência é `INVENTARIO-<contagem>-L<n>`; a 2ª sessão do mesmo lote (a que grava o resto depois de
   uma parada) leva `-S<k>`, para o "achar o fechamento pela referência" nunca confundir as duas.
 - **O modo manda.** 3 (inventário físico): para sem mexer. 2 que o controle não diz que é nosso (outra pessoa ou outra
-  tela): para sem mexer, e nunca o volta ao normal (os saldos dela ficariam sem o par de movimentos). O modo se confere no
-  começo do lote e de novo logo antes de abrir: entre uma conferência e a outra passam segundos (ligar as peças, ler).
+  tela): para sem mexer (voltá-lo ao normal deixaria os saldos dela sem o par de movimentos). O modo se confere no começo do
+  lote e de novo logo antes de abrir: entre uma conferência e a outra passam segundos (ligar as peças, ler). O 2 que o
+  controle diz ser nosso, numa retomada, é conferido pelo histórico desde que a sessão abriu: movimento sem a nossa
+  referência é a sessão que saiu das nossas mãos (alguém a finalizou e abriu outra), e a gravação para. QUASE nunca, e não
+  nunca: quem solta o modo no Fracttal sem finalizar não deixa rastro, e uma sessão aberta por outra pessoa logo depois
+  pareceria a nossa.
 - **Conflito, nunca gravar por cima:** com a sessão aberta nada se move, e a leitura feita ali é a que vale; a peça cujo
   saldo não é o da aprovação, ou que se moveu no histórico depois do "Contada em", vira o evento `conflito` e não é gravada.
   O específico cujo genérico ainda tem unidades por identificar na curadoria também (as unidades pendentes talvez sejam
   dele), já na aprovação.
 - **Retomar sem duplicar:** gravar o saldo é absoluto (regravar o mesmo número não muda nada); o finalizar NUNCA se repete
-  sem procurar antes o fechamento pela referência. A sessão em que nada se gravou não tem movimento para achar: aí só volta
-  ao modo 0 (um 2º finalizar seria erro no Fracttal).
+  sem procurar antes o fechamento pela referência, em toda retomada com o modo 2 e depois da resposta perdida (esta, depois
+  de esperar: o histórico pode ainda não mostrar o finalize). A sessão em que nada se gravou não tem movimento para achar:
+  aí só volta ao modo 0 (um 2º finalizar seria erro no Fracttal). O `movimento_fracttal` do evento é o folio do movimento
+  achado pela referência depois de fechar, nos dois caminhos (o fechamento normal e a retomada).
 - **Parar com a sessão aberta é o pior caso.** Antes de parar (429 de novo, erro inesperado) tenta fechar com o que já
   gravou. Sem login não há como fechar: para com o aviso forte ("ficou travado em ajuste no Fracttal; quem aprovou precisa
   continuar para destravar").
@@ -29,12 +35,20 @@ ATHN-MTS200 estava parado em "Inventário físico" (modo 3) com tudo travado. Po
 |---|---|
 | modo 3 (inventário físico) | como estava (de outra pessoa) |
 | modo 2 de outra pessoa ou tela | como estava (de outra pessoa) |
+| na retomada, o modo 2 com movimento de outra referência desde que a nossa sessão abriu | como estava (saiu das nossas mãos) |
 | 429, de novo depois de 62 s | fechado com o que gravou; travado (aviso forte) só se nem o fechamento passou |
 | login do Fracttal expirou | travado se a sessão estava aberta (aviso forte); quem aprovou entra de novo e continua |
 | erro inesperado (o Fracttal recusou, a rede caiu) | fechado com o que gravou (evento `erro` com o tipo); travado só se não fechou |
 | o livro do inventário não aceitou o registro | normal (o registro é sempre depois de fechar) |
 | a releitura não bateu | normal; o "Continuar" relê sem gravar (bate: gravada; não bate: conflito) |
 | o Nexus reiniciou no meio | como o controle diz: a tela mostra "parada", e o aviso forte se a sessão ficou aberta |
+| encerrada (quem aprovou, ou o administrador depois de 24 h parada) | normal: só se encerra com o almoxarifado fora do modo 2 |
+
+**Encerrar** (`encerrar`, Levi, 26/10/2026): a gravação parada que ninguém vai continuar. Quem aprovou encerra a qualquer
+hora; o administrador do Nexus, depois de 24 h parada (quem aprovou pode ter saído de férias). Só com o almoxarifado FORA
+do modo 2, conferido na hora no Fracttal: encerrar com a sessão aberta largaria o almoxarifado travado sem dono. Pede o
+motivo (cifrado). As peças já conferidas ficam `peca_gravada`; cada uma das outras vira `conflito` com o motivo (a contagem
+sai de "gravando" e fica "gravada com conflitos"), e a vez do almoxarifado é solta.
 
 O controle (`<NEXUS_DADOS>/almox_inventario/<contagem_id>.json`) guarda o ponto de retomada: o estado de cada lote
 (`pendente`, `abrindo`, `aberto`, `fechando`, `feito`), a hora em que a sessão abriu, as peças que se moveram, e o de cada
@@ -78,6 +92,7 @@ TIPO_DO_EVENTO = {"gravada": "peca_gravada", "conflito": "conflito", "erro": "er
 
 MODO_3 = "o almoxarifado está em Inventário físico no Fracttal"
 OUTRO = "o almoxarifado já está em ajuste no Fracttal (outra pessoa ou outra tela)"
+OUTRO_DEPOIS = "o almoxarifado está em ajuste por outra pessoa ou outra tela"
 MODO_DESCONHECIDO = "o almoxarifado está num modo que o Nexus não conhece ({modo})"
 LIMITE = "limite do Fracttal"
 LOGIN = "o login do Fracttal expirou"
@@ -90,6 +105,13 @@ SO_QUEM_APROVOU = "só quem aprovou continua"
 AVISO_TRAVADO = "{almox} ficou travado em ajuste no Fracttal; quem aprovou precisa continuar para destravar."
 SEM_PESSOA = ("Não sei quem está aprovando: entre com o seu login do Fracttal (a gravação fica no nome de quem aprova, e a "
               "senha de administrador não é uma pessoa).")
+MUDOU = "A contagem mudou desde que você abriu a tela; recarregue. Nada foi gravado."
+ADMIN_ENCERRA_H = 24            # o administrador encerra a gravação parada há mais que isto (quem aprovou, a qualquer hora)
+MOTIVO_MAX = 1000
+ENCERRADA = "a gravação foi encerrada: {motivo}"
+# a gravação viva salva o controle a cada pedido; a pausa mais longa entre dois salvamentos é a do 429 (62 s, o pedido de
+# novo, mais 62 s antes de fechar). O controle "gravando" mais velho que isto é de uma gravação que o Nexus já não roda
+VIVA_S = 300
 
 # os motivos que vão cifrados no evento (`dados`), sempre texto do Nexus, nunca o do Fracttal (pode ter nome de gente)
 MEXIDA = "a peça se moveu no Fracttal depois da contagem"
@@ -98,6 +120,8 @@ SALDO_MUDOU = "o saldo do Fracttal mudou depois da aprovação (era {de}, está 
 GENERICO = "o genérico desta peça ainda tem unidades por identificar na curadoria"
 NAO_BATEU = "a releitura depois de gravar não bateu com o contado (está {agora})"
 NAO_BATEU_DE_NOVO = "a releitura não bateu de novo: confira no Fracttal (está {agora})"
+ENCERRADA_SEM_GRAVAR = ("a gravação foi encerrada antes desta peça (o saldo dela talvez já seja o contado no Fracttal: "
+                        "confira): {motivo}")
 
 _TOLERANCIA = 1e-6
 _RE_SEGURO = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}")
@@ -223,7 +247,7 @@ def _ler_json(p: Path) -> dict | None:
         d = json.loads(texto)
     except ValueError:
         raise Recusada(f"O controle da gravação ({p.name}) está ilegível: chame quem cuida do Nexus antes de mexer no "
-                       "almoxarifado.", 503) from None
+                       "almoxarifado.") from None
     return d if isinstance(d, dict) else None
 
 
@@ -269,7 +293,7 @@ def _reservar(cfg, id_almox: str, contagem_id: str) -> None:
     outra = str((dono or {}).get("contagem_id") or "")
     if outra and outra != contagem_id:
         ctrl = _controle(cfg, outra)
-        if ctrl is not None and ctrl.get("estado") != "concluida":
+        if ctrl is not None and ctrl.get("estado") not in ("concluida", "encerrada"):
             raise Recusada(f"Não gravei: {EM_ANDAMENTO} (outra contagem, parada no meio: quem a aprovou precisa continuar).")
     _gravar_json(p, {"contagem_id": contagem_id, "desde": _iso(_agora())})
 
@@ -317,12 +341,13 @@ def _com_generico_pendente(linhas: list[dict], curadoria: dict) -> set[str]:
         if not generico or n is None:
             continue
         dec = cur.get(A._id(l.get("ID da linha"))) or {}
-        if A._txt(dec.get("decisao")) == "confirmar":
-            destino = A._id(dec.get("id_item")) or A._id(l.get("Identificado como"))
-            if destino and n != 0:
-                destinos.setdefault(generico, set()).add(destino)
-        else:
+        # como `contas._ler`: o "confirmar" sem alvo (nem na decisão, nem no "Identificado como") é pendente
+        destino = (A._id(dec.get("id_item")) or A._id(l.get("Identificado como"))
+                   if A._txt(dec.get("decisao")) == "confirmar" else "")
+        if not destino:
             pendentes.add(generico)
+        elif n != 0:
+            destinos.setdefault(generico, set()).add(destino)
     return {d for g in pendentes for d in destinos.get(g, ())}
 
 
@@ -345,12 +370,13 @@ class _Trabalho:
         self.c["atualizado_em"] = _iso(self._agora())
         try:
             _gravar_json(_caminho(self.cfg, self.c["contagem_id"]), self.c)
-        except OSError:
+        except OSError as ex:
             # parando, fechar a sessão no Fracttal vale mais que o controle em dia: a retomada parte do modo (o "aberto"
             # velho com o almoxarifado em modo 0 vira "fechada fora", e a releitura decide cada peça)
             if not self._parando:
                 raise
-            logging.exception("inventário %s: o controle não gravou enquanto a gravação parava", self.c["contagem_id"])
+            logging.error("inventário %s: o controle não gravou enquanto a gravação parava: %s", self.c["contagem_id"],
+                          type(ex).__name__)
 
     def item(self, i: str) -> dict:
         return self.c["itens"][i]
@@ -429,7 +455,10 @@ class _Trabalho:
 
     def lote(self, lote: dict) -> None:
         if lote["estado"] in SESSAO:                # a sessão que a rodada anterior deixou (talvez) aberta
-            self.retomar_sessao(lote, self.modo(lote))
+            m = self.modo(lote)
+            if m == 2:
+                self.conferir_que_e_nossa(lote)
+            self.retomar_sessao(lote, m)
         self.confirmar(lote)
         self.registrar()
         if self.nos_estados(lote, "pendente"):
@@ -439,12 +468,32 @@ class _Trabalho:
         if self.lote_feito(lote):
             self.marcar_lote(lote, "feito")
 
+    def conferir_que_e_nossa(self, lote: dict) -> None:
+        """O modo 2 que o controle diz ser nosso é mesmo a nossa sessão? O controle pode estar velho: alguém finalizou a
+        nossa sessão no Fracttal e abriu outra, e a retomada finalizaria a dos outros. O histórico desde a hora em que a
+        nossa abriu (sem folga: a de outra pessoa é depois) não pode ter movimento de outra referência. QUASE sempre pega:
+        quem só solta o modo, sem finalizar, não deixa rastro."""
+        outros = self.chamar(self.e.mexidas_desde, self.almox, lote["aberto_em"], None, self.prefixo())
+        if outros is None or outros:
+            raise _Parar(OUTRO_DEPOIS)
+
+    def prefixo(self) -> str:
+        return f"INVENTARIO-{self.c['contagem_id']}-"
+
     def retomar_sessao(self, lote: dict, m: int) -> None:
         """A sessão que a rodada anterior deixou em `abrindo`, `aberto` ou `fechando`, pelo modo de agora (já conferido:
         3 parou). Modo 2 é a nossa ainda aberta: grava o que faltava (a `enviando` regrava, absoluto) e fecha; do
         `fechando`, procura o fechamento antes de qualquer finalizar. Modo 0: ela já não está aberta (o `abrir` não valeu,
         ou os dois passos do fechamento valeram, ou alguém a fechou no Fracttal); a releitura decide cada peça."""
         if m == 2:
+            if lote["estado"] != "fechando" and self.nos_estados(lote, "escrita", "enviando"):
+                # o controle pode não saber que o finalizar já foi (o disco que falhou enquanto parava, e o 2º passo do
+                # fechamento que falhou junto): procura antes de gravar mais ou de finalizar de novo
+                achado = self.chamar(self.e.achar_movimento, self.almox, lote["ref"], self.desde(lote))
+                if achado:
+                    self.chamar(self.e.voltar_ao_normal, self.almox)
+                    self.sessao_fechada(lote, _digitos(achado))
+                    return
             if lote["estado"] == "abrindo":
                 self.marcar_lote(lote, "aberto")
             if lote["estado"] == "aberto":
@@ -459,7 +508,8 @@ class _Trabalho:
 
     def sessao_nova(self, lote: dict) -> None:
         self.modo(lote)                             # 3 ou 2 de outro: para sem mexer
-        mexidas = self.chamar(self.e.mexidas_desde, self.almox, self.c["contada_em"], None)
+        # sem as nossas próprias sessões (as de outros lotes e a 1ª deste): o movimento que o Nexus fez não é conflito
+        mexidas = self.chamar(self.e.mexidas_desde, self.almox, self.c["contada_em"], None, self.prefixo())
         if mexidas is None:
             raise _Parar(SEM_HISTORICO)
         antes = self.chamar(self.e.ler, self.almox)
@@ -512,10 +562,21 @@ class _Trabalho:
         if lote["estado"] == "aberto":
             self.marcar_lote(lote, "fechando")
             try:
-                folio = _digitos(self.e.fechar_ajuste(self.almox, lote["ref"]))
+                self.e.fechar_ajuste(self.almox, lote["ref"])
             except Limite:
                 self._dormir(ESPERA_LIMITE_S)
                 folio = self.recuperar_fechamento(lote)
+            except SemLogin:
+                raise
+            except Exception:
+                # a resposta perdida (não o 429): o finalize talvez valeu, e o histórico pode ainda não mostrá-lo. Espera
+                # antes de a parada procurar pela referência (`fechar_seguro`), senão o "não achei" finalizaria de novo
+                self._dormir(ESPERA_LIMITE_S)
+                raise
+            else:
+                # o folio do movimento achado pela referência, e não o `folio_return` (o "próximo número"): o mesmo número
+                # que a retomada acha, nos dois caminhos
+                folio = self.folio_achado(lote)
         else:
             folio = self.recuperar_fechamento(lote, m)
         self.sessao_fechada(lote, folio)
@@ -726,8 +787,9 @@ def _executar(t: _Trabalho) -> None:
             t.fim("parada", _motivo_do_erro(ex))
         else:
             t.fim("concluida", "")
-    except Exception:                               # noqa: BLE001 — nem o controle gravou: o log diz, a vez se solta abaixo
-        logging.exception("inventário %s: a gravação parou sem conseguir gravar o controle", cid)
+    except Exception as ex:                         # noqa: BLE001 — nem o controle gravou: o log diz, a vez se solta abaixo
+        # só o tipo: o texto do erro pode ser o do Fracttal, e ele pode ter nome de gente
+        logging.error("inventário %s: a gravação parou sem conseguir gravar o controle: %s", cid, type(ex).__name__)
     finally:
         with _TRAVA:
             reg = _ATIVAS.get(t.almox)
@@ -860,6 +922,8 @@ def continuar(cfg, contagem_id: str, estoque, pessoa: dict, *, dormir=None, agor
         ctrl = _controle(cfg, cid)
         if ctrl.get("estado") == "concluida":
             raise Recusada("A gravação desta contagem já terminou.")
+        if ctrl.get("estado") == "encerrada":
+            raise Recusada("A gravação desta contagem foi encerrada: não se continua.")
         _reservar(cfg, almox, cid)
         ctrl.update(estado="gravando", motivo="", fim=None, rodada=int(ctrl.get("rodada") or 1) + 1)
         t = _Trabalho(cfg, ctrl, estoque, dormir, agora)
@@ -868,14 +932,31 @@ def continuar(cfg, contagem_id: str, estoque, pessoa: dict, *, dormir=None, agor
     return estado(cfg, cid)
 
 
-def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, **opcoes) -> dict:
+def _fmt(v) -> str:
+    n = _num(v)
+    return "-" if n is None else f"{n:.6f}"
+
+
+def assinatura(itens: list[dict]) -> str:
+    """A impressão digital do lote que vai ao Fracttal: (id_item, sistema, contado) de cada peça `not tirada and situacao
+    in MEXEM`, em ordem. A tela a manda de volta com o "Gravar": o N igual não basta (um saldo que mudou de 10 para 11, com
+    o contado 12, segue "para cima" e o N não muda, mas o PCM aprovou o que viu)."""
+    linhas = sorted(f"{A._id(i.get('id_item'))}|{_fmt(i.get('sistema'))}|{_fmt(i.get('contado'))}"
+                    for i in itens or [] if isinstance(i, dict) and i.get("id_item") and not i.get("tirada")
+                    and i.get("situacao") in contas.MEXEM)
+    return hashlib.sha1("\n".join(linhas).encode("utf-8")).hexdigest()[:20]
+
+
+def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, assinatura_vista=None, **opcoes) -> dict:
     """O botão "Gravar N alterações": confere a contagem de agora (o livro relido), lê o saldo NA HORA com o login de quem
-    aprova, monta o lote pelas contas (com a revisão e a curadoria) e começa. `n_visto`: o N que a tela mostrou; se o lote
-    mudou desde então (o saldo mudou, outro PCM revisou), recusa: ninguém grava o que não viu. `SemLogin` sobe (a ponte
-    manda entrar pelo Fracttal); o resto vira `Recusada` com o status."""
+    aprova, monta o lote pelas contas (com a revisão e a curadoria) e começa. `n_visto` e `assinatura_vista`: o N e a
+    `assinatura` do lote que a tela mostrou (obrigatórios); se o lote mudou desde então (um saldo mudou, outro PCM revisou),
+    recusa: ninguém grava o que não viu. `SemLogin` sobe (a ponte manda entrar pelo Fracttal); o resto vira `Recusada`."""
     from . import leitura
     if not aprovador or not aprovador.get("pessoa_hmac"):
         raise Recusada(SEM_PESSOA)
+    if n_visto is None or not isinstance(assinatura_vista, str) or not assinatura_vista.strip():
+        raise Recusada("A tela não mandou o lote que mostrou: recarregue a página. Nada foi gravado.", 400)
     try:
         F.ler(cfg, forcar=True)
         todas = leitura.ler(cfg)
@@ -897,40 +978,209 @@ def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, **opc
         raise Recusada(f"Não consegui ler o saldo do Fracttal agora ({type(ex).__name__}): nada foi gravado.", 503) from None
     itens = contas.itens_do_lote(c["linhas"], sistema, curadoria, revisao)
     n = sum(1 for i in itens if i["id_item"] and not i["tirada"] and i["situacao"] in contas.MEXEM)
-    if n_visto is not None:
-        try:
-            visto = int(n_visto)
-        except (TypeError, ValueError):
-            visto = -1
-        if visto != n:
-            raise Recusada(f"O lote mudou desde que a tela abriu ({visto} → {n} alterações): recarregue e confira antes de "
-                           "gravar. Nada foi gravado.")
+    try:
+        visto = int(n_visto)
+    except (TypeError, ValueError):
+        visto = -1
+    if visto != n or assinatura_vista.strip() != assinatura(itens):
+        raise Recusada(MUDOU)
     return iniciar(cfg, c, itens, estoque, aprovador, curadoria=curadoria, **opcoes)
+
+
+# ── encerrar ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+def _parada_desde(ctrl: dict) -> datetime | None:
+    try:
+        return instante(ctrl.get("fim") or ctrl.get("atualizado_em"))
+    except ValueError:
+        return None
+
+
+def _quem_encerra(ctrl: dict, quem: str, admin: bool, agora: datetime, cid: str) -> str:
+    """Quem pode encerrar agora: "aprovador" (a qualquer hora) ou "administrador" (parada há mais de 24 h). Recusada com o
+    porquê, senão. A gravação andando, a terminada e a já encerrada não se encerram."""
+    if _viva(ctrl["id_almox"], cid):
+        raise Recusada("A gravação está andando: espere ela parar.")
+    if ctrl.get("estado") in ("concluida", "encerrada"):
+        raise Recusada("A gravação desta contagem já terminou.")
+    if quem and quem == (ctrl.get("aprovador") or {}).get("pessoa_hmac"):
+        return "aprovador"
+    if admin:
+        desde = _parada_desde(ctrl)
+        if desde is not None and agora - desde >= timedelta(hours=ADMIN_ENCERRA_H):
+            return "administrador"
+        raise Recusada(f"O administrador encerra só a gravação parada há mais de {ADMIN_ENCERRA_H} h (antes disso, só quem "
+                       "aprovou).", 403)
+    raise Recusada(f"Só quem aprovou encerra a gravação (o administrador, depois de {ADMIN_ENCERRA_H} h parada).", 403)
+
+
+def existe(cfg, contagem_id: str) -> bool:
+    """Esta contagem tem gravação? `Recusada` (409) se o controle está ilegível: a ponte diz isso, e não "só quem
+    aprovou" (que seria mentira: ninguém sabe quem aprovou)."""
+    return _controle(cfg, A._txt(contagem_id)) is not None
+
+
+def conferir_quem_encerra(cfg, contagem_id: str, pessoa, admin: bool = False, agora=None) -> str:
+    """Antes de falar com o Fracttal: quem pode encerrar ("aprovador" ou "administrador"), ou `Recusada` com o porquê."""
+    cid = A._txt(contagem_id)
+    ctrl = _controle(cfg, cid)
+    if ctrl is None:
+        raise Recusada("Esta contagem não tem gravação para encerrar.", 404)
+    return _quem_encerra(ctrl, _hmac(cfg, pessoa), bool(admin), instante((agora or _agora)()), cid)
+
+
+def pode_encerrar(cfg, contagem_id: str, pessoa, admin: bool = False, agora=None) -> bool:
+    """O "Encerrar" aparece para esta pessoa? Quem aprovou, com a gravação parada; o administrador, parada há 24 h."""
+    try:
+        conferir_quem_encerra(cfg, contagem_id, pessoa, admin, agora)
+        return True
+    except Recusada:
+        return False
+
+
+def encerrar(cfg, contagem_id: str, estoque, pessoa: dict, motivo, *, admin: bool = False, agora=None) -> dict:
+    """Encerra a gravação parada que ninguém vai continuar (Levi, 26/10/2026). `pessoa`: `{"pessoa_hmac", "pessoa_id"}`
+    (ou `{"email"}`) de quem encerra; `admin`: é administrador do Nexus. Só com o almoxarifado FORA do modo 2, lido agora no
+    Fracttal pelo `estoque` (o login de quem encerra): encerrar com a sessão aberta largaria o almoxarifado travado sem dono.
+    O motivo é obrigatório e vai só cifrado. As peças já conferidas ficam `peca_gravada`; cada uma das outras vira
+    `conflito` com o motivo (no nome de quem encerra), e a contagem sai de "gravando". Solta a vez do almoxarifado.
+    `Recusada` (nada mudou) com o status; `SemLogin` sobe."""
+    cid = A._txt(contagem_id)
+    ctrl = _controle(cfg, cid)
+    if ctrl is None:
+        raise Recusada("Esta contagem não tem gravação para encerrar.", 404)
+    motivo = A._txt(motivo) if isinstance(motivo, str) else ""
+    if not motivo:
+        raise Recusada("Escreva o motivo: ele fica na auditoria.", 400)
+    if len(motivo) > MOTIVO_MAX:
+        raise Recusada(f"O motivo passa de {MOTIVO_MAX} caracteres: resuma.", 400)
+    quem = _hmac(cfg, pessoa)
+    if not quem:
+        raise Recusada(SEM_PESSOA)
+    relogio = agora or _agora
+    _quem_encerra(ctrl, quem, admin, instante(relogio()), cid)
+    F._cofre_ou_recusar(cfg)                         # o motivo vai cifrado
+    try:
+        m = estoque.modo(ctrl["id_almox"])
+    except SemLogin:
+        raise
+    except Limite:
+        raise Recusada("O Fracttal pediu uma pausa: tente de novo em 1 minuto. Nada mudou.", 503) from None
+    except Exception as ex:      # noqa: BLE001 — sem saber o modo, não se encerra
+        raise Recusada(f"Não consegui ler o modo do almoxarifado no Fracttal ({type(ex).__name__}): nada mudou.", 503) from None
+    if m == 2:
+        raise Recusada("O almoxarifado está em ajuste no Fracttal (modo 2): encerrar agora o deixaria travado sem dono. "
+                       "Continue a gravação (ou feche o ajuste no Fracttal) e encerre depois.")
+    with _TRAVA:
+        ctrl = _controle(cfg, cid)                   # o de agora: ninguém continuou enquanto o Fracttal respondia
+        papel = _quem_encerra(ctrl, quem, admin, instante(relogio()), cid)
+        t = _Trabalho(cfg, ctrl, None, None, relogio)
+        quem_ev = {"pessoa_hmac": quem}
+        if (pessoa or {}).get("pessoa_id") is not None:
+            quem_ev["pessoa_id"] = pessoa["pessoa_id"]
+        eventos, mudancas = [], []
+        for i, it in ctrl["itens"].items():
+            if it["estado"] in FINAIS and it.get("registrado"):
+                continue
+            if it["estado"] in FINAIS:              # já conferida (ou já em conflito), só faltava o registro
+                eventos.append(t.evento(i, it, TIPO_DO_EVENTO[it["estado"]]))
+                mudancas.append((it, {"registrado": True}))
+                continue
+            texto = (ENCERRADA_SEM_GRAVAR if it["estado"] in ("enviando", "escrita", "fechada", "duvida", "erro")
+                     else ENCERRADA).format(motivo=motivo)
+            novo = dict(it, estado="conflito", motivo=texto)
+            e = t.evento(i, novo, "conflito")
+            e.pop("pessoa_id", None)
+            e.update(quem_ev)                        # o conflito é de quem encerrou, e não de quem aprovou
+            eventos.append(e)
+            mudancas.append((it, {"estado": "conflito", "motivo": ENCERRADA.format(motivo="motivo na auditoria"),
+                                  "registrado": True}))
+        try:
+            t.acrescentar(eventos)
+        except Exception as ex:      # noqa: BLE001 — o banco fora: nada mudou no controle, e se encerra de novo
+            raise Recusada(f"O livro do inventário não aceitou o encerramento ({type(ex).__name__}): nada mudou.",
+                           503) from None
+        for it, mais in mudancas:
+            it.update(mais)
+        for lote in ctrl["lotes"]:
+            lote["estado"] = "feito"
+        ctrl.update(estado="encerrada", motivo=f"encerrada por {'quem aprovou' if papel == 'aprovador' else 'um administrador'}",
+                    encerrada_por=quem, fim=_iso(relogio()))
+        t.salvar()
+        _soltar(cfg, ctrl["id_almox"], cid)
+    return estado(cfg, cid)
+
+
+# ── o que as outras telas e o deploy perguntam ──────────────────────────────────────────────────────────────────────────
+def _controles(pasta: Path):
+    """Os controles da pasta (sem a vez dos almoxarifados), pulando o ilegível."""
+    if pasta is None or not pasta.is_dir():
+        return
+    for arq in sorted(pasta.glob("*.json")):
+        if arq.name.startswith("trava-"):
+            continue
+        try:
+            ctrl = _ler_json(arq)
+        except Recusada:
+            continue
+        if ctrl and ctrl.get("contagem_id"):
+            yield ctrl
+
+
+def travadas(cfg) -> list[dict]:
+    """As gravações paradas com a sessão (talvez) aberta no Fracttal: `[{"contagem_id", "aviso"}]`. A lista das
+    contagens mostra o aviso forte também: quem aprovou pode não abrir a contagem, e o almoxarifado segue travado."""
+    out = []
+    for ctrl in _controles(_pasta(cfg)):
+        est = estado(cfg, ctrl["contagem_id"])
+        if est and est["travado"]:
+            out.append({"contagem_id": ctrl["contagem_id"], "aviso": est["aviso"]})
+    return out
+
+
+def com_lote_aberto(pasta: Path | None, agora: datetime | None = None) -> list[str]:
+    """As contagens com uma gravação VIVA e um lote aberto no Fracttal agora (o deploy espera por elas, decisão do Levi
+    de 26/10/2026): o controle em "gravando", um lote em `abrindo`/`aberto`/`fechando`, e salvo há menos de `VIVA_S`. O
+    processo que pergunta (o `ferramentas/gravacao_aberta.py`) não é o do Nexus e não vê a thread: a gravação viva salva o
+    controle a cada pedido, e a parada (a que o reinício matou, ou a sem login) não ganha nada com a espera."""
+    agora = instante(agora or _agora())
+    out = []
+    for ctrl in _controles(pasta):
+        if ctrl.get("estado") != "gravando" or not any(l.get("estado") in SESSAO for l in ctrl.get("lotes") or []):
+            continue
+        try:
+            salvo = instante(ctrl.get("atualizado_em"))
+        except ValueError:
+            continue
+        if agora - salvo <= timedelta(seconds=VIVA_S):
+            out.append(str(ctrl["contagem_id"]))
+    return out
 
 
 def _texto(est: dict) -> str:
     if est["estado"] == "gravando":
         return (f"Gravando no Fracttal: lote {est['lote']} de {est['lotes']}, {est['gravadas'] + est['conflitos']} de "
                 f"{est['total']} peças conferidas.")
-    if est["estado"] == "concluida":
+    if est["estado"] in ("concluida", "encerrada"):
         partes = [f"{est['gravadas']} {'peça gravada' if est['gravadas'] == 1 else 'peças gravadas'}"]
         if est["conflitos"]:
             partes.append(f"{est['conflitos']} em conflito (não gravadas: o PCM confere)")
-        return "Gravação concluída: " + ", ".join(partes) + "."
+        titulo = "Gravação concluída" if est["estado"] == "concluida" else f"Gravação {est['motivo']}"
+        return f"{titulo}: " + ", ".join(partes) + "."
     return f"Gravação parada: {est['motivo']}."
 
 
 def estado(cfg, contagem_id: str) -> dict | None:
-    """O andamento da gravação desta contagem, ou None se ela não tem. `{"estado": "gravando" | "parada" | "concluida",
-    "motivo", "feitas" (peças já escritas no Fracttal), "gravadas" (conferidas na releitura), "total", "conflitos", "erros",
-    "lote" (o lote em curso), "lotes", "travado" (parada com a sessão talvez aberta), "aviso" (o aviso forte), "texto"}`.
-    O controle que diz "gravando" sem a gravação viva neste processo (o Nexus reiniciou) é "parada"."""
+    """O andamento da gravação desta contagem, ou None se ela não tem. `{"estado": "gravando" | "parada" | "concluida" |
+    "encerrada", "motivo", "feitas" (peças já escritas no Fracttal), "gravadas" (conferidas na releitura), "total",
+    "conflitos", "erros", "lote" (o lote em curso), "lotes", "travado" (parada com a sessão talvez aberta), "aviso" (o aviso
+    forte), "parada_desde" (ISO UTC, ou ""), "texto"}`. O controle que diz "gravando" sem a gravação viva neste processo (o
+    Nexus reiniciou) é "parada"."""
     cid = A._txt(contagem_id)
     try:
         ctrl = _controle(cfg, cid)
     except Recusada as ex:
         est = {"estado": "parada", "motivo": str(ex), "feitas": 0, "gravadas": 0, "total": 0, "conflitos": 0, "erros": 0,
-               "lote": 0, "lotes": 0, "travado": True, "aviso": str(ex)}
+               "lote": 0, "lotes": 0, "travado": True, "aviso": str(ex), "parada_desde": ""}
         return dict(est, texto=_texto(est))
     if ctrl is None:
         return None
@@ -946,7 +1196,8 @@ def estado(cfg, contagem_id: str) -> dict | None:
     est = {"estado": situacao, "motivo": motivo, "feitas": conta("escrita", "fechada", "gravada"),
            "gravadas": conta("gravada"), "total": len(itens), "conflitos": conta("conflito"), "erros": conta("erro"),
            "lote": atual, "lotes": len(lotes), "travado": travado,
-           "aviso": AVISO_TRAVADO.format(almox=ctrl.get("almox_nome") or "O almoxarifado") if travado else ""}
+           "aviso": AVISO_TRAVADO.format(almox=ctrl.get("almox_nome") or "O almoxarifado") if travado else "",
+           "parada_desde": _iso(_parada_desde(ctrl)) if situacao == "parada" and _parada_desde(ctrl) else ""}
     est["texto"] = _texto(est)
     return est
 
