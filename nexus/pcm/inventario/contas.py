@@ -6,8 +6,9 @@ gravação e a curadoria chamam estas contas, e só estas, para o número não m
 O caso real por trás das regras: o livro das contagens volta da API TODO COMO TEXTO ("3,0", "" e "None" no lugar do vazio),
 e a peça que nunca foi ligada ao almoxarifado no Fracttal não vem na leitura de estoque. Daí:
 
-- **Em branco não é zero.** O vazio é "não contei" e a peça não é tocada (`nao_tocada`); só o 0 digitado é "zerar". Virar o
-  vazio em 0 zeraria o estoque de uma peça que ninguém contou.
+- **Em branco não é zero.** O vazio é "não contei" e a peça não é tocada (`nao_tocada`); só o 0 digitado na linha da
+  própria peça é "zerar". Virar o vazio em 0 zeraria o estoque de uma peça que ninguém contou; pelo mesmo motivo, 0
+  unidades achadas (ou 0 unidades de genérico confirmadas) que a curadoria atribui a uma peça em branco não a contam.
 - **Saldo não informado não é saldo cheio.** A peça ligada com o saldo vazio no Fracttal vale 0 para a conta, mas contar 0
   nela é `sem_alteracao`, não `zerar` (zerar uma peça de saldo desconhecido). O `sistema` do lote continua None para a tela
   dizer "não informado" e para a conferência da gravação comparar igual com igual.
@@ -98,8 +99,32 @@ class _Lido:
         elif n is not None:
             self.total[id_item] = (self.total.get(id_item) or 0.0) + n
 
+    def achadas(self, destino: str, n: float | None, codigo=None) -> None:
+        """As unidades achadas (de um achado decidido, ou de um genérico confirmado) que o PCM atribui à peça `destino`.
+        Só valem se forem MAIS que 0: o 0 do técnico é "zerar" na linha da PRÓPRIA peça, e 0 unidades achadas dizem
+        nada dela (caso: a peça 101 em branco, saldo 8, e um achado de 0 unidades decidido "é a peça 101" virava `zerar` e
+        apagava 8 peças que ninguém contou). Peça só pela decisão, com 0 unidades, nem entra. O negativo contamina o
+        destino, como em qualquer linha."""
+        if n is None or n == 0:
+            return
+        self.peca(destino, codigo)
+        self.somar(destino, n, n < 0)
+
     def efetivo(self) -> dict[str, float | None]:
         return {i: None if i in self.invalidos else _limpo(v) for i, v in self.total.items()}
+
+
+def _unicas(linhas) -> list[dict]:
+    """As linhas sem repetição. A fila offline do App reenvia a contagem quando não vê a resposta do servidor: a mesma
+    (ID da contagem, ID da linha) é a MESMA peça contada, não duas (somar as duas dobraria a contagem; um achado
+    repetido viraria duas pendências). Vale a última (o reenvio traz o que o técnico deixou na tela), na posição da
+    primeira. Linha sem ID da linha não tem como ser reconhecida e nunca se junta a outra."""
+    vistas: dict = {}
+    for i, l in enumerate(linhas or []):
+        if isinstance(l, dict):
+            chave = _id(l.get("ID da linha"))
+            vistas[(_id(l.get("ID da contagem")), chave) if chave else (None, i)] = l
+    return list(vistas.values())
 
 
 def _ler(linhas, curadoria) -> _Lido:
@@ -108,16 +133,16 @@ def _ler(linhas, curadoria) -> _Lido:
     - `item`: a peça vale o "Contado" da linha dela (linhas da mesma peça somam).
     - `identificar` (o genérico com saldo, uma linha por específico): as unidades contam no genérico, a não ser que o PCM
       tenha confirmado (`confirmar`, com o específico da decisão ou, sem ele, o "Identificado como" do técnico): aí saem
-      do genérico e entram no específico. Sem a confirmação a peça fica por decidir (`pendentes`).
+      do genérico e entram no específico. Sem a confirmação a peça fica por decidir (`pendentes`), a não ser que a linha
+      esteja em branco: unidades que ninguém contou não têm o que decidir.
     - `fora_do_catalogo` (o achado sem peça): `e_a_peca` e `cadastrar` somam as unidades à peça da decisão; `descartar` as
-      joga fora; sem decisão ficam por decidir. A decisão que não é do tipo da linha não resolve nada: a linha segue
-      pendente e nada é gravado por engano.
-    - Linha sem ID do item (nas duas primeiras) ou de um Tipo que não existe não é de peça nenhuma: não entra."""
+      joga fora; sem decisão ficam por decidir (o achado em branco nem isso: não é pendência). A decisão que não é do tipo
+      da linha não resolve nada: a linha segue pendente e nada é gravado por engano.
+    - Linha sem ID do item (nas duas primeiras) ou de um Tipo que não existe não é de peça nenhuma: não entra.
+    - A mesma linha reenviada conta uma vez (`_unicas`)."""
     lido = _Lido()
     cur = {_id(k): v for k, v in (curadoria or {}).items() if isinstance(v, dict)}
-    for l in linhas or []:
-        if not isinstance(l, dict):
-            continue
+    for l in _unicas(linhas):
         tipo = _txt(l.get("Tipo")).lower()
         chave = _id(l.get("ID da linha"))
         n = A.contado(l.get("Contado"))
@@ -135,23 +160,18 @@ def _ler(linhas, curadoria) -> _Lido:
             destino = (alvo or _id(l.get("Identificado como"))) if decisao == "confirmar" else ""
             if not destino:
                 lido.somar(id_item, n, negativo)
-                lido.pendentes.setdefault(id_item, []).append(chave)
-            elif n is None:
-                continue
-            else:
-                lido.peca(destino)
+                if n is not None:                           # em branco não há o que decidir: o genérico só não foi contado
+                    lido.pendentes.setdefault(id_item, []).append(chave)
+            elif n is not None:
                 if negativo:                                # unidades que não se sabe quantas são: nenhuma das duas vale
                     lido.somar(id_item, n, True)
-                    lido.somar(destino, n, True)
                 else:
                     lido.somar(id_item, 0.0)                # o genérico foi contado: o que achou menos o que saiu dele
-                    lido.somar(destino, n)
+                lido.achadas(destino, n)
         elif tipo == "fora_do_catalogo":
             if decisao in ("e_a_peca", "cadastrar") and alvo:
-                if n is not None:
-                    lido.peca(alvo, dec.get("codigo"))
-                    lido.somar(alvo, n, negativo)
-            elif decisao != "descartar":
+                lido.achadas(alvo, n, dec.get("codigo"))
+            elif decisao != "descartar" and n is not None:
                 lido.ordem.append(("achado", len(lido.achados)))
                 lido.achados.append((chave, n, negativo))
     return lido
@@ -163,12 +183,18 @@ def contado_efetivo(linhas: list[dict], curadoria: dict[str, dict]) -> dict[str,
     `linhas`: as da contagem, do livro do App. `curadoria`: `{ID da linha: {"decisao": "e_a_peca" | "cadastrar" |
     "descartar" | "confirmar", "id_item": str}}`. Caso real: X contada 3 + 2 unidades achadas fora do catálogo que o PCM
     decidiu que são X = 5 (e X em branco + 2 achadas = 2): o total SUBSTITUI o saldo de X no Fracttal. O genérico com 4
-    unidades identificadas e confirmadas como Y fica com 0 e Y ganha 4."""
+    unidades identificadas e confirmadas como Y fica com 0 e Y ganha 4. Achadas em 0 não contam a peça de destino (X em
+    branco continua em branco).
+
+    ATENÇÃO, quem GRAVA não usa este número direto: o genérico com unidades ainda por identificar sai daqui como NÚMERO (as
+    unidades dele, sem dono), e gravá-lo seria ajustar o estoque com unidades que talvez sejam de outra peça. A gravação
+    parte do `itens_do_lote` e só leva `not tirada and situacao in MEXEM` (a `curadoria`, a `nao_tocada`, a `sem_alteracao`
+    e a peça tirada pelo PCM ficam de fora)."""
     return _ler(linhas, curadoria).efetivo()
 
 
 # ── o lote ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
-def _entrada(id_item, codigo, sistema, campo, contado, ligada, sit, corrigido, tirada, invalido, pendentes) -> dict:
+def _entrada(*, id_item, codigo, sistema, campo, contado, ligada, sit, corrigido, tirada, invalido, pendentes) -> dict:
     return {"id_item": id_item, "codigo": codigo, "sistema": sistema, "contado": contado, "contado_campo": campo,
             "delta": None if contado is None else _limpo(contado - (sistema or 0.0)), "situacao": sit,
             "ligada": ligada, "corrigido": corrigido, "tirada": tirada, "invalido": invalido, "pendentes": pendentes}
@@ -188,7 +214,8 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
     teria), `invalido` e `pendentes` (os "ID da linha" do genérico por identificar).
 
     A peça com genérico por identificar fica na `curadoria` (não grava: as unidades ainda não têm dono). O achado fora do
-    catálogo por decidir é uma entrada à parte, sem `id_item` (""), na `curadoria` também, com a linha em `pendentes`."""
+    catálogo por decidir é uma entrada à parte, sem `id_item` (""), na `curadoria` também, com a linha em `pendentes`
+    (o achado em branco, sem número nenhum, não é pendência e não entra)."""
     lido = _ler(contagem, curadoria)
     efetivo = lido.efetivo()
     estoque = {_id(k): v for k, v in (sistema or {}).items() if isinstance(v, dict)}
@@ -200,12 +227,15 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
         if tipo == "achado":
             chave, n, negativo = lido.achados[ref]
             campo = None if negativo else _limpo(n)
-            itens.append(_entrada("", "", 0.0, campo, campo, False, "curadoria", False, False, negativo, [chave]))
+            itens.append(_entrada(id_item="", codigo="", sistema=0.0, campo=campo, contado=campo, ligada=False,
+                                  sit="curadoria", corrigido=False, tirada=False, invalido=negativo, pendentes=[chave]))
             continue
         id_item, campo = ref, efetivo[ref]
         no_estoque = estoque.get(id_item)
         ligada = no_estoque is not None
         saldo = A.numero(no_estoque.get("saldo")) if ligada else 0.0
+        if saldo is not None and not math.isfinite(saldo):
+            saldo = None                                    # "nan" e "inf" não são saldo: é "não informado", como o vazio
         contado, corrigido = campo, False
         if id_item in corrigidos:
             novo = A.contado(corrigidos[id_item])
@@ -213,9 +243,9 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
                 contado, corrigido = _limpo(novo), True
         pendentes = list(lido.pendentes.get(id_item, []))
         codigo = lido.codigos.get(id_item) or (_txt(no_estoque.get("codigo")) if ligada else "")
-        itens.append(_entrada(id_item, codigo, saldo, campo, contado, ligada,
-                              "curadoria" if pendentes else situacao(saldo, contado), corrigido, id_item in tiradas,
-                              id_item in lido.invalidos, pendentes))
+        itens.append(_entrada(id_item=id_item, codigo=codigo, sistema=saldo, campo=campo, contado=contado, ligada=ligada,
+                              sit="curadoria" if pendentes else situacao(saldo, contado), corrigido=corrigido,
+                              tirada=id_item in tiradas, invalido=id_item in lido.invalidos, pendentes=pendentes))
     return itens
 
 
@@ -233,13 +263,19 @@ def substituidas(contagens: list[dict], gravadas: set[str]) -> set[str]:
     por fim o ID, para o resultado não depender da ordem da lista); as mais velhas que ainda não foram gravadas ficam
     substituídas, e não se aprovam mais: aprovar a velha depois da nova desfaria a nova. A velha já gravada (`gravadas`:
     os `contagem_id` com gravação feita ou começada) fica como está. Data ilegível é a mais velha: sem como ordenar, ela
-    não pode ser a que vale. Cada contagem: `contagem_id`, `id_almox`, `contada_em`, `enviada_em`."""
+    não pode ser a que vale. Contagem sem `contagem_id` ou sem `id_almox` não entra (sem o almoxarifado não há de quem
+    ser a mais nova, e juntar todas num "almoxarifado vazio" faria uma substituir as outras sem motivo). Cada contagem:
+    `contagem_id`, `id_almox`, `contada_em`, `enviada_em`.
+
+    Quem chama passa só as contagens VIVAS: nem a `recontagem pedida` (recusada pelo PCM) nem a `substituída` entram aqui.
+    Uma recontagem pedida que contasse como "a mais nova" substituiria as boas anteriores sem ter número nenhum para
+    gravar no lugar delas."""
     gravadas = {_txt(g) for g in (gravadas or ())}
     por_almox: dict[str, list] = {}
     for c in contagens or []:
-        cid = _txt(c.get("contagem_id"))
-        if cid:
-            por_almox.setdefault(_id(c.get("id_almox")), []).append(
+        cid, almox = _txt(c.get("contagem_id")), _id(c.get("id_almox"))
+        if cid and almox:
+            por_almox.setdefault(almox, []).append(
                 ((_quando(c.get("contada_em")), _quando(c.get("enviada_em")), cid), cid))
     velhas: set[str] = set()
     for lista in por_almox.values():

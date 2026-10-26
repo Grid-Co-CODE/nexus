@@ -520,21 +520,31 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
 
 - **As seis situações** (`SITUACOES`; só `MEXEM` = para cima, para baixo e zerar grava no Fracttal): `sem_alteracao`,
   `nao_tocada` (em branco) e `curadoria` (o que o PCM ainda decide) não mexem. **Em branco não é zero:** o livro volta da API
-  todo como texto ("3,0", "" e "None" no lugar do vazio) e o vazio é "não contei"; só o 0 digitado é `zerar`. **Saldo não
+  todo como texto ("3,0", "" e "None" no lugar do vazio) e o vazio é "não contei"; só o 0 digitado NA LINHA DA PRÓPRIA PEÇA
+  é `zerar` (0 unidades achadas, ou 0 de genérico confirmado, que a curadoria atribui a uma peça em branco não a contam: foi
+  o caso da peça em branco com saldo 8 que virava `zerar` por um achado de 0 unidades). **Saldo não
   informado** (peça ligada com o saldo vazio no Fracttal) vale 0 na conta, mas contar 0 nela é `sem_alteracao`, e o `sistema`
   do lote segue None para a conferência da gravação comparar igual com igual. **Peça fora da leitura de estoque** (nunca
-  ligada ao almoxarifado) entra com `sistema` 0 e `ligada` falso: a gravação a liga antes. **Contado negativo** nunca mexe: a
-  peça entra como não contada e `invalido`. O 0.1 + 0.2 do metro não vira "ajuste" (soma arredondada, comparação com folga).
+  ligada ao almoxarifado) entra com `sistema` 0 e `ligada` falso: a gravação a liga antes. Saldo "nan" ou "inf" é "não
+  informado" (None), nunca NaN no lote. **Contado negativo** nunca mexe: a peça entra como não contada e `invalido`. O 0.1 +
+  0.2 do metro não vira "ajuste" (soma arredondada, comparação com folga).
 - **O contado efetivo** (`contado_efetivo`, a chave da linha é o "ID da linha"): a peça vale o "Contado" da linha; "é a peça
   X" e "cadastrar" SOMAM as unidades achadas ao contado de X nessa contagem (X em branco vira só as achadas) e o total substitui
   o saldo; o genérico (`identificar`) confirmado tira as unidades do genérico e as põe no específico. Sem decisão (ou com
-  uma que não é do tipo da linha), o genérico e o achado ficam na `curadoria` e não gravam. O genérico entra só como linhas
-  `identificar`: se o App mandar também uma linha `item` dele, as duas somam.
+  uma que não é do tipo da linha), o genérico e o achado ficam na `curadoria` e não gravam; em branco não há o que decidir
+  (o genérico em branco é `nao_tocada` e o achado em branco nem entra no lote). O genérico entra só como linhas
+  `identificar`: se o App mandar também uma linha `item` dele, as duas somam. A mesma linha reenviada pela fila offline do
+  App (mesmo "ID da contagem" e "ID da linha") conta uma vez, vale a última.
+- **QUEM GRAVA parte do `itens_do_lote` e só leva `not tirada and situacao in MEXEM`, nunca o `contado_efetivo` direto:** ele
+  devolve o genérico por identificar como um número (as unidades dele, ainda sem dono), e gravá-lo ajustaria o estoque com
+  unidades que talvez sejam de outra peça.
 - **`itens_do_lote`:** uma entrada por peça, na ordem do livro (`contado_campo` é o do campo já com a curadoria; `contado`, o
   que vai ao Fracttal, é o corrigido pelo PCM quando há; `tirada` fica de fora da gravação mas mantém a situação). O achado
   fora do catálogo por decidir é uma entrada à parte, sem `id_item`, na `curadoria`, com a linha em `pendentes`.
 - **`substituidas`:** por almoxarifado vale a contagem mais nova pelo "Contada em" (o instante: -03:00 e Z se comparam); as
-  velhas não gravadas ficam substituídas. **`aprovavel`: 90 dias, não 7.** Os 7 dias do desenho valiam enquanto não houvesse
+  velhas não gravadas ficam substituídas. Quem chama passa só as contagens VIVAS (nem a `recontagem pedida` nem a
+  `substituída`: uma recontagem recusada como "a mais nova" substituiria as boas sem número para gravar no lugar); a que
+  vem sem almoxarifado não entra. **`aprovavel`: 90 dias, não 7.** Os 7 dias do desenho valiam enquanto não houvesse
   jeito de saber o que se moveu depois da contagem; o passo 0 achou o histórico do almoxarifado (`mexidas_desde`) e o conflito
   sai dele, peça a peça, na gravação. Os 90 dias (`APROVAVEL_DIAS`) são só o teto: a janela do livro do App e do histórico a
   ler (que gasta da cota do Fracttal, de toda a empresa). Data ilegível ou do futuro (relógio do celular adiantado além de 1

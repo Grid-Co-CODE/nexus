@@ -215,6 +215,79 @@ def test_soma_decimal_sem_ruido():
         "situacao"] == "sem_alteracao"
 
 
+def test_zero_achadas_nao_zera_a_peca_em_branco():
+    """O 0 que a curadoria atribui a uma peça (achadas = 0) não é o 0 que o técnico digitou na linha dela: a peça em
+    branco (ninguém a contou, saldo 8 no Fracttal) continua "não contei" e NÃO vira `zerar`. A peça que só existe pela
+    decisão, com 0 unidades, nem entra na conta."""
+    achadas = _linha(9, tipo="fora_do_catalogo", contado="0")
+    cur = {"9": {"decisao": "e_a_peca", "id_item": "101"}}
+    linhas = [_linha(1, 101, ""), achadas]
+    assert C.contado_efetivo(linhas, cur) == {"101": None}
+    x = _por_peca(C.itens_do_lote(linhas, _sis(s101=8), cur, {}))["101"]
+    assert (x["contado"], x["situacao"]) == (None, "nao_tocada")
+    assert C.contado_efetivo([achadas], cur) == {}                                  # X nem estava na contagem
+    assert C.itens_do_lote([achadas], _sis(s101=8), cur, {}) == []
+    assert C.contado_efetivo([achadas], {"9": {"decisao": "cadastrar", "id_item": "777"}}) == {}
+    em_branco = _linha(9, tipo="fora_do_catalogo", contado="")                      # achadas em branco: também nada
+    assert C.contado_efetivo(linhas[:1] + [em_branco], cur) == {"101": None}
+
+
+def test_zero_do_generico_confirmado_nao_zera_o_especifico_em_branco():
+    """O mesmo pelo genérico: 0 unidades confirmadas como Y não contam Y. O genérico, esse, foi contado (o 0 é do técnico,
+    na linha dele): continua `zerar`."""
+    generico = _linha(2, 500, "0", tipo="identificar", **{"Identificado como": "201"})
+    linhas = [_linha(1, 201, ""), generico]
+    cur = {"2": {"decisao": "confirmar", "id_item": "201"}}
+    assert C.contado_efetivo(linhas, cur) == {"201": None, "500": 0.0}
+    itens = _por_peca(C.itens_do_lote(linhas, _sis(s201=8, s500=3), cur, {}))
+    assert (itens["201"]["contado"], itens["201"]["situacao"]) == (None, "nao_tocada")
+    assert (itens["500"]["contado"], itens["500"]["situacao"]) == (0.0, "zerar")
+    assert C.contado_efetivo([generico], cur) == {"500": 0.0}                       # Y nem estava na contagem
+
+
+def test_zero_achadas_nao_mexe_na_peca_contada():
+    achadas = _linha(9, tipo="fora_do_catalogo", contado="0")
+    cur = {"9": {"decisao": "e_a_peca", "id_item": "101"}}
+    assert C.contado_efetivo([_linha(1, 101, "3"), achadas], cur) == {"101": 3.0}
+    generico = _linha(2, 500, "0", tipo="identificar", **{"Identificado como": "201"})
+    assert C.contado_efetivo([_linha(1, 201, "3"), generico], {"2": {"decisao": "confirmar"}}) == {"201": 3.0, "500": 0.0}
+    # o 0 digitado na linha da própria peça segue sendo o "zerar"
+    assert C.itens_do_lote([_linha(1, 101, "0")], _sis(s101=8), {}, {})[0]["situacao"] == "zerar"
+
+
+def test_generico_em_branco_sem_decisao_e_nao_tocado():
+    """Não há o que decidir sobre unidades que ninguém contou: o genérico em branco é `nao_tocada`, não `curadoria`."""
+    linhas = [_linha(1, 500, "", tipo="identificar", **{"Identificado como": "201"}),
+              _linha(2, 500, "None", tipo="identificar")]
+    (g,) = C.itens_do_lote(linhas, _sis(s500=4), {}, {})
+    assert (g["id_item"], g["contado"], g["situacao"], g["pendentes"]) == ("500", None, "nao_tocada", [])
+    uma_contada = C.itens_do_lote(linhas + [_linha(3, 500, "2", tipo="identificar")], _sis(s500=4), {}, {})[0]
+    assert (uma_contada["situacao"], uma_contada["pendentes"]) == ("curadoria", ["3"])     # com unidades, decide-se
+
+
+def test_achado_em_branco_sem_decisao_nao_vira_pendencia():
+    for vazio in ("", "None", "  "):
+        achado = _linha(9, tipo="fora_do_catalogo", contado=vazio, **{"Descrição": "arruela lisa"})
+        assert C.itens_do_lote([achado], {}, {}, {}) == []
+        assert [i["id_item"] for i in C.itens_do_lote([achado, _linha(1, 101, "2")], {}, {}, {})] == ["101"]
+    assert len(C.itens_do_lote([_linha(9, tipo="fora_do_catalogo", contado="2")], {}, {}, {})) == 1
+
+
+def test_linha_reenviada_conta_uma_vez():
+    """A fila offline do App reenvia a contagem quando não vê a resposta: a mesma (ID da contagem, ID da linha) é a MESMA
+    peça contada, não duas. Vale a última (o reenvio traz o que o técnico deixou na tela)."""
+    assert C.contado_efetivo([_linha(1, 101, "3"), _linha(1, 101, "3")], {}) == {"101": 3.0}          # e não 6
+    assert C.contado_efetivo([_linha(1, 101, "3"), _linha(1, 101, "5")], {}) == {"101": 5.0}
+    achado = _linha(9, tipo="fora_do_catalogo", contado="2")
+    assert len(C.itens_do_lote([achado, dict(achado)], {}, {}, {})) == 1                              # uma pendência
+    generico = _linha(2, 500, "4", tipo="identificar", **{"Identificado como": "201"})
+    cur = {"2": {"decisao": "confirmar", "id_item": "201"}}
+    assert C.contado_efetivo([generico, dict(generico)], cur) == {"500": 0.0, "201": 4.0}             # Y +4, não +8
+    # o mesmo ID da linha em OUTRA contagem é outra linha; sem ID da linha não há como saber: não se junta
+    assert C.contado_efetivo([_linha(1, 101, "3"), _linha(1, 101, "4", **{"ID da contagem": "C-2"})], {}) == {"101": 7.0}
+    assert C.contado_efetivo([_linha("", 101, "1"), _linha("", 101, "1")], {}) == {"101": 2.0}
+
+
 def test_linha_que_nao_e_de_peca_nenhuma_nao_entra():
     """Sem ID do item, ou de um Tipo que não existe, não há peça para tocar: a linha não entra no lote."""
     linhas = [_linha(1, "", "5", tipo="item"), _linha(2, 101, "5", tipo="mistério"), _linha(3, 102, "5")]
@@ -251,6 +324,15 @@ def test_saldo_vazio_nao_zera():
     assert itens["101"]["situacao"] == "sem_alteracao" and itens["101"]["situacao"] != "zerar"
     assert itens["101"]["delta"] == 0.0
     assert itens["102"]["situacao"] == "para_cima" and itens["102"]["delta"] == 3.0
+
+
+def test_saldo_nan_e_saldo_nao_informado():
+    """O `float` aceita "nan" e "inf": o saldo que não é número é "não informado" (None), nunca NaN no `sistema` nem no
+    `delta` (NaN não é igual a nada, e a conferência da gravação comparar com ele travaria a peça)."""
+    for ruim in (float("nan"), "nan", float("inf"), "inf", float("-inf")):
+        (i,) = C.itens_do_lote([_linha(1, 101, "3")], _sis(s101=ruim), {}, {})
+        assert i["sistema"] is None and i["ligada"] is True
+        assert i["delta"] == 3.0 and i["situacao"] == "para_cima"
 
 
 def test_o_codigo_do_lote():
@@ -325,6 +407,16 @@ def test_a_mais_nova_substitui():
     assert C.substituidas(todas, {"velha", "meio", "nova"}) == set()
     assert C.substituidas(todas[:1], set()) == set()                 # sozinha, vale
     assert C.substituidas([], set()) == set() and C.substituidas(None, None) == set()
+
+
+def test_contagem_sem_almoxarifado_nao_agrupa():
+    """Sem o ID do almoxarifado não há de quem ser a mais nova: elas não se juntam num "almoxarifado vazio" (a mais nova
+    delas substituiria as outras sem nenhum motivo)."""
+    sem = [_contagem("s1", "2026-10-20T09:00:00Z", almox=""), _contagem("s2", "2026-10-22T09:00:00Z", almox=None),
+           {"contagem_id": "s3", "contada_em": "2026-10-23T09:00:00Z"}]
+    assert C.substituidas(sem, set()) == set()
+    com = sem + [_contagem("velha", "2026-10-20T09:00:00Z"), _contagem("nova", "2026-10-24T09:00:00Z")]
+    assert C.substituidas(com, set()) == {"velha"}
 
 
 def test_a_mais_nova_e_pelo_instante_e_nao_pelo_texto():
