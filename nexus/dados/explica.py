@@ -54,6 +54,9 @@ RESUMO = {
     "ciclo_varredura": "Cada varredura do almoxarifado: se leu tudo e se valeu",
     "peca_lancada": "Cada peça que o técnico lançou (ou tentou lançar) pelo App numa OS",
     "contagem_inventario": "Cada peça que o técnico contou no inventário do almoxarifado",
+    "evento_inventario": "Cada passo do inventário do almoxarifado, para auditar",
+    "regua_minimo": "O mínimo e o máximo de cada peça, o recomendado e o acordado",
+    "curadoria_inventario": "O que o PCM decidiu sobre a peça contada fora do catálogo",
     "exclusao_extintor": "Os extintores que a Segurança excluiu, e por quê",
     "pedido_ronda_extintor": "As novas rondas de extintores que a Segurança pediu, por usina",
     "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
@@ -213,6 +216,19 @@ PARA_QUE = {
     "contagem_inventario": "Guarda cada peça que o técnico contou no almoxarifado, pelo App, e as que ele não achou no "
                            "catálogo. Peça deixada em branco quer dizer que ninguém contou, e nunca vira zero. É a "
                            "entrada do inventário: o PCM compara com o saldo do Fracttal antes de gravar qualquer ajuste.",
+    "evento_inventario": "Guarda cada acontecimento do inventário do almoxarifado, na ordem em que aconteceu: a contagem "
+                         "que chegou do App, a aprovação do PCM, cada peça gravada no Fracttal (de quanto para quanto e o "
+                         "número do movimento), os conflitos e erros, a peça tirada do lote, a recontagem pedida, o "
+                         "número corrigido e a contagem trocada por outra mais nova. Nunca muda: é a auditoria de quem "
+                         "mexeu no estoque, quando e por quê (o motivo vai cifrado).",
+    "regua_minimo": "Guarda cada decisão do PCM sobre o mínimo e o máximo de uma peça num almoxarifado: a sugestão do "
+                    "Nexus (20% do saldo e o dobro dele), o recomendado pela Grid e o acordado com o cliente. Só o "
+                    "acordado vai ao Fracttal, onde dispara o alarme de estoque baixo; o recomendado fica aqui, com quem "
+                    "decidiu e quando, para defender o mínimo diante do cliente. Vale a última decisão de cada peça.",
+    "curadoria_inventario": "Guarda cada decisão do PCM sobre uma peça que o técnico contou e não estava no catálogo (ou "
+                            "que era um genérico a identificar): cadastrar a peça nova no Fracttal, dizer que é uma peça "
+                            "que já existe, confirmar a escolha do técnico ou descartar. Mostra o código criado e quem "
+                            "decidiu; o motivo vai cifrado. Vale a última decisão de cada linha da contagem.",
     "decisao_tela_setor":"Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
                           "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "

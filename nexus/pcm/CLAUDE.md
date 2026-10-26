@@ -62,7 +62,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
-| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro). As seções abaixo; as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
+| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo; as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
@@ -549,6 +549,29 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
   sai dele, peça a peça, na gravação. Os 90 dias (`APROVAVEL_DIAS`) são só o teto: a janela do livro do App e do histórico a
   ler (que gasta da cota do Fracttal, de toda a empresa). Data ilegível ou do futuro (relógio do celular adiantado além de 1
   h, que esconderia todo movimento real) não se aprova.
+
+## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
+
+Onde o PCM deixa o rastro do inventário: `nexus_almoxarifado_inventario` com `fato_evento_inventario` (a auditoria),
+`fato_regua_minimo` (a régua) e `fato_curadoria_inventario`. As regras de governança, as colunas e o porquê estão em
+`nexus/dados/CLAUDE.md` (linha "Inventário do almoxarifado"); aqui, o que a tela e a gravação em segundo plano precisam saber
+para usar:
+
+- **Tudo grava por `fato_inventario.acrescentar(cfg, aba, linhas)`** (uma lista de dicts pelas colunas do `CAB_*`); a leitura
+  é `ler(cfg)` (as três abas, cópia de 2 min) e o motivo se abre com `decifrar(cfg, aba, linha)`. Nunca escreva no livro por
+  outro caminho: a gravação relê e troca o livro inteiro, e só o `acrescentar` faz isso com a trava.
+- **O motivo é `dados={"motivo": ...}`** (no evento e na curadoria; a régua não tem texto): o módulo o cifra. `motivo=`,
+  nome ou e-mail como coluna é `ValueError` (erro de quem chama), e a pessoa vai como `pessoa_hmac` (sempre) e `pessoa_id`
+  (quando o cadastro a acha), nunca o e-mail.
+- **`fato_inventario.Recusada` é a exceção desta camada** (as Tasks 6 a 9 a importam de lá): nada foi gravado, e o texto é para
+  a tela mostrar (o banco não deixou reler, o evento já está, falta `GRIDCO_SQL_TOKEN` ou `NEXUS_CHAVE_CADASTRO`). `ler`
+  também a levanta quando não consegue ler: nunca devolve vazio no lugar do que não leu, senão a contagem já gravada
+  apareceria como `nova`.
+- **O módulo põe o que falta:** o `evento_id`, a hora (`quando` / `decidida_em`, UTC) e o `data_id` (o dia de Brasília). O que
+  o chamador traz pronto (a retomada de uma gravação) vale. O `evento_id` repetido é `Recusada` (é a chave do fato).
+- **Na cópia de prova e nos testes:** `NEXUS_ALMOX_INVENTARIO_ARQUIVO` (um JSON); teste sem ele lê vazio e não grava. Prova:
+  `tests/test_pcm_inventario_livro.py` (inclusive o banco falso com `como_texto=True`, a leitura que falha, a listagem
+  incompleta e as mutações nas regras).
 
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 

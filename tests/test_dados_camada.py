@@ -14,7 +14,7 @@ from pg_falso import ApiPGFalsa, Resposta
 
 from nexus.campo import decisao_pt, ronda_avulsa
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
-from nexus.dados import fato_almoxarifado, fato_chamado, fato_tarefa_os, programacao
+from nexus.dados import fato_almoxarifado, fato_chamado, fato_inventario, fato_tarefa_os, programacao
 from nexus.dados import telas as telas_dados
 
 BASE = "http://pg.falso"
@@ -76,7 +76,10 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         "programacao": programacao.CAB_PROGRAMACAO, "geracao_usina_dia": geracao.CAB_USINA_DIA,
         "geracao_inversor_dia": geracao.CAB_INVERSOR_DIA, "chamado": fato_chamado.CAB_CHAMADO,
         "tarefa_os": fato_tarefa_os.CAB_TAREFA_OS, "saldo_almox": fato_almoxarifado.CAB_SALDO,
-        "ciclo_varredura": fato_almoxarifado.CAB_CICLO, "peca_lancada": fato_almoxarifado.CAB_PECA}
+        "ciclo_varredura": fato_almoxarifado.CAB_CICLO, "peca_lancada": fato_almoxarifado.CAB_PECA,
+        # o livro do inventário do almoxarifado (26/10/2026): o Nexus é a fonte, estado conformado desde o registro
+        "evento_inventario": fato_inventario.CAB_EVENTO, "regua_minimo": fato_inventario.CAB_REGUA,
+        "curadoria_inventario": fato_inventario.CAB_CURADORIA}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 
@@ -94,8 +97,10 @@ def test_catalogo_bate_com_o_codigo_de_cada_fato_conformado_ou_montado():
             if est == "id":
                 assert any(c.startswith(col_dim[d]) or c.endswith(col_dim[d]) for c in cab), (fid, d)
         # no inversor × dia a usina é a da aba: a linhagem dela está no usina × dia da mesma (fonte, aba), sem repetir
-        # um texto em ~700 mil linhas
-        assert ("usina_id" not in cab) or "usina_ligada_por" in cab or fid == "geracao_inversor_dia", fid
+        # um texto em ~700 mil linhas. No inventário (26/10/2026) a usina é a do almoxarifado: a linhagem dela mora na
+        # `dim_almoxarifado` (usina_ligada_por), e as colunas do livro são o contrato fixado com as telas do PCM
+        assert ("usina_id" not in cab) or "usina_ligada_por" in cab or fid in (
+            "geracao_inversor_dia", "evento_inventario", "regua_minimo"), fid
         assert ("equipamento_id" not in cab) or "equipamento_ligado_por" in cab, fid
         # texto pessoal não entra; a contagem (_qtd), a chave (tarefa_chave) e o indicador 1/0 declarado, sim
         indicadores = {m.coluna for m in f.medidas if m.unidade == "1/0"}
