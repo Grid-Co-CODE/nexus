@@ -1402,5 +1402,6 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   Fracttal falso, rede bloqueada, dentro de uma moldura com o fundo desfocado): o escopo, o status, a busca, o vazio e o
   período (recorte sem pedido) funcionando; a caixa da busca crescia 460 px de altura (flex-basis do Histórico numa
   coluna), corrigida no `investigar.css`.
-- **Falta:** levar ao oem (`api.py`, `rotas.py` e os quatro arquivos novos), com o OK do Levi (o oem é público); até lá,
-  a plataforma do PC aberta direto (o `/os/*` dela vai ao 5090) dá 404 na janela. E o olho do Levi com uma OS de verdade.
+- **Levado ao oem em 26/10/2026** pela `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi ("sincroniza o
+  oem"): `api.py`, `rotas.py` e os quatro arquivos novos (sem commit lá: o oem é público). O 5090 só passa a servir a
+  janela depois de reiniciado. Falta o olho do Levi com uma OS de verdade.
