@@ -603,6 +603,8 @@ def test_criar_os_ao_lado_do_solicitar_com_os_mesmos_preenchimentos(pagina, clie
     sugestao = parse_qs(destino["Criar OS"].query)
     assert sugestao == parse_qs(destino["Solicitar OS"].query)
     assert sugestao["os_pai_folio"] == ["16502"] and sugestao["data"] == ["2026-10-08T06:00"]
+    # os dois, sempre (o OS Creator só escolhe a OS pai com o id E o nº; desde 26/10/2026 o campo fica no Passo 1)
+    assert sugestao["os_pai"] == [str(pagina["id_work_order"])]
 
 
 def test_os_de_varios_ativos_tem_o_bloco_ativos_em_cima_da_nota(pagina, cliente, monkeypatch):
