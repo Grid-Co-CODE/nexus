@@ -8,7 +8,12 @@
    2 Detalhes da Tarefa (steps/step2.py: cards "Detalhes da OS" e "Classificação"), 3 Sub tarefas (steps/step3.py) e
    4 Responsável (app.py::ResponsavelDialog, um diálogo — aqui um modal), com "Esta tarefa já foi realizada?" (steps/finalizar.py),
    "Agrupar em UMA OS com várias tarefas" e a OS pai (steps/ospai.py). O diálogo de imagens por ativo é o PerfAnexoDialog. #}
-<section class="os-pagina" id="trad" data-agora="{{ agora }}" data-programada="{{ programada }}" data-crit-default="{{ crit_default }}">
+<section class="os-pagina" id="trad" data-agora="{{ agora }}" data-programada="{{ programada }}" data-crit-default="{{ crit_default }}" data-subs-padrao='{{ subs_padrao|tojson }}'>
+  {# a sugestão pelo endereço (25/10/2026): o "Criar OS" da OS do Quadro da equipe da Engenharia abre esta tela com o
+     ativo dela marcado, a data do incidente dela e ela como OS pai no Passo 4 (`tradicional_web.sugestao`, a mesma da
+     Nova solicitação); a pessoa pode trocar tudo #}
+  {% set sug = sugestao or {} %}
+  <div id="sug" hidden data-sug-cliente="{{ sug.cliente or '' }}" data-sug-usina="{{ sug.usina or '' }}" data-sug-ativo="{{ sug.ativo or '' }}" data-sug-os-pai="{{ sug.os_pai or '' }}" data-sug-os-pai-folio="{{ sug.os_pai_folio or '' }}"></div>
   <div class="os-topo-linha">
     <a class="os-btn secondary os-voltar" href="/os/">← Voltar</a>
     <span class="trad-clonar-lbl">Clonar OS nº</span>
@@ -44,7 +49,7 @@
     <div class="os-ajuda" id="hint">Selecione cliente e usina para ver os ativos.</div>
     <div class="os-linha2">
       <label class="os-campo"><span class="os-lbl">Data do incidente <small>(Brasília)</small></span>
-        <span class="trad-dt-agora"><input id="dt_prog" type="datetime-local" value="{{ agora }}" max="{{ agora }}" title="Data do evento não aceita futuro — é quando aconteceu."><button type="button" class="os-btn secondary" id="b_agora">Agora</button></span></label>
+        <span class="trad-dt-agora"><input id="dt_prog" type="datetime-local" value="{{ sug.data or agora }}" max="{{ agora }}" title="Data do evento não aceita futuro — é quando aconteceu."><button type="button" class="os-btn secondary" id="b_agora">Agora</button></span></label>
       <label class="os-campo"><span class="os-lbl">Data programada <small>(quando executar)</small></span>
         <input id="dt_exec" type="datetime-local" value="{{ programada }}"></label>
     </div>
@@ -59,6 +64,8 @@
     <div class="trad-sub-t">Detalhes da OS</div>
     <label class="os-campo"><span class="os-lbl">Descrição da tarefa <i>*</i></span>
       <textarea id="desc" rows="2" placeholder="Somente uma ação"></textarea></label>
+    {# 26/10/2026: o nome do ativo entra sozinho no título de cada OS; aqui a prévia com o 1º marcado #}
+    <div class="os-ajuda" id="hint_desc">Escreva só a ação: o nome de cada ativo entra sozinho na frente do título.</div>
     <label class="os-campo"><span class="os-lbl">Observação <small>(opcional)</small></span>
       <textarea id="obs" rows="2" placeholder="Observações da OS (opcional)"></textarea></label>
     <label class="os-campo"><span class="os-lbl">Etiquetas <small>(opcional — marque as que quiser)</small></span>
@@ -104,6 +111,8 @@
     <div class="trad-modal-h"><span class="os-badge">4</span><span class="os-cardf-t">{{ passos[3] }}</span></div>
     <div class="trad-modal-corpo">
       <p class="trad-txt" id="resp_titulo"><b>1 OS</b> a gerar — escolha o <b>responsável</b> <small>(obrigatório na criação)</small>:</p>
+      {# 26/10/2026: os marcados de mais de uma usina, em âmbar (a OS 16996 nasceu num tracker de outra usina) #}
+      <p class="osb-aviso" id="resp_usinas" hidden></p>
       <input id="resp_busca" type="search" placeholder="Filtrar responsável…" autocomplete="off">
       <div class="trad-lista trad-pessoas" id="resp_lista"></div>
       <div id="fin">

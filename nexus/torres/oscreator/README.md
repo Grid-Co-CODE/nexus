@@ -726,7 +726,7 @@ alteração não salva.
 **Quem entra na Área PCM** (Levi, 13/10/2026: "Só o setor PCM ou administrador! Quem não é nenhum dos dois recebe a
 notificação!"). A Fila do PCM (aprovar, devolver, mudar status, gravar a observação, recarregar o catálogo) e os Temas
 (salvar, arquivar) são do setor PCM e dos administradores do Nexus; no app essa área pede a senha do PCM. Quem decide é a
-ponte (`ponte.area_pcm`): administrador passa sem ler nada; o resto, pelo setor de Base → Integração Fracttal, pelo NOME
+ponte (`ponte.area_pcm`): administrador passa sem ler nada; o resto, pelo setor de Base → Acessos → Pessoas e setores, pelo NOME
 ("PCM", sem acento nem caixa). Sem saber o setor (banco fora, Nexus sem a `NEXUS_PESSOA_HMAC`), fecha — só o
 administrador passa. A decisão vai ao clone no pedido (`request.environ["os_web.area_pcm"]`): no lugar da Fila e dos
 Temas vem o aviso (`solic_sem_acesso.html`, com a barra de sempre e o setor da pessoa), e as gravações voltam 403 com o
@@ -969,15 +969,15 @@ a OS na fila do PCM já vai vincular aquela OS como OS pai!".
   escolhido barrado, a Fila com a 16784 e a confirmação "filha da OS 16784", sem rolagem lateral. No oem, o
   `test_os_web_solic_27_09.py` (fora do git de lá) passou a cobrar a regra nova junto com a sincronia.
 
-## Nova solicitação com a sugestão pelo endereço (24/10/2026)
+## Nova solicitação e Criar OS do zero com a sugestão pelo endereço (24 e 25/10/2026)
 
 Levi, sobre a OS do Quadro da equipe da Engenharia: "Ao invés do botão "Abrir OS" bote um botão de "Solicitar OS" que já
 vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo mas sai como aquela OS como OS pai".
 
 - **O endereço:** `/os/solicitacao?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>&data=<AAAA-MM-DDTHH:MM>` abre a Nova
   solicitação com o cliente, a usina e o ativo marcados, a OS pai escolhida e a data do incidente dela (Levi, 24/10/2026:
-  "a data do incidente deve ser a mesma da OS pai"; `rotas_solic._data_sugerida`: torta ou no futuro fica de fora, e o
-  campo começa em agora) (`rotas_solic._sugestao`, `tradicional_web.onde_do_ativo`; na página,
+  "a data do incidente deve ser a mesma da OS pai"; `tradicional_web.data_sugerida`: torta ou no futuro fica de fora, e
+  o campo começa em agora) (`tradicional_web.sugestao`, uma regra só para as duas telas, e `onde_do_ativo`; na página,
   o `#sug` com os `data-sug-*` e o `sugerir()` no fim do script). A cascata virou duas funções que devolvem a promessa
   (`carregarUsinas`, `carregarAtivos`), para a sugestão esperar cada etapa.
 - **O que fica de fora:** o ativo que o catálogo não tem e a OS pai torta (o criar recusa a torta de qualquer jeito); sem
@@ -986,8 +986,43 @@ vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo ma
   torre OS Creator do Nexus). O comentário daquela página vai à nota da OS pela ponte
   (`/os/_nexus/engenharia/os/<id>/comentar`, só do Nexus, na sessão do Fracttal da pessoa; `editar_nota_os` com a regra
   do card: OS concluída, cancelada ou de várias tarefas não deixa).
-- **Prova:** `tests/test_oscreator_solic_pcm.py` (os dois de 24/10 da sugestão). Levado ao oem em 24/10/2026 pela
-  `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi (rotas_solic.py, tradicional_web.py e solic.html).
+- **Criar OS do zero (25/10/2026):** o mesmo endereço em `/os/tradicional?` (o "Criar OS" da OS do Quadro da equipe;
+  Levi: "Fará os mesmos preenchimentos automáticos que já faz na solicitação"): o Passo 1 abre com o cliente, a usina e
+  o ativo marcados (a busca mostra o ativo) e a data do incidente no campo; o Passo 4 abre com a OS pai escolhida
+  (`ospaiSug`), e a OS seguinte, depois de gerar, não herda a OS pai (como na Solicitação).
+- **As subtarefas padrão do Criar OS do zero (25/10/2026):** Levi: "quero que essas subtarefas já fiquem como padrão na
+  parte de criação de OS do zero!". O Passo 3 abre, e volta depois de gerar, com "Descreva a atividade realizada" e
+  "Ficou alguma pendência? Se sim, descreva" (`tradicional_web.SUBS_PADRAO`, no `data-subs-padrao` da página); a pessoa
+  edita, tira (fica o mínimo de 1) ou põe mais. São as mesmas palavras da `BASE` do `solic_spec`, e a primeira é a que a
+  página da OS da Engenharia lê nas OS filhas. Vão como as outras do Tradicional: tipo Texto, sem obrigatoriedade.
+- **Prova:** `tests/test_oscreator_solic_pcm.py` (os de 24/10 da sugestão) e `tests/test_oscreator_criar_os_25_10.py`.
+  Levado ao oem em 24/10/2026 pela `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi (rotas_solic.py,
+  tradicional_web.py e solic.html); o de 25/10 (rotas_solic.py, rotas_tradicional.py, tradicional_web.py,
+  tradicional.html e tradicional.js) vai com o OK dele.
+
+## Criar OS: o ativo no título de cada OS e o aviso das usinas (26/10/2026)
+
+O caso: as OS 16995 (um inversor de uma usina) e 16996 (um tracker de OUTRA usina) nasceram no mesmo minuto, da mesma
+pessoa, com o mesmo responsável, programada, duração e etiqueta, e o título "[<código da usina do inversor>] - Inspeção do
+Inversor com alarme de Ventoinha" nas duas. Foi uma geração só no Criar OS (Tradicional): o ativo marcado continua
+marcado quando se troca de usina (o `Step1._checked` do app de mesa, de propósito), a descrição digitada ia igual para
+cada OS, e o tracker marcado em outra usina levou o título escrito para o inversor. Levi escolheu: o ativo entra sozinho
+no título e a tela avisa quando os marcados são de mais de uma usina.
+
+- **O título:** a pessoa escreve só a ação; cada OS (e cada tarefa, na agrupada) sai "[Ativo] - descrição", com a regra da
+  Nova solicitação (`solic_web.titulo_do_ativo`: o nome curto do catálogo, a marca `[Ativo]` vale, o que já começa pelo
+  ativo não repete). Vai pelo `por_ativo` do `create_work_orders_bulk` e do `create_work_orders_agrupada` (o mesmo caminho
+  do COS e da Engenharia); o `desc` posicional segue o digitado (`tradicional_web.montar_payload`, com as frases do tipo
+  que a rota já guarda por 1 h). O Passo 2 mostra "Vai sair “[Inversor 5.1] - …”" com o 1º marcado.
+- **As usinas:** cada marcado guarda a usina em que foi marcado (`comUsina`). Com mais de uma, o Passo 1 diz "N
+  marcado(s) em K usinas diferentes", o Passo 4 mostra em âmbar (`.osb-aviso`, sem cor nova) quais ativos de quais usinas,
+  e a confirmação repete a lista antes de criar. A marcação entre usinas continua valendo (é o app de mesa).
+- **Prova:** `tests/test_oscreator_criar_os_titulo_26_10.py` (uma OS por ativo e a agrupada com o título de cada ativo, a
+  marca e o título que já tem o ativo, o payload puro, a tela). Na bancada (o Criar OS do fixture, a cascata de mentira
+  com duas usinas), a 1280 e a 375 px, no escuro e no claro: o inversor marcado na usina A segue marcado na B, o Passo 1
+  com "2 marcado(s) em 2 usinas diferentes", a prévia do título, o aviso âmbar do Passo 4 e a confirmação com as duas
+  usinas, sem rolagem lateral. No oem, o `test_os_web_tradicional.py` passou a cobrar o `por_ativo` junto com a sincronia
+  (cópia de trabalho; sem commit lá).
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
@@ -1308,3 +1343,65 @@ não lê as tarefas.
   administrador do Fracttal (o perfil do usuário). A tela passa a dizer isso (`_CHECKLIST_SEM_PERMISSAO`, com o código
   entre parênteses), como o `WITHOUT_PERMITS` de criar OS (`_RPC_MSG`). Prova: `tests/test_chamados_ordem_icone_permissao_24_10.py`.
 - No Nexus, a torre Chamados ficou na ordem Garantias, Fabricantes e Solicitações de clientes (`nexus/torres/chamados`).
+
+## O pulso laranja nas OS de Garantias paradas (25/10/2026)
+
+Levi, pelo chat da Engenharia: "sabe o pulsar que temos no quadro de equipe? passe instruções para o chat de Nexus
+(Chamados) implementar nas OSs de garantias porém quando a OS ficar a partir de 5 dias sem comentário de atualização!".
+
+- **A regra** (`acomp_web.parada`, `DIAS_PARADA = 5`): pulsa o cartão da OS ABERTA do quadro (Chegaram e Ticket aberto;
+  em verificação, finalizada e cancelada não) com 5 x 24 h ou mais desde o último comentário de atualização: a última
+  observação da tela (as do banco da Gridco, inclusive a anotação do ticket gravado) ou, na retroativa, a última data do
+  histórico da nota. Sem comentário nenhum, conta da abertura: a OS esquecida desde o início também pulsa. Sem as
+  observações lidas (o banco fora), nada pulsa e o aviso do quadro diz que o pulso fica desligado.
+- **O desenho é o do Quadro da equipe da Engenharia** (`nexus/static/engenharia.css`, `.kb-card--parada`, que usa 7 dias):
+  a camada `::after` de 0,5 a 1 de opacidade, com o contorno de 1,5 px e o halo, que pulsa mesmo com "reduzir movimento".
+  Aqui é `.card.parada` e `@keyframes ac-pulso`, com os tokens `--pulso-a71` a `--pulso-a14` no `chamados.css`, nos dois
+  temas (os mesmos valores do `nexus.css`, que não chega ao OS Creator). Mudou a sombra lá, traga para cá: o teste
+  compara as duas.
+- O cartão ganha no `title` "5 dias ou mais sem comentário".
+- Prova: `tests/test_oscreator_acomp_pulso_25_10.py` (4 d 23 h não, 5 d sim, as duas colunas abertas, as fechadas não,
+  sem comentário desde a abertura, o histórico da retroativa, o banco fora, a tela e o CSS). Na bancada (Fracttal
+  falso, metade das OS comentada na véspera): só as paradas pulsam, a 1440 e a 375 px, no escuro e no claro.
+
+## Investigar ativo: o histórico de OS de um ativo, para o Tempo real (26/10/2026)
+
+Levi: "Gostaria de poder clicar com botão direito do mouse em cima do inversor e ter a opção 'Investigar ativo'. Vai
+aproveitar o pré carregamento de histórico de OS do OS Creator filtrando esse ativo, deve mostrar o período filtrado e eu
+devo conseguir fazer novos filtros e pesquisas pela visão. Vai abrir uma sub janela sobrepondo a tela dando um blur de
+fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Monitoramento, `plataforma/CLAUDE.md`, seção
+"Investigar ativo"); a visão mora aqui, onde a lista do Histórico já está carregada.
+
+- **O endereço:** `/os/historico/ativo?codigo=<código do Fracttal>&usina=<usina>&nome=<inversor>[&rotulo=&de=&ate=]`
+  (`os_web/rotas_investigar.py`; as regras, puras, em `os_web/investigar_web.py`; a tela em `templates/historico_ativo.html`
+  e `static/investigar.css`). A plataforma abre com `janela=1` (a ponte tira o topo, como no Criar OS), e o formulário
+  guarda o `janela` e o pedido a cada nova busca. Fica debaixo do `/os/`: o portão do Nexus pede uma tela da torre OS
+  (`setor_telas.pode`), e o Caddy já manda o `/os/*` ao Nexus. Sem a sessão do Fracttal, o login do OS Creator, como
+  em qualquer tela (`exige_sessao`).
+- **De onde vem o histórico (nenhuma busca a mais no Fracttal):** a lista de "Todos" dos últimos 30 dias, a MESMA da
+  Visão COS e do "Criado por: Todos" (`rotas.ler_lista`, que saiu de dentro do `historico` para as duas usarem a mesma
+  leitura: a chave `("hist", "TODOS", "criadas", "TODOS", None, de, ate, ())` do `historico_store`, a conferência da
+  mesma visão e a renovação por trás). Quem abriu a Visão COS deixa a janela pronta; a 1ª janela deixa a Visão COS
+  pronta. O período DENTRO dos 30 dias é recortado da lista (pela data de criação, como o Histórico), sem pedido; fora
+  deles, a lista daquele período (a régua do Histórico, guardada para quem vier depois), com o aviso na tela e o do teto
+  de 2.000 quando a lista corta as mais antigas. O ↻ é o do Histórico.
+- **O ativo, pelo catálogo do disco** (`api._catalogo_cru`, vencido também serve; nunca o Fracttal): o código que a
+  plataforma manda (o gravado no de-para ou o derivado do nome) quando está no catálogo; senão, o inversor da usina com o
+  mesmo número (`INVR` + N.M, sem zero à esquerda; 1.1 não casa com 1.10), com o aviso de que o código não existe (o
+  derivado erra onde a árvore do Fracttal mudou, a Pharma II); sem inversor, a usina inteira, com o aviso.
+- **A OS é do ativo** quando o código dele está entre os itens dela: a linha do Histórico ganhou `codigos`
+  (`api._extrai_codigos`, todos os `{ ... }` dos itens; o `_extrai_code` fica só com o último), e a OS agrupada de dois
+  inversores aparece nos dois. "Da usina", pelo nome curto, o do Histórico (inclui as do item da usina: religamento).
+- **Os filtros da janela:** "Este ativo N | A usina inteira N", Status e Tipo de tarefa (as opções que existem nas OS da
+  usina no período) e a busca por texto são locais, sobre as linhas da usina que vieram; o período re-lê no servidor. O
+  nº abre o card da OS do Histórico (o mesmo `os_acoes.js`); a ação que muda a OS relê ao fechar. O Esc sem card aberto
+  fecha a janela do Tempo real (`{gc: "depara-fechar"}` à página de baixo).
+- **Prova:** `tests/test_oscreator_investigar_ativo_26_10.py` (14: o catálogo, o número, os códigos dos itens, o
+  período, a janela sem busca a mais depois da Visão COS e o contrário, o recorte, o período fora, os campos guardados,
+  a usina inteira, o login e o Histórico igual depois da `ler_lista`). Na bancada (o clone sozinho em `127.0.0.1:5097`,
+  Fracttal falso, rede bloqueada, dentro de uma moldura com o fundo desfocado): o escopo, o status, a busca, o vazio e o
+  período (recorte sem pedido) funcionando; a caixa da busca crescia 460 px de altura (flex-basis do Histórico numa
+  coluna), corrigida no `investigar.css`.
+- **Levado ao oem em 26/10/2026** pela `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi ("sincroniza o
+  oem"): `api.py`, `rotas.py` e os quatro arquivos novos (sem commit lá: o oem é público). O 5090 só passa a servir a
+  janela depois de reiniciado. Falta o olho do Levi com uma OS de verdade.

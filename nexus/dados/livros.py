@@ -41,7 +41,13 @@ def _so_cresce(livro: str) -> tuple:
 
 def _do_catalogo(livro: str):
     from . import catalogo        # aqui dentro: o catálogo importa os fatos, e eles importam este módulo
-    return catalogo.LIVRO_POR_NOME.get(livro)
+    l = catalogo.LIVRO_POR_NOME.get(livro)
+    if l is None:
+        # o livro de uma família (um por mês: nexus_almoxarifado_saldo_2026_10) tem a trava do molde no catálogo
+        # (25/10/2026: sem isto, a foto do saldo do mês, que só cresce, ficava sem trava)
+        molde = next((m for p, m in catalogo.FAMILIAS.items() if p.match(livro)), None)
+        l = catalogo.LIVRO_POR_NOME.get(molde) if molde else None
+    return l
 
 
 def _conferir_antes(livro: str, w: dict, tabelas: dict, base: str, sessao, so: tuple) -> None:

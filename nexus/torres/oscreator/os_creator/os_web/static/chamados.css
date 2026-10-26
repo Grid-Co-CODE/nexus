@@ -11,7 +11,9 @@
   --tx:#e9eef6;--mu:#94a3b8;--fa:#64748b;--gr:#a3d900;--gr-h:#b6ec12;--gr-t:#b8e84a;--gr-tint:rgba(163,217,0,.13);
   --rd:#ff5b6e;--rd-t:#ff8a98;--rd-tint:rgba(255,91,110,.13);--am:#F0B53D;--am-t:#f5c86a;--am-tint:rgba(240,181,61,.14);
   --ok:#4ade80;--ok-t:#7ee2a8;--ok-tint:rgba(74,222,128,.12);
-  --font:'Inter','Segoe UI',Arial,sans-serif;--mono:ui-monospace,Consolas,'Cascadia Mono',monospace}
+  --font:'Inter','Segoe UI',Arial,sans-serif;--mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+  /* o pulso laranja da OS parada (25/10/2026): os tokens do nexus.css, que não chega aqui */
+  --pulso-a71:rgba(255,143,60,.71);--pulso-a57:rgba(255,143,60,.57);--pulso-a43:rgba(255,143,60,.43);--pulso-a28:rgba(255,143,60,.28);--pulso-a14:rgba(255,143,60,.14)}
 
 body.os-form.cham{background:var(--bg);color:var(--tx);font-family:var(--font)}
 body.cham :focus-visible{outline:2px solid var(--gr);outline-offset:2px}
@@ -104,6 +106,20 @@ body.cham .filtros option{color:var(--tx);background:var(--sf)}
   box-shadow:inset 3px 0 0 var(--k,var(--ln2));text-decoration:none;color:inherit;transition:border-color .14s ease,background .14s ease}
 .card:hover{background:var(--sf3);border-color:var(--ln2)}
 .card.k-r{--k:var(--rd)}.card.k-a{--k:var(--am)}.card.k-g,.card.fim{--k:var(--ok)}
+/* o pulso laranja da OS aberta com 5 dias ou mais sem comentário de atualização (Levi, 25/10/2026, pelo chat da
+   Engenharia: "sabe o pulsar que temos no quadro de equipe? ... implementar nas OSs de garantias porém quando a OS ficar
+   a partir de 5 dias sem comentário de atualização!"; a regra é acomp_web.parada). O MESMO do Quadro da equipe da
+   Engenharia (nexus/static/engenharia.css, .kb-card--parada): uma camada por cima do cartão, de 0,5 a 1 de opacidade,
+   com o contorno de 1,5 px e o halo; mudou lá, traga para cá (o teste compara a sombra) */
+.card.parada{position:relative}
+.card.parada::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  box-shadow:0 0 0 1.5px var(--pulso-a71),0 0 16px 3px var(--pulso-a43),0.3px 0.5px 0.4px var(--pulso-a71),0.4px 0.6px 0.5px -1.2px var(--pulso-a57),
+    1px 1.7px 1.5px -2.5px var(--pulso-a43),2.8px 4.6px 4px -3.7px var(--pulso-a28),6.3px 10.2px 9px -5px var(--pulso-a14);
+  animation:ac-pulso 1.4s ease-in-out infinite alternate}
+@keyframes ac-pulso{from{opacity:.5}to{opacity:1}}
+/* pulsa mesmo com "reduzir movimento" (o Windows do Levi está sem os efeitos de animação, e o caso da Engenharia foi
+   "a sombra não está pulsando"): só muda a opacidade de uma sombra, sem movimento */
+@media (prefers-reduced-motion:reduce){.card.parada::after{animation:ac-pulso 1.4s ease-in-out infinite alternate!important}}
 .card.fim{opacity:.85}.card.fim:hover,.card.fim:focus-visible{opacity:1}
 .k-cab{display:flex;align-items:center;gap:8px;min-width:0}
 .k-os{font:700 12px/1.3 var(--mono);color:var(--gr-t);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -343,7 +359,8 @@ html[data-tema="claro"]{--bg:var(--osc-pagina);--sf:var(--osc-cartao);--sf2:var(
   --gr:var(--osc-musgo);--gr-h:var(--osc-lima-hover);--gr-t:var(--osc-musgo);--gr-tint:var(--osc-lima-suave);
   --rd:var(--osc-critico-cheio);--rd-t:var(--osc-critico);--rd-tint:var(--osc-critico-suave);
   --am:var(--osc-alerta-cheio);--am-t:var(--osc-alerta);--am-tint:var(--osc-alerta-suave);
-  --ok:var(--osc-ok-cheio);--ok-t:var(--osc-ok);--ok-tint:var(--osc-ok-suave)}
+  --ok:var(--osc-ok-cheio);--ok-t:var(--osc-ok);--ok-tint:var(--osc-ok-suave);
+  --pulso-a71:rgba(247,140,60,.71);--pulso-a57:rgba(247,140,60,.57);--pulso-a43:rgba(247,140,60,.43);--pulso-a28:rgba(247,140,60,.28);--pulso-a14:rgba(247,140,60,.14)}
 :where(html[data-tema="claro"]) .ac-head h1,:where(html[data-tema="claro"]) .kpi .val,:where(html[data-tema="claro"]) .col-h h2,
 :where(html[data-tema="claro"]) .col-h b,:where(html[data-tema="claro"]) .k-tit,:where(html[data-tema="claro"]) .card .ct,
 :where(html[data-tema="claro"]) .bloco h2,:where(html[data-tema="claro"]) ol.cadeia a,:where(html[data-tema="claro"]) .outros a b,

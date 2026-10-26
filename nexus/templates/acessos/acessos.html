@@ -9,9 +9,16 @@
 <div class="cad-topo">
   <div>
     <h1 class="titulo-pagina">Acessos</h1>
-    <p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>
+    {% if aba != 'pessoas' %}<p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>{% endif %}
   </div>
 </div>
+{# as abas (25/10/2026, Levi: "gostaria que não tivesse uma tela só para integração fractall e sim fosse para acessos"):
+   a antiga tela Base > Integração Fracttal é a aba Pessoas e setores; só ela lê o Fracttal #}
+<nav class="gc-subabas" aria-label="Acessos">
+  <a href="{{ url_for('torre_base.acessos') }}"{% if aba != 'pessoas' %} aria-current="page"{% endif %}>Telas e administradores</a>
+  <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>
+</nav>
+{% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% else %}
 
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
@@ -40,7 +47,7 @@
   <h2 id="ace-setores-titulo">Telas por setor</h2>
   <p class="gc-ajuda ace-ajuda ace-ajuda--topo">Marque o que cada setor vê no menu ao entrar no Nexus; o Início é de todos.
     Quem não tem setor vê só “Sem setor, fale com o responsável”. O setor de cada pessoa se escolhe em
-    <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>. Quem está em Administradores (abaixo) vê tudo, com ou sem setor.</p>
+    <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a>. Quem está em Administradores (abaixo) vê tudo, com ou sem setor.</p>
   {# a pré-carga (nexus/auth/pre_carga.py): abre por trás as telas do setor de quem entra, para o clique já achar tudo pronto #}
   <p class="gc-ajuda ace-ajuda ace-pre-carga"><strong>Pré-carga:</strong>
     {% if not pre_carga.ligada %}desligada neste Nexus (<span class="gc-dado">NEXUS_PRE_CARGA=0</span>).
@@ -61,7 +68,7 @@
   {% endif %}
 
   {% if not setores %}
-  <p class="ace-vazio">Nenhum setor criado ainda. Crie os setores em <a href="{{ url_for('torre_base.fracttal') }}">Base → Integração Fracttal</a>.</p>
+  <p class="ace-vazio">Nenhum setor criado ainda. Crie os setores na aba <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a>.</p>
   {% else %}
   <nav class="ace-setores" aria-label="Escolha o setor">
     {% for s in setores %}
@@ -272,4 +279,5 @@
   atualizar();
 })();
 </script>
+{% endif %}
 {% endblock %}

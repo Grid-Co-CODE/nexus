@@ -89,7 +89,9 @@ def _cartao(h, folio):
 # ── o cartão novo ─────────────────────────────────────────────────────────────────────────────────────────────────
 def test_o_cartao_traz_os_campos_do_quadro_da_engenharia(quadro):
     c = _cartao(quadro, 9103)
-    assert 'class="card cr k-a"' in c                                   # a fila (vermelha) e o fio da idade (âmbar)
+    # a fila (vermelha), o fio da idade (âmbar) e, há 7 dias sem comentário, o pulso das paradas (25/10/2026,
+    # test_oscreator_acomp_pulso_25_10.py)
+    assert 'class="card cr k-a parada"' in c
     assert '<span class="k-os">OS 9103</span>' in c                     # o nº da OS em verde, mono
     assert '<span class="tag u-a">7 d</span>' in c                      # o estado no canto, colorido pela idade
     assert '<div class="k-tit">Tracker 1.100 TST</div>' in c            # o ativo em negrito
@@ -100,7 +102,7 @@ def test_o_cartao_traz_os_campos_do_quadro_da_engenharia(quadro):
     av = re.search(r'<span class="k-av k-av(\d)" aria-hidden="true">([^<]+)</span>', c)
     assert av and av.group(2) == "AT" and int(av.group(1)) == aw.cor_avatar(EQUIPE_NOME)
     assert '<span class="k-quem">Analista Teste</span>' in c
-    assert 'title="chegou há 7 dias"' in c                              # a frase inteira continua no title
+    assert 'title="chegou há 7 dias · 5 dias ou mais sem comentário"' in c                              # a frase inteira continua no title
 
 
 def test_ticket_aberto_finalizado_e_os_avisos(quadro):

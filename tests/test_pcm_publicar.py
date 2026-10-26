@@ -205,7 +205,7 @@ def test_tela_publicar_so_administrador_e_com_confirmacao(app, logado, config, o
 
 
 def _no_setor(monkeypatch, nome):
-    """A pessoa do login no setor `nome` (o setor vem da Base → Integração Fracttal; aqui, dublado)."""
+    """A pessoa do login no setor `nome` (o setor vem da Base → Acessos → Pessoas e setores; aqui, dublado)."""
     from nexus.auth import setor_telas as ST
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 7, "nome": nome}, "erro": ""})
 

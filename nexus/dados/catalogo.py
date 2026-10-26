@@ -33,7 +33,7 @@ Estados de cada fato (`ESTADOS_FATO`):
 import re
 from dataclasses import dataclass
 
-from . import fato_chamado, fato_pt, fato_ronda, fato_tarefa_os, fatos, geracao, programacao
+from . import almoxarifado, fato_chamado, fato_pt, fato_ronda, fato_tarefa_os, fatos, geracao, programacao
 
 ESTADOS = {"id": "ID", "cod": "código", "hmac": "código da pessoa", "nome": "nome", "largo": "em colunas",
            "prop": "cadastro próprio", "nao": "—"}
@@ -550,11 +550,11 @@ FATOS = (
                     "quando o backfill refaz o dia). Só o número da OS: a descrição não vai. Quem vinculou fica no log da "
                     "máquina (logs/falhas_vinculos.log da plataforma), não no banco (regra 8)"),
     # Setor do pessoal do Fracttal (12/10/2026, Levi: "Como faço para definir um setor???? tem que dar possibilidade"):
-    # o Fracttal não tem setor e ainda não há base; a tela Base > Integração Fracttal cria a lista (dim_setor, no mesmo
+    # o Fracttal não tem setor e ainda não há base; a tela Base > Acessos > Pessoas e setores cria a lista (dim_setor, no mesmo
     # livro) e põe cada pessoa num setor.
     Fato("decisao_setor", "Decisão de setor do pessoal", "base", "nexus_setores · fato_decisao_setor",
          "1 linha = 1 decisão de pôr 1 pessoa do Fracttal em 1 setor, ou de tirá-la (setor_id vazio), tomada por um "
-         "administrador na tela Integração Fracttal",
+         "administrador na aba Pessoas e setores de Base → Acessos",
          _d(data=("id", "data_id (o dia de Brasília da decisão)"),
             pessoa=("id", "pessoa_id quando a pessoa do Fracttal tem ficha (o critério do login; pessoa_ligada_por diz "
                           "como; vazio = sem ficha) + fracttal_id (o id_personnel) + pessoa_hmac (o código do e-mail)")),
@@ -663,6 +663,51 @@ FATOS = (
                     "(NEXUS_ATRIBUICOES) estiver ligado. A observação do PCM vai só cifrada (dados_cifrados, regra 8). "
                     "A carga inicial (origem carga_inicial) é a regra da equipe do cadastro: cada pessoa de campo "
                     "recebe as usinas da equipe dela"),
+    # o almoxarifado (25/10/2026, Levi: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse
+    # almoxarifado na parte de PCM"): a varredura diária do inventário do Fracttal, que o App faz e publica; o livro do
+    # App guarda só o último ciclo, e o histórico é o do Nexus (`fato_almoxarifado.py`). O item do inventário segue o
+    # precedente do extintor (`prop` no lugar do equipamento): promover "item" a dimensão conformada mexe em todos os
+    # fatos, e fica para quando vierem compras e consumo
+    Fato("saldo_almox", "Saldo do almoxarifado", "pcm", f"{almoxarifado.LIVRO_SALDO} · {almoxarifado.ABA_SALDO}",
+         "1 linha = 1 item × 1 almoxarifado × 1 ciclo completo da varredura (a releitura do Admin no mesmo dia é "
+         "outra foto, com o mesmo data_id)",
+         _d(data=("id", "data_id (o dia de Brasília do início do ciclo; ciclo_inicio, o ciclo)"),
+            usina=("id", "usina_id (o local do almoxarifado, \"Cliente - Usina - UF\", só pela de-para do Fracttal)"),
+            equipamento=("prop", "id_item (o item do inventário, cadastro próprio: nexus_almoxarifado · dim_item_almox)")),
+         tipo="snapshot_periodico", chave=("saldo_id",), estado="montado",
+         conformado_em="nexus_almoxarifado_saldo_AAAA_MM · fato_saldo_almox",
+         medidas=_m((("saldo_qtd", "a do item", "semi"), ("minimo_qtd", "a do item", "semi"))),
+         fontes=(f"{almoxarifado.LIVRO_SALDO} · {almoxarifado.ABA_SALDO}",),
+         janela_origem="o último ciclo completo (App)",
+         observacao="o saldo soma entre almoxarifados do MESMO item, nunca no tempo nem entre itens (a unidade é a do "
+                    "item: UNIDADE, METRO, MASSA). Mínimo 0 = sem mínimo cadastrado. O dia sem ciclo fica sem foto "
+                    "(\"não medido\" não vira \"não mudou\"). Até o App publicar, o livro não existe"),
+    Fato("ciclo_varredura", "Ciclo da varredura do almoxarifado", "pcm",
+         f"{almoxarifado.LIVRO_CICLO} · {almoxarifado.ABA_CICLO}",
+         "1 linha = 1 ciclo da varredura que o Nexus viu (aplicado ou recusado, e a marca de anulado)",
+         _d(data=("id", "data_id (o dia de Brasília do início do ciclo)")),
+         tipo="snapshot_acumulado", chave=("ciclo_inicio",), estado="montado",
+         conformado_em="nexus_almoxarifado · fato_ciclo_varredura",
+         medidas=_m((("itens_lista_qtd", "qtd", "nao"), ("itens_lidos_qtd", "qtd", "nao"), ("erros_qtd", "qtd", "nao"),
+                     ("nao_lidos_qtd", "qtd", "nao"))),
+         fontes=(f"{almoxarifado.LIVRO_CICLO} · {almoxarifado.ABA_CICLO}",),
+         janela_origem="o último ciclo completo (App)",
+         observacao="aplica só com 90% dos itens da lista lidos (a completude do próprio ciclo); o ciclo aplicado "
+                    "errado se anula pela ferramenta (marca, não apaga: o livro só cresce)"),
+    Fato("peca_lancada", "Peça lançada pelo App", "pcm", f"{almoxarifado.LIVRO_PECAS} · {almoxarifado.ABA_PECAS}",
+         "1 linha = 1 peça lançada (ou recusada) pelo App numa tarefa de OS; o reenvio de uma recusada regrava a linha",
+         _d(data=("id", "data_id (o dia de Brasília do uso, o do celular; data_id_recebida, o do servidor)"),
+            usina=("id", "usina_id (o almoxarifado de onde a peça saiu, pela dim_almoxarifado)"),
+            pessoa=("id", "pessoa_id (Lançado por, o HMAC do e-mail)"),
+            equipamento=("prop", "id_item (e o codigo_ativo da tarefa, com a tarefa_chave, para achar o fechamento)"),
+            os=("cod", "os")),
+         tipo="snapshot_acumulado", chave=("lancamento_id",), estado="montado",
+         conformado_em="nexus_almoxarifado · fato_peca_lancada",
+         medidas=_m((("quantidade_qtd", "a do item", "semi"), ("lancada", "1/0", "aditiva"))),
+         fontes=(f"{almoxarifado.LIVRO_PECAS} · {almoxarifado.ABA_PECAS}",),
+         janela_origem="90 dias (App)",
+         observacao="a recusa vai como o domínio (dominios.RECUSA_PECA), nunca o texto do erro do Fracttal; a tarefa "
+                    "vira tarefa_chave. A recusada nunca saiu do saldo do Fracttal"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -1032,6 +1077,17 @@ LIVROS = (
     Livro("nexus_geracao_inversor_AAAA_MM", ("fato_geracao_inversor_dia",), "com o nexus_geracao, só o mês que mudou",
           "nexus/dados/carga.py (gerar_geracao) + geracao.py", True,
           "~700 mil linhas no total (29 a 36 MB num livro só não cabiam na troca integral); ~32 mil por mês"),
+    # o almoxarifado (25/10/2026): o histórico que o livro do App não guarda (ele tem só o último ciclo). Só cresce: a
+    # gravação relê o banco e acrescenta o ciclo novo; a foto do saldo vai num livro por mês (~270 linhas por ciclo)
+    Livro("nexus_almoxarifado", ("fato_ciclo_varredura", "fato_peca_lancada", "dim_item_almox", "dim_almoxarifado",
+                                 "qualidade", "atualizacao"),
+          "de hora em hora (:40), com portão próprio: só com ciclo novo do App ou peça lançada nova",
+          "nexus/dados/carga.py (gerar_almoxarifado) + fato_almoxarifado.py; só com NEXUS_ALMOX_GRAVAR=1", False,
+          "registrado antes de existir (25/10/2026): o Nexus sobe em ensaio e grava depois do ensaio com o 1º ciclo "
+          "real do App", so_cresce=("fato_ciclo_varredura", "fato_peca_lancada", "dim_item_almox", "dim_almoxarifado")),
+    Livro("nexus_almoxarifado_saldo_AAAA_MM", ("fato_saldo_almox",), "com o nexus_almoxarifado, a cada ciclo aplicado",
+          "nexus/dados/carga.py (gerar_almoxarifado) + fato_almoxarifado.py", False,
+          "um livro por mês: ~270 linhas por ciclo, ~8 mil por mês, só acrescentando", so_cresce=True),
     Livro("nexus_rondas_checklist", ("fato_checklist_ronda", "qualidade", "atualizacao"), "carga única (06/10/2026)",
           "ferramentas/carregar_checklist_rondas_sem_os.py", True,
           "a aba qualidade existe no banco desde a carga única e só entrou aqui em 09/10, quando o radar a achou"),
@@ -1109,8 +1165,8 @@ LIVROS = (
           "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "
           "8.746 tarefas, conferidas por GET depois de gravar); grava só a leitura inteira do Fracttal e se a "
           "última gravação tiver mais de 50 min"),
-    Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na tela Integração Fracttal",
-          "nexus/cadastro/setores.py, pela tela Base > Integração Fracttal", False,
+    Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na aba Pessoas e setores de Base → Acessos",
+          "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
           "1 minuto e relê o banco antes de cada gravação",
           so_cresce=True),
@@ -1187,7 +1243,8 @@ LIVROS = (
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
-FAMILIAS = {re.compile(r"^nexus_geracao_inversor_\d{4}_\d{2}$"): "nexus_geracao_inversor_AAAA_MM"}
+FAMILIAS = {re.compile(r"^nexus_geracao_inversor_\d{4}_\d{2}$"): "nexus_geracao_inversor_AAAA_MM",
+            re.compile(r"^nexus_almoxarifado_saldo_\d{4}_\d{2}$"): "nexus_almoxarifado_saldo_AAAA_MM"}
 
 
 def da_familia(livro: str, aba: str) -> bool:
@@ -1241,6 +1298,11 @@ CONHECIDAS = (
     Conhecida("campo_nexus", ("rondas", "atualizacao"), "aposentada",
               "do coletor do Fracttal do Nexus, desligado em 05/10/2026 (o fato dele se aposentou); fica no banco "
               "porque a API não apaga livro"),
+    # o catálogo de itens do inventário do Fracttal que o App publica a cada ciclo (25/10/2026): a fonte da
+    # nexus_almoxarifado · dim_item_almox
+    Conhecida(almoxarifado.LIVRO_ITENS, (almoxarifado.ABA_ITENS,), "dimensao",
+              "os itens do inventário do Fracttal (peças e insumos) que estavam na lista no último ciclo da varredura do "
+              "App: código, nome, unidade, família, avariado; a fonte da dimensão do item do almoxarifado"),
     Conhecida("gemeo_digital", ("usina", "equipamento", "alias", "modelo"), "apoio",
               "o cadastro próprio do gêmeo digital: as 25 usinas, os equipamentos, os apelidos e os modelos dele"),
     Conhecida("gemeo_digital", ("cascata_dia", "evento"), "candidata",

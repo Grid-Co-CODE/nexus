@@ -428,3 +428,17 @@ def test_linha_que_nao_mudou_guarda_o_lido_em_do_banco():
     assert {l[i_os]: l[i_lido] for l in m} == {"15001": "2026-10-08T12:00:00-03:00", "2": "13:00"}
     assert P.sha_linhas(m) == P.sha_linhas(agora)                              # o lido_em não entra no sha
     assert P.manter_lido_em(agora, []) == agora                                 # sem banco, nada muda
+
+
+def test_semana_da_fonte_sem_status_nao_troca_a_do_banco():
+    """26/10/2026: o robô do PCM publicou as 4 semanas sem o status das tarefas (o Fracttal devolveu 0 registros) e a
+    carga das :40 trocou o histórico do Nexus pela versão degradada. A semana da fonte em que NENHUMA tarefa tem status é
+    degradada: o banco guarda a dele, e a semana nova degradada não entra (nada é melhor que dado pela metade)."""
+    velho, _, _ = _fato(_dados(_semana("2026-W41", [_r(), _r(os_id="2")])))
+    _, _, l_fonte = _fato(_dados(_semana("2026-W41", [_r(os_id="3", status="", status_bd="")]),
+                                 _semana("2026-W42", [_r(os_id="4", status="", status_bd="")]),
+                                 _semana("2026-W43", [_r(os_id="5")])))
+    assert P.semanas_degradadas(l_fonte) == {20261005, 20261012}
+    m = [dict(zip(P.CAB_PROGRAMACAO, l)) for l in P.mesclar_semanas(velho, l_fonte)]
+    assert sorted((x["data_id_semana"], x["os"]) for x in m) == [(20261005, "15001"), (20261005, "2"), (20261019, "5")]
+    assert P.semanas_degradadas([]) == set()

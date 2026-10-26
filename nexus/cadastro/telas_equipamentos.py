@@ -15,7 +15,7 @@ a tela ordena as opções (as parecidas primeiro, com o porquê escrito) e quem 
 preenche um rascunho, e só o Salvar grava.
 
 Só administrador (o Registro mestre e a gravação no banco). Os POST são da própria página (`_de_outro_site`, a régua da
-moldura e da Integração Fracttal); o Salvar da estrutura vai por fetch com JSON e devolve o estado novo (os IDs novos),
+moldura e da aba Pessoas e setores (Base → Acessos)); o Salvar da estrutura vai por fetch com JSON e devolve o estado novo (os IDs novos),
 sem recarregar (a lista de inversores de uma usina grande passa de 40 linhas: recarregar perdia a rolagem).
 """
 import difflib

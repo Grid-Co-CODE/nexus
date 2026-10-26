@@ -50,6 +50,9 @@ RESUMO = {
     "decisao_motivo_pcm": "O motivo de cada tarefa do PCM, e as que saíram da programação por ele",
     "decisao_backoffice_pcm": "Quem é do backoffice: as OS dessas pessoas ficam fora da programação",
     "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
+    "saldo_almox": "O saldo de cada peça em cada almoxarifado, a cada varredura diária",
+    "ciclo_varredura": "Cada varredura do almoxarifado: se leu tudo e se valeu",
+    "peca_lancada": "Cada peça que o técnico lançou (ou tentou lançar) pelo App numa OS",
     "exclusao_extintor": "Os extintores que a Segurança excluiu, e por quê",
     "pedido_ronda_extintor": "As novas rondas de extintores que a Segurança pediu, por usina",
     "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
@@ -160,7 +163,7 @@ PARA_QUE = {
                           "OS de cada falha sem perguntar nada ao Fracttal (a busca lá só acontece no clique em Vincular "
                           "OS). Guarda só o número da OS: nem a descrição nem quem vinculou.",
     "decisao_setor": "Guarda cada decisão de pôr uma pessoa do Fracttal num setor (ou de tirá-la), tomada por um "
-                     "administrador na tela Integração Fracttal; a lista de setores fica no mesmo livro. O setor de cada "
+                     "administrador na aba Pessoas e setores de Base → Acessos; a lista de setores fica no mesmo livro. O setor de cada "
                      "pessoa é a última decisão dela, e as de antes contam quando ela mudou. Não guarda nome nem e-mail: "
                      "a pessoa vai pelo número do Fracttal e pela ficha do cadastro.",
     "decisao_dono_relatorio": "Guarda cada escolha do setor dono de um relatório da Central de emissão, feita por um "
@@ -196,6 +199,16 @@ PARA_QUE = {
     "decisao_atribuicao_pcm": "Guarda cada vez que o PCM põe ou tira um técnico de uma usina na tela Técnicos por "
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",
+    "saldo_almox": "Guarda, a cada varredura diária do App, quanto de cada peça há em cada almoxarifado do "
+                   "Fracttal e o mínimo cadastrado. É o histórico que o Fracttal não mostra: dá para ver quando "
+                   "uma peça ficou abaixo do mínimo e, mais adiante, prever a reposição. O dia sem varredura fica "
+                   "sem foto, sem inventar que nada mudou.",
+    "ciclo_varredura": "Guarda cada varredura do almoxarifado que o App fez: quantos itens o Fracttal listou, "
+                       "quantos foram lidos e se o Nexus aplicou o ciclo (só com 90% lidos). É por ele que se "
+                       "sabe se o saldo de um dia é confiável.",
+    "peca_lancada": "Guarda cada peça que o técnico lançou pelo App numa tarefa de OS, de qual almoxarifado e "
+                    "quanto, e as que o Fracttal recusou (com o motivo em poucas palavras). Liga a peça à tarefa "
+                    "fechada, para saber o que cada manutenção consumiu.",
     "decisao_tela_setor":"Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
                           "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "

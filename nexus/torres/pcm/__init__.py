@@ -14,7 +14,7 @@ O Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do 
 PCM essa visão de acompanhamento. O design quero alá Nexus [...] mas as estruturas quero sim que mantenha!"): as abas
 MPA, MPS, Radar de Backlog, Mapa e One Page, com as fontes do Nexus (`nexus/pcm/acompanhamento`), do setor PCM.
 """
-from ...pcm import acompanhamento
+from ...pcm import acompanhamento, almoxarifado
 from ...pcm.telas import registrar_pcm
 from ..modelo import Tela, Torre
 
@@ -70,9 +70,13 @@ TORRE = Torre(
         Tela("torre-de-controle", "Torre de controle",
              "Os controles do PCM estão em dia?",
              "Controles PCM"),
-        Tela("pecas", "Peças e sobressalentes",
-             "Tenho a peça crítica no cluster antes de abrir a OS?",
-             "Estoque por cluster (a definir)"),
+        # o Almoxarifado (25/10/2026, Levi: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse
+        # almoxarifado na parte de PCM"): o lugar que era o placeholder "Peças e sobressalentes", com o MESMO endereço
+        # (/t/pcm/pecas), para não mexer nas marcas de Base → Acessos (nexus/pcm/almoxarifado.py)
+        Tela("pecas", "Almoxarifado",
+             "Que peça está abaixo do mínimo ou no limite, em que almoxarifado, e o que saiu nas OS?",
+             "Fracttal (inventário), pela varredura diária do App de Campo",
+             do_setor="PCM"),
     ],
 )
 
@@ -80,3 +84,5 @@ bp = TORRE.criar_blueprint(__name__)
 registrar_pcm(bp)
 # o Acompanhamento do PCM (nexus/pcm/acompanhamento)
 acompanhamento.registrar(bp)
+# o Almoxarifado (nexus/pcm/almoxarifado.py)
+almoxarifado.registrar(bp)

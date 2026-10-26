@@ -14,7 +14,7 @@ from pg_falso import ApiPGFalsa, Resposta
 
 from nexus.campo import decisao_pt, ronda_avulsa
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
-from nexus.dados import fato_chamado, fato_tarefa_os, programacao
+from nexus.dados import fato_almoxarifado, fato_chamado, fato_tarefa_os, programacao
 from nexus.dados import telas as telas_dados
 
 BASE = "http://pg.falso"
@@ -39,8 +39,9 @@ def test_catalogo_declara_grao_estado_e_todas_as_dimensoes():
         assert all(p in catalogo.POR_ID and catalogo.POR_ID[p].estado not in ("parte", "aposentado")
                    for p in f.parte_de), f.id
     r = catalogo.resumo()
-    # a programação passou a gravar em 08/10 (decisão 7) e a geração em 11/10 (decisão 8): nada fica só montado
-    assert r["conformados"] >= 6 and r["montados"] == 0
+    # a programação passou a gravar em 08/10 (decisão 7) e a geração em 11/10 (decisão 8); os três do almoxarifado
+    # (25/10/2026) ficam montados até a NEXUS_ALMOX_GRAVAR ligar a gravação depois do ensaio com o 1º ciclo real do App
+    assert r["conformados"] >= 6 and r["montados"] == 3
     assert catalogo.POR_ID["geracao_usina_dia"].estado == catalogo.POR_ID["geracao_inversor_dia"].estado == "conformado"
     assert catalogo.POR_ID["programacao"].estado == "conformado"
     # a auditoria de 08/10: ronda e PT tinham o grão errado; checklist e avulsa viraram fonte do fato único de ronda
@@ -74,7 +75,8 @@ def test_todo_fato_declara_tipo_chave_e_medidas_com_unidade():
 CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt": fato_pt.CAB_PT,
         "programacao": programacao.CAB_PROGRAMACAO, "geracao_usina_dia": geracao.CAB_USINA_DIA,
         "geracao_inversor_dia": geracao.CAB_INVERSOR_DIA, "chamado": fato_chamado.CAB_CHAMADO,
-        "tarefa_os": fato_tarefa_os.CAB_TAREFA_OS}
+        "tarefa_os": fato_tarefa_os.CAB_TAREFA_OS, "saldo_almox": fato_almoxarifado.CAB_SALDO,
+        "ciclo_varredura": fato_almoxarifado.CAB_CICLO, "peca_lancada": fato_almoxarifado.CAB_PECA}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 
@@ -110,7 +112,7 @@ def test_livros_do_nexus_registrados_antes_de_existir_e_na_regra_10():
         assert l.abas and all(catalogo.aba_segue_a_regra(a) for a in l.abas), l.nome
     for nome in (carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO, equipamento.LIVRO_FOTO, programacao.LIVRO,
                  geracao.LIVRO, ronda_avulsa.LIVRO, decisao_pt.LIVRO, "nexus_rondas_checklist", fato_chamado.LIVRO,
-                 fato_tarefa_os.LIVRO):
+                 fato_tarefa_os.LIVRO, fato_almoxarifado.LIVRO):
         assert nome in catalogo.LIVRO_POR_NOME, nome
     assert ronda_avulsa.ABA in catalogo.LIVRO_POR_NOME[ronda_avulsa.LIVRO].abas
     assert equipamento.ABA_FOTO in catalogo.LIVRO_POR_NOME[equipamento.LIVRO_FOTO].abas
@@ -320,7 +322,7 @@ PCM = {"geradoEm": "2026-10-05T12:00:00Z", "semanas": [{"week": "2026-W41", "dat
        "geradaEm": "2026-10-04T20:00:00", "rows": [
            {"codigo": "THPN-PRM200-TRFR1", "os_id": "15500", "tarefa": "Inspeção do trafo", "dia": "Segunda-feira",
             "h_ini": "08:00", "usina": "Cliente Exemplo - Usina Exemplo 1 e 2 - PA", "cluster": "PR Oeste 01", "duracao": 1.5,
-            "resp_os": "Pessoa Inventada"},
+            "resp_os": "Pessoa Inventada", "status": "Não Iniciada"},   # o robô põe o status em toda linha
            {"foraDoPlano": True, "codigo": "THPN-PRM200-FORA9", "os_id": "15501", "tarefa": "x", "dia": "Terça-feira"}]}]}
 
 
@@ -716,3 +718,20 @@ def test_governanca_mostra_a_classificacao_1_de_outra_usina(app):
     assert "Cliente X - Oito - BA" in bloco and "Cliente X - Sete II - BA" in bloco and "CLX-STE200-NBRK1" in bloco
     assert "usina trocada" in bloco and "nome a conferir" in bloco and "16341" in bloco
     assert bloco.index("Cliente X - Oito - BA") < bloco.index("Thopen - Altair 1 - SP")     # a troca vem primeiro
+
+
+def test_carga_nao_troca_a_programacao_pelo_arquivo_degradado(banco):
+    """26/10/2026: o arquivo do PCM sem o status de nenhuma tarefa (a leitura do Fracttal falhou calada) não troca a
+    semana do banco; a carga diz quais semanas ficaram de fora."""
+    api, cfg = banco
+    _semana_velha(api)
+    from pathlib import Path
+    pcm = json.loads(Path(cfg["NEXUS_PCM_FONTE"]).read_text(encoding="utf-8"))
+    for s in pcm["semanas"]:
+        for r in s["rows"]:
+            r["status"] = r["status_bd"] = ""
+    Path(cfg["NEXUS_PCM_FONTE"]).write_text(json.dumps(pcm), encoding="utf-8")
+    r = carga.rodar(cfg, api, agora=datetime(2026, 10, 5, 15, 40, tzinfo=BRT))
+    assert r["programacao"]["semanas_degradadas"] == [20261005] and "degradado" in r["programacao"]["nao_grava"]
+    p = {x["data_id_semana"]: x for x in livros.ler(BASE, api, programacao.LIVRO, programacao.ABA)}
+    assert p[20261005]["os"] == "15499"                                 # a W41 do banco ficou

@@ -378,7 +378,7 @@ def quadro():
         else:
             d, erro = _ler_quadro(forcar, dono)
         ultimas, fins, erro_obs = f_obs.result()
-    q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins)
+    q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins, obs_lidas=not erro_obs)
     return render_template("acomp.html", conta=_conta(), aba="criar", q=q, quando=d.get("quando") or "", erro=erro,
                            erro_obs=erro_obs, equipe=aw.equipe()[1], renovando=por_tras)
 

@@ -118,6 +118,10 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 ## Acessos: quem é administrador (Base → Acessos, 11/10/2026)
 
+**Duas abas desde 25/10/2026:** Telas e administradores (o que está abaixo) e Pessoas e setores (a antiga Base →
+Integração Fracttal: o pessoal do Fracttal e o setor de cada um; regras em `nexus/cadastro/CLAUDE.md`). Só a segunda lê o
+Fracttal.
+
 Pedido de 11/10/2026, na véspera de o Nexus virar a porta principal: "Tem algum canto do Nexus onde eu posso administrar
 isso?". Até então administrador era só a `NEXUS_ADMINS` do `.env` do servidor (pôr ou tirar alguém = a T.I. editar e
 reiniciar) ou a senha de administrador. A tela `/t/base/acessos` (só administrador; quem não é vê a página "só para
@@ -266,7 +270,7 @@ cadeiras já que os setores irão substituir!". No mesmo dia ele voltou atrás n
 deixar como setores pois eu por exemplo sou da performance mas também sou administrador". A cadeira (o seletor do topo,
 que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O código: `nexus/auth/setor_telas.py` (regras e portão) e `telas_acessos.py` (a seção).
 
-- **O setor da pessoa** é o da tela Base → Integração Fracttal (`nexus/cadastro/setores.py`, livro `nexus_setores`). A
+- **O setor da pessoa** é o da tela Base → Acessos → Pessoas e setores (`nexus/cadastro/setores.py`, livro `nexus_setores`). A
   pessoa do login se acha pelo código do e-mail (`pessoa_hmac`, com a `NEXUS_PESSOA_HMAC`), o mesmo que a decisão de
   setor grava; nome e e-mail nunca vão ao banco (regra 8).
 - **A matriz** setor × tela mora no livro `nexus_setor_telas · fato_decisao_tela_setor` (catálogo: fato
@@ -322,7 +326,7 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
   de setor com elas pergunta antes), e o Salvar. Os números do topo ganharam "Setores" e "Entraram sem setor"; a
   lista de quem entrou e a de Administradores, a coluna Setor (pelo código do e-mail).
 - **Ao ligar num servidor** quem não tem setor passa a ver só a mensagem, e o setor sem telas marcadas, só o Início.
-  Antes de o código novo subir, ponha as pessoas nos setores (Integração Fracttal) e marque as telas de cada setor.
+  Antes de o código novo subir, ponha as pessoas nos setores (Acessos → Pessoas e setores) e marque as telas de cada setor.
 - **Prova:** `tests/test_setor_telas.py` (a matriz e o setor pela última decisão; o caminho segue a tela, a torre e o OS
   Creator; sem setor só a mensagem; o setor vê só o marcado, em página e dados, e fechar vale no clique seguinte; setor
   nenhum dá administrador e o administrador com setor vê tudo; banco fora não vira "sem setor"; desligado ou sem a chave,
@@ -347,7 +351,7 @@ pessoa abrir uma informação e analisar!". O código e as regras: `nexus/auth/p
   elas, a 1ª tela de cada torre primeiro. Enquanto a pessoa usa, repete a cada 2 min: a cópia que venceu é refeita por
   trás (com 4 min, a cópia de 5 min revista aos 4 vencia aos 5 e só seria refeita no clique de alguém).
 - **Fora:** administradores e quem não tem setor (pedido do Levi); as telas que leem o Fracttal ao abrir (`FORA`:
-  Confiabilidade, Quadro da equipe, Aprovação de OS e Integração Fracttal; a cota de 200/min é da empresa e o App vive
+  Confiabilidade, Quadro da equipe e Aprovação de OS; a cota de 200/min é da empresa e o App vive
   dela); o OS Creator; e as telas da plataforma na moldura (o peso é da plataforma, que tem pré-carga própria). Tela que
   leia o Fracttal na pré-carga assim mesmo é anotada pelo `campo.fracttal.marcar_pre_carga`, sai da volta até o Nexus
   reiniciar e o log pede para pô-la na `FORA` (regra em `nexus/torres/CLAUDE.md`).

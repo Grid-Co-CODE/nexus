@@ -1,4 +1,4 @@
-"""O pessoal do Fracttal ligado ao cadastro de pessoas do Nexus (Base > Integração Fracttal; 12/10/2026, Levi: "Temos a
+"""O pessoal do Fracttal ligado ao cadastro de pessoas do Nexus (Base > Acessos > Pessoas e setores; 12/10/2026, Levi: "Temos a
 relação do time de campo, precisamos da relação do pessoal do fractall e também posteriormente vamos precisar relacionar
 os setores, mas não tenho uma base em mãos agora para setores").
 

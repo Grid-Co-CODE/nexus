@@ -26,7 +26,8 @@ from datetime import datetime
 
 from flask import abort, current_app, render_template, request, session, url_for
 
-from . import carga, catalogo, equipamento, explica, fato_tarefa_os, historico, livros, previa, programacao, radar
+from . import carga, catalogo, equipamento, explica, fato_almoxarifado, fato_tarefa_os, historico, livros, previa
+from . import programacao, radar
 
 _CACHE = {"t": 0.0, "v": None}
 TTL_S = 300
@@ -52,6 +53,8 @@ def _ultima_qualidade():
         # as tarefas das OS do Fracttal também (18/10/2026, `nexus_os`, gravado pelo laço do Campo); livro que ainda
         # não existe volta vazio
         q.update({l.get("fato"): l for l in livros.ler(base, s, fato_tarefa_os.LIVRO, "qualidade")})
+        # o almoxarifado do PCM (25/10/2026, `nexus_almoxarifado`): o saldo, os ciclos e as peças lançadas
+        q.update({l.get("fato"): l for l in livros.ler(base, s, fato_almoxarifado.LIVRO, "qualidade")})
         at = next(iter(livros.ler(base, s, carga.LIVRO_FATOS, "atualizacao")), {})
         hq = livros.ler(base, s, carga.LIVRO_DIM, historico.ABA_QUALIDADE)
         eq = {(l.get("grupo"), l.get("item")): l for l in livros.ler(base, s, equipamento.LIVRO, "qualidade")}

@@ -7,7 +7,7 @@ responsável'. E aí eu teria essas visões do menu onde eu marcaria o que cada 
 substituir!"
 
 As regras:
-- O setor da pessoa é o da tela Base → Integração Fracttal (`cadastro/setores.py`): a última decisão de cada pessoa do
+- O setor da pessoa é o da tela Base → Acessos → Pessoas e setores (`cadastro/setores.py`): a última decisão de cada pessoa do
   Fracttal. A pessoa do login se acha pelo código do e-mail (`pessoa_hmac`, com a NEXUS_PESSOA_HMAC), o mesmo que a
   decisão grava. Nome e e-mail nunca vão ao banco (regra 8 da governança).
 - Administrador do Nexus (a NEXUS_ADMINS, a lista de Administradores desta tela e a senha de administrador) vê tudo,

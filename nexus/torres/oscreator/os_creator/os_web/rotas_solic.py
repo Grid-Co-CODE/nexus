@@ -247,34 +247,6 @@ def _ficha(s: dict, idx: dict, agora) -> dict:
 
 
 # ── criar a solicitação ──────────────────────────────────────────────────────────────────────
-def _sugestao(assets) -> dict:
-    """A Nova solicitação aberta pela OS do Quadro da equipe da Engenharia (Levi, 24/10/2026: "um botão de 'Solicitar OS'
-    que já vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo mas sai como aquela OS como OS
-    pai"): `?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>`. O ativo que o catálogo não tem e a OS pai torta ficam de fora
-    (o criar recusa a torta de qualquer jeito); sem nada no endereço, a tela abre como sempre."""
-    onde = trad.onde_do_ativo(assets, request.args.get("ativo"))
-    pai = str(request.args.get("os_pai") or "").strip()
-    folio = str(request.args.get("os_pai_folio") or "").strip()
-    ok_pai = pai.isdigit() and folio.isdigit()
-    return {"cliente": onde["cliente"] if onde else "", "usina": onde["usina"] if onde else "",
-            "ativo": onde["code"] if onde else "", "os_pai": pai if ok_pai else "", "os_pai_folio": folio if ok_pai else "",
-            "data": _data_sugerida(request.args.get("data"))}
-
-
-def _data_sugerida(texto) -> str:
-    """A data do incidente da OS pai (Levi, 24/10/2026: "a data do incidente deve ser a mesma da OS pai"), no formato do
-    campo (`AAAA-MM-DDTHH:MM`, Brasília). Torta ou no futuro fica de fora (o incidente não aceita futuro): o campo
-    começa em agora, como sempre."""
-    s = str(texto or "").strip()
-    try:
-        quando = trad.data_brt(s)
-    except ValueError:
-        return ""
-    if len(s) != 16 or quando > trad.agora_brt():
-        return ""
-    return s
-
-
 @bp.route("/solicitacao")
 @exige_sessao
 def solicitacao():
@@ -296,7 +268,7 @@ def solicitacao():
         "solic.html", conta=_conta(), aba="solic", clientes=trad.clientes(assets),
         todos_cliente=trad.TODOS_CLIENTE, todos_usina=trad.TODOS_USINA, todos_tipo=trad.TODOS_TIPO,
         grupos=tipos.get("grupo") or [], c1=tipos.get("classif1") or [], c2=tipos.get("classif2") or [],
-        temas=sw.temas_para_tela(), pessoas=pessoas, sugestao=_sugestao(assets),
+        temas=sw.temas_para_tela(), pessoas=pessoas, sugestao=trad.sugestao(assets, request.args),
         agora=agora.strftime("%Y-%m-%dT%H:%M"),
         # +2 dias: o mesmo default da data sugerida no app (`SolicitacaoTab.reset`)
         sugerida=(agora.replace(hour=8, minute=0) + dt.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"))

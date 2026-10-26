@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block titulo %}Investigar ativo{% endblock %}
+{% block body_class %}os-form{% endblock %}
+{% block head %}<link rel="stylesheet" href="/os/static/investigar.css">{% endblock %}
+{# O "Investigar ativo" do Tempo real (Levi, 26/10/2026): o histórico de OS de UM ativo, na janela por cima da tela
+   (rotas_investigar.py). A lista é a do Histórico (a de "Todos" da Visão COS); o período re-lê no servidor (dentro dos 30
+   dias já carregados, só recorta), e o resto é local, sobre as linhas da usina que vieram: este ativo × a usina inteira,
+   status, tipo de tarefa e a busca. O nº abre o mesmo card do Histórico. #}
+{% macro multi(nome, rotulo, todos, opcoes) -%}
+<span class="hf-lbl">{{ rotulo }}</span>
+<details class="os-multi hf-multi" data-nome="{{ nome }}" data-local="1">
+  <summary><span class="os-multi-txt" data-todos="{{ todos }}">{{ todos }}</span></summary>
+  <div class="os-multi-lista">
+    {% for o in opcoes %}<label><input type="checkbox" value="{{ o }}"> {{ o }}</label>{% else %}<span class="iv-vazio-op">Nenhuma opção no período.</span>{% endfor %}
+  </div>
+</details>
+{%- endmacro %}
+{% block conteudo %}
+<section class="os-pagina iv">
+  <header class="iv-cab">
+    <div class="iv-kicker">Investigar ativo</div>
+    <h1 class="iv-titulo">{{ ativo.nome or rotulo or 'Ativo sem nome' }}</h1>
+    <div class="iv-sub">
+      {% if ativo.code %}<span class="iv-cod" title="Código do ativo no Fracttal">{{ ativo.code }}</span>{% endif %}
+      {% if ativo.usina_curta %}<span>{{ ativo.usina_curta }}</span>{% endif %}
+      {% if ativo.cliente %}<span class="iv-mudo">{{ ativo.cliente }}</span>{% endif %}
+      {% if ativo.como == 'codigo' %}<span class="iv-mudo" title="O código que a plataforma mandou (o gravado no de-para, ou o derivado do nome) está no catálogo de ativos">pelo código da plataforma</span>
+      {% elif ativo.como == 'nome' %}<span class="iv-mudo">achado pelo nome na usina</span>{% endif %}
+    </div>
+    {% if ativo.aviso %}<p class="iv-aviso" role="status">{{ ativo.aviso }}</p>{% endif %}
+  </header>
+
+  <form id="f_iv" method="get" action="/os/historico/ativo" autocomplete="off">
+    <input type="hidden" name="codigo" value="{{ codigo_pedido }}">
+    <input type="hidden" name="usina" value="{{ usina_pedida }}">
+    <input type="hidden" name="nome" value="{{ nome_pedido }}">
+    <input type="hidden" name="rotulo" value="{{ rotulo }}">
+    <input type="hidden" name="escopo" id="iv_escopo" value="{{ escopo }}">
+    <input type="hidden" name="atualizar" id="iv_atualizar" value="">
+    {% if janela %}<input type="hidden" name="janela" value="1">{% endif %}
+    <div class="iv-barra">
+      <div class="os-seg iv-seg" role="group" aria-label="O que mostrar">
+        <button type="button" data-escopo="ativo" class="{% if escopo == 'ativo' %}on{% endif %}"{% if not ativo.code %} disabled title="Não achei o ativo no catálogo"{% endif %}>Este ativo <b>{{ n_ativo }}</b></button>
+        <button type="button" data-escopo="usina" class="{% if escopo == 'usina' %}on{% endif %}"{% if not ativo.usina_curta %} disabled{% endif %} title="As OS de qualquer ativo da usina, inclusive as da usina inteira (religamento, queda de energia)">A usina inteira <b>{{ n_usina }}</b></button>
+      </div>
+      <div class="hf-cel iv-per"><span class="hf-lbl">Período (criação da OS)</span>
+        <div class="hf-periodo"><input type="date" name="de" value="{{ de }}" aria-label="De"><span>até</span><input type="date" name="ate" value="{{ ate }}" aria-label="Até"></div></div>
+      <button type="submit" class="os-btn secondary os-btn-ico iv-atualizar" id="iv_b_atualizar" title="Atualizar: busca de novo no Fracttal">&#8635;</button>
+    </div>
+    <div class="hf-grade iv-grade">
+      <div class="hf-cel">{{ multi('status', 'Status', 'Todos os status', status_opts) }}</div>
+      <div class="hf-cel">{{ multi('tarefa', 'Tipo de tarefa', 'Todos os tipos de tarefa', tipos_tarefa) }}</div>
+      <label class="hf-cel iv-busca"><span class="hf-lbl">Buscar</span>
+        <span class="hf-filtro">{{ icone('search', '#8A93A8', 15) }}<input type="search" id="iv_busca" placeholder="nº, descrição, etiqueta, status…" aria-label="Buscar nas OS da janela"></span></label>
+    </div>
+  </form>
+
+  <p class="iv-periodo"><span id="iv_hint">{{ n_ativo if escopo == 'ativo' else n_usina }} OS {{ 'deste ativo' if escopo == 'ativo' else 'da usina' }}</span>
+    · período <b>{{ fmt(de + 'T03:00:00', False) }}</b> a <b>{{ fmt(ate + 'T03:00:00', False) }}</b>
+    {% if lista_de %}<span class="iv-mudo" title="A lista se renova sozinha a cada poucos minutos; o ↻ busca no Fracttal na hora"> · lista das {{ lista_de }}</span>{% endif %}</p>
+  {% if aviso_periodo %}<p class="iv-nota">{{ aviso_periodo }}</p>{% endif %}
+  {% if not carregada %}<p class="iv-nota">O período sai dos {{ dias_padrao }} dias já carregados: estas OS vieram da lista deste período no Fracttal (a de todos, guardada para quem vier depois).</p>{% endif %}
+  {% if cortadas %}<p class="hf-teto">O período tem {{ total_srv }} OS e a lista carrega até {{ teto }}: as {{ cortadas }} mais antigas ficaram de fora, e alguma deste ativo pode estar entre elas. Diminua o período para ver todas.</p>{% endif %}
+  {% if erro %}<p class="os-erro">{{ erro }}</p>{% endif %}
+
+  <div class="os-tbl-wrap">
+    <table class="os-tbl os-hist iv-tab" id="iv_tab">
+      <thead><tr>{% for rot, chave in cols %}<th class="k-{{ chave }}">{{ rot }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for l in linhas %}
+      <tr data-id="{{ l.id }}" data-ativo="{{ '1' if l._do_ativo else '0' }}" data-status="{{ l.status }}" data-tarefa="{{ l.tipo_tarefa or '' }}" data-texto="{{ l._texto }}"{% if escopo == 'ativo' and not l._do_ativo %} hidden{% endif %}>
+        {% for rot, chave in cols %}
+        {% if chave == 'folio' %}<td class="k-folio"><a class="os-folio" href="/os/os/{{ l.id }}?status={{ l.status|urlencode }}">{{ l.folio }}</a></td>
+        {% elif chave == 'status' %}<td class="k-status">{% if l.status %}<span class="os-status" {% if l._status_cor %}style="color:{{ l._status_cor }};background:{{ l._status_cor }}29;border-color:{{ l._status_cor }}6b"{% endif %}>{{ l.status }}</span>{% endif %}</td>
+        {% elif chave == 'etiqueta' %}<td class="k-etiqueta">{{ l._etiqueta }}</td>
+        {% elif chave == 'descricao' %}<td class="c-desc k-descricao">{{ l.descricao }}</td>
+        {% elif chave == 'ativo' %}<td class="k-ativo" title="{{ l.ativo }}">{{ l._ativo_curto or l.ativo or '—' }}</td>
+        {% elif chave in datas %}<td class="c-data k-{{ chave }}">{{ fmt(l[chave]) if l.get(chave) else '—' }}</td>
+        {% else %}<td class="k-{{ chave }}">{{ l.get(chave) or '—' }}</td>{% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      <tr class="vazio" id="iv_vazio"{% if (n_ativo if escopo == 'ativo' else n_usina) %} hidden{% endif %}><td colspan="{{ cols|length }}">Nenhuma OS {{ 'deste ativo' if escopo == 'ativo' else 'da usina' }} no período.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="os-modal" id="os_card" hidden>
+  <div class="os-modal-fundo" data-fechar></div>
+  <div class="os-modal-card os-form" role="dialog" aria-modal="true" aria-label="Detalhe da OS">
+    <button type="button" class="os-modal-x" data-fechar aria-label="Fechar">&times;</button>
+    <div class="os-modal-corpo" id="os_card_corpo"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/os/static/os_acoes.js"></script>
+<script>
+(function () {
+  // ── o card da OS (o mesmo do Histórico: as ações moram no os_acoes.js) ──
+  var modal = document.getElementById("os_card"), corpo = document.getElementById("os_card_corpo");
+  function abrir(url) {
+    corpo.innerHTML = '<p class="os-ajuda" style="padding:24px">Carregando a OS…</p>';
+    modal.hidden = false; document.body.classList.add("os-modal-aberto");
+    var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    OsCarga.buscar(url + sep + "parcial=1", {headers: {"X-Requested-With": "fetch"}, credentials: "same-origin"}, "Abrindo a OS…")
+      .then(function (r) { return r.text(); })
+      .then(function (h) {
+        corpo.innerHTML = h; corpo.scrollTop = 0;
+        var det = corpo.querySelector(".det");
+        if (window.OsAcoes && det) window.OsAcoes.contagem(det);
+      })
+      .catch(function () { corpo.innerHTML = '<p class="os-erro" style="padding:24px">Não consegui carregar a OS aqui.</p>'; });
+  }
+  // a ação que mudou a OS (concluir, cancelar, responsável, etiquetas, nota) deixa a linha velha: ao fechar, relê
+  var mudou = false;
+  document.addEventListener("os:alterada", function () { mudou = true; });
+  function fechar() {
+    modal.hidden = true; corpo.innerHTML = ""; document.body.classList.remove("os-modal-aberto");
+    if (mudou) { mudou = false; enviar(true); }
+  }
+  document.querySelectorAll("#iv_tab a.os-folio").forEach(function (a) {
+    a.addEventListener("click", function (e) { e.preventDefault(); abrir(a.getAttribute("href")); });
+  });
+  modal.addEventListener("click", function (e) { if (e.target.hasAttribute("data-fechar")) fechar(); });
+  // com o card aberto, o Esc é dele; sem card, o Esc vai à tela de baixo (a janela do Tempo real fecha com ele)
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!modal.hidden) { fechar(); return; }
+    if (document.querySelector(".os-multi[open]")) return;          // o Esc da lista aberta é dela (os_busca.js)
+    try { if (window.parent !== window) window.parent.postMessage({gc: "depara-fechar"}, location.origin); } catch (x) {}
+  });
+
+  // ── o período re-lê no servidor (dentro dos 30 dias carregados, só recorta) ──
+  var form = document.getElementById("f_iv");
+  function enviar(forcar) {
+    document.getElementById("iv_atualizar").value = forcar ? "1" : "";
+    var t = window.OsCarga ? window.OsCarga.token() : "";
+    var p = form.querySelector("input[name=p]");
+    if (t) {
+      if (!p) { p = document.createElement("input"); p.type = "hidden"; p.name = "p"; form.appendChild(p); }
+      p.value = t; window.OsCarga.mostrar(t);
+    }
+    form.submit();
+  }
+  form.addEventListener("submit", function (e) { e.preventDefault(); enviar(document.getElementById("iv_atualizar").value === "1"); });
+  document.getElementById("iv_b_atualizar").addEventListener("click", function () { document.getElementById("iv_atualizar").value = "1"; });
+  var tPer;
+  form.querySelectorAll("input[name=de], input[name=ate]").forEach(function (i) {
+    i.addEventListener("change", function () {
+      clearTimeout(tPer);
+      tPer = setTimeout(function () {                       // espera a data terminar de ser digitada
+        var de = form.querySelector("input[name=de]").value, ate = form.querySelector("input[name=ate]").value;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(de) && /^\d{4}-\d{2}-\d{2}$/.test(ate) && de <= ate) enviar(false);
+      }, 700);
+    });
+  });
+
+  // ── os filtros locais: este ativo × a usina inteira, status, tipo de tarefa e a busca ──
+  var linhas = Array.prototype.slice.call(document.querySelectorAll("#iv_tab tbody tr[data-id]"));
+  var hint = document.getElementById("iv_hint"), vazio = document.getElementById("iv_vazio");
+  var escopo = document.getElementById("iv_escopo");
+  function marcados(nome) {
+    var out = [];
+    document.querySelectorAll('.os-multi[data-nome="' + nome + '"] input:checked').forEach(function (c) { out.push(c.value); });
+    return out;
+  }
+  function resumo(det) {
+    var txt = det.querySelector(".os-multi-txt"), sel = [];
+    det.querySelectorAll("input[type=checkbox]:checked").forEach(function (c) { sel.push(c.value); });
+    txt.textContent = sel.length === 0 ? txt.getAttribute("data-todos") : (sel.length === 1 ? sel[0] : sel.length + " selecionados");
+  }
+  function aplica() {
+    var soAtivo = escopo.value === "ativo", stats = marcados("status"), tars = marcados("tarefa");
+    var no = (document.getElementById("iv_busca").value || "").trim().toLowerCase(), n = 0, base = 0;
+    linhas.forEach(function (tr) {
+      var d = tr.dataset, tarefas = (d.tarefa || "").split(" / ");
+      var noEscopo = !soAtivo || d.ativo === "1";
+      if (noEscopo) base++;
+      var ok = noEscopo && (!stats.length || stats.indexOf(d.status) >= 0)
+            && (!tars.length || tarefas.some(function (t) { return tars.indexOf(t) >= 0; }))
+            && (!no || (d.texto + " " + (d.tarefa || "").toLowerCase()).indexOf(no) >= 0);
+      tr.hidden = !ok; if (ok) n++;
+    });
+    var quem = soAtivo ? "deste ativo" : "da usina";
+    hint.textContent = n + " OS " + quem + (n !== base ? " (de " + base + ")" : "");
+    vazio.hidden = n > 0;
+    vazio.firstElementChild.textContent = base ? "Nenhuma OS " + quem + " com estes filtros." : "Nenhuma OS " + quem + " no período.";
+  }
+  document.querySelectorAll(".iv-seg [data-escopo]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (b.disabled) return;
+      escopo.value = b.getAttribute("data-escopo");
+      document.querySelectorAll(".iv-seg [data-escopo]").forEach(function (x) { x.classList.toggle("on", x === b); });
+      aplica();
+    });
+  });
+  document.querySelectorAll(".os-multi[data-local] input").forEach(function (c) {
+    c.addEventListener("change", function () { resumo(c.closest(".os-multi")); aplica(); });
+  });
+  document.addEventListener("click", function (e) {                 // fecha o combo aberto ao clicar fora
+    document.querySelectorAll(".os-multi[open]").forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
+  });
+  var tmr; document.getElementById("iv_busca").addEventListener("input", function () { clearTimeout(tmr); tmr = setTimeout(aplica, 200); });
+  document.getElementById("iv_busca").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); aplica(); } });
+  aplica();
+})();
+</script>
+{% endblock %}

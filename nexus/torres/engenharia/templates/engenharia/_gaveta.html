@@ -12,7 +12,7 @@
     <input type="hidden" name="cod" value="{{ cod }}">{% if livre %}<input type="hidden" name="livre" value="1">{% endif %}
     <select name="para" class="gc-campo" required aria-label="Para quem da Engenharia"><option value="">Escolha a pessoa</option>{% for p in pessoas if p.hmac != atual %}<option value="{{ p.hmac }}">{{ p.nome }}{% if meu and p.hmac == meu %} (você){% endif %}</option>{% endfor %}</select>
     <button type="submit" class="gc-btn gc-btn--primario">Encaminhar</button>
-  </form>{% else %}<p class="mudo eg-encaminhar-vazio">Ninguém do setor Engenharia para receber agora (o setor de cada pessoa fica em Base → Integração Fracttal).</p>{% endif %}
+  </form>{% else %}<p class="mudo eg-encaminhar-vazio">Ninguém do setor Engenharia para receber agora (o setor de cada pessoa fica em Base → Acessos → Pessoas e setores).</p>{% endif %}
 </details>{% endmacro %}
 {% macro comentarios(lista) %}<ol class="eg-acomp-tl">{% for c in lista %}<li><span class="q">{{ c.quando_txt }} · {{ c.nome or '—' }}</span>{{ c.texto }}</li>{% else %}<li class="mudo">Nenhum comentário ainda.</li>{% endfor %}</ol>{% endmacro %}
 <div class="eg-gav-cab">{% for k, rot, cor in niveis if k == a.get('nivel') %}<span class="eg-pill eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}<div><h2>{{ a.get('nome') or a.get('cod') }}</h2><p><code>{{ a.get('cod') }}</code>{% if a.get('usina') %} · {{ a.usina }}{% if a.get('uf') %} - {{ a.uf }}{% endif %}{% endif %}{% if a.get('cliente') %} · {{ a.cliente }}{% endif %}</p></div></div>

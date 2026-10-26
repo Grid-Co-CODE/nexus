@@ -48,7 +48,7 @@ Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenç
 supervisor responsável"; Levi escolheu mandar pelo App de Campo, que já manda e-mail. Toda segunda depois das 07:00 de
 Brasília o Nexus monta o e-mail de cada destinatário com as mesmas contas da Mesa (`_pendencias(fl)`) e publica uma
 linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou.
-- **Quem recebe:** a TST (as pessoas do setor Segurança em Base → Integração Fracttal, pelo código do e-mail) com todas
+- **Quem recebe:** a TST (as pessoas do setor Segurança em Base → Acessos → Pessoas e setores, pelo código do e-mail) com todas
   as usinas, e cada Responsável UFV com pendência, só com as usinas dele, pelo código do usuário do Fracttal ligado a ele
   ou, sem ele, do e-mail da ficha (`destinatarios`). Sem código, não recebe: a prévia lista quem ficou de fora (medido
   no banco real em 24/10: 1 da TST e 5 responsáveis recebem, 2 responsáveis sem código).

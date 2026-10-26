@@ -1,5 +1,6 @@
-"""Tela Base > Integração Fracttal (12/10/2026): o pessoal do Fracttal ligado ao cadastro de pessoas do Nexus, e o setor
-de cada pessoa. As regras estão em `fracttal_pessoal.py` (a ligação) e `setores.py` (o setor, no banco). Só
+"""Base > Acessos, aba Pessoas e setores (era a tela Base > Integração Fracttal, de 12/10/2026 até 25/10/2026: Levi,
+"gostaria que não tivesse uma tela só para integração fractall e sim fosse para acessos"): o pessoal do Fracttal ligado
+ao cadastro de pessoas do Nexus, e o setor de cada pessoa. O endereço antigo (/t/base/fracttal) leva à aba. As regras estão em `fracttal_pessoal.py` (a ligação) e `setores.py` (o setor, no banco). Só
 administrador: a tela tem o nome e o e-mail de todo o pessoal do Fracttal e grava no banco.
 
 Gravar (o setor de uma pessoa, o das marcadas e a lista de setores) é POST da própria página (`_de_outro_site`, a mesma
@@ -8,6 +9,8 @@ não recarrega a página (Levi atribui setor numa lista de 150: recarregar perdi
 marcadas e na lista de setores, o formulário volta por 303 à mesma lista, com os filtros e o aviso.
 """
 import logging
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode
 
@@ -22,6 +25,12 @@ _BRT = timezone(timedelta(hours=-3))
 LIGACOES = (("", "Todas"), ("ligadas", "Com ficha no Nexus"), ("sem_ficha", "Sem ficha no Nexus"))
 FILTROS = ("q", "ligacao", "acesso", "origem", "setor", "todas_fichas")     # o que a volta leva, e nada além
 _CHAVE_AVISO = "fracttal_aviso"
+# O Fracttal ligado às fichas, guardado para a tela (25/10/2026, Levi: "cada pesquisa faz um carregamento novo na tabela
+# que já está carregada"): a 1ª abertura fria levava ~2,4 s (o cadastro de pessoas e as equipes do banco, as fichas
+# decifradas; no servidor, mais o Fracttal). Fresco, a cópia; vencido, a cópia na hora e a releitura por trás, uma por vez.
+RELACAO_S = 120
+_TELA: dict = {"g": None, "renovando": False}
+_TELA_TRAVA = threading.Lock()
 
 
 def _meu_email() -> str:
@@ -30,8 +39,8 @@ def _meu_email() -> str:
 
 
 def _sem_permissao():
-    return render_template("cadastro/sem_permissao.html", titulo="Integração Fracttal", eyebrow="Base · Integração Fracttal",
-                           area="A Integração Fracttal", email=_meu_email()), 403
+    return render_template("cadastro/sem_permissao.html", titulo="Acessos", eyebrow="Base · Acessos",
+                           area="A tela Acessos", email=_meu_email()), 403
 
 
 def _de_outro_site() -> bool:
@@ -41,8 +50,48 @@ def _de_outro_site() -> bool:
 
 def _volta(qs: str = "", ancora: str = "") -> str:
     """A mesma lista, com os filtros de antes: só os conhecidos (nunca um endereço vindo do formulário)."""
-    pares = [(k, v[:120]) for k, v in parse_qsl(qs or "") if k in FILTROS]
-    return url_for("torre_base.fracttal") + ("?" + urlencode(pares) if pares else "") + (f"#{ancora}" if ancora else "")
+    pares = [("aba", "pessoas")] + [(k, v[:120]) for k, v in parse_qsl(qs or "") if k in FILTROS]
+    return url_for("torre_base.acessos") + "?" + urlencode(pares) + (f"#{ancora}" if ancora else "")
+
+
+def _dados(cfg, reler: bool = False) -> tuple:
+    """(lido, rel, erro do cadastro): fresco (RELACAO_S), a cópia; vencido, a cópia na hora e a releitura numa thread;
+    sem cópia (ou o "Ler o Fracttal de novo"), lê agora."""
+    with _TELA_TRAVA:
+        g = _TELA["g"]
+        if g and not reler:
+            if time.time() - g["t"] >= RELACAO_S and not _TELA["renovando"]:
+                _TELA["renovando"] = True
+                threading.Thread(target=_renovar, args=(current_app._get_current_object(),),
+                                 name="nexus-pessoas-fracttal", daemon=True).start()
+            return g["lido"], g["rel"], g["erro"]
+    return _ler_agora(cfg, reler)
+
+
+def _ler_agora(cfg, reler: bool) -> tuple:
+    lido = FP.ler_pessoal(forcar=reler)
+    rel, erro_cadastro = _relacao(cfg, lido)
+    if lido["pessoas"] and not erro_cadastro and not lido.get("erro"):     # só a leitura boa fica guardada
+        with _TELA_TRAVA:
+            _TELA["g"] = {"t": time.time(), "lido": lido, "rel": rel, "erro": erro_cadastro}
+    return lido, rel, erro_cadastro
+
+
+def _renovar(app) -> None:
+    try:
+        with app.app_context():
+            _ler_agora(app.config, False)
+    except Exception as ex:      # noqa: BLE001 — fica a cópia; a próxima visita vencida tenta de novo
+        log.warning("Pessoas e setores: a releitura por trás falhou (%s: %s).", type(ex).__name__, ex)
+    finally:
+        with _TELA_TRAVA:
+            _TELA["renovando"] = False
+
+
+def esquecer() -> None:
+    """Tira a cópia da tela (os testes)."""
+    with _TELA_TRAVA:
+        _TELA.update(g=None, renovando=False)
 
 
 def _relacao(cfg, lido: dict) -> tuple[dict, str]:
@@ -69,9 +118,11 @@ def _ler_setores(forcar: bool = False) -> dict:
 
 
 def contexto(cfg, args) -> dict:
+    """A aba Pessoas e setores. Vão TODAS as linhas à página (o filtro é na própria página, `filtro-local.js`: 25/10/2026,
+    "cada pesquisa faz um carregamento novo"); as que os filtros do endereço tiram chegam escondidas (`visiveis`)."""
     reler = args.get("reler") == "1"
-    lido = FP.ler_pessoal(forcar=reler)
-    rel, erro_cadastro = _relacao(cfg, lido)
+    lido, rel, erro_cadastro = _dados(cfg, reler)
+    rel = dict(rel, linhas=[dict(x) for x in rel["linhas"]])          # a cópia guardada não recebe o setor de agora
     st = _ler_setores(forcar=reler)
     vig = S.vigentes(st["decisoes"])
     nome_setor = {s["setor_id"]: s["nome"] for s in st["setores"]}
@@ -79,6 +130,8 @@ def contexto(cfg, args) -> dict:
     for x in rel["linhas"]:
         sid = vig.get(x["id"])
         x["setor_id"], x["setor"] = sid, (nome_setor.get(sid) or f"setor {sid}") if sid else ""
+        x["busca_base"] = FP._norm(" ".join((x["nome"], x["email"], x["equipe"])))
+        x["busca"] = FP._norm(" ".join((x["nome"], x["email"], x["equipe"], x["setor"])))
         if sid:
             n_setor[sid] = n_setor.get(sid, 0) + 1
     setores = [dict(s, n=n_setor.get(s["setor_id"], 0)) for s in S.ativos(st["setores"])]
@@ -88,7 +141,7 @@ def contexto(cfg, args) -> dict:
     acesso = args.get("acesso") if args.get("acesso") in acessos else ""
     origem = args.get("origem") if args.get("origem") in FP.ORIGENS else ""
     setor = args.get("setor") if args.get("setor") in ({"sem"} | {str(s["setor_id"]) for s in setores}) else ""
-    linhas = FP.filtrar(rel["linhas"], q, ligacao, acesso, origem, setor)
+    visiveis = {x["id"] for x in FP.filtrar(rel["linhas"], q, ligacao, acesso, origem, setor)}
     sem_ficha = [x for x in rel["linhas"] if not x["ficha"]]
     lido_em = datetime.fromtimestamp(lido["lido_em"], _BRT).strftime("%d/%m às %H:%M") if lido.get("lido_em") else ""
     so_ativas = args.get("todas_fichas") != "1"
@@ -96,7 +149,8 @@ def contexto(cfg, args) -> dict:
     filtros = {"q": q, "ligacao": ligacao, "acesso": acesso, "origem": origem, "setor": setor,
                "todas_fichas": "" if so_ativas else "1"}
     aviso = session.pop(_CHAVE_AVISO, None)
-    return {"rel": rel, "linhas": linhas, "total": len(lido["pessoas"]), "erro": lido.get("erro") or "",
+    return {"rel": rel, "linhas": rel["linhas"], "visiveis": visiveis, "total": len(lido["pessoas"]),
+            "erro": lido.get("erro") or "",
             "erro_cadastro": erro_cadastro,
             "velha": lido.get("velha", False), "lido_em": lido_em, "sem_chave": not cfg.get("NEXUS_CHAVE_CADASTRO"),
             "q": q, "ligacao": ligacao, "ligacoes": LIGACOES, "acesso": acesso, "acessos": acessos,
@@ -198,12 +252,13 @@ def _gravar_lista():
 
 
 def registrar_fracttal(bp) -> None:
-    """Pendura a tela na torre Base (`/t/base/fracttal`), vencendo o placeholder, e os dois POST do setor."""
+    """O endereço antigo da tela (`/t/base/fracttal`) leva à aba Pessoas e setores de Acessos, com os filtros; e os dois
+    POST do setor."""
     @bp.route("/fracttal")
     def fracttal():
-        if not session.get("admin"):
-            return _sem_permissao()
-        return render_template("cadastro/fracttal.html", **contexto(current_app.config, request.args))
+        pares = [("aba", "pessoas")] + [(k, v[:120]) for k, v in request.args.items(multi=True)
+                                         if k in FILTROS + ("reler",)]
+        return redirect(url_for("torre_base.acessos") + "?" + urlencode(pares))
 
     @bp.route("/fracttal/setor", methods=["POST"])
     def fracttal_setor():

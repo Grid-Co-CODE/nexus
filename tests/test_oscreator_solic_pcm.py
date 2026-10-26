@@ -575,7 +575,7 @@ def test_a_regra_do_nexus_setor_pcm_ou_administrador(app, setor_de_mentira):
         setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
         a = ponte.area_pcm()
         assert a["pode"] is False and "Você está no setor Performance." in a["aviso"]
-        assert "setor PCM e dos administradores" in a["aviso"] and "Base → Integração Fracttal" in a["aviso"]
+        assert "setor PCM e dos administradores" in a["aviso"] and "Base → Acessos → Pessoas e setores" in a["aviso"]
         setor_de_mentira["valor"] = None
         assert "Você está sem setor no Nexus." in ponte.area_pcm()["aviso"]
         setor_de_mentira["valor"] = RuntimeError("setores ilegíveis no banco")

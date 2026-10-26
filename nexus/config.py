@@ -37,6 +37,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_SSO_CHAVE",
              # camada de dados (05/10/2026): a carga de hora em hora liga onde há o token de escrita; "0" desliga
              "NEXUS_CARGA_DADOS",
+             # o histórico do almoxarifado (25/10/2026): "1" liga a gravação; sem ela a carga só mede (Levi: o Nexus sobe
+             # antes do App, em ensaio, e a gravação liga depois do ensaio com o 1º ciclo real)
+             "NEXUS_ALMOX_GRAVAR",
              # os chamados de garantia no banco (12/10/2026, nexus/campo/chamados_acompanhamento.py): "0" desliga numa máquina
              "NEXUS_CHAMADOS_PUBLICAR",
              # as tarefas das OS do Fracttal no banco (18/10/2026, nexus/campo/tarefas_os.py): "0" desliga numa máquina

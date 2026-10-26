@@ -21,8 +21,8 @@
       <a href="{{ url_for('torre_hseq.mesa_email', ver='tst')|na_raiz }}"{% if ver == 'tst' %} aria-current="page"{% endif %}>TST · {{ d.n_tst }} {{ 'pessoa' if d.n_tst == 1 else 'pessoas' }}</a>
       {% for x in resp %}<a href="{{ url_for('torre_hseq.mesa_email', ver=x.pessoa_id)|na_raiz }}"{% if ver == x.pessoa_id|string %} aria-current="page"{% endif %}>{{ x.nome }}</a>{% endfor %}
     </div>
-    {% if d.sem_codigo %}<p class="hs-dlg-nota"><b>Sem e-mail ligado ({{ d.sem_codigo|length }}):</b> {{ d.sem_codigo|join(', ') }}. Para receber, a pessoa precisa estar ligada ao usuário do Fracttal (Base → Integração Fracttal) ou ter e-mail na ficha.</p>{% endif %}
-    {% if not d.n_tst %}<p class="hs-dlg-nota">Ninguém está no setor Segurança (Base → Integração Fracttal): a TST não recebe.</p>{% endif %}
+    {% if d.sem_codigo %}<p class="hs-dlg-nota"><b>Sem e-mail ligado ({{ d.sem_codigo|length }}):</b> {{ d.sem_codigo|join(', ') }}. Para receber, a pessoa precisa estar ligada ao usuário do Fracttal (Base → Acessos → Pessoas e setores) ou ter e-mail na ficha.</p>{% endif %}
+    {% if not d.n_tst %}<p class="hs-dlg-nota">Ninguém está no setor Segurança (Base → Acessos → Pessoas e setores): a TST não recebe.</p>{% endif %}
   </section>
 
   {% if escolhido %}

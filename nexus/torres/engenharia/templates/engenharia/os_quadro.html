@@ -37,7 +37,7 @@
       <p class="eg-ac-titulo">OS {{ o.os }} <span>{{ (o.ativos|length ~ ' ativos') if o.ativos|length > 1 else (o.ativo or o.codigo) }}</span></p>
       <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
-    <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a></div>
+    <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a><a class="eg-ac-btn eg-ac-btn--o" href="{{ criar_url|na_raiz }}" title="O Criar OS do zero com o ativo desta OS, ela como OS pai e as subtarefas Descreva a atividade realizada e Ficou alguma pendência">Criar OS</a></div>
   </div>
   {% if msg_ok %}<p class="eg-os-aviso eg-os-aviso--ok" role="status">{{ msg_ok }}</p>{% endif %}
   {% if msg_erro %}<p class="cn-erro" role="status">{{ msg_erro }}</p>{% endif %}
@@ -91,16 +91,22 @@
           {% if o.ativos|length > 1 %}<dt>Ativo</dt><dd>{{ o.ativos|length }} ativos</dd>
           {% else %}<dt>Ativo</dt><dd class="mono">{{ o.codigo or '—' }}</dd>{% endif %}
           <dt>Usina</dt><dd>{{ o.usina or '—' }}</dd>
-          <dt>Responsável</dt><dd>{{ o.pessoa or '—' }}</dd>
+          <dt>Responsável</dt><dd class="eg-resp"><span data-resp-nome>{{ o.pessoa or '—' }}</span>{% if pode %}<button type="button" class="eg-resp-bt" data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ url_for('torre_engenharia.equipe', atualizar=1) }}" title="Atribuir esta OS a outra pessoa">trocar</button>{% endif %}</dd>
           <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
           <dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% else %}—{% endfor %}</dd>
         </dl>
+        <p class="eg-pdf-msg" data-resp-msg hidden></p>
       </section>
     </aside>
     <div>
       {% if o.ativos|length > 1 %}<section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Ativos</h2><span class="n">{{ o.ativos|length }}</span></div>
-        <table class="eg-t"><tbody>{% for a in o.ativos %}<tr><td class="k eg-mono">{{ a.codigo }}</td><td class="v">{{ a.nome }}</td></tr>{% endfor %}</tbody></table>
+        {# Levi, 24/10/2026: "no ativos também quero que limite a 5 por vez!": os 5 primeiros e o "Mostrar mais", como a
+           tabela de ativos da Nova solicitação (lá de 10 em 10) #}
+        <table class="eg-t"><tbody>{% for a in o.ativos %}<tr data-ativo{% if loop.index > 5 %} hidden{% endif %}><td class="k eg-mono">{{ a.codigo }}</td><td class="v">{{ a.nome }}</td></tr>{% endfor %}</tbody></table>
+        {% if o.ativos|length > 5 %}{% set resto = o.ativos|length - 5 %}<div class="eg-mais" data-mais-caixa><span data-mais-conta>Mostrando 5 de {{ o.ativos|length }}</span>
+          <button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-mais-ativos="5">Mostrar mais {{ [resto, 5]|min }}</button>
+          {% if resto > 5 %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-mais-ativos="tudo">Mostrar todos ({{ o.ativos|length }})</button>{% endif %}</div>{% endif %}
       </section>{% endif %}
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Na nota da OS</h2></div>
@@ -136,6 +142,21 @@
       </section>
     </div>
   </div>
+  {% if pode %}
+  {# o diálogo de trocar o responsável, o mesmo da tela do chamado (Levi, 24/10/2026: "em responsável quero a opção de
+     mudar de responsável que nem é feito no chamados"): o pessoal do Fracttal pela API do OS Creator, a busca pelo nome
+     e o Atribuir, na sessão do Fracttal da pessoa #}
+  <div class="eg-dlg-veu" data-dlg-resp hidden>
+    <div class="eg-dlg" role="dialog" aria-modal="true" aria-label="Trocar o responsável da OS {{ o.os }}">
+      <div class="eg-dlg-t">Trocar o responsável da OS {{ o.os }}</div>
+      <div class="eg-dlg-s">Hoje está com <b data-resp-hoje>{{ o.pessoa or '—' }}</b>.</div>
+      <input type="search" class="eg-ac-campo" data-resp-busca placeholder="digite o nome" aria-label="Buscar a pessoa" autocomplete="off">
+      <select class="eg-dlg-lista" data-resp-sel size="8" aria-label="Responsável"><option value="">carregando o pessoal…</option></select>
+      <p class="eg-dica" data-resp-hint></p>
+      <div class="eg-dlg-bts"><button type="button" class="eg-ac-btn eg-ac-btn--o" data-fechar>Cancelar</button><button type="button" class="eg-ac-btn eg-ac-btn--g" data-resp-ok disabled>Atribuir</button></div>
+    </div>
+  </div>
+  {% endif %}
   {% endif %}
 </div>
 {% if o %}<script>
@@ -172,6 +193,88 @@
       })
       .catch(function () { dizer('Não consegui falar com o Nexus. Tente de novo.', true); })
       .then(function () { b.removeAttribute('aria-busy'); });
+  });
+  // os ativos de 5 em 5: "Mostrar mais" revela os próximos 5; "Mostrar todos", o resto
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mais-ativos]'); if (!b) return;
+    var sec = b.closest('section'), ocultas = sec.querySelectorAll('tr[data-ativo][hidden]');
+    var n = b.getAttribute('data-mais-ativos') === 'tudo' ? ocultas.length : 5;
+    for (var i = 0; i < Math.min(n, ocultas.length); i++) ocultas[i].hidden = false;
+    var resto = sec.querySelectorAll('tr[data-ativo][hidden]').length, total = sec.querySelectorAll('tr[data-ativo]').length;
+    var caixa = sec.querySelector('[data-mais-caixa]');
+    if (!resto) { caixa.remove(); return; }
+    caixa.querySelector('[data-mais-conta]').textContent = 'Mostrando ' + (total - resto) + ' de ' + total;
+    caixa.querySelector('[data-mais-ativos="5"]').textContent = 'Mostrar mais ' + Math.min(resto, 5);
+    var todos = caixa.querySelector('[data-mais-ativos="tudo"]'); if (todos && resto <= 5) todos.remove();
+  });
+})();
+</script>{% endif %}
+{% if o and pode %}<script>
+(function () {
+  // trocar o responsável, como na tela do chamado (os_acoes.js do OS Creator): lista o pessoal, a pessoa escolhe e o
+  // Atribuir grava no Fracttal; o nome muda ali mesmo. Sem a sessão do Fracttal, o aviso traz o login dele.
+  var veu = document.querySelector('[data-dlg-resp]'), botao = document.querySelector('[data-trocar-resp]');
+  if (!veu || !botao) return;
+  var busca = veu.querySelector('[data-resp-busca]'), sel = veu.querySelector('[data-resp-sel]'),
+      ok = veu.querySelector('[data-resp-ok]'), dica = veu.querySelector('[data-resp-hint]');
+  var wid = botao.getAttribute('data-wid'), folio = botao.getAttribute('data-folio'), pessoas = null;
+  var login = (document.querySelector('[data-login-fracttal]') || {getAttribute: function () { return ''; }}).getAttribute('data-login-fracttal');
+  function sem(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+  function avisa(texto, link) {
+    dica.replaceChildren(document.createTextNode(texto || ''));
+    if (link) { var a = document.createElement('a'); a.href = link; a.textContent = 'Entrar pelo Fracttal'; dica.appendChild(document.createTextNode(' ')); dica.appendChild(a); }
+  }
+  function pinta() {
+    var t = sem(busca.value);
+    sel.replaceChildren();
+    (pessoas || []).filter(function (p) { return !t || sem(p.name).indexOf(t) >= 0; }).forEach(function (p) {
+      sel.appendChild(new Option(p.name || '?', p.id_personnel));
+    });
+    ok.disabled = !sel.options.length;
+  }
+  function fechar() { veu.hidden = true; botao.focus(); }
+  function resposta(r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); }
+  botao.addEventListener('click', function () {
+    veu.hidden = false; busca.value = ''; avisa(''); busca.focus();
+    if (pessoas) { pinta(); return; }
+    fetch(nexusRota('/os/api/responsaveis'), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(resposta)
+      .then(function (x) {
+        if (x.r.ok) { pessoas = (x.j.pessoas || []).filter(function (p) { return p.id_personnel; }); pinta(); return; }
+        if (x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; return; }
+        sel.replaceChildren();
+        avisa(x.j.login ? 'Para trocar o responsável, entre pelo Fracttal.' : ('Não consegui buscar o pessoal: ' + (x.j.erro || ('HTTP ' + x.r.status))), x.j.login ? login : '');
+      })
+      .catch(function () { avisa('Não consegui buscar o pessoal agora. Tente de novo.'); });
+  });
+  busca.addEventListener('input', pinta);
+  sel.addEventListener('dblclick', function () { ok.click(); });
+  veu.addEventListener('click', function (e) { if (e.target === veu || e.target.closest('[data-fechar]')) fechar(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !veu.hidden) fechar(); });
+  ok.addEventListener('click', function () {
+    var opt = sel.selectedOptions[0];
+    if (!opt || !opt.value) { avisa('Escolha a pessoa.'); return; }
+    ok.disabled = true; avisa('Gravando no Fracttal…');
+    fetch(nexusRota('/os/api/os/' + wid + '/responsavel'), {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: JSON.stringify({id_personnel: /^\d+$/.test(opt.value) ? Number(opt.value) : opt.value, name: opt.textContent, folio: folio})})
+      .then(resposta)
+      .then(function (x) {
+        ok.disabled = false;
+        if (x.r.ok && x.j.ok) {
+          document.querySelector('[data-resp-nome]').textContent = opt.textContent;
+          veu.querySelector('[data-resp-hoje]').textContent = opt.textContent;
+          var msg = document.querySelector('[data-resp-msg]');
+          msg.textContent = x.j.mensagem || ('OS ' + folio + ' agora está com ' + opt.textContent + '.'); msg.hidden = false;
+          // o quadro guarda a leitura do Fracttal por até 5 min: a volta a ele relê, senão a OS seguiria com quem estava
+          var volta = botao.getAttribute('data-volta');
+          if (volta) document.querySelectorAll('a.eg-ac-volta').forEach(function (a) { a.href = volta; });
+          fechar(); return;
+        }
+        if (x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; return; }
+        avisa(x.j.login ? 'Para trocar o responsável, entre pelo Fracttal.' : (x.j.erro || ('O Fracttal não gravou (HTTP ' + x.r.status + ').')), x.j.login ? login : '');
+      })
+      .catch(function () { ok.disabled = false; avisa('Não consegui falar com o Nexus. Tente de novo.'); });
   });
 })();
 </script>{% endif %}

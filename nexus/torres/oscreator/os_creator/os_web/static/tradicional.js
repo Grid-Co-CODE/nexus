@@ -11,6 +11,9 @@
   const apiErro = (j, r) => (j && j.erro) ? (j.login ? j.erro + ' Entre de novo em /os/login.' : j.erro) : ('HTTP ' + r.status);
   const PASSOS = ['Ativo + Data', 'Detalhes da Tarefa', 'Sub tarefas', 'Responsável'];   // app.py::STEP_LABELS
   const CRIT_DEFAULT = root.dataset.critDefault;
+  // as subtarefas com que a tela abre (Levi, 25/10/2026: "quero que essas subtarefas já fiquem como padrão na parte de
+  // criação de OS do zero!"), as de `tradicional_web.SUBS_PADRAO`
+  const SUBS_PADRAO = (() => { try { return JSON.parse(root.dataset.subsPadrao || '[]'); } catch (e) { return []; } })();
   const LIMITE = 4 * 1024 * 1024;                                                          // MAX_CONTENT_LENGTH do app
 
   async function getJson(url) {
@@ -109,9 +112,22 @@
     atualizaHint(rows.length + ' ativo(s) nesta seleção');
   }
 
+  // ── as usinas dos marcados (Levi, 26/10/2026). O marcado continua marcado ao trocar de usina (Step1._checked), e
+  //    ninguém via: a OS 16996 nasceu num tracker de outra usina, junto com a 16995 (um inversor), com o título do
+  //    inversor. Cada marcado guarda a usina em que foi marcado; mais de uma usina, a tela diz em cada passo. ──
+  const comUsina = (a) => Object.assign({usina: cbUsi.value}, a);
+  function usinasMarcadas() {                                  // usina → [ativos marcados nela], na ordem em que entraram
+    const m = new Map();
+    marcados.forEach((a) => { const u = a.usina || '?'; m.set(u, (m.get(u) || []).concat([a])); });
+    return m;
+  }
+  function textoUsinas(sep) {
+    return [...usinasMarcadas()].map(([u, l]) => u + ': ' + l.map((a) => a.curto || a.label || a.code).join(', ')).join(sep);
+  }
+
   function atualizaHint(base) {                                // Step1._atualiza_hint
-    const n = marcados.size;
-    hint.textContent = n ? base + '  ·  ' + n + ' marcado(s)' : base;
+    const n = marcados.size, nu = usinasMarcadas().size;
+    hint.textContent = n ? base + '  ·  ' + n + ' marcado(s)' + (nu > 1 ? ' em ' + nu + ' usinas diferentes' : '') : base;
     bNext1.textContent = n ? 'Próximo (' + n + ') ›››' : 'Próximo ›››';
     bNext1.disabled = !n;
   }
@@ -119,7 +135,7 @@
   tbody.addEventListener('change', (ev) => {
     if (!ev.target.classList.contains('chk')) return;
     const id = Number(ev.target.closest('tr').dataset.id), a = assets.find((x) => x.id === id);
-    if (ev.target.checked && a) marcados.set(id, a); else marcados.delete(id);
+    if (ev.target.checked && a) marcados.set(id, comUsina(a)); else marcados.delete(id);
     atualizaHint(hint.textContent.split('  ·')[0]);
   });
   tbody.addEventListener('click', (ev) => {
@@ -151,7 +167,7 @@
       await onCliente();
     } catch (e) { hint.textContent = '⚠ ' + e.message; }
   };
-  bNext1.onclick = () => irPara(1);
+  bNext1.onclick = () => { previaDesc(); irPara(1); };
 
   // ═══ Passo 2 — Step2 + TipoTarefaBox ═══
   const desc = $('desc'), obs = $('obs'), etiqBusca = $('etiq_busca'), etiqLista = $('etiq_lista');
@@ -186,7 +202,19 @@
     } catch (e) { cbTipoTarefa.innerHTML = '<option value="">⚠ falha ao carregar — relogue</option>'; }
   }
   const tipoPronto = () => !!cbTipoTarefa.value;              // TipoTarefaBox.is_ready
-  desc.oninput = () => { bNext2.disabled = !desc.value.trim(); };
+  // o título de cada OS é a descrição com o nome curto do SEU ativo na frente (26/10/2026; o servidor monta com
+  // `solic_web.titulo_do_ativo`): a marca [Ativo] vale, e o que já começa pelo ativo não repete
+  function tituloCom(v, curto) {
+    if (v.indexOf('[Ativo]') >= 0) return v.replace('[Ativo]', '[' + curto + ']');
+    return v.toLowerCase().indexOf(('[' + curto + ']').toLowerCase()) === 0 ? v : '[' + curto + '] - ' + v;
+  }
+  function previaDesc() {
+    const v = desc.value.trim(), m = [...marcados.values()], el = $('hint_desc');
+    if (!v || !m.length) { el.textContent = 'Escreva só a ação: o nome de cada ativo entra sozinho na frente do título.'; return; }
+    el.textContent = 'Vai sair “' + tituloCom(v, m[0].curto || 'Ativo') + '”'
+      + (m.length > 1 ? ' — e assim com o nome de cada um dos ' + m.length + ' ativos marcados.' : '.');
+  }
+  desc.oninput = () => { bNext2.disabled = !desc.value.trim(); previaDesc(); };
   $('b_back2').onclick = () => irPara(0);
   bNext2.onclick = () => { if (desc.value.trim()) irPara(2); };
 
@@ -207,6 +235,7 @@
   });
   subsEl.addEventListener('input', updSubs);
   $('b_add_sub').onclick = () => addSub('');
+  function subtarefasPadrao() { subsEl.innerHTML = ''; (SUBS_PADRAO.length ? SUBS_PADRAO : ['']).forEach((s) => addSub(s)); }
   $('b_back3').onclick = () => irPara(1);
 
   function mostrarResultado(msg, ruim) {
@@ -227,12 +256,16 @@
   const ckFin = $('ck_fin'), finpanel = $('finpanel'), finIni = $('fin_ini'), finFim = $('fin_fim'), finResp = $('fin_resp');
   const ckAgrupar = $('ck_agrupar'), wAgrupar = $('w_agrupar'), ospaiIn = $('ospai_in'), ospaiLista = $('ospai_lista'), respErro = $('resp_erro');
   let pessoas = null, pessoaSel = null, ospaiSel = null, ospaiTimer = null;
+  let ospaiSug = null;                // a OS pai que veio pelo endereço (o "Criar OS" da Engenharia): o Passo 4 abre com ela
 
   function erroModal(m) { respErro.hidden = !m; respErro.textContent = m ? '⚠ ' + m : ''; }
 
   async function abrirResponsavel() {
-    const n = marcados.size;
+    const n = marcados.size, nu = usinasMarcadas().size;
     $('resp_titulo').innerHTML = '<b>' + n + ' OS</b> a gerar — escolha o <b>responsável</b> <small>(obrigatório na criação)</small>:';
+    $('resp_usinas').hidden = nu < 2;
+    $('resp_usinas').textContent = nu < 2 ? '' : 'Atenção: os ativos marcados são de ' + nu + ' usinas diferentes — confira: '
+      + textoUsinas(' · ') + '.';
     bGerar.textContent = n > 1 ? 'Gerar ' + n + ' OS' : 'Gerar OS'; bGerar.disabled = true; pessoaSel = null;
     wAgrupar.hidden = !(n > 1); ckAgrupar.checked = false; $('fin').hidden = false;     // agrupar só com mais de um ativo
     ckFin.checked = false; finpanel.hidden = true;
@@ -240,7 +273,7 @@
     finIni.value = dtProg.value; finFim.value = dtProg.value;                            // data inicial = incidente do Passo 1
     finResp.innerHTML = subtarefas().map(() => '').length
       ? subtarefas().map((s) => '<div class="trad-sub-lbl">' + esc(s) + '</div><input type="text" class="resp" placeholder="Resposta…">').join('') : '';
-    ospaiIn.value = ''; ospaiSel = null; ospaiLista.hidden = true; erroModal('');
+    ospaiSel = ospaiSug; ospaiIn.value = ospaiSug ? ospaiSug.folio : ''; ospaiLista.hidden = true; erroModal('');
     modal.hidden = false; document.body.classList.add('os-modal-aberto');
     irPara(3, false);
     if (!pessoas) await carregarPessoas(); else filtrarPessoas();
@@ -341,7 +374,9 @@
     const frase = agrupar ? 'Vou criar 1 OS com ' + ativos.length + ' tarefas (uma por ativo marcado), responsável ' + pessoaSel.name + '.'
                           : 'Vou criar ' + ativos.length + ' OS — uma por ativo marcado —, responsável ' + pessoaSel.name + '.';
     const extra = finalizar ? '\nA OS nasce já realizada (' + (finalizar.to_in_review ? 'Verificação' : 'Finalizados') + ').' : '';
-    if (!confirm(frase + extra + (ospaiSel ? '\nOS pai: ' + ospaiSel.folio + '.' : '') + '\n\nContinuar?')) return;
+    const usinas = usinasMarcadas().size > 1
+      ? '\n\nATENÇÃO: os ativos são de ' + usinasMarcadas().size + ' usinas diferentes:\n- ' + textoUsinas('\n- ') : '';
+    if (!confirm(frase + extra + (ospaiSel ? '\nOS pai: ' + ospaiSel.folio + '.' : '') + usinas + '\n\nContinuar?')) return;
     bGerar.disabled = true; bCancel.disabled = true; erroModal('');
     respBusca.placeholder = agrupar ? 'Gerando 1 OS com ' + ativos.length + ' tarefas…' : 'Gerando ' + ativos.length + ' OS (resp.: ' + pessoaSel.name + ')…';
     try {
@@ -369,11 +404,12 @@
     imgs.forEach((lista) => lista.forEach((im) => { if (im.url) URL.revokeObjectURL(im.url); })); imgs.clear();
     dtProg.value = agoraLocal(); progTocada = false; dtExec.value = amanhaLocal();
     busca.value = ''; cbCli.value = ''; onCliente();
-    desc.value = ''; obs.value = ''; bNext2.disabled = true;
+    desc.value = ''; obs.value = ''; bNext2.disabled = true; previaDesc();
     etiqMarcadas.clear(); etiqBusca.value = ''; filtrarEtiq();
     cbCrit.value = CRIT_DEFAULT; if (cbC1.options.length) cbC1.selectedIndex = 0; if (cbC2.options.length) cbC2.selectedIndex = 0;
     if (cbTipoTarefa.options.length) cbTipoTarefa.selectedIndex = 0;
-    subsEl.innerHTML = ''; addSub('');
+    subtarefasPadrao();
+    ospaiSug = null;                                          // a OS seguinte não herda a OS pai da sugestão (como na Solicitação)
     irPara(0);
   }
 
@@ -441,10 +477,31 @@
     if (!modalImg.hidden) fecharImagens(); else if (!modal.hidden && !bCancel.disabled) fecharModal();
   });
 
+  // ── a sugestão pelo endereço (25/10/2026): o "Criar OS" da OS do Quadro da equipe da Engenharia abre esta tela com o
+  //    ativo dela marcado, a data do incidente dela (já no campo) e ela como OS pai no Passo 4 ──
+  async function sugerir() {
+    const s = $('sug') ? $('sug').dataset : {};
+    if (s.sugOsPai && s.sugOsPaiFolio) ospaiSug = {id: Number(s.sugOsPai), folio: s.sugOsPaiFolio};
+    if (!s.sugCliente || !s.sugUsina) return;
+    cbCli.value = s.sugCliente;
+    if (cbCli.value !== s.sugCliente) return;
+    await onCliente();
+    cbUsi.value = s.sugUsina;
+    if (cbUsi.value !== s.sugUsina) return;
+    await onUsina();
+    const a = assets.find((x) => x.code === s.sugAtivo);
+    if (!a) return;
+    marcados.set(a.id, comUsina(a));
+    // a busca mostra o ativo marcado na primeira página (o nome da tabela traz o código)
+    if (String(a.label || '').toLowerCase().includes(String(a.code).toLowerCase())) busca.value = a.code;
+    limite = PAGINA; refreshAtivos();
+  }
+
   // arranque
-  addSub('');
+  subtarefasPadrao();
   irPara(0, false);
   atualizaHint('Selecione cliente e usina para ver os ativos.');
   carregarEtiquetas();
   carregarTipos();
+  sugerir();
 })();

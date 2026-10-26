@@ -28,6 +28,9 @@ import chamado_modelos_store as modelos
 BRT = dt.timezone(dt.timedelta(hours=-3))
 MARCA_NOTA = "[CHAMADO] Acompanhamento"
 DIAS_FINALIZADOS = 90
+# o pulso laranja da OS aberta sem comentário de atualização há 5 dias ou mais (Levi, 25/10/2026: "quando a OS ficar a
+# partir de 5 dias sem comentário de atualização!"; o desenho é o do Quadro da equipe da Engenharia, que usa 7 dias)
+DIAS_PARADA = 5
 
 # o nome técnico do campo (o que a nota traz) → como a tela chama. É esse nome que liga a resposta do técnico ao campo
 # do formulário do fornecedor — por isso ele continua visível, pequeno, embaixo do rótulo.
@@ -338,11 +341,12 @@ def cor_avatar(nome: str) -> int:
     return sum(map(ord, _norm(nome))) % CORES_AVATAR if _norm(nome) else 0
 
 
-def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str = "") -> dict:
+def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str = "", obs_lidas: bool = True) -> dict:
     """Uma linha da lista do Fracttal + o ticket + a última observação → o que o card e a tela precisam.
 
     `finalizado` = quando a tela finalizou (do banco). A OS de acompanhamento é concluída sem registro de execução, e
-    o Fracttal deixa a data de fim vazia nesse caso — então a data da finalização é a que diz "em 26/09"."""
+    o Fracttal deixa a data de fim vazia nesse caso — então a data da finalização é a que diz "em 26/09".
+    `obs_lidas` falso = as observações não vieram do banco: nenhuma OS pulsa (`parada`)."""
     n = ler_nota(l.get("note"))
     criada = utc_para_brt(l.get("data"))
     # a retroativa (criada à mão para um chamado que já existia) conta a idade da abertura escrita na nota, e não do dia
@@ -355,6 +359,9 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
     referencia = max([x for x in [chegou, ult] + hist if x is not None], default=None)
     col = coluna(l.get("status_id"), ticket)
     d_chegou, d_sem = dias(chegou, hoje), dias(referencia, hoje)
+    # o último comentário de atualização: a observação da tela (a do ticket gravado também) ou a data do histórico da
+    # retroativa; sem nenhum, a abertura (a OS esquecida desde o início também pulsa)
+    comentarios = [x for x in [ult] + hist if x is not None]
     marca = n["marca"] or marca_do_titulo(l.get("descricao"))
     c = {"id": l.get("id"), "folio": str(l.get("folio") or ""), "col": col, "status_id": l.get("status_id"),
          "status": l.get("status") or "", "ativo_nome": str(l.get("ativo") or "").strip() or n["ativo"],
@@ -368,7 +375,8 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
          # sem data nenhuma de fim (concluída direto no Fracttal, sem execução), a idade vem da chegada — senão a OS
          # nunca sairia da coluna dos 90 dias
          "fim": fim.strftime("%d/%m") if fim else "", "dias_fim": dias(fim or chegou, hoje),
-         "responsavel": " ".join(str(l.get("atribuido_a") or "").split()), "da_equipe": da_equipe(l)}
+         "responsavel": " ".join(str(l.get("atribuido_a") or "").split()), "da_equipe": da_equipe(l),
+         "parada": parada(col, max(comentarios) if comentarios else chegou, hoje, obs_lidas)}
     c["cor"] = cor_avatar(c["responsavel"])
     # `tempo_curto` é o estado no canto do cartão, no jeito do Quadro da equipe da Engenharia do Nexus ("atrasada 10 d",
     # "fechada 02/10"). Levi, 08/10/2026: "Precisamos padronizar a estética para que coisas parecidas não pareçam
@@ -394,6 +402,14 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
     return c
 
 
+def parada(col: str, ultimo_comentario, hoje: dt.datetime, obs_lidas: bool = True) -> bool:
+    """A OS ABERTA do quadro (Chegaram ou Ticket aberto) com DIAS_PARADA x 24 h ou mais desde o último comentário de
+    atualização: o pulso laranja do cartão. Finalizada, em verificação ou cancelada não pulsa; sem as observações lidas
+    do banco (fora do ar), nada pulsa, porque a OS comentada pareceria esquecida: não se chuta."""
+    return (col in ("chegou", "ticket") and obs_lidas and ultimo_comentario is not None
+            and hoje - ultimo_comentario >= dt.timedelta(days=DIAS_PARADA))
+
+
 def precisa_ticket(l: dict, hoje: dt.datetime) -> bool:
     """Quem tem o ticket LIDO no Fracttal: as abertas e as finalizadas que ainda aparecem no quadro. A cota do Fracttal
     é por EMPRESA (200/min) — ler o ticket de OS que não vai para a tela seria gastar a dos outros."""
@@ -407,10 +423,11 @@ def precisa_ticket(l: dict, hoje: dt.datetime) -> bool:
     return False
 
 
-def montar_quadro(linhas, tickets: dict, ultimas: dict, hoje: dt.datetime, fins: dict = None) -> dict:
+def montar_quadro(linhas, tickets: dict, ultimas: dict, hoje: dt.datetime, fins: dict = None,
+                  obs_lidas: bool = True) -> dict:
     fins = fins or {}
     cards = [cartao(l, tickets.get(l.get("id"), ""), (ultimas or {}).get(str(l.get("folio") or ""), ""), hoje,
-                    fins.get(str(l.get("folio") or ""), "")) for l in (linhas or []) if eh_os3(l)]
+                    fins.get(str(l.get("folio") or ""), ""), obs_lidas) for l in (linhas or []) if eh_os3(l)]
     col = {"chegou": [], "ticket": [], "fim": []}
     canceladas = antigas = 0
     for c in cards:

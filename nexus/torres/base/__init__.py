@@ -59,11 +59,6 @@ TORRE = Torre(
         Tela("qualidade", "Qualidade do cadastro",
              "O que o Excel deixava passar calado?",
              "Cadastro do Nexus"),
-        # Integração Fracttal (12/10/2026, Levi: "precisamos da relação do pessoal do fractall"): o pessoal do Fracttal
-        # ao lado do cadastro de pessoas. A view mora em nexus/cadastro/telas_fracttal.py; só administrador.
-        Tela("fracttal", "Integração Fracttal",
-             "Quem do pessoal do Fracttal está no cadastro do Nexus, quem falta e o setor de cada um?",
-             "API do Fracttal (pessoal), o cadastro de pessoas do Nexus e o livro nexus_setores; só administrador"),
         # Porta única (09/10/2026): o /tokens da Plataforma de Performance (as chaves de SunOp, Axis e Plataforma) numa
         # moldura; só administrador do Nexus (spec 5.3). A view sai do mapa (nexus/performance/porta.py).
         Tela("chaves-fontes", "Chaves das fontes",
@@ -83,10 +78,12 @@ TORRE = Torre(
              "Ligar cada usina e cada inversor de cada fonte ao cadastro, com a sugestão pelo kWh do BD",
              "Plataforma de Performance (/admin/de-para) e o livro nexus_depara no banco, só administrador"),
         # Acessos (11/10/2026: "Tem algum canto do Nexus onde eu posso administrar isso?"): quem é administrador, dar e
-        # tirar pela tela, e quem entrou em 30 dias. Só administrador. A view e as regras moram em nexus/auth/.
+        # tirar pela tela, e quem entrou em 30 dias. Só administrador. A view e as regras moram em nexus/auth/. Desde
+        # 25/10/2026 a aba Pessoas e setores (`?aba=pessoas`) é a antiga Integração Fracttal
+        # (nexus/cadastro/telas_fracttal.py; /t/base/fracttal leva a ela): o pessoal do Fracttal e o setor de cada um.
         Tela("acessos", "Acessos",
-             "Quem é administrador do Nexus, e quem já entrou nele nos últimos 30 dias?",
-             "NEXUS_ADMINS do servidor e a lista da tela (pasta de dados do Nexus), só administrador"),
+             "O que cada setor vê, quem é administrador, quem entrou em 30 dias e o setor de cada pessoa do Fracttal",
+             "NEXUS_ADMINS do servidor, a lista da tela, a API do Fracttal (pessoal) e o livro nexus_setores; só administrador"),
         Tela("ia", "Nexus IA",
              "O que a IA leu e sugeriu, e quanto custou?",
              "API do Claude (a definir)"),
