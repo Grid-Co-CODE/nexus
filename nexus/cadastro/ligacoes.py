@@ -171,6 +171,12 @@ def fontes(config) -> dict:
     base = (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
     abas = {(x["workbook_key"], x["sheet_name"]): x["id"] for x in requests.get(f"{base}/api/sheets", timeout=60).json()}
     out = {FRACTTAL: fracttal(config)}
+    # os locais dos almoxarifados (25/10/2026): "Cliente - Usina - UF", a mesma chave da Classificação 1, lidos do livro
+    # que o App publica (igual nas duas máquinas); o que a Classificação 1 não tem (a Nobres) entra para ligar à mão
+    from ..dados import almoxarifado as ALM
+    if (ALM.LIVRO_SALDO, ALM.ABA_SALDO) in abas:
+        out[FRACTTAL] += locais_de_almoxarifado(_linhas_api(base, abas[(ALM.LIVRO_SALDO, ALM.ABA_SALDO)]),
+                                                {str(i.get("chave")) for i in out[FRACTTAL]})
     dicas = {}
     if ("de_para_trackers", "Resumo por usina") in abas:
         for t in _linhas_api(base, abas[("de_para_trackers", "Resumo por usina")]):
@@ -329,6 +335,20 @@ def usina_do_caminho(caminho):
         if m:
             return m.group(1), m.group(2)
     return None
+
+
+def locais_de_almoxarifado(linhas_saldo: list[dict], ja: set) -> list[dict]:
+    """Os locais de almoxarifado ("Cliente - Usina - UF", do livro Saldo do App) que ainda não são chave do sistema
+    Fracttal: a usina sem Classificação 1 nas tarefas (a Nobres, 25/10/2026) não aparecia na tela, e não havia como
+    ligar o almoxarifado dela."""
+    from ..dados.almoxarifado import chave_do_local
+    novos = []
+    for l in linhas_saldo:
+        k = chave_do_local(l.get("Local do almoxarifado"))
+        if k and k not in ja:
+            ja = ja | {k}
+            novos.append({"chave": k, "nome": k, "origem": "local de almoxarifado"})
+    return novos
 
 
 def fracttal(config) -> list[dict]:

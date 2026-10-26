@@ -385,3 +385,49 @@ def test_a_chave_da_gravacao_vem_do_env():
     from nexus import config
     assert "NEXUS_ALMOX_GRAVAR" in config.OPCIONAIS
     assert "NEXUS_ALMOX_GRAVAR=" in Path(__file__).resolve().parent.parent.joinpath(".env.example").read_text("utf-8")
+
+
+# ── a usina dos almoxarifados na Ligação e a qualidade na Governança ───────────────────────────────────────────────
+
+def test_local_de_almoxarifado_entra_na_ligacao():
+    """O local que a Classificação 1 já tem não repete; o que ela não tem (a Nobres, sem Classificação 1 nas tarefas)
+    entra com a origem, para ligar à mão em Base → Ligações."""
+    from nexus.cadastro import ligacoes as L
+    saldo = [_saldo(1, 5, IRC, 1, 1), _saldo(2, 5, IRC, 1, 1), _saldo(1, 6, NOB, 1, 1), _saldo(1, 7, "Almoxarifado", 1, 1)]
+    novos = L.locais_de_almoxarifado(saldo, {"Greenyellow - Irecê 1 - BA"})
+    assert novos == [{"chave": "RenoGrid - Nobres 1 - MT", "nome": "RenoGrid - Nobres 1 - MT",
+                      "origem": "local de almoxarifado"}]
+
+
+def test_fontes_da_ligacao_le_os_locais_do_livro_do_app(monkeypatch):
+    import requests
+    from pg_falso import ApiPGFalsa
+    from test_campo_visao import _aba
+    from nexus.cadastro import ligacoes as L
+    api = ApiPGFalsa()
+    for _s, wb, aba, *_r in L.FONTES_API:
+        _aba(api, wb, aba, [])
+    for _s, wb, ref in L.FONTES_ABA:
+        _aba(api, wb, ref, [])
+    _aba(api, A.LIVRO_SALDO, A.ABA_SALDO, [_saldo(1, 5, IRC, 1, 1), _saldo(1, 6, NOB, 1, 1)])
+    monkeypatch.setattr(requests, "get", api.get)
+    monkeypatch.setattr(L, "fracttal", lambda config: [{"chave": "Greenyellow - Irecê 1 - BA",
+                                                         "nome": "Greenyellow - Irecê 1 - BA"}])
+    fs = L.fontes({"GRIDCO_DB_API": BASE})
+    assert [i["chave"] for i in fs[L.FRACTTAL]] == ["Greenyellow - Irecê 1 - BA", "RenoGrid - Nobres 1 - MT"]
+
+
+def test_governanca_le_a_qualidade_do_almoxarifado(app, monkeypatch):
+    from pg_falso import ApiPGFalsa
+    from test_campo_visao import _aba
+    from nexus.dados import fatos
+    from nexus.dados import telas as T
+    api = ApiPGFalsa()
+    q = dict(zip(fatos.CAB_QUALIDADE, [None] * len(fatos.CAB_QUALIDADE)), fato="saldo_almox", linhas=3)
+    _aba(api, "nexus_almoxarifado", "qualidade", [q])
+    app.config.update(GRIDCO_DB_API=BASE)
+    app.extensions["nexus_dados_sessao"] = api
+    monkeypatch.setitem(T._CACHE, "v", None)
+    with app.app_context():
+        v = T._ultima_qualidade()
+    assert v["qualidade"]["saldo_almox"]["linhas"] == 3, v.get("erro")
