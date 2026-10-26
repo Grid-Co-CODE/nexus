@@ -4,7 +4,8 @@ A Confiabilidade é nossa desde 06/10/2026 (Levi: "traga a aba Confiabilidade do
 diretamente esse caminho mas construindo algo nosso!"): o Nexus lê as OS de falha do Fracttal (`nexus/engenharia/
 os_falhas.py`) e faz as contas (`nexus/engenharia/confiabilidade.py`). Desde 18/10/2026 a Confiabilidade tem o
 acompanhamento dos ativos com sinal (pegar, encaminhar, diagnóstico, comentários; `nexus/engenharia/acompanhamento.py`).
-O Quadro da equipe também é nosso; as outras telas seguem no placeholder da casca.
+O Quadro da equipe também é nosso, e a tela ETMs (26/10/2026) traz o app de ETM da Engenharia; as outras telas seguem
+no placeholder da casca.
 Leia o CLAUDE.md desta pasta antes de mexer.
 """
 import collections
@@ -39,6 +40,12 @@ TORRE = Torre(
         Tela("equipe", "Quadro da equipe",
              "Quem da engenharia está com o quê, o que atrasou e o que vem por aí?",
              "OS do Fracttal dos responsáveis da engenharia"),
+        # o app de ETM da Engenharia dentro do Nexus (Levi, 26/10/2026: "Quero que inclua essa visão de ETMs no Nexus,
+        # engenharia, aba própria"); do setor Engenharia, como a Mesa e a Confiabilidade
+        Tela("etm", "ETMs",
+             "Quais estações meteorológicas têm OS aberta, com quem e há quanto tempo?",
+             "OS de ETM do Fracttal e as marcações da Engenharia (banco)",
+             do_setor="Engenharia"),
         Tela("criticidade", "Matriz de criticidade",
              "Qual ativo, se parar, dói mais?",
              "engenharia.json do painel PCM"),
@@ -943,6 +950,78 @@ def _com_a_engenharia(oss: list[dict]) -> tuple[list[dict], str]:
                         ultima_iso=ultima.isoformat() if ultima else "",
                         parada=bool(not erro and O.parada(o["coluna"], ultima, agora))))
     return out, erro
+
+
+# ── a tela ETMs (26/10/2026): o Planner do app de ETM da Engenharia ──────────────────────────────────────────────────
+def _os_do_planner(o: dict, m: dict | None) -> dict:
+    """A OS de ETM como o Planner a desenha: o cartão do Fracttal enxuto e as marcações da Engenharia."""
+    from ...engenharia import etm_marcas as M
+    m = m or {}
+    criada = o.get("criada") or ""
+    return {"os": o["os"], "titulo": o["titulo"], "cliente": o["cliente"], "usina": o["usina"], "codigo": o["codigo"],
+            "ativo": o["ativo"], "responsavel": o["responsavel"], "solicitante": o["solicitante"],
+            "criado_por": o["criado_por"], "trabalho": o["trabalho"], "coluna": o["coluna_etm"], "tipo": o["tipo"],
+            "status": o["status"], "criada": criada[:10],
+            # o dia de Brasília da criação e o do fim: o "OS ativa entre" do app compara dias
+            "criada_dia": "-".join(reversed(criada[:10].split("/"))) if criada else "", "fim_dia": o.get("fim_iso") or "",
+            "etiquetas": o["etiquetas"], "n_tarefas": len(o.get("tarefas") or []),
+            "diagnostico": M.nome(M.DIAGNOSTICOS, m.get("diagnostico_id")) or None,
+            "status_pos": M.nome(M.STATUS_POS, m.get("status_pos_id")) or None,
+            "etiquetas_eng": [M.nome(M.ETIQUETAS, i) for i in sorted(m.get("etiquetas") or ())],
+            "acompanhamento": bool(m.get("acompanhamento")), "finalizado": bool(m.get("finalizado"))}
+
+
+def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False) -> list[dict]:
+    """Os quatro números da tela ETMs. "Abertas para a Engenharia" é a regra das Estações em Aberto do app: a OS só sai
+    quando a Engenharia encerra (o diagnóstico ou o finalizado), não quando o Fracttal fecha a tarefa."""
+    abertas = [o for o in oss if o["coluna"] in ("nao_iniciada", "em_andamento")]
+    analise = sum(1 for o in abertas if o["trabalho"] == "analise")
+    para_eng = [o for o in oss if o["coluna"] != "cancelada" and not o["diagnostico"] and not o["finalizado"]]
+    usinas = len({o["usina"] for o in para_eng})
+    piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
+    fechadas = sum(1 for o in oss if o["coluna"] == "finalizada" and (o["fim_dia"] or "") >= piso)
+    return [
+        {"rotulo": "Abertas no Fracttal", "valor": len(abertas), "grav": "",
+         "nota": [(str(analise), True), (" em análise de engenharia, ", False), (str(len(abertas) - analise), True),
+                  (" em campo", False)]},
+        {"rotulo": "Abertas para a Engenharia", "valor": "—" if sem_marcas else len(para_eng),
+         "grav": "" if sem_marcas or not para_eng else "alerta",
+         "nota": [("sem as marcações agora", False)] if sem_marcas else
+                 [("em ", False), (str(usinas), True), (" usina" + ("s" if usinas != 1 else ""), False),
+                  (", sem diagnóstico nem o finalizado", False)]},
+        {"rotulo": "Em acompanhamento", "valor": "—" if sem_marcas else sum(1 for o in oss if o["acompanhamento"]),
+         "grav": "", "nota": [("seguidas mesmo depois de fechadas no Fracttal", False)]},
+        {"rotulo": f"Finalizadas em {JANELA_CONCLUIDAS} dias", "valor": fechadas, "grav": "",
+         "nota": [("no Fracttal", False)]},
+    ]
+
+
+@bp.route("/etm")
+def etm():
+    """O Planner das OS das Estações Meteorológicas (o app de ETM da Engenharia): as colunas do app, os filtros dele no
+    navegador e as marcações da Engenharia em cada OS. Quem volta com ?atualizar=1 relê o Fracttal na hora."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import etm_marcas as M
+    ETM.marcar_uso()                # relida por trás nas próximas 2 h (`etm.manter_quente`)
+    if request.args.get("atualizar") == "1":
+        ETM.pedir_releitura(esperar=True, forcar=True)
+    else:
+        ETM.pedir_releitura(esperar=not ETM.dados()["lido"])
+    d = ETM.dados()
+    lido = M.ler()
+    erro_marcas = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
+    est = M.estado(lido["eventos"]) if not erro_marcas else {}
+    oss = [_os_do_planner(o, est.get(str(o.get("wid")))) for o in d["os"]]
+    hoje = datetime.now(BRT).date()
+
+    def nomes(campo):
+        return sorted({o[campo] for o in oss if o[campo]}, key=lambda s: s.lower())
+    return render_template(
+        "engenharia/etm.html", torre=TORRE, tela=TORRE.tela("etm"), oss=oss, colunas=ETM.COLUNAS,
+        kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas)), erro=d["erro"], erro_marcas=erro_marcas,
+        clientes=nomes("cliente"), criados=nomes("criado_por"), solicitantes=nomes("solicitante"),
+        responsaveis=nomes("responsavel"), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
+        lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
 
 
 @bp.route("/equipe")

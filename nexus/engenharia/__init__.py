@@ -16,10 +16,12 @@ def instalar(app):
     (NEXUS_CAMPO_AQUECER=0). O Quadro da equipe pronto enquanto alguém o usa (`os_equipe.manter_quente`) liga sempre:
     só lê quando alguém abriu a tela nas últimas 2 h (Levi, 09/10/2026)."""
     import threading
-    from . import os_equipe
+    from . import etm, os_equipe
     os_equipe.manter_quente(app)
+    etm.manter_quente(app)          # a tela ETMs (26/10/2026), do mesmo jeito
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
         from . import os_falhas
         threading.Timer(150, lambda: os_falhas.pedir_releitura(app)).start()
         # o quadro já lido quando a 1ª pessoa abrir depois de um reinício (no servidor, o deploy)
         threading.Timer(210, lambda: os_equipe.pedir_releitura(app)).start()
+        threading.Timer(270, lambda: etm.pedir_releitura(app)).start()

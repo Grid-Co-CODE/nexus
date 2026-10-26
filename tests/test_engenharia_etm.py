@@ -229,3 +229,128 @@ def test_livro_existente_sem_a_aba_e_leitura_incompleta(banco):
     assert lido["erro"] and lido["lido_em"] is None
     with pytest.raises(Exception, match="não vieram"):
         M.marcar(OSE, "diagnostico", 2, ANA, True)
+
+
+# ── a tela ETMs, o Planner (Task 3) ──────────────────────────────────────────────────────────────────────────────────
+URL_TELA = "/t/engenharia/etm"
+
+
+@pytest.fixture
+def tela(banco, app, monkeypatch):
+    """Quatro OS de ETM: a 1 não iniciada (campo), a 2 em andamento em análise, a 3 finalizada há 5 dias e a 4 cancelada.
+    Quem entra é do setor Engenharia."""
+    from datetime import datetime, timedelta, timezone
+
+    from nexus.auth import setor_telas as ST
+    fim = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    linhas = [w(1, "Corretiva", solic="Pessoa Dois", criado_por="Pessoa Três"),
+              w(2, "Preventiva", resp="Ana Lima", task="IN_PROGRESS", cod="GAM300-ESTM1"),
+              dict(w(3, "Corretiva", status=3, task="DONE"), final_date=fim, wo_final_date=fim),
+              w(4, "Administrativa", status=4)]
+    oss = E.montar(linhas, ETMS, EQUIPE, date.today())
+    pedidos = []
+    monkeypatch.setattr(E, "dados", lambda: {"os": oss, "lido": time.time(), "lendo": False, "erro": ""})
+    monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False:
+                        pedidos.append((esperar, forcar)))
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+                                               "erro": ""})
+    return pedidos
+
+
+def _dados_da_tela(html):
+    import json
+    return json.loads(html.split('<script type="application/json" id="etm-dados">', 1)[1].split("</script>", 1)[0])
+
+
+def test_a_tela_etms_na_torre_da_engenharia(tela, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.torres import engenharia as torre
+    t = torre.TORRE.tela("etm")
+    assert t.nome == "ETMs" and t.do_setor == "Engenharia"
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    d = _dados_da_tela(html)
+    assert sorted(o["os"] for o in d["oss"]) == ["1", "2", "3", "4"]
+    assert [c[1] for c in d["colunas"]] == ["Não iniciadas", "Em andamento", "Finalizadas", "Canceladas"]
+    o = {x["os"]: x for x in d["oss"]}
+    assert (o["1"]["coluna"], o["2"]["coluna"], o["3"]["coluna"], o["4"]["coluna"]) == \
+           ("nao_iniciada", "em_andamento", "finalizada", "cancelada")
+    assert o["2"]["trabalho"] == "analise" and o["1"]["cliente"] == "Cliente X"
+    assert o["1"]["solicitante"] == "Pessoa Dois" and o["1"]["criado_por"] == "Pessoa Três"
+    assert "nexusRota('/t/engenharia/etm/os/')" in html          # o clique abre a OS da ETM
+
+
+def test_os_filtros_do_planner_do_app(tela, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    for campo in ('id="etm-f-cliente"', 'id="etm-f-usina"', 'id="etm-f-criado"', 'id="etm-f-solicitante"',
+                  'id="etm-f-responsavel"', 'data-trabalho="analise"', 'data-trabalho="campo"', 'id="etm-f-ini"',
+                  'id="etm-f-fim"', 'id="etm-f-canceladas"', 'id="etm-f-limpar"'):
+        assert campo in html, campo
+    assert ">Análise de Engenharia<" in html and ">Campo<" in html
+    assert '<option value="Cliente X">Cliente X</option>' in html
+    # o filtro das etiquetas da Engenharia, na coluna Em andamento como no app
+    assert all(f'data-etiqueta="{n}"' in html for n in ("OS em campo", "Stand By", "Validação Final"))
+
+
+def test_cada_os_leva_as_marcacoes_da_engenharia(tela, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import etm_marcas as M
+    os2 = {"wid": 50002, "folio": "2", "codigo": "GAM300-ESTM1"}
+    M.marcar(os2, "diagnostico", 2, ANA, True)
+    M.marcar(os2, "status_pos", 1, ANA, True)
+    M.marcar(os2, "etiqueta", (3, True), ANA, True)
+    M.marcar(os2, "acompanhamento", True, ANA, True)
+    d = _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))
+    o = {x["os"]: x for x in d["oss"]}
+    assert (o["2"]["diagnostico"], o["2"]["status_pos"], o["2"]["etiquetas_eng"]) == \
+           ("Falha de Comunicação", "Chamado de Garantia", ["Validação Final"])
+    assert o["2"]["acompanhamento"] is True and o["2"]["finalizado"] is False
+    assert o["1"]["diagnostico"] is None and o["1"]["etiquetas_eng"] == []
+
+
+def test_a_faixa_de_numeros(tela, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import etm_marcas as M
+    M.marcar({"wid": 50001, "folio": "1", "codigo": "ALF100-ESTM1"}, "acompanhamento", True, ANA, True)
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    kpis = html.split('aria-label="As ETMs agora"', 1)[1].split("</section>", 1)[0]
+    import re
+    pares = re.findall(r'kb-kpi-rot">([^<]+)</span>\s*<span class="kb-kpi-linha"><b class="kb-kpi-v[^"]*">([^<]+)</b>', kpis)
+    assert pares == [("Abertas no Fracttal", "2"), ("Abertas para a Engenharia", "3"), ("Em acompanhamento", "1"),
+                     ("Finalizadas em 30 dias", "1")]
+
+
+def test_sem_o_livro_a_tela_diz_e_nao_chuta_marcacao(tela, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import etm_marcas as M
+    monkeypatch.setattr(M, "ler", lambda forcar=False: {"eventos": [], "lido_em": None, "erro": "Timeout: banco"})
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    assert "Não consegui ler as marcações da Engenharia (Timeout)" in html
+    assert _dados_da_tela(html)["sem_marcas"] is True
+    kpis = html.split('aria-label="As ETMs agora"', 1)[1].split("</section>", 1)[0]
+    assert kpis.count('">—</b>') == 2                                # as duas contas que dependem das marcações
+
+
+def test_atualizar_rele_o_fracttal_e_a_leitura_que_falhou_diz(tela, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+    _como(cliente, ANA).get(URL_TELA + "?atualizar=1")
+    assert tela[-1] == (True, True)
+    monkeypatch.setattr(E, "dados", lambda: {"os": [], "lido": time.time(), "lendo": False,
+                                             "erro": "o Fracttal recusou por excesso de pedidos (HTTP 429)"})
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    assert "O Fracttal recusou a leitura agora" in html and "HTTP 429" in html
+
+
+def test_a_subida_liga_a_releitura_por_tras(app, monkeypatch):
+    from nexus import engenharia as eng_pkg
+    from nexus.engenharia import os_equipe
+    ligados = []
+    monkeypatch.setattr(os_equipe, "manter_quente", lambda a: ligados.append("equipe"))
+    monkeypatch.setattr(E, "manter_quente", lambda a: ligados.append("etm"))
+    app.config["NEXUS_CAMPO_AQUECER"] = "0"
+    eng_pkg.instalar(app)
+    assert ligados == ["equipe", "etm"]
