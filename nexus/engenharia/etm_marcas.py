@@ -240,3 +240,19 @@ def marcar(os_: dict, evento: str, valor, usuario, pode: bool) -> dict:
         novo = _evento(cofre, evento, quem, os_, valor_id=valor_id, ligado=ligado)
         _publicar(lido["eventos"] + [novo])
     return {"aviso": aviso[0].upper() + aviso[1:], "evento": novo}
+
+
+def importar_marcas(itens: list[dict], origem: str) -> int:
+    """As marcações trazidas de outro lugar (as labels do app de ETM), com a data de lá. Só as que o livro não tem, pelo
+    `origem_id`; uma gravação só. Devolve quantas entraram."""
+    cofre = AC._cofre()
+    with _TRAVA:
+        lido = _reler()
+        ja = {str(e.get("origem_id")) for e in lido["eventos"] if e.get("origem") == origem and e.get("origem_id")}
+        novos = [_evento(cofre, i["evento"], {"nome": "app de ETM", "email": "", "hmac": None}, i["os_"],
+                         valor_id=i.get("valor_id"), ligado=i.get("ligado"), origem=origem, origem_id=str(i["origem_id"]),
+                         quando=i.get("quando"))
+                 for i in itens if str(i["origem_id"]) not in ja]
+        if novos:
+            _publicar(lido["eventos"] + novos)
+    return len(novos)

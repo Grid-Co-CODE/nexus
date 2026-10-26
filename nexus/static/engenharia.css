@@ -573,3 +573,6 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .etm-marcas{display:grid;gap:8px;margin-top:14px}
 .etm-marcas form,.etm-botoes form{display:inline}
 .etm-botoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+/* o histórico do app de ETM (só o administrador), no pé da tela */
+.etm-hist{margin-top:20px}
+.etm-hist summary{cursor:pointer;font:600 13px/20px var(--font-sans);color:var(--tinta)}

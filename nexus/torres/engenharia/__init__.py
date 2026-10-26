@@ -1017,7 +1017,9 @@ def _pagina_da_os(folio: int, tela_id: str):
         # a seta do PDF de cada OS da cadeia vai ao OS Creator na sessão do Fracttal: sem ela, este login volta para cá
         login_fracttal=na_raiz("/os/login") + "?next=" + quote(
             "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/{tela_id}/os/{o['os']}"}, safe="/"), safe=""),
-        comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"), **base)
+        comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"),
+        # a página de onde o comentário sai, sem o prefixo: o login do Fracttal volta para ela (a ponte confere)
+        de_pagina=f"/t/engenharia/{tela_id}/os/{o['os']}", **base)
 
 
 @bp.route("/etm/os/<int:folio>/marcar", methods=["POST"])
@@ -1181,6 +1183,7 @@ def etm():
         kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas)), erro=d["erro"], erro_marcas=erro_marcas,
         clientes=nomes("cliente"), criados=nomes("criado_por"), solicitantes=nomes("solicitante"),
         responsaveis=nomes("responsavel"), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
+        admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
 
 

@@ -666,6 +666,44 @@ def ir():
 # card da OS, e a regra medida do card vale (OS concluída, cancelada ou de várias tarefas não deixa editar a nota: com
 # várias tarefas, ela sobrescreveria a observação da tarefa errada). O que é só do Nexus fica aqui, nunca na cópia.
 _trava_nota = threading.Lock()      # dois comentários juntos na mesma OS: um não apaga o outro na nota
+# a página da OS de onde veio o comentário (a do Quadro da equipe ou a da tela ETMs): o login do Fracttal volta para ela
+_PAGINA_DA_OS = re.compile(r"^/t/engenharia/(equipe|etm)/os/\d+$")
+
+
+class _NotaIncompleta(RuntimeError):
+    """O Fracttal devolveu a OS sem as tarefas (a leitura que falha "mole"): gravar trocaria a nota inteira."""
+
+
+class _NotaNaoGravou(RuntimeError):
+    """O Fracttal não gravou a nota (a mensagem dele vai junto)."""
+
+
+def _acrescentar_na_nota(os_api, regra, o: dict, linhas: list[str]) -> str:
+    """As linhas no fim da nota da OS no Fracttal (o comentário da Engenharia e, uma vez, o histórico do app de ETM),
+    com a regra medida do card: OS concluída, cancelada ou de várias tarefas não deixa editar a nota (com várias, ela
+    sobrescreveria a observação da tarefa errada). A nota que a página mostra tem de estar no que vai ser regravado (o
+    Fracttal tem a nota da OS e a da tarefa, e a OS 12191 tinha as duas diferentes). A linha que já está na nota não
+    volta: trazer o histórico de novo não a repete. Devolve "sim" ou o motivo de o comentário ficar só no Nexus."""
+    d = os_api.get_os_detalhes(o["wid"]) or {}
+    if not d.get("tarefas"):
+        # a leitura que falha "mole" volta sem tarefas e com a nota vazia: gravar trocaria a nota inteira pela linha nova
+        # (revisão final de 24/10/2026)
+        raise _NotaIncompleta()
+    pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(o.get("status"), d), len(d.get("tarefas") or []))
+    if not pode_nota:
+        return motivo
+    atual = str(d.get("notas") or "").strip()
+    na_pagina = " ".join(str(o.get("nota") or "").split())
+    if na_pagina and na_pagina not in " ".join(atual.split()):
+        return ("a nota da OS no Fracttal não bateu com a leitura da página; para não sobrescrever, o comentário ficou "
+                "só no Nexus")
+    novas = [x for x in linhas if x not in atual]
+    if not novas:
+        return "sim"
+    r = os_api.editar_nota_os(o["wid"], "\n".join(([atual] if atual else []) + novas))
+    if not (isinstance(r, dict) and r.get("ok")):
+        raise _NotaNaoGravou((r or {}).get("erro") or "sem resposta")
+    return "sim"
 
 
 @bp_raiz.route("/os/_nexus/engenharia/os/<int:wid>/comentar", methods=["POST"])
@@ -691,7 +729,10 @@ def engenharia_comentar(wid: int):
         return jsonify({"erro": str(e)}), 400
     folio = str(c.get("folio") or "").strip()
     # a volta do login do Fracttal, como no card da OS: o /os/login do clone e o /os/_nexus/card/voltar até a página
-    de = f"/t/engenharia/equipe/os/{folio}" if folio.isdigit() else "/t/engenharia/equipe"
+    # (a do Quadro da equipe ou, desde 26/10/2026, a da tela ETMs)
+    de = str(c.get("de") or "")
+    if not _PAGINA_DA_OS.match(de):
+        de = f"/t/engenharia/equipe/os/{folio}" if folio.isdigit() else "/t/engenharia/equipe"
     login = na_raiz("/os/login") + "?next=" + quote("/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/"), safe="")
     app = current_app._get_current_object()
     s = sessao_do_os(app)
@@ -706,31 +747,13 @@ def engenharia_comentar(wid: int):
     import api as os_api                         # noqa: E402
     from os_web import os_acoes_web as regra     # noqa: E402
     from os_web import sessao as os_sessao       # noqa: E402
-    nota = "sim"
     with _trava_nota, os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
         try:
-            d = os_api.get_os_detalhes(wid) or {}
-            if not d.get("tarefas"):
-                # a leitura que falha "mole" volta sem tarefas e com a nota vazia: gravar trocaria a nota inteira pela
-                # linha nova (revisão final de 24/10/2026)
-                return jsonify({"erro": "O Fracttal não devolveu a OS inteira agora. Nada foi gravado; tente de "
-                                        "novo."}), 502
-            pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(o.get("status"), d),
-                                                       len(d.get("tarefas") or []))
-            atual = str(d.get("notas") or "").strip()
-            na_pagina = " ".join(str(o.get("nota") or "").split())
-            if pode_nota and na_pagina and na_pagina not in " ".join(atual.split()):
-                # o Fracttal tem a nota da OS e a da tarefa (a OS 12191 tinha as duas diferentes): a que a página
-                # mostra tem de estar no que vai ser regravado, senão acrescentar a apagaria
-                pode_nota, motivo = False, ("a nota da OS no Fracttal não bateu com a leitura da página; para não "
-                                            "sobrescrever, o comentário ficou só no Nexus")
-            if pode_nota:
-                r = os_api.editar_nota_os(wid, atual + "\n" + linha if atual else linha)
-                if not (isinstance(r, dict) and r.get("ok")):
-                    return jsonify({"erro": "O Fracttal não gravou a nota (%s). Nada foi gravado; tente de novo."
-                                            % ((r or {}).get("erro") or "sem resposta")}), 502
-            else:
-                nota = motivo
+            nota = _acrescentar_na_nota(os_api, regra, o, [linha])
+        except _NotaIncompleta:
+            return jsonify({"erro": "O Fracttal não devolveu a OS inteira agora. Nada foi gravado; tente de novo."}), 502
+        except _NotaNaoGravou as e:
+            return jsonify({"erro": "O Fracttal não gravou a nota (%s). Nada foi gravado; tente de novo." % e}), 502
         except os_api.SessionExpired:
             # o token cassado antes do exp: quem entrou pelo Fracttal sai do Nexus junto (o /os/login, com o JWT morto
             # no cookie, voltava direto para a página); quem entrou pela Microsoft perde só o cookie do OS Creator, e o
@@ -758,3 +781,56 @@ def engenharia_comentar(wid: int):
     if nota == "sim":
         return jsonify({"ok": True, "mensagem": "Comentário salvo na nota da OS %s, com a data e a hora." % o["os"]})
     return jsonify({"ok": True, "mensagem": "Comentário salvo só no Nexus: %s" % nota})
+
+
+# ── o histórico do app de ETM, trazido uma vez (26/10/2026) ──────────────────────────────────────────────────────────
+# Levi: "Traz 1 vez, para as OSs em aberto bota esses comentários na nota da OS." Mora aqui, em /os/_nexus, porque a nota
+# das OS em aberto vai na sessão do Fracttal de quem importa (o cookie os_sessao só vai para /os). A leitura do GitHub e
+# a importação rodam por trás (`etm_historico`); a tela ETMs do administrador acompanha pelo GET.
+@bp_raiz.route("/os/_nexus/engenharia/etm/historico", methods=["GET", "POST"])
+def engenharia_etm_historico():
+    from urllib.parse import quote, urlencode
+
+    from flask import jsonify
+
+    from ...engenharia import etm_historico as H
+    from ..moldura import _de_outro_site
+    if not session.get("admin"):
+        return jsonify({"erro": "Só o administrador traz o histórico do app de ETM."}), 403
+    if request.method == "GET":
+        return jsonify(H.estado_do_job())
+    if _de_outro_site():
+        return jsonify({"erro": "Pedido de outro site: nada foi feito."}), 403
+    app = current_app._get_current_object()
+    acao = (request.get_json(silent=True) or {}).get("acao")
+    if acao == "ler":
+        token = str(app.config.get("NEXUS_ETM_GITHUB_TOKEN") or "").strip()
+        repo = str(app.config.get("NEXUS_ETM_GITHUB_REPO") or "").strip()
+        if not token or not repo:
+            return jsonify({"erro": "Falta no .env do Nexus: NEXUS_ETM_GITHUB_TOKEN (um token que leia as Issues do "
+                                    "repositório do app de ETM) e NEXUS_ETM_GITHUB_REPO (dono/nome)."}), 400
+        return jsonify(H.iniciar_leitura(app, token, repo)), 202
+    if acao == "importar":
+        s = sessao_do_os(app)
+        jwt = str(s.get("jwt") or "")
+        if not jwt:
+            login = na_raiz("/os/login") + "?next=" + quote(
+                "/os/_nexus/card/voltar?" + urlencode({"de": "/t/engenharia/etm"}, safe="/"), safe="")
+            return jsonify({"erro": "Para a nota das OS em aberto, entre pelo Fracttal.", "login": login}), 401
+        email = str((s.get("conta") or {}).get("email") or "")
+        return jsonify(H.iniciar_importacao(app, lambda o, linhas: _nota_do_historico(app, jwt, email, o, linhas))), 202
+    return jsonify({"erro": "Ação desconhecida."}), 400
+
+
+def _nota_do_historico(app, jwt: str, email: str, o: dict, linhas: list[str]) -> str:
+    """As linhas do histórico na nota de uma OS aberta, na sessão do Fracttal de quem importa (por trás, fora do pedido)."""
+    from ...engenharia import etm_historico as H
+    clone(app)                                   # põe o `api` do clone no sys.path
+    import api as os_api                         # noqa: E402
+    from os_web import os_acoes_web as regra     # noqa: E402
+    from os_web import sessao as os_sessao       # noqa: E402
+    with _trava_nota, os_sessao.contexto(jwt, email):
+        try:
+            return _acrescentar_na_nota(os_api, regra, o, linhas)
+        except os_api.SessionExpired as e:
+            raise H.SessaoVencida(str(e)) from e

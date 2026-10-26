@@ -467,3 +467,22 @@ def test_os_comentarios_sao_os_da_os_da_engenharia(pagina_etm, cliente):
     html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
     assert 'data-comentar="/os/_nexus/engenharia/os/60003/comentar"' in html
     assert 'data-volta="/t/engenharia/etm?atualizar=1"' in html            # a troca de responsável volta para ETMs
+
+
+def test_o_login_do_fracttal_do_comentario_volta_para_a_os_da_etm(pagina_etm, cliente):
+    # o comentário da página da ETM sem a sessão do Fracttal: o login dele volta para a página da ETM, não para a do Quadro
+    import time
+
+    from test_engenharia_acompanhamento import ANA, SAME
+    with cliente.session_transaction() as s:
+        s["logado"], s["admin"], s["usuario"] = True, False, ANA
+        s["via"], s["ms_ate"] = "microsoft", time.time() + 3600
+    html = cliente.get(URL_OS).get_data(as_text=True)
+    assert 'data-de="/t/engenharia/etm/os/17003"' in html
+    r = cliente.post("/os/_nexus/engenharia/os/60003/comentar",
+                     json={"texto": "x", "folio": "17003", "de": "/t/engenharia/etm/os/17003"}, headers=SAME)
+    assert r.status_code == 401 and "%2Ft%2Fengenharia%2Fetm%2Fos%2F17003" in r.get_json()["login"]
+    r = cliente.post("/os/_nexus/engenharia/os/60003/comentar",
+                     json={"texto": "x", "folio": "17003", "de": "https://outro.site/x"}, headers=SAME)
+    assert "%2Ft%2Fengenharia%2Fequipe%2Fos%2F17003" in r.get_json()["login"]      # endereço estranho: a de sempre
+

@@ -60,6 +60,18 @@
     começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Análise de Engenharia = a OS que não
     é corretiva e está com alguém da engenharia; o resto é Campo. "Abertas para a Engenharia" só saem com o diagnóstico ou
     o finalizado pela Engenharia, não quando o Fracttal fecha a tarefa.</p>
+  {% if admin %}
+  {# o histórico do app de ETM, trazido uma vez (Levi, 26/10/2026: "Traz 1 vez, para as OSs em aberto bota esses
+     comentários na nota da OS"): lê o repositório do app, mostra a prévia e grava; roda por trás, e a tela acompanha #}
+  <details class="eg-bloco etm-hist">
+    <summary>Trazer o histórico do app de ETM (uma vez)</summary>
+    <p class="eg-dica">Os comentários, os diagnósticos, as etiquetas e as marcações que o app de ETM guardava no GitHub
+      entram no Nexus com o autor e a data de lá. Nas OS em aberto, os comentários vão também para a nota da OS, na sua
+      sessão do Fracttal. Trazer de novo não repete nada.</p>
+    <div class="etm-botoes"><button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-hist="ler">Ler o histórico</button><button type="button" class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" data-hist="importar" disabled>Trazer agora</button></div>
+    <p class="eg-pdf-msg" data-hist-msg role="status" hidden></p>
+  </details>
+  {% endif %}
 </div>
 <script type="application/json" id="etm-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "sem_marcas": erro_marcas != ""}|tojson }}</script>
 <script>
@@ -197,6 +209,47 @@
     document.querySelectorAll('[data-trabalho]').forEach(function (b) { b.setAttribute('aria-pressed', 'true'); });
     desenha();
   });
+  {% if admin %}
+  // o histórico do app de ETM (só o administrador): lê, mostra a prévia, grava; as duas tarefas rodam por trás e a
+  // tela pergunta a cada 2 s em que pé estão
+  var hist = document.querySelector('.etm-hist');
+  if (hist) {
+    var URL_H = nexusRota('/os/_nexus/engenharia/etm/historico');
+    var msg = hist.querySelector('[data-hist-msg]'), importar = hist.querySelector('[data-hist="importar"]');
+    var dizer = function (texto, link) {
+      msg.replaceChildren(document.createTextNode(texto || ''));
+      if (link) { var a = document.createElement('a'); a.href = link; a.textContent = 'Entrar pelo Fracttal'; msg.appendChild(document.createTextNode(' ')); msg.appendChild(a); }
+      msg.hidden = !texto;
+    };
+    var acompanhar = function () {
+      fetch(URL_H, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j.fase === 'lendo' || j.fase === 'importando') { dizer(j.msg); setTimeout(acompanhar, 2000); return; }
+          if (j.fase === 'erro') { dizer('Não deu: ' + j.erro); return; }
+          dizer(j.msg);
+          importar.disabled = !(j.fase === 'lido' && j.previa && (j.previa.comentarios || j.previa.marcacoes));
+          if (j.fase === 'feito') setTimeout(function () { location.replace(location.pathname + '?atualizar=1'); }, 3000);
+        })
+        .catch(function () { dizer('Não consegui falar com o Nexus. Tente de novo.'); });
+    };
+    hist.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-hist]'); if (!b) return;
+      if (b.dataset.hist === 'importar' && !confirm('Trazer o histórico do app de ETM agora? Nas OS em aberto, os comentários vão para a nota da OS no Fracttal.')) return;
+      importar.disabled = true;
+      fetch(URL_H, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                    body: JSON.stringify({acao: b.dataset.hist})})
+        .then(function (r) { return r.json().then(function (j) { return {r: r, j: j}; }); })
+        .then(function (x) {
+          if (x.r.status === 401 && x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; return; }
+          if (!x.r.ok) { dizer(x.j.erro || ('HTTP ' + x.r.status), x.j.login); return; }
+          acompanhar();
+        })
+        .catch(function () { dizer('Não consegui falar com o Nexus. Tente de novo.'); });
+    });
+    acompanhar();
+  }
+  {% endif %}
   // voltou da OS com a tela relida: o ?atualizar=1 sai do endereço, para o F5 não reler de novo
   if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* sem history */ } }
   desenha();

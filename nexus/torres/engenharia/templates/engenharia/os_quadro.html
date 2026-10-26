@@ -170,7 +170,7 @@
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Comentários</h2><span class="n">{{ (est.eventos or [])|length }}</span></div>
         {% if pode %}
-        <div class="eg-os-coment" data-comentar="{{ comentar_url }}" data-folio="{{ o.os }}">
+        <div class="eg-os-coment" data-comentar="{{ comentar_url }}" data-folio="{{ o.os }}" data-de="{{ de_pagina }}">
           <textarea class="eg-tl-obs" maxlength="2000" aria-label="Comentário" placeholder="O que a engenharia viu ou fez? (a data entra sozinha)"></textarea>
           <div class="eg-tl-comp"><span class="eg-dica">Vai para a nota da OS {{ o.os }} no Fracttal, com o seu nome, a data e a hora.</span>
             <button type="button" class="eg-ac-btn eg-ac-btn--g">Salvar comentário</button></div>
@@ -338,7 +338,7 @@
     if (!texto) { diz('Escreva o comentário antes de salvar.', true); ta.focus(); return; }
     btn.disabled = true; diz('Salvando na nota da OS…');
     fetch(box.dataset.comentar, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({texto: texto, folio: box.dataset.folio})})
+      body: JSON.stringify({texto: texto, folio: box.dataset.folio, de: box.dataset.de})})
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
       .then(function (x) {
         btn.disabled = false;
