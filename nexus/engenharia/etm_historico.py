@@ -191,7 +191,8 @@ def iniciar_leitura(app, token: str, repo: str, sessao=None) -> dict:
                 pv = previa(pl, abertas)
                 _JOB.update(fase="lido", plano=pl, previa=pv, msg=(
                     f"{pv['comentarios']} comentário(s) e {pv['marcacoes']} marcação(ões) em {pv['oss']} OS; "
-                    f"{pv['notas']} OS em aberto recebem os comentários na nota." if pl else
+                    f"{pv['notas']} OS em aberto {'recebe' if pv['notas'] == 1 else 'recebem'} os comentários na nota."
+                    if pl else
                     "Nada a trazer: o Nexus já tem todo o histórico do app."))
         except Exception as e:      # noqa: BLE001 — o GitHub ou o banco fora: a tela diz
             _JOB.update(fase="erro", erro=f"{type(e).__name__}: {str(e)[:200]}", msg="")
@@ -215,7 +216,7 @@ def iniciar_importacao(app, escrever_nota) -> dict:
                 r = _JOB["resultado"]
                 _JOB.update(fase="feito", plano=None, msg=(
                     f"Trazidos {r['comentarios']} comentário(s) e {r['marcacoes']} marcação(ões); {r['notas']} nota(s) "
-                    "de OS em aberto atualizadas." + (f" Ficaram para a próxima (o Fracttal não respondeu): OS "
+                    "de OS em aberto atualizada(s)." + (f" Ficaram para a próxima (o Fracttal não respondeu): OS "
                                                       f"{', '.join(r['adiadas'])}." if r["adiadas"] else "")
                     + (f" Não achei no Fracttal: OS {', '.join(r['sem_os'])}." if r["sem_os"] else "")))
         except SessaoVencida:
