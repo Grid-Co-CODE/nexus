@@ -251,12 +251,18 @@ em aberto os comentários vão também para a nota da OS; entrega por partes; o 
 como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenharia-etm-design.md`; plano em
 `docs/superpowers/plans/2026-10-26-engenharia-etm.md`.
 
-- **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), o Planner do app no desenho do Quadro da
-  equipe (`kb-*`): as colunas Não iniciadas, Em andamento, Finalizadas e, pelo filtro, Canceladas (a coluna do quadro
-  levada à do app: a verificação ainda está em andamento); os filtros do app no navegador (cliente, usina, criado por,
-  solicitante, responsável, Engenharia, Chamados ou Campo, o período em que a OS esteve ativa, as canceladas e, na
-  coluna Em andamento, as etiquetas da Engenharia); a faixa Abertas no Fracttal, Abertas para a Engenharia (a regra das
-  "Estações em Aberto" do app: a OS só sai com o diagnóstico ou o finalizado, não quando o Fracttal fecha), Em
+- **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), o Planner do app no desenho do Nexus: a
+  faixa de números em cima; à esquerda a coluna de filtros do Acompanhamento PCM (Levi, 26/10/2026: "o estilo de lista
+  dos filtros está todo bugado e torto, deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo
+  mau utilizado"): a pesquisa geral, os seletores Cliente, Usina, Tipo de trabalho, Status da OS, Criado por,
+  Solicitante e Responsável (a busca, as caixas de marcar com a conta de cada opção com os outros filtros, Selecionar
+  todos, Limpar e Aplicar; o painel abre dentro da coluna, que rola sozinha), o período e "Redefinir filtros"; à direita
+  o quadro, com as colunas Não iniciadas, Em andamento, Finalizadas e Canceladas (a coluna do quadro levada à do app: a
+  verificação ainda está em andamento) e, na coluna Em andamento, as etiquetas da Engenharia. O **Status da OS** (o do
+  Fracttal: Em Processo, Em Verificação, Concluída, Cancelada) entrou no lugar do "mostrar canceladas": sem marcar, as
+  canceladas ficam de fora. Abaixo de 1100 px a coluna sobe para cima do quadro, com os seletores em duas colunas. A
+  lista do navegador (datalist) saiu: abria clara e torta. Faixa: Abertas no Fracttal, Abertas para a Engenharia (a
+  regra das "Estações em Aberto" do app: a OS só sai com o diagnóstico ou o finalizado, não quando o Fracttal fecha), Em
   acompanhamento e Finalizadas em 30 dias. Sem ler o livro das marcações, a tela diz e as duas contas dele ficam "—".
 - **A leitura** (`nexus/engenharia/etm.py`, medida em 26/10/2026, só leitura): `items?field_1=Estação Meteorológica` dá
   as 172 ETMs (a descrição confere) e `work_orders?items_log_description=Estação Meteorológica` as 1213 OS delas: 15

@@ -31,37 +31,35 @@
     </div>{% endfor %}
   </section>
 
-  {# os filtros do Planner do app, na mesma ordem #}
-  <div class="etm-filtros" role="group" aria-label="Filtros">
-    <label class="etm-f"><span>Cliente</span>
-      <select class="gc-campo" id="etm-f-cliente"><option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></label>
-    <label class="etm-f"><span>Usina</span>
-      <input type="search" class="gc-campo" id="etm-f-usina" placeholder="buscar usina" autocomplete="off"></label>
-    <label class="etm-f"><span>Criado por</span>
-      <input class="gc-campo" id="etm-f-criado" list="etm-l-criado" placeholder="Todos" autocomplete="off"></label>
-    <label class="etm-f"><span>Solicitante</span>
-      <input class="gc-campo" id="etm-f-solicitante" list="etm-l-solicitante" placeholder="Todos" autocomplete="off"></label>
-    <label class="etm-f"><span>Responsável</span>
-      <input class="gc-campo" id="etm-f-responsavel" list="etm-l-responsavel" placeholder="Todos" autocomplete="off"></label>
-    <div class="etm-f"><span>Tipo de trabalho</span>
-      <span class="etm-chips"><button type="button" class="etm-chip" data-trabalho="engenharia" aria-pressed="true">Engenharia</button><button type="button" class="etm-chip" data-trabalho="chamados" aria-pressed="true">Chamados</button><button type="button" class="etm-chip" data-trabalho="campo" aria-pressed="true">Campo</button></span></div>
-    <div class="etm-f etm-f--datas"><span>Período (OS ativa entre)</span>
-      <span class="etm-datas"><input type="date" class="gc-campo" id="etm-f-ini" aria-label="De"><span>até</span><input type="date" class="gc-campo" id="etm-f-fim" aria-label="Até"></span></div>
-    <div class="etm-f etm-f--fim">
-      <label class="kb-marca"><input type="checkbox" id="etm-f-canceladas"> mostrar canceladas</label>
-      <button type="button" class="kb-limpar" id="etm-f-limpar">Limpar filtros</button></div>
+  {# os filtros à esquerda e o quadro ao lado (Levi, 26/10/2026: "o estilo de lista dos filtros está todo bugado e torto,
+     deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo mau utilizado"): a coluna e o
+     seletor do Acompanhamento PCM (a busca, as caixas de marcar com a conta de cada opção, Selecionar todos, Limpar e
+     Aplicar); a lista do navegador (datalist) saiu. Abaixo de 1100 px a coluna sobe para cima do quadro. #}
+  <div class="etm-app">
+    <aside class="etm-lado" aria-label="Filtros">
+      <h2 class="gc-rotulo">Filtros</h2>
+      <div class="etm-busca">
+        <label class="gc-rotulo" for="etm-f-busca">Pesquisa geral</label>
+        <div class="etm-busca-campo"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+          <input class="gc-campo" id="etm-f-busca" type="search" placeholder="OS, título, ETM, usina…" autocomplete="off"></div>
+      </div>
+      <div id="etm-filtros" class="etm-filtros"></div>
+      <div class="etm-periodo"><span class="gc-rotulo">Período (OS ativa entre)</span>
+        <input type="date" class="gc-campo" id="etm-f-ini" aria-label="De"><input type="date" class="gc-campo" id="etm-f-fim" aria-label="Até"></div>
+      <button class="gc-btn gc-btn--contorno etm-limpar" id="etm-f-limpar" type="button"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i>Redefinir filtros</button>
+      <div class="etm-lado-nota"><span id="etm-mostrando"></span>
+        <span>Os filtros se cruzam: o número ao lado de cada opção diz quantas OS ela traz com os outros filtros. Sem marcar o status, as canceladas ficam de fora.</span></div>
+    </aside>
+    <div class="etm-main">
+      {# as etiquetas da Engenharia filtram a coluna Em andamento, como no app (o JS põe os botões no cabeçalho dela) #}
+      <template id="etm-etiquetas">{% for n in etiquetas_eng %}<button type="button" class="etm-chip etm-chip--p" data-etiqueta="{{ n }}" aria-pressed="false">{{ n }}</button>{% endfor %}</template>
+      <div class="kb-quadro" aria-live="polite"></div>
+      <p class="mudo kb-rodape">Coluna: Não iniciadas = a OS aberta sem nenhuma tarefa começada; Em andamento = alguma tarefa
+        começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Engenharia e Chamados = a OS está
+        com alguém desses setores (Base → Acessos → Pessoas e setores); o resto é Campo. "Abertas para a Engenharia" só
+        saem com o diagnóstico ou o finalizado pela Engenharia, não quando o Fracttal fecha a tarefa.</p>
+    </div>
   </div>
-  <datalist id="etm-l-criado">{% for n in criados %}<option value="{{ n }}">{% endfor %}</datalist>
-  <datalist id="etm-l-solicitante">{% for n in solicitantes %}<option value="{{ n }}">{% endfor %}</datalist>
-  <datalist id="etm-l-responsavel">{% for n in responsaveis %}<option value="{{ n }}">{% endfor %}</datalist>
-  {# as etiquetas da Engenharia filtram a coluna Em andamento, como no app (o JS põe os botões no cabeçalho dela) #}
-  <template id="etm-etiquetas">{% for n in etiquetas_eng %}<button type="button" class="etm-chip etm-chip--p" data-etiqueta="{{ n }}" aria-pressed="false">{{ n }}</button>{% endfor %}</template>
-
-  <div class="kb-quadro" aria-live="polite"></div>
-  <p class="mudo kb-rodape">Coluna: Não iniciadas = a OS aberta sem nenhuma tarefa começada; Em andamento = alguma tarefa
-    começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Engenharia e Chamados = a OS está com
-    alguém desses setores (Base → Acessos → Pessoas e setores); o resto é Campo. "Abertas para a Engenharia" só saem com o diagnóstico ou
-    o finalizado pela Engenharia, não quando o Fracttal fecha a tarefa.</p>
   {% if admin %}
   {# o histórico do app de ETM, trazido uma vez (Levi, 26/10/2026: "Traz 1 vez, para as OSs em aberto bota esses
      comentários na nota da OS"): lê o repositório do app, mostra a prévia e grava; roda por trás, e a tela acompanha #}
@@ -75,18 +73,32 @@
   </details>
   {% endif %}
 </div>
-<script type="application/json" id="etm-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "sem_marcas": erro_marcas != "", "nunca_lido": nunca_lido}|tojson }}</script>
+<script type="application/json" id="etm-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "sem_marcas": erro_marcas != "", "nunca_lido": nunca_lido, "status": status}|tojson }}</script>
 <script>
 (function () {
   var D = JSON.parse(document.getElementById('etm-dados').textContent);
   var quadro = document.querySelector('.kb-quadro');
-  var estado = {cliente: '', usina: '', criado: '', solicitante: '', responsavel: '',
-                trabalho: {engenharia: true, chamados: true, campo: true},
-                ini: '', fim: '', canceladas: false, etiquetas: []};
   // as colunas do app com as cores das do Quadro da equipe
   var COR = {nao_iniciada: 'fazer', em_andamento: 'execucao', finalizada: 'concluida', cancelada: 'cancelada'};
   var ROT = {}; D.colunas.forEach(function (c) { ROT[c[0]] = c[1]; });
   var TRAB = {engenharia: 'Engenharia', chamados: 'Chamados', campo: 'Campo'};
+  // os filtros da coluna, na ordem do Planner do app; o status da OS (Levi, 26/10/2026: "Quero um filtro também para
+  // status da OS, se está em processo, concluída, em verificação etc") no lugar do "mostrar canceladas"
+  var FILTROS = [
+    {k: 'cliente', l: 'Cliente', i: 'buildings'},
+    {k: 'usina', l: 'Usina', i: 'solar-panel'},
+    {k: 'trabalho', l: 'Tipo de trabalho', i: 'users-three', ordem: ['engenharia', 'chamados', 'campo'], rot: TRAB},
+    {k: 'status', l: 'Status da OS', i: 'flag', ordem: D.status, padrao: 'Sem as canceladas'},
+    {k: 'criado_por', l: 'Criado por', i: 'user-plus'},
+    {k: 'solicitante', l: 'Solicitante', i: 'user-circle'},
+    {k: 'responsavel', l: 'Responsável', i: 'user-gear'}
+  ];
+  function novoEstado() {
+    var f = {}; FILTROS.forEach(function (d) { f[d.k] = new Set(); });
+    return {f: f, q: '', ini: '', fim: '', etiquetas: []};
+  }
+  var estado = novoEstado();
+  function fold(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   // "OS ativa entre" do app: criada até o fim do período e, se já fechou, fechada depois do começo dele
@@ -99,15 +111,93 @@
     if (estado.ini && fim && fim < estado.ini) return false;
     return true;
   }
-  function passa(o) {
-    if (o.coluna === 'cancelada' && !estado.canceladas) return false;
-    if (estado.cliente && o.cliente !== estado.cliente) return false;
-    if (estado.usina && o.usina.toLowerCase().indexOf(estado.usina) < 0) return false;
-    if (estado.criado && o.criado_por !== estado.criado) return false;
-    if (estado.solicitante && o.solicitante !== estado.solicitante) return false;
-    if (estado.responsavel && o.responsavel !== estado.responsavel) return false;
-    if (!estado.trabalho[o.trabalho]) return false;
+  // a OS passa nos filtros; `sem` é o filtro que não conta (a conta das opções dele, como no Acompanhamento PCM)
+  function passa(o, sem) {
+    for (var i = 0; i < FILTROS.length; i++) {
+      var d = FILTROS[i], sel = estado.f[d.k];
+      if (d.k === sem) continue;
+      if (sel.size) { if (!sel.has(String(o[d.k] || ''))) return false; }
+      else if (d.k === 'status' && o.status === 'Cancelada') return false;     // sem marcar, as canceladas ficam de fora
+    }
+    if (estado.q) {
+      var h = fold([o.os, o.titulo, o.codigo, o.usina, o.cliente, o.responsavel, o.solicitante, o.criado_por].join(' '));
+      if (!fold(estado.q).split(/\s+/).every(function (w) { return h.indexOf(w) >= 0; })) return false;
+    }
     return ativaNoPeriodo(o);
+  }
+  // ── o seletor de cada filtro (o do Acompanhamento PCM): o botão com o valor e o painel com a busca, as caixas de
+  //    marcar com a conta, Selecionar todos, Limpar, Cancelar e Aplicar ──
+  var aberto = null;
+  function fechar() { if (aberto) { aberto.hidden = true; aberto.previousElementSibling.setAttribute('aria-expanded', 'false'); aberto = null; } }
+  document.addEventListener('click', fechar);
+  function rotulo(d, v) { return d.rot ? (d.rot[v] || v) : v; }
+  function seletor(d) {
+    var sel = estado.f[d.k], conta = {};
+    D.oss.filter(function (o) { return passa(o, d.k); }).forEach(function (o) { var v = String(o[d.k] || ''); if (v) conta[v] = (conta[v] || 0) + 1; });
+    var tem = {}; D.oss.forEach(function (o) { var v = String(o[d.k] || ''); if (v) tem[v] = true; });
+    var opts = d.ordem ? d.ordem.slice() : Object.keys(tem).sort(function (a, b) { return a.localeCompare(b, 'pt'); });
+    if (!opts.length) return null;
+    var w = el('div', 'etm-ms' + (sel.size ? ' on' : ''));
+    var lid = 'etm-ms-' + d.k + '-l';
+    var lab = el('span', 'gc-rotulo', d.l); lab.id = lid; w.appendChild(lab);
+    var b = el('button', 'etm-ms-bt'); b.type = 'button';
+    b.setAttribute('aria-haspopup', 'listbox'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-labelledby', lid);
+    var v = sel.size === 0 ? (d.padrao || 'Todos') : sel.size === 1 ? rotulo(d, Array.from(sel)[0]) : sel.size + ' selecionados';
+    b.title = sel.size ? Array.from(sel).map(function (x) { return rotulo(d, x); }).join(', ') : v;
+    var ic = el('i', 'ph ph-' + d.i); ic.setAttribute('aria-hidden', 'true'); b.appendChild(ic);
+    b.appendChild(el('span', 'val', v));
+    var car = el('i', 'ph ph-caret-down'); car.setAttribute('aria-hidden', 'true'); b.appendChild(car);
+    w.appendChild(b);
+    var p = el('div', 'etm-ms-painel'); p.hidden = true;
+    var busca = null;
+    if (opts.length > 8) {
+      busca = el('input', 'gc-campo etm-ms-busca'); busca.type = 'search'; busca.placeholder = 'Buscar ' + d.l.toLowerCase();
+      busca.setAttribute('aria-label', 'Buscar ' + d.l); p.appendChild(busca);
+    }
+    var rap = el('div', 'etm-ms-rapido');
+    var todos = el('button', 'etm-lnk', 'Selecionar todos'); todos.type = 'button';
+    var nenhum = el('button', 'etm-lnk', 'Limpar'); nenhum.type = 'button';
+    rap.appendChild(todos); rap.appendChild(nenhum); p.appendChild(rap);
+    var lista = el('div', 'etm-ms-lista'); lista.setAttribute('role', 'listbox'); lista.setAttribute('aria-multiselectable', 'true');
+    opts.forEach(function (o) {
+      var c = conta[o] || 0, op = el('label', 'etm-ms-op' + (c ? '' : ' zero'));
+      var cx = el('input'); cx.type = 'checkbox'; cx.value = o; cx.checked = sel.has(o);
+      op.appendChild(cx); op.appendChild(el('span', null, rotulo(d, o))); op.appendChild(el('em', null, String(c)));
+      lista.appendChild(op);
+    });
+    p.appendChild(lista);
+    var ac = el('div', 'etm-ms-acoes');
+    var cancelar = el('button', 'gc-btn gc-btn--contorno', 'Cancelar'); cancelar.type = 'button';
+    var aplicar = el('button', 'gc-btn gc-btn--primario', 'Aplicar'); aplicar.type = 'button';
+    ac.appendChild(cancelar); ac.appendChild(aplicar); p.appendChild(ac);
+    w.appendChild(p);
+    b.addEventListener('click', function (e) {
+      e.stopPropagation(); var era = !p.hidden; fechar();
+      if (!era) { p.hidden = false; b.setAttribute('aria-expanded', 'true'); aberto = p; (busca || p.querySelector('input')).focus(); }
+    });
+    p.addEventListener('click', function (e) { e.stopPropagation(); });
+    if (busca) busca.addEventListener('input', function () {
+      var q = fold(busca.value); lista.querySelectorAll('.etm-ms-op').forEach(function (o) { o.hidden = fold(o.textContent).indexOf(q) < 0; });
+    });
+    todos.addEventListener('click', function () { lista.querySelectorAll('.etm-ms-op:not([hidden]) input').forEach(function (i) { i.checked = true; }); });
+    nenhum.addEventListener('click', function () { lista.querySelectorAll('input').forEach(function (i) { i.checked = false; }); });
+    cancelar.addEventListener('click', function () { fechar(); b.focus(); });
+    aplicar.addEventListener('click', function () {
+      var s = new Set(Array.from(lista.querySelectorAll('input:checked')).map(function (i) { return i.value; }));
+      // tudo marcado = Todos (no status, tudo marcado é com as canceladas, que o padrão deixa de fora)
+      estado.f[d.k] = s.size === opts.length && !d.padrao ? new Set() : s;
+      fechar(); desenha();
+    });
+    p.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { fechar(); b.focus(); }
+      if (e.key === 'Enter' && e.target.type !== 'checkbox' && e.target.tagName !== 'BUTTON') aplicar.click();
+    });
+    return w;
+  }
+  function filtros() {
+    var box = document.getElementById('etm-filtros');
+    box.replaceChildren();
+    FILTROS.forEach(function (d) { var w = seletor(d); if (w) box.appendChild(w); });
   }
   function passaEtiquetas(o) {
     if (!estado.etiquetas.length) return true;
@@ -155,8 +245,11 @@
   function desenha() {
     // sem leitura nenhuma ainda (a primeira em curso, logo depois de subir): nada de colunas vazias, e a tela se relê
     if (D.nunca_lido) { quadro.replaceChildren(el('p', 'kb-vazio', 'Lendo as OS de ETM no Fracttal…')); return; }
-    var lista = D.oss.filter(passa);
-    var cols = D.colunas.map(function (c) { return c[0]; }).filter(function (c) { return c !== 'cancelada' || estado.canceladas; });
+    filtros();
+    var lista = D.oss.filter(function (o) { return passa(o); });
+    document.getElementById('etm-mostrando').textContent = 'Mostrando ' + lista.length + ' de ' + D.oss.length + ' OS';
+    // a coluna das canceladas só com elas marcadas no status
+    var cols = D.colunas.map(function (c) { return c[0]; }).filter(function (c) { return c !== 'cancelada' || estado.f.status.has('Cancelada'); });
     var g = el('div', 'kb-colunas');
     g.style.setProperty('--n', cols.length);
     cols.forEach(function (c) {
@@ -184,38 +277,19 @@
     quadro.replaceChildren(g);
   }
   // os controles
-  function campo(id, chave, minusculo) {
-    var e = document.getElementById(id);
-    e.addEventListener(e.tagName === 'SELECT' ? 'change' : 'input', function () {
-      var v = e.value.trim(); estado[chave] = minusculo ? v.toLowerCase() : v; desenha();
-    });
-    return e;
-  }
-  var campos = [campo('etm-f-cliente', 'cliente'), campo('etm-f-usina', 'usina', true), campo('etm-f-criado', 'criado'),
-                campo('etm-f-solicitante', 'solicitante'), campo('etm-f-responsavel', 'responsavel'),
-                campo('etm-f-ini', 'ini'), campo('etm-f-fim', 'fim')];
-  document.querySelectorAll('[data-trabalho]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      estado.trabalho[b.dataset.trabalho] = !estado.trabalho[b.dataset.trabalho];
-      b.setAttribute('aria-pressed', String(estado.trabalho[b.dataset.trabalho])); desenha();
-    });
-  });
+  var busca = document.getElementById('etm-f-busca'), dIni = document.getElementById('etm-f-ini'), dFim = document.getElementById('etm-f-fim');
+  busca.addEventListener('input', function () { estado.q = busca.value.trim(); desenha(); });
+  dIni.addEventListener('input', function () { estado.ini = dIni.value; desenha(); });
+  dFim.addEventListener('input', function () { estado.fim = dFim.value; desenha(); });
   quadro.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-etiqueta]'); if (!b) return;
     var i = estado.etiquetas.indexOf(b.dataset.etiqueta);
     if (i >= 0) estado.etiquetas.splice(i, 1); else estado.etiquetas.push(b.dataset.etiqueta);
     desenha();
   });
-  var canceladas = document.getElementById('etm-f-canceladas');
-  canceladas.addEventListener('change', function () { estado.canceladas = canceladas.checked; desenha(); });
   document.getElementById('etm-f-limpar').addEventListener('click', function () {
-    campos.forEach(function (e) { e.value = ''; });
-    canceladas.checked = false;
-    estado = {cliente: '', usina: '', criado: '', solicitante: '', responsavel: '',
-              trabalho: {engenharia: true, chamados: true, campo: true},
-              ini: '', fim: '', canceladas: false, etiquetas: []};
-    document.querySelectorAll('[data-trabalho]').forEach(function (b) { b.setAttribute('aria-pressed', 'true'); });
-    desenha();
+    busca.value = ''; dIni.value = ''; dFim.value = '';
+    estado = novoEstado(); desenha();
   });
   {% if admin %}
   // o histórico do app de ETM (só o administrador): lê, mostra a prévia, grava; as duas tarefas rodam por trás e a

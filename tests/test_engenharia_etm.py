@@ -304,18 +304,35 @@ def test_a_tela_etms_na_torre_da_engenharia(tela, cliente):
     assert "nexusRota('/t/engenharia/etm/os/')" in html          # o clique abre a OS da ETM
 
 
-def test_os_filtros_do_planner_do_app(tela, cliente):
+def test_os_filtros_do_planner_no_padrao_do_nexus(tela, cliente):
+    # Levi, 26/10/2026: "o estilo de lista dos filtros está todo bugado e torto, deixe no nível do nexus!" — a lista do
+    # navegador (datalist) saiu; os filtros são o seletor do Acompanhamento PCM (a busca, as caixas de marcar com a conta
+    # de cada opção, Selecionar todos, Limpar e Aplicar), montados no navegador
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
-    for campo in ('id="etm-f-cliente"', 'id="etm-f-usina"', 'id="etm-f-criado"', 'id="etm-f-solicitante"',
-                  'id="etm-f-responsavel"', 'data-trabalho="engenharia"', 'data-trabalho="chamados"', 'data-trabalho="campo"',
-                  'id="etm-f-ini"',
-                  'id="etm-f-fim"', 'id="etm-f-canceladas"', 'id="etm-f-limpar"'):
+    assert "<datalist" not in html and 'id="etm-f-canceladas"' not in html
+    for campo in ('id="etm-filtros"', 'id="etm-f-busca"', 'id="etm-f-ini"', 'id="etm-f-fim"', 'id="etm-f-limpar"'):
         assert campo in html, campo
-    assert all(f'aria-pressed="true">{n}</button>' in html for n in ("Engenharia", "Chamados", "Campo"))
-    assert '<option value="Cliente X">Cliente X</option>' in html
+    defs = html.split("var FILTROS = [", 1)[1].split("];", 1)[0]
+    chaves = [x.split("'")[1] for x in defs.split("k: ")[1:]]
+    assert chaves == ["cliente", "usina", "trabalho", "status", "criado_por", "solicitante", "responsavel"]
+    # a coluna de filtros à esquerda (Levi: "tem um espaço livre do lado esquerdo que está sendo mau utilizado")
+    assert html.index('class="etm-lado"') < html.index('class="kb-quadro"')
+    assert "l: 'Status da OS'" in defs and "l: 'Tipo de trabalho'" in defs
+    assert "etm-ms-painel" in html and "'Selecionar todos'" in html and "'Aplicar'" in html
     # o filtro das etiquetas da Engenharia, na coluna Em andamento como no app
     assert all(f'data-etiqueta="{n}"' in html for n in ("OS em campo", "Stand By", "Validação Final"))
+
+
+def test_o_status_da_os_vai_no_json_e_as_canceladas_so_pelo_filtro(tela, cliente):
+    # Levi, 26/10/2026: "Quero um filtro também para status da OS, se está em processo, concluída, em verificação etc"
+    from test_engenharia_acompanhamento import ANA, _como
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    o = {x["os"]: x for x in _dados_da_tela(html)["oss"]}
+    assert (o["1"]["status"], o["3"]["status"], o["4"]["status"]) == ("Em Processo", "Concluída", "Cancelada")
+    assert _dados_da_tela(html)["status"] == ["Em Processo", "Em Verificação", "Concluída", "Cancelada"]
+    # sem nada marcado, todas menos as canceladas (o "mostrar canceladas" do app virou marcar Cancelada no filtro)
+    assert "padrao: 'Sem as canceladas'" in html
 
 
 def test_cada_os_leva_as_marcacoes_da_engenharia(tela, cliente):

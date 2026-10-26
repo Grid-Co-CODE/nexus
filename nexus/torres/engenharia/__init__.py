@@ -1208,15 +1208,13 @@ def etm():
     est = M.estado(lido["eventos"]) if not erro_marcas else {}
     oss = [_os_do_planner(o, est.get(str(o.get("wid")))) for o in d["os"]]
     hoje = datetime.now(BRT).date()
-
-    def nomes(campo):
-        return sorted({o[campo] for o in oss if o[campo]}, key=lambda s: s.lower())
+    from ...engenharia import os_equipe
     return render_template(
         "engenharia/etm.html", torre=TORRE, tela=TORRE.tela("etm"), oss=oss, colunas=ETM.COLUNAS,
         kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas), sem_leitura=not d["lido"]), erro=d["erro"],
         erro_marcas=erro_marcas, nunca_lido=not d["lido"], lendo=d["lendo"], erro_setores=d.get("erro_setores") or "",
-        clientes=nomes("cliente"), criados=nomes("criado_por"), solicitantes=nomes("solicitante"),
-        responsaveis=nomes("responsavel"), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
+        # os status da OS no Fracttal, na ordem dele (o filtro "Status da OS", 26/10/2026)
+        status=list(os_equipe.STATUS_OS.values()), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
         admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
 
