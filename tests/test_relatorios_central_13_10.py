@@ -93,10 +93,11 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # os do PCM (14/10/2026) são do setor PCM: os relatórios (nexus/pcm/relatorios, tests/test_relatorios_pcm.py) e o
         # Acompanhamento (nexus/pcm/acompanhamento, tests/test_pcm_acompanhamento.py)
         # e, desde 16/10/2026, o Gerar a semana e o Quadro da semana (Levi: "administradores e pessoas do setor de PCM
-        # conseguir gerar uma programação semanal!", tests/test_pcm_publicar.py)
+        # conseguir gerar uma programação semanal!", tests/test_pcm_publicar.py); e, desde 25/10/2026, o Almoxarifado
+        # (nexus/pcm/almoxarifado.py, tests/test_pcm_almoxarifado.py)
         assert ST.das_do_setor("PCM") == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
                                           | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao",
-                                             "pcm/tecnicos-por-usina"})
+                                             "pcm/tecnicos-por-usina", "pcm/pecas"})
         # o Gerar e o Quadro têm dois donos: o PCM e os supervisores (Levi, 16/10/2026: "tanto PCM quanto supervisores!
         # Vou criar um setor de Responsáveis UFV"), pelo nome, sem acento nem caixa
         # e, desde 16/10/2026, o Fora da programação (os motivos que tiram a tarefa da semana; tests/test_pcm_motivos.py)
