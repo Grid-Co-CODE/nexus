@@ -77,7 +77,7 @@
     <thead><tr><th>Almoxarifado</th><th>Peça</th><th>Família</th><th class="num">Saldo</th><th class="num">Mínimo</th><th class="num">Falta</th></tr></thead>
     <tbody>
     {% for x in d.reposicao %}
-    <tr{{ filtro(x.almox, x.familia, x.codigo ~ ' ' ~ x.nome) }}>
+    <tr{{ filtro(x.almox, x.familia, x.busca) }}>
       <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}{% if x.usina %}<span class="alm-det">{{ x.usina }}</span>{% endif %}</span></td>
       <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.codigo }}</span> {{ x.nome }}</span></td>
       <td data-r="Família"><span class="alm-v">{{ x.familia }}</span></td>
@@ -105,6 +105,7 @@
         <span{% if c.abaixo %} class="alm-ruim"{% endif %}><b>{{ c.abaixo }}</b> abaixo · <b>{{ c.no_limite }}</b> no limite</span>
         <span{% if c.sem_minimo %} class="alm-aviso"{% endif %}><b>{{ c.sem_minimo }}</b> sem mínimo</span>
         <span><b>{{ c.zeradas }}</b> zeradas</span>
+        {% if c.nao_informado %}<span class="alm-aviso"><b>{{ c.nao_informado }}</b> sem saldo informado</span>{% endif %}
       </div>
       <span class="alm-barra alm-barra--larga" title="{{ c.pct_ok }}% acima do mínimo"><i style="width:{{ c.pct_ok }}%"></i></span>
     </article>
@@ -119,7 +120,7 @@
     <thead><tr><th>Peça</th><th>Família</th><th class="num">Saldo total</th><th>Onde tem</th></tr></thead>
     <tbody>
     {% for c in d.catalogo %}
-    <tr{{ filtro(c.almoxes|join('|'), c.familia, c.codigo ~ ' ' ~ c.nome) }}>
+    <tr{{ filtro(c.almoxes|join('|'), c.familia, c.busca) }}>
       <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ c.codigo }}</span> {{ c.nome }}{% if c.avariado %} <span class="alm-aviso">avariada</span>{% endif %}</span></td>
       <td data-r="Família"><span class="alm-v">{{ c.familia }}</span></td>
       <td data-r="Saldo total" class="num"><span class="alm-v">{% if c.nao_lido %}<span class="alm-aviso">não lido neste ciclo</span>{% else %}{{ '%g'|format(c.total) }} {{ c.unidade|lower }}{% endif %}</span></td>
@@ -140,7 +141,7 @@
     <thead><tr><th>Dia</th><th>OS</th><th>Peça</th><th class="num">Qtd</th><th>Almoxarifado</th><th>No Fracttal</th></tr></thead>
     <tbody>
     {% for c in d.consumo|reverse %}
-    <tr{{ filtro(c.almox, c.familia, c.codigo ~ ' ' ~ c.nome ~ ' ' ~ c.os) }}>
+    <tr{{ filtro(c.almox, c.familia, c.busca) }}>
       <td data-r="Dia"><span class="alm-v">{{ c.dia }}</span></td>
       <td data-r="OS" class="alm-cod"><span class="alm-v">{{ c.os }}</span></td>
       <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ c.codigo }}</span> {{ c.nome }}</span></td>

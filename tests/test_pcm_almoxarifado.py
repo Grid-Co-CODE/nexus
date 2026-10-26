@@ -38,20 +38,28 @@ def _p(lid, item, almox, situacao, motivo=""):
             "Unidade": "UNIDADE", "Situação": situacao, "Motivo da recusa": motivo, "Lançado por (HMAC)": ""}
 
 
-def _semear(api, saldo_inicio=INICIO, lidos=4):
-    _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, [{"Início do ciclo": INICIO, "Fim do ciclo": FIM,
-                                             "Itens na lista do Fracttal": 4, "Itens lidos": lidos, "Erros": 0,
-                                             "Origem": "automático"}])
-    _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, [
-        _item(1, "SP-1", "Fusível 10A", "UNIDADE", "Proteção"), _item(2, "SP-2", "Cabo 6 mm", "METRO", "Cabos"),
-        _item(3, "SP-3-AV", "[AVARIADO] Disjuntor", "UNIDADE", "Proteção", av="Sim"),
-        _item(4, "SP-4", "Relé de proteção", "UNIDADE", "Proteção", lido="Não")])
-    _aba(api, A.LIVRO_SALDO, A.ABA_SALDO, [
-        _s(1, 10, ALT, 1, 3, saldo_inicio),          # abaixo: falta 2
-        _s(2, 10, ALT, 5, 5, saldo_inicio),          # no limite
-        _s(1, 20, SEM, 4, 0, saldo_inicio),          # sem mínimo
-        _s(3, 20, SEM, 2, 1, saldo_inicio),          # avariada com saldo
-        _s(2, 20, SEM, 0, 0, saldo_inicio)])         # zerada
+def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), itens_faltando=0, saldo_extra=()):
+    """Os 4 livros do App coerentes: `total` itens na lista (1 a 4 com nome; os outros sem saldo), os de `nao_lidos`
+    com Lido = Não (o 4, por padrão: 9 de 10 lidos, acima dos 90%)."""
+    nomes = {1: ("SP-1", "Fusível 10A", "UNIDADE", "Proteção", "Não"), 2: ("SP-2", "Cabo 6 mm", "METRO", "Cabos", "Não"),
+             3: ("SP-3-AV", "[AVARIADO] Disjuntor", "UNIDADE", "Proteção", "Sim"),
+             4: ("SP-4", "Relé de proteção", "UNIDADE", "Proteção", "Não")}
+    itens = [_item(i, *nomes.get(i, (f"SP-{i}", f"Peça {i}", "UNIDADE", "Cabos", "Não"))[:4],
+                   av=nomes.get(i, ("", "", "", "", "Não"))[4], lido="Não" if i in nao_lidos else "Sim")
+             for i in range(1, total + 1)]
+    for it in itens:
+        it["Início do ciclo"] = inicio
+    saldo = [_s(1, 10, ALT, 1, 3, saldo_inicio),          # abaixo: falta 2
+             _s(2, 10, ALT, 5, 5, saldo_inicio),          # no limite
+             _s(1, 20, SEM, 4, 0, saldo_inicio),          # sem mínimo
+             _s(3, 20, SEM, 2, 1, saldo_inicio),          # avariada com saldo
+             _s(2, 20, SEM, 0, 0, saldo_inicio)] + list(saldo_extra)        # zerada
+    _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, [{"Início do ciclo": inicio, "Fim do ciclo": FIM,
+                                             "Itens na lista do Fracttal": total,
+                                             "Itens lidos": total - len([i for i in nao_lidos if i <= total]),
+                                             "Erros": 0, "Origem": "automático", "Linhas de saldo": len(saldo)}])
+    _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, itens[:len(itens) - itens_faltando])
+    _aba(api, A.LIVRO_SALDO, A.ABA_SALDO, saldo)
     _aba(api, A.LIVRO_PECAS, A.ABA_PECAS, [_p("A", 1, 10, "lançada"),
                                           _p("B", 2, 20, "recusada", "chave recusada pelo Fracttal")])
 
@@ -154,7 +162,7 @@ def test_incoerente_sem_ciclo_no_nexus_nao_mostra_numero(app, almox, monkeypatch
 
 def test_ciclo_incompleto_tambem_fica_no_ultimo_bom(app, almox, monkeypatch):
     from nexus.pcm import almoxarifado as T
-    _semear(almox, lidos=2)
+    _semear(almox, nao_lidos=(3, 4, 5, 6, 7, 8, 9, 10))                   # 2 de 10 lidos
     visao.limpar()
     assert T.montar().dados["estado"] == "incoerente"
 
@@ -179,3 +187,64 @@ def test_tela_so_do_setor_pcm(app, logado, setores):  # noqa: F811
 def test_sem_cor_fora_de_token():
     t = (Path(__file__).resolve().parent.parent / "nexus" / "templates" / "pcm" / "almoxarifado.html").read_text("utf-8")
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", t) and "rgba(" not in t
+
+
+# ── a revisão final (25/10/2026): cada teste reproduz um achado e falhou antes do conserto ──────────────────────────
+
+def _guardar_ciclo(api):
+    """O Nexus guarda o ciclo de 25/10 (a carga do histórico, com a gravação ligada)."""
+    from nexus.dados import carga
+    carga.gerar_almoxarifado(CFG, api)
+    visao.limpar()
+
+
+def test_rev_i1_livros_incompletos_vao_para_a_reserva(app, almox, monkeypatch):
+    from nexus.pcm import almoxarifado as T
+    _semear(almox, itens_faltando=1)
+    visao.limpar()
+    d = T.montar().dados
+    assert d["estado"] == "incoerente" and "incompletos" in d["aviso"]
+
+
+def test_rev_i1_queda_de_itens_avisa(app, almox, monkeypatch):
+    from nexus.pcm import almoxarifado as T
+    _guardar_ciclo(almox)                                                  # 10 itens na lista
+    _semear(almox, inicio="2026-10-25T18:00:00Z", saldo_inicio="2026-10-25T18:00:00Z", total=4, nao_lidos=())
+    visao.limpar()
+    d = T.montar().dados
+    assert d["estado"] == "ok" and "6 a menos" in d["aviso"]
+
+
+def test_rev_i2_saldo_vazio_nao_entra_na_conta(app, almox, monkeypatch):
+    from nexus.pcm import almoxarifado as T
+    _semear(almox, saldo_extra=[_s(4, 10, ALT, "", 2)])                   # o Fracttal não deu o saldo
+    visao.limpar()
+    d = T.montar().dados
+    assert [r["codigo"] for r in d["reposicao"]] == ["SP-1", "SP-2"] and d["kpis"]["abaixo"] == 1
+    card = {c["id"]: c for c in d["por_almoxarifado"]}["10"]
+    assert card["zeradas"] == 0 and card["nao_informado"] == 1
+    assert _abrir(app, monkeypatch).status_code == 200
+
+
+def test_rev_i3_reserva_so_mostra_os_itens_da_foto(app, almox, monkeypatch):
+    from nexus.pcm import almoxarifado as T
+    _guardar_ciclo(almox)
+    _semear(almox, saldo_inicio="2026-10-26T03:00:05Z")                    # o App com livros de ciclos diferentes
+    visao.limpar()
+    d = T.montar().dados
+    assert {c["codigo"] for c in d["catalogo"]} == {"SP-1", "SP-2", "SP-3-AV"} and d["kpis"]["avariadas"] == 1
+
+
+def test_rev_i5_busca_sem_acento_e_sem_caixa(app, almox, monkeypatch):
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert 'data-f-busca="sp-1 fusivel 10a"' in html
+
+
+def test_rev_i6_ciclo_anulado_sai_da_tela(app, almox, monkeypatch):
+    from nexus.dados import carga
+    from nexus.pcm import almoxarifado as T
+    _guardar_ciclo(almox)
+    carga.anular_ciclo_almox(CFG, INICIO, almox, gravar=True)
+    visao.limpar()
+    d = T.montar().dados
+    assert d["estado"] == "incoerente" and "anulado" in d["aviso"]

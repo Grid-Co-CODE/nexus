@@ -54,7 +54,7 @@ def test_ciclo_comum():
 
 def test_contrato_e_dominio():
     assert A.COLUNAS_CICLO == ("Início do ciclo", "Fim do ciclo", "Itens na lista do Fracttal", "Itens lidos", "Erros",
-                               "Origem")
+                               "Origem", "Linhas de saldo")
     assert A.COLUNAS_SALDO[-1] == "Início do ciclo" and "Local do almoxarifado" in A.COLUNAS_SALDO
     assert "Lançado por (HMAC)" in A.COLUNAS_PECAS and not any("e-mail" in c.lower() for c in A.COLUNAS_PECAS)
     assert dominios.RECUSA_PECA == ("chave recusada pelo Fracttal", "sem permissão", "outro")
@@ -221,24 +221,34 @@ ALMOX_LIVRO = "nexus_almoxarifado"
 MES = "nexus_almoxarifado_saldo_2026_10"
 
 
-def _semear(api, inicio=INICIO, lidos=574, total=574, saldo_inicio=None, pecas=None, txt=False):
-    """Os 4 livros do App e o cadastro, no banco de mentira. `txt`: tudo como texto (a API pode devolver assim)."""
+DE_PARA_IRC = [{"usina_id": 7, "sistema": "Fracttal · Classificação 1", "chave_externa": "Greenyellow - Irecê 1 - BA"}]
+
+
+def _semear(api, inicio=INICIO, lidos=None, total=2, saldo_inicio=None, pecas=None, txt=False, de_para=None,
+            itens_faltando=0, saldo_extra=(), linhas_saldo=None):
+    """Os 4 livros do App e o cadastro, no banco de mentira, coerentes entre si: `total` itens na lista (o 1 e o 2 com
+    saldo), os `lidos` primeiros com Lido = Sim. `txt`: tudo como texto (a API pode devolver assim);
+    `itens_faltando`: o livro Itens chega sem as últimas linhas; `saldo_extra`: linhas a mais no Saldo."""
     from test_campo_visao import _aba
+    lidos = total if lidos is None else lidos
     t = (lambda v: None if v is None else str(v)) if txt else (lambda v: v)
     conv = lambda linhas: [{k: t(v) for k, v in l.items()} for l in linhas]      # noqa: E731
-    _aba(api, "cadastro_nexus", "usinas", [{"usina_id": 7, "codigo": "GRYL-IRC100", "excluido": "não"}])
-    _aba(api, "cadastro_nexus", "de_para", [{"usina_id": 7, "sistema": "Fracttal · Classificação 1",
-                                              "chave_externa": "Greenyellow - Irecê 1 - BA"}])
+    _aba(api, "cadastro_nexus", "usinas", [{"usina_id": 7, "codigo": "GRYL-IRC100", "excluido": "não"},
+                                           {"usina_id": 9, "codigo": "RNGR-NOB100", "excluido": "não"}])
+    _aba(api, "cadastro_nexus", "de_para", DE_PARA_IRC if de_para is None else de_para)
     _aba(api, "cadastro_nexus", "equipes", [{"equipe_id": 1, "nome": "BA Oeste 01", "excluido": "não"}])
-    _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, conv([_ciclo(lidos, total, inicio)]))
-    _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, conv([
-        {"ID do item": "1", "Código": "A", "Nome": "Fusível", "Unidade": "UNIDADE", "Família": "F", "Avariado": "Não",
-         "Ferramenta": "Não", "Início do ciclo": inicio, "Lido": "Sim"},
-        {"ID do item": "2", "Código": "B", "Nome": "Cabo", "Unidade": "METRO", "Família": "C", "Avariado": "Não",
-         "Ferramenta": "Não", "Início do ciclo": inicio, "Lido": "Sim"}]))
-    _aba(api, A.LIVRO_SALDO, A.ABA_SALDO, conv([_saldo(1, 123021, IRC, 4, 2, inicio=saldo_inicio or inicio),
-                                                _saldo(2, 123021, IRC, 0, 0, inicio=saldo_inicio or inicio),
-                                                _saldo(1, 123675, NOB, 1, 1, inicio=saldo_inicio or inicio)]))
+    nomes = {1: ("A", "Fusível", "UNIDADE", "F"), 2: ("B", "Cabo", "METRO", "C")}
+    itens = [{"ID do item": str(i), "Código": nomes.get(i, (f"I{i}",))[0],
+              "Nome": nomes.get(i, ("", f"Item {i}"))[1], "Unidade": nomes.get(i, ("", "", "UNIDADE"))[2],
+              "Família": nomes.get(i, ("", "", "", "F"))[3], "Avariado": "Não", "Ferramenta": "Não",
+              "Início do ciclo": inicio, "Lido": "Sim" if i <= lidos else "Não"} for i in range(1, total + 1)]
+    saldo = [_saldo(1, 123021, IRC, 4, 2, inicio=saldo_inicio or inicio),
+             _saldo(2, 123021, IRC, 0, 0, inicio=saldo_inicio or inicio),
+             _saldo(1, 123675, NOB, 1, 1, inicio=saldo_inicio or inicio)] + list(saldo_extra)
+    c = dict(_ciclo(lidos, total, inicio), **{"Linhas de saldo": len(saldo) if linhas_saldo is None else linhas_saldo})
+    _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, conv([c]))
+    _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, conv(itens[:len(itens) - itens_faltando]))
+    _aba(api, A.LIVRO_SALDO, A.ABA_SALDO, conv(saldo))
     _aba(api, A.LIVRO_PECAS, A.ABA_PECAS, conv(pecas if pecas is not None else [_peca("A", "lançada")]))
 
 
@@ -300,11 +310,11 @@ def test_releitura_no_mesmo_dia_vira_outra_foto():
 
 def test_ciclo_incompleto_e_recusado():
     from nexus.dados import carga
-    api = _api(lidos=516)
+    api = _api(lidos=8, total=10)
     r = carga.gerar_almoxarifado(CFG, api)
     assert set(r["gravado"]) == {ALMOX_LIVRO} and not api.linhas(MES, "fato_saldo_almox")
     c = api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")[0]
-    assert c["situacao"] == "recusado" and "516 de 574" in c["porque"]
+    assert c["situacao"] == "recusado" and "8 de 10" in c["porque"]
 
 
 def test_livros_de_ciclos_diferentes_nao_aplicam():
@@ -431,3 +441,86 @@ def test_governanca_le_a_qualidade_do_almoxarifado(app, monkeypatch):
     with app.app_context():
         v = T._ultima_qualidade()
     assert v["qualidade"]["saldo_almox"]["linhas"] == 3, v.get("erro")
+
+
+# ── a revisão final (25/10/2026): cada teste reproduz um achado e falhou antes do conserto ──────────────────────────
+
+def test_rev_i1_livros_incompletos_nao_aplicam_e_nao_ficam_vistos():
+    """Itens com menos linhas que a lista do ciclo, ou Saldo com menos linhas que o ciclo diz: o Nexus leu no meio da
+    publicação (ou o App subiu pela metade). Não aplica NESTA hora e não marca o ciclo como visto: a hora seguinte, com
+    os livros inteiros, aplica."""
+    from nexus.dados import carga
+    assert A.conferir_ciclo([_ciclo(2, 2)], [{"Início do ciclo": INICIO, "Lido": "Sim"}],
+                            [{"Início do ciclo": INICIO}]).startswith("o livro de itens tem 1 de 2")
+    api = _api(itens_faltando=1)
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert "incompletos" in r["nao_aplica"] and not api.linhas(MES, "fato_saldo_almox")
+    assert not api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")
+    _semear(api)                                                       # chegaram inteiros
+    carga.gerar_almoxarifado(CFG, api)
+    assert len(api.linhas(MES, "fato_saldo_almox")) == 3
+    api2 = _api(linhas_saldo=5)                                        # o Saldo veio com 3 das 5 linhas
+    assert "o livro de saldo tem 3 de 5" in carga.gerar_almoxarifado(CFG, api2)["nao_aplica"]
+
+
+def test_rev_i1_queda_de_itens_vai_na_qualidade():
+    from nexus.dados import carga
+    api = _api(total=10)
+    carga.gerar_almoxarifado(CFG, api)
+    _semear(api, inicio="2026-10-26T03:00:12Z", total=4)              # o Fracttal listou 4 dos 10 de ontem
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert r["queda_itens"] == {"antes": 10, "agora": 4}
+    q = {l["fato"]: l for l in api.linhas(ALMOX_LIVRO, "qualidade")}
+    assert '"queda_itens"' in q["ciclo_varredura"]["extra"]
+
+
+def test_rev_i2_saldo_vazio_e_nao_informado():
+    assert A.situacao(None, 2) == A.situacao("", 2) == A.situacao("", 0) == "nao_informado"
+    assert A.situacao(0, 2) == "abaixo"
+
+
+def test_rev_i3_nao_lidos_no_ciclo_e_na_qualidade():
+    from nexus.dados import carga
+    api = _api(total=10, lidos=9)
+    carga.gerar_almoxarifado(CFG, api)
+    c = api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")[0]
+    assert str(c["nao_lidos_qtd"]) == "1"
+    q = {l["fato"]: l for l in api.linhas(ALMOX_LIVRO, "qualidade")}
+    assert '"nao_lidos":1' in q["ciclo_varredura"]["extra"]
+
+
+def test_rev_i4_o_mes_corrente_e_religado():
+    """A Nobres ligada em Base → Ligações depois da 1ª foto: a foto do mesmo mês ganha a usina na gravação seguinte."""
+    from nexus.dados import carga
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)
+    sem = [l for l in api.linhas(MES, "fato_saldo_almox") if str(l["id_almoxarifado"]) == "123675"]
+    assert sem and all(l["usina_id"] in (None, "") for l in sem)
+    nob = {"usina_id": 9, "sistema": "Fracttal · Classificação 1", "chave_externa": "RenoGrid - Nobres 1 - MT"}
+    _semear(api, inicio="2026-10-26T03:00:12Z", de_para=DE_PARA_IRC + [nob])
+    carga.gerar_almoxarifado(CFG, api)
+    nobres = [l for l in api.linhas(MES, "fato_saldo_almox") if str(l["id_almoxarifado"]) == "123675"]
+    assert len(nobres) == 2 and all(str(l["usina_id"]) == "9" for l in nobres)
+
+
+def test_rev_i4_de_para_vazio_nao_grava():
+    from nexus.dados import carga
+    api = _api(de_para=[])
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert "de-para" in r["nao_grava"] and api.syncs == 0
+
+
+def test_rev_i7_saldo_id_repetido_recusa_a_foto_e_o_ensaio_mede():
+    from nexus.dados import carga
+    api = _api(saldo_extra=[_saldo(1, 123021, IRC, 4, 2)])             # o item 1 no almoxarifado 123021 duas vezes
+    r = carga.gerar_almoxarifado({k: v for k, v in CFG.items() if k != "NEXUS_ALMOX_GRAVAR"}, api, medir=True)
+    assert r["saldo_repetidos"] == 1 and "pct_usina" in r and r["ensaio"]
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert "chave repetida" in r["recusado"] and not api.linhas(MES, "fato_saldo_almox")
+
+
+def test_rev_m1_sem_ciclo_e_sem_peca_nao_cria_o_livro():
+    from nexus.dados import carga
+    api = _api(saldo_inicio="2026-10-24T03:00:05Z", pecas=[])
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert "pulou" in r and api.syncs == 0 and ALMOX_LIVRO not in api.workbooks

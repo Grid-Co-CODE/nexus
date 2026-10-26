@@ -2,6 +2,7 @@
 
     python ferramentas/carregar_dados.py --ensaio     monta com o dado real e NÃO grava (medir antes de gravar)
     python ferramentas/carregar_dados.py --ensaio --sem-geracao     idem, sem ler as 171 abas de geração (~1 min)
+                                                                    (os dois medem também o almoxarifado)
     python ferramentas/carregar_dados.py              grava se a última carga tiver mais de 50 min
     python ferramentas/carregar_dados.py --forcar     grava agora
 
@@ -69,6 +70,9 @@ def main():
                                                               inversor)
                 rel["geracao"] = rel_g
             rel["livros"] = {**_medir(grava, True), **_medir(montados, False)}
+            # o almoxarifado do PCM (25/10/2026): o ciclo do App medido (linhas, chave repetida, % de usina, não
+            # lidos, queda de itens) antes de ligar a NEXUS_ALMOX_GRAVAR; nada grava aqui
+            rel["almoxarifado"] = carga.gerar_almoxarifado(app.config, s, gravar=False, medir=True)
             rel["ensaio"] = "montado com o dado real; nada gravado"
         else:
             rel = carga.rodar(app.config, requests.Session(), forcar="--forcar" in sys.argv)

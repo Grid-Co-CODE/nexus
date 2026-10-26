@@ -35,7 +35,9 @@ LIGADA_DE_PARA = "de-para do Fracttal"
 CAB_SALDO = ["saldo_id", "ciclo_inicio", "data_id", "id_item", "codigo", "id_almoxarifado", "usina_id",
              "usina_ligada_por", "saldo_qtd", "minimo_qtd"]
 CAB_CICLO = ["ciclo_inicio", "data_id", "fim", "itens_lista_qtd", "itens_lidos_qtd", "erros_qtd", "origem",
-             "situacao", "porque", "anulado", "visto_em"]
+             "situacao", "porque", "anulado", "visto_em",
+             # a revisão de 25/10/2026: quantos itens da lista não foram lidos no ciclo (Lido = Não no livro do App)
+             "nao_lidos_qtd"]
 CAB_PECA = ["lancamento_id", "data_id", "data_id_recebida", "os", "codigo_ativo", "tarefa_chave", "id_item", "codigo",
             "id_almoxarifado", "usina_id", "usina_ligada_por", "pessoa_id", "quantidade_qtd", "lancada", "recusa"]
 CAB_DIM_ITEM = ["id_item", "codigo", "nome", "unidade", "familia", "avariado", "ferramenta"]
@@ -142,11 +144,39 @@ def mesclar_pecas(no_banco: list[dict], app: list[dict], lig, almox: dict) -> li
     return [por[k] for k in sorted(por)]
 
 
-def linha_ciclo(ciclo: dict, situacao: str, porque: str, visto_em: str) -> list:
+def linha_ciclo(ciclo: dict, situacao: str, porque: str, visto_em: str, nao_lidos: int | None = None) -> list:
     inicio = _txt(ciclo.get(A.INICIO))
     return [inicio, _dia(inicio), _txt(ciclo.get("Fim do ciclo")), _int(ciclo.get("Itens na lista do Fracttal")),
             _int(ciclo.get("Itens lidos")), _int(ciclo.get("Erros")), _txt(ciclo.get("Origem")), situacao, porque, 0,
-            visto_em]
+            visto_em, nao_lidos]
+
+
+def religar_almox(dim_almox: list[list], lig) -> list[list]:
+    """A usina de cada almoxarifado de novo pela de-para de AGORA (o almoxarifado ligado depois em Base → Ligações, a
+    Nobres, ganha a usina; o que deixou de ligar perde). Vale para a dimensão e, por ela, para o livro do mês."""
+    iu, ip, il = CAB_DIM_ALMOX.index("usina_id"), CAB_DIM_ALMOX.index("usina_ligada_por"), CAB_DIM_ALMOX.index("local")
+    out = []
+    for a in dim_almox:
+        a = list(a)
+        uid = lig.usina_do_fracttal(a[il]) if _txt(a[il]) else None
+        a[iu], a[ip] = (uid, LIGADA_DE_PARA) if uid else (None, None)
+        out.append(a)
+    return out
+
+
+def religar_saldo(linhas: list[list], dim_almox: list[list]) -> list[list]:
+    """O livro do mês corrente religado pela dimensão (o desenho, seção 4.1; a revisão de 25/10/2026 achou as fotos
+    antigas do mês presas à usina vazia de quando foram gravadas). Os meses fechados ficam como foram gravados."""
+    usina = {_txt(a[0]): (a[CAB_DIM_ALMOX.index("usina_id")], a[CAB_DIM_ALMOX.index("usina_ligada_por")])
+             for a in dim_almox}
+    ia, iu, ip = CAB_SALDO.index("id_almoxarifado"), CAB_SALDO.index("usina_id"), CAB_SALDO.index("usina_ligada_por")
+    out = []
+    for l in linhas:
+        l = list(l)
+        if _txt(l[ia]) in usina:
+            l[iu], l[ip] = usina[_txt(l[ia])]
+        out.append(l)
+    return out
 
 
 def _pct(n, total) -> float:

@@ -428,6 +428,11 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   da lista lidos; senão, o último ciclo aplicado no histórico do Nexus, com o aviso; sem ele (o ensaio), só o aviso.
   Ciclo com mais de 36 h: o aviso com a data. Item com Lido = Não: "não lido neste ciclo", nunca "sem saldo". O consumo
   vem do `fato_peca_lancada`; enquanto ele não existe, do livro Peças do App (90 dias), com a nota.
+- **A revisão de 25/10/2026** (cada item com teste em `tests/test_pcm_almoxarifado.py`, `test_rev_*`): livros do App que
+  chegaram pela metade e o ciclo anulado no Nexus também vão para o último ciclo bom, com o aviso; saldo vazio é "não
+  informado" (fora da Reposição e das contas; o cartão conta à parte); na reserva, o catálogo é só o dos itens da foto
+  (a dimensão guarda todo item já visto); o Fracttal listando menos de 90% dos itens do ciclo anterior dá um aviso; a
+  busca compara sem acento e sem caixa (o `data-f-busca` vai normalizado, como nas outras telas).
 - **Como provar:** `tests/test_pcm_almoxarifado.py`; no navegador, a cópia de prova com os 4 livros montados na memória
   a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
   peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).

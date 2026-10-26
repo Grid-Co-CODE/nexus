@@ -688,7 +688,8 @@ FATOS = (
          _d(data=("id", "data_id (o dia de Brasília do início do ciclo)")),
          tipo="snapshot_acumulado", chave=("ciclo_inicio",), estado="montado",
          conformado_em="nexus_almoxarifado · fato_ciclo_varredura",
-         medidas=_m((("itens_lista_qtd", "qtd", "nao"), ("itens_lidos_qtd", "qtd", "nao"), ("erros_qtd", "qtd", "nao"))),
+         medidas=_m((("itens_lista_qtd", "qtd", "nao"), ("itens_lidos_qtd", "qtd", "nao"), ("erros_qtd", "qtd", "nao"),
+                     ("nao_lidos_qtd", "qtd", "nao"))),
          fontes=(f"{almoxarifado.LIVRO_CICLO} · {almoxarifado.ABA_CICLO}",),
          janela_origem="o último ciclo completo (App)",
          observacao="aplica só com 90% dos itens da lista lidos (a completude do próprio ciclo); o ciclo aplicado "

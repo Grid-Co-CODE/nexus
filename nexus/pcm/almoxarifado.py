@@ -21,6 +21,7 @@ from ..campo import visao
 from ..dados import almoxarifado as A
 from ..dados import fato_almoxarifado as F
 from ..dados import livros
+from ..dados.dominios import norm
 
 TELA = "pecas"
 _RECUSA = "recusada"
@@ -64,7 +65,7 @@ def _do_app(ciclo: dict, itens: list[dict], saldo: list[dict], b) -> dict:
     linhas = [{"id_item": _id(s.get("ID do item")), "id_almox": _id(s.get("ID do almoxarifado")),
                "almox": _txt(s.get("Almoxarifado")), "usina_id": b.lig.usina_do_fracttal(
                    A.chave_do_local(s.get("Local do almoxarifado")) or ""),
-               "saldo": _num(s.get("Saldo")), "minimo": A.numero(s.get("Mínimo"))} for s in saldo]
+               "saldo": A.numero(s.get("Saldo")), "minimo": A.numero(s.get("Mínimo"))} for s in saldo]
     return {"inicio": _txt(ciclo.get(A.INICIO)), "fim": _txt(ciclo.get("Fim do ciclo")),
             "lidos": ciclo.get("Itens lidos"), "total": ciclo.get("Itens na lista do Fracttal"), "itens": its,
             "linhas": linhas}
@@ -79,14 +80,18 @@ def _do_nexus(ult: dict, abas_nx: dict) -> dict | None:
     foto = [l for l in visao._livro(mes, F.ABA_SALDO) if _txt(l.get("ciclo_inicio")) == inicio]
     almox = {_id(a.get("id_almoxarifado")): _txt(a.get("nome"))
              for a in (visao._livro(F.LIVRO, F.ABA_DIM_ALMOX) if F.ABA_DIM_ALMOX in abas_nx else [])}
+    # só os itens que estão na foto (a revisão de 25/10/2026): a dimensão guarda todo item já visto, inclusive os
+    # desativados há meses, e o item não lido no ciclo apareceria como "sem saldo em nenhum almoxarifado"
+    na_foto = {_id(l.get("id_item")) for l in foto}
     its = {_id(i.get("id_item")): {"codigo": _txt(i.get("codigo")), "nome": _txt(i.get("nome")),
                                     "unidade": _txt(i.get("unidade")), "familia": _txt(i.get("familia")),
                                     "avariado": _txt(i.get("avariado")) in ("1", "1.0"), "nao_lido": False}
-           for i in (visao._livro(F.LIVRO, F.ABA_DIM_ITEM) if F.ABA_DIM_ITEM in abas_nx else [])}
+           for i in (visao._livro(F.LIVRO, F.ABA_DIM_ITEM) if F.ABA_DIM_ITEM in abas_nx else [])
+           if _id(i.get("id_item")) in na_foto}
     linhas = [{"id_item": _id(l.get("id_item")), "id_almox": _id(l.get("id_almoxarifado")),
                "almox": almox.get(_id(l.get("id_almoxarifado")), _id(l.get("id_almoxarifado"))),
                "usina_id": int(float(_id(l.get("usina_id")))) if _id(l.get("usina_id")) else None,
-               "saldo": _num(l.get("saldo_qtd")), "minimo": A.numero(l.get("minimo_qtd"))} for l in foto]
+               "saldo": A.numero(l.get("saldo_qtd")), "minimo": A.numero(l.get("minimo_qtd"))} for l in foto]
     return {"inicio": inicio, "fim": _txt(ult.get("fim")), "lidos": ult.get("itens_lidos_qtd"),
             "total": ult.get("itens_lista_qtd"), "itens": its, "linhas": linhas}
 
@@ -103,10 +108,13 @@ def _partes(fonte: dict, b) -> dict:
     for l in fonte["linhas"]:
         i = its.get(l["id_item"], {})
         sit = A.situacao(l["saldo"], l["minimo"])
-        out.append(dict(l, codigo=i.get("codigo") or l["id_item"], nome=i.get("nome", ""),
-                        familia=i.get("familia", ""), unidade=(i.get("unidade") or "").lower(),
+        # saldo vazio (o Fracttal não deu o número) é "não informado": fora da Reposição e das contas (a revisão de
+        # 25/10/2026: virava "abaixo, falta 2" e uma "zerada" no cartão)
+        cod, nome = i.get("codigo") or l["id_item"], i.get("nome", "")
+        out.append(dict(l, codigo=cod, nome=nome, familia=i.get("familia", ""), unidade=(i.get("unidade") or "").lower(),
                         avariado=i.get("avariado", False), situacao=sit, usina=_usina(b, l["usina_id"]),
-                        falta=max((l["minimo"] or 0) - l["saldo"], 0)))
+                        falta=max((l["minimo"] or 0) - l["saldo"], 0) if l["saldo"] is not None else 0,
+                        busca=norm(f"{cod} {nome}")))
     abaixo = sorted((x for x in out if x["situacao"] == "abaixo"), key=lambda x: -x["falta"])
     limite = sorted((x for x in out if x["situacao"] == "no_limite"), key=lambda x: (x["almox"], x["codigo"]))
     for x in abaixo + limite:
@@ -114,32 +122,35 @@ def _partes(fonte: dict, b) -> dict:
     cards = {}
     for x in out:
         c = cards.setdefault(x["id_almox"], {"id": x["id_almox"], "nome": x["almox"], "usina": x["usina"], "pecas": 0,
-                                             "abaixo": 0, "no_limite": 0, "sem_minimo": 0, "zeradas": 0, "ok": 0})
+                                             "abaixo": 0, "no_limite": 0, "sem_minimo": 0, "zeradas": 0, "ok": 0,
+                                             "nao_informado": 0})
         c["pecas"] += 1
         c["abaixo"] += x["situacao"] == "abaixo"
         c["no_limite"] += x["situacao"] == "no_limite"
         c["sem_minimo"] += not (x["minimo"] and x["minimo"] > 0)
         c["zeradas"] += x["saldo"] == 0
         c["ok"] += x["situacao"] == "ok"
+        c["nao_informado"] += x["situacao"] == "nao_informado"
     for c in cards.values():
         c["pct_ok"] = round(100 * c["ok"] / c["pecas"]) if c["pecas"] else 0
     catalogo = []
     for iid, i in its.items():
-        onde = [x for x in out if x["id_item"] == iid and x["saldo"] > 0]
+        onde = [x for x in out if x["id_item"] == iid and (x["saldo"] or 0) > 0]
         catalogo.append(dict(i, id=iid, total=sum(x["saldo"] for x in onde), almoxes=[x["almox"] for x in onde],
-                             onde=[f"{x['almox']}: {x['saldo']:g}" for x in onde]))
+                             onde=[f"{x['almox']}: {x['saldo']:g}" for x in onde],
+                             busca=norm(f"{i.get('codigo', '')} {i.get('nome', '')}")))
     catalogo.sort(key=lambda c: (c["familia"], c["codigo"]))
     sem_min = {}
     for x in out:
-        if not (x["minimo"] and x["minimo"] > 0):
+        if not (x["minimo"] and x["minimo"] > 0) and x["situacao"] != "nao_informado":
             sem_min[x["almox"]] = sem_min.get(x["almox"], 0) + 1
-    kpis = {"almoxarifados": len(cards), "com_saldo": len({x["id_item"] for x in out if x["saldo"] > 0}),
+    kpis = {"almoxarifados": len(cards), "com_saldo": len({x["id_item"] for x in out if (x["saldo"] or 0) > 0}),
             "abaixo": len(abaixo), "no_limite": len(limite), "sem_minimo": sum(sem_min.values()),
             "avariadas": sum(1 for i in its.values() if i.get("avariado"))}
     return {"kpis": kpis, "reposicao": abaixo + limite, "linhas": out,
             "por_almoxarifado": sorted(cards.values(), key=lambda c: c["nome"]), "catalogo": catalogo,
             "cadastro": {"sem_minimo": [{"almoxarifado": a, "n": n} for a, n in sorted(sem_min.items())],
-                         "avariadas": [x for x in out if x["avariado"] and x["saldo"] > 0]}}
+                         "avariadas": [x for x in out if x["avariado"] and (x["saldo"] or 0) > 0]}}
 
 
 def _consumo(pecas_nx: list[dict] | None, pecas_app: list[dict], fonte: dict) -> tuple[list[dict], str]:
@@ -168,7 +179,7 @@ def _consumo(pecas_nx: list[dict] | None, pecas_app: list[dict], fonte: dict) ->
     for c in out:
         i = its.get(c["id_item"], {})
         c.update(nome=i.get("nome", ""), familia=i.get("familia", ""), almox=nomes.get(c["id_almox"], c["id_almox"]),
-                 dia=_dia(c["data_id"]))
+                 dia=_dia(c["data_id"]), busca=norm(f"{c['codigo']} {i.get('nome', '')} {c['os']}"))
     out.sort(key=lambda c: (c["data_id"], c["os"]))
     return out, origem
 
@@ -184,14 +195,28 @@ def montar():
         pecas_app = visao._livro(A.LIVRO_PECAS, A.ABA_PECAS) if abas_app[A.LIVRO_PECAS] else []
         abas_nx = _abas(F.LIVRO)
         b, aviso = visao._Base(), ""
-        if A.ciclo_comum(ciclo, itens, saldo) and A.completo(ciclo[0]):
+        ciclos = visao._livro(F.LIVRO, F.ABA_CICLO) if F.ABA_CICLO in abas_nx else []
+        anulados = {_txt(c.get("ciclo_inicio")) for c in ciclos if _id(c.get("anulado")) == "1"}
+        bons = [c for c in ciclos if _txt(c.get("situacao")) == "aplicado" and _id(c.get("anulado")) != "1"]
+        inicio = A.ciclo_comum(ciclo, itens, saldo)
+        # por que o ciclo do App não serve (a revisão de 25/10/2026: os livros que chegaram pela metade e o ciclo
+        # anulado no Nexus também vão para a reserva)
+        porque = ("Os livros do App chegaram de ciclos diferentes" if not inicio
+                  else f"Os livros do App chegaram pela metade ({A.conferir_ciclo(ciclo, itens, saldo)})"
+                  if A.conferir_ciclo(ciclo, itens, saldo)
+                  else "O último ciclo do App leu menos de 90% dos itens" if not A.completo(ciclo[0])
+                  else f"O ciclo de {_quando(inicio)} foi anulado no Nexus" if inicio in anulados else "")
+        if not porque:
             fonte = _do_app(ciclo[0], itens, saldo, b)
+            antes = [c for c in bons if _txt(c.get("ciclo_inicio")) != inicio]
+            n_antes = A.numero(max(antes, key=lambda c: _txt(c.get("ciclo_inicio"))).get("itens_lista_qtd")) if antes \
+                else None
+            n_agora = A.numero(fonte["total"])
+            if n_antes and n_agora is not None and n_agora < A.COMPLETUDE_MIN * n_antes:
+                aviso = (f"O Fracttal listou {n_agora:g} itens, {n_antes - n_agora:g} a menos que no ciclo anterior: "
+                         "confira se o catálogo foi limpo.")
         else:
-            ciclos = visao._livro(F.LIVRO, F.ABA_CICLO) if F.ABA_CICLO in abas_nx else []
-            bons = [c for c in ciclos if _txt(c.get("situacao")) == "aplicado" and _id(c.get("anulado")) != "1"]
             fonte = _do_nexus(max(bons, key=lambda c: _txt(c.get("ciclo_inicio"))), abas_nx) if bons else None
-            porque = ("Os livros do App chegaram de ciclos diferentes" if not A.ciclo_comum(ciclo, itens, saldo)
-                      else "O último ciclo do App leu menos de 90% dos itens")
             if not fonte:
                 return {"estado": "incoerente",
                         "aviso": f"{porque}, e o Nexus ainda não guardou um ciclo bom: nenhum número até o próximo."}
@@ -206,8 +231,9 @@ def montar():
         d["kpis"]["lancadas"] = sum(1 for c in d["consumo"] if c["situacao"] == "lançada")
         d["kpis"]["recusadas"] = sum(1 for c in d["consumo"] if c["situacao"] == _RECUSA)
         d["cadastro"]["recusadas"] = [c for c in d["consumo"] if c["situacao"] == _RECUSA]
+        n = (lambda v: f"{A.numero(v):g}" if A.numero(v) is not None else "?")        # "574.0" da API vira "574"
         d.update(estado="ok", aviso=aviso, ciclo={"fim": _quando(fonte["fim"] or fonte["inicio"]),
-                                                  "lidos": fonte["lidos"], "total": fonte["total"]},
+                                                  "lidos": n(fonte["lidos"]), "total": n(fonte["total"])},
                  almoxarifados=sorted({x["almox"] for x in d["linhas"]}),
                  familias=sorted({i["familia"] for i in fonte["itens"].values() if i["familia"]}))
         return d

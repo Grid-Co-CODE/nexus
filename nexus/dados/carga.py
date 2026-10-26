@@ -605,7 +605,7 @@ def _linhas_cab(linhas: list[dict], cab: list) -> list[list]:
     return [[d.get(c) for c in cab] for d in linhas]
 
 
-def gerar_almoxarifado(config, sessao=None, *, gravar=True, forcar=False, agora=None) -> dict:
+def gerar_almoxarifado(config, sessao=None, *, gravar=True, forcar=False, agora=None, medir=False) -> dict:
     """O histórico do almoxarifado (25/10/2026): o livro do App guarda só o último ciclo da varredura, e aqui o Nexus
     acrescenta, a cada ciclo novo e completo, a foto do saldo (no livro do mês) e a linha do ciclo, e as peças lançadas
     pelo App (`fato_almoxarifado.py`). Roda no laço de hora em hora com PORTÃO PRÓPRIO, como a `gerar_geracao`: a carga
@@ -615,8 +615,9 @@ def gerar_almoxarifado(config, sessao=None, *, gravar=True, forcar=False, agora=
     Não grava (o relatório diz por quê, só contagens): sem os livros do App; com o livro do Nexus existente e a leitura
     dele vazia (o histórico não encolhe; a trava `so_cresce` do `livros.publicar` confere de novo); sem a
     NEXUS_ALMOX_GRAVAR=1 (Levi, 25/10/2026: o Nexus sobe antes do App, em ensaio, e a gravação liga depois do ensaio
-    com o 1º ciclo real). Ciclo incompleto (menos de 90% dos itens lidos) entra só como recusado; livros do App de
-    ciclos diferentes não aplicam nada (as peças seguem)."""
+    com o 1º ciclo real). Ciclo incompleto (menos de 90% dos itens lidos) ou com chave repetida no saldo entra só
+    como recusado; livros do App de ciclos diferentes ou que chegaram pela metade (`conferir_ciclo`) não aplicam NESTA
+    hora e não ficam vistos (a hora seguinte aplica). `medir` (o `--ensaio`): mede o ciclo do App mesmo já visto."""
     import requests
     s = sessao or requests.Session()
     base = _base(config)
@@ -641,22 +642,47 @@ def gerar_almoxarifado(config, sessao=None, *, gravar=True, forcar=False, agora=
             return {"nao_grava": f"o {F.LIVRO} existe e veio vazio: o histórico não encolhe"}
     vistos = {str(c.get("ciclo_inicio") or "") for c in banco[F.ABA_CICLO]}
     ant = dict(banco["atualizacao"][0]) if banco["atualizacao"] else {}
-    novo = bool(inicio) and inicio not in vistos
+    novo = bool(inicio) and (inicio not in vistos or medir)
     rel = {"ciclo": inicio, "ciclo_novo": novo, "incoerente": inicio is None, "pecas_app": len(pecas_app)}
-    if not forcar and not novo and str(ant.get("sha_pecas") or "") == sha:
+    if not forcar and not medir and not novo and str(ant.get("sha_pecas") or "") == sha:
         return dict(rel, pulou="nenhum ciclo novo do App nem peça nova desde a última gravação")
+    falta = almox.conferir_ciclo(ciclo, itens, saldo) if novo else ""
+    if falta:
+        novo = False                       # passageiro: não aplica nem marca visto; a hora seguinte tenta de novo
+        rel["nao_aplica"] = falta
     cad = {a: le.ler(CADASTRO, a) for a in ("usinas", "de_para", "equipes")}
+    if not cad["de_para"]:
+        # a revisão de 25/10/2026: com o de-para lido vazio, a foto do dia ficaria sem usina para sempre
+        return dict(rel, nao_grava="o de-para do cadastro veio vazio: a usina não liga nesta hora")
     lig = ligador(cad, {"hmac": _pessoas_por_codigo(config, s)})
     linhas_ciclo = _linhas_cab(banco[F.ABA_CICLO], F.CAB_CICLO)
+    extra = {}
     dim_item, dim_almox = _linhas_cab(banco[F.ABA_DIM_ITEM], F.CAB_DIM_ITEM), _linhas_cab(banco[F.ABA_DIM_ALMOX],
                                                                                         F.CAB_DIM_ALMOX)
     q_ant = {str(q.get("fato") or ""): [q.get(c) for c in fatos.CAB_QUALIDADE] for q in banco["qualidade"]}
     q_saldo, mes, linhas_mes, aplicado = q_ant.get("saldo_almox"), None, None, str(ant.get("ciclo_inicio") or "")
     if novo:
         c0 = ciclo[0]
-        conta = f"{c0.get('Itens lidos')} de {c0.get('Itens na lista do Fracttal')} itens lidos"
-        if almox.completo(c0):
-            foto = F.saldo_do_ciclo(saldo, lig)
+        conta = f"{_int_ou_none(c0.get('Itens lidos'))} de {_int_ou_none(c0.get('Itens na lista do Fracttal'))} itens lidos"
+        nao_lidos = sum(1 for i in itens if str(i.get("Lido") or "").strip().lower() != "sim")
+        bons = [c for c in banco[F.ABA_CICLO] if str(c.get("situacao") or "") == "aplicado"
+                and str(c.get("anulado") or "0").split(".")[0] != "1"]
+        antes = _int_ou_none(max(bons, key=lambda c: str(c.get("ciclo_inicio") or "")).get("itens_lista_qtd")) if bons else None
+        agora_n = _int_ou_none(c0.get("Itens na lista do Fracttal"))
+        extra = {"nao_lidos": nao_lidos}
+        if antes and agora_n is not None and agora_n < almox.COMPLETUDE_MIN * antes:
+            # só aviso: o PCM pode ter limpado o catálogo (a completude é a do próprio ciclo)
+            extra["queda_itens"] = rel["queda_itens"] = {"antes": antes, "agora": agora_n}
+        foto = F.saldo_do_ciclo(saldo, lig)
+        ids = [l[0] for l in foto]
+        rel.update(saldo_linhas=len(foto), saldo_repetidos=len(ids) - len(set(ids)), nao_lidos=nao_lidos)
+        uid = [l[F.CAB_SALDO.index("usina_id")] for l in foto]
+        rel["pct_usina"] = round(100.0 * sum(1 for u in uid if u) / len(uid), 1) if uid else 0.0
+        if rel["saldo_repetidos"]:
+            linhas_ciclo.append(F.linha_ciclo(c0, "recusado", f"chave repetida no saldo ({rel['saldo_repetidos']})", iso,
+                                              nao_lidos))
+            rel["recusado"] = f"chave repetida no saldo ({rel['saldo_repetidos']})"
+        elif almox.completo(c0):
             mes = F.livro_do_mes(foto[0][F.CAB_SALDO.index("data_id")]) if foto else None
             no_mes = []
             if mes and le.abas(mes):
@@ -669,21 +695,29 @@ def gerar_almoxarifado(config, sessao=None, *, gravar=True, forcar=False, agora=
             # a foto deste ciclo que já estiver no mês (o mês gravou e a marca falhou na hora anterior) é trocada, não
             # repetida
             i = F.CAB_SALDO.index("ciclo_inicio")
-            linhas_mes = [l for l in _linhas_cab(no_mes, F.CAB_SALDO) if str(l[i] or "") != inicio] + foto
-            linhas_ciclo.append(F.linha_ciclo(c0, "aplicado", conta, iso))
+            linhas_ciclo.append(F.linha_ciclo(c0, "aplicado", conta, iso, nao_lidos))
             dim_item = F.mesclar_dim(banco[F.ABA_DIM_ITEM], F.dim_itens(itens), "id_item", F.CAB_DIM_ITEM)
             novas_almox = F.dim_almoxarifados(saldo, lig)
-            dim_almox = F.mesclar_dim(banco[F.ABA_DIM_ALMOX], novas_almox, "id_almoxarifado", F.CAB_DIM_ALMOX)
+            dim_almox = F.religar_almox(F.mesclar_dim(banco[F.ABA_DIM_ALMOX], novas_almox, "id_almoxarifado",
+                                                      F.CAB_DIM_ALMOX), lig)
+            # o mês corrente religado pela dimensão de agora (o almoxarifado ligado depois ganha a usina nas fotos dele)
+            linhas_mes = F.religar_saldo([l for l in _linhas_cab(no_mes, F.CAB_SALDO) if str(l[i] or "") != inicio]
+                                         + foto, dim_almox)
             sem_usina = [a[2] or a[1] for a in novas_almox if not a[3]]
             q_saldo = F.linha_qualidade("saldo_almox", foto, F.CAB_SALDO, inicio, iso, sem_usina=sem_usina)
             aplicado = inicio
-            rel.update(saldo_linhas=len(foto), almoxarifados=len(novas_almox), sem_usina=len(sem_usina), mes=mes)
+            rel.update(almoxarifados=len(novas_almox), sem_usina=len(sem_usina), mes=mes)
         else:
-            linhas_ciclo.append(F.linha_ciclo(c0, "recusado", f"{conta} (menos de 90%)", iso))
+            linhas_ciclo.append(F.linha_ciclo(c0, "recusado", f"{conta} (menos de 90%)", iso, nao_lidos))
             rel["recusado"] = conta
     usina_do_almox = {str(a[0]): (_int_ou_none(a[3]), a[4]) for a in dim_almox}
     pecas = F.mesclar_pecas(banco[F.ABA_PECA], pecas_app, lig, usina_do_almox)
-    q = [F.linha_qualidade("ciclo_varredura", linhas_ciclo, F.CAB_CICLO, inicio or "", iso),
+    if not linhas_ciclo and not pecas:
+        # a revisão de 25/10/2026: sem ciclo e sem peça não há o que guardar; gravar criaria um livro vazio, e a trava
+        # do "livro existe e veio vazio" pararia o histórico para sempre
+        return dict(rel, pulou="nada a guardar: nenhum ciclo aplicável e nenhuma peça lançada")
+    q = [F.linha_qualidade("ciclo_varredura", linhas_ciclo, F.CAB_CICLO, inicio or "", iso,
+                           extra=extra if novo else None),
          F.linha_qualidade("peca_lancada", pecas, F.CAB_PECA, inicio or "", iso)]
     q.insert(0, q_saldo or F.linha_qualidade("saldo_almox", [], F.CAB_SALDO, "", iso))
     como_ler = ("o saldo de um dia: o último ciclo aplicado (situacao = aplicado, anulado = 0) que começou nele, no "
@@ -816,9 +850,12 @@ def ligar(app):
                 # não segura nada
                 try:
                     _LACO["almoxarifado"] = gerar_almoxarifado(app.config)
+                    # as contagens também (a revisão de 25/10/2026: o ensaio tem de medir antes de ligar a gravação)
                     log.info("almoxarifado: %s", {k: v for k, v in _LACO["almoxarifado"].items()
-                                                  if k in ("pulou", "ensaio", "nao_grava", "gravado", "erro",
-                                                           "recusado", "incoerente")})
+                                                  if k in ("pulou", "ensaio", "nao_grava", "nao_aplica", "gravado",
+                                                           "erro", "recusado", "incoerente", "ciclo", "saldo_linhas",
+                                                           "saldo_repetidos", "almoxarifados", "sem_usina",
+                                                           "pct_usina", "nao_lidos", "queda_itens", "pecas")})
                 except Exception as e:      # noqa: BLE001
                     _LACO["almoxarifado"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
                     log.exception("almoxarifado")

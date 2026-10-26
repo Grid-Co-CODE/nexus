@@ -22,7 +22,9 @@ LIVRO_SALDO, ABA_SALDO = "almoxarifado_saldo_app_campo", "Saldo"
 LIVRO_PECAS, ABA_PECAS = "almoxarifado_pecas_app_campo", "Peças"
 
 # O contrato com o App, na ordem; coluna nova só no FIM, dos dois lados (o teste do pacote do App compara com estas)
-COLUNAS_CICLO = ("Início do ciclo", "Fim do ciclo", "Itens na lista do Fracttal", "Itens lidos", "Erros", "Origem")
+COLUNAS_CICLO = ("Início do ciclo", "Fim do ciclo", "Itens na lista do Fracttal", "Itens lidos", "Erros", "Origem",
+                 # a revisão de 25/10/2026: quantas linhas o Saldo tem, para conferir que ele chegou inteiro
+                 "Linhas de saldo")
 COLUNAS_ITENS = ("ID do item", "Código", "Nome", "Unidade", "Família", "Avariado", "Ferramenta", "Início do ciclo",
                  "Lido")
 COLUNAS_SALDO = ("ID do item", "Código", "ID do almoxarifado", "Almoxarifado", "Local do almoxarifado", "Saldo",
@@ -68,9 +70,11 @@ def chave_do_local(caminho) -> str | None:
 
 def situacao(saldo, minimo) -> str:
     """A situação de uma peça num almoxarifado. "No limite" separado de "abaixo": o Fracttal costuma ter o mínimo igual
-    ao saldo (25/10: 0 abaixo e 54 no limite), e misturar os dois daria um alarme falso por peça."""
+    ao saldo (25/10: 0 abaixo e 54 no limite), e misturar os dois daria um alarme falso por peça. Saldo vazio é "não
+    informado" (o Fracttal não deu o número), nunca 0: virava "abaixo, falta 2" na Reposição (a revisão de 25/10)."""
     s, m = numero(saldo), numero(minimo)
-    s = s or 0.0
+    if s is None:
+        return "nao_informado"
     if m and m > 0:
         return "abaixo" if s < m else "no_limite" if s == m else "ok"
     return "zerada" if s == 0 else "sem_minimo"
@@ -80,6 +84,24 @@ def completo(ciclo: dict) -> bool:
     """O ciclo leu ao menos `COMPLETUDE_MIN` dos itens que estavam na lista do Fracttal."""
     total, lidos = numero((ciclo or {}).get("Itens na lista do Fracttal")), numero((ciclo or {}).get("Itens lidos"))
     return bool(total and total > 0 and lidos is not None and lidos / total >= COMPLETUDE_MIN)
+
+
+def conferir_ciclo(ciclo: list[dict], itens: list[dict], saldo: list[dict]) -> str:
+    """Vazio se os três livros do ciclo chegaram INTEIROS; senão, o porquê. O Itens tem uma linha por item da lista, os
+    lidos batem com o ciclo e o Saldo tem as linhas que o ciclo diz (a revisão de 25/10/2026: o Nexus lendo no meio da
+    publicação, ou o App subindo pela metade, aplicava uma foto parcial como completa, e a inteira não entrava mais).
+    É passageiro: quem chama não aplica nesta hora e tenta na seguinte. A completude de 90% é outra conta (`completo`)."""
+    c = (ciclo or [{}])[0]
+    total, lidos, linhas = numero(c.get("Itens na lista do Fracttal")), numero(c.get("Itens lidos")), numero(
+        c.get("Linhas de saldo"))
+    if total is not None and len(itens) != int(total):
+        return f"o livro de itens tem {len(itens)} de {int(total)} itens: livros do App incompletos"
+    sim = sum(1 for i in itens if _txt(i.get("Lido")).lower() == "sim")
+    if lidos is not None and sim != int(lidos):
+        return f"o livro de itens tem {sim} itens lidos e o ciclo diz {int(lidos)}: livros do App incompletos"
+    if linhas is not None and len(saldo) != int(linhas):
+        return f"o livro de saldo tem {len(saldo)} de {int(linhas)} linhas: livros do App incompletos"
+    return ""
 
 
 def ciclo_comum(ciclo: list[dict], itens: list[dict], saldo: list[dict]) -> str | None:
